@@ -2,7 +2,6 @@ package store_test
 
 import (
 	"context"
-	"fmt"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -237,7 +236,7 @@ func TestFactSetsDifferentAssemblyInputs(t *testing.T) {
 	k := analyze.AssemblyKey(m, []string{filepath.Join(dir, "Code")}, nil)
 	k2 := analyze.AssemblyKey(m, []string{filepath.Join(dir, "Code")}, []string{"*.dll"})
 	if k == k2 {
-		t.Fatal(fmt.Sprintf("skip policy omitted from DLL key: %s", k))
+		t.Fatalf("skip policy omitted from DLL key: %s", k)
 	}
 }
 

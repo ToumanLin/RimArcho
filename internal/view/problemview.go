@@ -95,14 +95,16 @@ func parentNeed(st *app.LoadoutState, qs []*app.Problem, p *app.Problem) Need {
 }
 
 func BuildProblemPanel(a *app.App, ps *app.ProblemSet, ref string) (*ProblemPanel, error) {
-	return buildProblemPanel(nil, a, ps, ref)
+	return buildProblemPanel(context.Background(), false, a, ps, ref)
 }
 
 // BuildProblemPanelContext also searches installed providers on the caller's request.
 func BuildProblemPanelContext(ctx context.Context, a *app.App, ps *app.ProblemSet, ref string) (*ProblemPanel, error) {
-	return buildProblemPanel(ctx, a, ps, ref)
+	return buildProblemPanel(ctx, true, a, ps, ref)
 }
-func buildProblemPanel(ctx context.Context, a *app.App, ps *app.ProblemSet, ref string) (*ProblemPanel, error) {
+
+// search asks for installed providers beyond the cache.
+func buildProblemPanel(ctx context.Context, search bool, a *app.App, ps *app.ProblemSet, ref string) (*ProblemPanel, error) {
 	var p *app.Problem
 	for _, q := range ps.All() {
 		if q.Ref == ref {
@@ -118,7 +120,7 @@ func buildProblemPanel(ctx context.Context, a *app.App, ps *app.ProblemSet, ref 
 	if p.Code == "def.parent-missing" {
 		var h *app.ParentHelp
 		var err error
-		if ctx == nil {
+		if !search {
 			h, err = a.ParentHelp(ps, p)
 		} else {
 			h, err = a.FindParentHelp(ctx, ps, p)
@@ -135,12 +137,12 @@ func buildProblemPanel(ctx context.Context, a *app.App, ps *app.ProblemSet, ref 
 		case !unresolved: // the enable buttons say what to do
 		case h.SearchIncomplete:
 			panel.Notes = append(panel.Notes, T("not every installed mod could be checked"))
-		case ctx != nil && !h.CacheIncomplete:
+		case search && !h.CacheIncomplete:
 			panel.Notes = append(panel.Notes, T("no installed mod supplies this base content, enabled or not"))
 		default:
 			panel.Notes = append(panel.Notes, T(parentNext))
 		}
-		panel.Searching = ctx == nil && unresolved
+		panel.Searching = !search && unresolved
 		for _, q := range h.Problems {
 			if part, ok := app.MissingParent(q); ok {
 				panel.Affected = append(panel.Affected, parentPart(part))

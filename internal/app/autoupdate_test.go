@@ -119,7 +119,7 @@ func TestAutomaticCommunityDataConditionalChecksAndFailure(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
 		if fail {
-			http.Error(w, "offline", 503)
+			http.Error(w, "offline", http.StatusServiceUnavailable)
 			return
 		}
 		if conditional {
@@ -196,7 +196,7 @@ func TestAutomaticSteamCMDModsCheckOnlyAndKeepsPendingOffline(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
 		if fail {
-			http.Error(w, "offline", 503)
+			http.Error(w, "offline", http.StatusServiceUnavailable)
 			return
 		}
 		fmt.Fprintf(w, `{"response":{"publishedfiledetails":[{"publishedfileid":"1002","result":1,"time_updated":%d}]}}`, e.Now().Add(time.Hour).Unix())
@@ -245,7 +245,7 @@ func TestAutomaticToolVersionsAndOfflineRetention(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
 		if failed {
-			http.Error(w, "offline", 503)
+			http.Error(w, "offline", http.StatusServiceUnavailable)
 			return
 		}
 		switch r.URL.Path {

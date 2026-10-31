@@ -80,7 +80,7 @@ func TestContentKindsCacheFollowsReusedIDs(t *testing.T) {
 		return got["i"]
 	}
 	put(1, "Assemblies/a.dll")
-	if kinds() != HasDLL || kinds() != HasDLL {
+	if first, again := kinds(), kinds(); first != HasDLL || again != HasDLL {
 		t.Fatal("first read")
 	}
 	put(2, "Languages/English/k.xml")
