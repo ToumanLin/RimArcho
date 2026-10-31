@@ -4,6 +4,20 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- MCP: what an agent reads when it connects is about a fifth of what it was. The server
+  instructions and the tool descriptions went from 53,325 to 10,420 characters (8,816 +
+  44,509 → 1,589 + 8,831; roughly 13k → 2.6k tokens), and the whole `tools/list` answer
+  with parameter schemas from 81 KB to 44 KB. Each description now says in one to three
+  sentences what the tool does, when to use it or another tool, and whether to dry-run and
+  ask the player first. The detail moved to a new read-only tool `guide`
+  (`archo guide [<topic>]` on the command line, same text): `topic=diagnose` is the
+  error-diagnosis workflow that used to be in the instructions, `errors` the checklist of
+  error kinds, `plans`, `words` (what the interface calls things), and `topic=<tool name>`
+  a tool's full reference with an example call; no topic lists them, an unknown one is
+  an error. No tool or parameter was renamed or removed (`add_rule` and `copy_local` stay
+  as aliases); the `env` parameter's help is shorter. A test caps these sizes so they do
+  not creep back up.
+
 - Importing a Steam collection, a list of workshop links or a list of workshop IDs no
   longer leaves Core and the DLCs out. A list like that cannot name official content, so
   the import keeps the Core and DLCs the current plan has enabled, first in the list

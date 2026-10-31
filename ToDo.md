@@ -48,9 +48,6 @@ TUI的界面应该更新和GUI尽量一致
 docs应该做成英语, 项目中除了本地化和词表外不留中文;
 需做中文ReadMe
 
-## MCP
-精简MCP指令, 做到渐进式披露
-
 ## Github static check doesn't pass
 56s
 Run go run honnef.co/go/tools/cmd/staticcheck@2026.2.2 ./...
