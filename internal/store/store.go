@@ -14,7 +14,7 @@ import (
 )
 
 // SchemaVersion is bumped with every migration.
-const SchemaVersion = 27
+const SchemaVersion = 28
 
 const schemaV1 = `
 CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -371,20 +371,52 @@ type Store struct {
 	// MM is the game major.minor whose analysis facts the fact queries read (the app sets
 	// it from the Loadout it works on).
 	MM string
+
+	setFiles *setFileCache // fact sets' file lists (setfiles.go); nil: read every time
 }
 
 // Open opens (creating if needed) the database at path and applies migrations.
 func Open(path string) (*Store, error) {
-	return open(path, true)
+	return open(path, true, nil)
+}
+
+// UpgradeProgress is what OpenUpgrading reports while it upgrades an existing database
+// from schema From to To (02 §7): Done of Total rows of the slow steps (v28), both 0 while
+// the count is not known.
+type UpgradeProgress struct {
+	From, To    int
+	Done, Total int64
+}
+
+// OpenUpgrading is Open that calls progress, on the opening goroutine, while it upgrades an
+// existing database. A database that is new or already current makes no call.
+func OpenUpgrading(path string, progress func(UpgradeProgress)) (*Store, error) {
+	return open(path, true, progress)
 }
 
 // OpenSession connects to a database already initialised by Open. Page/worker
 // sessions do not run migrations or negotiate the journal mode while a writer runs.
 func OpenSession(path string) (*Store, error) {
-	return open(path, false)
+	return open(path, false, nil)
 }
 
-func open(path string, initialise bool) (*Store, error) {
+// PeekMeta reads one meta value without upgrading or writing anything ("" when there is no
+// database or no value). An upgrade on another connection does not block it (WAL).
+func PeekMeta(path, key string) string {
+	if _, err := os.Stat(path); err != nil {
+		return ""
+	}
+	db, err := sql.Open("sqlite", "file:"+filepath.ToSlash(path)+"?mode=ro&_pragma=busy_timeout(1000)")
+	if err != nil {
+		return ""
+	}
+	defer db.Close()
+	var v string
+	db.QueryRow(`SELECT value FROM meta WHERE key=?`, key).Scan(&v)
+	return v
+}
+
+func open(path string, initialise bool, progress func(UpgradeProgress)) (*Store, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return nil, err
 	}
@@ -405,9 +437,9 @@ func open(path string, initialise bool) (*Store, error) {
 			}
 		}
 	}
-	s := &Store{DB: db, Path: path}
+	s := &Store{DB: db, Path: path, setFiles: &setFileCache{}}
 	if initialise {
-		if err := s.migrate(); err != nil {
+		if err := s.migrate(progress); err != nil {
 			db.Close()
 			return nil, err
 		}
@@ -421,16 +453,28 @@ func open(path string, initialise bool) (*Store, error) {
 	return s, nil
 }
 
-func (s *Store) Close() error { return s.DB.Close() }
+func (s *Store) Close() error {
+	if s.setFiles != nil {
+		s.setFiles.close()
+	}
+	return s.DB.Close()
+}
 
-func (s *Store) migrate() error {
+func (s *Store) migrate(progress func(UpgradeProgress)) error {
 	var n int
 	if err := s.DB.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name='meta'`).Scan(&n); err != nil {
 		return err
 	}
-	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4, schemaV5, schemaV6, schemaV7, schemaV8, schemaV9, schemaV10, schemaV11, schemaV12, schemaV13, schemaV14, schemaV15, schemaV16, schemaV17, schemaV18, schemaV19, schemaV20, schemaV21, schemaV22, schemaV23, schemaV24, schemaV25, schemaV26, schemaV27}
+	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4, schemaV5, schemaV6, schemaV7, schemaV8, schemaV9, schemaV10, schemaV11, schemaV12, schemaV13, schemaV14, schemaV15, schemaV16, schemaV17, schemaV18, schemaV19, schemaV20, schemaV21, schemaV22, schemaV23, schemaV24, schemaV25, schemaV26, schemaV27, schemaV28}
+	from := 0
+	report := func(done, total int64) {
+		if progress != nil {
+			progress(UpgradeProgress{From: from, To: SchemaVersion, Done: done, Total: total})
+		}
+	}
 	// post runs after a step's SQL, in the same transaction.
-	post := map[int]func(*sql.Tx) error{11: migrateV11, 14: migrateV14, 19: migrateV19, 22: migrateV22, 24: migrateV24, 25: migrateV25, 26: migrateV26, 27: migrateV27}
+	post := map[int]func(*sql.Tx) error{11: migrateV11, 14: migrateV14, 19: migrateV19, 22: migrateV22, 24: migrateV24, 25: migrateV25, 26: migrateV26, 27: migrateV27,
+		28: func(tx *sql.Tx) error { return migrateV28(tx, report) }}
 	if n == 0 {
 		tx, err := s.DB.Begin()
 		if err != nil {
@@ -440,9 +484,12 @@ func (s *Store) migrate() error {
 			tx.Rollback()
 			return fmt.Errorf("store: create schema: %w", err)
 		}
-		if err := migrateV26(tx); err != nil {
-			tx.Rollback()
-			return err
+		// Steps whose SQL leaves old tables for their post step to convert and drop.
+		for _, f := range []func(*sql.Tx) error{migrateV26, func(tx *sql.Tx) error { return migrateV28(tx, nil) }} {
+			if err := f(tx); err != nil {
+				tx.Rollback()
+				return err
+			}
 		}
 		if _, err := tx.Exec(`INSERT INTO meta(key, value) VALUES('schema_version', ?)`, fmt.Sprint(SchemaVersion)); err != nil {
 			tx.Rollback()
@@ -453,6 +500,9 @@ func (s *Store) migrate() error {
 	v, _ := strconv.Atoi(s.Meta("schema_version"))
 	if v < 1 || v > SchemaVersion {
 		return fmt.Errorf("store: unsupported schema version %d (want %d)", v, SchemaVersion)
+	}
+	if from = v; v < SchemaVersion {
+		report(0, 0)
 	}
 	for ; v < SchemaVersion; v++ {
 		tx, err := s.DB.Begin()
