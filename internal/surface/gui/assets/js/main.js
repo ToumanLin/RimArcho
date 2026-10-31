@@ -804,13 +804,12 @@ async function refreshEnvironment() {
 }
 
 function commandLine() {
-  pop.ask(T("run an archo command"), "list --filter tag:ui", async (line) => {
-    const out = await api.RunCLI(line);
-    if (out.length === 1 && out[0] === T("uninstalling…")) { await uninst.restore(); return; }
-    if (uninst.locked()) return;
-    pop.text("archo " + line, out);
-    reload();
-  });
+  pop.palette();
+}
+
+async function commandDone() {
+  // Commands can change the current game, open list, language or theme.
+  await relang();
 }
 
 async function paletteChoice(o) {
@@ -1013,6 +1012,10 @@ function onKey(e) {
     e.preventDefault();
     return;
   }
+  const typing = document.activeElement?.matches("input,textarea,select,[contenteditable=true]");
+  if (!e.altKey && ((e.ctrlKey || e.metaKey) && !e.shiftKey && k.toLowerCase() === "k" || k === ":" && !e.ctrlKey && !e.metaKey && !typing && !S.popup)) {
+    e.preventDefault(); pop.palette(); return;
+  }
   // a menu opened with the mouse does not hold the focus: esc still closes it first (G5)
   if (k === "Escape" && !$("#menu").hidden) { e.preventDefault(); pop.hideMenu(); return; }
   // ctrl+b moves the navigation between the side and the top, on every page (06 §2.1)
@@ -1199,7 +1202,7 @@ async function loadWidths() {
 
 const ui = {
   reload, refreshEnvironment, relang, reaccent, render, pageEntering, pageEntered, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go, useEnv,
-  palette: paletteChoice, selectionItems: selection, planMenu: (id, x, y) => plans.menuAt(id, x, y),
+  palette: paletteChoice, commandDone, uninstallStarted: () => uninst.restore(), selectionItems: selection, planMenu: (id, x, y) => plans.menuAt(id, x, y),
   menu: (x, y) => openRowMenu(x, y, false),
   detailFollow: (f) => detailFollow(f),
   newList: (from) => planManage.newList(from),

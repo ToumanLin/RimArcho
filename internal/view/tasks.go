@@ -147,6 +147,8 @@ type TaskItemRow struct {
 // TaskTitle names a kind.
 func TaskTitle(kind string) string {
 	switch kind {
+	case "command":
+		return T("archo command")
 	case TaskAutomatic:
 		return T("automatic checks")
 	case OpSubRemoveFast:

@@ -33,6 +33,10 @@
 - `spikes/guidev`：开发用，在 127.0.0.1 上用同一个 API 驱动页面，便于在浏览器里调试（`-assets <目录>` 直接读磁盘上的页面文件，改了刷新就能看到）；不进发布包。
 - `/dev/pagecheck` 用模拟 API 检查各页的立即反馈、晚到结果与错误、重入和失败重试，也覆盖大日志的可变行高与键盘定位；使用真实前端模块，不连接产品数据库。
 
+**Windows 窗口**：主窗口使用无边框和 WebView2 composition hosting，保留 Wails 默认的窗口装饰和缩放能力。`window-chrome.js` 提供最小化、最大化 / 还原、关闭；浏览器调试页和其他平台保留各自原有的窗口形态，不显示这些按钮。导航最上方一行的空白可拖动、双击最大化 / 还原，按钮、链接、输入控件和分隔拖柄不拖窗口。最大化按钮使用 Wails 的原生命中区域以支持 Win11 Snap Layouts；边缘缩放、Aero Snap、最大化的屏幕工作区、阴影和圆角由 Wails / Windows 负责，须在 VM 验证。关闭必须调用 `Window.Close()`，触发可取消的 `WindowClosing`，与 Alt+F4 和任务栏关闭共用关闭拦截；不调用应用退出接口。按钮随页面深浅色变化。位置见 §2.2。
+
+窗口控件初始化允许 Wails 的系统信息晚于页面到达；异步确认 Windows 后补齐按钮，保持当时的导航位置，不等待它再显示首屏。
+
 ### 8.3 安全
 
 - 页面的 Content-Security-Policy：`default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'`。`script-src 'self'` 下 Wails 运行时正常工作，不需要 `unsafe-eval`。
@@ -42,6 +46,8 @@
 - 设置页只运行 `view.SettingCommand` 允许的命令（§2.14）。
 
 ### 8.4 长任务
+
+- 统一命令面板的 `RunCLI` 立即返回任务状态，通过 `CommandStatus` 读最近结果；`command.go` 的 worker 持有独立 App 会话，窗口关闭时取消并等待释放。普通命令用 `cmds.Check` / `ExecuteContext`，扫描和分析通过 `ChildCommandContext` 启动无控制台子进程，保留原文与退出码；参数直接传入，不经过 shell。补全、历史与解析共用 `internal/cmdline`（§3.5）。
 
 - 扫描和分析在子进程中运行（`archo scan`、`archo analyze`，`app.ChildScan` / `ChildAnalyze`，子进程带 `CREATE_NO_WINDOW`）。进度通过事件推到状态行，界面不阻塞。TUI 同样如此（`:` 里输入 `scan` 也交给子进程）。
 - 启动时：有索引就立即显示列表，然后在后台增量扫描；从没扫描过时自动开始扫描。

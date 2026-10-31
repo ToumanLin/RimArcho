@@ -56,9 +56,9 @@ func testUninstallCloseGuard(t *testing.T, commandLine bool) {
 	quit := make(chan struct{}, 1)
 	s.quit = func() { quit <- struct{}{} }
 	if commandLine {
-		out := s.RunCLI("archo uninstall --yes")
-		if len(out) != 1 || out[0] != view.T("uninstalling…") {
-			t.Fatalf("execution did not enter guarded worker: %v", out)
+		out, err := s.RunCLI("archo uninstall --yes")
+		if err != nil || !out.Uninstall {
+			t.Fatalf("execution did not enter guarded worker: %+v, %v", out, err)
 		}
 	} else if err := s.UninstallRun(view.UninstallChoice{}); err != nil {
 		t.Fatal(err)

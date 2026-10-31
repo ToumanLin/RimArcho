@@ -4,6 +4,7 @@ import { closeChoiceMenu } from "./choices.js";
 // line, closes with esc, and never nests: opening one closes the other.
 import { pathContent, copyablePath } from "./fields.js";
 import { S, $, el, esc, api, T, Tf, errText, say } from "./state.js";
+import { buildCommandPanel } from "./command-panel.js";
 
 let ui = null;
 export function initPopups(u) { ui = u; }
@@ -12,6 +13,7 @@ export function open(kind, title, build) {
   closeChoiceMenu();
   close();
   const box = $("#popup");
+  box.classList.remove("command-dock");
   box.innerHTML = "";
   const pop = el("div", "pop");
   box.append(pop);
@@ -28,6 +30,7 @@ export function close() {
   S.popup = null;
   const box = $("#popup");
   box.hidden = true;
+  box.classList.remove("command-dock");
   box.innerHTML = "";
   ui.renderWhere();
   ui.renderHeads();
@@ -89,18 +92,11 @@ function inputLine(pop, prompt, placeholder) {
 
 // ---- the command palette (06 §3.5) ----
 export function palette() {
+  if (S.popup?.kind === "palette") { close(); return; }
+  hideMenu();
   open("palette", T("command palette"), (pop, p) => {
-    const inp = inputLine(pop, "❯", T("a command, a mod, a game"));
-    const run = (o) => { close(); ui.palette(o); };
-    optionList(pop, p, [], (d, o) => {
-      d.append(el("span", "", o.name));
-      if (o.kind === 0 && o.alias !== o.name) d.append(el("span", "dim", o.alias));
-      d.append(el("span", "d", o.kind === 0 ? o.desc.split(" ")[0] : o.kind === 2 ? T("game") : o.kind === 3 ? T("list") : o.desc));
-    }, run, inp);
-    const refresh = async () => p.redraw(await api.Palette(inp.value));
-    inp.addEventListener("input", refresh);
-    inp.addEventListener("keydown", (e) => { if (e.ctrlKey && e.key === "u") { inp.value = ""; refresh(); e.preventDefault(); } });
-    refresh();
+    $("#popup").classList.add("command-dock");
+    buildCommandPanel(pop, p, { close, pick: ui.palette, reload: ui.commandDone || ui.reload, uninstall: ui.uninstallStarted });
   });
 }
 

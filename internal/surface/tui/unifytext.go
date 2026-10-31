@@ -19,7 +19,6 @@ func init() {
 		"sort by":                                      "排序",
 		"again reverses":                               "再选一次反过来",
 		"open / close":                                 "展开 / 收起",
-		"complete":                                     "补全",
 		"drops the last filter":                        "去掉最后一个条件",
 		"group":                                        "分组",
 		"value":                                        "值",

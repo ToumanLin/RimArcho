@@ -67,8 +67,11 @@ func Run(o Options) error {
 	api.x.native = wailsNative{w}
 	api.quit = w.Quit
 	frame := newWindowTheme(cmds.Setting(a, "ui.theme"))
+	// Composition hosting lets Windows hit-test our maximize button for Snap Layouts.
+	frame.options.WebView2CompositionHosting = true
 	win := w.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title: "RimArcho", Width: 1440, Height: 880, MinWidth: 720, MinHeight: 480, URL: perfURL(),
+		Frameless:                  runtime.GOOS == "windows",
 		BackgroundColour:           frame.background,
 		Windows:                    frame.options,
 		DefaultContextMenuDisabled: true, // the page draws its own (06 §8.5)

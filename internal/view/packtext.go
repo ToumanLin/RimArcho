@@ -82,7 +82,7 @@ func init() {
 		"export only its list, each mod with its version": "只导出它的列表，每个 Mod 带版本",
 		"%s is a list without files, not a pack":          "%s 只是列表，不含文件，不是整合包",
 		"no file dialog here; use the desktop window":     "这里没有文件对话框，请使用桌面窗口",
-		"next pack":                                       "下一个包",
-		"first pack":                                      "第一个包",
+		"next pack":  "下一个包",
+		"first pack": "第一个包",
 	})
 }
