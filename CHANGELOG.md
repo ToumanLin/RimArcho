@@ -19,9 +19,10 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
   RimArcho's version, the game version and Windows always go with a report. The enabled
   mods, the paths (your user folder shown as `%USERPROFILE%`) and the newest game log's
-  errors go only when ticked, and the page shows the whole text first. In the TUI the same
-  panel ticks the attachments with `m` `p` `l`, sends with `s` (title, text and contact on
-  the input line) and opens GitHub with `enter`.
+  errors go only when ticked. The preview shows the report as it reads (title, text, basic
+  info, each attachment folded under its heading), not the Markdown that is sent or copied.
+  In the TUI the same panel ticks the attachments with `m` `p` `l`, sends with `s` (title,
+  text and contact on the input line) and opens GitHub with `enter`.
 - Settings are reordered, most used first, in the window and the TUI alike: 界面
   (language, day/night, accent colour, Workshop descriptions and images, GPU, start page
   background), 账户, 更新 (RimArcho's own version and update first, then the automatic

@@ -38,8 +38,14 @@ func TestFeedbackPanel(t *testing.T) {
 	}
 	m.panelKey("m")
 	text = strings.Join(m.panel.lines, "\n")
-	if !strings.Contains(text, "[x] m enabled mods") || !strings.Contains(text, "tester.a  1001") {
+	if !strings.Contains(text, "[x] m enabled mods") || !strings.Contains(text, "\n  2. Alpha  tester.a  1001\n") {
 		t.Fatalf("m ticks the mods:\n%s", text)
+	}
+	// the preview is plain text; the Markdown goes only into the link
+	for _, mark := range []string{"<details>", "<summary>", "```", "---"} {
+		if strings.Contains(text, mark) {
+			t.Fatalf("the preview shows %q:\n%s", mark, text)
+		}
 	}
 	m.panelKey("enter")
 	u, err := url.Parse(opened)

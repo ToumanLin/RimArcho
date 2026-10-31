@@ -56,7 +56,8 @@ func (m *model) feedbackPanel(o view.FeedbackOptions) tea.Cmd {
 		}
 		fmt.Fprintf(&b, "%s %s %s  %s\n", mark, key[p.Key], p.Label, note)
 	}
-	b.WriteString("\n" + T("preview") + "  " + T("public on GitHub") + "\n\n" + res.Body + "\n")
+	// what the player reads; the Markdown sent or copied stays out of sight (res.Body)
+	b.WriteString("\n" + T("preview") + "  " + T("public on GitHub") + "\n\n" + view.FeedbackPreview("", at) + "\n")
 	if at.Send {
 		b.WriteString(T("s: send it here, no GitHub account needed") + "\n")
 	}

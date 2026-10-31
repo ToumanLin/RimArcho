@@ -9,8 +9,9 @@ import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { page, button, area, beginPageRead } from "./screens.js";
 
 // The draft stays for the session: leaving the page does not lose what was typed (06 §3.1).
-// sent: the issue 发送 opened last, shown until the next draft.
-const F = { title: "", text: "", contact: "", opts: { mods: false, paths: false, log: false }, at: null, res: null, sent: null, sending: false };
+// sent: the issue 发送 opened last, shown until the next draft. open: the preview's
+// attachments unfolded by the player (by key), kept while typing.
+const F = { title: "", text: "", contact: "", opts: { mods: false, paths: false, log: false }, at: null, res: null, sent: null, sending: false, open: new Set() };
 let seq = 0, typing = 0, retry = 0;
 
 export async function open() {
@@ -84,7 +85,7 @@ function draw() {
   const lab3 = el("div", "label section", T("preview"));
   lab3.append(el("span", "fb-public", T("public on GitHub")));
   const prev = el("section", "card settings");
-  prev.append(el("pre", "fb-prev"));
+  prev.append(el("div", "fb-prev"));
   w.append(lab3, prev);
   area(prev, lab3);
 
@@ -117,7 +118,26 @@ function partRow(p) {
   return row;
 }
 
-// refresh shows the newest body, notes and link without touching what is being typed.
+// preview is the report as the player reads it: the title, what happened, the basic lines,
+// then each attachment folded under its heading. No Markdown or HTML here; that is only in
+// the body sent and in 复制全文 (F.res.body). The TUI shows view.FeedbackPreview.
+function preview(box) {
+  box.innerHTML = "";
+  if (F.title.trim()) box.append(el("div", "fb-p-title", F.title.trim()));
+  if (F.text.trim()) box.append(el("div", "fb-p-text", F.text.trim()));
+  const basic = el("div", "fb-p-part");
+  basic.append(el("div", "fb-p-head", T("basic information")), el("div", "fb-p-lines", (F.at?.basic || []).join("\n")));
+  box.append(basic);
+  for (const s of F.at?.sections || []) {
+    const d = el("details", "fb-p-part");
+    d.open = F.open.has(s.key);
+    d.ontoggle = () => { if (d.open) F.open.add(s.key); else F.open.delete(s.key); };
+    d.append(el("summary", "fb-p-head", s.heading), el("div", "fb-p-lines", s.lines.join("\n")));
+    box.append(d);
+  }
+}
+
+// refresh shows the newest preview, notes and link without touching what is being typed.
 function refresh() {
   const sc = $("#screen");
   const pre = sc.querySelector(".fb-prev"), foot = sc.querySelector(".fb-foot");
@@ -126,7 +146,7 @@ function refresh() {
     const n = sc.querySelector(`[data-part="${p.key}"] .setting-note`);
     if (n) n.textContent = p.key === "log" && F.opts.log && F.at.pending ? T("the game log is still being analysed…") : p.note;
   }
-  pre.textContent = F.res.body;
+  preview(pre);
   foot.innerHTML = "";
   const copyBtn = button(T("copy the text"), "", () => copy(F.res.body, copyBtn));
   const gh = button(F.res.full ? T("open GitHub") : T("copy and open GitHub"), "", openIssue, F.at?.send ? "" : "primary");

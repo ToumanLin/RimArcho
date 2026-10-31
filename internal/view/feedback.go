@@ -67,12 +67,12 @@ func FeedbackAttachments(a *app.App, st *app.LoadoutState, o FeedbackOptions) *F
 	if loaded && st.Plan != nil {
 		mods.Note, mods.None = Tf("list “%s”, %d mods", st.Plan.Name, len(st.List)), false
 		if o.Mods {
-			out.Sections = append(out.Sections, feedback.Section{Heading: Tf("enabled mods (list “%s”, %d)", st.Plan.Name, len(st.List)), Lines: feedbackMods(st)})
+			out.Sections = append(out.Sections, feedback.Section{Key: "mods", Heading: Tf("enabled mods (list “%s”, %d)", st.Plan.Name, len(st.List)), Lines: feedbackMods(st)})
 		}
 	}
 	paths := FeedbackPart{Key: "paths", Label: T("paths"), Note: T("the game, its data, the mod folders and RimArcho's data; your user name becomes %USERPROFILE%")}
 	if o.Paths {
-		out.Sections = append(out.Sections, feedback.Section{Heading: T("paths"), Lines: scrub(feedbackPaths(a, st))})
+		out.Sections = append(out.Sections, feedback.Section{Key: "paths", Heading: T("paths"), Lines: scrub(feedbackPaths(a, st))})
 	}
 	logPart := FeedbackPart{Key: "log", Label: T("game log"), Note: T("no game log yet"), None: true}
 	if loaded {
@@ -82,7 +82,7 @@ func FeedbackAttachments(a *app.App, st *app.LoadoutState, o FeedbackOptions) *F
 				lines, pending := feedbackLog(a, st)
 				out.Pending = pending
 				if !pending {
-					out.Sections = append(out.Sections, feedback.Section{Heading: Tf("game log errors (Player.log of %s)", files[0].When), Lines: scrub(lines)})
+					out.Sections = append(out.Sections, feedback.Section{Key: "log", Heading: Tf("game log errors (Player.log of %s)", files[0].When), Lines: scrub(lines)})
 				}
 			}
 		}
@@ -169,6 +169,30 @@ func ComposeFeedback(title, text string, at *FeedbackAttach) feedback.Result {
 		d.Basic, d.Sections = at.Basic, at.Sections
 	}
 	return feedback.Compose(d)
+}
+
+// FeedbackPreview is the report as the player reads it (the TUI's panel; the window builds
+// the same from FeedbackAttach): what happened, then the basic lines and each attachment
+// under its heading, indented. No Markdown or HTML: that is only in the body sent.
+func FeedbackPreview(text string, at *FeedbackAttach) string {
+	var parts []string
+	if t := strings.TrimSpace(text); t != "" {
+		parts = append(parts, t)
+	}
+	part := func(heading string, lines []string) {
+		p := heading
+		for _, l := range lines {
+			p += "\n  " + l
+		}
+		parts = append(parts, p)
+	}
+	if at != nil {
+		part(T("basic information"), at.Basic)
+		for _, s := range at.Sections {
+			part(s.Heading, s.Lines)
+		}
+	}
+	return strings.Join(parts, "\n\n") + "\n"
 }
 
 // SendFeedback files the report through the feedback relay: the title (or the first line of

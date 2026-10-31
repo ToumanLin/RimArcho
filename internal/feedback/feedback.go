@@ -25,6 +25,8 @@ const MaxURL = 2000
 
 // Section is one attachment: a heading and its lines, shown folded on GitHub.
 type Section struct {
+	// Key names the attachment (mods, paths, log), so a preview can keep its fold open.
+	Key     string   `json:"key,omitempty"`
 	Heading string   `json:"heading"`
 	Lines   []string `json:"lines"`
 }
