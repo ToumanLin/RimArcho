@@ -264,7 +264,11 @@ func ikStoreList(tx *sql.Tx, dedup bool, snap int64, ns []ikRow, st *ikBlobStats
 }
 
 func ikConvertBlob(t *testing.T, tx *sql.Tx, l ikLayout) ikBlobStats {
-	ikExec(t, tx, `ALTER TABLE snapshot ADD COLUMN kinds INTEGER NOT NULL DEFAULT 0`, `ALTER TABLE snapshot ADD COLUMN langs TEXT NOT NULL DEFAULT ''`)
+	var has int // schema v27 has the columns already
+	tx.QueryRow(`SELECT count(*) FROM pragma_table_info('snapshot') WHERE name='kinds'`).Scan(&has)
+	if has == 0 {
+		ikExec(t, tx, `ALTER TABLE snapshot ADD COLUMN kinds INTEGER NOT NULL DEFAULT 0`, `ALTER TABLE snapshot ADD COLUMN langs TEXT NOT NULL DEFAULT ''`)
+	}
 	if l.blob == 2 {
 		ikExec(t, tx, `CREATE TABLE file_blob(id INTEGER PRIMARY KEY, sum BLOB NOT NULL UNIQUE, n INTEGER NOT NULL, data BLOB NOT NULL)`,
 			`CREATE TABLE snapshot_list(snapshot_id INTEGER PRIMARY KEY, blob_id INTEGER NOT NULL REFERENCES file_blob(id))`)

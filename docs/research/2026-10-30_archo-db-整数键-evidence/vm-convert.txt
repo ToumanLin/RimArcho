@@ -1,0 +1,19 @@
+﻿=== RUN   TestIntKeyConvertFile
+    intkey_file_test.go:27: OPEN 3ms schema=27
+    intkey_file_test.go:87: SCOPE 1271 current snapshots
+    intkey_file_test.go:58: QUERY ContentKinds/old best of 5 206.78ms
+    intkey_file_test.go:58: QUERY ContentKinds/v27 best of 5 2.02ms
+    intkey_file_test.go:58: QUERY SnapshotsWithPNG/old best of 5 18.48ms
+    intkey_file_test.go:58: QUERY SnapshotsWithPNG/v27 best of 5 1.06ms
+    intkey_file_test.go:106: ROWS snapshot=1285 snapshot_file=239350 fact_set=1269 content_state=1269 def_fact=80355 type_fact=0 harmony_fact=0 assembly_fact=0 patch_fact=29
+    intkey_file_test.go:107: SHAPE rel_path=14.3MB blobbed rows=187775 (rel 12.1MB) def_fact.file=3.5MB
+    intkey_file_test.go:113: VACUUM before 348ms
+    intkey_research_test.go:749: SIZE v27 file=37.18MB live=37.18MB | def_fact=12.08 dll_facts=0.04 snapshot_file=20.58 file_blobs=0.00 paths=0.00 sets+state+keys=0.95 analysis=0.04 snapshot=2.25 other=1.24
+    intkey_research_test.go:754: SIZE v27 top: snapshot_file=20.58 def_fact=8.60 def_fact_lookup=2.51 snapshot=2.20 def_fact_set=0.85 content_state=0.41 instance=0.27 log_cache=0.22 fact_set=0.19 sqlite_autoindex_fact_set_1=0.19 def_fact_named=0.12 change_event=0.10 lineage=0.09 sqlite_autoindex_content_state_1=0.05
+    intkey_file_test.go:125: CONVERT decided convert=1.085s file_before_vacuum=38.8MB live_before_vacuum=20.9MB vacuum=176ms
+    intkey_file_test.go:126: BLOB lists=1285 raw=3.7MB zstd=1.4MB stored=1.4MB
+    intkey_research_test.go:749: SIZE decided file=19.64MB live=19.64MB | def_fact=8.57 dll_facts=0.04 snapshot_file=4.20 file_blobs=1.65 paths=0.00 sets+state+keys=1.64 analysis=0.04 snapshot=2.25 other=1.24
+    intkey_research_test.go:754: SIZE decided top: def_fact=5.09 snapshot_file=4.20 def_fact_lookup=2.51 snapshot=2.20 snapshot_list=1.65 fact_set=0.88 def_fact_set=0.85 content_state=0.41 instance=0.27 log_cache=0.22 sqlite_autoindex_fact_set_1=0.19 def_fact_named=0.12 change_event=0.10 lineage=0.09
+    intkey_file_test.go:145: CHECK lists decode to 187775 rows
+--- PASS: TestIntKeyConvertFile (2.99s)
+PASS
