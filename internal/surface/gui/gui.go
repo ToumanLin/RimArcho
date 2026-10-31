@@ -51,14 +51,16 @@ func Run(o Options) error {
 	iconDone()
 	debug.FreeOSMemory() // the drawing's buffers
 	w := application.New(application.Options{
-		Name:     "RimArcho",
-		Icon:     ico, // used when the exe has no icon resource (development builds, 06 §8.6)
-		Services: []application.Service{application.NewService(api)},
-		Assets:   application.AssetOptions{Handler: page},
+		Name:       "RimArcho",
+		Icon:       ico, // used when the exe has no icon resource (development builds, 06 §8.6)
+		Services:   []application.Service{application.NewService(api)},
+		Assets:     application.AssetOptions{Handler: page},
+		ShouldQuit: api.allowClose,
 		Windows: application.WindowsOptions{
 			// WebView2's profile lives in RimArcho's data directory, not %APPDATA%\RimArcho.exe.
 			WebviewUserDataPath:   filepath.Join(a.Home, "webview2"),
 			AdditionalBrowserArgs: BrowserArgs(cmds.Setting(a, "ui.gpu") != "off"),
+			WndProcInterceptor:    api.uninstallSessionEnd,
 		},
 	})
 	api.emit = func(name string, data any) { w.Event.Emit(name, data) }
@@ -71,6 +73,8 @@ func Run(o Options) error {
 		Windows:                    frame.options,
 		DefaultContextMenuDisabled: true, // the page draws its own (06 §8.5)
 	})
+	win.RegisterHook(events.Common.WindowClosing, api.guardWindowClose)
+	api.uninstall.shutdownBlock = uninstallShutdownBlock(win)
 	win.OnWindowEvent(events.Common.WindowShow, func(*application.WindowEvent) { perftrace.Mark("window-show") })
 	win.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) { perftrace.Mark("webview-runtime-ready") })
 	api.windowTheme = frame.bind(win)

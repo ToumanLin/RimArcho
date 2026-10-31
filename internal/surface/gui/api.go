@@ -114,6 +114,7 @@ type API struct {
 	ll            *subscribe.LoversLab
 	llFiles       map[string]loverDownload
 
+	uninstall      uninstallState
 	uninstallSizes app.UninstallSizeCache
 	uninstallRead  logReader
 
@@ -1589,8 +1590,6 @@ func (s *API) Palette(query string) []view.PalEntry {
 
 // RunCLI runs a line the player typed as an archo command (the palette's command line).
 func (s *API) RunCLI(line string) []string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	argv := splitArgs(line)
 	if len(argv) > 0 && argv[0] == "archo" {
 		argv = argv[1:]
@@ -1598,6 +1597,20 @@ func (s *API) RunCLI(line string) []string {
 	if len(argv) == 0 || argv[0] == "mcp" || argv[0] == "tui" || argv[0] == "gui" {
 		return []string{view.T("not a command here")}
 	}
+	if argv[0] == "uninstall" {
+		options, run, err := cmds.ParseUninstallRequest(argv)
+		if err != nil {
+			return []string{"error: " + err.Error()}
+		}
+		if run {
+			if err := s.startUninstall(options); err != nil {
+				return []string{"error: " + err.Error()}
+			}
+			return []string{view.T("uninstalling…")}
+		}
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	text, _ := cmds.Execute(s.a, argv)
 	s.board, s.needs = nil, nil
 	st := s.boardState()

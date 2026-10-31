@@ -229,13 +229,34 @@ func UninstallOutline(n *render.Node, p *app.UninstallPlan, all, done bool) {
 // ParseUninstall reads an `uninstall …` command line's answers (the TUI's typed
 // confirmation); --yes and --dry-run are ignored.
 func ParseUninstall(argv []string) (app.UninstallOptions, error) {
-	c, rest := lookup(argv)
-	if c == nil || c.Name != "uninstall" {
-		return app.UninstallOptions{}, &UsageError{Msg: "not an uninstall command"}
-	}
-	a, err := parse(c, rest)
+	a, err := uninstallArgs(argv)
 	if err != nil {
 		return app.UninstallOptions{}, err
 	}
 	return UninstallOptions(a), nil
+}
+
+// ParseUninstallRequest distinguishes execution from a preview for embedded command
+// lines. Executions must use the surface's guarded uninstall worker (06 §2.14).
+func ParseUninstallRequest(argv []string) (app.UninstallOptions, bool, error) {
+	a, err := uninstallArgs(argv)
+	if err != nil {
+		return app.UninstallOptions{}, false, err
+	}
+	if a.Bool("yes") && a.Bool("dry-run") {
+		return app.UninstallOptions{}, false, &UsageError{Msg: "--yes runs it, --dry-run shows it: pick one"}
+	}
+	return UninstallOptions(a), a.Bool("yes"), nil
+}
+
+func uninstallArgs(argv []string) (*Args, error) {
+	c, rest := lookup(argv)
+	if c == nil || c.Name != "uninstall" {
+		return nil, &UsageError{Msg: "not an uninstall command"}
+	}
+	a, err := parse(c, rest)
+	if err != nil {
+		return nil, err
+	}
+	return a, nil
 }
