@@ -32,7 +32,7 @@ func init() {
 		"none found in the Steam libraries":    "Steam 库里没有找到",
 		"choose…":                              "选择…",
 		"choose a folder":                      "选择文件夹",
-		"no folder dialog here; type the path": "这里不能打开文件夹对话框，请输入路径",
+		"no folder dialog here; use the desktop window": "这里不能打开文件夹对话框，请使用桌面窗口",
 		// the guide's first step
 		"a game you have":    "已有的游戏",
 		"download a version": "下载一个版本",

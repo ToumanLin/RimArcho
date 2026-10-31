@@ -4,7 +4,7 @@
 // esc leaves only the full detail, back to the plan. A page's actions sit in the top bar.
 import { choiceControl } from "./choices.js";
 import { linkRows } from "./linkrows.js";
-import { copyablePath, pathContent } from "./fields.js";
+import { copyablePath, editablePath, pathContent } from "./fields.js";
 import { factText, S, $, el, api, T, Tf, errText, say, cur, slideThumb } from "./state.js";
 import { icon, bowMark } from "./icons.js";
 import { statusIcon } from "./icons.js";
@@ -1482,7 +1482,8 @@ async function refreshSettingTasks(values = false) {
       if (!row) continue;
       const note = row.querySelector(".setting-note"), value = row.querySelector(".setting-value");
       if (note) { factText(note, { text: it.note || "", paths: it.notePaths }); note.hidden = !it.note; }
-      if (value) factText(value, { text: it.value || "", paths: it.valuePath ? [it.value] : [] });
+      if (value) factText(value, { text: it.value || "", paths: it.valuePath || it.edit === "url" ? [it.value] : [] });
+      settingPathPicker(row, it, settings);
       const valueNote = row.querySelector(".setting-value-note");
       if (valueNote) { valueNote.textContent = it.valueNote || ""; valueNote.hidden = !it.valueNote; }
       const folded = row.nextElementSibling?.classList.contains("setting-details") ? row.nextElementSibling : null;
@@ -1521,59 +1522,51 @@ export async function checkDirectories() {
   for (const d of missing) {
     const row = el("div", "set");
     const left = el("div", "l");
-    left.append(el("div", "name", d.label), copyablePath(el("div", "sub", d.path), d.path));
-    row.append(left, button(T("locate"), "", () => directoryPrompt(d, false, async () => { await ui.reload(); checkDirectories(); })));
+    const choose = () => directoryPrompt(d, false, async () => { await ui.reload(); checkDirectories(); });
+    left.append(el("div", "name", d.label), editablePath(copyablePath(el("div", "sub", d.path), d.path), choose));
+    row.append(left, button(T("locate"), "", choose));
     body.append(row);
   }
   pop.panel(T("some directories need their new location"), body, T("skip for now"), () => {});
 }
 
 function directoryPrompt(d, moving, after) {
-  pop.open("directory", d.label, (box, p) => {
-    box.append(el("div", "ttl", d.label), copyablePath(el("p", "sub", d.path), d.path));
-    const input = el("input", "field");
-    input.spellcheck = false;
-    input.placeholder = T("new directory path");
-    const error = el("div", "err");
-    const actions = el("div", "actions");
-    let busy = false;
-    let previewedPath = "";
-    const affected = el("pre", "sub");
-    const apply = async () => {
-      const path = input.value.trim();
-      if (!path || busy) return;
-      busy = true;
-      error.textContent = "";
+  const popup = S.popup;
+  return chooseLocalPath(d.path, async selected => {
+    if (!moving) {
       try {
-        if (moving && previewedPath !== path) {
-          const links = await api.DirectoryMovePreview(d.id, path);
-          affected.textContent = [d.path + " → " + path, ...(links || [])].join("\n");
-          previewedPath = path;
-          applyButton.textContent = T("confirm move");
-          busy = false;
-          return;
-        }
-        const lines = await api.ApplySetting(["folder", moving ? "move" : "set", d.id, "{}"], path);
-        pop.close();
+        const lines = await api.ApplySetting(["folder", "set", d.id, "{}"], selected);
+        if (S.popup === popup) pop.close();
         say("ok", lines?.[0] || T("done"));
         if (after) await after();
-      } catch (e) { error.textContent = errText(e); busy = false; }
-    };
-    if (moving) box.append(el("p", "sub", T("move this directory and its files to the new path?")));
-    const applyButton = button(T(moving ? "preview move" : "locate"), "", apply, "primary", "apply-setting");
-    input.addEventListener("input", () => {
-      previewedPath = "";
-      affected.textContent = "";
-      applyButton.textContent = T(moving ? "preview move" : "locate");
-    });
-    actions.append(button(T(moving ? "choose parent folder…" : "choose…"), "", () => pickFolder(d.path, path => {
-      input.value = moving ? path.replace(/[\\/]$/, "") + "/" + d.path.split(/[\\/]/).pop() : path;
-    })),
-      applyButton, button(T("skip for now"), "", () => pop.close()));
-    box.append(input, affected, error, actions);
-    p.keys = e => { if (e.key === "Enter") { e.preventDefault(); apply(); return true; } return false; };
-    setTimeout(() => input.focus(), 0);
+      } catch (e) { say("fail", errText(e)); }
+      return;
+    }
+    // Moving chooses the parent folder, then keeps the original preview/confirmation.
+    const path = selected.replace(/[\\/]$/, "") + "/" + d.path.replace(/[\\/]$/, "").split(/[\\/]/).pop();
+    const screen = S.screen, epoch = S.screenSeq;
+    try {
+      const links = await api.DirectoryMovePreview(d.id, path);
+      if (S.screen !== screen || S.screenSeq !== epoch) return;
+      pop.confirm(d.label, [T("move this directory and its files to the new path?"), d.path + " → " + path, ...(links || [])], T("confirm move"), async () => {
+        try {
+          const lines = await api.ApplySetting(["folder", "move", d.id, "{}"], path);
+          say("ok", lines?.[0] || T("done"));
+          if (after) await after();
+        } catch (e) { say("fail", errText(e)); }
+      });
+    } catch (e) { say("fail", errText(e)); }
   });
+}
+
+// Reattach picker actions when background task results replace address text.
+function settingPathPicker(row, it, again) {
+  if (it.edit !== "directory" && it.edit !== "path") return;
+  const choose = it.edit === "directory"
+    ? () => directoryPrompt({ id: it.directory, label: it.label, path: it.value }, false, async () => { await ui.reload(); again(); })
+    : () => chooseLocalPath(it.editValue ?? it.value ?? "", value => settingRunner(again)(it.argv, value), { file: !!it.file });
+  editablePath(row.querySelector(".setting-value"), choose, !!it.file);
+  if (it.file) editablePath(row.querySelector(".setting-note"), choose, true);
 }
 
 // settingRunner runs a setting's command, then redraws the page with again.
@@ -1631,6 +1624,16 @@ function renderGroups(w, groups, again) {
         const after = async () => { await ui.reload(); again(); };
         right.append(value, button(T("locate"), "", () => directoryPrompt(d, false, after), "", "apply-setting"),
           button(T("move to…"), "", () => directoryPrompt(d, true, after), "", "apply-setting"));
+      } else if (it.edit === "path") {
+        right.append(factText(el("span", "muted setting-value"), { text: it.value || "", paths: it.valuePath ? [it.value] : [] }));
+        const adding = it.argv[0] === "folder" && it.argv[1] === "add";
+        right.append(button(T(adding ? "add…" : "change…"), "", () => chooseLocalPath(it.editValue ?? it.value ?? "",
+          value => run(it.argv, value), { file: !!it.file }), "", "apply-setting"));
+      } else if (it.edit === "url") {
+        right.append(factText(el("span", "muted setting-value"), { text: it.value, paths: [it.value] }),
+          button(T("change…"), "", () => urlPrompt(it.label, it.value, value => run(it.argv, value)), "", "apply-setting"));
+      } else if (it.links?.length) {
+        for (const link of it.links) right.append(button(link.label, "", () => api.OpenURL(link.url).catch(e => say("fail", errText(e))), "community-link"));
       } else if (it.edit) {
         const inp = el("input", "field");
         inp.value = it.editValue ?? it.value ?? "";
@@ -1639,17 +1642,13 @@ function renderGroups(w, groups, again) {
         inp.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); ok.click(); } };
         if (it.editValue !== undefined) right.append(factText(el("span", "muted setting-value"), { text: it.value || "", paths: it.valuePath ? [it.value] : [] }));
         right.append(inp);
-        // Apply the file or folder chosen through the window's dialog.
-        if (it.edit === "path") right.append(button(T("choose…"), "", async () => {
-          if (!it.file) return pickFolder(inp.value, (p) => run(it.argv, p));
-          try { const p = await api.PickProgram(); if (p) run(it.argv, p); } catch (e) { say("fail", errText(e)); }
-        }, "", "apply-setting"));
         right.append(ok);
       } else if (it.url) {
         // 社区: a web page, opened in the browser (06 §2.14)
-        const b = button(it.value + " ↗", "", () => api.OpenURL(it.url).catch(e => say("fail", errText(e))), "link");
-        b.title = it.url;
-        right.append(b);
+        const value = document.createElement("span"); value.textContent = it.value || it.url;
+        const b = button("↗", "", () => api.OpenURL(it.url).catch(e => say("fail", errText(e))), "link");
+        b.title = T("open the web page"); b.setAttribute("aria-label", T("open the web page"));
+        right.append(copyablePath(value, it.url), b);
       } else {
         right.append(factText(el("span", "muted setting-value"), { text: it.value || "", paths: it.valuePath ? [it.value] : [] }));
       }
@@ -1658,6 +1657,7 @@ function renderGroups(w, groups, again) {
       right.append(valueNote);
       renderSettingActions(right, it.actions, run, it);
       row.append(left, right);
+      settingPathPicker(row, it, again);
       card.append(row);
       if (it.details) card.append(settingDetails(it.details));
     }
@@ -1672,10 +1672,11 @@ function settingDetails(d) {
   box.append(el("summary", "", d.summary));
   if (d.text) box.append(el("pre", "sub", d.text.replace(/\r\n/g, "\n")));
   if (d.link) {
-    const a = el("a", "sub", d.link);
-    a.href = d.link;
-    a.onclick = (e) => { e.preventDefault(); api.OpenURL(d.link).catch((x) => say("fail", errText(x))); };
-    box.append(a);
+    const row = el("div", "setting-release-link");
+    const a = copyablePath(el("span", "sub", d.link), d.link);
+    const open = button("↗", "", () => api.OpenURL(d.link).catch(e => say("fail", errText(e))), "link");
+    open.title = T("open the web page"); open.setAttribute("aria-label", open.title);
+    row.append(a, open); box.append(row);
   }
   return box;
 }
@@ -1737,13 +1738,56 @@ function renderSettingActions(right, actions, run, item) {
   }
 }
 
-// pickFolder opens the window's folder dialog at start and calls then with the folder
-// chosen (nothing when cancelled). Without a window (the development harness) it says so:
-// every path can be typed.
+// Native selection is the only GUI local-path editor. Ignore cancelled or late results.
+let choosingPath = false;
+export async function chooseLocalPath(value, done, { file = false } = {}) {
+  if (choosingPath) return;
+  choosingPath = true;
+  const screen = S.screen, epoch = S.screenSeq;
+  let path;
+  try { path = file ? await api.PickProgram() : await api.PickFolder(value || ""); }
+  catch (e) { if (S.screen === screen && S.screenSeq === epoch) say("fail", errText(e)); }
+  finally { choosingPath = false; }
+  if (path && S.screen === screen && S.screenSeq === epoch) return done(path);
+}
+
+export function urlPrompt(title, value, done) {
+  const focused = document.activeElement;
+  pop.open("url", title, (box, p) => {
+    box.classList.add("url-editor");
+    box.setAttribute("role", "dialog"); box.setAttribute("aria-modal", "true"); box.setAttribute("aria-label", title);
+    box.append(el("div", "ttl", title));
+    const input = el("input", "field");
+    input.value = value; input.type = "url"; input.spellcheck = false;
+    input.setAttribute("aria-label", title);
+    const error = el("div", "err"); error.setAttribute("role", "alert");
+    const apply = () => {
+      const next = input.value.trim();
+      try {
+        const url = new URL(next);
+        if (!/^https?:\/\//i.test(next) || !["http:", "https:"].includes(url.protocol) || !url.hostname || /\s/.test(next)) throw new Error();
+      } catch {
+        error.textContent = T("enter a complete HTTP or HTTPS URL");
+        input.setAttribute("aria-invalid", "true"); input.focus(); return;
+      }
+      pop.close(); done(next);
+    };
+    input.oninput = () => { error.textContent = ""; input.removeAttribute("aria-invalid"); };
+    const body = el("div", "body"); body.append(input, error);
+    const actions = el("div", "btns");
+    actions.append(button(T("cancel"), "", () => pop.close()), button(T("OK"), "", apply, "primary", "apply-setting"));
+    box.append(body, actions);
+    p.keys = e => {
+      if (e.key === "Enter" && e.target === input) { e.preventDefault(); apply(); }
+      return true;
+    };
+    p.onclose = () => focused?.isConnected && focused.focus({ preventScroll: true });
+    requestAnimationFrame(() => { if (S.popup === p) input.focus(); });
+  });
+}
+
 export async function pickFolder(start, then) {
-  let p;
-  try { p = await api.PickFolder(start || ""); } catch (e) { say("fail", errText(e)); return; }
-  if (p) then(p);
+  return chooseLocalPath(start, then);
 }
 
 // ---- the environment (the pill on the left of the top bar) ----

@@ -362,7 +362,7 @@ func (s *API) PackExport(name, file string, list bool) (string, error) {
 	}
 	if file == "" {
 		if s.x.native == nil {
-			return "", errors.New(view.T("no file dialog here; type the path"))
+			return "", errors.New(view.T("no file dialog here; use the desktop window"))
 		}
 		f, err := s.x.native.saveFile(view.T("export the pack"), name+ext, [][2]string{{"*" + ext, "*" + ext}, {"All files (*.*)", "*.*"}})
 		if err != nil || f == "" {

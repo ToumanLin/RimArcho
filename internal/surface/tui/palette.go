@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"strconv"
@@ -146,7 +147,9 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 		// The settings page as text (06 §2.14); each value says the command that changes it.
 		return func(m *model) tea.Cmd {
 			var b strings.Builder
-			for _, g := range append(view.EnvGroups(m.app, m.st), view.SettingsPage(m.app, m.st)...) {
+			groups := view.SettingsPage(m.app, m.st)
+			groups = slices.Insert(groups, 1, view.EnvGroups(m.app, m.st)...)
+			for _, g := range groups {
 				b.WriteString(g.Title + "\n")
 				if g.Note != "" {
 					fmt.Fprintf(&b, "  %s\n", g.Note)
@@ -167,6 +170,9 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 						fmt.Fprintf(&b, "  %s", it.ValueNote)
 					}
 					b.WriteString("\n")
+					for _, link := range it.Links {
+						fmt.Fprintf(&b, "    %s: %s\n", link.Label, link.URL)
+					}
 					if it.Note != "" {
 						fmt.Fprintf(&b, "    %s\n", it.Note)
 					}
@@ -181,7 +187,11 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 							fmt.Fprintf(&b, "    %s  ctrl+k %s\n", a.Label, T("feedback"))
 							continue
 						}
-						fmt.Fprintf(&b, "    %s  : archo %s\n", a.Label, strings.Join(a.Argv, " "))
+						argv := strings.Join(a.Argv, " ")
+						if a.Argv[len(a.Argv)-1] == "" {
+							argv += strconv.Quote("")
+						}
+						fmt.Fprintf(&b, "    %s  : archo %s\n", a.Label, argv)
 					}
 				}
 				b.WriteString("\n")

@@ -1,7 +1,7 @@
-import { copyablePath, pathContent } from "./fields.js";
+import { editablePath, copyablePath, pathContent } from "./fields.js";
 // The first-run guide (06 §2.15): three steps, each with a way back.
-//   1. find the game: 已有的游戏 — what detection finds (tick several), a folder typed in or
-//      chosen in the folder dialog; or 下载一个版本 — a branch, a folder and an optional
+//   1. find the game: 已有的游戏 — what detection finds (tick several), or a folder
+//      chosen in the native dialog; or 下载一个版本 — a branch, a folder and an optional
 //      account override, downloaded by SteamCMD in its own window (08 §11);
 //   2. read the mods: a scan per environment in a child process, with its progress (a game
 //      added once the shared mod folders were read: only its own Data/ and Mods/);
@@ -9,7 +9,7 @@ import { copyablePath, pathContent } from "./fields.js";
 //      applied: view.ReadImport → PreviewImport → ApplyImport), or a pack / a collection.
 // The environment page's "add a game" starts at step 1.
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
-import { page, button, seg, pickFolder, beginPageRead } from "./screens.js";
+import { page, button, seg, chooseLocalPath, beginPageRead } from "./screens.js";
 import { exchange, importFrom } from "./exchange.js";
 import { withEnvironmentSwitch } from "./environment.js";
 import { on } from "./api.js";
@@ -129,7 +129,7 @@ function step1(card) {
   card.append(sw);
   if (G.way === 1) return download(card);
   const list = el("div", "games");
-  if (!G.games.length) list.append(el("div", "empty-state", T("no RimWorld found in the Steam libraries or the usual folders; type the game folder below")));
+  if (!G.games.length) list.append(el("div", "empty-state", T("no RimWorld found in the Steam libraries or the usual folders; add its folder below")));
   G.games.forEach((g, i) => {
     const r = el("label", "game" + (g.env ? " used" : ""));
     const cb = el("input");
@@ -157,13 +157,7 @@ function step1(card) {
     list.append(r);
   });
   card.append(list);
-  // a folder typed in or chosen in the folder dialog (detection found nothing, or not this one)
   const typed = el("div", "typed");
-  const inp = el("input", "field");
-  inp.placeholder = T("the game folder (the one with RimWorldWin64.exe)");
-  inp.spellcheck = false;
-  inp.value = G.typed;
-  inp.oninput = () => { G.typed = inp.value; };
   const addPath = async (path) => {
     let g;
     try { g = await api.GuideGame(path); } catch (e) { G.typed = path; G.error = errText(e); return draw(); }
@@ -175,10 +169,7 @@ function step1(card) {
     }
     draw();
   };
-  const add = button(T("add this folder"), "", () => addPath(inp.value));
-  const choose = button(T("choose…"), "", () => pickFolder(inp.value, addPath));
-  inp.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); add.click(); } };
-  typed.append(inp, choose, add);
+  typed.append(button(T("add this folder"), "", () => chooseLocalPath(G.typed, addPath)));
   card.append(typed);
   const picked = [...G.picked].filter((i) => G.games[i] && !G.games[i].env);
   const next = button(picked.length > 1 ? Tf("add %d games", picked.length) : T("add and continue"), "", async () => {
@@ -309,12 +300,9 @@ function download(card) {
   }
   card.append(list);
   const where = el("div", "typed");
-  const dir = el("input", "field");
-  dir.placeholder = T("the folder for the game");
-  dir.spellcheck = false;
-  dir.value = D.dir;
-  dir.oninput = () => { D.dir = dir.value; D.dirTyped = true; };
-  where.append(el("span", "muted lbl", T("game folder")), dir, button(T("choose…"), "", () => pickFolder(dir.value, (p) => { D.dir = p; D.dirTyped = true; draw(); })));
+  const choose = () => chooseLocalPath(D.dir, path => { D.dir = path; D.dirTyped = true; draw(); });
+  where.append(el("span", "muted lbl", T("game folder")), editablePath(copyablePath(el("span", "", D.dir), D.dir), choose),
+    button(T("change…"), "", choose));
   card.append(where);
   const who = el("div", "typed");
   const acc = el("input", "field");
@@ -446,19 +434,24 @@ function step3(card) {
   const imp = button(T("import a list…"), "", () => { ui.afterImport = () => finish(""); exchange(0); });
   ways.append(way(T("move over from RimSort or RimCrow"), T("a list file, a share code or pasted text; you see what changes before it is applied"), imp));
   const src = el("input", "field");
-  src.placeholder = T("a pack or list file, or a Steam Workshop collection link");
-  src.spellcheck = false;
+  src.placeholder = T("a Steam Workshop collection link");
+  src.type = "url"; src.spellcheck = false;
   const open = button(T("open"), "", async () => {
     const v = src.value.trim();
     if (!v) return src.focus();
-    // a list or a collection is previewed first; only a pack is unpacked at once
-    if (!/\.archopack["']?$/i.test(v)) { ui.afterImport = () => finish(""); return importFrom("text", v); }
-    try { finish(await api.PackImport(v)); } catch (e) { G.error = errText(e); draw(); }
+    if (!/^https?:\/\//i.test(v)) { G.error = T("enter a complete HTTP or HTTPS URL"); return draw(); }
+    ui.afterImport = () => finish(""); return importFrom("text", v);
   });
   src.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); open.click(); } };
   const row = el("div", "typed");
-  row.append(src, open);
-  ways.append(way(T("open a pack or a Steam collection"), T("a pack (.archopack) or a RimArcho list someone shared, or a Workshop collection"), row));
+  row.append(button(T("choose a pack…"), "", async () => {
+    const session = activeSession;
+    try {
+      const path = await api.PickPackFile();
+      if (path && S.screen === "guide" && activeSession === session) await finish(await api.PackImport(path));
+    } catch (e) { if (S.screen === "guide" && activeSession === session) { G.error = errText(e); draw(); } }
+  }), src, open);
+  ways.append(way(T("open a pack or a Steam collection"), T("choose a pack (.archopack), or paste a Steam Workshop collection link"), row));
   card.append(ways);
   footer(card, button(T("skip"), "", () => finish("")));
 }

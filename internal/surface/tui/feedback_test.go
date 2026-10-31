@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -119,5 +120,35 @@ func TestFeedbackSendTUI(t *testing.T) {
 	m.update(cmd())
 	if got.Title != "Crash" || got.Contact != "me#1" || !strings.HasPrefix(got.Body, "on load\n\n---\n") || !strings.Contains(m.status, "#7") {
 		t.Fatalf("sent %+v; status %q", got, m.status)
+	}
+}
+
+// Shared settings order and full links survive the terminal's text presentation.
+func TestSettingsAboutFirst(t *testing.T) {
+	e, _ := fixture(t)
+	tool := filepath.Join(e.Root, "tools", "steamcmd.exe")
+	e.WriteFile(tool, "synthetic tool")
+	e.MustRun("config", "set", "steamcmd.path", tool)
+	m := New(Options{App: e.App}).(*model)
+	m.Init()
+	defer view.SetLang("en")
+	for _, lang := range []string{"en", "zh"} {
+		view.SetLang(lang)
+		m.palRun("settings")(m)
+		if m.panel == nil {
+			t.Fatal("no settings panel")
+		}
+		text := strings.Join(m.panel.lines, "\n")
+		if !strings.HasPrefix(text, view.T("about")+"\n") || strings.Index(text, view.T("this game")) < strings.Index(text, view.T("about")) {
+			t.Fatal(text)
+		}
+		for _, value := range []string{"config set updates.auto {}", "config set updates.interval {}", `config set steamcmd.path ""`, "https://discord.gg/HF2GVyurQs", "https://github.com/ToumanLin/RimArcho"} {
+			if strings.Count(text, value) != 1 {
+				t.Fatalf("want one %q in settings: %s", value, text)
+			}
+		}
+		if !strings.Contains(text, "env set") {
+			t.Fatal("lost text path commands", text)
+		}
 	}
 }

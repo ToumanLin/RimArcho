@@ -17,6 +17,14 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
   TUI uninstall runs in the background with progress; Ctrl+C, q and Esc show the same
   notice while it runs, and work again afterwards. Embedded GUI/TUI commands
   (`uninstall --yes`) use the same protected workflow; previews remain read-only.
+- GUI file, folder and web addresses now have a trailing copy icon, show ✓ after
+  copying, and shorten in the middle as the window or column changes width. Hover
+  and copy retain the complete address; address text stays selectable. Local path
+  settings, first-run directory choices, tool programs and import files open the
+  system picker directly from an editable address or its Change/Add button. Choices
+  apply immediately; cancelling preserves the value and directory moves still need
+  preview confirmation. Community-data URLs use a validated small dialog. Narrow
+  address rows wrap their buttons before shrinking the address.
 
 - Settings › Feedback (反馈, also in the command palette): write a bug report or
   suggestion; it becomes a public issue in the GitHub repository, which the page says
@@ -37,14 +45,12 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
   info, each attachment folded under its heading), not the Markdown that is sent or copied.
   In the TUI the same panel ticks the attachments with `m` `p` `l`, sends with `s` (title,
   text and contact on the input line) and opens GitHub with `enter`.
-- Settings are reordered, most used first, in the window and the TUI alike: 界面
-  (language, day/night, accent colour, Workshop descriptions and images, GPU, start page
-  background), 账户, 更新 (RimArcho's own version and update first, then the automatic
-  checks; the group was called 自动检查 like one of its rows), 文件夹, 游戏日志, 外部工具, 社区数据, 存储, 社区, and 卸载 last. 外观 and
-  界面 became one group; RimArcho's folders and adding a mod folder became one group
-  (文件夹); the database and the caches became 存储. The new 社区 group has 反馈… and
-  the GitHub and Discord links (github.com/ToumanLin/RimArcho, discord.gg/HF2GVyurQs),
-  which open in the browser.
+- Settings now start with About in both GUI and TUI: RimArcho's version and
+  Check for updates, the existing automatic-check control (covering RimArcho, mods,
+  tools and community data), Feedback, then Discord/GitHub community links. Updates
+  retains interval controls; the old community group and duplicate version/check
+  entries are removed. The remaining groups are Interface, Accounts, Updates,
+  Folders, Game log, External tools, Community data, Storage and Uninstall.
 - Settings: the language choice reads 跟随系统 / 简体中文 / English instead of
   auto / zh / en, and RimArcho's subscription download folder is labelled
   (订阅下载目录) instead of "Subscriptions".

@@ -71,8 +71,16 @@ func TestExternalToolConfiguredEditValue(t *testing.T) {
 	e.MustRun("config", "set", "steamcmd.path", external)
 	g := view.DependencyGroup(e.App)
 	it := g.Items[1]
-	if it.EditValue == nil || *it.EditValue != external || len(it.Actions) != 1 || !strings.Contains(it.Note, external) {
+	if it.EditValue == nil || *it.EditValue != external || len(it.Actions) != 2 || !strings.Contains(it.Note, external) {
 		t.Fatalf("configured row %+v", it)
+	}
+	reset := it.Actions[1]
+	if reset.Label != view.T("use default") || view.SettingCommand(reset.Argv) != nil {
+		t.Fatal(reset)
+	}
+	e.MustRun(reset.Argv...)
+	if next := view.DependencyGroup(e.App).Items[1]; next.EditValue == nil || *next.EditValue != "" {
+		t.Fatal(next)
 	}
 }
 

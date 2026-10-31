@@ -4,9 +4,9 @@
 // Plan/report controls keep their native keyboard behavior.
 import { choiceControl } from "./choices.js";
 import * as pop from "./popups.js";
-import { copyablePath } from "./fields.js";
+import { editablePath, copyablePath } from "./fields.js";
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
-import { openScreen, page, button, pickFolder, beginPageRead } from "./screens.js";
+import { openScreen, page, button, chooseLocalPath, beginPageRead } from "./screens.js";
 
 const fresh = () => ({ keepLocked: false, lockedTo: "", removePacks: false, packsTo: "", removeSaves: false, savesTo: "", removeGames: false, restoreBackup: false });
 const U = { choice: fresh(), page: null, running: false, prog: null, loading: false };
@@ -103,14 +103,10 @@ function envPick(pg) {
 
 function folderPick(k, value) {
   const q = el("div", "un-ask");
-  const inp = el("input", "field");
-  inp.value = value || "";
-  inp.spellcheck = false;
-  inp.dataset.f = k;
-  const set = () => { if (inp.value.trim() !== (value || "")) answer(k, inp.value.trim()); };
-  inp.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); set(); } };
-  inp.onchange = set;
-  q.append(el("span", "muted", T("move to")), inp, button(T("choose…"), "", () => pickFolder(inp.value, (p) => answer(k, p))));
+  const choose = () => chooseLocalPath(value || "", path => answer(k, path));
+  const change = button(T("change…"), "", choose);
+  change.dataset.f = k;
+  q.append(el("span", "muted", T("move to")), editablePath(copyablePath(el("span", "", value || ""), value), choose), change);
   return q;
 }
 

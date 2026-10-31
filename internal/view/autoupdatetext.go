@@ -2,6 +2,9 @@ package view
 
 func init() {
 	Register(map[string]string{
+		"about":                           "关于",
+		"automatically check for updates": "自动检查更新",
+		"Checks RimArcho, mods, external tools and community data while RimArcho is open.": "RimArcho 打开时，检查 RimArcho、Mod、外部工具和社区数据的更新。",
 		"automatic checks":   "自动检查",
 		"check interval":     "检查间隔",
 		"standard intervals": "常规",

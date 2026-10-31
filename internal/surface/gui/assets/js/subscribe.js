@@ -2,7 +2,7 @@
 // a LoversLab file page, another web page, Workshop links or IDs); the card below asks only
 // the one decision that source needs and shows the --dry-run text before 订阅. Also the
 // file choice a download-page update needs (pageUpdate, in the 订阅与更新 detail).
-import { pathContent } from "./fields.js";
+import { pathContent, editablePath } from "./fields.js";
 import { el, api, T, Tf, errText, say } from "./state.js";
 import * as pop from "./popups.js";
 
@@ -90,7 +90,7 @@ export function importPicker(onChange = () => {}) {
   let value = "";
   const choose = async (folder) => {
     const v = folder ? await api.PickFolder(value) : await api.PickSubscriptionZip();
-    if (v) { value = v; shown.textContent = v; onChange(v); }
+    if (v) { value = v; pathContent(shown, v, [v]); editablePath(shown, () => choose(folder).catch(e => say("fail", errText(e))), !folder); onChange(v); }
   };
   row.append(button(T("choose zip…"), () => choose(false), "line"), button(T("choose folder…"), () => choose(true)), shown);
   return { el: row, value: () => value };

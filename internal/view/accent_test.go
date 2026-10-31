@@ -50,11 +50,11 @@ func TestAppearanceThemeRow(t *testing.T) {
 	for _, lang := range []string{"en", "zh"} {
 		view.SetLang(lang)
 		groups := view.SettingsPage(e.App, nil)
-		if groups[0].Title != view.T("interface") {
+		if groups[0].Title != view.T("about") || groups[1].Title != view.T("interface") {
 			t.Fatalf("first group: %s", groups[0].Title)
 		}
 		found := 0
-		for _, item := range groups[0].Items {
+		for _, item := range groups[1].Items {
 			if strings.Join(item.Argv, " ") != "config set ui.theme {}" {
 				continue
 			}
