@@ -55,7 +55,7 @@ func SettingTask(argv []string) string {
 			return TaskDepRemove
 		}
 		if argv[1] == "install" {
-			return map[string]string{deps.Todds: TaskTodds, deps.SteamCMD: TaskSteamCMD, deps.WezTerm: TaskWezTerm}[argv[2]]
+			return map[string]string{deps.Todds: TaskTodds, deps.SteamCMD: TaskSteamCMD}[argv[2]]
 		}
 	}
 	if len(argv) > 0 && argv[0] == "gc" {
@@ -77,7 +77,7 @@ func TaskPending(kind string) string {
 		return T("subscribe")
 	case TaskSubscriptionFrom:
 		return T("updating…")
-	case TaskSteamCMD, TaskTodds, TaskWezTerm:
+	case TaskSteamCMD, TaskTodds:
 		return T("downloading…")
 	case TaskDepRemove:
 		return T("removing…")

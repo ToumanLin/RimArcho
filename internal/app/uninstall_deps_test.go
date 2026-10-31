@@ -21,7 +21,7 @@ func TestUninstallNamesOwnedToolsAndLeavesConfiguredTools(t *testing.T) {
 			for _, key := range []string{"ProgramW6432", "ProgramFiles", "LOCALAPPDATA"} {
 				t.Setenv(key, "")
 			}
-			paths := map[string]string{deps.Todds: filepath.Join(e.App.LocalDir(), deps.Todds, "todds.exe"), deps.WezTerm: filepath.Join(e.App.Home, deps.WezTerm, "wezterm-gui.exe")}
+			paths := map[string]string{deps.Todds: filepath.Join(e.App.LocalDir(), deps.Todds, "todds.exe")}
 			for name, path := range paths {
 				if configured {
 					path = filepath.Join(e.Root, "external", name, filepath.Base(path))
@@ -30,9 +30,6 @@ func TestUninstallNamesOwnedToolsAndLeavesConfiguredTools(t *testing.T) {
 				e.WriteFile(path, "tool")
 				if configured {
 					key := "textures.todds"
-					if name == deps.WezTerm {
-						key = "wezterm.path"
-					}
 					e.MustRun("config", "set", key, path)
 				}
 			}
@@ -42,9 +39,6 @@ func TestUninstallNamesOwnedToolsAndLeavesConfiguredTools(t *testing.T) {
 			}
 			for name, path := range paths {
 				label := name
-				if name == deps.WezTerm {
-					label = "WezTerm"
-				}
 				found := false
 				for _, it := range p.Step(app.UnData).Items {
 					found = found || strings.Contains(it.Note, "includes the downloaded "+label)
@@ -83,7 +77,7 @@ func TestUninstallNamesOwnedToolsAndLeavesConfiguredTools(t *testing.T) {
 							notes = append(notes, it.Note)
 						}
 						note := strings.Join(notes, " ")
-						if !strings.Contains(note, "包含下载的 todds") || !strings.Contains(note, "包含下载的 WezTerm") {
+						if !strings.Contains(note, "包含下载的 todds") {
 							t.Fatalf("untranslated notes %s", note)
 						}
 					}

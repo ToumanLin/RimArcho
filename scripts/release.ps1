@@ -1,10 +1,7 @@
 # Builds a release: archo.exe and RimArcho.exe (pure Go, no cgo, no runtime to install; the same
 # program, RimArcho.exe linked as a Windows GUI so a double click opens the window, 06 §8.1)
-# with the version stamped in through -ldflags, plus README, CHANGELOG and LICENSE, and the font of
-# the WezTerm host (06 §9.2): Maple Mono NF CN Regular and Bold with its SIL OFL license under
-# fonts/. The font is fetched at build time from the official Maple Mono GitHub release
-# (pinned by -MapleTag, checked against the release's .sha256) and cached in dist/cache/;
-# it is never committed to the repository. Archo Monitor, the in-game companion mod (08 §9), is
+# with the version stamped in through -ldflags, plus README, CHANGELOG and LICENSE.
+# Archo Monitor, the in-game companion mod (08 §9), is
 # built by monitor/build.ps1 (needs the .NET SDK 10; game references come from NuGet) and
 # shipped under monitor/ArchoMonitor/.
 #
@@ -16,7 +13,6 @@ param(
     [Parameter(Mandatory = $true)][string]$Version,
     [string]$GOOS = "windows",
     [string]$GOARCH = "amd64",
-    [string]$MapleTag = "v7.9",
     [switch]$SkipTests
 )
 $ErrorActionPreference = "Stop"
@@ -88,38 +84,6 @@ Write-Host "building Archo Monitor"
 & (Join-Path $PSScriptRoot "..\monitor\build.ps1") -Out (Join-Path $out "monitor\ArchoMonitor")
 if (-not (Test-Path (Join-Path $out "monitor\ArchoMonitor\About\About.xml"))) { throw "Archo Monitor build produced no About.xml" }
 
-# The bundled font (06 §9.2): Maple Mono NF CN, Regular and Bold, and the OFL.
-$maple = "https://github.com/subframe7536/maple-font/releases/download/$MapleTag"
-$cache = Join-Path "dist" "cache\maple-$MapleTag"
-New-Item -ItemType Directory -Force $cache | Out-Null
-$fontZip = Join-Path $cache "MapleMono-NF-CN.zip"
-$shaFile = Join-Path $cache "MapleMono-NF-CN.sha256"
-$ProgressPreference = "SilentlyContinue"
-if (-not (Test-Path $shaFile)) { Invoke-WebRequest "$maple/MapleMono-NF-CN.sha256" -OutFile $shaFile -UseBasicParsing }
-$want = ((Get-Content $shaFile -Raw) -split '\s+')[0].Trim().ToLower()
-if ($want -notmatch '^[0-9a-f]{64}$') { throw "no sha256 in $shaFile" }
-if (-not (Test-Path $fontZip) -or (Get-FileHash $fontZip -Algorithm SHA256).Hash.ToLower() -ne $want) {
-    Write-Host "downloading MapleMono-NF-CN.zip ($MapleTag) from the official release"
-    Invoke-WebRequest "$maple/MapleMono-NF-CN.zip" -OutFile $fontZip -UseBasicParsing
-}
-$got = (Get-FileHash $fontZip -Algorithm SHA256).Hash.ToLower()
-if ($got -ne $want) { Remove-Item $fontZip; throw "MapleMono-NF-CN.zip sha256 $got, the release says $want" }
-Write-Host "font zip sha256 verified ($want)"
-$fonts = Join-Path $out "fonts"
-New-Item -ItemType Directory -Force $fonts | Out-Null
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-$z = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $fontZip))
-try {
-    foreach ($style in "Regular", "Bold") {
-        $e = $z.Entries | Where-Object { $_.Name -eq "MapleMono-NF-CN-$style.ttf" } | Select-Object -First 1
-        if (-not $e) { throw "MapleMono-NF-CN-$style.ttf not in the zip" }
-        [System.IO.Compression.ZipFileExtensions]::ExtractToFile($e, (Join-Path $fonts $e.Name), $true)
-    }
-} finally { $z.Dispose() }
-$ofl = Join-Path $cache "OFL.txt"
-if (-not (Test-Path $ofl)) { Invoke-WebRequest "https://raw.githubusercontent.com/subframe7536/maple-font/$MapleTag/OFL.txt" -OutFile $ofl -UseBasicParsing }
-if (-not (Select-String -Path $ofl -Pattern "SIL OPEN FONT LICENSE" -Quiet)) { throw "OFL.txt does not look like the SIL Open Font License" }
-Copy-Item $ofl (Join-Path $fonts "OFL.txt")
 $zip = "$out.zip"
 if (Test-Path $zip) { Remove-Item -Force $zip }
 Compress-Archive -Path (Join-Path $out "*") -DestinationPath $zip

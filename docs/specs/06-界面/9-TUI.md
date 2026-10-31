@@ -20,77 +20,52 @@ TUI 是**方案编辑器的键盘版**：默认打开当前方案的编辑器（
 | 环境 | `E` 切换环境（已实现）；目录和启动设置用 CLI `env set` |
 | 更新 RimArcho（待实现，07 §5.1） | 命令面板“更新 RimArcho”：文本面板，内容同 GUI 设置里的更新卡（版本、大小、更新说明摘要、会替换的文件、被什么挡住）。`enter` 确认后，下载、验证、解开排进后台任务（§2.16），状态行写进度；准备好后再按 `enter`：备份数据库并退出，由脚本换文件，不自动重新打开（要再开就运行 `archo`）。TUI 自己也是被换掉的程序，所以这一步会退出 TUI。TUI 打开期间自动检查发现新版本，状态行写一条安静通知 |
 | 导航在侧边 / 顶部（`ctrl+b`） | 没有侧栏，不适用 |
-| 启动页、编译成整合包、游玩回顾、值得玩 | 不提供页面；对应的 CLI 命令可在 `:` 里运行。没有启动页，所以编辑器里的 `L`（和顶栏的 `L 启动`）仍然直接写入并启动，不像 GUI 那样先去启动页（§2.5）；状态行在“正在启动游戏”后面写最可能出事的问题（“留意：…”，`view.LaunchHint`），`shift+2` 去能不能跑 |
+| 启动页、编译成整合包、游玩回顾、值得玩 | 不提供页面；对应的 CLI 命令可在 `:` 里运行（§9.4）。没有启动页，所以编辑器里的 `L`（和顶栏的 `L 启动`）仍然直接写入并启动，不像 GUI 那样先去启动页（§2.5）；状态行在“正在启动游戏”后面写最可能出事的问题（“留意：…”，`view.LaunchHint`），`shift+2` 去能不能跑 |
 | Archo 面板 | 暂不支持（09 §6） |
 
 - 游戏运行状态在**状态行右端**（GUI 侧栏没有对应的一行：2026-10-30 删去，GUI 自己读新日志，§2.1）：游戏运行时是 `● 游戏运行中  14:05 起`，本次运行的报错数是后面的琥珀色数字；游戏退出后有新的 Player.log 时是 `● 分析本次日志  shift+2`（强调色）；都没有时什么都不显示。状态行的一句话在左边，两者同时出现时这一段留在右边。新错误到来时顶栏“能不能跑 N”更新，不弹窗（`view.LiveTracker.Update`，刷新间隔见 §2.16.1 G01；文字是 `view.LiveText`）。
 - 能不能跑的日志项按 §2.4 的同一份阶段分组：缩进的淡色标题，不占光标、不计数；上下键始终落在实际报错项上。没有标记的日志不加标题；查看动作仍用现有技术页。
-- 右键菜单的键：Bubble Tea v1.3.10 不认 xterm 的 `shift+F10`（`CSI 21;2 ~`），Windows 控制台送来的是不带 shift 的 F10，菜单键在 xterm 类终端里是 F16；所以 TUI 里 F10、`shift+F10`、F16 都打开菜单，右键在指针处打开。TUI 的筛选栏占整个宽度（“未启用”一列放不下筛选块）；Mod 库存的副本详情只有备注、动作、状态和字段，没有简介和图（**待实现**）；Mod 库存在最底层按 `esc` 回到编辑器（TUI 没有侧栏）。
+- 右键菜单的键：Bubble Tea v1.3.10 不认 xterm 的 `shift+F10`（`CSI 21;2 ~`），Windows 控制台送来的是不带 shift 的 F10，菜单键在 xterm 类终端里是 F16；所以 TUI 里 F10、`shift+F10`、F16 都打开菜单，右键在指针处打开。TUI 的筛选栏占整个宽度（“未启用”一列放不下筛选块）；Mod 库存的副本详情只有备注、动作、状态和字段，没有简介（**待实现**）；TUI 不画图（§9.3）；Mod 库存在最底层按 `esc` 回到编辑器（TUI 没有侧栏）。
 - 跳页用 `shift+1`–`8`（终端里是 `!@#$%^&*`，美式布局；`shift+7` 贴图优化是带命令的文本面板），子页之间用 `tab` / `shift+tab`（§3.5）；`g` 是标签，不再是“到顶”（2026-10-22 定）。原来“`g` 前缀跳页”的建议不采用。
-- `archo tui` 进入 TUI，与不带参数相同，但不经过 WezTerm 宿主（§9.2）。界面上不出现 `#id`：结果由 TUI 写成人话，错误经 `view.Humanize`；保留 CLI 文字（带引用）的只有技术页和 `:` 的输出。技术页里 `enter` 跟进所选行的第一个引用；打印的命令里不带 `#` 的实例引用（05 §3.1 规则 11）也能跟进，只要当前索引认得它（`lineRef`）。
-- 颜色：termenv 在 ConPTY 下无法查询终端、会退回无色，所以 `SetColors` 在终端声明支持 24 位色时强制 24 位色：`COLORTERM=truecolor|24bit`、`TERM_PROGRAM=WezTerm`，或有 `WT_SESSION`（Windows Terminal）。其他终端沿用 termenv 的检测。
+- `archo` 和 `archo tui` 都在当前终端打开 TUI（§9.2）。界面上不出现 `#id`：结果由 TUI 写成人话，错误经 `view.Humanize`；保留 CLI 文字（带引用）的只有技术页和 `:` 的输出。技术页里 `enter` 跟进所选行的第一个引用；打印的命令里不带 `#` 的实例引用（05 §3.1 规则 11）也能跟进，只要当前索引认得它（`lineRef`）。
 
-### 9.2 WezTerm 宿主
+### 9.2 在哪个终端里运行
 
-图标和缩略图都依赖终端能力，而玩家的终端五花八门（例如 Windows Terminal 默认字体 Cascadia Mono 没有 Nerd Font 图标）。因此 RimArcho 自带一个受控的显示环境。
+2026-10-30 起 TUI 不再自带终端（00 §6 D24）：`archo`（不带参数）和 `archo tui` 都在启动它的终端里打开 TUI。双击 `archo.exe` 时由 Windows 打开默认的终端（Windows 11 是 Windows Terminal，更早的系统是控制台窗口），TUI 在里面运行，退出时窗口随之关闭。旧快捷方式里的 `archo --here` 仍然接受，和 `archo` 一样（`cli.globalFlags`）。
 
-**启动流程**（`internal/host`）。只有不带参数的 `archo` 会走到这里；`archo tui`、`archo --here`（强制在当前终端运行）、CLI 子命令和 `archo mcp` 从不触发（`wantsHost`）。检查顺序：
+- 字体由玩家的终端决定，RimArcho 不分发字体。
+- 颜色：termenv 在 ConPTY 下无法查询终端、会退回无色，所以 `SetColors` 在终端声明支持 24 位色时强制 24 位色：`COLORTERM=truecolor|24bit`，或有 `WT_SESSION`（Windows Terminal）。其他终端沿用 termenv 的检测。
+- 旧版本下载到数据目录的 `wezterm\`、生成的 `wezterm.lua` 和 `logs\wezterm-start.log` 不再使用，也不自动删除（2026-10-30 定）；卸载时随数据目录一起删除，玩家也可以自己删。`terminal.host`、`wezterm.path`、`ui.previews`、`ui.preview_dwell_ms` 四个设置已删去，数据库里的旧值不再读取。
 
-```
-双击 archo.exe（或在任意终端里运行 archo）
-  ├─ 已经运行在 WezTerm 中（TERM_PROGRAM=WezTerm）→ 在这里运行，完整模式
-  ├─ terminal.host none → 在这里运行
-  ├─ 找到了 WezTerm：PATH 中的 wezterm-gui，然后 %ProgramW6432% / %ProgramFiles% / %LOCALAPPDATA%\Programs 下的 WezTerm\，然后 <数据目录>/wezterm/
-  │    → 写 <数据目录>/wezterm.lua，启动 wezterm-gui --config-file <数据目录>/wezterm.lua start -- archo tui [--env x]，本进程退出
-  │      （--config-file 是全局参数，必须写在 start 之前）
-  └─ 没找到，且有控制台可问 → 询问：
-       “下载 WezTerm 便携版（约 66 MB）以显示图标和 Mod 预览图？[Y/n]”
-       Y：下载、校验、解压到 <数据目录>/wezterm/，设 terminal.host wezterm，然后按上一行启动
-       n：设 terminal.host none，在当前终端以兼容模式运行，并说明怎么改
-```
+### 9.3 图标、链接和图片
 
-- 下载只在玩家同意后进行，不静默下载。`archo config set terminal.host auto|wezterm|none`：auto（默认）表示还没问过，没找到 WezTerm 时询问一次；none 以后在当前终端运行；wezterm 表示总是用宿主。
-- 下载来源：WezTerm 官方 GitHub Releases 的最新稳定版（`/repos/wezterm/wezterm/releases/latest`），取 `WezTerm-windows-*.zip` 和同名 `.sha256`。边下载到 `.part` 文件边计算哈希，校验不符则不解压、不启动，回到当前终端。解压前检查每个条目都在 `<数据目录>/wezterm/` 之内，有一个越界就整体拒绝。
-- 没有控制台可问时（输出被重定向、管道），不询问，直接在当前终端运行。
-- 任何失败（下载、校验、启动）都说明原因，然后在当前终端运行 TUI。
+RimArcho 管不了玩家的终端用什么字体，所以：
+- 图标默认用 §7 表格中的 Unicode 备用字符。`ui.icons compat|nerd`：compat 是默认；终端已经在用 Nerd Font 时设成 `nerd`，换成 Nerd Font 图标。数据库里旧的 `auto` 按 compat 读（不在可选值里的旧值都按默认值读，`cmds.Setting`）。
+- 不画图片：没有缩略图，也不给它留位置，名称顶格；描述里的图片显示为文字占位（§4.4）。
+- 链接不可点击，在文字后面淡色显示域名。
 
-**wezterm.lua**（`internal/wezterm` 生成，每次启动重写，手改会丢失）：
+### 9.4 命令行（`:`）
 
-| 项 | 设置 |
-| --- | --- |
-| 字体 | **随 RimArcho 自带** Maple Mono NF CN（Regular、Bold；SIL OFL 1.1，许可证文件一并分发），放在 `<程序目录>/fonts/`，通过 `font_dirs` 加载，不安装到系统。它同时包含 Nerd Font 图标和中文字形，所以图标、中英文的宽度和风格完全受控。回退顺序为 Symbols Nerd Font Mono（WezTerm 内置）、Cascadia Mono、Segoe UI Symbol；不能设 `font_locator = 'ConfigDirsOnly'`，否则 Maple 没有的字形（如 `⬥`、`⇣`）会显示成方框。字号 11 |
-| 配色 | 与 §7 色板一致的深色方案：前景 `#E6E6E6`、背景 `#0E0F12`、光标 `#A5B4FC`、选区 `#2C2E4A` |
-| 窗口 | 无标签栏、无滚动条，标题为 “RimArcho”，初始 160×46，内边距左右 8、上下 6 |
-| 图片 | iTerm2 内联图片协议（WezTerm 原生支持）；关闭 kitty 图形协议 |
-| 宽度 | `treat_east_asian_ambiguous_width_as_wide = false`，`unicode_version = 14`，与 RimArcho 的宽度计算一致 |
-| 退出 | `exit_behavior = 'CloseOnCleanExit'`：archo 正常退出时关窗；出错退出时保留窗口，错误信息可读 |
-| 内存 | `front_end = 'OpenGL'`（WebGpu 内存高得多，以后的 WezTerm 可能把它设为默认，所以固定）；`line_state_cache_size`、`line_quad_cache_size`、`line_to_ele_shape_cache_size` 都降到 128（默认 1024，浏览 Mod 会显示大量不同的行，大多是 CJK，每行都被缓存；128 仍能容纳最大化窗口的行，CPU 不变）；`glyph_cache_image_cache_size = 16`（图片由 archo 自己的 LRU 保存）；`scrollback_lines = 0`（TUI 在备用屏幕上运行） |
-| 其他 | 关闭响铃、关闭字体连字（`harfbuzz_features = { 'calt=0', 'clig=0', 'liga=0' }`）、关闭更新检查和更新窗口、关闭配置热加载、关闭窗口时不确认 |
+进阶用的输入框：运行一条 archo 命令，和在终端里运行 `archo …` 一样：同一张命令表（`cmds.Commands`），同样的文字输出（05 §4）。2026-10-30 定：**所有命令都能运行，直接执行，不另加确认**，和 CLI 一样；会改文件的命令要先看结果，就自己加 `--dry-run`（有这个参数的命令）。代码在 `internal/surface/tui/cmdline.go`。
 
-- WezTerm 是独立进程，有自己的 GPU 和内存开销（实测见 07 §6）。§10 的 archo 目标只约束 archo 进程本身。
-- WezTerm 在 Windows 上总会在 `%USERPROFILE%\.local\share\wezterm\` 写 GUI 套接字和日志，这个位置不能通过配置改变；README 和卸载说明要提到它。
-- 脚本驱动 WezTerm 时注意：`WEZTERM_UNIX_SOCKET` 为空时，`wezterm cli` 会退回默认套接字，可能是玩家自己的窗口。测量脚本找不到自己的 `gui-sock-<pid>` 时必须停止。
+**打开、关闭。** 编辑器、能不能跑、订阅与更新、Mod 库存里按 `:`，或命令面板“运行 archo 命令”；文本面板（包括上一条命令的输出）里按 `:` 关掉面板再打开，可以一条接一条地运行。输入框占最底一行（`❯ archo ` 后面是输入），它上面一行是说明行，候选列表开着时再往上最多 8 行。`esc` 关闭（候选列表开着时先关列表）；没运行的那一行留着，下次按 `:` 还在（§3.1 规则 8）。运行后输入框关闭、清空。
 
-**自带字体的打包**：`scripts/release.ps1 -MapleTag v7.9`（固定版本）从 github.com/subframe7536/maple-font 的发布页下载 `MapleMono-NF-CN.zip` 和 `.sha256`，校验哈希，取 `MapleMono-NF-CN-Regular.ttf` 和 `-Bold.ttf`；`OFL.txt` 取自同一标签的仓库，脚本检查它是 SIL OFL。全部放在发布 zip 的 `fonts/` 下。下载缓存在 `dist/cache/`（不进 git）。仓库里没有字体文件。
+**编辑。** `←→` 移动光标，`home` / `end` 到行首行尾，`ctrl+←` / `ctrl+→` 按词移动，`backspace` / `delete` 删字，`ctrl+w` 删前一个词，`ctrl+u` 清空；可以直接粘贴。开头的 `archo` 写不写都行。`"带 空格"`、`'带 空格'` 是一个参数（整合包里打印的 `archo pack launch "名字"` 照抄就能用）；反斜杠照原样保留（Windows 路径）；`#` 不是注释，`#a3f9` 和 `a3f9` 都行（05 §3.3）。
 
-### 9.3 兼容模式
+**说明行。** 认出命令后写它的用法和一句说明（`cmds.Command.Usage`、`Summary`，和 `archo help` 一样是英文）；还没认出时写按键：`tab 补全  ↑↓ 历史  enter 运行  esc 关闭`。上一次 `enter` 的用法错误用红字写在这里，改了这一行就消失。
 
-在其他终端中运行时（RimArcho 无法控制别的终端用什么字体）：
-- 图标换成 §7 表格中的 Unicode 备用字符。`ui.icons auto|nerd|compat`：auto（默认）在 `TERM_PROGRAM=WezTerm` 时用 Nerd Font 图标，否则用兼容字符；玩家自己的终端已经在用 Nerd Font 时可以设 `nerd`。
-- 不显示缩略图，也不预留缩略图区，名称顶格。
-- 链接不可点击，在文字后面淡色显示域名；描述图片显示为文字占位。
-- 其余布局和交互完全相同。
+**补全（`tab`）。** 补光标所在的词：
+- 命令名：先按前缀，再按包含（输入 `remove` 能列出所有删除类命令）。候选写用法和说明。
+- 以 `-` 开头：这条命令的参数（`--dry-run` 等）和说明。
+- 位置参数按命令用法里的占位：Mod（`<ref>`、`<ref…>`、`<mod>`、`<A>`、`<B>`）按名称、别名、包名和引用匹配当前游戏的 Mod，插入不带 `#` 的引用（05 §3.1 规则 11），候选写名称和引用；词是空的时第一个候选是光标所在的 Mod。环境名（`env use|set|remove`）、列表名（`plan use|rename|remove|cost|versions|follow|unfollow|sync`、`test run`）、整合包名（`pack launch|export|remove|check|stop`）、设置键（`config get|set`）和 `config set <键>` 之后的可选值、用法里直接写出的取值（如 `same|copy|unrelated`、`yes|no`）、`deps install|remove` 的工具名。路径不补全。
+- 只有一个候选就直接补上（后面加空格）。多个时列在输入框上方，同时把第一个填进去；再按 `tab` 或 `↓` 换成下一个，`shift+tab` 或 `↑` 换成上一个，输入行跟着变。`enter` 选定（不运行），继续打字也算选定；`esc` 关列表并恢复补全前的那个词。没有候选时说明行写“没有可补全的”。
 
-### 9.4 缩略图
+**历史。** 候选列表没开时，`↑` 翻出以前运行过的命令（从最近的开始），`↓` 往回翻，翻过最近的一条回到正在输入的那行。保存最近 50 条，在数据库 meta `tui.cmdline.history`（JSON 数组），下次打开 TUI 还在；同一条再运行只留最新的一次；用法错误没有运行，不记。
 
-- **绘制**：bubbletea 渲染完一帧后，用 iTerm2 内联图片协议（OSC 1337），在详情区预留的矩形里单独绘制图片。做法：包装输出 writer，在同一次写入中帧后追加清除或绘制；绘制时必须临时显示光标（ConPTY 在光标隐藏时不转发定位）。
-- **尺寸由 RimArcho 决定，不交给终端**：图片按比例缩放到 18×9 格以内，取能放下它的最少行数 N，用透明像素补成恰好 18×N 格的比例，以 `width=18;height=N;preserveAspectRatio=0` 发送，所以图片覆盖的正好是这 18×N 格（16:9 占 5 行，正方形 8 行，竖图 9 行）。不能用 `preserveAspectRatio=1`：WezTerm 会保持宽度、按比例推算高度，竖图会超出预留区，清除后留下残条。
-- **预留区**：宽度固定 18 格；高度等于图片的行数，尺寸还不知道时按 16:9，没有 Preview.png 时是一行，居中显示淡色的“无预览”。名称、作者、事实写在预留区右边。右边剩不到 16 格文字时不显示预留区。全屏详情中预留 36×18 格，规则相同。
-- **清除**：选中项变化时，图片在下一帧消失，并在同一次写入中对图片自己占的那几行逐行执行 `ECH 18`。文字覆盖和 bubbletea 的整行重写都不能擦掉图片格子，不能依赖它们；也不擦整个 9 行（会把短图片下面没变的文字擦掉）。
-- **不等待**：选中项变化时立即绘制。为了不让快速滚动卡顿：
-  - 在后台预取光标上下各 10 个 Mod 的缩略图。可见图片和预取各用一个加载槽、每槽一张，所以当前行的未命中不会排在预取后面；加载完成时即使光标已经离开也保留，留作以后的预取。
-  - 编码好的图片序列放在内存 LRU 里，上限 64 张（缩略图已是 360 像素宽，64 张只占几 MB）；屏幕上的和正在加载的从不被逐出。
-  - 命中缓存时立刻画；未命中时立刻开始解码，解码完如果光标还在这一行就画，否则不画。
-  - 每帧重画已经显示的图片（这一帧可能写过它们），最多再加一张新图片；其余按 §2.16.1 T05 的间隔逐张画，不需要新帧。简略详情里只有缩略图，这条主要影响全屏详情。
-- `ui.preview_dwell_ms`：光标停留多久后才画缩略图，默认值和范围见 §2.16.1 T04，玩家觉得闪烁时可以调大。`ui.previews off` 整体关闭图片。
-- **描述图片**（只在全屏详情中）：在原位置占一块区域，宽度为列宽和 60 格中较小者，行数按图片比例算、最多 20 行；用与缩略图相同的方法绘制（补成整格比例、`preserveAspectRatio=0`、离开时 ECH 清除）。只有完全进入可见区域时才画，部分可见时显示占位行；加载中占一行。
+**运行（`enter`）。**
+- 命令在后台跑（§3.1 规则 9），用自己的数据库连接（`App.ReadSession`），界面照常能用；状态行写“正在运行 archo …”。同时只跑一条：前一条没结束时 `enter` 不运行，说明行写“上一条命令还在运行”。
+- 结束后重新读取列表。输出只有一行时写在状态行（带成功或失败的标记，§7）；多行时打开面板，标题是 `archo …`，失败时状态行另写“命令失败”。面板里是 CLI 的原文（带引用，§9.1），`↑↓` 滚动、`esc` 返回。
+- **用法错误**（不认识的命令、参数个数不对、没有这个参数，退出码 2）：输入框重新打开，那一行原样保留，错误写在说明行，改好再按 `enter`。`mcp`、`gui` 本身就报这种错（它们只能作为整条命令行运行）。
+- 交给别处的：`scan` 由扫描子进程做（同 `R`），`analyze` 由分析子进程做（03 §3），都不在界面进程里跑。`log --follow` 不运行（它一直不结束）：说明行写“TUI 的状态行已经在跟着游戏；要看滚动的日志就在终端里运行”。
+- `--env <名>` 和 CLI 一样只对这一条命令有效。
+- 运行后：`config set ui.lang` / `ui.icons` 立即生效；`env use`、`plan use` 之后界面换到新的环境 / 列表（同 `E`、`P`）；`uninstall --yes` 完成后，和卸载页一样只能退出（§2.14）。

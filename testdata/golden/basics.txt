@@ -78,7 +78,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     lineage merge <ref> <ref>                 merge the second lineage into the first
     gc                                        remove expired tombstones and superseded snapshots
     config get [<key>]                        show settings
-    config set <key> <value>                  change a setting (updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto|en|zh; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris; ui.icons: auto|nerd|compat; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; terminal.host: auto|wezterm|none; ui.previews: on|off; ui.gpu: on|off; ui.preview_dwell_ms: 0–5000; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; wezterm.path: an existing WezTerm program, or empty for discovery)
+    config set <key> <value>                  change a setting (updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto|en|zh; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris; ui.icons: compat|nerd; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program)
     guide [<topic>]                           the agent guide behind the MCP tools: a workflow (diagnose, errors, plans, words) or one tool's full reference
     mcp                                       serve the MCP tools over stdio (for Claude Code, Codex and other agents)
     gui                                       open the desktop window (RimArcho.exe does this on a double click)
@@ -88,7 +88,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     data update [<dataset>…]                  download the community data (rules, steamdb, replacements); automatic checks can also refresh it while the window is open
     data status                               the community data: source, version, when it was fetched, entries
     deps                                      show external dependencies: status, version, path and source
-    deps install <name>                       download todds, steamcmd or wezterm into RimArcho's own folder
+    deps install <name>                       download todds or steamcmd into RimArcho's own folder
     deps remove <name>                        remove only RimArcho's own downloaded dependency
     env branches                              list RimWorld's Steam branches (versions) SteamCMD can download
     env download <branch>                     download a RimWorld version with SteamCMD and add it as an environment (anonymous by default)

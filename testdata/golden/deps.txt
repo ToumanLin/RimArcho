@@ -1,10 +1,5 @@
 $ archo deps
 external dependencies
-  font:
-    status: not installed
-    path: <program>/fonts
-    source: bundled
-    error: the bundled font is missing
   todds:
     status: not installed
     error: todds is not installed
@@ -12,23 +7,11 @@ external dependencies
     status: installed
     path: $ROOT/LocalAppData/RimArcho/steamcmd/steamcmd.exe
     source: own
-  wezterm:
-    status: installed
-    path: $ROOT/external/wezterm-gui.exe
-    source: config
 
 $ archo deps install unknown
-error: unknown dependency "unknown" (known: [font todds steamcmd wezterm])
+error: unknown dependency "unknown" (known: [todds steamcmd])
 usage: archo deps install <name>
 [exit 2]
-
-$ archo deps install font
-error: the font ships with RimArcho; reinstall the release zip
-[exit 1]
-
-$ archo deps remove wezterm
-error: wezterm is not RimArcho's own copy; nothing removed
-[exit 1]
 
 $ archo deps remove steamcmd
 removed steamcmd

@@ -21,7 +21,6 @@ func (m *model) View() string {
 	lines[0] = m.topBar()
 	body := h - 4 // rows 2 … h-3
 	var content []string
-	var ps []placement
 	switch {
 	case m.loadErr != nil:
 		content = []string{"", "  " + sErrS.Render(fit(T("error: ")+m.loadErr.Error(), m.w-2)),
@@ -42,28 +41,32 @@ func (m *model) View() string {
 	case m.tab == tabSubscribe:
 		content = m.addLines(body)
 	case m.full:
-		content, ps = m.fullLines(body)
+		content = m.fullLines(body)
 	case m.pos != nil:
 		// The position input sits under the columns, which give it their last lines.
 		sheet := m.posLines(m.w)
 		bar := m.barView(m.w)
-		content, ps = m.columnLines(max(body-len(bar)-len(sheet)-1, 3))
+		content = m.columnLines(max(body-len(bar)-len(sheet)-1, 3))
 		content = append(append(append(bar, content...), ""), sheet...)
-		ps = shiftPlacements(ps, len(bar))
 	default:
 		bar := m.barView(m.w)
-		content, ps = m.columnLines(max(body-len(bar), 3))
+		content = m.columnLines(max(body-len(bar), 3))
 		content = append(bar, content...)
-		ps = shiftPlacements(ps, len(bar))
-	}
-	if m.images != nil {
-		m.images.set(ps) // an empty list clears the images of the previous screen
 	}
 	for i := 0; i < body && i < len(content); i++ {
 		lines[2+i] = content[i]
 	}
 	lines[h-2] = m.statusLine()
 	lines[h-1] = m.hintLine()
+	if m.cmdOn {
+		// the command line over the last lines: candidates, explanation, input (06 §9.4)
+		cl := m.cmdLines()
+		for i, l := range cl {
+			if r := h - len(cl) + i; r >= 1 {
+				lines[r] = l
+			}
+		}
+	}
 	if m.menu != nil {
 		m.overlayMenu(lines)
 	}
@@ -203,6 +206,9 @@ func (m *model) statusText(w int) string {
 	}
 	if text == "" && m.analyzing {
 		text, kind = T("analyzing…"), sayBusy
+	}
+	if text == "" && m.cmdBusy != "" {
+		text, kind = Tf("running archo %s…", m.cmdBusy), sayBusy
 	}
 	if text == "" {
 		return ""
@@ -378,12 +384,11 @@ func (m *model) descMax() int {
 	return 12
 }
 
-// detailLines draws the detail column (w wide, n lines, starting at 0-based column x) and
-// returns its image placements. The first line is the area title, "4 details", or the
+// detailLines draws the detail column (w wide, n lines). Its first line is "4 details", or the
 // mod's name once scrolled; in the accent colour when area 4 has the focus (06 §3.2).
-func (m *model) detailLines(w, n, x int) ([]string, []placement) {
+func (m *model) detailLines(w, n int) []string {
 	m.syncDetailOff()
-	lines := m.detailLayout(detailOpts{width: w, descMax: m.descMax(), images: m.inlineImages(), techText: m.detail})
+	lines := m.detailLayout(detailOpts{width: w, descMax: m.descMax(), techText: m.detail})
 	m.lastLines = lines
 	// The scroll is kept as asked until the mod's details have loaded: PgDn pressed while
 	// the description is still on its way would otherwise be lost.
@@ -402,14 +407,10 @@ func (m *model) detailLines(w, n, x int) ([]string, []placement) {
 		st = sAccent
 	}
 	out := []string{sDimS.Render("4 ") + st.Render(fit(title, w-2))}
-	var ps []placement
 	for i := off; i < len(lines) && len(out) < n; i++ {
 		out = append(out, lines[i].text)
-		if p, ok := m.place(lines[i], len(out)-1, n, x+1); ok { // x is 0-based
-			ps = append(ps, p)
-		}
 	}
-	return out, ps
+	return out
 }
 
 var _ = fmt.Sprint

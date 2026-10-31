@@ -61,7 +61,7 @@ func uninstallFixture(t *testing.T) *unFix {
 	e.WriteFile(filepath.Join(f.local, "steam", "steam_appid.txt"), "294100")
 
 	f.program = filepath.Join(e.Root, "Program")
-	for _, n := range []string{"archo.exe", "RimArcho.exe", "README.md", "CHANGELOG.md", "LICENSE", "fonts/MapleMono.ttf", "monitor/ArchoMonitor/About/About.xml"} {
+	for _, n := range []string{"archo.exe", "RimArcho.exe", "README.md", "CHANGELOG.md", "LICENSE", "fonts/legacy.ttf", "monitor/ArchoMonitor/About/About.xml"} {
 		e.WriteFile(filepath.Join(f.program, n), "x")
 	}
 	e.App.UninstallExe = filepath.Join(f.program, "archo.exe")

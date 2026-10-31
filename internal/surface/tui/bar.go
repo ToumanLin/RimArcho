@@ -478,11 +478,3 @@ func valText(v view.LibChoice) string {
 }
 
 func itoa(n int) string { return strconv.Itoa(n) }
-
-// shiftPlacements moves image placements down by n lines (the bar above the columns).
-func shiftPlacements(ps []placement, n int) []placement {
-	for i := range ps {
-		ps[i].row += n
-	}
-	return ps
-}

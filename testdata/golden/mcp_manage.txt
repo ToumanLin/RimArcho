@@ -18,14 +18,11 @@ settings
   data.steamdb.url: https://raw.githubusercontent.com/RimSort/Steam-Workshop-Database/main/steamDB.json
   monitor.default: on
   tags.pinned: 框架,美化,服装,种族,武器,建筑,家具,QoL,平衡,剧情,性能,语言包,测试中,待删除
-  terminal.host: auto
   ui.accent: default
   ui.gpu: on
-  ui.icons: auto
+  ui.icons: compat
   ui.lang: auto
   ui.mouse: on
-  ui.preview_dwell_ms: 0
-  ui.previews: on
   ui.theme: auto
   updates.auto: on
   updates.interval: normal
