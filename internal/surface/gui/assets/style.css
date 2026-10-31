@@ -702,7 +702,7 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .bd-step .b { flex: 1; min-width: 0; }
 .bd-step .t { font-weight: 600; }
 .bd-step .x { color: var(--fg-2); overflow-wrap: anywhere; }
-.bd-step select.bd-tex { flex: none; width: auto; min-width: 200px; height: 28px; margin: 4px 0 6px; padding: 0 6px; font: inherit; }
+.bd-step .bd-tex { flex: none; width: auto; min-width: 200px; height: 28px; margin: 4px 0 6px; padding: 0 6px; font: inherit; }
 .bd-step ul { margin: 6px 0 0; padding-left: 18px; font-size: 12px; color: var(--fg-2); user-select: text; }
 .bd-step li { overflow-wrap: anywhere; }
 .bd-step .btn { flex: none; height: 28px; padding: 0 12px; border-radius: var(--r-sm); font-size: 13px; }
@@ -1684,7 +1684,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .pm-new .pm-sub { color: var(--fg-2); }
 .pm-fields { min-width: 0; border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 14px; }
 .pm-field { display: flex; flex-direction: column; gap: 7px; min-width: 0; font-weight: 500; }
-.pm-field > input, .pm-field > select, .pm-field > textarea { font-weight: 400; width: 100%; color: var(--fg); }
+.pm-field > input, .pm-field > .choice-control, .pm-field > textarea { font-weight: 400; width: 100%; color: var(--fg); }
 .pm-field .xc-input { flex: none; height: 34px; }
 .pm-modes { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: var(--hairline) solid var(--line-2); padding-bottom: 10px; }
 .pm-modes .on { color: var(--accent); background: var(--accent-soft); }
@@ -2066,3 +2066,28 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .filesearch :is(.fs-note, .fs-empty) { margin: 8px; overflow-wrap: anywhere; }
 .filesearch .fs-note { font-size: 12px; }
 .filesearch .fs-paging { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px; padding: 12px 8px 6px; }
+/* ---- shared choice controls (06 §3.10, §7): off/on and single-value menus ---- */
+.choice-control { display: inline-flex; align-items: center; flex: 0 1 auto; min-width: 0; max-width: 100%; height: 30px; border: var(--hairline) solid var(--line-2); border-radius: var(--r-lg); background: var(--pill); color: var(--fg); font: inherit; font-weight: 400; user-select: none; transition: background var(--t-press), border-color var(--t-press); }
+.choice-control:hover:not(:disabled) { background: var(--pill-hover); }
+.choice-control:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.choice-control:disabled { opacity: .45; }
+.choice-switch { --choice-inset: 3px; padding: var(--choice-inset); gap: 2px; }
+.choice-part { display: flex; align-items: center; justify-content: center; height: 100%; min-width: 38px; padding: 0 10px; border-radius: calc(var(--r-lg) - var(--choice-inset)); color: var(--ctl-fg); }
+.choice-part.on { color: var(--fg); background: var(--seg-thumb); box-shadow: var(--seg-edge); }
+.choice-select { justify-content: space-between; gap: 12px; padding: 0 10px; text-align: left; }
+.choice-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.choice-arrow { display: inline-flex; align-items: center; justify-content: center; flex: none; color: var(--muted); transform: rotate(90deg); }
+.choice-arrow svg.i { display: block; vertical-align: initial; }
+.choice-select[aria-expanded="true"] { background: var(--pill-hover); }
+.choice-select[aria-expanded="true"] .choice-arrow { transform: rotate(270deg); }
+.choice-menu { --choice-inset: 5px; position: fixed; inset: auto; margin: 0; z-index: 30; display: flex; flex-direction: column; width: max-content; max-width: calc(100vw - 16px); max-height: min(340px, calc(100vh - 16px)); padding: var(--choice-inset); border: var(--hairline) solid var(--line-2); border-radius: var(--r-lg); box-shadow: var(--shadow); background: var(--card); color: var(--fg); font: 13px/1.4 var(--font); overflow: hidden; user-select: none; }
+.choice-title { flex: none; padding: 5px 8px 7px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.choice-options { overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
+.choice-option { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 5px 8px; border-radius: calc(var(--r-lg) - var(--choice-inset)); }
+.choice-option[aria-selected="true"] { background: var(--pill); }
+.choice-option.active { background: var(--pill-hover); outline: var(--hairline) solid var(--line); outline-offset: calc(-1 * var(--hairline)); }
+.choice-option[aria-disabled="true"] { opacity: .45; }
+.choice-check { flex: 0 0 14px; text-align: center; }
+.choice-label { min-width: 0; overflow-wrap: anywhere; }
+.settings .set .r > .choice-control { flex-shrink: 1; }
+.pm-field > .choice-control { width: 100%; }

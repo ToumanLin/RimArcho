@@ -2,6 +2,7 @@
 // game log (§2.10), Mod 库 › 变化 (§2.9), the full detail (§4.2), packs, the environment
 // and settings. The pages are side by side: esc does not go from one to another (06 §3.1);
 // esc leaves only the full detail, back to the plan. A page's actions sit in the top bar.
+import { choiceControl } from "./choices.js";
 import { linkRows } from "./linkrows.js";
 import { copyablePath, pathContent } from "./fields.js";
 import { factText, S, $, el, api, T, Tf, errText, say, cur, slideThumb } from "./state.js";
@@ -1615,12 +1616,10 @@ function renderGroups(w, groups, again) {
         row.classList.add("appearance-row");
         right.append(appearanceControl(it, () => ui.reaccent()));
       } else if (it.edit === "choice") {
-        const s = el("select");
-        for (const [i, c] of it.choices.entries()) {
-          const o = el("option", "", (it.choiceLabels && it.choiceLabels[i]) || c);
-          o.value = c;
-          if (c === it.value) o.selected = true;
-          s.append(o);
+        const s = choiceControl(it.label, it.choices.map((c, i) => ({ value: c, label: it.choiceLabels?.[i] || c })), it.value);
+        if (it.note) {
+          note.id = s.id + "-note";
+          s.setAttribute("aria-describedby", note.id);
         }
         // A new language: the page's text again, in place (main.js relang).
         s.onchange = () => run(it.argv, s.value,

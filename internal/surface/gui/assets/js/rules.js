@@ -1,3 +1,4 @@
+import { choiceControl } from "./choices.js";
 // The plan editor's 排序规则 (06 §2.5, 04 §6.1): a fold above 历史 in the left column. Rules
 // are global (every list and game shares them); the fold shows those with a mod enabled in
 // the current list (只看当前列表, the default) or all of them, and its bar counts what it
@@ -174,13 +175,8 @@ function form() {
     line.append(el("span", "rule-fixed", f.text));
   } else {
     line.append(el("span", "rule-a", f.a.name));
-    const sel = el("select", "rule-kind");
-    for (const k of kinds()) {
-      const o = el("option", "", kindLabel(k));
-      o.value = k.kind;
-      if (k.kind === f.kind) o.selected = true;
-      sel.append(o);
-    }
+    const sel = choiceControl(T("load-order rules"), kinds().map(k => ({ value: k.kind, label: kindLabel(k) })), f.kind);
+    sel.classList.add("rule-kind");
     sel.onchange = () => { f.kind = sel.value; draw(); focusForm(); };
     line.append(sel);
     const two = kindOf(f.kind)?.two;

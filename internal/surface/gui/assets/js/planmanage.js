@@ -1,3 +1,4 @@
+import { choiceControl } from "./choices.js";
 // 列表管理 (06 §2.17): the sidebar's 列表 › 列表管理. On the left every list of the game, on the
 // right the picked one: its game versions (04 §1.6), the Steam Workshop collections it
 // follows (04 §9.6) and how to share it (export, pack). The export is a sub-page of its own
@@ -412,9 +413,10 @@ function newForm() {
   }
   fields.append(modes);
   function choice(text, cls, options, value, change) {
-    const field = el("label", "pm-field", text), select = el("select", "xc-input " + cls);
-    for (const o of options) { const op = el("option", "", o.label); op.value = o.from; select.append(op); }
-    select.value = value; select.onchange = () => change(select.value); field.append(select); fields.append(field); return select;
+    const field = el("label", "pm-field", text);
+    const select = choiceControl(text, options.map(o => ({ value: o.from, label: o.label })), value);
+    select.classList.add("xc-input", cls);
+    select.onchange = () => change(select.value); field.append(select); fields.append(field); return select;
   }
   if (draft.from === "") {
     fields.append(el("div", "pm-note", T("the list starts with no mods; add them in the editor, or pick another start above")));
