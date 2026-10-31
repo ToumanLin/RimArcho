@@ -269,7 +269,7 @@ next:
 
 **分析参数**：`--game-version X.Y` 用于 `analyze`、`problems`、`def`、`patches`、`harmony`、`why`、`log`，按另一个游戏主次版本分析（格式必须像 `1.6`，命令结束后恢复）。MCP 对应工具有同名参数 `game_version`。日志的显式路径与版本参数不绕过环境归属检查，见 03 §6.4。
 
-**自动检查状态**：`status`、`data status`（包括 MCP `status` 对应输出）只用一行 `automatic checks`：开关状态，以及等待玩家处理的 Mod / 工具更新数、已设置的 LoversLab 账户登录提醒。没有待处理项时写 `nothing waiting (last MM-DD HH:MM)`；尚未检查时注明 `not checked yet`。省略不适用的账户及零计数，不联网，也不暴露 Cookie；`deps` 另列受管工具的新版本和检查时间，`data status` 列各份数据的检查时间。开关和间隔见 06 §2.16。
+**自动检查状态**：`status`、`data status`（包括 MCP `status` 对应输出）只用一行 `automatic checks`：开关状态，以及等待玩家处理的 Mod / 工具更新数、已设置的 LoversLab 账户登录提醒。没有待处理项时写 `nothing waiting (last MM-DD HH:MM)`；尚未检查时注明 `not checked yet`。省略不适用的账户及零计数，不联网，也不暴露 Cookie；`deps` 另列受管工具的新版本和检查时间，`data status` 列各份数据的检查时间。授权与通知见 06 §2.16，开关默认值和间隔见 06 §2.16.1。
 
 **设置键**（`config set`）：`ui.lang auto|en|zh`；`ui.icons auto|nerd|compat`；`ui.mouse on|off`（关掉终端的鼠标上报，方便选中文字）；`workshop.fetch on|off`（是否联网获取工坊简介）；`workshop.images on|off`（是否下载简介里的图片）；`updates.auto on|off`、`updates.interval normal|frequent|relaxed`（06 §2.16）；`terminal.host auto|wezterm|none`；`ui.previews on|off`；`ui.gpu on|off`（窗口的 GPU 加速，下次打开窗口生效，06 §2.14）；`ui.preview_dwell_ms 0–5000`；`tags.pinned <逗号分隔的标签>`；`monitor.default on|off`（是否把 Archo Monitor 自动加进方案，04 §1.5）；`monitor.dir <绝对路径>`（Monitor 目录，08 §9）。设置存在数据库的 meta 表（键 `cfg:<键>`）；`config.toml` 只有 `tombstone_days`（07 §3）。
 
@@ -301,7 +301,7 @@ next:
 - 启动时用当前环境。每个工具都有 `env` 参数，按次切换环境，调用结束恢复。
 - 同一进程里的工具调用串行执行（共用一个 App）。
 - 每个工具把参数拼成一条 CLI argv，返回 `cmds.Execute` 的文本，原样不改。退出码 1、2 设 `isError`；退出码 3（引用有歧义）是正常结果，因为文本就是候选列表。
-- 需要分析的调用最多等 10 秒（CLI 不限时）。分析子进程超过 10 秒仍未完成，就先返回声明层的问题，文本注明 “still computing in the background”，子进程继续跑，下一次调用取回结果；这段时间里 `get_def` / `get_patches` / `get_harmony` 用上一次（已过期）的分析，有的话。
+- 需要分析的调用按 06 §2.16.1 W01 等待（CLI 不限时）。分析子进程超过等待上限仍未完成，就先返回声明层的问题，文本注明 “still computing in the background”，子进程继续跑，下一次调用取回结果；这段时间里 `get_def` / `get_patches` / `get_harmony` 用上一次（已过期）的分析，有的话。
 - `read_source` 带 `search` 时默认预算 10 秒，并说明还有多少程序集待反编译（“still computing; run again”）。
 
 ### 5.2 工具表
