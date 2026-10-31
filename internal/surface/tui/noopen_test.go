@@ -6,4 +6,5 @@ package tui
 func init() {
 	openDir = func(string) error { return nil }
 	openURL = func(string) error { return nil }
+	copyText = func(string) error { return nil }
 }

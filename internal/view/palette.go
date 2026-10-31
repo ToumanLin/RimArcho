@@ -57,6 +57,7 @@ var Commands = []Command{
 	{"settings", "设置", "settings", "paths, language, data, caches"},
 	{"cli", "运行 archo 命令", "command line", ": archo"},
 	{"update", "更新 RimArcho", "update RimArcho", "new version release notes install upgrade"},
+	{"feedback", "反馈", "feedback", "GitHub issue report a bug suggestion"},
 	{"uninstall", "卸载 RimArcho", "uninstall RimArcho", "remove what RimArcho put on this machine"},
 	{"textures", "贴图优化", "texture optimisation", "convert mods' PNG textures to DDS"},
 	{"search-files", "搜索文件", "search files", "grep rg Def patch C# source decompile"},

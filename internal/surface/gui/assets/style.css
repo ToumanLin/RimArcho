@@ -425,7 +425,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 /* page width by shape (06 §7.3 rule 12): list-and-detail pages fill the window like the
    editor and the library; one-column pages share one reading width */
 .page:is(.logs, .pm-page, .packs, .subs-page, .needs) { padding-left: 12px; padding-right: 12px; }
-.page:is(.env, .textures, .settings) { padding-left: max(20px, calc(50% - 480px)); padding-right: max(20px, calc(50% - 480px)); }
+.page:is(.env, .textures, .settings, .feedback) { padding-left: max(20px, calc(50% - 480px)); padding-right: max(20px, calc(50% - 480px)); }
 @keyframes view-in { from { opacity: 0; transform: translateY(4px); } }
 .head-right { display: flex; align-items: center; gap: 8px; }
 .note { padding: 0 4px; font-size: 12px; }
@@ -1387,6 +1387,28 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .page .btn.primary.danger-go { background: var(--red); border-color: var(--red); color: #fff; }
 .page .btn.primary.danger-go:disabled { opacity: .45; cursor: default; }
 .uninstall .set .sub { white-space: normal; }
+
+/* 设置 › 反馈 (06 §2.14): what the player writes, the attachments, the whole text */
+.fb-form { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; }
+.fb-field { display: flex; flex-direction: column; gap: 6px; font-weight: 500; }
+.fb-field .field { flex: none; width: 100%; font-weight: 400; }
+.fb-field .fb-title { height: 30px; }
+.fb-field .fb-text { height: auto; min-height: 120px; padding: 7px 9px; resize: vertical; font: inherit; line-height: 1.5; }
+.fb-check { display: flex; gap: 8px; align-items: center; cursor: pointer; width: max-content; max-width: 100%; }
+.fb-check input { flex: none; width: 15px; height: 15px; margin: 0; accent-color: var(--accent); }
+.fb-check input:disabled { cursor: default; }
+.feedback .set .l .setting-note { white-space: normal; padding-left: 23px; }
+.fb-prev { padding: 12px 14px 14px; max-height: 420px; overflow: auto; display: flex; flex-direction: column; gap: 12px; user-select: text; cursor: text; }
+.fb-p-title { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.fb-p-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.fb-p-head { color: var(--muted); font-size: 12px; font-weight: 600; }
+summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
+.fb-p-lines { margin-top: 4px; padding-left: 14px; font-size: 12px; color: var(--fg-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.fb-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 14px 0 24px; }
+.fb-foot .m { flex: 1 1 260px; min-width: 0; color: var(--muted); font-size: 12px; }
+.fb-foot .m.warn { color: var(--amber); }
+/* "public on GitHub" beside 预览: a note, not part of the uppercase heading */
+.fb-public { margin-left: 12px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--faint); }
 
 /* 库 › 贴图优化 (08 §5.2): settings rows, the run's foot, the mods table */
 .textures .set .sub { white-space: normal; }

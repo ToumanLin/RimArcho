@@ -153,6 +153,9 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 				}
 				for _, it := range g.Items {
 					value := it.Value
+					if it.URL != "" {
+						value = it.URL
+					}
 					for i, choice := range it.Choices {
 						if choice == value && i < len(it.ChoiceLabels) {
 							value = it.ChoiceLabels[i]
@@ -174,6 +177,10 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 						fmt.Fprintf(&b, "    : archo %s\n", strings.Join(it.MoveArgv, " "))
 					}
 					for _, a := range it.Actions {
+						if a.Argv[0] == "feedback" { // a panel, not a command (06 §2.14)
+							fmt.Fprintf(&b, "    %s  ctrl+k %s\n", a.Label, T("feedback"))
+							continue
+						}
 						fmt.Fprintf(&b, "    %s  : archo %s\n", a.Label, strings.Join(a.Argv, " "))
 					}
 				}
@@ -182,6 +189,8 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 			m.openPanel(T("settings"), b.String())
 			return nil
 		}
+	case "feedback":
+		return func(m *model) tea.Cmd { return m.feedbackPanel(view.FeedbackOptions{}) }
 	case "uninstall":
 		return func(m *model) tea.Cmd { return m.uninstallPanel() }
 	case "update":

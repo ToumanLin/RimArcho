@@ -106,6 +106,7 @@ type API struct {
 	texMeasure    textureMeasurement
 	logRead       logReader
 	texRead       logReader
+	feedback      feedbackState
 	costMeasure   loadCostMeasurement
 	accountMu     sync.Mutex
 	accountActive bool

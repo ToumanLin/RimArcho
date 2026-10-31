@@ -32,8 +32,8 @@ func TestAutomaticSettingsOnlyControlsAndHumanIntervals(t *testing.T) {
 			}
 			e.MustRun("config", "set", "updates.interval", preset.value)
 			g := view.AutomaticGroup(e.App)
-			// the two controls, then RimArcho's own version (07 §5.1)
-			if len(g.Items) != 3 || g.Items[2].Label != "RimArcho" || strings.Contains(g.Note, "LoversLab") {
+			// RimArcho's own version (07 §5.1), then the two controls
+			if len(g.Items) != 3 || g.Items[0].Label != "RimArcho" || strings.Contains(g.Note, "LoversLab") {
 				t.Fatal(g)
 			}
 			want := view.Tf("While RimArcho is open: check mods, community data and RimArcho %s, tools %s.", intervals[0], intervals[1]) + " " + view.T("Mod, tool and RimArcho updates wait for your click.")
@@ -52,7 +52,7 @@ func TestAutomaticSettingsOnlyControlsAndHumanIntervals(t *testing.T) {
 		}
 	}
 	view.SetLang("zh")
-	if got := view.AutomaticGroup(e.App).Items[0].ChoiceLabels; !reflect.DeepEqual(got, []string{"开", "关"}) {
+	if got := view.AutomaticGroup(e.App).Items[1].ChoiceLabels; !reflect.DeepEqual(got, []string{"开", "关"}) {
 		t.Fatal(got)
 	}
 	for _, g := range view.SettingsPage(e.App, nil) {

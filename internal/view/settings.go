@@ -28,14 +28,16 @@ type SettingItem struct {
 	File      bool     `json:"file,omitempty"` // choose a program file rather than a directory
 	Choices   []string `json:"choices,omitempty"`
 	// ChoiceLabels are the words shown for Choices (same order); empty shows the values.
-	ChoiceLabels []string        `json:"choiceLabels,omitempty"`
-	Argv         []string        `json:"argv,omitempty"`
-	MoveArgv     []string        `json:"moveArgv,omitempty"`
-	Directory    string          `json:"directory,omitempty"`
-	Note         string          `json:"note,omitempty"`
-	Hover        string          `json:"hover,omitempty"`
-	ValueNote    string          `json:"valueNote,omitempty"`
-	Actions      []SettingAction `json:"actions,omitempty"`
+	ChoiceLabels []string `json:"choiceLabels,omitempty"`
+	Argv         []string `json:"argv,omitempty"`
+	MoveArgv     []string `json:"moveArgv,omitempty"`
+	Directory    string   `json:"directory,omitempty"`
+	Note         string   `json:"note,omitempty"`
+	Hover        string   `json:"hover,omitempty"`
+	ValueNote    string   `json:"valueNote,omitempty"`
+	// URL: the value is a web page; the interfaces open it in the browser (社区, 06 §2.14).
+	URL     string          `json:"url,omitempty"`
+	Actions []SettingAction `json:"actions,omitempty"`
 	// Details fold under the row (06 §3.1 rule 7): RimArcho's release notes.
 	Details *SettingDetails `json:"details,omitempty"`
 }
@@ -236,39 +238,55 @@ func FolderGroup(a *app.App) SettingGroup {
 	return g
 }
 
-// SettingsPage starts with every managed directory. Game launch and save options
-// also remain available on the environment page.
+// SettingsPage is the settings page's groups, the most used first (06 §2.14): 界面, 账户,
+// 更新, 文件夹, then 游戏日志, 外部工具, 社区数据, 存储, 社区 and, last, 卸载. The GUI and
+// the TUI show them in this order. Game launch and save options are on the environment page.
 func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
-	folders := FolderGroup(a)
-	// Existing folders have one row, with relocation controls, in DirectoryGroup.
-	var add []SettingItem
-	for _, item := range folders.Items {
-		if item.Value == "" {
-			add = append(add, item)
-		}
-	}
-	folders.Items = add
-	out := []SettingGroup{{Title: T("appearance"), Items: []SettingItem{
-		{Label: T("accent colour"), Value: cmds.Setting(a, "ui.accent"), Edit: "swatches", Choices: cmds.SettingChoices("ui.accent"),
-			ChoiceLabels: []string{T("default"), T("indigo"), T("blue"), T("cyan"), T("teal"), T("green"), T("grass"), T("orange"), T("amber"), T("red"), T("crimson"), T("pink"), T("plum"), T("purple"), T("violet"), T("iris")},
-			Argv:         []string{"config", "set", "ui.accent", "{}"}},
-		{Label: T("day/night theme"), Value: cmds.Setting(a, "ui.theme"), Edit: "segments", Choices: cmds.SettingChoices("ui.theme"),
-			ChoiceLabels: []string{T("follow system"), T("light"), T("dark")}, Argv: []string{"config", "set", "ui.theme", "{}"}},
-	}}, DirectoryGroup(a), folders, AccountGroup(a)}
-	out = append(out, DependencyGroup(a))
-	out = append(out, AutomaticGroup(a))
-	lang := cmds.Setting(a, "ui.lang")
 	gpuNote := ""
 	if cmds.Setting(a, "ui.gpu") == "off" {
 		gpuNote = T("takes effect next time you open RimArcho")
 	}
-	out = append(out, SettingGroup{Title: T("interface"), Items: []SettingItem{
-		{Label: T("language"), Value: lang, Edit: "choice", Choices: []string{"auto", "zh", "en"}, Argv: []string{"config", "set", "ui.lang", "{}"}},
-		{Label: T("Workshop descriptions"), Value: cmds.Setting(a, "workshop.fetch"), Edit: "choice", Choices: []string{"on", "off"}, ChoiceLabels: []string{T("on"), T("off")}, Argv: []string{"config", "set", "workshop.fetch", "{}"}},
-		{Label: T("images in descriptions"), Value: cmds.Setting(a, "workshop.images"), Edit: "choice", Choices: []string{"on", "off"}, ChoiceLabels: []string{T("on"), T("off")}, Argv: []string{"config", "set", "workshop.images", "{}"}},
-		{Label: T("GPU acceleration"), Value: cmds.Setting(a, "ui.gpu"), Edit: "choice", Choices: []string{"on", "off"}, ChoiceLabels: []string{T("on"), T("off")}, Argv: []string{"config", "set", "ui.gpu", "{}"},
-			Hover: T("uses about 20–35 MB less memory and draws in software"), ValueNote: gpuNote},
-	}})
+	onOff := func(label, key string) SettingItem {
+		return SettingItem{Label: label, Value: cmds.Setting(a, key), Edit: "choice", Choices: []string{"on", "off"}, ChoiceLabels: []string{T("on"), T("off")}, Argv: []string{"config", "set", key, "{}"}}
+	}
+	gpu := onOff(T("GPU acceleration"), "ui.gpu")
+	gpu.Hover, gpu.ValueNote = T("uses about 20–35 MB less memory and draws in software"), gpuNote
+	// 启动页背景 closes this card in the GUI (it is not a setting command).
+	out := []SettingGroup{{Title: T("interface"), Items: []SettingItem{
+		{Label: T("language"), Value: cmds.Setting(a, "ui.lang"), Edit: "choice", Choices: []string{"auto", "zh", "en"}, ChoiceLabels: []string{T("follow system"), "简体中文", "English"}, Argv: []string{"config", "set", "ui.lang", "{}"}},
+		{Label: T("day/night theme"), Value: cmds.Setting(a, "ui.theme"), Edit: "segments", Choices: cmds.SettingChoices("ui.theme"),
+			ChoiceLabels: []string{T("follow system"), T("light"), T("dark")}, Argv: []string{"config", "set", "ui.theme", "{}"}},
+		{Label: T("accent colour"), Value: cmds.Setting(a, "ui.accent"), Edit: "swatches", Choices: cmds.SettingChoices("ui.accent"),
+			ChoiceLabels: []string{T("default"), T("indigo"), T("blue"), T("cyan"), T("teal"), T("green"), T("grass"), T("orange"), T("amber"), T("red"), T("crimson"), T("pink"), T("plum"), T("purple"), T("violet"), T("iris")},
+			Argv:         []string{"config", "set", "ui.accent", "{}"}},
+		onOff(T("Workshop descriptions"), "workshop.fetch"),
+		onOff(T("images in descriptions"), "workshop.images"),
+		gpu,
+	}}, AccountGroup(a), AutomaticGroup(a)}
+
+	// RimArcho's folders, each with relocation controls, then adding a mod folder.
+	folders := DirectoryGroup(a)
+	folders.Title = T("folders")
+	for _, item := range FolderGroup(a).Items {
+		if item.Value == "" {
+			folders.Items = append(folders.Items, item)
+		}
+	}
+	out = append(out, folders)
+
+	mon := SettingItem{Label: T("add Archo Monitor to lists"), Value: cmds.Setting(a, "monitor.default"), Edit: "choice", Choices: []string{"on", "off"},
+		ChoiceLabels: []string{T("on"), T("off")}, Argv: []string{"config", "set", "monitor.default", "{}"}, Hover: T("new lists, and every sort")}
+	if s, err := a.MonitorState(); err == nil {
+		v := T("not installed")
+		if len(s.Installed) > 0 {
+			v = s.Installed[0]
+		}
+		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon, {Label: T("Archo Monitor installed"), Value: v, Note: s.Dir, NotePaths: []string{s.Dir}}}})
+	} else {
+		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon}})
+	}
+	out = append(out, DependencyGroup(a))
+
 	data := SettingGroup{Title: T("community data")}
 	status := a.DataStatus()
 	checked := a.AutomaticStatus("data").Checked
@@ -294,31 +312,22 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	data.Items = append(data.Items, SettingItem{Label: T("update the community data"), Actions: []SettingAction{{Label: T("update now"), Argv: []string{"data", "update"},
 		Confirm: T("RimArcho downloads the three files from their sources (about 50 MB)")}}})
 	out = append(out, data)
+
+	// 存储: the database and the caches, what takes room on the disk.
 	db, _ := a.DBInfo()
-	out = append(out, SettingGroup{Title: T("database"), Items: []SettingItem{
-		{Label: T("size"), Value: SizeText(db.Bytes), Note: db.Path, NotePaths: []string{db.Path}, Actions: []SettingAction{
+	storage := SettingGroup{Title: T("storage"), Items: []SettingItem{
+		{Label: T("database"), Value: SizeText(db.Bytes), Note: db.Path, NotePaths: []string{db.Path}, Actions: []SettingAction{
 			{Label: T("back up"), Argv: []string{"db", "backup"}},
 			{Label: T("compact"), Argv: []string{"db", "vacuum"}},
 			{Label: T("remove old tombstones"), Argv: []string{"gc"}, Confirm: T("mods gone for longer than the tombstone time are forgotten")},
 		}},
-	}})
-	caches := SettingGroup{Title: T("caches")}
+	}}
 	for _, c := range a.Caches() {
-		caches.Items = append(caches.Items, SettingItem{Label: T(c.Desc), Value: Tf("%s  %d items", SizeText(c.Bytes), c.Files),
+		storage.Items = append(storage.Items, SettingItem{Label: T(c.Desc), Value: Tf("%s  %d items", SizeText(c.Bytes), c.Files),
 			Actions: []SettingAction{{Label: T("clear"), Argv: []string{"cache", "clear", c.Kind}}}})
 	}
-	out = append(out, caches)
-	mon := SettingItem{Label: T("add Archo Monitor to lists"), Value: cmds.Setting(a, "monitor.default"), Edit: "choice", Choices: []string{"on", "off"},
-		ChoiceLabels: []string{T("on"), T("off")}, Argv: []string{"config", "set", "monitor.default", "{}"}, Hover: T("new lists, and every sort")}
-	if s, err := a.MonitorState(); err == nil {
-		v := T("not installed")
-		if len(s.Installed) > 0 {
-			v = s.Installed[0]
-		}
-		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon, {Label: T("Archo Monitor installed"), Value: v, Note: s.Dir, NotePaths: []string{s.Dir}}}})
-	} else {
-		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon}})
-	}
+	out = append(out, storage, CommunityGroup())
+
 	// Last: its own page with the plan (the interfaces open it; archo uninstall is not a
 	// settings command).
 	out = append(out, SettingGroup{Title: T("uninstall"), Items: []SettingItem{

@@ -65,6 +65,8 @@ type panel struct {
 	onDelete func(m *model, value string) tea.Cmd
 	// onEnter: enter runs it (a confirmation: the dry run is the text, 06 §6)
 	onEnter func(m *model) tea.Cmd
+	// keys: a text panel's own keys (反馈's m / p / l, 06 §2.14); the panel stays open
+	keys map[string]func(m *model) tea.Cmd
 }
 
 // prompt is an input line: a name, a note, a rule (r), an import source. The command
@@ -132,7 +134,7 @@ type model struct {
 	// list is the current one); the top bar says it (04 §1.3)
 	launches   string
 	launchesID int64
-	tasks taskRunner // the subscription actions' background tasks (06 §2.16)
+	tasks      taskRunner // the subscription actions' background tasks (06 §2.16)
 
 	bar      barState  // the editor's filter bar over 未启用 and 已启用 (06 §2.5)
 	board    *boardRef // the board the columns were built from (the bar filters it)
