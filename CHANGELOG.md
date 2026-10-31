@@ -4,6 +4,20 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- Uninstall confirmation now lists what will be removed or changed, counts, sizes,
+  removal methods and what stays. The dialog defaults to Cancel; only its red
+  Uninstall button starts the work. TUI shows the same summary and reviews changed
+  choices before confirmation. Progress is centered with a collapsible step list,
+  restored after reload. Windows' shutdown-block reason follows the app language.
+
+- Uninstall now opens a dedicated progress page and disables navigation until the report.
+  Go blocks window/application closing during uninstall, including custom close buttons;
+  the page explains that closing is available after completion. Progress/report survives
+  a WebView reload. Windows receives a shutdown-block reason during uninstall.
+  TUI uninstall runs in the background with progress; Ctrl+C, q and Esc show the same
+  notice while it runs, and work again afterwards. Embedded GUI/TUI commands
+  (`uninstall --yes`) use the same protected workflow; previews remain read-only.
+
 - Settings › Feedback (反馈, also in the command palette): write a bug report or
   suggestion; it becomes a public issue in the GitHub repository, which the page says
   above the preview. Two ways:

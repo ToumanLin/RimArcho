@@ -737,6 +737,7 @@ async function preview(what) {
 
 // cmd runs a palette command (view.Commands).
 async function cmd(id) {
+  if (uninst.locked()) return;
   if (environmentReason() && ["launch", "sort", "save", "undo", "redo", "restore-all", "stage-all", "rescan", "analyze"].includes(id)) return say("busy", environmentReason());
   // A page replaces the page shown once its data is in: the mod list never shows between.
   const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", subscribe: "subscribe", library: "library", log: "log", settings: "settings", packs: "packs", build: "build", "env-page": "env", uninstall: "uninstall", feedback: "feedback", textures: "textures", tasks: "tasks", "search-files": "search" };
@@ -805,6 +806,8 @@ async function refreshEnvironment() {
 function commandLine() {
   pop.ask(T("run an archo command"), "list --filter tag:ui", async (line) => {
     const out = await api.RunCLI(line);
+    if (out.length === 1 && out[0] === T("uninstalling…")) { await uninst.restore(); return; }
+    if (uninst.locked()) return;
     pop.text("archo " + line, out);
     reload();
   });
@@ -1003,6 +1006,13 @@ async function delKey() {
 function onKey(e) {
   if (e.isComposing || e.defaultPrevented) return;
   const k = e.key;
+  if (uninst.locked()) {
+    // Native focus/activation and copying still work on the progress/report page.
+    if (k === "Tab" || (e.altKey && k === "F4") || (e.ctrlKey && k.toLowerCase() === "c") ||
+        (["Enter", " "].includes(k) && document.activeElement?.closest("#screen button, #screen summary"))) return;
+    e.preventDefault();
+    return;
+  }
   // a menu opened with the mouse does not hold the focus: esc still closes it first (G5)
   if (k === "Escape" && !$("#menu").hidden) { e.preventDefault(); pop.hideMenu(); return; }
   // ctrl+b moves the navigation between the side and the top, on every page (06 §2.1)
@@ -1281,6 +1291,7 @@ async function start() {
   });
   on("pack", (ev) => packsPage.packEvent(ev));
   on("uninstall", (ev) => uninst.event(ev));
+  on("uninstall-close-blocked", () => uninst.closeBlocked());
   on("textures", (ev) => tex.event(ev));
   on("tasks", (ev) => tasksPage.event(ev));
   document.addEventListener("task-ended", (e) => {
@@ -1311,6 +1322,7 @@ async function start() {
     try { if (S.board && (await api.Stamp()) !== S.board.stamp) await reload(); } catch { /* keep the page */ }
     checkCredit();
   });
+  if (await uninst.restore()) { shell.settle(); return; }
   // The start page needs only Workspace's shell and board. The editor behind it gets its
   // filter answer (the bar's first one reads every mod's content) and its rows afterwards,
   // so the first page does not wait for them.

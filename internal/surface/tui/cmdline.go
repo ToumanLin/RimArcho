@@ -688,6 +688,19 @@ func (m *model) cmdSubmit() tea.Cmd {
 		l.err = T("the status line already follows the game; run it in a terminal for a scrolling log")
 		return nil
 	}
+	if argv[0] == "uninstall" {
+		options, run, err := cmds.ParseUninstallRequest(argv)
+		if err != nil {
+			l.err = err.Error()
+			return nil
+		}
+		if run {
+			m.cmdOn = false
+			l.text, l.cur = nil, 0
+			m.remember(line)
+			return m.startUninstallFor(options, envName)
+		}
+	}
 	m.cmdOn = false
 	l.text, l.cur = nil, 0
 	switch {

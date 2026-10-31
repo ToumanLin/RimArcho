@@ -133,6 +133,9 @@ func TestUninstallRunBlockedReleasesLocks(t *testing.T) {
 		t.Fatal("blocked execution retained the account lock")
 	}
 	s.accountMu.Unlock()
+	if s.UninstallStatus().Running {
+		t.Fatal("blocked preflight retained close guard")
+	}
 	if e.App.Uninstalled {
 		t.Fatal("blocked execution uninstalled the fixture")
 	}

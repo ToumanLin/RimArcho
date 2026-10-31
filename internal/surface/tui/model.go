@@ -107,11 +107,12 @@ type model struct {
 	question   int
 	missing    int
 
-	idleSeq    int
-	detailRef  string
-	detail     []string // technical information (the mod command), when expanded
-	detailSeq  int
-	detailTech bool
+	uninstallRun *uninstallRun
+	idleSeq      int
+	detailRef    string
+	detail       []string // technical information (the mod command), when expanded
+	detailSeq    int
+	detailTech   bool
 
 	insp     *inspectView
 	inspHist []*inspectView
@@ -251,6 +252,10 @@ func Run(o Options) error {
 		})
 	})
 	_, err := program.Run()
+	// Terminal loss must not interrupt file work.
+	if run := mdl.uninstallRun; run != nil {
+		<-run.done
+	}
 	mdl.closeTasks()
 	if run := mdl.selfRun; run != nil {
 		// Quit during an install: stop it, and let a swap that has begun finish or roll back.

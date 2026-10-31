@@ -2066,3 +2066,30 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .filesearch :is(.fs-note, .fs-empty) { margin: 8px; overflow-wrap: anywhere; }
 .filesearch .fs-note { font-size: 12px; }
 .filesearch .fs-paging { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px; padding: 12px 8px 6px; }
+
+/* Uninstall owns the page until its report (06 §2.14). */
+.uninstall-exclusive :is(#nav, #nav-settings, #tasks-line) { pointer-events: none; opacity: .45; }
+.uninstall-exclusive #crumbs, .uninstall-exclusive #env, .uninstall-exclusive #hints { pointer-events: none; }
+.uninstall-exclusive #hints { visibility: hidden; }
+.un-progress-page { width: min(640px, 100%); margin-inline: auto; padding: 0 20px 24px; min-height: 65vh; justify-content: center; }
+.un-progress { display: flex; flex-direction: column; gap: var(--card-gap); padding: 24px; text-align: center; }
+.un-progress p { margin: 0; }
+.un-progress progress { width: 100%; accent-color: var(--accent); }
+.un-close-notice { color: var(--amber); }
+
+.un-progress-steps { padding: 14px 18px; }
+.un-progress-steps summary { cursor: pointer; color: var(--muted); width: max-content; }
+.un-progress-steps ol { margin: 12px 0 0; padding-left: 22px; }
+.un-progress-steps li { padding: 5px 0; overflow-wrap: anywhere; }
+.un-progress-steps li > span { display: block; }
+.un-progress-steps li[aria-current] { color: var(--accent-11, var(--accent)); }
+.un-progress-steps li.pending { color: var(--muted); }
+.un-progress-steps li.done > span:first-child::after { content: " ✓"; color: var(--green); }
+.pop.un-confirm { width: min(640px, 94vw); }
+.un-confirm h2 { margin: 0; font-weight: 600; }
+.un-summary + .un-summary { margin-top: var(--card-gap); }
+.un-summary h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
+.un-summary-row { display: flex; flex-direction: column; gap: 3px; padding: 6px 0; overflow-wrap: anywhere; }
+.un-summary-row strong { font-weight: 500; }
+.un-summary p { margin: 8px 0 0; overflow-wrap: anywhere; }
+.pop.un-confirm .btns .danger-go { background: var(--red); border-color: var(--red); color: #fff; }

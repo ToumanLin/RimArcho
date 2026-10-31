@@ -24,7 +24,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	if _, ok := msg.(liveTick); ok {
 		// Not input: the idle countdown goes on.
-		m.pollLive()
+		if m.uninstallRun == nil {
+			m.pollLive()
+		}
 		return m, liveNext()
 	}
 	m.idleSeq++
@@ -36,6 +38,17 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	defer m.fsLeft() // leaving 搜索文件 stops its search (06 §3.1 rule 9)
+	if m.uninstallRun != nil {
+		switch msg := msg.(type) {
+		case uninstallStepMsg, uninstallDoneMsg:
+			return m, m.onUninstall(msg)
+		case tea.KeyMsg:
+			return m, m.key(msg)
+		case tea.WindowSizeMsg:
+			m.w, m.h = msg.Width, msg.Height
+		}
+		return m, nil
+	}
 	switch msg := msg.(type) {
 	case feedbackSentMsg:
 		if msg.err != nil {
@@ -143,6 +156,12 @@ func (m *model) scanSummary(out string) string {
 
 func (m *model) key(k tea.KeyMsg) tea.Cmd {
 	s := k.String()
+	if m.uninstallRun != nil {
+		if s == "ctrl+c" || s == "q" || s == "esc" {
+			m.say(sayBusy, T("uninstalling; you can close RimArcho when it finishes"))
+		}
+		return nil
+	}
 	if s == "ctrl+c" || (m.app.Uninstalled && m.panel == nil) {
 		m.quitting = true // after an uninstall nothing else runs
 		return tea.Quit
