@@ -286,6 +286,38 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .histarea .hbar { width: 100%; text-align: left; }
 .histbody { flex: 1; min-height: 0; overflow-y: auto; padding: 0 10px 6px; }
 .histbody .hist { margin-top: 4px; }
+/* 排序规则 (rules.js, 06 §2.5): the player's rules, each a sentence with its note; 编辑 / 删除
+   show on hover or focus; the form adds or changes a rule in place */
+.rulesarea .hbar { width: 100%; text-align: left; }
+.rulesbody { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 10px 8px; }
+.rule { position: relative; padding: 5px 8px; border-radius: var(--r-sm); }
+.rule:hover, .rule:focus-within { background: var(--pill); }
+.rule-t { color: var(--fg); line-height: 1.45; padding-right: 96px; }
+.rule-n { color: var(--muted); font-size: 12px; margin-top: 1px; padding-right: 96px; }
+.rule-mod { color: inherit; font-weight: 600; padding: 0; text-align: left; }
+.rule-mod:hover { color: var(--accent-11, var(--accent)); }
+.rule-gone { color: var(--faint); }
+.rule-acts { position: absolute; top: 4px; right: 6px; display: none; gap: 2px; }
+.rule:hover .rule-acts, .rule:focus-within .rule-acts { display: inline-flex; }
+.rule-add { margin-top: 4px; }
+.rule-add .ic svg.i { width: 11px; height: 11px; }
+.rule-form { display: flex; flex-direction: column; gap: 6px; padding: 8px; margin: 2px 0 6px; border: var(--hairline) solid var(--line-2); border-radius: var(--r-sm); background: var(--card-2); }
+.rule-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rule-a, .rule-fixed { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.rule-fixed { font-weight: 400; white-space: normal; }
+.rule-kind, .rule-b input, .rule-note { height: 26px; background: var(--card); color: var(--fg); border: var(--hairline) solid var(--line-2); border-radius: var(--r-sm); padding: 0 8px; font-size: 13px; }
+.rule-kind:focus, .rule-b input:focus, .rule-note:focus { border-color: var(--accent); }
+.rule-b { position: relative; flex: 1 1 160px; min-width: 0; }
+.rule-b input { width: 100%; }
+.rule-cands { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px); background: var(--card); border-radius: var(--r-lg); box-shadow: var(--shadow); overflow: hidden; }
+.rule-cands:empty { display: none; }
+.rule-cand { display: flex; gap: 8px; width: 100%; padding: 5px 9px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rule-cand .p { margin-left: auto; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+.rule-cand:hover, .rule-cand.on { background: var(--accent-soft); color: var(--accent-11, var(--accent)); }
+.rule-form-acts { display: flex; justify-content: flex-end; gap: 6px; }
+.rules-scope { display: flex; padding: 3px; margin: 2px 0 4px; }
+.rules-scope > .thumb { top: 3px; bottom: 3px; }
+.rules-scope button { flex: 1 1 0; justify-content: center; padding: 0 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .area { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--card); border: var(--hairline) solid var(--line-2); border-radius: var(--r-lg); overflow: hidden; transition: border-color var(--t-press); }
 .area.focus { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .area .head { display: flex; align-items: baseline; gap: 8px; padding: 9px 12px 6px; color: var(--faint); white-space: nowrap; overflow: hidden; border-bottom: var(--hairline) solid var(--line-2); }
@@ -1864,6 +1896,8 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 /* Approved editor layout: information left, load order centre, available copies right. */
 .editor-right > .area:not(.fold) {flex:1;min-height:0;}
 .editor-left > .histarea {flex:none;}
+.editor-left > .rulesarea {flex:none;}
+.editor-left > .rulesarea.open:not(.stack-sized) {max-height:40%;}
 .editor-left > .histarea.open:not(.stack-sized) {flex:0 1 25%;height:25%;max-height:25%;}
 .fcol:has(> .fbar.open.fill) > .area {min-height:0;}
 .fbar {overflow:visible;}
@@ -1966,3 +2000,41 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .identity-files { padding-left: 20px; margin: 6px 0 0; overflow-wrap: anywhere; font-size: 13px; }
 .identity-answer-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .identity-comparison .btns { flex-wrap: wrap; justify-content: space-between; }
+
+/* 搜索文件 (filesearch.js) */
+.page.filesearch { padding: 0 max(12px, calc(50% - 480px)) 24px; }
+.filesearch .fs-query { padding: 12px 14px; }
+.filesearch .fs-input-row { display: flex; align-items: center; gap: 6px; }
+.filesearch .fs-input { flex: 1; min-width: 80px; height: 30px; padding: 0 8px; border-radius: var(--r-sm); background: var(--card-2); border: var(--hairline) solid var(--line); }
+.filesearch .fs-toggle { min-width: 30px; padding: 0 6px; }
+.filesearch :is(.fs-toggle, .fs-kind)[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-11, var(--accent)); border-color: var(--accent-soft); }
+.filesearch .fs-options { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
+.filesearch .fs-label { flex: none; width: 32px; font-size: 12px; }
+.filesearch .fs-mod-chip { display: inline-flex; gap: 8px; align-items: center; max-width: 100%; overflow-wrap: anywhere; }
+.filesearch .fs-mod-chip button { flex: none; color: var(--muted); }
+.filesearch .fs-picker { flex: 1; min-width: 160px; max-width: 360px; }
+.filesearch .fs-mod-input { padding: 4px 8px; border-radius: var(--r-sm); background: var(--card-2); border: var(--hairline) solid var(--line); }
+.filesearch .fs-candidates { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+.filesearch .fs-candidate { justify-content: flex-start; text-align: left; height: auto; min-height: 26px; white-space: normal; overflow-wrap: anywhere; }
+.filesearch .fs-candidate.cur { background: var(--pill); }
+.filesearch .fs-results { padding: 6px; }
+.filesearch .fs-results > h2 { margin: 4px 8px 8px; font-size: 13px; font-weight: 600; }
+.filesearch .fs-mod-head { display: flex; align-items: baseline; gap: 12px; padding: 10px 8px 5px; }
+.filesearch .fs-position { width: 30px; flex: none; text-align: right; font-size: 12px; }
+.filesearch .fs-mod-name { min-width: 0; overflow-wrap: anywhere; color: var(--accent-11, var(--accent)); text-decoration: none; }
+.filesearch .fs-mod-name:hover { text-decoration: underline; }
+.filesearch .fs-count { margin-left: auto; flex: none; font-size: 12px; }
+.filesearch .fs-row { min-width: 0; padding: 4px 8px; border-radius: var(--r-sm); user-select: text; }
+.filesearch .fs-row.cur { background: var(--pill); }
+.filesearch .fs-row:focus-visible { outline: var(--hairline) solid var(--accent); outline-offset: -1px; }
+.filesearch .fs-file { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; font-size: 12px; }
+.filesearch .fs-path { flex: 1; min-width: 100px; font-family: var(--code); }
+.filesearch .fs-line { display: flex; gap: 12px; font: 12px/1.6 var(--code); }
+.filesearch .fs-line-number { flex: none; width: 42px; text-align: right; }
+.filesearch .fs-line-content { flex: 1; min-width: 0; }
+.filesearch .fs-context { display: block; white-space: pre-wrap; overflow-wrap: anywhere; }
+.filesearch .fs-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.filesearch mark { background: var(--accent-soft); color: var(--accent-11, var(--accent)); }
+.filesearch :is(.fs-note, .fs-empty) { margin: 8px; overflow-wrap: anywhere; }
+.filesearch .fs-note { font-size: 12px; }
+.filesearch .fs-paging { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px; padding: 12px 8px 6px; }

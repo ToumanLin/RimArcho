@@ -45,6 +45,8 @@ func init() {
 	register(&Command{Name: "rule add", Args: "after|before|incompatible|attach <A> <B> | top|bottom <A> | ignore <constraint>", Summary: "add a user rule",
 		MinArgs: 2, MaxArgs: 3, Flags: []Flag{{Name: "note", Value: "<text>"}}, Run: ruleAdd})
 	register(&Command{Name: "rule list", Summary: "list user rules", MaxArgs: 0, Run: ruleList})
+	register(&Command{Name: "rule edit", Args: "<r:n> after|before|incompatible|attach <A> <B> | top|bottom <A> | ignore <constraint>", Summary: "replace a user rule; r:<n> stays",
+		MinArgs: 3, MaxArgs: 4, Flags: []Flag{{Name: "note", Value: "<text>"}}, Run: ruleEdit})
 	register(&Command{Name: "rule remove", Args: "<r:n>", Summary: "delete a user rule", MinArgs: 1, MaxArgs: 1, Run: ruleRemove})
 	register(&Command{Name: "launch", Summary: "save the list and start the game (one game at a time)", MaxArgs: 0,
 		Flags: []Flag{{Name: "dry-run", Help: "show what would be written and the command; write nothing"}, {Name: "move-duplicates", Help: "first move plain Mods/ folders holding another version of a mod to link into the lock library"}}, Run: launchCmd})
@@ -626,27 +628,56 @@ func primaryRef(ix *app.Index) func(string) string {
 	}
 }
 
-func ruleAdd(c *Ctx, a *Args) (*render.Doc, error) {
-	spec := app.RuleSpec{Kind: strings.ToLower(a.Pos[0]), Note: a.Str("note")}
+// ruleSpec reads <kind> <A> [<B>] | ignore <constraint> and --note (rule add, rule edit).
+func ruleSpec(pos []string, note string) (app.RuleSpec, error) {
+	spec := app.RuleSpec{Kind: strings.ToLower(pos[0]), Note: note}
 	switch {
-	case spec.Kind == order.RuleIgnore && len(a.Pos) == 2:
-		spec.Target = a.Pos[1]
-	case (spec.Kind == order.RuleTop || spec.Kind == order.RuleBottom) && len(a.Pos) == 2:
-		spec.A = a.Pos[1]
-	case spec.Kind != order.RuleIgnore && spec.Kind != order.RuleTop && spec.Kind != order.RuleBottom && len(a.Pos) == 3:
-		spec.A, spec.B = a.Pos[1], a.Pos[2]
+	case spec.Kind == order.RuleIgnore && len(pos) == 2:
+		spec.Target = pos[1]
+	case (spec.Kind == order.RuleTop || spec.Kind == order.RuleBottom) && len(pos) == 2:
+		spec.A = pos[1]
+	case spec.Kind != order.RuleIgnore && spec.Kind != order.RuleTop && spec.Kind != order.RuleBottom && len(pos) == 3:
+		spec.A, spec.B = pos[1], pos[2]
 	default:
-		return nil, &UsageError{Msg: "after|before|incompatible|attach take two references; top|bottom take one; ignore takes one constraint reference"}
+		return spec, &UsageError{Msg: "after|before|incompatible|attach take two references; top|bottom take one; ignore takes one constraint reference"}
+	}
+	return spec, nil
+}
+
+func ruleAdd(c *Ctx, a *Args) (*render.Doc, error) {
+	spec, err := ruleSpec(a.Pos, a.Str("note"))
+	if err != nil {
+		return nil, err
 	}
 	r, err := c.App.AddRule(spec)
 	if err != nil {
 		return nil, err
 	}
+	return ruleDone(c, r, "added")
+}
+
+func ruleEdit(c *Ctx, a *Args) (*render.Doc, error) {
+	id, err := ruleID(a.Pos[0])
+	if err != nil {
+		return nil, err
+	}
+	spec, err := ruleSpec(a.Pos[1:], a.Str("note"))
+	if err != nil {
+		return nil, err
+	}
+	r, err := c.App.UpdateRule(id, spec)
+	if err != nil {
+		return nil, err
+	}
+	return ruleDone(c, r, "changed")
+}
+
+func ruleDone(c *Ctx, r *store.UserRule, did string) (*render.Doc, error) {
 	ix, err := c.App.Index()
 	if err != nil {
 		return nil, err
 	}
-	d, root := render.New(fmt.Sprintf("r:%d added", r.ID))
+	d, root := render.New(fmt.Sprintf("r:%d %s", r.ID, did))
 	root.AddColumns([][]string{ruleLine(c, ix, r)})
 	switch r.Kind {
 	case order.RuleIncompatible:
@@ -675,14 +706,22 @@ func ruleList(c *Ctx, a *Args) (*render.Doc, error) {
 	return d, nil
 }
 
+func ruleID(ref string) (int64, error) {
+	id, err := strconv.ParseInt(strings.TrimPrefix(strings.ToLower(ref), "r:"), 10, 64)
+	if err != nil {
+		return 0, &UsageError{Msg: "rule references look like r:<n> (archo rule list)"}
+	}
+	return id, nil
+}
+
 func ruleRemove(c *Ctx, a *Args) (*render.Doc, error) {
 	e, err := c.App.Env()
 	if err != nil {
 		return nil, err
 	}
-	id, err := strconv.ParseInt(strings.TrimPrefix(strings.ToLower(a.Pos[0]), "r:"), 10, 64)
+	id, err := ruleID(a.Pos[0])
 	if err != nil {
-		return nil, &UsageError{Msg: "rule references look like r:<n> (archo rule list)"}
+		return nil, err
 	}
 	ok, err := c.App.Store.RemoveRule(e.ID, id)
 	if err != nil {

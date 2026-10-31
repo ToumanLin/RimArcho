@@ -39,6 +39,8 @@ import { wireSeparator } from "./separator.js";
 import { go, openPage, initNavigation, pageEntering, pageEntered, wireHistory } from "./navigation.js";
 import { checkCredit, getChoices } from "./credit.js";
 import * as problems from "./problems.js";
+import * as fileSearch from "./filesearch.js";
+import { initRules, refreshRules, startRule } from "./rules.js";
 
 // ---- loading ----
 
@@ -89,6 +91,7 @@ async function reload(snapshot = null, read = null) {
   await Promise.all([0, 1, 2].map((k) => refilter(k, keep[k])));
   if (!current()) return;
   if (!read) { render(); detailFollow(); }
+  refreshRules();
   await scr.logEnvironmentChanged();
   return true;
 }
@@ -302,6 +305,7 @@ function renderHints() {
   if (S.screen === "full") list = fullPage.fullHints();
   else if (S.screen === "library") list = library.hintList();
   else if (S.screen === "tasks") list = tasksPage.hintList();
+  else if (S.screen === "search") list = fileSearch.hintList();
   else if (S.screen === "changes") list = scr.changesHints();
   else if (S.screen === "log") list = scr.logHints();
   else if (S.screen === "subscribe") list = scr.addHints();
@@ -735,7 +739,7 @@ async function preview(what) {
 async function cmd(id) {
   if (environmentReason() && ["launch", "sort", "save", "undo", "redo", "restore-all", "stage-all", "rescan", "analyze"].includes(id)) return say("busy", environmentReason());
   // A page replaces the page shown once its data is in: the mod list never shows between.
-  const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", subscribe: "subscribe", library: "library", log: "log", settings: "settings", packs: "packs", build: "build", "env-page": "env", uninstall: "uninstall", textures: "textures", tasks: "tasks" };
+  const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", subscribe: "subscribe", library: "library", log: "log", settings: "settings", packs: "packs", build: "build", "env-page": "env", uninstall: "uninstall", textures: "textures", tasks: "tasks", "search-files": "search" };
   if (pages[id]) return go(pages[id]);
   // the list's own actions show the list; the rest work on any page
   if (["filter", "details", "tech", "tags"].includes(id) && scr.closeScreen()) renderWhere();
@@ -1052,6 +1056,7 @@ function onKey(e) {
     if (S.screen === "needs") return scr.needsKey(e);
     if (S.screen === "library") return library.key(e);
     if (S.screen === "textures") return tex.key(e);
+    if (S.screen === "search") return fileSearch.key(e);
     if (S.screen === "log" || S.screen === "changes") return scr.logsKey(e);
     // 添加订阅: the form takes its keys; esc outside it goes back to 订阅与更新
     if (S.screen === "subscribe") { if (k === "Escape") { e.preventDefault(); go("changes"); } return; }
@@ -1120,6 +1125,7 @@ function onKey(e) {
     "/": () => startSearch(), "\\": () => S.bar.toggle(), c: () => go("changes"), l: () => go("log"), R: () => cmd("rescan"), A: () => cmd("analyze"),
     H: () => historyChooser(), C: () => changesOfCursor(), "<": () => widthKey(-1), ">": () => widthKey(1), "=": () => widthKey(0),
     E: () => go("env"), P: () => plans.chooser(), "?": () => pop.help("plan"), ":": () => commandLine(), i: () => exchange(0), e: () => exportCurrent(),
+    r: () => startRule(actionContext().sel[0]),
   };
   // shift+letter is the capital letter even where the key reports it in lower case
   const kk = e.shiftKey && /^[a-z]$/.test(k) ? k.toUpperCase() : k;
@@ -1161,7 +1167,7 @@ function wireSplits() {
       else card.style.removeProperty("--stack-size");
     };
     wireSeparator(gap, {
-      axis: "y", direction: -1, key: "ui.gui.plan." + (card.dataset.area === "2" ? "stage" : "history"),
+      axis: "y", direction: -1, key: "ui.gui.plan." + (card.dataset.area === "2" ? "stage" : card.classList.contains("rulesarea") ? "rules" : "history"),
       enabled: () => card.classList.contains("open") && !card.hidden,
       range: () => [72, stack.clientHeight - 148 - [...stack.querySelectorAll(".fold")]
         .filter((other) => other !== card).reduce((h, other) => h + other.getBoundingClientRect().height, 0)],
@@ -1191,6 +1197,7 @@ const ui = {
   resumeGuide: () => guide.resume(),
   manageLists: (id = 0) => { planManage.select(id); return go("plans"); },
   edited: (call, undoable = true) => edited(call, undoable),
+  ruleTarget: () => actionContext().sel[0],
   afterImport: null, // the first-run guide's next step once an import is applied
 };
 
@@ -1222,6 +1229,7 @@ async function start() {
   $("#board .barhost").replaceWith(S.bar.el);
   $('.area[data-area="3"] > .head').addEventListener("click", () => { if (S.bar.fills()) S.bar.toggle(false); });
   wireLists(ui);
+  initRules(ui);
   wireSplits();
   document.addEventListener("keydown", onKey);
   document.addEventListener("verb", (e) => { const v = e.detail; v === "needs" ? go("needs") : verb(v); });

@@ -61,6 +61,9 @@ func (s *API) Leave(page string) {
 	if page == "plans" {
 		s.cancelLoadCost(false)
 	}
+	if page == "search" {
+		s.stopFileSearch()
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	switch page {

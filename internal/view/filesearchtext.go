@@ -1,0 +1,36 @@
+package view
+
+// The text of 搜索文件 (06 §2.9, 03 §5.4–5.5).
+func init() {
+	Register(map[string]string{
+		"the %d mods %s enables":                                      "%[2]s 启用的 %[1]d 个 Mod",
+		"search files":                                                "搜索文件",
+		"type what to look for":                                       "先输入要找的内容",
+		"no mods to search":                                           "没有要搜的 Mod",
+		"%d matches in %d files of %d mods":                           "%[1]d 处，在 %[3]d 个 Mod 的 %[2]d 个文件里",
+		"searched %d files of %d mods in %s":                          "搜了 %[2]d 个 Mod 的 %[1]d 个文件，用时 %[3]s",
+		"%d matches in the C# of %d assemblies":                       "%d 处，在 %d 个程序集的 C# 里",
+		"the mods you named have no assemblies":                       "点名的 Mod 里没有程序集",
+		"not a regular expression":                                    "不是有效的正则表达式",
+		"%d files or folders could not be read; the first: %s":        "%d 个文件或文件夹读不了，第一个：%s",
+		"%d assemblies are not decompiled yet: search again to go on": "还有 %d 个程序集没反编译完：再搜一次会接着做",
+		"searching C# needs ilspycmd: dotnet tool install --global ilspycmd (it needs the .NET SDK)":                         "搜 C# 要用 ilspycmd：dotnet tool install --global ilspycmd（需要先装 .NET SDK）",
+		"translations, textures, other game versions and mods not enabled are not searched: choose them under kind or scope": "默认不搜翻译、贴图、别的游戏版本和没启用的 Mod：可以在种类或范围里加上",
+		"defines":      "定义",
+		"abstract":     "抽象",
+		"inherits":     "继承",
+		"patch":        "补丁",
+		"translation":  "翻译",
+		"reference":    "引用",
+		"translations": "翻译",
+		"About":        "About",
+		// the page's keys (KeyHelp)
+		"in the box: search; on a result: open its folder": "在输入框里：搜索；在结果上：打开文件夹",
+		"case, whole word, regex, Def name":                "区分大小写、整词、正则、Def 名",
+		"files / C# code":                                  "文件 / C# 代码",
+		"move the cursor":                                  "移动光标",
+		"previous / next page":                             "上一页 / 下一页",
+		"copy the path":                                    "复制路径",
+		"stop the search; in the box: leave it":            "停止搜索；在输入框里：离开输入框",
+	})
+}

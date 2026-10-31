@@ -19,6 +19,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/modchanges"
 	"github.com/ToumanLin/RimArcho/internal/perftrace"
+	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
@@ -40,6 +41,7 @@ type API struct {
 	libAt           string
 	libGate         sync.Mutex // coalesces full inventory builds, never acquired by edits
 	problemLookup   problemLookup
+	search          fileSearch // 搜索文件 (filesearch.go)
 	subRead         subscriptionReader
 	copyRead        inventoryReader
 	libRead         logReader
@@ -68,7 +70,9 @@ type API struct {
 	logPath   string           // the log page's Player.log and its clusters' first lines
 	logLinks  map[string]string
 	x         exchange // import and export (exchange.go)
-	free      releaser // returns memory to the OS after heavy work (memory.go)
+	// removedRule is the rule the editor removed last, for its 撤销 (rules.go).
+	removedRule *store.UserRule
+	free        releaser // returns memory to the OS after heavy work (memory.go)
 	// bgs are the environment bgsEnv's backgrounds; bgPick the image rotation chose for
 	// this window (background.go)
 	bgs    []app.Background

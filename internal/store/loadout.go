@@ -292,6 +292,25 @@ func (s *Store) Rules(envID string) ([]*UserRule, error) {
 	return out, rows.Err()
 }
 
+// UpdateRule replaces a rule's kind, mods, target and note; its ID and creation time
+// stay, so r:<n> keeps naming it. It reports whether the rule exists.
+func (s *Store) UpdateRule(r *UserRule) (bool, error) {
+	res, err := s.DB.Exec(`UPDATE user_rule SET kind=?, a_lineage=?, b_lineage=?, target=?, note=? WHERE id=?`, r.Kind, r.A, r.B, r.Target, r.Note, r.ID)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
+// RestoreRule puts a removed rule back with its own ID (the GUI's 撤销 after a removal):
+// r:<n> still names that rule only.
+func (s *Store) RestoreRule(r *UserRule) error {
+	_, err := s.DB.Exec(`INSERT INTO user_rule(id, environment_id, kind, a_lineage, b_lineage, target, note, created_at) VALUES(?,?,?,?,?,?,?,?)`,
+		r.ID, Shared, r.Kind, r.A, r.B, r.Target, r.Note, r.Created.Unix())
+	return err
+}
+
 // RemoveRule deletes a rule; it reports whether one was deleted.
 func (s *Store) RemoveRule(envID string, id int64) (bool, error) {
 	res, err := s.DB.Exec(`DELETE FROM user_rule WHERE id=?`, id)

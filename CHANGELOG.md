@@ -26,6 +26,25 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
   an error. No tool or parameter was renamed or removed (`add_rule` and `copy_local` stay
   as aliases); the `env` parameter's help is shorter. A test caps these sizes so they do
   not creep back up.
+- The window's list editor has 排序规则 (load-order rules) above 历史 in its left column.
+  Rules are shared by all games and lists; the card shows the ones that involve a mod
+  enabled in the current list (只看当前列表, the default) or every rule (全部排序规则), and
+  the count on its bar follows that choice. One sentence each with its note; the mod
+  names jump to the mod in the list. `r` on a mod, or 加一条规则 at the bottom, opens a
+  small form in place: the kind, the other mod (type its name and pick), a note. 编辑
+  changes a rule and keeps its `r:<n>`; 删除 is immediate and the status line's 撤销 (or
+  `u` right after) puts it back with the same number. Ignore rules still come from Can it
+  run and `archo sort`; here their note can change.
+- New `archo rule edit <r:n> <kind> <A> [<B>] | ignore <constraint> [--note <text>]`:
+  replaces a rule and keeps its `r:<n>`. The MCP tool `manage_rules` has no `edit` yet.
+- New page Mod 库 › 搜索文件 (also in the command palette): the window's way to
+  `archo files search`. Search the files the game loads for the enabled mods, or for the
+  mods you name, with case, whole-word, regex and defName switches and the Defs /
+  patches / About / translations / textures / sounds / assemblies kinds. 60 lines a page,
+  grouped by mod and file; a click on a path copies it, `enter` opens its folder. "C# 代码"
+  searches the decompiled C# of the mods you name (`archo source search --in`, needs
+  ilspycmd), decompiling for at most a minute per search. A new search, 停止 or leaving
+  the page cancels the one running.
 
 - Importing a Steam collection, a list of workshop links or a list of workshop IDs no
   longer leaves Core and the DLCs out. A list like that cannot name official content, so

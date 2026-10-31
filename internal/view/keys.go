@@ -69,11 +69,11 @@ func KeyHelp(page string, tui bool) []KeyRow {
 				r("H", "the history: steps and versions"),
 				r("C", "this mod's changes"),
 				r("< > =", "column width (= resets)"),
+				r("r", "add a rule"),
 			)
 			if tui {
 				out = append(out,
 					r("i", "technical information in the details"),
-					r("r", "add a rule"),
 					r("z", "wrap names"),
 					r("[ ]", "switch area (narrow)"),
 				)
@@ -164,6 +164,19 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("s / < > =", "the items' headers: sort and columns, the sorted column's width"),
 			r("shift+↑↓ / ctrl+space / ctrl+a", "select tasks"),
 			r("menu / shift+F10 / right click", "the row's menu: everything it can do"),
+		)
+	}
+	if page == PageSearch && !tui { // 搜索文件 (06 §2.9)
+		out = append(out,
+			r("/  ctrl+f", "search"),
+			r("enter", "in the box: search; on a result: open its folder"),
+			r("alt+c / alt+w / alt+r / alt+d", "case, whole word, regex, Def name"),
+			r("alt+1 / alt+2", "files / C# code"),
+			r("↑↓ / j k / PgUp PgDn / Home End", "move the cursor"),
+			r("[ ]", "previous / next page"),
+			r("ctrl+o", "open the folder"),
+			r("ctrl+c", "copy the path"),
+			r("esc", "stop the search; in the box: leave it"),
 		)
 	}
 	if !tui && (page == LibraryPage || page == "packs" || page == "textures") {
