@@ -16,6 +16,7 @@ import * as packsPage from "./packs.js";
 import * as planManage from "./planmanage.js";
 import * as tex from "./textures.js";
 import * as tasksPage from "./tasks.js";
+import * as fileSearch from "./filesearch.js";
 
 let ui;
 // The displayed shell can still name the previous plan while OpenPlan is in flight:
@@ -84,6 +85,7 @@ export async function openPage(id, plan = null, entry = null) {
     case "uninstall": return uninst.open();
     case "textures": return tex.open();
     case "tasks": return tasksPage.open();
+    case "search": return fileSearch.open();
     case "guide": return entry ? guide.resume() : guide.start(S.board && S.board.envs && S.board.envs.length ? "env" : "first");
   }
 }

@@ -274,6 +274,7 @@ func findTypeFile(dir, typ string) string {
 type SourceHit struct {
 	Instance string
 	File     string // relative to the cache dir: <dll>/<path in project>
+	Path     string // the decompiled file on disk
 	Line     int
 	Text     string
 }
@@ -290,6 +291,12 @@ type SourceSearchResult struct {
 // SourceSearch searches the cached sources of the given instances, decompiling uncached
 // assemblies first (at most for budget; 0 = no limit).
 func (a *App) SourceSearch(st *LoadoutState, mods []*store.Mod, pattern string, re *regexp.Regexp, limit int, budget time.Duration, progress func(string)) (*SourceSearchResult, error) {
+	return a.SourceSearchContext(context.Background(), st, mods, pattern, re, limit, budget, progress)
+}
+
+// SourceSearchContext is SourceSearch that stops when ctx ends (the GUI's 停止, a newer
+// search): decompiling stops between assemblies and the search between files.
+func (a *App) SourceSearchContext(ctx context.Context, st *LoadoutState, mods []*store.Mod, pattern string, re *regexp.Regexp, limit int, budget time.Duration, progress func(string)) (*SourceSearchResult, error) {
 	res := &SourceSearchResult{}
 	var all []*SourceDLL
 	for _, m := range mods {
@@ -307,8 +314,6 @@ func (a *App) SourceSearch(st *LoadoutState, mods []*store.Mod, pattern string, 
 		}
 	}
 	if len(todo) > 0 {
-		ctx := context.Background()
-		var cancel context.CancelFunc = func() {}
 		deadline := time.Time{}
 		if budget > 0 {
 			deadline = time.Now().Add(budget)
@@ -337,7 +342,7 @@ func (a *App) SourceSearch(st *LoadoutState, mods []*store.Mod, pattern string, 
 		}
 		var noILSpy bool
 		for _, d := range todo {
-			if !deadline.IsZero() && time.Now().After(deadline) {
+			if ctx.Err() != nil || !deadline.IsZero() && time.Now().After(deadline) {
 				res.Pending++
 				continue
 			}
@@ -351,7 +356,9 @@ func (a *App) SourceSearch(st *LoadoutState, mods []*store.Mod, pattern string, 
 		}
 		close(next)
 		wg.Wait()
-		cancel()
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		for _, e := range res.Errors {
 			if strings.Contains(e, "ilspycmd not found") {
 				return nil, ErrNoILSpy
@@ -364,6 +371,9 @@ func (a *App) SourceSearch(st *LoadoutState, mods []*store.Mod, pattern string, 
 			continue
 		}
 		filepath.WalkDir(d.Dir, func(p string, de os.DirEntry, err error) error {
+			if ctx.Err() != nil {
+				return filepath.SkipAll
+			}
 			if err != nil || de.IsDir() || !strings.EqualFold(filepath.Ext(p), ".cs") {
 				return nil
 			}
@@ -392,11 +402,14 @@ func (a *App) SourceSearch(st *LoadoutState, mods []*store.Mod, pattern string, 
 				}
 				res.Total++
 				if limit == 0 || len(res.Hits) < limit {
-					res.Hits = append(res.Hits, SourceHit{Instance: d.Instance, File: filepath.ToSlash(filepath.Join(filepath.Base(d.File), rel)), Line: n, Text: strings.TrimSpace(l)})
+					res.Hits = append(res.Hits, SourceHit{Instance: d.Instance, File: filepath.ToSlash(filepath.Join(filepath.Base(d.File), rel)), Path: p, Line: n, Text: strings.TrimSpace(l)})
 				}
 			}
 			return nil
 		})
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	sort.SliceStable(res.Hits, func(i, j int) bool { return st.Position(res.Hits[i].Instance) < st.Position(res.Hits[j].Instance) })
 	return res, nil

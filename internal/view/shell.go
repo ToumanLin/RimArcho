@@ -86,6 +86,8 @@ const (
 	PageTextures = "textures" // 贴图优化 (08 §5.2), under 库
 	// PageSubscribe: Mod 库 › 添加订阅 (06 §2.9)
 	PageSubscribe = "subscribe"
+	// PageSearch: Mod 库 › 搜索文件 (06 §2.9)
+	PageSearch = "search"
 )
 
 // NavItem is one sidebar entry. Kids show only under the open entry.
@@ -179,7 +181,7 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 		{ID: PagePlan, Label: T("lists"), Kids: planKids},
 		{ID: PagePacks, Label: T("packs"), Kids: packKids},
 		// Below the packs (2026-10-28). The entry opens 全部, its first sub-entry (06 §2.9).
-		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all mods")}, {ID: PageChanges, Label: T("subscriptions and updates")}, {ID: PageSubscribe, Label: T("add a subscription")}}},
+		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all mods")}, {ID: PageChanges, Label: T("subscriptions and updates")}, {ID: PageSubscribe, Label: T("add a subscription")}, {ID: PageSearch, Label: T("search files")}}},
 		// what the game loads faster (08 §5.2)
 		{ID: PageTextures, Label: T("texture optimisation")},
 		{ID: PageEnv, Label: T("game")},

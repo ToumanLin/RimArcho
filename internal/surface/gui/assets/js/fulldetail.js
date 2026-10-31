@@ -290,6 +290,7 @@ function editNote(c) {
 // back is esc: the list the page came from, where it was.
 export function back() {
   if (F.from === "library") return ui.go("library");
+  if (F.from === "search") return ui.go("search");
   closeScreen();
   ui.detailFollow && ui.detailFollow(true);
 }

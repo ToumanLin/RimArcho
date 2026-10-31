@@ -65,6 +65,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     note <ref> [<text>]                       attach a plain-text note to a mod (all its copies), or with --copy to this copy only
     tag add|remove <ref> <tag…> | list        tags for filtering (list --filter tag:<tag>)
     rule add after|before|incompatible|attach <A> <B> | top|bottom <A> | ignore <constraint>  add a user rule
+    rule edit <r:n> after|before|incompatible|attach <A> <B> | top|bottom <A> | ignore <constraint>  replace a user rule; r:<n> stays
     rule list                                 list user rules
     rule remove <r:n>                         delete a user rule
     launch                                    save the list and start the game (one game at a time)

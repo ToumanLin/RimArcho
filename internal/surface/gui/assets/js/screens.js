@@ -22,6 +22,8 @@ import { setVersionRunner } from "./versionwarnings.js";
 import { openVersionList } from "./versionpanel.js";
 
 let ui = null;
+// hintsChanged redraws the hint line after a page's own state changed what it lists.
+export const hintsChanged = () => ui && ui.renderHints();
 export function initScreens(u) {
   ui = u;
   initNeedText(u);
