@@ -197,6 +197,37 @@ func TestTruncateWAL(t *testing.T) {
 	}
 }
 
+// 03 §3: Def lookups by name start from the name index and then find each set's version
+// view. With a plain JOIN, the ORDER BY made SQLite walk the version's whole content_state
+// and probe the name index once per row (07 §6.2).
+func TestDefsNamedPlanStartsFromName(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "archo.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	for _, c := range []struct{ q, outer string }{
+		{defsByDefNameQ, "SEARCH f USING INDEX def_fact_lookup (def_name=?)"},
+		{defsByNameQ, "SEARCH f USING INDEX def_fact_named (name=?)"},
+	} {
+		rows, err := s.DB.Query(`EXPLAIN QUERY PLAN `+c.q, "a", "1.7")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var plan []string
+		for rows.Next() {
+			var id, parent, unused int
+			var detail string
+			rows.Scan(&id, &parent, &unused, &detail)
+			plan = append(plan, detail)
+		}
+		rows.Close()
+		if len(plan) < 2 || plan[0] != c.outer || !strings.HasPrefix(plan[1], "SEARCH c USING INDEX content_state_def (def_set_id=? AND game_mm=?)") {
+			t.Errorf("%s:\n%s", c.q, strings.Join(plan, "\n"))
+		}
+	}
+}
+
 // 03 §3: every fact query still finds an index after v25 dropped the single-column ones.
 func TestFactQueriesUseIndexes(t *testing.T) {
 	s, err := Open(filepath.Join(t.TempDir(), "archo.db"))

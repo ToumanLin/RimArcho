@@ -53,6 +53,18 @@ const defFields = `f.def_type, f.def_name, f.name, f.parent, f.abstract, f.file,
 const defCols = `c.instance_id, ` + defFields
 const defView = ` FROM def_fact f JOIN content_state c ON c.def_set_id=f.set_id `
 
+// defByName is defView for lookups by name: CROSS JOIN keeps the name index as the outer
+// loop. With a plain JOIN, ORDER BY c.instance_id makes SQLite walk every content_state row
+// of the version and probe the name index once per row: tens of times slower, more with
+// more mods (07 §6.2).
+const defByName = ` FROM def_fact f CROSS JOIN content_state c ON c.def_set_id=f.set_id `
+
+// The DefsNamed queries, by defName and by Name attribute.
+const (
+	defsByDefNameQ = `SELECT ` + defCols + defByName + `WHERE f.def_name=? AND c.game_mm=? ORDER BY c.instance_id, f.rowid`
+	defsByNameQ    = `SELECT ` + defCols + defByName + `WHERE f.name=? AND f.name<>'' AND c.game_mm=? ORDER BY c.instance_id, f.rowid`
+)
+
 func scanDefs(rows *sql.Rows) ([]analyze.DefFact, error) {
 	defer rows.Close()
 	var out []analyze.DefFact
@@ -82,9 +94,9 @@ func (s *Store) DefsOf(instanceID string) ([]analyze.DefFact, error) {
 // migrated facts get new rowids, and the first provider of a missing parent (and so a log
 // problem's ID) would change with them (03 §3).
 func (s *Store) DefsNamed(name string, byName bool) ([]analyze.DefFact, error) {
-	q := `SELECT ` + defCols + defView + ` WHERE f.def_name=? AND c.game_mm=? ORDER BY c.instance_id, f.rowid`
+	q := defsByDefNameQ
 	if byName {
-		q = `SELECT ` + defCols + defView + ` WHERE f.name=? AND f.name<>'' AND c.game_mm=? ORDER BY c.instance_id, f.rowid`
+		q = defsByNameQ
 	}
 	rows, err := s.DB.Query(q, name, s.MM)
 	if err != nil {

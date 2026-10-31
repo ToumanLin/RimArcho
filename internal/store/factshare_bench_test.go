@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -91,6 +92,43 @@ func TestFactShareScale(t *testing.T) {
 		}
 	}
 	t.Logf("SIZE bytes=%d live=%d free=%d", pages*size, (pages-free)*size, free*size)
+	// DefsNamed's SQL before 2026-10-30 (plain JOIN), for comparison: same rows, slower plan.
+	plainJoin := func(col, name string) ([]string, error) {
+		rows, err := s.DB.Query(`SELECT c.instance_id, f.def_type, f.def_name, f.name, f.parent, f.abstract, f.file, f.line, f.may_require, f.may_require_any
+			FROM def_fact f JOIN content_state c ON c.def_set_id=f.set_id WHERE f.`+col+`=? AND f.`+col+`<>'' AND c.game_mm=? ORDER BY c.instance_id, f.rowid`, name, s.MM)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+		var out []string
+		for rows.Next() {
+			var inst, typ, dn, n, parent, file, mr, mra string
+			var abs, line int
+			if err := rows.Scan(&inst, &typ, &dn, &n, &parent, &abs, &file, &line, &mr, &mra); err != nil {
+				return nil, err
+			}
+			out = append(out, fmt.Sprintf("%s:%s:%d", inst, file, line))
+		}
+		return out, rows.Err()
+	}
+	for j := 0; j < 190; j++ {
+		name := fmt.Sprintf("Parent_%04d_000", j)
+		ds, err := s.DefsNamed(name, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, d := range ds {
+			got = append(got, fmt.Sprintf("%s:%s:%d", d.Instance, d.File, d.Line))
+		}
+		want, err := plainJoin("name", name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(got) == 0 || fmt.Sprint(got) != fmt.Sprint(want) {
+			t.Fatalf("%s: DefsNamed %v, plain JOIN %v", name, got, want)
+		}
+	}
 	for _, q := range []struct {
 		name string
 		run  func() error
@@ -103,14 +141,23 @@ func TestFactShareScale(t *testing.T) {
 			}
 			return nil
 		}},
+		{"Name-190-plainJOIN", func() error {
+			for j := 0; j < 190; j++ {
+				if _, err := plainJoin("name", fmt.Sprintf("Parent_%04d_000", j)); err != nil {
+					return err
+				}
+			}
+			return nil
+		}},
 		{"defName", func() error { _, err := s.DefsNamed("Def_0001_001", false); return err }},
+		{"defName-plainJOIN", func() error { _, err := plainJoin("def_name", "Def_0001_001"); return err }},
 		{"DefsOf", func() error { _, err := s.DefsOf(mods[0].Instance); return err }},
 		{"DefCounts", func() error { _, err := s.DefCounts(); return err }},
 		{"TypeOwners", func() error { _, err := s.TypeOwners("Synthetic.Type_" + mods[0].Instance + "_0"); return err }},
 	} {
 		begin := time.Now()
 		runs := 100
-		if q.name == "DefCounts" || q.name == "Name-190" {
+		if q.name == "DefCounts" || strings.HasPrefix(q.name, "Name-190") {
 			runs = 10
 		}
 		for k := 0; k < runs; k++ {
