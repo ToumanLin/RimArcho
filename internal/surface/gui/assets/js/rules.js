@@ -64,6 +64,12 @@ export async function refreshRules() {
   draw();
 }
 
+// showRules is the palette's 排序规则: the fold opens and takes the focus.
+export function showRules() {
+  if (!R.open) setOpen(true);
+  requestAnimationFrame(() => $(".rules-scope button.on", area())?.focus({ preventScroll: true }));
+}
+
 // startRule is r (and the fold's 加一条规则): the form for a new rule about mod it.
 export function startRule(it) {
   if (!it || !it.id) return say("", T("choose a mod in the lists first"));

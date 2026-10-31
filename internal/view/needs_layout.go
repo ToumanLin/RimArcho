@@ -131,3 +131,48 @@ func currentLinksFirst(items []Need, gameRoot string) {
 		}
 	}
 }
+
+// NeedsLead is 能不能跑's lead sentence (06 §2.4): the open list's verdict from the
+// counted items before the start (sections 1–3) and of the runs (the last section), and
+// whether the files were never checked or only suggestions are left. GUI screens.js
+// needsLead writes the same.
+func NeedsLead(plan string, before, runs int, never, suggestions bool) string {
+	if plan == "" {
+		plan = T("the list")
+	}
+	switch {
+	case before > 0:
+		return Tf("%s is not safe to play yet: %d to handle before you start, %d error groups in the last run", plan, before, runs)
+	case runs > 0:
+		return Tf("%s: %d error groups in the last run", plan, runs)
+	case never:
+		return Tf("%s: the mods' files are not checked yet.", plan)
+	case suggestions:
+		return Tf("%s can run; suggestions below may help if you see errors.", plan)
+	}
+	return Tf("%s can run: nothing to handle.", plan)
+}
+
+// AutoFixCount is how many items 自动修复 (F) resolves: required mods that are installed but
+// not enabled (CompleteDependencies enables them), and the sort it runs after (06 §5).
+// 0: there is nothing it can fix, and the action is not offered.
+func AutoFixCount(items []Need) int {
+	enable, sorts := 0, 0
+	for _, it := range items {
+		if !it.Counted || it.Into != "" {
+			continue
+		}
+		for _, a := range it.Actions {
+			switch {
+			case a.Kind == ActEnable && it.Target != "":
+				enable++
+			case a.Kind == ActSort:
+				sorts++
+			}
+		}
+	}
+	if enable == 0 {
+		return 0
+	}
+	return enable + sorts
+}

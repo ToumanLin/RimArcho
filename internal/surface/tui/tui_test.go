@@ -210,6 +210,8 @@ func TestEnableMoveSortSaveUndo(t *testing.T) {
 	if !strings.Contains(e.ReadModsConfig(), "<li>tester.b</li>") {
 		t.Fatal("save did not write the list")
 	}
+	keys(tm, "L") // 启动 first (06 §2.5), then L there launches
+	waitFor(t, tm, T("launch the game"))
 	keys(tm, "L")
 	waitFor(t, tm, "the game is starting")
 	m := finish(t, tm)
@@ -299,11 +301,13 @@ func TestBreakpointsAndCJK(t *testing.T) {
 			if !strings.Contains(m.status, "staged Alpha") {
 				t.Fatalf("t: %q", m.status)
 			}
+			press(m, "right") // T in staging puts everything back (elsewhere it stages all)
 			press(m, "T")
 			if got := activeNames(t, e); got != "Core, Alpha, Harmony" {
 				t.Fatalf("T: %s", got)
 			}
 			// Not enabled: the CJK row, enable and disable again.
+			press(m, "h") // Staging → Enabled
 			press(m, "h")
 			press(m, "end")
 			check("CJK row selected")
@@ -646,7 +650,7 @@ func TestChangesView(t *testing.T) {
 	keys(tm, "R")
 	waitFor(t, tm, "1 mods updated")
 	keys(tm, "c")
-	waitFor(t, tm, "a: the whole library") // Beta is not in the plan
+	waitFor(t, tm, "a "+T("every mod")) // Beta is not in the plan
 	keys(tm, "a")
 	waitAll(t, tm, "worth a look", "Beta", "Defs, Patches changed")
 	keys(tm, "enter")

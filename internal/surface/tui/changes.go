@@ -88,7 +88,7 @@ func (c *chState) build() {
 			s := &c.subscriptions.Sources[i]
 			c.rows = append(c.rows, chRow{text: fmt.Sprintf("  %s  %d  %s  %s  %s", s.Name, s.Count, s.Checked, s.Result, s.Account), kind: chSource, src: s, key: "src:" + s.Key})
 		}
-		add("2 "+T("pending updates"), chHead)
+		add("2 "+T("waiting for you to update"), chHead) // the window's names (06 §2.9)
 		for i := range c.subscriptions.Pending {
 			r := &c.subscriptions.Pending[i]
 			c.rows = append(c.rows, chRow{text: "  " + r.Name + "  " + r.Source + "  " + r.Installed + " → " + r.Available + "  " + strings.Join(r.UsedIn, ", "), kind: chPending, pend: r, key: "pend:" + r.ID})
@@ -97,14 +97,14 @@ func (c *chState) build() {
 			add("  "+T("no known updates; check a source above"), chDim)
 		}
 	}
-	add("3 "+T("change history"), chHead)
+	add("3 "+T("already updated"), chHead)
 	switch {
 	case c.of != "":
 		add(Tf("only %s", c.ofName)+"  "+T("esc shows every mod"), chHead)
-	case c.library:
-		add(T("the whole library")+"  "+p.Since+"  "+T("a: only the current list"), chHead)
+	case c.library: // the window's scope bar: 列表「…」 / 所有 Mod, a switches
+		add(T("every mod")+"  "+p.Since+"  a "+Tf("list “%s”", p.Plan), chHead)
 	default:
-		add(Tf("list %s", p.Plan)+"  "+p.Since+"  "+T("a: the whole library"), chHead)
+		add(Tf("list “%s”", p.Plan)+"  "+p.Since+"  a "+T("every mod"), chHead)
 	}
 	if p.NoScan {
 		add("  "+T("no scan yet (R scans)"), chDim)
@@ -483,6 +483,9 @@ func (m *model) changesPairs() [][2]string {
 	default:
 		pairs = append(pairs, [2]string{"enter", T("open")})
 	}
+	if len(c.shownPending()) > 1 {
+		pairs = append(pairs, [2]string{"U", T("update all")})
+	}
 	pairs = append(append(pairs, [2]string{"K", T("check for updates")}, [2]string{"+", T("add a subscription")}), later...)
 	switch {
 	case c.of != "":
@@ -490,7 +493,7 @@ func (m *model) changesPairs() [][2]string {
 	case c.library:
 		pairs = append(pairs, [2]string{"a", T("the current plan")}, [2]string{"esc", T("back")})
 	default:
-		pairs = append(pairs, [2]string{"a", T("the whole library")}, [2]string{"esc", T("back")})
+		pairs = append(pairs, [2]string{"a", T("every mod")}, [2]string{"esc", T("back")})
 	}
 	return pairs
 }

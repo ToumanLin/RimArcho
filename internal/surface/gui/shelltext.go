@@ -73,7 +73,6 @@ func init() {
 		"now":                                    "现在",
 		"the game is running":                    "游戏运行中",
 		"no run read yet":                        "还没有读过游戏日志",
-		"no errors":                              "没有报错",
 		"no game yet: add one on the games page": "还没有游戏：在游戏页添加",
 		"the sort found mods the list is missing":               "排序发现列表缺了一些 Mod",
 		"required but not enabled, installed (%d):":             "需要但没启用，已安装（%d 个）：",
@@ -97,7 +96,6 @@ func init() {
 		"switch to %s and use this; no game file is written":       "切换到 %s 并用这个；不写游戏文件",
 		"%s is ready to launch":                                    "%s 可以启动了",
 		"new list / import":                                        "新列表 / 导入",
-		"launch the game":                                          "启动游戏",
 		"no errors yet":                                            "还没有报错",
 		"see this run →":                                           "看这次运行 →",
 		"open the game log →":                                      "打开游戏日志 →",
@@ -117,9 +115,7 @@ func init() {
 		// 能不能跑 (06 §2.4)
 		"%s is not safe to play yet: fix the %d problems below.": "%s 还不能放心玩：修好下面 %d 个问题就行。",
 		"%s can run; %d things below are worth a look.":          "%s 能跑；下面 %d 项可以看看。",
-		"%s: the mods' files are not checked yet.":               "%s：Mod 的文件还没有检查。",
-		"%s can run: nothing to handle.":                         "%s 能跑，没有要处理的。",
-		"ask Archo":                                              "问 Archo",
+		"ask Archo": "问 Archo",
 		// each page's one line under the breadcrumb (06 §2.2)
 		"what each scan found: mods added, updated and gone":                            "每次扫描发现的变化：新装、更新和消失的 Mod",
 		"each game is one RimWorld install: its folders, how it starts, its mods":       "每个游戏是一份 RimWorld 安装：它的目录、启动方式和 Mod",
@@ -168,10 +164,7 @@ func init() {
 		"what is wrong with this list, and the fixes": "这个列表有什么问题，以及怎么修",
 		"nothing to fix in this list":                 "这个列表没有要修的问题",
 		"%d problems in this list":                    "这个列表有 %d 个问题",
-		"fix %d automatically":                        "自动修复 %d 项",
-		"enables the required mods that are installed and sorts the list; u undoes it": "启用已安装的前置 Mod 并重新排序；按 u 可撤销",
-		"open can it run":     "打开能不能跑",
-		"show all %d":         "显示全部 %d 项",
-		"show it in the list": "在列表中定位",
+		"open can it run":                             "打开能不能跑",
+		"show all %d":                                 "显示全部 %d 项",
 	})
 }

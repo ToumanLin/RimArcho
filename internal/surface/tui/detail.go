@@ -121,7 +121,7 @@ func (m *model) detailLayout(o detailOpts) []dline {
 		why := view.UnloadableWhy(m.st, mod)
 		marked(statusIcon(s), why, sSecond)
 	default:
-		marked(statusIcon(s), T("needs attention, ! shows what"), sText)
+		marked(statusIcon(s), T("needs attention, shift+2 shows what"), sText)
 	}
 	add("")
 	var d *detailData

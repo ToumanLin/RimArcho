@@ -184,6 +184,7 @@ const (
 	SubscribePage = "subscribe"
 	PackPages     = "packs" // the packs, and each pack's page
 	BuildPageID   = "build" // 编译成整合包
+	RulesPage     = "rules" // the TUI's 排序规则 screen (06 §9.1)
 )
 
 // CopyOps are the codes that apply to a copy now, in menu order (06 §8.5): the plan ops by

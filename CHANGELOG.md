@@ -35,6 +35,44 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
   `dist/archo-<version>-windows-amd64.zip.sha256`; upload it with the zip, or the update
   is not offered for installing.
 
+- TUI: the pages use the window's names and keys. The top bar and breadcrumbs say
+  能不能跑 (not 需要处理) and Mod 库 › 订阅与更新 / 全部 / 添加订阅 / 搜索文件; 订阅与更新's
+  lists are 来源, 等你更新 and 已经更新, with the window's scope line (列表「…」, `a` 所有 Mod).
+  In the editor `H` opens the history chooser, `A` checks the mods' files again, and on a
+  narrow screen `4` opens the full detail like `enter`; `?` works in the full detail and
+  the technical page. 能不能跑 starts with the window's sentence ("…：开始之前要处理 3 项"),
+  has `F` 自动修复 N 项 when something can be fixed in one go, `c` for an item's mod and `u`
+  to undo; while the game runs the section reads 本次运行的报错. The palette's 标签,
+  游戏日志, 搜索文件, 排序规则 and 后台任务 now do something (they did nothing before), and
+  the key hints no longer offer `!` and `#` for what moved.
+- TUI: new 搜索文件 page (palette, or `tab` from 添加订阅): the window's file search in the
+  terminal, on the same search. Type and `enter`; the kind and scope rows below the box
+  take `↑↓ ←→ space`, the window's `alt+` switches work, `[` `]` turn the page, `enter`
+  opens the file's folder. `esc` stops a running search, and leaving the page stops it.
+- TUI: `r` in the editor opens a 排序规则 screen with the window's rule form for the
+  cursor's mod (kind, the other mod from candidates, a note), instead of a typed
+  `after <ref>` line. The screen lists the rules for the open list (`a` shows all),
+  `enter` edits one, `Del` removes it and `u` right after puts it back, `o` shows its mod
+  in the list. Also in the palette as 排序规则.
+- TUI: palette 后台任务 shows the background tasks as text: running, queued, today,
+  yesterday, earlier, one line each with its state and how it ended. Stop and retry stay
+  in the window.
+- TUI: after an edit on 能不能跑 (`F`, an item's key), the check that follows by itself no
+  longer writes its progress and "分析完成" over the status line, so "…，u 可撤销" stays;
+  the page head says "正在检查 Mod 的文件…" meanwhile. `A` still reports in the status line.
+- TUI: a simple 启动 page (`shift+1`): the current list, its game and full version, how it
+  stands, the last game's errors, the most likely trouble, and ▶ 启动游戏. The editor's `L`
+  now goes there first, as in the window, and `L` or `enter` there launches; `w` saves
+  without launching.
+- TUI: picking a list in `P`, in the palette or with `tab` in the editor only opens it, as
+  in the window: the list that launches stays, and the top bar says "启动的是 X". `P` has
+  设为当前; saving the list or `L` in its editor makes it current.
+- TUI: `T` outside staging puts every enabled mod into staging, as in the window; in
+  staging it still puts everything back.
+- GUI: the palette's 排序规则 opens the editor's rules card.
+- Palette (both): a name that ends with what you typed ranks like one that starts with it,
+  so "排序" still puts 自动排序 first, next to the new 排序规则.
+
 - List editor: the cards stacked in a column (详情, 排序规则, 历史; 已启用 and 暂存) are
   4 px apart like the columns, not 12 px.
 

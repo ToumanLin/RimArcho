@@ -76,7 +76,6 @@ func init() {
 		"open / close a mod's copies; → on a copy goes to its details":                      "展开 / 收起一个 Mod 的各份；在一份上按 → 到它的详情",
 		"move down / up 1 (10); with a filter, past the rows shown":                         "下移 / 上移 1（10）位；有筛选时越过显示的行",
 		"put everything back from staging; elsewhere, stage everything enabled":             "暂存里全部放回；其他地方是把已启用全部暂存",
-		"sort, save, launch (the palette previews them)":                                    "排序，保存，启动（命令面板里可预览）",
 		"sort, save, to the launch page (the palette previews them)":                        "排序，保存，去启动页（命令面板里可预览）",
 		"focus the page's areas (the numbers in their headings)":                            "聚焦页面的各个区（标题前的数字）",
 		"save the current list's edits to the game without launching (while there are any)": "把当前列表的修改保存到游戏，不启动（有修改时）",

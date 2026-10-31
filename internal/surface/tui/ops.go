@@ -204,8 +204,7 @@ func (m *model) goPage(n int) tea.Cmd {
 	m.full, m.insp, m.panel = false, nil, nil
 	switch n {
 	case 1:
-		m.say(sayInfo, T("the start page is in the window only, ctrl+k goes anywhere"))
-		return nil
+		return m.openHome()
 	case 2:
 		m.tab = tabProblems
 		return m.ensureProblems()
@@ -226,15 +225,20 @@ func (m *model) goPage(n int) tea.Cmd {
 	return nil
 }
 
-// subPage is tab / shift+tab: the next page under the same sidebar entry (Mod 库存 › 全部 →
-// 订阅与更新 → 添加订阅; the plans under 方案, which makes that plan current).
+// subPage is tab / shift+tab: the next page under the same sidebar entry (Mod 库 › 全部 →
+// 订阅与更新 → 添加订阅 → 搜索文件; the plans under 列表, which opens that plan).
 func (m *model) subPage(d int) tea.Cmd {
 	switch m.tab {
 	case tabLibrary:
 		if d < 0 {
-			return m.openAdd("")
+			return m.openSearch()
 		}
 		return m.openChangesOf("", "")
+	case tabSearch:
+		if d < 0 {
+			return m.openAdd("")
+		}
+		return m.openLibrary()
 	case tabChanges:
 		if d < 0 {
 			return m.openLibrary()
@@ -252,7 +256,7 @@ func (m *model) subPage(d int) tea.Cmd {
 				at = i
 			}
 		}
-		return m.usePlan(rows[(at+d+len(rows))%len(rows)].ID)
+		return m.openPlan(rows[(at+d+len(rows))%len(rows)].ID)
 	}
 	return nil
 }
@@ -269,6 +273,12 @@ func (m *model) helpPage() tea.Cmd {
 		page = view.ChangesPage
 	case tabSubscribe:
 		page = view.SubscribePage
+	case tabSearch:
+		page = view.PageSearch
+	case tabRules:
+		page = view.RulesPage
+	case tabHome:
+		page = "home"
 	}
 	rows := view.KeyHelp(page, true)
 	w := 0
