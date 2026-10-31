@@ -10,5 +10,7 @@ func init() {
 		"the other mod":                   "另一个 Mod",
 		"note (optional)":                 "备注（可不填）",
 		"add":                             "添加",
+		"only the current list":           "只看当前列表",
+		"all load-order rules":            "全部排序规则",
 	})
 }

@@ -315,6 +315,9 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .rule-cand .p { margin-left: auto; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
 .rule-cand:hover, .rule-cand.on { background: var(--accent-soft); color: var(--accent-11, var(--accent)); }
 .rule-form-acts { display: flex; justify-content: flex-end; gap: 6px; }
+.rules-scope { display: flex; padding: 3px; margin: 2px 0 4px; }
+.rules-scope > .thumb { top: 3px; bottom: 3px; }
+.rules-scope button { flex: 1 1 0; justify-content: center; padding: 0 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .area { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--card); border: var(--hairline) solid var(--line-2); border-radius: var(--r-lg); overflow: hidden; transition: border-color var(--t-press); }
 .area.focus { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .area .head { display: flex; align-items: baseline; gap: 8px; padding: 9px 12px 6px; color: var(--faint); white-space: nowrap; overflow: hidden; border-bottom: var(--hairline) solid var(--line-2); }
@@ -1894,6 +1897,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .editor-right > .area:not(.fold) {flex:1;min-height:0;}
 .editor-left > .histarea {flex:none;}
 .editor-left > .rulesarea {flex:none;}
+.editor-left > .rulesarea.open:not(.stack-sized) {max-height:40%;}
 .editor-left > .histarea.open:not(.stack-sized) {flex:0 1 25%;height:25%;max-height:25%;}
 .fcol:has(> .fbar.open.fill) > .area {min-height:0;}
 .fbar {overflow:visible;}

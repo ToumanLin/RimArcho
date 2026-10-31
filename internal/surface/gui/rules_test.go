@@ -70,6 +70,20 @@ func TestRulesFold(t *testing.T) {
 	if rules, _ = s.Rules(); rules.Rows[0].ID != 2 {
 		t.Fatalf("newest first, new number: %+v", rules.Rows)
 	}
+	// 只看当前列表: a rule shows there when one of its mods is enabled in the list
+	if !rules.Rows[1].InList {
+		t.Fatalf("Alpha is enabled, its rule is not in the list: %+v", rules.Rows[1])
+	}
+	beta, _ := s.RuleCandidates("beta", "")
+	if len(beta) != 1 || beta[0].Pos != 0 {
+		t.Fatalf("beta %+v", beta)
+	}
+	if _, err := s.SaveRule(0, RuleSpec{Kind: "top", A: beta[0].Ref}); err != nil {
+		t.Fatal(err)
+	}
+	if rules, _ = s.Rules(); rules.Rows[0].InList {
+		t.Fatalf("a rule about a mod not enabled counts as the list's: %+v", rules.Rows[0])
+	}
 }
 
 // An ignore rule reads as the constraint it drops; only its note changes in the editor.

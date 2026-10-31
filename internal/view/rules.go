@@ -40,6 +40,8 @@ type RuleRow struct {
 	Text    string     `json:"text"` // the parts as one line
 	Note    string     `json:"note,omitempty"`
 	Created string     `json:"created"`
+	// InList: one of its mods is enabled in the current list (the editor's 只看当前列表)
+	InList bool `json:"inList"`
 }
 
 // RuleKind is a kind the editor's form offers; ignore rules come from 能不能跑 and sort.
@@ -115,6 +117,7 @@ func ruleRow(st *app.LoadoutState, r *store.UserRule) RuleRow {
 		}
 	}
 	row.Text = b.String()
+	row.InList = row.A != nil && row.A.Pos > 0 || row.B != nil && row.B.Pos > 0
 	return row
 }
 

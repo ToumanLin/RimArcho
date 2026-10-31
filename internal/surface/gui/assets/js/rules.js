@@ -1,17 +1,32 @@
-// The plan editor's 排序规则 (06 §2.5, 04 §6.1): a fold under 历史 in the left column. Its bar
-// counts the player's load-order rules; open, it lists them (every list and game shares
-// them), each with 改 and 删除, and the form that adds or changes one in place (no popup,
+// The plan editor's 排序规则 (06 §2.5, 04 §6.1): a fold above 历史 in the left column. Rules
+// are global (every list and game shares them); the fold shows those with a mod enabled in
+// the current list (只看当前列表, the default) or all of them, and its bar counts what it
+// shows. Each row has 编辑 and 删除; the form adds or changes one in place (no popup,
 // 06 §3.1 rule 7). r opens the form for the mod at the cursor. Removing is at once, with
 // 撤销 in the status line (u right after, too); rules are not list edits, so they are not in
 // the list's undo stack.
 import { $, el, api, T, errText, say } from "./state.js";
 import { icon } from "./icons.js";
+import { seg } from "./screens.js";
 
-const R = { data: null, open: false, form: null, seq: 0, cands: [], at: 0, candSeq: 0 };
-try { R.open = localStorage.getItem("archo.rules.open") === "1"; } catch { /* folded */ }
+const R = { data: null, open: false, all: false, form: null, seq: 0, cands: [], at: 0, candSeq: 0 };
+try {
+  R.open = localStorage.getItem("archo.rules.open") === "1";
+  R.all = localStorage.getItem("archo.rules.scope") === "all";
+} catch { /* folded, the current list */ }
 let ui = null;
 
 const area = () => $(".rulesarea");
+
+function setAll(v) {
+  R.all = v;
+  try { localStorage.setItem("archo.rules.scope", v ? "all" : "list"); } catch { /* not kept */ }
+  draw();
+  $(".rules-scope button.on", area())?.focus({ preventScroll: true });
+}
+
+// the rules the fold shows: a rule being edited stays until the form closes
+const shown = () => (R.data ? R.data.rows : []).filter((r) => R.all || r.inList || (R.form && R.form.id === r.id));
 
 export function initRules(u) {
   ui = u;
@@ -86,7 +101,8 @@ function draw() {
   const a = area();
   if (!a) return;
   a.classList.toggle("open", R.open);
-  const n = R.data ? R.data.rows.length : 0;
+  const rows = shown();
+  const n = rows.length;
   const bar = $(".hbar", a);
   bar.replaceChildren(el("span", "t", T("load-order rules")));
   if (n) bar.append(el("span", "num", String(n)));
@@ -97,8 +113,11 @@ function draw() {
   const focusAt = was ? [was.className, was.selectionStart, was.selectionEnd] : null;
   body.replaceChildren();
   if (!R.open || !R.data) return;
+  const scope = seg([T("only the current list"), T("all load-order rules")], R.all ? 1 : 0, (i) => setAll(i === 1));
+  scope.classList.add("rules-scope");
+  body.append(scope);
   if (R.form && !R.form.id) body.append(form());
-  for (const r of R.data.rows) body.append(R.form && R.form.id === r.id ? form() : row(r));
+  for (const r of rows) body.append(R.form && R.form.id === r.id ? form() : row(r));
   if (!R.form) {
     const add = el("button", "btn small quiet rule-add", T("add a rule"));
     add.prepend(Object.assign(el("span", "ic"), { innerHTML: icon.plus }));
