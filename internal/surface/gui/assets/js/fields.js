@@ -1,45 +1,70 @@
 // The detail's one field list (06 §4.1, §2.9): the plan editor's detail and a copy's
-// detail on Mod 库存 draw view.Field rows with it. A click on a value copies it and says
-// "已复制" beside it; a row's own button opens the location, the page, or the tag bar.
+// detail on Mod 库存 draw view.Field rows with it. Address rows have a copy icon;
+// a row's own action opens the location, the page, or the tag bar.
 import { el, esc, api, T, errText, say } from "./state.js";
 import { icon } from "./icons.js";
+import { addressLabel } from "./address.js";
 import * as rt from "/wails/runtime.js";
 
 const Clipboard = rt.Clipboard || { SetText: () => Promise.reject(new Error("no clipboard")) };
 
-// Only these values copy on a click; the rest are just shown.
+// Address fields get a copy button; identifiers retain their existing copy action.
 const copyable = new Set(["id", "package", "path", "workshop", "subscription-url", "subscription-repo"]);
 
-// copyablePath decorates an existing element; the displayed text may be shortened.
-// Only activation keys are consumed: arrows, page keys and esc keep their page behavior.
+// Address text stays selectable; only its trailing icon copies the full value.
 export function copyablePath(node, path) {
   if (!path) return node;
-  if (node.querySelector(".path-copy")) node.textContent = node.textContent;
-  node.classList.add("copy", "path-copy");
+  const display = node.querySelector(".address-text")?.dataset.address ?? (node.textContent || path);
+  node.replaceChildren(addressLabel(display));
+  node.classList.remove("copy");
+  node.classList.add("path-copy");
   node.dataset.path = path;
-  node.tabIndex = 0;
-  node.setAttribute("role", "button");
-  node.title = path + "\n" + T("click to copy");
-  node.addEventListener("mousedown", e => e.stopPropagation());
-  // a drag that selected part of the text keeps that selection for ctrl+c (06 §3.1 rule 13)
-  node.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); if (!selectedIn(node)) copy(path, node); });
-  node.addEventListener("keydown", e => {
+  node.removeAttribute("tabindex");
+  node.removeAttribute("role");
+  node.title = path;
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "address-copy";
+  button.innerHTML = icon.copy;
+  button.title = T("copy");
+  button.setAttribute("aria-label", T("copy") + ": " + path);
+  button.addEventListener("mousedown", e => e.stopPropagation());
+  button.addEventListener("click", e => { e.preventDefault(); e.stopPropagation(); copy(path, button); });
+  button.addEventListener("keydown", e => {
     if (e.key !== "Enter" && e.key !== " ") return;
     e.preventDefault(); e.stopPropagation();
-    if (!e.repeat) copy(path, node);
+    if (!e.repeat) button.click();
   });
+  node.append(button);
   return node;
 }
 
-// selectedIn: the player has selected text inside node (a drag, not a click).
-function selectedIn(node) {
-  const sel = globalThis.getSelection ? globalThis.getSelection() : null;
-  return !!sel && !sel.isCollapsed && sel.toString().trim() !== "" && node.contains(sel.anchorNode);
+// Only editable local addresses open a picker; the copy icon remains independent.
+export function editablePath(node, choose, file = false) {
+  const paths = node.classList.contains("path-copy") ? [node] : node.querySelectorAll(".path-copy");
+  for (const path of paths) {
+    const text = path.querySelector(".address-text");
+    if (!text) continue;
+    text.classList.add("address-pick");
+    text.tabIndex = 0; text.setAttribute("role", "button");
+    text.title = path.dataset.path + "\n" + T(file ? "click to choose a file" : "click to choose a folder");
+    text.setAttribute("aria-label", text.title);
+    text.onclick = e => {
+      e.preventDefault(); e.stopPropagation();
+      const selection = globalThis.getSelection?.();
+      if (!selection || selection.isCollapsed || !text.contains(selection.anchorNode)) choose();
+    };
+    text.onkeydown = e => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault(); e.stopPropagation(); if (!e.repeat) choose();
+    };
+  }
+  return node;
 }
 
 // Render known paths before splitting facts, preserving spaces (even double spaces)
 // inside a filename. Paths may also be { text, path } to resolve a displayed relative
-// filename. The fallback is limited to rooted paths in legacy command output.
+// filename. The fallback recognises rooted paths and web URLs in legacy output.
 export function pathContent(node, text, paths = []) {
   text = String(text ?? "");
   node.replaceChildren();
@@ -53,9 +78,9 @@ export function pathContent(node, text, paths = []) {
     node.append(copyablePath(span, path));
   };
   const plain = value => {
-    // Legacy command/task text has no metadata. Only rooted paths with a clear
-    // boundary qualify; URLs and keyboard shortcuts cannot match that boundary.
-    const rooted = /(^|[\s("'（：])((?:[a-z]:[\\/]|\\\\[^\\\s]+\\|\/[^/\s:]+\/)[^<>"|\n]*?)(?=:\s|:\d+\b|["'?？。；，）]|$)/gi;
+    // Legacy command/task text has no metadata. Rooted paths and web addresses
+    // need a clear boundary; shortcuts do not qualify.
+    const rooted = /(^|[\s("'（：])((?:https?:\/\/[^\s<>"'？。；，）]+)|(?:(?:[a-z]:[\\/]|\\\\[^\\\s]+\\|\/[^/\s:]+\/)[^<>"|\n]*?)(?=:\s|:\d+\b|["'?？。；，）]|$))/gi;
     for (const part of value.split(/( {2,}|\n| → )/)) {
       if (!part) continue;
       let at = 0;
@@ -103,8 +128,18 @@ export function fieldList(fields, acts = {}) {
     } else {
       const t = el("span", copyable.has(f.kind) && f.value ? "copy" : "", f.value || "—");
       if (f.value && copyable.has(f.kind)) {
-        copyablePath(t, f.value);
-        if (f.kind !== "path") t.classList.remove("path-copy");
+        if (["path", "subscription-url", "subscription-repo"].includes(f.kind)) copyablePath(t, f.value);
+        else {
+          t.tabIndex = 0; t.setAttribute("role", "button"); t.title = T("click to copy");
+          t.onclick = () => {
+            const selection = globalThis.getSelection?.();
+            if (!selection || selection.isCollapsed || !t.contains(selection.anchorNode)) copy(f.value, t);
+          };
+          t.onkeydown = e => {
+            if (e.key !== "Enter" && e.key !== " ") return;
+            e.preventDefault(); e.stopPropagation(); if (!e.repeat) copy(f.value, t);
+          };
+        }
       }
       v.append(t);
       if (f.extra) v.append(el("span", "dim", `  (${f.extra})`));
@@ -127,7 +162,9 @@ export function fieldList(fields, acts = {}) {
   return box;
 }
 
-// copy puts text on the clipboard and shows "已复制" next to the node for a moment.
+const copyTimers = new WeakMap();
+
+// Copy feedback stays inside address buttons; other copy actions keep their text tip.
 export async function copy(text, node) {
   let ok = false;
   // the window's own clipboard (Wails), else the page's, else the old way
@@ -144,7 +181,24 @@ export async function copy(text, node) {
     t.remove();
     focused?.focus({ preventScroll: true });
   }
-  if (!ok) return say("fail", T("could not copy"));
+  if (!ok) { say("fail", T("could not copy")); return false; }
+  if (node.classList.contains("address-copy")) {
+    clearTimeout(copyTimers.get(node));
+    node.innerHTML = icon.ok;
+    node.title = T("copied");
+    node.setAttribute("aria-label", T("copied"));
+    node.dataset.copied = "true";
+    const status = document.createElement("span");
+    status.className = "address-status"; status.setAttribute("role", "status");
+    status.textContent = T("copied"); node.append(status);
+    copyTimers.set(node, setTimeout(() => {
+      node.innerHTML = icon.copy; node.title = T("copy");
+      node.setAttribute("aria-label", T("copy") + ": " + text);
+      delete node.dataset.copied;
+      copyTimers.delete(node);
+    }, 1600));
+    return true;
+  }
   const row = node.closest(".frow") || node.parentNode;
   if (!row || !node.isConnected) return;
   const old = row.querySelector(".copied");

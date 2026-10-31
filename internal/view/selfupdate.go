@@ -7,8 +7,8 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 )
 
-// RimArcho's own update (07 §5.1) as the surfaces show it: one row in settings › automatic
-// checks, one line on the launch page, a quiet notice when a new version is found.
+// RimArcho's own update (07 §5.1): a row in settings › about, a line on the launch
+// page and a quiet notice when a new version is found.
 
 const (
 	TaskSelfUpdate = "self-update"
@@ -29,7 +29,7 @@ func SelfUpdateHome(a *app.App) *SelfUpdateLine {
 	return &SelfUpdateLine{Title: "RimArcho", Text: Tf("%s can be updated", r.Version)}
 }
 
-// SelfUpdateItem is the first row of the 更新 group (06 §2.14): the running
+// SelfUpdateItem is the first row of the 关于 group (06 §2.14): the running
 // version, what the last check found, its notes folded under the row, and the buttons.
 func SelfUpdateItem(a *app.App) SettingItem {
 	cur := a.SelfVersionNow()

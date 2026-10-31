@@ -20,7 +20,7 @@ type SettingItem struct {
 	// Path markers identify filesystem text independently of editing/status text.
 	ValuePath bool     `json:"valuePath,omitempty"`
 	NotePaths []string `json:"notePaths,omitempty"`
-	// Edit: "path", "text", "choice", "swatches" or "segments" (Choices). The new
+	// Edit: "directory", "path", "url", "text", "choice", "swatches" or "segments". The new
 	// value replaces {} in Argv; "" has no editor, only Actions.
 	Edit string `json:"edit,omitempty"`
 	// EditValue separates an editable path from its displayed status/version.
@@ -37,6 +37,7 @@ type SettingItem struct {
 	ValueNote    string   `json:"valueNote,omitempty"`
 	// URL: the value is a web page; the interfaces open it in the browser (社区, 06 §2.14).
 	URL     string          `json:"url,omitempty"`
+	Links   []CommunityLink `json:"links,omitempty"`
 	Actions []SettingAction `json:"actions,omitempty"`
 	// Details fold under the row (06 §3.1 rule 7): RimArcho's release notes.
 	Details *SettingDetails `json:"details,omitempty"`
@@ -238,8 +239,8 @@ func FolderGroup(a *app.App) SettingGroup {
 	return g
 }
 
-// SettingsPage is the settings page's groups, the most used first (06 §2.14): 界面, 账户,
-// 更新, 文件夹, then 游戏日志, 外部工具, 社区数据, 存储, 社区 and, last, 卸载. The GUI and
+// SettingsPage is the settings page's groups (06 §2.14): 关于, 界面, 账户, 更新,
+// 文件夹, 游戏日志, 外部工具, 社区数据, 存储 and, last, 卸载. The GUI and
 // the TUI show them in this order. Game launch and save options are on the environment page.
 func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	gpuNote := ""
@@ -252,7 +253,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	gpu := onOff(T("GPU acceleration"), "ui.gpu")
 	gpu.Hover, gpu.ValueNote = T("uses about 20–35 MB less memory and draws in software"), gpuNote
 	// 启动页背景 closes this card in the GUI (it is not a setting command).
-	out := []SettingGroup{{Title: T("interface"), Items: []SettingItem{
+	out := []SettingGroup{AboutGroup(a), {Title: T("interface"), Items: []SettingItem{
 		{Label: T("language"), Value: cmds.Setting(a, "ui.lang"), Edit: "choice", Choices: []string{"auto", "zh", "en"}, ChoiceLabels: []string{T("follow system"), "简体中文", "English"}, Argv: []string{"config", "set", "ui.lang", "{}"}},
 		{Label: T("day/night theme"), Value: cmds.Setting(a, "ui.theme"), Edit: "segments", Choices: cmds.SettingChoices("ui.theme"),
 			ChoiceLabels: []string{T("follow system"), T("light"), T("dark")}, Argv: []string{"config", "set", "ui.theme", "{}"}},
@@ -306,7 +307,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		if di := status[d.Key]; di != nil {
 			v = Tf("%d entries  %s", di.Entries, ShortDate(di.Fetched))
 		}
-		data.Items = append(data.Items, SettingItem{Label: T(d.Desc), Value: a.DataSource(d), Edit: "text", Argv: []string{"config", "set", "data." + d.Key + ".url", "{}"},
+		data.Items = append(data.Items, SettingItem{Label: T(d.Desc), Value: a.DataSource(d), Edit: "url", Argv: []string{"config", "set", "data." + d.Key + ".url", "{}"},
 			Note: v})
 	}
 	data.Items = append(data.Items, SettingItem{Label: T("update the community data"), Actions: []SettingAction{{Label: T("update now"), Argv: []string{"data", "update"},
@@ -326,7 +327,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		storage.Items = append(storage.Items, SettingItem{Label: T(c.Desc), Value: Tf("%s  %d items", SizeText(c.Bytes), c.Files),
 			Actions: []SettingAction{{Label: T("clear"), Argv: []string{"cache", "clear", c.Kind}}}})
 	}
-	out = append(out, storage, CommunityGroup())
+	out = append(out, storage)
 
 	// Last: its own page with the plan (the interfaces open it; archo uninstall is not a
 	// settings command).

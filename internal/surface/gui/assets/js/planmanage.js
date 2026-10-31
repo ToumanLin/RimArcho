@@ -3,7 +3,7 @@
 // follows (04 §9.6) and how to share it (export, pack). The export is a sub-page of its own
 // (库 / 列表 / <列表> / 导出). Editing what a list holds stays in the editor (§2.5).
 // Data: API.PlanManage (view.BuildPlanManage), API.PlanExport (view.BuildPlanExport).
-import { pathContent } from "./fields.js";
+import { pathContent, copyablePath, editablePath } from "./fields.js";
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { openScreen, page, button, act, area, seg, beginPageRead } from "./screens.js";
 import { icon } from "./icons.js";
@@ -513,7 +513,7 @@ function inlineImport(draft, active, updateButtons) {
   const showFile = () => {
     chosen.replaceChildren();
     if (!imp.path) { chosen.append(el("span", "muted", T("or drop it here: .xml .rml .json .txt, a save (.rws)"))); return; }
-    chosen.append(el("b", "word-facts", imp.path.replace(/^.*[\\/]/, "")));
+    chosen.append(editablePath(copyablePath(el("b", "", imp.path), imp.path), () => void choose(), true));
     chosen.title = imp.path;
     const clear = el("button", "btn link", T("clear")); clear.type = "button";
     clear.onclick = () => { imp.path = ""; invalidate(); showFile(); };

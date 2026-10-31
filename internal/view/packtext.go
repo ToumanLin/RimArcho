@@ -81,7 +81,7 @@ func init() {
 		"exported the list of pack %s to %s":              "整合包 %s 的列表已导出到 %s",
 		"export only its list, each mod with its version": "只导出它的列表，每个 Mod 带版本",
 		"%s is a list without files, not a pack":          "%s 只是列表，不含文件，不是整合包",
-		"no file dialog here; type the path":              "这里没有文件对话框，请输入路径",
+		"no file dialog here; use the desktop window":     "这里没有文件对话框，请使用桌面窗口",
 		"next pack":                                       "下一个包",
 		"first pack":                                      "第一个包",
 	})

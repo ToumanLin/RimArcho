@@ -9,11 +9,11 @@ const info = (description = "old", refreshing = true, error = "") => ({
 
 async function setup() {
   const screen = new Element("div"), S = { screen: "guide" };
-  let now = 0, calls = 0, response = info(), switchWay;
+  let now = 0, calls = 0, response = info(), switchWay, pathEditor;
   const timers = [], delays = [];
   const el = (tag, cls, text) => new Element(tag, cls, text);
   const guide = await loadModules("./guide.js", {
-    "./fields.js": { copyablePath: (n) => n, pathContent: (n) => n },
+    "./fields.js": { copyablePath: (n) => n, editablePath: (n) => n, pathContent: (n) => n },
     "./state.js": { S, $: () => screen, el, api: {
       GuideFind: async () => [], GuideDownloadInfo: async () => { calls++; return await response; },
     }, T: s => s, Tf: s => s, errText: String, say() {} },
@@ -21,7 +21,7 @@ async function setup() {
       page: () => el("div"),
       button: (label, _, action) => { const b = el("button", "", label); b.onclick = action; return b; },
       seg: (_, __, action) => { switchWay = action; return el("div"); },
-      pickFolder() {}, beginPageRead: () => ({ current: () => true, finish() {}, fail(e) { throw e; } }),
+      chooseLocalPath: (value, done) => { pathEditor = { value, done }; }, beginPageRead: () => ({ current: () => true, finish() {}, fail(e) { throw e; } }),
     },
     "./exchange.js": { exchange() {}, importFrom() {} },
     "./environment.js": { withEnvironmentSwitch() {} },
@@ -33,6 +33,7 @@ async function setup() {
     screen, S, timers, delays, guide,
     calls: () => calls, now: () => now, respond: value => { response = value; },
     switchWay: n => switchWay(n),
+    changeDirectory(value) { screen.querySelectorAll("button").find(b => b.textContent === "change…").onclick(); pathEditor.done(value); },
     async tick() { assert.ok(timers.length); const {fn,ms} = timers.shift(); now += ms; fn(); await flush(); },
   };
 }
@@ -56,12 +57,12 @@ test("refresh polling backs off to five seconds and stops at two minutes", async
 test("refresh completion keeps selected branch and typed directory", async () => {
   const h = await setup();
   h.screen.querySelectorAll(".branch")[1].onclick();
-  const dir = h.screen.querySelectorAll("input")[0];
-  dir.value = "D:/custom"; dir.oninput();
+  h.changeDirectory("D:/custom");
   h.respond(info("fresh", false)); await h.tick();
   assert.match(h.screen.querySelector(".branches").textContent, /fresh/);
   assert.match(h.screen.querySelector(".branch.on").textContent, /1.5/);
-  assert.equal(h.screen.querySelectorAll("input")[0].value, "D:/custom");
+  assert.ok(h.screen.textContent.includes("D:/custom"));
+  assert.equal(h.screen.querySelectorAll("input").length, 1, "only the account remains an input");
   assert.doesNotMatch(h.screen.textContent, /refreshing branch list…/);
   assert.equal(h.timers.length, 0);
 });

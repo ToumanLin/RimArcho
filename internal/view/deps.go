@@ -49,6 +49,9 @@ func DependencyGroup(a *app.App) SettingGroup {
 					Confirm: Tf("remove RimArcho's own copy of %s?", labels[i.Name])})
 			}
 		}
+		if item.EditValue != nil && *item.EditValue != "" {
+			item.Actions = append(item.Actions, SettingAction{Label: T("use default"), Argv: []string{"config", "set", i.ConfigKey, ""}})
+		}
 		g.Items = append(g.Items, item)
 	}
 	return g
@@ -57,6 +60,7 @@ func DependencyGroup(a *app.App) SettingGroup {
 func init() {
 	Register(map[string]string{
 		"external tools": "外部工具",
+		"use default":    "使用默认",
 		"installed":      "已安装",
 		"install tool":   "安装工具",
 		"update tool":    "更新工具",

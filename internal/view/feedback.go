@@ -244,18 +244,6 @@ func feedbackSendError(err error) error {
 	return errors.New(Tf("the feedback relay could not file it (%s); open GitHub instead", re.Code))
 }
 
-// CommunityGroup is the settings page's 社区 (06 §2.14): 反馈 opens its page, and the
-// GitHub repository and the Discord server open in the browser.
-func CommunityGroup() SettingGroup {
-	g := SettingGroup{Title: T("community"), Items: []SettingItem{
-		{Label: T("bugs and suggestions"), Actions: []SettingAction{{Label: T("feedback…"), Argv: []string{"feedback"}}}},
-	}}
-	for _, l := range CommunityLinks() {
-		g.Items = append(g.Items, SettingItem{Label: l.Label, Value: strings.TrimPrefix(l.URL, "https://"), URL: l.URL})
-	}
-	return g
-}
-
 // CommunityLink is one of RimArcho's public pages (the settings page's head, 06 §2.14).
 type CommunityLink struct {
 	Label string `json:"label"`
@@ -264,13 +252,13 @@ type CommunityLink struct {
 
 // CommunityLinks: the GitHub repository and the Discord server.
 func CommunityLinks() []CommunityLink {
-	return []CommunityLink{{Label: "GitHub", URL: feedback.Repo}, {Label: "Discord", URL: feedback.Discord}}
+	return []CommunityLink{{Label: "Discord", URL: feedback.Discord}, {Label: "GitHub", URL: feedback.Repo}}
 }
 
 func init() {
 	Register(map[string]string{
 		"feedback":                     "反馈",
-		"feedback…":                    "反馈…",
+		"bugs and suggestions…":        "问题和建议…",
 		"enabled mods":                 "启用的 Mod",
 		"paths":                        "路径",
 		"no game yet":                  "还没有游戏",
