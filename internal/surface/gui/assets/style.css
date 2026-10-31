@@ -1705,7 +1705,8 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 @media (max-width: 760px) { .pm-page > .pm { grid-template-columns: minmax(0, 1fr); gap: var(--card-gap); } .pm-split { display: none; } }
 .pm-split { align-self: stretch; margin: 0; }
 #board > .stack { gap: var(--card-gap); }
-.stack > .stack-split { margin: 0; }
+/* the split takes the place of the stack's gap: cards stay --card-gap apart, as columns do */
+.stack > .stack-split { margin: calc(-1 * var(--card-gap)) 0; }
 .stack > .fold.open.stack-sized { flex: 0 1 var(--stack-size); height: var(--stack-size); max-height: none; }
 .stack-split:has(+ [hidden]) { display: none; }
 .stack-split[aria-disabled="true"] { cursor: default; pointer-events: none; }

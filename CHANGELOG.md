@@ -4,6 +4,9 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- List editor: the cards stacked in a column (详情, 排序规则, 历史; 已启用 and 暂存) are
+  4 px apart like the columns, not 12 px.
+
 - Game log: a missing texture or DLL is again traced to a Workshop, SteamCMD or other
   shared-folder mod that ships it ("ships … but is not enabled", with `archo enable`).
   Since mod folders became shared by every game, only mods in the game's own `Mods/` were
