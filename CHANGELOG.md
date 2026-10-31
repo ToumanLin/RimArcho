@@ -5,13 +5,23 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 ## 0.9.0 — plans and launching (unreleased)
 
 - Settings › Feedback (反馈, also in the command palette): write a bug report or
-  suggestion and open it as a new GitHub issue in the browser, title and text filled in.
-  No GitHub token; nothing is sent until you submit it on GitHub. RimArcho's version, the
-  game version and Windows always go with it; the enabled mods, the paths (your user
-  folder shown as `%USERPROFILE%`) and the newest game log's errors only when ticked, and
-  the page shows the whole text first. A report too long for a link (about 2,000
-  characters) is copied for you and the link says where to paste it. In the TUI the same
-  panel ticks the attachments with `m` `p` `l` and opens GitHub with `enter`.
+  suggestion; it becomes a public issue in the GitHub repository, which the page says
+  above the preview. Two ways:
+  - **发送** needs no GitHub account. It goes through RimArcho's feedback relay, a
+    Cloudflare Worker in `feedback-relay/` that holds the GitHub App key; RimArcho holds
+    none. An optional contact (Discord name or email) goes only to the maintainer, never
+    into the issue. The relay allows one report a minute and a daily cap. This button
+    appears only in builds with the relay's address (`internal/feedback/relay.go`, or
+    `RIMARCHO_FEEDBACK_RELAY` for testing).
+  - **打开 GitHub** opens the new-issue page with the title and text filled in, for
+    players with an account. A report too long for a link (about 2,000 characters) is
+    copied for you, and the link says where to paste it.
+
+  RimArcho's version, the game version and Windows always go with a report. The enabled
+  mods, the paths (your user folder shown as `%USERPROFILE%`) and the newest game log's
+  errors go only when ticked, and the page shows the whole text first. In the TUI the same
+  panel ticks the attachments with `m` `p` `l`, sends with `s` (title, text and contact on
+  the input line) and opens GitHub with `enter`.
 - Settings are reordered, most used first, in the window and the TUI alike: 界面
   (language, day/night, accent colour, Workshop descriptions and images, GPU, start page
   background), 账户, 更新 (the automatic checks; the group was called 自动检查 like its

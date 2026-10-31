@@ -1,6 +1,7 @@
 package gui
 
 import (
+	"context"
 	"sync"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -47,6 +48,15 @@ func (s *API) FeedbackCompose(title, text string) feedback.Result {
 	at := s.feedback.at
 	s.feedback.mu.Unlock()
 	return view.ComposeFeedback(title, text, at)
+}
+
+// FeedbackSend files the report through the feedback relay with the attachments read last
+// (发送, offered when FeedbackAttach says send). The contact goes to the relay only.
+func (s *API) FeedbackSend(title, text, contact string) (feedback.Sent, error) {
+	s.feedback.mu.Lock()
+	at := s.feedback.at
+	s.feedback.mu.Unlock()
+	return view.SendFeedback(context.Background(), title, text, contact, at)
 }
 
 // Community is RimArcho's public pages for the settings page.

@@ -1,7 +1,10 @@
 package tui
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
@@ -63,5 +66,49 @@ func TestFeedbackPanel(t *testing.T) {
 	m.panelKey("enter")
 	if !strings.Contains(copied, "tester.long39") || opened == "" || len(opened) > feedback.MaxURL || strings.Contains(opened, "long39") {
 		t.Fatalf("too long: opened %d chars, copied %d", len(opened), len(copied))
+	}
+}
+
+// s in 反馈 (06 §2.14): only with a relay; asks for the title, what happened and the
+// contact on the input line, then sends in the background and says the issue's number.
+func TestFeedbackSendTUI(t *testing.T) {
+	view.SetLang("en")
+	e, _ := fixture(t)
+	var got feedback.Report
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&got)
+		fmt.Fprint(w, `{"number":7,"url":"https://github.com/ToumanLin/RimArcho/issues/7"}`)
+	}))
+	defer srv.Close()
+
+	t.Setenv("RIMARCHO_FEEDBACK_RELAY", "")
+	m := New(Options{App: e.App}).(*model)
+	m.Init()
+	m.panel = nil
+	m.palRun("feedback")(m)
+	if strings.Contains(strings.Join(m.panel.lines, "\n"), "s: send") || m.panel.keys["s"] != nil {
+		t.Fatal("no relay, no s")
+	}
+
+	t.Setenv("RIMARCHO_FEEDBACK_RELAY", srv.URL+"/report")
+	m.panel = nil
+	m.palRun("feedback")(m)
+	if !strings.Contains(strings.Join(m.panel.lines, "\n"), "s: send it here") {
+		t.Fatalf("s offered:\n%s", strings.Join(m.panel.lines, "\n"))
+	}
+	m.panelKey("s")
+	for _, typed := range []string{"Crash", "on load"} {
+		if m.prompt == nil {
+			t.Fatal("asks on the input line")
+		}
+		m.prompt.submit(m, typed)
+	}
+	cmd := m.prompt.submit(m, "me#1")
+	if cmd == nil {
+		t.Fatal("sends in the background")
+	}
+	m.update(cmd())
+	if got.Title != "Crash" || got.Contact != "me#1" || !strings.HasPrefix(got.Body, "on load\n\n---\n") || !strings.Contains(m.status, "#7") {
+		t.Fatalf("sent %+v; status %q", got, m.status)
 	}
 }

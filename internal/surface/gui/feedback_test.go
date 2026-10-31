@@ -1,6 +1,10 @@
 package gui
 
 import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -75,5 +79,53 @@ func TestFeedbackAttachments(t *testing.T) {
 	}
 	if at.Pending || len(at.Sections) != 1 || !strings.Contains(strings.Join(at.Sections[0].Lines, "\n"), "SyntheticMissingDef") {
 		t.Fatalf("game log errors: pending=%v %+v", at.Pending, at.Sections)
+	}
+}
+
+// 发送 (06 §2.14): offered only with a relay; the report carries the title (or the first line
+// of what happened), the ticked attachments and the contact; the relay's refusal is said in
+// the player's words. The relay is httptest, standing in for feedback-relay/.
+func TestFeedbackSend(t *testing.T) {
+	view.SetLang("en")
+	_, api, _ := fixture(t)
+	t.Setenv("RIMARCHO_FEEDBACK_RELAY", "")
+	if at, err := api.FeedbackAttach(view.FeedbackOptions{}); err != nil || at.Send {
+		t.Fatalf("no relay, no 发送: %+v %v", at, err)
+	}
+
+	var got feedback.Report
+	var agent string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		agent = r.Header.Get("User-Agent")
+		_ = json.NewDecoder(r.Body).Decode(&got)
+		if got.Title == "again" {
+			w.WriteHeader(http.StatusTooManyRequests)
+			fmt.Fprint(w, `{"error":"slow_down"}`)
+			return
+		}
+		fmt.Fprint(w, `{"number":7,"url":"https://github.com/ToumanLin/RimArcho/issues/7"}`)
+	}))
+	defer srv.Close()
+	t.Setenv("RIMARCHO_FEEDBACK_RELAY", srv.URL+"/report")
+
+	at, err := api.FeedbackAttach(view.FeedbackOptions{Mods: true})
+	if err != nil || !at.Send {
+		t.Fatalf("a relay offers 发送: %+v %v", at, err)
+	}
+	if _, err := api.FeedbackSend(" ", "\n", ""); err == nil {
+		t.Fatal("nothing written, nothing sent")
+	}
+	s, err := api.FeedbackSend("", "Mods vanish\nafter saving", "me#1234")
+	if err != nil || s.Number != 7 {
+		t.Fatalf("sent: %+v %v", s, err)
+	}
+	if got.Title != "Mods vanish" || got.Contact != "me#1234" || !strings.HasPrefix(agent, "RimArcho/") {
+		t.Fatalf("report: %+v from %q", got, agent)
+	}
+	if !strings.HasPrefix(got.Body, "Mods vanish\nafter saving\n\n---\nRimArcho ") || !strings.Contains(got.Body, "2. Alpha  tester.a  1001") || strings.Contains(got.Body, "me#1234") {
+		t.Fatalf("body: the text, the basics and the ticked list, not the contact:\n%s", got.Body)
+	}
+	if _, err := api.FeedbackSend("again", "", ""); err == nil || !strings.Contains(err.Error(), "one report a minute") {
+		t.Fatalf("refusal in words: %v", err)
 	}
 }

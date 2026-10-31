@@ -36,6 +36,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case feedbackSentMsg:
+		if msg.err != nil {
+			m.say(sayFail, msg.err.Error())
+		} else {
+			m.say(sayOK, Tf("sent as #%d", msg.sent.Number)+"  "+msg.sent.URL)
+		}
+		return m, nil
 	case automaticDoneMsg:
 		if msg.kind == "data" {
 			m.app.DropCommunityData()

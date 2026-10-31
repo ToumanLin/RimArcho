@@ -2,6 +2,7 @@ package tui
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os/exec"
 	"runtime"
@@ -10,6 +11,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/ToumanLin/RimArcho/internal/feedback"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -30,8 +32,9 @@ var copyText = func(s string) error {
 }
 
 // feedbackPanel is 设置 › 反馈 in the terminal (06 §2.14, §9): the same attachments as the
-// window, m / p / l tick them, the whole text below, enter opens GitHub with it filled in
-// (the title and what happened are written there).
+// window, m / p / l tick them, the whole text below. s sends it through the feedback relay
+// (asked for the title, what happened and a contact on the input line; only when RimArcho
+// has a relay); enter opens GitHub with it filled in (the title and text are written there).
 func (m *model) feedbackPanel(o view.FeedbackOptions) tea.Cmd {
 	at := view.FeedbackAttachments(m.app, m.st, o)
 	res := view.ComposeFeedback("", "", at)
@@ -53,7 +56,10 @@ func (m *model) feedbackPanel(o view.FeedbackOptions) tea.Cmd {
 		}
 		fmt.Fprintf(&b, "%s %s %s  %s\n", mark, key[p.Key], p.Label, note)
 	}
-	b.WriteString("\n" + res.Body + "\n")
+	b.WriteString("\n" + T("preview") + "  " + T("public on GitHub") + "\n\n" + res.Body + "\n")
+	if at.Send {
+		b.WriteString(T("s: send it here, no GitHub account needed") + "\n")
+	}
 	if res.Full {
 		b.WriteString(T("enter: open GitHub with this text; write the title and what happened there") + "\n")
 	} else {
@@ -77,6 +83,9 @@ func (m *model) feedbackPanel(o view.FeedbackOptions) tea.Cmd {
 			m.panel.keys["l"] = toggle(func() { o.Log = !o.Log })
 		}
 	}
+	if at.Send {
+		m.panel.keys["s"] = func(m *model) tea.Cmd { m.panel = nil; return m.askFeedback(at) }
+	}
 	m.panel.onEnter = func(m *model) tea.Cmd {
 		if !res.Full {
 			if err := copyText(res.Body); err != nil {
@@ -98,9 +107,39 @@ func (m *model) feedbackPanel(o view.FeedbackOptions) tea.Cmd {
 	return nil
 }
 
+// askFeedback asks for the title, what happened and the contact, one input line each (esc
+// stops), then sends in the background; feedbackSentMsg says how it went.
+func (m *model) askFeedback(at *view.FeedbackAttach) tea.Cmd {
+	m.prompt = &prompt{label: T("title") + ": ", submit: func(m *model, title string) tea.Cmd {
+		m.prompt = &prompt{label: T("what happened") + ": ", submit: func(m *model, text string) tea.Cmd {
+			if title == "" && text == "" {
+				m.say(sayFail, T("write a title or what happened first"))
+				return nil
+			}
+			m.prompt = &prompt{label: T("contact (optional, not public)") + ": ", submit: func(m *model, contact string) tea.Cmd {
+				m.say(sayBusy, T("sending…"))
+				return func() tea.Msg {
+					s, err := view.SendFeedback(context.Background(), title, text, contact, at)
+					return feedbackSentMsg{s, err}
+				}
+			}}
+			return nil
+		}}
+		return nil
+	}}
+	return nil
+}
+
+// feedbackSentMsg is the relay's answer to s in 反馈.
+type feedbackSentMsg struct {
+	sent feedback.Sent
+	err  error
+}
+
 func init() {
 	view.Register(map[string]string{
 		"r: again": "r 再看一次",
+		"s: send it here, no GitHub account needed":                                  "s 在这里发送，不用 GitHub 账号",
 		"enter: open GitHub with this text; write the title and what happened there": "enter 用这段文字打开 GitHub，标题和说明在那里写",
 		"enter: copy the text and open GitHub; paste it into the issue":              "enter 复制全文并打开 GitHub，粘贴到正文里",
 	})

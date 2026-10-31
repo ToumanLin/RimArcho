@@ -19,5 +19,5 @@ RimArcho：Go 写的 RimWorld 启动器和 Mod 管理器。`RimArcho.exe` 是窗
 
 ## 测试
 
-- `go test ./...`，`node --test "scripts/vm/*.test.mjs"`。
+- `go test ./...`，`node --test "scripts/vm/*.test.mjs" "feedback-relay/*.test.mjs"`。
 - 自动测试只用合成数据（`internal/testkit`）。真实的游戏、Mod 和 `%APPDATA%\RimArcho` 只在 VM 里碰（[scripts/vm/README.md](scripts/vm/README.md)，安全规则见 07 §4）。

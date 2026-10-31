@@ -1,9 +1,12 @@
 package view
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/buildinfo"
@@ -11,9 +14,10 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
-// 设置 › 反馈 (06 §2.14): a GitHub issue written in RimArcho and opened in the browser.
-// RimArcho, the game and the system always go with it; the enabled mods, the paths and the
-// game log's errors only when the player ticks them, and the page shows the whole text first.
+// 设置 › 反馈 (06 §2.14): a GitHub issue written in RimArcho, sent through the feedback
+// relay (no GitHub account needed) or opened in the browser. RimArcho, the game and the
+// system always go with it; the enabled mods, the paths and the game log's errors only when
+// the player ticks them, and the page shows the whole text first.
 
 // FeedbackOptions are the attachments the player ticked.
 type FeedbackOptions struct {
@@ -37,13 +41,15 @@ type FeedbackAttach struct {
 	Sections []feedback.Section `json:"sections"`
 	// Pending: the game log is still being analysed; ask again.
 	Pending bool `json:"pending,omitempty"`
+	// Send: RimArcho has a feedback relay, so 发送 is offered (feedback.RelayURL).
+	Send bool `json:"send,omitempty"`
 }
 
 // FeedbackAttachments reads the attachments: always the basic lines and the parts' notes,
 // and the sections the options ask for. Paths in sections show the home folder as
 // %USERPROFILE%.
 func FeedbackAttachments(a *app.App, st *app.LoadoutState, o FeedbackOptions) *FeedbackAttach {
-	out := &FeedbackAttach{Basic: []string{"RimArcho " + buildinfo.String()}}
+	out := &FeedbackAttach{Basic: []string{"RimArcho " + buildinfo.String()}, Send: feedback.RelayURL() != ""}
 	if st != nil && st.Ix != nil && st.Ix.Env != nil && st.Ix.Env.GameVersion != "" {
 		out.Basic = append(out.Basic, "RimWorld "+st.Ix.Env.GameVersion)
 	}
@@ -165,6 +171,55 @@ func ComposeFeedback(title, text string, at *FeedbackAttach) feedback.Result {
 	return feedback.Compose(d)
 }
 
+// SendFeedback files the report through the feedback relay: the title (or the first line of
+// what happened), the whole body cut to the relay's limit, and the contact, which the relay
+// keeps for the maintainer and never puts in the public issue.
+func SendFeedback(ctx context.Context, title, text, contact string, at *FeedbackAttach) (feedback.Sent, error) {
+	relay := feedback.RelayURL()
+	if relay == "" {
+		return feedback.Sent{}, errors.New(T("RimArcho has no feedback relay; open GitHub instead"))
+	}
+	title = strings.TrimSpace(title)
+	if title == "" {
+		first, _, _ := strings.Cut(strings.TrimSpace(text), "\n")
+		title = truncateRunes(strings.TrimSpace(first), 60)
+	}
+	if title == "" {
+		return feedback.Sent{}, errors.New(T("write a title or what happened first"))
+	}
+	d := feedback.Draft{Title: title, Text: text, More: T("… %d more lines")}
+	if at != nil {
+		d.Basic, d.Sections = at.Basic, at.Sections
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	r := feedback.Report{Title: title, Body: d.SendBody(feedback.MaxBody), Contact: strings.TrimSpace(contact)}
+	s, err := feedback.Send(ctx, relay, "RimArcho/"+buildinfo.Version, r)
+	if err != nil {
+		return s, feedbackSendError(err)
+	}
+	return s, nil
+}
+
+// feedbackSendError says a refusal in the player's words; the caps point to GitHub.
+func feedbackSendError(err error) error {
+	var re *feedback.RelayError
+	if !errors.As(err, &re) {
+		return errors.New(Tf("could not reach the feedback relay: %v", err))
+	}
+	switch re.Code {
+	case "slow_down":
+		return errors.New(T("one report a minute; send it again in a moment"))
+	case "ip_daily":
+		return errors.New(T("this computer has sent enough reports today; send it tomorrow or open GitHub"))
+	case "daily":
+		return errors.New(T("RimArcho has had too many reports today; send it tomorrow or open GitHub"))
+	case "too_long":
+		return errors.New(T("the report is too long; untick an attachment or shorten the contact"))
+	}
+	return errors.New(Tf("the feedback relay could not file it (%s); open GitHub instead", re.Code))
+}
+
 // CommunityGroup is the settings page's 社区 (06 §2.14): 反馈 opens its page, and the
 // GitHub repository and the Discord server open in the browser.
 func CommunityGroup() SettingGroup {
@@ -223,5 +278,21 @@ func init() {
 		"copy and open GitHub":         "复制全文并打开 GitHub",
 		"opened GitHub in the browser": "已在浏览器里打开 GitHub",
 		"opened GitHub; paste the copied text into the issue": "已打开 GitHub，把复制的全文粘贴到正文里",
+		// sending through the relay
+		"RimArcho has no feedback relay; open GitHub instead":                          "RimArcho 没有反馈中转，请打开 GitHub 提交",
+		"write a title or what happened first":                                         "先写标题或说明",
+		"… %d more lines":                                                              "…还有 %d 行",
+		"could not reach the feedback relay: %v":                                       "连不上反馈中转：%v",
+		"one report a minute; send it again in a moment":                               "一分钟只能发一条，稍后再发",
+		"this computer has sent enough reports today; send it tomorrow or open GitHub": "这台电脑今天发的反馈够多了，明天再发，或打开 GitHub 提交",
+		"RimArcho has had too many reports today; send it tomorrow or open GitHub":     "今天收到的反馈太多了，明天再发，或打开 GitHub 提交",
+		"the report is too long; untick an attachment or shorten the contact":          "太长了，取消一项附带或缩短联系方式",
+		"the feedback relay could not file it (%s); open GitHub instead":               "反馈中转没能提交（%s），请打开 GitHub 提交",
+		"contact (optional, not public)":                                               "联系方式（可选，不公开）",
+		"Discord name or email, so the maintainer can ask you more":                    "Discord 名字或邮箱，方便维护者追问",
+		"public on GitHub": "会公开在 GitHub 上",
+		"send":             "发送",
+		"sending…":         "发送中…",
+		"sent as #%d":      "已发送，GitHub 上是 #%d",
 	})
 }

@@ -1,6 +1,7 @@
-// Package feedback writes a GitHub issue from RimArcho (06 §2.14 反馈): the body, and a
-// prefilled issues/new link the system browser opens. Nothing is sent from RimArcho; the
-// player submits the issue on GitHub. No token is needed.
+// Package feedback writes a GitHub issue from RimArcho (06 §2.14 反馈): the body, and either
+// a prefilled issues/new link the system browser opens (the player submits it on GitHub), or
+// a report sent to the feedback relay (relay.go), which files it without a GitHub account.
+// RimArcho holds no token either way.
 package feedback
 
 import (
@@ -38,6 +39,8 @@ type Draft struct {
 	// Paste is said in the link's body when the full text did not fit and was copied
 	// instead ("paste the copied text here"), in the player's language.
 	Paste string `json:"paste"`
+	// More ends a section SendBody shortened ("… %d more lines"), in the player's language.
+	More string `json:"-"`
 }
 
 // Result is the issue: the full body, and the link to open.
