@@ -157,6 +157,16 @@ type App struct {
 	AfterExitFunc     func(AfterExit) error
 	// Uninstalled is set once an uninstall has run: every command is refused after it.
 	Uninstalled bool
+	// Self-update (selfupdate.go, 07 §5.1), all for tests: SelfUpdateAPI replaces GitHub's
+	// API root, SelfVersion the running version, SelfProgram the program folder,
+	// SelfVersionOf asking the new program its version, SelfOthers listing the other
+	// RimArcho processes in a folder, SelfWaitPoll how often that is asked while waiting.
+	SelfUpdateAPI string
+	SelfVersion   string
+	SelfProgram   string
+	SelfVersionOf func(ctx context.Context, exe string) (string, error)
+	SelfOthers    func(dir string) []*GameRun
+	SelfWaitPoll  time.Duration
 
 	analyzing *pendingAnalysis
 

@@ -167,6 +167,11 @@ type model struct {
 
 	scanning bool
 	quitting bool
+
+	// selfRun is RimArcho's own update while it installs; restartExe the new program Run
+	// starts once the screen has closed (07 §5.1).
+	selfRun    *selfUpdate
+	restartExe string
 }
 
 // New builds the TUI model.
@@ -230,8 +235,22 @@ func Run(o Options) error {
 	})
 	_, err := program.Run()
 	mdl.closeTasks()
+	if run := mdl.selfRun; run != nil {
+		// Quit during an install: stop it, and let a swap that has begun finish or roll back.
+		run.cancel()
+		app.WaitSelfSwap(30 * time.Second)
+	}
+	if err == nil && mdl.restartExe != "" {
+		return &Restart{Exe: mdl.restartExe}
+	}
 	return err
 }
+
+// Restart is Run's answer after RimArcho updated itself: the caller closes the database
+// and starts Exe in this terminal with the same arguments (07 §5.1).
+type Restart struct{ Exe string }
+
+func (r *Restart) Error() string { return "restart " + r.Exe }
 
 // ---- messages ----
 

@@ -48,7 +48,7 @@ const (
 // IsSettingTask identifies maintenance tasks shared by settings and the guide.
 func IsSettingTask(kind string) bool {
 	switch kind {
-	case TaskSourceCheck, TaskWorkshopUpdate, TaskSubscribe, TaskSubscriptionFrom, TaskSteamCMD, TaskTodds, TaskDepRemove, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC:
+	case TaskSourceCheck, TaskWorkshopUpdate, TaskSubscribe, TaskSubscriptionFrom, TaskSteamCMD, TaskTodds, TaskDepRemove, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC, TaskSelfUpdate, TaskSelfCheck:
 		return true
 	}
 	return false
@@ -177,6 +177,10 @@ func TaskTitle(kind string) string {
 		return T("download SteamCMD")
 	case TaskTodds:
 		return T("download todds…")
+	case TaskSelfUpdate:
+		return T("update RimArcho")
+	case TaskSelfCheck:
+		return T("check for RimArcho updates")
 	case TaskDepRemove:
 		return T("remove external tool")
 	case TaskData:
@@ -511,7 +515,7 @@ func taskTarget(t *app.Task) string {
 		return PageChanges
 	case TaskAccount:
 		return PageSettings
-	case TaskSteamCMD, TaskTodds, TaskDepRemove, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC:
+	case TaskSteamCMD, TaskTodds, TaskDepRemove, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC, TaskSelfUpdate, TaskSelfCheck:
 		return PageSettings
 	case TaskScan:
 		return PageChanges

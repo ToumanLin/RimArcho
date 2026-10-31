@@ -108,6 +108,8 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.requestDetail()
 	case cmdDoneMsg:
 		return m, m.cmdDone(msg)
+	case selfStepMsg, selfDoneMsg:
+		return m, m.onSelfUpdate(msg)
 	case analyzeLineMsg, analyzeDoneMsg:
 		return m, m.analyzeMsg(msg)
 	case tea.KeyMsg:

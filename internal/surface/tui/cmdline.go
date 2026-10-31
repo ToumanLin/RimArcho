@@ -697,6 +697,9 @@ func (m *model) cmdSubmit() tea.Cmd {
 	case len(argv) == 1 && argv[0] == "analyze" && (envName == "" || envName == m.envName):
 		m.remember(line)
 		return m.startAnalyze() // the analysis child (03 §3)
+	case len(argv) == 1 && argv[0] == "update":
+		m.remember(line)
+		return m.selfUpdatePanel() // installs, then restarts this TUI (07 §5.1)
 	}
 	m.cmdBusy = line // the status line says so while it runs (statusText)
 	snap := m.snapshot()

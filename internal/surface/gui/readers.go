@@ -225,6 +225,8 @@ func (s *API) Close() {
 	}
 	s.mu.Unlock()
 	s.needsJobs.Wait()
+	// RimArcho's own update: a swap of the program files that has begun ends whole (W04).
+	app.WaitSelfSwap(30 * time.Second)
 	creditDone := make(chan struct{})
 	go func() { s.creditWG.Wait(); close(creditDone) }()
 	select {

@@ -4,6 +4,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/accounts"
@@ -64,6 +66,11 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	}
 	defer ap.Close()
 	ap.EnvName, ap.PlanName = envName, openPlan
+	interactive := len(rest) == 0 || len(rest) == 1 && (rest[0] == "gui" || rest[0] == "tui")
+	if interactive {
+		// What an update left in the program folder (07 §5.1); never delays the first paint.
+		go ap.CleanSelfUpdate()
+	}
 	if (len(rest) == 0 && buildinfo.GUI == "1") || (len(rest) == 1 && rest[0] == "gui") {
 		// RimArcho.exe (a double click) or `archo gui` (06 §8.1).
 		if err := runGUI(ap, len(rest) == 1); err != nil {
@@ -75,7 +82,13 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	if len(rest) == 0 || (len(rest) == 1 && rest[0] == "tui") {
 		// No command, or `archo tui`: run the TUI in the current terminal.
 		// Scans run as a child process of this executable.
-		if err := tui.Run(tui.Options{App: ap, ScanOnStart: true}); err != nil {
+		err := tui.Run(tui.Options{App: ap, ScanOnStart: true})
+		var restart *tui.Restart
+		if errors.As(err, &restart) {
+			ap.Close() // the new version may upgrade the database
+			return restartTUI(restart.Exe, argv, stderr)
+		}
+		if err != nil {
 			fmt.Fprintln(stderr, "error:", err)
 			return cmds.ExitError
 		}
@@ -92,7 +105,8 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 		return cmds.ExitOK
 	}
 	ctx := context.Background()
-	if len(rest) >= 2 && rest[0] == "test" && rest[1] == "run" {
+	// Ctrl+C stops a test run, or an update waiting for the other RimArcho to close.
+	if len(rest) >= 2 && rest[0] == "test" && rest[1] == "run" || rest[0] == "update" {
 		var stop context.CancelFunc
 		ctx, stop = signal.NotifyContext(ctx, os.Interrupt)
 		defer stop()
@@ -105,6 +119,24 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 		io.WriteString(stdout, out)
 	}
 	return code
+}
+
+// restartTUI runs the updated archo in this terminal with the same arguments and returns
+// its exit code (07 §5.1). Windows cannot replace a running process, so this one waits; the
+// new one leaves the old program file for the next start to remove.
+func restartTUI(exe string, argv []string, stderr io.Writer) int {
+	c := exec.Command(exe, argv...)
+	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
+	c.Env = append(os.Environ(), app.UpdatedFromEnv+"="+strconv.Itoa(os.Getpid()))
+	if err := c.Run(); err != nil {
+		var exit *exec.ExitError
+		if errors.As(err, &exit) {
+			return exit.ExitCode()
+		}
+		fmt.Fprintln(stderr, "error: RimArcho was updated, but the new version did not start:", err)
+		return cmds.ExitError
+	}
+	return cmds.ExitOK
 }
 
 // runGUI opens the GUI. `archo gui` hands over to RimArcho.exe next to it when there is
