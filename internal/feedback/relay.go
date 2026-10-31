@@ -16,8 +16,8 @@ import (
 
 // Relay is the feedback relay's address (feedback-relay/README.md, 06 §2.14 反馈): a
 // Cloudflare Worker that files a report as an issue, so a player without a GitHub account
-// can send one. Empty until it is deployed: 反馈 then offers only the GitHub link.
-var Relay = ""
+// can send one. Empty: 反馈 offers only the GitHub link.
+var Relay = "https://rimarcho-feedback.toumanlin.workers.dev/report"
 
 // RelayURL is where 发送 posts, or "" when there is no relay. RIMARCHO_FEEDBACK_RELAY
 // overrides Relay, to try a deployment before its address is written here.

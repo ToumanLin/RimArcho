@@ -1,4 +1,5 @@
-# RimArcho's feedback relay (README.md). Fill in APP_ID and the KV id, then `npx wrangler deploy`.
+# RimArcho's feedback relay (README.md), deployed at rimarcho-feedback.toumanlin.workers.dev.
+# After changing this file: `npx wrangler deploy`.
 name = "rimarcho-feedback"
 main = "worker.mjs"
 compatibility_date = "2026-09-01"
@@ -6,7 +7,7 @@ workers_dev = true
 
 [vars]
 REPO = "ToumanLin/RimArcho"
-APP_ID = ""            # the GitHub App's App ID (README step 2)
+APP_ID = "5556617"            # the GitHub App's App ID (README step 2)
 LABEL = "feedback"     # put on each issue; dropped when GitHub refuses it
 PER_IP_DAY = "5"       # reports a day from one sender
 PER_DAY = "30"         # reports a day from everyone; 0 stops sending
@@ -14,7 +15,7 @@ PER_DAY = "30"         # reports a day from everyone; 0 stops sending
 # daily counters and the contacts senders leave (README step 3)
 [[kv_namespaces]]
 binding = "COUNTS"
-id = ""
+id = "78f113b31b2744a4bccd1184ecb10ebc"
 
 # one report a minute per sender (needs Wrangler 4.36 or later)
 [[ratelimits]]

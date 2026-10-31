@@ -10,9 +10,9 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
   - **发送** needs no GitHub account. It goes through RimArcho's feedback relay, a
     Cloudflare Worker in `feedback-relay/` that holds the GitHub App key; RimArcho holds
     none. An optional contact (Discord name or email) goes only to the maintainer, never
-    into the issue. The relay allows one report a minute and a daily cap. This button
-    appears only in builds with the relay's address (`internal/feedback/relay.go`, or
-    `RIMARCHO_FEEDBACK_RELAY` for testing).
+    into the issue. The relay allows one report a minute and a daily cap. The relay is
+    deployed and its address is built in (`internal/feedback/relay.go`;
+    `RIMARCHO_FEEDBACK_RELAY` overrides it for testing).
   - **打开 GitHub** opens the new-issue page with the title and text filled in, for
     players with an account. A report too long for a link (about 2,000 characters) is
     copied for you, and the link says where to paste it.

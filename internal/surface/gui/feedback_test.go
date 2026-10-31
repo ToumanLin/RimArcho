@@ -88,6 +88,9 @@ func TestFeedbackAttachments(t *testing.T) {
 func TestFeedbackSend(t *testing.T) {
 	view.SetLang("en")
 	_, api, _ := fixture(t)
+	old := feedback.Relay
+	defer func() { feedback.Relay = old }()
+	feedback.Relay = ""
 	t.Setenv("RIMARCHO_FEEDBACK_RELAY", "")
 	if at, err := api.FeedbackAttach(view.FeedbackOptions{}); err != nil || at.Send {
 		t.Fatalf("no relay, no 发送: %+v %v", at, err)

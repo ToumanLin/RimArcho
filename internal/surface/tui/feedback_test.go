@@ -87,6 +87,9 @@ func TestFeedbackSendTUI(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	old := feedback.Relay
+	defer func() { feedback.Relay = old }()
+	feedback.Relay = ""
 	t.Setenv("RIMARCHO_FEEDBACK_RELAY", "")
 	m := New(Options{App: e.App}).(*model)
 	m.Init()
