@@ -23,9 +23,9 @@
 - 纯 HTML + CSS + 原生 JavaScript（ES modules）。**不用框架、不用 npm、没有构建步骤**。文件放在 `internal/surface/gui/assets/`（`index.html`、`style.css`、`js/` 下 `api.js` `state.js` `lists.js` `detail.js` `screens.js` `popups.js` `exchange.js` `icons.js` `shell.js` `home.js` `guide.js` `plans.js` `motion.js` `main.js`），用 `go:embed` 打进 exe。
 - 调用 Go：手写的 `api.js` 用 `import { Call } from "/wails/runtime.js"` 和 `Call.ByName`，用 `Proxy` 拼出方法全名 `github.com/ToumanLin/RimArcho/internal/surface/gui.API.<方法>`。不使用 `wails3` 生成的绑定，构建只需要 `go build`。
 - `internal/surface/gui`：`api.go`（Wails 服务，每个方法只调用 view）、`gui.go`（窗口、`/preview/`、`/img/` 本地图片处理器、CSP、图标路由）、`exchange.go`（导入导出对话框）、`text.go`。
-- Go → 前端：Wails 事件（`scan` 扫描结束、`analyze` 分析进度与结束、`pack` 编译进度）。游戏运行状态由前端每 2 秒调用 `Live` 轮询。
+- Go → 前端：Wails 事件（`scan` 扫描结束、`analyze` 分析进度与结束、`pack` 编译进度）。游戏运行状态由前端调用 `Live` 轮询（间隔见 §2.16.1 G01）。
 - 列表虚拟滚动：只创建可见行。
-- **页面读取**（§3.1 规则 9：进入优先于读取）：**每一页**都已通过 `beginPageRead` 在等待数据前切换页面并显示骨架，包括启动、能不能跑、变化、整合包及编译预览、设置、环境、引导、卸载预览、Mod 库、方案编辑器、游戏日志、贴图优化、全部列表、后台任务和全屏详情。同页刷新保留已显示的内容；切换 Mod 或整合包时显示相应占位，避免旧对象的操作还可点击。每次读取校验页面代号、请求序号、环境及方案；晚到的成功或错误不覆盖新页面。同一页面连续请求只接收最后一次的结果，失败结束加载状态并允许重试。全屏详情的延迟工坊描述也遵守相同校验。
+- **页面读取**（§3.1 规则 9：进入优先于读取）：**每一页**都已通过 `beginPageRead` 在等待数据前切换页面并显示骨架，包括启动、能不能跑、变化、整合包及编译预览、设置、环境、引导、卸载预览、Mod 库、方案编辑器、游戏日志、贴图优化、全部列表、后台任务和全屏详情。同页刷新保留已显示的内容；切换 Mod 或整合包时显示相应占位，避免旧对象的操作还可点击。每次读取校验页面代号、请求序号、环境及方案；晚到的成功或错误不覆盖新页面。同一页面连续请求只接收最后一次的结果，失败结束加载状态并允许重试。全屏详情的延迟工坊描述也遵守相同校验。页面轮询、失败重试、防抖、空闲会话回收及单帧调度统一见 §2.16.1 G01–G24、M06、R01–R16。
 - **预览的操作状态**：整合包类型/贴图选项改变后重新读取预览，未完成时快捷键也不使用旧预览启动编译。卸载选择重新估算时先撤掉旧确认按钮；只有读取完整结果后才显示下一步操作。
 - 样式表首行 `[hidden]{display:none !important}`：弹层容器的 `display:flex` 会盖过 `hidden` 属性，形成一层看不见的遮罩吃掉所有点击。
 - WebView2 用户数据放在 `<数据目录>/webview2`，不放 `%APPDATA%\RimArcho.exe`。
