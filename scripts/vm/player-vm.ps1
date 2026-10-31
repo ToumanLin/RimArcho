@@ -64,7 +64,7 @@ if ($ReplayTrace) { $runnerArgs += @('--replay',(Join-Path $guestBundle 'replay-
 if ($PreviousLedger) { $runnerArgs += @('--ledger',(Join-Path $guestBundle 'crawler-ledger.json')) }
 if ($Probe) { $runnerArgs += @('--probe','true') }
 if ($Allow -ne 'safe') { $runnerArgs += @('--allow',$Allow) }
-# The guest player's own home and Steam content; revert snapshot RimArcho-Real after the round.
+# The guest player's own home and Steam content; revert snapshot RimArcho-Real-Vulkan after the round.
 if ($RealHome) { $runnerArgs += @('--real-home','true') }
 $baselineLabel = if ($RealHome) { 'real-home' } else { '' }
 function Literal([string]$s) { "'" + $s.Replace("'","''") + "'" }
@@ -155,7 +155,7 @@ Get-ChildItem -LiteralPath (Join-Path $transfer 'evidence') -Recurse -Filter rep
  if($Allow -ne 'safe'){$replayArgs+=@('-Allow',$Allow)}
  if($StandardUser){$replayArgs+='-StandardUser'}
  $command='pwsh '+(Literal $PSCommandPath)+' '+(($replayArgs|ForEach-Object {Literal $_})-join ' ')
- @{command=$command;seed=$replay.seed;trace=$traceFile;requires=$(if($RealHome){'snapshot RimArcho-Real reverted first; Player signed in'}else{'same baseline content and matching signed-in guest account'})}|ConvertTo-Json|Set-Content -Encoding utf8 (Join-Path $evidenceFolder 'host-replay.json')
+ @{command=$command;seed=$replay.seed;trace=$traceFile;requires=$(if($RealHome){'snapshot RimArcho-Real-Vulkan reverted first; Player signed in'}else{'same baseline content and matching signed-in guest account'})}|ConvertTo-Json|Set-Content -Encoding utf8 (Join-Path $evidenceFolder 'host-replay.json')
 }
 
 } finally {

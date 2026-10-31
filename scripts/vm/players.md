@@ -45,7 +45,7 @@ go test ./...
 ## VM real content
 
 Read `D:/VMs/PLAYER-TEST-AI-HANDOFF.md`. Use only the released test VM and no
-credential printing. Real-data rounds start from snapshot `RimArcho-Real` and revert
+credential printing. Real-data rounds start from snapshot `RimArcho-Real-Vulkan` and revert
 to it afterwards (evidence exported first). The old copied baseline
 (`VM-Test/real-baseline`, `prepare-real.ps1`, `--baseline`) is gone.
 

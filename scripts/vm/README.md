@@ -6,6 +6,8 @@ Credentials come from `D:\VMs\Setup\Invoke-VMRun.ps1`, which reads them from DPA
 
 ## Once per VM (again after a snapshot revert)
 
+Real-data rounds revert to the snapshot `RimArcho-Real-Vulkan`, a live one: Player signed in, Steam up, the game, the Workshop mods and software Vulkan installed. If Steam shows its sign-in window after a revert (Steam can reject the snapshot's saved session; it did on 2026-10-30), the VM's owner signs in; game rounds need Steam for the Workshop mods. Never type the account's password from a script.
+
 ```powershell
 pwsh scripts/vm/vm.ps1 status    # running, Tools "running", guest IP
 pwsh scripts/vm/vm.ps1 prep      # no display-off or sleep while idle (else screenshots go black)
@@ -104,7 +106,7 @@ DevTools is on only because `launch` sets `RIMARCHO_DEVTOOLS_PORT`; players neve
 - `launch` and `cdp.mjs` need a user signed in on the guest screen. Windows Update restarts the guest by itself and leaves it at the lock screen: `launch` then fails with `runProgramInGuest (exit -1)`, and a guest screenshot shows the clock. `status`, `exec`, `cli` and `push` still work. Sign in through the VMware window. Auto sign-in and pausing updates in the guest would remove this step; both are security settings, so the VM's owner makes that call.
 - GUI tests run as **Player** (an administrator), because Player is the user logged in on the guest screen. `-StandardUser` only applies to `exec` and `cli`. Before a release, also do the first run as **新玩家**: log in as 新玩家 in the guest, then run `launch -StandardUser`.
 - Files copied in by VMware Tools have no download mark, so SmartScreen warnings aren't tested.
-- The guest has no GPU driver; game performance is checked on a real machine.
+- The guest has no GPU driver. Vulkan comes from Mesa lavapipe (software, `C:\Mesa\x64`, in the snapshot; a host copy is in `D:\RimArcho-test\mesa`), so RimWorld 1.7 starts, at a very low frame rate. Game performance is checked on a real machine.
 - Leftovers in the guest: `C:\Users\Public\Documents\VM-Test`, `%APPDATA%\RimArcho` and `%LOCALAPPDATA%\RimArcho` of the user who ran it. Delete the last two for a first run again.
 
 

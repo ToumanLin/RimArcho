@@ -39,7 +39,7 @@ assert(!options.baseline || mode || scenario!==2,'scenario 2 deployment switchin
 // first and restores it afterwards; child replays (--start-db) get a private DB from that backup.
 const realHome=options['real-home']?resolve(options['real-home']==='true'?join(process.env.APPDATA||'','RimArcho'):options['real-home']):null;
 const childOfReal=!!(realHome&&options['start-db']);
-assert(!realHome || guest,'the real home is used only in the test VM; revert snapshot RimArcho-Real after the round');
+assert(!realHome || guest,'the real home is used only in the test VM; revert snapshot RimArcho-Real-Vulkan after the round');
 assert(!realHome || !options.baseline,'--real-home replaces --baseline');
 assert(!realHome || mode || scenario!==2,'scenario 2 deployment switching changes content; refused on the real home');
 const outputBase = outside(guest ? options.out : hostOutput(options.out));
