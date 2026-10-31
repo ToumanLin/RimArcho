@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
@@ -33,6 +34,9 @@ func BenchmarkLibraryCopyAfterEdit(b *testing.B) {
 		_, err := e.App.Store.DB.Exec(`WITH RECURSIVE files(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM files WHERE n<100)
    INSERT INTO snapshot_file(snapshot_id,rel_path,size,mtime) SELECT id,'Defs/Fixture'||n||'.xml',1,1 FROM snapshot CROSS JOIN files`)
 		if err != nil {
+			b.Fatal(err)
+		}
+		if _, err := e.App.Store.DB.Exec(`UPDATE snapshot SET kinds = kinds | ?`, store.HasDefsPatch); err != nil {
 			b.Fatal(err)
 		}
 		a = e.App

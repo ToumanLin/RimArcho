@@ -49,17 +49,31 @@ func insertSnapshot(tx *sql.Tx, instanceID string, scanID int64, ob *scan.Observ
 		manifest, acfTime, acfSize = ob.ACF.Manifest, ob.ACF.TimeUpdated, ob.ACF.Size
 	}
 	h := ob.FP.SnapshotHash
+	copied := ob.FP.Files == nil && ob.FP.Count > 0
+	var kinds int
+	var langs string
+	if copied { // same paths as prevSnap
+		if err := tx.QueryRow(`SELECT kinds, langs FROM snapshot WHERE id=?`, prevSnap).Scan(&kinds, &langs); err != nil && err != sql.ErrNoRows {
+			return 0, err
+		}
+	} else {
+		rels := make([]string, len(ob.FP.Files))
+		for i, f := range ob.FP.Files {
+			rels[i] = f.Rel
+		}
+		kinds, langs = deriveContent(rels)
+	}
 	res, err := tx.Exec(`INSERT INTO snapshot(instance_id, scan_id, snapshot_hash, package_id, package_id_raw, name, authors,
 		workshop_id_declared, supported_versions, decl_blob, acf_manifest, acf_time_updated, acf_size, git_head, origin,
-		file_count, total_size, semantic_count) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		file_count, total_size, semantic_count, kinds, langs) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		instanceID, scanID, h[:], d.PackageID, d.PackageIDRaw, d.Name, strings.Join(d.Authors, ", "), d.PublishedFileID,
 		strings.Join(d.SupportedVersions, " "), string(blob), manifest, acfTime, acfSize, ob.GitHead, origin,
-		ob.FP.Count, ob.FP.TotalSize, len(ob.FP.Semantic))
+		ob.FP.Count, ob.FP.TotalSize, len(ob.FP.Semantic), kinds, langs)
 	if err != nil {
 		return 0, err
 	}
 	id, _ := res.LastInsertId()
-	if ob.FP.Files == nil && ob.FP.Count > 0 {
+	if copied {
 		_, err = tx.Exec(`INSERT INTO snapshot_file(snapshot_id, rel_path, size, mtime, hash)
 			SELECT ?, rel_path, size, mtime, hash FROM snapshot_file WHERE snapshot_id=?`, id, prevSnap)
 		return id, err

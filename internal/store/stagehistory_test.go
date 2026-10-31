@@ -25,7 +25,7 @@ func TestMigrateV20StageHistory(t *testing.T) {
 		t.Fatal(err)
 	}
 	downgradeFacts(t, s)
-	if _, err := s.DB.Exec(`ALTER TABLE identity_question DROP COLUMN summary; ALTER TABLE workspace_undo DROP COLUMN staging; UPDATE meta SET value='20' WHERE key='schema_version'`); err != nil {
+	if _, err := s.DB.Exec(`ALTER TABLE snapshot DROP COLUMN kinds; ALTER TABLE snapshot DROP COLUMN langs; ALTER TABLE identity_question DROP COLUMN summary; ALTER TABLE workspace_undo DROP COLUMN staging; UPDATE meta SET value='20' WHERE key='schema_version'`); err != nil {
 		t.Fatal(err)
 	}
 	s.Close()

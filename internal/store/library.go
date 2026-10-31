@@ -1,6 +1,7 @@
 package store
 
 import (
+	"database/sql"
 	"encoding/json"
 	"strings"
 	"time"
@@ -111,30 +112,15 @@ func (s *Store) UpdatesSince(id string, t time.Time) int {
 // Languages are the language folders a snapshot has (Languages/<name>/…, also under a
 // version folder such as 1.6/Languages/<name>/…), each once, in the order found.
 func (s *Store) Languages(snapID int64) ([]string, error) {
-	rows, err := s.DB.Query(`SELECT rel_path FROM snapshot_file WHERE snapshot_id=? AND lower(rel_path) LIKE '%languages/%'`, snapID)
+	var langs string
+	err := s.DB.QueryRow(`SELECT langs FROM snapshot WHERE id=?`, snapID).Scan(&langs)
+	if err == sql.ErrNoRows || langs == "" {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []string
-	seen := map[string]bool{}
-	for rows.Next() {
-		var rel string
-		if err := rows.Scan(&rel); err != nil {
-			return nil, err
-		}
-		parts := strings.Split(rel, "/")
-		for i := 0; i+2 < len(parts); i++ {
-			if strings.EqualFold(parts[i], "Languages") && (i == 0 || i == 1) {
-				if k := strings.ToLower(parts[i+1]); !seen[k] {
-					seen[k] = true
-					out = append(out, parts[i+1])
-				}
-				break
-			}
-		}
-	}
-	return out, rows.Err()
+	return strings.Split(langs, "/"), nil
 }
 
 // With no IDs the inventory reads all instances; copy details restrict indexed history

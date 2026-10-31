@@ -1,81 +1,167 @@
 package store
 
 import (
+	"database/sql"
+	"sort"
 	"strings"
-	"sync"
 )
 
-// Content kinds of snapshots (06 §3.7 type:assembly|xml|language), from their file lists.
+// Content kinds of snapshots (06 §3.7 type:assembly|xml|language), kept in snapshot.kinds.
 const (
 	HasDLL       = 1 << iota // a .dll anywhere
 	HasDefsPatch             // XML under Defs/ or Patches/ (at any load-folder depth)
 	HasLanguages             // something under Languages/
+	HasPNG                   // a .png under a folder whose name ends in "textures" (convertible textures, 08 §5.2)
+
+	contentKinds = HasDLL | HasDefsPatch | HasLanguages
 )
 
+// schemaV27: what a snapshot's file list says about its content, computed when the snapshot
+// is written (02 §4.3). A snapshot's paths never change (another file list hashes to another
+// snapshot), so the columns stay right for its whole life, also after 02 §7.1 drops its rows.
+const schemaV27 = `
+ALTER TABLE snapshot ADD COLUMN kinds INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE snapshot ADD COLUMN langs TEXT NOT NULL DEFAULT '';
+`
+
+// migrateV27 fills kinds and langs from the stored file rows, in their primary-key order.
+func migrateV27(tx *sql.Tx) error {
+	rows, err := tx.Query(`SELECT snapshot_id, rel_path FROM snapshot_file ORDER BY snapshot_id, rel_path`)
+	if err != nil {
+		return err
+	}
+	type derived struct {
+		id    int64
+		kinds int
+		langs string
+	}
+	var out []derived
+	var cur int64
+	var d deriver
+	flush := func() {
+		if k, l := d.result(); k != 0 || l != "" {
+			out = append(out, derived{cur, k, l})
+		}
+		d = deriver{}
+	}
+	for rows.Next() {
+		var id int64
+		var rel string
+		if err := rows.Scan(&id, &rel); err != nil {
+			rows.Close()
+			return err
+		}
+		if id != cur {
+			flush()
+			cur = id
+		}
+		d.add(rel)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return err
+	}
+	flush()
+	st, err := tx.Prepare(`UPDATE snapshot SET kinds=?, langs=? WHERE id=?`)
+	if err != nil {
+		return err
+	}
+	defer st.Close()
+	for _, x := range out {
+		if _, err := st.Exec(x.kinds, x.langs, x.id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// deriveContent computes snapshot.kinds and snapshot.langs from a file list.
+func deriveContent(rels []string) (kinds int, langs string) {
+	rels = append([]string(nil), rels...)
+	sort.Strings(rels) // langs keep the order of snapshot_file's primary key
+	var d deriver
+	for _, r := range rels {
+		d.add(r)
+	}
+	return d.result()
+}
+
+// deriver folds paths the way the old queries over snapshot_file did: SQLite's LIKE and lower()
+// fold ASCII letters only.
+type deriver struct {
+	kinds int
+	langs []string
+	seen  map[string]bool
+}
+
+func (d *deriver) add(rel string) {
+	l := asciiLower(rel)
+	if strings.HasSuffix(l, ".dll") {
+		d.kinds |= HasDLL
+	}
+	if strings.HasSuffix(l, ".xml") && (strings.HasPrefix(l, "defs/") || strings.Contains(l, "/defs/") ||
+		strings.HasPrefix(l, "patches/") || strings.Contains(l, "/patches/")) {
+		d.kinds |= HasDefsPatch
+	}
+	if strings.HasPrefix(l, "languages/") || strings.Contains(l, "/languages/") {
+		d.kinds |= HasLanguages
+	}
+	if i := strings.Index(l, "textures/"); i >= 0 && strings.HasSuffix(l, ".png") && i+len("textures/") <= len(l)-len(".png") {
+		d.kinds |= HasPNG
+	}
+	if !strings.Contains(l, "languages/") {
+		return
+	}
+	// a language is a folder in Languages/ at the mod root or one load folder down, with
+	// something in it
+	parts := strings.Split(rel, "/")
+	for i := 0; i+2 < len(parts) && i <= 1; i++ {
+		if strings.EqualFold(parts[i], "Languages") {
+			if k := strings.ToLower(parts[i+1]); !d.seen[k] {
+				if d.seen == nil {
+					d.seen = map[string]bool{}
+				}
+				d.seen[k] = true
+				d.langs = append(d.langs, parts[i+1])
+			}
+			break
+		}
+	}
+}
+
+// result: the kinds, and the languages joined by "/" (which no folder name contains).
+func (d *deriver) result() (int, string) { return d.kinds, strings.Join(d.langs, "/") }
+
+func asciiLower(s string) string {
+	for i := 0; i < len(s); i++ {
+		if 'A' <= s[i] && s[i] <= 'Z' {
+			b := []byte(s)
+			for j := i; j < len(b); j++ {
+				if 'A' <= b[j] && b[j] <= 'Z' {
+					b[j] += 'a' - 'A'
+				}
+			}
+			return string(b)
+		}
+	}
+	return s
+}
+
 // ContentKinds returns the content flags of the current snapshots of the given instances
-// (instance ID → flags), in one grouped query over snapshot_file.
-//
-// A snapshot's files keep their paths for its whole life (a later scan with other files makes
-// a new snapshot), so its flags are kept per database and only new snapshots are queried.
+// (instance ID → flags) from snapshot.kinds, by primary key.
 func (s *Store) ContentKinds(snapOf map[string]int64) (map[string]int, error) {
 	bySnap := map[int64]int{}
-	cache := contentCacheOf(s.Path)
-	// a snapshot is known by its ID and its scan: an ID freed by gc may come back later
-	all := snapshotIDs(snapOf)
-	scanOf, err := s.snapshotScans(all)
-	if err != nil {
+	if err := s.eachSnapshot(snapshotIDs(snapOf), `kinds`, func(r *sql.Rows) error {
+		var id int64
+		var k int
+		if err := r.Scan(&id, &k); err != nil {
+			return err
+		}
+		bySnap[id] = k & contentKinds
+		return nil
+	}); err != nil {
 		return nil, err
-	}
-	var ids []any
-	cache.mu.Lock()
-	for _, x := range all {
-		id := x.(int64)
-		sc, known := scanOf[id]
-		if k, ok := cache.kinds[snapKey{id, sc}]; known && ok {
-			bySnap[id] = k
-		} else {
-			ids = append(ids, x)
-		}
-	}
-	cache.mu.Unlock()
-	asked := len(ids)
-	queried := ids
-	// Bound parameters stay below SQLite's limit, even for a full inventory.
-	for len(ids) > 0 {
-		n := min(len(ids), 500)
-		rows, err := s.DB.Query(`SELECT snapshot_id,
-		  MAX(rel_path LIKE '%.dll'),
-		  MAX((rel_path LIKE 'defs/%' OR rel_path LIKE '%/defs/%' OR rel_path LIKE 'patches/%' OR rel_path LIKE '%/patches/%') AND rel_path LIKE '%.xml'),
-		  MAX(rel_path LIKE 'languages/%' OR rel_path LIKE '%/languages/%')
-		FROM snapshot_file WHERE snapshot_id IN (`+strings.TrimSuffix(strings.Repeat("?,", n), ",")+`) GROUP BY snapshot_id`, ids[:n]...)
-		if err != nil {
-			return nil, err
-		}
-		for rows.Next() {
-			var id int64
-			var dll, dp, lang int
-			if err := rows.Scan(&id, &dll, &dp, &lang); err != nil {
-				rows.Close()
-				return nil, err
-			}
-			bySnap[id] = dll*HasDLL | dp*HasDefsPatch | lang*HasLanguages
-		}
-		err = rows.Err()
-		rows.Close()
-		if err != nil {
-			return nil, err
-		}
-		ids = ids[n:]
-	}
-	if asked > 0 {
-		cache.mu.Lock()
-		for _, x := range queried {
-			id := x.(int64)
-			if sc, known := scanOf[id]; known { // no snapshot row: not kept
-				cache.kinds[snapKey{id, sc}] = bySnap[id] // no files: 0
-			}
-		}
-		cache.mu.Unlock()
 	}
 	out := make(map[string]int, len(snapOf))
 	for inst, snap := range snapOf {
@@ -84,50 +170,32 @@ func (s *Store) ContentKinds(snapOf map[string]int64) (map[string]int, error) {
 	return out, nil
 }
 
-// contentCache: snapshot ID → content flags, per database file (read sessions open their own
-// Store on the same file).
-type contentCache struct {
-	mu    sync.Mutex
-	kinds map[snapKey]int
-}
-
-type snapKey struct{ id, scan int64 }
-
-var contentCaches sync.Map // path → *contentCache
-
-func contentCacheOf(path string) *contentCache {
-	c, _ := contentCaches.LoadOrStore(path, &contentCache{kinds: map[snapKey]int{}})
-	return c.(*contentCache)
-}
-
-// snapshotScans: the scan each snapshot was made in (snapshot ID → scan ID), by primary key.
-func (s *Store) snapshotScans(ids []any) (map[int64]int64, error) {
-	out := make(map[int64]int64, len(ids))
+// eachSnapshot reads the given column(s) of the snapshots with these IDs, the ID first, in
+// batches that stay below SQLite's parameter limit.
+func (s *Store) eachSnapshot(ids []any, cols string, f func(*sql.Rows) error) error {
 	for len(ids) > 0 {
 		n := min(len(ids), 500)
-		rows, err := s.DB.Query(`SELECT id, scan_id FROM snapshot WHERE id IN (`+strings.TrimSuffix(strings.Repeat("?,", n), ",")+`)`, ids[:n]...)
+		rows, err := s.DB.Query(`SELECT id, `+cols+` FROM snapshot WHERE id IN (`+placeholders(n)+`)`, ids[:n]...)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		for rows.Next() {
-			var id, sc int64
-			if err := rows.Scan(&id, &sc); err != nil {
+			if err := f(rows); err != nil {
 				rows.Close()
-				return nil, err
+				return err
 			}
-			out[id] = sc
 		}
 		err = rows.Err()
 		rows.Close()
 		if err != nil {
-			return nil, err
+			return err
 		}
 		ids = ids[n:]
 	}
-	return out, nil
+	return nil
 }
 
-// snapshotIDs deduplicates the nonempty current snapshots before querying file rows.
+// snapshotIDs deduplicates the nonempty current snapshots before querying.
 func snapshotIDs(snapOf map[string]int64) []any {
 	seen := map[int64]bool{}
 	var ids []any
@@ -140,18 +208,19 @@ func snapshotIDs(snapOf map[string]int64) []any {
 	return ids
 }
 
-// SnapshotsWithPNGFor checks only the requested copies, using snapshot_file's primary key.
+// SnapshotsWithPNGFor: which of the requested copies have convertible textures.
 func (s *Store) SnapshotsWithPNGFor(snapOf map[string]int64) (map[int64]bool, error) {
 	out := map[int64]bool{}
-	for _, id := range snapshotIDs(snapOf) {
-		var png bool
-		err := s.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM snapshot_file WHERE snapshot_id=? AND rel_path LIKE '%textures/%.png')`, id).Scan(&png)
-		if err != nil {
-			return nil, err
+	err := s.eachSnapshot(snapshotIDs(snapOf), `kinds`, func(r *sql.Rows) error {
+		var id int64
+		var k int
+		if err := r.Scan(&id, &k); err != nil {
+			return err
 		}
-		if png {
-			out[id.(int64)] = true
+		if k&HasPNG != 0 {
+			out[id] = true
 		}
-	}
-	return out, nil
+		return nil
+	})
+	return out, err
 }

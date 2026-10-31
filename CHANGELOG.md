@@ -11,6 +11,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
   "installed copies" note when an assembly's types cannot be listed. Logs already analysed
   are attributed again.
 
+- Mod 库存 opens faster on a large library. Whether a mod has code, Defs / Patches, translations or convertible textures, and which languages it has, are now worked out once when a scan records the mod, instead of reading its whole file list each time. On 1354 mods the first open's content lookups went from about 245 ms to under 2 ms; the `type:` search, the texture mark and the languages in the details show the same as before. The first start after updating upgrades the database (schema 27) by reading the stored file lists once: about half a second for a library with a million file rows.
+
 - MCP: what an agent reads when it connects is about a fifth of what it was. The server
   instructions and the tool descriptions went from 53,325 to 10,420 characters (8,816 +
   44,509 → 1,589 + 8,831; roughly 13k → 2.6k tokens), and the whole `tools/list` answer
