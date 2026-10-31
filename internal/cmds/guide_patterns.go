@@ -1,8 +1,8 @@
-package mcp
+package cmds
 
-// patternChecklist extends the diagnosis workflow with the kinds of errors it did not cover:
-// 40% of the error clusters in 40,326 public 1.6 logs (spikes/patterns/RESULT.txt), most
-// frequent first. Shares are of all error clusters.
+// patternChecklist is guide topic errors: the kinds of errors the diagnosis workflow does not
+// cover, 40% of the error clusters in 40,326 public 1.6 logs (spikes/patterns/RESULT.txt),
+// most frequent first. Shares are of all error clusters.
 const patternChecklist = `Error kinds step 3 does not cover, most frequent first (shares of the error clusters in 40,326 public 1.6 logs). analyze_log names a cluster's kind as pattern:<id>; analyze_log pattern=<id> gives its usual causes, route and fixes. A pattern is community background about that kind of error, never on its own the reason to name a mod:
 - Save loading (21%; pattern:g:save.*, g:rt.post-load): "Could not load reference to X named", "Could not resolve reference to object with loadID", "is referenced but is not deep-saved", "Could not find think node", "Can't load abstract class". Data of mods added or removed during a save; the type or mod named is whose data remains in the save, not a broken mod. Fix: ignore, re-enable that mod, or a new game; do not disable mods for it.
 - Config errors (9%; g:xml.config-error): "Config error in <def>: …" is the game's consistency check of one def: get_def <def> names the defining mod (the source) and the patches that touched it. Usually harmless: ignore or report.
