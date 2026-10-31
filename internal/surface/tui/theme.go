@@ -13,7 +13,7 @@ import (
 
 // Visual system (06 §7, §3).
 
-// width uses the same East Asian setting as the CLI renderer and the WezTerm host
+// width uses the same East Asian setting as the CLI renderer
 // (07 §7 item 3, 06 §7): ambiguous-width characters and Nerd Font icons are 1 cell.
 var width = &runewidth.Condition{EastAsianWidth: false}
 
@@ -78,7 +78,7 @@ type icons struct {
 	evDeclared, evInferred, evLog, evCommunity, evRule, evCorpus string
 }
 
-// Nerd Font: the Font Awesome 4 range, in every Nerd Font and WezTerm's built-in symbols.
+// Nerd Font: the Font Awesome 4 range, in every Nerd Font.
 var nerdIcons = icons{
 	official: "", workshop: "", local: "", localCopy: "", git: "",
 	err: "", warn: "", logErr: "", unloadable: "", hint: "",
@@ -106,29 +106,20 @@ const (
 
 var ic = compatIcons
 
-// SetIcons picks the icon set: "nerd" or "compat" from ui.icons, else Nerd Font icons when
-// the WezTerm host runs the TUI (06 §9.3).
+// SetIcons uses Nerd Font icons only when explicitly requested.
 func SetIcons(setting string) {
-	switch setting {
-	case "nerd":
+	if setting == "nerd" {
 		ic = nerdIcons
-	case "compat":
+	} else {
 		ic = compatIcons
-	default:
-		if os.Getenv("TERM_PROGRAM") == "WezTerm" {
-			ic = nerdIcons
-		} else {
-			ic = compatIcons
-		}
 	}
 }
 
 // SetColors makes the palette render. Under ConPTY termenv cannot query the terminal and
-// falls back to no colour, so a terminal that says it has 24-bit colour (WezTerm sets
-// COLORTERM, Windows Terminal WT_SESSION) gets it.
+// falls back to no colour, so COLORTERM or Windows Terminal's WT_SESSION enables 24-bit colour.
 func SetColors() {
 	ct := os.Getenv("COLORTERM")
-	if ct == "truecolor" || ct == "24bit" || os.Getenv("TERM_PROGRAM") == "WezTerm" || os.Getenv("WT_SESSION") != "" {
+	if ct == "truecolor" || ct == "24bit" || os.Getenv("WT_SESSION") != "" {
 		lipgloss.SetColorProfile(termenv.TrueColor)
 	}
 }

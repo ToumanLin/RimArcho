@@ -156,6 +156,8 @@ func (m *model) popupName() string {
 		return T("tags")
 	case m.pos != nil:
 		return T("move to…")
+	case m.cmdOn:
+		return T("command line")
 	case m.prompt != nil:
 		return strings.TrimRight(strings.TrimSpace(m.prompt.label), ":：")
 	case m.panel != nil:

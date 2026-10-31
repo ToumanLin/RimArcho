@@ -34,8 +34,7 @@ func TestGoldenUninstall(t *testing.T) {
 	e.WriteFile(filepath.Join(local, "monitor", "ArchoMonitor-0.9.0", "About", "About.xml"), "<ModMetaData/>")
 	e.WriteFile(filepath.Join(local, "steamcmd", "steamcmd.exe"), "MZ")
 	e.WriteFile(filepath.Join(local, "todds", "todds.exe"), "MZ")
-	e.WriteFile(filepath.Join(e.Home, "wezterm", "wezterm-gui.exe"), "MZ")
-	for _, n := range []string{"archo.exe", "RimArcho.exe", "README.md", "fonts/MapleMono.ttf"} {
+	for _, n := range []string{"archo.exe", "RimArcho.exe", "README.md", "fonts/legacy.ttf"} {
 		e.WriteFile(filepath.Join(e.Root, "Program", n), "x")
 	}
 	e.App.UninstallExe = filepath.Join(e.Root, "Program", "archo.exe")

@@ -5,9 +5,7 @@ package tui
 
 import (
 	"context"
-	"os"
 	"runtime/debug"
-	"strconv"
 	"strings"
 	"time"
 
@@ -64,7 +62,8 @@ type panel struct {
 	onEnter func(m *model) tea.Cmd
 }
 
-// prompt is an input line: ":" command line, "m" move target, "r" rule.
+// prompt is an input line: a name, a note, a rule (r), an import source. The command
+// line (:) is cmdLine.
 type prompt struct {
 	label  string
 	text   string
@@ -138,33 +137,26 @@ type model struct {
 
 	panel   *panel
 	prompt  *prompt
-	tags    *tagBar // the tag bar is open (06 §3.8)
+	cmdl    *cmdLine // the command line, `:` (06 §9.4); kept while closed
+	cmdOn   bool     // the command line is open
+	cmdBusy string   // the command line's command that runs, "" none
+	tags    *tagBar  // the tag bar is open (06 §3.8)
 	status  string
 	sayKind int
 
 	content view.ContentCache // content kinds for type: (loaded on first use)
 
-	dd          *detailData          // the current mod's details beyond the row
-	imgs        map[string]*imgEntry // description images by url and width
-	imgLoading  string               // the image being loaded ("" none)
-	thumbShown  string               // the mod whose thumbnail may be drawn: the cursor rested on it (06 §9.4)
-	thumbSeq    int
-	dwell       time.Duration // ui.preview_dwell_ms (06 §9.4: 0, the thumbnail at once)
-	previewsOff bool          // ui.previews off: no images at all
-	prefetching string        // the thumbnail being made ahead of the cursor
-	imgUse      map[string]int
-	imgClock    int
-	fsecs       *fullSecs // the full-screen detail's sub-sections (06 §4.2)
-	pal         *palette  // the command palette (06 §3.5), nil when closed
-	sel         selRange  // the shift range of the selection (06 §3.4)
-	pos         *posInput // the position input, m (06 §3.6)
-	placed      []string  // the mods space just enabled: an m right after it moves them (06 §3.5)
-	prefs       colPrefs  // column widths and wrapping (06 §2.5)
+	dd          *detailData // the current mod's details beyond the row
+	fsecs       *fullSecs   // the full-screen detail's sub-sections (06 §4.2)
+	pal         *palette    // the command palette (06 §3.5), nil when closed
+	sel         selRange    // the shift range of the selection (06 §3.4)
+	pos         *posInput   // the position input, m (06 §3.6)
+	placed      []string    // the mods space just enabled: an m right after it moves them (06 §3.5)
+	prefs       colPrefs    // column widths and wrapping (06 §2.5)
 	prefsEnv    string
 	resizing    *resizeDrag // a column gap being dragged
 	rowMap      [3][]int    // per list column: body line → view index (-1: title or empty), as last drawn
 	armed       *armed      // a destructive key pressed once (06 §6)
-	images      *imgWriter  // the WezTerm host's output; nil: no inline images
 	full        bool        // the full-screen detail
 	fullOff     int
 	fullSec     int    // the full-screen sub-section tab / shift+tab went to (0: the summary)
@@ -186,14 +178,7 @@ func New(o Options) tea.Model {
 	o.App.LazyLog = true // the newest log is parsed when the Problems view opens
 	// Until then the status-bar counts use a stored log report only, never a parse.
 	o.App.LogCacheOnly = true
-	return &model{opts: o, app: o.App, w: 120, h: 30, focus: cActive, marked: map[string]bool{}, imgs: map[string]*imgEntry{}, imgUse: map[string]int{},
-		previewsOff: cmds.Setting(o.App, "ui.previews") == "off", dwell: dwellSetting(o.App)}
-}
-
-// dwellSetting reads ui.preview_dwell_ms.
-func dwellSetting(a *app.App) time.Duration {
-	n, _ := strconv.Atoi(cmds.Setting(a, "ui.preview_dwell_ms"))
-	return time.Duration(n) * time.Millisecond
+	return &model{opts: o, app: o.App, w: 120, h: 30, focus: cActive, marked: map[string]bool{}}
 }
 
 // MemoryLimit is the Go heap soft cap of the TUI process (06 §3.5 T5: idle ≤ 80 MB with
@@ -226,10 +211,6 @@ func Run(o Options) error {
 		opts = append(opts, tea.WithMouseCellMotion())
 	}
 	mdl := New(o).(*model)
-	if os.Getenv("TERM_PROGRAM") == "WezTerm" { // inline images in the host only (06 §9.3)
-		mdl.images = &imgWriter{Writer: os.Stdout}
-		opts = append(opts, tea.WithOutput(mdl.images))
-	}
 	program := tea.NewProgram(mdl, opts...)
 	go app.AutomaticLoop(ctx, func(parent context.Context) {
 		r, err := maintenance.ReadSession()
@@ -370,34 +351,7 @@ func (m *model) requestDetail() tea.Cmd {
 	m.detailSeq++
 	seq := m.detailSeq
 	tick := tea.Tick(120*time.Millisecond, func(time.Time) tea.Msg { return detailTick{seq} })
-	return tea.Batch(tick, m.thumbDwell())
-}
-
-// thumbDwell: the thumbnail follows the selection at once (06 §9.4); with
-// ui.preview_dwell_ms set, it goes when the selection changes and comes back once the
-// cursor has rested that long (the old 06 §9.4 behaviour).
-func (m *model) thumbDwell() tea.Cmd {
-	it := m.current()
-	if it == nil || it.id == "" {
-		m.thumbShown = ""
-		return nil
-	}
-	if it.id == m.thumbShown {
-		return nil
-	}
-	if m.dwell <= 0 {
-		m.thumbShown = it.id
-		return nil
-	}
-	m.thumbShown = ""
-	m.thumbSeq++
-	seq, id := m.thumbSeq, it.id
-	return tea.Tick(m.dwell, func(time.Time) tea.Msg { return thumbTick{seq, id} })
-}
-
-type thumbTick struct {
-	seq int
-	id  string
+	return tick
 }
 
 func (m *model) loadDetail() tea.Cmd {

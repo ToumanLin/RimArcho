@@ -8,7 +8,6 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/accounts"
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
-	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
@@ -112,13 +111,11 @@ func (s *API) runSettingTask(a *app.App, id, kind string, argv []string) (string
 		return view.T("Steam will download this Workshop update"), a.UpdateWorkshopClient(argv[1], false)
 	case view.TaskSubscribe, view.TaskSubscriptionFrom:
 		return s.runSubscriptionTask(a, id, kind, argv)
-	case view.TaskSteamCMD, view.TaskTodds, view.TaskWezTerm:
+	case view.TaskSteamCMD, view.TaskTodds:
 		var path string
 		var err error
 		if len(argv) == 3 && argv[0] == "deps" && argv[1] == "install" {
 			path, err = a.InstallDep(argv[2], progress)
-		} else if kind == view.TaskWezTerm {
-			path, err = a.InstallDep(deps.WezTerm, progress)
 		} else if kind == view.TaskSteamCMD {
 			path, err = a.InstallSteamCMDProgress(progress)
 		} else {

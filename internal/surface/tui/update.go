@@ -31,22 +31,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	seq := m.idleSeq
 	next := tea.Tick(idleAfter, func(time.Time) tea.Msg { return idleTick{seq} })
 	mm, cmd := m.update(msg)
-	return mm, tea.Batch(cmd, next, m.imageCmds(m.visibleDetail()))
-}
-
-// visibleDetail lays out the detail as the next frame will show it (for image loads).
-func (m *model) visibleDetail() []dline {
-	if !m.inlineImages() || m.tab != tabList || m.panel != nil || m.insp != nil {
-		return nil
-	}
-	if m.full {
-		return m.detailLayout(detailOpts{width: max(m.w-4, 20), full: true, images: true, techText: m.detail})
-	}
-	l := m.layout()
-	if l.detailW == 0 {
-		return nil
-	}
-	return m.detailLayout(detailOpts{width: l.detailW, descMax: m.descMax(), images: true, techText: m.detail})
+	return mm, tea.Batch(cmd, next)
 }
 
 func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -90,23 +75,6 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.fsecs = msg.s
 		}
 		return m, nil
-	case thumbTick:
-		if it := m.current(); msg.seq == m.thumbSeq && it != nil && it.id == msg.id {
-			m.thumbShown = msg.id
-		}
-		return m, nil
-	case imgLoadedMsg:
-		e := msg.e
-		m.imgs[msg.key] = &e
-		m.touchImage(msg.key)
-		if m.imgLoading == msg.key {
-			m.imgLoading = ""
-		}
-		if m.prefetching == msg.key {
-			m.prefetching = ""
-		}
-		m.evictImages()
-		return m, nil
 	case detailMsg:
 		if it := m.current(); it != nil && it.ref == msg.ref {
 			m.detailRef, m.detail = msg.ref, msg.lines
@@ -138,6 +106,8 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, m.requestDetail()
+	case cmdDoneMsg:
+		return m, m.cmdDone(msg)
 	case analyzeLineMsg, analyzeDoneMsg:
 		return m, m.analyzeMsg(msg)
 	case tea.KeyMsg:
@@ -176,6 +146,8 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 		return nil
 	}
 	switch {
+	case m.cmdOn:
+		return m.cmdKey(k)
 	case m.menu != nil:
 		return m.menuKey(s)
 	case m.pal != nil:
@@ -213,22 +185,7 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 	case "?":
 		return m.helpPage()
 	case ":":
-		m.prompt = &prompt{label: T("archo command: "), submit: func(m *model, text string) tea.Cmd {
-			argv := strings.Fields(text)
-			if len(argv) > 0 && argv[0] == "archo" {
-				argv = argv[1:]
-			}
-			if len(argv) == 0 {
-				return nil
-			}
-			if argv[0] == "scan" {
-				return m.startScan() // never scan inside the TUI process
-			}
-			out, _ := m.run(argv...)
-			m.openPanel("archo "+strings.Join(argv, " "), out)
-			return m.requestDetail()
-		}}
-		return nil
+		return m.openCmdLine()
 	case "E":
 		return m.chooseEnv()
 	case "P":
@@ -612,6 +569,9 @@ func (m *model) panelKey(s string) tea.Cmd {
 		return nil
 	}
 	switch s {
+	case ":":
+		m.panel = nil // one command after another (06 §9.4)
+		return m.openCmdLine()
 	case "down", "j":
 		p.off = min(p.off+1, max(len(p.lines)-page, 0))
 	case "up", "k":
@@ -705,6 +665,9 @@ func (m *model) hit(x, y int) (colKind, int, bool) {
 }
 
 func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
+	if m.cmdOn {
+		return nil // the command line takes keys only
+	}
 	wheel := 0
 	switch e.Button {
 	case tea.MouseButtonWheelDown:

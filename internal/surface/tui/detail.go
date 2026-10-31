@@ -12,7 +12,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 
-	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/bbcode"
 	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/view"
@@ -67,23 +66,16 @@ func (m *model) onFetchTick(id string) tea.Cmd {
 
 // ---- layout ----
 
-// dline is one line of the detail; an image slot is rows lines that start with img set.
+// dline is one text line of the detail.
 type dline struct {
-	text    string
-	imgURL  string // first line of an image slot
-	imgRows int
-	imgCols int
-	imgMax  int    // the rows the image may take (fewer in the column than in the full view)
-	imgInd  int    // cells from the start of the line to the image
-	thumb   string // the mod id, for a thumbnail slot (drawn only after the dwell)
-	sec     int    // 1–5 on a sub-section's header in the full-screen detail
+	text string
+	sec  int // 1–5 on a sub-section header in the full-screen detail
 }
 
 type detailOpts struct {
 	width    int
 	descMax  int  // description lines at most (0: all)
 	full     bool // the full-screen detail
-	images   bool // draw images (WezTerm); else placeholders
 	techText []string
 }
 
@@ -178,30 +170,12 @@ func (m *model) detailLayout(o detailOpts) []dline {
 	return out
 }
 
-// Thumbnail block sizes in cells (06 §9.4, §6.3): the column and the full-screen detail.
-const (
-	thumbCols, thumbRows         = 18, 9
-	thumbFullCols, thumbFullRows = 36, 18
-	thumbMinText                 = 16 // text cells beside the block, else no block
-)
-
-// headerLines: name, authors and facts, beside the thumbnail block in the WezTerm host.
-// The block is always reserved at full size; the image takes the fewest rows that hold
-// it, and a mod without Preview.png shows a faint "no preview" in it (06 §4.1, §6.2).
+// headerLines lays out the name, authors and facts at the left edge.
 func (m *model) headerLines(it *item, mod *store.Mod, facts string, w int, o detailOpts) []dline {
-	tc, tr := thumbCols, thumbRows
-	if o.full {
-		tc, tr = thumbFullCols, thumbFullRows
-	}
-	block := o.images && w-tc-2 >= thumbMinText
-	tw := w
-	if block {
-		tw = w - tc - 2
-	}
 	var text []string
 	put := func(s string, st lipgloss.Style) {
-		for _, l := range wrap(s, tw) {
-			text = append(text, st.Render(fit(l, tw)))
+		for _, l := range wrap(s, w) {
+			text = append(text, st.Render(fit(l, w)))
 		}
 	}
 	if m.detailFocus && !o.full {
@@ -213,39 +187,10 @@ func (m *model) headerLines(it *item, mod *store.Mod, facts string, w int, o det
 		put(a, sSecond)
 	}
 	put(it.icon+" "+facts, sDimS)
-	if !block {
-		out := make([]dline, len(text))
-		for i, l := range text {
-			out[i] = dline{text: l}
-		}
-		return out
+	out := make([]dline, len(text))
+	for i, l := range text {
+		out[i] = dline{text: l}
 	}
-	url := previewURL(mod.ID)
-	e := m.imgs[imgKey(url, tc, tr)]
-	empty := strings.Repeat(" ", tc)
-	// The block is as tall as the image: 16:9 until its size is known, one line for "no
-	// preview" (06 §9.4, revised: no fixed 9-line block).
-	rows := imgRows(0, 0, tc, tr)
-	switch {
-	case e != nil && e.state == imgOK:
-		rows = e.rows
-	case e != nil && e.state == imgFailed:
-		rows = 1
-	}
-	n := max(rows, len(text))
-	out := make([]dline, n)
-	for i := range out {
-		left := empty
-		if i == 0 && e != nil && e.state == imgFailed {
-			left = sDimS.Render(fit(strings.Repeat(" ", (tc-width.StringWidth(T("no preview")))/2)+T("no preview"), tc))
-		}
-		right := strings.Repeat(" ", tw)
-		if i < len(text) {
-			right = text[i]
-		}
-		out[i] = dline{text: left + "  " + right}
-	}
-	out[0].imgURL, out[0].imgCols, out[0].imgMax, out[0].thumb = url, tc, tr, mod.ID
 	return out
 }
 
@@ -301,13 +246,6 @@ func (m *model) descLines(d *detailData, o detailOpts, w int) []dline {
 	}
 	if o.descMax > 0 && len(out) > o.descMax {
 		out = append(out[:o.descMax-1], dline{text: sDimS.Render(fit(T("… enter shows all"), w))})
-		// an image slot cut at the end is dropped
-		for i := len(out) - 2; i >= 0; i-- {
-			if out[i].imgURL != "" && i+out[i].imgRows > len(out)-1 {
-				out = append(out[:i], out[len(out)-1])
-				break
-			}
-		}
 	}
 	return out
 }
@@ -316,18 +254,14 @@ func (m *model) descLines(d *detailData, o detailOpts, w int) []dline {
 func (m *model) renderBlocks(bs []bbcode.Block, w int, o detailOpts) []dline {
 	var out []dline
 	add := func(s string) { out = append(out, dline{text: s}) }
-	// The compact detail draws no description images: one faint line counts them, and the
-	// full-screen detail shows them (06 §9.4).
+	// The compact detail counts description images in one faint line; the
+	// full-screen detail lists each placeholder.
 	nimg, imgAt := 0, -1
 	fill := func() {
 		if nimg == 0 {
 			return
 		}
-		t := Tf("[images ×%d, enter shows them full screen]", nimg)
-		if !o.images {
-			t = Tf("[images ×%d]", nimg)
-		}
-		out[imgAt].text = "  " + sDimS.Render(fit(t, max(w-2, 4)))
+		out[imgAt].text = "  " + sDimS.Render(fit(Tf("[images ×%d]", nimg), max(w-2, 4)))
 	}
 	for i, b := range bs {
 		ind := 2
@@ -382,29 +316,7 @@ func (m *model) renderBlocks(bs []bbcode.Block, w int, o detailOpts) []dline {
 			if u, err := url.Parse(b.URL); err == nil {
 				host = u.Host
 			}
-			if !o.images {
-				add(strings.Repeat(" ", ind) + sDimS.Render(fit("["+T("image")+"  "+host+"]", bw)))
-				continue
-			}
-			cols := min(bw, 60)
-			// In the column an image takes at most half the description, so text stays visible.
-			maxR := 20
-			if o.descMax > 0 {
-				maxR = max(o.descMax/2, 3)
-			}
-			e := m.imgs[imgKey(b.URL, cols, maxR)]
-			switch {
-			case e == nil || e.state == imgLoading:
-				// one line until the size is known
-				out = append(out, dline{text: strings.Repeat(" ", ind) + sDimS.Render(fit(T("image loading… ")+host, bw)), imgURL: b.URL, imgRows: 1, imgCols: cols, imgMax: maxR, imgInd: ind})
-			case e.state == imgFailed:
-				add(strings.Repeat(" ", ind) + sDimS.Render(fit("["+T("image")+"  "+host+"  "+e.err+"]", bw)))
-			default:
-				out = append(out, dline{text: "", imgURL: b.URL, imgRows: e.rows, imgCols: cols, imgMax: maxR, imgInd: ind})
-				for r := 1; r < e.rows; r++ {
-					add("")
-				}
-			}
+			add(strings.Repeat(" ", ind) + sDimS.Render(fit("["+T("image")+"  "+host+"]", bw)))
 		}
 	}
 	fill()
@@ -420,7 +332,7 @@ func wrapSpans(spans []bbcode.Span, w int, base lipgloss.Style) []string {
 		space bool
 	}
 	var toks []tok
-	for _, sp := range spans {
+	for i, sp := range spans {
 		st := base
 		switch {
 		case sp.Strike:
@@ -450,6 +362,14 @@ func wrapSpans(spans []bbcode.Span, w int, base lipgloss.Style) []string {
 			}
 		}
 		flush()
+		// A link's domain follows its text, faint (06 §9.3), unless the text already shows it.
+		if sp.Link != "" && (i+1 == len(spans) || spans[i+1].Link != sp.Link) {
+			if u, err := url.Parse(sp.Link); err == nil && u.Host != "" && !strings.Contains(sp.Text, u.Host) {
+				domain := "(" + u.Host + ")"
+				toks = append(toks, tok{s: " ", out: " ", space: true},
+					tok{s: domain, out: sDimS.Render(domain), st: sDimS})
+			}
+		}
 	}
 	// Kinsoku: closing punctuation is glued to the token before it and opening punctuation
 	// to the token after it, so no line starts with "。" or ends with "「"; a break there
@@ -589,86 +509,6 @@ func tableLines(rows [][]string, w int) []string {
 	}
 	return out
 }
-
-// imageCmds starts loading the images of the detail that are not known yet (one at a
-// time, so the newest selection is not stuck behind a queue).
-func (m *model) imageCmds(lines []dline) tea.Cmd {
-	if !m.inlineImages() {
-		return nil
-	}
-	var cmds []tea.Cmd
-	if m.imgLoading == "" {
-		for _, l := range lines {
-			if l.imgURL == "" || (l.thumb != "" && m.thumbShown != l.thumb) {
-				continue // with a dwell set, a thumbnail waits until the cursor rests
-			}
-			key := imgKey(l.imgURL, l.imgCols, l.imgMax)
-			if _, ok := m.imgs[key]; ok {
-				continue
-			}
-			m.imgLoading = key
-			cmds = append(cmds, m.startImage(key, l.imgURL, l.imgCols, l.imgMax))
-			break
-		}
-	}
-	if m.prefetching == "" {
-		if c := m.prefetchCmd(lines); c != nil {
-			cmds = append(cmds, c)
-		}
-	}
-	return tea.Batch(cmds...)
-}
-
-func (m *model) startImage(key, url string, cols, maxRows int) tea.Cmd {
-	m.imgs[key] = &imgEntry{state: imgLoading}
-	var ix *app.Index
-	if m.st != nil {
-		ix = m.st.Ix
-	}
-	f := loadImage(m.app, ix, url, cols, maxRows)
-	return func() tea.Msg { return f() }
-}
-
-// prefetchRange: thumbnails are made ahead for this many rows above and below the cursor.
-const prefetchRange = 10
-
-// prefetchCmd loads the nearest thumbnail around the cursor that is not cached yet, one
-// at a time beside the visible images, so stopping on a row usually finds it ready.
-func (m *model) prefetchCmd(lines []dline) tea.Cmd {
-	tc, tr := 0, 0
-	for _, l := range lines {
-		if l.thumb != "" {
-			tc, tr = l.imgCols, l.imgMax
-			break
-		}
-	}
-	if tc == 0 || m.full {
-		return nil
-	}
-	c := m.col()
-	for d := 1; d <= prefetchRange; d++ {
-		for _, i := range []int{c.cursor + d, c.cursor - d} {
-			if i < 0 || i >= len(c.view) {
-				continue
-			}
-			id := c.items[c.view[i]].id
-			if id == "" {
-				continue
-			}
-			key := imgKey(previewURL(id), tc, tr)
-			if _, ok := m.imgs[key]; ok {
-				continue
-			}
-			m.prefetching = key
-			return m.startImage(key, previewURL(id), tc, tr)
-		}
-	}
-	return nil
-}
-
-// inlineImages: images are drawn in the WezTerm host (06 §4.3 item 6), unless ui.previews
-// is off (06 §9.4).
-func (m *model) inlineImages() bool { return m.images != nil && !m.previewsOff }
 
 // openURL opens a page in the default browser.
 // A variable so tests can never start the real program (noopen_test.go).
@@ -853,41 +693,20 @@ func (m *model) versionDetailKey(s string) (tea.Cmd, bool) {
 }
 
 // fullLines draws the full-screen detail, scrolled.
-func (m *model) fullLines(n int) ([]string, []placement) {
+func (m *model) fullLines(n int) []string {
 	w := max(m.w-4, 20)
-	lines := m.detailLayout(detailOpts{width: w, full: true, images: m.inlineImages(), techText: m.detail})
+	lines := m.detailLayout(detailOpts{width: w, full: true, techText: m.detail})
 	m.lastLines = lines
 	maxOff := max(len(lines)-n, 0)
 	m.fullOff = max(0, min(m.fullOff, maxOff))
 	var out []string
-	var ps []placement
 	for i := m.fullOff; i < len(lines) && len(out) < n; i++ {
 		l := lines[i]
 		out = append(out, "  "+l.text)
-		if p, ok := m.place(l, len(out)-1, n, 3); ok { // the line starts at column 3
-			ps = append(ps, p)
-		}
 	}
 	if maxOff > 0 && len(out) == n {
 		pct := 100 * m.fullOff / maxOff
 		out[n-1] = "  " + sDimS.Render(fit(Tf("%d%%, ↑↓ PgUp PgDn scroll", pct), w))
 	}
-	return out, ps
-}
-
-// place returns the placement of an image slot starting at body line y when it fits
-// entirely in the n body lines; x is the 1-based screen column where the line starts.
-func (m *model) place(l dline, y, n, x int) (placement, bool) {
-	if l.imgURL == "" || (l.thumb != "" && m.thumbShown != l.thumb) {
-		return placement{}, false
-	}
-	key := imgKey(l.imgURL, l.imgCols, l.imgMax)
-	e := m.imgs[key]
-	if e == nil || e.state != imgOK || y+e.rows > n {
-		return placement{}, false
-	}
-	m.touchImage(key)
-	// body line y is screen row 3+y (1-based): top bar, blank line, then the body
-	p := placement{row: 3 + y, col: x + l.imgInd, cols: l.imgCols, rows: e.rows, seq: e.seq}
-	return p, true
+	return out
 }

@@ -145,6 +145,35 @@ func lookup(words []string) (*Command, []string) {
 	return best, words[bestN:]
 }
 
+// Find is the command the leading words name (the longest match) and the words after its
+// name; nil when they name none.
+func Find(words []string) (*Command, []string) { return lookup(words) }
+
+// Check parses a command line without running it and returns the usage error Execute
+// would print, without the "error: " prefix; nil when the line would run (the TUI command
+// line checks a line before it runs it, 06 §9.4). Errors a command finds while running
+// are not checked.
+func Check(argv []string) error {
+	if len(argv) == 0 || argv[0] == "help" || argv[0] == "--help" || argv[0] == "-h" {
+		return nil
+	}
+	c, rest := lookup(argv)
+	if c == nil {
+		return fmt.Errorf("unknown command %q (archo help)", strings.Join(argv, " "))
+	}
+	if len(rest) > 0 && (rest[len(rest)-1] == "--help" || rest[len(rest)-1] == "-h") {
+		return nil
+	}
+	a, err := parse(c, rest)
+	if err != nil {
+		return err
+	}
+	if v := a.Str("game-version"); v != "" && !gameVersionRe.MatchString(v) {
+		return errors.New("--game-version must look like 1.6")
+	}
+	return nil
+}
+
 // UsageError is a bad invocation.
 type UsageError struct {
 	Msg string

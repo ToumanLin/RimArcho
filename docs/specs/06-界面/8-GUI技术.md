@@ -10,7 +10,7 @@
 
 | 文件 | 子系统 | 双击 | 用途 |
 | --- | --- | --- | --- |
-| `archo.exe` | 控制台 | WezTerm 中的 TUI（§9.2） | CLI、`archo mcp`、`archo tui`；`archo gui` 启动 GUI |
+| `archo.exe` | 控制台 | 默认终端里的 TUI（§9.2） | CLI、`archo mcp`、`archo tui`；`archo gui` 启动 GUI |
 | `RimArcho.exe` | Windows GUI（`-H windowsgui`，没有控制台黑框） | GUI | 给玩家双击的入口（可带 `--env <名称>`）；带命令参数时按 CLI 执行，供 GUI 的扫描和分析子进程使用 |
 
 - 两个 exe 共用数据目录和数据库，可以同时打开（SQLite WAL 支持多进程）。GUI 窗口获得焦点时比较 `Stamp()`（数据库状态，`ChangeKey`），变了就重新加载；在旧视图上的编辑不覆盖对方的修改（G8）。

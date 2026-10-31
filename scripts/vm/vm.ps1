@@ -86,14 +86,6 @@ switch ($Command) {
             go build -ldflags $ld -o (Join-Path $out 'archo.exe') ./cmd/archo; if ($LASTEXITCODE) { throw 'build failed' }
             # Same as scripts/release.ps1: GUI=1 makes a bare RimArcho.exe open the window, not the TUI.
             go build -ldflags "$ld -H windowsgui -X github.com/ToumanLin/RimArcho/internal/buildinfo.GUI=1" -o (Join-Path $out 'RimArcho.exe') ./cmd/archo; if ($LASTEXITCODE) { throw 'build failed' }
-            # The font comes from the newest release build, here or in the main checkout (a
-            # worktree has no dist/ of its own).
-            $dists = @(Join-Path $repo 'dist')
-            $common = (git rev-parse --path-format=absolute --git-common-dir 2>$null)
-            if ($common) { $dists += Join-Path (Split-Path -Parent $common) 'dist' }
-            $rel = $dists | ForEach-Object { Get-ChildItem $_ -Directory -Filter 'archo-*-windows-amd64' -ErrorAction SilentlyContinue } | Where-Object { Test-Path (Join-Path $_.FullName 'fonts') } | Sort-Object LastWriteTime | Select-Object -Last 1
-            if (Test-Path (Join-Path $out 'fonts')) { Remove-Item -Recurse -Force (Join-Path $out 'fonts') }
-            if ($rel) { Copy-Item -Recurse -Force (Join-Path $rel.FullName 'fonts') $out } else { Write-Warning 'no release build with fonts/ (scripts/release.ps1): the window uses the system font' }
             # Archo Monitor: built from monitor/ like scripts/release.ps1 does (again only when
             # its source changed), or the mod folder -Monitor names.
             $want = (Get-Content -Raw (Join-Path $repo 'monitor\VERSION')).Trim()

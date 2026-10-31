@@ -178,9 +178,7 @@ next:
 
 | 写法 | 作用 |
 | --- | --- |
-| `archo`（无参数） | 打开 TUI；双击时在 RimArcho 自带的 WezTerm 宿主里打开（06 §9.2） |
-| `archo tui` | 在当前终端打开 TUI（WezTerm 宿主运行的就是它） |
-| `archo --here` | 不启动 WezTerm 宿主，直接在当前终端打开 TUI |
+| `archo`（无参数）、`archo tui` | 在当前终端打开 TUI；双击 `archo.exe` 时在 Windows 默认的终端里打开（06 §9.2）。旧快捷方式里的 `archo --here` 也接受，作用相同 |
 | `archo gui` | 打开桌面窗口：同目录有 `RimArcho.exe` 就交给它并立即返回，否则在本进程运行 |
 | `archo mcp` | stdio MCP server（§5） |
 | `archo <命令> [参数]` | 执行一条命令后退出 |
@@ -272,7 +270,7 @@ next:
 
 **自动检查状态**：`status`、`data status`（包括 MCP `status` 对应输出）只用一行 `automatic checks`：开关状态，以及等待玩家处理的 Mod / 工具更新数、已设置的 LoversLab 账户登录提醒。没有待处理项时写 `nothing waiting (last MM-DD HH:MM)`；尚未检查时注明 `not checked yet`。省略不适用的账户及零计数，不联网，也不暴露 Cookie；`deps` 另列受管工具的新版本和检查时间，`data status` 列各份数据的检查时间。授权与通知见 06 §2.16，开关默认值和间隔见 06 §2.16.1。
 
-**设置键**（`config set`）：`ui.lang auto|en|zh`；`ui.icons auto|nerd|compat`；`ui.mouse on|off`（关掉终端的鼠标上报，方便选中文字）；`workshop.fetch on|off`（是否联网获取工坊简介）；`workshop.images on|off`（是否下载简介里的图片）；`updates.auto on|off`、`updates.interval normal|frequent|relaxed`（06 §2.16）；`terminal.host auto|wezterm|none`；`ui.previews on|off`；`ui.gpu on|off`（窗口的 GPU 加速，下次打开窗口生效，06 §2.14）；`ui.preview_dwell_ms 0–5000`；`tags.pinned <逗号分隔的标签>`；`monitor.default on|off`（是否把 Archo Monitor 自动加进方案，04 §1.5）；`monitor.dir <绝对路径>`（Monitor 目录，08 §9）。设置存在数据库的 meta 表（键 `cfg:<键>`）；`config.toml` 只有 `tombstone_days`（07 §3）。
+**设置键**（`config set`）：`ui.lang auto|en|zh`；`ui.icons compat|nerd`（06 §9.3）；`ui.mouse on|off`（关掉终端的鼠标上报，方便选中文字）；`workshop.fetch on|off`（是否联网获取工坊简介）；`workshop.images on|off`（是否下载简介里的图片）；`updates.auto on|off`、`updates.interval normal|frequent|relaxed`（06 §2.16）；`ui.gpu on|off`（窗口的 GPU 加速，下次打开窗口生效，06 §2.14）；`tags.pinned <逗号分隔的标签>`；`monitor.default on|off`（是否把 Archo Monitor 自动加进方案，04 §1.5）；`monitor.dir <绝对路径>`（Monitor 目录，08 §9）。设置存在数据库的 meta 表（键 `cfg:<键>`）；`config.toml` 只有 `tombstone_days`（07 §3）。
 
 ### 4.3 方案管理
 

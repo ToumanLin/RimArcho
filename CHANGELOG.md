@@ -18,6 +18,40 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
   as aliases); the `env` parameter's help is shorter. A test caps these sizes so they do
   not creep back up.
 
+- The terminal interface no longer uses WezTerm. `archo` (and a double click on
+  `archo.exe`) opens the TUI in the terminal it was started from; a double click opens
+  Windows' default terminal (Windows Terminal on Windows 11). RimArcho no longer offers
+  to download WezTerm, no longer ships the Maple Mono font (the release zip has no
+  `fonts/` folder), and the TUI no longer draws thumbnails or description images: the
+  name starts at the left edge and images show as text placeholders, as they already
+  did in other terminals. A link in a description now shows its domain after the text,
+  faint (`source (github.com)`), as the spec already said. A WezTerm an earlier version downloaded into the data folder
+  (`wezterm\`, `wezterm.lua`, `logs\wezterm-start.log`) is no longer used and is left
+  where it is; delete it yourself, or uninstalling RimArcho removes it with the data
+  folder. The settings `terminal.host`, `wezterm.path`, `ui.previews` and
+  `ui.preview_dwell_ms` are gone; `ui.icons` is `compat` (the default) or `nerd` for a
+  terminal that already uses a Nerd Font, and an old `auto` reads as `compat`. `archo
+  deps` and Settings › External tools list todds and SteamCMD only, and `archo deps
+  install wezterm` is gone. `archo --here` still works and does the same as `archo`.
+
+- The TUI's command line (`:`) is a real input box now. It runs any archo command, as
+  in a terminal, and runs it in the background, so the screen keeps working while a
+  long command (a pack build, a test run) is going. `tab` completes the word under the
+  cursor: command names (by prefix, then anywhere in the name, so `remove` lists every
+  remove command), flags, mods by name (it inserts the mod's reference; an empty word
+  offers the mod under the cursor first), game, list and pack names, setting keys and
+  their values. Several candidates show above the line; `tab` / `shift+tab` or `↑↓`
+  go through them, `enter` takes one, `esc` puts the word back. `↑↓` go through the
+  last 50 commands, which are kept for the next session. `←→`, `home` / `end`,
+  `ctrl+←→`, `ctrl+w` and `ctrl+u` edit the line. Quotes keep spaces in one argument,
+  so `pack launch "My pack"` as printed by the packs panel works (before, it split the
+  name). The line above the input shows the recognised command's usage. A usage error
+  (an unknown command, a missing argument) no longer runs anything: the line stays
+  with the error above it. One line of output goes to the status line, more opens a
+  panel. `--env <name>` works as in the CLI. `log --follow`, which never ends, is
+  refused with a pointer to the status line. `analyze` with `--game-version` now runs
+  as a child process like a bare `analyze`, instead of inside the TUI.
+
 - Importing a Steam collection, a list of workshop links or a list of workshop IDs no
   longer leaves Core and the DLCs out. A list like that cannot name official content, so
   the import keeps the Core and DLCs the current plan has enabled, first in the list

@@ -193,6 +193,7 @@ func (a *App) DefaultPacksTo() string { return filepath.Join(a.KeepBase(), "RimA
 
 // releaseFiles are what the release zip puts next to the program (07 §5); only these are
 // deleted from the program folder, and the folder only when nothing else is left in it.
+// Releases before this one shipped fonts/, so uninstall still removes it if present.
 var releaseFiles = []string{"archo.exe", "RimArcho.exe", "README.md", "CHANGELOG.md", "LICENSE", "fonts", "monitor"}
 
 // downloadedGame reports whether a game folder was downloaded with SteamCMD: force_install_dir
@@ -574,7 +575,7 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 		data = append(data, it)
 	}
 	// Name only managed tools actually covered by the scheduled data deletions.
-	for _, name := range []string{deps.Todds, deps.WezTerm} {
+	for _, name := range []string{deps.Todds} {
 		i := a.Deps().Status(name)
 		if !i.Own {
 			continue
@@ -587,9 +588,6 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 			continue
 		}
 		label := name
-		if name == deps.WezTerm {
-			label = "WezTerm"
-		}
 		for _, it := range data {
 			if it.Do == DoLater && source.Within(i.Dir, it.Path) {
 				if it.Note != "" {
