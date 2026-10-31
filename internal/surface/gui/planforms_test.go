@@ -78,7 +78,7 @@ func TestNewListImportUsesOnlyItsPreview(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if names(api.Board().Cols[view.Active]) != "Beta" {
+	if names(api.Board().Cols[view.Active]) != "Core,Beta" {
 		t.Fatal("created content differs from preview")
 	}
 	managed, err := api.PlanManage(view.PlanOfPage(done.Page))
@@ -142,7 +142,7 @@ func TestPlanForms(t *testing.T) {
 	if _, err := api.CreatePlan(original, "From save", save); err != nil {
 		t.Fatal(err)
 	}
-	if names(api.Board().Cols[view.Active]) != "Beta" {
+	if names(api.Board().Cols[view.Active]) != "Core,Beta" {
 		t.Fatal("save not read")
 	}
 	if _, err := api.ImportPreviewFor(original, view.ImportText, "tester.b"); err != nil {
@@ -152,7 +152,7 @@ func TestPlanForms(t *testing.T) {
 	if _, err := api.ImportApplyTo(original, false); err != nil {
 		t.Fatal(err)
 	}
-	if api.Shell().Plan.ID != original || names(api.Board().Cols[view.Active]) != "Beta" {
+	if api.Shell().Plan.ID != original || names(api.Board().Cols[view.Active]) != "Core,Beta" {
 		t.Fatal("import targeted wrong list")
 	}
 	if _, err := api.Undo(); err != nil {

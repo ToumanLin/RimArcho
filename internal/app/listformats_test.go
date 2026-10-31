@@ -113,8 +113,38 @@ func TestExportImportRoundTrip(t *testing.T) {
 	ids := filepath.Join(e.Root, "ids.txt")
 	os.WriteFile(ids, []byte("2009463077\nhttps://steamcommunity.com/sharedfiles/filedetails/?id=1001\n7777777\n"), 0o644)
 	out := e.MustRun("loadout", "import", ids)
-	if got := strings.Join(active(t, e), ", "); got != "Harmony, A" || !strings.Contains(out, "skipped: 1 workshop IDs") {
+	if got := strings.Join(active(t, e), ", "); got != "Core, Harmony, A" || !strings.Contains(out, "skipped: 1 workshop IDs") {
 		t.Errorf("workshop IDs: %s\n%s", got, out)
+	}
+}
+
+// A list that names no official content (workshop links, a collection, workshop IDs)
+// keeps the Core and DLCs the current plan has enabled, when it replaces the plan and as a
+// new plan; an installed DLC the plan does not enable stays out. A list that names Core is
+// taken as it is (04 §9.1).
+func TestImportWithoutOfficialKeepsCoreAndDLC(t *testing.T) {
+	t.Parallel()
+	e := loadoutEnv(t)
+	e.WriteMod(filepath.Join(e.Game, "Data", "Royalty"), testkit.Sample("ludeon.rimworld.royalty", "Royalty"))
+	e.WriteMod(filepath.Join(e.Game, "Data", "Ideology"), testkit.Sample("ludeon.rimworld.ideology", "Ideology"))
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "ludeon.rimworld.royalty", "brrainz.harmony", "tester.a")
+	scanNow(t, e)
+	links := filepath.Join(e.Root, "links.md")
+	e.MustRun("loadout", "export", "--format", "workshop", "--out", links)
+	e.MustRun("disable", "pkg:tester.a")
+	e.MustRun("loadout", "import", links)
+	if got := joined(active(t, e)); got != "Core, Royalty, Harmony, A" {
+		t.Fatalf("replace: %s", got)
+	}
+	e.MustRun("loadout", "import", links, "linked", "--new")
+	if got := planList(t, e, "linked"); got != "Core, Royalty, Harmony, A" {
+		t.Fatalf("new plan: %s", got)
+	}
+	text := filepath.Join(e.Root, "core.txt")
+	os.WriteFile(text, []byte("ludeon.rimworld\ntester.a\n"), 0o644)
+	e.MustRun("loadout", "import", text)
+	if got := joined(active(t, e)); got != "Core, A" {
+		t.Fatalf("a list naming Core: %s", got)
 	}
 }
 

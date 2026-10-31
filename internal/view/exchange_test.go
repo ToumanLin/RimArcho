@@ -194,7 +194,7 @@ func TestImportLinks(t *testing.T) {
 		t.Fatalf("collection: %+v", p)
 	}
 	view.ApplyImport(e.App, imp, false)
-	if got := enabled(t, e); got != "Harmony,Alpha" {
+	if got := enabled(t, e); got != "Core,Harmony,Alpha" {
 		t.Fatalf("collection import: %s", got)
 	}
 

@@ -129,7 +129,8 @@ func TestPlanVerbs(t *testing.T) {
 		t.Fatalf("rows %+v", rows)
 	}
 
-	// An import read and previewed becomes a plan of its own.
+	// An import read and previewed becomes a plan of its own; it names no official
+	// content, so it keeps the current plan's Core (04 §9.1).
 	imp, err := view.ReadImport(a, view.ImportText, "tester.b\nbrrainz.harmony\nsomeone.missing")
 	if err != nil {
 		t.Fatal(err)
@@ -138,11 +139,11 @@ func TestPlanVerbs(t *testing.T) {
 		t.Fatal(err)
 	}
 	p, text, err = view.ImportAsPlan(a, imp, "Pasted")
-	if err != nil || !strings.HasPrefix(text, "new list Pasted: 3 mods") {
+	if err != nil || !strings.HasPrefix(text, "new list Pasted: 4 mods") {
 		t.Fatalf("import: %v %q", err, text)
 	}
 	st, _ := a.Loadout()
-	if st.Plan.ID != p.ID || len(st.List) != 3 {
+	if st.Plan.ID != p.ID || len(st.List) != 4 {
 		t.Fatalf("imported plan %s %d", st.Plan.Name, len(st.List))
 	}
 	if v, _ := a.Store.Version(p.ID, 1); v == nil || v.Source != "import" || v.Note != "pasted list" {

@@ -221,8 +221,11 @@ func PreviewImportFor(a *app.App, imp *Import, id int64) (*ImportPreview, error)
 	if versions, e := a.PlanVersionsOf(&suggested, &plan); e == nil {
 		p.Allowed = app.FormatVersions(versions.Allowed)
 	}
-	p.Total = len(list) + len(unresolved)
-	for _, e := range list {
+	// Core and the DLCs kept from the current plan are not the list's (04 §9.1): they count
+	// in what the list would become, not in what it holds.
+	kept := app.KeptOfficial(st, il)
+	p.Total = len(list) - kept + len(unresolved)
+	for _, e := range list[kept:] {
 		if e.Instance != "" {
 			r := ImportRow{ID: e.Instance, Enabled: st.List.Index(e.Instance) >= 0}
 			if m := st.Ix.ByID[e.Instance]; m != nil {

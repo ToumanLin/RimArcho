@@ -13,10 +13,12 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
+	"github.com/ToumanLin/RimArcho/internal/order"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
@@ -363,6 +365,7 @@ func ImportedEntries(st *LoadoutState, il *ImportedList) (list loadout.List, unr
 		}
 	}
 	list, _ = st.Reg.FromTokens(tokens)
+	list = append(keptOfficial(st, il), list...)
 	for i, e := range list {
 		if e.Missing != "" {
 			list[i].Name = il.Names[e.Missing]
@@ -376,6 +379,32 @@ func ImportedEntries(st *LoadoutState, il *ImportedList) (list loadout.List, unr
 		}
 	}
 	return list, unresolved
+}
+
+// KeptOfficial is how many entries at the head of ImportedEntries come from the current
+// plan, not from the list (a preview counts the list's own).
+func KeptOfficial(st *LoadoutState, il *ImportedList) int { return len(keptOfficial(st, il)) }
+
+// keptOfficial is the official content an import that names none keeps (a Workshop
+// collection or a list of workshop links cannot name Core and the DLCs, 04 §9.1): what
+// the current plan has enabled, else the installed Core. Workshop IDs never stand for
+// official content, so the list's packageIds tell.
+func keptOfficial(st *LoadoutState, il *ImportedList) loadout.List {
+	if slices.ContainsFunc(il.Tokens, func(t string) bool { return order.IsOfficial(strings.TrimSuffix(t, "_steam")) }) {
+		return nil
+	}
+	var out loadout.List
+	for _, e := range st.List {
+		if m := st.Ix.ByID[e.Instance]; m != nil && m.Kind == source.Official {
+			out = append(out, e)
+		}
+	}
+	if len(out) == 0 {
+		if core, _ := st.Reg.FromTokens([]string{"ludeon.rimworld"}); len(core) == 1 && core[0].Instance != "" {
+			out = core
+		}
+	}
+	return out
 }
 
 // SameContent says whether m's content hash is hash (a RimArcho list's entry).
@@ -402,6 +431,7 @@ func MergedEntries(st *LoadoutState, il *ImportedList) loadout.List {
 // mergeEntries is MergedEntries adding only the entries keep accepts (nil: all).
 func mergeEntries(st *LoadoutState, il *ImportedList, keep func(loadout.Entry) bool) loadout.List {
 	imported, _ := ImportedEntries(st, il)
+	imported = imported[KeptOfficial(st, il):] // the plan's own; neighbours come from the list
 	out := st.List.Clone()
 	for i, e := range imported {
 		if e.Instance == "" || out.Index(e.Instance) >= 0 || (keep != nil && !keep(e)) {

@@ -156,18 +156,16 @@ next:
   archo collection 3000000001 --import
 
 > exchange_list {"action":"collection","from":"3000000001","import":true}
-workspace: 2 active, 1 change unsaved (plan:default, env:main)
+workspace: 3 active, saved (plan:default, env:main)
   imported collection Title 3000000001: 2 of 3 mods are installed
   not installed (subscribe in the Workshop): 1
     Title 5550001  https://steamcommunity.com/sharedfiles/filedetails/?id=5550001
-  removed  #i4uc  Core  was 1
-next:
-  archo save
+  no change
 
 > exchange_list {"action":"import","from":"$ROOT/list.txt"}
 workspace: 3 active, saved (plan:default, env:main)
   imported 3 entries from a RimWorld mod list (.rml), game 1.6.4633 rev1261
-  added  #i4uc  Core  at 1
+  no change
 next:
   archo undo
 
@@ -388,12 +386,10 @@ versions: 1 (plan:default, env:main)
   v1  2026-10-01 10:00  import  3 entries  1.6.4633 rev1261  ModsConfig.xml
 
 > plan_history {"action":"steps"}
-history: 3 unsaved edits, 0 redoable, 1 versions
+history: 1 unsaved edits, 0 redoable, 1 versions
   now: workspace: 2 active, 1 change unsaved (plan:default, env:main)
   undo: archo undo <n> returns to before step n
     1    disable    removed #hnyg Harmony was 2
-    2    import list.txt added #i4uc Core at 1
-    3    import collection ws:3000000001 removed #i4uc Core was 1
   versions: archo loadout checkout v<n>
     v1   2026-10-01  import   3 mods  ModsConfig.xml
 
@@ -411,13 +407,11 @@ workspace: 3 active, saved (plan:default, env:main)
   added  #hnyg  Harmony  at 2
 
 > plan_history {"action":"steps"}
-history: 4 unsaved edits, 0 redoable, 1 versions
+history: 2 unsaved edits, 0 redoable, 1 versions
   now: workspace: 3 active, saved (plan:default, env:main)
   undo: archo undo <n> returns to before step n
     1    checkout   added #hnyg Harmony at 2
     2    disable    removed #hnyg Harmony was 2
-    3    import list.txt added #i4uc Core at 1
-    4    import collection ws:3000000001 removed #i4uc Core was 1
   versions: archo loadout checkout v<n>
     v1   2026-10-01  import   3 mods  ModsConfig.xml
 

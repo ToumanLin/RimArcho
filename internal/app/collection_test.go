@@ -8,7 +8,8 @@ import (
 )
 
 // X4: a collection with an installed mod, one that is not installed and a nested
-// collection; sortorder has gaps. --import keeps the installed ones in order.
+// collection; sortorder has gaps. --import keeps the installed ones in order, after the
+// plan's Core.
 func TestCollection(t *testing.T) {
 	t.Parallel()
 	e := loadoutEnv(t)
@@ -56,7 +57,7 @@ func TestCollection(t *testing.T) {
 		t.Fatalf("installed items not in sortorder:\n%s", out)
 	}
 	out = e.MustRun("collection", "3000000001", "--import")
-	if got := joined(active(t, e)); got != "Harmony, A" || !strings.Contains(out, "not installed (subscribe in the Workshop): 1") {
+	if got := joined(active(t, e)); got != "Core, Harmony, A" || !strings.Contains(out, "not installed (subscribe in the Workshop): 1") {
 		t.Fatalf("import: %s\n%s", got, out)
 	}
 	if out, code := e.Run("collection", "1001"); code == 0 || !strings.Contains(out, "not a Workshop collection") {

@@ -150,7 +150,8 @@ func TestParseAndFormatVersions(t *testing.T) {
 }
 
 // The workshop export (04 §9.3): Markdown links in load order, the rest named in a
-// comment; it reads back as the installed mods with those workshop IDs.
+// comment; it reads back as the installed mods with those workshop IDs, after the current
+// plan's Core (04 §9.1).
 func TestExportWorkshopLinks(t *testing.T) {
 	t.Parallel()
 	e := loadoutEnv(t)
@@ -167,7 +168,7 @@ func TestExportWorkshopLinks(t *testing.T) {
 	}
 	e.MustRun("plan", "new", "links", "--from", f)
 	e.MustRun("plan", "use", "links")
-	if got := joined(active(t, e)); got != "Harmony, A" {
+	if got := joined(active(t, e)); got != "Core, Harmony, A" {
 		t.Fatalf("read back: %s", got)
 	}
 }

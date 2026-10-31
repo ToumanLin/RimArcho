@@ -1,11 +1,9 @@
 package app
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -22,6 +20,7 @@ import (
 //
 // The record survives the window in <data>/tasks.json; what still runs when the window
 // closes is marked stopped (00 §4 principle 6: RimArcho does not stay in the background).
+// Several windows share the file, each answering for its own tasks (taskfile.go).
 
 // Task lanes.
 const (
@@ -85,6 +84,7 @@ type Task struct {
 	Target string     `json:"target,omitempty"` // a pack's name, for its page
 	Args   []string   `json:"args,omitempty"`   // maintenance command, for retry after reopening
 	Env    string     `json:"env,omitempty"`    // the environment captured at submission
+	Owner  string     `json:"owner,omitempty"`  // the window that runs it (newTaskOwner)
 }
 
 // Ended reports whether the task has finished one way or another.
@@ -140,9 +140,13 @@ type Tasks struct {
 	stops    map[string]func() error // a self task's stop
 	working  map[string]bool         // lanes with a runner
 	selfRuns map[string]func(string) (string, error)
-	seq      int
 	now      func() time.Time
 	forgot   [][2]any // the last Forget: tasks and their places, for Unforget
+
+	owner     string          // this window (Task.Owner)
+	written   map[string]bool // this window's tasks in the file as it last wrote it
+	gone      map[string]bool // other windows' tasks taken out here, until the next write
+	stampSeen fileStamp       // the file as last read or written
 }
 
 // BatchCalls are how a Batch reports on its items (by their index in the task).
@@ -154,23 +158,30 @@ type BatchCalls struct {
 }
 
 // OpenTasks reads the record at path (missing: empty). Tasks that were running or queued
-// when the last window closed become stopped.
+// when their window closed (or ended without closing) become stopped, and this window
+// takes them over; another open window's unfinished tasks are left to it.
 func OpenTasks(path string) *Tasks {
-	ts := &Tasks{path: path, stopping: map[string]bool{}, stops: map[string]func() error{}, working: map[string]bool{}, now: time.Now}
-	if b, err := os.ReadFile(path); err == nil {
-		var list []*Task
-		if json.Unmarshal(b, &list) == nil {
-			ts.list = list
-		}
+	ts := &Tasks{path: path, stopping: map[string]bool{}, stops: map[string]func() error{}, working: map[string]bool{}, now: time.Now,
+		owner: newTaskOwner(), written: map[string]bool{}, gone: map[string]bool{}}
+	if path == "" {
+		return ts
 	}
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+	ts.syncLocked(false)
+	disk, _ := readTaskFile(path)
 	changed := false
-	for _, t := range ts.list {
-		if !t.Ended() {
-			ts.closeLocked(t)
-			changed = true
+	for _, t := range disk {
+		if t.Ended() || ownerAlive(t.Owner) {
+			continue
 		}
+		ts.closeLocked(t)
+		t.Owner = ts.owner
+		ts.list = append(ts.list, t)
+		changed = true
 	}
 	if changed {
+		newestFirst(ts.list)
 		ts.saveLocked()
 	}
 	return ts
@@ -191,14 +202,14 @@ func (ts *Tasks) stamp() int64 {
 }
 
 func (ts *Tasks) newID() string {
-	ts.seq++
-	return fmt.Sprintf("t%d-%d", ts.now().UnixNano()/1e6, ts.seq)
+	return fmt.Sprintf("t%d-%d-%d", ts.now().UnixNano()/1e6, os.Getpid(), taskSeq.Add(1))
 }
 
-// List is a copy of the record, newest first.
+// List is a copy of the record, newest first, with what other windows ended since.
 func (ts *Tasks) List() []Task {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
+	ts.reloadLocked()
 	out := make([]Task, len(ts.list))
 	for i, t := range ts.list {
 		out[i] = *t
@@ -221,7 +232,7 @@ func (ts *Tasks) find(id string) *Task {
 // is filled in) and starts the lane's runner if it is idle.
 func (ts *Tasks) Submit(kind, lane, obj string, items []TaskItem) *Task {
 	ts.mu.Lock()
-	t := &Task{ID: ts.newID(), Kind: kind, Lane: lane, Obj: obj, State: TaskQueued, Queued: ts.stamp(), Total: len(items)}
+	t := &Task{ID: ts.newID(), Kind: kind, Lane: lane, Obj: obj, State: TaskQueued, Queued: ts.stamp(), Total: len(items), Owner: ts.owner}
 	for _, it := range items {
 		it.State, it.Why, it.Again = ItemWait, "", ""
 		it.Got, it.Size = 0, 0
@@ -243,7 +254,7 @@ func (ts *Tasks) Submit(kind, lane, obj string, items []TaskItem) *Task {
 // does to it.
 func (ts *Tasks) Begin(kind, obj string, stop func() error) string {
 	ts.mu.Lock()
-	t := &Task{ID: ts.newID(), Kind: kind, Lane: LaneSelf, Obj: obj, State: TaskRunning, Queued: ts.stamp(), Start: ts.ms()}
+	t := &Task{ID: ts.newID(), Kind: kind, Lane: LaneSelf, Obj: obj, State: TaskRunning, Queued: ts.stamp(), Start: ts.ms(), Owner: ts.owner}
 	ts.list = append([]*Task{t}, ts.list...)
 	if stop != nil {
 		ts.stops[t.ID] = stop
@@ -260,16 +271,17 @@ func (ts *Tasks) EnqueueSelf(request Task, run func(string) (string, error)) Tas
 	if ts.selfRuns == nil {
 		ts.selfRuns = map[string]func(string) (string, error){}
 	}
-	t := &Task{ID: ts.newID(), Kind: request.Kind, Lane: LaneSelf, Obj: request.Obj, Args: slices.Clone(request.Args), Env: request.Env, State: TaskQueued, Queued: ts.stamp()}
+	t := &Task{ID: ts.newID(), Kind: request.Kind, Lane: LaneSelf, Obj: request.Obj, Args: slices.Clone(request.Args), Env: request.Env, State: TaskQueued, Queued: ts.stamp(), Owner: ts.owner}
 	if prior := ts.find(request.ID); prior != nil && prior.WorkshopSubscription() {
 		if prior.State != TaskStopped {
 			cp := *prior
 			ts.mu.Unlock()
 			return cp
 		}
-		// Continuing a cancelled download keeps its original items and progress.
+		// Continuing a cancelled download keeps its original items and progress; this
+		// window runs it now, whichever started it.
 		t = prior
-		t.State, t.End, t.Result, t.Closed, t.Phase = TaskQueued, 0, "", false, ""
+		t.State, t.End, t.Result, t.Closed, t.Phase, t.Owner = TaskQueued, 0, "", false, "", ts.owner
 		for i := range t.Items {
 			if t.Items[i].State == ItemSkip {
 				t.Items[i].State, t.Items[i].Why = ItemWait, ""
@@ -542,6 +554,9 @@ func (ts *Tasks) Forget(ids []string) int {
 	for i, t := range ts.list {
 		if slices.Contains(ids, t.ID) && t.Ended() {
 			gone = append(gone, [2]any{t, i})
+			if t.Owner != ts.owner {
+				ts.gone[t.ID] = true
+			}
 			continue
 		}
 		keep = append(keep, t)
@@ -579,6 +594,9 @@ func (ts *Tasks) Unforget() int {
 		if i > len(ts.list) {
 			i = len(ts.list)
 		}
+		// Put back, it is this window's: the file has it again whoever wrote it first.
+		t.Owner = ts.owner
+		delete(ts.gone, t.ID)
 		ts.list = slices.Insert(ts.list, i, t)
 	}
 	if len(gone) > 0 {
@@ -624,6 +642,7 @@ func (ts *Tasks) Close() {
 	clear(ts.selfRuns)
 	ts.saveLocked()
 	ts.mu.Unlock()
+	closeTaskOwner(ts.owner)
 	for _, stop := range stops {
 		stop()
 	}
@@ -839,38 +858,12 @@ func (ts *Tasks) do(kind, ref string) (err error) {
 	return ts.Do(kind, ref)
 }
 
-// saveLocked writes the record: everything running or waiting and the newest TaskLimit
-// that ended (the done ones go first when there are too many).
+// saveLocked writes the record (taskfile.go): everything running or waiting and the newest
+// TaskLimit that ended, this window's and the others'.
 func (ts *Tasks) saveLocked() {
-	ended := 0
-	for _, t := range ts.list {
-		if t.Ended() {
-			ended++
-		}
-	}
-	if over := ended - TaskLimit; over > 0 {
-		for _, drop := range []func(*Task) bool{
-			func(t *Task) bool { return t.State == TaskDone },
-			func(t *Task) bool { return t.Ended() },
-		} {
-			for i := len(ts.list) - 1; i >= 0 && over > 0; i-- {
-				if drop(ts.list[i]) {
-					ts.list = slices.Delete(ts.list, i, i+1)
-					over--
-				}
-			}
-		}
-	}
 	if ts.path == "" {
+		ts.list = trimTasks(ts.list)
 		return
 	}
-	b, err := json.Marshal(ts.list)
-	if err != nil {
-		return
-	}
-	os.MkdirAll(filepath.Dir(ts.path), 0o755)
-	tmp := ts.path + ".tmp"
-	if os.WriteFile(tmp, b, 0o644) == nil {
-		os.Rename(tmp, ts.path)
-	}
+	ts.syncLocked(true)
 }

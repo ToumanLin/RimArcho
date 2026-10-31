@@ -4,6 +4,20 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- Importing a Steam collection, a list of workshop links or a list of workshop IDs no
+  longer leaves Core and the DLCs out. A list like that cannot name official content, so
+  the import keeps the Core and DLCs the current plan has enabled, first in the list
+  (or the installed Core when the plan has none), whether it replaces the plan or becomes
+  a new one. A list that names Core or a DLC is still taken as it is. The preview's
+  counts are still the list's own mods.
+
+- With the window and the TUI open together (or two windows), neither drops the other's
+  background-task records any more. Each window runs and stops only the tasks it started.
+  When it writes `tasks.json` it reads the file back first and keeps the other's
+  records. Opening a window no longer marks another open window's running tasks as
+  stopped; only tasks whose window has gone are stopped. A task the other window runs
+  shows up on 后台任务 once it ends, and a record removed in one window is gone from both.
+
 - The window's sidebar no longer has the line above Settings ("Game running since
   14:05" while the game runs, "Analyse this run's log" after it). It only opened Can it
   run, which is right above it, and its number was already in that entry's badge. The
@@ -1152,10 +1166,7 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
 
 ### Known gaps
 - Command output still says "unsaved" in a few places (`1 change unsaved`).
-- `collection <id> --import` replaces the list with only the collection's mods, dropping Core.
-- TUI: no 后台任务 page or 列表管理 page yet (the CLI and the window have them). With the
-  window and the TUI open together, each rewrites `tasks.json` whole, so the later writer
-  drops the other's task records.
+- TUI: no 后台任务 page or 列表管理 page yet (the CLI and the window have them).
 - The TUI, CLI and MCP check download pages without the LoversLab session (public page
   reads); only the window uses a logged-in session.
 - Followed collections are checked when 列表管理 opens, not yet on a schedule.
