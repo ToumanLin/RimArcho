@@ -1,6 +1,6 @@
 # 05 · 语义接口与 MCP
 
-> 状态：CLI 与 MCP 已实现（40 个 MCP 工具，含别名 `add_rule`、`copy_local`）。还缺 1.1 的存档工具和少数引用形式，逐条标在文中。
+> 状态：CLI 与 MCP 已实现（41 个 MCP 工具，含别名 `add_rule`、`copy_local` 和说明工具 `guide`）。还缺 1.1 的存档工具和少数引用形式，逐条标在文中。
 > 依据：00、00a；02、03、04、08 的命令语义；09（Archo 用同一套工具）。
 
 ## 1. 一套命令与工具层
@@ -261,6 +261,7 @@ next:
 | 维护 | `db status` / `db backup` / `db vacuum [--dry-run]` | 数据库路径、大小、备份；写一份一致的副本到 `<数据目录>/backups`；整理与压缩（02 §7.2） |
 | | `cache status` / `cache clear <类别>` | 缓存大小；清空一类缓存（`previews`、`workshop`、`images`、`source`、`logs`），用到时重建 |
 | 设置 | `config get [<键>]` / `config set <键> <值>` | 见下 |
+| 说明 | `guide [<主题>]` | 给 agent 的说明（§5.3）：不带主题列出主题；工作流 `diagnose` / `errors` / `plans` / `words`，或一个 MCP 工具名（它的完整参考）。与 MCP `guide` 逐字相同；未知主题是用法错误 |
 | Archo Monitor | `monitor` / `monitor install [--dry-run]` | 随附与已安装的版本、来源、当前方案里的位置；安装、更新、默认加入方案（08 §9、04 §1.5） |
 | 卸载 | `uninstall [--dry-run] [--yes] [--keep-locked [--locked-to <环境>]] [--remove-packs] [--packs-to <目录>] [--remove-saves] [--saves-to <目录>] [--remove-games] [--restore-modsconfig-backup] [--all]` | 删除 RimArcho 放在这台电脑上的东西、恢复它改过的（01 §4.1）。不带 `--yes` 只显示计划（与 `--dry-run` 相同），`--yes` 与 `--dry-run` 同时给是用法错误。参数都是非默认的那一边：`--keep-locked` 锁定库副本放进游戏的 `Mods/`（默认进回收站），`--remove-*` 进回收站（默认保留），`--*-to` 是保留的东西移到哪里，`--restore-modsconfig-backup` 换回备份（默认清理当前列表）。游戏或别的 RimArcho 在运行时拒绝 |
 | 存档（1.1，待实现） | `saves list [--colony <名>]` / `saves show <存档>` / `unplayed [--group never\|partial\|functional] [--mod <引用>]` | 只读（10 §1.6） |
@@ -270,7 +271,7 @@ next:
 
 **分析参数**：`--game-version X.Y` 用于 `analyze`、`problems`、`def`、`patches`、`harmony`、`why`、`log`，按另一个游戏主次版本分析（格式必须像 `1.6`，命令结束后恢复）。MCP 对应工具有同名参数 `game_version`。日志的显式路径与版本参数不绕过环境归属检查，见 03 §6.4。
 
-**自动检查状态**：`status`、`data status`（包括 MCP `status` 对应输出）只用一行 `automatic checks`：开关状态，以及等待玩家处理的 Mod / 工具更新数、已设置的 LoversLab 账户登录提醒。没有待处理项时写 `nothing waiting (last MM-DD HH:MM)`；尚未检查时注明 `not checked yet`。省略不适用的账户及零计数，不联网，也不暴露 Cookie；`deps` 另列受管工具的新版本和检查时间，`data status` 列各份数据的检查时间。开关和间隔见 06 §2.16。
+**自动检查状态**：`status`、`data status`（包括 MCP `status` 对应输出）只用一行 `automatic checks`：开关状态，以及等待玩家处理的 Mod / 工具更新数、已设置的 LoversLab 账户登录提醒。没有待处理项时写 `nothing waiting (last MM-DD HH:MM)`；尚未检查时注明 `not checked yet`。省略不适用的账户及零计数，不联网，也不暴露 Cookie；`deps` 另列受管工具的新版本和检查时间，`data status` 列各份数据的检查时间。授权与通知见 06 §2.16，开关默认值和间隔见 06 §2.16.1。
 
 **设置键**（`config set`）：`ui.lang auto|en|zh`；`ui.icons auto|nerd|compat`；`ui.mouse on|off`（关掉终端的鼠标上报，方便选中文字）；`workshop.fetch on|off`（是否联网获取工坊简介）；`workshop.images on|off`（是否下载简介里的图片）；`updates.auto on|off`、`updates.interval normal|frequent|relaxed`（06 §2.16）；`terminal.host auto|wezterm|none`；`ui.previews on|off`；`ui.gpu on|off`（窗口的 GPU 加速，下次打开窗口生效，06 §2.14）；`ui.preview_dwell_ms 0–5000`；`tags.pinned <逗号分隔的标签>`；`monitor.default on|off`（是否把 Archo Monitor 自动加进方案，04 §1.5）；`monitor.dir <绝对路径>`（Monitor 目录，08 §9）。设置存在数据库的 meta 表（键 `cfg:<键>`）；`config.toml` 只有 `tombstone_days`（07 §3）。
 
@@ -302,7 +303,7 @@ next:
 - 启动时用当前环境。每个工具都有 `env` 参数，按次切换环境，调用结束恢复。
 - 同一进程里的工具调用串行执行（共用一个 App）。
 - 每个工具把参数拼成一条 CLI argv，返回 `cmds.Execute` 的文本，原样不改。退出码 1、2 设 `isError`；退出码 3（引用有歧义）是正常结果，因为文本就是候选列表。
-- 需要分析的调用最多等 10 秒（CLI 不限时）。分析子进程超过 10 秒仍未完成，就先返回声明层的问题，文本注明 “still computing in the background”，子进程继续跑，下一次调用取回结果；这段时间里 `get_def` / `get_patches` / `get_harmony` 用上一次（已过期）的分析，有的话。
+- 需要分析的调用按 06 §2.16.1 W01 等待（CLI 不限时）。分析子进程超过等待上限仍未完成，就先返回声明层的问题，文本注明 “still computing in the background”，子进程继续跑，下一次调用取回结果；这段时间里 `get_def` / `get_patches` / `get_harmony` 用上一次（已过期）的分析，有的话。
 - `read_source` 带 `search` 时默认预算 10 秒，并说明还有多少程序集待反编译（“still computing; run again”）。
 
 ### 5.2 工具表
@@ -313,6 +314,7 @@ next:
 
 | 工具 | 对应命令 | readOnlyHint | destructiveHint |
 | --- | --- | --- | --- |
+| `guide` | `guide`（`topic`）；没有 `env` 参数（各环境相同） | true | — |
 | `status` | `status` | true | — |
 | `find_mods` | 有 `query` 时 `find`；否则 `list`（`active`、`filter`） | true | — |
 | `get_mod` | `mod` | true | — |
@@ -362,30 +364,41 @@ next:
 | `status` | 示例里有 “unsaved edits” | 显示工作区与最新版本的差异 | 改说“与游戏里的列表的差异”，并列出方案 |
 | `copy_local` | “The Loadout is not changed: call edit_loadout action=swap …” | 不改方案 | “创建锁定版本：复制成独立副本并在当前方案里换上，其他方案不动；工坊更新不影响它。” |
 
-### 5.3 工具描述与诊断流程
+### 5.3 渐进式披露：Instructions、工具描述与 guide
 
-每个工具的描述都写明：什么时候用它、什么时候改用别的工具；参数里引用的写法；一条示例调用和示例输出的前三行。描述的读者是 agent：不加载任何 skill，只读 Instructions 和工具描述，就要能完成原 error-debugging skill 和 assembly-inspector 的工作流（I4）。Archo 用同一份描述（09 §2.1）。
+agent 连上时只读到 Instructions 和每个工具的短描述（以及参数结构），够它选对工具。细节放在只读工具 `guide` 里，用到时再取；`guide` 映射 CLI `archo guide [<主题>]`，输出逐字相同（§1.1）。理由见 00 §6 D23。
 
-工具参数结构里的 `game_version`、`env` 必须是**直接字段**：SDK 推断 schema 时不展开嵌入结构，嵌入的字段会被当成未知属性拒绝。
+| 层 | 什么时候读到 | 内容 | 代码 |
+| --- | --- | --- | --- |
+| Instructions | 初始化 | RimArcho 认识什么；输出里的引用（`#id`、`L#id`、`pkg:`、`ws:`、`def:Type/name`、`p:<hex>`、`log:E<n>`、`r:<n>`、`pattern:<id>`）可以直接传给别的工具；结果上限 24 KB，用 `mod=`、`target=`、簇或模式缩小，不用 `all=true`（日志语料 G7）。从 `status` 开始；报错或崩溃先读 `guide topic=diagnose`，并写出最要紧的两条：patcher、mentioned 没有进一步证据不能说成原因；没有 source 就说原因未定。编辑工具只改当前方案，`save_loadout` / `launch_game` 之前不碰游戏；改 Mod 文件先 `pin_mod`。破坏性工具名单（`save_loadout`、`launch_game`、`manage_plans`、`manage_packs`、`resolve_identity`、`manage_hidden`、`manage_library`、`manage_subscriptions`、`manage_textures`、`repair_links`、`maintenance`）：有 dry run 先给玩家看，经玩家同意再调用。最后说明 `guide` 怎么用 | `internal/surface/mcp/desc.go` 的 `Instructions` |
+| 工具描述 | `tools/list` | 一到三句：做什么；什么时候用、什么时候改用别的工具；会写什么，要先 `dry_run=true` 并问玩家的写明。不写示例，不逐个讲参数（参数说明在参数结构里） | `desc.go` 的 `desc*` |
+| guide 主题 | 调用 `guide` | 工作流 `diagnose`（诊断流程全文，见下）、`errors`（错误范式检查清单 `patternChecklist`，03 §6.8）、`plans`（方案与版本、库存、订阅、贴图，以及改 Mod 文件先锁定）、`words`（和玩家说话时用界面上的叫法，06 §7.2）；每个工具名一个主题：完整参考——每个动作、参数细节、边界情况、一条示例调用和示例输出的前几行 | `internal/cmds/guide.go`、`guide_tools.go`、`guide_patterns.go` |
 
-**Instructions**（初始化时发给客户端，原文英文）的内容：
+- 读者是 agent：不加载任何 skill，只读 Instructions、工具描述和按需取的 guide 主题，就要能完成原 error-debugging skill 和 assembly-inspector 的工作流（I4）。Archo 用同一份（09 §2.1）。
+- 长度有上限（`TestInitialContextBudget`，I13）：Instructions ≤ 2000 字符，单个工具描述 ≤ 320 字符，两者合计 ≤ 12000 字符；`tools/list` 的 JSON（含参数结构）≤ 48 KB。新工具的描述照现有的写短，细节写进它的 guide 主题；确实要提高上限时在提交里说明。参数说明同样从简：`env` 统一为 “environment name (default: current)”。
+- `guide` 不带主题时列出全部主题；未知主题是用法错误（退出码 2，`isError`），文本列出工作流主题。主题文本原样返回（不经 `ShellSafe`，示例 JSON 里的 `#引用` 保留）。
+- 没有合并工具：`add_rule`、`copy_local` 是别名，按 §6 保留；描述只有一句，指向新名字，原来的说明和示例在它们的 guide 主题里。
+- 每个 MCP 工具都必须有同名的 guide 主题（`guide` 自己除外），主题里有 `Example: <工具名> {`（`TestToolsAndAnnotations`）。
 
-- 开头：RimArcho 认识一套 RimWorld 安装——每个 Mod 实例、启用列表、Def、Patch 模拟结果、Harmony 补丁、Player.log 错误簇和反编译的 C#。每个工具返回大纲文本，其中的引用（`#id`、`L#id`、`pkg:`、`ws:`、`def:Type/name`、`p:<hex>`、`log:E<n>`、`r:<n>`、`pattern:<id>`）可以直接传给别的工具。
-- 诊断流程（用原样证据，不转述）：
-  1. **从错误开始。** 用户贴了日志就 `analyze_log text=…`；否则 `analyze_log` 看当前 Player.log，再 `analyze_log cluster=E<n>` 看具体的簇。每个簇列出候选 Mod 和角色：source（它的代码或数据产生了错误）、patcher（只是在某一帧上有 Harmony 补丁）、dependency（提供的东西缺失或被停用）、mentioned（出现在消息或较低的帧里）。没有进一步证据时，不能把 patcher 或 mentioned 说成原因。
-  2. **用 `get_mod` 确认身份和状态**：确切的实例、是否启用及位置、路径、同一 Lineage 的其他副本。
-  3. **分类：**
-     - XML（PatchOperation 失败、交叉引用缺失、父 Def 重复或缺失、XML 格式错误）：`get_patches failed=true`（原因：target-inactive、target-missing、target-later、wrong-version-route、stale-name、unguarded-optional、node-absent）、`get_def`、`search_files`。
-     - 材质 / 图标（`_MainTex`、`ResolveIcon`）：先查 XML；在点名的 Mod 里 `search_files` 找有 `uiIconColor` 却没有 `uiIconPath` / `texPath` 的。
-     - 程序集（C# 异常、`Pawn.Tick`、`ThingWithComps.Tick`、世界 tick）：对每个被补丁的帧 `get_harmony target=<方法>`，再 `read_source type=<补丁类>` 或 `search=<模式>`。tick 崩溃要在簇的候选里查 AllComps 的改动：`read_source search="AllComps.Remove(" in=[…]`（还有 `"AllComps.Add("`、`"InitializeComps"`、`"PostExposeData"`）。
-     - 混合：先确认 XML 一侧加载成功（`get_patches failed=true`），再怪代码。
-  4. `list_problems` 给静态全貌（依赖、不兼容、加载顺序、Def 覆盖、Patch 落空、Harmony 冲突）；`explain_relation` 解释两个具体的 Mod。
-  5. **报告**：失败阶段、XML / 程序集 / 混合、确切的 Mod 实例和路径、文件+行或类+方法、为什么失败、点名的 Mod 是原因、依赖还是旁观者，以及最小的修复。
-- 编辑：先 `pin_mod`（从不原地改工坊文件），再改副本；`edit_loadout` 只改 RimArcho 里的方案；`save_loadout` 写游戏的 ModsConfig.xml（先问用户）。破坏性工具（`save_loadout`、`launch_game`、`manage_plans`、`manage_packs`、`resolve_identity`、`manage_hidden`、`manage_library`、`manage_subscriptions`、`manage_textures`、`repair_links`、`maintenance`）先用 dry run 给用户看，再经用户同意调用。诊断流程加一步：以前能跑时，用 `list_changes` 和 `plan_history action=diff` 找出变化。
-- 工具结果上限 24 KB：用 `mod=`、`target=`、模式或簇缩小范围，不用 `all=true`（日志语料 G7）。
-- 最后附错误范式检查清单（`patternChecklist`，03 §6.8）：按语料中的实际分布排序，覆盖诊断流程未讲到的类别——读档、缺资源、配置检查、程序集加载，以及噪音；每类给出 `pattern=<id>` 追问。
+工具参数结构里的 `game_version`、`env` 必须是**直接字段**：SDK 推断 schema 时不展开嵌入结构，嵌入的字段会被当成未知属性拒绝。没有 `env` 字段的工具（`guide`、`preview_uninstall`）在当前环境执行。
 
-各工具描述的要点（示例调用与输出见 `internal/surface/mcp/desc.go`）：
+**`guide topic=diagnose`**（诊断流程，原文英文）的内容，用原样证据，不转述：
+
+1. **从错误开始。** 用户贴了日志就 `analyze_log text=…`；否则 `analyze_log` 看当前 Player.log，再 `analyze_log cluster=E<n>` 看具体的簇。每个簇列出候选 Mod 和角色：source（它的代码或数据产生了错误）、patcher（只是在某一帧上有 Harmony 补丁）、dependency（提供的东西缺失或被停用）、mentioned（出现在消息或较低的帧里）。没有进一步证据时，不能把 patcher 或 mentioned 说成原因；Mod 自己的证据让它保持 source；只提供类型的框架、只是调用出错代码的 Mod 不是原因；簇里没有 source、工具结果也没指出某个 Mod 自己的文件或代码出错时，说原因未定。
+2. **用 `get_mod` 确认身份和状态**：确切的实例、是否启用及位置、路径、同一 Lineage 的其他副本。
+3. **分类：**
+   - XML（PatchOperation 失败、交叉引用缺失、父 Def 重复或缺失、XML 格式错误）：`get_patches failed=true`（原因：target-inactive、target-missing、target-later、wrong-version-route、stale-name、unguarded-optional、node-absent，以及每种原因对玩家意味着什么）、`get_def`、`search_files`。
+   - 材质 / 图标（`_MainTex`、`ResolveIcon`）：先查 XML；在点名的 Mod 里 `search_files` 找有 `uiIconColor` 却没有 `uiIconPath` / `texPath` 的。
+   - 程序集（C# 异常、`Pawn.Tick`、`ThingWithComps.Tick`、世界 tick）：对每个被补丁的帧 `get_harmony target=<方法>`，再 `read_source type=<补丁类>` 或 `search=<模式>`。tick 崩溃要在簇的候选里查 AllComps 的改动：`read_source search="AllComps.Remove(" in=[…]`（还有 `"AllComps.Add("`、`"InitializeComps"`、`"PostExposeData"`）。
+   - 程序集加载（ReflectionTypeLoadException、TypeLoadException、静态构造函数出错）：消息或相邻行点名的程序集；`analyze_log` 说明哪个启用的 Mod 加载了那个 DLL。
+   - 混合：先确认 XML 一侧加载成功（`get_patches failed=true`），再怪代码。
+   - 其他（读档、配置检查、缺资源、噪音）：`guide topic=errors`。
+4. `list_problems` 给静态全貌（依赖、不兼容、加载顺序、Def 覆盖、Patch 落空、Harmony 冲突）；`explain_relation` 解释两个具体的 Mod。
+5. **报告**：失败阶段、XML / 程序集 / 混合、确切的 Mod 实例和路径、文件+行或类+方法、为什么失败、点名的 Mod 是原因、依赖还是旁观者，以及最小的修复。
+6. 以前能跑：`list_changes` 找变化的 Mod，`plan_history action=diff` 找方案的变化。
+
+各工具 guide 主题的要点（示例调用与输出见 `internal/cmds/guide_tools.go`）：
+
 
 | 工具 | 什么时候用 / 改用什么 |
 | --- | --- |
@@ -423,12 +436,13 @@ next:
 | I1 | 同一命令分别通过 CLI 和 MCP 执行 | 输出逐字相同（`TestCLIParity`：19 次调用经内存传输逐字节相同） | 通过 |
 | I2 | 输出中的任意引用 | 都能直接作为另一个命令的参数（`TestRefsRoundTrip`：`#id`、`pkg:`、`p:`、`log:E#`、`def:`） | 通过 |
 | I3 | `pkg:` 对应多个 Instance | 列出候选，不任选一个（`TestAmbiguousPackage`） | 通过 |
-| I4 | 用 Claude Code 或 Codex 接入 MCP，不加载任何 skill | 能完成一次补丁失败的诊断和一次 `Pawn.Tick` 异常的排查 | 通过（脚本化客户端自检，`spikes/mcpcheck`）；真实 agent 会话待验证 |
+| I4 | 用 Claude Code 或 Codex 接入 MCP，不加载任何 skill | 能完成一次补丁失败的诊断和一次 `Pawn.Tick` 异常的排查；2026-10-30 起诊断流程在 `guide topic=diagnose` 里，agent 要自己去读 | 通过（脚本化客户端自检，`spikes/mcpcheck`）；真实 agent 会话待验证（精简后尤其要看 agent 是否先读 guide） |
 | I5 | 默认输出 | 单次不超过 40 行，截断时给出展开命令（`TestCLIParity`、`TestTruncation`） | 通过 |
-| I6 | 注解 | 17 个只读工具 `readOnlyHint: true`；`destructiveHint: true` 的 11 个见 §5.2；每个描述都有示例调用（`TestToolsAndAnnotations`）。写工具只在合成环境测试（`TestWriteTools`）；`env` 参数（`TestEnvParameter`）；分析超过等待时间时返回“仍在计算”（`TestStillComputing`） | 通过 |
+| I6 | 注解 | 18 个只读工具 `readOnlyHint: true`；`destructiveHint: true` 的 11 个见 §5.2；每个工具的 guide 主题都有示例调用（`TestToolsAndAnnotations`）。写工具只在合成环境测试（`TestWriteTools`）；`env` 参数（`TestEnvParameter`）；分析超过等待时间时返回“仍在计算”（`TestStillComputing`） | 通过 |
 | I7 | 对照 §1.2 的表，逐个玩家动作找对应工具 | 每个动作都有 CLI 命令和 MCP 工具，注解与是否写文件一致 | 部分通过（1.0 的玩家动作都有工具，订阅与更新 2026-10-30 补上 `manage_subscriptions`；1.1 的存档工具未做） |
 | I8 | ModsConfig.xml 有未处理的外部修改冲突时调用 `save_loadout` | 拒绝，文本给出看差异 / 载入 / 忽略三条命令；ModsConfig.xml 不变 | 通过 |
 | I9 | 游戏正在运行时调用启动工具；调用 `save_loadout` | 启动工具拒绝并说明哪个环境的游戏在运行；`save_loadout` 照常写入，提示游戏下次启动才会读到 | 通过 |
 | I10 | `plan new` / `use` / `rename` / `remove` 与 `loadout import --new` 经 CLI 和 MCP 各执行一次 | 输出逐字相同；`plan use` 不写游戏文件；不能删除最后一个方案 | 通过 |
 | I11 | 把输出里的命令（`fix:`、`next:`、`… N more (…)`、错误里的提示）原样粘进 cmd、PowerShell、bash | 参数一个不少，引用能解析（`TestPrintedCommandsSurviveShells`：PowerShell 5.1 / 7 的解析器逐条读，没有注释、词与预期相同，再逐条执行；规则见 `TestShellSafe`） | 通过（合成夹具）；真实 VM 待验证 |
 | I12 | 在 PowerShell 或 bash 手打带 `#` 的引用，引用被当成注释 | 缺的是 Mod 引用时用法错误说明原因（`TestMissingRefNamesTheComment`；宿主上 PowerShell 5.1 / 7 跑过） | 通过（合成夹具）；真实 VM 待验证 |
+| I13 | agent 连上 MCP 时读到的内容（§5.3） | Instructions ≤ 2000 字符，单个工具描述 ≤ 320，两者合计 ≤ 12000；`tools/list` JSON ≤ 48 KB；`guide` 列出的每个主题都能取到，未知主题 `isError`（`TestInitialContextBudget`、`TestGuideTopics`） | 通过 |

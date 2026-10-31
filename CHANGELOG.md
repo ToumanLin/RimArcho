@@ -4,13 +4,28 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
-- The window's list editor has 排序规则 (load-order rules) under 历史 in its left column.
-  It lists every rule you have (rules are shared by all games and lists), one sentence
-  each with its note; the mod names jump to the mod in the list. `r` on a mod, or
-  加一条规则 at the bottom, opens a small form in place: the kind, the other mod (type its
-  name and pick), a note. 编辑 changes a rule and keeps its `r:<n>`; 删除 is immediate and
-  the status line's 撤销 (or `u` right after) puts it back with the same number. Ignore
-  rules still come from Can it run and `archo sort`; here their note can change.
+- MCP: what an agent reads when it connects is about a fifth of what it was. The server
+  instructions and the tool descriptions went from 53,325 to 10,420 characters (8,816 +
+  44,509 → 1,589 + 8,831; roughly 13k → 2.6k tokens), and the whole `tools/list` answer
+  with parameter schemas from 81 KB to 44 KB. Each description now says in one to three
+  sentences what the tool does, when to use it or another tool, and whether to dry-run and
+  ask the player first. The detail moved to a new read-only tool `guide`
+  (`archo guide [<topic>]` on the command line, same text): `topic=diagnose` is the
+  error-diagnosis workflow that used to be in the instructions, `errors` the checklist of
+  error kinds, `plans`, `words` (what the interface calls things), and `topic=<tool name>`
+  a tool's full reference with an example call; no topic lists them, an unknown one is
+  an error. No tool or parameter was renamed or removed (`add_rule` and `copy_local` stay
+  as aliases); the `env` parameter's help is shorter. A test caps these sizes so they do
+  not creep back up.
+- The window's list editor has 排序规则 (load-order rules) above 历史 in its left column.
+  Rules are shared by all games and lists; the card shows the ones that involve a mod
+  enabled in the current list (只看当前列表, the default) or every rule (全部排序规则), and
+  the count on its bar follows that choice. One sentence each with its note; the mod
+  names jump to the mod in the list. `r` on a mod, or 加一条规则 at the bottom, opens a
+  small form in place: the kind, the other mod (type its name and pick), a note. 编辑
+  changes a rule and keeps its `r:<n>`; 删除 is immediate and the status line's 撤销 (or
+  `u` right after) puts it back with the same number. Ignore rules still come from Can it
+  run and `archo sort`; here their note can change.
 - New `archo rule edit <r:n> <kind> <A> [<B>] | ignore <constraint> [--note <text>]`:
   replaces a rule and keeps its `r:<n>`. The MCP tool `manage_rules` has no `edit` yet.
 - New page Mod 库 › 搜索文件 (also in the command palette): the window's way to

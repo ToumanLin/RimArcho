@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/surface/mcp"
 )
 
@@ -113,9 +114,10 @@ func TestFilesSchemaAndArgv(t *testing.T) {
 	if got := mcp.FilesArgv(mcp.FilesIn{Pattern: "--def"}); !reflect.DeepEqual(got, []string{"files", "search", "--", "--def"}) {
 		t.Fatal(got)
 	}
+	guide, _ := cmds.Guide("search_files")
 	for _, text := range []string{"exact copies", "load order", "Defs/Patches/About", "translations are excluded", "def=true", "per_file", "24 KB", "Gun_Revolver"} {
-		if !strings.Contains(search.Description, text) {
-			t.Errorf("description missing %q", text)
+		if !strings.Contains(guide, text) {
+			t.Errorf("guide search_files missing %q", text)
 		}
 	}
 }

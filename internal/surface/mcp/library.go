@@ -41,7 +41,7 @@ func ManageLibraryArgv(in ManageLibraryIn) []string {
 }
 
 type LibraryIn struct {
-	Env     string   `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env     string   `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Search  string   `json:"search,omitempty" jsonschema:"words that must all appear in a name, package id, author, alias, tag, note, Workshop ID or folder"`
 	Include []string `json:"include,omitempty" jsonschema:"key:value filters to keep (keys tag, source, location, version, state, used, updated); location is a registered source folder path; values of one key are alternatives, different keys must all hold"`
 	Exclude []string `json:"exclude,omitempty" jsonschema:"key:value filters to drop"`
@@ -52,21 +52,9 @@ type LibraryIn struct {
 }
 
 type ManageLibraryIn struct {
-	Env    string   `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env    string   `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Action string   `json:"action" jsonschema:"move_to_locked, remove_from_plans, unsubscribe, subscribe, resubscribe or steam_state"`
 	Refs   []string `json:"refs" jsonschema:"the instances (#id); move_to_locked takes one"`
 	Reason string   `json:"reason,omitempty" jsonschema:"move_to_locked: why, kept in the copy's note"`
 	DryRun bool     `json:"dry_run,omitempty" jsonschema:"move_to_locked, unsubscribe, subscribe, resubscribe: show what would happen, change nothing"`
 }
-
-const descLibrary = `The mod library ("Mod 库"): every mod on this machine for the environment, one line per lineage (the same mod) with its copies, total size, its most important state and the plans using it. States: unloadable, subscribed but not on disk, ignored by the game (another copy in Mods/ wins), unsubscribed leftover, hidden by another manager, upstream updated (locked version), subscription source updated. "Used in" counts every plan of every environment of the same game and every pack. Filter with search (all words), include / exclude key:value (keys: tag, source = workshop|local|locked|steamcmd|git|page|extra|monitor, location = registered source folder path, version, state = unloadable|missing|ignored|residue|hidden|updated|source-update, used = plan:<name>|pack:<name>|none, updated = week|month|half-year|older); facets=true lists the values with counts; lineage=<ref> shows every copy with its path, states, plans and last launch, and the commands for its actions. Use it to answer "what do I have, where, how big, used where", and to find cleanup candidates; use find_mods for the current plan's view and get_mod for one instance's facts.
-Example: list_library {"include": ["used:none"], "exclude": ["source:local"]}
-  library: 4 of 1352 mods match (used:none, -source:local)
-    L#a6o7  Gone   [workshop, 533 B, unsubscribed leftover]
-    L#u2mx  Idle   [workshop, 533 B]`
-
-const descManageLibrary = `Mod library actions. action=move_to_locked refs=[<#id>] moves a spare copy of a mod out of the game's Mods/ folder (a copy made by hand or left by another manager, beside another copy of the same mod) into RimArcho's lock library: renamed on the same volume; on another volume copied, every file checked, then the original goes to the recycle bin; refused when the folder has links pointing outside it. The instance stays the same, so every plan keeps it (the game gets it through an _Archo_ link on the next save_loadout or launch_game); .rimarcho/origin.json is written only when it has none. action=remove_from_plans refs=[…] takes the mods out of every plan that has them (every environment of this game), one undoable step in each plan; nothing is saved to the game. action=unsubscribe refs=[…] unsubscribes Workshop items through the running Steam client (a short helper process using steam_api64.dll copied from the game install), and Steam then deletes their folders: refused while the game runs; plans using it are warned about and show it missing afterwards. action=resubscribe refs=[…] unsubscribes original Workshop copies; after Steam confirms, RimArcho moves each folder to the recycle bin and verifies it is gone before subscribing for a fresh download, losing local edits. Cleanup retries briefly; a folder still present fails that item without subscribing it. Enabled mods and mods used by plans are allowed; links and locked copies are refused, as is a running game. The copy identity and plan references survive. After confirmed subscription (also for unsubscribed leftovers), a high-priority download is requested and this call waits for installed files, failing if Steam makes no progress; check Steam on download failure. action=subscribe refs=[…] subscribes again to unsubscribed leftovers; Steam downloads them in the background. action=steam_state refs=[…] asks Steam whether items are subscribed, installed or waiting for an update (changes nothing); if Steam is unavailable it reports local folder presence, with subscription and update state explicitly unknown. Subscribe/unsubscribe/resubscribe still need an authenticated Steam client: if Steam is unavailable those calls fail with "Steam is not available" and the Workshop page links. Browsing the pages is anonymous; changing subscriptions there still needs login. Marked destructive because move_to_locked moves a folder of the game's Mods/ and unsubscribe lets Steam delete folders and resubscribe moves folders to the recycle bin: call them with dry_run=true first, show the player and ask. Other actions are other tools: enable (edit_loadout), pin / pin --update / unpin (pin_mod, unpin_mod), unhide and trash (manage_hidden).
-Example: manage_library {"action": "move_to_locked", "refs": ["#iqmu"], "dry_run": true}
-  #iqmu Lockable dry run, nothing changed: would move to the lock library
-    from: D:\Steam\steamapps\common\RimWorld\Mods\Lockable Copy
-    to: C:\Users\me\AppData\Local\RimArcho\locked\main\Lockable Copy`

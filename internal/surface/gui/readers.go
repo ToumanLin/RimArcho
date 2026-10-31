@@ -265,7 +265,9 @@ func (s *API) Close() {
 		s.texCancel = nil
 	}
 	s.mu.Unlock()
+	// Wait for a library build that still holds the gate.
 	s.libGate.Lock()
+	//lint:ignore SA2001 barrier, nothing to guard
 	s.libGate.Unlock()
 	for _, w := range []*logReader{&s.libRead, &s.plansRead, &s.workspaceReader, &s.indexRead} {
 		w.mu.Lock()

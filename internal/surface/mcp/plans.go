@@ -67,13 +67,13 @@ func HistoryArgv(in HistoryIn) []string {
 // ---- tool arguments ----
 
 type LaunchIn struct {
-	Env            string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env            string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	DryRun         bool   `json:"dry_run,omitempty" jsonschema:"show what would be written and the command line; write nothing, start nothing"`
 	MoveDuplicates bool   `json:"move_duplicates,omitempty" jsonschema:"first move plain Mods/ folders holding another version of a mod RimArcho links into the lock library (the refusal names them; show the dry run first)"`
 }
 
 type PlansIn struct {
-	Env     string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env     string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Action  string `json:"action,omitempty" jsonschema:"list (default), new, use, rename, remove, import, versions, follow, unfollow or sync"`
 	Name    string `json:"name,omitempty" jsonschema:"the plan (new, use, rename, remove); import: the new plan's name (default: the list's own name or the file name)"`
 	NewName string `json:"new_name,omitempty" jsonschema:"rename: the new name"`
@@ -88,7 +88,7 @@ type PlansIn struct {
 }
 
 type HistoryIn struct {
-	Env    string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env    string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Action string `json:"action,omitempty" jsonschema:"log (default: the versions), diff, or steps (the undo/redo steps and the newest versions)"`
 	From   string `json:"from,omitempty" jsonschema:"diff: the older side, v<n> or <n> (default: the newest version)"`
 	To     string `json:"to,omitempty" jsonschema:"diff: the newer side, v<n> or workspace (default: the current plan's list)"`

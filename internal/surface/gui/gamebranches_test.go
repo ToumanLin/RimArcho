@@ -73,7 +73,12 @@ func TestGuideDownloadInfoSingleflight(t *testing.T) {
 	}
 	// Network work must not hold the GUI mutex.
 	unlocked := make(chan struct{})
-	go func() { s.mu.Lock(); s.mu.Unlock(); close(unlocked) }()
+	go func() {
+		s.mu.Lock()
+		//lint:ignore SA2001 only checks the lock is free
+		s.mu.Unlock()
+		close(unlocked)
+	}()
 	select {
 	case <-unlocked:
 	case <-time.After(time.Second):

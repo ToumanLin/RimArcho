@@ -2,7 +2,6 @@ package store
 
 import (
 	"database/sql"
-	"fmt"
 	"github.com/ToumanLin/RimArcho/internal/analyze"
 	"os"
 	"path/filepath"
@@ -194,6 +193,6 @@ func TestMigrateV26Scale(t *testing.T) {
 	}
 	t.Logf("MIGRATION compacted=%d bytes", info.Size())
 	if len(fs) > 0 && fs[0].Type != "ThingDef" {
-		t.Fatal(fmt.Sprintf("bad migrated fact: %+v", fs[0]))
+		t.Fatalf("bad migrated fact: %+v", fs[0])
 	}
 }
