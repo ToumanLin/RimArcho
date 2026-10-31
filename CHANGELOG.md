@@ -4,6 +4,13 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- Game log: a missing texture or DLL is again traced to a Workshop, SteamCMD or other
+  shared-folder mod that ships it ("ships … but is not enabled", with `archo enable`).
+  Since mod folders became shared by every game, only mods in the game's own `Mods/` were
+  found, and the rest read "providers: none among installed mods". The same holds for the
+  "installed copies" note when an assembly's types cannot be listed. Logs already analysed
+  are attributed again.
+
 - MCP: what an agent reads when it connects is about a fifth of what it was. The server
   instructions and the tool descriptions went from 53,325 to 10,420 characters (8,816 +
   44,509 → 1,589 + 8,831; roughly 13k → 2.6k tokens), and the whole `tools/list` answer
