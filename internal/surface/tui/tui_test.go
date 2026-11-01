@@ -234,7 +234,8 @@ func TestRescanRunsOutOfProcessAndCommandLine(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	keys(tm, ":", "list --active", "enter")
-	waitFor(t, tm, "archo list --active")
+	// The command help also shows its name before the asynchronous result panel opens.
+	waitAll(t, tm, "archo list --active", "workspace: 3 active")
 	keys(tm, "esc", "c")
 	waitAll(t, tm, "subscriptions and updates", "the last scan", "nothing changed")
 	keys(tm, "esc")

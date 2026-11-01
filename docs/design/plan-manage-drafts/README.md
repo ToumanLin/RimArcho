@@ -1,12 +1,12 @@
-# 列表管理页草案
+# List management page draft
 
-“库 / 列表 / 管理”的可交互原型（第二稿）。配色和侧栏照现在的 GUI（`style.css` 的变量）。规格见 04 §1.6、§9.6 和 06 §2.17。
+Interactive second-draft prototype for "library / lists / manage". Colors/sidebar follow current GUI (`style.css` variables). Specifications: 04 §1.6, §9.6 and 06 §2.17.
 
-- 左边是当前游戏的所有列表，不分组。右边是选中列表的三段：
-  - 游戏版本：一排小按钮，只写版本号，现在的游戏后面有一个小点。
-  - 跟着 Steam 合集：写上次检查和没装几个；有变化时可以看差异、跟上合集。
-  - 分享：导出…、创建整合包…。
-- 导出是子页：库 / 列表 / <列表> / 导出。左边选格式，右边看内容，再保存或复制；`esc` 回来。
-- 新建和导入在右上角，打开弹窗。
+- Left: all lists for current game, ungrouped. Right: selected list's three sections:
+  - Game versions: small buttons with version numbers only; current game has a dot.
+  - Follow a Steam collection: last check/missing count; view differences and catch up when changed.
+  - Sharing: export…, create a pack….
+- Export is a subpage: library / lists / <list> / export. Choose format left, preview right, save/copy; `esc` returns.
+- New/import at top-right open dialogs.
 
-直接用浏览器打开 `index.html`。只用示例数据，不读写任何文件。
+Open `index.html` directly in browser. Example data only, no file reads/writes.

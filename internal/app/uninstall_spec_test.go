@@ -16,12 +16,12 @@ import (
 func TestUninstallCoversWriteList(t *testing.T) {
 	t.Parallel()
 	_, file, _, _ := runtime.Caller(0)
-	b, err := os.ReadFile(filepath.Join(filepath.Dir(file), "..", "..", "docs", "specs", "01-范围与状态.md"))
+	b, err := os.ReadFile(filepath.Join(filepath.Dir(file), "..", "..", "docs", "specs", "01-scope-and-status.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	doc := strings.ReplaceAll(string(b), "\r\n", "\n")
-	start := strings.Index(doc, "## 4. 写文件清单")
+	start := strings.Index(doc, "## 4. File Write List (Safety Boundary)")
 	end := strings.Index(doc, "## 5.")
 	if start < 0 || end < start {
 		t.Fatal("01 §4 not found")
@@ -43,7 +43,7 @@ func TestUninstallCoversWriteList(t *testing.T) {
 		cells := strings.Split(strings.Trim(l, "|"), " | ")
 		if !header {
 			header = true
-			if last := strings.TrimSpace(cells[len(cells)-1]); !strings.HasPrefix(last, "卸载") {
+			if last := strings.TrimSpace(cells[len(cells)-1]); !strings.HasPrefix(last, "On uninstall") {
 				t.Fatalf("the write list has no uninstall column: %q", last)
 			}
 			continue
@@ -62,7 +62,7 @@ func TestUninstallCoversWriteList(t *testing.T) {
 		if strings.Index(last, "`") == 0 && !named {
 			t.Errorf("row %q names no uninstall step: %q", cells[0], last)
 		}
-		if !named && !strings.HasPrefix(last, "无：") {
+		if !named && !strings.HasPrefix(last, "None:") {
 			t.Errorf("row %q: no uninstall step and no reason (none: …): %q", cells[0], last)
 		}
 	}

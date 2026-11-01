@@ -1,4 +1,4 @@
-Spike P0 — HugsLib log corpus feasibility (docs/research/00-日志语料顶层设计.md §10)
+Spike P0 — HugsLib log corpus feasibility (docs/research/00-log-corpus-design.md §10)
 Run: 2026-10-20, cloud session. Corpus: /home/user/rimarcho-corpus/hugslogs (outside the repo, 588 MB,
 raw logs + parsed.jsonl). Only aggregate numbers are recorded here.
 

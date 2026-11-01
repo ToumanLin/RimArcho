@@ -1,38 +1,38 @@
-# 订阅与更新页草案
+# Subscriptions and updates page drafts
 
-“库 / Mod 库 / 订阅与更新”的两个可交互候选。配色和侧栏照现在的 GUI（`style.css` 的变量）。只用示例数据，不读写任何文件。
+Two interactive candidates for "library / mod library / subscriptions and updates". Colors/sidebar follow current GUI (`style.css` variables). Example data only; no file reads/writes.
 
-从玩家打开这页的三个来意出发：
+Start with the three reasons players open this page:
 
-1. 添加新的订阅（Git、LoversLab、工坊 / SteamCMD）
-2. 更新 RimArcho 管的订阅（Git、LoversLab、SteamCMD）
-3. 看 Steam 工坊自动更新带来的变化
+1. Add subscriptions (Git, LoversLab, Workshop / SteamCMD)
+2. Update subscriptions managed by RimArcho (Git, LoversLab, SteamCMD)
+3. See changes from automatic Steam Workshop updates
 
-两个候选共同的改动：
+Changes shared by both:
 
-- **一个粘贴框代替“订阅…”表单。** 不再先选“类型”：粘贴地址后自动认出是 Git 仓库、LoversLab 文件页、工坊链接 / ID，还是拖进来的 zip，并且只问这一种需要的那一个决定（跟踪什么、下载哪个文件、用 Steam 还是 SteamCMD）。LoversLab 页面链接了 GitHub 时建议改用 Git。“下载页”这个抽象不再出现在界面上。
-- **本地 Mod 不在这里添加**，只有一句话加“打开 Mods 文件夹”。
-- **“来源”区去掉。** 来源只剩一行“14:02 检查过 4 个来源 ▾”，点开是每个来源的个数、结论和账户；工坊找不到的条目是一个琥珀色计数。
-- **LoversLab 的更新就地选文件**，不再在页面顶部展开表单。
-- 每一项更新先说改了什么（Git 的提交、作者的更新说明），再给按钮。
+- **One paste field replaces the subscribe form.** No type choice first: pasted URL identifies Git repo, LoversLab file page, Workshop link/ID or dropped zip. Ask only the needed decision (what to track, which file, Steam or SteamCMD). Suggest Git when a LoversLab page links GitHub. The abstract "download page" no longer appears in UI.
+- **Do not add local Mods here**; only a sentence and "open Mods folder".
+- **Remove the sources section.** One "14:02 checked 4 sources ▾" line expands per-source counts, conclusions and accounts; missing Workshop entries are an amber count.
+- **Choose LoversLab update files in place**, without expanding a top-of-page form.
+- Each update says what changed (Git commits, author notes), then offers buttons.
 
-| | A：一页读到底 | B：按来意分三个视图 |
+| | A: One page | B: Three views by intent |
 | --- | --- | --- |
-| 结构 | 粘贴框 → 等你更新 → Steam 已经更新 → 更早，一页往下读 | 顶栏切换：更新 / 变化 / 添加；更新和变化是左列表右详情 |
-| 添加 | 粘贴框一直在顶上，页面任何地方 `ctrl+v` 都行 | 单独的“添加”视图，三张来源卡片说明各自适合什么、账户状态 |
-| 适合 | 每次打开只扫一眼“有什么要我管的” | 想细看一项改了什么，或第一次添加不知道从哪来 |
-| 代价 | 详情只能行内展开，长提交列表会把页面拉长 | 多一次切换；“有事要管”分在两个视图里 |
+| Structure | Paste → waiting for you → Steam already updated → earlier, read down one page | Top tabs: updates / changes / add; updates/changes use list left, details right |
+| Add | Paste field always at top; `ctrl+v` anywhere | Dedicated add view with three source cards explaining fit/account status |
+| Best for | A quick glance at what needs attention each visit | Inspecting a change or first-time addition without knowing its source |
+| Cost | Inline details only; long commit lists lengthen page | Another switch; work split between two views |
 
-## C：B 的第二稿（现在的方向）
+## C: B's second draft (current direction)
 
-- **订阅与更新一页**：左边一张列表，先“等你更新”（Git、LoversLab、SteamCMD，带“全部更新”），再“已经更新”（Steam 工坊自动更新的，按会影响启动 / 留意 / 只是内容排，每行带标签），然后订阅变动、更早。右边是选中那一项的详情：等你更新的给改了什么和“更新”，已经更新的给这意味着什么和改了哪些文件。
-- **左列表上面一条范围栏**：`列表「主力殖民地」` / `所有 Mod`（`a` 切换），旁边写起点（上次游玩以来 / 最近 10 次扫描以来）。只看列表时，别的列表才用到的更新藏起来，写“别的列表还有 N 个 看整个库”。
-- **添加订阅是 Mod 库下的子页**（库 / Mod 库 / 添加订阅）：粘贴框加三张来源卡片。订阅与更新页右上角也有“添加订阅”按钮，`+` 过去，`esc` 回来；在页面上直接粘贴地址也会跳过去。
+- **One subscriptions and updates page**: left list has waiting for you (Git/LoversLab/SteamCMD, update all), already updated (automatic Workshop changes, ordered by affects launch / worth a look / content only with row labels), subscription changes, earlier. Right details: pending update shows changes/update; completed update explains implications/file changes.
+- **Scope bar above left list**: `list "Main colony"` / `all mods` (`a` switches), with baseline (since last played / last 10 scans). List scope hides updates used only elsewhere and says N other updates / see whole library.
+- **Add subscription is a mod library subpage** (library / mod library / add subscription): paste field/three source cards. Top-right add button and `+` navigate there; `esc` returns; pasting a URL on updates page also navigates there.
 
-用浏览器打开 `a.html` / `b.html` / `c.html` 需要经本地服务器（两页共用 `shared.css`、`shared.js`），例如：
+Open `a.html` / `b.html` / `c.html` through a local server (shared `shared.css`, `shared.js`), for example:
 
 ```bash
 python -m http.server 8765 --directory docs/design/subscriptions-drafts
 ```
 
-A 页顶部的“试一下”按钮填入示例地址；B 页点来源卡片。
+A's top try-it buttons insert example URLs; B uses source-card clicks.

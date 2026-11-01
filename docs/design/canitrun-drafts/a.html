@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>能不能跑 · A 两列</title>
+<title>can it run · A Two columns</title>
 <link rel="stylesheet" href="shared.css">
 <style>
   #page { overflow: hidden; display: grid; grid-template-columns: minmax(0, 11fr) minmax(0, 9fr); gap: 12px; padding-bottom: 12px; }
@@ -84,59 +84,59 @@
 <script src="shared.js"></script>
 <script>
 // A: two columns by where the problem comes from. Left: what checking the mods' files and
-// RimArcho's shared-log data found (会让游戏出错, 可以留意, 要你确认). Right: what the game's log saw.
+// RimArcho's shared-log data found (breaks the game, worth knowing, for you to confirm). Right: what the game's log saw.
 // Every action is a button under its item; choices are the options themselves; what is done
-// stays in place as one line with 撤销.
+// stays in place as one line with undo.
 
 // Every action of every item, in the order shown. eq: equal options, none is the main one.
 // say: what the done line says. ask: confirm in place first. run: resolves a group of items.
 const ACTS = {
-  official: [{ l: "自动排序", k: "S", run: "sort" }],
-  order: [{ l: "自动排序", k: "S", run: "sort" }],
-  links: [{ l: "修复…", k: "R", ask: "删除这 2 个断掉的链接？它们指向的文件夹已经不在了，不会动别的文件。", say: "已删除 2 个断掉的链接" }],
-  missing: [{ l: "全部订阅…", k: "s", toast: "会先问用 Steam 还是 SteamCMD，然后在后台下载" }, { l: "全部从列表中移除", k: "x", say: "已从列表中移除 3 个 Mod" }],
-  dep: [{ l: "启用 Vanilla Expanded Framework", k: "space", say: "已启用 Vanilla Expanded Framework" }],
-  patch: [{ l: "启用 Rimefeller", k: "space", say: "已启用 Rimefeller" }, { l: "看这些补丁", k: "v", toast: "打开问题详情：6 个补丁和它们的位置" }],
-  incompat: [{ l: "停用 Combat Extended", k: "1", eq: true, say: "已停用 Combat Extended" }, { l: "停用 Yayo's Combat 3", k: "2", eq: true, say: "已停用 Yayo's Combat 3" }],
-  dup: [{ l: "保留工坊那份", k: "1", eq: true, say: "已保留工坊那份，停用了本地那份" }, { l: "保留本地那份", k: "2", eq: true, say: "已保留本地那份，停用了工坊那份" }],
-  version: [{ l: "查看列表", k: "v", toast: "打开版本清单" }, { l: "忽略这 18 个的 1.6 提醒…", k: "M", ask: "以后不再提醒这 18 个 Mod 没标明支持 1.6。可以在版本清单里恢复。", say: "已忽略 18 个 Mod 的 1.6 提醒" }],
-  known: [{ l: "看这个错误", k: "v", toast: "打开问题详情：分享的日志里这个错误的样子和出现比例" }],
-  combo: [{ l: "停用 Performance Optimizer", k: "1", eq: true, say: "已停用 Performance Optimizer" }, { l: "停用 Vanilla Expanded Framework", k: "2", eq: true, say: "已停用 Vanilla Expanded Framework" }],
-  obs: [{ l: "在工坊打开 Alpha Memes", k: "o", toast: "在 Steam 里打开 Alpha Memes 的工坊页" }],
-  ident: [{ l: "是同一个", k: "1", eq: true, ask: "合并成一个 Mod，变化历史接在一起。这一步不能用 u 撤销。", say: "已记为同一个 Mod", final: true },
-    { l: "是副本", k: "2", eq: true, ask: "记为同一个 Mod 的另一份副本。这一步不能用 u 撤销。", say: "已记为副本", final: true },
-    { l: "无关", k: "3", eq: true, ask: "记为两个无关的 Mod，以后不再问。这一步不能用 u 撤销。", say: "已记为无关", final: true }],
-  extern: [{ l: "看差异", k: "d", toast: "打开差异：游戏里多启用了 2 个、停用了 1 个" }, { l: "载入游戏里的改动…", k: "L", ask: "用游戏里的改动替换这个列表现在的内容？u 可以撤销。", say: "已载入游戏里的改动" }, { l: "保留这个列表", k: "I", say: "已保留这个列表" }],
-  packlinks: [{ l: "移除链接", k: "r", say: "已移除 14 个链接" }],
+  official: [{ l: "sort automatically", k: "S", run: "sort" }],
+  order: [{ l: "sort automatically", k: "S", run: "sort" }],
+  links: [{ l: "repair…", k: "R", ask: "Delete these 2 broken links? Their target folders are gone; other files are untouched.", say: "deleted 2 broken links" }],
+  missing: [{ l: "subscribe to all…", k: "s", toast: "choose Steam or SteamCMD first, then download in background" }, { l: "remove all from the list", k: "x", say: "removed 3 mods from the list" }],
+  dep: [{ l: "enable Vanilla Expanded Framework", k: "space", say: "enabled Vanilla Expanded Framework" }],
+  patch: [{ l: "enable Rimefeller", k: "space", say: "enabled Rimefeller" }, { l: "see these patches", k: "v", toast: "open finding details: 6 patches and their locations" }],
+  incompat: [{ l: "disable Combat Extended", k: "1", eq: true, say: "disabled Combat Extended" }, { l: "disable Yayo's Combat 3", k: "2", eq: true, say: "disabled Yayo's Combat 3" }],
+  dup: [{ l: "keep the Workshop copy", k: "1", eq: true, say: "kept Workshop copy, disabled local copy" }, { l: "keep the local copy", k: "2", eq: true, say: "kept local copy, disabled Workshop copy" }],
+  version: [{ l: "see the list", k: "v", toast: "open version list" }, { l: "ignore 1.6 reminders for these 18…", k: "M", ask: "Stop reminding about missing 1.6 support declarations for these 18 mods. Restore reminders in the version list.", say: "ignored 1.6 reminders for 18 mods" }],
+  known: [{ l: "see the error", k: "v", toast: "open finding details: error example and proportion in shared logs" }],
+  combo: [{ l: "disable Performance Optimizer", k: "1", eq: true, say: "disabled Performance Optimizer" }, { l: "disable Vanilla Expanded Framework", k: "2", eq: true, say: "disabled Vanilla Expanded Framework" }],
+  obs: [{ l: "open in Workshop Alpha Memes", k: "o", toast: "open Alpha Memes Workshop page in Steam" }],
+  ident: [{ l: "same", k: "1", eq: true, ask: "Merge into one mod and join change histories. u cannot undo this step.", say: "recorded as the same mod", final: true },
+    { l: "a copy", k: "2", eq: true, ask: "Record as another copy of the same mod. u cannot undo this step.", say: "recorded as a copy", final: true },
+    { l: "unrelated", k: "3", eq: true, ask: "Record as unrelated mods; do not ask again. u cannot undo this step.", say: "recorded as unrelated", final: true }],
+  extern: [{ l: "see the changes", k: "d", toast: "open difference: 2 more enabled, 1 disabled in the game" }, { l: "use the outside change…", k: "L", ask: "Replace this list with outside changes? u can undo.", say: "loaded outside changes" }, { l: "keep this list", k: "I", say: "kept this list" }],
+  packlinks: [{ l: "remove the links", k: "r", say: "removed 14 links" }],
 };
-const LOGACT = [{ l: "打开游戏日志", k: "l", toast: "打开游戏日志，选中这一组" }];
-const GROUPS = { sort: { ids: ["official", "order"], say: "已自动排序" } };
-const AUTOFIX = [["official", "已自动排序"], ["order", "已自动排序"], ["dep", "已启用 Vanilla Expanded Framework"], ["patch", "已启用 Rimefeller"]];
-// in this draft, 可以留意 is the shared-log knowledge; weak order and the cycle go into 自动排序
-const TITLE = { known: "分享的日志里，这个版本的 ⟦Prison Labor⟧ 经常报错", combo: "⟦Vanilla Expanded Framework⟧ 和 ⟦Performance Optimizer⟧ 一起时常报错", obs: "⟦Alpha Genes⟧ 可能缺少 ⟦Alpha Memes⟧" };
-const WHY = { combo: "遇到报错时可以先停用其中一个。有 4 个启用的 Mod 需要 Vanilla Expanded Framework。" };
-const ALSO = { order: "顺带满足 5 条较弱的顺序要求；3 个 Mod 的循环要求按优先级处理（放弃“RimHUD 排在 Real Ruins 之后”）。" };
+const LOGACT = [{ l: "open game log", k: "l", toast: "open game log with this group selected" }];
+const GROUPS = { sort: { ids: ["official", "order"], say: "sorted automatically" } };
+const AUTOFIX = [["official", "sorted automatically"], ["order", "sorted automatically"], ["dep", "enabled Vanilla Expanded Framework"], ["patch", "enabled Rimefeller"]];
+// in this draft, worth knowing is the shared-log knowledge; weak order and the cycle go into sort automatically
+const TITLE = { known: "this version of ⟦Prison Labor⟧ often errors in shared logs", combo: "⟦Vanilla Expanded Framework⟧ and ⟦Performance Optimizer⟧ often error together", obs: "⟦Alpha Genes⟧ may need ⟦Alpha Memes⟧" };
+const WHY = { combo: "If errors occur, try disabling one first.4 enabled mods need Vanilla Expanded Framework." };
+const ALSO = { order: "Also satisfies 5 weak order requirements; handles cycles among 3 mods by priority (drops RimHUD after Real Ruins)." };
 const SHARE = { known: [71, 112], combo: [31, 60], obs: [40, 50] };
-const DISC = { order: "逐条看 7 个", missing: "逐个看 3 个" };
+const DISC = { order: "see all 7", missing: "see all 3" };
 
 const LEFT_SECS = ["break", "hint", "confirm"];
 const HINT_ORDER = ["known", "combo", "obs"];
 const LEFT = [...ITEMS.filter((x) => x.sec === "break"), ...HINT_ORDER.map((id) => byId[id]), ...ITEMS.filter((x) => x.sec === "confirm")];
 const RIGHT = ITEMS.filter((x) => x.sec === "run" && !x.old);
 const LIVE = [
-  { id: "live1", sec: "run", st: "err", phase: "游玩时", title: "⟦Prison Labor⟧：3× Exception in JobOnThing", why: "", ev: [["日志", "Player.log"]], counted: true },
-  { id: "live2", sec: "run", st: "warn", phase: "游玩时", title: "⟦Dubs Bad Hygiene⟧：1× Could not find a part of the path", why: "", ev: [["日志", "Player.log"]], counted: true },
-  { id: "live3", sec: "run", st: "err", phase: "游玩时", title: "来源不明：1× NullReferenceException in Pawn_PathFollower", why: "", ev: [["日志", "Player.log"]], counted: true },
+  { id: "live1", sec: "run", st: "err", phase: "while playing", title: "⟦Prison Labor⟧: 3× Exception in JobOnThing", why: "", ev: [["log", "Player.log"]], counted: true },
+  { id: "live2", sec: "run", st: "warn", phase: "while playing", title: "⟦Dubs Bad Hygiene⟧: 1× Could not find a part of the path", why: "", ev: [["log", "Player.log"]], counted: true },
+  { id: "live3", sec: "run", st: "err", phase: "while playing", title: "unknown source: 1× NullReferenceException in Pawn_PathFollower", why: "", ev: [["log", "Player.log"]], counted: true },
 ];
 LIVE.forEach((x) => (byId[x.id] = x));
 
 // what links the two columns: id → [target, text]
 function rel(id) {
   switch (id) {
-    case "dep": return ["log-vfe", "上次运行 ⟦Vanilla Furniture Expanded⟧ 报错 12 次，看右边那一组", "right"];
-    case "known": return ["log-pl", "上次运行它也报错 41 次，看右边那一组", "right"];
-    case "log-vfe": return done.has("dep") ? ["dep", "它的前置刚启用了，下次运行再看还报不报错", "left", true] : ["dep", "它的前置 ⟦Vanilla Expanded Framework⟧ 没有启用，看左边那一项", "left"];
-    case "log-pl": case "live1": return ["known", "分享的日志里这个版本也常报错，看左边那一项", "left"];
+    case "dep": return ["log-vfe", "⟦Vanilla Furniture Expanded⟧ errored 12 times last run; see the group on the right", "right"];
+    case "known": return ["log-pl", "it also errored 41 times last run; see the group on the right", "right"];
+    case "log-vfe": return done.has("dep") ? ["dep", "its dependency was just enabled; check for errors next run", "left", true] : ["dep", "its dependency ⟦Vanilla Expanded Framework⟧ is disabled; see the item on the left", "left"];
+    case "log-pl": case "live1": return ["known", "this version often errors in shared logs too; see the item on the left", "left"];
   }
   return null;
 }
@@ -151,18 +151,18 @@ const visible = (c) => (c === 0 ? LEFT.filter((x) => x.sec !== "hint" || hintsOp
 const nLeft = () => LEFT.filter((x) => x.counted && !done.has(x.id)).length;
 const nRight = () => right().filter((x) => x.counted && !done.has(x.id)).length;
 
-shell("a", 0, [["↑↓", "移动"], ["← →", "换一列"], ["enter", "主按钮"], ["按钮上的键", "直接执行"], ["u", "撤销"]], "");
+shell("a", 0, [["↑↓", "move"], ["← →", "change column"], ["enter", "primary button"], ["button keys", "run directly"], ["u", "undo"]], "");
 const liveBtn = document.createElement("button");
-liveBtn.className = "rb"; liveBtn.innerHTML = `${ic("refresh")} 模拟游戏运行`;
+liveBtn.className = "rb"; liveBtn.innerHTML = `${ic("refresh")} simulate game running`;
 $("#review .sp").after(liveBtn);
 liveBtn.onclick = toggleLive;
 
 function head() {
   const l = nLeft(), r = nRight(), af = AUTOFIX.filter(([id]) => !done.has(id)).length;
-  const runWord = live.length ? "这次和上次运行" : "上次运行";
-  $("#head").innerHTML = `<p class="lead"><b>${PLAN}</b>${l ? `还不能放心玩：开始之前要处理 ${l} 项` : "开始之前没有要处理的了"}，${r ? `${runWord}有 ${r} 组报错` : `${runWord}没有报错`}</p>
-    <div class="page-acts">${af ? `<button class="btn primary small" id="autofix" title="启用已安装的前置和补丁目标，再自动排序；u 撤销">${ic("wand")} 自动修好 ${af} 项<kbd>F</kbd></button>` : ""}
-    <button class="btn small" data-toast="重新检查 Mod 的文件">${ic("refresh")} 重新检查文件<kbd>A</kbd></button><button class="btn small" data-toast="打开游戏日志页">${ic("log")} 游戏日志</button></div>`;
+  const runWord = live.length ? "this and last run" : "last run";
+  $("#head").innerHTML = `<p class="lead"><b>${PLAN}</b> ${l ? `${l} things to fix before you start` : "nothing left to fix before you start"}, ${r ? `${runWord} has ${r} error groups` : `${runWord} has no errors`}</p>
+    <div class="page-acts">${af ? `<button class="btn primary small" id="autofix" title="enable installed dependencies and patch targets, then sort; u undoes">${ic("wand")} fix ${af} items automatically<kbd>F</kbd></button>` : ""}
+    <button class="btn small" data-toast="check mod files again">${ic("refresh")} recheck files<kbd>A</kbd></button><button class="btn small" data-toast="open game log page">${ic("log")} game log</button></div>`;
   $("#autofix")?.addEventListener("click", autofix);
   setBadge(l + r);
 }
@@ -175,8 +175,8 @@ function itemHTML(it) {
   const id = it.id;
   if (done.has(id)) {
     const u = undo.find((e) => e.ids.includes(id));
-    return `<div class="item done" data-id="${id}"><span class="okc">${ic("check")}</span><span class="what"><b>${esc(done.get(id))}</b>${esc(plain(TITLE[id] || it.title))}</span>
-      ${u && !u.noUndo ? `<button class="btn small" data-undo="${id}">撤销<kbd>u</kbd></button>` : ""}</div>`;
+    return `<div class="item done" data-id="${id}"><span class="okc">${ic("check")}</span><span class="what"><b>${esc(done.get(id))}</b> ${esc(plain(TITLE[id] || it.title))}</span>
+      ${u && !u.noUndo ? `<button class="btn small" data-undo="${id}">undo<kbd>u</kbd></button>` : ""}</div>`;
   }
   const acts = it.sec === "run" ? LOGACT : ACTS[id] || [];
   const eq = acts.some((a) => a.eq);
@@ -184,7 +184,7 @@ function itemHTML(it) {
     const cls = eq ? "eq" : j === 0 ? "primary" : "line";
     const key = !eq && j === 0 ? "enter" : a.k;
     return `<button class="btn small ${cls}" data-act="${j}">${esc(a.l)}<kbd>${key}</kbd></button>`;
-  }).join("") + (it.whyLink ? `<button class="btn link" data-toast="打开“为什么这样问”的比较">为什么这样问<kbd>?</kbd></button>` : "");
+  }).join("") + (it.whyLink ? `<button class="btn link" data-toast="open the why-this-question comparison">why this question?<kbd>?</kbd></button>` : "");
   const r = rel(id);
   const why = WHY[id] || it.why;
   let x = "";
@@ -195,9 +195,9 @@ function itemHTML(it) {
   }
   if (it.links) x += linkRows(it.links);
   if (ALSO[id]) x += `<div class="also">${esc(ALSO[id])}</div>`;
-  if (id === "version") x += `<div class="note-x">另有 2 个 Mod 的 1.6 提醒已忽略 <button class="btn link" data-toast="打开已忽略的清单">查看或恢复</button></div>`;
+  if (id === "version") x += `<div class="note-x">1.6 reminders for 2 other mods ignored <button class="btn link" data-toast="open ignored list">view or restore</button></div>`;
   if (r) x += `<button class="rel ${r[3] ? "quiet" : ""}" data-go="${r[0]}">${r[2] === "left" ? ic("arrow").replace("<svg", '<svg style="transform:scaleX(-1)"') : ""}<span>${nm(r[1])}</span>${r[2] === "right" ? ic("arrow") : ""}</button>`;
-  const confirm = ask && ask.id === id ? `<div class="confirm ${ask.fresh ? "anim" : ""}"><span class="t">${esc(ask.a.ask)}</span><button class="btn small primary" data-yes="1">${esc(ask.a.l.replace("…", ""))}<kbd>enter</kbd></button><button class="btn small" data-no="1">取消<kbd>esc</kbd></button></div>` : "";
+  const confirm = ask && ask.id === id ? `<div class="confirm ${ask.fresh ? "anim" : ""}"><span class="t">${esc(ask.a.ask)}</span><button class="btn small primary" data-yes="1">${esc(ask.a.l.replace("…", ""))}<kbd>enter</kbd></button><button class="btn small" data-no="1">cancel<kbd>esc</kbd></button></div>` : "";
   return `<div class="item ${it.isNew ? "new" : ""}" data-id="${id}">
     <div class="head">${statusIcon(it.st)}<div class="title">${nm(TITLE[id] || it.title)}</div></div>
     ${why && !it.links ? `<div class="why">${nm(why)}</div>` : ""}${x}
@@ -208,7 +208,7 @@ function section(s, list, extraHead = "", title = SEC[s].t) {
   const its = list.filter((x) => x.sec === s);
   const n = its.filter((x) => x.counted && !done.has(x.id)).length;
   const head = s === "hint"
-    ? `<h2 class="label toggle ${hintsOpen ? "open" : ""}" data-hint="1"><span class="fold">${ic("chev")}</span>${SEC[s].t}<span class="n">${its.length}</span><span class="r">RimArcho 从分享的日志里学到的（截至 2026-09），不算进数字</span></h2>`
+    ? `<h2 class="label toggle ${hintsOpen ? "open" : ""}" data-hint="1"><span class="fold">${ic("chev")}</span>${SEC[s].t}<span class="n">${its.length}</span><span class="r">RimArcho learned this from shared logs (through 2026-09); not counted</span></h2>`
     : `<h2 class="label">${title}${its.some((x) => x.counted) ? `<span class="n">${n || "✓"}</span>` : ""}${extraHead}</h2>`;
   if (s === "hint" && !hintsOpen) return `<section class="${SEC[s].cls}">${head}</section>`;
   let html = "", phase = "";
@@ -225,21 +225,21 @@ function draw() {
   const focused = document.activeElement?.closest?.(".item")?.dataset.id;
   head();
   const runHead = live.length
-    ? `<span class="r" style="display:inline-flex;gap:6px;align-items:center"><span class="dot"></span>游戏运行中</span>`
+    ? `<span class="r" style="display:inline-flex;gap:6px;align-items:center"><span class="dot"></span>game running</span>`
     : `<span class="r">${LASTRUN}</span>`;
   let rightHTML;
   if (live.length) {
-    rightHTML = section("run", live, runHead, "本次运行的报错").replace("</div></section>", "") +
-      `</div></section><div class="run-sub">上次运行<span>列表  ${LASTRUN}</span></div>` + section("run", RIGHT).replace(/<h2[\s\S]*?<\/h2>/, "");
+    rightHTML = section("run", live, runHead, "errors this run").replace("</div></section>", "") +
+      `</div></section><div class="run-sub">last run<span>list  ${LASTRUN}</span></div>` + section("run", RIGHT).replace(/<h2[\s\S]*?<\/h2>/, "");
   } else rightHTML = section("run", RIGHT, runHead);
   $("#page").innerHTML = `
-    <div class="col" id="c0"><div class="col-cap"><b>开始之前</b>检查 Mod 文件和分享的日志发现的</div>${LEFT_SECS.map((s) => section(s, LEFT)).join("")}
+    <div class="col" id="c0"><div class="col-cap"><b>before you start</b>found by checking the mods' files and shared logs</div>${LEFT_SECS.map((s) => section(s, LEFT)).join("")}
       <div class="moved">
-        <button data-toast="去 Mod 库 › 全部，筛选“隐藏”">${ic("arrow")} 3 个隐藏的 Mod（锁定版本有更新、退订残留）在 Mod 库 › 全部</button>
-        <button data-toast="去游戏页">${ic("arrow")} 游戏「1.5 测试」有 1 个链接要看，在 游戏</button>
+        <button data-toast="go to mod library › all, filter hidden">${ic("arrow")} 3 hidden mods (locked version updates, unsubscribed residue) in mod library › all</button>
+        <button data-toast="go to games">${ic("arrow")} game 1.5 test has 1 link to check, on games</button>
       </div></div>
-    <div class="col" id="c1"><div class="col-cap"><b>${live.length ? "这次和上次" : "上次玩的时候"}</b>游戏日志看到的</div>${rightHTML}
-      <div class="row old" style="padding:8px 4px;font-size:12px;color:var(--faint)">更早的日志  9 月 29 日  1.5（不算进数字）</div></div>`;
+    <div class="col" id="c1"><div class="col-cap"><b>${live.length ? "this run and the last" : "when you last played"}</b>seen in the game's log</div>${rightHTML}
+      <div class="row old" style="padding:8px 4px;font-size:12px;color:var(--faint)">older log  Sep 29  1.5 (not counted)</div></div>`;
   $("#c0").scrollTop = keep[0]; $("#c1").scrollTop = keep[1];
   live.forEach((x) => (x.isNew = false));
   if (ask) ask.fresh = false;
@@ -269,30 +269,30 @@ function resolve(ids, say, noUndo = false) {
 }
 function run(it, a) {
   if (!a) return;
-  if (a.toast) return toast(`会执行：${a.toast}`);
+  if (a.toast) return toast(`would run: ${a.toast}`);
   if (a.ask && !(ask && ask.id === it.id)) { ask = { id: it.id, a, fresh: true }; draw(); $(`.item[data-id="${it.id}"] [data-yes]`)?.focus(); return; }
   ask = null;
-  if (a.run) { const g = GROUPS[a.run]; resolve(g.ids.filter((id) => !done.has(id)), g.say); toast(`${g.say}：解决了 ${g.ids.length} 项（u 撤销）`); }
-  else { resolve([it.id], a.say, a.final); toast(a.say + (a.final ? "" : "（u 撤销）")); }
+  if (a.run) { const g = GROUPS[a.run]; resolve(g.ids.filter((id) => !done.has(id)), g.say); toast(`${g.say}: resolved ${g.ids.length} items (u undo)`); }
+  else { resolve([it.id], a.say, a.final); toast(a.say + (a.final ? "" : " (u undo)")); }
   draw();
 }
 function autofix() {
   const todo = AUTOFIX.filter(([id]) => !done.has(id));
   resolve(todo.map(([id]) => id), todo.map(([, s]) => s));
-  toast(`启用了 2 个 Mod 并自动排序：解决了 ${todo.length} 项（u 撤销）`);
+  toast(`enabled 2 mods and sorted: resolved ${todo.length} items (u undo)`);
   draw();
 }
 function undoLast(id) {
   let k = -1;
   for (let i = undo.length - 1; i >= 0; i--) if (!undo[i].noUndo && (!id || undo[i].ids.includes(id))) { k = i; break; }
-  if (k < 0) return toast("没有可以撤销的");
+  if (k < 0) return toast("nothing to undo");
   undo.splice(k, 1)[0].ids.forEach((x) => done.delete(x));
-  toast("已撤销"); draw();
+  toast("undone"); draw();
 }
 
 function toggleLive() {
-  if (liveT) { clearInterval(liveT); liveT = null; live = []; liveBtn.classList.remove("on"); liveBtn.innerHTML = `${ic("refresh")} 模拟游戏运行`; draw(); return; }
-  liveBtn.classList.add("on"); liveBtn.innerHTML = `<span class="dot"></span> 游戏运行中（点一下停止）`;
+  if (liveT) { clearInterval(liveT); liveT = null; live = []; liveBtn.classList.remove("on"); liveBtn.innerHTML = `${ic("refresh")} simulate game running`; draw(); return; }
+  liveBtn.classList.add("on"); liveBtn.innerHTML = `<span class="dot"></span> game running (click to stop)`;
   const push = () => {
     const next = LIVE[live.length];
     if (!next) { clearInterval(liveT); return; }
@@ -306,7 +306,7 @@ $("#page").addEventListener("click", (e) => {
   if (itEl) { pos[col = colOf(itEl.dataset.id)] = itEl.dataset.id; mark(false); }
   const b = e.target.closest("button"); if (!b) return;
   const it = itEl && byId[itEl.dataset.id];
-  if (b.dataset.toast) toast(`会执行：${b.dataset.toast}`);
+  if (b.dataset.toast) toast(`would run: ${b.dataset.toast}`);
   else if (b.dataset.disc) { open.has(b.dataset.disc) ? open.delete(b.dataset.disc) : open.add(b.dataset.disc); draw(); }
   else if (b.dataset.go) go(b.dataset.go);
   else if (b.dataset.undo) undoLast(b.dataset.undo);
@@ -315,7 +315,7 @@ $("#page").addEventListener("click", (e) => {
   else if (b.dataset.act !== undefined) run(it, (it.sec === "run" ? LOGACT : ACTS[it.id])[+b.dataset.act]);
 });
 $("#page").addEventListener("click", (e) => { if (e.target.closest("h2.label[data-hint]") && !e.target.closest("button")) { hintsOpen = !hintsOpen; draw(); } });
-$("#head").addEventListener("click", (e) => { const b = e.target.closest("[data-toast]"); if (b) toast(`会执行：${b.dataset.toast}`); });
+$("#head").addEventListener("click", (e) => { const b = e.target.closest("[data-toast]"); if (b) toast(`would run: ${b.dataset.toast}`); });
 $("#page").addEventListener("focusin", (e) => { const itEl = e.target.closest(".item"); if (itEl) { pos[col = colOf(itEl.dataset.id)] = itEl.dataset.id; mark(false); } });
 
 document.addEventListener("keydown", (e) => {
@@ -333,12 +333,12 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "ArrowLeft" || e.key === "ArrowRight") { col = e.key === "ArrowLeft" ? 0 : 1; if (!visible(col).includes(pos[col])) pos[col] = visible(col)[0]; }
   else if (e.key === "u") return undoLast();
   else if (e.key === "F") return autofix();
-  else if (e.key === "A") return toast("会执行：重新检查 Mod 的文件");
+  else if (e.key === "A") return toast("would run: check mod files again");
   else if (it && !done.has(it.id)) {
     const acts = it.sec === "run" ? LOGACT : ACTS[it.id] || [];
     const key = e.key === " " ? "space" : e.key;
     const a = e.key === "Enter" ? (acts.some((x) => x.eq) ? null : acts[0]) : acts.find((x) => x.k === key);
-    if (e.key === "Enter" && !a) { toast("这一项要你选：按 1 / 2（/ 3）"); e.preventDefault(); return; }
+    if (e.key === "Enter" && !a) { toast("choose an option: press 1 / 2 (/ 3)"); e.preventDefault(); return; }
     if (!a) return;
     e.preventDefault(); run(it, a); return;
   } else return;

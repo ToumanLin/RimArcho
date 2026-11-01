@@ -4,7 +4,7 @@ For the real-window state crawler and seeded player modes, see [players.md](play
 
 Run commands from the repository root. Node 22+, Go, PowerShell 7 and `sqlite3` must be on PATH. Native export cancellation also uses Windows PowerShell 5.1 (`powershell.exe`). W requires a signed-in Windows desktop and WebView2. C and A use the same generated library without a desktop.
 
-## Build outside the checkout
+#%23 Build outside the checkout
 
 ```powershell
 $tools = 'D:/RimArcho-test/tools'
@@ -17,7 +17,7 @@ go build -o "$tools/vmstate.exe" ./spikes/vmstate
 
 The runner records the checkout commit; rebuild the tools after app changes. Fixtures include two game versions, several dozen synthetic mods (including a Workshop copy for unsubscribe cancellation), installed/missing dependencies, an unresolved installed copy and a recommended replacement. They cannot launch RimWorld. `vmstate --mode fixture --root <new-directory>` also creates a persistent seed for inspection.
 
-## Run the fixture
+#%23 Run the fixture
 
 ```powershell
 node scripts/vm/run.mjs --scenario 1 --driver W --tools "$tools"
@@ -32,7 +32,7 @@ Each invocation creates a new case and prints its external result directory, eve
 
 Scenarios contain fast input deadlines, rather than waiting for each app operation. `window-trace.json` preserves trusted input arrival, selection/cursor, modifiers, repeat, focus, edit queue, page/plan context, DOM samples, feedback and backend events. Settled means no loading/error/environment switch, an empty editing queue, intact navigation, and repeated matching samples. API jobs await their matching `environment` event; an acknowledgement alone does not complete a step.
 
-## Real content: VM only
+#%23 Real content: VM only
 
 Host runs are fixture-only and all output is under `D:/RimArcho-test` (total <2 GiB).
 In the VM, `--real-home true` uses the guest player's own home and content; no
@@ -41,7 +41,7 @@ Scenario 2 deployment switching is refused on the real home. Scenario 4
 records the single-plan refusal and creates a companion plan before testing cancel.
 `--probe true` checks that refusal and the subscription preview without submitting.
 
-## Read and compare evidence
+#%23 Read and compare evidence
 
 `result.json` separates checks, functional failures, performance failures, timings and unsupported/external coverage. `functionalStatus` can pass while the overall `status` fails a budget. Full checkpoint data is compared in memory; result.json retains hashes/counts and failures. The `observation` field has raw runtime handles for validating the visible enabled order; it is excluded from cross-run comparisons.
 
@@ -54,9 +54,9 @@ node scripts/vm/compare.mjs <A-result-directory> <W-result-directory>
 
 Compare the same fixture, plan and scenario. The comparator reports the earliest differing domain section at shared checkpoints; retained hashes avoid storing private tables. It compares independently observed problem counts and per-instance severity, excluding surface-specific publication sequence/revision and transient updating state. Scenario 3 has exact common sort/undo/redo checkpoints. A matching domain result does not imply matching window input semantics. An invocation with no common checkpoints returns unsupported, not success.
 
-The budgets come from the [automation plan §6](../../docs/research/2026-10-27_VM自动化测试方案.md#6-通过判据与时间预算). Navigation mutation feedback uses the 200ms soft threshold; timer sampling gaps over 500ms fail separately. Burst settling has a 10s limit, individual page waits 15s and problem publication 120s. Cold local readiness is recorded against 2s/5s by content scale. First DOM mutation is a feedback proxy, not proof that the action finished. Observer/host overhead is included; these host measurements are not VM results. Repeat at least five independent runs for a timing baseline; retain all samples and do not report P95 from fewer than twenty.
+The budgets come from the [automation plan §6](../../docs/research/2026-10-27_vm-automation-test-plan.md#6-pass-criteria-and-budgets). Navigation mutation feedback uses the 200ms soft threshold; timer sampling gaps over 500ms fail separately. Burst settling has a 10s limit, individual page waits 15s and problem publication 120s. Cold local readiness is recorded against 2s/5s by content scale. First DOM mutation is a feedback proxy, not proof that the action finished. Observer/host overhead is included; these host measurements are not VM results. Repeat at least five independent runs for a timing baseline; retain all samples and do not report P95 from fewer than twenty.
 
-## Coverage boundaries
+#%23 Coverage boundaries
 
 - W: rapid Space/held/Shift input, navigation during reads, twenty alternating plan clicks, both game versions, repeated sorting, double/triple row activation and import apply, delete-plan/Mod/unsubscribe confirmation cancellation, native export overwrite cancellation, directory-move preview cancellation, import/menu/position/tag Esc, enable/move/stage/sort undo and fresh problem counts. Scenario 4 also checks staging redo and stage → undo → plain disable without stale staging membership.
 - A/C: matching sort history and dry-run semantics; A also tests queued workspace completion events and toggle. Both retain the independent stage/undo-payload oracle. History snapshots include staging payloads, with null identifying legacy steps.
@@ -66,7 +66,7 @@ The budgets come from the [automation plan §6](../../docs/research/2026-10-27_V
 - `--discover true` saves visible controls and their semantic keys, bounds, enabled/hit state. This is discovery on the final page, not an action crawler or a coverage denominator.
 - Filesystem manifests for full destructive/download workflows and task/credit replay belong to the later scenarios. Current cancellation checks compare domain/links/config and never confirm deletion or a move.
 
-## VM hook
+#%23 VM hook
 
 Use the existing [VM guide](README.md) for transfer, login and credentials. Stage the checkout scripts, four tools, Node and SQLite in the guest's test directory; prepare guest-local paths there. Do not use host absolute paths inside a guest DB. A guest script can run the same `node scripts/vm/run.mjs ...` commands and write results to the guest's external evidence directory.
 
@@ -76,7 +76,7 @@ pwsh scripts/vm/vm.ps1 exec guest-phase1a.ps1 -Interactive
 
 `-Interactive` runs the script in the signed-in desktop session for W. It is unnecessary for C/A. Export evidence with the existing VM transfer helper before reverting a VM. This phase does not perform any VM reset, online subscription or game launch.
 
-## Regression checks
+#%23 Regression checks
 
 ```powershell
 node --test scripts/vm/cdp.test.mjs scripts/vm/navigation.test.mjs scripts/vm/lists.test.mjs

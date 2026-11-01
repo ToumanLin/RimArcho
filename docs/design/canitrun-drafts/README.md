@@ -1,77 +1,77 @@
-# 能不能跑页草案
+# Can it run page drafts
 
-“在玩 / 能不能跑”（06 §2.4、§5）的三个候选，加一页按现在的规格画的“现在”方便对比。配色、侧栏和条目样式照现在的 GUI（`style.css` 的变量）。只用示例数据（`shared.js` 的 `ITEMS`），按钮只弹提示，不读写任何文件。
+Three candidates for "playing / can it run" (06 §2.4, §5), plus a "now" page drawn from current specifications for comparison. Colors, sidebar and items follow current GUI (`style.css` variables). Example data only (`ITEMS` in `shared.js`); buttons only show hints, never read/write files.
 
-## 现在的问题
+## Current problems
 
-- 页面成了“什么都往里放”的地方：“隐藏的 Mod”（锁定版本更新、退订残留）和其他游戏的断链都不影响这个列表能不能跑。
-- “会让游戏出错”里混着三种不计数的东西（语料提示、较弱的顺序要求、顺序循环），所以计数规则（§5“计数”）例外很多。
-- 一项的内容分散在好几个地方：行上的一句话和解释、只在光标处显示的凭据、`⋯` 菜单、`f` / `enter` 展开、问题详情弹层、“为什么这样问”比较层、版本清单面板。
+- The page became a catch-all: hidden Mods (locked-version updates, unsubscribed residue) and other games' broken links do not affect whether this list can run.
+- Breaks-the-game mixes three uncounted kinds (corpus hints, weak order requirements, cycles), creating many exceptions to counting (§5).
+- Item content is scattered: row sentence/explanation, cursor-only evidence, `⋯` menu, `f` / `enter` expansion, finding popover, identity-reason comparison and version-list panel.
 
-## 三个候选都做的改动
+## Changes shared by all three
 
-- **“隐藏的 Mod”移出去**，放到 Mod 库 › 全部（筛选“隐藏”），页面底部留一行指过去的链接。侧栏的数字本来就不算它们。
-- **链接面板只列当前游戏**。其他游戏的断链放到“游戏”页，这里只留一行“游戏「1.5 测试」有 1 个链接要看”。启动检查照旧只拦当前游戏。
-- **不计数的项单独成区“可以留意”**，默认收起。这样计数规则就简化成：数字 = 页面上除“可以留意”以外的项数。
+- **Move hidden Mods out** to mod library › all (hidden filter), leaving a bottom link. Sidebar already excludes them from counts.
+- **Link panel shows current game only.** Other games' broken links go to games page; retain just "game '1.5 test' has 1 link to check". Launch checks still block only current game.
+- **Separate uncounted items into worth knowing**, collapsed by default. Counting becomes: all items except worth knowing.
 
-## 候选
+## Candidates
 
-| | A：两列 | B：列表 + 详情 | C：按要做的事 |
+| | A: Two columns | B: List + details | C: By action |
 | --- | --- | --- | --- |
-| 结构 | 左列“开始之前”（会让游戏出错、要你确认、可以留意），右列“上次玩的时候”（日志报错），两列各自滚动 | 左边一行一项（按区分组），右边是选中项的全部内容和所有按钮 | 一列：可以直接做（编号的步骤）→ 要你来选（就地回答）→ 上次运行的报错 → 可以留意 |
-| 一项长什么样 | 和现在一样，只是窄一些 | 左边只有一句话和个数；解释、凭据、展开的清单、比较表、版本清单、日志片段都在右边 | 一步写清它解决哪几项：“自动排序”解决官方顺序和 7 个顺序问题，顺带处理较弱的顺序和循环 |
-| 去掉了什么 | 什么也没去掉，只是摆法变了 | `⋯` 菜单、`f` 展开、问题详情弹层、“为什么这样问”比较层、版本清单面板，全部收进右边的详情 | 没有“选择停用哪一个…”这类弹层，选项直接摆在步骤里 |
-| 计数 | 和现在一样 | 和现在一样 | 剩下的步数 + 日志里的报错组（示例里 16 → 13）；做完一步就少一个 |
-| 好处 | 游戏运行时右列实时更新、左列不动；“预测的”和“实际发生的”分得开 | 一屏能看到全部项；和游戏日志页、订阅与更新页的“左列表右详情”是同一种页面；能删掉几个弹层的代码 | 玩家最容易读懂：“还要做 9 件事”；和 §5 说的“数字反映的是要做几件事”一致 |
-| 代价 | 左列还是很长，复杂度没少，只是分到两边；TUI 的 80 列放不下两列，GUI 和 TUI 的摆法会不一样 | 要看解释得先点一下（现在是直接写在行上）；标题要短到一行放得下，有些现在的标题偏长 | 改动最大：`view.BuildNeeds` 之上要多一层“步骤”，按动作把不同的问题代码合在一起；版本汇总这类不对应单一动作的项要另外安排；编辑器的问题面板和行图标浮层还是用原来的项 |
+| Structure | Left before you start (breaks the game, for you to confirm, worth knowing), right last time you played (log errors), independent scrolling | One left row per item grouped by section; selected item's full content/actions right | One column: direct actions (numbered steps) → choices (inline answers) → last-run errors → worth knowing |
+| Item appearance | Same as now, narrower | Left only sentence/count; explanation, evidence, expanded lists, comparison, version list and log snippets right | Each step states what it solves: automatic sorting fixes official order and 7 ordering issues, also weak order/cycles |
+| Removed | Nothing, only rearranged | `⋯`, `f` expansion, finding popover, identity comparison, version panel all absorbed into details | No choose-which-to-disable popover; options directly in steps |
+| Count | Same as now | Same as now | Remaining steps + log error groups (16 → 13 in example); one fewer per finished step |
+| Benefit | While game runs, right updates live, left stays still; separates predicted/actual | All items on one screen; same list-left/details-right shape as game logs/subscriptions; delete several popover implementations | Easiest for players: 9 things left; matches §5 count-as-work principle |
+| Cost | Left still long; complexity only split, not reduced; TUI 80 columns cannot fit both, differing GUI/TUI layout | Explanation requires click instead of inline; titles must fit one line, some too long | Largest change: step layer above `view.BuildNeeds`, merges finding codes by action; version summaries without one action need separate treatment; editor finding panel/row popovers keep original items |
 
-## A 第二稿（现在的方向，2026-10-29）
+## A second draft (current direction, 2026-10-29)
 
-选了 A，`a.html` 按下面这些打磨过（“现在”、B、C 三页没动）：
+A was chosen; `a.html` polished as below (now/B/C unchanged):
 
-- **左列的顺序是 会让游戏出错 → 可以留意 → 要你确认。** “可以留意”是 RimArcho 从分享的日志里学到的东西，算核心功能：默认展开；不再是淡色，用强调色的标题和图标；凭据带比例小条。它仍然不算进数字。较弱的顺序要求和顺序循环不放在这里，并进“自动排序”那一项的一行说明（排序本来就一起处理它们），所以“可以留意”里只剩分享日志的提示。
-- **没有 `⋯` 菜单。** 每一项的所有动作都是按钮，放在这一项的最底下，和标题左边对齐；凭据放在同一行的右边，窄的时候折到下一行。主按钮在最前。按钮上的键（`enter`、`S`、`space`、`1` `2`…）只在光标所在的项上显示。
-- **选择题直接给选项。** “选择停用哪一个…”变成“停用 Combat Extended”“停用 Yayo's Combat 3”两个平等的按钮，同一个 Mod 两份、身份待确认、分享日志里常一起报错的两个 Mod 也一样。选项统一用 `1` `2` `3`：规格里身份问题的 `u`（无关）和撤销的 `u` 撞了。
-- **要确认的就地确认。** 修复链接、忽略版本提醒、载入外部改动、回答身份问题，点了以后按钮那一行换成一句后果加“确定 / 取消”（`enter` / `esc`），不弹框。身份问题的确认写明不能用 u 撤销。
-- **做完的留在原地。** 这一项变成一行绿色的“已自动排序  Core 和 DLC 要排在最前面”加“撤销”，别的项不跳位置。一个动作解决几项时（自动排序解决两项，“自动修好”解决四项）一起变，撤销也一起撤。区标题的数字、页头的那句话和侧栏角标跟着变；“自动修好 N 项”数的是它会解决的项数，做完就消失。
-- **两列互相指。**
-  - 左边的缺前置写“上次运行 Vanilla Furniture Expanded 报错 12 次，看右边那一组”；右边那一组写“它的前置没有启用，看左边那一项”。点一下就跳过去并闪一下。启用前置以后，右边那句改成“它的前置刚启用了，下次运行再看还报不报错”。
-  - 分享日志的提示和上次运行的报错也这样互相指：Prison Labor 这个版本常报错，上次运行它报了 41 次。
-- **游戏运行时右列实时更新。** 顶上的“模拟游戏运行”每 2.5 秒加一条本次运行的报错：
-  - 区标题换成“本次运行的报错  ● 游戏运行中”，新的在最上面。
-  - 下面一条细线和“上次运行  列表  10 月 28 日 21:04”，再接上次的。
-  - 左列不动。
-- 区标题在各自的列里吸顶；← → 换列时记住每一列的光标；Tab 进到按钮时光标跟过去；`u` 撤销上一步，`F` 自动修好。
+- **Left order: breaks the game → worth knowing → for you to confirm.** Worth knowing is learned from shared logs, a core feature: expanded by default, accent heading/icon instead of muted, proportion bars in evidence. Still uncounted. Weak order/cycles merge into an automatic-sorting item's explanation (sorting already handles them), leaving only shared-log hints here.
+- **No `⋯` menu.** All actions are bottom buttons aligned with title's left edge; evidence on same row at right, wrapping below when narrow. Primary first. Keys (`enter`, `S`, `space`, `1` `2`…) only on cursor item.
+- **Choices are buttons.** Choose-which-to-disable becomes equal "disable Combat Extended" / "disable Yayo's Combat 3" buttons. Same for duplicate copies, identity questions and pairs often erroring together in shared logs. Standardize `1` `2` `3`: specification identity `u` (unrelated) collided with undo.
+- **Confirm in place.** Repair links, ignore version reminders, load outside changes, answer identity: replace button row with consequence and confirm/cancel (`enter`/`esc`), no dialog. Identity confirmation states u cannot undo.
+- **Finished items stay put.** Become a green "sorted automatically  Core and DLC must come first" row plus undo; others do not jump. One action fixing multiple items (sort fixes two, auto-fix four) changes/undoes them together. Section counts, opening sentence and sidebar badge follow; auto-fix N counts resolved items and disappears when done.
+- **Columns link to each other.**
+  - Missing dependency left says Vanilla Furniture Expanded errored 12 times last run, see right; right says dependency disabled, see left. Click jumps/flashes. After enabling, right says dependency just enabled, check next run.
+  - Shared-log hint and last-run errors likewise: this Prison Labor version often errors; last run 41 times.
+- **Right updates live while game runs.** Top simulate-game adds a current-run error every 2.5s:
+  - Heading becomes current-run errors / ● game running, new rows first.
+  - Thin divider and "last run  list  Oct 28 21:04", then previous run.
+  - Left stays still.
+- Section headings stick within columns; ← → remembers each cursor, Tab to buttons moves cursor along; `u` undoes last action, `F` auto-fixes.
 
-落到规格和代码时要动的地方：
+Specification/code changes needed:
 
-- 06 §2.4 的布局和 §5 的“一键操作”列（所有动作可见、选项即按钮、`1` `2` `3`）。
-- §5 “语料提示”的颜色和位置。
-- 03 §4.3.1 里较弱顺序和循环的展示。
-- TUI 的 80 列放不下两列，按同样的顺序排成一列：左列的三个区，再接日志。
+- 06 §2.4 layout and §5 one-click actions column (all actions visible, choice buttons, `1` `2` `3`).
+- §5 corpus hint color/position.
+- 03 §4.3.1 weak-order/cycle display.
+- TUI 80 columns cannot fit two: same order in one column, three left sections then logs.
 
-## 第一稿时的建议（已改选 A）
+## First-draft recommendation (since changed to A)
 
-当时建议用 **B** 做主体：它是三个里唯一一个让页面真的变简单的。几种弹层和 `⋯` 菜单都收进右边的详情，代码能删掉一些（`versionpanel.js`、`popups.identity`、问题详情弹层、折叠动作），而不是再加一种画法。TUI 也能沿用同一种画法：120 列以上分左右，更窄时详情放在列表下面。
+Originally recommended **B** as the base: the only candidate that really simplified the page. Popovers/`⋯` merge into right details, allowing deletion (`versionpanel.js`, `popups.identity`, finding popover, folding actions), not another rendering method. TUI could share it: left/right above 120 columns, details below when narrower.
 
-C 里有两点很便宜，可以直接拿进 B：
+Two cheap C ideas could go straight into B:
 
-1. 较弱的顺序要求和顺序循环并进“自动排序”那一项（它们本来就是排序一起处理的），不再单独成项。
-2. 日志报错项写出相关的那一项（“它的前置 Vanilla Expanded Framework 没有启用，看那一项”）。B 的右边已经这样画了。
+1. Merge weak order/cycles into automatic sorting, which already handles them, instead of separate items.
+2. Log errors name related item (its Vanilla Expanded Framework dependency is disabled, see that item). B's right already shows this.
 
-当时觉得 A 只是把同样多的东西分到两边。第二稿用“所有动作可见、选项即按钮、做完留在原地、两列互相指”把一项的内容收回到这一项本身，这一点就不成立了。
+At the time A seemed only to split the same volume across two sides. Second draft's visible actions, choice buttons, stable finished rows and cross-links gather content back into each item, invalidating that objection.
 
-## 打开
+## Open
 
-页面共用 `shared.css`、`shared.js`，要经本地服务器打开，例如：
+Pages share `shared.css`, `shared.js`; use a local server, for example:
 
 ```bash
 python -m http.server 8765 --directory docs/design/canitrun-drafts
 ```
 
-然后打开 `http://localhost:8765/now.html`，用顶上的条切换四页。
+Open `http://localhost:8765/now.html`; top bar switches four pages.
 
-- 所有页都能用 ↑↓ 移动、← → 换区（A 是换一列）、enter 执行主操作。
-- A 里按钮上的键直接执行，`u` 撤销；顶上的“模拟游戏运行”演示右列实时更新。
-- B 里点左边的行，右边就换成那一项。
-- C 里点一步的按钮会把它标成做完，数字和进度跟着变，“撤销”能恢复。
+- All pages: ↑↓ move, ← → change section (column in A), enter primary action.
+- A: button keys execute directly, `u` undo; top simulate-game demonstrates live right column.
+- B: left-row click changes right details.
+- C: step buttons mark complete, count/progress update, undo restores.

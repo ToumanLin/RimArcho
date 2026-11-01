@@ -1,6 +1,6 @@
 # Log corpus P1 decisions and measurements (G1, G2)
 
-Research design: `docs/research/00-日志语料顶层设计.md`. Measurements: `spikes/corpusrun/RESULT.txt`
+Research design: `docs/research/00-log-corpus-design.md`. Measurements: `spikes/corpusrun/RESULT.txt`
 (this file only has the conclusions). Raw logs: the private `RimArcho-corpus` repository.
 
 ## 1. Collection
@@ -121,7 +121,7 @@ logs of 1.6 with full mod lists. Numbers in `spikes/corpusrun/RESULT.txt` "Final
 - ~~`harmony.multi-transpiler` warnings rose from 4,559 to 11,078 clusters with G9's IL scan;
   review its severity the way G8 did.~~ Info, warning with log evidence (merge into 0.9, §2).
 - Feed the G5 patterns into MCP `Instructions` / `analyze_log` (draft:
-  `docs/research/01-范式库接入草案.md`); 41% of clusters are in kinds the diagnosis workflow does
+  `docs/research/01-pattern-library-integration-draft.md`); 41% of clusters are in kinds the diagnosis workflow does
   not cover (save-load, missing resources, assembly dependencies, config checks).
 - Labelling: tighten the fix and cause-type fields, label a larger stratified set (≥ 20 per class),
   then accuracy per class and the agent evaluation set (design §6.5).

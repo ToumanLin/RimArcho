@@ -1,5 +1,5 @@
 // Spike knowndeps — observed prerequisites and known-bad combinations from the log corpus
-// (docs/research/00-日志语料顶层设计.md §3, G10). Output: internal/known/known.json
+// (docs/research/00-log-corpus-design.md §3, G10). Output: internal/known/known.json
 // (aggregates only: packageIds, counts, templates; every entry from >= -minplayers players).
 //
 // Inputs:

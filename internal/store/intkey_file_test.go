@@ -11,7 +11,7 @@ import (
 )
 
 // TestIntKeyConvertFile converts an existing archo.db in place to the layout decided in
-// docs/research/2026-10-30_archo-db-整数键.md §10 (one zstd list per snapshot without dedup,
+// docs/research/2026-10-30_archo-db-integer-keys.md §10 (one zstd list per snapshot without dedup,
 // plus a file list per fact set) and logs sizes and times. Point RIMARCHO_INTKEY_DB at a
 // copy: the file is rewritten. For the VM's real library the copy stays inside the VM.
 func TestIntKeyConvertFile(t *testing.T) {

@@ -43,7 +43,7 @@ pwsh scripts/vm/round.ps1 -KeepMonitor       # run the Monitor installed in the 
 pwsh scripts/vm/round.ps1 -Cleanup           # remove a driver an interrupted round left behind
 ```
 
-This is the "真的进游戏" round of [发布前VM测试](../../docs/发布前VM测试.md). **Archo Drive** (`drive/`, test only, never shipped) plays it inside the game. It calls what the game's buttons call:
+This is the "actually enter the game" round of [pre-release VM tests](../../docs/release-vm-tests.md). **Archo Drive** (`drive/`, test only, never shipped) plays it inside the game. It calls what the game's buttons call:
 
 - each page's Next (`CanDoNext`, then `DoNext`) after "New colony";
 - the save and load dialogs' file action;
@@ -81,7 +81,7 @@ quit                                   # last step only
 
 Any step takes `timeout=<s>`. Parser tests: `dotnet run --project scripts/vm/drive/test`.
 
-A script that does not end with `quit` leaves the game running when its last step is done, for a test that goes on by hand or with other tools. A script of just `menu` waits for the main menu. The driver sees the menu itself, so this works with a Monitor that writes no phase markers; round-check then fails only the phase lines. The driver stays loaded until the game quits, so autosave stays off. `pwsh scripts/vm/vm.ps1 quitgame` closes the game afterwards. If such a script saved, `round.ps1` leaves the save for you to delete before the game quits. The checks after the round are a person's job: what 能不能跑 and the game log page show. Use `cdp.mjs text` and `problems.txt` for those, not screenshots.
+A script that does not end with `quit` leaves the game running when its last step is done, for a test that goes on by hand or with other tools. A script of just `menu` waits for the main menu. The driver sees the menu itself, so this works with a Monitor that writes no phase markers; round-check then fails only the phase lines. The driver stays loaded until the game quits, so autosave stays off. `pwsh scripts/vm/vm.ps1 quitgame` closes the game afterwards. If such a script saved, `round.ps1` leaves the save for you to delete before the game quits. The checks after the round are a person's job: what can it run and the game log page show. Use `cdp.mjs text` and `problems.txt` for those, not screenshots.
 
 ## Looking and acting
 
@@ -104,7 +104,7 @@ DevTools is on only because `launch` sets `RIMARCHO_DEVTOOLS_PORT`; players neve
 ## Limits
 
 - `launch` and `cdp.mjs` need a user signed in on the guest screen. Windows Update restarts the guest by itself and leaves it at the lock screen: `launch` then fails with `runProgramInGuest (exit -1)`, and a guest screenshot shows the clock. `status`, `exec`, `cli` and `push` still work. Sign in through the VMware window. Auto sign-in and pausing updates in the guest would remove this step; both are security settings, so the VM's owner makes that call.
-- GUI tests run as **Player** (an administrator), because Player is the user logged in on the guest screen. `-StandardUser` only applies to `exec` and `cli`. Before a release, also do the first run as **新玩家**: log in as 新玩家 in the guest, then run `launch -StandardUser`.
+- GUI tests run as **Player** (an administrator), because Player is the user logged in on the guest screen. `-StandardUser` only applies to `exec` and `cli`. Before a release, also do the first run as **the standard test account (`\u65b0\u73a9\u5bb6`, Unicode escapes)**: log in as \u65b0\u73a9\u5bb6 in the guest, then run `launch -StandardUser`.
 - Files copied in by VMware Tools have no download mark, so SmartScreen warnings aren't tested.
 - The guest has no GPU driver. Vulkan comes from Mesa lavapipe (software, `C:\Mesa\x64`, in the snapshot; a host copy is in `D:\RimArcho-test\mesa`), so RimWorld 1.7 starts, at a very low frame rate. Game performance is checked on a real machine.
 - Leftovers in the guest: `C:\Users\Public\Documents\VM-Test`, `%APPDATA%\RimArcho` and `%LOCALAPPDATA%\RimArcho` of the user who ran it. Delete the last two for a first run again.

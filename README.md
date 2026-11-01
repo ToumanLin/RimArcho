@@ -1,3 +1,5 @@
+English | [&#31616;&#20307;&#20013;&#25991;](README.zh-CN.md)
+
 # RimArcho
 
 <img src="docs/assets/rimarcho.svg" width="96" alt="RimArcho icon: Archo chan">

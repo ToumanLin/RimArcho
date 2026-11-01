@@ -4,6 +4,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- Interface translations moved into language files. Archo Monitor settings now follow the game language. Mod roles on the game log page use normal brackets in English.
+- Documentation is now in English, with a new Chinese README (`README.zh-CN.md`).
 - Unity 1.6 RAM estimates now use heavy-texture VM measurements up to 7.5 GiB, reducing high-payload resident and loading budgets; larger loads remain extrapolated.
 - GUI: off/on dropdowns are now rounded rectangular two-segment switches with concentric inner corners. Other dropdowns use rounded menus with centered SVG arrows, concentric option corners, a title, checked current value, keyboard navigation and scrolling; menus stay within the window and above scroll containers.
 - Uninstall confirmation now lists what will be removed or changed, counts, sizes,
@@ -50,16 +52,16 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
   the TUI also confirms. Can it run compares RAM and VRAM on separate lines.
   Unknown readings keep the ordinary button; VRAM shortages remain warnings.
 
-- Settings › Feedback (反馈, also in the command palette): write a bug report or
+- Settings › Feedback (feedback, also in the command palette): write a bug report or
   suggestion; it becomes a public issue in the GitHub repository, which the page says
   above the preview. Two ways:
-  - **发送** needs no GitHub account. It goes through RimArcho's feedback relay, a
+  - **send** needs no GitHub account. It goes through RimArcho's feedback relay, a
     Cloudflare Worker in `feedback-relay/` that holds the GitHub App key; RimArcho holds
     none. An optional contact (Discord name or email) goes only to the maintainer, never
     into the issue. The relay allows one report a minute and a daily cap. The relay is
     deployed and its address is built in (`internal/feedback/relay.go`;
     `RIMARCHO_FEEDBACK_RELAY` overrides it for testing).
-  - **打开 GitHub** opens the new-issue page with the title and text filled in, for
+  - **open GitHub** opens the new-issue page with the title and text filled in, for
     players with an account. A report too long for a link (about 2,000 characters) is
     copied for you, and the link says where to paste it.
 
@@ -75,9 +77,9 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
   retains interval controls; the old community group and duplicate version/check
   entries are removed. The remaining groups are Interface, Accounts, Updates,
   Folders, Game log, External tools, Community data, Storage and Uninstall.
-- Settings: the language choice reads 跟随系统 / 简体中文 / English instead of
+- Settings: the language choice reads follow system / Simplified Chinese / English instead of
   auto / zh / en, and RimArcho's subscription download folder is labelled
-  (订阅下载目录) instead of "Subscriptions".
+  (subscription downloads) instead of "Subscriptions".
 
 - The database (`archo.db`) is about a third smaller: on a synthetic library like a big
   real one, 245 → 156 MB. Each mod version's list of textures, sounds, translations and
@@ -96,7 +98,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
   ask GitHub Releases for a newer RimArcho (daily by default, the same switch and interval
   as the other checks; a release build only looks at releases, a prerelease build such as
   1.0.0-rc1 also at newer prereleases; development builds never check). A new version
-  shows in Settings › 更新 as the first row, "RimArcho", with its release notes folded
+  shows in Settings › updates as the first row, "RimArcho", with its release notes folded
   under it and **install update** / **check for updates**, as a line at the top right of
   the launch page, and once as a quiet notice. Installing asks first, then downloads the
   release zip, checks it against the release's `.sha256` file, waits until no other
@@ -106,49 +108,49 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
   touched. New command `archo update` (installs; `--check` only checks and shows what it
   would do). `archo status` / MCP `status`: the `automatic checks` line says
   "RimArcho 0.9.1 available". There is no MCP tool that installs. TUI: command palette
-  "更新 RimArcho" or `:update`. `release.ps1` now also writes
+  "update RimArcho" or `:update`. `release.ps1` now also writes
   `dist/archo-<version>-windows-amd64.zip.sha256`; upload it with the zip, or the update
   is not offered for installing.
 
 - TUI: the pages use the window's names and keys. The top bar and breadcrumbs say
-  能不能跑 (not 需要处理) and Mod 库 › 订阅与更新 / 全部 / 添加订阅 / 搜索文件; 订阅与更新's
-  lists are 来源, 等你更新 and 已经更新, with the window's scope line (列表「…」, `a` 所有 Mod).
+  can it run (not needs attention) and mod library › subscriptions and updates / all / add a subscription / search files; subscriptions and updates'
+  lists are sources, waiting for you to update and already updated, with the window's scope line (list "…", `a` all mods).
   In the editor `H` opens the history chooser, `A` checks the mods' files again, and on a
   narrow screen `4` opens the full detail like `enter`; `?` works in the full detail and
-  the technical page. 能不能跑 starts with the window's sentence ("…：开始之前要处理 3 项"),
-  has `F` 自动修复 N 项 when something can be fixed in one go, `c` for an item's mod and `u`
-  to undo; while the game runs the section reads 本次运行的报错. The palette's 标签,
-  游戏日志, 搜索文件, 排序规则 and 后台任务 now do something (they did nothing before), and
+  the technical page. can it run starts with the window's sentence ("…: things to fix before you start: 3 items"),
+  has `F` fix N items automatically when something can be fixed in one go, `c` for an item's mod and `u`
+  to undo; while the game runs the section reads errors from this run. The palette's tags,
+  game log, search files, load-order rules and background tasks now do something (they did nothing before), and
   the key hints no longer offer `!` and `#` for what moved.
-- TUI: new 搜索文件 page (palette, or `tab` from 添加订阅): the window's file search in the
+- TUI: new search files page (palette, or `tab` from add a subscription): the window's file search in the
   terminal, on the same search. Type and `enter`; the kind and scope rows below the box
   take `↑↓ ←→ space`, the window's `alt+` switches work, `[` `]` turn the page, `enter`
   opens the file's folder. `esc` stops a running search, and leaving the page stops it.
-- TUI: `r` in the editor opens a 排序规则 screen with the window's rule form for the
+- TUI: `r` in the editor opens a load-order rules screen with the window's rule form for the
   cursor's mod (kind, the other mod from candidates, a note), instead of a typed
   `after <ref>` line. The screen lists the rules for the open list (`a` shows all),
   `enter` edits one, `Del` removes it and `u` right after puts it back, `o` shows its mod
-  in the list. Also in the palette as 排序规则.
-- TUI: palette 后台任务 shows the background tasks as text: running, queued, today,
+  in the list. Also in the palette as load-order rules.
+- TUI: palette background tasks shows the background tasks as text: running, queued, today,
   yesterday, earlier, one line each with its state and how it ended. Stop and retry stay
   in the window.
-- TUI: after an edit on 能不能跑 (`F`, an item's key), the check that follows by itself no
-  longer writes its progress and "分析完成" over the status line, so "…，u 可撤销" stays;
-  the page head says "正在检查 Mod 的文件…" meanwhile. `A` still reports in the status line.
-- TUI: a simple 启动 page (`shift+1`): the current list, its game and full version, how it
-  stands, the last game's errors, the most likely trouble, and ▶ 启动游戏. The editor's `L`
+- TUI: after an edit on can it run (`F`, an item's key), the check that follows by itself no
+  longer writes its progress and "analysis done" over the status line, so "…, u to undo" stays;
+  the page head says "checking mod files…" meanwhile. `A` still reports in the status line.
+- TUI: a simple start page (`shift+1`): the current list, its game and full version, how it
+  stands, the last game's errors, the most likely trouble, and ▶ launch the game. The editor's `L`
   now goes there first, as in the window, and `L` or `enter` there launches; `w` saves
   without launching.
 - TUI: picking a list in `P`, in the palette or with `tab` in the editor only opens it, as
-  in the window: the list that launches stays, and the top bar says "启动的是 X". `P` has
-  设为当前; saving the list or `L` in its editor makes it current.
+  in the window: the list that launches stays, and the top bar says "launching X". `P` has
+  make current; saving the list or `L` in its editor makes it current.
 - TUI: `T` outside staging puts every enabled mod into staging, as in the window; in
   staging it still puts everything back.
-- GUI: the palette's 排序规则 opens the editor's rules card.
+- GUI: the palette's load-order rules opens the editor's rules card.
 - Palette (both): a name that ends with what you typed ranks like one that starts with it,
-  so "排序" still puts 自动排序 first, next to the new 排序规则.
+  so "sort" still puts automatic sorting first, next to the new load-order rules.
 
-- List editor: the cards stacked in a column (详情, 排序规则, 历史; 已启用 and 暂存) are
+- List editor: the cards stacked in a column (details, load-order rules, history; Enabled and Staging) are
   4 px apart like the columns, not 12 px.
 
 - Game log: a missing texture or DLL is again traced to a Workshop, SteamCMD or other
@@ -158,7 +160,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
   "installed copies" note when an assembly's types cannot be listed. Logs already analysed
   are attributed again.
 
-- Mod 库存 opens faster on a large library. Whether a mod has code, Defs / Patches, translations or convertible textures, and which languages it has, are now worked out once when a scan records the mod, instead of reading its whole file list each time. On 1354 mods the first open's content lookups went from about 245 ms to under 2 ms; the `type:` search, the texture mark and the languages in the details show the same as before. The first start after updating upgrades the database (schema 27) by reading the stored file lists once: about half a second for a library with a million file rows.
+- mod library opens faster on a large library. Whether a mod has code, Defs / Patches, translations or convertible textures, and which languages it has, are now worked out once when a scan records the mod, instead of reading its whole file list each time. On 1354 mods the first open's content lookups went from about 245 ms to under 2 ms; the `type:` search, the texture mark and the languages in the details show the same as before. The first start after updating upgrades the database (schema 27) by reading the stored file lists once: about half a second for a library with a million file rows.
 
 - MCP: what an agent reads when it connects is about a fifth of what it was. The server
   instructions and the tool descriptions went from 53,325 to 10,420 characters (8,816 +
@@ -173,24 +175,24 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
   an error. No tool or parameter was renamed or removed (`add_rule` and `copy_local` stay
   as aliases); the `env` parameter's help is shorter. A test caps these sizes so they do
   not creep back up.
-- The window's list editor has 排序规则 (load-order rules) above 历史 in its left column.
+- The window's list editor has load-order rules (load-order rules) above history in its left column.
   Rules are shared by all games and lists; the card shows the ones that involve a mod
-  enabled in the current list (只看当前列表, the default) or every rule (全部排序规则), and
+  enabled in the current list (only the current list, the default) or every rule (all load-order rules), and
   the count on its bar follows that choice. One sentence each with its note; the mod
-  names jump to the mod in the list. `r` on a mod, or 加一条规则 at the bottom, opens a
-  small form in place: the kind, the other mod (type its name and pick), a note. 编辑
-  changes a rule and keeps its `r:<n>`; 删除 is immediate and the status line's 撤销 (or
+  names jump to the mod in the list. `r` on a mod, or add a rule at the bottom, opens a
+  small form in place: the kind, the other mod (type its name and pick), a note. edit
+  changes a rule and keeps its `r:<n>`; delete is immediate and the status line's undo (or
   `u` right after) puts it back with the same number. Ignore rules still come from Can it
   run and `archo sort`; here their note can change.
 - New `archo rule edit <r:n> <kind> <A> [<B>] | ignore <constraint> [--note <text>]`:
   replaces a rule and keeps its `r:<n>`. The MCP tool `manage_rules` has no `edit` yet.
-- New page Mod 库 › 搜索文件 (also in the command palette): the window's way to
+- New page mod library › search files (also in the command palette): the window's way to
   `archo files search`. Search the files the game loads for the enabled mods, or for the
   mods you name, with case, whole-word, regex and defName switches and the Defs /
   patches / About / translations / textures / sounds / assemblies kinds. 60 lines a page,
-  grouped by mod and file; a click on a path copies it, `enter` opens its folder. "C# 代码"
+  grouped by mod and file; a click on a path copies it, `enter` opens its folder. "C# code"
   searches the decompiled C# of the mods you name (`archo source search --in`, needs
-  ilspycmd), decompiling for at most a minute per search. A new search, 停止 or leaving
+  ilspycmd), decompiling for at most a minute per search. A new search, stop or leaving
   the page cancels the one running.
 
 - The terminal interface no longer uses WezTerm. `archo` (and a double click on
@@ -239,7 +241,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
   When it writes `tasks.json` it reads the file back first and keeps the other's
   records. Opening a window no longer marks another open window's running tasks as
   stopped; only tasks whose window has gone are stopped. A task the other window runs
-  shows up on 后台任务 once it ends, and a record removed in one window is gone from both.
+  shows up on background tasks once it ends, and a record removed in one window is gone from both.
 
 - The window's sidebar no longer has the line above Settings ("Game running since
   14:05" while the game runs, "Analyse this run's log" after it). It only opened Can it
@@ -283,9 +285,9 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 - Subscriptions now work outside the window. MCP has a write tool,
   `manage_subscriptions` (list, add, check, update, remove; `dry_run` for add, update
-  and remove), marked destructive and open-world. In the TUI, Mod 库 › 添加订阅 opens
-  from 订阅与更新 (`+`, `tab` or a paste) or the palette's 添加订阅: paste an address,
-  choose what to track, read the dry run, `enter` subscribes. On 订阅与更新, `K` checks
+  and remove), marked destructive and open-world. In the TUI, mod library › add a subscription opens
+  from subscriptions and updates (`+`, `tab` or a paste) or the palette's add a subscription: paste an address,
+  choose what to track, read the dry run, `enter` subscribes. On subscriptions and updates, `K` checks
   every source (`enter` on a source: that one), `u` / `U` update one / every one shown
   after their dry run, and `Del` removes a subscription. These run as background tasks
   recorded in `tasks.json`; updates are refused while a game runs. The TUI, MCP and the
@@ -397,7 +399,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   packs, subscriptions and updates. One-column pages share one narrower width (960px) so
   labels and values sit closer: can it run, game, texture optimisation, settings. Before,
   all of them were centred in 1200px.
-- The texture page's English hint no longer names its button in Chinese ("扫描统计").
+- The texture page's English hint no longer names its button in Chinese ("count the textures").
 - Sorting adds Archo Monitor right after Harmony when the setting "add Archo Monitor to
   lists" is on and the list has none, also after you took it out; it is part of the same
   undo step as the sort. Before, the setting only covered new lists, so a sort never put
@@ -519,7 +521,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   and Settings with quiet notices; CLI/MCP status and data output use one compact summary
   of pending updates or the latest check time. Settings keeps only the switch, interval
   and a note under automatic checks; dates appear with their subjects. Results say what
-  has updates, intervals use daily/weekly wording, and Chinese switches show 开/关.
+  has updates, intervals use daily/weekly wording, and Chinese switches show on/off.
   Unconfigured LoversLab accounts have no status text. Tool rows display new versions.
 - LoversLab sessions refresh through a signed-in request, saving renewed cookies in the
   existing encrypted session. Settings no longer waits for verification. If the site
@@ -584,7 +586,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   request high-priority Steam downloads and wait for installed files, with live byte
   progress in background tasks and CLI output. A missing folder never counts as installed;
   stalled downloads fail with a check-Steam hint, and stopping ends the download worker.
-- Smaller fixes: the sidebar's lists show 全部列表 first, then at most four lists (the
+- Smaller fixes: the sidebar's lists show all lists first, then at most four lists (the
   current one, the open one, the most recently used); the all-lists page puts "current" /
   "make current" at the right of each row and drops the collection icon; the editor's
   disabled column labels the source only for mods with several copies; Workshop mods
@@ -619,8 +621,8 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   sidebar, the palette or list management is only shown and edited; the current list — the
   one the launch page shows and launches — changes when you make another current, write it
   to the game or launch it from its editor. New lists open without becoming current. The
-  editor says which list launches and offers "make current". 列表 opens the current list,
-  which comes first in the sidebar and in list management (管理 moves last), and reordered
+  editor says which list launches and offers "make current". lists opens the current list,
+  which comes first in the sidebar and in list management (manage moves last), and reordered
   entries slide to their new place. `--open-plan <name>` runs one command on another list.
 - List management is simpler (06 §2.17). The sidebar entry is now "all lists" (and the mod
   library's first entry "all mods"). One "new / import" button opens one form that starts
@@ -666,11 +668,11 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   (`<data>/userdata/<env>`, started with `-savedatafolder`).
 - The Workshop folder (found from Steam), SteamCMD folders, other folders, the Archo Monitor
   folder and the lock library are shared by every environment: `archo folder list|add|remove`,
-  the settings page's Mod 文件夹, MCP `status show=folders`. One Workshop folder; naming another
+  the settings page's mod folders, MCP `status show=folders`. One Workshop folder; naming another
   moves it. `env add/set --workshop/--steamcmd/--extra/--remove-source` still work and mean the
   folder commands.
 - One record per mod: a shared folder's mods, every lineage, tags, notes, aliases, copy notes,
-  history and user rules are the same in every environment; Mod 库存's 用在 lists every
+  history and user rules are the same in every environment; mod library's used in lists every
   environment's plans. Problem ignores stay per environment. Analysis stays per game version.
 - `scan` reads the shared folders once plus the game's own; `scan --game-only` reads only the
   game's (adding a game), and its `Mods/` copies still join the Workshop original's lineage.
@@ -685,14 +687,14 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   shared SteamCMD folder, added on `env add`, on a download and, for games added earlier, on
   the next scan. It never replaces or moves the Steam client's Workshop folder; a removed one
   stays removed.
-- 删除环境 on the environment page, in the window's environment chooser (`Delete`) and in the
+- delete game on the environment page, in the window's environment chooser (`Delete`) and in the
   TUI's `E` (`d`): a dry run, then one confirmation. Only RimArcho's records go (plans, launch
   records, the mods read from its `Data`/`Mods`, history); game files, mods, saves and the
   shared folders stay. Refused while that game runs; another environment takes over, or the
   guide opens when none is left. `env remove <name>` without `--yes` is now that dry run.
 - The environment page shows only the game folder, version, launch, saves and arguments. The
-  add-environment guide offers 已有的游戏 (detected installs, a typed folder or the folder
-  dialog; named after the version, e.g. 1.6) or 下载一个版本, and after adding reads only the
+  add-environment guide offers a game you have (detected installs, a typed folder or the folder
+  dialog; named after the version, e.g. 1.6) or download a version, and after adding reads only the
   new game's `Data` and `Mods`.
 - A game outside a Steam library launches `direct` by default even when a Workshop folder is
   given (`env add --workshop`); only a game inside a Steam library defaults to `steam`.
@@ -700,7 +702,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 ### Downloading a game version (08 §11)
 - `archo env branches` lists RimWorld's Steam branches from SteamCMD (anonymous
   `app_info_print`); `archo env download <branch> --to <dir>` downloads one
-  with SteamCMD and adds it as an environment. The guide's 下载一个版本 does the same with a
+  with SteamCMD and adds it as an environment. The guide's download a version does the same with a
   progress bar.
 - Anonymous Steam login is the default — RimArcho also serves players without a Steam
   account. An account name can be stored in the `steamcmd.account` setting (settings page,
@@ -727,16 +729,16 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   every existing plan once, get it right after Harmony as one undoable edit;
   `config set monitor.default off` turns that off. Newer versions replace older ones in plans.
 - `archo monitor`, `archo monitor install [--dry-run]`; `status` and `scan` report it; the
-  settings page has a 游戏日志 group.
+  settings page has a game log group.
 - The log analysis and the live tracker read `ArchoMonitor.log` (and RimCrow's
-  `RimCrow_Realtime.log` / `RMM_Realtime.log`): files become source evidence and the 日志 chip
-  in 能不能跑, counts and times come from it, errors only it saw become clusters.
-- The 游戏日志 page shows the run's companion log as its own section, "Archo Monitor · 本次运行":
-  one row per entry (time, level, kind such as 补丁错误 / 程序集冲突, first line, ×count, related
+  `RimCrow_Realtime.log` / `RMM_Realtime.log`): files become source evidence and the log chip
+  in can it run, counts and times come from it, errors only it saw become clusters.
+- The game log page shows the run's companion log as its own section, "Archo Monitor · this run":
+  one row per entry (time, level, kind such as patch error / assembly conflict, first line, ×count, related
   mods by name and files), details on click, a link to the matching Player.log cluster, and
   the session's version, game and start–end as its header. It follows the live tracker while
   the game runs. The file picker lists ArchoMonitor.log under its Player.log. A plan without
-  the monitor gets one line with 加入 Archo Monitor (one undoable step) (06 §2.10).
+  the monitor gets one line with add Archo Monitor (one undoable step) (06 §2.10).
 - Log lines on that page take RimWorld's own debug-log colours (error #ff6666, warning
   #ffeb04, message white; darkened for the light theme with the hue kept), and mods' Unity
   rich text (`<color>`, `<b>`, `<i>`) is shown as styled text, parsed in Go; other tags stay
@@ -750,9 +752,9 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   `loadout log` and `stage list` name it. Share codes carry the plan name.
 - The ModsConfig.xml write record is kept per user-data folder and names the writer (plan,
   version).
-- The window: one sidebar entry per plan and + 新方案; new (empty, copy, a version, an
+- The window: one sidebar entry per plan and + new list; new (empty, copy, a version, an
   import), rename, delete (confirmed; never the last) from the plan page's ⋯ menu, a
-  right-click, `P` or the palette. The status bar says "游戏里现在是：<方案> v<n>". The TUI
+  right-click, `P` or the palette. The status bar says "in the game now:: <list> v<n>". The TUI
   has the same switcher on `P` and names the plan in its top bar.
 
 ### Outside changes (04 §4.3)
@@ -760,7 +762,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   in whichever environment shares the folder: loaded as an `external` version when that plan
   is untouched since, else recorded and marked. With no record it goes to the current plan.
 - `archo loadout ignore-external` clears the mark; the version stays. The mark shows in
-  `status`, `loadout log`, 能不能跑 (with "see the difference"), the sidebar and the plan page.
+  `status`, `loadout log`, can it run (with "see the difference"), the sidebar and the plan page.
 
 ### Launching (08 §1, §2, §4)
 - `archo launch` writes the plan to the game (links, ModsConfig.xml, a `launch` version unless
@@ -774,9 +776,9 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - Launch records carry the plan, the enabled list's fingerprint and the version played.
   A game in `RimWorld2` no longer counts as running in `RimWorld`.
 - Launch, write to the game and sort act on one click or key in the window and the TUI; the
-  status line says what happened (sort: 撤销 / u). A refusal names its reason and lists the
+  status line says what happened (sort: undo / u). A refusal names its reason and lists the
   commands that resolve it. Loading a history version or an outside change is one undoable
-  step, with no confirmation. The palette's 预览排序 / 预览写入 / 预览启动 show the dry runs
+  step, with no confirmation. The palette's preview the sort / preview save / preview the launch show the dry runs
   (06 §6).
 
 ### Locked versions (04 §7)
@@ -785,7 +787,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   per environment, scanned as source `src:locked`) and swaps it into the current plan. The game
   sees a copy only through an `_Archo_` link, so several copies coexist and each plan uses
   its own; no About.xml is renamed.
-- `mod.pinned` covers RimArcho's copies too, and turns into "上游有更新" when the upstream
+- `mod.pinned` covers RimArcho's copies too, and turns into "upstream has an update" when the upstream
   differs from `origin_snapshot`.
 - `pin --update <instance>` makes a fresh copy and swaps it in; the old one stays.
   `pin --move-to-library` (and the first `--update`) moves an older RimArcho copy out of
@@ -798,7 +800,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   plan, environment or pack, or a list changed since that launch; the header says why.
   ModsConfig.xml's modification time is no longer used.
 - Analysis is kept per plan's enabled set: switching plans and back does not re-run it.
-- "分析本次日志" shows in the sidebar foot and the TUI top bar when Player.log is newer than
+- "analyse this run's log" shows in the sidebar foot and the TUI top bar when Player.log is newer than
   the last launch and the log last seen.
 - `archo log` (MCP `analyze_log`) prints a cursor; `--since <cursor>` (MCP `since`) lists only
   the clusters that are new (`new`) or whose count grew (`+N`) since then, ArchoMonitor.log
@@ -824,7 +826,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   settings, data, db, cache); `launch_game`, `manage_plans`, `plan_history`;
   `edit_loadout` gains `checkout` and `ignore_external`; `list_library`, `manage_library`;
   `preview_uninstall` (read-only; there is no tool that uninstalls); `search_files`,
-  `test_run`, `check_links`, `repair_links` (below); `manage_textures` (贴图优化) and
+  `test_run`, `check_links`, `repair_links` (below); `manage_textures` (texture optimisation) and
   `manage_subscriptions` (Subscriptions). 40 tools in all.
 - `manage_plans` gains `versions`, `follow`, `unfollow` and `sync`; `manage_packs` gains
   `check`.
@@ -854,11 +856,11 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   deletes only the release zip's files, the program folder only when empty, and lists what it
   could not delete in `%TEMP%\RimArcho-uninstall.log`. A failed step keeps them, so it can
   run again.
-- GUI 设置 › 卸载 RimArcho: the plan with the questions inline, one button, progress, the
-  report and 关闭 RimArcho; TUI palette 卸载 RimArcho asks for the word `uninstall`; MCP
+- GUI settings › uninstall RimArcho: the plan with the questions inline, one button, progress, the
+  report and close RimArcho; TUI palette uninstall RimArcho asks for the word `uninstall`; MCP
   `preview_uninstall` is the dry run only.
 
-### Mod 库存 (06 §2.9)
+### mod library (06 §2.9)
 - `archo library` lists every mod on this machine, one line per Lineage (copies, size,
   the most important state, the plans using it), with `--search`, `--include` /
   `--exclude key:value` (tag, source, version, state, used), `--sort name|size|changed|played`,
@@ -871,29 +873,29 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   undo step each). Moving now keeps the instance (`pin --move-to-library` too), so every plan
   keeps it. `trash` refuses while any plan uses the folder and names the plans.
 - MCP: `list_library` (read-only) and `manage_library` (destructive).
-- The window's Mod 库存 › 全部: filters and a table like a file manager's details view.
+- The window's mod library › all: filters and a table like a file manager's details view.
   Click a header to sort (again reverses, with an arrow), drag it to move the column, drag
-  its edge to resize, right-click the headers to show or hide columns (名称 大小 状态 来源
-  用在 by default; 更新日期 版本 作者 标签 上次游玩 on request); the layout is kept in
-  `ui.gui.library.columns`. The name cell holds only the name, the copy's kind is in 来源,
+  its edge to resize, right-click the headers to show or hide columns (name size state source
+  used in by default; update date version author tags last played on request); the layout is kept in
+  `ui.gui.library.columns`. The name cell holds only the name, the copy's kind is in source,
   tags are not in rows. Rows show only states to act on (hidden, leftover, upstream
-  updated, unloadable, missing, ignored). 不支持 1.7 and 不在任何方案里 are not states at all:
+  updated, unloadable, missing, ignored). does not support 1.7 and not in any list are not states at all:
   not in the filters, not `state:` values or completions, not in the CLI / MCP (`state:unsupported`
   and `state:unused` are gone; `used:none` still finds copies no plan uses).
-  The filters mark the game's version and add 更新日期 (一周内 / 一月内 / 半年内 / 更早,
+  The filters mark the game's version and add update date (within a week / within a month / within half a year / earlier,
   the Workshop update time, else the folder's). No environment chip on this page; the
-  button says 重新扫描. A selection action bar; the TUI has the list in the palette.
-- A copy's details: its note at the top, then only the actions that apply — 恢复, 退订 /
-  删除, 重新订阅, 备份锁定版本, 打开文件夹, 打开网页 — then one field list. 删除 now also takes the player's own copies in `Mods/` and the lock library
+  button says rescan. A selection action bar; the TUI has the list in the palette.
+- A copy's details: its note at the top, then only the actions that apply — restore, unsubscribe /
+  delete, resubscribe, back up locked version, open the folder, open the web page — then one field list. delete now also takes the player's own copies in `Mods/` and the lock library
   (not links, not while a plan uses them).
 - Copy notes (schema v13 `instance_note`): each copy has its own note, apart from the mod's.
-  RimArcho writes the first version from how the copy was made ("该锁定版本创建于 10 月 21 日，
-  为方案「测试」创建，自从创建后上游有 2 次更新，原因：…"), worked out each time so the update
+  RimArcho writes the first version from how the copy was made ("this locked version was created on October 21,
+  for list 'test'; upstream has had 2 updates since creation, reason: …"), worked out each time so the update
   count stays current. Copies RimArcho did not make get one too: where they came from, the
-  day RimArcho first saw them and, beside a Workshop copy, how often it updated since. Edit it in the window (click), the TUI (`n` in Mod 库存), the CLI
+  day RimArcho first saw them and, beside a Workshop copy, how often it updated since. Edit it in the window (click), the TUI (`n` in mod library), the CLI
   (`archo note <ref> <text> --copy`, `--clear`) or MCP (`set_player_data` `copy_note`);
   `pin --reason`, `library move-to-locked --reason` and the MCP `reason` record why.
-- 退订 and 重新订阅 go through the running Steam client, as RimCrow does (08 §10): a
+- unsubscribe and resubscribe go through the running Steam client, as RimCrow does (08 §10): a
   short-lived `archo steam-worker` process, started in `%LOCALAPPDATA%\RimArcho\steam` with
   the game's `steam_api64.dll` copied in and `steam_appid.txt`, calls the Steamworks flat API
   (no cgo) and exits. Unsubscribing makes Steam delete the folder, so it shows the dry run
@@ -908,109 +910,109 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   used, updated, version, author, tags; a leading `-` reverses) and `--include updated:week`
   (month, half-year, older); `--lineage` lists each copy's `updated:` and `note:`.
 - RimArcho's own copy note is in the normal text colour, like the player's; only the small
-  "RimArcho 写的 · 点击修改" line stays muted.
-- A detail's 历史 keeps the newest three changes and links to 在变化记录查看全部: 变化 narrowed to
-  that mod's Lineage, every scan that changed one of its copies, with a removable "只看 <名字>"
+  "written by RimArcho · click to edit" line stays muted.
+- A detail's history keeps the newest three changes and links to see all in change history: changes narrowed to
+  that mod's Lineage, every scan that changed one of its copies, with a removable "only <name>"
   (× or `esc` shows every mod again). The TUI opens it with `C`.
 - `ctrl+o` opens the cursor's mod's folder and `ctrl+w` its Workshop page, in the plan editor
-  and Mod 库存, in both interfaces; without a Workshop ID the status line says so.
+  and mod library, in both interfaces; without a Workshop ID the status line says so.
 
-### One interface for the plan editor and Mod 库存 (06 §2.5, §2.9, §3, §8.5)
+### One interface for the plan editor and mod library (06 §2.5, §2.9, §3, §8.5)
 - One filter bar on both pages: a search box (the grey completion and `tag:` word matching
-  as before, now with `version:`), the filters in force as removable chips, and 筛选 (`\`).
-  Open, it shows one line per group (标签, 来源, 版本 with the current game marked, 内容 and 有
-  in the editor; Mod 库存 adds 状态, 用在, 更新日期): the values most used first with counts,
+  as before, now with `version:`), the filters in force as removable chips, and filters (`\`).
+  Open, it shows one line per group (tags, source, version with the current game marked, content and has
+  in the editor; mod library adds state, used in, update date): the values most used first with counts,
   then a box to type in for the rest. Left click (enter, space) keeps a value, right click
   (`x`) leaves it out; values of one group are "or", groups "and". The keyboard reaches all of
   it (↑↓ groups, ←→ values, a letter types into the group's box, backspace in an empty search
   takes the last chip off).
-- The editor's bar sits above 未启用 and filters 未启用 and 已启用 together; the heads say
-  "已启用 6 / 34". 暂存 keeps its own search. While the bar filters, `J` / `K` (and alt+) move
+- The editor's bar sits above Disabled and filters Disabled and Enabled together; the heads say
+  "Enabled 6 / 34". Staging keeps its own search. While the bar filters, `J` / `K` (and alt+) move
   past the next row shown (`view.StepAt`); `m`, `space` and drops still place by the whole
   load order.
-- Mod 库存 loses its filter column: the bar is over the table, and a copy's details are a
+- mod library loses its filter column: the bar is over the table, and a copy's details are a
   permanent right-hand column (the editor's detail card) that follows the cursor; `enter`
   lays them over the page, `enter` or `esc` closes them, `→` on a copy focuses them.
 - One key table on both pages (06 §3.5), in both interfaces: `PgUp` / `PgDn` move the cursor
   (they scroll only the focused details), `ctrl+a` selects everything shown, `enter` opens /
   closes the details, `esc` backs out (details → selection → search and filters), `space`
-  takes effect / stops (启用 / 停用 in the editor; 加入当前方案 / 从当前方案拿掉 / 换成这一份 in
-  Mod 库存), `m`, `t`, `x`, `g`, `n` (the mod's note in the editor, the copy's in Mod 库存),
-  `ctrl+o` / `ctrl+w`, `u` / `ctrl+z`, `ctrl+y` / `ctrl+r` (Mod 库存's undo is the plan's),
-  `Del` (退订 / 删除, dry run first). `tab` / `shift+tab` switch the pages under one sidebar
-  entry (全部 ↔ 变化, the plans); the editor's areas are `←→` and `1`–`4` only. `#`, `o`, `d`,
+  takes effect / stops (enable / disable in the editor; add to the current list / remove from the current list / switch to this copy in
+  mod library), `m`, `t`, `x`, `g`, `n` (the mod's note in the editor, the copy's in mod library),
+  `ctrl+o` / `ctrl+w`, `u` / `ctrl+z`, `ctrl+y` / `ctrl+r` (mod library's undo is the plan's),
+  `Del` (unsubscribe / delete, dry run first). `tab` / `shift+tab` switch the pages under one sidebar
+  entry (all ↔ changes, the plans); the editor's areas are `←→` and `1`–`4` only. `#`, `o`, `d`,
   `f` and `!` are no longer shortcuts (`shift+1`–`7` go to the sidebar's pages). `?` shows the
   keys of the page it is pressed on (`view.KeyHelp`).
-- One row menu on both pages, from one op table (`view.OpTable`, `view.CopyOps`): 方案
-  (space, m, t, x, 从所有方案里拿掉), 整理 (标签 g, 备注 n), 打开 (ctrl+o, ctrl+w), 版本 (锁定这个
-  版本, 更新锁定版本, 解除锁定, 备份锁定版本), 磁盘 (恢复, 重新订阅, then 退订 / 删除 in red),
+- One row menu on both pages, from one op table (`view.OpTable`, `view.CopyOps`): list
+  (space, m, t, x, remove from all lists), organize (tag g, note n), open (ctrl+o, ctrl+w), version (lock this
+  version, update the locked version, unlock, back up locked version), disk (restore, resubscribe, then unsubscribe / delete in red),
   each with its key, only what applies. The editor's menu now has the version and disk
   ops too.
 - New rule (06 §3.1 rule 6): everything the mouse can do, the keyboard can do. The menu key
   and `shift+F10` open the row's menu at the cursor (↑↓, enter, esc); `H` lists the history,
-  `C` a mod's changes, `<` `>` `=` set the editor's column widths, `s` in Mod 库存 is the
+  `C` a mod's changes, `<` `>` `=` set the editor's column widths, `s` in mod library is the
   headers' menu (sort, move, size, show columns). A test checks every op has a key or the
   menu and a runner on both pages.
-- Mod 库存's page data is 0.77 MB instead of 1.47 MB on a 1,284-mod library: each copy
+- mod library's page data is 0.77 MB instead of 1.47 MB on a 1,284-mod library: each copy
   carries op codes, the labels come once, and folder paths and Workshop URLs stay in Go.
 
-### 变化 (06 §2.9, §2.3)
+### changes (06 §2.9, §2.3)
 - One row per mod: its changes in the time range merged into "name · what it means", with a
-  tier pill (会影响启动 / 留意 / 只是内容), sorted by tier then name. The sentence comes only from
+  tier pill (affects launch / worth a look / content only), sorted by tier then name. The sentence comes only from
   what the scans recorded: supported versions added or dropped (the game's own version
   flagged), the mod's version, dependencies and incompatibilities with their installed /
   enabled state, load rules (compared from the two declarations), files grouped as code / Defs /
   Patches / About / textures / sounds / translations / other with size changes, the Workshop
   update time, and a locked version left behind.
 - Default: the current plan's mods since that plan was last played (the last scan when it never
-  was); `a` / the two buttons switch to the whole library. Older changes fold under 更早 by
+  was); `a` / the two buttons switch to the whole library. Older changes fold under earlier by
   day; new and gone mods are one summary row. One mod's history (the detail's link, TUI `C`)
   lists every change by scan.
 - Opening a row shows the grouped file summary first, then the raw file list behind `i`, then
-  its actions: 打开网页 (the Workshop change notes, `ctrl+w`), 看依赖 (`D`), 排序 (`S`),
-  锁定这个版本 (`p`, dry run first). `tab` goes to 全部.
+  its actions: open the web page (the Workshop change notes, `ctrl+w`), see dependencies (`D`), sort (`S`),
+  lock this one (`p`, dry run first). `tab` goes to all.
 - `archo changes` prints the same page in English (`--library`, `--since`, a ref for one mod's
   history); MCP `list_changes` gains `library`. The old per-event listing is gone. The builder
   is the new `internal/modchanges`, shared by the GUI, the TUI, the CLI and MCP.
-- Home page: the 「从上次扫描以来」 line is replaced by one sentence about the current plan
-  ("当前方案自上次游玩以来 · 5 个 Mod 更新，1 个需要处理 →"), which opens 变化 with that scope and
-  time. The 上次游戏 line shows only the result ("上次游戏 · 10 月 21 日 · 3 个错误"), reads a newer
+- Home page: the "since the last scan" line is replaced by one sentence about the current plan
+  ("since this list was last played · 5 mods updated, 1 needs attention →"), which opens changes with that scope and
+  time. The last game line shows only the result ("last game · October 21 · 3 errors"), reads a newer
   Player.log by itself when the page loads or the window regains focus, and is hidden when there
   was never a run.
 
 ### The window (06 §2)
-- One full detail page (06 §4.2): `enter` in the plan editor and in Mod 库存 › 全部 opens the
+- One full detail page (06 §4.2): `enter` in the plan editor and in mod library › all opens the
   same page. The mod on the left (picture, name, author, state, tags, description); its
   copies (state, size, version, folder, note, and the selected copy's actions), where each is
-  used with the current plan's `space`, the fields and the history on the right; 技术信息 under
+  used with the current plan's `space`, the fields and the history on the right; technical information under
   both, one tab per section of `view.Sections`. `← →` the previous / next mod of the list it
   came from, `esc` back there, `[ ]` another copy, the row menu and copy keys on that copy,
-  `1`–`6` its parts. The editor's detail column and Mod 库存's details stay as its short form.
+  `1`–`6` its parts. The editor's detail column and mod library's details stay as its short form.
 - `1`–`9` focus a page's areas on every page, as `1`–`4` do in the editor, and each area's
-  heading shows its number: Mod 库存 (filter, table, details), 能不能跑's sections, 游戏日志 (the
-  errors, the log text), 环境, 设置's groups, the build page's parts. The TUI's 能不能跑 and
-  Mod 库存 do the same.
-- 贴图优化 is a page of its own under 库, after 整合包 (`shift+7`; 环境 is now `shift+8`, `*` in
-  the TUI, where `shift+7` shows the textures panel). 设置 keeps only where todds is.
-- A sidebar replaces the top tabs, in two groups: 在玩 (启动, 能不能跑 with its badge,
-  游戏日志) and 库 (Mod 库存 › 变化, 方案, 整合包, 环境), then 设置 (`shift+1`–`7`).
-  Only 能不能跑 shows a number, and it leaves out hidden mods. Drag the sidebar's right
+  heading shows its number: mod library (filter, table, details), can it run's sections, game log (the
+  errors, the log text), games, settings's groups, the build page's parts. The TUI's can it run and
+  mod library do the same.
+- texture optimisation is a page of its own under library, after packs (`shift+7`; games is now `shift+8`, `*` in
+  the TUI, where `shift+7` shows the textures panel). settings keeps only where todds is.
+- A sidebar replaces the top tabs, in two groups: playing (start, can it run with its badge,
+  game log) and library (mod library › changes, list, packs, games), then settings (`shift+1`–`7`).
+  Only can it run shows a number, and it leaves out hidden mods. Drag the sidebar's right
   edge to change its width (double-click resets it).
   It collapses, and starts collapsed below 760 px.
 - The top bar has a clickable breadcrumb, the environment chip and the page's actions.
 - A home page: each plan and pack, newest played first, with its state (another plan's from
   its stored analysis) and a launch button, and the last run and last scan's changes.
 - A first-run guide: find games (several at once), scan them, start from the game's list, an
-  import, a pack or a Steam collection. 环境 › 添加环境 opens it.
+  import, a pack or a Steam collection. games › add game opens it.
 - The window follows the new design: no page title under the breadcrumb (it names the page)
   but one muted line saying what the page is for; the environment chip sits by the page name
-  (plan and environment on 能不能跑); page actions are quiet icon + text buttons. Home rows
-  have a fixed environment column, a 方案 / 整合包 tag, a meta line (mods, follows Workshop
+  (plan and environment on can it run); page actions are quiet icon + text buttons. Home rows
+  have a fixed environment column, a list / pack tag, a meta line (mods, follows Workshop
   updates / versions locked, last played) and a state chip; the activity is a row of cards.
   The sidebar shows quiet counts (plans, packs, environments, the library).
-- 能不能跑 is one column of four sections by consequence (会让游戏出错, 上次运行的报错,
-  要你确认, 隐藏的 Mod). Each item is a card: a bold line, a plain sentence, an evidence
-  chip (Mod 自己声明 / 推断 / 日志 / 社区数据 and the source) and one primary action, the
+- can it run is one column of four sections by consequence (breaks the game, errors from the last run,
+  for you to confirm, hidden Mod). Each item is a card: a bold line, a plain sentence, an evidence
+  chip (declared by the mod / inferred / log / community data and the source) and one primary action, the
   rest under ⋯; ← → jump between sections. The view model carries `Section`, `Title`,
   `Why` and `Evidence` for both interfaces. A mod's missing inherited definitions, and its
   patches that miss the same disabled target, are now one item each (the count drops).
@@ -1023,63 +1025,63 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   30 px entries, 14 px icons, small group titles), the open entry is raised, sub-entries hang
   16 px in on a guide line with their mod counts and their own sliding highlight, and they
   open and close smoothly (rows 0fr → 1fr, a turning chevron). Less always-on chrome: the
-  sidebar's environment / "游戏没在运行" box is gone (one line shows only while a game runs or
-  a new log waits), and the status line no longer says "游戏里现在是…" (with several plans, a
+  sidebar's environment / "game not running" box is gone (one line shows only while a game runs or
+  a new log waits), and the status line no longer says "in the game now:…" (with several plans, a
   green dot on that plan's entry) nor repeats the breadcrumb; the sidebar has no empty head.
   The home page lists the plans and packs of every environment: what is applied now is one
-  large card (environment · version, name [方案 / 整合包], mods · last played, the problem
-  if any, ▶ 启动游戏); every other one is a line on shared columns (game versions — a pack's
-  from its mods' supportedVersions —, name, kind, mods, 应用, which switches to it without
+  large card (environment · version, name [list / pack], mods · last played, the problem
+  if any, ▶ launch the game); every other one is a line on shared columns (game versions — a pack's
+  from its mods' supportedVersions —, name, kind, mods, apply, which switches to it without
   writing game files); the last run and scan are two lines. No page actions on home. The plan editor has three columns,
-  未启用 | 已启用 | 详情, with 暂存 and 历史 as folds under 详情 (drag to a folded 暂存 still
+  Disabled | Enabled | details, with Staging and history as folds under details (drag to a folded Staging still
   stages; `3` opens it); two splitters, old four-column widths carried over.
-- 启动 is laid out like the game's main menu over a background image (06 §2.3): the plans and
-  packs down the left (kind first, then the name; the applied one raised with 编辑 ↵, the
-  others with 应用 ↵ on the cursor), the last run and scan under them, ▶ 启动游戏 in the
+- start is laid out like the game's main menu over a background image (06 §2.3): the plans and
+  packs down the left (kind first, then the name; the applied one raised with edit ↵, the
+  others with apply ↵ on the cursor), the last run and scan under them, ▶ launch the game in the
   bottom right with the problem as a tab under it. `↑` `↓`, `enter` (apply / edit), `L`.
-- 设置 › 启动页背景 (06 §2.14): the game's art (RimWorld's planet by default, the DLC
+- settings › launch page background (06 §2.14): the game's art (RimWorld's planet by default, the DLC
   covers), the images of every mod with "background" in its name (their
   `VBE.BackgroundImageDef`s: Vanilla Backgrounds Expanded, Shella Backgrounds, …), your own
   PNG / JPG, or plain; dimming, blur, focus, and rotation among starred images, with a small
   live preview. Each image is decoded once, one at a time, into 1920 / 480 px JPEGs in
   `cache/backgrounds/`; the page never loads an original, and drops the image when you leave.
-- "未保存 N" is now "未写入 N" in both interfaces. The old 日志 › 操作记录 view is gone;
+- "unsaved N" is now "not written N" in both interfaces. The old log › manager actions view is gone;
   the history stays in the editor's third column.
-- Switching the language in 设置 happens in place: the page keeps its place, the lists their
+- Switching the language in settings happens in place: the page keeps its place, the lists their
   selection and scroll, the details stay open; it no longer reloads to the home page.
-- The plan editor: 排序 (`S`) is in the 已启用 column's header, 导入 / 导出 (`i`) in the
+- The plan editor: sort (`S`) is in the Enabled column's header, import / export (`i`) in the
   toolbar. Rows no longer show tags, in any column or interface (they are in the detail and
-  `tag:` search, 06 §3.8). The detail is one field list — Archo ID, 包名, 位置 [打开位置],
-  工坊 [打开页面], 标签 [编辑], 语言, 依赖, 冲突 — shared with Mod 库存; clicking Archo ID,
-  包名, 位置 or the Workshop ID copies it and says 已复制 (06 §4.1); the list has no
+  `tag:` search, 06 §3.8). The detail is one field list — Archo ID, package ID, location [open the location],
+  workshop [opens the page], tag [edit], languages, dependency, conflicts with — shared with mod library; clicking Archo ID,
+  package ID, location or the Workshop ID copies it and says copied (06 §4.1); the list has no
   background and long values wrap. The TUI detail draws the same list.
-- The TUI's 能不能跑 has the GUI's four sections, each heading with its count (and which run
+- The TUI's can it run has the GUI's four sections, each heading with its count (and which run
   the run errors are from), and every item's evidence chip on the line under it: an icon
-  (Nerd Font or the compatible set), the kind and the source, e.g. `≣ Mod 自己声明 · About.xml
-  modDependencies`. ← → jump between sections. The top bar's 能不能跑 N now counts this
+  (Nerd Font or the compatible set), the kind and the source, e.g. `≣ declared by the mod · About.xml
+  modDependencies`. ← → jump between sections. The top bar's can it run N now counts this
   run's errors too, the same number as the GUI's sidebar badge (G13).
 - The running game is at the GUI sidebar's foot and, in the TUI, at the right end of the
-  status line (no longer in the top bar): `● 游戏运行中 · 14:05 起` with this run's errors as
-  an amber number, `● 分析本次日志` after the game when a new log waits, else nothing (G17).
+  status line (no longer in the top bar): `● game running · since 14:05` with this run's errors as
+  an amber number, `● analyse this run's log` after the game when a new log waits, else nothing (G17).
 - `esc` brings every page back to its base (no popup or menu, nothing selected, the filter
   bar closed) in at most 3 presses, checked on every page of both interfaces (G5, T20). In the
   window, a row menu or ⋯ menu opened with the mouse now closes with `esc`, and `esc` on the
-  rows of the editor or Mod 库存 clears and closes an open filter bar in one press.
+  rows of the editor or mod library clears and closes an open filter bar in one press.
 - The navigation sits at the side or at the top: the toggle (heading the sidebar, or the
   strip's left end; `ctrl+b`) moves it, and `ui.gui.nav` remembers it. At the top the same
   entries form one strip, groups as thin separators, sub-entries as a dropdown from the
-  chevron (`↓` from the keyboard), 设置 and the running game at the right end; it scrolls
+  chevron (`↓` from the keyboard), settings and the running game at the right end; it scrolls
   when the window is narrow. The change is a view transition. (This replaces the expanded /
   icon rail / hidden sidebar made the same day.)
 - The top bar has no buttons on any page, only the breadcrumb and the environment chip. Page
   actions sit at the right end of the page's description line; the plan editor has that line
-  too ("启用了 34 个，按游戏加载的顺序") with its undo, import / export, build a pack, write to the
-  game, ⋯ and 启动游戏.
-- In the window, the editor's 启动游戏 (button, `L`, the palette's 启动) opens the 启动 page with
-  the current plan applied and the focus on ▶ 启动游戏; `L` or enter there starts the game. The
+  too ("enabled: 34 items, in the order the game loads them") with its undo, import / export, build a pack, write to the
+  game, ⋯ and launch the game.
+- In the window, the editor's launch the game (button, `L`, the palette's start) opens the start page with
+  the current plan applied and the focus on ▶ launch the game; `L` or enter there starts the game. The
   TUI's `L` and the CLI / MCP `launch` still launch at once.
 - The gaps between cards are 4 px everywhere (`--card-gap`): the editor's columns and its
-  stacked details / 暂存 / 历史, the filter card and what is under it, Mod 库存's two sides, the
+  stacked details / Staging / history, the filter card and what is under it, mod library's two sides, the
   log pages' columns. The draggable gaps keep a 10 px grab area that reaches over the cards'
   edges.
 - New icon artwork: the portrait with the accent rim light (1024×1024). 48 px and up show it
@@ -1088,14 +1090,14 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   radial and bounding-box gradients, evenodd fills and Gaussian blur, and skips what is only
   defined (defs, clip paths, gradients, filters).
 - The bow from the portrait is RimArcho's mark (06 §7): in front of Archo's name on the log
-  page's Archo 日志分析 card and the 让 Archo 分析 button. Brand colours: a `#4f46e5`
+  page's Archo log analysis card and the ask Archo analyze button. Brand colours: a `#4f46e5`
   rim in the light theme; a `#a5b4fc` rim and a grey outline in the dark theme.
 
 ### Memory (07 §8.3)
-- 设置 › 界面 has GPU 加速 (`config set ui.gpu on|off`, default on). Off draws the window in
+- settings › interface has GPU acceleration (`config set ui.gpu on|off`, default on). Off draws the window in
   software and saves about 20–35 MB; it takes effect the next time RimArcho opens.
 - The window's Go process returns freed memory to the system 2 seconds after heavy work, and
-  forgets a page's caches when the player leaves it (Mod 库存, 需要处理 / 日志, 首页); a 32 MiB
+  forgets a page's caches when the player leaves it (mod library, needs attention / log, home); a 32 MiB
   soft cap (now 128 MiB, below) and a 256 KiB SQLite page cache as in the TUI. Idle 85 → 22 MB.
 - The soft cap went from 32 MiB to 128 MiB: at 32 MiB a list edit ran garbage collection
   dozens to hundreds of times and was 2–3× slower. Idle memory still comes from the explicit
@@ -1106,33 +1108,33 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   memory target is low while the window is minimised.
 - Pack names are checked without a regular expression (about 1.4 MB less).
 - Measured on the same data copy, GPU on: idle 202 → 138 MB, plan editor 204 → 138,
-  Mod 库存 175 → 151, minimised 171 → 105. GPU off: 182 → 123, 185 → 123, 155 → 132, 150 → 88.
+  mod library 175 → 151, minimised 171 → 105. GPU off: 182 → 123, 185 → 123, 155 → 132, 150 → 88.
 
 ### Packs (06 §2.6, §2.7, 08 §5.3, §7)
 - The recycle bin has one entry that checks the allow-list (08 §7) for every caller: a mod
   folder inside a source folder (not the folder itself), a pack directly in the pack folder,
   saves (a game's `Saves/`, own save folders, save backups) and a game downloaded with
   SteamCMD. A link, or any other path, is refused whoever asks (`trash`, `pack remove`,
-  Mod 库存, moving copies to the lock library, uninstall).
-- 编译成整合包 is the current plan's own page, laid out as drawn: the name, the four things building does (check, leave out, lock, put in place) with their
+  mod library, moving copies to the lock library, uninstall).
+- create a pack is the current plan's own page, laid out as drawn: the name, the four things building does (check, leave out, lock, put in place) with their
   numbers, and a summary (environment, mods, size before → after, own saves, location) with
-  编译 and 先看清单，不写磁盘 (the text of `pack build --dry-run`). With error-level problems
-  编译 is disabled and says 先修好 N 个问题 →, which opens 能不能跑 (G14); not enough space, an
+  build and see the list first, without writing to disk (the text of `pack build --dry-run`). With error-level problems
+  build is disabled and says fix first: N problems →, which opens can it run (G14); not enough space, an
   unreadable mod, a bad or taken name and a build in progress disable it too. The build's
-  progress shows on the four steps with 停止; a finished build opens its pack. Builds cut
+  progress shows on the four steps with stop; a finished build opens its pack. Builds cut
   short are listed below. Keys: `B` build, `V` the dry run, `n` the name,
   `esc` back to the plan. The old build popup is gone.
-- Each pack is a sub-entry under 整合包 with a page of its own: what it is, 启动 (`L`), 导出
-  (`e`, a save dialog) and 移到回收站 (`Del`), and its mods in load order with their sizes and
+- Each pack is a sub-entry under packs with a page of its own: what it is, start (`L`), export
+  (`e`, a save dialog) and move to the recycle bin (`Del`), and its mods in load order with their sizes and
   the version folders left out. `tab` / `shift+tab` go from pack to pack (from the list: the
   first one); the list opens a pack with `enter`.
 - `Mods/` never gets two copies of one packageId from RimArcho (the game logs "Tried loading
   mod with the same packageId multiple times" and ignores one; the player's 2026-10-21 log
-  had six, from launching the pack 测试 next to RimCrow-style copies). Launching a pack uses
+  had six, from launching the pack test next to RimCrow-style copies). Launching a pack uses
   the copy already in `Mods/` when it is the same version (listed as "from Mods/"), refuses
   and names the folders when it is another version, and drops a plan's `_Archo_` link of the
   same package for the run. Writing a plan refuses a new `_Archo_` link next to another copy
-  in `Mods/`. Such pairs already there are `pkg.duplicate-mods` errors in 能不能跑 › 会让游戏出错,
+  in `Mods/`. Such pairs already there are `pkg.duplicate-mods` errors in can it run › breaks the game,
   whoever made them; the fix only ever changes RimArcho's own links or the plan, never the
   player's folders. Pack links that duplicate a copy raise `pack.links-left` to an error.
 - Another version in the way (08 §3, §5.3): when a pack or a plan's locked copy needs one
@@ -1142,10 +1144,10 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   refusal names the fix: `--move-duplicates` on `save`, `launch` and `pack launch` (MCP
   `move_duplicates`), or `archo library move-to-locked <ref>`. Links, folders another tool's
   link points at, and folders with links pointing outside never move. `pkg.duplicate-mods`
-  gets a 收进锁定库 action for the plain folder.
+  gets a move to the lock library action for the plain folder.
 - A pack's `!ArchoPack_` links left in `Mods/` while the pack is not being played (a game
   started from Steam would load the pack's copies) are a problem of the plan,
-  `pack.links-left`: in 能不能跑 › 要你确认 with 移除链接, in the tab under 启动游戏, in
+  `pack.links-left`: in can it run › for you to confirm with remove the links, in the tab under launch the game, in
   `archo problems` and MCP `list_problems`. `archo pack unlink [--dry-run]` / MCP
   `manage_packs action=unlink` remove only the links; refused while a game runs.
 - `.archopack` format 2 (08 §5.1, §5.4): tar + zstd with `pack.json` first, a SHA-256 digest
@@ -1160,7 +1162,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   content and marks mods installed in another version. A pack's page exports its list (`E`).
 - Packs remember the list they were made from.
 
-### 贴图优化 (08 §5.2)
+### texture optimisation (08 §5.2)
 - Database schema v15 → v16: the DDS RimArcho wrote, per file and per mod.
 - `archo textures status|optimize|clean|tool`: converts a mod's PNG textures to DDS next to
   them with todds 0.4.1 (BC1 when opaque, BC7 otherwise, with mipmaps); the PNGs stay. Every
@@ -1169,18 +1171,18 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   the game runs; can be stopped.
 - todds is downloaded only after the player agrees (`tool --install`, settings), or
   `textures.todds` points at an existing copy (e.g. RimSort's).
-- A mod updated after its textures were converted shows `texture.stale` in 需要处理.
+- A mod updated after its textures were converted shows `texture.stale` in needs attention.
 - Uninstall gains a `textures` step that deletes the recorded DDS.
-- `pack build --textures [--texture-scale N]`: 预转换 (full size) or 精简 (scaled) in the
+- `pack build --textures [--texture-scale N]`: pre-convert (full size) or slim (scaled) in the
   pack's copies, which then drop their PNGs. Space is checked against the peak; `pack.json`
   records what was done.
-- Opening 贴图优化 or 创建整合包 no longer reads every texture: 扫描统计 does, and can be
+- Opening texture optimisation or create a pack no longer reads every texture: count the textures does, and can be
   stopped. Changing the scope or scale keeps the last numbers and says to count again;
   converting works without counting (only new or changed PNGs).
-- GUI: a 贴图优化 page (estimate, scale, progress, stop, clean), Mod 库存's 优化贴图 /
-  清除贴图优化, the pack build's textures choice on 编译成整合包 (its own step 贴图: off / 预转换 /
-  精简 80–25%, with the PNGs converted, the size after and the peak while converting; `D` steps
-  through it; without todds the step says so and 编译 points to 设置 › 贴图优化); TUI palette panel; MCP `manage_textures`.
+- GUI: a texture optimisation page (estimate, scale, progress, stop, clean), mod library's convert textures to DDS /
+  remove the converted textures, the pack build's textures choice on create a pack (its own step textures: off / pre-convert /
+  slim 80–25%, with the PNGs converted, the size after and the peak while converting; `D` steps
+  through it; without todds the step says so and build points to settings › texture optimisation); TUI palette panel; MCP `manage_textures`.
 
 ### Log corpus (03 §4.3, §4.3.1, §5.3, §6.3, §6.8; 04 §5; 08 §2)
 The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
@@ -1218,31 +1220,31 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
   errors seen in at least 25 logs (was 1,034 from at least 10) and `internal/known` 95 prerequisites and 486 combinations (was 38 and 180),
   same thresholds. Severities (G8) and constraint strength (G2) keep their 6,734-log measurements.
 - **In the pages** (06 §2.3, §2.4, §2.5, §2.10, §4.2; TUI the same):
-  - 启动: the tab under 启动游戏 names the most likely trouble (the first `LaunchChecks` code
-    with an item in 能不能跑) and its one-line reason with the corpus numbers; it opens
-    能不能跑 and never blocks. The TUI's `L` says it on the status line (“留意：…”).
-  - 能不能跑: a 社区日志 evidence chip with the measured share (“缺了它时 40/50（80%）出错”);
+  - start: the tab under launch the game names the most likely trouble (the first `LaunchChecks` code
+    with an item in can it run) and its one-line reason with the corpus numbers; it opens
+    can it run and never blocks. The TUI's `L` says it on the status line (“worth a look: …”).
+  - can it run: a community logs evidence chip with the measured share (“without it 40/50 (80%) errored”);
     `dep.observed-missing` with the dependencies, `combo.known-bad` with the conflicts,
-    `mod.known-error` a dimmed “这是 Mod 自己的问题” note. Weak and harmless order
+    `mod.known-error` a dimmed “this is the mod's own problem” note. Weak and harmless order
     preferences are one dimmed, uncounted item; counts and the sidebar badge leave them out.
-  - 游戏日志 (and the Archo Monitor view): a cluster's detail shows the whole message, extra
-    lines and nearby messages (none for an entry only ArchoMonitor.log has), then a pattern card (“这类报错通常是…”, common causes, next
+  - game log (and the Archo Monitor view): a cluster's detail shows the whole message, extra
+    lines and nearby messages (none for an entry only ArchoMonitor.log has), then a pattern card (“this kind of error usually means…”, common causes, next
     step, kinds of fix) marked as community background, only when a pattern matches.
-  - 方案编辑 › 排序: the status line counts the strong requirements the sort put right; the
+  - list editor › sort: the status line counts the strong requirements the sort put right; the
     sort preview (`archo sort`) has a `why` section, strong / weak / harmless, strong first.
-  - Mod detail › 技术信息 › Harmony (`archo harmony --mod`): patches from `Harmony.Patch`
+  - Mod detail › technical information › Harmony (`archo harmony --mod`): patches from `Harmony.Patch`
     calls are marked, and every unresolved call is listed with its reason.
 
 ### Background tasks (06 §2.16)
-- Mod 库's file and Steam actions are queued once confirmed: two queues (files, Steam), one
+- mod library's file and Steam actions are queued once confirmed: two queues (files, Steam), one
   failure does not stop the rest, and each item's result is kept (`<data>/tasks.json`).
   Scans, checks, pack builds, texture work, game downloads and the long actions of the
   settings page and the guide are recorded as tasks too.
-- 后台任务 page: a line at the bottom of the sidebar and `ctrl+j`. The CLI and MCP still run
+- background tasks page: a line at the bottom of the sidebar and `ctrl+j`. The CLI and MCP still run
   in the foreground.
 - The TUI queues its subscription actions (subscribe, check, update, remove) into the same
   queues and `tasks.json`; the status line says when one is queued and how it ended. Its
-  other Mod 库 file actions still run in the foreground.
+  other mod library file actions still run in the foreground.
 - The window stays usable during long work (06 §3.1 rule 9): adding a large game, switching
   games, the first scan, folder sizes, and the settings page's downloads and database actions
   run in the background, and a page opens before its data is read; stale results are dropped.
@@ -1253,7 +1255,7 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
 - Packs, a pack's mods and the texture list are data tables. The gaps between cards can be
   dragged or moved with the keyboard, and their sizes are kept.
 - Two corner radii, four font sizes no smaller than 12 px, hairlines, shared motion timings; no
-  left colour bars (能不能跑, the TUI, selected rows), no `·` in interface text, no purpose
+  left colour bars (can it run, the TUI, selected rows), no `·` in interface text, no purpose
   lines under page titles. `TestStyleRules` and `TestWording` check this.
 - Every path shown in the window copies on click, by mouse or keyboard (rule 12); text never
   overlaps the controls next to it.
@@ -1261,34 +1263,34 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
   BrowserBack / BrowserForward share one session history of the last 50 pages; back first
   closes a menu or popup. Deleted lists, other games' pages and finished guides are skipped.
   The TUI keeps its own page switching (06 §8.5).
-- 启动 is a grid: the current list or pack as the title, then 01 game → 02 list / pack → 03
+- start is a grid: the current list or pack as the title, then 01 game → 02 list / pack → 03
   launch. Choosing applies it, choosing again opens it; a switch shows its progress on the
   launch block instead of a popup. The launch tab's problems can be folded away until they
   change. The page shows the game's full version (e.g. 1.6.4871 rev590).
 - RimWorld 1.6's own main-menu background is read from the game's Unity assets in the
   background and cached, falling back to the official preview image.
-- 设置 › 界面: an accent colour (`ui.accent`, the 15 Radix Colors scales or default), applied at
+- settings › interface: an accent colour (`ui.accent`, the 15 Radix Colors scales or default), applied at
   once in light and dark. The native title bar and the launch backdrop follow the theme.
 
 ### Lists (04 §1.6, §9.6; 06 §2.17)
-- 列表管理 (the sidebar's 列表 › 管理, `shift+5`): the lists on the left; on the right a list's
+- list management (the sidebar's lists › manage, `shift+5`): the lists on the left; on the right a list's
   game versions, the Steam collections it follows and sharing, with an export sub-page
   (`e` in the editor opens it too). New lists are created in the page, and unfinished drafts
   are kept.
 - A list's game versions (`archo plan versions [<name> [<versions…>|default]]`): by default the
   versions every mod supports plus the game it was made on, as one range. Copies of the list
-  and RimArcho list exports carry them. When the current game is not among them, 能不能跑's
-  要你确认 says so (add 1.7, or go to 列表管理).
+  and RimArcho list exports carry them. When the current game is not among them, can it run's
+  for you to confirm says so (add 1.7, or go to list management).
 - Following a Steam collection (`archo plan follow <name> <link|ID> [--mode add|follow]`,
   `plan unfollow`, `plan sync`; `collection --import --follow`): RimArcho keeps a snapshot and
   tells you what changed since; it never changes the list by itself. Catching up is one undo
   step: `add` enables the new installed mods, `follow` also disables the ones the collection
-  dropped. The network is used only when asked (列表管理 checks at most every 10 minutes).
-- Export format 工坊链接: Markdown Workshop links, read back by Workshop ID on import.
-- Load cost (`archo plan cost [<plan>] [--mods] [--json]`, 列表管理): a RAM and VRAM range for a
+  dropped. The network is used only when asked (list management checks at most every 10 minutes).
+- Export format workshop links: Markdown Workshop links, read back by Workshop ID on import.
+- Load cost (`archo plan cost [<plan>] [--mods] [--json]`, list management): a RAM and VRAM range for a
   list from its textures, sounds, XML and assemblies. 1.7 is calibrated on the real game;
   1.6 follows the loading rules only and says so. Results are cached per mod.
-- Sorting puts the installed base game back when it is missing; the 未启用 area lists Core and
+- Sorting puts the installed base game back when it is missing; the Disabled area lists Core and
   the DLCs first.
 
 ### Subscriptions (02 §3.4, 06 §2.9)
@@ -1299,22 +1301,22 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
   Steam client is not available (`subscribe workshop <id|url…>`). Where a mod came from is
   kept in `.rimarcho/source.json`. `subscribe list|check|update|remove`; updates are refused
   while the game runs; removing warns when lists use the mod.
-- Mod 库 › 订阅与更新 replaces 变化: a scope bar (lists / all mods), one list of 等你更新 then
-  已经更新 (the change records), new and gone, earlier; a source summary line at the bottom;
-  the selected item's details (update, choose files, open the source page, lock). Mod 库 ›
-  添加订阅 takes a pasted link, recognises Git / LoversLab / another page / Workshop, asks one
+- mod library › subscriptions and updates replaces changes: a scope bar (lists / all mods), one list of waiting for you to update then
+  already updated (the change records), new and gone, earlier; a source summary line at the bottom;
+  the selected item's details (update, choose files, open the source page, lock). mod library ›
+  add a subscription takes a pasted link, recognises Git / LoversLab / another page / Workshop, asks one
   question and shows the dry run.
-- Mod 库 gains a source column, the source-update state, fields and actions; MCP
+- mod library gains a source column, the source-update state, fields and actions; MCP
   `list_library` knows the new sources and states.
 - MCP `manage_subscriptions` maps onto `archo subscribe` (list, add, check, update,
   remove). `add` recognises the source from `url` as the paste box does, or takes `kind`.
   An agent never logs in to LoversLab: it asks the player to download and passes `from`.
-- TUI: Mod 库 › 添加订阅 and the 订阅与更新 keys `K`, `enter` on a source, `u`, `U`, `Del`,
+- TUI: mod library › add a subscription and the subscriptions and updates keys `K`, `enter` on a source, `u`, `U`, `Del`,
   `+` and paste, queued as background tasks. A page update or a page without a single Git
   repository points to the window or `--from`.
 
 ### Accounts (07 §3.1)
-- 设置 › 账户: one status line each for SteamCMD and LoversLab (log in, log in again, log out).
+- settings › accounts: one status line each for SteamCMD and LoversLab (log in, log in again, log out).
   SteamCMD's login runs in SteamCMD's own console and is verified, and RimWorld ownership is
   checked. LoversLab signs in in a separate WebView2 window (its own process, a throwaway
   profile); only the site's cookies are kept, encrypted for the current Windows user, so
@@ -1352,24 +1354,24 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
   repair. Links to a known mod count as RimArcho's own, old IDs too.
 
 ### Managed directories (06 §2.14)
-- 设置 › RimArcho 管理的目录 lists the game folders, Workshop, SteamCMD, other mod folders, the
+- settings › RimArcho managed directories lists the game folders, Workshop, SteamCMD, other mod folders, the
   lock library, packs, Archo Monitor and the SteamCMD program. Each can be relocated (you moved
   it) or moved by RimArcho (a verified copy across drives, the old folder to the recycle bin).
   Mods keep their identity, tags and lists, and links follow. Every start checks them and asks
-  where a missing one went; 能不能跑 and the launch check only warn.
+  where a missing one went; can it run and the launch check only warn.
 
 ### External tools (07 §2.1)
 - `archo deps`, `deps install <todds|steamcmd|wezterm>`, `deps remove <name>`: one place that
-  finds the bundled font, todds, SteamCMD and WezTerm. 设置 › 外部工具 installs and updates them
+  finds the bundled font, todds, SteamCMD and WezTerm. settings › external tools installs and updates them
   as background tasks (`wezterm.path`, `steamcmd.path`). Only RimArcho's own copy is removed,
   and SteamCMD not while it holds Workshop content, a game or a mod folder.
 
 ### Other
 - Unsubscribing or recycling a mod that lists use only warns: the confirmation names the lists,
   and their entries then show as missing. Unsubscribing is still refused while the game runs.
-- Mod detail: 不列为副本 separates a copy from its lineage and keeps its player data.
-- Faster on 1,349 mods: a list edit 1.3 s → 16–30 ms, a detail 650 → 6 ms, 需要处理 730 → 11 ms,
-  首页 800 → 125 ms (link checks no longer resolve every mod; a list edit no longer reloads the
+- Mod detail: do not list as a copy separates a copy from its lineage and keeps its player data.
+- Faster on 1,349 mods: a list edit 1.3 s → 16–30 ms, a detail 650 → 6 ms, needs attention 730 → 11 ms,
+  home 800 → 125 ms (link checks no longer resolve every mod; a list edit no longer reloads the
   index). Folder sizes, scan fingerprints and texture summaries walk folders in parallel, with
   fewer workers on hard disks (the whole Workshop's size 5.05 → 0.75 s).
 
@@ -1393,21 +1395,21 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
 
 ### Known gaps
 - Command output still says "unsaved" in a few places (`1 change unsaved`).
-- TUI: no 后台任务 page or 列表管理 page yet (the CLI and the window have them).
+- TUI: no background tasks page or list management page yet (the CLI and the window have them).
 - The TUI, CLI and MCP check download pages without the LoversLab session (public page
   reads); only the window uses a logged-in session.
-- Followed collections are checked when 列表管理 opens, not yet on a schedule.
+- Followed collections are checked when list management opens, not yet on a schedule.
 
 ## 0.8.0 — toward 1.0 (unreleased)
 
-Specs: `docs/specs/` (rewritten 2026-10-21; the old `10-1.0实现.md` was folded into them). Section
+Specs: `docs/specs/` (rewritten 2026-10-21; the old `10-1.0\u5b9e\u73b0.md` (Unicode escapes) was folded into them). Section
 numbers below are the current ones.
 
 ### Hidden and pinned mods (08 §6, 04 §7)
 - Folders another manager hid by renaming About.xml are classified: **pinned** (a loadable copy
   of the lineage is what the game uses; a warning once the workshop copy changed since, with
   `archo mod <copy> --diff <workshop>`), **left over** (unsubscribed) or **hidden** on their own.
-- 需要处理 gets a "hidden mods" group: keep hidden, show again (`archo unhide`), use the workshop
+- needs attention gets a "hidden mods" group: keep hidden, show again (`archo unhide`), use the workshop
   version (`archo unpin`), move to the recycle bin (`archo trash`). Trash never deletes
   permanently and only takes hidden or unsubscribed workshop/SteamCMD folders.
 
@@ -1416,7 +1418,7 @@ numbers below are the current ones.
   are read, clusters instead of text are kept, attribution is the full-log engine's.
 - RimCrow's companion log (`RimCrow_Realtime.log`) adds timestamps, levels and related mods.
 - The window says "game running since … · n errors" and puts this run's errors first in
-  需要处理; `archo status` shows a running game.
+  needs attention; `archo status` shows a running game.
 
 ### Lists from other tools (04 §9)
 - `loadout import` reads RimSort (XML, JSON, clipboard, Rentry), RimWorld's `.rml`, RimCrow's
@@ -1424,7 +1426,7 @@ numbers below are the current ones.
 - `loadout export --format rimsort|rml|rimcrow`.
 - `archo collection <link|ID> [--import]` compares a Steam Workshop collection with what is
   installed and can load it into the workspace.
-- The window imports and exports lists (导入 / 导出 in the Enabled list's head, `i` / `e`, the
+- The window imports and exports lists (import / export in the Enabled list's head, `i` / `e`, the
   palette): a file (open dialog, typed path or drop), pasted text, a share code, a Rentry or
   collection link is previewed first — installed, not installed with Workshop links and known
   replacements, what replacing or only adding the missing mods would change — and applied as
@@ -1466,16 +1468,16 @@ numbers below are the current ones.
 ### Other
 - The window's look follows magpie (MIT): cards with hairline borders and 12px corners, a
   centred view switch with a raised thumb, icon and text buttons, frosted popovers.
-- The top bar: the environment on the left, the pages as tabs in the middle (Mod 列表 · 需要处理
-  · 日志 · 整合包 · 设置, `shift+1`–`5` by physical key), rescan, sort, save and launch on the
+- The top bar: the environment on the left, the pages as tabs in the middle (Mod lists · needs attention
+  · log · packs · settings, `shift+1`–`5` by physical key), rescan, sort, save and launch on the
   right; no name or icon (the window's title bar has them). Switching pages no longer shows the
   mod list in between. The position line moved to the bottom bar. Tags are `g` in the window
   (`#` still works where it is not shift+3).
-- 日志 (`l`, `c`): the game log (its error clusters with the mods they are tied to, a cluster's
+- log (`l`, `c`): the game log (its error clusters with the mods they are tied to, a cluster's
   evidence beside it, Player.log or Player-prev.log), mod changes, and the manager's actions
   (unsaved steps and saved versions). A log of another game version is analysed in the
   background instead of holding the window for seconds.
-- 需要处理 is three columns (the list · the game · your call); ←→ between them. Moving the
+- needs attention is three columns (the list · the game · your call); ←→ between them. Moving the
   cursor no longer rebuilds the page.
 - The top bar holds the environment, the tabs, and the game: launch (the saved list) while it
   is not running, its state while it is. Sort and save sit in the Enabled list's head with
@@ -1493,8 +1495,8 @@ numbers below are the current ones.
 - A running game is told apart: its `-savedatafolder` (read from the process's command
   line) says whether a pack or the environment's list is playing; when the command line
   cannot be read, the launch records decide. The live log follows the log that run writes,
-  the top bar says "整合包 X 运行中", `archo status` names it, and 需要处理's last-run group
-  says whether the log came from the list or a pack. Its column is now called 游戏日志.
+  the top bar says "pack X running", `archo status` names it, and needs attention's last-run group
+  says whether the log came from the list or a pack. Its column is now called game log.
 - Smoother pages: a new page fades in once (no slide that shook the scrollbars), a redraw or
   a sub-view switch does not animate, the tabs and sub-tabs have a sliding thumb, the game
   log shows what it read before at once and a loading line only after 150 ms, popups have no
@@ -1530,7 +1532,7 @@ numbers below are the current ones.
 - `RimArcho.exe`: a desktop window (Wails v3 and plain HTML/CSS/JavaScript, no frontend build
   step) next to the terminal UI. A double click opens it; `archo gui` opens it from a terminal.
 - The window and the TUI share one layer, `internal/view`: the columns, the search syntax, the
-  details, 需要处理 with its actions, the changes, tags, the verbs and the position input, the
+  details, needs attention with its actions, the changes, tags, the verbs and the position input, the
   palette and the interface text. Neither interface builds these itself.
 - The window follows the TUI's v3 rules (06 §13) and adds the mouse: click and modifier clicks,
   double-click, drag and drop between and within the lists, a context menu, resizable columns.

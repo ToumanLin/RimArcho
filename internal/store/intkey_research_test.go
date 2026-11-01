@@ -1,6 +1,6 @@
 package store_test
 
-// Opt-in research harness for docs/research/2026-10-30_archo-db-整数键.md (ToDo: integer keys
+// Opt-in research harness for docs/research/2026-10-30_archo-db-integer-keys.md (ToDo: integer keys
 // and path tables in archo.db). RIMARCHO_INTKEY_BENCH=1 builds a synthetic archo.db shaped
 // like a 10-day real library (about 760k Def facts, 980k file rows, 200k Type / Harmony facts)
 // on the real v26 schema, copies it into prototype layouts, and logs sizes, query times and

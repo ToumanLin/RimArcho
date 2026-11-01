@@ -1,5 +1,5 @@
 // Package textures turns a mod's PNG textures into DDS files the game loads in their place
-// (docs/research/贴图优化-DDS.md). It knows the game's rules (which files are textures,
+// (docs/research/dds-texture-optimization.md). It knows the game's rules (which files are textures,
 // when a .dds shadows a .png, how load folders override each other), measures and
 // estimates, and drives the external encoder todds; it never decides where files may be
 // written (internal/app does).
