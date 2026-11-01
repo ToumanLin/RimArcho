@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- Uninstall now lists a relocated source library and its size, then deletes its generated code. Libraries already covered by data-folder deletion are counted once; linked library paths are refused.
 - Decompiled C# now lives in a movable Source library with readable paths, separate from clearable caches. Settings offers size, confirmed removal of unused folders, and a stoppable task to decompile the current list. Identical DLLs are searched once and results name their sharing copies.
 - CLI adds `source game`, `source search --game`, `source clean --dry-run/--yes`, and `source decompile --active`. MCP `read_source` adds `game`; source and search output return library paths. Existing decompile history migrates; the old source cache is discarded once on opening.
 - GUI: keys are drawn as key caps everywhere (buttons, dialog buttons, the hint line), so a key no longer reads as part of its label: confirm [enter ↵] instead of confirm enter.

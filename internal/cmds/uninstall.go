@@ -170,6 +170,8 @@ func UninstallStepText(p *app.UninstallPlan, s *app.UninstallStep) string {
 	case app.UnData:
 		add(app.DoLater, "folder", "once RimArcho has closed, delete its data: database, settings, caches, the Steam runtime folder ({n})"+size)
 		add(app.DoLeave, "folder", "{n} kept")
+	case app.UnSource:
+		add(app.DoDelete, "folder", "delete the generated source library ({n}); it can be recreated"+size)
 	case app.UnProgram:
 		add(app.DoLater, "folder", "once RimArcho has closed, delete the program")
 		add(app.DoLeave, "folder", "the program stays")

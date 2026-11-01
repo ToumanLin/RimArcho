@@ -75,6 +75,7 @@ var unTitles = map[string]string{
 	app.UnLinks: "RimArcho's links", app.UnModsConfig: "the games' mod lists", app.UnLocked: "lock library copies",
 	app.UnMonitor: "Archo Monitor", app.UnPacks: "packs", app.UnSaves: "own saves", app.UnGames: "downloaded games",
 	app.UnSteamCMD: "SteamCMD", app.UnData: "RimArcho's data", app.UnProgram: "the program",
+	app.UnSource: "source library",
 }
 
 var unVerbs = map[string]string{
@@ -217,6 +218,8 @@ func uninstallText(p *app.UninstallPlan, s *app.UninstallStep) string {
 	case app.UnData:
 		add(app.DoLater, "once RimArcho has closed, delete its database, settings and caches (%d folders)")
 		add(app.DoLeave, "%d folders kept")
+	case app.UnSource:
+		add(app.DoDelete, "delete generated code; it can be recreated")
 	case app.UnProgram:
 		add(app.DoLater, "once RimArcho has closed, delete the program")
 		add(app.DoLeave, "the program stays")
