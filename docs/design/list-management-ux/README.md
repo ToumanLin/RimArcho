@@ -1,131 +1,131 @@
-# 列表 / 管理：围绕“复制后继续修改”的交互提案
+# Lists / manage: interaction proposal for copying and continuing to edit
 
-日期：2026-10-24。基线：`dev/0.9.0`，`7386f87`。分支：`codex/lists-management-ux`。
+Date: 2026-10-24. Baseline: `dev/0.9.0`, `7386f87`. Branch: `codex/lists-management-ux`.
 
-状态：已按“就地创建”方案落地到本分支。下文保留调研与方案推导；会话中的交互原型使用示例列表，实际 GUI 使用现有 app / view 能力。生效规格同步到 06 §2.17 与 §3.1。
+Status: implemented on this branch using the create-in-place approach. Research and reasoning remain below; the session's interactive prototype uses example lists, while the real GUI uses existing app/view capabilities. Effective specifications updated in 06 §2.17 and §3.1.
 
-## 落地与验证
+## Implementation and validation
 
-- 管理详情直接显示复制入口；新建表单支持任意来源列表与完整历史版本选择，区分当前编辑内容。
-- 导入在表单内预览，复用已安装 / 缺失 Mod、版本差异与订阅入口；提交校验预览标识和所属游戏，拒绝过期或被另一流程覆盖的内容。
-- 草稿按游戏在本次应用会话保留；返回、浏览其他列表及前进后退均恢复原输入。明确丢弃提供撤销。
-- 主操作创建并编辑，次操作仅创建；仅创建的状态行保留创建撤销。进入编辑器后沿用编辑器自己的编辑撤销，不把删除整个列表与编辑撤销混为一谈。
-- `go test ./internal/surface/gui ./internal/view ./internal/surface/cli` 通过；列表页的 10 项 Node 行为回归通过，包括旧请求竞争、跨游戏草稿隔离、重名与重复提交。
-- 使用独立的 `tmp/list-ux-qa` 数据和真实 Go API，在浏览器验证历史复制、导入后仅创建、名称保留、返回与恢复草稿、Alt+← / Alt+→，以及创建后直接进入编辑器；项目现有浏览器页面回归检查全部通过。
-- 实际深色页面见 [截图](implemented-dark.png)。原生 WebView2 中的展开选项、系统浅色及 DPI 变化仍留给原生窗口验收；浏览器检查不等同于这些平台组合的验证。
-- 已构建 `bin/RimArcho.exe`（Windows GUI 入口），本地生成物不纳入 Git。
+- Management details show a direct copy entry; the new-list form supports any source list and full historical-version selection, distinguishing current edits.
+- Import previews inside the form, reusing installed/missing Mods, version differences and subscription entries; submission validates preview identity/game and rejects stale content or content overwritten by another flow.
+- Drafts persist per game during this app session; return, browse other lists and back/forward restore original input. Explicit discard offers undo.
+- Primary action creates and edits; secondary only creates. Create-only status keeps creation undo. Once in editor, use its editing undo; do not conflate deleting the entire list with undoing edits.
+- `go test ./internal/surface/gui ./internal/view ./internal/surface/cli` passed; ten Node list-page regressions passed, including old-request races, cross-game draft isolation, duplicate names and duplicate submissions.
+- With isolated `tmp/list-ux-qa` data and real Go API, browser-verified historical copying, import then create-only, name retention, back/draft restoration, Alt+← / Alt+→ and entering editor immediately after creation; all existing browser page regressions passed.
+- Actual dark page: [screenshot](implemented-dark.png). Expanded options, system light theme and DPI changes in native WebView2 remain for native acceptance; browser checks do not validate those platform combinations.
+- Built `bin/RimArcho.exe` (Windows GUI entry); local artifacts are not included in Git.
 
-## 研究范围与证据
+## Research scope and evidence
 
-输入是玩家实际试用反馈：“我要复制一个已有列表，再在副本上修改”。本次采用基于任务的认知走查与启发式评估，核对代码和规格；没有组织额外用户访谈，也没有将推测写成实测结论。
+Input was actual player feedback: "I want to copy an existing list, then edit the copy" (translated). This round used task-based cognitive walkthrough and heuristic evaluation, checking code/specifications; no additional user interviews, and no speculation presented as measurement.
 
-相关项目约束：
+Relevant project constraints:
 
-- [顶层设计 §4](../../00-top-level-design.md)：随时知道在哪里、能去哪里、怎么回去；最少步骤；可撤回；只在要求时写游戏文件。
-- [06 §2.17 列表管理](../../specs/06-ui/2.11-other-pages.md)：保留管理页的列表索引、详情、游戏版本、合集与分享；表单在页内或子页，不使用模态表单。
-- [06 §3.1 交互规则](../../specs/06-ui/3-interaction-rules.md)：导航不修改数据，键盘可达，Esc 回到上级，输入内容不因折叠丢失，后台读取只采用最新结果。
-- [06 §7 视觉](../../specs/06-ui/7-visual-design.md)：magpie / Linear 风格、单一强调色、安静卡片、4px 卡片间距、不使用左侧强调竖线、用“列表”等玩家用词。
-- [04 §1、§3、§9](../../specs/04-plans-and-sorting.md)：复制当前内容与复制历史版本是不同来源；新列表有自己的历史；导入先预览；创建本身不写游戏文件。
+- [Top-level design §4](../../00-top-level-design.md): know where you are, where you can go and how to return; minimum steps; undo; game writes only on request.
+- [06 §2.17 list management](../../specs/06-ui/2.11-other-pages.md): retain list index/details/game versions/collections/sharing; forms inline or on subpages, never modal forms.
+- [06 §3.1 interaction rules](../../specs/06-ui/3-interaction-rules.md): navigation does not mutate, keyboard access, Esc goes up, folding preserves input, background reads accept only latest result.
+- [06 §7 visuals](../../specs/06-ui/7-visual-design.md): magpie / Linear style, one accent, quiet cards, 4px gaps, no left accent bars, player wording such as list.
+- [04 §1, §3, §9](../../specs/04-plans-and-sorting.md): current content and historical versions are different copy sources; new list has its own history; import previews first; creation does not write game files.
 
-外部参照用于评估交互，并非新增产品能力的依据：[NN/g 系统状态可见](https://www.nngroup.com/articles/visibility-system-status/)、[用户控制与自由](https://www.nngroup.com/articles/user-control-and-freedom/)。普通文字的对比度以 [WCAG 2.2 1.4.3](https://www.w3.org/TR/WCAG22/#contrast-minimum) 的 4.5:1 为验收线。
+External references evaluate interactions, not justify new product capabilities: [NN/g visibility of system status](https://www.nngroup.com/articles/visibility-system-status/), [user control and freedom](https://www.nngroup.com/articles/user-control-and-freedom/). Normal text contrast acceptance is 4.5:1 under [WCAG 2.2 1.4.3](https://www.w3.org/TR/WCAG22/#contrast-minimum).
 
-## 发现与影响
+## Findings and impact
 
-| 发现 | 代码证据 | 对任务的影响 |
+| Finding | Code evidence | Task impact |
 | --- | --- | --- |
-| 复制来源由进入表单前选中的列表决定，表单没有来源选择器 | `assets/js/planmanage.js` 的 `newList()` 把 `source` 写进草稿，`newForm()` 只提供来源类型单选项 | 默认值被误作不可更改的前提；玩家必须退出表单、换列表、重新输入 |
-| 历史来源写成“复制它写入过的一版” | `internal/view/planmanagetext.go` | 需要理解“它”“写入”“一版”的隐含对应关系，且与“当前编辑内容”混淆 |
-| 版本 API 只列 save / launch / user 来源 | `internal/surface/gui/planforms.go` 的 `PlanSources()` | 仅改文案为“历史版本”仍可能遗漏可复制版本，需要同时核对数据范围 |
-| select 没有明确继承文字色，暗色下依赖浏览器原生样式 | `style.css` 的 `.xc-input` 未指定 color；通用文字色规则只覆盖 input，没有 select / textarea | 与用户报告的暗色黑字一致；应同时处理控件本体、原生选项和色彩方案，并在 Windows WebView2 验证 |
-| 草稿内的导入入口主动清空草稿 | `newForm()` 的导入回调先执行 `M.draft = null`；`navigation.go()` 在离开 plans 时又调用 `abandon()` | 名称丢失，进入另一个还会重新询问名称的流程；用户担心之前输入是否有效 |
-| 查看另一行就丢弃草稿 | `pick()` 与 `abandon()`；06 §2.17 明确写了 Esc / 选别的行放弃 | “浏览一个列表”与“丢弃输入”绑定，既不符合任务预期，也使返回失去恢复作用 |
-| 复制藏在 ⋯ 中，创建后只回管理详情 | `menuOf()` 与表单提交完成路径 | duplicate 难发现，创建完仍需要再找编辑入口 |
+| Copy source depends on list selected before opening form; no source picker | `newList()` in `assets/js/planmanage.js` writes `source` into draft; `newForm()` offers only source-kind radios | Default mistaken for fixed prerequisite; player must leave form, switch list, retype |
+| Historical source says copy a version it wrote | `internal/view/planmanagetext.go` | Requires understanding implicit "it", "write", "version" relationship; confused with current edits |
+| Version API lists only save / launch / user origins | `PlanSources()` in `internal/surface/gui/planforms.go` | Relabeling historical versions alone may still omit copyable versions; check data scope too |
+| select does not explicitly inherit text color; dark mode depends on browser defaults | `.xc-input` in `style.css` lacks color; general text rule covers input but not select / textarea | Matches reported dark-mode black text; handle control, native options and color scheme, then verify Windows WebView2 |
+| Import from draft explicitly clears it | `newForm()` import callback first sets `M.draft = null`; `navigation.go()` calls `abandon()` when leaving plans | Name lost, another flow asks for it again; player doubts prior input's validity |
+| Browsing another row discards draft | `pick()` and `abandon()`; 06 §2.17 explicitly says Esc / another row abandons | Browsing a list coupled to discarding input, violating task expectation and preventing return restoration |
+| Copy hidden in ⋯; creation returns only to details | `menuOf()` and submit-completion path | Duplicate hard to discover; editing entry must be found again after creation |
 
-前三类属于任务阻塞或明显困惑，草稿丢失优先级最高。根因不只是控件缺失：当前创建路径把“我想创建什么”依附在“我刚刚浏览什么”上，导入又重新开启了一个任务。
+The first three kinds block tasks or cause clear confusion; draft loss has highest priority. The root is more than missing controls: creation attaches what I want to create to what I just browsed, and import starts another task.
 
-## 推荐方案：管理页内的统一创建表单
+## Recommended approach: one creation form inside management
 
-保留现有两栏布局。左栏显示所有列表，并将“未完成草稿”作为单独条目放在最上方。右栏在列表详情和创建表单之间切换。草稿不是已经创建的列表，不计入正式列表数，不显示“当前”标记。
+Keep two columns. Left shows all lists with an unfinished draft as a separate top item. Right switches between list details and creation form. A draft is not a created list, does not count toward lists or show current status.
 
-### 入口与默认值
+### Entries and defaults
 
-- 详情头部直接显示“复制成新列表”，与“编辑”并列，编辑仍是主操作；⋯ 留给改名、删除等低频操作。
-- 点击“复制成新列表”：预选这个列表的当前编辑内容，建议名称为“原名称 副本”，重名时提供下一个可用名称。预选项都可修改。
-- 点击“新列表”：打开统一创建表单；复制可用当前浏览列表作建议来源。存在草稿时入口明确显示“继续新列表”，恢复草稿，不重置名称。
-- 点击“导入为新列表”：进入同一表单的导入来源。如果已有草稿，保留用户名称，仅切换来源。
-- 已有草稿时再次请求复制另一个列表，先恢复已有草稿并说明“已有未完成草稿，可在来源列表中更换”；不得悄悄覆盖输入。正式实现应提供明确的丢弃入口；此轮原型重点演示单份草稿的恢复路径。
+- Details header directly shows copy as new list alongside edit; edit stays primary. ⋯ keeps infrequent rename/delete actions.
+- Copy as new list preselects current edits from this list; suggest original name + copy, or next available name on collision. All presets editable.
+- New list opens unified form; copying may suggest browsed list. Existing draft changes entry to continue new list and restores without resetting name.
+- Import as new list enters same form's import source. Keep existing draft name; only switch source.
+- Requesting another copy with a draft restores it first and explains that source can be changed in the unfinished draft; never silently overwrite. Final implementation should offer explicit discard; this prototype emphasizes restoring one draft.
 
-### 表单顺序
+### Form order
 
-1. **新列表名称**：始终在原位置。重名和空名称就地说明，校验不阻塞其他字段的编辑。
-2. **从哪里开始**：复制列表 / 空列表 / 从存档 / 导入。切换只改变下方的来源字段，不换页，也不清空其他来源已输入的内容。
-3. **复制列表**下拆为两个独立字段：
-   - 来源列表：列出当前游戏的所有可用列表。仅用于选择复制来源，不切换正在编辑的列表。
-   - 基于哪个版本：默认“当前编辑内容（含尚未写入游戏的修改）”；历史项展示版本号、日期时间、Mod 数，按需显示备注和来源。
-4. **结果预览**：已启用 Mod 数、保留加载顺序、允许的游戏版本。历史复制必须标明来源列表与 vN，当前内容不伪装成最近保存版本。暂存、旧列表的撤销栈和历史不作为复制内容。
-5. **提交**：主操作“创建并编辑”，次操作“仅创建”，低强调操作“稍后继续”。按钮清楚说明下一站。
+1. **New list name**: always in same place. Explain empty/duplicate names inline; validation does not block editing other fields.
+2. **Where to start**: copy list / empty / from save / import. Switching changes only source fields below, never page or other sources' inputs.
+3. **Copy list** has two separate fields:
+   - Source list: all available lists in current game. Selects copy source without switching edited list.
+   - Version: defaults to current edits including unwritten changes; historical entries show version/date/time/Mod count, notes/origin as needed.
+4. **Result preview**: enabled count, preserved order, allowed game versions. Historical copy names source list/vN; current content must not masquerade as latest saved version. Staging, old undo stack/history not copied.
+5. **Submit**: primary create and edit, secondary create only, quiet continue later. Buttons clearly state destination.
 
-“创建并编辑”使新列表成为当前列表并进入编辑器；“仅创建”使其成为当前列表，留在管理页并选中新列表。沿用现有 `view.NewPlan()` 的当前列表语义，提交前在表单底部明确显示。浏览来源、预览或编辑草稿都不更改当前列表。
+Create and edit makes new list current and opens editor; create only makes it current, stays in management and selects it. Reuse `view.NewPlan()` current-list semantics, explicitly stated at form bottom before submit. Browsing sources, previewing or editing drafts does not change current list.
 
-创建成功显示来源和“游戏文件尚未更新”，带撤销入口。撤销沿用现有创建撤销逻辑；正式接入时需保留已有防冲突检查，不在后续编辑后静默删除新列表。
+Success shows source, game-files-not-updated message and undo. Reuse existing creation undo; final integration must preserve conflict checks and never silently delete a list after later edits.
 
-### 导入与名称归属
+### Import and name ownership
 
-新建表单内的“导入”是**新列表内容的来源**，不是跳往另一个需要选择目的地的任务。
+Import within creation is **the source of new-list content**, not a jump to another destination-selection task.
 
-- 名称字段不移动、不覆盖。来源中读出的名称只可作建议；用户没有输入时才自动建议。
-- 读文件 / 粘贴 / 读取链接后就地预览；确认前不创建列表。
-- 预览显示来源、Mod 数、已安装 / 缺失数、游戏版本差异；缺失内容与当前游戏不一致时沿用现有导入分析。
-- 新建上下文已经决定目的地为新列表，不再次询问“导入到哪里”。最终按钮仍为“创建并编辑”或“仅创建”。
-- 从编辑器进入的“导入到现有列表”保留现有替换 / 只加入缺少的能力；这属于另一个明确的入口，不挤进新建表单。
-- 改动导入输入后使旧预览失效；最新一次读取有效；失败保持名称与输入，并显示重试。读取链接沿用后台机制。
+- Name field never moves or gets overwritten. Source name is only a suggestion, auto-suggested only while user has not entered one.
+- File/paste/link reading previews inline; no list before confirmation.
+- Preview shows source, Mod count, installed/missing counts and game-version differences; reuse import analysis for missing content/version mismatch.
+- Creation context already sets destination to new list, so do not ask again. Final buttons still create and edit / create only.
+- Editor's import into existing list retains replace / add-only-missing options through its distinct entry, not squeezed into creation.
+- Changing import input invalidates preview; only latest read applies. Failure retains name/input and offers retry; URL reads use background mechanism.
 
-### 我在哪里、去哪里、怎么回来
+### Where I am, where I go, how I return
 
-| 状态 | 位置 | 下一步 | 返回与恢复 |
+| State | Location | Next | Return and restoration |
 | --- | --- | --- | --- |
-| 管理详情 | 库 / 列表 / 管理 | 编辑、复制、新建、导入为新列表 | 选其他列表只浏览 |
-| 创建草稿 | 库 / 列表 / 管理 / 新列表 | 换来源、选版本、预览、创建并编辑 | 返回管理 / Esc / Alt+← 保留草稿 |
-| 导入来源 | 同一创建位置，来源“导入”亮起 | 预览后创建 | 换回复制时名称、来源列表与版本仍在 |
-| 创建成功 | 库 / 列表 / 新名称 | 直接编辑 | 返回管理选中新列表；可撤销创建 |
+| Management details | library / lists / manage | Edit, copy, new, import as new | Other-list selection only browses |
+| Creation draft | library / lists / manage / new list | Change source/version, preview, create and edit | Back to manage / Esc / Alt+← retains draft |
+| Import source | Same creation location, import selected | Create after preview | Switching back keeps name/source/version |
+| Created | library / lists / new name | Edit directly | Return selects new list; creation undo available |
 
-草稿按游戏隔离，普通换页、前进后退、查看其他列表均保留。首次范围建议保存本次应用会话；不承诺重启或崩溃恢复。后续若保存到磁盘，需要定义过期与清理。草稿状态和页面历史分开保存，返回只恢复视图，不重新执行创建或导入。
+Drafts isolated by game survive normal navigation, back/forward and browsing lists. Initial scope is this app session; no promise of restart/crash recovery. Disk persistence later would need expiry/cleanup rules. Store drafts separately from page history; return restores view without repeating creation/import.
 
-## 可比较方案：专注创建子页
+## Alternative: focused creation subpage
 
-复用相同字段和状态模型，把创建表单放进单独子页，保留全局侧栏与“库 / 列表 / 管理 / 新列表”面包屑，显示“返回管理”。宽度限制在适合阅读的范围，暂时不显示管理页内部列表索引。
+Reuse fields/state model on a dedicated subpage with global sidebar, library / lists / manage / new list breadcrumbs and back to manage. Limit reading width; temporarily hide management's internal list index.
 
-优点是窄窗口空间更充足、焦点更集中；代价是浏览来源列表详情需要返回。推荐版保留原有空间关系，更适合玩家一边比较已有列表、一边派生副本的任务。两版都遵循非模态表单，不靠弹窗解决问题。
+Benefits: more narrow-window space, clearer focus. Cost: returning to browse source details. Recommended version preserves spatial relationships for comparing lists and deriving copies. Both use nonmodal forms rather than dialogs.
 
-## 视觉与可达性
+## Visuals and accessibility
 
-- 使用项目既有深浅色面板、强调色、12px 圆角和 4px 卡片间距。输入文字、select、option、textarea 明确指定文字色、底色和 color-scheme。
-- 次要文字提高到可阅读层级，避免将表单说明套用极淡的装饰性文字色；普通文字在实际底色上达到 4.5:1。错误同时提供文字，成功和警告不只靠颜色。
-- 用原生按钮、输入框、下拉控件，全部可 Tab 到达，保留可见焦点；切换来源后恢复对应控件焦点，不把用户送回页头。输入框内方向键保持编辑 / 选择语义。
-- Esc 关闭临时菜单后才退回管理；不会清空草稿。子页导航不触发写入。对深浅色原生下拉菜单必须在真实 Windows WebView2 补测。
-- 延续两栏分隔条的拖动、键盘调整与按页保存；此轮原型用固定比例展示，不模拟拖动。
+- Existing light/dark panels, accent, 12px corners and 4px gaps. Explicit text/background/color-scheme for input/select/option/textarea.
+- Secondary text remains readable, not decorative faint text; normal text reaches 4.5:1 on actual background. Errors have text; success/warnings never color alone.
+- Native buttons/inputs/selects, all tabbable with visible focus. Source changes focus corresponding control, not page top; input arrows keep editing/selection semantics.
+- Esc closes temporary menus before going back; never clears draft. Subpage navigation never writes. Native dropdown light/dark must be tested in real Windows WebView2.
+- Preserve splitter drag/keyboard/per-page persistence; prototype uses fixed proportions without simulated dragging.
 
-## 实现影响与验收
+## Implementation impact and acceptance
 
-实现主要涉及 `planmanage.js`、`exchange.js`、`navigation.js`、`planforms.go`、`planmanagetext.go` 和 `style.css`。需要更新 06 §2.17 的“Esc / 换行放弃”约定与 06 §3.1 的表单导航处理；无需把方案直接覆盖进现有规格后才评审。
+Main files: `planmanage.js`, `exchange.js`, `navigation.js`, `planforms.go`, `planmanagetext.go`, `style.css`. Update 06 §2.17 Esc/row-change abandonment and 06 §3.1 form navigation; no need to overwrite existing specifications with this proposal before review.
 
-1. 从列表 A 打开新建，输入名字，选择 B，再选 B 的历史版本，创建结果确实来自 B 的该版本；不依赖当前列表 A。
-2. 来源切换时清除上一列表的版本引用、重置为当前编辑内容；没有历史时显示解释，仍可复制当前内容。
-3. 当前内容包含未写入修改；历史项精确对应所选版本。API 列出所有实际支持复制的历史来源，并带时间、数量与来源标签；不可用项明确写原因。
-4. 填名称 → 导入 → 预览 → 切回复制 → 返回管理 → 查看另一列表 → 恢复草稿：名称和各来源字段保留。
-5. 切换游戏后不泄露另一游戏草稿；来源被删除时保留名称，提示重新选源；版本读取连续返回时只应用最后一次选择。
-6. 导入预览失败可原地重试；更新输入使旧预览失效；新建上下文不出现替换已有列表的选项。
-7. 空名、重名、重复提交不创建多份列表；错误保持全部输入。创建成功当前列表 / 侧栏 / 管理选中项一致，结果和可撤销范围明确。
-8. 深浅色下选择器本体、展开的原生选项与说明均可读；1024px、800px 与窄布局无横向溢出；键盘完成“选源 → 选历史 → 创建 → 返回”。
+1. Open new from A, name it, choose B and B's historical version: result comes from that B version, independent of current A.
+2. Source-list change clears previous version ref/resets to current edits; no history explains why while allowing current copy.
+3. Current includes unwritten changes, history exactly selected version. API lists all actually copyable origins with time/count/source; unavailable entries explain why.
+4. Name → import → preview → copy → back to manage → another list → restore draft: name and all source fields retained.
+5. Game switch leaks no draft; deleted source keeps name and asks to reselect; consecutive version responses apply only latest selection.
+6. Failed import preview retries inline; changed input invalidates old preview; creation never offers replacement of existing list.
+7. Empty/duplicate names and duplicate submit never create multiple lists; errors retain input. Success current/sidebar/management selection agree; result/undo scope explicit.
+8. Light/dark controls/native options/explanations readable; 1024px/800px/narrow no overflow; keyboard completes source → history → create → return.
 
-原型已覆盖：任意来源选择、历史联动、空列表 / 存档 / 导入切换、粘贴内容预览、草稿离开与恢复、创建后编辑、仅创建、撤销入口和两种布局对比。链接解析、缺失 Mod 检测、文件格式兼容、真正的撤销防冲突与数据库行为使用现有产品能力接入后另行验证，原型中的示例不代表这些后端验证已完成。
+Prototype covers any source, linked history, empty/save/import switching, paste preview, leave/restore draft, create-and-edit, create-only, undo entry and two layouts. Link parsing, missing-Mod detection, format compatibility, actual undo conflict protection and DB behavior need validation after integrating existing capabilities; examples do not claim backend validation complete.
 
-### 本轮原型检查记录
+### Prototype checks this round
 
-- JavaScript 语法检查通过；渲染器接受该片段。
-- 在浏览器中验证：来源切为 CE → 选择 v5 → 仅创建，结果显示 CE v5、158 个 Mod；撤销后回到原列表。
-- 验证重名错误仍保留输入；没有历史的列表仅提供当前编辑内容；两种布局可切换。
-- 验证输入名称 → 导入三个包名 → 预览 → 返回管理 → 恢复草稿，名称和内容仍在；创建后编辑器显示对应三个条目。
-- 验证空列表通过输入框 Enter 创建，编辑器显示零条已启用内容。
-- 检查 1024px 深色、800px 浅色与 320px 浅色布局。常用正文 / 说明色在卡片底面上的对比度约为 5.50:1–13.41:1；这不是对全部控件状态的无障碍认证。
-- 待正式实现补测：真实 WebView2 的原生下拉菜单、真正的前进后退历史栈、异步数据竞争、游戏切换、文件格式与磁盘写入边界。
+- JavaScript syntax passed; renderer accepted snippet.
+- Browser: source CE → v5 → create only yielded CE v5/158 Mods; undo returned original.
+- Duplicate-name error retained input; no-history list only current edits; both layouts switched.
+- Name → import three package IDs → preview → back → restore retained name/content; create/edit showed three entries.
+- Empty list created with input Enter, editor zero enabled.
+- 1024px dark, 800px light, 320px light checked. Common body/explanation contrast on cards about 5.50:1–13.41:1; not accessibility certification of every control state.
+- Final integration pending: real WebView2 native dropdown, real back/forward stack, async races, game switching, formats and disk-write boundaries.

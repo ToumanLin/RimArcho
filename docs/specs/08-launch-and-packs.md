@@ -1,534 +1,533 @@
-# 08 · 启动与整合包
+# 08 · Launch and packs
 
-> 状态：2026-10-21 按新的启动模型重写。整合包 v1、链接部署、隐藏的 Mod、回收站、启动时写入、同时只运行一个游戏、启动记录带方案已实现。
-> 依据：00、00a、01 §4、02 §2.4 / §3.3 / §4.2、03 §6.4 / §6.7、04 §1.5 / §4 / §7、06 §2、10 §4。2026-10-21 加入 Archo Monitor（§9）。
+> Status: rewritten 2026-10-21 for the new launch model. Implemented: packs v1, link deployment, hidden Mods, recycle bin, writing on launch, one running game at a time, launch records with plans.
+> Basis: 00, 00a, 01 §4, 02 §2.4 / §3.3 / §4.2, 03 §6.4 / §6.7, 04 §1.5 / §4 / §7, 06 §2, 10 §4. Archo Monitor added 2026-10-21 (§9).
 
-本文讲 RimArcho 怎样把方案或整合包交给游戏：写哪些文件、建哪些链接、怎样启动、怎样知道游戏在运行，隐藏的 Mod 和回收站这两类直接改动 Mod 文件夹的操作，以及随 RimArcho 发行的游戏内辅助 Mod Archo Monitor（§9）。
+This document covers handing plans/packs to the game: file writes, links, launch, running-game detection, hidden-Mod/recycle-bin operations that directly change Mod folders, and bundled in-game helper Archo Monitor (§9).
 
-所有会写磁盘的动作都满足三条：能预览（CLI 的 `--dry-run`，界面上命令面板的“预览…”），能撤回或说明为什么不能撤回，结果说清楚做了什么。启动和写入游戏在 CLI、TUI、GUI 里都是一步直接执行，不再先弹预览等确认（06 §6）；被拒绝时给出原因和能解决它的命令。改动 Mod 文件夹的隐藏、回收站操作 RimArcho 撤销不了，界面上仍先确认（§6、§7）。
+Every disk-writing action must offer preview (CLI `--dry-run`, command-panel "preview …"), be reversible or explain why not, and report what it did. Launch and game writes execute directly in CLI/TUI/GUI, without preview-confirmation prompts (06 §6); refusals give reasons and resolving commands. RimArcho cannot undo hiding/recycling Mod folders, so UI still confirms first (§6, §7).
 
-## 1. 启动模型
+## 1. Launch model
 
-**同一时间只运行一个游戏。** 启动前跨所有环境检测游戏进程（§4）；已有游戏在运行就拒绝，并说明是哪个环境、哪个方案或整合包在运行。
-理由：多个环境、多个方案共用同一份 ModsConfig.xml 和存档目录，同时跑两个游戏会互相覆盖。
+**One game at a time.** Before launch, detect game processes across all environments (§4). Refuse if any runs, identifying environment and plan/pack.
+Reason: environments/plans share ModsConfig.xml and saves; simultaneous games would overwrite one another.
 
-**启动时才写入。** ModsConfig.xml 是方案的投影，不是事实来源（00a §1）。方案的编辑即时保存在 RimArcho 的数据库里（04 §1），只有两个时刻写到游戏：
+**Write on launch.** ModsConfig.xml projects a plan; it is not the source of truth (00a §1). Edits persist immediately in RimArcho's database (04 §1), reaching the game only when:
 
-- 启动方案（§2）；
-- 玩家点“保存”（`archo save`），给从 Steam 或其他途径开游戏的玩家用。
+- Launching a plan (§2);
+- Player clicks "save" (`archo save`), for launching through Steam/other paths.
 
-**多个环境共用默认用户数据目录没有问题。** 例如 Steam 版和 SteamCMD 版的 RimWorld 都用 `%USERPROFILE%\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios`。因为同时只运行一个游戏，而且每次启动都重新写入这次要玩的方案，所以上一次是谁写的不影响这一次。RimArcho 按用户数据目录记录上次写入的哈希和写入者（哪个方案），用来判断外部修改（04 §4.3）。共用目录的其他后果见 02 §2.4。
+**Sharing the default user data directory is fine.** Steam and SteamCMD RimWorld may both use `%USERPROFILE%\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios`. Only one game runs and each launch writes its intended plan, so the previous writer does not affect this launch. RimArcho records last hash/writer (plan) per user data directory for outside-change detection (04 §4.3). Other consequences: 02 §2.4.
 
-**整合包例外。** 整合包用自己的用户数据目录（`-savedatafolder`，§5.3），不碰环境的 ModsConfig.xml 和存档。
+**Pack exception.** Packs use own user data (`-savedatafolder`, §5.3), leaving environment ModsConfig.xml/saves untouched.
 
-**启动记录。** 每次启动（方案或整合包）记一条：环境、方案或整合包、时间、启动方式、完整命令行、启用列表的指纹。日志按写入时间对应到最近一次启动记录（03 §6.4），存档管理按它对应方案（10 §4）。
-现状：表 `launch(environment_id, started_at, method, command, plan_id, fingerprint, version_n)`，`method` 是 `steam`、`direct` 或 `pack:<包名>`；`plan_id`、`fingerprint`、`version_n` 三列（schema v11）。方案启动记下方案、启用列表指纹（`ListFingerprint`，与过期判断共用）和这次玩的版本号；整合包启动没有方案，指纹是包的列表。
+**Launch records.** Record every plan/pack launch: environment, plan/pack, time, method, full command line, enabled-list fingerprint. Logs map to latest launch by write time (03 §6.4); save management uses records to identify plans (10 §4).
+Current table: `launch(environment_id, started_at, method, command, plan_id, fingerprint, version_n)`, `method` is `steam`, `direct` or `pack:<pack name>`; `plan_id`, `fingerprint`, `version_n` added in schema v11. Plan launches record plan, enabled fingerprint (`ListFingerprint`, shared with stale detection) and played version; pack launches have no plan, using pack-list fingerprint.
 
-## 2. 启动方案
+## 2. Launching a plan
 
-`archo launch [--dry-run]` 启动当前方案；指定方案的参数和其他引用方式见 05 §4。界面上的入口：顶栏的启动、首页大卡片的“启动游戏”、`L`（06 §2.1、§2.3）。一次点击直接执行，结果写在状态行；被下面第 1、2 步拒绝时，状态行写原因，并列出能解决它的命令（06 §6）。预览在命令面板的“预览启动”里，只读。
+`archo launch [--dry-run]` launches current plan; explicit plan arguments/references: 05 §4. UI: top-bar launch, home-card "launch the game", `L` (06 §2.1, §2.3). One click executes, status reports result. Steps 1/2 refusals show reasons/resolving commands (06 §6). Command-panel "preview the launch" is read-only.
 
-**步骤**（任何一步失败就停下，后面的不做）：
+**Steps** (stop on any failure):
 
-1. **检查。** 没有游戏在运行（§1、§4）。环境要有用户数据目录（否则报“用 `archo env set --user-data <dir>` 设置”）；现有的 ModsConfig.xml 读不出来时拒绝，请玩家先修好或删掉它。
-2. **处理外部修改。** 文件和上次写入的不同时，先按 04 §4.3 归到上次写入它的方案：能载入就载入，再往下走；成了冲突（有未载入的外部版本）就拒绝，给出看差异 / 载入 / 忽略三条命令（04 §4.1 第 1 条）。这样游戏内 Mod 菜单里的修改不会被这次写入无声覆盖。
-3. **同步 `_Archo_` 链接**（§3）：这个方案需要的链接缺了就建，多余的或目标不对的就删。
-4. **移除所有 `!ArchoPack_` 链接**（§5.3）：玩方案时游戏不能看到整合包里的副本。现在第 3、4 步在同一份计划里执行，先删后建。
-5. **写入 ModsConfig.xml**：规则见 04 §4.1（备份为 `ModsConfig.xml.rimarcho.bak`、写临时文件后原子替换、`version` 写当前游戏版本、`_steam` 令牌）。写入后记下这份文件的哈希和写入者。
-6. **记录启动**（§1）。实现上在游戏进程启动成功之后才记，启动失败就没有记录，日志不会对到一次没发生的启动。
-7. **记为方案的一个版本，来源 `launch`**（04 §3）。与该方案最新的版本相同时不重复记录。
-8. **启动游戏进程**，不等它结束。
+1. **Check.** No game running (§1, §4). Require user data directory (otherwise suggest `archo env set --user-data <dir>`). Refuse unreadable ModsConfig.xml; ask player to repair/delete it.
+2. **Handle outside changes.** If file differs from last write, attribute to last writer under 04 §4.3. Load if possible and continue; refuse conflicts (unloaded outside version), offering diff/load/ignore commands (04 §4.1 item 1), avoiding silent overwrite of in-game edits.
+3. **Synchronize `_Archo_` links** (§3): create missing required links, remove extras/wrong targets.
+4. **Remove all `!ArchoPack_` links** (§5.3): plan play must not see pack copies. Steps 3/4 now share one remove-then-create plan.
+5. **Write ModsConfig.xml** under 04 §4.1 (backup `ModsConfig.xml.rimarcho.bak`, temporary write/atomic replacement, current game `version`, `_steam` tokens). Record hash/writer afterward.
+6. **Record launch** (§1). Implementation records only after successful process start; failed launches produce no record, so logs cannot map to a nonexistent launch.
+7. **Record plan version, source `launch`** (04 §3), omitting duplicates of latest version.
+8. **Start game process**, without waiting for exit.
 
-链接放在写 ModsConfig.xml 之前，理由：链接失败（例如 `Mods/` 在 exFAT 上）时，ModsConfig.xml 还没动，不会留下一份引用了不存在的 Mod 的列表。
+Links precede ModsConfig.xml so link failure (e.g. exFAT `Mods/`) leaves the file unchanged, never a list referring to unavailable Mods.
 
-**两种启动方式**（环境的 `launch` 字段，`archo env set --launch direct|steam`）：
+**Two methods** (environment `launch`, `archo env set --launch direct|steam`):
 
-| 方式 | 运行 | 参数 |
+| Method | Run | Arguments |
 | --- | --- | --- |
-| `steam` | Steam 客户端（`steam.exe`、`steam.sh` 或 `steam`，在探测到的 Steam 目录里找） | `-applaunch 294100`，后面接附加参数 |
-| `direct` | 游戏目录下第一个存在的：`RimWorldWin64.exe`、`RimWorld.exe`、`RimWorldLinux`、`RimWorldMac.app` | 附加参数 |
+| `steam` | Steam client (`steam.exe`, `steam.sh`, `steam`, found in detected Steam directory) | `-applaunch 294100`, then extra arguments |
+| `direct` | First existing in game directory: `RimWorldWin64.exe`, `RimWorld.exe`, `RimWorldLinux`, `RimWorldMac.app` | Extra arguments |
 
-- 用户数据目录不是本机默认位置时，两种方式都附加 `-savedatafolder=<路径>`（与默认位置按规范化的路径比较）。
-- 附加参数在设置页“启动”分组里填（06 §2.14），存在设置项 `env:<环境ID>:launch_args`，按空白切开后接在最后。
-- 工作目录是游戏目录。路径含空格或制表符的参数在显示时加双引号。
-- 找不到 Steam：拒绝，提示 `archo env set --launch direct`。找不到游戏可执行文件：拒绝，说明在哪个目录里找过。
+- Both append `-savedatafolder=<path>` when user data differs from local default (normalized-path comparison).
+- Extra arguments are entered in settings "launch" (06 §2.14), stored as `env:<environmentID>:launch_args`, split on whitespace and appended last.
+- Working directory is game directory. Display arguments containing spaces/tabs in double quotes.
+- Missing Steam: refuse, suggest `archo env set --launch direct`. Missing executable: refuse, naming searched directory.
 
-**`--dry-run` 显示**：要建、要删的 `_Archo_` 和 `!ArchoPack_` 链接（`+ 名字` / `- 名字`），ModsConfig.xml 的路径，`version` 是否会从 X 改写为 Y，写入的条目数和缺失条目数，完整的启动命令行。不写磁盘，不启动。`save --dry-run` 显示同一份预览，只是没有启动命令行。
+**`--dry-run` shows** `_Archo_` / `!ArchoPack_` links to create/remove (`+ name` / `- name`), ModsConfig.xml path, version rewrite X → Y, entry/missing counts, full launch command. No writes/launch. `save --dry-run` shares preview without launch command.
 
-**启动前提示**（日志语料 G8）：`archo launch`（含 `--dry-run`）在启动命令下列出当前方案里最常导致游戏报错的问题，**不阻止启动**。
-- 哪些问题由 `internal/app/launchcheck.go` 的 `LaunchChecks` 表决定，按日志语料的“观察 / 机会”从高到低（03 §4.3.1）：`patch.no-match`、`def.parent-missing`、`incompat.active`、`dep.inactive`、`dep.missing`，以及日志语料层的 `dep.observed-missing`、`combo.known-bad`（只取 warning）。新的问题代码加一行即可：代码、一句原因（带语料数字）、多条时的汇总句。
-- 每种问题一行：只有一条时写它的结论和第一条建议；多条时写汇总（“5 个补丁在 2 个 Mod 中落空：#a A, #b B”），建议取它们共同的第一条建议，否则 `archo problems --code <code>`。下面各一行 `why:`（原因和语料数字）和 `fix:`。
-- 已忽略的问题、来自日志的问题不列。启动不等待分析：Def/Patch 层用已存的分析；从未分析或已过期时多一行 `checks:` 说明。
-- 界面：启动页“启动游戏”下的问题条显示最可能出事的那一种和它的一行原因，点开到“能不能跑”（06 §2.3）。
-- 界面另有一处确认：当前方案有 `dep.missing` 或 `dep.inactive`（缺硬前置）时，点启动先问一次“缺少前置 Mod”，列出每个缺的前置，按“仍然启动”才启动。游戏不会加载这些 Mod，还可能把 Mod 列表重置成本体和 DLC（VM 情景 9，B8）。启动本来就会被拒绝时（外部修改未载入、游戏在运行等）先说拒绝，不问。CLI 和 TUI 不问。
+**Prelaunch notices** (corpus G8): `archo launch` (including `--dry-run`) lists current-plan findings most associated with game errors below the command, **without blocking launch**.
+- `LaunchChecks` in `internal/app/launchcheck.go` selects codes by descending corpus observed/chance (03 §4.3.1): `patch.no-match`, `def.parent-missing`, `incompat.active`, `dep.inactive`, `dep.missing`, corpus-layer `dep.observed-missing`, `combo.known-bad` (warning only). New codes need one row: code, brief reason with corpus numbers, aggregate sentence.
+- One line per kind: single finding conclusion + first suggestion; several use summary ("5 patches miss in 2 Mods: #a A, #b B") and common first suggestion, otherwise `archo problems --code <code>`. Follow with separate `why:` (reason/numbers) and `fix:` lines.
+- Exclude ignored/log-derived findings. Do not wait for analysis; Def/Patch uses stored analysis, adding `checks:` if never analyzed/stale.
+- UI: problem strip below launch button shows most likely kind and brief reason, linking to "can it run" (06 §2.3).
+- UI has another confirmation: current-plan `dep.missing` / `dep.inactive` (missing hard dependencies) prompts "missing required mods", listing each, before "launch anyway". Game will not load these Mods and may reset list to vanilla/DLC (VM scenario 9, B8). If launch already refused (outside conflict, running game, etc.), show refusal first, no prompt. CLI/TUI do not ask.
 
-**写入游戏（`archo save`）** = 上面的第 1–5 步和第 7 步（版本来源仍按 04 §3 记），不记启动，不启动游戏。游戏正在运行时也允许写入，结果提示“游戏下次启动才会读到”（游戏运行中不会重读这个文件）。`save --dry-run` 显示与上面相同的预览。界面上叫“保存”，在方案页右上角（06 §2.5）。规则的主体在 04 §4。
+**Game write (`archo save`)** = steps 1–5 and 7 (version source per 04 §3), without launch record/process. Allowed while game runs; result says "the game reads it on its next start" (no live reread). `save --dry-run` shares preview. UI "save" at plan-page top right (06 §2.5). Primary rules: 04 §4.
 
-**游戏退出后。** 侦测到游戏退出（§4），或者下次打开 RimArcho 时，如果当前 Player.log 比最近一次启动新、也比玩家上次看过的日志新，提示“分析本次日志”。日志属于哪次启动按 03 §6.4 判断。提示是 `view.Live.NewLog`：TUI 显示在状态行右端，打开日志后消失；GUI 不显示提示，在它出现时自己读一次这份日志（`API.ReadNewLog`，2026-10-30，06 §2.1），能不能跑的角标随之计入这一次运行。
+**After game exit.** On detected exit (§4) or next RimArcho opening, if current Player.log is newer than latest launch and last viewed log, suggest "analyse this run's log". Launch attribution: 03 §6.4. Signal `view.Live.NewLog`: TUI status right, dismissed on opening logs. GUI shows no notice, instead reading the log once when signaled (`API.ReadNewLog`, 2026-10-30, 06 §2.1), including this run in can it run badge.
 
-**删除了什么**（以前的规则，不再有）：
+**Removed rules** (no longer applicable):
 
-- 方案有“未保存的修改”时阻止启动，`launch --force` 用已保存的列表启动。现在方案没有“未保存”这一说，启动就是写入这一次要玩的列表。`--force` 删除。（代码里的这道检查和 `--force` 参数待删除。）
-- ModsConfig.xml 的 `version` 主次号与游戏不同时阻止启动、要求先 `save`。现在启动本身就会按当前游戏版本重写这份文件，这道检查没有意义。（待删除。）读取时发现版本不符的提示仍保留，写法见 04 §4.1。
-- 启动前“询问是否保存”。
+- Blocking launch on "unsaved changes", `launch --force` using saved list. Plans now have no "unsaved" launch state; launch writes the intended list. `--force` removed. (Code check/argument deletion pending.)
+- Blocking mismatched ModsConfig.xml version and requiring `save`. Launch itself rewrites current version, so check is pointless. (Deletion pending.) Retain mismatch read notice, wording in 04 §4.1.
+- Asking whether to save before launch.
 
-## 3. 链接部署
+## 3. Link deployment
 
-**目标生命周期（共用）**：全游戏首层入链枚举覆盖环境、local 来源及台账已知物理 Mods，按物理路径去重；外来入链会被破坏或检查未知时拒绝。先预览/持久化意图，再安全摘链，搬移/回收实体、更新数据库，最后重建需要的入口；每实例每游戏最多一个有效入口。受影响游戏运行则拒绝，失败仅在原目标存在时回接。阶段台账独立于别名，启动只读报 `mods.link-recovery`，确认修复才恢复；不在退出时清健康 env/包。
+**Target lifecycle (shared)**: enumerate first-level incoming links across all games, covering environments, local sources and ledger-known physical Mods, deduplicated by physical path. Refuse if foreign links would break or inspection is unknown. Preview/persist intent, detach safely, move/recycle target, update database, rebuild needed entries; at most one effective entry per instance/game. Refuse affected running games; on failure reconnect only if original target exists. Phase ledger is independent of aliases. Startup reports `mods.link-recovery` read-only; recovery requires confirmed repair. Do not clear healthy env/pack links on exit.
 
-**链接健康与修复。** `InspectGameLinks` 每次重新读取所有已登记环境游戏根和未退役 local 来源的 `Mods/`，按物理路径去重；仅检查第一层 `_Archo_*`、`!ArchoPack_*`。先读 junction/symlink 的 reparse 类型与原始目标，再区分存在、明确缺失、未知/不可访问；不依赖普通 Mod 枚举、别名或目录 mtime 缓存。未登记的游戏不在覆盖范围。
+**Link health and repair.** `InspectGameLinks` rereads game roots of all registered environments and `Mods/` of nonretired local sources each time, deduplicating physical paths; inspect only first-level `_Archo_*`, `!ArchoPack_*`. Read junction/symlink reparse type and raw target first, then distinguish exists, definitively missing, unknown/inaccessible. Do not depend on ordinary Mod enumeration, aliases or directory-mtime cache. Unregistered games are outside coverage.
 
-断链、归属不符、检查失败、真实目录占名分别产生 03 §4.3 的游戏/路径问题，扫描与能不能跑页均显示。所选游戏存在断链或检查失败时，方案、包、测试运行都在写入及启动前拒绝；其他游戏只汇总。目标存在的 env 链接始终保留；多余有效包链接仍按 §5.3。
+Broken links, ownership mismatch, inspection failure and real-directory name collisions produce game/path findings from 03 §4.3, shown in scan and can it run. Broken/failed inspections in selected game block plan, pack and test-run writes/launches; other games are summaries only. Retain env links with existing targets; extra valid pack links follow §5.3.
 
-修复先预览，GUI/TUI 明确确认或 CLI `links repair --yes` 后才执行。只摘除已知 `Mods/` 第一层自有前缀的 junction/symlink，且须断链或可证目标错误；凭已知实例/包名与预期目标显示归属证据。前缀 junction/symlink 的现存目标若按物理路径（规范化、不区分大小写）对应 live 实例的 real_path，即使名字中的旧 ID 已删除，也以“target is known instance X”为归属证据，健康时保留且不报问题、不改名；搬移或回收该实例时同样枚举这些入链。重复入口仍按既有重复规则报告。只有前缀且目标无法对应已知实例或包的旧链接须玩家用 `--include <完整路径>` 或界面明确纳入，不能默删。真实文件/目录、非前缀条目、未知 tag、不可访问项永不删。修复按物理游戏目录跨进程串行，运行中的游戏拒绝；执行前重验原预览的父目录、文件身份、类型和原始目标，变化即拒绝。Windows 固定父目录及链接句柄并按句柄摘链；其他系统固定父目录后重验并单项 unlink，不递归、不沿目标删除。撤销部署只删链接本身，不回收目标、不进回收站；修复结果列出已摘链接，失败时保留其余项。未验证的新目标不提议重建。
+Preview repairs first; execute only after GUI/TUI explicit confirmation or CLI `links repair --yes`. Detach only first-level known-`Mods/` owned-prefix junctions/symlinks proven broken/wrong-target; show ownership evidence from known instance/pack and expected target. If an existing prefixed link's physical target (normalized, case-insensitive) matches a live instance real_path, even with deleted old ID in its name, use "target is known instance X" as ownership evidence: retain if healthy, without finding/rename. Enumerate these incoming links when moving/recycling that instance too. Report duplicate entries normally. Old prefix-only links with no known instance/pack target need player `--include <full path>` or explicit UI inclusion, never silent deletion. Never delete real files/directories, nonprefix entries, unknown tags or inaccessible items. Serialize cross-process repairs per physical game directory; refuse running games. Before execution, revalidate preview parent directory, file identity, type and raw target; refuse changes. Windows pins parent/link handles and detaches by handle; other systems pin parent, revalidate and unlink individually, never recursively or through targets. Undoing deployment removes links only, never recycles targets or uses recycle bin. Results list detached links; preserve remaining items on failure. Do not propose rebuilding unverified new targets.
 
 
-Mod 可以放在游戏不读的目录里（SteamCMD 下载目录、自己的 Mod 仓库、RimArcho 的锁定库和 Archo Monitor 目录，即 `steamcmd` 和 `extra` 来源，02 §3.1、04 §7、§9），启动前用目录链接放进 `Mods/`。
+Mods may live outside game-readable directories (SteamCMD downloads, personal repositories, RimArcho lock library, Archo Monitor directory: `steamcmd`/`extra` sources, 02 §3.1, 04 §7, §9), linked into `Mods/` before launch.
 
-**可部署。** Instance 的来源是 `steamcmd` 或 `extra`；活着、不是残留、不是 `unloadable`；并且游戏还看不到它：没有经过别名（不算 RimArcho 自己的链接）出现在官方目录（`Data/`）、`Mods/` 或工坊里（02 §3.3）。可部署的 Instance 可以直接启用。
+**Deployable.** Instance source `steamcmd`/`extra`, live, not residue/`unloadable`, not already game-visible through non-RimArcho aliases in official `Data/`, `Mods/` or Workshop (02 §3.3). Deployable Instances can be enabled directly.
 
-**链接名。** `Mods/_Archo_<来源标签>_<目录名>`；来源标签和目录名里的 `/`、`\`、`:` 换成 `_`。可部署的来源都是共用的 Mod 文件夹，标签全局唯一（02 §3.1），所以同一份 Instance 在每个游戏的 `Mods/` 里链接名相同。迁移 v14 改了标签时，旧名字的链接在下次写入游戏时按下面的规则换成新名字。前缀 `_Archo_` 表示“由 RimArcho 管理”，按不区分大小写匹配。
+**Link names.** `Mods/_Archo_<source label>_<directory name>`, replacing `/`, `\`, `:` with `_` in labels/names. Deployable sources are shared folders with globally unique labels (02 §3.1), so the same Instance uses the same link name in every game. If v14 migration renamed labels, next game write replaces old link names under rules below. `_Archo_` means RimArcho-managed, matched case-insensitively.
 
-**何时部署。** 启动方案和写入游戏时（§2 第 3 步）：方案里可部署的 Instance 缺链接就建；`_Archo_` 链接不在方案里，或者目标不是记录的那份 Instance，就删。先删后建，同名的旧链接因此会被换掉。`--dry-run` 只列出，不改磁盘。编辑方案本身不碰 `Mods/`。
+**Deployment timing.** Plan launch/game save (§2 step 3): create missing deployable-plan links; delete `_Archo_` links absent from plan or targeting wrong Instance. Remove before create, replacing same-name old links. `--dry-run` only lists. Plan editing never touches `Mods/`.
 
-**切换环境。** 按目标列表补齐缺少的 Monitor 等共用 Mod 链接，以及上个环境的本地 Mod 链接，先建链接再扫描、解析列表，详见 02 §0 第 14 项。本地 Mod 使用 `_Archo_env_<Instance ID>`；这类链接代表已安装的本地 Mod，普通保存只保留目标存在且类型已知的健康链接；异常先经下述检查和确认修复，卸载仍按 `_Archo_` 链接清理。
+**Environment switching.** Fill missing shared links (Monitor etc.) and previous environment's local-Mod links from target list before scanning/resolving; details: 02 §0 item 14. Local Mods use `_Archo_env_<Instance ID>`, representing installed local Mods. Ordinary save retains healthy known-type links with existing targets; inspect/confirm repair for anomalies. Uninstall still removes them as `_Archo_` links.
 
-**启用前的判断**（方案编辑时就做，不等写入）：
+**Pre-enable checks** (during editing, not deferred to writing):
 
-- 方案里的可部署 Instance，和 `Mods/` 里现有 `_Archo_` 链接指向的 Instance，都按“已在 `Mods/`、文件夹名是链接名”参与注册（04 §4.2）。现有链接指向的 Instance 不在方案里、方案里却有同包名的另一个 Instance 时，这条链接不参与（`deploySet`）：写入方案的那次会删掉它，它和方案里的那份不会同时在 `Mods/`。否则 Archo Monitor 更新后、下次写入前，旧版本的链接按文件夹名排在前面，方案里的新版本被报成 `mod.unloadable`（2026-10-28 VM）。
-- 和 `Mods/` 里已有的同包名 Mod 冲突时拒绝启用（`pkg.duplicate-installed`）：游戏只认先注册的那份。
-- **写入时再查一次**（2026-10-22 加）：`Mods/` 里同包名的两份会让游戏报 “Tried loading mod with the same packageId multiple times” 并忽略后一份（`Verse.ModLister.TryAddMod`，1.6 和 1.7 相同；只有工坊版可以和 `Mods/` 里的同包名，它成为 `_steam`）。方案编辑后 `Mods/` 里才出现同包名的文件夹（手动复制、RimCrow 的 `_Link_`）时，写入游戏和启动方案不新建这个 `_Archo_` 链接（`deployDuplicates`），而是提议**把那个文件夹收进锁定库**（2026-10-22 加，见下面“另一个版本挡路”），也可以 `archo swap` 改用 `Mods/` 里的那份。已经在的这种一对由能不能跑报告（§3 末尾）。
-- **另一个版本挡路**（2026-10-22 加；方案的 `_Archo_` 部署和整合包启动共用，`app/dupmove.go`）。RimArcho 要链接的副本与 `Mods/` 里一个普通文件夹同包名、内容不同时，拒绝的结果是 `DuplicatesError`：逐个列出挡路的文件夹、要它的是谁（`#引用 名称` 或“整合包 X 的 Y”）、收进锁定库后放到哪里、腾出来后链接什么。
-  - **一次确认。** 界面（写入游戏、启动方案、整合包的启动按钮、启动页的整合包）弹一个确认框，列出“`Mods/X → <锁定库>/X`，然后为 … 链接 `Mods/Y`”，按“收进锁定库并继续”后移动并接着写入或启动；不另外再问。命令行和 MCP 的拒绝末尾写出修复命令：同一个命令加 `--move-duplicates`（`archo save|launch --move-duplicates`、`archo pack launch <包> --move-duplicates`；MCP `save_loadout` / `launch_game` / `manage_packs action=launch` 的 `move_duplicates: true`），或逐个 `archo library move-to-locked <引用>`。带 `--dry-run` 时列出会移动的文件夹（“would move into the lock library first”），不动磁盘。
-  - **移动** 就是 04 §7 的收进锁定库（`moveToLibrary`）：同一个卷上改名，否则复制、核对后把原文件夹送进回收站；Instance 不变，所以**用它的方案照样用它**，下次写入那个方案时它经 `_Archo_` 链接回到 `Mods/`。移完后重新读状态再写入或启动，`Mods/` 里只有要链接的那份。
-  - **从不移动**：链接（RimArcho 自己的，或 RimCrow 的 `_Link_` 这类别的工具建的）；被别的工具的链接指着的文件夹（移走会让那条链接断掉）；RimArcho 还不认识的文件夹（先 `archo scan`）；里面有指向外面的链接的文件夹（04 §7 的规则）。有任何一个不能移时不提供修复命令，原样拒绝并逐个说明原因。
-  - 测试：`TestPackLaunchMovesOtherVersion`（移动后包启动；用那份的方案再写入时恰好链接那个版本）、`TestPackLaunchNeverMovesLinks`、`TestSaveMovesOtherVersion`、`TestDuplicateFixMovesToLocked`、`gui.TestPackLaunchMovesConfirm`。
-- 和工坊版同包名时，与普通本地版一样只能 `swap`；部署的那份写不带后缀的包名，工坊版写作 `<包名>_steam`。
+- Deployable plan Instances and Instances targeted by existing `_Archo_` links register as "in `Mods/`, folder name = link name" (04 §4.2). Exclude existing link target if absent from plan and another same-package Instance is present (`deploySet`): next write deletes it, so both will not coexist. Otherwise after Monitor updates but before saving, older link sorts first by name and falsely makes new version `mod.unloadable` (2026-10-28 VM).
+- Refuse enabling conflicts with same-package Mods already in `Mods/` (`pkg.duplicate-installed`); game recognizes only first registered copy.
+- **Recheck on write** (added 2026-10-22): duplicate packageIds in `Mods/` cause "Tried loading mod with the same packageId multiple times", later copy ignored (`Verse.ModLister.TryAddMod`, same in 1.6/1.7; only Workshop can coexist as `_steam`). If a same-package folder appears after editing (manual copy, RimCrow `_Link_`), save/launch does not create `_Archo_` (`deployDuplicates`), instead offers **move that folder into lock library** (added 2026-10-22, below), or `archo swap` to existing copy. Existing pairs are findings (§3 end).
+- **Another version blocks the way** (added 2026-10-22; shared by `_Archo_` deployment and pack launch, `app/dupmove.go`). A requested copy with same package ID but different content from an ordinary `Mods/` folder yields `DuplicatesError`: list blockers, who needs the copy (`#ref name` or "Y from pack X"), lock-library destinations, and links created after clearing space.
+  - **One confirmation.** UI (save, plan launch, pack launch button, launch-page pack) confirms once, listing "`Mods/X → <lock library>/X`, then link `Mods/Y` for …". "move and go on" moves and resumes save/launch. CLI/MCP refusal gives same-command `--move-duplicates` (`archo save|launch --move-duplicates`, `archo pack launch <pack> --move-duplicates`; MCP `save_loadout` / `launch_game` / `manage_packs action=launch` with `move_duplicates: true`), or individual `archo library move-to-locked <ref>`. `--dry-run` lists "would move into the lock library first", no writes.
+  - **Move** is 04 §7 lock-library move (`moveToLibrary`): same-volume rename, otherwise copy/verify/recycle original. Instance unchanged, so **its plans still use it**, linked back through `_Archo_` on next write. Reread state before save/launch; only requested copy remains in `Mods/`.
+  - **Never move** links (owned or other tools' RimCrow `_Link_`), folders targeted by other tools' links (would break them), unknown folders (scan first), folders with outward links (04 §7). If any cannot move, offer no repair command; refuse with each reason.
+  - Tests: `TestPackLaunchMovesOtherVersion` (pack launches after move; writing the copy's plan links exactly that version), `TestPackLaunchNeverMovesLinks`, `TestSaveMovesOtherVersion`, `TestDuplicateFixMovesToLocked`, `gui.TestPackLaunchMovesConfirm`.
+- Same-package Workshop copy permits only `swap`, as with ordinary local copies; deployed copy writes unsuffixed package ID, Workshop `<package ID>_steam`.
 
-**链接类型。** Windows 用 junction（目录联接点），不需要管理员权限；其他系统用符号链接。`Mods/` 所在的卷不支持 junction（FAT、exFAT）时拒绝，说明原因，不退回复制（复制只用于整合包）。环境没有 `Mods/` 而方案要部署时拒绝，提示 `archo env set --game <dir>`。
+**Link types.** Windows junctions need no admin; elsewhere symbolic links. Refuse unsupported `Mods/` volumes (FAT/exFAT), explaining without fallback copying (copies only for packs). Missing `Mods/` when deployment required: refuse, suggest `archo env set --game <dir>`.
 
-**删除。** 只删链接本身（Windows 上 `RemoveDirectory` 只去掉联接点），从不进入目标目录。删除前确认它确实是链接（重解析点或符号链接）。名字以 `_Archo_` 开头但不是链接的目录一律不动，报错请玩家自己改名或移走；要新建的链接名已被一个真实目录占用时同样报错。
+**Deletion.** Remove link itself only (Windows `RemoveDirectory` removes junction), never enter target. Verify link type (reparse point/symlink) first. Never touch nonlink `_Archo_` directories; error asking player to rename/move. Same for real-directory collision at intended link name.
 
-**身份。** 扫描把链接解析成真实路径（Windows 用 `GetFinalPathNameByHandle`），链接只是这份 Instance 的一个别名，不产生新 Instance，也不产生事件（02 §3.3）。
+**Identity.** Scan resolves links to real paths (Windows `GetFinalPathNameByHandle`); link is an Instance alias, no new Instance/event (02 §3.3).
 
-**数据目录保护。** 写 `Mods/` 之前检查 RimArcho 的数据目录和 `Mods/` 不互相包含，否则拒绝。
+**Data directory protection.** Before writing `Mods/`, refuse if it and RimArcho data directory contain one another.
 
-**不接管别人的链接。** RimCrow 的 `_Link_<工坊ID>` 链接按普通本地 Mod 识别（02 §8 的 A11），RimArcho 不接管、不删除。
+**No takeover of others' links.** Recognize RimCrow `_Link_<WorkshopID>` as ordinary local Mods (02 §8 A11), never manage/delete them.
 
-**`Mods/` 里同包名的两份**（`pkg.duplicate-mods`，error，能不能跑的“会让游戏出错”）。按 `Mods/` 实际的内容判断（`App.ModsCopies`：每个文件夹和链接读它的包名，`Mods/` 不变时缓存），不管是谁放的：普通文件夹、别的工具的链接、RimArcho 的 `_Archo_` / `!ArchoPack_` 链接。一键修复只动 RimArcho 自己的东西：其中有 `_Archo_` 链接时，改用 `Mods/` 里的那份（同一 Lineage 时 `swap`，可撤销）或把它移出方案，下次写入时链接去掉；只有整合包链接造成的重复并进 `pack.links-left`（§5.3），一键“移除链接”；有能移动的普通文件夹时（规则同上面“另一个版本挡路”），第一个动作是**收进锁定库**（`M`，再按一次确认；`archo library move-to-locked <引用>`）：优先移 `_Archo_` 链接旁的那个文件夹，否则移方案没用、游戏会忽略的那个；移走后用它的方案照样用它。都不能移时只说明要把多余的移出 `Mods/`。
+**Duplicate packageIds in `Mods/`** (`pkg.duplicate-mods`, error, "breaks the game" in can it run). Inspect actual contents (`App.ModsCopies`, reads packageId from every folder/link, cached while `Mods/` unchanged), regardless of creator: ordinary folders, other tools' links, `_Archo_` / `!ArchoPack_`. One-click fixes affect only RimArcho-owned items: with `_Archo_`, use existing `Mods/` copy (same-Lineage `swap`, undoable) or remove from plan so next write removes link. Pack-only duplicates merge into `pack.links-left` (§5.3), one-click "remove the links". With movable ordinary folders (same rules as blockers), first action **move into lock library** (`M`, press again to confirm; `archo library move-to-locked <ref>`): prefer folder beside `_Archo_`, otherwise unused/game-ignored copy. Its plans retain use after moving. If nothing movable, explain manual removal from `Mods/`.
 
-## 4. 游戏运行检测
+## 4. Running-game detection
 
-**怎么找。** Windows 上用 `CreateToolhelp32Snapshot` 列出进程，取可执行文件名以 `rimworld` 开头的，用 `QueryFullProcessImageName` 取完整路径；路径在环境的游戏目录下就是这个环境的游戏。同时读：
+**Discovery.** Windows `CreateToolhelp32Snapshot` lists processes whose executable names start `rimworld`; `QueryFullProcessImageName` gets full paths. Under environment game directory means that game. Also read:
 
-- 开始时间（`GetProcessTimes`）；
-- 命令行（`NtQueryInformationProcess` 的 `ProcessCommandLineInformation`，Windows 8.1 起用 `PROCESS_QUERY_LIMITED_INFORMATION` 即可），从中取 `-savedatafolder=` 的值（值或整个参数可以带引号）。
+- Start time (`GetProcessTimes`);
+- Command line (`NtQueryInformationProcess` `ProcessCommandLineInformation`, only `PROCESS_QUERY_LIMITED_INFORMATION` needed since Windows 8.1), extracting `-savedatafolder=` (value or whole argument may be quoted).
 
-其他系统还没实现，游戏一律算作没在运行。
+Unimplemented on other systems; games always considered stopped.
 
-**跨环境。** 启动前的检查（§1）要看所有环境：进程的可执行文件在任一已登记环境的游戏目录下，就算有游戏在运行；拒绝时说明是哪个环境，并按启动记录说是哪个方案或整合包。进程列表只读一次，与每个已登记环境的游戏目录比较（按路径边界，`RimWorld2` 不算 `RimWorld` 下）。拒绝和 `archo status` 都说出方案名（如 `environment main is running plan:default`）或整合包名；游戏不是从 RimArcho 启动的，写 `plan:X (last written to the game)`。
+**Across environments.** Prelaunch checks (§1) inspect every environment: executable under any registered game directory means running. Refusal identifies environment and plan/pack from launch records. Read process list once, compare with each root using path boundaries (`RimWorld2` is not within `RimWorld`). Refusal and `archo status` name plan (e.g. `environment main is running plan:default`) or pack. Non-RimArcho launches say `plan:X (last written to the game)`.
 
-**在玩什么。** 找到进程后判断它玩的是环境自己的列表还是某个整合包：
+**What is being played.** After finding process:
 
-- 读到了命令行：没有 `-savedatafolder`，或者它等于环境的用户数据目录 → 环境自己的列表；等于 `<整合包目录>/<包名>/userdata` → 那个整合包；其他目录 → 未知的数据目录，照它记。
-- 读不到命令行：取进程开始时间加 1 分钟之前最近的一条启动记录；它是 `pack:<包名>`、并且距进程开始不到 10 分钟（Steam 启动游戏要一会儿）→ 那个整合包，标“按启动记录推断”；否则当作环境自己的列表。
+- Command line available: no `-savedatafolder` or equals environment user data → environment list; equals `<pack directory>/<pack name>/userdata` → pack; another directory → record unknown user data directory as-is.
+- Command line unavailable: latest launch before process start + 1 minute; if `pack:<pack name>` and within 10 minutes of process start (Steam takes time), infer pack and label "from the launch records"; otherwise environment list.
 
-**多久看一次。** GUI / TUI 的游戏状态与新增日志读取、CLI `archo log --follow` 的日志和游戏退出检查，统一见 [06 §2.16.1](06-ui/2.16-scheduled-behavior.md) G01、L01。没有后台常驻进程。
+**Frequency.** GUI/TUI game status/new-log reads, CLI `archo log --follow` log and exit checks: [06 §2.16.1](06-ui/2.16-scheduled-behavior.md) G01, L01. No resident background process.
 
-**显示。** 状态是“没在运行”或“运行中”（带进程号和开始时间）。
+**Display.** "not running" or "running" with PID/start time.
 
-- `archo status`：`game: running the list for 12m (pid 1234; archo log --follow)`；整合包时写 `pack <包名>`，推断的加 `(from the launch records)`。
-- GUI：游戏运行时启动页的启动色块写“游戏运行中”和本次运行的报错数（禁用），右上“上次游戏”同样；报错进能不能跑和它的角标（06 §2.1、§2.3）。2026-10-30 起侧栏底部不再有“游戏运行中”一行。
-- TUI：状态栏同样显示（06 §9）。
-- 游戏退出时停止跟踪并做一次完整分析（03 §6.6），并按 §2 提示分析日志。
+- `archo status`: `game: running the list for 12m (pid 1234; archo log --follow)`; packs `pack <pack name>`, inferred adds `(from the launch records)`.
+- GUI: running launch-page block says "the game is running" and this-run error count (disabled); top-right "last game" likewise. Errors enter can it run/badge (06 §2.1, §2.3). Since 2026-10-30 no sidebar-bottom running-game line.
+- TUI: same status bar (06 §9).
+- On exit stop following, perform full analysis (03 §6.6), and suggest log analysis under §2.
 
-## 5. 整合包
+## 5. Packs
 
-整合包把一个方案**编译**成固定的产物：每个 Mod 锁定到当时的 Instance 和内容快照，记住它属于哪个 Lineage，复制一份只含本游戏版本会加载的内容，用自己的用户数据目录来玩。理由：一份今天没问题的列表，里面的 Mod 更新以后会不会出错，事先说不准；整合包让玩家有一份不会被更新弄坏的东西。
+A pack **builds** a plan into a fixed artifact: lock each Mod to its Instance/content snapshot, retain Lineage, copy only content loaded by this game version, play with own user data. A list working today may break after Mod updates; packs preserve an artifact unaffected by updates.
 
-### 5.1 数据
+### 5.1 Data
 
-**位置。** `<整合包目录>/<包名>/`。整合包目录是设置项 `pack.dir`（`archo config set pack.dir <路径>`），默认 `<数据目录>/packs`。
+**Location.** `<pack directory>/<pack name>/`. Setting `pack.dir` (`archo config set pack.dir <path>`), default `<data directory>/packs`.
 
-**包名**：字母、数字、空格、`.`、`_`、`-`，首字符是字母或数字，最长 64 个字符，不能以 `.` 或空格结尾。
+**Pack names**: letters, digits, spaces, `.`, `_`, `-`; first character letter/digit, max 64 characters, no trailing dot/space.
 
-**一个包的目录：**
+**Pack directory:**
 
-| 路径 | 内容 |
+| Path | Content |
 | --- | --- |
-| `pack.json` | 清单（下表） |
-| `mods/<目录名>/` | 每个随包携带的 Mod 的副本；目录名取原目录名，非 `[A-Za-z0-9._-]` 的字符换成 `_`，重名时加 `-2`、`-3` |
-| `mods/<目录名>/.rimarcho/origin.json` | 来源：原 Instance、Lineage、工坊 ID、快照哈希、复制时间（格式同锁定版本，04 §7） |
-| `userdata/` | 这个包自己的用户数据目录（第一次启动时建立，§5.3） |
-| `state.json` | `{"last_played": 时间}`，上次游玩时间 |
+| `pack.json` | Manifest below |
+| `mods/<directory name>/` | Bundled Mod copies; original directory name with non-`[A-Za-z0-9._-]` replaced by `_`, duplicates suffixed `-2`, `-3` |
+| `mods/<directory name>/.rimarcho/origin.json` | Origin: original Instance, Lineage, Workshop ID, snapshot hash, copy time (locked-version format, 04 §7) |
+| `userdata/` | Own user data (created on first launch, §5.3) |
+| `state.json` | `{"last_played": time}`, last played |
 
-**pack.json**（`format` 目前是 2；1 照常读；读到更高的格式版本时拒绝）：
+**pack.json** (`format` currently 2; still reads 1; rejects higher versions):
 
-| 字段 | 含义 |
+| Field | Meaning |
 | --- | --- |
-| `format` | 格式版本 |
-| `name` | 包名 |
-| `created` | 创建时间（UTC） |
-| `game` | 编译时游戏的**完整版本**（`Version.txt` 整行，例如 `1.6.4633 rev1261`，02 §2.1“游戏版本的完整形式”）。别处写的只有 `1.6` 的包照读，构建号算未知 |
-| `env` | 来源环境的名字 |
-| `light` | 只有清单、不带文件：RimArcho 列表（04 §9.3）。包目录里的 `pack.json` 没有这一项 |
-| `trimmed_bytes` | 全部省掉的字节数 |
-| `entries[]` | 按加载顺序的条目 |
+| `format` | Format version |
+| `name` | Pack name |
+| `created` | Creation time (UTC) |
+| `game` | **Full game version** at build (whole `Version.txt` line, e.g. `1.6.4633 rev1261`, "full game version" in 02 §2.1). Read packs carrying only `1.6`, treating build as unknown |
+| `env` | Source environment name |
+| `light` | Manifest only, no files: RimArcho list (04 §9.3). Absent from pack-directory `pack.json` |
+| `trimmed_bytes` | Total omitted bytes |
+| `entries[]` | Entries in load order |
 
-条目字段：`package_id`、`name`、`official`（Core 或 DLC，来自游戏，不携带）、`lineage`、`instance`、`workshop_id`、`hash`（语义快照哈希，02 §4.4）、`folder`（`mods/` 下的目录名）、`bytes`（副本大小）、`trimmed_bytes`、`trimmed`（省掉的版本目录名）。格式 2 加上（2026-10-24）：
+Entry fields: `package_id`, `name`, `official` (Core/DLC from game, not bundled), `lineage`, `instance`, `workshop_id`, `hash` (semantic snapshot hash, 02 §4.4), `folder` (under `mods/`), `bytes` (copy size), `trimmed_bytes`, `trimmed` (omitted version directories). Format 2 adds (2026-10-24):
 
-| 字段 | 含义 |
+| Field | Meaning |
 | --- | --- |
-| `files` | 副本的文件数（不含 `.rimarcho/`） |
-| `sha256` | 副本内容摘要：副本里每个文件（不含 `.rimarcho/`）一行 `<相对路径>\0<字节数>\0<文件 SHA-256 十六进制>
-`，路径用 `/`、按字节序排序，整段再取 SHA-256。编译最后一步算（贴图转换之后），导入和 `pack check` 用它核对 |
-| `workshop_updated` | 工坊版的更新时间（`appworkshop_294100.acf` 的 `timeupdated`，Unix 秒），有才写 |
-| `git_head` | Mod 目录是 git 仓库时的提交，有才写 |
+| `files` | Copy file count (excluding `.rimarcho/`) |
+| `sha256` | Copy digest: one `<relative path>\0<bytes>\0<file SHA-256 hex>\n` line per file (excluding `.rimarcho/`), `/` paths, bytewise sorted, then SHA-256 of the whole. Compute last in build (after textures); import and `pack check` verify |
+| `workshop_updated` | Workshop update time (`timeupdated` from `appworkshop_294100.acf`, Unix seconds), if available |
+| `git_head` | Commit if Mod directory is a git repository, if available |
 
-摘要用 SHA-256 而不用扫描的 xxh3：包会来自别人，要防的是有意改过的内容。
+Use SHA-256 rather than scan xxh3 because packs come from others and must detect deliberate tampering.
 
-**锁定的是什么。** 一个包锁住：每个 Mod 的包名、Lineage 和 Instance、工坊 ID、语义哈希与副本摘要（以及有时的工坊更新时间、git 提交）、加载顺序（`entries` 的顺序）、游戏的完整版本，和 DLC 集合（`official` 为 true 的条目就是这个列表要的 Core 与 DLC，不另设字段）。
+**What is locked.** Per-Mod package ID, Lineage/Instance, Workshop ID, semantic hash/copy digest (sometimes Workshop timestamp/git commit), load order (`entries`), full game version and DLC set (`official` entries are required Core/DLC; no separate field).
 
-**包和它的列表。** 包总是带着 Mod 文件，扩展名 `.archopack`（文件格式见下）。只分享列表时导出 RimArcho 列表（`.archolist.json`，04 §9.3）：同一个 `pack.json`，`light` 为 true，去掉文件相关的字段；导入时按 packageId 和语义哈希对照本地 Instance。
+**Pack and list.** Packs always bundle files, extension `.archopack` (below). For list-only sharing export RimArcho list (`.archolist.json`, 04 §9.3): same `pack.json`, `light` true, file-related fields removed; import compares local Instances by packageId/semantic hash.
 
-**.archopack 文件**（格式 2，2026-10-24）：一个 tar 流，整个用 zstd 压缩（klauspost/compress，`SpeedBetterCompression`，窗口 8 MB，单线程编码，07 §1）。第一项是 `pack.json`，之后只有 `mods/<目录名>/…`，`<目录名>` 必须是某个携带条目的 `folder`；只有普通文件和目录，没有链接。格式 1 的 `.archopack`（zip）照常导入。选 tar + zstd 而不是继续用 zip：在十个真实工坊 Mod（84.5 MB，大半是 PNG）上，zip 逐文件压缩 deflate 42.4 MB、zstd 41.3 MB，几乎一样；整体压缩（跨文件共享字典，各 Mod 的 XML 很像）zstd 29.5 MB，小 30%，速度相当。代价是不能随机读取，所以 `pack.json` 放在第一项，读清单不必解开整个文件。任何能读 `.tar.zst` 的工具都能打开它。
+**.archopack file** (format 2, 2026-10-24): tar stream compressed as a whole with zstd (klauspost/compress, `SpeedBetterCompression`, 8 MB window, single-thread encoding, 07 §1). First entry `pack.json`, followed only by `mods/<directory name>/…`, each name matching a bundled entry's `folder`. Regular files/directories only, no links. Still import format 1 ZIP. Why tar+zstd rather than ZIP: ten real Workshop Mods (84.5 MB, mostly PNG), per-file ZIP deflate 42.4 MB, zstd 41.3 MB, nearly equal; whole-stream zstd (shared dictionary across similar XML) 29.5 MB, 30% smaller, similar speed. No random access; putting manifest first avoids full extraction to read it. Any `.tar.zst` tool opens it.
 
-**绝不带游戏。** 包里只有 RimArcho 编译出的 Mod 副本，从来不带游戏本体、Core 或 DLC：编译不复制 `official` 条目；导出只写 `pack.json` 和携带条目的目录（`userdata/`、`state.json` 和其他东西一律不写）；导入时出现任何别的路径（例如 `RimWorldWin64_Data/`、`Data/Core/`、`Version.txt`）、链接、`official` 条目带 `folder`、或 `package_id` 以 `ludeon.rimworld` 开头的携带条目，整个包拒绝。对照：2026-10 见到的一个“1.6 全 DLC + 鼠族等五种族”整合包是 WinRAR 自解压 exe（RAR5，1.29 GB，解开 2.0 GB、44,670 个文件），里面是一整份游戏（`RimWorldWin64_Data/`、`Data/Core` 与 DLC、换掉的 `steam_api64`）加 38 个按工坊 ID 命名的 Mod 目录，没有清单、加载顺序和哈希，解开前也无从核对。RimArcho 的包只装后者那部分，并且每一项可核对。
+**Never bundle the game.** Only compiled Mod copies, never game/Core/DLC. Build skips `official`; export writes only manifest and bundled directories (no `userdata/`, `state.json` or extras). Reject entire imports with other paths (`RimWorldWin64_Data/`, `Data/Core/`, `Version.txt`), links, `official` with `folder`, or bundled `package_id` starting `ludeon.rimworld`. Comparison: an October 2026 pack advertised as "1.6 all DLC + Ratkin and four other races" (translated) was a WinRAR self-extracting exe (RAR5, 1.29 GB, 2.0 GB extracted, 44,670 files), containing a full game (`RimWorldWin64_Data/`, `Data/Core`/DLC, replaced `steam_api64`) plus 38 Workshop-ID Mod directories, no manifest/order/hashes and no pre-extraction verification. RimArcho packs only the Mod part, with every entry verifiable.
 
-2026-10-22 起没有“轻包”这种包：原来 `pack build --light` 在整合包目录里建一个只有清单的包，它不能启动、也不该出现在整合包列表里，玩家要分清“完整包 / 轻包”，其实只是想分享一份带版本的列表。现在列表从两处导出：当前列表（导出里选“RimArcho 列表”，`archo loadout export --format archo`）和一个包（包页的“导出列表”，`archo pack export --list`）。之前建的只有清单的包目录不再列出、不能启动（这个功能没发布过）。
+Since 2026-10-22 no "light packs": former `pack build --light` made manifest-only directories that could not launch and should not appear in packs. Players had to distinguish full/light when they only wanted versioned lists. Now export lists from current list ("RimArcho list", `archo loadout export --format archo`) or pack ("export the list", `archo pack export --list`). Old manifest-only directories are hidden/unlaunchable (never released).
 
-**列表。** `archo pack list`：包名、Mod 数、大小、游戏版本、上次游玩时间。大小用编译时记下的 `bytes` 相加，列表时不遍历副本（没有记录时才遍历 `mods/`）。一个环境只列出：在这个环境里编译的包，以及来源环境在本机不存在、但游戏主次版本相同的包；其余的只给个数。
+**Listing.** `archo pack list`: name, Mod count, size, game version, last played. Sum recorded `bytes` without traversing copies (walk `mods/` only if absent). Environment shows packs built there plus packs whose source environment is absent locally but major/minor matches; show only count of others.
 
-### 5.2 编译
+### 5.2 Building
 
-`archo pack build <包名> [--dry-run]`；界面是方案页的“编译成整合包”子页（06 §2.6）。
+`archo pack build <pack name> [--dry-run]`; UI "create a pack" subpage of plan (06 §2.6).
 
-1. **检查。** 包名合法、同名的包不存在。有缺失条目（“not installed: pkg:…”）或 error 级问题时拒绝并列出。**排序问题（`order.*`、`official.order`）不阻止**，因为下一步会单独排序；来自日志的问题不参与。`version.unsupported` 不阻止，列为警告（Mod 名加它声明支持的版本），遵循 03 §4.2 的提醒偏好。
-2. **排序。** 等于 `archo sort --dry-run`：结果只用于这个包，不改方案。记下移动了几项。
-3. **决定每个 Mod 复制什么（清洗）。** 只保留当前游戏版本会加载的目录：按游戏的加载规则（03 §1，有 `LoadFolders.xml` 时按其中对应版本的条目，否则公共目录加不高于当前版本的最高版本目录），根目录下没被用到的版本目录不复制，记进 `trimmed`。例如 1.6 环境只留 `1.6/` 和公共目录，丢掉 `1.5/`。`.git` 和 `.rimarcho` 不复制；指向 Mod 目录以外的链接不跟随，计数后跳过。Core 和 DLC 不复制。
-4. **测量。** 每个副本的大小、省掉的字节、整合包目录所在盘的剩余空间。有 Mod 的文件夹读不出来时拒绝并列出；剩余空间小于“需要的大小 + 256 MB”时拒绝。
-5. **复制。** 在 `<包名>.archo-tmp`（整合包目录里）组装，每个副本写 `.rimarcho/origin.json`。
-6. **写 pack.json**，然后把 `.archo-tmp` 改名为 `<包名>`。
+1. **Check.** Valid name, no existing pack. Refuse/list missing entries ("not installed: pkg:…") or error findings. **Sorting findings (`order.*`, `official.order`) do not block**: next step sorts. Exclude log findings. `version.unsupported` warns (Mod name/declared versions), respecting 03 §4.2 preferences, without blocking.
+2. **Sort.** Equivalent to `archo sort --dry-run`, for pack only, leaving plan unchanged. Record move count.
+3. **Select content (cleaning).** Keep only directories loaded by current game (03 §1: matching LoadFolders.xml entries, otherwise shared directories + highest version ≤ current). Omit unused root version directories, recording `trimmed`, e.g. 1.6 keeps `1.6/` and shared, drops `1.5/`. Exclude `.git`, `.rimarcho`; count/skip outward links without following. No Core/DLC copies.
+4. **Measure.** Per-copy size, omitted bytes, pack-volume free space. Refuse/list unreadable Mod folders; require needed size + 256 MB free.
+5. **Copy.** Assemble `<pack name>.archo-tmp` in pack directory, writing each `.rimarcho/origin.json`.
+6. **Write pack.json**, rename temporary directory into place.
 
-`--dry-run` 做到第 4 步，列出会省掉的版本目录、大小和警告，不写磁盘。
+`--dry-run` stops after step 4, listing omitted versions, sizes, warnings, no writes.
 
-**界面上的“编译”按钮** 有 error 时禁用并说明，点击说明去能不能跑；“先看清单，不写磁盘”等于 `--dry-run`（06 §2.6，G14）。
+**UI create button** is disabled with explanation on errors; explanation opens can it run. "see the list first, write nothing" means `--dry-run` (06 §2.6, G14).
 
-**长任务。** 复制要几分钟，GUI 把它交给子进程 `archo pack build <包名> [--env <环境>]`（同一个数据目录，脱离窗口运行，窗口关掉也继续）。进度写在 `<包名>.archo-tmp/build.json`：步骤（`check`、`measure`、`copy`、`write`、`done`）、已复制 / 总 Mod 数、已复制 / 总字节、当前 Mod、进程号、开始时间、心跳。心跳周期及失活阈值、进度写盘 / 报告节流和停止检查频率统一见 06 §2.16.1 P01–P02、P04。写法是先写 `build.json.part` 再改名，读的一方不会读到半个文件。
+**Long tasks.** Copying takes minutes; GUI launches child `archo pack build <pack name> [--env <environment>]` (same data directory, detached, continues after closing window). Progress in `<pack name>.archo-tmp/build.json`: step (`check`, `measure`, `copy`, `write`, `done`), copied/total Mods and bytes, current Mod, PID, start, heartbeat. Heartbeat/stale thresholds, write/report throttling, stop frequency: 06 §2.16.1 P01–P02, P04. Write `build.json.part`, rename, avoiding partial reads.
 
-- `archo pack stop <包名>`：在构建目录里放一个 `stop` 文件，构建每半秒看一次，看到后停下并删掉已复制的内容。
-- 中途断掉的构建留下 `.archo-tmp` 目录；`archo pack list` 列出它们，`archo pack remove <包名> --unfinished` 删除（这是 RimArcho 自己的未完成产物，直接删除，不进回收站）。正在运行的构建不能删，要先 `stop`。同名再编译时，旧的未完成目录被替换。
+- `archo pack stop <pack name>` creates `stop` in build directory; check every half-second, then stop/delete copied content.
+- Interrupted builds leave `.archo-tmp`; `archo pack list` lists them, `archo pack remove <pack name> --unfinished` deletes directly (RimArcho unfinished output, not recycle bin). Running builds require `stop` first. Rebuilding same name replaces old unfinished directory.
 
-**贴图优化。** PNG 转 DDS 分两种（2026-10-22 更正，原来只允许在包里做）：
+**Texture optimization.** Two PNG→DDS modes (corrected 2026-10-22; previously pack-only):
 
-- **普通优化**（Mod 库存的“优化贴图”、库 › 贴图优化、`archo textures optimize`、MCP `manage_textures`）：在原 Mod 的 PNG 旁边生成同名 `.dds`，PNG 保留。处理这份副本里所有含 `Textures/` 的目录（工坊目录被几个游戏版本共用）；同一个相对路径要么全部转换，要么一个都不留。每批写之前先在数据库里记成“进行中”，写完改成“完成”；失败或停下的那一组删掉已写的 DDS。只写、只删 RimArcho 自己生成并记录过的 `.dds`；作者自带的 `.dds` 所在的那一组跳过。生成的文件不算进扫描指纹；Mod 更新后报 `texture.stale`，可以重新生成或清掉。游戏在运行时拒绝。
-- **整合包精简**（编译页的贴图选项、`archo pack build --textures [--texture-scale N]`）：复制之后多一步“贴图”，在包的副本里转换，转换成功的 PNG 删掉，失败的那一组保留 PNG。默认不缩放；不缩放时界面叫“预转换”，选了缩放比例才叫“精简”。原 Mod 里 RimArcho 生成的 DDS 不复制进包。测量按转换后的大小算，剩余空间检查用峰值（转换时 PNG 和 DDS 同时存在）。`pack.json` 记录 `textures`（工具、比例、转换数、保留数、失败数、PNG 与 DDS 字节），副本的 `origin.json` 记 `textures`；导出的列表不带这条记录。
+- **Ordinary optimization** (mod library "convert textures to DDS", library › texture optimisation, `archo textures optimize`, MCP `manage_textures`): generate same-name `.dds` beside original PNGs, retaining PNGs. Process all `Textures/` directories in this copy (Workshop shared by game versions); same-relative-path group converts all or none. Record batch "in progress" in database before writing, "complete" afterward; failed/stopped groups remove written DDS. Write/delete only own recorded DDS; skip groups with author-provided DDS. Generated files excluded from scan fingerprints. Mod update produces `texture.stale`, offering regenerate/clear. Refuse while game runs.
+- **Pack slimming** (build-page texture options, `archo pack build --textures [--texture-scale N]`): add texture step after copying, converting pack copies, deleting successful PNGs, retaining PNGs for failed groups. Default no scaling, UI "pre-convert"; only scaled mode is "slim". Exclude original Mods' RimArcho DDS from pack copies. Measure final converted size, but free-space checks use peak with PNG/DDS together. `pack.json` records `textures` (tool, scale, converted/retained/failed counts, PNG/DDS bytes); copy `origin.json` records `textures`; list export excludes it.
 
-两种都用 todds 0.4.1（`-f BC1 -af BC7 -vf -fs`，有 mipmap）：不透明的贴图是 BC1，有透明的是 BC7。原尺寸转换不省盘（DDS 比 PNG 大），但省加载时间，不透明贴图还省一半显存（1.7 自己编码成 BC7、1.6 编码成 DXT5，都是每像素 8 位，BC1 是 4 位）。缩放比例只给能让宽高都保持 4 的倍数、短边不小于 128 像素的那些（20%–80%）；遮罩（`_m`）不缩放。todds 要玩家看过来源和大小、同意后从 GitHub 下载（库 › 贴图优化，或 `archo textures tool --install`），也可以用设置项 `textures.todds` 指向已有的一份（例如 RimSort 自带的）。转换在后台的 archo 子进程里跑，可以停下（在数据目录放 `textures.stop`）。研究结论、游戏的加载规则和实测数据见 docs/research/dds-texture-optimization.md。
+Both use todds 0.4.1 (`-f BC1 -af BC7 -vf -fs`, mipmaps): opaque BC1, transparent BC7. Full-size conversion costs disk (DDS larger than PNG) but saves loading time and half opaque video memory (1.7 encodes BC7, 1.6 DXT5, both 8 bits/pixel; BC1 4). Offer only scales keeping both dimensions divisible by 4 and short side ≥ 128 pixels (20%–80%); never scale masks (`_m`). Download todds from GitHub only after player sees source/size and agrees (library › texture optimisation, or `archo textures tool --install`), or configure existing tool through `textures.todds` (e.g. RimSort's). Conversion runs in background archo child, stoppable via `textures.stop` in data directory. Research, game loading rules, measurements: docs/research/dds-texture-optimization.md.
 
-### 5.3 启动
+### 5.3 Launching
 
-移走挡路副本前按 §3 计划并维护所有游戏入链；原确认列出受影响链接，env/locked 不重复注册。
+Before moving blockers, plan/maintain all game incoming links under §3. Original confirmation lists affected links; env/locked never double-register.
 
-`archo pack launch <包名> [--dry-run] [--move-duplicates]`；界面是“整合包”页每个包的启动按钮（06 §2.7）。
+`archo pack launch <pack name> [--dry-run] [--move-duplicates]`; UI launch button per pack (06 §2.7).
 
-1. **检查。** 只有清单的包目录不能启动（提示用 `archo loadout import` 载入它的 `pack.json`）。包的游戏主次版本与环境不同时拒绝。环境没有 `Mods/` 时拒绝。没有游戏在运行（§1）。
-2. **`Mods/` 里不出现同包名的两份**（2026-10-22 改；原来的做法靠 `!` 排在前面让包里的副本赢，游戏会为每一对报错，见下面“为什么”）。对包里的每个副本看 `Mods/` 现在有没有同包名的另一份（`App.ModsCopies`）：
-   - 没有：链接包里的副本。与工坊版同包名时它拿原名，工坊版成为 `_steam`。
-   - 有一份玩家自己的（文件夹，或 RimCrow 的 `_Link_` 这类别的工具的链接），并且内容就是包里那份（语义哈希等于 `pack.json` 里的 `hash`）：**不链接包里的副本，用 `Mods/` 里那份**，包的列表写它的包名；`--dry-run` 和结果里列在 “from Mods/”。这正是从 RimCrow 风格的 `_<工坊ID>_` 副本编译的包最常见的情况。
-   - 有，但内容不同（编译后更新过），或者有不止一份：**拒绝并提议收进锁定库**（§3 “另一个版本挡路”）：一次确认后把那些普通文件夹移进锁定库，再链接包里的副本；用它们的方案照样用它们。挡路的是链接或被别的工具的链接指着时不移动，原样拒绝并说明，提示把它们移出 `Mods/` 或用当前列表重新编译。RimArcho 从不改名玩家的文件夹。
-   - 方案部署的 `_Archo_` 链接与包里的副本同包名：这次启动先删掉它（是 RimArcho 自己的链接；之后写入游戏或启动方案时按方案重建）。
-   包的列表只写包里的副本和上面借用的 `Mods/` 副本。
-3. **链接。** 把 `mods/<目录>` 链接成 `Mods/!ArchoPack_<包名>_<目录>`（包名里的特殊字符换成 `_`），与链接部署是同一套代码（§3 的链接类型、删除规则同样适用）。其他包的 `!ArchoPack_` 链接删掉；本包已有且目标正确的保留，借用了 `Mods/` 副本的那几个不建（已有的删掉）。要建的名字被真实目录占用时拒绝。
-4. **首次游玩的设置。** `userdata/Config/` 不存在时，从环境的 `Config/` 复制除 ModsConfig.xml 以外的 `.xml`（画面、按键、Mod 设置），之后各自独立。
-5. **写包的列表** 到 `<包>/userdata/Config/ModsConfig.xml`：`version` 写环境的游戏版本（没有时用包的），已知 DLC 写本机安装的官方内容。这是包自己的文件，直接覆盖，不做备份。环境的 ModsConfig.xml 不动。
-6. **启动**，参数 `-savedatafolder=<包>/userdata`，其余同 §2（Steam / direct、附加参数）。包的列表、存档、设置因此都独立。
-7. **记录**：`state.json` 的上次游玩时间；启动记录，方式为 `pack:<包名>`。
+1. **Check.** Manifest-only directories cannot launch (suggest `archo loadout import` of `pack.json`). Refuse major/minor mismatch, missing `Mods/`, any running game (§1).
+2. **No same-package pairs in `Mods/`** (changed 2026-10-22; former `!`-first approach made pack win but game errored per pair, below). For every bundled copy inspect current same-package copies (`App.ModsCopies`):
+   - None: link pack copy. Workshop coexistence: pack keeps plain ID, Workshop `_steam`.
+   - One player-owned folder or other-tool link (RimCrow `_Link_`), same content (semantic hash equals manifest `hash`): **do not link pack copy; use existing `Mods/` copy**, plain package ID in list; preview/results under "from Mods/". Common for packs built from RimCrow `_<WorkshopID>_` copies.
+   - Different content (updated after build), or several copies: **refuse and offer lock-library move** (§3 blocker rules). One confirmation moves ordinary folders, then links pack; their plans retain use. Never move links or folders targeted by others' links; refuse, explain and suggest moving out of `Mods/` or rebuilding current list. Never rename player folders.
+   - Same-package plan `_Archo_` deployment: delete owned link for this launch; plan save/launch recreates later.
+   Pack list includes bundled and reused `Mods/` copies only.
+3. **Links.** Link `mods/<directory>` as `Mods/!ArchoPack_<pack name>_<directory>` (sanitize special pack-name characters to `_`) using deployment code (§3 types/deletion rules). Remove other packs' links; retain correct current ones; do not create (remove existing) for reused `Mods/` copies. Refuse real-directory name collisions.
+4. **First-play settings.** If `userdata/Config/` absent, copy environment `.xml` except ModsConfig.xml (graphics, keys, Mod settings); independent afterward.
+5. **Write pack list** to `<pack>/userdata/Config/ModsConfig.xml`: environment game version (fallback pack), installed official content as known DLC. Own file, overwrite without backup; environment ModsConfig.xml untouched.
+6. **Launch** with `-savedatafolder=<pack>/userdata`, otherwise §2 (Steam/direct, extra arguments). Own list, saves, settings.
+7. **Record** `state.json` last played and launch record `pack:<pack name>`.
 
-`--dry-run` 列出链接变化（`+` / `-`）、包的 ModsConfig.xml 路径和条目数、存档目录、会复制的设置、启动命令行，不写磁盘。
+`--dry-run` shows link changes (`+`/`-`), pack ModsConfig.xml path/count, saves, settings to copy, command, no writes.
 
-**为什么链接前缀是 `!ArchoPack_`，以及为什么不再靠它。** 游戏按目录名顺序注册 `Mods/`，`!` 排在所有名字前面。原来的设计让包里的副本借此赢过 `Mods/` 里同包名的另一份，那一份被游戏当作重复忽略。但游戏为每一对都写一条 error（玩家 2026-10-21 用整合包“测试”启动时的 Player.log 有 6 条：`_2888837973_` 与 `!ArchoPack____2888837973_` 等，`-savedatafolder` 说明是 RimArcho 启动的，不是从 Steam），玩家不接受任何这种报错，所以第 2 步改为从不建这样的一对。前缀保留：名字一眼能看出是哪个包的链接。
+**Why `!ArchoPack_`, and why no longer rely on it.** Game registers `Mods/` by name; `!` comes first. Originally pack copies won against same-package local copies, which game ignored as duplicates. But every pair emitted an error (player's 2026-10-21 "Test" pack launch Player.log had 6, e.g. `_2888837973_` / `!ArchoPack____2888837973_`; `-savedatafolder` proves RimArcho launch, not Steam). Player accepts no such errors, so step 2 never creates pairs. Keep prefix to identify pack ownership.
 
-**扫描跳过包的链接。** 列目录时以 `!ArchoPack_` 开头的链接直接跳过，所以玩整合包不会产生新 Instance。副本里的 `origin.json` 照常写，留给以后需要时归入原 Lineage。
+**Scan skips pack links.** Skip `!ArchoPack_` links during enumeration; pack play creates no new Instances. Still write copy `origin.json` for future original-Lineage matching.
 
-**`_Archo_` 链接。** 启动整合包不动方案部署的 `_Archo_` 链接；它们不在包的列表里，游戏看到也不会加载。
+**`_Archo_` links.** Pack launch leaves plan-deployment `_Archo_` links alone; absent from pack list, so game sees but does not load them.
 
-**离开整合包。** 启动方案或写入游戏时删掉所有 `!ArchoPack_` 链接（§2 第 4 步）。游戏退出后链接保留，下次启动同一个包不必重建。
+**Leaving a pack.** Plan launch/save removes all `!ArchoPack_` (§2 step 4). Keep after game exit so relaunching same pack need not recreate.
 
-**直接从 Steam 启动。** 玩家不经过 RimArcho 从 Steam 启动游戏时，上次留下的 `!ArchoPack_` 链接还在，游戏会把包里的副本当作普通 Mod 读到（`!` 排在最前，方案里同包名的那份被当作重复）。已实现（`app.LeftPackLinks`）：
-- **判断**：当前环境的 `Mods/` 里有 `!ArchoPack_` 链接，并且不是“这个环境的游戏正在作为这个包运行”（按 §4 的运行检测和 `WhatRuns`：命令行的 `-savedatafolder` 是包的 `userdata/`，读不到命令行时按启动记录）。游戏没在运行时也算：玩完整合包后链接留着，下次从 Steam 启动就会读到。每次取问题时都看一遍 `Mods/`（只读目录，有链接时才看进程），不进问题缓存。
-- **问题**：`pack.links-left`（warning，修法 `archo pack unlink`），出现在 `archo problems` 和 MCP `list_problems` 里；游戏正以这种方式运行时说“游戏正在用整合包的副本运行”。链接和 `Mods/` 里同一个 Mod 的另一份同包名时升为 error，列出每一对，放进能不能跑的“会让游戏出错”（游戏从 Steam 启动时会为每一对报错）。整合包链接和 `Mods/` 的重复不阻止编译整合包（编译只写整合包目录，启动包时第 2 步处理）。
-- **界面**：能不能跑的“要你确认”区一项（从 RimArcho 启动本来就会移除，所以不算“会让游戏出错”），一键“移除链接”，不确认（再启动这个包会重建）；启动页启动键下面的提示块在没有“会出错”的问题时写这一句，点击去能不能跑（06 §2.3）。
-- **移除**：`archo pack unlink [--dry-run]`、MCP `manage_packs action=unlink`：只删链接（§3 的删除规则），包不动；有游戏在运行时拒绝。
+**Direct Steam launch.** Without RimArcho, leftover pack links are read as ordinary Mods (`!` first, same-package plan copy ignored as duplicate). Implemented (`app.LeftPackLinks`):
+- **Detection**: current `Mods/` has `!ArchoPack_`, except when this environment's game runs that pack (§4/`WhatRuns`: command-line `-savedatafolder` matches pack userdata, fallback launch records). Also counts when stopped: next Steam launch would see links. Check directory on every findings read (processes only if links), outside finding cache.
+- **Finding**: `pack.links-left` (warning, fix `archo pack unlink`), in `archo problems` / MCP `list_problems`. If running this way, say "the game is running with the pack's copies". Duplicate packageIds with `Mods/` upgrade to error, list pairs in "breaks the game" (Steam launch errors for each). Pack/Mods duplicates do not block builds (build writes only pack; launch step 2 handles).
+- **UI**: one "for you to confirm" item (RimArcho launch removes links, so not "breaks the game"), one-click "remove the links", no confirmation (relaunch rebuilds). Launch-page notice shows it if no game-breaking findings, linking can it run (06 §2.3).
+- **Removal**: `archo pack unlink [--dry-run]`, MCP `manage_packs action=unlink`: links only (§3), pack unchanged; refuse any running game.
 
-**整合包的 Player.log（待实测）。** 代码现在假设：1.7 起游戏把日志写在数据目录的 `Logs/Player.log`，所以整合包的日志在 `<包>/userdata/Logs/Player.log`；1.7 以前是 Unity 固定的位置（与环境共用）。是否真的随 `-savedatafolder` 改变，要进游戏实测（07 §6 记录结果）。日志跟踪和归属按这个位置找（03 §6.4、§6.6）。
+**Pack Player.log (measurement pending).** Code assumes 1.7+ logs at data `Logs/Player.log`, hence `<pack>/userdata/Logs/Player.log`; earlier Unity fixed path shared with environment. Verify `-savedatafolder` behavior in game (record in 07 §6). Follow/attribution uses these locations (03 §6.4, §6.6).
 
-### 5.4 导入导出与删除
+### 5.4 Import, export and deletion
 
-移除包前摘除所有已知游戏指向该包的自有链接，不能只清当前环境；外来入链阻断移除。dry-run 同时列出目录与链接。
+Before removal detach all known games' owned links to pack, not just current environment; foreign incoming links block. Dry-run lists directories and links.
 
-- `archo pack export <包名> <文件> [--list]`：包写成 `.archopack`（格式 2，上面“.archopack 文件”），只含 `pack.json` 和携带的 Mod 目录，不含 `userdata/` 和 `state.json`（存档和设置不外传）。导出前先核对每个副本的摘要（格式 1 的包先补算并写回 `pack.json`，升为格式 2），不一致时拒绝并列出（包被改过，重新编译）。写到 `<文件>.part`，完成后改名；带 `--list` 时只写它的列表，成为 RimArcho 列表（`.archolist.json`，04 §9.3），去掉 `folder`、大小、省掉的目录和贴图记录。目标文件已存在时拒绝，不覆盖。界面：包页的“导出”（`e`）和“导出列表”（`E`）。
-- `archo pack import <文件> [--as-plan]`：
-  - 包（`.archopack`，按文件头认格式 2 的 zstd 或格式 1 的 zip）：读出 `pack.json`（上限 64 MB），包名合法、同名包不存在才继续；剩余空间不小于 `bytes` 之和加 256 MB；解到 `<包名>.archo-tmp`。路径含 `..`、是绝对路径、落在目录外、不在“绝不带游戏”的白名单里的条目一律拒绝整个包；单个文件上限 4 GB。**核对**：每个携带条目的目录都在；格式 2 时副本摘要与 `sha256` 相同、文件数相同；`mods/` 下没有清单外的目录。有一项不对就删掉临时目录、拒绝，并列出哪些 Mod 缺了或不同。核对通过才改名为 `<包名>`。格式 1 的包没有摘要，结果写“没有核对内容（旧格式）”。然后给出与当前游戏的对照（§5.5）。之后可以 `archo pack launch`。
-  - RimArcho 列表：按 packageId 和语义哈希对照本地活着的 Instance，分三组：同一版本已安装、已安装另一版本、未安装（给工坊链接）。带 `--as-plan` 时把列表载入当前方案（可撤销）。然后由玩家补齐缺的 Mod 再编译。界面上列表不走这里：导入预览（04 §9.2）读它，同样标出“版本不同”；首次向导的“打开”只把 `.archopack` 当包解开，别的交给导入预览。
-- `archo pack check <包名|文件>`：§5.5 的对照。给包名时还重算每个副本的摘要；给 `.archopack` 文件时不解开到磁盘，边读边核对（与导入同样的白名单和摘要），用来在导入前看一眼。
-- `archo pack remove <包名> [--dry-run]`：先删掉这个包的 `!ArchoPack_` 链接，再把包目录移进回收站（§7）。`--dry-run` 显示目录及所有受影响游戏的链接、原目标和动作。
-- `archo pack remove <包名> --unfinished`、`archo pack stop <包名>`：见 §5.2。
+- `archo pack export <pack name> <file> [--list]`: `.archopack` format 2 above, manifest and bundled Mod directories only, no userdata/state (no shared saves/settings). Verify each copy digest first (format 1 packs calculate/write digests and upgrade manifest to 2); refuse/list mismatches (modified pack, rebuild). Write `<file>.part`, then rename. `--list` writes RimArcho list (`.archolist.json`, 04 §9.3), removing `folder`, sizes, trimmed directories and texture records. Refuse existing destination, never overwrite. UI "export" (`e`), "export the list" (`E`).
+- `archo pack import <file> [--as-plan]`:
+  - Pack (`.archopack`, header detects zstd format 2 or ZIP format 1): read `pack.json` (64 MB cap), validate name/nonexistence; require sum `bytes` + 256 MB free; extract into `<pack name>.archo-tmp`. Reject whole pack for `..`, absolute/outside paths or entries outside "never bundle game" allowlist; per-file cap 4 GB. **Verify** every bundled directory exists, format 2 digest/count match, no unlisted `mods/` directories. Any failure deletes temporary directory and lists missing/different Mods. Rename into place only after verification. Format 1 lacks digests; report "content not verified (old format)". Then compare current game (§5.5); launch with `archo pack launch`.
+  - RimArcho list: compare live local Instances by packageId/semantic hash in three groups: same version, another version, uninstalled (links). `--as-plan` loads current plan reversibly. Player obtains missing Mods, then builds. UI lists use import preview (04 §9.2), also showing "another version"; first-run "open" extracts only `.archopack`, routing others to import preview.
+- `archo pack check <pack name|file>`: §5.5 comparison. Named packs also recalculate copy digests; `.archopack` streams verification without disk extraction (same allowlist/digests), for inspection before import.
+- `archo pack remove <pack name> [--dry-run]`: remove its `!ArchoPack_` links, recycle pack directory (§7). Preview directory and all affected games' links, original targets, actions.
+- `archo pack remove <pack name> --unfinished`, `archo pack stop <pack name>`: §5.2.
 
-### 5.5 与这个游戏的对照
+### 5.5 Comparison with this game
 
-升级游戏连小版本都麻烦，包要说清它是为哪个构建做的，不对时提醒。`app.CheckPack(包, 环境)` → `PackCheck`，三部分，每项有级别：
+Even minor game upgrades can cause trouble; packs must state their build and warn on mismatch. `app.CheckPack(pack, environment)` → `PackCheck`, three parts with levels:
 
-| 项 | 判断 | 级别 |
+| Item | Test | Level |
 | --- | --- | --- |
-| 游戏 | 主次版本不同（`1.5` 的包、`1.6` 的游戏） | error，启动拒绝（§5.3 第 1 步） |
-| | 主次相同、构建或修订不同（`1.6.4633 rev1261` 对 `1.6.4871 rev590`） | warning：“为 1.6.4633 rev1261 创建，这个游戏是 1.6.4871 rev590”，启动照常 |
-| | 任一边没有构建号 | info：“构建号没有记录” |
-| DLC | 包要的官方内容（`official` 条目）有本机没装的 | error，列出名字，启动拒绝（游戏会默默丢掉它们，依赖它们的 Mod 出错） |
-| | 本机装了、包没用的 DLC | info，列出（不启用，不影响） |
-| Mod | 包：副本缺失或摘要不同（只有 `pack check <包名>` 和导入时算） | error，列出，启动拒绝 |
-| | 列表（`.archolist.json`）：同一版本已安装 / 另一版本 / 未安装三组（§5.4） | 未安装为 warning |
+| Game | Different major/minor (`1.5` pack, `1.6` game) | error, refuse launch (§5.3 step 1) |
+| | Same major/minor, different build/revision (`1.6.4633 rev1261` vs `1.6.4871 rev590`) | warning: "created for 1.6.4633 rev1261; this game is 1.6.4871 rev590"; launch allowed |
+| | Either build absent | info: "build not recorded" |
+| DLC | Required official entries not installed | error, list names, refuse launch (game silently drops them; dependent Mods fail) |
+| | Installed DLC unused by pack | info, list (not enabled, no effect) |
+| Mod | Pack: copy missing/digest differs (calculated only for named `pack check` and import) | error, list, refuse launch |
+| | List (`.archolist.json`): same version / another version / uninstalled (§5.4) | uninstalled warning |
 
-出现在：`pack import` 和 `pack check` 的结果；`pack launch`（含 `--dry-run`）在开头列出 warning 和 info，有 error 时拒绝；MCP `manage_packs` 的 `check` 动作；包页（06 §2.7）。
+Shown in `pack import` / `pack check` results; at start of `pack launch` (including `--dry-run`), listing warnings/info and refusing errors; MCP `manage_packs check`; pack page (06 §2.7).
 
-## 6. 隐藏的 Mod
+## 6. Hidden Mods
 
-回收隐藏、锁定、残留或订阅 Mod 的实体前执行 §3 的全游戏入链计划；下载页替换、SteamCMD 更新和退订同样先摘后换，失败只接回仍存在的目标。
+Before recycling hidden, locked, residual or subscribed Mod targets, execute §3's all-game incoming-link plan. Download-page replacement, SteamCMD updates and unsubscribe also detach before replacement; failure reconnects only surviving targets.
 
-其他管理器（RimCrow 等）把 `About/About.xml` 改名成 `About.xml.disabled` 让游戏看不到某份 Mod。扫描把只有 `About.xml.disabled` 的目录建成 `unloadable: about-disabled` 的 Instance（02 §4.2）。
+Other managers (RimCrow etc.) rename `About/About.xml` to `About.xml.disabled`, hiding copies from game. Scan creates `unloadable: about-disabled` Instances for directories with only the disabled file (02 §4.2).
 
-**分类**：每次分析时计算，不入库；只对没有启用的这类 Instance 报问题。
+**Classification**: compute per analysis, not stored; report only disabled Instances of this kind.
 
-| 类别 | 条件 | 问题 |
+| Category | Condition | Finding |
 | --- | --- | --- |
-| 锁定版本 | 同一 Lineage 里有另一个活着、可加载、不是残留、不在工坊的 Instance，并且游戏看得到它或它可部署（RimCrow 的 `_<工坊ID>_` 副本、锁定版本的副本、部署进 `Mods/` 的副本都算）；有多份时优先已启用的 | `mod.pinned`，info |
-| 退订残留 | 工坊来源，不在 ACF 的已订阅列表里 | `mod.hidden-residue`，warning |
-| 单独隐藏 | 其余 | `mod.hidden`，warning |
+| Locked version | Same Lineage has another live, loadable, nonresidual, non-Workshop Instance, game-visible or deployable (RimCrow `_<WorkshopID>_`, locked copy, deployed `Mods/` copy all count); prefer enabled if several | `mod.pinned`, info |
+| Unsubscribed residue | Workshop source, absent from ACF subscription list | `mod.hidden-residue`, warning |
+| Individually hidden | Others | `mod.hidden`, warning |
 
-- 锁定版本这一类**不报** `mod.unloadable`：生效的是副本，工坊那份是“上游”。锁定版本的产品规则（创建、只换当前方案、上游提示）在 04 §7，这里只写对隐藏文件夹的处理。
-- **上游有更新**：工坊 Instance 的快照与副本不同，并且工坊 ACF 的 `timeupdated` 晚于副本首次出现的时间。此时 `mod.pinned` 升为 warning，动作是“查看差异”。差异按语义文件对比，工坊那份的 `About.xml.disabled` 当作 `About.xml` 比：`archo mod <副本> --diff <工坊那份>`，输出 `+ 只在后者`、`~ 改了`、`- 只在前者`。
-- 本机实测的分类数字见 07 §6。
+- Locked versions **do not report** `mod.unloadable`: copy is effective, Workshop "upstream". Product rules (creation, current-plan-only swap, upstream notices): 04 §7; only hidden-folder handling here.
+- **Upstream update**: Workshop snapshot differs from copy and ACF `timeupdated` is later than copy's first appearance. Upgrade `mod.pinned` to warning, action "see the changes". Compare semantic files, treating upstream About.xml.disabled as About.xml: `archo mod <copy> --diff <Workshop copy>`, output `+ only in latter`, `~ changed`, `- only in former`.
+- Local measured category counts: 07 §6.
 
-**动作：**
+**Actions:**
 
-| 类别 | 动作 | 命令 | 写什么 |
+| Category | Action | Command | Writes |
 | --- | --- | --- | --- |
-| 锁定版本 | 查看差异 | `archo mod <实例> --diff <实例>` | 不写 |
-| 锁定版本 | 解除锁定 | `archo unpin <实例> [--dry-run]` | 把工坊目录的 `About.xml.disabled` 改回 `About.xml`；副本在当前方案里时换成工坊版（等于 `swap`）；副本留在原处 |
-| 退订残留 | 移到回收站 | `archo trash <实例> [--dry-run]` | 整个文件夹移进回收站 |
-| 退订残留 | 重新订阅 | `archo workshop subscribe <实例> [--dry-run]` | 不写文件；经 Steam 客户端订阅，Steam 下载（§10） |
-| 单独隐藏 | 保持隐藏 | `archo problems ignore <p:ref>` | 只写 RimArcho 的数据库（现有忽略机制，Mod 变化后自动失效，03 §4.2） |
-| 单独隐藏 | 恢复 | `archo unhide <实例> [--dry-run]` | 把 `About.xml.disabled` 改回 `About.xml` |
-| 单独隐藏 | 移到回收站 | `archo trash <实例> [--dry-run]` | 整个文件夹移进回收站 |
+| Locked version | See differences | `archo mod <instance> --diff <instance>` | None |
+| Locked version | Unlock | `archo unpin <instance> [--dry-run]` | Rename Workshop About.xml.disabled to About.xml; swap current-plan copy to Workshop if present; retain copy |
+| Unsubscribed residue | Move to recycle bin | `archo trash <instance> [--dry-run]` | Recycle whole folder |
+| Unsubscribed residue | Resubscribe | `archo workshop subscribe <instance> [--dry-run]` | No file writes; subscribe through Steam client, Steam downloads (§10) |
+| Individually hidden | Keep hidden | `archo problems ignore <p:ref>` | RimArcho database only (existing ignore mechanism, expires on Mod change, 03 §4.2) |
+| Individually hidden | Restore | `archo unhide <instance> [--dry-run]` | Rename About.xml.disabled to About.xml |
+| Individually hidden | Move to recycle bin | `archo trash <instance> [--dry-run]` | Recycle whole folder |
 
-**改名（unhide、unpin）的规则：**
+**Rename rules (unhide, unpin):**
 
-- 只针对活着、`about-disabled` 的 Instance；`unpin` 的引用可以指副本，也可以指工坊那份，找不到“隐藏的工坊版 + 旁边可加载的副本”这一对时拒绝。
-- `About/` 里已有 `About.xml`（不区分大小写）时拒绝，不改任何文件；没有 `About.xml.disabled` 时也拒绝。
-- 改名前检查 RimArcho 的数据目录与这个文件夹不互相包含。
-- 改名后立即重扫。
+- Live about-disabled Instances only. `unpin` accepts copy/upstream reference; refuse unless hidden Workshop + loadable copy pair exists.
+- Refuse if About.xml already exists (case-insensitive) or About.xml.disabled absent; no changes.
+- Check data directory and folder do not contain one another before rename.
+- Rescan immediately after rename.
 
-**`trash` 的条件**（另见 §7 的白名单）：活着；来源是工坊或 SteamCMD；是 `about-disabled` 或退订残留（订阅中、可加载的 Mod 请在 Steam 里退订）；真实路径在它的来源目录之内，且不是来源目录本身。已启用或有方案在用时不拒绝：输出里 `warning:` 一行列出这些方案，照样执行。移走后重扫，这份 Instance 成为墓碑，用它的方案里显示为缺失。
+**`trash` conditions** (also §7 allowlist): live; Workshop/SteamCMD source; about-disabled or unsubscribed residue (unsubscribe subscribed loadable Mods through Steam); real path inside but not equal to source root. Enabled/in-use plans do not block: list plans in `warning:` and proceed. Rescan after moving; Instance becomes tombstone, its plan entries missing.
 
-**界面。** Mod 库存 › 全部的状态列和动作（06 §2.9），按上表给一键操作；先显示预览再确认。2026-10-29 起不在“能不能跑”页上，那里最下面一行链接过去（06 §2.4）。
+**UI.** Mod inventory › all status/actions (06 §2.9), one-click actions per table, preview/confirm first. Since 2026-10-29 not on can it run; bottom line links there (06 §2.4).
 
-## 7. 回收站
+## 7. Recycle bin
 
-回收目标前摘所有自有入链，复用 §3 的台账阶段与恢复；摘链不进回收站且不放宽白名单。
+Before recycling targets detach all owned incoming links, reusing §3 ledger/recovery; link detachment does not use recycle bin or widen allowlist.
 
-摘除部署链接属于 §3 的撤销部署，直接安全删除链接本身，不调用回收站入口，不扩大本节白名单。
+Deployment-link removal is §3 undeployment: safely delete link itself, without recycle-bin entry or expanding this allowlist.
 
-RimArcho 不做永久删除。需要“删掉”玩家的东西时，一律移进系统回收站，回收站不可用就拒绝。
+No permanent deletion of player content: always use system recycle bin; refuse if unavailable.
 
-**白名单。** 只接受以下四类，其他路径一律拒绝：
+**Allowlist.** Only four categories; reject everything else:
 
-| 类别 | 条件 | 谁会用 |
+| Category | Conditions | Callers |
 | --- | --- | --- |
-| Mod 文件夹 | 一个 Instance 的真实目录，在来源目录之内、不是来源目录本身：工坊或 SteamCMD 来源里被隐藏或退订残留的那份（还订阅着的，Steam 会再下载回来）；`Mods/` 和锁定库里玩家自己的那份（它本身是链接时拒绝）；已启用或仍有方案在用时只警告 | `trash`（§6），Mod 库存的“删除”（06 §2.9）；1.2 的退订 |
-| 整合包目录 | 整合包目录下的 `<包名>/` | `pack remove`（§5.4） |
-| 存档文件 | 环境用户数据目录 `Saves/` 下的存档（产品规则在 10 §4） | 存档管理（待实现） |
-| 卸载时玩家的东西 | 锁定库里的副本（默认）、整合包目录、独立存档目录和 `<数据目录>/backups/saves/`、用 SteamCMD 下载的游戏目录，都只在玩家选了“删除”（锁定库副本是默认）时；RimArcho 自己的文件夹（数据目录、Monitor、它下载的 SteamCMD）不进回收站，直接删除 | 卸载（01 §4.1） |
+| Mod folder | Instance real directory inside, not equal to source root: hidden/unsubscribed Workshop/SteamCMD copy (Steam redownloads subscribed ones); player's own `Mods/`/lock-library copy (refuse if itself a link); enabled/in-use only warns | `trash` (§6), mod library "delete" (06 §2.9), 1.2 unsubscribe |
+| Pack directory | `<pack name>/` under pack directory | `pack remove` (§5.4) |
+| Save file | Under environment user data `Saves/` (product rules: 10 §4) | Save management (unimplemented) |
+| Player content during uninstall | Lock-library copies (default), packs, own-saves directories, `<data directory>/backups/saves/`, SteamCMD-downloaded games, only when player chooses deletion (default for locked copies). RimArcho-owned folders (data, Monitor, downloaded SteamCMD) deleted directly, not recycled | Uninstall (01 §4.1) |
 
-回收站只有一个入口（`App.ToTrash`，`internal/app/trash.go`），白名单在那里按路径统一检查，不管是谁调用的；调用方自己的规则（已启用、有方案在用、还订阅着）在调用之前检查。按路径的白名单（先解析链接，路径本身是链接时一律拒绝）：
-- 某个来源目录（工坊、SteamCMD、`Mods/`、锁定库、其他 Mod 文件夹，任何环境的）之内、不是来源目录本身；每个环境的 `<游戏目录>/Mods/` 之内；
-- 整合包目录下直接的一层 `<包名>/`（整合包目录本身和包里面的文件夹不算）；
-- 任何环境用户数据目录的 `Saves/` 之内、独立存档目录 `<数据目录>/userdata/<环境名>`、存档备份 `<数据目录>/backups/saves` 和它里面的；
-- 某个环境的游戏目录本身，且它是用 SteamCMD 下载的（有 `steamapps/appmanifest_294100.acf`）。
+Single entry point `App.ToTrash` (`internal/app/trash.go`) enforces paths regardless of caller. Caller-specific rules (enabled, plan use, subscribed) checked beforehand. Path allowlist (resolve links first, reject paths that are themselves links):
+- Inside, not equal to, any source root (Workshop, SteamCMD, `Mods/`, lock library, other Mod folders, any environment); inside every `<game directory>/Mods/`;
+- Direct child `<pack name>/` under pack directory (not root or folders inside packs);
+- Inside any environment's user data `Saves/`, own saves `<data directory>/userdata/<environment name>`, save backups `<data directory>/backups/saves` and descendants;
+- An environment game directory itself only if SteamCMD-downloaded (`steamapps/appmanifest_294100.acf` exists).
 
-其余路径拒绝（`ErrNotInTrashList`，`TestTrashAllowList`）。
+Refuse others (`ErrNotInTrashList`, `TestTrashAllowList`).
 
-**各平台：**
+**Platforms:**
 
-- **Windows**：`SHFileOperationW`，`FO_DELETE`，标志 `FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI | FOF_WANTNUKEWARNING`。`FOF_WANTNUKEWARNING` 让没有回收站的卷（例如网络盘）报错而不是直接删掉。返回非 0 或操作被取消时报错，带外壳的错误码。
-- **macOS**：改名移到 `~/.Trash`，重名时加 `.2`、`.3`。
-- **其他系统**：freedesktop 规范，移到 `$XDG_DATA_HOME/Trash/files/`（默认 `~/.local/share/Trash`），同时写 `info/<名字>.trashinfo`（`Path`、`DeletionDate`），重名时加 `.2`、`.3`。
-- 非 Windows 上跨卷的改名会失败：拒绝，不退化成“复制后删除”。
+- **Windows**: `SHFileOperationW`, `FO_DELETE`, flags `FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI | FOF_WANTNUKEWARNING`. Last flag errors instead of permanently deleting on volumes without recycle bins (e.g. network drives). Nonzero return/cancellation errors include shell code.
+- **macOS**: rename into `~/.Trash`, suffix collisions `.2`, `.3`.
+- **Other**: freedesktop, move to `$XDG_DATA_HOME/Trash/files/` (default `~/.local/share/Trash`), write `info/<name>.trashinfo` (`Path`, `DeletionDate`); suffix collisions `.2`, `.3`.
+- Cross-volume renames fail outside Windows; refuse without copy/delete fallback.
 
-## 8. 验收
+## 8. Acceptance
 
-### 启动与链接部署
+### Launch and link deployment
 
-| # | 场景 | 期望 | 状态 |
+| # | Scenario | Expected | Status |
 | --- | --- | --- | --- |
-| J1 | `launch --dry-run`（Steam 方式，非默认用户数据目录） | 命令含 `steam.exe`、`-applaunch 294100`、`-savedatafolder=`；不启动（`TestLaunchPlans`） | 通过 |
-| J2 | `--launch direct` 后启动 | 运行 `RimWorldWin64.exe`；记录一条启动 | 通过 |
-| J3 | 启用一个 SteamCMD Mod，`save --dry-run`，再 `save` | 预演列出链接、不建；保存后 `Mods/_Archo_…` 是链接（`TestLinkDeployment`） | 通过 |
-| J4 | `Mods/` 里有一个以 `_Archo_` 开头的真实目录 | 拒绝，报“not a link”，真实目录不动（`TestLinkDeploymentRefusesRealFolder`） | 通过 |
-| J5 | SteamCMD Mod 与 `Mods/` 里的 Mod 同包名；与已启用的工坊版同包名 | 前者拒绝启用（`pkg.duplicate-installed`）；后者提示 `swap`，换后部署的那份写不带后缀的包名（`TestLinkDeploymentSamePackage`） | 通过 |
-| J6 | 另一个环境的游戏正在运行时启动方案 | 拒绝，说明是哪个环境、哪个方案在运行 | 通过 |
-| J7 | 方案在编辑后直接启动（以前叫“未保存”） | 先写 ModsConfig.xml 再启动；不需要 `--force`，也没有这个参数 | 通过 |
-| J8 | ModsConfig.xml 的 `version` 是旧版本时启动 | 按当前游戏版本写入并启动，不阻止 | 通过 |
-| J9 | 两个环境共用默认用户数据目录，依次启动各自的方案 | 每次启动写入的都是这次的方案；第二次启动把这份文件记为第二个方案写入 | 已实现（写入者按用户数据目录记录，`TestV8SharedUserData`）；两个真实游戏依次启动待 VM（发布前 VM 测试） |
-| J10 | 游戏内 Mod 菜单改了列表，退出后在 RimArcho 里启动另一个方案 | 先按 04 §4.3 把外部修改归到上次写入它的方案（载入为 external 版本或提示冲突），再写入这次的方案 | 通过（能载入时载入后写入；成了冲突时拒绝） |
-| J11 | 启动方案 | 启动记录含环境、方案、时间、列表指纹；方案多一个来源为 `launch` 的版本；列表与最新版本相同时不新增 | 通过 |
-| J12 | `archo save`（写入游戏） | 写入 ModsConfig.xml 和链接，不启动，不记启动 | 通过 |
-| J13 | 游戏退出后 Player.log 比启动时间新 | TUI 提示“分析本次日志”；GUI 自己读这份日志，能不能跑的角标计入（`TestReadNewLogCountsTheRun`） | TUI 通过；GUI 改于 2026-10-30，合成测试通过，VM 待测 |
-| J15 | 当前方案有 `patch.no-match`、`dep.missing` 等，`launch --dry-run` | 命令下列出 `before you play: …`，每种一行带 `why:`、`fix:`；不阻止启动；从未分析时多一行 `checks:`（golden `loadout`、`problems`） | 通过 |
-| J14 | 读不到命令行的整合包进程（`TestWhatRuns`）；带引号的 `-savedatafolder`（`TestSaveDataArg`） | 按启动记录判断为该包并标“推断”；路径正确取出 | 通过 |
+| J1 | `launch --dry-run` (Steam, nondefault userdata) | Command has `steam.exe`, `-applaunch 294100`, `-savedatafolder=`; no launch (`TestLaunchPlans`) | Pass |
+| J2 | Launch after `--launch direct` | Run `RimWorldWin64.exe`; one launch record | Pass |
+| J3 | Enable SteamCMD Mod, `save --dry-run`, then `save` | Preview lists but creates no link; save creates `Mods/_Archo_…` (`TestLinkDeployment`) | Pass |
+| J4 | Real `_Archo_` directory in `Mods/` | Refuse "not a link", preserve directory (`TestLinkDeploymentRefusesRealFolder`) | Pass |
+| J5 | SteamCMD Mod same package as `Mods/` Mod; same as enabled Workshop | First refuses enable (`pkg.duplicate-installed`); second suggests `swap`, deployed copy writes unsuffixed ID (`TestLinkDeploymentSamePackage`) | Pass |
+| J6 | Launch while another environment game runs | Refuse, name environment/plan | Pass |
+| J7 | Launch directly after edits (formerly "unsaved") | Write ModsConfig.xml then launch; no `--force` needed or accepted | Pass |
+| J8 | Launch with old ModsConfig.xml `version` | Write current version and launch, no block | Pass |
+| J9 | Two environments share default userdata, launch their plans in sequence | Each writes intended plan; second write attributes file to second plan | Implemented (writer per userdata, `TestV8SharedUserData`); real sequential launches await release VM tests |
+| J10 | Edit in game menu, exit, launch another plan in RimArcho | Attribute outside changes to last writer first (load external or conflict), then write target | Pass (loadable changes adopted then written; conflicts refuse) |
+| J11 | Launch plan | Record environment/plan/time/fingerprint; new `launch` version unless same as latest | Pass |
+| J12 | `archo save` | Write ModsConfig.xml/links, no process or launch record | Pass |
+| J13 | After exit Player.log newer than launch | TUI suggests analyzing; GUI reads and includes run in can it run badge (`TestReadNewLogCountsTheRun`) | TUI pass; GUI changed 2026-10-30, synthetic pass, VM pending |
+| J15 | `patch.no-match`, `dep.missing` etc., `launch --dry-run` | `before you play: …`, one line/kind plus `why:`/`fix:`; launch unblocked; `checks:` if never analyzed (golden `loadout`, `problems`) | Pass |
+| J14 | Pack process unreadable command line (`TestWhatRuns`); quoted `-savedatafolder` (`TestSaveDataArg`) | Infer pack from records, label inferred; extract correct path | Pass |
 
-### 整合包
+### Packs
 
-| # | 场景 | 期望 | 状态 |
+| # | Scenario | Expected | Status |
 | --- | --- | --- | --- |
-| K1 | 三个 Mod，其中一个有 1.5/1.6 目录，环境 1.6 | 包内只有 1.6 和公共目录；pack.json 列出省掉的目录和字节（`TestPackBuildAndLaunch`） | 通过 |
-| K2 | 有 error 级问题（不含排序问题）或缺失条目时编译 | 拒绝并列出（`TestPackBuildBlocked`）；只有排序问题时照常编译 | 通过 |
-| K3 | `pack launch --dry-run` | 列出 `+ !ArchoPack_…` 链接、ModsConfig 路径、启动参数；不写磁盘、不启动 | 通过 |
-| K4 | `pack launch` 后 | 环境的 ModsConfig.xml 不变；包的 `userdata/Config/ModsConfig.xml` 有包的列表；命令含 `-savedatafolder=<包>/userdata`；每个携带的 Mod 一个链接 | 通过 |
-| K5 | 包的列表（RimArcho 列表）导入到另一环境 | 同版本 / 另一版本 / 未安装三组正确（`TestPackExportImport`） | 通过 |
-| K6 | 玩整合包后扫描 | 不产生新 Instance（扫描跳过 `!ArchoPack_` 链接） | 通过 |
-| K7 | 玩过整合包后写入游戏或启动方案 | 所有 `!ArchoPack_` 链接被删除 | 通过 |
-| K8 | 包导出、删除、再导入 | 往返一致；导出不含 `userdata/` 和 `state.json` | 通过 |
-| K9 | 编译中途 `pack stop`；剩余空间不足 | 停下并删掉已复制内容；空间不足时拒绝并说明需要多少（`TestPackBuildStopAndSpace`） | 通过 |
-| K10 | 构建进程中断留下 `.archo-tmp` | `pack list` 列出；`pack remove --unfinished` 删除；运行中的不能删（`TestPackUnfinished`） | 通过 |
-| K11 | 编译进度 | `build.json` 按步骤推进，心跳停止 15 秒后算中断（`TestPackBuildProgress`） | 通过 |
-| K12 | 留着整合包链接，从 Steam 直接启动游戏 | “能不能跑”提示包的链接还在，可一键移除（`TestPackLinksLeft`：游戏没在运行、作为这个包运行、从 Steam 启动三种情况；移除只删链接；运行中拒绝） | 通过 |
-| K13 | 1.7 上玩整合包 | 日志写在 `<包>/userdata/Logs/Player.log`，实时跟踪读的是这份 | 待验证 |
-| K14 | 有游戏在运行时 `pack launch` | 拒绝 | 通过 |
-| K15 | 包里的 Mod 在 `Mods/` 里已有一份（RimCrow 的 `_<ID>_` 文件夹、`_Link_` 链接），内容相同；之后本地那份更新 | 启动时不建重复的 `!ArchoPack_` 链接，用 `Mods/` 里那份；更新后拒绝启动并列出文件夹（`TestPackLaunchNoDuplicates`，按玩家 10-21 的日志复现） | 通过 |
-| K16 | 方案部署的 `_Archo_` 链接与包里的副本同包名 | 启动包时这条链接先删掉，`Mods/` 没有重复（`TestPackDropsDuplicateDeploy`） | 通过 |
-| K18 | `Mods/` 里有包里某个 Mod 的另一个版本（普通文件夹）；或方案的锁定副本旁有同包名的普通文件夹 | 拒绝时给出 `--move-duplicates` 和 `archo library move-to-locked`；确认后文件夹收进锁定库，再链接要的那份；之后用那份的方案写入时链接的恰好是那个版本；挡路的是链接时不移动（`TestPackLaunchMovesOtherVersion`、`TestPackLaunchNeverMovesLinks`、`TestSaveMovesOtherVersion`、`TestDuplicateFixMovesToLocked`、`gui.TestPackLaunchMovesConfirm`） | 通过 |
-| K19 | 格式 2 导出再导入 | `.archopack` 是 tar + zstd，第一项 `pack.json`；往返后每个副本摘要一致；格式 1 的 zip 包照常导入（`TestPackArchiveRoundTrip`、`TestPackImportFormat1`） | 通过 |
-| K20 | 包里混进游戏文件（`RimWorldWin64_Data/…`、`Data/Core/…`、`Version.txt`）、链接、`ludeon.rimworld*` 的携带条目或清单外目录 | 整个包拒绝，不留临时目录（`TestPackImportRejectsGameFiles`） | 通过 |
-| K21 | 包里某个 Mod 的文件被改过或缺了 | 导入拒绝并列出那个 Mod；`pack check <包名>` 同样报出；导出前发现时拒绝（`TestPackImportVerifies`） | 通过 |
-| K22 | 包为 `1.6.4633 rev1261` 编译，游戏是 `1.6.4871 rev590`；包只写 `1.6`；包要 Biotech 而本机没装 | 分别是“构建不同”warning、“构建号没有记录”info、缺 DLC error；启动只在 error 时拒绝（`TestCheckPack`） | 通过 |
-| K17 | 遗留的 `!ArchoPack_` 链接与本地副本同包名；两个玩家自己的同包名文件夹；`_Archo_` 链接旁出现同包名文件夹 | 能不能跑分别报 `pack.links-left`（error，一键移除链接）和 `pkg.duplicate-mods`（说明怎么做 / 改用 `Mods/` 里那份）；写入时不新建重复的 `_Archo_` 链接（`TestPackLinksDuplicateReported`、`TestPlayerDuplicatesReported`、`TestDeployNoDuplicates`、`view.TestModsDuplicateNeed`） | 通过 |
+| K1 | Three Mods, one with 1.5/1.6 dirs, environment 1.6 | Only 1.6/shared content; manifest omitted directories/bytes (`TestPackBuildAndLaunch`) | Pass |
+| K2 | Build with non-sorting errors or missing entries | Refuse/list (`TestPackBuildBlocked`); sorting-only findings permit build | Pass |
+| K3 | `pack launch --dry-run` | List `+ !ArchoPack_…`, ModsConfig path, arguments; no writes/launch | Pass |
+| K4 | After `pack launch` | Environment ModsConfig unchanged; pack userdata contains list; `-savedatafolder=<pack>/userdata`; link per bundled Mod | Pass |
+| K5 | Import pack list into another environment | Correct same/another/uninstalled groups (`TestPackExportImport`) | Pass |
+| K6 | Scan after pack play | No new Instances (skip pack links) | Pass |
+| K7 | Save/launch plan after pack play | All pack links removed | Pass |
+| K8 | Export, delete, reimport pack | Round trip matches; no userdata/state export | Pass |
+| K9 | `pack stop` during build; insufficient space | Stop/delete copied content; refuse with needed size (`TestPackBuildStopAndSpace`) | Pass |
+| K10 | Interrupted `.archo-tmp` | Listed, removable `--unfinished`; running not deletable (`TestPackUnfinished`) | Pass |
+| K11 | Build progress | Steps advance in `build.json`; interrupted after 15-second heartbeat loss (`TestPackBuildProgress`) | Pass |
+| K12 | Direct Steam launch with leftover links | can it run notices, one-click removal (`TestPackLinksLeft`: stopped, running as pack, Steam launch; links only removed, running refuses) | Pass |
+| K13 | Play pack on 1.7 | Log `<pack>/userdata/Logs/Player.log`, followed live | Verification pending |
+| K14 | `pack launch` while game runs | Refuse | Pass |
+| K15 | Same-content `Mods/` copy (RimCrow `_<ID>_`, `_Link_`), then local update | Reuse existing without duplicate link; after update refuse/list folder (`TestPackLaunchNoDuplicates`, player's 10-21 log reproduction) | Pass |
+| K16 | Plan `_Archo_` same package as bundled copy | Remove link before pack launch, no duplicates (`TestPackDropsDuplicateDeploy`) | Pass |
+| K18 | Different-version ordinary folder blocks pack/locked copy | Refusal gives `--move-duplicates`/`archo library move-to-locked`; confirmation moves, links intended copy; its plans later link exactly original version; never move blockers that are links (`TestPackLaunchMovesOtherVersion`, `TestPackLaunchNeverMovesLinks`, `TestSaveMovesOtherVersion`, `TestDuplicateFixMovesToLocked`, `gui.TestPackLaunchMovesConfirm`) | Pass |
+| K19 | Format 2 round trip | tar+zstd, first manifest, matching digests; format 1 ZIP accepted (`TestPackArchiveRoundTrip`, `TestPackImportFormat1`) | Pass |
+| K20 | Game files (`RimWorldWin64_Data/…`, `Data/Core/…`, `Version.txt`), links, bundled `ludeon.rimworld*`, unlisted directories | Reject entire pack, no temporary residue (`TestPackImportRejectsGameFiles`) | Pass |
+| K21 | Modified/missing bundled file | Import refuses/names Mod; named `pack check` reports; export refuses (`TestPackImportVerifies`) | Pass |
+| K22 | Pack `1.6.4633 rev1261`, game `1.6.4871 rev590`; pack only `1.6`; missing required Biotech | Build-mismatch warning, unknown-build info, missing-DLC error; only error blocks (`TestCheckPack`) | Pass |
+| K17 | Leftover pack link duplicates local; two player folders; folder appears beside `_Archo_` | can it run reports `pack.links-left` error (remove links), `pkg.duplicate-mods` (guidance/use existing); writes create no duplicate deployment (`TestPackLinksDuplicateReported`, `TestPlayerDuplicatesReported`, `TestDeployNoDuplicates`, `view.TestModsDuplicateNeed`) | Pass |
 
-### 隐藏的 Mod 与回收站
+### Hidden Mods and recycle bin
 
-| # | 场景 | 期望 | 状态 |
+| # | Scenario | Expected | Status |
 | --- | --- | --- | --- |
-| H1 | RimCrow 风格：工坊 about-disabled + `Mods/_1234_` 副本启用 | `mod.pinned` info，没有 `mod.unloadable`（`TestHiddenPinned`） | 通过 |
-| H2 | H1 后工坊内容更新，ACF 时间更新 | `mod.pinned` warning “上游有更新”，差异列出改动文件 | 通过 |
-| H3 | 未订阅的 about-disabled 工坊目录 | `mod.hidden-residue`；`trash --dry-run` 列出目录；`trash` 后进回收站，重扫为墓碑（`TestHiddenResidueTrash`） | 通过 |
-| H4 | 已订阅、无副本 | `mod.hidden`；`unhide` 后可启用（`TestHiddenAlone`） | 通过 |
-| H5 | `unhide` 时 About.xml 已存在 | 拒绝，不改任何文件 | 通过 |
-| H6 | `trash` 指向本地 `Mods/` 目录 | 拒绝 | 通过 |
-| H7 | `unpin` 一个副本在当前方案里的锁定版本 | 工坊那份恢复 About.xml；当前方案换成工坊版；其他方案不变；副本留在原处 | 待验证（只改当前方案，04 §7.5） |
-| H8 | 回收站入口收到白名单以外的路径（例如方案外的任意目录） | 拒绝（`TestTrashAllowList`：任意目录、游戏目录、`Mods/` 本身、工坊目录本身、Core、用户数据目录、数据目录、整合包目录本身和包里的文件夹、`Mods/` 里的链接） | 通过 |
-| H9 | 在没有回收站的卷（网络盘）上 `trash` | 报错，文件不变，不做永久删除 | 待验证 |
+| H1 | RimCrow Workshop about-disabled + enabled `Mods/_1234_` | `mod.pinned` info, no `mod.unloadable` (`TestHiddenPinned`) | Pass |
+| H2 | Workshop content/ACF update after H1 | `mod.pinned` warning "upstream has an update", file diff | Pass |
+| H3 | Unsubscribed about-disabled Workshop folder | `mod.hidden-residue`; trash preview lists directory; recycle then tombstone (`TestHiddenResidueTrash`) | Pass |
+| H4 | Subscribed, no copy | `mod.hidden`; unhide makes loadable (`TestHiddenAlone`) | Pass |
+| H5 | About.xml exists during unhide | Refuse, no writes | Pass |
+| H6 | Trash local `Mods/` directory | Refuse | Pass |
+| H7 | Unpin locked copy in current plan | Restore Workshop About.xml, swap current only, retain copy/other plans | Verification pending (current only, 04 §7.5) |
+| H8 | Recycle entry receives nonallowlisted path | Refuse (`TestTrashAllowList`: arbitrary/game/Mods-root/Workshop-root/Core/userdata/data/pack-root/inside-pack/Mods-link) | Pass |
+| H9 | Trash on no-recycle-bin volume (network drive) | Error, preserve files, no permanent deletion | Verification pending |
 
 ### Archo Monitor
 
-| # | 场景 | 期望 | 状态 |
+| # | Scenario | Expected | Status |
 | --- | --- | --- | --- |
-| M1 | 第一次运行带随附 Monitor 的 RimArcho | 复制到 `<monitor.dir>/ArchoMonitor-<版本>/`，登记来源 `src:monitor`，扫描出一个 Instance（`TestMonitorInstallAndDefault`） | 通过 |
-| M2 | 再运行一次 | 不复制、不重复登记 | 通过 |
-| M3 | 随附新版本 | 新目录、新 Instance，并入同一 Lineage；有旧版本的方案各换成新版本，每个方案一步可撤销的编辑（`TestMonitorUpdate`） | 通过 |
-| M4 | 启动带 Monitor 的方案 | `Mods/_Archo_monitor_ArchoMonitor-<版本>` 是链接，ModsConfig.xml 里它紧跟在 Harmony 后面（`TestMonitorInstallAndDefault`；真实游戏里待验证） | 通过 |
-| M5 | `Mods/` 在 exFAT 上 | 不自动加入，说明原因；手动启用后启动和写入游戏拒绝，原因里点名 Monitor 并给出 `archo disable`（`TestMonitorExFAT`，exFAT 由测试模拟） | 通过 |
-| M6 | 编译带 Monitor 的方案为整合包 | 包里有 Monitor 的副本；启动包后日志写在 `<包>/userdata/`（`TestMonitorInPack`；日志位置要进游戏验证） | 通过（复制部分） |
-| M7 | 开发构建：`RIMARCHO_MONITOR` 指向本地构建、版本带 `-dev`、内容变了 | 没有游戏运行时替换目录；游戏运行时推迟（`TestMonitorDevReplace`、`TestMonitorDevPath`） | 通过 |
-| M8 | 没有随附 Monitor（`go run`，没有设环境变量） | 不安装、不加入；`archo monitor` 说明在哪里找过（`TestMonitorNotBundled`） | 通过 |
-| M9 | 启动后检查才完成，游戏运行时把方案里的 0.9.0-dev 换成 0.9.1 | 这次运行的日志退出后照常计数；旧版本的链接还在 `Mods/` 时新版本不报 `mod.unloadable`；下次启动换成新版本的链接；之后别的改动仍让日志过时（`TestMonitorUpdateAfterLaunch`；真实游戏见发布前 VM 表） | 通过 |
+| M1 | First bundled-Monitor run | Copy `<monitor.dir>/ArchoMonitor-<version>/`, register `src:monitor`, scan one Instance (`TestMonitorInstallAndDefault`) | Pass |
+| M2 | Run again | No recopy/duplicate registration | Pass |
+| M3 | New bundled version | New directory/Instance, same Lineage; swap each old-version plan, one undoable edit each (`TestMonitorUpdate`) | Pass |
+| M4 | Launch Monitor plan | Deployment link, immediately after Harmony in ModsConfig (`TestMonitorInstallAndDefault`; real game pending) | Pass |
+| M5 | exFAT `Mods/` | No auto-add, explain; manual enable then save/launch refuses naming Monitor and `archo disable` (`TestMonitorExFAT`, simulated exFAT) | Pass |
+| M6 | Build Monitor plan | Pack copy, logs under pack userdata (`TestMonitorInPack`; game verification needed) | Pass (copying) |
+| M7 | Development `RIMARCHO_MONITOR`, `-dev`, changed content | Replace when stopped, defer while running (`TestMonitorDevReplace`, `TestMonitorDevPath`) | Pass |
+| M8 | No bundled Monitor (`go run`, no env override) | No install/add; `archo monitor` reports searched locations (`TestMonitorNotBundled`) | Pass |
+| M9 | Check finishes after launch, swaps 0.9.0-dev to 0.9.1 while game runs | Run log counts after exit; old link does not make new version unloadable; next launch updates link; later other changes still stale log (`TestMonitorUpdateAfterLaunch`; real game in release VM table) | Pass |
 
 ## 9. Archo Monitor
 
-RimArcho 自带的游戏内辅助 Mod（抓什么、日志格式和 RimArcho 怎样读见 03 §6.7；默认加入方案见 04 §1.5）。本节讲它从发行包到游戏的路径。
+Bundled in-game helper (capture, log format, reading: 03 §6.7; default addition: 04 §1.5). This section follows it from release package to game.
 
-**随附的 Monitor。** 发行 zip 里有 `monitor/ArchoMonitor/`：完整的 Mod 文件夹（`About/`、`LoadFolders.xml`、`1.5/`、`1.6/`、`1.7/` 各自的程序集，07 §5）。RimArcho 按顺序找：
+**Bundled Monitor.** Release ZIP includes `monitor/ArchoMonitor/`: complete Mod (`About/`, `LoadFolders.xml`, assemblies in `1.5/`, `1.6/`, `1.7/`, 07 §5). Discovery order:
 
-1. 环境变量 `RIMARCHO_MONITOR`（一个 Mod 文件夹；开发和测试用）；
-2. 可执行文件旁的 `monitor/ArchoMonitor/`；
-3. 开发构建（`buildinfo.Version` 是 `dev`）：从可执行文件所在目录和工作目录往上找 `monitor/out/ArchoMonitor/`（`dotnet build` 的输出，07 §2）。
+1. `RIMARCHO_MONITOR` (Mod folder, development/tests);
+2. `monitor/ArchoMonitor/` beside executable;
+3. Development builds (`buildinfo.Version` = `dev`): search upward from executable directory and working directory for `monitor/out/ArchoMonitor/` (`dotnet build` output, 07 §2).
 
-都找不到就当作没有 Monitor：不安装、不加入方案，`archo monitor` 说明在哪里找过。
+If absent, treat as no Monitor: no install/add; `archo monitor` lists searched locations.
 
-**构建版本。** `monitor/VERSION` 是随附 Monitor 的版本来源，独立于启动器的版本。改 Monitor 行为或格式时递增它；`monitor/build.ps1`、直接 `dotnet build` 和发行脚本都默认使用这一个值。开发者可用 `build.ps1 -Version`（MSBuild 的 `MonitorVersion`）显式覆盖，生成 About.xml 的 `modVersion` 与程序集版本一致。
+**Build version.** `monitor/VERSION` owns bundled Monitor version, independent of launcher. Increment for Monitor behavior/format changes; `monitor/build.ps1`, direct `dotnet build`, release script default to this value. Explicit `build.ps1 -Version` (MSBuild `MonitorVersion`) overrides; generated About.xml `modVersion` matches assembly version.
 
-**安装位置。** `<Monitor 目录>/ArchoMonitor-<版本>/`。Monitor 目录是设置项 `monitor.dir`，默认 `%LOCALAPPDATA%\RimArcho\monitor`，与锁定库一样在数据目录之外（01 §4）。版本取 About.xml 的 `modVersion`（只允许 `[0-9A-Za-z.+-]`）。每个版本一个目录，Mod 文件夹直接放在 Monitor 目录下：来源只看根目录下一层（02 §3.1），所以不用 `<版本>/ArchoMonitor` 这样两层的结构。
+**Installation.** `<Monitor directory>/ArchoMonitor-<version>/`. Setting `monitor.dir`, default `%LOCALAPPDATA%\RimArcho\monitor`, outside data directory like lock library (01 §4). Version from About.xml `modVersion`, only `[0-9A-Za-z.+-]`. One directory/version directly under root, since sources inspect one level only (02 §3.1); not `<version>/ArchoMonitor`.
 
-**何时检查。** 打开 GUI 或 TUI、`archo scan`、`archo monitor install`、新建方案（04 §1.5）。步骤：
+**Check timing.** GUI/TUI opening, `archo scan`, `archo monitor install`, new plan (04 §1.5):
 
-1. 读随附 Monitor 的版本和内容指纹（每个文件的相对路径、大小、SHA-256）。
-2. 目标目录不存在：组装到 `<目标>.archo-tmp`，改名到位。已存在且指纹相同：不动。已存在但内容不同：正式版本（版本号不含 `-`）不覆盖，说明“同一版本号内容不同”；预发布版本（如 `0.9.0-dev`）在没有游戏运行时替换（组装新目录，旧目录改名为 `<目标>.archo-old` 后删除，这是 RimArcho 自己的产物），游戏运行时推迟到下次。
-3. 没有 Monitor 来源时登记：共用的 `extra` 来源（02 §0），标签 `monitor`，根目录 = Monitor 目录；登记前检查它与数据目录、各来源根目录互不包含。所有环境用这一个（0.9.0 之前每个环境各一个，迁移 v14 按根目录合并）。
-4. 复制了文件或新登记了来源时扫描一次。
-5. 更新已有方案里的旧版本（见下），再按 04 §1.5 默认加入。
+1. Read bundled version/content fingerprint (relative path, size, SHA-256 per file).
+2. Target absent: assemble `<target>.archo-tmp`, rename. Existing identical: no change. Different content: stable version (no `-`) not overwritten, explain "same version, different content"; prerelease (e.g. `0.9.0-dev`) replaced only while no game runs (stage new, rename old to `<target>.archo-old`, delete own artifact), otherwise defer.
+3. Register absent Monitor source: shared `extra` (02 §0), label `monitor`, root Monitor directory; check mutual noncontainment with data/source roots first. One source for all environments (pre-0.9.0 per-environment sources merged by root in v14).
+4. Scan if files copied or source registered.
+5. Update old versions in existing plans (below), then default-add under 04 §1.5.
 
-**进入游戏。** 与锁定库一样，只经 `_Archo_` 链接（§3）：`Mods/_Archo_monitor_ArchoMonitor-<版本>`。可部署的判断、启动前同步、删除规则都同 §3。
+**Into the game.** Like lock library, only via `_Archo_` (§3): `Mods/_Archo_monitor_ArchoMonitor-<version>`, same deployability, prelaunch sync and deletion rules.
 
-**更新。** 新版本是新目录、新 Instance。Monitor 来源下 packageId 为 `toumanlin.archomonitor` 的活着的 Instance 都算 Monitor，版本最高的是“最新”（按 About.xml `modVersion` 的语义化版本比较）；它们不在同一个 Lineage 时并入最新版本的 Lineage（02 §6，`lineage merge`）。环境里每个方案，凡是有旧版本 Monitor 的，原地换成最新版本：每个方案一步可撤销的编辑，名为 `update Archo Monitor <旧> → <新>`。这一步不看 `monitor.default`（那个设置只管要不要加进来）。游戏运行时也照常换，不等游戏退出，启动时也不再换一次（00 §6 D21）：这是方案的编辑，下次启动或写入游戏时才进 `Mods/`，旧版本的链接那时删掉；这之前它不和方案里的新版本抢（§3“启用前的判断”）。只换了 Monitor 的版本不让这次运行的日志过时（03 §6.4）。旧版本目录留着不删（每个不到 100 KB），没有方案用它时不会被链接进游戏。
+**Updates.** New version = new directory/Instance. All live `toumanlin.archomonitor` Instances under Monitor source count, highest About.xml semantic `modVersion` is latest. Merge differing Lineages into latest's (02 §6, `lineage merge`). Swap old versions in every environment plan in place, one reversible edit each, named `update Archo Monitor <old> → <new>`. Independent of `monitor.default` (addition only). Swap even while game runs; do not wait or repeat at launch (00 §6 D21): plan edits reach `Mods/` only next launch/save, then remove old link; until then it does not compete with new version (§3 pre-enable checks). Monitor-only updates do not stale this run's log (03 §6.4). Keep old directories (each < 100 KB); unused versions are not linked.
 
-**FAT、exFAT。** `Mods/` 所在的卷不支持 junction 时（Windows 上按 `GetVolumeInformationW` 的文件系统名 `FAT`、`FAT32`、`exFAT` 判断）：默认加入跳过，说明“`Mods/` is on exFAT, which cannot hold the link Archo Monitor needs”；玩家自己启用了它时，启动方案和写入游戏按 §3 拒绝，原因里点名 Archo Monitor 并给出 `archo disable <引用>`。不退回复制。
+**FAT/exFAT.** If `Mods/` volume lacks junctions (Windows `GetVolumeInformationW` filesystem `FAT`, `FAT32`, `exFAT`), skip default-add, explaining "`Mods/` is on exFAT, which cannot hold the link Archo Monitor needs". Manual enable then save/launch refuses under §3, naming Monitor and `archo disable <ref>`. No copy fallback.
 
-**整合包。** 与其他 Mod 一样复制进包（§5.2，来源是 `extra`）；包里的 Monitor 把日志写在 `<包>/userdata/ArchoMonitor.log`（03 §6.7.3）。
+**Packs.** Copy like any Mod (§5.2, source `extra`); bundled Monitor logs `<pack>/userdata/ArchoMonitor.log` (03 §6.7.3).
 
-**命令。**
+**Commands.**
 
-- `archo monitor`：随附的版本和位置（或在哪里找过）、已安装的版本、来源、当前方案里有没有它和位置、`monitor.default`。
-- `archo monitor install [--dry-run]`：执行上面的步骤；`--dry-run` 只列出会做什么。
-- `archo status` 多一行：`monitor: ArchoMonitor 0.9.0 in the plan (after Harmony)`、`monitor: not in the plan (archo enable …)` 或 `monitor: not installed`。
-- MCP：`status` 带同一行；`status show=settings` 列出 `monitor.default`；启用、停用、移动用现有的 `edit_loadout`。
+- `archo monitor`: bundled version/location (or searched locations), installed versions/source, current-plan presence/position, `monitor.default`.
+- `archo monitor install [--dry-run]`: steps above; preview only with flag.
+- `archo status` adds `monitor: ArchoMonitor 0.9.0 in the plan (after Harmony)`, `monitor: not in the plan (archo enable …)` or `monitor: not installed`.
+- MCP `status` same line; `status show=settings` lists `monitor.default`; use existing `edit_loadout` for enable/disable/move.
 
-## 10. Steam 客户端调用（订阅与退订）
+## 10. Steam client calls (subscribe and unsubscribe)
 
-已实现（Mod 库存的“退订”“重新订阅”，06 §2.9）。RimArcho 经玩家正在运行的 Steam 客户端订阅、退订工坊条目，和 RimCrow 的做法相同：
+Implemented (mod library unsubscribe/resubscribe, 06 §2.9). Like RimCrow, RimArcho subscribes/unsubscribes through the player's running Steam client:
 
-- **有界的子进程。** `archo steam-worker subscribe|unsubscribe|state|download|watch <工坊 ID…>`（不列在帮助里）由 RimArcho 自己启动，工作目录是运行目录 `%LOCALAPPDATA%\RimArcho\steam`：里面有从游戏安装复制来的 `steam_api64.dll`（本机的 1.7 在游戏根目录；也找 Unity 布局的 `RimWorldWin64_Data\Plugins\x86_64`；游戏的那份变了就重新复制）和写着 `294100` 的 `steam_appid.txt`。从不往游戏目录写东西。子进程调用完就退出；`watch` 在下载等待期间保持运行，Steam 会显示“正在玩 RimWorld”，因此必须主动请求下载，不能只等 Steam 的后台更新。DLL 出错不会带倒窗口。
-- **调用。** 不用 cgo，经 `syscall` 调 Steamworks 的扁平 C 接口：`SteamAPI_InitFlat`（SDK 1.58 起），没有就用 `SteamAPI_Init`；`SteamAPI_SteamUGC_v0NN`、`SteamAPI_SteamUtils_v0NN` 取 DLL 里有的最高版本；`SteamAPI_ISteamUGC_SubscribeItem` / `UnsubscribeItem` 逐个发出，然后循环 `SteamAPI_RunCallbacks`，用 `ISteamUtils_IsAPICallCompleted` / `GetAPICallResult` 读每个调用的 `EResult`，直到都有结果或超时；没等到结果的按 `GetItemState` 的“已订阅”位判断。操作前先处理初始化引发的订阅列表刷新，操作后继续处理回调并观察已确认成功项的状态回落，对回落项补发一次；初始化等待、答复等待和补偿观察的间隔与期限见 06 §2.16.1 S05。最后 `SteamAPI_Shutdown` 后退出。本机游戏（1.7.4982）的 DLL 有 `SteamAPI_Init`、`SteamUGC_v016`、`SteamUtils_v010`。
-- **输出**是逐行文字，父进程解析（`steamworks.Parse`）：`ITEM <ID> ok|failed:<EResult>|timeout <状态位>`、`STATE <ID> <状态位>`、`DONE`；连不上 Steam 时只有一行 `ERROR <原因>`。`watch` 增加 `PROGRESS <ID> <已下载字节> <总字节> <状态位>`，只在采样变化时写出，父进程通过 `App.runSteamStreaming` 逐行消费并调用 `BatchCalls.Progress` / `Done`，不等子进程结束才读取。一次最多 50 项；普通调用 40 秒超时，下载等待按下述期限。
-- **连不上 Steam**（没运行、没登录、没有 DLL、DLL 加载不了、超时）是 `app.ErrSteamUnavailable`：窗口打开这些条目的工坊页面并说明原因，CLI 的错误里给出页面链接。Steam 回答失败（`failed:<EResult>`）照实报错，不打开页面；说法在 `app.WorkshopResultText`。3（没有连接）写“Steam 客户端离线”，任务详情提示重启 Steam：常见原因是 SteamCMD 用同一个账号登录，把客户端挤下线（06 §2.9）。
-- **退订会让 Steam 删掉工坊文件夹**，所以它和回收站一样算破坏性动作：界面先显示 `--dry-run`（会删哪个文件夹）再确认，MCP 的 `manage_library` 标为 destructive。已启用、仍有方案（任何环境）在用时只警告（`warning:` 列出方案），照样退订，这些方案里显示为缺失；游戏正在运行时拒绝（§4）。退订残留不能再退订（用 `trash`），已订阅的不能再订阅。
-- **重新订阅已订阅的工坊原件。** `App.Workshop("resubscribe", refs, dryRun)` 先预览再确认：RimArcho 会先把文件夹移到回收站，再由 Steam 重新下载，其中的本地修改会丢失。只接受工坊来源、数字工坊 ID、副本自身不是链接且不带锁定标记的原件；已启用或任何列表使用都允许，游戏运行时拒绝。经现有 worker 先退订；只对 Steam 确认退订成功的项，由 RimArcho 经现有回收站路径白名单与后端清理 `…/workshop/content/294100/<工坊 ID>` 整个原目录（包括额外文件和 `.git`），从不沿副本自身的链接或 junction 清理目标，也不永久删除。用 `Lstat` 确认原路径不存在后才订阅；Steam 已并发删除视为成功，共享冲突等暂时失败按 06 §2.16.1 S10 短暂重试。期限后仍在或无法确认消失的目录逐项报清理失败，不继续订阅；其他成功项照常订阅。未确认退订的项不清理、不订阅。退订残留跳过退订和清理，直接订阅。GUI 沿用 Steam 后台任务队列，每批最多 50 项；CLI / MCP 前台执行。中间不移除实例、不修改列表、不摘除指向原路径的游戏链接；扫描的 R1（同来源、同相对路径，02 §5.1）会在文件夹回来时复用原 ID 和 Lineage，即使删除间隙扫描成缺失也如此。订阅确认的项（含残留）交给 `watch`：逐项调用 `ISteamUGC::DownloadItem(id, true)`，按 06 §2.16.1 S08 的间隔泵送 `SteamAPI_RunCallbacks`，读取 `GetItemState`、`GetItemDownloadInfo` 的字节数，并通过 `GetItemInstallInfo` 取得安装路径。只有目录存在且非空、带 Installed 且不带 Downloading / DownloadPending 才逐项成功；Installed 可能是旧清单，单独出现不能证明下载完成。无字节增长的逐项停滞阈值和总等待上限见 06 §2.16.1 S08；到期时说明“Steam 没有下载，请检查 Steam”或下载超时。`BatchCalls.Stopped` 触发取消，父进程关闭输入管道，worker 退出并 Shutdown；DLL 卡住时强制结束并回收子进程。父进程退出也会使管道 EOF，避免 worker 残留。任务页的阶段、逐项文案和 JSON 见 06 §2.16；CLI 每约 10% 及逐项结束输出进度，命令等到下载完成或失败才返回。
-- **匿名查看本地状态。** `workshop state` / MCP `steam_state` 连不上 Steam 时返回本地文件夹是否存在，明确标记 `Local` 并保留原因；订阅、更新和下载进度为未知，不能把状态位 0 解读成“未订阅”。订阅和退订仍需账户，失败不能伪装成功。
-- **命令**：`archo workshop unsubscribe <引用…> [--dry-run]`、`archo workshop subscribe <引用…> [--dry-run]`、`archo workshop resubscribe <引用…> [--dry-run]`、`archo workshop state <引用…>`（订阅、已安装、等更新、下载中）；MCP `manage_library` 的 `unsubscribe`、`subscribe`、`resubscribe`、`steam_state`。调用后不立即重扫：重新订阅会等待下载完成；普通订阅与退订仍由 Steam 后台下载或删除，下一次扫描看到结果。
-- **测试**用假的子进程（普通调用 `App.SteamWorker`，流式等待 `App.SteamWorkerStream`），不碰真的 Steam。真实调用只在玩家确认后发生；开发时的手动检查只做到预览。
+- **Bounded child process.** RimArcho launches hidden-from-help `archo steam-worker subscribe|unsubscribe|state|download|watch <Workshop IDs…>`, working directory `%LOCALAPPDATA%\RimArcho\steam`, holding game-copied `steam_api64.dll` (local 1.7 game root; also search Unity `RimWorldWin64_Data\Plugins\x86_64`; recopy if game DLL changes) and `steam_appid.txt` containing `294100`. Never write game directory. Child exits after calls; `watch` stays during download waits. Steam shows "playing RimWorld", requiring explicit downloads rather than waiting for background updates. DLL failures cannot crash the window.
+- **Calls.** No cgo; `syscall` invokes flat Steamworks C API: `SteamAPI_InitFlat` (SDK 1.58+), fallback `SteamAPI_Init`; highest available `SteamAPI_SteamUGC_v0NN`, `SteamAPI_SteamUtils_v0NN`; issue `SteamAPI_ISteamUGC_SubscribeItem` / `UnsubscribeItem` individually, loop `SteamAPI_RunCallbacks`, read `EResult` through `ISteamUtils_IsAPICallCompleted` / `GetAPICallResult` until all answered or timed out; unanswered use `GetItemState` subscribed bit. Process initialization subscription-list refresh first; afterward continue callbacks and observe confirmed-success items reverting, retry once for reverted items. Initialization/reply/compensation intervals/deadlines: 06 §2.16.1 S05. Finally `SteamAPI_Shutdown` and exit. Local 1.7.4982 DLL has `SteamAPI_Init`, `SteamUGC_v016`, `SteamUtils_v010`.
+- **Output** parsed by parent (`steamworks.Parse`): `ITEM <ID> ok|failed:<EResult>|timeout <state bits>`, `STATE <ID> <state bits>`, `DONE`; unavailable Steam yields only `ERROR <reason>`. `watch` adds `PROGRESS <ID> <downloaded bytes> <total bytes> <state bits>` only on sample changes. Parent `App.runSteamStreaming` consumes lines, calls `BatchCalls.Progress` / `Done`, without waiting for exit. Up to 50 items; ordinary timeout 40 seconds; download waits below.
+- **Steam unavailable** (not running/logged in, missing/unloadable DLL, timeout) is `app.ErrSteamUnavailable`: window opens item Workshop pages with reason; CLI error links pages. Steam `failed:<EResult>` reports actual error without opening pages; wording `app.WorkshopResultText`. Result 3 says "the Steam client is offline"; task details suggest restarting Steam. Common cause: SteamCMD login with same account displaces client (06 §2.9).
+- **Unsubscribe lets Steam delete Workshop folders**, destructive like recycling: UI preview (`--dry-run`, affected folder), then confirm; MCP `manage_library` destructive. Enabled/in-use in any environment only warns with plan list, then proceeds; those entries become missing. Refuse running games (§4). Residue cannot unsubscribe (trash instead); subscribed cannot subscribe again.
+- **Resubscribe subscribed Workshop originals.** `App.Workshop("resubscribe", refs, dryRun)` previews/confirms recycling folder then Steam redownload, losing local changes. Accept Workshop source, numeric ID, original not itself linked or locked. Allow enabled/in-use lists, refuse running game. Existing worker unsubscribes first; only confirmed-success items have entire original `…/workshop/content/294100/<Workshop ID>` recycled via existing backend/path allowlist (including extras/`.git`), never following the copy's own symlink/junction or permanently deleting. Subscribe only after `Lstat` confirms absence; concurrent Steam deletion counts as success; transient sharing failures retry briefly under 06 §2.16.1 S10. If still present/unknown after deadline, report cleanup failure and do not subscribe that item; successful others continue. Unconfirmed unsubscribe: no cleanup/subscribe. Residue skips unsubscribe/cleanup and subscribes directly. GUI reuses Steam background queue, ≤ 50 per batch; CLI/MCP foreground. Do not remove Instances, change lists or detach game links to original path in between. Scan R1 (same source/relative path, 02 §5.1) reuses ID/Lineage when folder returns, even if gap scan tombstoned it. Confirmed subscriptions (including residue) go to `watch`: `ISteamUGC::DownloadItem(id, true)` per item, pump callbacks at 06 §2.16.1 S08 intervals, read `GetItemState`, `GetItemDownloadInfo` bytes, `GetItemInstallInfo` path. Success only if directory exists/nonempty, Installed set, Downloading/DownloadPending unset; Installed alone may be old manifest, not completion proof. Per-item no-growth stall/total limits: 06 §2.16.1 S08; report "Steam did not download; please check Steam" or timeout. `BatchCalls.Stopped` cancels; parent closes input, worker exits/Shutdown; hung DLL force-kills/reaps child. Parent exit also causes pipe EOF, avoiding orphan workers. Task phases/text/JSON: 06 §2.16. CLI emits progress about every 10% and per-item completion, returning only after download success/failure.
+- **Anonymous local state.** `workshop state` / MCP `steam_state` returns local folder existence if Steam unavailable, explicitly `Local` with reason. Subscription/update/download progress unknown; state bits 0 cannot mean unsubscribed. Subscribe/unsubscribe still require account; never disguise failures as success.
+- **Commands**: `archo workshop unsubscribe <refs…> [--dry-run]`, `archo workshop subscribe <refs…> [--dry-run]`, `archo workshop resubscribe <refs…> [--dry-run]`, `archo workshop state <refs…>` (subscribed, installed, needs update, downloading); MCP `manage_library` actions `unsubscribe`, `subscribe`, `resubscribe`, `steam_state`. No immediate rescan: resubscribe waits for download; ordinary subscribe/unsubscribe leave Steam downloading/deleting in background, observed next scan.
+- **Tests** fake children (`App.SteamWorker` ordinary, `App.SteamWorkerStream` streaming), never real Steam. Real calls only after player confirmation; development manual checks stop at preview.
 
-## 11. 用 SteamCMD 下载游戏版本
+## 11. Downloading game versions with SteamCMD
 
-**账户管理**：设置 › 账户只提供登录/重新登录、退出账号；单行可用状态由 06 §2.14 定义。输入账户名后用 `+login <name>` 打开 SteamCMD 原生控制台，玩家自行输入密码和 Guard 并 quit。窗口关闭后，隐藏执行 `+login <name> +licenses_print +quit`，以缓存认证自动验证，不传密码。登录步骤及随后 user info 都 OK 才确认登录；兼容步骤/结果分行。每个 license 的 Apps/AppID 列表含应用 294100 才判拥有 RimWorld；只存布尔值与检查时间，不存许可证清单。匿名可下载工坊 Mod，不能拥有或下载游戏。网络失败不宣称凭据过期，路径或账户变化不复用别处记录。
+**Account management**: settings › accounts offers login/relogin and logout only; one-line availability defined by 06 §2.14. After account name, open native SteamCMD console `+login <name>`; player enters password/Guard and quits. Then hidden `+login <name> +licenses_print +quit` verifies cached authentication, no password passed. Confirm only if login steps and subsequent user info are OK; support separate step/result lines. Ownership requires 294100 in a license Apps/AppID list; store only boolean/check time, not license list. Anonymous downloads Workshop Mods, never owns/downloads game. Network failure does not imply expired credentials; never reuse records across tool/account changes.
 
-退出执行 `+logout +quit`，失败、未确认或离线时自动清理受管副本的已知本地认证缓存（01 §4），范围提前在确认文字说明；不读取 token、不备份认证文件、不退出其他设备。外部路径/PATH 副本由它自己管理登录，不提供受管账户按钮或清理。
+Logout runs `+logout +quit`; on failure/unconfirmed/offline automatically clear known local auth cache of managed copy (01 §4), scope disclosed beforehand in confirmation. Never read tokens, back up auth files or log out other devices. External/PATH copies manage login themselves, without managed account buttons/cleanup.
 
-工坊 fallback、游戏下载、账户操作共用实际实例与账户解析；实例互斥覆盖进程生命周期。公开版本列表始终匿名，读分支不等于有游戏许可。SteamCMD 控制台由它自己输出，RimArcho 不额外打印提示或设置含未翻译文字的标题；对外进度与错误只含允许的阶段、计数和原因，不转发原始认证/许可日志。
+Workshop fallback, game downloads and account operations share actual instance/account resolution and process-lifetime exclusion. Public branches always anonymous; reading branches does not establish ownership. SteamCMD controls its console output; RimArcho adds no prompts or untranslated window titles. External progress/errors include only permitted phases/counts/reasons, never raw auth/license logs.
 
-已实现（`archo env branches`、`archo env download`、引导第 1 步的“下载一个版本”，06 §2.15）。玩家拥有 RimWorld，想要一个旧版本（例如 1.5）作为另一个环境。
+Implemented (`archo env branches`, `archo env download`, first-run step 1 "download a version", 06 §2.15). Player owns RimWorld and wants an older version (e.g. 1.5) as another environment.
 
-- **SteamCMD 在哪里。** 依次找：设置项 `steamcmd.path`、`%LOCALAPPDATA%\RimArcho\steamcmd\steamcmd.exe`、`PATH`。都没有时，先问玩家（显示来源和大小：对 `https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip` 做一次 HEAD 取 `Content-Length`），玩家同意后（CLI 是 `--install-steamcmd`）下载并解开到 `%LOCALAPPDATA%\RimArcho\steamcmd`。SteamCMD 第一次运行时会自己更新（约 30 MB）。
-- **分支。** `steamcmd +login anonymous +app_info_update 1 +app_info_print 294100 +quit`：匿名登录就能读到 RimWorld 的应用信息，不需要拥有游戏。读 `depots/branches`，去掉要密码的（`pwdrequired`），排序：`public`、`unstable`、`version-*` 按版本从新到旧、其余（`alpha*`、`beta*`）。不猜分支名。2026-10-22 实测的列表（`testdata/steamcmd/app_info_print_294100.txt`）：`public`、`unstable`（Public testing）、`version-1.6.4633`、`version-1.5`、`version-1.4.3901`、`version-1.4.3563`、`version-1.4.3542`、`version-1.3-latest`、`version-1.3.3287`、`version-1.2.3005`、`version-1.2`、`version-1.1`、`version-1.0`、`beta19`、`beta18`、`alpha17`…`alpha13`、`alpha4`。没有 `version-1.6` 这样的名字；`public` 是哪个版本只有下载后读 `Version.txt` 才知道。
-- **分支缓存。** 公开分支按 appID 和 SteamCMD 工具身份（规范化真实路径、文件大小和修改时间）保存在进程内，有效期与失败后的重试门槛见 06 §2.16.1 C02（`internal/app/gamebranches.go`）；同一键并发查询只运行一次。过期先显示旧列表，后台匿名刷新完成后更新界面；刷新失败保留旧列表并显示错误，短暂退避后允许重试。实际查询仍持有 `accounts.Lock`，与下载、账户操作共用实例互斥。运行成功后重读工具身份，兼容 SteamCMD 自更新；分支查询随窗口关闭取消。界面刷新时显示轻量提示，状态轮询的退避和停止期限见 06 §2.16.1 G05，再次进入可重新读取。下载日志轮询及后代进程等待见 S01、S12。
-- **目标目录。** 不能在 RimArcho 的数据目录里（也不能包含它），不能和任何来源（任何游戏的 `Data`/`Mods`、Mod 文件夹）互相包含，不能是已有环境的游戏目录。不存在时建好。
-- **登录。** 默认使用设置中的账户；未登录时匿名只能下载工坊 Mod，游戏下载提示先登录拥有 RimWorld 的账户。设置中的 `steamcmd.account` 可留空（匿名）、填 `anonymous`，或填写账户名。下载表单及 CLI 的 `--account` 只覆盖本次：优先级为本次指定 → 设置 → 匿名；显式 `anonymous` 可覆盖已保存账户，清空设置可恢复匿名。公共版本列表始终匿名。RimArcho 只保存账户名，不接收密码和 Steam 令牌：玩家在 SteamCMD **自己的控制台窗口**（`CREATE_NEW_CONSOLE`）或 CLI 当前终端中输入它们。
-- **下载。** `+force_install_dir <目录> +login <账户名> +app_update 294100 [-beta <分支>] validate +quit`（`public` 不加 `-beta`）。RimArcho 不读 SteamCMD 的控制台，而是跟读它自己的日志 `<steamcmd>/logs/console_log.txt`（从启动前的长度开始；文件变短时从头读）：`Update state (0x..) downloading|verifying update, progress: P (done / total)` 变成进度，`Success! App '294100' fully installed.` 表示成功。之后确认目录里有游戏，再按“已有的游戏”加为环境（名字是版本，例如 `1.5`；启动方式 `direct`；存档默认共用，CLI 可 `--saves own`），并只扫它的 `Data`、`Mods`。
-- **失败说平常话。** 登录失败、Guard、网络、许可、磁盘或分支错误按 `DownloadError.Why` 的允许原因解释；未识别结果说明未确认完成。对外不附 SteamCMD 原话。最后出现 `fully installed` 时之前的错误不算：SteamCMD 自己会重连（`steamcmd has been disconnected from steam with result 3 (No Connection)` 后接 `Retrying...`），2026-10-28 VM 实测一次 16 GB 下载中途掉线一次、仍然装完，原来报成“连不上 Steam”、没有加环境（`TestSteamDownloadRecoversFromDisconnect`）。
-- **未验证**（开发时没有真的登录或下载；2026-10-28 VM 用缓存登录真实下载了 `unstable` 分支，16.4 GB、37 分钟，进度行格式和中途掉线的原话已核对）：真实登录的窗口和提示、各种失败的原话（只有 `No subscription` 和登录 `FAILED (...)` 的格式有把握）、分支不存在时 SteamCMD 是报错还是装 `public`、下载完成后的目录内容。测试用假的 SteamCMD（`App.SteamCMDStart` / `SteamCMDRun`）写日志行；开发时在浏览器里用一个假的 `steamcmd.exe` 走通了进度条和加入环境。
+- **SteamCMD location.** Search `steamcmd.path`, `%LOCALAPPDATA%\RimArcho\steamcmd\steamcmd.exe`, `PATH`. If absent, ask showing source/size (HEAD `https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip`, `Content-Length`); after consent (CLI `--install-steamcmd`) download/extract into `%LOCALAPPDATA%\RimArcho\steamcmd`. First run self-updates (about 30 MB).
+- **Branches.** `steamcmd +login anonymous +app_info_update 1 +app_info_print 294100 +quit`: anonymous reads app info, no ownership required. Read `depots/branches`, omit `pwdrequired`, sort `public`, `unstable`, newest-first `version-*`, others (`alpha*`, `beta*`). Never guess names. Measured 2026-10-22 (`testdata/steamcmd/app_info_print_294100.txt`): `public`, `unstable` (Public testing), `version-1.6.4633`, `version-1.5`, `version-1.4.3901`, `version-1.4.3563`, `version-1.4.3542`, `version-1.3-latest`, `version-1.3.3287`, `version-1.2.3005`, `version-1.2`, `version-1.1`, `version-1.0`, `beta19`, `beta18`, `alpha17`…`alpha13`, `alpha4`. No `version-1.6`; determine public version only from downloaded Version.txt.
+- **Branch cache.** In-process by appID/tool identity (normalized real path, size, mtime); validity/retry gates: 06 §2.16.1 C02 (`internal/app/gamebranches.go`); coalesce same-key concurrent queries. Show stale list immediately, anonymous refresh in background, update UI on completion; retain old/error on failure, retry after short backoff. Query holds `accounts.Lock`, sharing instance exclusion with downloads/accounts. Reread identity after success for SteamCMD self-updates; cancel queries on closing window. Lightweight refresh notice; polling backoff/deadline: 06 §2.16.1 G05; reentry can reread. Download-log polling/descendant waits: S01, S12.
+- **Destination.** Neither inside nor containing RimArcho data; no mutual containment with any source (any game's Data/Mods, Mod folder); not an existing environment game directory. Create if absent.
+- **Login.** Default settings account; anonymous can download only Workshop Mods, game download asks to log in with ownership. `steamcmd.account` empty/`anonymous` or account name. Form/CLI `--account` overrides only this run: explicit → settings → anonymous; explicit anonymous overrides saved account, clearing setting restores anonymous. Public branches always anonymous. Store account name only; never receive passwords/tokens. Player enters them in SteamCMD's **own console** (`CREATE_NEW_CONSOLE`) or CLI current terminal.
+- **Download.** `+force_install_dir <directory> +login <account> +app_update 294100 [-beta <branch>] validate +quit` (no `-beta` for `public`). Read no console; follow tool's `<steamcmd>/logs/console_log.txt` from prelaunch length (restart from beginning if truncated). `Update state (0x..) downloading|verifying update, progress: P (done / total)` becomes progress; `Success! App '294100' fully installed.` means success. Verify game directory, register as existing game (version name e.g. `1.5`, direct launch, shared saves default, CLI `--saves own`), scan only Data/Mods.
+- **Plain-language failures.** Explain login/Guard/network/license/disk/branch through allowed `DownloadError.Why`; unknown outcomes say completion unconfirmed. Never attach raw SteamCMD text externally. Final `fully installed` overrides earlier errors: SteamCMD reconnects (`steamcmd has been disconnected from steam with result 3 (No Connection)` then `Retrying...`). A 2026-10-28 VM 16 GB download disconnected but completed; previously falsely reported unavailable/no environment (`TestSteamDownloadRecoversFromDisconnect`).
+- **Unverified** (no real development login/download; 2026-10-28 VM cached login downloaded unstable, 16.4 GB, 37 minutes, validating progress format/disconnect text): real login window/prompts, failure text (only `No subscription` and login `FAILED (...)` formats certain), nonexistent branch behavior (error or public fallback), completed directory content. Fake SteamCMD (`App.SteamCMDStart` / `SteamCMDRun`) writes test log lines; development browser fake `steamcmd.exe` verified progress/environment addition.
 
-## 12. 测试运行
+## 12. Test runs
 
-在准备隔离数据和启动进程前执行 §3 的只读链接检查；被测游戏断链或检查失败时返回 `status: links-blocked` 的结构化报告，含路径、目标、原因及凭据，不创建测试数据、不改 Mods、不启动游戏。底层 `internal/gametest.Run` 也执行只读前检。
+Before isolated data/process setup, perform §3 read-only link inspection. Broken/failed inspected game links return structured `status: links-blocked`, paths/targets/reasons/evidence, without test data, Mod changes or launch. Low-level `internal/gametest.Run` also prechecks read-only.
 
-已实现（2026-10-24，`internal/gametest`、`App.TestRun`、`archo test run`、MCP `test_run`；调研与实测见 `docs/research/2026-10-24_game-test-runs-rimdevtools.md`）。用一个方案在一个环境的游戏里真的启动一次，看能不能进主菜单（或测试地图）、出了哪些错，然后关掉游戏出报告。不碰玩家的存档、配置和日志，也不写游戏目录。
+Implemented (2026-10-24, `internal/gametest`, `App.TestRun`, `archo test run`, MCP `test_run`; research/measurements: `docs/research/2026-10-24_game-test-runs-rimdevtools.md`). Actually launch a plan in an environment, check main-menu/test-map arrival and errors, terminate, report. Do not touch player saves/config/logs or write game directory.
 
-- **隔离的数据目录。** `<数据目录>/tests/<环境 ID>/userdata`，用 `-savedatafolder=` 传给游戏；跨次复用（1.7 在这里放着色器和纹理缓存，复用能快很多）。每次运行前写 `Config/ModsConfig.xml`（`loadout.Render`，已知 DLC 同 §5.3），从环境的 `Config/` 复制其余 `*.xml`（保留 Mod 设置；`ModsConfig.xml`、`Knowledge.xml`、`Prefs.xml` 和 `KeyPrefs.xml` 除外），删掉 `Config/Knowledge.xml`。隔离目录中旧的 Prefs/KeyPrefs 每次也移除，由目标游戏生成默认偏好（含语言、窗口、按键），避免共用玩家配置跨版本不兼容；缓存保留。目录不能在游戏目录里（`gametest` 里有检查）。
-- **日志。** 每次运行一个目录 `<数据目录>/tests/<环境 ID>/runs/<UTC 时间>/`（`20060102-150405`；同秒已有目录时顺延到下一秒），里面是 `Player.log`、合并 stdout/stderr 的 `stdout.log`、进程结果 `result.json` 和归因报告 `report.json`。每个环境只保留最新 10 次运行目录，`userdata` 缓存保留。1.6 及以前（Unity）加 `-logfile <运行目录>/Player.log`；1.7 起（游戏目录有 `Waylith.dll`）游戏的文件日志位置写死在玩家的 LocalLow，所以加 `-NoFileLog`，由 RimArcho 接管 stdout/stderr，把控制台格式（`HH:MM:SS  LEVEL 消息`）边读边转成文件格式写进 `Player.log`，`internal/logs` 照常解析。游戏以无控制台（`DETACHED_PROCESS`）启动，终端的 Ctrl+C 只到 RimArcho，由它杀游戏。已知限制：1.7 控制台输出按系统 ANSI 代码页编码，代码页表示不了的字符（如英文系统上的中文 Mod 名）在日志里是 `?`；包名和类型名不受影响，归因照常（2026-10-24 实测）。
-- **启动。** 总是直接起游戏可执行文件（不经 Steam，Steam 给不了进程句柄），工作目录是游戏目录；Unity 版再加 `-popupwindow`。已有游戏在运行时拒绝（`checkNoGame`）。
-- **判定。** 主菜单：`MainMenuDrawer.Init()` 写 `Config/Knowledge.xml`，它在启动后出现即“到主菜单”，再等 `--settle` 收晚到的错误。测试地图（`--map`）：加 `quicktest`，出现 `Initializing new game with mods` 后日志安静达到阈值算到地图。采样间隔、稳定等待和默认时限见 06 §2.16.1 V01–V04。游戏先退出是 `exited`，到 `--timeout` 是 `timeout`。最后杀掉进程。
-- **游戏看不见的 Mod。** 方案里的 Mod 只有在游戏的 `Data/`、`Mods/`（含已有链接）或环境的工坊目录里，游戏才找得到。测试运行不建链接，看不见的列在报告的 `missing` 里，照样启动。
-- **报告。** 状态（`menu`/`map`/`timeout`/`exited`）、加载秒数（启动到标志）、总秒数、峰值内存（进程 `PeakWorkingSetSize`）、请求的 Mod 数与 `missing`、日志的错误簇（`App.AnalyzeLog`，按被测方案归因）、各类数量。文本输出给人看，`--json` 给 MCP 和脚本。退出码：到达目标且没有错误簇 0；有错误或没到达 1。
+- **Isolated user data.** `<data directory>/tests/<environment ID>/userdata`, passed through `-savedatafolder`, reused (1.7 shader/texture caches greatly speed reuse). Before each run write `Config/ModsConfig.xml` (`loadout.Render`, known DLC as §5.3), copy other environment `Config/` `*.xml` to retain Mod settings except `ModsConfig.xml`, `Knowledge.xml`, `Prefs.xml`, `KeyPrefs.xml`; delete `Config/Knowledge.xml`. Remove old isolated Prefs/KeyPrefs each run; target game generates defaults (language/window/keys), avoiding cross-version incompatibility; retain caches. Directory cannot be inside game (`gametest` checks).
+- **Logs.** Per-run `<data directory>/tests/<environment ID>/runs/<UTC time>/` (`20060102-150405`; advance one second on collision): `Player.log`, merged stdout/stderr `stdout.log`, process `result.json`, attributed `report.json`. Keep latest 10 runs/environment, retain `userdata` cache. Unity ≤1.6 gets `-logfile <run directory>/Player.log`; ≥1.7 (`Waylith.dll` in game root) hardcodes file logs to player LocalLow, so pass `-NoFileLog`, capture stdout/stderr, stream console `HH:MM:SS  LEVEL message` into file-format Player.log for ordinary `internal/logs` parsing. Launch detached (`DETACHED_PROCESS`), so terminal Ctrl+C reaches RimArcho only, which kills game. Known limit: 1.7 console uses system ANSI code page; unrepresentable characters (Chinese Mod names on English systems) become `?`, but package/type names and attribution unaffected (measured 2026-10-24).
+- **Launch.** Always direct executable (Steam cannot supply process handle), game working directory; Unity also `-popupwindow`. Refuse running games (`checkNoGame`).
+- **Decision.** Main menu: `MainMenuDrawer.Init()` writes `Config/Knowledge.xml`; its postlaunch appearance marks arrival, then `--settle` waits for late errors. Map (`--map`): add `quicktest`; after `Initializing new game with mods`, quiet-log threshold marks arrival. Sampling/settle/default limits: 06 §2.16.1 V01–V04. Early game exit `exited`, `--timeout` deadline `timeout`. Kill process at end.
+- **Game-invisible Mods.** Only Data/Mods (including existing links)/environment Workshop are visible. Test runs create no links; list invisible Mods in report `missing`, launch anyway.
+- **Report.** Status (`menu`/`map`/`timeout`/`exited`), loading seconds (start to marker), total seconds, peak process `PeakWorkingSetSize`, requested Mod count/`missing`, log clusters (`App.AnalyzeLog`, attribution against tested plan), category counts. Human text, `--json` for MCP/scripts. Exit 0 if target reached without error clusters; otherwise 1.
 
-PrefsData / KeyPrefs 的 XML 错误归为 `settings`（环境配置），不列可能有错的 Mod；仍计入错误及失败退出码。
+PrefsData / KeyPrefs XML errors are `settings` (environment configuration), without suspected Mods; still count as errors and failing exit status.
 
-### 验收
+### Acceptance
 
-- `go test ./internal/gametest/`：假进程覆盖主菜单、地图、超时、提前退出、控制台日志转换后 `logs.Parse` 认得出 Waylith 格式。
-- 真机：`archo test run` 对一个小方案跑一次 1.6 或 1.7，玩家 LocalLow 下 `Logs/` 与 `Config/` 的修改时间不变，游戏目录不变，报告状态 `menu`。
+- `go test ./internal/gametest/`: fake processes cover menu/map/timeout/early exit; console-log conversion remains recognizable as Waylith by `logs.Parse`.
+- Real machine: run small-plan `archo test run` on 1.6/1.7; player LocalLow `Logs/` / `Config/` mtimes and game directory unchanged, report `menu`.

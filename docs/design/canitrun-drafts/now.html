@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>能不能跑 · 现在</title>
+<title>can it run · now</title>
 <link rel="stylesheet" href="shared.css">
 </head>
 <body>
@@ -18,7 +18,7 @@
 <script src="shared.js"></script>
 <script>
 // Today's page (06 §2.4): one column, four sections by consequence. Uncounted items (shared-log
-// hints, weak order, the cycle) sit dimmed inside 会让游戏出错; the link panel lists every game.
+// hints, weak order, the cycle) sit dimmed inside breaks the game; the link panel lists every game.
 const ORDER = ["break", "run", "confirm", "hidden"];
 const LIST = ORDER.flatMap((s) => ITEMS.filter((it) => (it.now || it.sec) === s));
 const sec = (it) => it.now || it.sec;
@@ -26,10 +26,10 @@ let cur = 0;
 const open = new Set();
 const n = LIST.filter((x) => x.counted && sec(x) !== "hidden").length;
 
-shell("now", n, [["↑↓", "移动"], ["← →", "换区"], ["enter", "主操作"], ["A", "重新检查"], ["l", "游戏日志"]],
-  "现在：一列四个区。不计数的提示淡色混在“会让游戏出错”里，链接面板列出所有游戏。");
-$("#head").innerHTML = `<p class="lead"><b>${PLAN}</b>还不能放心玩：修好下面 ${n} 个问题就行</p>
-  <div class="page-acts"><button class="btn primary small">${ic("wand")} 自动修好 2 个</button><button class="btn small">${ic("refresh")} 重新检查文件</button><button class="btn small">${ic("log")} 游戏日志</button></div>`;
+shell("now", n, [["↑↓", "move"], ["← →", "change section"], ["enter", "primary action"], ["A", "recheck"], ["l", "game log"]],
+  "Now: four sections in one column. Uncounted hints are muted inside breaks the game; link panel lists all games.");
+$("#head").innerHTML = `<p class="lead"><b>${PLAN}</b>fix ${n} problems below before playing</p>
+  <div class="page-acts"><button class="btn primary small">${ic("wand")} fix 2 automatically</button><button class="btn small">${ic("refresh")} recheck files</button><button class="btn small">${ic("log")} game log</button></div>`;
 
 function draw() {
   let html = "", i = 0;
@@ -55,10 +55,10 @@ function mark() {
 }
 const setCur = (i) => { cur = i; mark(); };
 bindRows($("#page"), LIST, setCur, (it, a) => {
-  if (a.l === "展开") { open.has(it.id) ? open.delete(it.id) : open.add(it.id); draw(); }
-  else toast(`会执行：${a.l}`);
+  if (a.l === "expand") { open.has(it.id) ? open.delete(it.id) : open.add(it.id); draw(); }
+  else toast(`would run: ${a.l}`);
 });
-keyNav(() => LIST.length, () => cur, setCur, (i) => sec(LIST[i]), (i) => LIST[i].acts && toast(`会执行：${LIST[i].acts[0].l}`));
+keyNav(() => LIST.length, () => cur, setCur, (i) => sec(LIST[i]), (i) => LIST[i].acts && toast(`would run: ${LIST[i].acts[0].l}`));
 draw();
 </script>
 </body>

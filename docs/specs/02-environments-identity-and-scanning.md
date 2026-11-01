@@ -1,529 +1,529 @@
-# 02 · 环境、身份与扫描
+# 02 · Environments, Identity and Scanning
 
-> 状态：已实现；标“（待实现）”的除外。
-> 依据：00、00a §4、01 §4。
+> Status: implemented except where marked "not implemented".
+> Basis: 00, 00a §4, 01 §4.
 
-本文定义环境与来源、扫描流程、Instance 对账、Lineage、变更事件，以及它们的存储。为什么这样设计见 00a §4。
+This document defines environments and sources, scanning, Instance reconciliation, Lineage, change events, and their storage. See 00a §4 for design rationale.
 
-## 0. 一个环境 = 一个游戏目录（0.9.0）
+## 0. One Environment = One Game Directory (0.9.0)
 
-> 已实现（分支 `claude/env-model-b161dc`）。下面是改造时的决定；§1–§3、§7 已按它改写。
+> Implemented (branch `claude/env-model-b161dc`). The decisions below guided the rework; §1–§3 and §7 have been rewritten accordingly.
 
-玩家认为一个环境同时挂着工坊、Monitor、SteamCMD 和额外文件夹不对：这些文件夹本来就是所有游戏共用的，按环境各存一份只会让同一个 Mod 有几条记录（§7 的已知限制）。批准的模型：
+The player found it wrong for each environment to attach Workshop, Monitor, SteamCMD, and extra folders: these folders are shared by all games, and storing them per environment only creates multiple records for the same Mod (known limitation in §7). Approved model:
 
-| 归属 | 内容 |
+| Ownership | Contents |
 | --- | --- |
-| 环境（一个游戏目录） | 自己的 `Data`（official）和 `Mods`（local）来源、游戏版本、启动方式、启动参数、当前方案、启动记录、`_Archo_` 部署链接、存档方式 |
-| 全局（所有环境共用） | **方案**（2026-10-25 起，04 §1.7）；**Mod 文件夹**：工坊目录（从 Steam 找）、SteamCMD 目录、额外文件夹、Archo Monitor 目录、锁定库。它们的 Instance 和 Lineage、标签、备注、别名、副本备注、历史、用户规则 |
-| 按游戏版本 | 分析槽位和事实视图；内容相同的事实集合跨版本共用（03 §3） |
-| 按用户数据目录 | ModsConfig.xml 写入记录（已经如此，§2.4 的“待实现”是旧的） |
+| Environment (one game directory) | Its own `Data` (official)` and ``Mods` (local) sources, game version, launch method, launch arguments, current plan, launch records, `_Archo_` deployment links, save mode |
+| Global (shared by all environments) | **Plans** (since 2026-10-25, 04 §1.7); **Mod folders**: Workshop directory (found through Steam), SteamCMD directories, extra folders, Archo Monitor directory, lock library. Their Instances and Lineages, tags, notes, aliases, copy notes, history, user rules |
+| By game version | Analysis slots and fact views; identical fact sets are shared across versions (03 §3) |
+| By user data directory | ModsConfig.xml write records (already implemented; "not implemented" in §2.4 is outdated) |
 
-**决定**：
-1. **共用来源**：`source.environment_id = ''`。共用来源的 Instance 也是 `environment_id = ''`；环境自己的 `official` / `local` 来源和它们的 Instance 仍带环境 ID。所有 Lineage 都是全局的（`environment_id = ''`），所以 `Mods/` 里的锁定副本和工坊原版照旧在同一个 Lineage。
-2. **标签**：共用来源的标签全局唯一（部署链接名里有标签，08 §3）；环境来源只有 `official`、`local`（及其退役名），在“共用 + 本环境”的范围里也唯一。
-3. **工坊目录**最多一个活的：`folder add` 一个新的工坊目录等于换路径，走 §3.2 的重新绑定。加环境时，如果游戏在 Steam 库里且还没有工坊目录，自动加上（“从 Steam 找”）。
-   **游戏自带的工坊目录是 SteamCMD 目录**（2026-10-22，分支 `claude/env-followups`）：SteamCMD 下载的游戏把 `steamapps\workshop\content\294100` 放在游戏目录里面（`force_install_dir`）。只要它存在、又不是 Steam 客户端的工坊目录，就登记成共用的 `steamcmd` 来源，设置页“文件夹”里和玩家加的一样显示，启用时同样经 `_Archo_` 链接部署（08 §3）。时机：`env add`（含“下载一个版本”）、`env set` 换了游戏目录，以及每次扫描前对所有环境查一遍（迁移前加的环境由此补上）。它**从不**当工坊目录，也不触发“第二个工坊目录等于换路径”：`--workshop` 指向它时也按 SteamCMD 目录加。已经登记过的（包括玩家移除后退役的）在每次扫描前的检查里不再加：移除了就是移除了。但玩家**明确加这个游戏**（`env add`，包括删掉游戏后再加回来）或用 `env set` 把游戏指到这里时，退役的这个目录会恢复（2026-10-25；玩家反馈删掉 1.6 再加回来，它的 SteamCMD 目录一直是“已移除”）。恢复的是原来那条来源记录（同一 ID，标签重新取 `steamcmd`），所以里面的 Mod 回来时还是原来的 Instance，列表、标签、备注都还认得。`folder add` 一个退役目录（同路径同类型）也同样恢复原记录，不新建。测试：`TestGameWorkshopIsSteamCMD`。
-4. **一个游戏目录只属于一个环境**：`env add` 拒绝别的环境已经用着的游戏目录。迁移前就共用游戏目录的两个环境保留原样（Mod 库存的“用在”仍按真实路径对应它们）。
-5. **存档**：`--saves shared`（默认，游戏默认的用户数据目录）或 `--saves own`（RimArcho 建 `<数据目录>/userdata/<环境名>`，启动时带 `-savedatafolder`，08 §2 已经支持非默认目录）。不单存字段，由 `user_data_root` 推出：等于游戏默认目录是“共用默认”，在 `<数据目录>/userdata/` 下是“独立”，其他是“自定义”（`--user-data` 仍可用）。数据目录检查对“独立”的存档目录放行，这是 RimArcho 自己的目录。
-6. **用户规则全局，按 Lineage**：规则描述的是两个 Mod 之间的关系（谁在谁后面、不兼容），与玩哪个游戏无关；全局才符合“一个 Mod 一条记录”，玩家只需要说一次。只有两个 Mod 都启用时规则才起作用，所以在另一个游戏里不会误伤。
-7. **问题忽略按环境**：一条问题是“这个游戏、这个版本、这些 Mod 一起”时的判断（缺 1.7 支持、和某个 Mod 冲突），在 1.6 里接受它不代表在 1.7 里也没事；忽略本来就会在 Mod 变化后失效，跨游戏共用会让真问题被藏起来。忽略里的 Lineage ID 照常随迁移改写。
-8. **扫描范围**：`archo scan` 扫“共用文件夹 + 当前环境自己的 `Data` / `Mods`”，共用文件夹在一次扫描里只扫一次。`scan --game-only` 只扫当前环境自己的来源，加环境和引导第二步用它。没扫到的共用来源下的活 Instance 不转墓碑，但仍是 R4 的“原版”候选（`Mods/` 里的副本照样挂到工坊原版的 Lineage）。
-9. **锁定库全局**：根目录就是 `lock.dir`（默认 `%LOCALAPPDATA%\RimArcho\locked`），一个共用来源 `src:locked`，不再按环境分子目录。旧的 `<lock.dir>/<环境名>` 来源迁移成共用文件夹 `locked-<环境名>`，文件不动，它们里面的副本仍算锁定版本（04 §7.1）。
-10. **Archo Monitor**：一个共用来源 `src:monitor`。
-11. **Mod 库存**：列“共用文件夹 + 当前环境自己的来源”的 Instance，以及**其他游戏自己的 `Mods/`**（2026-10-25 定，04 §1.7：Mod 库是整台机器的，玩家切到 1.7 时也要看到 1.6 `Mods/` 里的 Mod）。每个游戏的 `Mods/` 的来源值是 `local-<环境名>`（`local-main`、`local-1.6`；界面写“本地-main”），`source:local` 仍匹配所有游戏的 `Mods/`（`app.LocalValue`、`app.LocalMatches`）；“用在”列出所有方案（方案所有环境共用，04 §1.7；同一个 Mod 现在是同一个 Instance ID，不用再按真实路径近似）。
-12. **命令**：`archo env add <名> --game <目录> [--saves shared|own] [--launch …]`；新命令组 `archo folder list|add|remove`（MCP 对应 `status show=folders`，环境和设置的修改仍留给玩家）。`env add/set` 的 `--workshop`、`--steamcmd`、`--extra` 保留为兼容写法，等于 `folder add`；`--remove-source` 对共用来源等于 `folder remove`。
-13. **界面**：设置页加“Mod 文件夹”一组；环境页只显示游戏目录、版本、启动方式、存档和参数；添加环境引导第一步分“已有的游戏”和“下载一个版本”（SteamCMD，01 §3、08 §11）。
-14. **切换环境补链接**：`env use`（含 GUI、TUI 的切换）先按目标环境的 ModsConfig.xml 和当前方案补齐 `Mods/` 缺少的链接，再扫描该游戏的 `Data/Mods/`，最后设置当前环境。Monitor 等共用来源沿用普通部署链接；上一个环境的本地 Mod 使用 `_Archo_env_<Instance ID>`，指向真实目录，作为目标环境的本地 Mod 保留，保存或停用时不删除。目标 `Mods/` 已有同包名副本时保留，不建重复链接；独立存档没有列表时不继承。切换不写 ModsConfig.xml；需要补链接而目标游戏在运行时报告错误；创建失败则撤销本次新增链接并保留原环境。测试见 `TestEnvUse*`。
+**Decisions**:
+1. **Shared sources**: `source.environment_id = ''`. Their Instances also have `environment_id = ''`; environment-owned official / local sources and Instances retain their environment ID. All Lineages are global (`environment_id = ''`), so locked copies in `Mods/` and Workshop originals still share one Lineage.
+2. **Labels**: shared source labels are globally unique (deployment link names contain labels, 08 §3); environment sources have only official, local (and retired names), also unique within "shared + this environment".
+3. **Workshop directory**: at most one active directory. Adding a new Workshop directory with `folder add` means changing its path through §3.2 rebinding. When adding an environment, if the game is in a Steam library and no Workshop directory exists, add it automatically ("find through Steam").
+   **Workshop directories bundled with games are SteamCMD directories** (2026-10-22, branch `claude/env-followups`): SteamCMD-downloaded games place `steamapps\workshop\content\294100` inside the game directory (`force_install_dir`). If present and not the Steam client's Workshop directory, register it as a shared steamcmd source; show it like player-added folders in settings "mod folders", and deploy it through `_Archo_` links when enabled (08 §3). Timing: `env add` (including "download a version"), `env set` changing the game directory, and checks across all environments before every scan (backfills environments added before migration). It is **never** treated as a Workshop directory and never triggers "a second Workshop directory means changing paths"; `--workshop` pointing there also adds it as a SteamCMD directory. Pre-scan checks do not re-add previously registered directories (including retired ones removed by the player): removal stays removed. But **explicitly adding this game** (`env add`, including re-adding a removed game) or pointing `env set` here restores the retired directory (2026-10-25; player reported that after removing/re-adding `1.6`, its SteamCMD directory stayed "removed"). Restore the original source record (same ID, label reassigned from steamcmd), so returning `Mods` retain their original Instances, lists, tags, and notes. `folder add` for a retired directory (same path and kind) likewise restores the record instead of creating one. Test: `TestGameWorkshopIsSteamCMD`.
+4. **One game directory belongs to only one environment**: `env add` refuses game directories used by another environment. Two environments already sharing a directory before migration remain unchanged (Mod inventory "used in" still matches them by real path).
+5. **Saves**: `--saves shared` (default, game's default user data directory) or `--saves own` (RimArcho creates `<data-directory>/userdata/<environment-name>`, passes `-savedatafolder` on launch; 08 §2 already supports non-default directories). No separate field; infer from `user_data_root`: equal to game default means "shared default", under `<data-directory>/userdata/` means "own", otherwise "custom" (`--user-data` remains available). `Data` directory checks permit own saves because RimArcho owns that directory.
+6. **Global user rules by Lineage**: rules describe relationships between `Mods` (load after, incompatible), independent of which game is played; global rules fit "one record per Mod", so players state them once. Rules apply only when both `Mods` are enabled, preventing effects in another game.
+7. **Finding ignores by environment**: a finding judges "this game, this version, these `Mods` together" (missing 1.7 support, conflict with another Mod); accepting it in `1.6` does not imply safety in 1.7. Ignores already expire after Mod changes; sharing them across games would hide real findings. Lineage IDs in ignores are rewritten during migration as usual.
+8. **Scan scope**: `archo scan` scans "shared folders + current environment's `Data` / `Mods`", once per shared folder in a scan. `scan --game-only` scans only current environment sources; used for adding environments and guide step 2. Active Instances under unscanned shared sources do not become tombstones but remain R4 "original" candidates (copies in `Mods/` still join the Workshop original's Lineage).
+9. **Global lock library**: root is `lock.dir` (default `%LOCALAPPDATA%\RimArcho\locked`), one shared source `src:locked`, no per-environment subdirectories. Old `<lock.dir>/<environment-name>` sources migrate to shared folders `locked-<environment-name>` without moving files; their copies still count as locked versions (04 §7.1).
+10. **Archo Monitor**: one shared source `src:monitor`.
+11. **Mod inventory**: list Instances from "shared folders + current environment sources", plus **other games' own `Mods/`** (decided on 2026-10-25, 04 §1.7: the Mod library covers the whole machine; players switching to 1.7 must still see `Mods` in `1.6` `Mods/`). Each game's `Mods/` has source value `local-<environment-name>` (`local-main`, `local-1.6`; UI says "`local-main`"); `source:local` still matches every game's `Mods/` (`app.LocalValue`, `app.LocalMatches`); "used in" lists all plans (shared by all environments, 04 §1.7; the same Mod now has the same Instance ID, without approximating by real path).
+12. **Commands**: `archo env add <name> --game <directory> [--saves shared|own] [--launch …]`; new group `archo folder list|add|remove` (MCP `status show=folders`; environment/settings changes remain player-only). `env add/set` `--workshop`, `--steamcmd`, `--extra` remain compatibility aliases for `folder add`; `--remove-source` on shared sources equals `folder remove`.
+13. **Interface**: add "mod folders" settings group; environment page shows only game directory, version, launch method, saves, and arguments; first guide step for adding an environment splits into "a game you have"` and `"download a version" (SteamCMD, 01 §3, 08 §11).
+14. **Fill links on environment switch**: `env use` (including GUI/TUI switches) first fills missing `Mods/` links according to target environment ModsConfig.xml and current plan, then scans its `Data/Mods/`, then sets current environment. Shared sources such as Monitor use normal deployment links; previous environment's local `Mods` use `_Archo_env_<Instance ID>` pointing to real directories and remain as local `Mods` of the target environment, not deleted on save/disable. If target `Mods/` already contains the same package ID, retain it without duplicate links; own saves without a list do not inherit one. Switching does not write ModsConfig.xml; report an error if links are needed while target game runs; on creation failure roll back new links and keep original environment. Tests: `TestEnvUse*`.
 
-第 14 项的链接创建/撤销先写持久台账；保留仅限健康链接。目标搬移或删除前统一维护全游戏入链，失败和重启恢复见 §3.3、08 §3。
+Link creation/rollback in item 14 writes the persistent ledger first; only healthy links are retained. Maintain inbound links across all games before moving/deleting targets; failure and restart recovery are in §3.3 and 08 §3.
 
-### 0.1 迁移 v14
+### 0.1 Migration v14
 
-一个事务内完成（Go 后处理，`migrateV14`），之后 `schema_version = 14`：
-1. **合并共用来源**：`workshop`、`steamcmd`、`extra` 来源按 `(kind, PathKey(root))` 分组（退役的不参与合并，只改成共用），每组留最早的一个为规范来源，其余的 Instance、别名改指规范来源。共用来源的 `environment_id` 置空；标签冲突时按 `nextLabel` 重命名（部署链接下次写入游戏时自动换名）。`<lock.dir>/<环境>` 的锁定来源改标签为 `locked-<环境>`。
-2. **合并 Instance**：同一规范来源下，按小写 `rel_path` 分组；每组选规范 Instance（活的优先 → 最早 `first_seen` → ID），建立旧 → 新映射。
-3. **合并 Lineage**：被合并 Instance 的 Lineage 用并查集连起来，每类留最早创建的一个（相同时取 ID 小的）。所有 Lineage 的 `environment_id` 置空。
-4. **改写引用**：`instance`（被并掉的删除）、`instance_alias`、`snapshot.instance_id` 和 `snapshot.origin` 里的 ID、`change_event`（被并掉的 Instance 的 `discovered` 删除，其余移到规范 Instance）、`identity_question`（两边变成同一个 Instance 的标 `superseded`）、`instance_note`（文字不同时用空行拼接；`made` 保留规范的）、`source_cache`、`workspace` / `workspace_undo` / `loadout_version` 的条目 JSON（同一方案里重复的条目只留第一个，顺序不变）、`user_rule`（改写 Lineage，环境置空，完全相同的规则去重）、`lineage_data`（别名取规范的，空时取另一个；备注不同时拼接）、`lineage_tag`（并集）、`finding_ignore`（改写 Lineage，仍按环境）。
-5. **缓存**：有合并时删除被并掉 Instance 的事实视图及不再被引用的集合（规范 Instance 有自己的；03 §3），以及全部分析运行和 `log_cache`（下次分析重建）。
-6. **磁盘上的 ID 不改**：`pack.json`、`.rimarcho/origin.json` 里的旧 ID 通过新表 `id_alias(old_id, new_id, kind)` 解析：读整合包和 R5 出身标记时先查这张表。
+Complete in one transaction (Go post-processing, `migrateV14`), then `schema_version = 14`:
+1. **Merge shared sources**: group workshop, steamcmd, extra by `(kind, PathKey(root))` (retired sources do not merge; only become shared); retain earliest source per group as canonical and repoint other Instances/aliases to it. Clear shared source `environment_id`; rename label conflicts with `nextLabel` (deployment links rename automatically on next write to game). Relabel lock sources `<lock.dir>/<environment>` as `locked-<environment>`.
+2. **Merge Instances**: group by lowercase `rel_path` within each canonical source; select canonical Instance (active first → earliest `first_seen` → ID), build old → new mapping.
+3. **Merge Lineages**: connect merged Instances' Lineages with union-find; keep earliest created in each class (smaller ID breaks ties). Clear every Lineage's `environment_id`.
+4. **Rewrite references**: instance (delete merged-away records), `instance_alias`, IDs in `snapshot.instance_id`` and ``snapshot.origin`, `change_event` (delete merged-away Instances' discovered; move others to canonical Instance), `identity_question` (mark superseded if both sides become same Instance), `instance_note` (join differing text with blank line; keep canonical made), `source_cache`, entry JSON in workspace / `workspace_undo` / `loadout_version` (keep only first duplicate per plan, preserving order), `user_rule` (rewrite Lineage, clear environment, deduplicate identical rules), `lineage_data` (canonical alias, otherwise other's; concatenate differing notes), `lineage_tag` (union), `finding_ignore` (rewrite Lineage, still per environment).
+5. **Caches**: if merging occurs, delete merged-away Instances' fact views and unreferenced sets (canonical Instance has its own; 03 §3), all analysis runs,` and ``log_cache` (rebuilt on next analysis).
+6. **Do not change on-disk IDs**: resolve old IDs in `pack.json`` and ``.rimarcho/origin.json` through new `id_alias(old_id, new_id, kind)` table; query it first when reading packs and R5 origin markers.
 
-7. **启动记录**的列表指纹（按 Instance ID 算，08 §1）随改写后的列表一起换成新值，所以旧日志不会因为迁移被判成“方案改过”。
+7. **Launch records**: replace list fingerprints (computed from Instance IDs, 08 §1) with values for rewritten lists, so migration does not make old logs appear to follow a "changed plan".
 
-验收：`TestMigrateV14SharedFolders`、`TestMigrateV14SingleEnvironment`（`internal/store/migrate14_test.go`）、`TestMigrateV14App`（`internal/app/envmodel_test.go`）：两个环境共用一个工坊目录 → 合并后每个方案的列表和顺序不变；撤销历史仍在；迁移前做的整合包还能启动，并算作在用保留下来的 Instance；锁定副本的再一份拷贝仍被 R5 认出，进保留下来的 Lineage。
+Acceptance: `TestMigrateV14SharedFolders`, `TestMigrateV14SingleEnvironment` (`internal/store/migrate14_test.go`), `TestMigrateV14App` (`internal/app/envmodel_test.go`): two environments share one Workshop directory → plan lists/order unchanged after merge; undo history remains; pre-migration packs still launch and count as users of retained Instances; another copy of a locked copy is still recognized by R5 and joins retained Lineage.
 
-**真实数据**（2026-10-22，玩家数据的副本）：
-- 单环境（1.7，工坊 1270 个）：迁移后来源 3 → 3（工坊变共用），Instance 1355、Lineage 1295、标签 1128、规则 2 都不变，没有写 `id_alias`，分析缓存保留。
-- 两个环境（旧版本的 `archo` 先建出 v13 库：1.7 + `D:\RimWorld16`，各有一份工坊来源）：迁移 1.5 秒；来源 6 → 5，Instance 4825 → 3555（工坊的 1270 个合并），Lineage 4652 → 3382，变更事件 4931 → 3661（删掉被并掉一方的 `discovered`），标签 1129、规则 2、玩家数据 1 条不变；三个方案、全部撤销栈和版本按“来源类型/目录名”比较前后完全一致。
+**Real data** (2026-10-22, a copy of player data):
+- Single environment (1.7, 1270 Workshop items): sources 3 → 3 (Workshop becomes shared); Instances 1355, Lineages 1295, tags 1128, rules 2 unchanged; no `id_alias` writes; analysis cache retained.
+- Two environments (old archo first creates v13 database: 1.7 + `D:\RimWorld16`, each with a Workshop source): migration 1.5 seconds; sources 6 → 5, Instances 4825 → 3555 (merge 1270 Workshop items), Lineages 4652 → 3382, change events 4931 → 3661 (delete merged-away discovered); tags 1129, rules 2, player data 1 row unchanged; three plans, all undo stacks and versions identical before/after when compared by "source kind/directory name".
 
-### 0.2 界面的目录角色与别名（2026-10-25）
+### 0.2 Interface Directory Roles and Aliases (2026-10-25)
 
-`source:` 的界面语义为注册目录角色：`official`、`workshop`、`steamcmd`、`local`、`locked`、`other`，独立于下载途径 Git / 网页。锁定库沿用 `IsLockSource` 识别。额外目录同时有 `other` 和稳定别名两种值：别名取现有 `Source.Label`，保留字冲突时加 `folder/`，缺失时用 `folder/<Source.ID>`；显示值取目录末级名称。目录重新绑定只改变路径，别名不跟着路径变化。无需新增数据表或迁移；路径仍用于详情、CLI 和兼容的 `location:` 查询，GUI 筛选与补全不把它作为候选。副本行的抽象名称与筛选角色分开：锁定版本带创建时间，Git / 网页订阅可保留下载途径说明。
+The UI meaning of `source:` is registered directory role: official, workshop, steamcmd, local, locked, other, independent of Git / web download method. Lock library recognition still uses `IsLockSource`. Extra directories have both other and a stable alias: use existing `Source.Label`, prefix reserved-word conflicts with `folder/`, and use `folder/<Source.ID>` if missing; display the final directory name. Rebinding changes only path, not alias. No new table or migration; paths remain in details, CLI, and compatible `location:` queries, but not GUI filter/completion candidates. Abstract copy-row names are separate from filter roles: locked versions include creation time; Git / web subscriptions may retain download-method descriptions.
 
 
-## 1. 术语
+## 1. Terms
 
-| 术语 | 定义 | 界面上叫（06 §7.2） |
+| Term | Definition | UI name (06 §7.2) |
 | --- | --- | --- |
-| 环境（Environment） | 一个游戏目录，加它的存档方式（用户数据目录）。玩家可以有多个环境，例如正版 1.7 和用 SteamCMD 下载的 1.5 | 游戏 |
-| 来源（Source） | 一个存放 Mod 的根目录。游戏的 `Data`、`Mods` 属于它的环境；其余的是所有环境共用的 **Mod 文件夹** | Mod 文件夹；筛选里写来源 |
-| Instance | 磁盘上的一份 Mod，由 RimArcho 分配 ID | 这一份 |
-| 快照（Snapshot） | 某次扫描时，一个 Instance 的元数据和内容指纹 | — |
-| Lineage | “同一个 Mod”的家族，例如工坊原版、锁定版本、改名前后 | 同一个 Mod 的几份 |
-| 墓碑（Tombstone） | 已经消失、但仍保留的 Instance 记录 | 不见了的 Mod |
-| 别名位置 | 经链接指向同一个真实目录的其他位置，不另建 Instance | — |
-| 待确认项 | 对账时拿不准的“这是不是 #xxxx 回来了？”，交给玩家回答 | 要你确认 |
+| Environment | One game directory plus its save mode (user data directory). Players may have several, such as a licensed 1.7 and SteamCMD-downloaded 1.5 | game |
+| Source | A root directory storing `Mods`. A game's `Data`` and ``Mods` belong to its environment; others are **Mod folders** shared by all environments | mod folders; source in filters |
+| Instance | One Mod copy on disk, with a RimArcho-assigned ID | this one |
+| Snapshot | An Instance's metadata and content fingerprint from one scan | — |
+| Lineage | A family of "the same Mod", such as Workshop original, locked version, before/after rename | copies of the same mod |
+| Tombstone | A retained Instance record that has disappeared | missing mod |
+| Alias location | Other link locations pointing to the same real directory, without creating another Instance | — |
+| Identity question | An uncertain reconciliation match, "is this #xxxx returning?", for the player to answer | for you to confirm |
 
-方案（04）在界面上叫**列表**；其余概念的界面叫法见 06 §7.2。
+A plan (04) is a **list** in the UI; see 06 §7.2 for other UI terms.
 
-**ID**：Instance、Lineage、环境、来源的 ID 都是 128 位随机数，写成小写 base32（字母表 `a–z2–7`，无填充，26 位）。显示时用“本环境看得到的 Instance（共用文件夹的和自己的）里的最短唯一前缀，至少 4 位”；Instance 和 Lineage 分开计算前缀。引用写法（`#a3f9`、`L#7c2e`、`pkg:`、`ws:`、`q:`、`src:`、`scan:`、`env:`）和歧义处理见 05 §2。数据库和事件 detail 里一律存完整 ID，输出时才换成短引用。
+**IDs**: Instance, Lineage, environment, and source IDs are random 128-bit values, lowercase base32 (alphabet `a–z2–7`, no padding, 26 characters). Display the shortest unique prefix among Instances visible to this environment (shared folders and its own), at least 4 characters; compute Instance and Lineage prefixes separately. Reference syntax (`#a3f9`, `L#7c2e`, `pkg:`, `ws:`, `q:`, `src:`, `scan:`, `env:`) and ambiguity handling are in 05 §2. Store full IDs in databases and event detail; shorten only at output.
 
-## 2. 环境
+## 2. Environments
 
-### 2.1 字段
+### 2.1 Fields
 
-| 字段 | 说明 |
+| Field | Description |
 | --- | --- |
-| `id` | 随机 ID |
-| `name` | 玩家起的名字；不能为空，不能含空格、`:`、`#` |
-| `game_root` | 游戏安装目录。判定条件：含 `RimWorldWin64.exe`、`RimWorld.exe`、`RimWorldWin.exe`、`RimWorldLinux`、`RimWorldMac.app` 之一，或有 `Data/Core` 目录。一个游戏目录只属于一个环境（`env add` 拒绝别的环境已经用着的目录） |
-| `user_data_root` | 用户数据目录（含 `Config/ModsConfig.xml`），由存档方式决定：**共用默认**（`--saves shared`，游戏默认的用户数据目录，默认值，可以和其他环境相同，§2.4）、**独立**（`--saves own`，RimArcho 建 `<数据目录>/userdata/<环境名>`，启动时带 `-savedatafolder`，08 §2），或 `--user-data` 指定的**自选目录**。不另存字段，由路径推出 |
-| `game_version` | 读 `<game_root>/Version.txt` 第一行（去掉 UTF-8 BOM、首尾空白），**原样保存完整版本**，例如 `1.6.4633 rev1261`、`1.7.4985 rev1269`。比较时只取主次版本 `1.6`（下面“游戏版本的完整形式”）。每次扫描时重读，变了就更新 |
-| `launch` | `direct` 或 `steam`。`env add` 没指定时：游戏在 Steam 库里（`…/steamapps/common/RimWorld`）取 `steam`，否则 `direct`；手动指定工坊目录不改变这个默认，玩家仍可显式选择启动方式 |
-| 启动参数 | 存在设置里（键 `env:<id>:launch_args`），由 `env set --launch-args` 或设置页修改，不在环境表里 |
+| `id` | Random ID |
+| `name` | Player-chosen name; nonempty, no spaces, `:`, or `#` |
+| `game_root` | Game installation directory. Valid if it contains `RimWorldWin64.exe`, `RimWorld.exe`, `RimWorldWin.exe`, `RimWorldLinux`, `RimWorldMac.app`, or `Data/Core`. One game directory belongs to only one environment (`env add` refuses a directory already used by another environment) |
+| `user_data_root` | User data directory (containing `Config/ModsConfig.xml`), determined by save mode: **shared default** (`--saves shared`, game's default user data directory, default, may be shared with other environments, §2.4), **own** (`--saves own`, RimArcho creates `<data-directory>/userdata/<environment-name>`, passes `-savedatafolder`, 08 §2), or **custom directory** from `--user-data`. Inferred from path, without a separate field |
+| `game_version` | Read first line of `<game_root>/Version.txt` (strip UTF-8 BOM and surrounding whitespace), **preserve the complete version**, such as `1.6.4633 rev1261`, `1.7.4985 rev1269`. Compare only major/minor `1.6` ("Full game version" below). Reread each scan and update if changed |
+| `launch` | direct or steam. Without explicit `env add` choice: use steam for games in a Steam library (`…/steamapps/common/RimWorld`), otherwise direct; specifying a Workshop directory does not change this default; players may still explicitly choose launch method |
+| Launch arguments | Stored in settings (`env:<id>:launch_args`), changed by `env set --launch-args` or settings page, not in environment table |
 
-**游戏版本的完整形式**（2026-10-24 定）。存的永远是 `Version.txt` 的整行，不截断；需要“1.6”的地方现算。代码里是 `env.ParseVersion(s) → env.Version{Full, Major, Minor, Build, Rev}`，`Short()` 给 `1.6`（`env.MajorMinor` 等于 `ParseVersion(s).Short()`）。格式是 `主.次.构建 rev修订`；只有 `主.次` 的写法也认，这时构建号未知。
+**Full game version** (decided on 2026-10-24). Always store the entire `Version.txt` line without truncation; compute "`1.6`" when needed. Code: `env.ParseVersion(s) → env.Version{Full, Major, Minor, Build, Rev}`; `Short()` returns `1.6` (`env.MajorMinor` equals `ParseVersion(s).Short()`). Format: `major.minor.build revrevision`; `major.minor` is also accepted with unknown build.
 
-- **按主次版本比较**：Mod 的 `supportedVersions`、方案允许的版本（04 §1.6）、分析缓存的版本键、`--game-version` / MCP `game_version` 覆盖（本来就只给 `1.6`）、整合包能不能在这个游戏上启动（08 §5.3）、环境 chip（“main  1.6”）、TUI 状态行。
-- **按完整版本比较**：只有整合包的“构建不同”提示（08 §5.5）。两边都有构建号时才比；任一边只有 `主.次` 时写“构建号没有记录”，不算不同。
-- **显示完整版本**：启动页 01 游戏一栏（06 §2.3）、环境页与设置的“这个游戏”、`archo env list/show`、整合包的页和 `pack list`。窄处（chip、TUI 状态行）只写 `Short()`。
-- **旧数据**：RimArcho 自己的库里没有截断过的值（`environment.game_version` 每次扫描重读；方案版本记的是 ModsConfig.xml 的 `version`，本来就是整行）。只有别处来的值可能是短的：旧的或别的工具写的列表、存档的 `gameVersion`、手写的 `pack.json`。它们原样保留、不改写，按上面的规则当作“构建号未知”。
+- **Compare major/minor**: Mod `supportedVersions`, allowed plan versions (04 §`1.6`), analysis cache version key, `--game-version` / MCP `game_version` override (already only accepts `1.6`), whether a pack can launch on this game (08 §5.3), environment chip ("main  `1.6`"), TUI status line.
+- **Compare full version**: only pack "different build" notice (08 §5.5). Compare only if both have build numbers; if either has only `major.minor`, say "build not recorded", without counting as different.
+- **Display full version**: launch page 01 game area (06 §2.3), environment page and settings "this game", `archo env list/show`, pack pages and `pack list`. Narrow spaces (chips, TUI status line) show only `Short()`.
+- **Old data**: RimArcho's own database never stored truncated values (`environment.game_version` rereads each scan; plan versions record ModsConfig.xml version, already the whole line). Only outside values may be short: old lists or lists from other tools, save `gameVersion`, handwritten `pack.json`. Preserve them unchanged and treat as "unknown build" per the rules above.
 
-环境的命令（完整语法见 05 §4）：
-- `archo env list`（各环境和共用的 Mod 文件夹）、`env detect`（只输出探测建议）、`env add <名> --detected` 或 `env add <名> --game <目录> [--saves shared|own | --user-data <目录>] [--launch direct|steam]`。游戏在 Steam 库里、而还没有工坊目录时，`env add` 顺便把那个库的工坊目录加为 Mod 文件夹（§2.2 第 3 条）。
-- `archo env set <名> --game/--saves/--user-data/--launch/--launch-args`。改 `--game` 时 `official`、`local` 按 §3.2 重新绑定；新游戏目录在另一个 Steam 库里时，工坊目录也一起换。
-- 兼容写法：`env add/set` 的 `--workshop`、`--steamcmd`、`--extra` 等于 `archo folder add workshop|steamcmd|extra <目录>`，`--remove-source src:<标签>` 等于 `archo folder remove`（§3.1）。
-- `archo env branches`、`archo env download <分支> --to <目录> [--account <账户名或anonymous>]`：用 SteamCMD 下载一个游戏版本并加为环境（08 §11）。
-- `archo env use <名>` 切换当前环境；第一个加入的环境自动成为当前环境；全局参数 `--env <名>` 只对单条命令切换。
-- `archo env remove <名> --yes`：从数据库删除该环境自己的数据（`Data`、`Mods` 的 Instance 和历史、启动记录、分析、问题忽略）；方案所有环境共用，保留，里面指向该环境 Instance 的条目改写成 packageId（04 §1.7），共用 Mod 文件夹的 Instance 和玩家在 Mod 上写的东西都保留；因此变空的 Lineage 和它的玩家数据、规则一起删除。不碰游戏和 Mod 文件。不带 `--yes` 时拒绝（退出码 2）。
-- `archo env rebind src:<标签> yes|no`，见 §3.2。
+Environment commands (full syntax in 05 §4):
+- `archo env list` (environments and shared Mod folders), `env detect` (detection suggestions only), `env add <name> --detected` or `env add <name> --game <directory> [--saves shared|own | --user-data <directory>] [--launch direct|steam]`. When the game is in a Steam library and no Workshop directory exists, `env add` also adds that library's Workshop directory as a Mod folder (§2.2 item 3).
+- `archo env set <name> --game/--saves/--user-data/--launch/--launch-args`. Changing `--game` rebinds official` and `local per §3.2; if the new game is in another Steam library, change the Workshop directory too.
+- Compatibility syntax: `env add/set` `--workshop`, `--steamcmd`, `--extra` equal `archo folder add workshop|steamcmd|extra <directory>`; `--remove-source src:<label>` equals `archo folder remove` (§3.1).
+- `archo env branches`, `archo env download <branch> --to <directory> [--account <account-name-or-anonymous>]`: download a game version with SteamCMD and add an environment (08 §11).
+- `archo env use <name>` switches current environment; the first added environment becomes current automatically; global `--env <name>` switches for one command only.
+- `archo env remove <name> --yes`: delete this environment's own database data (`Data` / `Mods` Instances and history, launch records, analysis, finding ignores); retain globally shared plans, rewriting entries pointing to its Instances as `packageId` (04 §1.7); retain shared Mod folder Instances and player-authored Mod data; delete Lineages made empty and their player data/rules. Do not touch game or Mod files. Refuse without `--yes` (exit code 2).
+- `archo env rebind src:<label> yes|no`, see §3.2.
 
-**数据目录检查**：`env add`、`env set`、`folder add` 和 `scan` 都检查 RimArcho 自己的数据目录与游戏目录、用户数据目录和每个来源根目录**互不包含**，有包含关系就拒绝。理由：这些目录 RimArcho 只读或只按 01 §4 的清单写，数据目录落在里面会让这条边界失效。唯一的例外是“独立”存档目录 `<数据目录>/userdata/<环境名>`：它本来就是 RimArcho 自己的目录。
+**`Data` directory check**: `env add`, `env set`, `folder add`,` and `scan check that RimArcho's data directory, game directories, user data directories, and all source roots **do not contain one another**; refuse containment. Reason: RimArcho reads these directories or writes only under 01 §4's list; putting its data directory inside them would break that boundary. The only exception is own saves `<data-directory>/userdata/<environment-name>`, already owned by RimArcho.
 
-### 2.2 自动探测
+### 2.2 Automatic Detection
 
-按顺序尝试，每一步命中即停：
-1. **游戏目录**：先找 Steam 根目录（Windows 先读注册表，再试 `C:\Program Files (x86)\Steam`、`C:\Program Files\Steam`；macOS `~/Library/Application Support/Steam`；Linux `~/.steam/steam`、`~/.local/share/Steam`、Flatpak 的 `~/.var/app/com.valvesoftware.Steam/.local/share/Steam`）。读每个根目录的 `steamapps/libraryfolders.vdf`（或 `config/libraryfolders.vdf`；兼容 `"1" "D:\\SteamLibrary"` 这种很老的格式），在每个库里找 `steamapps/common/RimWorld`。命中时启动方式为 `steam`。
-   找不到再试常见的手动安装位置，命中时启动方式为 `direct`：
-   - Windows：`C:\Games\RimWorld`、`D:\Games\RimWorld`、`C:\GOG Games\RimWorld`、`D:\GOG Games\RimWorld`、`C:\Program Files\RimWorld`、`C:\Program Files (x86)\RimWorld`
-   - macOS：`/Applications/RimWorld.app`、`/Applications/RimWorld`
-   - Linux：`~/GOG Games/RimWorld`、`~/Games/RimWorld`
-2. **用户数据目录**：
-   - Windows：`%USERPROFILE%\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios`
-   - macOS：`~/Library/Application Support/RimWorld`
-   - Linux：`~/.config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios`，以及 Flatpak 下的 `~/.var/app/com.valvesoftware.Steam/.config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios`
-3. **工坊目录**：游戏所在 Steam 库的 `steamapps/workshop/content/294100`。游戏目录形如 `…/steamapps/common/RimWorld` 时，从它推出这个路径。设置页还没有工坊目录时，按 Steam 库列表（`libraryfolders.vdf`）找有 `workshop/content/294100` 的库，优先装着游戏的那个，给出“使用”按钮。
+Try in order, stopping at the first match in each step:
+1. **Game directory**: first find Steam roots (Windows: registry, then `C:\Program Files (x86)\Steam`, `C:\Program Files\Steam`; macOS: `~/Library/Application Support/Steam`; Linux: `~/.steam/steam`, `~/.local/share/Steam`, Flatpak `~/.var/app/com.valvesoftware.Steam/.local/share/Steam`). Read each root's `steamapps/libraryfolders.vdf` (or `config/libraryfolders.vdf`; support old formats such as `"1" "D:\\SteamLibrary"`), search each library for `steamapps/common/RimWorld`. Matches use steam launch.
+   If not found, try common manual installation locations, using direct launch:
+   - Windows: `C:\Games\RimWorld`, `D:\Games\RimWorld`, `C:\GOG Games\RimWorld`, `D:\GOG Games\RimWorld`, `C:\Program Files\RimWorld`, `C:\Program Files (x86)\RimWorld`
+   - macOS: `/Applications/RimWorld.app`, `/Applications/RimWorld`
+   - Linux: `~/GOG Games/RimWorld`, `~/Games/RimWorld`
+2. **User data directory**:
+   - Windows: `%USERPROFILE%\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios`
+   - macOS: `~/Library/Application Support/RimWorld`
+   - Linux: `~/.config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios`, plus Flatpak `~/.var/app/com.valvesoftware.Steam/.config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios`
+3. **Workshop directory**: `steamapps/workshop/content/294100` in the game's Steam library. Infer it from game paths shaped like `…/steamapps/common/RimWorld`. If settings have no Workshop directory yet, search libraries from `libraryfolders.vdf` for `workshop/content/294100`, preferring the game's library, and offer a "use it" button.
 
-探测结果只是建议：`env detect` 只输出建议和试过的位置，`env add --detected` 才写入。GUI 的首次引导里，玩家可以勾选多个探测到的环境一起加入（06 §2.15）。
+Detection results are suggestions only: `env detect` outputs suggestions and attempted locations; only `env add --detected` writes. In GUI first-run guide, players may select multiple detected environments to add together (06 §2.15).
 
-### 2.3 Player.log 位置
+### 2.3 Player.log Location
 
-- RimWorld 1.7 及以后：`<user_data_root>/Logs/Player.log`
-- 更早版本：`<user_data_root>/Player.log`
-- 版本未知时两处都看，取 mtime 最新的一个。上一次运行的日志是同目录下的 `Player-prev.log`。
-- 版本比较按数字逐段比较（`1.10` 大于 `1.9`）。
+- RimWorld 1.7 and later: `<user_data_root>/Logs/Player.log`
+- Earlier versions: `<user_data_root>/Player.log`
+- Unknown version: check both, choose newest mtime. Previous run log is `Player-prev.log` in the same directory.
+- Compare numeric version components (`1.10` exceeds `1.9`).
 
-日志属于哪次启动（环境、方案或整合包）不由路径决定，而是按启动记录判断，见 03 §6.4。
+Launch ownership of logs (environment, plan, or pack) comes from launch records, not paths; see 03 §6.4.
 
-### 2.4 共用用户数据目录
+### 2.4 Shared User Data Directories
 
-多个环境可以用同一个用户数据目录，常见情况是正版和测试版都用游戏默认的用户数据目录。这是允许的，`env add` / `env set` 不拒绝。可以这样做的前提：
-- 同一时间只允许运行一个游戏，跨所有环境检测（08 §4）。
-- ModsConfig.xml 只在启动方案或“保存”时才写（08 §2、04 §4.1），写的就是这次要玩的列表。
-- 外部修改的判断按**用户数据目录**记录上次写入的哈希和写入者（哪个方案），而不是按环境（04 §4.3）。
-- 同一个 Player.log 会被多个环境轮流写，归属靠启动记录（03 §6.4）。
+Multiple environments may use one user data directory, commonly licensed and test games sharing the game default. This is allowed; `env add` / `env set` do not refuse. Preconditions:
+- Only one game may run at a time, detected across all environments (08 §4).
+- Write ModsConfig.xml only on plan launch or "save" (08 §2, 04 §4.1), with the list for this play session.
+- Outside-change detection records last hash and writer (which plan) by **user data directory**, not environment (04 §4.3).
+- Multiple environments write the same Player.log in turn; launch records determine ownership (03 §6.4).
 
-整合包不共用：它用自己的 `-savedatafolder`（08 §5.3）。
+Packs do not share: each uses its own `-savedatafolder` (08 §5.3).
 
-## 3. 来源（Source）
+## 3. Sources
 
-### 3.1 来源类型
+### 3.1 Source Kinds
 
-| kind | 根目录 | 说明 |
+| `kind` | Root directory | Description |
 | --- | --- | --- |
-| kind | 根目录 | 属于 | 说明 |
+| `kind` | Root directory | Ownership | Description |
 | --- | --- | --- | --- |
-| `official` | `<game_root>/Data` | 环境 | Core 和 DLC。永远排在最前，不可停用 Core |
-| `local` | `<game_root>/Mods` | 环境 | 玩家的本地 Mod |
-| `workshop` | `.../workshop/content/294100` | 共用 | 子目录名就是工坊 ID。最多一个活的工坊目录 |
-| `steamcmd` | 玩家指定，或 SteamCMD 游戏自带的 `<game_root>/steamapps/workshop/content/294100`（§0 第 3 条） | 共用 | 结构同 workshop；游戏不直接读取，启用时经 `_Archo_` 链接部署（08 §3） |
-| `extra` | 玩家指定 | 共用 | 其他目录；启用方式同 `steamcmd`。RimArcho 自己的 Archo Monitor 目录（`src:monitor`，08 §9）和锁定库（`src:locked`，04 §7.1）也是 `extra` |
+| `official` | `<game_root>/Data` | Environment | `Core` and DLC. Always first; `Core` cannot be disabled |
+| `local` | `<game_root>/Mods` | Environment | Player's local `Mods` |
+| `workshop` | `.../workshop/content/294100` | Shared | Subdirectory name is Workshop ID. At most one active Workshop directory |
+| `steamcmd` | Player-specified, or `<game_root>/steamapps/workshop/content/294100` bundled with a SteamCMD game (§0 item 3) | Shared | Same structure as workshop; not read directly by the game; deploy through `_Archo_` links when enabled (08 §3) |
+| `extra` | Player-specified | Shared | Other directories; enabled like steamcmd. RimArcho's Archo Monitor directory (`src:monitor`, 08 §9) and lock library (`src:locked`, 04 §7.1) are also extra |
 
-- **Mod 文件夹**（共用来源，`source.environment_id` 为空）在一处管理：`archo folder list|add|remove`、设置页“文件夹”（06 §2.14），MCP 用 `status show=folders` 读取。`folder add workshop <目录>` 在已经有工坊目录时等于换路径，按 §3.2 重新绑定；Mod 文件夹之间、和任何游戏的 `Data`/`Mods` 之间不能互相包含；Monitor 目录和锁定库是 RimArcho 自己的，不能移除。
-- 每个来源有一个**标签**，用于引用 `src:<标签>`。共用来源的标签全局唯一（部署链接名里有它，08 §3）；环境自己的只有 `official`、`local`（及退役后的改名）。标签默认等于 kind，同 kind 已有时依次用 `steamcmd2`、`steamcmd3`……
-- 来源状态：
+- Manage **Mod folders** (shared sources with empty `source.environment_id`) in one place: `archo folder list|add|remove`, settings "mod folders" (06 §2.14); MCP reads with `status show=folders`. `folder add workshop <directory>` with an existing Workshop directory changes its path, rebinding per §3.2; Mod folders must not contain one another or any game's `Data`/`Mods`; Monitor directory and lock library belong to RimArcho and cannot be removed.
+- Each source has a **label** for `src:<label>` references. Shared labels are globally unique (included in deployment link names, 08 §3); environment-owned sources have only official, local (and renamed retired labels). Default label is kind; subsequent same-kind sources use `steamcmd2`, `steamcmd3`, etc.
+- Source states:
 
-| 状态 | 含义 | 扫描时 |
+| State | Meaning | During scan |
 | --- | --- | --- |
-| `ok` | 正常 | 扫描 |
-| `missing` | 根目录不存在 | 不扫描；它的 Instance 既不匹配也不转墓碑。下次扫描根目录又在了就回到 `ok` |
-| `rebind-pending` | 改了路径，但抽样匹配率不够（§3.2） | 不扫描，Instance 保持原样，等玩家回答 |
-| `retired` | 已移除或被新来源取代 | 不扫描；它的 Instance 在下次扫描时转为墓碑 |
+| `ok` | Normal | Scan |
+| `missing` | Root directory absent | Do not scan; neither match nor tombstone its Instances. Return to ok when root reappears on a later scan |
+| `rebind-pending` | Path changed, insufficient sample match rate (§3.2) | Do not scan; leave Instances unchanged pending player answer |
+| `retired` | Removed or replaced by new source | Do not scan; tombstone its Instances on next scan |
 
-- `missing` 用于整个来源暂时不在（例如移动硬盘拔出）：不把整个来源变成墓碑再“复活”一遍，重新绑定时也能和活着的 Instance 比对。墓碑只用于单个目录消失。
-- 移除 Mod 文件夹（`folder remove`）：状态改为 `retired`，标签改为 `<原标签>-removed`（重名时加数字），下次扫描它的 Instance 发 `disappeared` 转墓碑。
+- missing means the entire source is temporarily absent (for example an unplugged external drive): avoid tombstoning and "reviving" the whole source, and allow rebinding against live Instances. Tombstones represent individual directory disappearance only.
+- Removing a Mod folder (`folder remove`): mark retired, relabel `<original-label>-removed` (number suffix on conflict); next scan emits disappeared and tombstones its Instances.
 
-### 3.2 来源身份与重新绑定
+### 3.2 Source Identity and Rebinding
 
-每个来源有自己的 `source_id`。Instance 只记录 `source_id + 相对路径`，不记录绝对路径。所以游戏目录变了，只要把来源的根目录换掉，所有 Instance 的 ID 都不变。
+Every source has its own `source_id`. Instances record only `source_id + relative path`, not absolute paths. Thus changing a game directory only requires changing source roots to preserve all Instance IDs.
 
-**何时评估**：`env set --game` 改了游戏目录（同时改 `official`、`local` 两个来源；新目录在另一个 Steam 库里时工坊目录也按 §2.2 第 3 条换），`folder add workshop` 换了工坊目录，或在环境页、设置页改了路径（06 §2.14）。
+**When to evaluate**: `env set --game` changes game directory (both official` and `local; Workshop directory also changes per §2.2 item 3 if the new game is in another Steam library), `folder add workshop` changes Workshop directory, or paths change in environment/settings pages (06 §2.14).
 
-**怎么评估**：
-1. 在新根目录下列出有 `About/About.xml` 的子目录，按名字排序后**等间隔**抽取最多 20 个（不随机，结果可以复现）。
-2. 对每个样本算语义指纹（§4.4），找旧来源里相对路径相同（不区分大小写）的 Instance，相似度 ≥ 0.9 算匹配。
-3. 匹配率 = 匹配数 / 样本数。≥ 80% 时判定为同一个来源，只更新根路径。旧来源下没有任何 Instance 时直接绑定。
-4. 匹配率不足时不自动绑定。来源标为 `rebind-pending`，新路径记在 `pending_root`，并提示玩家“这是原来的来源吗？”，附匹配率和样例。玩家用 `archo env rebind src:<标签> yes|no` 回答：
-   - `yes`：采用新根目录，回到 `ok`。
-   - `no`：旧来源退役（`retired`），标签改为 `<标签>-old`，它的 Instance 在下次扫描时转为墓碑；同时在新根目录建一个新来源，沿用原标签。
+**Evaluation**:
+1. List subdirectories with `About/About.xml` under the new root, sort by name, and take up to 20 **evenly spaced** samples (not random; reproducible).
+2. Compute each sample's semantic fingerprint (§4.4), find an Instance in the old source with the same relative path (case-insensitive); similarity ≥ 0.9 counts as a match.
+3. Match rate = matches / samples. At ≥ 80%, treat as the same source and update only root path. Bind directly if old source has no Instances.
+4. Below threshold, do not bind automatically. Mark source `rebind-pending`, record new path in `pending_root`, and ask "is this the original source?" with match rate and examples. Player answers with `archo env rebind src:<label> yes|no`:
+   - yes: adopt new root, return to ok.
+   - no: retire old source (retired), relabel `<label>-old`, tombstone its Instances on next scan; create a new source at new root with original label.
 
-玩家同时改了游戏路径又删了 Mod：先按上面重新绑定，剩下对不上的进待确认项（§5.4）。
+If the player changes game path and deletes `Mods` together: rebind first, then put unmatched items into identity questions (§5.4).
 
-### 3.3 链接与别名
+### 3.3 Links and Aliases
 
-链接生命周期独立于扫描别名：`managed_link` 持久记录物理 Mods 路径、名称/类型、Instance 或包身份、原目标、新位置/目标、搬移 from/to、管理目录身份、操作 ID 与阶段。检查优先使用台账归属证据；正常别名仍不新建 Instance。所有已知游戏共用入链枚举，详见 08 §3。
+Link lifecycle is independent of scan aliases: `managed_link` persistently records physical `Mods` path, name/type, Instance or pack identity, original target, new location/target, move from/to, managed directory identity, operation ID, and phase. Inspection prioritizes ledger ownership evidence; normal aliases still create no Instance. All known games share inbound-link enumeration; see 08 §3.
 
-- 列子目录时，像游戏的 `DirectoryInfo.GetDirectories` 一样跟随 junction 和符号链接，并把它们解析成真实路径（Windows 用 `GetFinalPathNameByHandle`）。Windows 下路径比较不区分大小写，并展开 8.3 短路径。悬空链接不进入正常 Mod 列表，但由独立的只读链接检查报告，不能静默遗漏；不是目录的条目不建 Instance。
-- **别名**：多个位置解析到同一个真实目录时，只算一个 Instance。按下面的优先级选主位置，其余记为别名位置：
-  1. 已经是某个 Instance 的位置（保证 R1 继续命中）；
-  2. 不是链接的位置；
-  3. 来源的对账顺序（workshop → steamcmd → official → local → extra）；
-  4. 来源在环境里的顺序；
-  5. 相对路径。
-- 链接指向所有来源之外的目录时，只有一个位置，记录它的真实路径（`mod` 输出里的 `links-to`），不算别名。RimCrow 的 `Mods/_Link_<工坊ID>` 就是这种情况，按普通本地 Mod 识别；RimArcho 不接管、不删除它们。
-- **`_Archo_` 链接**：RimArcho 部署 `steamcmd` / `extra` 里的 Mod 时建的 `Mods/_Archo_<来源标签>_<目录名>`（08 §3）。它解析到来源里的真实目录，所以只是那个 Instance 的一个别名：不产生新 Instance，也不产生任何事件。
-- **整合包链接**：名字以 `!ArchoPack_` 开头（不区分大小写）的链接，扫描时直接跳过。它们只在玩整合包时存在（08 §5.3），不属于环境。包内副本虽然带 `.rimarcho/origin.json`，现在不会被扫到。
-- 不跟随 Mod 目录**内部**的链接（01 §4）。对根目录本身是链接的 Mod，算指纹时走链接目标。
+- When listing subdirectories, follow junctions and symbolic links like the game's `DirectoryInfo.GetDirectories`, resolving real paths (Windows `GetFinalPathNameByHandle`). Windows comparisons ignore case and expand 8.3 short paths. Dangling links do not enter normal Mod lists but must be reported by separate read-only link inspection, never silently omitted; non-directory entries create no Instance.
+- **Aliases**: multiple locations resolving to one real directory count as one Instance. Choose primary location in this priority order; record the others as alias locations:
+  1. An existing Instance's location (keeps R1 matching);
+  2. A non-link location;
+  3. Source reconciliation order (workshop → steamcmd → official → local → extra);
+  4. Source order within environment;
+  5. Relative path.
+- A link outside all sources has only one location; record its real path (`links-to` in mod output), not an alias. RimCrow's `Mods/_Link_<Workshop-ID>` works this way and is recognized as a normal local Mod; RimArcho does not manage or delete these links.
+- **`_Archo_` links**: `Mods/_Archo_<source-label>_<directory-name>` created when deploying `Mods` from steamcmd / extra (08 §3). They resolve to real source directories and are merely aliases of those Instances: no new Instance or event.
+- **Pack links**: scan skips links with names starting `!ArchoPack_` (case-insensitive). They exist only while playing packs (08 §5.3), outside the environment. Pack copies carry `.rimarcho/origin.json` but are not scanned now.
+- Do not follow links **inside** Mod directories (01 §4). For `Mods` whose root is a link, fingerprint the target.
 
-### 3.4 订阅：Git、下载页、SteamCMD（2026-10-24）
+### 3.4 Subscriptions: Git, Download Pages, SteamCMD (2026-10-24)
 
-“订阅”= 从一个来处装一个 Mod，之后能检查和拉取更新、能撤掉。工坊订阅仍由 Steam 客户端做（08 §10）；这里加三种来处：
+"Subscribe" = install a Mod from an origin, then check/pull updates and remove it later. Steam client still handles Workshop subscriptions (08 §10); add three origins here:
 
-| 来处 | 装到哪 | 跟踪 | 检查更新 | 更新 |
+| Origin | Install location | Tracks | Update check | Update |
 | --- | --- | --- | --- | --- |
-| `git`：一个 Git 仓库地址（https、`file://` 或本机路径） | 订阅目录 `<subscribed.dir>/<仓库名>`，整个工作区连同 `.git` | 分支（默认远端的默认分支）、标签或提交，三选一 | 读远端引用（ls-remote），分支或标签指向的提交和已装的不同 = 有更新；跟踪提交的永远没有更新 | 抓取后把工作区切到新提交；工作区有改动时拒绝（玩家自己改的东西不丢） |
-| `page`：一个公开的 Mod 下载页（LoversLab `https://www.loverslab.com/files/file/<id>-<名>/`），下载要登录 | 订阅目录 `<subscribed.dir>/<页面名>` | 页面 | 读页面（不登录）的版本和更新时间（JSON-LD），变了 = 有更新 | 玩家在浏览器里下载，再从 zip 或解开的文件夹更新；RimArcho 不下载 |
-| `steamcmd`：工坊 ID，玩家明确选择或 Steam 客户端不可用时 | SteamCMD 下载目录 `<steamcmd-mods.dir>/steamapps/workshop/content/294100/<工坊 ID>`，登记为共用 `steamcmd` 来源 | 工坊条目 | 不能离线知道，只记上次下载时间 | 重新运行 `workshop_download_item`（SteamCMD 自己做增量） |
+| git: Git repository URL (https, `file://`, or local path) | Subscription directory `<subscribed.dir>/<repository-name>`, entire working tree including `.git` | One of branch (remote default by default), tag, or commit | Read remote refs (ls-remote); branch/tag commit differs from installed = update; tracked commits never have updates | Fetch and check out new commit; refuse dirty working tree (preserve player edits) |
+| page: public Mod download page (LoversLab `https://www.loverslab.com/files/file/<id>-<name>/`), login required for download | Subscription directory `<subscribed.dir>/<page-name>` | Page | Read public page version/update time (JSON-LD), changed = update | Player downloads in browser, then updates from zip/extracted folder; RimArcho does not download |
+| steamcmd: Workshop ID, explicitly chosen or Steam client unavailable | SteamCMD download directory `<steamcmd-mods.dir>/steamapps/workshop/content/294100/<Workshop-ID>`, registered as shared steamcmd source | Workshop item | Cannot determine offline; record last download time only | Rerun `workshop_download_item` (SteamCMD handles incremental download) |
 
-**全部订阅的选择与后续 credit**（GUI 后端合同见 [Steam credit API](../api/steam-credit.md)）：
+**Subscribe all choice and later credit** (GUI backend contract: [Steam credit API](../api/steam-credit.md)):
 
-- 导入页的全部订阅、关注合集、需要处理页的批量 subscribe，在执行前由玩家选择“从 Steam 订阅（慢，但用订阅给作者 credit，由 Steam 管理）”或“从 SteamCMD 下载（快，但不给作者 credit，由 RimArcho 管理）”。客户端路径不建 credit 批次。未传 `batch:true` 的旧调用保留原有语义。
-- 只有显式 `kind=workshop, steamcmd=true, batch=true` 的实际执行才记一个批次；只纳入本次有成功确认、About.xml 存在并扫描成 SteamCMD Instance 的项。部分失败不丢成功项，全部失败不建批次。这里的批次是后续询问范围，与 SteamCMD runner 的下载分包不同。下载本身不会建立 Steam 账户订阅。
-- 普通方案成功启动并记录 Launch 后，按本次实际启用的、仍为 live SteamCMD 来源的 Instance 匹配批次；同一个 Launch 对同一个批次只计一次，不使用该批 Mod 的游戏不计。整合包运行使用包内固定副本，不算使用 SteamCMD 实例。达到三次后由 `counting` 进入 `prompt`。
-- `CreditPrompt` 只在没有已登记游戏运行且 Steam worker 当前可用时返回，合并所有到期批次，按 Workshop ID 去重数量并给最多三个名字。查询不消费询问，前端须合并并发查询、同一时间只开一个弹窗；只有回答落盘才消耗本次询问。Steam 不可用或游戏运行时推迟。选择“不用了”永久进入 `dismissed`，这一批永不再问。
-- 确认替换后先持久进入 `replacing`，再运行任务 `steam-credit-replace`。按记录的 Instance 逐项真实 SubscribeItem，重叠批次复用已持久确认的订阅，不通过退订重订来重试；同一原副本已被前批替换时，后批记为 `done`（已替换）。临时失败持久记录次数和退避时间；Steam 不可用就等恢复；明确不可见、无权限、下架等不可恢复错误进入逐项 `failed`，保留 CMD 内容、原始结果码和工坊页面，不自动重试。
-- 只有客户端状态含 Subscribed、Installed，且没有 NeedsUpdate、Downloading、DownloadPending，About.xml 可读并扫描出同工坊 ID 的 workshop Instance，才交接。游戏运行时暂停整个交接。列表为全游戏共享：逐一检查所有环境的 registry，凡旧 SteamCMD 实例可加载（包含可部署后加载）的环境，新 workshop 实例也必须可加载；任一不满足即整项 `retained`，不改任何列表或部署，注明环境名称，不以列表创建时的 EnvID 判断。暂存 JSON 损坏也整项 `retained`，注明列表并结束，不进入无限退避；经现有 registry、游戏写入和链接生命周期更新原来已部署的游戏投影，只改本项，保留其它未保存编辑和当前方案选择。中断时持久部署义务保证下次补完。
-- 已部署游戏投影交接后，全部列表的当前内容、历史版本、撤销/重做、暂存项与锚点在同一事务中重映射到 workshop Instance，合并双方 instance_note（文字去重，已有来历优先）；同事务递增 `meta.credit.remap` 使长期打开的编辑批次失效。DDS 记录绑定物理目录、文件状态和内容快照，不直接迁移 texture_mod/texture_file，也不复制 DDS；有记录时结果提示对 workshop 副本重新优化贴图；同一 Lineage 的同一 Mod 视为同一项，不新增恢复旧副本的撤销步。固定整合包不重写；除上述跨环境可加载性或暂存损坏外，固定整合包、未完成的其它游戏部署或已知入链（包括 managed_link 台账所在目录中的实际链接）仍使用原 CMD 副本时，标记 `retained` 并保留、注明原因。只有已无引用、无入链时，原副本才经白名单和链接生命周期进入回收站，从不硬删。所有项达到 `done` / `retained` / `failed` 后批次 `done`；逐项原因留在任务结果。`done` 表示处理结束，不能据此声称全部订阅成功或全部已回收。
-- 等待扫描、文件任务或客户端扫描结果是固定短等待，不增加失败退避次数。RimArcho 列表读取同步、保存、撤销/重做、暂存和普通/整合包启动与交接共享跨进程锁；列表修改在读取前持锁，晚到的快照保存拒绝冲突，长期 TUI 编辑批次遇到重映射必须重新载入。扫描在锁外，只有交接、部署与回收阶段持锁；启动遇锁的等待上限见 06 §2.16.1 W02，等待时由 Go 提供“等待后台替换完成”提示，超时才报错。写入及回收前再查游戏进程；Steam 等外部启动不遵守锁，仍有进程检查的竞态窗口。启动成功后的会话计数失败只记日志，不把已经启动的游戏报成启动失败。停止任务取消当前 Steam worker，在交接项边界停止；关闭窗口等待 runner 的上限见 06 §2.16.1 W04，保留已完成的订阅和未完成义务。应用退出不常驻；下次 GUI 启动从 SQLite 续跑，也可在后台任务页继续。清理任务历史不删除义务。询问和替换的授权只覆盖记录在这一批里的实例，不自动退订、不复制内容到客户端目录、不修改客户端 ACF。
+- Before subscribe all on import, following collections, or batch subscribe on needs attention, players choose "subscribe through Steam (slow, but credits authors through subscriptions, managed by Steam)" or "download through SteamCMD (fast, but gives authors no credit, managed by RimArcho)". Client path creates no credit batch. Old calls without `batch:true` keep their semantics.
+- Record a batch only for actual execution with explicit `kind=workshop, steamcmd=true, batch=true`; include only items confirmed successful this time, with `About.xml` present and scanned as SteamCMD Instances. Partial failure retains successes; total failure creates no batch. This batch scopes later prompts and differs from SteamCMD runner download batches. Downloads do not create Steam account subscriptions.
+- After a normal plan successfully launches and records a Launch, match batches against actually enabled Instances still in live SteamCMD sources; count each Launch once per batch, not games that do not use those `Mods`. Pack runs use fixed copies and do not count as SteamCMD Instance use. After three sessions, change counting to prompt.
+- Return `CreditPrompt` only when no registered game runs and the Steam worker is available; merge all due batches, deduplicate count by Workshop ID, and give up to three names. Queries do not consume prompts; frontend must coalesce concurrent queries and open only one dialog at a time; only a persisted answer consumes a prompt. Defer if Steam is unavailable or a game runs. "dismiss" permanently enters dismissed; never ask again for that batch.
+- After replacement confirmation, persist replacing before task `steam-credit-replace`. Perform real SubscribeItem calls per recorded Instance; overlapping batches reuse persistently confirmed subscriptions, never unsubscribe/resubscribe to retry; if an earlier batch already replaced the original, later batch records done (already replaced). Persist transient failure counts/backoff; wait for Steam recovery; permanent errors such as explicit invisibility, no access, or removal mark item failed, retain CMD content, original result code and Workshop page, without automatic retry.
+- Handover requires client state Subscribed and Installed, without NeedsUpdate, Downloading, or DownloadPending, readable `About.xml`, and scanned workshop Instance with the same Workshop ID. Pause all handover while a game runs. Lists are shared across games: check every environment registry; wherever the old SteamCMD Instance is loadable (including after deployment), the new workshop Instance must also be loadable; otherwise mark whole item retained, change no list/deployment, and name the environment; do not use the list's creation EnvID. Corrupt staging JSON also marks the entire item retained, names the list, and ends without infinite backoff; update existing deployed game projections through registry, game writes, and link lifecycle, changing only this item while preserving other unsaved edits and current plan selection. Persistent deployment obligations ensure completion after interruption.
+- After deployed projections hand over, remap current contents, historical versions, undo/redo, staging entries and anchors of all lists to the workshop Instance in one transaction; merge both `instance_note` values (deduplicate text, prefer existing origin); increment `meta.credit.remap` in that transaction to invalidate long-open edit batches. DDS records bind physical directories, file state, and content snapshots; do not migrate texture_mod/texture_file directly or copy DDS; if records exist, prompt to optimize the workshop copy again. The same Mod in one Lineage counts as one item, without an undo step restoring old copy. Do not rewrite fixed packs; beyond cross-environment loadability or corrupt staging above, mark retained with reason if a fixed pack, unfinished other-game deployment, or known inbound link (including actual links in `managed_link` ledger directories) still uses original CMD copy. Only unreferenced copies without inbound links pass allowlist and link lifecycle into recycle bin, never hard deletion. Once all items are done / retained / failed, batch becomes done; per-item reasons remain in task results. done means processing ended, not that all subscriptions succeeded or all copies were recycled.
+- Waiting for scans, file tasks, or client scan results uses fixed short waits without increasing failure backoff. RimArcho list read synchronization, save, undo/redo, staging, normal/pack launch, and handover share a cross-process lock; list edits lock before reading, stale snapshot saves reject conflicts, and long-lived TUI edit batches must reload after remapping. Scans run outside the lock; lock only handover, deployment, and recycling; launch wait limit is 06 §2.16.1 W02, with Go supplying "waiting for background replacement" while waiting, error only on timeout. Recheck game processes before writes/recycling; Steam and other external launches ignore the lock, leaving a process-check race window. Session-count failure after successful launch logs only; do not report a launched game as a failed launch. Stopping a task cancels current Steam worker and stops at a handover item boundary; window-close runner wait limit is 06 §2.16.1 W04, retaining completed subscriptions and unfinished obligations. App exit leaves no resident process; next GUI startup resumes from SQLite, or resume on background tasks page. Task history cleanup does not delete obligations. Prompt/replacement authorization covers only recorded batch Instances, without automatic unsubscribe, copying into client directories, or changing client ACF.
 
-**规则**：
-1. **工坊条目先用 Steam 客户端**：`subscribe workshop <工坊 ID>` 先经 Steam 客户端订阅（08 §10 的同一个 worker）；只有得到“Steam 不可用”（`ErrSteamUnavailable`：Steam 没运行、游戏目录没有 `steam_api64.dll`、API 起不来）才用 SteamCMD。玩家可以用 `--steamcmd` 直接要求 SteamCMD。两条路都不通时报错并给出工坊页面。
+**Rules**:
+1. **Prefer Steam client for Workshop items**: `subscribe workshop <Workshop-ID>` subscribes through Steam client first (same worker as 08 §10); fall back to SteamCMD only on "Steam unavailable" (`ErrSteamUnavailable`: Steam not running, no `steam_api64.dll` in game directory, API startup fails). Players may explicitly request SteamCMD with `--steamcmd`. If neither path works, report error and Workshop page.
 
-   实际订阅前，两条路径都用无需 key 的公开 `ISteamRemoteStorage/GetPublishedFileDetails` POST 预检，每次最多 100 个 ID，每次请求最多三秒；HTTP、解码或连接失败就停止后续预检，未知项照常交给下载路径。响应中明确 `result != 1` 或 `consumer_app_id != 294100` 的项直接记为“已不在创意工坊（作者删除或设为私有）”，不调用 Steam / SteamCMD，不重试，也不进入 credit 批次；未返回的项仍按未知处理。有 `title` 时作为任务名，有 `file_size` 时作为进度权重。预览不联网预检。
-2. **SteamCMD 由设置里的依赖管理负责找和装**；订阅只通过一个查找函数要路径（`App.FindTool("steamcmd") (path, ok)`，默认实现是 `SteamCMDPath()`），找不到时说“去设置里安装 SteamCMD”，订阅本身不下载 SteamCMD。账户同 08 §11（`SteamCMDAccount`）：匿名时隐藏运行；有账户名时在 SteamCMD 自己的窗口里登录，RimArcho 不碰密码。
-3. **订阅目录**（设置项 `subscribed.dir`，默认 `%LOCALAPPDATA%\RimArcho\subscribed`）是 RimArcho 的目录，登记成共用 `extra` 来源 `src:subscribed`，和 Monitor 目录一样（08 §9）：启用时经 `_Archo_` 链接部署（08 §3），出现在受管目录列表（移动、重新定位）里，不能 `folder remove`。SteamCMD 下载目录（设置项 `steamcmd-mods.dir`，默认 `%LOCALAPPDATA%\RimArcho\steamcmd-mods`）第一次下载时登记成 `steamcmd` 来源。两者与数据目录、各来源根目录互不包含。
-4. **来历记在 Mod 自己的文件夹里**：`.rimarcho/source.json`（扫描指纹本来就不算 `.rimarcho`、`.git`，§4.4）。来源来历不另加表（credit 批次单独持久化）：库存和详情读订阅来源下各文件夹的这个文件（按修改时间缓存），所以数据库重建、文件夹移动后来历仍在。字段：
+   Before actual subscription, both paths preflight using keyless public `ISteamRemoteStorage/GetPublishedFileDetails` POST, up to 100 IDs/request and three seconds/request; HTTP, decoding, or connection failure stops later preflight requests, leaving unknown items to normal download paths. Explicit `result != 1` or `consumer_app_id != 294100` marks "no longer on the Workshop (author deleted it or made it private)", without Steam / SteamCMD calls, retries, or credit inclusion; missing items remain unknown. Use title as task name and `file_size` as progress weight if present. Previews do not preflight over network.
+2. **Settings dependency management locates/installs SteamCMD**; subscriptions request its path through one lookup (`App.FindTool("steamcmd") (path, ok)`, default `SteamCMDPath()`); if absent, say "install SteamCMD in settings"; subscriptions do not download it. Accounts follow 08 §11 (`SteamCMDAccount`): anonymous runs hidden; named accounts log in through SteamCMD's own window; RimArcho never touches passwords.
+3. **Subscription directory** (`subscribed.dir`, default `%LOCALAPPDATA%\RimArcho\subscribed`) belongs to RimArcho, registered as shared extra source `src:subscribed`, like Monitor (08 §9): deploy via `_Archo_` links (08 §3), include in managed directories (move, relocate), prohibit `folder remove`. Register SteamCMD download directory (`steamcmd-mods.dir`, default `%LOCALAPPDATA%\RimArcho\steamcmd-mods`) as steamcmd source on first download. Neither may contain/be contained by data directory or source roots.
+4. **Origin lives in the Mod folder**: `.rimarcho/source.json` (fingerprints already exclude `.rimarcho`, `.git`, §4.4). No separate table for subscription origin (credit batches persist separately): inventory/details read this file in subscription source folders (mtime-cached), preserving origin after database rebuild or folder moves. Fields:
 
    ```json
-   {"kind": "git|page|steamcmd", "url": "仓库地址或下载页", "repo": "下载页链接到的 Git 仓库",
-    "workshop_id": "steamcmd 的工坊 ID", "ref_type": "branch|tag|commit", "ref": "main",
-    "installed": "已装的提交，或下载页当时的更新时间", "installed_at": "RFC3339",
-    "latest": "上次检查看到的提交 / 页面更新时间", "checked_at": "RFC3339", "check_error": "上次检查失败的原因"}
+   {"kind": "git|page|steamcmd", "url": "repository URL or download page", "repo": "Git repository linked by download page",
+    "workshop_id": "steamcmd Workshop ID", "ref_type": "branch|tag|commit", "ref": "main",
+    "installed": "installed commit or page update time at installation", "installed_at": "RFC3339",
+    "latest": "commit / page update time from last check", "`checked_at`": "RFC3339", "`check_error`": "last check failure reason"}
    ```
-   SteamCMD 目录里没有这个文件的条目（玩家以前自己下的）按 `kind=steamcmd`、目录名为工坊 ID 处理。
-5. **装**：先装到同一卷的临时目录 `<subscribed.dir>/.archo-tmp-*`（扫描跳过 `.archo-` 开头的目录），确认根目录有 `About/About.xml`，写好 `source.json`，再改名成最终名字；名字被占用时加 `-2`、`-3`……，从不覆盖。仓库根目录不是 Mod（Mod 在子目录里）时拒绝，并列出含 `About/About.xml` 的子目录。同一个地址加同一个跟踪已经订阅过时拒绝。装完立刻扫描，新 Instance 按普通规则对账（§5），和工坊里的同一个 Mod 照常归到同一 Lineage（R4）。
-6. **检查更新**只在玩家要求时联网（`subscribe check`、库存里的“检查更新”），结果写回 `latest`、`checked_at`、`check_error`；“有更新”= `latest` 非空且不等于 `installed`。离线时库存照样显示上次的结论和时间。
-7. **更新**先用 `--dry-run` 说明从哪个提交到哪个；游戏正在运行时拒绝（会换掉它加载的文件）。git 更新在原地进行（Instance 不变，发 `updated`）；下载页的更新见第 11 条。
+   SteamCMD items without this file (previous player downloads) use `kind=steamcmd` and directory name as Workshop ID.
+5. **Install**: install into same-volume temporary `<subscribed.dir>/.archo-tmp-*` first (scan skips `.archo-` directories), require root `About/About.xml`, write `source.json`, then rename to final name; suffix occupied names with `-2`, `-3`, etc.; never overwrite. If repository root is not a Mod (Mod in subdirectory), refuse and list subdirectories with `About/About.xml`. Refuse duplicate URL + tracking target. Scan immediately after install; reconcile new Instance normally (§5), joining same Workshop Mod's Lineage through R4.
+6. **Check updates** connects only on player request (`subscribe check`, inventory "check updates"); write latest, `checked_at`, `check_error`; "update available" means nonempty latest differs from installed. Offline inventory still shows last result/time.
+7. **Update**: `--dry-run` first explains old/new commits; refuse while a game runs (loaded files would change). Git updates in place (same Instance, updated event); download page updates in rule 11.
 
-   - SteamCMD 新增和更新共用分批下载：连续的 SteamCMD 更新按真实来源根目录及有效账户分组、工坊 ID 去重，按 `internal/app/subscribeworkshoprun.go` 的 `workshopBatchSize` 限定每批条目数；每批启动一个进程，在 SteamCMD exe 旁建唯一临时脚本，`+runscript` 仅传 ASCII 文件名，进程结束后清理。实例仍互斥；非匿名账户继续使用原生控制台。
-   - 每条目必须得到成功确认并有 `About/About.xml`，退出码 0 或已有目录均不能代替确认。非法 ID 在分批前逐项报错，不阻塞其它 ID；脚本创建等本地准备失败保留路径与系统错误。单条失败保留其它成功，后续批次和来源组按下条规则继续；各组下载结束后校验、发布、写来历，整个订阅更新最后统一扫描和索引。已有来源在原库更新；任意布局来源仍经暂存、回收旧目录和入链生命周期替换，身份不变。
-   - 超时、连接失败、SteamCMD 异常退出或未确认完成（含只给出 `Failure`、未说明永久原因）的 ID，在全部初始下载执行完后统一重新排队；只重试剩余的可重试项，最多额外两轮，沿用退避。权限、不可见、所有权、认证、磁盘不足和明确未知错误不自动重试。`File Not Found` / `FileNotFound` 归为“不在创意工坊”，不提示检查账户；只有登录、所有权或访问拒绝等账户问题才提示检查账户。不存在、私有、无权限、未拥有和磁盘写入失败的项带不可重试标记。某批未确认任何条目且发生密码、Guard、登录或匿名登录失败时，停止该来源组并将未运行条目标为相同失败。失败项逐条报告原因及工坊页面，不输出原始认证日志。
-   - 一次全部订阅只有一个任务，内部下载分包和重试轮次不产生任务行或步骤。SteamCMD 在现有账户锁内记录启动前的 `console_log.txt` 偏移，并在运行中增量读取本次输出；每条 Success / ERROR 更新任务，结束后仍以逐项最终解析和 About.xml 校验为准。进度和取消的界面合同见 06 §2.16。
-   - 取消只终止本任务拥有的 SteamCMD 进程树（Windows Job Object，进程恢复执行前加入），清理临时脚本并释放账户锁；成功确认的项继续校验、登记来源、扫描入库并纳入 credit，未完成项标为已取消。继续沿用原任务和进度，只提交剩余项。Steam 客户端路径在当前调用返回后停止后续调用，已经订阅的保留。关闭窗口同样取消当前任务的 runner。
-   - 只有 Git 条目是 SteamCMD 分组边界；更新全部时跳过的下载页条目不切分分组，返回条目仍保持选择顺序。Git 更新失败仍停止后续操作，之前成功的更新仍扫描。SteamCMD 失败汇总到操作末尾，继续后续 Git 更新并保留各自结果。
+   - SteamCMD additions and updates share batched downloads: group consecutive updates by real source root and effective account, deduplicate Workshop IDs, limit items per batch with `workshopBatchSize` in `internal/app/subscribeworkshoprun.go`; start one process per batch, create unique temporary script beside SteamCMD exe, pass only ASCII filename to `+runscript`, clean up after process exit. Instances remain mutually exclusive; nonanonymous accounts keep native console.
+   - Each item requires success confirmation and `About/About.xml`; exit code 0 or existing directory is insufficient. Report invalid IDs individually before batching, without blocking others; local preparation failures such as script creation retain path/system error. Individual failures retain successes; later batches/source groups continue per next rule; after each group download, verify, publish, write origin; scan/index once at end of subscription update. Update existing sources in their original library; arbitrary layouts still replace via staging, old-directory recycling, and inbound-link lifecycle, preserving identity.
+   - After all initial downloads finish, requeue IDs with timeouts, connection failures, abnormal SteamCMD exit, or unconfirmed completion (including bare `Failure` without permanent reason); retry only remaining retryable items, at most two extra rounds, with backoff. Do not automatically retry permissions, invisibility, ownership, authentication, disk-full, or explicit unknown errors. `File Not Found` / `FileNotFound` means "no longer on the Workshop", without account advice; suggest checking account only for login, ownership, or access-denied issues. Nonexistent, private, unauthorized, unowned, or disk-write-failed items carry nonretryable markers. If no item in a batch is confirmed and password, Guard, login, or anonymous login fails, stop that source group and mark unrun items with the same failure. Report each failure reason and Workshop page without raw authentication logs.
+   - One subscribe-all operation is one task; internal batches/retry rounds create no task rows or steps. Within the existing account lock, SteamCMD records starting `console_log.txt` offset and reads this run's output incrementally; each Success / ERROR updates task, but final per-item parsing and `About.xml` validation remain authoritative. Progress/cancellation UI contract: 06 §2.16.
+   - Cancellation terminates only this task's SteamCMD process tree (Windows Job Object, assigned before process resumes), removes temporary script, releases account lock; confirmed successes still validate, register source, scan into database, and enter credit batch; unfinished items become canceled. Resume keeps original task/progress, submitting only remaining items. Steam client path stops later calls after current call returns, retaining subscriptions already made. Closing window also cancels current task runner.
+   - Only Git items split SteamCMD groups; skipped download-page items during update-all do not split groups, and returned items retain selection order. Git failure still stops later operations, scanning earlier successes. SteamCMD failures aggregate at operation end, continuing later Git updates and preserving their results.
 
-8. **撤掉**（`subscribe remove`）= 把文件夹移到回收站（08 §7 的白名单加上订阅目录和 SteamCMD 下载目录里带 `source.json` 或在 SteamCMD 来源里的文件夹），从不永久删除；方案在用时只警告（同 06 §2.9 的删除）。SteamCMD 下的条目没有账户里的订阅要撤，删掉就是撤掉。
-9. **命令**：`archo subscribe git <地址> [--branch <名> | --tag <名> | --commit <sha>] [--dry-run]`、`archo subscribe page <下载页> [--git | --from <zip 或文件夹>] [--dry-run]`、`archo subscribe workshop <工坊 ID…> [--steamcmd] [--dry-run]`、`archo subscribe list`、`archo subscribe check [<引用>…]`、`archo subscribe update <引用…> | --all [--dry-run]`、`archo subscribe remove <引用…> [--dry-run]`。`check` 不给引用时查全部订阅；`update` 要写引用或 `--all`，都没写时拒绝（05 §3.3）。
-10. **Git 用纯 Go 实现**（go-git，07 §1），不要求玩家装 Git，也不调用系统的 `git`；只支持不需要登录的仓库（公开 https、本机路径），不支持子模块和 LFS（拉下来是指针文件，装完提示）。分支和标签浅克隆（depth 1），跟踪提交时完整抓取后检出。
-11. **下载页与 LoversLab**：公开元数据由 `subscribe.ReadPage` 单次 HTTPS GET 获取，不带 Cookie、不跟重定向、不读下载按钮。公开页也可能被挑战，403 不等于未登录。LoversLab 认证下载是独立的玩家入口：
-   - 取页面的 JSON-LD（schema.org `SoftwareApplication`：`name`、`softwareVersion`、`dateModified`；没有时退回 `og:title`、`og:updated_time`），以及正文里指向 Git 仓库的链接（gitgud.io、GitHub、GitLab 的仓库根地址，去掉 `/-/tree/…`、`/-/blob/…` 这类子路径）。
-   - 页面链接到一个仓库时（例如 RimJobWorld 链接到 gitgud.io），`subscribe page <页面>` 建议改用 Git 订阅那个仓库（链接了几个仓库时，取页面链接进其文件的那个：`/-/tree/…`、`/-/blob/…`、`/tree/…`、`/blob/…` 最多的；只链到仓库首页或 releases 的多半是依赖，例如 RimJobWorld 页上的 Harmony；分不出来时让玩家用 `subscribe git` 自己选），并把页面记在 `source.json` 的 `url`（kind 仍是 `git`，`repo` 是仓库）；`--git` 直接这样做。gitgud.io 是 GitLab，匿名 https 克隆，地址带不带 `.git` 都行。
-   - 没有仓库、或玩家要用页面上的发布包时：`subscribe page <页面> --from <zip 或文件夹>`。玩家先在浏览器里下载（界面里“打开下载页”），RimArcho 从 zip（标准库 `archive/zip`；7z、rar 请先解开）或文件夹装进订阅目录：Mod 在压缩包根目录或唯一的一层子目录里，找不到 `About/About.xml` 拒绝。`installed` 记页面当时的版本和更新时间（`1.4.1 @ 2026-10-23T15:16:59Z`）。例：RimJobWorld 的页面链接到 gitgud.io 仓库（走 Git）；RJW Industrial Milk Management 的页面只有下载按钮（走 zip）。
-   - 检查更新：再读一次页面，版本不同或更新时间更新就是有更新；更新 = `subscribe update <引用> --from <新 zip 或文件夹>`，先装到临时目录，原目录进回收站，再改名过去（同一位置，R1，Instance 不变）。
-   - 读页面失败（Cloudflare 拦截、页面改版）时只记 `check_error`，不重试、不绕过。
-   - 玩家在设置 › 账户首次登录并同意站点说明、独立窗口自行登录后，可在没有 Git 仓库的订阅文件页读取可下载文件；多个文件按实际文件名、大小、日期逐项列出，无元数据才用下载按钮文字，必须由玩家选。认证客户端 `subscribe.LoversLab` 不改变公开读取器的合同。更新入口使用相同文件选择流程。
-   - 根据当次真实链接与表单处理下载，不猜附件 ID 或 CSRF 参数。站点声明以原文显示、玩家点同意才提交；隐藏字段与临时链接仅留内存，不写 `source.json` 或任务。下载到受管临时 zip，再复用 `subscribe.Import`、About.xml 校验、安装预览和旧目录回收流程；公开元数据被拦时本地安装记 `player download`。
-   - 会话缺失、过期、登录重定向、403、Cloudflare/captcha 或无法识别页面时，说明原因并回到“打开下载页 → 选择 zip”。不自动求解挑战、循环登录或重试。
-   - 会话以当前 Windows 用户的 DPAPI 加密保存，只保存 Cookie 与非秘密状态，不保存密码；会话 Cookie 不伪造持久到期。登录窗保留原站 Remember me。显示最长有效认证 Cookie（member/login/device key 等）的到期时间，不取最早的短会话 Cookie；只有会话 Cookie 时写 N/A。验证、文件读取、下载、认证更新检查的每次 HTTPS 响应均合并 Set-Cookie（含轮换、到期、删除）回加密存储，重启后继续生效。公开 `ReadPage` 仍无 Cookie；已登录的 GUI 更新检查复用认证客户端。
-   - 单服务串行，请求间隔与 429 的 Retry-After 冷却见 06 §2.16.1 S11，长冷却中拒绝重试。仅 HTTPS、精确 `loverslab.com` / `www.loverslab.com` 的文件流程；未经实际观测登记的外部 CDN 一律退回手动，不向 CDN 转发站点 Cookie。
-   - 没有做通用的“Mod 索引”来源：没有现成的索引可接。
+8. **Remove** (`subscribe remove`) = recycle folder (08 §7 allowlist includes subscription/download directory folders with `source.json` or in SteamCMD sources), never permanently delete; warn only if plans use it (same as 06 §2.9 deletion). SteamCMD items have no account subscription to cancel; deletion is removal.
+9. **Commands**: `archo subscribe git <URL> [--branch <name> | --tag <name> | --commit <sha>] [--dry-run]`, `archo subscribe page <download-page> [--git | --from <zip-or-folder>] [--dry-run]`, `archo subscribe workshop <Workshop-ID…> [--steamcmd] [--dry-run]`, `archo subscribe list`, `archo subscribe check [<reference>…]`, `archo subscribe update <references…> | --all [--dry-run]`, `archo subscribe remove <references…> [--dry-run]`. check without references checks all subscriptions; update requires references or `--all`, refusing neither (05 §3.3).
+10. **Pure-Go Git** (go-git, 07 §1), no installed Git or system git calls; only repositories requiring no login (public https, local paths); no submodules or LFS (pointer files are downloaded, warn after install). Shallow clone branches/tags (depth 1); full fetch then checkout for tracked commits.
+11. **Download pages and LoversLab**: `subscribe.ReadPage` fetches public metadata with one HTTPS GET, no cookies, redirects, or download-button reading. Public pages may also challenge; 403 does not mean not logged in. Authenticated LoversLab download is a separate player entry point:
+   - Read JSON-LD (schema.org `SoftwareApplication`: name, `softwareVersion`, `dateModified`; fall back to `og:title`, `og:updated_time`), and body links to Git repositories (gitgud.io, GitHub, GitLab root URLs, stripping `/-/tree/…`, `/-/blob/…`, etc.).
+   - If page links one repository (for example RimJobWorld to gitgud.io), `subscribe page <page>` suggests a Git subscription (with several repositories, choose the one most linked into files via `/-/tree/…`, `/-/blob/…`, `/tree/…`, `/blob/…`; homepage/release-only links are usually dependencies, such as Harmony on RimJobWorld's page; if ambiguous, ask player to choose using `subscribe git`), recording page in `source.json` url (kind remains git, repo is repository); `--git` does this directly. gitgud.io is GitLab, anonymous https clone with or without `.git`.
+   - Without a repository, or if player wants page releases: `subscribe page <page> --from <zip-or-folder>`. Player downloads in browser first (UI "open download page"); RimArcho installs zip (standard `archive/zip`; extract 7z/rar first) or folder into subscription directory: Mod at archive root or sole first-level subdirectory; refuse without `About/About.xml`. installed records page version/update time (`1.4.1 @ 2026-10-23T15:16:59Z`). Examples: RimJobWorld links a gitgud.io repository (Git); RJW Industrial Milk Management has only a download button (zip).
+   - Update check rereads page; changed version or newer update time means update; update = `subscribe update <reference> --from <new-zip-or-folder>`, install in temporary directory, recycle original, rename into same location (R1, same Instance).
+   - Page read failures (Cloudflare block, changed page layout) only record `check_error`, without retry or bypass.
+   - After first login in settings › accounts, accepting site notice and logging in personally in isolated window, players can read downloadable files on subscribed pages without Git repositories; list multiple files by actual filename, size, date, falling back to button text only without metadata; player selection required. Authenticated `subscribe.LoversLab` does not change public reader contract. Updates use the same file selection flow.
+   - Download using actual links/forms from this request, never guessed attachment IDs or CSRF parameters. Show site declarations verbatim and submit only after player agreement; hidden fields and temporary links stay in memory, never `source.json` or tasks. Download managed temporary zip, then reuse `subscribe.Import`, `About.xml` validation, install preview, and old-directory recycling; if public metadata is blocked, local installation records `player download`.
+   - Missing/expired sessions, login redirects, 403, Cloudflare/captcha, or unrecognized pages explain the reason and return to "open download page → choose zip". No automatic challenge solving, login loops, or retries.
+   - Save session encrypted with current Windows user DPAPI; cookies and non-secret status only, no passwords; do not invent persistent expiry for session cookies. Preserve site's Remember me in login window. Show expiry of longest-lived authentication cookie (member/login/device key, etc.), not earliest short session cookie; session-only means N/A. Merge Set-Cookie (rotation, expiry, deletion) from every HTTPS response in validation, file reading, download, and authenticated update checks into encrypted storage, surviving restarts. Public `ReadPage` stays cookie-free; logged-in GUI update checks reuse authenticated client.
+   - Serialize per service; request spacing and 429 Retry-After cooldown in 06 §2.16.1 S11; refuse retries during long cooldowns. HTTPS only, exact `loverslab.com` / `www.loverslab.com` file flows; unregistered external CDNs not observed in practice fall back to manual download; never forward site cookies to CDNs.
+   - No general "Mod index" `source:` no existing index to connect.
 
-## 4. 扫描
+## 4. Scanning
 
-### 4.1 流程
+### 4.1 Flow
 
 ```
-检查来源状态 → 列出来源子目录 → 分组（真实路径相同的合为一个）→ 读取观测 → 对账 → 写入快照 → 发出变更事件 → 标记过期的事实
+Check source states → list source subdirectories → group (merge identical real paths) → read observations → reconcile → write snapshots → emit change events → mark stale facts
 ```
 
-- 命令：`archo scan [--full] [--game-only]`。`--full` 忽略缓存的哈希，重读所有语义文件。TUI 和 GUI 都以子进程运行 `archo scan`，主进程不做扫描，避免把扫描的峰值内存留在界面进程里。
-- **范围**：默认扫共用的 Mod 文件夹和当前环境自己的 `Data`、`Mods`，每个目录一次。`--game-only` 只扫当前环境自己的两个来源：加环境后（引导第二步）只需读新游戏的。这时没扫到的共用来源下的活 Instance 不匹配、不转墓碑，但仍是 R4 的“原版”候选，所以 `Mods/` 里的副本照样进工坊原版的 Lineage。共用文件夹从没读过时，引导第二步不加 `--game-only`。
-- 开始前做 §2.1 的数据目录检查，并按 §3.1 刷新每个来源的状态；`missing`、`rebind-pending`、`retired` 的来源不扫描。
-- 读出身标记（`.rimarcho/origin.json`）时，先把迁移 v14 合并掉的 ID 按 `id_alias` 换成保留下来的（§0.1）。
-- 一个子目录算 Mod 的条件：有 `About/About.xml`，或只有 `About/About.xml.disabled`（§4.2）。文件名不区分大小写。其他子目录只计数，不建 Instance。
-- **并发**：每个来源一个 goroutine，每个来源内部最多 `NumCPU` 个 worker。ID 在对账阶段按确定的顺序分配，与并发无关。
-- **增量**：文件的“相对路径 + 大小 + mtime”都没变时，复用上次的哈希。mtime 只用来跳过哈希，不参与身份判断。
-- **内存**：增量扫描只加载带哈希的语义文件行，不加载完整清单。目录没变、也没有重新哈希时，清单读完就释放；只有外部状态变了（例如 ACF manifest）时，新快照的文件行用 SQL 从旧快照复制。实测内存和耗时见 07 §6。
-- 扫描只更新身份和元数据。Def、Patch、Harmony 事实由分析层按需重建（03 §3）。
-- 扫描输出按来源列出：子目录数、Mod 数、残留数、about-disabled 数、不是 Mod 的目录数、只计数的残留目录数、别名数；工坊来源找不到 ACF 时显示 `no ACF`。
+- Command: `archo scan [--full] [--game-only]`. `--full` ignores cached hashes and rereads all semantic files. TUI and GUI run `archo scan` in subprocesses; the main process does not scan, avoiding retention of peak scan memory in the interface process.
+- **Scope**: shared Mod folders and current environment's own `Data`, `Mods`, once per directory. `--game-only` scans only the current environment's two sources: after adding an environment (guide step 2), only the new game needs reading. Active Instances in unscanned shared sources neither match nor tombstone but remain R4 "original" candidates, so `Mods/` copies still join Workshop originals' Lineages. If shared folders have never been read, guide step 2 omits `--game-only`.
+- Before starting, check data directory per §2.1 and refresh each source state per §3.1; skip missing, `rebind-pending`, retired.
+- When reading origin markers (`.rimarcho/origin.json`), first map IDs merged away by v14 through `id_alias` (§0.1).
+- A subdirectory is a Mod if it has `About/About.xml` or only `About/About.xml.disabled` (§4.2). Filenames are case-insensitive. Other subdirectories are counted without Instances.
+- **Concurrency**: one goroutine per source, up to `NumCPU` workers within each. Assign IDs in deterministic reconciliation order, independent of concurrency.
+- **Incremental**: reuse previous hash if relative path, size, and mtime are unchanged. mtime only skips hashing; it does not determine identity.
+- **Memory**: incremental scans load only hashed semantic file rows, not the full list. Release lists after reading if directories are unchanged and no rehash occurred; if only external state changed (such as ACF manifest), copy old snapshot file rows to the new snapshot with SQL. Measured memory/timing: 07 §6.
+- Scans update only identity and metadata. Analysis rebuilds Def, Patch, Harmony facts on demand (03 §3).
+- Per-source scan output lists subdirectory count, Mod count, residue count, about-disabled count, non-Mod directory count, count-only residue directories, alias count; Workshop sources without ACF show `no ACF`.
 
-### 4.2 残留与 about-disabled
+### 4.2 Residue and about-disabled
 
-**订阅与残留**（只用于 `workshop` 来源；SteamCMD 目录游戏本来就不直接加载）：
-- 游戏只加载**已订阅**的工坊条目（07 §7）。判为已订阅的条件：出现在 `appworkshop_294100.acf` 的 `WorkshopItemsInstalled` 或 `WorkshopItemDetails` 中。
-- 找不到 ACF 时，全部视为已订阅。
-- 不在订阅记录里的文件夹记为 `residue`（残留）：仍然建 Instance，但不能加入方案，在“能不能跑”里提示可以清理（03 §4.3、08 §7）。
-- 没有 `About.xml`（也没有 `.disabled`）的残留文件夹只计数，不建 Instance。
+**Subscriptions and residue** (workshop sources only; game does not directly load SteamCMD directories):
+- Game loads only **subscribed** Workshop items (07 §7). Subscribed means present in `appworkshop_294100.acf` `WorkshopItemsInstalled` or `WorkshopItemDetails`.
+- Without ACF, treat all as subscribed.
+- Folders absent from subscription records are residue: still create Instances, but cannot add to plans; can it run suggests cleanup (03 §4.3, 08 §7).
+- Residue folders without `About.xml` or `.disabled` are counted only, without Instances.
 
-**about-disabled**：
-- `About/About.xml` 不存在、但有 `About/About.xml.disabled`（RimCrow 停用 Mod 的方式）时：读取这个文件作为声明，建 Instance，标记 `unloadable: about-disabled`。这样的 Instance 不能加入方案，`list --filter unloadable` 可以筛出来。
-- 工坊残留文件夹里只有 `About.xml.disabled` 时，同时标为 residue 和 about-disabled。
-- 扫描不改回文件名。分析时再按下面的规则分类，结果不入库，每次分析时计算：
+**about-disabled**:
+- If `About/About.xml` is absent but `About/About.xml.disabled` exists (RimCrow's disable method), read it as declaration, create Instance, mark `unloadable: about-disabled`. Such Instances cannot join plans; filter with `list --filter unloadable`.
+- Workshop residue folders containing only `About.xml.disabled` are both residue and about-disabled.
+- Scan does not restore filenames. Analysis classifies them below, computed per analysis without persistence:
 
-| 类别 | 条件 | 问题代码 | 说明 |
+| Category | Condition | Finding code | Description |
 | --- | --- | --- | --- |
-| 锁定版本 | 同一 Lineage 里有另一个活着、可加载、不在工坊的 Instance（RimCrow 的 `_<工坊ID>_` 副本、copy-local 副本、部署进 `Mods/` 的副本都算） | `mod.pinned`（info；上游有更新时 warning） | 不报 `mod.unloadable`；生效的是副本，工坊那份是“上游”。产品规则见 04 §7 |
-| 退订残留 | 工坊来源，且不在 ACF 的已订阅列表里 | `mod.hidden-residue`（warning） | 可移到回收站（08 §7） |
-| 单独隐藏 | 其余 | `mod.hidden`（warning） | 保持隐藏、恢复或移到回收站（08 §6） |
+| Locked version | Same Lineage has another live, loadable, non-Workshop Instance (RimCrow `_<Workshop-ID>_` copies, `copy-local` copies, and copies deployed in `Mods/` count) | `mod.pinned` (info; warning if upstream updated) | Do not report `mod.unloadable`; the copy is effective, Workshop copy is upstream. Product rules: 04 §7 |
+| Unsubscribed residue | Workshop source, absent from ACF subscription list | `mod.hidden-residue` (warning) | May recycle (08 §7) |
+| Independently hidden | Everything else | `mod.hidden` (warning) | Keep hidden, restore, or recycle (08 §6) |
 
-### 4.3 观测
+### 4.3 Observations
 
-每个 Mod 目录记录：
+Record for each Mod directory:
 
-| 类别 | 内容 |
+| Category | Contents |
 | --- | --- |
-| 位置 | `source_id`、相对路径、真实路径、是否链接、别名位置 |
-| 声明 | About.xml：`packageId`、`name`、`author`/`authors`、`modVersion`、`supportedVersions`、`description`、`modDependencies` 与 `modDependenciesByVersion`、`loadBefore`、`loadAfter`、`forceLoadBefore`、`forceLoadAfter`、`incompatibleWith`、`loadBeforeByVersion`、`loadAfterByVersion`、`incompatibleWithByVersion`、`descriptionsByVersion`；`About/PublishedFileId.txt`（去掉 BOM 和空白）；`LoadFolders.xml` 原文 |
-| 工坊 ID | 工坊类来源（`workshop`、`steamcmd`）取目录名；其他来源取 `PublishedFileId.txt` |
-| 外部状态 | 工坊类来源：ACF 中的 manifest ID、`timeupdated`、大小、是否订阅；目录中有 `.git` 时：HEAD commit（读 `HEAD`，再读对应 ref 文件或 `packed-refs`） |
-| 内容指纹 | 见 §4.4 |
-| 出身标记 | `.rimarcho/origin.json`（如果存在且 `origin_instance` 不为空） |
-| 状态 | `residue`、`unloadable` |
+| Location | `source_id`, relative path, real path, link flag, alias locations |
+| Declarations | `About.xml`: `packageId`, name, author/authors, `modVersion`, `supportedVersions`, description, `modDependencies`` and ``modDependenciesByVersion`, `loadBefore`, `loadAfter`, `forceLoadBefore`, `forceLoadAfter`, `incompatibleWith`, `loadBeforeByVersion`, `loadAfterByVersion`, `incompatibleWithByVersion`, `descriptionsByVersion`; `About/PublishedFileId.txt` (strip BOM/whitespace); original `LoadFolders.xml` |
+| Workshop ID | Workshop-type sources (workshop, steamcmd): directory name; others: `PublishedFileId.txt` |
+| External state | Workshop-type sources: ACF manifest ID, timeupdated, size, subscription status; with `.git`: `HEAD` commit (read `HEAD`, then ref file or `packed-refs`) |
+| Content fingerprint | See §4.4 |
+| Origin marker | `.rimarcho/origin.json` (if present and `origin_instance` nonempty) |
+| State | residue, unloadable |
 
-**About.xml 解析要容忍**：
-- 编码：按 BOM 识别 UTF-16 LE/BE 和 UTF-8 BOM，统一转成 UTF-8；没有 BOM 但 XML 声明写 `encoding="utf-16"` 时也按 UTF-16 读，实际内容是 UTF-8 的按实际内容读。同样适用于 LoadFolders.xml 和 Defs/Patches。
-- 标签大小写不同、`author` 和 `authors` 混用、`li` 里的空白、包名大小写。
-- `author` 拆分同游戏的 `ModMetaData.Authors`：按 ` and `、`&`、`,` 切开并去空白。
-- 依赖的 `li` 既可以是带 `packageId` 子元素的结构，也可以直接是文本。
-- About.xml 坏了也建 Instance，错误记在声明里，不中断扫描。
+**Tolerant `About.xml` parsing**:
+- Encoding: detect UTF-16 LE/BE and UTF-8 BOM, convert to UTF-8; without BOM but with XML `encoding="utf-16"`, read UTF-16, unless actual content is UTF-8, then follow actual encoding. Applies to `LoadFolders.xml` and Defs/Patches too.
+- Tolerate tag case, mixed author/authors, whitespace in li, package ID case.
+- Split author like game `ModMetaData.Authors`: on ` and `, `&`, `,`, trimming whitespace.
+- Dependency li may contain `packageId` child or plain text.
+- Malformed `About.xml` still creates Instance; record error in declaration without interrupting scan.
 
-packageId 一律存两份：原文 `package_id_raw`，以及小写的 `package_id`。缺 packageId 时按 §4.5 派生。
+Always store `packageId` twice: original `package_id_raw`, lowercase `package_id`. Derive missing `packageId` per §4.5.
 
-### 4.4 指纹与相似度
+### 4.4 Fingerprints and Similarity
 
-| 层 | 范围 | 计算 |
+| Layer | Scope | Calculation |
 | --- | --- | --- |
-| 结构清单 | 全部文件 | 相对路径 + 大小（+ mtime，只用于增量） |
-| 语义哈希 | `About/` 下全部文件、`LoadFolders.xml`、任何 `Defs/` 或 `Patches/` 目录下的 XML（含 `1.6/Defs/` 这样的版本目录）、任何 `Assemblies/` 目录下的 `.dll` | 每个文件取 xxh3-128 |
-| 快照哈希 | 以上两层 | 清单按小写路径排序，逐条哈希“小写路径 + 大小 + 语义哈希（如有）”，用于快速判断“有没有变”。路径小写，所以 Windows 下只改大小写的改名不算更新 |
+| Structural list | All files | Relative path + size (+ mtime, incremental only) |
+| Semantic hash | All files under `About/`, `LoadFolders.xml`, XML under any `Defs/` or `Patches/` (including version directories like `1.6/Defs/`), `.dll` under any `Assemblies/` | xxh3-128 per file |
+| Snapshot hash | Both layers above | Sort by lowercase path; hash each "lowercase path + size + semantic hash (if any)" to quickly detect changes. Lowercase paths mean case-only renames on Windows do not count as updates |
 
-- 贴图、音频等大文件只比大小，不读内容。
-- `.git`、`.svn`、`.rimarcho` 目录不计入指纹，所以锁定版本和原版的指纹相同。
-- Mod 内部的链接、设备文件不跟随；读不了的条目跳过。
+- Large files such as textures/audio compare size only, without content reads.
+- Exclude `.git`, `.svn`, `.rimarcho`, so locked versions and originals have identical fingerprints.
+- Do not follow links or device files within `Mods`; skip unreadable entries.
 
-**相似度**：在两个快照的语义文件集合上，取两项 Jaccard 系数中较大的一个：
-- `J(路径)`：只比较相对路径（小写）。用于识别“移动 + 更新”：内容变了，结构没变。
-- `J(哈希)`：只比较内容哈希，不看路径，按**多重集合**计算（几个内容相同的文件各算一次）。用于识别“重组”：文件挪进 `1.6/` 之类的子目录，内容不变。
+**Similarity**: over two snapshots' semantic file sets, take the larger of two Jaccard coefficients:
+- `J(paths)`: compare lowercase relative paths only. Recognizes "move + update": contents changed, structure unchanged.
+- `J(hashes)`: compare content hashes without paths, as a **multiset** (count each identical-content file separately). Recognizes "reorganization": files move into subdirectories like `1.6/` without content changes.
 
-两边都没有语义文件时相似度为 0。R3、R4 另外要求声明一致；R6 不把路径相同当成内容相同，使用 §5.1 的内容凭据检查。小 Mod 新增文件可能让相似度低于 0.85（例如 4 个语义文件的 Mod 新增 1 个后是 0.8），这时走 R6 待确认，是可以接受的保守结果。
+With no semantic files on either side, similarity is 0. R3/R4 additionally require matching declarations; R6 does not equate same paths with same content, using content evidence in §5.1. Adding files to small `Mods` can lower similarity below 0.85 (for example adding one to 4 semantic files gives 0.8); R6 then asks for confirmation, an acceptable conservative outcome.
 
-### 4.5 派生 packageId
+### 4.5 Derived packageId
 
-游戏允许很老的 Mod 不写 `<packageId>`。RimArcho 按游戏的 `ModMetaDataInternal.TryParsePackageId`（反编译 1.7.4982 确认，07 §7）派生，结果标为“推断”（`package_id_derived`）：
+Game permits very old `Mods` without `<packageId>`. RimArcho derives it like `ModMetaDataInternal.TryParsePackageId` (confirmed by decompiling 1.7.4982, 07 §7), marking "inferred" (`package_id_derived`):
 
 ```
 ConvertToASCII(author + hash3(description)) + "." + ConvertToASCII(name)
 ```
 
-- `author` 缺省为 `Anonymous`。
-- `hash3`：`description` 为空时是字符串 `none`；否则对 `description` 算 `GenText.StableStringHash`（初值 23，按 UTF-16 码元逐个 `n = n*31 + c`，int32 溢出回绕），转成十进制、去掉负号，取前 3 位。
-- `ConvertToASCII`：按 UTF-16 码元，字母和数字保留，其他字符 `c` 换成 `c % 25 + 65`。
-- 结果再转小写存入 `package_id`。
-- 官方内容（`official` 来源）缺 packageId 时：`Core` 用 `ludeon.rimworld`，其余用 `ludeon.rimworld.<小写目录名>`。
+- Default author: `Anonymous`.
+- `hash3`: empty description gives none; otherwise compute `GenText.StableStringHash` (initial 23, UTF-16 code units `n = n*31 + c`, int32 wraparound), decimal, remove minus sign, take first 3 digits.
+- `ConvertToASCII`: per UTF-16 code unit, retain letters/digits, replace other c with `c % 25 + 65`.
+- Lowercase result into `package_id`.
+- Official content (official source) missing `packageId`: `Core` uses `ludeon.rimworld`, others `ludeon.rimworld.<lowercase-directory-name>`.
 
-## 5. 对账
+## 5. Reconciliation
 
-输入：本次扫描的所有观测；数据库中现有的 Instance（含墓碑）；不扫描的来源列表。输出：每条观测对应的 Instance ID、变更事件、待确认项、本次消失的 Instance。对账是纯逻辑（`internal/identity`），读写数据库由调用方负责。
+Input: all current scan observations; database Instances (including tombstones); unscanned source list. Output: Instance ID per observation, change events, identity questions, Instances disappearing this scan. Reconciliation is pure logic (`internal/identity`); caller handles database I/O.
 
-### 5.1 规则 R1–R7
+### 5.1 Rules R1–R7
 
-已匹配的观测和 Instance 不再参与后续规则。
+Matched observations and Instances do not participate in later rules.
 
-| 规则 | 条件 | 结果 | 事件 |
+| Rule | Condition | Result | Event |
 | --- | --- | --- | --- |
-| R1 | 同一 `source_id` + 同一相对路径（不区分大小写） | 同一 Instance | 见 §5.3 |
-| R2 | 观测来自工坊类来源（`workshop`、`steamcmd`）；另有一个同样来自工坊类来源、目录名相同（即工坊 ID 相同）、本次还没出现的 Instance | 同一 Instance（例如工坊内容换了 Steam 库） | `moved` |
-| R5 | 观测带有 `.rimarcho/origin.json` | 新 Instance，加入记录中的 Lineage，标“确认”；例外见下 | `copied` |
-| R3 | 某个本次没出现的活 Instance 与观测相似度 ≥ 0.85，并且 packageId 或工坊 ID 声明一致 | 同一 Instance | `moved` |
-| R4 | 某个本次已出现的 Instance 与观测相似度 ≥ 0.6，并且 packageId 或工坊 ID 声明一致 | 新 Instance，加入对方的 Lineage，标“推断” | `copied` |
-| R6 | 某个墓碑或本次正在消失的 Instance 通过 `identity.QuestionScore` 的内容检查，且双向候选唯一（见下） | 新 Instance、新 Lineage，同时生成待确认项“这是不是 #xxxx 回来了？” | `discovered` |
-| R7 | 其余 | 新 Instance，新 Lineage | `discovered` |
+| R1 | Same `source_id` + relative path (case-insensitive) | Same Instance | See §5.3 |
+| R2 | Observation from Workshop-type source (workshop, steamcmd); another Instance from a Workshop-type source, same directory name (same Workshop ID), not seen this scan | Same Instance (for example Workshop content moved Steam libraries) | moved |
+| R5 | Observation has `.rimarcho/origin.json` | New Instance, join recorded Lineage, mark "confirmed"; exceptions below | copied |
+| R3 | A live Instance not seen this scan has similarity ≥ 0.85 to observation and matching `packageId` or Workshop ID declaration | Same Instance | moved |
+| R4 | An Instance already seen this scan has similarity ≥ 0.6 to observation and matching `packageId` or Workshop ID declaration | New Instance, join its Lineage, mark "inferred" | copied |
+| R6 | A tombstone or currently disappearing Instance passes `identity.QuestionScore` content check, with unique candidates in both directions (below) | New Instance, new Lineage, and identity question "is this #xxxx returning?" | discovered |
+| R7 | Everything else | New Instance, new Lineage | discovered |
 
-- **声明一致**：非空 packageId（不区分大小写）相同，或有效工坊 ID 相同；空白、`0` 和非数字工坊 ID 不算一致。R2 的目录名也必须是有效工坊 ID。
-- **R5 先于 R3、R4**：有出身标记时以标记为准，即使副本被大改、相似度已经认不出来。
-- **R5 的改名例外**：如果某个本次没出现的活 Instance，它的最新快照带有同一份出身标记（`origin_instance` 相同），且相似度 ≥ 0.85，就判为“副本被改名”：同一 Instance，发 `moved`，不新建副本。否则玩家给锁定版本改个目录名就会多出一个 Instance。
-- **R5 的 Lineage**：优先用标记里的 `origin_lineage`（本环境里存在时）；否则用 `origin_instance` 当前所在的 Lineage；两者都找不到时新建 Lineage（仍发 `copied`）。
-- R2–R5 多个候选都满足时，取相似度最高的。
-- **R6 内容凭据**：只用 Defs / Patches XML 和 Assemblies DLL 的内容哈希；不计 About 下文件、预览图和 LoadFolders.xml，排除空内容，重复内容只算一次，不依赖路径。内容集合 Jaccard ≥ 0.6；声明一致时至少有一份相同内容，否则至少三份不同的相同内容。名字、作者、文件夹名、贴图的共同路径都不能单独触发提问。实现：`identity.QuestionScore`、`identity.CompareFiles`。
-- **R6 歧义保护**：一个新观测有多个合格候选，或一个候选被多个新观测选中时，都按 R7 独立记录，不生成提问；不任选最高分，也不逐对提问。
-- 标记“推断”“确认”存在 Instance 的 `lineage_basis` 上（§6）。
+- **Matching declarations**: same nonempty `packageId` (case-insensitive), or valid Workshop ID; blank, `0`, and nonnumeric Workshop IDs do not match. R2 directory names must also be valid Workshop IDs.
+- **R5 before R3/R4**: origin markers are authoritative even after major edits make similarity unrecognizable.
+- **R5 rename exception**: if a live Instance not seen this scan has the same origin marker in its latest snapshot (same `origin_instance`) and similarity ≥ 0.85, treat as "copy renamed": same Instance, emit moved, no new copy. Otherwise renaming a locked version's directory would create another Instance.
+- **R5 Lineage**: prefer marker `origin_lineage` if it exists in this environment; otherwise current Lineage of `origin_instance`; if neither exists, create Lineage (still emit copied).
+- For multiple candidates in R2–R5, choose highest similarity.
+- **R6 content evidence**: only content hashes of Defs / Patches XML and Assemblies DLL; exclude About files, previews, `LoadFolders.xml`, empty content; count duplicates once; path-independent. Content-set Jaccard ≥ 0.6; matching declarations require at least one shared content, otherwise at least three distinct shared contents. Names, authors, folder names, and common texture paths alone cannot trigger a question. Implementation: `identity.QuestionScore`, `identity.CompareFiles`.
+- **R6 ambiguity guard**: if a new observation has multiple eligible candidates or multiple observations choose one candidate, record independently through R7 without questions; do not pick highest score or ask per pair.
+- Store "inferred"/"confirmed" in Instance `lineage_basis` (§6).
 
-### 5.2 执行顺序与候选范围
+### 5.2 Execution Order and Candidate Scope
 
-**两段执行**：
-1. R1、R2、R5、R3 按规则逐条对全部观测执行，只和数据库里已知的 Instance 匹配。
-2. 剩下的观测逐个走 R4 → R6 → R7。
+**Two phases**:
+1. Run R1, R2, R5, R3 rule by rule over all observations, matching only known database Instances.
+2. Run remaining observations individually through R4 → R6 → R7.
 
-这样，同一次扫描中刚由 R7 建立的 Instance 也能成为 R4 的“原版”。没有这一点，首次扫描时工坊版和 `Mods/` 里的副本、Steam 和 SteamCMD 里的同一个工坊 ID，都会被判成两个无关的 Lineage。
+This allows Instances just created by R7 in this scan to be R4 originals. Otherwise the first scan would assign unrelated Lineages to Workshop originals and `Mods/` copies, or the same Workshop ID in Steam and SteamCMD.
 
-**观测的处理顺序**：来源按 workshop → steamcmd → official → local → extra，同类来源按环境里的顺序，最后按小写相对路径。让原版先于副本建立。
+**Observation order**: workshop → steamcmd → official → local → extra; same-kind sources follow environment order, then lowercase relative path. Establish originals before copies.
 
-**候选范围**：
+**Candidate scope**:
 
-| 规则 | 候选 |
+| Rule | Candidates |
 | --- | --- |
-| R2 | 工坊类来源里本次没出现的 Instance，**包括墓碑**；活的优先。匹配墓碑时发 `reappeared`，位置变了再加 `moved` |
-| R5 改名例外、R3 | 本次扫描前还活着、这次没出现的 Instance；不含墓碑（墓碑留给 R6） |
-| R4 | 本次已出现的 Instance，包括本次新建的 |
-| R6 | 墓碑，加上本次正在消失的 Instance |
+| R2 | Workshop-type Instances not seen this scan, **including tombstones**; prefer live. Matching tombstones emit reappeared, plus moved if location changed |
+| R5 rename exception, R3 | Instances live before scan and not seen this time; no tombstones (reserved for R6) |
+| R4 | Instances already seen this scan, including newly created |
+| R6 | Tombstones plus currently disappearing Instances |
 
-不扫描的来源（`missing`、`rebind-pending`）下的 Instance 不进任何候选，也不转墓碑。
+Instances in unscanned sources (missing, `rebind-pending`) are excluded from all candidates and do not become tombstones.
 
-**方向说明**：R4 的“原版”是先被处理的那份。RimCrow 停用的工坊原版若比部署副本晚建成 Instance（例如 about-disabled 支持上线前就已扫描过副本），事件里会把工坊那份记为副本的“推断副本”。这不影响 Lineage，主 Instance 仍按 §6 的顺序选出。
+**Direction**: R4 "original" is whichever copy was processed first. If a RimCrow-disabled Workshop original becomes an Instance after a deployed copy (for example copy scanned before about-disabled support), events record the Workshop copy as an "inferred copy" of the deployed one. Lineage is unaffected; primary Instance still follows §6 priority.
 
-### 5.3 事件
+### 5.3 Events
 
-**身份事件**：
+**Identity events**:
 
-| 事件 | 何时 | detail |
+| Event | When | detail |
 | --- | --- | --- |
-| `discovered` | R6、R7 新建 | `src:<标签> <相对路径>` |
-| `copied` | R4、R5 新建 | R4：`inferred copy of #<原版>`；R5：`origin #<来源 Instance> (.rimarcho/origin.json)` |
-| `moved` | R2、R3、R5 改名例外 | `src:<旧标签> <旧路径> → src:<新标签> <新路径>` |
-| `reappeared` | 墓碑被 R1/R2 匹配回来，或玩家对待确认项答 `same` | `src:<标签> <相对路径>` |
-| `disappeared` | 扫描结束仍未出现的活 Instance（来源被扫描时） | `src:<标签> <相对路径>`；随后转为墓碑 |
-| `updated` | 匹配到已有 Instance，且快照哈希变了（包括 R2/R3 的移动加更新） | — |
+| `discovered` | R6, R7 creation | `src:<label> <relative-path>` |
+| `copied` | R4, R5 creation | R4: `inferred copy of #<original>`; R5: `origin #<source-Instance> (.rimarcho/origin.json)` |
+| `moved` | R2, R3, R5 rename exception | `src:<old-label> <old-path> → src:<new-label> <new-path>` |
+| `reappeared` | R1/R2 matches a tombstone, or player answers same to identity question | `src:<label> <relative-path>` |
+| `disappeared` | Live Instance still unseen after scan (its source was scanned) | `src:<label> <relative-path>`; then tombstone |
+| `updated` | Existing Instance matched and snapshot hash changed (including R2/R3 move + update) | — |
 
-**字段事件**：只在快照哈希变了时，比较新旧快照的声明，分别发出：
+**Field events**: only when snapshot hash changes, compare old/new declarations and emit separately:
 
-| 事件 | 比较 | detail |
+| Event | Comparison | detail |
 | --- | --- | --- |
-| `package-id-changed` | 小写 packageId | `pkg:<旧> → pkg:<新>` |
-| `renamed` | `name` | `"<旧>" → "<新>"` |
-| `author-changed` | 作者列表 | `<旧, …> → <新, …>` |
-| `version-support-changed` | `supportedVersions` | `<旧> → <新>`（空格分隔） |
-| `dependencies-changed` | 全部依赖的 packageId（含按版本的依赖，小写去重排序） | `+pkg:<x> -pkg:<y>` |
-| `load-rules-changed` | `loadBefore`/`loadAfter`/`forceLoad*`/`incompatibleWith` 及其按版本的形式（小写排序后比较） | — |
+| `package-id-changed` | Lowercase `packageId` | `pkg:<old> → pkg:<new>` |
+| `renamed` | name | `"<old>" → "<new>"` |
+| `author-changed` | Author list | `<old, …> → <new, …>` |
+| `version-support-changed` | `supportedVersions` | `<old> → <new>` (space-separated) |
+| `dependencies-changed` | All dependency packageIds (including versioned, lowercased, deduplicated, sorted) | `+pkg:<x> -pkg:<y>` |
+| `load-rules-changed` | `loadBefore`/`loadAfter`/`forceLoad*`/`incompatibleWith` and versioned forms (lowercase, sort, compare) | — |
 
-- 一次扫描可能对同一 Instance 发出多个事件。所有事件共用一个扫描批次 ID（`scan:<n>`）。
-- 每个事件带前后两个快照的引用（`before_snapshot`、`after_snapshot`），可以下钻到文件级差异。变化记录（06 §2.9）把一个 Mod 在一段时间里的事件合成一行：比较最早的 `before_snapshot` 和最新的 `after_snapshot` 的声明和文件列表，`load-rules-changed` 的具体差异也是从这两份声明里比出来的。
-- `_Archo_` 链接的出现和消失只改别名位置，不发事件（§3.3）。
-- 事件在 GUI 的“Mod 库存 › 变化”（06 §2.9）、`archo changes [<引用>] [--since …] [--all]`（默认显示最近一次扫描，05 §4）和 MCP 里查看。
+- One scan may emit several events for one Instance. All share a scan ID (`scan:<n>`).
+- Each event references before/after snapshots (`before_snapshot`, `after_snapshot`), allowing file-level diffs. Change history (06 §2.9) combines a Mod's events over a period into one row: compare declarations/file lists of earliest `before_snapshot` and latest `after_snapshot`; detailed `load-rules-changed` differences come from those declarations too.
+- `_Archo_` link appearance/disappearance changes alias locations only, without events (§3.3).
+- View events in GUI "mod library › changes" (06 §2.9), `archo changes [<reference>] [--since …] [--all]` (latest scan by default, 05 §4), and MCP.
 
-**快照写入条件**：只有快照哈希、ACF manifest、git HEAD 或出身标记变了才写新快照。内容没变但 mtime 变了，直接更新当前快照里各文件的 mtime。只有 ACF manifest 变了时写新快照，但不发 `updated`。
+**Snapshot write conditions**: write a new snapshot only when snapshot hash, ACF manifest, git `HEAD`, or origin marker changes. If only mtime changes, update file mtimes in current snapshot directly. ACF-manifest-only changes create a snapshot without updated.
 
-### 5.4 待确认项
+### 5.4 Identity Questions
 
-- 由 R6 生成，记录观测对应的新 Instance、候选 Instance、内容重合度及小型比较摘要（相同内容数、两边内容数、声明差异）。摘要随问题存下，页面构建只读问题记录，不查文件清单。
-- 每次成功扫描在 `Store.ApplyScan` 的同一事务中重新检查可见的未回答项：用两边当前快照应用 R6 内容检查，凭据不足、引用不存在或同一个 Mod 涉及多条合格提问时删除未回答项。只用已存快照判断，所以本次没读到的来源（部分扫描、别的游戏的 `Mods/`）里的项一样检查（2026-10-28 起；之前暂留，主机上 67 条关于同一个 VRE 补丁的错问题因此一直留着）。已回答项（含玩家的 same / copy / unrelated 决定）不参与清理。不修改 Mod、列表、历史或分组。
-- 查看：`archo identity [list] [--all]`（不带子命令也列出；`--all` 含已处理的）、`archo identity why q:<n>`；GUI 在“能不能跑 › 要你确认”及编辑器的问题面板显示（06 §2.4、§5）。CLI/MCP 列出、查看和回答时附相同的简要比较。
-- **比较凭据按需读取**：`Store.QuestionEvidence` 从已存的观测快照和候选在提问批次时的快照读取声明与文件记录。文件夹及从目录取得的工坊编号用当前记录；记录已清理时明确说无法比较。`cmds.CompareIdentity` / `IdentityReasonLines` 共用比较：省略两边都缺失的字段，只有一条内容重合结论，相同文件最多五个，其余报数量；不输出匹配方法说明。界面结构见 [06 §5](06-ui/4-details-and-feedback.md#5-需要处理)。读取不扫 Mod 文件、不联网。
-- 回答：`archo identity resolve q:<n> same|copy|unrelated`，界面上是“是同一个”“是副本”“无关”。
-  - `same`：新 Instance 并入候选。候选保留自己的 ID、Lineage 和历史，接管新的位置、快照、事件和别名；在同一事务中重写全部方案的当前列表、撤销 / 重做、历史版本和暂存项及锚点，重复条目留首次位置，缺失条目原样保留；启动记录的列表指纹跟着重写。`id_alias` 保存被合并的 ID 及变空的 Lineage 映射，整合包清单和 origin 标记读取时解析到保留者，文件本身不改；删除新 Instance 的 `discovered` 事件，在该问题所属的扫描批次下补一条 `reappeared`；涉及这两个 Instance 的其他待确认项标为 `superseded`。如果候选在此期间已经被 R1/R2 匹配回来，拒绝 `same`。
-  - `copy`：新 Instance 加入候选的 Lineage，标“确认”。
-  - `unrelated`：只关闭问题。
+- R6 records the observation's new Instance, candidate Instance, content overlap, and a small comparison summary (shared content count, each side's content count, declaration differences). Store summary with question; page construction reads question records only, not file lists.
+- Every successful scan rechecks visible unanswered questions in the same `Store.ApplyScan` transaction: apply R6 content checks to current snapshots; delete unanswered questions with insufficient evidence, missing references, or multiple eligible questions involving the same Mod. Use stored snapshots only, so check unscanned sources too (partial scans, other games' `Mods/`) (since 2026-10-28; previously retained, leaving 67 incorrect questions about one VRE patch on the host). Exclude answered questions, including player same / copy / unrelated decisions. Do not modify `Mods`, lists, history, or grouping.
+- View: `archo identity [list] [--all]` (no subcommand also lists; `--all` includes processed), `archo identity why q:<n>`; GUI "can it run › needs your answer" and editor problems panel (06 §2.4, §5). CLI/MCP list, inspect, and answer include the same brief comparison.
+- **Load comparison evidence on demand**: `Store.QuestionEvidence` reads declarations/file records from stored observation snapshot and candidate snapshot at question scan. Folders and directory-derived Workshop IDs use current records; explicitly say comparison unavailable if records were cleaned. `cmds.CompareIdentity` / `IdentityReasonLines` share comparison: omit fields absent on both sides, give one content overlap conclusion, up to five shared files plus remaining count; no matching-method explanation. UI structure: [06 §5](06-ui/4-details-and-feedback.md#5-%E9%9C%80%E8%A6%81%E5%A4%84%E7%90%86). No Mod file scan or network reads.
+- Answer: `archo identity resolve q:<n> same|copy|unrelated`; UI "same", "a copy", "unrelated".
+  - same: merge new Instance into candidate. Candidate keeps ID, Lineage, history, takes new location, snapshots, events, aliases; rewrite current lists, undo/redo, historical versions, staging entries/anchors across all plans in one transaction; retain first duplicate position and unchanged missing entries; rewrite launch list fingerprints too. `id_alias` maps merged ID and emptied Lineage; pack manifests/origin markers resolve to survivor without modifying files; delete new Instance's discovered, add reappeared under question's scan; mark other questions involving both Instances superseded. Refuse same if R1/R2 already matched candidate back meanwhile.
+  - copy: join candidate Lineage, mark "confirmed".
+  - unrelated: close question only.
 
-### 5.5 墓碑与 gc
+### 5.5 Tombstones and gc
 
-- 消失的 Instance 转为墓碑，记下 `tombstone_at`。墓碑保留它的 Lineage、规则、别名和历史快照。
-- 默认保留 90 天，可在 `config.toml` 的 `tombstone_days` 修改（非负整数）。
-- `archo gc [--dry-run]`（设置页“清理墓碑”）清除：
-  - 过期的墓碑，连同它的事件；未处理的待确认项引用的墓碑不清除；
-  - 既不是当前快照、也没有被任何事件或待确认项引用的旧快照；
-  - 因此变空的 Lineage。
-- `--dry-run` 只计数。
-- 墓碑 gc 只由玩家手动执行。定期数据库整理不改变墓碑和身份行为，只按 §7.1 清理旧文件清单。
+- Disappeared Instances become tombstones with `tombstone_at`, retaining Lineage, rules, aliases, historical snapshots.
+- Default retention 90 days, configurable with nonnegative `tombstone_days` in `config.toml`.
+- `archo gc [--dry-run]` (settings "clean tombstones") removes:
+  - Expired tombstones and events, except those referenced by unanswered questions;
+  - Old snapshots neither current nor referenced by events/questions;
+  - Lineages made empty.
+- `--dry-run` counts only.
+- Players run tombstone gc manually. Periodic database maintenance does not change tombstone/identity behavior; it only cleans old file lists per §7.1.
 
-## 6. Lineage（含锁定版本）
+## 6. Lineage (Including Locked Versions)
 
-- 每个新 Instance 默认创建自己的 Lineage（`lineage_basis` 为空，表示“创始成员”）。
-- 并入已有 Lineage 的途径和标记：
+- Every new Instance creates its own Lineage by default (empty `lineage_basis` means "founding member").
+- Ways to join existing Lineages and markers:
 
-| 途径 | `lineage_basis` |
+| Method | `lineage_basis` |
 | --- | --- |
-| R4 推断副本 | `inferred`（推断） |
-| R5 出身标记、待确认项答 `copy` | `confirmed`（确认） |
-| 玩家手动拆分、合并 | `manual` |
+| R4 inferred copy | inferred |
+| R5 origin marker, copy answer | confirmed |
+| Manual split/merge | manual |
 
-- 手动拆分合并：`archo lineage split <引用>`（把一个 Instance 移到它自己的新 Lineage）、`archo lineage merge <引用> <引用>`（把第二个 Lineage 并入第一个）。
-- 拆分时复制原组的别名、Mod 备注和标签到新组，此后各自编辑；副本备注仍随 Instance 保留。用户规则和问题忽略留在原组。修改身份与复制玩家数据在同一事务中完成，Instance ID、路径、快照和方案条目不变。已有实例重扫时保留手动分组；出身标记和上游更新关系继续保留。
-- **主 Instance**：用于显示 Lineage 的默认名称。优先级：活着的 → 工坊类来源 → 最早 `first_seen` → ID。
-- **什么挂在 Lineage 上**：用户规则、玩家数据（别名、标签、备注）挂在 Lineage 上，原版和锁定版本共享，改名后也不丢；方案条目挂在 Instance 上（04 §1、04 §8，理由见 00a §4.3）。
-- **已知难题的处理**：作者分叉出新 Mod、工坊 ID 不同但 packageId 相同 → 不同 Lineage，分析层报“包名重复”；同一工坊 ID 同时在 Steam 工坊和 SteamCMD 目录 → 两个 Instance、同一 Lineage。
+- Manual split/merge: `archo lineage split <reference>` (move Instance into its own new Lineage), `archo lineage merge <reference> <reference>` (merge second Lineage into first).
+- Splitting copies original alias, Mod notes, tags into new group, then edits are independent; copy notes stay with Instance. User rules/finding ignores stay with original group. Change identity and copy player data in one transaction; Instance ID, path, snapshots, plan entries stay unchanged. Rescans preserve manual grouping; origin markers/upstream update relationships remain.
+- **Primary Instance**: default Lineage display name; priority: live → Workshop-type source → earliest `first_seen` → ID.
+- **Lineage attachments**: user rules and player data (aliases, tags, notes) belong to Lineage, shared by originals/locked versions and survive renames; plan entries belong to Instances (04 §1, 04 §8; rationale 00a §4.3).
+- **Known hard cases**: author forks a new Mod with different Workshop ID but same `packageId` → separate Lineages, analysis reports duplicate package ID; same Workshop ID in Steam Workshop and SteamCMD → two Instances, one Lineage.
 
-**锁定版本的身份**（产品规则见 04 §7）：
-- 锁定版本是同一 Lineage 下、经 R5 确认的一个新 Instance。创建时（`copy-local` 是底层命令）把 Mod 复制到 `local` 来源（默认目录名 `<原目录名>_local`），并在副本里写 `.rimarcho/origin.json`：
+**Locked version identity** (product rules 04 §7):
+- Locked version is a new R5-confirmed Instance in the same Lineage. Creation (`copy-local` is low-level command) copies Mod to local source (default `<original-directory-name>_local`) and writes `.rimarcho/origin.json`:
 
 ```json
 {
-  "origin_instance": "<来源 Instance 完整 ID>",
-  "origin_lineage": "<Lineage 完整 ID>",
-  "workshop_id": "<工坊 ID，可空>",
-  "origin_snapshot": "<复制时的快照哈希，十六进制>",
+  "origin_instance": "<full source Instance ID>",
+  "origin_lineage": "<full Lineage ID>",
+  "workshop_id": "<Workshop ID, may be empty>",
+  "origin_snapshot": "<snapshot hash at copy time, hexadecimal>",
   "copied_at": "2026-10-21T08:00:00Z"
 }
 ```
 
-- 下次扫描时 R5 把它挂回原 Lineage，标“确认”，发 `copied`。玩家之后改了副本的目录名，按 §5.1 的改名例外判为 `moved`，仍是同一个锁定版本。
-- RimArcho 从不往工坊目录写标记文件，因为 Steam 校验或更新时会删掉它。
-- 玩家手动复制的副本没有标记，靠 R4 推断，标“推断”。
-- RimCrow 风格（工坊那份改成 `About.xml.disabled`，`Mods/` 里放一份副本）：两份经 R4 进同一 Lineage；分析时按 §4.2 识别为锁定版本。
-- `unpin`（解除锁定）把方案里的副本换回工坊版，不改身份数据；副本留在原处（04 §7）。
+- Next scan R5 rejoins original Lineage, marks "confirmed", emits copied. Later directory rename follows §5.1 exception as moved, retaining locked version identity.
+- RimArcho never writes Workshop marker files, because Steam verification/updates delete them.
+- Manual player copies have no marker; R4 marks "inferred".
+- RimCrow style (Workshop `About.xml.disabled`, copy in `Mods/`): R4 joins both to one Lineage; analysis recognizes locked version per §4.2.
+- unpin swaps plan copy back to Workshop version without changing identity data; copy stays in place (04 §7).
 
-## 7. 存储
+## 7. Storage
 
-**迁移 v18**：新增 `managed_link` 及阶段/路径索引，保留既有实例和别名；不把扫描别名迁成已证实的创建记录。`intent` 在链接文件操作前提交，后续为 `detached`、`records-updated`、`complete`；安全回滚记 `rolled-back`。启动只读核对未完成行，问题页和 scan 报 `mods.link-recovery`；只经 `links repair` 的既有确认入口恢复，不能静默重建。
+**Migration v18**: add `managed_link` and phase/path indexes, retain existing Instances/aliases; do not convert scan aliases into proven creation records. Commit intent before link file operations, then detached, `records-updated`, complete; safe rollback records `rolled-back`. Startup checks unfinished rows read-only; problems page/scan report `mods.link-recovery`; recover only through existing confirmed `links repair`, never silent rebuilding.
 
-**迁移 v22**：`identity_question.summary` 保存 §5.4 的小型比较摘要；升级时从已存快照补齐未回答问题的摘要，不改变问题状态或玩家答案。实现与版本常量见 `store.migrateV22`、`store.SchemaVersion`。
+**Migration v22**: `identity_question.summary` stores §5.4's small comparison summary; backfill unanswered questions from stored snapshots without changing states/answers. Implementation/version: `store.migrateV22`, `store.SchemaVersion`.
 
-**迁移 v24**：为未回答项加索引 `identity_question_open(status, environment_id)`；升级时按环境把所有未回答项照 §5.4 的扫描检查判一遍（`store.migrateV24`），清掉之前因来源没被扫描而留下的错问题，不动已回答项。
+**Migration v24**: add `identity_question_open(status, environment_id)` index for unanswered questions; upgrade rechecks all unanswered questions per environment using §5.4 scan checks (`store.migrateV24`), removing old incorrect questions retained because sources were unscanned, without touching answers.
 
-**迁移 v25**：删掉事实表上只按单列的旧索引（`def_fact_name`、`type_fact_name`、`type_fact_instance`、`harmony_fact_instance`、`harmony_fact_target`：所有查询都带 `game_mm`，用不到它们），补建 `def_fact_mm_named`（2026-10-22 两个分支都用了 v15，走过贴图那个 v15 的库没有它），把已存的日志报告压缩（03 §6.5）。实现见 `store.schemaV25`、`store.migrateV25`。
+**Migration v25**: drop old single-column fact indexes (`def_fact_name`, `type_fact_name`, `type_fact_instance`, `harmony_fact_instance`, `harmony_fact_target`: all queries include `game_mm` and cannot use them), add `def_fact_mm_named` (two branches used v15 on 2026-10-22; databases taking texture v15 lack it), compress stored log reports (03 §6.5). Implementation: `store.schemaV25`, `store.migrateV25`.
 
-**迁移 v27**：`snapshot` 加 `kinds`、`langs`；升级时按主键顺序读一遍已存的 `snapshot_file`，给每个快照补算两列（`store.migrateV27`），结果与之前的查询相同（`TestDeriveContentMatchesOldQueries`、`TestMigrateV27`）。文件行已被 §7.1 清理的旧快照两列是 0 和空；它们不是当前快照，没有读者。不 VACUUM。
+**Migration v27**: add snapshot kinds, langs; read stored `snapshot_file` once in primary-key order to derive both per snapshot (`store.migrateV27`), matching previous queries (`TestDeriveContentMatchesOldQueries`, `TestMigrateV27`). Old snapshots whose files were cleaned by §7.1 get 0/empty; they are not current and have no readers. No VACUUM.
 
-**迁移 v28**（2026-10-31）：非语义文件（DLL 除外）的清单从 `snapshot_file` 移到 `snapshot_list`，每个快照一个压缩块；事实行的文件路径换成本集合文件列表的下标（03 §3）。一个事务完成：按 `(snapshot_id, rel_path)` 顺序读一遍 `snapshot_file`，在内存里拼好每个快照的块，写入后删掉移走的行（删掉的行数必须等于移走的，否则回滚）；`fact_set` 只加 `files` 列，五张事实表各自改名、建新表、按 rowid 分段复制、删旧表，rowid 和行顺序不变，索引最后重建（`store.migrateV28`）。迁移前后各个读者的结果相同（`TestMigrateV28`；块的读写与之前的行逐字节相同，`TestFileListsMatchRows`）。不 VACUUM：旧页成为空闲页，留给 §7.2 回收。合成库（07 §6.2）一次约 5–8 秒。
+**Migration v28** (2026-10-31): move non-semantic file lists (except DLL) from `snapshot_file` to `snapshot_list`, one compressed block per snapshot; replace fact paths with per-set file-list indexes (03 §3). One transaction: read `snapshot_file` once ordered by `(snapshot_id, rel_path)`, assemble each block in memory, write then delete moved rows (deleted count must equal moved count, otherwise rollback); only add files column to `fact_set`; rename each of five fact tables, create replacement, copy in rowid chunks, delete old table, retaining rowids/order, rebuild indexes last (`store.migrateV28`). Reader results unchanged (`TestMigrateV28`; block reads/writes byte-identical to old rows, `TestFileListsMatchRows`). No VACUUM: old pages become free, reclaimed by §7.2. Synthetic database (07 §6.2): about 5–8 seconds.
 
-**启动时的升级进度**：打开数据库时要迁移，就显示进度（`store.OpenUpgrading`、`app.OpenWith`、`cli.upgradeReport`）。300 毫秒内完成的不显示。`RimArcho.exe` 没有控制台，显示一个小的原生窗口（`internal/surface/upgradewin`：标题 RimArcho，一行文字和进度条，不能关闭，跟着系统 DPI 和界面语言），迁移结束就关；TUI 在接管终端前往 stderr 写同一行（终端里原地刷新百分比，界面语言）；CLI 和 MCP 往 stderr 写英文一行“Upgrading the RimArcho database (schema 27 → 28)…”，结束时写用时。stdout 不受影响，MCP 的协议流不会多出内容。进度按行数：v28 的总数是 `snapshot_file` 加五张事实表的行数，每处理 5 万行报一次；之前的迁移不报行数，只显示“正在升级”。
+**Startup upgrade progress**: display progress when opening requires migration (`store.OpenUpgrading`, `app.OpenWith`, `cli.upgradeReport`); hide if complete within 300 ms. `RimArcho.exe` has no console; show small native window (`internal/surface/upgradewin`: RimArcho title, one text line/progress bar, cannot close, system DPI/interface language), close on migration completion; TUI writes same line to stderr before taking terminal (in-place percentage refresh, interface language); CLI/MCP write one English stderr line "Upgrading the RimArcho database (schema 27 → 28)…", then elapsed time. stdout unchanged; MCP protocol stream gets no extra content. Row-based progress: v28 total is `snapshot_file` plus five fact tables, report each 50,000 rows; earlier migrations show only "upgrading" without row counts.
 
-**事实缓存迁移与清理**：v26 的集合结构、原地转换和引用清理规则见 03 §3；`Store.PruneFacts(now)` 是独立整理入口。删除环境和清理墓碑也在同一事务中清理，共享实例仍由可见环境和其分析槽位保留。
+**Fact cache migration and cleanup**: v26 set structure, in-place conversion, reference cleanup: 03 §3; `Store.PruneFacts(now)` is independent maintenance entry point. Environment removal/tombstone cleanup also prune in the same transaction; visible environments and analysis slots retain shared Instances.
 
-SQLite（modernc，WAL + `synchronous=NORMAL` + `journal_size_limit` 16 MB）。一次大写入之后，WAL 文件在下次复位时截回 16 MB，不会在任何连接还开着时一直停在最大尺寸；分析写完、扫描写了新快照之后再做一次不等待的 `wal_checkpoint(TRUNCATE)`（`Store.TruncateWAL`）。实测：一次约 38 万行的分析在 GUI 开着时会留下约 100 MB 的 WAL。身份相关的表（`environment_id` 为空 = 所有环境共用）：
+SQLite (modernc, WAL + `synchronous=NORMAL` + `journal_size_limit` 16 MB). After a large write, next reset truncates WAL to 16 MB instead of retaining peak size while connections remain open; after analysis writes or scans creating snapshots, also attempt nonwaiting `wal_checkpoint(TRUNCATE)` (`Store.TruncateWAL`). Measured: about 380,000 analysis rows leave about 100 MB WAL while GUI is open. Identity tables (empty `environment_id` = shared across all environments):
 
 ```
 environment(id, name UNIQUE, game_root, user_data_root, game_version, launch, created_at, current_plan)
 source(id, environment_id, kind, label, root, status[ok|missing|rebind-pending|retired], pending_root,
-       UNIQUE(environment_id, label))                       -- 共用文件夹 environment_id=''
-lineage(id, environment_id, primary_instance_id, created_at) -- 全部 environment_id=''
+       UNIQUE(environment_id, label))                       -- shared folders: environment_id=''
+lineage(id, environment_id, primary_instance_id, created_at) -- all environment_id=''
 instance(id, environment_id, lineage_id, lineage_basis[''|inferred|confirmed|manual], source_id, rel_path,
          real_path, status[live|tombstone], residue, unloadable, current_snapshot_id,
          first_seen, last_seen, tombstone_at)
@@ -531,92 +531,92 @@ instance_alias(instance_id, source_id, rel_path, real_path)
 snapshot(id, instance_id, scan_id, snapshot_hash, package_id, package_id_raw, name, authors,
          workshop_id_declared, supported_versions, decl_blob, acf_manifest, acf_time_updated, acf_size,
          git_head, origin, file_count, total_size, semantic_count, kinds, langs)
-snapshot_file(snapshot_id, rel_path, size, mtime, hash NULL)   -- 语义文件（hash 只给它们）和 DLL
-snapshot_list(snapshot_id PRIMARY KEY, n, data)               -- 其余文件：每个快照一个压缩块（v28）
+snapshot_file(snapshot_id, rel_path, size, mtime, hash NULL)   -- semantic files (only these have hashes) and DLL
+snapshot_list(snapshot_id PRIMARY KEY, n, data)               -- remaining files: one compressed block per snapshot (v28)
 scan(id, environment_id, started_at, finished_at, full, stats)
 change_event(id, scan_id, instance_id, kind, before_snapshot, after_snapshot, detail)
 identity_question(id, environment_id, scan_id, instance_id, observation_snapshot_id, candidate_instance_id,
                   score, status[open|resolved], resolution[same|copy|unrelated|superseded], resolved_at, summary)
-meta(key, value)   -- schema_version、当前环境等
-id_alias(old_id PRIMARY KEY, new_id, kind[instance|lineage])  -- 迁移或 same 回答合并掉的 ID（§0.1、§5.4）
+meta(key, value)   -- schema_version, current environment, etc.
+id_alias(old_id PRIMARY KEY, new_id, kind[instance|lineage])  -- IDs merged by migration or same answer (§0.1, §5.4)
 ```
 
-- `decl_blob` 保存 About.xml 的规范化结构（JSON），供分析层使用。
-- **快照的文件清单分两处**（v28，`store/filelist.go`）：有哈希的语义文件和 `.dll`（任意位置，大小写只折叠 ASCII）是 `snapshot_file` 的行；其余的（贴图、音效、Languages、`.meta` 等）合成一个块，存在 `snapshot_list`：按 `rel_path` 排序，每项是与上一项相同的前缀长度、其余部分和大小（不存 mtime：它只服务于增量扫描，而增量扫描只读带哈希的行，`Store.CurrentFiles`），整块 zstd 压缩，`n` 是项数。块**不去重**：同内容新外部状态复制清单时整块复制；同一快照刷新 mtime 时整块重写。没有非语义文件的快照没有块。读者：`Store.SnapshotFiles`（变更页的文件差异）把两处合并、按路径排序；`Store.InstanceFiles`（日志找贴图 / DLL 的提供方）先查行，模式以 `.dll` 结尾时不读块，否则解开当前快照的块，在 Go 里按 SQLite `LIKE` 的规则匹配（`%`、`_`，只折叠 ASCII 大小写）。DLL 留在行里，是因为日志按 DLL 名找 Mod（`%x.dll`）是最常见的查询，不该为它解开所有块。
-- `snapshot.kinds`、`snapshot.langs` 是写快照时从它的文件清单算出的派生值（v27，`store.deriveContent`）。`kinds` 是位：任意位置的 `.dll`、`Defs/` 或 `Patches/` 下（任意加载文件夹深度）的 XML、`Languages/` 下的文件、文件夹名以 `textures` 结尾的目录下的 PNG（`%textures/%.png`，可转换的贴图）。`langs` 是根目录或下一层加载文件夹里 `Languages/<名字>/…` 的语言名，按路径顺序，大小写不同的同名只留第一个，用 `/` 连接。大小写只折叠 ASCII，与之前的 SQLite `LIKE` 一致。一个快照的路径不会变（路径或大小不同就是另一个快照哈希），所以两列一直有效，§7.1 删掉它的文件行之后也是；同内容、新外部状态而复制清单时，两列从上一个快照复制。Mod 库存的内容类型（`Store.ContentKinds`）、可转换贴图（`Store.SnapshotsWithPNG*`）、详情的语言（`Store.Languages`）都按主键读这两列，不再扫 `snapshot_file`。
-- `instance.environment_id` 跟着它的来源：共用文件夹里的为空，`Data`、`Mods` 里的是那个环境。一个环境“看得到”的 Instance 是 `environment_id IN ('', <环境>)`。
-- 全局：Lineage、玩家数据（`lineage_data`、`lineage_tag`）、副本备注、用户规则、变更事件（按 Instance 归属）。全局还有方案（04 §1.7）。按环境：当前方案、启动记录、分析运行、问题忽略、扫描记录。按用户数据目录：ModsConfig.xml 写入记录。
-- 数据库按 `meta.schema_version` 逐版迁移，旧库自动升级。
-- 版本提醒偏好是全局数据库记录，存储与迁移见 03 §4.2。
-- 方案、规则和玩家数据的表见 04；事实和分析的表见 03 §3；启动记录见 08 §1。
+- `decl_blob` stores normalized `About.xml` (JSON) for analysis.
+- **Snapshot file lists have two locations** (v28, `store/filelist.go`): hashed semantic files and `.dll` (any location, ASCII case folding only) are `snapshot_file` rows; remaining files (textures, sounds, Languages, `.meta`, etc.) form one `snapshot_list` block: sort by `rel_path`; each entry stores shared prefix length with previous entry, suffix, size (no mtime: incremental scan alone needs it and reads only hashed rows, `Store.CurrentFiles`); zstd compress entire block; n is count. Blocks **are not deduplicated**: copying lists for identical content/new external state copies whole block; refreshing same-snapshot mtime rewrites whole block. Snapshots without non-semantic files have no block. Readers: `Store.SnapshotFiles` (change-page file diffs) merges both and sorts by path; `Store.InstanceFiles` (log texture / DLL provider lookup) queries rows first, skips blocks for `.dll`-ending patterns, otherwise decompresses current blocks and matches SQLite `LIKE` rules in Go (`%`, `_`, ASCII case folding only). DLL remain rows because DLL-name Mod lookup (`%x.dll`) is the commonest query and must not decompress every block.
+- `snapshot.kinds`, `snapshot.langs` are derived from file lists at snapshot write (v27, `store.deriveContent`). kinds bits: `.dll` anywhere; XML under `Defs/` or `Patches/` at any loading-folder depth; files under `Languages/`; PNG under directories whose names end with textures (`%textures/%.png`, convertible textures). langs: language names from `Languages/<name>/…` at root or next-level loading folder, in path order, first case-insensitive duplicate only, joined by `/`. ASCII folding matches previous SQLite `LIKE`. Snapshot paths never change (different path/size means different snapshot hash), so columns stay valid even after §7.1 removes files; identical-content/new-external-state list copies copy both columns. Mod inventory content types (`Store.ContentKinds`), convertible textures (`Store.SnapshotsWithPNG*`), detail languages (`Store.Languages`) read columns by primary key instead of scanning `snapshot_file`.
+- `instance.environment_id` follows `source:` empty for shared folders, owning environment for `Data`/`Mods`. Visible Instances have `environment_id IN ('', <environment>)`.
+- Global: Lineage, player data (`lineage_data`, `lineage_tag`), copy notes, user rules, change events (by Instance ownership), plans (04 §1.7). Per environment: current plan, launch records, analysis runs, finding ignores, scan records. Per user data directory: ModsConfig.xml write records.
+- Migrate database version by version using `meta.schema_version`; old databases upgrade automatically.
+- Version reminder preferences are global database records; storage/migration in 03 §4.2.
+- Plan/rule/player-data tables: 04; fact/analysis tables: 03 §3; launch records: 08 §1.
 
-### 7.1 快照文件清单保留
+### 7.1 Snapshot File List Retention
 
-`Store.Maintain` 清理 `snapshot_file` 和 `snapshot_list`（块与行一起，按快照），保留 `snapshot` 行（含声明、哈希、文件数、总大小）和事件。完整清单保留以下集合的并集：
+`Store.Maintain` cleans `snapshot_file`` and ``snapshot_list` together per snapshot, retaining snapshot rows (declarations, hash, file count, total size) and events. Keep full lists for the union of:
 
-- 所有 Instance 的当前快照，含墓碑的当前快照，供增量扫描和身份匹配读取。
-- 未回答身份提问的 `observation_snapshot_id`，以及 `questionevidence.go` 所选的候选快照：候选 Instance 在提问扫描批次及以前，排除观测快照，按 `scan_id DESC, id DESC` 取最新一条。两边的当前快照也受上一条保护，扫描重检的语义集合仍完整。
-- 每个 Instance 最近 3 条 `updated` 事件的 before / after 快照，按 `scan_id DESC, id DESC` 排序。没有天数限制。
+- Every Instance's current snapshot, including tombstones, for incremental scans and identity matching.
+- Unanswered questions' `observation_snapshot_id`, plus candidate snapshots selected by `questionevidence.go`: candidate Instance snapshot at or before question scan, excluding observation snapshot, latest by `scan_id DESC, id DESC`. Both current snapshots are also protected above, preserving semantic sets for scan rechecks.
+- Before/after snapshots of each Instance's latest 3 updated events, ordered by `scan_id DESC, id DESC`. No age limit.
 
-其余快照整份删除文件清单，不只删除无 hash 的行。`modchanges` 仍显示声明与事件；无法比较清单时只加一行“（文件清单已清理）”，不把剩下的一端误报成新增或删除。
+Delete entire file lists for other snapshots, not only unhashed rows. modchanges still shows declarations/events; if lists cannot be compared, add only "(file lists no longer stored)", without misreporting the remaining side as additions/deletions.
 
-### 7.2 数据库整理与空间回收
+### 7.2 Database Maintenance and Space Reclamation
 
-入口为 `App.Maintain` → `Store.Maintain`；设置页已有“压缩”、`archo db vacuum [--dry-run]`、MCP `maintenance action=vacuum` 与 GUI 自动整理共用它。步骤顺序固定：
+Entry: `App.Maintain` → `Store.Maintain`; settings "compact", `archo db vacuum [--dry-run]`, MCP `maintenance action=vacuum`, and GUI automatic maintenance share it. Fixed order:
 
-1. 在一个事务里按 §7.1 清理旧文件清单。
-2. 同一事务里按 03 §3 清理没有游戏需要的版本视图、过期的非当前版本分析槽位和无引用的事实集合（`pruneFactsOn`，与保存分析时的清理相同）。
-3. 提交清理事务后回收空间：手动总是 VACUUM；自动只在空闲页至少 16 MiB，或至少 1 MiB 且占库页数 20% 时 VACUUM。保持现有 auto_vacuum 模式，不修改 schema。
-4. `wal_checkpoint(TRUNCATE)`，记录 `meta[maintenance:last_completed]`，再截断完成标记的 WAL。完成提示写释放了多少和现在的大小（“数据库已压缩：释放了 183 MB，现在 260 MB”）。
+1. Clean old file lists per §7.1 in one transaction.
+2. In that transaction, clean version views no game needs, expired non-current analysis slots, unreferenced fact sets per 03 §3 (`pruneFactsOn`, same as analysis-save cleanup).
+3. After commit, reclaim space: manual always VACUUM; automatic only if free pages total at least 16 MiB, or at least 1 MiB and 20% of database pages. Keep existing auto_vacuum mode, no schema change.
+4. `wal_checkpoint(TRUNCATE)`, record `meta[maintenance:last_completed]`, truncate completion-marker WAL too. Completion says released/current size ("database compacted: freed 183 MB, now 260 MB").
 
-VACUUM 前须确认库所在卷可用空间至少为当前库页大小的两倍加 64 MiB，覆盖临时库与整库 WAL；空间不足或无法确定时放弃回收，手动时提示需要多少（“需要 1.2 GB 可用磁盘空间”）。清理事务已提交的清单无需恢复，下次重试。整理私有连接设零 busy 等待；SQLite busy / locked、checkpoint 返回 busy 均立即放弃，自动时不通知玩家。中断或失败也尽力截断 WAL；不能截断则留待重试。`meta[maintenance:lease]` 防止多个窗口在 VACUUM 事务间隙重复进入，失效时长见 06 §2.16.1 A10。
+Before VACUUM, require free space on database volume at least twice database page size total plus 64 MiB for temporary database/full WAL; skip reclamation if insufficient/unknown, with manual required-space message ("cannot compact database: it needs 1.2 GB of free disk space"). Already-committed file-list cleanup needs no restore; retry later. Private maintenance connection has zero busy wait; SQLite busy / locked or busy checkpoint aborts immediately, silently for automatic maintenance. On interruption/failure, attempt WAL truncation; otherwise retry later. `meta[maintenance:lease]` prevents multiple windows entering between VACUUM transactions; expiry in 06 §2.16.1 A10.
 
-自动只由 GUI 首屏绘制完成后调度，首次延迟、尝试周期、成功后间隔和执行中复查频率见 [06 §2.16.1](06-ui/2.16-scheduled-behavior.md) A08、A10；完成时间记在上述 meta 键。任何已登记环境的游戏运行、扫描、分析、后台任务正在执行或排队、页面后台文件读取期间都跳过；执行中持续复查，开始前台工作或游戏、关窗则取消。使用独立连接，既不借用页面连接，也不持有页面互斥锁；忙时下次再试。CLI、MCP、TUI 不启动此调度。
+GUI alone schedules automatic maintenance after first paint; initial delay, attempt period, successful interval, and recheck frequency in [06 §2.16.1](06-ui/2.16-scheduled-behavior.md) A08, A10; completion time in meta key above. Skip while any registered game's process, scan, analysis, running/queued background task, or page background file read exists; recheck continuously, cancel on foreground work/game start or window close. Use independent connection, no page connection or page mutex; retry later if busy. CLI, MCP, TUI do not schedule this.
 
-手动不受周期和空闲条件限制，但游戏运行时仍拒绝，提示先关闭游戏。`--dry-run` 仅计算将删除的文件记录数量（行数加上块里的项数，与 v28 之前全是行时的数相同），不提交清理、压缩或完成时间。墓碑 gc 仍见 §5.5。
+Manual maintenance ignores period/idle restrictions but still refuses while a game runs, asking to close it. `--dry-run` counts file records to delete only (rows plus block entries, matching pre-v28 row counts), without cleanup, compression, or completion-time writes. Tombstone gc: §5.5.
 
-## 8. 验收
+## 8. Acceptance
 
-合成临时游戏验证：两游戏入链后同卷/模拟跨卷移库、回收及跨游戏包移除；外来入链与运行中游戏阻断；各阶段中断只读报告、确认恢复；v17 → v18 迁移保留旧事实。全部使用真实 junction/平台 symlink，不使用玩家游戏或 RimArcho AppData。
+Synthetic temporary games verify same-volume/simulated cross-volume lock-library moves, recycling, and cross-game pack removal after linking into two games; foreign inbound links/running games block; read-only reports after interruption at each phase and confirmed recovery; v17 → v18 migration retains old facts. All use real junctions/platform symlinks, never player games or RimArcho AppData.
 
-| # | 场景 | 期望 | 测试 | 状态 |
+| # | Scenario | Expected | Test | Status |
 | --- | --- | --- | --- | --- |
-| A1 | 首次扫描 300 个以上 Mod | 每个目录一个 Instance；`discovered` 事件数等于 Mod 数 | `TestA1FirstScanManyMods` | 通过 |
-| A2 | 工坊更新了某个 Mod | 同一 Instance，发 `updated` | `TestA2WorkshopUpdate` | 通过 |
-| A3 | 作者在更新中改了 packageId | 同一 Instance，发 `package-id-changed`；Instance ID、Lineage ID 不变，所以方案和用户规则不受影响 | `TestA3PackageIDChange` | 通过 |
-| A4 | 把整个游戏目录移到另一块盘，再修改环境路径 | 来源重新绑定成功；Instance ID 全部不变 | `TestA4GameFolderMoved` | 通过 |
-| A5 | 手动把工坊 Mod 复制到 `Mods/` | 新 Instance，与原版同一 Lineage，标“推断” | `TestA5ManualCopy` | 通过 |
-| A6 | 带 `.rimarcho/origin.json` 的副本（大改过内容） | 新 Instance，同一 Lineage，标“确认”，发 `copied`；再改目录名只发 `moved` | `TestA6OriginMarker` | 通过 |
-| A7 | 本地 Mod 目录改名 | 同一 Instance，发 `moved`；改名加编辑发 `moved` + `updated`；4 个语义文件的 Mod 改名加新增 1 个文件 → `discovered` + `disappeared` + 1 个待确认项 | `TestA7LocalRename` | 通过 |
-| A8 | 退订后 30 天内重新订阅 | 同一 Instance，发 `reappeared` | `TestA8Resubscribe` | 通过 |
-| A9 | 同一工坊 ID 同时出现在 Steam 和 SteamCMD 目录 | 两个 Instance，同一 Lineage | `TestA9SteamAndSteamCMD` | 通过 |
-| A10 | 两个无关 Mod 使用相同 packageId | 两个 Instance，两个 Lineage；`pkg:` 引用列出全部候选（退出码 3）；分析层报“包名重复” | `TestA10SamePackageIDUnrelated` | 通过 |
-| A11 | 一个目录通过 junction 出现在两个来源 | 只有一个 Instance，带一个别名位置 | `TestA11Junction` | 通过 |
-| A12 | 用 `copy-local` 创建锁定版本 | 新 Instance 在 `Mods/` 下，带 `origin.json`；同一 Lineage，标“确认”；不复制 `.git`，不跟随指向 Mod 外的链接 | `TestCopyLocal` | 通过 |
-| A13 | RimCrow 风格：工坊 about-disabled + `Mods/_Link_<id>` junction 指向 RimCrow 仓库里的副本 | 两个 Instance，同一 Lineage；工坊那份 `unloadable: about-disabled`，packageId 照常读出；`list --filter unloadable` 能筛出；分析时归为锁定版本（`mod.pinned`，见 04 §10） | `TestAboutDisabled`、`TestHiddenPinned` | 通过 |
-| A14 | 启用 SteamCMD 里的 Mod 后写入游戏，`Mods/` 出现 `_Archo_` 链接，再扫描 | 链接是该 Instance 的别名；没有新 Instance，没有任何事件；链接删除后再扫描也没有事件 | `TestLinkDeployment` | 通过 |
-| A15 | 玩整合包时 `Mods/` 里有 `!ArchoPack_` 链接，再扫描 | 链接被跳过；Instance 数不变 | `TestPackBuildAndLaunch` | 通过 |
-| A16 | 两个环境（例如 1.6 和 1.7）共用默认用户数据目录 | `env add` 不拒绝；ModsConfig.xml 的外部修改按用户数据目录判断，在 A 环境写入后切到 B 环境不误报外部修改，而是归到写入它的方案；日志按 03 §6.4 排除别的游戏写的文件 | `TestV8SharedUserData`、`TestForeignLogExcludedBeforeAnalysis` | 通过 |
-| A17 | 两个环境共用同一个工坊目录 | 同一个工坊 Mod 在两边是同一个 Instance、同一个 Lineage，标签和备注两边都在；`Mods/` 里的副本经 `--game-only` 扫描也进工坊原版的 Lineage；方案各归各的；“用在”列出两边的方案；移除一个环境不丢共用 Mod 和标签；同一个游戏目录不能加第二次 | `TestEnvModelSharedWorkshop` | 通过 |
-| A18 | 工坊目录里有未订阅的 Mod 和未订阅的非 Mod 文件夹 | 前者是 residue Instance；后者只计数（`ResidueNoAbout`）；已订阅的不标 residue | `TestResidue` | 通过 |
-| A19 | 未订阅的工坊文件夹只有 `About.xml.disabled` | 同时标 residue 和 about-disabled | — | 待验证 |
-| A20a | 67 个小 Mod 与一个墓碑只有 About / 预览 / 贴图路径相同，或实际内容形成 1:67 / 67:1 | 无误问；双向多候选不提问；下次扫描清掉旧误问，保留已回答决定 | `TestIdentityQuestionsCommonPathsFanOut`、`TestIdentityQuestionsAmbiguousContent`、`TestIdentityQuestionsRecheckStored` | 通过 |
-| A20b | 新发现的 Mod 已被当前列表、旧版本、撤销 / 重做、暂存锚点及整合包引用，再回答 same / copy / unrelated | same 的引用在同一事务归到原 Mod，回退旧版本不丢条目；copy / unrelated 保留原引用；事务失败整体回滚 | `TestIdentityAnswersPreserveListReferences`、`TestResolveSameReferenceRewriteRollback`、`TestMigrateIdentityQuestionSummary` | 通过 |
-| A20 | 消失的 Mod 在别处以新 packageId 出现（R6），玩家答 `same` | 恢复原 Instance ID，补 `reappeared`，新 Instance 的 `discovered` 删除 | `TestQuestionResolveSame` | 通过 |
-| A21 | `lineage split` 和 `lineage merge` | Lineage 归属按命令改变，标 `manual` | `TestLineageSplitMerge` | 通过 |
-| A22 | 墓碑过期后 `gc` | 过期墓碑与其事件被清除；被未处理待确认项引用的保留 | `TestTombstoneGC` | 通过 |
-| A23 | 工坊条目只有 ACF manifest 变了 | 写新快照，不发 `updated` | `TestManifestOnlyChange` | 通过 |
-| A24 | 改路径后抽样匹配率不足，玩家答 `no` | 来源进 `rebind-pending`；答 `no` 后旧来源改名 `<标签>-old` 退役，下次扫描其 Instance 转墓碑，新根目录成为新来源 | `TestA4RebindRejected` | 通过 |
-| A25 | 文件整体挪进 `1.6/`（内容不变）；只改内容（路径不变） | 两种情况相似度都够，仍是同一 Instance | `TestSimilarityRestructureAndContentOnly` | 通过 |
-| A26 | 移除 `steamcmd` 来源、移除环境 | 移除 `local` 被拒绝；移除 `steamcmd` 后其 Instance 发 `disappeared`；`env remove` 不带 `--yes` 拒绝，带了之后数据库里该环境的行全部删除 | `TestEnvRemoveAndSourceRemove` | 通过 |
-| A27 | About.xml 为 UTF-16 LE/BE 带 BOM、UTF-8 BOM、声明 utf-16 但实际是 UTF-8 | 都能正确读出声明 | `TestReadDeclUTF16` | 通过 |
-| A28 | 没有 `<packageId>` 的老 Mod | 按 §4.5 派生，结果与游戏一致，标“推断” | `TestDerivePackageID` | 通过 |
-| A29 | 数据目录位于游戏目录或某个来源根目录之内 | `env add`、`env set`、`scan` 拒绝并说明 | — | 待验证 |
-| A30 | 存档方式 | `--saves own` 建 `<数据目录>/userdata/<环境名>`，启动带 `-savedatafolder`；`--saves shared` 回到默认目录；`--saves` 与 `--user-data` 同时给拒绝 | `TestEnvModelSaves` | 通过 |
-| A31 | Mod 文件夹的增删 | `folder add` 已有的目录不变；包含关系拒绝；游戏的 `Mods` 拒绝；`folder remove` 只限共用文件夹，其 Instance 下次扫描 `disappeared`；第二个工坊目录等于换路径，Instance 不变 | `TestFolderCommands` | 通过 |
-| A32 | 迁移 v14 | 见 §0.1 | `TestMigrateV14SharedFolders`、`TestMigrateV14SingleEnvironment`、`TestMigrateV14App` | 通过 |
-| A33 | 从本机的裸仓库订阅 Git（分支、标签、提交各一次） | 文件夹在订阅目录，带 `.git` 和 `.rimarcho/source.json`；扫描出一个 Instance；同地址同跟踪再订阅拒绝；仓库根目录不是 Mod 时拒绝并列出子目录 | `TestSubscribeGit` | 通过 |
-| A34 | 裸仓库的分支多了一个提交 | `subscribe check` 标“有更新”；`update --dry-run` 不改文件；`update` 后提交前进，Instance ID 不变；工作区有改动时拒绝 | `TestSubscribeGitUpdate` | 通过 |
-| A35 | 订阅工坊条目：Steam 可用 / 不可用 | 可用时只走 Steam 客户端，不调用 SteamCMD；不可用时调用查找到的 SteamCMD（`workshop_download_item 294100 <ID>`），下载目录登记为 `steamcmd` 来源；SteamCMD 找不到时报错并给出工坊页面 | `TestSubscribeWorkshopFallback` | 通过 |
-| A36 | `subscribe remove` | 文件夹进回收站（测试里的假回收站），方案在用时警告；不在订阅目录 / SteamCMD 来源里的拒绝 | `TestSubscribeRemove` | 通过 |
-| A37 | 下载页（测试用本机 HTTP 服务器给一个假的文件页，中性名字） | 读出标题、更新时间、仓库链接；有仓库时 `--git` 订阅那个仓库并记下页面；`--from` zip 装进订阅目录；页面更新时间变新后 `check` 标“有更新”；`update --from` 后 Instance ID 不变 | `TestSubscribePage` | 通过 |
+| A1 | First scan of over 300 `Mods` | One Instance per directory; discovered count equals Mod count | `TestA1FirstScanManyMods` | Pass |
+| A2 | Workshop updates a Mod | Same Instance, updated | `TestA2WorkshopUpdate` | Pass |
+| A3 | Author changes `packageId` in update | Same Instance, `package-id-changed`; unchanged Instance/Lineage IDs preserve plans/user rules | `TestA3PackageIDChange` | Pass |
+| A4 | Move entire game to another disk, change environment path | Rebind succeeds; all Instance IDs unchanged | `TestA4GameFolderMoved` | Pass |
+| A5 | Manually copy Workshop Mod to `Mods/` | New Instance, original Lineage, "inferred" | `TestA5ManualCopy` | Pass |
+| A6 | Copy with `.rimarcho/origin.json`, heavily edited | New Instance, same Lineage, "confirmed", copied; later directory rename emits only moved | `TestA6OriginMarker` | Pass |
+| A7 | Rename local Mod directory | Same Instance, moved; rename + edit: moved + updated; rename + add 1 file to 4-semantic-file Mod → discovered + disappeared + 1 question | `TestA7LocalRename` | Pass |
+| A8 | Resubscribe within 30 days | Same Instance, reappeared | `TestA8Resubscribe` | Pass |
+| A9 | Same Workshop ID in Steam and SteamCMD | Two Instances, one Lineage | `TestA9SteamAndSteamCMD` | Pass |
+| A10 | Unrelated `Mods` share `packageId` | Two Instances, two Lineages; `pkg:` lists all candidates (exit 3); analysis reports duplicate package ID | `TestA10SamePackageIDUnrelated` | Pass |
+| A11 | Directory appears in two sources through junction | One Instance, one alias location | `TestA11Junction` | Pass |
+| A12 | `copy-local` creates locked version | New Instance in `Mods/`, `origin.json`, same Lineage, "confirmed"; no `.git` copy or following links outside Mod | `TestCopyLocal` | Pass |
+| A13 | RimCrow style: Workshop about-disabled + `Mods/_Link_<id>` junction to RimCrow repository copy | Two Instances, one Lineage; Workshop `unloadable: about-disabled`, `packageId` read normally; `list --filter unloadable` matches; analysis recognizes locked version (`mod.pinned`, 04 §10) | `TestAboutDisabled`, `TestHiddenPinned` | Pass |
+| A14 | Enable SteamCMD Mod, write to game, `_Archo_` link in `Mods/`, rescan | Link is alias; no new Instance/events; removing link and rescanning also emits none | `TestLinkDeployment` | Pass |
+| A15 | Scan with pack `!ArchoPack_` links in `Mods/` | Skip links; Instance count unchanged | `TestPackBuildAndLaunch` | Pass |
+| A16 | Two environments (e.g. `1.6`/1.7) share default user data | `env add` permits; outside changes judged by user data directory, no false report switching A→B after A writes; attribute to writer plan; logs exclude other game's files per 03 §6.4 | `TestV8SharedUserData`, `TestForeignLogExcludedBeforeAnalysis` | Pass |
+| A17 | Two environments share Workshop | Same Mod has same Instance/Lineage, tags/notes in both; `Mods/` copies join Workshop Lineage even with `--game-only`; plans belong to their respective environments; "used in" lists both sets; environment removal retains shared `Mods`/tags; cannot add same game directory twice | `TestEnvModelSharedWorkshop` | Pass |
+| A18 | Unsubscribed Mod and non-Mod folders in Workshop | Former is residue Instance; latter counted only (`ResidueNoAbout`); subscribed not marked residue | `TestResidue` | Pass |
+| A19 | Unsubscribed Workshop folder has only `About.xml.disabled` | Both residue/about-disabled | — | Pending validation |
+| A20a | 67 small `Mods` share only About/preview/texture paths with tombstone, or content forms 1:67 / 67:1 | No false questions; no questions for bidirectional ambiguity; next scan removes old false questions, retains answers | `TestIdentityQuestionsCommonPathsFanOut`, `TestIdentityQuestionsAmbiguousContent`, `TestIdentityQuestionsRecheckStored` | Pass |
+| A20b | Newly discovered Mod referenced by current list, old versions, undo/redo, staging anchors, packs; answer same/copy/unrelated | same remaps references transactionally to original, historical checkout retains entries; copy/unrelated retain references; failure rolls back all | `TestIdentityAnswersPreserveListReferences`, `TestResolveSameReferenceRewriteRollback`, `TestMigrateIdentityQuestionSummary` | Pass |
+| A20 | Disappeared Mod appears elsewhere with new `packageId` (R6), answer same | Restore original Instance ID, add reappeared, delete new Instance discovered | `TestQuestionResolveSame` | Pass |
+| A21 | `lineage split` / `lineage merge` | Membership follows command, manual | `TestLineageSplitMerge` | Pass |
+| A22 | gc after tombstone expiry | Remove expired tombstones/events, retain unanswered-question references | `TestTombstoneGC` | Pass |
+| A23 | Only Workshop ACF manifest changes | New snapshot, no updated | `TestManifestOnlyChange` | Pass |
+| A24 | Insufficient path-rebind samples; answer no | `rebind-pending`; no retires/relabels old source `<label>-old`, tombstones Instances next scan, new root becomes new source | `TestA4RebindRejected` | Pass |
+| A25 | Move all files into `1.6/` unchanged; change contents with unchanged paths | Both have sufficient similarity, same Instance | `TestSimilarityRestructureAndContentOnly` | Pass |
+| A26 | Remove steamcmd source/environment | Refuse removing local; removed steamcmd Instances emit disappeared; `env remove` refuses without `--yes`, otherwise deletes all environment rows | `TestEnvRemoveAndSourceRemove` | Pass |
+| A27 | `About.xml` UTF-16 LE/BE BOM, UTF-8 BOM, declares utf-16 but UTF-8 | Read declarations correctly | `TestReadDeclUTF16` | Pass |
+| A28 | Old Mod lacks `<packageId>` | Derive per §4.5, matching game, "inferred" | `TestDerivePackageID` | Pass |
+| A29 | `Data` directory inside game/source root | `env add`, `env set`, scan refuse with explanation | — | Pending validation |
+| A30 | Save modes | `--saves own` creates `<data-directory>/userdata/<environment-name>`, launches with `-savedatafolder`; `--saves shared` restores default; refuse `--saves` + `--user-data` | `TestEnvModelSaves` | Pass |
+| A31 | Add/remove Mod folders | Adding existing directory unchanged; refuse containment/game `Mods`; remove shared folders only, Instances disappeared next scan; second Workshop directory means rebind with unchanged Instances | `TestFolderCommands` | Pass |
+| A32 | Migration v14 | See §0.1 | `TestMigrateV14SharedFolders`, `TestMigrateV14SingleEnvironment`, `TestMigrateV14App` | Pass |
+| A33 | Subscribe to local bare Git repository (branch/tag/commit) | Subscription folder has `.git`/`.rimarcho/source.json`; one scanned Instance; refuse duplicate URL/target; refuse non-Mod root and list subdirectories | `TestSubscribeGit` | Pass |
+| A34 | Bare repository branch gains commit | `subscribe check` marks update; `update --dry-run` no writes; update advances commit, same Instance; refuse dirty tree | `TestSubscribeGitUpdate` | Pass |
+| A35 | Workshop subscribe with Steam available/unavailable | Available: Steam client only; unavailable: located SteamCMD (`workshop_download_item 294100 <ID>`), download directory registered as steamcmd; missing SteamCMD reports error/page | `TestSubscribeWorkshopFallback` | Pass |
+| A36 | `subscribe remove` | Recycle folder (fake bin in test), warn if plan uses it; refuse outside subscription directories/SteamCMD sources | `TestSubscribeRemove` | Pass |
+| A37 | Download page (local test HTTP server, fake neutral file page) | Read title/update/repository; `--git` subscribes repository and records page; `--from` zip installs; newer page time makes check report update; `update --from` preserves Instance ID | `TestSubscribePage` | Pass |

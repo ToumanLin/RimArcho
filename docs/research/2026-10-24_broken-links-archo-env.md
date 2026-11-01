@@ -1,14 +1,14 @@
-# 失效 `_Archo_env_` 链接调研
+# Investigation of broken `_Archo_env_` links
 
-2026-10-24；代码基线 `7386f87`，引用行号为调查时工作区。调查只读，仅新增本文；未运行 RimArcho、游戏、测试或修复命令，未改游戏、玩家 AppData、LocalLow、已有仓库文件，未提交。时间默认 UTC。
+2026-10-24; code baseline `7386f87`, line references refer to the workspace at investigation time. Read-only investigation; only this document was added. RimArcho, the game, tests, and repair commands were not run. No game files, player AppData, LocalLow, or existing repository files were changed; no commit. Times are UTC unless stated otherwise.
 
-**结论：是 RimArcho 的链接生命周期缺陷。** 切换环境先建立跨游戏本地链接；随后“收进锁定库”把目标从 D 盘搬到 C 盘，只更新数据库里的 Instance 路径，没有维护其他游戏里的入链。普通保存无条件保留 `_Archo_env_`，扫描和重复检查又跳过断链。因此一次成功完成的正常操作就足以触发，无需崩溃。能够确认移动操作、Mod 身份和目标位置；没有逐操作审计日志，不能确定当时点击的按钮、具体 CLI 或执行进程所属 worktree。
+**Conclusion: a defect in RimArcho's link lifecycle.** Switching environments first created cross-game local links. Later, "move into the lock library" moved the target from drive D to C, updating only the Instance path in the database and leaving inbound links in other games untouched. Normal save unconditionally preserves `_Archo_env_`, while scanning and duplicate checks skip broken links. A normally completed operation is therefore enough to trigger this; no crash is needed. The move, Mod identity, and target location are confirmed. Without a per-operation audit log, the button clicked, exact CLI command, and worktree of the executing process cannot be determined.
 
-## 1. 证据与时间线
+## 1. Evidence and timeline
 
-### E1：实际链接和目标
+### E1: Actual link and target
 
-执行的只读命令：
+Read-only commands executed:
 
 ```powershell
 $link = 'D:\rimworld16\Mods\_Archo_env_yvae4hr7j2zwsjepwkqalnykwq'
@@ -18,20 +18,20 @@ fsutil reparsepoint query $link
 Test-Path -LiteralPath 'D:\SteamLibrary\steamapps\common\RimWorld\Mods\_3700765558_alt_decapitate'
 ```
 
-输出摘录：
+Output excerpt:
 
 ```text
 LinkType        : Junction
 Target          : D:\SteamLibrary\steamapps\common\RimWorld\Mods\_3700765558_alt_decapitate
-CreationTime    : 2026-10-22 16:32:48（本机 PDT）
+CreationTime    : 2026-10-22 16:32:48 (local PDT)
 CreationTimeUtc : 2026-10-22 23:32:48
 Attributes      : Directory, ReparsePoint
-Reparse Tag Value : 0xa0000003（Mount Point）
+Reparse Tag Value : 0xa0000003 (Mount Point)
 Substitute Name: \??\D:\SteamLibrary\steamapps\common\RimWorld\Mods\_3700765558_alt_decapitate
 Test-Path: False
 ```
 
-同时检查两个已知游戏所有前缀条目，命令如下（`@(...)[0]` 保证取得完整目标而不是字符串首字符）：
+Also checked all prefixed entries in both known games with the following command (`@(...)[0]` ensures the full target is read, rather than the first character of a string):
 
 ```powershell
 foreach ($root in @('D:\rimworld16','D:\SteamLibrary\steamapps\common\RimWorld')) {
@@ -48,26 +48,26 @@ foreach ($root in @('D:\rimworld16','D:\SteamLibrary\steamapps\common\RimWorld')
 }
 ```
 
-| 游戏 | 结果 |
+| Game | Result |
 | --- | --- |
-| `D:\rimworld16` | 7 个 junction：5 env、1 locked、1 monitor；只有本文的 env 目标不存在 |
-| Steam 版 RimWorld | 4 个 env junction，目标均存在 |
-| 合计 | 11 条链接，1 条断链，没有 `!ArchoPack_` |
+| `D:\rimworld16` | 7 junctions: 5 env, 1 locked, 1 monitor; only this document's env target is missing |
+| Steam RimWorld | 4 env junctions, all targets exist |
+| Total | 11 links, 1 broken, no `!ArchoPack_` |
 
-1.6 另有有效 `_Archo_locked__3700765558_alt_decapitate`，创建于 `2026-10-23T20:58:49Z`，指向 `%LOCALAPPDATA%\RimArcho\locked\_3700765558_alt_decapitate`。旧 env 链接未被替换。该锁定库目录和原 Mod 内容仍在。
+1.6 also has a valid `_Archo_locked__3700765558_alt_decapitate`, created at `2026-10-23T20:58:49Z`, pointing to `%LOCALAPPDATA%\RimArcho\locked\_3700765558_alt_decapitate`. The old env link was not replaced. The lock-library directory and original Mod contents still exist.
 
-### E2：数据库证明是搬移，不是测试临时目录被清除
+### E2: The database proves a move, rather than cleanup of a temporary test directory
 
-读取 `%APPDATA%\RimArcho\archo.db` 使用 Python SQLite URI **`mode=ro&immutable=1`**，避免数据库、WAL、SHM 写入；未执行迁移/checkpoint。限制：只读已 checkpoint 的主库，不包含 WAL 中的新事务，因此不据此断言最近操作不存在。以下历史证据已在主库中。
+Read `%APPDATA%\RimArcho\archo.db` using the Python SQLite URI **`mode=ro&immutable=1`**, avoiding database, WAL, and SHM writes; no migration/checkpoint. Limitation: this reads only the checkpointed main database, excluding newer WAL transactions, so it cannot establish that recent operations did not occur. The following historical evidence is already in the main database.
 
-可复核的只读查询命令：
+Reproducible read-only queries:
 
 ```powershell
 python -B -c 'import sqlite3,os; p=os.path.join(os.environ["APPDATA"],"RimArcho","archo.db"); c=sqlite3.connect("file:"+p.replace(chr(92),chr(47))+"?mode=ro&immutable=1",uri=True); mid="yvae4hr7j2zwsjepwkqalnykwq"; print(c.execute("SELECT id,real_path,source_id,status FROM instance WHERE id=?",(mid,)).fetchone()); print(c.execute("SELECT made FROM instance_note WHERE instance_id=?",(mid,)).fetchone()); print(c.execute("SELECT id,scan_id,package_id,name,origin FROM snapshot WHERE instance_id=? ORDER BY id",(mid,)).fetchall()); print(c.execute("SELECT id,name,game_root FROM environment").fetchall())'
 Get-Content -LiteralPath "$env:LOCALAPPDATA\RimArcho\locked\_3700765558_alt_decapitate\.rimarcho\origin.json"
 ```
 
-输出要点：
+Key output:
 
 ```text
 Instance: yvae4hr7j2zwsjepwkqalnykwq
@@ -75,39 +75,39 @@ package_id: touma.beheading.dolls
 name: Beheading & Animatronic Dolls
 status: live
 real_path: C:\Users\Touman_Lin\AppData\Local\RimArcho\locked\_3700765558_alt_decapitate
-source_id: qra4ztcixedbnoxtdb3acaflf4（extra / locked，共享来源）
+source_id: qra4ztcixedbnoxtdb3acaflf4 (extra / locked, shared source)
 instance_note.made:
   {"kind":"move","at":"2026-10-23T04:28:56.890403Z","plans":["Test"]}
 snapshot 1254 / scan 1: origin=""
 snapshot 7187 / scan 40: origin.copied_at="2026-10-23T04:28:53Z"
-origin_instance: fdg5n42ixgrny76jo55mkk3osy（工坊上游，非被移动副本）
+origin_instance: fdg5n42ixgrny76jo55mkk3osy (Workshop upstream, not the moved copy)
 origin_lineage: r54h3wy43kvrof5dtuv4aduuhi
 workshop_id: 3700765558
 ```
 
-磁盘 `origin.json` 与快照一致。`copied_at` 在这里是补写标记的时间，单独不能证明 pin；**`made.kind=move` 明确标识本次移动**，由 `internal/app/libraryact.go:151,165` 在移动成功后记录。另查询 `scan WHERE id IN (34,40)`：34 从 `10-22 23:32:48` 开始，与链接创建同秒；40 为 `10-23 04:28:53–56`，local 文件夹从 79 减为 78，首次出现 locked 来源（1 Mod），事件为空，符合保留身份的搬移。
+The on-disk `origin.json` matches the snapshot. Here, `copied_at` is when the marker was backfilled; alone, it cannot prove a pin. **`made.kind=move` explicitly identifies this move**, recorded by `internal/app/libraryact.go:151,165` after success. Also queried `scan WHERE id IN (34,40)`: 34 began at `10-22 23:32:48`, the same second the link was created; 40 was `10-23 04:28:53–56`, local folders fell from 79 to 78, and the locked source first appeared (1 Mod), with no events, consistent with an identity-preserving move.
 
-查询 `instance_alias WHERE instance_id=…` 仅有两个游戏的有效 locked 别名，没有旧 env 断链。别名是扫描产物，不能作为可靠的创建台账；数据库结构中也没有专门的链接意图/操作日志表。
+Querying `instance_alias WHERE instance_id=…` finds only valid locked aliases for both games, not the old broken env link. Aliases are scan output, not a reliable creation ledger; the database has no dedicated link-intent/operation log table either.
 
-| 时间 | 证据及含义 |
+| Time | Evidence and meaning |
 | --- | --- |
-| 10-22 23:32:27 | `%APPDATA%\RimArcho\logs\gui.log:51`：启动 `107808d805b0-dirty` 构建 |
-| 10-22 23:32:48 | 1.6 的五条 env 链接同批建立，scan 34 开始 |
-| 10-23 04:28:53–56 | 副本移入锁定库，补标记、重扫，记录 `kind=move`、方案 `Test` |
-| 10-23 20:58:49 | 1.6 新建有效 locked/monitor 链接，旧 env 仍在 |
-| 10-24 | `archo test run` 发现游戏扫描失败（E3） |
+| 10-22 23:32:27 | `%APPDATA%\RimArcho\logs\gui.log:51`: started build `107808d805b0-dirty` |
+| 10-22 23:32:48 | Five env links for 1.6 created in one batch; scan 34 began |
+| 10-23 04:28:53–56 | Copy moved to lock library, marker backfilled, rescanned, `kind=move` and plan `Test` recorded |
+| 10-23 20:58:49 | Valid locked/monitor links created in 1.6; old env remained |
+| 10-24 | `archo test run` found game scanning failed (E3) |
 
-现有环境为 `main`（Steam 游戏）和 `1.6`（`D:\rimworld16`）；当前 `1.6` 记录创建于 `10-23 20:57:27`，晚于旧链接，旧环境记录已不在当前环境表。不能把新环境 ID 当作原创建操作 ID，应按物理游戏路径、链接中的 Instance ID 和时间线定位。
+Existing environments are `main` (Steam game) and `1.6` (`D:\rimworld16`); the current `1.6` record was created at `10-23 20:57:27`, later than the old link. The old environment record is no longer in the current table. Do not use the new environment ID as the original creation-operation ID; locate by physical game path, Instance ID in the link, and timeline.
 
-### E3：游戏失败和测试归属的证据边界
+### E3: Evidence limits for game failure and test ownership
 
-已有实测报告 [游戏测试运行调研](2026-10-24_game-test-runs-rimdevtools.md) 的 `:48` 记录：1.6 `ModLister` 扫到此链接抛 `DirectoryNotFoundException`，继而 `ModsConfig`/`ModLister` 类型初始化失败，逐帧 `Root level exception`，约 47k 行日志。`:58` 记录测试用了临时 `RIMARCHO_HOME`、游戏链接数未变；`:63` 记录只开 Core 仍有 6 个 exception 簇、退出码 1。Knowledge.xml 虽已写出，菜单初始化仍失败，不能只凭 `menu` 标志判成功。
+The existing [game test-run investigation](2026-10-24_game-test-runs-rimdevtools.md) records at `:48`: 1.6 `ModLister` throws `DirectoryNotFoundException` when scanning this link, followed by `ModsConfig`/`ModLister` type initialization failure and a `Root level exception` every frame, about 47k log lines. `:58` records that the test used a temporary `RIMARCHO_HOME` and game link counts did not change; `:63` records 6 exception clusters and exit code 1 even with Core alone. Although Knowledge.xml was written, menu initialization still failed; a `menu` flag alone cannot establish success.
 
-本次未重跑游戏；异常证据引用已有实测报告，未找到该次原始运行日志供独立逐行核验。Roaming 日志仅 `gui.log`、`pack-build.log`、`wezterm-start.log`，检索 `yvae4hr7|3700765558|decapitate` 无命中，GUI 日志只有启动版本/耗时。game-test worktree 中也未找到该次 Player.log/result.json。不能凭这些记录认定某个 worktree 进程创建了链接。
+The game was not rerun in this investigation. Exception evidence comes from the existing report; the original run log was not found for independent line-by-line verification. Roaming logs contain only `gui.log`, `pack-build.log`, and `wezterm-start.log`; searching `yvae4hr7|3700765558|decapitate` found no matches. GUI logs contain only startup version/timing. That run's Player.log/result.json was not found in the game-test worktree either. These records cannot establish that a particular worktree's process created the link.
 
-## 2. 全部生产创建入口与清理约定
+## 2. All production creation entry points and cleanup contracts
 
-检索命令：
+Search commands:
 
 ```powershell
 rg -n '_Archo_env_|_Archo_|!ArchoPack_|junction|symlink|mklink' internal
@@ -115,96 +115,96 @@ rg -n 'CreateLink\(|os\.Symlink\(|FSCTL_SET_REPARSE_POINT|applyLinks\(' internal
 git log --all --date=iso-strict --format='%h %ad %s' -- internal/app/envlinks.go internal/app/deploy.go internal/app/locklib.go internal/app/directories.go internal/app/packlinks.go
 ```
 
-| 创建入口 | 时机、目标 | 移除/保留 |
+| Creation entry | When and target | Removal/preservation |
 | --- | --- | --- |
-| `internal/app/deploy.go:26,137,218`；`loadout.go:834` | save/启动方案；`_Archo_<来源标签>_<rel>` → 启用的 extra/SteamCMD 实例真实目录，包括 locked、monitor | 不再需要/目标不符的普通部署链接先删后建；`:167` 无条件保留所有 env 链接，没有健康检查；不随退出清除 |
-| `internal/app/envlinks.go:28,140,148,201`；`envs.go:571,589` | `EnvUse → PrepareEnv → prepareEnvLinks`；按目标配置/工作区，从前一环境补本地 Mod；`_Archo_env_<Instance ID>` → 原游戏的真实 Mod 目录；共享 Mod 用普通部署名 | 视为安装库，换方案/停用/保存也保留；本批新增或扫描失败时 `:190` 回滚新增；卸载时清理。没有成功后跟踪目标搬移的步骤 |
-| `internal/app/pack.go:748,872,902,914` | 启动整合包；`!ArchoPack_<净化包名>_<目录>` → `<包>/mods/<目录>` | 换包清其他/错误包链接；写普通方案清包链接；`pack unlink` 清当前游戏；退出后保留是既有设计。`RemovePack:1085` 仅清当前环境再回收包，其他游戏存在遗漏面 |
-| `internal/app/directories.go:435,495,508` | 跨卷移动管理目录，摘其内部游戏 Mods 自有链接，再在新位置重建，链接位置和内部目标重基址 | 复制失败尝试原地接回；此路径未接入单 Mod 的 moveToLibrary |
-| `internal/app/directories.go:517,561,562` | 管理目录移动/重新定位后，遍历各环境，Readlink 读取旧目标，删除后按新根重建；失败尝试旧目标 | 能处理断链，但在移动后修，仍有中断窗口；不是单 Mod 收进锁定库的调用链 |
+| `internal/app/deploy.go:26,137,218`; `loadout.go:834` | Save/launch plan; `_Archo_<source-tag>_<rel>` → enabled extra/SteamCMD instance real directory, including locked, monitor | Remove unneeded/mismatched normal deployment links before creating; `:167` preserves all env links unconditionally, without health checks; no cleanup on exit |
+| `internal/app/envlinks.go:28,140,148,201`; `envs.go:571,589` | `EnvUse → PrepareEnv → prepareEnvLinks`; fill local Mods from the previous environment according to target config/workspace; `_Archo_env_<Instance ID>` → real Mod directory in the original game; shared Mods use normal deployment names | Treated as installed library; retained across plan changes/disabling/saving; `:190` rolls back newly added links on batch creation or scan failure; cleaned on uninstall. No post-success tracking of target moves |
+| `internal/app/pack.go:748,872,902,914` | Launch pack; `!ArchoPack_<sanitized-pack-name>_<directory>` → `<pack>/mods/<directory>` | Switching packs clears other/wrong pack links; writing a normal plan clears pack links; `pack unlink` clears the current game; retention after exit is existing design. `RemovePack:1085` clears only the current environment before recycling the pack, leaving a gap for other games |
+| `internal/app/directories.go:435,495,508` | Cross-volume managed-directory move: detach its owned game Mods links, rebuild at the new location, rebase link locations and internal targets | Attempt to reconnect in place if copying fails; this path is not used by single-Mod moveToLibrary |
+| `internal/app/directories.go:517,561,562` | After moving/relocating a managed directory, iterate environments, Readlink old targets, remove and recreate under the new root; try old targets on failure | Handles broken links, but repairs after the move, leaving an interruption window; not in the single-Mod move-to-lock-library call chain |
 
-Windows 统一落到 `internal/source/link_windows.go:69`：建空目录，再以 `FSCTL_SET_REPARSE_POINT` 写 mount-point junction；其他系统为 `link_other.go:27` 的符号链接。`internal/testkit/link_windows.go:10` 的 `mklink /J` 是合成测试助手，不是额外生产入口。
+On Windows all creation reaches `internal/source/link_windows.go:69`: create an empty directory, then write a mount-point junction with `FSCTL_SET_REPARSE_POINT`; other systems use a symbolic link in `link_other.go:27`. `mklink /J` in `internal/testkit/link_windows.go:10` is a synthetic test helper, not another production entry.
 
-删除使用 `source.RemoveLink`（`link_windows.go:121`），先确认链接再单项 `os.Remove`，不进入目标。卸载 `uninstall.go:267` 按前缀枚举、真实目录保留，步骤 `:44` 先 links 后 locked/pack 等目标；比单 Mod 搬移完整。
+Deletion uses `source.RemoveLink` (`link_windows.go:121`): verify a link, then a single `os.Remove`, without entering the target. Uninstall `uninstall.go:267` enumerates by prefix and preserves real directories; step `:44` handles links before locked/pack targets. This is more complete than single-Mod moves.
 
-## 3. 根因、准确序列及历史
+## 3. Root cause, exact sequence, and history
 
-**F1（E1、E2，高置信度）：成功移库漏维护跨环境入链。** 调用路径 P1：
+**F1 (E1, E2, high confidence): successful library moves omit cross-environment inbound-link maintenance.** Call path P1:
 
-1. 环境切换由 `prepareEnvLinks` 建 `_Archo_env_yvae… → Steam/Mods/_3700765558_alt_decapitate`；尾部即原 Instance ID（E1；`envlinks.go:148`）。
-2. “收进锁定库”走 `MoveToLockedFor → moveToLibrary`（`libraryact.go:151`）。D → C 跨卷走 `locklib.go:149,181`：复制核对，然后 `ToTrash(from)`；原路径消失。同卷 `:146` 的 Rename 也会断链。
-3. `locklib.go:157` 调 `Store.RelocateInstance`；`internal/store/library.go:33` 仅 UPDATE Instance 来源/路径，然后重扫，没有摘除/重定向其他游戏入链。`linkedBy`（`dupmove.go:129`）只防当前游戏的 `CopyPlayer` 外部管理器链接，保护不到本次自有链接。
-4. 移动成功，记录 `made.kind=move` / `Test`（E2）。后来新建 locked 链接，旧 env 链接仍指旧位置（E1）。无需崩溃即可完整走到此状态。
-5. `source.List`（`source.go:140–146`）解析失败便跳过；`ModsCopies`（`modscopies.go:99–102`）也跳过，注释误称游戏看不到；`planLinks`（`deploy.go:167`）又保留断链。因此数据库问题页遗漏，游戏实际扫描崩溃（E3）。
+1. During an environment switch, `prepareEnvLinks` creates `_Archo_env_yvae… → Steam/Mods/_3700765558_alt_decapitate`; the suffix is the original Instance ID (E1; `envlinks.go:148`).
+2. "Move to lock library" follows `MoveToLockedFor → moveToLibrary` (`libraryact.go:151`). D → C crosses volumes via `locklib.go:149,181`: copy and verify, then `ToTrash(from)`; the old path disappears. Same-volume Rename at `:146` also breaks links.
+3. `locklib.go:157` calls `Store.RelocateInstance`; `internal/store/library.go:33` only UPDATEs the Instance source/path, then rescans, without detaching/redirecting other games' inbound links. `linkedBy` (`dupmove.go:129`) protects only external-manager `CopyPlayer` links in the current game, not these owned links.
+4. The move succeeds and records `made.kind=move` / `Test` (E2). A locked link is created later; the old env link still points to the old location (E1). The sequence can complete without a crash.
+5. `source.List` (`source.go:140–146`) skips resolution failures; `ModsCopies` (`modscopies.go:99–102`) also skips them, with a comment incorrectly claiming the game cannot see them; `planLinks` (`deploy.go:167`) preserves the broken link. Thus the database problems page misses it, while game scanning crashes (E3).
 
-只改“先记 DB 后创建”不能解决成功搬移；必须在目标消失前维护所有入链。也不能直接把旧 env 改指锁定库：本机已有有效 locked 链接，会产生同 Mod 的双注册/重复包名。
+Merely changing to "record DB before creation" cannot fix a successful move; all inbound links must be maintained before the target disappears. Nor can the old env simply be redirected to the lock library: a valid locked link already exists locally, which would register the same Mod twice / duplicate its package ID.
 
-候选排查：`Trash`（`hidden.go:252`）直接回收后扫描，也有同类隐患；目录移动已有重定向，卸载已有先摘链顺序。测试 `gametest.go:110–148` 只准备隔离数据后启动，不建 Mods 链接；现有实测也记录链接数未变。本次证据支持**单 Mod 收进锁定库**，没有证据支持 uninstall、测试清临时目录或崩溃。
+Other candidates: `Trash` (`hidden.go:252`) recycles directly and then scans, with a similar risk; directory moves already redirect links, and uninstall already detaches first. Tests in `gametest.go:110–148` only prepare isolated data and launch, without creating Mods links; existing measurements also record unchanged link counts. Evidence supports **moving one Mod into the lock library**, with none supporting uninstall, temporary-test-directory cleanup, or a crash.
 
-| 提交 | 关系 |
+| Commit | Relationship |
 | --- | --- |
-| `3b070cf`，10-20；`2499d59`，10-20 | 分别引入普通链接部署、整合包 |
-| `29eb24e`，10-21；`af1b5bf`，10-22 | 移入锁定库保留 Instance；扩展为搬移挡路副本 |
-| `c48a200` / `46e431b`，10-22 | 增加 pack.links-left、包重复链接处理，未覆盖本次 env 生命周期 |
-| `ca6d353`，10-22 16:36:38 PDT | 引入 `_Archo_env_` 和普通保存保留例外；本机创建早约 4 分钟，GUI 为 dirty 开发构建，不能据提交时间排除提交前已运行新代码 |
-| `451288a`，10-23 | 管理目录移动/定位修链接，晚于本次 10-22 21:28 PDT 搬移，且未接入 moveToLibrary |
+| `3b070cf`, 10-20; `2499d59`, 10-20 | Introduced normal link deployment and packs respectively |
+| `29eb24e`, 10-21; `af1b5bf`, 10-22 | Preserve Instance on move to lock library; extend to moving blocking copies |
+| `c48a200` / `46e431b`, 10-22 | Add pack.links-left and duplicate pack-link handling, without this env lifecycle |
+| `ca6d353`, 10-22 16:36:38 PDT | Introduce `_Archo_env_` and the normal-save preservation exception; local creation was about 4 minutes earlier, but the GUI was a dirty development build, so commit time cannot rule out running new code before commit |
+| `451288a`, 10-23 | Repair links when moving/locating managed directories; later than this move at 10-22 21:28 PDT, and not wired into moveToLibrary |
 
-检索到当前基线，未见单 Mod 移库跨环境入链维护修复。
+No single-Mod cross-environment inbound-link maintenance fix was found through the current baseline.
 
-## 4. 预防设计
+## 4. Prevention design
 
-- **先维护目标生命周期。** 统一枚举所有已知游戏 Mods 的入链，供单 Mod 移动、管理目录移动/定位、trash、包/订阅移除、卸载使用；按物理 Mods 去重，不能只看当前环境或扫描别名。外部管理器链接只报告，移动会破坏它们时拒绝并说明。
-- **目标消失前摘链。** 单卷：持久化计划 → 摘自有入链 → Rename → 更新 Instance → 重建必要入口。跨卷：先复制核对 → 持久化计划 → 摘链 → 回收旧目录 → 更新 Instance → 重建。失败只在目标存在时回接，避免低层 CreateLink 重造断链；预览包含所有受影响游戏。重建保持跨环境安装语义，同一实例只留一个有效入口，不能同时生成 env 和 locked 双链接。
-- **先记录创建/变更意图。** 增加小型 managed_link 台账：游戏物理路径、链接名/类型、实例或包身份、原始目标、数据目录身份、操作 ID/阶段；移动还记 from/to。先提交意图再变更文件系统，成功后完成记录；失败反向回滚并保留失败状态。DB 事务不能让文件操作原子化，阶段记录用于恢复，不是用 DB 路径提前更新代替文件系统协调。
-- **启动检查中断状态，退出仅辅助。** 重启只读核对计划和实际链接，生成恢复预览；在已授权写动作内恢复。不能依赖退出钩子，也不应退出即清空有效 env/pack。来源盘离线不等于 Mod 被删。
+- **Manage target lifecycles first.** Enumerate inbound links across all known games' Mods through a shared mechanism for single-Mod moves, managed-directory moves/relocation, trash, pack/subscription removal, and uninstall; deduplicate physical Mods directories rather than checking only the current environment or scan aliases. Report external-manager links only; refuse a move that would break them and explain why.
+- **Detach before targets disappear.** Same volume: persist plan → detach owned inbound links → Rename → update Instance → rebuild necessary entries. Cross-volume: copy and verify → persist plan → detach → recycle old directory → update Instance → rebuild. Reconnect on failure only if the target exists, avoiding broken-link recreation by low-level CreateLink; previews include all affected games. Rebuilding preserves cross-environment installation semantics, leaving one valid entry per instance rather than both env and locked links.
+- **Record creation/change intent first.** Add a small managed_link ledger: physical game path, link name/type, instance or pack identity, original target, data-directory identity, operation ID/phase; also from/to for moves. Commit intent before filesystem changes, complete the record on success; roll back in reverse on failure and retain failure state. DB transactions cannot make file operations atomic; phase records support recovery, rather than replacing filesystem coordination with an early DB path update.
+- **Check interrupted state on startup; exit is only supplementary.** On restart, compare plans and actual links read-only and generate a recovery preview; recover inside an authorized write action. Do not rely on exit hooks or clear valid env/pack links on exit. An offline source drive does not mean a Mod was deleted.
 
-## 5. 自动检测与安全修复
+## 5. Automatic detection and safe repair
 
-### 检测
+### Detection
 
-新增只读 InspectGameLinks：从 `Store.Envs` 游戏根、有效 local 来源及历史台账取得已知 Mods，归一化去重。只读第一层 `ReadDir + Lstat`，先验自有前缀及 junction/symlink tag，再 `Readlink`/读 reparse 数据取得不要求目标存在的原始目标。没有登记也没有台账的游戏路径不能声称覆盖，需玩家补登记。
+Add read-only InspectGameLinks: obtain known Mods directories from `Store.Envs` game roots, valid local sources, and historical ledger; normalize and deduplicate. Read only the first level with `ReadDir + Lstat`, verify owned prefixes and junction/symlink tags, then use `Readlink`/reparse data to obtain raw targets without requiring target existence. Do not claim coverage of unregistered games absent from the ledger; ask players to register them.
 
-不能复用正常 Mod 列表（断链/包链接已被过滤）；不能只缓存 Mods mtime（外部目标删除不一定改变 Mods）。每次检查重新探测目标状态。
+Do not reuse normal Mod lists (broken/pack links are filtered out); do not cache only Mods mtime (external target deletion need not change it). Probe target status on every check.
 
-| 分类 | 判据与处理 |
+| Category | Criteria and handling |
 | --- | --- |
-| `mods.link-dangling` | 目标明确不存在且父盘/来源可访问；error，影响整个游戏，与方案是否启用无关 |
-| `mods.link-foreign` | 指向与台账预期身份不符，或前缀链接无法对应已知实例/包；显示归属证据及原始目标。env 合法目标本来就是玩家目录，不能用“目标不在 RimArcho 数据目录”判外来 |
-| 状态未知 | 拒绝访问、离线盘/网络、未知 reparse 类型；报检查失败，原样保留，不能当成缺失 |
-| 前缀真实目录/文件 | 报占名问题，不提供删除动作 |
-| 有效但多余 | 重复入口交重复包名规则；有效包遗留交 pack.links-left；有效 env 保留 |
+| `mods.link-dangling` | Target definitely absent and parent drive/source accessible; error, affects the entire game regardless of plan enablement |
+| `mods.link-foreign` | Target identity differs from ledger expectation, or prefixed link cannot be associated with a known instance/pack; show ownership evidence and raw target. Valid env targets are player directories, so "outside RimArcho's data directory" cannot establish foreign ownership |
+| Unknown status | Access denied, offline drive/network, unknown reparse type; report check failure, preserve unchanged, never treat as missing |
+| Prefixed real directory/file | Report a name collision, offer no deletion action |
+| Valid but redundant | Duplicate entries go to the duplicate-package-ID rule; valid leftover packs to pack.links-left; retain valid env links |
 
-扫描、GUI/TUI 启动检查全部已知游戏；needs/能不能跑每次取问题时附加实时结果，支持无 Instance 的游戏/路径主体，不放进 Def/Patch 缓存。方案/包启动前重查所选游戏，断链未修则拒绝；其他游戏只汇总，不阻止健康游戏。`test run` 在准备数据/启动进程前检测，被测游戏存在断链则返回结构化失败（路径、目标、原因），不启动、不改 Mods。
+Scanning and GUI/TUI startup check all known games; needs/can it run appends live results whenever fetching findings, supports game/path subjects without an Instance, and does not put them in the Def/Patch cache. Recheck the selected game before plan/pack launch and refuse if broken links remain; summarize other games without blocking a healthy game. `test run` checks before preparing data/starting a process; broken links in the tested game return structured failure (path, target, reason), without launching or changing Mods.
 
-### 修复权限与动作
+### Repair permissions and actions
 
-`docs/specs/01-scope-and-status.md:72`（§4）要求可预览、GUI 确认或 CLI 明确执行；`:81` 只允许管理自有前缀链接。`docs/specs/08-launch-and-packs.md:332`（§7）和 `trash.go:52` 拒绝链接进入回收站。因此设计为：
+`docs/specs/01-scope-and-status.md:72` (§4) requires previews, GUI confirmation or explicit CLI execution; `:81` allows management only of owned prefixed links. `docs/specs/08-launch-and-packs.md:332` (§7) and `trash.go:52` reject links in the recycle bin. Therefore:
 
-1. **自动检测，默认经确认修复。** 拟新增 `archo links check --all`（只读）、`archo links repair --all --dry-run` 和明确执行的 repair；GUI 一次列出各游戏完整路径、目标、原因、删除/重建动作再确认。这些是拟议接口，当前不可用。
-2. 仅操作已知 Mods 第一层、自有前缀、确为 junction/symlink 的链接；执行前重验父路径、类型、文件身份和原始目标，预览后发生变化即中止。用受检查的单链接删除，不 RemoveAll、不递归、不先解析成目标再删除、不写目标。实现需以固定父目录/句柄或等效身份检查防止并发换成真实目录，跨进程写操作串行化。
-3. 台账确定归属的断链/被换指向链接可摘除；新目标已验证时才提议重建。仅有前缀、无台账的旧/外来链接不静默删：显示证据，玩家明确确认为 RimArcho 遗留后只摘链接；可以保留“归属未知”。非自有前缀、真实目录、未知 reparse 类型永不删。
-4. 摘链是 08 §3/§5.3 的撤销部署，直接安全删除链接本身，**不走 ToTrash，也不扩大回收站白名单**；真实 Mod 的删除仍按 §7 进回收站，摘入链失败就不回收目标。
-5. 移动/删除/保存/启动的已确认预览可包含必要摘链，随后自动完成，不逐链接再问；scan、打开问题页、应用启动、test run 不构成删除授权。若以后要启动时静默修复，须先修改 §4 定义持续授权，本设计不引入。
-6. 受影响游戏运行中只检测，不改 Mods；保存操作前链接信息供撤回。仅在目标存在且不制造重复时重建，否则说明不能恢复到可用状态。
+1. **Detect automatically; repair with confirmation by default.** Proposed interfaces: `archo links check --all` (read-only), `archo links repair --all --dry-run`, and explicit repair execution. GUI lists full paths, targets, reasons, and delete/rebuild actions across games in one confirmation. These interfaces are proposed, not currently available.
+2. Operate only on first-level known Mods entries with owned prefixes that are actual junctions/symlinks; immediately before execution revalidate parent path, type, file identity, and raw target, aborting if changed since preview. Delete a checked single link: no RemoveAll, no recursion, no resolving to the target before deleting, no target writes. Implementation must prevent concurrent replacement with a real directory using a fixed parent directory/handle or equivalent identity checks; serialize cross-process writes.
+3. Detach broken/retargeted links whose ownership is established by the ledger; propose rebuilding only after validating the new target. Do not silently delete legacy/foreign links with only a prefix and no ledger: show evidence, and detach only after the player explicitly confirms RimArcho ownership; "ownership unknown" may remain. Never delete unowned prefixes, real directories, or unknown reparse types.
+4. Detaching is deployment reversal under 08 §3/§5.3: safely delete the link itself, **without ToTrash or expanding the recycle-bin allowlist**. Real Mod deletion still uses the recycle bin under §7; do not recycle the target if inbound detachment fails.
+5. Confirmed move/delete/save/launch previews may include necessary detachment and then finish automatically without per-link questions. Scanning, opening problems, app startup, and test run do not authorize deletion. Silent startup repair would first require §4 to define standing authorization; this design does not introduce it.
+6. While an affected game runs, detect only; do not change Mods. Save pre-operation link information for rollback. Rebuild only if the target exists and no duplicates result; otherwise explain that a usable state cannot be restored.
 
-**本机拟议修复：只摘旧 `_Archo_env_yvae4hr7j2zwsjepwkqalnykwq`，保留已有有效 locked 链接及其目标。** 其他十条均有效，不因本故障清空。本次未实施。
+**Proposed local repair: detach only old `_Archo_env_yvae4hr7j2zwsjepwkqalnykwq`, preserving the existing valid locked link and target.** The other ten links are valid; do not clear them because of this fault. Not performed in this investigation.
 
-## 6. 待实施代码与规格修改
+## 6. Pending code and spec changes
 
-| 代码范围 | 修改 |
+| Code scope | Change |
 | --- | --- |
-| source/link_windows.go、link_other.go | 原始目标/链接类型读取、缺失与不可访问区分、安全单链接删除 |
-| app 新检查/修复模块；envlinks.go、deploy.go | 共用枚举/规划；先验健康再保留 env；台账、失败回滚；env/locked 去重 |
-| locklib.go、libraryact.go、dupmove.go、directories.go | 全游戏入链维护、摘链与搬移排序、阶段恢复、预览 |
-| hidden.go、pack.go、订阅/退订、uninstall.go | 目标消失前清所有游戏入链；RemovePack 不限当前环境；保留卸载先 links 顺序 |
-| store | 链接台账/阶段记录、迁移和查询，扫描别名不替代台账 |
-| scan.go、problems.go、launch.go、gametest.go、view/needs、CLI/MCP/GUI/TUI | 共用只读检查、游戏级问题、预览/确认动作、测试前置失败及结构化报告；MCP 修复标写操作 |
-| 合成回归 | 两游戏跨环境链接后同卷/跨卷移库、trash/包移除；每阶段失败/中断恢复；外来前缀、真实目录、未知 tag、离线盘；并发换目录；env+locked 去重；test run 检出后不启动、不写游戏。禁止用玩家路径写测试 |
+| source/link_windows.go, link_other.go | Read raw targets/link types, distinguish missing from inaccessible, safe single-link deletion |
+| New app inspection/repair module; envlinks.go, deploy.go | Shared enumeration/planning; verify health before retaining env; ledger, rollback; env/locked deduplication |
+| locklib.go, libraryact.go, dupmove.go, directories.go | Inbound-link maintenance across all games, detach/move ordering, phase recovery, previews |
+| hidden.go, pack.go, subscribe/unsubscribe, uninstall.go | Clear inbound links in all games before target disappearance; RemovePack beyond current environment; retain links-first uninstall ordering |
+| store | Link ledger/phase records, migrations and queries; scan aliases do not replace a ledger |
+| scan.go, problems.go, launch.go, gametest.go, view/needs, CLI/MCP/GUI/TUI | Shared read-only checks, game-level findings, preview/confirmation actions, pre-test failure and structured reports; mark MCP repair as mutation |
+| Synthetic regressions | Two-game cross-environment links followed by same-/cross-volume library moves, trash/pack removal; failure/interruption recovery at every phase; foreign prefixes, real directories, unknown tags, offline drives; concurrent directory replacement; env+locked deduplication; test run detects without launching or writing the game. Never use player paths in tests |
 
-规格分工（本次只列，不修改）：
+Spec ownership (listed only, not changed here):
 
-- **01 §4/§4.1**：链接修复、搬移/删除联动、恢复时机和确认边界；卸载台账。
-- **08 §3**：链接归属、健康 env 才保留、目标生命周期/恢复主契约；**§5.3/§5.4** 包入链跨游戏清理；**§6/§7** 回收目标前摘链，摘链不进回收站且不放宽白名单；**§8** 验收；**§12** test run 只读前检和失败报告。
-- **02 §0 第14项、§3.3、§4.1、§7/§8**：补链生命周期、扫描不再悄悄丢异常、台账/迁移/验收；正常别名仍不新建 Instance。
-- **04 §7.4** 和 **06/2.9-inventory-and-logs.md §2.9**：移库预览受影响链接，详情引用 08 §3；**06/2.1-navigation-and-launch.md §2.3/§2.4**：启动拦截、跨游戏问题和一次确认修复。
-- **03 §4.3**：链接问题代码/严重度/路径主体；**05 §5**：检查/修复工具、dry-run 与写权限；**07 §3/§4**：台账位置及不触碰玩家数据的合成验证。
+- **01 §4/§4.1**: link repair, move/delete coordination, recovery timing and confirmation boundaries; uninstall ledger.
+- **08 §3**: link ownership, retain only healthy env links, primary target lifecycle/recovery contract; **§5.3/§5.4** cross-game pack inbound-link cleanup; **§6/§7** detach before recycling targets, no recycle bin for detachment or allowlist expansion; **§8** acceptance; **§12** read-only test run precheck and failure report.
+- **02 §0 item 14, §3.3, §4.1, §7/§8**: link lifecycle, scanning no longer silently drops exceptions, ledger/migrations/acceptance; normal aliases still do not create a new Instance.
+- **04 §7.4** and **06/2.9-inventory-and-logs.md §2.9**: preview affected links on library moves, details reference 08 §3; **06/2.1-navigation-and-launch.md §2.3/§2.4**: launch blocking, cross-game findings, one-confirmation repair.
+- **03 §4.3**: link finding codes/severity/path subjects; **05 §5**: inspection/repair tools, dry-run and write permissions; **07 §3/§4**: ledger location and synthetic verification without touching player data.

@@ -1,406 +1,406 @@
-# 07 · 技术栈与工程
+# 07 · Technology and engineering
 
-> 状态：技术栈已定并在用；§6 是全部规格引用的性能目标与实测基线；§7 是反编译确认的游戏行为。
-> 依据：00、00a；01 §4（写文件清单）；06 §8–§10（GUI、TUI 技术）。
+> Status: technology choices are settled and in use; §6 holds the performance targets and measured baselines referenced by all specifications; §7 records game behavior confirmed through decompilation.
+> Basis: 00, 00a; 01 §4 (write allowlist); 06 §8–§10 (GUI and TUI technology).
 
-## 1. 技术栈
+## 1. Technology
 
-| 用途 | 选择 | 理由 / 备注 |
+| Purpose | Choice | Reason / notes |
 | --- | --- | --- |
-| 语言 | Go 1.27.2，`CGO_ENABLED=0` | 单个 exe、内存可控、并发简单；不要 C 工具链，交叉编译直接可用 |
-| TUI | Bubble Tea v1.3.10 + Lip Gloss（v1.1.1 伪版本）+ termenv | 500 行以上的列表渲染与中文宽度都验证过（§6）；不用 Bubbles |
-| GUI | Wails v3.0.0-beta.28 + WebView2；前端是纯 HTML / CSS / 原生 JS（ES modules），`go:embed` 打进 exe | 不用框架、不用 npm、没有构建步骤；不用 `wails3` 生成绑定，构建只要 `go build`（06 §8） |
-| 存储 | SQLite，纯 Go 实现 modernc.org/sqlite v1.60.1；WAL + `synchronous=NORMAL`，默认缓存；当前 schema v16（v11 方案，v12 按方案缓存分析，v13 副本备注 `instance_note`，v14 共用的 Mod 文件夹，v15 按 `Name` 查 Def 的索引，v16 贴图优化写的 DDS） | 不依赖 cgo；多进程（archo.exe、RimArcho.exe、子进程）共用一个库 |
-| XML 读取 | 标准库 `encoding/xml` 流式解析 | Def 层只抽字段，不建 DOM |
-| XPath 模拟 | antchfx/xpath v1.3.9 + 自己的紧凑节点存储 `internal/xdoc`（实现 `xpath.NodeNavigator`） | 与 .NET XPath 1.0 实测无差异（§6）。antchfx/xmlquery v1.5.2 只在 `spikes/` 里用 |
-| .NET 元数据 | saferwall/pe v1.6.5 读表和堆 + 自写的 CustomAttribute blob 解码（约 450 行，`internal/dotnet`） | 不需要自研 ECMA-335 读取器 |
-| MCP | 官方 Go SDK modelcontextprotocol/go-sdk v1.8.0，只用 stdio | 支持工具注解 |
-| KeyValues | 自写 `internal/vdf` | 读 `libraryfolders.vdf` 和 `appworkshop_*.acf` |
-| 哈希 | xxh3-128（zeebo/xxh3 v1.1.0） | 快 |
-| 整合包文件（2026-10-24） | `.archopack` 格式 2：标准库 `archive/tar` + klauspost/compress v1.20.3 `zstd`（`SpeedBetterCompression`，窗口 8 MB，编码单线程；解码 `WithDecoderLowmem`、单线程、窗口上限 64 MB），副本摘要 SHA-256（标准库）；格式 1 的 zip 用标准库读 | 理由与实测见 08 §5.1 |
-| 游戏菜单背景（2026-10-24） | `internal/menubg`：klauspost/compress v1.20.3（1.7 ZIP zstd 方法 93）+ 自写 Unity SerializedFile / ResourceManager / Texture2D 范围读取（1.6 无 ZIP）+ woozymasta/bcn v0.7.0（BC1 / BC3 / BC7，MIT）；RGBA32 用标准库 | 纯 Go，无运行时外部工具；按行解码缩放，提取失败保留官方预览图；资源选择、支持边界及缓存规则见 [06 §2.14](06-ui/2.11-other-pages.md#214-设置) |
-| 字符宽度 | mattn/go-runewidth v0.0.31（`EastAsianWidth` 关闭） | 中文对齐；见 §8.2 |
-| 系统接口 | golang.org/x/sys | 路径解析、进程表、回收站、子进程不弹窗 |
-| Git（订阅，02 §3.4） | go-git v5（github.com/go-git/go-git/v5，纯 Go） | 不要求玩家装 Git，`CGO_ENABLED=0` 不变；只用 https / 本机路径的匿名抓取、浅克隆、ls-remote 和检出。没选系统 `git`：大多数玩家没装，找路径和解析输出各版本不同。测试用 go-git 在临时目录建裸仓库，不联网 |
-| 反编译 | ilspycmd（外部，可选，不随程序分发） | 按需调用（03 §5.4）。查找顺序 `ARCHO_ILSPYCMD` → PATH → `~/.dotnet/tools`；从不自动安装，缺失时提示 `dotnet tool install --global ilspycmd` |
+| Language | Go 1.27.2, `CGO_ENABLED=0` | Single exe, controlled memory use, simple concurrency; no C toolchain, direct cross-compilation |
+| TUI | Bubble Tea v1.3.10 + Lip Gloss (v1.1.1 pseudo-version) + termenv | Rendering lists of over 500 rows and Chinese character widths verified (§6); no Bubbles |
+| GUI | Wails v3.0.0-beta.28 + WebView2; plain HTML / CSS / native JS (ES modules), embedded in the exe with `go:embed` | No framework, npm or build step; no `wails3` binding generation; only `go build` needed (06 §8) |
+| Storage | SQLite, pure Go modernc.org/sqlite v1.60.1; WAL + `synchronous=NORMAL`, default cache; current schema v16 (v11 plans, v12 analysis cache by plan, v13 copy notes `instance_note`, v14 shared Mod folders, v15 Def index by `Name`, v16 DDS written by texture optimization) | No cgo; multiple processes (archo.exe, RimArcho.exe, child processes) share one database |
+| XML reading | Standard library `encoding/xml` streaming parser | Def layer extracts fields without building a DOM |
+| XPath simulation | antchfx/xpath v1.3.9 + custom compact node store `internal/xdoc` (implements `xpath.NodeNavigator`) | No measured difference from .NET XPath 1.0 (§6). antchfx/xmlquery v1.5.2 is used only in `spikes/` |
+| .NET metadata | saferwall/pe v1.6.5 reads tables and heaps + custom CustomAttribute blob decoder (about 450 lines, `internal/dotnet`) | No need to develop an ECMA-335 reader |
+| MCP | Official Go SDK modelcontextprotocol/go-sdk v1.8.0, stdio only | Supports tool annotations |
+| KeyValues | Custom `internal/vdf` | Reads `libraryfolders.vdf` and `appworkshop_*.acf` |
+| Hash | xxh3-128 (zeebo/xxh3 v1.1.0) | Fast |
+| Pack files (2026-10-24) | `.archopack` format 2: standard library `archive/tar` + klauspost/compress v1.20.3 `zstd` (`SpeedBetterCompression`, 8 MB window, single-thread encoding; decoding uses `WithDecoderLowmem`, one thread, 64 MB window limit), copy digests SHA-256 (standard library); standard library reads format 1 ZIP | Rationale and measurements in 08 §5.1 |
+| Game menu backgrounds (2026-10-24) | `internal/menubg`: klauspost/compress v1.20.3 (1.7 ZIP zstd method 93) + custom Unity SerializedFile / ResourceManager / Texture2D range reads (no ZIP in 1.6) + woozymasta/bcn v0.7.0 (BC1 / BC3 / BC7, MIT); standard library for RGBA32 | Pure Go, no external runtime tools; decode and resize by row; retain official preview if extraction fails. Resource selection, support boundaries and cache rules: [06 §2.14](06-ui/2.11-other-pages.md#214-%E8%AE%BE%E7%BD%AE) |
+| Character width | mattn/go-runewidth v0.0.31 (`EastAsianWidth` disabled) | Chinese alignment; see §8.2 |
+| System interfaces | golang.org/x/sys | Path resolution, process table, recycle bin, hidden child-process windows |
+| Git (subscriptions, 02 §3.4) | go-git v5 (github.com/go-git/go-git/v5, pure Go) | Players need not install Git; `CGO_ENABLED=0` unchanged. Only anonymous HTTPS / local fetch, shallow clone, ls-remote and checkout. System `git` rejected: most players do not have it; discovery and output parsing vary by version. Tests create bare repositories in temporary directories with go-git, without networking |
+| Decompilation | ilspycmd (external, optional, not distributed) | Called on demand (03 §5.4). Search `ARCHO_ILSPYCMD` → PATH → `~/.dotnet/tools`; never install automatically; if missing, suggest `dotnet tool install --global ilspycmd` |
 
-不引入：Web 框架、前端框架和构建工具、ORM、cgo 版 SQLite（门槛见 §6.1）。Archo 调用模型的方式见 09 §3。
+Do not introduce Web frameworks, frontend frameworks or build tools, ORMs, or cgo SQLite (thresholds in §6.1). Archo model invocation: 09 §3.
 
-## 2. 代码结构
+## 2. Code structure
 
 ```
-cmd/archo/            入口：无参数打开 TUI，有参数走 CLI，`mcp` 走 MCP，`gui` 打开窗口
+cmd/archo/            Entry: no arguments opens TUI; arguments use CLI; `mcp` uses MCP; `gui` opens a window
 internal/
-  env/                环境、路径探测、Version.txt、Player.log 定位、只读解析 ModsConfig、数据目录
-  source/             来源类型、junction / 符号链接 / 8.3 短路径解析、子目录枚举、重新绑定、回收站
-  scan/               About.xml 容错解析、PublishedFileId、LoadFolders、ACF、git HEAD、origin.json、分层指纹、相似度
-  identity/           对账 R1–R7、Lineage 归属、变更事件、待确认项（纯逻辑）
-  store/              SQLite 访问、表结构与迁移、gc
-  ids/                内部 ID 与短引用
+  env/                Environments, path detection, Version.txt, Player.log location, read-only ModsConfig parsing, data directory
+  source/             Source types, junction / symbolic link / 8.3 short-path resolution, child directory enumeration, rebinding, recycle bin
+  scan/               Tolerant About.xml parsing, PublishedFileId, LoadFolders, ACF, git HEAD, origin.json, layered fingerprints, similarity
+  identity/           Reconciliation R1–R7, Lineage membership, change events, identity questions (pure logic)
+  store/              SQLite access, schema and migrations, gc
+  ids/                Internal IDs and short references
   vdf/                Valve KeyValues
-  textenc/            Mod XML 文件的编码归一（含 UTF-16）
-  content/            生效内容（LoadFolders、版本目录、条件）
-  modsearch/          按游戏载入范围搜索 Mod 文件（`files search` / `search_files`，03 §5.5）
-  xdoc/               Patch 模拟用的紧凑 XML 节点存储与 NodeNavigator
-  analyze/            Def 事实、Patch 模拟、Def / Patch 问题
-  dotnet/             .NET 元数据读取
-  harmony/            从程序集读 Harmony 事实
-  logs/               Player.log 解析与分簇
-  finding/            问题（Finding）模型
-  loadout/            方案的列表、ModsConfig.xml 读写（备份、原子替换）
-  order/              约束图与排序
-  rules/              社区规则数据
-  bbcode/             工坊简介 BBCode 解析
-  app/                每个命令背后的操作：环境、扫描流水线、引用解析、方案、分析、日志、整合包、启动、游戏运行检测
-  view/               界面无关的视图模型（TUI、GUI 共用，06 §1）
-  cmds/               唯一的命令表：参数解析、执行、大纲文本（05 §1）
-  render/             大纲文本渲染（05 §3）
-  surface/cli|mcp|tui|gui/   各表面
-  deps/               外部依赖（todds、SteamCMD）的查找与版本（§2.1）
-  feedback/           反馈：issue 正文、预填链接、发给反馈中转（06 §2.14）
-  selfupdate/         RimArcho 自己的更新：发布信息、版本比较、下载与校验、解包、替换与回滚（§5.1）
-  icon/、winres/      图标渲染（portrait.svg）与 Windows 资源对象
-  buildinfo/          发布版本号（-ldflags -X）
-  procmem/            进程内存读数
-  testkit/            测试用合成环境
-scripts/release.ps1   发布脚本；scripts/winres/  写 .syso；scripts/monitoricon/  Archo Monitor 的图标
-feedback-relay/       反馈中转（Cloudflare Worker，JavaScript，06 §2.14）：worker.mjs、worker.test.mjs、wrangler.toml，部署步骤在 README.md；不进发布包，由仓库所有者自己部署
-monitor/              Archo Monitor（游戏内辅助 Mod，C#，03 §6.7）：src/ 源码，About/ 和 LoadFolders.xml，build.ps1；输出 monitor/out/ArchoMonitor/（不提交）
-spikes/               技术验证与测量程序（同一模块，`go vet ./...` 会包含它们；不进发布包）
-testdata/             合成 Mod 样本（mods/）、golden 文件（golden/）、.NET 夹具（dotnet/）
+  textenc/            Mod XML encoding normalization (including UTF-16)
+  content/            Effective content (LoadFolders, version directories, conditions)
+  modsearch/          Search Mod files in the game's loading scope (`files search` / `search_files`, 03 §5.5)
+  xdoc/               Compact XML node store and NodeNavigator for Patch simulation
+  analyze/            Def facts, Patch simulation, Def / Patch findings
+  dotnet/             .NET metadata reading
+  harmony/            Read Harmony facts from assemblies
+  logs/               Player.log parsing and clustering
+  finding/            Finding model
+  loadout/            Plan lists, ModsConfig.xml reading and writing (backup, atomic replacement)
+  order/              Constraint graph and sorting
+  rules/              Community rule data
+  bbcode/             Workshop description BBCode parsing
+  app/                Operations behind commands: environments, scan pipeline, reference resolution, plans, analysis, logs, packs, launch, running-game detection
+  view/               Surface-independent view models (shared by TUI and GUI, 06 §1)
+  cmds/               Single command table: argument parsing, execution, outline text (05 §1)
+  render/             Outline text rendering (05 §3)
+  surface/cli|mcp|tui|gui/   Surfaces
+  deps/               External dependency discovery and versions (todds, SteamCMD, §2.1)
+  feedback/           Feedback: issue body, prefilled links, relay submission (06 §2.14)
+  selfupdate/         RimArcho updates: release information, version comparison, download and verification, extraction, replacement and rollback (§5.1)
+  icon/, winres/      Icon rendering (portrait.svg) and Windows resource objects
+  buildinfo/          Release version (-ldflags -X)
+  procmem/            Process memory readings
+  testkit/            Synthetic test environments
+scripts/release.ps1   Release script; scripts/winres/ writes .syso; scripts/monitoricon/ holds Archo Monitor icons
+feedback-relay/       Feedback relay (Cloudflare Worker, JavaScript, 06 §2.14): worker.mjs, worker.test.mjs, wrangler.toml; deployment in README.md; excluded from releases, deployed by repository owner
+monitor/              Archo Monitor (in-game helper Mod, C#, 03 §6.7): src/ source, About/ and LoadFolders.xml, build.ps1; outputs monitor/out/ArchoMonitor/ (not committed)
+spikes/               Technology experiments and measurement programs (same module, included by `go vet ./...`; excluded from releases)
+testdata/             Synthetic Mod samples (mods/), golden files (golden/), .NET fixtures (dotnet/)
 ```
 
-- CLI 和 MCP 只依赖 `cmds`；TUI 和 GUI 依赖 `view` 和 `app`。业务包从不反向依赖表面层。
-- 业务规则只能写在 `app` 或 `view` 里，表面层出现“如果是工坊 Mod 就……”这类判断就是缺陷（06 §1）。
-- 重活在短命子进程里做：扫描（`archo scan`）和分析（`archo analyze --env <名称>`）由 TUI、GUI 和需要内容事实的命令以子进程启动，`RIMARCHO_HOME` 传给子进程；进度行（`progress: …`）写 stderr，界面转到状态栏。测试注入进程内的 runner。
+- CLI and MCP depend only on `cmds`; TUI and GUI depend on `view` and `app`. Business packages never depend on surfaces.
+- Business rules belong only in `app` or `view`. A surface-layer condition such as "if this is a Workshop Mod …" is a defect (06 §1).
+- Heavy work runs in short-lived child processes. TUI, GUI and commands needing content facts launch scanning (`archo scan`) and analysis (`archo analyze --env <name>`) as children, passing `RIMARCHO_HOME`. Progress lines (`progress: …`) go to stderr; the UI routes them to its status bar. Tests inject an in-process runner.
 
-### 2.1 外部依赖（`internal/deps`，2026-10-24）
+### 2.1 External dependencies (`internal/deps`, 2026-10-24)
 
-RimArcho 用到两个不随 exe 编译进去的程序（2026-10-30 去掉随附字体和 WezTerm，06 §9.2）。查找只在 `deps` 里做，别处（贴图优化、下载游戏、Mod 来源、设置页、卸载）都问它，不自己找。
+RimArcho uses two programs not compiled into the exe (bundled fonts and WezTerm removed on 2026-10-30, 06 §9.2). Only `deps` discovers them. Other features (texture optimization, game downloads, Mod sources, settings, uninstall) ask it instead of searching themselves.
 
-| 名 | 是什么 | 查找顺序 | 版本 | RimArcho 自己的目录 |
+| Name | Purpose | Search order | Version | RimArcho-owned directory |
 | --- | --- | --- | --- | --- |
-| `todds` | DDS 编码器（08 §5.2） | `textures.todds` → 自己的 → `PATH` | 运行 `--version`；不是 0.4.1 算不能用 | `%LOCALAPPDATA%\RimArcho\todds` |
-| `steamcmd` | 下载游戏版本（08 §11）和 Mod | `steamcmd.path`（文件不在时找同目录）→ 自己的 → `PATH` | 不运行它（它会自我更新），版本留空 | `%LOCALAPPDATA%\RimArcho\steamcmd` |
+| `todds` | DDS encoder (08 §5.2) | `textures.todds` → own copy → `PATH` | Run `--version`; anything other than 0.4.1 is unusable | `%LOCALAPPDATA%\RimArcho\todds` |
+| `steamcmd` | Download game versions (08 §11) and Mods | `steamcmd.path` (search same directory if file absent) → own copy → `PATH` | Do not run it (it self-updates); leave version empty | `%LOCALAPPDATA%\RimArcho\steamcmd` |
 
-接口（给其他功能用，保持很小）：
+Interface (kept small for other features):
 
 ```go
-f := app.Deps()                          // *deps.Finder，读当前设置
-path, version, ok := f.Locate(deps.SteamCMD) // ok：找到且能用
-info := f.Status(deps.Todds)             // Path、Version、Source（config/own/path）、OK、Own、Err、ConfigKey、Dir、Installable
-all := f.All()                           // 按 todds、steamcmd 的顺序
-app.InstallDep(name, progress)           // 下载到自己的目录（玩家同意后才调用），返回程序路径
-app.RemoveDep(name)                      // 只删自己的那份，见 01 §4
+f := app.Deps()                          // *deps.Finder; reads current settings
+path, version, ok := f.Locate(deps.SteamCMD) // ok: found and usable
+info := f.Status(deps.Todds)             // Path, Version, Source (config/own/path), OK, Own, Err, ConfigKey, Dir, Installable
+all := f.All()                           // todds, then steamcmd
+app.InstallDep(name, progress)           // Download to own directory (call only after player consent); returns executable path
+app.RemoveDep(name)                      // Delete only own copy; see 01 §4
 ```
 
-- 查找不联网、不下载、不改文件；版本探测按路径、大小、修改时间缓存，设置页刷新不会每次都运行 todds。
-- 安装不改设置：玩家指定了别处的一份时，装好后用的仍是指定的那份（设置页说明里写着来源）。
-- `app.CheckToolUpdates` 只检查当前使用的受管 SteamCMD 和 todds：Valve 的 Windows SteamCMD 包清单、todds 的 GitHub 最新正式发布；不下载可执行文件。结果在设置行和 `archo deps` 中显示，检查调度见 06 §2.16。SteamCMD 版本从安装包清单读取，手动更新运行其自身更新流程；不以引导 zip 覆盖已装工具。todds 仍只安装调用方支持的版本，发现未兼容新版只提示。
-- 更新和移除前检查进程，同名工具仍在使用时拒绝；SteamCMD 和 todds 的应用内使用、替换共用锁。Windows 进程无法检查时拒绝替换，不凭一次写入失败判断工具是否忙。
-- CLI：`archo deps`（列出状态、版本、路径、来源）、`archo deps install <名>`、`archo deps remove <名>`；设置页的按钮跑同样的命令，下载排进后台任务（06 §2.16）。
-- 测试：`internal/deps` 用临时目录和假的 `LookPath`、`Version` 检查每个依赖的查找顺序、版本缓存和 `Own` 的判断；`internal/app/deps_test.go` 检查 `RemoveDep` 拒绝非自有副本。
+- Discovery does not use networking, download or modify files. Cache version probes by path, size and modification time so refreshing settings does not run todds each time.
+- Installation does not change settings: if the player specified another copy, it remains selected after installation (the settings explanation shows the source).
+- `app.CheckToolUpdates` checks only the currently used managed SteamCMD and todds: Valve's Windows SteamCMD package manifest and todds' latest stable GitHub release. It downloads no executables. Results appear in settings rows and `archo deps`; scheduling: 06 §2.16. Read SteamCMD's version from the package manifest; manual updates run its own update process, never overwrite an installed tool with the bootstrap ZIP. Install only the todds version supported by the caller; merely notify about incompatible newer releases.
+- Check processes before updating or removing; refuse while a same-named tool is in use. In-app use and replacement of SteamCMD and todds share locks. Refuse replacement if Windows process inspection fails; do not infer whether a tool is busy from a single failed write.
+- CLI: `archo deps` (status, versions, paths, sources), `archo deps install <name>`, `archo deps remove <name>`. Settings buttons run the same commands; downloads enter background tasks (06 §2.16).
+- Tests: `internal/deps` uses temporary directories and fake `LookPath` / `Version` to check discovery order, version caching and `Own`; `internal/app/deps_test.go` checks that `RemoveDep` refuses copies it does not own.
 
-## 3. 数据位置
+## 3. Data locations
 
-| 平台 | 目录 |
+| Platform | Directory |
 | --- | --- |
 | Windows | `%APPDATA%\RimArcho\` |
 | macOS | `~/Library/Application Support/RimArcho/` |
-| Linux | `$XDG_DATA_HOME/rimarcho/`，没有时 `~/.local/share/rimarcho/` |
+| Linux | `$XDG_DATA_HOME/rimarcho/`, otherwise `~/.local/share/rimarcho/` |
 
-环境变量 `RIMARCHO_HOME` 覆盖上表（测试和子进程都用它）。
+The `RIMARCHO_HOME` environment variable overrides this table (used by tests and child processes).
 
-| 内容 | 说明 |
+| Content | Description |
 | --- | --- |
-| `config.toml` | 只读取 `tombstone_days`（默认 90）；首次启动写入默认文件。其他设置在数据库 meta 表（`cfg:<键>`，05 §4.2） |
-| `archo.db`（及 WAL） | 全部事实、身份、方案、历史、问题、日志归因缓存 |
-| `cache/` | `previews/`（缩略图）、`workshop/<工坊 ID>.json`（工坊简介）、`workshop-img/`（简介图片）、`source/<sha256 前 20 位>/`（反编译结果，整个项目；`<hash>.types/<Type>.cs` 是单个类型）、社区数据（`communityRules.json`、`steamDB.json` 压成的 `steamDB.index.json`、`replacements.json.gz`）；`loadcost-v1.json`（列表加载占用的逐 Mod 测量，键是 Mod 目录，戳是载入目录的列表指纹；2026-10-24）。`cache clear` 可以清空任一类，用到时重建 |
-| `logs/` | `gui.log`、`pack-build.log`（旧版本还留着 `wezterm-start.log`） |
-| `backups/` | 数据库备份 `archo-YYYYMMDD-HHMMSS.db`（本地时间）；存档备份 `saves/YYYYMMDD-HHMMSS/`（10 §4.4，待实现，时间格式与数据库备份一致） |
-| `packs/` | 整合包（08 §5） |
-| `webview2/` | WebView2 的用户数据（不放 `%APPDATA%\RimArcho.exe`） |
-| `wezterm/`、`wezterm.lua` | 旧版本下载的 WezTerm 便携版和生成的配置；2026-10-30 起不再使用、不再写，也不自动删（06 §9.2） |
-| `rimcrow-*` | `import rimcrow` 时 RimCrow 数据库的临时副本，用完删除 |
+| `config.toml` | Reads only `tombstone_days` (default 90); writes defaults on first launch. Other settings live in the database meta table (`cfg:<key>`, 05 §4.2) |
+| `archo.db` (and WAL) | All facts, identities, plans, history, findings and log attribution cache |
+| `cache/` | `previews/` (thumbnails), `workshop/<Workshop ID>.json` (Workshop descriptions), `workshop-img/` (description images), `source/<first 20 sha256 characters>/` (decompiled full projects; `<hash>.types/<Type>.cs` for one type), community data (`communityRules.json`, `steamDB.json` compressed into `steamDB.index.json`, `replacements.json.gz`); `loadcost-v1.json` (per-Mod list loading measurements, keyed by Mod directory, stamped by the loading-directory list fingerprint; 2026-10-24). `cache clear` clears any category; rebuild on demand |
+| `logs/` | `gui.log`, `pack-build.log` (older versions also leave `wezterm-start.log`) |
+| `backups/` | Database backups `archo-YYYYMMDD-HHMMSS.db` (local time); save backups `saves/YYYYMMDD-HHMMSS/` (10 §4.4, unimplemented, same time format as database backups) |
+| `packs/` | Packs (08 §5) |
+| `webview2/` | WebView2 user data (not in `%APPDATA%\RimArcho.exe`) |
+| `wezterm/`, `wezterm.lua` | Portable WezTerm downloaded by older versions and generated configuration; unused and unwritten since 2026-10-30, not automatically deleted (06 §9.2) |
+| `rimcrow-*` | Temporary RimCrow database copies during `import rimcrow`; deleted afterward |
 
-- 数据目录不能与游戏目录、用户数据目录、任何来源根目录互相包含；`env add`、`env set`、`folder add` 和 `scan` 时检查。例外：“独立”存档目录 `<数据目录>/userdata/<环境名>`（02 §2.1）。
-- RimArcho 写数据目录以外的地方，只限 01 §4 列出的写文件清单。
-- 游戏的 ModsConfig.xml 备份是同目录下的 `ModsConfig.xml.rimarcho.bak`（04 §4.1）。
+- The data directory must not contain, or be contained by, game directories, user data directories or any source root. Check on `env add`, `env set`, `folder add` and `scan`. Exception: the "own saves" directory `<data directory>/userdata/<environment name>` (02 §2.1).
+- Writes outside the data directory are limited to the allowlist in 01 §4.
+- The game's ModsConfig.xml backup is `ModsConfig.xml.rimarcho.bak` in the same directory (04 §4.1).
 
-### 3.1 账户存储与登录窗口隔离
+### 3.1 Account storage and login window isolation
 
-`internal/deps` 仍只发现工具，账户边界由 `internal/accounts` 管理。秘密仅保存于 `%LOCALAPPDATA%\RimArcho\accounts\loverslab.session`，使用 `golang.org/x/sys/windows` 当前用户 CryptProtectData，不使用机器范围。账户目录受保护 DACL 只授权当前用户并向子项继承；保存站点 Cookie 的必要属性，包括登录窗口退出后 API 使用的 session-only Cookie，由站点失效或退出，不保存密码或浏览器数据库。`.session.new` 同样只有密文，单一权威文件原子替换；不进入 DB 备份、导出、pack、诊断、日志与任务。
+`internal/deps` still only discovers tools; `internal/accounts` manages account boundaries. Secrets live only in `%LOCALAPPDATA%\RimArcho\accounts\loverslab.session`, protected with current-user CryptProtectData from `golang.org/x/sys/windows`, never machine scope. A protected DACL grants only the current user and propagates to children. Store necessary site cookie attributes, including session-only cookies used by the API after the login window exits; expiry and logout belong to the site. Store no passwords or browser databases. `.session.new` is also ciphertext only; atomically replace the single authoritative file. Exclude it from DB backups, exports, packs, diagnostics, logs and tasks.
 
-登录通过单独 `account-login-helper` 原生进程、STA 消息循环和独立 WebView2 环境运行，临时 `accounts/webview-profile` 关闭后删除，下次不恢复旧 profile。进程在 CLI / 主界面初始化之前分流，无 Wails 服务、host objects、web messages、DevTools、远程调试、脚本注入、截图、请求体诊断或 agent 接口；关闭密码自动保存、普通表单自动填充与浏览器快捷调试。只用 CookieManager 获取限定域的 Cookie。宿主具备本机进程能力，不能宣称能够防住同用户任意代码。
+Login runs in a separate native `account-login-helper` process with an STA message loop and independent WebView2 environment. Delete temporary `accounts/webview-profile` after closing; never restore an old profile next time. Dispatch this process before CLI / main UI initialization. It exposes no Wails services, host objects, web messages, DevTools, remote debugging, script injection, screenshots, request-body diagnostics or agent interface. Disable password saving, ordinary form autofill and browser debug shortcuts. Use only CookieManager to retrieve cookies for the allowed domains. The host can run local processes; do not claim protection from arbitrary code running as the same user.
 
-`accounts/downloads` 为认证下载的受管临时文件，安装或忘记时删除，崩溃残留由忘记步骤清理。会话普通读取不联网；验证一次 GET，下载限定真实文件页和已观察的站点链接。原始响应、CSRF 和临时签名链接不进错误或任务。卸载先执行 01 §4.1 的账户忘记，失败保留重试条件。
+`accounts/downloads` holds managed temporary authenticated downloads; delete on installation or forgetting the account, and clear crash residue when forgetting. Ordinary session reads are offline; verification is one GET; downloads are restricted to real file pages and observed site links. Raw responses, CSRF and temporary signed URLs never enter errors or tasks. Uninstall first performs account forgetting from 01 §4.1; preserve retry conditions on failure.
 
-自动续期复用 `subscribe.LoversLab.Verify` 的单次原站设置页 GET（规范地址 `/settings/`；旧的查询地址会 301 到它，而这次 GET 不跟随重定向，会把已登录的会话误判为需要验证），接受服务器的 Set-Cookie 后由同一密文文件保存；不启动浏览器、不提交密码，不承诺服务器一定延长会话。调度使用 `accounts.Session.RenewalExpiry` 中最早的持久认证 Cookie 到期时间，忽略短 session Cookie，接近到期时提前检查。验证后仍临近到期、需要登录或浏览器验证时，设置 › 账户和安静通知提示玩家；提前检查的公式、提示阈值及间隔见 06 §2.16.1 A02，授权与通知规则见 06 §2.16。离线保留已知会话和待处理状态，失败不循环请求。自动检查 Mod 时读取的文件页对访客也可见，只有页面带登录用户的退出链接（与验证相同的依据）才把会话记为可用；访客视图不改变会话检查的结论。
+Automatic renewal reuses the single original-site settings-page GET in `subscribe.LoversLab.Verify` (canonical `/settings/`; the old query URL redirects there with 301, but this GET does not follow redirects, falsely classifying a logged-in session as needing verification). Accept server Set-Cookie and save through the same encrypted file. Do not launch a browser or submit passwords; do not promise server-side extension. Schedule from the earliest persistent authentication-cookie expiry in `accounts.Session.RenewalExpiry`, ignoring short session cookies, and check ahead near expiry. If verification still leaves imminent expiry, login or browser verification is needed, show this in settings › accounts and quiet notifications. Advance-check formula, notification thresholds and intervals: 06 §2.16.1 A02; authorization and notification rules: 06 §2.16. Offline, retain known sessions and pending status; do not loop requests on failure. File pages read during automatic Mod checks are also guest-visible. Mark a session usable only if a page contains the logged-in user's logout link (the same evidence as verification); a guest view does not change the session-check conclusion.
 
-## 4. 测试
+## 4. Tests
 
-| 层 | 方式 |
+| Layer | Method |
 | --- | --- |
-| 单元 | 各包内 `_test.go`：About.xml（BOM、标签大小写、`authors`、派生 packageId）、语义文件分类、相似度、增量哈希、ACF、VDF、ID、探测、Player.log、ModsConfig 等 |
-| 身份 | `internal/app/accept_test.go` 用 `internal/testkit` 构造 02 §8 的 A1–A11：假时钟、固定种子的 ID、`mklink /J`（macOS / Linux 改用符号链接）、手写 Mod 模板 |
-| 输出 | golden 测试（`internal/cmds/golden_test.go`、`m4_golden_test.go`）：场景 `basics`、`lifecycle`、`rebind`、`loadout`、`problems`、`harmonylog`，快照在 `testdata/golden/*.txt`，多次运行结果稳定 |
-| CLI = MCP | `internal/surface/mcp/mcp_test.go`：`TestToolsAndAnnotations`、`TestCLIParity`、`TestRefsRoundTrip`、`TestAmbiguousPackage`、`TestTruncation`、`TestWriteTools`、`TestEnvParameter`、`TestStillComputing`（05 §7） |
-| 分析 | 03 的 B、C 系列；Harmony 夹具在 `testdata/dotnet`：假的 0Harmony、假的 Assembly-CSharp 和四个 Mod 的 C# 源码、构建脚本和编好的 DLL（每个 4–5 KB，已提交，测试不需要 .NET SDK） |
-| 方案与排序 | `internal/order/order_test.go`（S1–S5）、`app/loadout_test.go`、`loadout.TestWriteFileBackupAtomic` |
-| TUI | teatest 交互快照（`TestListEnableMoveSortSaveUndo`、`TestSmallTerminalAndCJK`、`TestProblemsView`、`TestChangesViewAndMouse`、`TestProblemsViewLogs`、`TestT6Thumbnail`、`TestT7Wrapping`、`TestFullSections` 等）；人工可用性测试 T4（06 §11） |
-| GUI | `gui.TestSameViewModels`、`gui.TestVerbsAndUndo`；浏览器中用 `spikes/guidev`（只监听 127.0.0.1，不进发布包）调试 |
-| 反馈中转 | `node --test "feedback-relay/*.test.mjs"`：假的 GitHub、用 Map 当 KV、计数器当限流绑定，不连真实的 GitHub 或 Cloudflare。覆盖：开 issue、JWT 签名、token 复用、三道上限、各种拒绝、IP 和联系方式不进 issue、私钥格式。客户端用 `httptest` 当中转：`feedback.TestSend`、`gui.TestFeedbackSend`、`tui.TestFeedbackSendTUI`；`RIMARCHO_FEEDBACK_RELAY` 指过去；测“没有中转”时连 `feedback.Relay` 一起清空，测试从不连真实的中转。真实的一次发送在 VM 测试里做 |
-| 并发 | `app/concurrent_test.go`：同一数据目录两个连接，对方的修改改变 `ChangeKey`，旧视图上的编辑不覆盖对方（G8） |
-| 真实语料 | 可选测试，只在设置了环境变量时运行：`RIMARCHO_REAL_HOME`（数据目录）+ `RIMARCHO_EXE`（子进程用的 archo）跑 TUI 内存；`RIMARCHO_IDLE_SECONDS` 改空闲时长；`RIMARCHO_NO_BROWSE` 跳过浏览；`RIMARCHO_LOG_VERSION` 指定日志回放的主次版本；`RIMARCHO_REAL_COPY`（数据目录的**副本**）跑 T1；`RIMARCHO_WORKSHOP_CACHE` 回放真实工坊简介。测量程序在 `spikes/`（`tuimem`、`tuistart`、`mcplat`、`mcpcheck`、`analyzereal`、`logreal`、`logfirst` 等） |
+| Unit | `_test.go` in each package: About.xml (BOM, tag case, `authors`, derived packageId), semantic file classification, similarity, incremental hashing, ACF, VDF, IDs, detection, Player.log, ModsConfig, etc. |
+| Identity | `internal/app/accept_test.go` builds A1–A11 from 02 §8 with `internal/testkit`: fake clock, fixed-seed IDs, `mklink /J` (symbolic links on macOS / Linux), handwritten Mod templates |
+| Output | Golden tests (`internal/cmds/golden_test.go`, `m4_golden_test.go`): `basics`, `lifecycle`, `rebind`, `loadout`, `problems`, `harmonylog`; snapshots in `testdata/golden/*.txt`; stable across runs |
+| CLI = MCP | `internal/surface/mcp/mcp_test.go`: `TestToolsAndAnnotations`, `TestCLIParity`, `TestRefsRoundTrip`, `TestAmbiguousPackage`, `TestTruncation`, `TestWriteTools`, `TestEnvParameter`, `TestStillComputing` (05 §7) |
+| Analysis | B and C series from 03; Harmony fixtures in `testdata/dotnet`: fake 0Harmony, fake Assembly-CSharp and C# source for four Mods, build script and compiled DLLs (4–5 KB each, committed; tests need no .NET SDK) |
+| Plans and sorting | `internal/order/order_test.go` (S1–S5), `app/loadout_test.go`, `loadout.TestWriteFileBackupAtomic` |
+| TUI | teatest interaction snapshots (`TestListEnableMoveSortSaveUndo`, `TestSmallTerminalAndCJK`, `TestProblemsView`, `TestChangesViewAndMouse`, `TestProblemsViewLogs`, `TestT6Thumbnail`, `TestT7Wrapping`, `TestFullSections`, etc.); manual usability test T4 (06 §11) |
+| GUI | `gui.TestSameViewModels`, `gui.TestVerbsAndUndo`; debug in a browser using `spikes/guidev` (listens only on 127.0.0.1, excluded from releases) |
+| Feedback relay | `node --test "feedback-relay/*.test.mjs"`: fake GitHub, Map as KV, counters as rate-limit bindings; no real GitHub or Cloudflare. Covers issue creation, JWT signing, token reuse, three limits, refusals, excluding IP and contact details from issues, private key format. Client uses `httptest` as relay: `feedback.TestSend`, `gui.TestFeedbackSend`, `tui.TestFeedbackSendTUI`; point `RIMARCHO_FEEDBACK_RELAY` to it. Clear `feedback.Relay` too when testing "no relay"; tests never contact the real relay. One real submission belongs in VM testing |
+| Concurrency | `app/concurrent_test.go`: two connections to one data directory; external changes update `ChangeKey`, edits from a stale view do not overwrite them (G8) |
+| Real corpus | Optional tests run only with environment variables: `RIMARCHO_REAL_HOME` (data directory) + `RIMARCHO_EXE` (archo for children) for TUI memory; `RIMARCHO_IDLE_SECONDS` changes idle duration; `RIMARCHO_NO_BROWSE` skips browsing; `RIMARCHO_LOG_VERSION` specifies log replay major/minor version; `RIMARCHO_REAL_COPY` (data directory **copy**) for T1; `RIMARCHO_WORKSHOP_CACHE` replays real Workshop descriptions. Measurement programs in `spikes/` (`tuimem`, `tuistart`, `mcplat`, `mcpcheck`, `analyzereal`, `logreal`, `logfirst`, etc.) |
 
-**Archo Monitor**（03 §6.7、08 §9）：游戏内的部分只能进游戏测。不需要游戏的部分在 `monitor/test`（`dotnet run -c Release -p:GameVersion=1.7`）：消息切分、指纹、栈帧解析、JSON 写出、去重与计数行、轮换。RimArcho 这边的读取、配对、证据和安装见 03 §7 的 L5–L14、08 §8 的 M1–M8。
+**Archo Monitor** (03 §6.7, 08 §9): in-game behavior requires game testing. Game-independent tests live in `monitor/test` (`dotnet run -c Release -p:GameVersion=1.7`): message splitting, fingerprints, stack-frame parsing, JSON writing, deduplication and count lines, rotation. RimArcho-side reading, pairing, evidence and installation: L5–L14 in 03 §7, M1–M8 in 08 §8.
 
-在测试 VM 里，进游戏的整个回合（新殖民地、游玩、存档、读档、回主菜单、退出）由 `scripts/vm/round.ps1` 自动跑，并检查阶段顺序、存档名，以及游戏跑的是不是 RimArcho 随包的那个 Monitor。游戏里由只供测试的 Archo Drive 操作（`scripts/vm/drive`，不进发布包），不用截图，见 `scripts/vm/README.md`。`vm.ps1 build` 和 `release.ps1` 一样从 `monitor/` 构建 Monitor。回合开始前先 `archo monitor install`，再放驱动：开发版 Monitor 文件夹内容一变就会被整个替换，驱动也会跟着没了。
+In the test VM, `scripts/vm/round.ps1` automates a whole game round (new colony, play, save, load, return to main menu, exit) and checks phase order, save name, and whether the game uses RimArcho's bundled Monitor. Test-only Archo Drive controls the game (`scripts/vm/drive`, excluded from releases), without screenshots; see `scripts/vm/README.md`. Like `release.ps1`, `vm.ps1 build` builds Monitor from `monitor/`. Before a round, run `archo monitor install`, then place the driver: any content change replaces the entire development Monitor folder, removing the driver too.
 
-手动测试清单（在 1.6 和 1.7 各做一遍；用一个测试用的方案和存档，不要用常玩的）：
+Manual checklist (repeat on 1.6 and 1.7; use a test plan and save, not regular playthroughs):
 
-1. 构建：`pwsh monitor/build.ps1 -RimWorldDir <游戏目录>`，再设 `RIMARCHO_MONITOR=<仓库>\monitor\out\ArchoMonitor` 运行 `archo monitor install`。看到 `installed`、`registered src:monitor`、`plan:<名>: added after Harmony`。
-2. 准备一个已知的 XML 错误：在一个本地测试 Mod 的 `Defs/` 里放一个缺 `label` 的 `ThingDef`（`Config error in <defName>`），另放一个引用不存在 Def 的列表项（`<costList><NoSuchThing>1</NoSuchThing></costList>`，交叉引用缺失）。启用这个 Mod。
-3. `archo launch`（或界面上的启动）。确认 `Mods/_Archo_monitor_ArchoMonitor-<版本>` 是链接，ModsConfig.xml 里 `toumanlin.archomonitor` 紧跟在 `brrainz.harmony` 后面。
-4. 游戏进主菜单后：存档数据目录下有 `ArchoMonitor.log`，第一行是 session 行（`version`、`game`、`skipped` 为空）；Player.log 里有 `[Archo Monitor] <版本> session <id>: <路径>`。
-5. `ArchoMonitor.log` 里两条错误：Config error 的 `relatedFiles` 是测试 Mod 的那个 XML 文件、`relatedModIds` 有它、`inferredType` 是 `DefConfigError`；交叉引用的那条 `inferredType` 是 `CrossRefError`，`refs` 有 `xref:NoSuchThing:…`。
-6. 游戏运行中看“能不能跑”的“本次运行”：这两条出现，证据条是“日志 · ArchoMonitor.log · Defs/…”；`archo log --follow --once` 的同一条后面是测试 Mod（source）。
-7. 退出游戏：`ArchoMonitor.log` 最后一行是 `kind:"exit"`。再启动一次：上一份变成 `ArchoMonitor-prev.log`；“上次运行的报错”里的证据条仍写文件。
-8. 1.6 上用整合包（`archo pack build`、`archo pack launch`）玩一次：日志写在 `<包>/userdata/ArchoMonitor.log`，Player.log 的标记行指向它。
-9. 开销：在一个大方案（几百个 Mod）里对比启用和停用 Monitor 的加载时间（`gui.log` 不管这个，用秒表或 Player.log 的时间戳），差别应在几秒以内；游戏里刷大量同一错误时不卡顿。
-10. Mod 设置里打开“记录信息级消息”，重启游戏后 `ArchoMonitor.log` 有 INFO 条目；关掉后没有。
+1. Build: `pwsh monitor/build.ps1 -RimWorldDir <game directory>`, then set `RIMARCHO_MONITOR=<repository>\monitor\out\ArchoMonitor` and run `archo monitor install`. Expect `installed`, `registered src:monitor`, `plan:<name>: added after Harmony`.
+2. Prepare known XML errors: in a local test Mod's `Defs/`, place a `ThingDef` missing `label` (`Config error in <defName>`) and a list item referencing a nonexistent Def (`<costList><NoSuchThing>1</NoSuchThing></costList>`, missing cross-reference). Enable this Mod.
+3. `archo launch` (or launch in the UI). Confirm `Mods/_Archo_monitor_ArchoMonitor-<version>` is a link and `toumanlin.archomonitor` immediately follows `brrainz.harmony` in ModsConfig.xml.
+4. After the game reaches the main menu: `ArchoMonitor.log` exists in the save data directory; its first line is a session line (`version`, `game`, empty `skipped`). Player.log contains `[Archo Monitor] <version> session <id>: <path>`.
+5. Two errors in `ArchoMonitor.log`: Config error has the test Mod's XML in `relatedFiles`, the Mod in `relatedModIds`, and `inferredType` of `DefConfigError`; the cross-reference error has `inferredType` of `CrossRefError` and `xref:NoSuchThing:…` in `refs`.
+6. While the game runs, view "this run" in "can it run": both errors appear, with evidence "log · ArchoMonitor.log · Defs/…"; the same item in `archo log --follow --once` is followed by the test Mod (source).
+7. Exit the game: last line of `ArchoMonitor.log` is `kind:"exit"`. Launch again: the previous file becomes `ArchoMonitor-prev.log`; evidence in "errors from the last run" still names the file.
+8. Play once with a pack on 1.6 (`archo pack build`, `archo pack launch`): log goes to `<pack>/userdata/ArchoMonitor.log`; the marker in Player.log points there.
+9. Overhead: compare load time with Monitor enabled and disabled in a large plan (hundreds of Mods), using a stopwatch or Player.log timestamps (`gui.log` does not cover this). Difference should be within a few seconds; many repeats of one in-game error should not cause stutter.
+10. Enable "record info-level messages" in Mod settings, restart, and check INFO entries in `ArchoMonitor.log`; disable it and check their absence.
 
-**测试安全规则：**
+**Test safety rules:**
 
-1. 自动测试只用合成环境和临时数据目录（`RIMARCHO_HOME` 指向临时目录）。所有写操作的测试（保存、复制、链接、回收站、整合包）只在合成环境上跑。
-2. 碰真实数据时，**对游戏、工坊、`Mods/`、ModsConfig.xml 和 RimCrow 数据库只读**；测量前后记录 ModsConfig.xml 的 md5 并比对，必要时放标记文件检查 mtime。
-3. 需要 RimArcho 自己写库的真实测量，用数据目录的**副本**（`RIMARCHO_REAL_COPY`），不用 `%APPDATA%\RimArcho`。教训：一次被中途停下的 TUI 内存测量没走到恢复步骤，把真实 `archo.db` 里的 `log.selected` / `log.seen` 指向了真实 Player.log；之后经测试工具查看真实“能不能跑”页面又发生了一次。这些是 RimArcho 自己的设置，事后已清空，但说明“测量结束会恢复”不可靠。
-4. 测量脚本不得在用户目录留下文件；第三方程序自己会写的要记下来。
-5. VM 的游戏存档会同步到玩家真实的 Steam Cloud。所以 `round.ps1` 跑的回合不自动存档，自己的存档在退出前删掉。往 Monitor 文件夹里放测试驱动时，只放进 `archo monitor` 写出的那个目录，从不猜默认路径。在宿主上演练 guest 脚本时，`USERPROFILE`、`APPDATA`、`LOCALAPPDATA` 都指向临时目录。教训：一次演练猜了默认路径，把驱动放进了宿主真实的 Monitor 文件夹（当场删掉，没被游戏加载）。
+1. Automated tests use only synthetic environments and temporary data directories (`RIMARCHO_HOME` points to a temporary directory). All write-operation tests (save, copy, links, recycle bin, packs) run only on synthetic environments.
+2. With real data, **game, Workshop, `Mods/`, ModsConfig.xml and RimCrow databases are read-only**. Record and compare ModsConfig.xml md5 before and after measurements; use marker files to check mtime if needed.
+3. Real measurements needing RimArcho database writes use a data directory **copy** (`RIMARCHO_REAL_COPY`), never `%APPDATA%\RimArcho`. Lesson: an interrupted TUI memory measurement skipped restoration and pointed `log.selected` / `log.seen` in the real `archo.db` at the real Player.log; later this happened again when viewing the real "can it run" page through test tools. These were RimArcho's own settings and were cleared afterward, but "restore after measurement" is unreliable.
+4. Measurement scripts must leave no files in user directories; record files third-party programs write themselves.
+5. VM game saves sync to the player's real Steam Cloud. Therefore rounds run by `round.ps1` do not autosave and delete their own saves before exit. Place the test driver only in the Monitor directory written by `archo monitor`, never a guessed default. When rehearsing guest scripts on the host, point `USERPROFILE`, `APPDATA` and `LOCALAPPDATA` to temporary directories. Lesson: one rehearsal guessed a default and placed the driver in the host's real Monitor folder (deleted immediately, never loaded by the game).
 
-## 5. 发布
+## 5. Releases
 
-- 主平台：Windows amd64。同一份源码链接两次（06 §8.1）：
-  - `archo.exe`：控制台程序，CLI、`archo mcp`、`archo tui`、`archo gui`。
-  - `RimArcho.exe`：`-H windowsgui`，双击直接出 GUI，没有控制台黑框；`buildinfo.GUI=1`。扫描、分析子进程带 `CREATE_NO_WINDOW`。
-  - 两个 exe 共用数据目录和数据库，可以同时打开。
-- `scripts/release.ps1 -Version X.Y.Z[-rc1] [-SkipTests]`：
-  1. 校验版本号格式（语义化版本），先跑测试：`go test -short -count=1 ./internal/... ./cmd/... ./scripts/... ./spikes/hugslogs ./spikes/corpuslabel`（产品代码、构建辅助和维护中的语料工具；`-short` 跳过耗时的性能检查，改了扫描或 TUI 速度时去掉它）；
-  2. `CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X buildinfo.Version/Commit/Date"`，提交号带 `-dirty` 标记；
-  3. 每次构建前 `go run ./scripts/winres` 写 `cmd/archo/rsrc_windows_amd64.syso`（图标组 ID 3，尺寸 16/20/24/32/40/48/64/256 各一张 PNG；版本信息：`FileVersion` / `ProductVersion` = 发布版本，`ProductName` RimArcho，`FileDescription` 分别是 “RimArcho command line” 和 “RimArcho”），构建后删除；`.syso` 不提交；
-  4. 构建 Archo Monitor（`monitor/build.ps1`，版本规则见 08 §9），放进 `monitor/ArchoMonitor/`；
-  5. 打包 `dist/archo-<版本>-windows-amd64.zip`：两个 exe、README.md、CHANGELOG.md、LICENSE、`monitor/ArchoMonitor/`（2026-10-30 起不再带 `fonts/`）；
-  6. 写 `dist/archo-<版本>-windows-amd64.zip.sha256`（sha256sum 格式：`<64 位小写十六进制>  <zip 名>`，2026-10-31）。发布时 zip 和它一起上传到 GitHub release：RimArcho 自己的更新没有校验文件就不安装（§5.1）。
-  脚本只写 `dist/`，从不推送、不发布。
-- 仓库公开，不提交二进制：图标由 `internal/icon` 从 `portrait.svg` 在运行时或发布时生成（06 §8.6）。
-- **Archo Monitor 的构建**（`monitor/`，08 §9）：
-  - SDK 风格的 csproj，`dotnet build`；需要 .NET SDK 8 以上（`net10.0` 目标需要 SDK 10）。同一份源码编两次：`net472`（`1.5/`、`1.6/` 用，Mono + Harmony 2.x）和 `net10.0`（`1.7/` 用，Waylith + Harmony 3.x），差异用编译常量（`RW_UNITY`、`RW_WAYLITH`）和反射处理（03 §6.7.5）。
-  - 游戏程序集不提交：默认引用 NuGet 的 `Krafs.Rimworld.Ref`（`1.5.4409` 给 1.5，`1.6.4871` 给 1.6，`1.7.4984-unstable` 给 1.7）；设 `RimWorldDir=<游戏目录>` 时改为引用本机游戏的程序集（`RimWorldWin64_Data/Managed` 或 1.7 的游戏根目录），用来对本机版本编译。Harmony 用 `Lib.Harmony`（2.3.x 给 net472，3.0.x 给 net10.0），`ExcludeAssets=runtime`：程序集不进输出，运行时用 Harmony Mod 的。
-  - `build.ps1 [-Version <版本>] [-RimWorldDir <目录>]`：编 1.5、1.6、1.7 三份，组装 `monitor/out/ArchoMonitor/`（About.xml 的 `modVersion` 写入版本，来源见 08 §9），`go run ./scripts/monitoricon` 生成 `About/Preview.png` 和 `About/ModIcon.png`（与应用图标同源，不提交 PNG）。
-  - 开发时 `RIMARCHO_MONITOR=<仓库>/monitor/out/ArchoMonitor` 让本地的 RimArcho 用这份构建（08 §9）。
-- 反馈中转（`feedback-relay/`）不随发布包分发：仓库所有者按它的 README 部署到 Cloudflare，再把地址写进 `internal/feedback/relay.go` 的 `Relay`（2026-10-31 已部署并写入）。地址为空的版本只有“打开 GitHub”这一条路。
-- 通过 GitHub Releases 发布，tag 是 `v<版本>`，预发布版本（`-rc1` 等）在 GitHub 上勾“预发布”。RimArcho 自己的更新见 §5.1（玩家确认后才换文件，不是无人值守的）。exe 没有代码签名（README 说明）。
-- 没有安装程序：解压即用，卸载是 RimArcho 自己的 `archo uninstall` / 设置 › 卸载 RimArcho（01 §4.1），关闭后由一个临时 cmd 脚本删掉 zip 带的文件；以后若改用安装程序，卸载的最后一步改为运行它的卸载程序，更新（§5.1）也交给它。
-- 文本输出格式（05 §6）和 MCP 工具的变化记入 CHANGELOG。
-- 发布前在 VM 里把 [发布前 VM 测试](../release-vm-tests.md) 的表全走一遍（真实数据，`scripts/vm/`），发现的问题修掉或记成待办，才打 tag。
-- macOS 和 Linux：`GOOS=linux`、`GOOS=darwin` 能编译，没有运行测试；正式支持在 1.x（00 §5）。
+- Primary platform: Windows amd64. Link the same source twice (06 §8.1):
+  - `archo.exe`: console application, CLI, `archo mcp`, `archo tui`, `archo gui`.
+  - `RimArcho.exe`: `-H windowsgui`; double-click opens the GUI without a console window; `buildinfo.GUI=1`. Scan and analysis children use `CREATE_NO_WINDOW`.
+  - Both executables share a data directory and database and can run together.
+- `scripts/release.ps1 -Version X.Y.Z[-rc1] [-SkipTests]`:
+  1. Validate the version format (semantic versioning), then test: `go test -short -count=1 ./internal/... ./cmd/... ./scripts/... ./spikes/hugslogs ./spikes/corpuslabel` (product code, build helpers and maintained corpus tools; `-short` skips expensive performance checks; omit it after scan or TUI speed changes);
+  2. `CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X buildinfo.Version/Commit/Date"`, marking dirty commits with `-dirty`;
+  3. Before each build, `go run ./scripts/winres` writes `cmd/archo/rsrc_windows_amd64.syso` (icon group ID 3, one PNG each at 16/20/24/32/40/48/64/256; version information: `FileVersion` / `ProductVersion` = release version, `ProductName` RimArcho, `FileDescription` respectively "RimArcho command line" and "RimArcho"); delete afterward; do not commit `.syso`;
+  4. Build Archo Monitor (`monitor/build.ps1`, version rules in 08 §9), place in `monitor/ArchoMonitor/`;
+  5. Package `dist/archo-<version>-windows-amd64.zip`: both executables, README.md, CHANGELOG.md, LICENSE, `monitor/ArchoMonitor/` (no `fonts/` since 2026-10-30);
+  6. Write `dist/archo-<version>-windows-amd64.zip.sha256` (sha256sum format: `<64 lowercase hexadecimal digits>  <zip name>`, 2026-10-31). Upload both ZIP and checksum to GitHub Releases; self-update refuses installation without the checksum (§5.1).
+  The script writes only `dist/`; it never pushes or publishes.
+- The repository is public; do not commit binaries. `internal/icon` generates icons from `portrait.svg` at runtime or release time (06 §8.6).
+- **Building Archo Monitor** (`monitor/`, 08 §9):
+  - SDK-style csproj, `dotnet build`; requires .NET SDK 8+ (`net10.0` requires SDK 10). Compile the same source twice: `net472` (for `1.5/`, `1.6/`, Mono + Harmony 2.x) and `net10.0` (for `1.7/`, Waylith + Harmony 3.x). Handle differences with constants (`RW_UNITY`, `RW_WAYLITH`) and reflection (03 §6.7.5).
+  - Do not commit game assemblies. Default references use NuGet `Krafs.Rimworld.Ref` (`1.5.4409` for 1.5, `1.6.4871` for 1.6, `1.7.4984-unstable` for 1.7). Setting `RimWorldDir=<game directory>` references local game assemblies instead (`RimWorldWin64_Data/Managed`, or game root for 1.7) to build against the local version. Harmony uses `Lib.Harmony` (2.3.x for net472, 3.0.x for net10.0), `ExcludeAssets=runtime`: exclude assemblies from output; use Harmony Mod's at runtime.
+  - `build.ps1 [-Version <version>] [-RimWorldDir <directory>]`: build for 1.5, 1.6 and 1.7, assemble `monitor/out/ArchoMonitor/` (write version to About.xml `modVersion`; source in 08 §9). `go run ./scripts/monitoricon` generates `About/Preview.png` and `About/ModIcon.png` (same source as application icon; do not commit PNGs).
+  - During development, `RIMARCHO_MONITOR=<repository>/monitor/out/ArchoMonitor` selects this build for local RimArcho (08 §9).
+- The feedback relay (`feedback-relay/`) is excluded from releases. The repository owner deploys it to Cloudflare following its README, then sets `Relay` in `internal/feedback/relay.go` (deployed and set on 2026-10-31). Versions with an empty address offer only "open GitHub".
+- Publish through GitHub Releases, tag `v<version>`; mark prereleases (`-rc1`, etc.) as prereleases on GitHub. Self-update: §5.1 (files change only after player confirmation, never unattended). Executables are unsigned (explained in README).
+- No installer: extract and run. Uninstall uses RimArcho's `archo uninstall` / settings › uninstall RimArcho (01 §4.1); after closing, a temporary cmd script deletes the ZIP's files. If an installer is adopted later, its uninstaller becomes the last step and also handles updates (§5.1).
+- Record text output format (05 §6) and MCP tool changes in CHANGELOG.
+- Before release, run the entire [release VM tests](../release-vm-tests.md) table in the VM (real data, `scripts/vm/`); fix findings or record TODOs before tagging.
+- macOS and Linux: `GOOS=linux` and `GOOS=darwin` compile, without runtime testing; official support in 1.x (00 §5).
 
-### 5.1 RimArcho 自己的更新（2026-10-31）
+### 5.1 RimArcho self-update (2026-10-31)
 
-检查是自动的，安装要玩家确认（01 §4）。代码：`internal/selfupdate`（不依赖别的包）、`internal/app/selfupdate.go`，界面见 06 §2.3、§2.14、§2.16、§9.1，CLI `archo update [--check]`（05 §4）。
+Checks are automatic; installation needs player confirmation (01 §4). Code: `internal/selfupdate` (independent of other packages), `internal/app/selfupdate.go`; UI: 06 §2.3, §2.14, §2.16, §9.1; CLI `archo update [--check]` (05 §4).
 
-- **检查**（`app.CheckSelfUpdate`）：自动维护的 `self` 类别（06 §2.16.1 A15），以及设置的“检查更新”、TUI“更新 RimArcho”、`archo update [--check]`（`App.RunAutomaticNow`，记录同自动检查）。`selfupdate.Client.Latest` 读 GitHub Releases（`api.github.com/repos/ToumanLin/RimArcho`；元数据最多 1 MB、15 秒；环境变量 `RIMARCHO_UPDATE_API` 换成测试用的发布服务，VM 测试用，不往正式仓库发）。**通道跟着正在运行的版本**：正式版问 `/releases/latest`（GitHub 跳过草稿和预发布），预发布版（如 `1.0.0-rc1`）问 `/releases?per_page=30`，取版本最高的非草稿发布（含预发布，所以 rc 用户也会收到正式版）。版本按语义化版本比较，`rc2 < rc10`（`selfupdate.Compare`）。开发版（版本不是语义化版本，如 `dev`）不检查、不安装。结果写 meta `self-update`（版本、说明、发布页、两个资产）和 `automatic:self`（`latest` 用来同一个版本只通知一次）；“有没有新版本”每次按正在运行的版本重算（`App.SelfUpdatePending`），装好后旧记录不再算。离线保留上次的结果。
-- **资产**：`archo-<版本>-windows-amd64.zip` 和 `<zip>.sha256`（§5 第 6 步）。缺其中一个的发布只提示，界面让玩家去发布页下载。
-- **安装**（`app.InstallSelfUpdate`）：
-  1. 在程序文件夹里建 `.archo-update/`（写不进去时报错并指向发布页），独占打开其中的 `lock`（Windows 不共享打开，句柄属于进程）：同一个程序文件夹的第二个安装被拒绝（“另一个 RimArcho 正在安装这次更新”），启动时的清理也跳过它。
-  2. 下载到 `download/`：先取校验文件（≤ 64 KB），zip 写 `<zip>.part`，边写边算 SHA-256；字节数等于发布页列出的大小、哈希等于校验文件里的值，才改名为 zip。下载中断、大小或哈希不符、停止，都删掉 `.part`，什么都不改。已经下载好且哈希对的 zip 直接用。上限 200 MB。
-  3. 解开到 `new-<版本>/`（`selfupdate.Extract`）：zip 顶层只允许 `selfupdate.Files`（`archo.exe`、`RimArcho.exe`、`README.md`、`CHANGELOG.md`、`LICENSE`、`monitor/`），拒绝绝对路径、盘符、`..`、符号链接、单个文件超过 200 MB、合计超过 500 MB；两个 exe 必须都在。`\` 和 `/` 都当分隔符（Windows PowerShell 5 的 Compress-Archive 写 `\`）。
-  4. 等程序文件夹里别的 RimArcho（窗口、TUI、`archo mcp`、它们的扫描子进程）都退出（06 §2.16.1 W09）：新版本可能升级数据库，旧版本接着用会出错。等的时候可以停止：不改文件，下载留着下次用。
-  5. 替换（`selfupdate.Apply`）：对每个条目，先把旧的改名进 `old-<旧版本>-<时间>/`，再把新的改名到位。Windows 允许改名正在运行的 exe、不允许删除，所以旧文件是移开不是删掉；它们和新文件都在程序文件夹里，同一个卷，只有改名。任何一步失败就按相反顺序撤回已经做的。zip 里没有的条目不动。
-  6. 核对：用一个临时的空数据目录运行新的 `archo.exe version`（`selfupdate.VersionOf`，最多 20 秒，不随停止中断），报的版本必须是新版本，否则撤回（`Swap.Rollback`）并报“新程序没能启动，已换回 RimArcho <旧版本>”。从第 5 步起，关窗口或退出 TUI 会等这一段做完或撤回（`app.WaitSelfSwap`，06 §2.16.1 W04）。
-  7. 重启由界面做：GUI 用同样的参数启动新的 `RimArcho.exe`（环境变量 `RIMARCHO_UPDATED_FROM=<旧进程 pid>`），任务结果写进记录后关窗口；TUI 退出、关掉数据库后在同一个终端运行新的 `archo.exe` 并等它结束（`cli.restartTUI`）；CLI 只替换，提示重新打开。
-- **清理**：窗口和 TUI 启动时（不挡首屏）`App.CleanSelfUpdate` 先等 `RIMARCHO_UPDATED_FROM` 的进程退出（最多 10 秒），再删 `.archo-update/` 里的 `old-*`、`new-*`、`download/`；还被占用的文件（TUI 的旧进程还在等新进程）留到下次。卸载删整个 `.archo-update/`（01 §4.1）。
-- **不碰**：数据目录、`%LOCALAPPDATA%\RimArcho`、游戏和 Mod。新版本第一次打开时照常升级数据库（02 §7）；旧版本不打开更新的数据库（`unsupported schema version`），所以要退回旧版本得先自己备份数据库（设置 › 数据库 › 备份）。
-- **测试**：`internal/selfupdate` 用 `httptest` 测发布读取与通道、版本比较、校验文件格式、下载中断、校验和大小不符、zip 路径检查、替换与回滚（第 N 次改名失败）、Windows 上改名正在运行的 exe、`VersionOf`；`internal/app/selfupdate_test.go` 用假的 GitHub 测检查、等别的 RimArcho、校验失败、下载中断、新程序起不来时回滚、等待时停止、一次只能有一个安装。真的替换 exe 只在宿主机上用自己编译的副本试；从旧版本更新到新版本在 VM 里测（发布前 VM 测试表）。
+- **Check** (`app.CheckSelfUpdate`): automatic maintenance category `self` (06 §2.16.1 A15), settings "check for updates", TUI "update RimArcho", and `archo update [--check]` (`App.RunAutomaticNow`, recorded like automatic checks). `selfupdate.Client.Latest` reads GitHub Releases (`api.github.com/repos/ToumanLin/RimArcho`; metadata ≤ 1 MB, 15 seconds; `RIMARCHO_UPDATE_API` substitutes a test release service for VM tests without publishing to the production repository). **The running version determines the channel**: stable requests `/releases/latest` (GitHub excludes drafts and prereleases); prereleases (such as `1.0.0-rc1`) request `/releases?per_page=30` and select the highest non-draft version, including prereleases, so rc users also receive stable releases. Compare semantic versions, `rc2 < rc10` (`selfupdate.Compare`). Development builds (non-semantic versions such as `dev`) neither check nor install. Store results in meta `self-update` (version, notes, release page, two assets) and `automatic:self` (`latest` ensures one notification per version). Recalculate update availability against the running version each time (`App.SelfUpdatePending`); old records no longer count after installation. Retain last results offline.
+- **Assets**: `archo-<version>-windows-amd64.zip` and `<zip>.sha256` (§5 step 6). If either is absent, only notify and direct the player to the release page.
+- **Install** (`app.InstallSelfUpdate`):
+  1. Create `.archo-update/` in the application folder (on write failure, report an error and link the release page). Open its `lock` exclusively (Windows non-shared handle owned by the process). Refuse a second installation in that folder ("another RimArcho is already installing the update"); startup cleanup also skips it.
+  2. Download into `download/`: checksum first (≤ 64 KB), ZIP into `<zip>.part`, computing SHA-256 while writing. Rename to ZIP only if its byte count matches the release asset size and its hash matches the checksum. On interruption, size/hash mismatch or stop, delete `.part` and change nothing. Reuse a downloaded ZIP with a correct hash. Limit 200 MB.
+  3. Extract into `new-<version>/` (`selfupdate.Extract`): allow only `selfupdate.Files` at ZIP root (`archo.exe`, `RimArcho.exe`, `README.md`, `CHANGELOG.md`, `LICENSE`, `monitor/`). Reject absolute paths, drive letters, `..`, symbolic links, files over 200 MB and totals over 500 MB; require both executables. Treat `\` and `/` as separators (Windows PowerShell 5 Compress-Archive writes `\`).
+  4. Wait for other RimArcho processes in the application folder (GUI, TUI, `archo mcp`, their scan children) to exit (06 §2.16.1 W09): the new version may migrate the database, making continued use by old versions unsafe. Allow stopping while waiting: change no files, retain the download for next time.
+  5. Replace (`selfupdate.Apply`): rename each old entry into `old-<old version>-<time>/`, then rename the new one into place. Windows permits renaming running executables, not deleting them, so move old files aside. All files remain on the same volume in the application folder; only renames occur. On any failure, reverse completed steps in reverse order. Leave entries absent from the ZIP untouched.
+  6. Verify: run the new `archo.exe version` with an empty temporary data directory (`selfupdate.VersionOf`, up to 20 seconds, not interrupted by stop). Require the new version; otherwise roll back (`Swap.Rollback`) and report "the new program could not start; restored RimArcho <old version>". From step 5 onward, window closing or TUI exit waits for completion or rollback (`app.WaitSelfSwap`, 06 §2.16.1 W04).
+  7. The surface restarts: GUI launches the new `RimArcho.exe` with the same arguments (`RIMARCHO_UPDATED_FROM=<old process pid>`), records task results, then closes. TUI exits, closes the database, runs the new `archo.exe` in the same terminal and waits (`cli.restartTUI`). CLI only replaces files and asks the player to reopen.
+- **Cleanup**: on GUI and TUI startup, without blocking the first screen, `App.CleanSelfUpdate` waits up to 10 seconds for `RIMARCHO_UPDATED_FROM` to exit, then deletes `old-*`, `new-*` and `download/` in `.archo-update/`. Keep files still in use (the old TUI process waiting for the new one) until next time. Uninstall deletes all `.archo-update/` (01 §4.1).
+- **Untouched**: data directory, `%LOCALAPPDATA%\RimArcho`, game and Mods. First opening the new version migrates the database normally (02 §7); old versions refuse newer databases (`unsupported schema version`). Back up the database yourself before reverting (settings › database › back up).
+- **Tests**: `internal/selfupdate` uses `httptest` for release reading and channels, version comparison, checksum format, download interruption, hash/size mismatch, ZIP paths, replacement and rollback (Nth rename failure), renaming running executables on Windows, and `VersionOf`. `internal/app/selfupdate_test.go` uses fake GitHub for checks, waiting for other RimArcho processes, verification failure, interrupted download, rollback when the new program cannot start, stopping while waiting, and single installation. Actual executable replacement is tried only on self-built copies on the host; old-to-new upgrades are tested in the VM (release VM test table).
 
-## 6. 性能目标与实测基线
+## 6. Performance targets and measured baselines
 
-### 6.1 测量环境与口径
+### 6.1 Measurement environment and conventions
 
-- **机器**：Windows 11，RTX 4090 主机，SSD，Go 1.27.2。
-- **真实环境**（玩家本机，测量时只读或用数据目录副本）：RimWorld 1.7.4982 rev1280（Steam，`D:\SteamLibrary`）。1354 个 Mod 文件夹：官方 6、本地 74、工坊 1274（工坊里 64 个只有 `About.xml.disabled`，5 个是退订残留；`Mods/` 里 23 个 RimCrow 的 `_Link_*` junction）。ModsConfig.xml 是 1.6.4871 的列表，485 个条目（482 个能解析，3 个缺失）。261,448 个文件、20.9 GB，语义文件 48,033 个。Player.log 是 1.6 的日志，5814 行、8.7 MB（2026-09-29，1.7 更新之前）。
-- **研究环境**：日志语料研究用的独立数据目录，约 3500 个 Instance（1.6 游戏 + 下载的研究用 Mod 库）。
-- **口径**：内存用工作集（任务管理器“内存”列 = 专用工作集）；专用提交量（private）记录但不作门槛——modernc 的 libc 启动时预留约 33–49 MB 专用提交，大部分不驻留。时间不注明时是墙钟。
-- **cgo 门槛**：只有 TUI 空闲工作集超过 65 MB 才考虑换 cgo 版 SQLite（mattn/go-sqlite3，预计专用提交降到 25–35 MB；代价是每次构建要 mingw-w64、不能简单交叉编译）。
+- **Machine**: Windows 11, RTX 4090 host, SSD, Go 1.27.2.
+- **Real environment** (player's machine, read-only measurements or data directory copies): RimWorld 1.7.4982 rev1280 (Steam, `D:\SteamLibrary`). 1354 Mod folders: 6 official, 74 local, 1274 Workshop (64 Workshop folders have only `About.xml.disabled`, 5 are unsubscribed residue; `Mods/` has 23 RimCrow `_Link_*` junctions). ModsConfig.xml is a 1.6.4871 list, 485 entries (482 resolvable, 3 missing). 261,448 files, 20.9 GB; 48,033 semantic files. Player.log is from 1.6, 5814 lines, 8.7 MB (2026-09-29, before the 1.7 update).
+- **Research environment**: separate data directory for log corpus research, about 3500 Instances (1.6 game + downloaded research Mod library).
+- **Conventions**: memory means working set (Task Manager "Memory" = private working set). Record private committed memory but do not use it as a threshold: modernc's libc reserves about 33–49 MB of private commit at startup, mostly nonresident. Unqualified times are wall-clock.
+- **cgo threshold**: consider cgo SQLite (mattn/go-sqlite3) only if TUI idle working set exceeds 65 MB (expected private commit 25–35 MB; costs mingw-w64 for every build and simple cross-compilation).
 
-### 6.2 总表
+### 6.2 Summary table
 
-2026-10-31，共用选择控件合成基准（Windows / headless Chrome，10 个三选项字段，预热 5 轮后 30 轮中位，包含同步布局）：原生 `<select>` 创建 **0.5 毫秒**，`js/choices.js` 的 `choiceControl` 创建 **0.2 毫秒**，单个菜单展开 **0.3 毫秒**。菜单关闭后释放节点与监听器，100 次开关后无遗留菜单。这里只测合成卡片的控件创建和展开；完整页面加载、原生 WebView2 工作集仍待 VM 验收。
-地址组件合成基准（2026-10-31，Windows / headless Chrome，原生字体，无后端 IO）：同一个 40 行可见路径夹具，改动前后各 7 次取中位；创建 DOM **0.2 → 0.6 毫秒**，插入到经过两帧 **33.1 → 32.9 毫秒**，缩窄到经过两帧 **33.1 → 33.1 毫秒**。两帧口径包含刷新等待，不等于纯 JS 耗时。20 次创建 / 移除页面后，地址的 ResizeObserver 观察目标回到初始数量。只验证地址组件的合成开销及分离节点释放；原生 WebView2 整体内存、首屏和真实 1354 Mod 列表仍按 06 §10 在 VM 验收。
-2026-10-31，Windows 原生窗口 composition hosting 合成对照（`window-chrome` 第 2 阶段）：`internal/testkit` 的 Core + 1 个假 Mod、隔离主目录，每组 5 个新进程，首屏后空闲 30 秒。hosting 开 / 关的首屏中位数 **542 / 574 毫秒**，进程树 private bytes 中位数 **317.4 / 316.4 MiB**，专用工作集中位数 **123.4 / 125.3 MiB**，Go 专用工作集均 **19.8 MiB**。全部首屏 502–605 毫秒。没有清系统文件缓存和 WebView2 profile；测试主机、合成规模、30 秒口径与此前真实规模 / 10 分钟基线不同，不能把差值归因于 hosting，也不能代替 06 §10 的完整验收。原始十次记录与脚本在 `D:\RimArcho-test\window-chrome\composition-results.json`、`measure-native.ps1`；合成主目录已删除，产品保留 hosting。
+2026-10-31, shared choice-control synthetic benchmark (Windows / headless Chrome, ten three-option fields, median of 30 rounds after 5 warm-ups, including synchronous layout): native `<select>` creation **0.5 ms**, `choiceControl` in `js/choices.js` creation **0.2 ms**, opening one menu **0.3 ms**. Closing frees nodes and listeners; no menus remain after 100 open/close cycles. Measures only control creation and opening on synthetic cards; full-page loading and native WebView2 working set await VM acceptance.
+Address component synthetic benchmark (2026-10-31, Windows / headless Chrome, native fonts, no backend IO): same 40-visible-path-row fixture, median of 7 runs before and after; DOM creation **0.2 → 0.6 ms**, insertion through two frames **33.1 → 32.9 ms**, narrowing through two frames **33.1 → 33.1 ms**. Two-frame timings include refresh waiting, not pure JS time. After 20 page creation/removal cycles, address ResizeObserver targets returned to the initial count. Verifies only synthetic component overhead and detached-node release; native WebView2 overall memory, first screen and real 1354-Mod list still require VM acceptance under 06 §10.
+2026-10-31, Windows native-window composition hosting synthetic comparison (`window-chrome` phase 2): `internal/testkit` Core + 1 fake Mod, isolated home, 5 fresh processes per group, idle 30 seconds after first screen. Hosting on / off first-screen medians **542 / 574 ms**, process-tree private bytes **317.4 / 316.4 MiB**, private working set **123.4 / 125.3 MiB**, Go private working set **19.8 MiB** in both. All first screens 502–605 ms. System file cache and WebView2 profile were not cleared. Host, synthetic scale and 30-second convention differ from earlier real-scale / 10-minute baselines; differences cannot be attributed to hosting or replace full acceptance in 06 §10. Ten raw records and scripts: `D:\RimArcho-test\window-chrome\composition-results.json`, `measure-native.ps1`; synthetic homes deleted; product retains hosting.
 
-数据库整理合成基准（2026-10-29，Windows / Go 1.27.2，`RIMARCHO_MAINTENANCE_BENCH=1 go test ./internal/app -run '^TestMaintenanceMedium$' -count=1 -v`）：`internal/testkit.MaintenanceHistory` 构造 40 版、每版 15,000 个文件，以加长路径控制库大小。整理前 **351,555,584 字节（335.27 MiB）**，整理后 **35,573,760 字节（33.93 MiB）**，释放 **315,981,824 字节（301.34 MiB）**，删除 540,000 条旧文件记录，整理 **9.42 秒**（建库时间不计）。独立测试验证 WAL 截断、完整性检查和受保护清单；GUI 合成测试在压缩前暂停整理时页面加载 ≤ 200 毫秒，新任务开始后取消。此数据不代表真实文件路径分布、冷盘或原生窗口表现；未读取玩家数据库、未运行 VM。
+Database maintenance synthetic benchmark (2026-10-29, Windows / Go 1.27.2, `RIMARCHO_MAINTENANCE_BENCH=1 go test ./internal/app -run '^TestMaintenanceMedium$' -count=1 -v`): `internal/testkit.MaintenanceHistory` creates 40 versions, 15,000 files each, using longer paths to control database size. Before **351,555,584 bytes (335.27 MiB)**, after **35,573,760 bytes (33.93 MiB)**, freed **315,981,824 bytes (301.34 MiB)**, deleted 540,000 old file records, maintenance **9.42 seconds** (excluding database creation). Separate tests verify WAL truncation, integrity and protected records. GUI synthetic tests pause maintenance before compaction: page load ≤ 200 ms; cancel when a new task starts. Not representative of real path distributions, cold disks or native windows; no player database read or VM run.
 
-2026-10-29，事实跨版本共用合成基准（4000 Mod、两个版本、760,000 条旧 Def；Windows / Go 1.27.2；每组 3 次中位）：v25 → v26，新库在用大小 **215.7 → 66.6 MB**；第二版本分析 / 保存 **1.363 / 5.502 → 1.111 / 0.457 秒**；190 个不同 Name 查询 **6.297 → 5.589 毫秒**（B1 修复之前；现状见下段），全库 DefCounts **79.40 → 58.89 毫秒**。另一个 760,000 行旧结构库原地迁移 **4.33 秒**，保留查询结果；物理空闲页由后续整理回收。数据构造、原始输出与限制见 [实测报告](../research/2026-10-29_facts-shared-across-versions.md)。这里只验证存储和合成分析成本，完整日志 / 原生页面仍待 VM 验收。
+2026-10-29, facts shared across versions synthetic benchmark (4000 Mods, two versions, 760,000 old Defs; Windows / Go 1.27.2; median of 3 per group): v25 → v26, new database used size **215.7 → 66.6 MB**; second-version analysis / save **1.363 / 5.502 → 1.111 / 0.457 seconds**; 190 distinct Name queries **6.297 → 5.589 ms** (before B1 fix; current state below), full-database DefCounts **79.40 → 58.89 ms**. Another old-schema database with 760,000 rows migrated in place in **4.33 seconds**, preserving query results; later maintenance reclaims physical free pages. Data construction, raw output and limits: [measurement report](../research/2026-10-29_facts-shared-across-versions.md). Verifies only storage and synthetic analysis cost; full logs / native pages await VM acceptance.
 
-2026-10-30，按名字查 Def 复测（同一基准，`RIMARCHO_FACT_BENCH=1 go test ./internal/store -run '^TestFactShareScale$' -count=3 -v`，临时目录设在 `D:\RimArcho-test`；380,000 行 Def、每个版本 4000 行 `content_state`；Windows / Go 1.27.2，改前 1 组、改后 2 组，每组 3 次，同时有其他会话在编译）：B1 修复（`6c67849`，`Store.DefsNamed` 加了 `ORDER BY c.instance_id`）之后，190 个不同 Name 查询是 **457–496 毫秒**：SQLite 为省掉排序，先扫该版本的全部 `content_state`，每行查一次名字索引（03 §3）。改成 `CROSS JOIN` 后 **9.3–11.3 毫秒**；同一次运行里旧 SQL 对照是 747–914 毫秒（这两组时机器更忙，`DefCounts` 也慢了 1.5–2 倍），快 73–94 倍，190 个名字逐条比对结果和顺序都相同。单个 defName 查询 2.55–2.76 毫秒 → **36–48 微秒**。只是合成库的数字；真实日志的首次查询仍按下表“MCP 新日志后第一次”一行在 VM 验收。
+2026-10-30, Def-by-name retest (same benchmark, `RIMARCHO_FACT_BENCH=1 go test ./internal/store -run '^TestFactShareScale$' -count=3 -v`, temporary directory `D:\RimArcho-test`; 380,000 Def rows, 4000 `content_state` rows per version; Windows / Go 1.27.2, 1 group before, 2 after, 3 runs each, other sessions compiling): after B1 fix (`6c67849`, `ORDER BY c.instance_id` added to `Store.DefsNamed`), 190 distinct Name queries took **457–496 ms**. To avoid sorting, SQLite scanned all `content_state` for the version, querying the name index once per row (03 §3). With `CROSS JOIN`, **9.3–11.3 ms**; old SQL in the same run took 747–914 ms (machine busier in these two groups, `DefCounts` also 1.5–2 times slower), a 73–94-fold improvement, with identical results and order for all 190 names. One defName query: 2.55–2.76 ms → **36–48 microseconds**. Synthetic database only; first queries on real logs still need VM acceptance under "MCP first call after a new log" below.
 
-2026-10-31，快照内容类型的派生列（schema v27）合成基准：`go test ./internal/store -run '^$' -bench BenchmarkDerivedContent1354 -benchtime 20x -count 3`，Windows / Ryzen 9 7950X / Go 1.27.2，1354 个当前快照、共 4864 个快照、每个 200 行文件清单（97 万行，和真实库的行数相当），3 次的范围。Mod 库存首次打开的内容类型（`Store.ContentKinds`）**210–212 → 1.4 毫秒**；可转换贴图（`Store.SnapshotsWithPNG`）**32–35 → 0.4 毫秒**；详情的语言 100 次 **7.9–10.6 → 1.0–1.1 毫秒**。代价：扫描写新快照时在 Go 里算两列，1354 个快照全是新的时共 48–61 毫秒（无变化的增量扫描不写新快照，没有这部分）；升级一次读完已存清单，97 万行 **0.50–0.61 秒**（一个事务，不 VACUUM）。研究和原型见 [实测报告](../research/2026-10-30_archo-db-integer-keys.md)。
+2026-10-31, derived snapshot content-kind columns (schema v27) synthetic benchmark: `go test ./internal/store -run '^$' -bench BenchmarkDerivedContent1354 -benchtime 20x -count 3`, Windows / Ryzen 9 7950X / Go 1.27.2, 1354 current snapshots, 4864 total, 200 file rows each (970,000 rows, comparable to the real database), ranges across 3 runs. Content kinds on first Mod inventory opening (`Store.ContentKinds`) **210–212 → 1.4 ms**; convertible textures (`Store.SnapshotsWithPNG`) **32–35 → 0.4 ms**; 100 detail-language queries **7.9–10.6 → 1.0–1.1 ms**. Cost: compute two columns in Go when writing new snapshots, totaling 48–61 ms if all 1354 are new (unchanged incremental scans write no new snapshots and incur none). Upgrade reads all stored manifests once: 970,000 rows in **0.50–0.61 seconds** (one transaction, no VACUUM). Research and prototype: [measurement report](../research/2026-10-30_archo-db-integer-keys.md).
 
-2026-10-31，文件清单压缩块与集合文件列表（schema v28）合成基准：`RIMARCHO_INTKEY_BENCH=1 go test ./internal/store -run '^TestV28Formal$' -v -count=1`（临时目录设在 `D:\RimArcho-test`），Windows / Ryzen 9 7950X / Go 1.27.2，研究用的合成库（`ikPlanLibrary`：1354 个当前快照，其中 4656 个快照有块），同一个库先测 v27、再用正式迁移升级到 v28，每项 3 次中位。库大小（VACUUM 后）**245.5 → 156.2 MB**：`def_fact` 等 Def 表 114.7 → 79.8、DLL 事实 33.8 → 26.9、`snapshot_file` 84.0 → 21.8，新增块 11.9（69.8 万个文件，压缩后 10.1 MB）和集合文件列表 3.0；与研究原型 `combo-setfiles` 修正后的 ≈156 MB 一致。升级 **4.7 秒**（另一次机器更忙时 8.4 秒；不 VACUUM，升级后文件 257 MB、在用 164 MB，之后的整理回收），磁盘峰值 306 MB。查询 v27 → v28：日志找贴图（`InstanceFiles` `%Textures/%`）**141 → 70 毫秒**；按 DLL 名 20 次 **1281 → 407 毫秒**；变更页的文件差异 100 次 21.3 → 13.4；增量扫描读语义文件 103 → 82；Mod 库存首次打开的内容类型 3.6 → 2.9；`DefsOf` 100 次 81.7 → 69.9；`CachedDefs` 541 → 518；`HarmonyPatches` 65 → 53；按 defName 100 次 2.67 → 2.74、按 Name 190 次 4.56 → 5.55（列表缓存冷时 19.7）、`TypeOwners` 100 次 2.1 → 2.8 毫秒，后两项是每次多读一次集合列表（每次几微秒）；写 30 个快照清单 19.5 → 7.5 毫秒。只是合成库，真实库的升级时间和大小按 [发布前 VM 测试](../release-vm-tests.md) 验收。
+2026-10-31, compressed file-manifest blocks and set file lists (schema v28) synthetic benchmark: `RIMARCHO_INTKEY_BENCH=1 go test ./internal/store -run '^TestV28Formal$' -v -count=1` (temporary directory `D:\RimArcho-test`), Windows / Ryzen 9 7950X / Go 1.27.2, research synthetic database (`ikPlanLibrary`: 1354 current snapshots, 4656 snapshots with blocks). Measure v27 then formally migrate the same database to v28; median of 3 per item. Size after VACUUM **245.5 → 156.2 MB**: Def tables including `def_fact` 114.7 → 79.8, DLL facts 33.8 → 26.9, `snapshot_file` 84.0 → 21.8; new blocks 11.9 (698,000 files, 10.1 MB compressed) and set file lists 3.0. Matches corrected research prototype `combo-setfiles` ≈156 MB. Upgrade **4.7 seconds** (8.4 in another busier run; no VACUUM; afterward file 257 MB, used 164 MB, reclaimed by later maintenance), peak disk 306 MB. Queries v27 → v28: log texture lookup (`InstanceFiles` `%Textures/%`) **141 → 70 ms**; 20 DLL-name lookups **1281 → 407 ms**; 100 changes-page file diffs 21.3 → 13.4; incremental scan semantic-file reads 103 → 82; first Mod inventory content kinds 3.6 → 2.9; 100 `DefsOf` 81.7 → 69.9; `CachedDefs` 541 → 518; `HarmonyPatches` 65 → 53; 100 defName lookups 2.67 → 2.74, 190 Name lookups 4.56 → 5.55 (19.7 with cold list cache), 100 `TypeOwners` 2.1 → 2.8 ms. The latter two each read one extra set list (a few microseconds per call). Writing 30 snapshot manifests 19.5 → 7.5 ms. Synthetic database only; real upgrade time and size require [release VM tests](../release-vm-tests.md).
 
-2026-10-28，名字链接视图投影的合成基准：`go test ./internal/view -run '^$' -bench BenchmarkNeeds1354 -benchmem -benchtime=500ms -count=3`，1354 个 Mod、100 条不兼容项。名字候选限定为本项关联的 Mod 后，旧字符串管线对照中位 2.05 ms / 1.09 MiB 分配，加入 `Need.Content` 后中位 3.59 ms / 2.02 MiB 分配（全套测试结束后单独运行）。包名索引和各项的小型名字索引只在生成本次快照时存在，不进入长期缓存。这里的分配量是每次生成的累计分配，不是常驻工作集；没有读取真实游戏，原生窗口的整体内存仍按 06 §10 在 VM 验收。
+2026-10-28, name-link view projection synthetic benchmark: `go test ./internal/view -run '^$' -bench BenchmarkNeeds1354 -benchmem -benchtime=500ms -count=3`, 1354 Mods, 100 incompatibilities. After restricting name candidates to related Mods, old string pipeline median 2.05 ms / 1.09 MiB allocated; with `Need.Content`, 3.59 ms / 2.02 MiB (run separately after the full test suite). Package-ID index and per-item small name indexes exist only while producing this snapshot, not in long-lived caches. Allocation is cumulative per generation, not resident working set; no real game read; native-window overall memory still requires VM acceptance under 06 §10.
 
-版本提醒合成基准（2026-10-28，Windows / Ryzen 9 7950X / Go 1.27.2，`BenchmarkVersionWarnings1354`，1354 个启用 Mod 全部只声明 1.6、游戏 1.7；每组 20 次、3 组中位，前后同一 harness）：`BuildNeeds` 2.53 → 5.43 毫秒，分配 1.97 → 7.24 MB/次；Board 问题摘要及行说明的 JSON 72.7 → 4.13 毫秒、39.34 → 1.71 MB，分配 39.42 → 2.31 MB/次。新增逐个操作增加视图生成成本；单个 Mod 的说明不再携带整份名单，避免返回数据随 Mod 数量平方增长。这里只测后端和序列化，真实窗口与空闲工作集仍按 06 §10 在 VM 验证。
+Version warning synthetic benchmark (2026-10-28, Windows / Ryzen 9 7950X / Go 1.27.2, `BenchmarkVersionWarnings1354`, 1354 enabled Mods declaring only 1.6, game 1.7; 20 runs per group, median of 3 groups, same harness before/after): `BuildNeeds` 2.53 → 5.43 ms, allocation 1.97 → 7.24 MB/run; Board finding-summary and row-description JSON 72.7 → 4.13 ms, 39.34 → 1.71 MB, allocation 39.42 → 2.31 MB/run. New per-item actions increase view-generation cost. A single Mod's explanation no longer includes the entire list, avoiding quadratic response growth with Mod count. Backend and serialization only; real-window and idle working-set validation remains in the VM under 06 §10.
 
-版本清单按需加载后的复测（2026-10-28，同机、同一 harness、每组 20 次、3 组中位）：`BuildNeeds` **2.41 毫秒、2.38 MB/次**，18,531 次分配；JSON **3.71 毫秒、1.35 MB**。本轮修改前复测提交 `51e37f1` 为 9.13 毫秒、7.24 MB/次（时间受当时机器负载影响；上次记录为 5.43 毫秒）。分配剖析定位到 `indexNeeds` 在单个理由覆盖前仍复制汇总动作，约 1.8 MB/次；同时每次构建生成并排序整份清单、重复生成相同文案和解析游戏版本。现在清单由 `ReadVersionWarnings` 打开时生成，汇总动作不再为每行复制，相同声明在同一快照复用文案。
+Retest after loading version lists on demand (2026-10-28, same machine and harness, 20 runs per group, median of 3 groups): `BuildNeeds` **2.41 ms, 2.38 MB/run**, 18,531 allocations; JSON **3.71 ms, 1.35 MB**. Pre-change retest of `51e37f1`: 9.13 ms, 7.24 MB/run (timing affected by machine load; previous record 5.43 ms). Allocation profiling found `indexNeeds` still copying summary actions before overriding individual reasons, about 1.8 MB/run; each build also generated and sorted the full list, regenerated identical text and reparsed game versions. Now `ReadVersionWarnings` builds lists on opening, summary actions are no longer copied per row, and identical declarations reuse text within a snapshot.
 
-| 项 | 目标 | 实测基线 | 结论 |
+| Item | Target | Measured baseline | Conclusion |
 | --- | --- | --- | --- |
-| 游戏日志单击（2026-10-28，合成数据） | 交互 ≤ 50 毫秒，列表保持虚拟化 | guidev / headless Chrome / CDP，200 个 Player.log 聚类、201 条伴生日志，末段单击各 7 次取中位：处理与同步布局 **7.3 → 2.8 毫秒**，至第二个动画帧 **10.9 → 6.7 毫秒**；修复后只挂载视口附近的 26 行，单击保留原行节点 | 合成浏览器检查通过；未测原生 WebView2 空闲工作集 |
-| 能不能跑：缺失父模板汇总（合成数据） | 不在加载页面时扫未启用 Defs；构建 < 50 ms | `BenchmarkParentNeeds`，100 个合成 Mod、每个 5 条问题，Windows / Go 1.27.2，3 次中位；HEAD → 聚焦问题视图：**2.18 → 2.33 ms/op**，**1,021,172 → 951,017 B/op**；同一基准在隔离 HEAD 源码副本与工作树串行运行，提供方查询在打开详情时才执行 | 仅 Go 页面模型与每次分配量；原生 WebView2 的工作集和真实 VM 待测 |
-| 缺失父模板：按需查找未分析的提供方（合成数据） | 仅主动打开详情后执行；可取消且有读取上限（03 §4.3） | `BenchmarkNeverAnalysedParentProviders400`：400 个未启用、从未分析的 Mod，1,198 个 Def 文件（其余每 Mod 3 文件 × 100 Def），Windows / Go 1.27.2，3 次、每次 3 轮，中位 **247.28 ms/op、65,905,552 B/op**；提供方命中仍完整检查其余缺失 Name。行文精简后的 `BenchmarkParentNeeds` 中位 **1.76 ms/op、863,808 B/op**（此前 2.33 ms/op、951,017 B/op） | 分配量不是驻留内存；页面加载不执行提供方查找。原生窗口与真实 VM 待测 |
-| **TUI** 空闲内存（T5，archo 进程） | ≤ 80 MB 工作集；超过 65 MB 才考虑 cgo | 扫描（子进程）+ 浏览 + 能不能跑（子进程分析）+ 查看 + 分析日志后空闲 10 分钟：**47.3 MB**（峰值 57.1，专用 84.8）。不预选日志时：列表 32.3 → 打开问题视图（解析日志）43.6 → 空闲 1 分钟 45.1。其他会话 46–58 MB。刚启动空闲 30–32 MB（Go 堆 5–8 MB） | 达标 |
-| TUI 冷启动到列表可交互 | ≤ 2 秒（命中索引） | 扫描后第一次 0.35 秒，之后 0.10 秒（进程启动到首帧，1354 行）；进程内 50 毫秒；V3 后首帧 105 毫秒 | 达标 |
-| TUI 按键响应（T1） | ≤ 50 毫秒 | 1354 行、340 次按键（滚动、翻页、输入搜索）：中位 < 0.1 毫秒，p95 0.5，最大 1.6。早期：500 行平均 0.02 / 最大 1.2 毫秒，5000 行最大 1.7 毫秒；中文增量搜索最大 0.5（500 行）/ 1.5 毫秒（5000 行）；5.3 万行渲染结果显示宽度全部一致；500 行原型工作集 16 MB | 达标 |
-| TUI 内存的变化过程 | — | 早期（无软上限、全量加载）空闲 78.7 MB：打开库后 10.6、载入一次方案后 29.7、子进程扫描并浏览后 84–89、空闲 2–10 分钟 76–79 MB；当时 Go 堆只用 10–13 MB，Go 运行时约 45 MB，其余约 33 MB 主要是 modernc libc 分配器。加入按需加载、缓存、软上限后：30.8 MB（专用 66.4）。加入日志解析后：44.8 MB（峰值 53.3，专用 81.2），日志分析约多 12 MB | 记录 |
-| **GUI** Go 进程空闲 | ≤ 80 MB | 0.9.0 内存整理后（新数据副本，开发版）：刚启动 21 MB，空闲 22，Mod 库存后 22；启动峰值工作集 67 MB（以前 122）。整理前：头一分钟起一直 85 MB（256px 图标的绘制留下的堆），打开 Mod 库存后才降到 49。更早：空闲 10 分钟 32.7 MB；刚用完 52.5 MB；V0 55.6 MB | 达标 |
-| GUI 整体内存（Go + WebView2，任务管理器口径） | ≤ 200 MB | 见下一行。更早：空闲 10 分钟 141.4 MB（WebView2 6 个进程 108.7 MB）；空闲 5 分钟同为 141.4；刚用完 169.0 MB；V0 152 MB | 达标 |
-| GUI 内存整理前后（0.9.0，同一个数据副本，`LOCALAPPDATA` 改到临时目录，开发版） | 记录 | GPU 加速开：头 10 秒 205 → 140 MB；空闲 60 秒 202 → 138；方案编辑 204 → 138；Mod 库存 175 → 151；回到首页 175 → 146；最小化 171 → 105；进程 7 → 6。GPU 加速关（整理前用同样的 WebView2 开关）：186 → 126；182 → 123；185 → 123；155 → 132；154 → 129；150 → 88；进程 5。WebView2 部分两次测量之间相差约 ±5 MB。§8.3 | 记录 |
-| GUI 冷启动到列表可交互 | ≤ 1.5 秒 | 390–423 毫秒（3 次，`logs/gui.log`） | 达标 |
-| GUI 单次交互 | ≤ 50 毫秒 | 1354 行数据 106 毫秒到达并显示（含方案加载）；点一个 Mod 9 毫秒出详情和缩略图；单击、方向键、筛选在一帧内重绘 | 达标 |
-| 身份提问：页面模型与扫描匹配（2026-10-28，纯合成） | 页面 ≤ 200 毫秒；不在建页时读比较文件清单 | Windows / Ryzen 9 7950X，5 次中位。1354 Mod + 67 条旧提问，`BenchmarkIdentityQuestionPage1354 -benchtime=100x`：`BuildNeeds` **1.35 → 1.62 毫秒**，累计分配 747 → 856 KB/次。`BenchmarkReconcile1354 -benchtime=1x`：无变化 **0.89 → 0.78 毫秒**；全部换成不同内容 **541 → 323 毫秒**，累计分配 81.8 → 83.3 MB/次。比较按需读取数据库，不扫 Mod 文件、不联网 | 页面模型达标；这是合成基准，未测本次改动的真实库和 WebView2 整帧 |
-| 身份比较行摘要（2026-10-28，纯合成） | 页面 ≤ 200 毫秒；建页不查文件记录 | Windows / Ryzen 9 7950X，1354 Mod + 67 条带摘要的问题，`BenchmarkIdentityQuestionPage1354 -benchtime=100x -count=5`：中位 **1.92 毫秒**，累计分配约 **880 KB/次**。`TestIdentityComparisonPruningAndStoredHeadline` 暂时改名文件记录表后仍能生成相同结论 | 页面模型达标；guidev 中文合成夹具已看面板和确认，真实库 / WebView2 待 VM 验证 |
-| GUI 贴图优化：列表（06 §2.13，2026-10-24） | 450 个 Mod 首次 ≤ 1 秒出列表；后台填数时可交互 | Windows 11 / Ryzen 9 7950X / D 盘 Nextorage NVMe SSD / Go 1.27.2；隔离数据目录，真实工坊 1265 个文件夹只读，方案准确启用 450 个非官方 Mod，40,749 个 PNG，最终 267 行有贴图。guidev + Chrome headless 1600×1100：修改前 141–167 毫秒，修改后 133–184 毫秒。`spikes/guidev/textureperf.cjs` 记录真实 DOM、双 rAF 后完成、长任务及事件，并验证快速换范围/缩放、排序、滚动和列宽 | 列表达标；转换从未在真实 Mod 上执行 |
-| GUI 贴图优化：首次估算与再次打开（同一 450-Mod 方案） | 首次后台持续填上；未变时再次打开基本立即有数 | 清空应用缓存、OS 文件缓存已热：全部绘制完成 **5.04 → 2.84 秒**；再次打开 **1.71–2.80 → 0.57–0.79 秒**。最早的原版首次文件访问曾耗 **313.71 秒**；不能与预热后的结果计算纯代码加速比，未清系统缓存复测。后端命中摘要直接读数，只核对路径/大小/mtime 指纹：独立探针 434 毫秒；仍需核对外部未扫描的增删改，这是本机再次打开的下限 | 达标；HDD、清系统缓存后的新版及原生 WebView2 未测 |
-| GUI 贴图优化：阶段与前端代价 | 按实测定位瓶颈；不为每个 Mod 重绘全表 | 450-Mod 原版独立串行计时（OS 热、应用缓存空，5.88 秒）：目录发现 1077 毫秒；贴图枚举/路径整理等 716；打开并读 40,749 个 PNG 头 3396；估算计划 55；头缓存读 18 / 写 365；DDS 记录查询 87。更早 447-Mod 的 pprof：314 秒中 ReadPNGHeader 栈 294.7 秒，os.Open 栈 288.8 秒；没有图像解码。前端同 OS 热首次：脚本+布局+样式 **1964 → 501 毫秒**，创建节点 **110,473 → 11,976**；新版再次打开无 >50 毫秒长任务，另一次首次建立摘要有 2 次、最大 80 毫秒（原版最大 156–262）。估算事件推送一直为 **0**，原本已每 100 毫秒轮询合批；现在未变快照不画、只替换变更行，屏幕外行跳过绘制。阶段为独立测量，后台和前端不可相加 | 大头是文件打开与反复整表建 DOM；保留 PNG 头缓存，新增按指纹/选项/DDS 记录验证的摘要缓存，一页至多一次原子写 |
-| GUI 贴图优化：并发（同一 450-Mod 摘要缓存，3 次中位） | 有限并发，不按 32 线程全开 | 后端 1 / 2 / 4 / 8 worker：**2132 / 1058 / 584 / 352 毫秒**（`BenchmarkTextureSummary`，`RIMARCHO_TEXTURE_PERF_HOME` 指向 tmp 数据目录）。采用最多 4 个、且不超过 GOMAXPROCS；每个 worker 只保留一个 Mod 的文件集合，回调串行，取消后不发布旧请求结果。摘要命中不读取 PNG 头缓存或重新做估算计划；仍逐文件检查元数据 | 本机 SSD 有收益；控制并发和内存，HDD 收益未验证 |
-| 体积 | — | `archo.exe` / `RimArcho.exe` 各 22.7 MB（`-s -w`；加入 Wails 前 17.3 MB）；发布包 zip 36.5 MB（两个 exe + 字体） | 记录 |
-| **扫描** 首次全量 | ≤ 60 秒 | 冷缓存（当天首次）12.5 秒；热缓存 1.7–2.1 秒（4 次）、2.3 秒；峰值工作集 125–140 MB | 达标；冷缓存待复测 |
-| 增量扫描（无变化） | ≤ 3 秒 | 0.58–0.74 秒（进程内）/ 0.61–0.83 秒（墙钟）；0.61 秒，峰值 109 MB。只读带哈希的语义文件行之前峰值 255 MB；`GOGC=50` 时 79 MB | 达标 |
-| 其他扫描 | — | `scan --full`（已有库）1.72 秒，峰值 140 MB；含 about-disabled 的重扫 2.47 秒，峰值 121 MB；5 次扫描后数据库 26.8 MB | 记录 |
-| SQLite 写入 | 500 个 Mod 后常驻 ≤ 50 MB | 写入 137,003 行（500 个 Mod 的实例、快照、文件清单，对应 8.2 GB）1.8 秒（约 7.5 万行/秒）；工作集 21.5 MB（3 次一致），库文件 15.5 MB；专用约 59 MB（其中约 33 MB 是 libc 预留）；空 Go 程序 6 MB | 达标 |
-| **分析** 全量 Def + Patch（+ Harmony） | ≤ 30 秒，峰值 ≤ 400 MB，子进程，结束即释放 | 3.9 秒，峰值 313 MB（482 个 Mod，35,254 个 Def，5433 个操作，2524 个 Harmony 补丁）；含 Harmony 4.6 秒 / 311 MB；不含 Harmony：首次 3.3–4.0 秒（解析 804 个未启用 Mod），有缓存 2.7 秒。子进程软上限 300 MiB 时峰值 310 MB，不设时 435 MB（代价 +0.1 秒） | 达标 |
-| 分析规模 | — | 合并文档 268 万节点、35 MB 文本、35,254 个顶层 Def；7044 次 XPath 求值（6729 次走 defName/@Name 索引，重建 66 次）。没有索引时 58–70 秒（`NodeNavigator.MoveToNext` 占 54% CPU）；有索引 7.8 秒。用 xmlquery 的 DOM 时每节点约 225 字节，峰值 0.8–1.0 GB，所以换成 arena（§8.4） | 记录 |
-| 研究环境分析 | — | 约 3500 个 Instance：74–133 秒 → 3.5–13 秒（schema v10 给分析事实表加 `(instance_id, game_mm)` 索引后） | 记录 |
-| XPath 兼容 | 与日志报告的失败不一致率 < 0.5% | 482 个 Mod、1155 个 Patch 文件、5433 个顶层操作（另有 269 个自定义操作类无法模拟）、0 个编译错误；模拟失败 9 个、日志 7 个，7 个吻合；**不一致 0.037%**，2 个都因被补丁的 Mod 在日志之后改了 defName（`sbzSmallDisplayShelfBase` → `sbzDisplayShelfBase`），不是 XPath 引擎造成的 | 达标 |
-| .NET 元数据 | 与 ilspycmd 一致率 ≥ 95% | 20 个 DLL 560/560，60 个 DLL 920/920（100%）；575 个 DLL 6943 个 HarmonyPatch 特性、0 个解码错误、0.12 秒（约 0.2 毫秒/DLL）；ilspycmd 处理 20 个 DLL 要 14 秒。全部版本目录 1541 个 DLL 0.8 秒：451 个程序集 2524 个补丁，42,240 个类型 | 达标 |
-| **MCP** 单次查询（索引已建） | ≤ 500 毫秒 | `status`、`find_mods`、`get_mod`、`get_def`、`get_patches`、`get_harmony`、`list_problems`、`list_changes`、`analyze_log` ≤ 3 毫秒（5 次中位）；`search_files` 约 310 毫秒；会话第一次调用 49–57 毫秒（从库里读已归因的日志；之前 553 毫秒） | 达标 |
-| MCP 新日志后第一次 `list_problems` / `analyze_log` | ≤ 500 毫秒 | 每份新日志一次，之后存库。2026-10-22（485 个条目的方案、1.6 分析、数据目录副本；`spikes/logfirst`，`App.AnalyzeLog` 进程内，5 次中位）：语料日志 9208b55（2.2 MB、1483 簇）14,115 → **241 毫秒**；f666fc4（7.8 MB、1737 簇）7,809 → **297**；eec1c3d（10.9 MB、534 簇）2,443 → **330**；5b1a59b（2.7 MB、359 簇）1,103 → **128**；本机 1.7 Player.log（26 簇）55 → 47。原来的 568 毫秒里引用方搜索占 455；语料日志更慢的主因是按 `Name` 查 Def 没有索引（每次约 70 毫秒）和长消息上的正则。改法见 03 §6.5：v15 索引、引用索引（分析时建，0.3–0.4 秒、4.8 MB；没有时第一次查询当场建，这次约多 0.3 秒）、分簇按条目记忆。`since` 轮询（03 §6.6）：日志没变 0.25 秒（整个 `archo` 进程）；追加 2 MB 后 0.6 秒 | 达标 |
-| MCP 自检（I4） | — | 13 次调用：冷 3.0 秒（含一次单类型反编译和反编译 3 个程序集），热 0.6 秒 | 记录 |
-| CLI 查询 | — | `status`、`list`、`find`、`mod`、`changes`：34–45 毫秒（含进程启动），工作集约 26 MB；`list --active` 54 毫秒、32 MB | 记录 |
-| **日志** 解析与归因 | — | 8.7 MB / 5814 行 → 153 个簇（patch-failed 14、xref-missing 72、exception 13、xml-load 9、harmony-stack 4、other 41）；`archo log` 端到端 0.57 秒。TUI 进程里分析日志多占约 12 MB | 记录 |
-| 日志实时追踪（L1、L4） | 追加一个异常 1 秒内出现新簇；追加 50 万行同一错误：1 个簇、常驻内存增长 < 20 MB | 分类正则每条约 70 微秒，相同“消息 + 栈顶”只算一次；L1、L4 结果见 03 §7 | 见 03 |
-| **排序**（S5） | 500 个 Mod ≤ 1 秒 | 进程内（载入 + 建图 + 排序 + diff）最快 22 毫秒；算法本身 0.5 毫秒；`sort --dry-run` 墙钟 43–52 毫秒（2090 条边，移动 13 个，1 个环） | 达标 |
-| **搜索** 生效内容（`files search`） | MCP ≤ 500 毫秒 | 482 个 Mod、约 1 万个文件：0.37 秒（8 个读文件 worker，之前 1.1 秒）。2026-10-24 `internal/modsearch`（1.7、484 个启用条目、只走游戏载入的内容子目录，热缓存，3 次）：默认范围 6334 个文件 100–170 毫秒，`--def` 5753 个文件 110–135，`--mode count` 约 100；`--all-versions --languages` 20,919 个文件 380–390；`--kind textures` 60,970 个路径 130–175；整个 `archo` 进程 0.23–0.34 秒；冷缓存第一次约 2 秒（`--all-versions` 冷 3.0 秒）。所在 Def / XPath 只为显示的那一页计算 | 达标 |
-| 源码 | — | `read_source` 一个嵌套补丁类冷 0.7 秒；搜索 3 个程序集 1.7 秒；`source search --active` 估算：424 个程序集、407 个未缓存、27 MB DLL、缓存约 82 MB、约 11 分钟 | 记录 |
-| 存档读取（10 §1） | — | 202 个存档，每个 15–28 MB；最新存档不同的 `<def>` 1382 个，提取 0.11 秒 | 记录 |
-| 列表搜索的内容类型（`type:`） | — | v27 起按主键读 `snapshot.kinds`：合成 1354 个快照 1.4 毫秒（之前对文件清单 GROUP BY：真实库第一次 246 毫秒、合成 210 毫秒，之后每次 < 1 毫秒）；结果仍按数据库变化缓存（`view.ContentCache`） | 记录 |
-| 能不能跑的计数（T8） | 每项一句人话加一个动作 | 真实数据上可操作项从 32 → 19（按“可操作”计数）→ 9（合并 `order.violated`） | 记录 |
-| 对比 | — | RimCrow 常驻 400–500 MB | 记录 |
-| 遍历 Mod 文件夹（`internal/fsscan`，2026-10-24） | 不为列目录另写原生 API | 1,315 个文件夹、28.5 万个文件：串行 3.7 秒，8 / 16 worker 0.61 / 0.55–0.61 秒，再多不变快；`FindFirstFileEx` 更慢，256 KiB 缓冲只快 0–5%；目录 mtime 缓存只省一半还会漏原地覆盖；USN 要管理员。第一次打开文件（Defender）单线程约 1.3 毫秒 / 个，8–16 worker 最快、32 反而慢。`fsscan.Workers`：SSD 16、HDD 2（未实测）、未知 8。详见 docs/research/2026-10-24_small-file-reads-and-load-memory.md | 记录 |
-| 迁移到 fsscan 前后 | — | 整合包 / 卸载算大小（`dirSize`），整个工坊 5,055 → 754 毫秒；无变化重扫 `ComputeSkip`（16 worker）768 → 686 毫秒，分配 586 → 246 MB；贴图页摘要并发 4 → 最多 8 | 记录 |
-| 列表加载占用（06 §2.17） | 再次打开立即有数 | 476 个 Mod 第一次 47 秒（3 万个 DDS 头第一次打开），之后 0.45 秒。1.7 实测（RTX 4090，隔离数据目录，100 / 250 / 484 个 Mod）：原版 + DLC 专用内存 2.30 GB、显存 1.25 GB；484 个 Mod 首次启动 15.1 / 7.3 GB，再次启动 21.9–22.1 / 15.3 GB（显存是引擎的上传水位）；估算范围覆盖 6 次实测中的 5 次 | 记录；1.6 未实测 |
+| Game log click (2026-10-28, synthetic data) | Interaction ≤ 50 ms; list stays virtualized | guidev / headless Chrome / CDP, 200 Player.log clusters, 201 companion-log entries, median of 7 clicks near the end each: handler and synchronous layout **7.3 → 2.8 ms**, through second animation frame **10.9 → 6.7 ms**; after fix only 26 rows near viewport mounted, clicks preserve original row nodes | Synthetic browser check passed; native WebView2 idle working set unmeasured |
+| can it run: missing parent-template summary (synthetic) | No disabled-Defs scan on page load; build < 50 ms | `BenchmarkParentNeeds`, 100 synthetic Mods, 5 findings each, Windows / Go 1.27.2, median of 3; HEAD → focused finding view: **2.18 → 2.33 ms/op**, **1,021,172 → 951,017 B/op**; same benchmark run serially in isolated HEAD source copy and worktree; provider query runs only when opening details | Go page model and allocation only; native WebView2 working set and real VM untested |
+| Missing parent templates: on-demand search for unanalyzed providers (synthetic) | Only on explicit detail opening; cancellable and read-limited (03 §4.3) | `BenchmarkNeverAnalysedParentProviders400`: 400 disabled, never-analyzed Mods, 1,198 Def files (other Mods each 3 files × 100 Defs), Windows / Go 1.27.2, 3 runs of 3 rounds, median **247.28 ms/op, 65,905,552 B/op**; finding a provider still checks all remaining missing Names. After text simplification, `BenchmarkParentNeeds` median **1.76 ms/op, 863,808 B/op** (previously 2.33 ms/op, 951,017 B/op) | Allocation is not resident memory; page loading performs no provider search. Native window and real VM untested |
+| **TUI** idle memory (T5, archo process) | ≤ 80 MB working set; consider cgo only above 65 MB | Scan (child) + browse + can it run (child analysis) + inspect + analyze log, then idle 10 minutes: **47.3 MB** (peak 57.1, private 84.8). Without preselected log: list 32.3 → findings view (log parsing) 43.6 → idle 1 minute 45.1. Other sessions 46–58 MB. Fresh idle 30–32 MB (Go heap 5–8 MB) | Met |
+| TUI cold start to interactive list | ≤ 2 seconds (index hit) | First after scan 0.35 seconds, then 0.10 (process start to first frame, 1354 rows); in-process 50 ms; first frame after V3 105 ms | Met |
+| TUI key response (T1) | ≤ 50 ms | 1354 rows, 340 keystrokes (scroll, page, search input): median < 0.1 ms, p95 0.5, max 1.6. Earlier: 500 rows mean 0.02 / max 1.2 ms, 5000 rows max 1.7 ms; Chinese incremental search max 0.5 (500 rows) / 1.5 ms (5000 rows); all 53,000 rendered rows had equal display width; 500-row prototype working set 16 MB | Met |
+| TUI memory progression | — | Early (no soft limit, full loading) idle 78.7 MB: database open 10.6, one plan loaded 29.7, child scan and browse 84–89, idle 2–10 minutes 76–79 MB. Go heap only 10–13 MB, Go runtime about 45 MB, remaining about 33 MB mostly modernc libc allocator. After on-demand loading, caching and soft limit: 30.8 MB (private 66.4). With log parsing: 44.8 MB (peak 53.3, private 81.2), log analysis adds about 12 MB | Recorded |
+| **GUI** Go process idle | ≤ 80 MB | After 0.9.0 memory cleanup (new data copy, development build): startup 21 MB, idle 22, after Mod inventory 22; startup peak working set 67 MB (formerly 122). Before cleanup: 85 MB from first minute (heap left by drawing 256px icons), falling to 49 only after opening Mod inventory. Earlier: idle 10 minutes 32.7 MB; just used 52.5 MB; V0 55.6 MB | Met |
+| GUI total memory (Go + WebView2, Task Manager convention) | ≤ 200 MB | See next row. Earlier: idle 10 minutes 141.4 MB (6 WebView2 processes 108.7 MB); same 141.4 after 5 minutes; just used 169.0 MB; V0 152 MB | Met |
+| GUI before/after memory cleanup (0.9.0, same data copy, `LOCALAPPDATA` temporary, development build) | Record | GPU acceleration on: first 10 seconds 205 → 140 MB; idle 60 seconds 202 → 138; plan editing 204 → 138; Mod inventory 175 → 151; home 175 → 146; minimized 171 → 105; processes 7 → 6. GPU acceleration off (same WebView2 switches before cleanup): 186 → 126; 182 → 123; 185 → 123; 155 → 132; 154 → 129; 150 → 88; 5 processes. WebView2 measurements varied about ±5 MB. §8.3 | Recorded |
+| GUI cold start to interactive list | ≤ 1.5 seconds | 390–423 ms (3 runs, `logs/gui.log`) | Met |
+| GUI single interaction | ≤ 50 ms | 1354 rows arrive and display in 106 ms (including plan load); clicking a Mod shows details and thumbnail in 9 ms; clicks, arrows and filtering redraw within one frame | Met |
+| Identity questions: page model and scan matching (2026-10-28, synthetic only) | Page ≤ 200 ms; no comparison file manifests read during page construction | Windows / Ryzen 9 7950X, median of 5. 1354 Mods + 67 old questions, `BenchmarkIdentityQuestionPage1354 -benchtime=100x`: `BuildNeeds` **1.35 → 1.62 ms**, cumulative allocation 747 → 856 KB/run. `BenchmarkReconcile1354 -benchtime=1x`: unchanged **0.89 → 0.78 ms**; all replaced with different content **541 → 323 ms**, cumulative allocation 81.8 → 83.3 MB/run. Comparison reads database on demand, no Mod-file scan or networking | Page model meets target; synthetic benchmark, real database and WebView2 full frame unmeasured for this change |
+| Identity comparison row summary (2026-10-28, synthetic only) | Page ≤ 200 ms; no file-record queries during page construction | Windows / Ryzen 9 7950X, 1354 Mods + 67 questions with summaries, `BenchmarkIdentityQuestionPage1354 -benchtime=100x -count=5`: median **1.92 ms**, cumulative allocation about **880 KB/run**. `TestIdentityComparisonPruningAndStoredHeadline` produces identical conclusions with the file-record table temporarily renamed | Page model meets target; panels and confirmation inspected in guidev Chinese synthetic fixture; real database / WebView2 await VM validation |
+| GUI texture optimization: list (06 §2.13, 2026-10-24) | First 450-Mod list ≤ 1 second; interactive while numbers fill in background | Windows 11 / Ryzen 9 7950X / D-drive Nextorage NVMe SSD / Go 1.27.2; isolated data directory, 1265 real Workshop folders read-only, plan enables exactly 450 nonofficial Mods, 40,749 PNGs, 267 final texture rows. guidev + headless Chrome 1600×1100: before 141–167 ms, after 133–184 ms. `spikes/guidev/textureperf.cjs` records real DOM, completion after double rAF, long tasks and events; verifies rapid scope/scale changes, sorting, scrolling and column widths | List meets target; conversion never performed on real Mods |
+| GUI texture optimization: first estimate and reopening (same 450-Mod plan) | First pass fills continuously in background; nearly immediate numbers on unchanged reopen | Application cache empty, OS file cache warm: fully painted **5.04 → 2.84 seconds**; reopen **1.71–2.80 → 0.57–0.79 seconds**. Earliest original first file access took **313.71 seconds**; cannot derive pure code speedup against warm results; no cold-system-cache retest. Backend summary hit reads values directly and checks only path/size/mtime fingerprints: separate probe 434 ms. Must still check external unscanned additions/deletions/changes; this is the local reopen floor | Met; HDD, new version with cleared system cache, and native WebView2 untested |
+| GUI texture optimization: phases and frontend cost | Locate bottlenecks by measurement; no full-table redraw per Mod | Original 450-Mod independent serial timings (OS warm, app cache empty, 5.88 seconds): directory discovery 1077 ms; texture enumeration/path cleanup etc. 716; open/read 40,749 PNG headers 3396; estimate plan 55; header cache read 18 / write 365; DDS-record query 87. Earlier 447-Mod pprof: of 314 seconds, ReadPNGHeader stack 294.7, os.Open 288.8; no image decoding. Frontend, same OS-warm first pass: script+layout+style **1964 → 501 ms**, nodes created **110,473 → 11,976**; new reopen no >50 ms long tasks; another initial summary build had 2, max 80 ms (original max 156–262). Estimate push events always **0**; already polled/batched every 100 ms. Now skip unchanged snapshots, replace changed rows only, skip off-screen drawing. Phases measured independently; backend and frontend times cannot be added | Main cost: file opening and repeated full-table DOM construction. Retain PNG header cache; add summary cache validated by fingerprints/options/DDS records, at most one atomic write per page |
+| GUI texture optimization: concurrency (same 450-Mod summary cache, median of 3) | Bounded concurrency, not all 32 threads | Backend 1 / 2 / 4 / 8 workers: **2132 / 1058 / 584 / 352 ms** (`BenchmarkTextureSummary`, `RIMARCHO_TEXTURE_PERF_HOME` points to tmp data directory). Use at most 4, capped at GOMAXPROCS; each worker retains only one Mod's file set; callbacks serial; canceled requests publish no stale results. Summary hits neither read PNG header cache nor recalculate estimates; still check metadata per file | Benefit on local SSD; concurrency and memory bounded, HDD benefit unverified |
+| Size | — | `archo.exe` / `RimArcho.exe` each 22.7 MB (`-s -w`; 17.3 MB before Wails); release ZIP 36.5 MB (two executables + fonts) | Recorded |
+| **Scan** first full pass | ≤ 60 seconds | Cold cache (first that day) 12.5 seconds; warm 1.7–2.1 (4 runs), 2.3; peak working set 125–140 MB | Met; cold retest pending |
+| Incremental scan (unchanged) | ≤ 3 seconds | 0.58–0.74 seconds (in-process) / 0.61–0.83 (wall-clock); 0.61 seconds, peak 109 MB. Peak before reading only hashed semantic-file rows 255 MB; `GOGC=50`: 79 MB | Met |
+| Other scans | — | `scan --full` (existing database) 1.72 seconds, peak 140 MB; rescan including about-disabled 2.47 seconds, peak 121 MB; database after 5 scans 26.8 MB | Recorded |
+| SQLite writes | Resident ≤ 50 MB after 500 Mods | 137,003 rows (instances, snapshots, file manifests for 500 Mods, 8.2 GB) written in 1.8 seconds (about 75,000 rows/second); working set 21.5 MB (same across 3 runs), database 15.5 MB; private about 59 MB (about 33 MB libc reserve); empty Go program 6 MB | Met |
+| **Analysis** full Def + Patch (+ Harmony) | ≤ 30 seconds, peak ≤ 400 MB, child process freed on exit | 3.9 seconds, peak 313 MB (482 Mods, 35,254 Defs, 5433 operations, 2524 Harmony patches); with Harmony 4.6 seconds / 311 MB; without: first 3.3–4.0 seconds (parsing 804 disabled Mods), cached 2.7. Child soft limit 300 MiB: peak 310 MB, without 435 MB (cost +0.1 seconds) | Met |
+| Analysis scale | — | Merged document 2.68 million nodes, 35 MB text, 35,254 top-level Defs; 7044 XPath evaluations (6729 use defName/@Name indexes, rebuilt 66 times). No indexes: 58–70 seconds (`NodeNavigator.MoveToNext` 54% CPU); indexed 7.8 seconds. xmlquery DOM about 225 bytes/node, peak 0.8–1.0 GB, hence arena replacement (§8.4) | Recorded |
+| Research environment analysis | — | About 3500 Instances: 74–133 seconds → 3.5–13 seconds (after schema v10 added `(instance_id, game_mm)` indexes to analysis fact tables) | Recorded |
+| XPath compatibility | Failure disagreement with logs < 0.5% | 482 Mods, 1155 Patch files, 5433 top-level operations (269 additional custom operation classes cannot be simulated), 0 compilation errors; simulation failed 9, logs 7, all 7 match; **disagreement 0.037%**, both due to patched Mod changing defName after the log (`sbzSmallDisplayShelfBase` → `sbzDisplayShelfBase`), not XPath engine | Met |
+| .NET metadata | Agreement with ilspycmd ≥ 95% | 20 DLLs 560/560, 60 DLLs 920/920 (100%); 575 DLLs, 6943 HarmonyPatch attributes, 0 decoding errors, 0.12 seconds (about 0.2 ms/DLL); ilspycmd needs 14 seconds for 20 DLLs. All version directories: 1541 DLLs in 0.8 seconds, 451 assemblies, 2524 patches, 42,240 types | Met |
+| **MCP** single query (indexed) | ≤ 500 ms | `status`, `find_mods`, `get_mod`, `get_def`, `get_patches`, `get_harmony`, `list_problems`, `list_changes`, `analyze_log` ≤ 3 ms (median of 5); `search_files` about 310 ms; first session call 49–57 ms (reading attributed log from database; formerly 553 ms) | Met |
+| MCP first `list_problems` / `analyze_log` after a new log | ≤ 500 ms | Once per new log, then stored. 2026-10-22 (485-entry plan, 1.6 analysis, data-directory copy; `spikes/logfirst`, in-process `App.AnalyzeLog`, median of 5): corpus log 9208b55 (2.2 MB, 1483 clusters) 14,115 → **241 ms**; f666fc4 (7.8 MB, 1737 clusters) 7,809 → **297**; eec1c3d (10.9 MB, 534 clusters) 2,443 → **330**; 5b1a59b (2.7 MB, 359 clusters) 1,103 → **128**; local 1.7 Player.log (26 clusters) 55 → 47. Referrer search accounted for 455 of the original 568 ms. Corpus logs were slower mainly from unindexed Def-by-`Name` queries (about 70 ms each) and regex on long messages. Fixes: 03 §6.5, v15 index, reference index (built during analysis, 0.3–0.4 seconds, 4.8 MB; if absent, first query builds it, about +0.3 seconds), per-entry clustering memoization. `since` polling (03 §6.6): unchanged log 0.25 seconds (whole `archo` process); after appending 2 MB, 0.6 seconds | Met |
+| MCP self-check (I4) | — | 13 calls: cold 3.0 seconds (including single-type and 3-assembly decompilation), warm 0.6 | Recorded |
+| CLI queries | — | `status`, `list`, `find`, `mod`, `changes`: 34–45 ms (including process start), working set about 26 MB; `list --active` 54 ms, 32 MB | Recorded |
+| **Log** parsing and attribution | — | 8.7 MB / 5814 lines → 153 clusters (patch-failed 14, xref-missing 72, exception 13, xml-load 9, harmony-stack 4, other 41); `archo log` end-to-end 0.57 seconds. In-TUI log analysis adds about 12 MB | Recorded |
+| Live log follow (L1, L4) | New cluster within 1 second of appended exception; 500,000 identical error lines: 1 cluster, resident growth < 20 MB | Classification regex about 70 microseconds/entry; identical "message + top frame" classified once; L1, L4 results in 03 §7 | See 03 |
+| **Sorting** (S5) | 500 Mods ≤ 1 second | In-process (load + graph + sort + diff) best 22 ms; algorithm alone 0.5 ms; `sort --dry-run` wall-clock 43–52 ms (2090 edges, 13 moved, 1 cycle) | Met |
+| **Search** effective content (`files search`) | MCP ≤ 500 ms | 482 Mods, about 10,000 files: 0.37 seconds (8 file-reading workers, formerly 1.1). 2026-10-24 `internal/modsearch` (1.7, 484 enabled entries, only game-loaded content subdirectories, warm cache, 3 runs): default scope 6334 files 100–170 ms, `--def` 5753 files 110–135, `--mode count` about 100; `--all-versions --languages` 20,919 files 380–390; `--kind textures` 60,970 paths 130–175; whole `archo` process 0.23–0.34 seconds; first cold-cache pass about 2 seconds (`--all-versions` cold 3.0). Enclosing Def / XPath computed only for displayed page | Met |
+| Source | — | `read_source` for one nested patch class cold 0.7 seconds; search 3 assemblies 1.7 seconds; `source search --active` estimate: 424 assemblies, 407 uncached, 27 MB DLLs, about 82 MB cache, about 11 minutes | Recorded |
+| Save reading (10 §1) | — | 202 saves, 15–28 MB each; latest save 1382 distinct `<def>` values, extraction 0.11 seconds | Recorded |
+| Content kinds in list search (`type:`) | — | Since v27, primary-key reads of `snapshot.kinds`: synthetic 1354 snapshots 1.4 ms (previous manifest GROUP BY: real database first 246 ms, synthetic 210 ms, later < 1 ms each); still cached by database change (`view.ContentCache`) | Recorded |
+| can it run counts (T8) | One plain-language sentence and action per item | Real-data actionable items 32 → 19 (counted by actionability) → 9 (merged `order.violated`) | Recorded |
+| Comparison | — | RimCrow resident 400–500 MB | Recorded |
+| Mod folder traversal (`internal/fsscan`, 2026-10-24) | No custom native directory-enumeration API | 1,315 folders, 285,000 files: serial 3.7 seconds, 8 / 16 workers 0.61 / 0.55–0.61, no gain beyond; `FindFirstFileEx` slower, 256 KiB buffer only 0–5% faster; directory mtime cache saves half but misses in-place overwrites; USN needs admin. First file open (Defender) about 1.3 ms/file single-threaded, 8–16 workers fastest, 32 slower. `fsscan.Workers`: SSD 16, HDD 2 (unmeasured), unknown 8. Details: docs/research/2026-10-24_small-file-reads-and-load-memory.md | Recorded |
+| Before/after fsscan migration | — | Pack / uninstall size calculation (`dirSize`), whole Workshop 5,055 → 754 ms; unchanged rescan `ComputeSkip` (16 workers) 768 → 686 ms, allocation 586 → 246 MB; texture-page summary concurrency 4 → at most 8 | Recorded |
+| List loading resource use (06 §2.17) | Immediate numbers on reopen | 476 Mods first 47 seconds (first opening 30,000 DDS headers), later 0.45. Measured 1.7 (RTX 4090, isolated data directory, 100 / 250 / 484 Mods): vanilla + DLC private memory 2.30 GB, video memory 1.25 GB; 484 Mods first launch 15.1 / 7.3 GB, subsequent 21.9–22.1 / 15.3 GB (video memory is engine upload high-water mark); estimated range covers 5 of 6 measurements | Recorded; 1.6 unmeasured |
 
-### 6.3 真实数据上的计数（各规格引用）
+### 6.3 Real-data counts (referenced by specifications)
 
-| 项 | 实测 |
+| Item | Measurement |
 | --- | --- |
-| 首次扫描的身份结果（02） | 1286 个 Instance（官方 6、本地 70、工坊 1210）：1282 个 `discovered`、4 个推断副本（`Mods/` 里的 alt 版本）、3 个多成员 Lineage、没有残留 Instance。之后为 1354 个活 Instance，1294 个 Lineage（57 个有多个 Instance） |
-| ACF 订阅 | `WorkshopItemsInstalled` 与 `WorkshopItemDetails` 都是 1269 项，工坊目录有 5 个文件夹不在其中（退订残留） |
-| about-disabled（02 §4.2） | 64 个工坊 + 4 个本地，全部是 RimCrow 把 `About.xml` 改成 `About.xml.disabled` 停用的；64 个工坊里 5 个同时已退订 |
-| 隐藏的 Mod（08 §6） | 69 个：锁定 54（其中 2 个上游有更新）、退订残留 5、单独隐藏 10 |
-| 导入游戏列表（04 §4.2） | 485 个条目，3 个缺失；`status` 提示“这份列表是为 1.6 保存的，游戏 1.7 启动时会重置” |
-| 列表交换（04 §9） | RimCrow 的 `Latest_ModList.rml` 导入 419 条，4 条缺失 |
-| RimCrow 导入（04 §8，dry run） | 1160 条记录映射 1105 条（95.3%；另 55 条未安装）；125 个分组 → 1128 个标签；5 条用户规则在 RimCrow 里是关闭的，默认不导入 |
-| 问题（03，1.7 游戏 + 1.6 列表） | 早期：1 error、322 warning、339 info（316 个 warning 是 version.unsupported）；Harmony：12 multi-transpiler、134 skip-prefix（改为 info 后在这份日志上升级 0 个：99 个 bool prefix 的目标都没出现在日志里）、296 shared-target、97 manual；过期日志处理后 `problems` 为 1 error、46 warning（过期日志的 26 error、86 warning 折叠不计） |
-| 日志语料（03 §6；研究线） | 40,743 份原始日志（2025-07 起按月均匀抽样，采集时清洗；原始 23.3 GB，git 打包 2.61 GiB），其中 40,050 份 1.6 日志进入分析（v5）；研究用 Mod 库 3,709 个文件夹（4,849 个包）；v5 有来源的簇 56.8%。以下是 6,734 份样本时的测量：有来源的归因率：全样本 6734 份 21.2%（前 671 份是 28.4%，小样本偏高；同一批 671 份上规则改进前后 22.5% → 26.1%）；约一半日志违反依赖或加载顺序声明、45% 违反社区规则，100 个 Mod 以上有无违反的日志出错比例相同；23% 的日志 Odyssey 排得太晚（DLC 后启用被追加到末尾）；规则改进使 Core / DLC 被误判为来源从 5875 降到 0（同 671 份），xml-load 有来源 3.3% → 12.8%；1.7 日志原生解析后 `other` 簇 77,795 → 15,280 |
-| 工坊简介图片（09 §5，OCR 依据） | 127 个 VE 条目中，96 个同作者条目全部带 ≥ 3 张图，图片数中位数 27；图里独有文字中位约 2700 字 |
-| RimCrow 实时日志（03 §6） | `RimCrow_Realtime.log` 819 行，`relatedModIds` 一条都没填，只有 44 条标了错误类型 |
+| First-scan identity results (02) | 1286 Instances (6 official, 70 local, 1210 Workshop): 1282 `discovered`, 4 inferred copies (alt versions in `Mods/`), 3 multi-member Lineages, no residual Instances. Later 1354 live Instances, 1294 Lineages (57 with multiple Instances) |
+| ACF subscriptions | `WorkshopItemsInstalled` and `WorkshopItemDetails` each have 1269 entries; 5 Workshop folders are in neither (unsubscribed residue) |
+| about-disabled (02 §4.2) | 64 Workshop + 4 local, all disabled by RimCrow renaming `About.xml` to `About.xml.disabled`; 5 of the 64 Workshop entries also unsubscribed |
+| Hidden Mods (08 §6) | 69: locked 54 (2 with upstream updates), unsubscribed residue 5, individually hidden 10 |
+| Game-list import (04 §4.2) | 485 entries, 3 missing; `status` warns "this list was saved for 1.6; game 1.7 will reset it on launch" |
+| List exchange (04 §9) | RimCrow `Latest_ModList.rml` imports 419 entries, 4 missing |
+| RimCrow import (04 §8, dry run) | 1160 records map to 1105 (95.3%; 55 uninstalled); 125 groups → 1128 tags; 5 user rules disabled in RimCrow, excluded by default |
+| Findings (03, 1.7 game + 1.6 list) | Early: 1 error, 322 warnings, 339 info (316 warnings version.unsupported); Harmony: 12 multi-transpiler, 134 skip-prefix (0 upgraded in this log after changing to info: none of the 99 bool-prefix targets appear in the log), 296 shared-target, 97 manual; after stale-log handling, `problems`: 1 error, 46 warnings (26 errors, 86 warnings from stale logs collapsed and excluded) |
+| Log corpus (03 §6; research track) | 40,743 raw logs (uniform monthly samples since 2025-07, cleaned during collection; raw 23.3 GB, git-packed 2.61 GiB), 40,050 1.6 logs analyzed (v5); research Mod library 3,709 folders (4,849 packages); v5 clusters with sources 56.8%. Earlier measurements on 6,734 samples: sourced attribution rate 21.2% across all 6734 (28.4% in first 671, inflated by small sample; same 671 before/after rule improvements 22.5% → 26.1%); about half violate dependencies or load-order declarations, 45% community rules; above 100 Mods, error proportions same with or without violations; 23% place Odyssey too late (DLC enabled later appended at end); rule improvements reduce false Core / DLC source attribution 5875 → 0 (same 671), sourced xml-load 3.3% → 12.8%; native parsing of 1.7 logs reduces `other` clusters 77,795 → 15,280 |
+| Workshop description images (09 §5, OCR basis) | Of 127 VE entries, all 96 from the same author have ≥ 3 images, median 27; median unique text in images about 2700 characters |
+| RimCrow live log (03 §6) | `RimCrow_Realtime.log` 819 lines, no `relatedModIds` filled, only 44 entries with error types |
 
-## 7. 游戏行为备忘（反编译确认的事实）
+## 7. Game behavior notes (facts confirmed by decompilation)
 
-依据：ilspycmd 反编译 1.7.4982 的 `Assembly-CSharp.dll`，涉及 `Verse.ModsConfig`、`ModLister`、`ModMetaData`、`ModMetaDataInternal`、`ModContentPack`、`LoadedModManager`、`PatchOperation*`、`DirectXmlLoader`。标“实测”的经过真实环境验证。
+Basis: ilspycmd decompilation of 1.7.4982 `Assembly-CSharp.dll`, covering `Verse.ModsConfig`, `ModLister`, `ModMetaData`, `ModMetaDataInternal`, `ModContentPack`, `LoadedModManager`, `PatchOperation*`, `DirectXmlLoader`. Items marked "measured" were verified in a real environment.
 
-**Mod 登记与 ModsConfig.xml**
+**Mod registration and ModsConfig.xml**
 
-1. `ModLister.RebuildModList` 按官方 `Data/` → `Mods/` → **已订阅**的工坊条目的顺序调用 `TryAddMod`。`Mods/` 内按文件夹名顺序登记，所以 `!` 开头的目录排在最前（整合包链接用 `!ArchoPack_` 前缀，08 §3）。
-2. 游戏只枚举**已订阅**的工坊条目：退订后残留在工坊目录里的文件夹不会被加载（实测：本机有一批这样的文件夹）。RimArcho 判“已订阅”的依据是条目出现在 ACF 的 `WorkshopItemsInstalled` 或 `WorkshopItemDetails`（02 §4.2）。
-3. **`_steam` 规则**：packageId 重复、来源不同、而新加入的是工坊副本时，给它设 `appendPackageIdSteamPostfix`，ID 变成 `<pkg>_steam`；保存时写的就是带后缀的 ID。来源相同的重复副本报错并被忽略。读取时：先按完整 ID 匹配；不中再按文件夹名；还不中而带 `_steam` 时去掉后缀再匹配；同一个无后缀 ID 被启用两次时，后一个被停用。（游戏内实测待做：同包名的本地版与工坊版同时存在时进游戏确认。）
-4. `ModsConfig.version` 的主次版本与当前游戏不同时，**整个启用列表被重置**（实测：玩家的 1.6 列表对 1.7 游戏）。所以 RimArcho 写入时总写当前游戏版本（04 §4.1）。
-5. 派生 packageId（About.xml 没写时，`ModMetaDataInternal.TryParsePackageId`）：`ConvertToASCII(author + 描述哈希前 3 位) + "." + ConvertToASCII(name)`；`author` 缺省 `Anonymous`；描述哈希用 `GenText.StableStringHash`（UTF-16，int32 溢出回绕）。官方内容缺 packageId 时 Core 用 `ludeon.rimworld`，其余用 `ludeon.rimworld.<文件夹>`（02 §4.5）。
-6. 官方 DLC 的 About.xml 没有 `<name>`，显示名取 ExpansionDef 的标签，即文件夹名（例如 “Royalty”）。
-7. 日志里 Mod 前缀 `[Name]` 用的是 About.xml 的名字，不是 RimArcho 的别名。
-8. Player.log 位置：1.7 及以后在 `<用户数据>/Logs/Player.log`，更早在用户数据目录根部（02 §2.3）。
+1. `ModLister.RebuildModList` calls `TryAddMod` in order: official `Data/` → `Mods/` → **subscribed** Workshop entries. Within `Mods/`, registration follows folder-name order, so `!` folders come first (pack links use `!ArchoPack_`, 08 §3).
+2. The game enumerates only **subscribed** Workshop entries; folders left after unsubscribing are not loaded (measured: several exist locally). RimArcho considers an entry subscribed if it appears in ACF `WorkshopItemsInstalled` or `WorkshopItemDetails` (02 §4.2).
+3. **`_steam` rule**: if packageId duplicates an existing entry from another source and the new entry is a Workshop copy, set `appendPackageIdSteamPostfix`, making its ID `<pkg>_steam`; save that suffixed ID. Duplicates from the same source produce an error and are ignored. Reading: match full ID, then folder name; if still unmatched and suffixed `_steam`, strip it and retry. If one unsuffixed ID is enabled twice, disable the later entry. (In-game verification pending: coexistence of local and Workshop copies with the same package ID.)
+4. If `ModsConfig.version` major/minor differs from the game, **reset the whole enabled list** (measured: player's 1.6 list with 1.7 game). RimArcho therefore always writes the current game version (04 §4.1).
+5. Derived packageId (when absent in About.xml, `ModMetaDataInternal.TryParsePackageId`): `ConvertToASCII(author + first 3 characters of description hash) + "." + ConvertToASCII(name)`; default `author` is `Anonymous`; description hash uses `GenText.StableStringHash` (UTF-16, wrapping int32 overflow). Official content without packageId uses `ludeon.rimworld` for Core, `ludeon.rimworld.<folder>` otherwise (02 §4.5).
+6. Official DLC About.xml has no `<name>`; display name comes from the ExpansionDef label, the folder name (for example, "Royalty").
+7. Log Mod prefix `[Name]` uses About.xml's name, not RimArcho's alias.
+8. Player.log: `<user data>/Logs/Player.log` in 1.7+, user data root in earlier versions (02 §2.3).
 
-**Def 与 Patch（XPath 模拟必须照顾的行为，03 §5.2）**
+**Def and Patch (behavior XPath simulation must honor, 03 §5.2)**
 
-9. 解析 XML 时忽略注释和空白（`IgnoreComments` / `IgnoreWhitespace`）。
-10. 所有 Mod 的 Def 先合并，再按加载顺序执行 Patch；所以“被后面的 Mod 定义”不会导致落空，`target-later` 的意思是“由后面的 Patch 创建”。
-11. ParentName 继承在 Patch 之后解析（Mod 会用 AttributeAdd 给 Core 的 Def 加 `Name`）。
-12. Def 自己带 `MayRequire` / `MayRequireAnyOf` 时，相应 Mod 没启用就跳过这个 Def。
-13. 只有 `PatchOperationSequence` 列表里的 `li` 才认 `MayRequire`；顶层 Operation 上的不起作用。
-14. `PatchOperationFindMod` 按 Mod 的**显示名**匹配（DLC 见第 6 条）。最初的模拟漏了这一点，产生 2 个误报。
-15. 选中属性节点后做树操作会抛异常，该操作算失败。
-16. 日志里的失败描述就是操作的 `ToString()`，例如 `Verse.PatchOperationAdd(xpath)`、`...Sequence(count=N, lastFailedOperation=...)`；比对以“文件路径 + 描述”为键，一个失败的顶层操作对应一条。
-17. LoadFolders 的 `IfDLCActive` / `IfDLCNotActive` 按 `IfModActive` / `IfModNotActive` 处理，包名去掉 `_steam` 后缀（03 §1）。
+9. Ignore comments and whitespace while parsing XML (`IgnoreComments` / `IgnoreWhitespace`).
+10. Merge all Mods' Defs first, then execute Patches in load order. Thus "defined by a later Mod" does not cause a miss; `target-later` means "created by a later Patch".
+11. Resolve ParentName inheritance after Patches (Mods use AttributeAdd to add `Name` to Core Defs).
+12. A Def with `MayRequire` / `MayRequireAnyOf` is skipped if the relevant Mod is not enabled.
+13. Only `li` in a `PatchOperationSequence` list honors `MayRequire`; it has no effect on top-level Operation.
+14. `PatchOperationFindMod` matches Mod **display names** (DLC: item 6). Initial simulation missed this and produced 2 false positives.
+15. Tree operations on a selected attribute node throw an exception; count that operation as failed.
+16. Failure descriptions in logs are the operation's `ToString()`, such as `Verse.PatchOperationAdd(xpath)`, `...Sequence(count=N, lastFailedOperation=...)`; compare by "file path + description", one entry per failed top-level operation.
+17. Treat LoadFolders `IfDLCActive` / `IfDLCNotActive` as `IfModActive` / `IfModNotActive`, stripping `_steam` from package IDs (03 §1).
 
-**其他**
+**Other**
 
-18. Steam 校验或更新工坊条目时会覆盖其中的文件，所以 RimArcho 从不往工坊目录写标记文件，改 Mod 要先做锁定版本（04 §7）。
-19. 游戏的 `-savedatafolder` 参数让整合包有独立的存档和配置目录（08 §5.3）；Player.log 是否随之改变位置待实测。
+18. Steam verification or updates overwrite Workshop files, so RimArcho never writes marker files there. Create a locked version before modifying a Mod (04 §7).
+19. Game argument `-savedatafolder` gives packs their own save and configuration directories (08 §5.3); whether Player.log follows awaits measurement.
 
-## 8. 工程备注
+## 8. Engineering notes
 
-### 8.1 依赖锁定
+### 8.1 Dependency pinning
 
-- **Wails 锁定 v3.0.0-beta.28**（v3 仍是 beta）。升级要单独验证，包括最小化时的内存目标（§8.3）：它按字段名读 Wails 的私有字段，布局变了就什么也不做，不会出错，但也不再省内存。
-- **charmbracelet/x/ansi**：v0.11.9 与 bubbletea v1.3.10 的 cellbuf 不兼容，不能用。原先锁 v0.10.1；引入 Wails 后最小版本选择把它抬到 v0.11.4、lipgloss 抬到 v1.1.1 的伪版本，`clipperhouse/displaywidth` 需升到 v0.11.0 才能与 uax29 v2.7.0 一起编译；TUI 全部测试通过。
-- **saferwall/pe**：返回原始编码索引，标签位要自己解码；它把堆映射到文件，`Close` 之前要先复制出来。Harmony 的枚举都按 int32 处理（它们确实都是 int32）。
-- **MCP SDK**：工具参数结构的字段必须是直接字段，嵌入结构不会被展开（05 §5.3）。
+- **Wails pinned to v3.0.0-beta.28** (v3 is still beta). Verify upgrades separately, including minimized memory targets (§8.3). This reads Wails private fields by name; layout changes cause a harmless no-op, but memory savings cease.
+- **charmbracelet/x/ansi**: v0.11.9 is incompatible with bubbletea v1.3.10 cellbuf; do not use it. Originally pinned v0.10.1; Wails raised it through minimal version selection to v0.11.4 and lipgloss to a v1.1.1 pseudo-version. `clipperhouse/displaywidth` must become v0.11.0 to compile with uax29 v2.7.0; all TUI tests pass.
+- **saferwall/pe**: returns raw coded indexes; decode tag bits yourself. Heaps map into the file; copy before `Close`. Treat all Harmony enums as int32 (they are all int32).
+- **MCP SDK**: tool argument structures require direct fields; embedded structures are not flattened (05 §5.3).
 
-- **go-git**：本机路径（`file://`）的抓取在没有 `git-upload-pack` 时用进程内实现，测试不依赖系统 Git。它不支持子模块的递归更新和 LFS（02 §3.4 第 10 条）。
-- **SteamCMD 的位置**：订阅只经 `App.FindTool(name) (path, ok)` 要路径（02 §3.4 第 2 条），由设置里的依赖管理提供；测试替换成假的。
+- **go-git**: fetching local paths (`file://`) uses an in-process implementation when `git-upload-pack` is absent; tests need no system Git. It does not support recursive submodule updates or LFS (02 §3.4 item 10).
+- **SteamCMD location**: subscriptions request paths only through `App.FindTool(name) (path, ok)` (02 §3.4 item 2), supplied by dependency management in settings; tests replace it with a fake.
 
-### 8.2 终端与 Windows 的坑
+### 8.2 Terminal and Windows pitfalls
 
-- **东亚“模糊宽度”**：`–`、`…`、`·` 在 Windows Terminal 中占 1 格。runewidth 的 `EastAsianWidth` 被语言环境或 `RUNEWIDTH_EASTASIAN` 打开时对齐会错位，所以必须关闭。Nerd Font 码位属私用区，宽度“不明确”，同样按 1 格。
-- **管道输入**下 bubbletea 把 UTF-8 逐字节解码，所以端到端测试里的中文按键用 `p.Send` 注入；真实控制台的中文输入要人工验证。
-- **GUI**：弹层容器的 `display:flex` 会盖过 `hidden` 属性，形成看不见的遮罩吃掉点击，样式表首行加 `[hidden]{display:none !important}`。`script-src 'self'` 下 Wails 运行时正常，不需要 `unsafe-eval`。服务方法全名 `github.com/ToumanLin/RimArcho/internal/surface/gui.API.<方法>`，`api.js` 用 `Proxy` 拼出。Wails 在 Windows 上用 WebView2 的资源拦截，不开端口（实测没有 TCP 连接或监听）。
+- **East Asian ambiguous width**: `–`, `…`, `·` occupy 1 cell in Windows Terminal. If locale or `RUNEWIDTH_EASTASIAN` enables runewidth's `EastAsianWidth`, alignment breaks; disable it. Nerd Font private-use code points also have ambiguous width; count them as 1 cell.
+- With **piped input**, bubbletea decodes UTF-8 byte by byte, so end-to-end tests inject Chinese keystrokes using `p.Send`; real-console Chinese input requires manual validation.
+- **GUI**: `display:flex` on popup containers overrides `hidden`, creating an invisible click-blocking overlay; start stylesheets with `[hidden]{display:none !important}`. Wails runtime works under `script-src 'self'`, without `unsafe-eval`. Full service method names are `github.com/ToumanLin/RimArcho/internal/surface/gui.API.<method>`, assembled with `Proxy` in `api.js`. On Windows, Wails intercepts WebView2 resources without opening ports (measured: no TCP connections or listeners).
 
-### 8.3 内存手段
+### 8.3 Memory measures
 
-- **TUI 进程**（`tui.TuneProcess`，在 `tui.Run` 第一行）：`debug.SetMemoryLimit(40 MiB)` 软上限、GOGC 50、TUI 唯一连接 `PRAGMA cache_size=-256`（256 KiB 页缓存）。扫描一律在子进程做，主进程不扫描。
-- **按需加载**：`store.Mods` 不取 `decl_blob`，`Mod.Decl()` 用到时才读，排序和分析用 `Store.LoadDecls` 分批读。
-- **缓存**：`app.Loadout()`、`app.Problems()` 按 `Store.ChangeKey()`（`PRAGMA data_version` + `total_changes()`）+ 环境 ID + ModsConfig.xml 的大小和 mtime 缓存；两个 exe 同时打开时也靠 `ChangeKey` 发现对方的修改。`app.Index()` 和链接检查按 `Store.IndexKey()` 缓存，索引另含环境 ID。`store.Open` 安装共享的 `archo_index_gen` 计数表和持久触发器，仅在 environment、source、lineage、instance、snapshot、lineage_data、lineage_tag 改动时推进代次；列表修改不会使其他连接的索引失效。`OpenSession` 不安装触发器、不写库。复制索引保留源代次，避免并发提交后把旧数据标成最新。链接检查一次读取所有环境，只缓存 ID、来源标签、相对路径、真实路径及状态，共用 Instance 不重复加载。
-- **日志懒解析**：`App.LazyLog` 让 TUI 启动时状态栏只读库里存好的归因报告（`App.LogCacheOnly`），打开问题视图才解析新日志。`status`、`mod`（MCP `status`、`get_mod`）从不解析日志。
-- **扫描**：每个来源一个 goroutine，来源内最多 NumCPU 个 worker；ID 在对账阶段按确定顺序分配，与并发无关。增量扫描只加载带哈希的语义文件行；文件夹没变、没重新哈希时清单读完就释放；只有外部状态（如 ACF manifest）变了时，新快照的文件行用 SQL 从旧快照复制。
-- 试过无效的：`PRAGMA shrink_memory`、关闭空闲连接。空闲后 `FreeOSMemory` 保留（计时规则见 06 §2.16.1 M01；空闲初期约少 5 MB）。
-- **GUI 进程**（`gui/memory.go`）：`debug.SetMemoryLimit(256 MiB)`、每个连接 `PRAGMA cache_size=-256`。软上限为并发读取保留临时分配空间；5183 行真实库存与复用的 WAL reader 常驻堆约 100 MiB，128 MiB 下重建页面仍会频繁 GC。原先的 32 MiB 也曾让刷新时的常驻堆贴着上限，改一次列表要 GC 几十到几百次、慢 2–3 倍。Go 在窗口空闲时不会自己回收，所以 `Board`、`Library`、`Needs`、日志/贴图读取结束、扫描结束和离开页面之后，按 06 §2.16.1 M01 防抖执行 `FreeOSMemory`。库存保留按数据库 ChangeKey 失效的 `Library`，避免每次返回重建；离开需要处理 / 日志时丢掉主 App 的日志报告和问题集，独立日志读取会话保留自己的变化感知缓存；离开首页丢掉各方案的问题集。离开贴图页取消未完成的统计。页面在 `openScreen` / `closeScreen` 里调用 `Leave`。旧版基线中，`Library` 约 0.9 MB、索引约 2 MB，显式释放与软上限配合时空闲约 22 MB；这不是新增读取会话后的内存复测值。
-- **装载状态与慢读取**：`s.board.St`、`s.lib.St` 和主 App 缓存共用索引，只各自复制启用列表和工作区。日志使用独立 App / SQLite 连接及互斥锁，保存跨版本分析的挂起状态；贴图读取也使用独立连接，但从主 App 捕获只有名字、引用和目录的目标，不重新加载全库索引。只在捕获输入和发布结果时持共享 API 锁。贴图统计最多 4 个 worker，各自逐 Mod 保留摘要；PNG 文件头在 `cache/textures/` 按路径、大小和 mtime 缓存，页面摘要另存 `summaries-v1.json`，按贴图元数据指纹、选项和 DDS 记录复用，一页至多一次原子写。仍枚举目录核对文件大小和 mtime，以发现未扫描的外部文件变更；转换和还原始终重新验证文件。
-- **其他页面的慢读取**：启动和能不能跑复用独立日志会话；侧栏与列表编辑器共用一个读取会话，Mod 库、列表管理分别保留自己的连接和缓存。冷索引查询由独立 reader 合并，各会话持有独立的可变 Mod 对象；构建页面时短期固定 WAL 只读视图，避免连续列表提交导致同一页反复重建状态，发布前释放。启动页直接读取列表状态，不构造编辑器的全库行。主 App 保持缓存读取模式，不因访问这些页面开启后续请求的同步日志解析。变化、技术详情、设置、环境、整合包列表/详情/编译预览、游戏检测及卸载预览使用短期独立连接，构建完视图即关闭；修改操作仍由主 App 串行执行。环境页只读取环境配置，不重建 Mod 索引；背景查找只从现有索引捕获官方内容和背景 Mod 的名字、目录等小份输入，再在锁外访问文件，并在发布时校验环境。不要在同一个 App 上简单去掉锁，也不要为了一个小设置页保留第二份全库缓存。
-- **包名检查**不用正则：`^[\p{L}\p{N}][\p{L}\p{N} ._\-]{0,63}$` 把两个 Unicode 类复制 63 份，常驻约 1.4 MB。
-- **WebView2 开关**（`gui.BrowserArgs`，经 `application.WindowsOptions.AdditionalBrowserArgs`；环境变量 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` 在 Wails 下无效）：总是 `--enable-features=NetworkServiceInProcess2 --renderer-process-limit=1`，网络服务并进浏览器进程，少一个约 7 MB 的进程（页面不联网，06 §8.2；只有一个页面，限制渲染进程数不改变什么，只是防止多开）；GPU 开着时空闲约省 6 MB，看不出差别。`ui.gpu off`（06 §2.14）再加 `--disable-gpu --disable-gpu-compositing --in-process-gpu`：GPU 进程也没了，空闲再省约 15 MB，Mod 库存约 20 MB，页面改由 CPU 绘制。
-- **最小化**（`gui/winmem_windows.go`）：最小化时调用 `ICoreWebView2_19::put_MemoryUsageTargetLevel(LOW)`，恢复时 `NORMAL`；WebView2 运行时没有这个接口（早于 1.0.2210）时不做。Wails beta.28 不公开它；它内部的 `ICoreWebView2_19` 绑定的 vtable 在 IUnknown 后只列了自己的两个方法，照它调用会调到 `get_Settings`，所以这里按真实 vtable 的槽位直接调用（IUnknown 3 + ICoreWebView2 58 + _2…_18 共 58 + 1 = 120）。WebView2 指针按字段名从 Wails 私有字段取（`WebviewWindow.impl.chromium.webview`）。省下约 45 MB（WebView2 129 → 81 MB）。`TrySuspend` 还要实现一个 COM 回调对象，没做。
+- **TUI process** (`tui.TuneProcess`, first line of `tui.Run`): `debug.SetMemoryLimit(40 MiB)` soft limit, GOGC 50, sole TUI connection `PRAGMA cache_size=-256` (256 KiB page cache). All scans run in children, never in the main process.
+- **On-demand loading**: `store.Mods` omits `decl_blob`; `Mod.Decl()` reads it on demand; sorting and analysis batch-load through `Store.LoadDecls`.
+- **Caching**: `app.Loadout()` and `app.Problems()` cache by `Store.ChangeKey()` (`PRAGMA data_version` + `total_changes()`) + environment ID + ModsConfig.xml size/mtime. Concurrent executables detect each other's changes through `ChangeKey`. `app.Index()` and link checks cache by `Store.IndexKey()`; the index also includes environment ID. `store.Open` installs the shared `archo_index_gen` counter table and persistent triggers, advancing generation only on environment, source, lineage, instance, snapshot, lineage_data and lineage_tag changes. List edits do not invalidate other connections' indexes. `OpenSession` installs no triggers and writes nothing. Copied indexes retain their source generation, avoiding marking stale data current after a concurrent commit. Link checks read all environments once, caching only IDs, source labels, relative paths, real paths and status; shared Instances are not loaded twice.
+- **Lazy log parsing**: `App.LazyLog` makes TUI startup status read only the stored attribution report (`App.LogCacheOnly`); opening findings parses new logs. `status` and `mod` (MCP `status`, `get_mod`) never parse logs.
+- **Scanning**: one goroutine per source, up to NumCPU workers per source. IDs are assigned deterministically during reconciliation, independent of concurrency. Incremental scans load only hashed semantic-file rows. If a folder is unchanged and not rehashed, release its manifest after reading. If only external state (such as ACF manifest) changes, copy file rows from the old snapshot to the new one with SQL.
+- Tried without benefit: `PRAGMA shrink_memory`, closing idle connections. Retain idle `FreeOSMemory` (timing: 06 §2.16.1 M01; about 5 MB less early in idle).
+- **GUI process** (`gui/memory.go`): `debug.SetMemoryLimit(256 MiB)`, `PRAGMA cache_size=-256` per connection. Soft limit leaves room for concurrent read allocations. With 5183 real inventory rows and reused WAL readers, resident heap is about 100 MiB; 128 MiB still causes frequent GC during page rebuilds. The former 32 MiB also kept resident heap near the limit during refresh: one list edit triggered tens to hundreds of GCs, 2–3 times slower. Go does not reclaim memory itself while the window idles, so debounce `FreeOSMemory` under 06 §2.16.1 M01 after `Board`, `Library`, `Needs`, log/texture reads, scans and page departure. Retain `Library`, invalidated by database ChangeKey, to avoid rebuilding on return. Leaving needs attention / logs drops main App log reports and findings; independent log sessions keep their own change-aware cache. Leaving home drops each plan's findings. Leaving textures cancels unfinished statistics. Pages call `Leave` in `openScreen` / `closeScreen`. In the older baseline, `Library` was about 0.9 MB, index about 2 MB; explicit release plus soft limit yielded about 22 MB idle. This is not a memory retest after new read sessions.
+- **Loaded state and slow reads**: `s.board.St`, `s.lib.St` and main App cache share the index, copying only enabled lists and workspaces. Logs use an independent App / SQLite connection and mutex, preserving pending cross-version analysis. Texture reads also use an independent connection, but capture targets with only names, references and directories from main App, without reloading the full index. Hold the shared API lock only while capturing inputs and publishing results. Texture statistics use at most 4 workers, each retaining per-Mod summaries. Cache PNG headers in `cache/textures/` by path, size and mtime; page summaries in `summaries-v1.json`, reused by texture metadata fingerprint, options and DDS records, at most one atomic write per page. Still enumerate directories and check sizes/mtime to detect unscanned external changes; conversion and restoration always revalidate files.
+- **Slow reads on other pages**: launch and can it run reuse the independent log session; sidebar and list editor share one read session; mod library and list management keep their own connections/caches. An independent reader coalesces cold-index queries; sessions own independent mutable Mod objects. Pin a short-lived WAL read view during page construction to avoid repeated state rebuilding under consecutive list commits; release before publication. Launch reads list state directly without constructing all editor library rows. Main App stays in cache-only mode; visiting these pages does not enable synchronous log parsing for later requests. Changes, technical details, settings, environments, pack list/details/build preview, game detection and uninstall preview use short-lived independent connections, closed after constructing views; mutations remain serialized by main App. Environment pages read configuration only, not Mod indexes. Background discovery captures small inputs (official/background Mod names, directories) from existing indexes, accesses files outside the lock, then validates the environment on publication. Do not simply remove locks on one App or retain a second full-library cache for a small settings page.
+- **Package-name validation** avoids regex: `^[\p{L}\p{N}][\p{L}\p{N} ._\-]{0,63}$` copies two Unicode classes 63 times, retaining about 1.4 MB.
+- **WebView2 switches** (`gui.BrowserArgs`, through `application.WindowsOptions.AdditionalBrowserArgs`; `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` is ineffective under Wails): always `--enable-features=NetworkServiceInProcess2 --renderer-process-limit=1`, merging network service into the browser and removing a roughly 7 MB process (page is offline, 06 §8.2; only one page, so renderer cap changes nothing except preventing extras). With GPU enabled, idle savings about 6 MB without visible differences. `ui.gpu off` (06 §2.14) adds `--disable-gpu --disable-gpu-compositing --in-process-gpu`: removes GPU process, saving another about 15 MB idle, 20 MB in Mod inventory; CPU draws the page.
+- **Minimization** (`gui/winmem_windows.go`): call `ICoreWebView2_19::put_MemoryUsageTargetLevel(LOW)` on minimize, `NORMAL` on restore; no-op if runtime lacks the interface (before 1.0.2210). Wails beta.28 does not expose it; its internal `ICoreWebView2_19` binding lists only its own two methods after IUnknown, which would call `get_Settings`. Call the actual vtable slot directly instead (IUnknown 3 + ICoreWebView2 58 + _2…_18 total 58 + 1 = 120). Read the WebView2 pointer by field names from Wails private fields (`WebviewWindow.impl.chromium.webview`). Saves about 45 MB (WebView2 129 → 81 MB). `TrySuspend` also requires implementing a COM callback; not done.
 
-### 8.4 分析的实现
+### 8.4 Analysis implementation
 
-- 包：`internal/xdoc`（arena XML 存储与 NodeNavigator）、`internal/content`（生效内容）、`internal/analyze`（Def 事实、Patch 模拟、问题）、`internal/finding`、`app/analysis.go` 与 `app/problems.go`（输入、存储、新鲜度、声明层）。
-- **arena**：节点是 44 字节的结构，按 64K 个一块分配（第一块像切片一样增长，小文档保持小）；链接用 int32；名字驻留在合并文档和 Patch 文档共用的 `Names` 表；文本放在 1 MiB 的只追加页里，64 KiB 以上的文本单独分配。教训：最初用一个不断增长的文本缓冲，被索引键引用的字符串让每个旧底层数组都活着，常驻约 226 MB。
-- **解析流水线**：最多 8 个 worker 用 `encoding/xml` 把文件切成事件，内存里最多 2 倍 worker 数的文件；文档按加载顺序依次构建。
-- **defName/@Name 索引快速路径是必须的**（没有它 30 秒目标达不到）；失效规则见 `spikes/xpathcompat/index.go`。
-- **子进程**：`debug.SetMemoryLimit(300 MiB)`。
-- **新鲜度**：`AnalysisKey` 哈希分析器版本、游戏主次版本、每个纳入的 Instance 的 ID、快照哈希和位置；用户和社区规则不进键（它们只影响随时计算的声明层）。纳入的 Instance = 启用列表 + 所有活着、可加载、未启用的 Instance（后者只建 Def 事实，作为 `target-inactive` 的定义者）。
-- **存储**：分析槽位、内容集合和引用清理见 03 §3（`store.SaveAnalysis`、`store.PruneFacts`）；日志归因报告和文件引用索引见 03 §6.5。
-- **按方案缓存分析**（schema v12）：按方案启用集合的指纹缓存，保留多份，切换方案不互相驱逐（03 §3）。
+- Packages: `internal/xdoc` (arena XML store and NodeNavigator), `internal/content` (effective content), `internal/analyze` (Def facts, Patch simulation, findings), `internal/finding`, `app/analysis.go` and `app/problems.go` (inputs, storage, freshness, declaration layer).
+- **Arena**: 44-byte node structures, allocated in blocks of 64K (first grows like a slice to keep small documents small); int32 links; names interned in a `Names` table shared by merged and Patch documents; text in 1 MiB append-only pages, separate allocations above 64 KiB. Lesson: an initially growing text buffer left every old backing array alive through strings referenced by index keys, retaining about 226 MB.
+- **Parsing pipeline**: up to 8 workers turn files into events with `encoding/xml`, retaining at most twice the worker count in files; build documents sequentially in load order.
+- **defName/@Name index fast path is mandatory** (otherwise the 30-second target is unreachable); invalidation rules: `spikes/xpathcompat/index.go`.
+- **Child process**: `debug.SetMemoryLimit(300 MiB)`.
+- **Freshness**: `AnalysisKey` hashes analyzer version, game major/minor, each included Instance's ID, snapshot hash and position. User/community rules do not enter the key (they affect only the dynamically computed declaration layer). Included Instances = enabled list + all live, loadable, disabled Instances (the latter build only Def facts as `target-inactive` providers).
+- **Storage**: analysis slots, content sets and reference cleanup: 03 §3 (`store.SaveAnalysis`, `store.PruneFacts`); log attribution reports and file reference indexes: 03 §6.5.
+- **Per-plan analysis caching** (schema v12): cache by fingerprint of enabled set, retain multiple results; switching plans does not evict others (03 §3).
 
-### 8.5 其他
+### 8.5 Other
 
-- 数据库定期整理由 GUI 首屏后以独立会话执行，保留、回收与调度规则统一见 02 §7.1–§7.2；合成数据回归覆盖身份凭据、历史退化、磁盘不足、busy、取消、后台任务与游戏运行保护。手动压缩复用同一流程。
+- GUI performs scheduled database maintenance in an independent session after the first screen. Retention, collection and scheduling: 02 §7.1–§7.2. Synthetic regressions cover identity evidence, history degradation, insufficient disk, busy, cancellation, background tasks and running-game protection. Manual compaction uses the same flow.
 
-- 多个位置解析到同一个真实目录时，主位置按“已是某 Instance 的位置 → 非链接 → 来源对账顺序 → 来源顺序”选，其余记为别名；不跟随 Mod 目录内部的链接；`.git`、`.svn`、`.rimarcho` 不计入指纹（02 §3.3、§4.4）。
-- 工坊简介的外部内容一律不当 HTML 插入，图片只从本地缓存经 `/img/` 读出（06 §8.3）。
-- 环境变量 `ARCHO_MEMSTATS=1`：退出前打印进程内存（测量用）。
-- `app.ChildAnalyze` 发现自己运行在 Go 测试二进制里时拒绝启动子进程，否则测试会无限自启（曾经发生过）。
-- 文件搜索（03 §5.5）不调用 `rg.exe`：纯 Go，字面量先在整个文件上做 ASCII 大小写折叠的 `bytes.Index`，命中后才算行号；正则用 RE2 并以字面前缀预筛。每次搜索约 5–6 千个文件、150 毫秒，在 500 毫秒预算内，所以不建三元组或 defName 索引（索引要随快照失效，收益不抵维护）；Def 的定义与补丁关系另有分析索引（`get_def`）。目录读取和读文件都经过 `modsearch.FS`，以后可换成带缓存的遍历器。
-- 给界面截图用 Win32 `PrintWindow`，不把玩家的前台窗口拉起，也不会截进别的窗口。
+- When several locations resolve to one real directory, choose primary by "already an Instance location → not a link → source reconciliation order → source order"; record others as aliases. Do not follow links inside Mod directories; exclude `.git`, `.svn`, `.rimarcho` from fingerprints (02 §3.3, §4.4).
+- Never insert external Workshop description content as HTML; serve images only from local cache through `/img/` (06 §8.3).
+- `ARCHO_MEMSTATS=1` prints process memory before exit (measurement).
+- `app.ChildAnalyze` refuses child launch inside a Go test binary; otherwise tests recursively relaunch themselves (this happened).
+- File search (03 §5.5) does not invoke `rg.exe`: pure Go. Literal search first uses ASCII-case-folded `bytes.Index` on whole files, calculating line numbers only on hits; regex uses RE2 with literal-prefix prefiltering. About 5–6 thousand files and 150 ms per search, within 500 ms budget, so no trigram or defName index (snapshot invalidation maintenance outweighs benefit). Def-definition and Patch relationships have separate analysis indexes (`get_def`). Directory and file reads use `modsearch.FS`, allowing a cached walker later.
+- UI screenshots use Win32 `PrintWindow`, without bringing the player's window forward or capturing other windows.

@@ -1,214 +1,214 @@
-# 页面加载耗时与优化研究
+# Page Load Times and Optimization Research
 
-研究日期：2026-10-26（本机 PDT）。代码：`dev/0.9.0`，`81017d8`。本报告记录当前实现的观测和优化建议，未实施优化、未提交代码。
+Research date: 2026-10-26 (local PDT). Code: `dev/0.9.0`, `81017d8`. This report records observations of the current implementation and optimization recommendations. No optimizations were implemented or code committed.
 
-## 1. 结论与阅读口径
+## 1. Conclusions and How to Read the Results
 
-最明显的等待来自“手动统计全部 Mod 贴图”（首次 **78.9 秒**，复测 **2.5 秒**）、卸载预览（真实目录 **4.5 秒**）、下载游戏版本信息（匿名 SteamCMD **2.8–2.9 秒**）。在 1.6 环境查看共享的 1.7 日志，还需先补齐跨版本分析，本次隔离数据库中的直接分析耗时 **30.3 秒**。1.6“需要处理”页原分析已过期，从首次展示到自动分析完成并返回新结果实测 **35.2 秒**。这些都不能用异步 API 立即返回的时间替代最终数据就绪时间。
+The clearest waits come from manually measuring all Mod textures (first run **78.9 seconds**, repeat **2.5 seconds**), uninstall preview (real directories **4.5 seconds**), and game download version information (anonymous SteamCMD **2.8–2.9 seconds**). Viewing the shared 1.7 logs in the 1.6 environment also requires cross-version analysis first: direct analysis in the isolated database took **30.3 seconds**. The existing analysis on the 1.6 "needs attention" page was stale; the measured interval from initial display through automatic analysis to fresh results was **35.2 seconds**. The immediate return time of an asynchronous API cannot stand in for final data readiness.
 
-高频页面中，订阅与更新页热缓存仍为 **0.56–0.74 秒**，添加订阅页也走同一重路径；新进程首次打开全库范围为 **1.45 秒**。Mod 库热缓存约 **0.19–0.20 秒 + 22–26 ms JSON 编码**，一次传送约 **5.4 MB**；新进程首次约 **1.46 秒**。启动页首次进入约 **0.75 秒**，重复进入约 **0.17–0.20 秒**。方案管理主面板目前为几十至一百多毫秒，不能沿用此前优化前的秒级判断。
+Among frequent pages, subscriptions and updates still takes **0.56–0.74 seconds** with a warm cache; add subscription follows the same heavy path. The first whole-library request in a new process takes **1.45 seconds**. The Mod library takes about **0.19–0.20 seconds + 22–26 ms JSON encoding** with a warm cache and transfers about **5.4 MB** at once; the first request in a new process takes about **1.46 seconds**. Home takes about **0.75 seconds** on first entry and **0.17–0.20 seconds** on repeat entry. The list management main panel now takes tens to just over a hundred milliseconds; the old, pre-optimization judgment of seconds no longer applies.
 
-建议优先：①拆轻添加订阅并复用订阅页库存读取；②复用卸载预览尺寸缓存；③减少 Mod 库全量 DTO/筛选条重复构建；④按快照增量维护贴图统计与占用统计；⑤启动页/工作区复用同一次读取的分析结果。具体收益是研究目标范围，见第 7 节，未经修改后的对照验证。
+Recommended priorities: (1) make add subscription lightweight and reuse subscription-page inventory reads; (2) reuse the uninstall preview size cache; (3) reduce repeated construction of full Mod library DTOs and filter bars; (4) maintain texture and resource-usage statistics incrementally by snapshot; (5) reuse analysis results from the same read in Home/Workspace. Specific gains are research targets in section 7, with no modified-code comparison yet.
 
-**数字均为后端数据就绪时间，不是 GUI 端到端实测。** 没有启动 GUI、截图或假造 DOM/绘制时间。所有纯本地标签、折叠、菜单都单列映射；“增量后端 0”表示无需新请求，不表示屏幕渲染耗时为零。没有真实数据或需要登录/执行写操作的节点标为未测，并给出测量路径。
+**All figures measure backend data readiness, not end-to-end GUI time.** No GUI was launched, screenshots taken, or DOM/paint timings invented. All purely local tabs, collapsible areas, and menus are mapped separately. "Incremental backend 0" means no new request, not zero screen rendering time. Nodes without real data, or requiring login or writes, are marked unmeasured with a measurement path.
 
-## 2. 数据、隔离与方法
+## 2. Data, Isolation, and Method
 
-### 2.1 实际数据
+### 2.1 Actual Data
 
-| 项目 | 本次样本 |
+| Item | Sample in this study |
 | --- | --- |
-| 机器 | Ryzen 9 7950X，16 核 / 32 逻辑线程；约 63 GiB RAM；Windows 11 Pro 10.0.26200 |
-| 工具 | Go 1.27.2 windows/amd64；当前仓库 GUI 包内临时 Go 测试，直接调用真实 API；图片用 `PageHandler` + `httptest` |
-| 数据目录 | `%APPDATA%\RimArcho`，本机展开为 `C:\Users\Touman_Lin\AppData\Roaming\RimArcho` |
-| 数据库 | 335,196,160 B；6,523 instance、6,791 snapshot、950,168 snapshot_file、601,193 def_fact、1,727 finding、9,455 change_event |
-| 可见 Mod | 两环境 Index 均为 6,506；不等同于全表行数（墓碑/环境归属等过滤） |
-| 游戏 main | `D:\SteamLibrary\steamapps\common\RimWorld`，1.7.4990 rev1069；当前方案 1；工作区列表 481 项 |
-| 游戏 1.6 | `D:\rimworld16`，1.6.4871 rev590；当前方案 4；工作区列表 56 项 |
-| 方案 | 1 default；2 Test；3 default (1.6)；4 Multiplayer Modpack 1.6 (Stable)；5 The Progression Modpack [UPDATED 1.7]。全局共享，两环境均可看到 5 个 |
-| 其他 | 4 plan_collection；2 log_cache；texture_file 为 0；真实 packs 目录无包 |
+| Machine | Ryzen 9 7950X, 16 cores / 32 logical threads; about 63 GiB RAM; Windows 11 Pro 10.0.26200 |
+| Tools | Go 1.27.2 windows/amd64; temporary Go tests in the current repository's GUI package, calling real APIs directly; images via `PageHandler` + `httptest` |
+| Data directory | `%APPDATA%\RimArcho`, locally expanded to `C:\Users\Touman_Lin\AppData\Roaming\RimArcho` |
+| Database | 335,196,160 B; 6,523 instance, 6,791 snapshot, 950,168 snapshot_file, 601,193 def_fact, 1,727 finding, 9,455 change_event |
+| Visible Mods | Both environments' Index contains 6,506; not the full table row count (tombstones/environment ownership and other filters) |
+| Game main | `D:\SteamLibrary\steamapps\common\RimWorld`, 1.7.4990 rev1069; current plan 1; workspace list has 481 entries |
+| Game 1.6 | `D:\rimworld16`, 1.6.4871 rev590; current plan 4; workspace list has 56 entries |
+| Plans | 1 default; 2 Test; 3 default (1.6); 4 Multiplayer Modpack 1.6 (Stable); 5 The Progression Modpack [UPDATED 1.7]. Shared globally; both environments see all 5 |
+| Other | 4 plan_collection; 2 log_cache; texture_file is 0; real packs directory has no packs |
 
-先读了 [顶层设计](../00-top-level-design.md)、[架构](../00a-architecture.md)、[工程规格](../specs/07-technology-and-engineering.md) 和 [界面规格](../specs/06-ui/README.md)，随后以实际路由与调用为准枚举。GUI 是 Wails v3 + 原生 ES modules；薄 API → `internal/view` → `internal/app` → SQLite/磁盘。这里的直接调用绕过 Wails 桥接，不会把 Go 耗时误称为画面加载时间。
+Read the [top-level design](../00-top-level-design.md), [architecture](../00a-architecture.md), [engineering spec](../specs/07-technology-and-engineering.md), and [UI spec](../specs/06-ui/README.md) first, then enumerated actual routes and calls. The GUI is Wails v3 + native ES modules; thin API → `internal/view` → `internal/app` → SQLite/disk. Direct calls here bypass the Wails bridge, so Go duration is not called screen load time.
 
-### 2.2 冷、首次进入、热的定义
+### 2.2 Definitions of Cold, First Entry, and Warm
 
-- **C（会话冷）**：新 `app.Open` / `newAPI`，不预先读 Workspace，单次调用。数据库打开时间在计时外；保留已有持久缓存；同一测试进程可能复用进程级内容缓存。不能称为进程冷、OS 冷或首次安装。
-- **E（首次进入）**：另一新 API 先完成 Workspace，再第一次打开目标页。通常更接近应用已打开后点击侧栏的路径。Workspace 完成时间不重复计入目标页。
-- **H（热）**：同一 API 的后续 5 次调用中位数。表中 C/E 各 1 次，H 为 5 次；样本量不足以推导 p95。跨页顺序和磁盘缓存可使 C 小于 E，不能据此判定倒退。
-- **P（进程冷）**：单独编译测试程序，每次启动新进程，直接调用目标 API，无预读 Index/Loadout。main 每项 3 个独立进程，取中位数及范围；OS 文件缓存仍保留。
-- **异步最终**：Workspace 等 `environment` 完成事件；Build、PlanLoadCost、Textures 等最终结果。本测试每 1 ms 轮询；前端 Build 实际每 50 ms、贴图/占用每 100 ms 轮询，显示结果还会增加约 0–50 / 0–100 ms，再加桥接与渲染。
-- JSON 时间另计：`json.Marshal` 在 API 返回后测量，不含 JS 解码、DOM、图片解码。Windows 小时间出现 0，统一记作 `<1 ms`。
+- **C (session cold)**: new `app.Open` / `newAPI`, one call without reading Workspace first. Database opening is outside the timer; existing persistent caches remain; the same test process may reuse process-level content caches. This is not process cold, OS cold, or first installation.
+- **E (first entry)**: another new API completes Workspace, then opens the target page for the first time. Usually closer to clicking the sidebar after opening the app. Workspace completion is not counted again in the target page.
+- **H (warm)**: median of the next 5 calls on the same API. Each table has 1 C/E call and 5 H calls, insufficient for p95. Cross-page order and disk caches can make C lower than E; that alone does not show a regression.
+- **P (process cold)**: compile the test program separately; each run starts a new process and directly calls the target API without pre-reading Index/Loadout. Each main item uses 3 independent processes, reporting median and range; OS file caches remain.
+- **Asynchronous final**: wait for Workspace's `environment` completion event or the final Build, PlanLoadCost, Textures result. This test polls every 1 ms; the frontend actually polls Build every 50 ms and textures/usage every 100 ms, adding about 0–50 / 0–100 ms before display, plus bridge and rendering time.
+- JSON time is separate: `json.Marshal` is measured after API return, excluding JS decoding, DOM, and image decoding. Small Windows timings reported as 0 are recorded as `<1 ms`.
 
-测量串行执行；profile 与主要计时分开。分阶段样本各 3 次，记录中位数；阶段会改变缓存温度，累计调用也可能重叠，不能把它们直接求和作为页面总耗时。没有清空 Windows 文件缓存或为了制造“冷”而删除真实缓存。
+Measurements ran serially; profiling was separate from main timing. Phase samples ran 3 times and report medians. Phases change cache temperature, and cumulative calls may overlap, so they cannot be summed directly as page totals. Windows file caches were not cleared, nor were real caches deleted to manufacture "cold" conditions.
 
-### 2.3 隔离与副作用边界
+### 2.3 Isolation and Side-Effect Boundaries
 
-通过 SQLite 只读连接的 `backup()` 建立 `.cache/page-load-20261026/home/archo.db`，复制 config.toml、tasks.json 和真实 cache；游戏、Mod 与日志继续读真实路径。原始备份 SHA-256 为 `6a9abaf587854829581a3b4adfb2aa2595f6ff50adcced7e6fc80e86ca70fa1b`。所有正常 API 的数据库/缓存写入落在副本。账户会话/cookie目录未复制，所以Settings账户状态不等于保留真实已登录会话的场景；生产设置页若恰逢4小时自动站点验证，还可能多一次最长10秒网络等待，本次未覆盖。未复制 WebView/WezTerm 等宿主目录，所以又使用副本 Store + 真实 `Home` 直接调用已审查为只读的 `PlanUninstall` 补测目录尺寸；未调用 `Uninstall` / `UninstallRun`。
+Created `.cache/page-load-20261026/home/archo.db` using `backup()` through a read-only SQLite connection, and copied config.toml, tasks.json, and the real cache. Games, Mods, and logs were still read from real paths. The original backup SHA-256 is `6a9abaf587854829581a3b4adfb2aa2595f6ff50adcced7e6fc80e86ca70fa1b`. All normal API database/cache writes went to the copy. Account sessions/cookie directories were not copied, so Settings account state does not represent retained real login sessions. If production settings coincides with the 4-hour automatic site verification, it may add up to 10 seconds of network waiting; this was not covered. Host directories such as WebView/WezTerm were not copied either, so directory sizes were additionally measured using the copied Store + real `Home`, directly calling `PlanUninstall` after reviewing it as read-only. `Uninstall` / `UninstallRun` was not called.
 
-主轮次禁用 HTTP、SteamWorker 和自动 AnalyzeRunner，避免后台扫描/分析污染计时，因而体现“现有扫描结果下打开页面”。**SteamCMDRun 与 SteamWorker 是不同通道**：`GuideDownloadInfo` 仍真实执行了匿名 `app_info_update` / `app_info_print 294100`，返回 21 个公开分支，这是表中约 3 秒的来源。没有登录真实 Steam 账号，没有订阅、退订、删除、安装工具、部署或启动游戏。随后仅对 Harmony 公开描述做了少量无登录 HTTP 读取，结果见第 5 节。日志跨版本分析另在副本显式运行并单列，未将原先被禁用后的错误返回当作就绪。
+The main round disabled HTTP, SteamWorker, and automatic AnalyzeRunner to keep background scanning/analysis out of timing. It therefore represents opening pages with existing scan results. **SteamCMDRun and SteamWorker are separate channels**: `GuideDownloadInfo` still actually ran anonymous `app_info_update` / `app_info_print 294100`, returning 21 public branches; this accounts for the roughly 3 seconds in the table. No real Steam account login, subscription, unsubscription, deletion, tool installation, deployment, or game launch occurred. A few unauthenticated HTTP reads of Harmony's public description followed; see section 5. Cross-version log analysis was explicitly run separately on the copy; errors from disabled analysis were not counted as readiness.
 
-`%APPDATA%\RimArcho\refnums` 本次不存在，DB 中亦无 `ui.gui.refnums` 记录，无法核实 `hom22` 等具体编号。以下只引用 [refnums.js](../../internal/surface/gui/assets/js/refnums.js) 的真实前缀，不编造数字。
+`%APPDATA%\RimArcho\refnums` did not exist, and the DB had no `ui.gui.refnums` record, so specific numbers such as `hom22` could not be verified. Only real prefixes from [refnums.js](../../internal/surface/gui/assets/js/refnums.js) are cited below; no numbers are invented.
 
-## 3. 当前页面树与逐节点测量映射
+## 3. Current Page Tree and Measurement Mapping by Node
 
-入口依据：[navigation.js](../../internal/surface/gui/assets/js/navigation.js) 的 `openPage/go`、[shell.go](../../internal/surface/gui/shell.go) 的 Nav、各页的 `api.*` 调用。树中的 `L` 表示已由父 payload 提供，进入该子节点无需新后端请求（C/H 增量均 0，DOM 未测）；`U` 表示第 6 节说明的未测路径。任意搜索词、每条数据行和每个按钮状态不另算无穷多个页面，列出它们的入口类型与代表性实测。
+Entry points come from `openPage/go` in [navigation.js](../../internal/surface/gui/assets/js/navigation.js), Nav in [shell.go](../../internal/surface/gui/shell.go), and each page's `api.*` calls. `L` in the tree means the parent payload already supplies the data: entering the child needs no new backend request (incremental C/H both 0; DOM unmeasured). `U` marks an unmeasured path explained in section 6. Arbitrary search terms, every data row, and every button state are not counted as infinitely many pages; their entry types and representative measurements are listed.
 
 ```text
 RimArcho GUI
-├─ 全局外壳 / 侧栏 / 面包屑 / 环境和方案选择 → Init、Shell、Workspace（表 A）
-│  ├─ 跨环境切换 / 打开另一方案 → Workspace；实际切换动作未对真实配置执行
-│  ├─ 命令面板 → Palette；帮助 / 快捷键弹窗 → Keys（表 C）
-│  ├─ 选择 / 输入 / 通用确认 / 文本弹窗 / 右键菜单 → L；动态内容见对应页 API
-│  └─ 表格列显隐 / 列顺序 / 菜单 / 拖拽分隔条 → L；读保存的 Setting 很小，保存未执行
-├─ 启动 [hom] → Home + HomeBackground 并发（表 A）
-│  ├─ 游戏选择、该游戏方案/包卡片、上次运行、状态与变化 → 父 payload
-│  ├─ 隐藏/展开问题、键盘焦点、同一数据内的卡片切换 → L
-│  └─ 背景 JPEG → /bg（表 F）；选用其他游戏/方案会写选择，本次用目标环境会话模拟读取
-├─ 能不能跑 / 需要处理 [run] → Needs（表 A）
-│  ├─ 会坏档/无法运行、上次运行错误、需确认、隐藏 Mod 四分区 → L
-│  ├─ 更多操作、选择禁用对象、身份确认选择、证据文本 → 父数据或 Inspect（表G）
-│  └─ 日志 / Mod 详情跳转 → 对应独立节点；重新检查属于 Analyze 操作（U）
-├─ Mod 库
-│  ├─ 全部 [lib] → Library（表 A）
-│  │  ├─ 搜索 harmony / 来源 workshop 筛选 / 排序 → Library，代表值已测
-│  │  ├─ 家族展开、副本行、列菜单 / facet 菜单 → L；本地虚拟滚动不减少传输数据
-│  │  ├─ 右侧详情 → Detail + LibraryFields（表 C / D），工坊详情按需补取（表 F）
-│  │  └─ 副本操作预览/确认 → LibraryPreview / OpPreview（表G单Mod；其他范围U）；标签/备注/位置见公共弹窗
-│  ├─ 订阅与更新 [chg] → SubscriptionsPage（表 A）
-│  │  ├─ 当前列表 / 全部 Mod / 单 Mod 家族范围 → 三个独立请求均已测
-│  │  ├─ 待更新 / 已更新、按日期折叠、来源状态、选中项详情 → L
-│  │  ├─ 文件变化明细展开 → ChangeFiles，真实前后快照补测（表 F）
-│  │  └─ 来源检查 / 更新 / 重新下载 / 取消订阅预览与确认 → 表G单Mod预览；任务执行U
-│  └─ 添加订阅 [sub] → SubscriptionsPage(false, "")（表 A）
-│     ├─ 自动识别 Workshop / Git / 网页 / LoversLab、Steam/SteamCMD方式 → 本地表单 L
-│     ├─ Workshop 确认预览 → SubscribePreview（表 F，仅 --dry-run）
-│     ├─ 网页元数据 / Git branch/tag/commit / LoversLab文件、协议与认证页 → U / 公共网页失败样本表 F
-│     └─ 选择下载目录/zip、认证文件 / 原生站点登录窗口 → U
-├─ 列表
-│  ├─ 当前/指定列表编辑器 [edt] → Workspace（表 A）
-│  │  ├─ 未启用 / 已启用 / 暂存三栏及选择、排序菜单 → 父数据 L
-│  │  ├─ 栏内搜索 → Filter；顶部跨栏筛选及 facet → BarFilter（表 D）
-│  │  ├─ 右侧详情 → Detail + LibraryCopy（表 C / D）
-│  │  ├─ 历史抽屉 → History；副本选择 → ModCopies；行操作 → RowOps
-│  │  ├─ 标签编辑 → TagCandidates；移动到位置 → PosOptions；备注输入 → ModNote
-│  │  └─ 排序 / 写入游戏 / 启动预览 → Preview(sort/save/launch)（表 C），未应用动作
-│  ├─ 全部列表 [lst] → PlanManage，全部 5 个方案分别已测（表 B）
-│  │  ├─ 名称 / 游戏版本 chips / 关注合集 / 关注模式 / 差异与缺失条目 → 父 payload L
-│  │  ├─ 占用统计面板及 Top 明细 → PlanLoadCost → PlanLoadCostMeasure（表 B / D）
-│  │  ├─ 关注合集自动检查（过 10 min）→ PlanCheck（U，网络分支未混入主面板）
-│  │  ├─ 新建/复制/草稿 → CheckPlanName、PlanSources / PlanFroms（表 C）
-│  │  │  ├─ 空白 / 现有列表、游戏版本 / 从存档来源选项 → PlanSources 返回；选项切换 L
-│  │  │  └─ 导入文件/文本/合集预览 → ExchangeInfo、ImportPreviewFor（表 C；合集 U）
-│  │  └─ 重命名 / 删除确认 → CheckPlanName、RemovePlanWarn（表 C / D），未应用
-│  ├─ 导入 [imp] → ExchangeInfo；选格式/目标/粘贴/预览 → ImportPreviewFor
-│  │  └─ 合并/替换/新建、缺失订阅选择 → 预览数据 L；应用/订阅/原生选择器 U
-│  ├─ 导出 [exp] → PlanExport + ExchangeInfo（表 C / D）
-│  │  ├─ archo / rimsort / rml / rimcrow-xml / rimcrow / text / modsconfig / workshop → 8格式均已测
-│  │  └─ 输出文本、复制/保存结果及覆盖确认 → L / U（未写剪贴板或导出文件）
-│  └─ 创建整合包 [bld] → BuildPage → BuildPageResult（表 A / D）
-│     ├─ 名称检查 → PackNameCheck；目的路径、步骤、阻止原因 → 父 payload
-│     ├─ 不转换 / 100 / 80 / 75 / 60 / 50 / 40 / 25% → 切选项仅 L，点击“扫描统计”才重新请求
-│     ├─ 先看清单 → PackDryRun（表 F）
-│     └─ 编译进度 / 错误 / 继续未完成包 / 完成包 → U（不实际构建）
-├─ 整合包 [pak] → Packs（表 A，真实为空）
-│  ├─ 单包 pack:<name> / Mod表 / 说明 / 存档等详情 → Pack（U，无真实样本）
-│  ├─ 未完成构建条目 / 进度 → U，无真实样本
-│  └─ 启动检查、导出预览 / 删除确认 → PackLaunch / PackExport / PackRemovePreview（U）
-├─ 贴图优化 [tex] → TexturesInfo(plan/all)（表 A）
-│  ├─ 当前列表 / 全部范围、比例和编码器选择 → TexturesInfo 或已有本地选项
-│  ├─ 手动“统计”→ Textures → TextureMeasure，含全库首轮78.9s（表 A / D）
-│  ├─ 统计行详情 / 展开 / 进度 → 已返回 payload L
-│  └─ 工具安装确认 / 转换 / 清理 / 停止及结果 → U（未执行）
-├─ 游戏环境 [env] → Environment（表 A）
-│  ├─ 路径 / 版本 / 启动方式 / 存档 / 参数编辑 → 已有组数据 L；原生路径选择 U
-│  ├─ 删除环境确认 → EnvRemovePreview（表 C），不执行删除
-│  └─ 添加环境 → 引导 [gui]
-├─ 设置 [set] → Settings + Backgrounds + Tasks 并发（表 A）
-│  ├─ 外观：主题、强调色 → Settings 同一次返回；打开选项 L（实际修改会写配置，未测）
-│  ├─ 启动页背景 → Backgrounds(initial/complete)
-│  │  ├─ 游戏、每个背景Mod、自选图片分组标签 → L；缩略/大图 /bg → 表 F
-│  │  └─ 暗化、模糊、焦点、收藏、轮播选项 → 已有数据；选图/删除/保存未执行
-│  ├─ RimArcho 管理目录 → Settings；检查目录弹窗 → Directories
-│  │  └─ 更改/移动位置确认 → DirectoryMovePreview（U），路径选择 U
-│  ├─ Mod 文件夹 → Settings；添加/移除确认 L，未应用
-│  ├─ 账户 → Settings 中状态；登录/忘记/网页登录/Steam验证弹窗 → U
-│  ├─ 外部工具 → Settings 中状态；安装信息确认 ToolInstallOffer → U
-│  ├─ 界面 / 社区数据 / 数据库 / 缓存 / 游戏日志 → Settings 同一请求的6组，增量 L
-│  │  └─ 缓存清理 / 数据库清理 / 日志重读等确认 → 已有文本 L；执行及结果 U
-│  └─ 卸载 [del] → UninstallPlan（表 A / F）
-│     ├─ 保留副本/包/存档/游戏、目的目录、备份恢复选项 → 每改答案重新 UninstallPlan
-│     └─ 最终确认 → L；执行进度 / 结果 / 退出 → U（绝不执行）
-├─ 日志 [log] → LogPage（表 A / F）
-│  ├─ Player.log / Player-prev.log / ArchoMonitor.log 及伴随监控区域 → 3文件均补测
-│  ├─ 错误簇列表、筛选/排序、选择 → 已有 Rows L
-│  ├─ 证据原文 + 社区模式卡 → LogCluster + LogPattern（串行 reader，表 F）
-│  └─ 实时监控区 → LogMonitor / Live；本次无正在运行游戏（表 C / D，无数据说明）
-├─ 任务 [tsk] → Tasks（表 A）
-│  ├─ 状态 / 队列 / 时间 / 搜索筛选、各列菜单 → L
-│  └─ 任务行详情 / 子项 / 失败文本展开 → 已有 payload L；重试/取消/清理结果 U
-├─ 引导 [gui] → Tasks + GuideFind（表 A）
-│  ├─ 初次/添加游戏、探测到的游戏与手输路径确认 → GuideFind / GuideGame（表 F）
-│  ├─ 下载游戏：公开分支/目录/账户选择 → GuideDownloadInfo；下拉选项 L
-│  │  └─ SteamCMD安装 / 下载进度 / 登录确认 → U
-│  ├─ 读取Mod进度 → GuideScan（U：是真扫描操作，不是只读页面）
-│  └─ 从哪里开始：游戏列表/列表导入/包或合集 → L；导入复用 imp，包解压 U
-└─ Mod 完整详情 [ful]（独立入口）→ Detail + ModCopies + Sections 并发（表 D）
-   ├─ Mod说明 / 副本 / 用在何处 / 字段 / 历史 / 技术信息六卡 → 同一次结果
-   ├─ 技术的 Def / Patch / Harmony / 规则 / 历史标签 → Sections 一次返回全部；切标签 L
-   ├─ 选择副本/说明缓存或远程补取 → 相应 Detail / ModCopies（表 C / F）
-   └─ 标签/位置/备注/操作预览、全部变化跳转 → 复用相应节点
+├─ Global shell / sidebar / breadcrumbs / game and list selection → Init, Shell, Workspace (table A)
+│  ├─ Switch environments / open another list → Workspace; no actual switch against real config
+│  ├─ Command palette → Palette; help / shortcut dialog → Keys (table C)
+│  ├─ Selection / input / generic confirmation / text dialog / context menu → L; dynamic content uses the relevant page API
+│  └─ Table column visibility / order / menus / draggable dividers → L; saved Setting reads are tiny; no saves performed
+├─ Home [hom] → Home + HomeBackground concurrently (table A)
+│  ├─ Game selection, that game's list/pack cards, last run, status and changes → parent payload
+│  ├─ Hide/expand problems, keyboard focus, switch cards within the same data → L
+│  └─ Background JPEG → /bg (table F); selecting another game/list writes selection, so target-environment sessions simulated reads here
+├─ Can it run / needs attention [run] → Needs (table A)
+│  ├─ Four sections: save-breaking/unrunnable, last-run errors, needs confirmation, hidden Mods → L
+│  ├─ More actions, choose disable targets, identity confirmation choices, evidence text → parent data or Inspect (table G)
+│  └─ Log / Mod details navigation → independent nodes; recheck is an Analyze operation (U)
+├─ Mod library
+│  ├─ All [lib] → Library (table A)
+│  │  ├─ Search harmony / workshop source filter / sort → Library; representative values measured
+│  │  ├─ Expand families, copy rows, column/facet menus → L; local virtual scrolling does not reduce transferred data
+│  │  ├─ Right details → Detail + LibraryFields (tables C / D), Workshop details fetched on demand (table F)
+│  │  └─ Copy operation preview/confirmation → LibraryPreview / OpPreview (table G, single Mod; other scopes U); tags/notes/position use shared dialogs
+│  ├─ Subscriptions and updates [chg] → SubscriptionsPage (table A)
+│  │  ├─ Current list / all Mods / single Mod family scope → all three independent requests measured
+│  │  ├─ Pending / completed updates, date collapse, source status, selected-item details → L
+│  │  ├─ Expand file changes → ChangeFiles, real before/after snapshots measured (table F)
+│  │  └─ Source checks / updates / redownload / unsubscribe preview and confirmation → table G single-Mod previews; task execution U
+│  └─ Add subscription [sub] → SubscriptionsPage(false, "") (table A)
+│     ├─ Auto-detect Workshop / Git / web / LoversLab, Steam/SteamCMD method → local form L
+│     ├─ Workshop confirmation preview → SubscribePreview (table F, --dry-run only)
+│     ├─ Web metadata / Git branch/tag/commit / LoversLab files, protocol and authentication pages → U / public web failure sample in table F
+│     └─ Choose download directory/zip, authentication file / native site login window → U
+├─ Lists
+│  ├─ Current/specified list editor [edt] → Workspace (table A)
+│  │  ├─ Inactive / active / staged columns, selections, sort menus → parent data L
+│  │  ├─ Search within column → Filter; top cross-column filters and facets → BarFilter (table D)
+│  │  ├─ Right details → Detail + LibraryCopy (tables C / D)
+│  │  ├─ History drawer → History; copy selection → ModCopies; row actions → RowOps
+│  │  ├─ Edit tags → TagCandidates; move to position → PosOptions; note input → ModNote
+│  │  └─ Sort / write to game / launch preview → Preview(sort/save/launch) (table C), no actions applied
+│  ├─ All lists [lst] → PlanManage, all 5 plans measured separately (table B)
+│  │  ├─ Name / game-version chips / followed collections / follow mode / differences and missing entries → parent payload L
+│  │  ├─ Resource-usage statistics panel and Top details → PlanLoadCost → PlanLoadCostMeasure (tables B / D)
+│  │  ├─ Automatic followed-collection check (after 10 min) → PlanCheck (U; network branch excluded from main panel)
+│  │  ├─ New/copy/draft → CheckPlanName, PlanSources / PlanFroms (table C)
+│  │  │  ├─ Empty / existing list, game version / save sources → PlanSources response; option switching L
+│  │  │  └─ Import file/text/collection preview → ExchangeInfo, ImportPreviewFor (table C; collection U)
+│  │  └─ Rename / delete confirmation → CheckPlanName, RemovePlanWarn (tables C / D), not applied
+│  ├─ Import [imp] → ExchangeInfo; choose format/target/paste/preview → ImportPreviewFor
+│  │  └─ Merge/replace/new, missing-subscription choices → preview data L; apply/subscribe/native picker U
+│  ├─ Export [exp] → PlanExport + ExchangeInfo (tables C / D)
+│  │  ├─ archo / rimsort / rml / rimcrow-xml / rimcrow / text / modsconfig / workshop → all 8 formats measured
+│  │  └─ Output text, copy/save results and overwrite confirmation → L / U (no clipboard or export-file writes)
+│  └─ Create a pack [bld] → BuildPage → BuildPageResult (tables A / D)
+│     ├─ Name check → PackNameCheck; destination, steps, blockers → parent payload
+│     ├─ No conversion / 100 / 80 / 75 / 60 / 50 / 40 / 25% → option switching is L; only clicking "count the textures" requests again
+│     ├─ See the list first → PackDryRun (table F)
+│     └─ Build progress / errors / resume unfinished pack / completed pack → U (no actual build)
+├─ Packs [pak] → Packs (table A, actually empty)
+│  ├─ Individual pack pack:<name> / Mod table / description / saves and other details → Pack (U, no real sample)
+│  ├─ Unfinished build entries / progress → U, no real sample
+│  └─ Launch checks, export preview / delete confirmation → PackLaunch / PackExport / PackRemovePreview (U)
+├─ Convert textures to DDS [tex] → TexturesInfo(plan/all) (table A)
+│  ├─ Current list / all scope, scale and encoder choices → TexturesInfo or existing local options
+│  ├─ Manual "measure" → Textures → TextureMeasure, including first whole-library 78.9s (tables A / D)
+│  ├─ Statistics row details / expansion / progress → returned payload L
+│  └─ Tool install confirmation / conversion / cleanup / stop and results → U (not executed)
+├─ Games [env] → Environment (table A)
+│  ├─ Edit path / version / launch method / saves / arguments → existing group data L; native path selection U
+│  ├─ Remove game confirmation → EnvRemovePreview (table C), no removal
+│  └─ Add game → guide [gui]
+├─ Settings [set] → Settings + Backgrounds + Tasks concurrently (table A)
+│  ├─ Appearance: theme, accent → same Settings response; open options L (actual changes write config, unmeasured)
+│  ├─ Home background → Backgrounds(initial/complete)
+│  │  ├─ Game, each background Mod, custom-image group tabs → L; thumbnail/full image /bg → table F
+│  │  └─ Dimming, blur, focus, favorites, slideshow options → existing data; no image selection/deletion/saves
+│  ├─ RimArcho management directories → Settings; directory-check dialog → Directories
+│  │  └─ Change/move location confirmation → DirectoryMovePreview (U), path picker U
+│  ├─ Mod folders → Settings; add/remove confirmation L, not applied
+│  ├─ Accounts → status in Settings; login/forget/web login/Steam verification dialogs → U
+│  ├─ External tools → status in Settings; ToolInstallOffer install-information confirmation → U
+│  ├─ Interface / community data / database / cache / game logs → 6 groups in the same Settings request, incremental L
+│  │  └─ Cache cleanup / database cleanup / reread logs and other confirmations → existing text L; execution and results U
+│  └─ Uninstall [del] → UninstallPlan (tables A / F)
+│     ├─ Keep copies/packs/saves/games, destination directory, backup/restore options → UninstallPlan again for each answer change
+│     └─ Final confirmation → L; execution progress / results / exit → U (never executed)
+├─ Logs [log] → LogPage (tables A / F)
+│  ├─ Player.log / Player-prev.log / ArchoMonitor.log and accompanying monitor area → all 3 files measured additionally
+│  ├─ Error-cluster list, filters/sort, selection → existing Rows L
+│  ├─ Original evidence + community pattern card → LogCluster + LogPattern (serial reader, table F)
+│  └─ Live monitor area → LogMonitor / Live; no running game in this study (tables C / D, empty-data note)
+├─ Tasks [tsk] → Tasks (table A)
+│  ├─ Status / queue / time / search filters, column menus → L
+│  └─ Task row details / children / failure-text expansion → existing payload L; retry/cancel/cleanup results U
+├─ Guide [gui] → Tasks + GuideFind (table A)
+│  ├─ First run/add game, detected games and manual-path confirmation → GuideFind / GuideGame (table F)
+│  ├─ Download game: public branches/directory/account choice → GuideDownloadInfo; dropdown options L
+│  │  └─ SteamCMD installation / download progress / login confirmation → U
+│  ├─ Read Mods progress → GuideScan (U: actual scan operation, not a read-only page)
+│  └─ Where to start: game lists/list import/pack or collection → L; import reuses imp, pack extraction U
+└─ Full Mod details [ful] (independent entry) → Detail + ModCopies + Sections concurrently (table D)
+   ├─ Six cards: Mod description / copies / used by / fields / history / technical information → same result
+   ├─ Technical Def / Patch / Harmony / rules / history tabs → Sections returns all at once; switching L
+   ├─ Choose copy/description cache or remote fetch → corresponding Detail / ModCopies (tables C / F)
+   └─ Tags/position/notes/operation previews, all-changes navigation → reuse corresponding nodes
 ```
 
-设置的 11 个基础分组是一次 `Settings()` 返回，不是 11 个后台路由；背景组件独立。当前没有注册的未来“回顾/存档管理/值得玩/Archo”等规划页不计入当前页面数。TUI 使用同一 `internal/view`，本报告范围为上述 GUI 页面；TUI 绘制与终端启动时间未冒充 GUI 数据。
+The 11 basic Settings groups come from one `Settings()` response, not 11 backend routes; backgrounds are independent. Future planned pages such as recap/save management/worth playing/Archo, which are not registered yet, are excluded from current page counts. TUI uses the same `internal/view`; this report covers the GUI pages above, and does not present TUI drawing or terminal startup as GUI data.
 
-## 4. 每页与子入口耗时表
+## 4. Page and Sub-Entry Timing Tables
 
-所有单位 ms；每环境单元格为 **C / E / H**。H 是 5 次中位数。附加表则明确为 **E₀ / H₃**（预热工作区后首次 / 随后3次中位数）。主要来源是代码链与第 5 节分阶段证据，不是仅凭时间猜测。
+All units are ms; each environment cell is **C / E / H**. H is the median of 5 calls. Supplementary tables explicitly use **E₀ / H₃** (first after warming Workspace / median of the next 3 calls). Attribution mainly comes from call chains and phase evidence in section 5, not guesses based solely on timing.
 
-### 表 A：主要页面
+### Table A: Main Pages
 
-| 页面 / 后端调用 | main：C / E / H | 1.6：C / E / H | 主要来源、就绪边界 |
+| Page / backend call | main: C / E / H | 1.6: C / E / H | Main source, readiness boundary |
 | --- | --- | --- | --- |
-| 全局初始化 Init | <1 / <1 / <1 | <1 / <1 / <1 | 静态描述/设置；额外 JSON 约0.5ms |
-| 编辑器/环境工作区 Workspace | 419.5 / 284.6 / 281.6 | 376.8 / 263.0 / 260.5 | 完成事件；Index、Board、Needs、Shell；约1.33MB |
-| 启动 hom：Home | 1003.0 / 753.3 / 169.5 | 803.6 / 754.0 / 198.1 | 独立log reader、当前方案Board/Needs、其他方案与环境 |
-| 启动背景 HomeBackground | 125.7 / 2.5 / <1 | 129.1 / 2.0 / <1 | 首次Index/背景设置；JPEG另计 |
-| 侧栏 Shell | 279.2 / 105.1 / 6.5 | 246.5 / 79.7 / 7.5 | boardState、Needs、方案/包行；热可复用 |
-| 能不能跑 run：Needs | 605.2 / 273.1 / 120.2 | 508.9 / 237.4 / 78.6 | 载入分析/日志、磁盘副本/链接检查、BuildNeeds |
-| Mod库 lib：全部 Library | 1600.6 / 687.2 / 200.1 | 869.8 / 686.2 / 191.6 | 库存构建/全量视图；JSON约5.4MB另计 |
-| lib：搜索 harmony | 591.1 / 534.6 / 68.8 | 621.5 / 496.7 / 57.8 | 同一库存，仍构建匹配视图/全量facets |
-| lib：来源筛选 workshop | 669.0 / 516.7 / 103.4 | 639.2 / 545.3 / 95.0 | 同上；非仅前端筛选 |
-| 更新 chg：当前方案 | 649.2 / 618.3 / 595.5 | 564.4 / 541.2 / 560.1 | SubscriptionsPage；新reader、BuildChanges、全Library |
-| 更新 chg：全部库 | 697.5 / 759.0 / 735.4 | 633.1 / 656.6 / 636.3 | 同上；勿用旧 Changes API 数字替代 |
-| 更新 chg：单Mod | 547.4 / 559.4 / 562.6 | 534.7 / 568.9 / 672.9 | 同上；范围缩小仍建全库 |
-| 添加订阅 sub：账户/最近项 | 612.1 / 579.6 / 605.5 | 572.7 / 562.3 / 656.9 | 与SubscriptionsPage同链，不是纯表单开销 |
-| 整合包 pak：列表 | 5.8 / 1.5 / 1.1 | 5.9 / 1.5 / 1.5 | 真实0包；只代表空列表 |
-| 创建包 bld：不转贴图最终 | 358.7 / 278.4 / 271.3 | 464.8 / 396.7 / 393.2 | 异步BuildPage，问题检查、空间/清单 |
-| bld：100%贴图扫描最终 | 310.2 / 278.6 / 274.8 | 17336.2 / 780.8 / 779.6 | 1.6首轮补纹理信息；切比例本身不触发此项 |
-| 全部列表 lst：默认主面板 | 185.6 / 37.0 / 35.3 | 262.6 / 118.4 / 100.7 | 局部部署预览，统计面板另计 |
-| lst：默认方案占用统计最终 | 426.4 / 316.7 / 311.1 | 586.3 / 197.5 / 172.7 | 目录stamp遍历、缓存校验、资源计数 |
-| 导出 exp：默认格式 | 177.8 / 2.0 / 2.5 | 138.8 / 1.0 / 1.1 | 方案序列化；8格式表D |
-| 导入 imp：页面信息 | <1 / <1 / <1 | <1 / <1 / <1 | 格式/导入能力描述 |
-| imp：文本预览 | 161.7 / 2.5 / 2.0 | 168.1 / 1.0 / 1.0 | 2个packageId样本；实际导入未应用 |
-| 游戏环境 env | 4.8 / 1.0 / 1.5 | 5.8 / <1 / 1.1 | 环境设置组，不重建全Board |
-| 设置 set：Settings主体 | 225.6 / 194.2 / 183.7 | 151.4 / 191.3 / 160.0 | 每次detachedReader；Index/工具/目录等，背景与Tasks并发另计 |
-| set：背景初始选项 | 131.6 / 2.0 / 1.0 | 107.0 / 2.0 / 1.5 | 已有缓存、首次可能同步Index；未等后台提取 |
-| set：背景后台全部准备完成 | 301.4 / 30.8 / 33.1 | 134.6 / 32.9 / 32.2 | 等workers；持久图缓存保留，不是无图缓存首次解码 |
-| 贴图 tex：方案页初始信息 | 151.1 / 2.5 / 1.5 | 148.8 / 1.5 / 1.0 | 不读贴图内容，仅targets/工具 |
-| tex：全库页初始信息 | 170.5 / 3.1 / 2.0 | 137.6 / 5.7 / 5.6 | 同上；统计另计 |
-| tex：方案统计最终 | 826.4 / 203.0 / 233.2 | 215.8 / 77.9 / 79.8 | CollectCached、目录/PNG头缓存、MakePlan |
-| 任务 tsk | 1.3 / <1 / <1 | <1 / 1.4 / <1 | 当前历史/队列快照；本次无真实任务执行 |
-| 引导 gui：现有游戏探测 | 6.8 / 2.5 / 1.5 | 5.6 / 1.5 / 2.2 | 检测路径、版本文件 |
-| gui：下载版本信息 | 2946.7 / 2830.7 / 2868.5 | 3057.6 / 2720.5 / 2795.9 | 真实匿名SteamCMD公开分支查询 |
-| 日志 log：默认文件 | 355.0 / 213.7 / 4.1 | 未就绪（禁用分析；表F补测） | main有效；1.6原轮次分析被禁用，见表F，错误返回不算就绪 |
-| log：第二候选文件 | 618.1 / 196.6 / 6.1 | 未就绪（禁用分析；表F补测） | API按LogFiles第二项；本机为Player-prev；1.6同上 |
-| 卸载 del：预览 | 7663.8 / 4470.2 / 4508.3 | 4152.9 / 4572.8 / 4219.3 | 副本Home；真实Home补测见表F；逐目录尺寸与链接检查 |
+| Global initialization Init | <1 / <1 / <1 | <1 / <1 / <1 | Static descriptions/settings; about 0.5ms additional JSON |
+| Editor/environment workspace Workspace | 419.5 / 284.6 / 281.6 | 376.8 / 263.0 / 260.5 | Completion event; Index, Board, Needs, Shell; about 1.33MB |
+| Home hom: Home | 1003.0 / 753.3 / 169.5 | 803.6 / 754.0 / 198.1 | Independent log reader, current plan Board/Needs, other plans and environments |
+| Home background HomeBackground | 125.7 / 2.5 / <1 | 129.1 / 2.0 / <1 | Initial Index/background settings; JPEG separate |
+| Sidebar Shell | 279.2 / 105.1 / 6.5 | 246.5 / 79.7 / 7.5 | boardState, Needs, plan/pack rows; reusable when warm |
+| Can it run run: Needs | 605.2 / 273.1 / 120.2 | 508.9 / 237.4 / 78.6 | Load analysis/logs, disk copy/link checks, BuildNeeds |
+| Mod library lib: all Library | 1600.6 / 687.2 / 200.1 | 869.8 / 686.2 / 191.6 | Inventory construction/full view; about 5.4MB JSON measured separately |
+| lib: search harmony | 591.1 / 534.6 / 68.8 | 621.5 / 496.7 / 57.8 | Same inventory; still constructs matching view/full facets |
+| lib: workshop source filter | 669.0 / 516.7 / 103.4 | 639.2 / 545.3 / 95.0 | Same; not just frontend filtering |
+| Updates chg: current plan | 649.2 / 618.3 / 595.5 | 564.4 / 541.2 / 560.1 | SubscriptionsPage; new reader, BuildChanges, full Library |
+| Updates chg: whole library | 697.5 / 759.0 / 735.4 | 633.1 / 656.6 / 636.3 | Same; do not substitute old Changes API figures |
+| Updates chg: single Mod | 547.4 / 559.4 / 562.6 | 534.7 / 568.9 / 672.9 | Same; smaller scope still builds the full library |
+| Add subscription sub: accounts/recent items | 612.1 / 579.6 / 605.5 | 572.7 / 562.3 / 656.9 | Same chain as SubscriptionsPage, not pure form overhead |
+| Packs pak: list | 5.8 / 1.5 / 1.1 | 5.9 / 1.5 / 1.5 | Actually 0 packs; represents empty list only |
+| Create pack bld: final without texture conversion | 358.7 / 278.4 / 271.3 | 464.8 / 396.7 / 393.2 | Asynchronous BuildPage, problem checks, space/manifest |
+| bld: final 100% texture scan | 310.2 / 278.6 / 274.8 | 17336.2 / 780.8 / 779.6 | Initial 1.6 run fills texture information; changing scale alone does not trigger this |
+| All lists lst: default main panel | 185.6 / 37.0 / 35.3 | 262.6 / 118.4 / 100.7 | Scoped deployment preview; statistics panel separate |
+| lst: final default plan resource-usage statistics | 426.4 / 316.7 / 311.1 | 586.3 / 197.5 / 172.7 | Directory stamp traversal, cache validation, resource counting |
+| Export exp: default format | 177.8 / 2.0 / 2.5 | 138.8 / 1.0 / 1.1 | Plan serialization; 8 formats in table D |
+| Import imp: page information | <1 / <1 / <1 | <1 / <1 / <1 | Format/import capability descriptions |
+| imp: text preview | 161.7 / 2.5 / 2.0 | 168.1 / 1.0 / 1.0 | 2 packageId samples; actual import not applied |
+| Games env | 4.8 / 1.0 / 1.5 | 5.8 / <1 / 1.1 | Environment settings groups; no full Board rebuild |
+| Settings set: Settings body | 225.6 / 194.2 / 183.7 | 151.4 / 191.3 / 160.0 | detachedReader each time; Index/tools/directories etc.; concurrent backgrounds and Tasks separate |
+| set: initial background options | 131.6 / 2.0 / 1.0 | 107.0 / 2.0 / 1.5 | Existing cache; initial call may synchronously read Index; no wait for background extraction |
+| set: all background preparation complete | 301.4 / 30.8 / 33.1 | 134.6 / 32.9 / 32.2 | Wait for workers; persistent image cache retained, not first decode without image cache |
+| Textures tex: initial plan-page information | 151.1 / 2.5 / 1.5 | 148.8 / 1.5 / 1.0 | Targets/tools only, no texture contents read |
+| tex: initial whole-library page information | 170.5 / 3.1 / 2.0 | 137.6 / 5.7 / 5.6 | Same; statistics separate |
+| tex: final plan statistics | 826.4 / 203.0 / 233.2 | 215.8 / 77.9 / 79.8 | CollectCached, directory/PNG header cache, MakePlan |
+| Tasks tsk | 1.3 / <1 / <1 | <1 / 1.4 / <1 | Current history/queue snapshot; no real task execution in this study |
+| Guide gui: existing game detection | 6.8 / 2.5 / 1.5 | 5.6 / 1.5 / 2.2 | Detect paths and version files |
+| gui: download version information | 2946.7 / 2830.7 / 2868.5 | 3057.6 / 2720.5 / 2795.9 | Real anonymous SteamCMD public branch query |
+| Logs log: default file | 355.0 / 213.7 / 4.1 | Not ready (analysis disabled; supplement in table F) | main valid; original 1.6 round disabled analysis, see table F; error return is not readiness |
+| log: second candidate file | 618.1 / 196.6 / 6.1 | Not ready (analysis disabled; supplement in table F) | API uses second LogFiles item, locally Player-prev; same 1.6 limitation |
+| Uninstall del: preview | 7663.8 / 4470.2 / 4508.3 | 4152.9 / 4572.8 / 4219.3 | Copied Home; real Home supplement in table F; per-directory sizes and link checks |
 
-### 表 B：全部真实方案的主面板与占用统计
+### Table B: Main Panels and Resource-Usage Statistics for All Real Plans
 
-方案 `PlanManage(id)` 为 C/E/H；占用统计直接 `App.PlanLoadCost` 分阶段三次中位数，已使用真实目录、保留持久缓存，属于单独诊断而非端到端。环境不同会解析不同版本的LoadFolders，统计项数可与工作区条目数不同（DLC/去重/可用资源规则）。
+`PlanManage(id)` uses C/E/H. Resource-usage statistics directly use `App.PlanLoadCost`, median of three phase measurements, with real directories and persistent caches retained. This is separate diagnosis, not end-to-end timing. Different environments resolve different versions of LoadFolders; statistics counts may differ from workspace entries (DLC/deduplication/available-resource rules).
 
-| 方案 | main 主面板 C/E/H | 1.6 主面板 C/E/H | main 占用统计 | 1.6 占用统计 |
+| Plan | main panel C/E/H | 1.6 panel C/E/H | main resource-usage statistics | 1.6 resource-usage statistics |
 | --- | --- | --- | --- | --- |
 | 1 default | 275.1 / 33.7 / 39.1 | 232.1 / 91.3 / 102.6 | 244.6 | 280.5 |
 | 2 Test | 256.7 / 46.5 / 39.7 | 308.5 / 101.5 / 104.2 | 74.9 | 70.9 |
@@ -216,69 +216,69 @@ RimArcho GUI
 | 4 Multiplayer Modpack 1.6 (Stable) | 226.8 / 46.2 / 45.4 | 287.2 / 160.8 / 153.4 | 145.7 | 143.1 |
 | 5 The Progression Modpack [UPDATED 1.7] | 259.8 / 67.8 / 68.4 | 307.9 / 151.2 / 151.4 | 325.1 | 364.0 |
 
-占用统计缓存并非零工作量。例如main方案1第三轮仍为430命中/44重测，方案5为527/43；1.6方案5首轮454命中/259重测，后两轮671/42。不能把总耗时全部归为缓存miss，也不能称此次已实现全量命中对照。
+Resource-usage cache hits are not zero work. For example, the third main plan 1 run still had 430 hits/44 remeasurements, plan 5 had 527/43; 1.6 plan 5 had 454 hits/259 remeasurements initially and 671/42 in the next two runs. Total time cannot all be attributed to cache misses, nor was a full-hit comparison achieved here.
 
-### 表 C：详情、弹窗、编辑器与设置子请求
+### Table C: Details, Dialogs, Editor, and Settings Subrequests
 
-| 子入口 / API | main：C / E / H | 1.6：C / E / H | 方法 / 备注 |
+| Sub-entry / API | main: C / E / H | 1.6: C / E / H | Method / notes |
 | --- | --- | --- | --- |
-| Mod缓存详情 Detail | 301.3 / 166.3 / 6.7 | 259.1 / 141.0 / 7.2 | Harmony有效数据；About/已缓存Workshop解析，网络补取表F |
-| 副本选择 ModCopies | 204.8 / 40.4 / <1 | 133.8 / 34.1 / <1 | Harmony真实副本 |
-| 编辑器副本字段 LibraryCopy | 192.8 / 39.8 / <1 | 140.3 / 32.2 / <1 | 与Detail并发复合表D |
-| 库右侧字段 LibraryFields | 176.8 / 41.2 / <1 | 144.7 / 38.3 / <1 | 同上 |
-| 完整详情技术 Sections | 203.6 / 172.8 / 176.3 | 149.5 / 137.7 / 143.0 | Harmony；新reader、全标签文本及Humanize |
-| 标签候选 TagCandidates | 171.4 / 1.0 / <1 | 125.0 / <1 / 1.0 | 单Mod；候选空也是有效结果 |
-| 移动位置 PosOptions | 186.7 / 7.6 / 4.5 | 128.5 / 1.5 / 1.2 | 单Mod，空搜索，before=false |
-| 行菜单 RowOps | 161.2 / 37.3 / <1 | 144.6 / 32.6 / <1 | 已启用栏Harmony |
-| 命令面板 Palette | 164.9 / 3.4 / 1.5 | 126.2 / 3.1 / 2.5 | 空query |
-| 快捷键帮助 Keys | <1 / <1 / <1 | <1 / 1.0 / <1 | plan页；不同页为静态表变化 |
-| 历史 History | 不适用 / 19.4 / 17.3 | 不适用 / <1 / <1 | C没有board，null不算完成；仅E/H有效 |
-| 排序预览 Preview(sort) | 194.5 / 6.8 / 7.0 | 141.2 / 1.5 / 1.0 | 不实际排序 |
-| 写入预览 Preview(save) | 203.7 / 37.2 / 28.9 | 174.8 / 47.7 / 27.7 | 不写ModsConfig |
-| 启动预览 Preview(launch) | 339.6 / 158.2 / 39.7 | 239.0 / 136.8 / 42.6 | 不启动游戏 |
-| 新建来源 PlanSources | 173.0 / 1.0 / 1.5 | 123.3 / 1.5 / 1.0 | 当前方案来源/版本/存档选项 |
-| 新建名称校验 CheckPlanName | 152.6 / 1.0 / 1.0 | 136.5 / 1.5 / 1.5 | 合法new list，无写入 |
-| 旧新建来源 PlanFroms | 153.3 / <1 / <1 | 134.3 / <1 / <1 | 已存在入口兼容数据 |
-| 删除环境确认 EnvRemovePreview | <1 / 1.0 / <1 | 1.0 / <1 / 1.0 | 当前环境，只读 |
-| 目录检查 Directories | 1.9 / 1.0 / <1 | <1 / <1 / <1 | 只读目录摘要 |
-| 实时监控 LogMonitor | 175.7 / <1 / <1 | 132.9 / <1 / <1 | 无运行游戏：返回空，不代表有监控数据场景 |
+| Cached Mod details Detail | 301.3 / 166.3 / 6.7 | 259.1 / 141.0 / 7.2 | Valid Harmony data; About/cached Workshop parsing; network fetch in table F |
+| Copy selection ModCopies | 204.8 / 40.4 / <1 | 133.8 / 34.1 / <1 | Real Harmony copies |
+| Editor copy fields LibraryCopy | 192.8 / 39.8 / <1 | 140.3 / 32.2 / <1 | Concurrent composition with Detail in table D |
+| Library right-side fields LibraryFields | 176.8 / 41.2 / <1 | 144.7 / 38.3 / <1 | Same |
+| Full-detail technical Sections | 203.6 / 172.8 / 176.3 | 149.5 / 137.7 / 143.0 | Harmony; new reader, all tab text and Humanize |
+| Tag candidates TagCandidates | 171.4 / 1.0 / <1 | 125.0 / <1 / 1.0 | Single Mod; empty candidates also valid |
+| Move position PosOptions | 186.7 / 7.6 / 4.5 | 128.5 / 1.5 / 1.2 | Single Mod, empty search, before=false |
+| Row menu RowOps | 161.2 / 37.3 / <1 | 144.6 / 32.6 / <1 | Harmony in active column |
+| Command palette Palette | 164.9 / 3.4 / 1.5 | 126.2 / 3.1 / 2.5 | Empty query |
+| Shortcut help Keys | <1 / <1 / <1 | <1 / 1.0 / <1 | plan page; static table varies by page |
+| History History | N/A / 19.4 / 17.3 | N/A / <1 / <1 | C has no board; null is not completion; E/H valid only |
+| Sort preview Preview(sort) | 194.5 / 6.8 / 7.0 | 141.2 / 1.5 / 1.0 | No actual sorting |
+| Write preview Preview(save) | 203.7 / 37.2 / 28.9 | 174.8 / 47.7 / 27.7 | No ModsConfig writes |
+| Launch preview Preview(launch) | 339.6 / 158.2 / 39.7 | 239.0 / 136.8 / 42.6 | No game launch |
+| New-list sources PlanSources | 173.0 / 1.0 / 1.5 | 123.3 / 1.5 / 1.0 | Current plan source/version/save options |
+| New-list name validation CheckPlanName | 152.6 / 1.0 / 1.0 | 136.5 / 1.5 / 1.5 | Valid new list, no writes |
+| Old new-list sources PlanFroms | 153.3 / <1 / <1 | 134.3 / <1 / <1 | Compatibility data for existing entry point |
+| Remove game confirmation EnvRemovePreview | <1 / 1.0 / <1 | 1.0 / <1 / 1.0 | Current environment, read-only |
+| Directory check Directories | 1.9 / 1.0 / <1 | <1 / <1 / <1 | Read-only directory summary |
+| Live monitor LogMonitor | 175.7 / <1 / <1 | 132.9 / <1 / <1 | No running game: empty return does not represent populated monitoring |
 
-### 表 D：组合入口、选项与全库统计补测
+### Table D: Combined Entries, Options, and Supplementary Whole-Library Statistics
 
-E₀/H₃各为工作区预热后的首次/3次中位数；没有独立C样本的组合不伪造冷时间，冷成本可查表C的组成请求。并发组合已实际调用，不能直接把单项时长相加。
+E₀/H₃ are first after Workspace warmup / median of 3 subsequent calls. No cold duration is invented for combinations without independent C samples; table C has their component requests' cold costs. Concurrent combinations were actually invoked; individual durations cannot simply be added.
 
-| 节点 | main E₀ / H₃ | 1.6 E₀ / H₃ | 说明 |
+| Node | main E₀ / H₃ | 1.6 E₀ / H₃ | Description |
 | --- | --- | --- | --- |
-| Full/Harmony | 236.1 / 189.3 | 164.5 / 166.5 | 完整详情Promise.all，6卡/技术各tab共享 |
-| Panel/editor | 158.0 / 7.5 | 138.9 / 12.5 | Detail + LibraryCopy并发 |
-| Panel/library | 159.9 / 6.0 | 127.3 / 10.1 | Detail + LibraryFields并发 |
-| Full/largeDefs | 222.7 / 196.8 | 失败：no mod | main按def_fact最多实例取样；1.6该实例不在本环境Index，失败不算完成 |
-| Sections/largeDefs | 193.8 / 215.2 | 失败：no mod | 同上，main输出约13.6KB；并非所有大Def都同等开销 |
-| Export/archo | 3.0 / 2.5 | 2.5 / 1.2 | 导出文本 |
-| Export/rimsort | 1.5 / 1.5 | 1.5 / 1.0 | 导出文本 |
-| Export/rml | 3.4 / 1.6 | 1.2 / 1.0 | 导出文本 |
-| Export/rimcrow-xml | 2.5 / 1.0 | 2.0 / <1 | 导出文本 |
-| Export/rimcrow | 3.1 / 2.8 | <1 / 1.5 | 导出文本 |
-| Export/text | 2.5 / 1.5 | 1.5 / 1.0 | 导出文本 |
-| Export/modsconfig | 1.5 / 1.6 | 1.6 / 1.6 | 导出文本 |
-| Export/workshop | 2.0 / 1.8 | <1 / 1.0 | 导出文本 |
-| Build/80 | 277.0 / 295.9 | 784.0 / 775.7 | 显式“扫描统计”；选择比例本身无需请求 |
-| Build/75 | 283.9 / 306.0 | 800.7 / 767.3 | 显式“扫描统计”；选择比例本身无需请求 |
-| Build/60 | 283.2 / 273.2 | 883.8 / 819.3 | 显式“扫描统计”；选择比例本身无需请求 |
-| Build/50 | 288.1 / 298.4 | 847.3 / 825.8 | 显式“扫描统计”；选择比例本身无需请求 |
-| Build/40 | 307.3 / 277.1 | 793.5 / 760.4 | 显式“扫描统计”；选择比例本身无需请求 |
-| Build/25 | 301.6 / 278.6 | 884.4 / 830.3 | 显式“扫描统计”；选择比例本身无需请求 |
-| Textures/all | 78861.8 / 2553.9 | 2280.1 / 2481.1 | 两环境共享同一批纹理文件/cache；main首次78.9s，1.6已经被main预热 |
-| Filter/inactive | 107.5 / 6.1 | 91.9 / 8.5 | 未启用栏harmony搜索，主过滤结果不是重载全Board |
-| BarFilter | 338.4 / 398.1 | 330.7 / 311.9 | 跨栏筛选+facets，约1.08MB结果，值得优化 |
-| RemovePlanWarn | 1.5 / 1.0 | <1 / 1.0 | 删除当前方案的只读提示 |
-| Live | 33.3 / 35.0 | 23.7 / 24.0 | 无游戏运行的probe；只代表空闲状态 |
+| Full/Harmony | 236.1 / 189.3 | 164.5 / 166.5 | Full-detail Promise.all, shared by 6 cards/all technical tabs |
+| Panel/editor | 158.0 / 7.5 | 138.9 / 12.5 | Detail + LibraryCopy concurrently |
+| Panel/library | 159.9 / 6.0 | 127.3 / 10.1 | Detail + LibraryFields concurrently |
+| Full/largeDefs | 222.7 / 196.8 | Failed: no mod | main samples instance with most def_fact rows; absent from this environment's 1.6 Index; failure is not completion |
+| Sections/largeDefs | 193.8 / 215.2 | Failed: no mod | Same; main output about 13.6KB; not all large Def sets cost the same |
+| Export/archo | 3.0 / 2.5 | 2.5 / 1.2 | Export text |
+| Export/rimsort | 1.5 / 1.5 | 1.5 / 1.0 | Export text |
+| Export/rml | 3.4 / 1.6 | 1.2 / 1.0 | Export text |
+| Export/rimcrow-xml | 2.5 / 1.0 | 2.0 / <1 | Export text |
+| Export/rimcrow | 3.1 / 2.8 | <1 / 1.5 | Export text |
+| Export/text | 2.5 / 1.5 | 1.5 / 1.0 | Export text |
+| Export/modsconfig | 1.5 / 1.6 | 1.6 / 1.6 | Export text |
+| Export/workshop | 2.0 / 1.8 | <1 / 1.0 | Export text |
+| Build/80 | 277.0 / 295.9 | 784.0 / 775.7 | Explicit "count the textures"; scale selection itself needs no request |
+| Build/75 | 283.9 / 306.0 | 800.7 / 767.3 | Explicit "count the textures"; scale selection itself needs no request |
+| Build/60 | 283.2 / 273.2 | 883.8 / 819.3 | Explicit "count the textures"; scale selection itself needs no request |
+| Build/50 | 288.1 / 298.4 | 847.3 / 825.8 | Explicit "count the textures"; scale selection itself needs no request |
+| Build/40 | 307.3 / 277.1 | 793.5 / 760.4 | Explicit "count the textures"; scale selection itself needs no request |
+| Build/25 | 301.6 / 278.6 | 884.4 / 830.3 | Explicit "count the textures"; scale selection itself needs no request |
+| Textures/all | 78861.8 / 2553.9 | 2280.1 / 2481.1 | Both environments share texture files/cache; main first run 78.9s; main already warmed 1.6 |
+| Filter/inactive | 107.5 / 6.1 | 91.9 / 8.5 | harmony search in inactive column; primary filter result does not reload full Board |
+| BarFilter | 338.4 / 398.1 | 330.7 / 311.9 | Cross-column filtering + facets, about 1.08MB result; worth optimizing |
+| RemovePlanWarn | 1.5 / 1.0 | <1 / 1.0 | Read-only warning for removing current plan |
+| Live | 33.3 / 35.0 | 23.7 / 24.0 | Probe without running game; represents idle state only |
 
-### 表 E：独立进程首次请求（main）
+### Table E: First Request in Independent Processes (main)
 
-P 是3个新进程的中位数 [最小, 最大]；进程/数据库打开均在API计时外，OS缓存未清。JSON列也取3次中位数。
+P is the median [minimum, maximum] of 3 new processes; process/database opening is outside API timing, and OS caches were not cleared. JSON also reports the median of 3 calls.
 
-| 目标 | P ms [范围] | JSON ms |
+| Target | P ms [range] | JSON ms |
 | --- | --- | --- |
 | Workspace | 424.2 [414.1, 429.1] | 5.6 |
 | Home | 843.6 [842.7, 855.0] | <1 |
@@ -286,70 +286,70 @@ P 是3个新进程的中位数 [最小, 最大]；进程/数据库打开均在AP
 | SubscriptionsPage | 1452.3 [1451.1, 1464.1] | 2.0 |
 | Settings | 213.6 [197.6, 284.2] | <1 |
 
-## 5. 来源拆分、有效性校验与慢页排序
+## 5. Source Breakdown, Validity Checks, and Slow-Page Ranking
 
-### 表 F：真实文件、日志和外部读取补测
+### Table F: Supplementary Real Files, Logs, and External Reads
 
-| 节点 | 首次 / 后续 ms | 数据与边界 |
+| Node | First / subsequent ms | Data and boundary |
 | --- | --- | --- |
-| ChangeFiles 11009 → 14785 | 7.6 / 5.1 | 65条文件差异，后续3次中位数；真实change_event |
-| ChangeFiles 11007 → 14781 | <1 / <1 | 8条差异 |
-| ChangeFiles 1427 → 14780 | 7.1 / 6.5 | 138条差异 |
-| ChangeFiles 1043 → 14777 | <1 / <1 | 16条差异；最新5条事件有重复对，只列一次 |
-| 真实Home卸载计划 | 4512.9 / 4446.3 / 4555.2 | 三次独立reader，10个步骤；中位数4512.9；未执行卸载 |
-| Harmony Preview HTTP | 68.8 / 0.5 | 200，41,807 B；已有磁盘缩略图缓存，不是无缓存生成 |
-| 背景 thumb HTTP | 52.7 / <1 | 200，23,479 B；已有JPEG缓存 |
-| 背景 full HTTP | <1 / <1 | 200，255,479 B；同图；浏览器解码未测 |
-| Harmony工坊详情强制刷新 | 412.2 | 无登录，24个Workshop文本块；随后缓存读取134.0、139.6，均无错误 |
-| SubscriptionPage公开网页 | 253.3 / 270.7 | 请求成功到达解析阶段但“no version or modification date”，属于错误就绪，不是成功网页预览基线 |
-| Workshop订阅dry-run预览 | main 151.9 / 147.3；1.6 140.3 / 151.1 | 返回1条订阅计划，apply仅是可执行标志；没有调用Subscribe |
-| PackNameCheck | main <1 / <1；1.6 <1 / <1 | 新合法名字，未创建包 |
-| PackDryRun | main 104.2 / 5.2；1.6 298.0 / 221.4 | main因缺依赖返回阻止信息；1.6返回真实dry-run清单；两者工作量不同 |
-| ModNote | 两环境 <1 / <1 | 当前备注为空，有效空字符串 |
-| GuideGame真实路径 | main <1 / <1；1.6 5.6 / <1 | 分别成功返回1.7、1.6版本和路径信息 |
-| main Player.log | 333.2 / 3.1 | 9簇；同reader再进；与表A独立样本，不取代C |
-| main Player-prev.log | 11.9 / 5.1 | 26簇；此前Player.log已读，reader已温热 |
-| main ArchoMonitor.log | 4.6 / 5.2 | 26行；同上 |
-| 1.6补齐日志1.7分析 | 30296.0 | 在副本显式App.Analyze；不含生产子进程启动/GUI轮询，作为完整就绪额外前提 |
-| 1.6 Player.log（分析后） | 339.2 / 5.1 | 9簇；不能把原轮次禁用分析的4.6ms算完成 |
-| 1.6 Player-prev.log（分析后） | 177.1 / 7.2 | 26簇 |
-| 1.6 ArchoMonitor.log（分析后） | 5.9 / 8.7 | 26行 |
-| 证据 + 模式卡，main三个日志 | 53.4 / 3.6 / 222.2 | 分别选真实首簇E4、E17、E17；18/13/18行；后两张社区卡存在 |
-| 证据 + 模式卡，1.6三个日志 | 40.2 / 41.9 / 190.7 | 19/14/21行；LogCluster与LogPattern共用logRead锁，前端并发也会串行 |
+| ChangeFiles 11009 → 14785 | 7.6 / 5.1 | 65 file differences; median of next 3 calls; real change_event |
+| ChangeFiles 11007 → 14781 | <1 / <1 | 8 differences |
+| ChangeFiles 1427 → 14780 | 7.1 / 6.5 | 138 differences |
+| ChangeFiles 1043 → 14777 | <1 / <1 | 16 differences; repeated pairs in latest 5 events listed once |
+| Real Home uninstall plan | 4512.9 / 4446.3 / 4555.2 | Three independent readers, 10 steps; median 4512.9; no uninstall execution |
+| Harmony Preview HTTP | 68.8 / 0.5 | 200, 41,807 B; existing disk thumbnail cache, not generation without cache |
+| Background thumb HTTP | 52.7 / <1 | 200, 23,479 B; existing JPEG cache |
+| Background full HTTP | <1 / <1 | 200, 255,479 B; same image; browser decoding unmeasured |
+| Forced Harmony Workshop details refresh | 412.2 | Unauthenticated, 24 Workshop text blocks; subsequent cached reads 134.0, 139.6, all error-free |
+| SubscriptionPage public web page | 253.3 / 270.7 | Request reached parsing but "no version or modification date"; error readiness, not successful web-preview baseline |
+| Workshop subscription dry-run preview | main 151.9 / 147.3; 1.6 140.3 / 151.1 | Returns 1 subscription plan; apply is only an executability flag; Subscribe not called |
+| PackNameCheck | main <1 / <1; 1.6 <1 / <1 | New valid name, no pack created |
+| PackDryRun | main 104.2 / 5.2; 1.6 298.0 / 221.4 | main returns blockers for missing dependencies; 1.6 returns real dry-run manifest; workloads differ |
+| ModNote | Both environments <1 / <1 | Current note empty; valid empty string |
+| GuideGame real path | main <1 / <1; 1.6 5.6 / <1 | Successfully returns 1.7 and 1.6 version/path information respectively |
+| main Player.log | 333.2 / 3.1 | 9 clusters; repeat entry on same reader; independent from table A, not a replacement C |
+| main Player-prev.log | 11.9 / 5.1 | 26 clusters; Player.log read before, reader already warm |
+| main ArchoMonitor.log | 4.6 / 5.2 | 26 lines; same |
+| Complete 1.7 log analysis for 1.6 | 30296.0 | Explicit App.Analyze on copy; excludes production subprocess startup/GUI polling; additional prerequisite for full readiness |
+| 1.6 Player.log (after analysis) | 339.2 / 5.1 | 9 clusters; original 4.6ms with analysis disabled is not completion |
+| 1.6 Player-prev.log (after analysis) | 177.1 / 7.2 | 26 clusters |
+| 1.6 ArchoMonitor.log (after analysis) | 5.9 / 8.7 | 26 lines |
+| Evidence + pattern card, main's three logs | 53.4 / 3.6 / 222.2 | Actual first clusters E4, E17, E17 respectively; 18/13/18 lines; latter two community cards exist |
+| Evidence + pattern card, 1.6's three logs | 40.2 / 41.9 / 190.7 | 19/14/21 lines; LogCluster and LogPattern share logRead lock, so concurrent frontend calls still serialize |
 
-原轮次用相同snapshot测得的 `ChangeFiles` 空差异、`LibraryPreview("lock")` 无此操作的错误，以及1.6“大Def实例”不存在的失败，均未作为成功性能数据。原 `LogPattern/LogCluster("E1")` 也不作为有证据内容基线，以上使用实际返回的簇校验。
+The original round's empty `ChangeFiles` differences using the same snapshot, unsupported-operation error from `LibraryPreview("lock")`, and missing 1.6 "large Def instance" failure are excluded from successful performance data. Original `LogPattern/LogCluster("E1")` is also not an evidence-content baseline; actual returned clusters were checked above.
 
-### 表 G：页面并发依赖、分析最终就绪及操作弹窗补齐
+### Table G: Concurrent Page Dependencies, Final Analysis Readiness, and Operation Dialog Supplements
 
-下面在主轮次之后补测；副本已完成日志跨版本分析与1.6当前方案分析，不能用这批数字替换原Stale场景。页面组合确实以goroutine并发请求，C/E各1次，H为随后3次中位数；不含JSON编码。Settings组合仅等待Backgrounds初始选项，后台全部图片准备见表A。
+The following were measured after the main round. The copy had completed cross-version log analysis and analysis of the current 1.6 plan; these figures cannot replace the original Stale scenario. Page combinations actually used goroutines concurrently. C/E each have 1 sample; H is the median of the next 3; JSON encoding excluded. The Settings combination waits only for initial Backgrounds options; complete background image preparation is in table A.
 
-| 页面组合 | main C / E / H ms | 1.6 C / E / H ms |
+| Page combination | main C / E / H ms | 1.6 C / E / H ms |
 | --- | --- | --- |
-| hom：Home + HomeBackground + Setting(hidden) | 833.8 / 648.3 / 162.5 | 762.1 / 641.2 / 196.9 |
-| set：Settings + Backgrounds + Tasks | 299.7 / 226.3 / 214.7 | 158.1 / 167.3 / 165.3 |
+| hom: Home + HomeBackground + Setting(hidden) | 833.8 / 648.3 / 162.5 | 762.1 / 641.2 / 196.9 |
+| set: Settings + Backgrounds + Tasks | 299.7 / 226.3 / 214.7 | 158.1 / 167.3 / 165.3 |
 
-1.6 Needs补测沿真实`Needs → startAnalyze → analyze事件 → Needs`路径，runner仅替换为独立App在副本内直接Analyze（避开启动GUI/子进程）：207.0ms先返回`stale=true`的62项；34771.3ms收到分析成功；35191.6ms取得`stale=false/never=false`的62项。随后三次74.9/70.9/76.5ms，中位数74.9ms。**即使项数相同，旧结果与最终新分析也必须分开。** 生产子进程启动、IPC和前端刷新调度尚未包括；此样本给出了后台实际工作量，不能宣称是生产完整端到端35.2秒。
+The supplementary 1.6 Needs measurement followed the real `Needs → startAnalyze → analyze event → Needs` path. Only the runner was replaced with an independent App directly running Analyze on the copy (avoiding GUI/subprocess startup): at 207.0ms it first returned 62 items with `stale=true`; at 34771.3ms analysis success arrived; at 35191.6ms it returned 62 items with `stale=false/never=false`. The next three calls took 74.9/70.9/76.5ms, median 74.9ms. **Even with equal item counts, old results and final fresh analysis must be distinguished.** Production subprocess startup, IPC, and frontend refresh scheduling remain excluded. This sample shows actual backend work; it does not establish a full production end-to-end 35.2 seconds.
 
-以下用main工作区及真实Harmony `#nvxs`，单副本，首次/随后3次中位数；只有`LibraryPreview`，从未调用`LibraryDo`。`apply=false`为预览中的真实拒绝/无事可做，只计该分支，不代表成功执行准备。编辑器`OpPreview`转换ID为ref后直接调用同一LibraryPreview，可复用该依赖时间，但转换开销未独立计时。
+The following uses the main Workspace and real Harmony `#nvxs`, a single copy, first call / median of next 3 calls. Only `LibraryPreview` was called, never `LibraryDo`. `apply=false` means actual rejection/nothing to do in the preview, measuring only that branch, not successful execution preparation. Editor `OpPreview` converts IDs to refs and calls the same LibraryPreview directly, so these dependency times can be reused, but conversion overhead was not separately timed.
 
-| LibraryPreview操作 | 首次 / H₃ ms | apply / 行数 | 解释 |
+| LibraryPreview operation | First / H₃ ms | apply / rows | Explanation |
 | --- | --- | --- | --- |
-| pin | 8.9 / <1 | true / 3 | 仅dry-run，计划可展示；不执行 |
-| pin-update | <1 / <1 | false / 1 | 当前工坊副本/禁用Steam工具下拒绝或无工作，不计成功基线 |
-| unpin | <1 / <1 | false / 1 | 当前工坊副本/禁用Steam工具下拒绝或无工作，不计成功基线 |
-| unhide | <1 / <1 | false / 1 | 当前工坊副本/禁用Steam工具下拒绝或无工作，不计成功基线 |
-| move | <1 / <1 | false / 1 | 当前工坊副本/禁用Steam工具下拒绝或无工作，不计成功基线 |
-| delete | 304.0 / 253.7 | true / 2 | 仅dry-run，计划可展示；不执行 |
-| unsubscribe | 1.0 / 1.0 | false / 1 | 当前工坊副本/禁用Steam工具下拒绝或无工作，不计成功基线 |
-| resubscribe | <1 / <1 | false / 2 | 当前工坊副本/禁用Steam工具下拒绝或无工作，不计成功基线 |
-| textures | 29.9 / 28.6 | false / 4 | 当前工坊副本/禁用Steam工具下拒绝或无工作，不计成功基线 |
-| textures-clean | 25.2 / 27.1 | false / 1 | 当前工坊副本/禁用Steam工具下拒绝或无工作，不计成功基线 |
-| subscription-remove | 502.0 / 480.6 | true / 3 | 仅dry-run，计划可展示；不执行 |
-| subscription-update | 238.0 / 216.7 | true / 4 | 仅dry-run，计划可展示；不执行 |
+| pin | 8.9 / <1 | true / 3 | Dry-run only, plan displayable; not executed |
+| pin-update | <1 / <1 | false / 1 | Rejected or no work with current Workshop copy/Steam tools disabled; not a successful baseline |
+| unpin | <1 / <1 | false / 1 | Rejected or no work with current Workshop copy/Steam tools disabled; not a successful baseline |
+| unhide | <1 / <1 | false / 1 | Rejected or no work with current Workshop copy/Steam tools disabled; not a successful baseline |
+| move | <1 / <1 | false / 1 | Rejected or no work with current Workshop copy/Steam tools disabled; not a successful baseline |
+| delete | 304.0 / 253.7 | true / 2 | Dry-run only, plan displayable; not executed |
+| unsubscribe | 1.0 / 1.0 | false / 1 | Rejected or no work with current Workshop copy/Steam tools disabled; not a successful baseline |
+| resubscribe | <1 / <1 | false / 2 | Rejected or no work with current Workshop copy/Steam tools disabled; not a successful baseline |
+| textures | 29.9 / 28.6 | false / 4 | Rejected or no work with current Workshop copy/Steam tools disabled; not a successful baseline |
+| textures-clean | 25.2 / 27.1 | false / 1 | Rejected or no work with current Workshop copy/Steam tools disabled; not a successful baseline |
+| subscription-remove | 502.0 / 480.6 | true / 3 | Dry-run only, plan displayable; not executed |
+| subscription-update | 238.0 / 216.7 | true / 4 | Dry-run only, plan displayable; not executed |
 
-订阅移除预览热480.6ms、删除预览热253.7ms，本身也是>200ms的慢弹窗；它们使用的dry-run及“哪些方案受影响”统计应按当前ref/方案集合缩小读取范围（`view/library.go LibPreview/usedWarning`），避免逐选中项重复Loadout/PlansUsing。首批优化P1/P4可共享此处只读库存与方案反向索引；多选按批查询，不能缓存最终删除许可。
+Warm subscription-removal previews at 480.6ms and deletion previews at 253.7ms are themselves slow dialogs above 200ms. Their dry-run and "which plans are affected" statistics should narrow reads to the current ref/plan set (`view/library.go LibPreview/usedWarning`), avoiding repeated Loadout/PlansUsing for each selection. Initial optimizations P1/P4 can share the read-only inventory and reverse plan index here; query multiple selections in batches, without caching final deletion permission.
 
-| Inspect证据命令 | 首次 / H₃ ms | 文本行数 |
+| Inspect evidence command | First / H₃ ms | Text lines |
 | --- | --- | --- |
 | `mod/#nvxs` | 101.8 / 7.1 | 23 |
 | `patches/--mod/#nvxs` | 2.6 / 1.6 | 3 |
@@ -358,139 +358,139 @@ P 是3个新进程的中位数 [最小, 最大]；进程/数据库打开均在AP
 | `problems` | 173.5 / 9.9 | 37 |
 | `folder/check` | 1.0 / 1.0 | 11 |
 
-证据仅为这些真实命令结果；Def/Patch的行数可为空或只有摘要，不推导所有Mod的大输出性能。
+Evidence covers only these real command results. Def/Patch lines may be empty or summary-only; they do not establish large-output performance for all Mods.
 
-### 5.1 分阶段耗时证据
+### 5.1 Phase Timing Evidence
 
-| 独立诊断阶段（三次中位数） | main ms | 1.6 ms | 对总耗时的含义 |
+| Independent diagnostic phase (median of three) | main ms | 1.6 ms | Meaning for total duration |
 | --- | --- | --- | --- |
-| Index/cold | 152.3 | 115.7 | DB载入、字段/索引组装；不等于全磁盘重扫 |
-| Loadout/after-index | 32.0 | 22.8 | 解析方案与依赖/LoadFolders等 |
-| ReadSession | 5.7 | 6.6 | 新SQLite连接开销本身远小于重建Index |
-| ReadIndex/copy | 3.0 | 3.0 | 已有不可变索引快照复制已有实现，可供其他慢页借鉴 |
-| Loadout/after-copy | 32.8 | 22.4 | 复制Index仍须构建当前Loadout |
-| Library/build-warm-index | 491.7 | 398.1 | 先得到Index后首次库存聚合；并非BuildLibrary视图 |
-| Library/rebuild | 247.6 | 225.5 | 同reader再建库存仍不是0 |
-| Library/render-all | 192.1 | 176.7 | BuildLibrary全量DTO/ops/facets，不含JSON |
-| Library/render-filter | 74.2 | 56.1 | harmony过滤的视图构建 |
-| Library/JSON | 26.7 | 24.7 | 分阶段样本编码约24–27ms |
-| Changes/after-index | 47.8 | 14.2 | 旧BuildChanges，仅作为Subscriptions内部阶段证据 |
-| Subscriptions/after-index | 271.2 | 238.7 | 同一预热reader；和每次fresh API不同 |
-| ModsCopies/disk | 6.6 | 31.3 | 独立磁盘副本检查；1.6目录情况不同 |
-| GameLinks/disk | 25.4 | 24.7 | 链接检查；Problems热分支未必完整重跑此链 |
-| Problems/first | 96.7 | 39.7 | 首次问题聚合，含缓存和磁盘分支 |
-| Problems/hot-with-disk | 4.7 | 6.7 | Problems已有缓存后仍有磁盘检查 |
-| Needs/view | 2.5 | 1.2 | BuildNeeds本身很小，主要等待在其输入准备 |
-| Board/view | 142.8 | 162.1 | 同一会话预热后的Board生成 |
-| Settings/Dependencies | 16.2 | 13.4 | 工具定位/版本读取，已有版本cache |
-| Settings/Caches | 2.5 | 2.7 | 缓存目录WalkDir统计并非此数据下设置页主瓶颈 |
-| Settings/Folders | 3.0 | 3.2 | 文件夹组 |
-| Settings/All | 19.6 | 19.9 | 同App已有Index等状态后完整SettingsPage |
-| Home/first | 698.8 | 589.4 | 读过上述阶段后的首次Home；不与表A算同一温度 |
-| Home/hot | 172.3 | 222.9 | 重复生成启动页仍有工作 |
+| Index/cold | 152.3 | 115.7 | DB loading, field/index assembly; not full disk rescan |
+| Loadout/after-index | 32.0 | 22.8 | Resolve plan, dependencies/LoadFolders etc. |
+| ReadSession | 5.7 | 6.6 | New SQLite connection overhead itself far below Index rebuild |
+| ReadIndex/copy | 3.0 | 3.0 | Immutable index snapshot copying already implemented; useful pattern for other slow pages |
+| Loadout/after-copy | 32.8 | 22.4 | Copying Index still requires current Loadout construction |
+| Library/build-warm-index | 491.7 | 398.1 | First inventory aggregation after obtaining Index; not BuildLibrary view |
+| Library/rebuild | 247.6 | 225.5 | Rebuilding inventory on same reader is still nonzero |
+| Library/render-all | 192.1 | 176.7 | Full BuildLibrary DTO/ops/facets, excluding JSON |
+| Library/render-filter | 74.2 | 56.1 | View construction for harmony filter |
+| Library/JSON | 26.7 | 24.7 | Phase samples encode in about 24–27ms |
+| Changes/after-index | 47.8 | 14.2 | Old BuildChanges, used only as internal Subscriptions phase evidence |
+| Subscriptions/after-index | 271.2 | 238.7 | Same warmed reader; differs from fresh API on every call |
+| ModsCopies/disk | 6.6 | 31.3 | Independent disk copy checks; 1.6 directories differ |
+| GameLinks/disk | 25.4 | 24.7 | Link checks; warm Problems branch may not rerun this full chain |
+| Problems/first | 96.7 | 39.7 | Initial problem aggregation, including cache and disk branches |
+| Problems/hot-with-disk | 4.7 | 6.7 | Disk checks remain after Problems cache exists |
+| Needs/view | 2.5 | 1.2 | BuildNeeds itself tiny; most waiting prepares its inputs |
+| Board/view | 142.8 | 162.1 | Board generation after same-session warmup |
+| Settings/Dependencies | 16.2 | 13.4 | Tool location/version reads, existing version cache |
+| Settings/Caches | 2.5 | 2.7 | Cache directory WalkDir statistics not the main Settings bottleneck with this data |
+| Settings/Folders | 3.0 | 3.2 | Folder group |
+| Settings/All | 19.6 | 19.9 | Complete SettingsPage after same App has Index and other state |
+| Home/first | 698.8 | 589.4 | Initial Home after phases above; not same temperature as table A |
+| Home/hot | 172.3 | 222.9 | Repeated Home generation still does work |
 
-实测主轮次Library/all热编码main为约22.2 ms，1.6约26.2 ms；payload分别5,355,970 B、5,335,776 B。搜索仍约1.65 MB、来源筛选约2.60 MB。Workspace约1.33 MB、编码约4.6 ms。相比之下订阅全库仅约0.37 MB、编码约1.5 ms，因此订阅页优先减重后端重建，库页还应减传输与对象构造。
+In the main round, warm Library/all encoding was about 22.2 ms for main and 26.2 ms for 1.6; payloads were 5,355,970 B and 5,335,776 B. Search still transfers about 1.65 MB, source filtering about 2.60 MB. Workspace is about 1.33 MB with about 4.6 ms encoding. In contrast, whole-library subscriptions is only about 0.37 MB with about 1.5 ms encoding, so prioritize reducing backend reconstruction on subscriptions, and also reduce transfer/object construction on the library page.
 
-### 5.2 磁盘、XML、网络、重复计算和锁分别在哪里
+### 5.2 Where Disk, XML, Network, Repeated Computation, and Locks Occur
 
-**库存/订阅重复计算。** [SubscriptionsPage](../../internal/surface/gui/subscriptions.go) 每次 `detachedReader → Loadout → BuildSubscriptions`；[BuildSubscriptions](../../internal/view/subscriptions.go) 先构建变化再调用 `App.Library()` 全库存。只看单Mod也不会跳过全库；添加订阅只需账户/最近条目，却先构建同一数据。新连接5–7ms并非全部问题，Index 116–152ms、库存首次398–492ms、重复225–248ms才更值得处理。[readers.go](../../internal/surface/gui/readers.go) 和 [readsession.go](../../internal/app/readsession.go) 已有 `ReadIndex/readInventorySession` 模式，不需要共享可变App来省成本。
+**Repeated inventory/subscription computation.** [SubscriptionsPage](../../internal/surface/gui/subscriptions.go) runs `detachedReader → Loadout → BuildSubscriptions` every time. [BuildSubscriptions](../../internal/view/subscriptions.go) builds changes, then calls `App.Library()` for the full inventory. Viewing one Mod does not skip the whole library. Add subscription needs only accounts/recent entries but constructs the same data first. New connections at 5–7ms are not the whole problem; Index at 116–152ms, first inventory at 398–492ms, and repeated inventory at 225–248ms deserve more attention. [readers.go](../../internal/surface/gui/readers.go) and [readsession.go](../../internal/app/readsession.go) already have the `ReadIndex/readInventorySession` pattern; sharing a mutable App is unnecessary to save this cost.
 
-**CPU与锁证据。** 单独对 main `SubscriptionsPage(true, "")` 连续12次取CPU/mutex profile，含一次Workspace准备；9.93s壁钟、14.15 CPU秒。`BuildSubscriptions` 累计7.21 CPU秒、`App.Library` 5.28、SQLite VDBE 4.18、`Loadout` 2.03、`Index/loadIndex` 1.57、`ContentKinds` 1.03；这些是嵌套累计采样，不能相加，且不代表页面各阶段壁钟百分比。GC drain累计3.77 CPU秒，支持减少临时全库对象的方向。mutex profile的1.86秒聚合等待主要是runtime/GC锁，**没有证据把当前串行订阅慢页归因为API主互斥锁等待**。代码能证明某些并发请求串行，无法从这份单页profile推导真实GUI并发p95。
+**CPU and lock evidence.** A separate CPU/mutex profile of 12 consecutive main `SubscriptionsPage(true, "")` calls, including one Workspace preparation, took 9.93s wall time and 14.15 CPU seconds. Cumulative samples: `BuildSubscriptions` 7.21 CPU seconds, `App.Library` 5.28, SQLite VDBE 4.18, `Loadout` 2.03, `Index/loadIndex` 1.57, `ContentKinds` 1.03. These nested cumulative samples cannot be added and do not represent wall-time percentages of page phases. GC drain accumulated 3.77 CPU seconds, supporting fewer temporary whole-library objects. The mutex profile's 1.86 seconds of aggregate waiting is mainly runtime/GC locks. **There is no evidence attributing the current serial subscription-page slowness to the main API mutex.** Code proves some concurrent requests serialize, but this single-page profile cannot establish real concurrent GUI p95.
 
-**XML/About。** 页面使用扫描保存在DB里的decl/analysis，不是每次递归解析全部磁盘XML。`Index` 的懒声明读取与Loadout仍有解析/组装成本，本次没有独立给 `encoding/xml` 插桩，不能报一个虚构“XML占比”。30.3秒跨版本分析才是真正需要读Def/Patch/程序集并模拟的前提；应与现有分析下展示页面区分。首轮贴图78.9秒及Build100首次17.3秒与PNG头/尺寸持久缓存、不同目标范围有关，**不是XML解析时间**；未做系统调用逐文件追踪，二者细分的精确占比仍待专项profile。
+**XML/About.** Pages use decl/analysis stored in the DB by scanning, rather than recursively parsing all disk XML on every request. Lazy declaration reads in `Index` and Loadout still involve parsing/assembly costs, but `encoding/xml` was not separately instrumented here; an "XML share" cannot be invented. The 30.3-second cross-version analysis is the prerequisite that actually reads Def/Patch/assemblies and simulates them; distinguish it from page display with existing analysis. The initial 78.9-second texture run and 17.3-second Build100 run relate to persistent PNG header/dimension caches and different target scopes, **not XML parsing time**. There was no per-file syscall tracing; exact breakdowns still require focused profiling.
 
-**贴图与占用统计。** [app/textures.go](../../internal/app/textures.go) 的 `readTextureMod → CollectCached → MakePlan` 遍历纹理目录并统计，缓存命中省PNG头读取而不省全部目录遍历；[Collect](../../internal/textures/collect.go) 读取Textures树及每个文件信息。[loadcost.go](../../internal/app/loadcost.go) 在 `cache.Get` **之前**用 `loadCostStamp/fsscan.Walk` 遍历Textures/Sounds/Defs/Patches/Languages/Assemblies；已有最多8个Mod worker，不应无证据再加大并行。不同方案仍有失效条目，缓存key/失效源可继续专项排查。
+**Texture and resource-usage statistics.** `readTextureMod → CollectCached → MakePlan` in [app/textures.go](../../internal/app/textures.go) traverses texture directories and computes statistics. Cache hits save PNG header reads, not all directory traversal. [Collect](../../internal/textures/collect.go) reads the Textures tree and each file's information. [loadcost.go](../../internal/app/loadcost.go) traverses Textures/Sounds/Defs/Patches/Languages/Assemblies through `loadCostStamp/fsscan.Walk` **before** `cache.Get`. Up to 8 Mod workers already exist; do not increase parallelism without evidence. Different plans still have invalidated entries; cache keys/invalidation sources merit focused investigation.
 
-**Home/Workspace。** [shell.go Home](../../internal/surface/gui/shell.go) 通过独立 `logRead` reader构建Board、readNeeds、方案/包，再AddOtherEnvs；部分数据重复求值。[problems.go](../../internal/app/problems.go) 即使问题缓存存在仍检查副本/链接/遗留包；Needs视图本身仅1–3ms。`shellLocked(nil)` 也会再次取Needs。该读取兼顾用户在外部修改Mod的事实，优化应采用一次操作内复用或有失效的短缓存。
+**Home/Workspace.** [shell.go Home](../../internal/surface/gui/shell.go) builds Board, readNeeds, plans/packs through an independent `logRead` reader, then AddOtherEnvs; some data is evaluated repeatedly. [problems.go](../../internal/app/problems.go) checks copies/links/legacy packs even with a problem cache; the Needs view itself takes only 1–3ms. `shellLocked(nil)` also obtains Needs again. These reads account for external Mod changes, so optimize by reuse within one operation or short caches with invalidation.
 
-**设置/详情。** [api.go Sections/Settings](../../internal/surface/gui/api.go) 使用新reader，已预热App的SettingsPage约20ms，而GUI API热仍160–184ms，差值包含新状态重建。Settings缓存目录统计仅约3ms，不宜首先优化它。完整详情 [fulldetail.js](../../internal/surface/gui/assets/js/fulldetail.js) `Promise.all(Detail, ModCopies, Sections)` 后才finish；技术页的全部命令与Humanize在进入时做完，导致本来很快的详情必须等Sections的143–176ms。
+**Settings/details.** [api.go Sections/Settings](../../internal/surface/gui/api.go) uses new readers. SettingsPage on a warmed App is about 20ms, while warm GUI API calls remain 160–184ms; the difference includes rebuilding new state. Settings cache directory statistics take only about 3ms and should not be optimized first. Full details [fulldetail.js](../../internal/surface/gui/assets/js/fulldetail.js) finishes only after `Promise.all(Detail, ModCopies, Sections)`; all technical-page commands and Humanize run on entry, making otherwise fast details wait for Sections at 143–176ms.
 
-**卸载。** [uninstall.go sizeOf](../../internal/app/uninstall.go) 已有“每个App测一次尺寸”的缓存；但GUI [UninstallPlan](../../internal/surface/gui/uninstall.go) 每次新建detached reader，缓存随调用丢弃，改复选框又扫描尺寸。真实Home三次仍4.4–4.6秒，副本首轮7.7秒不应当作稳定磁盘冷基线。
+**Uninstall.** [uninstall.go sizeOf](../../internal/app/uninstall.go) already caches sizes once per App. However, GUI [UninstallPlan](../../internal/surface/gui/uninstall.go) creates a detached reader each time, discarding that cache after the call and rescanning sizes when checkboxes change. Three real-Home runs still take 4.4–4.6 seconds; the copy's first 7.7-second run is not a stable disk-cold baseline.
 
-**网络。** [gamedl.go GameBranches](../../internal/app/gamedl.go) 会经SteamCMD匿名公开查询并持有 `accounts.Lock(exe)`，这里3秒同时包括进程启动/SteamCMD/网络，未逐项拆秒。详情强制刷新成功为412ms，缓存fetch仍134–140ms，说明详情自己的短生命周期reader重建也有成本。一般网页解析成功条件与Workshop描述API不同，本次公共页元数据样本失败，不能混为同一路径。
+**Network.** [gamedl.go GameBranches](../../internal/app/gamedl.go) makes anonymous public queries via SteamCMD and holds `accounts.Lock(exe)`. Its 3 seconds includes process startup/SteamCMD/network, not separately timed. A successful forced details refresh takes 412ms, while cached fetches still take 134–140ms, showing the cost of details' short-lived reader reconstruction. General web parsing success conditions differ from the Workshop description API. The public-page metadata sample failed and cannot be treated as the same path.
 
-### 5.3 慢节点排序
+### 5.3 Slow-Node Ranking
 
-以下按主要观察的完整就绪等待排序，不将不同温度拼成统一排行榜。高频表内H为main/1.6热中位数；异步结果加前端轮询时间才接近用户感知。
+The following ranks major observed complete-readiness waits, without combining different cache temperatures into one uniform ranking. H in frequent-page rows is the main/1.6 warm median. Asynchronous results need frontend polling time added to approach user-perceived time.
 
-| 顺序 | 节点 | 本次等待 | 类型 |
+| Order | Node | Observed wait | Type |
 | --- | --- | --- | --- |
-| 1 | 全库贴图手动统计 | 首次78.862s；H 2.554 / 2.481s | 极慢首次+热遍历；不是贴图初始页 |
-| 2 | Needs过期分析 / 跨版本日志前提 | Needs最终35.192s；日志直接分析30.296s + 页面构建 | 副本内in-process runner；生产还有子进程启动，未测其开销 |
-| 3 | 创建包100%贴图统计 | 1.6 C 17.336s；H 0.275 / 0.780s | 首轮目标纹理缓存；手动扫描统计 |
-| 4 | 卸载预览 | 真实Home中位数4.513s | 每次改答案都能复现 |
-| 5 | 下载游戏版本信息 | H 2.869 / 2.796s | SteamCMD公开分支查询 |
-| 6 | 订阅与更新全库 | P 1.452s；H 0.735 / 0.636s | 高频纯读取，收益明确 |
-| 7 | 添加订阅 / 当前 / 单Mod更新 | H 0.56–0.67s | 小页面也全库重建 |
-| 8 | 首次Mod库全部 | P 1.459s；E 0.687s | 库存+DTO；H仍约0.2s和编码 |
-| 9 | 启动页首次进入 | E 0.753 / 0.754s；H 0.170 / 0.198s | 独立reader、跨方案/环境 |
-| 10 | 订阅移除dry-run弹窗 | main H 0.481s | 单Harmony预览，无真实取消订阅 |
-| 11 | 创建包不转换 | H 0.271 / 0.393s | 预检查，不含实际构建 |
-| 12 | 编辑器顶部筛选条 | H 0.398 / 0.312s | 重建facets/约1.08MB对象 |
-| 13 | Workspace | H 0.282 / 0.261s | Board/Needs/Shell总快照 |
-| 14 | 方案占用统计 | main当前H0.311s；最大方案诊断0.325/0.364s | stamp扫描，失效再测 |
-| 15 | 删除dry-run弹窗 | main H 0.254s | 单Harmony，未调用删除 |
-| 16 | 方案贴图统计 | H 0.233 / 0.080s | 取决于方案目标纹理数 |
-| 17 | 完整详情/技术、设置 | 通常0.15–0.20s | 接近200ms；大内容与并发还需GUI验证 |
+| 1 | Manual whole-library texture statistics | First 78.862s; H 2.554 / 2.481s | Very slow initial run + warm traversal; not initial texture page |
+| 2 | Stale Needs analysis / cross-version log prerequisite | Final Needs 35.192s; direct log analysis 30.296s + page construction | In-process runner on copy; production subprocess startup overhead unmeasured |
+| 3 | Create pack 100% texture statistics | 1.6 C 17.336s; H 0.275 / 0.780s | Initial target texture cache; manual scan statistics |
+| 4 | Uninstall preview | Real Home median 4.513s | Reproducible on each answer change |
+| 5 | Game download version information | H 2.869 / 2.796s | SteamCMD public branch query |
+| 6 | Whole-library subscriptions and updates | P 1.452s; H 0.735 / 0.636s | Frequent pure reads, clear gains |
+| 7 | Add subscription / current / single-Mod updates | H 0.56–0.67s | Small pages also rebuild whole library |
+| 8 | Initial full Mod library | P 1.459s; E 0.687s | Inventory + DTO; H still about 0.2s plus encoding |
+| 9 | First Home entry | E 0.753 / 0.754s; H 0.170 / 0.198s | Independent reader, cross-plan/environment |
+| 10 | Subscription removal dry-run dialog | main H 0.481s | Single Harmony preview, no real unsubscription |
+| 11 | Create pack without conversion | H 0.271 / 0.393s | Prechecks, excluding actual build |
+| 12 | Editor top filter bar | H 0.398 / 0.312s | Rebuild facets/about 1.08MB objects |
+| 13 | Workspace | H 0.282 / 0.261s | Combined Board/Needs/Shell snapshot |
+| 14 | Plan resource-usage statistics | main current H 0.311s; largest plan diagnosis 0.325/0.364s | Stamp scan, remeasure invalidated entries |
+| 15 | Delete dry-run dialog | main H 0.254s | Single Harmony, deletion not called |
+| 16 | Plan texture statistics | H 0.233 / 0.080s | Depends on plan target texture count |
+| 17 | Full details/technical, settings | Usually 0.15–0.20s | Near 200ms; large content/concurrency still need GUI validation |
 
-## 6. 没有成功数值的节点，以及如何估算/补测
+## 6. Nodes Without Successful Figures and How to Estimate/Measure Them
 
-| 节点 | 未测原因 | 可执行的测法 / 进入到就绪模型 |
+| Node | Why unmeasured | Executable method / entry-to-readiness model |
 | --- | --- | --- |
-| 所有L子标签/选项/折叠/纯确认弹窗 | 无独立handler，后端增量C/H均0；未启动GUI | 在现有JS `beginPageRead/read.finish` 或点击回调前后 `performance.mark`，再用两次requestAnimationFrame测绘制；保留父payload准备时间，单列DOM。不能给未经测量的“16ms必达”承诺 |
-| 原生文件/目录/程序选择器、账户窗口、Steam验证码/网页登录 | 必须有GUI/人工操作；不应自动触发真实账号交互 | 只计“打开→首个可用控件”的时间，人工思考/输入另计；UI自动化或Wails/native回调计时，需专门允许启动窗口，本次未做 |
-| 成功的普通网页/Git/LoversLab分支与文件页 | URL/认证/远端内容决定成本；本次仅有公开页元数据失败样本 | 对用户实际来源做无账号/已授权只读API，冷指无持久元数据、热保留缓存；HTTP DNS/TLS/TTFB/body + 解析分别计时；需要登录的文件列表不以公共错误代替。表F失败已明确 |
-| 关注合集刷新 PlanCheck、导入Workshop合集 | 主面板先ready，再网络检查；本轮禁网控制后台变量，未取实际远程结果 | 用4条真实plan_collection的只读公开读取，记录首屏PlanManage与全量集合ready两个时间，隔离Store记录缓存；不同集合大小单列，不可用本地表单2ms推断 |
-| Pack详情/未完成包/包启动检查、包导出与移除预览 | 真实packs为空；创建合成包不等于真实用户样本 | 有包后依次测 `Pack/PackRemovePreview`、PackExport预览及安全启动检查；分别计manifest解码、Mod表、目录尺寸。首屏≈manifest+视图，最终≈首屏+明细扫描；本次不给数值范围 |
-| DirectoryMovePreview、LibraryPreview/OpPreview、Needs Inspect的其余输入组合 | 路径/操作/选择数量/证据种类决定成本；表G已测全部12类LibPreview的单Mod分支及6类Inspect，未测任意路径/多选/所有证据实例 | 使用副本配置，合法目标路径、单Mod/100Mod/全选各测cold/hot，只调用dry-run。返回拒绝也应单列，禁止执行Apply/Run。此前错误lock样本已排除 |
-| 重新扫描、首次导入包、安装/构建/贴图转换、任务执行/重试/取消/卸载结果 | 是操作后的状态页，需产生写行为；不是进入页只读加载 | 进度壳的后端数据已由Tasks/事件给出；完整结果时间由操作持续时间决定。仅在隔离输出目录进行专项吞吐测试，不能把按钮排队返回当完成 |
-| 当前真实游戏运行监控 | 测试时未运行游戏；LogMonitor为空 | 在用户已有游戏运行时被动轮询，分probe、文件尾增量解析、归因/展示；本次不为测量启动游戏 |
-| 网络图片/img首次下载、无持久背景缓存首次Unity解码 | 保留了真实缓存；图片HTTP仅测了有效缓存命中 | 在副本中仅移走目标缓存项，保留真实资源不动；测下载/解码缩放/JPEG编码/磁盘写，再测HTTP和浏览器decode；大量图需并发上限与取消统计 |
-| OS真正冷盘/安装后首次扫描 | 未清系统缓存，已有335MB索引库；会显著改变题目基线 | 重启后固定顺序采样，或独立克隆VM；记录读盘字节/磁盘队列/杀软影响。不能用本文C充当清空全部缓存后的加载时间 |
+| All L subtabs/options/collapsible areas/pure confirmation dialogs | No independent handler; incremental backend C/H both 0; GUI not launched | Add `performance.mark` around existing JS `beginPageRead/read.finish` or click callbacks, then measure paint with two requestAnimationFrame calls; retain parent payload preparation time and report DOM separately. No unmeasured "guaranteed 16ms" promises |
+| Native file/directory/program pickers, account windows, Steam codes/web login | Require GUI/human interaction; real account interaction should not be triggered automatically | Measure only open→first usable control; human thinking/input separate. UI automation or Wails/native callback timing requires specific authorization to launch windows; not done here |
+| Successful ordinary web/Git/LoversLab branch and file pages | Cost depends on URL/auth/remote content; only public metadata failure sample here | Use unauthenticated/authorized read-only APIs for actual user sources; cold means no persistent metadata, warm retains cache. Time HTTP DNS/TLS/TTFB/body and parsing separately; do not replace authenticated file lists with public errors. Table F explicitly identifies failure |
+| Followed-collection refresh PlanCheck, Workshop collection import | Main panel ready before network checks; network disabled this round to control background variables; no actual remote results | Read the 4 real plan_collection entries through read-only public requests; record first PlanManage screen and complete collection readiness separately, storing cache in isolated Store. Separate collection sizes; do not infer from a 2ms local form |
+| Pack details/unfinished packs/pack launch checks, export and removal previews | Real packs empty; synthetic packs are not real user samples | Once packs exist, measure `Pack/PackRemovePreview`, PackExport preview, and safe launch checks in order; time manifest decoding, Mod table, directory sizes separately. First screen ≈ manifest + view; final ≈ first screen + detail scans; no numeric range here |
+| DirectoryMovePreview, other LibraryPreview/OpPreview and Needs Inspect input combinations | Depends on path/action/selection count/evidence type; table G covers single-Mod branches for all 12 LibPreview types and 6 Inspect types, not arbitrary paths/multiselection/all evidence instances | Use copied config, valid target paths, single Mod/100 Mods/select all, cold/hot, dry-run only. List rejections separately too; never execute Apply/Run. Earlier erroneous lock sample excluded |
+| Rescan, first pack import, installation/build/texture conversion, task execution/retry/cancel/uninstall results | Post-operation state pages require writes; not read-only entry loading | Tasks/events already supply backend data for progress shells; complete result time depends on operation duration. Run focused throughput tests only in isolated output directories; button enqueue return is not completion |
+| Current real-game live monitoring | Game not running during test; LogMonitor empty | Passively poll an already running user game; separate probe, incremental tail parsing, attribution/display; do not launch game for measurement here |
+| First network image/img download, first Unity decode without persistent background cache | Real cache retained; image HTTP measured valid cache hits only | Move only target cache entry aside in copy; leave real resources untouched. Measure download/decode-resize/JPEG encode/disk write, then HTTP and browser decode; many images require concurrency limits/cancellation statistics |
+| Truly OS-cold disk / first scan after installation | System caches not cleared; existing 335MB index database; would substantially change baseline | Sample fixed order after reboot or use independent cloned VM; record disk bytes/queue/antivirus effects. This report's C is not load time after clearing all caches |
 
-这些限制不是将未测项按“很快”归零。当前已成功测量的读取入口见各表，全部有限UI节点都有数据依赖或上述补测路径；尚未取得成功样本的分支不声称已经完成全GUI端到端覆盖。
+These limits do not zero unmeasured items as "fast." Successful read entries appear in the tables. Every finite UI node has a data dependency or supplementary measurement path above; branches without successful samples do not establish full end-to-end GUI coverage.
 
-## 7. 优化清单（收益 / 成本排序）
+## 7. Optimizations (Ordered by Benefit / Cost)
 
-收益范围为基于当前实测阶段可移除的工作量和目标，**不是已实现的加速结果**。以真实外部文件改变后的正确失效为约束，不缓存删除/部署授权结论。
+Benefit ranges are removable work and targets based on current measured phases, **not implemented speedups**. Correct invalidation after real external file changes is required; deletion/deployment authorization results must not be cached.
 
-| 优先级 | 证据 → 具体方案 | 预期收益 / 验收目标 | 改动范围（相对internal/的文件 / 函数） | 成本与风险 |
+| Priority | Evidence → concrete approach | Expected benefit / acceptance target | Change scope (files / functions relative to internal/) | Cost and risk |
 | --- | --- | --- | --- | --- |
-| P1 | sub只有账户/最近项却调用全BuildSubscriptions；新增轻量AddSubscriptionInfo；chg使用readInventorySession/ReadIndex，按环境、快照、范围与change key复用只读库存 | sub热约0.6s→目标30–50ms以内；chg减少116–152ms索引重建+225–248ms重复库存；热目标150–300ms，需实测 | `surface/gui/subscriptions.go SubscriptionsPage`、`assets/js/subscriptions.js openAdd`、`view/subscriptions.go BuildSubscriptions`、`gui/readers.go` / `app/readsession.go` | 小至中；不能共享可变App/DB迭代器，必须在scan/任务/环境/方案/标签备注变更后失效；先做轻sub可独立交付 |
-| P2 | 卸载已有App.sizeOf缓存被每次detachedReader丢弃；保留专用预览reader或本次预览的尺寸map，选项改动只重组计划；尺寸可后台渐入 | 用户连续改选项可省大部分4.5s目录遍历；目标热<100–300ms，首次路径摘要先出 | `gui/uninstall.go UninstallPlan`、`app/uninstall.go PlanUninstall/sizeOf` | 小至中；缓存仅字节估计，不缓存删除判定；执行前全量重新验证路径/进程/归属；外部大小变化标记估计并可刷新 |
-| P3 | 公开分支每次启动SteamCMD；按appID/tool身份作5–10min TTL+singleflight，旧数据先展示后刷新 | 热分支信息2.8s→本地<10–30ms；首次仍后台约3s | `app/gamedl.go GameBranches`、`gui/shell.go GuideDownloadInfo`、`assets/js/guide.js` | 小；分支新增短暂延迟、失败不覆盖旧数据；保留accounts.Lock，不能绕过SteamCMD串行锁 |
-| P4 | Library热BuildLibrary约177–192ms、5.4MB；缓存静态行/ops，详情按选中读取，facets一次聚合；BarFilter复用相同计数/查询索引 | 库热后端目标80–120ms以内；payload目标降50–80%（先列字段审计验证）；BarFilter目标50–100ms以内 | `view/library.go BuildLibrary/libInst`、`gui/library.go library/Library`、`view/columns.go` / `view/bar.go`、`gui/ops.go BarFilter`、`assets/js/library.js/lists.js` | 中；行操作可用性随当前方案/任务/标签改变，不能仅按snapshot缓存；保留可访问字段；不要用已有DOM虚拟化冒充传输优化 |
-| P5 | 全库贴图首轮78.9s、热2.5s，loadcost命中前仍Walk；按snapshot+LoadFolders+游戏MM+活动package集合维护摘要，只重扫变更Mod；先显示上次统计、后台核验 | 相同输入再次进入目标50–150ms以内；全库首轮仍需I/O，渐进可见；若90%快照未变，重测工作量目标降约90%，非保证等比例壁钟 | `app/textures.go TextureSummaryProgress/readTextureMod`、`textures/cache.go CollectCached`、`app/loadcost.go PlanLoadCost/loadCostStamp`、`gui/textures.go`、`gui/planmanage.go` | 中至大；根目录mtime不能代表子文件变化；需扫描事件/文件监视或短TTL+后台递归验证、工具/算法版本key；外部DDS归属仍须安全检查 |
-| P6 | Home另建Board/Needs并跨方案环境重复取值；Workspace的Shell又可重复needs；一次读取上下文memo，传已得Needs给shell，按输入key复用Board/PlanProblems | 首次减少一个或多个116–162ms阶段，目标E<350–500ms、H<80–120ms；Workspace节省重复聚合，需profile确认实际可去掉量 | `gui/shell.go Home/shellLocked`、`gui/api.go needsLocked`、`gui/environment.go`、`app/problems.go`、`view/shell.go BuildHome/AddOtherEnvs` | 中；当前/打开方案不同，不可复用错方案；日志更新、外部链接变化必须失效；长TTL会遮住新问题 |
-| P7 | 完整详情Promise.all等全部Sections；先发Detail/Copies，再按技术tab懒加载/缓存Sections；设置采用独立reader但复用Index | ful先显示主要说明/副本约10–50ms（已有reader时），避免等143–176ms；Settings热从160–184ms向20–50ms靠近 | `assets/js/fulldetail.js full`、`gui/api.go Sections/Settings`、`view/detail.go Sections`、`gui/readers.go` | 小至中；渐进区需准确loading，不把首屏当全部ready；section缓存key含snapshot、gameMM、分析版本、语言；readIndex复制需保证一致性 |
-| P8 | 跨版本日志需30.3s分析；按环境+方案集合指纹+日志MM缓存分析，发现版本冲突后后台排队，日志先给原文/簇再渐进归因；LogCluster/Pattern合并读取共享一次报告 | 首次30s工作本身不保证减少，二次避免重做；证据190–222ms路径目标<20–50ms；按profile判断解析/归因重复 | `app/logs.go EnsureLogAnalysis`、`app/analysis.go EnsureAnalysis`、`gui/api.go LogPage/LogCluster/LogPattern`、`view/logpage.go` | 中至大；当前已有pending/持久缓存，应补缺失key与复用，不能再造一层同功能缓存；后台分析须尊重128/子进程内存限制与取消 |
+| P1 | sub needs only accounts/recent items but calls full BuildSubscriptions; add lightweight AddSubscriptionInfo; chg uses readInventorySession/ReadIndex and reuses read-only inventory by environment, snapshot, scope, change key | sub warm about 0.6s→target within 30–50ms; chg removes 116–152ms Index rebuild + 225–248ms repeated inventory; warm target 150–300ms, needs measurement | `surface/gui/subscriptions.go SubscriptionsPage`, `assets/js/subscriptions.js openAdd`, `view/subscriptions.go BuildSubscriptions`, `gui/readers.go` / `app/readsession.go` | Small to medium; no shared mutable App/DB iterators; invalidate after scan/task/environment/plan/tag/note changes; lightweight sub can ship independently first |
+| P2 | Existing App.sizeOf uninstall cache discarded by each detachedReader; retain dedicated preview reader or per-preview size map; option changes only reassemble plan; sizes may appear progressively in background | Repeated option changes save most 4.5s directory traversal; warm target <100–300ms, initial path summary first | `gui/uninstall.go UninstallPlan`, `app/uninstall.go PlanUninstall/sizeOf` | Small to medium; cache byte estimates only, not deletion decisions; fully revalidate paths/processes/ownership before execution; mark external size changes as estimates and allow refresh |
+| P3 | Public branches start SteamCMD each time; 5–10min TTL + singleflight by appID/tool identity; show old data before refresh | Warm branch info 2.8s→local <10–30ms; initial still about 3s in background | `app/gamedl.go GameBranches`, `gui/shell.go GuideDownloadInfo`, `assets/js/guide.js` | Small; briefly delayed new branches; failure must not overwrite old data; retain accounts.Lock, never bypass SteamCMD serialization lock |
+| P4 | Warm Library BuildLibrary about 177–192ms, 5.4MB; cache static rows/ops, read selected details on demand, aggregate facets once; BarFilter reuses counts/query index | Warm library backend target within 80–120ms; payload target down 50–80% (verify with field audit first); BarFilter target within 50–100ms | `view/library.go BuildLibrary/libInst`, `gui/library.go library/Library`, `view/columns.go` / `view/bar.go`, `gui/ops.go BarFilter`, `assets/js/library.js/lists.js` | Medium; row action availability changes with current plan/tasks/tags, so snapshot-only caching insufficient; retain accessible fields; existing DOM virtualization is not transfer optimization |
+| P5 | Whole-library textures first 78.9s, warm 2.5s; loadcost still Walks before hit; maintain summaries by snapshot+LoadFolders+game MM+active package set; rescan only changed Mods; show last statistics, validate in background | Same-input reentry target within 50–150ms; initial whole-library still requires I/O, progressively visible; if 90% of snapshots unchanged, target about 90% less remeasurement work, no guaranteed proportional wall-time reduction | `app/textures.go TextureSummaryProgress/readTextureMod`, `textures/cache.go CollectCached`, `app/loadcost.go PlanLoadCost/loadCostStamp`, `gui/textures.go`, `gui/planmanage.go` | Medium to large; root directory mtime does not represent child-file changes; need scan events/file watching or short TTL + recursive background validation, tool/algorithm version keys; external DDS ownership still needs safety checks |
+| P6 | Home rebuilds Board/Needs and repeatedly reads across plans/environments; Workspace Shell may repeat needs; memoize within one read context, pass existing Needs to shell, reuse Board/PlanProblems by input key | Initial removes one or more 116–162ms phases; target E<350–500ms, H<80–120ms; Workspace saves repeated aggregation, profile actual removable work | `gui/shell.go Home/shellLocked`, `gui/api.go needsLocked`, `gui/environment.go`, `app/problems.go`, `view/shell.go BuildHome/AddOtherEnvs` | Medium; current/open plans differ, never reuse wrong plan; log updates/external link changes must invalidate; long TTL hides new problems |
+| P7 | Full-detail Promise.all waits for all Sections; send Detail/Copies first, lazy-load/cache Sections by technical tab; Settings keeps independent reader but reuses Index | ful shows main description/copies first in about 10–50ms (existing reader), avoiding 143–176ms wait; warm Settings approaches 20–50ms from 160–184ms | `assets/js/fulldetail.js full`, `gui/api.go Sections/Settings`, `view/detail.go Sections`, `gui/readers.go` | Small to medium; progressive sections need accurate loading states; first screen is not all ready; section cache key includes snapshot, gameMM, analysis version, language; readIndex copy must remain consistent |
+| P8 | Cross-version logs require 30.3s analysis; cache by environment + plan-set fingerprint + log MM; queue in background on version conflict, show original text/clusters before progressive attribution; combine LogCluster/Pattern to share one report | Initial 30s work not guaranteed to shrink; avoid repeating it on second read; evidence path at 190–222ms targets <20–50ms; profile repeated parsing/attribution | `app/logs.go EnsureLogAnalysis`, `app/analysis.go EnsureAnalysis`, `gui/api.go LogPage/LogCluster/LogPattern`, `view/logpage.go` | Medium to large; pending/persistent caches already exist, fill missing keys/reuse rather than adding duplicate cache layer; background analysis must respect 128/subprocess memory limits and cancellation |
 
-按**收益/成本**看，低频下载页的P3可很快落地；按**用户最常遇到的等待**，推荐近期实际推进这5项：
+By **benefit/cost**, P3 on the infrequent download page can land quickly. By **waits users encounter most**, recommend these 5 near-term changes:
 
-1. **轻量添加订阅 + chg只读库存复用（P1）**：高频、证据明确，先拆轻接口，再测旧/新订阅页。
-2. **卸载预览保留尺寸缓存（P2）**：已有缓存设计可直接接续，连续点选不应每次等4.5秒。
-3. **库列表DTO/筛选条减重（P4）**：同时改善Go构建、5.4MB桥接与WebView端对象处理。
-4. **贴图/占用统计按Mod快照增量（P5）**：处理最长78.9秒等待，先交付上次结果+后台校验，再做增量正确性。
-5. **Home/Workspace一次读取内复用（P6）**：改善日常启动/切页，先用阶段和CPU profile明确重复后合并。
+1. **Lightweight add subscription + chg read-only inventory reuse (P1)**: frequent and well evidenced; split the lightweight interface first, then compare old/new subscription pages.
+2. **Retain uninstall preview size cache (P2)**: continue the existing cache design; consecutive selections should not each wait 4.5 seconds.
+3. **Reduce library-list DTO/filter-bar weight (P4)**: improve Go construction, the 5.4MB bridge transfer, and WebView object handling together.
+4. **Incremental texture/usage statistics by Mod snapshot (P5)**: address the longest 78.9-second wait; deliver last results + background validation before incremental correctness.
+5. **Reuse within one Home/Workspace read (P6)**: improve daily startup/navigation; establish repetition with phase/CPU profiles before merging work.
 
-P7可作为小补丁穿插；P8先安排跨版本key和避免重复分析的专项观测。没有建议“给所有页面统一全局缓存”或盲目增加goroutine：这会牺牲外部Mod变更可见性、放大内存/磁盘竞争。
+P7 can fit between these as a small patch; P8 first needs focused observation of cross-version keys and repeated analysis. No recommendation for a global cache on every page or blindly adding goroutines: that would reduce external Mod-change visibility and amplify memory/disk contention.
 
-### 7.1 与最近已有优化的关系
+### 7.1 Relationship to Recent Existing Optimizations
 
-- `bfc8d93`（“只看同packageId的副本，不再重建全部Mod的登记表”）：`app/deploy.go regWith` 已收窄候选。当前PlanManage主面板热35–153ms，表B是优化后的基线，不应重复提出已经完成的全库registry修复。值得借鉴的是“按当前范围做局部查询”，直接用于Subscriptions单Mod/当前方案分支。
-- `93b5639`：当前 `app/library.go` 已按folder构建Mods/duplicate map，`store/content.go ContentKinds` 已有按snapshot/scans缓存。仍有新的App/reader、热视图重建和payload成本；P1/P4应复用现有缓存并补失效边界，不再建议实现同一folder map或重复缓存ContentKinds。
-- `ReadIndex`、库存reader、PNG header cache、异步测量/取消、最多8个loadcost workers都已存在。优化应先贯通这些已有路径；当前基线不足以支持改SQLite驱动、引入ORM/前端框架或增加依赖。
+- `bfc8d93` ("only inspect copies with the same packageId, instead of rebuilding the registry for all Mods", translated): `app/deploy.go regWith` already narrows candidates. Current warm PlanManage panels take 35–153ms; table B is the post-optimization baseline. Do not propose the completed whole-library registry fix again. The useful pattern is scoped queries, directly applicable to single-Mod/current-plan Subscriptions branches.
+- `93b5639`: `app/library.go` already builds Mods/duplicate maps by folder, and `store/content.go ContentKinds` already caches by snapshot/scans. New Apps/readers, warm view reconstruction, and payload costs remain. P1/P4 should reuse existing caches and complete invalidation boundaries, not reimplement the folder map or duplicate ContentKinds caching.
+- `ReadIndex`, inventory readers, PNG header cache, asynchronous measurement/cancellation, and up to 8 loadcost workers already exist. Connect these existing paths first; this baseline does not justify replacing the SQLite driver, introducing ORM/frontend frameworks, or adding dependencies.
 
-## 8. 复现与研究产物
+## 8. Reproduction and Research Artifacts
 
-原始观测保留在本机被git忽略的 `.cache/page-load-20261026/`：`results.jsonl`（910条，65种入口×两环境×C/E/H）、`run.log`、`detail.log`、`process.log`、`supplement.log`、`logpreviews.log`、`public.log`、`sub.cpu`、`sub.mutex`、`needsfinal.log`、`groups.log`。报告自带汇总，不依赖这些缓存文件才能阅读。原始文件含本机路径，不上传外部服务。
+Original observations remain locally in git-ignored `.cache/page-load-20261026/`: `results.jsonl` (910 records, 65 entry types × two environments × C/E/H), `run.log`, `detail.log`, `process.log`, `supplement.log`, `logpreviews.log`, `public.log`, `sub.cpu`, `sub.mutex`, `needsfinal.log`, `groups.log`. This report includes summaries and can be read without those caches. Raw files contain local paths and are not uploaded to external services.
 
-临时测量文件为 `internal/surface/gui/research_pageload_test.go`，完成后删除；本次仅新增本报告，没有业务代码修改，也没有commit。清理时工作区还出现了另一份 `2026-10-26_steamcmd-parallel-downloads.md`，非本次产物，未改动或删除；最终没有遗留研究测试源码。下附完整测量源码可供在同一版本复现，保留它是为了测试恢复后仍可审查测量口径。
+The temporary measurement file was `internal/surface/gui/research_pageload_test.go`, deleted on completion. Only this report was added; no business code changed and no commit was made. Another `2026-10-26_steamcmd-parallel-downloads.md` appeared in the workspace during cleanup, was not produced by this study, and was neither changed nor deleted. No research test source remained. Full measurement source follows for reproduction on the same version, preserving an auditable measurement contract after restoring the tests.
 
-复现步骤：
+Reproduction steps:
 
-1. 确认分支/提交，关闭会改变Mod/日志的后台任务；记录硬件、游戏版本、方案/索引数量和已有cache状态。
-2. 以SQLite只读备份创建新的隔离Home，复制配置、tasks、cache、空packs；不要直接把研究Home指向真实 `%APPDATA%\RimArcho`。示例备份代码如下，`dst`应是新目录。
+1. Confirm branch/commit, close background tasks that change Mods/logs, and record hardware, game versions, plan/index counts, and existing cache state.
+2. Create a new isolated Home with a read-only SQLite backup; copy config, tasks, cache, and empty packs. Do not point research Home directly at real `%APPDATA%\RimArcho`. Example backup code follows; `dst` must be a new directory.
 
 ```python
 from pathlib import Path
@@ -507,16 +507,16 @@ shutil.copytree(src / "cache", dst / "cache")
 (dst / "packs").mkdir()
 ```
 
-3. 将下方源码临时保存到上述Go测试路径。原样运行主测量会包含匿名SteamCMD分支查询；`TestResearchPublicAndAssets`仅做公开HTTP，`TestResearchLogAndPreviews`在副本做一次实际分析。调整固定Harmony ID/真实环境名后再跑补测；实际样本换了不能直接用本报告快照ID。
+3. Temporarily save the source below to the Go test path above. Running the main measurement unchanged includes anonymous SteamCMD branch queries; `TestResearchPublicAndAssets` performs only public HTTP; `TestResearchLogAndPreviews` runs one actual analysis on the copy. Adjust fixed Harmony ID/real environment names before supplementary runs; changed actual samples cannot reuse this report's snapshot IDs directly.
 
 ```powershell
 $env:RIMARCHO_RESEARCH_HOME = (Resolve-Path .cache/page-load-repeat/home).Path
 $env:RIMARCHO_RESEARCH_OUTPUT = Join-Path (Resolve-Path .cache/page-load-repeat).Path 'results.jsonl'
 go test ./internal/surface/gui -run '^TestResearchPageLoads$' -count=1 -timeout 20m -v
 go test ./internal/surface/gui -run '^TestResearch(Breakdown|Extras|Validate)$' -count=1 -timeout 20m -v
-# 补测互相串行执行，避免CPU/I/O干扰
+# Run supplementary tests serially to avoid CPU/I/O interference
 go test ./internal/surface/gui -run '^TestResearch(Supplement|LogAndPreviews|PublicAndAssets|NeedsFinal|PageGroups)$' -count=1 -timeout 20m -v
-# 真进程冷：每个方法启动3个新进程，不用PageLoads的预读准备路径
+# True process cold: start 3 new processes per method, without PageLoads pre-read preparation
 go test -c -o .cache/page-load-repeat/gui.test.exe ./internal/surface/gui
 foreach ($method in @('Workspace','Home','Library','SubscriptionsPage','Settings')) {
     $env:RIMARCHO_RESEARCH_ENV = 'main'
@@ -528,15 +528,15 @@ foreach ($method in @('Workspace','Home','Library','SubscriptionsPage','Settings
 $env:RIMARCHO_RESEARCH_PROFILE = 'SubscriptionsPage'
 & .cache/page-load-repeat/gui.test.exe '-test.run=^TestResearchProfile$' '-test.cpuprofile=.cache/page-load-repeat/sub.cpu' '-test.mutexprofile=.cache/page-load-repeat/sub.mutex'
 go tool pprof -top -cum .cache/page-load-repeat/gui.test.exe .cache/page-load-repeat/sub.cpu
-# 只移除本次新增的临时研究源码；保留报告
+# Remove only temporary research source added by this study; keep the report
 git diff --check
 git status --short
 ```
 
-附录源码中的 `AnalyzeRunner/SteamWorker` 禁用、公开HTTP单独开启、JSON单独计时和异步最终轮询是测量契约的一部分。它不是用于提交的测试，亦不应添加到常规CI自动触网。
+Disabling `AnalyzeRunner/SteamWorker`, enabling public HTTP separately, timing JSON separately, and polling asynchronous final results in the appendix are part of the measurement contract. This is not a test for submission and must not be added to regular CI with automatic network access.
 
 <details>
-<summary>完整临时测量源码（研究完成后已从业务目录移除）</summary>
+<summary>Full temporary measurement source (removed from business directories after research)</summary>
 
 ```go
 

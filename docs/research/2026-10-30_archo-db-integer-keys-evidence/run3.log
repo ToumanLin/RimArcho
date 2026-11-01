@@ -14,20 +14,20 @@
     intkey_main_test.go:275: QUERY v26 | defName×100(CROSS JOIN) | 2.131ms | rows=96 | base
     intkey_main_test.go:275: QUERY v26 | Name×190(CROSS JOIN) | 4.677ms | rows=193 | base
     intkey_main_test.go:275: QUERY v26 | DefsOf×100 | 79.756ms | rows=60428 | base
-    intkey_main_test.go:275: QUERY v26 | DefCounts(全表) | 65.794ms | rows=1277 | base
-    intkey_main_test.go:275: QUERY v26 | CachedDefs(未启用全部) | 613.308ms | rows=429390 | base
+    intkey_main_test.go:275: QUERY v26 | DefCounts(whole table) | 65.794ms | rows=1277 | base
+    intkey_main_test.go:275: QUERY v26 | CachedDefs(all disabled) | 613.308ms | rows=429390 | base
     intkey_main_test.go:275: QUERY v26 | TypeOwners×100 | 2.886ms | rows=83 | base
-    intkey_main_test.go:275: QUERY v26 | HarmonyPatches(全部) | 107.628ms | rows=25198 | base
-    intkey_main_test.go:275: QUERY v26 | CurrentFiles(增量扫描) | 137.448ms | rows=77252 | base
+    intkey_main_test.go:275: QUERY v26 | HarmonyPatches(all) | 107.628ms | rows=25198 | base
+    intkey_main_test.go:275: QUERY v26 | CurrentFiles(incremental scan) | 137.448ms | rows=77252 | base
     intkey_main_test.go:275: QUERY v26 | SemanticSet×100 | 14.837ms | rows=8176 | base
-    intkey_main_test.go:275: QUERY v26 | SnapshotFiles×100(变更页) | 28.024ms | rows=30977 | base
+    intkey_main_test.go:275: QUERY v26 | SnapshotFiles×100(changes page) | 28.024ms | rows=30977 | base
     intkey_main_test.go:275: QUERY v26 | InstanceFiles(%Textures/%) | 208.697ms | rows=174419 | base
     intkey_main_test.go:275: QUERY v26 | InstanceFiles(%x.dll)×20 | 1.811801s | rows=359 | base
-    intkey_main_test.go:275: QUERY v26 | ContentKinds(全部,无缓存) | 294.245ms | rows=1354 | base
-    intkey_main_test.go:275: QUERY v26 | SnapshotsWithPNG(全部) | 30.971ms | rows=1298 | base
-    intkey_main_test.go:275: QUERY v26 | Languages×100(详情) | 21.079ms | rows=64 | base
-    intkey_main_test.go:294: WRITE v26 | 写入30个快照清单 | 32.1ms
-    intkey_main_test.go:294: WRITE v26 | 写入30个Def集合 | 111.7ms
+    intkey_main_test.go:275: QUERY v26 | ContentKinds(all, uncached) | 294.245ms | rows=1354 | base
+    intkey_main_test.go:275: QUERY v26 | SnapshotsWithPNG(all) | 30.971ms | rows=1298 | base
+    intkey_main_test.go:275: QUERY v26 | Languages×100(details) | 21.079ms | rows=64 | base
+    intkey_main_test.go:294: WRITE v26 | write 30 snapshot manifests | 32.1ms
+    intkey_main_test.go:294: WRITE v26 | write 30 Def sets | 111.7ms
     intkey_main_test.go:212: CONVERT v26-copy convert=0s file_before_vacuum=245.5MB live_before_vacuum=245.5MB vacuum=4.224s
     intkey_research_test.go:749: SIZE v26-copy file=245.47MB live=245.47MB | def_fact=114.67 dll_facts=33.75 snapshot_file=84.04 file_blobs=0.00 paths=0.00 sets+state+keys=1.09 analysis=5.57 snapshot=5.17 other=1.18
     intkey_research_test.go:754: SIZE v26-copy top: snapshot_file=84.04 def_fact=80.66 def_fact_lookup=24.08 type_fact=15.70 type_fact_lookup=9.71 def_fact_set=8.39 harmony_fact=5.60 snapshot=5.00 patch_fact=3.97 type_fact_set=2.25 def_fact_named=1.53 finding=0.96 patch_fact_analysis=0.59 content_state=0.34
@@ -39,20 +39,20 @@
     intkey_main_test.go:275: QUERY v26-copy | defName×100(CROSS JOIN) | 2.269ms | rows=96 | same
     intkey_main_test.go:275: QUERY v26-copy | Name×190(CROSS JOIN) | 5.356ms | rows=193 | same
     intkey_main_test.go:275: QUERY v26-copy | DefsOf×100 | 77.835ms | rows=60428 | same
-    intkey_main_test.go:275: QUERY v26-copy | DefCounts(全表) | 62.173ms | rows=1277 | same
-    intkey_main_test.go:275: QUERY v26-copy | CachedDefs(未启用全部) | 493.913ms | rows=429390 | same
+    intkey_main_test.go:275: QUERY v26-copy | DefCounts(whole table) | 62.173ms | rows=1277 | same
+    intkey_main_test.go:275: QUERY v26-copy | CachedDefs(all disabled) | 493.913ms | rows=429390 | same
     intkey_main_test.go:275: QUERY v26-copy | TypeOwners×100 | 1.855ms | rows=83 | same
-    intkey_main_test.go:275: QUERY v26-copy | HarmonyPatches(全部) | 58.06ms | rows=25198 | same
-    intkey_main_test.go:275: QUERY v26-copy | CurrentFiles(增量扫描) | 96.079ms | rows=77252 | same
+    intkey_main_test.go:275: QUERY v26-copy | HarmonyPatches(all) | 58.06ms | rows=25198 | same
+    intkey_main_test.go:275: QUERY v26-copy | CurrentFiles(incremental scan) | 96.079ms | rows=77252 | same
     intkey_main_test.go:275: QUERY v26-copy | SemanticSet×100 | 6.761ms | rows=8176 | same
-    intkey_main_test.go:275: QUERY v26-copy | SnapshotFiles×100(变更页) | 16.387ms | rows=30977 | same
+    intkey_main_test.go:275: QUERY v26-copy | SnapshotFiles×100(changes page) | 16.387ms | rows=30977 | same
     intkey_main_test.go:275: QUERY v26-copy | InstanceFiles(%Textures/%) | 121.289ms | rows=174419 | same
     intkey_main_test.go:275: QUERY v26-copy | InstanceFiles(%x.dll)×20 | 1.322921s | rows=359 | same
-    intkey_main_test.go:275: QUERY v26-copy | ContentKinds(全部,无缓存) | 234.587ms | rows=1354 | same
-    intkey_main_test.go:275: QUERY v26-copy | SnapshotsWithPNG(全部) | 20.565ms | rows=1298 | same
-    intkey_main_test.go:275: QUERY v26-copy | Languages×100(详情) | 10.731ms | rows=64 | same
-    intkey_main_test.go:294: WRITE v26-copy | 写入30个快照清单 | 20.4ms
-    intkey_main_test.go:294: WRITE v26-copy | 写入30个Def集合 | 57.6ms
+    intkey_main_test.go:275: QUERY v26-copy | ContentKinds(all, uncached) | 234.587ms | rows=1354 | same
+    intkey_main_test.go:275: QUERY v26-copy | SnapshotsWithPNG(all) | 20.565ms | rows=1298 | same
+    intkey_main_test.go:275: QUERY v26-copy | Languages×100(details) | 10.731ms | rows=64 | same
+    intkey_main_test.go:294: WRITE v26-copy | write 30 snapshot manifests | 20.4ms
+    intkey_main_test.go:294: WRITE v26-copy | write 30 Def sets | 57.6ms
     intkey_main_test.go:212: CONVERT setfiles convert=3.416s file_before_vacuum=294.1MB live_before_vacuum=206.6MB vacuum=1.702s
     intkey_research_test.go:749: SIZE setfiles file=206.56MB live=206.56MB | def_fact=79.81 dll_facts=26.89 snapshot_file=84.04 file_blobs=0.00 paths=0.00 sets+state+keys=3.90 analysis=5.57 snapshot=5.17 other=1.18
     intkey_research_test.go:754: SIZE setfiles top: snapshot_file=84.04 def_fact=45.81 def_fact_lookup=24.08 type_fact=9.79 type_fact_lookup=9.71 def_fact_set=8.39 snapshot=5.00 harmony_fact=4.70 patch_fact=3.97 fact_set=3.03 type_fact_set=2.25 def_fact_named=1.53 finding=0.96 patch_fact_analysis=0.59
@@ -64,20 +64,20 @@
     intkey_main_test.go:275: QUERY setfiles | defName×100(CROSS JOIN) | 5.479ms | rows=96 | same
     intkey_main_test.go:275: QUERY setfiles | Name×190(CROSS JOIN) | 11.287ms | rows=193 | same
     intkey_main_test.go:275: QUERY setfiles | DefsOf×100 | 499.173ms | rows=60428 | same
-    intkey_main_test.go:275: QUERY setfiles | DefCounts(全表) | 63.914ms | rows=1277 | same
-    intkey_main_test.go:275: QUERY setfiles | CachedDefs(未启用全部) | 557.902ms | rows=429390 | same
+    intkey_main_test.go:275: QUERY setfiles | DefCounts(whole table) | 63.914ms | rows=1277 | same
+    intkey_main_test.go:275: QUERY setfiles | CachedDefs(all disabled) | 557.902ms | rows=429390 | same
     intkey_main_test.go:275: QUERY setfiles | TypeOwners×100 | 2.791ms | rows=83 | same
-    intkey_main_test.go:275: QUERY setfiles | HarmonyPatches(全部) | 67.965ms | rows=25198 | same
-    intkey_main_test.go:275: QUERY setfiles | CurrentFiles(增量扫描) | 98.912ms | rows=77252 | same
+    intkey_main_test.go:275: QUERY setfiles | HarmonyPatches(all) | 67.965ms | rows=25198 | same
+    intkey_main_test.go:275: QUERY setfiles | CurrentFiles(incremental scan) | 98.912ms | rows=77252 | same
     intkey_main_test.go:275: QUERY setfiles | SemanticSet×100 | 7.1ms | rows=8176 | same
-    intkey_main_test.go:275: QUERY setfiles | SnapshotFiles×100(变更页) | 16.948ms | rows=30977 | same
+    intkey_main_test.go:275: QUERY setfiles | SnapshotFiles×100(changes page) | 16.948ms | rows=30977 | same
     intkey_main_test.go:275: QUERY setfiles | InstanceFiles(%Textures/%) | 124.937ms | rows=174419 | same
     intkey_main_test.go:275: QUERY setfiles | InstanceFiles(%x.dll)×20 | 1.3665s | rows=359 | same
-    intkey_main_test.go:275: QUERY setfiles | ContentKinds(全部,无缓存) | 254.305ms | rows=1354 | same
-    intkey_main_test.go:275: QUERY setfiles | SnapshotsWithPNG(全部) | 20.26ms | rows=1298 | same
-    intkey_main_test.go:275: QUERY setfiles | Languages×100(详情) | 10.315ms | rows=64 | same
-    intkey_main_test.go:294: WRITE setfiles | 写入30个快照清单 | 20.4ms
-    intkey_main_test.go:294: WRITE setfiles | 写入30个Def集合 | 53.8ms
+    intkey_main_test.go:275: QUERY setfiles | ContentKinds(all, uncached) | 254.305ms | rows=1354 | same
+    intkey_main_test.go:275: QUERY setfiles | SnapshotsWithPNG(all) | 20.26ms | rows=1298 | same
+    intkey_main_test.go:275: QUERY setfiles | Languages×100(details) | 10.315ms | rows=64 | same
+    intkey_main_test.go:294: WRITE setfiles | write 30 snapshot manifests | 20.4ms
+    intkey_main_test.go:294: WRITE setfiles | write 30 Def sets | 53.8ms
     intkey_main_test.go:212: CONVERT combo-global convert=7.877s file_before_vacuum=256.6MB live_before_vacuum=152.7MB vacuum=1.215s
     intkey_main_test.go:230: PATHGC combo-global 432ms deleted=0
     intkey_main_test.go:233: BLOB combo-global lists=4864 stored_blobs=3312 raw=19.4MB raw+mtime=23.5MB zstd=10.1MB zstd+mtime=15.2MB stored=9.1MB
@@ -91,20 +91,20 @@
     intkey_main_test.go:275: QUERY combo-global | defName×100(CROSS JOIN) | 2.405ms | rows=96 | DIFF
     intkey_main_test.go:275: QUERY combo-global | Name×190(CROSS JOIN) | 5.167ms | rows=193 | DIFF
     intkey_main_test.go:275: QUERY combo-global | DefsOf×100 | 78.245ms | rows=60428 | DIFF
-    intkey_main_test.go:275: QUERY combo-global | DefCounts(全表) | 61.999ms | rows=1277 | same
-    intkey_main_test.go:275: QUERY combo-global | CachedDefs(未启用全部) | 517.557ms | rows=429390 | DIFF
+    intkey_main_test.go:275: QUERY combo-global | DefCounts(whole table) | 61.999ms | rows=1277 | same
+    intkey_main_test.go:275: QUERY combo-global | CachedDefs(all disabled) | 517.557ms | rows=429390 | DIFF
     intkey_main_test.go:275: QUERY combo-global | TypeOwners×100 | 2.258ms | rows=83 | same
-    intkey_main_test.go:275: QUERY combo-global | HarmonyPatches(全部) | 61.792ms | rows=25198 | same
-    intkey_main_test.go:275: QUERY combo-global | CurrentFiles(增量扫描) | 115.421ms | rows=77252 | same
+    intkey_main_test.go:275: QUERY combo-global | HarmonyPatches(all) | 61.792ms | rows=25198 | same
+    intkey_main_test.go:275: QUERY combo-global | CurrentFiles(incremental scan) | 115.421ms | rows=77252 | same
     intkey_main_test.go:275: QUERY combo-global | SemanticSet×100 | 10.739ms | rows=8176 | same
-    intkey_main_test.go:275: QUERY combo-global | SnapshotFiles×100(变更页) | 17.24ms | rows=30977 | same
+    intkey_main_test.go:275: QUERY combo-global | SnapshotFiles×100(changes page) | 17.24ms | rows=30977 | same
     intkey_main_test.go:275: QUERY combo-global | InstanceFiles(%Textures/%) | 167.627ms | rows=174419 | same
     intkey_main_test.go:275: QUERY combo-global | InstanceFiles(%x.dll)×20 | 786.767ms | rows=359 | same
-    intkey_main_test.go:275: QUERY combo-global | ContentKinds(全部,无缓存) | 5.715ms | rows=1354 | same
-    intkey_main_test.go:275: QUERY combo-global | SnapshotsWithPNG(全部) | 4.556ms | rows=1298 | same
-    intkey_main_test.go:275: QUERY combo-global | Languages×100(详情) | 727µs | rows=64 | same
-    intkey_main_test.go:294: WRITE combo-global | 写入30个快照清单 | 44.1ms
-    intkey_main_test.go:294: WRITE combo-global | 写入30个Def集合 | 88ms
+    intkey_main_test.go:275: QUERY combo-global | ContentKinds(all, uncached) | 5.715ms | rows=1354 | same
+    intkey_main_test.go:275: QUERY combo-global | SnapshotsWithPNG(all) | 4.556ms | rows=1298 | same
+    intkey_main_test.go:275: QUERY combo-global | Languages×100(details) | 727µs | rows=64 | same
+    intkey_main_test.go:294: WRITE combo-global | write 30 snapshot manifests | 44.1ms
+    intkey_main_test.go:294: WRITE combo-global | write 30 Def sets | 88ms
     intkey_main_test.go:212: CONVERT combo-setfiles convert=8.356s file_before_vacuum=256.4MB live_before_vacuum=162.7MB vacuum=1.57s
     intkey_main_test.go:233: BLOB combo-setfiles lists=4864 stored_blobs=3312 raw=19.4MB raw+mtime=23.5MB zstd=10.1MB zstd+mtime=15.2MB stored=9.1MB
     intkey_research_test.go:749: SIZE combo-setfiles file=152.58MB live=152.58MB | def_fact=77.19 dll_facts=26.89 snapshot_file=21.77 file_blobs=10.91 paths=0.00 sets+state+keys=3.90 analysis=5.57 snapshot=5.17 other=1.18
@@ -117,20 +117,20 @@
     intkey_main_test.go:275: QUERY combo-setfiles | defName×100(CROSS JOIN) | 7.965ms | rows=96 | DIFF
     intkey_main_test.go:275: QUERY combo-setfiles | Name×190(CROSS JOIN) | 12.315ms | rows=193 | DIFF
     intkey_main_test.go:275: QUERY combo-setfiles | DefsOf×100 | 607.223ms | rows=60428 | DIFF
-    intkey_main_test.go:275: QUERY combo-setfiles | DefCounts(全表) | 75.496ms | rows=1277 | same
-    intkey_main_test.go:275: QUERY combo-setfiles | CachedDefs(未启用全部) | 702.022ms | rows=429390 | DIFF
+    intkey_main_test.go:275: QUERY combo-setfiles | DefCounts(whole table) | 75.496ms | rows=1277 | same
+    intkey_main_test.go:275: QUERY combo-setfiles | CachedDefs(all disabled) | 702.022ms | rows=429390 | DIFF
     intkey_main_test.go:275: QUERY combo-setfiles | TypeOwners×100 | 3.568ms | rows=83 | same
-    intkey_main_test.go:275: QUERY combo-setfiles | HarmonyPatches(全部) | 77.133ms | rows=25198 | same
-    intkey_main_test.go:275: QUERY combo-setfiles | CurrentFiles(增量扫描) | 74.964ms | rows=77252 | same
+    intkey_main_test.go:275: QUERY combo-setfiles | HarmonyPatches(all) | 77.133ms | rows=25198 | same
+    intkey_main_test.go:275: QUERY combo-setfiles | CurrentFiles(incremental scan) | 74.964ms | rows=77252 | same
     intkey_main_test.go:275: QUERY combo-setfiles | SemanticSet×100 | 7.607ms | rows=8176 | same
-    intkey_main_test.go:275: QUERY combo-setfiles | SnapshotFiles×100(变更页) | 15.241ms | rows=30977 | same
+    intkey_main_test.go:275: QUERY combo-setfiles | SnapshotFiles×100(changes page) | 15.241ms | rows=30977 | same
     intkey_main_test.go:275: QUERY combo-setfiles | InstanceFiles(%Textures/%) | 159.024ms | rows=174419 | same
     intkey_main_test.go:275: QUERY combo-setfiles | InstanceFiles(%x.dll)×20 | 424.21ms | rows=359 | same
-    intkey_main_test.go:275: QUERY combo-setfiles | ContentKinds(全部,无缓存) | 1.872ms | rows=1354 | same
-    intkey_main_test.go:275: QUERY combo-setfiles | SnapshotsWithPNG(全部) | 875µs | rows=1298 | same
-    intkey_main_test.go:275: QUERY combo-setfiles | Languages×100(详情) | 867µs | rows=64 | same
-    intkey_main_test.go:294: WRITE combo-setfiles | 写入30个快照清单 | 16.9ms
-    intkey_main_test.go:294: WRITE combo-setfiles | 写入30个Def集合 | 71.8ms
+    intkey_main_test.go:275: QUERY combo-setfiles | ContentKinds(all, uncached) | 1.872ms | rows=1354 | same
+    intkey_main_test.go:275: QUERY combo-setfiles | SnapshotsWithPNG(all) | 875µs | rows=1298 | same
+    intkey_main_test.go:275: QUERY combo-setfiles | Languages×100(details) | 867µs | rows=64 | same
+    intkey_main_test.go:294: WRITE combo-setfiles | write 30 snapshot manifests | 16.9ms
+    intkey_main_test.go:294: WRITE combo-setfiles | write 30 Def sets | 71.8ms
     intkey_main_test.go:212: CONVERT combo-hash convert=9.777s file_before_vacuum=256.4MB live_before_vacuum=150.4MB vacuum=1.341s
     intkey_main_test.go:230: PATHGC combo-hash 567ms deleted=0
     intkey_main_test.go:233: BLOB combo-hash lists=4864 stored_blobs=3312 raw=19.4MB raw+mtime=23.5MB zstd=10.1MB zstd+mtime=15.2MB stored=9.1MB
@@ -144,20 +144,20 @@
     intkey_main_test.go:275: QUERY combo-hash | defName×100(CROSS JOIN) | 3.874ms | rows=96 | DIFF
     intkey_main_test.go:275: QUERY combo-hash | Name×190(CROSS JOIN) | 7.685ms | rows=193 | DIFF
     intkey_main_test.go:275: QUERY combo-hash | DefsOf×100 | 95.502ms | rows=60428 | DIFF
-    intkey_main_test.go:275: QUERY combo-hash | DefCounts(全表) | 80.983ms | rows=1277 | same
-    intkey_main_test.go:275: QUERY combo-hash | CachedDefs(未启用全部) | 613.091ms | rows=429390 | DIFF
+    intkey_main_test.go:275: QUERY combo-hash | DefCounts(whole table) | 80.983ms | rows=1277 | same
+    intkey_main_test.go:275: QUERY combo-hash | CachedDefs(all disabled) | 613.091ms | rows=429390 | DIFF
     intkey_main_test.go:275: QUERY combo-hash | TypeOwners×100 | 2.509ms | rows=83 | same
-    intkey_main_test.go:275: QUERY combo-hash | HarmonyPatches(全部) | 65.092ms | rows=25198 | same
-    intkey_main_test.go:275: QUERY combo-hash | CurrentFiles(增量扫描) | 119.299ms | rows=77252 | same
+    intkey_main_test.go:275: QUERY combo-hash | HarmonyPatches(all) | 65.092ms | rows=25198 | same
+    intkey_main_test.go:275: QUERY combo-hash | CurrentFiles(incremental scan) | 119.299ms | rows=77252 | same
     intkey_main_test.go:275: QUERY combo-hash | SemanticSet×100 | 8.061ms | rows=8176 | same
-    intkey_main_test.go:275: QUERY combo-hash | SnapshotFiles×100(变更页) | 15.45ms | rows=30977 | same
+    intkey_main_test.go:275: QUERY combo-hash | SnapshotFiles×100(changes page) | 15.45ms | rows=30977 | same
     intkey_main_test.go:275: QUERY combo-hash | InstanceFiles(%Textures/%) | 152.616ms | rows=174419 | same
     intkey_main_test.go:275: QUERY combo-hash | InstanceFiles(%x.dll)×20 | 776.58ms | rows=359 | same
-    intkey_main_test.go:275: QUERY combo-hash | ContentKinds(全部,无缓存) | 3.864ms | rows=1354 | same
-    intkey_main_test.go:275: QUERY combo-hash | SnapshotsWithPNG(全部) | 3.176ms | rows=1298 | same
-    intkey_main_test.go:275: QUERY combo-hash | Languages×100(详情) | 611µs | rows=64 | same
-    intkey_main_test.go:294: WRITE combo-hash | 写入30个快照清单 | 55.1ms
-    intkey_main_test.go:294: WRITE combo-hash | 写入30个Def集合 | 91.5ms
+    intkey_main_test.go:275: QUERY combo-hash | ContentKinds(all, uncached) | 3.864ms | rows=1354 | same
+    intkey_main_test.go:275: QUERY combo-hash | SnapshotsWithPNG(all) | 3.176ms | rows=1298 | same
+    intkey_main_test.go:275: QUERY combo-hash | Languages×100(details) | 611µs | rows=64 | same
+    intkey_main_test.go:294: WRITE combo-hash | write 30 snapshot manifests | 55.1ms
+    intkey_main_test.go:294: WRITE combo-hash | write 30 Def sets | 91.5ms
 --- PASS: TestIntKeyResearch (152.58s)
 PASS
 ok  	github.com/ToumanLin/RimArcho/internal/store	152.751s

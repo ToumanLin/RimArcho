@@ -1,94 +1,94 @@
-# 06 · 界面 · TUI（§9）
+# 06 · Interface · TUI (§9)
 
-> 属于 [06 · 界面](README.md)。章节号在整个 06 里连续，拆成多个文件后不变，引用照旧写 `06 §x.y`。
+> Part of [06 · Interface](README.md). Section numbers run through all of 06 and stay unchanged when split across files. References still use `06 §x.y`.
 
 ## 9. TUI
 
-### 9.1 定位与页面映射
+### 9.1 Positioning and page mapping
 
-TUI 是**方案编辑器的键盘版**：默认打开当前方案的编辑器（§2.5），其他页面经命令面板到达，不画侧栏。TUI 和 GUI 用同一套 view 模型和同样的按键（§3）。
+TUI is the **keyboard version of the plan editor**: it opens the current plan's editor by default (§2.5), with other pages through the command panel and no sidebar. TUI and GUI share view models and keys (§3).
 
-| GUI 页面 | TUI |
+| GUI page | TUI |
 | --- | --- |
-| 方案编辑器 | 主界面（已实现）。打开、新建、改名、删除列表：`P` 或命令面板；顶栏显示“列表 <名字>”。和 GUI 一样**打开不等于切换**（2026-10-31，04 §1.3）：`P`、命令面板里的列表、编辑器里的 `tab` 只是打开它，当前列表（启动的那个）不变，顶栏接着写“启动的是 X”；`P` 里的“设为当前”、在它的编辑器里保存（`w`）或按 `L` 时它才成为当前列表。`T` 同 GUI：在暂存区是全部放回，在别处是把“已启用”全部放进暂存（2026-10-31）。`H` 历史选择框、`A` 重新检查文件、窄屏 `4` 开全屏详情和 GUI 相同（2026-10-31 起，§2.5、§3.5） |
-| 能不能跑 | `shift+2`（`@`）或命令面板（已实现，二级界面，`esc` 回编辑器）；一列。页面头的结论、`F` 自动修复、`A` 重新检查、`l` 选择日志、项上的 `c` 和 `u` 撤销同 GUI（§2.4） |
-| Mod 库存 › 订阅与更新 | `c` 或命令面板；来源、等你更新、已经更新按简单列表展示（名字同 GUI，§2.9），`1` / `2` / `3` 跳区，`C` 落在单 Mod 的变化记录；历史操作不变。动作（2026-10-30 已实现）：`K` 检查所有有 Mod 的来源，来源行 `enter` 只查这一个；`u` 更新光标所在的可更新项，`U` 更新显示的全部，都先显示 `--dry-run` 的文字再 `enter` 确认，游戏运行时拒绝；`Del` 撤掉订阅（同样先预览；Steam 客户端管的工坊条目在 Mod 库存退订）；可更新行 `p` 先锁定这个版本（按两次）、`ctrl+w` 打开来源页；`+` 或直接粘贴去添加订阅。都排进后台任务（§2.16），状态行写“已排进…队列”，结束时写结果。下载页的更新要选新下载的文件：TUI 说明去窗口或用 `archo subscribe update --from`。账户跳转（LoversLab 登录）仍在 GUI |
-| Mod 库存 › 添加订阅 | 订阅与更新的 `+`、`tab`、粘贴，或命令面板“添加订阅”（2026-10-30 已实现）。粘贴框同 GUI，来源识别是同一张表（`subscribe.Detect`）；打开时就在输入，`q`、`?` 等都是字母。认出后下面是这一种要问的一个决定（`↑↓` 选：Git 跟踪默认分支 / 分支 / 标签 / 提交，选了后三个就进名字框，`tab` 在名字框和粘贴框之间切换；工坊用 Steam 订阅 / 用 SteamCMD 下载）和后台跑出的 `--dry-run` 文字，`enter` 订阅（排进后台任务）；`ctrl+u` 清空，`esc` 先退出名字框、再清空、再回订阅与更新；不在名字框时 `tab` 去下一个子页搜索文件、`shift+tab` 回订阅与更新。下载页只在页面有唯一 Git 仓库时能在 TUI 订阅（“用 Git 订阅 <仓库>”）；要选 zip / 文件夹或 LoversLab 站点文件的，说明去窗口或 `archo subscribe page <地址> --from <zip\|文件夹>`。没有来源卡和“最近添加” |
-| Mod 库存 › 全部 | 命令面板“Mod 库存”、`shift+6`（`^`）：和 GUI 同一套界面（§2.9）：筛选栏、可展开的 Lineage 行、宽时右边是副本详情，按键和右键菜单同 §3.5、§8.5 |
-| Mod 库存 › 搜索文件 | 命令面板“搜索文件”、添加订阅的 `tab`（2026-10-31 已实现，§2.9 的 TUI 一条）。同一份 `view.FileSearch`；终端里没有复制，结果不能点去全屏详情 |
-| 编辑器的排序规则 | 二级界面：编辑器 `r`、命令面板“排序规则”（2026-10-31 已实现，§2.5 的 TUI 一条） |
-| 启动 | `shift+1`（`!`），编辑器的 `L` 和命令面板“启动游戏”（2026-10-31 已实现，`surface/tui/home.go`）。和 GUI 同一份数据（`view.BuildHomeFromState`，只看当前列表，不管编辑器打开的是哪个），只放最必要的：当前列表的名字、游戏和完整版本、Mod 数和状态（能玩 / N 个问题会让游戏出错 / 还没检查）、上次游戏和它的报错数、最可能出事的问题（“留意：…  shift+2”，`Home.Launch`），然后是 ▶ 启动游戏  L，有未保存的修改时下面是“保存 N 项修改  w”。没有 01 / 02 两栏、背景图和“当前方案自上次游玩以来…”那一行；换列表用 `P`。按键：`L` / `enter` 启动，`w` 只保存，`P` 列表，`@` 能不能跑，`esc` 回编辑器。编辑器的 `L` 和 GUI 一样先到这里（编辑器打开的不是当前列表时先把它设为当前），在这里再按 `L` 才启动；状态行在“正在启动游戏”后面写“留意：…”（`view.LaunchHint`）。编辑器打开着别的列表时从 `shift+1` 进来，`L` 启动的是当前列表，编辑器随之回到它 |
-| 游戏日志 | 在能不能跑里 `l` 选择日志，命令面板“游戏日志”同样；日志项 `enter` 打开技术页（已实现）。**游戏日志页待做**（报错列表、日志原文、伴生日志区，§2.10），这次不做（2026-10-31 定） |
-| 整合包、设置 | 命令面板，显示为带命令的文本面板（已实现） |
-| 后台任务 | 命令面板“后台任务”：只读文本面板（2026-10-31），按进行中、排队中、今天、昨天、更早分组，一个任务一行：状态、做什么、对象和结果（失败写原因，`view.TaskStatus`）。停止、重试、忘掉在窗口里；任务结束时状态行照旧写结果 |
-| 环境 | `E` 切换环境（已实现）；目录和启动设置用 CLI `env set` |
-| 更新 RimArcho（2026-10-31，07 §5.1） | 命令面板“更新 RimArcho”或 `:update`：文本面板，内容同 GUI 设置里 RimArcho 那一行（版本、上次检查、有新版本时的更新说明和发布页、安装确认的那段话：版本、大小、替换程序文件并重启、数据不动、还有别的 RimArcho 开着时等它们关掉）。没有新版本时 `enter` 检查一次，查完重开面板；有新版本时 `enter` 安装：在后台下载、核对、解开，状态行写阶段（“更新 RimArcho：等另外 1 个 RimArcho 关闭”）；安装中再开面板，`enter` 停止（替换之前停下什么都不改）。替换并确认新版本能运行后 TUI 退出，在同一个终端用同样的参数打开新版本（`cli.restartTUI`，旧进程等它结束）。`:update --check` 只检查、输出写进面板。TUI 打开期间自动检查发现新版本，状态行写一条安静通知 |
-| 导航在侧边 / 顶部（`ctrl+b`） | 没有侧栏，不适用 |
-| 编译成整合包、游玩回顾、值得玩 | 不提供页面；对应的 CLI 命令可在 `:` 里运行（§9.4）。整合包和贴图优化仍是带命令的文本面板（2026-10-31 定，这次不做页面） |
-| Archo 面板 | 暂不支持（09 §6） |
+| Plan editor | Main screen (implemented). Open, create, rename, delete lists: `P` or command panel; top bar shows list <name>. Like GUI, **opening is not switching** (2026-10-31, 04 §1.3): `P`, command-panel lists, and editor `tab` only open a list; the current (launch) list stays unchanged, and the top bar adds launching X. Only set as current in `P`, save (`w`) in its editor, or `L` makes it current. `T` matches GUI: put all back in Staging, stage everything Enabled elsewhere (2026-10-31). `H` history picker, `A` recheck files, narrow-screen `4` full-screen details match GUI (since 2026-10-31, §2.5, §3.5) |
+| can it run | `shift+2` (`@`) or command panel (implemented, secondary screen, `esc` returns to editor); one column. Page-head conclusion, `F` automatic fix, `A` recheck, `l` choose log, item `c`, and `u` undo match GUI (§2.4) |
+| Mod inventory > subscriptions and updates | `c` or command panel; sources, waiting for you to update, already updated are simple lists (GUI names, §2.9); `1` / `2` / `3` jump areas, `C` lands on one Mod's change history; history actions unchanged. Actions (implemented 2026-10-30): `K` checks all sources with Mods; `enter` on a source checks only that source; `u` updates the cursor's updatable item, `U` all displayed items, both show `--dry-run` text then `enter` confirms, refused while game runs; `Del` removes subscription after preview (Steam-client-managed Workshop items unsubscribe in Mod inventory); `p` on updatable row first locks this version (press twice), `ctrl+w` opens source page; `+` or direct paste opens add subscription. All queue as background tasks (§2.16), status says queued, then reports result. Download-page updates require choosing the newly downloaded file: TUI directs to the window or `archo subscribe update --from`. Account navigation (LoversLab login) stays in GUI |
+| Mod inventory > add subscription | subscriptions and updates `+`, `tab`, paste, or command panel add subscription (implemented 2026-10-30). Same paste box and source detection (`subscribe.Detect`) as GUI; typing starts immediately, so `q`, `?`, etc. are input. Once recognized, show the one source-specific decision (`↑↓`: Git default branch / branch / tag / commit; last three open name field, `tab` switches name / paste; Workshop via Steam subscription / SteamCMD download) and background-generated `--dry-run` text; `enter` subscribes through background tasks. `ctrl+u` clears, `esc` leaves name field, then clears, then returns to subscriptions and updates; outside name field `tab` goes to search files, `shift+tab` back to subscriptions and updates. Download pages work in TUI only with one unique Git repository (subscribe with Git <repository>); zip / folder or LoversLab site file selection directs to window or `archo subscribe page <url> --from <zip\|folder>`. No source cards or recently added |
+| Mod inventory > all | Command panel mod library, `shift+6` (`^`): same interface as GUI (§2.9): filter bar, expandable Lineage rows, copy details at right when wide, keys and context menu per §3.5, §8.5 |
+| Mod inventory > search files | Command panel search files, add subscription `tab` (implemented 2026-10-31, TUI bullet in §2.9). Same `view.FileSearch`; no terminal copy, results cannot open full-screen details |
+| Editor sorting rules | Secondary screen: editor `r`, command panel sorting rules (implemented 2026-10-31, TUI bullet in §2.5) |
+| launch | `shift+1` (`!`), editor `L`, command panel launch game (implemented 2026-10-31, `surface/tui/home.go`). Same data as GUI (`view.BuildHomeFromState`, current list only regardless of editor). Essentials only: current list name, game and full version, Mod count and status (ready / N problems breaks the game / not checked yet), last game and errors, likeliest problem (worth knowing: … shift+2, `Home.Launch`), then ▶ launch game L, with save N changes w below if unsaved. No 01 / 02 areas, background, or current list since last played line; switch lists with `P`. Keys: `L` / `enter` launch, `w` save only, `P` lists, `@` can it run, `esc` editor. Editor `L` first comes here like GUI (making its open list current if needed); another `L` here launches. Status appends worth knowing: … after launching game (`view.LaunchHint`). Entering with `shift+1` while editing another list: `L` launches current list, editor follows it |
+| game log | `l` chooses log in can it run; command panel game log does the same; log item `enter` opens technical page (implemented). **Game log page pending** (error list, raw log, companion log area, §2.10), excluded this round (decided 2026-10-31) |
+| packs, settings | Command panel, text panels with commands (implemented) |
+| background tasks | Command panel background tasks: read-only text panel (2026-10-31), groups running, queued, today, yesterday, earlier; one row per task: status, action, object, result (failure reason, `view.TaskStatus`). Stop, retry, forget in the window; completion still reports in status |
+| Environments | `E` switches environment (implemented); directories / launch settings use CLI `env set` |
+| update RimArcho (2026-10-31, 07 §5.1) | Command panel update RimArcho or `:update`: text panel matching GUI settings RimArcho row (version, last check, release notes / page if newer, installation confirmation: version, size, replace program files and restart, data stays, wait for other RimArcho processes). Without update `enter` checks then reopens panel; with update `enter` installs: background download, verification, extraction; status reports phases (updating RimArcho: waiting for 1 other RimArcho to close). Open panel during install: `enter` stops, changing nothing before replacement. After replacement and verifying the new version runs, TUI exits and opens new version in same terminal with same arguments (`cli.restartTUI`, old process waits for it). `:update --check` only checks, writes output in panel. An automatic check finding a newer version while TUI is open gives one quiet status notification |
+| Side / top navigation (`ctrl+b`) | No sidebar, not applicable |
+| Create a pack, play review, worth playing | No pages; corresponding CLI commands run in `:` (§9.4). Packs and texture optimization remain text panels with commands (decided 2026-10-31, no pages this round) |
+| Archo panel | Not supported yet (09 §6) |
 
-- 启动页按 §2.3 使用红 / 黄两级启动文字；严重时启动前分行列出需要量和可用量，选择器默认“取消”，明确选“仍然启动”才执行。能不能跑的内存比较和级别见 §2.4。
-- 游戏运行状态在**状态行右端**（GUI 侧栏没有对应的一行：2026-10-30 删去，GUI 自己读新日志，§2.1）：游戏运行时是 `● 游戏运行中  14:05 起`，本次运行的报错数是后面的琥珀色数字；游戏退出后有新的 Player.log 时是 `● 分析本次日志  shift+2`（强调色）；都没有时什么都不显示。状态行的一句话在左边，两者同时出现时这一段留在右边。新错误到来时顶栏“能不能跑 N”更新，不弹窗（`view.LiveTracker.Update`，刷新间隔见 §2.16.1 G01；文字是 `view.LiveText`）。
-- 能不能跑的日志项按 §2.4 的同一份阶段分组：缩进的淡色标题，不占光标、不计数；上下键始终落在实际报错项上。没有标记的日志不加标题；查看动作仍用现有技术页。
-- 右键菜单的键：Bubble Tea v1.3.10 不认 xterm 的 `shift+F10`（`CSI 21;2 ~`），Windows 控制台送来的是不带 shift 的 F10，菜单键在 xterm 类终端里是 F16；所以 TUI 里 F10、`shift+F10`、F16 都打开菜单，右键在指针处打开。TUI 的筛选栏占整个宽度（“未启用”一列放不下筛选块）；Mod 库存的副本详情只有备注、动作、状态和字段，没有简介（**待实现**）；TUI 不画图（§9.3）；Mod 库存在最底层按 `esc` 回到编辑器（TUI 没有侧栏）。
-- 跳页用 `shift+1`–`8`（终端里是 `!@#$%^&*`，美式布局；`shift+7` 贴图优化是带命令的文本面板），子页之间用 `tab` / `shift+tab`（§3.5）；`g` 是标签，不再是“到顶”（2026-10-22 定）。原来“`g` 前缀跳页”的建议不采用。
-- `archo` 和 `archo tui` 都在当前终端打开 TUI（§9.2）。界面上不出现 `#id`：结果由 TUI 写成人话，错误经 `view.Humanize`；保留 CLI 文字（带引用）的只有技术页和 `:` 的输出。技术页里 `enter` 跟进所选行的第一个引用；打印的命令里不带 `#` 的实例引用（05 §3.1 规则 11）也能跟进，只要当前索引认得它（`lineRef`）。
+- Launch uses §2.3 red / yellow wording; severe lists required and available amounts separately before launch, cancel selected by default, explicit launch anyway required. Memory levels: §2.4.
+- Game status at **status line right** (no GUI sidebar equivalent since 2026-10-30; GUI reads new logs itself, §2.1): `● game running since 14:05`, with current errors as amber count; new Player.log after exit: `● read the new log  shift+2` in accent; otherwise blank. Status sentence stays left when both appear. New errors update top can it run N without dialog (`view.LiveTracker.Update`, interval §2.16.1 G01; text `view.LiveText`).
+- Can it run log items use §2.4 phase groups: indented muted headings, no cursor or count; arrows always land on actual errors. Unmarked logs have no headings; viewing still opens existing technical page.
+- Context menu keys: Bubble Tea v1.3.10 does not recognize xterm `shift+F10` (`CSI 21;2 ~`); Windows console sends plain F10, xterm-like terminals send F16 for the menu key. Therefore F10, `shift+F10`, F16 all open the menu; right-click opens at pointer. Filter bar spans full TUI width (Disabled column cannot fit filters). Mod inventory copy details have notes, actions, status, fields but no description (**pending**); no images (§9.3); bottom-level inventory `esc` returns to editor (no sidebar).
+- Jump pages with `shift+1`–`8` (`!@#$%^&*` in US terminal layout; `shift+7` texture optimization is a command text panel); subpages `tab` / `shift+tab` (§3.5); `g` is tags, not top (decided 2026-10-22). The proposed `g`-prefix navigation was not adopted.
+- `archo` and `archo tui` open in current terminal (§9.2). No `#id` in interface: TUI uses plain wording, errors through `view.Humanize`. Only technical pages and `:` output retain CLI text / references. Technical-page `enter` follows the selected line's first reference; unprefixed instance references in printed commands (05 §3.1 rule 11) also follow if known to current index (`lineRef`).
 
-### 9.2 在哪个终端里运行
+### 9.2 Which terminal runs it
 
-2026-10-30 起 TUI 不再自带终端（00 §6 D24）：`archo`（不带参数）和 `archo tui` 都在启动它的终端里打开 TUI。双击 `archo.exe` 时由 Windows 打开默认的终端（Windows 11 是 Windows Terminal，更早的系统是控制台窗口），TUI 在里面运行，退出时窗口随之关闭。旧快捷方式里的 `archo --here` 仍然接受，和 `archo` 一样（`cli.globalFlags`）。
+Since 2026-10-30 TUI bundles no terminal (00 §6 D24): `archo` without arguments and `archo tui` open in their launching terminal. Double-clicking `archo.exe` lets Windows open its default terminal (Windows Terminal on Windows 11, console window on older systems); TUI runs there and the window closes on exit. Old shortcut `archo --here` remains accepted, same as `archo` (`cli.globalFlags`).
 
-- 字体由玩家的终端决定，RimArcho 不分发字体。
-- 颜色：termenv 在 ConPTY 下无法查询终端、会退回无色，所以 `SetColors` 在终端声明支持 24 位色时强制 24 位色：`COLORTERM=truecolor|24bit`，或有 `WT_SESSION`（Windows Terminal）。其他终端沿用 termenv 的检测。
-- 旧版本下载到数据目录的 `wezterm\`、生成的 `wezterm.lua` 和 `logs\wezterm-start.log` 不再使用，也不自动删除（2026-10-30 定）；卸载时随数据目录一起删除，玩家也可以自己删。`terminal.host`、`wezterm.path`、`ui.previews`、`ui.preview_dwell_ms` 四个设置已删去，数据库里的旧值不再读取。
+- Player terminal controls fonts; RimArcho distributes none.
+- Colors: termenv cannot query under ConPTY and falls back to no color, so `SetColors` forces 24-bit color when the terminal declares 24-bit color support: `COLORTERM=truecolor|24bit` or `WT_SESSION` (Windows Terminal). Others use termenv detection.
+- Old data-directory `wezterm\`, generated `wezterm.lua`, and `logs\wezterm-start.log` are unused and not automatically deleted (decided 2026-10-30); uninstall removes them with data, or players may delete them. Settings `terminal.host`, `wezterm.path`, `ui.previews`, `ui.preview_dwell_ms` are removed; old database values unread.
 
-### 9.3 图标、链接和图片
+### 9.3 Icons, links, images
 
-RimArcho 管不了玩家的终端用什么字体，所以：
-- 图标默认用 §7 表格中的 Unicode 备用字符。`ui.icons compat|nerd`：compat 是默认；终端已经在用 Nerd Font 时设成 `nerd`，换成 Nerd Font 图标。数据库里旧的 `auto` 按 compat 读（不在可选值里的旧值都按默认值读，`cmds.Setting`）。
-- 不画图片：没有缩略图，也不给它留位置，名称顶格；描述里的图片显示为文字占位（§4.4）。
-- 链接不可点击，在文字后面淡色显示域名。
+RimArcho cannot control terminal fonts, so:
+- Default icons use §7 Unicode fallbacks. `ui.icons compat|nerd`: compat default; select nerd if terminal already uses Nerd Font. Old database auto means compat (unknown old values use defaults, `cmds.Setting`).
+- No images: no thumbnails or reserved space; names start flush left; description images become text placeholders (§4.4).
+- Links are not clickable; append muted domain text.
 
-### 9.4 命令行（`:`）
+### 9.4 Command line (`:`)
 
-进阶用的输入框：运行一条 archo 命令，和在终端里运行 `archo …` 一样：同一张命令表（`cmds.Commands`），同样的文字输出（05 §4）。2026-10-30 定：**所有命令都能运行，直接执行，不另加确认**，和 CLI 一样；会改文件的命令要先看结果，就自己加 `--dry-run`（有这个参数的命令）。代码在 `internal/surface/tui/cmdline.go`。
+Advanced input: runs one archo command just like terminal `archo …`, same `cmds.Commands` and text output (05 §4). Decided 2026-10-30: **all commands run directly, without extra confirmation**, like CLI; add `--dry-run` yourself to preview file-changing commands that support it. Code: `internal/surface/tui/cmdline.go`.
 
-**打开、关闭。** 编辑器、能不能跑、订阅与更新、Mod 库存里按 `:`，或命令面板“运行 archo 命令”；文本面板（包括上一条命令的输出）里按 `:` 关掉面板再打开，可以一条接一条地运行。输入框占最底一行（`❯ archo ` 后面是输入），它上面一行是说明行，候选列表开着时再往上最多 8 行。`esc` 关闭（候选列表开着时先关列表）；没运行的那一行留着，下次按 `:` 还在（§3.1 规则 8）。运行后输入框关闭、清空。
+**Open / close.** `:` in editor, can it run, subscriptions and updates, Mod inventory; or command panel run archo command. `:` in text panels, including prior output, closes the panel then opens input, allowing consecutive commands. Input occupies bottom line after `❯ archo `, help above, up to 8 candidate rows above help. `esc` closes candidates first, then input. Unrun text remains for next `:` (§3.1 rule 8); execution closes / clears input.
 
-**编辑。** `←→` 移动光标，`home` / `end` 到行首行尾，`ctrl+←` / `ctrl+→` 按词移动，`backspace` / `delete` 删字，`ctrl+w` 删前一个词，`ctrl+u` 清空；可以直接粘贴。开头的 `archo` 写不写都行。`"带 空格"`、`'带 空格'` 是一个参数（整合包里打印的 `archo pack launch "名字"` 照抄就能用）；反斜杠照原样保留（Windows 路径）；`#` 不是注释，`#a3f9` 和 `a3f9` 都行（05 §3.3）。
+**Editing.** `←→` cursor, `home` / `end` line ends, `ctrl+←` / `ctrl+→` words, `backspace` / `delete` characters, `ctrl+w` previous word, `ctrl+u` clear; direct paste. Leading `archo` optional. `"with spaces"`, `'with spaces'` each form one argument (copy printed `archo pack launch "name"` directly); backslashes preserved for Windows paths. `#` is not comment: `#a3f9` / `a3f9` both work (05 §3.3).
 
-**说明行。** 认出命令后写它的用法和一句说明（`cmds.Command.Usage`、`Summary`，和 `archo help` 一样是英文）；还没认出时写按键：`tab 补全  ↑↓ 历史  enter 运行  esc 关闭`。上一次 `enter` 的用法错误用红字写在这里，改了这一行就消失。
+**Help line.** Recognized command: usage and sentence (`cmds.Command.Usage`, `Summary`, English like `archo help`); otherwise keys `tab complete  ↑↓ history  enter run  esc close`. Last Enter's usage error appears red here until input changes.
 
-**补全（`tab`）。** 补光标所在的词：
-- 命令名：先按前缀，再按包含（输入 `remove` 能列出所有删除类命令）。候选写用法和说明。
-- 以 `-` 开头：这条命令的参数（`--dry-run` 等）和说明。
-- 位置参数按命令用法里的占位：Mod（`<ref>`、`<ref…>`、`<mod>`、`<A>`、`<B>`）按名称、别名、包名和引用匹配当前游戏的 Mod，插入不带 `#` 的引用（05 §3.1 规则 11），候选写名称和引用；词是空的时第一个候选是光标所在的 Mod。环境名（`env use|set|remove`）、列表名（`plan use|rename|remove|cost|versions|follow|unfollow|sync`、`test run`）、整合包名（`pack launch|export|remove|check|stop`）、设置键（`config get|set`）和 `config set <键>` 之后的可选值、用法里直接写出的取值（如 `same|copy|unrelated`、`yes|no`）、`deps install|remove` 的工具名。路径不补全。
-- 只有一个候选就直接补上（后面加空格）。多个时列在输入框上方，同时把第一个填进去；再按 `tab` 或 `↓` 换成下一个，`shift+tab` 或 `↑` 换成上一个，输入行跟着变。`enter` 选定（不运行），继续打字也算选定；`esc` 关列表并恢复补全前的那个词。没有候选时说明行写“没有可补全的”。
+**Completion (`tab`).** Completes cursor word:
+- Command names: prefix first, then substring (`remove` finds all removal commands). Candidates show usage / description.
+- Leading `-`: command flags (`--dry-run`, etc.) and descriptions.
+- Positional arguments follow usage placeholders: Mods (`<ref>`, `<ref…>`, `<mod>`, `<A>`, `<B>`) match current game's names, aliases, package IDs, references, insert unprefixed reference (05 §3.1 rule 11), show name / reference. Empty word's first candidate is cursor Mod. Environment names (`env use|set|remove`), list names (`plan use|rename|remove|cost|versions|follow|unfollow|sync`, `test run`), pack names (`pack launch|export|remove|check|stop`), setting keys (`config get|set`), allowed values after `config set <key>`, literal usage choices (`same|copy|unrelated`, `yes|no`), tool names for `deps install|remove`. No path completion.
+- Single candidate inserts directly plus space. Multiple list above input and insert first; `tab` / `↓` next, `shift+tab` / `↑` previous, updating input. `enter` accepts without running; continued typing also accepts; `esc` closes and restores original word. No candidates: nothing to complete in help.
 
-**历史。** 候选列表没开时，`↑` 翻出以前运行过的命令（从最近的开始），`↓` 往回翻，翻过最近的一条回到正在输入的那行。保存最近 50 条，在数据库 meta `tui.cmdline.history`（JSON 数组），下次打开 TUI 还在；同一条再运行只留最新的一次；用法错误没有运行，不记。
+**History.** Without candidate list, `↑` recalls prior commands newest first; `↓` moves back, past newest returns draft. Latest 50 persisted as JSON array in database meta `tui.cmdline.history`, surviving TUI restart; duplicates keep only latest; unexecuted usage errors excluded.
 
-**运行（`enter`）。**
-- 命令在后台跑（§3.1 规则 9），用自己的数据库连接（`App.ReadSession`），界面照常能用；状态行写“正在运行 archo …”。同时只跑一条：前一条没结束时 `enter` 不运行，说明行写“上一条命令还在运行”。
-- 结束后重新读取列表。输出只有一行时写在状态行（带成功或失败的标记，§7）；多行时打开面板，标题是 `archo …`，失败时状态行另写“命令失败”。面板里是 CLI 的原文（带引用，§9.1），`↑↓` 滚动、`esc` 返回。
-- **用法错误**（不认识的命令、参数个数不对、没有这个参数，退出码 2）：输入框重新打开，那一行原样保留，错误写在说明行，改好再按 `enter`。`mcp`、`gui` 本身就报这种错（它们只能作为整条命令行运行）。
-- 交给别处的：`scan` 由扫描子进程做（同 `R`），`analyze` 由分析子进程做（03 §3），都不在界面进程里跑。`log --follow` 不运行（它一直不结束）：说明行写“TUI 的状态行已经在跟着游戏；要看滚动的日志就在终端里运行”。
-- `--env <名>` 和 CLI 一样只对这一条命令有效。
-- 运行后：`config set ui.lang` / `ui.icons` 立即生效；`env use`、`plan use` 之后界面换到新的环境 / 列表（同 `E`、`P`）；`uninstall --yes` 完成后，和卸载页一样只能退出（§2.14）。
+**Run (`enter`).**
+- Background execution (§3.1 rule 9), own database connection (`App.ReadSession`), interface usable; status running archo …. One command at a time; Enter while running reports previous command is still running in help.
+- Reread list afterward. Single output line in status with success / failure (§7); multiline opens panel titled `archo …`; failure also reports command failed in status. Panel uses original CLI text / references (§9.1); `↑↓` scroll, `esc` return.
+- **Usage errors** (unknown command, wrong argument count, unknown flag, exit 2): reopen input unchanged, error in help; correct then Enter. `mcp`, `gui` report these errors themselves, requiring standalone command lines.
+- Delegated: `scan` in scan subprocess like `R`, `analyze` in analysis subprocess (03 §3), never surface process. `log --follow` refused as endless; help explains TUI status already follows game, run in terminal for scrolling log.
+- `--env <name>` applies only to this command, like CLI.
+- After execution: `config set ui.lang` / `ui.icons` immediate; `env use`, `plan use` switch environment / list like `E`, `P`; after `uninstall --yes`, only exit remains, like uninstall page (§2.14).
 
-### 9.5 与 GUI 的差异
+### 9.5 Differences from GUI
 
-2026-10-31 逐页对照过（§2.x 对 §9.1，按键对 §3.5）。名字、子页顺序、按键说明、命令面板的命令、打开和切换列表、`L` 先去启动页、`T` 都已和 GUI 一致；下面是剩下的差异。
+Compared page by page 2026-10-31 (§2.x vs §9.1, keys vs §3.5). Names, subpage order, key hints, command-panel commands, opening / switching lists, `L` first visiting launch, and `T` now match. Remaining differences:
 
-**有意不同**（终端里做不到，或 TUI 这样更顺手）：
-- 没有侧栏：其他页面是二级界面，最底层按 `esc` 回编辑器；`alt+←` / `alt+→` 不适用（§3.1 规则 11）。
-- 能不能跑是一列，不分“开始之前 / 上次玩的时候”两列（§2.4）。
-- 编辑器里 `h` `l` 是方向键（§3.3），`i` 是技术信息，不是导入 / 导出（§3.5）。
-- 启动页只有一栏：当前列表和启动键，不列别的列表、整合包和游戏（§9.1 表）。
-- 没有点击复制和 `ctrl+c` 复制：终端自己能选字（§3.1 规则 12、13）。
-- 订阅与更新是三个简单列表，不是带详情栏的表格（§2.9）。
+**Intentional** (terminal limits or easier TUI use):
+- No sidebar; other pages secondary, bottom-level `esc` returns editor; `alt+←` / `alt+→` inapplicable (§3.1 rule 11).
+- Can it run single column, no before you play / last time columns (§2.4).
+- Editor `h` `l` arrows (§3.3), `i` technical info, not import / export (§3.5).
+- Launch single column with current list / launch only, no other lists, packs, games (§9.1 table).
+- No click-to-copy / `ctrl+c` copy: terminal selects text (§3.1 rules 12, 13).
+- Subscriptions / updates three simple lists, no table with details (§2.9).
 
-**还没对齐**（待实现或待定）：
-- Mod 库存 › 全部的 `enter` 开的是副本详情（只有备注、动作、状态和字段），不是 GUI 的全屏详情：TUI 的全屏详情跟着编辑器的行走（§9.1）。搜索文件的结果同样不能开全屏详情。
-- 能不能跑最下面“不在这一页的”几行只是文字，不能按键去 Mod 库存或贴图优化。
-- 游戏日志页待做（§9.1 表）；整合包、贴图优化、后台任务是文本面板，没有页面。
-- Mod 库存 › 全部只有默认的几列（大小、状态、来源、用在），`s` 选排序；没有 GUI 列菜单里的显示 / 隐藏列。
+**Not yet aligned** (pending implementation or decision):
+- Mod inventory > all `enter` opens copy details (notes, actions, status, fields only), not GUI full-screen details: TUI full-screen details follow editor rows (§9.1). search files results also cannot open them.
+- Outside-page rows at can it run bottom are text only, no key to inventory / texture optimization.
+- Game log page pending (§9.1 table); packs, texture optimization, background tasks text panels only.
+- Mod inventory > all only default columns (size, status, source, used in), `s` sort; no GUI column-menu show / hide.

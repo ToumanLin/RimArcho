@@ -22,45 +22,45 @@ const IC = {
   inbox: '<path d="M2.5 9 4.4 3.5h7.2L13.5 9v3.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/><path d="M2.5 9h3l.8 1.6h3.4l.8-1.6h3"/>',
 };
 const ic = (n) => `<svg class="i" viewBox="0 0 16 16">${IC[n]}</svg>`;
-const SRC = { ws: ["steam", "工坊"], cmd: ["cmd", "SteamCMD"], git: ["git", "Git"], ll: ["globe", "LoversLab"], local: ["folder", "本地"] };
+const SRC = { ws: ["steam", "workshop"], cmd: ["cmd", "SteamCMD"], git: ["git", "Git"], ll: ["globe", "LoversLab"], local: ["folder", "local"] };
 const src = (k) => `<span class="src">${ic(SRC[k][0])}${SRC[k][1]}</span>`;
 
 // What waits for the player: sources RimArcho updates itself (Steam updates the Workshop).
 const PENDING = [
-  { id: "pf", n: "Performance Fish", s: "git", from: "a1b2c3d", fromD: "10月12日", to: "7f3e9a1", toD: "10月23日", track: "默认分支 main",
-    used: ["主力殖民地", "轻量开荒"], kind: "commits",
-    log: [["7f3e9a1", "Fix null ref in pawn cache after reload", "10月23日"], ["5c02b4e", "Support 1.6 hotfix 2", "10月21日"], ["e91d77a", "Bump version to 0.6.3", "10月21日"], ["0b3fa10", "Cleanup: remove unused patches", "10月18日"]],
-    impact: "代码改了；会影响启动" },
-  { id: "pl", n: "Prison Labor", s: "git", from: "v2.1.0", fromD: "9月30日", to: "v2.2.0", toD: "10月20日", track: "标签 v*",
-    used: ["主力殖民地"], kind: "commits",
-    log: [["v2.2.0", "Release 2.2.0: new work types, Chinese translation", "10月20日"]], impact: "Defs 和翻译改了" },
-  { id: "bs", n: "Body Shape Patch", s: "ll", from: "2.3", fromD: "9月02日", to: "2.4", toD: "10月20日",
-    used: ["战锤 40K"], kind: "files", page: "loverslab.com/files/file/18342-body-shape-patch",
-    files: [["BodyShapePatch-2.4.zip", "12.4 MB", "10月20日", true], ["BodyShapePatch-2.4-legacy-1.5.zip", "11.9 MB", "10月20日", false]],
-    note: "作者写的更新说明：适配 1.6；修复体型贴图偏移。", impact: "还没下载，下载后才知道改了什么" },
-  { id: "ce", n: "Combat Extended", s: "cmd", from: "10月10日", fromD: "", to: "10月22日", toD: "", used: ["主力殖民地"], kind: "notes",
-    note: "工坊更新说明：Fixed ammo loading for mortars; new ammo for VFE Mechanoids.", impact: "还没下载" },
+  { id: "pf", n: "Performance Fish", s: "git", from: "a1b2c3d", fromD: "10/12", to: "7f3e9a1", toD: "10/23", track: "default branch main",
+    used: ["Main colony", "Light start"], kind: "commits",
+    log: [["7f3e9a1", "Fix null ref in pawn cache after reload", "10/23"], ["5c02b4e", "Support 1.6 hotfix 2", "10/21"], ["e91d77a", "Bump version to 0.6.3", "10/21"], ["0b3fa10", "Cleanup: remove unused patches", "10/18"]],
+    impact: "code changed; affects launch" },
+  { id: "pl", n: "Prison Labor", s: "git", from: "v2.1.0", fromD: "09/30", to: "v2.2.0", toD: "10/20", track: "tag v*",
+    used: ["Main colony"], kind: "commits",
+    log: [["v2.2.0", "Release 2.2.0: new work types, Chinese translation", "10/20"]], impact: "Defs and translations changed" },
+  { id: "bs", n: "Body Shape Patch", s: "ll", from: "2.3", fromD: "09/02", to: "2.4", toD: "10/20",
+    used: ["Warhammer 40K"], kind: "files", page: "loverslab.com/files/file/18342-body-shape-patch",
+    files: [["BodyShapePatch-2.4.zip", "12.4 MB", "10/20", true], ["BodyShapePatch-2.4-legacy-1.5.zip", "11.9 MB", "10/20", false]],
+    note: "Author notes: support 1.6; fix body texture offsets.", impact: "not downloaded yet; changes known after download" },
+  { id: "ce", n: "Combat Extended", s: "cmd", from: "10/10", fromD: "", to: "10/22", toD: "", used: ["Main colony"], kind: "notes",
+    note: "Workshop change notes: Fixed ammo loading for mortars; new ammo for VFE Mechanoids.", impact: "not downloaded yet" },
 ];
 // What Steam already changed since the current list was last played (modchanges tiers).
 const CHANGES = [
-  { id: "vef", n: "Vanilla Expanded Framework", t: 1, say: "代码改了：Harmony 补丁新增 3 个、改了 1 个", when: "10月23日", used: ["主力殖民地", "轻量开荒"],
-    groups: [["代码 (.dll)", "改了 2 个"], ["Defs", "改了 6 个"], ["Patches", "新增 1 个"]] },
-  { id: "har", n: "Humanoid Alien Races", t: 1, say: "需要的前置多了 Harmony 2.3；代码改了", when: "10月23日", used: ["主力殖民地"],
-    groups: [["代码 (.dll)", "改了 1 个"], ["About", "前置新增 brrainz.harmony"]] },
-  { id: "rr", n: "Real Ruins", t: 2, say: "支持的版本加了 1.6；Defs 改了 4 个", when: "10月22日", used: ["主力殖民地"], groups: [["Defs", "改了 4 个"], ["About", "支持 1.6"]] },
-  { id: "dbh", n: "Dubs Bad Hygiene", t: 2, say: "Patches 改了 2 个，Defs 新增 1 个", when: "10月22日", used: ["主力殖民地", "轻量开荒"], groups: [["Patches", "改了 2 个"], ["Defs", "新增 1 个"]] },
-  { id: "vfe", n: "Vanilla Furniture Expanded", t: 3, say: "贴图 +3.2 MB", when: "10月23日", used: ["主力殖民地"], groups: [["贴图", "+3.2 MB"]] },
-  { id: "rs", n: "RimSaves", t: 3, say: "翻译改了 3 个", when: "10月22日", used: ["主力殖民地"], groups: [["翻译", "改了 3 个"]] },
+  { id: "vef", n: "Vanilla Expanded Framework", t: 1, say: "code changed: 3 Harmony patches added, 1 changed", when: "10/23", used: ["Main colony", "Light start"],
+    groups: [["code (.dll)", "2 changed"], ["Defs", "6 changed"], ["Patches", "1 added"]] },
+  { id: "har", n: "Humanoid Alien Races", t: 1, say: "new dependency Harmony 2.3; code changed", when: "10/23", used: ["Main colony"],
+    groups: [["code (.dll)", "1 changed"], ["About", "dependency brrainz.harmony added"]] },
+  { id: "rr", n: "Real Ruins", t: 2, say: "1.6 support added; 4 Defs changed", when: "10/22", used: ["Main colony"], groups: [["Defs", "4 changed"], ["About", "supports 1.6"]] },
+  { id: "dbh", n: "Dubs Bad Hygiene", t: 2, say: "2 Patches changed, 1 Def added", when: "10/22", used: ["Main colony", "Light start"], groups: [["Patches", "2 changed"], ["Defs", "1 added"]] },
+  { id: "vfe", n: "Vanilla Furniture Expanded", t: 3, say: "textures +3.2 MB", when: "10/23", used: ["Main colony"], groups: [["textures", "+3.2 MB"]] },
+  { id: "rs", n: "RimSaves", t: 3, say: "3 translations changed", when: "10/22", used: ["Main colony"], groups: [["translation", "3 changed"]] },
 ];
 const ARRIVALS = { add: ["Vanilla Gravship Expanded", "Allow Tool"], gone: ["Rimefeller"] };
-const OLDER = [{ day: "10月21日", n: 7 }, { day: "10月19日", n: 3 }, { day: "10月15日", n: 12 }];
-const TIER = { 1: "会影响启动", 2: "留意", 3: "只是内容" };
+const OLDER = [{ day: "10/21", n: 7 }, { day: "10/19", n: 3 }, { day: "10/15", n: 12 }];
+const TIER = { 1: "affects launch", 2: "worth a look", 3: "content only" };
 const SOURCES = [
-  { k: "ws", c: 412, m: "Steam 自己下载更新", r: '<span class="warn">2 个已找不到</span>' },
-  { k: "cmd", c: 6, m: "14:02 检查过", r: "1 个有更新", acct: "账户 rim_player" },
-  { k: "git", c: 3, m: "14:02 检查过", r: "2 个有更新" },
-  { k: "ll", c: 2, m: "14:02 检查过", r: "1 个有更新", acct: "已登录，11月30日到期" },
-  { k: "local", c: 38, m: "放在 Mods 文件夹，没有来源", r: "" },
+  { k: "ws", c: 412, m: "Steam downloads updates itself", r: '<span class="warn">2 no longer available</span>' },
+  { k: "cmd", c: 6, m: "checked at 14:02", r: "1 update available", acct: "account rim_player" },
+  { k: "git", c: 3, m: "checked at 14:02", r: "2 updates available" },
+  { k: "ll", c: 2, m: "checked at 14:02", r: "1 update available", acct: "signed in, expires Nov 30" },
+  { k: "local", c: 38, m: "in Mods folder, no source", r: "" },
 ];
 
 // Example inputs for the paste box.
@@ -86,53 +86,53 @@ function found(kind, st) {
   const enter = kind !== found.last ? " enter" : ""; found.last = kind;
   const head = (icon, name, meta) => `<div class="found-h"><span class="ico">${ic(icon)}</span><b>${name}</b>
     <button class="btn x" data-do="clear" title="esc">${ic("x")}</button><div class="meta">${meta}</div></div>`;
-  const foot = (left, main) => `<div class="found-f"><span class="muted">${left}</span><button class="btn" data-do="clear">取消<kbd>esc</kbd></button><button class="btn primary" data-do="add">${main}<kbd>enter</kbd></button></div>`;
-  if (kind === "bad") return `<div class="found${enter}"><div class="found-h"><span class="ico">${ic("info")}</span><b>认不出这个地址</b>
-    <button class="btn x" data-do="clear">${ic("x")}</button><div class="meta">支持 GitHub / GitLab 仓库、LoversLab 的文件页、工坊链接或 ID、下载好的 zip</div></div></div>`;
-  if (kind === "git") return `<div class="found${enter}">${head("git", "Performance Fish", `<span>${src("git")}</span><span>bbradson/Performance-Fish</span><span>最新提交 2 天前</span>`)}
+  const foot = (left, main) => `<div class="found-f"><span class="muted">${left}</span><button class="btn" data-do="clear">cancel<kbd>esc</kbd></button><button class="btn primary" data-do="add">${main}<kbd>enter</kbd></button></div>`;
+  if (kind === "bad") return `<div class="found${enter}"><div class="found-h"><span class="ico">${ic("info")}</span><b>unrecognized address</b>
+    <button class="btn x" data-do="clear">${ic("x")}</button><div class="meta">Supports GitHub / GitLab repos, LoversLab file pages, Workshop links or IDs, downloaded zips</div></div></div>`;
+  if (kind === "git") return `<div class="found${enter}">${head("git", "Performance Fish", `<span>${src("git")}</span><span>bbradson/Performance-Fish</span><span>latest commit 2 days ago</span>`)}
     <div class="found-b">
-      <div class="facts"><div class="f"><span class="ok">✓</span><span>找到 About/About.xml，包名 <code>bs.performance</code>，支持 1.5、1.6</span></div>
-        <div class="f"><span class="warn">!</span><span>你已经有工坊那份 Performance Fish（主力殖民地在用）。两份同包名，游戏只加载一份；订阅后在列表里选用哪一份</span></div></div>
-      <div class="vrow" style="display:flex;align-items:center;gap:10px"><span class="muted" style="font-size:12px">跟踪</span>
-        <div class="seg">${["默认分支 main", "最新的标签", "固定在这个提交"].map((x, i) => `<button class="${(st.track || 0) === i ? "on" : ""}" data-track="${i}">${x}</button>`).join("")}</div></div>
-    </div>${foot("克隆到 Mods 文件夹，以后检查更新时比较提交", "订阅")}</div>`;
+      <div class="facts"><div class="f"><span class="ok">✓</span><span>found About/About.xml, package ID <code>bs.performance</code>, supports 1.5, 1.6</span></div>
+        <div class="f"><span class="warn">!</span><span>You already have the Workshop Performance Fish (used by Main colony). Both have the same package ID; the game loads one. Choose a copy in the list after subscribing</span></div></div>
+      <div class="vrow" style="display:flex;align-items:center;gap:10px"><span class="muted" style="font-size:12px">tracking</span>
+        <div class="seg">${["default branch main", "latest tag", "stay on this commit"].map((x, i) => `<button class="${(st.track || 0) === i ? "on" : ""}" data-track="${i}">${x}</button>`).join("")}</div></div>
+    </div>${foot("clone into Mods; compare commits when checking updates", "subscribe to it")}</div>`;
   if (kind === "ll") {
     const f = st.file ?? 0;
-    return `<div class="found${enter}">${head("globe", "Gene Tweaks", `<span>${src("ll")}</span><span>作者 Kaz</span><span>版本 1.2</span><span>10月18日更新</span>`)}
+    return `<div class="found${enter}">${head("globe", "Gene Tweaks", `<span>${src("ll")}</span><span>author Kaz</span><span>version 1.2</span><span>updated Oct 18</span>`)}
     <div class="found-b">
-      <div class="note acc">${ic("git")}<span>这个页面链接了 GitHub 仓库 <code>kaz/gene-tweaks</code>。用 Git 订阅，以后更新不用再选文件。</span><button class="btn link" data-sample="git">改用 Git</button></div>
-      <div class="choice">${[["GeneTweaks-1.2.zip", "4.1 MB", "10月18日"], ["GeneTweaks-1.2-nolore.zip", "3.6 MB", "10月18日"]].map(([n, s, d], i) =>
-        `<button class="opt ${f === i ? "on" : ""}" data-file="${i}"><span class="rd"></span><span class="nm">${n}${i === 0 ? "<small>最大的那个</small>" : ""}</span><span class="ext">${s}  ${d}</span></button>`).join("")}</div>
-      <div class="facts"><div class="f"><span class="ok">✓</span><span>已登录 LoversLab（记住我，11月30日到期）</span></div>
-        <div class="f"><span class="muted">i</span><span>下载前会显示站点的下载协议；同意后才下载</span></div></div>
-    </div>${foot("没登录也行：在浏览器下载 zip，拖到这里", "下载并订阅")}</div>`;
+      <div class="note acc">${ic("git")}<span>This page links GitHub repository <code>kaz/gene-tweaks</code>. Subscribe with Git to avoid choosing files for future updates.</span><button class="btn link" data-sample="git">use Git instead</button></div>
+      <div class="choice">${[["GeneTweaks-1.2.zip", "4.1 MB", "10/18"], ["GeneTweaks-1.2-nolore.zip", "3.6 MB", "10/18"]].map(([n, s, d], i) =>
+        `<button class="opt ${f === i ? "on" : ""}" data-file="${i}"><span class="rd"></span><span class="nm">${n}${i === 0 ? "<small>the largest one</small>" : ""}</span><span class="ext">${s}  ${d}</span></button>`).join("")}</div>
+      <div class="facts"><div class="f"><span class="ok">✓</span><span>signed in to LoversLab (remember me, expires Nov 30)</span></div>
+        <div class="f"><span class="muted">i</span><span>the site's download terms appear before downloading; agree to proceed</span></div></div>
+    </div>${foot("No login needed: download the zip in your browser and drop it here", "download and subscribe")}</div>`;
   }
   if (kind === "ws") {
     const w = st.via ?? 0;
-    return `<div class="found${enter}">${head("steam", "Allow Tool", `<span>${src("ws")}</span><span>ID 2009463077</span><span>UnlimitedHugs</span><span>支持 1.6</span>`)}
+    return `<div class="found${enter}">${head("steam", "Allow Tool", `<span>${src("ws")}</span><span>ID 2009463077</span><span>UnlimitedHugs</span><span>supports 1.6</span>`)}
     <div class="found-b"><div class="choice">
-      <button class="opt ${w === 0 ? "on" : ""}" data-via="0"><span class="rd"></span><span class="nm">用 Steam 订阅<small>推荐</small></span><span class="ext ok">Steam 在运行</span><span class="ds">Steam 下载，以后自动更新；变化记在下面</span></button>
-      <button class="opt ${w === 1 ? "on" : ""}" data-via="1"><span class="rd"></span><span class="nm">用 SteamCMD 下载</span><span class="ext">账户 rim_player</span><span class="ds">不经过 Steam 客户端；以后由 RimArcho 检查更新</span></button>
-    </div></div>${foot("前置 HugsLib 已经装了", "订阅")}</div>`;
+      <button class="opt ${w === 0 ? "on" : ""}" data-via="0"><span class="rd"></span><span class="nm">subscribe with Steam<small>recommended</small></span><span class="ext ok">Steam is running</span><span class="ds">Steam downloads and updates automatically; changes appear below</span></button>
+      <button class="opt ${w === 1 ? "on" : ""}" data-via="1"><span class="rd"></span><span class="nm">downloaded with SteamCMD</span><span class="ext">account rim_player</span><span class="ds">without the Steam client; RimArcho checks updates later</span></button>
+    </div></div>${foot("dependency HugsLib is already installed", "subscribe to it")}</div>`;
   }
-  if (kind === "zip") return `<div class="found${enter}">${head("zip", "GeneTweaks-1.2.zip", `<span>4.1 MB</span><span>里面是 1 个 Mod：Gene Tweaks（kaz.genetweaks）</span>`)}
+  if (kind === "zip") return `<div class="found${enter}">${head("zip", "GeneTweaks-1.2.zip", `<span>4.1 MB</span><span>contains 1 mod: Gene Tweaks (kaz.genetweaks)</span>`)}
     <div class="found-b">
-      <label class="omni" style="height:32px"><span class="muted" style="white-space:nowrap;font-size:12px">从哪下载的</span><input placeholder="粘贴 LoversLab 文件页（可不填）" value="${st.from ? "https://www.loverslab.com/files/file/20511-gene-tweaks/" : ""}" data-from></label>
-      <div class="facts"><div class="f"><span class="muted">i</span><span>${st.from ? "填了页面：以后能检查更新，有新版时在这里提醒你" : "不填：装成本地 Mod，不检查更新"}</span></div></div>
-    </div>${foot("解压到 Mods 文件夹", "添加")}</div>`;
+      <label class="omni" style="height:32px"><span class="muted" style="white-space:nowrap;font-size:12px">downloaded from</span><input placeholder="paste LoversLab file page (optional)" value="${st.from ? "https://www.loverslab.com/files/file/20511-gene-tweaks/" : ""}" data-from></label>
+      <div class="facts"><div class="f"><span class="muted">i</span><span>${st.from ? "with a page: check for updates later and notify here" : "without it: install as local mod, no update checks"}</span></div></div>
+    </div>${foot("extract into Mods folder", "add")}</div>`;
   return "";
 }
 
-// nav draws the sidebar and breadcrumb. on: "subs" or "add"; withAdd: show the 添加订阅 sub-page.
+// nav draws the sidebar and breadcrumb. on: "subs" or "add"; withAdd: show the add subscription sub-page.
 function nav(kidBadge, on = "subs", withAdd = false) {
   const it = (t, extra = "", cls = "") => `<button class="nav-item ${cls}"><span>${t}</span>${extra}</button>`;
   const chev = `<span class="chev">${ic("chev")}</span>`;
   const kid = (k, t, extra = "") => `<button class="nav-kid ${on === k ? "on" : ""}" data-page="${k}">${t}${extra}</button>`;
-  $("#nav").innerHTML = `<div class="grp">在玩</div>${it("启动")}${it("能不能跑", '<span class="badge-n">2</span>')}${it("游戏日志")}
-    <div class="grp">库</div>${it("Mod 库", chev, "open")}
-    <div class="kids"><button class="nav-kid">全部</button>${kid("subs", "订阅与更新", kidBadge ? `<span class="badge-n acc">${kidBadge}</span>` : "")}${withAdd ? kid("add", "添加订阅") : ""}</div>
-    ${it("列表", chev)}${it("整合包", chev)}${it("贴图优化")}${it("游戏")}`;
-  $("#crumbs").innerHTML = `<span class="crumb">库</span><span class="sep">/</span><span class="crumb">Mod 库</span><span class="sep">/</span><span class="crumb last">${on === "add" ? "添加订阅" : "订阅与更新"}</span>`;
+  $("#nav").innerHTML = `<div class="grp">playing</div>${it("start")}${it("can it run", '<span class="badge-n">2</span>')}${it("game log")}
+    <div class="grp">library</div>${it("the library", chev, "open")}
+    <div class="kids"><button class="nav-kid">all</button>${kid("subs", "subscriptions and updates", kidBadge ? `<span class="badge-n acc">${kidBadge}</span>` : "")}${withAdd ? kid("add", "add a subscription") : ""}</div>
+    ${it("lists", chev)}${it("packs", chev)}${it("texture optimisation")}${it("game")}`;
+  $("#crumbs").innerHTML = `<span class="crumb">library</span><span class="sep">/</span><span class="crumb">the library</span><span class="sep">/</span><span class="crumb last">${on === "add" ? "add a subscription" : "subscriptions and updates"}</span>`;
 }
 function hints(arr) { $("#hints").innerHTML = arr.map(([k, d]) => `<span><span class="k">${k}</span>${d}</span>`).join(""); }
 let sayT;
@@ -141,10 +141,10 @@ function sourcesPopover(anchor) {
   const r = anchor.getBoundingClientRect();
   const v = $("#veil"); v.hidden = false;
   v.innerHTML = `<div class="popover" style="top:${r.bottom + 6}px;left:${Math.max(8, Math.min(r.left, innerWidth - 370))}px">
-    ${SOURCES.map((s) => `<div class="srcrow">${ic(SRC[s.k][0])}<span>${SRC[s.k][1]}  <span class="muted">${s.c} 个</span></span><span class="r">${s.k === "ws" || s.k === "local" ? "" : '<button class="btn small">检查</button>'}</span>
-      <span class="m">${[s.m, s.r, s.acct].filter(Boolean).join("，")}</span></div>`).join("")}
-    <div class="srcrow"><span></span><span class="m">工坊 2 个已找不到：被删除或设为私有。<button class="btn link">看是哪两个</button></span></div>
-    <div class="srcrow"><span></span><span class="m">账户在设置里管理 <button class="btn link">设置 › 账户 →</button></span></div></div>`;
+    ${SOURCES.map((s) => `<div class="srcrow">${ic(SRC[s.k][0])}<span>${SRC[s.k][1]}  <span class="muted">${s.c} items</span></span><span class="r">${s.k === "ws" || s.k === "local" ? "" : '<button class="btn small">check</button>'}</span>
+      <span class="m">${[s.m, s.r, s.acct].filter(Boolean).join(", ")}</span></div>`).join("")}
+    <div class="srcrow"><span></span><span class="m">2 Workshop items unavailable: deleted or private.<button class="btn link">see which two</button></span></div>
+    <div class="srcrow"><span></span><span class="m">manage accounts in settings <button class="btn link">settings › accounts →</button></span></div></div>`;
 }
 function themeButton() {
   $("#theme").onclick = () => {

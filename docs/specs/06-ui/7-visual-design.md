@@ -1,204 +1,204 @@
-# 06 · 界面 · 视觉、动效、界面用词（§7）
+# 06 · Interface · Visual design, motion, interface wording (§7)
 
-> 属于 [06 · 界面](README.md)。章节号在整个 06 里连续，拆成多个文件后不变，引用照旧写 `06 §x.y`。
+> Part of [06 · Interface](README.md). Section numbers run through all of 06 and stay unchanged when split across files. References still use `06 §x.y`.
 
-## 7. 视觉
+## 7. Visual design
 
-**原则**（magpie / Linear 式精致极简）：
-1. **零边框（TUI）。** 区域之间只用空白、两格缩进、淡色小标题来分隔，不画方框和分割线。GUI 用 magpie 的卡片：一层安静的底面，内容放在带发丝线边框（`--hairline`，§7.3）、12px 圆角的卡片上。
-2. **一种强调色。** 只有强调色、成功绿、错误红，加上一个用于警告的琥珀色。强调色只给“正在操作的东西”：光标、选中名称、聚焦区的标题、输入提示符。
-3. **大部分文字是灰的。** 多数字符是次要色或淡色，只有你要操作的那一项是亮的。
-4. **光标是淡底加变色，选择是强调色淡底。** 光标所在行是一层淡底色，聚焦时名称变强调色（TUI 再加 `▸`）；选中的行是强调色的淡底。实心背景只用于“药丸”（当前环境、聚焦的筛选项）。**任何框、行、卡片的左边都不加竖线或色条表示选中、光标或强调**（2026-10-23 定，看起来像模板，没有信息），TUI 也一样：选中的行使用整行强调色淡底，光标所在的选中行更深一点。
-5. **粗体只表示身份**（Mod 名称、标题），不用斜体、下划线和反色。
-6. **不显示开发者术语。** 界面上不出现问题代码、`#id`、`decl`、`lineage` 等词，它们只在技术信息和 CLI / MCP 中出现。例外：包名在详情中默认显示。界面上每个概念叫什么见 §7.2。
-7. **静止的界面。** TUI 没有动画和转圈；进行中的工作在状态行用 `…` 表示。GUI 的动效只用来说明“什么变了、东西去了哪里”（§7.1），都很短，`prefers-reduced-motion` 时全部关闭。
-8. **TUI 每一行只占一行**，没有行间距。放不下就截断加 `…`，并告诉玩家藏了多少（`还有 12 个`）。详情文字换行（§4.1）。
+**Principles**, refined minimalism like magpie / Linear:
+1. **No borders in TUI.** Areas separated only by blank space, two-cell indentation, muted subheadings, no boxes / rules. GUI uses magpie cards: quiet base, hairline borders (`--hairline`, §7.3), 12px corners.
+2. **One accent.** Accent, success green, error red, warning amber only. Accent for what is being operated: cursor, selected name, focused heading, input prompt.
+3. **Most text gray.** Secondary / faint for most characters; only current object bright.
+4. **Cursor faint background / changed color; selection faint accent.** Cursor row faint, focused name accent, TUI adds ▸; selected rows faint accent. Solid backgrounds only pills, current environment / focused filter. **No left vertical line / color strip on any box, row, card for selection, cursor, emphasis** (2026-10-23: template-like, no information). TUI same, full-row accent tint, deeper selected cursor.
+5. **Bold indicates identity only**, Mod names / headings. No italics, underline, inversion.
+6. **No developer terms**: finding codes, #id, decl, lineage only in technical / CLI / MCP. Exception: package ID default details. Names §7.2.
+7. **Still interface**: TUI no animation / spinner; … in status for work. GUI motion only explains changes / destinations (§7.1), short, all disabled with `prefers-reduced-motion`.
+8. **One TUI line per row**, no line spacing; ellipsize overflow and state hidden count, e.g. 12 more. Details wrap (§4.1).
 
-**TUI 色板**（深色）：
+**TUI dark palette**:
 
-| 角色 | 值 | 用途 |
+| Role | Value | Use |
 | --- | --- | --- |
-| 文字 | `#E6E6E6` | 名称、值、按键字母 |
-| 次要 | `#7C8290` | 说明、按键提示文字、作者 |
-| 淡色 | `#4A4F5A` | 序号、小标题、未聚焦区的内容 |
-| 强调 | `#A5B4FC` | 光标、选中名称、聚焦区标题、提示符 |
-| 药丸底色 | `#2C2E4A` | 当前环境、聚焦的筛选项 |
-| 聚焦行底色 | `#1A1C24` | 聚焦区的光标行 |
-| 选中行底色 | `#232539` | 选中的整行，含名称换行的续行 |
-| 光标选中行底色 | `#303450` | 聚焦区光标所在的选中整行，含续行 |
-| 成功 | `#7EE2A8` | `✓` 结果 |
-| 警告 | `#F2C46D` | 警告图标（magpie 没有警告色；Mod 管理需要区分“会坏”和“可能有问题”） |
-| 错误 | `#FF8A80` | 错误图标、失败结果 |
+| Text | `#E6E6E6` | Names, values, keys |
+| Secondary | `#7C8290` | Explanations, hints, authors |
+| Faint | `#4A4F5A` | Numbers, subheadings, unfocused content |
+| Accent | `#A5B4FC` | Cursor, selected names, focused headings, prompt |
+| Pill | `#2C2E4A` | Current environment / focused filter |
+| Focused row | `#1A1C24` | Cursor in focused area |
+| Selected row | `#232539` | Whole row incl. wrapped continuation |
+| Selected cursor | `#303450` | Focused selected cursor incl. continuation |
+| Success | `#7EE2A8` | ✓ result |
+| Warning | `#F2C46D` | Warning icons; magpie has no warning, Mod management must distinguish breaks / may be wrong |
+| Error | `#FF8A80` | Error icons / failed results |
 
-TUI 只有深色，背景是终端自己的；在 ConPTY 下无法可靠地检测终端背景（与 §9.2 的颜色检测同一原因），所以不跟着终端换浅色。
+TUI dark only, terminal background; ConPTY cannot reliably detect background, same reason as §9.2 color detection; no automatic light theme.
 
-**日志颜色**（游戏日志页，§2.10）：日志文字是“大部分文字是灰的”的例外，用游戏日志窗口自己的颜色（Error 红 `#ff6666`、Warning 黄 `#ffeb04`、Message 白），Mod 写在消息里的 `<color>` 也照样显示；浅色主题只调对比度、不换色相。只用在日志原文那一行，界面自己的文字和图标仍按上面的色板。
+**Log colors** (§2.10): exception to gray text, use game's log-window colors: Error red `#ff6666`, Warning yellow `#ffeb04`, Message white; Mod message `<color>` retained. Light theme changes contrast, not hue. Only raw log rows; UI text / icons retain palette.
 
-**GUI 色板**：取自 magpie 的 `app.css`（MIT，版权声明在 `style.css` 开头），用 CSS 变量定义，**深色 / 浅色由设置 › 界面的日夜切换决定**（2026-10-24，§7.4）。深色值：底 `--bg #1a1a1e`、卡片 `--card #232327`、药丸 `--pill #2d2d33`、细线 `--line #333339`、文字 `--fg #ededf1`、次要 `--fg-2 #b9b9c1`、`--muted #8b8b94`、淡色 `--faint #56565f`、强调 `--accent #a5b4fc`、强调浅底 `--accent-soft #2b2c47`、选中 `--sel #33345a`、成功 `--green #6fd99b`、错误 `--red #f28b82`、警告 `--amber #f2b544`、日志 `--log #f5a97f`。浅色值见 `style.css` 的 `:root`（强调 `#4f46e5`）。行高 28px，文字 13px。
+**GUI palette**: magpie `app.css` MIT, copyright atop `style.css`, CSS variables; **settings > interface day / night controls effective theme** (2026-10-24, §7.4). Dark: background `--bg #1a1a1e`, card `--card #232327`, pill `--pill #2d2d33`, line `--line #333339`, text `--fg #ededf1`, secondary `--fg-2 #b9b9c1`, `--muted #8b8b94`, faint `--faint #56565f`, accent `--accent #a5b4fc`, soft `--accent-soft #2b2c47`, selected `--sel #33345a`, success `--green #6fd99b`, error `--red #f28b82`, warning `--amber #f2b544`, log `--log #f5a97f`. Light: `style.css` :root, accent #4f46e5. 28px rows, 13px text.
 
-**卡片间距**（2026-10-22 定）：并排和上下叠放的圆角卡片之间一律是 `--card-gap`（4px），没有别的值：方案编辑器的三栏、第三栏的详情 / 暂存 / 历史、左栏的筛选卡片和下面的列表或详情、Mod 库存的左栏和表格、游戏日志和变化记录并排的栏、后台任务的左右栏和右栏的两张卡片、全部列表的左右栏。**分配同一块空间的卡片之间的缝都能拖动改大小**（2026-10-23 定，§3.1 规则 10），双击恢复，拖到的大小按页面存在 `ui.gui.<页面>.*` 设置里；新页面加这样的卡片时同时给缝。一张接一张往下排、高度跟着内容的卡片（能不能跑的各区、设置的各组、全屏详情的六块）之间的缝不拖。能拖动的缝（栏之间的分隔、筛选卡片下面的缝）看得见的宽度还是 4px，但点击区域向两边的卡片各伸进 `--grab`（3px），一共约 10px；光标、悬停时中间那条强调色的发丝线（§7.3）和双击恢复不变。侧栏右边缘的拖动区不变（6px，在侧栏里面）。
+**Card spacing** (2026-10-22): all horizontal / vertical rounded-card gaps `--card-gap` 4px, no other value: editor columns / third-column details-staging-history / left filters and list-details, inventory filter / table, log / changes columns, tasks columns / right cards, all-lists columns. **Space-sharing card gaps draggable** (§3.1 rule 10, 2026-10-23), double-click reset, persist `ui.gui.<page>.*`; new cards must include splitters. Content-height stacked needs / settings / six full-details sections no drag. Visible gap stays 4px, hit area extends `--grab` 3px into each card, about 10px; resize cursor, accent hairline hover (§7.3), double-click unchanged. Sidebar right edge remains 6px inside sidebar.
 
-**字体**：字号见 §7.3。TUI 用玩家终端的字体（§9.2）。GUI 用系统界面字体（`Segoe UI Variable Text`、`Segoe UI`、`Microsoft YaHei UI`），序号用等宽数字，代码用 `Cascadia Mono`。
+**Fonts**: sizes §7.3. TUI player's terminal (§9.2); GUI system Segoe UI Variable Text, Segoe UI, Microsoft YaHei UI; tabular numbers, Cascadia Mono code.
 
-**文案**：
-- 中文界面用短句，动词开头：“启用 Vehicle Framework”，不写“执行启用操作”。
-- 小标题用淡色短词：`已启用 485`、`简介`、`需要`。
-- 空状态是一句话，并指出按哪个键：`暂存是空的，按 t 把选中的 Mod 放进来`。
-- 不用中点 `·` 分隔（§7.3）。
-- 未知值用淡色的 `—`，不写 unknown。
-- 每个界面字符串都有中文条目（GUI 的测试检查页面用到的每个字符串）。
+**Wording**:
+- Short verb-first Chinese UI sentences, e.g. enable Vehicle Framework, not perform enable operation.
+- Short muted subheadings: Enabled 485, description, needs.
+- Empty states one sentence / key: staging is empty; t stages selected mods.
+- No middle-dot separators (§7.3).
+- Unknown faint —, never unknown.
+- Every UI string has Chinese translation; GUI tests check every used string.
 
-**图标**：TUI 默认用右栏“兼容模式”的 Unicode 字符；`ui.icons nerd` 时用 Nerd Font 中的 Font Awesome 4 区段（码位 U+F000–U+F2E0；所有 Nerd Font 都包含这一段）（§9.3）。GUI 用自绘的简单 SVG（`js/icons.js`），含义与下表一一对应。
+**Icons**: TUI defaults compatibility Unicode; ui.icons nerd uses Nerd Font Font Awesome 4 U+F000–U+F2E0, included in all Nerd Fonts (§9.3). GUI simple custom SVG `js/icons.js`, matching meanings:
 
-| 含义 | Nerd Font（码位） | 兼容模式 | 颜色 |
+| Meaning | Nerd Font | Compatibility | Color |
 | --- | --- | --- | --- |
-| 来源：官方（Core、DLC） | shield `U+F132` | `⬥` U+2B25 | 淡色 |
-| 来源：工坊（含 SteamCMD） | steam `U+F1B6` | `◉` U+25C9 | 淡色 |
-| 来源：本地 | folder `U+F07B` | `▢` U+25A2 | 淡色 |
-| 来源：锁定版本（来自工坊的副本） | clone `U+F24D` | `⬦` U+2B26 | 淡色 |
-| 来源：Git | git `U+F1D3` | `∆` U+2206 | 淡色 |
-| 状态：错误（会导致加载失败） | times-circle `U+F057` | `⨯` U+2A2F | 错误红 |
-| 状态：警告（可能有问题） | exclamation-triangle `U+F071` | `!` | 警告琥珀 |
-| 状态：语料提示（计数规则见 §5） | info-circle `U+F05A` | `ⓘ` U+24D8 | 次要；GUI 为圆圈里的 i |
-| 状态：上次运行报错 | bug `U+F188` | `◍` U+25CD | 错误红 |
-| 状态：不可加载（被停用的残留） | ban `U+F05E` | `◌` U+25CC | 淡色 |
-| 状态：无问题 | 不显示 | 不显示 | — |
-| 与游戏里的列表不同 | circle `U+F111` | `⬤` U+2B24 | 强调色 |
-| 锁定（Core 不可移动） | lock `U+F023` | 不显示 | 淡色 |
-| 有更新 / 有变化 | refresh `U+F021` | `⇣` U+21E3 | 次要 |
-| 前置依赖 | link `U+F0C1` | `›` U+203A | 次要 |
-| 暂存 | inbox `U+F01C` | `◫` U+25EB | 次要 |
-| 启动游戏 | play `U+F04B` | `►` U+25BA | 文字 |
-| 保存 | floppy `U+F0C7` | `↲` U+21B2 | 文字 |
-| 自动排序 | sort-amount-asc `U+F160` | `↨` U+21A8 | 文字 |
-| 搜索 | search `U+F002` | `/` | 次要 |
+| Official Core / DLC source | shield `U+F132` | `⬥` U+2B25 | Faint |
+| Workshop incl. SteamCMD | steam `U+F1B6` | `◉` U+25C9 | Faint |
+| Local | folder `U+F07B` | `▢` U+25A2 | Faint |
+| Locked Workshop copy | clone `U+F24D` | `⬦` U+2B26 | Faint |
+| Git | git `U+F1D3` | `∆` U+2206 | Faint |
+| Error, load failure | times-circle `U+F057` | `⨯` U+2A2F | Error red |
+| Warning, possible issue | exclamation-triangle `U+F071` | `!` | Amber |
+| Corpus hint, counting §5 | info-circle `U+F05A` | `ⓘ` U+24D8 | Secondary; GUI circled i |
+| Last-run error | bug `U+F188` | `◍` U+25CD | Error red |
+| Unloadable disabled residue | ban `U+F05E` | `◌` U+25CC | Faint |
+| No problem | Hidden | Hidden | — |
+| Different from game's list | circle `U+F111` | `⬤` U+2B24 | Accent |
+| Locked, Core immovable | lock `U+F023` | Hidden | Faint |
+| Update / change | refresh `U+F021` | `⇣` U+21E3 | Secondary |
+| Dependency | link `U+F0C1` | `›` U+203A | Secondary |
+| Staging | inbox `U+F01C` | `◫` U+25EB | Secondary |
+| Launch | play `U+F04B` | `►` U+25BA | Text |
+| Save | floppy `U+F0C7` | `↲` U+21B2 | Text |
+| Automatic sort | sort-amount-asc `U+F160` | `↨` U+21A8 | Text |
+| Search | search `U+F002` | `/` | Secondary |
 
-- 一行最多两个图标（来源和状态）；有问题或语料提示时显示状态图标，二者都没有时没有图标。GUI 里状态图标悬停显示、点击固定它的说明（§4.2），提示框用 `--pop-bg`、发丝线边框和 `--shadow`，文字能划选（§3.1 规则 13）。
-- 锁图标目前不画：Core 的位置由 `official.order` 问题表达。
-- 两种模式共用的标记：光标 `▸`、成功 `✓`、提示符 `❯`、进行中 `…`（都按 1 格绘制）；失败在完整模式用 times-circle，兼容模式用 `⨯`（`✗` 在 Cascadia Mono 中没有字形）。
-- 宽度：兼容字符全部是东亚宽度“中性”（N）的字符，无论 runewidth 是否开启 `EastAsianWidth` 宽度都是 1，并且 Windows 默认字体 Cascadia Mono 都有字形、按 1 格绘制。Nerd Font 码位属于私用区，东亚宽度是“不明确”（A），`…` 也是 A，所以 RimArcho 计算宽度时必须关闭 `EastAsianWidth`；终端把“不明确”宽度画成 2 格时（WezTerm 的 `treat_east_asian_ambiguous_width_as_wide`、部分 CJK 控制台），Nerd Font 图标会错位，这时用兼容模式。两套图标都由 `TestIconWidths` 检查为 1 格。
+- At most source / status two icons; status for findings / corpus hints, absent otherwise. GUI hover explains, click pins (§4.2), `--pop-bg`, hairline, `--shadow`, selectable text (§3.1 rule 13).
+- Lock currently omitted: Core position via `official.order` finding.
+- Shared cursor ▸, success ✓, prompt ❯, progress …, all one cell. Failure times-circle full, ⨯ compat; Cascadia Mono lacks ✗.
+- Compat glyphs East Asian Neutral N, width 1 with either runewidth EastAsianWidth value, present / one cell in default Cascadia Mono. Nerd private-use icons and … Ambiguous A; RimArcho must disable EastAsianWidth. Terminals rendering ambiguous width 2, e.g. WezTerm treat_east_asian_ambiguous_width_as_wide / some CJK consoles, misalign Nerd; use compat. `TestIconWidths` verifies both one cell.
 
-**应用图标**：玩家提供的头像插画 `internal/icon/portrait.svg`（1024×1024，矢量，带强调色 `#4f46e5` 的轮廓光），也是 Archo 的形象，见 §8.6。
+**App icon**: player-supplied `internal/icon/portrait.svg`, 1024×1024 vector, #4f46e5 outline glow; also Archo image (§8.6).
 
-**标志（蝴蝶结）**（2026-10-25）：头像左上的蝴蝶结单独作为 RimArcho 的标志，放在头像太小、认不出的地方。GUI 用简化画法（`js/icons.js` 的 `bowMark`）：三片翼和中间的结，左下边缘是轮廓光（与头像的光照方向一致）；`bowMark(24)` 每片翼多一块浅色面，`bowMark(16)` 是纯色块。颜色是品牌固定色，不随玩家选的强调色变：浅色主题轮廓光 `#4f46e5`；深色主题轮廓光 `#a5b4fc`，外加一圈灰色描边（`#4a4d5c`），否则黑色的翼会融进深色背景。现在只用在界面里提到 Archo 的小尺寸位置，名字前面的 14px 标记（16px 画法）：游戏日志页的“Archo 日志分析”卡片标题、“让 Archo 分析”按钮；以后 Archo 发起的任务行也用它（§2.11）。头像留给大尺寸（Archo 面板等）。侧栏不放标志（2026-10-25 定，§2.1）。
+**Bow mark** (2026-10-25): portrait's upper-left bow used where portrait too small. GUI simplified `js/icons.js` bowMark, three wings / knot, lower-left glow matching portrait; bowMark(24) extra light face per wing, bowMark(16) solid. Fixed brand colors independent of chosen accent: light glow #4f46e5, dark #a5b4fc with #4a4d5c gray outline so black wings remain visible. Currently 14px preceding Archo name, 16px drawing, game-log Archo log analysis card / ask Archo to analyze button; future Archo task rows too (§2.11). Portrait for large panel etc. No sidebar mark (2026-10-25, §2.1).
 
-**选择控件**（交互见 §3.10）：两段开关选中段用 `--seg-thumb` / `--seg-edge`，未选中文字用 `--ctl-fg`。单值选择按钮右侧带箭头；展开菜单顶上是字段名，当前项左侧打勾并以圆角底色高亮，键盘候选另有焦点底色。面板沿用卡片颜色、发丝边框和菜单阴影；深浅主题共用现有变量。
+**Choice controls** (§3.10): selected segment `--seg-thumb` / `--seg-edge`, unselected text `--ctl-fg`. Single-choice right arrow; menu field name atop, current checked left / rounded highlight, separate keyboard focus background. Card colors / hairline / menu shadow, shared theme variables.
 
-### 7.1 动效（GUI）
+### 7.1 Motion (GUI)
 
-四个时长，定义在 `style.css` 的 `:root`。进入和移动用 ease-out 的 `--ease`（`cubic-bezier(.2, .8, .2, 1)`），基础是 250ms；消失比出现快，用 `--ease-in`（`cubic-bezier(.4, 0, 1, 1)`）：
+Four `style.css` :root durations; entry / movement ease-out `--ease` cubic-bezier(.2, .8, .2, 1), base 250ms; exits faster, `--ease-in` cubic-bezier(.4, 0, 1, 1):
 
-| 变量 | 时长 | 用于 |
+| Variable | Duration | Use |
 | --- | --- | --- |
-| `--t-press` | 120ms | 悬停、按下、颜色的淡入淡出 |
-| `--t-enter` | 200ms | 出现：页面进入、菜单、状态行 |
-| `--t-exit` | 150ms | 消失：菜单关闭、卡片收起（`--ease-in`） |
-| `--t-layout` | 250ms | 位置和大小变化：列表行换位、侧栏高亮滑动、展开收起、数字跳动 |
+| `--t-press` | 120ms | Hover, press, color fades |
+| `--t-enter` | 200ms | Page / menu / status entry |
+| `--t-exit` | 150ms | Menu close, card collapse, ease-in |
+| `--t-layout` | 250ms | Row movement, sidebar highlight, expansion, number pulse |
 
-菜单关闭和卡片内容收起用 `--t-exit` / `--ease-in`；布局移动与 `motion.js` 的 FLIP 共用 250ms 的节奏。
+Menu close / card content collapse use exit / ease-in; layout / `motion.js` FLIP share 250ms.
 
-动效清单（`js/motion.js` 和 `style.css` 的 motion 一节）：
-- **页面进入**：新打开的页面淡入并上移 4px；同一页重绘（动作之后、切换子视图）不动。
-- **侧栏高亮**：当前条目的底色是一块滑动的高亮（像视图切换的 thumb），换页时从旧条目滑到新条目；尺寸直接变，只有位置动。子项有自己的一块高亮，在同一条目的子项之间滑动。
-- **侧栏子项展开 / 收起**：子项所在的格子的行高从 `0fr` 过渡到 `1fr`（`--t-layout`），同时淡入（`--t-enter`），条目名称后的小箭头转 90°。换条目时旧的收起、新的展开一起进行，下面的条目跟着平滑移动，不跳。高亮直接滑向目标条目动画结束时的位置（`motion.js` 按正在展开、收起的子项算出终点）。收起的子项不在 tab 顺序里。
-- **列表变化**（启用、停用、移动、排序、撤销、拖放）：动作前记下可见行（按 Mod）在屏幕上的位置，重绘后把仍可见的行从旧位置滑到新位置（FLIP）；被操作的行（不知道是哪些时，是换了位置或新进入这个列表的行）闪一下强调浅底，约 400ms 淡出。只处理虚拟列表已经画出来的行（几十行），一批行只触发一次样式计算。
-- **数字**：侧栏角标和个数、列表标题的数目、能不能跑各区的计数、“N 项未保存”，数字变了时轻轻放大一下。
-- **状态行**：新的一句从下方滑入。
-- **加载中**：按需加载的部分（游戏日志、日志详情、全屏详情的分页）显示几条微光闪动的占位条，不写“加载中…”；屏幕阅读器读到的是原来的文字。
-- **卡片和弹层**：保持原来的轻微缩放淡入。
+Motion inventory, js/motion.js / `style.css` motion:
+- **Page entry** fades / rises 4px; same-page redraw after action / subview no motion.
+- **Sidebar highlight** slides old to new, size changes immediately, position only animated; own child highlight within same entry.
+- **Sidebar children** grid row 0fr → 1fr, layout duration, entry fade, arrow rotates 90°. Old collapse / new expansion simultaneous, following entries move smoothly. Highlight goes directly to final destination computed from expanding / collapsing children by motion.js. Collapsed children excluded from tab order.
+- **List changes**, enable / disable / move / sort / undo / drag: record visible Mod row positions, FLIP surviving rows after redraw; affected rows (if unknown, moved / new rows) flash soft accent, fade about 400ms. Only rendered virtual rows, dozens; one style calculation per batch.
+- **Numbers**: badge / count, list headings, needs sections, unsaved softly pulse on change.
+- **Status** new sentence slides up.
+- **Loading** lazy game log / details / full-detail pages shimmer placeholders, no loading… text; screen readers retain old text.
+- **Cards / overlays** existing slight scale fade retained.
 
-规则：
-- 会持续或会移动的动画只动 `opacity` 和 `transform`（WebView2 合成，不重新布局、不重绘）；闪一下用一层淡出的覆盖层，不对背景色做动画；微光和进度条的流光是移动的渐变层。例外：120ms 的悬停颜色过渡（一次性，不是持续动画），和侧栏子项展开时格子的行高（只有几行，一次 250ms）。
-- 不用 `backdrop-filter` 模糊（WebView2 每一帧都重绘它）。
-- `prefers-reduced-motion: reduce` 时：CSS 把所有动画和过渡的时长设为 0，`motion.js` 不做 FLIP、闪烁、跳动和滑入。
-- 滚动不触发任何动画：1341 行的列表连续滚动 400 次，没有动画在运行，每次重绘可见行中位数 0.5ms（开发环境实测）。
+Rules:
+- Continuous / moving animation only opacity / transform for WebView2 compositing, no relayout / repaint. Flash fading overlay, not background-color animation; shimmer / progress moving gradient layers. Exceptions: one-off 120ms hover colors, few sidebar grid rows once at 250ms.
+- No `backdrop-filter` blur: WebView2 repaints it every frame.
+- Under `prefers-reduced-motion: reduce`, CSS sets all animation and transition durations to 0; `motion.js` skips FLIP, flashing, pulsing, and sliding.
+- Scrolling no animations: 1341 rows, 400 consecutive scrolls, none running, visible-row redraw median 0.5ms in development.
 
-### 7.2 界面用词
+### 7.2 Interface wording
 
-2026-10-22 定。界面（TUI、GUI，中文和英文）用玩家的说法；代码、CLI、MCP 和规格书保留原来的名字（方案、环境、Instance……），所以规格书里写“方案”的地方，界面上写“列表”。
+Decided 2026-10-22. GUI / TUI in both languages use player wording; code / CLI / MCP / specs keep domain names: plan, environment, Instance. Thus spec plan becomes UI list.
 
-英文界面的文字就是翻译表的键，所以改英文要连调用处一起改。app、modchanges 用 CLI 的说法写给界面翻译的几句（例如 “the current plan”）不改键，英文界面经 `view.enText` 显示成新说法。历史里每一步的名字来自 app 的操作代码，`checkout`、`swap`、`restore` 经 `stepWords` 换成玩家的说法。
+English UI text is translation lookup key; changing English requires callers too. app / modchanges CLI-worded keys, e.g. the current plan, stay; `view.enText` overrides UI display. History operation names checkout / swap / restore mapped by stepWords.
 
-检查：`internal/surface/cli` 的 `TestWording`（`view.WordingProblems`）读程序里所有的翻译表和命令面板，中文有“不写”一列的词、英文有 plan、environment、upstream、workspace、swap、pinned、checkout 或 not written 就失败；同一个英文键在两张表里译法不同也失败（后注册的覆盖前一个，前一个就丢了）。确实需要这个词的个别文字记在 `wordingExempt`（例如“反编译”）。
+Check: internal/surface/cli TestWording (`view.WordingProblems`) reads all translation maps / panel. Chinese forbidden terms in final column, English plan / environment / upstream / workspace / swap / pinned / checkout / not written fail; conflicting translations for one English key also fail, because later registration overwrites. Necessary exceptions in wordingExempt, e.g. decompilation.
 
-| 概念（规格书里的名字） | 界面上写 | English | 不写 |
+| Domain concept | UI wording | English | Avoid |
 | --- | --- | --- | --- |
-| 方案（plan、loadout） | **列表**：当前列表、新列表、列表历史 | list | 方案、工作区 |
-| 方案里启用的部分 | 已启用 | Enabled | 启用列表 |
-| 编辑器的三栏 | 区：已启用、未启用、暂存区 | areas | 列表（和“列表”混淆） |
-| 加入方案 / 从方案拿掉（编辑器和 Mod 库是同一个动作） | **启用 / 停用**；从所有方案里拿掉 = 在所有列表里停用 | enable / disable; disable in every list | 加入当前方案、拿掉、移出方案 |
-| 暂存、`stage restore` | 放进暂存 / 放回列表 | stage / put back | — |
-| `save` | **保存**；编辑器按钮是“保存修改 / 没有变化”，个数是“N 项未保存”；未保存到游戏的修改 = 未保存；版本 = 保存过的版本 | save; save changes / no changes; N unsaved; saved versions | 写入游戏、未写入、还没写入游戏、写入过的版本 |
-| `checkout` | 回到这一版（历史里的一步叫“回到旧版”） | go back to this version | 载入版本、载入列表 |
-| 载入外部修改（ModsConfig.xml 在外面改过） | 采用外部修改 | use the outside change | 载入到列表 |
-| 环境（Environment） | **游戏**；`env remove` = 移除游戏（不动文件） | game; remove the game | 环境、删除环境 |
-| 来源（Source） | 设置里叫 Mod 文件夹；筛选和详情里写来源（工坊、本地……） | mod folders; source | — |
-| Instance | 这一份、另一份、N 份 | this one, another copy | 实例、Instance |
-| Lineage | 同一个 Mod 的几份 | copies of the same mod | Lineage |
-| 副本 | 只指 RimArcho 复制出来的（锁定库里的、整合包里的） | copy | 把工坊原版叫副本 |
-| `pin` / `unpin` / `pin --update` | **锁定这个版本** / 解除锁定 / 更新锁定版本（旧的那份保留）；来源一栏写“锁定版本” | lock this version / unlock / update the locked version | 固定（别的工具做的固定也叫锁定） |
-| 锁定之后上游有更新 | **有新版本**；改用工坊版 | a newer version is out | 上游、原版有更新、改用原版（“原版”是 Core 和 DLC） |
-| `library move-to-locked` | 移入锁定库 | move into the lock library | 收进锁定库、备份锁定版本 |
-| `swap` | **切换版本…** | switch version… | 换成另一份副本、替换实例 |
-| `unhide` | 取消隐藏 | unhide | 恢复给游戏 |
-| `trash` | 移到回收站 | move to the recycle bin | 删除（“删除”只用于真的删掉的东西：列表、DDS、卸载） |
-| Mod 库存 | **Mod 库** | mod library | 库存 |
-| 方案允许的游戏版本（04 §1.6） | **游戏版本**；恢复默认 | game versions; reset to default | 允许版本、兼容版本 |
-| `plan follow` / `unfollow` / `sync`（04 §9.6） | **跟着 Steam 合集** / 取消关联 / **跟上合集**；跟上方式“只加入新增的” / “也停用移除的” | follow a Steam collection / unlink / catch up with the collection; add new only / also disable removed | 订阅合集（“订阅”只指 Steam 订阅 Mod）、同步 |
-| 编译整合包 | **创建整合包**、重新创建、没创建完的整合包 | create a pack | 编译 |
-| 完整包 / 轻包 | **整合包**（总是带文件）；只分享列表时导出 **RimArcho 列表**（导出里的一种格式，包页的“导出列表”） | pack; RimArcho list | 完整包、轻包（light pack、full pack） |
+| Plan / loadout | Current / new list, list history | list | plan, workspace |
+| Enabled portion | Enabled | Enabled | enabled list |
+| Three editor lists | Areas: Enabled, Disabled, Staging | areas | list, ambiguous with plan |
+| Add / remove plan entry, editor / library same | Enable / disable, disable in every list | enable / disable; disable in every list | add to current plan, take out, remove from plan |
+| Staging / stage restore | Stage / put back | stage / put back | — |
+| save | Save changes / no changes, N unsaved, saved versions | save; save changes / no changes; N unsaved; saved versions | write to game, unwritten, not yet written, written versions |
+| checkout | Go back to this version; history step go back | go back to this version | load version, load list |
+| External ModsConfig changes | Use outside change | use the outside change | load into list |
+| Environment | Game; `env remove` removes the game without changing files | game; remove the game | environment, delete environment |
+| Source | Mod folders in settings, source in filters / details, Workshop / local | mod folders; source | — |
+| Instance | This one, another copy, N copies | this one, another copy | instance, Instance |
+| Lineage | Copies of same Mod | copies of the same mod | Lineage |
+| Copy | Only RimArcho-made lock-library / pack copies | copy | calling original Workshop installation a copy |
+| pin / unpin / pin --update | Lock, unlock, update locked version, keep old; source locked version | lock this version / unlock / update the locked version | pin, including other tools' pins |
+| Upstream changed after lock | Newer version, use Workshop version | a newer version is out | upstream, original updated, use original; original means Core / DLC |
+| library move-to-locked | Move into lock library | move into the lock library | collect into lock library, back up locked version |
+| swap | Switch version… | switch version… | replace with another copy, replace instance |
+| unhide | Unhide | unhide | restore to game |
+| trash | Recycle | move to the recycle bin | delete, reserved for real deletion: lists, DDS, uninstall |
+| Mod inventory | Mod library | mod library | inventory |
+| Allowed game versions (04 §1.6) | Game versions / reset default | game versions; reset to default | allowed / compatible versions |
+| plan follow / unfollow / sync (04 §9.6) | Follow collection, unlink, catch up; add new only / also disable removed | follow a Steam collection / unlink / catch up with the collection; add new only / also disable removed | subscribe collection, subscription only for Steam Mods; sync |
+| Build pack | Create / recreate / unfinished pack | create a pack | compile |
+| Full / light pack | Pack always includes files; list-only RimArcho list, export format / pack export list | pack; RimArcho list | full pack, light pack |
 
-### 7.3 视觉规则
+### 7.3 Visual rules
 
-启动页（§2.3）是特例，字号、线和圆角按它自己的设计稿，不受第 1、3、4 条限制。它的字号也只有四档：12px、17px、26px 和随宽度变化的大标题（2026-10-28）。
+Launch (§2.3) exception: own sizes / rules / radii, exempt rules 1, 3, 4; four sizes 12px, 17px, 26px, responsive headline (2026-10-28).
 
-2026-10-23 定。以下对 GUI 成立，TUI 例外写在每条后面。检查见本节最后。
+Decided 2026-10-23, GUI; TUI exceptions per rule. Checks below.
 
-1. **圆角两档。** `--r-lg` 12px：卡片、面板、菜单。`--r-sm` 6px：按钮、输入框、chip、缩略图和其他小块。单值选择按钮和开／关两段开关的外框用 `--r-lg`。正圆和药丸形（`50%`、`999px`）不算在两档里。没有第三个值，`style.css` 通过圆角变量统一取值。
-2. **嵌套圆角同圆心。** 内层贴着外层边缘（间距 8px 以内）时，内层半径 = 外层半径 − 内边距；开关的选中块和菜单选项也按各自外框的内边距计算。卡片里贴边的小块用 6px 的间距，正好 12 − 6 = 6，和第 1 条不冲突；离边缘远的不要求同心。
-3. **线只用发丝线。** 边框、分隔线、菜单里组之间的线都用 `--hairline`：高分屏（`resolution >= 2dppx`）是 0.5px；100% 和 150% 缩放时是 1px，颜色比 `--line` 更淡（0.5px 在这些缩放下会糊成半透明或消失）。不用 2px 和更粗的线：拖动缝悬停线用强调色发丝线；引用块用缩进和淡色，不画线。
-4. **字号四种，最小 12px。**
+1. **Two radii**: --r-lg 12px cards / panels / menus; --r-sm 6px buttons / inputs / chips / thumbnails / small blocks. Single-select / segmented outer frames lg. Circles / pills 50% / 999px excluded. No third value, stylesheet variables.
+2. **Concentric nested corners**: inner within 8px of outer edge, inner radius = outer minus padding, including switch thumb / menu options. Card-edge blocks 6px gap, 12−6=6, consistent with rule 1; distant blocks exempt.
+3. **Hairlines only**: all borders / separators / menu group rules --hairline; `resolution >= 2dppx` 0.5px, 100% / 150% 1px, lighter than --line, since 0.5px blurs / disappears there. No ≥2px; hover splitters accent hairline; quotes indent / muted, no line.
+4. **Four font sizes, minimum 12px**:
 
-   | 字号 | 用于 |
+   | Size | Use |
    | --- | --- |
-   | 12px | 次要文字、表格、小标题、侧栏分组标题、子项、角标、chip |
-   | 13px | 正文、列表行、按钮、侧栏条目 |
-   | 15px | 面包屑、页面名、概要卡的标题 |
-   | 32px | 只用于启动页的大标题 |
+   | 12px | Secondary, tables, subheads, sidebar groups / children, badges, chips |
+   | 13px | Body, rows, buttons, sidebar entries |
+   | 15px | Breadcrumbs, page names, summary titles |
+   | 32px | Launch headline only |
 
-   层次不够时用字重、颜色、间距，不加字号。TUI 只有终端的一种字号，不适用。
-5. **不用中点 `·` 分隔。** 并列的几个事实用间距隔开（GUI 12px，TUI 两格空白）；句子里用中文逗号；范围用 `–`；层级用 `/` 或 `›`。提示行的每组“键 说明”之间留更大的间距（GUI 16px，TUI 三格）。规格书自己的标题不是界面文字，不受这条限制；规格里界面文字的例子用两个空格表示间距。
-6. **左边不加竖线和色条**（§7 原则 4）。引用块是缩进 14px 加淡色，不画线。侧栏子项挂的那条线是树形引导线，不表示选中，保留（§2.1）。
-7. **不写解释性文字。** 判断：删掉这句，玩家会不会少知道一件此刻需要的事？会的才留。页面头那一行（§2.2）只放这一页的状态或结论（“主力殖民地还不能放心玩：修好下面 2 个问题就行”）和页面动作，不写“这一页是做什么的”。和安全有关的话（“不写游戏文件”）放进确认里或悬停提示里。空状态仍是一句话（§7 文案）。
-8. **眉题只在有信息时用。** 主标题上方的小字只写主标题没说的分类或上下文。启动页的大标题上面没有眉题（2026-10-26 删去类型和游戏：01、02 已经写了，§2.3）。不加英文大写的小标签。区标题前的数字是聚焦键（§3.5 的 `1`–`9`），有用；不对应按键的编号不写。
-9. **光学对齐。**
-   - 图标和文字按视觉中心对齐：图标盒和行同高，不按基线。
-   - 数字一律等宽（`tabular-nums`），一列数字右对齐。
-   - 圆形图标比同一行的方形图标大 1px。
-   - 按钮左右内边距相等；带图标的那一侧少 2px，让图标和文字整体看起来居中。
-   - 同一栏里图标、名称、右侧的数在每一行对齐同一条边（§2.1 已经这样做）。
-10. **动效**：进入和移动用 ease-out，基础 250ms；数值见 §7.1。
-11. **文字不重叠**（2026-10-24 定）。任何宽度下，文字都留在自己的栏里：长文字在栏内换行，或用省略号截断并在悬停时显示全文；地址统一按 §3.1 规则 12 展示，不压到旁边的文字、输入框和按钮上；窗口变窄时右侧的控件换到下一行，而不是盖住左边的说明。TUI 按终端宽度截断，同样不重叠。
-12. **页面宽度按页面的形状分两种**（2026-10-28 定）。有列表又有详情、分成几栏的页面和窗口一样宽，左右各留 12px，栏宽可拖、双击恢复，和方案编辑器（38% / 31% / 31%）一致：Mod 库存、游戏日志（列表 62%）、能不能跑（左列 55%，2026-10-29 起两列）、全部列表（列表 38%）、整合包、订阅与更新、后台任务。只有一栏的页面共用一个阅读宽度 960px，在页面区里居中，标签和值不至于隔得太远：游戏、贴图优化、设置。其他页面（首次引导、卸载、编译、导入导出）暂时沿用 1200px。实现：`style.css` 里 `.page:is(...)` 两条规则。
+   Use weight / color / spacing for more hierarchy, no extra sizes. TUI single terminal size, inapplicable.
+5. **No middle-dot separators**. Parallel facts spaced, GUI 12px / TUI 2 cells; sentence commas, ranges en dash, hierarchy slash / ›. Hint groups wider: GUI 16px / TUI 3 cells. Spec titles exempt; UI examples use two spaces.
+6. **No left vertical / color bars** (§7 principle 4). Quotes 14px indentation / muted, no line. Sidebar child tree guide retained, not selection (§2.1).
+7. **No explanatory filler**. Keep sentence only if removing it loses information needed now. Head (§2.2) status / conclusion, e.g. Main colony not ready: fix these 2 problems, plus actions; never page-purpose explanation. Safety text, e.g. no game-file writes, in confirmation / tooltip. Empty state one sentence (§7 wording).
+8. **Eyebrows only informative**: category / context absent from title. Launch no type / game eyebrow since 2026-10-26, already in 01 / 02 (§2.3). No uppercase English labels. Heading numbers only meaningful focus keys 1–9 (§3.5).
+9. **Optical alignment**:
+   - Icons visual-centered in full row-height boxes, not baseline.
+   - All numbers use `tabular-nums`; numeric columns are right-aligned.
+   - Round icons 1px larger than square peers.
+   - Equal button padding, icon side 2px less for optical centering.
+   - Align icons / names / right counts throughout column, as sidebar (§2.1).
+10. **Motion** ease-out entry / movement, base 250ms, values §7.1.
+11. **No text overlap** (2026-10-24): text stays in own column at any width, wraps / ellipsizes with full hover. Addresses §3.1 rule 12 never cover neighbors; narrow windows wrap right controls below, not over explanations. TUI truncates to width, likewise no overlap.
+12. **Two page widths by shape** (2026-10-28): multicolumn list / details full-window, 12px side padding, draggable resettable widths like editor 38/31/31: inventory, log list 62%, needs left 55% / two columns since 2026-10-29, all lists list 38%, packs, subscriptions, tasks. Single column centered 960px reading width so labels / values close: games, textures, settings. Others guide / uninstall / build / exchange retain 1200px. Two `.page:is(...)` stylesheet rules.
 
-**检查**：
-- GUI 的 `TestStyleRules` 读 `style.css`：圆角只能是 `var(--r-lg)`、`var(--r-sm)`、`50%`、`999px`、`inherit`，以及选择控件按内边距计算的内层圆角；字号只能是上表的四种；线宽只能是 `var(--hairline)`（去掉线用 `0` 或 `none`）；失败时报告源文件行号和违规值；不准用 `border-left` / `border-right` 或 `box-shadow: inset` 画强调色的竖条。
-- `TestWording`（§7.2）同时检查翻译表和 `view.Text` 里没有 `·`（`view.WordingTextProblems`，GUI 的界面字面量同样检查）。
+**Checks**:
+- GUI TestStyleRules reads `style.css`: only var(--r-lg), var(--r-sm), 50%, 999px, inherit, calculated inner choice radii; only table's font sizes; only var(--hairline), 0 / none to remove. Reports line / value. No border-left / border-right or `box-shadow: inset` accent bars.
+- TestWording (§7.2) checks no middle dots in translation maps / `view.Text` (`view.WordingTextProblems`) and GUI literals.
 
-### 7.4 强调色主题（GUI，2026-10-24）
+### 7.4 Accent themes (GUI, 2026-10-24)
 
-- 设置 › 界面 › 强调色（`ui.accent`，06 §2.14）。可选：`default`（默认，即上面原有的靛蓝色值，不覆盖任何变量）和 Radix Colors 3.0.0 的 15 个色阶：indigo、blue、cyan、teal、green、grass、orange、amber、red、crimson、pink、plum、purple、violet、iris。每个色阶 12 级，分浅色（`<名>`）和深色（`<名>Dark`）两套，原值放在 `assets/js/accent.js`（带 Radix 的 MIT 许可声明）。
-- **只换强调色的四个变量**，其他颜色（成功绿、错误红、琥珀、灰阶）不动，§7 原则 2 照旧：
+- Settings > interface > accent (`ui.accent`, 06 §2.14): default leaves existing indigo unchanged; 15 Radix Colors 3.0.0 scales: indigo, blue, cyan, teal, green, grass, orange, amber, red, crimson, pink, plum, purple, violet, iris. Each 12 light <name> / dark <name>Dark levels in assets/js/accent.js with MIT notice.
+- **Only four accent variables change**, success / error / amber / grays unchanged, §7 principle 2:
 
-  | 变量 | 浅色 | 深色 |
+  | Variable | Light | Dark |
   | --- | --- | --- |
-  | `--accent`（填充、边框、光标） | 第 9 级 | 第 11 级 |
-  | `--accent-soft`（药丸、光标行淡底） | 第 3 级 | 第 3 级 |
-  | `--sel`（选中行） | 第 4 级 | 第 5 级 |
-  | `--accent-fg`（强调色填充上的字） | 白色；琥珀用第 12 级 | 第 1 级 |
+  | --accent, fill / border / cursor | 9 | 11 |
+  | --accent-soft, pills / cursor tint | 3 | 3 |
+  | --sel, selection | 4 | 5 |
+  | --accent-fg, text on fill | White, amber level 12 | 1 |
 
-  另外把 12 级都设成 `--accent-1` … `--accent-12`；强调色的文字用第 11 级（`var(--accent-11, var(--accent))`），比第 9 级在白底上更清楚。
-- **日夜切换**（2026-10-24）：设置 › 界面里的 `ui.theme` 是 `auto`（默认，跟随系统）、`light`、`dark`。页面灰阶、日志颜色和强调色使用同一个有效深浅色；手动选浅色 / 深色时不受系统影响。加载样式前从本地缓存恢复主题以避免闪烁，启动 `Init.theme` 再同步数据库里的值；关闭本地存储时仍按启动数据应用。
-- **立即生效**：启动时 `Init` 带回 `accent`，在第一次绘制前写到根元素的内联变量上；设置里换值后重新取一次并应用，不重新载入页面；选择浅色 / 深色时立即换那一套，只有 `ui.theme=auto` 时跟随系统变化。强调色用色块展示当前有效深浅色的 `--accent` 实际颜色，选中标记为环和 ✓，悬停及旁边的文字显示名称。选 `default` 时删掉这些内联变量。TUI 不受影响（仍用 §7 的 TUI 色板）。
-- 已知：浅色下几个色阶第 9 级上的白字对比度低于 4.5:1（Radix 自己的取舍），按钮字是 13px 中等字重，暂不调整。
-- 检查：`internal/surface/gui/accent_test.go` 确认每个可选值在 `accent.js` 里都有 12 + 12 个合法色值，`style.css` 的新规则同样过 `TestStyleRules`。
+  Also expose all 12 levels as `--accent-1` … `--accent-12`; accent text level 11 `var(--accent-11, var(--accent))`, clearer on white than level 9.
+- **Day / night** (2026-10-24): `ui.theme` auto default follows OS, light / dark manual. Gray, log, accent share effective theme. Restore local cached theme before styles to avoid flash, `Init.theme` syncs database; disabled local storage still uses startup data.
+- **Immediate**: Init includes accent, root inline vars before first paint; setting change refetch / apply without reload; manual light / dark swaps immediately, OS changes apply only with `ui.theme=auto`. Swatches actual effective --accent, ring / ✓ selected, hover / adjacent name. Default removes inline vars. TUI retains the §7 palette.
+- Known: some light scales' level-9 white contrast <4.5:1, Radix tradeoff; 13px medium buttons unchanged for now.
+- `internal/surface/gui/accent_test.go` verifies 12+12 valid colors per choice, new CSS passes TestStyleRules.

@@ -1,16 +1,16 @@
-# VM 自动化测试方案（2026-10-27）
+# VM automation test plan (2026-10-27)
 
-## 1. 建议与核验边界
+## 1. Recommendation and verification boundaries
 
-第一阶段以**真实 Wails 窗口的 WebView2 CDP 驱动**为主，覆盖普通玩家的快速操作、切页、取消、导入导出和 Mod 增删；CLI 跑核心场景和状态对照，guidev／直接 `*API` 跑 GUI 服务、事件和缓存断言。三层使用同一份场景语义与快照，不能用 CLI 成功替代窗口验收。VM 优先复用现有 **VMware Workstation / Win11-Player-Test**，另建测试克隆与数据基线。
+Phase 1 primarily uses **WebView2 CDP against the real Wails window**, covering ordinary fast input, navigation, cancellation, import/export, and adding/removing Mods. CLI runs core scenarios and state comparisons; guidev/direct `*API` verifies GUI services, events, and caches. All three layers use the same scenario semantics and snapshots; CLI success cannot replace window acceptance. Reuse the existing **VMware Workstation / Win11-Player-Test**, with a new test clone and data baseline.
 
-这是静态代码研究及实施提案，没有执行 VM 还原、真实订退订、删除或游戏启动，也没有把旧性能研究当作当前构建验收。不新增 PoC：仓库已经具备真实窗口驱动，优先扩展它。
+Static code research and implementation proposal only: no VM restore, real subscribe/unsubscribe, deletion, or game launch. Old performance research is not current-build acceptance. No new PoC: extend the existing real-window driver.
 
-核验基线为本 worktree `codex/automation-research` 的 `0b30d42ab85ffc94eecc4c56df316bb3ca459047`；核验时本地 `dev/0.9.0` 同指此提交。另检查 `codex/background-nonblocking` 的 `bd8d5d8`（包含 `b3edbbd`）；该分支的改动**尚不在本基线**。下文未注明分支的 `file:line` 都指 `0b30d42`。行号用于定位研究证据，实施时以函数名复查。
+Baseline: this `codex/automation-research` worktree, `0b30d42ab85ffc94eecc4c56df316bb3ca459047`; local `dev/0.9.0` pointed to it during review. Also checked `codex/background-nonblocking` `bd8d5d8` (includes `b3edbbd`), **not in this baseline**. Unqualified file:line references mean `0b30d42`; use symbols to recheck during implementation.
 
-当前顶层 Go 文件中可找到 **184 个导出 `*API` 方法、132 个 `register(&Command{Name: ...})` 注册项**；后者含别名和入口命令，不是 132 种独立玩家能力。旧稿“约 180 / 80”低估了命令注册项。覆盖表按玩家动作归并读写、预览、轮询和弹窗，同一动作的多个按钮不重复计作领域能力，但 crawler 必须分别点到。
+Current top-level Go files contain **184 exported `*API` methods and 132 `register(&Command{Name: ...})` entries**; the latter includes aliases/entry commands, not 132 independent player capabilities. Old "about 180 / 80" underestimated registrations. Coverage groups reads/writes/previews/polls/dialogs by player action. Multiple buttons for one action are one domain capability, but crawler must click each.
 
-可复核命令（仓库根目录；PowerShell；只读）：
+Reproducible read-only commands (repository root, PowerShell):
 
 ```powershell
 git rev-parse HEAD
@@ -20,175 +20,175 @@ rg -n 'register\(&Command\{Name:' internal/cmds -g '!**/*_test.go'
 git diff 0b30d42...codex/background-nonblocking -- internal/surface/gui/tasks.go
 ```
 
-需求范围以实际 GUI 路由与 API 为准，并逐类对照 `docs/specs/06-ui/`：导航／启动 §2.1–2.4、列表／整合包／环境 §2.5–2.8、库存／日志 §2.9–2.10、设置／引导／任务／全部列表 §2.14–2.17，以及 §3–6 的快捷键、选择、详情和确认反馈。父目录 `inventory/ui-pages.md:37`、`:110`、`:198`、`:239` 和 `inventory/api-surface.md:29` 是 RimCrow 的需求来源，不能把那里所有功能算作 RimArcho 已实现的 GUI。
+Scope follows actual GUI routes/APIs, checked against `docs/specs/06-ui/`: navigation/launch §2.1–2.4, lists/packs/environments §2.5–2.8, inventory/logs §2.9–2.10, settings/guide/tasks/all lists §2.14–2.17, and shortcuts/selection/details/confirmation in §3–6. Parent `inventory/ui-pages.md:37`, `:110`, `:198`, `:239`, `inventory/api-surface.md:29` describe RimCrow requirements, not all implemented RimArcho GUI features.
 
-## 2. 当前差异与补齐顺序
+## 2. Current differences and fix order
 
-### 2.1 近期改动与旧 D1–D10 复核
+### 2.1 Recent changes and D1–D10 review
 
-| 项 | 当前证据／结论 | CLI 等价性及处理 |
+| Item | Current evidence / conclusion | CLI equivalence and handling |
 | --- | --- | --- |
-| D1 批量删除／取消隐藏 | 基线 `internal/surface/gui/tasks.go:411` 仍直接 `TrashPath`／`os.Rename` 后一次 Scan；单项 CLI 在 `internal/app/hidden.go:120`、`:203`、`:270` 处理链接与受影响环境 | **基线不同路径**。`codex/background-nonblocking@bd8d5d8:internal/surface/gui/tasks.go:386` 已逐项调用 `a.Trash`／`a.Unhide`，合入后领域路径相同，任务包装仍不同；先验收该修复，不再另写一套批量删除 |
-| D2 建议位置启用 | `internal/view/verbs.go:105` 的 Toggle 先 SuggestAt，再 Enable(At)；`internal/cmds/loadout.go:146` 直接 Enable；无位置时 `internal/app/loadout.go:555` 逐项附加再排位 | **不同路径**；把“建议整组选位并启用”收进 app，共用该语义；CLI 加 `enable --suggested` 和只读位置预览，保留显式 `--at` |
-| D3 缺失项原位恢复 | `internal/app/loadout.go:578` 只在未指定位置时原位换缺失条目；Toggle 带 At。新增 `internal/app/useinstalled.go:13` 是另一项明确修复能力 | D3 不能因 UseInstalled 上线就宣布消失。加 CLI `loadout use-installed <packageId…>` 调同一函数，并测 Toggle／显式位置对缺失项的约定 |
-| D4 当前与打开方案 | `internal/app/plan.go:335`、`:354`；`internal/surface/cli/cli.go:195` 支持 `--open-plan`，`internal/cmds/registry.go:281` 帮助只展示 `--env` | 明确传 env 和 open-plan 可对齐；补全局帮助。NewPlan 后 GUI 会打开，CLI new 不等同于 use；不要为了对齐误改持久“当前方案” |
-| D5 更新已有订阅 | `internal/surface/gui/tasks.go:84`、`:118` 逐项，page 更新跳过；`internal/cmds/subscribe.go:73` 将整组交 UpdateSubscriptions | **不同路径／失败策略**。共享带逐项结果的 batch runner，CLI 增 continue-on-error／page-skipped 结果；不要用 shell 循环声称事务及历史相同 |
-| D6 退订／重订 | `internal/surface/gui/tasks.go:487` 逐项预检、50 项一批，Steam 不可达可开网页；CLI `internal/cmds/workshop.go:16` → Workshop 整组 | 领域函数可共用但容错和反馈不同；共享预检结果／分块执行，给 CLI 相同逐项状态；窗口仍测网页降级与任务结束反馈 |
-| D7 建包 | `internal/surface/gui/api.go:348` GUI 全局 busy；`internal/app/pack.go:415` 核心同名占用检查 | **不同并发约束**；明确是否允许不同名并建，把选择后的门禁下沉，共享 app 检查。CLI 同步与 GUI 子进程不必强行同形 |
-| D8 needs 转换贴图 | `internal/surface/gui/api.go:1053` → `internal/view/needs.go:1017` 仍同步 OptimizeTextures；贴图页走可停止子进程 `internal/surface/gui/textures.go:171` | 是 GUI 两入口调度差异；needs 动作转统一贴图任务入口；CLI 已有 optimize，但无 stop 命令 |
-| D9 下载后切环境 | `internal/surface/gui/shell.go:426` 后续切环境；CLI `env download` 只下载／登记 | 场景显式加 env use；若产品需要原子“下载并打开”，新增 `env download --use` 共用收尾 |
-| D10 细节 | `internal/surface/gui/ops.go:115`／view 备注处理、`internal/view/exchange.go:396` 跟随合集、`internal/view/planmanage.go:334` 十分钟检查；CLI note／collection／plan sync | trim 需共用；合集 follow 明确传值；节流与后台分析是调度差异，比较最终事实、新鲜度和错误，不比较调用次数 |
-| needs／ListProblems 缓存 | `internal/surface/gui/needscache.go:39` 键含环境 ID、方案、版本、列表、日志、链接、目录；`:105` ListProblems 来自 Needs；`:139` 后台发布检查输入版本 | CLI `problems` 同属 app 问题源，但没有 GUI 的缓存、sequence、updating、`list-problems` 事件合同；**结果可对照，缓存行为 GUI-only**。补只读结构化问题输出用于比较，不要求 CLI 复制缓存 |
-| sort 新提示 | `internal/view/preview.go:47`、`:78` 传 missingDependencies／missingMods／replacements／cycles；`internal/cmds/loadout.go:250` sortCmd 仍只渲染排序变更、约束、旧 cycle 说明 | **部分等价**：排序本身同 App.Sort；cycles 有旧文字入口，其余新增 notice 未完整输出。抽共享 SortNotices DTO，CLI 文字及 JSON 都输出四类，dry-run 也要有 |
-| CompleteDependencies | `internal/surface/gui/ops.go:128` → `internal/view/verbs.go:298` → `internal/app/dependencies.go:164` | **无 CLI 入口**；增加 `loadout complete-dependencies`，一个撤销步骤，远程缺失只报告／另订阅，不默默下载 |
-| ReplaceRecommended | `internal/surface/gui/ops.go:137` → `internal/app/sortnotices.go:206`，执行时重验推荐 | **无 CLI 入口**；增加 `loadout replace-recommended <ref…>`；不能以逐项 swap 近似整批原子验证和单步撤销 |
-| UseInstalled | `internal/surface/gui/ops.go:145`、needs DoAction → `internal/app/useinstalled.go:13` | **无 CLI 入口**；增加 `loadout use-installed <packageId…>`，保位置、批量重验、单步撤销 |
-| Steam credit | `internal/surface/gui/subscribe.go:89` 为 SteamCMD 批次加内部标记；`:146` 调 SubscribeWorkshopBatch；`internal/app/credit.go:19` 记批次，`:97` 答复、`:127` 推进；`internal/surface/gui/credit.go:35` 运行任务 | CLI `subscribe workshop` 只调 SubscribeWorkshop（`internal/cmds/subscribe.go:67`），既无公开 credit-batch 参数，也无 prompt／answer／step 命令。内部标记不是 CLI 参数。增显式批次策略与 credit status／answer／run，复用 SQLite checkpoint，不自动替用户选答案 |
-| subscribe 任务重做 | `internal/surface/gui/subscribe.go:128` 复用 SubscribeWorkshopBatch＋WorkshopCalls；`internal/surface/gui/tasks.go:165` 控制取消／继续／重试，永久失败按项记录 | 底层订阅重试能力与 CLI 共享一部分；GUI task ID、逐项展示、续做同一行、永久失败按钮状态 **无 CLI 等价**。核心 batch 结果先结构化，再考虑 CLI resumable job；Phase 1 直接在窗口测取消与继续 |
+| D1 bulk delete/unhide | Baseline `internal/surface/gui/tasks.go:411` still directly `TrashPath`/`os.Rename`, then one Scan; single CLI `internal/app/hidden.go:120`, `:203`, `:270` handles links/affected environments | **Different baseline paths**. `codex/background-nonblocking@bd8d5d8:internal/surface/gui/tasks.go:386` calls `a.Trash`/`a.Unhide` per item; after merge domain shared, task wrappers differ. Accept this fix first, no second bulk-delete implementation |
+| D2 enable at suggested position | `internal/view/verbs.go:105` Toggle calls SuggestAt then Enable(At); `internal/cmds/loadout.go:146` directly Enable; without position `internal/app/loadout.go:555` appends each then positions | **Different paths**; move suggested-block placement+enable into app; add CLI `enable --suggested` and read-only placement preview, retain `--at` |
+| D3 restore missing item in place | `internal/app/loadout.go:578` replaces missing entries only without explicit position; Toggle passes At. New `internal/app/useinstalled.go:13` is a separate repair | UseInstalled does not resolve D3. Add `loadout use-installed <packageId…>` to same function; test Toggle/explicit-position contract |
+| D4 current vs open plan | `internal/app/plan.go:335`, `:354`; `internal/surface/cli/cli.go:195` supports `--open-plan`, `internal/cmds/registry.go:281` help only shows `--env` | Explicit env/open-plan aligns; fix global help. GUI opens NewPlan, CLI new is not use; do not change persistent current plan for symmetry |
+| D5 update subscriptions | `internal/surface/gui/tasks.go:84`, `:118` per-item, skips page updates; `internal/cmds/subscribe.go:73` sends whole batch to UpdateSubscriptions | **Different failure paths/policy**. Shared batch runner with per-item results, CLI continue-on-error/page-skipped output; shell loops do not reproduce transaction/history |
+| D6 unsubscribe/resubscribe | `internal/surface/gui/tasks.go:487` per-item precheck, batches 50, browser fallback if Steam unavailable; CLI `internal/cmds/workshop.go:16` → whole Workshop batch | Domain function shareable, tolerance/feedback differ; shared precheck/chunks and CLI item status; window tests browser fallback/task feedback |
+| D7 build pack | `internal/surface/gui/api.go:348` global GUI busy; `internal/app/pack.go:415` same-name core collision | **Different concurrency rules**; decide different-name parallel builds, move gate into shared app. CLI sync/GUI subprocess need not be identical |
+| D8 needs texture conversion | `internal/surface/gui/api.go:1053` → `internal/view/needs.go:1017` synchronous OptimizeTextures; texture page stoppable subprocess `internal/surface/gui/textures.go:171` | GUI scheduling difference; unify needs task entry; CLI optimize exists, stop absent |
+| D9 switch after download | `internal/surface/gui/shell.go:426` switches environment; CLI `env download` only downloads/registers | Explicit env use in scenario; if atomic download/open desired add shared `env download --use` |
+| D10 details | `internal/surface/gui/ops.go:115`/view notes; `internal/view/exchange.go:396` collection follow; `internal/view/planmanage.go:334` ten-minute checks; CLI note/collection/plan sync | Shared trim; explicit collection follow values; throttling/background analysis are scheduling, compare facts/freshness/errors, not calls |
+| needs/ListProblems cache | `internal/surface/gui/needscache.go:39` key includes env ID/plan/version/list/log/links/directories; `:105` ListProblems from Needs; `:139` checks input version on publish | Same app findings as CLI `problems`, but no GUI cache/sequence/updating/`list-problems` event contract. **Compare results; cache GUI-only**. Add structured read-only findings, no CLI cache copy |
+| New sort notices | `internal/view/preview.go:47`, `:78` missingDependencies/missingMods/replacements/cycles; `internal/cmds/loadout.go:250` sortCmd still changes/constraints/old cycle text | **Partial equivalence**: same App.Sort, cycles old output, others incomplete. Shared SortNotices DTO, all four in CLI text/JSON including dry-run |
+| CompleteDependencies | `internal/surface/gui/ops.go:128` → `internal/view/verbs.go:298` → `internal/app/dependencies.go:164` | **No CLI**; add `loadout complete-dependencies`, one undo; report remote missing, separate subscribe, no silent download |
+| ReplaceRecommended | `internal/surface/gui/ops.go:137` → `internal/app/sortnotices.go:206`, revalidates on execution | **No CLI**; add `loadout replace-recommended <ref…>`; per-item swap not equivalent to batch atomic validation/one undo |
+| UseInstalled | `internal/surface/gui/ops.go:145`, needs DoAction → `internal/app/useinstalled.go:13` | **No CLI**; add `loadout use-installed <packageId…>`, preserve position, batch revalidate, one undo |
+| Steam credit | `internal/surface/gui/subscribe.go:89` internal CMD batch marker; `:146` SubscribeWorkshopBatch; `internal/app/credit.go:19` records, `:97` answers, `:127` advances; `internal/surface/gui/credit.go:35` task | CLI `subscribe workshop` only SubscribeWorkshop (`internal/cmds/subscribe.go:67`), no public credit-batch or prompt/answer/step. Internal marker not CLI flag. Add explicit policy, credit status/answer/run with SQLite checkpoint; never choose answers for users |
+| Subscription task rework | `internal/surface/gui/subscribe.go:128` SubscribeWorkshopBatch+WorkshopCalls; `internal/surface/gui/tasks.go:165` cancel/continue/retry, permanent item failures | Some core retry shared; GUI task IDs/item display/same-row continuation/permanent-failure buttons **not CLI equivalent**. Structure batch results first, later resumable CLI jobs; Phase 1 tests cancellation/continuation in window |
 
-### 2.2 按玩家自动化覆盖收益排序的修复
+### 2.2 Fixes ranked by player automation coverage
 
-优先级看它解锁多少常用动作及其差分验证，不以补齐 API 数量排序。3a 的快按、页面状态和取消反馈无法靠新增 CLI 解锁。
+Prioritize common actions/differential validation unlocked, not API counts. Fast input, page state, and cancellation feedback in 3a cannot be unlocked by CLI additions.
 
-| 顺序 | 具体改动（提议名称，尚未实现） | 解锁的常见场景 | 工作量估计 |
+| Order | Proposed change (unimplemented names) | Common scenarios unlocked | Estimate |
 | --- | --- | --- | --- |
-| P0-1 | CompleteDependencies／ReplaceRecommended／UseInstalled 三个薄 CLI 入口＋共享 SortNotices，sort 增结构化结果 | 排序→补依赖→处理缺失／推荐→立即 undo；目前最集中的新增 GUI 功能 | 1–2 人日 |
-| P0-2 | 收敛 D2/D3 的 EnableSuggested；MoveBlock／暂存放置收 app 组合操作；CLI move 多 ref、stage all | 空格多选、指定位置、拖动、全暂存及其历史对照；尤其防“列表相同但撤销步数不同” | 2–3 人日 |
-| P0-3 | 导入统一 ReadImport／ApplyImport；CLI 增 `--text`／`--merge`／合集 `--new`，显式 follow；导出共用覆盖策略 | 文件／分享码／粘贴／合集的替换、合并、新列表、导出再导入 | 1–2 人日 |
-| P0-4 | 合入并验收 D1；D5/D6 batch 共享逐项结果与失败策略；开放批量 trash/unhide/pin/unpin | 玩家选一批→删除／退订／更新→取消，跨游戏链接核验；先依赖在途 D1 修复 | 2–4 人日，含验证，不能与 P0-1 简单视为同时完成 |
-| P1-1 | CLI `pin --update-to-workshop` → UpdateToWorkshop；`workshop update` → UpdateWorkshopClient；`subscribe check --source` → CheckSubscriptionSource | 正常升级／更新来源，避免用“重订删了重下”替代更新 | 1–2 人日 |
-| P1-2 | credit 显式命令／策略、状态查询，复用 CreditStep；后续统一任务查询／取消／继续接口 | SteamCMD→工坊换份、防重复、失败恢复；窗口取消现在即可测，无需等命令 | 2–4 人日 |
-| P1-3 | `textures stop` → StopTextures；needs 贴图入口转任务；`monitor add` → AddMonitor | 停止转换、取消后保留完成项、日志监控插入位置 | 0.5–1 人日 |
-| P2 | D4 帮助、D7 并发门禁、D9 `--use`、D10 trim／follow 明确化 | 降低脚本误操作，补低频组合；不阻塞主窗口验收 | 1–2 人日 |
+| P0-1 | Thin CompleteDependencies/ReplaceRecommended/UseInstalled CLI, shared SortNotices, structured sort | Sort→dependencies→missing/recommended→immediate undo; concentrated new GUI features | 1–2 person-days |
+| P0-2 | Shared D2/D3 EnableSuggested; app MoveBlock/staging placement; multi-ref move, stage all | Multiselect Space, placement, drag, stage all/history, especially equal lists with unequal undo counts | 2–3 person-days |
+| P0-3 | Shared ReadImport/ApplyImport; CLI `--text`/`--merge`/collection `--new`, explicit follow; shared export overwrite | File/share-code/paste/collection replace/merge/new list, export/import | 1–2 person-days |
+| P0-4 | Merge/accept D1; shared D5/D6 per-item results/failure policy; bulk trash/unhide/pin/unpin | Select batch→delete/unsubscribe/update→cancel, cross-game links; depends on in-flight D1 | 2–4 person-days including validation; not automatically concurrent with P0-1 |
+| P1-1 | `pin --update-to-workshop` → UpdateToWorkshop; `workshop update` → UpdateWorkshopClient; `subscribe check --source` → CheckSubscriptionSource | Normal upgrades/source checks rather than delete/redownload resubscribe | 1–2 person-days |
+| P1-2 | Explicit credit policy/commands/state using CreditStep; later shared query/cancel/continue | CMD→Workshop replacement, duplicates/failure recovery; window cancel testable now | 2–4 person-days |
+| P1-3 | `textures stop` → StopTextures; needs task entry; `monitor add` → AddMonitor | Stop conversion, retain completed items, monitor position | 0.5–1 person-day |
+| P2 | D4 help, D7 gate, D9 `--use`, D10 trim/follow | Reduce script mistakes, uncommon combinations; no block to window acceptance | 1–2 person-days |
 
-第一批只读状态导出可放测试程序内，直接读取 app/store 并输出 canonical JSON；不要为研究加一套生产 snapshot 框架，也不要靠解析会截断／本地化的 CLI 文本判断数据库状态。
+Initial read-only canonical JSON export can live in test code reading app/store directly. No production snapshot framework for research; no parsing truncated/localized CLI text as DB truth.
 
-## 3. 玩家动作完整映射
+## 3. Complete player-action mapping
 
-“同一路径”表示主要 app 能力相同，不承诺 GUI 调度、预检、确认、DTO 和呈现已经测过；“不同路径”包括组合、参数及失败策略差异；“GUI-only”表示无专用 CLI 等价（不把 RunCLI 面板算所有能力的 GUI 按钮）。纯界面动作也计入表，由真实窗口覆盖，不为凑齐 CLI 加命令。无差异行的修复为“保持共享并纳入场景”。表中 API 既是动作入口，也覆盖关联读取、预览和结果轮询。
+"Same path" means main app capability shared, not GUI scheduling/prechecks/confirmation/DTO/presentation tested. "Different path" includes composition/parameters/failure policies. "GUI-only" has no dedicated CLI equivalent (RunCLI does not make every command a GUI button). Pure UI actions belong here and use real-window tests, not artificial CLI commands. Unchanged rows: preserve sharing and include scenarios. APIs cover actions plus related reads/previews/polls.
 
-### 3.1 列表、诊断、导入导出
+### 3.1 Lists, diagnosis, import/export
 
-| 玩家动作／API | CLI 等价 | 状态 | 代码定位／补齐 |
+| Player action / API | CLI equivalent | Status | Location / completion |
 | --- | --- | --- | --- |
-| 初始化／打开编辑器：Init、Board、Workspace、Shell、Stamp | status、list、plan list | 不同路径 | gui/api.go:183、:208；gui/environment.go:179；GUI 异步组合，比较最终内容，测迟到读不覆盖 |
-| 搜索、筛选、facet：Filter、BarFilter | list、find、library filters | 不同路径 | gui/api.go:604、gui/ops.go:15；共享查询事实，GUI 三栏／显示位置单测 |
-| 空格启用／停用／放回：Toggle | enable／disable／stage restore | 不同路径 | view/verbs.go:105；D2/D3 |
-| 暂存／移出：Stage、Unstage、RestoreAll | stage add/drop/restore | 同一路径 | gui/api.go:801；view/verbs.go:138；对照暂存位置及撤销 |
-| 全部暂存：StageAll | 无直接命令 | GUI-only | view/verbs.go:277；补 stage all，不能把循环做成 N 步历史 |
-| 整组选位／移动：MoveBy、Place、MoveShown、PosOptions | move 单 ref；enable／stage restore 的位置参数 | 不同路径 | view/verbs.go:161、:178，gui/ops.go:41；补 app 组合语义和批量入口；shown 位置属于界面输入 |
-| 换副本：Swap；LibraryDo use/swap | swap A [B] | 同一路径 | gui/api.go:881；view/library.go:914；CLI 可明确 B，GUI 歧义选择要窗口测 |
-| 排序／保存／启动：Run、RunMoving、Preview | sort/save/launch，--dry-run、--move-duplicates | 不同路径 | view/preview.go:72、:144；领域共享，sort notices／拒绝结果呈现及重入不同 |
-| 撤销／重做／历史跳转：Undo、Redo、History、HistoryGo | undo／redo／history／loadout checkout | 同一路径 | gui/api.go:558、:569、:853；app/history.go:29；比较 undo/redo 栈，不只最后列表 |
-| 依赖闭包补齐：CompleteDependencies | 无 | GUI-only | app/dependencies.go:164；P0-1 |
-| 推荐替换：ReplaceRecommended | 无（swap 不等价） | GUI-only | app/sortnotices.go:206；P0-1 |
-| 缺失条目用已安装：UseInstalled | 无（enable 不等价） | GUI-only | app/useinstalled.go:13；P0-1 |
-| 标签候选／修改：TagCandidates、SetTag | tag list/add/remove，--mod 可重复 | 同一路径 | gui/api.go:930、:947；比较 lineage 标签，确认按钮快点另测 |
-| 模组备注／副本备注：ModNote、SetModNote、LibrarySetNote | note、note --copy | 不同路径 | gui/ops.go:104、:115；gui/library.go:292；统一 trim |
-| 新建／复制／从版本或存档创建：PlanFroms、PlanSources、CreatePlan、NewPlan、CheckPlanName | plan new --from | 不同路径 | gui/planforms.go:22、:93；gui/shell.go:156；新建后打开的进程状态单列，校验与创建共用 app 规则 |
-| 选为当前／仅打开：UsePlan、OpenPlan | plan use／--open-plan | 同一路径 | gui/shell.go:195、:204；D4，进程内打开状态也要快照 |
-| 全部列表／删除预警／改名／删除：PlanManage、RemovePlanWarn、RenamePlan、RemovePlan | plan list/rename/remove --yes | 同一路径 | gui/planmanage.go:122；gui/shell.go:212；预警、取消、最后一份保护窗口测 |
-| 游戏版本：PlanVersionsSet | plan versions | 同一路径 | gui/planmanage.go:137 → view/planmanage.go:258 |
-| 关注／模式／取消／检查／同步：PlanFollow、PlanFollowMode、PlanUnfollow、PlanCheck、PlanSync | plan follow --mode／unfollow／sync --check | 不同路径 | gui/planmanage.go:130；view/planmanage.go:334 节流；明确 follow 与同步模式 |
-| 内存／显存估算：PlanLoadCost、PlanLoadCostMeasure | plan cost | 同一路径 | gui/planmanage.go:30、:77；异步进度／迟到结果另测 |
-| 导入信息／预览：ExchangeInfo、ImportPreview、ImportPreviewFor、ImportFollow | loadout import；collection --import --follow | 不同路径 | gui/exchange.go:40、:132；view/exchange.go:49；CLI 缺预览 DTO、文本及合并入口 |
-| 替换／合并／指定方案：ImportApply、ImportApplyTo | loadout import 仅替换 | 不同路径 | gui/exchange.go:153、gui/planforms.go:178；补 --merge，统一到 app.ApplyImport（view/exchange.go:367 调用） |
-| 导入新方案／合集跟随：ImportAsPlan、ImportAsPlanPreview | loadout import --new；collection 仅当前工作区 | 不同路径 | gui/shell.go:167、gui/planforms.go:160；补合集 --new，明确是否打开 |
-| 导出文本／保存／复制：PlanExport、PlanExportSave、PlanExportCopy、ExportSave、ExportCopy | loadout export --format --out | 不同路径 | gui/planmanage.go:173；view/exchange.go:468；8 格式覆盖，CLI 不覆盖已有文件，GUI 可确认覆盖；统一显式 --overwrite |
-| 需要处理／编辑器问题：Needs、ListProblems | problems/show/ignore/unignore | 不同路径 | gui/needscache.go:105；缓存与事件只在 GUI，核心问题快照可对照 |
-| needs 一键修复：DoAction | move、sort、enable、disable、rule add ignore、loadout checkout/ignore-external、identity resolve、unhide/unpin/trash、problems ignore、pack unlink、links repair、swap、library move-to-locked、textures optimize/clean、plan versions | 同一路径为主，两个例外 | view/needs.go:965 逐 case；use-installed 无 CLI，textures 同步入口见 D8；导航／折叠／打开网页由前端完成 |
-| 行操作／菜单／预览：RowOps、RunOp、OpPreview | 对应本表库存／列表命令 | 不同路径 | gui/ops.go:60；view/ops.go:74 是按钮／菜单／键的单一操作表；预览允许不代表确认时一定成功，执行须重验 |
-| 命令面板／命令行／帮助：Palette、RunCLI、Keys | help 与全部 cmds | 同一路径＋纯界面 | gui/api.go:1403、:1444；RunCLI 继承打开方案，自动补齐／焦点／键路由只测窗口 |
+| Initialize/open editor: Init, Board, Workspace, Shell, Stamp | status, list, plan list | Different | gui/api.go:183, :208; gui/environment.go:179; async composition, compare final content, reject late reads |
+| Search/filter/facets: Filter, BarFilter | list, find, library filters | Different | gui/api.go:604, gui/ops.go:15; shared facts, test three columns/positions separately |
+| Space enable/disable/put back: Toggle | enable/disable/stage restore | Different | view/verbs.go:105; D2/D3 |
+| Stage/remove: Stage, Unstage, RestoreAll | stage add/drop/restore | Same | gui/api.go:801; view/verbs.go:138; compare placement/undo |
+| StageAll | No direct command | GUI-only | view/verbs.go:277; add stage all, not N history steps |
+| Block placement/move: MoveBy, Place, MoveShown, PosOptions | single-ref move; enable/stage restore position | Different | view/verbs.go:161, :178, gui/ops.go:41; app composition/bulk entry; shown position is UI input |
+| Swap copy: Swap; LibraryDo use/swap | swap A [B] | Same | gui/api.go:881; view/library.go:914; explicit B in CLI, GUI ambiguity window test |
+| Sort/save/launch: Run, RunMoving, Preview | sort/save/launch, --dry-run, --move-duplicates | Different | view/preview.go:72, :144; shared domain, notice/refusal/reentry differ |
+| Undo/redo/history jump: Undo, Redo, History, HistoryGo | undo/redo/history/loadout checkout | Same | gui/api.go:558, :569, :853; app/history.go:29; compare stacks, not only list |
+| Dependency closure: CompleteDependencies | None | GUI-only | app/dependencies.go:164; P0-1 |
+| Recommended replacement: ReplaceRecommended | None (swap not equivalent) | GUI-only | app/sortnotices.go:206; P0-1 |
+| Installed copy for missing: UseInstalled | None (enable not equivalent) | GUI-only | app/useinstalled.go:13; P0-1 |
+| Tag candidates/edit: TagCandidates, SetTag | tag list/add/remove, repeatable --mod | Same | gui/api.go:930, :947; lineage tags, fast-confirm separate |
+| Mod/copy notes: ModNote, SetModNote, LibrarySetNote | note, note --copy | Different | gui/ops.go:104, :115; gui/library.go:292; shared trim |
+| New/copy/from version/save: PlanFroms, PlanSources, CreatePlan, NewPlan, CheckPlanName | plan new --from | Different | gui/planforms.go:22, :93; gui/shell.go:156; separate post-create open state, shared app validation |
+| Current vs open: UsePlan, OpenPlan | plan use/--open-plan | Same | gui/shell.go:195, :204; D4, snapshot process-local open state |
+| All lists/delete warning/rename/delete: PlanManage, RemovePlanWarn, RenamePlan, RemovePlan | plan list/rename/remove --yes | Same | gui/planmanage.go:122; gui/shell.go:212; window warning/cancel/last-plan protection |
+| Game versions: PlanVersionsSet | plan versions | Same | gui/planmanage.go:137 → view/planmanage.go:258 |
+| Follow/mode/unfollow/check/sync: PlanFollow, PlanFollowMode, PlanUnfollow, PlanCheck, PlanSync | plan follow --mode/unfollow/sync --check | Different | gui/planmanage.go:130; view/planmanage.go:334 throttle; explicit follow/mode |
+| Memory/video estimates: PlanLoadCost, PlanLoadCostMeasure | plan cost | Same | gui/planmanage.go:30, :77; async/late results separately |
+| Import info/preview: ExchangeInfo, ImportPreview, ImportPreviewFor, ImportFollow | loadout import; collection --import --follow | Different | gui/exchange.go:40, :132; view/exchange.go:49; CLI lacks preview DTO/text/merge |
+| Replace/merge/target plan: ImportApply, ImportApplyTo | loadout import replace only | Different | gui/exchange.go:153, gui/planforms.go:178; add --merge, app.ApplyImport (view/exchange.go:367) |
+| Import new/follow collection: ImportAsPlan, ImportAsPlanPreview | loadout import --new; collection current workspace only | Different | gui/shell.go:167, gui/planforms.go:160; collection --new, explicit opening |
+| Export text/save/copy: PlanExport, PlanExportSave, PlanExportCopy, ExportSave, ExportCopy | loadout export --format --out | Different | gui/planmanage.go:173; view/exchange.go:468; 8 formats, CLI refuses existing file, GUI confirms overwrite; explicit --overwrite |
+| Needs/editor problems: Needs, ListProblems | problems/show/ignore/unignore | Different | gui/needscache.go:105; GUI cache/events, comparable core snapshots |
+| Needs one-click fixes: DoAction | move, sort, enable, disable, rule add ignore, loadout checkout/ignore-external, identity resolve, unhide/unpin/trash, problems ignore, pack unlink, links repair, swap, library move-to-locked, textures optimize/clean, plan versions | Mostly same, two exceptions | view/needs.go:965 cases; no use-installed CLI, synchronous textures D8; frontend navigation/collapse/web |
+| Row/menu/preview: RowOps, RunOp, OpPreview | Inventory/list commands here | Different | gui/ops.go:60; view/ops.go:74 single table for buttons/menu/keys; preview permission still revalidated on execution |
+| Palette/CLI/help: Palette, RunCLI, Keys | help/all cmds | Same + UI | gui/api.go:1403, :1444; RunCLI inherits open plan; completion/focus/key routing window-only |
 
-本节及下表 `gui/…` 均为 `internal/surface/gui/…`，`app/…`、`view/…`、`cmds/…` 均在 `internal/` 下。
+Here and below `gui/…` means `internal/surface/gui/…`; `app/…`, `view/…`, `cmds/…` under `internal/`.
 
-### 3.2 库存、文件、订阅、账号
+### 3.2 Inventory, files, subscriptions, accounts
 
-| 玩家动作／API | CLI 等价 | 状态 | 代码定位／补齐 |
+| Player action / API | CLI equivalent | Status | Location / completion |
 | --- | --- | --- | --- |
-| 浏览、筛选、副本和字段：Library、ModCopies、LibraryCopy、LibraryFields | library --lineage/--facets/--include/--exclude/--sort/--all，mod | 同一路径 | gui/library.go:107、:242；view/library.go:417；逐层展开及虚拟滚动由窗口测 |
-| 库存加入／移出当前、暂存、指定副本：LibraryDo enable/add/disable/take-out/stage/use/swap | enable/disable/stage add/swap | 不同路径 | view/library.go:914 共用 Toggle 等；D2/D3 |
-| 从所有列表移除：LibraryDo remove | library remove-from-plans | 同一路径 | view/library.go:869；每个受影响列表各一撤销步骤 |
-| 不列为副本：LibraryDo separate | lineage split | 同一路径 | view/library.go:831；CLI 还能 merge，GUI 适用性判定也要测 |
-| 锁定／解除／搬入锁定库：LibraryPreview、LibraryDo pin/unpin/move | pin/unpin/library move-to-locked | 不同路径（批量包装） | view/library.go:884；单项相同，CLI 单 ref，GUI 队列继续处理失败项；扩批量结果 |
-| 更新至工坊：LibraryDo pin-update | pin --update 创建新目录，不等价 | GUI-only | view/library.go:888 → UpdateToWorkshop；P1-1 |
-| 删除／取消隐藏：LibraryDo delete/unhide | trash/unhide | 不同路径 | gui/tasks.go:411；D1 在途修复须再验收跨环境链接 |
-| 退订／重新订阅：LibraryDo unsubscribe/resubscribe | workshop unsubscribe/resubscribe | 不同路径 | gui/tasks.go:487；D6 |
-| 转换／清理 DDS：LibraryDo textures/textures-clean | textures optimize/clean <ref…> | 同一路径（调度不同） | view/library.go:854；只删 RimArcho 生成 DDS，原 PNG 不变 |
-| 变化历史／文件差异：Changes、ChangeFiles | changes [--library] | 不同路径 | gui/api.go:1097、:1121；文件差异独立 GUI DTO，无直接同形命令；共享 snapshot diff 为只读输出 |
-| 订阅与更新／轻添加页：SubscriptionsPage、AddSubscriptionInfo | subscribe list、changes、workshop state | 不同路径 | gui/subscriptions.go:13、:50；GUI 聚合来源／任务／库存；CLI 应复用同一来源事实 |
-| 添加 git／page／工坊：SubscribePreview、Subscribe、SubscriptionPage | subscribe git/page/workshop --dry-run | 不同路径 | gui/subscribe.go:27、:79、:128；git/page 常走 cmds，Workshop 任务多进度及 credit 批次，见近期复核 |
-| 下载文件替换订阅：SubscriptionFromPreview、SubscriptionFrom | subscribe update <ref> --from <zip或目录> | 同一路径 | gui/subscribe.go:109、:120，任务运行 cmds |
-| 已有订阅检查／更新／移除：LibraryDo subscription-check/update/remove | subscribe check/update/remove | 不同路径 | gui/tasks.go:84、:118；D5，page skip 和单项失败不等价 |
-| 按来源整体检查：CheckSubscriptionSource | subscribe check 只覆盖订阅来源记录，不能替代所有来源检查 | GUI-only | gui/subscriptions.go:62、gui/settingtasks.go:69；加 source 入口 |
-| 让 Steam 更新现有 Mod：WorkshopUpdatePreview、WorkshopUpdate | resubscribe 会删后重下，不等价 | GUI-only | gui/subscriptions.go:73、:99 → UpdateWorkshopClient |
-| SteamCMD 回补询问／接受／暂缓：CreditPrompt、CreditAnswer | 无 | GUI-only | gui/credit.go:18、:35；app/credit.go:19、:127；P1-2 |
-| 后台任务查看／已读／停止／取消／继续／重试／换队列／清除／移除／记录撤销：Tasks、TasksSeen、TaskAct | 无统一 tasks 命令 | GUI-only | gui/tasks.go:155、:165；生产 GUI 记录和 worker 不等同于 shell 进程；先窗口测，后提共享 job 控制 |
-| Steam／LoversLab 账号登录、验证、登出、遗忘：AccountAction、AccountStatus、SteamLogin | 无 | GUI-only（认证交互保留） | gui/accounts.go:18、:261、:266；后续项，不扩 Phase 1 |
-| LoversLab 文件选取、跟随、安装、预览：LoverFiles、LoverFollow、LoverInstall、LoverInstallPreview、SubscriptionFilePage | page --from 仅部分近似 | GUI-only | gui/accounts.go:127、:155、:192、:218、:242；认证站点以后测，普通 zip 更新 Phase 1 已覆盖 |
-| 打开目录／工坊／客户端页／来源／更新说明：OpenFolder、OpenWorkshop、OpenSteamWorkshop、OpenSubscriptionSource、OpenModsFolder、OpenChangeNotes、OpenURL | 无同形 UI 命令 | GUI-only（界面） | gui/library.go:158、:181、:199；gui/subscriptions.go:111、:146；gui/api.go:1128、:1466；检查目标，外部窗口后续处理 |
+| Browse/filter/copies/fields: Library, ModCopies, LibraryCopy, LibraryFields | library --lineage/--facets/--include/--exclude/--sort/--all, mod | Same | gui/library.go:107, :242; view/library.go:417; expansion/virtual scroll window |
+| Inventory enable/add/disable/take-out/stage/use/swap via LibraryDo | enable/disable/stage add/swap | Different | view/library.go:914 shares Toggle; D2/D3 |
+| Remove from all lists: LibraryDo remove | library remove-from-plans | Same | view/library.go:869; one undo per affected list |
+| Separate copy: LibraryDo separate | lineage split | Same | view/library.go:831; CLI merge too, test GUI applicability |
+| Lock/unlock/move: LibraryPreview, LibraryDo pin/unpin/move | pin/unpin/library move-to-locked | Different bulk wrapper | view/library.go:884; same single-item, CLI single-ref, GUI continues failures; bulk results needed |
+| Update to Workshop: LibraryDo pin-update | pin --update creates new directory, not equivalent | GUI-only | view/library.go:888 → UpdateToWorkshop; P1-1 |
+| Delete/unhide: LibraryDo delete/unhide | trash/unhide | Different | gui/tasks.go:411; accept D1 cross-env links after merge |
+| Unsubscribe/resubscribe: LibraryDo unsubscribe/resubscribe | workshop unsubscribe/resubscribe | Different | gui/tasks.go:487; D6 |
+| Convert/clean DDS: LibraryDo textures/textures-clean | textures optimize/clean <ref…> | Same, scheduling differs | view/library.go:854; only generated DDS deleted, PNG unchanged |
+| Change history/file diff: Changes, ChangeFiles | changes [--library] | Different | gui/api.go:1097, :1121; separate GUI DTO, shared snapshot diff as read-only output |
+| Subscriptions/add page: SubscriptionsPage, AddSubscriptionInfo | subscribe list, changes, workshop state | Different | gui/subscriptions.go:13, :50; GUI source/task/inventory aggregate; same source facts |
+| Add git/page/Workshop: SubscribePreview, Subscribe, SubscriptionPage | subscribe git/page/workshop --dry-run | Different | gui/subscribe.go:27, :79, :128; git/page often cmds; Workshop tasks/progress/credit |
+| Replace from file: SubscriptionFromPreview, SubscriptionFrom | subscribe update <ref> --from <zip-or-directory> | Same | gui/subscribe.go:109, :120, task runs cmds |
+| Check/update/remove existing: LibraryDo subscription-check/update/remove | subscribe check/update/remove | Different | gui/tasks.go:84, :118; D5 page skip/item failure |
+| Whole source check: CheckSubscriptionSource | subscribe check only recorded subscriptions, not all sources | GUI-only | gui/subscriptions.go:62, gui/settingtasks.go:69; source entry needed |
+| Steam updates existing: WorkshopUpdatePreview, WorkshopUpdate | resubscribe deletes/redownloads, not equivalent | GUI-only | gui/subscriptions.go:73, :99 → UpdateWorkshopClient |
+| CMD credit prompt/accept/defer: CreditPrompt, CreditAnswer | None | GUI-only | gui/credit.go:18, :35; app/credit.go:19, :127; P1-2 |
+| Tasks view/seen/stop/cancel/continue/retry/requeue/clear/remove/record undo: Tasks, TasksSeen, TaskAct | No unified tasks | GUI-only | gui/tasks.go:155, :165; GUI records/worker not shell processes; window first, shared job control later |
+| Steam/LoversLab login/verify/logout/forget: AccountAction, AccountStatus, SteamLogin | None | GUI-only, retain player authentication | gui/accounts.go:18, :261, :266; later, not Phase 1 |
+| LoversLab select/follow/install/preview: LoverFiles, LoverFollow, LoverInstall, LoverInstallPreview, SubscriptionFilePage | page --from partial approximation | GUI-only | gui/accounts.go:127, :155, :192, :218, :242; auth later, ordinary zip covered Phase 1 |
+| Open folder/Workshop/client/source/notes: OpenFolder, OpenWorkshop, OpenSteamWorkshop, OpenSubscriptionSource, OpenModsFolder, OpenChangeNotes, OpenURL | No matching UI command | GUI-only UI | gui/library.go:158, :181, :199; gui/subscriptions.go:111, :146; gui/api.go:1128, :1466; target check, external windows later |
 
-### 3.3 其余页面与外壳
+### 3.3 Other pages and shell
 
-| 玩家动作／API | CLI 等价 | 状态 | 代码定位／补齐 |
+| Player action / API | CLI equivalent | Status | Location / completion |
 | --- | --- | --- | --- |
-| 首页卡片选择／启动：Home、HomeApply、HomeBackground | env use＋plan use／pack launch／launch | 不同路径 | gui/shell.go:86、gui/environment.go:44；选择快照与持久 current 区分；首页不得短暂误判无游戏 |
-| 包列表／详情／名称检查／编译估算：Packs、Pack、PackNameCheck、BuildPage、BuildPageResult | pack list/check/build --dry-run | 不同路径 | gui/api.go:249、:267、:304；gui/buildpage.go:26；GUI 独立估算 DTO，复用事实并比较数值 |
-| 预览／编译／停止：PackDryRun、PackBuild、PackStop | pack build [--dry-run]、pack stop | 不同路径 | gui/api.go:284、:348、:433；D7；主动停止清理已复制内容，异常中断残留另由 unfinished 删除／重新构建（app/packbuild.go:251、app/pack.go:426），不承诺断点续编 |
-| 删除完成／未完成包／预览：PackRemove、PackRemoveUnfinished、PackRemovePreview | pack remove [--unfinished] | 同一路径 | gui/api.go:444、:467；gui/linklifecycle.go:15 |
-| 包导入／导出／启动：PackImport、PackExport、PackLaunch | pack import/export/launch | 同一路径 | gui/shell.go:348；gui/api.go:317、:460；CLI list-as-plan 参数另列 |
-| 贴图信息／统计／轮询：TexturesInfo、Textures、TextureMeasure | textures status | 不同路径 | gui/textures.go:48、:69、:88；同内容、scope、scale 下核验统计，不能把异步 ack 当完成 |
-| 安装／转换／停止／清理：TexturesInstall、TexturesRun、TexturesStop、TexturesClean | textures tool --install／optimize／无 stop／clean | 不同路径，stop GUI-only | gui/textures.go:163、:171、:278、:291；CLI 加 stop，needs 调度统一 |
-| 环境列表／切换／移除确认／移除：Environment、UseEnv、EnvRemovePreview、RemoveEnv | env list/use/remove --yes | 同一路径（异步包装） | gui/api.go:502、:1147、:1159；gui/environment.go:39；测迟到结果及写入门禁 |
-| 引导查找／目录校验／添加／扫描：GuideFind、GuideGame、GuideAdd、GuideScan | env detect/add/use、scan、analyze | 不同路径（组合） | gui/shell.go:237、:247、:255；gui/environment.go:49；不需要把 UI 实时校验变 CLI 命令 |
-| 下载分支／安装 SteamCMD／下载游戏：GuideDownloadInfo、GuideInstallSteamCMD、GuideDownload | env branches／deps install／env download | 不同路径 | gui/shell.go:380、:416、:426；D9；目录与账号状态单独记录 |
-| 设置／依赖安装 offer／目录状态／迁移预览：Settings、ToolInstallOffer、Directories、DirectoryMovePreview | config get、deps、folder check／move --dry-run | 同一路径 | gui/api.go:478、:489、:518；gui/linklifecycle.go:5；检查返回错误和取消无写入 |
-| 应用设置／环境路径／目录注册／工具／DB／缓存／社区数据／gc：ApplySetting | config set、env set/rebind、folder set/move/add/remove、deps install/remove、db backup/vacuum、cache clear、data update、gc | 同一路径 | gui/api.go:528，gui/settingtasks.go:140；异步任务状态必须额外测 |
-| 读取／写布局与偏好：Setting、SetSetting | 部分 config get/set；ui.gui.* 无逐项公开命令 | GUI-only（界面） | gui/api.go:1498、:1508；列显隐、宽度、顺序、导航、语言主题的持久化／恢复用窗口测 |
-| 背景浏览／设置／添加／移除：Backgrounds、SetBackground、AddBackgroundFile、RemoveBackgroundFile | 无专用入口 | GUI-only（界面） | gui/background.go:160、:197、:220、:251；crawler 展开控件，文件系统结果可快照 |
-| 日志列表／选定／簇／社区模式：Logs、LogPage、SelectLog、LogCluster、LogPattern | log --file/--select/--cluster、pattern | 同一路径 | gui/api.go:1169、:1187、:1240、:1265、:1281；比较被选文件与簇，不比较排版 |
-| 实时／伴随监控：Live、LogMonitor | monitor、log | 不同路径（聚合） | gui/api.go:587、:1217；等待正确 run/session，不读上次残留 |
-| 添加 Monitor：AddMonitor | monitor install 仅 EnsureMonitor，不等价 | GUI-only | view/monitorlog.go:225；cmds/monitor.go:72；补 monitor add 放 Harmony 后 |
-| 扫描／分析：Scan、Analyze | scan／analyze | 同一路径 | gui/api.go:1293、:1334；GUI 起子进程，按钮重入、任务和事件仍须窗口测 |
-| 详情／技术卡／命令证据：Detail、Sections、Inspect | mod、describe、def、patches、harmony、problems | 同一路径（聚合） | gui/api.go:676、:737、:1077；Section 切换／网络补读／图片／copy 按钮由 crawler 测 |
-| 原生选择器／剪贴板：PickFolder、PickProgram、PickImportFile、PickExportFile、PickSubscriptionZip、Clipboard | 显式路径／文件参数；无 OS 弹窗 | GUI-only（界面） | gui/exchange.go:68、:88、:96、:104、:122；gui/subscribe.go:102；CDP 测调用前后，原生弹窗用 UIA／短后续项 |
-| 引用编号：SaveRefNums、ctrl+反斜杠 | 无 | GUI-only（测试辅助） | gui/api.go:1477；assets/js/refnums.js:1；用于 crawler 发现和定位，不当完整控制清单 |
-| 卸载预览／执行：UninstallPlan、UninstallRun | uninstall --dry-run／--yes 及选项 | 同一路径 | gui/uninstall.go:16、:33；最后单独克隆验收，退出不作为一般 crawler 中途导航 |
-| 窗口就绪／离页／关闭／退出／边框主题：Ready、Leave、Close、Quit、SetWindowTheme | 进程退出，无同形界面动作 | GUI-only（生命周期） | gui/api.go:132、gui/memory.go:55、gui/readers.go:161、gui/uninstall.go:70、gui/window_theme.go:7；关闭等后台退出、缓存释放及任务记停止 |
-| 点击／双击／右键／拖动／多选／搜索建议／表格菜单／展开／滚动／Tab／Esc／前进后退／快捷键 | 无 | GUI-only（输入与呈现） | assets/js/main.js:983、lists.js:300、navigation.js:186、popups.js:170；全在真实窗口与 crawler 检查，不加 CLI |
+| Home selection/launch: Home, HomeApply, HomeBackground | env use + plan use/pack launch/launch | Different | gui/shell.go:86, gui/environment.go:44; selection vs persistent current; no transient false no-game |
+| Packs/details/name/estimate: Packs, Pack, PackNameCheck, BuildPage, BuildPageResult | pack list/check/build --dry-run | Different | gui/api.go:249, :267, :304; gui/buildpage.go:26; GUI estimate DTO, shared facts/numbers |
+| Preview/build/stop: PackDryRun, PackBuild, PackStop | pack build [--dry-run], pack stop | Different | gui/api.go:284, :348, :433; D7; active stop cleans copied content, crash remnants removed/rebuilt via unfinished (app/packbuild.go:251, app/pack.go:426), no resume promise |
+| Remove finished/unfinished/preview: PackRemove, PackRemoveUnfinished, PackRemovePreview | pack remove [--unfinished] | Same | gui/api.go:444, :467; gui/linklifecycle.go:15 |
+| Import/export/launch pack: PackImport, PackExport, PackLaunch | pack import/export/launch | Same | gui/shell.go:348; gui/api.go:317, :460; CLI list-as-plan separate |
+| Texture info/stats/poll: TexturesInfo, Textures, TextureMeasure | textures status | Different | gui/textures.go:48, :69, :88; same scope/content/scale; async ack not completion |
+| Install/convert/stop/clean: TexturesInstall, TexturesRun, TexturesStop, TexturesClean | textures tool --install/optimize/no stop/clean | Different; stop GUI-only | gui/textures.go:163, :171, :278, :291; add CLI stop, unify needs |
+| Environments/switch/remove preview/remove: Environment, UseEnv, EnvRemovePreview, RemoveEnv | env list/use/remove --yes | Same, async wrapper | gui/api.go:502, :1147, :1159; gui/environment.go:39; late results/write gate |
+| Guide find/validate/add/scan: GuideFind, GuideGame, GuideAdd, GuideScan | env detect/add/use, scan, analyze | Different composition | gui/shell.go:237, :247, :255; gui/environment.go:49; no CLI for live UI validation |
+| Branches/install CMD/download game: GuideDownloadInfo, GuideInstallSteamCMD, GuideDownload | env branches/deps install/env download | Different | gui/shell.go:380, :416, :426; D9, directory/account state separate |
+| Settings/tool offer/directories/move preview: Settings, ToolInstallOffer, Directories, DirectoryMovePreview | config get, deps, folder check/move --dry-run | Same | gui/api.go:478, :489, :518; gui/linklifecycle.go:5; errors/cancel no writes |
+| Settings/env paths/directories/tools/DB/cache/data/gc: ApplySetting | config set, env set/rebind, folder set/move/add/remove, deps install/remove, db backup/vacuum, cache clear, data update, gc | Same | gui/api.go:528, gui/settingtasks.go:140; extra async task tests |
+| Layout/preferences: Setting, SetSetting | Some config get/set; no per-key ui.gui.* command | GUI-only UI | gui/api.go:1498, :1508; column visibility/width/order, nav, language/theme persistence |
+| Background browse/set/add/remove: Backgrounds, SetBackground, AddBackgroundFile, RemoveBackgroundFile | None | GUI-only UI | gui/background.go:160, :197, :220, :251; crawler controls, filesystem snapshot |
+| Logs/select/cluster/pattern: Logs, LogPage, SelectLog, LogCluster, LogPattern | log --file/--select/--cluster, pattern | Same | gui/api.go:1169, :1187, :1240, :1265, :1281; compare file/clusters, not formatting |
+| Live/companion monitor: Live, LogMonitor | monitor, log | Different aggregate | gui/api.go:587, :1217; correct run/session, no stale results |
+| AddMonitor | monitor install only EnsureMonitor, not equivalent | GUI-only | view/monitorlog.go:225; cmds/monitor.go:72; monitor add after Harmony |
+| Scan/analyze: Scan, Analyze | scan/analyze | Same | gui/api.go:1293, :1334; subprocess GUI, window reentry/tasks/events |
+| Details/technical cards/evidence: Detail, Sections, Inspect | mod, describe, def, patches, harmony, problems | Same aggregate | gui/api.go:676, :737, :1077; crawler tabs/network/images/copy |
+| Native pickers/clipboard: PickFolder, PickProgram, PickImportFile, PickExportFile, PickSubscriptionZip, Clipboard | Explicit paths/files, no OS dialogs | GUI-only UI | gui/exchange.go:68, :88, :96, :104, :122; gui/subscribe.go:102; CDP before/after, UIA later |
+| Reference numbers: SaveRefNums, ctrl+backslash | None | GUI-only test aid | gui/api.go:1477; assets/js/refnums.js:1; discovery/location, not full inventory |
+| Uninstall preview/run: UninstallPlan, UninstallRun | uninstall --dry-run/--yes/options | Same | gui/uninstall.go:16, :33; final separate clone, not mid-crawler navigation |
+| Ready/leave/close/quit/frame theme: Ready, Leave, Close, Quit, SetWindowTheme | Process exit, no matching UI | GUI-only lifecycle | gui/api.go:132, gui/memory.go:55, gui/readers.go:161, gui/uninstall.go:70, gui/window_theme.go:7; exit waits/cache release/task stopped |
+| Click/double/right/drag/multiselect/suggestions/table menus/expand/scroll/Tab/Esc/back/forward/shortcuts | None | GUI-only input/presentation | assets/js/main.js:983, lists.js:300, navigation.js:186, popups.js:170; real window/crawler, no CLI |
 
-### 3.4 CLI-only 与“参考清单里有”
+### 3.4 CLI-only and reference requirements
 
-| 能力 | 状态与现有证据 | 自动化处理 |
+| Capability | Status/evidence | Automation |
 | --- | --- | --- |
-| 指定目标副本 swap A B；pin 的 --name/--git/--reason；move-to-locked --reason；textures --force/--no-mipmaps | CLI-only 的额外选择参数；cmds/loadout.go:25、copylocal.go:13、library.go:28、textures.go:40 | GUI 无独立输入不算失配；纳入核心参数测试，若产品希望玩家可选再加 UI |
-| pack import 清单 --as-plan、plan sync --dry-run、loadout ignore-external、workshop subscribe/state | CLI 专用入口／额外模式；cmds/pack.go、planfollow.go:18、loadout.go:39、workshop.go:18 | GUI 某些有 needs 入口或间接表达；按具体场景声明适用，不强配不存在的按钮 |
-| alias，rule add/list/remove 全编辑，lineage merge，import rimcrow，source/search，files search，why，loadout log/diff、data/cache/db status、version | 专用 GUI 没有完整对应编辑器／命令页；cmds/playerdata.go:14、loadout.go:40、identity.go、rimcrow.go、source.go、content.go:23、settings.go、version.go | 可在 RunCLI 调用；CLI-only 核心覆盖，GUI 聚合页已有的只读子集以上表为准 |
-| archo test run [plan] --json [--map] [--timeout] [--settle] | CLI-only 专用入口；cmds/test.go:15；app/gametest.go:80 | 复用作游戏加载烟雾测试；不是 GUI 的 launch 行为，二者分别验收 |
-| mcp／gui、copy-local 别名和各类 dry-run | CLI 传输／启动入口或额外模式；cmds/registry.go:109、copylocal.go:18 | 不计普通按钮缺口；保留 CLI 回归 |
-| RimCrow AI 诊断／翻译／语言包管理／Workshop 发布／自定义主题编辑／数据包迁移等 | inventory/ui-pages.md:259、:266、:322、:344、:351；api-surface.md:285；RimArcho 当前 API／导航没有这些同形实现 | 记“参考需求，当前 GUI 未实现”，不是 GUI-only；不把它们纳入 Phase 1 按钮分母 |
-| 回顾／存档管理、值得玩、Archo | specs/06-ui/2.11-other-pages.md:5、:11、:15 是后续规划 | 路由开放时再让 crawler 纳入；当前不伪造覆盖 |
+| swap A B; pin --name/--git/--reason; move-to-locked --reason; textures --force/--no-mipmaps | Extra CLI choices; cmds/loadout.go:25, copylocal.go:13, library.go:28, textures.go:40 | No GUI input is not mismatch; core parameter tests, UI only if product needs |
+| pack import --as-plan, plan sync --dry-run, loadout ignore-external, workshop subscribe/state | CLI entries/modes; cmds/pack.go, planfollow.go:18, loadout.go:39, workshop.go:18 | Some indirect needs GUI; declare scenario applicability, no invented buttons |
+| alias, full rule editing, lineage merge, import rimcrow, source/search, files search, why, loadout log/diff, data/cache/db status, version | No complete dedicated GUI; cmds/playerdata.go:14, loadout.go:40, identity.go, rimcrow.go, source.go, content.go:23, settings.go, version.go | RunCLI available; CLI core coverage, GUI read subsets as above |
+| archo test run [plan] --json [--map] [--timeout] [--settle] | CLI-only; cmds/test.go:15; app/gametest.go:80 | Reuse game-loading smoke, separate from GUI launch acceptance |
+| mcp/gui, copy-local aliases, dry-run modes | CLI transport/launch/modes; cmds/registry.go:109, copylocal.go:18 | Not missing buttons; retain CLI regressions |
+| RimCrow AI diagnosis/translation/language packs/Workshop publishing/custom themes/data migration | inventory/ui-pages.md:259, :266, :322, :344, :351; api-surface.md:285; no current matching RimArcho API/routes | Reference requirements, not implemented GUI, not GUI-only or Phase 1 denominator |
+| Retrospective/save management, worth playing, Archo | Future specs/06-ui/2.11-other-pages.md:5, :11, :15 | Crawler when routes open; no fabricated coverage |
 
-## 4. 三层驱动与真实窗口的实施入口
+## 4. Three driver layers and real-window entry points
 
-| 层 | 能抓到 | 抓不到／成本 |
+| Layer | Detects | Cannot detect / cost |
 | --- | --- | --- |
-| CLI 进程＋核心状态快照 | 参数、退出码、业务校验、列表顺序、批量失败、历史、文件／链接／ModsConfig、副本替换；跨进程撤销 | 看不到 loading 覆盖、空白 DOM、键值、事件前端过滤。合成小 fixture 多为秒级；全库扫描／网络另计。每 PR 全跑离线核心场景 |
-| guidev `/call` 或直接 `*API`＋事件；可加 Chrome 前端 | GUI DTO、request／stale、缓存失效、任务／事件、needs/editor 同源、错误被吞；Chrome 模式也可抓 DOM 和状态文案 | 直接 API 不执行 JS；Chrome 不是 Wails/WebView2，无法证明原生桥接／输入／并发正确。现有 HTTP harness 可复用，维护成本中等，通常秒至分钟 |
-| 真实 RimArcho.exe＋WebView2 CDP，少量 UIA | 快按 race、切页迟到结果、焦点／快捷键、确认／Esc、取消反馈、loading／白页、真实事件消费、WebView2 呈现 | 需登录桌面、WebView2、VM／显示；原生文件／Steam 弹窗不在 DOM。每 PR 跑高价值 10 场景，夜间跑 crawler、全库、在线和游戏；成本分钟至小时 |
+| CLI processes + core snapshots | Parameters, exit codes, validation, order, bulk failures, history, files/links/ModsConfig, swaps, cross-process undo | No loading overwrite/blank DOM/key values/frontend event filtering. Small synthetic fixtures seconds; full scan/network extra. Offline core scenarios each PR |
+| guidev `/call` or direct `*API` + events; optional Chrome frontend | DTOs, request/stale, invalidation, tasks/events, needs/editor common source, swallowed errors; Chrome also DOM/text | API skips JS; Chrome is not Wails/WebView2, proves no native bridge/input/concurrency. Reuse HTTP harness, moderate upkeep, seconds–minutes |
+| Real RimArcho.exe + WebView2 CDP, limited UIA | Fast-input races, late navigation results, focus/shortcuts, confirm/Esc, cancel feedback, loading/blank pages, actual event consumption, WebView2 rendering | Requires a logged-in desktop, WebView2, VM/display; native file/Steam dialogs are outside DOM. Run 10 high-value scenarios per PR; crawler, whole-library, online, and game cases nightly. Cost: minutes to hours |
 
-四类近期 bug 的必测观察点：
+Required observation points for four recent bugs:
 
-| bug | 最低有意义的验证 | 当前保护证据 |
+| Bug | Minimum meaningful verification | Current protection |
 | --- | --- | --- |
-| 结果文案被 loading 覆盖 | 在排序／编辑／undo 后，跨刷新连续采样 `#status`，结果保留到下一个玩家动作，不能只查 API text | assets/js/screens.js:138 保留已有编辑器状态；main.js:426 发布结果再 reload |
-| 连续空格后空白／旧读取覆盖新编辑 | 真实窗口高频 Input，记录画面和最终列表；不得逐次 await 业务完成后才发下一键 | main.js:54 的 reloadSeq／editEpoch；:407 editChain／editsPending；单个串行脚本难触发 |
-| 环境 ID 与 name 不一致导致事件被丢 | 至少运行前端消费：环境显示名故意与 ID 不同，跨 env／plan 及延迟事件，检查新结果采纳、旧结果拒绝 | needscache.go:80 发布 Env.ID；assets/js/problems.js:206 用 board.problems.environment 对照 |
-| Shift+字母到达时仍小写 | Wails 真窗口发 `key='s', shift=true` 与 `key='S'` 两变体，S 排序／J K 移动／T 放回等到正确分支 | main.js:1111 归一化；scripts/vm/cdp.mjs:36 默认就产生小写字母＋Shift modifier |
+| Loading overwrites result text | Continuously sample `#status` across sort/edit/undo refresh; result persists until next action, not just API text | assets/js/screens.js:138 retains editor status; main.js:426 publishes then reloads |
+| Rapid Space gives blank/stale reads overwrite edit | High-frequency real-window Input, record frames/final list; do not await business completion between keys | main.js:54 reloadSeq/editEpoch; :407 editChain/editsPending; serial scripts rarely trigger |
+| Environment ID/name mismatch drops events | Run frontend with display name deliberately different from ID; cross env/plan, delayed events; accept new/reject old | needscache.go:80 publishes Env.ID; assets/js/problems.js:206 compares board.problems.environment |
+| Shift+letter still lowercase | Real Wails `key='s', shift=true` and `key='S'`; S sort/J K move/T put back reach correct branch | main.js:1111 normalization; scripts/vm/cdp.mjs:36 defaults lowercase+Shift |
 
-**关于“guidev 串行化”的精确边界：**不把它用作 Wails 并发验收，这是实践上的必要限制。但本基线 `spikes/guidev/main.go:30` 的 shim 每次独立 fetch，`:145` HTTP handler 直接反射 call，并没有全局串行队列；`:53` 的 mutex 属于事件 hub。串行脚本、共享 API 锁、浏览器 HTTP/1 连接上限及前端 editChain 都会改变交错。报告不能将“guidev 必然串行所有调用”当源码事实，也不能因 HTTP 并发请求通过就认定 Wails race 已修。
+**Exact guidev serialization boundary:** do not use it for Wails concurrency acceptance. But baseline `spikes/guidev/main.go:30` shim fetches independently, `:145` handler reflects directly, no global serial queue; `:53` mutex belongs to event hub. Serial scripts, API locks, HTTP/1 connection limits, frontend editChain alter interleaving. Do not claim guidev necessarily serializes all calls, or HTTP concurrency proves Wails races fixed.
 
-真实窗口推荐 **现成 CDP**，不用另造测试 bridge：`internal/surface/gui/gui.go:79` 的 BrowserArgs 已读取 `RIMARCHO_DEVTOOLS_PORT`，把 `--remote-debugging-port` 直接交给 Wails 的 AdditionalBrowserArgs；单设 WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS 在这里不是有效接入方式。构建与启动入口为 `scripts/vm/vm.ps1:55` 的 build 和 `:124` 的 launch；发布式 GUI 构建带 GUI=1 与 windowsgui。VM 内等价的启动上下文如下（RimArcho 已部署在该目录）：
+Use **existing CDP**, no new bridge: `internal/surface/gui/gui.go:79` BrowserArgs reads `RIMARCHO_DEVTOOLS_PORT`, passing `--remote-debugging-port` to Wails AdditionalBrowserArgs; WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS alone is ineffective here. Build/launch: `scripts/vm/vm.ps1:55`, `:124`; release-style GUI uses GUI=1/windowsgui. Equivalent guest context (RimArcho deployed there):
 
 ```powershell
 $env:RIMARCHO_DEVTOOLS_PORT = '9222'
@@ -196,15 +196,15 @@ $env:RIMARCHO_HOME = 'C:\VM-Test\case\home'
 Start-Process -FilePath 'C:\Users\Public\Documents\VM-Test\RimArcho\RimArcho.exe' -WorkingDirectory 'C:\Users\Public\Documents\VM-Test\RimArcho'
 ```
 
-复用 `scripts/vm/cdp.mjs:19` 的 connect／evaluate／key／mouse，`smoke.mjs:43` 已检查 wails.localhost、导航键、侧键和脚本错误。用 Runtime.evaluate **只做观测、发现和设置测试 fixture**；玩家操作走 Input.dispatchKeyEvent／Input.dispatchMouseEvent，不以调用 api.Toggle 或 DOM `.click()` 替代真实输入验收。对快速操作按 20/50/100ms 的固定节拍发输入，只等 CDP 输入确认、不等业务 Promise；记录下发与实际接收的 key/time/repeat，不能用串行 `await edited()` 把 race 消掉。key repeat 另设 autoRepeat／长按与 keyUp；双三击设置 clickCount，并测同位置快速独立点击。
+Reuse connect/evaluate/key/mouse in `scripts/vm/cdp.mjs:19`; `smoke.mjs:43` already checks wails.localhost, navigation, side buttons, script errors. Runtime.evaluate **only observes/discovers/sets fixtures**. Player actions use Input.dispatchKeyEvent/Input.dispatchMouseEvent, not api.Toggle or DOM `.click()` substitutes. Send rapid input at fixed 20/50/100ms intervals, await CDP acknowledgement only, not business Promises. Record sent/received key/time/repeat; serial `await edited()` must not erase races. Test autoRepeat/hold/keyUp separately; double/triple clicks use clickCount plus independent rapid same-position clicks.
 
-先补现成驱动的三个小边界：`cdp.mjs:36` 的 key 当前未专门映射 Space／Backslash，场景需补 `Space → key=" " / VK=32` 与反斜杠键值／VK=220；mouse helper只处理侧键，左／右键按坐标点击另用Input.dispatchMouseEvent；`cdp.call`（`:30`）需加超时、协议error检查及断线拒绝pending Promise，避免输入没送到却报成功或测试永久挂起。沿用 smoke.mjs:15 的页面内 error／unhandledrejection 采集，默认不开 Runtime.enable（已有注释说明它曾改变快按导航表现），必要诊断单独复测。屏幕关闭／未登录要报 driver-not-ready，不能算应用白页。UIA 用于少量原生窗口与少量OS输入交叉验证；CDP不代替Windows级热键／IME验收，新增test hook只在以后确实缺观测点时考虑。
+Fill three driver gaps first: `cdp.mjs:36` lacks explicit Space/Backslash mapping; add `Space → key=" " / VK=32`, backslash/VK=220. Mouse helper handles side buttons only; use coordinate Input.dispatchMouseEvent for left/right. `cdp.call` (`:30`) needs timeout, protocol error checks, disconnect rejection of pending Promises, preventing false input success/hangs. Reuse smoke.mjs:15 page error/unhandledrejection capture, keep Runtime.enable off by default (comment notes altered rapid navigation); diagnostics separately. Screen off/not logged in → driver-not-ready, not app blank page. UIA for a few native dialogs/OS-input cross-checks. CDP does not replace Windows hotkey/IME acceptance; add hooks only later if observations truly missing.
 
-## 5. 一个场景，多种驱动与可比较状态
+## 5. One scenario, multiple drivers, comparable state
 
-### 5.1 场景合同
+### 5.1 Scenario contract
 
-第一阶段用 JSON 或 YAML 均可；已有 Node／PowerShell 能读 JSON，故落地优先 JSON，下面 YAML 仅展示拟议字段与语义，**不是已实现的 runner 输入**。业务动作与输入突发分开：业务动作可差分，窗口输入动作明确只适用窗口，不能在 CLI 中静默跳过并报全通过。
+JSON or YAML works; existing Node/PowerShell read JSON, so prefer JSON. YAML below illustrates proposed fields/semantics, **not implemented runner input**. Separate business actions from input bursts: business actions comparable, window-only input explicitly inapplicable to CLI, never silently skipped as passed.
 
 ```yaml
 schema: 1
@@ -230,160 +230,160 @@ steps:
 budgets: {feedbackMs: 200, localReadyMs: 5000, analysisMs: 120000}
 ```
 
-此例 enable 动作完成后自动产生 `after-enable` checkpoint；所有 action 自动记录前后状态。CLI 尚不支持 suggested-block 时，runner 返回 **unsupported: D2**，不会偷换默认 enable。适配器表逐项声明 exact／composite／unsupported；组合仍比较历史，不可隐去额外撤销步骤。subscribe/trash 等同样用语义动作：transport／batch policy／目标 refs、取消边界、预期部分结果均显式声明。
+Enable automatically creates `after-enable`; every action records before/after. Until CLI supports suggested-block, return **unsupported: D2**, not default enable. Adapters declare exact/composite/unsupported per action; compare history even for composites, never hide extra undo steps. Subscribe/trash semantic actions explicitly declare transport/batch policy/refs/cancel boundary/partial outcomes.
 
-每一步有 stepId、requestId、超时、可接受拒绝类型、前置状态、完成条件。GUI API 先连 `/events` 再调用；UseEnv／Workspace 等 await 匹配 request 的 environment 完成事件，bool true 只是 ack。任务等待 terminal＋逐项结果落盘，不能看到 Tasks 事件就算完成。真实窗口等待 DOM 可交互且上下文匹配，并独立读取状态验证；随机压力场景保存 seed、输入轨迹和每次检查点。
+Each step has stepId, requestId, timeout, acceptable refusals, prestate, completion conditions. GUI API connects `/events` first; UseEnv/Workspace await matching request's environment completion, bool true is ack only. Tasks await terminal and persisted item results, not merely a Tasks event. Real window waits for interactive DOM/correct context, independently verifies state. Random stress saves seed/input trace/checkpoints.
 
-### 5.2 同一初态分别运行
+### 5.2 Separate runs from identical initial state
 
-1. 冻结 fixture：相同构建、DB backup、游戏版本／DLC、Mod 内容清单、社区规则／替代数据、ACF、设置及 tasks.json；所有路径已在 guest 内。SQLite 用 backup API 或停进程后完整备份，不能只复制活跃 DB 而漏 WAL。
-2. 从同一 VM 基线分别跑 CLI、GUI API、Wails，顺序运行；每次先恢复整个 guest 可变数据盘／差分盘，启动后核验 fixture hash。不能先 CLI 改完再让 GUI 接着跑，也不能两 driver 同时写一个 DB。
-3. 每个语义动作完成／每个输入 burst 稳定后快照；比较每步差异，报告最早分歧、输入、错误、任务项及相关文件，不只比最终列表。快速输入中间另做 UI 连续采样，静态终态无法证明没有短暂白页。
-4. 离线 fixture 固定网络响应／下载内容；在线 Workshop 测试单列，远端内容或订阅状态不同标 inconclusive，不能粗暴放宽本地 invariant。VM snapshot 不会回滚 Steam 服务端状态，在线用例记录起始／结束订阅集合并按场景清理。
+1. Freeze fixture: build, DB backup, game version/DLC, Mod manifests, community/replacement data, ACF, settings, tasks.json; all guest paths. Use SQLite backup API or complete stopped backup, never live DB copy without WAL.
+2. Run CLI, GUI API, Wails sequentially from same VM baseline. Restore entire mutable data/differencing disk each run, verify fixture hashes. No CLI mutation followed by GUI continuation, no simultaneous DB writers.
+3. Snapshot after every semantic action/stable burst; compare earliest divergence, inputs/errors/task items/files, not only final list. Continuously sample UI during bursts; static end state cannot rule out transient blank pages.
+4. Offline fixtures fix network responses/content. Online Workshop separate; changed remote content/subscriptions → inconclusive, not relaxed invariants. Snapshots do not roll back Steam server state; record starting/ending sets and clean per scenario.
 
-### 5.3 快照和比较
+### 5.3 Snapshots and comparison
 
-| 范围 | 必须记录／比较 | 归一化及禁止忽略的内容 |
+| Scope | Required data/comparison | Normalization and never-ignore rules |
 | --- | --- | --- |
-| 上下文 | env ID→fixture 环境名、游戏 MM／DLC、持久 current plan、当前 GUI open plan、最新 request | 每个独立运行的随机 ID 映射到 fixture key；不能把 env name 当 ID，不能忽略编辑到错误方案 |
-| DB 列表 | 所有 plan 名称／版本限制、workspace.entries 有序列表、origin kind／version、conflict、暂存 entries＋原位 | 对应 `internal/store/plan.go:11`、`:31`，loadout.go:10；instance 映射为来源相对路径＋packageId＋内容指纹，不能只用 packageId 合并副本 |
-| DB 历史 | 每 plan undo/redo 栈有序 entries＋op、保存版本有序 entries／source、关注合集模式和成员、玩家 tags／note、锁定／来源元数据 | store/loadout.go:57、:89、:132；自增行 ID 可映射，**栈长度、相对顺序、版本相对编号、操作类别不能忽略**；发现 GUI 组合多一步历史就报差异 |
-| 安装与任务 | live/tombstone、lineage 映射、订阅记录、credit batch/item checkpoint、任务类型／项状态／失败原因／重试资格／完成集合 | task ID／批次 ID 用关系映射；UI 展示 tasks 是 surface-only 扩展快照，CLI 没有时标不适用，不能据此忽略领域安装差异 |
-| ModsConfig.xml | 原始 SHA-256／字节及 XML 投影：activeMods 顺序、knownExpansions、version | 两运行先比语义，再报告字节差；仅路径根／生成时刻的明确字段归一化；不排序 activeMods、不丢 _steam 等真实后缀 |
-| Mods/ 链接 | 所有受影响游戏与整合包 Mods 下的相对名、reparse 类型、目标、存在／可读、RimArcho 归属 | guest 根目录换成 GAME_A／LIBRARY 等 token；不沿链接递归把外部树误当自身目录，也不能只看当前 env |
-| 磁盘 | 可变目录完整 manifest：相对路径、文件类型、长度、SHA-256；About.xml(.disabled)、标记、ZIP／解包、DDS、锁定库与回收结果 | 基础几千 Mod 的 immutable manifest 一次建好，步骤只 hash touched 集合＋核验无计划外变动；回收站系统随机名字不硬比，核对源已移走及原内容可恢复 |
-| GUI 问题与视觉 | Needs/ListProblems/Board 相同环境、plan、listVersion、revision／sequence、新鲜度、problemId 归属；当前页、选择／焦点、aria-busy、状态行、console 错误 | sequence 只在单次运行检查单调与迟到丢弃，不跨驱动硬比数字；同状态内容与计数必须一致；不把空白、错误占位或零列表当“加载中可忽略” |
+| Context | env ID→fixture name, game MM/DLC, persistent current plan, GUI open plan, latest request | Map random IDs to fixture keys; name is not ID; wrong-plan edits never ignored |
+| DB lists | All plan names/version limits, ordered workspace.entries, origin kind/version, conflict, staging entries/original positions | `internal/store/plan.go:11`, :31, loadout.go:10; map instance by source-relative path+packageId+fingerprint, never merge copies by packageId |
+| DB history | Per-plan ordered undo/redo entries+op, saved versions entries/source, collection mode/members, tags/notes, lock/source metadata | store/loadout.go:57, :89, :132; map row IDs, **never ignore stack size/order, relative version numbers, operation kinds**; extra GUI step is difference |
+| Installation/tasks | live/tombstone, lineage mapping, subscription records, credit batch/item checkpoints, task/item state/reasons/retryability/completed set | Relational ID mapping; UI tasks surface-only extension, CLI inapplicable does not hide domain installation differences |
+| ModsConfig.xml | Raw SHA-256/bytes plus activeMods order, knownExpansions, version | Semantics first, byte differences reported; normalize explicit root/time fields only; no activeMods sorting or dropping _steam suffix |
+| Mods/ links | Relative names/reparse types/targets/existence/readability/ownership for all affected game/pack Mods | Guest roots → GAME_A/LIBRARY tokens; no recursive traversal into external targets; not current env only |
+| Disk | Full mutable manifest: relative path/type/length/SHA-256, About.xml(.disabled), markers, ZIP/extraction, DDS, locks, recycle results | Build immutable thousands-Mod manifest once; hash touched set/check no unplanned changes per step. Recycle random names not literal equality; verify source removed/content recoverable |
+| GUI findings/visuals | Needs/ListProblems/Board env/plan/listVersion/revision/sequence/freshness/problemId ownership, page/selection/focus/aria-busy/status/console | Sequence monotonic/late-drop within run, not numeric equality across drivers; same-state counts/content equal. Blank/error/zero list never dismissed as loading |
 
-忽略项限于：实际墙钟创建／检查／耗时字段、随机 UUID 和自增主键本身、guest 绝对根目录、正常访问产生的 cache／webview profile／日志滚动差异。其关联、先后因果、到期／重试语义照常检查；测试固定时钟时连这些时序分支也能比较。不得为了消除 diff 忽略所有 meta、history、credit 或文件属性。DB 主文件字节、WAL 页面布局不作等价判据。
+Ignore only actual wall-clock creation/check/duration fields, random UUID/autoincrement values themselves, guest absolute roots, normal cache/WebView profile/log rotation differences. Check relationships/causal order/expiry/retry semantics; fixed clocks can compare time branches too. Never ignore all meta/history/credit/file attributes to erase diffs. DB bytes/WAL layout are not equivalence criteria.
 
-## 6. 通过判据与时间预算
+## 6. Pass criteria and budgets
 
-### 6.1 所有场景共用的判据
+### 6.1 Shared criteria
 
-- **列表不会消失**：有环境的 fixture 不出现错误“还没有游戏／no game yet”，任何成功读取不得把非空列表变成空白 DOM；加载前先出现占位是允许的，但窗口要有可辨识反馈、可导航，最终须到请求的页与方案。确认取消、Esc 只关闭对应层，不意外换环境／清空列表。
-- **状态属于最新动作**：成功／拒绝／部分完成结果不会被后台 loading 覆盖；快切页旧响应不得覆盖新页；事件只接受正确 env ID＋plan＋listVersion，sequence 不倒退。任务完成结果保留且可查，不能因离页丢掉错误。
-- **列表与历史**：有序 entries、暂存位置及玩家元数据正确；单步编辑＋undo 后应恢复被该动作负责的 payload 的原始字节（如 entries 编码），不是恢复整个 SQLite 文件。undo 本身会移动历史栈；tag／磁盘删除不应被错误宣称可撤销。**已发现的共同核心边界**：`app.Stage` 及 Unstage 分开写暂存 meta（stage.go:57、:126），UndoRedo 只恢复 workspace entries（loadout.go:839），`view.Place` 从暂存放置也分 Enable＋Unstage（verbs.go:178）。因此“列表与暂存整体字节恢复”是要验证／收敛的目标，不能当成当前已保证；两驱动都错时差分仍可能一致，需要这个独立oracle。
-- **部署和磁盘**：无 dangling／循环／错误目标链接；save 后 ModsConfig 的投影等于所保存列表，未 save 的编辑不得擅自写游戏配置；外部修改冲突要可解释拒绝。无未计划的文件丢失，DDS 清理不碰原 PNG，普通目录冲突不能悄悄覆盖。
-- **副本与 credit**：同一个可加载 package 在目标环境只能有预期获胜副本；成功换到工坊后列表、暂存、可恢复历史／部署不再错误指向已回收 SteamCMD 副本，重复执行不额外造新副本。保护分支允许保留原份，必须有 retained 原因，不能一律要求物理副本数为 1。参见 app/credit.go:127 与 app/credit_test.go:676。
-- **取消有边界**：已完成下载／删除保留；取消前未开始项不执行；当前项允许在安全边界结束，不承诺取消能撤回 Steam 服务器请求。继续只做剩余／可重试项，永久失败不伪装成功，不重复安装已完成项。
-- **问题一致**：待后台稳定且 updating=false、stale=false 后，needs 页与 editor 的全局计数、每 Mod problemIds 和实际卡片一致；等待期间允许旧结果但必须标 updating。排序后的四类 notices 与共享源相符；API 错误、拒绝与 CLI exit code 都需显式匹配。
+- **Lists never disappear**: fixtures with environments never falsely show "no game yet"; successful reads cannot turn nonempty lists into blank DOM. Initial placeholders allowed with recognizable feedback/navigation and eventual requested page/plan. Cancel/Esc closes only correct layer, no accidental env switch/list clearing.
+- **Latest action owns state**: success/refusal/partial results survive background loading; old navigation replies cannot overwrite new page; accept correct env ID+plan+listVersion, nondecreasing sequence. Task results remain inspectable after leaving.
+- **Lists/history**: ordered entries/staging positions/metadata correct; one edit+undo restores original bytes of that action's payload (e.g. entries encoding), not whole SQLite. Undo moves stacks; tags/disk deletion must not falsely claim undo. **Known shared-core boundary**: app.Stage/Unstage separately write staging meta (stage.go:57, :126), UndoRedo restores only workspace entries (loadout.go:839), view.Place does Enable+Unstage (verbs.go:178). Whole list+staging byte restoration is a target to verify/converge, not an existing guarantee. Both drivers can be equally wrong, requiring independent oracle.
+- **Deployment/disk**: no dangling/cyclic/wrong-target links; saved ModsConfig equals saved list; unsaved edits never write game config. Explain external conflicts. No unplanned loss, DDS cleanup preserves PNG, real-directory collisions never silently overwritten.
+- **Copies/credit**: target environment has expected winning loadable package copy. After Workshop switch, list/staging/recoverable history/deployment no longer points wrongly to recycled CMD. Repeats create no extra copies. Protected originals may remain with retained reason; never require physical count=1 universally. app/credit.go:127, app/credit_test.go:676.
+- **Cancellation boundaries**: completed downloads/deletions retained, unstarted items not executed. Current item may finish at safe boundary; cancellation cannot revoke Steam requests. Continue only remaining/retryable, permanent failures explicit, no reinstallation of completed items.
+- **Finding consistency**: after updating=false/stale=false, needs/editor global counts, per-Mod problemIds, cards agree. While waiting, old results allowed with updating. Four sort notices match source; match API errors/refusals/CLI exits explicitly.
 
-### 6.2 分开反馈、数据就绪和真实完成
+### 6.2 Feedback, readiness, actual completion separately
 
-旧数据是历史单轮／少量重复观测，不是当前版本 P95：批量审计基于 `887b668` 起始实现，页面研究为 `81017d8`，needs 修后研究单列。引用文件中的测量口径是预算的依据；**下面新预算是拟议验收门槛，尚未测得达标**。
+Historical single/few observations are not current P95: bulk audit starts `887b668`, page study `81017d8`, needs post-fix separate. Their methods inform budgets; **new thresholds below are proposed and unverified**.
 
-| 场景／历史依据 | 旧观测 | Phase 1 门槛／超时 |
+| Scenario / historical source | Old observation | Phase 1 threshold / timeout |
 | --- | --- | --- |
-| 单次输入／骨架／loading／取消反馈 | 批量审计 §5，首次反馈多数 13–115ms，也有 314ms；§5 暂存全量绘制约 540ms | 常规交互遵循 specs §10 的 50ms 目标；压力测试反馈／导航软门槛 200ms，主线程连续无响应 >500ms 记性能失败。数据未就绪不能冒充完成 |
-| 本地页：编辑器／home／library／needs | 页面研究 §1：home 首入 0.75s；library 新进程 1.46s，热 0.19–0.20s＋JSON 22–26ms；订阅热 0.56–0.74s，新进程 1.45s | 小 fixture 本地 ready ≤2s；千级库 ≤5s，热切页 ≤2s；单步骤硬超时 15s。冷启动 1.5s 是规格目标另记；VM 结果不冒充宿主基准 |
-| needs 缓存／后台分析 | needs 缓存研究“1.6 大列表的改前／改后”：热 10.8–12.2ms，ListProblems 22.8–46.3ms，编辑后完整发布 11.658s；旧页首次分析 35.2s | 同版本 API 热读目标 ≤100ms；窗口计数反馈 ≤200ms；完整新鲜结果 ≤120s，期间保留内容／updating；慢机先独立建基线 |
-| 取消订阅确认前 10／100／1293 | 批量审计 §4：1.24／11.148／98.585s；Setting 可被锁住98.49s | 点下后 ≤200ms 显示预检；本地确认内容 10项≤2s、100≤5s、全库≤15s 为优化目标；非相关 Setting／导航 ≤200ms；超时或被锁均失败，不以“JS还能动”通过 |
-| 删除／来源更新／全量预检 | 批量审计：删除 100项6.214s、3760项234.341s；全部更新135项39.590s；pin全库111.909s | 与上项相同区分预检进度与确认就绪；100项／全库 5s／15s 目标待 D1／非阻塞分支重测，超目标登记性能缺陷，不能先提高门槛掩盖 |
-| 确认后的编辑与刷新 | 批量审计 §5：570项停用4.358s，Toggle仅22.4ms；排序1.471s | 小 fixture≤2s，千级列表≤5s；期间输入／切页可用，不丢最后动作；连续输入结束后10s内稳定 |
-| 下载／文件批量／取消 | 原审计未执行破坏操作，**无实测完成基线** | 任务入队反馈≤200ms，进度可见≤1s；取消意图反馈≤200ms，安全边界停止建议≤5s，若外部会话无法停止须显示等待原因。本地批量首轮10min硬超时；在线20min，每项停滞60s报诊断；按大小／网络另建基线 |
-| 贴图统计／转换 | 页面研究全库统计首次78.9s，复测2.5s | 初始反馈≤200ms；全量统计≤120s；转换按 fixture 建大小预算，先10min硬超时；停止不等到所有文件完成 |
-| 游戏加载 | 本研究未实际启动；cmds/test.go:15 默认 test run 最大10min | 小有效列表菜单≤120s目标，真实大列表先10min硬超时并记录加载时间／内存；到菜单／地图＋本轮日志断言才通过 |
+| Single input / skeleton / loading / cancel feedback | Bulk audit §5: initial feedback mostly 13–115ms, also 314ms; §5 stage-all painting about 540ms | Normal interactions follow the specs §10 target of 50ms; stress-test feedback/navigation has a soft 200ms threshold; continuous main-thread stalls >500ms fail performance. Unready data is not completion |
+| Local editor/home/library/needs | Page §1: home first 0.75s; library new 1.46s, warm 0.19–0.20s+JSON 22–26ms; subscriptions warm 0.56–0.74s, new 1.45s | Small ready ≤2s; thousands library ≤5s, warm nav ≤2s; hard 15s/step. Cold 1.5s spec separately; VM not host benchmark |
+| needs cache/background analysis | Large 1.6 before/after: warm 10.8–12.2ms, ListProblems 22.8–46.3ms, post-edit publish 11.658s; old first analysis 35.2s | Same-version warm API ≤100ms target; window counts ≤200ms; fresh ≤120s retaining content/updating; separate baseline on slow hardware |
+| Unsubscribe confirmation precheck 10/100/1293 | Bulk §4 1.24/11.148/98.585s; Setting locked 98.49s | Precheck feedback ≤200ms; local confirm 10≤2s,100≤5s,all≤15s optimization targets; unrelated Setting/nav ≤200ms; timeout/lock fails even if JS moves |
+| Delete/source update/all precheck | Delete 100 6.214s,3760 234.341s; update 135 39.590s; all pin 111.909s | Same progress vs confirm distinction; 100/all 5s/15s targets retest after D1/nonblocking; log defects rather than raise limits |
+| Post-confirmation editing and refresh | Bulk audit §5: disabling 570 entries took 4.358s, Toggle only 22.4ms; sorting 1.471s | Small fixture ≤2s, thousand-entry list ≤5s; input/navigation remains usable, last action retained; stable within 10s after continuous input ends |
+| Download/file batch/cancel | No destructive actions in audit, **no measured completion baseline** | Queue≤200ms,progress≤1s; cancel intent≤200ms,safe stop≤5s target or explain external wait. Local hard10min,online20min,item stall60s diagnostic; size/network baselines separate |
+| Texture stats/conversion | First full78.9s,retest2.5s | Feedback≤200ms,stats≤120s; fixture-size conversion budget, initial hard10min; stop before all files finish |
+| Game loading | Not launched in this study; cmds/test.go:15 defaults test run to at most 10min | Small valid list reaches menu within 120s target; real large lists initially have a hard 10min timeout with load-time/memory records. Menu/map + assertions on current-run logs required |
 
-每个预算都记录宿主／guest CPU、内存、磁盘、GPU、构建 hash、内容规模及冷／热类别。计时起点为输入实际到达，分别记录 first-feedback、confirm-ready、API-ack、data-ready、task-terminal、stable-snapshot；至少5轮保存全样本，20轮以上才报告有意义的分位数。性能失败与功能失败分列，不能把旧单轮结果称为 P95。
+For every budget, record host/guest CPU, RAM, disk, GPU, build hash, content scale, and cold/warm category. Time from actual input receipt; record first-feedback, confirm-ready, API-ack, data-ready, task-terminal, and stable-snapshot separately. Run at least 5 rounds and retain all samples; report meaningful quantiles only after 20 or more. Separate performance failures from functional failures; old single runs are not P95.
 
-历史详细数据的唯一原始记录为 [批量操作耗时审计](2026-10-27_batch-operation-timing-audit.md)、[页面加载研究](2026-10-26_page-load-time-and-optimization.md)、[needs 缓存实测](2026-10-27_needs-cache-and-list-problems-api-results.md)。
+Original detailed records: [bulk timing audit](2026-10-27_batch-operation-timing-audit.md), [page-load research](2026-10-26_page-load-time-and-optimization.md), [needs cache results](2026-10-27_needs-cache-and-list-problems-api-results.md).
 
-## 7. 第一阶段的 10 个具体场景
+## 7. Ten Concrete Phase 1 Scenarios
 
-驱动简记：C=CLI，A=guidev／直接 API，W=真实 Wails。A 只证明服务结果；涉及输入／DOM 的断言必须 W。下表时间引用 §6，便于同一场景在三层复用；未补齐的 C 动作明确标 unsupported，先做 W/A。
+Drivers C=CLI,A=guidev/direct API,W=real Wails. A proves service results only; DOM/input assertions require W. Budgets reference §6; unsupported C actions explicit, W/A first.
 
-| 顺序／场景 | 步骤 | 可运行驱动 | 预期与不变量 | 预算 |
+| Order/scenario | Steps | Drivers | Expected invariants | Budget |
 | --- | --- | --- | --- | --- |
-| 1 快速空格、连键与 Shift | 在未启用栏选1／10／100个合法 Mod；每20/50/100ms 按空间20次；已启用／暂存重复；再长按 Space、Shift+J/K、Shift+S/T，测小写 key＋Shift 和大写变体；等待稳定→undo/redo | W 必须；A/C 可跑对应顺序动作，但 C 的 suggested-block 待 P0-2 | 非空白、三栏守恒、没有重复条目／漏操作；最终按“实际收到的合法输入”计算，不假定浏览器一定接收每键；历史可逐步回退，状态不丢、计数稳定一致 | 每键反馈≤200ms；无>500ms UI 冻结；burst后≤10s稳定，分析≤120s |
-| 2 未加载完就切页／切列表 | A/B 两非空方案交替打开20次，间隔50–200ms；穿插 editor→needs→library→home 循环；数据读取在途再发下一次导航；含 env ID≠显示名、两游戏版本；回到A | W；A 可直接压 request/事件，C 仅上下文核心对照 | 最后页／列表胜出，旧回复不能清空新列表；从不错误显示 no game yet；A/B内容与current语义不丢，正确事件被采纳；切换中写按钮被禁用，结束后恢复 | 导航反馈≤200ms；最后本地页≤5s／硬15s；分析≤120s |
-| 3 重复排序与双三击 | 连按S／点击排序10次；对启用、导入应用、订阅提交按钮双／三击；一次在前次尚未返回时重按；排序后立即undo，随后redo并跨页返回 | W；A/C 跑确定语义顺序并比历史，新增notice修复入口待 P0-1 | 排序幂等、无重复方案／下载／列表条目；重复请求是禁用／合并／明确拒绝或合法重复，不凭空要求所有按钮同策略；结果不被loading覆盖，undo确实回到对应动作前 | 入队／拒绝≤200ms；局部动作≤2s／大列表5s；burst后10s稳定 |
-| 4 误点、确认取消、Esc 和立即撤销 | 对删除／退订／覆盖导出／移目录打开确认，分别点取消、Esc、关闭；打开菜单／位置／标签／导入弹窗逐层Esc；对 enable/move/stage/sort 立即undo，重复误点与取消 | W；A 可验预览无写，C 可验 dry-run；取消输入只有W | 取消前后领域快照一致，不丢列表／不触发任务，不误关主窗口；焦点回合理位置；可撤销动作恢复payload，配置／文件未被预览写入 | 本地弹窗≤200ms，关闭≤200ms；预检10/100/全库2/5/15s目标；undo稳定≤5s |
-| 5 添加 Mod→取消下载→继续→启用 | 工坊单项／批量订阅（含永久不可用项和可重试失败），中途点击取消；立刻切页；继续同任务；再重复继续按钮；SteamCMD与Steam路径各一轮，最后scan→enable→sort | W/A；C 覆盖订阅核心，GUI任务续做／credit unsupported | 完成项保留，剩余取消，继续不重新安装完成项；永久失败有逐项原因且不提供无效重试；总数／任务行一致，无重复副本，当前列表不受切页误改 | ack≤200ms，进度≤1s；取消反馈≤200ms／停止5s目标；在线20min，停滞60s诊断 |
-| 6 移除 Mod：停用／退订／删除及取消批次 | 启用一组共享来源；停用→undo→redo；退订部分；回收隐藏／残留项；文件批次开始后取消，含坏ref；检查A/B游戏Mods链接，再扫描、重开GUI | W/A/C；D1在基线应暴露差异，合入后再跑 | 停用可撤销；退订／回收不伪装可undo；已完成留着、未开始没动；跨env无dangling，缺失显示真实；部分失败不丢后续项／状态 | 反馈≤200ms；预检2/5/15s目标；本地批次10min；取消同上 |
-| 7 四种导入入口与八种导出往返 | 文件／RC分享码／粘贴text／Workshop合集依次预览→取消→重开→替换；再合并→undo；导入新方案；导出8格式，已存在目标取消覆盖／确认覆盖；重新导入并比较对应格式能表达的信息 | W/A；C 文件／分享码可跑，文本先文件适配标composite，merge/合集new待 P0-3 | 预览取消无写；替换／合并单步可撤销；同名／双击不丢原方案，顺序／缺失项保真；text等有损格式只比其可表达投影，不要求保留instance hash；所有格式不得意外写ModsConfig | 本地preview/apply≤2s／全库5s；反馈≤200ms；合集网络30s硬超时，失败保留原列表 |
-| 8 排序提示→补齐／用已安装／推荐替换 | fixture同时含已安装依赖、远程缺依赖、缺失占位但有可用副本、已安装推荐替代与cycle；sort→逐类处理；处理过程中改状态以触发重验；每项立即undo，切needs/editor对计数 | W/A；C sort当前仅部分提示，三修复入口待 P0-1 | 四类notice完整；不能错用不可加载副本、不能丢缺失项位置；原子批次重验失败无半改；各修复一撤销步骤；fresh后全局和每Mod计数一致，正确env事件不被过滤 | 本地≤2s／大列表5s；问题反馈200ms，完整分析120s |
-| 9 保存→实际启动并加载 | 用有效列表save；检查ModsConfig与每条部署链接；真实GUI launch检查普通启动路径；停止后另跑archo test run --json（1.6再接LogSync/AutoTest）；故意缺依赖／配置外改／游戏已运行各拒绝分支 | W/A/C；guidev禁用Launcher，真实launch只能W/C | save投影正确、备份存在、无dangling；到本轮菜单／地图，实际loaded列表匹配；失败可定位而非只看进程存活；test run隔离配置不得代替GUI保存／启动验收 | save≤5s；启动反馈200ms；小列表菜单120s目标／大列表10min硬超时；游戏退出后状态收敛 |
-| 10 每页自动找控件并逐个尝试 | 按§8 crawler发现所有页、卡片、菜单、tab和代表行；每条边从已知fixture开始，先取消分支再确认分支；加入双击、Esc及离页；记录未可达控件及原因 | W主，A核验状态，C对可映射动作差分 | 无脚本错误／白页／假无游戏／列表丢失；每条可写边有状态oracle；只“点过”不能算通过；计数、历史、文件、副本保持各动作约定 | 每本地边ready5s／硬15s，反馈200ms；长任务套专属预算；全crawler先60min总上限，到限报告未覆盖 |
+| 1 Rapid Space, repeats, and Shift | Select 1/10/100 valid Mods in the inactive column; press Space 20 times at 20/50/100ms intervals; repeat in active/staged columns. Hold Space, Shift+J/K, Shift+S/T; test lowercase key + Shift and uppercase variants; settle→undo/redo | W required; A/C can run corresponding sequential actions, but C suggested-block awaits P0-2 | No blank view; conservation across three columns; no duplicates/lost actions. Calculate final state from actually received legal input, without assuming every key reaches the browser. History can step back; state retained, stable counts agree | Per-key feedback ≤200ms; no >500ms UI freeze; stable ≤10s after burst, analysis ≤120s |
+| 2 Navigate/switch before ready | Open nonempty A/B20 times at50–200ms,editor→needs→library→home, next navigation while read pending;env ID≠name,two versions;return A | W;A request/event stress,C core context only | Last page/list wins,no old clearing/no false no-game;A/B/current intact,correct events;write controls gated during switch,restored after | Nav≤200ms,last local≤5s/hard15s,analysis≤120s |
+| 3 Repeat sort/double/triple click | S/sort10 times;double/triple enable/import/subscribe;repeat while pending;immediate undo after sort,redo,navigate back | W;A/C deterministic order/history;notice repairs P0-1 | Idempotent sort,no duplicate plan/download/entry;controls may disable/coalesce/refuse/legally repeat by contract,not universal policy;status survives loading,undo correct predecessor | Ack/refusal≤200ms,local≤2s/large5s,burst stable10s |
+| 4 Mistakes, confirmation cancellation, Esc, and immediate undo | Open delete/unsubscribe/export-overwrite/move-directory confirmations; test cancel, Esc, and close separately. Open menu/position/tag/import dialogs and Esc one layer at a time. Immediately undo enable/move/stage/sort; repeat mistakes and cancellation | W; A verifies preview does not write, C verifies dry-run; cancellation input requires W | Domain snapshots equal before/after cancel; no lost list, task started, or accidental main-window exit; reasonable focus return. Undoable actions restore payload; previews write no config/files | Local dialog open ≤200ms, close ≤200ms; precheck for 10/100/all: 2/5/15s targets; undo stable ≤5s |
+| 5 Add→cancel download→continue→enable | Single/bulk Workshop incl permanent/retryable failures,cancel midtask,navigate,continue same task,repeat continue;CMD/Steam rounds,scan→enable→sort | W/A;C subscription core,GUI continuation/credit unsupported | Completed retained,remaining canceled,no reinstall,permanent reasons/no invalid retry,total/task rows agree,no duplicate copies/wrong-list edits | Ack≤200ms,progress≤1s,cancel≤200ms/stop5s target,online20min,stall60s diagnostic |
+| 6 Remove:disable/unsubscribe/delete/cancel batch | Shared source group;disable→undo→redo,unsubscribe subset,recycle hidden/residue,cancel batch incl badref;check A/B links,scan,reopen | W/A/C;baseline D1 should differ,retest after merge | Disable undoable,unsubscribe/recycle not falsely undoable;completed retained,unstarted untouched,no cross-env dangling,missing honest,partial failure keeps later results | Feedback≤200ms,precheck2/5/15s,local10min,cancel as above |
+| 7 Four imports/eight export roundtrips | File/RC code/pasted text/Workshop collection preview→cancel→reopen→replace;merge→undo,new plan;8 exports,cancel/confirm overwrite;reimport representable data | W/A;C file/code,text-as-file composite,merge/collection-new P0-3 | Canceled previews no writes,single-step replace/merge undo,naming/double-click preserves originals,order/missing intact;lossy text compares projection,not instance hash;no accidental ModsConfig | Local preview/apply≤2s/all5s,feedback≤200ms,collection hard30s,failed original intact |
+| 8 Notices→complete/use-installed/recommended | Fixture installed/remote missing dependencies,missing placeholder with available copy,recommended alternative,cycle;sort,handle each,mutate during repair for revalidation,immediate undo,needs/editor counts | W/A;C partial notices/three repairs pending P0-1 | Four notices,no unloadable copies/lost position,atomic revalidation,no partial mutation,one undo each,fresh counts agree,correct env events | Local≤2s/large5s,counts200ms,analysis120s |
+| 9 Save→real launch/load | Valid save,check ModsConfig/all links,GUI launch normal path;after stop separately archo test run --json (1.6 LogSync/AutoTest later);missing dep/external config/running-game refusal | W/A/C;guidev disables Launcher,real launch W/C | Correct projection/backup/no dangling,current menu/map,actual loaded list,diagnosable failure not mere live process;isolated test config not GUI save/launch substitute | Save≤5s,launch feedback200ms,small menu120s/large hard10min,settle after exit |
+| 10 Discover every control/try each | §8 crawler all pages/cards/menus/tabs/representative rows;known fixture per edge,cancel before confirm,double-click/Esc/leave;unreachable reasons | W primary,A state,C mapped differential | No script errors/blank/false no-game/lost list;state oracle per write edge,clicked is not pass;counts/history/files/copies follow action contract | Local edge ready5s/hard15s,feedback200ms,long-task budgets;initial crawler hard60min,report uncovered |
 
-每个场景先跑小型可控 fixture，再跑真实规模（约5千 lineage／6千份实例量级，规模取运行时实际值）。3/5/10 的重复提交策略先按控件定义确定；例如用户连续点“新建”若允许创建两份必须名字明确且不覆盖，不能未经产品约定把任何重复都判缺陷。压力输入的完成时刻以最后一个输入及相关请求稳定为准。
+Each scenario starts small/controlled, then realistic scale (about5k lineages/6k instances, actual runtime counts). Define repeat policies for3/5/10 by control; if repeated new allows two plans, require clear names/no overwrite, not an invented universal defect. Stress completion is after last input and related requests settle.
 
-## 8. “每个按钮都试”：自动控件 crawler
+## 8. "Try every button": automatic control crawler
 
-采用**运行时 DOM 发现＋refnums 定位＋命令/操作表校验**，不维护第二份手写按钮清单。
+Use **runtime DOM discovery + refnums location + command/operation-table checks**, not another handwritten button list.
 
-已有 `assets/js/refnums.js:26` 的 CONTROL 选择器包括 button、a、input/select/textarea、summary、role 控件及列表行，IDENT（`:30`）含 data-cmd、data-env-write 等；`window.refnum(id)` 可拿当前 DOM。编号还覆盖文本／图片，文件还包含“not shown now”的历史元素，且每页只保留最多3000条（`:23`），因此 **refnums 文件行数不是按钮分母**，编号也不是跨fixture永恒稳定的业务ID。`SaveRefNums` 写到 `a.Home/refnums`（gui/api.go:1477），默认才是 `%APPDATA%\RimArcho\refnums`。隔离 RIMARCHO_HOME 后读取 guest 测试 home，不读宿主玩家 profile。
+Existing CONTROL selector `assets/js/refnums.js:26` includes button,a,input/select/textarea,summary,roles,list rows; IDENT (`:30`) includes data-cmd,data-env-write. `window.refnum(id)` returns current DOM. Numbers also cover text/images, historical "not shown now" elements, capped3000/page (`:23`); **refnums line count is not button denominator**, IDs not eternally stable across fixtures. SaveRefNums writes `a.Home/refnums` (gui/api.go:1477), default `%APPDATA%\RimArcho\refnums`; with isolated RIMARCHO_HOME read guest test home, never host player profile.
 
-实施步骤：
+Implementation:
 
-1. CDP 打开真实窗口，启用 ctrl+反斜杠。联合 CONTROL、可点击行、语义 data 属性、onclick／tabindex、Accessibility tree 和 cursor:pointer 候选发现控件，经命中检测及实际事件判断去掉装饰元素；过滤 disabled／inert／不可命中／覆盖层遮挡，记录禁用原因和激活前提，不能直接忽略。refnums 的 pick 会把整行作为一个control，可能不再深入行内按钮；crawler 必须另外递归找行内可操作后代并去重。委托事件没有逐元素监听器，不能仅靠枚举 addEventListener 找全按钮。
-2. 控件键为 page＋dialog/menu 状态＋tag/role＋data-cmd/data-env-write/data-id/name＋归一化label；补祖先路径、refnum、bounds、当前plan/env、visible/enabled和触发的API/事件。只有 key 相同但对象实例不同的重复行可按动作类型归类，仍保留1／多选／缺失／重复副本／隐藏等代表状态；内容文本不是稳定选择器。
-3. 点击导航、tab、展开器、表头菜单、右键菜单／shift+F10、更多动作、详情tab，滚动虚拟列表后重扫。用 MutationObserver 发现动态新增控件，维护页面状态图的待探索边；显式包含窄窗口覆盖层、空列表／有问题列表／正在运行任务等状态。键盘专用动作从 Palette／Keys／view.OpTable（view/ops.go:74）补入，避免只点DOM漏快捷键。
-4. `data-env-write` 是**写入门禁提示**（environment.js:21），不是完整动作注册表：不是所有导航、取消、输入或点击都带它，且同值可表示不同对象。命令面板是另一类发现源，也不能枚举原生对话框、拖动和动态任务按钮。将三源做集合对照，新出现未归类入口自动报 coverage-new。
-5. 每条边从可重置状态开始，以坐标Input点击当前可命中中心；原地连续点是单独压力变体。先走取消／Esc边，比较无领域改动；再恢复fixture执行确认／提交边，匹配通用不变量和动作专属oracle。表单自动填合法最小值，再填非法／重复／空值；需要上下文的按钮用发现到的输入语义和小量**动作fixture配方**满足前提，不写每页按钮名单。
-6. 不在同一个污染状态里一直盲点。移目录、删包、卸载、退出等会改变探索根，用单独克隆分支跑；证据输出后恢复下一分支。外部窗口边记录触发目标与blocked/external状态，后续补UIA；不可达入口不能算pass。
-7. coverage ledger 自动输出 discovered、eligible、attempted、asserted、passed、failed、blocked、disabled-by-precondition；以 **asserted / eligible action edges** 为主，不拿“clicked / refnums”充数。新增可点击元素／命令／OpTable项而无覆盖时失败；API导出方法变化也做差异提醒。100%指所定义fixture状态空间的可达边，不宣称覆盖所有数据组合。
+1. CDP real window, enable ctrl+backslash. Discover through CONTROL, clickable rows, semantic data,onclick/tabindex,Accessibility tree,cursor:pointer; hit-test/actual events remove decoration. Filter disabled/inert/unhittable/occluded while recording reasons/preconditions, not silently ignoring. refnums pick treats whole rows as controls and may skip child buttons: recursively discover/deduplicate actionable descendants. Delegated events make addEventListener enumeration insufficient.
+2. Control key: page + dialog/menu state + tag/role + data-cmd/data-env-write/data-id/name + normalized label. Include ancestor path, refnum, bounds, current plan/env, visible/enabled, and triggered API/events. Group repeated rows by action type only when keys match but object instances differ; retain representative states for 1/multiple selections, missing entries, duplicate copies, and hidden entries. Content text is not a stable selector.
+3. Click nav,tabs,expanders,header/right-click/shift+F10 menus,more actions,detail tabs; rescan after virtual scroll. MutationObserver discovers dynamic controls; maintain pending edges in page-state graph. Include narrow overlays,empty/problem lists,running tasks. Add keyboard-only Palette/Keys/view.OpTable (`view/ops.go:74`), not DOM-only coverage.
+4. `data-env-write` is a **write-gate hint** (`environment.js:21`), not full registry: navigation/cancel/input/click may lack it, same value may mean different objects. Palette cannot enumerate native dialogs/drag/dynamic task buttons either. Compare three sources; new unclassified entries → coverage-new.
+5. Reset state per edge; coordinate Input at hittable center, repeated same-position clicks separate stress variant. Cancel/Esc first and compare unchanged domain; restore fixture, confirm/submit with shared invariants/action oracle. Fill minimal valid forms, then invalid/duplicate/empty; context preconditions through discovered semantics/small **action-fixture recipes**, not per-page lists.
+6. Do not blindly click through polluted state. Move directories/delete packs/uninstall/exit change root; separate clone branches, export evidence then restore. External edges record target/blocked/external, UIA later. Unreachable never passes.
+7. Automatic ledger: discovered,eligible,attempted,asserted,passed,failed,blocked,disabled-by-precondition. Primary **asserted / eligible action edges**, not clicked/refnums. New clickable/command/OpTable without coverage fails; API exports change alert.100% means reachable edges in defined fixture space, not all combinations.
 
-每条写边的语义断言仍需按动作实现；通用crawler能自动发现／执行／抓通用破坏，却不能从按钮文字自动证明排序正确或下载了正确内容。推荐用一个小的操作语义表连接§5快照，保持“发现自动、预期明确”。性能计时轮关闭refnums／额外MutationObserver，避免标注绘制改变竞态；正常覆盖轮保留编号便于失败定位。
+Write semantics still need action-specific assertions. Generic crawler discovers/executes/catches general damage but cannot infer correct sorting/downloads from labels. Small semantic operation table connects §5 snapshots: automatic discovery, explicit expectations. Performance rounds disable refnums/extra MutationObserver to avoid altering races; normal coverage retains numbers for diagnosis.
 
-## 9. VM、真实数据与游戏加载
+## 9. VM, real data, game loading
 
-### 9.1 平台选择
+### 9.1 Platform choice
 
-| 选择 | 重置与供给 | GPU／游戏 | 成本与取舍 |
+| Option | Reset/provisioning | GPU/game | Cost/tradeoff |
 | --- | --- | --- | --- |
-| Windows Sandbox | 每次关闭丢弃；可用.wsb预置映射／启动脚本，缺少持久多层测试快照 | 可用vGPU，但不能据此保证RimWorld／目标Mod完整兼容 | 环境轻，适合首次运行／安装 smoke；每场景重装／复制几千Mod和Steam状态成本大，不作为主平台 |
-| Hyper-V | checkpoint／差分VHDX／PowerShell可编排；适合可重复离线状态场景 | 普通来宾不能默认假定拥有足够3D；GPU-P／DDA依赖硬件、宿主和guest配置，需单独验证 | Windows Pro／足够内存磁盘；离线CLI/API好用，但为本任务另建GUI/GPU链路收益小 |
-| **现有VMware Workstation** | 已有vmrun wrapper、Tools拷贝、测试VM、快照和CDP端口转发 | 虚拟3D适合先验启动验证；不等同于实体GPU性能／DDS画质验收 | 复用成本最低；现有4vCPU/8GB/120GB只是新玩家底板，千级Mod测试建议8vCPU/16–32GB、独立大容量数据盘，需测内存后定 |
-| 其他VM／实体备用 | VirtualBox也可快照；独立Windows机器可系统盘镜像 | 3D兼容需验证；GPU敏感问题最后在实体机复核 | 不为第一阶段迁移驱动；没有任何VM通过就自动证明实体游戏性能 |
+| Windows Sandbox | Discard on close;.wsb mappings/startup,no persistent layered snapshots | vGPU available,no full RimWorld/Mod compatibility guarantee | Light first-run/install smoke; repeated thousands-Mod/Steam copies costly,not primary |
+| Hyper-V | Checkpoints/differencing VHDX/PowerShell | No assumed sufficient guest3D;GPU-P/DDA depend hardware/host/guest,validate separately | Windows Pro/RAM/disk;good offline CLI/API,little benefit rebuilding GUI/GPU stack |
+| **Existing VMware Workstation** | vmrun wrapper,Tools copies,test VM,snapshots,CDP forwarding | Virtual3D for initial launch,not physical GPU performance/DDS quality | Lowest reuse cost;4vCPU/8GB/120GB only new-player base;thousands-Mod suggest8vCPU/16–32GB,separate large data disk,measure RAM |
+| Other VM / physical fallback | VirtualBox supports snapshots; a dedicated Windows machine can use a system-disk image | Validate 3D compatibility; recheck GPU-sensitive issues on physical hardware | Do not migrate drivers for Phase 1; no VM pass automatically proves physical game performance |
 
-现有依据：`scripts/vm/README.md:1`、`vm.ps1:16` 指向 Win11-Player-Test；宿主 `D:\VMs\PLAYER-TEST-AI-HANDOFF.md` 的“已有环境／每轮测试和还原”规定仅测试VM、先导出证据再还原、不擅改 Clean-Player。本文设计新克隆及场景快照，**本轮不操作现有VM**。恢复应覆盖游戏目录、Mod库、RimArcho home、Windows回收站、user data、Steam本地状态及任务文件，不能只恢复DB。
+Existing basis: `scripts/vm/README.md:1`, `vm.ps1:16` Win11-Player-Test; host `D:\VMs\PLAYER-TEST-AI-HANDOFF.md` existing-environment/test-reset rules: test VM only, export evidence before restore, do not alter Clean-Player. New clones/scenario snapshots designed here; **no existing VM operation this round**. Restore game,Mod library,RimArcho home,recycle bin,user data,Steam local state,tasks,not DB alone.
 
-### 9.2 供给与重置
+### 9.2 Provisioning/reset
 
-先在用户自己的VM内建三套fixture：small（20–50个手工可控Mod及最小XML/Def依赖）、realistic（数千真实Mod，少量有效可启动列表）、online（小批Workshop ID与网络失败样本）。从宿主Steam库复制 `steamapps/common/RimWorld` 的游戏与已拥有DLC、`workshop/content/294100`、必要的manifest/ACF及本地／锁定／SteamCMD来源；先做内容manifest和占用统计，所有写入落guest磁盘。来源只读传入，实际测试前复制成guest可写副本，不让guest删除穿透宿主可写共享文件夹。游戏/DLC取得与使用沿用户已有授权；匿名SteamCMD用于支持匿名下载的Workshop内容，不把它当全部付费本体／DLC的供给保证。
+Create three fixtures in user's own VM: small (20–50 controlled Mods/minimal XML/Def dependencies), realistic (thousands of real Mods,few valid launch lists), online (small Workshop sets/network failures). Copy owned game/DLC `steamapps/common/RimWorld`, `workshop/content/294100`, required manifests/ACF,local/locked/CMD sources from host; inventory/hash/size first, all writes guest disk. Read-only source transfer, copy to guest-writable before tests; no delete-through-host writable shares. Existing game/DLC authorization applies; anonymous CMD only for supported Workshop, not guaranteed paid game/DLC provisioning.
 
-用户真实DB副本仅在其自己的私有VM使用，不提交、上传或作为公共CI fixture。备份迁入后重新绑定每个环境的游戏／userdata与共享源、锁定库／packs路径；同盘符同相对布局优先。通过 `folder set`／`env rebind` 等产品能力迁移，再扫描核验身份与历史，不用全库字符串替换破坏ID/路径关系。RIMARCHO_HOME 由 `internal/env/env.go:167` 支持；还隔离 APPDATA／LOCALAPPDATA、日志、依赖缓存和WebView2 profile；单改home并不自动隔离DB里的绝对路径。
+Real DB copies stay in the user's own private VM, never committed, uploaded, or used as public CI fixtures. After backup import, rebind every environment's game/userdata, shared sources, lock library, and packs paths; prefer the same drive letters and relative layout. Migrate through product `folder set`/`env rebind`, then scan to verify identity and history; do not corrupt ID/path relationships with whole-database string replacements. `internal/env/env.go:167` supports RIMARCHO_HOME; also isolate APPDATA/LOCALAPPDATA, logs, dependency caches, and WebView2 profile. Changing home alone does not isolate absolute paths in the DB.
 
-供给后正常关机，创建“操作系统＋工具”和“fixture＋构建”两级基线；每场景差分磁盘／克隆，所有driver从同一fixture重新开始。重置前导出脱敏状态diff、输入轨迹、测试结果和必要日志到私有结果目录，检查上一轮进程退出，再恢复并核验hash。记录snapshot恢复／内容复制耗时以确定是否按独立场景或共享只读fixture批次优化；不能因为恢复慢就让写场景串联污染。
+Normal shutdown after provisioning; OS+tools and fixture+build baselines. Each scenario differencing disk/clone, each driver starts same fixture. Export sanitized diffs,input traces,results,needed logs privately before reset; verify prior processes exited, restore/hash. Record reset/copy times to consider independent cases/shared read-only batches; slow resets do not justify chained write contamination.
 
-Steam客户端订退订是账号全局状态；按用户接受的范围可直接用其真实账号，VM快照不会撤销服务器端订阅。
+Steam subscriptions are account-global; real account may be used within user-accepted scope. VM snapshots never undo server subscriptions.
 
-### 9.3 “确实在游戏里加载”
+### 9.3 "Actually loaded in game"
 
-先复用本项目的 `archo test run <plan> --json`：`internal/cmds/test.go:15` 已有 `--map`／`--timeout`／`--settle`，`internal/app/gametest.go:80` 使用隔离userdata、直接启动游戏、记录日志／内存和report，`:112` 检查现有链接，`:179` 生成测试配置。它不会代替GUI save部署缺少的链接；先在VM完成save并核验。`Success()`（`:66`）要求menu/map且无非信息错误簇，**没有直接把 Missing 非空作为失败**，外层还须断言missing为空、请求项与实际loaded Mods匹配，并检查没有fallback到仅Core。不能只凭退出码／启动进程就通过。
+Reuse `archo test run <plan> --json`: `internal/cmds/test.go:15` has `--map`/`--timeout`/`--settle`; `internal/app/gametest.go:80` isolated userdata,direct launch,logs/memory/report; `:112` link check,`:179` test config. Does not create missing GUI save links: save/verify in VM first. `Success()` (`:66`) requires menu/map/no non-info clusters but **does not directly fail nonempty Missing**; wrapper asserts missing empty,requested vs actual loaded match,no Core-only fallback. Exit/process alone never passes.
 
-RimDevTools可作第二步：本机独立仓库 `D:\Game\RimModManager_Upgrade\RimDevTools`，`RimDevTools/Commands/TestCommand.cs:154` 的 test run支持quick/manual/auto/xml，`:339` quick等RUNTIME_READY_TO_CLOSE与主线程心跳，auto等带runId的COMPLETED；`:825` 校验manifest executed≥planned。`source/AutoTestRunner/AutoTestReportWriter.cs:51` 输出Result／Manifest／Evidence，`source/LogSyncMod/LogSyncMod.cs:29` 发布启动信号。用本轮runId＋日志起始offset防读旧结果，除了启动还可做少量建图／Def／窗口／配方等断言。
+RimDevTools second: local repository `D:\Game\RimModManager_Upgrade\RimDevTools`; `RimDevTools/Commands/TestCommand.cs:154` quick/manual/auto/xml;`:339` quick waits RUNTIME_READY_TO_CLOSE/main-thread heartbeat,auto runId COMPLETED;`:825` executed≥planned. `source/AutoTestRunner/AutoTestReportWriter.cs:51` Result/Manifest/Evidence; `source/LogSyncMod/LogSyncMod.cs:29` startup signal. Current runId/log offset prevents stale results; add limited map/Def/window/recipe assertions.
 
-RimDevTools当前工具Mod是1.6（`RimDevTools/README.md:1`），不能直接承诺覆盖1.7。先在1.6 fixture安装LogSync并做quick＋少量确定目标auto/xml；1.7先用本项目test run，验证兼容后再扩展。其 test run会事务写入／恢复ModsConfig与LogSync设置，并可按active-mods-file设置列表（TestCommand.cs:586）；因此测试“RimArcho保存的列表”时先留存原配置hash并核实没有被工具换成另一个列表，运行后验证恢复；自动测试样本范围通过不代表几千Mod所有玩法都正常。
+Tools currently1.6 (`RimDevTools/README.md:1`), not promised1.7. Install LogSync in1.6,quick+few deterministic auto/xml;1.7 uses local test run until compatibility validated. It transactionally writes/restores ModsConfig/LogSync settings and may use active-mods-file (TestCommand.cs:586); when testing RimArcho-saved lists, retain original hash/check no list substitution,verify restore afterward. Passing samples never proves all gameplay across thousands of Mods.
 
-## 10. 后续特殊情况
+## 10. Later special cases
 
-录制／回放与人工接手以后再做。guidev `/call` 和前端Call.ByName是潜在记录点，但当前没有完整会话录制器；未来只记录脱敏语义动作，不能原样记录账号参数。Steam Guard、Steam客户端对话框、原生选择器及需要玩家判断的游戏内检查先记blocked/manual，后续再补UIA或人工继续，不在Phase 1设计认证／回放协议。
+Recording/replay/manual handoff later. guidev `/call`/frontend Call.ByName possible observation points,no complete recorder now; future records sanitized semantic actions,not raw account parameters. Steam Guard/client dialogs/native pickers/player-judgment game checks blocked/manual initially,UIA/manual continuation later. No Phase1 auth/replay protocol.
 
-## 11. 实施阶段、工作量与证据链
+## 11. Phases, effort, evidence
 
-估计为熟悉代码的开发者净人日，不包含下载／游戏加载等待、平台故障或大规模性能修复。先交能重置、能失败定位的10场景，不等CLI全补齐再测窗口。
+Net person-days for experienced developer,excluding download/load waits,platform faults,major performance fixes. Deliver resettable10 scenarios with failure diagnosis first; do not await full CLI parity.
 
-| 阶段 | 交付与退出条件 | 估计 |
+| Phase | Deliverable/exit | Estimate |
 | --- | --- | --- |
-| Phase 1a：共同底座与最高频压力 | 复用VM/CDP，driver超时、fixture小库、canonical快照、通用DOM／状态oracle；场景1–4稳定可复现，记录真实输入交错；开始crawl发现控件 | 3–4人日 |
-| Phase 1b：普通管理闭环 | 场景5–9，文件／分享码／文本／合集＋8格式、订阅取消继续、停用退订删除、sort修复、save/launch/test run；P0-1 CLI最先补，D1合入后同场景对照；在线与离线结果分开 | 4–6人日 |
-| Phase 1c：每个控件及真实规模 | 场景10的状态图crawler、每条写边oracle、可达性ledger；真实DB仅私有VM，千级数据预算；失败轨迹与快照可复现，未覆盖入口明确列出 | 3–5人日 |
-| Phase 2：差分覆盖补全 | P0-2/3/4与P1 CLI能力、全库跨env链接、credit故障恢复、贴图/整合包中断、目录迁移/卸载独立克隆，定期游戏内断言 | 6–10人日，视共用batch改造调整 |
-| Phase 3：特殊交互 | 后续§10；真实GPU／兼容性矩阵，适量人工检查 | 后续单独估算 |
+| Phase1a shared base/high-frequency stress | Reuse VM/CDP,timeouts,small fixtures,canonical snapshots,DOM/state oracles;reproducible1–4,input interleaving,crawl discovery |3–4 person-days|
+| Phase1b ordinary management loop |5–9,file/code/text/collection+8 formats,cancel/continue,disable/unsubscribe/delete,sort repairs,save/launch/test run;P0-1 first,D1 differential after merge;online/offline separate|4–6 person-days|
+| Phase1c controls/real scale |10 state graph,crawler/write oracles/reachability;private real DB,thousands-scale budgets,reproducible traces/snapshots,explicit gaps|3–5 person-days|
+| Phase2 differential completion |P0-2/3/4,P1 CLI,full cross-env links,credit recovery,textures/packs interruption,migration/uninstall separate clones,periodic game assertions|6–10 person-days,depends shared batches|
+| Phase3 special interactions |§10,physical GPU/compatibility matrix,limited manual checks|Estimate later|
 
-Phase 1约10–15人日，已有驱动减少了重新搭平台的工作；CLI P0-1约1–2人日可穿插，其他P0按实际依赖排期。验收交付是10场景结果＋动作可达性台账＋首次差异定位，不是“脚本跑完没有崩溃”。CI先在合成fixture跑C/A；私有VM串行跑W，联网和重型游戏夜间运行。结果目录默认仓库外，Git只收场景／runner／文档，永不收DB、截图、tmp、浏览器profile。
+Phase 1 takes about 10–15 person-days; existing drivers reduce platform rebuilding. CLI P0-1 takes about 1–2 person-days and can fit alongside; schedule other P0 items by actual dependencies. Deliver 10 scenario results + an action-reachability ledger + earliest-divergence diagnosis, not "the script finished without crashing." Start CI with synthetic C/A fixtures; run W serially in the private VM, online/heavy game cases nightly. Results default outside the repository; Git receives scenarios/runner/docs only, never DBs, screenshots, tmp, or browser profiles.
 
-证据→发现→实施路径索引（静态代码结论validated；性能门槛与新runner为proposal，未执行验收）：
+Evidence→finding→implementation (static findings validated;thresholds/new runner proposed,acceptance not executed):
 
-| Evidence | Finding | Path／验收 |
+| Evidence | Finding | Path/acceptance |
 | --- | --- | --- |
-| E01：gui/tasks.go:411；background-nonblocking@bd8d5d8同文件:386；复核命令见§1 | F01：D1当前仍存在，在途已改共享app函数 | P01：合入后跑场景6，比较两环境Mods链接和取消后的逐项结果 |
-| E02：gui/ops.go:128；cmds/loadout.go:250；app/dependencies.go:164、sortnotices.go:206、useinstalled.go:13 | F02：三项GUI修复无CLI入口、sort notices输出不全 | P02：P0-1，场景8三驱动、单步undo与四类notice对照 |
-| E03：view/verbs.go:105、:178；app/loadout.go:555；store/loadout.go:57 | F03：建议位置／原位恢复／组合历史不能用命令循环宣称等价 | P03：P0-2，场景1/4/8的entries与暂存／历史快照 |
-| E04：spikes/guidev/main.go:30、:145；gui/gui.go:79；scripts/vm/cdp.mjs:19 | F04：已有API与真窗口驱动，harness并发特征不同 | P04：Phase 1a，场景1–4必须W验证，C/A仅领域对照 |
-| E05：assets/js/screens.js:138；main.js:407、:1111；problems.js:206；needscache.go:139 | F05：提示／空白／键值／事件过滤在CLI外 | P05：持续UI采样＋输入压力＋晚到事件，不能只取最终DB |
-| E06：assets/js/refnums.js:26、:81、:186；view/ops.go:74；environment.js:21 | F06：refnums可帮助发现，但文件不是完整按钮分母 | P06：Phase 1c运行时crawl＋操作语义oracle，记录blocked与新入口 |
-| E07：cmds/test.go:15；app/gametest.go:66；外部TestCommand.cs:339、:825 | F07：已有游戏加载与游戏内验证入口，默认成功不足以证明列表全加载 | P07：场景9额外检查missing／实际loaded列表／runId／manifest完整性 |
+|E01:gui/tasks.go:411;background-nonblocking@bd8d5d8:386;§1 commands|F01:D1 exists in baseline,in-flight fix shares app|P01:merge then scenario6,two games' links/canceled item results|
+|E02:gui/ops.go:128;cmds/loadout.go:250;app/dependencies.go:164,sortnotices.go:206,useinstalled.go:13|F02:three GUI repairs no CLI,incomplete sort notices|P02:P0-1,scenario8 three drivers,one undo/four notices|
+|E03:view/verbs.go:105,:178;app/loadout.go:555;store/loadout.go:57|F03:suggested placement/in-place restore/composite history not command-loop equivalent|P03:P0-2,1/4/8 entries/staging/history|
+|E04:spikes/guidev/main.go:30,:145;gui/gui.go:79;scripts/vm/cdp.mjs:19|F04:API/real driver exist,different concurrency|P04:Phase1a,1–4 require W,C/A domain only|
+|E05:assets/js/screens.js:138;main.js:407,:1111;problems.js:206;needscache.go:139|F05:status/blank/keys/event filtering outside CLI|P05:continuous UI/input/late events,not final DB only|
+|E06:assets/js/refnums.js:26,:81,:186;view/ops.go:74;environment.js:21|F06:refnums assists,not complete denominator|P06:Phase1c runtime crawl/oracles,blocked/new entries|
+|E07:cmds/test.go:15;app/gametest.go:66;external TestCommand.cs:339,:825|F07:load/game validation exists,default success insufficient|P07:scenario9 missing/actual loaded/runId/manifest|
 
-源码重现以§1的rg和git show为入口，外部RimDevTools与VM handoff只在用户本机可读。没有把其他项目的凭据、私有DB内容或运行产物嵌入本报告。
+Reproduce source findings through §1 rg/git show;external RimDevTools/VM handoff local to user. No external-project credentials,private DB contents,or runtime artifacts embedded.

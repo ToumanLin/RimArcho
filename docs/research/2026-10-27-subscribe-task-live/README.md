@@ -1,56 +1,56 @@
-# 订阅任务真实联调 · 2026-10-27
+# Live subscription-task integration test · 2026-10-27
 
-在 Windows 实机上用真实数据副本、真实 Steam 公共 API、真实 SteamCMD 和真实 GUI 页面验证。没有使用 `-steam-api`、`/dev/pagecheck` 或下载替身。分支先 rebase 到包含 `d64c974` 的 `dev/0.9.0`；原 `de6cdaa` 在 rebase 后为 `40f54af`。
+Validated on a real Windows machine with a copy of real data, real Steam public API, real SteamCMD, and real GUI pages. No `-steam-api`, `/dev/pagecheck`, or download stand-in was used. The branch first rebased onto `dev/0.9.0` containing `d64c974`; original `de6cdaa` became `40f54af` after rebase.
 
-## 隔离与操作
+## Isolation and operations
 
-将 `%APPDATA%/RimArcho/archo.db*` 和 `config.toml` 复制到系统临时目录。仅修改副本：SteamCMD 来源根指向临时目录，`cfg:steamcmd-mods.dir` 指向每轮独立的临时下载目录，工具路径复用受管 SteamCMD，账户为 anonymous。浏览器 profile、APPDATA、LOCALAPPDATA 也隔离到临时目录。扫描会读取现有游戏和 Mod 文件；没有执行游戏启动、部署、真实列表编辑或真实 Mod 删除。
+Copied `%APPDATA%/RimArcho/archo.db*` and `config.toml` into a system temporary directory. Changed only the copy: SteamCMD source root pointed to a temporary directory, `cfg:steamcmd-mods.dir` to a separate temporary download directory per round, tool path reused managed SteamCMD, account anonymous. Browser profile, APPDATA, and LOCALAPPDATA were also isolated to temporary directories. Scanning read existing game and Mod files; no game launch, deployment, real list editing, or real Mod deletion was performed.
 
-从副本库存按大小选择公开 Mod，再通过真实 `GetPublishedFileDetails` POST 确认 30 项 `result=1`、`consumer_app_id=294100`，大小合计 811,767 字节。另加 `3226502149`、`3309016770`、`3778487830`、`3809376831`，真实响应均为 `result=9`。完整公开 ID、标题、大小见 [observations.json](observations.json)。为在副本中显示“未安装”，将这组 ID 的副本库存状态设为 gone；原 Mod 文件不动，每轮使用新下载目录。
+Selected public Mods by size from the copied inventory, then confirmed 30 entries with real `GetPublishedFileDetails` POST responses: `result=1`, `consumer_app_id=294100`, total size 811,767 bytes. Added `3226502149`, `3309016770`, `3778487830`, and `3809376831`, all returning real `result=9` responses. Full public IDs, titles, and sizes are in [observations.json](observations.json). To show "not installed" in the copy, these IDs' copied inventory states were set to gone; original Mod files stayed untouched, and each round used a new download directory.
 
-编译 `./spikes/guidev` 和 `./cmd/archo`，以 `guidev -home <副本> -exe <临时 archo.exe>` 启动。Chrome 使用 `--headless=new` 和独立 profile，CDP 通信方式参考 `scripts/check-accounts-page.cjs`。在真实导入页预览 34 个工坊链接，点击“全部订阅（34 个）”，再选“从 SteamCMD 下载”，打开后台任务页。通过 DOM 读取文本、CDP 截图，并每约 250 ms 采集真实 `Tasks` 返回值；保留运行中脚本以核对实际提交的 ID。
+Built `./spikes/guidev` and `./cmd/archo`, launched with `guidev -home <copy> -exe <temporary archo.exe>`. Chrome used `--headless=new` and a separate profile; CDP communication followed `scripts/check-accounts-page.cjs`. Previewed 34 Workshop links on the real import page, clicked "subscribe to all 34", selected "download with SteamCMD", and opened background tasks. Read DOM text, captured CDP screenshots, and sampled real `Tasks` responses about every 250 ms; retained the running script to verify actually submitted IDs.
 
-每次启动下载和继续前检查进程列表。遇到另一个 worktree 的 SteamCMD 时等待其退出，没有结束它，也没有与它并发运行。每次实际下载的 `+force_install_dir` 都在本测试临时目录内，未使用玩家真实 `steamcmd-mods` 下载根。
+Checked processes before each download start and continuation. When another worktree's SteamCMD was present, waited for it to exit without terminating it or running concurrently. Every actual download used `+force_install_dir` inside this test's temporary directory, never the player's real `steamcmd-mods` download root.
 
-## 实测结果
+## Measurements
 
-| 检查 | 观测 |
+| Check | Observation |
 | --- | --- |
-| 完整下载跨批 | 第一轮 30 个公开项真实下载成功；内部两次调用分别为 25 和 5 项，任务页只有一条任务，无分批行或步骤 |
-| 预检 | 4 个删除项在首个下载前显示“已不在创意工坊”；下载脚本、该轮 console_log 和 credit_item 均没有这 4 个 ID |
-| 实时进度 | 第一轮采到 11%、12%、13%、15%……95%、99%，期间有具体 Mod 名；最终版本取消/继续/异常重试全过程 104 份任务快照、一个任务 ID、最多一行、零步骤，百分比单调 |
-| 取消 | 最新轮在 15 项成功时自动点击页面“取消”，结束前又确认一项；最终完成 16、已取消 14、永久失败 4，进度 45%，`20 / 34` |
-| 进程归属 | 取消前唯一 SteamCMD 为 PID 99540，父 PID 75692（本轮 guidev），命令指向临时目录及唯一脚本；取消后查询不到 SteamCMD，脚本已清理 |
-| 保留成功项 | 取消后 16 个已确认项均有 `.rimarcho/source.json`，且在副本 DB 中为 live；没有把未确认项记入成功或 credit |
-| 继续 | 点击“继续 14 个”；沿用 `t1793088101148-1`，仍为 45%、`20 / 34`；实际新脚本恰好包含这 14 个剩余 ID，没有重下 16 个成功项或 4 个删除项 |
-| 真实异常与自动重试 | 继续时核对 PID 44624 的父进程和临时目标，随后仅对此 PID 执行受控强制退出。采样时为 52%、`22 / 34`；进程查询和结束期间又完成两项，最终自动重试脚本仅含 10 个未确认项；无需点击重试 |
-| 重试进度 | 中断后仍为 59%、`24 / 34`，没有因 10 个临时失败跳到 99%；随后随成功项继续增加，最终为 100%、`34 / 34` |
-| 最终入库 | 30 个公开项全部成功，30 个来历文件、30 个 live 实例；4 个删除项保持永久失败 |
+| Complete download across batches | First round downloaded all 30 public entries successfully; two internal calls contained 25 and 5 entries, while the task page showed only one task, no batch rows or steps |
+| Preflight | The 4 deleted entries showed "no longer on the Workshop" before the first download; none of their IDs appeared in download scripts, that round's console_log, or credit_item |
+| Live progress | First-round samples included 11%, 12%, 13%, 15%…95%, 99%, with specific Mod names; the final version's full cancel/continue/error-retry flow produced 104 task snapshots, one task ID, at most one row, zero steps, and monotonic percentages |
+| Cancellation | In the latest round the page's "cancel" was clicked automatically after 15 successes; one more was confirmed before stopping. Final counts: completed 16, cancelled 14, permanent failures 4, progress 45%, `20 / 34` |
+| Process ownership | Before cancellation, the sole SteamCMD was PID 99540, parent PID 75692 (this round's guidev), with a command targeting the temporary directory and unique script; after cancellation SteamCMD was absent and the script cleaned up |
+| Preserve successes | All 16 confirmed entries had `.rimarcho/source.json` after cancellation and were live in the copied DB; unconfirmed entries were not counted as successes or credited |
+| Continue | Clicked "continue 14 items"; reused `t1793088101148-1`, still 45%, `20 / 34`; the new script contained exactly those 14 remaining IDs, without redownloading 16 successes or 4 deleted entries |
+| Real error and automatic retry | On continuation, verified PID 44624's parent and temporary target, then force-terminated only that PID under control. At sampling it showed 52%, `22 / 34`; two more entries completed during process lookup and termination, so the final automatic retry script contained only 10 unconfirmed entries; no retry click needed |
+| Retry progress | After interruption it stayed at 59%, `24 / 34`, without jumping to 99% for 10 temporary failures; it then increased with successful entries, ending at 100%, `34 / 34` |
+| Final storage | All 30 public entries succeeded: 30 origin files, 30 live instances; 4 deleted entries remained permanent failures |
 
-进程、脚本 ID 集合、进度时间线、实际 DOM 文本见 [observations.json](observations.json)。
+Processes, script ID sets, progress timeline, and actual DOM text are in [observations.json](observations.json).
 
-## 实际页面文本
+## Actual page text
 
-左侧只有一行任务，标题“**订阅 34 个 Mod**”；状态“部分完成”，第二行“**完成 30，失败 4：已不在创意工坊**”。
+The left side had one task row titled "**subscribe 34 mods**", status "partly done", second line "**completed 30, failed 4: no longer on the Workshop**".
 
-右侧摘要只有“**4 个 Mod 已不在创意工坊（作者删除或设为私有）**”，没有 URL，也没有四次重复原因。
+The right summary contained only "**4 mods are no longer on the Workshop (deleted or private)**", no URLs or four repeated reasons.
 
-“每一项”显示 34 项：例如 `Better Animal Info`、`FrameRateControl` 等使用真实 title；4 个删除项的名称为 `Workshop <ID>`，因为公开 API 不再返回 title；其原因均为“**已不在创意工坊**”，没有 `failed:`。失败项菜单实际包含“**打开工坊页面**”，没有重试该项。
+"every item" showed 34 entries: `Better Animal Info`, `FrameRateControl`, etc. used real titles; the 4 deleted entries were named `Workshop <ID>` because the public API no longer returns titles. Their reasons were all "**no longer on the Workshop**", without `failed:`. The failed-item menu actually contained "**open the Workshop page**", without a retry-this-item action.
 
-主按钮“**前往订阅与更新**”，另有“从记录里去掉”；没有“重试 4 个”。取消后的按钮是“**继续 14 个**”，各剩余行显示“已取消”。
+Primary button: "**go to subscriptions and updates**"; also "take off the record", no "retry 4". After cancellation the button was "**continue 14 items**", and remaining rows showed "cancelled".
 
-## 联调发现并修复
+## Integration findings and fixes
 
-1. 原版本继续会新增“订阅 13 个 Mod”，从 0% 开始。改为重新排队原任务，只执行剩余 ID，合并此前结果与字节权重；也修复排队中的继续被取消时会覆盖旧成功结果的问题。
-2. 原版本把等待自动重试的失败提前计入完成数，异常退出后进度跳到 99%。运行中只累计成功及明确永久失败，操作结束再结算最终失败。
-3. 一轮真实进程中断后，SteamCMD 对被中断条目返回裸 `failed (Failure)`；旧分类不会自动重试。此项错误现按未确认处理，仍限制最多额外两轮。登录阶段同名 `FAILED (Failure)` 保留登录分类。最终重跑验证了真实异常退出后的自动恢复；裸 Failure 分支的修改后行为另由注入测试验证。
+1. Previously, continuing created a new "subscribe 13 mods" task starting at 0%. It now requeues the original task, executes only remaining IDs, and merges previous results and byte weights. Also fixed cancellation of a queued continuation overwriting earlier successes.
+2. Previously, failures awaiting automatic retry counted as completed too early, making progress jump to 99% after abnormal exit. During execution, only successes and definite permanent failures count; final failures are settled when the operation ends.
+3. After one real process interruption, SteamCMD returned bare `failed (Failure)` for the interrupted entry; the old classifier did not retry it automatically. This error is now treated as unconfirmed, still limited to two extra rounds. The identically named login-stage `FAILED (Failure)` retains its login classification. The final rerun verified automatic recovery from real abnormal exit; changed behavior of the bare Failure branch was separately checked by injected tests.
 
-## 验证范围与限制
+## Validation scope and limits
 
-`go build ./... && go vet ./... && go test ./internal/...` 全部通过。
+`go build ./... && go vet ./... && go test ./internal/...` all passed.
 
-本次实际验证匿名 SteamCMD、跨批下载、预检删除项、页面文本、实时进度、取消、同任务继续及真实进程异常后的自动重试。API 请求失败降级、非 RimWorld app ID、超时/断网、连续两轮耗尽、磁盘/所有权/权限错误、登录与 Steam 客户端订阅取消，仍主要由无网络单元测试覆盖。Windows 进程树归属还有真实辅助进程测试；实机下载时按要求没有同时启动另一个 SteamCMD 来制造并发。
+This run actually validated anonymous SteamCMD, downloads across batches, deleted-item preflight, page text, live progress, cancellation, continuation on the same task, and automatic retry after a real process error. API-request failure fallback, non-RimWorld app IDs, timeout/network loss, exhaustion of two consecutive rounds, disk/ownership/permission errors, login, and Steam-client subscription cancellation remain mainly covered by offline unit tests. Windows process-tree ownership also has a real helper-process test; as required, no second SteamCMD was launched concurrently during real downloads to manufacture contention.
 
-取消可能留下 SteamCMD 已写出的部分文件。一次实测中另一个条目的 About.xml 已落盘但尚无成功确认，扫描可识别该文件夹；任务仍把该项列为已取消，不给它写成功来历或 credit，继续时重新请求下载。不能用目录存在代替成功确认。
+Cancellation may leave partial files already written by SteamCMD. In one run another entry's About.xml had landed without success confirmation, and scanning could recognize that folder. The task still marked it cancelled, wrote no success origin or credit, and requested download again on continuation. Directory existence cannot substitute for success confirmation.
 
-实测数据副本、下载内容、临时程序和 Chrome profile 在结束进程后移入回收站；仅保留本目录去除本地私人路径的数据观察记录（截图未入库）。
+After processes exited, the data copy, downloads, temporary programs, and Chrome profile were moved to the recycle bin; only observations with local private paths removed remain in this directory (screenshots were not committed).

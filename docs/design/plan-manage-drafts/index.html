@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>列表管理草案</title>
+<title>list management draft</title>
 <style>
 /* Tokens are the GUI's own (internal/surface/gui/assets/style.css, from magpie, MIT). */
 :root {
@@ -204,12 +204,12 @@ pre.prev { margin: 8px 0 0; padding: 10px 12px; border-radius: 8px; background: 
 </style>
 </head>
 <body>
-<header class="review"><b>列表管理 · 第二稿</b><span>交互草案 · 示例数据 · 不读写任何文件</span><span class="sp"></span><button class="rb" id="theme">切换深浅色</button></header>
+<header class="review"><b>list management · second draft</b><span>interactive draft · example data · no file reads/writes</span><span class="sp"></span><button class="rb" id="theme">toggle light / dark</button></header>
 <div id="app">
   <aside id="side">
-    <div class="side-head"><button class="navtoggle" aria-label="侧栏"><svg class="i" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="2"/><path d="M6 3v10"/></svg></button></div>
+    <div class="side-head"><button class="navtoggle" aria-label="sidebar"><svg class="i" viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="2"/><path d="M6 3v10"/></svg></button></div>
     <nav id="nav"></nav>
-    <div class="side-foot"><button class="nav-item"><span>后台任务</span></button><button class="nav-item"><span>设置</span></button></div>
+    <div class="side-foot"><button class="nav-item"><span>background tasks</span></button><button class="nav-item"><span>settings</span></button></div>
   </aside>
   <div id="main">
     <header id="top"><nav id="crumbs"></nav><span class="envchip">main · 1.7</span></header>
@@ -237,19 +237,19 @@ const ic = (n) => `<svg class="i" viewBox="0 0 16 16">${IC[n]}</svg>`;
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 const LISTS = [
-  { id: 1, name: "主力殖民地", cur: true, game: "v18", mods: 412, played: "10月21日", born: "9月3日 · 复制自 default v4", decl: ["1.5", "1.6"], created: "1.7", chosen: null,
+  { id: 1, name: "Main colony", cur: true, game: "v18", mods: 412, played: "10/21", born: "09/03 · copied from default v4", decl: ["1.5", "1.6"], created: "1.7", chosen: null,
     miss: { "1.0": 391, "1.1": 377, "1.2": 352, "1.3": 248, "1.4": 96, "1.5": 0, "1.6": 0, "1.7": 37 },
     subs: [
-      { title: "Vanilla Expanded 全系列", n: 148, checked: "今天 14:02", mode: "add", notInstalled: 4,
+      { title: "Vanilla Expanded full series", n: 148, checked: "today 14:02", mode: "add", notInstalled: 4,
         add: ["Vanilla Factions Expanded - Deserters", "Vanilla Psycasts Expanded - Hemosage", "Vanilla Gravship Expanded"], remove: ["Vanilla Weapons Expanded - Laser"] },
-      { title: "QoL 必备", n: 36, checked: "今天 14:02", mode: "follow", notInstalled: 0, add: [], remove: [] } ],
-    pack: { name: "主力殖民地 10-20", size: "3.2 GB", date: "10月20日" } },
-  { id: 2, name: "轻量开荒", mods: 86, played: "10月12日", born: "10月1日 · 空列表", decl: ["1.6", "1.7"], created: "1.7", chosen: null,
+      { title: "QoL essentials", n: 36, checked: "today 14:02", mode: "follow", notInstalled: 0, add: [], remove: [] } ],
+    pack: { name: "Main colony 10-20", size: "3.2 GB", date: "10/20" } },
+  { id: 2, name: "Light start", mods: 86, played: "10/12", born: "10/01 · empty list", decl: ["1.6", "1.7"], created: "1.7", chosen: null,
     miss: { "1.0": 80, "1.1": 79, "1.2": 74, "1.3": 61, "1.4": 30, "1.5": 9, "1.6": 0, "1.7": 0 }, subs: [], pack: null },
-  { id: 3, name: "战锤 40K", ext: true, mods: 230, played: "8月30日", born: "7月2日 · 导入 Steam 合集", decl: [], created: "1.6", chosen: null,
+  { id: 3, name: "Warhammer 40K", ext: true, mods: 230, played: "08/30", born: "07/02 · imported Steam collection", decl: [], created: "1.6", chosen: null,
     miss: { "1.0": 230, "1.1": 229, "1.2": 221, "1.3": 190, "1.4": 160, "1.5": 41, "1.6": 6, "1.7": 58 },
-    subs: [{ title: "Warhammer 40K Collection", n: 226, checked: "10月22日", mode: "add", notInstalled: 0, add: ["Vanilla Races Expanded - Sanguophage"], remove: [] }], pack: null },
-  { id: 4, name: "测试用", mods: 12, played: null, born: "今天 · 复制自 主力殖民地 v18", decl: ["1.4", "1.5", "1.6", "1.7"], created: "1.7", chosen: ["1.6", "1.7"],
+    subs: [{ title: "Warhammer 40K Collection", n: 226, checked: "10/22", mode: "add", notInstalled: 0, add: ["Vanilla Races Expanded - Sanguophage"], remove: [] }], pack: null },
+  { id: 4, name: "Testing", mods: 12, played: null, born: "today · copied from Main colony v18", decl: ["1.4", "1.5", "1.6", "1.7"], created: "1.7", chosen: ["1.6", "1.7"],
     miss: { "1.0": 12, "1.1": 12, "1.2": 10, "1.3": 4, "1.4": 0, "1.5": 0, "1.6": 0, "1.7": 0 }, subs: [], pack: null },
 ];
 const ENTRIES = [["brrainz.harmony", "Harmony", "2009463077"], ["ludeon.rimworld", "Core", ""], ["ludeon.rimworld.royalty", "Royalty", ""],
@@ -264,129 +264,129 @@ const same = (a, b) => a.length === b.length && a.every((x) => b.includes(x));
 function fmtVers(vs) {
   const ix = vs.map(idx).sort((a, b) => a - b), out = [];
   for (let i = 0; i < ix.length; i++) { let j = i; while (j + 1 < ix.length && ix[j + 1] === ix[j] + 1) j++; out.push(i === j ? VERS[ix[i]] : VERS[ix[i]] + "–" + VERS[ix[j]]); i = j; }
-  return out.join("、") || "—";
+  return out.join(", ") || "—";
 }
 function toggleVer(l, v) {
   const c = new Set(chosen(l)); c.has(v) ? c.delete(v) : c.add(v);
-  if (!c.size) return say("至少要留一个版本");
+  if (!c.size) return say("keep at least one version");
   const arr = VERS.filter((x) => c.has(x)); l.chosen = same(arr, defaults(l)) ? null : arr;
-  say(`${l.name} 允许 ${fmtVers(chosen(l))}`, true); render();
+  say(`${l.name} allows ${fmtVers(chosen(l))}`, true); render();
 }
 
 function versionBlock(l) {
   const c = chosen(l);
   const chips = VERS.map((v) => {
-    const m = l.miss[v], tip = (v === GAME ? "现在的游戏 · " : "") + (m ? `${m} 个 Mod 没写支持 ${v}` : `所有 Mod 都写了支持 ${v}`);
+    const m = l.miss[v], tip = (v === GAME ? "current game · " : "") + (m ? `${m} mods do not claim support for ${v}` : `all mods claim support for ${v}`);
     return `<button class="v ${c.includes(v) ? "on" : ""}" data-ver="${v}" title="${tip}">${v}${v === GAME ? '<span class="cur"></span>' : ""}</button>`;
   }).join("");
-  return `<div class="vrow"><div class="vstrip">${chips}</div>${l.chosen ? `<button class="btn link" data-reset title="默认 ${fmtVers(defaults(l))}">恢复默认</button>` : ""}</div>`;
+  return `<div class="vrow"><div class="vstrip">${chips}</div>${l.chosen ? `<button class="btn link" data-reset title="default ${fmtVers(defaults(l))}">reset to default</button>` : ""}</div>`;
 }
 function subsBlock(l) {
   const rows = l.subs.map((s, k) => {
     const key = l.id + ":" + k, parts = [];
-    if (s.add.length) parts.push(`新增 <b>${s.add.length}</b> 个`); if (s.remove.length) parts.push(`移除 <b>${s.remove.length}</b> 个`);
+    if (s.add.length) parts.push(`<b>${s.add.length}</b> added`); if (s.remove.length) parts.push(`<b>${s.remove.length}</b> removed`);
     return `<div class="coll">
-      <div class="t"><span class="muted">${ic("steam")}</span><b>${esc(s.title)}</b><span class="muted">${s.n} 个</span>
-        <span class="r"><button class="btn small" title="在 Steam 打开">${ic("ext")}</button><button class="btn small" data-unlink="${k}">取消关联</button></span></div>
-      <div class="meta">上次检查 ${s.checked}${s.notInstalled ? ` · <span class="warn">${s.notInstalled} 个没装</span> <button class="btn link">在工坊订阅</button>` : ""}</div>
-      ${parts.length ? `<div class="chg"><span>合集有变化：${parts.join("、")}</span><button class="btn link" data-diff="${key}">${S.showDiff[key] ? "收起" : "看差异"}</button><span style="flex:1"></span><button class="btn small line" data-sync="${k}">跟上合集</button></div>` : `<div class="same">${ic("check")} 和合集一致</div>`}
+      <div class="t"><span class="muted">${ic("steam")}</span><b>${esc(s.title)}</b><span class="muted">${s.n} items</span>
+        <span class="r"><button class="btn small" title="open in Steam">${ic("ext")}</button><button class="btn small" data-unlink="${k}">stop following</button></span></div>
+      <div class="meta">last checked ${s.checked}${s.notInstalled ? ` · <span class="warn">${s.notInstalled} not installed</span> <button class="btn link">subscribe in the Workshop</button>` : ""}</div>
+      ${parts.length ? `<div class="chg"><span>collection changed: ${parts.join(", ")}</span><button class="btn link" data-diff="${key}">${S.showDiff[key] ? "show fewer" : "see the changes"}</button><span style="flex:1"></span><button class="btn small line" data-sync="${k}">catch up</button></div>` : `<div class="same">${ic("check")} matches collection</div>`}
       ${S.showDiff[key] ? `<div class="diff">${s.add.map((n) => `<div class="a">${esc(n)}</div>`).join("")}${s.remove.map((n) => `<div class="d">${esc(n)}</div>`).join("")}</div>` : ""}
-      <div class="follow">跟上时：<span class="seg"><button class="${s.mode === "add" ? "on" : ""}" data-mode="${k}:add">只加入新增的</button><button class="${s.mode === "follow" ? "on" : ""}" data-mode="${k}:follow">也停用移除的</button></span></div>
+      <div class="follow">when catching up:<span class="seg"><button class="${s.mode === "add" ? "on" : ""}" data-mode="${k}:add">add new only</button><button class="${s.mode === "follow" ? "on" : ""}" data-mode="${k}:follow">also disable dropped</button></span></div>
     </div>`;
   }).join("");
-  return `${rows || '<p class="line-note" style="margin-top:0">还没有关联合集</p>'}
-    <div class="addcoll"><label class="field">${ic("link")}<input placeholder="粘贴 Steam 合集链接，让这个列表跟着它" spellcheck="false"></label><button class="btn line" data-link>关联</button></div>`;
+  return `${rows || '<p class="line-note" style="margin-top:0">no collection yet</p>'}
+    <div class="addcoll"><label class="field">${ic("link")}<input placeholder="paste a Steam collection link to make this list follow it" spellcheck="false"></label><button class="btn line" data-link>follow</button></div>`;
 }
 
 const FMTS = [
-  { k: "archo", nm: "RimArcho 列表", ext: ".archolist.json", ds: "带每个 Mod 的版本和允许的游戏版本", rec: true },
-  { k: "code", nm: "RimCrow 分享码", ext: "一行文本", ds: "贴到聊天里就能分享" },
-  { k: "text", nm: "文本列表", ext: ".txt", ds: "每行一个包名，后面注释写名称" },
-  { k: "mc", nm: "ModsConfig.xml", ext: ".xml", ds: "游戏自己的格式，RimSort 也读" },
-  { k: "rml", nm: "RimWorld Mod 列表", ext: ".rml", ds: "游戏的 Mod 菜单里能直接载入" },
-  { k: "rcx", nm: "RimCrow ModList.xml", ext: ".xml", ds: "RimCrow 的列表文件" },
-  { k: "ws", nm: "工坊链接", ext: ".md", ds: "每行一个工坊链接，没装的人照着订阅" },
+  { k: "archo", nm: "RimArcho list", ext: ".archolist.json", ds: "includes each mod version and allowed game versions", rec: true },
+  { k: "code", nm: "RimCrow share code", ext: "one line of text", ds: "paste into chat to share" },
+  { k: "text", nm: "text list", ext: ".txt", ds: "one package ID per line, name in trailing comment" },
+  { k: "mc", nm: "ModsConfig.xml", ext: ".xml", ds: "the game's format; RimSort reads it too" },
+  { k: "rml", nm: "RimWorld Mod list", ext: ".rml", ds: "load directly in the game's Mod menu" },
+  { k: "rcx", nm: "RimCrow ModList.xml", ext: ".xml", ds: "RimCrow list file" },
+  { k: "ws", nm: "workshop links", ext: ".md", ds: "Markdown links for subscribing by hand; reads back as workshop IDs" },
 ];
 function preview(l, k) {
   const e = ENTRIES, c = chosen(l);
   switch (k) {
-    case "archo": return `{\n  "format": 1,\n  "light": true,\n  "name": "${l.name}",\n  "game": "1.7.4520 rev1137",\n  "versions": [${c.map((v) => `"${v}"`).join(", ")}],\n  "entries": [\n${e.slice(0, 4).map(([p, n, w]) => `    { "package_id": "${p}", "name": "${n}"${w ? `, "workshop_id": "${w}", "hash": "b3:9f2c…"` : `, "official": true`} }`).join(",\n")},\n    …共 ${l.mods} 个\n  ]\n}`;
+    case "archo": return `{\n  "format": 1,\n  "light": true,\n  "name": "${l.name}",\n  "game": "1.7.4520 rev1137",\n  "versions": [${c.map((v) => `"${v}"`).join(", ")}],\n  "entries": [\n${e.slice(0, 4).map(([p, n, w]) => `    { "package_id": "${p}", "name": "${n}"${w ? `, "workshop_id": "${w}", "hash": "b3:9f2c…"` : `, "official": true`} }`).join(",\n")},\n    …${l.mods} total\n  ]\n}`;
     case "code": return "RC-8F3A11C2-eNqNkk1uwjAQha9ieZ0FcRJIwq7qrmvpBVA0dSbE6sSObCcoQty9DgRo…";
-    case "text": return `# ${l.name} · main 1.7 · ${l.mods} 个 Mod · 2026-10-23\n# 导入：RimArcho、RimSort、RimCrow 都能读\n${e.map(([p, n]) => `${p.padEnd(44)}# ${n}`).join("\n")}\n…`;
+    case "text": return `# ${l.name} · main 1.7 · ${l.mods} mods · 2026-10-23\n# import: readable by RimArcho, RimSort and RimCrow\n${e.map(([p, n]) => `${p.padEnd(44)}# ${n}`).join("\n")}\n…`;
     case "mc": return `<?xml version="1.0" encoding="utf-8"?>\n<ModsConfigData>\n  <version>1.7.4520 rev1137</version>\n  <activeMods>\n${e.slice(0, 5).map(([p]) => `    <li>${p}</li>`).join("\n")}\n    …\n  </activeMods>\n</ModsConfigData>`;
     case "rml": return `<?xml version="1.0" encoding="utf-8"?>\n<savedModList>\n  <meta>\n    <gameVersion>1.7.4520 rev1137</gameVersion>\n    <modIds>\n${e.slice(0, 3).map(([p]) => `      <li>${p}</li>`).join("\n")}\n      …\n    </modIds>\n  </meta>\n</savedModList>`;
     case "rcx": return `<?xml version="1.0" encoding="utf-8"?>\n<ModList>\n  <modIds>\n${e.slice(0, 3).map(([p]) => `    <li>${p}</li>`).join("\n")}\n    …\n  </modIds>\n</ModList>`;
-    case "ws": return `# ${l.name} · ${l.mods} 个 Mod，其中 ${l.mods - 9} 个在工坊\n${e.filter((x) => x[2]).map(([, n, w]) => `- [${n}](https://steamcommunity.com/sharedfiles/filedetails/?id=${w})`).join("\n")}\n…\n# 不在工坊：Core、Royalty、Biotech …`;
+    case "ws": return `# ${l.name} · ${l.mods} mods, ${l.mods - 9} on Workshop\n${e.filter((x) => x[2]).map(([, n, w]) => `- [${n}](https://steamcommunity.com/sharedfiles/filedetails/?id=${w})`).join("\n")}\n…\n# not on Workshop: Core, Royalty, Biotech …`;
   }
 }
 
-const marks = (l) => `${l.cur ? '<span class="pill cur">当前</span>' : ""}${l.game ? `<span class="gdot" title="游戏里现在是：${l.name} ${l.game}"></span>` : ""}${l.ext ? '<span class="adot" title="有没采用的外部修改"></span>' : ""}`;
+const marks = (l) => `${l.cur ? '<span class="pill cur">current</span>' : ""}${l.game ? `<span class="gdot" title="in the game now: ${l.name} ${l.game}"></span>` : ""}${l.ext ? '<span class="adot" title="unapplied outside changes"></span>' : ""}`;
 const changed = (l) => l.subs.some((s) => s.add.length || s.remove.length);
 const cur = () => LISTS.find((x) => x.id === S.sel);
 
 function renderManage() {
   const l = cur();
-  $("#head").innerHTML = `<p class="lead">main 里有 ${LISTS.length} 个列表。选一个，看它能在哪些版本上玩、跟着哪个合集、怎么分享出去。</p>
-    <div class="page-acts"><button class="btn" data-do="import">${ic("imp")}导入<kbd>i</kbd></button><button class="btn primary" data-do="new">${ic("plus")}新列表<kbd>n</kbd></button></div>`;
+  $("#head").innerHTML = `<p class="lead">${LISTS.length} lists in main. Select one to see playable versions, followed collections and sharing options.</p>
+    <div class="page-acts"><button class="btn" data-do="import">${ic("imp")}import<kbd>i</kbd></button><button class="btn primary" data-do="new">${ic("plus")}new list<kbd>n</kbd></button></div>`;
   $("#page").innerHTML = `<div class="A">
     <section class="card"><div class="scroll" style="padding-top:4px">
-      ${LISTS.map((x) => `<button class="lrow ${x.id === S.sel ? "on" : ""}" data-sel="${x.id}"><span class="n"><b>${esc(x.name)}</b>${marks(x)}</span><span class="m">${fmtVers(chosen(x))} · ${x.mods} 个 Mod · ${x.played || "没玩过"}</span><span class="ri">${x.subs.length ? `<span class="${changed(x) ? "warn" : ""}" title="${changed(x) ? "合集有变化" : "跟着 Steam 合集"}">${ic("steam")}</span>` : ""}</span></button>`).join("")}
+      ${LISTS.map((x) => `<button class="lrow ${x.id === S.sel ? "on" : ""}" data-sel="${x.id}"><span class="n"><b>${esc(x.name)}</b>${marks(x)}</span><span class="m">${fmtVers(chosen(x))} · ${x.mods} mods · ${x.played || "never played"}</span><span class="ri">${x.subs.length ? `<span class="${changed(x) ? "warn" : ""}" title="${changed(x) ? "collection changed" : "follow a Steam collection"}">${ic("steam")}</span>` : ""}</span></button>`).join("")}
     </div></section>
     <section class="card"><div class="dhead">
         <h2>${esc(l.name)} ${marks(l)}</h2>
-        <div class="facts">${l.mods} 个 Mod · ${l.played ? "上次游玩 " + l.played : "没玩过"} · ${l.born}${l.game ? ` · <span class="ok">游戏里现在是 ${l.game}</span>` : ""}</div>
-        <div class="acts"><button class="btn line" data-do="edit">${ic("edit")}编辑<kbd>↵</kbd></button>${l.cur ? "" : '<button class="btn line" data-do="use">设为当前</button>'}<button class="btn" data-do="menu" title="改名、复制、删除">${ic("more")}</button></div>
+        <div class="facts">${l.mods} mods · ${l.played ? "last played " + l.played : "never played"} · ${l.born}${l.game ? ` · <span class="ok">in the game now ${l.game}</span>` : ""}</div>
+        <div class="acts"><button class="btn line" data-do="edit">${ic("edit")}edit<kbd>↵</kbd></button>${l.cur ? "" : '<button class="btn line" data-do="use">make current</button>'}<button class="btn" data-do="menu" title="rename, copy, delete">${ic("more")}</button></div>
       </div>
       <div class="scroll">
-        <div class="sub-h">游戏版本</div><div class="sec">${versionBlock(l)}</div>
+        <div class="sub-h">game version</div><div class="sec">${versionBlock(l)}</div>
         <div class="sec-sep"></div>
-        <div class="sub-h">跟着 Steam 合集<span class="r">${l.subs.length ? l.subs.length + " 个" : ""}</span></div><div class="sec">${subsBlock(l)}</div>
+        <div class="sub-h">follows Steam collections<span class="r">${l.subs.length ? l.subs.length + " items" : ""}</span></div><div class="sec">${subsBlock(l)}</div>
         <div class="sec-sep"></div>
-        <div class="sub-h">分享</div><div class="sec">
-          ${l.pack ? `<div class="packrow"><span class="muted">${ic("box")}</span><div><b>${l.pack.name}</b><div class="meta">${l.pack.size} · ${l.pack.date} 创建</div></div><span class="r"><button class="btn small">打开</button></span></div>` : ""}
-          <div class="acts-row"><button class="btn line" data-do="export">${ic("exp")}导出…</button><button class="btn line" data-do="pack">${ic("box")}创建整合包…</button></div></div>
+        <div class="sub-h">share</div><div class="sec">
+          ${l.pack ? `<div class="packrow"><span class="muted">${ic("box")}</span><div><b>${l.pack.name}</b><div class="meta">${l.pack.size} · ${l.pack.date} created</div></div><span class="r"><button class="btn small">open</button></span></div>` : ""}
+          <div class="acts-row"><button class="btn line" data-do="export">${ic("exp")}export…</button><button class="btn line" data-do="pack">${ic("box")}create a pack…</button></div></div>
       </div></section></div>`;
-  hints([["↑↓", "选列表"], ["enter", "编辑"], ["n", "新列表"], ["i", "导入"], ["e", "导出"], ["B", "创建整合包"], ["?", "全部按键"]]);
+  hints([["↑↓", "pick a list"], ["enter", "edit"], ["n", "new list"], ["i", "imported"], ["e", "export"], ["B", "create a pack"], ["?", "all keys"]]);
 }
 function renderExport() {
   const l = cur();
-  $("#head").innerHTML = `<p class="lead">把 ${esc(l.name)} 导出成文件或分享码。只读：不改列表，不写游戏。</p><div class="page-acts"><button class="btn" data-do="back">取消<kbd>esc</kbd></button></div>`;
+  $("#head").innerHTML = `<p class="lead">Export ${esc(l.name)} as a file or share code. Read-only: no list changes or game writes.</p><div class="page-acts"><button class="btn" data-do="back">cancel<kbd>esc</kbd></button></div>`;
   $("#page").innerHTML = `<div class="X">
-    <section class="card"><div class="card-head"><h3>格式</h3></div><div class="scroll" style="padding:6px"><div class="fmts">
-      ${FMTS.map((x) => `<button class="fmt ${x.k === S.fmt ? "on" : ""}" data-fmt="${x.k}"><span class="rd"></span><span class="nm">${x.nm}${x.rec ? "<small>推荐</small>" : ""}</span><span class="ext">${x.ext}</span><span class="ds">${x.ds}</span></button>`).join("")}
+    <section class="card"><div class="card-head"><h3>format</h3></div><div class="scroll" style="padding:6px"><div class="fmts">
+      ${FMTS.map((x) => `<button class="fmt ${x.k === S.fmt ? "on" : ""}" data-fmt="${x.k}"><span class="rd"></span><span class="nm">${x.nm}${x.rec ? "<small>recommended</small>" : ""}</span><span class="ext">${x.ext}</span><span class="ds">${x.ds}</span></button>`).join("")}
     </div></div></section>
-    <section class="card"><div class="card-head"><h3>内容</h3><span class="r">${l.mods} 个 Mod · ${fmtVers(chosen(l))}</span></div><div class="scroll" style="padding:4px 14px 14px">
+    <section class="card"><div class="card-head"><h3>content</h3><span class="r">${l.mods} mods · ${fmtVers(chosen(l))}</span></div><div class="scroll" style="padding:4px 14px 14px">
       <pre class="prev">${esc(preview(l, S.fmt))}</pre>
-      <div class="acts-row">${S.fmt === "code" ? `<button class="btn primary" data-do="copy">${ic("copy")}复制分享码</button>` : `<button class="btn primary" data-do="save">${ic("save")}保存为文件…</button><button class="btn line" data-do="copy">${ic("copy")}复制</button>`}</div>
+      <div class="acts-row">${S.fmt === "code" ? `<button class="btn primary" data-do="copy">${ic("copy")}copy share code</button>` : `<button class="btn primary" data-do="save">${ic("save")}save as file…</button><button class="btn line" data-do="copy">${ic("copy")}copy</button>`}</div>
     </div></section></div>`;
-  hints([["↑↓", "选格式"], ["enter", "保存"], ["c", "复制"], ["esc", "回到管理"], ["?", "全部按键"]]);
+  hints([["↑↓", "choose format"], ["enter", "saved"], ["c", "copy"], ["esc", "back to manage"], ["?", "all keys"]]);
 }
 
 function openPop(kind) {
   const l = cur(); let h = "";
-  if (kind === "new") h = `<div class="pop"><h3>新列表</h3><p class="lead">在 main · 1.7 里新建；不写游戏文件。</p><div class="bd">
-      <label class="field" style="height:30px"><span class="muted">名字</span><input value="新列表 1" spellcheck="false"></label>
-      <div class="lbl">从哪里开始</div><div class="fmts">
-        <button class="fmt"><span class="rd"></span><span class="nm">空列表</span></button>
-        <button class="fmt on"><span class="rd"></span><span class="nm">复制「${esc(l.name)}」</span><span class="ext">现在的样子</span></button>
-        <button class="fmt"><span class="rd"></span><span class="nm">复制它写入过的一版</span><span class="ext">v18 · 10月21日 ▾</span></button>
-        <button class="fmt"><span class="rd"></span><span class="nm">照一个存档</span><span class="ext">选择存档 ▾</span></button></div>
-      <div class="lbl">导入文件、分享码或合集</div><button class="btn link" data-do="import">去导入…</button>
-    </div><div class="btns"><button class="btn" data-do="close">取消</button><button class="btn primary" data-do="create">创建</button></div></div>`;
+  if (kind === "new") h = `<div class="pop"><h3>new list</h3><p class="lead">Create in main · 1.7; no game file writes.</p><div class="bd">
+      <label class="field" style="height:30px"><span class="muted">name</span><input value="new list 1" spellcheck="false"></label>
+      <div class="lbl">start from</div><div class="fmts">
+        <button class="fmt"><span class="rd"></span><span class="nm">an empty list</span></button>
+        <button class="fmt on"><span class="rd"></span><span class="nm">copy ${esc(l.name)}</span><span class="ext">current content</span></button>
+        <button class="fmt"><span class="rd"></span><span class="nm">copy a version it wrote to the game</span><span class="ext">v18 · 10/21 ▾</span></button>
+        <button class="fmt"><span class="rd"></span><span class="nm">a save file</span><span class="ext">choose save ▾</span></button></div>
+      <div class="lbl">import file, share code or collection</div><button class="btn link" data-do="import">go to import…</button>
+    </div><div class="btns"><button class="btn" data-do="close">cancel</button><button class="btn primary" data-do="create">create list</button></div></div>`;
   else if (kind === "import") {
     const d = S.imp;
-    h = `<div class="pop"><h3>导入</h3><p class="lead">粘贴分享码、Steam 合集链接、Rentry 链接或包名，或把文件拖进窗口。</p><div class="bd">
-      <textarea placeholder="粘贴到这里…" spellcheck="false">${d ? "https://steamcommunity.com/sharedfiles/filedetails/?id=2817362812" : ""}</textarea>
-      ${d ? `<div class="kv"><span>名称</span><b>Warhammer 40K Collection</b><span>来源</span><span>Steam 合集</span><span>游戏</span><span class="warn">1.6，现在的游戏是 1.7</span><span>Mod</span><span>226 个 · 已安装 219 · <span class="warn">没装 7</span> <button class="btn link">在工坊订阅</button></span><span>版本</span><span>建议 1.6–1.7</span></div>
-        <div class="fmts">${[["new", "导入为新列表"], ["replace", `替换「${l.name}」`, "新增 31、移除 12、移动 40"], ["merge", "只加入缺少的"]].map(([k, t, ds]) => `<button class="fmt ${d.dest === k ? "on" : ""}" data-dest="${k}"><span class="rd"></span><span class="nm">${t}</span><span></span>${ds ? `<span class="ds">${ds}</span>` : ""}</button>`).join("")}</div>
-        <button class="chk ${d.follow ? "on" : ""}" data-follow><span class="box">${d.follow ? ic("check") : ""}</span>以后跟着这个合集</button>
-        <p class="line-note">都不写游戏文件。</p>` : `<div class="acts-row"><button class="btn line small" data-do="sample">试一个合集链接</button><button class="btn small">选择文件…</button></div>`}
-    </div><div class="btns"><button class="btn" data-do="close">取消</button><button class="btn primary" data-do="imp-go" ${d ? "" : "disabled"}>导入</button></div></div>`;
+    h = `<div class="pop"><h3>imported</h3><p class="lead">Paste a share code, Steam collection link, Rentry link or package IDs, or drop a file into the window.</p><div class="bd">
+      <textarea placeholder="paste here…" spellcheck="false">${d ? "https://steamcommunity.com/sharedfiles/filedetails/?id=2817362812" : ""}</textarea>
+      ${d ? `<div class="kv"><span>name</span><b>Warhammer 40K Collection</b><span>library source</span><span>Steam collection</span><span>game</span><span class="warn">1.6; current game is 1.7</span><span>Mod</span><span>226 total · 219 installed · <span class="warn">7 not installed</span> <button class="btn link">subscribe in the Workshop</button></span><span>supported versions</span><span>suggested 1.6–1.7</span></div>
+        <div class="fmts">${[["new", "import as a new list"], ["replace", `replace ${l.name}`, "31 added, 12 removed, 40 moved"], ["merge", "add only missing"]].map(([k, t, ds]) => `<button class="fmt ${d.dest === k ? "on" : ""}" data-dest="${k}"><span class="rd"></span><span class="nm">${t}</span><span></span>${ds ? `<span class="ds">${ds}</span>` : ""}</button>`).join("")}</div>
+        <button class="chk ${d.follow ? "on" : ""}" data-follow><span class="box">${d.follow ? ic("check") : ""}</span>follow this collection from now on</button>
+        <p class="line-note">Neither writes game files.</p>` : `<div class="acts-row"><button class="btn line small" data-do="sample">try a collection link</button><button class="btn small">choose a file…</button></div>`}
+    </div><div class="btns"><button class="btn" data-do="close">cancel</button><button class="btn primary" data-do="imp-go" ${d ? "" : "disabled"}>imported</button></div></div>`;
   } else if (kind === "menu") h = `<div class="pop" style="width:300px"><h3>${esc(l.name)}</h3><div class="bd fmts" style="padding-bottom:10px">
-      <button class="fmt" data-do="close"><span></span><span class="nm">改名…</span><span class="ext">F2</span></button>
-      <button class="fmt" data-do="close"><span></span><span class="nm">复制成新列表</span></button>
-      <button class="fmt" data-do="close"><span></span><span class="nm">写入游戏</span><span class="ext">w</span></button>
-      <button class="fmt" data-do="close"><span></span><span class="nm" style="color:var(--red)">删除列表…</span><span class="ext">Del</span></button></div></div>`;
+      <button class="fmt" data-do="close"><span></span><span class="nm">rename…</span><span class="ext">F2</span></button>
+      <button class="fmt" data-do="close"><span></span><span class="nm">copy as a new list</span></button>
+      <button class="fmt" data-do="close"><span></span><span class="nm">write to the game</span><span class="ext">w</span></button>
+      <button class="fmt" data-do="close"><span></span><span class="nm" style="color:var(--red)">delete list…</span><span class="ext">Del</span></button></div></div>`;
   const v = $("#veil"); v.innerHTML = h; v.hidden = false; S.pop = kind;
 }
 const closePop = () => { $("#veil").hidden = true; S.pop = null; };
@@ -394,16 +394,16 @@ const closePop = () => { $("#veil").hidden = true; S.pop = null; };
 function nav() {
   const it = (t, extra = "", cls = "") => `<button class="nav-item ${cls}"><span>${t}</span>${extra}</button>`;
   const chev = `<span class="chev">${ic("chev")}</span>`;
-  $("#nav").innerHTML = `<div class="grp">在玩</div>${it("启动")}${it("能不能跑", '<span class="badge-n">2</span>')}${it("游戏日志")}
-    <div class="grp">库</div>${it("Mod 库", chev)}${it("列表", chev, "open")}
-    <div class="kids"><button class="nav-kid ${S.sub ? "" : "on"}" data-do="back">管理</button>${LISTS.map((l) => `<button class="nav-kid" data-sel="${l.id}">${esc(l.name)}${l.game ? '<span class="gdot"></span>' : ""}${l.ext ? '<span class="adot"></span>' : ""}</button>`).join("")}</div>
-    ${it("整合包", chev)}${it("贴图优化")}${it("游戏")}`;
+  $("#nav").innerHTML = `<div class="grp">playing</div>${it("start")}${it("can it run", '<span class="badge-n">2</span>')}${it("game log")}
+    <div class="grp">library</div>${it("the library", chev)}${it("lists", chev, "open")}
+    <div class="kids"><button class="nav-kid ${S.sub ? "" : "on"}" data-do="back">manage</button>${LISTS.map((l) => `<button class="nav-kid" data-sel="${l.id}">${esc(l.name)}${l.game ? '<span class="gdot"></span>' : ""}${l.ext ? '<span class="adot"></span>' : ""}</button>`).join("")}</div>
+    ${it("packs", chev)}${it("texture optimisation")}${it("game")}`;
   const l = cur(), c = (t, x = "") => `<button class="crumb ${x}">${t}</button>`, s = '<span class="sep">/</span>';
-  $("#crumbs").innerHTML = S.sub ? [c("库"), c("列表"), c(esc(l.name)), c("导出", "last")].join(s) : [c("库"), c("列表"), c("管理", "last")].join(s);
+  $("#crumbs").innerHTML = S.sub ? [c("library"), c("lists"), c(esc(l.name)), c("export", "last")].join(s) : [c("library"), c("lists"), c("manage", "last")].join(s);
 }
 function hints(arr) { $("#hints").innerHTML = arr.map(([k, d]) => `<span class="k">${k}</span> ${d}`).join('<span class="dot">·</span>'); }
 let sayT;
-function say(t, undo) { $("#status").innerHTML = `<span class="ok">✓</span> ${esc(t)}${undo ? ' · <button class="btn link" style="height:18px">撤销</button>' : ""}`; clearTimeout(sayT); sayT = setTimeout(() => ($("#status").innerHTML = ""), 6000); }
+function say(t, undo) { $("#status").innerHTML = `<span class="ok">✓</span> ${esc(t)}${undo ? ' · <button class="btn link" style="height:18px">undo</button>' : ""}`; clearTimeout(sayT); sayT = setTimeout(() => ($("#status").innerHTML = ""), 6000); }
 function render() { nav(); S.sub ? renderExport() : renderManage(); if (S.pop) openPop(S.pop); }
 
 document.addEventListener("click", (ev) => {
@@ -411,12 +411,12 @@ document.addEventListener("click", (ev) => {
   const d = t.dataset, l = cur();
   if (d.sel) { S.sel = +d.sel; S.sub = null; return render(); }
   if (d.ver) return toggleVer(l, d.ver);
-  if ("reset" in d) { l.chosen = null; say(`${l.name} 恢复默认 ${fmtVers(chosen(l))}`, true); return render(); }
+  if ("reset" in d) { l.chosen = null; say(`${l.name} reset to default ${fmtVers(chosen(l))}`, true); return render(); }
   if (d.diff) { S.showDiff[d.diff] = !S.showDiff[d.diff]; return render(); }
-  if (d.sync) { const s = l.subs[+d.sync], a = s.add.length, r = s.mode === "follow" ? s.remove.length : 0; l.mods += a - r; s.add = []; s.remove = []; say(`${l.name} 跟上「${s.title}」：启用 ${a} 个${r ? `，停用 ${r} 个` : ""}`, true); return render(); }
+  if (d.sync) { const s = l.subs[+d.sync], a = s.add.length, r = s.mode === "follow" ? s.remove.length : 0; l.mods += a - r; s.add = []; s.remove = []; say(`${l.name} caught up with ${s.title}: enabled ${a}${r ? `, disabled ${r}` : ""}`, true); return render(); }
   if (d.mode) { const [k, m] = d.mode.split(":"); l.subs[+k].mode = m; return render(); }
-  if (d.unlink) { const s = l.subs.splice(+d.unlink, 1)[0]; say(`「${s.title}」不再关联 ${l.name}；列表不变`); return render(); }
-  if ("link" in d) { l.subs.push({ title: "Combat Extended 兼容包", n: 52, checked: "刚刚", mode: "add", notInstalled: 2, add: [], remove: [] }); say(`${l.name} 跟着「Combat Extended 兼容包」`); return render(); }
+  if (d.unlink) { const s = l.subs.splice(+d.unlink, 1)[0]; say(`${s.title} unlinked from ${l.name}; list unchanged`); return render(); }
+  if ("link" in d) { l.subs.push({ title: "Combat Extended compatibility pack", n: 52, checked: "just now", mode: "add", notInstalled: 2, add: [], remove: [] }); say(`${l.name} follows Combat Extended compatibility pack`); return render(); }
   if (d.fmt) { S.fmt = d.fmt; return render(); }
   if (d.dest) { S.imp.dest = d.dest; return render(); }
   if ("follow" in d) { S.imp.follow = !S.imp.follow; return render(); }
@@ -425,16 +425,16 @@ document.addEventListener("click", (ev) => {
     case "import": return openPop("import");
     case "menu": return openPop("menu");
     case "close": return closePop();
-    case "create": closePop(); return say(`新建「新列表 1」：复制自 ${l.name}`, true);
+    case "create": closePop(); return say(`created new list 1: copied from ${l.name}`, true);
     case "sample": S.imp = { dest: "new", follow: true }; return openPop("import");
-    case "imp-go": S.imp = null; closePop(); return say("导入为新列表「Warhammer 40K Collection」：219 个 Mod，允许 1.6–1.7", true);
+    case "imp-go": S.imp = null; closePop(); return say("imported as new list Warhammer 40K Collection: 219 mods, allows 1.6–1.7", true);
     case "export": S.sub = "export"; return render();
     case "back": S.sub = null; return render();
-    case "copy": return say("已复制到剪贴板");
-    case "save": return say(`已保存 ${l.name}${FMTS.find((x) => x.k === S.fmt).ext}`);
-    case "pack": return say(`去 库 / 列表 / ${l.name} / 创建整合包`);
-    case "edit": return say(`打开 ${l.name} 的编辑器`);
-    case "use": LISTS.forEach((x) => (x.cur = x.id === l.id)); say(`${l.name} 成为当前列表；没写游戏文件`); return render();
+    case "copy": return say("copied to clipboard");
+    case "save": return say(`saved ${l.name}${FMTS.find((x) => x.k === S.fmt).ext}`);
+    case "pack": return say(`go to library / lists / ${l.name} / create a pack`);
+    case "edit": return say(`open editor for ${l.name}`);
+    case "use": LISTS.forEach((x) => (x.cur = x.id === l.id)); say(`${l.name} is now current; no game files written`); return render();
   }
 });
 $("#theme").onclick = () => {

@@ -1,176 +1,176 @@
-# VM：archo.db 体积、迁移与日志归属（2026-10-29）
+# VM: archo.db size, migration, and log ownership (2026-10-29)
 
-本轮完成 A–F 的主要检查，发现 1 项升级输出回归；G 因游戏没有关闭自动存档的 UI 而停在主菜单，完整回合未测。只测试，不修 App 或测试工具代码。分支 `codex/vm-db-round`，待测提交 `6e062a999941b3c0e18ec19d82793dee361dc0fa`。任务范围和停止条件来自 `D:\RimArcho-test\vm-db-round\BRIEF.md`。证据保存在同目录；没有把真实数据库复制到宿主。
+Completed main A–F checks, found 1 upgrade-output regression; G stopped at main menu because the game lacks an autosave-off UI, so full flow untested. Testing only, no App or test-tool fixes. Branch `codex/vm-db-round`, target commit `6e062a999941b3c0e18ec19d82793dee361dc0fa`. Scope/stop conditions from `D:\RimArcho-test\vm-db-round\BRIEF.md`. Evidence in same directory; no real database copied to host.
 
-## 1. 环境与方法
+## 1. Environment and method
 
-- VM：`Win11-Player-Test`，由用户还原到 `RimArcho-Real` 并启动；本轮未操作快照。Player 已登录桌面，Steam 进程运行。
-- 真实 home：guest 的 `C:\Users\Player\AppData\Roaming\RimArcho`，库名 `archo.db`。游戏环境 `Steam`，游戏目录 `C:\Program Files (x86)\Steam\steamapps\common\RimWorld`，共用默认用户数据目录。
-- 旧构建：`a201344a0d37`，schema **18**。游戏登记版本 `1.6.4871 rev590`，实际 Player.log 和游戏为 `1.6.4871 rev591`；不是预设的 schema 24，按实测记录。
-- 新构建：`0.0.0-vm (6e062a999941)`，未剥离调试信息；CLI SHA-256 `04865BB6E60B26EF147FD242D84DE19EDE0C191A49DEEE7A4D4E3BC40B9C40B1`，GUI SHA-256 `903776543125CF42E81CAC3180D236855DD04272780E40500737041BD327BE36`。字体和 Monitor 随附资源取自主仓库已有的 `dist/archo-0.9.0-dev-windows-amd64`，Monitor 0.9.1。
-- 为遵守宿主产物只放证据目录的限制，构建输出改到该目录的 `build/`，使用和 `vm.ps1 build` 相同的编译参数；依次执行 `push`、CLI 迁移、`launch`，没有使用会先启动 GUI 的 `go`。没有修改 vm.ps1。
-- `sqlite3` 不在 guest PATH；使用已存在的 `C:\Users\Public\Documents\VM-Test\phase1a\node\sqlite3.exe -readonly`。每次先确认库存在；只取回 UTF-8 文本。
-- GUI 使用 `cdp.mjs` 的真实鼠标输入；游戏操作在 guest 通过 `SetCursorPos` / `mouse_event` / `keybd_event`，截图用 VMware wrapper。控制台辅助脚本隐藏自身窗口，每次输入前核对前台窗口确实为 RimWorld。
-- 数据库体积表用字节，MiB = 1,048,576 字节；App 的提示保留原文 MB。
+- VM: `Win11-Player-Test`, user restored `RimArcho-Real` and started it; this round did not operate snapshots. Player logged in, Steam running.
+- Real home: guest `C:\Users\Player\AppData\Roaming\RimArcho`, database `archo.db`. Environment `Steam`, game `C:\Program Files (x86)\Steam\steamapps\common\RimWorld`, shared default user data directory.
+- Old build: `a201344a0d37`, schema **18**. Registered game `1.6.4871 rev590`, actual Player.log/game `1.6.4871 rev591`; not assumed schema 24, recorded as measured.
+- New build: `0.0.0-vm (6e062a999941)`, debug information retained; CLI SHA-256 `04865BB6E60B26EF147FD242D84DE19EDE0C191A49DEEE7A4D4E3BC40B9C40B1`, GUI SHA-256 `903776543125CF42E81CAC3180D236855DD04272780E40500737041BD327BE36`. Bundled fonts/Monitor from existing main-repository `dist/archo-0.9.0-dev-windows-amd64`, Monitor 0.9.1.
+- To keep host artifacts under the evidence directory, builds went to its `build/`, using `vm.ps1 build` compiler arguments. Ran `push`, CLI migration, then `launch`, avoiding `go` which opens GUI first. vm.ps1 unchanged.
+- `sqlite3` absent from guest PATH; used existing `C:\Users\Public\Documents\VM-Test\phase1a\node\sqlite3.exe -readonly`. Checked database existence first each time; retrieved UTF-8 text only.
+- GUI used real mouse input through `cdp.mjs`; game input inside guest through `SetCursorPos` / `mouse_event` / `keybd_event`, screenshots through VMware wrapper. Console helpers hid their windows and checked RimWorld was foreground before every input.
+- Database-size tables use bytes, MiB = 1,048,576 bytes; App notices retain original MB.
 
-## 2. A：旧版本基线
+## 2. A: old-version baseline
 
-期望：在换构建之前保存真实事实、缓存和 CLI 输出；用含 Def / DLL 的测试方案验证迁移。
+Expected: preserve real facts, caches, and CLI output before replacing build; validate migration with a Def/DLL test plan.
 
-先发现 80,355 条 Def，已有分析事实，无需为初始 6-Mod 方案补跑分析。随后用旧 CLI 从 current 创建并切换 `dbtest`，加入 Harmony、HugsLib、Vanilla Expanded Framework、Vanilla Furniture Expanded 和已有 Archo Monitor，排序并保存。共 11 个 Mod：上述 5 个加 Core 和 5 个 DLC。最终旧版分析 1.278 秒，以下是保存后的基线。
+Initially found 80,355 Defs with existing analysis facts, so no analysis rerun needed for initial 6-Mod plan. With old CLI, created/switched to `dbtest` from current, added Harmony, HugsLib, Vanilla Expanded Framework, Vanilla Furniture Expanded, existing Archo Monitor, sorted/saved. Total 11 Mods: those 5 plus Core and 5 DLCs. Final old analysis 1.278 seconds; saved baseline below.
 
-| 指标 | A：升级前 | B：仅迁移后 | B：首次新版分析后 | C：增加 1.7 分析后 |
+| Metric | A: before upgrade | B: migration only | B: first new analysis | C: after adding 1.7 analysis |
 | --- | ---: | ---: | ---: | ---: |
-| 数据库字节 | 58,089,472 | 64,237,568 | 64,237,568 | 64,237,568 |
-| WAL 字节 | 0（文件不存在） | 0（文件不存在） | 0（文件不存在） | 0（文件不存在） |
+| Database bytes | 58,089,472 | 64,237,568 | 64,237,568 | 64,237,568 |
+| WAL bytes | 0 (file absent) | 0 (file absent) | 0 (file absent) | 0 (file absent) |
 | page_count | 14,182 | 15,683 | 15,683 | 15,683 |
 | freelist_count | 662 | 5,657 | 4,966 | 4,142 |
 | schema | 18 | 26 | 26 | 26 |
-| fact_set | 不适用 | 1,275 | 1,282 | 1,531 |
+| fact_set | Not applicable | 1,275 | 1,282 | 1,531 |
 | def_fact | 80,380 | 80,380 | 80,468 | 97,851 |
 | type_fact | 4,114 | 4,114 | 4,114 | 7,977 |
 | snapshot_file | 239,350 | 239,350 | 239,350 | 239,350 |
 | log_cache | 1 | 1 | 1 | 1 |
 | sum(length(report)) | 2,738,332 | 218,162 | 218,319 | 218,319 |
-| 报告头两字节 | `7B22` | `1F8B` | `1F8B` | `1F8B` |
+| First two report bytes | `7B22` | `1F8B` | `1F8B` | `1F8B` |
 
-初始未改方案时，库为 53,633,024 字节，page_count 13,094，freelist_count 0，snapshot_file 239,350，log_cache 1，报告 2,737,033 字节。不可把这组数和启用 5 个 Mod 后的迁移直接计算差值。
+Before plan changes, database was 53,633,024 bytes, page_count 13,094, freelist_count 0, snapshot_file 239,350, log_cache 1, report 2,737,033 bytes. Do not directly compare these with migration after enabling 5 Mods.
 
-证据：`a-inventory.txt`、`a-prepare.txt`、`a-baseline.txt`、`a-{problems,def,patches,harmony,why,log}.txt`。
+Evidence: `a-inventory.txt`, `a-prepare.txt`, `a-baseline.txt`, `a-{problems,def,patches,harmony,why,log}.txt`.
 
-## 3. B：迁移与输出等价
+## 3. B: migration and output equivalence
 
-期望：新 CLI 首次开库升到 schema 26，旧报告压缩，旧索引删除，事实集合存在，查询内容和顺序保持一致。
+Expected: first new-CLI open upgrades to schema 26, compresses old reports, removes old indexes, creates fact sets, preserves query content/order.
 
-`db status` 首次打开耗时 **1,708 毫秒**，退出码 0。关闭 CLI 后库为 64,237,568 字节。命令执行期间打印 `database 75.7 MB`，它不是关闭连接后的主库大小。v26 迁移不自动 VACUUM（03 §3），因此主库暂时比旧库大 6,148,096 字节，同时留下 5,657 个空闲页；后续自动整理已回收，见 §5。测试表“升级后库变小”不能解释成迁移事务结束后物理文件必须立即缩小。
+First `db status` open took **1,708 ms**, exit 0. After CLI closed, database 64,237,568 bytes. Command printed `database 75.7 MB` while running; not the main-file size after closing connections. v26 does not auto-VACUUM (03 §3), so main file temporarily grew 6,148,096 bytes, leaving 5,657 free pages, later reclaimed by automatic maintenance (§5). Test-table "database smaller after upgrade" cannot mean immediate physical shrink on migration-transaction completion.
 
-`fact_set` 存在；`def_fact_name`、`type_fact_name`、`type_fact_instance`、`harmony_fact_instance`、`harmony_fact_target` 均不存在。最终 Name 查询索引为 v26 的 `def_fact_named`；v25 中间态的 `def_fact_mm_named` 被 v26 取代，不能要求它在最终库继续存在。gzip 把原报告压到原来的 **7.97%**（减少约 92.0%）。
+`fact_set` exists; `def_fact_name`, `type_fact_name`, `type_fact_instance`, `harmony_fact_instance`, `harmony_fact_target` absent. Final Name index is v26 `def_fact_named`; intermediate v25 `def_fact_mm_named` is superseded by v26 and need not remain. gzip compresses original report to **7.97%** (about 92.0% reduction).
 
-| 对照命令（实际语法） | 实际结果 |
+| Comparison command (actual syntax) | Actual result |
 | --- | --- |
-| `problems --all` | 主分析仍为 0 error / 0 warning / 8 info，旧日志仍为 347 error / 296 warning、不计数；首查触发分析器 7 → 8 的重建（20,162 毫秒，分析器内部 18.3 秒）。日志问题顺序、两条 ID 改变，见 B1 |
-| `def Steel` | 文件字节完全一致，新版 69 毫秒 |
-| `patches --mod pkg:vanillaexpanded.vfecore` | 文件字节完全一致：32 operations / 0 failed，新版 62 毫秒 |
-| `harmony` | 文件字节完全一致：500 patches / 14 assemblies，新版 68 毫秒 |
-| `why pkg:vanillaexpanded.vfecore pkg:brrainz.harmony` | 文件字节完全一致，新版 65 毫秒 |
-| `log` | 647 clusters，分类和次数相同；E6 摘要首位提供方变了，见 B1；新版 108 毫秒 |
+| `problems --all` | Main analysis still 0 error / 0 warning / 8 info; old log still 347 error / 296 warning, uncounted; first query rebuilt analyzer 7 → 8 (20,162 ms, analyzer internal 18.3 seconds). Log finding order and two IDs changed, see B1 |
+| `def Steel` | Byte-identical file, new version 69 ms |
+| `patches --mod pkg:vanillaexpanded.vfecore` | Byte-identical file: 32 operations / 0 failed, new version 62 ms |
+| `harmony` | Byte-identical file: 500 patches / 14 assemblies, new version 68 ms |
+| `why pkg:vanillaexpanded.vfecore pkg:brrainz.harmony` | Byte-identical file, new version 65 ms |
+| `log` | 647 clusters, same categories/counts; E6 summary's first provider changed, see B1; new version 108 ms |
 
-BRIEF 的 `patches <Mod>` 和 `why <Mod>` 是概括写法，实际 CLI 要 `--mod` 和两个 Mod 参数。旧、新两版都使用上述实际语法，最初错误参数的输出未作为对照基线。Windows PowerShell 5.1 把 native stderr 包装成 `NativeCommandError` 的位置行属于取证包装；重分析本身退出码 0，不能把这些包装行记成 App 报错。
+BRIEF's `patches <Mod>` and `why <Mod>` abbreviate syntax; actual CLI needs `--mod` and two Mod arguments. Both versions used actual syntax above; early invalid-argument output was not comparison baseline. Windows PowerShell 5.1's `NativeCommandError` location lines wrapping native stderr are evidence-wrapper output; reanalysis itself exits 0, so wrappers are not App errors.
 
-### B1：缺父模板日志在升级后改变主归因、问题 ID 和顺序
+### B1: upgrade changes primary attribution, finding IDs, and order for missing-parent-template logs
 
-状态：**已修，待 VM 复测**（`6c67849`：`Store.DefsNamed` 改为先按 Instance ID、再按文件顺序，不再依赖行号；合成测试 `TestDefsNamedOrderIndependentOfWrites`）。原记录：已观察到的输出回归。尚不能把原因单独归到 v26 迁移，因为首次查询同时重建了分析器 7 的旧缓存为分析器 8；保留这个限定，不声称纯 schema 转换已隔离复现。
+Status: **fixed, awaiting VM retest** (`6c67849`: `Store.DefsNamed` orders by Instance ID then file, no longer row number; synthetic `TestDefsNamedOrderIndependentOfWrites`). Original record: observed output regression. Cause cannot yet be attributed solely to v26 migration, because first query also rebuilt analyzer-7 cache for analyzer 8; this qualification remains, without claiming an isolated schema-only repro.
 
-复现路径：从本轮旧快照，用旧版建立并保存上述 11-Mod 方案，分别保存 `problems --all` 和 `log`；不改 Mod 文件与方案，换本轮构建，先 `db status` 再重复两个查询。
+Repro: from this round's old snapshot, use old version to create/save the 11-Mod plan above and save `problems --all`/`log`. Without changing Mod files/plan, replace build, run `db status`, repeat both queries.
 
-期望：同一日志、相同内容的事实查询得到相同的候选展示与问题引用。
+Expected: identical log and fact-query content yield identical candidate presentation and finding references.
 
-实际：
+Actual:
 
-1. `log:E6`（缺 `Bomb`）的首位依赖从 `#ecpc Vanilla Arsenal` 换成 `#rcm2 Impact Weaponry - Reloaded`，两边仍写 `(dependency, +1)`，候选数未减少。
-2. E6 的问题 ID 从 `p:92d9ba` 变为 `p:719e84`；E237（缺 `Plant_Bush`）从 `p:727121` 变为 `p:d4d4a8`。
-3. `problems --all` 日志段开头从 **E36 → E238 → E6 → E237** 变成 **E237 → E6 → E36 → E238**；其余计数不变。
-4. 随后在新版上读取保留的原始日志，E6 的详细归因又以 Vanilla Arsenal 为首，两名候选仍同时存在。输出未能保持 BRIEF 要求的顺序和内容一致。
+1. First dependency for `log:E6` (missing `Bomb`) changed from `#ecpc Vanilla Arsenal` to `#rcm2 Impact Weaponry - Reloaded`; both still say `(dependency, +1)`, candidate count unchanged.
+2. E6 finding ID changed `p:92d9ba` → `p:719e84`; E237 (missing `Plant_Bush`) changed `p:727121` → `p:d4d4a8`.
+3. Start of `problems --all` log section changed **E36 → E238 → E6 → E237** to **E237 → E6 → E36 → E238**; other counts unchanged.
+4. Reading retained original log afterward on new version put Vanilla Arsenal first again in detailed E6 attribution, with both candidates still present. Output did not preserve BRIEF-required order/content consistency.
 
-只读代码核对：`Store.DefsNamed` 按事实行 `rowid` 排序（`internal/store/analysis.go`）；缺父模板归因沿此顺序加入 dependency，按角色排序使用稳定排序（`internal/app/logs.go`）。这使候选展示有机会依赖事实写入布局；这是原因线索，不是隔离后的根因结论。
+Read-only code review: `Store.DefsNamed` orders fact `rowid` (`internal/store/analysis.go`); missing-parent attribution adds dependencies in that order, using stable role sorting (`internal/app/logs.go`). Candidate display may therefore depend on write layout; a causal lead, not an isolated root-cause conclusion.
 
-证据：`a-log.txt` / `b-log.txt`、`diff-log.patch`、`a-problems.txt` / `b-problems.txt`、`diff-problems.patch`、`b-detail-and-prefs.txt`、`e-history-and-provider.txt`。本轮没有修改代码，也没有把两条 ID 变化分算成多个 bug。
+Evidence: `a-log.txt` / `b-log.txt`, `diff-log.patch`, `a-problems.txt` / `b-problems.txt`, `diff-problems.patch`, `b-detail-and-prefs.txt`, `e-history-and-provider.txt`. No code changed this round; the two ID changes were not counted as separate bugs.
 
-## 4. C、D：跨版本共用与 WAL
+## 4. C, D: cross-version sharing and WAL
 
-C 期望：1.7 只增加内容不同的集合，查询正常。
+C expected: 1.7 adds only content-different sets, with normal queries.
 
-`analyze --game-version 1.7` **4,895 毫秒**，退出码 0；`problems --game-version 1.7` **309 毫秒**，退出码 0。两个版本各有 1,271 个 Def 视图，其中 **1,025 个指向同一集合，246 个不同**。fact_set 增加 249（Def +246、DLL +3），def_fact +17,383，type_fact +3,863；主库增量 **0 字节**，复用了空闲页，空闲页从 4,966 降到 4,142。无未被 content_state 引用的集合。
+`analyze --game-version 1.7` **4,895 ms**, exit 0; `problems --game-version 1.7` **309 ms**, exit 0. Each version has 1,271 Def views: **1,025 point to the same sets, 246 differ**. fact_set +249 (Def +246, DLL +3), def_fact +17,383, type_fact +3,863; main database growth **0 bytes**, reusing free pages, 4,966 → 4,142. No sets unreferenced by content_state.
 
-D 期望：保持 GUI 打开，真实控件触发分析后 WAL ≤ 16 MiB。
+D expected: keep GUI open; WAL ≤ 16 MiB after analysis triggered by real controls.
 
-在“能不能跑”点击“重新检查文件”，等状态显示“分析完成”。窗口仍开着，`archo.db-wal` 为 **0 字节**。GUI 的首次真实扫描及 Monitor 0.9.0-dev → 0.9.1 更新使启用集合从 `f6caa3d9c88929da6af477d7` 变为 `cec0ffbb691cc5da1b48af9b`，原 1.7 槽位随后被无引用清理；这是实际方案引用变化，不能当跨版本共用丢失。C 的比较在 GUI 首次扫描之前完成。
+Clicked "check files again" on can it run, waited for "analysis complete". With window open, `archo.db-wal` was **0 bytes**. First real GUI scan and Monitor 0.9.0-dev → 0.9.1 update changed enabled set `f6caa3d9c88929da6af477d7` → `cec0ffbb691cc5da1b48af9b`; old 1.7 slot was subsequently cleaned as unreferenced. This is an actual plan-reference change, not lost cross-version sharing. C comparison preceded first GUI scan.
 
-扫描后 `snapshot_file` 为 266,878；Def 80,711、Type 4,137。工坊在 Steam 在线状态下发生的变化和 Monitor 换版，没有混入 B 的升级前后比较。
+After scan: `snapshot_file` 266,878; Def 80,711, Type 4,137. Online Steam Workshop changes and Monitor update were excluded from B upgrade comparisons.
 
-证据：`c-second-version.txt`、`c-analyze17.txt`、`c-problems17.txt`、`d-wal.txt`、`e-before-idle.txt`。
+Evidence: `c-second-version.txt`, `c-analyze17.txt`, `c-problems17.txt`, `d-wal.txt`, `e-before-idle.txt`.
 
-## 5. E：自动整理和压缩入口
+## 5. E: automatic maintenance and compact entry
 
-期望：GUI 启动后空闲时完成整理，写入完成时间，回收迁移空闲页；真实“压缩”入口给出释放量和当前体积；游戏运行时拒绝。
+Expected: idle maintenance after GUI startup, completion timestamp, migration-page reclamation; real "compact" action reports reclaimed/current size; refuses while game runs.
 
-| 时点 | 库字节 | WAL 字节 | 空闲页 | 完成时间（UTC） |
+| Point | Database bytes | WAL bytes | Free pages | Completion time (UTC) |
 | --- | ---: | ---: | ---: | --- |
-| GUI 分析完成、整理前 | 64,237,568 | 0 | 4,168 | 无 |
-| 首次自动整理后 | 40,882,176 | 0 | 0 | `2026-10-29T08:15:36Z` |
-| 手动点击“压缩”后 | 40,882,176 | 0 | 0 | `2026-10-29T08:16:45Z` |
+| GUI analysis complete, before maintenance | 64,237,568 | 0 | 4,168 | None |
+| After first automatic maintenance | 40,882,176 | 0 | 0 | `2026-10-29T08:15:36Z` |
+| After manual "compact" | 40,882,176 | 0 | 0 | `2026-10-29T08:16:45Z` |
 
-自动整理释放 **23,355,392 字节（22.27 MiB）**。手动入口实际提示：`数据库已压缩：释放了 0 B，现在 39.0 MB`。游戏进程 6152 运行时，按钮仍可点击，随后实际提示：`无法压缩数据库：游戏 Steam 正在运行（进程 6152），请先关闭游戏`，没有执行整理。
+Automatic maintenance freed **23,355,392 bytes (22.27 MiB)**. Actual manual notice: `database compacted: freed 0 B, now 39.0 MB` (translated). With game process 6152 running, button remained clickable, then reported `cannot compact database: game Steam is running (process 6152); close it first` (translated), without maintenance.
 
-旧更新事件有 76 条，但旧 before 清单被清理的 updated 事件数为 **0**，不具备显示“（文件清单已清理）”的真实历史样本；该分支不能算通过，也没有为制造样本破坏真实 Mod。
+There were 76 old update events, but **0** updated events whose old before-manifest was cleaned, so no real historical sample showing "(file list cleaned up)". This branch cannot count as passed; no real Mod was damaged to create a sample.
 
-证据：`d-wal.txt`、`e-before-idle.txt`、`e-after-manual.txt`、`e-vacuum-completed.png`、`e-vacuum-ui.txt`、`e-running-refusal.png`、`e-running-refusal-ui.txt`、`e-history-and-provider.txt`、`f-prepare.txt`。
+Evidence: `d-wal.txt`, `e-before-idle.txt`, `e-after-manual.txt`, `e-vacuum-completed.png`, `e-vacuum-ui.txt`, `e-running-refusal.png`, `e-running-refusal-ui.txt`, `e-history-and-provider.txt`, `f-prepare.txt`.
 
-## 6. F：共用用户数据目录时的日志归属
+## 6. F: log ownership with shared user data directory
 
-期望：路径明确属于另一个登记环境的日志被 1.6 排除；显式路径和版本不能绕过；自己的 prev 可以回退；新环境接受自身日志；删除环境清理其事实。
+Expected: 1.6 excludes logs whose paths clearly belong to another registered environment; explicit path/version cannot bypass; own prev fallback; new environment accepts own log; removing environment cleans its facts.
 
-在 guest 的测试目录建 `fake-game17`，含 `Version.txt`（1.7.4990 rev1069）、Data/Core/About.xml 和一份来自真实 Core 的 DamageDef XML，仅用于登记与事实清理，不启动假游戏。登记 `dbforeign17`，与 Steam 环境共用真实用户数据目录。先把原始 Player.log 和原有 Player-prev.log（若有）备份在 guest，再把真实日志的 Mono path 改指假目录、`RimWorld …` 版本行改成 1.7。
+Created guest test `fake-game17` with `Version.txt` (1.7.4990 rev1069), Data/Core/About.xml, and one DamageDef XML from real Core, solely for registration/fact cleanup, never launching fake game. Registered `dbforeign17`, sharing real user data with Steam environment. Backed up original Player.log and existing Player-prev.log (if any) in guest, then changed real log Mono path to fake directory and `RimWorld …` version line to 1.7.
 
-| 检查 | 实际结果 |
+| Check | Actual result |
 | --- | --- |
-| 1.6 的 `problems --all` | 外环境日志不列入日志段或计数 |
-| 1.6 无自己的 prev 时默认 `log` / GUI 日志页 | CLI 报无可用 Player.log；GUI “未找到 Player.log”；能不能跑最终显示“这里没有要处理的” |
-| 1.6 显式 `log --file <当前日志>` | 退出码 1：`log belongs to environment dbforeign17` |
-| 同上加 `--game-version 1.7` | 同样拒绝，退出码 1 |
-| 1.6 环境分析槽位 | 仍只有两个 1.6 槽位，没有生成 1.7 槽位 |
-| 补上属于 Steam 的 Player-prev.log | 默认 CLI 和 GUI 回退 prev，647 个簇；当前 1.7 文件继续被排除 |
-| 在 GUI 切到 dbforeign17 | 显示 Player.log、1.7.4990 rev1069、1435 行；CLI 同样接受，647 个簇 |
-| `env remove dbforeign17 --yes` | 私有实例 1 → 0、事实集合 2 → 0、Def 14 → 0；版本视图和分析槽位均为 0，无孤儿集合 |
+| 1.6 `problems --all` | Other-environment log excluded from log section/counts |
+| Default 1.6 `log` / GUI log page without own prev | CLI reports no usable Player.log; GUI "Player.log not found"; can it run eventually "nothing needs attention here" |
+| 1.6 explicit `log --file <current log>` | Exit 1: `log belongs to environment dbforeign17` |
+| Same plus `--game-version 1.7` | Same refusal, exit 1 |
+| 1.6 analysis slots | Still only two 1.6 slots; no 1.7 slot created |
+| Add Steam-owned Player-prev.log | Default CLI/GUI fall back to prev, 647 clusters; current 1.7 file still excluded |
+| Switch GUI to dbforeign17 | Shows Player.log, 1.7.4990 rev1069, 1435 lines; CLI accepts too, 647 clusters |
+| `env remove dbforeign17 --yes` | Private instances 1 → 0, fact sets 2 → 0, Defs 14 → 0; version views and analysis slots 0, no orphan sets |
 
-初次构造版本行时按“行首是 1.6”替换，未匹配真实的 `RimWorld 1.6...`；核对后已更正并整组重测。初次因此在假环境产生的 1.6 槽位属于测试夹具错误，不记 App bug，删除环境时也已清掉。正式判断使用 `f-corrected.txt` 和 `f-cli/*-corrected.txt`。
+Initial version-line construction replaced lines starting "1.6", failing to match actual `RimWorld 1.6...`; corrected after checking and reran whole group. Resulting initial 1.6 slot in fake environment was a fixture mistake, not App bug, cleaned on environment removal. Final judgments use `f-corrected.txt` and `f-cli/*-corrected.txt`.
 
-测试后恢复原始日志；假环境已删除，当前环境恢复 Steam。没有修改 Steam 订阅、退订或账号登录。
+Restored original logs afterward; fake environment removed, current environment back to Steam. No Steam subscriptions, unsubscriptions, or account logins changed.
 
-证据：`f-corrected.txt`、`f-cli/`、`f-steam-no-own-log.png`、`f-steam-needs.png`、`f-steam-prev.png`、`f-foreign17-log.png`、`f-remove-and-restore.txt`。
-## 7. G：完整游戏回合受阻，未计为通过
+Evidence: `f-corrected.txt`, `f-cli/`, `f-steam-no-own-log.png`, `f-steam-needs.png`, `f-steam-prev.png`, `f-foreign17-log.png`, `f-remove-and-restore.txt`.
+## 7. G: full game round blocked, not counted as passing
 
-已经从 GUI 启动真实 1.6 到主菜单，Monitor 0.9.1 已加载，并在游戏运行时完成 §5 的压缩拒绝检查。
+Launched real 1.6 from GUI to main menu with Monitor 0.9.1 loaded, and completed running-game compact refusal (§5).
 
-BRIEF 明确要求“先在游戏设置里关掉自动存档”，因为 VM 的 Saves 同步到真实 Steam 云。实际游戏 General 设置只有 0.5 / 1 / 3 / 7 / 14 天的间隔，Autosaves count 最小 1；开发模式只增加更短的 debug 间隔，Dev 设置和 Debug Settings 中也未找到关闭项。因此没有进入殖民地，没有创建或覆盖存档，不能把这一轮算作游戏日志相关的整回合验收。
+BRIEF explicitly requires "disable autosaves in game settings first" because VM Saves sync to real Steam cloud. Actual General options have only intervals 0.5 / 1 / 3 / 7 / 14 days and Autosaves count minimum 1. Developer mode adds shorter debug intervals only; no off option found in Dev/Debug Settings either. Thus no colony entered and no saves created/overwritten; this round cannot count as full game-log-flow acceptance.
 
-已提出替代办法：经用户确认后，在 guest 的 Prefs.xml 把间隔设为 999999 天并重启游戏，或经用户确认改为 14 天并限定游玩时间。在未获得确认前，按 BRIEF 的“被环境挡住、需要用户处理”停止条件收尾，不把时间流逝视为同意。
+Proposed alternatives: with user confirmation, set guest Prefs.xml interval to 999999 days and restart, or confirm 14 days with bounded play time. Without confirmation, followed BRIEF's "environment blocked, user intervention needed" stop condition; elapsed time was not treated as consent.
 
-查找关闭项时暂时打开过开发模式、把 autosaves count 调到 1，随后已在游戏 UI 恢复 **开发模式关闭、数量 5、间隔 1 天**。开发模式增加 `Dev quicktest` 导致主菜单位置变化，恢复设置时曾误打开旧存档的不匹配确认；没有点击 Load anyway / Load mod list，而是 Go back 后关闭存档选择窗口。没有实际读取或保存该旧存档。这是测试操作失误，不是 App bug。
+While searching, temporarily enabled developer mode and changed autosaves count to 1, then restored in game UI to **developer mode off, count 5, interval 1 day**. Developer mode's `Dev quicktest` shifted main-menu positions; while restoring settings, mistakenly opened an old-save mismatch confirmation. Did not click Load anyway / Load mod list; chose Go back and closed the load window. No old save actually loaded/saved. Test-operation mistake, not App bug.
 
-证据：`g-taskbar-active.png`、`g-autosave-menu.png`、`g-autosave-min.png`、`g-autosave-devmenu.png`、`g-dev-settings.png`、`g-debug-search-result.png`、`g-options-restored-corrected.png`。`g-autosave-off.png` 是初次滑块点击未生效的过程截图，不能当关闭成功的证据。
+Evidence: `g-taskbar-active.png`, `g-autosave-menu.png`, `g-autosave-min.png`, `g-autosave-devmenu.png`, `g-dev-settings.png`, `g-debug-search-result.png`, `g-options-restored-corrected.png`. `g-autosave-off.png` records an initial ineffective slider click, not successful disabling.
 
-**仍须补测**：新开殖民地 → 游玩几分钟（暂停、加速、开窗口）→ 使用全新名字存档 → 读取该档 → 正常退出 → 对照 Player.log / ArchoMonitor.log 和“上次运行的报错”；完整回合后再核对 gzip / WAL。以下主菜单日志检查仅记录为部分覆盖。
+**Still needed**: new colony → several minutes of play (pause, speed up, open windows) → save under a new name → load it → normal exit → compare Player.log / ArchoMonitor.log and "errors from the last run"; then recheck gzip/WAL. Main-menu log checks below are partial coverage only.
 
-### 7.1 主菜单正常退出后的部分检查
+### 7.1 Partial checks after normal main-menu exit
 
-从当前截图确认 `Quit to OS` 后点击，游戏于 **08:54 UTC** 正常退出；进程检查已无 RimWorldWin64。Player.log 为 **14,372 字节 / 309 行**，CLI 读到 **3 个信息簇、没有错误或警告**；GUI 的 Player.log 页列出这三条加载阶段信息。ArchoMonitor.log 为 **864 字节**，同一 session `37d3c50a27a4` 依次记录 session → menu → exit，`context.entries=0`；GUI Monitor 页显示“这次运行没有报错”。能不能跑显示“dbtest 能跑，没有要处理的”，未出现虚构的游玩 / 存档 / 读档阶段。`problems --all` 是 0 error / 0 warning / 9 info；其中增加的信息为已安装两份 Monitor 的提示，不是本次游戏运行错误。
+Confirmed `Quit to OS` from current screenshot and clicked; game exited normally at **08:54 UTC**, no RimWorldWin64 process remained. Player.log **14,372 bytes / 309 lines**, CLI **3 informational clusters, no errors/warnings**; GUI Player.log listed these three loading-phase entries. ArchoMonitor.log **864 bytes**, same session `37d3c50a27a4` records session → menu → exit, `context.entries=0`; GUI Monitor tab "no errors in this run". Can it run "dbtest can run; nothing needs attention", without invented play/save/load phases. `problems --all`: 0 error / 0 warning / 9 info; extra info is two installed Monitors, not a game-run error.
 
-GUI 保持打开时，最终库为 **46,596,096 字节**，WAL 为 **6,208,872 字节（5.92 MiB，低于 16 MiB）**，page_count 11,376、freelist_count 937。三个 log_cache 报告均以 `1F8B` 开头，长度分别 1,475 / 217,659 / 217,742 字节。此时已经过 F 的环境创建 / 删除及真实扫描，不和 B 的仅迁移体积混为同一时点。Prefs.xml 只读核对：间隔 1 天、数量 5、devMode=False；登记环境只剩 Steam。
+With GUI open, final database **46,596,096 bytes**, WAL **6,208,872 bytes (5.92 MiB, below 16 MiB)**, page_count 11,376, freelist_count 937. Three log_cache reports start `1F8B`, lengths 1,475 / 217,659 / 217,742 bytes. This follows F environment creation/removal and real scans, not the same point as B migration-only size. Read-only Prefs.xml check: 1 day, count 5, devMode=False; Steam only registered environment.
 
-证据：`g-menu-final.txt`、`g-menu-only-Player.log`、`g-menu-only-ArchoMonitor.log`、`g-menu-only-cli-log.txt`、`g-menu-only-problems.txt`、`g-menu-log.png`（Monitor）、`g-menu-player.png`、`g-menu-needs.png` 及同名 UI 文本。
+Evidence: `g-menu-final.txt`, `g-menu-only-Player.log`, `g-menu-only-ArchoMonitor.log`, `g-menu-only-cli-log.txt`, `g-menu-only-problems.txt`, `g-menu-log.png` (Monitor), `g-menu-player.png`, `g-menu-needs.png`, and matching UI text.
 
-## 8. 从 VM 测试表移来的已测范围
+## 8. Tested scope moved from VM checklist
 
-| 原测试项 | 本轮已测部分 | 剩余工作 |
+| Original test item | Tested this round | Remaining |
 | --- | --- | --- |
-| v26 事实跨版本共用、旧事实与槽位清理 | 旧库迁移，六项 CLI 对照，1.6 / 1.7 集合共用与差异、真实 Monitor 换版后旧槽位清理、删除假环境的私有事实清理 | B1 输出回归待修后复测；相同版本的目录条件 / 优先级隔离、删除旧方案、当前版本保留 / 外版本过期重建、首次日志和页面性能尚未隔离验证 |
-| schema 25 压缩与 WAL | 实际 schema 18 → 26、gzip、索引、CLI 缓存读取计数一致、GUI 分析完成且窗口开着 WAL = 0 | G 完整回合后的游戏日志和 WAL / gzip 核对 |
-| 共用用户数据目录的日志归属 | 假 1.7 头 + 真 1.6 环境，CLI / GUI 排除、显式路径和强制版本拒绝、prev 回退、无日志、新环境接受自己的日志 | 两个真实游戏轮流完整启动退出、MCP、同目录游戏升级后的旧日志、实时覆盖，以及每个计数 / 提示入口逐一检查 |
-| 定期整理与压缩 | 空闲自动整理、完成标记、物理回收、GUI 手动提示、运行游戏时拒绝 | 7 天周期的隔离验证、任务 / 页面读取时跳过与执行中取消、MCP busy / 安静重试、CLI / MCP 入口、空间不足、旧历史清单被清理的显示及保留集合完整性 |
+| v26 cross-version fact sharing, old-fact/slot cleanup | Old DB migration, six CLI comparisons, 1.6/1.7 shared/different sets, old-slot cleanup after real Monitor update, private-fact cleanup on fake-environment removal | B1 output regression retest after fix; same-version folder-condition/priority isolation, old-plan removal, current-version retention/other-version expiry/rebuild, first-log/page performance not isolated |
+| Schema 25 compression and WAL | Actual schema 18 → 26, gzip, indexes, matching CLI cache-read counts, WAL = 0 with completed GUI analysis/window open | Game logs/WAL/gzip after full G flow |
+| Shared user-data log ownership | Fake 1.7 header + real 1.6 environment; CLI/GUI exclusion, explicit-path/forced-version refusal, prev fallback, no log, new environment accepts own log | Two real games alternating full launch/exit, MCP, old logs after same-directory game upgrade, live overwrite, each count/notice entry |
+| Periodic maintenance and compaction | Idle automatic maintenance, completion marker, physical reclamation, manual GUI notice, refusal while game runs | Isolated 7-day cycle, skip during task/page reads and cancel in progress, MCP busy/quiet retry, CLI/MCP entries, insufficient space, cleaned old-history manifest display, retained-set integrity |
 
-测试表只保留右栏范围；本报告的通过结果不替代这些剩余验收。
+Checklist retains only right-column scope; passing results here do not replace remaining acceptance.
 
-## 9. 自动检查
+## 9. Automated checks
 
-- `node --test "scripts/vm/*.test.mjs"`：**42 / 42 通过**。
-- `go test ./...`：**失败**，唯一失败为 `internal/surface/gui.TestSubscriptionReadDoesNotBlockEditsAndRechecksAfterOvertake`，`subscriptions_test.go:221: editor waits for a slow read`；其余包通过。未修改代码。
-- 单独复跑 `go test ./internal/surface/gui -run '^TestSubscriptionReadDoesNotBlockEditsAndRechecksAfterOvertake$' -count=1`：**通过**（2.233 秒）。这不能把第一次全套失败改写成通过，记录为并发 / 时序待查，不新增一个已确认的 VM App bug。
-- 测试前清除宿主测试进程的 RIMARCHO_* 变量，仅用仓库默认合成夹具；没有运行宿主 App 来打开真实 home。
+- `node --test "scripts/vm/*.test.mjs"`: **42 / 42 passed**.
+- `go test ./...`: **failed**, sole failure `internal/surface/gui.TestSubscriptionReadDoesNotBlockEditsAndRechecksAfterOvertake`, `subscriptions_test.go:221: editor waits for a slow read`; other packages passed. No code changed.
+- Targeted rerun `go test ./internal/surface/gui -run '^TestSubscriptionReadDoesNotBlockEditsAndRechecksAfterOvertake$' -count=1`: **passed** (2.233 seconds). Does not rewrite the first full-suite failure as passing; recorded as concurrency/timing to investigate, not another confirmed VM App bug.
+- Cleared host test-process RIMARCHO_* variables first, using default synthetic repository fixtures only; no host App opened real home.
 
-证据：`go-test.txt`、`go-test-recheck.txt`、`node-test.txt`。本轮不改规格和 CHANGELOG，因为未改变产品行为；提交仅包含本报告及 VM 测试表。
-## 10. 收尾状态
+Evidence: `go-test.txt`, `go-test-recheck.txt`, `node-test.txt`. Specifications/CHANGELOG unchanged because product behavior unchanged; commit includes this report and VM checklist only.
+## 10. Cleanup state
 
-按 BRIEF 的环境受阻停止条件结束：A–F 主要项完成，B1 未修复，G 完整回合未测；没有进入殖民地，没有写入任何存档。游戏已从菜单正常退出，随后调用 guest Windows `shutdown /s /t 0` 正常关机；宿主 `vmrun list` 确认 **Total running VMs: 0**。未还原、创建或删除快照。测试方案 `dbtest`、新构建及本轮 guest 测试产物保留，后续还原由用户处理。
+Ended under BRIEF environment-blocked condition: main A–F checks complete, B1 unfixed, G full flow untested; no colony entered or saves written. Game exited normally from menu; guest Windows shut down normally with `shutdown /s /t 0`; host `vmrun list` confirmed **Total running VMs: 0**. No snapshots restored/created/deleted. Test plan `dbtest`, new build, and guest artifacts remain; user handles later restoration.
 
-宿主证据在 `D:\RimArcho-test\vm-db-round\`，收尾统计 244 个文件、263,737,362 字节（约 251.5 MiB，低于 1 GB；不含随后添加的微小收尾记录）。没有复制真实 DB。提交只含本报告和测试表四行的剩余范围；没有 push 或合并。
+Host evidence `D:\RimArcho-test\vm-db-round\`: cleanup count 244 files, 263,737,362 bytes (about 251.5 MiB, below 1 GB; excludes tiny later cleanup notes). No real DB copied. Commit contains this report and four checklist rows' remaining scope only; no push/merge.

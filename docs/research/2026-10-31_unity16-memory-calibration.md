@@ -1,52 +1,52 @@
-# Unity 1.6 内存校准（2026-10-31）
+# Unity 1.6 memory calibration (2026-10-31)
 
-测量对象：Win11-Player-Test、RimWorld 1.6.4871 rev591、8 GiB RAM，Unity 2022.3.35f1 / D3D11 / VMware SVGA 3D。贴图压缩开启。开始、结束均还原 `RimArcho-Real-Vulkan`；只把还原后的原版组称为“首次”，后续列表同一 guest 会话，未重启，不称严格冷缓存。1.7 和显存不在本次校准范围。
+Measured target: Win11-Player-Test, RimWorld 1.6.4871 rev591, 8 GiB RAM, Unity 2022.3.35f1 / D3D11 / VMware SVGA 3D. Texture compression enabled. Restored `RimArcho-Real-Vulkan` at start and end; only the vanilla group after restoration is called "first". Subsequent lists shared the same guest session without reboot, so are not strictly cold-cache runs. 1.7 and video memory are outside this calibration.
 
-## 指标与方法
+## Metrics and method
 
-每秒记录进程 private bytes、working set、peak working set、系统可用物理内存和提交量。常驻是首次主菜单成功后 55–85 秒的 private bytes 中位数；启动峰值是进程启动至首次主菜单成功前的最大 private bytes；读档后是成功事件后 30–55 秒的中位数。工作集独立记录，不用来拟合提交量。
+Recorded process private bytes, working set, peak working set, system available physical memory, and commit every second. Resident cost is median private bytes 55–85 seconds after the first successful main menu; startup peak is maximum private bytes from process start until first successful main menu; post-load is the median 30–55 seconds after the success event. Working set is recorded separately, not used to fit commit.
 
-完整流程每列表一次：主菜单稳定90秒 → 游戏内 Prefs 属性临时设置14天自动存档 → 新殖民地（150×150、5%世界、和平）→ 正常速度120秒 → 新名存档 → 读回 → 60秒 → 主菜单 → 恢复1天、5个 → 正常退出。未手改 Prefs.xml；退出后只读核对原值，tick未到一天。阶段3不遍历 Mod 页签。250-light复用阶段2的一次完整流程，其中存在页签/暂停窗口干扰。
+One complete flow per list: main menu stable for 90 seconds → temporarily set the in-game Prefs property to a 14-day autosave interval → new colony (150×150, 5% world, peaceful) → normal speed for 120 seconds → save under a new name → reload → 60 seconds → main menu → restore 1 day, 5 saves → normal exit. Prefs.xml was not edited manually; original values were checked read-only after exit, and ticks did not reach a day. Phase 3 did not traverse Mod tabs. 250-light reused one full flow from phase 2, with tab/pause-window interference.
 
-原版组含6个官方项及 Harmony、Archo Monitor，驱动 DLL 临时加入 Monitor 的1.6 Assemblies。测得 Harmony 两个 DLL 共2,503,168字节、Monitor 1.6 DLL 40,448字节、ArchoDrive 32,256字节。驱动初始化局部 managed GC差额约0.4–0.5 MiB；不能当作驱动总开销。按 light 拟合的每Mod固定项约2.13 MiB，把两个测量Mod分摊约4.26 MiB，再加模型中的程序集项约4.9–12.1 MiB；这是估计，缺少不带测量栈的配对运行，不能独立辨识 Harmony、Monitor、驱动各自真实开销。
+The vanilla group includes 6 official entries plus Harmony and Archo Monitor; the driver DLL was temporarily added to Monitor's 1.6 Assemblies. Measured Harmony's two DLLs at 2,503,168 bytes total, Monitor's 1.6 DLL at 40,448 bytes, ArchoDrive at 32,256 bytes. Local managed-GC difference at driver initialization was about 0.4–0.5 MiB, not total driver overhead. The light fit gives about 2.13 MiB fixed per Mod, allocating about 4.26 MiB to the two measurement Mods, plus about 4.9–12.1 MiB from the model's assembly term. This is an estimate: without paired runs lacking the measurement stack, Harmony, Monitor, and driver overhead cannot be identified independently.
 
-## 结果
+## Results
 
-下表均为GiB（2^30字节）。Mod数包括6个官方项；拟合固定项排除官方项。
+All values below are GiB (2^30 bytes). Mod counts include 6 official entries; the fitted fixed term excludes official entries.
 
-| 列表 | Mod数 | 主菜单常驻 | 启动private峰值 | peak working set | 读档后 |
+| List | Mod count | Main-menu resident | Startup private peak | peak working set | After save load |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| 原版与测量栈 | 8 | 1.443 | 2.414 | 2.353 | 1.824 |
-| 250-light（阶段2） | 250 | 3.981 | 5.563 | 4.250 | 4.266 |
-| 500（720失败后的回退） | 500 | 8.237 | 10.866 | 4.546 | 8.745 |
-| 250可载入贴图组 | 250 | 5.384 | 7.346 | 4.683 | 5.682 |
-| 同250组热启动（仅主菜单） | 250 | 5.428 | 7.085 | 5.240 | — |
-| 720 | 720 | 未到达 | ≥18.146 | 4.773 | — |
-| 250极重贴图 | 250 | 未到达 | ≥18.461 | 4.718 | — |
+| Vanilla and measurement stack | 8 | 1.443 | 2.414 | 2.353 | 1.824 |
+| 250-light (phase 2) | 250 | 3.981 | 5.563 | 4.250 | 4.266 |
+| 500 (fallback after 720 failed) | 500 | 8.237 | 10.866 | 4.546 | 8.745 |
+| 250 loadable texture group | 250 | 5.384 | 7.346 | 4.683 | 5.682 |
+| Same 250 group warm start (main menu only) | 250 | 5.428 | 7.085 | 5.240 | — |
+| 720 | 720 | Not reached | ≥18.146 | 4.773 | — |
+| 250 extremely heavy textures | 250 | Not reached | ≥18.461 | 4.718 | — |
 
-720在约20分钟采样期间崩溃，停止脚本检查时进程已不存在；堆栈涉及 AudioClip.CreateUserSound/RuntimeAudioClipLoader，系统可用物理内存最低约5 MiB。不能声称该组已有稳定值或完整流程。极重250约10分钟崩溃，明确记录 `OutOfMemoryException`、`System out of memory` 和 `MemoryLabel: Texture`（申请约52 MiB）。二者系统提交峰值约22.85 GiB；已观察进程峰值只是未完成载入的下界。500热启动在Mod加载前遇到DX11全屏分辨率1024×768切换失败的Error窗口，关闭测试进程并记无效，不纳入拟合。
+720 crashed during about 20 minutes of sampling; the process was gone when checked after stopping the script. Stack involved AudioClip.CreateUserSound/RuntimeAudioClipLoader; minimum available physical memory was about 5 MiB. No stable value or complete flow can be claimed for this group. Extremely heavy 250 crashed after about 10 minutes, explicitly recording `OutOfMemoryException`, `System out of memory`, and `MemoryLabel: Texture` (request about 52 MiB). Both had system commit peaks about 22.85 GiB; observed process peaks are only lower bounds for incomplete loading. A 500 warm start hit a DX11 fullscreen 1024×768 resolution-switch failure Error window before Mod loading; the test process was closed, run marked invalid, and excluded from fitting.
 
-Unity统计支持 retained heap 不能忽略：原版菜单Mono used/reserved约189/234 MiB；500菜单约1367/1511 MiB，稳定等待后reserved约1735 MiB；250贴图组菜单约1259/1377 MiB。500的Unity GFX allocator峰值约1.43 GB，Default Main约0.59 GB。Unity used/reserved与系统private bytes口径不同，不能相加。原始数值、阶段标记、CLI旧估算和精简日志在任务输出 `vm-calib/`，每轮 `*-summary.json` / `*-memory.csv` / `*-drive.log` / `*-player-small.log`。
+Unity statistics support retaining heap cost: vanilla menu Mono used/reserved about 189/234 MiB; 500 menu about 1367/1511 MiB, reserved about 1735 MiB after stable waiting; 250 texture-group menu about 1259/1377 MiB. For 500, Unity GFX allocator peaked around 1.43 GB, Default Main around 0.59 GB. Unity used/reserved and system private bytes measure different things and cannot be added. Raw values, phase markers, old CLI estimates, and trimmed logs are in task output `vm-calib/`, with per-round `*-summary.json` / `*-memory.csv` / `*-drive.log` / `*-player-small.log`.
 
-## 拟合与实现
+## Fitting and implementation
 
-先从原版稳定值扣除测量程序集的估算中点，得到约1.434 GiB基线。对同为244个非官方Mod的 light / 可载入贴图组，先扣音效、XML、程序集等类别的中点差，消去固定Mod项，贴图系数约1.625。再由light扣基线、贴图及其他项，每Mod固定项约2.13 MiB。两个250组不是只替换贴图的严格控制实验，因此这是有效系数，包含相关的Mono堆、Unity/驱动、图集影响；不声称分开测出了每种机制。
+Subtract the estimated midpoint of measurement-assembly cost from stable vanilla to obtain about 1.434 GiB baseline. For light / loadable texture groups, each with 244 unofficial Mods, first subtract midpoint differences in audio, XML, assemblies, and other categories, eliminating the fixed Mod term and yielding a texture coefficient about 1.625. Then subtract baseline, texture, and other terms from light to get about 2.13 MiB fixed per Mod. These two 250 groups are not a strict experiment changing only textures, so this is an effective coefficient including correlated Mono heap, Unity/driver, and atlas effects; it does not separately measure each mechanism.
 
-当前系数只在 `loadcost.Coef`、`Estimate`、`Baseline`、`LoadingBudget` 维护：拟合采用1.43 GiB基线，贴图RAM为载荷1.6–1.8倍，每非官方Mod约1.8–2.5 MiB固定项；原有音效/XML/DLL项保留。载入预留由固定启动余量、贴图量、最大PNG解码及XML/语言量组成。1.7的贴图/常驻与原载入预留公式保持原样。
+Current coefficients are maintained only in `loadcost.Coef`, `Estimate`, `Baseline`, and `LoadingBudget`: the fit uses a 1.43 GiB baseline, texture RAM 1.6–1.8 times payload, and about 1.8–2.5 MiB fixed per unofficial Mod; existing audio/XML/DLL terms remain. Loading reserve combines fixed startup headroom, texture volume, largest PNG decode, and XML/language volume. 1.7 texture/resident terms and original loading-reserve formula remain unchanged.
 
-| 有效组 | 新常驻区间GiB | 新载入预算GiB |
+| Valid group | New resident range GiB | New loading budget GiB |
 | --- | ---: | ---: |
-| 原版与测量栈 | 1.438–1.447 | 2.338–2.747 |
+| Vanilla and measurement stack | 1.438–1.447 | 2.338–2.747 |
 | 250-light | 3.649–4.472 | 4.717–6.303 |
 | 500 | 7.001–9.355 | 8.326–12.240 |
-| 250可载入贴图组 | 5.008–6.052 | 6.259–8.341 |
+| 250 loadable texture group | 5.008–6.052 | 6.259–8.341 |
 
-四个有效组以及250热启动的稳定值/启动峰值均落入各自区间；匿名数值聚合合成回归 `TestUnity16CalibrationCoverage` 固定这一事实，同时限制常驻区间宽度。失败组不用于拟合稳定目标。旧250贴图组估算常驻2.3–2.8、载入2.4–3.0 GiB，显著低于实测5.384/7.346，验证旧1.6系数不足。
+All four valid groups and the 250 warm-start stable/startup-peak values fall within their respective ranges; synthetic regression `TestUnity16CalibrationCoverage`, using anonymous numerical aggregates, fixes this fact while limiting resident-range width. Failed groups are not fitted as stable targets. Old 250 texture-group estimates were resident 2.3–2.8, loading 2.4–3.0 GiB, far below measured 5.384/7.346, confirming the old 1.6 coefficients were insufficient.
 
-## 限制与发现
+## Limits and findings
 
-只覆盖一台8 GiB VM、开启贴图压缩的Unity1.6；没有验证关闭压缩、真实GPU显存、1.7或不同物理内存下驱动备份/换页差异。AssetBundle和Mod自行分配不能从普通资源头完整推断，720和极重250含相关加载，不承诺估算上界。地图、存档和运行增长仍排除。
+Covers only one 8 GiB VM with texture compression enabled on Unity 1.6; compression disabled, real-GPU video memory, 1.7, and driver-copy/paging differences at other physical-memory sizes were not verified. AssetBundle and Mod-specific allocations cannot be fully inferred from normal resource headers; 720 and extremely heavy 250 include such loading, so no estimate upper bound is promised. Maps, saves, and runtime growth remain excluded.
 
-500及可载入250组虽然补齐依赖并完成流程，仍有Patch/xref/Harmony等运行错误；模型不代表这些组合可正常游玩。RimArcho游戏日志和能不能跑页已检查原版、500和可载入250；720的GUI检查未完成。第一次720启动还遇到CLI `SQLITE_BUSY store:index generation`，当时测试GUI仍在后台，关闭本任务GUI后重试成功启动；尚未证明属于应用并发缺陷。
+Although dependencies were completed and full flows finished for 500 and loadable 250, Patch/xref/Harmony runtime errors remained; the model does not establish these combinations are playable. RimArcho game logs and can it run were checked for vanilla, 500, and loadable 250; GUI checking for 720 was incomplete. The first 720 launch also hit CLI `SQLITE_BUSY store:index generation` while the test GUI was still in the background; closing this task's GUI allowed a successful retry. An application concurrency defect is not yet proven.
 
-本阶段创建存档：`RimArcho-calib-vanilla-1031-162627`、`RimArcho-calib-500-1031-165626`、`RimArcho-calib-250-feasible-1031-172059`。复用阶段2数据的存档是 `RimArcho-calib-250-light-1031-160148`。720、极重250和热启动未创建存档。快照还原不能保证撤回Steam云存档。
+Saves created in this phase: `RimArcho-calib-vanilla-1031-162627`, `RimArcho-calib-500-1031-165626`, `RimArcho-calib-250-feasible-1031-172059`. Save reused from phase 2: `RimArcho-calib-250-light-1031-160148`. 720, extremely heavy 250, and warm starts created no saves. Snapshot restoration cannot guarantee rollback of Steam cloud saves.

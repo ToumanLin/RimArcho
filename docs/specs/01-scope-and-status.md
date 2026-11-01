@@ -1,210 +1,210 @@
-# 01 · 范围与状态
+# 01 · Scope and Status
 
-> 状态：2026-10-21 重写，2026-10-22 按新的 1.0 范围更新。各版本做什么、不做什么、RimArcho 会写哪些文件、还有哪些事没做完。
-> 依据：00（定位、三个问题、原则）、00a（架构）。功能细节以各功能自己的规格为准。
+> Status: rewritten on 2026-10-21; updated for the new 1.0 scope on 2026-10-22. What each version includes and excludes, which files RimArcho writes, and what remains unfinished.
+> Basis: 00 (positioning, three questions, principles), 00a (architecture). Each feature's own specification governs its details.
 
-## 1. 版本划分
+## 1. Version Scope
 
-| 版本 | 回答的问题 | 内容 |
+| Version | Question answered | Contents |
 | --- | --- | --- |
-| 1.0 | 我现在在玩什么，它能正常跑吗 | 已实现的基础：环境与身份（02）、分析与日志归因（03）、方案编辑与排序（04）、CLI 与 MCP（05）、整合包 v1 与链接部署（08）、游戏日志实时追踪（03 §6.6）、列表交换（04 §9）、社区数据通道（04 §6）、隐藏的 Mod（08 §6）、设置页与历史区（06）。**新设计带来的 1.0 工作（已实现，在 `dev/0.9.0`）**：一个环境多个方案（04 §1）、启动时写入与同时只运行一个游戏（08 §1、§2）、外部修改按写入者归属（04 §4.3）、锁定版本（04 §7）、侧栏界面与首次引导（06 §2）、工具层补齐（05 §1）。**2026-10-21/22 加进 1.0 的（已实现）**：Mod 库存（06 §2.9）、一个环境一个游戏目录与共用的 Mod 文件夹（02 §0）、用 SteamCMD 下载游戏版本（08 §11）、经 Steam 退订与重新订阅（08 §10）、Archo Monitor 伴生模组（08 §9）、变化记录按 Mod 说清意味着什么（06 §2.9）、启动页（06 §2.3）、编辑器与 Mod 库存同一套筛选栏、键位和右键菜单（06 §3）、卸载（§4.1）、降低内存（06 §10）。**日志语料并入 0.9（已实现）**：按语料定的严重度与约束强度（03 §4.3.1、04 §5.3）、启动前提示（08 §2）、日志语料层的已知依赖与组合（03 §4.3）、手动 Harmony 补丁的目标（03 §5.3）、簇详情的附近消息与错误范式库（03 §6.3、§6.8） |
-| 1.1 | 有什么没玩到 | 存档读取与内容目录（10 §1、§2）、没碰过的内容（10 §3）、存档管理（10 §4）、内置 AI 助手 Archo（09） |
-| 1.2 | 有什么没玩到（续） | 工坊合集一键订阅与退订（04 §9）、本局主题与内容冲突（10 §5） |
-| 远期 | 有什么值得玩 | 玩家分享的整合包（分享网站是另一个项目）、理解玩家的内容与游玩目标推荐（10 §6） |
-| 1.x | — | 手动 `Harmony.Patch` 里运行时才确定的目标（扫描整个游戏的方法、辅助方法构造的集合、`Assembly.GetType`；能静态解出的已在 0.9 做了，03 §5.3）、条件兼容补丁存为事实；AllComps 增删审计、图标与材质审计；用 Assembly-CSharp 元数据里的 Def 字段类型做静态交叉引用；macOS 与 Linux（现在只验证了能编译）。（游戏内辅助模组已提前到 0.9：Archo Monitor，08 §9） |
+| 1.0 | What am I playing now, and can it run properly? | Implemented foundation: environments and identity (02), analysis and log attribution (03), plan editing and sorting (04), CLI and MCP (05), packs v1 and link deployment (08), live game log tracking (03 §6.6), list exchange (04 §9), community data channel (04 §6), hidden Mods (08 §6), settings page and history area (06). **1.0 work from the new design (implemented in `dev/0.9.0`)**: multiple plans per environment (04 §1), writing on launch and running only one game at a time (08 §1, §2), attributing outside changes to the writer (04 §4.3), locked versions (04 §7), sidebar interface and first-run guide (06 §2), completing the tool layer (05 §1). **Added to 1.0 on 2026-10-21/22 (implemented)**: Mod inventory (06 §2.9), one game directory per environment and shared Mod folders (02 §0), downloading game versions with SteamCMD (08 §11), unsubscribing and resubscribing through Steam (08 §10), Archo Monitor companion Mod (08 §9), change history explaining the impact per Mod (06 §2.9), launch page (06 §2.3), shared filter bar, keys, and context menus for the editor and Mod inventory (06 §3), uninstall (§4.1), reducing memory use (06 §10). **Log corpus integrated into 0.9 (implemented)**: corpus-based severity and constraint strength (03 §4.3.1, 04 §5.3), pre-launch notices (08 §2), known dependencies and combinations in the log corpus layer (03 §4.3), manual Harmony patch targets (03 §5.3), nearby messages and error pattern library in cluster details (03 §6.3, §6.8) |
+| 1.1 | What have I not played? | Save reading and content catalog (10 §1, §2), untouched content (10 §3), save management (10 §4), built-in AI assistant Archo (09) |
+| 1.2 | What have I not played? (continued) | Subscribe and unsubscribe to Workshop collections in one action (04 §9), playthrough themes and content conflicts (10 §5) |
+| Long term | What is worth playing? | Player-shared packs (the sharing website is a separate project), recommendations based on understanding player content and play goals (10 §6) |
+| 1.x | — | Targets in manual `Harmony.Patch` calls resolved only at runtime (scanning methods across the game, collections built by helper methods, `Assembly.GetType`; statically resolvable targets were implemented in 0.9, 03 §5.3), storing conditional compatibility patches as facts; auditing AllComps additions/removals, icons and materials; static cross-references using Def field types in Assembly-CSharp metadata; macOS and Linux (only compilation has been verified). (The in-game helper Mod was brought forward to 0.9: Archo Monitor, 08 §9) |
 
-## 2. 能力清单
+## 2. Capabilities
 
-按“谁、能做什么”列出，状态指现在的代码。
+Listed by who can do what; status refers to the current code.
 
-### 2.1 玩家
+### 2.1 Players
 
-| 能力 | 规格 | 状态 |
+| Capability | Specification | Status |
 | --- | --- | --- |
-| 自动找到游戏、用户数据和工坊目录，找不到时手动指定 | 02 §2 | 已实现（GUI 首次引导已实现，06 §2.15） |
-| 一个环境就是一个游戏目录；工坊、SteamCMD、其他 Mod 文件夹、Monitor、锁定库所有环境共用；存档共用默认或独立 | 02 §0 | 已实现 |
-| 用 SteamCMD 下载一个游戏版本，作为新环境 | 08 §11 | 已实现（真实登录和下载待验证，§5.2） |
-| 多个方案，切换、新建、改名、删除；方案所有游戏共用（2026-10-25） | 04 §1、§1.7 | 已实现 |
-| 在一个列表里看到启用状态、顺序和问题；启用、停用、移动、暂存 | 04 §2、06 §2.5 | 已实现 |
-| 一键排序；排不了时说明是哪些约束冲突 | 04 §5 | 已实现 |
-| 看到缺前置、不兼容、版本不支持、包名重复、补丁落空，并给出处理办法 | 03 §4 | 已实现 |
-| 报错归因到 Mod，带证据 | 03 §6 | 已实现 |
-| 工坊更新、作者改名、改包名后，列表和规则不断，并能看到变化 | 02 §5、06 §2.9 | 已实现 |
-| 撤销，或回到方案的历史版本 | 04 §3 | 已实现 |
-| 改游戏路径后，身份、规则、历史都还在 | 02 §3.2 | 已实现 |
-| 把一个 Mod 锁定版本，不受工坊更新影响 | 04 §7 | 已实现（锁定库，04 §7） |
-| 从 RimCrow、RimSort、Steam 合集等导入列表，导出给别人 | 04 §8、§9 | 已实现 |
-| 启动方案，启动时写入游戏 | 08 §2 | 已实现 |
-| 把方案编译成整合包，单独存档玩 | 08 §5 | 已实现 |
-| 游戏运行时实时看到新报错 | 03 §6.6 | 已实现 |
-| 处理被隐藏（About.xml.disabled）和退订残留的 Mod | 08 §6 | 已实现 |
-| 在一页里看手上所有 Mod：每个 Lineage 有几份、放在哪、多大、用在哪；筛选、清理 | 06 §2.9 | 已实现（GUI Mod 库存 › 全部；CLI `library`；MCP `list_library`、`manage_library`；TUI 列表与详情） |
-| 经 Steam 退订、重新订阅工坊条目 | 08 §10 | 已实现（真实调用待验证，§5.2） |
-| 看一个 Mod 的变化对自己意味着什么（会影响启动 / 留意 / 只是内容），默认只看当前方案、自上次游玩以来 | 06 §2.9 | 已实现 |
-| 游戏运行时由 Archo Monitor 记下实时日志 | 08 §9、03 §6.7 | 已实现 |
-| 鼠标能做的事键盘都能做（编辑器和 Mod 库存同一套键和右键菜单） | 06 §3.1 | 已实现 |
-| 卸载 RimArcho，撤回它改过的东西 | §4.1 | 已实现（装好的发布版上待验证，§5.2） |
-| 订阅 Git 仓库和下载页（LoversLab：有 gitgud.io 仓库的走 Git，只有下载按钮的由玩家下载后从 zip 装）里的 Mod，检查和拉取更新；没有 Steam 客户端时用 SteamCMD 下载工坊条目 | 02 §3.4、06 §2.9 | 已实现（GUI、CLI、TUI、MCP `manage_subscriptions`；TUI 的下载页只经它唯一的 Git 仓库订阅，zip / 文件夹和 LoversLab 站点文件在窗口里选或用 `--from`；真实 SteamCMD 下载工坊条目待验证，§5.2） |
-| 看哪些 Mod 和内容从没玩到；管理存档 | 10 | 待实现（1.1） |
+| Automatically find game, user data, and Workshop directories; specify them manually when detection fails | 02 §2 | Implemented (GUI first-run guide implemented, 06 §2.15) |
+| One environment is one game directory; Workshop, SteamCMD, other Mod folders, Monitor, and the lock library are shared across all environments; use shared default saves or own saves | 02 §0 | Implemented |
+| Download a game version with SteamCMD as a new environment | 08 §11 | Implemented (real login and download await validation, §5.2) |
+| Switch, create, rename, and delete multiple plans; all games share plans (2026-10-25) | 04 §1, §1.7 | Implemented |
+| See enabled state, order, and findings in one list; enable, disable, move, and stage | 04 §2, 06 §2.5 | Implemented |
+| Sort in one action; explain conflicting constraints when sorting fails | 04 §5 | Implemented |
+| See missing dependencies, incompatibilities, unsupported versions, duplicate package IDs, and patches with no match, with remedies | 03 §4 | Implemented |
+| Attribute errors to Mods with evidence | 03 §6 | Implemented |
+| Preserve lists and rules through Workshop updates, author renames, and package ID changes, and see the changes | 02 §5, 06 §2.9 | Implemented |
+| Undo, or return to a plan's historical version | 04 §3 | Implemented |
+| Preserve identities, rules, and history after changing the game path | 02 §3.2 | Implemented |
+| Lock a Mod version against Workshop updates | 04 §7 | Implemented (lock library, 04 §7) |
+| Import lists from RimCrow, RimSort, Steam collections, etc., and export them for others | 04 §8, §9 | Implemented |
+| Launch a plan, writing it to the game on launch | 08 §2 | Implemented |
+| Build a plan into a pack and play with separate saves | 08 §5 | Implemented |
+| See new errors live while the game runs | 03 §6.6 | Implemented |
+| Handle hidden Mods (About.xml.disabled) and unsubscribed residue | 08 §6 | Implemented |
+| See all owned Mods on one page: copies per Lineage, locations, sizes, and usage; filter and clean up | 06 §2.9 | Implemented (GUI mod library › all; CLI `library`; MCP `list_library`, `manage_library`; TUI list and details) |
+| Unsubscribe and resubscribe to Workshop items through Steam | 08 §10 | Implemented (real calls await validation, §5.2) |
+| See what a Mod's changes mean for the player (affects launch / watch / content only), scoped by default to the current plan since the last play session | 06 §2.9 | Implemented |
+| Record live logs through Archo Monitor while the game runs | 08 §9, 03 §6.7 | Implemented |
+| Do everything by keyboard that can be done by mouse (shared keys and context menus for the editor and Mod inventory) | 06 §3.1 | Implemented |
+| Uninstall RimArcho and reverse its changes | §4.1 | Implemented (validation on an installed release pending, §5.2) |
+| Subscribe to Mods in Git repositories and download pages (LoversLab: use Git when a gitgud.io repository exists; otherwise players download the zip and install it), check and pull updates; download Workshop items with SteamCMD when the Steam client is unavailable | 02 §3.4, 06 §2.9 | Implemented (GUI, CLI, TUI, MCP `manage_subscriptions`; TUI subscribes to a download page only through its single Git repository; choose zip / folders and LoversLab site files in the window or use `--from`; real SteamCMD Workshop downloads await validation, §5.2) |
+| See Mods and content never played; manage saves | 10 | Not implemented (1.1) |
 
-### 2.2 AI 助手
+### 2.2 AI Assistants
 
-| 能力 | 规格 | 状态 |
+| Capability | Specification | Status |
 | --- | --- | --- |
-| 查询 Mod、Def、Patch、Harmony 的事实和冲突 | 05 §5 | 已实现 |
-| 给一段堆栈，得到 Harmony 补丁所属的 Mod 和下一步 | 03 §6、05 §5.3 | 已实现 |
-| 按需反编译单个 Mod 并搜索源码 | 03 §5.4 | 已实现 |
-| 玩家能做的每个动作都有对应工具 | 05 §1 | 已实现（第 7 步补齐；卸载只给只读预览，§4.1；实时日志的 `since` 游标第 13 步补齐，03 §6.6；订阅的写工具 `manage_subscriptions` 第 17 步补齐） |
-| 内置 Archo：对话与一键任务 | 09 | 待实现（1.1） |
+| Query facts and conflicts for Mods, Defs, Patches, and Harmony | 05 §5 | Implemented |
+| Given a stack trace, identify the Mods owning Harmony patches and the next steps | 03 §6, 05 §5.3 | Implemented |
+| Decompile an individual Mod on demand and search its source | 03 §5.4 | Implemented |
+| A corresponding tool for every player action | 05 §1 | Implemented (completed in step 7; uninstall has only a read-only preview, §4.1; live log `since` cursor completed in step 13, 03 §6.6; subscription mutation tool `manage_subscriptions` completed in step 17) |
+| Built-in Archo: conversations and one-action tasks | 09 | Not implemented (1.1) |
 
-## 3. 不做
+## 3. Exclusions
 
-- 通用的工坊浏览器和工坊搜索。“值得玩”只从玩家已有的 Mod 和其他玩家验证过的整合包出发（00 §2）。
-- （2026-10-24 更正：订阅 Git 仓库、没有 Steam 客户端时用 SteamCMD 下载工坊条目改为要做，02 §3.4；工坊条目仍先用 Steam 客户端。）用 SteamCMD 下载**游戏版本**是做的（1.0，08 §11）：玩家在 SteamCMD 自己的窗口里登录，RimArcho 只给它账户名。
-- 无人确认就更新 RimArcho（2026-10-31 起检查新版本是自动的，下载和替换要玩家确认，07 §5.1）；常驻后台进程；开放任何网络端口（MCP 只走 stdio）。
-- 休眠屏、推荐清单导出（RimCrow 有，RimArcho 不做）。
-- 获取 Mod 的枢纽：工坊检索（Git 仓库订阅 2026-10-24 改为要做，02 §3.4）（RimCrow“库存枢纽”的另外三页）。管理已在本机的 Mod 是 Mod 库存页（06 §2.9），要做。（2026-10-21 更正：最初的“不做库存枢纽”是 MVP 的范围，重写规格时误写成了永久不做。）
-- 购买代码签名证书。README 说明首次运行时 SmartScreen 的提示。
-- 替外部 agent 审批权限：外部 agent 的写操作是否放行由它的 harness 决定，工具按 MCP 规范标注 `readOnlyHint` / `destructiveHint`（05 §5.2）。内置 Archo 的写操作走 RimArcho 自己的确认（09 §2）。
+- A general Workshop browser or Workshop search. "Worth playing" starts only from Mods the player owns and packs validated by other players (00 §2).
+- (Correction on 2026-10-24: Git repository subscriptions and SteamCMD Workshop downloads when the Steam client is unavailable are now in scope, 02 §3.4; Workshop items still prefer the Steam client.) Downloading **game versions** through SteamCMD is in scope (1.0, 08 §11): players log in through SteamCMD's own window; RimArcho gives it only the account name.
+- Updating RimArcho without confirmation (since 2026-10-31, checks for new versions are automatic; download and replacement require player confirmation, 07 §5.1); resident background processes; opening any network port (MCP uses only stdio).
+- Sleep screen and recommendation list export (RimCrow has these; RimArcho does not).
+- A Mod acquisition hub: Workshop search (Git repository subscriptions moved into scope on 2026-10-24, 02 §3.4) (the other three pages in RimCrow's "inventory hub"). Managing local Mods belongs to the Mod inventory page (06 §2.9) and is in scope. (Correction on 2026-10-21: the original "no inventory hub" applied to the MVP scope; the specification rewrite incorrectly made it a permanent exclusion.)
+- Buying a code-signing certificate. README explains the SmartScreen prompt on first run.
+- Approving permissions for external agents: their harness decides whether to allow writes; tools carry MCP `readOnlyHint` / `destructiveHint` annotations (05 §5.2). Built-in Archo uses RimArcho's own confirmation for writes (09 §2).
 
-## 4. 写文件清单（安全底线）
+## 4. File Write List (Safety Boundary)
 
-移动或移除 Mod 实体目录前，共用入链计划覆盖所有已知游戏：记录意图 → 摘自有链接 → 搬移/回收 → 更新记录 → 重建必要入口。受影响游戏运行、外来入链会断或链接状态未知时拒绝；原确认预览列出受影响链接，不另弹确认。失败只向仍可访问的原目标回接；中断恢复须经已确认的链接修复，启动不自动改盘。
+Before moving or removing a physical Mod directory, the shared inbound-link plan covers all known games: record intent → detach owned links → move/recycle → update records → rebuild required entry points. Refuse if an affected game is running, a foreign inbound link would break, or link state is unknown; list affected links in the original confirmation preview without another confirmation dialog. On failure, reconnect only to the original target if it remains accessible; recovery after interruption requires confirmed link repair. Startup does not change disk state automatically.
 
-链接检查只读。链接修复须先展示游戏、链接完整路径、原始目标、原因、归属凭据及动作，再经界面确认或 CLI `links repair --yes` 执行；只有前缀而无归属凭据的链接还须逐路径明确纳入。修复边界及重验规则由 [08 §3](08-launch-and-packs.md#3-链接部署) 定义。扫描、打开问题页、启动检查和测试运行都不授权删除；摘除部署链接不进回收站，也不扩大回收站白名单。
+Link inspection is read-only. Link repair must first show the game, full link path, original target, reason, ownership evidence, and action, then run after interface confirmation or CLI `links repair --yes`; links with only a prefix and no ownership evidence also require explicit inclusion per path. [08 §3](08-launch-and-packs.md#3-%E9%93%BE%E6%8E%A5%E9%83%A8%E7%BD%B2) defines repair boundaries and revalidation rules. Scanning, opening the problems page, launch checks, and test runs do not authorize deletion; detaching deployment links does not use the recycle bin or expand its allowlist.
 
-RimArcho 只写下面这些地方，其他一律不碰。每个会写磁盘的动作都要能预览（CLI 的 `--dry-run`、界面里的预览）、要玩家确认（界面）或明确执行（CLI 不带 `--dry-run`），并且能撤回，或者说明为什么不能撤回。
+RimArcho writes only to the locations below and touches nothing else. Every disk-writing action must have a preview (CLI `--dry-run`, interface preview), require player confirmation (interface) or explicit execution (CLI without `--dry-run`), and be reversible or explain why it cannot be reversed.
 
-自动检查（06 §2.16）是上述逐次确认的例外：总开关开启时允许写检查记录（含 RimArcho 新版本的记录）、已有订阅的元数据、已启用账户的加密续期会话和社区数据缓存；不授权安装 Mod、更新外部工具或 RimArcho、修改游戏配置。
+Automatic checks (06 §2.16) are an exception to per-action confirmation above: when the master switch is on, they may write check records (including RimArcho version checks), metadata for existing subscriptions, encrypted renewed sessions for enabled accounts, and community data caches; they do not authorize installing Mods, updating external tools or RimArcho, or changing game configuration.
 
-| 写什么 | 什么时候 | 规则 | 规格 | 卸载时（§4.1） |
+| What is written | When | Rules | Specification | On uninstall (§4.1) |
 | --- | --- | --- | --- | --- |
-| SQLite meta `memory-estimate:<环境>:<列表>`、`cache/loadcost-v1.json` | 显式估算或打开能不能跑后后台测量 | 只保存可丢弃的文件测量与精简估算总量；不写游戏 / Mod；未知不等于容量为零 | 06 §2.4、§2.17 | `data`：随数据库和缓存处理 |
-| SQLite meta `automatic:*`、`tool-update:*`、`self-update`、`subscriptions:check:shared:*`、`community:generation`，已有 `tasks.json`，订阅 Mod 的 `.rimarcho/source.json`，`cache/` 社区数据及 `.source.json`、暂存文件和 `.community-data-backup-*` 回滚目录 | 自动检查开启且到期时 | 只记录非秘密的检查结果和版本；Git / 下载页只更新订阅元数据，不安装新内容；社区数据替换及回滚遵循 04 §6.3；账户密文仍用下列限定位置 | 06 §2.16 | `data`：随数据库和缓存处理；订阅元数据随玩家的 Mod 保留 |
-| SQLite `credit_batch`、`credit_item`、`credit_session`、`credit_deployment`（迁移 v20） | 显式批量 SteamCMD 下载后、成功启动游戏、回答 credit 询问、逐步替换时 | 批次存创建时间、范围、会话数、`counting/prompt/replacing/done/dismissed`；逐项存原 Instance、目标 Instance、`pending/subscribed/switching/done/retained/failed`、退避与结果；会话以批次、游戏和 Launch 身份去重（移除游戏后仍保留已计次数）；部署义务记游戏、写入者方案及完成状态；重叠批次复用确认和替换结果，不新增订阅。所有能加载旧副本的环境必须能加载新副本，否则整项保留；暂存损坏保留并结束。全部列表的当前内容、历史、撤销/重做与暂存在交接后同事务重映射，合并 instance_note，递增 meta.credit.remap 使旧编辑快照失效；texture_mod/texture_file 绑定旧目录与内容快照，不直接迁移，结果提示重新优化。不因历史而保留旧副本；固定包、未交接部署或入链保留。Dismiss 永久，任务历史清理不删未完成义务 | 02 §3.4 | `data`：随数据库处理 |
-| 既有 `tasks.json`、游戏 ModsConfig.xml 及备份、自有部署链接、SteamCMD 副本 | 玩家接受逐步替换后 | SQLite 是续跑依据；复用既有 registry 和链接台账，只替换本批对应的投影；游戏运行时暂停；仍有引用或链接就保留，只有无引用的 CMD 副本进回收站。不写客户端内容或 ACF，不自动退订 | 02 §3.4、08 §3、06 §2.16 | `data`：任务记录随数据处理；游戏配置保留，链接及 SteamCMD 目录沿用下列现有条目规则 |
-| 账户会话 `%LOCALAPPDATA%\RimArcho\accounts\loverslab.session`、原子替换文件 `.session.new`、临时 `webview-profile/` 与 `downloads/loverslab-*.zip` | 玩家启用后登录、验证、选择文件下载 | 当前用户 DPAPI 加密持久 Cookie，目录 ACL 限当前用户；临时独立浏览器目录关闭后删除，下载临时文件安装后删除。普通设置读取不联网；验证可能刷新会话。秘密不进入 DB、配置、日志、任务、导出、整合包、诊断或 MCP | 07 §3.1、02 §3.4 | `accounts`：在工具和数据之前忘记，失败停止卸载并保留可重试数据 |
-| 受管 SteamCMD 的 `config/config.vdf`、`ssfn*`、`*.sentry`、`config/*.sentry`、`config/ssfn*` | SteamCMD 自己维护；玩家退出失败后明确选择本地忘记，或卸载 | RimArcho 不读、复制或修改认证内容，只限定删除已知缓存位置，影响所有缓存账户；拒绝重定向路径及未知布局。不删除外部实例文件，标“外部缓存，不接管” | 08 §11 | `accounts`：即使 SteamCMD 因保留 Mod 而不删除也清理；游戏和 Mod 不动 |
-| RimArcho 自己的数据目录（`%APPDATA%\RimArcho\`） | 随时 | 数据目录不能与游戏目录、用户数据目录、任何来源根目录互相包含，`env add/set`、`folder add` 和 `scan` 时检查；“独立”存档目录 `userdata/<环境名>` 是数据目录里的例外 | 07 §3、02 §2.1 | `data`：RimArcho 关闭后删除（没有 `archo.db` 的文件夹不动） |
-| 程序文件夹里发布 zip 带的文件（`archo.exe`、`RimArcho.exe`、`README.md`、`CHANGELOG.md`、`LICENSE`、`monitor/`）和 `.archo-update/`（`download/`、`new-<版本>/`、`old-<版本>-<时间>/`、`lock`） | 玩家确认安装 RimArcho 新版本后（设置、TUI“更新 RimArcho”、`archo update`）；启动时清理上次留下的 | 下载的 zip 大小和 SHA-256 与发布一致才解开；zip 只能带这几样；等程序文件夹里没有别的 RimArcho 在运行才动程序文件；旧文件改名移进 `old-*`、新文件改名到位，失败或新程序报的版本不对就换回旧的；数据目录和 `%LOCALAPPDATA%\RimArcho` 不动；下次启动删掉 `.archo-update/` 里的旧文件、解开的和下载的 | 07 §5.1 | `program`：zip 带的文件和 `.archo-update/` 随程序一起删 |
-| “独立”存档目录 `<数据目录>/userdata/<环境名>` | `env add/set --saves own` 时建；启动时游戏写存档、RimArcho 写 ModsConfig.xml | 同上一行的 ModsConfig.xml 规则；游戏以 `-savedatafolder` 启动 | 02 §2.1、08 §2 | `saves`：默认移到玩家选的文件夹（默认 `文档\RimArcho saves`），选“删除”才进回收站；从不直接删 |
-| SteamCMD（`%LOCALAPPDATA%\RimArcho\steamcmd`） | 玩家看过大小、同意从 Valve 下载后 | 只解开 zip 里的平铺文件；之后 SteamCMD 在那里更新自己、写它的日志和登录缓存；工坊分批命令写入 SteamCMD exe 旁唯一 `RimArcho-workshop-*.txt` 脚本，每批进程结束后删除（02 §3.4） | 08 §11 | `steamcmd`：删除；里面有用它下载的 Mod（`steamapps/workshop/content/294100` 不空）或是某个来源时不动 |
-| 下载的游戏目录 | 玩家选好分支、目录并开始下载后 | 目录不能在数据目录里，不能与任何来源互相包含，不能是已有环境的游戏目录；写入的是 SteamCMD，不是 RimArcho | 08 §11 | `games`：默认保留；选“删除”进回收站（游戏目录里有 `steamapps/appmanifest_294100.acf` 才算下载的） |
-| `<用户数据目录>/Config/ModsConfig.xml` | 启动方案、写入游戏 | 先备份为 `ModsConfig.xml.rimarcho.bak`（只留一份），再写临时文件原子替换 | 04 §4.1 | `modsconfig`：保留当前列表，只去掉 Archo Monitor 和只靠被删链接才有的 Mod（别处还有同 packageId 的留着），删除 `.rimarcho.bak`；或选“换回备份” |
-| `Mods/` 下以 `_Archo_` 开头的目录链接 | 启动方案、写入游戏、切换环境时补齐目标列表需要的链接 | 只建、删带这个前缀的链接；从不写链接目标；同名但不是链接的目录不动并报错；`_Archo_env_` 本地链接在普通保存时保留 | 08 §3 | `links`：只删链接，从不进入链接目标；同名但不是链接的目录不动并列出 |
-| `Mods/` 下以 `!ArchoPack_` 开头的目录链接 | 启动整合包；切回方案时清理 | 同上 | 08 §5.3 | `links`：同上 |
-| 把 `Mods/` 里多出来的同 Lineage 副本收进锁定库 | 玩家在 Mod 库存确认后，或 `library move-to-locked` | 同卷改名；跨卷复制、核对后原目录进回收站；只移整个 Mod 文件夹，且同 Lineage 还有别的副本；有指向文件夹外的链接时拒绝；没有 `.rimarcho/origin.json` 时写一份；Instance 不变（已实现） | 06 §2.9 | `locked`：收进来的副本就是锁定库的副本，同下 |
-| 锁定库（设置项 `lock.dir`，默认 `%LOCALAPPDATA%\RimArcho\locked`，所有环境共用）下的新文件夹 | 玩家锁定一个 Mod、更新锁定版本时 | 只新建，名字被占用时加后缀，从不覆盖；写 `.rimarcho/origin.json`；锁定库与数据目录、各来源根目录互不包含 | 04 §7 | `locked`：默认进回收站；选“保留”时移到玩家选的游戏的 `Mods/` 成为普通 Mod（同卷改名，跨卷复制核对后原目录进回收站），删去 `.rimarcho/origin.json` |
-| 订阅目录（设置项 `subscribed.dir`，默认 `%LOCALAPPDATA%\RimArcho\subscribed`）下的 Mod 文件夹；SteamCMD 下载目录（`steamcmd-mods.dir`，默认 `%LOCALAPPDATA%\RimArcho\steamcmd-mods`） | 玩家订阅、更新订阅时 | 先装到同卷的 `.archo-tmp-*` 再改名，名字被占用时加后缀，从不覆盖；写 `.rimarcho/source.json`；Git 更新只在工作区没有改动时原地检出；撤掉订阅进回收站；与数据目录、各来源根目录互不包含 | 02 §3.4 | 无：订阅来的 Mod 是玩家的 Mod，和其他 Mod 文件夹一样不动（§4.1“从不碰”） |
-| Monitor 目录（设置项 `monitor.dir`，默认 `%LOCALAPPDATA%\RimArcho\monitor`）下的 `ArchoMonitor-<版本>/` | 安装、更新随附的 Archo Monitor 时 | 只新建版本目录（先组装临时目录再改名）；同版本内容不同时只替换预发布版本的目录，且没有游戏在运行；与数据目录、各来源根目录互不包含 | 08 §9 | `monitor`：删除 `ArchoMonitor-*` 版本目录，空了再删 Monitor 目录 |
-| 把 `Mods/` 里 RimArcho 建的旧副本移进锁定库 | 第一次更新它、或 `pin --move-to-library` 时，玩家确认后 | 只移带 `.rimarcho/origin.json` 的目录；同卷改名，跨卷复制并核对后把原目录移到回收站 | 04 §7.4 | `locked`：同上 |
-| 贴图编码器 todds（`%LOCALAPPDATA%\RimArcho\todds`） | 玩家看过来源和大小、同意从 GitHub 下载后（库 › 贴图优化，或 `archo textures tool --install`） | 只解开 zip 里的 `todds.exe` 和许可文件；下载大小必须等于发布页列出的大小，解开后 `--help` 必须报 0.4.1；设置项 `textures.todds` 可以指向已有的一份（例如 RimSort 自带的），RimArcho 不写那里 | 08 §5.2 | `data`：随 `%LOCALAPPDATA%\RimArcho` 删除 |
-| 外部工具的移除（`archo deps remove <名>`，设置 › 外部工具） | 玩家确认后 | 只删 RimArcho 自己下载的那一份所在的目录（`%LOCALAPPDATA%\RimArcho\todds`、`%LOCALAPPDATA%\RimArcho\steamcmd`），解析链接后必须仍是这个目录；指定路径、`PATH`、Program Files 里的那份从不删；SteamCMD 目录里有它下载的 Mod、游戏目录、某个来源或锁定库时拒绝 | 07 §2.1 | 无：这一步本身就是删除，没有要撤回的 |
-| Mod 文件夹里 PNG 旁边的同名 `.dds`（贴图优化） | 玩家看过预估、确认优化（Mod 库存、库 › 贴图优化，或 `archo textures optimize`）后 | 只新建 `.dds`，从不改、删 PNG；同名 `.dds` 已存在而不是 RimArcho 写的（作者自带或别的工具生成）时整组跳过、从不覆盖；每个文件写之前先记进数据库，`textures clean` 和更新后的重新生成只删记录里、大小没变过的文件；游戏在运行时拒绝；Core 和 DLC 不处理 | 08 §5.2 | `textures`：删除记录里的 DDS，PNG 和文件夹不动 |
-| 把 `About.xml.disabled` 改回 `About.xml` | 玩家确认 unhide / unpin 时 | `About.xml` 已存在时拒绝 | 08 §6 | 无：这是把玩家的 Mod 恢复给游戏，卸载不再把它藏起来 |
-| 移到回收站 | 玩家确认后 | 只有一个入口，统一按白名单检查路径（08 §7）。只接受：工坊或 SteamCMD 来源里被隐藏或退订残留的 Instance 真实目录、`Mods/` 和锁定库里玩家自己的副本（本身是链接时拒绝）、整合包目录、存档文件；已启用或有方案在用的 Mod 只警告、照样执行（玩家说了算），这些方案里的条目随后显示为缺失；回收站不可用时拒绝，从不永久删除 | 08 §7，06 §2.9 | 无：回收站里的东西由玩家处理 |
-| 经 Steam 退订工坊条目（Steam 随后删掉它的文件夹） | 玩家在 Mod 库存确认后，或 `workshop unsubscribe` | RimArcho 自己不删文件，是 Steam 删；已启用、有方案在用、游戏在运行时拒绝；运行目录 `%LOCALAPPDATA%\RimArcho\steam` 只放复制来的 `steam_api64.dll` 和 `steam_appid.txt`，不写游戏目录 | 08 §10 | `data`：运行目录随 `%LOCALAPPDATA%\RimArcho` 删除；退订是玩家在 Steam 的订阅，不恢复 |
-| 存档备份 | 玩家确认后 | 复制到 `<数据目录>/backups/saves/<时间>/`，不改原存档 | 10 §4 | `saves`：`<数据目录>/backups/saves/` 和独立存档一起处理 |
-| 整合包的数据目录 `<包>/userdata/` | 启动整合包 | 首次启动时从环境复制设置（不含 ModsConfig.xml） | 08 §5.3 | `packs`：随整合包目录处理（见下一行） |
-| 整合包目录（设置项 `pack.dir`，默认 `<数据目录>/packs`）下的 `<包名>/` | 编译、导入整合包时 | 编译先写临时目录 `<包名>.archo-tmp`；`pack remove` 进回收站 | 08 §5 | `packs`：默认保留，在数据目录里时移到玩家选的文件夹（默认 `文档\RimArcho packs`），在别处时留在原处；选“删除”进回收站；没编译完的临时目录删除 |
-| 测试数据 `<数据目录>/tests/<环境 ID>/` | 明确执行游戏测试运行时 | `userdata/` 复用缓存，每次重写测试配置；`runs/<UTC 时间>/` 留日志与报告，只保留最新 10 次；不能在游戏或玩家数据目录内，不建 Mod 链接 | 08 §12 | `data`：随数据目录删除 |
+| SQLite meta `memory-estimate:<environment>:<list>`, `cache/loadcost-v1.json` | Explicit estimation or background measurement after opening can it run | Store only disposable file measurements and compact estimated totals; do not write to the game / Mods; unknown does not mean zero capacity | 06 §2.4, §2.17 | `data`: handled with the database and cache |
+| SQLite meta `automatic:*`, `tool-update:*`, `self-update`, `subscriptions:check:shared:*`, `community:generation`; existing `tasks.json`; subscribed Mods' `.rimarcho/source.json`; `cache/` community data and `.source.json`, staging files and `.community-data-backup-*` rollback directories | When automatic checks are enabled and due | Record only non-secret check results and versions; Git / download pages update only subscription metadata, without installing content; community data replacement and rollback follow 04 §6.3; encrypted account data stays in the restricted locations below | 06 §2.16 | `data`: handled with the database and cache; subscription metadata stays with the player's Mods |
+| SQLite `credit_batch`, `credit_item`, `credit_session`, `credit_deployment` (migration v20) | After explicit batch SteamCMD downloads, successful game launches, credit prompt answers, and gradual replacement | Batches store creation time, scope, session count, and `counting/prompt/replacing/done/dismissed`; items store original Instance, target Instance, `pending/subscribed/switching/done/retained/failed`, backoff, and result; sessions deduplicate by batch, game, and Launch identity (counts remain after game removal); deployment obligations record game, writer plan, and completion. Overlapping batches reuse confirmations and replacement results without new subscriptions. Every environment able to load the old copy must be able to load the new one, or the whole item is retained; corrupt staging is retained and the item ends. After handover, current contents, history, undo/redo, and staging across all lists are remapped in the same transaction, instance_note is merged, and meta.credit.remap increments to invalidate old edit snapshots; texture_mod/texture_file bind to the old directory and content snapshot, are not migrated directly, and the result asks for optimization again. History alone does not retain old copies; fixed packs, deployments awaiting handover, or inbound links do. Dismiss is permanent; task history cleanup does not delete unfinished obligations | 02 §3.4 | `data`: handled with the database |
+| Existing `tasks.json`, game ModsConfig.xml and backup, owned deployment links, SteamCMD copies | After the player accepts gradual replacement | SQLite governs resumption; reuse the existing registry and link ledger, replacing only this batch's projections; pause while a game runs; retain copies still referenced or linked, and recycle only unreferenced CMD copies. Do not write client content or ACF, or unsubscribe automatically | 02 §3.4, 08 §3, 06 §2.16 | `data`: task records handled with data; game configuration retained; links and SteamCMD directories follow the existing entries below |
+| Account session `%LOCALAPPDATA%\RimArcho\accounts\loverslab.session`, atomic replacement `.session.new`, temporary `webview-profile/` and `downloads/loverslab-*.zip` | Login, validation, and selected file downloads after player opt-in | Encrypt persistent cookies with current-user DPAPI; restrict directory ACL to that user; delete the isolated temporary browser directory on close and downloaded temporary files after installation. Normal settings reads do not connect; validation may refresh the session. Secrets never enter DB, configuration, logs, tasks, exports, packs, diagnostics, or MCP | 07 §3.1, 02 §3.4 | `accounts`: forget before tools and data; failure stops uninstall and retains data for retry |
+| Managed SteamCMD `config/config.vdf`, `ssfn*`, `*.sentry`, `config/*.sentry`, `config/ssfn*` | Maintained by SteamCMD itself; explicit local forgetting after failed logout, or uninstall | RimArcho does not read, copy, or modify authentication contents; it only deletes known cache locations, affecting all cached accounts; refuse redirected paths and unknown layouts. Do not delete external instance files; label "external cache, not managed" | 08 §11 | `accounts`: clean even when SteamCMD is retained for Mods; leave games and Mods untouched |
+| RimArcho's own data directory (`%APPDATA%\RimArcho\`) | At any time | Data directory must not contain or be contained by game directories, user data directories, or source roots; checked during `env add/set`, `folder add`, and `scan`; own saves at `userdata/<environment-name>` are an exception inside the data directory | 07 §3, 02 §2.1 | `data`: delete after RimArcho closes (leave folders without `archo.db` untouched) |
+| Release zip files in the program folder (`archo.exe`, `RimArcho.exe`, `README.md`, `CHANGELOG.md`, `LICENSE`, `monitor/`) and `.archo-update/` (`download/`, `new-<version>/`, `old-<version>-<time>/`, `lock`) | After player confirmation to install a new RimArcho version (settings, TUI "update RimArcho", `archo update`); clean leftovers on startup | Extract only when downloaded zip size and SHA-256 match the release; zip may contain only these items; wait until no other RimArcho runs in the program folder before touching program files; rename old files into `old-*` and new files into place, restoring old files on failure or if the new program reports the wrong version; leave the data directory and `%LOCALAPPDATA%\RimArcho` untouched; on next startup delete old, extracted, and downloaded files in `.archo-update/` | 07 §5.1 | `program`: delete release zip files and `.archo-update/` with the program |
+| Own save directory `<data-directory>/userdata/<environment-name>` | Created on `env add/set --saves own`; game writes saves and RimArcho writes ModsConfig.xml on launch | Same ModsConfig.xml rules as the row above; launch game with `-savedatafolder` | 02 §2.1, 08 §2 | `saves`: move to a player-chosen folder by default (default `Documents\RimArcho saves`); only recycle when "delete" is selected; never delete directly |
+| SteamCMD (`%LOCALAPPDATA%\RimArcho\steamcmd`) | After player sees the size and agrees to download from Valve | Extract only flat files from the zip; SteamCMD then updates itself and writes its logs and login cache there; Workshop batch commands go into a unique `RimArcho-workshop-*.txt` script beside the SteamCMD exe, deleted after each batch process exits (02 §3.4) | 08 §11 | `steamcmd`: delete; retain if it contains downloaded Mods (`steamapps/workshop/content/294100` is nonempty) or is a source |
+| Downloaded game directory | After player selects a branch and directory and starts downloading | Must be outside the data directory, must not contain or be contained by any source, and must not be an existing environment's game directory; SteamCMD writes it, not RimArcho | 08 §11 | `games`: retain by default; recycle when "delete" is selected (counts as downloaded only when game directory contains `steamapps/appmanifest_294100.acf`) |
+| `<user-data-directory>/Config/ModsConfig.xml` | Launching a plan, writing to the game | Back up to `ModsConfig.xml.rimarcho.bak` first (one copy only), then write a temporary file and replace atomically | 04 §4.1 | `modsconfig`: keep the current list, removing only Archo Monitor and Mods available solely through deleted links (retain if the same packageId exists elsewhere), delete `.rimarcho.bak`; or choose "put the backup back" |
+| Directory links under `Mods/` starting with `_Archo_` | Fill links needed by the target list on plan launch, writing to the game, or environment switch | Create/delete only links with this prefix; never write link targets; leave same-name non-link directories and report an error; retain `_Archo_env_` local links during normal saves | 08 §3 | `links`: delete links only; never enter targets; leave and list same-name non-link directories |
+| Directory links under `Mods/` starting with `!ArchoPack_` | Launching a pack; clean up when switching back to a plan | Same as above | 08 §5.3 | `links`: same as above |
+| Move extra copies of the same Lineage from `Mods/` into the lock library | After player confirmation in Mod inventory, or `library move-to-locked` | Rename on the same volume; across volumes, copy and verify, then recycle the original directory; move only whole Mod folders with another copy in the same Lineage; refuse links outside the folder; write `.rimarcho/origin.json` if absent; Instance stays unchanged (implemented) | 06 §2.9 | `locked`: moved copies are lock library copies; see below |
+| New folders in the lock library (`lock.dir`, default `%LOCALAPPDATA%\RimArcho\locked`, shared by all environments) | Locking a Mod or updating a locked version | Create only; add suffix if name is occupied; never overwrite; write `.rimarcho/origin.json`; lock library, data directory, and source roots must not contain one another | 04 §7 | `locked`: recycle by default; when "keep" is selected, move to a player-chosen game's `Mods/` as a normal Mod (rename on same volume; across volumes copy, verify, then recycle original), removing `.rimarcho/origin.json` |
+| Mod folders in the subscription directory (`subscribed.dir`, default `%LOCALAPPDATA%\RimArcho\subscribed`); SteamCMD download directory (`steamcmd-mods.dir`, default `%LOCALAPPDATA%\RimArcho\steamcmd-mods`) | Subscribing or updating subscriptions | Install in same-volume `.archo-tmp-*` then rename; suffix occupied names; never overwrite; write `.rimarcho/source.json`; Git updates check out in place only with a clean working tree; recycle removed subscriptions; must not contain or be contained by the data directory or source roots | 02 §3.4 | None: subscribed Mods belong to the player and are left untouched like other Mod folders (§4.1 "Never touch") |
+| `ArchoMonitor-<version>/` under Monitor directory (`monitor.dir`, default `%LOCALAPPDATA%\RimArcho\monitor`) | Installing or updating bundled Archo Monitor | Create version directories only (assemble temporary directory then rename); if same-version contents differ, replace only prerelease version directories, with no game running; must not contain or be contained by data directory or source roots | 08 §9 | `monitor`: delete `ArchoMonitor-*` version directories, then Monitor directory if empty |
+| Move old RimArcho-made copies from `Mods/` into the lock library | On first update, or `pin --move-to-library`, after player confirmation | Move only directories with `.rimarcho/origin.json`; rename on same volume; across volumes copy and verify, then recycle original | 04 §7.4 | `locked`: same as above |
+| Texture encoder todds (`%LOCALAPPDATA%\RimArcho\todds`) | After player sees source and size and agrees to download from GitHub (library › texture optimization, or `archo textures tool --install`) | Extract only `todds.exe` and license files; download size must equal the release page's size; extracted `--help` must report 0.4.1; `textures.todds` may point to an existing copy (such as RimSort's), which RimArcho never writes | 08 §5.2 | `data`: delete with `%LOCALAPPDATA%\RimArcho` |
+| External tool removal (`archo deps remove <name>`, settings › external tools) | After player confirmation | Delete only the directory containing RimArcho's own downloaded copy (`%LOCALAPPDATA%\RimArcho\todds`, `%LOCALAPPDATA%\RimArcho\steamcmd`), which must still resolve to that directory after following links; never delete copies at specified paths, in `PATH`, or in Program Files; refuse if the SteamCMD directory contains its downloaded Mods, a game directory, a source, or the lock library | 07 §2.1 | None: this action itself is deletion; nothing to reverse |
+| Same-name `.dds` beside PNG files in Mod folders (texture optimization) | After player sees estimates and confirms optimization (Mod inventory, library › texture optimization, or `archo textures optimize`) | Create `.dds` only; never modify/delete PNG; if a same-name `.dds` exists and was not written by RimArcho (author-supplied or generated by another tool), skip the whole group without overwriting; record each file in DB before writing; `textures clean` and regeneration after updates delete only recorded files whose size has not changed; refuse while game runs; exclude Core and DLC | 08 §5.2 | `textures`: delete recorded DDS; leave PNG and folders untouched |
+| Rename `About.xml.disabled` back to `About.xml` | Player confirms unhide / unpin | Refuse if `About.xml` exists | 08 §6 | None: this restores the player's Mod to the game; uninstall does not hide it again |
+| Move to recycle bin | After player confirmation | One entry point checks paths against the allowlist (08 §7). Accept only: real Instance directories hidden or left after unsubscribing in Workshop or SteamCMD sources, player-owned copies in `Mods/` and lock library (refuse links), pack directories, save files; warn but proceed for enabled Mods or Mods used by plans (the player decides); those plans' entries then appear missing; refuse if recycle bin is unavailable; never delete permanently | 08 §7, 06 §2.9 | None: the player handles recycle bin contents |
+| Unsubscribe from Workshop items through Steam (Steam later deletes the folder) | After player confirmation in Mod inventory, or `workshop unsubscribe` | Steam deletes files, not RimArcho; refuse when enabled, used by a plan, or game is running; runtime directory `%LOCALAPPDATA%\RimArcho\steam` holds only copied `steam_api64.dll` and `steam_appid.txt`; do not write game directory | 08 §10 | `data`: runtime directory deleted with `%LOCALAPPDATA%\RimArcho`; unsubscribing changes the player's Steam subscriptions and is not reversed |
+| Save backups | After player confirmation | Copy to `<data-directory>/backups/saves/<time>/`; do not modify original saves | 10 §4 | `saves`: handle `<data-directory>/backups/saves/` with own saves |
+| Pack data directory `<pack>/userdata/` | Launching a pack | Copy settings from environment on first launch (excluding ModsConfig.xml) | 08 §5.3 | `packs`: handle with pack directory (next row) |
+| `<pack-name>/` in pack directory (`pack.dir`, default `<data-directory>/packs`) | Building or importing packs | Build in temporary `<pack-name>.archo-tmp` first; `pack remove` recycles | 08 §5 | `packs`: retain by default; if inside data directory move to player-chosen folder (default `Documents\RimArcho packs`), otherwise leave in place; recycle when "delete" selected; delete unfinished temporary build directories |
+| Test data `<data-directory>/tests/<environment-ID>/` | Explicit game test run | Reuse cached `userdata/`, rewriting test configuration each time; retain logs and reports in `runs/<UTC-time>/`, latest 10 runs only; must be outside game and player data directories; create no Mod links | 08 §12 | `data`: delete with data directory |
 
-从不做的事：
-- 不修改工坊条目里已有的文件。工坊目录里只会发生三件事：玩家确认后把 `About.xml.disabled` 改回 `About.xml`、把整个条目文件夹移到回收站，或贴图优化在 PNG 旁边新建 `.dds`（2026-10-22 起；Steam 更新或校验时可能删掉它们，RimArcho 按记录发现并提示重新生成）。
-- 不往工坊目录写标记文件（Steam 校验或更新时会删掉它）。贴图优化写了哪些文件记在数据库里，不在 Mod 文件夹里。
-- 不跟随指向 Mod 目录以外的链接写入；防止路径穿越。
-- 联网限于玩家触发的动作，以及总开关开启时的自动检查（06 §2.16）：社区数据更新（04 §6）、工坊简介和图片（可在设置里关闭，06 §4.3）、读取 Steam 合集（04 §9）、订阅 Git 仓库、读 Mod 下载页元数据并检查、拉取更新，玩家主动启用后登录与验证 LoversLab 会话、选择站点文件下载（02 §3.4），没有 Steam 客户端时用 SteamCMD 下载工坊条目（02 §3.4）、经 Steam 客户端订阅与退订条目（08 §10），以及玩家接受后持久续跑的 credit 替换订阅（02 §3.4）、下载 SteamCMD 和用它读分支、下载游戏版本（08 §11）、外部工具版本元数据检查及下载（07 §2.1）、检查 RimArcho 新版本和玩家确认后下载它（GitHub Releases，07 §5.1）、调用模型（征得同意后，09 §3）。
-- 从不询问、接收、保存或传递任何服务的密码、验证码、Guard、恢复码或 TOTP 秘钥。SteamCMD 只在自己的控制台交互；LoversLab 只在独立原站窗口交互。会话 Cookie 只在 07 §3.1 的秘密存储与限定 HTTP 客户端中使用，不进入普通数据或 agent。
+Never do the following:
+- Never modify existing files in Workshop items. Only three changes may occur in Workshop directories: after player confirmation, restore `About.xml.disabled` to `About.xml`, recycle the entire item folder, or create `.dds` beside PNG during texture optimization (since 2026-10-22; Steam updates or verification may delete them, which RimArcho detects from its records and prompts to regenerate).
+- Never write marker files into Workshop directories (Steam verification or updates would delete them). Record texture optimization's file writes in the database, not Mod folders.
+- Never follow links outside a Mod directory for writes; prevent path traversal.
+- Network access is limited to player-triggered actions and automatic checks when the master switch is on (06 §2.16): community data updates (04 §6), Workshop descriptions and images (can be disabled in settings, 06 §4.3), reading Steam collections (04 §9), subscribing to Git repositories, reading Mod download page metadata and checking/pulling updates, logging in and validating LoversLab sessions after player opt-in and downloading selected site files (02 §3.4), SteamCMD Workshop downloads without a Steam client (02 §3.4), subscribing/unsubscribing through the Steam client (08 §10), and persistent resumable credit replacement subscriptions after player acceptance (02 §3.4), downloading SteamCMD and using it to read branches/download game versions (08 §11), external tool version metadata checks and downloads (07 §2.1), checking for new RimArcho versions and downloading after confirmation (GitHub Releases, 07 §5.1), model calls (with consent, 09 §3).
+- Never ask for, receive, save, or pass passwords, verification codes, Guard, recovery codes, or TOTP secrets for any service. SteamCMD interacts only in its own console; LoversLab only in an isolated original-site window. Session cookies are used only in the secret storage and restricted HTTP client of 07 §3.1, never in ordinary data or agents.
 
-### 4.1 卸载
+### 4.1 Uninstall
 
-第一步“忘记账户会话”（`accounts`）：停用内存会话，删除加密 Cookie、临时登录 profile 和下载残留，清理受管 SteamCMD 的已知认证缓存。与删除工具独立，保留 Mod 时仍执行；系统浏览器及外部 SteamCMD 缓存不动。清理失败即停止，不删除工具与数据、不报告已全部忘记，玩家关闭登录窗口后可重试。本地忘记不可恢复，也不撤销其他设备。
+First step, "forget account sessions" (`accounts`): deactivate in-memory sessions, delete encrypted cookies, temporary login profiles and download residue, and clear known authentication caches in managed SteamCMD. This is independent of tool deletion and still runs when retaining Mods; leave system browsers and external SteamCMD caches untouched. Stop on cleanup failure, without deleting tools/data or claiming everything was forgotten; players can close login windows and retry. Local forgetting cannot be undone and does not revoke other devices.
 
-链接台账随数据保留到卸载目标步骤完成；先摘所有已知游戏的自有链接，再处理锁定库、包和订阅目标。外来、未知类型及真实目录保持原样，会被后续删除破坏的外来入链使计划拒绝。
+Keep the link ledger with data until uninstall target steps finish; detach owned links across all known games before handling lock library, pack, and subscription targets. Leave foreign links, unknown types, and real directories untouched; refuse plans whose later deletions would break foreign inbound links.
 
-2026-10-22 定，已实现（`internal/app/uninstall.go`）。卸载按上表最后一列逐行撤回：每行写明对应的步骤（`accounts`、`links`、`modsconfig`、`textures`、`locked`、`monitor`、`packs`、`saves`、`games`、`steamcmd`、`data`、`program`），或以“无：”写明为什么没有。`TestUninstallCoversWriteList` 检查每一行都有这一列、提到的步骤都存在、每个步骤都在本节出现。
+Decided on 2026-10-22, implemented (`internal/app/uninstall.go`). Uninstall reverses each row in the table above using its last column: each row names the corresponding step (`accounts`, `links`, `modsconfig`, `textures`, `locked`, `monitor`, `packs`, `saves`, `games`, `steamcmd`, `data`, `program`), or explains why none applies with "None:". `TestUninstallCoversWriteList` checks that every row has this column, all named steps exist, and every step appears in this section.
 
-- **入口**：GUI 设置 › 卸载 RimArcho（06 §2.14）；TUI 命令面板“卸载 RimArcho”；CLI `archo uninstall`（不带 `--yes` 只显示计划，05 §4.2）。MCP 只有预览 `preview_uninstall`（只读）。**不给 AI 卸载的工具**：卸载删掉的是玩家装的这个程序和它的全部记录（方案、历史、备注），一个工具调用不应该能让 RimArcho 从玩家的电脑上消失；AI 可以解释会发生什么，动手的只能是玩家自己。
-- **先看计划**：每一步的文件夹、大小和去向，有选择的步骤把问题直接放在那一行（GUI 是复选框和文件夹选择，不弹一串对话框）。默认：锁定库副本进回收站，整合包保留，独立存档移出，下载的游戏保留，ModsConfig.xml 保留当前列表只去掉 RimArcho 的条目。
-- **预览大小**：GUI 用 `≈` 标为估计值，同一路径的字节统计最多复用 60 秒；改选项仍重新检查路径、进程和归属，不复用可删判定。执行卸载前重新生成完整计划，不使用预览尺寸缓存，也不递归统计目录大小；执行报告省略目录大小。
-- **一次确认**：GUI / TUI 的确认交互和摘要见 06 §2.14；CLI 用 `--yes`。
-- **拒绝**：有游戏在运行；同一程序文件夹里还有别的 RimArcho（窗口、`archo mcp`、扫描子进程）开着数据库；选择互相冲突（保留的副本要放进一个要删掉的游戏、保留的存档或整合包要放进将被删除的文件夹）。拒绝时什么都不改。
-- **顺序**：链接 → ModsConfig.xml → 贴图优化写的 DDS → 锁定库 → Monitor → 整合包 → 独立存档 → 下载的游戏 → SteamCMD → 数据 → 程序。某一项失败（例如回收站不可用，08 §7）时其余照做，最后两步不做：数据和数据库留着，处理好后可以再卸载一次。
-- **最后两步在 RimArcho 关闭后**：Windows 不能删除运行中的程序和打开着的数据库，所以卸载写一个 cmd 脚本到临时文件夹并分离启动：等这个进程退出（最多 5 分钟），删除数据目录和 `%LOCALAPPDATA%\RimArcho`，再删程序文件夹里发布 zip 带的文件（`archo.exe`、`RimArcho.exe`、`README.md`、`CHANGELOG.md`、`LICENSE`、`fonts/`、`monitor/`）和更新留下的 `.archo-update/`（07 §5.1），程序文件夹空了才删；删不掉的写进 `%TEMP%\RimArcho-uninstall.log`；最后删掉脚本自己。脚本用完整路径调用 System32 的 `tasklist`、`find`、`ping`（PATH 里有 Git 的 `usr/bin` 时会先找到 GNU find）。`rd /s` 不进入链接。开发版（`go run`、`guidev`）不删程序。其他系统上直接在进程里删。
-- **没有安装程序**：发布物是 zip（07 §5），卸载自己删文件。以后若加安装程序，`program` 一步改为运行它的卸载程序。
-- **从不碰**：Mod 本身（工坊、SteamCMD 来源、其他文件夹、`Mods/` 里玩家自己的文件夹；贴图优化写进去的 DDS 除外，由 `textures` 一步删掉）、工坊订阅、游戏默认用户数据目录里的存档、“恢复”（`unhide`）还给游戏的 Mod。
-- 卸载后这个进程里的命令一律拒绝（“RimArcho was uninstalled; close it”）；GUI 只剩报告和“关闭 RimArcho”，TUI 按 enter 退出。
+- **Entry points**: GUI settings › uninstall RimArcho (06 §2.14); TUI command panel "uninstall RimArcho"; CLI `archo uninstall` (without `--yes`, show only the plan, 05 §4.2). MCP has only read-only `preview_uninstall`. **No AI uninstall tool**: uninstall removes the program the player installed and all its records (plans, history, notes); one tool call should not make RimArcho disappear from the player's computer. AI may explain what will happen; only the player can execute it.
+- **Preview the plan first**: folders, sizes, and destinations per step; put choices directly in the corresponding row (GUI checkboxes and folder selectors, without a series of dialogs). Defaults: recycle lock library copies, retain packs, move own saves out, retain downloaded games, and keep the current ModsConfig.xml list while removing RimArcho entries.
+- **Preview sizes**: GUI marks estimates with `≈`; reuse byte counts for the same path for at most 60 seconds; option changes still recheck paths, processes, and ownership without reusing deletion eligibility. Regenerate the full plan before uninstall, without preview size cache or recursive directory size counting; omit directory sizes in the execution report.
+- **One confirmation**: GUI / TUI confirmation and summary are in 06 §2.14; CLI uses `--yes`.
+- **Refuse**: a game is running; another RimArcho in the same program folder (window, `archo mcp`, scan subprocess) has the database open; choices conflict (retained copies go into a game to be deleted, or retained saves/packs go into a folder to be deleted). Change nothing on refusal.
+- **Order**: links → ModsConfig.xml → texture optimization DDS → lock library → Monitor → packs → own saves → downloaded games → SteamCMD → data → program. If one item fails (for example, recycle bin unavailable, 08 §7), continue the others but skip the final two steps: retain data and database so uninstall can be retried after fixing the issue.
+- **Final two steps after RimArcho closes**: Windows cannot delete running programs or open databases, so uninstall writes a cmd script to a temporary folder and launches it detached: wait for this process to exit (up to 5 minutes), delete the data directory and `%LOCALAPPDATA%\RimArcho`, then delete release zip files in the program folder (`archo.exe`, `RimArcho.exe`, `README.md`, `CHANGELOG.md`, `LICENSE`, `fonts/`, `monitor/`) and update leftovers `.archo-update/` (07 §5.1); delete the program folder only if empty; log failures in `%TEMP%\RimArcho-uninstall.log`; finally delete the script itself. The script invokes System32 `tasklist`, `find`, and `ping` by full path (Git's `usr/bin` in PATH would resolve GNU find first). `rd /s` does not enter links. Development builds (`go run`, `guidev`) do not delete the program. Other systems delete directly in-process.
+- **No installer**: releases are zip files (07 §5); uninstall deletes files itself. If an installer is added later, the `program` step will invoke its uninstaller.
+- **Never touch**: Mods themselves (Workshop, SteamCMD sources, other folders, player-owned folders in `Mods/`; except DDS written by texture optimization, removed in `textures`), Workshop subscriptions, saves in the game's default user data directory, or Mods restored to the game by `unhide`.
+- After uninstall, reject every command in this process ("RimArcho was uninstalled; close it"); GUI shows only the report and "close RimArcho"; TUI exits on enter.
 
-## 5. 待办与待验证
+## 5. Pending Work and Validation
 
-### 5.1 1.0 待实现（新设计）
+### 5.1 1.0 Work to Implement (New Design)
 
-**发布版本号**（2026-10-21 定）。§1 的 1.0 / 1.1 / 1.2 是产品版本；代码的发布版本号按语义化版本走（`scripts/release.ps1 -Version`，CHANGELOG）：
+**Release version numbers** (decided on 2026-10-21). The 1.0 / 1.1 / 1.2 in §1 are product versions; code release numbers follow semantic versioning (`scripts/release.ps1 -Version`, CHANGELOG):
 
-| 发布版本 | 内容 | 条件 |
+| Release | Contents | Condition |
 | --- | --- | --- |
-| 0.8.0 | 现有代码（CHANGELOG 0.8.0 一节），按现状收口 | — |
-| 0.9.0 | 下表第 1–8 步和第 10–23 步，即全部 1.0 工作 | 这些步骤完成，`release.ps1` 的测试通过，发布前 VM 测试表走完（07 §5） |
-| 1.0.0-rc1 | 0.9.0 加上 §5.2 的验证与 §5.3 遗留项的取舍 | §5.2 各项有结论 |
-| 1.0.0 | 回答第一个问题（00 §2） | rc 期间没有新的阻断问题 |
+| 0.8.0 | Existing code (CHANGELOG 0.8.0 section), finalized as it stands | — |
+| 0.9.0 | Steps 1–8 and 10–23 below: all 1.0 work | Steps complete, `release.ps1` tests pass, pre-release VM test checklist complete (07 §5) |
+| 1.0.0-rc1 | 0.9.0 plus §5.2 validation and decisions on §5.3 remaining items | Conclusions for every §5.2 item |
+| 1.0.0 | Answer the first question (00 §2) | No new blockers during rc |
 
-0.9.0 有不兼容的改动：数据库 schema v10 → v27（v11 方案，v12 按方案缓存分析，v13 副本备注，v14 共用的 Mod 文件夹，02 §0；v15 按 `Name` 查 Def 的索引，03 §6.5；v16 贴图优化写的 DDS，08 §5.2；之后各版的迁移见 02 §7 和 03 §3，v26 事实跨版本共用，最新的是 v27 快照的内容类型和语言），一个游戏目录只属于一个环境，删除 `launch --force` 和 `loadout tag`，`archo save` 改为只写入游戏。
+0.9.0 has breaking changes: database schema v10 → v27 (v11 plans, v12 analysis cache per plan, v13 copy notes, v14 shared Mod folders, 02 §0; v15 Def lookup index by `Name`, 03 §6.5; v16 DDS written by texture optimization, 08 §5.2; later migrations in 02 §7 and 03 §3, v26 facts shared across versions, latest v27 snapshot content types and languages), one game directory belongs to only one environment, remove `launch --force` and `loadout tag`, and make `archo save` only write to the game.
 
-**实施步骤**（按依赖排序；第 2、5、6 步在第 1 步之后可以并行）：
+**Implementation steps** (dependency order; steps 2, 5, and 6 may run in parallel after step 1):
 
-| # | 步骤 | 依赖 | 规格 |
+| # | Step | Dependencies | Specification |
 | --- | --- | --- | --- |
-| 1 | **数据模型（schema v11）**：新表 `plan`；工作区、撤销栈、版本、暂存改为按方案存；环境记当前方案；`modsconfig_state` 改为按用户数据目录一行并记写入者；`launch` 表加方案、列表指纹、版本号；按 04 §1.4 迁移（`loadout_tag` 的每个名字变成一个方案，然后删表） | — | 04 §1.2、§1.4，08 §1 |
-| 2 | **方案命令**：`plan list/new/use/rename/remove`、`loadout import --new`；删除 `loadout tag`；其他命令作用于当前方案 | 1 | 04 §1.3，05 §4.3 |
-| 3 | **启动时写入与单游戏**：启动按 08 §2 的 8 步执行；删除“未保存则阻止启动”“版本不符阻止启动”和 `launch --force`；`archo save` 改为写入游戏不启动；`launch` 与 `save` 的 `--dry-run` 合并为同一份预览；启动记一个来源为 `launch` 的版本；跨所有环境检测游戏进程，同时只运行一个游戏 | 1 | 04 §4.1，08 §1、§2、§4 |
-| 4 | **外部修改按写入者归属**：按用户数据目录判断，归到上次写入它的方案；冲突的三个选项：看差异 `loadout diff v<n> workspace`、载入 `loadout checkout v<n>`、忽略 `loadout ignore-external` | 1、3 | 04 §4.3 |
-| 5 | **锁定版本**：`pin` 在当前方案里换上副本；RimArcho 创建的副本识别为锁定版本（`mod.pinned`），按 `origin_snapshot` 判断上游有更新；更新锁定版本 `pin --update <实例>`；RimArcho 创建的副本也能 `unpin` | 1 | 04 §7 |
-| 6 | **日志按启动记录归属**；分析结果按方案的启用集合缓存多份 | 1、3 | 03 §3、§6.4 |
-| 7 | **工具层补齐**：`launch_game`、`manage_plans`、`plan_history`、`pin_mod` / `unpin_mod`、`manage_packs`、`ignore_problem` 等 | 2–5 | 05 §1.2、§5.2 |
-| 8 | **界面**：侧栏、面包屑顶栏、首页、方案页、首次引导；界面文字统一使用“保存 / 未保存”；TUI 的页面映射 | 1、3、6 | 06 §2、§9 |
-| 9 | **发布 0.9.0**（先走完发布前 VM 测试表，再 `release.ps1 -Version 0.9.0`）；然后做 §5.2 的验证、取舍 §5.3，发 1.0.0-rc1 | 1–8、10–23 | 07 §5 |
-| 10 | **2026-10-21/22 加进 1.0 的功能**：Mod 库存与 `library` 命令、副本备注（v13）；一个环境一个游戏目录、共用的 Mod 文件夹（v14）；SteamCMD 下载游戏版本；经 Steam 退订与重新订阅；Archo Monitor；变化记录重做；启动页；编辑器与 Mod 库存的筛选栏、键位、右键菜单统一，键盘能做鼠标能做的一切；卸载；降低内存与 GPU 加速设置 | 1–8 | 06 §2.3、§2.9、§3、§10，02 §0，08 §9–§11，§4.1 |
-| 11 | **整合包的缺口**（已完成，分支 `claude/packs-gaps-72ff5e`）：编译页按原型重排、“编译”在有 error 时禁用并说明（G14）；侧栏里每个包一个子项，`tab` 切换，每个包一页；直接从 Steam 启动时留下的包链接在能不能跑里提示并可一键移除（K12，`pack.links-left`、`archo pack unlink`）；**`Mods/` 里同包名的两份**：启动整合包时 `Mods/` 已有内容相同的那份就借用、不同就拒绝，方案的 `_Archo_` 链接同包名时这次先删掉；写入游戏不新建重复的 `_Archo_` 链接；能不能跑列出已存在的（`pkg.duplicate-mods`，K15–K17）；回收站入口统一检查白名单（H8，`App.ToTrash`） | 10 | 06 §2.6、§2.7，08 §3、§5.3、§7 |
-| 12 | **界面的缺口**（**已完成**，2026-10-22）：TUI 能不能跑的凭据 chip（G13）；新页面上反复 `esc` 回到基态（G5、T20）；游戏运行状态放到侧栏底部（G17，TUI 在状态行右端） | 10 | 06 §2.4、§11 |
-| 13 | **日志的缺口**（已完成，2026-10-22）：MCP 实时日志的 `since` 游标（L7）；新日志第一次查询 568 → ≤ 500 毫秒（按 defName 建索引；实测语料日志 128–330 毫秒） | 10 | 03 §6.5、§6.6，07 §6 |
-| 14 | **后台任务**（2026-10-23 定）：任务记录与文件、Steam 两条队列（`app.Tasks`，`<数据目录>/tasks.json`）；Mod 库的文件和 Steam 动作确认后排进队列、一项失败不停、逐项记结果；扫描、检查、创建整合包、贴图、下载游戏同时记成任务；后台任务页（侧栏底部一行、`ctrl+j`）；同时落实 06 §3.1 规则 7、8（弹窗只用于警告、筛选栏离开焦点就收起）、§3.9 表格、GUI 不用左边竖线 | 10 | 06 §2.16、§3.1、§3.9、§7 |
-| 15 | **界面规则落地**（2026-10-23 定；**已完成**，分支 `codex/ui-rules`，验收 G21 只差真实大游戏和原生窗口）：后台不卡前台（加入大游戏、切换游戏、算大小、设置页的下载和数据库动作）；每一页进入优先于读取；新列表、导入、清单、载入历史版本不弹窗；能不能跑和 TUI 去掉左边的色条；页面头去掉用途说明；界面文字去掉 `·`；圆角两档、字号四种不小于 12px、发丝线、动效时长；整合包、包内 Mod、贴图列表改成数据表；`TestStyleRules` 和 `TestWording` 的检查 | 14 | 06 §3.1 规则 7–10、§3.9、§7.3，验收 G21–G25；06 里标了 **待改** 的地方 |
-| 16 | **GUI 页面前进后退**（2026-10-24，已实现）：会话历史、鼠标侧键与键盘入口；TUI 的差异见 06 §8.5 | 15 | 06 §3.1 规则 11、§3.5、§8.5，验收 G26 |
-| 17 | **订阅 Mod**（2026-10-24，分支 `claude/mod-sources-ceb9a8`）：Git 仓库（go-git，跟踪分支 / 标签 / 提交）、下载页（LoversLab，不登录、不自动下载）、SteamCMD 下载工坊条目（只在 Steam 客户端不可用时；SteamCMD 的位置由设置的依赖管理提供）；来历写在 `.rimarcho/source.json`；检查更新、更新、撤掉；`archo subscribe`；库存的来源列、状态、字段和动作。**已实现**（GUI、CLI；`list_library` 认得新来源和状态）；2026-10-30 补齐 TUI 的订阅动作（Mod 库 › 添加订阅子页，订阅与更新上的 `K` / `u` / `U` / `Del`，都排进后台任务）和 MCP 写工具 `manage_subscriptions`；SteamCMD 的位置由 `SteamCMDPath()` 给（设置的 `steamcmd.path`、RimArcho 自己的副本、PATH），`App.FindTool` 只在测试里注入 | 10、14 | 02 §3.4、06 §2.9、07 §1 |
-| 18 | **订阅与更新**：替换 Mod 库的变化子页；2026-10-24 改成一张列表（等你更新、已经更新）加详情、左栏范围栏、来源摘要行，订阅表单换成 Mod 库 › 添加订阅子页的粘贴框（自动认出来源）；后台检查、更新预览和记录深链接照旧，多选去掉；TUI 简单列表，操作差异见 06 §9 | 17 | 06 §2.9、§2.1、§10 |
-| 19 | **完整游戏版本与整合包分享**（2026-10-24，分支 `claude/modpack-79d769`）：`env.Version`，启动页写完整版本；`.archopack` 格式 2（tar + zstd、副本摘要、白名单绝不带游戏、导入核对）；`pack check` 与“与这个游戏的对照”（构建、DLC、Mod） | 11 | 02 §2.1，08 §5.1、§5.4、§5.5，06 §2.3、§2.7，07 §1 |
-| 20 | **按载入范围搜索文件**（2026-10-24，已实现，分支 `claude/scoped-search-47339e`）：`internal/modsearch`；`files search` / `search_files` 只搜启用的那份副本、游戏这个版本载入的文件夹和内容子目录，按载入顺序分组、分页，带所在 Def / XPath；Def 模式；不建索引（07 §8.5） | — | 03 §5.5，05 §4、§5.2，07 §6.2 |
-| 21 | **小文件读取与加载占用**（2026-10-24，分支 `claude/smallfile-io-9071ae`，已实现）：共用的 `internal/fsscan`（并发遍历、列表指纹、按盘选并发、缓存），整合包大小、扫描指纹和贴图页并发迁过去；列表管理页的内存 / 显存估算（`internal/loadcost`，校准范围与指标见 06 §2.17） | 15 | 06 §2.17，07 §6.2，research 2026-10-24_small-file-reads-and-load-memory |
-| 22 | **游戏测试运行（2026-10-24，已实现）**：隔离数据启动指定方案，等到主菜单或测试地图后停止，输出日志归因报告；CLI `test run`、MCP `test_run` | — | 08 §12 |
-| 23 | **设置：外部工具、强调色**（2026-10-24，已实现，分支 `claude/settings-deps-607064`）：`internal/deps` 统一查找随附字体、todds、SteamCMD、WezTerm（别的功能问“SteamCMD 在哪、能不能用”都走它），`archo deps`、`deps install`、`deps remove`，设置页“外部工具”一组；强调色 `ui.accent`（Radix 色阶，立即生效并保存）；卸载页的数据一步写明里面有下载的工具（卸载页本身已在第 10 步完成） | 15 | 06 §2.14、§7.4，07 §2.1，§4 |
-| 24 | **archo.db 体积**（2026-10-31 定，research 2026-10-30_archo-db-integer-keys §8–§10）：(0) **已完成（另外两个分支）**：先修研究里发现的两个问题，`Store.InstanceFiles` 也查共用文件夹里的 Mod（日志找贴图 / DLL 的提供方），`Store.DefsNamed` 先走名字索引（research §1 第 3 条、§7.2）。(1) **已完成**：快照加 `kinds`、`langs`，写快照时从文件清单算，升级时补算（schema v27）；Mod 库存的内容类型、可转换贴图、详情的语言改读这两列。(2) **已完成**（schema v28，2026-10-31，分支 `claude/db-v28-6b0a03`；真实库的升级时间和大小待发布前 VM 测试）：非语义文件（DLL 除外）从 `snapshot_file` 移到每个快照一个 zstd 压缩块（按路径排序、前缀压缩、存大小，不存 mtime，**不去重**），清理跟着 02 §7.1 的清单走；`fact_set` 加本集合的文件列表，事实行的 `file` 换成列表下标，列表随集合删除。迁移一个事务完成，启动时显示进度，不 VACUUM，只给 `fact_set` 加列、不删了重建。不建全局或每个 Mod 的路径表，不加 Instance 整数键，不给未启用的 Mod 只存名字层。合成库 245.5 → 156.2 MB，升级 4.7 秒 | — | 02 §7、§7.1、§7.2，03 §3，06 §8.1，07 §6.2 |
+| 1 | **Data model (schema v11)**: new `plan` table; store workspace, undo stack, versions, and staging per plan; environment records current plan; one `modsconfig_state` row per user data directory, recording writer; add plan, list fingerprint, and version to `launch`; migrate per 04 §1.4 (each name in `loadout_tag` becomes a plan, then drop table) | — | 04 §1.2, §1.4, 08 §1 |
+| 2 | **Plan commands**: `plan list/new/use/rename/remove`, `loadout import --new`; remove `loadout tag`; other commands act on current plan | 1 | 04 §1.3, 05 §4.3 |
+| 3 | **Write on launch and single game**: launch follows the 8 steps in 08 §2; remove "block launch if unsaved", "block launch on version mismatch", and `launch --force`; `archo save` writes without launching; combine `launch` and `save` `--dry-run` into one preview; launch records a version with source `launch`; detect game processes across all environments, allowing only one game at a time | 1 | 04 §4.1, 08 §1, §2, §4 |
+| 4 | **Attribute outside changes to writer**: identify by user data directory, assign to the plan that last wrote it; three conflict choices: view diff `loadout diff v<n> workspace`, load `loadout checkout v<n>`, ignore `loadout ignore-external` | 1, 3 | 04 §4.3 |
+| 5 | **Locked versions**: `pin` swaps in a copy in current plan; identify RimArcho-made copies as locked versions (`mod.pinned`), detect upstream updates using `origin_snapshot`; update locked version with `pin --update <instance>`; RimArcho-made copies can also `unpin` | 1 | 04 §7 |
+| 6 | **Attribute logs to launch records**; cache multiple analysis results by each plan's enabled set | 1, 3 | 03 §3, §6.4 |
+| 7 | **Complete tool layer**: `launch_game`, `manage_plans`, `plan_history`, `pin_mod` / `unpin_mod`, `manage_packs`, `ignore_problem`, etc. | 2–5 | 05 §1.2, §5.2 |
+| 8 | **Interface**: sidebar, breadcrumb header, home, plan pages, first-run guide; consistent "save / unsaved" wording; TUI page mapping | 1, 3, 6 | 06 §2, §9 |
+| 9 | **Release 0.9.0** (complete pre-release VM checklist first, then `release.ps1 -Version 0.9.0`); validate §5.2, decide §5.3, release 1.0.0-rc1 | 1–8, 10–23 | 07 §5 |
+| 10 | **Features added to 1.0 on 2026-10-21/22**: Mod inventory and `library` command, copy notes (v13); one game directory per environment, shared Mod folders (v14); SteamCMD game downloads; Steam unsubscribe/resubscribe; Archo Monitor; change history rework; launch page; shared filter bar, keys, and context menus for editor and Mod inventory, keyboard parity with mouse; uninstall; reduced memory and GPU acceleration settings | 1–8 | 06 §2.3, §2.9, §3, §10, 02 §0, 08 §9–§11, §4.1 |
+| 11 | **Pack gaps** (complete, branch `claude/packs-gaps-72ff5e`): rearrange build page per mockup, disable "create a pack" with explanation when errors exist (G14); each pack is a sidebar child, `tab` switches, one page per pack; can it run reports pack links left by direct Steam launches and removes them in one action (K12, `pack.links-left`, `archo pack unlink`); **two copies with the same package ID in `Mods/`**: on pack launch, borrow an identical existing copy in `Mods/`, refuse differing content, and temporarily remove same-package `_Archo_` plan links; writing to game does not create duplicate `_Archo_` links; can it run lists existing duplicates (`pkg.duplicate-mods`, K15–K17); recycle bin entry point checks allowlist centrally (H8, `App.ToTrash`) | 10 | 06 §2.6, §2.7, 08 §3, §5.3, §7 |
+| 12 | **Interface gaps** (**complete**, 2026-10-22): evidence chips in TUI can it run (G13); repeated `esc` on new pages returns to base state (G5, T20); game running state at sidebar bottom (G17, right end of status line in TUI) | 10 | 06 §2.4, §11 |
+| 13 | **Log gaps** (complete, 2026-10-22): live MCP log `since` cursor (L7); first query for a new log 568 → ≤ 500 ms (index by defName; corpus logs measured at 128–330 ms) | 10 | 03 §6.5, §6.6, 07 §6 |
+| 14 | **Background tasks** (decided on 2026-10-23): task records and two queues, file and Steam (`app.Tasks`, `<data-directory>/tasks.json`); enqueue Mod library file/Steam actions after confirmation, continue after individual failures, record per-item results; also record scans, checks, pack creation, textures, and game downloads as tasks; background tasks page (one row at sidebar bottom, `ctrl+j`); implement 06 §3.1 rules 7, 8 (dialogs only for warnings, collapse filter bar on focus loss), §3.9 tables, no left vertical bars in GUI | 10 | 06 §2.16, §3.1, §3.9, §7 |
+| 15 | **Apply interface rules** (decided on 2026-10-23; **complete**, branch `codex/ui-rules`; acceptance G21 still needs a real large game and native window): background work does not block foreground (adding/switching large games, sizes, settings downloads/database actions); enter every page before reading; no dialogs for new lists, imports, manifests, loading history; remove left color bars from can it run and TUI; remove purpose explanations from page headers; remove `·` from UI text; two corner radii, four font sizes no smaller than 12px, hairlines, animation durations; pack, pack Mod, and texture lists become data tables; `TestStyleRules` and `TestWording` checks | 14 | 06 §3.1 rules 7–10, §3.9, §7.3, acceptance G21–G25; places marked **to change** in 06 |
+| 16 | **GUI back/forward navigation** (2026-10-24, implemented): session history, mouse side buttons, keyboard entry points; TUI differences in 06 §8.5 | 15 | 06 §3.1 rule 11, §3.5, §8.5, acceptance G26 |
+| 17 | **Mod subscriptions** (2026-10-24, branch `claude/mod-sources-ceb9a8`): Git repositories (go-git, tracking branch / tag / commit), download pages (LoversLab, no login or automatic download), SteamCMD Workshop item downloads (only without Steam client; SteamCMD location comes from settings dependency management); origin in `.rimarcho/source.json`; check/update/remove; `archo subscribe`; inventory source column, states, fields, and actions. **Implemented** (GUI, CLI; `list_library` recognizes new sources/states); TUI subscription actions completed on 2026-10-30 (mod library › add subscription subpage; `K` / `u` / `U` / `Del` on subscriptions and updates, all queued as background tasks) and MCP mutation tool `manage_subscriptions`; `SteamCMDPath()` supplies location (setting `steamcmd.path`, RimArcho's own copy, PATH); `App.FindTool` injected only in tests | 10, 14 | 02 §3.4, 06 §2.9, 07 §1 |
+| 18 | **Subscriptions and updates**: replaces Mod library change subpage; on 2026-10-24 changed to one list (waiting for you to update, already updated) with details, left scope bar, source summary row, and subscription form replaced by paste field on mod library › add subscription subpage (automatic source detection); retain background checks, update previews, and record deep links; remove multiselect; simple TUI list, action differences in 06 §9 | 17 | 06 §2.9, §2.1, §10 |
+| 19 | **Full game versions and pack sharing** (2026-10-24, branch `claude/modpack-79d769`): `env.Version`, full version on launch page; `.archopack` format 2 (tar + zstd, copy digests, allowlist excludes game, import verification); `pack check` and "comparison with this game" (build, DLC, Mods) | 11 | 02 §2.1, 08 §5.1, §5.4, §5.5, 06 §2.3, §2.7, 07 §1 |
+| 20 | **Search files within loaded scope** (2026-10-24, implemented, branch `claude/scoped-search-47339e`): `internal/modsearch`; `files search` / `search_files` search only enabled copies, folders loaded by this game version, and content subdirectories, grouped in load order, paginated, with containing Def / XPath; Def mode; no index (07 §8.5) | — | 03 §5.5, 05 §4, §5.2, 07 §6.2 |
+| 21 | **Small-file reads and load memory** (2026-10-24, branch `claude/smallfile-io-9071ae`, implemented): shared `internal/fsscan` (concurrent traversal, list fingerprint, concurrency per disk, caching); move pack sizes, scan fingerprints, and texture page concurrency there; memory / video memory estimates on list management page (`internal/loadcost`, calibration scope and metrics in 06 §2.17) | 15 | 06 §2.17, 07 §6.2, research 2026-10-24_small-file-reads-and-load-memory |
+| 22 | **Game test runs (2026-10-24, implemented)**: launch a selected plan with isolated data, stop after main menu or test map, produce log attribution report; CLI `test run`, MCP `test_run` | — | 08 §12 |
+| 23 | **Settings: external tools, accent color** (2026-10-24, implemented, branch `claude/settings-deps-607064`): `internal/deps` centrally locates bundled fonts, todds, SteamCMD, WezTerm (all other features ask it where SteamCMD is and whether it works), `archo deps`, `deps install`, `deps remove`, "external tools" settings group; `ui.accent` (Radix scale, applied and saved immediately); uninstall data step states that downloaded tools are included (uninstall page itself completed in step 10) | 15 | 06 §2.14, §7.4, 07 §2.1, §4 |
+| 24 | **archo.db size** (decided on 2026-10-31, research 2026-10-30_archo-db-integer-keys §8–§10): (0) **Complete (two other branches)**: first fix two research findings: `Store.InstanceFiles` also queries Mods in shared folders (log lookup of texture / DLL providers), `Store.DefsNamed` uses name index first (research §1 item 3, §7.2). (1) **Complete**: add `kinds`, `langs` to snapshots, compute from file lists on write, backfill on upgrade (schema v27); Mod inventory content types, convertible textures, and detail languages read these columns. (2) **Complete** (schema v28, 2026-10-31, branch `claude/db-v28-6b0a03`; real database migration time and size await pre-release VM tests): move non-semantic files (except DLL) from `snapshot_file` into one zstd block per snapshot (path sorted, prefix compressed, storing size, not mtime, **no deduplication**); cleanup follows 02 §7.1; add each fact set's file list to `fact_set`, replace fact-row `file` with list index, delete list with set. One transaction for migration, startup progress, no VACUUM; only add a column to `fact_set`, do not drop/recreate it. No global or per-Mod path table, no Instance integer key, no name-only layer for disabled Mods. Synthetic database 245.5 → 156.2 MB, upgrade 4.7 seconds | — | 02 §7, §7.1, §7.2, 03 §3, 06 §8.1, 07 §6.2 |
 
-**进度**（2026-10-30，分支 `dev/0.9.0`）：第 1–8 步和第 10–23 步都已完成并合并（第 17 步的 TUI 订阅动作和 MCP 写工具 `manage_subscriptions` 2026-10-30 补齐），`go test ./...` 通过。之后是第 9 步：走完发布前 VM 测试表（07 §5），发布 0.9.0，再做 §5.2 的验证。
+**Progress** (2026-10-30, branch `dev/0.9.0`): steps 1–8 and 10–23 are all complete and merged (step 17 TUI subscription actions and MCP mutation tool `manage_subscriptions` completed on 2026-10-30); `go test ./...` passes. Next is step 9: finish the pre-release VM checklist (07 §5), release 0.9.0, then validate §5.2.
 
-代码注释里的旧规格章节号已按对照表替换；以后改规格章节号时同步更新代码注释。
+Old specification section numbers in code comments have been replaced using the mapping table; future specification renumbering must update code comments too.
 
-### 5.2 已实现但待验证
+### 5.2 Implemented but Awaiting Validation
 
-| 项 | 怎么验证 | 谁来做 |
+| Item | How to validate | Who |
 | --- | --- | --- |
-| T4 新用户可用性 | 真人 5 分钟内完成启用、排序、启动 | 玩家安排 |
-| I4 真实 agent | 在 Claude Code 中按 README 跑一次诊断（现在只有脚本客户端自检） | 玩家或 agent |
-| `_steam` 规则 | 本地版与工坊版同包名同时存在，进游戏确认两份都登记、工坊版成为 `<包名>_steam`、不报错。2026-10-22 反编译 1.6.4871 和 1.7.4985 的 `Verse.ModLister.TryAddMod`：两版相同，来源不同（`OnSteamWorkshop` 不同）时给工坊版加后缀再登记；来源相同（例如都在 `Mods/`）时报 “Tried loading mod with the same packageId multiple times” 并忽略后一份。玩家日志里的这种报错都是 `Mods/` 里同包名的两份：本地副本和 `!ArchoPack_` 链接（RimArcho 启动整合包时建的，RimArcho 的缺陷，已在 §5.1 第 11 步修正：08 §5.3 第 2 步） | 玩家进游戏 |
-| SteamCMD 下载游戏 | 真实登录（含 Steam 令牌）、真实下载一个分支、进度行格式、不存在的分支怎么报错 | 玩家 |
-| 经 Steam 退订 / 重新订阅 | 对一个不要的工坊条目真实退订一次、再订阅回来 | 玩家 |
-| v14 迁移 | 先备份数据库，在玩家真实数据上迁移；方案、标签、规则、历史都在 | 玩家 |
-| 卸载 | 在干净机器上装好的发布版里卸载；文档目录被 OneDrive 接管时 | 玩家或虚拟机 |
-| 只在真窗口里有的 | 选择文件夹对话框、`ctrl+w`、菜单键 / `shift+F10`、最小化时 WebView2 内存降到“低” | 玩家 |
-| TUI | 在真实终端里走一遍编辑器、Mod 库存、变化记录的键 | 玩家或 agent |
-| 冷缓存扫描 | 重启后复测首次扫描，目标 ≤ 60 秒 | 玩家重启后执行 |
-| WebView2 缺失 | 在没有 WebView2 的虚拟机里双击 `RimArcho.exe` | 玩家或虚拟机 |
-| 整合包的 Player.log 位置 | 用 `-savedatafolder` 启动后，日志写在哪里 | 玩家进游戏 |
-| 社区数据真实下载 | `archo data update` 连真实来源（约 50 MB） | 玩家执行 |
-| SteamCMD 下载工坊条目 | 没有 Steam 客户端时 `archo subscribe workshop <ID>`：匿名能不能下载 RimWorld 的条目、要账户时在 SteamCMD 窗口登录、日志里成功和失败行的格式 | 玩家 |
+| T4 new-user usability | A person completes enable, sort, and launch within 5 minutes | Player arranges |
+| I4 real agent | Run a diagnostic in Claude Code following README (only scripted client self-checks exist now) | Player or agent |
+| `_steam` rule | With local and Workshop copies sharing a package ID, verify in game that both register, Workshop copy becomes `<package-id>_steam`, and no error occurs. Decompilation of `Verse.ModLister.TryAddMod` in 1.6.4871 and 1.7.4985 on 2026-10-22: identical in both versions; differing sources (`OnSteamWorkshop` differs) cause the Workshop copy to receive a suffix before registration; same sources (for example both in `Mods/`) report "Tried loading mod with the same packageId multiple times" and ignore the later copy. These errors in player logs all involved two copies with the same package ID in `Mods/`: a local copy and an `!ArchoPack_` link (created by RimArcho on pack launch; a RimArcho defect fixed in §5.1 step 11: 08 §5.3 step 2) | Player enters game |
+| SteamCMD game download | Real login (including Steam Guard), download a real branch, progress line format, error for nonexistent branch | Player |
+| Steam unsubscribe / resubscribe | Really unsubscribe from an unwanted Workshop item once, then resubscribe | Player |
+| v14 migration | Back up database first, migrate real player data; plans, tags, rules, and history remain | Player |
+| Uninstall | Uninstall an installed release on a clean machine; Documents redirected by OneDrive | Player or VM |
+| Native-window-only behavior | Folder selection dialog, `ctrl+w`, menu key / `shift+F10`, WebView2 memory drops to "low" when minimized | Player |
+| TUI | Exercise editor, Mod inventory, and change history keys in a real terminal | Player or agent |
+| Cold-cache scan | Remeasure first scan after reboot, target ≤ 60 seconds | Player after reboot |
+| Missing WebView2 | Double-click `RimArcho.exe` in a VM without WebView2 | Player or VM |
+| Pack Player.log location | Where logs are written with `-savedatafolder` | Player enters game |
+| Real community data download | `archo data update` against real sources (about 50 MB) | Player |
+| SteamCMD Workshop download | `archo subscribe workshop <ID>` without Steam client: whether anonymous login can download RimWorld items, login in SteamCMD window if needed, log success/failure line formats | Player |
 
-### 5.3 已实现功能的遗留项
+### 5.3 Remaining Items in Implemented Features
 
-- 新 Player.log 第一次查询的速度、MCP 实时日志的 `since` 游标：§5.1 第 13 步，已完成。
-- 直接从 Steam 启动时留下的整合包链接：§5.1 第 11 步，已完成（08 §5.3）。
-- PNG 转 DDS（普通优化与整合包精简）：已做（08 §5.2，工具 todds 0.4.1，玩家同意后下载）；还要在 1.6 和 1.7 里实际进游戏看一遍（docs/research/dds-texture-optimization.md §6）。
-- GUI 最小化时降低 WebView2 内存：已做（直接调 WebView2 的接口，07 §8.3）；升级 Wails 时要复查。
+- First-query speed for a new Player.log and live MCP log `since` cursor: §5.1 step 13, complete.
+- Pack links left by direct Steam launches: §5.1 step 11, complete (08 §5.3).
+- PNG to DDS (normal optimization and pack slimming): implemented (08 §5.2, todds 0.4.1, downloaded with player consent); still needs in-game visual checks in 1.6 and 1.7 (docs/research/dds-texture-optimization.md §6).
+- Reducing WebView2 memory when GUI is minimized: implemented (direct WebView2 API call, 07 §8.3); recheck when upgrading Wails.

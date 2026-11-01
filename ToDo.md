@@ -1,16 +1,16 @@
 # ToDo
 
-待研究、还没定的事。定了就写进规格（实现计划放 01 §5），研究过程放 docs/research/。
+Things to research, not yet decided. Once decided, put them in the specifications (implementation plans in 01 §5); research goes in docs/research/.
 
-## 重贴图列表的内存估算是外推的
-1.6 内存按 VM 里贴图载荷 1–3 GiB 的列表校准（2026-10-31，research Unity16内存校准）。贴图载荷 20 GiB 以上的列表（如 720 个 Mod 的那份）现在估常驻 43–57 GiB、载入 47–71 GiB，超出校准范围约 8 倍；8 GiB 的 VM 里没能载入，量不到真值。需要一台内存够大的机器实测一次，再定贴图系数在高端是否线性
+## Memory estimates for texture-heavy lists are extrapolated
+1.6 memory was calibrated against lists with 1–3 GiB of texture payload in the VM (2026-10-31, research Unity16 memory calibration). Lists with over 20 GiB of texture payload (such as the 720-Mod list) currently estimate 43–57 GiB resident and 47–71 GiB during loading, about 8 times beyond the calibration range; they could not load in the 8 GiB VM, so actual usage could not be measured. Measure once on a machine with enough memory, then decide whether the texture coefficient stays linear at the high end
 
-## 本地化
-docs应该做成英语, 项目中除了本地化和词表外不留中文;
-需做中文ReadMe
+## Localization
+docs should be in English, with no Chinese in the project except localization and the glossary;
+a Chinese ReadMe is needed
 
-## 加载动画
-也许可做界面加载动画--暂时低优先级
+## Loading animation
+Maybe add a UI loading animation--low priority for now
 
 ## Archo Agent
-Archo 要做的是能动手的 Mod 开发 agent，不是翻译、打标签这类小功能 
+Archo should be a Mod development agent that can take action, not just translate or tag

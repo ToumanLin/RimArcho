@@ -12,14 +12,14 @@ export const Call = { async ByName(name, ...args) {
     case 'Leave': return;
     case 'PackLaunch': {
       const row = fixture.rows.find(r => r.kind === 'pack' && r.name === args[0]);
-      if (fixture.running) return {refused:['已有游戏在运行'],text:'已有游戏在运行'};
+      if (fixture.running) return {refused:['a game is already running'],text:'a game is already running'};
       fixture.running = true; fixture.runningRow = row?.id || fixture.applied;
-      return {text:`已提交启动：${row?.name || args[0]}（草案预览）`};
+      return {text:`launch submitted: ${row?.name || args[0]} (draft preview)`};
     }
     case 'HomeApply': {
       const row = fixture.rows.find(r => r.kind === args[0] && r.envName === args[1] && (r.kind === 'plan' ? r.plan === args[2] : r.name === args[3]));
       if (row) applyRow(row.id);
-      return `已应用 ${row?.name || ''}`;
+      return `applied ${row?.name || ''}`;
     }
     default: return null;
   }

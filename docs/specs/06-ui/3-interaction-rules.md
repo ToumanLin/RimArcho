@@ -1,224 +1,224 @@
-# 06 · 界面 · 交互规则（§3）
+# 06 · Interface · Interaction rules (§3)
 
-> 属于 [06 · 界面](README.md)。章节号在整个 06 里连续，拆成多个文件后不变，引用照旧写 `06 §x.y`。
+> Part of [06 · Interface](README.md). Section numbers run through all of 06 and stay unchanged when split across files. References still use `06 §x.y`.
 
-## 3. 交互规则
+## 3. Interaction rules
 
-本章的规则对方案编辑器和 Mod 库存 › 全部完整成立（两页是同一套界面：同一个筛选栏、同一张按键表、同一个右键菜单，2026-10-22 定），其他页面按同样的原则（方向键只导航、动作是按钮或动词键、`esc` 回上一级）。GUI 和 TUI 的键盘按键相同，例外在 §8.5 和 §9.1 写明。
+These rules fully apply to the plan editor and Mod inventory > all (same interface, filter bar, key table, context menu; decided 2026-10-22). Other pages follow the same principles: arrows navigate only, actions use buttons / verb keys, `esc` returns one level. GUI / TUI share keys except §8.5 / §9.1.
 
-### 3.1 规则
+### 3.1 Rules
 
-1. **方向键只导航，永不改动数据。** 除 GUI 开／关字段的两段开关（§3.10）外，`↑↓←→` 都只移动光标、焦点或滚动位置，不移动 Mod、不启用、不打标签。GUI 中单击和滚轮同样不改数据。
-2. **动作是动词键，立即生效，`u` 撤销。** 动作作用于“对象”：有选中时是选中的实例，否则是光标所在行。动作不进入任何模式，没有“放下 / 取消”这一步。每个动词是一次 app 编辑，所以是一步撤销。
-3. **位置始终可见。** 位置行随时说明：焦点在哪个区域、光标是第几个、选中了几个、当前打开了什么弹层（§3.2）。
-4. **可去哪里始终可见。** 提示行只列出当前对象此刻能用的动作（最多 7 个），`?` 列出全部，`ctrl+k` 可以从任何地方去任何地方。
-5. **弹层最少。** 只有命令面板、标签候选行、位置输入、确认、帮助和版本清单（§5）。每个弹层都有标题并显示在位置行中，`esc` 关闭，不嵌套。GUI 的 `:` 与 `ctrl+k` 共用命令面板（§3.5）；TUI 的 `:` 是命令行（§9.4）。`r` 规则输入只在 `?` 中列出；GUI 的 `r` 不是弹层，是编辑器“排序规则”里就地展开的表单（§2.5）。
-6. **鼠标能做的，键盘都能做**（2026-10-22 定，为了 TUI）。每个页面上的点击、右键、拖动、双击都有按键或键盘焦点能到：行的动作有自己的键，没有键的在右键菜单里，而菜单键和 `shift+F10` 在光标所在行打开同一个菜单（`↑↓` 选、`enter` 执行、`esc` 关，菜单里显示的键也直接执行）。筛选栏、表头（`s`）、历史（`H`）、列宽（`<` `>` `=`）、详情里的链接（`C`、`ctrl+o`、`ctrl+w`、`g`、`n`）同样。新功能先给键再给鼠标；测试 `TestOpsReachable`（view）和 `TestOpsRunnable`（GUI）检查每个动作有键或菜单、两页都能执行。
-7. **弹窗只用于警告与提示**（2026-10-23 定，同日细化）。弹窗有紧急性：它要求玩家停在这里处理完才能做别的，这和“随时知道在哪里、能去哪里”相反。**不是玩家主动叫出来的弹窗**只用于必须马上决定的事：确认撤不回的动作（§6）、被拒绝时能解决它的命令。**玩家自己叫出来、`esc` 就走的临时层不算弹窗**：命令面板、右键菜单和 `⋯` 菜单、标签候选行、位置输入、帮助、身份提问的“为什么这样问”（§5）、版本清单面板（§5）。问题说明与处理按钮（§5）也可由玩家主动叫出为临时层，`esc` 就走。表单（新列表、导入）、其他查看（清单、差异）、进度、记录都是页面、子页或页面里就地展开的一块（后台任务是一页，§2.16；导入是子页，§2.17），不做成弹窗。
-8. **没用的东西折叠起来**（2026-10-23 定）。暂时用不上的部分收成一行：筛选栏展开后**焦点一离开就立刻收起**（点到别处、`tab` 走、`esc`；焦点进到筛选栏自己打开的下拉或输入框不算离开），生效的条件留在收起的那一行里；长列表收在“还有 N 项”后面；结束的、次要的信息淡色。玩家正在输入的东西不因为折叠而丢掉。
-9. **操作一定有回应，后台的事不卡前台**（2026-10-23 定）。
-   - **前台**是进入页面和读取页面；**进入优先于读取**：点了就先换到新页面（骨架或上次的内容），数据到了再填，晚到的结果不覆盖更新的页面（§8.2）。
-   - 每次点击和按键在 **100ms 内**有看得见的变化：按下态、骨架、状态行的 `…`、进度都算。
-   - **后台**是所有可能超过约 100ms、或要碰磁盘和网络的事：移动和删除文件、退订、下载、导入新游戏和第一次扫描、初始化 Mod（扫描、分析）、计算文件大小、切换游戏时读数据。它们都不在界面线程里做，做的时候其他页面照常能用；只有和它冲突的动作变灰并写原因（例如扫描时文件队列等着，§2.16）。
-   - 同一个东西的新请求来了，旧的作废（下拉菜单连续换值时只算最后一次，旧的计算停掉或丢掉结果）。
-   - 玩家发起、要做一阵子、有结果要看的事记成后台任务（§2.16）；算大小、读页面这类随手的后台计算不记，只在所在的地方显示进行中。
-10. **分配同一块空间的卡片，缝都能拖**（2026-10-23 定，§7）。相邻、平分同一栏或同一行空间的卡片之间的缝能拖动改大小，双击恢复，大小按页面保存。键盘：缝是可以聚焦的分隔条（`role="separator"`，`tab` 能到），聚焦时方向键每次移动 40 像素，`enter` 恢复；筛选栏里的 `ctrl+↑↓`（§2.5）照旧。高度跟着内容、一张接一张往下排的卡片（能不能跑的各区、设置的各组）之间的缝不能拖。
-11. **页面能前进后退**（2026-10-24 定，GUI；TUI 的例外见 §8.5）。鼠标侧键 XButton1 后退、XButton2 前进；键盘 `alt+←` / `alt+→`（也接受 `BrowserBack` / `BrowserForward`）。
-   - 每次进入页面完成后记一次历史，侧栏、命令面板、面包屑、链接和子页都一样；在页面仍在读取时后退，保留这次明确打开的目标供前进重访。重复打开当前页不增加记录，刷新和晚到的读取结果也不增加。后退后另去一页会丢掉前进记录。只保留本次会话最近的 50 项，不保存到磁盘。
-   - 后退先关最上面的弹层或菜单并停下；在技术页栈里按 `backspace` 的规则退一页（GUI 的技术信息在全屏详情里，回到打开详情的列表）；其余情况去历史的上一页。前进取历史的下一页；没有可去的记录时停在当前页。
-   - 已删除的方案或整合包、已经结束的引导等不能再进入的页面跳过；也不为重访历史自动切换游戏。卸载期间和卸载完成后仍遵守页面锁定（§2.14）。
-   - 重访仍走 `go()`，遵守规则 9 的进入优先、旧读取作废。表单离开和重进沿用普通换页的处理，不增加未保存确认；全部列表的新建草稿按游戏在本次应用会话内保留，没改过名字的草稿离开表单即丢弃（§2.17），管理详情与新建视图分别记入历史。前进后退只导航，不执行编辑、撤销、导入、构建等数据动作。
-   - GUI 拦截侧键的按下、松开和辅助点击的默认行为，一次按键只走一步；不用浏览器自身的历史，不离开 Wails 的页面地址。
-12. **地址展示、复制和编辑**（GUI）。文件、文件夹和网址共用 `fields.js` 的 `copyablePath` / `pathContent`：文字可划选，尾部复制图标按钮悬停提示“复制”，成功后短暂换成 ✓，始终复制完整值。地址单行按实际宽度中间省略，优先保留开头目录和末尾目录 / 文件名；宽度变化时重新计算，悬停显示全文。地址保留可读的最小宽度，空间不足先把旁边按钮换到下一行。复制按钮可用 `tab` 聚焦、`enter` 或空格操作。只读地址点击不做任何事；打开位置或网页用独立动作。可修改的本地地址，点文字或“更改…”/“添加…”直接打开系统文件夹或文件选择器，悬停提示点击会选择；选好立即生效，取消不改变，原有预览 / 确认仍保留，不提供手填路径框。网址平时只读，点“更改…”打开小对话框：一个输入框，校验完整 HTTP(S) 地址，“取消”不保存、“确定”才保存，Enter 确定、Esc 取消。相对文件名可显示相对路径，悬停和复制使用数据提供的完整路径。TUI 没有原生选择器，保留文本输入与完整地址；CLI / MCP 命令不变。
-13. **文字都能划选**（2026-10-25 定，GUI）。RimArcho 里给玩家看的文字默认都能用鼠标划选、`ctrl+c` 复制：Mod 名称、路径、简介、详情字段、日志原文、问题说明、悬停与固定的提示、弹窗正文、状态行。只有控件不能选：按钮、侧栏与面包屑、区标题和拖动缝、标签 chip，以及可以多选的列表行（方案编辑器三栏、Mod 库存的表格、后台任务）——这些行的按下是选中行，`shift` / `ctrl` 扩展选择，拖动是移动 Mod，所以不当文字选；行上的名称到详情里去选。实现：`style.css` 里 `body` 是 `user-select: text`，上述控件单独设为 `none`；新控件按同一规则加。地址文字（规则 12）划选后可用 `ctrl+c` 复制所选文字；尾部按钮复制完整地址。TUI 不受影响（终端自己能选）。
+1. **Arrows only navigate, never mutate.** Except GUI off / on segmented controls (§3.10), `↑↓←→` move cursor, focus, scroll only, never Mods, enablement, tags. GUI clicks / wheel likewise never mutate.
+2. **Actions are verb keys, immediate, `u` undoes.** Object means selected instances if any, else cursor row. No mode, drop / cancel step. Each verb is one app edit, one undo step.
+3. **Position always visible.** Position line gives focused area, cursor index, selection count, open overlay (§3.2).
+4. **Destinations always visible.** Hints list currently available actions, at most 7; `?` all, `ctrl+k` goes anywhere from anywhere.
+5. **Minimal overlays.** Only command panel, tag candidates, position input, confirmation, help, version list (§5). Every overlay titled and in position line, `esc` closes, no nesting. GUI `:` / `ctrl+k` share panel (§3.5); TUI `:` command line (§9.4). `r` rule input listed only in `?`; GUI `r` is inline editor sorting-rules form, not overlay (§2.5).
+6. **Everything mouse can do, keyboard can do** (2026-10-22, for TUI). Every click, right-click, drag, double-click has a key or keyboard focus: row actions have keys or context-menu entries; menu key / `shift+F10` opens same menu at cursor, `↑↓` selects, `enter` executes, `esc` closes, displayed keys execute directly. Likewise filters, headers (`s`), history (`H`), widths (`<` `>` `=`), detail links (`C`, `ctrl+o`, `ctrl+w`, `g`, `n`). New features get keys before mouse. `TestOpsReachable` (view) / `TestOpsRunnable` (GUI) verify key / menu reachability and execution on both pages.
+7. **Dialogs only for warnings / prompts** (2026-10-23, refined same day). Dialogs demand handling before other work, opposing knowing where to go. **Unsolicited dialogs** only for immediate decisions: irreversible confirmation (§6), commands solving a refusal. **Player-opened temporary layers dismissed by `esc` are not dialogs**: command / context / `⋯` menus, tag candidates, position input, help, identity why-this-question (§5), version list (§5). Player-opened finding explanation / actions (§5) may also be temporary layers. Forms (new list, import), other views (lists, diffs), progress, records are pages, subpages, inline sections, never dialogs (background tasks §2.16; import subpage §2.17).
+8. **Collapse unused parts** (2026-10-23). Unneeded content becomes one line. Expanded filter bar **collapses immediately on focus leaving**, by outside click, tab, esc; entering its own dropdown / input is not leaving. Effective conditions remain in collapsed line. Long lists behind N more; completed / secondary info muted. Collapse never loses entered text.
+9. **Always respond; background work never blocks foreground** (2026-10-23).
+   - **Foreground**: page entry / reading; **enter before read**: navigate immediately to skeleton / previous content, fill on arrival; late results never overwrite newer page (§8.2).
+   - Every click / key has visible response within **100ms**: pressed state, skeleton, status `…`, progress all count.
+   - **Background**: anything likely over about 100ms or touching disk / network: moving / deleting files, unsubscribe, download, import game / first scan, initialize Mods (scan / analysis), size calculation, game-switch reads. Never on UI thread; other pages remain usable; only conflicting actions disable with reason, e.g. file queue waits during scan (§2.16).
+   - New request for same object invalidates old; rapid dropdown changes keep latest only, cancel old computation or discard result.
+   - Player-initiated work taking time with a result becomes background task (§2.16); incidental sizes / page reads only show local progress.
+10. **Splitters between space-sharing cards are draggable** (2026-10-23, §7). Adjacent cards sharing a row / column resize via gap; double-click resets, page-specific persistence. Focusable `role="separator"`, tab reachable, arrows 40px per press, enter resets; filter `ctrl+↑↓` unchanged (§2.5). Content-height vertically stacked cards, e.g. needs sections / settings groups, have no draggable gaps.
+11. **Pages support back / forward** (2026-10-24, GUI; TUI exception §8.5). XButton1 back, XButton2 forward; `alt+←` / `alt+→`, also `BrowserBack` / `BrowserForward`.
+   - Record completed page entry, whether sidebar, panel, breadcrumbs, links, subpage. Back during reading retains explicitly opened target for forward revisit. Reopening current, refresh, late results add none. New page after back discards forward branch. Last 50 this session, never disk.
+   - Back closes top overlay / menu and stops; technical-page stack follows backspace one-level rule (GUI technical info within full-screen details returns to source list); otherwise previous history page. Forward next; absent destination stays.
+   - Skip deleted plans / packs, completed guides, other invalid pages; no automatic game switch for history. Respect uninstall navigation lock during / after (§2.14).
+   - Revisit via `go()`, rule 9 enter-first / stale-read invalidation. Forms use normal leave / reentry, no unsaved confirmation. All-lists new drafts persist per game this session; untouched-name drafts discarded on leaving form (§2.17); management details / new view separate history entries. Navigation never edits, undoes, imports, builds.
+   - GUI intercepts side-button down / up / auxiliary defaults, one step per press; no browser history, never leaves Wails address.
+12. **Address display, copy, edit** (GUI). Files / folders / URLs share `fields.js` `copyablePath` / `pathContent`: selectable text, trailing copy icon with copy tooltip, brief ✓ on success, always full value. Single-line middle ellipsis by actual width, preserving initial directory / final directory or filename; recalculate on resize, full hover. Keep readable minimum width; adjacent buttons wrap first. Copy tab-focusable, Enter / Space. Read-only text click does nothing; separate open-folder / web actions. Editable local text or change… / add… directly opens system folder / file picker, tooltip explains; selection immediate, cancel unchanged, existing preview / confirmation retained, no manual-path box. URLs normally read-only; change… opens small one-input dialog, validates complete HTTP(S), cancel discards / OK saves, Enter OK / Esc cancel. Relative filenames may show relative paths; hover / copy use full provided path. TUI retains text entry / full addresses without native picker; CLI / MCP unchanged.
+13. **Text is selectable** (2026-10-25, GUI). Player-visible text selectable / ctrl+c by default: Mod names, paths, descriptions, detail fields, raw logs, finding explanations, hover / pinned hints, dialog bodies, status. Controls excluded: buttons, sidebar / breadcrumbs, area headings / splitters, tag chips, multiselect rows (editor's three lists, inventory table, tasks); presses select rows, shift / ctrl extend, drags move Mods, so select names in details instead. `style.css` body `user-select: text`, controls `none`; new controls follow rule. Address selected text ctrl+c copies selection, trailing button full address (rule 12). TUI unchanged, terminal handles selection.
 
-**基态**：当前页、无选择、无弹层或菜单、筛选栏收起（方案编辑器里还要求聚焦的列表没有搜索）。筛选栏收起后仍生效的筛选是页面自己的状态，不算离开基态（再按一次 `esc` 清掉）。任何状态下最多按 3 次 `esc` 回到基态（T20、G5）：
-- `esc` 先关弹层和菜单（GUI 里用鼠标打开、焦点不在菜单上的右键菜单和 `⋯` 菜单也一样），再一级一级退：详情（盖满的详情、详情焦点）→ 选择 → 筛选栏（焦点在行上时一次清掉并收起；焦点在筛选栏里时只收起）；
-- 在二级界面（全屏详情、技术页、能不能跑某项的展开视图、TUI 的整合包 / 设置文本）里 `esc` 回到打开它的页面；技术页里 `esc` 关闭整叠技术页（`backspace` 才是退一页），所以从任何深度都满足 3 次；
-- `esc` 仍不在侧栏页面之间后退：页面是平级的；换页用侧栏、面包屑或 `ctrl+k`，前进后退用鼠标侧键和 `alt+←` / `alt+→`（规则 11）。
+**Base state**: current page, no selection / layer / menu, collapsed filters; editor focused list also has no search. Remaining effective filters are page state, still base; another esc clears. At most 3 esc from anywhere (T20, G5):
+- Close layers / menus first, including mouse-opened unfocused context / `⋯` menus; then details (covering / focused) → selection → filters (from rows, clear / collapse together; inside filter, collapse only).
+- Secondary screens (full details, technical, expanded needs item, TUI pack / settings text) return to opener; technical esc closes whole stack, backspace one level, so any depth meets 3.
+- Esc never navigates peer sidebar pages; use sidebar / crumbs / ctrl+k, side buttons / alt arrows for history (rule 11).
 
-### 3.2 位置
+### 3.2 Position
 
-方案编辑器有四个焦点区：`1` 未启用、`2` 已启用、`3` 暂存 / 历史、`4` 详情。数字键直接跳到对应区；区标题前显示这个数字（淡色）。
+Four editor focus areas: `1` Disabled, `2` Enabled, `3` Staging / history, `4` details. Numbers jump directly and prefix headings in muted text.
 
-- 聚焦区：标题用强调色，光标所在行加一层很淡的整行底色（TUI `#1A1C24`）。非聚焦区的光标只把名称变成文字色，不加底色，不显示 `▸`。焦点在详情时，列表都画成非聚焦，所以屏幕上永远只有一处“最亮的地方”。
-- 详情区有标题行 `4 详情`（滚动后变成 `▲ 名称`），焦点在详情时用强调色；内容从下一行开始，和列表第一行对齐。
-- 位置行（TUI 在顶栏右侧，GUI 在方案编辑器和全屏详情的状态行左侧）：
-  - 列表区：`已启用  322 / 488  已选 3`。位置按可见（搜索后）的行数计算，有搜索时加 `已筛选`。
-  - 详情区：`详情  Combat Extended  简介 40%`。小节取当前顶行上方的小标题（概要、简介、历史、技术信息）加上滚动了多少。
-  - 弹层打开时在后面追加，例如：`已启用  322 / 488 › 标签`。搜索显示为 `› 搜索`，等待第二次按键的确认显示为 `› 确认`。
-  - 全屏详情：`已启用 › Combat Extended（322 / 488）› Harmony`。
-  - 其他页面（全屏、技术页、能不能跑、变化）：位置行就是面包屑。
+- Focused heading accent, cursor row faint full background (TUI `#1A1C24`). Unfocused cursor only name text-colored, no background / `▸`. Detail focus makes all lists unfocused: one brightest place only.
+- Details heading `4 details`, becomes `▲ name` when scrolled, accent when focused; next line aligns with first list row.
+- Position line: TUI top right, GUI editor / full details status left:
+  - List: `Enabled  322 / 488  selected 3`, visible / filtered row counts; add filtered if searching.
+  - Details: `details  Combat Extended  description 40%`; current top-line section heading (summary, description, history, technical) plus scroll progress.
+  - Open layer appends, e.g. `Enabled  322 / 488 › tags`; search `› search`, second-press confirmation `› confirm`.
+  - Full details: `Enabled › Combat Extended (322 / 488) › Harmony`.
+  - Other pages (full-screen, technical, needs, changes): breadcrumbs are position.
 
-### 3.3 方向键
+### 3.3 Arrows
 
-| 状态 | `↑↓` | `←→` |
+| State | `↑↓` | `←→` |
 | --- | --- | --- |
-| 列表区 | 移动光标 | 切换焦点区 |
-| 详情区 | 滚动详情 | 切换焦点区 |
-| 全屏详情 | 滚动内容 | 上一个 / 下一个 Mod（仍是导航） |
-| 弹层（面板、标签行、位置输入） | 在弹层的选项中移动 | 在弹层的选项中移动 |
+| List | Cursor | Focus area |
+| Details | Scroll | Focus area |
+| Full-screen details | Scroll | Previous / next Mod, still navigation |
+| Overlay: panel, tags, position | Options | Options |
 
-- `PgUp` / `PgDn` 在列表里把光标移动一页，`Home` / `End` 到首尾（2026-10-22 定，两页相同）；焦点在详情时它们滚动详情。鼠标滚轮在指针所在的任何位置都滚动详情，不移动列表光标；列表用按键或单击滚动。
-- `←` 从详情回到它所显示 Mod 所在的列表（不是第 3 区）：130 列宽时暂存不在屏幕上，而从“已启用”过来时第 3 区会显示另一个 Mod。从暂存（第 3 区）按 `→` 仍到第 4 区。`←→` 不循环。区之间只用 `←→` 和 `1`–`4`；`tab` / `shift+tab` 切换同一侧栏条目下的子页（§3.5）。
-- `j` `k` 等于 `↓` `↑`，`h` `l` 等于 `←` `→`（TUI）。`Home` / `End` 到列表首尾（TUI 的 `g` 现在是标签，`G` 不再用）。
-- 详情中简介默认只显示前 12 行；一旦详情被滚动或聚焦，就显示全文。详情还没加载时按的 `PgDn` 会保留到加载完成。
+- `PgUp` / `PgDn` page cursor, `Home` / `End` ends (2026-10-22, both pages); focused details scroll instead. Wheel anywhere scrolls details, not list cursor; lists use keys / click.
+- `←` from details returns to displayed Mod's list, not area 3: at width 130 Staging absent, area 3 would show another Mod when coming from Enabled. Staging (area 3) `→` still enters area 4. No wrap. Area switching only arrows / `1`–`4`; tab switches sidebar entry's subpages (§3.5).
+- TUI `j` `k` = down / up, `h` `l` = left / right. Home / End list ends; `g` now tags, `G` unused.
+- Description initially 12 lines; any scrolling / focus shows full. PgDn before loading retained until ready.
 
-### 3.4 选择
+### 3.4 Selection
 
-- `shift+↑↓`：从光标处扩展连续选择。
-- `ctrl+space`（TUI 也可 `v`）：切换光标所在行的选中状态。`ctrl+a`：选中显示的全部（筛选后就是筛选出的行）。普通的 `↑↓` 和 `ctrl+↑↓` **不会**清除选择，所以“移动光标 → `ctrl+space`”就能间断多选。
-- 鼠标：单击移动光标，`shift+单击` 范围选择，`ctrl+单击` 切换选中。在同一个列表里单击保留选择（和 `↑↓` 一样只移动光标）；单击另一个列表会清除选择。
-- `esc`：清除选择。切换到另一个列表区时选择也会清除，提示行事先说明：`←→ 换列表会取消选择`。
-- 选中的行：整行强调色的淡底（光标所在的选中行更深一点），GUI 和 TUI 一样；**不在行或卡片的左边画竖线**（2026-10-23 定，§7 原则 4）。有选中时，提示行变为：`已选 3  space 停用  t 暂存  m 移动  g 标签  esc 取消选择`。这只是提示行，不是悬浮窗，也不是模式。
-- 动作之后：`g` 保留选择（可以再按 `g`）；`space`、`t` 清除选择（行离开了这个列表）；`J` / `K` 和在“已启用”内的 `m` 保留选择。
+- `shift+↑↓` extends contiguous selection from cursor.
+- `ctrl+space` (TUI also `v`) toggles row; `ctrl+a` all displayed, filtered when applicable. Normal / ctrl arrows **do not** clear, enabling scattered selection by move → toggle.
+- Click moves cursor, shift-click range, ctrl-click toggle. Same-list click preserves selection like arrows; different list clears.
+- Esc clears, as does changing list area; hint warns `←→ changing lists clears selection`.
+- Selected row faint full accent, deeper for cursor; same GUI / TUI; **no left vertical row / card bar** (2026-10-23, §7 principle 4). Hints become `selected 3  space disable  t stage  m move  g tags  esc clear selection`; just hints, not popup / mode.
+- After action: `g` keeps selection for repeat; space / t clear as rows leave; J / K / Enabled-internal m keep.
 
-### 3.5 动词键
+### 3.5 Verb keys
 
-方案编辑器和 Mod 库存 › 全部用**同一张按键表**（2026-10-22 玩家确认），GUI 和 TUI 相同（例外在 §8.5、§9.1）。`?` 显示当前页面的按键（`view.KeyHelp`）。
+Editor / inventory > all share **one key table** (player confirmed 2026-10-22), GUI / TUI except §8.5 / §9.1. `?` shows current-page `view.KeyHelp`.
 
-| 键 | 动作（作用于对象：选中的，否则光标所在行） |
+| Key | Action on selected objects, otherwise cursor row |
 | --- | --- |
-| `↑↓` / `j` `k` | 移动光标（在详情里是滚动） |
-| `shift+↑↓`、`ctrl+space`、`ctrl+a` | 连续选择、选中或取消一个、选中显示的全部 |
-| `PgUp` `PgDn` `Home` `End` | 光标翻一页 / 到首尾（焦点在详情时滚动详情） |
-| `enter` | 打开全屏详情（§4.2，编辑器和 Mod 库存是同一页） |
-| `esc` | 退回一级：详情 → 选择 → 搜索和筛选 |
-| `/`、`ctrl+f` | 搜索（筛选栏的搜索框；编辑器的暂存区是它自己的搜索框） |
-| `\` | 展开 / 收起筛选栏（§2.5） |
-| `space` | 在当前方案里生效 / 不再生效：仅编辑器启用 / 停用（暂存里是放回）。启用时直接放到排序约束建议的位置，状态行说明 `✓ 已放在第 352 位，m 改位置`；启用后光标留在“未启用”，可以连续启用几个；紧接着按的 `m` 移动刚放下的这几个，其他键让它忘掉它们 |
-| `m` | 仅编辑器：启用到… / 移动到…，位置输入（§3.6） |
-| `t` | 仅编辑器：暂存 / 放回（暂存保留） |
-| `x` | 仅编辑器：换成同一 Mod 的另一份副本（`swap`） |
-| `g` | 标签（§3.8）。TUI 的 `g` 不再是“到顶”，用 `Home` |
-| `n` | 备注：编辑器是 Mod 的备注（Lineage 上，`archo note`），Mod 库存是这一份的副本备注 |
-| `ctrl+o`、`ctrl+w` | 打开文件夹、工坊页面（替代原来的 `o` 和 `d`）；没有工坊 ID 时状态行说“没有工坊 ID：不是创意工坊 Mod”。GUI 对这两个键 `preventDefault`：Wails 窗口不拦截它们。提示行把两个合成一项“ctrl+o ctrl+w 文件夹 / 工坊页面” |
-| `u`、`ctrl+z` / `ctrl+y`、`ctrl+r` | 仅编辑器：撤销 / 重做 |
-| `Del` | 退订（工坊那份）/ 删除（自己的那份），先显示 dry run 再确认 |
-| 菜单键、`shift+F10` | 在光标所在行打开右键菜单（§8.5） |
-| `shift+1`–`shift+8` | 去侧栏的 8 个条目（启动、能不能跑、游戏日志、列表（打开当前列表）、整合包、Mod 库存、贴图优化、环境）；GUI 按物理键位识别，在任何键盘布局下都可用；TUI 收到的是 `!@#$%^&*`（美式布局）。`!` 和 `#` 不再是单独的快捷键 |
-| `tab`、`shift+tab` | 同一侧栏条目下的下一个 / 上一个子页：Mod 库存 › 全部 ↔ 订阅与更新 ↔ 添加订阅 ↔ 搜索文件（TUI 同序，2026-10-31 起含搜索文件）、方案下的各个方案（只是打开，当前方案不变，04 §1.3）、整合包下的各个包（在整合包列表上到第一个）。搜索框里 `tab` 先接受灰色补全；带表单的页面（订阅与更新、设置、编译成整合包等）`tab` 照常移动焦点；全屏详情里 `tab` 切换它的分页 |
+| `↑↓` / `j` `k` | Cursor / details scroll |
+| `shift+↑↓`, `ctrl+space`, `ctrl+a` | Range, toggle one, select displayed |
+| `PgUp` `PgDn` `Home` `End` | Cursor page / ends, or details scroll |
+| `enter` | Full details (§4.2), same editor / inventory page |
+| `esc` | One level: details → selection → search / filters |
+| `/`, `ctrl+f` | Filter search; Staging own search |
+| `\` | Toggle filter bar (§2.5) |
+| `space` | Effective / ineffective in current plan: editor enable / disable, Staging put back. Enable at suggested constraint position; status ✓ placed at 352, m to move. Cursor stays Disabled for consecutive enables; immediate m moves those just placed, any other key forgets |
+| `m` | Editor only: enable / move to… position input (§3.6) |
+| `t` | Editor stage / put back, Staging retained |
+| `x` | Editor switch same Mod's copy (`swap`) |
+| `g` | Tags (§3.8), TUI top now Home |
+| `n` | Editor Lineage Mod note (`archo note`); inventory copy note |
+| `ctrl+o`, `ctrl+w` | Folder / Workshop, replacing o / d. Without ID status no Workshop ID: not a Workshop mod. GUI `preventDefault`, Wails does not intercept. Combined hint ctrl+o ctrl+w folder / workshop |
+| `u`, `ctrl+z` / `ctrl+y`, `ctrl+r` | Editor undo / redo |
+| `Del` | Unsubscribe Workshop / delete own copy, dry-run then confirmation |
+| Menu key, `shift+F10` | Cursor context menu (§8.5) |
+| `shift+1`–`shift+8` | 8 entries: launch, needs, log, lists (current), packs, inventory, textures, environments. GUI physical keys work any layout; TUI `!@#$%^&*` US layout. ! / # no separate shortcuts |
+| `tab`, `shift+tab` | Next / previous sibling subpage: inventory all ↔ subscriptions / updates ↔ add ↔ search (TUI same, search since 2026-10-31); plans open only, current unchanged (04 §1.3); packs, first from pack list. Search Tab first accepts ghost completion; forms (subscriptions, settings, build etc.) normal focus; full details tabs switch pages |
 
-只在方案编辑器：
+Editor only:
 
-| 键 | 动作 |
+| Key | Action |
 | --- | --- |
-| `←→`、`1`–`4` | 切换区（`tab` 不再切换区） |
-| `J` / `K`、`alt+J` / `alt+K` | 在“已启用”中下移 / 上移 1 位、10 位（也可 `alt+j` / `alt+k`；终端分不清 `shift+J` 和 `J`，所以 10 位用 alt）。有筛选时越过显示的行（§2.5） |
-| `T` | 在暂存区：暂存里的 Mod 全部放回原位置；在别处：把“已启用”全部放进暂存（TUI 2026-10-31 起同样） |
-| `S` / `w` / `L` | 自动排序 / 保存 / 启动（作用于整个方案；排序可撤销；预览在命令面板）。`L` 去启动页、焦点在启动键上，在那里再按 `L` 才启动（§2.5；TUI 2026-10-31 起同样，§9.1） |
-| `i` / `e` | GUI：导入 / 导出列表；TUI：`i` 展开 / 收起详情中的技术信息 |
-| `R` / `A` | 重新扫描 / 重新检查文件（TUI 的 `A` 2026-10-31 起在编辑器里也有，原来只在能不能跑） |
-| `c` | 去 Mod 库存 › 订阅与更新（所有 Mod）；`C` 只看光标所在 Mod 的 Lineage（§2.9） |
-| `H` | 历史（每一步和各版本）的选择框（TUI 2026-10-31 起也有；TUI 的第 3 区另外列着历史） |
-| `<` `>` `=` | 聚焦列变窄 / 变宽 / 恢复默认宽度 |
-| `r` | 为光标所在 Mod 加一条排序规则：打开“排序规则”里的表单（§2.5；GUI 在左栏，TUI 是二级界面）。全屏详情中是重新获取工坊简介 |
-| `P`、`E` | 方案（切换、新建、改名、删除）、切换环境（GUI：环境页） |
+| `←→`, `1`–`4` | Areas, no tab area switching |
+| `J` / `K`, `alt+J` / `alt+K` | Enabled down / up 1 or 10, also `alt+j` / `alt+k`; terminal cannot distinguish shift+J / J, hence alt for 10 positions. Filtered moves cross displayed rows (§2.5) |
+| `T` | Staging put all back at original positions, elsewhere stage all Enabled; TUI same since 2026-10-31 |
+| `S` / `w` / `L` | Whole plan sort / save / launch; sort undoable, previews in panel. L visits launch focused on launch, another L executes; TUI same since 2026-10-31 (§2.5, §9.1) |
+| `i` / `e` | GUI import / export; TUI i toggles technical details |
+| `R` / `A` | Rescan / recheck; TUI editor A since 2026-10-31, formerly needs only |
+| `c` / `C` | Subscriptions / updates all / cursor Lineage only (§2.9) |
+| `H` | History steps / versions picker; TUI also since 2026-10-31, plus area 3 history |
+| `<` `>` `=` | Focused column narrower / wider / reset |
+| `r` | Add cursor Mod rule: sorting-rules form (§2.5), GUI left column / TUI secondary. Full details r refetches Workshop description |
+| `P`, `E` | Plans switch / new / rename / delete; environment switch (GUI environment page) |
 
-全局：
+Global:
 
-| 键 | 动作 |
+| Key | Action |
 | --- | --- |
-| `c` | 去 Mod 库存 › 订阅与更新（所有 Mod） |
-| `l` | 去游戏日志（TUI：在能不能跑里选择日志） |
-| `ctrl+k` | 命令面板 |
-| `alt+←` / `alt+→` | GUI：页面后退 / 前进（§3.1 规则 11） |
-| `ctrl+b` | GUI：导航放在侧边 / 顶部（§2.1） |
-| `ctrl+\` | GUI：引用编号模式开 / 关。页面上每个控件、文字段落、图片和图表加一个红色细框，左上角是红底白字的编号（页面简称 + 序号，如 `lib12`），提改动时可以直接说“改 lib12”。编号按页面顺序只数画出来的（看不到的、被别的层盖住的不算），所以连续不跳号，滚动后会重新编；框在页面之上一层，不挡点击、不改布局 |
-| `1`–`9` | 聚焦页面的第几个区（2026-10-22 起每一页都有，和编辑器的 `1`–`4` 一样；区的标题前写着它的数字）：启动页 1 游戏、2 列表 / 整合包、3 启动键（§2.3）；Mod 库存 1 筛选、2 表格、3 详情；订阅与更新 1 列表（等你更新、已经更新）、2 详情；能不能跑是它的各区（显示出来的顺序，光标到那一区的第一项）；游戏日志 1 报错列表、2 日志原文（焦点在原文时方向键滚动它）；环境 1 所有环境，然后是各组设置；设置是各组；编译成整合包是它的各段。GUI 里选中的区边框是强调色；TUI 的能不能跑和 Mod 库存同样（TUI 的 1 打开筛选栏，3 是副本详情，放不下时盖满页面） |
-| `:` | GUI：同 `ctrl+k`，任意页面打开统一命令面板；TUI：命令行（§9.4） |
-| `?` | 当前页面的全部按键 |
-| `q` | 退出（TUI） |
+| `c` | Subscriptions / updates all |
+| `l` | Game log, TUI needs log picker |
+| `ctrl+k` | Command panel |
+| `alt+←` / `alt+→` | GUI back / forward (§3.1 rule 11) |
+| `ctrl+b` | GUI side / top navigation (§2.1) |
+| `ctrl+\` | GUI reference-number mode: thin red box on every control, paragraph, image, chart, red / white upper-left page abbreviation + number, e.g. lib12, so feedback can say change lib12. Only rendered visible / uncovered objects count in page order; contiguous, renumber on scroll. Overlay does not block clicks / alter layout |
+| `1`–`9` | Page areas since 2026-10-22, numbered headings like editor 1–4. Launch 1 game / 2 list-pack / 3 launch (§2.3); inventory 1 filters / 2 table / 3 details; subscriptions 1 waiting-updated list / 2 details; needs displayed sections, cursor first item; log 1 errors / 2 raw, arrows scroll focused raw; environments 1 all, then settings groups; settings groups; build sections. GUI selected-area border accent; TUI needs / inventory same, 1 opens filters, 3 copy details fills screen if narrow |
+| `:` | GUI unified panel like ctrl+k, any page; TUI command line (§9.4) |
+| `?` | All current-page keys |
+| `q` | TUI quit |
 
-**命令面板**（GUI：`ctrl+k` / `:`；TUI：`ctrl+k`）：
-- GUI 面板停在页面底部、状态行上方，宽度和外观跟随普通弹层；结果和 CLI 输出在输入行上方向上展开，长输出可滚动、全选或复制。关闭保留草稿和最近输出；打开其他弹层先关闭它，不叠放。
-- 内容：动作的中文名和英文别名（`view.Commands`）、所有 Mod（直接跳转）、其他环境（切换）和列表（打开）。输入还能直接运行 archo 命令，不再另开输入框；搜索结果和运行项可以用鼠标或 `ctrl+n/p` 选择，`ctrl+enter` 直接运行输入。
-- 打分：前缀或后缀 4 > 子串 3 > 子序列 2 > 说明文字 1（后缀和前缀同分，2026-10-31：中文名的中心词在末尾，输入“排序”时自动排序和排序规则同分，命令表里在前的自动排序排第一）（说明里写着按键，所以按按键也能找到）。同分时命令在前，其次是 Mod，然后是环境，再其次是较短的名称。输入为空时只列命令和其他环境。
-- GUI 按键：输入即筛选，`↑↓` 翻执行历史，`tab` 补全命令 / 参数 / 对象，多候选时继续 `tab` 循环、`enter` 接受而不执行；`ctrl+n/p` 选搜索结果，`enter` 执行；`esc` 或再按 `ctrl+k` 关闭并归还焦点；`ctrl+u` 清空。输入框中的 `:` 保留为文字。TUI 命令面板仍用方向键 / Tab 选结果；TUI 命令行见 §9.4。
-- GUI 与 TUI 共用 `internal/cmdline` 的引号解析、补全和最近 50 条去重历史算法；历史各自保存（兼容 TUI 原有记录）。单次 `--env`、Windows 反斜杠和 `#` 的语义沿用 CLI / TUI，不经 shell。
-- GUI 用 `cmds.Check` 检查，在独立会话里后台调用 `ExecuteContext`；一次只运行一条，不持有页面锁。超过一秒还没结束的命令才在后台任务页（§2.16）留一行，可在那里停止；快的只在面板里给结果。扫描 / 分析仍由子进程执行；拒绝 `log --follow`。结果保留 CLI 原文和退出码，破坏性命令仍要求玩家明确输入 CLI 的 `--yes`。
-- 选中 Mod 后跳到它所在的列并选中它；那一列的搜索把它隐藏时，清除搜索。
+**Command panel**, GUI ctrl+k / colon, TUI ctrl+k:
+- GUI at page bottom above status, ordinary overlay width / appearance; results / CLI output expand upward, long output scroll / select all / copy. Close retains draft / latest output; opening other layer closes first, no stacking.
+- Contents: Chinese action names / English aliases (`view.Commands`), all Mods (jump), other environments (switch), lists (open). Input also runs archo commands without separate box; mouse / ctrl+n/p select results / run item; ctrl+enter runs input directly.
+- Score: prefix or suffix 4 > substring 3 > subsequence 2 > description 1. Suffix equal prefix since 2026-10-31: Chinese headwords at end, sort matches automatic sorting / sorting rules equally, automatic sorting first by command table. Descriptions include keys, enabling key search. Ties: commands, Mods, environments, shorter names. Empty only commands / other environments.
+- GUI typing filters, up/down execution history, Tab command / argument / object completion, repeated Tab cycles, Enter accepts without running; ctrl+n/p results, Enter execute, Esc / ctrl+k close / restore focus, ctrl+u clear. Colon in input literal. TUI panel arrows / Tab selects results; TUI command line §9.4.
+- Shared `internal/cmdline` quotes, completion, last-50 deduplicated history algorithms; histories separate, preserving old TUI. Per-command `--env`, Windows backslash, and `#` retain CLI/TUI semantics; no shell.
+- GUI `cmds.Check`, background `ExecuteContext` in independent session, one command, no page lock. Only commands exceeding one second get stoppable background-task row (§2.16); quick results only panel. Scan / analysis subprocesses; refuse log --follow. Retain raw CLI / exit code, destructive commands still need explicit CLI --yes.
+- Mod selection jumps / selects its column row; clear that column's search if hiding it.
 
-### 3.6 位置输入（`m`）
+### 3.6 Position input (`m`)
 
 ```
- 移动 3 个到 ❯ harm▌
-   之后  Harmony                       （第 1 位）
-   之后  Harmony Patches for VFE        （第 212 位）
-   第 352 位（建议位置）
-   最前   最后
+ move 3 to ❯ harm▌
+   after  Harmony                       (position 1)
+   after  Harmony Patches for VFE        (position 212)
+   position 352 (suggested)
+   first   last
 ```
 
-- 输入数字表示“移到第 N 位”；输入 Mod 名，模糊匹配后最多显示 5 个候选（排序：前缀、子串、字母顺序），默认是“放在它之后”，`tab` 切换为“放在它之前”并保持选中的行。
-- 不输入、直接 `enter`，就移到建议位置。建议位置（`App.SuggestAt`）用排序器的约束边：紧跟在必须排在它前面的最后一个已启用 Mod 之后；只有“排在之前”的约束时，放在其中第一个 Mod 之前；没有约束时放末尾；官方内容优先这条边本身不算约束，但有约束时建议位置不会早于官方内容（例如只需要 Harmony 的 Mod，不会建议到 Harmony 和 Core 之间）。对已经启用的 Mod，先把它们从列表里拿出来再算，所以 `m` 也能为移动建议位置。
-- 选项是一个列表，每项一行，只有 `最前  最后` 共用一行；两对方向键都能在选项间移动。位置按“去掉要移动的 Mod 之后”的列表计数（`MoveBlock` 和 `Enable` 用的就是它）；名字旁的“（第 N 位）”是那个 Mod 现在的序号。
-- 对象在“未启用”或“暂存”中时，`m` 等于“启用并放到所选位置”；从暂存移多个时启用并移出暂存，是一步撤销。
-- 输入框位于列表下方，占用列表的最后几行。数据：`view.PosOptions`、`view.Place`。
+- Number means position N; Mod name fuzzy matches up to 5, prefix / substring / alphabetic. Default after; Tab switches before retaining selected row.
+- Empty Enter uses suggested `App.SuggestAt`, sorter edges: after last enabled predecessor; only before constraints means before first target; unconstrained append. Official-first edge alone not a constraint; constrained suggestion never before official content, e.g. Harmony-dependent Mod not between Harmony / Core. Remove already enabled objects before calculation, so m also suggests moves.
+- Options one row each except first / last share; both arrow pairs navigate. Positions count list after removing moved Mods (`MoveBlock`, `Enable`); number by candidate name is its current position.
+- Disabled / Staging m enables at selection; multiple staged objects enabled / unstaged in one undo.
+- Input occupies list bottom rows. `view.PosOptions`, `view.Place`.
 
-### 3.7 搜索（`/`）
+### 3.7 Search (`/`)
 
-- 搜索是筛选栏的一部分（§2.5）：一次筛选“未启用”和“已启用”两列，结果即时显示；`enter` 结束输入，筛选保留，直到按 `esc` 清除。列标题显示 `已启用 12 / 485`。暂存区有自己的搜索框，规则相同。
-- 原来的“tab 跳到下一个有匹配的列表”不再需要（两列一起筛选），`tab` 只接受灰色补全。
+- Shared filter bar (§2.5) filters Disabled / Enabled instantly; Enter stops typing, filter until Esc clears. Heading `Enabled 12 / 485`. Staging separate search, same rules.
+- Old Tab-next-matching-list unnecessary with two-list filtering; Tab only ghost completion.
 
-查询由空格分隔的词组成，自由词全部满足（AND）；结构化条件同键为“或”、跨键为“且”，排除项逐个剔除：
+Space-separated query; free words AND; structured same-key OR, cross-key AND; exclusions individually removed:
 
-| 写法 | 含义 |
+| Syntax | Meaning |
 | --- | --- |
-| `词` | 名称、别名或作者包含它（不分大小写）；整个查询都没有结果时，自由词再按名称的字母顺序匹配（`hsl` 找到 “Hair Style Lib”） |
-| `name:词` / `author:词` / `tag:词` | 只看名称（含别名）/ 作者 / 标签；`tag:` 匹配标签中任一单词的开头（`tag:facial` 找到 Facial Hair 和 Facial Animation，`tag:animation` 找到 Facial Animation，`tag:"facial hair"` 只找前者） |
-| `id:值` | 包名包含它、工坊 ID 等于它，或者是 `#引用` |
-| `tags:值` | 精确选择标签，点击筛选也写入这个形式；旧 `tag:` 前缀查询保留 |
-| `source:值` | 目录角色 `official` `workshop` `local` `steamcmd` `locked` `other`，或自定义目录稳定别名（02 §0.2） |
-| `content:值` | `assembly`、`xml`、`language` |
-| `type:值`（兼容） | 来源 `official` `workshop` `local` `copy` `git` `steamcmd`；内容 `assembly`（带 DLL）、`xml`（没有 DLL，也可写 `xml-only`）、`language`（只有语言文件，也可写 `language-pack`） |
-| `has:problem` / `has:error` | 有能不能跑的可操作项 / 有会导致加载失败的问题；还有 `has:tag` `has:note` `has:alias` |
-| `version:1.6` | 声明支持这个游戏版本 |
-| `-词`、`-tag:x` | 取反 |
-| `"带 空格"` | 引号内是一个词 |
+| `word` | Case-insensitive name / alias / author substring; if the complete query has no matches, free words fall back to ordered name-letter subsequence: hsl finds Hair Style Lib |
+| `name:word` / `author:word` / `tag:word` | Name incl. alias / author / tag only; tag matches any word prefix: tag:facial finds Facial Hair / Facial Animation, tag:animation latter, tag:"facial hair" former only |
+| `id:value` | Package substring, exact Workshop ID, or `#reference` |
+| `tags:value` | Exact tag selection, also click-filter syntax; old tag: prefix retained |
+| `source:value` | Directory role official / workshop / local / steamcmd / locked / other, or stable custom-directory alias (02 §0.2) |
+| `content:value` | assembly, xml, language |
+| `type:value` legacy | Sources official / workshop / local / copy / git / steamcmd; assembly DLL, xml no DLL also xml-only, language language-only also language-pack |
+| `has:problem` / `has:error` | Actionable needs / load-failure finding; also has:tag / has:note / has:alias |
+| `version:1.6` | Declared version support |
+| `-word`, `-tag:x` | Negation |
+| `"with spaces"` | One quoted word |
 
-GUI 补全：点击搜索框或 `/` 时在框下显示小悬浮窗，按当前光标所在词匹配可用键 / 值，包括标签、来源、内容、版本、作者等，原始 `location:` 不作为候选。首个候选显示灰色后缀；`↑↓` 改选候选时后缀随之改变，`tab` 接受，不改变方向键在输入框里的编辑作用。带空格的值自动加引号，光标在查询中间也可补全。浮窗不显示 Mod 数，重复的标签文字不再列一遍；固定说明走翻译，作者 / 标签 / 自定义目录名作为数据原样展示。`enter` 应用并离开输入；`esc` 先关浮窗，再退出输入。点击筛选值直接增删同一个搜索文本中的条件，不产生小块。旧 `tag:`、`type:`、`location:` 查询兼容；TUI 保留原有文本补全。
+GUI click search / slash shows small popup matching cursor word against available keys / values, tags, sources, content, versions, authors; raw location: excluded. First ghost suffix changes with up/down selection; Tab accepts without changing arrow editing semantics in input. Quote spaced values automatically; complete mid-query. No counts or repeated tag text. Fixed help translated; author / tag / custom directory data unchanged. Enter applies / leaves input; Esc closes popup then input. Filter clicks add / remove conditions in same text, no chips. Legacy tag:, type:, location: compatible; TUI existing completion retained.
 
-GUI 编辑器的 `←→` 按实际位置走：详情 → 已启用 → 未启用；数字 `1`–`4` 保留逻辑编号，暂存位于右栏。`space` 启用 / 停用和撤销规则不变。
+GUI editor arrows follow physical order: details → Enabled → Disabled; numbers `1`–`4` retain logical IDs, Staging right. Space / undo unchanged.
 
-内容类型（`type:assembly` 等）来自当前快照的 `snapshot.kinds`（写快照时从文件清单算好，02 §7），按主键读；第一次用到时加载，数据库变化前一直保留（`view.ContentCache`）。
+Content types (`type:assembly`, etc.) come from current `snapshot.kinds`, precomputed from file list when writing snapshot (02 §7), primary-key reads. Lazy load, retain until database change (`view.ContentCache`).
 
-### 3.8 标签
+### 3.8 Tags
 
-- 详情的字段列表里显示 Mod 的标签（§4.1，旁边是“编辑”）；列表的行里不显示标签（名字长时它挤掉名字，一千多行里也读不过来），找带某个标签的 Mod 用 `tag:` 搜索（§3.7）或 Mod 库存的标签筛选（§2.9）。
-- 标签属于 Mod 的 Lineage（04 §8），对应 CLI `tag add|remove <引用> <标签…> --mod <引用>…`、MCP `set_player_data`。
-- 标签不进撤销：它是玩家数据，不是列表编辑，`u` 不撤销它，GUI 状态行也不给标签修改显示“撤销”。
+- Mod tags in detail fields (§4.1) with edit; never row tags competing with long names across thousands of rows. Find via tag: (§3.7) / inventory tags (§2.9).
+- Lineage-owned (04 §8), CLI `tag add|remove <ref> <tag…> --mod <ref>…`, MCP `set_player_data`.
+- Player data, not list edits: no undo; GUI tag status has no undo link.
 
-`g` 在提示行（或详情）下方打开一行候选，不是输入框：
+`g` opens candidate row under hints / details, not input:
 
 ```
- ✎ 输入…   [框架]  [美化]  [服装]  [种族]  [武器]  [建筑]  [QoL]  [测试中] …
-           ▲ 初始选中第一个候选
+ ✎ type…   [framework] [visuals] [apparel] [races] [weapons] [buildings] [QoL] [testing] …
+           ▲ first candidate initially selected
 ```
 
-- `←→`（或 `↑↓`）移动选择；`enter` 应用；`esc` 关闭。`enter` 后候选行关闭，选择保留，可以再按 `g`。
-- 第一个候选左边是“✎ 输入…”：从第一个候选按 `←` 就到达它，此时可以直接打字，`enter` 创建并应用新标签。在任何候选上直接打字也会跳到输入处。
-- 已经挂在**全部**对象上的标签显示为 `[✓框架]`，`enter` 把它从这些对象上移除；只挂在部分对象上的显示为 `[~框架]`，`enter` 补齐到全部。
-- 候选顺序：常用标签（`archo config set tags.pinned "框架,美化,…"`，`,` 和 `，` 都可分隔）在前，然后按使用次数排序的已有标签。放不下时向右滚动。数据：`view.TagCandidates`、`view.PinnedTags`。
-- 预置常用标签是 `tags.pinned` 的默认值（不在首次运行时写进数据库，`config get` 能看到，`config set` 整体替换）：框架、美化、服装、种族、武器、建筑、家具、QoL、平衡、剧情、性能、语言包、测试中、待删除。
-- 没有选择时，候选行代替状态行。
+- Both arrow pairs move, Enter applies / closes retaining selection for repeat g, Esc closes.
+- Before first candidate is ✎ type…; left reaches it, typing / Enter creates and applies. Typing on any candidate jumps there.
+- Tag on **all** objects `[✓framework]`, Enter removes; partial `[~framework]`, Enter fills all.
+- Pinned first (`archo config set tags.pinned "framework,visuals,…"`, accepts ASCII / full-width commas), then existing by usage. Horizontal scroll. `view.TagCandidates`, `view.PinnedTags`.
+- Defaults are `tags.pinned` defaults, not inserted on first run; config get shows, config set replaces whole: framework, visuals, apparel, races, weapons, buildings, furniture, QoL, balance, story, performance, language packs, testing, to delete.
+- Without selection candidate row replaces status.
 
-### 3.9 表格
+### 3.9 Tables
 
-2026-10-23 定：**每一张数据表的表头**都像 Windows 文件管理器的“详细信息”，规则和 Mod 库存的表格（§2.9）相同，不只是那一页。数据表是一行一个对象、有两列以上能排序的表；设置页这类“项 → 值”的固定表、只有一两行的汇总不算。
-- 点表头按这一列排序，再点反过来，箭头标出方向；每一列有自己的“自然方向”（名称 A 到 Z、大小从大到小、日期从新到旧、状态从要紧到不要紧）。
-- 拖表头移动列；拖表头的右边缘改宽度，双击恢复；名称列拿走多出来的宽度。
-- 右键表头：按这一列排序、加宽、变窄、显示或隐藏每一列（名称总在）、恢复默认列。
-- 键盘（§3.1 规则 6）：`s` 在当前排序列打开同一个表头菜单，`<` `>` `=` 改排序列的宽度、恢复。
-- 列的顺序、宽度、显示哪些按表存在 `ui.gui.<表>.columns`。
-- 已经照这一节做的表：Mod 库存（`library`）、后台任务的每一项（`tasks.items`，§2.16）、整合包列表（`packs`，§2.7）、一个包里的 Mod（`pack.mods`，§2.7）、贴图优化的贴图列表（`textures`，§2.13）。
-- 以后新做的表照这一节。
+Decided 2026-10-23: **every data-table header** follows Windows Explorer Details, same as inventory (§2.9), not just that page. Data tables: one object per row, more than two sortable columns; settings item → value fixed tables / one-two-row summaries excluded.
+- Click sorts, again reverses, directional arrow; natural direction per column: name A–Z, size descending, date newest, status urgent first.
+- Drag headers reorder, right edges resize, double-click reset; name takes surplus width.
+- Header context menu: sort column, widen, narrow, show / hide each (name always), reset columns.
+- Keyboard (§3.1 rule 6): s opens same menu at sorted column; < > = resize / reset it.
+- Column order / widths / visibility in `ui.gui.<table>.columns`.
+- Implemented: library, `tasks.items` (§2.16), packs (§2.7), `pack.mods` (§2.7), textures (§2.13).
+- Future tables follow this.
 
-### 3.10 选择控件（GUI）
+### 3.10 Choice controls (GUI)
 
-共用 `js/choices.js` 的 `choiceControl`：只有 `off` / `on` 的字段用两段开关（左关、右开，文字沿用字段的本地化标签）；其余单值选择用圆角下拉菜单。原有值、禁用与 `change` 保存回调保持一致，程序赋值不触发保存。复选框仍用于选择条目、附带内容和确认处理方式。
+Shared `js/choices.js` `choiceControl`: off / on only uses two segments, off left / on right, localized field labels; other single choices rounded dropdown. Preserve values / disabled / change saving, programmatic assignment never saves. Checkboxes still select items, attachments, confirmation handling.
 
-- `tab` 聚焦控件；开关用空格或 `enter` 切换，`←` 关、`→` 开。
-- 下拉用空格、`enter` 或 `↓` 打开；`↑↓` 移动候选，`Home` / `End` 到首尾，输入文字按前缀跳转，略过禁用项；`enter` 或空格确认。候选移动不保存，只有确认才保存。
-- `esc` 关闭并还焦点给按钮；`tab` 关闭后按页面顺序去下一个控件。点外面、焦点离开、页面滚动、窗口改大小或控件被移除／禁用时关闭；菜单内部滚动保持打开。后退先关闭菜单。
-- 同时只开一个菜单。菜单浮在滚动容器之外，底部空间不足时向上弹，右边越界时向内收；长清单在面板内滚动。
-- 控件与选项支持引用编号。开关报告 `switch` / `aria-checked`，下拉报告 `combobox`、展开状态、当前候选和 `listbox` / `option` 的选择与禁用状态；设置说明关联到对应控件。
+- Tab focus; Space / Enter toggles, left off / right on.
+- Dropdown Space / Enter / down opens; arrows navigate, Home / End ends, typing prefix jumps, skip disabled. Enter / Space confirms; moving never saves, confirmation only.
+- Esc closes / restores button focus; Tab closes / next in page order. Outside click, blur, page scroll, resize, removal / disable closes; internal menu scroll stays. Back closes menu first.
+- One menu; floats outside scrolling container, opens upward if needed, shifts inward at right; long list internally scrolls.
+- Reference numbers supported on controls / options. Switch exposes switch / aria-checked, dropdown combobox / expanded / current candidate, listbox / option selected / disabled states; settings help associated to controls.

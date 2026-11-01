@@ -1,87 +1,87 @@
-# 分析事实跨版本共用与清理实测
+# Cross-version analysis-fact sharing and cleanup measurements
 
-2026-10-29。仅合成数据；工作分支 `codex/fact-share`，已执行 `git merge dev/0.9.0`，合入带 v25 的 `aa5da8e`。未使用 VM、玩家游戏、Mod 或宿主 RimArcho 数据目录，未 push。规格合同见 [03 §1–3](../specs/03-facts-and-analysis.md)，本报告记录测量与取舍。
+2026-10-29. Synthetic data only; branch `codex/fact-share`, ran `git merge dev/0.9.0`, incorporating `aa5da8e` with v25. No VM, player game, Mods, or host RimArcho data directory used; no push. Specification contract: [03 §1–3](../specs/03-facts-and-analysis.md). This report records measurements and tradeoffs.
 
-## 结果
+## Results
 
-4000 个合成 Mod、两个游戏版本、每 Mod 95 条 Def 和 20 条 Type。两版目录相同；原结构 760,000 条 Def / 160,000 条 Type，现为 380,000 / 80,000。新库在用大小从 v25 的 215.7 MB 降到 66.6 MB（减少 69.1%）；原分支起点 v24 为 250.9 MB。第二个版本保存中位 0.457 秒，v25 为 5.50 秒。原地迁移另在 760,000 条 Def 的旧结构合成库上测得 4.33 秒，保留版本视图和事实字段，无需重新分析 Mod 文件。
+4000 synthetic Mods, two game versions, 95 Defs and 20 Types per Mod. Both versions use identical folders; old structure: 760,000 Defs / 160,000 Types; now 380,000 / 80,000. In-use database size fell from v25's 215.7 MB to 66.6 MB (69.1% reduction); original branch base v24 was 250.9 MB. Median save for the second version: 0.457 seconds, versus v25's 5.50 seconds. In-place migration separately measured 4.33 seconds on an old-structure synthetic database with 760,000 Defs, retaining version views and fact fields without reanalyzing Mod files.
 
-## 表结构、键与读取
+## Tables, keys, and reads
 
-| 表 | 归属与键 | 用途 |
+| Table | Ownership and key | Purpose |
 | --- | --- | --- |
-| `fact_set` | `id INTEGER PRIMARY KEY`，唯一 `(instance_id, kind, content_key)` | 同一 Instance 的输入集合；`kind=def` 或 `dll` |
-| `content_state` | 主键 `(instance_id, game_mm)`；引用 `def_set_id`、可空 `dll_set_id` | 当前版本的事实视图；保留目录和解析摘要 |
-| `def_fact` | `set_id` 外键 | 原 Def 字段；通过视图取得 Instance 和版本 |
-| `assembly_fact` / `type_fact` / `harmony_fact` / `harmony_id` | `set_id` 外键 | DLL 事实；集合删除时外键级联清理 |
-| `analysis` / `patch_fact` / `finding` | 原环境 / 版本 / 启用集合槽位 | 补丁模拟及问题语义保持 |
+| `fact_set` | `id INTEGER PRIMARY KEY`, unique `(instance_id, kind, content_key)` | Input set for one Instance; `kind=def` or `dll` |
+| `content_state` | Primary key `(instance_id, game_mm)`; references `def_set_id`, nullable `dll_set_id` | Current version's fact view; retains folders and parsing summary |
+| `def_fact` | `set_id` foreign key | Original Def fields; Instance and version come through the view |
+| `assembly_fact` / `type_fact` / `harmony_fact` / `harmony_id` | `set_id` foreign key | DLL facts; cascading cleanup when a set is deleted |
+| `analysis` / `patch_fact` / `finding` | Original environment / version / enabled-set slot | Patch simulation and finding semantics preserved |
 
-Def 输入键是快照哈希、有序生效目录列表哈希、分析器版本。目录先清理并统一路径分隔符；优先级和重复项保留。版本和条件文本只负责选择目录，不另造一份相同内容。集合仍限定同一 Instance，不把不同副本的身份混在一起，也没有把 Instance ID 整数化。
+Def input key consists of snapshot hash, ordered effective-folder-list hash, and analyzer version. Folders are cleaned and path separators normalized first; priority and duplicates are retained. Version and condition text only select folders, without creating another copy of identical content. Sets remain scoped to one Instance; identities of different copies are not mixed, and Instance IDs were not converted to integers.
 
-DLL 输入键是快照哈希、实际生效 DLL 相对路径及每个 DLL 是否跳过 Harmony 解析、分析器版本。不同 XML 目录可共用相同 DLL 集合；包身份造成的 HugsLib 跳过差异及自定义跳过名单均会体现在键里。启用后 DLL 为空也建立空集合，替换旧 DLL 视图。
+DLL input key consists of snapshot hash, effective DLL relative paths and whether each DLL skips Harmony parsing, and analyzer version. Different XML folders can share the same DLL set; package-identity-based HugsLib skipping and custom skip lists are reflected in the key. Enabling with no DLLs also creates an empty set, replacing the old DLL view.
 
-`DefsOf`、`DefsNamed`、`DefCounts`、`DefCount`、程序集、Type / Harmony ID 所有者和 Harmony 查询均通过 `content_state` 按 `Store.MM` 读取。补丁、why、日志、target-inactive、modsearch 和 Name 补查沿用这些接口或生效目录解析；父模板补查的快路径同步适配新键。`CachedDefs` 可按 Instance 和内容键复用别的版本集合。
+`DefsOf`, `DefsNamed`, `DefCounts`, `DefCount`, assembly, Type / Harmony ID owner, and Harmony queries all read through `content_state` using `Store.MM`. Patches, why, logs, target-inactive, modsearch, and Name lookups continue using these interfaces or effective-folder resolution; the parent-template lookup fast path supports the new key. `CachedDefs` can reuse another version's set by Instance and content key.
 
-仅保留集合删除 / 枚举、名字查询和版本视图关联使用的索引。`def_fact_instance` 及旧版本复合索引随旧表移除；`Name` 改走部分索引 `def_fact_named(name,set_id) WHERE name<>''`。Type / Harmony ID 查询固定先按名字取事实，再关联版本视图，避免 SQLite 选成逐 Mod 扫描。索引计划测试覆盖这些路径。
+Only indexes used for set deletion/enumeration, name lookup, and version-view joins remain. `def_fact_instance` and old version composite indexes disappear with old tables; `Name` uses partial index `def_fact_named(name,set_id) WHERE name<>''`. Type / Harmony ID queries always fetch facts by name first, then join version views, preventing SQLite from choosing per-Mod scans. Index-plan tests cover these paths.
 
-## 清理与产品决定
+## Cleanup and product decisions
 
-`Store.PruneFacts(now time.Time) error` 是供定期整理和压缩入口接入的独立函数，事务内完成，可反复调用。`SaveAnalysis`、环境删除、gc、链接身份合并已就地调用清理。
+`Store.PruneFacts(now time.Time) error` is an independent, transactional, repeatable function for periodic maintenance and the compact entry point. `SaveAnalysis`, environment removal, gc, and link identity merging already call cleanup in place.
 
-1. 保存一个环境的新分析时，删除这个环境所有版本下已没有方案使用的启用集合槽位；同一槽位只保留最新批次。
-2. 非当前游戏版本的槽位在最后分析完成超过 30 天后删除；当前版本槽位不按时间过期。判断的是最后分析时间，读取不续期。游戏版本未知时保守保留。
-3. Instance 不存在，或所有可见环境既无当前游戏版本 mm、也无 mm 分析槽位时，删除 `(instance, mm)` 视图。共享 Instance 可见于所有环境，私有 Instance 只看所属环境。未知游戏版本保守保留其可见实例视图。
-4. 没有任何版本视图引用的集合删除，其事实级联删除。另一个日志归属分支修好误用后，错误版本不再更新的槽位可由 30 天策略过期；旧方案槽位被替换或环境移除时也能立即清理。
+1. Saving new analysis for an environment removes enabled-set slots unused by any plan across all that environment's versions; each slot retains only the latest run.
+2. Slots for noncurrent game versions expire more than 30 days after their last completed analysis; current-version slots do not expire by time. Reads do not renew the last-analysis time. Unknown game versions are retained conservatively.
+3. Remove `(instance, mm)` views when the Instance no longer exists, or no visible environment has either current game version mm or an mm analysis slot. Shared Instances are visible to all environments; private Instances consider only their owning environment. Unknown game versions conservatively retain visible instance views.
+4. Delete sets unreferenced by any version view, cascading to their facts. Once the other log-ownership branch fixes misuse, wrong-version slots no longer updated can expire under the 30-day policy; replacing old-plan slots or removing environments can also clean them immediately.
 
-30 天是本任务采纳的产品建议：保留近期跨版本日志反复分析的收益，给误用槽位明确上限。没有新增玩家设置。删除旧集合以“无引用”为条件：一个版本更新后，其他仍有效的版本视图还引用旧集合时必须保留它，直到该视图更新或不再需要。
+30 days is the product suggestion adopted for this task: preserve the benefit of repeated recent cross-version log analysis while bounding misused slots. No player setting was added. Old sets are deleted only when unreferenced: if another valid version view still references an old set after one version updates, retain it until that view updates or is no longer needed.
 
-**同版本不同方案的条件目录限制仍然存在。** 内容键不含版本后，同目录的跨版本重复消除了；但 `content_state` 仍只有 `(instance, mm)` 一个视图，没有按方案寻址。同一版本下最后分析的方案会替换视图，切回另一个已有新鲜槽位的方案仍可能看到上个方案的 Def。此次共用未新增这一问题，也没有声称解决它；要解决需另设分析槽位到集合的映射及读取上下文。
+**The conditional-folder limit for different plans on the same version remains.** Removing version from the content key eliminates duplicate cross-version data for identical folders, but `content_state` still has only one `(instance, mm)` view, not a per-plan view. The last analyzed plan on a version replaces the view; returning to another plan with an already-fresh slot may still show the previous plan's Defs. Sharing did not introduce or claim to solve this issue; a solution needs an analysis-slot-to-set mapping and read context.
 
-## 迁移
+## Migration
 
-`schemaV26` / `migrateV26` 在同一事务里重建事实表。从旧键提取快照和分析器版本，结合已存有序目录合并 Def 集合；旧 DLL 记录没有输入跳过策略，用快照、分析器版本及完整 DLL 事实指纹保守共用，下一次分析换成正常 DLL 输入键。无法识别的旧键按版本分别保留。没有 `content_state` 的孤立事实不迁移。查询等价测试覆盖 defName、Name、空 Def 集合、Type 嵌套名、Harmony ID 大小写、手动 Harmony 补丁、程序集标志与字段，以及不同快照 / 分析器版本不混用。
+`schemaV26` / `migrateV26` rebuild fact tables in one transaction. Snapshot and analyzer versions are extracted from old keys and combined with stored ordered folders to merge Def sets. Old DLL records lack input skip policy, so sharing conservatively uses snapshot, analyzer version, and a full DLL-fact fingerprint; the next analysis replaces this with a normal DLL input key. Unrecognized old keys remain separate by version. Orphan facts without `content_state` are not migrated. Query-equivalence tests cover defName, Name, empty Def sets, nested Type names, Harmony ID case, manual Harmony patches, assembly flags/fields, and isolation of different snapshots/analyzer versions.
 
-| 迁移合成库测量 | 数字 |
+| Synthetic migration database measurement | Value |
 | --- | ---: |
-| 迁移前物理 / 在用大小 | 196,337,664 B |
-| 原地迁移 | 4.3277 s |
-| 迁移后在用大小 | 63,344,640 B |
-| 迁移后物理大小 | 259,330,048 B |
-| 其中可复用空闲页 | 195,985,408 B |
-| 另行压缩后物理大小 | 60,465,152 B |
+| Physical / in-use size before migration | 196,337,664 B |
+| In-place migration | 4.3277 s |
+| In-use size after migration | 63,344,640 B |
+| Physical size after migration | 259,330,048 B |
+| Reusable free pages within it | 195,985,408 B |
+| Physical size after separate compaction | 60,465,152 B |
 
-迁移样本用 SQL 生成，文件路径和快照键更短，与分析基准不是同一库；不可把两组大小直接相减。迁移有临时空间增长，事务失败整体回滚。启动升级不执行 `VACUUM`；后续整理负责物理缩小。旧 DLL 集合在下一次分析被相应视图替换，无引用即清除。
+The migration sample was SQL-generated with shorter file paths and snapshot keys; it differs from the analysis benchmark database, so sizes cannot be directly subtracted. Migration temporarily grows disk usage; transaction failure rolls everything back. Startup migration does not run `VACUUM`; later maintenance shrinks physical size. Old DLL sets are replaced by their views on the next analysis and removed when unreferenced.
 
-## 分析与查询测量
+## Analysis and query measurements
 
-Windows / Go 1.27.2，modernc SQLite，`internal/testkit` 合成目录。每种实现独立三组取中位；查询在每组分别重复 10 次（190 次 Name、DefCounts）或 100 次（其他），表中为各组均值的中位数。磁盘页大小在 checkpoint 后统计。包括 4000 个 Mod 的实际 XML 解析和额外构造的 DLL 事实保存；DLL 元数据解析性能由既有合成 DLL 回归覆盖。OS 文件缓存与机器并行负载未固定，因此微秒差异只作量级参考。
+Windows / Go 1.27.2, modernc SQLite, `internal/testkit` synthetic directories. Median of three independent groups per implementation; queries repeat 10 times per group (190 Name queries, DefCounts) or 100 times (others), with the median of group means shown. Disk pages measured after checkpoint. Includes actual XML parsing for 4000 Mods and saving additionally constructed DLL facts; existing synthetic-DLL regressions cover DLL metadata parsing performance. OS file cache and concurrent machine load were not fixed, so microsecond differences indicate scale only.
 
-| 指标 | v25 | v26 |
+| Metric | v25 | v26 |
 | --- | ---: | ---: |
-| 数据库在用大小 | 215,703,552 B | 66,596,864 B |
-| 1.6 分析（保存前） | 1.471 s | 1.208 s |
-| 1.6 保存 | 5.331 s | 3.258 s |
-| 1.7 分析（保存前） | 1.363 s | 1.111 s |
-| 1.7 保存 | 5.502 s | 0.457 s |
-| 1.6 分析 + 保存，同组总和中位 | 6.941 s | 4.531 s |
-| 1.7 分析 + 保存，同组总和中位 | 6.865 s | 1.568 s |
-| 190 个不同 Name 查询 | 6.297 ms | 5.589 ms |
-| 单个 defName 查询 | 30.47 µs | 25.17 µs |
-| 单个 Instance 的 95 个 Def | 172.49 µs | 172.33 µs |
-| 全库 DefCounts | 79.40 ms | 58.89 ms |
+| In-use database size | 215,703,552 B | 66,596,864 B |
+| 1.6 analysis (before saving) | 1.471 s | 1.208 s |
+| 1.6 save | 5.331 s | 3.258 s |
+| 1.7 analysis (before saving) | 1.363 s | 1.111 s |
+| 1.7 save | 5.502 s | 0.457 s |
+| 1.6 analysis + save, median of same-group totals | 6.941 s | 4.531 s |
+| 1.7 analysis + save, median of same-group totals | 6.865 s | 1.568 s |
+| 190 distinct Name queries | 6.297 ms | 5.589 ms |
+| One defName query | 30.47 µs | 25.17 µs |
+| 95 Defs for one Instance | 172.49 µs | 172.33 µs |
+| Whole-database DefCounts | 79.40 ms | 58.89 ms |
 | TypeOwners | 30.76 µs | 25.42 µs |
 
-v24 起点的三组中位：250,933,248 B；1.6 保存 5.758 s、1.7 保存 5.990 s；190 个 Name 查询 4.184 ms。v25 的索引缩减和本次 v26 的集合共用分别列出，避免把 v25 收益计入本次。
+Three-group medians at v24 base: 250,933,248 B; 1.6 save 5.758 s, 1.7 save 5.990 s; 190 Name queries 4.184 ms. v25 index reductions and this v26 set sharing are listed separately to avoid attributing v25 gains to this task.
 
-没有观察到关键查询或总分析成本退步。190 次 Name 约 5.6 ms 不会单独耗尽 500 ms 首次日志预算；这只是存储读取验证，不能替代整份日志和 GUI 页面端到端耗时、原生窗口工作集的 VM 验收。本任务按限制未运行 VM，对应行已加进发布前检查表。
+No regression in key queries or total analysis cost was observed. About 5.6 ms for 190 Name queries cannot alone exhaust the 500 ms first-log budget; this validates storage reads only, not full-log/GUI end-to-end latency or native-window working-set VM acceptance. This task did not run the VM per its limits; the corresponding row was added to the prerelease checklist.
 
-## 测试与复现
+## Tests and reproduction
 
-`go test ./...` 已通过；`node --test "scripts/vm/*.test.mjs"` 42 / 42 通过。
+`go test ./...` passed; `node --test "scripts/vm/*.test.mjs"` passed 42 / 42.
 
-新增 / 调整的覆盖：两版本相同目录只存一份；目录或覆盖顺序不同分别保存；Mod 更新后最后引用消失才删旧集合；删除环境 / 删除方案槽位 / 30 天过期；共享与私有可见性；DLL 跨 XML 目录共用、跳过名单、空 DLL 替换；迁移前后字段与查询结果等价；索引查询计划。`TestAnalysisPerGameVersion`、Name 补查和日志回归保持通过。
+Added/adjusted coverage: identical folders across two versions stored once; different folders/override order stored separately; old sets removed only after the final reference disappears following Mod updates; environment/plan-slot removal/30-day expiry; shared/private visibility; DLL sharing across XML folders, skip lists, empty-DLL replacement; migration field/query equivalence; index query plans. `TestAnalysisPerGameVersion`, Name lookups, and log regressions remain passing.
 
-复现前把 TEMP、TMP、APPDATA、LOCALAPPDATA、USERPROFILE 指向任务自己的临时目录，**不设置 `RIMARCHO_HOME`**：GUI 的既有 `TestUseInstalledRealCopy` 把这个变量当成真实备份验收的显式启用信号。首次全量执行因设置该变量而被该测试的标记检查拒绝，未访问备份；取消后复跑。普通测试均由 testkit 指定自己的数据目录。
+Before reproducing, point TEMP, TMP, APPDATA, LOCALAPPDATA, and USERPROFILE at the task's temporary directories; **do not set `RIMARCHO_HOME`**. Existing GUI `TestUseInstalledRealCopy` treats it as an explicit opt-in for real-backup acceptance. The first full run set it and was rejected by that test's marker check without accessing the backup; reran after unsetting it. Ordinary tests use their own testkit data directories.
 
 ```powershell
 $base = 'D:\RimArcho-test\fact-share'
@@ -102,43 +102,43 @@ go test ./internal/store -run '^TestMigrateV26' -v -count=1
 Remove-Item Env:RIMARCHO_FACT_BENCH
 ```
 
-测改前时，使用 `git archive` 把对应提交复制到同一临时根下，再复制当前 `factshare_bench_test.go` 到其 `internal/store/`。v24=`de2fa73`，v25=`aa5da8e`。基准默认跳过，显式设置 `RIMARCHO_FACT_BENCH=1` 才生成规模库；测试结束自动清理数据。没有运行 archo.exe；若另行运行，四个用户指定隔离变量都必须设置。
+For before-change measurements, use `git archive` to copy the corresponding commit under the same temporary root, then copy current `factshare_bench_test.go` into its `internal/store/`. v24=`de2fa73`, v25=`aa5da8e`. Benchmarks skip by default; only explicit `RIMARCHO_FACT_BENCH=1` generates scale databases, cleaned automatically afterward. archo.exe was not run; if run separately, all four user-specified isolation variables must be set.
 
-## 主要修改入口
+## Main change entry points
 
-| 文件 / 函数 | 改动 |
+| File / function | Change |
 | --- | --- |
-| `internal/content/content.go`：`Resolved.Key`、`FolderKey` | 生效目录键 |
-| `internal/analyze/analyze.go`、`harmony.go`：`ContentState`、`AssemblyKey` | DLL 输入键及空输入状态 |
-| `internal/store/migrate26.go`、`store.go` | v26 结构、迁移注册及转换 |
-| `internal/store/savecontent.go`、`analysis.go` | 复用集合保存和全部事实读取 |
-| `internal/store/factsets.go` | 清理、独立入口和历史迁移删除兼容 |
-| `envs.go`、`mutate.go`、`migrate14.go`、`linkedinstances.go` | 自然清理时机 |
-| `internal/app/parentproblems.go` | Name 补查缓存键验证 |
-| `internal/testkit/legacyfacts.go`、`testdata/store/facts-v25.sql` | 既有迁移测试回退真实旧表结构 |
-| `factsets_test.go`、`migrate26_test.go`、`factshare_bench_test.go`、既有迁移 / 索引 / WAL 测试 | 行为、查询与规模验证 |
+| `internal/content/content.go`: `Resolved.Key`, `FolderKey` | Effective-folder key |
+| `internal/analyze/analyze.go`, `harmony.go`: `ContentState`, `AssemblyKey` | DLL input key and empty-input state |
+| `internal/store/migrate26.go`, `store.go` | v26 structure, migration registration and conversion |
+| `internal/store/savecontent.go`, `analysis.go` | Reused-set saving and all fact reads |
+| `internal/store/factsets.go` | Cleanup, independent entry point, and historical migration-deletion compatibility |
+| `envs.go`, `mutate.go`, `migrate14.go`, `linkedinstances.go` | Natural cleanup points |
+| `internal/app/parentproblems.go` | Name-lookup cache-key validation |
+| `internal/testkit/legacyfacts.go`, `testdata/store/facts-v25.sql` | Existing migration tests restore actual old table structures |
+| `factsets_test.go`, `migrate26_test.go`, `factshare_bench_test.go`, existing migration/index/WAL tests | Behavior, query, and scale validation |
 
-规格、架构引用、CHANGELOG 和 VM 检查表与代码同一提交。
+Specifications, architecture references, CHANGELOG, and VM checklist accompany code in the same commit.
 
-## 代码与原文档的冲突
+## Conflicts between code and original documentation
 
-原 03 §2 写 `analyze.Version=4` 且每条事实都带版本；代码实际为版本 8，事实行也没有独立的快照 / 分析器字段，只有旧内容键与批次记录。已改成引用 `analyze.Version` 与集合关联。
+Original 03 §2 stated `analyze.Version=4` and a version on every fact; actual code was version 8, and fact rows had no separate snapshot/analyzer fields, only old content keys and run records. Changed to references to `analyze.Version` and set associations.
 
-原 03 §3 同时写“每 `(环境, mm)` 只留最新一批”和“按启用集合保留多槽位”。实际代码按集合分槽；已以多槽位合同为准。旧方案删除原先只清本次 mm，本次明确跨该环境所有 mm 清理。
+Original 03 §3 stated both "only the latest run per `(environment, mm)`" and "multiple slots by enabled set". Actual code uses set-based slots; the multiple-slot contract now governs. Old-plan removal previously cleaned only the current mm; this explicitly cleans across all mm of that environment.
 
-原 07 §8.4 / 00a 的事实按版本物理分区说明已更新为引用内容集合与版本视图。保留历史实测表，未把历史索引改进数字改成当前结构。
+Original 07 §8.4 / 00a descriptions of facts physically partitioned by version now reference content sets and version views. Historical measurement tables remain; historical index-improvement figures were not rewritten as current structure.
 
-## 证据链
+## Evidence chain
 
-原始输出保存在同名 `fact-share-evidence/` 目录；校验和见 `sha256.json`。
+Raw output is in the matching `fact-share-evidence/` directory; checksums in `sha256.json`.
 
-| Evidence | 来源与复现 | 观察 |
+| Evidence | Source and reproduction | Observation |
 | --- | --- | --- |
-| E-001 | `v24.log` / `v25.log` / `v26.log`；`TestFactShareScale` 三组 | 相同场景行数、大小、保存及查询耗时 |
-| E-002 | `migration.log`；`TestMigrateV26Scale` | 760,000 行就地转换耗时和空间；查询一致 |
-| E-003 | `fact-tests.log`；`go test ./internal/store -run 'Test(Fact|MigrateV26Fact)' -v` | 目录、更新、可见性、槽位及 DLL 边界通过 |
-| E-004 | `node-test.log`；`node --test "scripts/vm/*.test.mjs"` | 42 项通过，未运行 VM |
+| E-001 | `v24.log` / `v25.log` / `v26.log`; three `TestFactShareScale` groups | Row counts, sizes, save/query times for the same scenario |
+| E-002 | `migration.log`; `TestMigrateV26Scale` | Time and space for 760,000-row in-place conversion; matching queries |
+| E-003 | `fact-tests.log`; `go test ./internal/store -run 'Test(Fact|MigrateV26Fact)' -v` | Folder, update, visibility, slot, and DLL boundaries passed |
+| E-004 | `node-test.log`; `node --test "scripts/vm/*.test.mjs"` | 42 passed, VM not run |
 
-E-005：`go-test.log`，`go test ./...` 全量通过（真实备份验收未启用）。
+E-005: `go-test.log`, full `go test ./...` passed (real-backup acceptance not enabled).
 
-Finding F-001：E-001 / E-002 支持按输入集合共用能减少重复数据且可快速转换，状态 validated。Finding F-002：E-003 支持引用和可见性清理不会删除仍需保留的版本事实，状态 validated。调用路径 P-001：`analyze.Run` 生成输入键 → `SaveAnalysis` / `saveContent` 查找或新建集合 → `content_state` 更新版本引用 → `PruneFacts` 删除不需要的视图 → 无引用集合级联删除。边界是未实测的 VM 端到端耗时与前述方案视图限制。
+Finding F-001: E-001 / E-002 support input-set sharing reducing duplicate data with fast conversion, status validated. Finding F-002: E-003 supports reference/visibility cleanup preserving version facts still needed, status validated. Call path P-001: `analyze.Run` generates input key → `SaveAnalysis` / `saveContent` finds or creates a set → `content_state` updates version reference → `PruneFacts` removes unneeded views → unreferenced sets cascade-delete. Boundaries are unmeasured VM end-to-end latency and the plan-view limitation above.

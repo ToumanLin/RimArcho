@@ -1,118 +1,118 @@
-# 06 · 界面 · 资源目标与验收（§10–11）
+# 06 · Interface · Resource targets and acceptance (§10–11)
 
-> 属于 [06 · 界面](README.md)。章节号在整个 06 里连续，拆成多个文件后不变，引用照旧写 `06 §x.y`。
+> Part of [06 · Interface](README.md). Section numbers run through all of 06 and stay unchanged when split across files. References still use `06 §x.y`.
 
-## 10. 资源目标
+## 10. Resource targets
 
-**页面加载务必快，内存占用务必少。** 这是 RimArcho 和 RimCrow（常驻 400–500 MB，07 §6）的主要区别，新功能不能拿它去换：
+**Pages must load fast and use little memory.** This is a key difference between RimArcho and RimCrow (400–500 MB resident, 07 §6); new features must not sacrifice it:
 
-- **页面先出来。** 切换页面先显示已有的数据。慢的部分（读文件、分析、网络、Steam）在后台填，不挡页面，也不挡按键。
-- **不长期占内存。** 离开页面就放掉它的数据（07 §8.3）；缓存要有上限，或者按数据变化失效；空闲内存不随使用时间增长。
-- **下表是门槛。** 改动让任何一项超标就不合并。动到页面加载、列表、扫描、缓存时，测改动前后，把数字写进提交说明和 07 §6。
+- **Show the page first.** Show existing data on navigation. Fill slow parts (files, analysis, network, Steam) in the background without blocking pages or keys.
+- **Do not retain memory indefinitely.** Release page data on leaving (07 §8.3); cap caches or invalidate on data changes; idle memory must not grow with usage time.
+- **The table sets merge thresholds.** Do not merge changes exceeding any threshold. For page loading, lists, scans, or caches, measure before / after and record numbers in the commit description and 07 §6.
 
-| 指标 | 目标 | 实测 |
+| Metric | Target | Measured |
 | --- | --- | --- |
-| TUI：archo 进程空闲 10 分钟的工作集 | ≤ 80 MB | 07 §6 |
-| TUI：每次按键响应（1354 个 Mod 的滚动和筛选） | ≤ 50 毫秒 | 07 §6 |
-| GUI：Go 进程空闲内存（专用工作集） | ≤ 80 MB | 07 §6 |
-| GUI：整体内存（Go + WebView2，任务管理器“内存”口径，空闲 10 分钟） | ≤ 200 MB | 07 §6 |
-| GUI：冷启动到列表可交互 | ≤ 1.5 秒 | 07 §6 |
-| GUI：切换页面到内容可交互（1354 个 Mod 规模） | ≤ 200 毫秒；要读文件的页面先出框架和已有数据 | 编辑器 106 毫秒（07 §6）；其他页面待测 |
-| GUI：单次交互（调用 + 重绘） | ≤ 50 毫秒 | 07 §6 |
-| GUI：启动页背景（§2.3、§2.14） | 不改变 Go 进程空闲内存 | 2026-10-22 开发调试服务器：一次生成 58 张缩略图（约 8.6 秒），之前 Private 77 MB，结束 6 秒后 75 MB |
+| TUI: archo working set after 10 idle minutes | ≤ 80 MB | 07 §6 |
+| TUI: each key response (1354 Mods, scrolling and filtering) | ≤ 50 ms | 07 §6 |
+| GUI: idle Go memory (private working set) | ≤ 80 MB | 07 §6 |
+| GUI: total memory (Go + WebView2, Task Manager Memory metric, 10 idle minutes) | ≤ 200 MB | 07 §6 |
+| GUI: cold start to interactive list | ≤ 1.5 seconds | 07 §6 |
+| GUI: page switch to interactive content (1354 Mods) | ≤ 200 ms; file-reading pages show structure and existing data first | Editor 106 ms (07 §6); other pages unmeasured |
+| GUI: single interaction (call + redraw) | ≤ 50 ms | 07 §6 |
+| GUI: launch background (§2.3, §2.14) | No change in Go idle memory | 2026-10-22 development debug server: generated 58 thumbnails (about 8.6 seconds), Private 77 MB before, 75 MB 6 seconds after |
 
-- 00 设想的 80 MB 只对 Go 进程本身成立；WebView2 的部分无法压到这个范围。TUI 运行在玩家自己的终端里，终端进程不计入（§9.2）。两者都远低于 RimCrow（07 §6）。
-- GUI 最小化时 WebView2 的内存目标设为“低”，恢复时回到“正常”（07 §8.3）：用过 Mod 库存后最小化，整体 151 → 103 MB。
-- WebView2 不可用（极少数精简系统）时，弹出说明和微软下载页链接，不自动下载；玩家仍可使用 `archo.exe` 的 TUI。
+- 00's proposed 80 MB applies only to the Go process; WebView2 cannot fit this range. TUI runs in the player's terminal, whose process is excluded (§9.2). Both remain far below RimCrow (07 §6).
+- On minimize, GUI sets WebView2 memory target to low, restoring normal on restore (07 §8.3): after using Mod inventory, minimizing reduced total 151 → 103 MB.
+- Without WebView2 (rare stripped systems), show an explanation and Microsoft download link, never download automatically; `archo.exe` TUI remains usable.
 
-## 11. 验收
+## 11. Acceptance
 
 ### TUI
 
-| # | 场景 | 期望 | 状态 |
+| # | Scenario | Expected | Status |
 | --- | --- | --- | --- |
-| T1 | 1354 个 Mod 的四区滚动和搜索（含 CJK） | 每次按键响应 ≤ 50 毫秒 | 通过 |
-| T2 | 终端宽度 160、130、100、78 | 按 §2.5 正确降级，所有操作仍可完成（`TestBreakpointsAndCJK`） | 通过 |
-| T3 | 中文名称和别名 | 对齐正确，截断不切半个字，没有 U+FFFD | 通过 |
-| T4 | 新用户不看文档：启用、排序、启动 | 5 分钟内完成（真人可用性测试） | 待验证 |
-| T5 | 空闲 10 分钟 | archo 进程工作集 ≤ 80 MB | 通过 |
-| T7 | 详情中的长简介、长路径、中英混排 | 宽度 24–80、详情区和全屏、技术信息展开和折叠时全部正确换行，不超出列宽（`TestT7Wrapping`、`TestWrap`） | 通过 |
-| T8 | 真实环境 | 能不能跑的每一项都能用一句人话读懂，并且有一个可执行的按键；界面上不出现问题代码和 `#id`；顶栏数字等于计数项（`TestT8NeedsReal`） | 通过 |
-| T9 | 把 20 个 Mod 移进暂存再全部放回 | 每个 Mod 回到原来的位置（`TestStagingT9`） | 通过 |
-| T13 | 选中两个 Mod，`g` 后不打字只按 `→` `enter` | 给全部对象加上第二个候选标签；再来一次则移除它（`TestT13TagBar`） | 通过 |
-| T15 | 全屏详情中 `↓` 滚到底，`→` | 切到下一个 Mod，内容从顶部开始（`TestT15FullScreenNext`） | 通过 |
-| T16 | 调整列宽、开启名称换行后重启 | 宽度和换行设置保持；详情 ≥ 40 格；`=` 恢复（`TestT16WidthsPersist`） | 通过 |
-| T17 | 在每一种状态下随机按 1000 次方向键（含 `PgUp` / `PgDn`、shift 和 ctrl 方向键、滚轮） | 列表、暂存、标签和撤销栈始终不变（`TestT17ArrowsOnlyNavigate`，15 种状态） | 通过 |
-| T18 | 用脚本按 §3 的按键序列执行 6 个任务（见下表） | 每个任务的按键数不超过下表，结果正确（`TestT18TaskSteps`） | 通过 |
-| T19 | 遍历所有状态（含 5 种弹层和全屏详情）并渲染 | 位置行都显示焦点区和位置；弹层名称出现在位置行中（`TestT19PositionLine`） | 通过 |
-| T20 | 任意状态下按 `esc`，直到不再变化 | 最多 3 次回到基态（当前页、无选择、无弹层、筛选栏收起）（`TestT20EscBack`：编辑器 15 种状态加 7 种嵌套；`TestT20EscBackPages`：启动、能不能跑、游戏日志、Mod 库存 › 全部、订阅与更新和搜索文件、排序规则、整合包、贴图优化、设置、卸载的 27 种状态，`TestT20PagesBuilt` 检查每种状态确实建起来了） | 通过 |
-| T21 | 不带参数启动 TUI | 打开当前方案的编辑器；命令面板能到达 §9.1 表中 TUI 提供的每个页面 | 通过 |
-| T22 | 一个环境有两个方案，在命令面板中切换 | 编辑器显示另一个方案的列表、暂存和历史 | 通过 |
-| T24 | 和 GUI 对齐（§9.1、§9.5）：命令面板的每条命令在 TUI 里都有反应；顶栏和面包屑写“能不能跑”“Mod 库 › 订阅与更新”等 GUI 的名字；搜索文件搜打开的列表启用的 Mod、结果按 Mod → 文件 → 行、改开关再搜一次、离开就停止；排序规则 `r` 加一条、`Del` 删、紧接着 `u` 放回、`a` 切换范围；编辑器 `H` 选择框、窄屏 `4` 开全屏详情、全屏详情里 `?`；`shift+1` 和编辑器的 `L` 去启动页、只有在那里 `L` 才启动；`P` 打开列表不改当前列表，顶栏写“启动的是 X”；`T` 在暂存区以外全部暂存 | 都正确（`TestWindowNames`、`TestFileSearchPage`、`TestFileSearchLeaveStops`、`TestRulesScreen`、`TestEditorKeysOfTheWindow`、`TestStartPage`、`TestOpenListIsNotCurrent`、`TestStageAllKey`） | 通过 |
-| T23 | 命令行 `:`（§9.4）：输入 `pl` 按 `tab`、选 `plan new`、补列表名；`enable` 后按 `tab` 补光标所在的 Mod；`↑` 翻出上一条；输错参数；运行一条多行输出的命令 | 候选和说明行正确；用法错误时输入框保留原文并写红字；单行结果在状态行、多行开面板；带引号的名字是一个参数；命令在后台跑、界面不卡；重开 TUI 后历史还在（`TestCmdLine*`） | 通过 |
+| T1 | Four-area scrolling / search with 1354 Mods, including CJK | Each key ≤ 50 ms | Passed |
+| T2 | Terminal widths 160, 130, 100, 78 | Correct §2.5 degradation, all operations usable (`TestBreakpointsAndCJK`) | Passed |
+| T3 | Chinese names / aliases | Correct alignment, no split characters, no U+FFFD | Passed |
+| T4 | New user enables, sorts, launches without docs | Within 5 minutes, human usability test | Unverified |
+| T5 | Idle 10 minutes | archo working set ≤ 80 MB | Passed |
+| T7 | Long descriptions, paths, mixed Chinese / English details | Widths 24–80, detail area / full-screen, technical info expanded / collapsed: correct wrapping within width (`TestT7Wrapping`, `TestWrap`) | Passed |
+| T8 | Real environment | Every can it run item understandable in one plain sentence, with executable key; no finding codes / `#id`; top count equals counted items (`TestT8NeedsReal`) | Passed |
+| T9 | Stage 20 Mods, put all back | Every original position restored (`TestStagingT9`) | Passed |
+| T13 | Select two Mods, `g`, no typing, just `→` `enter` | Add second candidate tag to both, repeat removes it (`TestT13TagBar`) | Passed |
+| T15 | In full-screen details, `↓` to bottom, `→` | Next Mod, content starts at top (`TestT15FullScreenNext`) | Passed |
+| T16 | Resize columns, enable name wrapping, restart | Width / wrapping persist; details ≥ 40 cells; `=` resets (`TestT16WidthsPersist`) | Passed |
+| T17 | 1000 random navigation keys in every state, including `PgUp` / `PgDn`, shift / ctrl arrows, wheel | List, staging, tags, undo stack unchanged (`TestT17ArrowsOnlyNavigate`, 15 states) | Passed |
+| T18 | Script §3 key sequences for 6 tasks below | No more keys than table, correct results (`TestT18TaskSteps`) | Passed |
+| T19 | Render every state, including 5 overlays / full-screen details | Position line always gives focused area / position, including overlay names (`TestT19PositionLine`) | Passed |
+| T20 | Repeat `esc` from any state until stable | At most 3 to base: current page, no selection / overlay, collapsed filter bar (`TestT20EscBack`: 15 editor states + 7 nested; `TestT20EscBackPages`: 27 states across launch, can it run, game log, Mod inventory > all, subscriptions and updates, search files, sorting rules, packs, texture optimization, settings, uninstall; `TestT20PagesBuilt` verifies each state really built) | Passed |
+| T21 | Start TUI without arguments | Current plan editor; command panel reaches every TUI page in §9.1 | Passed |
+| T22 | Two plans in one environment; command-panel switch | Editor shows other plan's list, staging, history | Passed |
+| T24 | GUI alignment (§9.1, §9.5): every command-panel action responds; top / breadcrumbs use GUI names can it run and mod library > subscriptions and updates; file search covers open list's enabled Mods, results Mod → file → line, toggle and rerun, stop on leaving; rules `r` add, `Del` delete, immediate `u` restore, `a` scope; editor `H` picker, narrow `4` details, details `?`; `shift+1` / editor `L` visit launch, only `L` there launches; `P` opens without changing current, top says launching X; `T` stages all outside Staging | All correct (`TestWindowNames`, `TestFileSearchPage`, `TestFileSearchLeaveStops`, `TestRulesScreen`, `TestEditorKeysOfTheWindow`, `TestStartPage`, `TestOpenListIsNotCurrent`, `TestStageAllKey`) | Passed |
+| T23 | `:` (§9.4): `pl`, `tab`, choose `plan new`, add name; `enable`, `tab` completes cursor Mod; `↑` recalls; invalid flags; multiline command | Correct candidates / help; usage error preserves input, red error; single line status / multiline panel; quoted name one argument; background execution without blocking; history survives restart (`TestCmdLine*`) | Passed |
 
-T11、T12 随“拾取会话”一起删除；T6、T14（缩略图）和 T10（下载 WezTerm）随 2026-10-30 去掉 WezTerm 宿主和图片一起删除（§9.2）。
+T11 / T12 were removed with session picking; T6 / T14 (thumbnails) and T10 (download WezTerm) with removal of the WezTerm host / images on 2026-10-30 (§9.2).
 
-T18 的任务（“+ 名字”表示还要输入几个字符）：
+T18 tasks (+ name means typing a few characters):
 
-| 任务 | 按键 |
+| Task | Keys |
 | --- | --- |
-| 启用一个已知名字的 Mod，并放到合适位置（焦点在已启用区） | `/` 名字 `tab` `space`：3 键 + 名字 |
-| 把一个 Mod 挪到另一个 Mod 后面（相距 120 位） | `m` 名字 `enter`：2 键 + 名字 |
-| 停用 3 个不相邻的 Mod | 用 `↑↓` 移动加 3 次 `ctrl+space`，`space`：移动键 + 4 |
-| 读完当前 Mod 的简介 | `PgDn` `PgDn`：2 键 |
-| 给 5 个连续的 Mod 加一个常用标签 | `shift+↓` 4 次，`g` `→` `enter`：7 键 |
-| 把一半的 Mod 放进暂存来排查问题 | `shift+↓` N 次，`t` |
+| Enable known-name Mod at suitable position, focus Enabled | `/` name `tab` `space`: 3 keys + name |
+| Move Mod behind another, 120 positions apart | `m` name `enter`: 2 keys + name |
+| Disable 3 nonadjacent Mods | `↑↓` movement plus 3 `ctrl+space`, `space`: movement + 4 |
+| Read current Mod description | `PgDn` `PgDn`: 2 keys |
+| Add common tag to 5 consecutive Mods | `shift+↓` 4 times, `g` `→` `enter`: 7 keys |
+| Stage half the Mods to investigate findings | `shift+↓` N times, `t` |
 
 ### GUI
 
-| # | 场景 | 期望 | 状态 |
+| # | Scenario | Expected | Status |
 | --- | --- | --- | --- |
-| G1 | 同一状态（测试环境） | TUI 和 GUI 得到的列和能不能跑与 `view.BuildBoard` / `view.BuildNeeds` 完全相同；GUI 的 Go 代码中修改数据都走 view / app 的类型化调用，`cmds.Execute` 只用于 §1 列出的只读文字和玩家输入的命令（`gui.TestSameViewModels`） | 通过 |
-| G2 | 1354 个 Mod 滚动、筛选 | 每次交互 ≤ 50 毫秒 | 通过 |
-| G3 | 每种操作做一次（键盘、鼠标、拖放、右键菜单） | 结果与 TUI 中相同操作一致；每一步都能 `u` 撤销（`gui.TestVerbsAndUndo`） | 通过 |
-| G4 | 在 GUI 中随机单击、滚动、按方向键 1000 次 | 数据库状态和三列不变（§3.1 规则 1） | 通过 |
-| G5 | 任意状态反复按 `esc` | 最多 3 次回到基态；订阅与更新先收起来源，再去掉只看条件；添加订阅先清粘贴框，再回订阅与更新 | 既有页面见 `spikes/guidev/esccheck.js`；新页的面板、选择和记录条件由 `/dev/pagecheck` 覆盖 |
-| G6 | 工坊简介中含脚本标签、`onerror`、`javascript:` 链接、远程图片 | 不执行、不加载；文字原样显示，图片来自本地缓存 | 通过 |
-| G7 | 真实环境的能不能跑 | 与 TUI 同一列表，每项有一个按钮可以执行 | 通过 |
-| G8 | 同时打开 TUI 和 GUI（两个进程），在一方修改 | 另一方获得焦点后显示新的状态，不覆盖对方的修改（`app` 的并发测试） | 通过 |
-| G9 | 空闲 10 分钟 | 满足 §10 | 通过 |
-| G10 | 双击 `RimArcho.exe` | 没有控制台窗口，直接出现 GUI；扫描、分析子进程不弹窗 | 通过 |
-| G11 | 打开每个侧栏条目 | 只展开当前条目的子项；面包屑与侧栏位置一致；面包屑每一级可点击返回 | 通过 |
-| G12 | 首页（两个环境、三个方案、一个整合包） | 按最近游玩排序；每行状态与该方案能不能跑“会让游戏出错”的计数一致；游戏运行时启动按钮禁用并说明 | 部分通过（排序、每个方案一行、运行时禁用；两个环境的情况待测） |
-| G13 | 能不能跑 | GUI 左列会让游戏出错、可以留意、要你确认，右列上次运行的报错（TUI 一列同序）；隐藏或锁定的 Mod 和过时的转换贴图只剩最下面的链接行；侧栏角标等于计数项（可以留意不算）；每项有凭据 chip | 通过（GUI `TestNeedsSectionsAndEvidence`；TUI `TestG13NeedsSectionsTUI`、`TestNeedsSectionsLive`、`TestNeedsMergedAndElsewhere`，两套图标；view `TestCorpusNeeds`、`TestHiddenModsNotCounted`、`TestNeedsElsewhereAndLinks`） |
-| G29 | 能不能跑的按钮与做完的项（2026-10-29） | 每项的全部动作是底下一行的按钮，没有 `⋯`；二选一的每个选项一个按钮；要确认的动作在这一项里就地确认；执行后不见了的项留成“✓ …”一行，最近一个可撤销的带“撤销”；上次运行的报错和左列相关项互相链接 | 通过（GUI `scripts/vm/needs.test.mjs`、`identity-answers.test.mjs`；view `TestNeedsRelated`、`TestNeedsSortAlso`）；原生窗口和真实数据待 VM |
-| G14 | 有 error 级问题时打开编译成整合包 | “编译”禁用并说明是哪些问题；“先看清单”不写磁盘 | 通过（`gui.TestBuildPageG14`；浏览器里在数据副本上看过） |
-| G15 | 首次引导：两个环境、从 RimSort 导入 | 勾选两个环境都建立；导入先预览，确认后成为第一个方案 | 已实现（`guide.js`，§2.15），待验证 |
-| G16 | 在任意页面打开 Archo 面板 | 面板在右侧打开，`esc` 关闭，页面状态不变 | 待实现（1.1） |
-| G17 | 游戏运行状态（2026-10-30 侧栏底部那一行删去） | 游戏启动后 3 秒内启动页显示运行中；新报错更新能不能跑的角标，不弹窗；游戏退出后新日志不用点就计入角标（`TestReadNewLogCountsTheRun`） | 通过（以下是删去前的记录：2026-10-22 开发调试服务器 `-fakegame`：游戏“启动”后 1.6 秒出现“游戏运行中  03:51 起”和角标 1，顶栏没有；“退出”后这一行消失。TUI 在状态行右端：`TestLiveGame`、`TestStatusLineAfterGame`） |
-| G18 | 全部列表：四个列表，其中一个关联的合集有变化 | 点“列表”打开全部列表；左栏不分组；每行右侧是“当前”或“设为当前”；点版本按钮改了允许的版本后出现“恢复默认”，状态行可以撤销；“跟上合集”后一步 `u` 回到原列表；这一页的任何操作都不写 ModsConfig.xml | 已实现 |
-| G19 | 从全部列表和从编辑器分别打开导出 | 面包屑“库 / 列表 / <列表> / 导出”；每种格式的全文与 `archo loadout export --format` 的输出相同；`esc` 回到来的那一页 | 已实现 |
-| G21 | 加入一个有 2000 多个 Mod 的游戏；切换到它；在编译页和贴图优化页连续换贴图选项 | 每次点击 100ms 内有回应；扫描、切换和测量期间侧栏能换页、其他页面能操作；只有冲突的动作变灰；连续换值只算最后一次（§3.1 规则 9） | 部分通过（合成的 2100 个 Mod 的游戏：扫描和第一次分析时能换页，连续切换最后状态对；编译页和贴图优化页晚到的测量不覆盖新选项，`/dev/pagecheck`；真实的 2000+ Mod 游戏和原生窗口未验证） |
-| G22 | 打开每个侧栏条目 | 先换到新页面（骨架或上次的内容），数据到了再填；晚到的结果不覆盖新页面（§8.2） | 通过（无界面 Chrome `/dev/pagecheck`：立即反馈、晚到成功与错误隔离；补齐页面的失败重试、同页刷新、环境及方案校验，编辑器和 Mod 库切换对象时旧虚拟行不可操作） |
-| G23 | 新列表、导入、载入历史版本、先看清单 | 都不弹窗：新列表在右栏、导入是子页、清单就地展开；载入历史版本不确认，`u` 撤回（§3.1 规则 7） | 通过：新列表右栏表单、导入子页（分享码和测试 Steam 合集）、历史版本载入及 `u` 撤回已在 `spikes/guidev` 验证；“先看清单”就地展开（`codex/ui-tables`） |
-| G24 | 每一对分配同一块空间的卡片 | 缝能拖、双击恢复、`tab` 到缝后方向键能调、大小重开后还在（§3.1 规则 10） | 通过（`gui.TestSeparators`；`spikes/guidev/gapcheck.cjs` 在无界面 Chrome 实测 14 条分隔：编辑器、展开的暂存和历史、三页筛选栏、Mod 库、日志、后台任务、全部列表和侧栏；拖动、扩展点击区、40px 按键、双击及 enter 恢复、重开保存、窄窗禁用。日志卡片和空任务使用测试数据，设置由真实 GUI API 保存） |
-| G25 | `TestStyleRules`、`TestWording` | 圆角两档、字号四种且不小于 12px、线都是发丝线、没有左边的强调竖条、界面文字里没有 `·`（§7.3） | 通过：`TestStyleRules` 检查圆角、字号（含 font 简写和变量）、发丝线宽度和强调竖条，违规报告行号和值；`TestWording` 检查中英翻译表、命令面板、Go 界面字面量和 GUI JS 字符串里没有 `·`（CLI 输出保留原格式） |
-| G26 | A→B→C 后退两次、前进一步、另去新页；侧键和 `alt+←/→`；弹层、详情、删除的页面与卸载锁定 | 遵守 §3.1 规则 11；无重复记录、分支截断、跳过失效页、晚到结果不夺回页面、地址不离开 Wails / 开发服务器；导航不执行数据动作 | 部分通过（2026-10-24，无界面 Chrome `/dev/pagecheck`：导航历史、侧键事件拦截与去重、键盘、失效页、弹层、详情、引导结束、卸载锁定、晚到结果隔离；原生 WebView2 实机侧键待验证） |
-| G27 | 订阅与更新：一张列表（等你更新、已经更新）加详情，范围栏，来源摘要行；添加订阅子页；首页及详情的变化链接 | 来源与账户状态只在就地展开的来源行里只读展示；检查和更新排队，更新先预览并在游戏运行时拒绝；范围栏同时过滤两段，藏起来的待更新项写个数；粘贴地址自动认出 Git / LoversLab / 其他网页 / 工坊，只问一个决定并显示 `--dry-run`；首页 / 详情保留范围；全部页无订阅入口 | 自动化覆盖：view fixture / golden、GUI API、`spikes/guidev/pagecheck`；真实 Steam / SteamCMD / LoversLab 与原生窗口待验证 |
+| G1 | Same synthetic environment state | TUI / GUI columns / needs exactly match `view.BuildBoard` / `view.BuildNeeds`; GUI Go mutations use typed view / app calls, `cmds.Execute` only §1 read-only text / user commands (`gui.TestSameViewModels`) | Passed |
+| G2 | Scroll / filter 1354 Mods | Each interaction ≤ 50 ms | Passed |
+| G3 | Each keyboard, mouse, drag, context-menu action | Same result as TUI, every step `u` undoable (`gui.TestVerbsAndUndo`) | Passed |
+| G4 | 1000 random clicks, scrolls, arrows | Database / three columns unchanged (§3.1 rule 1) | Passed |
+| G5 | Repeat `esc` anywhere | At most 3 to base; subscriptions / updates collapse sources then clear single-Mod condition; add subscription clears paste then returns | Existing pages: `spikes/guidev/esccheck.js`; new panels / selection / record conditions: `/dev/pagecheck` |
+| G6 | Workshop description with scripts, `onerror`, `javascript:`, remote images | No execution / loading; literal text, images from local cache | Passed |
+| G7 | Real environment can it run | Same list as TUI, executable button per item | Passed |
+| G8 | TUI / GUI open together, edit in one | Other refreshes on focus without overwriting (`app` concurrency tests) | Passed |
+| G9 | Idle 10 minutes | §10 targets met | Passed |
+| G10 | Double-click `RimArcho.exe` | Direct GUI, no console, scan / analysis subprocesses no windows | Passed |
+| G11 | Every sidebar entry | Only current children expand; breadcrumbs match location, every level clickable | Passed |
+| G12 | Home, two environments / three plans / one pack | Last-played order; row status equals plan can it run error count; launch disabled with explanation while running | Partial: ordering, each plan row, runtime disable passed; two environments untested |
+| G13 | can it run | Left errors / hints / confirmation, right last-run errors, TUI same order one column; hidden / locked Mods and stale textures bottom links only; badge counts actionable items, excludes hints; evidence chips | Passed: GUI `TestNeedsSectionsAndEvidence`; TUI `TestG13NeedsSectionsTUI`, `TestNeedsSectionsLive`, `TestNeedsMergedAndElsewhere`, both icon modes; view `TestCorpusNeeds`, `TestHiddenModsNotCounted`, `TestNeedsElsewhereAndLinks` |
+| G29 | Buttons / finished items (2026-10-29) | All actions bottom buttons, no `⋯`; one button per choice; inline confirmation; vanished completed item retained as ✓ …, newest undoable has undo; last-run / related left items cross-link | Passed: GUI `scripts/vm/needs.test.mjs`, `identity-answers.test.mjs`; view `TestNeedsRelated`, `TestNeedsSortAlso`; native window / real data pending VM |
+| G14 | Create pack with error findings | Build disabled with specific findings; see the list first writes nothing | Passed (`gui.TestBuildPageG14`; browser checked on data copy) |
+| G15 | Guide, two environments, RimSort import | Both checked environments created; import preview then first plan on confirm | Implemented (`guide.js`, §2.15), unverified |
+| G16 | Open Archo anywhere | Right panel, `esc` closes, page state unchanged | Pending (1.1) |
+| G17 | Runtime status, sidebar row removed 2026-10-30 | Launch page running within 3 seconds; new errors update badge without dialog; new log counted automatically on exit (`TestReadNewLogCountsTheRun`) | Passed; pre-removal record: 2026-10-22 development server `-fakegame`, 1.6 seconds after start showed game running since 03:51 and badge 1, absent from top bar; row vanished on exit. TUI status right: `TestLiveGame`, `TestStatusLineAfterGame` |
+| G18 | All lists, four lists, one followed collection changed | Clicking lists opens all lists; ungrouped left; current / make current at row right; version changes expose reset to default / undo; catch up undo returns original in one step; no ModsConfig.xml writes here | Implemented |
+| G19 | Export from all lists and editor | Breadcrumbs library / lists / <list> / export; every format exactly matches `archo loadout export --format`; `esc` returns to origin | Implemented |
+| G21 | Add 2000+ Mod game, switch to it, rapidly change texture options on build / texture pages | Each click responds within 100ms; sidebar / other pages usable during scan / switch / measurement; only conflicting actions disabled; latest value wins (§3.1 rule 9) | Partial: synthetic 2100 Mods allow navigation during scan / first analysis, final rapid-switch state correct; stale measurements cannot overwrite build / texture options, `/dev/pagecheck`; real 2000+ game / native window unverified |
+| G22 | Every sidebar entry | New page skeleton / old content first, fill on arrival; late results cannot overwrite new page (§8.2) | Passed headless Chrome `/dev/pagecheck`: immediate feedback, late success / error isolation, failure retries, same-page refresh, environment / plan checks, old virtual rows inert during editor / library object changes |
+| G23 | New list, import, load history, see list first | No dialogs: right-column new list, import subpage, inline list; history loads without confirmation, `u` undoes (§3.1 rule 7) | Passed in `spikes/guidev`: right form, import subpage (share code / test Steam collection), history / undo; inline list (`codex/ui-tables`) |
+| G24 | Every pair of space-sharing cards | Drag splitter, double-click reset, tab then arrows resize, persists (§3.1 rule 10) | Passed `gui.TestSeparators`; headless `spikes/guidev/gapcheck.cjs` measured 14 splitters: editor, expanded staging / history, three filter bars, library, log, tasks, lists, sidebar; drag, hit area, 40px keys, double-click / Enter reset, restart persistence, narrow disable. Synthetic log / empty tasks, real GUI settings API |
+| G25 | `TestStyleRules`, `TestWording` | Two radii, four font sizes ≥ 12px, hairlines only, no left accent bars, no `·` in UI (§7.3) | Passed: style tests check radii / font shorthand / variables / hairlines / accent bars, report line / value; wording checks Chinese-English tables, command panel, Go UI literals, GUI JS; CLI retains format |
+| G26 | A→B→C, back twice, forward once, new page; side buttons / `alt+←/→`; overlays, details, deleted pages, uninstall lock | §3.1 rule 11: no duplicates, truncate branches, skip invalid pages, late results never reclaim page, address stays Wails / dev server, navigation never mutates data | Partial (2026-10-24 headless Chrome `/dev/pagecheck`): history, side-event interception / deduplication, keys, invalid pages, overlays, details, guide end, uninstall lock, late isolation; native WebView2 physical side buttons unverified |
+| G27 | Subscriptions / updates unified waiting / updated list with details, scope, source summary; add subpage; home / detail changes links | Read-only source / account status in inline sources; queued checks / updates, preview / runtime refusal; scope filters both groups, counts hidden updates; paste recognizes Git / LoversLab / other page / Workshop, one decision and `--dry-run`; home / detail scope preserved; no all-page subscription entry | Automated view fixture / golden, GUI API, `spikes/guidev/pagecheck`; real Steam / SteamCMD / LoversLab / native window unverified |
 
-| G28 | 编辑器和 Mod 库共用筛选，多个版本的 Mod | 查询文本为唯一条件；只有标签 / 来源 / 内容常用组；浮窗、灰字、Tab 补全无数量；副本抽象标识一致；38:31:31 分栏、切换版本和撤销、Space 和暂存 | 自动化：`TestEditorFilterBehavior`、`TestTypedBarConditions`、`TestDirectorySourceIdentityAndCopyFilters`、`TestCopyCaptionsAcrossPages`；正式 GUI 开发服务器 + 隔离测试游戏验证点击、补全、失焦收起、切换 / 撤销、Space 和暂存；原生 WebView2 待验证 |
-| G30 | 编辑器的排序规则：只看当前列表 / 全部，`r` 加、编辑、删除和撤销 | 在历史上面；默认只列涉及当前列表启用 Mod 的规则，切到全部列出所有规则，段头数字跟着变；`r` 就地打开表单，候选不含自己；编辑后 `r:<n>` 不变；删除后撤销用原编号放回；表单里的键不落到列表上；改动后顺序问题和角标更新 | 自动化：`TestRulesFold`（含 `InList`）、`TestRulesIgnoreRow`、`TestRuleCandidates`、`TestRuleEditCommand`；guidev 合成夹具上点击和按键走过切换、加、改、删、撤销；原生 WebView2 待验证 |
-| G31 | Mod 库 › 搜索文件 | `enter` 搜索，新的一次作废旧的，`esc` / 离开页面停止；按 Mod → 文件 → 行分页；路径点击复制；C# 代码只搜点名的 Mod | 自动化：`TestFileSearchAPI`；guidev 合成夹具；C# 代码要 ilspycmd，合成夹具上未测 |
+| G28 | Shared editor / library filters, multiple Mod versions | Query text sole condition; only common tags / source / content groups; popup / ghost text / Tab completion without counts; consistent copy abstractions; 38:31:31 columns, swap / undo, Space / staging | Automated `TestEditorFilterBehavior`, `TestTypedBarConditions`, `TestDirectorySourceIdentityAndCopyFilters`, `TestCopyCaptionsAcrossPages`; production GUI dev server + isolated game: clicks, completion, blur collapse, swap / undo, Space / staging; native WebView2 unverified |
+| G30 | Editor rules, current / all, `r` add, edit, delete, undo | Above history; default enabled-list Mods only; all scope includes all, counts update; inline `r` form excludes self; edit retains `r:<n>`; undo restores deleted number; form keys cannot affect list; order findings / badge refresh | Automated `TestRulesFold` incl. `InList`, `TestRulesIgnoreRow`, `TestRuleCandidates`, `TestRuleEditCommand`; guidev synthetic clicks / keys cover scope, add, edit, delete, undo; native WebView2 unverified |
+| G31 | Mod library > search files | Enter searches, new invalidates old, esc / leave stops; Mod → file → line pagination; click path copies; C# only named Mods | Automated `TestFileSearchAPI`, guidev synthetic fixtures; C# needs ilspycmd, not tested on fixtures |
 
-### 历史区与设置页
+### History area and settings
 
-| # | 场景 | 期望 | 状态 |
+| # | Scenario | Expected | Status |
 | --- | --- | --- | --- |
-| P1 | 设置页改语言 | 立即生效，重开仍有效 | 待验证 |
-| P2 | 清除缩略图缓存 | 大小归零，缩略图按需重建（`TestSettingsCommands`） | 通过 |
-| P3 | `db backup` | 生成可打开的副本，原库不受影响（`TestSettingsCommands`） | 通过 |
-| P4 | 从设置页提交一条不在允许列表里的命令 | 拒绝，不执行；带确认的项先确认 | 待验证 |
+| P1 | Change language in settings | Immediate, persists restart | Unverified |
+| P2 | Clear thumbnails | Zero size, rebuilt on demand (`TestSettingsCommands`) | Passed |
+| P3 | `db backup` | Openable copy, original unaffected (`TestSettingsCommands`) | Passed |
+| P4 | Settings submits disallowed command | Refused, not executed; confirmation where required | Unverified |
 
-### 图标
+### Icons
 
-| # | 场景 | 期望 | 状态 |
+| # | Scenario | Expected | Status |
 | --- | --- | --- | --- |
-| G18 | 发布包里的两个 exe | 资源管理器中显示头像图标，属性页显示版本号与描述 | 待验证 |
-| G19 | 窗口 | 任务栏和 Alt+Tab 显示窗口图标；`go build` 的开发构建（无 `.syso`）也有图标；Windows 窗口交互见 §8.2 | 待验证 |
-| G20 | 16 px 图标 | 只显示头部（头发和脸），能认出 | 待验证 |
+| G18 | Both release executables | Portrait in Explorer, version / description in properties | Unverified |
+| G19 | Window | Taskbar / Alt+Tab icons; `go build` without `.syso` also has icon; Windows interaction §8.2 | Unverified |
+| G20 | 16 px icon | Recognizable head only, hair and face | Unverified |

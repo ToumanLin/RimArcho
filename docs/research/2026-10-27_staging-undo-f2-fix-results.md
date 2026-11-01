@@ -1,58 +1,58 @@
-# 暂存撤销 F2：修复与宿主实测
+# Staging undo F2: fix and host measurements
 
-2026-10-27。基于 `dev/0.9.0` 的 `3d19db0`，工作区 `.claude/worktrees/stage-undo`，分支 `codex/stage-undo`。以下是 Windows 宿主实测，不是 VM 测量。运行方式沿用 [Phase 1a runbook](../../scripts/vm/phase1a.md)。
+2026-10-27. Based on `3d19db0` from `dev/0.9.0`, workspace `.claude/worktrees/stage-undo`, branch `codex/stage-undo`. These are Windows host measurements, not VM measurements. Runs follow the [Phase 1a runbook](../../scripts/vm/phase1a.md).
 
-## 根因和修复
+## Root cause and fix
 
-原来的 `App.Stage` / `Restore` 先编辑 entries，再单独写 `stage:<plan>`；`Unstage` 只写 meta，撤销栈只保存 entries。`Staged()` 把已启用项从返回值中过滤，却仍在 DB 留着它。因此 `stage add → undo → disable → stage list` 会重新显示旧暂存项。
+Previously, `App.Stage` / `Restore` edited entries first, then separately wrote `stage:<plan>`; `Unstage` wrote only meta, while the undo stack saved only entries. `Staged()` filtered enabled entries from its return value but left them in the DB. Thus `stage add → undo → disable → stage list` made old staged entries reappear.
 
-`workspace_undo.staging` 保存每步编辑前的完整暂存 JSON，包括条目、顺序、位置和锚点。SQL NULL 表示旧历史没有快照，空字符串表示没有暂存 meta；JSON `null` 和 `[]` 保持各自原样。编辑及 undo/redo 将 entries、暂存和两个历史栈在同一个 SQLite 事务中提交；元数据写失败时全部回滚，缓存也不发布失败的 workspace。
+`workspace_undo.staging` saves the complete pre-edit staging JSON for each step, including entries, order, positions, and anchors. SQL NULL means old history lacks a snapshot; an empty string means no staging meta; JSON `null` and `[]` retain their respective forms. Edits and undo/redo commit entries, staging, and both history stacks in one SQLite transaction. Metadata-write failure rolls everything back, and the cache does not publish the failed workspace.
 
-所有普通列表编辑都会记录暂存，并持久清除重新启用的暂存项。覆盖 add/drop/restore、GUI/API 的 Toggle/Stage/Place、批量选择的 Commit/Revert、历史 checkout、替换/合并导入、外部 ModsConfig 载入、Monitor 编辑。普通 disable 没有自动移入暂存的路径。GUI 从暂存放置现在直接使用共享 Enable 的完整事务，不再随后单独 Unstage。credit 引用检查、副本交接和链接身份合并也包括历史暂存项及锚点。
+All ordinary list edits record staging and persistently remove staged entries that are enabled again. Coverage includes add/drop/restore, GUI/API Toggle/Stage/Place, batch-selection Commit/Revert, history checkout, replace/merge imports, external ModsConfig loading, and Monitor edits. Ordinary disable has no path that automatically stages an entry. Placing from staging in the GUI now directly uses the full shared Enable transaction, without a separate subsequent Unstage. Credit-reference checks, copy handoff, and link identity merges also include historical staged entries and anchors.
 
-旧历史只还原 entries，保留无关暂存项，并清除当前或目标 entries 中已启用的隐藏暂存项；反向步骤保存完整快照。它不会推测旧历史没有记录的位置和锚点。
+Old history restores entries only, preserving unrelated staged entries and removing hidden staged entries enabled in current or target entries; the reverse step saves a complete snapshot. It does not infer positions or anchors absent from old history.
 
-规格更新：[04 §1.2、§2.1–2.2](../specs/04-plans-and-sorting.md) 规定 entries 与暂存共同进入撤销栈，stage drop 和仅暂存未启用项也各记一步，并定义旧历史兼容；[06 §2.5](../specs/06-ui/2.5-plans-and-packs.md) 同步 GUI 契约。
+Specification updates: [04 §1.2, §2.1–2.2](../specs/04-plans-and-sorting.md) require entries and staging to enter the undo stack together, give stage drop and staging-only edits of disabled entries their own steps, and define old-history compatibility; [06 §2.5](../specs/06-ui/2.5-plans-and-packs.md) updates the GUI contract.
 
-## 提交
+## Commits
 
-| 提交 | 内容 |
+| Commit | Content |
 | --- | --- |
-| `273e297` | 根因修复、schema 迁移、共享编辑路径、规格及 app/store/GUI API 回归测试 |
-| `5baaa15` | 场景4增加 redo 和精确 ghost repro；CLI golden 增加仅暂存编辑的历史步 |
-| `29d4ce4` | 全量测试暴露的无关测试竞态：fake HTTP 请求计数改用 atomic；定向连续20轮通过 |
-| `97bc79b` | 只读观察器兼容旧 schema，不为观测而迁移 baseline |
-| `0d29395` | 真实窗口发现的 WAL 事务升级问题；读取快照前先取得写锁，并加双连接争用测试 |
+| `273e297` | Root-cause fix, schema migration, shared edit paths, specifications, and app/store/GUI API regression tests |
+| `5baaa15` | Scenario 4 adds redo and exact ghost repro; CLI golden adds history steps for staging-only edits |
+| `29d4ce4` | Unrelated test race exposed by full tests: fake HTTP request counter made atomic; 20 consecutive targeted rounds passed |
+| `97bc79b` | Read-only observer supports old schemas without migrating the baseline for observation |
+| `0d29395` | WAL transaction-upgrade issue found in a real window; acquire write lock before reading snapshots, plus two-connection contention test |
 
-最终矩阵使用 `0d29395` 的干净工作区；四个工具均重建在 `D:/stage-undo-tools`。每个 result.json 保存实际工具哈希。
+The final matrix used a clean workspace at `0d29395`; all four tools were rebuilt in `D:/stage-undo-tools`. Each result.json saves actual tool hashes.
 
-## 场景4结果
+## Scenario 4 results
 
-最终轮次的所有功能断言通过，包括 stage undo/redo 的 entries＋暂存完整 payload，以及 undo 后普通 disable 不复现暂存项。W 输入来自真实 Wails 窗口的 CDP；真实内容从 `D:/vm-phase1a-real-baseline` 用 `sqlite3 -readonly .backup` 创建新的外部测试 home。没有打开真实 APPDATA home，没有提交 DB、截图或 profile。
+All functional assertions passed in the final rounds, including complete entries + staging payloads for stage undo/redo, and no staged-entry reappearance after undo followed by ordinary disable. W input came from CDP on a real Wails window; real content was copied from `D:/vm-phase1a-real-baseline` into a new external test home using `sqlite3 -readonly .backup`. The real APPDATA home was not opened; no DB, screenshots, or profiles were committed.
 
-| 内容 / 驱动 | 功能断言 | 冷 ready / 预算 | 场景耗时 | 结果目录 |
+| Content / driver | Functional assertions | Cold ready / budget | Scenario time | Result directory |
 | --- | --- | --- | --- | --- |
-| fixture C | 10/10 | 不适用 | 1.736s | `D:/stage-undo-results/s4-C-NA2SQb` |
+| fixture C | 10/10 | Not applicable | 1.736s | `D:/stage-undo-results/s4-C-NA2SQb` |
 | fixture A | 13/13 | 0.693s / 2s | 0.909s | `D:/stage-undo-results/s4-A-XyHS78` |
-| fixture W | 283/283 | **2.295s / 2s，超预算** | 19.431s | `D:/stage-undo-results/s4-W-loRQP5` |
-| 真实副本 W | 269/269 | **5.791s / 5s，超预算** | 84.025s | `D:/stage-undo-results/s4-W-QsaRm2` |
+| fixture W | 283/283 | **2.295s / 2s, over budget** | 19.431s | `D:/stage-undo-results/s4-W-loRQP5` |
+| Real copy W | 269/269 | **5.791s / 5s, over budget** | 84.025s | `D:/stage-undo-results/s4-W-QsaRm2` |
 
-C/A 的13个共享检查点完全相同，包括完整历史暂存 payload。W 的独立 oracle 全部通过；W 额外操作取消确认、启用和移动，因此不将其全部历史栈与 C/A 强行视为相同。
+The 13 shared C/A checkpoints were identical, including full historical staging payloads. All independent W oracles passed; W also cancels confirmations, enables, and moves entries, so its entire history stack is not forced to match C/A.
 
-最终 W 轮次没有 console/script error、页面空白、侧栏丢失或数据库锁错误。真实副本的删除确认就绪为152–160ms（预算200ms），取消反馈55–70ms（预算200ms），sort-to-settled 1.368s（预算5s），最终新鲜问题计数等待454ms（预算120s），热 ListProblems 30–34ms（预算100ms）。没有因排序本来已正确而声称覆盖了该轮不存在的排序改动。
+The final W rounds had no console/script errors, blank pages, missing sidebar, or database-lock errors. On the real copy, delete confirmation became ready in 152–160ms (budget 200ms), cancel feedback took 55–70ms (budget 200ms), sort-to-settled 1.368s (budget 5s), final fresh problem-count wait 454ms (budget 120s), and warm ListProblems 30–34ms (budget 100ms). Because sorting was already correct, no coverage was claimed for sorting changes absent from that round.
 
-两个最终 W 结果的 `functionalStatus` 是 passed，整体 `status` 仍是 failed，唯一剩余失败为冷 ready 超预算。真实库冷启动超5s在 Phase 1a 已存在；本次5.791s与旧报告的5.17–5.50s不是受控性能对照，不能据单轮声称性能不退化。fixture 的本次样本为2.448s、1.828s、2.295s，存在跨越2s门槛的波动；没有抬高预算，也没有只保留通过轮次。以上均为单轮观测，不报告 P95。
+Both final W results have `functionalStatus` passed but overall `status` failed; the sole remaining failure is cold ready exceeding budget. Real-library cold startup already exceeded 5s in Phase 1a. This round's 5.791s and the previous report's 5.17–5.50s are not a controlled performance comparison; one run cannot establish no regression. Fixture samples were 2.448s, 1.828s, and 2.295s, fluctuating across the 2s threshold. The budget was not raised, and failed rounds were retained. These are single-round observations; no P95 is reported.
 
-## 实测发现与保留的失败证据
+## Findings and retained failure evidence
 
-- F2 原始复现：`archo stage add <enabled-ref>` → `archo undo` → `archo disable <same-ref>` → `archo stage list`。已修复；另有多批暂存、位置/锚点、drop/restore、仅暂存编辑、checkout/import、旧历史、批量选择、API 放置及失败回滚测试。
-- 本次事务改造曾引入 WAL 升级失败：真实库后台分析运行时按 `2 Home Down t` 暂存，状态行报 `database is locked (5) (SQLITE_BUSY)`，操作没有提交。证据 `D:/stage-undo-results/s4-W-4VRju9`，三项功能断言失败。SQLite 延迟事务先读 staging，再写入；后台连接在其间提交后，读事务不能升级。`0d29395` 在读前预留写锁，利用现有 busy timeout 等待；没有用重试、延迟输入或跳过断言处理。最终真实 W 轮次无此错误。
-- 观察器首次读取旧 schema 时曾因不存在 staging 列而在应用启动前失败：`D:/stage-undo-results/s4-W-PhgyWO`。`97bc79b` 已修复，并验证旧 DB 观测不修改字节。
-- 早期 fixture W：`D:/stage-undo-results/s4-W-LYC5GN` 功能通过，冷启动2.448s超预算；`D:/stage-undo-results/s4-W-XJnCXz` 功能和预算均通过，冷启动1.828s。两者在写锁修复前，最终验收使用上表的重建工具轮次。
+- Original F2 repro: `archo stage add <enabled-ref>` → `archo undo` → `archo disable <same-ref>` → `archo stage list`. Fixed; additional tests cover multiple staging batches, positions/anchors, drop/restore, staging-only edits, checkout/import, old history, batch selection, API placement, and failure rollback.
+- This transaction change initially introduced WAL upgrade failure: with real-library background analysis running, staging via `2 Home Down t` showed `database is locked (5) (SQLITE_BUSY)` in the status line and did not commit. Evidence: `D:/stage-undo-results/s4-W-4VRju9`, three failed functional assertions. The deferred SQLite transaction read staging before writing; a background connection committed in between, preventing the read transaction from upgrading. `0d29395` reserves a write lock before reading and waits through the existing busy timeout; no retries, delayed input, or skipped assertions were used. The final real W round had no such error.
+- The observer initially failed before application startup on old schemas without a staging column: `D:/stage-undo-results/s4-W-PhgyWO`. Fixed in `97bc79b`, with verification that observing an old DB leaves its bytes unchanged.
+- Early fixture W: `D:/stage-undo-results/s4-W-LYC5GN` passed functionality but exceeded the cold-start budget at 2.448s; `D:/stage-undo-results/s4-W-XJnCXz` passed functionality and budget at 1.828s. Both predate the write-lock fix; final acceptance uses the rebuilt-tool rounds above.
 
-## 复跑
+## Rerunning
 
-从此 worktree 根目录运行。所有工具、home 和证据保持在仓库外。
+Run from this worktree root. Keep all tools, homes, and evidence outside the repository.
 
 ```powershell
 New-Item -ItemType Directory -Force D:/stage-undo-tools | Out-Null
@@ -69,4 +69,4 @@ go test ./...
 node --test scripts/vm/cdp.test.mjs scripts/vm/navigation.test.mjs scripts/vm/lists.test.mjs
 ```
 
-`go test ./...` 最终全量通过（app 123.598s、store 5.123s、GUI 24.071s），Node 的7项测试通过。Go 输出记录在 `D:/stage-undo-results/go-test-final.txt`；Node 输出在 `D:/stage-undo-results/node-test-final.txt`。原 navigation.js 的“没有 pending open 时点击当前方案跳过”逻辑未修改。
+Final full `go test ./...` passed (app 123.598s, store 5.123s, GUI 24.071s); all 7 Node tests passed. Go output: `D:/stage-undo-results/go-test-final.txt`; Node output: `D:/stage-undo-results/node-test-final.txt`. The original navigation.js logic to skip clicking the current plan when no open is pending was unchanged.

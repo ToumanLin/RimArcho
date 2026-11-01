@@ -1,652 +1,652 @@
-# 03 · 事实与分析
+# 03 · Facts and Analysis
 
-> 状态：已实现（声明层、Def 层、Patch 层、Harmony 层、日志归因、实时追踪）、日志按启动记录归属（§6.4）、按方案缓存多份分析（§3）。
-> 依据：00、00a、02、04、07 §6、07 §7、08 §4
+> Status: implemented (declaration, `Def`, Patch, Harmony layers, log attribution, live tracking), log ownership by launch records (§6.4), multiple cached analyses per plan (§3).
+> Basis: 00, 00a, 02, 04, 07 §6, 07 §7, 08 §4
 
-本文讲 RimArcho 怎样从 Mod 文件和游戏日志里得到“事实”，再从事实得出“问题”（Finding）。身份与扫描见 02，方案与排序见 04，命令与 MCP 工具见 05，界面怎么呈现见 06（“能不能跑”页的写法在 06 §5）。性能目标和实测数字在 07 §6，本文只引用。
+This document explains how RimArcho collects facts from Mod files/game logs and derives findings. Identity/scanning: 02; plans/sorting: 04; commands/MCP tools: 05; interface presentation: 06 (can it run page wording in 06 §5). Performance targets/measurements live in 07 §6 and are only referenced here.
 
-“被分析的方案”：分析总是针对一个方案（04 §1）的启用列表和顺序进行。界面上是当前打开的方案；CLI 和 MCP 默认是该环境当前的方案。
+"Analyzed plan": analysis always uses one plan's (04 §1) enabled list and order. In the interface, the open plan; CLI/MCP default to the environment's current plan.
 
-## 1. 生效内容
+## 1. Effective Content
 
-游戏实际加载的不是 Mod 目录里的全部文件。所有内容层分析（Def、Patch、程序集、日志里的引用查找）都只看“生效内容”。语义照游戏的 `ModContentPack.InitLoadFolders` 和 `DirectXmlLoader.XmlAssetsInModFolder`（07 §7）。
+The game does not load every file in a Mod directory. All content analysis (`Def`, Patch, assemblies, log reference lookup) uses only effective content, following `ModContentPack.InitLoadFolders` and `DirectXmlLoader.XmlAssetsInModFolder` (07 §7).
 
-**版本目录选择**。给定游戏主次版本 `V`（如 `1.6`）：
+**Version directory selection**. Given game major/minor `V` (e.g. `1.6`):
 
-- **有 `LoadFolders.xml`**：先找与 `V` 完全相同的版本标签；没有就取不高于 `V` 的最高标签；再没有就取 `<default>`；仍没有就取最低的标签。选中标签下：
-  - 无条件的 `<li>` 一律生效；
-  - 带 `IfModActive`、`IfModNotActive`、`IfModActiveAll` 的 `<li>` 按被分析的方案求值；旧式 `IfDLCActive` / `IfDLCNotActive` 当作 `IfModActive` / `IfModNotActive` 处理。条件里的 packageId 去掉 `_steam` 后缀再比较。
-- **没有 `LoadFolders.xml`**：版本目录（完全相同；否则不高于 `V` 的最高；否则最低）、`Common`、根目录，优先级依次递减。版本目录名须匹配 `^[vV]?\d+\.\d+$`。同一相对路径的资源只取优先级最高的那份。
-- 版本比较按数字元组：`1.10 > 1.6`。
+- **With `LoadFolders.xml`**: exact `V` tag first; otherwise highest tag not above `V`; otherwise `<default>`; otherwise lowest tag. Within selected tag:
+  - All unconditional `<li>` apply;
+  - Evaluate `IfModActive`, `IfModNotActive`, `IfModActiveAll` against analyzed plan; legacy `IfDLCActive` / `IfDLCNotActive` mean `IfModActive` / `IfModNotActive`. Strip `_steam` from conditional packageIds before comparison.
+- **Without `LoadFolders.xml`**: version directory (exact, otherwise highest not above `V`, otherwise lowest), `Common`, root, in descending priority. Version directory names must match `^[vV]?\d+\.\d+$`. For identical relative resource paths, use only highest-priority copy.
+- Compare numeric tuples: `1.10 > 1.6`.
 
-**编码**。About.xml、LoadFolders.xml 和 Defs/Patches 按 BOM 识别 UTF-16 LE/BE 和 UTF-8 BOM，统一转成 UTF-8 再解析；没有 BOM 但 XML 声明写 `encoding="utf-16"` 时也按 UTF-16 读（`internal/textenc`，scan、xdoc、content 共用）。
+**Encoding**. Detect UTF-16 LE/BE and UTF-8 BOM for About.xml, `LoadFolders.xml`, `Defs`/`Patches`; convert to UTF-8 before parsing. Without BOM but XML `encoding="utf-16"`, also read UTF-16 (`internal/textenc`, shared by scan, xdoc, content).
 
-**条件目录**。每个被加载的条件目录记下它的条件点名的那些包（`Resolved.Requires`）。放在这种目录里的补丁算“有守卫”，那些包就是它的预期目标（§4.4）。
+**`Conditional` directories**. Record named condition packages for each loaded conditional directory (`Resolved.Requires`). `Patches` there are guarded; those packages are expected targets (§4.4).
 
-**缓存键**。条件 `<li>` 让生效内容随方案变化，所以生效内容的缓存键是：
+**Cache key**. `Conditional` `<li>` makes effective content plan-dependent, so its key is:
 
-`快照哈希 | 生效目录的有序列表哈希 | 分析器版本`
+`snapshot hash | hash of ordered effective directory list | analyzer version`
 
-目录按加载优先级保留顺序和重复项，路径先清理并统一分隔符（`content.FolderKey`）；顺序改变可能改变同名资源的覆盖结果。游戏版本和条件求值已经体现在目录选择里，相同目录不再因版本或条件文本不同而多存一份。键不含整个方案；改方案时，只有生效目录改变的 Mod 才失效（测试 `TestLoadFoldersConditions`）。
+Preserve directory priority order and duplicates; clean paths/normalize separators first (`content.FolderKey`); changing order can change same-name resource overrides. Game version and condition evaluation already affect directory selection; identical directories do not need extra sets for different versions/condition text. Key excludes whole plan; plan edits invalidate only `Mods` whose effective directories change (`TestLoadFoldersConditions`).
 
-程序集另用 `analyze.AssemblyKey`：快照哈希、生效 DLL 的相对路径及各 DLL 是否跳过 Harmony 解析、分析器版本。XML 目录不同但实际生效 DLL 和跳过策略相同，DLL 事实仍能共用。
+`Assemblies` use `analyze.AssemblyKey`: snapshot hash, relative effective DLL paths, each DLL's Harmony-skip flag, analyzer version. Different XML directories can share DLL facts if effective DLLs and skip policy match.
 
-## 2. 事实类型
+## 2. Fact Types
 
-| 事实 | 字段 | 来源 |
+| Fact | Fields | Source |
 | --- | --- | --- |
-| `ModDecl` | 依赖（含按版本的依赖）、loadBefore/After、forceLoad*、incompatibleWith、supportedVersions、LoadFolders.xml 原文 | 快照的 `decl_blob`（02 §4.3） |
-| `Def` | 类型（元素名）、`defName`、`Name`、`ParentName`、`Abstract`、文件（相对 Mod 根目录）、行号（起始标签所在行）、所属 Instance、该 Def 自己的 `MayRequire` / `MayRequireAnyOf` | 生效的 `Defs/**/*.xml` |
-| `PatchOp` | 操作类、XPath、子操作结构、`value` 摘要、文件和行号、序号、模拟结果与原因 | 生效的 `Patches/**/*.xml` |
-| `TypeDef` | 程序集、命名空间、类型全名 | 生效 DLL 的 .NET 元数据 |
-| `HarmonyPatch` | 目标类型、目标方法与参数、`MethodType`、补丁类型（prefix / postfix / transpiler / finalizer）、补丁方法、是否可能跳过原方法、是否动态目标 | 同上 |
-| `HarmonyId` | 疑似 Harmony ID 字符串（启发式） | 同上 |
-| `Rule` | 主体、关系、对象、来源（用户 / 社区 / 替代）、作用域 | 04 §6 |
+| `ModDecl` | Dependencies (including versioned), loadBefore/After, forceLoad*, incompatibleWith, `supportedVersions`, original `LoadFolders.xml` | Snapshot `decl_blob` (02 §4.3) |
+| `Def` | Type (element name), `defName`, `Name`, `ParentName`, `Abstract`, file relative to Mod root, line (opening tag), owning Instance, `Def`'s own `MayRequire` / `MayRequireAnyOf` | Effective `Defs/**/*.xml` |
+| `PatchOp` | Operation class, XPath, child-operation structure, value summary, file/line, ordinal, simulation result/reason | Effective `Patches/**/*.xml` |
+| `TypeDef` | Assembly, namespace, full type name | Effective DLL .NET metadata |
+| `HarmonyPatch` | Target type/method/parameters, `MethodType`, patch kind (prefix / postfix / transpiler / finalizer), patch method, possible original-method skip, dynamic target flag | Same as above |
+| `HarmonyId` | Suspected Harmony ID strings (heuristic) | Same as above |
+| `Rule` | Subject, relation, object, source (user / community / replacement), scope | 04 §6 |
 
-- 每条事实通过所属集合关联 Instance、快照和分析器版本（`analyze.Version`）；读取通过 §3 的版本视图取当前 `Store.MM`。分析器版本不同的事实会重建。
-- 带 `MayRequire` 的 Def，游戏只在那些 Mod 启用时才加载；分析照此处理（`DefFact.Loaded`）。
-- `archo def` 按加载顺序列出每个定义处的 `file:line`，最后一个标 `← effective`。
+- Fact sets associate each fact with Instance, snapshot, analyzer version (`analyze.Version`); reads use §3 version views for current `Store.MM`. Rebuild facts when analyzer version differs.
+- Game loads `Defs` with `MayRequire` only when required `Mods` are enabled; analysis follows this (`DefFact.Loaded`).
+- `archo def` lists definitions' `file:line` in load order; last marked `← effective`.
 
-## 3. 执行与存储
+## 3. Execution and Storage
 
-**分层**。声明层（毫秒级，随时现算）→ Def 层 → Patch 层（依赖 Def 层）；Harmony 层独立。上层失败不影响下层结果；Harmony 层的失败只影响它自己的事实。
+**Layers**. Declaration (milliseconds, computed on demand) → `Def` → Patch (depends on `Def`); Harmony independent. Higher-layer failures do not affect lower-layer results; Harmony failure affects only its facts.
 
-**声明层现算**。声明层不进子进程、不入库。它的结果和方案读取一起缓存在进程里，缓存键是 `Store.ChangeKey()`（`PRAGMA data_version` + `total_changes()`）加环境 ID，再加 ModsConfig.xml 的大小和修改时间；界面频繁刷新和详情面板都复用它。
+**On-demand declarations**. No subprocess or persistence. Cache results with plan reads in-process, keyed by `Store.ChangeKey()` (`PRAGMA data_version` + `total_changes()`), environment ID, ModsConfig.xml size/mtime; frequent UI refreshes/details reuse it.
 
-**GUI 列表快照**。编辑器与能不能跑共用内存中的问题快照。列表编辑同步更新声明层，内容层保留上次结果并标记正在更新，后台补齐日志与分析；缓存键、失效条件和事件合同见 [06 §8.7](06-ui/8-gui-technology.md#87-列表问题与-needs-缓存-api)。
+**GUI list snapshots**. Editor and can it run share in-memory finding snapshots. `List` edits synchronously update declarations, retain previous content results marked updating, and complete logs/analysis in background; keys, invalidation, events in [06 §8.7](06-ui/8-gui-technology.md#87-%E5%88%97%E8%A1%A8%E9%97%AE%E9%A2%98%E4%B8%8E-needs-%E7%BC%93%E5%AD%98-api).
 
-**按需**。打开“能不能跑”页、方案编辑器的详情需要问题时，或 CLI / MCP 请求内容层信息时，才检查并重建失效的部分。`problems`、`def`、`patches`、`harmony` 会经子进程重建过期的分析；`mod`、`status`、`why` 只用已存的结果，保持快速（`--no-analyze` 让 `problems` 也不重建）。
+**On demand**. Check/rebuild stale parts only when can it run opens, editor details need findings, or CLI/MCP request content information. problems, def, patches, harmony rebuild stale analysis through subprocesses; mod, status, why stay fast using stored results only (`--no-analyze` also prevents problems rebuilding).
 
-**子进程**。Def、Patch、Harmony 分析在 `archo analyze` 子进程里做：调用方（`App.EnsureAnalysis`）在存储的结果过期时启动 `<exe> analyze --env <名字>`，传下 `RIMARCHO_HOME` 和 `--game-version`。子进程写完事实库就退出，主进程内存不受影响。
+**Subprocess**. `Def`, Patch, Harmony analysis runs in `archo analyze`: caller (`App.EnsureAnalysis`) starts `<exe> analyze --env <name>` when stored results are stale, passing `RIMARCHO_HOME` and `--game-version`. Subprocess writes facts and exits without affecting main-process memory.
 
-- 进度行 `progress: …` 写到 stderr；界面显示在状态栏 / 进度条，CLI 显示文本。
-- 子进程设软上限 `debug.SetMemoryLimit(300 MiB)`（`AnalyzeMemoryLimit`）；目标峰值见 07 §6。
-- 测试注入进程内的运行器（`InProcessAnalyze`）。
-- **等待上限**：各入口的 `App.AnalyzeWait` 默认值见 06 §2.16.1 W01，CLI 不设上限。超时时先返回声明层问题并注明“still computing in the background”，子进程继续跑，下一次调用取结果；这段时间里 `def` / `patches` / `harmony` 用上一份（已过期的）结果。
+- `progress: …` lines go to stderr; UI status/progress bar, CLI text.
+- Soft limit `debug.SetMemoryLimit(300 MiB)` (`AnalyzeMemoryLimit`); peak target in 07 §6.
+- Tests inject in-process runner (`InProcessAnalyze`).
+- **Wait limit**: per-entry default `App.AnalyzeWait` in 06 §2.16.1 W01; CLI unlimited. On timeout return declaration findings with "still computing in the background"; subprocess continues; next call gets results. Meanwhile def / patches / harmony use previous stale results.
 
-**AnalysisKey（新鲜度）**。对分析器版本、游戏主次版本、每个纳入实例的 ID、快照哈希和在方案中的位置做哈希（取前 24 位十六进制）。用户规则和社区规则不进键，因为它们只影响现算的声明层。算键不需要加载声明，很便宜。
+**AnalysisKey (freshness)**. Hash analyzer version, game major/minor, each included Instance ID, snapshot hash, position in plan (first 24 hexadecimal characters). User/community rules excluded because they affect only on-demand declarations. Cheap to compute without loading declarations.
 
-**纳入的实例**。被分析方案的启用列表，加上其他所有活着、可加载、未启用的 Instance；可加载包括游戏已能看到的，和保存时经链接启用的 SteamCMD / 其他文件夹 Mod（2026-10-28 起，此前这些 Mod 未启用时不建 Def 事实，缺失父模板的提供方只能靠逐个读文件补查）。未启用的只抽 Def 事实，用来回答 `target-inactive`（§4.4）和日志里“谁提供了缺失的 Def”。Harmony 层只读启用的实例。
+**Included Instances**. Plan enabled list plus all other live, loadable disabled Instances; loadable includes game-visible `Mods` and SteamCMD / other-folder `Mods` deployable through links on save (since 2026-10-28; previously disabled copies had no `Def` facts and missing-parent providers required per-file fallback reads). Disabled Instances yield only `Def` facts for `target-inactive` (§4.4) and missing-`Def` provider lookup in logs. Harmony reads enabled Instances only.
 
-**`--game-version X.Y`**。`analyze`、`problems`、`def`、`patches`、`harmony`、`why`、`log` 都接受它（格式校验为 `X.Y`，命令结束即恢复），覆盖环境的游戏版本；MCP 对应工具有 `game_version` 参数。用途：游戏是 1.7、列表和日志还是 1.6 的情况。
+**`--game-version X.Y`**. Accepted by analyze, problems, def, patches, harmony, why, log (validate `X.Y`, restore after command), overriding environment version; MCP tools expose `game_version`. Use when game is 1.7 but list/logs remain `1.6`.
 
-**存储**（`store.SaveAnalysis`、`store.saveContent`、`store.PruneFacts`）。
+**Storage** (`store.SaveAnalysis`, `store.saveContent`, `store.PruneFacts`).
 
-- 分析槽位是 `(环境, game_mm, 启用集合指纹)`（`analysis.set_key`），每个槽位保留最新一批。批次、补丁事实、问题仍按环境和版本隔离；顺序变化由 AnalysisKey 判断是否新鲜。启用集合相同的方案共用一个槽位。保存分析时，在该环境的所有游戏版本下，删除已没有方案使用的启用集合槽位。
-- `fact_set(id, instance_id, kind, content_key, files)` 唯一键是 `(Instance, 事实种类, 内容键)`；`kind=def` 存 Def，`kind=dll` 存 Assembly / Type / Harmony / Harmony ID。事实行只带 `set_id`，所属 Instance 由集合确定，Instance ID 格式不变。
-- **集合的文件列表**（v28，`store/setfiles.go`）：`fact_set.files` 是本集合用到的文件（相对 Mod 的路径）的 JSON 数组，按行第一次用到的顺序；`def_fact`、`type_fact`、`harmony_fact`、`harmony_id`、`assembly_fact` 不再存路径，只存下标 `file_ix`（从 0 起）。保存时每个集合建一次列表（`saveContent`、`saveHarmony`），集合写完就不再变，列表随集合删除。读者（`DefsOf`、`DefsNamed`、`HarmonyPatches`、`Assemblies`、`TypeOwners`）读完行后，每个集合读一次列表、把下标换回路径；列表按 `set_id` 缓存在 `Store` 里，数据库一变（`ChangeKey`）就清空，因为删掉的集合的 ID 可能给了新集合；总数超过 65,536 个路径时随机丢掉一半。`CachedDefs`（每次分析读全部未启用 Mod 的 Def）一次读一个集合，列表和集合一起读，不经缓存，免得冲掉别的。迁移和结果等价见 02 §7 的 v28。
-- `content_state` 仍以 `(instance_id, game_mm)` 为主键，`def_set_id` / `dll_set_id` 指向对应集合，保留生效目录和解析摘要。所有事实读取按 `Store.MM` 关联这张版本视图；同一实例在不同环境、不同游戏版本的内容相同就共用集合。未启用实例只建立 Def；已存 DLL 视图只在内容未变时保留，启用后即使生效 DLL 为空也写入空集合，清掉旧 DLL 视图。
-- 集合按 `set_id` 索引；全局名字查询按名字索引，再关联版本视图。`def_fact_named(name, set_id) WHERE name<>''` 保留日志按 `Name` 找父节点的快速路径；Type / Harmony ID 同样先按名字查集合，避免逐 Mod 扫描。DDL 见 `store.schemaV26`，v28 换成 `file_ix` 的五张事实表见 `store.schemaV28`。
-- **按名字查 Def 的顺序**（`Store.DefsNamed`，`def`、日志归因、缺失父模板的补查都用它）：先按 Instance ID，同一 Mod 内按文件顺序。不按表里的行顺序：缓存重建或迁移后行号会变，缺失父模板的首位提供方和日志问题的引用会跟着变（2026-10-29 VM：分析器 7→8 重建后 `log:E6` 的首位提供方和 `p:` 引用都变了）。排序不改变连接顺序：先走名字索引，再关联版本视图（`CROSS JOIN`，同 `TypeOwners`）；普通 `JOIN` 时 SQLite 为了省掉这次排序，会先扫该版本的整个 `content_state`、每行查一次名字索引，慢几十倍，Mod 越多差得越多（07 §6.2；`TestDefsNamedPlanStartsFromName` 检查计划）。
-- **方案限制仍在**：版本视图不是方案视图。同一 `(instance, mm)` 最后分析的目录会替换该版本视图；两个方案对 LoadFolders 条件取值相反且加载不同目录时，切回已有新鲜槽位的方案，`def` 仍可能显示另一个方案的内容。按目录共用集合没有改变这个既有限制。
-- **槽位保留期**：与环境当前游戏主次版本相同的槽位不按时间过期；其他版本在最后一次分析完成后超过 `store.ForeignAnalysisRetention` 时删除，同时删除该批次的补丁和问题。默认时长见 06 §2.16.1 A11。环境游戏版本未知时暂不按时间过期。
-- **版本视图清理**：Instance 已不存在，或能看到它的所有环境中，既没有当前游戏版本为 mm 的环境，也没有 mm 的分析槽位时，删除 `(instance, mm)`。可见性按 02 §7 判断，不访问 Mod 文件；游戏版本未知的可见环境保守保留。共享实例检查所有环境，私有实例只检查所属环境。删除环境和槽位后同样应用此规则。
-- **集合清理**：没有任何 `content_state` 引用的集合立即删除，事实行随外键级联删除。`SaveAnalysis`、`env remove`、`gc` 和链接身份合并在自身事务中清理；独立维护调用 `Store.PruneFacts(now time.Time) error`，可反复调用。清理只修改事实缓存和分析槽位；缩小物理数据库文件由整理执行。
-- **迁移**：v26 从旧内容键的快照和分析器版本及已存目录转换 Def 集合，不重新读 Mod 文件。旧 DLL 缓存没有记录跳过策略，迁移按其快照、分析器版本及全部 DLL 事实的指纹保守共用；下次分析换为正常输入键。无法识别的旧键按版本保留，不猜测共用。没有旧版本视图引用的事实不迁移；事务失败整体回滚。迁移不自动 `VACUUM`。
-- 反编译记录 `source_cache`（§5.4）和日志归因缓存 `log_cache`（§6.5）另见下文。
+- Analysis slot: `(environment, game_mm, enabled-set fingerprint)` (`analysis.set_key`), latest run per slot. Runs, patch facts, findings remain isolated by environment/version; AnalysisKey detects order changes. Plans sharing enabled set share a slot. Saving analysis removes enabled-set slots unused by any plan across all this environment's game versions.
+- `fact_set(id, instance_id, kind, content_key, files)` unique key `(Instance, fact kind, content key)`; `kind=def` stores `Defs`, `kind=dll` stores Assembly / Type / Harmony / Harmony ID. Fact rows carry only `set_id`; set determines Instance, whose ID format is unchanged.
+- **Set file lists** (v28, `store/setfiles.go`): `fact_set.files` is a JSON array of used Mod-relative paths, in first-use row order; `def_fact`, `type_fact`, `harmony_fact`, `harmony_id`, `assembly_fact` store zero-based `file_ix` instead of paths. Build list once per set on save (`saveContent`, `saveHarmony`); immutable after set write, deleted with set. Readers (`DefsOf`, `DefsNamed`, `HarmonyPatches`, `Assemblies`, `TypeOwners`) read list once per set after rows, mapping indexes to paths; `Store` caches by `set_id`, clearing on `ChangeKey` because deleted IDs may be reused; randomly discard half above 65,536 paths. `CachedDefs` (all disabled Mod `Defs` per analysis) reads one set/list together, bypassing cache to avoid evicting others. Migration/result equivalence: 02 §7 v28.
+- `content_state` retains `(instance_id, game_mm)` primary key; `def_set_id` / `dll_set_id` point to sets, retaining effective directories/parse summaries. Every fact read joins this version view by `Store.MM`; identical content for same Instance across environments/game versions shares sets. Disabled Instances build `Def` only; retain stored DLL view only if content unchanged; enabling writes an empty set even with no effective DLL to clear old views.
+- Index sets by `set_id`; global name queries start at name index then join version view. `def_fact_named(name, set_id) WHERE name<>''` preserves fast parent `Name` log lookup; Type / Harmony ID also look up sets by name before per-Mod scans. DDL: `store.schemaV26`; five `file_ix` fact tables: `store.schemaV28`.
+- **`Def` lookup order by name** (`Store.DefsNamed`, used by def, log attribution, missing-parent fallback): Instance ID first, file order within Mod. Not table row order: cache rebuild/migration changes rows, changing first missing-parent provider and log finding references (2026-10-29 VM: analyzer 7→8 rebuild changed `log:E6` first provider and `p:`). Sorting does not change join order: name index first, then version view (`CROSS JOIN`, like `TypeOwners`); ordinary `JOIN` lets SQLite avoid sort by scanning whole version `content_state` and querying name index per row, dozens of times slower, worsening with Mod count (07 §6.2; `TestDefsNamedPlanStartsFromName` checks plan).
+- **Plan limitation remains**: version views are not plan views. Last analyzed directories for `(instance, mm)` replace its view; if two plans select opposite LoadFolders conditions/different folders, returning to a plan with a fresh slot may still show the other's content in def. Directory-based shared sets do not change this existing limitation.
+- **Slot retention**: slots matching environment's current major/minor do not expire by age; others expire after `store.ForeignAnalysisRetention` since last completed analysis, deleting run patches/findings too. Default in 06 §2.16.1 A11. Unknown game version suspends age expiry.
+- **Version view cleanup**: delete `(instance, mm)` if Instance no longer exists, or no visible environment currently uses mm or has an mm analysis slot. Visibility per 02 §7, no Mod file access; conservatively retain for visible environments with unknown version. Shared Instances check all environments, private ones only owner. Same rule after environment/slot deletion.
+- **Set cleanup**: immediately delete sets without `content_state` references; cascade fact rows. `SaveAnalysis`, `env remove`, gc, link identity merges clean within their transactions; independent `Store.PruneFacts(now time.Time) error` is repeatable. Cleanup changes only fact cache/analysis slots; maintenance shrinks physical database.
+- **Migration**: v26 converts old content-key snapshot/analyzer versions and stored directories into `Def` sets, without rereading Mod files. Old DLL cache lacked skip policy; conservatively share by snapshot, analyzer version, fingerprint of all DLL facts; next analysis replaces with normal input key. Retain unrecognized old keys per version, without guessing sharing. Do not migrate facts without old version-view references; transaction failure rolls back all. No automatic `VACUUM`.
+- Decompilation `source_cache` (§5.4) and log attribution `log_cache` (§6.5) below.
 
-## 4. 问题
+## 4. Findings
 
-### 4.1 结构
+### 4.1 Structure
 
-| 字段 | 说明 |
+| Field | Description |
 | --- | --- |
-| `code` | 问题代码，见 §4.3 |
-| `severity` | `error` / `warning` / `info` |
-| `subjects` | 涉及的实体引用，第一个是主体（Instance、`pkg:<id>` 或 `log:E<n>`） |
-| `claim` | 一句话结论 |
-| `evidence` | 证据列表：每条是“引用 + 说明 + 来源类型”。来源类型：`declared`（Mod 自己声明）/ `inferred`（推断）/ `log`（日志）/ `community`（社区数据）/ `user`（玩家规则） |
-| `confidence` | `certain` / `likely` / `possible` |
-| `suggestions` | 可执行的命令，如 `archo enable #b21c`。不是 archo 命令的建议以前缀标明：`subscribe: <工坊链接>`、`steam://url/CommunityFilePage/<id>`，界面显示为链接 |
-| `key` | 同一 code 下跨批次识别这条问题的键（用于引用和忽略） |
-| `layer` | `decl` / `def` / `patch` / `harmony` / `log` |
+| `code` | Finding code, §4.3 |
+| `severity` | error / warning / info |
+| `subjects` | Entity references; first is main subject (Instance, `pkg:<id>`, or `log:E<n>`) |
+| `claim` | One-sentence conclusion |
+| `evidence` | `List` of "reference + explanation + source type": declared (Mod declaration) / inferred / log / community / user (player rule) |
+| `confidence` | certain / likely / possible |
+| `suggestions` | Executable commands such as `archo enable #b21c`. `Prefix` non-archo suggestions: `subscribe: <Workshop-link>`, `steam://url/CommunityFilePage/<id>`, displayed as links |
+| `key` | Identifies finding across runs within code (references/ignores) |
+| `layer` | decl / def / patch / harmony / log |
 
-界面上的“凭据 chip”就是证据来源类型（06 §5）。
+UI evidence chips are evidence source types (06 §5).
 
-**原则：不把出现位置当原因。** 例如堆栈里出现了某个 Mod 的补丁，只能记为“相关”（`patcher`），不能记为“原因”，除非还有它自己的帧或文件作证据（§6.3）。
+**Principle: appearance is not causation.** A Mod patch appearing in a stack is only related (patcher), not a cause without its own frames/files as evidence (§6.3).
 
-### 4.2 忽略与引用
+### 4.2 Ignores and References
 
-- **问题引用** `p:<6 位十六进制>` = sha1(`code | key | 主体的 Lineage`) 的前 3 字节。跨批次稳定。日志问题的 key 把绝对路径截到最后三段并转小写，所以 Mod 库挪了位置、或在测试里，引用和忽略照样有效。
-- **忽略**按 `(Lineage, code, key)` 记录，挂在 Lineage 上，按环境存放，并记下忽略时主体的快照。主体快照变了（Mod 更新，可在 Mod 库 › 变化看到），忽略自动失效，问题重新出现并标 `[ignore expired: the mod changed]`。
-- 命令：`problems ignore|unignore <p:ref>`、`problems --ignored`、`problems show <p:ref>`；默认列表末尾有 `ignored: N (archo problems --ignored)`。界面按键见 06。
+- **Finding reference** `p:<6-hex-digits>` = first 3 bytes of sha1(`code | key | subject Lineage`), stable across runs. Log keys lowercase absolute paths reduced to final three segments, preserving references/ignores after Mod library moves or in tests.
+- **Ignore** records `(Lineage, code, key)` on Lineage per environment, with subject snapshot at ignore time. Snapshot changes (Mod update, visible in mod library › changes) expire ignore; finding returns with `[ignore expired: the mod changed]`.
+- Commands: `problems ignore|unignore <p:ref>`, `problems --ignored`, `problems show <p:ref>`; default list ends with `ignored: N (archo problems --ignored)`. UI keys: 06.
 
-**版本提醒的忽略与恢复**独立于上述快照忽略（`app.SetVersionMute`、`store.VersionMutes`）。键为规范化 packageId（去首尾空白、转小写、去游戏的 `_steam` 后缀）和游戏主次版本；所有方案、环境与同包名副本共用，Mod 更新、快照变化和 Lineage 合并 / 拆分不清除，到另一个主次版本重新提醒。包名本身变了视为另一个 Mod。schema v23 新增 `version_mute(package_id, game_mm)`，联合主键；不绑定环境、快照或 Instance，迁移不改变旧的 `finding_ignore`。
+**Mute/restore version reminders** is independent of snapshot ignores (`app.SetVersionMute`, `store.VersionMutes`). Key: normalized `packageId` (trim, lowercase, strip game's `_steam`) + game major/minor; shared by all plans/environments/same-package copies, surviving Mod updates, snapshot changes, Lineage merges/splits; another major/minor reminds again. Changed package ID means another Mod. Schema v23 adds `version_mute(package_id, game_mm)` composite primary key, not environment/snapshot/Instance-bound; migration leaves old `finding_ignore` unchanged.
 
-- `ProblemSet.Muted` 保留当前方案已忽略的 `version.unsupported`，不放进 `List`；`All()` 和单条详情仍能查看。默认 CLI / MCP 及汇总项报告已忽略数（CLI 字段 `ignored-version-warnings`）；`--all`、主体或代码筛选也不自动显示它们，显式 `--include-muted` / `include_muted=true` 才带着标记显示。命令与工具见 05 §4.2、§5.2。
-- 问题数、Mod 行图标、启动前的问题提示、整合包编译的 `Mismatch` 警告排除它们；方案各游戏版本的未声明数量也排除，并另记已忽略数（04 §1.6）。声明事实、允许版本的交集 / 默认值、整合包的版本交集、包与游戏的主次版本限制、文件完整性检查不受影响。
-- 忽略单个 Mod 可直接恢复，不要求确认；汇总项和清单分组批量忽略先确认。界面入口与单个 Mod 文案见 06 §5。
+- `ProblemSet.Muted` retains muted current-plan `version.unsupported` outside `List`; `All()`/individual details still expose them. Default CLI/MCP/summaries report muted count (CLI `ignored-version-warnings`); `--all`, subject/code filters do not automatically show them; explicit `--include-muted` / `include_muted=true` includes marked items. Commands/tools: 05 §4.2, §5.2.
+- Exclude them from finding counts, Mod row icons, pre-launch prompts, pack build `Mismatch` warnings; allowed-version undeclared counts also exclude them, recording muted count separately (04 §`1.6`). Declaration facts, allowed-version intersection/default, pack version intersection, pack/game major/minor restrictions, file integrity checks are unaffected.
+- Restore individual Mod mute directly without confirmation; batch mute of summaries/manifest groups requires confirmation. UI entry points/individual wording: 06 §5.
 
-### 4.3 问题目录
+### 4.3 Finding Catalog
 
-**声明层**（现算）
+**Declaration layer** (computed on demand)
 
-链接问题每次从 `InspectGameLinks` 现查，独立于声明/Def/Patch 缓存；不因目标位于玩家目录而判外来。现查的是磁盘：各 `Mods/` 第一层和每条链接的目标；Instance 的名字和登记的真实路径随 Mod 索引按 `Store.IndexKey` 缓存（07 §8.3）。链接目标先和 Instance 扫描时登记的真实路径比对，并在磁盘上确认该 Instance 现在仍解析到同一处；对不上时才逐个重新解析所有 Instance 的路径。
+Link findings query `InspectGameLinks` each time, independent of declaration/`Def`/Patch caches; player-directory targets are not inherently foreign. Inspect disk: first level of each `Mods/` and link targets; Instance names/registered real paths are cached with Mod index using `Store.IndexKey` (07 §8.3). Compare link target with scanned Instance real path and confirm Instance still resolves there; only on mismatch re-resolve every Instance path.
 
-| code | 严重度 | 判定与建议 |
+| `code` | Severity | Detection and suggestions |
 | --- | --- | --- |
-| `entry.missing` | warning | 方案里的条目对不上任何已安装的 Mod（条目仍保留在 ModsConfig.xml 里）。主体 `pkg:<id>`。建议 `archo find <id>`、`archo disable pkg:<id>`；社区数据知道工坊条目时加 `subscribe: <链接>` |
-| `mods.link-dangling` | error | 已知游戏 `Mods/` 第一层的自有前缀链接，目标明确缺失且来源可访问；主体为 `path:<完整路径>`，附 `game:<游戏路径>`，不要求 Instance。所选游戏启动及测试运行被拦截；其他游戏只汇总。修复见 08 §3 |
-| `mods.link-foreign` | warning | 链接目标与已知 Instance/包身份不符，或无法对应；列原始目标和归属凭据。有效 env 链接保留，前缀本身不授权删除 |
-| `mods.link-check-failed` | error | 拒绝访问、离线盘、未知 reparse tag 等无法判定；报告检查失败并保留；所选游戏启动前须完成检查 |
-| `mods.link-occupied` | warning | 自有前缀被真实目录/文件占用；仅报告，不提供删除 |
-| `mods.link-recovery` | error | 持久链接台账有未完成操作；只读展示实际状态与恢复动作，经链接修复确认后完成，启动不自动改盘 |
-| `mod.unloadable` | error / info | **error**：启用了游戏不会加载的实例（不可加载、残留、被同包名的另一份挤掉）；建议 `disable`。**info**：已安装、未启用、因 about-disabled 以外的原因不可加载（02 §4.2） |
-| `mod.pinned` | info / warning | 锁定版本（玩家文案一律叫“锁定版本”，代码名保留）。现实现：工坊那份被改成 `About.xml.disabled`，同一 Lineage 里有另一份活着、可加载、不在工坊的 Instance（RimCrow 的 `_<工坊ID>_` 副本、`copy-local` 副本、部署进 `Mods/` 的副本都算）。**info**：生效的是副本，工坊那份是“上游”；建议 `archo unpin`。**warning “上游有更新”**：工坊 Instance 的语义哈希与副本不同，且 ACF `timeupdated` 晚于副本首次出现；建议 `archo mod <副本> --diff <工坊>`、`archo unpin`。由 RimArcho 创建、工坊那份没被隐藏的锁定版本（锁定库里的副本，04 §7）：上游快照与 `origin.json` 记录的 `origin_snapshot` 不同即报 warning，建议 `archo pin --update <副本>`。锁定版本不再报 `mod.unloadable` |
-| `mod.hidden-residue` | warning | 工坊来源、About.xml 被改名、且不在 ACF 已订阅列表里：退订残留。建议 `archo trash` |
-| `mod.hidden` | warning | 其余被改名隐藏的 Mod（多半是别的管理器干的）。建议 `archo unhide`、`archo trash`，或用忽略“保持隐藏”。隐藏分类每次分析时计算、不入库，动作见 08 §6 |
-| `mod.replaced` | warning | 社区数据（Use This Instead，`replacements.json`，经 `archo data update` 获得，04 §6）知道这个 Mod 在当前游戏版本有维护中的替代品。已安装替代品时建议停用旧的、启用新的；否则给工坊链接 |
-| `dep.missing` | error | 依赖的包（含 `modDependenciesByVersion` 里当前版本的）在本环境里不存在。缺 DLC 时用单独的文案。建议 `subscribe: <steamWorkshopUrl>` 和 `steam://url/CommunityFilePage/<id>` |
-| `dep.inactive` | error | 依赖的包已安装但没启用。建议对每个候选 `archo enable` |
-| `order.violated` | warning / info | 当前顺序违反一条排序约束（loadBefore/After、依赖、社区或用户规则），且不在环上。每条边一条问题，key 为 `<前包>><后包>`；证据来源按约束种类标 declared / community / user。严重度按约束强度（04 §5.3）：依赖、loadBefore、forceLoad*、用户规则（强）为 warning；loadAfter、社区规则（弱）和语料中违反无害的规则为 info。建议 `archo sort --dry-run`、`archo move <A> --after <B>`、`archo rule add ignore <ref>` |
-| `official.order` | warning | Core 和 DLC 不在列表最前，或不按发布顺序。所有违反内置官方顺序的边合成这一条。语料里最常见的情形是 DLC 在列表建好之后才启用、被追加到末尾（Odyssey 排太晚）。第一条建议是最省的 `archo move`（把后启用的 DLC 移回前一个官方包之后，04 §5.3），再是 `archo sort --dry-run` |
-| `order.cycle` | info | 排序约束成环，列出环上每条边及来源。游戏本身不排序、只警告，所以成环不阻止写入和启动。建议的打破方式和排名见 04 §5。info 的依据见 §4.3.1；“能不能跑”仍列出它（淡色、不计数），因为只有玩家能决定屏蔽哪条 |
-| `incompat.active` | error | 两个声明互不兼容的 Mod 同时启用。建议停用其中一个、`archo why A B` |
-| `version.unsupported` | warning / info | `supportedVersions` 不含当前主次版本（官方内容和没写该字段的 Mod 不检查）。停在上一个次版本（游戏 1.7、Mod 写到 1.6）时为 warning，只写了更早的版本时为 info（日志语料，§4.3.1；与旧规则相反） |
-| `pkg.duplicate-active` | error | 同一 packageId 的多个 Instance 同时启用。主体是所有启用的副本；建议只留第一个 |
-| `pkg.duplicate-installed` | info | 同一 packageId 有多个 Instance，最多启用了一个；证据里标出哪份被游戏忽略。建议 `archo swap` |
+| `entry.missing` | warning | Plan entry matches no installed Mod (retained in ModsConfig.xml). Subject `pkg:<id>`. Suggest `archo find <id>`, `archo disable pkg:<id>`; add `subscribe: <link>` if community data knows Workshop item |
+| `mods.link-dangling` | error | Owned-prefix link at first level of known game's `Mods/`, target confirmed missing and source accessible; subject `path:<full-path>`, with `game:<game-path>`, no Instance required. Block selected game's launch/test run; summarize others only. Repair: 08 §3 |
+| `mods.link-foreign` | warning | Target mismatches known Instance/pack identity or cannot be mapped; show original target/ownership evidence. Retain valid env links; prefix alone never authorizes deletion |
+| `mods.link-check-failed` | error | Access denied, offline disk, unknown reparse tag, etc. prevent judgment; report failure/retain; complete inspection before selected-game launch |
+| `mods.link-occupied` | warning | Real directory/file occupies owned-prefix name; report only, no deletion action |
+| `mods.link-recovery` | error | Persistent ledger has unfinished operation; show actual state/recovery action read-only, complete after confirmed repair, no automatic startup disk changes |
+| `mod.unloadable` | error / info | **error**: enabled Instance game will not load (unloadable, residue, displaced by same-package copy); suggest disable. **info**: installed, disabled, unloadable for reasons other than about-disabled (02 §4.2) |
+| `mod.pinned` | info / warning | Locked version (always "locked version" in player text, retain code name). Current implementation: Workshop `About.xml.disabled` with another live, loadable non-Workshop Instance in same Lineage (RimCrow `_<Workshop-ID>_`, `copy-local`, `Mods/` deployed copies count). **info**: copy effective, Workshop upstream; suggest `archo unpin`. **warning "upstream has an update"**: Workshop semantic hash differs from copy, ACF timeupdated later than copy first seen; suggest `archo mod <copy> --diff <Workshop>`, `archo unpin`. RimArcho-made locked versions with unhidden Workshop original (lock library, 04 §7): warn when upstream snapshot differs from `origin.json` `origin_snapshot`, suggest `archo pin --update <copy>`. No `mod.unloadable` for locked versions |
+| `mod.hidden-residue` | warning | Workshop source, renamed About.xml, absent from ACF subscriptions: unsubscribed residue. Suggest `archo trash` |
+| `mod.hidden` | warning | Other rename-hidden `Mods` (usually another manager). Suggest `archo unhide`, `archo trash`, or ignore to keep hidden. Recompute classification per analysis without persistence; actions: 08 §6 |
+| `mod.replaced` | warning | Community Use This Instead (`replacements.json`, `archo data update`, 04 §6) knows maintained replacement for current game version. If installed, suggest disable old/enable new; otherwise Workshop link |
+| `dep.missing` | error | Required package (including current-version `modDependenciesByVersion`) absent from environment. Separate wording for DLC. Suggest `subscribe: <steamWorkshopUrl>` and `steam://url/CommunityFilePage/<id>` |
+| `dep.inactive` | error | Dependency installed but disabled. Suggest `archo enable` per candidate |
+| `order.violated` | warning / info | Order violates a noncyclic constraint (loadBefore/After, dependency, community/user). One finding per edge, key `<before-package>><after-package>`; declared/community/user evidence by kind. Severity follows strength (04 §5.3): dependency, loadBefore, forceLoad*, user (strong) warning; loadAfter, community (weak), corpus-harmless violations info. Suggest `archo sort --dry-run`, `archo move <A> --after <B>`, `archo rule add ignore <ref>` |
+| `official.order` | warning | Core/DLC not first or out of release order. Combine all built-in official-order violations. `Common` corpus case: DLC enabled after list creation, appended last (Odyssey too late). First suggest minimal `archo move` (new DLC after previous official package, 04 §5.3), then `archo sort --dry-run` |
+| `order.cycle` | info | Constraint cycle, listing each edge/source. Game warns without sorting, so cycles do not block write/launch. Break suggestions/ranking: 04 §5. Info basis: §4.3.1; can it run still lists it (muted, uncounted), because only player decides which rule to suppress |
+| `incompat.active` | error | Two declared-incompatible `Mods` enabled. Suggest disabling one, `archo why A B` |
+| `version.unsupported` | warning / info | `supportedVersions` omits current major/minor (exclude official/no-field `Mods`). Previous minor (game 1.7, Mod through `1.6`) warning; only older versions info (corpus, §4.3.1; opposite old rule) |
+| `pkg.duplicate-active` | error | Multiple Instances with same `packageId` enabled. Subjects all enabled copies; suggest retaining first only |
+| `pkg.duplicate-installed` | info | Multiple Instances with same `packageId`, at most one enabled; evidence marks game-ignored copy. Suggest `archo swap` |
 
-> 声明约束的违反很常见，且多数无害：语料里一半的日志违反依赖或加载顺序声明，45% 违反社区规则；超过 100 个 Mod 时，有无违反的日志出错一样频繁；违反最多的约束很少涉及报错指向的 Mod，有的（`modoptionssort` 排在 Core 前）根本无法满足。所以排序结果要区分“会出错”和“声明了但不强制”，按约束种类定严重度（04 §5.3）。数字见 07 §6。
+> Declaration violations are common and mostly harmless: half of corpus logs violate dependency/order declarations, 45% community rules; above 100 `Mods`, error frequency is equal with/without violations; most-violated constraints rarely involve error-attributed `Mods`, some (modoptionssort before Core) are impossible. Distinguish errors from non-enforced declarations by constraint-kind severity (04 §5.3). Numbers: 07 §6.
 
-旧目录里的 `replacement.available` 不再产出，由 `mod.replaced` 取代。
+Old `replacement.available` no longer emitted; replaced by `mod.replaced`.
 
-**日志语料层**（声明层的一部分，按当前启用列表计算；数据见 `internal/known/known.json`，由 `spikes/knowndeps` 从 40,326 份玩家分享的 1.6 日志生成，只含 packageId、计数和错误模板，每条至少来自 5 个不同玩家；证据来源类型 `community`。数据随程序内嵌：`archo data update` 只取第三方数据，RimArcho 还没有自己的数据仓库，与 `internal/order/observed.json` 相同）
+**Log corpus layer** (part of declarations, computed for current enabled list; `internal/known/known.json`, generated by `spikes/knowndeps` from 40,326 player-shared `1.6` logs, packageIds/counts/error templates only, at least 5 distinct players per entry; community evidence. Embedded with program: `archo data update` fetches third-party data only; RimArcho has no own data repository, like `internal/order/observed.json`)
 
-| code | 严重度 | 判定 |
+| `code` | Severity | Detection |
 | --- | --- | --- |
-| `dep.observed-missing` | warning / info | A 启用、B 未启用，A 的 About.xml 没有声明 B，而语料中“A 启用、B 未启用”的日志里至少 25% 出现“B 提供的类型/父 Def/Def/贴图缺失”的错误。B 已安装时建议启用，未安装时给出工坊链接。至少一半的日志出现、且缺的不只是音效或贴图时为 warning，否则为 info。证据列出计数、缺失项、典型错误，以及同一玩家下一次上传时错误是否消失（启用 B 之后几次） |
-| `combo.known-bad` | warning / info | 归因到 A 的错误，主要在 B 也启用时出现（同时启用的日志中 ≥ 30%，只有 A 时不到四分之一），或主要在 A 的某个版本出现（与 About.xml `modVersion` 或 `About/Manifest.xml` 的 `version` 比对，HugsLib 记录的正是这两者）。≥ 50% 且不是缺音效/贴图时为 warning，否则为 info |
-| `mod.known-error` | info | A 在启用它的分享日志中至少一半都报同一个错误，与列表其余部分无关：说明这是该 Mod 自己的已知错误 |
+| `dep.observed-missing` | warning / info | A enabled, B disabled, A About.xml does not declare B; at least 25% of such corpus logs report missing type/parent `Def`/`Def`/texture supplied by B. Suggest enabling installed B or Workshop link. Warning if at least half and not merely missing sound/texture, otherwise info. Evidence counts, missing items, typical error, whether next upload by same player loses error (sessions after enabling B) |
+| `combo.known-bad` | warning / info | A-attributed errors mainly with B enabled (≥ 30% together, less than one-quarter with A alone), or mainly one A version (About.xml `modVersion` / `About/Manifest.xml` version, exactly what HugsLib records). Warning `at `≥ 50% and not missing sound/texture, otherwise info |
+| `mod.known-error` | info | Same error in at least half of shared logs enabling A, independent of rest of list: known error in Mod itself |
 
-严重度依据：声明的依赖未启用（`dep.inactive`）时主体 Mod 成为错误来源的比例是 18%，偶然水平 7.5%（decisions-corpus §3.7）；本层的条目按构造在对应日志中至少 25–30% 出现其错误，但它们是观察而非声明，作者可能有意让其可选，所以最高为 warning。
+Severity basis: with declared dependency disabled (`dep.inactive`), subject Mod is an error source 18% vs 7.5% chance (decisions-corpus §3.7); this layer's entries have errors in at least 25–30% of corresponding logs by construction, but observations are not declarations and authors may intend optionality, so maximum warning.
 
-**Def 层**
+**`Def` layer**
 
-| code | 严重度 | 判定 |
+| `code` | Severity | Detection |
 | --- | --- | --- |
-| `def.override` | info | 同类型、同 defName 由多个 Mod 定义，按加载顺序后者生效，指明哪个生效。跳过抽象 Def、同一 Mod 内的重复、`MayRequire` 不满足的 Def |
-| `def.parent-missing` | error | `ParentName` 找不到对应的 `Name`。在 Patch 模拟**之后**、对打过补丁的文档检查（§5.1）。已运行的自定义操作类（`patch.unknown-op`）按成功处理，它的 XML 里写出的文本值视为它添加的 `Name`，不报（Chimera Creation (Continued) 用自己的操作类给 Anomaly 定义加 `Name`）。confidence `likely` |
-| `def.abstract-collision` | warning | 两个及以上 Mod 用同一个 `Name` 定义抽象父节点 |
+| `def.override` | info | Multiple `Mods` define same type/`defName`; later load wins, identified. Skip abstract `Defs`, same-Mod duplicates, unmet `MayRequire` |
+| `def.parent-missing` | error | `ParentName` has no matching `Name`. Check patched documents **after** Patch simulation (§5.1). Executed custom classes (`patch.unknown-op`) count as success; their XML text values count as added `Name`, suppressing false reports (Chimera Creation (Continued) adds Anomaly `Name` via custom class). confidence likely |
+| `def.abstract-collision` | warning | Two or more `Mods` define abstract parents with same `Name` |
 
-**缺失父模板的处理建议**（`app.ParentHelp` / `FindParentHelp`）。`def.parent-missing` 的影响是对应内容加载不了；按同一主体 Mod 汇总受影响的类型和数量。提供方优先查询已有事实库的 `Name` 索引（`Store.DefsNamed`）：已安装、可加载、未启用的定义者，在分析及其内容键均有效、启用后条件目录不变且该定义的条件满足时，给启用命令。
+**Missing parent template help** (`app.ParentHelp` / `FindParentHelp`). `def.parent-missing` prevents affected content loading; aggregate types/counts by subject Mod. Query stored `Name` index (`Store.DefsNamed`) first for providers: offer enable commands for installed, loadable disabled definers when analysis/content key are fresh, enabling does not change conditional directories, and `Def` conditions are met.
 
-只有玩家打开问题详情或 CLI / MCP 请求单个问题时，才为没有缓存提供方的 Name 补查已安装、可加载、未启用 Mod 的生效 Defs（`modsearch.FindNames`）；页面加载不做这一步。分析新鲜时事实库已索引每个可加载 Mod（含经链接启用的）的 `Name`，补查只读事实可能与启用后不同的 Mod：内容键过期，或启用它会改变条件目录；没有这样的 Mod 时不读文件，直接确定已安装的 Mod（包括未启用的）都提供不了它。按启用该 Mod 后的当前游戏版本、LoadFolders 和 MayRequire 条件，只匹配顶层 Def 的 `Name`，不把 `defName` 或嵌套属性当成提供方；不联网、不写分析缓存。查找有截止时间及 Mod 数、目录项、文件数、单文件和总读取量上限（见实现），支持调用方取消；到上限、文件不可读或 XML 无效时保留已找到的结果并说明未查完，不把未找到当成不存在。GUI 用独立读取会话，不持有导航、编辑或日志读取锁；取消见 06 §5。
+Only when players open details or CLI/MCP request one finding, search effective `Defs` of installed/loadable/disabled `Mods` for `Names` without cached providers (`modsearch.FindNames`); never during page load. Fresh facts index every loadable Mod's `Name` (including link-deployed `Mods`); fallback reads only `Mods` whose facts may differ after enablement: stale content key or changed conditional directories. Without such `Mods`, read no files and conclude no installed Mod (including disabled) provides it. Apply current game version, LoadFolders, `MayRequire` after enabling that Mod; match top-level `Def` `Name` only, not `defName` or nested properties; no network or analysis-cache writes. Search has deadline and limits on `Mods`, directory entries, files, single-file/total bytes (implementation), supports caller cancellation; limits/unreadable files/invalid XML retain results and state incomplete search, never equate not found with absent. GUI uses independent read session without navigation/edit/log read locks; cancellation: 06 §5.
 
-未安装的候选来自该 Mod 的依赖声明（含当前游戏版本）、loadAfter / forceLoadAfter（含当前版本）、缓存 Def 的 MayRequire / MayRequireAnyOf。声明 URL 或已有社区 Steam DB 的包名索引能确定工坊 ID 时给订阅及页面，否则给工坊搜索；这些仅是候选，不声称已确认它提供哪个模板；每个缺失的 Name 都已有已安装提供方时不再列候选。始终提供主体的工坊要求入口（没有工坊 ID 时退为名称搜索）。只有已有、归因完成、与当前列表匹配的日志中没有涉及该 Mod 的错误或警告时，才说明可能是无害的可选搭配内容，并提供整组忽略；仍逐条沿用 §4.2 的更新失效规则，不写新式忽略记录。界面和命令输出见 06 §5、05 §3.2。
+Uninstalled candidates come from subject dependencies (including current version), loadAfter / forceLoadAfter (including current version), cached `Def` `MayRequire` / `MayRequireAnyOf`. If declared URL or existing community Steam DB package index identifies Workshop ID, offer subscribe/page; otherwise Workshop search; candidates do not claim confirmed template provision. Omit candidates if every missing `Name` already has an installed provider. `Always` offer subject Workshop requirements (name search without Workshop ID). Only when existing, attributed, current-list-matching logs contain no error/warning involving that Mod, explain potentially harmless optional content and offer group ignore; use §4.2's per-finding update expiry, no new ignore format. UI/command output: 06 §5, 05 §3.2.
 
-**Patch 层**
+**Patch layer**
 
-| code | 严重度 | 判定 |
+| `code` | Severity | Detection |
 | --- | --- | --- |
-| `patch.no-match` | warning | 顶层操作在模拟时失败（游戏会记日志的那一层），每个失败的顶层操作一条；附原因（§4.4） |
-| `patch.contested` | info | 两个及以上 Mod 用 Replace 或 Remove 改同一节点。节点键 = Def + 元素路径 |
-| `patch.unknown-op` | info | 自定义 PatchOperation 类，无法模拟。每个 Mod 一条，列出它的自定义类；这些操作按“成功”处理 |
+| `patch.no-match` | warning | `Top`-level simulation failure (the layer game logs); one per failed top-level operation, with reason (§4.4) |
+| `patch.contested` | info | Two or more `Mods` `Replace`/`Remove` same node. Node key = `Def` + element path |
+| `patch.unknown-op` | info | Unsimulatable custom PatchOperation; one per Mod listing custom classes; treat operations as successful |
 
-**Harmony 层**
+**Harmony layer**
 
-| code | 严重度 | 判定 |
+| `code` | Severity | Detection |
 | --- | --- | --- |
-| `harmony.shared-target` | info | 两个及以上 Mod 补丁同一方法，每个方法一条 |
-| `harmony.skip-prefix` | info，可升为 warning | 某个返回 `bool` 的 prefix 可能跳过原方法，且同一方法还有其他 Mod 的补丁。confidence `possible`。升级规则见 §4.5 |
-| `harmony.multi-transpiler` | info，可升为 warning | 同一方法上有两个及以上 Mod 的 transpiler。严重度依据见 §4.3.1，升级规则同 skip-prefix（§4.5） |
-| `harmony.manual` | info | 程序集在代码里调用 `Harmony.Patch`。能从 IL 解出的目标照常记为补丁（§5.3）；这条说明解出了几次调用、其余为什么解不出。不误报为“没有补丁” |
+| `harmony.shared-target` | info | Two or more `Mods` patch same method; one per method |
+| `harmony.skip-prefix` | info, may become warning | A bool-returning prefix may skip original method, also patched by other `Mods`. confidence possible. Escalation: §4.5 |
+| `harmony.multi-transpiler` | info, may become warning | Two or more `Mods`' transpilers on same method. Severity basis §4.3.1; escalation same as skip-prefix (§4.5) |
+| `harmony.manual` | info | Assembly calls `Harmony.Patch`; statically resolved IL targets become normal patches (§5.3); explains resolved calls and unresolved reasons, never misreports no patches |
 
-**日志层**：每个错误簇一条 `log.<分类>`（分类见 §6.1）。
+**Log layer**: one `log.<category>` per error cluster (categories §6.1).
 
-| code | 严重度 |
+| `code` | Severity |
 | --- | --- |
-| `log.exception`、`log.harmony-stack`、`log.xml-load` | error |
-| `log.patch-failed`、`log.xref-missing`、`log.material`、`log.texture-missing`、`log.save-load` | warning |
-| `log.mod-report`、`log.other` | info，不进入问题列表 |
+| `log.exception`, `log.harmony-stack`, `log.xml-load` | error |
+| `log.patch-failed`, `log.xref-missing`, `log.material`, `log.texture-missing`, `log.save-load` | warning |
+| `log.mod-report`, `log.other` | info, excluded from finding list |
 
-#### 4.3.1 严重度的依据（日志语料，G4/G8）
+#### 4.3.1 Severity Basis (Log Corpus, G4/G8)
 
-严重度按“这个问题预示游戏日志里会出错”的程度定，用 6,734 份 RimWorld 1.6 公开日志检验（docs/research/decisions-corpus.md §3、§2 G8）。对每条问题，看它涉及的 Mod 是否在同一份日志里被归因为某个错误的来源，和“随便挑同样多的 Mod”的机会比较（观察 / 机会）。
+Severity measures how strongly a finding predicts game log errors, tested with 6,734 public RimWorld `1.6` logs (docs/research/decisions-corpus.md §3, §2 G8). For each finding, compare whether involved `Mods` are attributed as error sources in the same log against randomly choosing as many `Mods` (observed / chance).
 
-规则：
+Rules:
 
-- **error**：游戏确定会出问题（声明的前置不满足、声明不兼容、父定义不存在），且观察值明显高于机会（约 2 倍以上）。error 会阻止编译整合包（08 §5.2），所以不放只是“可能”的问题。
-- **warning**：观察值约 2 倍以上，玩家能据此行动。
-- **info**：接近或低于机会；或者数量很大、是 Mod 共存的正常方式（覆盖、争用），单条没有行动价值。
+- **error**: game will definitely have a problem (unmet declared dependencies, declared incompatibility, missing parent `Def`), observed clearly above chance (about 2× or more). Errors block pack building (08 §5.2), so exclude merely possible problems.
+- **warning**: observed about 2× or more, actionable for players.
+- **info**: near/below chance, or numerous normal coexistence patterns (overrides, contention) without individual action value.
 
-| code | 严重度 | 观察 / 机会 | 理由 |
+| `code` | Severity | Observed / chance | Reason |
 | --- | --- | --- | --- |
-| `patch.no-match` | warning | 37.3% / 4.5%（8.3×）；补丁失败类错误 29.7% / 0.9% | 最能预示错误的问题。不升为 error：七成在日志里没有对应的补丁失败（例如目标是可选内容），升级后一半的列表无法编译整合包 |
-| `def.parent-missing` | error | 16.3% / 4.1%（3.9×） | 保持 |
-| `incompat.active` | error | 26.4% / 7.3%（3.6×） | 保持 |
-| `def.abstract-collision` | warning | 25.4% / 8.3%（3.0×）；去掉 Harmony 堆栈类错误后 3.2× | 保持 |
-| `harmony.multi-transpiler` | info（原 warning），在日志堆栈里时升为 warning | G9 之前 20.3% / 7.0%（2.9×，全量）；G9 之后同 669 份日志 20.7% / 8.9%（2.3×），G9 新增的 7,291 条 2.2×；去掉 Harmony 堆栈类错误后 2.3× | G9 解出手动补丁后条数从 4,559 涨到 11,078（每份日志 17 条），比例降到同层 info 的 `harmony.shared-target`（2.6×）、`harmony.skip-prefix`（2.5×）之下；被改写的方法出现在错误堆栈里的比例（0.5%）与共享目标（0.6%）相同，说明比例来自“这些 Mod 补丁多”，不是 transpiler 冲突本身。降为 info，不进启动前提示；被补丁的方法出现在当前日志的错误簇里时与 skip-prefix 一样升为 warning（§4.5） |
-| `dep.inactive` | error | 18.1% / 7.5%（2.4×） | 保持 |
-| `dep.missing` | error | 9.9% / 4.4%（2.3×，玩家列表里确实没有这个前置的 242 条） | 保持。语料里另有 10,941 条是研究库缺这个前置、玩家其实有（1.6% / 3.3%），那是研究环境的假象，不能用来给本问题定级；它低于机会，正好说明方法不会把无关的问题算成有关 |
-| `version.unsupported`（停在上一版本） | warning（原 info） | 10.4% / 4.0%（2.6×） | 代码是为上一版游戏编译的，新版本改了接口就会出错 |
-| `version.unsupported`（只写更早版本） | info（原 warning） | 0.8% / 3.2%（0.3×） | 玩家还在用的老 Mod 是经过几个版本仍能用的那些（坏掉的早被弃用了） |
-| `official.order` | warning（原 error） | 涉及 Mod 时 7.4% / 3.6%（2.1×）；04 §5.3 的成对比较 1.8× | 和违反依赖顺序（1.4×，warning）一个量级，不是“游戏确定出错”。总体 2.3% / 2.5% 不可用：一半的问题主体是 DLC，而 Core/DLC 从不被归因为来源 |
-| `order.cycle` | info（原 warning） | 6.8% / 6.1%（1.1×） | 成环的列表照常能跑，出错比例与机会持平；排序时放弃环里最弱的约束（04 §5.2） |
-| `patch.contested` | info | 41.9% / 6.6%（6.3×）；主体没有 `patch.no-match` 时 21.3% / 6.6%（3.2×） | 保持 info。高比例主要来自同一批 Mod 的补丁落空（那部分已由 `patch.no-match` 报告）；剩下的 3.2× 与 `def.override`（3.0×，info）同类：多个 Mod 改同一处是共存的正常方式，约 7 万条、每份日志 18 条，单条无法行动 |
-| `def.override` | info | 24.6% / 8.1%（3.0×） | 保持，理由同上（70 万条） |
-| `harmony.shared-target`、`harmony.skip-prefix` | info | 2.7×、2.6× | 保持：数量最大（139 万、87 万条），单条无法行动；skip-prefix 有日志证据时升为 warning（§4.5） |
-| `harmony.manual`、`patch.unknown-op` | info | 1.6×、2.5× | 保持：说明分析不完整，不是问题本身 |
+| `patch.no-match` | warning | 37.3% / 4.5% (8.3×); `patch-failed` errors 29.7% / 0.9% | Strongest error predictor. Not error: 70% have no matching logged patch failure (e.g. optional targets); escalation would prevent half of lists building packs |
+| `def.parent-missing` | error | 16.3% / 4.1% (3.9×) | Retain |
+| `incompat.active` | error | 26.4% / 7.3% (3.6×) | Retain |
+| `def.abstract-collision` | warning | 25.4% / 8.3% (3.0×); 3.2× excluding Harmony stack errors | Retain |
+| `harmony.multi-transpiler` | info (formerly warning), warning when in log stack | Before G9 20.3% / 7.0% (2.9×, full); same 669 logs after G9 20.7% / 8.9% (2.3×); 7,291 G9 additions 2.2×; excluding Harmony stack errors 2.3× | Resolving manual patches increased 4,559 to 11,078 (17/log), dropping ratio below same-layer info `harmony.shared-target` (2.6×), `harmony.skip-prefix` (2.5×); patched-method error-stack rate (0.5%) matches shared targets (0.6%), indicating patch-heavy `Mods` rather than transpiler conflicts. Lower to info, exclude pre-launch prompts; promote like skip-prefix when patched method occurs in current error cluster (§4.5) |
+| `dep.inactive` | error | 18.1% / 7.5% (2.4×) | Retain |
+| `dep.missing` | error | 9.9% / 4.4% (2.3×, 242 genuinely missing player dependencies) | Retain. Another 10,941 entries reflect missing research-library dependencies players actually had (`1.6`% / 3.3%), an artifact unsuitable for severity; below-chance ratio confirms unrelated findings are `not counted` related |
+| `version.unsupported` (previous version only) | warning (formerly info) | 10.4% / 4.0% (2.6×) | Code compiled for previous game version may fail after API changes |
+| `version.unsupported` (older versions only) | info (formerly warning) | 0.8% / 3.2% (0.3×) | Old `Mods` still used survived several versions; broken ones were abandoned |
+| `official.order` | warning (formerly error) | 7.4% / 3.6% (2.1×) when `Mods` involved; paired comparison in 04 §5.3 1.8× | Similar to dependency-order violations (1.4×, warning), not certain game errors. Overall 2.3% / 2.5% unusable: half subjects are DLC, and Core/DLC never attributed as sources |
+| `order.cycle` | info (formerly warning) | 6.8% / 6.1% (1.1×) | Cyclic lists run normally, error rate matches chance; drop weakest cyclic constraint during sort (04 §5.2) |
+| `patch.contested` | info | 41.9% / 6.6% (6.3×); without subject `patch.no-match`, 21.3% / 6.6% (3.2×) | Retain info. High ratio mainly same `Mods`' no-match findings already reported; remaining 3.2× resembles `def.override` (3.0×, info): shared edits are normal coexistence, about 70,000 entries, 18/log, individually unactionable |
+| `def.override` | info | 24.6% / 8.1% (3.0×) | Retain, same reason (700,000 entries) |
+| `harmony.shared-target`, `harmony.skip-prefix` | info | 2.7×, 2.6× | Retain: most numerous (1.39 million, 870,000), individually unactionable; log-backed skip-prefix promotes to warning (§4.5) |
+| `harmony.manual`, `patch.unknown-op` | info | `1.6`×, 2.5× | Retain: describe incomplete analysis, not problems themselves |
 
-启动前列出的问题（`LaunchChecks`，08 §2）按这张表的观察 / 机会挑选，不按严重度。
+Pre-launch findings (`LaunchChecks`, 08 §2) are selected by this observed/chance table, not severity.
 
-### 4.4 `patch.no-match` 的原因
+### 4.4 `patch.no-match` Reasons
 
-原因在最内层失败的操作上判定，可以有多个。
+`Classify` at innermost failed operation; multiple reasons allowed.
 
-| 原因 | 判定 |
+| Reason | Detection |
 | --- | --- |
-| `target-inactive` | 目标 Def 由一个已安装但未启用的 Mod 定义（查所有已安装 Mod 的 Def 事实） |
-| `target-missing` | 任何已安装的 Mod 中都找不到目标 |
-| `target-later` | 所有补丁跑完后 XPath 能命中：目标由排在后面的 Mod 的**补丁**创建。创建者按节点分配区间认出。游戏先合并所有 Mod 的 Def 再按顺序应用补丁，所以“目标由后面的 Mod 定义”本身不会导致落空 |
-| `node-absent` | Def 存在，但 XPath 的其余路径不存在 |
-| `wrong-version-route` | 目标在磁盘上，但不在生效内容中：在打补丁的 Mod 及其预期目标的非生效 XML 里搜索 |
-| `stale-name` | 预期目标 Mod 已启用，但没有这个 defName；按编辑距离列出该 Mod 里最多 3 个相近的名字 |
-| `unguarded-optional` | 只和 `target-inactive` 一起出现：没有任何守卫，且定义方不是硬依赖 |
-| `exception` | 游戏会抛异常，例如对属性节点做树操作 |
-| `unclassified` | XPath 里没有 Def 名字，无法分类 |
+| `target-inactive` | Target `Def` defined by installed disabled Mod (query all installed `Def` facts) |
+| `target-missing` | No installed Mod defines target |
+| `target-later` | XPath matches after all patches: target created by a later Mod's **patch**. Creator identified by node allocation ranges. Game merges all `Defs` before patches, so definition by later Mod alone never causes failure |
+| `node-absent` | `Def` exists, remaining XPath does not |
+| `wrong-version-route` | Target on disk outside effective content: search inactive XML in patching Mod and expected targets |
+| `stale-name` | Expected target Mod enabled, lacks `defName`; list up to 3 similar names by edit distance |
+| `unguarded-optional` | Only with `target-inactive`: no guard and definer not hard dependency |
+| `exception` | Game would throw, e.g. tree operations on attribute nodes |
+| `unclassified` | No `Def` name in XPath |
 
-**守卫**：`PatchOperationFindMod` 的 match 分支、`Conditional`、带 `MayRequire` 的 `Sequence` 子项、条件加载目录（§1）。顶层操作上的 `MayRequire` 与游戏一样被忽略，详情里会说明。
+**Guards**: `PatchOperationFindMod` match branch, `Conditional`, `Sequence` children with `MayRequire`, conditional loading folders (§1). Ignore top-level `MayRequire` like game, explaining in details.
 
-**预期目标**：FindMod 写的名字（显示名；DLC 用目录名）、`MayRequire` 的包、条件目录的包，以及 Harmony 和 Ludeon 以外的硬依赖。
+**Expected targets**: `FindMod` names (display names, DLC directory names), `MayRequire` packages, conditional-folder packages, hard dependencies other than Harmony/Ludeon.
 
-### 4.5 默认显示
+### 4.5 Default Display
 
-同一份问题集，各入口默认显示的范围不同。通常用 `--all` 或筛选拿到完整列表；已忽略的版本提醒须显式加 `--include-muted`（§4.2）。
+Entry points show different defaults from the same finding set. Usually `--all` or filters show full list; muted version reminders need explicit `--include-muted` (§4.2).
 
-- **`def.override`、`patch.contested` 默认隐藏**：在 `problems` 默认输出和界面问题列表里不出现，末尾有一行 `hidden: N def.override, M patch.contested (archo problems --all)`。带 `--all`、`--code`、`--subject`、`--severity info` 或 `--min-severity info` 时显示；在 `def`、`patches` 输出和详情页里总是显示。
-- **`version.unsupported` 折叠**：同一游戏版本、未忽略提醒（§4.2）的合成一行，严重度取其中最高的：`<sev> version.unsupported  N enabled mods do not list 1.7 (a list 1.6, b older only)  (archo problems --code version.unsupported)`。CLI、MCP、界面汇总一致；Mod 行的提示和详情只说明该 Mod 声明的版本（06 §5）。
-- **`harmony.multi-transpiler` 默认 info**，升级规则与下面的 skip-prefix 相同（不折叠）。
-- **`harmony.skip-prefix` 默认 info 并折叠**：info 的这类问题合成一行（`… N bool prefixes from M mods can skip methods other mods also patch; none is in a log stack (archo problems --code harmony.skip-prefix)`）。只有当被补丁的方法（去掉重载部分）出现在**当前（非过期）问题日志**某个错误簇里（堆栈帧，或 Harmony 补丁行所属的帧）时，才升为 warning：加上该簇作为 `log` 证据，并把 `archo log --cluster E<n>` 放在建议第一位。升级后的单独列出。用 `--code harmony.skip-prefix`、`--all`、`--subject`、`harmony --target` 看全部。
-- 折叠行排在各自严重度的最前面，默认 30 行的截断不会把它们藏掉。
-- **MCP `list_problems`** 默认 `--min-severity warning`，除非给了 `severity`、`min_severity`、`all` 或 `include_muted`。
-- **日志问题**：按日志分组（§6.4）。当前日志默认列前 5 条，其余 `archo problems --code log`；过期日志折叠成标题一行，不计数，展开用 `archo problems --code log --all`。`log.mod-report` 和 `log.other` 不进问题列表。
-- **已忽略的问题**不在默认列表里（§4.2）。
-- **“能不能跑”页**只收 error 和 warning 里玩家能处理的项，info 留在技术信息里；具体哪些代码进页、怎么分组、写成什么话，见 06 §5。
+- **Hide `def.override`, `patch.contested` by default** from problems and UI finding lists; end with `hidden: N def.override, M patch.contested (archo problems --all)`. Show with `--all`, `--code`, `--subject`, `--severity info`, `--min-severity info`; always visible in def, patches, details.
+- **Collapse `version.unsupported`**: combine same-game-version unmuted reminders (§4.2), highest severity: `<sev> version.unsupported  N enabled mods do not list 1.7 (a list 1.6, b older only)  (archo problems --code version.unsupported)`. Same CLI/MCP/UI summaries; Mod row tooltips/details only state its declared versions (06 §5).
+- **`harmony.multi-transpiler` defaults to info**, same escalation as skip-prefix below (not collapsed).
+- **`harmony.skip-prefix` defaults to info, collapsed**: one summary (`… N bool prefixes from M mods can skip methods other mods also patch; none is in a log stack (archo problems --code harmony.skip-prefix)`). Promote only if patched method (without overload) appears in an error cluster of **current, non-stale problem log** (stack frame or owning frame of Harmony patch line): add cluster as log evidence, put `archo log --cluster E<n>` first. `List` escalated findings individually. `Full` list via `--code harmony.skip-prefix`, `--all`, `--subject`, `harmony --target`.
+- Summaries precede individual findings within severity, avoiding default 30-row truncation.
+- **MCP `list_problems`** defaults `--min-severity warning` unless severity, `min_severity`, all, `include_muted` supplied.
+- **Log findings** group by log (§6.4). Current log first 5 by default; rest via `archo problems --code log`; stale logs collapse to uncounted title, expanded via `archo problems --code log --all`. Exclude `log.mod-report`, `log.other`.
+- **Ignored findings** excluded by default (§4.2).
+- **Can it run page** includes only actionable errors/warnings, leaving info in technical details; codes, grouping, wording: 06 §5.
 
-## 5. 分析器
+## 5. Analyzers
 
-### 5.1 Def 层
+### 5.1 Def Layer
 
-- 流式解析 XML，只抽取 §2 的字段，不保留完整 DOM。
-- 继承解析在应用完全部补丁之后做，与游戏一致（补丁可以改 `Name` 和 `ParentName`，例如用 AttributeAdd 给 Core 的 Def 加 `Name`）。先收集打过补丁的文档里的全部 `Name`，再解析 `ParentName`；同名抽象节点按加载顺序后者覆盖。在打补丁之前检查会产生误报（真实环境的实测见 07 §6）。
+- Stream XML, extract §2 fields only, no full DOM.
+- Resolve inheritance after all patches, like game (patches can change `Name`/`ParentName`, e.g. `AttributeAdd` names Core `Defs`). Collect all patched-document `Name`, then resolve `ParentName`; later same-name abstract nodes override. Pre-patch checks create false positives (real measurements: 07 §6).
 
-### 5.2 Patch 模拟
+### 5.2 Patch Simulation
 
-1. 按方案顺序，把各 Mod 的生效 Defs 合并成一个内存文档（`<Defs>` 根）。
-2. 按同样顺序依次应用各 Mod 的 PatchOperation，记录每个操作命中的节点数。
-3. 支持的操作：`Add`、`Insert`、`Remove`、`Replace`、`AttributeAdd`、`AttributeSet`、`AttributeRemove`、`SetName`、`AddModExtension`、`Sequence`、`Conditional`、`Test`、`FindMod`。其他操作类记为 `patch.unknown-op`，按成功处理。
-4. `success` 属性（`Always`、`Normal`、`Invert`、`Never`）按游戏语义解释。
-5. 失败的键 = 文件 + 游戏对该操作的描述（`FailKey`），与 Player.log 的补丁失败消息对得上（§6.2）。
+1. Merge effective Mod `Defs` into one in-memory document (`<Defs>` root), plan order.
+2. Apply PatchOperations in same order, recording node match counts.
+3. Support `Add`, `Insert`, `Remove`, `Replace`, `AttributeAdd`, `AttributeSet`, `AttributeRemove`, `SetName`, `AddModExtension`, `Sequence`, `Conditional`, `Test`, `FindMod`. Other classes are `patch.unknown-op`, treated as success.
+4. Interpret success (`Always`, `Normal`, `Invert`, `Never`) like game.
+5. Failure key = file + game's operation description (`FailKey`), matching `Player.log` failure messages (§6.2).
 
-**XPath**：引擎须兼容 .NET 的 XPath 1.0 行为。用真实 Mod 集合的全部 XPath 做兼容性测试，并用 Player.log 回放（日志里的失败都要模拟出来），不一致率须低于 0.5%，差异记录在案；实测见 07 §6。常见的 `Defs/XDef[defName="…"]` 走索引快速路径。
+**XPath**: engine must match .NET XPath 1.0. Compatibility-test all XPath in real Mod collection, replay `Player.log` (simulate every logged failure), mismatch below 0.5%, documented differences; measurements: 07 §6. `Common` `Defs/XDef[defName="…"]` uses indexed fast path.
 
-**内存与解析**（合并文档只在子进程里存在）：
+**Memory and parsing** (merged document exists only in subprocess):
 
-- 节点存储（`internal/xdoc`）：节点是 44 字节的结构，按 64K 节点一块存放；第一块像 slice 一样增长，小文档保持小。链接用 int32；元素名放进合并文档和补丁文档共用的 `Names` 表。
-- 文本放在 1 MiB 只追加的页里；64 KiB 及以上的文本单独分配。不用单一增长的文本缓冲区：被索引键引用的旧底层数组会一直留在内存里。
-- 解析管线：最多 8 个 worker 用 `encoding/xml` 把文件切成事件，同时在内存里的文件最多是 worker 数的 2 倍；文档按加载顺序依次构建。
+- Nodes (`internal/xdoc`): 44-byte structs in 64K-node blocks; first block grows like slice to keep small documents small. int32 links; element names in shared `Names` table for merged/patch documents.
+- Text in 1 MiB append-only pages; ≥ 64 KiB text allocated separately. No single growing text buffer: index-key references would retain old backing arrays.
+- Parsing pipeline: up to 8 `encoding/xml` workers tokenize files, at most twice worker count files in memory; build documents sequentially in load order.
 
-### 5.3 程序集与 Harmony
+### 5.3 Assemblies and Harmony
 
-Go 原生读 .NET 元数据，不依赖 .NET 运行时（`internal/dotnet`、`internal/harmony`）。读取每个启用实例生效目录下 `Assemblies/*.dll`。
+Read .NET metadata natively in Go, no .NET runtime (`internal/dotnet`, `internal/harmony`). Read `Assemblies/*.dll` in effective directories of enabled Instances.
 
-- 读取 `TypeDef`、`MethodDef`、`MemberRef`、`TypeRef`、`CustomAttribute` 表和 `#Strings`、`#US` 堆。
-- **目标方法**：合并类级和方法级 `[HarmonyPatch]` 的参数（目标类型、方法名、`MethodType`、`Type[]` 参数列表、命名参数）。用 `TargetMethod(s)` 的补丁标为动态目标。
-- **补丁类型**：看 `[HarmonyPrefix]` / `[HarmonyPostfix]` / `[HarmonyTranspiler]` / `[HarmonyFinalizer]` 特性，没有时按方法名 `Prefix` / `Postfix` / `Transpiler` / `Finalizer` 推断。
-- **可能跳过原方法**：prefix 的返回类型是 `bool`。
-- **手动补丁**（日志语料 G9，`internal/harmony/manual.go`、`internal/dotnet/il.go`）：程序集里有对 `HarmonyLib.Harmony::Patch` 的 `MemberRef` 时，抽象解释每个方法的 IL，找出 `Harmony.Patch` 调用的原方法和补丁方法；参数形如 `(MethodBase, HarmonyMethod, …)`、定义在其他程序集里的包装方法也算。解出的记为普通补丁事实（目标、类型、补丁方法），和特性补丁一样参与 `harmony.shared-target`、`harmony.multi-transpiler` 等；原方法解不出时记一条动态事实 `<manual: 原因>`（补丁方法已知）。`harmony.manual` 说明解出了几次调用、其余为什么解不出。仍解不出的：运行时挑选的原方法（扫描整个游戏的方法，例如 HAR 的 `BodyReferenceTranspiler`）、辅助方法构造的集合、`Assembly.GetType`、通过子类写出的基类方法（标题里是声明类型）。
-- **HugsLib**：`HugsLib.dll` 在它自己的 Mod（`unlimitedhugs.hugslib`）里照常读，补丁算它自己的；只在别的 Mod 里带的副本才跳过（`harmony.OwnLibrary`）。
-- **Harmony ID 候选**：`#US` 堆里传给 `new Harmony(...)` 一类调用的字符串（实际是像 ID 的反向域名字符串，`a.b.c`），标为启发式。日志里补丁行的 owner 不是 packageId 时，靠它对到 Mod。
-- **跳过名单**（`harmony.DefaultSkip`，glob，不分大小写）：`0harmony.dll`、`harmony.dll`、`hugslib.dll`、`0multiplayerapi.dll`、`0prepatcherapi.dll`、`mono.cecil*.dll`、`system.*.dll`、`microsoft.*.dll`、`newtonsoft.json.dll`、`unityengine*.dll`、`assembly-csharp*.dll`。这些库不收 Harmony 事实，但 `TypeDef` 照常索引（堆栈帧落在里面时归为库）。名单可由分析输入替换（`Input.HarmonySkip`），目前没有玩家设置。
-- 测试夹具：`testdata/dotnet` 有假的 0Harmony、假的 Assembly-CSharp 和四个 Mod 的 C# 源码、构建脚本和已构建的 DLL（各 4–5 KB，已提交，测试不需要 .NET SDK）。
+- Read `TypeDef`, `MethodDef`, `MemberRef`, `TypeRef`, `CustomAttribute`, `#Strings`, `#US`.
+- **Targets**: merge class/method `[HarmonyPatch]` arguments (target type, method, `MethodType`, `Type[]` parameters, named arguments). `TargetMethod(s)` patches are dynamic.
+- **Patch kinds**: `[HarmonyPrefix]` / `[HarmonyPostfix]` / `[HarmonyTranspiler]` / `[HarmonyFinalizer]`; otherwise infer method names `Prefix` / `Postfix` / `Transpiler` / `Finalizer`.
+- **May skip original**: bool-returning prefix.
+- **Manual patches** (corpus G9, `internal/harmony/manual.go`, `internal/dotnet/il.go`): if assembly has `MemberRef` to `HarmonyLib.Harmony::Patch`, abstract-interpret each method IL to resolve original/patch methods; wrappers in other assemblies with `(MethodBase, HarmonyMethod, …)` also count. Resolved targets become ordinary facts (target, kind, patch method), participating in shared-target/multi-transpiler like attribute patches; unresolved originals create dynamic `<manual: reason>` facts (known patch method). `harmony.manual` explains resolved call count/unresolved reasons. Still unresolved: runtime-selected originals (whole-game scans such as HAR `BodyReferenceTranspiler`), helper-built collections, `Assembly.GetType`, base methods referenced through subclasses (headings use declaring type).
+- **HugsLib**: read `HugsLib.dll` normally in own Mod (`unlimitedhugs.hugslib`), attributing patches to it; skip only copies in other `Mods` (`harmony.OwnLibrary`).
+- **Harmony ID candidates**: `#US` strings passed to calls like `new Harmony(...)` (in practice ID-like reverse-domain `a.b.c`), heuristic. Maps log patch owners to `Mods` when owner is not `packageId`.
+- **Skip list** (`harmony.DefaultSkip`, case-insensitive glob): `0harmony.dll`, `harmony.dll`, `hugslib.dll`, `0multiplayerapi.dll`, `0prepatcherapi.dll`, `mono.cecil*.dll`, `system.*.dll`, `microsoft.*.dll`, `newtonsoft.json.dll`, `unityengine*.dll`, `assembly-csharp*.dll`. Skip Harmony facts but index `TypeDef` (frames there are libraries). Analysis input can replace (`Input.HarmonySkip`); no player setting yet.
+- Fixtures: `testdata/dotnet` has fake `0Harmony`/`Assembly-CSharp` and four `Mods`' C# sources, build scripts, committed DLLs (4–5 KB each); tests need no .NET SDK.
 
-### 5.4 按需反编译
+### 5.4 On-demand Decompilation
 
-用 ilspycmd，只在需要时反编译，不在后台预先反编译（不常驻、重活做完就退出）。
+Use ilspycmd only on demand, no background pre-decompilation (no resident process; exits after heavy work).
 
-- **查找**：`ARCHO_ILSPYCMD`、PATH、`~/.dotnet/tools`。找不到时报错并给出安装命令 `dotnet tool install --global ilspycmd`，从不自动安装。
-- **引用目录**：游戏的 Managed 目录（1.7 是游戏根目录）、DLL 所在目录、0Harmony.dll 所在目录。
-- **缓存**：`<数据目录>/cache/source/<sha256[:20]>/` 存整个项目（写到 `.tmp` 再改名，完成后放 `.done` 标记）；项目未缓存时单个类型用 `-t` 反编译到 `<hash>.types/<Type>.cs`。`source_cache` 表记录每次反编译；缓存目录被删时按需重建，DLL 变了缓存失效。
-- `archo source <实例> [--type <类型>]`：只反编译所请求的程序集或类型。
-- `archo source search <模式>` 必须指定范围：`--in <ref>...`、`--implicated`（最新日志错误簇的候选 Mod；没有日志时取 Harmony warning 的主体）或 `--active`。`--active` 先打印估算（程序集数、DLL 大小、缓存约为 DLL 的 3 倍、每个程序集约 1.5 秒），CLI 要再加 `--yes` 才执行。日志的下一步建议只在该簇自己的候选里搜（`--in …`）。
-- MCP `read_source` 带 `search` 时默认 `--implicated`，`scope: "active"` 才扩到全部启用的 Mod；默认预算 10 秒，超出时说明还有多少程序集待反编译（“still computing; run again”）。
-- `archo files search` 默认跳过 `Languages/`（翻译文件会重复每个键），`--languages` 才包含；按 Mod 遍历，用 8 个 worker 读文件，保持遍历顺序。命令细节见 05 §4。范围规则见 §5.5。
-- GUI：Mod 库 › 搜索文件的“C# 代码”（06 §2.9）只搜点名的 Mod，不给 `--active` 的整张列表；每次最多反编译 60 秒（`view.CodeSearchBudget`），没做完的说还剩几个，再搜一次接着做；停止或换一次搜索会取消正在进行的反编译（`App.SourceSearchContext`）。
+- **Locate**: `ARCHO_ILSPYCMD`, PATH, `~/.dotnet/tools`. If missing, error with `dotnet tool install --global ilspycmd`; never install automatically.
+- **Reference directories**: game's Managed directory (game root in 1.7), DLL directory, `0Harmony`.dll directory.
+- **Cache**: entire project in `<data-directory>/cache/source/<sha256[:20]>/` (write `.tmp`, rename, `.done` on completion); without cached project, decompile individual type with `-t` into `<hash>.types/<Type>.cs`. `source_cache` records each decompilation; rebuild deleted caches on demand; DLL changes invalidate.
+- `archo source <instance> [--type <type>]`: only requested assembly/type.
+- `archo source search <pattern>` requires scope: `--in <ref>...`, `--implicated` (latest log cluster candidate `Mods`; Harmony warning subjects without logs), or `--active`. `--active` prints estimate first (assembly count, DLL size, cache about 3× DLL, about 1.5 seconds/assembly), CLI requires `--yes`. Cluster next steps search only own candidates (`--in …`).
+- MCP `read_source` with search defaults `--implicated`; only `scope: "active"` expands to all enabled `Mods`; default 10-second budget, report remaining assemblies on expiry ("still computing; run again").
+- `archo files search` excludes `Languages/` by default (translations repeat every key), includes with `--languages`; traverse per Mod, 8 file-read workers, preserve traversal order. Commands: 05 §4; scope: §5.5.
+- GUI: mod library › search files "C# code" (06 §2.9) searches named `Mods` only, no whole-list `--active`; up to 60 seconds decompilation per search (`view.CodeSearchBudget`), state remaining count, next search resumes; stop/new search cancels decompilation (`App.SourceSearchContext`).
 
-### 5.5 按载入范围搜索文件（2026-10-24）
+### 5.5 Search Files Within Loaded Scope (2026-10-24)
 
-`files search` / `search_files` 只搜游戏真正载入的东西，结果按载入顺序排列（`internal/modsearch`）：
+`files search` / `search_files` searches only game-loaded content, ordered by load order (`internal/modsearch`):
 
-- **哪些 Mod**：默认当前方案启用的条目，正是列表里那一份副本（创意工坊、本地、锁定版本各算各的），带列表位置；`--mod`（可重复）点名其他副本，同包名有多份时取列表里那份；官方内容（Core、DLC）默认包含，`--game without|only` 排除或只搜它们。
-- **哪些文件夹**：每个 Mod 的载入文件夹按 §1 解析（`LoadFolders.xml` 的版本标签与条件；没有时版本目录、`Common`、根目录），每个载入文件夹里只走游戏读取的子目录 `Defs`、`Patches`、`Languages`、`Textures`、`Sounds`、`Assemblies`（加 `Lunar/Components`），`About/` 只取根目录；根目录下的其他文件夹不搜。同一相对路径只搜优先级最高的那份。`--all-versions` 改为搜所有版本目录和 `LoadFolders.xml` 里每个文件夹，不看条件也不去重，每个结果标出所在文件夹。`LoadFolders.xml` 指向不存在的文件夹时静默跳过，读不了的文件计数并给出第一个错误。
-- **哪些种类**：默认 `defs,patches,about`；`--kind` 选择，`--languages` 或 `--lang <语言文件夹>` 才加翻译。`Textures`、`Sounds`、`Assemblies` 按相对路径匹配（不读二进制内容）。
-- **匹配**：默认字面量、不区分大小写；`--regex`（RE2）、`--case`、`--word`。每行算一次命中。
-- **结果**：按 Mod（位置、引用、名称、包名、副本、载入文件夹）→ 文件 → 行分组；`Defs` 和 `Patches` 的命中带所在的顶层 Def（`ThingDef/名字`，抽象的 `ThingDef@Name`）或所在补丁操作的 XPath。每个文件默认留 5 行，每页 40 行（`--per-file`、`--limit`、`--page`），总数总是全部；`--mode files|count` 只列文件或每个 Mod 的计数。默认范围没有命中时提示被排除的范围。
-- **Def 模式**（`--def`）：模式是 defName，整词、区分大小写，默认只搜 `Defs`、`Patches`。每个命中带角色：`def`（`<defName>`）、`abstract`（`Name="…"`）、`child`（`ParentName="…"`）、`patch`（所在操作的 XPath 含该名字）、`patch-value`（补丁里当值用）、`translation`、`ref`；前面先列摘要：定义者（多于一个时注明后载入的生效）、父与子、补丁操作数与 Mod、引用它的 Mod 数。它是文本证据，补丁是否真的命中仍以 `get_def` / `get_patches` 的模拟为准。
+- **`Mods`**: current plan's enabled entries by default, exact listed copies (Workshop/local/locked separate), with positions; repeatable `--mod` names others, choosing listed copy on package duplicates; include official Core/DLC by default, `--game without|only` excludes/searches only them.
+- **Folders**: resolve per §1 (LoadFolders version/conditions; otherwise version/`Common`/root); traverse only game content subdirectories `Defs`, `Patches`, `Languages`, `Textures`, `Sounds`, `Assemblies` (plus `Lunar/Components`); `About/` at root only, no other root folders. Identical relative paths use highest priority only. `--all-versions` searches all version directories/every LoadFolders folder, ignoring conditions and deduplication, marking folder per result. Silently skip nonexistent LoadFolders targets; count unreadable files and show first error.
+- **Kinds**: default `defs,patches,about`; select with `--kind`, add translations only with `--languages` / `--lang <language-folder>`. `Textures`/`Sounds`/`Assemblies` match relative paths, not binary contents.
+- **Matching**: literal, case-insensitive default; `--regex` (RE2), `--case`, `--word`. One hit per line.
+- **Results**: grouped Mod (position/reference/name/package/copy/loading folder) → file → line; `Defs`/`Patches` hits include containing top-level `Def` (`ThingDef/name`, abstract `ThingDef@Name`) or operation XPath. Default 5 lines/file, 40/page (`--per-file`, `--limit`, `--page`), totals always complete; `--mode files|count` lists files or per-Mod counts only. If default scope finds nothing, explain excluded scope.
+- **`Def` mode** (`--def`): pattern is `defName`, whole-word case-sensitive, default `Defs`/`Patches` only. Roles: def (`<defName>`), abstract (`Name="…"`), child (`ParentName="…"`), patch (containing XPath names it), `patch-value`, translation, ref; summary first: definers (later effective if multiple), parent/children, patch operation/Mod counts, referencing Mod count. Text evidence only; `get_def` / `get_patches` simulation determines actual matches.
 
-## 6. 日志归因
+## 6. Log Attribution
 
-### 6.1 解析
+### 6.1 Parsing
 
-**两种格式**：
+**Two formats**:
 
-- 1.6 及以前（Unity）：消息没有级别。版本从前 50 行的 `RimWorld X.Y.Z revN` 读。
-- 1.7（Waylith，前 50 行内出现 `=== Waylith log ===`）：每条消息形如 `<日期> <时间> <级别> [<分类>] <消息>`，其后是异常堆栈（如有）和调用栈。版本从 `Version: X.Y.Z.N` 读。只收 `WARN`、`WARNING`、`ERROR`、`FATAL`、`CRITICAL`；`INFO`、`DEBUG`、`TRACE` 不进错误簇。调用栈里日志系统自己的帧（`Brutal.Logging.*`、`Verse.Log`）丢弃，其余标为调用方帧，与异常帧分开。只有调用栈的消息不算 `exception`。补丁行 `- PREFIX owner: Target.Method <- Ret Type:Method(…)` 改写成 Unity 形式；.NET 10 打印的 `.Ns.Type.Method_PatchN(…)` 去掉前导点和 `_PatchN` 并标为被补丁的方法。
+- `1.6` and earlier (`Unity`): no message level. Read `RimWorld X.Y.Z revN` in first 50 lines.
+- 1.7 (`Waylith`, `=== Waylith log ===` within first 50 lines): `<date> <time> <level> [<category>] <message>`, then exception stack (if any) and call stack. Read `Version: X.Y.Z.N`. Collect only `WARN`, `WARNING`, `ERROR`, `FATAL`, `CRITICAL`; exclude `INFO`, `DEBUG`, `TRACE` from clusters. Discard logging-system call frames (`Brutal.Logging.*`, `Verse.Log`), mark others caller frames separately from exception frames. Call-stack-only messages are not exception. Rewrite `- PREFIX owner: Target.Method <- Ret Type:Method(…)` into `Unity` format; strip leading dot and `_PatchN` from .NET 10 `.Ns.Type.Method_PatchN(…)`, marking patched methods.
 
-**切分条目**：消息行加上紧随其后的续行。
+**Entries**: message line plus following continuation lines.
 
-- 续行：以空白开头的行；`[Ref `、`(wrapper `、`Rethrow as `、`--- End of`、`file: `、`Subnode:`（及其下一行）开头的行；跨行的 .NET 异常消息 `Parameter name: `、`Actual value was `、`Object name: `；Mono 原生帧 `<0x… + 0x…> <unknown method>`；不带 `at ` 的裸帧（内层异常堆栈）。
-- `(Filename: ` 行或空行结束当前条目。超过 4 KiB 的行截断。
-- `[Ref X] Duplicate stacktrace` 指回前面同 Ref 的原始堆栈。
-- XML Extensions 的错误块（`[Mod - Start of stack trace]` … `[End of stack trace]` … `Source file: <路径>`）合成一个条目：`[Mod] <第一行失败信息>`，其余行作为续行，路径作为 `file:`。
-- 条目的位置帧（`Top`）：第一个异常帧；没有异常时取第一个调用方帧（即写日志的代码）。
+- Continuations: whitespace-prefixed; `[Ref `, `(wrapper `, `Rethrow as `, `--- End of`, `file: `, `Subnode:` (and next line); multiline .NET `Parameter name: `, `Actual value was `, `Object name: `; `Mono` native `<0x… + 0x…> <unknown method>`; bare frames without `at ` (inner exception stack).
+- `(Filename: ` or blank lines end entry. Truncate lines above 4 KiB.
+- `[Ref X] Duplicate stacktrace` refers to earlier original with same Ref.
+- Combine XML Extensions blocks (`[Mod - Start of stack trace]` … `[End of stack trace]` … `Source file: <path>`) into `[Mod] <first-failure-line>`; rest continuations, path as `file:`.
+- Entry location frame (`Top`): first exception frame, otherwise first caller frame (logging code).
 
-**不进错误簇的行**：没有异常堆栈、且是引擎或框架的状态行——着色器回退（`Shader '…': fallback shader '…' not found`）、翻译数据错误数汇总（`Translation data for language … has N errors`）、XML Extensions 的补丁统计（`[XML Extensions] N total patch operations run`）、`Curl error N: Callback aborted`、`Mod … is missing supported versions list in About.xml`。规则来自日志语料。Unity 日志里，其余条目有异常堆栈、或分类不是信息性的、或含 error / exception / failed / could not / couldn't / invalid / missing / not found 之一时才算问题。
+**Excluded from error clusters**: no exception stack and engine/framework status lines: shader fallback (`Shader '…': fallback shader '…' not found`), translation totals (`Translation data for language … has N errors`), XML Extensions statistics (`[XML Extensions] N total patch operations run`), `Curl error N: Callback aborted`, `Mod … is missing supported versions list in About.xml`. Rules from corpus. Other `Unity` entries count only with exception stack, noninformational category, or error / exception / failed / could not / couldn't / invalid / missing / not found.
 
-**分类**（按此顺序判定）：
+**Categories** (in order):
 
-| 分类 | 判定 |
+| Category | Detection |
 | --- | --- |
-| `patch-failed` | `] Patch operation `、`Patch operation ` 开头、`Verse.PatchOperation…): Failed`、`Verse.PatchOperationSequence: Error in the operation`，以及 XML Extensions 块里的 `Verse.PatchOperation…` 失败 |
-| `xref-missing` | `Could not resolve cross-reference`、`Could not load reference to`、`Failed to find <X>Def named …` |
-| `material` | 含 `_MainTex`，或堆栈里有 `ResolveIcon` |
-| `xml-load` | XML 错误、`Could not find parent node`、`Duplicate def`、`Could not find a type named`、`Config error in` 等 |
-| `texture-missing` | `Could not load Texture2D at`、`Failed to find any textures at`、`Could not load Texture|Material|Shader|AudioClip|SoundDef` |
-| `save-load` | 存档中的引用无法解析：`Could not resolve reference to object with loadID`、`… is not deep-saved`、`Error in PostExposeData`、`Could not find think node with key`、`Exception loading … from save` 等 |
-| `harmony-stack` | 堆栈里有 Harmony 补丁行 |
-| `exception` | 有异常堆栈，或消息含 `Exception` |
-| `mod-report` | Mod 以 `[名称]`、`<color=…>[名称]`、`名称 :: `、`MOD: ` 等前缀报告自身情况（不是 `ERROR:` 这类级别词） |
-| `other` | 其余 |
+| `patch-failed` | Starts `] Patch operation ` / `Patch operation `, `Verse.PatchOperation…): Failed`, `Verse.PatchOperationSequence: Error in the operation`, XML Extensions `Verse.PatchOperation…` failures |
+| `xref-missing` | `Could not resolve cross-reference`, `Could not load reference to`, `Failed to find <X>Def named …` |
+| `material` | `_MainTex` or `ResolveIcon` in stack |
+| `xml-load` | XML errors, `Could not find parent node`, `Duplicate def`, `Could not find a type named`, `Config error in`, etc. |
+| `texture-missing` | `Could not load Texture2D at`, `Failed to find any textures at`, `Could not load Texture\|Material\|Shader\|AudioClip\|SoundDef` |
+| `save-load` | Unresolved save references: `Could not resolve reference to object with loadID`, `… is not deep-saved`, `Error in PostExposeData`, `Could not find think node with key`, `Exception loading … from save`, etc. |
+| `harmony-stack` | Harmony patch lines in stack |
+| `exception` | `Exception` stack or message containing `Exception` |
+| `mod-report` | Mod self-report with `[name]`, `<color=…>[name]`, `name :: `, `MOD: `, etc. (not level words like `ERROR:`) |
+| `other` | Everything else |
 
-`mod-report` 和 `other` 是信息性的，不进问题列表。
+`mod-report` / other are informational, outside finding list.
 
-**分类不代表运行阶段**：`save-load` 等名称只描述消息内容；阶段只读 Archo Monitor 的明确标记（§6.7.3–4），不从分类、堆栈或“Loading game…”一类原版文本推测。`logs.Entry.Phase` 是条目之前最近的标记；`logs.Cluster.Phase` 保留首次出现的阶段，`Phases` 分别累计各阶段次数，聚类键和编号不因阶段变化而改变。没有标记的旧日志不分阶段。
+**Category is not runtime phase**: names like `save-load` describe content only; phases use explicit Archo Monitor markers (§6.7.3–4), never category/stack/vanilla text such as "Loading game…". `logs.Entry.Phase` is latest preceding marker; `logs.Cluster.Phase` retains first phase, `Phases` counts each phase separately; keys/numbers do not change with phase. Old marker-free logs remain unphased.
 
-**聚类**：
+**Clustering**:
 
-- 归一化消息：取前 300 字符，路径换 `<path>`，地址和长十六进制 ID 换 `<hex>`，数字换 `#`。
-- 聚类键 = 分类 | 归一化消息 |（`patch-failed` 再加续行，用文件区分失败）| 位置帧的 `Type.Method`。同键条目合成一个错误簇 `log:E<n>`（按首次出现编号），记次数和前 5 次出现的行号。
-- **模板** = 分类 | 在归一化基础上再把颜色标签、`defName=…`、引号内容、`named / loadID / Type / field / at / for def / key` 后的名字、“found to give to X” 的 Def、括号里的类型名、packageId 换成占位符。模板用来统计“哪一类问题”（例如每张缺失贴图各报一行，聚类键不同，模板相同）。聚类键保留这些名字，因为归因要用。
+- Normalize first 300 message characters: paths → `<path>`, addresses/long hexadecimal IDs → `<hex>`, numbers → `#`.
+- Key = category | normalized message | (for `patch-failed`, continuations to distinguish files) | location frame `Type.Method`. Merge into `log:E<n>` by first appearance, count and first 5 line numbers.
+- **Template** = category | further replace color tags, `defName=…`, quoted contents, names after `named / loadID / Type / field / at / for def / key`, `Def` in "found to give to X", parenthesized types, `packageId` with placeholders. Templates count problem kinds (each missing texture has distinct cluster, same template). Keys retain names needed for attribution.
 
-### 6.2 证据
+### 6.2 Evidence
 
-归因对照的是事实库：生效内容、Def 事实、Patch 模拟结果、`TypeDef`、`HarmonyId`。Mod 名按 About.xml 的名字匹配（游戏打印的是 `[Name]`，不是玩家别名）。Core 和 DLC（packageId 以 `ludeon.rimworld` 开头）不会因为文本匹配或“定义了某个 Def”被当成来源。
+Attribute against facts: effective content, `Defs`, Patch simulation, `TypeDef`, `HarmonyId`. Match Mod names from About.xml (game prints `[Name]`, not aliases). Core/DLC (`ludeon.rimworld` prefix) never become sources from text matches or `Def` ownership.
 
-按强度从高到低：
+Strongest first:
 
-| 证据 | 规则 |
+| Evidence | `Rule` |
 | --- | --- |
-| 消息前缀 `[Mod 名]` | Mod 自报的问题 → `source`。XML Extensions 块写的是全名（`[[FSF] Vanilla Bionics Expansion] Verse.PatchOperation…`） |
-| 文件路径 | 消息或续行里的 `.xml/.dll/.png/.txt` 路径，落在某个实例目录里 → `source`。别人机器上的日志按 Mod 目录对：`…\workshop\content\294100\<id>\…` 或 `…\Mods\<目录>\…`（含 HugsLib 脱敏后的 `[Rimworld_dir]\Mods\…`） |
-| 补丁失败对模拟 | `patch-failed` 按 `[Mod]|描述` 或 `file:` 找到模拟里同一失败 → `source`，附 `file:line` 和 §4.4 原因；目标 Def 的提供方未启用 → `dependency` + `archo enable`。XML Extensions 的失败按 XPath 对。模拟里这条操作现在不失败时注明“the mod or the Loadout changed since the log” |
-| defName（`xref-missing`） | 记下缺失的 `def:<Type>/<name>`；查 Def 事实列出提供方（已启用 / 未启用），未启用的提供方 → `dependency` + `archo enable`；都没有时写 “providers: none among installed mods”。`Could not load reference` 注明是读存档时出的。**wanter 规则**：“found to give to <XDef> <名字>” 里那个 Def 的定义方（已启用、非官方）→ `source`。**引用方**：在启用 Mod 的生效 Defs/Patches 里一次性搜 `>Name<` 和 `<Name>`（后者是 `costList`、`products` 这类 ThingDefCountClass 列表）；跳过 Core/DLC 和自己就定义了这个名字的 Mod；匹配超过 3 个 Mod 或 wanter 规则已找到来源时只记 `mentioned` |
-| `texture-missing` 的 `for def 'X'` | X 的定义方 → `source` |
-| 文件的提供方 | 没有启用 Mod 的文件引用的缺失贴图，找带 `Textures/<路径>.*` 的已安装 Mod（跳过官方内容）；`Cannot resolve dependency to assembly 'X'`（X 不是游戏自带的）找带 `X.dll` 的。未启用 → `dependency` + `archo enable`；已启用 → `mentioned`（游戏不读那个载入文件夹？）；都没有时写 “providers: none among installed mods”。程序集列不出类型、又没有启用 Mod 加载它时，详情列出带这个 DLL 的已安装副本。范围是本环境看得到的活 Instance：共用文件夹（工坊、SteamCMD、额外文件夹、Monitor、锁定库）加本环境自己的 `Data`、`Mods`（02 §0，`Store.InstanceFiles`），别的游戏的 `Mods/` 不算 |
-| `xml-load` | `Could not find parent node named "X"`：提供 X 的已安装未启用 Mod → `dependency`。`Two ThinkNodes have the same unique save key`：补丁了 `ThinkTreeDef/<key>` 的启用 Mod → `patcher`。`Context` / `Full node` 里的 `<defName>` 或 `Name="…"` 的定义方 → `source` |
-| `material` | 给出检查清单（带 `uiIconColor` 却没有 `uiIconPath` / `uiIconPathsStuff` / `graphicData/texPath` 的可建造 Def，含抽象基类）和 `archo files search "uiIconColor"`、`"uiIconPath"` |
-| 缺失类型 | `Could not find type named NS.T` / `expected class 'NS.T'`：提供该类型的未启用 Mod → `dependency`；已启用 → `mentioned`（版本不匹配？） |
-| Harmony 补丁行 | 堆栈中 `- PREFIX <owner>: …` 这类行 → `patcher`，按补丁类型、Harmony ID、packageId 依次对 owner；对不上时记 “no installed mod matches” |
-| 堆栈帧的类型 | 非游戏命名空间的帧对照 `TypeDef`：最上面的 Mod 帧 → `source`，下面的 → `mentioned`。游戏命名空间：`Verse.`、`RimWorld.`、`System.`、`UnityEngine.`、`HarmonyLib.`、`Mono.`、`Unity.`、`MonoMod.`、`Ionic.`、`LudeonTK.`、`Steamworks.`、`Waylith.`、`Brutal.`、`RimWorldWaylith.` |
-| 消息里的类型名 | → `mentioned`；“instantiating a mod of type T”和“static constructor of T”→ `source` |
+| `[Mod name]` prefix | Self-reported issue → source. XML Extensions uses full names (`[[FSF] Vanilla Bionics Expansion] Verse.PatchOperation…`) |
+| File path | `.xml/.dll/.png/.txt` in message/continuations inside Instance directory → source. Other-machine logs match Mod directories: `…\workshop\content\294100\<id>\…`, `…\Mods\<directory>\…` (including HugsLib-redacted `[Rimworld_dir]\Mods\…`) |
+| Patch failure vs simulation | Match `patch-failed` by `[Mod]\|description` or `file:` → source, with `file:line`, §4.4 reasons; disabled target provider → dependency + `archo enable`. XML Extensions matches XPath. If no longer failing, state "the mod or the Loadout changed since the log" |
+| `defName` (`xref-missing`) | Record missing `def:<Type>/<name>`; `Def` facts list enabled/disabled providers; disabled → dependency + `archo enable`; none: "providers: none among installed mods". `Could not load reference` states save-reading context. **Wanter**: enabled nonofficial definer of `Def` in "found to give to `<XDef>` `<name>`" → source. **Referrers**: search enabled effective `Defs`/`Patches` once for `>Name<` and `<Name>` (ThingDefCountClass lists like `costList`/products); skip Core/DLC and `Mods` defining name themselves; if over 3 `Mods` match or wanter found source, only mentioned |
+| `for def 'X'` in `texture-missing` | X definer → source |
+| File providers | For missing textures without enabled-Mod file reference, find installed nonofficial `Textures/<path>.*`; for nongame `Cannot resolve dependency to assembly 'X'`, find `X.dll`. Disabled → dependency + enable; enabled → mentioned (game not reading that loading folder?); none: "providers: none among installed mods". If assembly has no types and no enabled loader, details list installed DLL copies. Scope: live visible Instances, shared folders (Workshop, SteamCMD, extra, Monitor, locked) plus own `Data`/`Mods` (02 §0, `Store.InstanceFiles`), not other games' `Mods` |
+| `xml-load` | `Could not find parent node named "X"`: installed disabled provider → dependency. `Two ThinkNodes have the same unique save key`: enabled patchers of `ThinkTreeDef/<key>` → patcher. Definers of `<defName>` / `Name="…"` in `Context` / `Full node` → source |
+| `material` | Checklist (buildable `Def` with `uiIconColor` but no `uiIconPath` / `uiIconPathsStuff` / `graphicData/texPath`, including abstract bases), `archo files search "uiIconColor"`, `"uiIconPath"` |
+| Missing types | `Could not find type named NS.T` / `expected class 'NS.T'`: disabled provider → dependency; enabled → mentioned (version mismatch?) |
+| Harmony patch lines | `- PREFIX <owner>: …` → patcher; match owner by patch type, Harmony ID, `packageId` in order; otherwise "no installed mod matches" |
+| Stack frame types | Non-game namespaces vs `TypeDef`: topmost Mod frame → source, lower → mentioned. Game namespaces: `Verse.`, `RimWorld.`, `System.`, `UnityEngine.`, `HarmonyLib.`, `Mono.`, `Unity.`, `MonoMod.`, `Ionic.`, `LudeonTK.`, `Steamworks.`, `Waylith.`, `Brutal.`, `RimWorldWaylith.` |
+| Message type names | mentioned; "instantiating a mod of type T" / "static constructor of T" → source |
 
-### 6.3 角色与输出
+### 6.3 Roles and Output
 
-**角色**：`source`（错误由它产生）、`patcher`（只是补丁了相关方法）、`dependency`（缺的、未启用的被依赖方）、`mentioned`（只是被提到）。按此顺序排列候选。`patcher` 没有自己的帧或文件，绝不升为 `source`。例外：`xref-missing` 查到已安装未启用的提供方时，`dependency` 排在 `patcher` 前。缺的 Def 就是它的，补丁了读档或加载代码的 Mod 只是碰过这段代码（VM 2026-10-28：存档缺发型，原先报成补丁了 `Pawn.ExposeData` 的 Vanilla Expanded Framework）。
+**Roles**: source (produced error), patcher (only patched related method), dependency (missing disabled dependency), mentioned (only mentioned), candidates in this order. `Never` promote patcher without own frames/files. `Exception`: installed disabled `xref-missing` providers rank dependency before patcher. Missing `Def` belongs to provider; save/load patchers merely touched code (VM 2026-10-28: missing hair in save previously blamed Vanilla Expanded Framework patching `Pawn.ExposeData`).
 
-**置信度**：第一候选是 `source` 且有文件或补丁证据 → `certain`；是 `source` 但只有其他证据 → `likely`；按上面的例外排第一的 `dependency` → `likely`（“a mod that defines it is installed but not enabled”，后来的规则找到 `source` 时改回 `source` 的结论）；有候选但无 `source` → `possible`（“no source identified”）；没有候选 → `possible`（“no mod identified”）。缓存的归因报告带版本号（`logCacheVersion`），归因规则改变时加一，旧日志重新归因。
+**Confidence**: first source with file/patch evidence → certain; source with other evidence → likely; exception-first dependency → likely ("a mod that defines it is installed but not enabled", later source evidence restores source conclusion); candidates without source → possible ("no source identified"); no candidates → possible ("no mod identified"). Cached reports carry `logCacheVersion`; increment on attribution rule changes to reattribute old logs.
 
-**热点**：堆栈经过 `Verse.Pawn.Tick`、`Verse.ThingWithComps.Tick`、`Verse.Thing.DoTick`、`RimWorld.Planet.WorldPawns.WorldPawnsTick`、`Verse.Pawn.TickRare`、`Verse.ThingWithComps.TickRare`、`Verse.TickList.Tick`、`Verse.ThingWithComps.CompTick` 时，附 tick 崩溃检查清单（循环中增删 `AllComps`、运行时加 comp 没走 `InitializeComps()`、补丁行只说明谁最后碰过这个方法、还要查 ExposeData/SpawnSetup/DeSpawn/Destroy）和 `archo source search "AllComps.Remove(" --in …`、`"AllComps.Add("`。
+**Hot paths**: stacks through `Verse.Pawn.Tick`, `Verse.ThingWithComps.Tick`, `Verse.Thing.DoTick`, `RimWorld.Planet.WorldPawns.WorldPawnsTick`, `Verse.Pawn.TickRare`, `Verse.ThingWithComps.TickRare`, `Verse.TickList.Tick`, `Verse.ThingWithComps.CompTick` include tick-crash checklist (`AllComps` mutation during iteration, runtime comp addition without `InitializeComps()`, patch lines only show last method touch, also inspect ExposeData/SpawnSetup/DeSpawn/Destroy), `archo source search "AllComps.Remove(" --in …`, `"AllComps.Add("`.
 
-**每个错误簇产出一条 `log.<分类>` 问题**：
+**One `log.<category>` finding per cluster**:
 
-- `subjects`：候选实例；没有候选时是 `log:E<n>`。
-- `claim`：`log:E<n> x<次数>: <消息>`。
-- `evidence`：每个候选的 `<角色>: <证据>`（来源 `log`），再加分类相关的细节（原因、提供方等，来源 `inferred`）。
-- `suggestions`：第一条 `archo log --cluster E<n>`，然后是下一步，如 `archo patches --mod <ref> --failed`、`archo harmony --target Verse.Pawn.Tick`、`archo source <ref> --type <类型>`、`archo def <Type>/<name>`、`archo enable <ref>`。
-- `key`：聚类键，绝对路径截到最后三段（§4.2）。
+- subjects: candidate Instances, or `log:E<n>` without candidates.
+- claim: `log:E<n> x<count>: <message>`.
+- evidence: candidate `<role>: <evidence>` (log), plus category details (reasons/providers, inferred).
+- suggestions: first `archo log --cluster E<n>`, then next steps such as `archo patches --mod <ref> --failed`, `archo harmony --target Verse.Pawn.Tick`, `archo source <ref> --type <type>`, `archo def <Type>/<name>`, `archo enable <ref>`.
+- key: cluster key, absolute paths reduced to final three segments (§4.2).
 
-**簇详情**（`archo log --cluster E<n>`、MCP、界面）：完整消息、续行、首次出现前后的其他日志消息（`nearby`：前 4 条、后 3 条，30 行以内，每条截到 200 字符），省得再去翻原始日志（日志语料 G7）。
+**Cluster details** (`archo log --cluster E<n>`, MCP, UI): complete message/continuations, messages around first occurrence (nearby: 4 before, 3 after, ≤30 lines, 200 characters/message), avoiding raw-log lookup (corpus G7).
 
-**错误范式**（`pattern:<id>`，§6.8）：簇匹配到范式库中的已知范式时，列表行末尾附 `[pattern:g:<id>]`，簇详情附 `pattern:` 小节。范式是证据来源 `community` 的背景知识，不改变归因、角色和置信度，也不单独构成结论。
+**Error patterns** (`pattern:<id>`, §6.8): matching clusters show `[pattern:g:<id>]` at row end and `pattern:` in details. Community background knowledge only; no attribution/role/confidence changes or standalone conclusions.
 
-**贴进来的文本**（`AnalyzeLogText`，例如玩家粘贴的堆栈）用同一套解析和归因，标签为 `<text>`。
+**Pasted text** (`AnalyzeLogText`, e.g. pasted stacks) uses identical parsing/attribution, labeled `<text>`.
 
-### 6.4 日志属于哪次启动
+### 6.4 Which Launch Owns a Log
 
-**先判断哪个游戏写的**：`App.CheckLogOwner` 在选日志、读取归因缓存、归因、启动日志版本分析和记为已看之前检查归属。优先用日志启动头明确的游戏路径对照环境的 `game_root`：目前识别 1.6 Unity 的 `Mono path[0] = '<game_root>/…_Data/Managed'`，只接受绝对路径，不从 Mod 的报错、堆栈里的源码路径推断。仓库的 1.7 Waylith 样例有版本行，没有可核对的游戏路径，不能假设它也打印 Mono 行。没有确定路径时，用下文按时间匹配的启动记录或 ModsConfig 写入记录判断环境；明确路径与记录矛盾时，以路径判断游戏，方案来源标为不明。**仅版本不同不说明是另一个游戏**：同一游戏目录可能已经升级；即使另一个环境正好使用日志的版本，也不能据此排除。没有足够依据时保留原有来源不明 / 过期处理，不猜成别的环境。
+**First identify writing game**: `App.CheckLogOwner` checks before selection, cache reads, attribution, log-version analysis, marking seen. Prefer explicit startup-header game path against `game_root`: currently `Unity` `1.6` `Mono path[0] = '<game_root>/…_Data/Managed'`; absolute paths only, not Mod errors/stack source paths. Repository `Waylith` 1.7 sample has version but no verifiable game path; do not assume `Mono` lines. Without definite path, use time-matched launch or ModsConfig write records below; path/record conflict uses path for game, unknown plan. **Version mismatch alone does not mean another game**: directory may have upgraded; another environment matching log version is insufficient. Without evidence, retain unknown/stale behavior, do not guess another environment.
 
-**别的游戏的日志不属于本环境**：从候选中排除，不做归因、不读归因缓存、不触发 `EnsureLogAnalysis`、不写已看状态，不出现在问题列表（包括过期组）、侧栏计数、新日志提示或上次运行的报错里。游戏日志页、CLI `problems` / `log` / `status` 和 MCP 对应工具使用同一规则。已有的选择指向被另一个游戏覆盖的文件时也重新判断；实时追踪每次读取和结束时检查，被覆盖后丢弃旧聚类。**显式 `log --file` 和 `--game-version` 也不绕过归属**：确定是另一个已登记环境的游戏写的才拒绝读取（`log belongs to environment <名字>`）；本环境和归属不明的文件仍可显式查看，后者照常按过期处理、不触发分析。启动头的游戏目录不属于任何环境（别人发来的日志、语料日志、搬走之前的本游戏）算归属不明，不算别的环境。`--game-version` 只改分析版本，不改环境身份。
+**Other games' logs do not belong here**: exclude before attribution/cache/`EnsureLogAnalysis`/seen writes; absent from finding lists (even stale groups), sidebar counts, new-log notices, last-run errors. Game log page, CLI problems/log/status, MCP share rules. Recheck selections overwritten by another game; live tracking checks each read/end, discards clusters after overwrite. **Explicit `log --file` / `--game-version` never bypass ownership**: refuse only when definitely written by another registered environment (`log belongs to environment <name>`); explicit own/unknown files remain viewable, unknown stale without analysis. Header path outside all registered environments (shared/corpus logs, same game before move) is unknown, not foreign. `--game-version` changes analysis version, not identity.
 
-**找哪份日志**：1.7 及以上优先 `<用户数据>/Logs/Player.log`，更早优先用户数据根目录（02 §2.3）；两处分别寻找可用的 `Player.log` 和 `Player-prev.log`，排除别的游戏写的文件。当前文件不可用时，问题列表、游戏日志页和默认 `archo log` 改读可用的上一份；都没有时当作没有日志。整合包在 1.7 上使用自己的用户数据目录，1.6 仍用环境的日志（08 §5.3）。
+**Which file**: 1.7+ prefer `<user-data>/Logs/Player.log`, earlier user-data root (02 §2.3); find available `Player.log`/`Player-prev.log` at both, excluding foreign files. If current unavailable, finding list/game log/default `archo log` use available previous; none means no log. Pack 1.7 uses own userdata; `1.6` uses environment log (08 §5.3).
 
-**问题日志**：进入问题列表的那份日志 = 玩家选中的（`archo log --select`，或在游戏日志页选中一份；存在 `log.selected:<环境>`），或者当前 Player.log 比它新时用当前的。**游戏运行时**，当前环境的游戏正在写的那份（`App.LiveLog`，同 `RunLog`）是本次运行、不是上次运行：它不当问题日志，选中的正是它时也一样，Player.log 让位给 Player-prev.log（游戏启动时把上一份挪到这里），只读缓存时（`LazyLog`，侧栏的计数）也一样，游戏退出后恢复。整合包在 1.7 上写自己的日志，不受影响。`archo log` 不受影响，默认仍读正在写的 Player.log（2026-10-28：原先运行中重新检查会把正在写的日志读成上次运行，同一批错误在能不能跑列两遍、计数翻倍）。CLI `problems` / `status` 与 MCP 对应工具不使用懒加载，但同样按上述规则选问题日志。界面为了空闲内存，在打开“能不能跑”页之前不解析日志、只读缓存（`App.LazyLog`、`App.LogCacheOnly`），打开时才解析并把日志记为已看（`log.seen:<环境>`）。当可用的 Player.log 比上次启动和上次看过的日志都新时，TUI 显示“新日志”提示；GUI 不等玩家打开页面，在后台读一次（`API.ReadNewLog`，2026-10-30，06 §2.1），读完照常释放。
+**Problem log**: player-selected (`archo log --select` or game-log page, stored `log.selected:<environment>`), or current `Player.log` if newer. **While game runs**, current environment file (`App.LiveLog`, same as `RunLog`) is this run, not last run: never use as problem log, even selected; `Player.log` yields to `Player-prev.log` (moved on startup), including cache-only `LazyLog` sidebar counts; restore after exit. 1.7 pack own logs unaffected. `archo log` still defaults live `Player.log` (2026-10-28: rechecking while running previously read live as last run, duplicating findings/counts). CLI problems/status/MCP are not lazy but choose by same rule. For idle memory, UI parses only when can it run opens; before then cache-only (`App.LazyLog`, `App.LogCacheOnly`); opening marks seen (`log.seen:<environment>`). If available `Player.log` is newer than last launch/seen log, TUI shows "new log"; GUI reads once in background without waiting for page (`API.ReadNewLog`, 2026-10-30, 06 §2.1), then releases normally.
 
-**按日志自己的版本分析**：已确认由本环境游戏写出的日志，写明的主次版本与环境不同、且没给 `--game-version` 时，先把该版本的分析更新到最新（文件入口 `EnsureLogFileAnalysis`，再调用 `EnsureLogAnalysis`），按日志版本归因，标题写 `analysed: as 1.6 (log version); environment is 1.7`。例如同一游戏从 1.6 升到 1.7 后仍可分析自己的 1.6 旧日志。归属不明的文件可以查看、保持过期不计数，但不自动触发另一个版本的分析；归因仍可读取已有事实。
+**Analyze by log version**: confirmed own-game log with different major/minor and no `--game-version` first refreshes that version's analysis (`EnsureLogFileAnalysis` → `EnsureLogAnalysis`), attributes by log version, heading `analysed: as 1.6 (log version); environment is 1.7`. Same directory upgraded `1.6`→1.7 can analyze its `1.6` logs. Unknown files remain stale, uncounted, viewable; no automatic other-version analysis, but stored facts may attribute.
 
-**归属与过期**：
+**Ownership and staleness**:
 
-- **规则**：每份日志按写入时间对应到**最近一次启动记录**——开始时间不晚于日志修改时间的那条（共用用户数据目录的其他环境的启动也算；1.7 起 `Logs/` 下的日志不对应整合包的启动，整合包的游戏写自己的日志）（启动记录含环境、方案或整合包、时间、列表指纹，见 08 §2）。以下任一成立即为过期：
-  1. 日志的游戏主次版本与被分析的版本不同；
-  2. 对应的启动不是被分析的方案（本环境的另一个方案或整合包；别的环境的日志已在选取前排除）；
-  3. 对应启动的列表指纹与方案当前的启用列表指纹不同（启动之后方案改过）。只是同一位置的 Archo Monitor 换了版本（08 §9 的更新）不算改过：按启动记录（或写入记录）的版本号取出当时的列表、核对指纹，再把每个 Monitor 当作同一项比较（`App.monitorSwapOnly`；2026-10-28 VM：游戏启动后检查才把 Monitor 换成随附的新版本，刚结束的这次运行被算成过时，能不能跑只剩更早的日志）。
+- **`Rule`**: match each log by write time to **latest launch record** starting no later than mtime (including other environments sharing userdata; 1.7 `Logs/` excludes pack launches because packs write their own) (environment/plan or pack/time/list fingerprint in 08 §2). Stale if any:
+  1. Log major/minor differs from analyzed version;
+  2. Matched launch is not analyzed plan (another own plan/pack; foreign environments already excluded);
+  3. Launch list fingerprint differs from current enabled list (edited after launch). Replacing only same-position Archo Monitor version (08 §9) does not count: retrieve list at recorded launch/write version, verify fingerprint, compare Monitors as same item (`App.monitorSwapOnly`; VM 2026-10-28: post-launch check updated Monitor, incorrectly staling just-finished run and leaving only older logs).
   
-  找不到对应启动记录（游戏从 Steam 等别处启动）时，按日志写入时间之前最近一次 ModsConfig 写入记录（04 §4.3，记录写入者方案）归属；仍对不上时标为“来源不明”，按过期处理，并在标题说明。不再使用 ModsConfig.xml 的修改时间。
-- 过期日志的问题不计入 `problems`、`status` 和界面计数，不让 `harmony.skip-prefix` 升级；默认折叠成标题一行；按 `--code`、`--subject`、`--all` 筛选时逐条列出；`problems show` 仍能查到并注明所属日志。
+  Without launch record (Steam/external launch), use latest ModsConfig write before log time (04 §4.3, writer plan); no match means unknown source, stale with heading explanation. Do not use ModsConfig.xml mtime anymore.
+- Stale findings excluded from problems/status/UI counts and skip-prefix escalation; collapse to title by default; `--code`, `--subject`, `--all` show individual entries; `problems show` still works, naming log.
 
-**标题行**：每份日志一行：文件名、日志写明的游戏版本、写入时间、当前还是过期（附原因，如 `written by 1.6, the game is 1.7`），以及各严重度计数；过期的加 `not counted` 和展开命令。该日志的错误簇列在标题下。
+**Heading**: one per log: filename, declared game version, write time, current/stale with reason (e.g. `written by 1.6, the game is 1.7`), severity counts; stale adds `not counted` and expand command. Clusters below heading.
 
-### 6.5 缓存
+### 6.5 Caching
 
-- 解析加聚类很快，耗时大头是引用方搜索（实测见 07 §6），所以缓存的是**整份归因结果**，按日志路径一行存在 `log_cache` 表里，同时在进程内存里留一份。
-- 键 = 路径 + 大小 + 修改时间 + 归因输入指纹：缓存版本（`logCacheVersion`）、`--game-version`、游戏主次版本、分析批次、启用列表、每个已安装 Mod 的 ID、快照、名称、别名、packageId 和目录。任一项变化即重新解析。
-- `status` 和 `mod`（MCP `status`、`get_mod`）只读缓存、从不解析日志。缓存缺失时日志标为“尚未分析”（Pending），`status` 说明它的错误不在计数里。
-- 报告的 JSON 用 gzip 压缩后存（schema v25 起，旧报告在迁移时压缩）：报告常比日志本身还大（4 MB 的 Player.log 约 9 MB），压缩后约为二十分之一。读出的报告解压不了时当作没有缓存，重新解析。
-- 报告只覆盖读取时的文件大小（游戏可能还在写）；同时记下这些字节的 CRC-32C，作为游标（§6.6）。
+- Parsing/clustering is fast; referrer searches dominate (07 §6), so cache **whole attribution report**, one `log_cache` row per path, plus in-memory copy.
+- Key = path + size + mtime + input fingerprint: `logCacheVersion`, `--game-version`, game major/minor, analysis run, enabled list, each installed Mod ID/snapshot/name/alias/`packageId`/directory. Any change reparses.
+- status, mod (MCP status/`get_mod`) only read cache, never parse. Missing cache marks Pending; status explains errors uncounted.
+- gzip JSON (since schema v25, old reports compressed in migration): reports often exceed logs (4 MB `Player.log` about 9 MB report), compressed to about one-twentieth. Invalid compressed report is cache miss/reparse.
+- Report covers file size at read time (game may append), with CRC-32C of bytes for cursor (§6.6).
 
-**新日志第一次查询**（缓存没命中时，目标 ≤ 500 毫秒，07 §6）：
+**First query for new log** (cache miss, target ≤500 ms, 07 §6):
 
-- **按 Name 查 Def 走索引**（`def_fact_named`，只含有 `Name` 属性的约 5% 行，再按 `content_state` 筛选当前版本；存储见 §3）：缺父节点的簇按 `Name="…"` 找定义方，之前每次扫一遍该游戏版本的全部 Def 事实（8.3 万行约 70 毫秒），一份有 190 个这类簇的日志要 14 秒。同一份日志里同一个名字只查一次。
-- **引用索引**（按 defName 找引用方）：每个启用集合 + 游戏版本一份，记录每个生效的 `Defs/`、`Patches/` 文件里以引用形式出现的名字（元素文本 `>X<`、元素名 `<X>`，不含空白）的哈希。分析子进程分析完顺手建好（485 个 Mod、5750 个文件、77 MB：约 0.3–0.4 秒，4.8 MB），查询时找不到也当场建。存在 `<数据目录>/cache/refindex/<键>.idx`，键 = 游戏主次版本 + 每个启用 Mod 的 Instance、快照和目录（与顺序无关），只留最近 8 份。交叉引用的引用方搜索只读索引指出的文件，在文件里按原规则（两种形式取最早出现的行）确认并取行号；之前是对每个缺失的名字把每个启用 Mod 的每个文件读一遍。结果与之前相同（4 份语料日志、4113 个簇逐一比对），引用证据改为按文件排序。
-- **分簇**：同一条目（级别、消息、续行、各帧）只分类一次，`Classify` 每个条目只算一次；`noiseRe`、`textureRe`、`modReportRe` 改成一个开头的 `^`（每个分支各带 `^` 时 Go 在长消息的每个位置重试）。
-- 实测见 07 §6：568 毫秒那类日志现在 130–330 毫秒。
+- **Indexed `Name` lookup** (`def_fact_named`, only ~5% of rows with `Name`, filtered by `content_state` version; §3): missing-parent clusters query `Name="…"`; formerly full-version `Def` scan per lookup (83,000 rows ~70 ms), 190 clusters ~14 seconds. One query per distinct name/log.
+- **Reference index** (`defName` referrers): per enabled set/game version, hashes names appearing as references in effective `Defs`/`Patches` (`>X<`, `<X>`, no whitespace). Analysis subprocess builds afterward (485 `Mods`, 5750 files, 77 MB: ~0.3–0.4 seconds, 4.8 MB); build on query if absent. `<data-directory>/cache/refindex/<key>.idx`, key = game major/minor + enabled Instance/snapshot/folders, order-independent; latest 8 only. Search only index-selected files, verify original forms taking earliest line; formerly reread every enabled file per missing name. Identical results across 4 corpus logs/4113 clusters; reference evidence now file-sorted.
+- **Clustering**: classify each entry (level/message/continuations/frames) once; `Classify` once/entry; `noiseRe`, `textureRe`, `modReportRe` use one leading `^` (branch-local anchors made Go retry each position of long messages).
+- Measurements in 07 §6: former 568 ms logs now 130–330 ms.
 
-### 6.6 实时追踪
+### 6.6 Live Tracking
 
-游戏运行检测见 08 §4。游戏运行时：
+Game detection: 08 §4. While running:
 
-- **增量读取**（`app.LiveLog`）：记住 Player.log 的路径、已读偏移；每秒检查一次，每次最多读 8 MiB，其余下次读。文件变小视为新文件（游戏重启）：偏移归零，旧聚类清空。新内容按行切分，没有换行的最后一行留到下次。
-- 解析器状态跨批次保留，条目在下一个非续行出现或游戏退出时结束（`logs.Parser`）。
-- 阶段标记也跨批次保留（§6.7.4）。同一个旧簇在另一阶段再次出现，只更新该阶段的次数；“本次运行”项随之更新，不要求产生新簇。第一次读到标记后，之前的记录归入加载游戏；始终没有标记则保持原来的平铺项。
-- **内存**：只保留聚类，不保留原文。每个聚类留前 3 个样本条目和计数；聚类数超过 2000 时丢弃最旧的信息性聚类。分类结果按“消息 + 位置帧 + 续行”记忆（正则每条约 70 µs，重复消息只算一次），记忆表满 10000 条清空。
-- 每批新聚类用第一个样本走完整归因（§6.2），结果进“能不能跑”页“上次运行的报错”组的“本次运行”部分，按首次出现时间排序（06 §2.4）。新错误到来时计数更新，不弹窗；“游戏运行中”和本次运行的错误数写在 GUI 启动页和 TUI 状态行（2026-10-30 起 GUI 侧栏底部不再写）。
-- 游戏退出后停止追踪，做一次完整分析（同 `archo log`），结果替换“本次运行”部分。
+- **Incremental read** (`app.LiveLog`): remember `Player.log` path/offset; check each second, up to 8 MiB/read, remainder next time. Shrink means new file (restart): reset offset/clusters. Split lines, retain incomplete last line.
+- Parser state across batches; entry ends at next noncontinuation or game exit (`logs.Parser`).
+- Phase markers persist (§6.7.4). Old cluster repeated in new phase updates that phase count and this-run entry without new cluster. First marker assigns preceding entries to loading; no markers keeps flat entries.
+- **Memory**: clusters only, no raw log; first 3 samples/count each; beyond 2000 discard oldest informational clusters. Memoize category by message + location + continuations (regex ~70 µs/entry, repeated once); clear at 10000 entries.
+- Attribute each new cluster's first sample fully (§6.2), show in this-run part of can it run last-run errors, first-appearance order (06 §2.4). Update counts without dialogs; game-running/current-error count on GUI launch page/TUI status line (since 2026-10-30, no GUI sidebar-bottom text).
+- On exit stop tracking, perform full analysis like `archo log`, replacing this-run section.
 
-**伴生日志**：游戏内辅助 Mod 写的 JSON 日志（Archo Monitor 的 `ArchoMonitor.log`，或 RimCrow 的 `RimCrow_Realtime.log`）随 Player.log 一起增量读取，补时间戳、级别、次数、文件和相关 Mod。找哪份、每个字段怎么用见 §6.7。
+**Companion logs**: in-game Mod JSON (Archo Monitor `ArchoMonitor.log`, RimCrow `RimCrow_Realtime.log`) read incrementally with `Player.log`, adding timestamps/levels/counts/files/related `Mods`. Selection/fields: §6.7.
 
-**接口**：CLI `archo log --follow` 持续输出新聚类，直到游戏退出或 Ctrl+C，`--json` 每个聚类一行，`--once` 读完现有内容即停。`archo log` 的其他参数（`--cluster`、`--file`、`--prev`、`--text`、`--all`、`--select`）见 05 §4。
+**Interface**: CLI `archo log --follow` emits new clusters until game exit/Ctrl+C; `--json` one cluster/line, `--once` stops after current contents. Other log flags (`--cluster`, `--file`, `--prev`, `--text`, `--all`, `--select`): 05 §4.
 
-**`since` 游标**（MCP `analyze_log` 的 `since`，CLI `archo log --since`，供 agent 轮询；已实现，2026-10-22）：
+**since cursor** (MCP `analyze_log` since, CLI `archo log --since`, agent polling; implemented 2026-10-22):
 
-- `archo log` / `analyze_log` 的簇列表带一行 `cursor: log1.<大小>.<校验>[.<伴生日志大小>.<校验>]`：这份报告读了 Player.log（和配对的伴生日志，§6.7.4）的多少字节（36 进制）和这些字节的 CRC-32C。游标不在磁盘上存任何状态，CLI 和 MCP 结果一致。
-- 带 `since=<游标>` 再调用：照常分析当前日志（有缓存用缓存），再把日志的前 `<大小>` 字节按同样的规则重新分簇（不归因），得到每个簇在游标时的次数；只列出新出现的簇（`new`）和次数增加的簇（`+N`），标题给出新增数和总簇数，再给一个新游标。伴生日志同样取前 `<伴生日志大小>` 字节，所以只在 ArchoMonitor.log 里的条目（游戏停写 Player.log 之后）和伴生日志里增加的次数也算；伴生日志换了一份（另一个 session）时按“游标时什么都不知道”处理。
-- **过期**：日志的开头已不是游标时的那些字节（变短或校验不同）= 游戏重启、写了新的一份。回答写明“游标已过期”，并列出当前日志的全部簇。当前是 Player.log 而 Player-prev.log 的开头对得上时，说明“游标所在的那次运行现在是 Player-prev.log”，下一步给 `archo log --prev --since <游标>`（MCP `prev=true`）；Player-prev.log 本身对不上时说明它已被更新的一次运行替换（游戏又重启了）。
-- 游标时最后一行可能只写了一半：之后补全的那个条目算作新簇（宁可多报，不漏报）。
-- 这是轮询完整分析，不是 `LiveLog`：每次调用都按文件当时的大小做一次完整分析（第一次查询的速度见 §6.5）。
+- Cluster lists include `cursor: log1.<size>.<checksum>[.<companion-size>.<checksum>]`: `Player.log` and paired companion (§6.7.4) byte counts in base 36 plus CRC-32C. No on-disk cursor state; identical CLI/MCP.
+- With since, analyze current log normally (cached if possible), recluster first size bytes without attribution for old counts; show only new clusters (new) and count increases (`+N`), heading added/total counts, new cursor. Companion prefix included, so companion-only entries after game stops `Player.log` and increased counts also count; changed companion session means no knowledge at cursor.
+- **Expired**: shorter/different-checksum prefix means restart/new log. State expired cursor and list all current clusters. If current `Player.log` mismatches but `Player-prev.log` prefix matches, say cursor's run is now `Player-prev.log`, suggest `archo log --prev --since <cursor>` (MCP `prev=true`); mismatching previous means replaced by a newer run (another restart).
+- Half-written final cursor line: completed entry counts new (prefer extra report over omission).
+- `Full`-analysis polling, not `LiveLog`; analyze size at each call (§6.5 first-query speed).
 
-### 6.7 Archo Monitor 与伴生日志
+### 6.7 Archo Monitor and Companion Logs
 
-> 状态：2026-10-21 新增。决定：RimArcho 自带游戏内辅助 Mod Archo Monitor，默认加入方案（04 §1.5），随发行包安装（08 §9）。
+> Status: added 2026-10-21. Decision: RimArcho bundles in-game helper Archo Monitor, enabled in plans by default (04 §1.5), installed with releases (08 §9).
 
-Player.log 说不出的事，只有游戏里面知道：报错时正在加载哪个文件、哪个 Def；调用栈上的程序集和 Harmony 补丁属于哪个 Mod；游戏的日志条数到上限以后还出了多少错。Archo Monitor（`packageId` `toumanlin.archomonitor`）在游戏里记下这些，写成每行一条 JSON 的伴生日志。行为参照 RimCrow Companion 0.3.12（只读它的反编译代码理解行为和格式，代码是自己写的）；它致谢的 BetterModSort（Apache-2.0）、LogAfterDefError（MIT）、BetterLog（MPL-2.0）、Mod Error Checker（无公开许可）没有借用代码，About.xml 里一并致谢。
+Only the game knows what `Player.log` cannot say: currently loading file/`Def`, Mod owners of stack assemblies/Harmony patches, errors after logging limit. Archo Monitor (`packageId` `toumanlin.archomonitor`) records these as JSON lines. Behavior follows RimCrow Companion 0.3.12 (decompiled code read only for behavior/format; implementation written independently); no code borrowed from its credited BetterModSort (Apache-2.0), LogAfterDefError (MIT), BetterLog (MPL-2.0), Mod Error Checker (no public license); About.xml credits all.
 
-#### 6.7.1 抓什么
+#### 6.7.1 What Is Captured
 
-| 钩子 | 做什么 |
+| Hook | Action |
 | --- | --- |
-| `Verse.Log.Error(string)`、`Verse.Log.Warning(string)` 的 prefix | 每条错误、警告进记录。游戏写到 `StopLoggingAtMessageCount` 条后不再写 Player.log，prefix 在这道检查之前，所以之后的报错也有计数 |
-| `Verse.Log.Message(string)` 的 prefix | 默认不挂（信息条目最多，是热路径）；Mod 设置里打开“记录信息级消息”后，下次启动才挂 |
-| `Application.logMessageReceivedThreaded` | 不经过 `Verse.Log` 的 Exception、Error、Assert（堆栈里没有 `Verse.Log`） |
-| `DirectXmlLoader.DefFromNode`、`DirectXmlToObjectNew.DefFromNodeNew`（1.6 起）的 prefix + finalizer | 线程内的栈：正在加载的文件（`LoadableXmlAsset`）和 Def 节点；同时记下 defName（没有时 `Name` 属性）→ 文件、所属 Mod、`ParentName` |
-| `LoadedModManager.ApplyPatches` 的 prefix + finalizer | 标记“正在打 XML 补丁”；第一次进入时收集启用 Mod 的全部补丁操作：xpath 里的 `defName="…"`、`Name="…"` → （Mod，操作类型），`Sequence`、`FindMod`、`Conditional` 的子操作也收 |
-| `DirectXmlToObject.ValidateListNode` 的 postfix | 列表项引用的 Def 名 → 正在加载的 Def、文件和列表字段名（取自上面的栈，不另外遍历 XML），用于交叉引用缺失 |
-| `Verse.UIRoot_Entry.Init()` 的 postfix | 菜单初始化完成（其中已执行 `MainMenuDrawer.Init`），进入 `menu`；从游戏返回主菜单时再次记录 |
-| `Verse.SavedGameLoaderNow.LoadGameFromSaveFileNow(string)` 的 prefix | 开始读取存档，进入 `save`，保留文件名（不含目录） |
-| `RimWorld.Planet.WorldGenerator.GenerateWorld`、`Verse.Game.InitNewGame()` 的 prefix | 世界生成、新殖民地初始化开始，进入 `new`；连续进入同一阶段只记录一次 |
-| `Verse.Game.FinalizeInit()` 的 postfix | 新殖民地或存档的初始化完成，进入 `play` |
+| `Prefix` on `Verse.Log.Error(string)`, `Verse.Log.Warning(string)` | Record every error/warning. `Prefix` precedes `StopLoggingAtMessageCount` check, so count errors even after `Player.log` stops |
+| `Prefix` on `Verse.Log.Message(string)` | Off by default (most entries, hot path); enabling "record informational messages" in Mod settings attaches on next startup |
+| `Application.logMessageReceivedThreaded` | `Exception`/Error/Assert outside `Verse.Log` (no `Verse.Log` stack frame) |
+| `Prefix` + finalizer on `DirectXmlLoader.DefFromNode`, `DirectXmlToObjectNew.DefFromNodeNew` (`1.6`+) | Thread-local stack: loading `LoadableXmlAsset`/`Def` node; map `defName` (otherwise `Name`) → file, owning Mod, `ParentName` |
+| `Prefix` + finalizer on `LoadedModManager.ApplyPatches` | Mark XML patching; first entry collects enabled `Mods`' operations: XPath `defName`/`Name` → Mod/operation type, including `Sequence`/`FindMod`/`Conditional` children |
+| `Postfix` on `DirectXmlToObject.ValidateListNode` | Referenced `Def` name → loading `Def`/file/list field from stack above, no extra XML traversal, for missing cross-references |
+| `Postfix` on `Verse.UIRoot_Entry.Init()` | Menu initialization complete (`MainMenuDrawer.Init` already ran), enter menu; record again on returning to menu |
+| `Prefix` on `Verse.SavedGameLoaderNow.LoadGameFromSaveFileNow(string)` | Begin loading save, enter save, retain filename without directory |
+| `Prefix` on `RimWorld.Planet.WorldGenerator.GenerateWorld`, `Verse.Game.InitNewGame()` | Begin world/new colony initialization, enter new; consecutive same phase recorded once |
+| `Postfix` on `Verse.Game.FinalizeInit()` | New colony/save initialization complete, enter play |
 
-- **调用栈 → Mod**：帧的声明类型所在程序集 → 加载这个程序集的 Mod（按程序集缓存）；帧方法上的 Harmony 补丁 → 补丁方法的程序集，找不到时按 Harmony owner 对 packageId（按方法缓存）。基础程序集（`mscorlib`、`System`、`netstandard`、`Microsoft`、`Mono`、`MonoMod`、`Unity`、`UnityEngine`、`Assembly-CSharp`、`Assembly-CSharp-firstpass`、`0Harmony`、`HarmonyLib`、`Waylith`、`Brutal`、`ICSharpCode`、`Newtonsoft`、`NAudio`、`NVorbis`、`ISharpZipLib`、`com.rlabrecque.steamworks.net`、Archo Monitor 自己）不算；基础 Mod（Harmony、HugsLib、XML Extensions、Prepatcher、Performance Optimizer、RocketMan、Mod Error Checker）只在找不到别的 Mod 时记。遇到第一个非基础 Mod 的帧就停。文字形式的堆栈（消息自带的、Unity 回调给的）按行解析出 `类型.方法` 再走同样的映射。
-- **补充上下文**（按顺序，第一个给出结果的为准）：`Config error in X:` / `Exception in ConfigErrors() of X:` → X 的文件、父 Def 链（最多 10 层）的文件、补丁了这些 Def 的操作；`Could not resolve cross-reference … named X` → 引用 X 的 Def、文件、字段，以及往这些 Def 里加了 X 的补丁；`… loadID X` → 只记 `loadID:X`；正在加载 Def 时 → 当前文件、Def 和 Mod。消息里形如 `[a.b]` 的 packageId 和 `assembly name: X` 也对到 Mod。
-- **推断类型** `inferredType`（第一个命中的为准）：`DefConfigError`（上面的 Config error）、`CrossRefError`（交叉引用、loadID）、`PatchError`（打 XML 补丁期间，或消息含 `Patch operation`）、`XMLSyntaxError`（加载 Def 期间；名字沿用 RimCrow，意思是“加载 XML 时报的错”）、`AssemblyConflict`（`MissingMethodException`、`TypeLoadException`、`ReflectionTypeLoadException`、`MissingFieldException`）、`TickException`（`Exception ticking`）、`DrawException`（`Exception drawing`）、`NullReference`、`OutOfMemory`、`MissingTexture`（`Failed to find any texture`、`Could not load Texture2D`、`Could not load UnityEngine.Texture2D`），其余为空。Monitor 自己出错时写一行 `ObserverFailure`，不影响游戏。
-- **堆栈级别**：1.5、1.6（Unity）把 Error、Exception 的堆栈级别从低于 `ScriptOnly` 调到 `ScriptOnly`（`Full` 不动）；加载了其他诊断 Mod（Visual Exceptions、Mod Error Checker）时不调。1.7（Waylith）没有这个设置，本来就写完整堆栈。
-- **不改消息**：RimCrow 在消息前加 `[Mod 名, …] `，Archo Monitor 不加。消息与 Player.log 里的一字不差，RimArcho 才对得上。
+- **Stack → Mod**: declaring type assembly → loading Mod (assembly cache); Harmony patches on frame method → patch method assembly, fallback owner vs `packageId` (method cache). Exclude base assemblies (mscorlib, `System`, netstandard, `Microsoft`, `Mono`, `MonoMod`, `Unity`, `UnityEngine`, `Assembly-CSharp`, `Assembly-CSharp-firstpass`, `0Harmony`, `HarmonyLib`, `Waylith`, `Brutal`, `ICSharpCode`, `Newtonsoft`, `NAudio`, `NVorbis`, `ISharpZipLib`, `com.rlabrecque.steamworks.net`, Monitor itself); base `Mods` (Harmony, HugsLib, XML Extensions, Prepatcher, Performance Optimizer, RocketMan, Mod Error Checker) only without others. Stop at first non-base Mod frame. Text stacks (message-supplied/`Unity` callbacks) parse `Type.Method` per line through same mapping.
+- **Extra context**, first successful rule: `Config error in X:` / `Exception in ConfigErrors() of X:` → X file, parent chain files (up to 10), patch operations on these `Defs`; `Could not resolve cross-reference … named X` → referencing `Def`/file/field and patches adding X; `… loadID X` → `loadID:X` only; while loading `Def` → current file/`Def`/Mod. Also map message `[a.b]` packageIds and `assembly name: X`.
+- **`inferredType`**, first match: `DefConfigError` (above), `CrossRefError` (cross-reference/loadID), `PatchError` (during XML patching or `Patch operation` message), `XMLSyntaxError` (while loading `Def`; RimCrow name meaning error during XML loading), `AssemblyConflict` (`MissingMethodException`, `TypeLoadException`, `ReflectionTypeLoadException`, `MissingFieldException`), `TickException` (`Exception ticking`), `DrawException` (`Exception drawing`), `NullReference`, `OutOfMemory`, `MissingTexture` (`Failed to find any texture`, `Could not load Texture2D`, `Could not load UnityEngine.Texture2D`), otherwise empty. Monitor failures write `ObserverFailure` without affecting game.
+- **Stack levels**: 1.5/`1.6` `Unity` raises Error/`Exception` below `ScriptOnly` to `ScriptOnly` (`Full` unchanged), unless other diagnostic `Mods` (Visual Exceptions, Mod Error Checker) are loaded. 1.7 `Waylith` has no setting and already writes full stacks.
+- **Unchanged messages**: unlike RimCrow's `[Mod name, …] ` prefix, Monitor preserves `Player.log` message exactly for matching.
 
-#### 6.7.2 开销
+#### 6.7.2 Overhead
 
-- **每条日志（热路径）**：按“级别 + 原消息”查一次哈希表；命中只加计数，不做别的。没命中才归一化、分析堆栈、补充上下文（每种不同的消息一次）。
-- **加载期**：每个 Def 一次压栈出栈和一次字典写入；每个 Def 列表项一次字典写入（不拼节点路径）；补丁收集一次。表各有上限（Def 30 万、引用 50 万），满了不再记。
-- **写文件**：64 KiB 缓冲。ERROR 的首次出现立即写到磁盘（游戏可能紧接着崩溃）；其他首次出现和重复次数由后台计时器每秒最多写一次；退出时（`Application.quitting`、`AppDomain.ProcessExit`）写完。
-- **阶段变化**：只在上述钩子触发时处理，不加轮询或逐帧工作。在 Writer 的同一把锁内先 `FlushDirty` 再写阶段边界并 flush；每条错误的热路径不增加堆栈、反射或写文件。
+- **Per log (hot path)**: one level + original message hash lookup; hit increments count only. Miss normalizes/analyzes stack/context once per distinct message.
+- **Loading**: one stack push/pop and dictionary write per `Def`; one write per `Def` list item (no node-path construction); one patch collection pass. Table caps: 300,000 `Defs`, 500,000 references; stop recording when full.
+- **File writes**: 64 KiB buffer. First `ERROR` flushes immediately (crash may follow); other first occurrences/count changes written by background timer at most once/second; flush on `Application.quitting`/`AppDomain.ProcessExit`.
+- **Phase changes**: only hook-driven, no polling/frame work. Under Writer lock, `FlushDirty` then write/flush boundary; no added stacks/reflection/file writes on per-error hot path.
 
-#### 6.7.3 文件
+#### 6.7.3 Files
 
-- **位置**：存档数据根（`GenFilePaths.SaveDataFolderPath`，随 `-savedatafolder` 改变，所以整合包写在 `<包>/userdata/`；取不到时读命令行的 `-savedatafolder`，再不行用 `Application.persistentDataPath`）下的 `ArchoMonitor.log`。启动时把已有的改名为 `ArchoMonitor-prev.log`（替换上一份），再新建 `ArchoMonitor.log`。
-- UTF-8 无 BOM，每行一个 JSON 对象，以 `\n` 结束。`message` 超过 4 KiB、`details` 超过 16 KiB 的部分截掉并加 `…`。文件到 32 MiB 时写一行 `kind:"full"`，之后不再写新条目；阶段变化和退出时仍写剩余次数及边界。
-- **去重**：指纹 = 级别 | 推断类型 | 归一化消息（小写；十六进制地址 → `<hex>`，数字 → `<num>`，连续空白 → 一个空格）。精确消息表（热路径）最多 8000 条，指纹表最多 4000 条；满了先写出待写次数再清空，之后相同的消息重新按首次处理。
+- **Location**: `ArchoMonitor.log` under save-data root (`GenFilePaths.SaveDataFolderPath`, follows `-savedatafolder`, packs `<pack>/userdata/`; fallback command-line `-savedatafolder` then `Application.persistentDataPath`). On startup rename existing to `ArchoMonitor-prev.log`, replacing previous, create new current.
+- UTF-8 without BOM, JSON object/line ending `\n`. Truncate message above 4 KiB/details above 16 KiB with … . At 32 MiB write `kind:"full"`, stop new entries; phase/exit still write remaining counts/boundaries.
+- **Deduplication**: level | inferred type | normalized lowercase message (hex addresses → `<hex>`, numbers → `<num>`, whitespace collapsed). Exact-message hot table cap 8000, fingerprint table 4000; flush pending counts then clear when full; subsequent same messages treated as first.
 
-**格式（schema 1）**：RimCrow 格式的超集，同一个读取器两种都能读。
+**Format (schema 1)**: superset of RimCrow format, one reader handles both.
 
-| 字段 | RimCrow Companion | Archo Monitor |
+| Field | RimCrow Companion | Archo Monitor |
 | --- | --- | --- |
-| `timestamp` | `yyyy-MM-dd HH:mm:ss.fff`，本地时间，写这一行的时间 | 同 |
-| `level` | `ERROR`、`WARNING`、`INFO` | 同 |
-| `message` | 堆栈前的那段文字；找到 Mod 时前面加 `[名称, …] ` | 堆栈前的那段文字，原样 |
-| `details` | 堆栈文本（每一行都带） | 只在条目的第一行写（之后的计数行为空串，省得每秒重复写一份堆栈）；ERROR、WARNING 没有自带堆栈时是调用 `Verse.Log` 的那段代码的堆栈（去掉 Monitor 和日志系统自己的帧） |
-| `count` | 这一行代表的次数：首次 1，之后是距同一条目上一行新增的次数 | 同 |
-| `context.relatedModIds` | packageId（小写，玩家看到的那个） | 同 |
-| `context.relatedFiles` | 混着放：Mod 内相对路径、绝对路径、`patch:<Def>:<操作>`、`xref:<名>:<节点路径>`、`def:<名>`、`loadID:<ID>`、`<root:<节点>>` | 只放文件的绝对路径；其余放 `context.refs` |
-| `context.inferredType` | 上面那组名称（没有 `PatchError`） | 上面那组名称 |
+| `timestamp` | `yyyy-MM-dd HH:mm:ss.fff`, local write time | Same |
+| `level` | `ERROR`, `WARNING`, `INFO` | Same |
+| `message` | Pre-stack text, prefixed [names] if `Mods` found | Original pre-stack text |
+| `details` | Stack on every line | First entry line only; later count lines empty to avoid repeated stacks. `ERROR`/`WARNING` without own stack get calling `Verse.Log` code stack, excluding Monitor/logging frames |
+| `count` | Occurrences represented: first 1, then increment since previous line | Same |
+| `context.relatedModIds` | Lowercase player-visible `packageId` | Same |
+| `context.relatedFiles` | Mixed Mod-relative/absolute paths, `patch:`<`Def`>:`<operation>`, `xref:``<name>`:`<node-path>`, `def:``<name>`, `loadID:<ID>`, `<root:``<node>`> | Absolute file paths only; others in `context.refs` |
+| `context.inferredType` | `Names` above except `PatchError` | `Names` above |
 | `source` | — | `"archo-monitor"` |
 | `schema` | — | `1` |
-| `id` | — | 条目指纹的 8 位十六进制；同一条目的每一行都相同 |
-| `total` | — | 到这一行为止的累计次数 |
-| `kind` | — | 只在特殊行出现：`session`（第一行）、`exit`（正常退出的最后一行）、`full`、`phase` |
-| `context.phase` | — | `phase` 行的阶段：`menu`、`save`、`new`、`play`；第一条阶段行之前为 `loading` |
-| `context.save` | — | `save` 阶段行的存档文件名（取得到时；不含目录） |
-| `context.roles` | — | `{"<packageId>": "xml" \| "def" \| "patch" \| "stack" \| "text"}`：这个 Mod 是怎么找到的（文件的所属 Mod、Def 链里某个 Def 的定义方、补丁方、堆栈帧或补丁所有者、消息里写了它） |
-| `context.refs` | — | `patch:<Def>:<操作类型>@<packageId>`、`xref:<名>:<Def>/<字段>`、`def:<名>`、`loadID:<ID>` |
-| `context.def` | — | 报错时正在加载的 Def |
+| `id` | — | 8-hex fingerprint, identical per entry line |
+| `total` | — | Cumulative count through this line |
+| `kind` | — | Special lines only: session (first), exit (last on normal exit), full, phase |
+| `context.phase` | — | Phase row: menu, save, new, play; loading before first phase |
+| `context.save` | — | Save filename on save phase, if available, no directory |
+| `context.roles` | — | `{"<packageId>": "xml" \| "def" \| "patch" \| "stack" \| "text"}`: file owner, `Def` chain definer, patcher, stack/patch owner, message mention |
+| `context.refs` | — | `patch:`<`Def`>:`<operation-type>`@<`packageId`>, `xref:``<name>`:<`Def`>/`<field>`, `def:``<name>`, `loadID:<ID>` |
+| `context.def` | — | `Def` loading at error time |
 
-**session 行**（每份文件第一行）：`level` `INFO`，`message` `[Archo Monitor] session <id>`，`kind` `session`，`context` 里有 `session`（12 位十六进制随机数）、`version`（Monitor 版本）、`game`（`VersionControl.CurrentVersionStringWithRev`）、`dataRoot`、`playerLog`（`Application.consoleLogPath`，取不到时为空）。同时用 `Log.Message` 往 Player.log 写一行 `[Archo Monitor] <版本> session <id>: <ArchoMonitor.log 的完整路径>`，RimArcho 靠它把两份文件配对：1.6 的整合包运行时 Player.log 仍在 Unity 的固定位置，伴生日志却在包的数据根里，路径写在标记里就不必猜。**exit 行**：`kind` `exit`，`context.entries` 是不同条目数。
+**Session line**, first: level `INFO`, message `[Archo Monitor] session <id>`, kind session; context: session (12 random hex), version (Monitor), game (`VersionControl.CurrentVersionStringWithRev`), `dataRoot`, `playerLog` (`Application.consoleLogPath`, empty if unavailable). Also `Log.Message` into `Player.log`: `[Archo Monitor] <version> session <id>: <full-ArchoMonitor.log-path>`. This pairs files: `1.6` pack `Player.log` stays `Unity`-fixed while companion is in pack root, avoiding guesses. **Exit line**: kind exit, `context.entries` distinct entry count.
 
-**phase 行**：`level` 为 `INFO`，`kind` 为 `phase`，`message` 为 `[Archo Monitor] phase <阶段名>`，`context.phase` 如上表；其余信封字段同 schema 1。变化前先写完待写 `count`，所以一条计数行只属于一个阶段，`total` 仍是整次运行的累计数。同时调用 `Log.Message` 将同样的 `[Archo Monitor] phase <阶段名>` 写进 Player.log，不受“记录信息级消息”设置影响。两份文件各自按文件顺序读边界，阶段消息本身不进错误簇。
+**Phase line**: `INFO`, kind phase, message `[Archo Monitor] phase <phase>`, `context.phase` above; other envelope fields schema 1. Flush pending count first, so count rows belong to one phase; total remains whole-run cumulative. Write same phase message via `Log.Message` to `Player.log` regardless of informational logging setting. Read boundaries independently in file order; phase messages never form clusters.
 
-#### 6.7.4 RimArcho 怎样读
+#### 6.7.4 How RimArcho Reads Them
 
-**找哪份**（都只读、不改名、不删除）：
+**Selection** (read-only, no rename/deletion):
 
-1. 伴生日志在**这次运行的存档数据根**：方案运行时是环境的用户数据目录；整合包是 `<包>/userdata`（08 §5.3）。分析一份 Player.log 时，数据根是它所在目录（1.7 的 `Logs/Player.log` 取上一级）。
-2. Player.log 里有 `[Archo Monitor] <版本> session <id>: <路径>` → 依次看标记写的路径、它旁边的 `ArchoMonitor-prev.log`（下一次启动会把它改名）、数据根下的这两个文件，取 session 行 id 相同的那一份。
-3. 没有标记时，先看同一“代”的 `ArchoMonitor.log` / `ArchoMonitor-prev.log`（须有有效 session 行），再看 RimCrow；有标记但 session 对不上时，只回退 RimCrow。RimCrow 按“代”配对：`Player.log` ↔ `RimCrow_Realtime.log`（不可用时试 `RMM_Realtime.log`），`Player-prev.log` ↔ 带 `-prev` 的同名文件。所有无 session 匹配的候选都须是非空普通文件，修改时间不早于本次运行开始，且不晚于 Player.log 修改时间加 1 分钟；不能确认归属就不配对。开始时间取 Player.log 的 `Started:`（1.7，带时区），否则取 Windows 文件创建时间；取不到或晚于日志修改时间时，保守用 Player.log 修改时间。当前运行的下界还须晚于 Player-prev.log 修改时间，避免 Unity 截断复用文件时保留的旧创建时间。
-4. 同一伴生日志（含硬链接或路径别名）不能同时配给同目录的两份 Player.log：session 标记匹配优先；证据相同时归当前代。`app.CompanionFor`、完整分析、日志页和实时追踪共用这些规则；伴生日志新增或轮转后，即使 Player.log 没变也重新检查配对。
-5. 实时追踪（§6.6）：在本次运行的数据根按上述规则选择，Archo Monitor 优先于 RimCrow；标记行到来后重新核对 session，包括已轮转的文件。伴生日志变小视为重新开始（同 Player.log）。每次先读伴生日志再读 Player.log，分类提示才赶得上；一个聚类在它的伴生条目到来之前就归因过的，条目到来后重新归因一次。只在伴生日志里的条目按 06 §2.16.1 L03 等待配对（Player.log 和 Monitor 几乎同时写），游戏退出时不再等；Player.log 正在写的最后一个条目就是它（下一行还没来，条目没结束），或者 Player.log 还有一次读不完的内容时，接着等。等过了才在 Player.log 出现的，并入那个只在伴生日志里的聚类：Player.log 的条目当第一个样本并重新归因，次数取 Player.log 和伴生日志里大的那个，不另起一条。“Player.log 有没有它”和完整分析一样看 Player.log 的全部条目，噪声和信息行也算（只记第一行规范化后的哈希，最多 5 万条，满了清空）：Monitor 的条目带堆栈、过了噪声过滤，Player.log 里同一行是噪声时，它也不是一条报错。
+1. Companion is in **this run's save-data root**: environment userdata for plans, `<pack>/userdata` for packs (08 §5.3). Analyzing `Player.log` uses its containing directory, parent of Logs in 1.7.
+2. With `Player.log` session marker, try marker path, adjacent `ArchoMonitor-prev.log` (renamed by next startup), then both in data root; require matching session-line ID.
+3. Without marker, try same-generation `ArchoMonitor.log`/prev with valid session, then RimCrow; marker with no session match falls back only to RimCrow. Generation pairing: `Player.log` ↔ `RimCrow_Realtime.log` (fallback `RMM_Realtime.log`), `Player-prev.log` ↔ same names with `-prev`. Candidates without session match must be nonempty regular files, mtime at/after run start and at/before `Player.log` mtime +1 minute; no confident ownership means no pair. Start: `Started:` in 1.7 (timezone), otherwise Windows creation time; absent or later than mtime falls back conservatively to mtime. Current-run lower bound also exceeds `Player-prev.log` mtime, avoiding stale creation times on `Unity` truncation/reuse.
+4. Same companion (hardlinks/path aliases included) cannot pair with both Player.logs in directory: session evidence first, current generation on ties. `app.CompanionFor`/full analysis/log page/live tracking share rules; recheck on companion append/rotation even if `Player.log` unchanged.
+5. Live (§6.6): select by above in run data root, Monitor before RimCrow; recheck session on marker arrival, including rotated files. Shrink resets like `Player.log`. Read companion first for classification hints; reattribute already-attributed clusters when companion arrives. Wait for companion-only pairing per 06 §2.16.1 L03 (near-simultaneous writes), no wait after game exit; keep waiting if unfinished `Player.log` last entry is the match or unread backlog remains. Late `Player.log` entries merge into companion-only cluster, become first sample/reapply attribution; max counts, no extra cluster. As full analysis, presence checks include all `Player.log` entries, even noise/info (normalized first-line hashes only, cap 50,000 then clear): companion stack passing noise filter does not turn same `Player.log` noise into error.
 
-**每个字段的用途**：
+**Field usage**:
 
-| 字段 | 用途 |
+| Field | Use |
 | --- | --- |
-| `message` | 取第一行，按 §6.1 归一化后对到 Player.log 的聚类。RimCrow 的行 `relatedModIds` 非空、消息以 `[` 开头时，先去掉开头到第一个 `] ` 为止的前缀 |
-| `id` | Archo Monitor 的同一条目用 `id` 合并；RimCrow 的行按“级别 + 归一化消息”合并 |
-| `timestamp` | 条目第一行的时间 = 聚类首次出现的时间（实时追踪的“本次运行”、完整分析的聚类详情都显示） |
-| `level` | 聚类的级别（1.6 的 Player.log 没有级别）；`ERROR` 映射为 error，其余为 warning |
-| `count`、`total` | 同一条目各行 `count` 之和（有 `total` 时取最大的 `total`）。没有阶段标记时，聚类次数取 Player.log 次数和它的较大者；有阶段标记时按下行分别合并。游戏停写 Player.log 之后的次数只有伴生日志知道 |
-| `kind:phase` | 每条 Player.log 消息、伴生计数行归入它之前最近的阶段。两份来源同阶段的次数取较大者，再合成簇的阶段总数，不重复相加；`total` 补回但不能定位阶段的次数保留为 `unknown`（界面写“未记录阶段”）。只有伴生日志有标记、Player.log 的条目又没有对应伴生记录时，也保留为未知，不能当作加载期 |
-| `details` | 伴生日志里有、Player.log 里对不上的 ERROR、WARNING 条目（多半出在游戏停写日志之后）：`message` + 换行 + `details` 交给 §6.1 的解析器，成为普通聚类、照常归因，详情注明“只在 ArchoMonitor.log 里”。RimCrow 的日志不这样做（它的消息带前缀，堆栈常是猜的） |
-| `relatedFiles` | 绝对路径落在某个**启用**实例的目录里 → 该实例 `source`，证据 `ArchoMonitor.log: <Mod 内相对路径>`，与 §6.2 的“文件路径”同级（因此置信度可到 `certain`）。RimCrow 的相对路径按 `relatedModIds` 里各 Mod 的目录拼成绝对路径后同样处理；伪路径（`patch:`、`xref:`、`def:`、`loadID:`、`<root:`）当作 `refs` |
-| `relatedModIds` + `roles` | `xml`、`def` 且同一实例有文件证据 → `source`；`patch` → `patcher`；`stack`、`text`、没有角色（RimCrow）→ `mentioned`。只加不减：实例已有更强的角色时只追加证据 |
-| `refs` | 作为证据文字附在对应实例上（`patch:…@<packageId>` 附在补丁方） |
-| `inferredType` | 聚类提示：RimArcho 自己分到 `other` 或 `exception`，而提示对应更具体的分类时用提示的分类（`DefConfigError`、`XMLSyntaxError` → `xml-load`；`CrossRefError` → `xref-missing`，loadID 的 → `save-load`；`PatchError` → `patch-failed`；`MissingTexture` → `texture-missing`）。聚类键随之改变，所以实时追踪和完整分析用同一规则。其余提示只写进详情 |
-| `context.def` | 写进证据文字（`while loading <Def>`） |
+| `message` | First line normalized per §6.1 matches clusters. RimCrow with `relatedModIds` and leading [ strips through first ] space |
+| `id` | Merge Monitor by id; RimCrow by level + normalized message |
+| `timestamp` | First line time = cluster first occurrence, shown in live/full details |
+| `level` | Cluster level (absent in `1.6` `Player.log`); `ERROR` → error, others warning |
+| count, total | Sum counts, or max total if available. No phases: max of `Player.log`/companion; phases: merge below. Only companion knows counts after game logging limit |
+| `kind:phase` | Assign messages/count rows latest preceding phase. Max per phase across sources, then cluster phase totals, no double addition; unlocatable total-restored counts remain unknown (UI "phase not recorded"). If only companion has markers and `Player.log` entry lacks companion, unknown, never assumed loading |
+| `details` | Monitor-only `ERROR`/`WARNING` (usually after game logging limit): message newline details through §6.1 parser, ordinary cluster/attribution, details "only in `ArchoMonitor.log`". Not for RimCrow (prefixed messages, often guessed stacks) |
+| `relatedFiles` | Absolute path in **enabled** Instance → source, evidence `ArchoMonitor.log`: `<Mod-relative-path>`, same strength as §6.2 file paths (certain possible). RimCrow relative paths combine each `relatedModIds` root; pseudo-paths `patch:`/`xref:`/`def:`/`loadID:`/`<root:` treated as refs |
+| `relatedModIds` + roles | xml/def with same-Instance file evidence → source; patch → patcher; stack/text/no role (RimCrow) → mentioned. `Add` evidence, never downgrade stronger roles |
+| `refs` | Evidence text on corresponding Instance (`patch:…@<packageId>` on patcher) |
+| `inferredType` | If own category other/exception and hint more specific, use hint: `DefConfigError`/`XMLSyntaxError` → `xml-load`; `CrossRefError` → `xref-missing` or `save-load` for loadID; `PatchError` → `patch-failed`; `MissingTexture` → `texture-missing`. Changes key, identical live/full rules; other hints details only |
+| `context.def` | Evidence `while loading <Def>` |
 
-- **界面**：“能不能跑”里，带文件证据的聚类的证据条是 kind `log`（“日志”），来源写 `文件 <Mod 内相对路径>  ArchoMonitor.log  <时间>`（RimCrow 的写 `…  RimCrow_Realtime.log`）：文件在前并标明“文件”，各部分之间是 06 §7.3 的间距，窗口按两个空格拆成几段显示（2026-10-28 VM 实测：原来的 `ArchoMonitor.log  <路径>` 在窗口里空格合并成一个，读起来像一条路径）；同一 Mod 有几条时写第一条和“另有 N 处”。
-- **游戏日志页**（06 §2.10）：伴生日志本身也是一个区“Archo Monitor · 本次运行”，每个条目一行（时间、级别、`inferredType` 的短名、第一行、次数、相关 Mod 和文件），展开看 `details`，对上的聚类可以跳过去；session 行的 `version`、`game` 和 session / exit 行的时间是区头。文件选择里伴生日志列在它的 Player.log 下面。读取用同一个读取器（session 行的 `game`、exit 行的时间、`full` 行也记下），按文件的路径、大小、修改时间缓存；游戏运行时用实时追踪已读进来的那份，不另外读。
-- **阶段与显示**：有阶段信息时，伴生条目按每次阶段边界分别去重，保留文件中的首次出现顺序；相同 `id` 在再次读档后可以再出现一行，便于显示边界。全局归因仍按原 `id` 合并。能不能跑的分组、日志页的分隔分别见 06 §2.4、§2.10；CLI/MCP 见 05 §4。旧 Monitor、RimCrow 或无 Monitor 的日志如果没有阶段标记，计数和展示沿用原规则。
-- **缓存**（§6.5）：键加上配对到的伴生日志的路径、大小、修改时间。
-- 无效行跳过并计数（实时追踪的 `BadLines`、完整分析的标题行）；每份伴生日志的条目表、供界面显示的阶段条目表各上限 20000 条，满了只更新已有条目。
+- **UI**: can it run file-backed cluster evidence chip kind log ("log"), source `file <Mod-relative-path>  ArchoMonitor.log  <time>` (`…  RimCrow_Realtime.log` for RimCrow); file first with explicit label, spacing per 06 §7.3, window splits on two spaces (VM 2026-10-28: old `ArchoMonitor.log` path spacing collapsed into apparent single path). Multiple same-Mod locations show first plus N more.
+- **Game log page** (06 §2.10): companion section "Archo Monitor · this run", row per entry (time/level/short `inferredType`/first line/count/`Mods`/files), expand details, jump matching cluster; header session version/game and session/exit times. File selector lists companion below `Player.log`. Same reader (also session game/exit time/full), cached path/size/mtime; running uses live-loaded data, no extra read.
+- **`Phases`/display**: with phases, deduplicate entries per boundary, retain first file order; same id can reappear after save load to show boundary. Global attribution still merges by id. Can it run/log separators: 06 §2.4/§2.10; CLI/MCP: 05 §4. Older Monitor/RimCrow/no Monitor without markers retains old count/display rules.
+- **Cache** (§6.5): add paired companion path/size/mtime.
+- Skip/count invalid lines (live `BadLines`, full heading); companion entry table and UI phase-entry table each cap 20000; update existing entries only when full.
 
-#### 6.7.5 版本差异
+#### 6.7.5 Version Differences
 
-| | 1.5、1.6 | 1.7 |
+| | 1.5, `1.6` | 1.7 |
 | --- | --- | --- |
-| 运行时 | Mono，程序集按 net472 编译 | .NET 10（Waylith），程序集按 net10.0 编译 |
-| Harmony | Harmony Mod 自带的 2.x | 3.x |
-| `Application` | UnityEngine | `UnityStubs`：有 `logMessageReceivedThreaded`、`quitting`、`consoleLogPath`，没有 `SetStackTraceLogType` |
-| `DefFromNodeNew` | 1.6 有，1.5 没有（反射查找，找不到就不挂） | 有 |
-| 阶段钩子（§6.7.1） | 引用程序集里全部存在；`GenerateWorld` 在 1.5 没有 `LandmarkDensity` 参数，1.6 有，按名称反射查找 | 全部存在；`GenerateWorld` 参数与 1.6 相同 |
+| Runtime | `Mono`, net472 assemblies | .NET 10 (`Waylith`), net10.0 |
+| Harmony | Mod-bundled 2.x | 3.x |
+| `Application` | `UnityEngine` | `UnityStubs`: `logMessageReceivedThreaded`/quitting/`consoleLogPath`, no `SetStackTraceLogType` |
+| `DefFromNodeNew` | `1.6` yes, 1.5 no (reflection, skip if missing) | Yes |
+| Phase hooks (§6.7.1) | All in reference assemblies; `GenerateWorld` lacks `LandmarkDensity` in 1.5, has it in `1.6`; reflect by name | All present; `GenerateWorld` parameters same as `1.6` |
 
-`LoadFolders.xml` 按游戏版本选目录：`1.5/`、`1.6/` 放 net472 的程序集，`1.7/` 放 net10.0 的；钩子目标都用反射找，缺了就跳过并在 session 行的 `context.skipped` 里列出。
+`LoadFolders.xml` chooses version folders: net472 in `1.5/` and `1.6/`, net10.0 in `1.7/`; reflect hook targets, skip missing and list in session `context.skipped`.
 
-阶段钩子的签名已逐版核对 `monitor/ArchoMonitor.csproj` 所选 Krafs 引用程序集；引用只有方法签名，实际进入菜单、世界生成、载入及可操作时机须在 1.6、1.7 各走完整游戏回合验收（发布前 VM 表）。
+Phase hook signatures checked per version against Krafs references selected by `monitor/ArchoMonitor.csproj`; references have signatures only; actual menu/world/load/play timing needs full rounds in `1.6`/1.7 (pre-release VM checklist).
 
-### 6.8 错误范式库
+### 6.8 Error Pattern Library
 
-范式库来自公开 HugsLib 日志语料（`docs/research/00-log-corpus-design.md` §3 G5、§9；接入方案 `docs/research/01-pattern-library-integration-draft.md`），作为嵌入数据随程序发布（`internal/patterns/patterns.json`，与 `internal/order/observed.json` 相同），只含模板、packageId 和计数。数据由 `go run ./spikes/patterns -export internal/patterns/patterns.json` 从研究数据集生成；`-verify <corpusrun 结果>` 检查产品匹配器与研究的分类逐簇一致（v0：610,910 个簇，0 处不同）。
+Public HugsLib corpus patterns (`docs/research/00-log-corpus-design.md` §3 G5, §9; integration `docs/research/01-pattern-library-integration-draft.md`) embedded as `internal/patterns/patterns.json`, like `internal/order/observed.json`, templates/packageIds/counts only. Generate with `go run ./spikes/patterns -export internal/patterns/patterns.json`; `-verify <corpusrun-result>` checks product/research classifications per cluster (v0: 610,910 clusters, 0 differences).
 
-| 层 | 引用 | 识别 | 在簇上显示 |
+| Layer | Reference | Recognition | Cluster display |
 | --- | --- | --- | --- |
-| 通用范式 | `pattern:g:<id>`，如 `pattern:g:xml.type-missing` | 对簇模板（§6.1 聚类，`类别\|消息`）的消息部分按顺序匹配正则，可限定类别；第一条命中的规则生效 | 一句话说明；`evidence: community: seen in N of M public 1.6 logs (x% of error clusters)`；常见原因；诊断路线（MCP 工具，去掉当前这一步，`E<n>` 换成本簇）；修法类型；同一玩家重复上传时，列表改动 1–3 项后错误消失的比例及无改动对照（配对少于 5 对不显示） |
-| 回退范式 | 同上，`fallback` | 裸 `NullReferenceException`、其他异常、其他 XML/补丁/读档错误：只说明类别 | 不显示 |
-| Mod 特定范式 | `pattern:m:<packageId>:<hash>` | 模板完全相同，且簇的归因把该 Mod 标为 `source` | `known-error:` 一行：在多少份公开日志中出现、首次与最近出现的月份、见过的 Mod 版本，并注明“Mod 新版本可能已修复” |
+| Generic | `pattern:g:<id>`, e.g. `pattern:g:xml.type-missing` | Ordered regex on message part of template (§6.1, category\|message), optional category restriction; first match wins | One-sentence explanation; `evidence: community: seen in N of M public 1.6 logs (x% of error clusters)`; common causes; diagnostic route (MCP tools, omit current step, replace `E<n>`); fix kind; error disappearance after 1–3 list edits on same-player repeat uploads vs unchanged control (hide below 5 pairs) |
+| Fallback | Same, fallback | Bare `NullReferenceException`, other exception/XML/patch/save errors: category only | Hidden |
+| Mod-specific | `pattern:m:<packageId>:<hash>` | Exact template, Mod attributed source | `known-error:` log count, first/latest months, observed versions, "newer Mod versions may have fixed this" |
 
-- 范式只说明“这一类错误通常是什么”，不说明“这份列表里是谁”：仍遵守“不把出现位置当原因”。界面上范式卡片标明“社区背景”，只在匹配到时出现（06 §2.10）。
-- Mod 特定范式只保留至少 10 份日志、5 个玩家会话中出现的模板，看起来含路径或用户数据的模板一律丢弃（docs/research/00 §8）。
-- `archo pattern [<引用>]` 查看一个范式（识别规则、阶段、出现次数、常见原因、诊断路线、修法、重复上传证据），不带参数时按簇占比列出所有通用范式；`--mod <packageId>` 列出某 Mod 的已知错误。MCP 中由 `analyze_log pattern=<引用>` 提供（05 §4）。
-- 一份检查清单（MCP `guide topic=errors`，CLI `archo guide errors`，05 §5.3），按语料中的实际分布排序，覆盖诊断流程（`guide topic=diagnose`）未讲到的类别：读档、缺资源、配置检查、程序集加载，以及噪音；诊断流程第 3 步指向它。
-- 分发：v0 随程序发布；以后与社区排序规则相同，由 `archo data update` 获取新版本（04 §6.3）。
+- Patterns describe typical error kind, not culprit in this list; appearance is not cause. UI labels "community background", only on match (06 §2.10).
+- Mod-specific templates need ≥10 logs/5 player sessions; discard path/user-data-looking templates (docs/research/00 §8).
+- `archo pattern [<reference>]`: rule, phase, counts, causes, route, fixes, repeat-upload evidence; no argument lists generic patterns by cluster share; `--mod <packageId>` lists known errors. MCP `analyze_log pattern=``<reference>` (05 §4).
+- Checklist (MCP `guide topic=errors`, CLI `archo guide errors`, 05 §5.3), corpus-frequency order, covers gaps in `guide topic=diagnose`: save loading, missing assets, config checks, assembly loads, noise; diagnose step 3 links it.
+- Distribution: v0 bundled; later updates via `archo data update` like community sort rules (04 §6.3).
 
-## 7. 验收
+## 7. Acceptance
 
-| # | 场景 | 期望 | 状态 |
+| # | Scenario | Expected | Status |
 | --- | --- | --- | --- |
-| B1 | 补丁失败日志 | 归因到具体 Patch 文件和行号，给出 §4.4 原因（golden `harmonylog`：`Patches/Compat.xml:2 … (patch.no-match: target-inactive, unguarded-optional)`，Lib 为 dependency，confidence certain） | 通过 |
-| B2 | 交叉引用缺失日志 | 给出引用方 Mod 和文件；说明是否存在提供方 | 通过 |
-| B3 | `Pawn.Tick` 异常，带 3 个 Mod 的 Harmony 补丁行 | 3 个 Mod 都是 `patcher`，没有 `source`；给出检查清单和 `harmony --target` / `source search "AllComps.Remove("` | 通过 |
-| B4 | 同一异常重复 500 次 | 一个错误簇，`x500` | 通过 |
-| B5 | 用旧 inspector 的用例回放（`internal/app/m4_test.go`） | 结论一致或更准确：选择器对照启用状态；files search 排除 Languages 并带 Mod 引用；反编译缓存在目录被删后重建、DLL 变化后失效 | 通过 |
-| B6 | 同一游戏升级到 1.7 后自己的 1.6 旧日志 | 自动按 1.6 分析，标题注明（`TestLogOwnVersion`、`TestOwnLogBeforeGameUpgrade`） | 通过 |
-| B7 | 本环境旧游戏版本的日志、方案改动之前写的日志 | 标为过期，不计数，折叠（`TestStaleLog`、`tui.TestProblemsViewLogs`） | 通过（按现规则） |
-| B8 | 新进程第二次读同一日志 | 用 `log_cache`，不重新解析；`status` 只读缓存（`TestLogCache`） | 通过 |
-| B9 | 日志写于方案 A 的启动之后，分析方案 B | 过期，原因“对应另一个方案的启动” | 通过 |
-| B10 | 方案 A 启动后改了方案 A 再看日志 | 过期，原因“启动之后方案改过”；改回原列表后恢复为当前 | 通过 |
-| B11 | 从 Steam 启动（没有启动记录），之前用“保存”写过方案 A | 日志归属方案 A | 通过 |
-| B12 | 簇的模板属于已知范式（§6.8） | 附 `pattern:<id>`，可用 `archo pattern` / `analyze_log pattern=` 追问；回退范式不显示；Mod 特定范式只在该 Mod 是 `source` 时显示（golden `harmonylog`） | 通过 |
-| B13 | 日志语料层（`dep.observed-missing`、`combo.known-bad`、`mod.known-error`） | 按 `known.json` 对当前启用列表报出，证据来源 `community`（`internal/app/known_test.go`） | 通过 |
-| B14 | 两个环境共用用户数据目录，日志由另一个游戏写入 | 在分析、归因和缓存读取之前排除，不记已看、不提示新日志、不进入问题及计数；回退自己的上一份；CLI/MCP 一致（`TestForeignLogExcludedBeforeAnalysis`、`TestLogOwnerEvidence`、`TestForeignLogCLIParity`） | 合成测试通过；VM 待测 |
-| C1 | 启用一个依赖未安装的 Mod | `dep.missing`，建议给出工坊链接 | 通过 |
-| C2 | 同一 packageId 的工坊版和本地版同时启用 | `pkg.duplicate-active` | 通过 |
-| C3 | 两个 Mod 定义同一个 `ThingDef` | `def.override`，指明哪个生效 | 通过 |
-| C4 | 补丁的目标 Mod 未启用，且补丁没用 FindMod 保护 | `patch.no-match`，原因 `target-inactive` 和 `unguarded-optional` | 通过 |
-| C5 | 两个 Mod 用 transpiler 改同一方法 | `harmony.multi-transpiler` info；该方法在当前日志的堆栈里时为 warning（golden `harmonylog`：Mod B + Mod C 于 `Verse.Pawn.Tick`，日志当前时 warning、过期后 info） | 通过 |
-| C6 | 一个 Mod 只用代码手动打补丁 | `harmony.manual`，不误报为“没有补丁” | 通过 |
-| C7 | 改方案只翻转一个 Mod 的 LoadFolders 条件 | 只有该 Mod 的生效内容失效（`TestLoadFoldersConditions`） | 通过 |
-| C8 | 交替分析 1.7 和 1.6 | 两份分析都保留，不互相驱逐（`TestAnalysisPerGameVersion`） | 通过 |
-| C9 | bool prefix 的目标方法出现在当前日志的错误簇里 | `harmony.skip-prefix` 升为 warning，带簇证据和 `archo log --cluster`；过期日志不升（`TestSkipPrefixEscalation`） | 通过 |
-| C10 | `source search` 不带范围；带 `--active` 不带 `--yes` | 前者报用法错误；后者只打印估算、不反编译（`TestSourceSearchScope`） | 通过 |
-| C11 | 在两个启用集合不同的方案之间来回切换并查看问题 | 第二次切回时不重跑分析 | 通过 |
-| C12 | RimArcho 创建的锁定版本，上游工坊更新 | `mod.pinned` warning “上游有更新”，可看差异 | 通过 |
-| L1 | 向夹具 Player.log 追加一个异常 | 1 秒内出现 1 个新聚类，归因与完整分析一致 | 通过 |
-| L2 | 一个条目分两次写入（续行在第二批） | 合成一个条目 | 通过 |
-| L3 | 文件被截断并重写（游戏重启） | 偏移归零，旧聚类清空 | 通过 |
-| L4 | 追加 50 万行同一错误 | 1 个聚类，计数 50 万，常驻内存增长 < 20 MB | 通过 |
-| L5 | `RimCrow_Realtime.log` 有 JSON 与坏行 | 时间戳补上，坏行计数 | 通过 |
-| L6 | 只有旧名 `RMM_Realtime.log` | 同样读取，不改名（`TestCompanionFor`） | 通过 |
-| L7 | MCP `analyze_log` 带上次返回的 `since` | 只返回之后新出现或次数增加的簇；伴生日志里增加的也算；游戏重启后说明游标过期、旧的一次运行在 Player-prev.log（`TestLogSince`、`TestLogSinceMonitor`、`mcp.TestCLIParity`） | 通过 |
-| L8 | Player.log 有 session 标记，`ArchoMonitor.log` 同 id，某行 `relatedFiles` 指向启用 Mod 的 `Defs/X.xml` | 该 Mod 为 `source`，证据 `ArchoMonitor.log: Defs/X.xml`，“能不能跑”的证据条写文件（`TestLogAnalysisWithMonitor`、`view.TestCompanionChip`） | 通过 |
-| L9 | 两次运行后：`Player-prev.log` 与 `ArchoMonitor-prev.log` 的 session 相同，`ArchoMonitor.log` 是另一次 | prev 配 prev；当前 Player.log 配不到旧的那份（`TestCompanionFor`） | 通过 |
-| L10 | 伴生日志里有 Player.log 没有的 ERROR（游戏停写之后） | 成为一个聚类，次数取伴生日志的 `total`；实时追踪按 06 §2.16.1 L03 等待（`TestLogAnalysisWithMonitor`、`TestLiveLogMonitor`） | 通过 |
-| L11 | 坏行、截断的最后一行、RimCrow 带 `[名称] ` 前缀的消息 | 坏行计数；最后一行等下次；去掉前缀后对上聚类（`logs.TestCompanionMonitor`、`logs.TestCompanionRimCrow`） | 通过 |
-| L12 | 整合包运行（`-savedatafolder=<包>/userdata`） | 读 `<包>/userdata/ArchoMonitor.log`，不读环境的（`TestCompanionFor`、`TestLiveLogMonitor`） | 通过 |
-| L14 | 1.6 和 1.7 的真实游戏里，启用 Monitor 后制造一个已知的 XML 错误 | `ArchoMonitor.log` 有该条目和文件；“能不能跑”的证据条写文件 | 待验证（手动测试清单见 07 §4） |
-| L13 | 同一条目分多行写入（`count` 1、5、3，`total` 9） | 聚类次数 9；时间取第一行（`logs.TestCompanionMonitor`、`TestLogAnalysisWithMonitor`） | 通过 |
-| L15 | 实时追踪：伴生日志的条目先到，Player.log 的那一条过了 5 秒才结束或才出现 | 只有一个聚类，凭据是 Player.log；之后的同一错误计入它（`TestLiveLogMonitorFirst`；VM 2026-10-28 曾拆成两条）。Player.log 里是噪声的一行（如 `Translation data … errors`），伴生日志的条目带堆栈：实时也不列（`TestLiveLogMonitorNoise`） | 通过 |
+| B1 | Patch-failed log | Specific Patch file/line, §4.4 reasons (golden harmonylog: `Patches/Compat.xml:2 … (patch.no-match: target-inactive, unguarded-optional)`, Lib dependency, certain) | Pass |
+| B2 | Missing cross-reference | Referrer Mod/file, whether provider exists | Pass |
+| B3 | `Pawn.Tick` exception, 3 `Mods`' Harmony lines | All patcher, no source; checklist, `harmony --target`/`source search` `AllComps`.`Remove`( | Pass |
+| B4 | `Exception` repeated 500 times | One cluster `x500` | Pass |
+| B5 | Old inspector replay (`internal/app/m4_test.go`) | Same/better conclusions: selectors vs enabled state, `files search` excludes `Languages` with Mod refs, decompilation rebuilds deleted cache/invalidates changed DLL | Pass |
+| B6 | Own `1.6` log after game upgrade to 1.7 | Auto analyze as `1.6`, heading notes (`TestLogOwnVersion`, `TestOwnLogBeforeGameUpgrade`) | Pass |
+| B7 | Own old-version log or before plan edit | Stale, uncounted, collapsed (`TestStaleLog`, `tui.TestProblemsViewLogs`) | Pass (current rules) |
+| B8 | New process rereads same log | `log_cache`, no parse; status cache-only (`TestLogCache`) | Pass |
+| B9 | Log after plan A launch, analyze B | Stale, other-plan launch reason | Pass |
+| B10 | Edit A after A launch | Stale, edited-after-launch; restoring original list makes current | Pass |
+| B11 | Steam launch without record, previous save of A | Belongs to A | Pass |
+| B12 | Known pattern template (§6.8) | pattern ref, pattern/`analyze_log` follow-up; no fallback display; Mod-specific only source (golden harmonylog) | Pass |
+| B13 | Corpus `dep.observed-missing`/`combo.known-bad`/`mod.known-error` | `known.json` findings for enabled set, community evidence (`internal/app/known_test.go`) | Pass |
+| B14 | Shared userdata, another game writes log | Exclude before analysis/attribution/cache; no seen/new notice/findings/counts; own previous fallback; CLI/MCP parity (`TestForeignLogExcludedBeforeAnalysis`, `TestLogOwnerEvidence`, `TestForeignLogCLIParity`) | Synthetic pass; VM pending |
+| C1 | Enable Mod with uninstalled dependency | `dep.missing`, Workshop suggestion | Pass |
+| C2 | Same-package Workshop/local both enabled | `pkg.duplicate-active` | Pass |
+| C3 | Two `Mods` define `ThingDef` | `def.override`, effective definer | Pass |
+| C4 | Disabled patch target, no `FindMod` | `patch.no-match`: `target-inactive`, `unguarded-optional` | Pass |
+| C5 | Two transpilers same method | info; warning if current stack (golden harmonylog Mod B/C `Verse.Pawn.Tick`, current warning/stale info) | Pass |
+| C6 | Manual code-only patching | `harmony.manual`, no false no-patches | Pass |
+| C7 | Flip one Mod LoadFolders condition | Only that Mod effective content invalidated (`TestLoadFoldersConditions`) | Pass |
+| C8 | Alternate 1.7/`1.6` analysis | Both retained (`TestAnalysisPerGameVersion`) | Pass |
+| C9 | bool prefix target in current error cluster | warning, cluster evidence/log command; stale no escalation (`TestSkipPrefixEscalation`) | Pass |
+| C10 | `source search` no scope; active without yes | Usage error; estimate only/no decompile (`TestSourceSearchScope`) | Pass |
+| C11 | Switch between different enabled-set plans | No rerun on second return | Pass |
+| C12 | RimArcho locked copy, Workshop update | `mod.pinned` warning upstream update, diff available | Pass |
+| L1 | Append fixture exception | New cluster within 1 second, same attribution | Pass |
+| L2 | Entry split across batches | One entry | Pass |
+| L3 | Truncate/rewrite | Reset offset/clusters | Pass |
+| L4 | Append 500,000 identical errors | One cluster/count 500,000, resident growth <20 MB | Pass |
+| L5 | `RimCrow_Realtime.log` JSON/bad lines | Timestamps, bad-line count | Pass |
+| L6 | Only `RMM_Realtime.log` | Read without rename (`TestCompanionFor`) | Pass |
+| L7 | MCP since cursor | Only new/increased clusters including companion counts; restart expiry/Player-prev explanation (`TestLogSince`, `TestLogSinceMonitor`, `mcp.TestCLIParity`) | Pass |
+| L8 | Matching session, `relatedFiles` enabled `Defs/X.xml` | source, `ArchoMonitor.log: Defs/X.xml` evidence, can it run file chip (`TestLogAnalysisWithMonitor`, `view.TestCompanionChip`) | Pass |
+| L9 | Matching prev sessions, current different | Pair prev with prev, not current with old (`TestCompanionFor`) | Pass |
+| L10 | Monitor-only `ERROR` after game logging stops | Cluster, companion total, live waits per L03 (`TestLogAnalysisWithMonitor`, `TestLiveLogMonitor`) | Pass |
+| L11 | Bad lines, incomplete last, RimCrow prefix | Count bad, wait incomplete, strip prefix to match (`logs.TestCompanionMonitor`, `logs.TestCompanionRimCrow`) | Pass |
+| L12 | Pack `-savedatafolder`=`<pack>`/userdata | Read pack Monitor, not environment (`TestCompanionFor`, `TestLiveLogMonitor`) | Pass |
+| L14 | Real `1.6`/1.7 known XML error with Monitor | Entry/file in Monitor, can it run file evidence | Pending (manual checklist 07 §4) |
+| L13 | Count lines 1/5/3, total 9 | Count 9, first timestamp (`logs.TestCompanionMonitor`, `TestLogAnalysisWithMonitor`) | Pass |
+| L15 | Companion first, `Player.log` ends/appears after 5 seconds | One cluster, `Player.log` evidence; later errors counted (`TestLiveLogMonitorFirst`; split in VM 2026-10-28). `Player.log` noise (e.g. `Translation data … errors`) with companion stack also excluded live (`TestLiveLogMonitorNoise`) | Pass |
 
-事实集合与清理验收：`TestFactSetsShareVersionsAndUpdates`、`TestFactSetsDifferentFoldersAndPriority`、`TestFactSetsHarmonyViews`、`TestFactPruneVisibilitySlotsAndEnvRemoval`、`TestFactSetsDifferentAssemblyInputs`、`TestMigrateV26FactViews`；规模与迁移测量见 07 §6。
+Fact set/cleanup acceptance: `TestFactSetsShareVersionsAndUpdates`, `TestFactSetsDifferentFoldersAndPriority`, `TestFactSetsHarmonyViews`, `TestFactPruneVisibilitySlotsAndEnvRemoval`, `TestFactSetsDifferentAssemblyInputs`, `TestMigrateV26FactViews`; scale/migration measurements: 07 §6.

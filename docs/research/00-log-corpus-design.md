@@ -1,316 +1,316 @@
-# 社区日志语料研究 · 顶层设计（草案 v1）
+# Community log corpus research · top-level design (draft v1)
 
-> 状态：草案，待定项见 §10。v1 加入 G5（错误范式库，服务 agent 修复流程）。v2 记录已定项、处理方式和清洗要求（§10）。
-> 范围：用玩家公开分享的 HugsLib 日志，检验和改进 RimArcho 的分析能力，并为 MCP 上的 agent 诊断与修复流程提供数据驱动的错误范式。本文只回答“目标是什么、为此要收集什么”，不涉及实现。
+> Status: draft; open questions in §10. v1 adds G5 (error pattern library for agent repair workflows). v2 records decisions, processing methods, and cleaning requirements (§10).
+> Scope: use publicly shared HugsLib logs to test and improve RimArcho analysis and supply data-driven error patterns for agent diagnosis and repair over MCP. This document answers only "what are the goals, and what must we collect?", not implementation.
 
-## 1. 为什么做
+## 1. Why do this
 
-RimArcho 现在的判断，都只在一个真实环境上验证过（作者本人的 485 个 Mod，见 decisions-m2/m3）：
+RimArcho's judgments have so far been validated on only one real environment (the author's 485 Mods; see decisions-m2/m3):
 
-- 排序约束是否合理、成环是否常见；
-- 问题目录（03 §4.3）的严重度是否合适；
-- 日志归因（03 §6）能覆盖多少真实报错。
+- Whether sorting constraints are reasonable and cycles common;
+- Whether finding catalog (03 §4.3) severities are appropriate;
+- How many real errors log attribution (03 §6) covers.
 
-一个环境的样本太少。HugsLib 的“分享日志”功能已经积累了大量真实玩家的数据，每份都同时包含**加载顺序**和**运行结果**，正好可以补上这个缺口。
+One environment is too small a sample. HugsLib's "share logs" feature has accumulated extensive real-player data, each containing both **load order** and **run results**, filling exactly this gap.
 
-另一方面，agent 的诊断流程（MCP `Instructions` 中的 Diagnosis workflow，以及 `analyze_log` 附带的热点检查清单）来自旧 inspector skill 的经验，是手写的，只覆盖少数几类错误（XML 补丁、交叉引用、材质、`Pawn.Tick`）。真实错误的分布、每类错误的常见原因和有效修法，目前都没有数据支撑。语料可以把这部分变成数据驱动的。
+Meanwhile, the agent diagnostic workflow (Diagnosis workflow in MCP `Instructions`, and the hotspot checklist attached to `analyze_log`) is handwritten from the old inspector skill's experience. It covers only a few error kinds (XML patches, cross-references, materials, `Pawn.Tick`). No data currently supports the distribution of real errors, common causes per kind, or effective fixes. The corpus can make this data-driven.
 
-这是**离线研究**，不是产品功能：RimArcho 本身不联网收集任何数据，与“只有 `data update` 才访问网络”的原则（04 §6.3）一致。
+This is **offline research**, not a product feature: RimArcho itself collects no data online, consistent with "only `data update` accesses the network" (04 §6.3).
 
-## 2. 数据源：一份 HugsLib 日志里有什么
+## 2. Data source: what a HugsLib log contains
 
-依据 HugsLib 源码 `Source/Logs/LogPublisher.cs` 的 `PrepareLogData()`，上传内容依次为：
+According to `PrepareLogData()` in HugsLib `Source/Logs/LogPublisher.cs`, uploads contain, in order:
 
-| 段落 | 内容 | 备注 |
+| Section | Content | Notes |
 | --- | --- | --- |
-| 时间戳 | 上传时间 | |
-| `Loaded mods:` | 按**加载顺序**列出：名称、packageId、版本（覆盖版本 / Manifest 版本）、每个程序集及其版本 | 研究排序的核心数据 |
-| `Active Harmony patches:` | 运行时所有被补丁的方法，及各补丁的来源；Harmony 版本 | 静态 Harmony 分析的标准答案 |
-| `Platform information:` | CPU、OS、内存，默认隐藏 | 不需要，丢弃 |
-| Player.log | 经过脱敏：去掉 RimWorld 路径、用户目录、Steam ID、连接信息、显卡信息和无用行 | 默认截断到 10,000 行 |
+| Timestamp | Upload time | |
+| `Loaded mods:` | In **load order**: name, packageId, version (override / Manifest version), every assembly and version | Core data for sorting research |
+| `Active Harmony patches:` | All runtime-patched methods and each patch's source; Harmony version | Ground truth for static Harmony analysis |
+| `Platform information:` | CPU, OS, memory, hidden by default | Not needed; discard |
+| Player.log | Sanitized: RimWorld paths, user directories, Steam IDs, connection information, GPU information, and useless lines removed | Truncated to 10,000 lines by default |
 
-上传方式：默认用 HugsLib 内置账号创建**公开 gist**；玩家填写自己的 token 时为私有 gist，拿不到。
+Upload method: by default creates a **public gist** through HugsLib's built-in account; players supplying their own token create private gists, which we cannot obtain.
 
-数据特点（影响结论的解读）：
+Data characteristics (affecting interpretation):
 
-- **自选样本**：玩家主动分享，通常是出了问题之后。问题日志的比例远高于真实情况。
-- **只有 HugsLib 用户**：不装 HugsLib 的玩家不在样本中。
-- **没有因果标注**：只知道“这些 Mod、这个顺序、出了这些错”，不知道真正原因。
-- **可能截断**：超过 10,000 行的日志只有前半段。
-- **版本混杂**：从 1.0 到当前版本都有。
-- **重复**：同一个玩家可能连续上传多次，Mod 列表几乎相同。
+- **Self-selected sample**: players share voluntarily, usually after a problem. Problem logs are far more common than in actual play.
+- **HugsLib users only**: players without HugsLib are absent.
+- **No causal labels**: we know "these Mods, this order, these errors", not the true cause.
+- **Possible truncation**: logs exceeding 10,000 lines include only the beginning.
+- **Mixed versions**: from 1.0 to the current version.
+- **Duplicates**: one player may upload repeatedly with nearly identical Mod lists.
 
-## 3. 目标
+## 3. Goals
 
-按优先级排列。每个目标写明要回答的问题、改进 RimArcho 的哪一部分、用什么指标衡量。
+In priority order. Each goal states the question, the part of RimArcho to improve, and the metric.
 
-### G1 日志归因：覆盖率与回归语料（主目标）
+### G1 Log attribution: coverage and regression corpus (primary)
 
-- **问题**：真实报错中，有多少能被归因到具体 Mod？哪些类型的报错归因失败？有没有新的错误格式没被识别？
-- **改进**：03 §6 的解析、分类和归因证据。
-- **指标**：
-  - 错误簇的分类覆盖率（非 `other` 的比例）；
-  - 归因率（至少有一个 `source` 角色的比例）；
-  - 人工标注子集上的准确率（§6.4）。
-- **副产品**：一套脱敏后的回归测试日志。
+- **Questions**: how many real errors can be attributed to specific Mods? Which kinds fail attribution? Are new error formats unrecognized?
+- **Improve**: parsing, classification, and attribution evidence in 03 §6.
+- **Metrics**:
+  - Error-cluster classification coverage (fraction other than `other`);
+  - Attribution rate (fraction with at least one `source` role);
+  - Accuracy on the labeled subset (§6.4).
+- **By-product**: a sanitized set of regression-test logs.
 
-### G2 排序：真实加载顺序的研究（主目标）
+### G2 Sorting: research on real load orders (primary)
 
-- **问题**：
-  - 玩家的实际顺序违反声明约束（loadBefore/After、依赖）的情况有多常见？违反和报错是否同时出现？
-  - RimArcho 的排序器作用在真实列表上会移动多少个 Mod？结果是否稳定？
-  - 哪些 Mod 对经常同时出现且伴随 `patch-failed` 类报错？能否从中提炼出社区规则或推断约束的候选？
-- **改进**：04 §5 的排序器，以及上一轮讨论中的 `inferred` 约束和分层。
-- **指标**：违反率、排序移动数、与报错共现的约束对数量。
+- **Questions**:
+  - How often do players' actual orders violate declared constraints (loadBefore/After, dependencies)? Do violations coincide with errors?
+  - How many Mods would RimArcho's sorter move on real lists? Are results stable?
+  - Which Mod pairs often co-occur with `patch-failed` errors? Can these yield candidate community rules or inferred constraints?
+- **Improve**: the sorter in 04 §5, plus `inferred` constraints and tiers discussed previously.
+- **Metrics**: violation rate, number of moves, count of constraint pairs co-occurring with errors.
 
-### G3 Harmony 静态分析的召回率（次目标）
+### G3 Static Harmony analysis recall (secondary)
 
-- **问题**：运行时实际生效的 Harmony 补丁里，有多少被静态扫描找到了？漏掉的是否集中在手动 `Harmony.Patch`（`harmony.manual`）？
-- **改进**：03 §2 的 `HarmonyPatch` 事实，以及 01 §1 里 1.x 的“IL 扫描手动 Patch 目标”。
-- **指标**：按方法和 Mod 计算的召回率。
-- **前提**：需要本地有对应版本的 DLL（§5 L2）。
+- **Questions**: how many runtime-active Harmony patches does static scanning find? Are misses concentrated in manual `Harmony.Patch` (`harmony.manual`)?
+- **Improve**: `HarmonyPatch` facts in 03 §2 and 1.x "IL scan for manual Patch targets" in 01 §1.
+- **Metrics**: recall by method and Mod.
+- **Prerequisite**: corresponding-version DLLs locally (§5 L2).
 
-### G4 问题目录的严重度校准（次目标）
+### G4 Finding catalog severity calibration (secondary)
 
-- **问题**：静态问题（`def.override`、`harmony.skip-prefix`、`patch.no-match` 等）出现时，日志中真的出现对应报错的比例是多少？
-- **改进**：03 §4.3 的严重度，以及 `confidence` 的取值。
-- **指标**：每个问题代码的“日志中有对应报错”的比例。
-- **前提**：需要本地有对应的 Mod 文件（§5 L2）。
+- **Questions**: when static findings (`def.override`, `harmony.skip-prefix`, `patch.no-match`, etc.) appear, how often do corresponding errors actually occur in logs?
+- **Improve**: severity in 03 §4.3 and `confidence` values.
+- **Metrics**: fraction with a corresponding log error for each finding code.
+- **Prerequisite**: corresponding Mod files locally (§5 L2).
 
-### G5 错误范式库：服务 agent 的诊断与修复（次目标）
+### G5 Error pattern library: agent diagnosis and repair (secondary)
 
-- **问题**：
-  - 真实错误有哪些常见范式？各占多少比例？现有诊断流程覆盖了多少？
-  - 每个范式通常由什么原因造成？对应哪条诊断路线（先调用哪些 MCP 工具）？
-  - 哪些修法真的有效：停用某个 Mod、调整顺序、补上依赖、更新 Mod、在本地副本中修补丁？
-- **改进**：MCP `Instructions` 的诊断流程、`analyze_log` 的检查清单（03 §6.3）、`suggestions` 的内容。
-- **指标**：
-  - 范式覆盖率：错误簇中能匹配到已知范式的比例（按次数加权和按日志加权各算一次）；
-  - 每个范式的“已知修法”是否有证据支持（§5 L1 的 `Resolution`）；
-  - agent 评测：在评测集上，agent 按诊断流程得出的结论与标注一致的比例（§6.5）。
-- **范式分两层**：
-  - **通用范式**：与具体 Mod 无关，长期有效。例如 `Could not resolve cross-reference`、`MissingMethodException`（程序集与依赖或游戏版本不匹配）、`TypeLoadException`、补丁失败、`Exception ticking`、材质缺失、XML 重复定义。产出是“识别规则 + 诊断路线 + 常见原因 + 修法类型”。
-  - **Mod 特定范式**：某个 Mod 的某个版本的已知问题，例如“A 的 1.2 版与 B 同时启用时报某个错误”。时效短，必须带 Mod 版本和发现时间，Mod 更新后自动降级为“可能已修复”。
+- **Questions**:
+  - What common patterns occur in real errors? What fraction is each? How much does the existing workflow cover?
+  - What usually causes each pattern? Which diagnostic route applies (which MCP tools first)?
+  - Which fixes work: disabling a Mod, reordering, adding dependencies, updating Mods, repairing patches in a local copy?
+- **Improve**: MCP `Instructions` diagnostic workflow, `analyze_log` checklist (03 §6.3), `suggestions` content.
+- **Metrics**:
+  - Pattern coverage: fraction of error clusters matching a known pattern (weighted by occurrence and by log separately);
+  - Whether each pattern's "known fixes" have evidence (`Resolution` in §5 L1);
+  - Agent evaluation: fraction of conclusions following the workflow that agree with labels (§6.5).
+- **Two pattern tiers**:
+  - **Generic patterns**: independent of specific Mods, durable. Examples: `Could not resolve cross-reference`, `MissingMethodException` (assembly mismatch with dependencies or game version), `TypeLoadException`, patch failures, `Exception ticking`, missing materials, duplicate XML definitions. Output: "matching rules + diagnostic route + common causes + fix kinds".
+  - **Mod-specific patterns**: known issues in a particular Mod version, e.g. "A version 1.2 raises an error when enabled with B". Short-lived; must include Mod version and discovery time, automatically downgraded to "possibly fixed" after a Mod update.
 
-### 非目标
+### Non-goals
 
-- 不训练模型，不做“自动诊断 AI”。范式是给 agent 的数据和线索，推理仍由 harness 中的 agent 完成（D6），RimArcho 不内置 LLM。
-- 范式匹配不等于结论。匹配结果作为证据之一，来源类型标为 `community` 或 `inferred`，仍须遵守 03 §4.2“不把出现位置当原因”。
-- 不建公开数据库，不重新发布任何日志。
-- 不在 RimArcho 中加入遥测或自动上传。
-- 不声称因果。所有结论都是“相关”，与 03 §4.2“不把出现位置当原因”一致。
+- No model training or "automatic diagnostic AI". Patterns are data and clues for agents; reasoning remains with the agent in the harness (D6). RimArcho has no built-in LLM.
+- Pattern matching is not a conclusion. Matches are one piece of evidence, with source type `community` or `inferred`, still following 03 §4.2: "do not treat occurrence location as cause".
+- No public database or republication of logs.
+- No telemetry or automatic uploads in RimArcho.
+- No causal claims. All conclusions describe "correlation", consistent with 03 §4.2.
 
-## 4. 研究问题与所需数据
+## 4. Research questions and required data
 
-| 所需数据 | G1 归因 | G2 排序 | G3 Harmony | G4 校准 | G5 范式 |
+| Required data | G1 attribution | G2 sorting | G3 Harmony | G4 calibration | G5 patterns |
 | --- | :-: | :-: | :-: | :-: | :-: |
-| 游戏版本 | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Mod 列表（顺序、packageId） | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Mod 与程序集版本 | | ✓ | ✓ | ✓ | ✓（Mod 特定范式） |
-| 运行时 Harmony 补丁列表 | ✓ | | ✓ | ✓ | ✓ |
-| 日志错误簇（含堆栈形状） | ✓ | ✓ | | ✓ | ✓ |
-| 同一玩家的前后两次上传 | | | | | ✓（修法证据） |
-| 讨论帖中的解决过程 | | | | | ✓（修法证据） |
-| 本地 Mod 文件（About.xml） | 部分 | ✓ | | ✓ | 部分 |
-| 本地 Mod 文件（Defs、Patches、DLL） | 部分 | 部分 | ✓ | ✓ | 部分 |
-| 人工标注的真实原因 | ✓（准确率） | | | | ✓（评测集） |
+| Game version | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Mod list (order, packageId) | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Mod and assembly versions | | ✓ | ✓ | ✓ | ✓ (Mod-specific patterns) |
+| Runtime Harmony patch list | ✓ | | ✓ | ✓ | ✓ |
+| Log error clusters (with stack shapes) | ✓ | ✓ | | ✓ | ✓ |
+| Consecutive uploads by one player | | | | | ✓ (fix evidence) |
+| Resolution process in discussion threads | | | | | ✓ (fix evidence) |
+| Local Mod files (About.xml) | Partial | ✓ | | ✓ | Partial |
+| Local Mod files (Defs, Patches, DLL) | Partial | Partial | ✓ | ✓ | Partial |
+| Manually labeled true causes | ✓ (accuracy) | | | | ✓ (evaluation dataset) |
 
-结论：**G1、G2 和 G5 的范式发现只需要日志本身**，可以最先做；G3、G4 以及 G5 的修法验证依赖本地 Mod 文件或额外的修法证据，放在后面。
+Conclusion: **G1, G2, and G5 pattern discovery need only logs**, so can come first; G3, G4, and G5 fix validation depend on local Mod files or additional fix evidence and come later.
 
-日志本身**不包含修法**，只有“出了什么错”。修法证据只能来自三个地方，按可靠程度从低到高：
+Logs themselves **contain no fixes**, only "what went wrong". Fix evidence can come from three sources, from least to most reliable:
 
-1. **同一玩家的前后两次上传**：两次之间 Mod 列表发生了变化，某个错误簇随之消失，就记一条“这个变化可能修好了这个错误”的弱证据。
-2. **讨论帖**：§7 途径 B 收集的帖子里，回复中常有解决办法，且楼主会确认是否解决。
-3. **人工标注**：§6.4 的标注子集，同时标注原因和修法。
+1. **Consecutive uploads by one player**: if the Mod list changes and an error cluster disappears, record weak evidence that "this change may have fixed this error".
+2. **Discussion threads**: replies in threads collected through §7 route B often contain fixes confirmed by the original poster.
+3. **Manual labeling**: label both cause and fix in the §6.4 subset.
 
-## 5. 收集什么：四层数据
+## 5. What to collect: four data layers
 
-### L0 原始文本（仅本地）
+### L0 Raw text (local only)
 
-- 原样保存 gist 内容，用于以后解析器升级后重新解析。
-- 键：gist ID；附内容哈希，用于去重。
-- **只放在本地数据目录，不进仓库，不外传。**
+- Preserve gist content unchanged for reparsing after parser upgrades.
+- Key: gist ID; attach a content hash for deduplication.
+- **Store only in the local data directory, never in the repository or shared externally.**
 
-### L1 结构化记录（仅本地）
+### L1 Structured records (local only)
 
-每份日志解析为一条记录：
+Parse each log into a record:
 
-| 实体 | 字段 |
+| Entity | Fields |
 | --- | --- |
-| `LogRecord` | gist ID、上传时间、完整游戏版本与主次版本、HugsLib 版本、Harmony 版本、是否截断、日志总行数、Mod 列表哈希 |
-| `ModEntry` | 位置、名称、packageId、Mod 版本、程序集列表（名称、版本） |
-| `HarmonyEntry` | 目标方法、补丁类型、补丁来源（Harmony ID / Mod） |
-| `ErrorCluster` | 归一化键（与 03 §6.1 相同）、分类、次数、首次出现行号、一条脱敏样本、堆栈中的类型帧、堆栈中的 Harmony 补丁行 |
-| `StackShape` | 供 G5 使用：异常类型、最内层的游戏方法（例如 `Verse.Pawn.Tick`）、最内层的 Mod 帧所属程序集、帧序列去掉 Mod 部分后的指纹。用于把不同 Mod 引起的同类错误归为一个通用范式 |
-| `Attribution` | RimArcho 对每个错误簇的归因结果、使用的证据，以及归因器版本 |
-| `Session` | 同一玩家的连续上传（§6.2）。相邻两份日志之间记录 `ListDiff`：新增、移除、移动的 Mod，以及版本变化 |
-| `Resolution` | 修法证据：错误簇的归一化键、修法类型（停用 / 启用依赖 / 调整顺序 / 更新版本 / 其他）、涉及的 Mod、证据来源（session / thread / label）、置信度 |
-| `Pattern` | G5 的产出：识别规则（归一化键模式和 `StackShape` 条件）、层级（通用 / Mod 特定）、出现次数与日志数、诊断路线、常见原因、修法及其 `Resolution` 证据数；Mod 特定范式另记 Mod 版本范围和发现时间 |
+| `LogRecord` | gist ID, upload time, full and major/minor game version, HugsLib version, Harmony version, truncation flag, total lines, Mod-list hash |
+| `ModEntry` | Position, name, packageId, Mod version, assembly list (names, versions) |
+| `HarmonyEntry` | Target method, patch kind, patch source (Harmony ID / Mod) |
+| `ErrorCluster` | Normalized key (same as 03 §6.1), category, count, first line number, one sanitized sample, type frames in stack, Harmony patch lines in stack |
+| `StackShape` | For G5: exception type, innermost game method (e.g. `Verse.Pawn.Tick`), assembly owning innermost Mod frame, fingerprint of the frame sequence with Mod parts removed. Groups similar errors from different Mods into one generic pattern |
+| `Attribution` | RimArcho attribution for each cluster, evidence used, attribution engine version |
+| `Session` | Consecutive uploads by one player (§6.2). Record `ListDiff` between neighbors: added, removed, moved Mods, and version changes |
+| `Resolution` | Fix evidence: normalized cluster key, fix kind (disable / enable dependency / reorder / update / other), involved Mods, evidence source (session / thread / label), confidence |
+| `Pattern` | G5 output: matching rules (normalized-key patterns and `StackShape` conditions), tier (generic / Mod-specific), occurrence and log counts, diagnostic route, common causes, fixes and `Resolution` evidence counts; Mod-specific patterns also record version range and discovery time |
 
-`ErrorCluster` 直接复用 `internal/logs` 的切分和归一化，保证研究与产品使用同一套规则。
+`ErrorCluster` directly reuses `internal/logs` splitting and normalization so research and product share rules.
 
-`Resolution` 来自 `Session` 时，必须排除同时变化太多的情况：一次改了几十个 Mod，就无法判断是哪个变化起了作用。规则在 P1 根据实际数据确定。
+For `Resolution` from `Session`, exclude cases with too many simultaneous changes: if dozens of Mods changed, we cannot tell which change mattered. Determine rules in P1 from actual data.
 
-### L2 与本地 Mod 文件关联（仅本地）
+### L2 Association with local Mod files (local only)
 
-日志里只有 Mod 列表，没有 Mod 文件。要做声明层、Def 层、Patch 层和 Harmony 层分析，需要把列表对应到本地文件：
+Logs contain Mod lists, not files. Declaration, Def, Patch, and Harmony analysis requires mapping lists to local files:
 
-1. 统计所有日志中各 packageId 的出现频率。预期是长尾分布：少数几百个 Mod 覆盖大部分条目。
-2. 用本地已有的 Mod（作者环境），加上通过 SteamCMD 下载的高频 Mod，组成一个**研究用 Mod 库**。
-3. 每份日志记录**覆盖率**：列表中有多少 Mod 能对应到本地文件，版本是否一致。
-4. 只在覆盖率足够高的日志上做 G3 和 G4，并在结论中注明覆盖率阈值。
+1. Count packageId frequency across logs. Expect a long tail: a few hundred Mods cover most entries.
+2. Combine existing local Mods (author's environment) and high-frequency Mods downloaded through SteamCMD into a **research Mod library**.
+3. Record **coverage** per log: how many listed Mods map to local files, and whether versions match.
+4. Run G3 and G4 only on sufficiently covered logs, stating the threshold in conclusions.
 
-工程前提：RimArcho 目前的分析以“环境 + Instance”为单位。研究需要一个**虚拟环境**：输入一份 Mod 列表，从研究用 Mod 库中解析出 Instance，再像真实 Loadout 一样分析。这是 G3 和 G4 唯一需要新增的核心能力。
+Engineering prerequisite: RimArcho analysis currently uses "environment + Instance". Research needs a **virtual environment**: input a Mod list, resolve Instances from the research library, then analyze as a real Loadout. This is the only new core capability required for G3 and G4.
 
-### L3 汇总结果（可进仓库）
+### L3 Aggregate results (may enter the repository)
 
-- 统计数字和结论写在 `spikes/<名称>/RESULT.txt` 和 `docs/decisions-*.md`。
-- 回归测试用的日志样本必须经过人工复查和二次脱敏，数量很少，单独存放。
-- **范式库**（`Pattern`）是一个可以进仓库、也可以随产品分发的数据集。其中只有识别规则、统计数字、诊断路线和修法，不含任何日志原文。形态见 §8。
+- Statistics and conclusions in `spikes/<name>/RESULT.txt` and `docs/decisions-*.md`.
+- Regression log samples require manual review and a second sanitization, in small numbers, stored separately.
+- The **pattern library** (`Pattern`) can enter the repository and ship with the product. It contains only matching rules, statistics, diagnostic routes, and fixes, with no original log text. Form described in §8.
 
-### 明确不收集
+### Explicitly excluded
 
-- CPU、内存等平台信息（即使玩家选择公开）。
-- gist 的评论、上传账号以外的任何账号信息。
-- 脱敏后仍残留的个人信息：用户名、存档名、本地 Mod 目录名等，入库前再做一次脱敏。
+- Platform information such as CPU and memory (even when players make it public).
+- gist comments and any account information beyond the uploading account.
+- Personal information remaining after sanitization: user names, save names, local Mod folder names, etc.; sanitize again before ingestion.
 
-## 6. 样本设计
+## 6. Sample design
 
-### 6.1 筛选
+### 6.1 Filtering
 
-- 游戏版本：1.6 为主，1.7 单独跟踪（当前版本，样本正在增长）。更早的版本不收（P0 依据版本分布确定，见 §7）。
-- 只收含 `Loaded mods:` 段的日志；格式无法解析的，计数后丢弃。
+- Game versions: mainly 1.6, track 1.7 separately (current version, growing sample). Do not collect earlier versions (P0 decision from version distribution, §7).
+- Collect only logs with `Loaded mods:`; count and discard unparseable formats.
 
-### 6.2 去重
+### 6.2 Deduplication
 
-- 完全相同的内容：按内容哈希去重。
-- 同一玩家的连续上传：Mod 列表哈希相同、或差异很小，且错误簇集合相近的，视为同一个“会话”。统计时以会话为单位，避免重度上传者主导结果。
+- Identical content: deduplicate by content hash.
+- Consecutive uploads by one player: identical or nearly identical Mod-list hashes and similar error-cluster sets count as one "session". Use sessions as the statistical unit to prevent frequent uploaders dominating results.
 
-### 6.3 规模
+### 6.3 Scale
 
-| 阶段 | 规模 | 用途 |
+| Phase | Scale | Purpose |
 | --- | --- | --- |
-| P0 可行性 | 约 50 份 | 确认能批量获取，摸清格式 |
-| P1 初版 | 约 500 份 | G1、G2 的第一批指标 |
-| P2 扩充 | 数千份 | 统计稳定的结论、长尾分析 |
+| P0 feasibility | About 50 logs | Confirm bulk acquisition and understand formats |
+| P1 initial version | About 500 logs | First G1/G2 metrics |
+| P2 expansion | Thousands | Statistically stable conclusions, long-tail analysis |
 
-### 6.4 人工标注子集
+### 6.4 Manually labeled subset
 
-归因的**准确率**只能靠人工标注来衡量。从 P1 中抽 50–100 份，由人判断每个主要错误簇的真实来源 Mod，并尽量写下修法，作为标准答案。这是工作量最大的部分，需要提前确认能投入多少时间。
+Attribution **accuracy** requires manual labels. Sample 50–100 P1 logs; a human identifies the true source Mod for each main error cluster and, where possible, its fix, as ground truth. This is the largest workload; confirm available time in advance.
 
-抽样时按范式分层：每个高频通用范式至少几份，避免标注集被最常见的一两类错误占满。
+Stratify by pattern: at least a few examples of every common generic pattern, avoiding dominance by the top one or two error kinds.
 
-**标注方式（2026-10-21 试点，`spikes/corpuslabel`，数字见其 `RESULT.txt`）。** 标注由小模型（Haiku）完成，人只做抽查复核：
+**Labeling method (2026-10-21 pilot, `spikes/corpuslabel`; figures in its `RESULT.txt`).** A small model (Haiku) labels; humans spot-check:
 
-- **证据包**：每个（日志，错误簇）一份 1.5–7.5 KB 的纯文本。内容是消息、附加行、堆栈与 Harmony 行、前后几行日志、证据指向的 Mod（位置、版本、About.xml、缺失依赖、被违反的声明规则），以及研究环境中的事实：`def`、`harmony --target`、`patches --failed`、`files search`、DLL 的程序集引用，以及语料共现（同一错误的其他日志里明显偏多的 Mod）。事实由与 MCP 工具相同的 `cmds` 命令生成，所以输出与 agent 看到的一致。
-- **为什么不让标注模型直接调用 MCP**：研究环境一次只能装载一份日志的 Mod 列表，并行的标注 agent 无法共用；预先生成的证据包可以复现、篇幅有上限、成本低，也能逐份复查。让 agent 通过 MCP 自己诊断属于 §6.5 的评测，用同一份标注作答案，两件事分开做。
-- **标注者看不到 RimArcho 的归因结论**，否则一致率会因锚定而虚高。
-- **标签**是固定字段的 JSON（原因 Mod 与角色、失败阶段、原因类型、修法、置信度、原文引文、模型名、提示版本），用 `validate` 校验：gist、簇键必须存在，packageId 必须在该日志的列表中，引文必须逐字出自证据包。
-- 抽样：库覆盖率 ≥ 80% 的日志，排除 `other`、`mod-report`；每个问题类取日志数最多的 2 个模板，每个模板 2 簇，每份日志最多 1 簇。
+- **Evidence packet**: 1.5–7.5 KB of plain text per (log, cluster). Includes message, extra lines, stack and Harmony lines, nearby log lines, evidence-linked Mods (position, version, About.xml, missing dependencies, violated declared rules), and research-environment facts: `def`, `harmony --target`, `patches --failed`, `files search`, DLL assembly references, and corpus co-occurrence (Mods markedly overrepresented in other logs with the same error). Facts come from the same `cmds` commands as MCP tools, matching what agents see.
+- **Why the labeling model does not call MCP directly**: the research environment can load only one log's Mod list at a time, so parallel labeling agents cannot share it. Pregenerated packets are reproducible, bounded, cheap, and individually reviewable. Agent diagnosis over MCP belongs to §6.5 evaluation, using the same labels as answers; keep the two tasks separate.
+- **Labelers cannot see RimArcho attribution conclusions**, avoiding inflated agreement from anchoring.
+- **Labels** are fixed-field JSON (cause Mod and role, failure phase, cause type, fix, confidence, verbatim quote, model name, prompt version), checked with `validate`: gist and cluster key must exist, packageId must occur in that log's list, quotes must match packet text exactly.
+- Sampling: library coverage ≥ 80%, excluding `other` and `mod-report`; take the 2 templates occurring in most logs per problem class, 2 clusters per template, at most 1 cluster per log.
 
-试点 32 簇的结论：RimArcho 在复核标签上**从未给错来源**（13/13），但对 12/25 个有明确原因的簇没有给出来源：xml-load 4 个全部漏掉，其余分散在 exception、harmony-stack、material、save-load。所以 21.2% 的覆盖率基本都是正确的归因，缺口在于沉默，而不是误判（n = 32，按类各 4 个，只是初步估计）。Haiku 的错误几乎都是“说不知道”，而不是认错 Mod。三轮迭代中，与复核的不一致率从 44% 降到 31%，再降到 22%（见 RESULT）。降幅来自证据包的改进（共现、消息后的行、精确的 `files search`），而不是换更大的模型。
+Pilot conclusion, 32 clusters: RimArcho **never named a wrong source** against reviewed labels (13/13), but named no source for 12/25 clusters with clear causes: all 4 xml-load cases missed, others spread across exception, harmony-stack, material, save-load. Thus the 21.2% coverage is mostly correct attribution; the gap is silence rather than wrong judgments (n = 32, 4 per class, preliminary only). Haiku errors were almost all "unknown", rather than blaming the wrong Mod. Across three iterations, disagreement with review fell from 44% to 31% to 22% (see RESULT). The gain came from better packets (co-occurrence, post-message lines, exact `files search`), not a larger model.
 
-### 6.5 agent 评测集
+### 6.5 Agent evaluation dataset
 
-标注子集中，本地 Mod 覆盖率足够高的日志（§5 L2），可以组成 agent 的评测集：
+Labeled logs with sufficiently high local Mod coverage (§5 L2) can form an agent evaluation dataset:
 
-1. 用日志中的 Mod 列表建立虚拟环境；
-2. agent 只通过 MCP 工具诊断，流程与 `docs/m4-mcp-transcripts.md` 的脚本客户端相同；
-3. 把 agent 的结论（原因 Mod、失败阶段、修法）与标注对比。
+1. Build a virtual environment from the log's Mod list;
+2. Let the agent diagnose only through MCP tools, following the scripted client in `docs/m4-mcp-transcripts.md`;
+3. Compare agent conclusions (cause Mod, failure phase, fix) against labels.
 
-这样，诊断流程和范式库的每次修改，都能用同一套评测集衡量效果，而不是只靠几份手工记录。
+Each workflow or pattern-library change can then be measured on the same evaluation dataset rather than a few manual records.
 
-## 7. 获取途径（P0 已验证，见 `spikes/hugslogs/RESULT.txt`；API 探测 2026-10-19）
+## 7. Acquisition routes (P0 validated, `spikes/hugslogs/RESULT.txt`; API probe 2026-10-19)
 
-| 途径 | 说明 | P0 结论 |
+| Route | Description | P0 conclusion |
 | --- | --- | --- |
-| A. HugsLib 账号的公开 gist | 账号为 `HugsLibRecordKeeper` | **GitHub API（带自己的 token）能列出全部历史**：约 7,041 页 × 100 ≈ **70.4 万份**，最早到 2016-11-17（`hugslogs probe`）。原始内容从 `gist.githubusercontent.com` 下载。网页列表最多 100 页（最近约 1,000 份，约 2.6 天），翻页过快会被限流（429），只作为无 token 时的备用 |
-| B. Steam 讨论帖中的 gist 链接 | Mod 的 Bug 报告帖通常要求附 HugsLib 日志 | 帖子页可以直接抓取，含 gist 链接（包在 `steamcommunity.com/linkfilter` 跳转里）和回复。也是更早历史日志的唯一来源 |
+| A. Public gists of the HugsLib account | Account `HugsLibRecordKeeper` | **GitHub API (with our own token) lists all history**: about 7,041 pages × 100 ≈ **704,000 logs**, back to 2016-11-17 (`hugslogs probe`). Download raw content from `gist.githubusercontent.com`. Web listing stops at 100 pages (about 1,000 recent logs, about 2.6 days); rapid paging triggers 429 rate limits. Fallback only without a token |
+| B. gist links in Steam discussion threads | Mod bug-report threads usually request HugsLib logs | Thread pages can be scraped directly, with gist links (wrapped in `steamcommunity.com/linkfilter` redirects) and replies. Also the only source of older historical logs |
 
-**推论：** 途径 A 可以**按时间段回填历史**，不再是只能滚动抓取。限制变成了体量：近期每天约 370–450 份，1.6 发布以来估计 17–20 万份；每份约 600 KB，全量约 100 GB，放不进 git 仓库。所以按目标**抽样**（见 §6.3），定期增量抓取只用于跟上新日志，错过某天不会丢数据。
+**Inference:** route A can **backfill by time range**, rather than only collect a rolling window. Volume is now the constraint: about 370–450 logs daily recently, estimated 170,000–200,000 since 1.6 released; about 600 KB each, roughly 100 GB total, too much for git. Thus **sample** by goal (§6.3); periodic incremental collection only keeps up with new logs, and missing a day loses no data.
 
-**1.7 日志格式。** 当前游戏版本 1.7 换了运行时（日志头为 `=== Waylith log ===`，.NET 10），每行带时间戳、级别和分类，例如 `2026-10-19 15:17:41.976  INFO [Verse] RimWorld 1.7.4982 rev1280`；多行消息的续行可以顶格；每条消息（包括警告）都带调用栈，栈顶是日志系统自身（`Brutal.Logging.*`、`Verse.Log.*`）。另有一个非官方发布器（`m00nl1ght.UnofficialUpdates.HugsLogPublisher`），它上传的 1.7 日志缺少 `Log file contents:` 分隔行。
+**1.7 log format.** Current game version 1.7 changed runtime (header `=== Waylith log ===`, .NET 10); lines include timestamp, level, and category, e.g. `2026-10-19 15:17:41.976  INFO [Verse] RimWorld 1.7.4982 rev1280`. Multiline continuation lines may start at column zero; every message (including warnings) has a stack starting in logging itself (`Brutal.Logging.*`, `Verse.Log.*`). An unofficial publisher (`m00nl1ght.UnofficialUpdates.HugsLogPublisher`) uploads 1.7 logs without the `Log file contents:` separator.
 
-**版本分布。** P0 的 998 份中，1.6 占 936 份，1.7 只有 39 份，1.5 有 16 份。1.7 的 39 份里有 34 份加载了官方 HugsLib，所以样本少不是发布器的问题，而是大部分玩家仍在 1.6。研究范围定为 **1.6 为主，1.7 单独跟踪**：1.7 是当前版本，也是 RimArcho 作者自己的环境，样本会随时间增加。
+**Version distribution.** Of 998 P0 logs, 936 were 1.6, only 39 were 1.7, and 16 were 1.5. Of the 39 for 1.7, 34 loaded official HugsLib, so the small sample reflects most players still using 1.6, rather than publisher issues. Scope: **mainly 1.6, track 1.7 separately**. 1.7 is current and the author's own environment; samples will grow over time.
 
-规则：
+Rules:
 
-- 使用自己的 GitHub token，遵守速率限制。
-- **不使用 HugsLib 源码中内置的 token。**
+- Use our own GitHub token and respect rate limits.
+- **Never use the token embedded in HugsLib source.**
 
-## 8. 合规与隐私
+## 8. Compliance and privacy
 
-- 数据是公开的，但用途限定为研究，不重新发布、不做个体分析。
-- L0–L2 只在本地，仓库中只有 L3。
-- 入库前做二次脱敏（§5 “明确不收集”）。
-- 结论中不出现可以定位到某个玩家的信息，例如罕见 Mod 组合的完整列表。
-- 范式库只记录“出现在多少份日志中”，不记录来自哪些 gist。只在少于若干份日志中出现的 Mod 特定范式不进入范式库。
+- Data is public but used only for research, without republication or individual profiling.
+- L0–L2 stay local; only L3 enters the repository.
+- Sanitize again before ingestion (§5 "Explicitly excluded").
+- Conclusions must not identify players, e.g. by listing a complete rare Mod combination.
+- Patterns record "how many logs", not which gists. Mod-specific patterns seen in fewer than a minimum number of logs are excluded.
 
-## 9. 范式库如何进入产品（方向，不在本阶段实现）
+## 9. How patterns enter the product (direction, not implemented in this phase)
 
-范式库是研究最直接的产品产出，进入产品的方式要符合现有原则：RimArcho 提供事实，推理交给 agent。
+The pattern library is the most direct product output of this research. Integration follows existing principles: RimArcho supplies facts; agents reason.
 
-| 位置 | 用法 |
+| Location | Use |
 | --- | --- |
-| `analyze_log` / `archo log` | 错误簇匹配到范式时，附上 `pattern:<id>` 引用，作为一条证据（来源类型 `community`），给出出现频率、常见原因和建议的下一步命令 |
-| 新的可引用实体 `pattern:<id>` | 与其他引用一样，可以在 Inspect、CLI、MCP 中继续追问：识别规则、诊断路线、修法及其证据数 |
-| MCP `Instructions` | 诊断流程的分类和检查清单，按范式库的实际分布重写，先覆盖最常见的范式 |
-| `suggestions` | 修法转成可执行的命令，例如 `archo disable #a3f9`、`archo rule add after …` |
-| 数据分发 | 与社区排序规则相同，通过 `archo data update` 获取，记录数据集版本（04 §6.3） |
+| `analyze_log` / `archo log` | On a cluster match, attach `pattern:<id>` as evidence (source type `community`), with frequency, common causes, suggested next commands |
+| New referenceable entity `pattern:<id>` | As with other references, inspect further in Inspect, CLI, MCP: matching rules, diagnostic route, fixes and evidence counts |
+| MCP `Instructions` | Rewrite workflow categories and checklists from actual pattern distribution, covering common patterns first |
+| `suggestions` | Turn fixes into executable commands, e.g. `archo disable #a3f9`, `archo rule add after …` |
+| Data distribution | As with community sorting rules, obtain through `archo data update`, recording dataset version (04 §6.3) |
 
-## 10. 阶段与待定项
+## 10. Phases and open questions
 
-### 阶段
+### Phases
 
-| 阶段 | 内容 | 交付 |
+| Phase | Work | Deliverable |
 | --- | --- | --- |
-| P0 可行性 | 验证 §7 的途径 A；抓约 50 份，记录三个段落的实际格式；粗看同一玩家连续上传的比例 | `spikes/hugslogs/RESULT.txt`：能否批量获取、格式说明、`Session` 是否足够多 |
-| P1 语料与 G1、G2、G5 发现 | 抓取、解析、去重、入本地库；跑现有日志归因和排序器；按 `StackShape` 聚类出通用范式的初版；从 `Session` 提取 `Resolution`；完成人工标注子集 | G1、G2 的指标；范式库初版及覆盖率；`decisions-*.md` 中的结论与改进清单 |
-| P2 本地 Mod 库与 G3、G4、G5 评测 | packageId 频率统计；下载高频 Mod；实现虚拟环境；跑静态分析并与运行时数据对比；建立 agent 评测集 | G3、G4 的指标；agent 评测基线 |
-| P3 范式库进入产品 | 按 §9 接入 `analyze_log`、`pattern:` 引用和 MCP `Instructions`；用评测集对比接入前后 | 新的 spec 章节（03 §6、05） |
+| P0 feasibility | Validate §7 route A; fetch about 50 logs, record actual formats of three sections; roughly inspect repeat-upload share | `spikes/hugslogs/RESULT.txt`: bulk acquisition feasibility, format notes, whether enough `Session` records exist |
+| P1 corpus and G1/G2/G5 discovery | Fetch, parse, deduplicate, ingest locally; run existing attribution and sorter; cluster initial generic patterns by `StackShape`; extract `Resolution` from `Session`; finish labeled subset | G1/G2 metrics; initial pattern library and coverage; conclusions and improvements in `decisions-*.md` |
+| P2 local Mod library and G3/G4/G5 evaluation | packageId frequency; download frequent Mods; implement virtual environment; compare static analysis with runtime; build agent evaluation dataset | G3/G4 metrics; agent evaluation baseline |
+| P3 product integration | Integrate `analyze_log`, `pattern:` references, MCP `Instructions` per §9; compare before/after using evaluation dataset | New spec sections (03 §6, 05) |
 
-每个阶段结束时，在 `docs/decisions-*.md` 记录结论，再决定是否进入下一阶段。
+At each phase end, record conclusions in `docs/decisions-*.md`, then decide whether to proceed.
 
-**P0 状态：完成**（2026-10-20），结论见 `spikes/hugslogs/RESULT.txt`。对 P1 的影响：
+**P0 status: complete** (2026-10-20), conclusions in `spikes/hugslogs/RESULT.txt`. Impact on P1:
 
-- ~~途径 A 只能滚动抓取~~（P0 时只有网页列表可用）。2026-10-19 用 API 探测：可以列出全部历史（约 70.4 万份，到 2016-11），P1 可以按时间段回填；约束改为存储体量，需要抽样。
-- 同一玩家重复上传占 40% 的日志，可以作为修法证据的来源。
-- Mod 长尾比预期重：前 1,000 个包只覆盖 57% 的条目，前 3,000 个覆盖 80%。
-- 先解决清洗问题：`other` 类混入了大量状态行；按类型逐条报的消息需要模板级归一；1.7 要按级别区分。
-- 讨论帖的文本提取要处理嵌套引用和 Mod 作者标识，然后再交给小模型。
+- ~~Route A supports only rolling collection~~ (only web listing worked in P0). API probe 2026-10-19: all history is listable (about 704,000 logs, back to 2016-11); P1 can backfill by date. Storage volume becomes the constraint; sampling required.
+- Repeat uploads by one player account for 40% of logs, a source of fix evidence.
+- The Mod tail is longer than expected: top 1,000 packages cover only 57% of entries; top 3,000 cover 80%.
+- Clean first: `other` contains many status lines; per-type messages need template normalization; 1.7 needs level-based distinctions.
+- Thread text extraction must handle nested quotes and Mod-author identifiers before passing to a small model.
 
-**P1 状态：G1、G2 首轮完成**（2026-10-20），结论见 `docs/research/decisions-corpus.md`，数字见 `spikes/corpusrun/RESULT.txt`。
-- 样本：1.6 时期每月 15 日整天，共 6,734 份 1.6 日志；研究环境用独立的 1.6 安装和 1,960 个下载的 Mod，每份日志的 Mod 覆盖率中位数 82%。
-- G1：按语料修改解析和归因规则后，同一批 671 份日志中找到来源的簇从 22.5% 升到 28.4%，把 Core/DLC 误判为来源的簇从 5,875 降到 0。全量样本为 21.2%；覆盖率高的日志并不更好，剩下的缺口是规则问题。
-- G2：一半日志违反声明的约束，但 100 个 Mod 以上时，违反与否和是否报错无关；最常被违反的约束很少涉及被归因的 Mod。
-- 仍然只有覆盖率，没有准确率（待定项 3）。
+**P1 status: first G1/G2 round complete** (2026-10-20); conclusions in `docs/research/decisions-corpus.md`, figures in `spikes/corpusrun/RESULT.txt`.
+- Sample: whole 15th day of each month in the 1.6 period, 6,734 logs for 1.6; research uses a separate 1.6 installation and 1,960 downloaded Mods, median per-log Mod coverage 82%.
+- G1: corpus-driven parser/attribution changes raised clusters with a source from 22.5% to 28.4% on the same 671 logs, reducing Core/DLC falsely named sources from 5,875 to 0. Full sample: 21.2%; highly covered logs do no better, so remaining gaps are rules.
+- G2: half of logs violate declared constraints, but above 100 Mods violation is unrelated to errors; the most violated constraints rarely involve attributed Mods.
+- Still coverage only, not accuracy (open question 3).
 
-**P1 第二轮与 G3/G4/G5 首轮完成**（2026-10-22，最终运行 v4，合并后的 master，完整 Mod 列表）：
-- G1：全量样本中找到来源的问题簇 21.2% → 29.9%；标注试点（32 簇）中 RimArcho 给出的来源全部正确，缺口是"没给出"，不是"给错"。
-- G2：排序器按约束的实际影响分级，加载顺序警告 19,945 → 2,274。
-- G3：Harmony 静态扫描召回率 60%（找到补丁方法则 71%），漏掉的 82% 来自直接调用 `Harmony.Patch` 的程序集。
-- G4：`patch.no-match` 最有预测力（约 8 倍于随机）；`dep.missing (lib)` 和 `official.order` 定为 error 偏重。
-- G5：范式库 v0 见 `spikes/patterns/RESULT.txt`，接入草案见 `docs/research/01-pattern-library-integration-draft.md`。
+**Second P1 round and first G3/G4/G5 round complete** (2026-10-22, final run v4, merged master, complete Mod lists):
+- G1: problem clusters with a source on the full sample 21.2% → 29.9%; all sources named by RimArcho in the 32-cluster labeling pilot were correct; gaps were "not named", not "wrong".
+- G2: sorter grades constraints by observed impact; load-order warnings 19,945 → 2,274.
+- G3: static Harmony recall 60% (71% with patch method found); 82% of misses from assemblies directly calling `Harmony.Patch`.
+- G4: `patch.no-match` is most predictive (about 8 times chance); error is too severe for `dep.missing (lib)` and `official.order`.
+- G5: library v0 in `spikes/patterns/RESULT.txt`; integration draft in `docs/research/01-pattern-library-integration-draft.md`.
 
-### 已定（v2）
+### Decided (v2)
 
-| # | 问题 | 裁定 |
+| # | Question | Decision |
 | --- | --- | --- |
-| 1 | 主目标 | G1、G2。G5 保留为次目标，P1 中随 G1 一起做范式发现 |
-| 2 | 下载高频 Mod | 可以。研究在云端环境中进行，磁盘空间不是约束 |
-| 4 | 语料库位置 | 独立的**私有**仓库 `ToumanLin/RimArcho-corpus`。RimArcho 是公开仓库，原始日志放进去等于重新发布，且无法撤回；研究在临时的云端容器中进行，所以语料必须存到容器之外 |
-| 5 | 讨论帖 | 收集（§7 途径 B） |
+| 1 | Primary goals | G1, G2. Keep G5 secondary; discover patterns alongside G1 in P1 |
+| 2 | Download frequent Mods | Allowed. Research runs in the cloud; disk space is not a constraint |
+| 4 | Corpus location | Separate **private** repository `ToumanLin/RimArcho-corpus`. RimArcho is public: placing raw logs there republishes them irreversibly; research runs in temporary cloud containers, so corpus must live outside the container |
+| 5 | Discussion threads | Collect (§7 route B) |
 
-**处理方式（R1）。** 文本富集类任务，例如判断讨论帖是否给出了解决办法、提取修法、给错误簇做初步分类，用并行的小模型子 agent 处理。机器可确定的部分（解析日志头、切分错误簇、归一化、去重）一律用确定性代码，不交给模型。
+**Processing (R1).** Text enrichment, such as determining whether a thread has a solution, extracting fixes, or initially classifying error clusters, uses parallel small-model subagents. Machine-determinable work (header parsing, cluster splitting, normalization, deduplication) always uses deterministic code, never models.
 
-**数据清洗（R2）。** 清洗是每个阶段的第一步，不是事后补救：
-- 每份原始日志都记录清洗结果：通过、丢弃（并写明原因，例如版本过旧、缺少 Mod 列表、格式无法解析），丢弃原因按数量汇总到 RESULT。
-- 模型输出必须是结构化的（固定字段），并保存模型名和提示版本；进入语料库前做格式校验，引用的 gist ID、错误簇键必须在库中存在。
-- 每批模型输出抽样人工复查，在 RESULT 中记录抽样数和不合格率。
+**Data cleaning (R2).** Cleaning is the first step in every phase, not an afterthought:
+- Record cleaning outcomes for every raw log: accepted, discarded (with reason, e.g. old version, missing Mod list, unparseable format); aggregate discard reasons by count in RESULT.
+- Model output must be structured (fixed fields), storing model name and prompt version; validate before corpus ingestion, including existence of referenced gist IDs and cluster keys.
+- Manually spot-check each model-output batch; record sample size and failure rate in RESULT.
 
-### 待定项
+### Open questions
 
-6. ~~抽样与存储~~ 已定（2026-10-20）：每月抽一整天（15 日），原始日志留在语料仓库（git 压缩约 8 倍，6,093 份打包后 0.49 GB，上限按打包大小 2 GB 计）。
-3. 人工标注子集（§6.4）能投入多少时间？这决定能不能衡量归因**准确率**（与覆盖率的区别见下），以及能不能建立 agent 评测集（§6.5）。
+6. ~~Sampling and storage~~ Decided (2026-10-20): sample one whole day monthly (the 15th), keep raw logs in the corpus repository (git compresses about 8-fold; 6,093 logs pack to 0.49 GB; cap at 2 GB packed).
+3. How much time is available for the labeled subset (§6.4)? This determines whether attribution **accuracy** can be measured (distinction below), and whether an agent evaluation dataset (§6.5) can be built.
 
-> **覆盖率与准确率。** 覆盖率 = 给出了来源 Mod 的错误簇占全部错误簇的比例，自动就能算。准确率 = 在人工确认过真实原因的错误簇中，RimArcho 判定的来源与人工结论一致的比例，必须有标注。只看覆盖率有风险：一个总是“猜一个 Mod”的归因器覆盖率可以是 100%，但大部分是错的。讨论帖中楼主确认解决的案例可以充当一部分标注，减少人工工作量。
+> **Coverage vs. accuracy.** Coverage = fraction of all error clusters for which a source Mod is named, computable automatically. Accuracy = fraction of clusters with manually confirmed causes where RimArcho's source agrees with the human conclusion; requires labels. Coverage alone is risky: an attributor always "guessing a Mod" can reach 100% coverage while mostly wrong. Thread cases with confirmed fixes can supply some labels and reduce manual work.

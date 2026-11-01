@@ -1,160 +1,160 @@
-# 09 · Archo（内置 AI 助手）
+# 09 · Archo (built-in AI assistant)
 
-> 状态：1.1 的设计规格，全部（待实现）。现在能用的 AI 接入只有外部 agent 走 `archo mcp`（05 §5）。
-> 依据：00（§2、§3.2、§4）、00a、05、06。
+> Status: design specification for 1.1; all features are unimplemented. The only AI integration available now is an external agent using `archo mcp` (05 §5).
+> Basis: 00 (§2, §3.2, §4), 00a, 05, 06.
 
-Archo 是 RimArcho 内置的 AI 助手，形象是项目图标 `internal/icon/portrait.svg`，小尺寸用头像上的蝴蝶结作标志（06 §7）。界面里提到 AI 助手的地方都用这个名字和头像，例如“让 Archo 分析这个报错”。外部 agent（Claude Code、Codex 等）通过 MCP 接入时用它们自己的名字。
+Archo is RimArcho's built-in AI assistant. Its image is the project icon, `internal/icon/portrait.svg`; at small sizes, the bow on the portrait serves as its mark (06 §7). Every UI reference to the AI assistant uses this name and portrait, for example, "Ask Archo to analyze this error". External agents (Claude Code, Codex, etc.) connecting through MCP use their own names.
 
-两条前提贯穿全文：
+Two premises apply throughout:
 
-- **没有 Archo，所有功能照样好用。** Archo 只是让玩家少走几步，不是某个功能的唯一入口。每个一键任务背后的动作，玩家都能自己在界面上完成。
-- **Archo 和玩家守同样的规矩。** 它能做的事，玩家都能做；它做的改动进撤销历史；写游戏文件、移到回收站、备份要玩家确认；发给模型的内容先征得同意。
+- **Every feature works well without Archo.** Archo saves the player a few steps; it is never a feature's only entry point. Players can perform every action behind a one-click task in the UI themselves.
+- **Archo follows the same rules as the player.** Anything it can do, the player can do. Its changes enter undo history. Writing game files, moving files to the recycle bin and making backups require player confirmation. Sending content to a model requires consent first.
 
-## 1. 形态
+## 1. Form
 
-- **内置一个轻量 harness**（例如 Pi，选型待定），跑在 RimArcho 的 GUI 进程里。**默认开启，可以关闭**（设置页，06 §2.14）。关闭后界面上所有“让 Archo …”的按钮和侧栏底部的 Archo 入口都隐藏，不留空位。
-- **入口**：侧栏底部的 Archo，打开右侧面板（06 §2.13），任何页面都能打开，切换页面时面板和对话保留。页面上的一键任务按钮（§4.2）也打开这个面板，并在里面显示任务的进度和结果。
-- **只在 GUI 里有。** TUI 暂不支持 Archo 面板（§6）；CLI 没有对话命令。终端用户需要 AI 时，用外部 agent 接 `archo mcp`。
-- **不常驻**：面板关闭、任务结束后不留后台进程（00 §4 第 6 条）。调用本机 Claude Code / Codex 时，子进程随任务结束退出。
-- **对话不跨会话保存**（待定）：关闭 RimArcho 后对话清空。是否保存、保存多久，等有了实际使用再定；如果保存，只存在本机数据目录（07 §3）。
+- **A lightweight built-in harness** (for example, Pi; selection undecided) runs in RimArcho's GUI process. **Enabled by default; can be disabled** on the settings page (06 §2.14). Disabling it hides every "Ask Archo to …" button and the Archo entry at the bottom of the sidebar, leaving no gap.
+- **Entry point**: Archo at the bottom of the sidebar opens the right panel (06 §2.13). It can open on any page; the panel and conversation persist when changing pages. One-click task buttons on pages (§4.2) also open this panel and show task progress and results there.
+- **GUI only.** The TUI does not yet support the Archo panel (§6); the CLI has no chat command. Terminal users who need AI connect an external agent to `archo mcp`.
+- **No resident process**: closing the panel after a task ends leaves no background process (00 §4 item 6). When invoking local Claude Code / Codex, the child process exits with the task.
+- **Conversations do not persist across sessions** (undecided): closing RimArcho clears the conversation. Whether to save it, and for how long, will be decided after actual use. If saved, it stays only in the local data directory (07 §3).
 
-## 2. 工具与权限
+## 2. Tools and permissions
 
-### 2.1 工具就是 05 的工具层
+### 2.1 Tools are the tool layer from 05
 
-账户操作遵守 05 §1.2 的玩家专用例外：Archo 只知道“需玩家登录”，不能观测独立登录窗口的 DOM、截图、调试或输入，不能读取 / 设置 / 导入 Cookie 和密码，不能替玩家点站点声明。秘密目录、临时 profile 和对应进程还须由外部 harness 排除；DPAPI 不提供同用户任意本机代码的隔离。
+Account operations follow the player-only exception in 05 §1.2. Archo knows only that the player needs to log in. It cannot observe the independent login window's DOM, screenshots, debugging or input; read / set / import cookies or passwords; or accept site declarations for the player. The external harness must also exclude secret directories, temporary profiles and their processes. DPAPI does not isolate arbitrary local code running as the same user.
 
-Archo 用的工具就是 05 §1 定义的那一套命令与工具层，和 MCP 工具表（05 §5.2）是同一份：同名、同参数、返回同一段文本。不为 Archo 另写一套“AI 专用”的接口，原因是玩家看到的、外部 agent 拿到的、Archo 拿到的必须是同一份事实（00 §4 第 5 条）。
+Archo uses the commands and tool layer defined in 05 §1, the same set as the MCP tool table (05 §5.2): identical names, parameters and returned text. There is no separate "AI-only" interface for Archo, because the player, external agents and Archo must receive the same facts (00 §4 item 5).
 
-工具描述也是同一份（05 §5.3）。Archo 额外的只有一段系统提示，内容是：RimArcho 的概念和术语（02 §1，用来回答“lineage 是什么”这类问题）、当前所在页面和选中的对象（例如当前方案、选中的 Mod、选中的日志条目），以及 §2.2 的权限规则。
+Tool descriptions are also shared (05 §5.3). Archo adds only a system prompt containing RimArcho concepts and terms (02 §1, to answer questions such as "what is a lineage?"), the current page and selected objects (such as the current plan, selected Mod and selected log entry), and the permission rules in §2.2.
 
-新增给玩家的动作，要同时加对应的工具；没有工具的动作，Archo 只能建议，由玩家点按钮完成。
+New player actions must gain corresponding tools at the same time. For actions without tools, Archo can only suggest that the player click the button.
 
-### 2.2 三档权限
+### 2.2 Three permission levels
 
-| 档 | 包含 | Archo 怎么做 |
+| Level | Includes | Archo's behavior |
 | --- | --- | --- |
-| 只读 | `readOnlyHint: true` 的全部工具：`status`、`find_mods`、`get_mod`、`get_description`、`get_def`、`get_patches`、`get_harmony`、`explain_relation`、`list_problems`、`list_changes`、`analyze_log`、`search_files`、`read_source`，以及 10 的存档读取工具（10 §1.6） | 直接调用，不问玩家 |
-| 改动，可撤销 | 编辑方案（`edit_loadout`：启用、停用、移动、换实例、排序、暂存）、玩家数据（`set_player_data`：标签、别名、备注）、用户规则（`add_rule`）、创建锁定版本（`copy_local`） | 直接调用。每一步都走现有动作，进**当前方案**的撤销历史（04 §3），历史里的操作名以“Archo：”开头。面板里每次改动显示一行“Archo 做了 … · 撤销” |
-| 要玩家确认 | 05 §5.2 里标 `destructiveHint: true` 的全部工具：保存（`save_loadout`，写 ModsConfig.xml）、启动游戏（`launch_game`）、移到回收站（08 §7）、备份存档（10 §4.4）、回答身份问题（`resolve_identity`）、从 RimCrow 导入、清理（`maintenance`）等 | Archo 只能**发起**：面板里出现一张确认卡，写清会改哪些文件（同 06 §6 的确认规则），由玩家点“确认”。玩家不点，什么都不发生 |
+| Read-only | All tools with `readOnlyHint: true`: `status`, `find_mods`, `get_mod`, `get_description`, `get_def`, `get_patches`, `get_harmony`, `explain_relation`, `list_problems`, `list_changes`, `analyze_log`, `search_files`, `read_source`, and the save-reading tools from 10 (10 §1.6) | Call directly without asking the player |
+| Reversible changes | Plan edits (`edit_loadout`: enable, disable, move, swap instance, sort, stage), player data (`set_player_data`: tags, aliases, notes), user rules (`add_rule`), creating locked versions (`copy_local`) | Call directly. Each step uses an existing action and enters the **current plan's** undo history (04 §3). Operation names in history start with "Archo:". Each change shows a line in the panel: "Archo did … · undo" |
+| Player confirmation required | All tools marked `destructiveHint: true` in 05 §5.2: save (`save_loadout`, writes ModsConfig.xml), launch the game (`launch_game`), move to the recycle bin (08 §7), back up saves (10 §4.4), answer identity questions (`resolve_identity`), import from RimCrow, cleanup (`maintenance`), etc. | Archo can only **request** the action. A confirmation card appears in the panel, specifying which files will change (the same confirmation rules as 06 §6); the player clicks "confirm". Nothing happens without that click |
 
-修改环境和设置只能由玩家自己做，没有对应工具（05 §1.2）。Archo 判断需要做这些事时，在回答里放一个按钮，按钮打开对应的页面。
+Only the player can change environments and settings; there are no corresponding tools (05 §1.2). When Archo determines that these changes are needed, it includes a button in its answer that opens the relevant page.
 
-### 2.3 Archo 不能绕过确认
+### 2.3 Archo cannot bypass confirmation
 
-- 确认在 RimArcho 的动作层执行，不靠 harness 自觉。工具层收到需要确认的调用时，只登记一个“待确认”请求并返回 `pending confirmation`（文本固定，待定），真正的写操作要等 GUI 里玩家点“确认”才执行。
-- 确认卡只能由玩家的鼠标或键盘操作关闭。Archo 的任何工具都不能代替玩家点确认、也不能修改“需要确认”的设置。
-- 调用本机 Claude Code / Codex（§3.1）时，RimArcho 给它们接的是同一个工具层，确认规则一样生效：它们拿到的也只是 `pending confirmation`（具体接法待定，见 §3.1）。
-- 外部 agent 直接接 `archo mcp` 时，是否放行由它的 harness 决定（05 §5.2 的注解：`save_loadout` 标 `destructiveHint: true`）。这条不变：外部 agent 是玩家自己配置的，RimArcho 只负责如实标注。
+- RimArcho's action layer enforces confirmation; it does not rely on harness compliance. When the tool layer receives a call requiring confirmation, it only registers a pending request and returns `pending confirmation` (fixed wording, undecided). The actual write waits for the player to click "confirm" in the GUI.
+- Only the player's mouse or keyboard input can dismiss a confirmation card. No Archo tool can confirm for the player or change the setting that requires confirmation.
+- When invoking local Claude Code / Codex (§3.1), RimArcho connects them to the same tool layer, with the same confirmation rules. They too receive only `pending confirmation` (connection details undecided; see §3.1).
+- When an external agent connects directly to `archo mcp`, its harness decides whether to allow the call (05 §5.2 annotations: `save_loadout` has `destructiveHint: true`). This remains unchanged: the player configures external agents; RimArcho is responsible only for truthful annotations.
 
-### 2.4 记录
+### 2.4 Records
 
-- Archo 每次调用工具，面板里都能展开看到工具名、参数和返回文本的前几行，玩家能看到它凭什么下结论（00 §4 第 2 条）。
-- 不另建 AI 操作日志。改动以撤销历史为准（04 §3）。
+- Every Archo tool call can be expanded in the panel to show the tool name, parameters and first few lines of returned text. Players can see the basis for its conclusions (00 §4 item 2).
+- No separate AI action log. Undo history is the record of changes (04 §3).
 
-## 3. 模型来源与同意
+## 3. Model sources and consent
 
-### 3.1 模型来源
+### 3.1 Model sources
 
-两种，玩家在设置页选一种（06 §2.14）：
+Two options; the player selects one on the settings page (06 §2.14):
 
-1. **玩家自带 API key**。支持哪些服务商待定（至少一家支持图片输入的，OCR 需要，§5）。key 只存在本机；存放方式待定（倾向 Windows 凭据管理器，不写进普通配置文件）。key 不进日志、不进导出、不进诊断信息。
-2. **调用本机已装的 Claude Code 或 Codex**。RimArcho 不保存它们的登录信息，用玩家已经登录好的那份。RimArcho 探测到 `claude` 或 `codex` 在 PATH 上才显示这个选项。怎么接（例如以非交互模式启动它们，并把 `archo mcp` 作为唯一的工具服务器传进去）待定，前提是满足 §2.3：确认仍由 RimArcho 的 GUI 收。
+1. **The player's own API key.** Supported providers are undecided (at least one must support image input for OCR, §5). The key stays local. Storage is undecided (Windows Credential Manager is favored over a plain configuration file). Keys never enter logs, exports or diagnostics.
+2. **Invoke locally installed Claude Code or Codex.** RimArcho stores none of their login information; it uses the player's existing login. This option appears only when RimArcho detects `claude` or `codex` on PATH. Integration is undecided (for example, launching them noninteractively with `archo mcp` as the only tool server), subject to §2.3: RimArcho's GUI still collects confirmation.
 
-没有配置模型来源时，Archo 入口仍在，点开显示一段说明和“去设置”按钮。
+Without a configured model source, the Archo entry remains visible. Opening it shows an explanation and a "go to settings" button.
 
-### 3.2 同意
+### 3.2 Consent
 
-发给模型的内容按**任务类型**征得同意：每类任务**第一次**要发送内容前，弹出一次说明，写清这类任务会发出去什么、发给谁（当前的模型来源），玩家选“同意”或“不同意”。同意后这类任务以后不再问；不同意则这次不执行。
+Consent to send content to the model is requested by **task type**. Before the **first** transmission for each task type, a prompt explains what that type sends and to whom (the current model source). The player chooses "agree" or "disagree". Agreement suppresses future prompts for that task type; disagreement cancels this invocation.
 
-| 内容类别 | 哪些任务会发 |
+| Content category | Tasks that send it |
 | --- | --- |
-| Mod 名称与简介 | 翻译、标签分类、聊天里问到某个 Mod |
-| 简介里的图片 | 图片识字（§5） |
-| 游戏日志片段 | 报错分析、修 Mod 报错 |
-| 反编译出的源码片段 | 修 Mod 报错（03 §5.4） |
-| Mod 列表、问题列表、排序约束 | 修排序、排序错误分析、聊天 |
-| 存档读出的统计（不是存档本身） | 没碰过的内容的解读、本局主题与内容冲突（10 §3、10 §5） |
+| Mod names and descriptions | Translation, tag classification, chat questions about a Mod |
+| Images in descriptions | OCR (§5) |
+| Game log excerpts | Error analysis, fixing Mod errors |
+| Decompiled source excerpts | Fixing Mod errors (03 §5.4) |
+| Mod lists, finding lists, sorting constraints | Fixing sorting, sorting error analysis, chat |
+| Statistics read from saves (not the saves themselves) | Interpreting unused content, playthrough themes and content conflicts (10 §3, 10 §5) |
 
-- 同意状态按任务类型存，设置页（06 §2.14）列出每类任务的状态，可以随时改回“未同意”或“不同意”。改回后下次使用重新问。
-- 存档文件、API key、本机路径中的用户名不发给模型。日志片段发送前去掉用户目录里的用户名（替换成 `<user>`）。
-- 聊天时 Archo 自己决定调用哪些工具；工具返回的内容属于哪一类，就按那一类的同意状态处理。某类未同意时，那段内容不发，Archo 会说明缺了什么、在哪里改。
+- Consent is stored by task type. The settings page (06 §2.14) lists each type's status and lets the player reset it to "not agreed" or "disagree" at any time. The next use asks again after a reset.
+- Save files, API keys and usernames in local paths are never sent to the model. Before sending log excerpts, replace the username in user directory paths with `<user>`.
+- In chat, Archo chooses which tools to call. Returned content follows the consent status of its category. Without consent for a category, that content is not sent; Archo explains what is missing and where to change it.
 
-## 4. 任务
+## 4. Tasks
 
-### 4.1 聊天
+### 4.1 Chat
 
-在 Archo 面板（06 §2.13）里，用玩家的话提问。典型问题：
+Ask questions in the player's own words in the Archo panel (06 §2.13). Typical questions:
 
-- 管理器本身的问题：“lineage 和 instance 是什么”“锁定版本和方案有什么区别”。答案来自系统提示里的术语表（02 §1），不需要发送玩家数据。
-- 关于当前状态的问题：“为什么 Combat Extended 和 Yayo's Combat 不能一起开”。Archo 调 `explain_relation`、`get_mod` 回答，并附上工具返回里的证据。
-- 让它动手：“把所有 VE 系列的 Mod 打上 VE 标签”“停用这三个 Mod”。按 §2.2 的权限执行。
+- About the manager: "What are lineage and instance?", "How does a locked version differ from a plan?" Answers come from the terminology in the system prompt (02 §1); no player data needs to be sent.
+- About the current state: "Why can't Combat Extended and Yayo's Combat be enabled together?" Archo calls `explain_relation` and `get_mod`, and includes evidence from their output.
+- Requests for action: "Tag every VE Mod with VE", "Disable these three Mods". Execute under the permissions in §2.2.
 
-### 4.2 一键任务
+### 4.2 One-click tasks
 
-每个一键任务是页面上的一个按钮，点了打开 Archo 面板并开始执行；结果以“建议 + 一键应用”的形式给出，应用走 §2.2 的权限。
+Each one-click task is a button on a page. Clicking opens the Archo panel and starts the task. Results take the form of suggestions with one-click application; applying them follows §2.2.
 
-| 任务 | 按钮在哪里 | 做什么 | 结果怎么落地 |
+| Task | Button location | What it does | Applying the result |
 | --- | --- | --- | --- |
-| 修排序自循环 | 能不能跑（06 §2.4）里“顺序矛盾”那一项；方案编辑器（06 §2.5）自动排序失败时的提示里 | 读排序约束和规则，找出构成循环的那几条，说明哪条最可能是错的 | 建议删掉或改写某条用户规则（`add_rule` / 删除规则），或调整顺序；玩家点“应用”，进撤销历史 |
-| 管理器与排序错误分析修复 | 能不能跑（06 §2.4）里“会让游戏出错”“要你确认”两组的每一项 | 解释这条问题为什么出现、凭据是什么，给出修法 | 修法是现有动作（启用前置、停用、移动、换实例），玩家点“应用” |
-| 结合日志与本地反编译修 Mod 报错 | 能不能跑（06 §2.4）“上次运行的报错”组的每一项；游戏日志（06 §2.10）每个报错簇 | 用日志归因（03 §6）、Harmony 补丁、按需反编译（03 §5.4）找原因 | 能用列表操作解决的（停用、换顺序、换实例）给一键应用；需要改 Mod 代码的只给说明和定位，不改任何 Mod 文件 |
-| 名称与简介翻译 | Mod 详情（06 §4.1）简介区右上；Mod 库存（06 §2.9）选中多个时的批量动作 | 把名称和简介译成界面语言 | 只用于显示，标“Archo 翻译”；缓存在本机（位置待定），不改 About.xml，不覆盖玩家起的别名 |
-| 标签分类 | Mod 库（06 §2.9）选中多个时的批量动作 | 按名称、简介、Def 类别建议标签 | 一张“建议标签”清单，玩家勾选后一次应用（`set_player_data` 的 tag_add，一步撤销） |
-| 简介图片识字 | Mod 详情简介里每张图片下方（06 §4.3、06 §4.4）；简介区右上“识别全部图片” | 见 §5 | 识出的文字显示在图片下方 |
+| Fix a sorting cycle | The "contradictory order" item in can it run (06 §2.4); the automatic sorting failure message in the plan editor (06 §2.5) | Read sorting constraints and rules, find the rules forming the cycle, explain which is most likely wrong | Suggest deleting or rewriting a user rule (`add_rule` / delete rule), or changing the order; clicking "apply" adds it to undo history |
+| Analyze and fix manager and sorting errors | Every item in "breaks the game" and "for you to confirm" in can it run (06 §2.4) | Explain why the finding appeared, its evidence and a fix | The fix is an existing action (enable a dependency, disable, move, swap instance); the player clicks "apply" |
+| Fix Mod errors using logs and local decompilation | Every item in "errors from the last run" in can it run (06 §2.4); every error cluster in game log (06 §2.10) | Find causes using log attribution (03 §6), Harmony patches and on-demand decompilation (03 §5.4) | Offer one-click application for fixes using list operations (disable, reorder, swap instance); for Mod code changes, provide only explanations and locations, never modify Mod files |
+| Translate names and descriptions | Top right of the description in Mod details (06 §4.1); batch actions for multiple selections in Mod inventory (06 §2.9) | Translate names and descriptions into the UI language | Display only, labeled "translated by Archo"; cached locally (location undecided); never change About.xml or overwrite player aliases |
+| Classify tags | Batch actions for multiple selections in the mod library (06 §2.9) | Suggest tags from names, descriptions and Def categories | A "suggested tags" checklist, applied once after the player selects items (`set_player_data` tag_add, one undo step) |
+| Read text in description images | Below each image in Mod descriptions (06 §4.3, 06 §4.4); "read all images" at the top right of the description | See §5 | Show recognized text below the image |
 
-1.1 以后的任务：没碰过的内容的解读（游玩回顾，10 §3）；本局主题与内容冲突（1.2，10 §5）。
+Tasks after 1.1: interpreting unused content (playthrough review, 10 §3); playthrough themes and content conflicts (1.2, 10 §5).
 
-## 5. OCR（简介图片识字）
+## 5. OCR (reading text in description images)
 
-### 5.1 为什么做
+### 5.1 Why
 
-Vanilla Expanded 这类 Mod 的工坊简介大量用图片，图片里是章节标题和功能展示，只看文字会漏掉很多内容。
+Workshop descriptions for Mods such as Vanilla Expanded use many images containing section titles and feature showcases. Reading text alone misses much of the content.
 
-- 2026-10-19 测量（1274 个有 About.xml 的工坊 Mod，取回 1264 份工坊描述）：55%（696 个）的工坊描述带图片，共 7981 张；139 个以图片为主（≥ 3 张、每张不到 100 字的文字）；文字不到 80 字、只有图片的只有 1 个。
-- 2026-10-20 用 Steam 公开接口取了本机已装的 127 个 “Vanilla … Expanded” 条目：最大的作者账号有 96 个，**全部带 3 张以上图片，中位数 27 张**；去掉各 Mod 共用的段落后，独有文字中位数约 2700 字。图片夹在段落之间，像是章节标题和功能展示（未逐张核实）。
+- Measured on 2026-10-19 (1274 Workshop Mods with About.xml; 1264 Workshop descriptions retrieved): 55% (696) had images, totaling 7981 images; 139 were mainly images (≥ 3 images, fewer than 100 characters of text per image). Only 1 had fewer than 80 characters of text and otherwise only images.
+- On 2026-10-20, Steam's public API retrieved the 127 locally installed "Vanilla … Expanded" entries. The largest author account had 96, **all with 3 or more images, median 27**. After removing shared paragraphs, median unique text was about 2700 characters. Images sit between paragraphs and appear to be section titles and feature showcases (not verified image by image).
 
-所以 OCR 的作用是读出这些图片里的标题和展示内容，而不只是补全没有文字的简介。“只靠图片写简介的只有 1 个”只统计了纯图片的情况，低估了图片的作用。
+OCR therefore reads the titles and showcased content in these images, rather than merely filling in descriptions without text. "Only 1 description uses images alone" counts only the image-only case and understates the role of images.
 
-### 5.2 怎么做
+### 5.2 How
 
-- **用视觉模型**，走 §3.1 的模型来源。不用 Windows 自带 OCR：它要 WinRT 调用，对工坊横幅这类艺术字识别不可靠。
-- 图片取自本机已下载的缓存（`<数据目录>/cache/workshop-img/`，06 §4.4），没有缓存时先按简介图片的规则下载；`workshop.images off` 时不做 OCR。
-- 只在玩家点按钮时识别，不预先识别整个 Mod 库。
-- 识别结果按图片地址缓存在本机（位置待定，跟随 07 §3 的缓存目录），图片地址不变就不重复识别。设置页的“缓存”里单独显示大小、可清除。
-- 显示：识出的文字放在图片下方，淡色小字，前面标 Archo 头像和“图片文字 · 推断”。它是推断，不是 Mod 自己声明的（00 §4 第 2 条）。
-- 发送前按 §3.2 征得“简介里的图片”这一类的同意。
+- **Use a vision model** through the model source in §3.1. Do not use Windows OCR: it requires WinRT calls and does not reliably recognize stylized lettering in Workshop banners.
+- Use images from the local download cache (`<data directory>/cache/workshop-img/`, 06 §4.4). If absent, download them under the description-image rules first. Do not perform OCR when `workshop.images off`.
+- Recognize only when the player clicks; do not preprocess the whole mod library.
+- Cache results locally by image URL (location undecided, under the cache directory in 07 §3). Reuse results while the URL stays unchanged. Show a separate size and clear action under "caches" in settings.
+- Display recognized text below the image in small, muted text, prefixed with the Archo portrait and "image text · inference". It is an inference, not the Mod's own declaration (00 §4 item 2).
+- Obtain consent for the "images in descriptions" category before sending (§3.2).
 
-### 5.3 待定
+### 5.3 Undecided
 
-- 识别出的文字是否参与 Mod 库搜索。
-- 是否把识别结果交给翻译任务一起翻译。
+- Whether recognized text participates in mod library searches.
+- Whether to pass recognized text to the translation task as well.
 
-## 6. TUI 与 MCP 的关系
+## 6. Relationship with TUI and MCP
 
-| | Archo（GUI 内置） | 外部 agent（`archo mcp`） | TUI |
+| | Archo (built into GUI) | External agent (`archo mcp`) | TUI |
 | --- | --- | --- | --- |
-| 工具 | 05 §1 的工具层 | 同一套（05 §5.2） | 没有 Archo 面板（暂不支持） |
-| 权限 | §2.2 三档，确认卡由 RimArcho 收 | 由外部 harness 按注解决定 | — |
-| 模型 | 玩家的 API key，或本机 Claude Code / Codex | agent 自己的 | — |
-| 同意 | 按任务类型（§3.2） | 由 agent 自己负责 | — |
+| Tools | Tool layer from 05 §1 | Same set (05 §5.2) | No Archo panel (not yet supported) |
+| Permissions | Three levels in §2.2; RimArcho collects confirmation cards | External harness decides from annotations | — |
+| Model | Player's API key, or local Claude Code / Codex | Agent's own | — |
+| Consent | By task type (§3.2) | Agent's responsibility | — |
 
-- TUI 定位是方案编辑器的键盘版（06 §9.1），暂不做 Archo 面板，也不显示“让 Archo …”按钮。以后是否加，待定。
-- 外部 agent 能做到的事和 Archo 一样多：Archo 没有私有工具。这保证 MCP 一直是一等接口，外部 agent 的验收（05 §7 的 I4）同时也验证了 Archo 能用的工具够不够。
+- The TUI is the keyboard version of the plan editor (06 §9.1). It has no Archo panel or "Ask Archo to …" buttons for now. Future support is undecided.
+- External agents can do as much as Archo: Archo has no private tools. This keeps MCP a first-class interface. External-agent acceptance (I4 in 05 §7) also verifies whether the tools available to Archo are sufficient.
 
-## 7. 验收
+## 7. Acceptance
 
-全部（待实现）。
+All unimplemented.
 
-| # | 场景 | 期望 |
+| # | Scenario | Expected |
 | --- | --- | --- |
-| AR1 | 设置里关闭 Archo | 侧栏底部入口和所有“让 Archo …”按钮消失，其他功能不受影响 |
-| AR2 | 没配置模型来源时点 Archo | 面板显示说明和“去设置”，不报错 |
-| AR3 | Archo 在聊天里停用一个 Mod | 方案的撤销历史多一步“Archo：…”，`undo` 能撤回 |
-| AR4 | Archo 要保存列表 | 只出现确认卡；玩家不点“确认”，ModsConfig.xml 不变 |
-| AR5 | 工具层直接收到 Archo 的 `save_loadout`、移到回收站、备份调用 | 都返回待确认，不写磁盘 |
-| AR6 | 第一次用“翻译” | 先弹同意说明；选“不同意”则不发送任何内容 |
-| AR7 | 设置页把“翻译”改回未同意 | 下次翻译重新问 |
-| AR8 | 同一张图片识别两次 | 第二次读缓存，不再调用模型 |
-| AR9 | Archo 和外部 agent 调同一个只读工具 | 返回文本逐字相同 |
-| AR10 | 发送日志片段 | 用户目录里的用户名替换成 `<user>` |
+| AR1 | Disable Archo in settings | Sidebar entry and all "Ask Archo to …" buttons disappear; other features are unaffected |
+| AR2 | Click Archo without a configured model source | Panel shows an explanation and "go to settings", without an error |
+| AR3 | Archo disables a Mod in chat | Plan undo history gains "Archo: …"; `undo` reverses it |
+| AR4 | Archo requests saving the list | Only a confirmation card appears; ModsConfig.xml stays unchanged until the player clicks "confirm" |
+| AR5 | Tool layer directly receives Archo calls for `save_loadout`, recycle bin moves or backups | All return pending confirmation without writing to disk |
+| AR6 | First use of translation | Consent explanation appears first; "disagree" sends nothing |
+| AR7 | Reset translation to not agreed in settings | Next translation asks again |
+| AR8 | Recognize the same image twice | Second call reads the cache without calling the model |
+| AR9 | Archo and an external agent call the same read-only tool | Returned text is identical, character for character |
+| AR10 | Send a log excerpt | Username in user directory paths becomes `<user>` |

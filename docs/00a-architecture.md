@@ -1,123 +1,126 @@
-# RimArcho 架构
+# RimArcho architecture
 
-> 状态：2026-10-21 重写。顶层设计（00）讲做什么、为谁做；本文讲系统怎么组织。具体算法和规则在 `docs/specs/`。
-> 原则：RimCrow 只作为需求和边界情况的来源，不沿用它的界面、导航和模块划分。
+> Status: rewritten 2026-10-21. The top-level design (00) covers what to build and for whom; this document covers system organization. Specific algorithms and rules are in `docs/specs/`.
+> Principle: use RimCrow only as a source of requirements and edge cases; do not reuse its interface, navigation or module structure.
 
-## 1. 领域模型
+## 1. Domain model
 
 ```
-Environment（一个游戏目录：版本、启动方式、存档——共用默认或独立；一个游戏目录只属于一个环境）
-  ├─ Source（这个游戏自己的：官方 Data / 本地 Mods）
-  ├─ Plan（方案：有序的 Instance 列表，带撤销栈、版本历史、暂存；一个环境可以有多个）
-  ├─ Pack（整合包：从方案编译出的固定产物，有自己的存档目录）
-  └─ Launch（一次启动：哪个方案或整合包、何时、启用了什么）
-Mod 文件夹（所有环境共用的 Source：工坊 / SteamCMD / 其他目录 / Archo Monitor / 锁定库）
+Environment (one game directory: version, launch method, saves—shared default or separate; a game directory belongs to only one environment)
+  ├─ Source (owned by this game: official Data / local Mods)
+  ├─ Plan (an ordered Instance list, with undo stack, version history and staging; multiple per environment)
+  ├─ Pack (a fixed artifact compiled from a plan, with its own save directory)
+  └─ Launch (one launch: which plan or pack, when, what was enabled)
+Mod folders (Sources shared across all environments: Workshop / SteamCMD / other directories / Archo Monitor / lock library)
 Source
-  └─ Instance（磁盘上的一份 Mod，ID 由 RimArcho 分配；共用文件夹里的 Instance 所有环境是同一个）
-       ├─ Snapshot（某次扫描时的元数据与内容指纹）
-       └─ Facts：ModDecl · Def · PatchOp · TypeDef · HarmonyPatch（按游戏版本读取，内容集合共用）
-Lineage（“同一个 Mod”的家族：原版、锁定版本、本地副本、改名前后；全局）
-Rule（用户规则 / 社区规则 / 替代规则；用户规则挂在 Lineage 上）
-Finding（结论 + 证据[]）
-LogRun（一份 Player.log，错误簇归因到 Instance / Finding，归属到一次 Launch）
-Save（一份存档：殖民地、当时启用的 Mod、引用的 Def；1.1）
+  └─ Instance (one Mod on disk, with an ID assigned by RimArcho; the same Instance across all environments for shared folders)
+       ├─ Snapshot (metadata and content fingerprint from a scan)
+       └─ Facts: ModDecl · Def · PatchOp · TypeDef · HarmonyPatch (read per game version, shared by content set)
+Lineage (the family of "the same Mod": original, locked versions, local copies, before/after renaming; global)
+Rule (user / community / replacement rule; user rules attach to Lineage)
+Finding (conclusion + evidence[])
+LogRun (one Player.log, with error clusters attributed to Instance / Finding, belonging to a Launch)
+Save (one save: colony, enabled Mods at the time, referenced Defs; 1.1)
 ```
 
-- 方案条目指向 Instance，不指向 packageId：玩家选的是“这一份”。
-- 锁定版本不是新概念，是同一 Lineage 下的另一个 Instance（02 §6、04 §7）。
-- 一个 Mod 一条记录：工坊、SteamCMD 等文件夹所有游戏共用，所以它们的 Instance、Lineage 和玩家写的东西不按环境分；环境只有自己的 `Data`、`Mods`、方案、启动记录和部署链接（02 §0）。
-- ModsConfig.xml 是方案的投影，不是事实来源。启动方案或写入游戏时才写它（04 §4、08 §2）。
+- Plan entries point to Instance, not packageId: players choose "this copy".
+- A locked version is not a new concept; it is another Instance in the same Lineage (02 §6, 04 §7).
+- One record per Mod: Workshop, SteamCMD and similar folders are shared by all games, so their Instances, Lineages and player-authored data are not split by environment. An environment owns only its `Data`, `Mods`, plans, launch records and deployment links (02 §0).
+- ModsConfig.xml is a projection of a plan, not a source of truth. Write it only when launching a plan or writing to the game (04 §4, 08 §2).
 
-## 2. 模块分层与交付形态
+## 2. Module layers and delivery
 
 ```
-┌────────────────────── 表面层（薄）──────────────────────┐
-│  GUI（Wails）   TUI（Bubble Tea）   CLI   MCP server   Archo │
-└───────────┬───────────────────────────────┬────────────┘
-┌───────────▼───────────┐       ┌───────────▼────────────┐
-│ 视图模型 internal/view │       │ 工具层：命令与工具描述   │
-│ （GUI、TUI 共用）       │       │ （CLI、MCP、Archo 共用） │
-└───────────┬───────────┘       └───────────┬────────────┘
-┌───────────▼───────────────────────────────▼────────────┐
-│ 应用层 internal/app：方案编辑、启动、整合包、导入导出…    │
-├─────────────────────────────────────────────────────────┤
-│ 分析层：生效内容 · 排序 · Def · Patch · Harmony · 日志归因 │
-├─────────────────────────────────────────────────────────┤
-│ 身份层：Instance 对账 · Lineage · 变更事件               │
-├─────────────────────────────────────────────────────────┤
-│ 事实层：SQLite，按快照增量更新                           │
-├─────────────────────────────────────────────────────────┤
-│ 采集层：文件系统 · ACF · ModsConfig · Player.log ·       │
-│   .NET 元数据 · 社区数据 · 存档（1.1）                    │
-└─────────────────────────────────────────────────────────┘
-外部：Steam 客户端（订阅、下载、启动）、ilspycmd（按需看源码）、模型提供方（Archo，1.1）
+┌────────────────── Thin surfaces ────────────────────────┐
+│ GUI (Wails)   TUI (Bubble Tea)   CLI   MCP server   Archo │
+└───────────┬───────────────────────────────┬─────────────┘
+┌───────────▼──────────────┐    ┌───────────▼──────────────┐
+│ View models             │    │ Tool layer: commands    │
+│ internal/view           │    │ and tool descriptions   │
+│ (shared by GUI and TUI)  │    │ (CLI, MCP, Archo)        │
+└───────────┬──────────────┘    └───────────┬──────────────┘
+┌───────────▼──────────────────────────────▼──────────────┐
+│ Application internal/app: plan editing, launching,      │
+│ packs, import/export…                                  │
+├────────────────────────────────────────────────────────┤
+│ Analysis: effective content · sorting · Def · Patch ·   │
+│ Harmony · log attribution                              │
+├────────────────────────────────────────────────────────┤
+│ Identity: Instance reconciliation · Lineage · changes   │
+├────────────────────────────────────────────────────────┤
+│ Facts: SQLite, updated incrementally by snapshot        │
+├────────────────────────────────────────────────────────┤
+│ Collection: filesystem · ACF · ModsConfig · Player.log ·│
+│ .NET metadata · community data · saves (1.1)            │
+└────────────────────────────────────────────────────────┘
+External: Steam client (subscriptions, downloads, launching), ilspycmd (source on demand), model providers (Archo, 1.1)
 ```
 
-- **视图模型**：页面要显示什么、每个对象此刻能做什么，都由 `internal/view` 给出，可以直接序列化成 JSON。GUI 和 TUI 只负责绘制和输入映射（06 §1）。
-- **工具层**：CLI、MCP 和 Archo 调用同一套命令，CLI 和 MCP 的输出逐字相同（05 §1）。
-- **分析在子进程里跑**：`archo analyze` 算完写库就退出，界面和 MCP 只读结果（03 §3）。
+- **View models**: `internal/view` provides what pages show and what each object can do right now, directly serializable to JSON. GUI and TUI only render and map input (06 §1).
+- **Tool layer**: CLI, MCP and Archo call the same commands; CLI and MCP output is identical, word for word (05 §1).
+- **Analysis runs in subprocesses**: `archo analyze` computes, writes to the database and exits; UI and MCP only read results (03 §3).
 
-交付形态是同一份源码链接成两个程序（07 §5）：
+The same source links into two programs (07 §5):
 
-| 程序 | 用途 |
+| Program | Purpose |
 | --- | --- |
-| `RimArcho.exe` | 双击打开桌面窗口（GUI）；带命令参数时按 CLI 执行，供扫描、分析子进程使用 |
-| `archo.exe` | 不带参数：在当前终端打开 TUI；`archo <命令>`：一次性的 CLI；`archo mcp`：stdio MCP server；`archo gui`：打开窗口 |
+| `RimArcho.exe` | Double-click opens the desktop window (GUI); command arguments run CLI actions, for scan and analysis subprocesses |
+| `archo.exe` | No arguments: TUI in the current terminal; `archo <command>`: one-shot CLI; `archo mcp`: stdio MCP server; `archo gui`: open the window |
 
-## 3. 技术原则
+## 3. Technical principles
 
-1. **一套核心，多个表面。** GUI、TUI、CLI、MCP、Archo 用同一套查询和命令，业务规则只写在应用层和视图模型里。界面层出现“如果是工坊 Mod 就……”就是缺陷。
-2. **可引用的实体。** 每个对象都有稳定的引用（`#a3f9`、`def:ThingDef/Gun_Revolver`、`log:E42`、`p:3f2a1c` 等，全集见 05 §2），能出现在任何输出里，也能直接拿去调用下一个命令。
-3. **结论必须带证据。** 每个问题都写清结论、证据引用和来源类型（声明、推断、日志、社区数据、玩家）（03 §4）。
-4. **改动可撤销。** 方案的每次修改都进撤销栈，可以回到历史版本（04 §3）。不能撤销的动作（写游戏文件以外的删除、身份合并）要确认（06 §6）。
-5. **随时知道在哪里、能去哪里、怎么回去。** 界面始终显示当前位置和可用动作，`esc` 或面包屑返回上一级（06 §3.1）。
-6. **默认省资源。** 不常驻进程；索引增量更新；重活交给用完即退的子进程（07 §6）。
-7. **只写清单里的文件。** RimArcho 会写的文件只有 01 §4 列出的那些。
+1. **One core, multiple surfaces.** GUI, TUI, CLI, MCP and Archo use the same queries and commands. Business rules belong only in application and view-model layers. "If this is a Workshop Mod…" in the interface layer is a defect.
+2. **Referenceable entities.** Every object has a stable reference (`#a3f9`, `def:ThingDef/Gun_Revolver`, `log:E42`, `p:3f2a1c`, etc.; full list in 05 §2), usable in any output and directly in the next command.
+3. **Conclusions require evidence.** Every finding states the conclusion, evidence references and source types (declaration, inference, log, community data, player) (03 §4).
+4. **Undoable changes.** Every plan edit enters the undo stack; historical versions can be restored (04 §3). Actions that cannot be undone (deletion other than game-file writes, identity merges) require confirmation (06 §6).
+5. **Always know where you are, where you can go and how to return.** The interface always shows the current location and available actions; `esc` or breadcrumbs return one level (06 §3.1).
+6. **Use few resources by default.** No resident process; incremental indexes; heavy work runs in subprocesses that exit when done (07 §6).
+7. **Write only listed files.** RimArcho writes only the files listed in 01 §4.
 
-## 4. 身份设计的理由
+## 4. Identity design rationale
 
-具体规则在 02。这里说明为什么这样设计。
+Specific rules are in 02. This section explains the reasons.
 
-### 4.1 没有可靠的自然主键
+### 4.1 No reliable natural primary key
 
-| 信号 | 失效场景 |
+| Signal | Failure case |
 | --- | --- |
-| 绝对路径 | 玩家移动游戏目录或库目录后，全部变成“新 Mod” |
-| 工坊 ID | 复制到本地后，副本的 `About/PublishedFileId.txt` 仍然声称同一个 ID |
-| packageId | 作者可以改；不同 Mod 可以撞名；一个包可以有多份 |
-| 名字、作者 | 随时会改 |
-| 内容哈希 | 每次更新都会变 |
+| Absolute path | Moving the game or library directory makes everything a "new Mod" |
+| Workshop ID | After a local copy, its `About/PublishedFileId.txt` still claims the same ID |
+| packageId | Authors can change it; different Mods can collide; one package can have multiple copies |
+| Name, author | Can change at any time |
+| Content hash | Changes on every update |
 
-所以身份不能“读出来”，只能由 RimArcho 维护：第一次见到一份 Mod 时分配 Instance ID；之后每次扫描，用多个信号把新观测对账到已知的 Instance 上；对不上时不猜，交给玩家确认。这和 git 识别文件改名、照片库处理“文件夹被移动”是同一个思路。
+Identity therefore cannot be "read"; RimArcho must maintain it. Assign an Instance ID when first seeing a Mod; on later scans, use multiple signals to reconcile new observations with known Instances. Ask the player to confirm unmatched cases rather than guess. This is the same approach as git detecting renames or a photo library handling moved folders.
 
-几条推论：
-- 只记录相对来源根目录的路径。游戏目录变了，靠“来源重新绑定”整体修正，而不是逐个 Mod 猜（02 §3.2）。
-- 修改时间只用来跳过没变的文件，不用来判断身份，因为复制会重置修改时间。
-- 消失的 Mod 先变成墓碑，保留一段时间，处理退订后又订阅回来的情况（02 §5.5）。
+Consequences:
+- Store only paths relative to the source root. When a game directory moves, fix it as a whole through source rebinding rather than guessing per Mod (02 §3.2).
+- Use modification times only to skip unchanged files, not to identify Mods, because copying resets them.
+- Turn missing Mods into tombstones for a retention period, covering unsubscribe-then-resubscribe cases (02 §5.5).
 
-### 4.2 复制品自带出身
+### 4.2 Copies carry their origin
 
-RimArcho 创建锁定版本或本地副本时，在副本里写 `.rimarcho/origin.json`，记录来源 Instance、Lineage、工坊 ID 和复制时的快照。下次扫描直接挂回同一 Lineage，标“确认”。玩家手动复制的，靠内容相似度推断，标“推断”（02 §5.1）。
+When creating a locked version or local copy, RimArcho writes `.rimarcho/origin.json` in the copy, recording the source Instance, Lineage, Workshop ID and snapshot at copy time. The next scan attaches it directly to the same Lineage, marked "confirmed". Infer manually made copies by content similarity, marked "inferred" (02 §5.1).
 
-RimArcho 从不往工坊目录写标记文件，因为 Steam 校验或更新时会删掉它。
+RimArcho never writes marker files into Workshop directories: Steam verification or updates would delete them.
 
-### 4.3 什么挂在哪一层
+### 4.3 Where data belongs
 
-| 数据 | 挂在 | 原因 |
+| Data | Attached to | Reason |
 | --- | --- | --- |
-| 方案条目 | Instance | 玩家选的是“这一份” |
-| 用户规则、别名、标签、备注 | Lineage（全局） | 原版和锁定版本应该共享；改名后也不能丢；同一个 Mod 在哪个游戏里都是它 |
-| 问题忽略 | Lineage + 环境 | 一条问题是对“这个游戏、这些 Mod 一起”的判断，换个游戏版本未必还成立（02 §0） |
-| 分析结果 | 环境 / 版本 / 启用集合的批次；Instance 的内容集合及版本视图 | 版本按实际生效内容选集合，存储规则见 03 §3 |
-| 社区规则、替代规则 | packageId（匹配时解析到 Lineage） | 外部数据只认 packageId |
-| ModsConfig.xml | 方案的投影 | 启动或写入游戏时生成 |
+| Plan entry | Instance | Players choose "this copy" |
+| User rules, aliases, tags, notes | Lineage (global) | Original and locked versions should share them; renaming must not lose them; the Mod is the same in every game |
+| Ignored finding | Lineage + environment | A finding judges "this game with these Mods together"; another game version may change it (02 §0) |
+| Analysis results | Runs scoped to environment / version / enabled set; Instance content sets and version views | Select a set by actual effective content for the version; storage rules in 03 §3 |
+| Community and replacement rules | packageId (resolved to Lineage when matching) | External data knows only packageId |
+| ModsConfig.xml | Projection of a plan | Generated on launch or write to the game |
 
-直接的收益：作者改了 packageId 之后，方案和用户规则都不会断。RimArcho 提示“包名由 A 改为 B”，下次写 ModsConfig.xml 时自动使用新包名。
+Direct benefit: when an author changes packageId, plans and user rules stay connected. RimArcho reports "package ID changed from A to B" and uses the new ID on the next ModsConfig.xml write.
 
-### 4.4 已知的难题
+### 4.4 Known difficult cases
 
-- 作者分叉出新 Mod，工坊 ID 不同但 packageId 相同：判为不同 Lineage，并报“包名重复”。
-- 同一个工坊 ID 同时在 Steam 工坊目录和 SteamCMD 目录：两个 Instance，同一 Lineage。
-- 很老的 Mod 没有 packageId：按游戏的规则派生一个临时包名，标为推断（02 §4.5）。
-- 玩家同时改了游戏路径又删了 Mod：先重新绑定来源，剩下的缺口进待确认项。
-- 两个环境共用同一个工坊目录：工坊是所有环境共用的 Mod 文件夹，同一个 Mod 只有一个 Instance 和 Lineage；0.9.0 之前各环境的副本由迁移 v14 合并（02 §0.1）。
+- An author forks a new Mod with a different Workshop ID but the same packageId: separate Lineages and a "duplicate package ID" finding.
+- The same Workshop ID in both Steam Workshop and SteamCMD directories: two Instances, one Lineage.
+- A very old Mod with no packageId: derive a temporary package ID by game rules, marked inferred (02 §4.5).
+- The player moves the game and deletes Mods at the same time: rebind the source first; remaining gaps become identity questions.
+- Two environments share a Workshop directory: Workshop is a Mod folder shared by all environments, with one Instance and Lineage per Mod; migration v14 merges pre-0.9.0 per-environment copies (02 §0.1).

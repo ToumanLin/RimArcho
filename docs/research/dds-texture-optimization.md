@@ -1,185 +1,185 @@
-# 贴图优化：PNG 转 DDS
+# Texture optimization: PNG to DDS
 
-2026-10-22 研究。依据：反编译本机 1.7.4985（Waylith 引擎）和 1.6.4871 的 `Assembly-CSharp.dll` / `Waylith.dll` / `RimWorld.dll`，RimCrow（`../RimModManager`）的 `backend/managers/mgr_texture_opt.py` 和 `doc/07-贴图优化说明.md`，RimSort 自带的 todds 0.4.1，以及对本机工坊目录的统计和一次实际转换。
+Research on 2026-10-22. Basis: decompiled `Assembly-CSharp.dll` / `Waylith.dll` / `RimWorld.dll` from local 1.7.4985 (Waylith engine) and 1.6.4871; RimCrow (`../RimModManager`) `backend/managers/mgr_texture_opt.py` and `doc/07-%E8%B4%B4%E5%9B%BE%E4%BC%98%E5%8C%96%E8%AF%B4%E6%98%8E.md`; todds 0.4.1 bundled with RimSort; local Workshop directory statistics and one actual conversion.
 
-## 1. 结论
+## 1. Conclusions
 
-1. **游戏原生支持，不需要前置 Mod。** 1.6 和 1.7 都会读 Mod 里的 `.dds`，同名 `.dds` 存在时不加载 `.png`；只有 `.dds` 没有 `.png` 也能加载。所以“普通优化（保留 PNG）”和“整合包精简（删掉 PNG）”都可行。
-2. **工具用 todds 0.4.1。** 它是 RimSort、RimCrow 共用的编码器，MPL-2.0，但仓库已在 2026-03-31 归档，0.4.1 是最后一版。按固定版本 + SHA-256 处理，问题不大。
-3. **DDS 比 PNG 大得多。** 实测原尺寸 9.5 倍，缩到 50% 仍是 2.5 倍（§4）。整合包精简删掉 PNG 后，**不缩放时包会变大而不是变小**。只有缩放才能省盘。显存不一样：不透明的贴图转成 BC1（每像素 4 位），而 1.7 自己把 PNG 编码成 BC7、1.6 编码成 DXT5（都是 8 位），所以原尺寸转换也能省下不透明贴图一半的显存（2026-10-22 更正，原来写“只有缩放才省显存”）。
-4. **1.7 收益比 1.6 小。** 1.7 自己会把 PNG 编码成 BC1/BC7 并写进持久缓存，第二次启动起就不再解码。DDS 在 1.7 上主要省掉三种情况下的那次编码：第一次启动、Mod 更新之后、**每个整合包的第一次启动**（整合包用 `-savedatafolder`，缓存跟着进了包自己的 `userdata/`，是空的）。
-5. **在原 Mod 里生成 DDS 有两个风险必须处理**：Mod 更新后旧 DDS 盖住新 PNG（玩家看到旧贴图），以及低优先级目录里的 DDS 盖住高优先级目录里的 PNG（§2.3）。RimArcho 要自己记录生成了哪些文件，不能靠 todds 的 mtime 比较。
+1. **The game supports it natively; no prerequisite Mod is needed.** Both 1.6 and 1.7 read `.dds` files in Mods and skip `.png` when a `.dds` of the same name exists. DDS also loads without a PNG. Thus both "normal optimization (keep PNG)" and "pack slimming (delete PNG)" work.
+2. **Use todds 0.4.1.** RimSort and RimCrow share this MPL-2.0 encoder, but its repository was archived on 2026-03-31; 0.4.1 is the final release. A fixed version + SHA-256 should be manageable.
+3. **DDS is much larger than PNG.** Measured at 9.5 times the size at full dimensions, and still 2.5 times at 50% (§4). After deleting PNGs during pack slimming, **a pack grows rather than shrinks without scaling**. Only scaling saves disk space. Video memory differs: opaque textures convert to BC1 (4 bits per pixel), whereas 1.7 encodes PNG as BC7 and 1.6 as DXT5 (both 8 bits), so full-size conversion also halves video memory for opaque textures (corrected 2026-10-22; previously said "only scaling saves video memory").
+4. **1.7 gains less than 1.6.** 1.7 encodes PNG as BC1/BC7 itself and writes a persistent cache, avoiding decoding from the second launch. On 1.7, DDS mainly saves that encoding on the first launch, after Mod updates, and **the first launch of each pack** (packs use `-savedatafolder`, so the cache goes into the pack's own empty `userdata/`).
+5. **Generating DDS inside the original Mod has two risks to handle**: old DDS shadows new PNG after an update (players see old textures), and DDS in lower-priority folders shadows PNG in higher-priority folders (§2.3). RimArcho must track generated files itself rather than rely on todds mtime comparisons.
 
-## 2. 游戏怎么读贴图
+## 2. How the game reads textures
 
-### 2.1 扩展名与遮蔽（1.6、1.7 相同）
+### 2.1 Extensions and shadowing (same in 1.6 and 1.7)
 
-`Verse.ModContentLoader<Texture2D>`：
+`Verse.ModContentLoader<Texture2D>`:
 
-- 可接受的扩展名：`.png .jpg .jpeg .psd .dds`。
-- `ShadowedByDds`：同一个 Mod 里，相对路径相同的 `x.dds` 存在时，`x.png` / `x.jpg` / `x.psd` 不加载。比较不分大小写。
-  - 小缺陷：代码去掉最后 4 个字符再拼 `.dds`，所以 `.jpeg` 永远不会被遮蔽（`x.jpeg` → `x..dds`）。
-- `.dds` 本身是一等公民，单独存在也照常加载。
+- Accepted extensions: `.png .jpg .jpeg .psd .dds`.
+- `ShadowedByDds`: within one Mod, if `x.dds` exists at the same relative path, `x.png` / `x.jpg` / `x.psd` do not load. Comparison is case-insensitive.
+  - Minor defect: the code removes the last 4 characters and appends `.dds`, so `.jpeg` is never shadowed (`x.jpeg` → `x..dds`).
+- `.dds` is a first-class format and loads normally on its own.
 
-### 2.2 DDS 解码（`Verse.ModDdsLoader` / `DdsPixelFormat`）
+### 2.2 DDS decoding (`Verse.ModDdsLoader` / `DdsPixelFormat`)
 
-- 头部校验：魔数 `DDS `、头大小 124、像素格式大小 32，不对就抛异常，贴图变成 `BadTex`（1.7 是品红占位）。
-- 支持的格式：DXT1（BC1）、DXT5（BC3）、BC7（DX10 扩展头，数据从 148 字节开始）、未压缩 RGB24 / RGBA32 / BGR888 / RGB565 / ARGB4444 / Alpha8。其他压缩格式（BC4、BC5、BC6H 等）抛 `NotSupportedException`。
-- 带 mipmap 就用文件里的 mip；不带时调用 `Apply(updateMipmaps: true)`。所以**要生成 mipmap**（todds 默认就生成）。
-- 用 `LoadRawTextureData` 直接上传，原点在左下角，所以要**垂直翻转**（todds `-vf`，RimCrow 也这么传）。
-- DDS 的 `anisoLevel` 是 0，PNG 是 2，远看时 DDS 略糊一点，可以忽略。
+- Header validation: magic `DDS `, header size 124, pixel format size 32. Invalid values throw an exception and produce `BadTex` (a magenta placeholder in 1.7).
+- Supported formats: DXT1 (BC1), DXT5 (BC3), BC7 (DX10 extension header, data starts at byte 148), uncompressed RGB24 / RGBA32 / BGR888 / RGB565 / ARGB4444 / Alpha8. Other compressed formats (BC4, BC5, BC6H, etc.) throw `NotSupportedException`.
+- Uses the file's mipmaps if present; otherwise calls `Apply(updateMipmaps: true)`. Therefore **generate mipmaps** (todds does so by default).
+- Uploads directly with `LoadRawTextureData`, with the origin at bottom left, so **flip vertically** (todds `-vf`, also used by RimCrow).
+- DDS has `anisoLevel` 0, PNG 2. DDS is slightly blurrier at a distance; negligible.
 
-### 2.3 加载目录之间的遮蔽（容易踩的坑）
+### 2.3 Shadowing across load folders (a common pitfall)
 
-`ModContentPack.GetAllFilesForMod` 按加载目录的优先级（高到低）收集文件，键是“相对于加载目录的路径”，先到先得。遮蔽检查在这个合并后的字典上做，所以：
+`ModContentPack.GetAllFilesForMod` collects files by load-folder priority (high to low), keyed by "path relative to the load folder", first wins. Shadowing is checked against this merged dictionary, so:
 
-- `1.6/Textures/a.png`（高优先级）和 `Textures/a.dds`（公共目录，低优先级）同时存在时，`a.dds` 会遮蔽 `a.png`，游戏显示的是公共目录那张旧图。
-- 只要每个加载目录里的每张 PNG 都有自己的 DDS，就不会出错（高优先级目录的 `a.dds` 会赢过低优先级的 `a.dds`）。
-- 规则：**某个相对路径只要有一张 PNG 没转成功，就不能让任何低优先级目录里留着这个路径的、由我们生成的 DDS**。转换失败时要回退整组，而不是只跳过那一张。
+- If `1.6/Textures/a.png` (high priority) and `Textures/a.dds` (common folder, low priority) both exist, `a.dds` shadows `a.png`; the game shows the old image from the common folder.
+- This works correctly if every PNG in every load folder has its own DDS (the high-priority `a.dds` beats the low-priority `a.dds`).
+- Rule: **if any PNG at a given relative path fails conversion, none of our generated DDS files at that path may remain in lower-priority folders**. On failure, roll back the whole group rather than skip just that image.
 
-### 2.4 1.7 的贴图缓存（Waylith）
+### 2.4 Texture cache in 1.7 (Waylith)
 
-- `Waylith.Rendering.GpuTextureService`：PNG 解码后，引擎自己编码成 BC1/BC7（CPU 或 GPU），写进 `<数据目录>/TextureCache/v23/<设置标签>/`，LZ4 压缩。键是完整路径 + 文件大小 + 修改时间。
-- 本机缓存 209 MB。
-- `RimWorldWaylith.Bootstrap.ResolveCacheRootOverride`：带 `-savedatafolder` 启动时，缓存根目录就是那个文件夹。**所以每个整合包都有自己的空缓存**，第一次启动要把所有 PNG 重新编码一遍。
-- DDS 加载后也会被写进同一个缓存（`PersistToTextureCache`），多占一份盘。
+- `Waylith.Rendering.GpuTextureService`: after PNG decoding, the engine encodes BC1/BC7 itself (CPU or GPU) and writes to `<data-directory>/TextureCache/v23/<settings-tag>/`, LZ4-compressed. The key is full path + file size + modification time.
+- Local cache: 209 MB.
+- `RimWorldWaylith.Bootstrap.ResolveCacheRootOverride`: when launched with `-savedatafolder`, that folder is the cache root. **Each pack therefore has its own empty cache** and must re-encode all PNGs on its first launch.
+- Loaded DDS files are also written to the same cache (`PersistToTextureCache`), taking another copy's worth of disk space.
 
-### 2.5 本机现状
+### 2.5 Local state
 
-| 项 | 数量 |
+| Item | Count |
 | --- | --- |
-| 有 PNG 贴图的工坊 Mod | 827 |
-| PNG 贴图 | 132,847 张，4.24 GiB |
-| 估算全部转成 DDS（BC1/BC7 + mipmap，不缩放） | 约 26.7 GiB（6.3 倍） |
-| 已经有 `.dds` 的 Mod | 292 个，32,448 个文件，5.68 GiB |
+| Workshop Mods with PNG textures | 827 |
+| PNG textures | 132,847 images, 4.24 GiB |
+| Estimated full conversion to DDS (BC1/BC7 + mipmaps, no scaling) | About 26.7 GiB (6.3 times) |
+| Mods already containing `.dds` | 292 Mods, 32,448 files, 5.68 GiB |
 
-已有的 DDS 一部分是作者自己发布的（例如 `[NL] Facial Animation`：PNG 1.2 MB，DDS 51.7 MB），一部分是以前用 RimSort / RimCrow / RimPy 生成的。RimArcho 分不出来，所以**默认不碰别人的 DDS**。
+Some existing DDS files were published by authors (e.g. `[NL] Facial Animation`: PNG 1.2 MB, DDS 51.7 MB); others were generated earlier by RimSort / RimCrow / RimPy. RimArcho cannot tell them apart, so **leave others' DDS untouched by default**.
 
-## 3. 工具：todds
+## 3. Tool: todds
 
-| 项 | 内容 |
+| Item | Details |
 | --- | --- |
-| 版本 | 0.4.1（最后一版），仓库 `todds-encoder/todds`，2026-03-31 归档 |
-| 许可 | MPL-2.0，可以随包分发，但要附带许可和源码地址 |
-| 获取 | RimCrow：GitHub release 的 `todds_Windows_0.4.1.zip`；RimSort：随安装包附带 `todds/todds.exe` |
-| 本机 | `D:\SteamLibrary\steamapps\common\RimWorld\RimSort\todds\todds.exe`，`--help` 显示 0.4.1 |
+| Version | 0.4.1 (final release), repository `todds-encoder/todds`, archived 2026-03-31 |
+| License | MPL-2.0; redistribution allowed with the license and source URL |
+| Acquisition | RimCrow: `todds_Windows_0.4.1.zip` from GitHub releases; RimSort: bundled `todds/todds.exe` |
+| Local copy | `D:\SteamLibrary\steamapps\common\RimWorld\RimSort\todds\todds.exe`, `--help` reports 0.4.1 |
 
-**RimCrow 的参数**（RimArcho 照用）：
+**RimCrow arguments** (reuse in RimArcho):
 
 ```
-todds -f BC1 -af BC7 -vf -fs -o|-on -t -p [-nm] [-sc <百分比> | -ms <最大边>] <文件列表.txt>
+todds -f BC1 -af BC7 -vf -fs -o|-on -t -p [-nm] [-sc <percentage> | -ms <max-side>] <file-list.txt>
 ```
 
-- `-f BC1 -af BC7`：不透明图用 BC1（每像素 0.5 字节），有透明通道的用 BC7（1 字节）。
-- `-fs`：宽高补到 4 的倍数（BC 格式要求按 4×4 分块）。
-- 输入用 txt 文件列表，方便只转选中的文件。txt 输入时 todds 不支持另指输出目录，DDS 一定写在 PNG 旁边。
-- `-on` 按 mtime 判断“DDS 比 PNG 旧才重转”。工坊更新可能保留旧的 mtime，不可靠，RimArcho 用自己的清单判断（§5.1）。
+- `-f BC1 -af BC7`: BC1 for opaque images (0.5 bytes per pixel), BC7 for images with an alpha channel (1 byte).
+- `-fs`: pad width and height to multiples of 4 (BC formats require 4×4 blocks).
+- Use a txt file list as input to convert only selected files. With txt input, todds does not support a separate output directory; DDS files always go beside PNGs.
+- `-on` uses mtime to "reconvert only when DDS is older than PNG". Workshop updates may preserve old mtime, so this is unreliable; RimArcho uses its own manifest (§5.1).
 
-**RimCrow 的其他规则**（值得照搬）：
+**Other RimCrow rules** (worth reusing):
 
-- 跳过任何叫 `Source` 的目录（作者的工程素材）。
-- 扩展名是 `.png` 但内容不是 PNG 的跳过。
-- `_m.png`（遮罩）转换但不缩放。
-- 缩放有最小边保护（默认 128）：缩完会小于这个值的图，退回更大的比例或保留原尺寸。
-- 分批调用，每批最多 10,000 个文件；单批超时 600 秒。
+- Skip any directory named `Source` (the author's source assets).
+- Skip files with a `.png` extension whose contents are not PNG.
+- Convert `_m.png` (masks) without scaling.
+- Protect the minimum side when scaling (default 128): if the result would fall below it, use a larger scale or retain full size.
+- Invoke in batches of at most 10,000 files, with a 600-second timeout per batch.
 
-**来源怎么定（待决定）：**
+**Tool source (undecided):**
 
-- A. 第一次使用时，经玩家同意，从 GitHub release 下载 0.4.1，用写死的 SHA-256 校验，放到 `%APPDATA%\RimArcho\tools\todds\0.4.1\`。仓库已归档，地址不会再变。
-- B. 直接放进 RimArcho 的发布 zip（多约 10 MB，附 MPL 许可）。省掉下载这一步。
-- 两种都允许玩家在设置里指定已有的 `todds.exe`（例如 RimSort 自带的那份），用 `--help` 第一行确认版本。
+- A. On first use, with player consent, download 0.4.1 from GitHub releases, verify a hardcoded SHA-256, and store in `%APPDATA%\RimArcho\tools\todds\0.4.1\`. The repository is archived, so the URL will not change.
+- B. Include it in RimArcho's release zip (about 10 MB extra, with MPL license). Avoids the download step.
+- Both allow players to specify an existing `todds.exe` in settings (e.g. RimSort's copy), checking the version from the first line of `--help`.
 
-推荐 A，规格原来就要求“玩家同意后下载”。
+Recommend A; the spec already requires "download with player consent".
 
-## 4. 实测
+## 4. Measurements
 
-`EGI Holograms and Projectors`（工坊 2979598490）的 `Common/Textures` 复制到临时目录后转换，32 线程：
+Converted `Common/Textures` from `EGI Holograms and Projectors` (Workshop 2979598490) after copying it to a temporary directory, with 32 threads:
 
-| 方案 | 大小 | 相对 PNG | 耗时 |
+| Method | Size | Relative to PNG | Time |
 | --- | --- | --- | --- |
-| PNG 原图（2,521 张） | 41 MB | 1× | — |
-| DDS 原尺寸 | 389 MB | 9.5× | 10.6 秒 |
-| DDS 缩到 50% | 102 MB | 2.5× | 4.5 秒 |
+| Original PNG (2,521 images) | 41 MB | 1× | — |
+| Full-size DDS | 389 MB | 9.5× | 10.6 seconds |
+| DDS scaled to 50% | 102 MB | 2.5× | 4.5 seconds |
 
-按这个速度，本机全部 13 万张 PNG 原尺寸转一遍大约 10 分钟，要 20 多 GiB 盘。
+At this speed, converting all 130,000 local PNGs at full size takes about 10 minutes and over 20 GiB of disk.
 
-显存估算（RimCrow 的公式）：BC1 = 宽×高×0.5，BC7 = 宽×高×1，有 mipmap 再乘 1.333。缩到 50% 显存约降到 1/4。
+Video memory estimate (RimCrow's formula): BC1 = width×height×0.5, BC7 = width×height×1; multiply by 1.333 with mipmaps. Scaling to 50% reduces video memory to about 1/4.
 
-## 5. 设计
+## 5. Design
 
-### 5.1 普通优化（原 Mod 里生成，保留 PNG）
+### 5.1 Normal optimization (generate in the original Mod, keep PNG)
 
-**命令：**
+**Commands:**
 
-- `archo textures status [<Mod>…]`：每个 Mod 的 PNG 数和大小、已生成的 DDS、过期的 DDS、别人的 DDS、预计大小。
-- `archo textures optimize <Mod…> | --plan | --all [--scale <百分比>] [--max-size <像素>] [--no-mipmaps] [--dry-run]`
-- `archo textures clean <Mod…> | --all [--dry-run]`：只删清单里的文件。
+- `archo textures status [<Mod>…]`: PNG count and size, generated DDS, stale DDS, others' DDS, estimated size per Mod.
+- `archo textures optimize <Mod…> | --plan | --all [--scale <percentage>] [--max-size <pixels>] [--no-mipmaps] [--dry-run]`
+- `archo textures clean <Mod…> | --all [--dry-run]`: delete only files in the manifest.
 
-**写入范围。** 这是 README “从不写 Mod 目录”的第三个例外（前两个是 `save` 和 `copy-local`），只在玩家明确执行时发生：
+**Write scope.** This is the third exception to the README's "never writes to Mod directories" (the first two are `save` and `copy-local`), and happens only on an explicit player action:
 
-- 只在 PNG 旁边新建 `.dds`，不改、不删 PNG。
-- 已有、但不在清单里的 `.dds` 一律不覆盖，列为“别人的 DDS”。
-- 游戏运行时拒绝（文件可能被占用，和 `save` 一样）。
+- Create `.dds` only beside PNGs; do not modify or delete PNGs.
+- Never overwrite existing `.dds` files absent from the manifest; list them as "others' DDS".
+- Refuse while the game is running (files may be in use, as with `save`).
 
-**清单。** 数据库新表，每个生成的文件一行：Instance、相对路径、源 PNG 的大小 + mtime + xxh3、DDS 大小、参数（格式、比例、mipmap）、todds 版本、生成时间。`clean` 和过期检查都靠它。
+**Manifest.** A new database table, one row per generated file: Instance, relative path, source PNG size + mtime + xxh3, DDS size, parameters (format, scale, mipmaps), todds version, generation time. Both `clean` and stale checks rely on it.
 
-**过期检查。** 每次扫描后对比清单：
+**Stale checks.** Compare with the manifest after every scan:
 
-| 情况 | 问题 | 级别 | 动作 |
+| Condition | Finding | Severity | Action |
 | --- | --- | --- | --- |
-| 源 PNG 变了（大小或哈希不同） | `texture.stale` | warning（游戏会显示旧贴图） | 重新优化 / 清理 |
-| 源 PNG 没了 | `texture.orphan` | info（DDS 还在被加载） | 清理 |
-| DDS 被删了或被改了 | 从清单移除 | — | — |
+| Source PNG changed (different size or hash) | `texture.stale` | warning (game shows old texture) | Optimize again / clean |
+| Source PNG gone | `texture.orphan` | info (DDS still loads) | Clean |
+| DDS deleted or changed | Remove from manifest | — | — |
 
-**遮蔽规则（§2.3）。** 按 Mod 生效的全部加载目录收集 PNG，不只是 `Textures/` 根目录。某个相对路径只要有一张 PNG 被跳过或转换失败，就删掉这个路径下所有由我们生成、优先级更低的 DDS。
+**Shadowing rule (§2.3).** Collect PNGs across all effective load folders of the Mod, not just the `Textures/` root. If any PNG at a relative path is skipped or fails conversion, delete all lower-priority DDS files we generated at that path.
 
-**扫描指纹。** 结构清单现在包含所有文件（02 §4.4），新增的 DDS 会让快照哈希变化，Mod 被当成“更新了”。要把清单里的 DDS 排除在结构层之外。作者自己的 DDS 照常计入。
+**Scan fingerprint.** The structural manifest now includes all files (02 §4.4); new DDS changes the snapshot hash and makes the Mod look "updated". Exclude manifest-tracked DDS from the structural layer. Authors' own DDS still counts.
 
-**工坊更新会不会删掉我们的 DDS：** 不确定，要实测（§6）。不管会不会删，过期检查都能兜住。
+**Will Workshop updates delete our DDS?** Unknown; test it (§6). Stale checks cover either outcome.
 
-### 5.2 整合包精简（包里的副本，删掉 PNG）
+### 5.2 Pack slimming (copies in the pack, delete PNG)
 
-在 08 §5.2 的“清洗”和“测量”之间加一步，作用于 `.archo-tmp` 里的副本：
+Add a step between "clean" and "measure" in 08 §5.2, operating on copies in `.archo-tmp`:
 
-1. 对副本里生效加载目录下的 PNG 跑 todds（参数同上，可选缩放）。
-2. 转换成功的 PNG 删掉；失败的保留 PNG，并按 §2.3 回退同一路径下优先级更低的 DDS。
-3. `pack.json` 记录 `textures`：工具与版本、参数、转换数、失败数、PNG 字节、DDS 字节。
+1. Run todds on PNGs under effective load folders in the copy (same arguments, optional scaling).
+2. Delete successfully converted PNGs; keep failed PNGs and roll back lower-priority DDS at the same path per §2.3.
+3. Record `textures` in `pack.json`: tool and version, parameters, converted count, failed count, PNG bytes, DDS bytes.
 
-注意事项：
+Notes:
 
-- **测量要用转换后的大小**。不缩放时包会变成原来的几倍，剩余空间检查要按估算的 DDS 大小算。界面在编译前就显示“PNG x MB → DDS 约 y MB”。
-- **默认不缩放**（2026-10-22 决定）。原尺寸转换不省盘，省的是加载时间（1.7 上是每个包第一次启动的编码时间）和不透明贴图一半的显存（§1 第 3 条），所以不缩放时界面叫它**“预转换”**，选了缩放比例才叫“精简”。要省盘，得由玩家自己选缩放。
-- 只处理 `Textures/`。`About/Preview.png` 等不是通过贴图加载器读的，不碰。
-- 语义哈希不含贴图，所以包条目的 `hash` 和 RimArcho 列表的匹配都不受影响。
-- 副本的 `origin.json` 加一个标记，说明贴图被精简过，“查看差异”时不把它当成 Mod 被改了。
+- **Measure the converted size**. Without scaling, the pack grows several times larger; free-space checks must use estimated DDS size. Before building, the UI shows "PNG x MB → DDS about y MB".
+- **No scaling by default** (decided 2026-10-22). Full-size conversion saves loading time (the first-launch encoding time of each pack on 1.7) and half the video memory for opaque textures (§1 item 3), rather than disk space. The UI therefore calls it **"pre-convert (full size)"** without scaling, and "texture slimming" only when a scale is selected. Players must choose scaling to save disk space.
+- Process only `Textures/`. Leave `About/Preview.png` and other files not read through the texture loader untouched.
+- Semantic hashes exclude textures, so pack entry `hash` and RimArcho list matching are unaffected.
+- Add a marker to the copy's `origin.json` indicating texture slimming, so "see the changes" does not treat it as a modified Mod.
 
-### 5.3 界面
+### 5.3 Interface
 
-- Mod 库存页：批量操作“优化贴图 / 清理”，详情里显示贴图统计和过期提示。
-- 方案页的“编译成整合包”子页：一个贴图开关、缩放比例（默认“不缩放”），加上编译前的大小估算。不缩放时开关叫“预转换贴图”，选了比例后叫“精简贴图”。
-- 第一次使用时的 todds 下载确认（文件名、来源、大小）。
+- Mod inventory page: bulk "convert textures to DDS / clean" actions; texture statistics and stale notices in details.
+- "create a pack" subpage on the plan page: a texture toggle, scale (default "full size"), and size estimate before building. The toggle is "pre-convert textures" without scaling, "slim textures" with a scale selected.
+- todds download confirmation on first use (file name, source, size).
 
-## 6. 动手前要实测
+## 6. Tests needed before implementation
 
-| 项 | 方法 |
+| Item | Method |
 | --- | --- |
-| 1.6 和 1.7 都能正确显示 todds 生成的 DDS（方向、透明、BC1/BC7、非 4 倍数尺寸） | 一个小 Mod 转换后进游戏看，留截图 |
-| 只有 DDS、没有 PNG 时能加载（精简的前提） | 同上，删掉 PNG |
-| 工坊更新会不会删掉 Mod 目录里多出来的文件 | 给一个会更新的 Mod 加个标记文件，等它更新 |
-| 加载时间：1.6 普通启动、1.7 冷缓存 / 热缓存、整合包第一次启动 | 同一列表各测 3 次，看 Player.log 时间戳 |
-| 本机 292 个已有 DDS 的 Mod 里，有多少 DDS 比 PNG 旧（以前的工具留下的过期文件） | 只读统计 |
+| Both 1.6 and 1.7 display todds DDS correctly (orientation, transparency, BC1/BC7, dimensions not divisible by 4) | Convert a small Mod, inspect in game, keep screenshots |
+| DDS loads without PNG (required for slimming) | As above, delete PNG |
+| Whether Workshop updates delete extra files in the Mod directory | Add a marker file to a Mod that will update, wait for the update |
+| Load times: normal 1.6 launch, 1.7 cold / warm cache, first pack launch | Test the same list 3 times each; inspect Player.log timestamps |
+| Among the 292 local Mods with DDS, how many DDS files are older than PNGs (stale files from earlier tools) | Read-only statistics |
 
-## 7. 待决定
+## 7. Open decisions
 
-1. todds 的来源：同意后下载（推荐）还是放进发布 zip。
-2. ~~整合包精简的默认缩放比例~~ 已定（2026-10-22）：默认不缩放；不缩放时界面叫“预转换”，选了缩放比例才叫“精简”（§5.2）。
-3. 普通优化要不要接管以前的工具留下的 DDS（例如 DDS 比 PNG 旧时提示清理）。默认只读、只提示。
-4. 要不要支持 RimCrow 的 `.dds.zstd`（需要 Image Opt 这个 Mod）。建议不做：游戏不能原生读取。
+1. todds source: download with consent (recommended) or bundle in the release zip.
+2. ~~Default scale for pack slimming~~ Decided (2026-10-22): no scaling by default; the UI calls it "pre-convert (full size)" without scaling, "texture slimming" only when a scale is selected (§5.2).
+3. Whether normal optimization should take over DDS left by earlier tools (e.g. suggest cleaning DDS older than PNG). Read-only notices by default.
+4. Whether to support RimCrow's `.dds.zstd` (requires the Image Opt Mod). Suggest no: the game cannot read it natively.
 
-## 8. 实现记录（2026-10-22，分支 `claude/texture-opt-3d7a51`）
+## 8. Implementation record (2026-10-22, branch `claude/texture-opt-3d7a51`)
 
-- 第 1 条定了：同意后下载（`archo textures tool --install`、库 › 贴图优化），或用设置项 `textures.todds` 指向已有的一份。GitHub 不给这个 zip 的摘要，所以按发布页的大小（3,846,213 字节）和 `--help` 报的版本检查。
-- todds 先把源图补到 4 的倍数，再缩放，缩放后不再补。所以缩放比例只给能让宽高仍是 4 的倍数、短边不小于 128 像素的（`ScaleSteps`），遮罩不缩放。DDS 大小按实际写出的格式算，和 todds 的输出逐字节一致。
-- RGBA 但完全不透明的 PNG（例如很多 `_m` 遮罩）todds 会写成 BC1，校验按文件头里的格式算，不按 PNG 的颜色类型猜。
-- 原 Mod 里 RimArcho 生成的 DDS 不算进扫描指纹，复制到别的文件夹或整合包时也不带。
-- 沙箱实测（EGI Holograms and Projectors + Harmony，RimSort 的 todds）：普通优化 2521 个文件、384.4 MB（预估 385.1 MB），重新扫描没有变化；50% 精简的包 143.9 MB（预估 144.4 MB），包里不剩 PNG；停下、清理都正常。还没进游戏看。
+- Item 1 decided: download with consent (`archo textures tool --install`, library › texture optimization), or point `textures.todds` at an existing copy. GitHub provides no digest for this zip, so check its release-page size (3,846,213 bytes) and the version reported by `--help`.
+- todds pads source images to multiples of 4 before scaling, with no padding afterward. Offer only scales that keep width and height divisible by 4 and the shorter side at least 128 pixels (`ScaleSteps`); do not scale masks. DDS size is computed from the actual output format, matching todds output byte for byte.
+- todds writes fully opaque RGBA PNGs (e.g. many `_m` masks) as BC1. Validate using the header format rather than guessing from PNG color type.
+- RimArcho-generated DDS in original Mods is excluded from scan fingerprints and from copies to other folders or packs.
+- Sandbox measurements (EGI Holograms and Projectors + Harmony, RimSort's todds): normal optimization 2521 files, 384.4 MB (estimated 385.1 MB), no changes on rescan; 50% slimmed pack 143.9 MB (estimated 144.4 MB), no PNG left in pack; stopping and cleaning both work. Not yet inspected in game.

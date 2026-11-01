@@ -1,31 +1,31 @@
-# 10 · 没玩到与值得玩
+# 10 · Unplayed and worth playing
 
-> 状态：问题二“有什么没玩到”是 1.1 的设计规格；§5 是 1.2；§6 是远期方向。已实现的只有读存档开头的 Mod 列表（§1.3），其余全部（待实现）。
-> 依据：00（§2、§4）、00a、03、04、06、08、09。
+> Status: question two, "what haven't I played?", is a design specification for 1.1; §5 is for 1.2; §6 is a long-term direction. Only reading the Mod list at the start of a save (§1.3) is implemented; everything else is unimplemented.
+> Basis: 00 (§2, §4), 00a, 03, 04, 06, 08, 09.
 
-问题二要回答：**装了却多局都没碰过的 Mod 和内容有哪些。** 做法是只读地读取全部存档，把存档里引用到的 Def 映射回提供它的 Mod。这是确定性分析，不需要 AI；Archo 只在解读结果、给建议时参与（09 §4）。
+Question two asks: **which installed Mods and content have gone unused across multiple playthroughs?** Read all saves without modifying them and map the Defs they reference back to their providing Mods. This analysis is deterministic and needs no AI; Archo participates only in interpreting results and making suggestions (09 §4).
 
-问题二的答案是问题三的输入：先查清没玩到什么，再从里面挑值得玩的。
+The answer to question two feeds question three: first establish what has gone unplayed, then choose what is worth playing.
 
-## 1. 存档读取
+## 1. Save reading
 
-### 1.1 只读
+### 1.1 Read-only
 
-- 存档分析**只读**：只以读方式打开存档文件，从不写入、改名、移动。备份和移到回收站是存档管理里单独的动作，要玩家确认（§4.4、§4.5）。
-- 读出的结果只存在本机，不上传。发给模型的只有统计结果，而且要先征得同意（09 §3.2）。
+- Save analysis is **read-only**: open saves for reading only, never write, rename or move them. Backups and recycle bin moves are separate save-management actions requiring player confirmation (§4.4, §4.5).
+- Results stay local and are not uploaded. Only statistics are sent to the model, after consent (09 §3.2).
 
-### 1.2 存档在哪里
+### 1.2 Save locations
 
-| 位置 | 属于 |
+| Location | Belongs to |
 | --- | --- |
-| `<用户数据目录>/Saves/*.rws` | 用这个用户数据目录的环境，以及在这些环境里启动过的方案。多个环境共用游戏默认的用户数据目录时（02 §2.4），按真实路径去重，只读一次 |
-| `<数据目录>/packs/<包名>/userdata/Saves/*.rws` | 这个整合包（整合包用自己的 `-savedatafolder`，08 §5.3） |
+| `<user data directory>/Saves/*.rws` | Environments using this user data directory, and plans launched in those environments. When environments share the game's default user data directory (02 §2.4), deduplicate by real path and read only once |
+| `<data directory>/packs/<pack name>/userdata/Saves/*.rws` | This pack (packs use their own `-savedatafolder`, 08 §5.3) |
 
-自动存档（`Autosave-*.rws`）和手动存档一样读，界面上标“自动存档”。
+Read autosaves (`Autosave-*.rws`) like manual saves; label them "autosave" in the UI.
 
-### 1.3 格式与 `<meta>`（已实现）
+### 1.3 Format and `<meta>` (implemented)
 
-存档是 XML，根元素 `<savegame>`，开头是 `<meta>`，后面是 `<game>`：
+Saves are XML with a `<savegame>` root, starting with `<meta>`, followed by `<game>`:
 
 ```xml
 <savegame><meta><gameVersion>1.6.4633 rev1261</gameVersion>
@@ -35,200 +35,200 @@
 <game>…</game></savegame>
 ```
 
-- `<meta><modIds>` 是存档时启用的 packageId，按加载顺序排列；`<modNames>` 与它一一对应。
-- 读取规则（`internal/app/exchange.go` 的 `readSaveMeta`）：流式解析，非严格模式，忽略声明的字符集；读到 `</meta>` 立即停止，不读后面几十 MB 的 `<game>`。packageId 一律转小写；`gameVersion` 记下来；`modNames` 用来给“没装”的条目标名字。没有 `<meta><modIds>` 时报错 `no <meta><modIds> in the save`。
-- 识别：扩展名是 `.rws`，或文件前 4096 字节里有 `<savegame`，就按存档读，不看其他扩展名（`ReadLoadoutFile`；`listformats.go` 的 `ParseList` 同样按 `<savegame` 识别）。
-- 现在的用途是列表导入：`archo loadout import <存档>` 把存档的 Mod 列表作为一步可撤销的编辑放进方案，不写游戏文件（04 §9）。测试：`TestLoadoutExchange`。
-- `<modSteamIds>` 目前不读（待定：存档管理里“现在缺哪些”是否用它找工坊条目）。
+- `<meta><modIds>` contains the packageIds enabled when saving, in load order; `<modNames>` corresponds one-to-one.
+- Reading rules (`readSaveMeta` in `internal/app/exchange.go`): stream parsing, non-strict mode, ignore the declared character set. Stop at `</meta>` without reading the tens of MB in `<game>`. Lowercase all packageIds, record `gameVersion`, and use `modNames` to name "not installed" entries. Missing `<meta><modIds>` returns `no <meta><modIds> in the save`.
+- Detection: treat a file as a save if its extension is `.rws` or its first 4096 bytes contain `<savegame`, regardless of any other extension (`ReadLoadoutFile`; `ParseList` in `listformats.go` also detects `<savegame`).
+- Current use is list import: `archo loadout import <save>` puts the save's Mod list into a plan as one reversible edit, without writing game files (04 §9). Test: `TestLoadoutExchange`.
+- `<modSteamIds>` is not read yet (undecided: whether save management should use it to locate Workshop entries for "what is missing now").
 
-### 1.4 Def 引用提取
+### 1.4 Extracting Def references
 
-- 流式读完整个存档，收集所有 `<def>` 元素的文本，去重，得到“这份存档引用过的 defName 集合”。
-- 其他引用形式（研究进度表里以研究名为键的条目、`<kindDef>` 等不叫 `<def>` 的字段）是否补进来，以及具体元素路径，待实测后确定（待定）。
-- 每份存档的结果按（路径、大小、修改时间）缓存在本机，三者都不变就不重读。缓存位置跟随 07 §3（待定）。
-- 实测基线见 07 §6：本机 202 个存档，每个 15–28 MB；最新存档中不同的 `<def>` 有 1382 个，提取 0.11 秒。按这个速度，第一次全量读取约二十几秒，要放在后台做并显示进度（06 §8.4）；之后只读新增和变了的存档。
+- Stream the entire save, collect text from all `<def>` elements and deduplicate it into "the set of defNames referenced by this save".
+- Whether to include other reference forms (research-name keys in research progress, `<kindDef>` and other fields not named `<def>`), and their exact element paths, will be decided after measurement (undecided).
+- Cache each save's results locally by (path, size, modification time); do not reread when all three are unchanged. Cache location follows 07 §3 (undecided).
+- Measured baseline in 07 §6: 202 local saves, 15–28 MB each; the latest has 1382 distinct `<def>` values, extracted in 0.11 seconds. At this rate, the first full read takes twenty-odd seconds; run it in the background with progress (06 §8.4). Thereafter read only new and changed saves.
 
-### 1.5 Def 映射回 Mod
+### 1.5 Mapping Defs back to Mods
 
-- 候选范围：**这份存档 `<modIds>` 里的 Mod**，按 04 §4.2 的规则解析到当前装着的 Instance。不在候选里的 Mod，这份存档不算它的。
-- 用这些 Mod 的生效内容（03 §1）里的 Def 事实（03 §5.1），按 defName 找定义者。同一个 defName 被多个 Mod 定义（覆盖）时，算存档加载顺序里最后定义它的那个（与游戏一致）。同名但不同 Def 类型的，几个类型都算出现过（最小规则，以后可用元素上下文区分，待定）。
-- 抽象 Def（`Abstract="True"`）不参与。
-- 存档里有、但现在装着的 Mod 都不定义的 defName：Mod 更新删掉了，或 Mod 已卸载。计入“存档里有、找不到来源”，不报错。
-- 口径：Def 引用只说明“**出现过**”，不说明玩得多深。
+- Candidates: **Mods in this save's `<modIds>`**, resolved to currently installed Instances under 04 §4.2. This save does not count toward Mods outside that set.
+- Use Def facts (03 §5.1) in those Mods' effective content (03 §1) to find the defining Mod by defName. When several Mods define (override) the same defName, attribute it to the last in the save's load order, matching the game. If several Def types share a name, count all those types as present (minimal rule; element context may distinguish them later, undecided).
+- Exclude abstract Defs (`Abstract="True"`).
+- A defName in a save but not defined by any installed Mod means a Mod update removed it, or the Mod was uninstalled. Count it as "in the save, source not found", without an error.
+- Interpretation: a Def reference means only **"was present"**, not depth of play.
 
-### 1.6 给 Archo 和外部 agent 的工具
+### 1.6 Tools for Archo and external agents
 
-存档读取要有对应的只读工具，加进 05 的工具层，同时出现在 CLI 和 MCP（待实现，命令名待定，进入 05 §4 时确定）。建议形态：
+Save reading must have corresponding read-only tools in the tool layer from 05, exposed in both CLI and MCP (unimplemented; command names undecided, to be settled when added to 05 §4). Suggested form:
 
-| 建议命令 | 作用 |
+| Suggested command | Purpose |
 | --- | --- |
-| `saves list [--colony <名>]` | 列出存档：殖民地、时间、游戏版本、启用数、对应方案（§4.2） |
-| `saves show <存档>` | 一份存档的 Mod 列表、对应方案、缺 / 多（§4.3） |
-| `unplayed [--group never\|partial\|functional] [--mod <引用>]` | 没碰过的内容（§3） |
+| `saves list [--colony <name>]` | List saves: colony, time, game version, enabled count, matching plan (§4.2) |
+| `saves show <save>` | A save's Mod list, matching plan, missing / extra Mods (§4.3) |
+| `unplayed [--group never\|partial\|functional] [--mod <ref>]` | Unused content (§3) |
 
-## 2. 内容目录
+## 2. Content catalog
 
-### 2.1 作用
+### 2.1 Purpose
 
-玩家不认识 `ThingDef`、`IncidentDef`。内容目录把每个 Mod 的 Def 按玩家能懂的类别归类，用来：
+Players do not know `ThingDef` or `IncidentDef`. The content catalog groups each Mod's Defs into categories players understand, to:
 
-- Mod 详情里写“这个 Mod 加了 12 种武器、3 个派系、5 个事件”；
-- 没碰过的内容按类别列（§3）；
-- 判定功能型 Mod（§3.3）。
+- Say "this Mod adds 12 weapons, 3 factions and 5 events" in Mod details;
+- List unused content by category (§3);
+- Identify functional Mods (§3.3).
 
-### 2.2 Def 类型到类别的映射（草案）
+### 2.2 Mapping Def types to categories (draft)
 
-| 类别 | Def 类型 | 说明 |
+| Category | Def type | Notes |
 | --- | --- | --- |
-| 派系 | `FactionDef` | 隐藏派系（`hidden`）算不算，待定 |
-| 种族 | `ThingDef` 带 `race` 且 `humanlike` | |
-| 动物 | `ThingDef` 带 `race`，不是 humanlike，不是机械体 | |
-| 机械体 | `ThingDef` 带 `race` 且是机械体 | |
-| 建筑 | `ThingDef`，`category` 为 `Building` | 含家具、生产台、防御 |
-| 武器 | `ThingDef`，是武器（有 `verbs` 或在武器类物品分类下） | |
-| 服装 | `ThingDef` 带 `apparel` | 含护甲 |
-| 植物 | `ThingDef` 带 `plant` | |
-| 物品 | 其他 `category` 为 `Item` 的 `ThingDef` | 食物、药品、材料等 |
-| 地板 | `TerrainDef` | |
-| 研究 | `ResearchProjectDef` | |
-| 事件 | `IncidentDef`、`GameConditionDef` | |
-| 任务 | `QuestScriptDef` | |
-| 异种与基因 | `XenotypeDef`、`GeneDef` | Biotech |
-| 文化 | `MemeDef`、`PreceptDef`、`RitualPatternDef` | Ideology |
-| 能力 | `AbilityDef` | 含灵能 |
-| 植入体与状态 | `HediffDef` | |
-| 特性 | `TraitDef` | |
-| 生物群系 | `BiomeDef` | |
-| 叙事者 | `StorytellerDef` | |
-| 剧本 | `ScenarioDef` | |
-| 不算内容 | 其他类型，例如 `KeyBindingDef`、`MainButtonDef`、`StatDef`、`JobDef`、`WorkGiverDef`、`ThinkTreeDef`、`SoundDef`、`DesignationCategoryDef`、`LetterDef` | 机制和界面，玩家不会“玩到”它们 |
+| Factions | `FactionDef` | Whether hidden factions (`hidden`) count is undecided |
+| Races | `ThingDef` with `race` and `humanlike` | |
+| Animals | `ThingDef` with `race`, neither humanlike nor mechanoid | |
+| Mechanoids | `ThingDef` with `race`, a mechanoid | |
+| Buildings | `ThingDef` with `category` of `Building` | Includes furniture, production benches and defenses |
+| Weapons | `ThingDef`, a weapon (has `verbs` or belongs to a weapon item category) | |
+| Apparel | `ThingDef` with `apparel` | Includes armor |
+| Plants | `ThingDef` with `plant` | |
+| Items | Other `ThingDef` with `category` of `Item` | Food, medicine, materials, etc. |
+| Floors | `TerrainDef` | |
+| Research | `ResearchProjectDef` | |
+| Events | `IncidentDef`, `GameConditionDef` | |
+| Quests | `QuestScriptDef` | |
+| Xenotypes and genes | `XenotypeDef`, `GeneDef` | Biotech |
+| Culture | `MemeDef`, `PreceptDef`, `RitualPatternDef` | Ideology |
+| Abilities | `AbilityDef` | Includes psycasts |
+| Implants and conditions | `HediffDef` | |
+| Traits | `TraitDef` | |
+| Biomes | `BiomeDef` | |
+| Storytellers | `StorytellerDef` | |
+| Scenarios | `ScenarioDef` | |
+| Not content | Other types, such as `KeyBindingDef`, `MainButtonDef`, `StatDef`, `JobDef`, `WorkGiverDef`, `ThinkTreeDef`, `SoundDef`, `DesignationCategoryDef`, `LetterDef` | Mechanics and UI; players do not "play" these |
 
-- 这张表是草案。`ThingDef` 的细分要读 Def 的字段（`race`、`category`、`apparel`、`plant`、`verbs`），03 §5.1 的 Def 事实目前是否带这些字段待核对，不带则要补（待实现）。
-- 继承：字段可能来自父 Def（`ParentName`），细分要按继承后的结果判断。
-- 一个 Def 只归一个类别，按表从上往下取第一个匹配。
-- `PawnKindDef` 不单独成类：它是派系和种族的组成部分。
-- 存档里不一定留下痕迹的类别（事件、任务、剧本、叙事者）在界面上注明“可能低估”。
+- This table is a draft. Subdividing `ThingDef` requires reading its fields (`race`, `category`, `apparel`, `plant`, `verbs`). Whether Def facts in 03 §5.1 currently carry these fields needs checking; add them if absent (unimplemented).
+- Inheritance: fields may come from a parent Def (`ParentName`); classify using inherited values.
+- Each Def belongs to one category: use the first matching row, top to bottom.
+- `PawnKindDef` is not a separate category: it forms part of factions and races.
+- Label categories that may leave no trace in saves (events, quests, scenarios, storytellers) "may be underestimated" in the UI.
 
-## 3. 没碰过的内容
+## 3. Unused content
 
-在“没玩到 › 游玩回顾 › 没碰过的内容”（06 §2.11）。只看玩家确实开着它玩过的存档：一个 Mod 只和 `<modIds>` 里有它的存档比较。
+Under "not played yet › playthrough review › unused content" (06 §2.11). Consider only saves where the player actually played with the Mod enabled: compare a Mod only against saves whose `<modIds>` includes it.
 
-### 3.1 三组
+### 3.1 Three groups
 
-| 组 | 判定 | 界面上怎么写 |
+| Group | Criterion | UI wording |
 | --- | --- | --- |
-| 从没出现过 | Mod 有可玩内容（§2.2 里“不算内容”以外的类别），在所有启用过它的存档里，它的内容一次都没出现 | “开着玩过 4 个殖民地，一次都没碰过”，下面按类别列它有什么 |
-| 只玩到一小部分 | 出现过的内容占它可玩内容的比例低于阈值（草案 20%，可在设置里改，待定） | “加了 40 种武器，只用过 3 种”，按类别列没碰过的 |
-| 功能型，不算 | 见 §3.3 | 单独一组，折叠，写明“这类 Mod 不进存档，不能用存档判断” |
+| Never appeared | The Mod has playable content (categories other than "not content" in §2.2), none of which appears in any save with it enabled | "Enabled across 4 colonies, never encountered", followed by what it adds, by category |
+| Only a small part played | The share of playable content encountered is below a threshold (draft: 20%, configurable in settings, undecided) | "Adds 40 weapons, only 3 used", listing unused content by category |
+| Functional, excluded | See §3.3 | Separate collapsed group: "These Mods leave no save data; saves cannot tell whether they were used" |
 
-- 统计单位是**殖民地**（§4.1）：同一个殖民地的多份存档取并集，避免一个殖民地存了 30 次就算 30 局。
-- 只统计现在还装着的 Mod。现在启用与否不影响，但界面上标出“当前方案里启用 / 未启用”。
-- 只在一个殖民地里开过、而且那个殖民地很短（存档数少）的 Mod，结论可信度低，标“样本少”（阈值待定）。
-- 每一条都可以展开看凭据：哪些存档启用了它、出现过哪些 defName（00 §4 第 2 条）。
+- Count **colonies** (§4.1): union all saves of the same colony so that saving a colony 30 times does not count as 30 playthroughs.
+- Count only Mods still installed. Current enabled status does not affect the result, but show "enabled / not enabled in the current list" in the UI.
+- A Mod enabled in only one short colony (few saves) has a low-confidence conclusion; label it "small sample" (threshold undecided).
+- Each item expands to show evidence: which saves enabled it and which defNames appeared (00 §4 item 2).
 
-### 3.2 口径
+### 3.2 Interpretation
 
-- Def 引用只说明“出现过”：建过一面墙和用了一百面墙一样；研究过但没造过，也只算研究出现过。
-- 映射用的是现在装着的版本。Mod 更新改了 defName 时，旧存档里的引用找不到来源（§1.5），会让结论偏向“没碰过”，界面上说明。
-- Def 由 Patch 加进来的（03 §1 的生效内容），算加 Patch 的那个 Mod 的。
+- Def references mean only "was present": one wall and a hundred walls count alike; researching without building counts only as the research being present.
+- Mapping uses the currently installed version. If a Mod update changes defNames, references in old saves lose their source (§1.5), biasing conclusions toward "unused". Explain this in the UI.
+- Defs added by a Patch (effective content in 03 §1) belong to the Mod adding the Patch.
 
-### 3.3 功能型 Mod
+### 3.3 Functional Mods
 
-界面、性能、修 bug、纯机制调整这类 Mod 不往存档里加 Def，不能用存档判断用没用过。判定（草案）：
+UI, performance, bug-fix and pure mechanics-adjustment Mods do not add Defs to saves; saves cannot tell whether they were used. Criterion (draft):
 
-1. Mod 在生效内容里**没有**任何可玩内容类别的 Def（只有 Patch、程序集、贴图、语言文件，或只有“不算内容”类别的 Def），就算功能型；
-2. 玩家可以手动把一个 Mod 标成“功能型”或“不是功能型”，覆盖自动判定。这个标记是玩家数据，挂在 Lineage 上（04 §8），存法待定（可以是一个保留标签）。
+1. A Mod with **no** Def in a playable content category in its effective content (only Patches, assemblies, textures, language files, or Defs solely in "not content") is functional;
+2. The player may mark a Mod "functional" or "not functional", overriding detection. This is player data on its Lineage (04 §8); storage is undecided (possibly a reserved tag).
 
-功能型的 Mod 不进前两组。框架类 Mod（例如 Harmony、HugsLib）按规则 1 自然落进功能型。
+Functional Mods do not enter the first two groups. Framework Mods (such as Harmony and HugsLib) naturally fall under rule 1.
 
-### 3.4 和 Archo 的关系
+### 3.4 Relationship with Archo
 
-结果本身不需要 AI。Archo 可以在这一页上做“解读”：挑出值得一试的没碰过的内容、说明为什么（09 §4.2，1.1 以后）。发送的是统计结果，不是存档，按 09 §3.2 征得同意。
+Results need no AI. Archo may "interpret" this page: pick unused content worth trying and explain why (09 §4.2, after 1.1). Send statistics, not saves, with consent under 09 §3.2.
 
-## 4. 存档管理
+## 4. Save management
 
-在“没玩到 › 游玩回顾 › 存档管理”（06 §2.11）。
+Under "not played yet › playthrough review › save management" (06 §2.11).
 
-### 4.1 按殖民地分组
+### 4.1 Group by colony
 
-- 同一个殖民地的多份存档归为一组。殖民地的身份取存档里世界和玩家派系的信息（例如世界种子、世界名、玩家派系名），具体字段待实测确定（待定）；取不到时退回按文件名去掉末尾数字和 `Autosave-` 前缀分组。
-- 组名用玩家派系名或世界名；组内按存档时间倒序。
-- 每组标出对应的方案和环境（§4.2）。对不上任何方案的旧档单独一组，叫“对不上方案的存档”。
-- 整合包的存档（§1.2）归到那个整合包，标整合包名。
+- Group saves from the same colony. Derive colony identity from world and player-faction information in the save (for example, world seed, world name, player faction name); exact fields await measurement (undecided). If unavailable, group by filename after removing trailing numbers and the `Autosave-` prefix.
+- Name groups after the player faction or world; order saves newest first.
+- Show the matching plan and environment for each group (§4.2). Older saves without any matching plan form a separate "saves without a matching list" group.
+- Pack saves (§1.2) belong to that pack and show its name.
 
-### 4.2 对应哪个方案
+### 4.2 Matching a plan
 
-按顺序判定，第一条命中即停：
+Evaluate in order and stop at the first match:
 
-1. 存档在整合包的存档目录里 → 那个整合包。
-2. 存档的修改时间落在某次启动记录（08 §1）之后、下一次启动之前，并且那次启动用的是这个用户数据目录 → 那次启动的方案。
-3. 存档的 `<modIds>`（按 04 §4.2 解析后的启用集合）与某个方案的某个版本（04 §3）完全相同 → 那个方案；多个方案命中时取最近游玩的。
-4. 都不命中 → “对不上方案的存档”。
+1. Save is in a pack's save directory → that pack.
+2. Save modification time falls after a launch record (08 §1) and before the next launch, and that launch used this user data directory → that launch's plan.
+3. Save `<modIds>` (enabled set resolved under 04 §4.2) exactly matches a version (04 §3) of a plan → that plan; if several match, choose the most recently played.
+4. No match → "saves without a matching list".
 
-近似匹配（例如启用集合只差一两个）是否也算对上，待定；先不做，避免误判。
+Approximate matching (for example, an enabled set differing by one or two entries) is undecided; omit it initially to avoid false matches.
 
-### 4.3 选中一份存档
+### 4.3 Selecting a save
 
-显示：
+Show:
 
-- 存档时间、游戏版本（`<gameVersion>`）、当时启用数；
-- 对应的方案和环境（或整合包），以及判定依据（§4.2 的第几条）；
-- **现在缺哪些**：存档的 `<modIds>` 里有、对应方案现在没启用的。再分成“装着但没启用”和“没装”（用 `<modNames>` 标名字）；
-- **现在多哪些**：对应方案现在启用、存档里没有的。
+- Save time, game version (`<gameVersion>`), enabled count then;
+- Matching plan and environment (or pack), and the basis for the match (which rule in §4.2);
+- **What is missing now**: entries in the save's `<modIds>` not currently enabled in the matching plan. Divide into "installed but not enabled" and "not installed" (names from `<modNames>`);
+- **What is extra now**: entries currently enabled in the matching plan but absent from the save.
 
-比较按 packageId，大小写不敏感；工坊版写作 `<包名>_steam` 的条目按去掉后缀的包名比（04 §4.1）。
+Compare packageIds case-insensitively. For Workshop entries written as `<package ID>_steam`, strip the suffix before comparing (04 §4.1).
 
-### 4.4 动作
+### 4.4 Actions
 
-| 动作 | 做什么 | 确认 |
+| Action | What it does | Confirmation |
 | --- | --- | --- |
-| 在方案里重新启用缺的 | 把“装着但没启用”的那些加回对应方案，位置按存档里的顺序；没装的列出来，不处理 | 不需要，是一步可撤销的方案编辑（04 §2.1） |
-| 用这份存档的 Mod 建新方案 | 新建方案，内容等于导入这份存档的列表（同 `loadout import`，§1.3）；没装的条目保留并标出，和导入 ModsConfig.xml 一样 | 不需要；新方案的第一个版本来源是 `import` |
-| 备份 | 复制到 `<数据目录>/backups/saves/<时间>/`，保持文件名；可以多选，一次备份放在同一个时间目录下。只复制，不动原文件 | 要玩家确认 |
-| 移到回收站 | 用 08 §7 的回收站规则：存档文件是回收站接受的三类之一。不做永久删除 | 要玩家确认 |
+| Re-enable missing Mods in the list | Add "installed but not enabled" entries back to the matching plan, positioned in save order; list uninstalled entries without acting on them | Not required; one reversible plan edit (04 §2.1) |
+| Create a list from this save's Mods | Create a plan containing the imported save list (same as `loadout import`, §1.3); retain and mark uninstalled entries, as with ModsConfig.xml import | Not required; the new plan's first version has source `import` |
+| back up | Copy to `<data directory>/backups/saves/<time>/`, preserving filenames. Allow multiple selections; one backup shares one time directory. Copy only; leave originals in place | Player confirmation required |
+| Move to the recycle bin | Use the recycle bin rules in 08 §7: save files are one of the three accepted categories. No permanent deletion | Player confirmation required |
 
-- `<时间>` 用本地时间，格式与其他备份目录一致（07 §3，待定）。
-- 两个要确认的动作都按 06 §6：先列出涉及的文件和大小，玩家点“确认”才执行；Archo 只能发起，不能代为确认（09 §2.3）。
-- 游戏正在运行时（08 §4），移到回收站拒绝并说明“游戏运行中”；备份照常（只读源文件）。
+- `<time>` is local time, formatted consistently with other backup directories (07 §3, undecided).
+- Both actions requiring confirmation follow 06 §6: list affected files and sizes first; execute only after the player clicks "confirm". Archo can request but cannot confirm for the player (09 §2.3).
+- While the game runs (08 §4), refuse recycle bin moves and explain "the game is running". Backups work normally (read-only source access).
 
-## 5. 本局主题与内容冲突（1.2）
+## 5. Playthrough themes and content conflicts (1.2)
 
-有些 Mod 技术上不冲突，但放在一起玩会互相抵消。例子：米莉拉（Milira）与 Deadman's Switch 技术上不冲突，但强度差太多，一起玩时后者没有意义。
+Some Mods have no technical conflict but undermine one another in play. For example, Milira and Deadman's Switch do not technically conflict, but their power levels differ so much that the latter becomes pointless when played together.
 
-- 1.2 先由 Archo 给建议：在方案编辑器（06 §2.5）或游玩回顾里，玩家点“让 Archo 看看这个方案的主题”，Archo 读方案的 Mod 列表、内容目录统计（§2）和没碰过的内容（§3），指出可能互相抵消的组合并说明理由。结论标“推断”。
-- 发送的是 Mod 名称、简介和统计，按 09 §3.2 征得同意。
-- 不进“能不能跑”，不阻止任何操作：这是玩法建议，不是错误。
-- 社区数据积累后再做成规则（04 §6 的社区数据通道），规则形态待定。
+- In 1.2, Archo provides suggestions first. In the plan editor (06 §2.5) or playthrough review, the player clicks "Ask Archo about this list's theme". Archo reads the plan's Mod list, content catalog statistics (§2) and unused content (§3), identifies combinations that may undermine one another and explains why. Label conclusions "inferred".
+- Send Mod names, descriptions and statistics with consent under 09 §3.2.
+- Keep this out of "can it run" and block no actions: these are gameplay suggestions, not errors.
+- Turn accumulated community data into rules later (community data channel in 04 §6); rule form is undecided.
 
-## 6. 值得玩（远期）
+## 6. Worth playing (long term)
 
-侧栏“值得玩”下的两页：游玩目标、分享的整合包（06 §2.12）。这里只记方向，**具体做法以后再定**。
+Two pages under "worth playing" in the sidebar: play goals and shared packs (06 §2.12). This records direction only; **details will be decided later**.
 
-### 6.1 玩家分享整合包
+### 6.1 Player-shared packs
 
-- 分享的是**RimArcho 列表**（整合包导出的列表，04 §9.3）：只有清单（每个 Mod 的 lineage、语义哈希、来源工坊 ID，08 §5.1），不含 Mod 文件。
-- Mod 一律从创意工坊下载，分享网站不托管任何 Mod 文件。
-- 导入时按 packageId 和哈希匹配本地 Instance（04 §9.1、08 §5.4），缺的列出工坊链接。
-- 分享网站是另一个项目，不在 RimArcho 仓库里。RimArcho 这一侧只做：导出 RimArcho 列表、导入它、在“分享的整合包”页里浏览（接口待定）。
+- Share a **RimArcho list** (the list exported from a pack, 04 §9.3): a manifest only (each Mod's lineage, semantic hash and source Workshop ID, 08 §5.1), without Mod files.
+- Download every Mod from Steam Workshop; the sharing site hosts no Mod files.
+- On import, match local Instances by packageId and hash (04 §9.1, 08 §5.4), and list Workshop links for missing entries.
+- The sharing site is a separate project outside the RimArcho repository. RimArcho only exports RimArcho lists, imports them and browses them on the "shared packs" page (interface undecided).
 
-### 6.2 理解玩家的推荐
+### 6.2 Recommendations that understand the player
 
-- 输入是问题二的答案：没碰过的内容（§3）、玩家开过哪些殖民地、常用哪些类别。
-- 由 Archo 根据这些推荐内容和游玩目标（“值得玩 › 游玩目标”）。这是 00 §2 说的“从被指挥到理解玩家”。
-- 玩家画像**只存本机**，玩家能看到、能清除。发给模型前按 09 §3.2 征得同意。
-- 推荐需要的数据、画像的形态、和分享网站的关系，以后再定。
+- Input is the answer to question two: unused content (§3), colonies the player has played and frequently used categories.
+- Archo uses this to recommend content and play goals ("worth playing › play goals"). This is "from being directed to understanding the player" in 00 §2.
+- The player profile **stays local**; the player can view and clear it. Obtain consent under 09 §3.2 before sending it to the model.
+- Recommendation data requirements, profile structure and relationship with the sharing site will be decided later.
 
-## 7. 验收
+## 7. Acceptance
 
-| # | 场景 | 期望 | 状态 |
+| # | Scenario | Expected | Status |
 | --- | --- | --- | --- |
-| SV1 | `loadout import` 一份存档（`TestLoadoutExchange`） | 读 `<meta>` 后停止；导入 4 条，1 条没装并带名字；不写 ModsConfig.xml；`undo` 恢复 | 通过 |
-| SV2 | 读取全部存档做 Def 提取 | 任何存档文件的大小和修改时间不变 | 待实现 |
-| SV3 | 第二次分析，没有新存档 | 不重读存档，直接用缓存 | 待实现 |
-| SV4 | 一个只有 Patch 和程序集的 Mod | 进“功能型，不算”，不进“从没出现过” | 待实现 |
-| SV5 | 一个 Mod 只在没启用它的存档里“出现” | 不算它出现过 | 待实现 |
-| SV6 | 同一殖民地 30 份存档 | 统计按 1 个殖民地算 | 待实现 |
-| SV7 | 存档对应方案的判定 | 按 §4.2 的顺序；对不上时进“对不上方案的存档” | 待实现 |
-| SV8 | 备份存档，玩家不确认 | 不写任何文件；确认后出现在 `<数据目录>/backups/saves/<时间>/`，原文件不变 | 待实现 |
-| SV9 | 移到回收站 | 先确认；进系统回收站；游戏运行中拒绝 | 待实现 |
-| SV10 | “在方案里重新启用缺的” | 一步可撤销的编辑；没装的只列出 | 待实现 |
+| SV1 | `loadout import` a save (`TestLoadoutExchange`) | Stop after `<meta>`; import 4 entries, 1 uninstalled with a name; no ModsConfig.xml writes; `undo` restores | Pass |
+| SV2 | Read all saves to extract Defs | Every save's size and modification time remain unchanged | Unimplemented |
+| SV3 | Second analysis with no new saves | Use the cache without rereading saves | Unimplemented |
+| SV4 | A Mod with only Patches and assemblies | Goes into "functional, excluded", not "never appeared" | Unimplemented |
+| SV5 | A Mod "appears" only in saves without it enabled | Does not count as having appeared | Unimplemented |
+| SV6 | 30 saves from one colony | Count as 1 colony | Unimplemented |
+| SV7 | Matching a save to a plan | Follow §4.2 order; unmatched saves enter "saves without a matching list" | Unimplemented |
+| SV8 | Back up a save without player confirmation | No files written; after confirmation, appears in `<data directory>/backups/saves/<time>/`, original unchanged | Unimplemented |
+| SV9 | Move to the recycle bin | Confirm first; enter system recycle bin; refuse while the game runs | Unimplemented |
+| SV10 | "Re-enable missing Mods in the list" | One reversible edit; only list uninstalled entries | Unimplemented |

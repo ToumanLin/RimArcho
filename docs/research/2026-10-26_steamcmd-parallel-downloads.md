@@ -1,244 +1,244 @@
-# SteamCMD 并行下载调研
+# SteamCMD parallel-download research
 
-> 研究日期：2026-10-26，实测约 19:13–19:26（PDT，UTC−07:00）。性质：源码核查、公开资料核查和本机匿名下载实验；下述推荐尚未实施。未改业务代码、未提交、未使用真实账号、未调用 Steam 订阅接口、未写真实游戏或 Mods 目录。
+> Research date: 2026-10-26, measurements about 19:13–19:26 (PDT, UTC−07:00). Source/public-reference review and local anonymous-download experiments; recommendations below not implemented. No business-code changes, commits, real accounts, Steam subscription API calls, or writes to real game/Mods directories.
 
-## 1. 结论与决策
+## 1. Conclusions and decisions
 
-**有条件可以并行：匿名下载使用独立 SteamCMD 运行目录、独立工坊库和缓存，每份实例只跑一个进程；完成后串行发布到正式来源目录。不能直接给当前实现加 goroutine，也不能去掉现有实例互斥锁。**
+**Parallelism is conditionally feasible: anonymous downloads use independent SteamCMD runtimes, Workshop libraries, and caches, one process per instance; publish completed content serially to the final source. Do not simply add goroutines or remove existing instance locks.**
 
-本机四个公开小 Mod 的三轮测试中，4 个完整隔离进程的总耗时中位数为 **10.006 秒**，单进程批量为 **15.610 秒**（约 1.56 倍，耗时减少 35.9%），两者均 12/12 成功。2 个进程为 18.374 秒，反而慢于单进程批量。此结果支持提供可关闭的匿名并行选项，不支持承诺任意网络、任意 Mod 数量均加速。
+Three rounds with four small public Mods: four fully isolated processes took median **10.006 seconds**, single-process batching **15.610 seconds** (about 1.56×, 35.9% less time), both 12/12 successful. Two processes took 18.374 seconds, slower than batching. Supports optional anonymous parallelism, not guaranteed gains for every network/Mod count.
 
-**优先改批量更新。** 当前新增工坊订阅已经“一次启动下载多个条目”；更新却逐项启动、逐项扫描。逐项启动组中位数 28.169 秒，单进程批量已可减少约 44.6% 的下载阶段耗时；此改动比维护多个 SteamCMD 运行目录简单。单进程 `+runscript` 中位数 14.163 秒，和同进程批量命令行处于同一量级；它主要解决长命令行及分批组织，不提供条目并行。
+**Prioritize batch updates.** New Workshop subscriptions already download multiple entries per launch; updates launch/scan per entry. Per-item median 28.169 seconds; single-process batching cuts download-stage time about 44.6%, simpler than multiple runtimes. Single-process `+runscript` median 14.163 seconds is comparable to batch command lines; it addresses long commands/batch organization, not item parallelism.
 
-| 方式 | 判定 | 依据及条件 |
+| Method | Verdict | Basis and conditions |
 | --- | --- | --- |
-| 一个进程，重复多个 `+workshop_download_item` 或脚本内多行命令 | 可以，条目串行 | 本机日志中前一条成功后才请求下一条；下载内部仍可有多个 HTTP 连接 |
-| 多进程，共用安装目录及同一工坊库 | **不采用** | 本机三轮仅 5/12 条目成功；最终 ACF 安装记录分别剩 1、0、0 项 |
-| 多进程，共用安装目录，只分开 `+force_install_dir` | 不足以作为受支持方案 | 本次 12/12 成功，但配置、depotcache、日志和自更新文件仍共用，没有得到并发写安全保证 |
-| 多份安装目录，但共用同一 `force_install_dir` | 不采用 | 隔离了运行时，仍共享工坊 ACF、暂存和提交目录；没有消除内容库竞争，本次未另测此组合 |
-| 多份完整隔离安装目录 + 独立内容库 + anonymous | **有条件可以** | 本机 2/4 并发均成功；不得共享可写缓存、目录链接或最终发布动作 |
-| 同一真实账号多 SteamCMD 会话 | 首版不并行 | 存在会话替换/异地登录失败语义；复制运行目录不解决服务端会话冲突。本次按约束未登录验证 |
+| One process, repeated `+workshop_download_item` or multiple script commands | Works, entries serial | Logs request next only after previous success; individual downloads may use multiple HTTP connections |
+| Multiple processes, shared installation/library | **Do not adopt** | Three rounds: 5/12 successes; final ACF installed records 1, 0, 0 |
+| Multiple processes, shared installation, separate `+force_install_dir` only | Insufficient as supported design | 12/12 succeeded, but config/depotcache/logs/self-update files shared; no concurrent-write guarantee |
+| Separate installations, shared `force_install_dir` | Do not adopt | Runtime isolated, ACF/staging/commit directories still shared; library contention remains; not separately tested |
+| Fully isolated installations + separate libraries + anonymous | **Conditionally feasible** | Local 2/4 concurrency succeeded; no shared writable caches, directory links, final publication |
+| Multiple SteamCMD sessions for one real account | No parallelism in first version | Session replacement/elsewhere-login failures exist; runtime copies do not solve server conflicts; login untested under task limits |
 
-## 2. 当前实现：新增批量，更新逐项
+## 2. Current implementation: batch additions, per-item updates
 
-代码快照：RimArcho `dev/0.9.0`，HEAD `81017d85f73f504ed59d4701c94ccd907363d8f6`。先读了 [工作区约定](../../../AGENTS.md)、[架构](../00a-architecture.md)、[登录态调研](2026-10-24_login-sessions-loverslab-steamcmd.md) 和 [订阅规格 §3.4](../specs/02-environments-identity-and-scanning.md#34-订阅git下载页steamcmd2026-10-24)。前一份调研中的建议不能替代当前源码：账户动作及锁目前已有实现。
+Code snapshot: RimArcho `dev/0.9.0`, HEAD `81017d85f73f504ed59d4701c94ccd907363d8f6`. Read [workspace rules](../../../AGENTS.md), [architecture](../00a-architecture.md), [session research](2026-10-24_login-sessions-loverslab-steamcmd.md), [subscription spec §3.4](../specs/02-environments-identity-and-scanning.md#34-%E8%AE%A2%E9%98%85git%E4%B8%8B%E8%BD%BD%E9%A1%B5steamcmd2026-10-24). Earlier recommendations do not replace source: account actions/locks already exist.
 
-### 2.1 入口、进程和结果解析
+### 2.1 Entry points, processes, result parsing
 
-| 文件 / 符号 | 实际行为 | 加速时应注意 |
+| File / symbol | Actual behavior | Acceleration considerations |
 | --- | --- | --- |
-| [subscribeworkshop.go](../../internal/app/subscribeworkshop.go) `workshopIDs`、`SubscribeWorkshop` | 校验并去重 ID；默认先走 Steam 客户端。仅 `ErrSteamUnavailable` 才 fallback SteamCMD；也可显式 `--steamcmd`。Steam 返回条目失败不会任意改走 SteamCMD | 保留已有路由，不把账号权限错误当作并行触发条件 |
-| 同文件 `downloadWorkshop` | 一次构造 `+force_install_dir <base> +login <account> +workshop_download_item 294100 <ID> … +quit`；本次所有 ID 放进同一进程，无批大小上限，无 `runscript` | 新增多条订阅已摊薄启动开销；大量 ID 有命令行长度和长生命周期风险 |
-| 同文件 `runWorkshopSteamCMD`；[gamedl.go](../../internal/app/gamedl.go) `runSteamCMD` | `accounts.Lock(exe)` 后运行。anonymous 隐藏窗口，`CombinedOutput()` 等到进程退出才返回整段输出；工作目录为 exe 所在目录 | 工坊路径没有实时字节/百分比回调，也没有 context、无进度超时或自动重试 |
-| `runWorkshopSteamCMD` 的非匿名分支；[console_windows.go](../../internal/app/console_windows.go) `startConsole` | 原生独立控制台供玩家认证；先记录实例 `logs/console_log.txt` 偏移，等待退出后读取新增内容 | 共用实例并发会串日志、破坏任务归属；不能把账号任务扩成多个认证窗口 |
-| `workshopSuccess`、`workshopFailure` | 全局匹配 `Success. Downloaded item <ID>`、`ERROR! Download item <ID> failed (...)`；失败 ID 优先于成功 ID。未确认条目标记失败，附工坊页面；进程错误也加入结果 | 当前结果粒度是条目，需要保留。其他格式如 `ERROR! Timeout downloading item …` 可能只落为未确认，分类需补全 |
-| [gamedl.go](../../internal/app/gamedl.go) `errorKind`、`DownloadError.Why` | 将失败归为 ownership/disk/branch/network/other；工坊输出的失败原因只保留映射后的说明 | 不等于具备重试分类，例如一般 `Failure` 无法直接断定是网络故障 |
-| [subscribe.go](../../internal/app/subscribe.go) `UpdateSubscriptions` | 遍历选择项，对每个 SteamCMD Mod 调用 `downloadWorkshop([]string{ID}, 原来源根目录, false)`；遇错误中止后续更新 | **每个 Mod 启动一次**；`downloadWorkshop` 每次成功都会登记来源、扫描、取 Index，重复开销大 |
-| 同文件 `CheckSubscriptions`；[record.go](../../internal/subscribe/record.go) `Record` | 工坊不做远端新版本检查；SteamCMD 的 `Installed` 写下载时间而非 manifest。重跑下载命令让 SteamCMD 自己判增量 | 不能用 `InstalledAt` 或本地 About.xml 时间判“已最新” |
+| [subscribeworkshop.go](../../internal/app/subscribeworkshop.go) `workshopIDs`, `SubscribeWorkshop` | Validate/deduplicate IDs; default Steam client; SteamCMD fallback only for `ErrSteamUnavailable`, or explicit `--steamcmd`. Item failure does not arbitrarily reroute | Preserve routing; account permissions must not trigger parallelism |
+| Same file `downloadWorkshop` | Builds `+force_install_dir <base> +login <account> +workshop_download_item 294100 <ID> … +quit`; all IDs in one process, no batch cap/`runscript` | Additions amortize startup; many IDs risk command length/long lifetimes |
+| Same file `runWorkshopSteamCMD`; [gamedl.go](../../internal/app/gamedl.go) `runSteamCMD` | Runs after `accounts.Lock(exe)`; anonymous window hidden, `CombinedOutput()` returns all output after exit; cwd exe directory | No Workshop live bytes/percentage callback, context, no-progress timeout, automatic retry |
+| Nonanonymous `runWorkshopSteamCMD`; [console_windows.go](../../internal/app/console_windows.go) `startConsole` | Native authentication console; record `logs/console_log.txt` offset, read appended text after exit | Shared-instance concurrency mixes logs/ownership; do not multiply authentication windows |
+| `workshopSuccess`, `workshopFailure` | Globally match `Success. Downloaded item <ID>`, `ERROR! Download item <ID> failed (...)`; failures override success. Unconfirmed entries fail with Workshop page; process errors included | Preserve item granularity. Other formats, e.g. `ERROR! Timeout downloading item …`, may remain unconfirmed; complete classification |
+| [gamedl.go](../../internal/app/gamedl.go) `errorKind`, `DownloadError.Why` | Classifies ownership/disk/branch/network/other; Workshop reasons retain mapped explanation | Not retry classification: generic `Failure` does not establish network fault |
+| [subscribe.go](../../internal/app/subscribe.go) `UpdateSubscriptions` | Per selected SteamCMD Mod calls `downloadWorkshop` with one item (`[]string{ID}`, original source root, false); errors stop following updates | **One launch per Mod**; each success registers source/scans/gets Index, repeating overhead |
+| Same file `CheckSubscriptions`; [record.go](../../internal/subscribe/record.go) `Record` | No remote Workshop-version check; SteamCMD `Installed` is download time, not manifest; rerun lets SteamCMD determine increments | `InstalledAt`/About.xml time cannot establish current version |
 
-不要把游戏下载的进度误认为工坊已经支持：[gamedl.go](../../internal/app/gamedl.go) `FetchGame`、`steamResult.read` 会轮询日志、解析 `Update state … progress: … (done / total)`；`downloadWorkshop` 没有走这套进度循环。
+Game-download progress is not Workshop support: [gamedl.go](../../internal/app/gamedl.go) `FetchGame`, `steamResult.read` poll logs/parse `Update state … progress: … (done / total)`; `downloadWorkshop` bypasses that loop.
 
-### 2.2 登录态、工具查找与互斥
+### 2.2 Sessions, tool discovery, exclusion
 
-`findTool` 默认使用 `SteamCMDPath()` → [deps.go](../../internal/deps/deps.go) `Finder.Status`：配置 exe/其目录、受管 `%LOCALAPPDATA%\RimArcho\steamcmd`、PATH。不能仅从默认路径推断本次实际实例。
+`findTool` defaults to `SteamCMDPath()` → [deps.go](../../internal/deps/deps.go) `Finder.Status`: configured exe/directory, managed `%LOCALAPPDATA%\RimArcho\steamcmd`, PATH. Default path alone cannot identify effective instance.
 
-`SteamCMDAccount` 的规则是“本次覆盖 → 配置 `steamcmd.account` → anonymous”；工坊调用传空覆盖值，因此实际是配置或 anonymous。只传账户名，密码和 Steam Guard 由 SteamCMD 自己处理；`GameBranches` 仍显式匿名查询。
+`SteamCMDAccount`: invocation override → `steamcmd.account` → anonymous. Workshop supplies empty override, hence configured account or anonymous. Only account name passed; SteamCMD handles password/Guard; `GameBranches` explicitly anonymous.
 
-[lock.go](../../internal/accounts/lock.go) `accounts.Lock` 对绝对/真实路径归一化后使用进程内 mutex；Windows 的 [lock_windows.go](../../internal/accounts/lock_windows.go) 再以路径哈希创建 `Local\RimArcho-account-…` 命名 mutex，覆盖同 Windows 会话内的 RimArcho 进程。[accounts.go](../../internal/app/accounts.go) `SteamAccountAction`、`ForgetAccounts`，以及 `FetchGame`、安装工具、查询分支均复用实例锁。非 Windows 的 `platformLock` 为空实现，只有进程内互斥。
+[lock.go](../../internal/accounts/lock.go) `accounts.Lock` normalizes absolute/real paths, using in-process mutex; Windows [lock_windows.go](../../internal/accounts/lock_windows.go) adds path-hashed `Local\RimArcho-account-…` named mutex across same-session RimArcho processes. [accounts.go](../../internal/app/accounts.go) `SteamAccountAction`, `ForgetAccounts`, `FetchGame`, tool installation/branch queries share it. Non-Windows `platformLock` empty: in-process only.
 
-这些锁约束遵守协议的 RimArcho 调用，**不能锁住用户手动启动或其他管理器启动的 SteamCMD**；锁键也不是内容库路径。换四个 exe 路径后，若仍写同一内容库，现有锁不会阻止 ACF 竞争。
+Locks constrain cooperating RimArcho calls, **not manually/other-manager-launched SteamCMD**; key is not library path. Four exe paths writing one library evade existing protection against ACF contention.
 
-### 2.3 下载目录与进入游戏的流程
+### 2.3 Download directories and game visibility
 
-正常路径是：
+Normal flow:
 
 ```text
-SteamCMD exe 所在目录：自身更新、config、depotcache、logs
+SteamCMD exe directory: self-update, config, depotcache, logs
     ↓ +force_install_dir <steamcmd-mods.dir>
 <base>/steamapps/workshop/content/294100/<ID>
-    ↓ 成功确认 + About/About.xml 检查 + 写 .rimarcho/source.json
-FolderAdd(source.SteamCMD, content根) → Scan(false) → Index
-    ↓ 玩家启用/部署方案
-<game>/Mods/_Archo_<来源标签>_<目录名> → 指向来源中同一份 Mod
+    ↓ success confirmation + About/About.xml check + write .rimarcho/source.json
+FolderAdd(source.SteamCMD, content root) → Scan(false) → Index
+    ↓ player enables/deploys plan
+<game>/Mods/_Archo_<source label>_<directory name> → same source Mod
 ```
 
-默认 `base` 是 `%LOCALAPPDATA%\RimArcho\steamcmd-mods`，可用 `steamcmd-mods.dir` 改。标准布局的已有来源在原库更新；若来源根目录不是标准工坊布局，先用受管 `.archo-tmp-*` 暂存，再 `replaceWorkshopImport`：导入到目标旁的临时目录、处理入链、旧目录进回收站、新目录重命名，退出清理暂存。
+Default `base`: `%LOCALAPPDATA%\RimArcho\steamcmd-mods`, configurable via `steamcmd-mods.dir`. Standard existing sources update in original library; nonstandard roots use managed `.archo-tmp-*`, then `replaceWorkshopImport`: temporary sibling import, inbound-link handling, recycle old directory, rename new, clean staging on exit.
 
-**正常下载不把 Mod 实体移动进游戏 Mods。** [deploy.go](../../internal/app/deploy.go) `DeployName`、`planLinks`、`applyLinks` 使用 `_Archo_` 链接部署；来源是所有游戏共用的，不能为并行下载复制一套每环境来源。更新还必须保留 [linklifecycle.go](../../internal/app/linklifecycle.go) 的 `PlanIncomingLinks` / begin / finish / abort，及运行游戏时拒绝更新的检查。
+**Normal downloads do not move physical Mods into game Mods.** [deploy.go](../../internal/app/deploy.go) `DeployName`, `planLinks`, `applyLinks` deploy `_Archo_` links. Sources shared across games; do not duplicate per-environment sources for parallelism. Retain [linklifecycle.go](../../internal/app/linklifecycle.go) `PlanIncomingLinks` / begin / finish / abort and running-game update refusals.
 
-## 3. 本机实测
+## 3. Local measurements
 
-### 3.1 方法与边界
+### 3.1 Method and boundaries
 
-- Windows 11 Pro，build 26200；Ryzen 9 7950X（16 核/32 线程），Python 3.13.5；Wi-Fi 网卡链路显示 1.2 Gbps。链路速率不代表可用互联网带宽，本次没有测速或包捕获。
-- 本机受管目录存在 SteamCMD，但实验从 Valve [官方安装包](https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip) 下载全新副本，**没有复制或读取已有账号缓存**。下载 zip 774,825 字节约 0.195 秒；首次更新/启动观察约 9.225 秒，bootstrap 返回 7 后出现更新重启输出；后续实际下载客户端均为 `1792617903`，退出均为 0。
-- 当前实验 exe 的 SHA-256：`7baf77927639793e11b2a02ec2fd6d9114c95432be2f23a3225e274732255cf4`。这只定位本次版本，不意味着未来官方 zip 会给同一版本。
-- 全部安装、脚本、日志、内容和 ACF 位于系统临时目录一个独有 `RimArcho-SteamCMD-research-` GUID 子目录；没有链接到真实 Steam 库。所有命令均为 `+login anonymous`，`force_install_dir` 在 login 之前；未加 `validate`、未自动重试。
-- 正式测速前复制已经自更新的干净 seed。每个“模式 × 轮次”使用新的运行目录和空内容库；复制 seed、自更新、哈希校验不计入计时。冷启动部署多份运行目录的耗时/空间不在加速数字里。
-- 计时用 `time.perf_counter()`，从启动该组第一条命令到所有子进程结束并做基本目录检查；并发组取整组墙钟时间，不能把进程秒数相加。2/4 进程按 ID 列表步长拆分（每进程 2/1 项）。所有进程隐藏窗口，stdin 关闭，单进程上限 120 秒，本次正式组无超时。
-- 三轮轮换顺序：①空登录、逐项、批量、2、4、脚本；②4、批量、逐项、脚本、2、空登录；③脚本、2、4、空登录、批量、逐项。没有同时运行其它研究测速组；没有清除 OS/CDN 缓存，也不能排除机器其它活动，所以三轮数据是小样本观察。
+- Windows 11 Pro build 26200; Ryzen 9 7950X (16 cores/32 threads), Python 3.13.5; Wi-Fi link 1.2 Gbps, not available internet bandwidth; no speed test/packet capture.
+- Managed SteamCMD existed, but experiment downloaded fresh [official Valve package](https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip), **without copying/reading account caches**. Zip 774,825 bytes/about 0.195 seconds; first update/start about 9.225 seconds, bootstrap 7 then update/restart output; actual download clients all `1792617903`, exits 0.
+- Exe SHA-256: `7baf77927639793e11b2a02ec2fd6d9114c95432be2f23a3225e274732255cf4`, identifies this version, not future zip versions.
+- All installs/scripts/logs/content/ACF in unique system-temp `RimArcho-SteamCMD-research-` GUID directory; no real Steam-library links. All `+login anonymous`, `force_install_dir` before login, no `validate`/automatic retry.
+- Copied clean self-updated seed before formal timing; new runtime/empty library per mode × round. Seed copying/self-update/hashes excluded; multiple-runtime cold deployment time/space excluded from gains.
+- `time.perf_counter()` from first command start to all subprocess exits/basic directory checks; concurrent wall time, not summed process seconds. Stride split for 2/4 processes (2/1 entries each). Hidden windows, closed stdin, 120-second limit; no formal timeout.
+- Three rotated orders: ①empty login, per-item, batch, 2, 4, script; ②4, batch, per-item, script, 2, empty login; ③script, 2, 4, empty login, batch, per-item. No other simultaneous research timing groups; OS/CDN caches uncleared, other machine activity possible: small observational sample.
 
-样本先通过无需 key/登录的 `ISteamRemoteStorage/GetPublishedFileDetails/v1/` POST 核验：均 `result=1`、`consumer_app_id=294100`、`visibility=0`、`banned=0`，再验证匿名下载。开始预试验用过 Wall Light `1423699208`，它虽能匿名下，但公共详情返回 `result=9`，已替换并废弃该组测速，以下正式表不含它。Steam 网页的隐藏模板提示不用于判断公开性。
+Samples checked with key/login-free `ISteamRemoteStorage/GetPublishedFileDetails/v1/` POST: `result=1`, `consumer_app_id=294100`, `visibility=0`, `banned=0`, then anonymous downloads verified. Preliminary Wall Light `1423699208` downloaded anonymously but public details `result=9`; replaced and timing discarded, excluded below. Hidden Steam-page template notices do not establish public visibility.
 
-| 工坊条目 | ID | 下载后文件数 | 内容字节数 | SteamPipe 日志下载数据字节数 |
+| Workshop item | ID | Downloaded files | Content bytes | SteamPipe logged download bytes |
 | --- | --- | ---: | ---: | ---: |
 | [CM Color Coded Mood Bar](https://steamcommunity.com/sharedfiles/filedetails/?id=2006605356) | 2006605356 | 47 | 5,402,600 | 800,816 |
 | [Allow Tool](https://steamcommunity.com/sharedfiles/filedetails/?id=761421485) | 761421485 | 138 | 1,558,281 | 744,544 |
 | [Replace Stuff](https://steamcommunity.com/sharedfiles/filedetails/?id=1372003680) | 1372003680 | 87 | 1,348,299 | 929,984 |
 | [Common Sense](https://steamcommunity.com/sharedfiles/filedetails/?id=1561769193) | 1561769193 | 90 | 1,038,445 | 400,416 |
-| 合计 | — | 362 | 9,347,625 | 2,875,760 |
+| Total | — | 362 | 9,347,625 | 2,875,760 |
 
-最后一列来自 `content_log.txt` 的 `update started : download 0/N`，是内容下载计划量，**不是包含握手、manifest 和协议开销的网卡收包量**。
+Final column: `content_log.txt` `update started : download 0/N`, planned content bytes, **not received network bytes including handshake/manifest/protocol overhead**.
 
-### 3.2 正式测速：内容冷、运行时已初始化
+### 3.2 Formal timing: cold content, initialized runtime
 
-“逐项”模拟当前更新路径的进程调用形态；不包含 RimArcho 的 DB、扫描、链接和导入开销。“单进程批量”模拟新增订阅的调用形态。
+Per-item models current update process calls, excluding RimArcho DB/scans/links/import. Single-process batch models new subscriptions.
 
-| 模式 | 第 1 轮 / 秒 | 第 2 轮 / 秒 | 第 3 轮 / 秒 | 中位数 / 秒 | 条目成功率 |
+| Mode | Round 1 / s | Round 2 / s | Round 3 / s | Median / s | Item success |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| 逐项串行，每项启动一次（共 4 进程） | 42.966 | 28.169 | 25.478 | **28.169** | 12/12 |
-| 单进程，重复 4 个 `+workshop_download_item` | 22.362 | 15.610 | 14.065 | **15.610** | 12/12 |
-| 单进程 `+runscript`，同样 4 条下载命令 | 12.011 | 14.163 | 14.386 | **14.163** | 12/12 |
-| 2 个完整隔离进程，各 2 项 | 17.932 | 18.374 | 30.567 | **18.374** | 12/12 |
-| 4 个完整隔离进程，各 1 项 | 10.166 | 8.836 | 10.006 | **10.006** | 12/12 |
-| 对照：启动、匿名连接、退出，无下载 | 6.706 | 7.934 | 5.710 | **6.706** | 不适用；3/3 正常退出 |
+| Serial per-item launch (4 processes) | 42.966 | 28.169 | 25.478 | **28.169** | 12/12 |
+| One process, 4 repeated `+workshop_download_item` | 22.362 | 15.610 | 14.065 | **15.610** | 12/12 |
+| One `+runscript`, same 4 commands | 12.011 | 14.163 | 14.386 | **14.163** | 12/12 |
+| 2 fully isolated processes, 2 items each | 17.932 | 18.374 | 30.567 | **18.374** | 12/12 |
+| 4 fully isolated processes, 1 item each | 10.166 | 8.836 | 10.006 | **10.006** | 12/12 |
+| Control: start, anonymous connect, quit, no download | 6.706 | 7.934 | 5.710 | **6.706** | N/A; 3/3 normal exits |
 
-成功要求有对应 ID 的 `Success. Downloaded item`、存在 About.xml；之后对 5 种下载模式 × 3 轮的全部 60 份内容做完整文件树哈希比较，每个 Mod 的 15 份内容一致。正式组所有进程退出码 0、未出现条目失败，不能据此估计长期故障率为零。
+Success requires corresponding `Success. Downloaded item` and About.xml. Full-tree hashes of all 60 contents (5 modes × 3 rounds) matched each Mod's 15 copies. Formal processes all exited 0 without item failures; not evidence of zero long-term failure rate.
 
-相对单进程批量，2 进程的中位耗时**增加 17.7%**；4 进程减少 35.9%。相对脚本批量，4 进程耗时减少约 29.4%。轮换顺序仍不能将 `runscript` 和命令行的约 1.45 秒中位差归因为脚本机制；二者都只登录一次，没有“脚本再省四次启动”这回事。
+Versus single-process batch, 2 processes **increase median time 17.7%**, 4 reduce 35.9%; versus script batch, 4 reduce about 29.4%. Rotation cannot attribute script/command-line median gap about 1.45 seconds to `runscript`; both log in once, scripts do not save four more launches.
 
-### 3.3 共享目录对照：失败进程仍返回 0
+### 3.3 Shared-directory control: failed processes still exit 0
 
-在正式测速结束后，用相同四个公开条目，4 个匿名进程同时启动，三轮均重建临时目录。这里是刻意测试竞态，不是推荐方式。最终完整项按所有进程结束后的文件树哈希判定；ACF 只数 `WorkshopItemsInstalled` 中的目标 ID，不把 `WorkshopItemDetails` 当安装成功。
+After formal timing, 4 anonymous processes started together on same public items, fresh temp directories for three rounds. Deliberate race test, not recommendation. Final completeness uses tree hashes after all exit; ACF counts target IDs only in `WorkshopItemsInstalled`, not `WorkshopItemDetails`.
 
-| 运行目录 / 内容库 | 轮次 | 总耗时 / 秒 | 控制台确认成功 | 最终完整内容 | ACF 安装记录合计 |
+| Runtime / library | Round | Total s | Console successes | Final complete content | ACF installed total |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| 同一 exe 目录，4 个独立 `force_install_dir` | 1 | 13.321 | 4/4 | 4/4 | 4/4（每库 1 项） |
-| 同上 | 2 | 10.698 | 4/4 | 4/4 | 4/4 |
-| 同上 | 3 | 22.781 | 4/4 | 4/4 | 4/4 |
-| 同一 exe 目录，同一 `force_install_dir` | 1 | 45.729 | 3/4 | 3/4 | **1/4** |
-| 同上 | 2 | 9.542 | 1/4 | 1/4 | **0/4** |
-| 同上 | 3 | 9.943 | 1/4 | 1/4 | **0/4** |
+| Same exe directory, 4 independent `force_install_dir` | 1 | 13.321 | 4/4 | 4/4 | 4/4 (1 per library) |
+| Same | 2 | 10.698 | 4/4 | 4/4 | 4/4 |
+| Same | 3 | 22.781 | 4/4 | 4/4 | 4/4 |
+| Same exe directory, same `force_install_dir` | 1 | 45.729 | 3/4 | 3/4 | **1/4** |
+| Same | 2 | 9.542 | 1/4 | 1/4 | **0/4** |
+| Same | 3 | 9.943 | 1/4 | 1/4 | **0/4** |
 
-**以上全部进程都返回退出码 0，包括 7 个下载失败项所在进程。** 例如第一轮 Allow Tool 输出 `ERROR! Download item 761421485 failed (Failure).`；最后 ACF 的 `WorkshopItemsInstalled` 只剩 Replace Stuff，尽管另外两个 Mod 的内容也完整。第二、三轮 Mood Bar 文件完整且控制台成功，但 ACF 的已安装列表为空。不能只检查退出码，也不能只检查某个目录存在。
+**All exited 0, including processes with 7 failed downloads.** Round 1 Allow Tool: `ERROR! Download item 761421485 failed (Failure).`; final `WorkshopItemsInstalled` only Replace Stuff despite two other complete Mods. Rounds 2/3: Mood Bar complete/console success, ACF installed empty. Exit code/directory existence alone insufficient.
 
-实验直接证明本版本没有把这些共享写入变成安全队列；它没有定位到具体哪一次文件写入的因果关系，不能把所有失败都单独归因为 ACF。共享库下的 `workshop/downloads/294100`、temp、提交目录和每 App 状态同样存在竞争。
+Experiment proves this version does not safely queue shared writes, not the precise causal file writes, so do not blame ACF alone. Shared `workshop/downloads/294100`, temp/commit directories and per-App state also contend.
 
-### 3.4 增量重跑与瓶颈
+### 3.4 Incremental reruns and bottlenecks
 
-在三个单进程批量库里，再运行同样四条命令：**4.329 / 4.662 / 4.719 秒，中位数 4.662 秒，12/12 成功**；文件哈希及 ACF 均完整。日志显示 `has no changes`、提交 `0 updated`。所以现有 SteamCMD 已能避免重传未变内容，但仍付出启动、连接、远端检查和本地检查开销。
+Same four commands rerun in three batch libraries: **4.329 / 4.662 / 4.719 seconds, median 4.662, 12/12 success**; hashes/ACF complete. Logs `has no changes`, commit `0 updated`. SteamCMD avoids unchanged retransfers but still pays startup/connection/remote/local checks.
 
-单进程正式批量日志中，逐条请求到 `result : OK` 的秒级间隔分别为：
+Seconds from each request to `result : OK` in formal batch logs:
 
-| 轮次 | Mood Bar | Allow Tool | Replace Stuff | Common Sense |
+| Round | Mood Bar | Allow Tool | Replace Stuff | Common Sense |
 | --- | ---: | ---: | ---: | ---: |
-| 1 | 4 秒 | 2 秒 | 1 秒 | 2 秒 |
-| 2 | 3 秒 | 1 秒 | 1 秒 | 2 秒 |
-| 3 | 3 秒 | 2 秒 | 1 秒 | 1 秒 |
+| 1 | 4 s | 2 s | 1 s | 2 s |
+| 2 | 3 s | 1 s | 1 s | 2 s |
+| 3 | 3 s | 2 s | 1 s | 1 s |
 
-间隔包括 item info、manifest、内容下载、解压/校验/落盘，不是纯传输时间。结合只有约 2.88 MB 的内容下载数据、空登录中位数 6.706 秒、批量更新明显优于逐项启动，本样本的主要可优化处是**启动/会话开销和每条目的固定处理延迟**。本机单进程日志已有多个 HTTP/2 CDN 连接及分块下载；“一条命令”不等于“单 TCP 连接下载”。
+Intervals include info/manifest/download/decompression/validation/writes, not pure transfer. About 2.88 MB content, empty-login median 6.706 seconds, batching better than per-item launches: key opportunities **startup/session overhead and fixed item latency**. Single-process logs already show multiple HTTP/2 CDN connections/chunks; one command is not one TCP connection.
 
-**没有测出单个大 Mod 的最大吞吐，也不能声称单下载一定吃不满带宽。** 未隔离网卡流量、未做大文件测试，不能拿 9.35 MB 解压后体积除总耗时作为网速。大 Mod 可能受出口带宽、CDN、磁盘、解压 CPU 或校验限制；这些场景下多进程可能无益甚至退化。四个小 Mod、单台 Windows、三轮测试也不能外推数百项队列的最优并发数。
+**Maximum single-large-Mod throughput unmeasured; no claim one download cannot saturate bandwidth.** No isolated traffic/large-file test; 9.35 MB decompressed size divided by total time is not speed. Large Mods may be bandwidth/CDN/disk/CPU/validation limited; multiprocessing may not help. Four small Mods/one Windows/three rounds do not establish optimal hundred-item concurrency.
 
-## 4. 安全并行需要隔离什么
+## 4. What safe parallelism must isolate
 
-| 共享资源 | 本次证据 / 资料 | 要求 |
+| Shared resource | Evidence / references | Requirement |
 | --- | --- | --- |
-| 安装目录、自更新 exe/dll、package | 首次启动确有下载更新与重启；同目录多进程不是受保证的维护模式 | 安装/更新阶段互斥；初始化后每 worker 独立运行目录，不能用硬链接或 junction 共享可写文件 |
-| `config/config.vdf`、libraryfolders | 本次每实例生成配置；Valve 明说成功登录后 config.vdf 可能更新 | 只换内容目录不隔离配置。真实账户实例继续独占；不要把它整目录复制成匿名 worker |
-| `ssfn`/sentry/登录凭据 | [已有登录态调研 §3](2026-10-24_login-sessions-loverslab-steamcmd.md#3-steamcmd)；本次不读取真实缓存，也未验证账号会话 | 不复制、合并或解析；新匿名 worker 从官方安装或无凭据 seed 初始化。不能用“没有 ssfn”证明没有登录缓存 |
-| `depotcache` | 本次运行目录生成 `294100_<manifest>.manifest` 文件 | 每 worker 独立；保留以复用，运行中不清缓存；不能假设它对外提供多写者锁协议 |
-| `steamapps/workshop/appworkshop_294100.acf` | 共享库实验丢安装记录 | 按完整内容库隔离，不能仅按 `<ID>` 子目录分工，不能在并发结束时拼接/覆盖整份 ACF |
-| `workshop/downloads/294100`、暂存、正式内容 | 本次共享库部分条目失败；失败也可能退出 0 | worker 使用独立 base；成功内容经过校验后，由单一发布者写正式来源 |
-| `logs/console_log.txt`、workshop/content 日志 | 当前非匿名结果按日志偏移取尾；同目录各进程会共写 | 每 worker 单独日志与 offset；按请求 ID、worker、批次归属事件 |
-| 锁文件/命名锁 | 本次未发现可依赖的持久 `.lock` 文件；共用路径的 4 个进程确能同时运行并互相破坏状态 | “没看到锁文件”不证明没有内部锁；但已证明内部行为不足以保证本任务一致性。保留应用层实例锁，并增加最终来源发布锁 |
+| Installation, self-updating exe/dll/package | First launch updates/restarts; shared-directory multiprocess maintenance not guaranteed | Exclusive installation/update; independent initialized runtimes, no hardlinks/junctions sharing writable files |
+| `config/config.vdf`, libraryfolders | Per-instance config generated; Valve says login may update config.vdf | Content-root isolation does not isolate config; real-account instance stays exclusive, never cloned into anonymous workers |
+| `ssfn`/sentry/credentials | [Prior session research §3](2026-10-24_login-sessions-loverslab-steamcmd.md#3-steamcmd); real caches unread, sessions untested | Never copy/merge/parse; anonymous workers from official install/credential-free seed; absent ssfn does not prove no login cache |
+| `depotcache` | Generated `294100_<manifest>.manifest` | Independent per worker, retained for reuse, not cleared while running; no assumed multiwriter protocol |
+| `steamapps/workshop/appworkshop_294100.acf` | Shared-library tests lost records | Isolate whole library, not just `<ID>`; no concatenating/overwriting ACF after parallel execution |
+| `workshop/downloads/294100`, staging/final content | Shared-library failures may exit 0 | Independent base, verify successes, one publisher to final source |
+| `logs/console_log.txt`, workshop/content logs | Nonanonymous parsing reads offset tails; same-directory processes share writes | Separate worker logs/offsets; associate request ID/worker/batch events |
+| Lock files/named locks | No dependable persistent `.lock` found; 4 shared-path processes ran/damaged state | No visible file does not prove no locks, but internal protection insufficient here; retain instance lock, add final-source publishing lock |
 
-`force_install_dir` 在本 Windows 版本上**确实把工坊 content 和 appworkshop ACF 放到指定 base**，本机正常组已验证。它不把安装目录下所有状态一起迁走；历史版本/平台有 [工坊路径相关问题报告](https://github.com/ValveSoftware/steam-for-linux/issues/11662)。新平台应核验实际落盘及成功输出，不把参数当完整 sandbox。Linux 还可能使用用户级 Steam 配置，RimSort 已另设专用 home；本次没有验证 Linux/macOS。
+This Windows version's `force_install_dir` **does place Workshop content/appworkshop ACF under specified base**, verified. Not all runtime state moves; historical platforms/versions have [path issues](https://github.com/ValveSoftware/steam-for-linux/issues/11662). Verify actual writes/success on new platforms, not treating argument as complete sandbox. Linux may use user Steam config; RimSort supplies separate home. Linux/macOS untested.
 
-账号方面，[Valve 登录缓存说明](https://partner.steamgames.com/doc/sdk/uploading#Using_SteamPipe_In_A_CI_CD_Environment)确认缓存 token 与 config.vdf 的写入；[官方 EResult](https://partner.steamgames.com/doc/api/steam_api#EResult)包含 `LoggedInElsewhere`、`LogonSessionReplaced`、`PasswordRequiredToKickSession` 等语义。这说明并发登录有会话冲突路径，**不证明每一版本/每种会话都会立即互踢**。本次没有以真实账号测试，采用保守产品条件：同账号下载、登录、验证、忘记都串行；独立目录不解除这个限制。anonymous 的 4 会话实测可以共存，但依然受同 IP、CDN、服务端限流影响，未测阈值。
+[Valve login-cache docs](https://partner.steamgames.com/doc/sdk/uploading#Using_SteamPipe_In_A_CI_CD_Environment) confirm token/config.vdf writes; [official EResult](https://partner.steamgames.com/doc/api/steam_api#EResult) includes `LoggedInElsewhere`, `LogonSessionReplaced`, `PasswordRequiredToKickSession`. Conflicts exist, **not proof every version/session immediately evicts another**. No real login tested; conservative rule serializes same-account download/login/verify/forget despite separate directories. Four anonymous sessions coexisted, still subject to same-IP/CDN/server limits, thresholds untested.
 
-社区原作者的 [SCMDAutomated](https://github.com/Risonna/SCMDAutomated)也描述匿名多实例、登录下载单实例，并承认多实例失败风险。它只是社区经验佐证，不能替代本次隔离对照或作为生产可靠性证明。Valve Developer Wiki 的 SteamCMD 正文此次访问为 403，未把未读正文或其旧镜像的“一次只能登录一个”句子当作现版本强保证。
+Community [SCMDAutomated](https://github.com/Risonna/SCMDAutomated) author describes anonymous multi-instance/logged-in single-instance, acknowledging failure risks. Corroboration, not isolation-test substitute/production proof. Valve Developer Wiki page returned 403; unread text/old-mirror one-login claim not treated as current guarantee.
 
-## 5. 两个本地参考项目
+## 5. Two local reference projects
 
-以下是本地 checkout 的实现，不把它们等同于线上任意版本。
+Local checkout implementations, not arbitrary online versions.
 
-| 项目 / 快照 | 下载组织 | 结果、重试与隔离 |
+| Project / snapshot | Organization | Results, retry, isolation |
 | --- | --- | --- |
-| RimSort `4964bf8900aa31f946591cd1c711be58d0ef2873` | [wrapper.py](../../../RimSort/app/utils/steam/steamcmd/wrapper.py) `SteamcmdInterface.download_mods`：`STEAMCMD_BATCH_SIZE=25`；`_build_download_script` 写 force_install_dir、login anonymous、每 ID 一行、可选 validate、quit；一批一个进程 | [runner_panel.py](../../../RimSort/app/windows/runner_panel.py) `finished` → `_start_next_steamcmd_batch` 串接下一批；没有下载 worker 池。以条目成功/失败更新计数，结束询问是否重试剩余项 |
-| 同项目的运行目录 | 工具 `<prefix>/steamcmd`、内容 `<prefix>/steam`、depotcache 位于工具目录 | `_get_process_environment` 在 Linux 使用 prefix 下独立 home，防止改桌面 Steam 库配置；`_build_download_script` 使用固定临时文件名 `steamcmd_script.txt`，不适合原样搬到并行实现 |
-| RimModManager `90740602c47d4fa62136237b253346716832dced` | [mgr_steam.py](../../../RimModManager/backend/managers/mgr_steam.py) `download_workshop_items` 启后台线程，`_run_steamcmd_process` 在 `FileManager.storage_lock` 内按 25 项分批；`_run_single_steamcmd_batch` 每批一个进程，使用唯一临时脚本、login anonymous | 循环顺序调用各批，并非多进程并行。`_consume_steamcmd_log_progress` 读 workshop 日志；批失败后 `_retry_steamcmd_batch` 尝试缩为 10/1 项，深度限制；仅剩单项时提前返回，不是无限重试 |
-| 同项目的运行器 | `cwd=self.steamcmd_dir`；普通下载脚本没有 force_install_dir，默认写工具自带的工坊库 | 180 秒“无进度”超时及进程树取消；`last_progress_at` 主要在完成/失败/批错误时更新，持续下载但未完成的大条目可能误超时。`_steamcmd_lock` 主要保护任务映射，真正覆盖下载循环的串行锁是 storage_lock |
+| RimSort `4964bf8900aa31f946591cd1c711be58d0ef2873` | [wrapper.py](../../../RimSort/app/utils/steam/steamcmd/wrapper.py) `SteamcmdInterface.download_mods`: `STEAMCMD_BATCH_SIZE=25`; `_build_download_script`: force_install_dir, login anonymous, one ID per line, optional validate, quit; one process/batch | [runner_panel.py](../../../RimSort/app/windows/runner_panel.py) `finished` → `_start_next_steamcmd_batch` serially; no worker pool. Per-item counters, prompt retry remaining afterward |
+| Same runtime | Tool `<prefix>/steamcmd`, content `<prefix>/steam`, depotcache in tool directory | `_get_process_environment` separate Linux home under prefix protects desktop library config; `_build_download_script` uses fixed `steamcmd_script.txt` unsuitable unchanged for parallelism |
+| RimModManager `90740602c47d4fa62136237b253346716832dced` | [mgr_steam.py](../../../RimModManager/backend/managers/mgr_steam.py) `download_workshop_items` background thread, `_run_steamcmd_process` batches 25 under `FileManager.storage_lock`; `_run_single_steamcmd_batch` one process/unique temporary anonymous script | Serial loop, not multiprocess parallel; `_consume_steamcmd_log_progress` reads logs, `_retry_steamcmd_batch` shrinks failures 10/1 with depth limit; single-item early return, not infinite retries |
+| Same runner | `cwd=self.steamcmd_dir`; normal scripts lack force_install_dir, use tool library | 180-second no-progress timeout/process-tree cancel; `last_progress_at` mainly completion/failure/batch-error, so unfinished large downloads may falsely time out. `_steamcmd_lock` protects task map; storage_lock serializes download loop |
 
-RimModManager 的 [mgr_download.py](../../../RimModManager/backend/managers/mgr_download.py) 中 `ThreadPoolExecutor(max_workers=5)` 是通用下载管理器，不能据此说 SteamCMD Mod 下载并发 5。其独立的“补救 Steam 工坊”流程会写 Steam ACF/工坊文件，本次没有调用，也不应随普通加速一起移植。
+RimModManager [mgr_download.py](../../../RimModManager/backend/managers/mgr_download.py) `ThreadPoolExecutor(max_workers=5)` is generic, not SteamCMD concurrency 5. Separate Workshop-repair flow writes Steam ACF/files; not called, should not accompany normal acceleration.
 
-RimSort 的 25 项上限是针对 vprof 线程表耗尽的防御性分批策略，源码及原始 [issue #1411](https://github.com/RimSort/RimSort/issues/1411) 有依据；不是 Valve 宣布的“最多下载 25 个 Mod”协议上限。其 [用户指南](https://rimsort.github.io/RimSort/user-guide/steamcmd-browser)确认可脱离 Steam 客户端下载 RimWorld Mod，与本次公开样本匿名实测一致。
+RimSort 25-item cap defensively avoids vprof thread-table exhaustion, source/original [issue #1411](https://github.com/RimSort/RimSort/issues/1411) support it; not a Valve protocol limit of "at most 25 Mods per download". [User guide](https://rimsort.github.io/RimSort/user-guide/steamcmd-browser) confirms client-independent RimWorld Mod downloads, consistent with anonymous samples.
 
-## 6. 推荐实施路径（本次不改代码）
+## 6. Recommended implementation (no code changes here)
 
-### 6.1 先保留单实例，把更新合成小批次
+### 6.1 Keep single instance first, batch updates
 
-默认并发度继续 **1**；同来源、同账号的待更新 ID 去重后，每批先取 **25**，批间重启 SteamCMD。25 来自两个参考项目的经验值，应能调整，不当协议保证。每批使用唯一临时 `runscript`，避免 Windows 长命令行和固定脚本名竞争；保留每条目结果，不因一个条目失败就丢掉其它成功结果。
+Default concurrency **1**; deduplicate same-source/account IDs, initially **25** per batch, restart between batches. 25 empirical from references, adjustable, not protocol guarantee. Unique temporary `runscript` avoids Windows long commands/fixed-name races; preserve other successes after one failure.
 
-先将“运行/解析”和“校验/发布/扫描”拆开，按来源聚合链接生命周期，成功内容统一写来历、统一扫描/索引，仍支持部分成功后报告失败。不能仅在 `UpdateSubscriptions` 中收集 IDs 后忽略其返回项、原序号及不同来源根。
+Separate execution/parsing from validation/publication/scanning; aggregate link lifecycle per source, write origins/scan/index successes together, report partial failures. Collecting IDs in `UpdateSubscriptions` must retain returned items/original positions/distinct roots.
 
-| 文件 / 函数 | 建议改动 |
+| File / function | Suggested change |
 | --- | --- |
-| [subscribe.go](../../internal/app/subscribe.go) `UpdateSubscriptions` | 按真实 source root + 有效账号聚合 SteamCMD 更新，保留其它订阅类型的顺序/错误语义，避免每 Mod 启进程和扫描 |
-| [subscribeworkshop.go](../../internal/app/subscribeworkshop.go) `downloadWorkshop` | 将批次执行、结果归并、来源发布拆为清晰步骤；每批至多 25；协调链接生命周期，末尾一次 Scan/Index |
-| 同文件 `runWorkshopSteamCMD`；[gamedl.go](../../internal/app/gamedl.go) runner | 支持唯一脚本清理、增量读取条目事件、取消和无进度检查；保留现有 `accounts.Lock(exe)` |
-| `workshopSuccess`、`workshopFailure`、`errorKind` | 补其他 timeout/连接/认证输出形式；退出码 0 仍须逐项确认、校验 About.xml；只有可重试的失败重新排队 |
-| [subscribeworkshop_test.go](../../internal/app/subscribeworkshop_test.go)、[subscribe_test.go](../../internal/app/subscribe_test.go) | 后续实现时覆盖分组/分批、混合成功失败、退出 0 但条目失败、取消及链接生命周期；现有测试不证明真实 SteamCMD 并发安全 |
+| [subscribe.go](../../internal/app/subscribe.go) `UpdateSubscriptions` | Group SteamCMD updates by real root/effective account; preserve other types' order/errors, avoid process/scan per Mod |
+| [subscribeworkshop.go](../../internal/app/subscribeworkshop.go) `downloadWorkshop` | Separate execution/result merge/publication, cap 25, coordinate links, one final Scan/Index |
+| Same `runWorkshopSteamCMD`; [gamedl.go](../../internal/app/gamedl.go) runner | Unique-script cleanup, incremental events, cancel/no-progress checks; keep `accounts.Lock(exe)` |
+| `workshopSuccess`, `workshopFailure`, `errorKind` | Add timeout/connection/auth forms; exit 0 still requires item/About.xml checks; retry eligible failures only |
+| [subscribeworkshop_test.go](../../internal/app/subscribeworkshop_test.go), [subscribe_test.go](../../internal/app/subscribe_test.go) | Future grouping/batching/mixed outcomes/exit-0 failure/cancel/link tests; existing tests do not prove real concurrency safety |
 
-### 6.2 可选匿名隔离池：先提供 1/2/4，不能硬编码“2 更快”
+### 6.2 Optional isolated anonymous pool: 1/2/4, never "2 is faster"
 
-作为第二阶段，增加明确可关闭的匿名加速选项，**上限 4**，已有/外部实例和真实账号继续单实例。在本机同类小 Mod 队列中，4 是有实测收益的档位；2 只能作为资源受限/诊断档，不能宣传为本机推荐加速档。是否以后默认 4，应等待更多网络、长队列、SSD/HDD 与大 Mod 数据；当前默认仍 1。
+Second phase: explicitly disableable anonymous acceleration, **cap 4**; existing/external instances/real accounts single-instance. Four measured useful locally for similar small-Mod queues; 2 only resource-limited/diagnostic, not recommended speed tier. Default 4 requires broader networks/queues/SSD/HDD/large-Mod evidence; default stays 1.
 
-每 worker 独立维护安装目录、config、appcache、depotcache、logs、base/steamapps；初始化和升级时停止对应 worker，来源只能是无账号的专用 seed。不能克隆用户现有受管/外部 SteamCMD，不能靠给同一 exe 传不同工作目录冒充隔离。
+Each worker owns installation/config/appcache/depotcache/logs/base/steamapps; stop for initialization/upgrades, source only credential-free dedicated seed. Never clone user's SteamCMD or pretend different cwd for same exe isolates state.
 
-优先保持一个稳定的正式内容来源，worker 只下载到自己的库：下载成功后主协调器按目标来源锁逐项发布，复用 `replaceWorkshopImport` 和链接生命周期，最后统一扫描。**不要让 worker goroutine 直接调用整个 `downloadWorkshop`**：`subscriptionCache`、来源登记、DB/Index、链接及回收站操作并非天然支持并发。
+Prefer stable final source; workers download privately, coordinator publishes under target-source lock via `replaceWorkshopImport`/link lifecycle, one final scan. **Worker goroutines must not call entire `downloadWorkshop`**: `subscriptionCache`, source registration, DB/Index, links/recycle are not inherently concurrent.
 
-此方案引入缓存副本与发布状态，须先定存储合同：保留 worker 的 ACF/缓存，让相同 ID 尽量回原 worker；用可持久化的“正式来源已应用 manifest”记录判断发布状态，不移动完就丢掉 worker 清单，也不拼接多份 ACF。worker 成功但发布失败时保留可重试内容及错误，不能报完成。若把正式根改作仅发布目录，迁移旧 ACF 的归属和禁用旧下载器直接写它必须一并设计；没有这部分前不启用池。
+Pool adds cache copies/publication state: define storage first. Retain worker ACF/cache, route same ID back when possible, persist final-source-applied manifest. Do not discard worker manifest after moving/splice ACF. Download success/publication failure retains retryable content/error, not completion. Publication-only final root needs old-ACF ownership migration and disabling old direct writes designed together; do not enable pool beforehand.
 
-备选是每个 worker 内容根各自登记为一个 SteamCMD 来源，免发布副本，但会改变来源/目录管理体验和后续重新分配规则，不建议作为无需规格变更的捷径。
+Alternative worker roots registered separately avoid copies but alter source UX/reassignment, not a spec-free shortcut.
 
-后续涉及位置：`subscribeworkshop.go` 的任务规划/结果汇总/发布，`gamedl.go` 或独立 worker runner 的实例启动，`accounts/lock.go` 保留实例锁并另加目标来源锁，`deps/deps.go` 明确受管匿名 worker 和玩家账户实例的关系，`accounts.go`/卸载逻辑覆盖新增运行目录的维护。新增目录、设置及状态需同步 [01 写入清单](../specs/01-scope-and-status.md)、02 §3.4、08 §11 和设置页规格；密码、token、ssfn 不进入业务参数或报告。
+Future locations: planning/results/publication `subscribeworkshop.go`; startup `gamedl.go`/worker runner; retain `accounts/lock.go` instance locks/add source locks; `deps/deps.go` defines worker/account relation; `accounts.go`/uninstall maintain new directories. Sync directories/settings/state with [01 write inventory](../specs/01-scope-and-status.md), 02 §3.4, 08 §11, settings specs. No passwords/tokens/ssfn in business parameters/reports.
 
-### 6.3 其它收益与回退
+### 6.3 Other gains and fallback
 
-| 手段 | 建议策略 | 风险与回退 |
+| Technique | Suggested policy | Risks/fallback |
 | --- | --- | --- |
-| 跳过最新条目 | 首阶段保留 ACF/depotcache，让 SteamCMD 自己做增量。后续仅在玩家发起检查时批量获取公开远端版本信号，与可靠的已应用 manifest/更新时间比较；未知、缺内容或本地损坏仍送 SteamCMD | 本地下载时间不是远端版本；只知道“上次安装时最新”不能离线保证现在最新。元数据失败退回现有下载检查 |
-| 失败重试 | 只重试失败 ID；暂时连接/超时最多额外 2 次，约 5/15 秒退避加抖动；批错误可 25→10→1 拆小。一般 Failure 先看条目结果及日志分类；权限/不可见/无许可不盲重试，磁盘不足先停止 | 仅记录允许字段，避免保存完整认证控制台；出现限流时暂停队列、降低并发，遵循服务返回的等待信息 |
-| 超时与取消 | 监测独立进程、条目状态以及可信字节/落盘变化；可从 180 秒无有效进度起步，认证等待另标状态；取消只终止该任务的进程树 | 不能只以“本条目还没完成”当作无进度；大 Mod 要有持续进度容错。不要全局 taskkill 所有 steamcmd.exe |
-| 大小混合调度 | 已知体积时按预计剩余量平衡 worker，尽早启动大条目，小条目填其它 worker；一批按 25 项并可加字节预算，避免一个长批锁住整个队列 | 未知大小用普通队列；网络/磁盘已满时降到 1–2，不将本次小 Mod 的 4 并发外推到大包 |
-| 缓存/校验 | 保留可复用清单和缓存，不每批清 depotcache，不默认给每项追加 validate；保持 About.xml 和发布校验 | 检测损坏时提供有针对性的校验/重下；清缓存是修复手段，不是常规提速步骤 |
-| 上线及回退 | 首先只上线批量更新；隔离池作为独立可关闭选项。发生版本异常、重复失败、限流或状态不一致时，待当前进程结束后降为单 worker/单实例处理剩余项 | 不降级为“多个进程共享原库”；不重下已成功发布项。账号任务回到原独占原生控制台路径。新发布架构的单并发回退仍遵守其 ACF 归属 |
+| Skip current items | Initially retain ACF/depotcache for increments; later player-requested batched public-version signals compared with reliable applied manifest/time; unknown/missing/damaged content goes to SteamCMD | Local download time not remote version; latest-at-install cannot ensure latest offline; metadata failure uses existing checks |
+| Retry failures | Failed IDs only, temporary connection/timeouts max 2 extra attempts, about 5/15-second jittered backoff; batch errors 25→10→1. Classify Failure; no blind permission/private/unlicensed retries; stop disk-full | Allowed fields only, no full auth console; rate-limit pauses/reduces concurrency, respects service wait |
+| Timeout/cancel | Independent process/item/trustworthy byte/disk progress; initial 180 seconds without effective progress, separate auth-wait; terminate owned tree only | Incomplete item alone not no-progress; tolerate ongoing large downloads; never global taskkill steamcmd.exe |
+| Mixed sizes | Balance remaining size, start large early/fill others small, 25-item plus byte budgets avoids long batch blocking | Unknown size normal queue; saturated network/disk drops to 1–2; do not extrapolate the measured 4 concurrent small-Mod workers to large packages |
+| Cache/validation | Retain manifests/caches, no per-batch depotcache purge/default validate; retain About.xml/publication validation | Targeted validation/redownload for damage; cache purge repair, not routine speedup |
+| Rollout/fallback | Batch updates first, pool separately optional; version anomalies/repeated failures/rate limits/inconsistency finish processes then remaining items single-worker/instance | Never shared-original-library multiprocess fallback; no redownload of published successes; accounts original exclusive console; single-worker publisher respects ACF ownership |
 
-## 7. 证据、局限与可复核性
+## 7. Evidence, limits, reviewability
 
-| 证据 | 发现 | 推荐路径 |
+| Evidence | Finding | Recommended path |
 | --- | --- | --- |
-| E1：§2 链接的本地源码及 HEAD；可用 `rg -n 'downloadWorkshop|runWorkshopSteamCMD|accounts.Lock' internal/app internal/accounts` 复查 | F1：新增已批量，更新仍逐项；来源发布和账号互斥有必须保留的合同 | P1：先聚合更新、分批执行，统一发布/扫描 |
-| E2：§3.1 元数据核验、§3.2 原始三轮耗时和 60 份文件树校验；复现见 §8 | F2：本机 4 个隔离匿名进程有效，2 不保证收益 | P2：默认 1；提供可关闭的隔离 4 档及资源受限 2 档，拓展样本后再决定默认 |
-| E3：§3.3 三轮共享库对照和最终 ACF；所有失败进程仍退出 0 | F3：同库并发实际失败，条目文件与 ACF 可分离失真 | P3：完整隔离、逐项验证、单一发布者；保留应用层锁 |
-| E4：§5 两个本地项目的具体文件/符号、RimSort 原始 issue | F4：成熟参考采用小批串行；25 是经验分批值 | P4：先复用分批思想，不把后台线程/HTTP worker 池误认成 SteamCMD 并行 |
-| E5：§4 Valve 缓存和 EResult 原始文档；未登录真实账号 | F5：运行时状态需要隔离；账号多会话安全性未验证 | P5：账号路径串行，不复制凭据，不对“永远不会互踢”作保证 |
+| E1: §2 local source/HEAD; `rg -n 'downloadWorkshop|runWorkshopSteamCMD|accounts.Lock' internal/app internal/accounts` | F1: additions batch, updates per-item; required publication/account-lock contracts | P1: aggregate updates, batches, shared publish/scan |
+| E2: §3.1 metadata, §3.2 three timings/60 trees; reproduce §8 | F2: four isolated anonymous processes useful locally, two not guaranteed | P2: default 1, optional isolated 4-worker/resource-limited 2-worker tiers, more samples before default |
+| E3: §3.3 three shared-library controls/final ACF; failures exit 0 | F3: shared-library failures, files/ACF diverge | P3: full isolation/item checks/single publisher/app locks |
+| E4: §5 local symbols/original issue | F4: references serial small batches; 25 empirical | P4: borrow batching, do not confuse threads/HTTP pools with SteamCMD concurrency |
+| E5: §4 original Valve docs; no real login | F5: isolate runtime, account multisession safety unverified | P5: serialize accounts, no credential cloning/no eviction guarantees |
 
-观察范围只覆盖该 Windows 客户端及四个公开条目。未测真实账号、私有条目、数百项长队列、单大 Mod 极限吞吐、并发初始化/自更新、断电恢复、跨平台。内容不需要依赖项齐全才能下载；本次没有启动游戏验证 Mod 功能/版本兼容性。
+Only this Windows client/four public items observed. Untested real accounts/private items/hundreds-item queues/large-Mod maximum throughput/concurrent bootstrap/self-update/power-loss recovery/cross-platform. Download does not require complete dependencies; no game launch verified functionality/compatibility.
 
-实验结束后清除整个专用临时目录，原始日志/脚本不作为常驻项目文件保留；下面保留实际测速脚本、原始计时表、关键日志摘录和文件树指纹，供独立复测。指纹算法：按相对 POSIX 路径排序，对每文件拼接 `UTF8(相对路径) + NUL + SHA256(文件内容)` 后再做 SHA-256。
+Dedicated temp directory removed after experiments; raw logs/scripts not permanent project files. Actual scripts/raw timings/key excerpts/tree fingerprints below support independent reruns. Fingerprint: sorted relative POSIX paths, concatenate per-file `UTF8(relative path) + NUL + SHA256(file contents)`, then SHA-256.
 
-| ID | 每 Mod 15 份正式下载一致的树指纹 |
+| ID | Matching tree fingerprint for 15 formal downloads per Mod |
 | --- | --- |
 | 2006605356 | `18d072af6d6f71cf0f4c9f246f45e6438beb9b8d3bf9ba04148e196d0e3a040e` |
 | 761421485 | `849d55095e0c78afebb054fd590caf3e050138cd23cdc5a9cd298791be002e57` |
 | 1372003680 | `cc5ced34522840882d18476234486bbe4b32bedc094bd9613481b7cbdd4c7058` |
 | 1561769193 | `2f31a951a3e0dd3fc8464659f53780913904e06c407ec883ab84923a3e4b4716` |
 
-## 8. 复测步骤与实际脚本
+## 8. Rerun steps and actual scripts
 
-需要 Windows、PowerShell、Python 标准库及 Steam/CDN 网络访问。只能新建临时目录，不把下列变量改为已有 Steam/游戏目录。先独立核验样本公开性（POST 返回值随时间变化），再准备无登录的 seed：
+Requires Windows/PowerShell/Python stdlib/Steam-CDN network. New temporary directories only; never existing Steam/game paths. Verify public samples independently (POST values change), prepare unlogged seed:
 
 ```powershell
 $publicIds = @('2006605356', '761421485', '1372003680', '1561769193')
@@ -246,18 +246,18 @@ $publicBody = @{itemcount=$publicIds.Count}
 for ($i=0; $i -lt $publicIds.Count; $i++) { $publicBody["publishedfileids[$i]"]=$publicIds[$i] }
 $publicDetails = Invoke-RestMethod -Uri 'https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/' -Method Post -Body $publicBody
 $publicDetails.response.publishedfiledetails | Select-Object publishedfileid,result,consumer_app_id,visibility,banned,file_size
-if (@($publicDetails.response.publishedfiledetails | Where-Object { $_.result -ne 1 -or $_.consumer_app_id -ne 294100 -or $_.visibility -ne 0 -or $_.banned -ne 0 }).Count) { throw '样本不再全部公开，停止复测' }
+if (@($publicDetails.response.publishedfiledetails | Where-Object { $_.result -ne 1 -or $_.consumer_app_id -ne 294100 -or $_.visibility -ne 0 -or $_.banned -ne 0 }).Count) { throw 'Samples are no longer all public; stop rerun' }
 $benchRoot = Join-Path ([IO.Path]::GetTempPath()) ('RimArcho-SteamCMD-research-' + [guid]::NewGuid().ToString('N'))
 $benchSeed = Join-Path $benchRoot 'seed'
 New-Item -ItemType Directory -Path $benchSeed | Out-Null
 Invoke-WebRequest -Uri 'https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip' -OutFile (Join-Path $benchRoot 'steamcmd.zip')
 Expand-Archive -LiteralPath (Join-Path $benchRoot 'steamcmd.zip') -DestinationPath $benchSeed
-# 先完成自更新；必要时再运行一次 +quit，确认不再更新后才测速。
+# Complete self-update; rerun +quit if necessary, confirm no more updates before timing.
 Start-Process -FilePath (Join-Path $benchSeed 'steamcmd.exe') -ArgumentList '+quit' -WorkingDirectory $benchSeed -WindowStyle Hidden -Wait
 Start-Process -FilePath (Join-Path $benchSeed 'steamcmd.exe') -ArgumentList '+quit' -WorkingDirectory $benchSeed -WindowStyle Hidden -Wait
 ```
 
-将以下本次正式测速代码保存为 `$benchRoot\bench.py`，执行 `python (Join-Path $benchRoot 'bench.py') $benchRoot`。每轮目录必须不存在；代码不会清理或覆盖旧轮次，重测应新建 benchRoot。
+Save formal benchmark below as `$benchRoot\bench.py`, run `python (Join-Path $benchRoot 'bench.py') $benchRoot`. Round directories must not exist; no clearing/overwriting old rounds, use new benchRoot.
 
 
 ```python
@@ -311,7 +311,7 @@ for repeat,modes in enumerate([['login','peritem','batch','parallel2','parallel4
 print('BENCHMARK_COMPLETE',flush=True)
 ```
 
-正式测速退出后，再将下段保存为同一临时目录的 `extras.py`，执行 `python (Join-Path $benchRoot 'extras.py') $benchRoot`。它复用 bench.py 的启动函数，三轮比较共用运行时/共用内容库，再对已有 batch 库重跑。不要与正式测速并行执行。
+After formal benchmark exits, save next as `extras.py` in same temp directory; run `python (Join-Path $benchRoot 'extras.py') $benchRoot`. Reuses bench.py launch, three shared-runtime/library controls then existing batch reruns. Not concurrent with formal timing.
 
 ```python
 import pathlib, sys
@@ -346,15 +346,15 @@ for repeat in range(1,4):
 print('EXTRA_COMPLETE',flush=True)
 ```
 
-结果文件中的 `ok` 是单个进程完成时的初步检查；共享目录实验应在整组退出后再次核验。正式组每个内容目录做前述树哈希，随后对 extras 的最终内容做同样哈希，并与正式基准比较；ACF 只核对 WorkshopItemsInstalled。本次最终校验得到 §3.3 表，而非只抄进程退出时的瞬时状态。
+Result `ok` is preliminary per-process-exit check; shared directories require whole-group recheck. Hash all formal trees, extras final contents against baseline; ACF only WorkshopItemsInstalled. Final verification produced §3.3, not transient exit snapshots.
 
-最后确认没有实验子进程运行，再在创建变量的同一 PowerShell 会话清理。以下检查限定为本机系统临时目录直接子目录，且名称必须符合本实验 GUID 格式；不得改为已有用户目录：
+Confirm no experiment children remain; cleanup in same PowerShell session. Checks restrict target to direct system-temp child matching GUID pattern, never user directory:
 
 ```powershell
 $benchResolved = [IO.Path]::GetFullPath($benchRoot).TrimEnd('\')
 $benchTemp = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\')
-if ((Split-Path $benchResolved -Parent) -ne $benchTemp -or (Split-Path $benchResolved -Leaf) -notmatch '^RimArcho-SteamCMD-research-[0-9a-f]{32}$') { throw '清理目标不在专用临时目录内' }
+if ((Split-Path $benchResolved -Parent) -ne $benchTemp -or (Split-Path $benchResolved -Leaf) -notmatch '^RimArcho-SteamCMD-research-[0-9a-f]{32}$') { throw 'Cleanup target is outside dedicated temporary directory' }
 $benchRunning = Get-CimInstance Win32_Process -Filter "Name='steamcmd.exe'" | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($benchResolved + '\', [StringComparison]::OrdinalIgnoreCase) }
-if ($benchRunning) { throw '实验 SteamCMD 仍在运行，先等待结束' }
+if ($benchRunning) { throw 'Experiment SteamCMD still running; wait for exit' }
 Remove-Item -LiteralPath $benchResolved -Recurse -Force
 ```

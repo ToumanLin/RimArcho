@@ -1,209 +1,209 @@
-# 06 · 界面 · 详情与简介、能不能跑的写法、确认与反馈（§4–6）
+# 06 · Interface · Details and descriptions, can it run wording, confirmation and feedback (§4–6)
 
-> 属于 [06 · 界面](README.md)。章节号在整个 06 里连续，拆成多个文件后不变，引用照旧写 `06 §x.y`。
+> Part of [06 · Interface](README.md). Section numbers run through all of 06 and stay unchanged when split across files. References still use `06 §x.y`.
 
-## 4. 详情与简介
+## 4. Details and descriptions
 
-### 4.1 结构
+### 4.1 Structure
 
-自上而下（数据：`view.LoadDetail`、`HeaderFacts`、`ModFields`、`HistoryLine`）：
+Top to bottom, `view.LoadDetail`, `HeaderFacts`, `ModFields`, `HistoryLine`:
 
 ```
-┌缩略图┐  Combat Extended                         ← 粗体文字色；TUI 没有缩略图，名称顶格（§9.3）
-│      │  CETeam                                  ← 次要色
-│      │  ◉ 工坊   支持 1.5 1.6   第 34 个          ← 淡色
-└──────┘
+┌thumbnail┐ Combat Extended                     ← bold text color; TUI no thumbnail, flush-left name (§9.3)
+│         │ CETeam                              ← secondary
+│         │ ◉ workshop  supports 1.5 1.6  #34    ← faint
+└─────────┘
 
-能不能跑                                           ← 淡色小标题；没问题时整段换成一行“✓ 没有发现问题”
-  ⨯ 与 Yayo's Combat 3 不兼容，它们同时开着          space 停用这个
-  ! 应该排在 Harmony 之后                           S 自动排序
+can it run                                      ← muted heading; no findings: ✓ no problems found
+  ⨯ Incompatible with Yayo's Combat 3, both enabled     space disable this
+  ! Should follow Harmony                              S sort
 
-Archo ID  #4k2p                                    ← 字段列表：标签淡色，值文字色；点值复制
-包名      ceteam.combatextended
-位置      D:\…\workshop\content\294100\2890901044   打开位置
-工坊      2890901044                       打开页面   ← o 打开
-标签      combat   core                         编辑   ← g / #
-别名      CE                                       ← 只在有时显示，备注同
-语言      ChineseSimplified   English              ← Languages/ 下的文件夹
-依赖      ✓ Harmony                                ← 前置依赖：✓ 已启用、! 未启用、⨯ 未安装
-          ⨯ Vanilla Expanded Framework（未安装）
-          ! Some Library（未启用）
-冲突      ⨯ Yayo's Combat 3                        ← 声明的不兼容：⨯ 已启用（冲突）、! 已安装未启用、✓ 不在这台机器上
+Archo ID   #4k2p                                ← faint labels / text values, click to copy
+package ID ceteam.combatextended
+location   D:\…\workshop\content\294100\2890901044    open folder
+workshop   2890901044                                open page ← o opens
+ tags      combat   core                            edit      ← g / #
+alias      CE                                   ← only if set, likewise note
+languages  ChineseSimplified   English          ← Languages/ folders
+needs      ✓ Harmony                            ← ✓ enabled, ! disabled, ⨯ not installed
+           ⨯ Vanilla Expanded Framework (not installed)
+           ! Some Library (disabled)
+conflicts  ⨯ Yayo's Combat 3                     ← declared incompatibility: ⨯ enabled, ! installed disabled, ✓ absent
 
-简介   工坊页面                                     ← 来源见 §4.3
-  Combat Extended 彻底改造了战斗系统……
-  （详情区中显示前 12 行，enter 全屏查看全部）
+description   workshop page                     ← source §4.3
+  Combat Extended overhauls combat…
+  (first 12 lines in detail column, enter full-screen)
 
-历史
-  10 月 17 日更新   9 月 30 日改了包名              ← 最新 3 条事件
-  在变化记录查看全部                                ← 打开变化记录，只看这个 Mod（§2.9）
+history
+  updated Oct 17   package ID changed Sep 30     ← latest 3 events
+  see all in changes                            ← this Mod only (§2.9)
 
-技术信息   i 展开                                   ← 默认折叠
+technical information   i expand                ← collapsed by default
 ```
 
-**字段列表**（`view.ModFields`，GUI `fields.js`，TUI `fieldLines`）：方案编辑器的详情和 Mod 库存的副本详情（§2.9，`view.LibFields` 在中间多出状态、用在、大小、支持的版本、更新日期、上次游玩）用同一份，一个字段一行：Archo ID、包名；位置 [打开位置]；工坊 [打开页面]；标签 [编辑]；别名、备注（有时）；语言、依赖、冲突。GUI 里点 Archo ID、包名、位置、工坊 ID 的值就复制它，旁边出现“已复制”；其他字段只显示。字段列表没有底色和边框，长的值（位置）折行显示全；行尾的按钮做那一行的事。版本、来源、大小已在名字下面那行，不重复列。
+**Fields** (`view.ModFields`, GUI `fields.js`, TUI `fieldLines`): editor details / inventory copy details (§2.9, `view.LibFields` adds status, used in, size, supported versions, update date, last played in middle) share fields, one per row: Archo ID, package ID; location / open; Workshop / open; tags / edit; alias / note if set; languages, dependencies, conflicts. GUI clicks on ID, package, path, Workshop ID copy with copied notice; other fields display only. No field background / borders, long paths wrap fully, end buttons act on row. Version / source / size already below name, not repeated.
 
-- 包名默认显示（玩家用它在别的工具和论坛里找 Mod），这是“不显示开发者术语”的唯一例外。
-- “能不能跑”里每一条都写成人话，并在行尾给出一个可直接执行的按键（§5）。
-- “技术信息”展开后才显示：引用 `#id`、路径、工坊 ID、文件数和大小、Def / 补丁 / Harmony 数量、Lineage 与副本、不可加载的原因（`view.UnloadableWhy`）。TUI 用 `i` 展开（这时才加载 `mod` 命令的输出）；GUI 点击展开。
-- 所有文字按显示宽度换行（CJK 算 2 格），不允许超出列宽或被截断成半个字：
-  - 在空格处和 CJK 字符之间断行，不在拉丁单词中间断；遵守避头尾规则；过长的路径在 `\` 或 `/` 后断；保留行的缩进。
-  - 状态行、简介小标题、长依赖名和底部提示也换行，不截断。只有详情区的“… enter 显示全部”和 BBCode 表格（宽列）仍用 `…`。
-- **聚焦的详情**：焦点在详情区时显示整段简介（没有 12 行上限）；滚动后第一行是强调色的 `▲ <名称>`。`i`、`ctrl+w`、`r`、`g`、`enter` 作用于显示的 Mod 并保持焦点；其他键回到列表并在那里处理。单击详情区聚焦它。
+- Package ID visible by default for other tools / forums, sole developer-term exception.
+- Every can it run item plain sentence / executable end key (§5).
+- Technical info only after expansion: #id, paths, Workshop ID, file count / size, Def / Patch / Harmony counts, Lineage / copies, unloadable reason (`view.UnloadableWhy`). TUI i loads mod output then; GUI click expands.
+- Display-width wrapping, CJK 2 cells, never overflow / split characters:
+  - Break at spaces / CJK boundaries, not Latin words, honor prohibited line-start / end punctuation; long paths after slash / backslash, retain indentation.
+  - Status, description subheads, long dependencies, bottom hints wrap, never truncate; only detail … enter for all / wide BBCode table cells ellipsize.
+- **Focused details**: full description, no 12-line cap; scrolled first line accent ▲ <name>. i, ctrl+w, r, g, enter act on displayed Mod and keep focus; other keys return list and act there. Click details focuses.
 
-**GUI 编辑器简略详情（2026-10-25）**：左栏显示名称、作者、字段、简介，并列出同一 Mod 的所有在本机副本，使用 §2.9 的抽象标识；选中的按钮用底色区分，不使用单选圆点。点击一份只浏览它，不改加载顺序；单独的“在列表中使用这一份”才切换，保留位置，可撤销，游戏实际忽略或不可加载的份禁用这个动作。简略详情不再显示“能不能跑”独立段，完整诊断仍在全屏和问题页。详情标题右侧常驻可点击的“查看完整详情 Enter ↵”，点击或按 `enter` 打开当前浏览的那份。库存沿用自己的副本动作和字段，完整详情仍为共用页。
+**GUI compact editor details (2026-10-25)**: left name / author / fields / description, all installed same-Mod copies with §2.9 abstract labels. Selected button background, no radio dot. Clicking browses only; separate use this one in the list swaps preserving position / undo. Game-ignored / unloadable copies disable action. No standalone can it run section; full diagnostics in full-screen / findings. Permanent clickable full details Enter ↵ at heading right opens currently browsed copy. Inventory retains copy actions / fields; shared full page.
 
-### 4.2 全屏详情
+### 4.2 Full-screen details
 
-**一页**（2026-10-22 定，`fulldetail.js`）：方案编辑器和 Mod 库存 › 全部按 `enter` 打开的是同一页，有自己的设计，不是其中一个的放大。编辑器左栏的详情和 Mod 库存左栏的副本详情是它的简版（同样的 `renderDetail`、字段列表和副本动作）。面包屑是“库 / 方案 / <方案> / <Mod>”或“库 / Mod 库存 / 全部 / <Mod>”，页面头不写文字（按键在提示行），右端是选中那一份的“打开文件夹”“创意工坊页面”。
+**One page** (2026-10-22, `fulldetail.js`): Enter from editor / inventory all opens same independently designed page, not enlarged source. Left-column compact views are simplified versions, same `renderDetail`, fields, copy actions. Breadcrumbs library / lists / <plan> / <Mod> or library / mod library / all / <Mod>. No head text, keys in hints; right selected-copy open folder / Workshop.
 
-布局：左边宽的一栏是 Mod，右边一栏是它的副本、用在、字段和历史，技术信息在两栏下面占满宽度；窗口窄于 900 像素时排成一栏。六块都是带编号的卡片（`1`–`6` 聚焦，§3.5）：
+Wide Mod column left, copies / used in / fields / history right; technical full-width below, single column below 900px. Six numbered cards, 1–6 focus (§3.5):
 
-| # | 块 | 内容 |
+| # | Card | Content |
 | --- | --- | --- |
-| 1 | Mod | 大图（Preview.png）、名称、作者、状态一句（同编辑器详情）、标签和“标签 … g”、简介（About.xml / 工坊页，§4.3） |
-| 2 | 副本 | 这个 Mod 的 Lineage 的每一份（`API.ModCopies` → `view.LibRow`）：来源标签、状态、是否在当前方案；大小、版本、文件夹；副本备注（玩家的，或 RimArcho 写的淡色那句）。选中的一份（凸起、左侧强调色）下面是它的动作：Mod 库存的六个副本动作和方案动作，按 `view.OpTable` 的顺序，只列适用的 |
-| 3 | 用在 | 每一份被哪些方案和整合包用着；当前方案里有没有它，旁边是 `space` 的动作（加入 / 拿掉 / 换成这一份） |
-| 4 | 字段 | 字段列表（§4.1），点值复制 |
-| 5 | 历史 | 最近几条变化，“在变化记录查看全部”去 Mod 库存 › 订阅与更新，只看这个 Mod 的 Lineage |
-| 6 | 技术信息 | `view.Sections` 的每一节一个标签页：Def、补丁、Harmony、规则、完整历史，以及以后加进来的节（例如手写的 Harmony 补丁目标、日志模式卡片）；这一块只按节画，不认识具体哪几节，数据加一节就多一个标签 |
+| 1 | Mod | Large Preview.png, name, author, one-line status like editor, tags / tags … g, About.xml / Workshop description (§4.3) |
+| 2 | Copies | Every Lineage instance (`API.ModCopies` → `view.LibRow`): source, status, current-plan presence, size, version, folder, player / muted generated note. Selected raised / left-accent copy shows inventory six copy actions plus plan actions, `view.OpTable` order, applicable only |
+| 3 | Used in | Plans / packs using each copy, current-plan presence and space action add / remove / swap |
+| 4 | Fields | §4.1, click values copies |
+| 5 | History | Recent changes, all changes links to subscriptions / updates filtered Lineage |
+| 6 | Technical | One tab per `view.Sections`: Def, patches, Harmony, rules, full history, future sections such as manual targets / log pattern cards. Renderer knows sections, not concrete kinds; new data section adds tab |
 
-技术信息现在的节（`view.Sections`）：
+Current technical sections:
 
-| 技术信息的节 | 内容 |
+| Section | Content |
 | --- | --- |
-| Def | `def --mod` 的文字，`#引用` 换成名称 |
-| 补丁 | `patches --mod` 的文字 |
-| Harmony | `harmony --mod` 的文字：特性补丁和手动 `Harmony.Patch` 调用里解出的补丁（后者标“Harmony.Patch call in code”），再一行 `manual:` 说解出几个、几个没解出，下面逐个列出没解出的补丁方法和原因（03 §5.3） |
-| 规则 | About.xml 声明的排序（loadAfter、loadBefore、incompatibleWith）和玩家自己写的、涉及这个 Mod 的规则，都写成人话 |
-| 完整历史 | 这个 Mod 的全部变化事件，按时间倒序 |
+| Def | def --mod text with references replaced by names |
+| Patches | patches --mod text |
+| Harmony | harmony --mod attribute / resolved manual `Harmony.Patch` calls, latter marked `Harmony.Patch` call in code; manual: resolved / unresolved counts, then unresolved methods / reasons (03 §5.3) |
+| Rules | Plain About.xml loadAfter / loadBefore / incompatibleWith and relevant player rules |
+| Full history | All Mod events newest first |
 
-按键（共用按键表，§3.5）：
-- `←` `→`：来时那个列表的上一个 / 下一个 Mod（移动的是那个列表的光标；编辑器里跳过“列表里有但没安装”的行）；
-- `esc`（或 `backspace`）：回到来时的页面，光标停在最后看的 Mod 上；
-- `↑↓` / `j` `k` / `PgUp` `PgDn` / `Home` `End`：滚动；`tab` / `shift+tab`：技术信息的标签页；`1`–`6`：各块；
-- `[` `]`：换选中的那一份；菜单键 / `shift+F10` 打开这一份的右键菜单；`space` `m` `t` `x` `g` `n` `Del` `ctrl+o` `ctrl+w` 作用于这一份（和 Mod 库存相同，§3.5）；
-- 提示行：`← → 上一个 / 下一个  esc 返回  space <动作>  [ ] 另一份  F10 菜单  1–6 各部分  ? 全部按键`。
+Keys, shared §3.5:
+- Left / right source-list previous / next, moving source cursor; skip uninstalled editor entries.
+- Esc / backspace return source, cursor last viewed Mod.
+- `↑↓` / `j` `k` / `PgUp` `PgDn` / `Home` `End` scroll; `tab` / `shift+tab` technical tabs; 1–6 cards.
+- [ ] selects copy; menu / shift+F10 its context menu; space m t x g n Del ctrl+o ctrl+w act on selected copy like inventory (§3.5).
+- Hints: left right previous / next, esc back, space <action>, [ ] another copy, F10 menu, 1–6 sections, ? all keys.
 
-TUI 仍是原来的全屏详情（编辑器的 `enter`，子区用 `tab`）和 Mod 库存的副本详情；这一页先在 GUI 里。
+TUI retains editor full details with Tab subsections and inventory copy details; new page GUI first.
 
-### 4.3 简介来源与渲染
+### 4.3 Description source and rendering
 
-**测量**（2026-10-19，玩家环境，1274 个有 About.xml 的工坊 Mod，只读；工坊描述用 Steam 公开接口 `ISteamRemoteStorage/GetPublishedFileDetails/v1`，无需 key，13 次批量请求取回 1264 个）。按去掉 BBCode 和图片后的纯文本长度：
+**Measurement**, 2026-10-19 player environment, 1274 Workshop Mods with About.xml, read-only. Public keyless `ISteamRemoteStorage/GetPublishedFileDetails/v1`, 13 batches returned 1264. Plain text length excluding BBCode / images:
 
-| 长度 | About.xml | 工坊页面 |
+| Length | About.xml | Workshop |
 | --- | --- | --- |
-| 空 | 25 | 1 |
-| 1–79 字 | 355 | 19 |
+| Empty | 25 | 1 |
+| 1–79 characters | 355 | 19 |
 | 80–299 | 376 | 108 |
 | 300–999 | 276 | 345 |
 | ≥ 1000 | 242 | 791 |
 
-- About.xml 为空或不到 80 字的占 30%（380 个）；其中 305 个的工坊页面有 300 字以上。两边都只有一两句、也没有图片的只有 18 个。工坊描述 300 字以上的占 90%，About.xml 只占 41%。
-- 504 个 Mod 的两边开头是同一段文字（作者复制了一份）。只有 5 个用了 `descriptionsByVersion`。
-- 工坊描述 55%（696 个）带图片，共 7981 张；139 个以图片为主（≥ 3 张、每张不到 100 字的文字）。几乎全是图文混排：文字不到 80 字、只有图片的只有 1 个。
-- 图片格式：PNG 7351、GIF 323、无扩展名 244、JPEG 55、WebP 6。图床：i.imgur.com 72%，其次 raw.githubusercontent.com、img.litet.net、i.postimg.cc、Steam 自己的 images.steamusercontent.com。
-- 出现最多的 BBCode：`img` `*`（列表项）`url` `b` `h1` `list` `h2` `td` `h3` `i` `tr` `hr` `th` `u` `table` `code` `nl` `strike` `olist` `quote`。
+- Empty / under 80 About.xml: 30%, 380; 305 have Workshop ≥300. Only 18 have one-two sentences / no images on both. Workshop ≥300 90%, About.xml 41%.
+- 504 begin identically, author copied; only 5 descriptionsByVersion.
+- Workshop 55%, 696, have images, 7981 total; 139 image-led (≥3, <100 characters per image). Almost all mixed; only 1 under-80 image-only.
+- PNG 7351, GIF 323, extensionless 244, JPEG 55, WebP 6; `i.imgur.com` 72%, then raw.githubusercontent.com, img.litet.net, i.postimg.cc, images.steamusercontent.com.
+- Common BBCode: img, * list item, url, b, h1, list, h2, td, h3, i, tr, hr, th, u, table, code, nl, strike, olist, quote.
 
-**规则：**
+**Rules:**
 
-1. **来源。** About.xml 的 `description`（若有当前游戏版本的 `descriptionsByVersion` 条目则用它）随时可读，从磁盘按需读取，不存进数据库。工坊页面描述在线获取。
-2. **选哪个。** 有工坊描述时：About.xml 不到 300 字，或者两边开头相同（忽略图片），只显示工坊描述（标题“简介  工坊页面”）；两边都长且不同，先显示 About.xml，再显示工坊描述（两个小标题）。没有工坊描述（本地 Mod、离线、获取失败）时显示 About.xml，并在小标题后淡色注明原因（`view.DescNote`）。
-3. **何时获取。** 只为选中的 Mod 按需获取，在后台发单个 ID 的请求，不预取整个列表。GUI 编辑器先防抖读取详情，返回未缓存后立即获取简介；GUI 全屏详情和 TUI 在本地详情返回后再延迟获取，间隔见 §2.16.1 G12。结果缓存在 `<数据目录>/cache/workshop/<工坊 ID>.json`。缓存里的 `time_updated` 不早于本地 appworkshop 清单中的 `timeupdated` 时视为最新，不再联网；没有清单时间时的有效期见 §2.16.1 C01。全屏详情里按 `r` 强制刷新。
-4. **离线开关。** `archo config set workshop.fetch on|off`（默认 on）；`workshop.images on|off`（默认 on）单独关闭图片下载。关闭后只用缓存和 About.xml。联网只访问 Steam 的这个公开接口，以及工坊描述里出现的图片地址。请求带 RimArcho 的 User-Agent。
-5. **BBCode 渲染**（按显示宽度换行，遵守 §7 的原则）：`h1`–`h3` 粗体文字色并前后空一行；`b` 粗体；`i` `u` 照常显示（不用斜体和下划线）；`strike` 淡色；`list` / `olist` 用 `•` 和序号、按层级缩进两格；`url` 显示链接文字，GUI 里可以点，TUI 在文字后面淡色显示域名（§9.3）；`quote` `code` 缩进两格、次要色（GUI 缩进 14px，不画左边的线，§7.3）；`table` 按列对齐、放不下的列截断；`hr` 变成空行；`nl` 换行；`noparse` 原样；未知标签去掉、保留内容。GUI 由 Go 端解析成块结构，前端渲染为标题、列表、表格、引用、代码、链接、图片元素（§8.3）。
-6. **图片里的文字（OCR）**：界面不做。用视觉模型识别，放在 Archo 的任务里（09 §5）。
+1. **Sources**: About.xml description, current-game descriptionsByVersion if present, read on demand, never database. Workshop fetched online.
+2. **Selection**: with Workshop, About under 300 or identical beginnings ignoring images means Workshop only, description / workshop page heading. Both long / different: About then Workshop, two headings. Without Workshop (local, offline, failure), About with muted `view.DescNote` reason.
+3. **When**: selected Mod only, background one-ID request, no whole-list prefetch. GUI editor debounce local read then immediate uncached fetch; GUI full / TUI delayed after local, §2.16.1 G12. Cache `<data directory>/cache/workshop/<Workshop ID>.json`; time_updated ≥ local appworkshop timeupdated means fresh, no request. No manifest expiry §2.16.1 C01. Full-details r forces.
+4. **Offline controls**: `archo config set workshop.fetch on|off` default on; workshop.images on|off default on separately disables images. Off cache / About only. Network only public Steam endpoint / image URLs in description, RimArcho User-Agent.
+5. **BBCode**, display-width wraps / §7: h1–h3 bold text with blank lines, b bold, i / u normal, strike muted; list / olist bullets / numbers, two-cell nested indentation; url link text clickable GUI / muted domain TUI (§9.3); quote / code two-cell secondary, GUI 14px / no left line (§7.3); tables align / truncate wide columns; hr blank, nl newline, noparse literal, unknown strip tags retain content. Go block parsing, frontend headings / lists / tables / quotes / code / links / images (§8.3).
+6. **OCR**: not in UI; visual-model recognition belongs to Archo tasks (09 §5).
 
-### 4.4 图片
+### 4.4 Images
 
-- **缩略图来源**：Mod 的 `About/Preview.png`（文件名大小写不敏感；内容是 JPEG 也接受）。缩放到宽 360 像素（不放大）的 PNG，按快照哈希缓存为 `<数据目录>/cache/previews/<快照哈希>.png`。只读 Mod 目录。
-- **描述图片**：在需要时才下载；解码、缩放到 720 像素宽后缓存为 PNG（`<数据目录>/cache/workshop-img/`）。`imgur.com/x.png` 这样的链接直接改成 `i.imgur.com`。GIF 只显示第一帧；WebP 和解码失败的显示占位。
-- **简略详情不内嵌描述图片**：只显示缩略图和文字，描述中的图片在第一张图片的位置合成一行淡色占位 `[图片 ×3  enter 在全屏中查看]`（TUI 是 `[图片 ×3]`）。描述图片只在全屏详情中显示；TUI 的全屏详情逐张列成文字占位 `[图片  i.imgur.com]`。
-- `workshop.images off` 关闭描述图片的下载。
-- GUI 直接用 `<img>` 显示、按比例缩放，描述图片 `loading="lazy"`，进入可视区域时才请求；图片只经 `/img/` 处理器从本地缓存读出（§8.3）。TUI 不画图片（§9.3）。
-- 图片画廊、大图浏览等功能只在 GUI 做。
+- **Thumbnail**: About/Preview.png case-insensitive, JPEG content accepted; downscale without enlargement to 360px PNG, snapshot-hash cache `<data directory>/cache/previews/<snapshot hash>.png`; read-only Mod directory.
+- **Description images**: download on demand, decode / downscale to 720px PNG, `<data directory>/cache/workshop-img/`; imgur.com/x.png → i.imgur.com. GIF first frame; WebP / failures placeholders.
+- **No inline images in compact details**: thumbnail / text only; first description image becomes muted [images ×3 enter to view full-screen], TUI [images ×3]. Images only full-screen; TUI one textual [image `i.imgur.com`] each.
+- workshop.images off disables description downloads.
+- GUI `<img>` scales proportionally, description images use `loading="lazy"` and request only on visibility; local `/img/` only (§8.3). TUI no images (§9.3).
+- Gallery / enlarged image browsing GUI only.
 
-## 5. 能不能跑的写法
+## 5. Can it run wording
 
-**上次运行的报错**（`view.lastRunNeed`）：标题只写一次 Mod 名和错误 / 警告的发生次数，两种级别都有时都列；解释按次数列最多两种实际分类和各自次数，只有一种时不重复次数，贴图类附一条代表资源路径，其余种类汇总余数。凭据只补日志文件、时间或伴生日志文件证据，不再重复总次数。归因是 `possible` 时追加“尚未确定来源”；无候选时标题写“来源不明”。主体不在当前列表里时追加“它不在列表里”（存档或别的 Mod 用到了它的内容，2026-10-28）。`game-log` 动作携带日志路径和聚类 ID，GUI 直接到 §2.10；未归因项不选聚类，旧日志打开它自己的文件。TUI 按主体的 `problems --code log --subject …` 查看，旧日志用 `log --file …`。本次运行的条目（`view.LiveNeeds`）写“A：N× 消息”，不再以“本次运行，”开头，凭据只写日志文件名：区标题已写本次运行，次数在正文里（2026-10-28）。它们也是 `game-log`：“打开游戏日志”到正在写的 Player.log 并选中该聚类，TUI 看 `archo log`（2026-10-28：原来的“查看日志与证据”只弹出一段文字，和上次运行不一致）。其他 `view` 动作不变。
+**errors from the last run** (`view.lastRunNeed`): title Mod once / error-warning occurrence counts, both if present. Explanation top two actual categories by frequency / counts, omit count repetition if one, representative texture resource path, remainder aggregate. Evidence only log file / time / companion evidence, no duplicate count. possible attribution adds source not yet certain; none source unknown. Subject outside current list adds not in the list, save / another Mod may use content (2026-10-28). game-log action path / cluster ID, GUI §2.10; unattributed no cluster, stale log own file. TUI problems --code log --subject …, stale log --file …. This run (`view.LiveNeeds`) A: N× message, no this run prefix, evidence filename only, heading / body already identify run / count (2026-10-28). Also game-log opens active Player.log / cluster, TUI archo log; old text-only view log and evidence was inconsistent (2026-10-28). Other view actions unchanged.
 
-**每一项**由问题集合和环境的待确认项生成：分组、一句由 Mod 名组成的话、作用于它的动作（`view.Action`）、是否计数。问题代码、`#引用`、`pkg:`、`p:` 等 CLI 引用形式从不出现在页面上，它们只在技术信息、CLI 和 MCP 里。
+**Each item** generated from findings / environment questions: group, sentence with Mod names, `view.Action`, counted flag. No finding codes / #refs / pkg: / p: on page, technical / CLI / MCP only.
 
-**名字与导航**：`Need.Content` 在 Go 中给标题、正文、解释和折叠条目提供 `NeedPart` 片段（原有字符串保留给终端和文本客户端）。名字候选只取本项的 `Mods`、`RequiredBy`、动作引用（含目标和选项）及原始问题的对象；合并项保留各原始问题的对象，不从整个 Mod 库的名字中匹配。每个 Mod 名称分别带已安装副本的 ID，未安装但已知工坊 ID 时带工坊 URL，来源未知时保持文字。能不能跑、编辑器的问题面板和行图标浮层使用同一套渲染：点已安装的名称到编辑器对应行，必要时清掉遮住它的筛选；未安装的名称打开工坊。每个名字都能用 Tab 聚焦、Enter 或空格打开；不把整句绑定到第一个 Mod，不由 JS 从字符串中查找名称。身份待确认项也遵守这条导航规则。`Reason.Content` 和 `Reason.Evidence` 给行浮层提供相同的名字和凭据。包名索引每个快照建立一次，各项只用相关名字生成片段，不为每项遍历 Mod 库。GUI 文字片段按普通行内文本排版，标题、解释、折叠条目及浮层均不使用事实字段之间的 flex 间隔。行浮层中本行自己的 Mod 名保持文字，其他相关 Mod 仍分别链接；不修改共享的片段数据。
+**Names / navigation**: Go `Need.Content` gives `NeedPart` title / body / explanation / folded fragments, original strings retained for terminals / text clients. Candidates only this item's Mods, RequiredBy, action refs incl. targets / options, original finding subjects; merged items retain original subjects, never whole-library name matching. Each name has installed copy ID, else known Workshop URL, else plain. Shared rendering needs / editor panel / row popover: installed name locates editor row, clears hiding filter; uninstalled opens Workshop. Tab-focusable, Enter / Space opens; never whole sentence linked to first Mod, no JS substring matching. Identity questions same. `Reason.Content` / `Reason.Evidence` same names / evidence in popovers. Package index once per snapshot, fragments only relevant names, no per-item library traversal. Normal inline flow, not fact-field flex spacing in titles / explanations / folded / overlays. Popover's own Mod plain, others independently linked, shared fragments never mutated.
 
-**语料提示**：`Evidence.Kind == EvCorpus` 的项统一为 `StatusHint`。在能不能跑里它们单独成“可以留意”区（`SectionHint`，§2.4），这是 RimArcho 从分享的日志里学到的东西，所以不淡化：区标题和图标用强调色，标题照常加粗，凭据照常显示；在编辑器面板和相关行的浮层中用中性色的信息图标（§7），警告、错误始终排在提示之前。它们不计入侧栏、编辑器“问题”按钮、各区的问题数或 Mod 的问题数，也不参与自动补齐前置；只有提示时编辑器按钮写“提示”，仍可打开。`has:problem` 不纳入提示。凭据写“分享的日志（截至 YYYY-MM）”，截止月份读取 `known.Data.Cutoff`（嵌入的 `known.json`），比例仍列在来源中；不把语料关联写成这次游戏一定会发生的错误。作者明确声明的前置和语料推测的前置分别成项。编辑器问题面板仅在语料提示中显示凭据行，以保留截止日期；普通问题省略重复的凭据。能不能跑和行浮层仍显示各自的凭据。
+**Corpus hints**: `Evidence.Kind == EvCorpus` always uses `StatusHint`, separate worth knowing `SectionHint` (§2.4). Learned from shared logs, not faded: accent heading / icon, bold title, normal evidence. Editor / popovers use neutral information icons (§7), errors / warnings before hints. Excluded sidebar, editor problem-button / section / Mod counts, auto-dependencies; hints-only button says hints, still opens; has:problem excludes. Evidence shared logs as of YYYY-MM from `known.Data.Cutoff` embedded `known.json`, ratios in source; association never guaranteed current-run failure. Declared / inferred dependencies separate. Editor evidence row only for corpus to retain cutoff; ordinary duplicate evidence omitted. Needs / popovers retain evidence.
 
-| 内部代码 | 玩家看到的 | 一键操作（TUI 键） | 分组 |
+| Internal code | Player sees | One-step action / TUI key | Group |
 | --- | --- | --- | --- |
-| `official.order` | Core 和 DLC 要排在最前面 | `S` 自动排序 | 会让游戏出错 |
-| `order.violated`（强要求，warning） | 只有一条时：A 应该排在 B 之后，说明顺序不对可能让前置或部分内容无法生效；多条时合并成一项：10 个 Mod 的顺序不对（数的是需要挪动的 Mod），`enter` 展开逐条列出 | `S` 自动排序 | 会让游戏出错 |
-| `order.violated`（弱或无害，info，04 §5.3） | 有带 `S` 的那一项（`official.order` 或强要求的 `order.violated`）时不单独成项，那一项多一行（`Need.Also`）：“顺带满足 5 条较弱的顺序要求”；没有时单独一项：5 条较弱的顺序要求没满足，说明这是作者或社区建议的顺序，分享的日志里违反它们并没有更常出错 | `S` 自动排序；单独成项时 `f` 展开 | 并入会让游戏出错的那一项；单独时在可以留意 |
-| `order.cycle` | 同上并入带 `S` 的那一项，`Also` 写“3 个 Mod 的循环要求按优先级处理”和放弃的要求，查看按钮也挂到那一项上；单独时：排序会按优先级处理 3 个 Mod 的循环要求；说明列出排序时具体放弃的要求（info：不计入数字，03 §4.3.1） | `enter`（并入后是 `v`）用人话查看各条要求；自动处理，不要求确认或手动忽略 | 并入会让游戏出错的那一项；单独时在可以留意 |
-| `pkg.duplicate-active` | 同一个 Mod 启用了两份 | `space` 选择保留哪一份 | 会让游戏出错 |
-| `entry.missing` | 只有一个时：列表里有 X，但没有安装它（知道工坊 ID 时用工坊名）；多个时合并成一项（2026-10-25，导入的列表常见）：列表里有 N 个 Mod 没有安装，说明写“订阅并下载后会自动回到列表里的位置”。需要其中某个的 `dep.missing` 不再单独成项 | 知道工坊 ID 时 `s` 订阅（一个）/ 全部订阅（N 个；先选 Steam 或 SteamCMD，后台任务，TUI 显示要执行的 `archo subscribe workshop …`）；一个时 `o` 在工坊打开或搜索、`space` 从列表中移除；多个时 `x` 全部从列表中移除、`f` 展开逐个列出 | 会让游戏出错 |
-| `mod.unloadable` | A 已启用，但游戏无法加载它 | `space` 停用 | 会让游戏出错 |
-| `mod.replaced`（社区数据 replacements） | A 有维护中的替代品：B | B 已安装：`space` 启用 B、停用 A；未安装：`o` 在工坊打开 B | 会让游戏出错 |
-| `version.unsupported`（汇总） | 293 个 Mod 没有标明支持 1.7（其中 288 个支持 1.6），不含已忽略提醒的 Mod | `enter` 打开清单面板；`M` 忽略这 N 个 Mod 的 1.7 提醒（先确认） | 会让游戏出错 |
-| 列表为旧版本保存 | 列表是为 1.5 保存的，游戏启动时会重置它，保存一次就好 | `w` 保存 | 会让游戏出错 |
-| `dep.missing` | A 需要 B，但没有安装 B | `o` 在工坊打开 B（声明的 URL，否则工坊搜索） | 会让游戏出错 |
-| `dep.inactive` | A 需要 B，但 B 没有启用 | `space` 启用 B | 会让游戏出错 |
-| `dep.observed-missing`（日志语料） | 提示：A 可能缺少 B；B 没有安装 / 没有启用，遇到相应报错时可尝试补齐；包含仅涉及声音、贴图的观察 | 已安装：`space` 启用 B；未安装：工坊动作 | 可以留意 |
-| `combo.known-bad`（日志语料） | 提示：A 和 B 一起时常报错；或：这个版本的 A 常报错；说明遇到报错时可尝试停用一个或检查更新 | `space` 选择停用哪一个；版本：`space` 停用 A | 可以留意 |
-| `mod.known-error`（日志语料） | 提示：分享的日志中，A 经常报错；说明如果也遇到了可以检查更新 | `enter` 看这个错误 | 可以留意 |
-| `patch.no-match`（目标未启用） | A 的部分内容没有生效（它针对的 B 没有启用） | `space` 启用 B，或 `enter` 查看 | 会让游戏出错 |
-| `def.parent-missing` | A 加入的 N 项内容加载不了；下一行用一句话解释缺少基础内容和语料中的出错比例。类型数量和处理建议放在详情，行上不重复展开清单作为凭据 | `enter` 打开问题与处理办法：启用提供方、订阅或查看声明候选、核对主体的工坊要求；符合日志条件时可整组忽略（03 §4.3） | 会让游戏出错 |
-| `incompat.active` | A 与 B 不兼容 | `space` 选择停用哪一个 | 会让游戏出错 |
-| `log.*` | A — 8 个警告；下一行：贴图缺失（代表路径） | `enter` 打开游戏日志并选中该 Mod 的聚类；TUI 保留按主体查看日志问题的技术页 | 上次运行的报错 |
-| 实时日志 | A：N× 消息（区标题写本次运行；同阶段里新的在前；阶段分组见 §2.4） | `enter` 打开游戏日志并选中该聚类；TUI 看 `archo log` | 上次运行的报错（本次运行） |
-| 身份待确认 | X 和 Y 是同一个 Mod 吗？ | `s` / `c` / `u` 回答（两次确认） | 要你确认 |
-| ModsConfig.xml 外部修改冲突 | ModsConfig.xml 在 RimArcho 之外被改了，而这个方案之后也改过 | 看差异 / `L` 载入（两次确认，会替换这个方案现在的列表）/ `I` 忽略 | 要你确认 |
-| `mod.pinned`（上游有更新） | A 锁定了版本，工坊那份之后更新过 | 查看差异（`mod <工坊实例> --diff <副本>`）、更新锁定版本（`pin --update`）、解除锁定（`unpin`，确认） | 不在这页：Mod 库存（§2.4、§2.9） |
-| `mod.hidden-residue` | A 被隐藏、已经退订，文件夹还留着 | 移到回收站（`trash`，确认） | 不在这页：Mod 库存 |
-| `mod.hidden` | A 被隐藏了（大概是别的 Mod 管理器做的） | 保持隐藏（忽略问题）、恢复（`unhide`，确认）、移到回收站（确认） | 不在这页：Mod 库存 |
-| `texture.stale` | A 的贴图在转换之后变了 | 重新转换、删除转换的贴图（确认） | 不在这页：贴图优化 |
+| `official.order` | Core / DLC first | S sort | breaks the game |
+| `order.violated` strong warning | Single A should follow B, wrong order may disable dependencies / content; multiple aggregate 10 Mods out of order, counts moved Mods; Enter expands | S sort | breaks the game |
+| `order.violated` weak / harmless info (04 §5.3) | Merge with official / strong S item, `Need.Also` also satisfies 5 weaker requirements; otherwise separate 5 unmet weaker requirements, author / community suggestions not associated with more shared-log errors | S sort; standalone f expands | Merged error item or worth knowing |
+| `order.cycle` | Merge with S item, Also priority-resolved cycle among 3 Mods / abandoned edges, viewing action there; standalone sorting resolves 3-Mod cycle by priority, explanation lists dropped requirements, info uncounted (03 §4.3.1) | Enter, v if merged, plain requirements; automatic, no confirmation / manual ignore | Merged error or worth knowing |
+| `pkg.duplicate-active` | Two copies enabled | Space choose retained copy | breaks the game |
+| `entry.missing` | One X listed but uninstalled, Workshop name if known; multiple merge since 2026-10-25 for imports: N uninstalled, subscription / download restores list positions. Their `dep.missing` not separate | s one / all subscriptions if IDs known, choose Steam / SteamCMD, background; TUI prints archo subscribe workshop …. One o opens / searches, Space removes; multiple x remove all / f list | breaks the game |
+| `mod.unloadable` | A enabled but game cannot load | Space disable | breaks the game |
+| `mod.replaced`, community replacements | A maintained replacement B | Installed B: Space enable B / disable A; else o Workshop B | breaks the game |
+| `version.unsupported` aggregate | 293 not declared 1.7, 288 declare 1.6, ignored excluded | Enter list; M ignore these N for 1.7, confirm | breaks the game |
+| List saved for old version | Saved for 1.5, game resets on start, save once | w save | breaks the game |
+| `dep.missing` | A needs uninstalled B | o declared Workshop URL else search | breaks the game |
+| `dep.inactive` | A needs disabled B | Space enable B | breaks the game |
+| `dep.observed-missing` corpus | A may lack B, not installed / disabled; try if matching errors, includes sound / texture-only observations | Installed Space enable, else Workshop | worth knowing |
+| `combo.known-bad` corpus | A / B together often error, or this A version; try disabling one / updating if errors | Space choose disable; version Space disable A | worth knowing |
+| `mod.known-error` corpus | Shared logs often show A errors, check update if encountered | Enter error | worth knowing |
+| `patch.no-match` target inactive | Some A content inactive, B target disabled | Space enable B / Enter view | breaks the game |
+| `def.parent-missing` | N A contents unloadable, one-line missing basics / corpus error ratio; kinds / advice in details, no repeated list evidence | Enter focused finding / fixes: enable provider, subscribe / declared candidates, subject Workshop requirements; group-ignore when log condition permits (03 §4.3) | breaks the game |
+| `incompat.active` | A incompatible B | Space choose disable | breaks the game |
+| log.* | A — 8 warnings, texture missing representative path below | Enter game log / Mod cluster, TUI subject technical page | errors from last run |
+| Live log | A: N× message, this-run heading, newest within phase first (§2.4) | Enter log / cluster, TUI archo log | Last-run group, this run |
+| Identity question | Are X / Y same Mod? | s / c / u, twice confirmation | for you to confirm |
+| External ModsConfig conflict | Changed outside, plan also edited since | Diff / L load, twice, replaces list / I ignore | for you to confirm |
+| `mod.pinned` upstream changed | A locked, Workshop later updated | mod <Workshop instance> --diff <copy>, pin --update, confirmed unpin | Elsewhere inventory (§2.4, §2.9) |
+| `mod.hidden-residue` | Hidden / unsubscribed A folder remains | Confirm trash recycle | Elsewhere inventory |
+| `mod.hidden` | A hidden, likely other manager | Keep hidden ignore, confirmed unhide / recycle | Elsewhere inventory |
+| `texture.stale` | A textures changed since conversion | Reconvert, confirmed delete converted | Elsewhere textures |
 
-- 动作类型（`view.Action.Kind`）：`sort`、`save`、`enable`、`disable`、`choose-disable`（从选项中选一个停用）、`open-url`、`problem`（聚焦的问题说明与修复）、`view`（只读命令文字）、`list`（显示标题和行）、`fold`（展开 / 收起合并项）、`ignore-rule`、`load-external`、`dismiss-conflict`、`answer`、`unhide`、`unpin`、`trash`、`ignore`。`Action.Key` 是 TUI 的键，GUI 显示为按钮，按钮文字就是动作（“启用 B”“自动排序”“在工坊打开”）。
-- **问题详情**（`view.BuildProblemPanel`、GUI `ProblemDetail`、`popups.problem`）：父模板缺失、补丁目标未启用、已知错误的查看动作只显示问题含义、受影响内容、依据与处理按钮，不打开完整 Mod 卡或该 Mod 的全部补丁。GUI 是玩家主动打开的临时层，`esc` 离开；按钮用 `tab` / 左右方向键聚焦、`enter` 执行，打开其他层先关闭当前层。迟到的读取结果不重开已关闭的层，也不覆盖新层或另一游戏。先显示缓存的问题说明与处理选项；需要补查已安装提供方时，在面板里显示“正在查找已安装的 Mod…”，后台结果回来后更新按钮。关闭、打开其他层或离开环境会取消查找；查找完成也释放取消上下文。启用提供方优先，其次是订阅候选；存在其中一种时，第一个按钮用主按钮样式，主体工坊入口保持次要。每个缺失模板都找到已安装提供方时只给启用按钮，不列候选，也不写“找到提供这些内容的 Mod 后启用它”；查完仍没有提供方时写“已安装的 Mod（包括未启用的）都提供不了这些基础内容”，没查完时写“没能查完所有已安装的 Mod”，不叫玩家重试。仅列出候选时才说明候选可能是可选搭配。每条受影响内容后淡色显示它的文件:行号；只有文件位置时不再另列“依据”，其他解释性证据保留。初始读取使用独立日志会话，补查使用私有读取会话；均不占住导航与编辑锁。TUI 用同一个问题引用的 CLI 聚焦文本。锁定版本的文件差异、列表差异和按主体查看的日志沿用专门的查看入口；同 Mod 身份提问与版本汇总不变。
-- `patch.no-match` 只有在它针对的 Mod 已安装但未启用时（target-inactive）才出现；目标根本不存在、版本路由错误等情况玩家无法处理，留在技术信息。`def.abstract-collision` 同样只在技术信息里。
-- `version.unsupported` 只有在其中有 Mod 停在上一个版本（warning）时才出现；全部只写了更早的版本时按 info 处理，不出现（日志语料 G8 把两者的严重度对调了，03 §4.3.1）。
-- **版本提醒**（03 §4.2）：`Needs.Reasons` 对每个 Mod 单独写“没有标明支持 1.7（标明了 1.6）”，列出它实际声明的版本；说明用单数，唯一动作是“忽略此 Mod 的 1.7 提醒”，完成后写“已忽略此 Mod 的 1.7 提醒”，不带汇总的“查看列表”。详情使用同一份 `VersionReason`，未启用的 Mod 也能查看 / 忽略；已忽略时淡色显示相同完成文案和“恢复 1.7 提醒”，完成后写“已恢复此 Mod 的 1.7 提醒”。更新后已声明支持也保留恢复入口。TUI 详情用 `M` / `U`。
-- 能不能跑及编辑器问题面板在版本汇总旁显示淡色“N 个 Mod 的 1.7 提醒已忽略”和“查看或恢复”，不计问题数、不产生行图标。这里数的是当前列表中仍未声明支持、但已忽略提醒的 Mod；全部忽略后编辑器仍保留淡色的“0 个问题”入口。后台问题事件直接采用 Go 给出的 `Status` / `Reasons`，不从汇总项重建单个 Mod 的文字。
-- **版本清单面板**（`versionpanel.js`，§3.1 规则 7 的临时层）：点击“查看列表”才调用 `API.VersionWarnings`，不在 `Needs` / Board 内生成或携带行清单。顶部只说一次“没有标明支持 1.7”，右侧“全部忽略”；滚动正文一行一个 Mod，依次是可点击名称（回编辑器定位，清除遮住它的筛选）、“标明了 1.6”等实际声明、紧凑的“忽略”。按声明分组：上个主次版本在前（如“标明了 1.6  352”），再是只声明更早版本（如“只标明了 1.5 或更早  13”），其余按各自声明分组；每组有“忽略这组”。分组 / 全部忽略先确认全局范围和可恢复；逐个忽略直接执行。已忽略清单使用相同面板，行 / 组 / 顶部动作是“恢复” / “恢复这组” / “全部恢复”，不再确认。操作后保留面板与滚动位置，重新读取清单；关闭、换游戏或换列表后的迟到读取不更新旧面板。`tab` / `shift+tab` 在面板控件间移动，`enter` / 空格执行聚焦控件，方向键和翻页键滚动，`esc` 关闭。TUI 按需打开分组选择列表，选单个 Mod 后可定位或忽略 / 恢复。
-- **合并规则**：同一种问题如果一个键就能全部解决，就合并成一项，`enter` 展开逐条显示；目前有 `order.violated`（`S` 一次排好）、同一个 Mod 的 `def.parent-missing`（一个问题视图列出受影响内容与处理按钮）、同一个 Mod 针对同一个未启用目标的 `patch.no-match`（“X 的 6 个补丁不会生效”，启用目标一次解决）。前置按规范化目标合并，解释列出需要它的 Mod；缺失的列表条目按能否使用已安装副本分别合并。合并项的展开键是 `f`（`order.violated` 是 `enter`），GUI 是解释下面的“逐条看 N 个”（不当成按钮）；编辑器面板用就地折叠列表。展开后每条单独一行，GUI 用语义列表，不在行首加逗号。日志仍按 Mod 分项。
-- **计数**：角标和顶栏的数字 = 页面上 `Counted` 的项数：可以留意的提示、折叠的旧日志和不在这一页的项都不算。合并后的一项算 1，所以数字反映的是要做几件事，而不是有几条发现。行状态包含计数项和语料提示，图标说明与计数分别计算。
-- **按钮**（2026-10-29，GUI）：每一项的全部动作都是按钮，放在这一项最底下一行，和标题左边对齐；没有 `⋯` 菜单。第一个是主按钮，其余是次要按钮。`fold` 不是按钮，是解释下面的“逐条看 N 个”。二选一的动作（`choose-disable`、`pkg.duplicate-active` 的保留哪一份）不再先弹出选择：每个选项一个按钮（“停用 Combat Extended”“停用 Yayo's Combat 3”），样式平等，没有主按钮；它的键（`space`）把焦点放到第一个选项上，← → 换，`enter` 执行。身份问题的三个回答本来就平等（见下）。TUI 照旧：键打开选择面板。
-- **就地确认**（2026-10-29，GUI）：在能不能跑页上点了要确认的动作（`Action.Confirm`，§6），按钮那一行换成一句后果（`Action.Warn`；链接修复写“修复上面标着‘将删除’的链接？”，上面的链接行就是预览）和“确定 / 取消”（`enter` / `esc`），不弹对话框。编辑器的问题面板和行图标浮层里的同一个动作照旧用对话框。
-- **做完的项**（2026-10-29，GUI）：在这一页执行的动作结束后，页面重新读取（动作进行中别的刷新不算）；原来的项不见了、也没有同一种问题的新项接替它（`Need.Kind` 相同算接替，比如“7 个 Mod 的顺序不对”变成“6 个”）时，它留在原来的位置，变成淡色的一行：✓、动作自己回报的那句话（排序和保存没有回报，用它结束时状态行的话；之后后台检查写进状态行的“分析完成”不会顶掉它）、原来的标题。一个动作解决了几项（自动排序、自动修复）时几项一起变。能用 `u` 撤销的动作，只有最近的那一行带“撤销”（`u`，撤销列表的上一步，那几项回来）。这些行不计数，光标能停在上面（为了撤销），离开页面或换游戏时清掉。
-- **两列互相指**（2026-10-29，`Need.Related`）：上次运行的报错项的主体 Mod，同时是左列某一项里需要前置的 Mod（`dep.*` 的 `RequiredBy`）或可以留意某一项的主体时，两边各多一行链接：左边写“上次运行：Vanilla Furniture Expanded — 12 个错误”，右边写“相关：Vanilla Factions Expanded 需要 Vanilla Expanded Framework，但它没有启用”。点了光标跳到另一列的那一项并短暂高亮。本次运行的项不参与。
-- **自动修复**（`F`，页面动作）：启用已安装的必需前置并重新排序（`API.CompleteDependencies`，一步撤销）。按钮写它会解决的计数项数（带启用动作的前置项，加上有 `S` 的项），没有时不出现。
-- **行上的图标说明自己**（2026-10-25 定，GUI）：鼠标停在列表行的警告 / 错误图标上，旁边弹出一个小提示，逐条写出这一行背后的项（标题或一句话，有解释时附在下面一行，最严重的在前），未安装的条目写“未安装”，加载不了的写“游戏无法加载它”。点一下图标把提示**固定**住：可以划选里面的文字；再点同一个图标、`esc`、点到别处或滚动列表都会关掉。没固定时最后一行淡色写“点击固定”。固定后每一项下面有和能不能跑（§2.4）同样的快捷按钮（第一个是主按钮；身份问题三个回答平等；“展开”除外，提示里没有可展开的部分），点了先关掉提示再执行，和在能不能跑里点一样（确认框、撤销、游戏切换中变灰的规则相同；`Reason.Actions`，执行用 `screens.js` 的 `runAction`）。数据是 `Needs.Reasons`（GUI 的 `Board.reasons`，按 Instance ID），和图标用同一批项，所以有图标就有说明。键盘不另加键：同样的问题在详情（`enter`）里列出（§3.1 规则 6）。实现：`js/badgepop.js`。
-- **身份待确认项**（`view.questionNeed`）：GUI 在能不能跑、编辑器问题面板和固定的行图标提示中，都直接显示“是同一个 / 是副本 / 无关”，不把任何回答设为主按钮或藏进菜单。每个回答悬停说明对列表和变化历史的影响，确认框重复该影响并说明不能用 `u` 撤销；按键仍为 `s` / `c` / `u`。问题行直接用已存摘要显示主要原因，不附通用“很像”的解释或空泛的推断 chip；“为什么这样问”是文字下方的淡色链接，与三个回答分开。
-- **为什么这样问**：`v` 或链接主动打开临时比较层，`esc` 关闭并回到原处。GUI 用 `popups.identity` / `view.IdentityQuestionPanel`：一句结论开头；两列“新发现的 / 之前记录的”比较名称、包名、作者、工坊编号和文件夹，用符号与底色区分相同 / 不同；两边都缺失的行不显示。文件夹只显示目录名，悬停为全路径，可点击复制；下方列相同文件（上限见 [02 §5.4](../02-environments-identity-and-scanning.md#54-待确认项)）。面板内三个回答仍平等并带影响提示，点击或 `s` / `c` / `u` 先关闭比较层，再进入既有确认，不嵌套；初始焦点为关闭，Enter 不选默认答案。TUI 继续用简短文字查看面板。
-- **不出现在这里的**：
-  - info 级别（Def 覆盖、补丁争用、共享 Harmony 目标等）：只在详情的技术信息里，以及 CLI 和 MCP 中；
-  - 没有日志证据的 Harmony 警告：归入技术信息，玩家无法据此行动；
-  - 旧日志（不属于当前方案最近一次启动，或来自另一个游戏版本，03 §6.4）：折叠成一行淡色 `更早的日志  9 月 29 日  1.6`，不计数。
+- `view.Action.Kind`: sort, save, enable, disable, choose-disable (one option), open-url, problem (focused explanation / fix), view (read-only command text), list (title / rows), fold, ignore-rule, load-external, dismiss-conflict, answer, unhide, unpin, trash, ignore. `Action.Key` TUI key, GUI button label is action, e.g. enable B, sort the list, open in Workshop.
+- **Problem details** (`view.BuildProblemPanel`, GUI ProblemDetail / `popups.problem`): missing parent, inactive patch target, known-error viewing shows meaning, affected content, evidence, fixes only, never full Mod / all patches. Player-opened temporary GUI layer, Esc leaves; Tab / left-right buttons, Enter executes; close before other layer. Late reads cannot reopen / overwrite new layer / game. Cached explanation / options first; provider lookup says searching installed mods…, background updates buttons. Closing / another layer / environment cancels, completion also releases context. Enable providers before subscriptions; first available primary, subject Workshop secondary. If all missing templates have installed providers, enable only, no candidates / generic find-provider advice. Complete unsuccessful lookup says installed Mods including disabled cannot provide basics; incomplete says not all checked, never asks retry. Only candidate-only view warns optional combination. Each affected content appends muted file:line; no duplicate evidence if only location, other evidence retained. Initial read independent log session, supplemental private read session, no navigation / edit locks. TUI same-reference focused CLI. Locked diffs / list diffs / subject logs keep dedicated viewers; identity / version aggregates unchanged.
+- `patch.no-match` only target-inactive, installed but disabled; absent target / wrong version routing unfixable, technical only. `def.abstract-collision` technical only.
+- `version.unsupported` only warning Mods stopped at previous version; all older info omitted; corpus G8 reversed levels (03 §4.3.1).
+- **Version reminders** (03 §4.2): `Needs.Reasons` per Mod not declared 1.7, declares 1.6, actual versions, singular; sole action ignore this Mod's 1.7 reminder, completion says this Mod’s 1.7 reminder was ignored, no aggregate view list. Shared VersionReason in details, disabled also view / ignore; ignored muted done / restore 1.7, completion says this Mod’s 1.7 reminder was restored; update adding support still retains restore. TUI M / U.
+- Needs / editor aggregate muted N ignored 1.7 reminders / view or restore, no count / icon. Counts only current-list undeclared-support ignored Mods; all ignored still muted 0 problems entry. Events use Go Status / Reasons directly, no per-Mod reconstruction from aggregate.
+- **Version list** (`versionpanel.js`, temporary §3.1 rule 7): only view list calls `API.VersionWarnings`, no Needs / Board row list. Once atop not declared 1.7, ignore all right; scroll rows clickable Mod name locates editor / clears filter, actual supports 1.6, compact ignore. Groups previous major.minor first, e.g. 1.6 / 352, older-only next, e.g. 1.5 or earlier / 13, others by declaration; group ignore. Batch / all confirm global scope / recoverability; individual direct. Ignored panel same, restore / group / all without confirmation. Preserve panel / scroll, reread after actions; late results after close / game / list change ignored. Tab / shift+Tab controls, Enter / Space execute, arrows / page keys scroll, Esc close. TUI grouped picker on demand, individual locate / ignore / restore.
+- **Merge**: same finding solved by one key merges, Enter expands. Current `order.violated` S all, same-Mod parent-missing one focused view, same-Mod patches to same disabled target (X's 6 patches inactive, enable once). Dependencies normalized target, explanation requiring Mods; missing entries separate by installed-copy availability. Fold f, order Enter; GUI see N one by one below explanation, not button; editor inline lists. Each expanded row separate semantic list, no leading commas. Logs per Mod.
+- **Counts**: sidebar / top = Counted items, excludes hints, folded stale log, elsewhere. Merged counts 1, reflects tasks not findings. Row status includes counted / corpus, explanations and counts calculated separately.
+- **Buttons** (2026-10-29 GUI): all actions bottom aligned title, no ⋯; first primary / rest secondary. `fold` is a textual See N individually link, not a button. `choose-disable` / duplicate-copy choices have separate equal buttons, e.g. disable Combat Extended / disable Yayo’s Combat 3, no primary; Space focuses first, left/right switch, Enter execute. Identity three equal. TUI retains picker.
+- **Inline confirmation** (2026-10-29 GUI): needs `Action.Confirm` (§6) replaces button row with `Action.Warn` consequence / OK Cancel Enter / Esc; link fix says repair above links marked remove, rows are preview. No dialog. Editor panel / popover same action still dialog.
+- **Completed items** (2026-10-29 GUI): after this-page action completes reread, not incidental mid-action refresh. If original vanishes without replacement of same `Need.Kind` (7 out-of-order → 6 counts replacement), retain original location as muted ✓ / action result / old title. Sort / save use completion status, later analysis complete never overwrites. Action solving multiple marks all. Only latest undoable row has undo / u, restores previous list step / findings. Uncounted, cursor can stop for undo; cleared on page leave / game change.
+- **Cross-column links** (2026-10-29 `Need.Related`): last-run subject also left dependency (`dep.*` `RequiredBy`) / hint subject creates links both ways: last run Vanilla Furniture Expanded — 12 errors; related Vanilla Factions Expanded needs disabled Vanilla Expanded Framework. Click jumps / briefly highlights other column item. Current-run excluded.
+- **Automatic fix F**: enable installed required dependencies / reorder (`API.CompleteDependencies`), one undo. Button count = solved counted enable-dependency items + S items, hidden if none.
+- **Self-explaining row icons** (2026-10-25 GUI): hover warning / error shows underlying titles / sentences, explanations below, severe first; uninstalled / unloadable explicit. Click pins, selectable; same icon / Esc / outside / list scroll closes. Unpinned muted click to pin. Pinned item has same needs shortcuts (§2.4), first primary, identity equal, no fold. Click closes then executes via `screens.js` runAction / `Reason.Actions`, same confirmation / undo / switch disabling. `Needs.Reasons` / `Board.reasons` by Instance ID, same items as icon; every icon has explanation. No new keyboard key, Enter details has findings (§3.1 rule 6). js/badgepop.js.
+- **Identity questions** (`view.questionNeed`): GUI needs / editor / pinned popover directly shows same / copy / unrelated, equal, no menu. Hover explains list / change-history impact; confirmation repeats and no-u warning; keys s / c / u. Stored summary main reason, no generic similar / vague inference chip; why this question muted link separately below.
+- **Why this question**: v / link opens comparison, Esc returns. `popups.identity` / `view.IdentityQuestionPanel`: one-sentence conclusion, new / previously recorded columns compare name, package ID, author, Workshop ID, folder with symbols / background for matches; omit both-missing. Folder basename, full hover / click copy; shared files below, cap [02 §5.4](../02-environments-identity-and-scanning.md#54-%E5%BE%85%E7%A1%AE%E8%AE%A4%E9%A1%B9). Three equal answers / impact; click or s/c/u closes layer before confirmation, no nesting. Close initially focused, Enter no default answer. TUI brief text panel.
+- **Absent here**:
+  - Info Def overrides / patch contention / shared Harmony targets only technical / CLI / MCP.
+  - Harmony warnings without log evidence technical, not actionable.
+  - Stale logs outside current plan latest launch / game version (03 §6.4) muted earlier log / Sep 29 / 1.6 row, uncounted.
 
-## 6. 确认与反馈
+## 6. Confirmation and feedback
 
-- **排序、保存、启动直接执行**（`view.Run`）：一次点击或一个键，结果写在状态行（`view.Outcome.Text`）；排序能用 `u` 撤销，状态行带“撤销”（TUI 写“u 可撤销”）。被拒绝时（有游戏在运行、有未载入的外部修改、没有用户数据目录、找不到 Steam……）不弹确认：状态行写原因，`Outcome.Refused` 有命令时，GUI 开一个只读弹窗、TUI 开一个面板，列出能解决它的命令（看差异 / 载入 / 忽略等）。
-- **预览**照样可以看，但不在动作前面拦一道：命令面板的“预览排序 / 预览保存 / 预览启动”（`view.DryRun`，CLI 的 `--dry-run` 文字）只读，没有“继续”按钮；CLI 是 `archo sort|save|launch --dry-run`。
-- **一步可撤销的动作不确认**：除了排序，还有载入历史版本、载入外部修改的 ModsConfig.xml（`L`）。两者都是工作区的一步编辑，被替换的列表留在历史里，状态行带“撤销”（`view.Action.Undo`）。
-- **RimArcho 撤销不了的动作要确认**。
-  - TUI 用“再按一次”：第一次按在状态行显示 `✗ 再按一次 R：……`，再按同一个键执行，按其他键取消（“已取消”）。
-  - GUI 用确认对话框，对话框显示 `view.Action.Warn`；能不能跑页上就地确认，不弹对话框（§5“就地确认”）。
-  - 目前用于：删除方案；回答身份问题（`s` `c` `u`，合并或拆分 Lineage 不能用 `u` 撤销）；`unhide`、`unpin`（改名 Mod 文件夹里的 About.xml）；`trash`、整合包移到回收站、删除未完成编译复制的文件；设置页里的忘掉文件夹、下载社区数据（约 50 MB）、`gc`。
-- **回收站和改名**动作（`unhide`、`unpin`、`trash`）先显示预览（`--dry-run`）再确认（08 §6、§7）。
-- **卸载 RimArcho** 预览后用一次确认对话框；内容与焦点规则见 §2.14，卸载范围见 01 §4.1。
-- **结果文字**由界面写成人话（“启用了 Beta”“Harmony 现在是第 3 个”）；命令的错误经过 `view.Humanize`，把实例引用换成 Mod 名。
-- **长任务**不阻塞界面，进度在状态行（§8.4），每一个都记在后台任务里（§2.16）。Mod 库里会动文件或经 Steam 的动作确认之后排进后台队列，一项失败不停，结果逐项记下。
-- **变化不弹窗**：扫描结果、新的游戏报错只更新状态行和数字。
+- **Sort / save / launch direct** (`view.Run`), one click / key, status `view.Outcome.Text`; sort u undo, GUI link / TUI u undoes. Refusal (running game, outside edits, no user data, Steam missing…) status without confirmation; `Outcome.Refused` commands show read-only GUI dialog / TUI panel for diff / load / ignore etc.
+- **Preview** optional, never action gate: panel sort / save / launch `view.DryRun`, CLI --dry-run text, read-only, no continue; `archo sort|save|launch --dry-run`.
+- **One-step undoable actions no confirmation**: sort, history checkout, external ModsConfig load L; workspace edits preserve prior list, status undo (`view.Action.Undo`).
+- **Confirm what RimArcho cannot undo**:
+  - TUI repeat key: first status ✗ press R again: …, same executes, other cancels / cancelled.
+  - GUI dialog displays `view.Action.Warn`; needs inline (§5).
+  - Current: plan delete; identity s/c/u merges / splits Lineage not undoable; unhide / unpin rename About.xml; trash, pack recycle, unfinished copied-file deletion; settings forget folder, download community data about 50 MB, gc.
+- **Recycle / rename** unhide / unpin / trash preview --dry-run then confirm (08 §6, §7).
+- **Uninstall** preview then one confirmation; contents / focus §2.14, scope 01 §4.1.
+- **Results** plain surface wording, enabled Beta / Harmony now position 3; errors through `view.Humanize`, instance refs → names.
+- **Long work** nonblocking status (§8.4), every task recorded (§2.16). Library file / Steam actions queue after confirmation; one failure does not stop others, per-item results.
+- **Changes never pop dialogs**: scans / new game errors update status / counts only.
 
-### 6.1 排序返回与补齐 API
+### 6.1 Sort outcome and completion API
 
-GUI 按钮与 S 键调用 `api.Run("sort")`，返回 `view.Outcome`。排序照常完成；以下四个数组没有内容时省略。缺失依赖只查启用实例的 About.xml 必需依赖，含当前游戏版本项，不把 loadAfter 等可选顺序算成依赖。循环按 04 §5.2 自动取舍，`cycles` 供查看，不能当作排序失败。
+GUI button / S calls `api.Run("sort")`, returns view.Outcome. Sort completes normally; omit following four arrays if empty. Missing dependencies only enabled About.xml required dependencies incl. current-version entries, not optional loadAfter. Cycles resolved automatically (04 §5.2); cycles for inspection, not sort failure.
 
-JSON 字段合同（`?` 表示可省略）：
+JSON contract, ? optional:
 
 ```ts
 type SortMod = {
@@ -232,19 +232,19 @@ type SortOutcome = {
 };
 ```
 
-`missingMods` 是列表中尚未解析到当前游戏实例的条目，按规范化 packageId 去重；**不等于本机没有文件**。另一游戏的 Mods/ 中可能已有可部署副本，此时 `installed`、`canEnable` 为 true，并带 `instance/ref`，可以用现有启用动作处理。工坊 ID 依次取列表元数据、已记录的 Lineage／实例、缓存的公开工坊索引；未知时省略，官方 DLC 不提供工坊来源。排序不发网络请求。仅 `!installed && workshopId` 的条目适合加入“全部订阅”，已安装但不能启用的应显示原因或引导检查副本。
+missingMods: entries unresolved to current-game instances, deduplicated normalized packageId; **not necessarily absent files**. Other game's Mods/ may provide deployable copy: installed / canEnable true, instance/ref, existing enable action. Workshop ID from list metadata, known Lineage / instance, cached public index in order; omit unknown, no DLC Workshop. No sort network. Only !installed && workshopId for subscribe all; installed but unenableable shows reason / copy-check guidance.
 
-`replacements` 复用现有 Use This Instead 数据及游戏版本筛选；数据经“更新数据”获取，未下载时不猜测建议。同包名的不同工坊分支按工坊 ID 区分；已安装但不可加载时 `canReplace=false`，带 `blockedReason`。`before/after` 表示被放弃的有向顺序边，`strength` 为 `harmless/weak/strong`，`kind` 为排序器的约束种类。
+replacements reuse Use This Instead / version filters, downloaded via update data; absent data means no guesses. Same-package Workshop branches distinguished by Workshop ID; installed unloadable canReplace=false / blockedReason. before/after dropped directed edge, strength harmless/weak/strong, kind sorter constraint.
 
-后端导出方法：
+Backend exports:
 
 ```go
 func (s *API) CompleteDependencies() (*view.Result, error)
 func (s *API) ReplaceRecommended(refs []string) (*view.Result, error)
 ```
 
-`api.CompleteDependencies()` 启用全部可用的已安装必需依赖（含新启用依赖自己的依赖），自动排序，整体只有一个撤销步骤。返回 `{text, undo?, enabled?: string[], workshopIds?: string[], missingDependencies?: MissingDependency[]}`；`enabled` 是新增实例 ID，`workshopIds` 已去重，`missingDependencies` 是操作后仍缺少的项。
+`api.CompleteDependencies()` enables all available installed required dependencies transitively, sorts, one undo. Returns `{text, undo?, enabled?: string[], workshopIds?: string[], missingDependencies?: MissingDependency[]}`; enabled new instance IDs, deduplicated Workshop IDs, remaining missing dependencies.
 
-`api.ReplaceRecommended(replacements.filter(r => r.canReplace).map(r => r.original.ref))` 用当前建议重新校验并替换已启用的原 Mod，保留原位置，目标已启用时去重；批量全部成功才写入，只产生一个撤销步骤。不自动排序，不订阅，不改 Mod 文件。返回 `{text, undo?}`；不可用或失效建议返回 error，原列表不变。一次批次含替代链时拒绝，分批处理。
+`api.ReplaceRecommended(replacements.filter(r => r.canReplace).map(r => r.original.ref))` revalidates current suggestions, replaces enabled originals at original positions, deduplicates enabled targets; all-or-nothing batch / one undo. No auto-sort / subscription / Mod-file edits. `{text, undo?}`; unavailable / stale error leaves original unchanged. Reject chains within batch, split them.
 
-需要订阅的工坊 ID 由前端去重，并先让玩家选 Steam 或 SteamCMD，再调用现有 `api.Subscribe({kind:"workshop", url:"https://steamcommunity.com/sharedfiles/filedetails/?id=" + id, steamcmd: useSteamCMD, batch:true})`。订阅完成并扫描后，可重新排序、启用或替换；订阅本身不自动替换原 Mod。
+Frontend deduplicates needed IDs, asks Steam / SteamCMD, then existing `api.Subscribe({kind:"workshop", url:"https://steamcommunity.com/sharedfiles/filedetails/?id=" + id, steamcmd: useSteamCMD, batch:true})`. After download / scan, sort / enable / replace again; subscription never automatically replaces original.

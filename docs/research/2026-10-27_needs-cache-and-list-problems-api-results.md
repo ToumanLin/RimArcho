@@ -1,61 +1,61 @@
-# needs 缓存与列表问题 API 实测
+# needs cache and list-problems API measurements
 
-测量日期：2026-10-27。接口合同在 [06 §8.7](../specs/06-ui/8-gui-technology.md#87-列表问题与-needs-缓存-api)。本文记录一次真实内容验证，数字不作为所有机器的延迟保证。
+Measured on 2026-10-27. The interface contract is in [06 §8.7](../specs/06-ui/8-gui-technology.md#87-%E5%88%97%E8%A1%A8%E9%97%AE%E9%A2%98%E4%B8%8E-needs-%E7%BC%93%E5%AD%98-api). This records one validation with real content; these figures are not latency guarantees for every machine.
 
-## 数据与方法
+## Data and method
 
-Windows amd64，AMD Ryzen 9 7950X，Go 1.27.2。数据来自 `%APPDATA%\RimArcho` 的隔离副本：复制 `archo.db`、WAL、SHM、`config.toml`，只对副本 checkpoint；同时复制缓存，创建空 packs 目录。真实游戏／Mod／日志路径只读，HTTP 禁用；没有保存 ModsConfig、扫描、订阅或改动真实 Mod 文件。
+Windows amd64, AMD Ryzen 9 7950X, Go 1.27.2. Data came from an isolated copy of `%APPDATA%\RimArcho`: copy `archo.db`, WAL, SHM, and `config.toml`, checkpoint only the copy; also copy caches and create an empty packs directory. Real game/Mod/log paths were read-only, and HTTP was disabled. No ModsConfig saves, scans, subscriptions, or real Mod file changes were performed.
 
-同一个大列表在两种环境中的解析不同，必须区分列表条目数与实际启用数：
+The same large list resolves differently in two environments, so distinguish list-entry counts from actually enabled counts:
 
-| 场景 | 列表条目 | 实际已安装并启用 | 未安装条目 | 索引实例 |
+| Scenario | List entries | Actually installed and enabled | Uninstalled entries | Indexed instances |
 | --- | ---: | ---: | ---: | ---: |
-| 1.6 环境打开大列表 | 715 | 715 | 0 | 6640 |
-| main（1.7）环境打开同一列表 | 715 | 572 | 143 | 6640 |
+| Large list opened in 1.6 environment | 715 | 715 | 0 | 6640 |
+| Same list opened in main (1.7) environment | 715 | 572 | 143 | 6640 |
 
-需求中记录的是 713 个启用；测量时同一大列表已经有 715 个。主要对照使用 **1.6 环境的 715 个实际启用 Mod**。原始基线提交为 `926eb32824e617f687674a35ef976c18137bf474`，通过 `git archive` 导出到系统临时目录，执行原始源码；改前、改后使用同一数据副本和列表。基线在计时前对该集合完成一次原始分析，避免把缺失分析的旧结果误当成最终结果。
+The request recorded 713 enabled entries; by measurement time the same large list had 715. The main comparison uses **715 actually enabled Mods in the 1.6 environment**. Baseline commit `926eb32824e617f687674a35ef976c18137bf474` was exported with `git archive` to a system temporary directory and run from the original source. Before/after runs used the same data copy and list. Before timing, the baseline completed one original analysis of this set, avoiding treating old results with missing analysis as final results.
 
-后端处理时间不含 WebView 渲染和 IPC；Workspace 时间包含请求到 `environment` 事件的等待。OS 文件缓存未清空。后台分析使用独立 App 运行真实 `Analyze`，保持环境与打开列表一致；生产子进程的启动和 IPC 开销未计入。
+Backend processing time excludes WebView rendering and IPC; Workspace time includes waiting from the request to the `environment` event. The OS file cache was not cleared. Background analysis ran real `Analyze` in a separate App, keeping the environment and open list aligned; production subprocess startup and IPC overhead were excluded.
 
-## 1.6 大列表的改前／改后
+## Before/after: large 1.6 list
 
-单位为 ms；热读列保留实际样本，不把不同新鲜度混为一种延迟。
+Units: ms. Warm-read columns retain actual samples rather than mixing different freshness states into one latency.
 
-| 操作 | 原始源码 | 缓存实现 |
+| Operation | Original source | Cache implementation |
 | --- | --- | --- |
-| Board 首次组合 | 505.338 | 492.787 |
-| Needs 首次返回 | 394.043，311 项，分析已新鲜 | 19.472，先返回 121 项旧分析结果，`stale=true/updating=true` |
-| Needs 稳定命中／切回页面 | 192.487 / 203.878 / 216.914 | 12.178 / 11.185 / 10.799 |
-| 普通停用操作 | 3.108，只返回编辑结果 | 196.463，已包含更新后的问题摘要 |
-| 停用后再取 Needs | 550.907 | 13.667 |
-| Workspace 第一次 | 本轮基线未单独测量 | 421.039 |
-| Workspace 稳定命中 | 见前一日 P6 研究 | 12.100 / 10.778 / 11.656 |
-| ListProblems | 无此 API | 29.479 / 22.786 / 46.256 / 24.625 |
+| First Board composition | 505.338 | 492.787 |
+| First Needs response | 394.043,311 items, analysis already fresh | 19.472, initially returns 121 old analysis items, `stale=true/updating=true` |
+| Stable Needs hit / return to page | 192.487 / 203.878 / 216.914 | 12.178 / 11.185 / 10.799 |
+| Ordinary disable operation | 3.108, edit result only | 196.463, includes updated problem summary |
+| Needs read after disabling | 550.907 | 13.667 |
+| First Workspace | Not measured separately in this baseline round | 421.039 |
+| Stable Workspace hit | See previous day's P6 research | 12.100 / 10.778 / 11.656 |
+| ListProblems | No such API | 29.479 / 22.786 / 46.256 / 24.625 |
 
-内容分析完成后，新完整结果为 **143 项**，不是首次返回的 121 项旧结果。一次分析提交后，Workspace 有效失效，重新组合耗时 681.781ms；表中热读是此后同键命中。首次组合与有效失效仍有成本，前端可保留已有列表并消费问题更新事件。
+After content analysis completed, the new full result contained **143 items**, not the 121 old items initially returned. One analysis commit invalidated Workspace; recomposition took 681.781ms. Warm reads in the table are subsequent hits on the same key. First composition and effective invalidation still have costs; the frontend can retain its existing list and consume problem-update events.
 
-ListProblems 返回 267 个有问题归属的 Mod、143 个列表项，JSON 为 314,774 B。完整问题只在 `items` 中传一次，各 Mod 用 `problemIds` 引用。
+ListProblems returned 267 Mods with associated problems and 143 list items, totaling 314,774 B of JSON. Full problems are transmitted once in `items`; each Mod references them through `problemIds`.
 
-## 合并与修复验证
+## Merge and fix validation
 
-原始 needs **311 项 → 143 项**。缺依赖及未启用的补丁目标按规范化 packageId 合并：
+Original needs **311 items → 143 items**. Missing dependencies and disabled patch targets merge by normalized packageId:
 
-| 目标 | 声明依赖问题 | 合并后卡片 | 需要它的 Mod（含补丁目标） |
+| Target | Declared dependency problems | Cards after merging | Mods needing it (including patch targets) |
 | --- | ---: | ---: | ---: |
 | Biotech | 47 | 1 | 53 |
 | Ideology | 32 | 1 | 34 |
 | Anomaly | 15 | 1 | 17 |
 | Odyssey | 15 | 1 | 17 |
 
-抽取实际返回的两条 `enable` 动作，在副本执行，验证目标进入启用列表、对应依赖卡片立即消失；每条再 Undo，列表指纹恢复。两条动作连摘要分别为 172.788ms、169.405ms，随后读取为 13.238ms、13.838ms。动作抽查暂缓后台发布以隔离撤销验证；上表的普通停用样本已开启真实后台工作。
+Two actual returned `enable` actions were sampled and executed on the copy, verifying that the target entered the enabled list and its dependency card disappeared immediately. Each was then undone, restoring the list fingerprint. Including summaries, the actions took 172.788ms and 169.405ms; subsequent reads took 13.238ms and 13.838ms. Background publication was deferred for these action checks to isolate undo validation; the ordinary disable sample above ran with real background work enabled.
 
-停用后完整内容分析在 **11,658.055ms** 发布 `stale=false/never=false/updating=false` 的结果；分析器自身记录 5,705ms，复用 **4294 个 Mod** 的 Def 缓存，读取／模拟 3970 个 Def 文件、1683 个 Patch 文件。Def／程序集事实按 Mod 有效内容键复用；Patch 模拟依赖完整文档及顺序，仍在后台重算。
+After disabling, full content analysis published `stale=false/never=false/updating=false` results in **11,658.055ms**. The analyzer itself recorded 5,705ms, reusing Def caches for **4294 Mods**, reading/simulating 3970 Def files and 1683 Patch files. Def/assembly facts reuse each Mod's effective-content key; Patch simulation depends on the full document and order, so it still recomputes in the background.
 
-补充 main（1.7）样本：原始 needs 热读 159.742–173.617ms、编辑后 516.059–531.947ms；缓存命中约 7–9ms，完整结果 263 项 → 133 项。该场景只有 572 个已安装启用 Mod，不能代替上面的 715 个启用验证。
+Additional main (1.7) sample: original warm needs reads 159.742–173.617ms, after edits 516.059–531.947ms; cache hits about 7–9ms, full results 263 items → 133 items. This scenario has only 572 installed and enabled Mods and cannot replace the 715-enabled validation above.
 
-## 复现
+## Reproduction
 
-源码：[TestNeedsRealCopy](../../internal/surface/gui/needscache_real_test.go)。默认跳过，只有设置副本目录且存在 `needs-benchmark-copy` 标记才运行。下面用 SQLite 只读备份合入 WAL 中已提交的内容，与复制 DB/WAL/SHM 的输入等价；输出在系统临时目录。
+Source: [TestNeedsRealCopy](../../internal/surface/gui/needscache_real_test.go). Skipped by default; runs only with a copy directory set and a `needs-benchmark-copy` marker present. The SQLite read-only backup below incorporates committed WAL contents, equivalent to copying DB/WAL/SHM; outputs go to a system temporary directory.
 
 ```powershell
 $benchCopy = @"
@@ -81,9 +81,9 @@ $env:RIMARCHO_NEEDS_PLAN = '5'
 go test ./internal/surface/gui -run '^TestNeedsRealCopy$' -count=1 -timeout 6m -v
 ```
 
-`5` 是本次副本的大列表 ID；重测时根据 `plans=` 输出选择。测试环境当前列表时不设置 `RIMARCHO_NEEDS_PLAN`。测试只在副本编辑／撤销，最后恢复列表指纹。
+`5` is the large-list ID in this copy; choose from `plans=` output when rerunning. Leave `RIMARCHO_NEEDS_PLAN` unset to test the environment's current list. The test edits/undoes only on the copy and restores the list fingerprint afterward.
 
-验证命令：
+Validation commands:
 
 ```powershell
 go build ./...
@@ -91,10 +91,10 @@ go vet ./...
 go test ./internal/... -count=1
 ```
 
-回归覆盖缓存输入、跨连接写入失效、大小写／目录别名／`_steam` 合并、连续编辑和撤销复用内容、旧后台结果不能覆盖新编辑、Workspace 被编辑覆盖时丢弃、目录／链接实时变化，以及独立会话生成的链接修复动作在主会话执行。
+Regressions cover cache inputs, invalidation after writes from other connections, case/directory-alias/`_steam` merging, content reuse across consecutive edits and undo, old background results not overwriting newer edits, discarding Workspace when superseded by edits, live directory/link changes, and executing a link-repair action generated by an independent session in the main session.
 
-## 边界
+## Boundaries
 
-首次打开或扫描／分析完成后，缓存可能失效；命中目标不代表首次完整内容分析也在 50ms 完成。返回旧结果时须显示 `updating`，失败通过 `error` 和分析事件返回。关闭 API 等待已启动的读取和分析退出，避免遗留写入。
+First opening, or completion of scanning/analysis, may invalidate the cache. The hit target does not mean first full content analysis also completes within 50ms. Old results must show `updating`; failures return through `error` and analysis events. API shutdown waits for started reads and analyses to exit, avoiding leftover writes.
 
-订阅和 DLC 商店动作只核对生成、分派和既有任务接口，真实验证没有下载或购买。前端需接入 `Board.problems`、`Result.problems` 和 `list-problems`，按环境／列表及发布序号过滤迟到事件；测试不包含页面渲染。
+Subscription and DLC-store actions were checked only for generation, dispatch, and existing task interfaces; real validation did not download or purchase anything. The frontend must consume `Board.problems`, `Result.problems`, and `list-problems`, filtering late events by environment/list and publication sequence. Testing excludes page rendering.

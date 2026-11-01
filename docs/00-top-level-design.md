@@ -1,100 +1,100 @@
-# RimArcho 顶层设计（v2）
+# RimArcho top-level design (v2)
 
-> 状态：2026-10-21。本文只讲 RimArcho 是什么、为谁做、要回答哪些问题，用玩家的话写。
-> 技术部分（领域模型、模块分层、Mod 身份与变化追踪）在 [00a-架构](00a-architecture.md)。功能规格在 `docs/specs/`。
+> Status: 2026-10-21. This document covers only what RimArcho is, who it serves and which questions it answers, in players' words.
+> Technical details (domain model, module layers, Mod identity and change tracking) are in [00a-architecture](00a-architecture.md). Feature specifications are in `docs/specs/`.
 
-## 1. 定位
+## 1. Positioning
 
-**RimArcho 是一个懂 RimWorld 玩家的一站式启动器。**
+**RimArcho is a one-stop launcher that understands RimWorld players.**
 
-选 Mod、排顺序、检查能不能跑、启动游戏、出了错告诉你为什么，都在一个地方完成。玩家不用在管理器、日志、工坊页面和论坛之间来回切换。
+Pick Mods, sort them, check whether they can run, launch the game and find out why something broke, all in one place. Players need not switch between a manager, logs, Workshop pages and forums.
 
-“懂玩家”指两件事：它认得你手上每一份 Mod 的来历和变化，不靠猜；它说出的每个结论都带着凭据。
+"Understands players" means two things: it knows the origin and changes of every Mod copy you have, without guessing; every conclusion comes with evidence.
 
-## 2. 要回答的三个问题
+## 2. Three questions to answer
 
-| # | 玩家的问题 | 怎么回答 | 版本 |
+| # | Player's question | How to answer it | Version |
 | --- | --- | --- | --- |
-| 1 | **我现在在玩什么，它能正常跑吗？** | 方案（启用列表）与排序、Mod 的来历和变化、缺前置与冲突、Patch 和 Harmony 分析、日志归因、整合包、启动 | 1.0 |
-| 2 | **有什么没玩到？** | 读取存档，找出装了却多局都没碰过的 Mod 和内容（10 §3） | 1.1 |
-| 3 | **有什么值得玩？** | 玩家之间分享的整合包；AI 助手根据你没玩到的内容推荐内容和游玩目标 | 远期 |
+| 1 | **What am I playing, and will it run?** | Plans (enabled lists) and sorting, Mod origins and changes, missing dependencies and conflicts, Patch and Harmony analysis, log attribution, packs, launching | 1.0 |
+| 2 | **What haven't I played yet?** | Read saves to find installed Mods and content untouched across multiple games (10 §3) | 1.1 |
+| 3 | **What's worth playing?** | Packs shared between players; an AI assistant recommends content and play goals based on what you have not played | Longer term |
 
-**到 1.0 为止，RimArcho 回答的是第一个问题。**
+**Through 1.0, RimArcho answers the first question.**
 
-三个问题是递进的：第一个问题保证游戏能跑；第二个问题的答案是第三个问题的输入，先查清没玩到什么，再从里面挑值得玩的。
+The questions build on each other: the first ensures the game can run; the answer to the second feeds the third. First find what has not been played, then choose what is worth playing.
 
-第三个问题对 AI 助手的要求也不同：前两个问题里，AI 按玩家的指令做事（修排序、翻译、分析报错）；到第三个问题，AI 要理解玩家怎么玩、想玩什么。也就是**从被指挥到理解玩家**。
+The third question also asks something different of the AI assistant: for the first two, AI follows players' instructions (fix sorting, translate, analyze errors); for the third, AI must understand how players play and what they want to play. In other words, **from taking instructions to understanding players**.
 
-第三个问题的具体做法（分享网站、推荐所需的数据）以后再定。
+The details of the third question (a sharing website and the data needed for recommendations) will be decided later.
 
-## 3. 使用对象
+## 3. Users
 
-### 3.1 玩家
+### 3.1 Players
 
-主要用户，尤其是攒了几百个 Mod 的玩家。
+The primary users, especially those with hundreds of Mods.
 
-- **同样服务盗版用户。** RimArcho 不把 Steam 账户或游戏所有权作为管理本地游戏和 Mod 的门槛。需要授权的行为尽可能提供匿名方案；确实只能由账户完成的操作照实说明，并提供可用的本地路径。
-- **所有功能在没有 AI 时都必须好用。**
-- 玩家不需要懂 Mod 的内部结构。界面和提示用玩家的话说，技术细节在详情里，需要时再看。
+- **Serve users of pirated copies too.** RimArcho does not require a Steam account or game ownership to manage local games and Mods. Offer anonymous options wherever possible for actions needing authorization; explain actions that truly require an account and provide a usable local path.
+- **Every feature must work well without AI.**
+- Players need not understand Mod internals. Interfaces and prompts use players' words; technical details are available in details when needed.
 
-### 3.2 AI 助手：Archo
+### 3.2 AI assistant: Archo
 
-**第二类用户，按用户来设计**，而不是附在玩家功能上的附件。设计每个功能时，同时问：AI 助手要用它，需要什么？
+**A second kind of user, designed as a user**, rather than an attachment to player features. When designing each feature, also ask what an AI assistant needs to use it.
 
-- **名字和形象**：内置的 AI 助手叫 **Archo**，形象就是项目图标（`internal/icon/portrait.svg`）；头像左上的蝴蝶结是标志，用在头像太小的地方（06 §7）。界面里提到 AI 助手的地方都用这个名字和头像，例如“让 Archo 分析这个报错”。外部 agent 通过 MCP 接入时用它们自己的名字。
+- **Name and appearance**: the built-in AI assistant is called **Archo**, represented by the project icon (`internal/icon/portrait.svg`); the bow at the top left of the portrait is the mark for places too small for the portrait (06 §7). Use this name and portrait wherever the interface mentions the assistant, for example "ask Archo to analyze this error". External agents connecting through MCP use their own names.
 
-- **两种接入方式，用同一套能力**：RimArcho 内置的 AI 工作台（默认开启，可以关闭）；外部 agent（Claude Code、Codex 等）通过 `archo mcp` 接入。
-- **它需要的东西**：每个对象都有能直接引用的名字；每个结论都带证据；玩家能做的动作，它都有对应的工具；每个工具都标明是只读还是会改动东西。
-- **它和玩家守同样的规矩**：改动进撤销历史；写游戏文件要玩家确认；发给模型的内容（简介、日志、源码片段）每类任务第一次使用前征得玩家同意（09 §3）。
+- **Two ways to connect, with the same capabilities**: RimArcho's built-in AI workbench (on by default, can be disabled); external agents (Claude Code, Codex, etc.) through `archo mcp`.
+- **What it needs**: every object has a name it can reference directly; every conclusion has evidence; every player action has a corresponding tool; every tool states whether it is read-only or changes things.
+- **The same rules as players**: changes enter undo history; writing game files requires player confirmation; get player consent before first sending each task category's content (descriptions, logs, source snippets) to a model (09 §3).
 
-## 4. 原则
+## 4. Principles
 
-1. **随时知道在哪里、能去哪里、怎么回去。** 不让玩家沿着复杂路径操作，用最少的步骤完成任务。
-2. **每个结论都告诉你凭什么。** 说明证据从哪来：Mod 自己声明的、推断的、日志里的，还是社区数据。推断会标出来。
-3. **改错了随时能撤回。** 每次修改都进历史，可以对比、回退。
-4. **不乱动你的文件。** 只在你要求时写游戏文件（保存启用列表、复制到本地、为 SteamCMD 和额外目录的 Mod 建链接），写之前先预览、先备份。
-5. **玩家和 AI 助手用同一套能力。** 窗口、终端界面、命令行和 MCP 背后是同一套代码，玩家看到的和 AI 拿到的是同一份事实。
-6. **不占你的电脑。** 不常驻后台，重活做完就退出。
+1. **Always know where you are, where you can go and how to return.** Avoid complicated paths; complete tasks in as few steps as possible.
+2. **Every conclusion tells you why.** State whether evidence comes from a Mod's declaration, inference, logs or community data. Label inferences.
+3. **Undo mistakes at any time.** Every edit enters history, for comparison and rollback.
+4. **Respect your files.** Write game files only on request (save the enabled list, copy locally, create links for SteamCMD and extra-folder Mods), with a preview and backup first.
+5. **Players and AI assistants use the same capabilities.** The window, terminal UI, CLI and MCP use the same code; players and AI receive the same facts.
+6. **Leave your computer free.** No resident background process; exit when heavy work finishes.
 
-对应的技术原则见 00a §3。
+See 00a §3 for the corresponding technical principles.
 
-## 5. 版本路线
+## 5. Version roadmap
 
-| 版本 | 回答的问题 | 主要内容 |
+| Version | Question answered | Main content |
 | --- | --- | --- |
-| 1.0 | 我现在在玩什么，它能正常跑吗 | 列表（一个环境可以有多个）、启动、整合包、锁定版本、能不能跑、日志归因与实时追踪、导入导出、侧栏界面与首次引导 |
-| 1.1 | 有什么没玩到 | 读取存档、没碰过的内容、存档管理、Archo |
-| 1.2 | 有什么没玩到（续） | 工坊合集一键订阅与退订、本局主题与内容冲突 |
-| 远期 | 有什么值得玩 | 玩家分享的整合包、理解玩家的内容与游玩目标推荐 |
+| 1.0 | What am I playing, and will it run | Lists (multiple per environment), launching, packs, locked versions, can it run, log attribution and live tracking, import/export, sidebar UI and first-run guide |
+| 1.1 | What haven't I played yet | Save reading, untouched content, save management, Archo |
+| 1.2 | What haven't I played yet (continued) | One-click Workshop collection subscription and unsubscription, playthrough themes and content conflicts |
+| Longer term | What's worth playing | Player-shared packs, content and play-goal recommendations that understand the player |
 
-细节和每项的完成状态见 01。
+See 01 for details and completion status of each item.
 
-## 6. 决策记录
+## 6. Decision record
 
-只记现在有效的结论。编号不重排，缺号的是已经作废的决策。
+Record only conclusions still in force. Do not renumber; missing numbers are retired decisions.
 
-| # | 决策 | 结论 |
+| # | Decision | Conclusion |
 | --- | --- | --- |
-| D2 | 主要用户 | 玩家。AI 在玩家群体中渗透率还不高，所有功能没有 AI 也要好用。AI 助手的地位见 D12 |
-| D3 | 界面 | GUI 为主，用侧栏按三个问题组织页面；TUI 是列表编辑器的键盘版。两者共用视图模型，各自绘制（06） |
-| D4 | 与 RimCrow 的数据关系 | 独立运行，可以一次性导入别名、分组（变成标签）、用户规则和列表（04 §8） |
-| D5 | 程序集分析 | Go 原生读 .NET 元数据，拿到 Harmony 补丁和类型引用；看源码时再按需调用 ilspycmd（03 §5.3、§5.4） |
-| D6 | AI 的写权限 | 外部 agent 走 MCP，写操作是否放行由它的 harness 决定。内置 Archo 的写操作走现有动作、进撤销历史，写游戏文件、删除、备份仍要玩家确认（09 §2） |
-| D8 | Mod 身份与变化追踪 | 身份由 RimArcho 维护并逐次对账，对不上时交给玩家确认（00a §4、02）。墓碑默认保留 90 天，可配置 |
-| D9 | GUI 技术 | Wails v3 + 原生 HTML/CSS/JS，不用框架、没有构建步骤；不是把 TUI 渲染进窗口（06 §8） |
-| D10 | 版本划分 | 见 §5 和 01 §1 |
-| D11 | 定位 | 懂 RimWorld 玩家的一站式启动器，回答三个问题：我现在在玩什么，它能正常跑吗；有什么没玩到；有什么值得玩。1.0 回答第一个问题 |
-| D12 | AI 助手的地位| 作为第二类用户来设计，不是玩家功能的附件 |
-| D13 | AI 助手的名字| 内置 AI 助手叫 Archo，形象是项目图标 `internal/icon/portrait.svg`；2026-10-25 起头像上的蝴蝶结作为标志，用在小尺寸（06 §7） |
-| D14 | 列表与整合包 | 未编译的启用列表叫**列表**，跟着工坊更新；编译出的固定产物叫**整合包**，每个 Mod 的版本锁住，有自己的存档（04、08 §5） |
-| D15 | 一个环境多个方案 | 一个环境可以有多个列表。列表共用游戏默认的存档，不提供独立存档的选项；要隔离就编译成整合包（04 §1） |
-| D16 | 启动模型 | 同一时间只允许运行一个游戏。启动列表时才把它写进 ModsConfig.xml，所以多个环境可以共用游戏默认的用户数据目录（08 §1） |
-| D17 | 锁定版本 | 锁定版本是单个 Mod 级别的：复制成同一 Lineage 下的新 Instance，不受工坊更新影响（04 §7） |
-| D18 | 存档管理 | 存档分析只读；存档管理可以在玩家确认后备份存档、把存档移到回收站（10 §4） |
-| D19 | 订阅与退订（2026-10-20） | 订阅交给 Steam；退订时向 Steam 发请求，再由 RimArcho 把本地文件夹移到回收站，不等 Steam 慢慢清理（1.2） |
-| D20 | 页面宽度| 按页面形状分：分栏的页面（列表加详情、表格）铺满窗口，栏宽和编辑器一样可拖；只有一栏的页面共用 960px 的阅读宽度。全部铺满则要把表单页硬拆成几栏（06 §7.3 第 12 条） |
-| D21 | Archo Monitor 更新与正在玩的游戏| 检查把列表里的旧 Monitor 换成新版本时不等游戏退出，也不在启动时再换一次；只换 Monitor 的版本不算列表变了：这次运行的日志照常计数（03 §6.4），旧版本留在 `Mods/` 的链接在下次写入前不和新版本抢（08 §3）。理由：VM 里第一次扫描比启动晚 27 秒才完成，启动时新版本还没扫描到，启动时换不了；等游戏退出再换，退出后那一换同样让刚结束的运行过时。Monitor 只记录，不改变别的 Mod 怎么加载，换版本不改变日志说的是哪份列表（08 §9） |
-| D22 | 能不能跑的形状| GUI 分两列：左列是检查文件和分享的日志发现的（会让游戏出错、可以留意、要你确认），右列是游戏日志看到的；每项的全部动作是底下一行的按钮，没有 `⋯`；做完的项留在原地带撤销（06 §2.4、§5）。“可以留意”是 RimArcho 从分享的日志里学到的东西，算核心功能，单独成区、不淡化、放在要你确认之前。隐藏或锁定的 Mod 和过时的转换贴图不影响列表能不能跑，移到 Mod 库存和贴图优化。理由：一页原来装了五种不同来源的东西，一项的内容散在行、`⋯` 菜单、展开和弹层里；分成“预测的”和“实际发生的”两列，游戏运行时右列实时更新、左列不动。候选和比较见 `docs/design/canitrun-drafts/` |
-| D23 | MCP 渐进式披露（2026-10-30）| agent 连上 MCP 时只读到短的 Instructions 和每个工具一到三句的描述；每个动作的细节、示例、诊断流程和错误范式清单放进只读工具 `guide`（CLI `archo guide`），用到时再取（05 §5.3）。理由：精简前连上就要读 Instructions 8816 字符加工具描述 44509 字符（约 13k token），`tools/list` 连参数结构 81 KB，一次会话大多用不到；精简后 1589 + 8831 字符、43.8 KB。用工具而不用 MCP resource：所有客户端都支持工具，resource 的支持参差，agent 也很少主动去读。做成 CLI 命令，保住“每个 MCP 工具就是一条 CLI 命令、输出逐字相同”（05 §1.1），评测脚本和 TUI 命令面板也能用。工具名和参数都没改，别名 `add_rule`、`copy_local` 照 05 §6 保留，只把描述缩成一句 |
-| D24 | TUI 不自带终端（2026-10-30） | TUI 在玩家自己的终端里运行，不再下载、启动 WezTerm，不随发布包分发字体，不画图片（06 §9.2、§9.3）。理由：自带终端要多下载约 66 MB、多一个常驻进程（空闲约 91 MB），还要维护配置生成、字体打包和 OSC 1337 的绘制与清除；换来的图标和缩略图只是锦上添花，图片和大图浏览在 GUI 里做得更好。命令行 `:` 能运行全部命令、直接执行，和 CLI 一样（06 §9.4） |
-| D25 | RimArcho 自己的更新（2026-10-31） | 检查接进自动维护（`self` 类别，同一个计时器和间隔档位），安装要玩家确认（01 §4）。玩家定的三点：**通道跟着正在运行的版本**：正式版只看正式版，预发布版也看更新的预发布版，不加设置项；**提示在设置 › 更新的“RimArcho”一行和启动页右上的一行**，发现时一条安静通知，不弹窗（06 §3.1 规则 7）；**还有别的 RimArcho 开着时先下载、核对，等它们都关掉再替换**，不拒绝也不硬换：新版本可能升级数据库，旧版本接着用会出错，而让玩家先去关窗口再回来点又多一步。替换用 Windows 允许的“改名正在运行的 exe”，新程序报不出新版本就换回；数据目录不动，退回旧版本要自己备份数据库（07 §5.1） |
+| D2 | Primary users | Players. AI adoption among players is still low; every feature must work well without AI. See D12 for the role of AI assistants |
+| D3 | Interface | GUI first, with sidebar pages organized around the three questions; TUI is the keyboard version of the list editor. Both share view models and render separately (06) |
+| D4 | Data relationship with RimCrow | Runs independently; supports one-time import of aliases, groups (as tags), user rules and lists (04 §8) |
+| D5 | Assembly analysis | Read .NET metadata natively in Go for Harmony patches and type references; invoke ilspycmd on demand to view source (03 §5.3, §5.4) |
+| D6 | AI write permissions | External agents use MCP; their harness decides whether writes are allowed. Built-in Archo uses existing actions and undo history; writing game files, deleting and backing up still require player confirmation (09 §2) |
+| D8 | Mod identity and change tracking | RimArcho maintains identity and reconciles each scan; ask players to confirm unmatched cases (00a §4, 02). Keep tombstones for 90 days by default, configurable |
+| D9 | GUI technology | Wails v3 + native HTML/CSS/JS, no framework or build step; does not render the TUI into a window (06 §8) |
+| D10 | Version scope | See §5 and 01 §1 |
+| D11 | Positioning | A one-stop launcher that understands RimWorld players and answers three questions: what am I playing and will it run; what haven't I played yet; what's worth playing. 1.0 answers the first |
+| D12 | AI assistants' role | Design them as a second kind of user, not an attachment to player features |
+| D13 | AI assistant's name | The built-in AI assistant is Archo, represented by `internal/icon/portrait.svg`; since 2026-10-25, the portrait's bow serves as the small-size mark (06 §7) |
+| D14 | Lists and packs | An uncompiled enabled list is a **list**, following Workshop updates; a compiled fixed artifact is a **pack**, with every Mod version locked and its own saves (04, 08 §5) |
+| D15 | Multiple plans per environment | One environment can have multiple lists. Lists share the game's default saves, with no option for separate saves; compile a pack for isolation (04 §1) |
+| D16 | Launch model | Only one game may run at a time. Write a list to ModsConfig.xml only when launching it, so multiple environments can share the game's default user data directory (08 §1) |
+| D17 | Locked versions | Lock individual Mods: copy to a new Instance in the same Lineage, unaffected by Workshop updates (04 §7) |
+| D18 | Save management | Save analysis is read-only; save management may back up saves or move them to the recycle bin after player confirmation (10 §4) |
+| D19 | Subscribing and unsubscribing (2026-10-20) | Steam handles subscriptions; for unsubscription, request it from Steam, then have RimArcho move the local folder to the recycle bin instead of waiting for Steam's slow cleanup (1.2) |
+| D20 | Page width | By page shape: multi-column pages (lists with details, tables) fill the window, with draggable column widths like the editor; single-column pages share a 960px reading width. Filling all pages would force forms into several columns (06 §7.3 item 12) |
+| D21 | Archo Monitor updates and running games | When a check replaces an old Monitor in a list with a new version, do not wait for the game to exit or swap again at launch; changing only the Monitor version does not make the list changed: this run's logs still count (03 §6.4), and the old version's `Mods/` link does not compete with the new version before the next write (08 §3). Rationale: in the VM, the first scan finished 27 seconds after launch; the new version had not been scanned at launch and could not be swapped then. Waiting for game exit would likewise make the just-ended run stale. Monitor only records; it does not change how other Mods load, so its version does not change which list the logs describe (08 §9) |
+| D22 | Shape of can it run | GUI has two columns: the left contains findings from file checks and shared logs (breaks the game, worth knowing, for you to confirm); the right contains observations from game logs. All actions for each item are a bottom row of buttons, without `⋯`; completed items stay in place with undo (06 §2.4, §5). "worth knowing" is what RimArcho learned from shared logs: a core feature, in its own section, not faded, before identity questions. Hidden or locked Mods and outdated converted textures do not affect whether the list can run; move them to mod library and texture optimization. Rationale: the page had five kinds of sources, and each item's content was scattered across rows, `⋯` menus, expansions and popovers. Split into "predicted" and "actually happened" columns: the right updates live while the game runs; the left stays still. Candidates and comparison: `docs/design/canitrun-drafts/` |
+| D23 | MCP progressive disclosure (2026-10-30) | On MCP connection, agents read only short Instructions and one-to-three-sentence tool descriptions; action details, examples, diagnostic workflows and the error pattern catalog live in the read-only `guide` tool (CLI `archo guide`), fetched as needed (05 §5.3). Rationale: before trimming, connection required reading 8816 characters of Instructions plus 44509 characters of tool descriptions (about 13k tokens); `tools/list` with parameter schemas was 81 KB, mostly unused per session. Afterwards: 1589 + 8831 characters, 43.8 KB. Use a tool rather than an MCP resource: all clients support tools, resource support varies, and agents rarely read resources proactively. Making it a CLI command preserves "every MCP tool is a CLI command, with identical output" (05 §1.1); evaluation scripts and the TUI command panel can also use it. Tool names and parameters are unchanged; keep `add_rule` and `copy_local` aliases under 05 §6, shortening only their descriptions to one sentence |
+| D24 | TUI has no bundled terminal (2026-10-30) | TUI runs in the player's terminal; no WezTerm download or launch, bundled fonts or image drawing (06 §9.2, §9.3). Rationale: bundling a terminal adds about 66 MB of downloads and a resident process (about 91 MB idle), plus configuration generation, font packaging and OSC 1337 drawing/clearing to maintain. Icons and thumbnails are only a bonus; GUI handles images and large previews better. The `:` command line runs every command directly, like CLI (06 §9.4) |
+| D25 | RimArcho self-updates (2026-10-31) | Checks join automatic maintenance (`self` category, same timer and interval levels); installation requires player confirmation (01 §4). Three player requirements: **channel follows the running version**: stable sees only stable; prerelease also sees newer prereleases, without a setting; **show a line in Settings › Updates under "RimArcho" and at the top right of the launch page**, with one quiet notification on discovery and no dialog (06 §3.1 rule 7); **if other RimArcho processes are open, download and verify first, then wait for all to close before replacement**, without refusing or forcing: a new version may migrate the database and break older versions still using it; asking players to close windows and come back to click adds a step. Replace by renaming the running exe, which Windows allows; roll back if the new program cannot report its new version. Leave the data directory alone; back up the database yourself before downgrading (07 §5.1) |

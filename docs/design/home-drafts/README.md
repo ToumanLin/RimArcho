@@ -1,43 +1,43 @@
-# RimArcho 启动页排布草案
+# RimArcho start-page layout drafts
 
-本轮只探索用户提出的「游戏 → 方案/整合包 → 启动游戏」。界面沿用项目已定用词：方案显示为「列表」，环境显示为「游戏」。此前偏离项目的品牌、文案、配色和统计卡片已移除。
+This round explores only the user's "game → list/pack → launch game" request. The interface keeps established project wording: plans appear as "lists", environments as "games". Earlier off-project branding, copy, colors and statistics cards have been removed.
 
-## 依据与复用
+## Basis and reuse
 
-- `docs/00-top-level-design.md`：一站式启动器；先回答“我现在在玩什么，它能正常跑吗”；最少步骤。
-- `docs/00a-architecture.md` §1：游戏、列表、整合包和启动记录的关系。
-- `docs/specs/06-ui.md` §2.1–2.3：侧栏、顶部导航、面包屑、原版游戏主菜单、跨游戏的最近列表、左下两行动向和启动问题条。
-- `docs/specs/06-ui.md` §2.14：游戏原图或纯色背景；§3.1：移动与应用分开，减少弹层；§7–7.2：magpie 灰白与淡紫色板、小字号、短文案，无左侧强调竖线，玩家用词。
-- `docs/specs/04-plans-and-sorting.md` §1：一个游戏多个列表，编辑持久化与写入游戏分开。
-- `docs/specs/08-launch-and-packs.md` §1–2、§5.3：应用时不写游戏文件；启动直接执行；同时只运行一个游戏；整合包保留自己的存档与设置。
+- `docs/00-top-level-design.md`: one-stop launcher; first answer "what am I playing, and will it run"; minimum steps.
+- `docs/00a-architecture.md` §1: relationships between games, lists, packs and launch records.
+- `docs/specs/06-ui.md` §2.1–2.3: sidebar, top navigation, breadcrumbs, vanilla game main menu, recent lists across games, two bottom-left activity lines and launch warning strip.
+- `docs/specs/06-ui.md` §2.14: original game art or solid background; §3.1: separate movement and applying, reduce popovers; §7–7.2: magpie gray/white and pale-purple palette, small text, short copy, no left accent bars, player wording.
+- `docs/specs/04-plans-and-sorting.md` §1: multiple lists per game, persistent edits separate from writing to the game.
+- `docs/specs/08-launch-and-packs.md` §1–2, §5.3: applying does not write game files; launching executes directly; one running game at a time; packs keep their own saves and settings.
 
-预览直接加载仓库的 `style.css`、`shell.js`、`icons.js`。原版对照直接运行现有 `home.js`。不复制一套相似的导航或视觉组件。只有 Wails 接口在预览中替换为 `HomeRow` / `Home` 形状的浏览器示例数据。
+Previews load the repository's `style.css`, `shell.js` and `icons.js` directly. The original comparison runs existing `home.js` directly. No duplicate lookalike navigation or visual components. Only Wails APIs are replaced by browser example data shaped as `HomeRow` / `Home`.
 
-## 四个视图
+## Four views
 
-- **原版对照**：现有 `home.js` 渲染，作为本次修改的起点。
-- **A · 底部并排**：保留跨游戏的最近列表和左下动态，把启动区变成底部同一行的三个控件。
-- **B · 上部并排**：相同三个控件放在页面左上，其余内容与 A 一致。
-- **C · 分列选择**：左列游戏，中列该游戏的列表与整合包，右下启动。与原版的差别是把跨游戏混排列出改成按游戏查看。
+- **Original comparison**: existing `home.js` rendering, the starting point for this change.
+- **A · Bottom row**: keep recent lists across games and bottom-left activity; make launch area three controls in one bottom row.
+- **B · Top row**: same three controls at top-left; otherwise identical to A.
+- **C · Columns**: games on left, that game's lists/packs in middle, launch at bottom-right. Unlike the original, browse by game rather than mixing games.
 
-原版及 A/B 都显示所有游戏的最近列表；下拉框只显示选定游戏的列表与整合包。列表行单击、方向键只移光标，应用按钮或 Enter 才应用；选择框的明确选择直接应用，仍不写游戏文件。切换游戏记住各自上次选中的项。
+Original and A/B show recent lists from all games; dropdown shows only selected game's lists/packs. Clicking a list row or arrows only moves cursor; apply button/Enter applies. Explicit dropdown selection applies directly, still without game-file writes. Remember each game's last selected item.
 
-共有：原侧栏及其顶部布局、后台任务入口、上次游戏和当前列表变化、启动提示、有问题仍可启动、运行中禁用启动、未检查说明、没有游戏的空状态、键盘导航。没有新增欢迎语、装饰大标题、品牌区、常驻成功标记、DLC 统计、游戏时长卡片或启动确认弹窗。
+Shared: original sidebar/top layout, tasks entry, last game/current-list changes, launch hints, launch despite problems, disabled launch while running, unchecked explanation, no-game empty state, keyboard navigation. No new welcome text, decorative titles, branding section, persistent success marks, DLC stats, playtime cards or launch confirmation dialogs.
 
-顶部和底部的对比栏在产品画布外。可以切换原图 / 纯色和有问题 / 无问题 / 未检查 / 游戏运行中 / 无游戏状态。原图直接读取本机游戏的 Core `About/Preview.png`，没有把游戏素材加入仓库。
+Top/bottom comparison bars sit outside product canvas. Switch original art/solid and problems/no problems/unchecked/running/no game. Original art reads local game's Core `About/Preview.png` directly; no game assets added to repository.
 
-## 本地预览
+## Local preview
 
-从任意位置运行：
+Run from anywhere:
 
 ```powershell
 node D:/Game/RimModManager_Upgrade/RimArcho/docs/design/home-drafts/server.cjs
 ```
 
-打开 `http://127.0.0.1:8766/?design=original`，用顶部标签对比。需要指定背景时，设置 `RIMARCHO_DRAFT_BACKGROUND` 为本地图片绝对路径；端口通过 `RIMARCHO_DRAFT_PORT` 设置。
+Open `http://127.0.0.1:8766/?design=original` and compare via top tabs. Set `RIMARCHO_DRAFT_BACKGROUND` to an absolute local image path to choose a background; `RIMARCHO_DRAFT_PORT` sets the port.
 
-草案的启动按钮只模拟运行状态，所有示例数据留在浏览器。生产启动修复与这里的设计探索分开，未将任何草案接入正式首页。
+Draft launch buttons only simulate running; all example data stays in browser. Production launch fixes are separate from this exploration; no draft is connected to the real home page.
 
-## 验证
+## Validation
 
-已在 1440 × 880 桌面尺寸实际渲染原版和 A/B/C；检查游戏与列表选择联动、C 版按游戏显示、纯色模式、有提示但仍允许启动、未检查说明、运行中禁用启动、没有游戏的空状态和现有导航位置切换。启动结果在原状态行显示，没有新增确认弹窗。截图为 `previews/original.jpg`、`a.jpg`、`b.jpg`、`c.jpg`，对比图为 `previews/overview-v2.jpg`。
+Actually rendered original/A/B/C at 1440 × 880 desktop size; checked linked game/list selection, C's per-game display, solid background, launch allowed with hints, unchecked explanation, disabled running launch, no-game empty state and existing navigation-position switching. Launch results use original status line, no new confirmation dialog. Screenshots: `previews/original.jpg`, `a.jpg`, `b.jpg`, `c.jpg`; comparison: `previews/overview-v2.jpg`.

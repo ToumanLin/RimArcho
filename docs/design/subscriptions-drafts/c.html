@@ -1,14 +1,14 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>订阅与更新 C</title>
+<title>subscriptions and updates C</title>
 <link rel="stylesheet" href="shared.css">
 <style>
-/* C (B, second draft): 订阅与更新 is one list and a detail: what waits for you, then what already
-   changed. Adding is its own sub-page, Mod 库 / 添加订阅. */
+/* C (B, second draft): subscriptions and updates is one list and a detail: what waits for you, then what already
+   changed. Adding is its own sub-page, mod library / add subscription. */
 .split { display: grid; grid-template-columns: minmax(330px, 430px) minmax(0, 1fr); gap: var(--card-gap); height: 100%; }
 .leftcol { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: var(--card-gap); min-height: 0; }
 /* the scope bar above the left list */
@@ -41,7 +41,7 @@
 .kv { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 4px 10px; font-size: 12.5px; }
 .kv > :nth-child(odd) { color: var(--muted); }
 
-/* Mod 库 / 添加订阅 */
+/* mod library / add subscription */
 .addv { height: 100%; overflow-y: auto; }
 .addv .col { max-width: 720px; margin: 0 auto; padding: 18px 0 24px; display: grid; gap: 12px; }
 .addv .omni { height: 46px; font-size: 14px; border-radius: 12px; }
@@ -61,8 +61,8 @@
 </style>
 </head>
 <body>
-<header class="review"><b>订阅与更新 · 候选 C（B 第二稿）：更新和变化一页，添加是子页</b><span>示例数据，不读写文件</span><span class="sp"></span>
-  <a href="a.html">A</a><a href="b.html">B</a><a href="c.html" class="on">C</a><button class="rb" id="theme">深浅色</button></header>
+<header class="review"><b>subscriptions and updates · C (B second draft): updates and changes together, add on a subpage</b><span>example data; no file reads or writes</span><span class="sp"></span>
+  <a href="a.html">A</a><a href="b.html">B</a><a href="c.html" class="on">C</a><button class="rb" id="theme">light / dark</button></header>
 <div id="app">
   <aside id="side"><div class="side-head"></div><nav id="nav"></nav></aside>
   <div id="main">
@@ -75,7 +75,7 @@
 <div id="veil" hidden></div>
 <script src="shared.js"></script>
 <script>
-const PLAN = "主力殖民地";
+const PLAN = "Main colony";
 const S = { page: "subs", sel: "pf", scope: 0, done: new Set(), text: "", st: {}, checking: false };
 const inScope = (x) => S.scope === 1 || x.used.includes(PLAN);
 const pendingAll = () => PENDING.filter((p) => !S.done.has(p.id));
@@ -85,31 +85,31 @@ const changes = () => CHANGES.filter(inScope).sort((a, b) => a.t - b.t);
 const items = () => [...pending().map((p) => p.id), ...changes().map((c) => c.id), "arr"];
 
 function head() {
-  const check = `<button class="btn line" data-do="check">${S.checking ? `<span class="spin" style="display:inline-flex">${ic("refresh")}</span>正在检查…` : `${ic("refresh")}检查更新`}<kbd>R</kbd></button>`;
-  if (S.page === "subs") $("#head").innerHTML = `<p class="lead">先是等你更新的（Git、LoversLab、SteamCMD），再是已经变了的（Steam 工坊自己更新的）</p>
-    <div class="page-acts">${check}<button class="btn line" data-page="add">${ic("plus")}添加订阅<kbd>+</kbd></button></div>`;
-  else $("#head").innerHTML = `<p class="lead">粘贴一个地址，RimArcho 认出它是什么、从哪里下载、以后怎么检查更新</p>`;
+  const check = `<button class="btn line" data-do="check">${S.checking ? `<span class="spin" style="display:inline-flex">${ic("refresh")}</span>checking…` : `${ic("refresh")}check for updates`}<kbd>R</kbd></button>`;
+  if (S.page === "subs") $("#head").innerHTML = `<p class="lead">Waiting for your update first (Git, LoversLab, SteamCMD), then already changed (automatic Steam Workshop updates)</p>
+    <div class="page-acts">${check}<button class="btn line" data-page="add">${ic("plus")}add subscription<kbd>+</kbd></button></div>`;
+  else $("#head").innerHTML = `<p class="lead">Paste an address; RimArcho recognizes it, its download source and how to check updates later</p>`;
 }
 
 function leftList() {
   const P = pending(), C = changes(), hiddenP = pendingAll().length - P.length;
   const pRows = P.map((p) => `<button class="row lrow ${S.sel === p.id ? "sel" : ""}" data-sel="${p.id}">
       <span class="nm">${esc(p.n)}</span><span class="m">${src(p.s)}<span>${p.from} → ${p.to}</span></span>
-      <span class="ri">${p.s === "ll" ? '<span class="pill">要选文件</span>' : ""}<span class="when">${p.toD}</span></span></button>`).join("");
+      <span class="ri">${p.s === "ll" ? '<span class="pill">choose a file</span>' : ""}<span class="when">${p.toD}</span></span></button>`).join("");
   const cRows = C.map((c) => `<button class="row lrow ${S.sel === c.id ? "sel" : ""}" data-sel="${c.id}">
       <span class="nm">${esc(c.n)}</span><span class="m"><span>${esc(c.say)}</span></span>
       <span class="ri"><span class="pill tier${c.t}">${TIER[c.t]}</span></span></button>`).join("");
   return `<div class="scroll" style="padding-bottom:6px">
-    <div class="lh"><h3>等你更新 <span class="n">${P.length}</span></h3><span class="r"><button class="btn primary small" data-do="all" ${P.length ? "" : "disabled"}>全部更新<kbd style="color:inherit;opacity:.7">U</kbd></button></span></div>
-    ${P.length ? pRows : `<div class="allgood"><span class="ok">${ic("check")}</span>都是最新的</div>`}
-    ${hiddenP ? `<div class="hidden-note">别的列表还有 ${hiddenP} 个<button class="btn link" data-scope="1">看整个库</button></div>` : ""}
-    <div class="lh"><h3>已经更新 <span class="n">${C.length}</span></h3><span class="r muted" style="font-size:12px">Steam 工坊自动</span></div>
+    <div class="lh"><h3>waiting for you to update <span class="n">${P.length}</span></h3><span class="r"><button class="btn primary small" data-do="all" ${P.length ? "" : "disabled"}>update all<kbd style="color:inherit;opacity:.7">U</kbd></button></span></div>
+    ${P.length ? pRows : `<div class="allgood"><span class="ok">${ic("check")}</span>everything is up to date</div>`}
+    ${hiddenP ? `<div class="hidden-note">other lists have ${hiddenP} items<button class="btn link" data-scope="1">see whole library</button></div>` : ""}
+    <div class="lh"><h3>already updated <span class="n">${C.length}</span></h3><span class="r muted" style="font-size:12px">automatic Steam Workshop</span></div>
     ${cRows}
-    <button class="row lrow ${S.sel === "arr" ? "sel" : ""}" data-sel="arr"><span class="nm" style="font-weight:500">新订阅 ${ARRIVALS.add.length} 个，不见了 ${ARRIVALS.gone.length} 个</span><span class="m"><span>${ARRIVALS.add.concat(ARRIVALS.gone).join("、")}</span></span><span class="ri"><span class="pill">订阅变动</span></span></button>
-    <div class="lh quiet"><h3>更早</h3></div>
-    ${OLDER.map((o) => `<button class="row lrow"><span>${o.day}</span><span class="m"><span>${o.n} 个 Mod</span></span><span class="ri faint">${ic("chev")}</span></button>`).join("")}
+    <button class="row lrow ${S.sel === "arr" ? "sel" : ""}" data-sel="arr"><span class="nm" style="font-weight:500">${ARRIVALS.add.length} new subscriptions, ${ARRIVALS.gone.length} missing</span><span class="m"><span>${ARRIVALS.add.concat(ARRIVALS.gone).join(", ")}</span></span><span class="ri"><span class="pill">subscription changes</span></span></button>
+    <div class="lh quiet"><h3>earlier</h3></div>
+    ${OLDER.map((o) => `<button class="row lrow"><span>${o.day}</span><span class="m"><span>${o.n} mods</span></span><span class="ri faint">${ic("chev")}</span></button>`).join("")}
   </div>
-  <div class="foot"><button class="srcsum" data-do="sources">${ic("clock")}14:02 检查过 4 个来源${ic("down")}</button><span class="warn" style="margin-left:auto;display:inline-flex;gap:4px;align-items:center">${ic("warn")}工坊 2 个已找不到</span></div>`;
+  <div class="foot"><button class="srcsum" data-do="sources">${ic("clock")}4 sources checked at 14:02${ic("down")}</button><span class="warn" style="margin-left:auto;display:inline-flex;gap:4px;align-items:center">${ic("warn")}2 Workshop items unavailable</span></div>`;
 }
 
 function subsPage() {
@@ -118,60 +118,60 @@ function subsPage() {
   const p = PENDING.find((x) => x.id === S.sel), c = CHANGES.find((x) => x.id === S.sel);
   return `<div class="split">
     <div class="leftcol">
-      <div class="scopebar"><div class="seg">${[`列表「${PLAN}」`, "所有 Mod"].map((x, i) => `<button class="${S.scope === i ? "on" : ""}" data-scope="${i}" title="a">${x}</button>`).join("")}</div>
-        <span class="since">${S.scope ? "最近 10 次扫描以来" : "上次游玩 10月22日 以来"}</span></div>
+      <div class="scopebar"><div class="seg">${[`list: ${PLAN}`, "every mod"].map((x, i) => `<button class="${S.scope === i ? "on" : ""}" data-scope="${i}" title="a">${x}</button>`).join("")}</div>
+        <span class="since">${S.scope ? "since last 10 scans" : "since last played Oct 22"}</span></div>
       <section class="card">${leftList()}</section>
     </div>
     <section class="card">${p ? updDetail(p) : c ? chgDetail(c) : arrDetail()}</section></div>`;
 }
 function usedBlock(used, extra) {
-  return `<div class="sub-h">用在</div><div class="sec"><div style="display:flex;gap:6px;flex-wrap:wrap">${used.map((u) => `<span class="pill ${u === PLAN ? "cur" : ""}">${u}</span>`).join("")}</div>${extra}</div>`;
+  return `<div class="sub-h">used in</div><div class="sec"><div style="display:flex;gap:6px;flex-wrap:wrap">${used.map((u) => `<span class="pill ${u === PLAN ? "cur" : ""}">${u}</span>`).join("")}</div>${extra}</div>`;
 }
 function updDetail(p) {
   let body = "";
-  if (p.kind === "commits") body = `<div class="sub-h">改了什么<span class="r">${p.log.length} 个提交</span></div><div class="sec"><div class="log">${p.log.map(([h, m, d]) => `<code>${h}</code><span>${esc(m)}</span><span class="d">${d}</span>`).join("")}</div>
-    <div class="note">${ic("info")}<span>按改动的文件推断：${p.impact}</span></div></div>`;
-  else if (p.kind === "files") body = `<div class="sub-h">改了什么</div><div class="sec"><div style="color:var(--fg-2)">${esc(p.note)}</div><div class="muted" style="font-size:12px">${p.impact}</div></div>
-    <div class="sub-h">下载哪个文件</div><div class="sec"><div class="choice">${p.files.map(([n, s, d, same], i) => `<button class="opt ${(S.st[p.id] ?? 0) === i ? "on" : ""}" data-pfile="${p.id}:${i}"><span class="rd"></span><span class="nm">${n}${same ? "<small>和上次下载的同名</small>" : ""}</span><span class="ext">${s}  ${d}</span></button>`).join("")}</div>
-    <div class="facts"><div class="f"><span class="ok">✓</span><span>已登录 LoversLab（11月30日到期）。下载前会显示站点的下载协议</span></div></div>
-    <div><button class="btn small">或者选下载好的 zip…</button><button class="btn small">${ic("ext")}打开下载页</button></div></div>`;
-  else body = `<div class="sub-h">改了什么</div><div class="sec"><div style="color:var(--fg-2)">${esc(p.note)}</div><div class="muted" style="font-size:12px">${p.impact}；下载后按文件说明改了什么</div></div>`;
+  if (p.kind === "commits") body = `<div class="sub-h">what changed<span class="r">${p.log.length} commits</span></div><div class="sec"><div class="log">${p.log.map(([h, m, d]) => `<code>${h}</code><span>${esc(m)}</span><span class="d">${d}</span>`).join("")}</div>
+    <div class="note">${ic("info")}<span>inferred from changed files: ${p.impact}</span></div></div>`;
+  else if (p.kind === "files") body = `<div class="sub-h">what changed</div><div class="sec"><div style="color:var(--fg-2)">${esc(p.note)}</div><div class="muted" style="font-size:12px">${p.impact}</div></div>
+    <div class="sub-h">which file</div><div class="sec"><div class="choice">${p.files.map(([n, s, d, same], i) => `<button class="opt ${(S.st[p.id] ?? 0) === i ? "on" : ""}" data-pfile="${p.id}:${i}"><span class="rd"></span><span class="nm">${n}${same ? "<small>same name as last download</small>" : ""}</span><span class="ext">${s}  ${d}</span></button>`).join("")}</div>
+    <div class="facts"><div class="f"><span class="ok">✓</span><span>signed in to LoversLab (expires Nov 30). Site download terms appear before downloading</span></div></div>
+    <div><button class="btn small">or choose a downloaded zip…</button><button class="btn small">${ic("ext")}open download page</button></div></div>`;
+  else body = `<div class="sub-h">what changed</div><div class="sec"><div style="color:var(--fg-2)">${esc(p.note)}</div><div class="muted" style="font-size:12px">${p.impact}; after downloading, explain changes by file</div></div>`;
   return `<div class="dhead"><h2>${esc(p.n)}</h2>
-      <div class="facts2"><span class="pill">等你更新</span>${src(p.s)}<span>${p.from}${p.fromD ? "（" + p.fromD + "）" : ""} → <b style="font-weight:600;color:var(--fg)">${p.to}</b>${p.toD ? "（" + p.toD + "）" : ""}</span>${p.track ? `<span>跟踪 ${p.track}</span>` : ""}</div>
-      <div class="acts"><button class="btn primary" data-upd="${p.id}">${p.s === "ll" ? "下载并更新" : "更新"}<kbd style="color:inherit;opacity:.7">u</kbd></button></div></div>
-    <div class="scroll">${body}${usedBlock(p.used, `<div class="muted" style="font-size:12px">更新会替换 Mods 文件夹里的这一份。想留着旧版：先锁定这个版本</div>
-      <div><button class="btn line small">锁定现在这个版本</button>${p.s === "git" ? `<button class="btn small">${ic("ext")}在 GitHub 看对比</button>` : ""}<button class="btn small">在 Mod 库打开</button></div>`)}</div>`;
+      <div class="facts2"><span class="pill">waiting for you to update</span>${src(p.s)}<span>${p.from}${p.fromD ? " (" + p.fromD + ")" : ""} → <b style="font-weight:600;color:var(--fg)">${p.to}</b>${p.toD ? " (" + p.toD + ")" : ""}</span>${p.track ? `<span>tracking ${p.track}</span>` : ""}</div>
+      <div class="acts"><button class="btn primary" data-upd="${p.id}">${p.s === "ll" ? "download and update" : "updates"}<kbd style="color:inherit;opacity:.7">u</kbd></button></div></div>
+    <div class="scroll">${body}${usedBlock(p.used, `<div class="muted" style="font-size:12px">Updating replaces this copy in Mods. To keep the old version, lock it first</div>
+      <div><button class="btn line small">lock this version first</button>${p.s === "git" ? `<button class="btn small">${ic("ext")}compare on GitHub</button>` : ""}<button class="btn small">show in the mod library</button></div>`)}</div>`;
 }
 function chgDetail(c) {
   return `<div class="dhead"><h2>${esc(c.n)}</h2>
-      <div class="facts2"><span class="pill tier${c.t}">${TIER[c.t]}</span>${src("ws")}<span>Steam 在 ${c.when} 更新</span></div>
-      <div class="acts"><button class="btn line">${ic("ext")}工坊更新说明<kbd>ctrl+w</kbd></button></div></div>
-    <div class="scroll"><div class="sub-h">这意味着什么</div><div class="sec"><div style="color:var(--fg-2)">${esc(c.say)}</div>
-      ${c.t === 1 ? `<div class="note amber">${ic("warn")}<span>启动前看一下能不能跑：代码和前置变了，最容易出问题</span><button class="btn link">去能不能跑 →</button></div>` : ""}</div>
-      <div class="sub-h">改了哪些文件<span class="r"><button class="btn small">逐个文件<kbd>i</kbd></button></span></div><div class="sec"><div class="kv">${c.groups.map(([a, b]) => `<span>${a}</span><span>${b}</span>`).join("")}</div></div>
-      ${usedBlock(c.used, `<div class="muted" style="font-size:12px">Steam 不留旧版。不想被自动更新：锁定这个版本</div>
-        <div><button class="btn line small">锁定现在这个版本<kbd>p</kbd></button><button class="btn small">在 Mod 库打开</button></div>`)}</div>`;
+      <div class="facts2"><span class="pill tier${c.t}">${TIER[c.t]}</span>${src("ws")}<span>Steam updated at ${c.when}</span></div>
+      <div class="acts"><button class="btn line">${ic("ext")}Workshop change notes<kbd>ctrl+w</kbd></button></div></div>
+    <div class="scroll"><div class="sub-h">what it means</div><div class="sec"><div style="color:var(--fg-2)">${esc(c.say)}</div>
+      ${c.t === 1 ? `<div class="note amber">${ic("warn")}<span>Check can it run before launch: code and dependencies changed, the most likely trouble spots</span><button class="btn link">go to can it run →</button></div>` : ""}</div>
+      <div class="sub-h">what changed<span class="r"><button class="btn small">every file<kbd>i</kbd></button></span></div><div class="sec"><div class="kv">${c.groups.map(([a, b]) => `<span>${a}</span><span>${b}</span>`).join("")}</div></div>
+      ${usedBlock(c.used, `<div class="muted" style="font-size:12px">Steam keeps no old versions. To avoid automatic updates, lock this version</div>
+        <div><button class="btn line small">lock this version first<kbd>p</kbd></button><button class="btn small">show in the mod library</button></div>`)}</div>`;
 }
 function arrDetail() {
-  return `<div class="dhead"><h2>订阅变动</h2><div class="facts2"><span>上次游玩 10月22日 以来</span></div></div><div class="scroll">
-    <div class="sub-h">新订阅</div><div class="sec">${ARRIVALS.add.map((n) => `<div>${src("ws")}  ${n}</div>`).join("")}</div>
-    <div class="sub-h">不见了</div><div class="sec">${ARRIVALS.gone.map((n) => `<div>${n}  <span class="err">列表「${PLAN}」还在用，会影响启动</span></div>`).join("")}
-      <div><button class="btn line small">在所有列表里停用</button><button class="btn small">${ic("ext")}在工坊重新订阅</button></div></div></div>`;
+  return `<div class="dhead"><h2>subscription changes</h2><div class="facts2"><span>since last played Oct 22</span></div></div><div class="scroll">
+    <div class="sub-h">new subscription</div><div class="sec">${ARRIVALS.add.map((n) => `<div>${src("ws")}  ${n}</div>`).join("")}</div>
+    <div class="sub-h">no longer here</div><div class="sec">${ARRIVALS.gone.map((n) => `<div>${n}  <span class="err">list: ${PLAN} still uses it; affects launch</span></div>`).join("")}
+      <div><button class="btn line small">disable in every list</button><button class="btn small">${ic("ext")}resubscribe in Workshop</button></div></div></div>`;
 }
 
 function addPage() {
   const k = detect(S.text);
   if (!k) found.last = null;
   return `<div class="addv"><div class="col">
-    <label class="omni">${ic("link")}<input id="omni" placeholder="粘贴 GitHub 仓库、LoversLab 文件页、工坊链接或 ID" value="${esc(S.text)}" spellcheck="false"></label>
+    <label class="omni">${ic("link")}<input id="omni" placeholder="paste a GitHub repository, a LoversLab file page, a Workshop link or ID" value="${esc(S.text)}" spellcheck="false"></label>
     ${k ? found(k, S.st) : `<div class="tiles">
-      <button class="tile" data-sample="git"><span class="t">${ic("git")}Git 仓库</span><span class="w">作者在 GitHub 上发布的 Mod，或想用开发中的版本。以后更新只下载改动</span><code>github.com/作者/仓库</code><span class="st">不需要账户</span></button>
-      <button class="tile" data-sample="ll"><span class="t">${ic("globe")}LoversLab</span><span class="w">只在 LoversLab 发布的 Mod。粘贴文件页，选文件下载；有新版时提醒你</span><code>loverslab.com/files/file/…</code><span class="st"><span class="ok">${ic("check")}</span>已登录，11月30日到期</span></button>
-      <button class="tile" data-sample="ws"><span class="t">${ic("steam")}工坊条目</span><span class="w">用 Steam 订阅；没有 Steam 客户端时用 SteamCMD 下载</span><code>steamcommunity.com/…?id=… 或 ID</code><span class="st"><span class="ok">${ic("check")}</span>Steam 在运行，SteamCMD 账户 rim_player</span></button>
+      <button class="tile" data-sample="git"><span class="t">${ic("git")}Git repository</span><span class="w">Mods published on GitHub, or development versions. Future updates download only changes</span><code>github.com/author/repository</code><span class="st">no account needed</span></button>
+      <button class="tile" data-sample="ll"><span class="t">${ic("globe")}LoversLab</span><span class="w">A mod published only on LoversLab. Paste its file page and choose a file; RimArcho tells you when a new version is out.</span><code>loverslab.com/files/file/…</code><span class="st"><span class="ok">${ic("check")}</span>signed in, expires Nov 30</span></button>
+      <button class="tile" data-sample="ws"><span class="t">${ic("steam")}Workshop item</span><span class="w">Subscribe with Steam; without the Steam client, download with SteamCMD.</span><code>steamcommunity.com/…?id=… or ID</code><span class="st"><span class="ok">${ic("check")}</span>Steam running, SteamCMD account rim_player</span></button>
     </div>`}
-    <div class="local">${ic("zip")}<span>下载好的 zip：拖进窗口。</span>${ic("folder")}<span>本地 Mod 不用在这里添加：复制进 Mods 文件夹，下次扫描就认得</span><button class="btn link" data-do="mods">打开 Mods 文件夹</button></div>
-    <div class="sub-h" style="padding:10px 0 0">最近添加</div>
-    <div class="recent"><div class="r">${src("git")}<b>Performance Fish</b><span>10月12日</span></div><div class="r">${src("ll")}<b>Body Shape Patch</b><span>9月02日</span></div><div class="r">${src("cmd")}<b>Combat Extended</b><span>8月20日</span></div></div>
+    <div class="local">${ic("zip")}<span>Downloaded zip: drop into window.</span>${ic("folder")}<span>Local mods need no subscription: copy them into the Mods folder and the next scan finds them.</span><button class="btn link" data-do="mods">open the Mods folder</button></div>
+    <div class="sub-h" style="padding:10px 0 0">recently added</div>
+    <div class="recent"><div class="r">${src("git")}<b>Performance Fish</b><span>10/12</span></div><div class="r">${src("ll")}<b>Body Shape Patch</b><span>09/02</span></div><div class="r">${src("cmd")}<b>Combat Extended</b><span>08/20</span></div></div>
   </div></div>`;
 }
 
@@ -182,8 +182,8 @@ function render() {
   $("#page").innerHTML = S.page === "subs" ? subsPage() : addPage();
   const sc = $("#page .leftcol .scroll"); if (sc) sc.scrollTop = top;
   if (S.page === "add" && (a === "omni" || !S.text)) { const i = $("#omni"); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
-  hints(S.page === "subs" ? [["a", "列表 / 所有 Mod"], ["↑↓", "选一项"], ["u", "更新"], ["U", "全部更新"], ["R", "检查更新"], ["+", "添加订阅"]]
-    : detect(S.text) ? [["enter", "订阅"], ["esc", "取消"]] : [["ctrl+v", "粘贴"], ["esc", "回到订阅与更新"]]);
+  hints(S.page === "subs" ? [["a", "lists / all mods"], ["↑↓", "select item"], ["u", "updates"], ["U", "update all"], ["R", "check for updates"], ["+", "add a subscription"]]
+    : detect(S.text) ? [["enter", "subscribe to it"], ["esc", "cancel"]] : [["ctrl+v", "paste"], ["esc", "back to subscriptions and updates"]]);
 }
 function go(page) { S.page = page; S.text = ""; S.st = {}; render(); }
 function setText(t) { S.text = t; S.st = {}; render(); }
@@ -201,13 +201,13 @@ document.addEventListener("click", (e) => {
   if (d.file) { S.st.file = +d.file; return render(); }
   if (d.via) { S.st.via = +d.via; return render(); }
   if (d.pfile) { const [id, i] = d.pfile.split(":"); S.st[id] = +i; return render(); }
-  if (d.upd) { const p = PENDING.find((x) => x.id === d.upd); S.done.add(p.id); say(`已排进后台任务：更新 ${p.n}（${p.from} → ${p.to}）`); return render(); }
+  if (d.upd) { const p = PENDING.find((x) => x.id === d.upd); S.done.add(p.id); say(`queued background task: update ${p.n} (${p.from} → ${p.to})`); return render(); }
   if (d.do === "clear") return setText("");
-  if (d.do === "add") { say(detect(S.text) === "zip" ? "已添加 Gene Tweaks" : "已排进后台任务：订阅，完成后扫描；在订阅与更新里看结果"); return setText(""); }
-  if (d.do === "all") { pending().filter((p) => p.s !== "ll").forEach((p) => S.done.add(p.id)); if (pending().length) { S.sel = pending()[0].id; say("已排进后台任务：更新几个；Body Shape Patch 要先选文件"); } else say("已排进后台任务：全部更新"); return render(); }
-  if (d.do === "check") { S.checking = true; render(); setTimeout(() => { S.checking = false; say("检查完了：没有新的更新"); render(); }, 1400); return; }
+  if (d.do === "add") { say(detect(S.text) === "zip" ? "added Gene Tweaks" : "queued subscription; scan on completion; results in subscriptions and updates"); return setText(""); }
+  if (d.do === "all") { pending().filter((p) => p.s !== "ll").forEach((p) => S.done.add(p.id)); if (pending().length) { S.sel = pending()[0].id; say("queued several updates; choose files first for Body Shape Patch"); } else say("queued update all"); return render(); }
+  if (d.do === "check") { S.checking = true; render(); setTimeout(() => { S.checking = false; say("check complete: no new updates"); render(); }, 1400); return; }
   if (d.do === "sources") { e.stopPropagation(); return sourcesPopover(b); }
-  if (d.do === "mods") return say("已打开 Mods 文件夹");
+  if (d.do === "mods") return say("opened Mods folder");
 });
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") { if (!$("#veil").hidden) $("#veil").hidden = true; else if (S.text) setText(""); else if (S.page === "add") go("subs"); return; }

@@ -1,99 +1,99 @@
-# 小文件读取与列表的加载占用（2026-10-24）
+# Small-file reads and list load cost (2026-10-24)
 
-分支 `claude/smallfile-io-9071ae`。代码：`internal/fsscan`（遍历、大小、指纹、缓存）、`internal/loadcost`（内存 / 显存估算）、`spikes/fsscan`（基准程序，只读）。
+Branch `claude/smallfile-io-9071ae`. Code: `internal/fsscan` (traversal, sizes, fingerprints, caching), `internal/loadcost` (RAM / video memory estimates), `spikes/fsscan` (read-only benchmark).
 
-## 1. 结论
+## 1. Conclusions
 
-1. **Go 标准库在 Windows 上已经是“列目录时顺带拿大小和时间”。** `os.File.ReadDir` 用 `GetFileInformationByHandleEx(FileIdBothDirectoryInfo)`、64 KiB 缓冲，`DirEntry.Info()` 不再发系统调用。`FindFirstFileEx(FindExInfoBasic, FIND_FIRST_EX_LARGE_FETCH)` 反而更慢；256 KiB 的 `FileFullDirectoryInfo` 只快 0–5%。不另写一套原生枚举，只保留“只要列目录权限”的打开方式（`fsscan/open_windows.go`）。
-2. **并发是最大的变量。** 1,315 个 Mod 文件夹全量列一遍：单线程 3.7 秒，8 个 worker 0.61 秒，16 个 0.55–0.61 秒，再多不变快。`fsscan.Workers` 取 SSD 16、机械盘 2、不知道时 8（用 `IOCTL_STORAGE_QUERY_PROPERTY` 的寻道惩罚判断，不要管理员）。本机没有机械盘，HDD 的 2 **没有实测**。
-3. **贵的是第一次打开文件，不是列目录。** 实时防护开着（Defender），第一次打开一个 PNG 读 33 字节：单线程约 1.3 毫秒 / 个（780 个 / 秒），8 个 worker 6,000 个 / 秒，16 个 10,000 个 / 秒，32 个反而降到 4,800 个 / 秒；同样的文件第二次 3–20 万个 / 秒。所以缓存要做的是“大小和 mtime 没变就不再打开文件”（扫描的哈希、贴图页的 PNG 头、加载占用的逐 Mod 结果都是这样），第一次读用 8–16 个 worker。
-4. **按目录 mtime 跳过不划算。** 只 stat 所有目录（0.27 秒）只比完整列一遍（0.55 秒）快一倍，而且原地覆盖文件时目录 mtime 不变，会漏掉更新。不做。
-5. **USN 日志要管理员**（打开 `\\.\D:` 拒绝访问），不用。`ReadDirectoryChangesW` 只在程序运行时有效，以后可以给 GUI 做“打开期间自动失效”，这次没做。
-6. **小文件批量读**：现有的读取本来就只读头部（PNG 33 字节、DDS 128 字节、WAV 头），瓶颈是每次打开的固定代价，不是读取量，合并读取没有收益。
+1. **The Go standard library on Windows already obtains sizes and times while listing directories.** `os.File.ReadDir` uses `GetFileInformationByHandleEx(FileIdBothDirectoryInfo)` with a 64 KiB buffer; `DirEntry.Info()` makes no additional system call. `FindFirstFileEx(FindExInfoBasic, FIND_FIRST_EX_LARGE_FETCH)` is slower; 256 KiB `FileFullDirectoryInfo` is only 0–5% faster. Do not implement another native enumerator; retain only the open mode requiring directory-list permission alone (`fsscan/open_windows.go`).
+2. **Concurrency is the biggest variable.** Listing all 1,315 Mod folders: 3.7 seconds single-threaded, 0.61 seconds with 8 workers, 0.55–0.61 seconds with 16; more workers add no speed. `fsscan.Workers` uses 16 for SSD, 2 for HDD, 8 when unknown (seek-penalty detection through `IOCTL_STORAGE_QUERY_PROPERTY`, no administrator needed). No local HDD was available; the HDD setting of 2 is **unmeasured**.
+3. **Opening a file for the first time is expensive; listing directories is not.** With Defender real-time protection enabled, the first open of a PNG to read 33 bytes takes about 1.3 ms/file single-threaded (780/s), 6,000/s with 8 workers, 10,000/s with 16; 32 drops to 4,800/s. Second reads of the same files reach 30,000–200,000/s. Caching should therefore avoid reopening files whose size and mtime are unchanged (scan hashes, PNG headers on the texture page, and per-Mod load-cost results all follow this rule). Use 8–16 workers for first reads.
+4. **Skipping by directory mtime is not worthwhile.** Statting all directories (0.27 seconds) is only twice as fast as listing everything (0.55 seconds), and in-place file overwrites do not change directory mtime, so updates would be missed. Not implemented.
+5. **The USN journal requires administrator access** (opening `\\.\D:` was denied), so it is not used. `ReadDirectoryChangesW` works only while the program runs; it could later invalidate GUI caches while open, but was not implemented here.
+6. **Batch reads of small files**: existing reads already read only headers (PNG 33 bytes, DDS 128 bytes, WAV headers). The bottleneck is the fixed cost of each open, not read volume; combining reads offers no benefit.
 
-## 2. 测量环境
+## 2. Measurement environment
 
-Windows 11、Ryzen 9 7950X（32 线程）、D 盘 Nextorage NVMe SSD、Go 1.27.2、Defender 实时防护开、非管理员。工坊 `294100` + 游戏 `Mods`：1,315 个文件夹、84,093 个目录、285,133 个文件、23.1 GB，全部只读。没有管理员权限，清不掉系统文件缓存；“冷”指本次开机第一次碰到这些文件。
+Windows 11, Ryzen 9 7950X (32 threads), D: Nextorage NVMe SSD, Go 1.27.2, Defender real-time protection enabled, non-administrator. Workshop `294100` + game `Mods`: 1,315 folders, 84,093 directories, 285,133 files, 23.1 GB, all read-only. Without administrator privileges the system file cache could not be cleared; "cold" means the first access to these files since boot.
 
-## 3. 枚举与读取实测（毫秒，3 次的后两次中位数）
+## 3. Enumeration and read measurements (milliseconds, median of the last two of 3 runs)
 
-| 方式 | 1 | 4 | 8 | 16 | 32 |
+| Method | 1 | 4 | 8 | 16 | 32 |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `filepath.WalkDir`，按 Mod 并发（现状的写法） | 2,919 | 874 | 611 | 673 | 689 |
-| 共享目录队列 + `ReadDir`（fsscan 的做法） | 3,727 | 1,127 | 737 | 607 | 568 |
+| `filepath.WalkDir`, concurrent by Mod (existing approach) | 2,919 | 874 | 611 | 673 | 689 |
+| Shared directory queue + `ReadDir` (fsscan approach) | 3,727 | 1,127 | 737 | 607 | 568 |
 | `FindFirstFileEx` LARGE_FETCH | 2,946 | 1,345 | 1,000 | 805 | 676 |
 | 256 KiB `FileFullDirectoryInfo` | 2,811 | 978 | 611 | 554 | 586 |
-| 只 stat 目录（目录 mtime 缓存的代价） | 932 | 327 | 268 | 279 | 294 |
-| `scan.ComputeSkip`，全部重新哈希 | 7,479 | 2,437 | 1,528 | 1,117 | 1,078 |
-| `scan.ComputeSkip`，复用哈希（无变化重扫） | 3,591 | 1,135 | 718 | 504 | 499 |
-| `textures.Fingerprint`（贴图页核对） | 2,497 | 851 | 536 | 381 | 361 |
-| `scan.ReadDecl`（About.xml） | 240 | 74 | 47 | 31 | 27 |
+| Stat directories only (directory-mtime cache cost) | 932 | 327 | 268 | 279 | 294 |
+| `scan.ComputeSkip`, rehash everything | 7,479 | 2,437 | 1,528 | 1,117 | 1,078 |
+| `scan.ComputeSkip`, reuse hashes (unchanged rescan) | 3,591 | 1,135 | 718 | 504 | 499 |
+| `textures.Fingerprint` (texture-page check) | 2,497 | 851 | 536 | 381 | 361 |
+| `scan.ReadDecl`(About.xml) | 240 | 74 | 47 | 31 | 27 |
 
-- 串行 `WalkDir` 3,713 毫秒。第一次（内容冷）单线程全部哈希 **178 秒**，同一批之后 7.5 秒。
-- `fsscan.Walk` / `fsscan.Size` 与共享目录队列在同一进程里比，差距在 3% 以内（中途修过一次：单个调度 goroutine 和 GC 丢弃标准库的 64 KiB 目录缓冲让它慢了近一倍）。
+- Serial `WalkDir`: 3,713 ms. First full hash (cold contents) single-threaded: **178 seconds**; 7.5 seconds on the same batch afterward.
+- Comparing `fsscan.Walk` / `fsscan.Size` with the shared directory queue in the same process showed a gap within 3% (a mid-run fix addressed a single dispatcher goroutine and GC discarding the standard library's 64 KiB directory buffers, which had nearly doubled the time).
 
-**迁移前后**（同一台机器，旧新交替跑；期间在跑游戏校准，扫描两行有噪声）：
+**Before and after migration** (same machine, alternating old/new runs; game calibration was running, adding noise to the two scan rows):
 
-| 调用方 | 之前 | 之后 |
+| Caller | Before | After |
 | --- | ---: | ---: |
-| `dirSize`（整合包大小、卸载）：整个工坊 | 5,055 毫秒 | **754 毫秒** |
-| `dirSize`：最大的一个 Mod（5.1 GB） | 4.6 毫秒 | 2.6 毫秒 |
-| 扫描 `ComputeSkip`，16 worker，全部哈希 | 1,118 | 1,019 |
-| 扫描 `ComputeSkip`，16 worker，无变化 | 768 | 686；分配 586 → 246 MB |
-| 贴图页摘要并发 | 4 个 | `min(8, Workers)`（07 §6.2 测过 4 → 8：584 → 352 毫秒） |
-| 扫描每个来源的并发 | `NumCPU`（32） | `fsscan.Workers`（SSD 16、HDD 2） |
+| `dirSize` (pack size, uninstall): entire Workshop | 5,055 ms | **754 ms** |
+| `dirSize`: largest Mod (5.1 GB) | 4.6 ms | 2.6 ms |
+| Scan `ComputeSkip`, 16 workers, full hash | 1,118 | 1,019 |
+| Scan `ComputeSkip`, 16 workers, unchanged | 768 | 686; allocations 586 → 246 MB |
+| Texture-page summary concurrency | 4 | `min(8, Workers)` (07 §6.2 measured 4 → 8:584 → 352 ms) |
+| Scan concurrency per source | `NumCPU` (32) | `fsscan.Workers` (SSD 16, HDD 2) |
 
-## 4. 列表的加载占用
+## 4. List load cost
 
-### 4.1 游戏怎么载入（反编译确认）
+### 4.1 How the game loads resources (confirmed by decompilation)
 
-**1.6（Unity）**：PNG 用 `LoadImage` 解码；宽高都是 4 的倍数且开了贴图压缩（默认开）时压成 DXT（每像素 1 字节），否则留 RGBA32（4 字节）；都有 mipmap（约 ×4/3），上传后不留 CPU 副本（`makeNoLongerReadable`）。小于 512 像素的物品类贴图另外拷进静态图集。音效：不超过 300 KB 的整段解码进内存，更大的边播边读。`.dds` 原样上传，同名 PNG 不再载入。
+**1.6 (Unity)**: PNGs decode with `LoadImage`; with both dimensions divisible by 4 and texture compression enabled (the default), they compress to DXT (1 byte/pixel); otherwise they remain RGBA32 (4 bytes). Both have mipmaps (about ×4/3), with no CPU copy after upload (`makeNoLongerReadable`). Item textures smaller than 512 pixels are also copied into static atlases. Audio clips up to 300 KB decode fully into memory; larger ones stream. `.dds` uploads unchanged and shadows same-name PNGs.
 
-**1.7（Waylith，.NET + Vulkan）**：
-- PNG / JPG / PSD 解码后编码成 **BC7**（每像素 1 字节；纯灰度不透明的是 BC4；两边都 ≤16 像素的留 RGBA32），完整 mipmap，不要求 4 的倍数。编码结果写进 `<数据目录>/TextureCache/v23/`，下次直接读。不留 CPU 副本。压缩关不掉（`Prefs.TextureCompression` 恒为真）。
-- **按需上传**：默认只有画过的贴图在显存里；用到显卡预算的一定比例（`max(预算/2, min(0.8·预算, 预算−512 MB))`）后，60 帧没用到的换出。所以显存不是“所有贴图之和”，显卡越小显示得越少。
-- 小于 512 像素的贴图拷进静态图集后，原图会从显存换出，基本不重复。
-- 音效：解码后按 PCM16 估算不超过 2 MiB 的留在内存里（WAV 是解码后的数据，OGG / MP3 是压缩后的文件字节），更大的边播边读。
-- XML 合并文档载入后释放，留下 Def 对象；程序集载入后不卸载。
+**1.7(Waylith,.NET + Vulkan)**:
+- PNG / JPG / PSD decode and then encode to **BC7** (1 byte/pixel; opaque grayscale uses BC4; textures with both dimensions ≤16 pixels stay RGBA32), with full mipmaps and no divisibility-by-4 requirement. Encoded results go to `<data directory>/TextureCache/v23/` for direct reads next time. No CPU copy is retained. Compression cannot be disabled (`Prefs.TextureCompression` is always true).
+- **Upload on demand**: by default only textures already drawn reside in video memory. After a fraction of the GPU budget is used (`max(budget/2, min(0.8·budget, budget−512 MB))`), textures unused for 60 frames are evicted. Video memory is therefore not "the sum of all textures"; smaller GPUs display less.
+- After textures smaller than 512 pixels are copied to static atlases, originals are evicted from video memory, largely avoiding duplication.
+- Audio: clips whose estimated decoded PCM16 size is at most 2 MiB stay in memory (WAV uses decoded data; OGG / MP3 use compressed file bytes); larger clips stream.
+- The merged XML document is freed after loading, leaving Def objects; assemblies are never unloaded once loaded.
 
-### 4.2 实测（1.7.4985，RTX 4090 24 GB，隔离 `-savedatafolder`，主菜单出现后 150 秒内每 3 秒采样）
+### 4.2 Measurements (1.7.4985, RTX 4090 24 GB, isolated `-savedatafolder`, sampled every 3 seconds within 150 seconds after the main menu appeared)
 
-用当前列表 `default`（484 个 Mod，含 6 个官方）按加载顺序取前 100、前 250 和全部。“首次”是空的贴图缓存，“再次”是同一个数据目录第二次启动。
+From the current `default` list (484 Mods, including 6 official), take the first 100, first 250, and all entries in load order. "First" means an empty texture cache; "repeat" means the second launch with the same data directory.
 
-| 列表 | 到主菜单 | 专用内存 | 工作集 | 显存 |
+| List | Main menu reached | Private bytes | Working set | Video memory |
 | --- | ---: | ---: | ---: | ---: |
-| 原版 + 全部 DLC | 12 秒 | 2.30 GB | 1.34 GB | 1.25 GB |
-| 前 100（首次 / 再次） | 85 秒 / — | 5.3 / 4.24 GB | — / 1.62 GB | 2.1 / 3.0 GB |
-| 前 250（首次 / 再次） | 128 秒 / — | 6.7 / 7.66 GB | — / 3.69 GB | 2.4 / 4.82 GB |
-| 全部 484（首次 / 再次 ×3） | 353 秒 / 91–115 秒 | 15.1 / 21.9–22.1 GB | 8.2 / 7.2–7.7 GB | 7.3 / 15.3 GB |
+| Vanilla + all DLCs | 12 s | 2.30 GB | 1.34 GB | 1.25 GB |
+| First 100 (first / repeat) | 85 s / — | 5.3 / 4.24 GB | — / 1.62 GB | 2.1 / 3.0 GB |
+| First 250 (first / repeat) | 128 s / — | 6.7 / 7.66 GB | — / 3.69 GB | 2.4 / 4.82 GB |
+| All 484 (first / repeat ×3) | 353 s / 91–115 s | 15.1 / 21.9–22.1 GB | 8.2 / 7.2–7.7 GB | 7.3 / 15.3 GB |
 
-- 再次启动的三次结果几乎一样，显存三次都是 15,283 MB：这是引擎的上传水位（约 24 GB 的 65%），不是贴图的真实大小。载入时工作集峰值约 15 GB。
-- 这个列表里 30,080 个 DDS（5.2 GB 载荷）遮蔽了大部分 PNG，真正载入的 PNG 只有约 900 张。
+- The three repeat launches were nearly identical, all using 15,283 MB video memory: this is the engine's upload threshold (about 65% of 24 GB), not the actual texture size. Working set peaked at about 15 GB during loading.
+- This list has 30,080 DDS files (5.2 GB payload) shadowing most PNGs; only about 900 PNGs actually load.
 
-### 4.3 模型（`internal/loadcost`，系数都在 `Coef` 里）
+### 4.3 Model (`internal/loadcost`, all coefficients in `Coef`)
 
-> 2026-10-31 更正：下表 1.6 的贴图内存 ×0–0.1 和基线都未经实测。`makeNoLongerReadable` 不代表贴图、Mono 堆、解码/压缩缓冲、图集或驱动备份不占系统内存；不能据此认为 1.6 比 1.7 占用更少。该行仅记录当时的旧假设；当前 1.6 模型已由 [2026-10-31 VM 校准](2026-10-31_unity16-memory-calibration.md) 替换。
+> Correction, 2026-10-31: the 1.6 texture-memory multiplier ×0–0.1 and baseline below were not measured. `makeNoLongerReadable` does not mean textures, Mono heap, decoding/compression buffers, atlases, or driver copies consume no system memory; it does not establish that 1.6 uses less memory than 1.7. This row records the old assumption only; the current 1.6 model was replaced by the [2026-10-31 VM calibration](2026-10-31_unity16-memory-calibration.md).
 
-| 部分 | 1.7 | 1.6（没实测，只按规则） |
+| Component | 1.7 | 1.6 (rules only, unmeasured) |
 | --- | --- | --- |
-| 贴图载荷 | PNG 按 BC7 + mipmap（≤16 像素按 RGBA32），DDS 按文件去掉头；JPG / PSD 不知道尺寸，按文件字节 ×4–×12 像素 | DXT 或 RGBA32 + mipmap，上限加静态图集 |
-| 显存 | 载荷 × **0.9–2.6**（实测） | 载荷 |
-| 内存 | 载荷 × **1.5–3.5**（实测，包括引擎留在系统内存里的 Vulkan 内存） | 载荷 × 0–0.1 |
-| 音效 | 留在内存里的那部分文件字节 × 1–1.5 | ≤300 KB 的解码后 PCM × 1–2 |
-| Def XML | 字节 × 3–8 | 同左 |
-| Patch XML | 字节 × 0.5–2 | 同左 |
-| 程序集 | 字节 × 2–5 | 同左 |
+| Texture payload | PNG as BC7 + mipmaps (≤16 pixels as RGBA32); DDS file minus header; unknown JPG / PSD dimensions estimated as file bytes ×4–×12 pixels | DXT or RGBA32 + mipmaps, adding static atlases to the upper bound |
+| Video memory | Payload × **0.9–2.6** (measured) | Payload |
+| RAM | Payload × **1.5–3.5** (measured, including Vulkan memory retained by the engine in system memory) | Payload × 0–0.1 |
+| Audio | Bytes of files retained in memory × 1–1.5 | Decoded PCM for files ≤300 KB × 1–2 |
+| Def XML | Bytes × 3–8 | Same as left |
+| Patch XML | Bytes × 0.5–2 | Same as left |
+| Assemblies | Bytes × 2–5 | Same as left |
 
-再加原版 + DLC 的实测基线（1.7：内存 2.3 GB、显存 1.2 GB；1.6 的 2.0 / 1.0 GB 是占位，没实测）。
+Add the measured vanilla + DLC baseline (1.7: RAM 2.3 GB, video memory 1.2 GB; 1.6's 2.0 / 1.0 GB are unmeasured placeholders).
 
-**对照**：估算（基线 + Mod）与实测——前 100：内存 4.1–7.0 / 实测 4.2–5.3，显存 2.3–4.6 / 实测 2.1–3.0；前 250：内存 5.6–10.4 / 实测 6.7–7.7，显存 3.1–6.9 / 实测 2.4–4.8；全部：内存 11.0–23.2 / 实测 15.1–22.1，显存 6.2–16.0 / 实测 7.3–15.3。只有前 250 首次启动的显存（2.4 GB）低于下限。**范围大约是两倍宽**：同一个列表首次和再次启动就差这么多，而且只在一台 24 GB 显卡的机器上测过。
+**Comparison**: estimates (baseline + Mods) vs. measurements: first 100: RAM 4.1–7.0 / measured 4.2–5.3, video memory 2.3–4.6 / measured 2.1–3.0; first 250: RAM 5.6–10.4 / measured 6.7–7.7, video memory 3.1–6.9 / measured 2.4–4.8; all: RAM 11.0–23.2 / measured 15.1–22.1, video memory 6.2–16.0 / measured 7.3–15.3. Only the first launch of the first 250 had video memory (2.4 GB) below the lower bound. **Ranges span about a factor of two**: first and repeat launches of the same list differ that much, and testing covered only one machine with a 24 GB GPU.
 
-**代价**：476 个 Mod 第一次 47 秒（主要是第一次打开 3 万个 DDS 头），之后 0.45 秒（`cache/loadcost-v1.json`，按每个 Mod 载入目录的 fsscan 列表指纹；贴图页读过的 PNG 头直接复用）。
+**Cost**: 476 Mods took 47 seconds on the first pass (mostly opening 30,000 DDS headers for the first time), then 0.45 seconds (`cache/loadcost-v1.json`, keyed by the fsscan listing fingerprint of each Mod's load folders; PNG headers already read on the texture page are reused).
 
-### 4.4 没做的 / 已知的偏差
+### 4.4 Not implemented / known deviations
 
-- 本次（2026-10-24）1.6 没能校准：`D:\rimworld16` 现在进不了主菜单（Mods 里有一个指向已删除目录的 `_Archo_env_*` 联接，见 game-test 会话的记录）。
-- 没测更小的显卡；显存上限在小显卡上会被上传水位截住，界面的说明里写了。
-- 语言文件只计数，不进估算；存档、地图和游戏中的增长不算。
-- Def 的重复路径（高优先级加载目录覆盖低优先级的同名 XML）没有去重，会略微高估。
-- 游戏启动时会在自己的根目录里建了又删一个东西（根目录 mtime 变了，没留下文件）。这是游戏自己的行为，我们没有写游戏目录。
+- 1.6 could not be calibrated in this round (2026-10-24): `D:\rimworld16` cannot currently reach the main menu (a `_Archo_env_*` junction in Mods points to a deleted directory; see the game-test session record).
+- Smaller GPUs were not tested; their video-memory upper bound is capped by the upload threshold, as explained in the UI.
+- Language files are counted only, not estimated; saves, maps, and growth during play are excluded.
+- Duplicate Def paths (higher-priority load folders overriding same-name XML in lower-priority folders) are not deduplicated, slightly overestimating cost.
+- During startup the game creates and deletes something in its root directory (root mtime changed, no file remained). This is the game's own behavior; we did not write to the game directory.

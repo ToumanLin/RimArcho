@@ -1,48 +1,48 @@
-# 06 · 界面 · 分层与共享视图模型（§1）
+# 06 · Interface · Layers and shared view models (§1)
 
-> 属于 [06 · 界面](README.md)。章节号在整个 06 里连续，拆成多个文件后不变，引用照旧写 `06 §x.y`。
+> Part of [06 · Interface](README.md). Section numbers run through all of 06 and stay unchanged when split across files. References still use `06 §x.y`.
 
-## 1. 分层与共享视图模型
+## 1. Layers and shared view models
 
 ```
-surface/tui   (Bubble Tea)        surface/gui   (Wails 服务 + assets/*.html|css|js)
-      │  只做：布局、绘制、按键/鼠标映射      │  只做：把 view 模型序列化给前端、事件推送
+surface/tui   (Bubble Tea)        surface/gui   (Wails services + assets/*.html|css|js)
+      │  Only layout, drawing, key/mouse mapping  │  Only serialize view models for the frontend and push events
       └──────────────┬──────────────────────┘
-                internal/view     界面无关的视图模型
+                internal/view     Interface-independent view models
                      │
-                internal/app      业务
+                internal/app      Business logic
 ```
 
-- TUI 用 Bubble Tea + Bubbles + Lip Gloss；GUI 用 Wails v3 + 原生 HTML/CSS/JavaScript（§8）。GUI 不是把 TUI 渲染进窗口，也不调用 CLI 再解析文字。
-- `internal/view` 不依赖 Bubble Tea、Lip Gloss、Wails。输入是 `*app.App` 的状态，输出是普通 Go 结构（可以直接 JSON 化）。
+- TUI uses Bubble Tea + Bubbles + Lip Gloss; GUI uses Wails v3 + native HTML/CSS/JavaScript (§8). The GUI does not render the TUI into a window or invoke the CLI and parse its text.
+- `internal/view` has no dependency on Bubble Tea, Lip Gloss, or Wails. Its input is `*app.App` state; its output is plain Go structs (directly serializable to JSON).
 
-| 文件 | 内容 | 主要函数 |
+| File | Content | Main functions |
 | --- | --- | --- |
-| `text.go` | 中英文字符串表；TUI / GUI 各自用 `Register` 补充自己的按键说明；语言检测（`lang_windows.go`、`lang_other.go`） | `T`、`Tf`、`Table`、`SetLang`、`Lang`、`Register` |
-| `columns.go` | 三列各有哪些 Mod，每行的序号、来源类型、名称（别名优先）、状态、是否淡化、是否未保存 | `BuildBoard`、`ModItem`、`RowStatus`、`SourceKind`、`SourceText` |
-| `query.go` | 搜索语法的解析与匹配、子序列回退、内容类型缓存（§3.7） | `ParseQuery`、`Query.Filter`、`Subsequence`、`ContentCache.Get` |
-| `needs.go`、`evidence.go` | 能不能跑的分组与区（`Section`、`SectionOf`，不在这一页的项 `SectionElsewhere` / `Needs.Elsewhere`）、两列互相指（`Need.Related`）、人话文案（`Text` 一句话；GUI 卡片的 `Title` / `Why`）、凭据（`Evidence{Kind, Label, Source}`）、合并规则、计数、行状态；**一键操作是数据**（`Action{Kind, …}`），由界面决定绑定到哪个键或按钮；`Do` 执行修改数据的动作（§5） | `BuildNeeds`、`Do`、`Humanize`、`TokName`、`EdgeWords`、`ShortDate`、`WorkshopSearch`；页面头的结论和自动修复的项数（`needs_layout.go`：`NeedsLead`、`AutoFixCount`） |
-| `live.go` | 游戏运行时的状态和“本次运行”的报错（§2.10） | `LiveTracker.Update`、`LiveNeeds`、`LiveText` |
-| `detail.go` | 详情各层的数据和顺序：头部事实、依赖、简介来源选择、历史、全屏子区（§4） | `LoadDetail`、`HeaderFacts`、`Facts`、`Deps`、`DescNote`、`HistoryLine`、`EventText`、`Sections`、`UnloadableWhy`、`WorkshopURL` |
-| `changes.go` | 变化记录（§2.9）：`internal/modchanges` 建页面（CLI / MCP 共用，传入译文），这里给它界面的语言；扫描后的一句话 | `BuildChanges`、`ChangeFiles`、`ChangeHome`、`ChangeSummary`、`LineageIDs` |
-| `library.go` | Mod 库存 › 全部：Lineage 行与它的各份、右栏的大小、状态、用在、筛选分组与个数、生效的条件、每份的动作（数据）、会改文件的动作的预览与执行（§2.9）；筛选本身是 `app.Library` 的，和 `archo library` 共用 | `BuildLibrary`、`LibPreview`、`LibDo`、`LibStateText` |
-| `history.go` | 历史区：撤销栈的每一步和版本（§2.5） | `HistoryItems`、`StepText` |
-| `tags.go` | 标签候选（§3.8） | `TagCandidates`、`PinnedTags` |
-| `rules.go` | 编辑器的排序规则（§2.5）：每条规则一句话（Mod 名可点）、表单的种类和另一个 Mod 的候选、加 / 改 / 删 / 放回 | `BuildRules`、`RuleCandidates`、`SaveRule`、`RemoveRule`、`RestoreRule` |
-| `filesearch.go` | Mod 库 › 搜索文件（§2.9）：`modsearch` 和反编译 C# 的结果按 Mod → 文件 → 行分页；结果的文件夹能不能打开 | `FileSearch`、`FileSearchScope`、`SearchFolder` |
-| `verbs.go` | 动词：启用 / 停用、暂存、放回、移动、放到某位置、位置输入候选（§3.5、§3.6） | `Toggle`、`Stage`、`Unstage`、`StageAll`、`MoveBy`、`Place`、`PosOptions`、`ObjectOf`、`Positions`、`PlacedText`、`NowAt` |
-| `preview.go` | 排序、保存、启动：直接执行和只读预览（§6）；撤销、重做、全部放回、换副本 | `Run`、`Outcome`、`RefusalLines`、`DryRun`、`Apply`、`UndoRedo`、`RestoreAll`、`Swap` |
-| `palette.go` | 命令表（中文名 + 英文别名，**用命令 ID 而不是按键**）、打分与排序（§3.5） | `Commands`、`PalScore`、`PalRank` |
-| `packs.go`、`packpage.go` | 整合包列表、每个包的页、编译成整合包页（四件事、汇总、禁用的理由）、编译进度、未完成的编译（§2.6、§2.7） | `PackRows`、`BuildPackPage`、`BuildPageOf`、`DefaultPackName`、`ProgressOf`、`UnfinishedRows` |
-| `logpage.go`、`monitorlog.go` | 游戏日志页和它的伴生日志区（§2.10） | `LogFiles`、`BuildLogPage`、`MonitorOf`、`LiveMonitor`、`MonitorKind`、`MonitorAdd` |
-| `settings.go` | 设置页和环境页（§2.8、§2.14） | `SettingsPage`、`BuildEnvPage`、`EnvGroups`、`SettingCommand` |
-| `feedback.go` | 设置的“社区”组和反馈页（§2.14）：附带的内容、正文和链接（拼正文和链接在 `internal/feedback`） | `CommunityGroup`、`CommunityLinks`、`FeedbackAttachments`、`ComposeFeedback` |
-| `exchange.go` | 列表导入导出（04 §9） | `ReadImport`、`PreviewImport`、`ApplyImport`、`ExportFormats`、`ExportText`、`ExportTo`、`DefaultExportDir` |
+| `text.go` | Chinese and English string tables; TUI / GUI each add their key descriptions through `Register`; language detection (`lang_windows.go`, `lang_other.go`) | `T`, `Tf`, `Table`, `SetLang`, `Lang`, `Register` |
+| `columns.go` | Mods in each of the three columns; each row's number, source type, name (alias first), status, dimming, and unsaved state | `BuildBoard`, `ModItem`, `RowStatus`, `SourceKind`, `SourceText` |
+| `query.go` | Search syntax parsing and matching, subsequence fallback, content type cache (§3.7) | `ParseQuery`, `Query.Filter`, `Subsequence`, `ContentCache.Get` |
+| `needs.go`, `evidence.go` | Groups and sections for can it run (`Section`, `SectionOf`; items outside this page use `SectionElsewhere` / `Needs.Elsewhere`), links between columns (`Need.Related`), plain wording (`Text`: one sentence; GUI cards: `Title` / `Why`), evidence (`Evidence{Kind, Label, Source}`), merging rules, counts, row status; **one-step actions are data** (`Action{Kind, …}`), with the interface choosing the key or button; `Do` performs data mutations (§5) | `BuildNeeds`, `Do`, `Humanize`, `TokName`, `EdgeWords`, `ShortDate`, `WorkshopSearch`; page lead and automatic fix count (`needs_layout.go`: `NeedsLead`, `AutoFixCount`) |
+| `live.go` | Game runtime status and errors from "this run" (§2.10) | `LiveTracker.Update`, `LiveNeeds`, `LiveText` |
+| `detail.go` | Data and order for each detail layer: header facts, dependencies, description source selection, history, full-screen subsections (§4) | `LoadDetail`, `HeaderFacts`, `Facts`, `Deps`, `DescNote`, `HistoryLine`, `EventText`, `Sections`, `UnloadableWhy`, `WorkshopURL` |
+| `changes.go` | Change history (§2.9): `internal/modchanges` builds the page (shared with CLI / MCP, given translated text); this supplies the interface language; one sentence after scanning | `BuildChanges`, `ChangeFiles`, `ChangeHome`, `ChangeSummary`, `LineageIDs` |
+| `library.go` | Mod inventory > all: Lineage rows and their copies, size, status, used-in lists in the right column, filter groups and counts, effective conditions, each copy's actions (data), preview and execution of file-changing actions (§2.9); filtering itself belongs to `app.Library`, shared with `archo library` | `BuildLibrary`, `LibPreview`, `LibDo`, `LibStateText` |
+| `history.go` | History area: each undo step and version (§2.5) | `HistoryItems`, `StepText` |
+| `tags.go` | Tag candidates (§3.8) | `TagCandidates`, `PinnedTags` |
+| `rules.go` | Editor sorting rules (§2.5): one sentence per rule (clickable Mod names), form kinds and candidates for the other Mod, add / edit / delete / restore | `BuildRules`, `RuleCandidates`, `SaveRule`, `RemoveRule`, `RestoreRule` |
+| `filesearch.go` | Mod library > search files (§2.9): paginated `modsearch` and decompiled C# results by Mod → file → line; whether result folders can be opened | `FileSearch`, `FileSearchScope`, `SearchFolder` |
+| `verbs.go` | Verbs: enable / disable, stage, put back, move, place at a position, position input candidates (§3.5, §3.6) | `Toggle`, `Stage`, `Unstage`, `StageAll`, `MoveBy`, `Place`, `PosOptions`, `ObjectOf`, `Positions`, `PlacedText`, `NowAt` |
+| `preview.go` | Sort, save, launch: direct execution and read-only preview (§6); undo, redo, put all back, switch copies | `Run`, `Outcome`, `RefusalLines`, `DryRun`, `Apply`, `UndoRedo`, `RestoreAll`, `Swap` |
+| `palette.go` | Command table (Chinese names + English aliases, **command IDs rather than keys**), scoring and ranking (§3.5) | `Commands`, `PalScore`, `PalRank` |
+| `packs.go`, `packpage.go` | Pack list, each pack's page, create-a-pack page (four choices, summary, reasons for disabled controls), build progress, unfinished builds (§2.6, §2.7) | `PackRows`, `BuildPackPage`, `BuildPageOf`, `DefaultPackName`, `ProgressOf`, `UnfinishedRows` |
+| `logpage.go`, `monitorlog.go` | Game log page and its companion log area (§2.10) | `LogFiles`, `BuildLogPage`, `MonitorOf`, `LiveMonitor`, `MonitorKind`, `MonitorAdd` |
+| `settings.go` | Settings and environment pages (§2.8, §2.14) | `SettingsPage`, `BuildEnvPage`, `EnvGroups`, `SettingCommand` |
+| `feedback.go` | Settings community group and feedback page (§2.14): attachments, body, links (`internal/feedback` assembles the body and links) | `CommunityGroup`, `CommunityLinks`, `FeedbackAttachments`, `ComposeFeedback` |
+| `exchange.go` | List import and export (04 §9) | `ReadImport`, `PreviewImport`, `ApplyImport`, `ExportFormats`, `ExportText`, `ExportTo`, `DefaultExportDir` |
 
-`internal/app` 给界面提供类型化接口：`SetTags` / `SetAlias` / `SetNote`、身份问题回答、日志选择、`ChildScan`（扫描子进程，不弹控制台窗口）、每个 Mod 的 Def / Patch / Harmony 小结。界面不拼 CLI 参数做编辑。`cmds.Execute` 只留给本来就是文字的只读场景：排序 / 写入 / 启动的预览（CLI 的 `--dry-run` 文字）、“查看”类操作和全屏详情的 Def / 补丁 / Harmony 子区，以及玩家自己在命令行输入框里输入的 archo 命令。
+`internal/app` provides typed interfaces to the surfaces: `SetTags` / `SetAlias` / `SetNote`, identity question answers, log selection, `ChildScan` (scan subprocess without a console window), and per-Mod Def / Patch / Harmony summaries. Surfaces do not assemble CLI arguments for editing. `cmds.Execute` remains only for read-only cases that are inherently text: sort / write / launch previews (CLI `--dry-run` text), "show" actions and Def / patches / Harmony subsections of full-screen details, and archo commands the player enters in the command line input.
 
-规则：
-1. 业务规则只能写在 `app` 或 `view` 中。界面层出现“如果是工坊 Mod 就……”这类判断即为缺陷。
-2. 两个界面的同一操作调用同一个函数。同一个状态下，TUI 和 GUI 拿到的 `Needs`、`Board`、详情数据完全相同（G1）。
-3. 文案只有一份（`view.Text`），GUI 通过一次调用拿到当前语言的整张表。
-4. 每个会写磁盘的动作都满足三条：能预览（`--dry-run`，界面上命令面板的“预览…”），能撤回或在执行前说明为什么不能撤回，结果写在状态行（01 §4）。只有 RimArcho 的撤销管不到的动作才先确认（§6）。
+Rules:
+1. Business rules belong only in `app` or `view`. A surface-level condition such as "if this is a Workshop Mod, then…" is a defect.
+2. The same operation in both interfaces calls the same function. Given the same state, TUI and GUI receive identical `Needs`, `Board`, and detail data (G1).
+3. There is one copy of the text (`view.Text`). One call gives the GUI the entire table for the current language.
+4. Every disk-writing action meets three conditions: it has a preview (`--dry-run`, "preview…" in the interface command panel), can be undone or explains beforehand why it cannot, and reports its result in the status line (01 §4). Only actions beyond RimArcho's undo require confirmation first (§6).
