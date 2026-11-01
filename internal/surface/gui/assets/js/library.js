@@ -7,7 +7,7 @@
 // comes from view.BuildLibrary through API.Library; each copy carries only the codes of
 // its ops (view.CopyOps), the labels and keys are the page's op table, sent once. The table
 // draws only the rows in view, so 1350+ Lineages stay smooth.
-import { S, $, el, api, T, Tf, errText, say } from "./state.js";
+import { S, $, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { on } from "./api.js";
 import { icon } from "./icons.js";
 import { detailFrame } from "./detail.js";
@@ -563,12 +563,12 @@ function drawBar() {
     const b = el("button", "btn" + (o.danger ? " danger" : ""), o.label);
     if (copies.length < L.sel.size) b.append(el("span", "faint", " " + copies.length));
     if (o.group !== 3) b.dataset.envWrite = c;
-    if (o.key) b.append(el("kbd", "", o.key));
+    if (o.key) b.append(keyCaps(o.key));
     b.onclick = () => run(c, copies);
     bar.append(b);
   }
   const x = el("button", "btn quiet", T("clear the selection"));
-  x.append(el("kbd", "", "esc"));
+  x.append(keyCaps("esc"));
   x.onclick = () => { L.sel.clear(); els.rows.dataset.sig = ""; drawRows(); drawBar(); hints(); };
   bar.append(x);
 }

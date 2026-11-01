@@ -5,7 +5,7 @@
 import { choiceControl } from "./choices.js";
 import { linkRows } from "./linkrows.js";
 import { copyablePath, editablePath, pathContent } from "./fields.js";
-import { factText, S, $, el, api, T, Tf, errText, say, cur, slideThumb } from "./state.js";
+import { factText, S, $, el, api, T, Tf, errText, say, cur, slideThumb, keyCaps } from "./state.js";
 import { icon, bowMark } from "./icons.js";
 import { statusIcon } from "./icons.js";
 import { bump, shimmer } from "./motion.js";
@@ -267,7 +267,7 @@ export function archoMark() {
 export function button(label, keyName, run, cls = "", envWrite = "") {
   const b = el("button", "btn " + cls, label);
   if (envWrite) b.dataset.envWrite = envWrite;
-  if (keyName) b.append(el("kbd", "", keyName));
+  if (keyName) b.append(keyCaps(keyName));
   b.onclick = (e) => { e.stopPropagation(); run(); };
   return b;
 }

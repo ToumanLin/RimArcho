@@ -4,7 +4,7 @@
 // New (empty, a copy, a version, an import) opens management; delete asks for confirmation.
 // Every verb is a view call through the API (view.NewPlan, UsePlan, OpenPlan, RenamePlan,
 // RemovePlan, ImportAsPlan).
-import { S, $, el, api, T, Tf, errText, say } from "./state.js";
+import { S, $, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import * as pop from "./popups.js";
 
 let ui = null;
@@ -93,9 +93,11 @@ export function renamePlan(id, after = null) {
     box.append(el("div", "ttl", Tf("rename %s", p0.name)));
     const f = nameField(box, p0.name, id);
     const btns = el("div", "btns");
-    const no = el("button", "", T("cancel") + "  esc");
+    const no = el("button", "", T("cancel"));
+    no.append(keyCaps("esc"));
     no.onclick = pop.close;
-    const yes = el("button", "go", T("rename") + "  enter");
+    const yes = el("button", "go", T("rename"));
+    yes.append(keyCaps("enter"));
     yes.dataset.envWrite = "rename-plan";
     const go = async () => { await f.check(); if (f.bad()) return f.inp.focus(); done(api.RenamePlan(id, f.inp.value), after); };
     yes.onclick = go;

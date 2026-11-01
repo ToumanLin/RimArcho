@@ -10,7 +10,7 @@
 // The page gives: data() → { groups, conds, complete } of its last answer; change(search,
 // filters) when either changed; and the place it lives in. The bar keeps search, filters
 // and open; the page reads them.
-import { el, T, Tf, api } from "./state.js";
+import { el, T, Tf, api, keyCaps } from "./state.js";
 import { wireSeparator } from "./separator.js";
 import { suggestions, queryContext, setQueryFilter } from "./searchsuggest.js";
 
@@ -195,7 +195,7 @@ export function createBar(opts) {
 
   function draw() {
     const d = data();
-    tog.replaceChildren(el("span", "", T("filter")),el("kbd", "", "\\"));
+    tog.replaceChildren(el("span", "", T("filter")),keyCaps("\\"));
     clear.hidden=!inp.value;
     tog.classList.toggle("on", b.open);
     panel.hidden = !b.open;

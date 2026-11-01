@@ -27,6 +27,18 @@ export const S = {
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
+// keyCaps draws a key label as key caps, never as plain words beside a label (06 §7.3 rule 13):
+// "ctrl+o ctrl+w" is two caps, and enter shows ↵.
+const KEY_TEXT = { enter: "enter ↵" };
+export function keyCaps(keys) {
+  const parts = String(keys).split(" ").filter(Boolean);
+  const cap = (k) => el("kbd", "", KEY_TEXT[k] || k);
+  if (parts.length === 1) return cap(parts[0]);
+  const s = el("span", "keys");
+  s.append(...parts.map(cap));
+  return s;
+}
+
 export function el(tag, cls, text) {
   const e = document.createElement(tag);
   if (cls) e.className = cls;

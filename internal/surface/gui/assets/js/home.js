@@ -9,7 +9,7 @@
 // comes back when the row, its game, its mods or its problem change.
 // Data: API.Home (view.BuildHome, view.AddOtherEnvs, view.PickFeatured) and
 // API.HomeBackground (the image, its dimming, blur and focus; 06 §2.14).
-import { S, el, api, T, Tf, errText, say } from "./state.js";
+import { S, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { openScreen, page, changesPlan, beginPageRead } from "./screens.js";
 import { launchPack } from "./packs.js";
 import { withEnvironmentSwitch } from "./environment.js";
@@ -362,7 +362,7 @@ function launchStep(f) {
   const title = el("span", "title", live ? T("the game is running") : starting ? T("starting…") : T(severity === "severe" ? "launch with RAM risk" : severity === "warning" ? "launch with limited RAM" : "launch the game"));
   if (live) title.prepend(el("span", "dot"));
   top.append(title);
-  if (!live) top.append(el("kbd", "", "L"));
+  if (!live) top.append(keyCaps("L"));
   // 01 and 02 already say what starts; the block adds only the edits that launching saves,
   // and they can be saved alone: save sits in the block's corner, beside it, not in it
   const saving = !starting && canSave(f);
@@ -381,7 +381,7 @@ function launchStep(f) {
   if (saving) {
     const sv = el("button", "hm-save");
     sv.dataset.envWrite = "save";
-    sv.append(el("span", "num", Tf("save %d changes", f.unsaved)), el("kbd", "", "w"));
+    sv.append(el("span", "num", Tf("save %d changes", f.unsaved)), keyCaps("w"));
     sv.title = T("write these edits to the game's mod list now, without launching; launching saves them too");
     sv.onclick = () => save();
     block.append(sv);

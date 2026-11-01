@@ -1,7 +1,7 @@
 // The detail (06 §4): who the mod is, its state, one field list (fields.js), the
 // description, the history. The description is built from Go's BBCode blocks with
 // elements and textContent only: outside text is never inserted as HTML (06 §8.2).
-import { factText, S, $, el, esc, api, T, Tf, errText, say } from "./state.js";
+import { factText, S, $, el, esc, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { icon, sourceIcon, statusIcon } from "./icons.js";
 import { fieldList } from "./fields.js";
 
@@ -167,7 +167,7 @@ export function detailFrame(box, sc, o = {}) {
         const x = ops.op(c);
         const b = el("button", "btn" + (x.danger ? " danger" : ""), x.label);
         if (x.group !== 3) b.dataset.envWrite = c;
-        if (x.key) b.append(el("kbd", "", x.key));
+        if (x.key) b.append(keyCaps(x.key));
         b.onclick = () => o.run && o.run(c, r);
         acts.append(b);
       }

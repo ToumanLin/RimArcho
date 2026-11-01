@@ -3,7 +3,7 @@ import { closeChoiceMenu } from "./choices.js";
 // confirmation, a text or choice panel, help. Each has a title, shows in the position
 // line, closes with esc, and never nests: opening one closes the other.
 import { pathContent, copyablePath } from "./fields.js";
-import { S, $, el, esc, api, T, Tf, errText, say } from "./state.js";
+import { S, $, el, esc, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { buildCommandPanel } from "./command-panel.js";
 
 let ui = null;
@@ -224,11 +224,13 @@ export function panel(title, content, goLabel, go, cls = "", envWrite = "") {
     body.append(content);
     pop.append(body);
     const btns = el("div", "btns");
-    const no = el("button", "", (go ? T("cancel") : T("close")) + "  esc");
+    const no = el("button", "", go ? T("cancel") : T("close"));
+    no.append(keyCaps("esc"));
     no.onclick = close;
     btns.append(no);
     if (go) {
-      const yes = el("button", "go", goLabel + "  enter");
+      const yes = el("button", "go", goLabel);
+      yes.append(keyCaps("enter"));
       if (envWrite) yes.dataset.envWrite = envWrite;
       yes.onclick = () => { close(); go(); };
       btns.append(yes);
@@ -291,7 +293,8 @@ export async function identity(question, run) {
     }
     pop.append(body);
     const btns = el("div", "btns");
-    const leave = el("button", "identity-close", T("close") + "  esc");
+    const leave = el("button", "identity-close", T("close"));
+    leave.append(keyCaps("esc"));
     leave.onclick = close; btns.append(leave);
     const answers = el("div", "identity-answer-buttons");
     const pick = (action) => { close(); run(action); };
@@ -327,7 +330,8 @@ export function choose(title, labels, pick, current = 0, other = null) {
     optionList(pop, p, labels.map((l, i) => ({ l, i })), (d, o) => d.append(el("span", "word-facts", o.l)), (o) => { close(); pick(o.i); });
     if (other) {
       const btns = el("div", "btns");
-      const b = el("button", "word-facts", other.label + "  " + (other.key === "Delete" ? "del" : other.key));
+      const b = el("button", "", other.label);
+      b.append(keyCaps(other.key === "Delete" ? "del" : other.key));
       if (other.envWrite) b.dataset.envWrite = other.envWrite;
       const run = () => { const i = p.opts[p.sel] && p.opts[p.sel].i; close(); if (i !== undefined) other.run(i); };
       b.onclick = run;
@@ -460,7 +464,8 @@ export async function problem(ref, run, actionWrite) {
         b.onclick = () => { close(); run(act); };
         btns.append(b);
       }
-      const back = el("button", "", T("close") + "  esc");
+      const back = el("button", "", T("close"));
+      back.append(keyCaps("esc"));
       back.onclick = close;
       btns.append(back);
       box.append(btns);

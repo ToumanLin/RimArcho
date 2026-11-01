@@ -11,7 +11,7 @@ import "./window-theme.js";
 import "./refnums.js";
 import "./fulltitle.js";
 import { applyAccent } from "./accent.js";
-import { factText, S, $, $$, el, esc, T, Tf, errText, say, clearSay, undoStatus, col, cur, selection, key, idsOf, refsOf, named, AREAS } from "./state.js";
+import { factText, S, $, $$, el, esc, T, Tf, errText, say, clearSay, undoStatus, col, cur, selection, key, idsOf, refsOf, named, AREAS, keyCaps } from "./state.js";
 import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, pageDelta, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn } from "./lists.js";
 import { createBar } from "./filterbar.js";
 import { followDetail, showDetail, scrollDetail } from "./detail.js";
@@ -180,7 +180,7 @@ function planActions() {
   const btn = (label, k, run, cls = "", envWrite = "") => {
     const b = el("button", "btn " + cls, label);
     if (envWrite) b.dataset.envWrite = envWrite;
-    if (k) { b.append(el("kbd", "", k)); b.title = k; }
+    if (k) { b.append(keyCaps(k)); b.title = k; }
     b.onclick = (e) => { e.stopPropagation(); run(); };
     return b;
   };
@@ -320,12 +320,12 @@ function renderHints() {
   if (c && c.sel.size && !S.screen) h.append(el("span", "accent", Tf("%d selected", c.sel.size)));
   list.slice(0, 7).forEach((a) => {
     const group = el("span", "hint-group");
-    group.append(el("b", "", a.key), " " + a.label);
+    group.append(keyCaps(a.key), " " + a.label);
     h.append(group);
   });
   if (c && c.sel.size && !S.screen) {
     const group = el("span", "hint-group");
-    group.append(el("b", "", "esc"), " " + T("clear the selection"));
+    group.append(keyCaps("esc"), " " + T("clear the selection"));
     h.append(group);
   }
 }

@@ -7,7 +7,7 @@ import { choiceControl } from "./choices.js";
 // Data: API.Packs (view.PackRows, view.UnfinishedRows), API.Pack (view.BuildPackPage),
 // API.BuildPage (view.BuildPageOf), API.PackDryRun (archo pack build --dry-run).
 import { copyablePath, pathContent } from "./fields.js";
-import { factText, S, $, el, api, T, Tf, errText, say } from "./state.js";
+import { factText, S, $, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { shimmer } from "./motion.js";
 import { openScreen, page, button, act, area, beginPageRead } from "./screens.js";
 import * as pop from "./popups.js";
@@ -518,7 +518,7 @@ function drawBuild() {
   side.append(kv);
   const go1 = el("button", "btn primary bd-go");
   go1.dataset.envWrite = "pack-build";
-  go1.append(T("create pack"), el("kbd", "", "B"));
+  go1.append(T("create pack"), keyCaps("B"));
   go1.onclick = () => go();
   const why = el("div", "bd-why");
   const dry = button(T("see the list first, write nothing"), "V", () => dryRun());

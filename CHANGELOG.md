@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- GUI: keys are drawn as key caps everywhere (buttons, dialog buttons, the hint line), so a key no longer reads as part of its label: confirm [enter ↵] instead of confirm enter.
 - Interface translations moved into language files. Archo Monitor settings now follow the game language. Mod roles on the game log page use normal brackets in English.
 - Documentation is now in English, with a new Chinese README (`README.zh-CN.md`).
 - Unity 1.6 RAM estimates now use heavy-texture VM measurements up to 7.5 GiB, reducing high-payload resident and loading budgets; larger loads remain extrapolated.

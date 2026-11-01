@@ -1,5 +1,5 @@
 // A temporary, scrollable version list. Its rows are fetched only while it is open.
-import { S, el, api, T, errText } from "./state.js";
+import { S, el, api, T, errText, keyCaps } from "./state.js";
 import * as pop from "./popups.js";
 
 export function openVersionList(act, run, show) {
@@ -18,7 +18,8 @@ export function openVersionList(act, run, show) {
       all.hidden = true;
       head.append(title, all);
       body = el("div", "body", T("loading…"));
-      const foot = el("div", "btns"), close = el("button", "", T("close") + "  esc");
+      const foot = el("div", "btns"), close = el("button", "", T("close"));
+      close.append(keyCaps("esc"));
       close.onclick = pop.close;
       foot.append(close);
       box.append(head, body, foot);

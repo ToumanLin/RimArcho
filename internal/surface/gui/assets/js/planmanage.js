@@ -5,7 +5,7 @@ import { choiceControl } from "./choices.js";
 // (Library / Lists / <list> / export). Editing what a list holds stays in the editor (§2.5).
 // Data: API.PlanManage (view.BuildPlanManage), API.PlanExport (view.BuildPlanExport).
 import { pathContent, copyablePath, editablePath } from "./fields.js";
-import { S, $, el, api, T, Tf, errText, say } from "./state.js";
+import { S, $, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { openScreen, page, button, act, area, seg, beginPageRead } from "./screens.js";
 import { icon } from "./icons.js";
 import * as pop from "./popups.js";
@@ -380,7 +380,7 @@ function newForm() {
   const updateButtons = () => {
     const hasInput = !!(draft.import.text.trim() || draft.import.path);
     const label = previewing() ? T("preview") : T("create and edit");
-    if (main.firstChild?.textContent !== label) main.replaceChildren(label, el("kbd", "", "enter"));
+    if (main.firstChild?.textContent !== label) main.replaceChildren(label, keyCaps("enter"));
     if (previewing()) { delete main.dataset.envWrite; main.disabled = !!draft.submitting || !!draft.importing || !hasInput; ui.renderHints?.(); return; }
     main.dataset.envWrite = "create-plan";
     const sourceOK = draft.from === "import" ? !draft.importing : draft.from === "" || !!draft.sources && !draft.loading && (draft.from !== "save" || !!draft.save);

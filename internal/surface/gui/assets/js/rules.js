@@ -6,7 +6,7 @@ import { choiceControl } from "./choices.js";
 // 06 §3.1 rule 7). r opens the form for the mod at the cursor. Removing is at once, with
 // undo in the status line (u right after, too); rules are not list edits, so they are not in
 // the list's undo stack.
-import { $, el, api, T, errText, say } from "./state.js";
+import { $, el, api, T, errText, say, keyCaps } from "./state.js";
 import { icon } from "./icons.js";
 import { seg } from "./screens.js";
 
@@ -128,7 +128,7 @@ function draw() {
   if (!R.form) {
     const add = el("button", "btn small quiet rule-add", T("add a rule"));
     add.prepend(Object.assign(el("span", "ic"), { innerHTML: icon.plus }));
-    add.append(el("kbd", "", "r"));
+    add.append(keyCaps("r"));
     add.title = T("for the mod at the cursor") + "  r";
     add.onclick = () => startRule(ui.ruleTarget());
     body.append(add);
@@ -208,10 +208,10 @@ function form() {
   box.append(note);
   const acts = el("div", "rule-form-acts");
   const cancel = el("button", "btn small quiet", T("cancel"));
-  cancel.append(el("kbd", "", "esc"));
+  cancel.append(keyCaps("esc"));
   cancel.onclick = closeForm;
   const ok = el("button", "btn small primary", f.id ? T("save") : T("add"));
-  ok.append(el("kbd", "", "enter"));
+  ok.append(keyCaps("enter"));
   ok.onclick = save;
   acts.append(cancel, ok);
   box.append(acts);

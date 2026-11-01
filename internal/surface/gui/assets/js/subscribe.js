@@ -3,7 +3,7 @@
 // the one decision that source needs and shows the --dry-run text before subscribe. Also the
 // file choice a download-page update needs (pageUpdate, in the subscriptions and updates detail).
 import { pathContent, editablePath } from "./fields.js";
-import { el, api, T, Tf, errText, say } from "./state.js";
+import { el, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import * as pop from "./popups.js";
 
 // button runs an action once at a time: disabled with "…" while it runs.
@@ -190,9 +190,9 @@ export function addForm(ctx = {}) {
       field.value = ""; recognise(); ctx.done?.();
     }, "primary", () => !!ready && ready === JSON.stringify(args()));
     sub.disabled = true;
-    sub.append(el("kbd", "", "enter"));
+    sub.append(keyCaps("enter"));
     const cancel = button(T("cancel"), () => { field.value = ""; recognise(); field.focus(); });
-    cancel.append(el("kbd", "", "esc"));
+    cancel.append(keyCaps("esc"));
     foot.append(cancel, sub);
     // refresh: the dry run of the current choice; a reply for an older choice is dropped.
     const refresh = async () => {

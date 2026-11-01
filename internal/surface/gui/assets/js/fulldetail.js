@@ -12,7 +12,7 @@
 // focus the parts, the row menu and the copy keys act on the selected copy ([ ] pick it).
 // The editor's detail column and Mod library's details are the short form of the same parts
 // (detail.js renderDetail, library.js drawDetail).
-import { S, $, el, api, T, Tf, errText, say, cur } from "./state.js";
+import { S, $, el, api, T, Tf, errText, say, cur, keyCaps } from "./state.js";
 import { closeScreen, page, seg, button, area, beginPageRead } from "./screens.js";
 import { shimmer } from "./motion.js";
 import { renderDetail } from "./detail.js";
@@ -222,7 +222,7 @@ function copyCard(x) {
       const o = ops.op(code);
       const btn = el("button", "btn small" + (o.danger ? " danger" : ""), o.label);
       if (o.group !== 3) btn.dataset.envWrite = code;
-      if (o.key) btn.append(el("kbd", "", o.key));
+      if (o.key) btn.append(keyCaps(o.key));
       btn.onclick = (e) => { e.stopPropagation(); runOp(code); };
       acts.append(btn);
     }
