@@ -57,10 +57,11 @@ function barHarness(groups) {
   return {bar:ctx.bar,document};
 }
 
-test('Lists is the first group, includes zero counts, and supports click, exclusion and keys', () => {
+test('Lists is the first group, hides lists with no matching mods, and supports click, exclusion and keys', () => {
   const groups=[{key:'tag',title:'tags',values:[{filter:'tag:Visual',label:'Visual',count:2}]},
     {key:'lists',title:'lists',values:[
       {filter:'lists:Main colony',label:'Main colony',count:1,cur:true},
+      {filter:'lists:Tribal start',label:'Tribal start',count:3},
       {filter:'lists:Empty list',label:'Empty list',count:0},
     ]}];
   const {bar,document}=barHarness(groups);
@@ -68,16 +69,17 @@ test('Lists is the first group, includes zero counts, and supports click, exclus
   assert.equal(buttons.length,3);
   assert.equal(buttons[0].children[0].textContent,'Main colony');
   assert.equal(buttons[0].children[1].textContent,'current list');
-  assert.equal(buttons[1].children.at(-1).textContent,'0');
+  assert.equal(buttons[1].children.at(-1).textContent,'3');
+  assert.ok(![...buttons].some((x)=>x.children[0].textContent==='Empty list'));
   buttons[0].onclick();assert.equal(bar.search,'lists:"Main colony"');
   buttons[0].oncontextmenu({preventDefault(){}});assert.equal(bar.search,'-lists:"Main colony"');
   const key = (node,key)=>node.onkeydown({key,preventDefault(){},stopPropagation(){}});
-  key(buttons[1],'Enter');assert.equal(bar.search,'-lists:"Main colony" lists:"Empty list"');
-  key(buttons[1],'x');assert.equal(bar.search,'-lists:"Main colony" -lists:"Empty list"');
+  key(buttons[1],'Enter');assert.equal(bar.search,'-lists:"Main colony" lists:"Tribal start"');
+  key(buttons[1],'x');assert.equal(bar.search,'-lists:"Main colony" -lists:"Tribal start"');
   key(buttons[0],'ArrowDown');assert.equal(document.activeElement,buttons[2]);
   groups[1].values[0].on=-1;bar.draw();
   const main=bar.el.querySelectorAll('.fbar-v')[0];
-  main.oncontextmenu({preventDefault(){}});assert.equal(bar.search,'-lists:"Empty list"');
+  main.oncontextmenu({preventDefault(){}});assert.equal(bar.search,'-lists:"Tribal start"');
 });
 
 test('task groups do not acquire list suggestions', () => {

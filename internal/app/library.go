@@ -748,7 +748,7 @@ func IsTagSep(c byte) bool { return c == ' ' || c == '-' || c == '_' || c == '/'
 
 // LibQuery selects and orders the library: search words (all must match: names, package
 // id, authors, alias, tags, note, Workshop ID, folder), filters "key:value" (one key's
-// values are alternatives except lists, which require every value; different keys must all hold; Exclude drops what has any of
+// values are alternatives, different keys must all hold; Exclude drops what has any of
 // its values) and a sort: name, size, changed, played.
 type LibQuery struct {
 	Search           string
@@ -925,14 +925,6 @@ func (q LibQuery) cond() (*libCond, error) {
 // passes: the instance holds every key's included values but skip's, and none excluded.
 func (c *libCond) passes(l *LibLineage, i *LibInstance, skip string) bool {
 	for k, want := range c.inc {
-		if k == "lists" && k != skip {
-			for name := range want {
-				if !c.has(l, i, k, map[string]bool{name: true}) {
-					return false
-				}
-			}
-			continue
-		}
 		if k != skip && !c.has(l, i, k, want) {
 			return false
 		}

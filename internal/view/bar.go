@@ -12,7 +12,7 @@ import (
 // (LibGroup, LibChoice, LibCond), so both pages draw them with one component.
 //
 // A filter is "group:value" ("-group:value" leaves out). Within a group the values are
-// "or" (lists require every value), between groups "and", as in Mod library (06 §2.9). The search box is the column search
+// "or", between groups "and", as in Mod library (06 §2.9). The search box is the column search
 // of §3.7 and may hold tag: type: has: version: words of its own.
 
 // BarKeys are the editor bar's groups in the order shown.
@@ -74,14 +74,6 @@ func parseBar(filters []string) barCond {
 func (c barCond) passes(it *Item, f MatchFacts, skip string) bool {
 	for k, ts := range c.inc {
 		if k == skip {
-			continue
-		}
-		if k == "lists" {
-			for _, t := range ts {
-				if !termMatch(t, it, f) {
-					return false
-				}
-			}
 			continue
 		}
 		if !slices.ContainsFunc(ts, func(t term) bool { return termMatch(t, it, f) }) {

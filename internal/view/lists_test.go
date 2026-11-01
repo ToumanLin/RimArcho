@@ -2,6 +2,7 @@ package view_test
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -43,16 +44,19 @@ func TestListsFilterCopiesAndGroups(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, tc := range []struct{ query, want string }{
-		{`lists:"MAIN COLONY"`, enabled},
-		{`lists:"Other colony"`, spare},
-		{`-lists:"Main colony" name:Lockable`, spare},
-		{`lists:"missing list"`, ""},
-		{`lists:"Main colony" lists:"Other colony"`, ""},
-		{`lists:"Empty list"`, ""},
-		{`lists:"Other colony" -lists:"Main colony"`, spare},
-		{`lists:"Main colony" id:` + spare, ""},
-		{`lists:"Other colony" id:` + enabled, ""},
+	for _, tc := range []struct {
+		query string
+		want  []string
+	}{
+		{`lists:"MAIN COLONY"`, []string{enabled}},
+		{`lists:"Other colony"`, []string{spare}},
+		{`-lists:"Main colony" name:Lockable`, []string{spare}},
+		{`lists:"missing list"`, nil},
+		{`lists:"Main colony" lists:"Other colony"`, []string{enabled, spare}}, // one key's values: either
+		{`lists:"Empty list"`, nil},
+		{`lists:"Other colony" -lists:"Main colony"`, []string{spare}},
+		{`lists:"Main colony" id:` + spare, nil},
+		{`lists:"Other colony" id:` + enabled, nil},
 	} {
 		p, err := view.BuildLibrary(lib, tc.query, nil, "")
 		if err != nil {
@@ -64,7 +68,9 @@ func TestListsFilterCopiesAndGroups(t *testing.T) {
 				refs = append(refs, i.Ref)
 			}
 		}
-		if strings.Join(refs, "") != tc.want {
+		slices.Sort(refs)
+		slices.Sort(tc.want)
+		if !slices.Equal(refs, tc.want) {
 			t.Errorf("%s: copies %v, want %s", tc.query, refs, tc.want)
 		}
 	}
@@ -98,11 +104,13 @@ func TestListsFilterCopiesAndGroups(t *testing.T) {
 			t.Fatal("editor offered the list being edited")
 		}
 	}
-	for _, query := range []string{`lists:"Main colony" lists:"Other colony" name:Lockable`, `lists:"unknown list"`} {
-		result := view.FilterBoard(b, query, nil, view.MatchFacts{}, false, "1.6")
-		if len(result.Rows[0])+len(result.Rows[1]) != 0 {
-			t.Errorf("editor %s matched %v", query, result.Rows)
-		}
+	if result := view.FilterBoard(b, `lists:"unknown list"`, nil, view.MatchFacts{}, false, "1.6"); len(result.Rows[0])+len(result.Rows[1]) != 0 {
+		t.Errorf("editor unknown list matched %v", result.Rows)
+	}
+	// one key's values: either, so a second (empty) list adds nothing and takes nothing away
+	either := `lists:"Main colony" lists:"Empty list" name:Lockable -lists:"Other colony"`
+	if result := view.FilterBoard(b, either, nil, view.MatchFacts{}, false, "1.6"); len(result.Rows[0])+len(result.Rows[1]) != 1 {
+		t.Errorf("editor %s matched %v", either, result.Rows)
 	}
 	allGroups := view.FilterBoard(b, "", nil, view.MatchFacts{}, true, "1.6").Groups
 	for _, v := range allGroups[0].Values {
@@ -143,7 +151,7 @@ func TestListsFilterCopiesAndGroups(t *testing.T) {
 	}
 	// CLI/MCP use the same app query through include/exclude arguments.
 	result, err := lib.Filter(app.LibQuery{Include: []string{"lists:Main colony", "lists:Other colony"}})
-	if err != nil || len(result.Matches) != 0 {
+	if err != nil || len(result.Matches) != 1 || len(result.Matches[0].Shown) != 2 {
 		t.Fatalf("repeated app filters: %+v, %v", result, err)
 	}
 	out := e.MustRun("library", "--include", "lists:Main colony", "--exclude", "lists:Other colony", "--all")

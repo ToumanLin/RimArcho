@@ -4,7 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
-- Mod library and the plan editor support `lists:"<name>"` and its negation, matching exact Mod copies enabled by a list. The shared filter panel offers Lists first, marks the current list, and omits the edited list in the editor. CLI/MCP library filters accept `lists:<name>` too.
+- Mod library and the plan editor support `lists:"<name>"` and its negation, matching exact Mod copies enabled by a list. The filter panel shows Lists first, marks the current list, and leaves out the list being edited. CLI/MCP library filters accept `lists:<name>` too.
 - GUI: keys are drawn as key caps everywhere (buttons, dialog buttons, the hint line), so a key no longer reads as part of its label: confirm [enter ↵] instead of confirm enter.
 - Mod library's Subscriptions and updates page is now Updates in the GUI, TUI, and tool descriptions. The source summary selects Update checks in the detail pane, with per-source results, failed Mod names and reasons, and account links only where needed.
 - Workshop items removed by their author or made private appear under Won't update any more, with a short explanation and actions to lock this version or open its exact copy in Mod library. They do not count as failed checks.

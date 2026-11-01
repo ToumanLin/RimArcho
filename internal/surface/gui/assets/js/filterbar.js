@@ -187,7 +187,7 @@ export function createBar(opts) {
   b.focus = () => { inp.focus(); inp.select(); };
   b.focused = () => root.contains(document.activeElement);
 
-  const available = (g) => (g.values || []).filter((v) => g.key === "lists" || v.count > 0 || v.on);
+  const available = (g) => (g.values || []).filter((v) => v.count > 0 || v.on);
   const lineOf = (g) => {
     const vals = available(g);
     return expanded.has(g.key) ? vals : vals.slice(0, LINE).concat(vals.slice(LINE).filter((v) => v.on));

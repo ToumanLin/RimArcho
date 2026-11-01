@@ -50,7 +50,7 @@ func (b *barState) shownValues(g view.LibGroup) []view.LibChoice {
 	var out []view.LibChoice
 	q := strings.ToLower(b.find)
 	for _, v := range g.Values {
-		if g.Key != "lists" && v.Count == 0 && v.On == 0 {
+		if v.Count == 0 && v.On == 0 {
 			continue
 		}
 		if q != "" && !strings.Contains(strings.ToLower(v.Label), q) {
