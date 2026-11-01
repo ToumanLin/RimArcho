@@ -77,7 +77,7 @@ type memoryEstimate struct {
 
 func memoryKey(st *LoadoutState) string {
 	h := sha256.New()
-	fmt.Fprintf(h, "unity16-calibrated-v2|%s|%s|%s", st.Ix.Env.ID, st.GameMM(), ListFingerprint(st.List))
+	fmt.Fprintf(h, "unity16-heavy-calibrated-v3|%s|%s|%s", st.Ix.Env.ID, st.GameMM(), ListFingerprint(st.List))
 	for _, e := range st.List {
 		if m := st.Ix.ByID[e.Instance]; m != nil {
 			fmt.Fprintf(h, "|%s:%d:%x", m.ID, m.SnapID, m.SnapHash)
