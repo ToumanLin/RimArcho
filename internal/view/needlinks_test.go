@@ -189,10 +189,10 @@ func TestNeedLinksKeepEachProblemsMissingTarget(t *testing.T) {
 			Suggestions: []string{fmt.Sprintf("subscribe: https://steamcommunity.com/sharedfiles/filedetails/?id=%d", 123456+i)}}})
 	}
 	n := BuildNeeds(e.App, st, ps)
-	if len(n.Items) != 2 {
+	if len(n.Items) != 3 || n.Items[2].Kind != "memory.capacity" {
 		t.Fatalf("expected two dependencies: %+v", n.Items)
 	}
-	for _, it := range n.Items {
+	for _, it := range n.Items[:2] {
 		want := "https://steamcommunity.com/sharedfiles/filedetails/?id=123456"
 		if strings.HasSuffix(it.Target, "1") {
 			want = "https://steamcommunity.com/sharedfiles/filedetails/?id=123457"
@@ -224,7 +224,7 @@ func TestCorpusAndDeclaredDependenciesStaySeparate(t *testing.T) {
 			Subjects: []string{finding.Inst([]string{a.ID, b.ID}[i]), finding.Inst(f.ID)}}})
 	}
 	n := BuildNeeds(e.App, st, ps)
-	if len(n.Items) != 2 || n.Count != 1 || n.Status[a.ID] != StatusHint || n.Status[b.ID] != StatusWarn {
+	if len(n.Items) != 3 || n.Items[2].Kind != "memory.capacity" || n.Count != 1 || n.Status[a.ID] != StatusHint || n.Status[b.ID] != StatusWarn {
 		t.Fatalf("hint merged with author requirement: %+v %+v", n.Items, n.Status)
 	}
 	if n.Items[0].Status != StatusWarn || n.Items[0].ID == n.Items[1].ID {
@@ -232,7 +232,7 @@ func TestCorpusAndDeclaredDependenciesStaySeparate(t *testing.T) {
 	}
 	ps.List[1].Code = "dep.observed-missing"
 	merged := BuildNeeds(e.App, st, ps)
-	if len(merged.Items) != 1 || merged.Count != 0 || !strings.Contains(merged.Items[0].Why, "may be needed") {
+	if len(merged.Items) != 2 || merged.Items[1].Kind != "memory.capacity" || merged.Count != 0 || !strings.Contains(merged.Items[0].Why, "may be needed") {
 		t.Fatalf("merged hints must keep uncertainty: %+v", merged.Items)
 	}
 	if flatParts(merged.Items[0].Content.Why) != merged.Items[0].Why {

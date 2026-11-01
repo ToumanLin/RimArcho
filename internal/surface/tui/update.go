@@ -37,6 +37,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	defer m.fsLeft() // leaving 搜索文件 stops its search (06 §3.1 rule 9)
 	switch msg := msg.(type) {
+	case memoryMeasuredMsg:
+		m.memoryMeasured(msg)
+		if msg.err == nil && m.tab == tabHome && m.panel == nil {
+			return m, m.openHome()
+		}
+		return m, nil
 	case feedbackSentMsg:
 		if msg.err != nil {
 			m.say(sayFail, msg.err.Error())

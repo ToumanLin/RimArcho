@@ -14,6 +14,7 @@ import { openScreen, page, changesPlan, beginPageRead } from "./screens.js";
 import { launchPack } from "./packs.js";
 import { withEnvironmentSwitch } from "./environment.js";
 import { places, slideFrom } from "./motion.js";
+import { memoryConfirm } from "./popups.js";
 
 let ui = null;
 export function initHome(u) {
@@ -38,6 +39,7 @@ const shown = { game: null, row: null, note: false, drawn: false };
 const markY = new Map();
 
 let homeRetries = 0, homeRetryTimer = null;
+let memoryTimer = null, launchPending = false;
 export async function home({ keep = false } = {}) {
   clearTimeout(homeRetryTimer);
   const read = beginPageRead("home", { keep, retry: () => home() });
@@ -61,6 +63,7 @@ export async function home({ keep = false } = {}) {
   if (f) picks.set(f.envName, key(f));
   draw();
   read.finish();
+  refreshHomeMemory(next);
 }
 
 // retryHome reads the page again after 1, 2, 4, 8 s, then every 10 s, for about a minute
@@ -351,11 +354,12 @@ function rowStep(f, env, moved) {
 function launchStep(f) {
   const s = step("03", "hm-s3", T("launch"));
   const live = running(), starting = !live && launching > Date.now();
-  const b = el("button", "hm-go" + (live ? " running" : "") + (starting ? " starting" : "") + (arrived ? " arrived" : ""));
+  const severity = !live && !starting ? f?.memory?.assessment?.ramSeverity : "";
+  const b = el("button", "hm-go" + (["severe", "warning"].includes(severity) ? " memory-" + severity : "") + (live ? " running" : "") + (starting ? " starting" : "") + (arrived ? " arrived" : ""));
   b.dataset.envWrite = "launch";
   arrived = false;
   const top = el("div", "top");
-  const title = el("span", "title", live ? T("the game is running") : starting ? T("starting…") : T("launch the game"));
+  const title = el("span", "title", live ? T("the game is running") : starting ? T("starting…") : T(severity === "severe" ? "launch with RAM risk" : severity === "warning" ? "launch with limited RAM" : "launch the game"));
   if (live) title.prepend(el("span", "dot"));
   top.append(title);
   if (!live) top.append(el("kbd", "", "L"));
@@ -554,15 +558,69 @@ function actLine(title, text, go) {
   return b;
 }
 
-// launch is the applied row's L (08 §2, §5.3): the plan launches at once, as the pack
-// does on the packs page. ▶ says it is starting until the game's live state arrives.
+// Late estimates must belong to the row, environment and list that are still shown.
+async function refreshHomeMemory(expected) {
+  clearTimeout(memoryTimer);
+  const r = applied(), env = S.envSeq;
+  const current = () => S.screen === "home" && data === expected && S.envSeq === env && applied() === r;
+  if (!r || r.kind !== "plan" || !r.current || !current()) return;
+  try {
+    let m = await api.HomeMemory();
+    if (!current() || m?.env !== r.envName || m?.plan !== r.plan) return;
+    r.memory = m;
+    if (!S.popup) draw();
+    if (!m.assessment.estimated || m.assessment.stale) {
+      const first = await api.PlanLoadCost(r.plan);
+      if (!current()) return;
+      while (current()) {
+        await new Promise(resolve => setTimeout(resolve, 250));
+        if (!current()) return;
+        const result = await api.PlanLoadCostMeasure(first.request);
+        if (!current() || !result || result.error) return;
+        if (result.loading) continue;
+        m = await api.HomeMemory();
+        if (!current() || m?.env !== r.envName || m?.plan !== r.plan || m.token !== r.memory.token) return;
+        r.memory = m;
+        if (!S.popup) draw();
+        break;
+      }
+    }
+  } catch { /* Unknown estimates retain the ordinary launch button. */ }
+  if (current()) memoryTimer = setTimeout(() => refreshHomeMemory(expected), 30000);
+}
+
+// Launch the applied row after checking its current RAM comparison (08 §2, §5.3).
 async function launch(r) {
   if (S.busy.env) return say("busy", Tf("switching to %s…", S.busy.env));
-  launching = Date.now() + 4000;
-  draw();
-  setTimeout(() => { if (S.screen === "home" && launching && launching <= Date.now()) { launching = 0; draw(); } }, 4100);
-  try {
-    if (r.kind !== "plan") await launchPack(r.name);
-    else if (await ui.run("launch") === "asked") { launching = 0; draw(); }
-  } catch (e) { launching = 0; draw(); say("fail", errText(e)); }
+  if (launchPending || running() || launching > Date.now()) return;
+  const expected = data, env = S.envSeq;
+  const current = () => S.screen === "home" && data === expected && S.envSeq === env && applied() === r;
+  const start = async (approved = null) => {
+    if (!current()) return;
+    launchPending = true;
+    try {
+      if (r.kind === "plan") {
+        let m = null;
+        try { m = await api.HomeMemory(); } catch { /* unavailable means unknown */ }
+        if (!current()) return;
+        if ((approved && !m) || (m && (m.env !== r.envName || m.plan !== r.plan || (approved && m.token !== approved) || (!approved && r.memory?.token && m.token !== r.memory.token)))) {
+          say("busy", T("the list changed; review the updated estimate before launching"));
+          home({ keep: true });
+          return;
+        }
+        if (!approved && m?.assessment?.ramSeverity === "severe") {
+          r.memory = m;
+          memoryConfirm(m, () => start(m.token));
+          return;
+        }
+      }
+      launching = Date.now() + 4000;
+      draw();
+      setTimeout(() => { if (S.screen === "home" && launching && launching <= Date.now()) { launching = 0; draw(); } }, 4100);
+      if (r.kind !== "plan") await launchPack(r.name);
+      else if (await ui.run("launch") === "asked") { launching = 0; draw(); }
+    } catch (e) { launching = 0; if (current()) draw(); say("fail", errText(e)); }
+    finally { launchPending = false; }
+  };
+  await start();
 }

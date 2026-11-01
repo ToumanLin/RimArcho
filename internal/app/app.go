@@ -21,6 +21,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/ids"
+	"github.com/ToumanLin/RimArcho/internal/machine"
 	"github.com/ToumanLin/RimArcho/internal/perftrace"
 	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/textures"
@@ -39,6 +40,8 @@ tombstone_days = 90
 
 // App is one opened RimArcho data directory.
 type App struct {
+	// MemoryProbe replaces cached hardware observations in synthetic tests.
+	MemoryProbe       func() machine.Memory
 	checkContext      context.Context // automatic worker cancellation; never shared with pages
 	dataKey           string          // community data generation read by this connection's compact indexes
 	workspaceSnapshot bool

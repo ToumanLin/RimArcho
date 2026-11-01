@@ -2,6 +2,7 @@ package view
 
 func init() {
 	Register(map[string]string{
+		"The 1.7 loading reserve is uncalibrated.": "1.7 的载入预留尚未校准。",
 		"%d files":                    "%d 个文件",
 		"DDS":                         "DDS",
 		"Patches":                     "Patch",
@@ -18,12 +19,13 @@ func init() {
 		"RAM upper bound":   "内存上限",
 		"VRAM upper bound":  "显存上限",
 		"largest contributors (five by RAM and VRAM)": "占用最多的 Mod（内存、显存各前五）",
-		"textures":   "贴图",
-		"sounds":     "音效",
-		"assemblies": "程序集",
+		"textures":     "贴图",
+		"sounds":       "音效",
+		"assemblies":   "程序集",
+		"mod overhead": "Mod 固定开销",
 		"Textures: the range is measured on 1.7 with 100–484 mods (0.9–2.6× the BC7 + mipmap size in VRAM, 1.5–3.5× in RAM); first launches sit lower, later launches higher.": "贴图：范围是在 1.7 上用 100–484 个 Mod 实测的（显存是 BC7 加 mipmap 大小的 0.9–2.6 倍，内存 1.5–3.5 倍）；第一次启动偏低，之后的启动偏高",
 		"The game uploads textures on demand and starts evicting at a share of the graphics card's memory, so a smaller card shows less VRAM.":                                 "游戏按需上传贴图，用到显卡显存的一定比例后开始换出，所以显存小的显卡上显示的会更少",
-		"Not measured on 1.6: this range follows the game's loading rules only.":                                                                                               "1.6 没有实测：这个范围只按游戏的加载规则算",
+		"1.6 RAM is calibrated against test runs with 250–500 mods; VRAM follows the loading rules only.":                                                                      "1.6 的内存按 250–500 个 Mod 的实测校准；显存只按加载规则算",
 		"RAM is the game's committed private memory; Task Manager's Memory column shows only the part in physical memory, usually less.":                                       "内存指游戏提交的专用内存；任务管理器的“内存”一栏只算在物理内存里的部分，通常更少",
 		"Sounds: decoded clips up to 2 MiB stay in RAM; larger clips stream.":                                                                                                  "音效：解码后不超过 2 MiB 的留在内存里，更大的边播边读",
 		"Textures use DXT or RGBA32 with mipmaps; all textures load into VRAM. The upper bound includes static atlas copies.":                                                  "贴图按 DXT / RGBA32 加 mipmap 算；所有贴图都会载入显存，上限还算了静态图集的副本",

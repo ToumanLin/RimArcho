@@ -6,6 +6,7 @@ package cmds_test
 import (
 	"flag"
 	"fmt"
+	"github.com/ToumanLin/RimArcho/internal/machine"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -448,4 +449,16 @@ func problemsFixture(t *testing.T) *testkit.Env {
 	e.AddEnv(false)
 	e.MustRun("scan")
 	return e
+}
+
+func TestGoldenMemory(t *testing.T) {
+	e := testkit.New(t)
+	e.AddEnv(false)
+	e.AddWorkshop("3101", testkit.Sample("tester.memory", "Memory fixture"))
+	e.WriteModsConfig("1.6.4633", "ludeon.rimworld", "tester.memory")
+	e.MustRun("scan")
+	e.App.MemoryProbe = func() machine.Memory {
+		return machine.Memory{TotalRAM: 8 << 30, AvailableRAM: 1 << 30, SampledAt: time.Unix(100, 0), Adapters: []machine.Adapter{{Name: "Fixture GPU", Dedicated: 1 << 30}}}
+	}
+	runGolden(t, "memory", e, []step{cmd("plan", "cost")})
 }

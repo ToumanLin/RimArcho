@@ -34,6 +34,11 @@ func (m *model) openHome() tea.Cmd {
 		return func(m *model) tea.Cmd {
 			if m.home.seq == seq {
 				m.home.data, m.home.err, m.home.loading = data, err, false
+				if m.tab == tabHome {
+					if row := m.homeRow(); row != nil && row.Memory != nil && (!row.Memory.Assessment.Estimated || row.Memory.Assessment.Stale) {
+						return m.startMemoryEstimateAt(row.Plan, row.EnvName)
+					}
+				}
 			}
 			return nil
 		}
@@ -106,6 +111,9 @@ func (m *model) homeKey(s string) tea.Cmd {
 			}
 		}
 		cmd := m.listAction(view.ListLaunch)
+		if m.panel != nil {
+			return cmd
+		}
 		return tea.Batch(cmd, m.openHome())
 	case "w":
 		if m.launches != "" || m.unsaved == 0 {
@@ -162,7 +170,16 @@ func (m *model) homeLines(n int) []string {
 		add("  " + sWarnS.Render(Tf("watch for: %s", l.Text)) + "  " + sDimS.Render("shift+2"))
 	}
 	add("")
-	add("  " + sAccent.Render(ic.play+" "+T("launch the game")) + "  " + sText.Render("L"))
+	launchLabel, launchStyle := T("launch the game"), sAccent
+	if r.Memory != nil {
+		switch r.Memory.Assessment.RAMSeverity {
+		case "severe":
+			launchLabel, launchStyle = T("launch with RAM risk"), sErrS
+		case "warning":
+			launchLabel, launchStyle = T("launch with limited RAM"), sWarnS
+		}
+	}
+	add("  " + launchStyle.Render(ic.play+" "+launchLabel) + "  " + sText.Render("L"))
 	if r.Unsaved > 0 && m.launches == "" {
 		add("  " + sDimS.Render(Tf("save %d changes", r.Unsaved)) + "  " + sText.Render("w"))
 	}

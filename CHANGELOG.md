@@ -4,6 +4,18 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- Memory estimates now report an unknown game version instead of silently using
+  the 1.6 model; all lists use the selected game environment and its effective folders.
+
+- Unity 1.6 RAM estimates now use VM measurements for the baseline, texture memory,
+  per-mod overhead and startup reserve. Resident and loading budgets stay separate;
+  existing 1.7 texture calibration is retained. `plan cost` and MCP `estimate_memory`
+  report the same capacity levels.
+- The launch button turns yellow when available RAM is inside the loading budget,
+  red below its lower bound. Red launches ask for confirmation with Cancel focused;
+  the TUI also confirms. Can it run compares RAM and VRAM on separate lines.
+  Unknown readings keep the ordinary button; VRAM shortages remain warnings.
+
 - Settings › Feedback (反馈, also in the command palette): write a bug report or
   suggestion; it becomes a public issue in the GitHub repository, which the page says
   above the preview. Two ways:

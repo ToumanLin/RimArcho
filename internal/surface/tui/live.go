@@ -20,6 +20,7 @@ func liveNext() tea.Cmd { return tea.Tick(livePoll, func(time.Time) tea.Msg { re
 
 // pollLive updates the running game; 需要处理 is rebuilt when its errors changed.
 func (m *model) pollLive() {
+	m.refreshMemoryCapacity()
 	if m.st == nil || m.loadErr != nil {
 		return
 	}

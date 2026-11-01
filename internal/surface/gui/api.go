@@ -1034,7 +1034,8 @@ func (s *API) Needs() *view.Needs {
 	if c, key := s.cachedNeedsLocked(); c != nil {
 		if c.key == key {
 			s.refreshNeedsLocked(c)
-			n := c.n
+			st, _ := s.a.Loadout()
+			n := view.RefreshMemory(s.a, st, c.n)
 			if c.eager && n.Error == "" && (n.Stale || n.Never) && !s.busy["analyze"] {
 				s.startAnalyze()
 			}
@@ -1049,6 +1050,8 @@ func (s *API) Needs() *view.Needs {
 		}
 		n.Updating = true
 		s.refreshNeedsLocked(c)
+		st, _ := s.a.Loadout()
+		n = *view.RefreshMemory(s.a, st, &n)
 		s.mu.Unlock()
 		return &n
 	}

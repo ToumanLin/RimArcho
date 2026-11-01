@@ -93,3 +93,5 @@ const descManageSubscriptions = `Mods RimArcho installs and updates itself (Git 
 const descTextures = `Convert mods' PNG textures to DDS next to them for lighter loading and less video memory (the PNGs stay): status (read-only estimate), optimize, clean. optimize: dry_run=true first and ask; refused while a game runs.`
 
 const descUninstall = `Preview what uninstalling RimArcho would delete, move or keep (read-only). No tool uninstalls: that is the player's decision alone.`
+
+const descMemory = `Estimate resident RAM, loading RAM and VRAM for a plan. Available physical RAM below loading low is severe, below high warning, otherwise ok; unknown stays unknown. VRAM shortages warn only. Unity 1.6 RAM is VM-calibrated. Reads headers and caches estimates. Limits: guide estimate_memory.`

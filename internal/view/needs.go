@@ -167,15 +167,16 @@ type Need struct {
 
 // Needs is the screen's content and what it means for the rest of the interface.
 type Needs struct {
-	Environment string         `json:"environment,omitempty"`
-	Plan        int64          `json:"plan,omitempty"`
-	ListVersion string         `json:"listVersion,omitempty"`
-	Sequence    uint64         `json:"sequence"`
-	Revision    string         `json:"revision,omitempty"`
-	Updating    bool           `json:"updating"`
-	Error       string         `json:"error,omitempty"`
-	Items       []Need         `json:"items"`
-	Status      map[string]int `json:"status"` // each mod's row icon
+	Memory      *app.MemoryAssessment `json:"memory,omitempty"`
+	Environment string                `json:"environment,omitempty"`
+	Plan        int64                 `json:"plan,omitempty"`
+	ListVersion string                `json:"listVersion,omitempty"`
+	Sequence    uint64                `json:"sequence"`
+	Revision    string                `json:"revision,omitempty"`
+	Updating    bool                  `json:"updating"`
+	Error       string                `json:"error,omitempty"`
+	Items       []Need                `json:"items"`
+	Status      map[string]int        `json:"status"` // each mod's row icon
 	// Reasons say why a row has its icon: the items behind it, worst first (06 §4.2: the
 	// badge's hover / pinned popover).
 	Reasons map[string][]Reason `json:"reasons,omitempty"`
@@ -234,12 +235,17 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 	missing := a.MissingMods(st)
 	n.Items = append(mergeDependencies(st, buildItems(a, st, ps, missing)), directoryNeeds(a)...)
 	n.Items = append(n.Items, linkNeeds(a, ps.GameLinks)...)
+	capacity := a.CachedMemoryAssessment(st)
+	n.Memory = &capacity
+	n.Items = append(n.Items, MemoryNeed(capacity, st.Plan.ID))
 	var names *needNameIndex
 	if len(n.Items) > 0 {
 		names = newNeedNames(a, st, missing)
 	}
 	for i := range n.Items {
-		n.Items[i].Section = SectionOf(n.Items[i].Group)
+		if n.Items[i].code != "memory.capacity" {
+			n.Items[i].Section = SectionOf(n.Items[i].Group)
+		}
 		n.Items[i].Kind = n.Items[i].code
 		if ev := n.Items[i].Evidence; ev != nil && ev.Kind == EvCorpus {
 			// what shared logs taught: a hint, not counted; on 能不能跑 it is 可以留意 (06 §5)

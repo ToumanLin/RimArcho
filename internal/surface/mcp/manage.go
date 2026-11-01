@@ -16,6 +16,7 @@ func manageTools() []tool {
 		reg("check_links", true, false, descCheckLinks, func(in LinksCheckIn) []string { return argv("links", "check").flag("all", in.All).flag("json", true).a }),
 		reg("repair_links", false, true, descRepairLinks, LinksRepairArgv),
 		reg("test_run", false, false, descTestRun, TestRunArgv),
+		reg("estimate_memory", true, false, descMemory, MemoryArgv),
 		reg("manage_rules", false, false, descRules, func(in RuleIn) []string { return RulesArgv(in) }),
 		reg("ignore_problem", false, false, descIgnore, func(in IgnoreIn) []string { return IgnoreArgv(in) }),
 		reg("mute_version_warnings", false, false, descVersionMute, VersionMuteArgv),

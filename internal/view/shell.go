@@ -241,12 +241,13 @@ const HomeOK = "ok"
 
 // HomeRow is one row of "正在玩": a plan or a pack, its state, and what launches it.
 type HomeRow struct {
-	GameVersion string `json:"gameVersion"`
-	Kind        string `json:"kind"`
-	Name        string `json:"name"`
-	Env         string `json:"env"`   // the environment chip
-	State       string `json:"state"` // "2 problems break the game", "ready to play", "not checked yet"
-	Level       string `json:"level"` // LevelBad, HomeOK, or "" for not checked
+	Memory      *MemoryLaunch `json:"memory,omitempty"`
+	GameVersion string        `json:"gameVersion"`
+	Kind        string        `json:"kind"`
+	Name        string        `json:"name"`
+	Env         string        `json:"env"`   // the environment chip
+	State       string        `json:"state"` // "2 problems break the game", "ready to play", "not checked yet"
+	Level       string        `json:"level"` // LevelBad, HomeOK, or "" for not checked
 	// Facts: "312 mods"; Mode how its mods change: a plan follows Workshop updates, a pack
 	// keeps its versions (08 §5). Unsaved: the current plan's entries not written to the
 	// game yet (the launch step says so).
@@ -333,6 +334,7 @@ func BuildHomeFromState(a *app.App, st *app.LoadoutState, n *Needs, plans []Plan
 		}
 		k, checked := 0, false
 		if p.Current {
+			r.Memory = BuildMemoryLaunch(a, st)
 			r.Mods = active
 			r.Facts = Tf("%d mods", active)
 			r.Unsaved = len(st.Changes())

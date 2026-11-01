@@ -144,3 +144,58 @@ func TestPlanLoadCostMissingLoadFolder(t *testing.T) {
 		t.Fatalf("newly populated load folder: %+v, %v", populated, err)
 	}
 }
+
+func TestPlanLoadCostUsesSelectedEnvironmentVersion(t *testing.T) {
+	e := setup(t, false)
+	dir := e.AddWorkshop("3199", testkit.Sample("tester.versions", "Versions"))
+	e.WriteFile(filepath.Join(dir, "LoadFolders.xml"), "<loadFolders><v1.6><li>1.6</li></v1.6><v1.7><li>1.7</li></v1.7></loadFolders>")
+	e.WriteFile(filepath.Join(dir, "1.6", "Defs", "old.xml"), "<Defs/>")
+	e.WriteFile(filepath.Join(dir, "1.7", "Defs", "new.xml"), "<Defs><ThingDef><defName>New</defName></ThingDef></Defs>")
+	texPNG(t, filepath.Join(dir, "1.7", "Textures", "new.png"), 64, 64)
+	e.WriteModsConfig("1.6.4633", "ludeon.rimworld", "tester.versions")
+	scanNow(t, e)
+	e.MustRun("plan", "new", "historical-16", "--from", "current")
+	saved, err := e.App.FindPlan("historical-16")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A game's update changes the model and effective folders for every list,
+	// including a non-current list originally saved with the old game version.
+	e.WriteFile(filepath.Join(e.Game, "Version.txt"), "1.7.4985 rev1269")
+	scanNow(t, e)
+	for _, id := range []int64{0, saved.ID} {
+		r, err := e.App.PlanLoadCost(context.Background(), id, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r.Game != loadcost.Game17 || len(r.PerMod) != 1 || r.PerMod[0].Measure.PNG.Count != 1 || r.PerMod[0].Measure.Defs.Bytes <= int64(len("<Defs/>")) {
+			t.Fatalf("selected environment/folders ignored for plan %d: %+v", id, r)
+		}
+	}
+	game, err := e.App.Env()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, bad := range []string{"", "not-a-version"} {
+		game.GameVersion = bad
+		if err := e.App.Store.UpdateEnv(game); err != nil {
+			t.Fatal(err)
+		}
+		if r, err := e.App.PlanLoadCost(context.Background(), saved.ID, nil); err == nil || r != nil || !strings.Contains(err.Error(), "game version is unknown") {
+			t.Fatalf("unknown version silently estimated as 1.6: %+v %v", r, err)
+		}
+		st, err := e.App.Loadout()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if e.App.CachedMemoryAssessment(st).Estimated {
+			t.Fatal("unknown version reused estimate")
+		}
+	}
+	// The explicit analysis override is shared by CLI/MCP and detached GUI readers.
+	e.App.GameVersion = "1.7"
+	r, err := e.App.PlanLoadCost(context.Background(), saved.ID, nil)
+	if err != nil || r.Game != loadcost.Game17 {
+		t.Fatalf("explicit override ignored: %+v %v", r, err)
+	}
+}

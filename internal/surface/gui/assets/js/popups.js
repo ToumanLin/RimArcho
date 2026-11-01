@@ -502,3 +502,42 @@ export async function problem(ref, run, actionWrite) {
     if (current()) { close(); say("fail", errText(e)); }
   }
 }
+
+// B1: separate needed/available values; Enter follows focus, initially Cancel.
+export function memoryConfirm(memory, go) {
+  open("memory", T("RAM may be insufficient"), (pop, p) => {
+    pop.classList.add("memory-confirm");
+    pop.setAttribute("role", "dialog");
+    pop.setAttribute("aria-modal", "true");
+    pop.setAttribute("aria-label", T("RAM may be insufficient"));
+    pop.append(el("div", "ttl", T("RAM may be insufficient")));
+    const values = el("div", "memory-values");
+    for (const [label, value] of [["loading RAM needed", memory.needed], ["RAM available now", memory.available]]) {
+      const cell = el("div");
+      cell.append(el("div", "muted", T(label)), el("strong", "num", value));
+      values.append(cell);
+    }
+    const body = el("div", "body");
+    body.append(values, el("p", "", T("close other apps or reduce the list before launching.")));
+    pop.append(body);
+    const buttons = el("div", "btns");
+    const cancel = el("button", "memory-cancel", T("cancel"));
+    const yes = el("button", "go", T("launch anyway"));
+    yes.dataset.envWrite = "launch";
+    cancel.onclick = close;
+    let accepted = false;
+    yes.onclick = () => { if (accepted || S.popup !== p) return; accepted = true; close(); go(); };
+    buttons.append(cancel, yes); pop.append(buttons);
+    cancel.focus();
+    p.keys = e => {
+      if (["Tab", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+        e.preventDefault();
+        (document.activeElement === cancel ? yes : cancel).focus();
+      } else if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        (document.activeElement === yes ? yes : cancel).click();
+      }
+      return true;
+    };
+  });
+}
