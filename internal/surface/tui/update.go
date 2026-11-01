@@ -50,6 +50,12 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	switch msg := msg.(type) {
+	case memoryMeasuredMsg:
+		m.memoryMeasured(msg)
+		if msg.err == nil && m.tab == tabHome && m.panel == nil {
+			return m, m.openHome()
+		}
+		return m, nil
 	case feedbackSentMsg:
 		if msg.err != nil {
 			m.say(sayFail, msg.err.Error())

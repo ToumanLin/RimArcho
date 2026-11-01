@@ -30,6 +30,7 @@ var Coef = struct {
 	Tex17VRAMHigh           float64
 	Tex17RAMLow             float64
 	Tex17RAMHigh            float64
+	TextureRAM16Low         float64
 	TextureRAM16High        float64
 	CompressedPCM16         float64
 	Sound16FileLimit        int64
@@ -54,12 +55,14 @@ var Coef = struct {
 	UnknownMips:             4.0 / 3,
 	// 1.7, RTX 4090, 100 / 250 / 484 mods, first and later launches: VRAM 0.9–2.6× and
 	// private bytes 1.5–3.5× the payload (the engine also keeps Vulkan host memory).
-	Tex17VRAMLow:        0.9,
-	Tex17VRAMHigh:       2.6,
-	Tex17RAMLow:         1.5,
-	Tex17RAMHigh:        3.5,
-	TextureRAM16High:    0.10, // 1.6 (not measured): transient/staging RAM; lower bound is zero.
-	CompressedPCM16:     11,   // OGG/MP3: roughly 128 kbit/s versus 1411 kbit/s PCM16.
+	Tex17VRAMLow:  0.9,
+	Tex17VRAMHigh: 2.6,
+	Tex17RAMLow:   1.5,
+	Tex17RAMHigh:  3.5,
+	// 2026-10-31 VM, Unity 1.6: vanilla, 250 light/texture, 500; see research calibration.
+	TextureRAM16Low:     1.6,
+	TextureRAM16High:    1.8,
+	CompressedPCM16:     11, // OGG/MP3: roughly 128 kbit/s versus 1411 kbit/s PCM16.
 	Sound16FileLimit:    300 << 10,
 	Sound17PCM16Limit:   2 << 20,
 	Sound16DecodedLow:   1, // PCM16 versus float32 at the upper bound.
@@ -120,12 +123,12 @@ func Estimate(g Game, mods []Mod) Report {
 	vLow := png + unknown*c.UnknownPixelsLow
 	vHigh := png + unknown*c.UnknownPixelsHigh
 	dLow, dHigh := float64(m.DDS.Bytes), float64(m.DDS.Bytes)
-	// RAM per texture part: 1.6 only transient copies; 1.7 measured rates of the payload.
+	// 1.6 includes retained Mono/Unity/driver memory measured in private bytes.
 	if g == Game16 {
 		vHigh += float64(m.PNGSmall512Pixels) * c.AtlasBytesPerPixel
 	}
-	tRAMLow, tRAMHigh := 0.0, vHigh*c.TextureRAM16High
-	dRAMLow, dRAMHigh := 0.0, dHigh*c.TextureRAM16High
+	tRAMLow, tRAMHigh := vLow*c.TextureRAM16Low, vHigh*c.TextureRAM16High
+	dRAMLow, dRAMHigh := dLow*c.TextureRAM16Low, dHigh*c.TextureRAM16High
 	if g == Game17 {
 		tRAMLow, tRAMHigh = vLow*c.Tex17RAMLow, vHigh*c.Tex17RAMHigh
 		dRAMLow, dRAMHigh = dLow*c.Tex17RAMLow, dHigh*c.Tex17RAMHigh
@@ -156,6 +159,10 @@ func Estimate(g Game, mods []Mod) Report {
 		part("patches", m.Patches, float64(m.Patches.Bytes)*c.PatchesLow, float64(m.Patches.Bytes)*c.PatchesHigh, 0, 0),
 		part("assemblies", m.Assemblies, float64(m.Assemblies.Bytes)*c.AssembliesLow, float64(m.Assemblies.Bytes)*c.AssembliesHigh, 0, 0),
 	}}
+	if g == Game16 {
+		// Fixed per non-official Mod: fitted separately using equal-count texture groups.
+		r.Parts = append(r.Parts, part("mod overhead", Files{Count: len(mods)}, float64(len(mods))*(1.8*(1<<20)), float64(len(mods))*(2.5*(1<<20)), 0, 0))
+	}
 	for _, p := range r.Parts {
 		r.RAMLow += p.RAMLow
 		r.RAMHigh += p.RAMHigh

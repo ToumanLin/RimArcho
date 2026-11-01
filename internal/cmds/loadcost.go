@@ -1,7 +1,6 @@
 package cmds
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 
@@ -9,7 +8,7 @@ import (
 )
 
 func init() {
-	register(&Command{Name: "plan cost", Args: "[<plan>]", Summary: "estimate a plan's loaded RAM and VRAM ranges", MaxArgs: 1,
+	register(&Command{Name: "plan cost", Args: "[<plan>]", Summary: "estimate resident/loading RAM and VRAM, compare with hardware capacity", MaxArgs: 1,
 		Flags: []Flag{
 			{Name: "mods", Help: "include per-mod RAM and VRAM ranges in load order"},
 			{Name: "json", Help: "print the full report and per-mod raw measurements as JSON"},
@@ -27,7 +26,7 @@ func planCost(c *Ctx, args *Args) (*render.Doc, error) {
 			return nil, err
 		}
 	}
-	r, err := c.App.PlanLoadCost(context.Background(), p.ID, nil)
+	r, err := c.App.PlanLoadCost(c.Context, p.ID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -43,10 +42,26 @@ func planCost(c *Ctx, args *Args) (*render.Doc, error) {
 	root.KV("mods", fmt.Sprintf("%d (%d measured, %d cached)", r.Mods, r.Measured, r.Cached))
 	root.KV("RAM, baseline + mods", rangeText(r.RAMLow+r.Baseline.RAM, r.RAMHigh+r.Baseline.RAM))
 	root.KV("VRAM, baseline + mods", rangeText(r.VRAMLow+r.Baseline.VRAM, r.VRAMHigh+r.Baseline.VRAM))
+	root.KV("RAM, loading budget", rangeText(r.LoadingRAMLow+r.Baseline.RAM, r.LoadingRAMHigh+r.Baseline.RAM))
+	capacity := r.Capacity
+	hardware := capacity.Hardware
+	ramAvailable, vramAvailable := "unknown", "unknown"
+	if hardware.TotalRAM > 0 {
+		ramAvailable = render.Size(capacity.RAMBudget) + " / total " + render.Size(hardware.TotalRAM)
+	}
+	if hardware.VRAM() > 0 {
+		vramAvailable = render.Size(hardware.VRAM())
+	}
+	root.KV("RAM, available now", ramAvailable+" ["+capacity.RAMSeverity+"]")
+	root.KV("VRAM, dedicated capacity", vramAvailable+" ["+capacity.VRAMSeverity+"]")
+	if len(hardware.Adapters) > 0 {
+		root.KV("GPU candidate", hardware.Adapters[0].Name+" (OS adapter preference; game selection unverified)")
+	}
+	root.KV("capacity caveat", "Unity 1.6 RAM calibrated in VM; 1.6 VRAM and 1.7 loading reserve uncalibrated. Excludes saves and arbitrary mod allocations; shortage is a risk, not proof of a crash.")
 	root.KV("RAM, mods only", rangeText(r.RAMLow, r.RAMHigh))
 	root.KV("VRAM, mods only", rangeText(r.VRAMLow, r.VRAMHigh))
 	root.KV("vanilla + all DLC baseline", "RAM "+render.Size(r.Baseline.RAM)+", VRAM "+render.Size(r.Baseline.VRAM))
-	rows := [][]string{{"category", "files", "disk bytes (DDS payload)", "RAM", "VRAM"}}
+	rows := [][]string{{"category", "files / mods", "disk bytes (DDS payload)", "RAM", "VRAM"}}
 	for _, p := range r.Parts {
 		rows = append(rows, []string{p.Key, fmt.Sprint(p.Count), render.Size(p.Bytes), rangeText(p.RAMLow, p.RAMHigh), rangeText(p.VRAMLow, p.VRAMHigh)})
 	}

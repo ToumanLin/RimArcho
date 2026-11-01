@@ -331,6 +331,7 @@ next:
 | `edit_loadout` | `action`：`enable` / `disable` / `move` / `swap` / `sort`（`dry_run`）/ `undo` / `redo` / `stage`（`stage add`）/ `unstage`（`stage drop`）/ `restore`（`stage restore`）；位置参数 `at`、`before`、`after`、`up`、`down` | false | false |
 | `save_loadout` | `save`（`dry_run`） | false | true |
 | `launch_game` | `launch`（`dry_run`） | false | true |
+| `estimate_memory` | `plan cost [<列表>]`；常驻范围、载入预算及 RAM / VRAM 容量比较，未知与严重度，口径见 06 §2.4；只写可丢弃的估算缓存 | true | false |
 | `test_run` | `test run --json`（`env`、`plan`、`map`、`timeout_seconds`）；启动游戏可能耗时数分钟，隔离玩家存档、配置和日志（08 §12），`openWorldHint: false` | false | false |
 | `manage_plans` | `plan list/new/use/rename/remove --yes`、`loadout import --new` | false | true |
 | `plan_history` | `loadout log`、`loadout diff`、`history`（`action=steps`） | true | — |
@@ -438,7 +439,7 @@ agent 连上时只读到 Instructions 和每个工具的短描述（以及参数
 | I3 | `pkg:` 对应多个 Instance | 列出候选，不任选一个（`TestAmbiguousPackage`） | 通过 |
 | I4 | 用 Claude Code 或 Codex 接入 MCP，不加载任何 skill | 能完成一次补丁失败的诊断和一次 `Pawn.Tick` 异常的排查；2026-10-30 起诊断流程在 `guide topic=diagnose` 里，agent 要自己去读 | 通过（脚本化客户端自检，`spikes/mcpcheck`）；真实 agent 会话待验证（精简后尤其要看 agent 是否先读 guide） |
 | I5 | 默认输出 | 单次不超过 40 行，截断时给出展开命令（`TestCLIParity`、`TestTruncation`） | 通过 |
-| I6 | 注解 | 18 个只读工具 `readOnlyHint: true`；`destructiveHint: true` 的 11 个见 §5.2；每个工具的 guide 主题都有示例调用（`TestToolsAndAnnotations`）。写工具只在合成环境测试（`TestWriteTools`）；`env` 参数（`TestEnvParameter`）；分析超过等待时间时返回“仍在计算”（`TestStillComputing`） | 通过 |
+| I6 | 注解 | 只读工具按 `Tools()` 标注 `readOnlyHint: true`；`destructiveHint: true` 的 11 个见 §5.2；每个工具的 guide 主题都有示例调用（`TestToolsAndAnnotations`）。写工具只在合成环境测试（`TestWriteTools`）；`env` 参数（`TestEnvParameter`）；分析超过等待时间时返回“仍在计算”（`TestStillComputing`） | 通过 |
 | I7 | 对照 §1.2 的表，逐个玩家动作找对应工具 | 每个动作都有 CLI 命令和 MCP 工具，注解与是否写文件一致 | 部分通过（1.0 的玩家动作都有工具，订阅与更新 2026-10-30 补上 `manage_subscriptions`；1.1 的存档工具未做） |
 | I8 | ModsConfig.xml 有未处理的外部修改冲突时调用 `save_loadout` | 拒绝，文本给出看差异 / 载入 / 忽略三条命令；ModsConfig.xml 不变 | 通过 |
 | I9 | 游戏正在运行时调用启动工具；调用 `save_loadout` | 启动工具拒绝并说明哪个环境的游戏在运行；`save_loadout` 照常写入，提示游戏下次启动才会读到 | 通过 |

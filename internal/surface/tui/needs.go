@@ -97,7 +97,13 @@ func (m *model) actionKey(a view.Action, text string) needKey {
 		k.run = func(m *model) tea.Cmd { return m.open(a.URL) }
 	case view.ActLocateDirectory:
 		k.run = func(m *model) tea.Cmd { return m.locateDirectory(a.Refs[0], a.Label) }
-	case view.ActProblem, view.ActView, view.ActGameLog, view.ActManageLists: // the TUI has no list management page: its CLI view
+	case view.ActView:
+		if len(a.Argv) >= 2 && a.Argv[0] == "plan" && a.Argv[1] == "cost" {
+			k.run = func(m *model) tea.Cmd { return m.startMemoryEstimate(true) }
+		} else {
+			k.run = func(m *model) tea.Cmd { return m.openInspect(a.Argv) }
+		}
+	case view.ActProblem, view.ActGameLog, view.ActManageLists: // the TUI has no list management page: its CLI view
 		k.run = func(m *model) tea.Cmd { return m.openInspect(a.Argv) }
 	case view.ActList:
 		k.run = func(m *model) tea.Cmd { m.openPanel(a.Title, strings.Join(a.Lines, "\n")); return nil }
@@ -188,6 +194,14 @@ func (m *model) open(u string) tea.Cmd {
 // listAction is S, w and L (06 §6): it acts at once and says what it did; sort adds "u
 // undoes". A refusal says why and opens a panel with the commands that resolve it.
 func (m *model) listAction(what string) tea.Cmd {
+	if what == view.ListLaunch {
+		if c := m.currentLaunchMemory(); c != nil && c.Assessment.RAMSeverity == "severe" {
+			return m.confirmMemoryLaunch(c)
+		}
+	}
+	return m.doListAction(what)
+}
+func (m *model) doListAction(what string) tea.Cmd {
 	o := view.Run(m.app, what)
 	m.reload()
 	m.detailRef = ""

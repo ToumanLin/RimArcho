@@ -53,7 +53,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     plan use <name>                           make a plan current (writes no game file)
     plan rename <old> <new>                   rename a plan (its history stays)
     plan remove <name>                        delete a plan and its history (not the last one)
-    plan cost [<plan>]                        estimate a plan's loaded RAM and VRAM ranges
+    plan cost [<plan>]                        estimate resident/loading RAM and VRAM, compare with hardware capacity
     stage list                                staged mods, with the place each one came from
     stage add <ref…>                          stage mods (enabled ones leave the Loadout and remember their place)
     stage drop <ref…>                         take mods out of staging without enabling them

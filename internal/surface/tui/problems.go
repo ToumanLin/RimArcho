@@ -2,6 +2,7 @@ package tui
 
 import (
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -13,12 +14,14 @@ import (
 // process (A) and the choice of log (l).
 
 type probState struct {
-	items       []need
-	cursor, off int
-	stale       bool
-	never       bool
-	loaded      bool
-	countsKey   string
+	memoryReading bool
+	memoryAt      time.Time
+	items         []need
+	cursor, off   int
+	stale         bool
+	never         bool
+	loaded        bool
+	countsKey     string
 	// status is each mod's row icon and need the top bar's number: the counted items of
 	// 需要处理 (06 §7, §4.2, §7).
 	status map[string]int
@@ -50,9 +53,9 @@ func (m *model) ensureProblems() tea.Cmd {
 	if (m.prob.stale || m.prob.never) && !m.analyzing {
 		cmd := m.startAnalyze()
 		m.analyzeQuiet, m.status = true, before
-		return cmd
+		return tea.Batch(cmd, m.startMemoryEstimate(false))
 	}
-	return nil
+	return m.startMemoryEstimate(false)
 }
 
 // loadProblems reads the problems (declaration layer now, Def/Patch layers as stored) and

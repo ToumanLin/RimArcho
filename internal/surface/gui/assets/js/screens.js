@@ -386,6 +386,27 @@ export async function needs(keepCursor) {
   orderNeeds();
   drawNeeds();
   read.finish();
+  if (!data.memory?.estimated || data.memory?.stale) refreshMemoryEstimate(read);
+}
+
+let memoryRead = 0;
+async function refreshMemoryEstimate(read) {
+  const token = ++memoryRead;
+  const env = N.data.environment, plan = N.data.plan, list = N.data.listVersion;
+  const current = () => token === memoryRead && S.screen === "needs" && N.data.environment === env && N.data.plan === plan && N.data.listVersion === list && (!read || read.current());
+  try {
+    const first = await api.PlanLoadCost(plan || 0);
+    if (!first || !current()) return;
+    let result = first;
+    while (result?.loading && current()) {
+      await new Promise(resolve => setTimeout(resolve, 250));
+      if (!current()) return;
+      result = await api.PlanLoadCostMeasure(first.request);
+    }
+    if (!result || !current()) return;
+    if (result.error) { say("fail", result.error); return; }
+    needs(true);
+  } catch (e) { if (current()) say("fail", errText(e)); }
 }
 
 // snapshot: the rows as they are before an action that changes something.
@@ -594,7 +615,7 @@ function autoFix() {
 function needCard(it, ci, i) {
   if (it.done) return doneLine(it, ci, i);
   const quiet = it.dim && it.section !== 1;
-  const row = el("div", "need" + (quiet ? " dimmed" : ""));
+  const row = el("div", "need" + (quiet ? " dimmed" : "") + (it.kind === "memory.capacity" ? " memory-capacity" : ""));
   row.dataset.id = it.id || "";
   const top = el("div", "top");
   const body = el("div", "body");
@@ -799,6 +820,7 @@ async function runAction(it, act, here = false) {
       L.tabPick = 0;
       return gameLog(act.logPath || "", true);
     case "view":
+      if (act.argv?.[0] === "plan" && act.argv?.[1] === "cost") return refreshMemoryEstimate();
       if (act.argv?.[0] === "identity" && act.argv?.[1] === "why") {
         return pop.identity(act.question, (answer) => runAction(it, answer, here));
       }

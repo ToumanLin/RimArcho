@@ -20,7 +20,7 @@ func TestPlanLoadCostDisplay(t *testing.T) {
 		if !strings.HasPrefix(p.Summary, "内存约 ") || !strings.Contains(p.Summary, "显存约 ") || !strings.Contains(p.Detail, "原版和 DLC") || p.Mods != "2 个 Mod" {
 			t.Fatalf("translated totals: %+v", p)
 		}
-		if len(p.Parts) != 6 || p.Parts[0].Files != "1 个文件" || p.Parts[0].Category != "贴图" || len(p.Top) != 1 {
+		if len(p.Parts) != len(r.Parts) || p.Parts[0].Files != "1 个文件" || p.Parts[0].Category != "贴图" || len(p.Top) != 1 {
 			t.Fatalf("display rows: %+v", p)
 		}
 		notes := strings.Join(p.Notes, "\n")

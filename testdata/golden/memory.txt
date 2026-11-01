@@ -1,0 +1,26 @@
+$ archo plan cost
+plan:default load cost (estimate)
+  mods: 1 (1 measured, 0 cached)
+  RAM, baseline + mods: 1.4 GB–1.4 GB
+  VRAM, baseline + mods: 1.0 GB–1.0 GB
+  RAM, loading budget: 2.3 GB–2.7 GB
+  RAM, available now: 1.0 GB / total 8.0 GB [severe]
+  VRAM, dedicated capacity: 1.0 GB [ok]
+  GPU candidate: Fixture GPU (OS adapter preference; game selection unverified)
+  capacity caveat: Unity 1.6 RAM calibrated in VM; 1.6 VRAM and 1.7 loading reserve uncalibrated. Excludes saves and arbitrary mod allocations; shortage is a risk, not proof of a crash.
+  RAM, mods only: 1.8 MB–2.5 MB
+  VRAM, mods only: 0 B–0 B
+  vanilla + all DLC baseline: RAM 1.4 GB, VRAM 1.0 GB
+  parts (mods only):
+    category      files / mods  disk bytes (DDS payload)  RAM            VRAM
+    textures      0             0 B                       0 B–0 B        0 B–0 B
+    dds           0             0 B                       0 B–0 B        0 B–0 B
+    sounds        0             0 B                       0 B–0 B        0 B–0 B
+    defs          2             149 B                     447 B–1.2 KB   0 B–0 B
+    patches       1             118 B                     59 B–236 B     0 B–0 B
+    assemblies    0             0 B                       0 B–0 B        0 B–0 B
+    mod overhead  1             0 B                       1.8 MB–2.5 MB  0 B–0 B
+  top mods (five by VRAM, five by RAM; duplicates omitted):
+    mod             ref    RAM high  VRAM high
+    Memory fixture  #6olp  2.5 MB    0 B
+

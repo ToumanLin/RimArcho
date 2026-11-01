@@ -27,6 +27,12 @@ func TestNeedsSectionsAndEvidence(t *testing.T) {
 	}
 	var dep *view.Need
 	for i, it := range n.Items {
+		if it.Kind == "memory.capacity" {
+			if it.Section != view.SectionHint {
+				t.Errorf("unknown memory belongs in hints: %+v", it)
+			}
+			continue
+		}
 		if it.Section != view.SectionOf(it.Group) {
 			t.Errorf("item %q: section %d, group %d", it.Text, it.Section, it.Group)
 		}
@@ -70,11 +76,11 @@ func TestNeedsMergePerMod(t *testing.T) {
 			Evidence: []finding.Evidence{{Source: finding.Inferred, Text: "x"}}}}
 	}
 	one := view.BuildNeeds(e.App, b.St, &app.ProblemSet{List: []*app.Problem{parent("A_Def")}})
-	if len(one.Items) != 1 || one.Items[0].Fold || one.Items[0].Evidence != nil {
+	if len(one.Items) != 2 || one.Items[1].Kind != "memory.capacity" || one.Items[0].Fold || one.Items[0].Evidence != nil {
 		t.Fatalf("one %+v", one.Items)
 	}
 	three := view.BuildNeeds(e.App, b.St, &app.ProblemSet{List: []*app.Problem{parent("A_Def"), parent("B_Def"), parent("C_Def")}})
-	if len(three.Items) != 1 || three.Count != 1 {
+	if len(three.Items) != 2 || three.Items[1].Kind != "memory.capacity" || three.Count != 1 {
 		t.Fatalf("merged into %d items, count %d", len(three.Items), three.Count)
 	}
 	it := three.Items[0]

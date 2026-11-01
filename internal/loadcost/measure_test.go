@@ -128,7 +128,8 @@ func TestMeasure(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := Mod{
-		PNG: Files{3, pngBytes}, PNGPixels: 364132, PNGPixelsMip: 486656,
+		MaxPNGDecode: mipPixels(600, 600) * 4,
+		PNG:          Files{3, pngBytes}, PNGPixels: 364132, PNGPixelsMip: 486656,
 		PNGRaw16: MipFiles{1, 96}, PNGNot4: 96, PNGSmall512Pixels: 4132,
 		DDS: Files{3, 1256}, JPG: Files{2, 150}, PSD: Files{1, 200},
 		Sounds: map[string]Sound{
@@ -148,7 +149,7 @@ func TestMeasure(t *testing.T) {
 		game                               Game
 		ramLow, ramHigh, vramLow, vramHigh int64
 	}{
-		{Game16, 2344389, 4607850, 490066, 497932},
+		{Game16, 5015931, 8075774, 490066, 497932},
 		{Game17, 1147315, 2347306, 441059, 1283881},
 	} {
 		r := Estimate(tc.game, []Mod{got})

@@ -367,6 +367,12 @@ func (m *model) panelLines(n int) []string {
 	inner := max(m.w-4, 10)
 	var out []string
 	if p.choices != nil {
+		for _, line := range p.lines {
+			out = append(out, "  "+sText.Render(fit(line, inner)))
+		}
+		if len(p.lines) > 0 {
+			out = append(out, "")
+		}
 		for i, c := range p.choices {
 			if i == p.choice {
 				out = append(out, "  "+sAccent.Render(markSel+" ")+sSel.Render(fit(c, inner-2)))

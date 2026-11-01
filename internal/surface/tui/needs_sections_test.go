@@ -133,19 +133,24 @@ func TestNeedsSectionsLive(t *testing.T) {
 	}
 	press(m, "home")
 	press(m, "right")
+	if it := m.prob.items[m.prob.cursor]; it.section != view.SectionHint {
+		t.Fatalf("first → should reach memory hint: %+v", it)
+	}
+	press(m, "right")
 	if it := m.prob.items[m.prob.cursor]; it.section != view.SectionRun || it.group != view.GroupThisRun {
 		t.Fatalf("→ went to %+v", it)
 	}
+	press(m, "left")
 	press(m, "left")
 	if m.prob.cursor != 0 {
 		t.Fatalf("← went to %d", m.prob.cursor)
 	}
 	// the number keys go to the n-th section shown, whose heading carries the number
-	press(m, "2")
+	press(m, "3")
 	if it := m.prob.items[m.prob.cursor]; it.section != view.SectionRun {
-		t.Fatalf("2 went to %+v", it)
+		t.Fatalf("3 went to %+v", it)
 	}
-	if s := ansi.Strip(m.View()); !strings.Contains(s, "2 "+T("errors this run")) {
+	if s := ansi.Strip(m.View()); !strings.Contains(s, "3 "+T("errors this run")) {
 		t.Fatalf("no number on the section:\n%s", s)
 	}
 }

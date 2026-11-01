@@ -189,6 +189,7 @@ func measureTextures(ctx context.Context, m *Mod, set *textures.Set) error {
 			}
 			w, h := int64(f.png.W), int64(f.png.H)
 			pixels := mipPixels(w, h)
+			m.MaxPNGDecode = max(m.MaxPNGDecode, pixels*4)
 			m.PNG.add(count)
 			m.PNGPixels += w * h
 			m.PNGPixelsMip += pixels

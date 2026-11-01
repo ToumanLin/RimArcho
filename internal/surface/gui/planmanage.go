@@ -60,6 +60,7 @@ func (s *API) PlanLoadCost(id int64) (*PlanCostPage, error) {
 			return
 		}
 		defer r.Close()
+		r.WorkspaceSnapshot()
 		cost, err := r.PlanLoadCost(ctx, id, func(done, total int) {
 			s.publishLoadCost(ctx, request, nil, view.Tf("read %d / %d mods", done, total), nil)
 		})

@@ -687,6 +687,7 @@ function showCost(p, id) {
   s.replaceChildren(el("div", "pm-sub", T("Loaded memory (estimate)")));
   if (p.error) { s.append(el("div", "muted pm-note", p.error)); return; }
   s.append(el("div", "word-facts", p.summary), el("div", "muted pm-note", p.detail));
+  if (p.loadingBudget) s.append(el("div", "muted pm-note", p.loadingBudget));
   const details = el("details"), summary = el("summary", "muted pm-note", T("what is counted"));
   details.open = M.open.has("cost:" + id);
   details.ontoggle = () => { if (details.open) M.open.add("cost:" + id); else M.open.delete("cost:" + id); };

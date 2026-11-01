@@ -2169,3 +2169,12 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
   .settings .set { flex-wrap: wrap; gap: 6px; }
   .settings .set .l, .settings .set .r { flex-basis: 100%; }
 }
+
+/* RAM comparison and launch risk (06 §2.3–2.4). */
+.hm-go.memory-warning { background: var(--amber-soft); color: var(--amber); }
+.hm-go.memory-severe { background: var(--red-soft); color: var(--red); }
+.need.memory-capacity .why { white-space: pre-line; }
+.memory-confirm .memory-values { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--card-gap); padding: 12px 0; }
+.memory-confirm .memory-values strong { display: block; margin-top: 8px; font-size: 15px; }
+.memory-confirm .memory-cancel:focus, .memory-confirm .go:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (max-width: 480px) { .memory-confirm .memory-values { grid-template-columns: 1fr; } }

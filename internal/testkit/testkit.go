@@ -22,6 +22,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/machine"
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
@@ -88,6 +89,7 @@ func (e *Env) Open() {
 	if err != nil {
 		e.T.Fatal(err)
 	}
+	a.MemoryProbe = func() machine.Memory { return machine.Memory{} }
 	a.Now = func() time.Time { return e.now }
 	a.Rand = rand.NewChaCha8([32]byte{'r', 'i', 'm', 'a', 'r', 'c', 'h', 'o'})
 	a.Loc = time.UTC

@@ -28,6 +28,7 @@ func (a *App) WorkspaceSnapshot() { a.workspaceSnapshot = true }
 // ReadOptions refreshes the invocation settings without discarding a reader's caches.
 // Neither App may be in use while its options are copied.
 func (b *App) ReadOptions(a *App) {
+	b.MemoryProbe = a.MemoryProbe
 	b.Home, b.Config, b.Now, b.Rand, b.Loc = a.Home, a.Config, a.Now, a.Rand, a.Loc
 	b.Detect, b.FreeSpace, b.Decompile = a.Detect, a.FreeSpace, a.Decompile
 	b.EnvName, b.GameVersion = a.EnvName, a.GameVersion
