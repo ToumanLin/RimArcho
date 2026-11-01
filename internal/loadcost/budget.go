@@ -1,8 +1,9 @@
 package loadcost
 
 // LoadingBudget estimates startup peak private bytes, not peak working set.
-// Unity 1.6 reserve: 2026-10-31 VM, vanilla, 250 light/texture and 500,
-// including repeated menu-only runs. See research calibration for fit and limits.
+// Unity 1.6: 2026-10-31 baseline/light/texture runs and 2026-11-01 heavy
+// textures up to 7.5 GiB payload. The resident curve also shapes this budget.
+// See docs/research/2026-11-01_unity16-heavy-texture-memory.md for fit and limits.
 // 1.7 retains the uncalibrated XML/decode reserve. Arbitrary Mod allocations,
 // AssetBundles, saves and play growth can exceed either model.
 func LoadingBudget(g Game, r Report, mods []Mod) (low, high int64) {

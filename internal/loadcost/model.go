@@ -13,7 +13,7 @@ const (
 // Coef holds all model coefficients. Texture rates are bytes per pixel; unknown
 // dimensions are pixels per file byte, with a geometric mip-chain multiplier.
 // The Tex17 rates multiply the 1.7 texture payload (BC7 with mips, plus DDS payload);
-// they are measured, not derived: docs/research/2026-10-24_小文件读取与加载占用.md §4.
+// they are measured, not derived: docs/research/2026-10-24_small-file-reads-and-load-memory.md §4.
 // RAM rates multiply texture VRAM, XML/DLL bytes, or sound bytes.
 // Sound16Decoded rates multiply PCM16 bytes; streamed sounds use a fixed buffer.
 // AIFF-family and unreadable WAV files approximate PCM16 by file size.
@@ -32,6 +32,9 @@ var Coef = struct {
 	Tex17RAMHigh            float64
 	TextureRAM16Low         float64
 	TextureRAM16High        float64
+	TextureRAM16Knee        int64
+	TextureRAM16TailLow     float64
+	TextureRAM16TailHigh    float64
 	CompressedPCM16         float64
 	Sound16FileLimit        int64
 	Sound17PCM16Limit       int64
@@ -59,23 +62,29 @@ var Coef = struct {
 	Tex17VRAMHigh: 2.6,
 	Tex17RAMLow:   1.5,
 	Tex17RAMHigh:  3.5,
-	// 2026-10-31 VM, Unity 1.6: vanilla, 250 light/texture, 500; see research calibration.
-	TextureRAM16Low:     1.6,
-	TextureRAM16High:    1.8,
-	CompressedPCM16:     11, // OGG/MP3: roughly 128 kbit/s versus 1411 kbit/s PCM16.
-	Sound16FileLimit:    300 << 10,
-	Sound17PCM16Limit:   2 << 20,
-	Sound16DecodedLow:   1, // PCM16 versus float32 at the upper bound.
-	Sound16DecodedHigh:  2,
-	Sound16StreamBuffer: 64 << 10,
-	Sound17ResidentLow:  1, // File bytes of the decoded-size-selected subset.
-	Sound17ResidentHigh: 1.5,
-	DefsLow:             3,
-	DefsHigh:            8,
-	PatchesLow:          0.5, // The merged XmlDocument is freed after loading.
-	PatchesHigh:         2,
-	AssembliesLow:       2,
-	AssembliesHigh:      5,
+	// Unity 1.6 VM calibration: 2026-10-31 baseline and light/texture groups,
+	// extended on 2026-11-01 to 7.5 GiB combined texture payload. Above the
+	// original 3 GiB coverage, retained private bytes grow more slowly.
+	// See docs/research/2026-11-01_unity16-heavy-texture-memory.md.
+	TextureRAM16Low:      1.6,
+	TextureRAM16High:     1.8,
+	TextureRAM16Knee:     3 << 30,
+	TextureRAM16TailLow:  1.3,
+	TextureRAM16TailHigh: 1.6,
+	CompressedPCM16:      11, // OGG/MP3: roughly 128 kbit/s versus 1411 kbit/s PCM16.
+	Sound16FileLimit:     300 << 10,
+	Sound17PCM16Limit:    2 << 20,
+	Sound16DecodedLow:    1, // PCM16 versus float32 at the upper bound.
+	Sound16DecodedHigh:   2,
+	Sound16StreamBuffer:  64 << 10,
+	Sound17ResidentLow:   1, // File bytes of the decoded-size-selected subset.
+	Sound17ResidentHigh:  1.5,
+	DefsLow:              3,
+	DefsHigh:             8,
+	PatchesLow:           0.5, // The merged XmlDocument is freed after loading.
+	PatchesHigh:          2,
+	AssembliesLow:        2,
+	AssembliesHigh:       5,
 }
 
 // Part attributes a range to one resource category. Bytes is on-disk size,
@@ -127,8 +136,14 @@ func Estimate(g Game, mods []Mod) Report {
 	if g == Game16 {
 		vHigh += float64(m.PNGSmall512Pixels) * c.AtlasBytesPerPixel
 	}
-	tRAMLow, tRAMHigh := vLow*c.TextureRAM16Low, vHigh*c.TextureRAM16High
-	dRAMLow, dRAMHigh := dLow*c.TextureRAM16Low, dHigh*c.TextureRAM16High
+	rateLow, rateHigh := c.TextureRAM16Low, c.TextureRAM16High
+	if g == Game16 {
+		// PNG and DDS share one curve; attribute the result by payload share.
+		rateLow = textureRAM16Rate(vLow+dLow, c.TextureRAM16Low, c.TextureRAM16TailLow)
+		rateHigh = textureRAM16Rate(vHigh+dHigh, c.TextureRAM16High, c.TextureRAM16TailHigh)
+	}
+	tRAMLow, tRAMHigh := vLow*rateLow, vHigh*rateHigh
+	dRAMLow, dRAMHigh := dLow*rateLow, dHigh*rateHigh
 	if g == Game17 {
 		tRAMLow, tRAMHigh = vLow*c.Tex17RAMLow, vHigh*c.Tex17RAMHigh
 		dRAMLow, dRAMHigh = dLow*c.Tex17RAMLow, dHigh*c.Tex17RAMHigh
@@ -170,6 +185,14 @@ func Estimate(g Game, mods []Mod) Report {
 		r.VRAMHigh += p.VRAMHigh
 	}
 	return r
+}
+
+func textureRAM16Rate(payload, initial, tail float64) float64 {
+	knee := float64(Coef.TextureRAM16Knee)
+	if payload <= knee {
+		return initial
+	}
+	return (knee*initial + (payload-knee)*tail) / payload
 }
 
 func part(key string, files Files, rLow, rHigh, vLow, vHigh float64) Part {
