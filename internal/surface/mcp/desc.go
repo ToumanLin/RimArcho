@@ -38,7 +38,7 @@ const descLog = `Attribute Player.log errors to mods: clusters log:E<n> with can
 
 const descFiles = `Text search in the files of the enabled mods as the game loads them (Defs/Patches/About by default, load order, shadowing). def=true finds a whole defName with its roles: defines, inherits, patches, references. For XML evidence; C# is read_source. Paged: follow next:.`
 
-const descSource = `Decompiled C# of mod assemblies (on demand, cached). ref with type shows one type (a patch class from get_harmony, a frame from analyze_log); search=<text> searches the mods the newest log implicates, or in=[refs]. scope="active" (every enabled mod, many minutes) only when the user asks.`
+const descSource = `C# in the Source library, decompiled on demand. ref with type reads one type; game=true selects game code or adds it to search. search=<text> searches log suspects or in=[refs]; shared code appears once with its copies. scope="active" (all enabled mods, many minutes) only when the user asks.`
 
 const descEdit = `Change the current plan: enable, disable, move, swap (another copy), sort, undo, redo, checkout (a version), stage / unstage / restore, ignore_external. Stored at once and undoable; no game file is written until save_loadout or launch_game.`
 

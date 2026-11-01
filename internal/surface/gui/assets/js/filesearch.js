@@ -323,6 +323,7 @@ function drawResults() {
       copyablePath(path, file.path);
       path.addEventListener("click", () => setCursor(X.rows.findIndex(r => r.node === row), false));
       row.append(path);
+      if (file.shared) row.append(el("span", "muted", file.shared));
       if (file.count !== mod.count) row.append(el("span", "muted fs-count", Tf("%d matches", file.count)));
       if (file.more) row.append(el("span", "muted", Tf("+%d matches not shown", file.more)));
       resultsCard.append(row);

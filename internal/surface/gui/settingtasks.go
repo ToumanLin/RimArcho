@@ -27,6 +27,11 @@ func (s *API) queueSettingTaskLocked(kind string, argv []string, env string, res
 	if env != "" {
 		snapshot.EnvName = env
 	}
+	if kind == view.TaskSourceDecompile && snapshot.OpenPlan == 0 && snapshot.PlanName == "" {
+		if e, err := snapshot.Env(); err == nil {
+			snapshot.OpenPlan = snapshot.Store.CurrentPlanID(e.ID)
+		}
+	}
 	obj := "RimArcho"
 	if len(argv) == 3 && argv[0] == "deps" {
 		obj = argv[2]
@@ -59,6 +64,9 @@ func (s *API) queueSettingTaskLocked(kind string, argv []string, env string, res
 		}
 		s.mu.Unlock()
 		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				return "", err
+			}
 			return "", errors.New(view.Humanize(nil, err.Error()))
 		}
 		return text, nil
@@ -76,6 +84,26 @@ func (s *API) runSettingTask(a *app.App, id, kind string, argv []string) (string
 		})
 	}
 	switch kind {
+	case view.TaskSourceDecompile, view.TaskSourceClean:
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		s.tasks.SetStop(id, func() error { cancel(); return nil })
+		if kind == view.TaskSourceClean {
+			p, err := a.CleanSourceLibrary(ctx, true)
+			if err != nil {
+				return "", err
+			}
+			return view.Tf("removed %d folders (%s)", p.Folders, view.SizeText(p.Bytes)), nil
+		}
+		err := a.DecompileActive(ctx, func(done, total int, file string) {
+			s.tasks.Update(id, func(t *app.Task) {
+				t.Done, t.Total, t.Phase = done, total, file
+				if total > 0 {
+					t.Frac = float64(done) / float64(total)
+				}
+			})
+		})
+		return view.T("the current list's mods are in the Source library"), err
 	case view.TaskVacuum:
 		defer s.free.soon()
 		if len(argv) != 2 {

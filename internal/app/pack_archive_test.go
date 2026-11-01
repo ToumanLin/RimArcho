@@ -143,6 +143,7 @@ func assertNoPackTemp(t *testing.T, packsDir, name string) {
 func TestPackArchiveRoundTrip(t *testing.T) {
 	t.Parallel()
 	e := packEnv(t)
+	e.WriteFile(filepath.Join(e.App.SourceDir(), "game", "1.6.4633", "Assembly-CSharp", "Private.cs"), "local source must never leave this library")
 	e.MustRun("disable", "pkg:gone.mod")
 	e.MustRun("enable", "pkg:tester.versions")
 	e.MustRun("pack", "build", "roundtrip")

@@ -22,9 +22,8 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// On-demand decompilation with ilspycmd (03 §5.3). Output is cached per DLL hash under
-// <home>/cache/source/<hash>/; the source_cache table records every decompile, so the
-// history survives a deleted cache and a missing directory is re-decompiled on demand.
+// On-demand decompilation with ilspycmd (03 §5.4). Generated projects live in the
+// managed Source library; identities and uses survive removed output.
 
 // Decompiler turns dll into C# under outDir (a whole project, or one type when typ != "").
 type Decompiler func(ctx context.Context, dll, outDir, typ string, refs []string) error
@@ -93,15 +92,17 @@ func safeName(s string) string { return unsafeRe.ReplaceAllString(s, "_") }
 
 // SourceDLL is one decompilable assembly of an instance.
 type SourceDLL struct {
-	Instance string
-	File     string // relative to the mod root
-	Path     string
-	Hash     string
-	Dir      string // cache directory of the whole project ("" until decompiled)
-	Cached   bool
+	Instance  string
+	File      string // relative to the mod root
+	Path      string
+	Hash      string
+	Dir       string // whole-project directory in the Source library
+	Cached    bool
+	PackageID string
+	GameBuild string
+	Kind      string
+	Shared    []string // requested instances sharing this assembly, in scope order
 }
-
-func (a *App) sourceRoot() string { return filepath.Join(a.Home, "cache", "source") }
 
 func fileHash(p string) (string, error) {
 	f, err := os.Open(p)
@@ -113,7 +114,7 @@ func fileHash(p string) (string, error) {
 	if _, err := io.Copy(h, f); err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%x", h.Sum(nil))[:20], nil
+	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }
 
 // SourceDLLs lists the effective, non-library assemblies of an instance.
@@ -138,9 +139,9 @@ func (a *App) SourceDLLs(st *LoadoutState, m *store.Mod) ([]*SourceDLL, error) {
 		if err != nil {
 			continue
 		}
-		d := &SourceDLL{Instance: m.ID, File: as.Rel, Path: as.Path, Hash: h, Dir: filepath.Join(a.sourceRoot(), h)}
-		if fi, err := os.Stat(filepath.Join(d.Dir, ".done")); err == nil && !fi.IsDir() {
-			d.Cached = true
+		d := &SourceDLL{Instance: m.ID, File: as.Rel, Path: as.Path, Hash: h, PackageID: m.PackageID, Kind: "mod"}
+		if err := a.locateSource(d); err != nil {
+			return nil, err
 		}
 		out = append(out, d)
 	}
@@ -159,22 +160,23 @@ func (a *App) referenceDirs(st *LoadoutState, dll string) []string {
 		}
 	}
 	out = append(out, filepath.Dir(dll))
-	if a.harmonyDir == "" {
+	harmonyDir := ""
+	{
 		for _, e := range st.List {
 			m := st.Ix.ByID[e.Instance]
 			if m == nil || !strings.Contains(strings.ToLower(m.PackageID), "harmony") {
 				continue
 			}
 			filepath.WalkDir(st.Ix.ModDir(m), func(p string, d os.DirEntry, err error) error {
-				if err == nil && !d.IsDir() && strings.EqualFold(d.Name(), "0Harmony.dll") && a.harmonyDir == "" {
-					a.harmonyDir = filepath.Dir(p)
+				if err == nil && !d.IsDir() && strings.EqualFold(d.Name(), "0Harmony.dll") && harmonyDir == "" {
+					harmonyDir = filepath.Dir(p)
 				}
 				return nil
 			})
 		}
 	}
-	if a.harmonyDir != "" {
-		out = append(out, a.harmonyDir)
+	if harmonyDir != "" {
+		out = append(out, harmonyDir)
 	}
 	return out
 }
@@ -186,34 +188,41 @@ func (a *App) decompiler() Decompiler {
 	return ILSpyDecompiler
 }
 
-// Decompile makes sure the DLL's whole project is cached.
+// DecompileDLL publishes a whole project atomically and records reuse too.
 func (a *App) DecompileDLL(ctx context.Context, st *LoadoutState, d *SourceDLL) error {
-	if d.Cached {
-		return nil
-	}
-	tmp := d.Dir + ".tmp"
-	os.RemoveAll(tmp)
-	err := a.decompiler()(ctx, d.Path, tmp, "", a.referenceDirs(st, d.Path))
-	status, msg := "ok", ""
+	release, err := a.sourceAccess(ctx, false, true)
 	if err != nil {
-		status, msg = "error", err.Error()
-		os.RemoveAll(tmp)
-	} else {
-		os.RemoveAll(d.Dir)
-		if err = os.Rename(tmp, d.Dir); err == nil {
-			os.WriteFile(filepath.Join(d.Dir, ".done"), []byte(d.Path), 0o644)
-			d.Cached = true
-		}
+		return err
 	}
-	if !errors.Is(err, ErrNoILSpy) {
-		a.Store.RecordDecompile(d.Hash, d.Instance, d.File, status, msg, a.Now())
+	defer release()
+	unlock, err := a.lockSourceArtifact(ctx, d)
+	if err != nil {
+		return err
 	}
-	return err
+	defer unlock()
+	if err := a.claimSource(d); err != nil {
+		return err
+	}
+	if d.Cached {
+		return a.recordSourceUse(d, "project-hit", nil)
+	}
+	err = a.publishSource(ctx, st, d, "")
+	return errors.Join(err, a.recordSourceUse(d, "project", err))
 }
 
 // DecompileType returns the source of one type, decompiling only that type unless the
 // whole project is cached.
 func (a *App) DecompileType(ctx context.Context, st *LoadoutState, ds []*SourceDLL, typ string) (string, string, error) {
+	release, err := a.sourceAccess(ctx, false, true)
+	if err != nil {
+		return "", "", err
+	}
+	defer release()
+	for _, d := range ds {
+		if err := a.locateSource(d); err != nil {
+			return "", "", err
+		}
+	}
 	// 1. A cached project file named after the type.
 	for _, d := range ds {
 		if !d.Cached {
@@ -221,13 +230,13 @@ func (a *App) DecompileType(ctx context.Context, st *LoadoutState, ds []*SourceD
 		}
 		if p := findTypeFile(d.Dir, typ); p != "" {
 			b, err := os.ReadFile(p)
-			return string(b), p, err
+			return string(b), p, errors.Join(err, a.recordSourceUse(d, "type-hit", err))
 		}
 	}
 	// 2. Decompile the type alone, from the DLL that defines it.
 	owners, _ := a.Store.TypeOwners(typ)
 	for _, d := range ds {
-		match := len(owners) == 0
+		match := d.Kind == "game" || len(owners) == 0
 		for _, o := range owners {
 			if o[0] == d.Instance && o[1] == d.File {
 				match = true
@@ -236,20 +245,17 @@ func (a *App) DecompileType(ctx context.Context, st *LoadoutState, ds []*SourceD
 		if !match {
 			continue
 		}
-		dir := filepath.Join(d.Dir + ".types")
-		p := filepath.Join(dir, safeName(typ)+".cs")
-		if b, err := os.ReadFile(p); err == nil && len(b) > 0 {
-			return string(b), p, nil
-		}
-		if err := a.decompiler()(ctx, d.Path, dir, typ, a.referenceDirs(st, d.Path)); err != nil {
+		src, p, err := a.sourceType(ctx, st, d, typ)
+		if err != nil {
 			if errors.Is(err, ErrNoILSpy) {
 				return "", "", err
 			}
+			if ctx.Err() != nil {
+				return "", "", ctx.Err()
+			}
 			continue
 		}
-		if b, err := os.ReadFile(p); err == nil && len(bytes.TrimSpace(b)) > 0 {
-			return string(b), p, nil
-		}
+		return src, p, nil
 	}
 	return "", "", fmt.Errorf("type %s not found in %d assemblies", typ, len(ds))
 }
@@ -273,10 +279,11 @@ func findTypeFile(dir, typ string) string {
 // SourceHit is one search match.
 type SourceHit struct {
 	Instance string
-	File     string // relative to the cache dir: <dll>/<path in project>
+	File     string // display path: <dll>/<path in project>
 	Path     string // the decompiled file on disk
 	Line     int
 	Text     string
+	Shared   []string
 }
 
 // SourceSearchResult is the outcome of SourceSearch.
@@ -288,15 +295,20 @@ type SourceSearchResult struct {
 	Errors     []string
 }
 
-// SourceSearch searches the cached sources of the given instances, decompiling uncached
-// assemblies first (at most for budget; 0 = no limit).
+// SourceSearch searches the library for the given instances, decompiling missing
+// projects first. The budget stops new work; in-flight work finishes (0 = no limit).
 func (a *App) SourceSearch(st *LoadoutState, mods []*store.Mod, pattern string, re *regexp.Regexp, limit int, budget time.Duration, progress func(string)) (*SourceSearchResult, error) {
 	return a.SourceSearchContext(context.Background(), st, mods, pattern, re, limit, budget, progress)
 }
 
 // SourceSearchContext is SourceSearch that stops when ctx ends (the GUI's stop, a newer
 // search): decompiling stops between assemblies and the search between files.
-func (a *App) SourceSearchContext(ctx context.Context, st *LoadoutState, mods []*store.Mod, pattern string, re *regexp.Regexp, limit int, budget time.Duration, progress func(string)) (*SourceSearchResult, error) {
+func (a *App) SourceSearchContext(ctx context.Context, st *LoadoutState, mods []*store.Mod, pattern string, re *regexp.Regexp, limit int, budget time.Duration, progress func(string), game ...bool) (*SourceSearchResult, error) {
+	release, err := a.sourceAccess(ctx, false, true)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	res := &SourceSearchResult{}
 	var all []*SourceDLL
 	for _, m := range mods {
@@ -305,6 +317,28 @@ func (a *App) SourceSearchContext(ctx context.Context, st *LoadoutState, mods []
 			return nil, err
 		}
 		all = append(all, ds...)
+	}
+	if len(game) > 0 && game[0] {
+		d, err := a.GameSourceDLL(st)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, d)
+	}
+	// Group before dispatch: identical assemblies share one job and one result.
+	uses := all
+	all = nil
+	byHash := map[string]*SourceDLL{}
+	for _, d := range uses {
+		key := d.Hash + "|" + d.GameBuild
+		if first := byHash[key]; first != nil {
+			if !containsSourceInstance(first.Shared, d.Instance) {
+				first.Shared = append(first.Shared, d.Instance)
+			}
+			continue
+		}
+		d.Shared = []string{d.Instance}
+		byHash[key], all = d, append(all, d)
 	}
 	res.Assemblies = len(all)
 	var todo []*SourceDLL
@@ -341,6 +375,12 @@ func (a *App) SourceSearchContext(ctx context.Context, st *LoadoutState, mods []
 			}()
 		}
 		var noILSpy bool
+		var budgetC <-chan time.Time
+		if !deadline.IsZero() {
+			timer := time.NewTimer(time.Until(deadline))
+			defer timer.Stop()
+			budgetC = timer.C
+		}
 		for _, d := range todo {
 			if ctx.Err() != nil || !deadline.IsZero() && time.Now().After(deadline) {
 				res.Pending++
@@ -352,7 +392,13 @@ func (a *App) SourceSearchContext(ctx context.Context, st *LoadoutState, mods []
 			if noILSpy {
 				break
 			}
-			next <- d
+			select {
+			case next <- d:
+			case <-ctx.Done():
+				res.Pending++
+			case <-budgetC:
+				res.Pending++
+			}
 		}
 		close(next)
 		wg.Wait()
@@ -362,6 +408,15 @@ func (a *App) SourceSearchContext(ctx context.Context, st *LoadoutState, mods []
 		for _, e := range res.Errors {
 			if strings.Contains(e, "ilspycmd not found") {
 				return nil, ErrNoILSpy
+			}
+		}
+	}
+	for _, d := range uses {
+		first := byHash[d.Hash+"|"+d.GameBuild]
+		if first.Cached {
+			d.Dir, d.Cached = first.Dir, true
+			if err := a.recordSourceUse(d, "search-hit", nil); err != nil {
+				return nil, err
 			}
 		}
 	}
@@ -402,7 +457,7 @@ func (a *App) SourceSearchContext(ctx context.Context, st *LoadoutState, mods []
 				}
 				res.Total++
 				if limit == 0 || len(res.Hits) < limit {
-					res.Hits = append(res.Hits, SourceHit{Instance: d.Instance, File: filepath.ToSlash(filepath.Join(filepath.Base(d.File), rel)), Path: p, Line: n, Text: strings.TrimSpace(l)})
+					res.Hits = append(res.Hits, SourceHit{Instance: d.Instance, File: filepath.ToSlash(filepath.Join(filepath.Base(d.File), rel)), Path: p, Line: n, Text: strings.TrimSpace(l), Shared: d.Shared})
 				}
 			}
 			return nil

@@ -226,6 +226,16 @@ func OpenWith(home string, o OpenOptions) (*App, error) {
 		return nil, err
 	}
 	a := &App{Home: home, Store: st, Config: cfg, Now: time.Now, Rand: rand.Reader, Loc: time.Local}
+	if st.Meta("source-library:legacy-cleared") == "" {
+		if err := os.RemoveAll(filepath.Join(home, "cache", "source")); err != nil {
+			st.Close()
+			return nil, fmt.Errorf("remove legacy source cache: %w", err)
+		}
+		if err := st.SetMeta("source-library:legacy-cleared", "true"); err != nil {
+			st.Close()
+			return nil, err
+		}
+	}
 	// The interfaces check the managed directories at each start (ManagedDirectories is
 	// read after Open, once overrides such as LockBase are installed); it never blocks.
 	// Older installations have no usage metadata. Packs are under Home or an

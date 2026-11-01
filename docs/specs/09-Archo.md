@@ -72,7 +72,7 @@ Consent to send content to the model is requested by **task type**. Before the *
 | Mod names and descriptions | Translation, tag classification, chat questions about a Mod |
 | Images in descriptions | OCR (§5) |
 | Game log excerpts | Error analysis, fixing Mod errors |
-| Decompiled source excerpts | Fixing Mod errors (03 §5.4) |
+| Decompiled source excerpts | Fixing Mod errors through `read_source`, including `game: true` for the current game's code; the local Source library is not an attachment (03 §5.4; tool contract: 05 §5.1) |
 | Mod lists, finding lists, sorting constraints | Fixing sorting, sorting error analysis, chat |
 | Statistics read from saves (not the saves themselves) | Interpreting unused content, playthrough themes and content conflicts (10 §3, 10 §5) |
 

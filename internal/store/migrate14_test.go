@@ -198,7 +198,7 @@ func TestMigrateV14SharedFolders(t *testing.T) {
 	if got := col(t, s, `SELECT instance_id || ':' || source_id FROM instance_alias`); got != "i1a:s2l" {
 		t.Fatalf("aliases: %s", got)
 	}
-	if got := col(t, s, `SELECT instance_id FROM source_cache`); got != "i1a" {
+	if got := col(t, s, `SELECT instance_id FROM source_use`); got != "i1a" {
 		t.Fatalf("source cache: %s", got)
 	}
 	if got := col(t, s, `SELECT c.instance_id FROM def_fact f JOIN content_state c ON c.def_set_id=f.set_id`); got != "i1a" {

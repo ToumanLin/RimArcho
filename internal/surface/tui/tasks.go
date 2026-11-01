@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"errors"
 	"path/filepath"
 	"strings"
@@ -14,6 +15,27 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
+
+func (m *model) queueSourceDecompile(envName string) tea.Cmd {
+	ts := m.taskList()
+	return m.queueSelf(view.TaskSourceDecompile, m.envName, []string{"source", "decompile", "--active"}, func(a *app.App, id string) (string, error) {
+		if envName != "" {
+			a.EnvName = envName
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		ts.SetStop(id, func() error { cancel(); return nil })
+		err := a.DecompileActive(ctx, func(done, total int, file string) {
+			ts.Update(id, func(t *app.Task) {
+				t.Done, t.Total, t.Phase = done, total, file
+				if total > 0 {
+					t.Frac = float64(done) / float64(total)
+				}
+			})
+		})
+		return view.T("the current list's mods are in the Source library"), err
+	})
+}
 
 // Background tasks (06 §2.16) in the terminal: the subscription actions (add a subscription, check for updates, update,
 // remove subscription) queue into app.Tasks — the record and lanes the window uses, <data>/tasks.json —
@@ -178,6 +200,9 @@ func (m *model) queueSelf(kind, obj string, args []string, run func(a *app.App, 
 		ts.Update(id, func(t *app.Task) { t.Phase = view.TaskPending(kind) })
 		text, err := run(a, id)
 		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				return "", err
+			}
 			return "", errors.New(view.Humanize(nil, err.Error()))
 		}
 		return text, nil

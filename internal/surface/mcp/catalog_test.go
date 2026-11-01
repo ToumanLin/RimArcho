@@ -41,6 +41,8 @@ func TestCatalogAndArgvFor(t *testing.T) {
 		{"analyze_log", `{"cluster":"E3"}`, []string{"log", "--cluster", "E3"}},
 		{"get_patches", `{"failed":true,"mod":"pkg:a.b"}`, []string{"patches", "--mod", "pkg:a.b", "--failed"}},
 		{"read_source", `{"search":"AllComps.Remove(","in":["#a1"]}`, []string{"source", "search", "AllComps.Remove(", "--in", "#a1", "--budget", "10"}},
+		{"read_source", `{"game":true,"type":"Verse.Pawn"}`, []string{"source", "game", "--type", "Verse.Pawn"}},
+		{"read_source", `{"game":true,"search":"Tick","in":["#a1"]}`, []string{"source", "search", "Tick", "--in", "#a1", "--game", "--budget", "10"}},
 		{"status", ``, []string{"status"}},
 		{"test_run", ``, []string{"test", "run", "--json"}},
 		{"test_run", `{"plan":"small","map":true,"timeout_seconds":30}`, []string{"test", "run", "small", "--map", "--timeout", "30s", "--json"}},

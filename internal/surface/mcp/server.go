@@ -326,15 +326,16 @@ func FilesArgv(in FilesIn) []string {
 }
 
 type SourceIn struct {
+	Game   bool     `json:"game,omitempty" jsonschema:"read the current game's code; with search, include it alongside the selected mods"`
 	Env    string   `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Ref    string   `json:"ref,omitempty" jsonschema:"decompile this mod (with type: one type) — #id or pkg:…"`
 	Type   string   `json:"type,omitempty" jsonschema:"full type name to show, e.g. MyMod.HarmonyPatches.Pawn_Tick"`
 	Search string   `json:"search,omitempty" jsonschema:"search decompiled C# for this text instead"`
 	In     []string `json:"in,omitempty" jsonschema:"mods to search (default: the mods the newest log and Harmony warnings implicate)"`
-	Scope  string   `json:"scope,omitempty" jsonschema:"active: search every enabled mod (decompiles everything not cached; can take many minutes)"`
+	Scope  string   `json:"scope,omitempty" jsonschema:"active: search every enabled mod (decompiles missing library projects; can take many minutes)"`
 	Regex  bool     `json:"regex,omitempty"`
 	All    bool     `json:"all,omitempty"`
-	Budget int      `json:"budget,omitempty" jsonschema:"seconds to spend decompiling before searching what is cached (default 10)"`
+	Budget int      `json:"budget,omitempty" jsonschema:"seconds to dispatch new decompiles; running work finishes (default 10)"`
 }
 
 type EditIn struct {
@@ -575,7 +576,10 @@ func SourceArgv(in SourceIn) []string {
 		if budget == 0 {
 			budget = 10
 		}
-		return b.flag("regex", in.Regex).flag("all", in.All).num("budget", budget).a
+		return b.flag("game", in.Game).flag("regex", in.Regex).flag("all", in.All).num("budget", budget).a
+	}
+	if in.Game {
+		return argv("source", "game").str("type", in.Type).flag("all", in.All).a
 	}
 	return argv("source").pos(in.Ref).str("type", in.Type).flag("all", in.All).a
 }

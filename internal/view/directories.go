@@ -16,6 +16,8 @@ func DirectoryLabel(d app.ManagedDirectory) string {
 		return Tf("other mod folder (%s)", d.Label)
 	case "lock":
 		return T("lock library")
+	case "source":
+		return T("Source library")
 	case "packs":
 		return T("where packs are kept")
 	case "monitor":
@@ -52,6 +54,13 @@ func DirectoryGroup(a *app.App) SettingGroup {
 		}
 		item := SettingItem{Label: DirectoryLabel(d), Value: d.Path, ValuePath: true, Edit: "directory", Directory: d.ID,
 			Argv: []string{"folder", "set", d.ID, "{}"}, MoveArgv: []string{"folder", "move", d.ID, "{}"}, Note: note}
+		if d.ID == "source" {
+			item.ValueNote = SizeText(a.Store.SourceLibraryBytes())
+			item.Actions = []SettingAction{
+				{Label: T("remove unused"), Argv: []string{"source", "clean", "--yes"}, Confirm: T("remove unused Source library folders")},
+				{Label: T("decompile the current list's mods"), Argv: []string{"source", "decompile", "--active"}},
+			}
+		}
 		if d.Kind == "steamcmd" || d.Kind == "extra" {
 			item.Actions = []SettingAction{{Label: T("remove"), Argv: []string{"folder", "remove", "src:" + d.Label},
 				Confirm: T("RimArcho forgets this folder; the files stay where they are")}}

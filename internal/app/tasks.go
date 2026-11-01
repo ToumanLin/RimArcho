@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -336,6 +337,9 @@ func (ts *Tasks) runSelf(kind, key string) {
 		state := TaskDone
 		if err != nil {
 			state, result = TaskFailed, err.Error()
+		}
+		if errors.Is(err, context.Canceled) && ts.StopAsked(id) {
+			state, result = TaskStopped, "stopped"
 		}
 		if next.Kind == "subscribe" {
 			ts.mu.Lock()

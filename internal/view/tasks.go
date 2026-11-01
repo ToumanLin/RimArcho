@@ -33,6 +33,8 @@ const (
 	TaskBackup           = "db-backup"
 	TaskVacuum           = "db-vacuum"
 	TaskGC               = "gc"
+	TaskSourceDecompile  = "source-decompile"
+	TaskSourceClean      = "source-clean"
 	TaskSubscribe        = "subscribe"
 	TaskSourceCheck      = "source-check"
 	TaskWorkshopUpdate   = "workshop-update"
@@ -48,7 +50,7 @@ const (
 // IsSettingTask identifies maintenance tasks shared by settings and the guide.
 func IsSettingTask(kind string) bool {
 	switch kind {
-	case TaskSourceCheck, TaskWorkshopUpdate, TaskSubscribe, TaskSubscriptionFrom, TaskSteamCMD, TaskTodds, TaskDepRemove, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC, TaskSelfUpdate, TaskSelfCheck:
+	case TaskSourceDecompile, TaskSourceClean, TaskSourceCheck, TaskWorkshopUpdate, TaskSubscribe, TaskSubscriptionFrom, TaskSteamCMD, TaskTodds, TaskDepRemove, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC, TaskSelfUpdate, TaskSelfCheck:
 		return true
 	}
 	return false
@@ -195,6 +197,10 @@ func TaskTitle(kind string) string {
 		return T("compact the database")
 	case TaskGC:
 		return T("remove old tombstones")
+	case TaskSourceDecompile:
+		return T("decompile the current list's mods")
+	case TaskSourceClean:
+		return T("remove unused Source library folders")
 	}
 	if l := opLabel(kind); l != "" {
 		return l
@@ -517,7 +523,7 @@ func taskTarget(t *app.Task) string {
 		return PageChanges
 	case TaskAccount:
 		return PageSettings
-	case TaskSteamCMD, TaskTodds, TaskDepRemove, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC, TaskSelfUpdate, TaskSelfCheck:
+	case TaskSourceDecompile, TaskSourceClean, TaskSteamCMD, TaskTodds, TaskDepRemove, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC, TaskSelfUpdate, TaskSelfCheck:
 		return PageSettings
 	case TaskScan:
 		return PageChanges
@@ -557,7 +563,7 @@ func TaskTargetName(target string) string {
 
 // TaskCanStop says which self tasks stop part way (a pack build, a texture run).
 func TaskCanStop(kind string) bool {
-	return kind == TaskCreditReplace || kind == TaskPack || kind == TaskTextures || kind == TaskTexClean
+	return kind == TaskSourceDecompile || kind == TaskSourceClean || kind == TaskCreditReplace || kind == TaskPack || kind == TaskTextures || kind == TaskTexClean
 }
 
 // handedOver counts the items a new task took over.

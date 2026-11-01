@@ -125,16 +125,16 @@ func (s *API) closeFileSearch() {
 }
 
 // OpenSearchFolder opens the folder holding a result's file (ctrl+o on a result): only a
-// file inside mod id's folder, or a decompiled file in RimArcho's C# cache.
+// file inside mod id's folder, or a decompiled file in the Source library.
 func (s *API) OpenSearchFolder(id, path string) error {
 	s.mu.Lock()
 	ix, err := s.a.Index()
-	home := s.a.Home
+	root := s.a.SourceDir()
 	s.mu.Unlock()
 	if err != nil {
 		return err
 	}
-	dir, err := view.SearchFolder(ix, home, id, path)
+	dir, err := view.SearchFolder(ix, root, id, path)
 	if err != nil {
 		return err
 	}

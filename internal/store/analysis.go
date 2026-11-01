@@ -669,7 +669,7 @@ func (s *Store) HarmonyIDOwners(id string) ([]string, error) {
 	return out, rows.Err()
 }
 
-// DecompileRecord is one source_cache row.
+// DecompileRecord is one source_use row.
 type DecompileRecord struct {
 	Hash, Instance, File, Status, Err string
 	At                                time.Time
@@ -677,15 +677,12 @@ type DecompileRecord struct {
 
 // RecordDecompile notes a decompile attempt.
 func (s *Store) RecordDecompile(hash, instance, file, status, errText string, at time.Time) error {
-	_, err := s.DB.Exec(`INSERT INTO source_cache(dll_hash, instance_id, file, status, error, decompiled_at) VALUES(?,?,?,?,?,?)
-		ON CONFLICT(dll_hash, instance_id) DO UPDATE SET file=excluded.file, status=excluded.status, error=excluded.error, decompiled_at=excluded.decompiled_at`,
-		hash, instance, file, status, errText, at.Unix())
-	return err
+	return s.RecordSourceUse(hash, instance, file, "project", status, errText, at)
 }
 
 // DecompileRecords returns the decompile history of an instance, newest first.
 func (s *Store) DecompileRecords(instance string) ([]*DecompileRecord, error) {
-	rows, err := s.DB.Query(`SELECT dll_hash, instance_id, file, status, error, decompiled_at FROM source_cache WHERE instance_id=? ORDER BY decompiled_at DESC`, instance)
+	rows, err := s.DB.Query(`SELECT dll_hash, instance_id, file, status, error, decompiled_at FROM source_use WHERE instance_id=? ORDER BY decompiled_at DESC`, instance)
 	if err != nil {
 		return nil, err
 	}

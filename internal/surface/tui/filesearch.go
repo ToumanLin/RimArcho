@@ -554,7 +554,7 @@ func (m *model) fsOpenFolder(r fsRow) {
 	ix, err := m.app.Index()
 	if err == nil {
 		var dir string
-		if dir, err = view.SearchFolder(ix, m.app.Home, r.modID, r.dirPath); err == nil {
+		if dir, err = view.SearchFolder(ix, m.app.SourceDir(), r.modID, r.dirPath); err == nil {
 			open := m.opts.OpenDir
 			if open == nil {
 				open = openDir
@@ -718,6 +718,9 @@ func (m *model) fsResultLines(w int) []string {
 		case r.line < 0:
 			file := mod.Files[r.file]
 			text := file.Rel
+			if file.Shared != "" {
+				text += "  " + file.Shared
+			}
 			st := sText
 			if cur {
 				st = sSel
