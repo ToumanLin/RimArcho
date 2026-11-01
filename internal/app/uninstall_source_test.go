@@ -113,8 +113,8 @@ func TestUninstallRefusesSourceLibraryLinks(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer source.RemoveLink(link)
-			if _, err := f.App.PlanUninstall(app.UninstallOptions{}); err == nil || !strings.Contains(err.Error(), "link") {
-				t.Fatalf("linked library accepted: %v", err)
+			if p, err := f.App.PlanUninstall(app.UninstallOptions{}); err != nil || p.Blocked() == nil || !strings.Contains(p.Blocked().Error(), "link") {
+				t.Fatalf("linked library not blocked on the page: %+v %v", p, err)
 			}
 			if _, err := f.App.Uninstall(app.UninstallOptions{}, nil); err == nil {
 				t.Fatal("linked library uninstalled")

@@ -536,11 +536,7 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 	}
 	add(UnSteamCMD, scmd)
 
-	// Generated code inside Home is already covered by the data-folder deletion.
 	sourceRoot := a.SourceDir()
-	if err := a.checkUninstallSource(sourceRoot); err != nil {
-		return nil, err
-	}
 
 	// Kept and moved things must not land where the data folders are deleted.
 	for _, dst := range []struct{ dir, what string }{{p.SavesTo, "saves"}, {p.PacksTo, "packs"}} {
@@ -609,8 +605,16 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 	for _, dir := range p.AfterExit.Dirs {
 		sourceCovered = sourceCovered || source.Within(sourceRoot, dir)
 	}
+	// A source library inside a deleted data folder goes with it; a relocated one is its own
+	// step, and a link there blocks the uninstall with the reason on the page.
 	if !sourceCovered && dirExists(sourceRoot) {
-		add(UnSource, []*UninstallItem{{Path: sourceRoot, Do: DoDelete, Bytes: sizeOf(sourceRoot)}})
+		if err := a.checkUninstallSource(sourceRoot); err != nil {
+			if p.Problem == "" {
+				p.Problem = err.Error()
+			}
+		} else {
+			add(UnSource, []*UninstallItem{{Path: sourceRoot, Do: DoDelete, Bytes: sizeOf(sourceRoot)}})
+		}
 	}
 	add(UnData, data)
 
