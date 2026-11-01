@@ -1,6 +1,6 @@
 # Decompiled code: where it lives (proposal, 2026-11-01)
 
-Status: proposal, waiting for the owner's decision. Facts below come from a code survey of `dev/1.0` (Codex task `task_62077f853a`, report kept outside the repository).
+Status: decided 2026-11-01. A and B are accepted with the proposed defaults; C (Mod projects) is deferred (ToDo: New Mod Project). Facts below come from a code survey of `dev/1.0` (Codex task `task_62077f853a`, report kept outside the repository).
 
 Decompiling serves two purposes: finding out why mods conflict, and making mods. The current design serves neither well.
 
@@ -47,10 +47,10 @@ Never inside the cache or the library.
 - The project is linked into the Mods folder (a junction), so a list can enable it; build, launch and read the log is Archo's loop.
 - "Copy into a Mod project" copies one decompiled file as a starting point; the library itself stays read-only.
 
-## Decisions needed
+## Decisions (2026-11-01)
 
-1. Library location: `<home>/source` by default and movable (proposed), or ask on first use.
-2. Unused folders: removed only by the Settings button (proposed), or also automatically after 30 days.
-3. Mod projects: part of 1.0, or together with Archo later.
+1. Library location: `<home>/source` by default, movable like the other managed directories.
+2. Unused folders: removed only by the Settings button, never automatically.
+3. Mod projects: later, not part of this change.
 
 Specifications to change once decided: 03 §5.4 (decompile), 07 §3 (data directory layout), 06 §2.9 (Search files), 09 (Archo's tools).

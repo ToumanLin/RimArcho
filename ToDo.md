@@ -18,7 +18,7 @@ Search results also need review: addresses are relative and players cannot direc
 
 Decompilation serves two purposes: investigating Mod conflicts and creating Mods. Reconsider storing decompiled assemblies in the cache and propose an approach.
 
-2026-11-01: proposal in [research/2026-11-01_decompile-storage.md](docs/research/2026-11-01_decompile-storage.md) (a durable source library including the game's own code, plus separate Mod projects). Three decisions wait for the owner.
+2026-11-01: decided in [research/2026-11-01_decompile-storage.md](docs/research/2026-11-01_decompile-storage.md): a durable source library including the game's own code; being implemented. Mod projects are deferred (New Mod Project below).
 
 ## Research displaying, editing, and managing Mod configuration
 
@@ -27,6 +27,9 @@ Mod configuration determines how a Mod's content is played. In the game it has a
 ## Accessibility
 
 Accessibility is intended to let AI agents operate without screenshots. Define acceptance criteria for it.
+
+## New Mod Project
+Allow player to initialize a new mod project
 
 ## Save analysis
 
