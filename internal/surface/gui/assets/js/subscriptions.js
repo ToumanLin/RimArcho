@@ -295,7 +295,7 @@ function sourcesDetail(card) {
     const l = el("div", "l");
     const n = el("div", "n");
     n.append(ic(SRC_ICON[s.key] || "local"), el("b", "", s.name), el("span", "muted", Tf("%d mods", s.count)));
-    l.append(n, el("div", "muted word-facts", [s.checked || T("not checked yet"), s.result].filter(Boolean).join("  ")));
+    l.append(n, el("div", "muted word-facts", (s.checked ? [s.checked, s.result] : [s.result || T("not checked yet")]).filter(Boolean).join("  ")));
     if (s.account && ["steamcmd", "page"].includes(s.key)) {
       const a = el("div", "word-facts acct");
       a.append(el("span", "", s.account), button(T("accounts") + " →", "", () => goAccounts(), "link"));
