@@ -1,5 +1,7 @@
 # Unity 1.6 heavy-texture memory calibration
 
+Broken down by [2026-11-01 Unity 1.6 texture memory breakdown](2026-11-01_unity16-texture-memory-breakdown.md): most of the texture coefficient is the VM graphics driver's copy of each texture.
+
 Measured on 2026-11-01 UTC in the Player-Test VM (8 GiB RAM, VMware virtual GPU, RimWorld 1.6.4871 rev591). This extends the [previous private-byte calibration](2026-10-31_unity16-memory-calibration.md), rather than calibrating physical RAM residency or VRAM.
 
 ## Method and coverage

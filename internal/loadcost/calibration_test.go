@@ -30,7 +30,11 @@ func TestUnity16CalibrationCoverage(t *testing.T) {
 				t.Fatal(err)
 			}
 			r := Estimate(Game16, mods)
-			base, _ := Baseline(Game16)
+			// The VMware adapter has no dedicated VRAM: every GPU byte is private bytes.
+			ram, vram := Baseline(Game16)
+			sLow, sHigh := Spill(Game16, r.VRAMLow+vram, r.VRAMHigh+vram, 0)
+			r.RAMLow, r.RAMHigh = r.RAMLow+sLow, r.RAMHigh+sHigh
+			base := ram
 			lo, hi := LoadingBudget(Game16, r, mods)
 			for _, v := range tc.stable {
 				if v < r.RAMLow+base || v > r.RAMHigh+base {

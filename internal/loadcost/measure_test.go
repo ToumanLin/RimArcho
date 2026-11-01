@@ -149,7 +149,7 @@ func TestMeasure(t *testing.T) {
 		game                               Game
 		ramLow, ramHigh, vramLow, vramHigh int64
 	}{
-		{Game16, 5015931, 8075774, 490066, 497932},
+		{Game16, 4427851, 7478256, 588079, 597520},
 		{Game17, 1147315, 2347306, 441059, 1283881},
 	} {
 		r := Estimate(tc.game, []Mod{got})

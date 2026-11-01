@@ -14,7 +14,7 @@ const (
 // dimensions are pixels per file byte, with a geometric mip-chain multiplier.
 // The Tex17 rates multiply the 1.7 texture payload (BC7 with mips, plus DDS payload);
 // they are measured, not derived: docs/research/2026-10-24_small-file-reads-and-load-memory.md §4.
-// RAM rates multiply texture VRAM, XML/DLL bytes, or sound bytes.
+// RAM rates multiply the texture payload, XML/DLL bytes, or sound bytes.
 // Sound16Decoded rates multiply PCM16 bytes; streamed sounds use a fixed buffer.
 // AIFF-family and unreadable WAV files approximate PCM16 by file size.
 // Re-measure cached Mods after changing audio thresholds or CompressedPCM16.
@@ -35,6 +35,8 @@ var Coef = struct {
 	TextureRAM16Knee        int64
 	TextureRAM16TailLow     float64
 	TextureRAM16TailHigh    float64
+	TextureGPU16            float64
+	UsableVRAM              float64
 	CompressedPCM16         float64
 	Sound16FileLimit        int64
 	Sound17PCM16Limit       int64
@@ -71,6 +73,13 @@ var Coef = struct {
 	TextureRAM16Knee:     3 << 30,
 	TextureRAM16TailLow:  1.3,
 	TextureRAM16TailHigh: 1.6,
+	// Part of that VM curve is the driver's copy of each texture: GPU memory, which
+	// the VMware adapter (no dedicated VRAM) commits as process memory. Per payload
+	// byte, committed GPU memory grew by TextureGPU16; Estimate moves it to VRAM and
+	// Spill returns the share that does not fit in UsableVRAM of the dedicated memory.
+	// See docs/research/2026-11-01_unity16-texture-memory-breakdown.md.
+	TextureGPU16:        1.2,
+	UsableVRAM:          0.9, // Assumption: other programs and the desktop keep about a tenth.
 	CompressedPCM16:      11, // OGG/MP3: roughly 128 kbit/s versus 1411 kbit/s PCM16.
 	Sound16FileLimit:     300 << 10,
 	Sound17PCM16Limit:    2 << 20,
@@ -132,7 +141,7 @@ func Estimate(g Game, mods []Mod) Report {
 	vLow := png + unknown*c.UnknownPixelsLow
 	vHigh := png + unknown*c.UnknownPixelsHigh
 	dLow, dHigh := float64(m.DDS.Bytes), float64(m.DDS.Bytes)
-	// 1.6 includes retained Mono/Unity/driver memory measured in private bytes.
+	// 1.6 keeps small originals resident beside their static atlas copy.
 	if g == Game16 {
 		vHigh += float64(m.PNGSmall512Pixels) * c.AtlasBytesPerPixel
 	}
@@ -144,6 +153,14 @@ func Estimate(g Game, mods []Mod) Report {
 	}
 	tRAMLow, tRAMHigh := vLow*rateLow, vHigh*rateHigh
 	dRAMLow, dRAMHigh := dLow*rateLow, dHigh*rateHigh
+	if g == Game16 {
+		// The calibrated curve includes the driver's copy (committed GPU memory in the
+		// VM). Report it as VRAM; RAM keeps the engine and Mono share.
+		gpu := c.TextureGPU16
+		tRAMLow, tRAMHigh = math.Max(0, tRAMLow-vLow*gpu), math.Max(0, tRAMHigh-vHigh*gpu)
+		dRAMLow, dRAMHigh = math.Max(0, dRAMLow-dLow*gpu), math.Max(0, dRAMHigh-dHigh*gpu)
+		vLow, vHigh, dLow, dHigh = vLow*gpu, vHigh*gpu, dLow*gpu, dHigh*gpu
+	}
 	if g == Game17 {
 		tRAMLow, tRAMHigh = vLow*c.Tex17RAMLow, vHigh*c.Tex17RAMHigh
 		dRAMLow, dRAMHigh = dLow*c.Tex17RAMLow, dHigh*c.Tex17RAMHigh

@@ -1,16 +1,16 @@
 $ archo plan cost
 plan:default load cost (estimate)
   mods: 1 (1 measured, 0 cached)
-  RAM, baseline + mods: 1.4 GB–1.4 GB
-  VRAM, baseline + mods: 1.0 GB–1.0 GB
-  RAM, loading budget: 2.3 GB–2.7 GB
+  RAM, baseline + mods: 790.3 MB–791.0 MB
+  VRAM, baseline + mods: 675.8 MB–675.8 MB
+  RAM, loading budget: 1.7 GB–2.1 GB
   RAM, available now: 1.0 GB / total 8.0 GB [severe]
   VRAM, dedicated capacity: 1.0 GB [ok]
   GPU candidate: Fixture GPU (OS adapter preference; game selection unverified)
-  capacity caveat: Unity 1.6 RAM calibrated in VM; 1.6 VRAM and 1.7 loading reserve uncalibrated. Excludes saves and arbitrary mod allocations; shortage is a risk, not proof of a crash.
+  capacity caveat: Unity 1.6 calibrated in a VM without dedicated VRAM; the RAM / VRAM split on a real graphics card is inferred, and the 1.7 loading reserve is uncalibrated. Excludes saves and arbitrary mod allocations; shortage is a risk, not proof of a crash.
   RAM, mods only: 1.8 MB–2.5 MB
   VRAM, mods only: 0 B–0 B
-  vanilla + all DLC baseline: RAM 1.4 GB, VRAM 1.0 GB
+  vanilla + all DLC baseline: RAM 788.5 MB, VRAM 675.8 MB
   parts (mods only):
     category      files / mods  disk bytes (DDS payload)  RAM            VRAM
     textures      0             0 B                       0 B–0 B        0 B–0 B
@@ -27,19 +27,20 @@ plan:default load cost (estimate)
 $ archo plan cost
 plan:default load cost (estimate)
   mods: 2 (1 measured, 1 cached)
-  RAM, baseline + mods: 7.5 GB–8.4 GB
-  VRAM, baseline + mods: 5.0 GB–5.0 GB
-  RAM, loading budget: 10.4 GB–12.9 GB
+  RAM, baseline + mods: 6.6 GB–7.5 GB
+  VRAM, baseline + mods: 5.5 GB–5.5 GB
+  RAM, loading budget: 9.5 GB–12.0 GB
+  RAM, VRAM held in RAM: 4.6 GB–4.6 GB (included above: VRAM beyond the dedicated capacity, or all of it without one)
   RAM, available now: 1.0 GB / total 8.0 GB [severe]
   VRAM, dedicated capacity: 1.0 GB [warning]
   GPU candidate: Fixture GPU (OS adapter preference; game selection unverified)
-  capacity caveat: Unity 1.6 RAM calibrated in VM; 1.6 VRAM and 1.7 loading reserve uncalibrated. Excludes saves and arbitrary mod allocations; shortage is a risk, not proof of a crash.
-  RAM, mods only: 6.1 GB–7.0 GB
-  VRAM, mods only: 4.0 GB–4.0 GB
-  vanilla + all DLC baseline: RAM 1.4 GB, VRAM 1.0 GB
+  capacity caveat: Unity 1.6 calibrated in a VM without dedicated VRAM; the RAM / VRAM split on a real graphics card is inferred, and the 1.7 loading reserve is uncalibrated. Excludes saves and arbitrary mod allocations; shortage is a risk, not proof of a crash.
+  RAM, mods only: 1.3 GB–2.2 GB
+  VRAM, mods only: 4.8 GB–4.8 GB
+  vanilla + all DLC baseline: RAM 788.5 MB, VRAM 675.8 MB
   parts (mods only):
     category      files / mods  disk bytes (DDS payload)  RAM            VRAM
-    textures      12            396 B                     6.1 GB–7.0 GB  4.0 GB–4.0 GB
+    textures      12            396 B                     1.3 GB–2.2 GB  4.8 GB–4.8 GB
     dds           0             0 B                       0 B–0 B        0 B–0 B
     sounds        0             0 B                       0 B–0 B        0 B–0 B
     defs          2             149 B                     447 B–1.2 KB   0 B–0 B
@@ -48,6 +49,6 @@ plan:default load cost (estimate)
     mod overhead  2             0 B                       3.6 MB–5.0 MB  0 B–0 B
   top mods (five by VRAM, five by RAM; duplicates omitted):
     mod                    ref    RAM high  VRAM high
-    Heavy texture fixture  #nyh3  7.0 GB    4.0 GB
+    Heavy texture fixture  #nyh3  2.2 GB    4.8 GB
     Memory fixture         #6olp  2.5 MB    0 B
 

@@ -30,6 +30,9 @@ func MemoryNeed(c app.MemoryAssessment, plan int64) Need {
 		Tf("RAM: loading needs %s; available now %s of %s", ram, available, total),
 		Tf("VRAM: estimated %s; dedicated capacity %s", vram, video),
 	}
+	if c.Estimated && c.VRAMInRAMHigh > 0 {
+		lines = append(lines, Tf("RAM includes %s of VRAM held in system memory on this computer.", costRange(c.VRAMInRAMLow, c.VRAMInRAMHigh)))
+	}
 	if c.RAMSeverity == "severe" {
 		it.Status = StatusErr
 		it.Section = SectionBreak
