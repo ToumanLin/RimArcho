@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/loadcost"
 	"github.com/ToumanLin/RimArcho/internal/machine"
 )
 
@@ -20,7 +21,11 @@ type MemoryAssessment struct {
 	VRAMHigh     int64          `json:"vramHigh"`
 	RAMSeverity  string         `json:"ramSeverity"`
 	VRAMSeverity string         `json:"vramSeverity"`
-	Estimated    bool           `json:"estimated"`
+	// VRAMInRAM: the part of the VRAM estimate held in system memory on this machine
+	// (loadcost.Spill), already included in RAMLow / RAMHigh.
+	VRAMInRAMLow  int64 `json:"vramInRAMLow"`
+	VRAMInRAMHigh int64 `json:"vramInRAMHigh"`
+	Estimated     bool  `json:"estimated"`
 	// Stale: the totals are over an hour old. They still count; callers re-measure in
 	// the background, so the launch button does not flicker back to unknown.
 	Stale bool `json:"stale,omitempty"`
@@ -52,6 +57,9 @@ func AssessMemory(m machine.Memory, r *LoadCost) MemoryAssessment {
 	c.RAMHigh = r.LoadingRAMHigh + r.Baseline.RAM
 	c.VRAMLow = r.VRAMLow + r.Baseline.VRAM
 	c.VRAMHigh = r.VRAMHigh + r.Baseline.VRAM
+	c.VRAMInRAMLow, c.VRAMInRAMHigh = loadcost.Spill(r.Game, c.VRAMLow, c.VRAMHigh, m.VRAM())
+	c.RAMLow += c.VRAMInRAMLow
+	c.RAMHigh += c.VRAMInRAMHigh
 	if m.TotalRAM > 0 && !m.SampledAt.IsZero() {
 		c.RAMSeverity = "ok"
 		if c.RAMBudget < c.RAMLow {
@@ -77,7 +85,7 @@ type memoryEstimate struct {
 
 func memoryKey(st *LoadoutState) string {
 	h := sha256.New()
-	fmt.Fprintf(h, "unity16-heavy-calibrated-v3|%s|%s|%s", st.Ix.Env.ID, st.GameMM(), ListFingerprint(st.List))
+	fmt.Fprintf(h, "unity16-vram-split-v4|%s|%s|%s", st.Ix.Env.ID, st.GameMM(), ListFingerprint(st.List))
 	for _, e := range st.List {
 		if m := st.Ix.ByID[e.Instance]; m != nil {
 			fmt.Fprintf(h, "|%s:%d:%x", m.ID, m.SnapID, m.SnapHash)

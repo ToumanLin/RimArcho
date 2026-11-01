@@ -56,6 +56,12 @@ type LoadCost struct {
 	PerMod         []ModCost        `json:"perMod"`
 }
 
+// VRAMInRAM is the share of the resident VRAM estimate (baseline included) held in
+// system memory on the hardware Capacity was assessed with; RAM shown to players adds it.
+func (r *LoadCost) VRAMInRAM() (low, high int64) {
+	return loadcost.Spill(r.Game, r.VRAMLow+r.Baseline.VRAM, r.VRAMHigh+r.Baseline.VRAM, r.Capacity.Hardware.VRAM())
+}
+
 // PlanLoadCost measures the selected plan, using its own enabled entries.
 // Progress callbacks are serialized, including the initial (0, total) callback.
 func (a *App) PlanLoadCost(ctx context.Context, planID int64, progress func(done, total int)) (*LoadCost, error) {

@@ -53,3 +53,41 @@ func TestMeasureDecodeReserveRespectsDDSShadowing(t *testing.T) {
 		t.Fatalf("shadowed PNG included: %+v", m)
 	}
 }
+
+// The 1.6 VM curve is split, not changed: RAM + VRAM per bound is the calibrated
+// private-byte total, and Spill decides where the VRAM share lives.
+func TestUnity16TextureVRAMSplit(t *testing.T) {
+	mod := Mod{PNG: Files{Count: 1, Bytes: 1 << 20}, PNGPixelsMip: 4 << 30, DDS: Files{Count: 1, Bytes: 1 << 30}}
+	r := Estimate(Game16, []Mod{mod})
+	payload := float64(5 << 30)
+	rateLow := textureRAM16Rate(payload, Coef.TextureRAM16Low, Coef.TextureRAM16TailLow)
+	var ramLow, vramLow int64
+	for _, p := range r.Parts {
+		if p.Key == "textures" || p.Key == "dds" {
+			ramLow += p.RAMLow
+			vramLow += p.VRAMLow
+		}
+	}
+	if want := int64(payload * rateLow); ramLow+vramLow < want-2 || ramLow+vramLow > want {
+		t.Fatalf("RAM %d + VRAM %d, want the VM total %d", ramLow, vramLow, want)
+	}
+	if want := int64(payload * Coef.TextureGPU16); vramLow < want-1 || vramLow > want {
+		t.Fatalf("VRAM %d, want payload × TextureGPU16 = %d", vramLow, want)
+	}
+	for _, tc := range []struct {
+		name                 string
+		game                 Game
+		dedicated, low, high int64
+	}{
+		{"no dedicated VRAM, as in the VM", Game16, 0, 6 << 30, 8 << 30},
+		{"unreadable adapter", Game16, -1, 6 << 30, 8 << 30},
+		{"card holds everything", Game16, 10 << 30, 0, 0},
+		{"card holds part", Game16, 5 << 30, 6<<30 - int64(float64(5<<30)*Coef.UsableVRAM), 8<<30 - int64(float64(5<<30)*Coef.UsableVRAM)},
+		{"1.7 keeps its measured RAM rates", Game17, 0, 0, 0},
+	} {
+		low, high := Spill(tc.game, 6<<30, 8<<30, tc.dedicated)
+		if low != tc.low || high != tc.high {
+			t.Fatalf("%s: spill %d–%d, want %d–%d", tc.name, low, high, tc.low, tc.high)
+		}
+	}
+}

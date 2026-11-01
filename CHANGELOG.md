@@ -7,6 +7,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 - Interface translations moved into language files. Archo Monitor settings now follow the game language. Mod roles on the game log page use normal brackets in English.
 - Documentation is now in English, with a new Chinese README (`README.zh-CN.md`).
 - Unity 1.6 RAM estimates now use heavy-texture VM measurements up to 7.5 GiB, reducing high-payload resident and loading budgets; larger loads remain extrapolated.
+- Unity 1.6 memory estimates now count each texture's graphics-driver copy (1.2 bytes per texture byte, 0.66 GiB for vanilla) as VRAM instead of RAM. A computer with a large enough graphics card sees a much lower RAM need; VRAM the card cannot hold, or all of it without dedicated VRAM (VMs, integrated GPUs), still counts as RAM, and Can it run, Loading cost and `archo plan cost` say how much (JSON `vramInRAMLow` / `vramInRAMHigh`). Without dedicated VRAM the estimates are unchanged. The real-card split is inferred from the game's code and VM measurements, not yet measured.
 - GUI: off/on dropdowns are now rounded rectangular two-segment switches with concentric inner corners. Other dropdowns use rounded menus with centered SVG arrows, concentric option corners, a title, checked current value, keyboard navigation and scrolling; menus stay within the window and above scroll containers.
 - Uninstall confirmation now lists what will be removed or changed, counts, sizes,
   removal methods and what stays. The dialog defaults to Cancel; only its red
