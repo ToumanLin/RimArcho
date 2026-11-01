@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Mod 库存 (06 §2.9): every mod on this machine, one line per Lineage; --lineage shows each
+// Mod library (06 §2.9): every mod on this machine, one line per Lineage; --lineage shows each
 // copy. The GUI page, the TUI list and MCP list_library filter the same app.Library.
 func init() {
 	flags := []Flag{

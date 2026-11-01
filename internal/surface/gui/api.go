@@ -37,11 +37,11 @@ type API struct {
 	emit            func(name string, data any) // Wails events; nil in tests
 	open            func(url string) error      // the system browser
 	openDir         func(dir string) error      // the file manager (nil: the system's)
-	lib             *app.Library                // Mod 库存, as of libAt
+	lib             *app.Library                // Mod library, as of libAt
 	libAt           string
 	libGate         sync.Mutex // coalesces full inventory builds, never acquired by edits
 	problemLookup   problemLookup
-	search          fileSearch // 搜索文件 (filesearch.go)
+	search          fileSearch // Search files (filesearch.go)
 	subRead         subscriptionReader
 	copyRead        inventoryReader
 	libRead         logReader
@@ -70,7 +70,7 @@ type API struct {
 	logPath   string           // the log page's Player.log and its clusters' first lines
 	logLinks  map[string]string
 	x         exchange // import and export (exchange.go)
-	// removedRule is the rule the editor removed last, for its 撤销 (rules.go).
+	// removedRule is the rule the editor removed last, for its undo (rules.go).
 	removedRule *store.UserRule
 	free        releaser // returns memory to the OS after heavy work (memory.go)
 	// bgs are the environment bgsEnv's backgrounds; bgPick the image rotation chose for
@@ -90,7 +90,7 @@ type API struct {
 	autoWG          sync.WaitGroup
 	quit            func()     // closes the window (nil in the harness and in tests)
 	windowTheme     func(bool) // synchronises the native frame with the resolved page scheme
-	// tasks is the 后台任务 record and its lanes (tasks.go, 06 §2.16)
+	// tasks is the Background tasks record and its lanes (tasks.go, 06 §2.16)
 	tasks        *app.Tasks
 	taskEv       taskEvents
 	creditID     string
@@ -192,12 +192,13 @@ func (s *API) checkMonitor() {
 
 // Start is what the page needs once: the language, its text table, the commands.
 type Start struct {
-	Lang     string            `json:"lang"`
-	Accent   string            `json:"accent"`
-	Theme    string            `json:"theme"`
-	Text     map[string]string `json:"text"`
-	Commands []view.Command    `json:"commands"`
-	Version  string            `json:"version"`
+	Lang      string            `json:"lang"`
+	Accent    string            `json:"accent"`
+	Theme     string            `json:"theme"`
+	Text      map[string]string `json:"text"`
+	ExtraText map[string]string `json:"extraText,omitempty"`
+	Commands  []view.Command    `json:"commands"`
+	Version   string            `json:"version"`
 	// Ops is the op table both pages' menus, hint lines and keys come from (06 §8.5).
 	Ops []view.Op `json:"ops"`
 }
@@ -207,7 +208,7 @@ func (s *API) Init() *Start {
 	defer perftrace.Span("Init")()
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return &Start{Lang: view.Lang(), Accent: cmds.Setting(s.a, "ui.accent"), Theme: cmds.Setting(s.a, "ui.theme"), Text: view.Table(), Commands: view.Commands, Version: buildinfo.String(), Ops: view.OpTable()}
+	return &Start{Lang: view.Lang(), Accent: cmds.Setting(s.a, "ui.accent"), Theme: cmds.Setting(s.a, "ui.theme"), Text: view.Table(), ExtraText: view.ExtraText(), Commands: view.Commands, Version: buildinfo.String(), Ops: view.OpTable()}
 }
 
 // ---- the board ----
@@ -319,7 +320,7 @@ func (s *API) PackNameCheck(name string) string {
 	return ""
 }
 
-// PackDryRun is 先看清单，不写磁盘: the text of archo pack build --dry-run (nothing is written).
+// PackDryRun is preview the file list without writing to disk: the text of archo pack build --dry-run (nothing is written).
 func (s *API) PackDryRun(name string, tex int) []string {
 	r, err := s.detachedReader()
 	if err != nil {
@@ -941,7 +942,7 @@ func (s *API) Swap(id string) (string, error) {
 	return s.text(view.Swap(s.a, st, id))
 }
 
-// Preview is the dry run of sort, save or launch (the palette's 预览…; 06 §6).
+// Preview is the dry run of sort, save or launch (the palette's preview…; 06 §6).
 func (s *API) Preview(what string) (*view.Preview, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -1026,7 +1027,7 @@ func (s *API) SetTag(ids []string, tag string, remove bool) (string, error) {
 	return s.text(view.Tf("tags of %s: %s", o.What, msg), err)
 }
 
-// ---- 需要处理 (06 §5) ----
+// ---- Can it run (06 §5) ----
 
 // Needs builds the screen. Opening it includes the newest log (parsing it if needed) and
 // starts the files' check when it is stale, as the TUI does.
@@ -1086,9 +1087,9 @@ func (s *API) Needs() *view.Needs {
 }
 
 // ReadNewLog reads Player.log once when it is newer than the last launch and the last log
-// read (app.NewLog): the game exited, or ran without RimArcho. Then 能不能跑's badge counts
-// that run without a visit (06 §2.1; the sidebar's "分析本次日志" line asked for one until
-// 2026-10-30). Like opening 能不能跑 it parses the log, records it as read and lets the
+// read (app.NewLog): the game exited, or ran without RimArcho. Then Can it run's badge counts
+// that run without a visit (06 §2.1; the sidebar's "analyse this run's log" line asked for one until
+// 2026-10-30). Like opening Can it run it parses the log, records it as read and lets the
 // memory go again soon; it starts no analysis. It reports whether it read one.
 func (s *API) ReadNewLog() bool {
 	defer perftrace.Span("ReadNewLog")()
@@ -1244,7 +1245,7 @@ func (s *API) Inspect(argv []string) ([]string, error) {
 
 // ---- changes (06 §2.9) ----
 
-// Changes is the 变化 page: the current plan's mods since it was last played, or the whole
+// Changes is the Subscriptions and updates page: the current plan's mods since it was last played, or the whole
 // library; of (an instance ID) narrows it to that mod's Lineage, every change by day.
 func (s *API) Changes(library bool, of string) (*modchanges.Page, error) {
 	r, err := s.detachedReader()
@@ -1276,7 +1277,7 @@ func (s *API) ChangeFiles(before, after int64) []string {
 	return view.ChangeFiles(s.a, before, after)
 }
 
-// OpenChangeNotes opens a Workshop item's change notes (ctrl+w on 变化).
+// OpenChangeNotes opens a Workshop item's change notes (ctrl+w on Subscriptions and updates).
 func (s *API) OpenChangeNotes(ws string) (string, error) {
 	if !view.IsNumber(ws) {
 		return "", errors.New(view.T("no Workshop ID: not a Workshop mod"))
@@ -1335,7 +1336,7 @@ func (s *API) Logs() []string {
 	return out
 }
 
-// LogPage analyses a log for the 日志 tab (the newest when path is empty).
+// LogPage analyses a log for the Game log tab (the newest when path is empty).
 func (s *API) LogPage(path string) (*view.LogPage, error) {
 	// Serialise log reads with each other, not with the board, navigation or textures.
 	// Keeping this reader also preserves pending cross-version analysis between polls.
@@ -1429,7 +1430,7 @@ func (s *API) LogPattern(path, id string) *view.PatternCard {
 	return view.PatternCardOf(r, st, path, id)
 }
 
-// SelectLog picks the log whose errors join 需要处理.
+// SelectLog picks the log whose errors join Can it run.
 func (s *API) SelectLog(path string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

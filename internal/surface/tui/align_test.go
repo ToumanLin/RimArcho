@@ -13,12 +13,12 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The TUI's pages and keys the window has too (06 §9.1): 搜索文件, H, F, 4 on a narrow
+// The TUI's pages and keys the window has too (06 §9.1): Search files, H, F, 4 on a narrow
 // screen, and the window's names.
 
 func screen(m *model) string { return ansi.Strip(m.View()) }
 
-// 搜索文件: reached by tab from 添加订阅 and from the palette; typing goes into the box, enter
+// Search files: reached by tab from add a subscription and from the palette; typing goes into the box, enter
 // searches the open list's enabled mods, the results are mod → file → line, and the options
 // change the search at once.
 func TestFileSearchPage(t *testing.T) {
@@ -57,7 +57,7 @@ func TestFileSearchPage(t *testing.T) {
 	if m.fs.row != 1 || m.fs.results {
 		t.Fatalf("↓: row %d results %v", m.fs.row, m.fs.results)
 	}
-	for i := 0; i < 2; i++ { // past 文件, C# 代码 to Defs
+	for i := 0; i < 2; i++ { // past files, C# code to Defs
 		key(m, tea.KeyMsg{Type: tea.KeyRight})
 	}
 	key(m, tea.KeyMsg{Type: tea.KeySpace, Runes: []rune(" ")})
@@ -108,7 +108,7 @@ func TestFileSearchPage(t *testing.T) {
 	}
 }
 
-// Leaving 搜索文件 cancels its search (06 §3.1 rule 9).
+// Leaving Search files cancels its search (06 §3.1 rule 9).
 func TestFileSearchLeaveStops(t *testing.T) {
 	view.SetLang("en")
 	e, _ := fixture(t)
@@ -177,7 +177,7 @@ func TestWindowNames(t *testing.T) {
 	s := screen(m)
 	for _, w := range []string{"mod library › subscriptions and updates", "2 waiting for you to update", "3 already updated", "a every mod"} {
 		if !strings.Contains(s, w) {
-			t.Fatalf("订阅与更新 has no %q:\n%s", w, s)
+			t.Fatalf("Subscriptions and updates has no %q:\n%s", w, s)
 		}
 	}
 	press(m, "^")
@@ -196,7 +196,7 @@ func TestWindowNames(t *testing.T) {
 			t.Errorf("palette command %s did nothing", c.ID)
 		}
 	}
-	// 后台任务 is the shared record as text, one line a task under its group
+	// Background tasks is the shared record as text, one line a task under its group
 	m = direct(t, e, 160, 40)
 	runAlias(m, "background tasks")
 	if m.panel == nil || m.panel.title != "background tasks" || !strings.Contains(strings.Join(m.panel.lines, "\n"), "nothing has run in the background yet") {
@@ -211,8 +211,8 @@ func TestWindowNames(t *testing.T) {
 	}
 }
 
-// 排序规则 (06 §9.1): r opens it with the form for the cursor's mod; the other mod comes from
-// the candidates; the rule is listed under 只看当前列表; Del removes it, u puts it back with
+// Load-order rules (06 §9.1): r opens it with the form for the cursor's mod; the other mod comes from
+// the candidates; the rule is listed under only the current list; Del removes it, u puts it back with
 // its number; enter changes it; letters in the form are the form's.
 func TestRulesScreen(t *testing.T) {
 	view.SetLang("en")
@@ -290,7 +290,7 @@ func TestRulesScreen(t *testing.T) {
 	}
 }
 
-// F on 能不能跑 enables the installed requirement and sorts; the check 能不能跑 then starts
+// F on Can it run enables the installed requirement and sorts; the check Can it run then starts
 // by itself says so in the head and leaves the status line's undo hint alone (06 §2.4).
 func TestAutoFixKeepsTheUndoHint(t *testing.T) {
 	view.SetLang("en")
@@ -330,8 +330,8 @@ func TestAutoFixKeepsTheUndoHint(t *testing.T) {
 	}
 }
 
-// 启动 (06 §2.3, §9.1): shift+1 and the editor's L open it; it shows the current list and
-// ▶ 启动游戏, and only L there launches.
+// Start (06 §2.3, §9.1): shift+1 and the editor's L open it; it shows the current list and
+// ▶ launch game, and only L there launches.
 func TestStartPage(t *testing.T) {
 	view.SetLang("en")
 	e, _ := fixture(t)
@@ -351,12 +351,12 @@ func TestStartPage(t *testing.T) {
 	}
 	key(m, runes("L"))
 	if len(e.Launched) != 1 {
-		t.Fatalf("L on 启动 did not launch: %v (%s)", e.Launched, m.status)
+		t.Fatalf("L on Start did not launch: %v (%s)", e.Launched, m.status)
 	}
 }
 
 // Lists are opened, not switched to (04 §1.3): P opens another list, the top bar says which
-// one launches, 设为当前 or the editor's L makes it current.
+// one launches, make current or the editor's L makes it current.
 func TestOpenListIsNotCurrent(t *testing.T) {
 	view.SetLang("en")
 	e, _ := fixture(t)
@@ -404,7 +404,7 @@ func TestStageAllKey(t *testing.T) {
 	m.focus = cActive
 	press(m, "T")
 	if len(m.cols[cStaging].items) == 0 {
-		t.Fatalf("T in 已启用 staged nothing: %s", m.status)
+		t.Fatalf("T in Enabled staged nothing: %s", m.status)
 	}
 	m.focus = cStaging
 	press(m, "T")

@@ -303,7 +303,7 @@ func (s *Store) UpdateRule(r *UserRule) (bool, error) {
 	return n > 0, nil
 }
 
-// RestoreRule puts a removed rule back with its own ID (the GUI's 撤销 after a removal):
+// RestoreRule puts a removed rule back with its own ID (the GUI's undo after a removal):
 // r:<n> still names that rule only.
 func (s *Store) RestoreRule(r *UserRule) error {
 	_, err := s.DB.Exec(`INSERT INTO user_rule(id, environment_id, kind, a_lineage, b_lineage, target, note, created_at) VALUES(?,?,?,?,?,?,?,?)`,

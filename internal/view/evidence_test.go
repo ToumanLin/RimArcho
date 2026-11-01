@@ -10,7 +10,7 @@ import (
 )
 
 // G13 in part: every item sits in one of the four sections by its group, and the items of
-// 会让游戏出错 say where their claim comes from (06 §2.4).
+// Will cause errors say where their claim comes from (06 §2.4).
 func TestNeedsSectionsAndEvidence(t *testing.T) {
 	_, _, n := shellEnv(t)
 	for g, want := range map[int]int{

@@ -15,7 +15,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 反馈 in the terminal (06 §2.14): the basics only until m / p / l tick a part; enter opens
+// Feedback in the terminal (06 §2.14): the basics only until m / p / l tick a part; enter opens
 // the prefilled link, copying the text first when it is too long for the link.
 func TestFeedbackPanel(t *testing.T) {
 	view.SetLang("en")
@@ -76,7 +76,7 @@ func TestFeedbackPanel(t *testing.T) {
 	}
 }
 
-// s in 反馈 (06 §2.14): only with a relay; asks for the title, what happened and the
+// s in Feedback (06 §2.14): only with a relay; asks for the title, what happened and the
 // contact on the input line, then sends in the background and says the issue's number.
 func TestFeedbackSendTUI(t *testing.T) {
 	view.SetLang("en")

@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
-// 设置 › 卸载 RimArcho (06 §2.14): the plan as both interfaces show it — one row per step, the
+// settings › uninstall RimArcho (06 §2.14): the plan as both interfaces show it — one row per step, the
 // player's choices on the rows that have them, then the same rows as the report.
 
 // UninstallChoice is the player's answers (app.UninstallOptions for the page).

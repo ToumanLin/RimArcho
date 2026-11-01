@@ -180,7 +180,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .side-foot { flex: none; padding: 8px 10px 10px; border-top: var(--hairline) solid var(--line-2); display: flex; flex-direction: column; gap: 6px; }
 /* the navigation at the top (06 §2.1): the same entries as one strip over the page. The
    toggle ends it on the left; the groups are thin separators; an entry's sub-entries are a
-   dropdown from its chevron (↓ on the keyboard); 设置 at the right
+   dropdown from its chevron (↓ on the keyboard); settings at the right
    end. The raised highlight and the badge stay; a narrow window scrolls the strip. */
 #app.nav-top { grid-template-columns: minmax(0, 1fr); grid-template-rows: 46px minmax(0, 1fr); }
 #app.nav-top #side { grid-row: 1; flex-direction: row; align-items: center; gap: 4px; padding: 0 10px; border-right: 0; border-bottom: var(--hairline) solid var(--line-2); }
@@ -222,7 +222,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .page-acts .unwritten { color: var(--accent-11, var(--accent)); font-size: 12px; white-space: nowrap; margin-right: 2px; }
 .page-acts .unwritten::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: 1px; }
 #top #env { flex: 0 1 auto; }
-/* the chip beside the page's name: the environment (and the plan on 能不能跑) */
+/* the chip beside the page's name: the environment (and the plan on Can it run) */
 .envchip { height: 20px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: var(--r-sm); background: var(--pill); color: var(--fg-2); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; transition: background var(--t-press), color var(--t-press); }
 .envchip:hover, .envchip.on { background: var(--pill-hover); color: var(--fg); }
 /* a page's actions: quiet icon + text, no border (06 §2.2) */
@@ -274,15 +274,15 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .area .head .acts .btn:hover { border-color: var(--muted); color: var(--fg); }
 .area .head .acts .btn.hot { color: var(--accent-11, var(--accent)); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 
-/* ---- the board: three columns (06 §2.5): 未启用 | 已启用 | 详情, with 暂存 and 历史 folded
-   under 详情 in the third column ---- */
+/* ---- the board: three columns (06 §2.5): Not enabled | Enabled | details, with Staging and history folded
+   under details in the third column ---- */
 #board { display: grid; min-height: 0; padding: 0 12px 6px; grid-template-columns: var(--c0, 38fr) var(--card-gap) var(--c1, 31fr) var(--card-gap) var(--c2, 31fr); }
 #board > .fcol { grid-column: 1; } #board > [data-split="0"] { grid-column: 2; }
 #board > [data-area="1"] { grid-column: 3; } #board > [data-split="1"] { grid-column: 4; }
 #board > .editor-right { grid-column: 5; } #board > * { grid-row: 1; }
 .stack { display: flex; flex-direction: column; gap: var(--card-gap); min-width: 0; min-height: 0; }
 .stack > .detail { flex: 1 1 0; min-height: 140px; }
-/* a fold is its bar until opened; open, it takes a share of the column under 详情 */
+/* a fold is its bar until opened; open, it takes a share of the column under details */
 .stack > .fold { flex: none; }
 .stack > .fold.open { flex: 0 1 auto; max-height: 38%; min-height: 72px; }
 .fold > .head { cursor: pointer; }
@@ -296,7 +296,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .histarea .hbar { width: 100%; text-align: left; }
 .histbody { flex: 1; min-height: 0; overflow-y: auto; padding: 0 10px 6px; }
 .histbody .hist { margin-top: 4px; }
-/* 排序规则 (rules.js, 06 §2.5): the player's rules, each a sentence with its note; 编辑 / 删除
+/* Load-order rules (rules.js, 06 §2.5): the player's rules, each a sentence with its note; edit / delete
    show on hover or focus; the form adds or changes a rule in place */
 .rulesarea .hbar { width: 100%; text-align: left; }
 .rulesbody { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 10px 8px; }
@@ -483,7 +483,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .cols .col { display: flex; flex-direction: column; min-height: 0; transition: border-color var(--t-press); }
 .cols .col.focus { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .cols .col .scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 6px; }
-/* the log page's right side: the log text, and under it the Archo 日志分析 card */
+/* the log page's right side: the log text, and under it the Archo log analysis card */
 .cols.logcols { grid-template-columns: minmax(260px, var(--log-left, 62fr)) var(--card-gap) minmax(320px, 38fr); gap: 0; }
 .logsplit { margin: 0; }
 .logside { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
@@ -499,7 +499,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 @media (max-width: 900px) { .cols.three, .cols.two, .cols.logcols { grid-template-columns: 1fr; } .logsplit { display: none; } .page.fill { height: auto; } .cols .col .scroll { max-height: 60vh; } }
 
-/* 能不能跑 (06 §2.4): two columns that scroll on their own, each a stack of sections; a
+/* Can it run (06 §2.4): two columns that scroll on their own, each a stack of sections; a
    section is a card of items, its heading stays at the top of its column */
 .cols.needcols { grid-template-columns: minmax(320px, var(--needs-left, 55fr)) var(--card-gap) minmax(300px, 45fr); gap: 0; }
 .needcol { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
@@ -513,7 +513,7 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 .need-sec.break > h2.label { color: var(--red); }
 .need-sec.run > h2.label { color: var(--log); }
 .need-sec.confirm > h2.label { color: var(--amber); }
-/* 可以留意: what shared logs taught, RimArcho's own knowledge: the accent, not dimmed */
+/* worth knowing: what shared logs taught, RimArcho's own knowledge: the accent, not dimmed */
 .need-sec.worth > h2.label { color: var(--accent-11, var(--accent)); cursor: pointer; }
 .need-sec.worth .need-ic { color: var(--accent-11, var(--accent)); }
 .need-sec > h2.label .fold-chev { display: inline-block; width: 12px; color: var(--faint); transition: transform var(--t-press); }
@@ -613,7 +613,7 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 .page-acts .chip.prob.hint { color: var(--muted); background: var(--pill); }
 @media (max-width: 760px) { .need .top { flex-wrap: wrap; } }
 
-/* 日志 */
+/* Game log */
 .lrow { display: flex; gap: 10px; padding: 8px 10px; border-radius: var(--r-sm); align-items: flex-start; }
 .lrow:hover { background: var(--card-2); }
 .lrow.cur { background: var(--accent-soft); }
@@ -626,7 +626,7 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 .lrow .mods { margin-left: auto; color: var(--accent-11, var(--accent)); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .lrow .text { margin-top: 3px; color: var(--fg-2); font-size: 12px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 .detail-card .scroll { padding: 12px 14px; }
-/* 游戏日志's file picker and the companion section (06 §2.10) */
+/* game log's file picker and the companion section (06 §2.10) */
 .btn.picker { display: inline-flex; align-items: center; gap: 8px; }
 .btn.picker .chev { color: var(--faint); font-size: 12px; }
 #menu button.sub { padding-left: 22px; color: var(--muted); }
@@ -704,8 +704,8 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .prog .ptext { margin-top: 5px; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prog .ptext.bad { color: var(--red); white-space: pre-wrap; }
 
-/* 编译成整合包 (06 §2.6): the name, the kind and the four steps on the left; the summary
-   and 编译 on the right; the builds cut short below */
+/* Create a pack (06 §2.6): the name, the kind and the four steps on the left; the summary
+   and create on the right; the builds cut short below */
 .bd-cols { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
 .bd-left { flex: 999 1 440px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .bd-left > .sec:first-child { margin-top: 0; }
@@ -864,7 +864,7 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .help b { color: var(--fg); font-weight: 500; white-space: nowrap; }
 .help span { color: var(--muted); }
 
-/* a narrow window: the third column goes first (enter opens the full detail; 暂存 and 历史
+/* a narrow window: the third column goes first (enter opens the full detail; Staging and history
    are reached by their keys and the command palette) */
 @media (max-width: 680px) { #board { grid-template-columns: minmax(0,1fr) var(--card-gap) minmax(0,1fr); } #board > .editor-left, #board [data-split="0"] { display: none; } #board > [data-area="1"] {grid-column:1} #board > [data-split="1"] {grid-column:2} #board > .editor-right {grid-column:3} }
 
@@ -874,8 +874,8 @@ svg.i.fill { fill: currentColor; }
 .packs .pack.hl { background: var(--accent-soft); }
 
 /* home: special case, 06 §7.3 */
-/* ---- 启动 (06 §2.3): like the game's main menu — the plans and packs down the left over a
-   background image, the last run and scan under them, ▶ 启动游戏 in the bottom right with the
+/* ---- Start (06 §2.3): like the game's main menu — the plans and packs down the left over a
+   background image, the last run and scan under them, ▶ launch game in the bottom right with the
    applied list's problem tucked under it like a tab ---- */
 #main { position: relative; }
 #top, #body { z-index: 1; }
@@ -901,8 +901,8 @@ svg.i.fill { fill: currentColor; }
 #app.photo #board { visibility: hidden; }
 :root[data-scheme="dark"] #app.photo #crumbs .crumb.last { text-shadow: 0 1px 8px rgba(0, 0, 0, .5); }
 
-/* 启动 (06 §2.3) on a 12-column grid: the headline carries the page; under a rule the three
-   steps read left to right; ▶ 启动游戏 is the one block of colour. */
+/* Start (06 §2.3) on a 12-column grid: the headline carries the page; under a rule the three
+   steps read left to right; ▶ launch game is the one block of colour. */
 .page.home { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: auto minmax(0, 1fr) auto auto;
   gap: 12px 24px; padding: 8px 48px 36px; overflow-y: auto; font-variant-numeric: normal; }
 .page.home::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: 10px; }
@@ -928,7 +928,7 @@ svg.i.fill { fill: currentColor; }
 .hm-floor { display: none; grid-column: 1 / 13; grid-row: 3 / 5; margin: -64px -48px -36px; pointer-events: none;
   background: linear-gradient(180deg, rgba(var(--photo-shade), 0), rgba(var(--photo-shade), .8) 64px); }
 #app.photo .hm-floor { display: block; }
-/* 启动 is the root page and its headline names what is applied: no breadcrumb */
+/* Start is the root page and its headline names what is applied: no breadcrumb */
 #app:has(.page.home) #crumbs > :is(.crumb, .sep) { display: none; }
 .hm-step { grid-row: 4; position: relative; padding-top: 16px; min-width: 0; }
 .hm-s1 { grid-column: 1 / 4; } .hm-s2 { grid-column: 4 / 9; } .hm-s3 { grid-column: 9 / 13; }
@@ -990,7 +990,7 @@ svg.i.fill { fill: currentColor; }
 .hm-go.arrived::before { content: ""; position: absolute; inset: 0; background: var(--accent-fg); opacity: 0; animation: hm-flash 400ms var(--ease); pointer-events: none; }
 .hm-pick.leaving { animation: hm-leave var(--t-exit) var(--ease-in) forwards; }
 .hm-go .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--green); margin-right: 10px; animation: hm-blink 1.4s infinite; }
-/* 保存 in the block's lower left, where "N 项未保存" was: a button of its own beside ▶ (not
+/* save in the block's lower left, where "N unsaved" was: a button of its own beside ▶ (not
    inside it), drawn like the block's L key so the block stays the page's one colour */
 .hm-launch { position: relative; }
 .hm-save { position: absolute; left: 18px; bottom: 16px; max-width: calc(100% - 96px); display: inline-flex; align-items: center; gap: 8px; height: 26px; padding: 0 6px 0 10px;
@@ -1044,7 +1044,7 @@ svg.i.fill { fill: currentColor; }
 }
 /* end home */
 
-/* ---- 设置 › 启动页背景 (06 §2.14): the launch page in small, the controls beside it, the
+/* ---- settings › Start page background (06 §2.14): the launch page in small, the controls beside it, the
    images by group below ---- */
 .bg-card { padding: 18px 20px; display: flex; flex-direction: column; }
 .bg-head { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 28px; }
@@ -1235,11 +1235,11 @@ details.xc-sec > summary { cursor: pointer; }
 .xc-way .xc-input { width: 100%; }
 .plan-pop .in .pr { flex: none; }
 
-/* ---- Mod 库存 (06 §2.9): the filters, one row per Lineage, and size · state · used-in on
+/* ---- Mod library (06 §2.9): the filters, one row per Lineage, and size · state · used-in on
    the right of every row; a copy's details take the right column's place ---- */
 /* the list scrolls inside its card at every width, so only the rows in view are drawn */
 .page.fill.library { height: 100%; }
-/* the left column (the filter bar, then the details) as wide as the editor's 未启用; the
+/* the left column (the filter bar, then the details) as wide as the editor's Not enabled; the
    table takes the rest of the page, which is as wide as the window (no centred cap) */
 .page.library { padding-left: 12px; padding-right: 12px; }
 .lib { flex: 1; min-height: 0; display: grid; grid-template-columns: var(--lib-side, calc((100% - 2 * var(--card-gap)) * .38)) var(--card-gap) minmax(0, 1fr); position: relative; }
@@ -1280,7 +1280,7 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .lib-row.open { background: var(--accent-soft); }
 .lib-row.open .t { color: var(--accent-11, var(--accent)); }
 .lib-row .c { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 12px; color: var(--muted); }
-/* a cell's facts stay on the row's one line ("锁定版本  2026/10/27 22:02" wrapped and spilled
+/* a cell's facts stay on the row's one line ("locked version  2026/10/27 22:02" wrapped and spilled
    over the rows above and below); what does not fit is cut, the title has it all */
 .lib-row .c.word-facts { flex-wrap: nowrap; }
 .lib-row .c.word-facts > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -1333,7 +1333,7 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .lib-bar .btn.quiet { margin-left: auto; border-color: transparent; background: none; box-shadow: none; }
 @media (prefers-reduced-motion: reduce) { .lib-bar, .fbar-panel { animation: none; } .lib-row .chev svg { transition: none; } }
 
-/* ---- the filter bar (06 §2.5, §2.9): the plan editor and Mod 库存 share it ---- */
+/* ---- the filter bar (06 §2.5, §2.9): the plan editor and Mod library share it ---- */
 .fbar { position: relative; flex: none; z-index: 6; }
 .fbar-row { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 6px; border-bottom: var(--hairline) solid var(--line-2); }
 .fbar-search { flex: 1; min-width: 90px; position: relative; }
@@ -1367,9 +1367,9 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .fbar-v.cur .l { color: var(--fg); font-weight: 600; }
 .fbar-v .curv { font-size: 12px; line-height: 15px; padding: 0 4px; border-radius: var(--r-sm); background: var(--accent-soft); color: var(--accent-11, var(--accent)); }
 /* open, the bar grows down its column (06 §2.5, §2.9): the groups stacked, each group's
-   values wrapping; what was under it (未启用's rows, Mod 库存's details) shrinks to its
+   values wrapping; what was under it (Not enabled's rows, Mod library's details) shrinks to its
    title bar at the bottom, a click on which (or \, esc) closes the bar again */
-/* the bar is a card of its own over the column's other card (未启用, the details); the
+/* the bar is a card of its own over the column's other card (Not enabled, the details); the
    --card-gap between them is the gap that shares the column */
 .fcol { display: flex; flex-direction: column; gap: var(--card-gap); min-width: 0; min-height: 0; }
 .fcol > .area { flex: 1; min-height: 0; }
@@ -1387,18 +1387,18 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .fbar-gap::after { content: ""; position: absolute; left: 12px; right: 12px; top: 50%; height: var(--hairline); transform: translateY(-50%); border-radius: var(--r-sm); background: transparent; transition: background var(--t-press); }
 .fbar-gap:hover::after, .fbar-gap.drag::after { background: var(--accent); }
 /* filling the column, the bar leaves the card below only its title, a slim card at the
-   bottom like 暂存 and 历史: a click on it gives the column back */
+   bottom like Staging and history: a click on it gives the column back */
 .fcol:has(> .fbar.open.fill) > .area { flex: none; }
 .fcol:has(> .fbar.open.fill) > .area > :not(.head) { display: none; }
 .fcol:has(> .fbar.open.fill) > .area > .head { border-bottom: 0; cursor: pointer; }
 
-/* the row menu (06 §8.5): groups split by a hairline, keys on the right, 退订 / 删除 in red */
+/* the row menu (06 §8.5): groups split by a hairline, keys on the right, unsubscribe / delete in red */
 #menu hr { border: 0; border-top: var(--hairline) solid var(--line-2); margin: 3px 4px; }
 #menu button.danger { color: var(--red); }
 #menu button.danger:hover, #menu button.danger:focus { background: var(--red-soft); }
 #menu button:focus { outline: 0; background: var(--pill); }
 
-/* 设置 › 卸载 RimArcho (06 §2.14): one row per step, the answer inline, the items folded */
+/* settings › uninstall RimArcho (06 §2.14): one row per step, the answer inline, the items folded */
 .uninstall .un-step + .un-step { border-top: var(--hairline) solid var(--line-2); }
 .uninstall .un-step .set { border-top: 0; }
 .uninstall .un-toggle { display: flex; gap: 6px; align-items: center; cursor: pointer; white-space: nowrap; }
@@ -1420,7 +1420,7 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .page .btn.primary.danger-go:disabled { opacity: .45; cursor: default; }
 .uninstall .set .sub { white-space: normal; }
 
-/* 设置 › 反馈 (06 §2.14): what the player writes, the attachments, the whole text */
+/* Settings > Feedback (06 §2.14): what the player writes, the attachments, the whole text */
 .fb-form { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; }
 .fb-field { display: flex; flex-direction: column; gap: 6px; font-weight: 500; }
 .fb-field .field { flex: none; width: 100%; font-weight: 400; }
@@ -1439,10 +1439,10 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 .fb-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 14px 0 24px; }
 .fb-foot .m { flex: 1 1 260px; min-width: 0; color: var(--muted); font-size: 12px; }
 .fb-foot .m.warn { color: var(--amber); }
-/* "public on GitHub" beside 预览: a note, not part of the uppercase heading */
+/* "public on GitHub" beside preview: a note, not part of the uppercase heading */
 .fb-public { margin-left: 12px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--faint); }
 
-/* 库 › 贴图优化 (08 §5.2): settings rows, the run's foot, the mods table */
+/* Library > Texture optimisation (08 §5.2): settings rows, the run's foot, the mods table */
 .textures .set .sub { white-space: normal; }
 /* 06 §2.13: offscreen texture cells need no layout/paint during background estimates. */
 .tex-rows .data-row { content-visibility: auto; contain-intrinsic-size: auto 30px; }
@@ -1468,7 +1468,7 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 .packpv .packtex { display: flex; gap: 8px; align-items: center; margin: 0 0 10px; }
 .packpv .packtex select { height: 26px; background: var(--card-2); color: var(--fg); border: var(--hairline) solid var(--line-2); border-radius: var(--r-sm); padding: 0 6px; font: inherit; }
 
-/* ---- the full detail (06 §4.2): one page for the editor and Mod 库存. The mod on the left,
+/* ---- the full detail (06 §4.2): one page for the editor and Mod library. The mod on the left,
    wide; its copies, where they are used, the fields and the history on the right; the
    technical information under both, full width. Each part is a numbered card (1–6). ---- */
 .page.mod-page { padding-left: max(20px, calc(50% - 720px)); padding-right: max(20px, calc(50% - 720px)); }
@@ -1517,7 +1517,7 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 .fd-desc .desc s { color: var(--faint); }
 .fd-desc .desc .link { color: var(--accent-11, var(--accent)); cursor: pointer; }
 
-/* ---- 后台任务 (06 §2.16): the filter bar and the tasks on the left; the task's summary over
+/* ---- Background tasks (06 §2.16): the filter bar and the tasks on the left; the task's summary over
    a table of every item it touched on the right. The selection is a tint, never a bar on
    the left (06 §7 rule 4). ---- */
 .page.fill.tasks { height: 100%; padding-left: 12px; padding-right: 12px; }
@@ -1617,7 +1617,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 }
 @media (prefers-reduced-motion: reduce) { .mini i, .tasks-line .ring circle.v { transition: none; } }
 
-/* ---- 列表管理 (06 §2.17): the lists on the left, the picked one on the right ---- */
+/* ---- Manage lists (06 §2.17): the lists on the left, the picked one on the right ---- */
 .pm { display: grid; grid-template-columns: minmax(270px, 320px) minmax(0, 1fr); gap: var(--card-gap); align-items: start; }
 .pm-list { position: sticky; top: 0; max-height: calc(100vh - 140px); display: flex; flex-direction: column; }
 .pm-list .scroll { overflow-y: auto; padding: 6px 0; }
@@ -1734,7 +1734,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .pm-new label.xc-sec { display: grid; gap: 8px; }
 .pm-new .xc-check .xc-input { flex: 1; min-width: 140px; }
 .pm-new .xc-check input[type=radio], .pm-import input[type=radio], .pm-import input[type=checkbox] { flex: none; width: auto; }
-/* The title renames in place (double-click, F2, 改名); 设为当前 sits beside it (06 §2.17). */
+/* The title renames in place (double-click, F2, rename); make current sits beside it (06 §2.17). */
 .pm-head h2.pm-title { cursor: text; border-radius: var(--r-sm); padding: 1px 4px; margin-left: -4px; }
 .pm-head h2.pm-title:hover { background: var(--pill); }
 .pm-rename { display: grid; gap: 4px; min-width: 0; flex: 1; max-width: 360px; }
@@ -1833,7 +1833,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
   .link-tag { justify-self: end; }
 }
 
-/* ---- Mod 库 › 订阅与更新 (06 §2.9): the scope bar and the list on the left, the detail ---- */
+/* ---- Mod library › subscriptions and updates (06 §2.9): the scope bar and the list on the left, the detail ---- */
 .page.fill.subs-page { display: flex; flex-direction: column; }
 .subs { flex: 1; min-height: 0; display: grid; grid-template-columns: var(--subs-side, clamp(320px, 34%, 460px)) var(--card-gap) minmax(0, 1fr); }
 .subs-split { align-self: stretch; margin: 0; }
@@ -1907,7 +1907,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .page .btn.link:hover { background: var(--accent-soft); }
 @media (max-width: 900px) { .subs { grid-template-columns: minmax(0, 1fr); gap: var(--card-gap); } .subs-split { display: none; } .page.fill.subs-page { height: auto; } .subs-list > .scroll { max-height: 60vh; } }
 
-/* ---- Mod 库 › 添加订阅 (06 §2.9): one paste box, what it recognised, the source cards ---- */
+/* ---- Mod library › add a subscription (06 §2.9): one paste box, what it recognised, the source cards ---- */
 .subscribe-page { height: 100%; overflow-y: auto; }
 .subscribe-add { max-width: 760px; margin: 0 auto; padding: 8px 0 24px; display: flex; flex-direction: column; gap: 12px; }
 .subscribe-omni { display: flex; align-items: center; height: 44px; padding: 0 14px; border: var(--hairline) solid var(--line); border-radius: var(--r-lg); background: var(--card); transition: border-color var(--t-press), box-shadow var(--t-press); }
@@ -2059,7 +2059,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .identity-answer-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .identity-comparison .btns { flex-wrap: wrap; justify-content: space-between; }
 
-/* 搜索文件 (filesearch.js) */
+/* Search files (filesearch.js) */
 .page.filesearch { padding: 0 max(12px, calc(50% - 480px)) 24px; }
 .filesearch .fs-query { padding: 12px 14px; }
 .filesearch .fs-input-row { display: flex; align-items: center; gap: 6px; }

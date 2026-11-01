@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 订阅与更新 (06 §2.9, §9.1): three simple lists. 1 the sources (enter checks one, K every
+// subscriptions and updates (06 §2.9, §9.1): three simple lists. 1 the sources (enter checks one, K every
 // one with mods); 2 the updates waiting for the player (u updates one, U every one shown —
 // the dry run first, then a background task, refused while a game runs; Del removes the
 // subscription; p locks this version first; ctrl+w opens the source page); 3 the change
@@ -19,9 +19,9 @@ import (
 // since that plan was last played (a: the whole library); new and gone mods are one summary
 // row; older changes follow by day. enter expands a row (the grouped summary, then every
 // fact), i shows its raw file list. ctrl+w opens the Workshop change notes, ctrl+o the
-// folder, S sorts, D goes to 能不能跑 for dependencies, p locks this version (twice: it
-// copies files), Del removes a subscription RimArcho keeps. + (or a paste) goes to 添加订阅;
-// tab / shift+tab go to the other pages of Mod 库存.
+// folder, S sorts, D goes to Can it run for dependencies, p locks this version (twice: it
+// copies files), Del removes a subscription RimArcho keeps. + (or a paste) goes to add a subscription;
+// tab / shift+tab go to the other pages of Mod library.
 
 const (
 	chHead    = iota + 1 // a heading
@@ -101,7 +101,7 @@ func (c *chState) build() {
 	switch {
 	case c.of != "":
 		add(Tf("only %s", c.ofName)+"  "+T("esc shows every mod"), chHead)
-	case c.library: // the window's scope bar: 列表「…」 / 所有 Mod, a switches
+	case c.library: // the window's scope bar: list "…" / every mod, a switches
 		add(T("every mod")+"  "+p.Since+"  a "+Tf("list “%s”", p.Plan), chHead)
 	default:
 		add(Tf("list “%s”", p.Plan)+"  "+p.Since+"  a "+T("every mod"), chHead)
@@ -450,8 +450,8 @@ func (c *chState) shownPending() []view.PendingUpdate {
 	return out
 }
 
-// changesPairs: the hint line of 订阅与更新 — what the cursor's row can do, then the page's
-// own keys (06 §2.9 按键).
+// changesPairs: the hint line of subscriptions and updates — what the cursor's row can do, then the page's
+// own keys (06 §2.9 keys).
 func (m *model) changesPairs() [][2]string {
 	c := &m.chg
 	var r *chRow
@@ -496,10 +496,4 @@ func (m *model) changesPairs() [][2]string {
 		pairs = append(pairs, [2]string{"a", T("every mod")}, [2]string{"esc", T("back")})
 	}
 	return pairs
-}
-
-func init() {
-	view.Register(map[string]string{
-		"not a subscription RimArcho keeps: Steam's are unsubscribed in the mod library": "不是 RimArcho 管的订阅：Steam 的订阅在 Mod 库里退订",
-	})
 }

@@ -31,7 +31,7 @@ type CopyResult struct {
 	// keepAll: copy .git and .rimarcho too (moving a locked copy, 04 §7).
 	keepAll bool
 	// generated: files RimArcho wrote into the mod (lower-cased paths relative to it; the
-	// DDS of 贴图优化), not part of the mod, so a copy leaves them out.
+	// DDS of Texture optimisation), not part of the mod, so a copy leaves them out.
 	generated map[string]bool
 }
 

@@ -140,7 +140,7 @@ type App struct {
 	FindTool func(name string) (path string, ok bool)
 	pageRepo func(string) string // resolved-repository override in local tests
 	SteamAPI string
-	// 贴图优化 (textures.go): TextureEncoder replaces todds, ToddsZip its download URL,
+	// Texture optimisation (textures.go): TextureEncoder replaces todds, ToddsZip its download URL,
 	// ToddsNoPath leaves PATH out when looking for it (tests).
 	TextureEncoder textures.Encoder
 	ToddsZip       string
@@ -178,7 +178,7 @@ type App struct {
 	ixCache  *Index
 	linkInst *linkInstances // InspectGameLinks, keyed like ixCache
 	ixKey    string
-	// pngSnaps: the snapshots with PNG textures (贴图优化), until the snapshots change
+	// pngSnaps: the snapshots with PNG textures (Texture optimisation), until the snapshots change
 	pngSnaps           map[int64]bool
 	pngSnapsKey        string
 	stCache            *LoadoutState

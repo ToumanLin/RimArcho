@@ -206,36 +206,6 @@ func (s *API) runCredit(ctx context.Context, a *app.App, id string) {
 	}
 }
 
-func init() {
-	view.Register(map[string]string{
-		"replace SteamCMD mods with Steam subscriptions": "用 Steam 订阅替换 SteamCMD Mod",
-		"replacing %s":                   "正在替换 %s",
-		"SteamCMD mods":                  "SteamCMD Mod",
-		"SteamCMD copy retained":         "SteamCMD 副本已保留",
-		"retained: ":                     "已保留副本：",
-		"waiting to retry: ":             "等待重试：",
-		"waiting for Steam installation": "等待 Steam 完成安装",
-		"SteamCMD copy already removed":  "SteamCMD 副本已移走",
-		"already replaced with Workshop": "已由另一批替换为工坊里的这一份",
-		"Workshop copy cannot be loaded in %s; shared lists unchanged":                                       "游戏 %s 无法加载工坊副本；共享列表保持原副本",
-		"staging list %s is unreadable; repair it before replacing":                                          "列表 %s 的暂存数据无法读取；修复后再替换",
-		"waiting for background replacement to finish":                                                       "等待后台替换完成",
-		"waiting for background replacement timed out; try launching again":                                  "等待后台替换超时，请稍后重新启动游戏",
-		"texture records are bound to the old folder and content snapshot; optimise Workshop textures again": "贴图记录绑定原目录和内容快照，请重新优化工坊副本的贴图",
-		"waiting for scan":      "等待扫描完成",
-		"waiting for file task": "等待文件任务完成",
-		"switched to Workshop; SteamCMD copy moved to recycle bin":                  "已切换到工坊里的这一份，SteamCMD 副本已移入回收站",
-		"recorded SteamCMD instance is unavailable or has changed":                  "原来这份 SteamCMD Mod 已不可用或发生变化",
-		"SteamCMD copy is no longer live":                                           "SteamCMD 副本已不在磁盘上",
-		"Workshop instance identity needs review":                                   "工坊里这份 Mod 的身份需要检查",
-		"an unavailable game list or fixed pack still references the SteamCMD copy": "不可切换的游戏列表或固定整合包仍引用 SteamCMD 副本",
-		"links still reference the SteamCMD copy":                                   "链接仍指向 SteamCMD 副本",
-		"replacement paused; Steam subscriptions kept":                              "替换已暂停，已完成的 Steam 订阅保留",
-		"waiting for Steam or a safe time to replace":                               "等待 Steam 安装完成或游戏退出后替换",
-		"replacement finished; see item results":                                    "替换已处理完，请查看逐项结果",
-	})
-}
-
 func creditResultText(result string) string {
 	for _, pattern := range []string{
 		"Workshop copy cannot be loaded in %s; shared lists unchanged",

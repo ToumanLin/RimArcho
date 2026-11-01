@@ -13,8 +13,8 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Mod 库 › 搜索文件 (06 §2.9, §9.1): the window's page in the terminal, on the same
-// view.FileSearch. Area 1 is the query: the box, then the kind row (文件 / C# 代码 and the
+// Mod library › Search files (06 §2.9, §9.1): the window's page in the terminal, on the same
+// view.FileSearch. Area 1 is the query: the box, then the kind row (files / C# code and the
 // file kinds) and the scope row (the open list's mods, or the mods named with + Mod); ↑↓
 // go between the rows, ←→ between a row's chips, space or enter switches one. Area 2 is
 // the results: ↑↓ move over the files and lines, enter or ctrl+o opens the file's folder,
@@ -84,7 +84,7 @@ func (p *fsProgress) get() string {
 	return p.s
 }
 
-// openSearch shows 搜索文件, its box focused; what was typed before is kept.
+// openSearch shows Search files, its box focused; what was typed before is kept.
 func (m *model) openSearch() tea.Cmd {
 	m.panel, m.insp, m.full = nil, nil, false
 	s := &m.fs
@@ -819,7 +819,7 @@ func highlight(text string, q view.FileSearchReq, w int, cur bool) string {
 	return b.String()
 }
 
-// fsPairs: the hint line of 搜索文件.
+// fsPairs: the hint line of Search files.
 func (m *model) fsPairs() [][2]string {
 	f := &m.fs
 	switch {

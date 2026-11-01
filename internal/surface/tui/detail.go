@@ -151,7 +151,7 @@ func (m *model) detailLayout(o detailOpts) []dline {
 		for _, l := range wrap(view.HistoryLine(d.Events), w-2) {
 			add("  " + sSecond.Render(fit(l, w-2)))
 		}
-		// the whole history of its Lineage is on the 变化 page (06 §2.9)
+		// the whole history of its Lineage is on the Subscriptions and updates page (06 §2.9)
 		for _, l := range wrap(T("see all in change history")+", C", w-2) {
 			add("  " + sDimS.Render(l))
 		}
@@ -372,7 +372,7 @@ func wrapSpans(spans []bbcode.Span, w int, base lipgloss.Style) []string {
 		}
 	}
 	// Kinsoku: closing punctuation is glued to the token before it and opening punctuation
-	// to the token after it, so no line starts with "。" or ends with "「"; a break there
+	// to the token after it, so no line starts with a CJK closing mark or ends with an opening mark; a break there
 	// takes the previous character down with it.
 	glued := toks[:0:0]
 	for _, t := range toks {
@@ -428,8 +428,8 @@ func wrapSpans(spans []bbcode.Span, w int, base lipgloss.Style) []string {
 
 // Punctuation that must not start a line, and that must not end one (CJK and ASCII).
 const (
-	closingPunct = "。，、；：！？）」』】〉》〕］｝”’．・…ー,.;:!?)]}%"
-	openingPunct = "（「『【〈《〔［｛“‘([{"
+	closingPunct = "\u3002\uff0c\u3001\uff1b\uff1a\uff01\uff1f\uff09\u300d\u300f\u3011\u3009\u300b\u3015\uff3d\uff5d”’\uff0e・…ー,.;:!?)]}%"
+	openingPunct = "\uff08\u300c\u300e\u3010\u3008\u300a\u3014\uff3b\uff5b“‘([{"
 )
 
 // allIn reports whether s is non-empty and made only of runes in set.

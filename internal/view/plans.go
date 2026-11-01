@@ -17,7 +17,7 @@ import (
 // new, switch, rename, delete. Switching writes no game file; the game holds what the
 // write record says (InGame).
 
-// PagePlanNew is the sidebar's "+ 新方案"; a plan's page is PlanPage(id).
+// PagePlanNew is the sidebar's "+ new list"; a plan's page is PlanPage(id).
 const PagePlanNew = "plan:new"
 
 // PlanPage is the sidebar page ID of a plan: "plan:<id>". IDs, not names, so a page
@@ -44,7 +44,7 @@ type PlanRow struct {
 	Open     bool `json:"open,omitempty"`
 	Entries  int  `json:"entries"`
 	Versions int  `json:"versions"`
-	// Played is "played 10 月 20 日" or "never played".
+	// Played is "played Oct 20" or "never played".
 	Played string `json:"played"`
 	// Conflict: an external version was not loaded (04 §4.3); ConflictText says so.
 	Conflict     bool   `json:"conflict,omitempty"`
@@ -91,7 +91,7 @@ type InGameState struct {
 	PlanID  int64  `json:"planId"`
 	Plan    string `json:"plan"`
 	Version int    `json:"version"`
-	// Text is the status line's "游戏里现在是：<方案> v<n>".
+	// Text is the status line's "the game now uses: <list> v<n>".
 	Text string `json:"text"`
 	// Other: another game sharing the folder wrote it.
 	Other bool `json:"other,omitempty"`
@@ -127,7 +127,7 @@ func InGame(a *app.App) *InGameState {
 	return g
 }
 
-// PlanProblems is the number of "会让游戏出错" items of a plan that is not the current
+// PlanProblems is the number of "Will cause errors" items of a plan that is not the current
 // one, and whether its analysis is known. It reads stored results only (PlanCheckOf,
 // 03 §3): a plan whose enabled set has no stored run is "not checked yet". A variable so
 // tests can replace it.

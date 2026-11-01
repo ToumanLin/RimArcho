@@ -88,7 +88,7 @@ export function bump(name, e, value) {
   e.classList.add("bump");
 }
 
-// ---- reordered entries slide to their new place (the sidebar's lists, 列表管理's rows) ----
+// ---- reordered entries slide to their new place (the sidebar's lists, Manage lists's rows) ----
 
 // places remembers where each element matching sel under root is on screen, by its data-id:
 // a redraw replaces the elements, and slideFrom moves the new ones from there.

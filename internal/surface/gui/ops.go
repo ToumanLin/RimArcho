@@ -11,7 +11,7 @@ import (
 // The plan editor's filter bar, the ops both pages share and the help per page (06 §2.5,
 // §2.9, §3.5, §8.5).
 
-// BarFilter is the editor's filter bar over 未启用 and 已启用: the rows that match, and the
+// BarFilter is the editor's filter bar over Not enabled and Enabled: the rows that match, and the
 // groups while the bar is open.
 func (s *API) BarFilter(search string, filters []string, groups bool) (*view.BarFilter, error) {
 	defer perftrace.Span("BarFilter")()
@@ -54,7 +54,7 @@ func (s *API) BarFilter(search string, filters []string, groups bool) (*view.Bar
 	return view.FilterBoard(b.Board, search, filters, f, groups, b.St.GameMM()), nil
 }
 
-// MoveShown is J / K while the bar filters 已启用: past the next shown row (view.StepAt).
+// MoveShown is J / K while the bar filters Enabled: past the next shown row (view.StepAt).
 // shown are the load positions of the rows shown, in order.
 func (s *API) MoveShown(ids []string, d int, shown []int) (*view.Result, error) {
 	s.mu.Lock()
@@ -84,7 +84,7 @@ func (s *API) RowOps(col int, id string) []string {
 	return out
 }
 
-// RunOp runs an op of the version and disk groups (and 从所有方案里拿掉) on editor rows; the
+// RunOp runs an op of the version and disk groups (and disable in every list) on editor rows; the
 // plan ops have their own verbs.
 func (s *API) RunOp(code string, ids []string) (string, error) {
 	s.mu.Lock()

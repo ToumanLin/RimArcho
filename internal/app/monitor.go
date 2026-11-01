@@ -260,7 +260,7 @@ type MonitorPlanChange struct {
 	Reason string // why it was skipped
 }
 
-// MonitorResult is what one check did (08 §9 "何时检查").
+// MonitorResult is what one check did (08 §9 "when to check").
 type MonitorResult struct {
 	DryRun     bool
 	Bundled    *MonitorBundled

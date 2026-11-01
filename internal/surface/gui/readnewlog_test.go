@@ -11,9 +11,9 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// After a game, the window reads the new Player.log by itself (06 §2.1): 能不能跑's badge
+// After a game, the window reads the new Player.log by itself (06 §2.1): Can it run's badge
 // counts the run without a visit, the log is recorded as read, and a second call reads
-// nothing. Until 2026-10-30 the sidebar said "分析本次日志" and waited for a click.
+// nothing. Until 2026-10-30 the sidebar said "analyse this run's log" and waited for a click.
 func TestReadNewLogCountsTheRun(t *testing.T) {
 	view.SetLang("en")
 	e := testkit.New(t)
@@ -34,7 +34,7 @@ func TestReadNewLogCountsTheRun(t *testing.T) {
 				}
 			}
 		}
-		t.Fatal("no 能不能跑 in the sidebar")
+		t.Fatal("no Can it run in the sidebar")
 		return 0
 	}
 	if api.ReadNewLog() {

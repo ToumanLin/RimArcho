@@ -1,4 +1,4 @@
-// 设置 › 启动页背景 (06 §2.14): a small launch page that shows the choice as it will look,
+// settings › Start page background (06 §2.14): a small launch page that shows the choice as it will look,
 // the dimming, blur, focus and rotation beside it, and the images by group below — the
 // game's, each background mod's, the player's own. Every change is saved at once
 // (API.SetBackground). The grid is reached with tab: arrows pick, enter uses, * stars

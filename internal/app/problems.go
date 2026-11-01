@@ -604,7 +604,7 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 		}
 		add(f)
 	}
-	// 贴图优化: a mod updated since RimArcho wrote its DDS may show its old textures (a DDS
+	// Texture optimisation: a mod updated since RimArcho wrote its DDS may show its old textures (a DDS
 	// shadows the PNG of the same name).
 	for _, m := range a.StaleTextures(st.Ix) {
 		add(&finding.Finding{Code: "texture.stale", Severity: finding.Warning, Key: "textures", Subjects: []string{inst(m.ID)},

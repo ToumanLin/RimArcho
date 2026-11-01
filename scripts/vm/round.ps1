@@ -1,7 +1,7 @@
 # One real game round in the Player-Test VM, with no screenshots and no clicks: launch from
 # RimArcho, main menu, a new colony, play, save, load that save, play, main menu, delete the
 # save (the guest's saves sync to the player's Steam Cloud), quit to the desktop
-# (docs/发布前VM测试.md, "真的进游戏"). Archo Drive (scripts/vm/drive) plays it
+# (docs/发布前VM测试.md, "launch the actual game"). Archo Drive (scripts/vm/drive) plays it
 # inside the game; this script places it, launches, waits, collects the evidence and checks
 # the driver's steps and Archo Monitor's phases. Prints PASS / FAIL / NOTE lines; exit code =
 # number of failures. See README.md, "Game rounds".

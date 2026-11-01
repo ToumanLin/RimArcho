@@ -16,7 +16,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 设置 › 反馈 (06 §2.14): only the basics unless ticked; ticked parts are the list, the
+// Settings > Feedback (06 §2.14): only the basics unless ticked; ticked parts are the list, the
 // paths without the user's home, and the game log's error groups; the link stays openable.
 func TestFeedbackAttachments(t *testing.T) {
 	t.Parallel()
@@ -31,12 +31,12 @@ func TestFeedbackAttachments(t *testing.T) {
 	if len(at.Parts) != 3 || at.Parts[0].Key != "mods" || at.Parts[0].None || !at.Parts[2].None {
 		t.Fatalf("parts: %+v", at.Parts)
 	}
-	res := api.FeedbackCompose("标题", "说明")
-	if !res.Full || strings.Contains(res.Body, "tester.a") || !strings.Contains(res.Body, "说明\n\n---\nRimArcho ") {
+	res := api.FeedbackCompose("Title", "Description")
+	if !res.Full || strings.Contains(res.Body, "tester.a") || !strings.Contains(res.Body, "Description\n\n---\nRimArcho ") {
 		t.Fatalf("basic body: %+v", res)
 	}
 	u, _ := url.Parse(res.URL)
-	if !strings.HasPrefix(res.URL, feedback.Repo+"/issues/new?") || u.Query().Get("title") != "标题" || u.Query().Get("body") != res.Body {
+	if !strings.HasPrefix(res.URL, feedback.Repo+"/issues/new?") || u.Query().Get("title") != "Title" || u.Query().Get("body") != res.Body {
 		t.Fatalf("link: %s", res.URL)
 	}
 
@@ -82,7 +82,7 @@ func TestFeedbackAttachments(t *testing.T) {
 	}
 }
 
-// 发送 (06 §2.14): offered only with a relay; the report carries the title (or the first line
+// send (06 §2.14): offered only with a relay; the report carries the title (or the first line
 // of what happened), the ticked attachments and the contact; the relay's refusal is said in
 // the player's words. The relay is httptest, standing in for feedback-relay/.
 func TestFeedbackSend(t *testing.T) {
@@ -93,7 +93,7 @@ func TestFeedbackSend(t *testing.T) {
 	feedback.Relay = ""
 	t.Setenv("RIMARCHO_FEEDBACK_RELAY", "")
 	if at, err := api.FeedbackAttach(view.FeedbackOptions{}); err != nil || at.Send {
-		t.Fatalf("no relay, no 发送: %+v %v", at, err)
+		t.Fatalf("no relay, no Send: %+v %v", at, err)
 	}
 
 	var got feedback.Report
@@ -113,7 +113,7 @@ func TestFeedbackSend(t *testing.T) {
 
 	at, err := api.FeedbackAttach(view.FeedbackOptions{Mods: true})
 	if err != nil || !at.Send {
-		t.Fatalf("a relay offers 发送: %+v %v", at, err)
+		t.Fatalf("a relay offers Send: %+v %v", at, err)
 	}
 	if _, err := api.FeedbackSend(" ", "\n", ""); err == nil {
 		t.Fatal("nothing written, nothing sent")

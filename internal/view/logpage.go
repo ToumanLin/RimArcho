@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/logs"
 )
 
-// The game log page (the 日志 tab): one log's error clusters, each with the mods it is tied
+// The game log page (the Game log tab): one log's error clusters, each with the mods it is tied
 // to; the interfaces show a cluster's evidence with `archo log --cluster`.
 
 // LogFile is a log the page can show. A companion log (ArchoMonitor.log, RimCrow's) has Of
@@ -49,8 +49,8 @@ type LogPage struct {
 	Path     string    `json:"path"`
 	Facts    string    `json:"facts"` // "1.6.4633  12 840 lines"
 	Rows     []LogRow  `json:"rows"`
-	Selected bool      `json:"selected"` // its errors are in 需要处理
-	// Live: the running game still writes it; its errors join 需要处理 when the game exits.
+	Selected bool      `json:"selected"` // its errors are in Can it run
+	// Live: the running game still writes it; its errors join Can it run when the game exits.
 	Live bool `json:"live,omitempty"`
 	// Pending is the game version whose analysis is still running: no rows yet, ask again.
 	Pending string `json:"pending,omitempty"`
@@ -182,7 +182,7 @@ func BuildLogPage(a *app.App, st *app.LoadoutState, path string, live *LiveTrack
 			if m := st.Ix.ByID[at.Instance]; m != nil {
 				name = m.DisplayName()
 			}
-			row.Mods = name + "（" + T(at.Role) + "）"
+			row.Mods = Tf("%s (%s)", name, T(at.Role))
 			if len(lc.Attr) > 1 {
 				row.Mods += Tf(" +%d", len(lc.Attr)-1)
 			}

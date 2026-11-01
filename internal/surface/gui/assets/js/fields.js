@@ -1,5 +1,5 @@
 // The detail's one field list (06 §4.1, §2.9): the plan editor's detail and a copy's
-// detail on Mod 库存 draw view.Field rows with it. Address rows have a copy icon;
+// detail on Mod library draw view.Field rows with it. Address rows have a copy icon;
 // a row's own action opens the location, the page, or the tag bar.
 import { el, esc, api, T, errText, say } from "./state.js";
 import { icon } from "./icons.js";
@@ -80,7 +80,7 @@ export function pathContent(node, text, paths = []) {
   const plain = value => {
     // Legacy command/task text has no metadata. Rooted paths and web addresses
     // need a clear boundary; shortcuts do not qualify.
-    const rooted = /(^|[\s("'（：])((?:https?:\/\/[^\s<>"'？。；，）]+)|(?:(?:[a-z]:[\\/]|\\\\[^\\\s]+\\|\/[^/\s:]+\/)[^<>"|\n]*?)(?=:\s|:\d+\b|["'?？。；，）]|$))/gi;
+    const rooted = /(^|[\s("'\uff08\uff1a])((?:https?:\/\/[^\s<>"'\uff1f\u3002\uff1b\uff0c\uff09]+)|(?:(?:[a-z]:[\\/]|\\\\[^\\\s]+\\|\/[^/\s:]+\/)[^<>"|\n]*?)(?=:\s|:\d+\b|["'?\uff1f\u3002\uff1b\uff0c\uff09]|$))/gi;
     for (const part of value.split(/( {2,}|\n| → )/)) {
       if (!part) continue;
       let at = 0;

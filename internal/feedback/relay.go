@@ -14,12 +14,12 @@ import (
 	"unicode/utf16"
 )
 
-// Relay is the feedback relay's address (feedback-relay/README.md, 06 §2.14 反馈): a
+// Relay is the feedback relay's address (feedback-relay/README.md, 06 §2.14 Feedback): a
 // Cloudflare Worker that files a report as an issue, so a player without a GitHub account
-// can send one. Empty: 反馈 offers only the GitHub link.
+// can send one. Empty: Feedback offers only the GitHub link.
 var Relay = "https://rimarcho-feedback.toumanlin.workers.dev/report"
 
-// RelayURL is where 发送 posts, or "" when there is no relay. RIMARCHO_FEEDBACK_RELAY
+// RelayURL is where send posts, or "" when there is no relay. RIMARCHO_FEEDBACK_RELAY
 // overrides Relay, to try a deployment before its address is written here.
 func RelayURL() string {
 	if v := strings.TrimSpace(os.Getenv("RIMARCHO_FEEDBACK_RELAY")); v != "" {

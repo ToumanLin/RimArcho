@@ -2,7 +2,7 @@ package mcp
 
 import "fmt"
 
-// 贴图优化 (08 §5.2). optimize writes into mods' folders and clean deletes files there (only
+// Texture optimisation (08 §5.2). optimize writes into mods' folders and clean deletes files there (only
 // RimArcho's own DDS), so the tool is marked destructive. Downloading the encoder is not a
 // tool: RimArcho only goes online when the player asks (01 §4).
 func textureTools() []tool {

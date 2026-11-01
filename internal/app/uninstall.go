@@ -1,6 +1,6 @@
 package app
 
-// Uninstall (01 §4's 卸载 column, 05 §4.2 `archo uninstall`, 06 §2.14): undo every row of
+// Uninstall (01 §4's uninstall column, 05 §4.2 `archo uninstall`, 06 §2.14): undo every row of
 // the write list. The plan is computed first and shown as a dry run; Uninstall carries it
 // out. What holds the player's things (lock library copies, packs, saves, downloaded games)
 // is a choice; RimArcho's own folders are deleted; the data folders and the program go last,
@@ -25,12 +25,12 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// The steps, in the order they run. 01 §4's 卸载 column names them.
+// The steps, in the order they run. 01 §4's uninstall column names them.
 const (
 	UnAccounts   = "accounts"   // forget sessions before removing tools or data
 	UnLinks      = "links"      // _Archo_ and !ArchoPack_ links in each game's Mods/
 	UnModsConfig = "modsconfig" // ModsConfig.xml in each user data folder RimArcho wrote
-	UnTextures   = "textures"   // the DDS RimArcho wrote next to mods' PNGs (贴图优化)
+	UnTextures   = "textures"   // the DDS RimArcho wrote next to mods' PNGs (Texture optimisation)
 	UnLocked     = "locked"     // the lock library's copies
 	UnMonitor    = "monitor"    // Archo Monitor's folder
 	UnPacks      = "packs"      // packs and the saves inside them
@@ -251,7 +251,7 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 			p.Steps = append(p.Steps, &UninstallStep{Key: key, Items: items})
 		}
 	}
-	add(UnAccounts, []*UninstallItem{{Path: a.AccountsDir(), Do: "forget-accounts", Note: "忘记账户会话：删除站点会话与临时登录目录，并清理受管 SteamCMD 的已知认证缓存（所有缓存账户）；外部缓存不接管。不可恢复，不撤销其他设备。"}})
+	add(UnAccounts, []*UninstallItem{{Path: a.AccountsDir(), Do: "forget-accounts", Note: "Forget account sessions: delete site sessions and temporary login folders, and clear known authentication caches for all accounts in managed SteamCMD. External caches stay under their owner's control. This cannot be undone and does not sign out other devices."}})
 
 	// Where kept lock library copies go: a game that is not itself removed.
 	var lockEnv *env.Environment
@@ -813,7 +813,7 @@ func (a *App) Uninstall(o UninstallOptions, progress func(UninstallProgress)) (*
 				it.Err = err.Error()
 				failed = true
 				if s.Key == UnAccounts {
-					return p, errors.New("忘记账户会话失败；已保留工具和数据，请关闭登录窗口后重试")
+					return p, errors.New("could not forget account sessions; tools and data were kept; close the login window and retry")
 				}
 			} else if it.Do != DoKeep && it.Do != DoLeave {
 				it.Done = true

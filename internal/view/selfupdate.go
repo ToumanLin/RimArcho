@@ -29,7 +29,7 @@ func SelfUpdateHome(a *app.App) *SelfUpdateLine {
 	return &SelfUpdateLine{Title: "RimArcho", Text: Tf("%s can be updated", r.Version)}
 }
 
-// SelfUpdateItem is the first row of the 关于 group (06 §2.14): the running
+// SelfUpdateItem is the first row of the About group (06 §2.14): the running
 // version, what the last check found, its notes folded under the row, and the buttons.
 func SelfUpdateItem(a *app.App) SettingItem {
 	cur := a.SelfVersionNow()

@@ -506,7 +506,7 @@ async function deletionPrerequisite() {
   if(!c||(await uiState()).plans.length!==1)return;
   await c.click('[data-env-write="remove-plan"]');await sleep(350);await settled();
   result.lastPlanRefusal={popup:(await uiState()).popup,status:await c.evaluate('document.querySelector("#status")?.textContent'),message:await c.evaluate('document.querySelector("#say")?.textContent||document.querySelector(".toast")?.textContent||""')};
-  check('last plan deletion refuses without confirmation',!(await uiState()).popup&&/only list|cannot be deleted|唯一|不能删除/.test(result.lastPlanRefusal.status));
+  check('last plan deletion refuses without confirmation',!(await uiState()).popup&&/only list|cannot be deleted|\u552f\u4e00|\u4e0d\u80fd\u5220\u9664/.test(result.lastPlanRefusal.status));
   await c.click('#nav [data-id="plans"]');await settled('plans');await press('KeyN');await settled('plans');
   await c.click('.pm-name');await press('Control+KeyA');await c.call('Input.insertText',{text:'VM cancellation companion'});
   await until(()=>c.evaluate('!!document.querySelector("[data-env-write=create-plan]:not(:disabled)")'));
@@ -658,7 +658,7 @@ try {
       if(sequences.has(key)&&sample.sequence<sequences.get(key))check('problem sequence never goes backwards',false,{key,before:sequences.get(key),after:sample.sequence});
       sequences.set(key,sample.sequence);
     }
-    for(let i=1;i<evidence.statuses.length;i++){const a=evidence.statuses[i-1],b=evidence.statuses[i];if(a.text && !/loading|checking|正在|加载/i.test(a.text) && /loading|加载/i.test(b.text) && a.inputCount===b.inputCount)result.failures.push({name:'result overwritten by loading without input',a,b});}
+    for(let i=1;i<evidence.statuses.length;i++){const a=evidence.statuses[i-1],b=evidence.statuses[i];if(a.text && !/loading|checking|\u6b63\u5728|\u52a0\u8f7d/i.test(a.text) && /loading|\u52a0\u8f7d/i.test(b.text) && a.inputCount===b.inputCount)result.failures.push({name:'result overwritten by loading without input',a,b});}
     result.feedback={measurement:'first observed DOM mutation after latest real input; 25ms state sampler separately records stalls',samples:evidence.feedback.length,maxMs:Math.max(0,...evidence.feedback.map(f=>f.ms)),over200ms:evidence.feedback.filter(f=>{const i=evidence.inputs[f.inputIndex];return f.ms>200&&i?.type==='keydown'&&i.shift&&/^Digit[12458]$/.test(i.code)&&!i.popup})};
     result.performanceFailures.push(...result.feedback.over200ms.map(f=>({name:'first feedback',...f,budgetMs:200})));
     const stalls=evidence.samples.filter(s=>s.gapMs>500);result.performanceFailures.push(...stalls.map(s=>({name:'main-thread stall',...s,budgetMs:500})));

@@ -1,16 +1,16 @@
 // The full detail (06 §4.2): one page for a mod, opened by enter from the plan editor and
-// from Mod 库存 › 全部. It puts together what the two lists know about it:
+// from Mod library > All. It puts together what the two lists know about it:
 //   1 the mod: picture, name, author, its state, its tags, the description;
-//   2 its copies (副本): each copy's state, place, size, version and note, and the selected
+//   2 its copies (copies): each copy's state, place, size, version and note, and the selected
 //     copy's actions (the six copy ops and the plan's, view.OpTable);
-//   3 用在: the plans and packs that use each copy, and the current plan, with its key;
+//   3 used in: the plans and packs that use each copy, and the current plan, with its key;
 //   4 the field list (a click copies a value);
-//   5 历史: the newest changes and the way to 变化;
-//   6 技术信息: Defs, patches, Harmony, rules, every change (view.Sections, which other parts
+//   5 history: the newest changes and the way to Subscriptions and updates;
+//   6 technical information: Defs, patches, Harmony, rules, every change (view.Sections, which other parts
 //     of RimArcho add to: this page draws whatever sections come).
 // ← → step to the previous / next mod of the list it came from, esc goes back there, 1–6
 // focus the parts, the row menu and the copy keys act on the selected copy ([ ] pick it).
-// The editor's detail column and Mod 库存's details are the short form of the same parts
+// The editor's detail column and Mod library's details are the short form of the same parts
 // (detail.js renderDetail, library.js drawDetail).
 import { S, $, el, api, T, Tf, errText, say, cur } from "./state.js";
 import { closeScreen, page, seg, button, area, beginPageRead } from "./screens.js";
@@ -32,7 +32,7 @@ export function initFull(u) {
 // ref for a subscribed item RimArcho never saw), and what was loaded for it.
 const F = { from: "plan", id: "", env: "", d: null, row: null, secs: null, tab: 0, copy: "", seq: 0 };
 
-// PLAN: the ops that are one plan step (u undoes them), as on Mod 库存.
+// PLAN: the ops that are one plan step (u undoes them), as on Mod library.
 const PLAN = new Set(["add", "take-out", "put-back", "stage", "use", "swap", "remove"]);
 
 export async function full(from, id) {
@@ -232,7 +232,7 @@ function copyCard(x) {
   return b;
 }
 
-// runOp runs an op on the selected copy, as Mod 库存 does (06 §3.5): the plan's ops at once
+// runOp runs an op on the selected copy, as Mod library does (06 §3.5): the plan's ops at once
 // (u undoes), the ones that change files after their dry run.
 async function runOp(code) {
   const c = theCopy();

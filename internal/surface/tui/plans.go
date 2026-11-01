@@ -8,7 +8,7 @@ import (
 
 // Plans in the TUI (04 §1.3, 06 §9.1), as in the window: P (or the palette's "plans"), the
 // palette's list entries and tab in the editor open a list without making it current;
-// the top bar then says which list launches. P's 设为当前, saving it or launching it makes
+// the top bar then says which list launches. P's make current, saving it or launching it makes
 // it current. P also makes a new list, renames or deletes the open one. Every verb is the
 // view function the window calls too.
 

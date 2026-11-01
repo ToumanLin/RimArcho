@@ -49,7 +49,7 @@ export function on(name, fn) {
 
 // The interface text: English keys, the Chinese table from Go (view.Table).
 let table = {};
-export function setText(t) { table = t || {}; }
+export function setText(t, extra) { table = Object.assign(t || {}, extra || {}); }
 export function T(s) { return table[s] || s; }
 export function Tf(f, ...a) {
   let i = 0;

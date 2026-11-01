@@ -28,7 +28,7 @@ type SourceFailureGroup struct {
 	Gone bool `json:"gone,omitempty"`
 }
 
-// PendingUpdate is one row of 等你更新 (06 §2.9) and its detail.
+// PendingUpdate is one row of waiting for you to update (06 §2.9) and its detail.
 type PendingUpdate struct {
 	ID        string   `json:"id"`
 	Ref       string   `json:"ref"`
@@ -38,7 +38,7 @@ type PendingUpdate struct {
 	Installed string   `json:"installed"`
 	Available string   `json:"available"`
 	UsedIn    []string `json:"usedIn"`
-	// InPlan: the current plan uses it (the scope bar's 列表 shows only these).
+	// InPlan: the current plan uses it (the scope bar's list shows only these).
 	InPlan bool `json:"inPlan,omitempty"`
 	// Tracking: a Git subscription's branch, tag or commit.
 	Tracking string `json:"tracking,omitempty"`
@@ -47,7 +47,7 @@ type PendingUpdate struct {
 	Checked     string `json:"checked,omitempty"`
 	// LoversLab: a download page subscription on LoversLab (its files can be read with the session).
 	LoversLab bool `json:"loversLab,omitempty"`
-	// Opens: what 打开来源页 opens: "compare" (two commits on GitHub / GitLab), "page" (the
+	// Opens: what open the source page opens: "compare" (two commits on GitHub / GitLab), "page" (the
 	// repository or download page), "notes" (the Workshop change notes), "" nothing.
 	Opens string `json:"opens,omitempty"`
 }
@@ -59,7 +59,7 @@ type SourceSummary struct {
 	Failed   string `json:"failed,omitempty"`   // "2 no longer on the Workshop"
 }
 
-// RecentSubscription is one of the newest subscriptions RimArcho installed (添加订阅).
+// RecentSubscription is one of the newest subscriptions RimArcho installed (add a subscription).
 type RecentSubscription struct {
 	Name   string `json:"name"`
 	Kind   string `json:"kind"`
@@ -260,7 +260,7 @@ func subscriptionTracking(r *subscribe.Record) string {
 	return T(r.RefType) + " " + r.Ref
 }
 
-// subscriptionOpens: what 打开来源页 opens for a subscription (see PendingUpdate.Opens).
+// subscriptionOpens: what open the source page opens for a subscription (see PendingUpdate.Opens).
 func subscriptionOpens(r *subscribe.Record) string {
 	switch r.Kind {
 	case "git":
@@ -274,7 +274,7 @@ func subscriptionOpens(r *subscribe.Record) string {
 	return ""
 }
 
-// SubscriptionSourceURL is the page 打开来源页 opens: the compare view of the installed and
+// SubscriptionSourceURL is the page open the source page opens: the compare view of the installed and
 // the latest commit on GitHub or GitLab, else the repository or download page.
 func SubscriptionSourceURL(r *subscribe.Record) string {
 	if r.Kind == "git" {

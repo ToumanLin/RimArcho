@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 设置 › 卸载 RimArcho (06 §2.14): the dry run for the player's answers, then the run with
+// settings › uninstall RimArcho (06 §2.14): the dry run for the player's answers, then the run with
 // "uninstall" events and the report.
 
 // UninstallPlan is the plan for these answers (nothing changes).
@@ -146,7 +146,7 @@ func (s *API) uninstallSession() (*app.App, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.a.Uninstalled {
-		return nil, errors.New("RimArcho 已卸载，预览已停用")
+		return nil, errors.New("RimArcho was uninstalled; previews are disabled")
 	}
 	if s.uninstallRead.a == nil {
 		r, err := s.a.ReadSession()

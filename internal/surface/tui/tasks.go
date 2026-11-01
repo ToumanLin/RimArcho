@@ -15,11 +15,11 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 后台任务 (06 §2.16) in the terminal: the subscription actions (添加订阅, 检查更新, 更新,
-// 撤掉订阅) queue into app.Tasks — the record and lanes the window uses, <data>/tasks.json —
+// Background tasks (06 §2.16) in the terminal: the subscription actions (add a subscription, check for updates, update,
+// remove subscription) queue into app.Tasks — the record and lanes the window uses, <data>/tasks.json —
 // and run on their own database session, so the screen never waits for Git, a web page,
 // Steam or a folder move. The status line says when a task is queued and how it ended; the
-// palette's 后台任务 shows the record as text (showTasks), and the window's page acts on it.
+// palette's Background tasks shows the record as text (showTasks), and the window's page acts on it.
 
 // taskEndedMsg: a background task ended.
 type taskEndedMsg struct{ t app.Task }
@@ -113,7 +113,7 @@ func (r *taskRunner) session() (*app.App, error) {
 	return a, nil
 }
 
-// item runs one item of a lane task: Mod 库's action on one copy (检查更新, 更新).
+// item runs one item of a lane task: Mod library's action on one copy (check for updates, update).
 func (r *taskRunner) item(kind, ref string) error {
 	a, err := r.session()
 	if err != nil {
@@ -127,7 +127,7 @@ func (r *taskRunner) item(kind, ref string) error {
 	return nil
 }
 
-// batch runs 撤掉订阅 as one task: every folder checked, moved, then one scan (the window's
+// batch runs remove subscription as one task: every folder checked, moved, then one scan (the window's
 // batchRemoveSubscriptions).
 func (r *taskRunner) batch(kind string, refs []string, b app.BatchCalls) bool {
 	if kind != view.OpSubRemove {
@@ -149,7 +149,7 @@ func (r *taskRunner) batch(kind string, refs []string, b app.BatchCalls) bool {
 	return true
 }
 
-// submitLane queues a files-lane op (检查更新, 更新, 撤掉订阅) on copies and says so.
+// submitLane queues a files-lane op (check for updates, update, remove subscription) on copies and says so.
 func (m *model) submitLane(kind string, refs, names []string) tea.Cmd {
 	if len(refs) == 0 {
 		return nil
@@ -234,7 +234,7 @@ func (m *model) closeTasks() {
 	}
 }
 
-// showTasks is 后台任务 as text (06 §9.1): the record the window and this TUI share, by
+// showTasks is Background tasks as text (06 §9.1): the record the window and this TUI share, by
 // group, a task a line with how it ended. Stopping and retrying stay in the window.
 func (m *model) showTasks() {
 	p := view.BuildTasks(m.taskList().List(), time.Now())

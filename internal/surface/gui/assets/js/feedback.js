@@ -1,5 +1,5 @@
-// 设置 › 反馈 (06 §2.14): a GitHub issue written here, sent through the feedback relay
-// (发送, no GitHub account needed; offered only when RimArcho has one) or opened in the
+// Settings > Feedback (06 §2.14): a GitHub issue written here, sent through the feedback relay
+// (send, no GitHub account needed; offered only when RimArcho has one) or opened in the
 // browser with the title and body filled in (view.FeedbackAttachments, ComposeFeedback,
 // SendFeedback). RimArcho, the game and the system always go with it; the enabled mods, the
 // paths and the game log's errors only when ticked. The whole text shows before anything
@@ -9,7 +9,7 @@ import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { page, button, area, beginPageRead } from "./screens.js";
 
 // The draft stays for the session: leaving the page does not lose what was typed (06 §3.1).
-// sent: the issue 发送 opened last, shown until the next draft. open: the preview's
+// sent: the issue send opened last, shown until the next draft. open: the preview's
 // attachments unfolded by the player (by key), kept while typing.
 const F = { title: "", text: "", contact: "", opts: { mods: false, paths: false, log: false }, at: null, res: null, sent: null, sending: false, open: new Set() };
 let seq = 0, typing = 0, retry = 0;
@@ -120,7 +120,7 @@ function partRow(p) {
 
 // preview is the report as the player reads it: the title, what happened, the basic lines,
 // then each attachment folded under its heading. No Markdown or HTML here; that is only in
-// the body sent and in 复制全文 (F.res.body). The TUI shows view.FeedbackPreview.
+// the body sent and in copy all (F.res.body). The TUI shows view.FeedbackPreview.
 function preview(box) {
   box.innerHTML = "";
   if (F.title.trim()) box.append(el("div", "fb-p-title", F.title.trim()));
@@ -156,7 +156,7 @@ function refresh() {
     foot.append(m, copyBtn, gh);
     return;
   }
-  // 发送 first; GitHub stays as the other way for players with an account
+  // send first; GitHub stays as the other way for players with an account
   const m = el("span", "m");
   if (F.sent) {
     const url = F.sent.url;

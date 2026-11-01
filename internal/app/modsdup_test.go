@@ -15,7 +15,7 @@ import (
 
 // dupEnv is the player's 2026-10-21 game: a RimCrow-style local copy Mods/_2888837973_
 // (hair.Kawaii) and RimCrow's companion reached through Mods/_Link_RimCrowCompanion, both in
-// the plan, which is compiled into the pack 测试.
+// the plan, which is compiled into the pack test.
 func dupEnv(t *testing.T) *testkit.Env {
 	t.Helper()
 	e := setup(t, true)
@@ -27,7 +27,7 @@ func dupEnv(t *testing.T) *testkit.Env {
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "hair.kawaii", "rimcrow.companion")
 	scanNow(t, e)
 	e.MustRun("env", "set", "main", "--launch", "direct")
-	e.MustRun("pack", "build", "测试")
+	e.MustRun("pack", "build", "Test pack")
 	return e
 }
 
@@ -42,7 +42,7 @@ func packLinksIn(t *testing.T, e *testkit.Env) []string {
 func TestPackLaunchNoDuplicates(t *testing.T) {
 	t.Parallel()
 	e := dupEnv(t)
-	out := e.MustRun("pack", "launch", "测试")
+	out := e.MustRun("pack", "launch", "Test pack")
 	if !strings.Contains(out, "from Mods/: 2 mods") {
 		t.Fatalf("launch:\n%s", out)
 	}
@@ -52,7 +52,7 @@ func TestPackLaunchNoDuplicates(t *testing.T) {
 	if dups := app.ModsDuplicates(e.App.ModsCopies(mustIndex(t, e))); len(dups) != 0 {
 		t.Fatalf("duplicates in Mods/: %+v", dups)
 	}
-	cfg, _ := os.ReadFile(filepath.Join(e.Home, "packs", "测试", "userdata", "Config", "ModsConfig.xml"))
+	cfg, _ := os.ReadFile(filepath.Join(e.Home, "packs", "Test pack", "userdata", "Config", "ModsConfig.xml"))
 	if !strings.Contains(strings.ToLower(string(cfg)), "<li>hair.kawaii</li>") || !strings.Contains(string(cfg), "<li>rimcrow.companion</li>") {
 		t.Fatalf("the pack's list:\n%s", cfg)
 	}
@@ -61,7 +61,7 @@ func TestPackLaunchNoDuplicates(t *testing.T) {
 	// and linking it would put two in Mods/: refused, naming the folder.
 	e.WriteFile(filepath.Join(e.Game, "Mods", "_2888837973_", "Defs", "New.xml"), "<Defs><ThingDef><defName>N</defName></ThingDef></Defs>")
 	scanNow(t, e)
-	out, code := e.Run("pack", "launch", "测试")
+	out, code := e.Run("pack", "launch", "Test pack")
 	if code == 0 || !strings.Contains(out, "Mods/_2888837973_") || !strings.Contains(out, "another version") || !strings.Contains(out, "--move-duplicates") {
 		t.Fatalf("a changed local copy: exit %d\n%s", code, out)
 	}
@@ -70,13 +70,13 @@ func TestPackLaunchNoDuplicates(t *testing.T) {
 	}
 }
 
-// What the old pack launch left (local _X_ and !ArchoPack____X_): one item in 会让游戏出错
+// What the old pack launch left (local _X_ and !ArchoPack____X_): one item in Will cause errors
 // whose one action removes only the pack's links.
 func TestPackLinksDuplicateReported(t *testing.T) {
 	t.Parallel()
 	e := dupEnv(t)
 	mods := filepath.Join(e.Game, "Mods")
-	copyDir := filepath.Join(e.Home, "packs", "测试", "mods")
+	copyDir := filepath.Join(e.Home, "packs", "Test pack", "mods")
 	ents, _ := os.ReadDir(copyDir)
 	if len(ents) == 0 {
 		t.Fatal("the pack carries nothing")
@@ -188,14 +188,14 @@ func TestPackLaunchMovesOtherVersion(t *testing.T) {
 	scanNow(t, e)
 	before := one(t, e, "Kawaii Hair")
 
-	out := e.MustRun("pack", "launch", "测试", "--dry-run", "--move-duplicates")
+	out := e.MustRun("pack", "launch", "Test pack", "--dry-run", "--move-duplicates")
 	if !strings.Contains(out, "would move into the lock library") || !strings.Contains(out, "Mods/_2888837973_ →") || !strings.Contains(out, "+ !ArchoPack_") {
 		t.Fatalf("dry run:\n%s", out)
 	}
 	if _, err := os.Stat(filepath.Join(mods, "_2888837973_")); err != nil {
 		t.Fatal("the dry run moved the folder")
 	}
-	out = e.MustRun("pack", "launch", "测试", "--move-duplicates")
+	out = e.MustRun("pack", "launch", "Test pack", "--move-duplicates")
 	if !strings.Contains(out, "moved into the lock library first") {
 		t.Fatalf("launch:\n%s", out)
 	}
@@ -243,7 +243,7 @@ func TestPackLaunchNeverMovesLinks(t *testing.T) {
 	e := dupEnv(t)
 	e.WriteFile(filepath.Join(e.Root, "RimCrow", "Companion", "Defs", "New.xml"), "<Defs><ThingDef><defName>N</defName></ThingDef></Defs>")
 	scanNow(t, e)
-	out, code := e.Run("pack", "launch", "测试", "--move-duplicates")
+	out, code := e.Run("pack", "launch", "Test pack", "--move-duplicates")
 	if code == 0 || !strings.Contains(out, "Mods/_Link_RimCrowCompanion") || !strings.Contains(out, "a link another tool made") || strings.Contains(out, "archo pack launch") {
 		t.Fatalf("a link in the way: exit %d\n%s", code, out)
 	}
@@ -291,7 +291,7 @@ func TestSaveMovesOtherVersion(t *testing.T) {
 	}
 }
 
-// 能不能跑's pair of plain folders: the first fix is 收进锁定库 for one of them.
+// Can it run's pair of plain folders: the first fix is move into the lock library for one of them.
 func TestDuplicateFixMovesToLocked(t *testing.T) {
 	t.Parallel()
 	e := setup(t, false)

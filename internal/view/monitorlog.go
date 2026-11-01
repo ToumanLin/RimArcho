@@ -20,7 +20,7 @@ type MonitorEntry struct {
 	Key        string     `json:"key"`
 	Time       string     `json:"time"` // 17:51:45
 	Status     int        `json:"status"`
-	Kind       string     `json:"kind,omitempty"` // inferredType in a few words: 补丁错误
+	Kind       string     `json:"kind,omitempty"` // inferredType in a few words: patch error
 	Text       string     `json:"text"`           // the message's first line, rich-text tags removed
 	Spans      []TextSpan `json:"spans"`          // with the mod's rich text (logtext.go)
 	Level      string     `json:"level"`

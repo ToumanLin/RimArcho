@@ -40,18 +40,18 @@ type RuleRow struct {
 	Text    string     `json:"text"` // the parts as one line
 	Note    string     `json:"note,omitempty"`
 	Created string     `json:"created"`
-	// InList: one of its mods is enabled in the current list (the editor's 只看当前列表)
+	// InList: one of its mods is enabled in the current list (the editor's only the current list)
 	InList bool `json:"inList"`
 }
 
-// RuleKind is a kind the editor's form offers; ignore rules come from 能不能跑 and sort.
+// RuleKind is a kind the editor's form offers; ignore rules come from Can it run and sort.
 type RuleKind struct {
 	Kind  string `json:"kind"`
 	Label string `json:"label"` // with %s for the mods, as the row reads
 	Two   bool   `json:"two"`   // names a second mod
 }
 
-// Rules is the editor's 排序规则 fold.
+// Rules is the editor's Load-order rules fold.
 type Rules struct {
 	Rows  []RuleRow  `json:"rows"`
 	Kinds []RuleKind `json:"kinds"`

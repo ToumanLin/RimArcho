@@ -169,7 +169,7 @@ func (ts *Tasks) syncLocked(write bool) {
 				continue // taken out in another window
 			}
 			if d.Owner != t.Owner {
-				continue // another window took it over since (继续剩下的, 放回)
+				continue // another window took it over since (continue the rest, put back)
 			}
 		}
 		if d != nil {

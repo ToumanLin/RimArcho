@@ -320,7 +320,7 @@ export async function identity(question, run) {
 
 // choose offers a few choices; pick gets the chosen index. other is a second action on
 // the highlighted choice ({key, label, run}), shown under the list (the environment
-// chooser's 删除环境).
+// chooser's remove game).
 export function choose(title, labels, pick, current = 0, other = null) {
   open("choose", title, (pop, p) => {
     pop.append(el("div", "ttl", title));
@@ -359,7 +359,7 @@ export function ask(title, placeholder, done, value = null) {
 }
 
 // help: the keys of the page it is asked on (06 §3.1 rule 4, view.KeyHelp): the plan
-// editor and Mod 库存 share one table, then each page's own.
+// editor and Mod library share one table, then each page's own.
 export async function help(page = "plan") {
   let rows = [];
   try { rows = await api.Keys(page === "full" ? "plan" : page); } catch { rows = []; }

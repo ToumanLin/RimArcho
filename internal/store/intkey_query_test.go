@@ -258,14 +258,14 @@ func ikQueries() []ikQuery {
 			}
 			return all, nil
 		}},
-		{"DefCounts(全表)", 1, false, func(c ikCtx) ([]string, error) {
+		{"DefCounts(whole table)", 1, false, func(c ikCtx) ([]string, error) {
 			q := `SELECT c.instance_id, count(*) FROM def_fact f JOIN content_state c ON c.def_set_id=f.set_id WHERE c.game_mm=? GROUP BY c.instance_id`
 			if c.l.ik {
 				q = `SELECT k.id, x.n FROM (SELECT c.inst, count(*) n FROM def_fact f JOIN content_state c ON c.def_set_id=f.set_id WHERE c.game_mm=? GROUP BY c.inst) x JOIN instance_key k ON k.n=x.inst`
 			}
 			return ikLines(c.db.Query(q, "1.6"))
 		}},
-		{"CachedDefs(未启用全部)", 1, true, func(c ikCtx) ([]string, error) {
+		{"CachedDefs(all disabled)", 1, true, func(c ikCtx) ([]string, error) {
 			var all []string
 			fields := `f.def_type, f.def_name, f.name, f.parent, f.abstract, %s, f.line, f.may_require, f.may_require_any FROM def_fact f%s WHERE f.set_id=? ORDER BY f.rowid`
 			for _, k := range c.smp.cached {
@@ -323,12 +323,12 @@ func ikQueries() []ikQuery {
 			}
 			return all, nil
 		}},
-		{"HarmonyPatches(全部)", 1, true, func(c ikCtx) ([]string, error) {
+		{"HarmonyPatches(all)", 1, true, func(c ikCtx) ([]string, error) {
 			col, ij := c.l.inst()
 			fcol, fj := c.l.file("c.inst")
 			return ikLines(c.db.Query(`SELECT `+col+`, `+fcol+`, f.patch_type, f.patch_method, f.kind, f.target, f.skips, f.dynamic FROM harmony_fact f JOIN content_state c ON c.dll_set_id=f.set_id`+ij+fj+` WHERE c.game_mm=? ORDER BY f.target, f.rowid`, "1.6"))
 		}},
-		{"CurrentFiles(增量扫描)", 1, false, func(c ikCtx) ([]string, error) {
+		{"CurrentFiles(incremental scan)", 1, false, func(c ikCtx) ([]string, error) {
 			kj, ie := "", ""
 			if c.l.path == 3 {
 				kj, ie = " JOIN instance_key k ON k.id=i.id", "k.n"
@@ -357,7 +357,7 @@ func ikQueries() []ikQuery {
 			}
 			return all, nil
 		}},
-		{"SnapshotFiles×100(变更页)", 1, false, func(c ikCtx) ([]string, error) {
+		{"SnapshotFiles×100(changes page)", 1, false, func(c ikCtx) ([]string, error) {
 			var all []string
 			for _, snap := range c.smp.snaps[:min(100, len(c.smp.snaps))] {
 				ie := ""
@@ -394,7 +394,7 @@ func ikQueries() []ikQuery {
 			}
 			return all, nil
 		}},
-		{"ContentKinds(全部,无缓存)", 1, false, func(c ikCtx) ([]string, error) {
+		{"ContentKinds(all, uncached)", 1, false, func(c ikCtx) ([]string, error) {
 			var all []string
 			ids := c.smp.snaps
 			for len(ids) > 0 {
@@ -425,7 +425,7 @@ func ikQueries() []ikQuery {
 			}
 			return all, nil
 		}},
-		{"SnapshotsWithPNG(全部)", 1, false, func(c ikCtx) ([]string, error) {
+		{"SnapshotsWithPNG(all)", 1, false, func(c ikCtx) ([]string, error) {
 			if c.l.kinds {
 				return ikLines(c.db.Query(`SELECT i.current_snapshot_id FROM instance i JOIN snapshot s ON s.id=i.current_snapshot_id WHERE s.kinds&8<>0`))
 			}
@@ -437,7 +437,7 @@ func ikQueries() []ikQuery {
 			return ikLines(c.db.Query(`SELECT i.current_snapshot_id FROM instance i` + kj + ` WHERE i.current_snapshot_id IS NOT NULL
 		AND EXISTS(SELECT 1 FROM snapshot_file f` + rj + ` WHERE f.snapshot_id=i.current_snapshot_id AND ` + rcol + ` LIKE '%textures/%.png')`))
 		}},
-		{"Languages×100(详情)", 1, true, func(c ikCtx) ([]string, error) {
+		{"Languages×100(details)", 1, true, func(c ikCtx) ([]string, error) {
 			var all []string
 			for _, snap := range c.smp.snaps[:min(100, len(c.smp.snaps))] {
 				if c.l.kinds {

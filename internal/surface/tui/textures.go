@@ -10,9 +10,9 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 贴图优化 from the command palette (08 §5.2, 06 §2.14): the current plan's textures as a
+// Texture optimisation from the command palette (08 §5.2, 06 §2.14): the current plan's textures as a
 // panel, with the commands that convert and take them back (run them on the : line). One
-// copy at a time is Mod 库存's 优化贴图 (the shared op table).
+// copy at a time is Mod library's optimise textures (the shared op table).
 
 // texturesText is the page as panel text.
 func texturesText(p *view.TexturePage) string {

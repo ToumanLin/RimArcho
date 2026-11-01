@@ -1,5 +1,5 @@
-// The filter bar (06 §2.5, §2.9): one component for the plan editor and Mod 库存 › 全部.
-// One row: the query (grey completion, Tab takes it) and a "筛选" toggle (also `\`).
+// The filter bar (06 §2.5, §2.9): one component for the plan editor and Mod library > All.
+// One row: the query (grey completion, Tab takes it) and a "filter" toggle (also `\`).
 // Clicked conditions edit the same query. Open, it shows tags, source and content:
 // the values most used first with their counts, then a button to expand the rest. A left
 // click (enter, space) keeps a value, a right click (x) leaves it out, again drops it; the

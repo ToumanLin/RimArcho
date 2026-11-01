@@ -1,5 +1,5 @@
-// The pages over the board (the sidebar's entries, 06 §2.1): 能不能跑 (06 §2.4, §5), the
-// game log (§2.10), Mod 库 › 变化 (§2.9), the full detail (§4.2), packs, the environment
+// The pages over the board (the sidebar's entries, 06 §2.1): Can it run (06 §2.4, §5), the
+// game log (§2.10), Mod library › Subscriptions and updates (§2.9), the full detail (§4.2), packs, the environment
 // and settings. The pages are side by side: esc does not go from one to another (06 §3.1);
 // esc leaves only the full detail, back to the plan. A page's actions sit in the top bar.
 import { choiceControl } from "./choices.js";
@@ -72,7 +72,7 @@ export function openScreen(name) {
   sc.hidden = false;
   sc.removeAttribute("aria-busy");
   sc.replaceChildren();
-  // While the game switches, or when coming back to a page kept warm (06 §2.4: 能不能跑,
+  // While the game switches, or when coming back to a page kept warm (06 §2.4: Can it run,
   // the editor's other half) for the same game and list, the last drawing shows at once
   // and the page reads again behind it.
   const sameContext = WARM.has(name) && pageContexts.get(name) === JSON.stringify([S.board?.env, S.shell?.plan?.id]);
@@ -223,7 +223,7 @@ export function page(cls, lead, ...right) {
 }
 
 // ---- numbered areas (06 §3.5): on every page 1–9 focus its areas, as 1–4 do in the editor;
-// each area's heading shows its number ("1 会让游戏出错") ----
+// each area's heading shows its number ("1 breaks the game") ----
 let areas = [];
 let onArea = 0; // the area last picked on this page: a redraw keeps its mark
 export function resetAreas() { areas = []; }
@@ -315,13 +315,13 @@ function moveIn(curIdx, n, k) {
   return null;
 }
 
-// ---- 能不能跑 (06 §2.4, §5): two columns ----
-// Left (开始之前): 会让游戏出错, 可以留意, 要你确认, what checking the mods' files and the
-// shared logs found. Right (上次玩的时候): the run's errors, this run first while the game
+// ---- Can it run (06 §2.4, §5): two columns ----
+// Left (before you start): breaks the game, worth knowing, for you to confirm, what checking the mods' files and the
+// shared logs found. Right (when you last played): the run's errors, this run first while the game
 // runs. Each item is a card: a bold line, a plain sentence, what belongs to it (link rows,
 // its parts, Also, links to the other column), then all its actions as buttons with the
 // evidence on the right of that row; no ⋯ menu. An action that needs a confirmation asks in
-// the item; the items an action resolved stay in place as one line with 撤销.
+// the item; the items an action resolved stay in place as one line with undo.
 const SECTIONS = ["breaks the game", "worth knowing", "for you to confirm", "errors from the last run"];
 const SECTION_CLS = ["break", "worth", "confirm", "run"];
 const COL_SECS = [[0, 1, 2], [3]]; // view.Section*: the left column's, then the right's
@@ -335,7 +335,7 @@ const N = { data: null, cols: [[], []], cur: [0, 0], at: ["", ""], col: 0, open:
   hintsShut: false, done: [], batch: 0, before: null, ready: false, result: null, ask: null, others: false, env: "" };
 
 // archo is the hook for the Archo panel (06 §2.13, 1.1): when set, an item can be handed
-// to it ("Archo 在看"). Nothing sets it yet.
+// to it ("Archo is watching"). Nothing sets it yet.
 export const archo = { ask: null };
 
 export function liveChanged() {
@@ -417,7 +417,7 @@ function snapshot() {
     kind: x.kind || "", dim: !!x.dim, col: ci, after: i ? c[i - 1].id : "", title: x.done ? x.title : (x.title || x.text) })));
 }
 
-// statusNow: what the status line says, and whether it offers 撤销.
+// statusNow: what the status line says, and whether it offers undo.
 function statusNow() {
   const st = $("#status");
   return { text: st ? [...st.childNodes].filter((n) => n.nodeName !== "A").map((n) => n.textContent).join("").trim() : "",
@@ -451,7 +451,7 @@ function settleDone(data) {
   }
 }
 
-// undoBatch: the done lines that 撤销 brings back (the last action that u can undo).
+// undoBatch: the done lines that undo brings back (the last action that u can undo).
 function undoBatch() {
   for (let i = N.done.length - 1; i >= 0; i--) if (N.done[i].undo) return N.done[i].batch;
   return 0;
@@ -549,7 +549,7 @@ function needSection(si, rows, ci, shut, live) {
   const h = el("h2", "label", T(title));
   const n = rows.filter((x) => !x.done && x.counted).length;
   if (si === 1) {
-    // 可以留意 folds and opens by its heading (06 §2.4)
+    // worth knowing folds and opens by its heading (06 §2.4)
     const all = (N.data.items || []).filter((x) => x.section === 1 && !x.into).length;
     h.prepend(el("span", "fold-chev" + (shut ? "" : " open"), "›"));
     h.append(el("span", "n num muted", String(all)));
@@ -661,7 +661,7 @@ function needCard(it, ci, i) {
   for (const a of acts) {
     if (a.kind === "fold") continue;
     if (a.kind === "view" && a.argv?.[0] === "identity" && a.argv?.[1] === "why") {
-      // 为什么这样问: a quiet link under the sentence, apart from the three answers
+      // why this question?: a quiet link under the sentence, apart from the three answers
       const b = button(a.label, "", pick(a), "identity-why", actionWrite(a));
       if (a.title) b.title = a.title;
       body.append(b);
@@ -722,7 +722,7 @@ function jumpTo(id) {
 }
 
 // doneLine: an item the last actions resolved (06 §5): ✓, what the status line said, its
-// title; the latest that u can undo has 撤销.
+// title; the latest that u can undo has undo.
 function doneLine(d, ci, i) {
   const row = el("div", "need done");
   row.dataset.id = d.id;
@@ -794,7 +794,7 @@ setVersionRunner((it, a) => runAction(it, a));
 export const runNeedAction = (it, a) => runAction(it, a);
 export const needActionWrite = actionWrite;
 
-// runAction runs an item's action. here: from 能不能跑 itself, where a confirmation is
+// runAction runs an item's action. here: from Can it run itself, where a confirmation is
 // asked in the item, a choice is its buttons, and what the action resolves stays as done
 // lines (06 §5); the editor's panel and popover ask in a dialog.
 async function runAction(it, act, here = false) {
@@ -925,7 +925,7 @@ export function analyzeEvent(ev) {
   if (S.screen === "needs" && ev.done) needs(true);
 }
 
-// ---- 游戏日志 (06 §2.10) and Mod 库 › 变化 (§2.9) ----
+// ---- game log (06 §2.10) and Mod library › Subscriptions and updates (§2.9) ----
 // tab: 0 the Player.log clusters, 1 the companion log's entries (mcur, open: their cursor
 // and the entries whose details are open).
 const L = { env: null, path: "", page: null, loading: false, pending: "", error: "", cur: 0, target: "", targetLine: "", detail: new Map(), seq: 0, els: [], tab: 0, tabPick: null, mcur: 0, open: new Set(), want: "", list: null, views: [], view: null, viewPath: "" };
@@ -1099,7 +1099,7 @@ function drawGameLog() {
   const dscroll = el("div", "scroll", "");
   dscroll.tabIndex = -1;
   det.append(dscroll);
-  // Archo 日志分析: what the shared logs say about the picked error, its own card under the
+  // Archo log analysis: what the shared logs say about the picked error, its own card under the
   // log text (06 §2.10); hidden while nothing matches
   const ana = el("section", "card col ana-card");
   ana.hidden = true;
@@ -1344,7 +1344,7 @@ function showLines(box, lines, card) {
 }
 
 // logSplits: the gap between the list and the right side drags the list's width; the gap
-// under Archo 日志分析 drags its height. Kept in ui.gui.log.left / ui.gui.log.ana;
+// under Archo log analysis drags its height. Kept in ui.gui.log.left / ui.gui.log.ana;
 // double-click goes back to the default.
 const LOG_LEFT = "ui.gui.log.left", LOG_ANA = "ui.gui.log.ana";
 const logSize = { left: null, ana: null };
@@ -1369,7 +1369,7 @@ function logSplits(grid, list, vs, ana, hs) {
   wire(hs, "ana", "y", () => ana.getBoundingClientRect().height, () => [80, grid.clientHeight - 140]);
 }
 
-// setAna fills the Archo 日志分析 card with a pattern card, or hides it (null).
+// setAna fills the Archo log analysis card with a pattern card, or hides it (null).
 function setAna(card) {
   const ana = $("#screen .ana-card");
   if (!ana) return;
@@ -1408,7 +1408,7 @@ function patternCard(c) {
   return d;
 }
 
-// ---- Mod 库存 › 订阅与更新 and 添加订阅 (06 §2.9): subscriptions.js ----
+// ---- Mod library › subscriptions and updates and add a subscription (06 §2.9): subscriptions.js ----
 export { changes, changesHints, changesFiltered, changesPlan, openAdd, addHints } from "./subscriptions.js";
 
 export function rescanButton(label) {
@@ -1456,7 +1456,7 @@ export function logsKey(e) {
   return changesKey(e);
 }
 
-// ---- the full detail (06 §4.2): one page for the editor and Mod 库存 (fulldetail.js) ----
+// ---- the full detail (06 §4.2): one page for the editor and Mod library (fulldetail.js) ----
 export { full, fullKey, fullSection } from "./fulldetail.js";
 
 // ---- settings (06 §2.14) ----
@@ -1475,7 +1475,7 @@ export async function settings() {
   sc.innerHTML = "";
   const w = page("settings", "");
   sc.append(w);
-  // Groups in view.SettingsPage's order (the TUI's too); 启动页背景 closes the card that
+  // Groups in view.SettingsPage's order (the TUI's too); Start page background closes the card that
   // holds the accent colour.
   for (const g of groups) {
     renderGroups(w, [g], settings);
@@ -1666,7 +1666,7 @@ function renderGroups(w, groups, again) {
         right.append(inp);
         right.append(ok);
       } else if (it.url) {
-        // 社区: a web page, opened in the browser (06 §2.14)
+        // Community: a web page, opened in the browser (06 §2.14)
         const value = document.createElement("span"); value.textContent = it.value || it.url;
         const b = button("↗", "", () => api.OpenURL(it.url).catch(e => say("fail", errText(e))), "link");
         b.title = T("open the web page"); b.setAttribute("aria-label", T("open the web page"));
@@ -1705,7 +1705,7 @@ function settingDetails(d) {
 
 function renderSettingActions(right, actions, run, item) {
   for (const a of actions || []) {
-    // 卸载 RimArcho and 反馈 are their own pages; every other action is a command
+    // uninstall RimArcho and Feedback are their own pages; every other action is a command
     if (a.argv[0] === "uninstall" || a.argv[0] === "feedback") {
       const b = button(a.label, "", () => ui.go(a.argv[0]));
       b.dataset.settingAction = a.argv.join(" ");
@@ -1732,7 +1732,7 @@ function renderSettingActions(right, actions, run, item) {
         form.onsubmit = e => {
           e.preventDefault(); e.stopPropagation();
           const name = input.value.trim();
-          if (!name || /^(anonymous|匿名)$/i.test(name)) { say("fail", T("enter a Steam account name first")); input.focus(); return; }
+          if (!name || /^(anonymous|\u533f\u540d)$/i.test(name)) { say("fail", T("enter a Steam account name first")); input.focus(); return; }
           close(); submit(name);
         };
         form.onkeydown = e => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(); } else if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); form.requestSubmit(); } };

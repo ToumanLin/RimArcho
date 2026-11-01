@@ -1,14 +1,14 @@
 // The ops both pages share (06 §3.5, §8.5): the op table (view.OpTable: code, label, key,
-// menu group) and the row menu built from a row's codes. The plan editor and Mod 库存 › 全部
+// menu group) and the row menu built from a row's codes. The plan editor and Mod library > All
 // list the same groups in the same order, each item with its key on the right, only the
-// ops that apply, 退订 / 删除 last in red.
+// ops that apply, unsubscribe / delete last in red.
 import { S } from "./state.js";
 import * as pop from "./popups.js";
 
 let table = new Map();
 let order = [];
 
-// setTable takes the op table (the start data's, or Mod 库存's page).
+// setTable takes the op table (the start data's, or Mod library's page).
 export function setTable(list) {
   if (!list || !list.length) return;
   order = list;
@@ -46,7 +46,7 @@ export function openMenu(x, y, codes, run, keys = false) {
 }
 
 // keyed: the op of codes that key runs ("space", "m", "Del" …), in menu order; for space
-// the first plan op (启用, 加入, 停用, 拿掉, 放回, 换成这一份).
+// the first plan op (enable, add, disable, remove, put back, switch to this copy).
 export function keyed(codes, k) {
   for (const c of sorted(codes)) {
     const o = op(c);

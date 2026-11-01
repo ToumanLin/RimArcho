@@ -20,7 +20,7 @@ type PatternCard struct {
 	Level     string   `json:"level,omitempty"`
 	LevelText string   `json:"levelText,omitempty"`
 	Impact    string   `json:"impact,omitempty"`
-	Summary   string   `json:"summary,omitempty"` // "这类报错通常是：…"
+	Summary   string   `json:"summary,omitempty"` // "this kind of error is usually: …"
 	Causes    []string `json:"causes,omitempty"`
 	Next      string   `json:"next,omitempty"` // the first kind of fix, as a step
 	Fixes     []string `json:"fixes,omitempty"`

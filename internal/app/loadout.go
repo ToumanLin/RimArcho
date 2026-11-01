@@ -999,7 +999,7 @@ type SaveResult struct {
 	Running *RunningGame
 }
 
-// Save writes the workspace to ModsConfig.xml without starting the game (08 §2 "写入游戏":
+// Save writes the workspace to ModsConfig.xml without starting the game (08 §2 "writegame":
 // steps 1–5 and 7). It is allowed while the game runs; the game reads the file on its next
 // start.
 func (a *App) Save(dryRun bool) (*SaveResult, error) { return a.SaveWith(dryRun, false) }

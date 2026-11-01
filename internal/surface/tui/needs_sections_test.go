@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// G13 in the TUI (06 §2.4): 能不能跑 shows the four sections in order with their counts,
+// G13 in the TUI (06 §2.4): Can it run shows the four sections in order with their counts,
 // every item with its evidence chip, and the top bar's number equals the counted items,
 // the running game's errors included.
 func TestG13NeedsSectionsTUI(t *testing.T) {
@@ -68,7 +68,7 @@ func TestNeedsPhaseHeadingsAreNotCursorItems(t *testing.T) {
 	}
 }
 
-// The running game's errors come after 会让游戏出错, under 上次运行的报错 marked "this run";
+// The running game's errors come after Will cause errors, under errors from the last run marked "this run";
 // ← → jump between the sections, and the top bar counts them too.
 func TestNeedsSectionsLive(t *testing.T) {
 	t.Parallel()
@@ -155,7 +155,7 @@ func TestNeedsSectionsLive(t *testing.T) {
 	}
 }
 
-// 06 §3.5: Mod 库存's areas are numbered, 1 the filter, 2 the table, 3 the details.
+// 06 §3.5: Mod library's areas are numbered, 1 the filter, 2 the table, 3 the details.
 func TestLibraryAreaKeys(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)

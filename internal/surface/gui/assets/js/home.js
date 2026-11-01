@@ -1,8 +1,8 @@
-// 启动 (06 §2.3), on a Swiss grid: what is applied is one large headline that fits its
+// Start (06 §2.3), on a Swiss grid: what is applied is one large headline that fits its
 // width (its mods and last play below), the last game and the changes since it was last
 // played in the top right, and under a rule three steps read left to right — 01 the game,
-// 02 that game's lists and packs, 03 ▶ 启动游戏 with the applied list's problem under it
-// in one line; edits not yet written to the game get 保存 in the block's corner (w).
+// 02 that game's lists and packs, 03 ▶ launch game with the applied list's problem under it
+// in one line; edits not yet written to the game get save in the block's corner (w).
 // Picking a game or a row applies it at once
 // (its environment and plan become current; a pack becomes the featured item); it writes
 // no game file. Picking the applied row again opens it. The problem can be hidden; it
@@ -112,7 +112,7 @@ function focusStep(n) {
 export function homeKey(e) {
   const k = e.key, f = pendingRow || applied();
   if (/^[1-3]$/.test(k) && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) { e.preventDefault(); focusStep(k); return; }
-  // 保存 is its own button: enter on it saves, as a click does
+  // save is its own button: enter on it saves, as a click does
   if ((k === "Enter" || k === " ") && document.activeElement?.matches(".hm-save")) return;
   if (k === "w" && !e.ctrlKey && !e.altKey && !e.metaKey) {
     if (canSave(f)) { e.preventDefault(); save(); }
@@ -140,7 +140,7 @@ export function homeKey(e) {
   launch(f);
 }
 
-// (w, 保存, is on its button while there is something to save: the line holds seven)
+// (w, save, is on its button while there is something to save: the line holds seven)
 export function hintList() {
   return [{ key: "1–3", label: T("column") }, { key: "↑↓", label: T("list") }, { key: "←→", label: T("game") }, { key: "enter", label: T("edit") }, { key: "L", label: T("launch") },
     { key: "shift+1–8", label: T("pages") }, { key: "?", label: T("all keys") }];
@@ -159,8 +159,8 @@ async function save() {
   if (S.screen === "home") home({ keep: true });
 }
 
-// focusLaunch is the editor's 启动游戏 (06 §2.5): the current plan becomes the applied row
-// (it usually is; a pack applied here gives way) and the focus goes to ▶ 启动游戏, so L or
+// focusLaunch is the editor's launch game (06 §2.5): the current plan becomes the applied row
+// (it usually is; a pack applied here gives way) and the focus goes to ▶ launch game, so L or
 // enter starts the game.
 export async function focusLaunch() {
   if (!data) return;
@@ -182,7 +182,7 @@ function draw() {
   const before = places(sc.querySelector(".page.home"), ".hm-pick");
   sc.innerHTML = "";
   setBackdrop(bg);
-  // no page actions: rescanning is Mod 库's, a new plan is 方案's
+  // no page actions: rescanning is Mod library's, a new plan is Lists's
   const w = page("home", "");
   sc.append(w);
   const f = applied();
@@ -350,7 +350,7 @@ function rowStep(f, env, moved) {
   return s;
 }
 
-// 03: ▶ 启动游戏 (the one block of colour on the page) and the problem under it.
+// 03: ▶ launch game (the one block of colour on the page) and the problem under it.
 function launchStep(f) {
   const s = step("03", "hm-s3", T("launch"));
   const live = running(), starting = !live && launching > Date.now();
@@ -364,7 +364,7 @@ function launchStep(f) {
   top.append(title);
   if (!live) top.append(el("kbd", "", "L"));
   // 01 and 02 already say what starts; the block adds only the edits that launching saves,
-  // and they can be saved alone: 保存 sits in the block's corner, beside it, not in it
+  // and they can be saved alone: save sits in the block's corner, beside it, not in it
   const saving = !starting && canSave(f);
   const sub = live ? (S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet")) : f && f.unsaved && !saving ? Tf("%d unsaved", f.unsaved) : "";
   const bottom = el("div", "bottom");
@@ -414,7 +414,7 @@ function note(r) {
   if (hidden === fp) return null;
   const wrap = el("div", "hm-note" + (p.bad ? " bad" : "") + (shown.note ? "" : " enter"));
   const inner = el("div"), box = el("div", "box");
-  // one line; the reason and its log numbers are on hover and on 能不能跑
+  // one line; the reason and its log numbers are on hover and on Can it run
   const what = el(p.go ? "button" : "div", "what", (p.bad ? "▲  " : "") + p.what);
   what.title = [p.what, p.why].filter(Boolean).join("\n");
   if (p.go) what.onclick = () => ui.go("needs");
@@ -464,7 +464,7 @@ function pickGame(env) {
   if (r) apply(r);
 }
 
-// apply: 应用 (06 §2.3) — the row becomes the applied one. The page stays as it is: the
+// apply: apply (06 §2.3) — the row becomes the applied one. The page stays as it is: the
 // squares move to the pick at once, and ▶ shows the switch (another game: "switching to
 // main…", which can take a while; another row: "applying X…") until the new page is read,
 // then the new pick comes in on it.

@@ -1,4 +1,4 @@
-// Mod 库存 › 全部 (06 §2.9): what is on this machine. The same layout as the plan editor:
+// Mod library > All (06 §2.9): what is on this machine. The same layout as the plan editor:
 // the filter bar on top of a table, the details in a column on the right. The table is like
 // a file manager's details view: one row per Lineage (opening to its copies), columns the
 // player sorts (click a header, again reverses), moves (drag a header), sizes (drag its
@@ -56,7 +56,7 @@ export function initLibrary(u) {
   addEventListener("resize", () => { if (S.screen === "library") drawRows(); });
 }
 
-// open shows the page (the sidebar's Mod 库存 › 全部).
+// open shows the page (the sidebar's Mod library > All).
 export async function open() {
   if (S.screen !== "library") { L.full = false; L.focus = "rows"; }
   const read = beginPageRead("library", { retry: open });
@@ -156,7 +156,7 @@ function build() {
   const sizer = el("div", "lib-sizer");
   rows.append(th, sizer);
   main.append(head, rows);
-  // the left column, as the editor's 未启用: the filter bar on top, then the details (the
+  // the left column, as the editor's Not enabled: the filter bar on top, then the details (the
   // editor's detail card) filling the rest (06 §2.9)
   const detail = el("section", "area detail lib-detail");
   const dhead = el("div", "head");
@@ -467,7 +467,7 @@ function setFull(v) {
 
 let detailSeq = 0, frame = null;
 // drawDetail: the cursor's copy in the details, laid out as the editor's (detail.js
-// detailFrame): its note, picture and name, where it comes from, Mod 库存's field list, its
+// detailFrame): its note, picture and name, where it comes from, Mod library's field list, its
 // actions, the description and history (06 §2.9). A Workshop page not read yet is fetched
 // straight away.
 async function drawDetail() {

@@ -59,7 +59,7 @@ func TestPalette(t *testing.T) {
 	m.update(ctrlK)
 	typeIn(m, "排序")
 	if r := m.pal.results[0]; r.name != "自动排序" {
-		t.Fatalf("排序: first result %q", r.name)
+		t.Fatalf("sort: first result %q", r.name)
 	}
 	m.update(tea.KeyMsg{Type: tea.KeyCtrlU})
 	typeIn(m, "save")

@@ -70,13 +70,13 @@ func TestToolsAndAnnotations(t *testing.T) {
 		"pin_mod": "write", "unpin_mod": "write",
 		// 0.9: launching, plans and their history.
 		"launch_game": "destructive", "manage_plans": "destructive", "plan_history": "ro",
-		// 06 §2.9: Mod 库存.
+		// 06 §2.9: Mod library.
 		"list_library": "ro", "manage_library": "destructive",
 		// 02 §3.4: subscriptions RimArcho installs and updates (Git, download pages, SteamCMD).
 		"manage_subscriptions": "destructive",
 		// Uninstall: only its dry run (05 §5.2).
 		"preview_uninstall": "ro",
-		// 贴图优化 (08 §5.2).
+		// Texture optimisation (08 §5.2).
 		"manage_textures": "destructive",
 	}
 	openWorld := map[string]bool{"get_description": true, "exchange_list": true, "maintenance": true, "manage_subscriptions": true}

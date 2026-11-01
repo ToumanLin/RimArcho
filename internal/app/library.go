@@ -19,7 +19,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 )
 
-// Mod 库存 (06 §2.9): every mod on this machine for the environment, one Lineage with each
+// Mod library (06 §2.9): every mod on this machine for the environment, one Lineage with each
 // of its Instances, where it lives, how big it is, which plans and packs use it and what is
 // wrong with it. The interfaces (CLI `library`, MCP list_library, the GUI page, the TUI
 // list) all filter the same Library with the same LibQuery.
@@ -125,9 +125,9 @@ type LibInstance struct {
 	Note             *store.CopyNote
 	UpstreamUpdates  int
 	UpstreamWorkshop bool
-	// Textures: the DDS RimArcho wrote next to this copy's PNGs (贴图优化; nil: none).
+	// Textures: the DDS RimArcho wrote next to this copy's PNGs (Texture optimisation; nil: none).
 	Textures *TextureSummary
-	// PNG: the copy has PNGs under a Textures/ folder (its last scan), so 优化贴图 applies.
+	// PNG: the copy has PNGs under a Textures/ folder (its last scan), so optimise textures applies.
 	PNG bool
 }
 
@@ -280,7 +280,7 @@ func (a *App) library(st *LoadoutState, only string) (*Library, error) {
 		return nil, err
 	}
 	notes, err := a.Store.CopyNotes(ix.Env.ID, instances...)
-	texs := a.TextureSummaries() // 贴图优化: the DDS RimArcho wrote into each copy
+	texs := a.TextureSummaries() // Texture optimisation: the DDS RimArcho wrote into each copy
 	if err != nil {
 		return nil, err
 	}
@@ -411,7 +411,7 @@ func (a *App) library(st *LoadoutState, only string) (*Library, error) {
 		}
 		add(m, i)
 	}
-	// Subscribed Workshop items with no folder (06 §2.9: "幽灵"). A tombstone of the item
+	// Subscribed Workshop items with no folder (06 §2.9: "missing Workshop items"). A tombstone of the item
 	// keeps its name and lineage.
 	for _, s := range ix.Sources {
 		if s.Kind != source.Workshop || s.Status == source.StatusRetired {

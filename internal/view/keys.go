@@ -2,7 +2,7 @@ package view
 
 import "github.com/ToumanLin/RimArcho/internal/app"
 
-// The key table (06 §3.5): the plan editor and Mod 库存 › 全部 share one, the page's own keys
+// The key table (06 §3.5): the plan editor and Mod library > All share one, the page's own keys
 // come after it, and `?` lists the keys of the page it is pressed on, the same for the GUI
 // and the TUI but for the few each writes in §8.5 and §9.1.
 
@@ -112,7 +112,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("a", "the current list / the whole library"),
 			r("ctrl+w", "the Workshop change notes"),
 			r("ctrl+o", "open the location"),
-			r("D", "see dependencies (能不能跑)"),
+			r("D", "see dependencies (can it run)"),
 			r("S", "sort the list"),
 			r("p", "lock this version (dry run first)"),
 			r("esc", "close the panel, clear selection, then show every mod"),
@@ -166,7 +166,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("menu / shift+F10 / right click", "the row's menu: everything it can do"),
 		)
 	}
-	if page == RulesPage { // the TUI's 排序规则 screen (06 §9.1); the window's card has buttons
+	if page == RulesPage { // the TUI's Load-order rules screen (06 §9.1); the window's card has buttons
 		out = append(out,
 			r("↑↓ / PgUp PgDn / Home End", "move the cursor"),
 			r("a", "only the current list / all load-order rules"),
@@ -179,7 +179,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("esc", "close the form; back to the editor"),
 		)
 	}
-	if page == PageSearch { // 搜索文件 (06 §2.9)
+	if page == PageSearch { // Search files (06 §2.9)
 		out = append(out,
 			r("/  ctrl+f", "search"),
 			r("enter", "in the box: search; on a result: open its folder"),
@@ -212,7 +212,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 		out = append(out, r("L / enter", "launch the game"),
 			r("w", "save the current list's edits to the game without launching (while there are any)"),
 			r("P", "lists"), r("esc", "back"))
-	} else if page != EditorPage && page != RulesPage { // 排序规则 is one list
+	} else if page != EditorPage && page != RulesPage { // Load-order rules is one list
 		out = append(out, r("1–9", "focus the page's areas (the numbers in their headings)"))
 	}
 	tabText := "next / previous page under the same sidebar entry"
