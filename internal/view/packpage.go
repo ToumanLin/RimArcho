@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
-// ---- 编译成整合包 (06 §2.6) ----
+// ---- Create a pack (06 §2.6) ----
 
 // BuildStep is one of the four things building does, as the page says it.
 type BuildStep struct {
@@ -18,9 +18,9 @@ type BuildStep struct {
 	Text  string   `json:"text"`
 	Level string   `json:"level,omitempty"` // LevelWarn, LevelBad, LevelOff
 	More  []string `json:"more,omitempty"`  // the problems, the mods that cannot be copied, …
-	Needs bool     `json:"needs,omitempty"` // the step's problems are fixed on 能不能跑
+	Needs bool     `json:"needs,omitempty"` // the step's problems are fixed on Can it run
 	// Kind "textures": the step holds the textures choice (BuildPage.Tex); Go a page that
-	// fixes it ("textures": the 贴图优化 page under 库, where todds is installed).
+	// fixes it ("textures": the Texture optimisation page under Library, where todds is installed).
 	Kind string `json:"kind,omitempty"`
 	Go   string `json:"go,omitempty"`
 }
@@ -31,8 +31,8 @@ type TexChoice struct {
 	Label string `json:"label"`
 }
 
-// PackTextureChoices are the values a pack's textures can take: off, 预转换 (DDS at full
-// size), 精简 at a percent of the size (08 §5.2).
+// PackTextureChoices are the values a pack's textures can take: off, preconvert (DDS at full
+// size), resize at a percent of the size (08 §5.2).
 func PackTextureChoices() []TexChoice {
 	out := []TexChoice{{0, T("off: copy the PNGs")}, {100, T("pre-convert (full size)")}}
 	for _, p := range []int{80, 75, 60, 50, 40, 25} {
@@ -42,7 +42,7 @@ func PackTextureChoices() []TexChoice {
 }
 
 // BuildPage is the build page: on the left the four steps, on the right the summary and
-// the 编译 button, which is disabled with Why when something stops the build (G14).
+// the create button, which is disabled with Why when something stops the build (G14).
 type BuildPage struct {
 	Plan string `json:"plan"`
 	Name string `json:"name"` // a free name to start from
@@ -55,8 +55,8 @@ type BuildPage struct {
 	Dir    string      `json:"dir"`
 	Steps  []BuildStep `json:"steps"`
 	Ok     bool        `json:"ok"`
-	Why    string      `json:"why,omitempty"`     // why 编译 is disabled
-	ToNeed bool        `json:"toNeeds,omitempty"` // Why is fixed on 能不能跑
+	Why    string      `json:"why,omitempty"`     // why create is disabled
+	ToNeed bool        `json:"toNeeds,omitempty"` // Why is fixed on Can it run
 	ToGo   string      `json:"toGo,omitempty"`    // Why is fixed on that page ("textures")
 	// Tex is the textures choice the page was measured with; TexChoices its values.
 	Tex        int         `json:"tex"`
@@ -207,7 +207,7 @@ func BuildPageOf(pl *app.PackPlan, plan, envChip, packsDir string, tex int) *Bui
 	return p
 }
 
-// textureStep is the 贴图 step (08 §5.2): the choice, and what it costs and
+// textureStep is the textures step (08 §5.2): the choice, and what it costs and
 // saves (the PNGs converted, the pack's size after, the most the drive needs meanwhile).
 func textureStep(r *app.PackBuild, tex int) BuildStep {
 	s := BuildStep{Key: "textures", Title: T("textures"), Kind: "textures"}
@@ -236,7 +236,7 @@ func textureStep(r *app.PackBuild, tex int) BuildStep {
 	}
 	if t := r.Tool; t != nil && t.Err != "" {
 		s.Level, s.Go = LevelBad, "textures"
-		msg := T("the DDS encoder (todds) is not installed: install it in 库 › 贴图优化")
+		msg := T("the DDS encoder (todds) is not installed: install it in Library > Texture optimisation")
 		if t.Path != "" {
 			msg = t.Err
 		}
@@ -259,10 +259,10 @@ type PackPageEntry struct {
 // PackPage is a pack's own page: what it is, and its mods in load order.
 type PackPage struct {
 	Name     string          `json:"name"`
-	Facts    []string        `json:"facts"` // "42 mods  1.2 GB", "runs on 1.6", "built 10 月 20 日 in main", "played …"
+	Facts    []string        `json:"facts"` // "42 mods  1.2 GB", "runs on 1.6", "built Oct 20 in main", "played …"
 	Dir      string          `json:"dir"`
 	Mods     []PackPageEntry `json:"mods"`
-	Exported string          `json:"exportDir"` // where 导出 offers to write
+	Exported string          `json:"exportDir"` // where export offers to write
 	Check    *app.PackCheck  `json:"check"`
 	Blocked  bool            `json:"blocked"`
 	Why      string          `json:"why,omitempty"`

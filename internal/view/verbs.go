@@ -72,10 +72,10 @@ func Named(st *app.LoadoutState, ids []string) string {
 	return Plural(len(ids), "mod")
 }
 
-// Plural: "1 mod" / "3 mods" (English), "3 个Mod" (Chinese, T(noun)).
+// Plural: "1 mod" / "3 mods" (English), the localized count and noun (Chinese, T(noun)).
 func Plural(n int, noun string) string {
 	if Lang() == "zh" {
-		return fmt.Sprintf("%d 个%s", n, T(noun))
+		return fmt.Sprintf(localeExtra("zh", "@plural"), n, T(noun))
 	}
 	if n == 1 {
 		return fmt.Sprintf("%d %s", n, noun)

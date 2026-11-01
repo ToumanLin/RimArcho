@@ -8,7 +8,7 @@ import (
 )
 
 // LastChanged maps each instance of an environment to the start of the newest scan that
-// recorded a change for it (Mod 库存's "最近变化" sort, 06 §2.9). Optional IDs restrict the lookup.
+// recorded a change for it (Mod library's "last changed" sort, 06 §2.9). Optional IDs restrict the lookup.
 func (s *Store) LastChanged(envID string, instances ...string) (map[string]time.Time, error) {
 	where, args := libraryInstances(envID, instances)
 	rows, err := s.DB.Query(`SELECT c.instance_id, max(s.started_at) FROM change_event c JOIN scan s ON s.id=c.scan_id

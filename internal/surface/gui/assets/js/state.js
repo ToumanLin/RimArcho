@@ -111,7 +111,7 @@ export const idsOf = (its) => its.filter((it) => it.id).map((it) => it.id);
 export const refsOf = (its) => its.map((it) => it.ref);
 export function named(its) {
   if (its.length === 1) return its[0].name;
-  return S.start && S.start.lang === "zh" ? `${its.length} 个 Mod` : `${its.length} mods`;
+  return Tf("%d mods", its.length);
 }
 
 // slideThumb moves a switch's raised thumb under its open choice (magpie's view switch):

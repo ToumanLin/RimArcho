@@ -13,8 +13,8 @@ import (
 
 // Background tasks (06 §2.16): what RimArcho does after a click that takes a while, kept
 // as one record per task so the window can say what runs, what waits and what each item
-// came to. Two lanes run here, one task at a time, one item at a time: "files" (Mod 库's
-// actions on folders) and "steam" (退订 and 重新订阅 through the Steam client). The third
+// came to. Two lanes run here, one task at a time, one item at a time: "files" (Mod library's
+// actions on folders) and "steam" (unsubscribe and resubscribe through the Steam client). The third
 // lane, "self", is RimArcho's own jobs (scan, analysis, packs, textures, downloads); they
 // keep their own runners (Begin, Update, Finish), or queue work by kind (EnqueueSelf).
 //
@@ -59,13 +59,13 @@ type TaskItem struct {
 	Why         string `json:"why,omitempty"` // a failure's reason
 	FailureKind string `json:"failureKind,omitempty"`
 	Permanent   bool   `json:"permanent,omitempty"`
-	Again       string `json:"again,omitempty"` // the task that took this item over (重试, 继续剩下的)
+	Again       string `json:"again,omitempty"` // the task that took this item over (retry, continue the rest)
 }
 
 // Task is one background task.
 type Task struct {
 	ID     string     `json:"id"`
-	Kind   string     `json:"kind"` // a Mod 库 op (view.Lib*) or one of view.Task* kinds
+	Kind   string     `json:"kind"` // a Mod library op (view.Lib*) or one of view.Task* kinds
 	Lane   string     `json:"lane"`
 	Obj    string     `json:"obj"` // what it works on: "14 mods", a pack's name
 	State  string     `json:"state"`
@@ -120,7 +120,7 @@ func (t *Task) Counts() map[string]int {
 const TaskLimit = 200
 
 // Tasks is the record and the two lanes' runners. Do runs one item of a lane's task (the
-// window passes Mod 库's single-item action); Gate holds a lane while it says false (the
+// window passes Mod library's single-item action); Gate holds a lane while it says false (the
 // files lane waits for a scan); Changed is told after every change; Ended after a task
 // ends. None is called with the record's lock held.
 type Tasks struct {
@@ -464,8 +464,8 @@ func (ts *Tasks) StopAsked(id string) bool {
 	return ts.stopping[id]
 }
 
-// Again queues a new task with the items of id in state (ItemFail for 重试, ItemSkip for
-// 继续剩下的); ref (not "") takes only that item.
+// Again queues a new task with the items of id in state (ItemFail for retry, ItemSkip for
+// continue the rest); ref (not "") takes only that item.
 func (ts *Tasks) Again(id, state, ref, obj string) (*Task, error) {
 	ts.mu.Lock()
 	t := ts.find(id)

@@ -25,10 +25,10 @@ header b { font-weight:600; } header span { color:var(--dim); }
 </head>
 <body>
 <div id="app">
-  <header><b>RimArcho</b><span id="sum">加载中…</span></header>
-  <section class="col"><h2>未启用</h2><div class="list" id="c0"></div></section>
-  <section class="col"><h2>已启用</h2><div class="list" id="c1"></div></section>
-  <section class="col"><h2>暂存（V0 空）</h2><div class="list" id="c2"></div></section>
+  <header><b>RimArcho</b><span id="sum">Loading…</span></header>
+  <section class="col"><h2>Disabled</h2><div class="list" id="c0"></div></section>
+  <section class="col"><h2>Enabled</h2><div class="list" id="c1"></div></section>
+  <section class="col"><h2>Staging (empty in V0)</h2><div class="list" id="c2"></div></section>
   <section id="detail"></section>
 </div>
 <script type="module">
@@ -73,7 +73,7 @@ async function show(id) {
 const t0 = performance.now(), rows = await call("Rows");
 const on = rows.filter(r => r.pos).sort((a, b) => a.pos - b.pos), off = rows.filter(r => !r.pos);
 virtual(document.getElementById("c0"), off); virtual(document.getElementById("c1"), on); virtual(document.getElementById("c2"), []);
-document.getElementById("sum").textContent = `${rows.length} 个 Mod · 启用 ${on.length} · Rows ${Math.round(performance.now() - t0)} ms`;
+document.getElementById("sum").textContent = `${rows.length} mods · Enabled ${on.length} · Rows ${Math.round(performance.now() - t0)} ms`;
 </script>
 </body>
 </html>

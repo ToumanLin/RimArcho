@@ -210,7 +210,7 @@ func TestEnableMoveSortSaveUndo(t *testing.T) {
 	if !strings.Contains(e.ReadModsConfig(), "<li>tester.b</li>") {
 		t.Fatal("save did not write the list")
 	}
-	keys(tm, "L") // 启动 first (06 §2.5), then L there launches
+	keys(tm, "L") // Start first (06 §2.5), then L there launches
 	waitFor(t, tm, T("launch the game"))
 	keys(tm, "L")
 	waitFor(t, tm, "the game is starting")
@@ -420,7 +420,7 @@ func TestMouseClicks(t *testing.T) {
 		m.update(tea.MouseMsg{X: x, Y: y, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress, Shift: shift, Ctrl: ctrl})
 		m.View()
 	}
-	// Disabled rows start at y=4 (the filter bar is above the lists): Beta, N1 … N5, 中文
+	// Disabled rows start at y=4 (the filter bar is above the lists): Beta, N1 … N5, the CJK-named mod
 	click(xOf(cInactive), 4, false, false)
 	if m.focus != cInactive || m.current().name != "Beta" || len(m.marked) != 0 {
 		t.Fatalf("click: focus %d on %+v, selected %d", m.focus, m.current(), len(m.marked))
@@ -533,7 +533,7 @@ func TestChineseUI(t *testing.T) {
 	}
 }
 
-// needItems: the texts of the items of 需要处理.
+// needItems: the texts of the items of Can it run.
 func needItems(m *model) []string {
 	var out []string
 	for _, it := range m.prob.items {
@@ -638,7 +638,7 @@ func countedNeeds(m *model) int {
 }
 
 // 06 §2.9: changes are a sentence on the status line after a scan and the c view, in
-// words; an outside change of ModsConfig.xml is an item of 需要处理 with load / ignore.
+// words; an outside change of ModsConfig.xml is an item of Can it run with load / ignore.
 func TestChangesView(t *testing.T) {
 	t.Parallel()
 	e, scans := fixture(t)
@@ -789,7 +789,7 @@ func TestColumnSearch(t *testing.T) {
 		return strings.Join(out, ",")
 	}
 	all := func(q string) string {
-		m.bar.search = q // the filter bar filters 未启用 and 已启用 together (06 §2.5)
+		m.bar.search = q // the filter bar filters Not enabled and Enabled together (06 §2.5)
 		m.barChanged()
 		return names(cActive) + " | " + names(cInactive)
 	}

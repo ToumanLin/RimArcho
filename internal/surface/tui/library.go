@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Mod 库存 › 全部 (06 §2.9, §9.1), laid out as the window's page: the filter bar on top (the
+// Mod library > All (06 §2.9, §9.1), laid out as the window's page: the filter bar on top (the
 // editor's, view.BuildLibrary's groups), the table of Lineages that open to their copies
 // (→ ←), and the detail of the cursor's copy on the right when the terminal is wide enough
 // (enter shows it full screen). Every op of a copy is a key or in the row menu (view.CopyOps,
@@ -811,7 +811,7 @@ func (m *model) libDetailLines(w, n int) []string {
 
 var _ = fmt.Sprint
 
-// libPairs: the hint line of Mod 库存: what the cursor's copy can do now (06 §2.2).
+// libPairs: the hint line of Mod library: what the cursor's copy can do now (06 §2.2).
 func (m *model) libPairs() [][2]string {
 	l := &m.libr
 	pairs := [][2]string{}

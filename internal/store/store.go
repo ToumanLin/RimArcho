@@ -289,7 +289,7 @@ UPDATE launch SET plan_id=(SELECT min(p.id) FROM plan p WHERE p.environment_id=l
 CREATE INDEX launch_env ON launch(environment_id, started_at);
 `
 
-// schemaV12: analysis runs are kept per enabled set (03 §3 "按方案缓存多份"): the slot is
+// schemaV12: analysis runs are kept per enabled set (03 §3 "cache per list"): the slot is
 // (environment, game_mm, set_key), so switching between plans does not evict each other's
 // runs. Existing runs get an empty key and are replaced on the next analysis.
 const schemaV12 = `

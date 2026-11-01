@@ -35,7 +35,7 @@ type SettingItem struct {
 	Note         string   `json:"note,omitempty"`
 	Hover        string   `json:"hover,omitempty"`
 	ValueNote    string   `json:"valueNote,omitempty"`
-	// URL: the value is a web page; the interfaces open it in the browser (社区, 06 §2.14).
+	// URL: the value is a web page; the interfaces open it in the browser (Community, 06 §2.14).
 	URL     string          `json:"url,omitempty"`
 	Links   []CommunityLink `json:"links,omitempty"`
 	Actions []SettingAction `json:"actions,omitempty"`
@@ -181,7 +181,7 @@ func EnvGroups(a *app.App, st *app.LoadoutState) []SettingGroup {
 	}}}
 }
 
-// FolderGroup is the settings page's "Mod 文件夹" (02 §0): the folders every environment
+// FolderGroup is the settings page's "Mod folders" (02 §0): the folders every environment
 // shares. The Workshop folder can be moved; SteamCMD and other folders added and removed;
 // RimArcho's own folders (Archo Monitor, the lock library) are shown.
 func FolderGroup(a *app.App) SettingGroup {
@@ -239,8 +239,8 @@ func FolderGroup(a *app.App) SettingGroup {
 	return g
 }
 
-// SettingsPage is the settings page's groups (06 §2.14): 关于, 界面, 账户, 更新,
-// 文件夹, 游戏日志, 外部工具, 社区数据, 存储 and, last, 卸载. The GUI and
+// SettingsPage is the settings page's groups (06 §2.14): About, Interface, Accounts, update,
+// Folders, game log, external tools, community data, Storage and, last, uninstall. The GUI and
 // the TUI show them in this order. Game launch and save options are on the environment page.
 func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	gpuNote := ""
@@ -252,9 +252,9 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	}
 	gpu := onOff(T("GPU acceleration"), "ui.gpu")
 	gpu.Hover, gpu.ValueNote = T("uses about 20–35 MB less memory and draws in software"), gpuNote
-	// 启动页背景 closes this card in the GUI (it is not a setting command).
+	// Start page background closes this card in the GUI (it is not a setting command).
 	out := []SettingGroup{AboutGroup(a), {Title: T("interface"), Items: []SettingItem{
-		{Label: T("language"), Value: cmds.Setting(a, "ui.lang"), Edit: "choice", Choices: []string{"auto", "zh", "en"}, ChoiceLabels: []string{T("follow system"), "简体中文", "English"}, Argv: []string{"config", "set", "ui.lang", "{}"}},
+		{Label: T("language"), Value: cmds.Setting(a, "ui.lang"), Edit: "choice", Choices: languageChoices(), ChoiceLabels: languageLabels(), Argv: []string{"config", "set", "ui.lang", "{}"}},
 		{Label: T("day/night theme"), Value: cmds.Setting(a, "ui.theme"), Edit: "segments", Choices: cmds.SettingChoices("ui.theme"),
 			ChoiceLabels: []string{T("follow system"), T("light"), T("dark")}, Argv: []string{"config", "set", "ui.theme", "{}"}},
 		{Label: T("accent colour"), Value: cmds.Setting(a, "ui.accent"), Edit: "swatches", Choices: cmds.SettingChoices("ui.accent"),
@@ -314,7 +314,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		Confirm: T("RimArcho downloads the three files from their sources (about 50 MB)")}}})
 	out = append(out, data)
 
-	// 存储: the database and the caches, what takes room on the disk.
+	// Storage: the database and the caches, what takes room on the disk.
 	db, _ := a.DBInfo()
 	storage := SettingGroup{Title: T("storage"), Items: []SettingItem{
 		{Label: T("database"), Value: SizeText(db.Bytes), Note: db.Path, NotePaths: []string{db.Path}, Actions: []SettingAction{
@@ -347,17 +347,6 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		}
 	}
 	return out
-}
-
-func init() {
-	Register(map[string]string{
-		"downloading…": "正在下载…",
-		"updating…":    "正在更新…",
-		"backing up…":  "正在备份…",
-		"compacting…":  "正在压缩…",
-		"clearing…":    "正在清理…",
-		"removing…":    "正在移除…",
-	})
 }
 
 // SettingCommand checks that argv is one of the settings page's commands (the interfaces

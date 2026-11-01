@@ -58,7 +58,7 @@ try {
  [void][NativeSave]::SendMessage($edit.handle,0x000C,[IntPtr]::Zero,[IO.Path]::GetFullPath($ExistingFile))
  Invoke (Button $dialog @(1))
  $no=WaitFor {foreach($d in (Dialogs)) {
-  Controls $d | Where-Object {$_.class -eq 'Button' -and $_.name -match '^&?(No|否)(\s|\(|$)'} | Select-Object -First 1
+  Controls $d | Where-Object {$_.class -eq 'Button' -and $_.name -match '^&?(No|\u5426)(\s|\(|$)'} | Select-Object -First 1
  }}
  Invoke $no
  $trace.Add(@{action='overwrite-declined'})

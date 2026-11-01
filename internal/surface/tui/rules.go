@@ -10,16 +10,16 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 排序规则 (06 §2.5, §9.1, 04 §6.1): the editor's rules card as a screen of its own, on the
+// Load-order rules (06 §2.5, §9.1, 04 §6.1): the editor's rules card as a screen of its own, on the
 // same view.BuildRules / SaveRule / RemoveRule / RestoreRule. The window folds it into the
 // editor's left column; the terminal's third column is too narrow for its sentences. Rules
-// are global; the screen shows the ones with a mod enabled in the open list (只看当前列表,
+// are global; the screen shows the ones with a mod enabled in the open list (only the current list,
 // the default) or all of them (a). r on a mod in the editor opens it with the form for
 // that mod; enter changes the rule under the cursor, Del removes it (u right after puts it
 // back), o shows its mod in the list, esc goes back to the editor. Rules are not list
 // edits: they are not in the list's undo stack (u here is only the removal's undo).
 
-// rulesScopeKey keeps 只看当前列表 / 全部排序规则 across starts, as the window keeps it.
+// rulesScopeKey keeps only the current list / all load-order rules across starts, as the window keeps it.
 const rulesScopeKey = "ui.tui.rules.scope"
 
 type rulesState struct {
@@ -46,7 +46,7 @@ type ruleForm struct {
 	candAt int
 }
 
-// openRules shows 排序规则; mod (when not nil) opens the form for a new rule about it.
+// openRules shows Load-order rules; mod (when not nil) opens the form for a new rule about it.
 func (m *model) openRules(mod *item) tea.Cmd {
 	m.panel, m.insp, m.full = nil, nil, false
 	r := &m.rules
@@ -316,7 +316,7 @@ func (m *model) rulePick() {
 }
 
 // ruleSave adds or changes the rule; the editor reloads (the order problems, the row icons
-// and 能不能跑's number follow), and nothing is sorted (06 §2.5).
+// and Can it run's number follow), and nothing is sorted (06 §2.5).
 func (m *model) ruleSave() tea.Cmd {
 	r := &m.rules
 	f := r.form
@@ -453,7 +453,7 @@ func (m *model) ruleFormLines(w int) []string {
 	return out
 }
 
-// rulesPairs: the hint line of 排序规则.
+// rulesPairs: the hint line of Load-order rules.
 func (m *model) rulesPairs() [][2]string {
 	r := &m.rules
 	if f := r.form; f != nil {
@@ -484,13 +484,4 @@ func (m *model) rulesPairs() [][2]string {
 		pairs = append(pairs, [2]string{"a", T("all load-order rules")})
 	}
 	return append(pairs, [2]string{"esc", T("back")}, [2]string{"?", T("all keys")})
-}
-
-func init() {
-	view.Register(map[string]string{
-		"no load-order rules yet":                          "还没有排序规则",
-		"no rule names a mod of this list; a shows all %d": "没有涉及这个列表的规则；按 a 看全部 %d 条",
-		"next field": "下一项",
-		"take it":    "选定",
-	})
 }

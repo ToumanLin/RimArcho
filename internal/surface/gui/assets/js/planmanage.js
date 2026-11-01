@@ -1,8 +1,8 @@
 import { choiceControl } from "./choices.js";
-// 列表管理 (06 §2.17): the sidebar's 列表 › 列表管理. On the left every list of the game, on the
+// Manage lists (06 §2.17): the sidebar's list › Manage lists. On the left every list of the game, on the
 // right the picked one: its game versions (04 §1.6), the Steam Workshop collections it
 // follows (04 §9.6) and how to share it (export, pack). The export is a sub-page of its own
-// (库 / 列表 / <列表> / 导出). Editing what a list holds stays in the editor (§2.5).
+// (Library / Lists / <list> / export). Editing what a list holds stays in the editor (§2.5).
 // Data: API.PlanManage (view.BuildPlanManage), API.PlanExport (view.BuildPlanExport).
 import { pathContent, copyablePath, editablePath } from "./fields.js";
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
@@ -187,7 +187,7 @@ function detailCard(p) {
   return card;
 }
 
-// ---- rename in place: double-click the title, F2 or 改名 ----
+// ---- rename in place: double-click the title, F2 or rename ----
 
 export function startRename(id) {
   if (M.creating || !sel() || sel().id !== id) return;
@@ -260,7 +260,7 @@ export async function duplicate(id) {
   });
 }
 
-// ---- 新建 / 导入: one form in the right column ----
+// ---- new / import: one form in the right column ----
 
 // named: the player gave the draft a name of their own. A draft that still has the name
 // it was given is dropped when the form closes: the player wanted nothing from it.
@@ -373,7 +373,7 @@ function newForm() {
   const name = el("input", "xc-input pm-name"); name.value = draft.name; name.spellcheck = false;
   label.append(name);
   const why = el("div", "plan-why", draft.error || ""); why.setAttribute("role", "alert");
-  // One main button: in an import it reads the content first (预览), then it creates.
+  // One main button: in an import it reads the content first (preview), then it creates.
   const main = button(T("create and edit"), "enter", () => go(), "primary", "create-plan");
   const active = () => M.draft === draft && M.form === form && M.creating && S.screen === "plans" && draft.env === game();
   const previewing = () => draft.from === "import" && !draft.import.preview;
@@ -503,7 +503,7 @@ function newForm() {
 }
 
 // The import source: a file (the window's open dialog or a drop) or pasted text. Choosing
-// a file reads it at once; pasted text is read with 预览 (links go to Steam or Rentry).
+// a file reads it at once; pasted text is read with preview (links go to Steam or Rentry).
 function inlineImport(draft, active, updateButtons) {
   const box = el("div", "pm-inline-import"), imp = draft.import;
   box.append(el("div", "pm-note", T("bring in a list from RimSort, RimCrow, RimWorld or another RimArcho, a save, a share code or a Steam collection; you see which mods you have before anything is created")));
@@ -702,7 +702,7 @@ function showCost(p, id) {
   s.append(details);
 }
 
-// ---- 游戏版本 (04 §1.6): one small button per version, the allowed ones raised ----
+// ---- game version (04 §1.6): one small button per version, the allowed ones raised ----
 
 function versions(p) {
   const s = section(T("game versions"));
@@ -745,7 +745,7 @@ async function setVersions(p, vs) {
   });
 }
 
-// ---- 跟着 Steam 合集 (04 §9.6) ----
+// ---- follows Steam collections (04 §9.6) ----
 
 function follows(p) {
   const s = section(T("follows Steam collections"), p.follows.length ? String(p.follows.length) : "");
@@ -855,7 +855,7 @@ function collection(p, f) {
   return c;
 }
 
-// ---- 分享: the newest pack made from it, export and create a pack ----
+// ---- share: the newest pack made from it, export and create a pack ----
 
 function share(p) {
   const s = section(T("share"));
@@ -873,7 +873,7 @@ function share(p) {
   return s;
 }
 
-// buildOf opens 编译成整合包 (§2.6) for the list: it is opened first (the current list
+// buildOf opens Create a pack (§2.6) for the list: it is opened first (the current list
 // stays), and esc comes back here.
 async function buildOf(p) {
   if (!(await plans.openPlan(p.id))) return;
@@ -929,7 +929,7 @@ export function hintList() {
     { key: "D", label: T("duplicate") }, { key: "e", label: T("export") }, { key: "?", label: T("all keys") }];
 }
 
-// ---- the export sub-page (库 / 列表 / <列表> / 导出) ----
+// ---- the export sub-page (Library / Lists / <list> / export) ----
 
 // exportOf opens the export of list id; from is where esc goes back to: "plans" (this
 // page) or "editor" (the plan editor's e).

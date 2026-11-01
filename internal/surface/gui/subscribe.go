@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// SubscriptionRequest is the 添加订阅 card's decision (view.SubscribeRequest, shared with the TUI).
+// SubscriptionRequest is the add a subscription card's decision (view.SubscribeRequest, shared with the TUI).
 type SubscriptionRequest = view.SubscribeRequest
 
 func subscriptionArgs(r SubscriptionRequest) ([]string, error) { return view.SubscribeArgv(r) }

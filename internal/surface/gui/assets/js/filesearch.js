@@ -1,4 +1,4 @@
-// Mod 库 › 搜索文件 (06 §2.9, 03 §5.4–5.5).
+// Mod library › Search files (06 §2.9, 03 §5.4–5.5).
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { beginPageRead, page, area, button, seg, hintsChanged } from "./screens.js";
 import { copyablePath, copy } from "./fields.js";

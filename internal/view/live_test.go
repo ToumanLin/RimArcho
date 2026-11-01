@@ -61,7 +61,7 @@ func TestLiveTracker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// the game still writes it: this run, not yet in 需要处理 as the last run
+	// the game still writes it: this run, not yet in Can it run as the last run
 	if page.Selected || !page.Live {
 		t.Fatalf("log page of the running game's log: selected %v, live %v", page.Selected, page.Live)
 	}

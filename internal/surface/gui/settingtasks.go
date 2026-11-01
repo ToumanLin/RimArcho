@@ -160,11 +160,3 @@ func executeSettingTask(a *app.App, argv []string) (string, error) {
 	line, _, _ := strings.Cut(text, "\n")
 	return line, nil
 }
-
-func init() {
-	view.Register(map[string]string{
-		"downloaded to %s":       "已下载到 %s",
-		"%s: %d entries":         "%s：%d 条",
-		"community data updated": "社区数据已更新",
-	})
-}

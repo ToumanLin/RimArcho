@@ -110,16 +110,16 @@ func TestV28Formal(t *testing.T) {
 		{"defName×100(CROSS JOIN)", "DefsNamed defName×100"},
 		{"Name×190(CROSS JOIN)", "DefsNamed Name×190"},
 		{"DefsOf×100", "DefsOf×100"},
-		{"CachedDefs(未启用全部)", "CachedDefs(未启用全部)"},
+		{"CachedDefs(all disabled)", "CachedDefs(all disabled)"},
 		{"TypeOwners×100", "TypeOwners×100"},
-		{"HarmonyPatches(全部)", "HarmonyPatches(全部)"},
-		{"CurrentFiles(增量扫描)", "CurrentFiles(增量扫描)"},
-		{"SnapshotFiles×100(变更页)", "SnapshotFiles×100(变更页)"},
+		{"HarmonyPatches(all)", "HarmonyPatches(all)"},
+		{"CurrentFiles(incremental scan)", "CurrentFiles(incremental scan)"},
+		{"SnapshotFiles×100(changes page)", "SnapshotFiles×100(changes page)"},
 		{"InstanceFiles(%Textures/%)", "InstanceFiles(%Textures/%)"},
 		{"InstanceFiles(%x.dll)×20", "InstanceFiles(%x.dll)×20"},
-		{"ContentKinds(全部,无缓存)", "ContentKinds(全部)"},
+		{"ContentKinds(all, uncached)", "ContentKinds(all)"},
 	}
-	// Mod 库存's first open reads snapshot.kinds by primary key, the same SQL in v27 and v28.
+	// Mod library's first open reads snapshot.kinds by primary key, the same SQL in v27 and v28.
 	oldQ["kinds"] = ikQuery{name: "kinds", run: func(c ikCtx) ([]string, error) {
 		var all []string
 		ids := c.smp.snaps
@@ -238,7 +238,7 @@ func TestV28Formal(t *testing.T) {
 			}
 			return n, nil
 		},
-		"CachedDefs(未启用全部)": func() (int, error) {
+		"CachedDefs(all disabled)": func() (int, error) {
 			n := 0
 			for _, k := range smp.cached {
 				fs, ok := s.CachedDefs(k[0], k[1])
@@ -260,11 +260,11 @@ func TestV28Formal(t *testing.T) {
 			}
 			return n, nil
 		},
-		"HarmonyPatches(全部)": func() (int, error) {
+		"HarmonyPatches(all)": func() (int, error) {
 			hs, err := s.HarmonyPatches(store.HarmonyFilter{})
 			return len(hs), err
 		},
-		"CurrentFiles(增量扫描)": func() (int, error) {
+		"CurrentFiles(incremental scan)": func() (int, error) {
 			m, err := s.CurrentFiles(envID)
 			n := 0
 			for _, x := range m {
@@ -272,7 +272,7 @@ func TestV28Formal(t *testing.T) {
 			}
 			return n, err
 		},
-		"SnapshotFiles×100(变更页)": func() (int, error) {
+		"SnapshotFiles×100(changes page)": func() (int, error) {
 			n := 0
 			for _, snap := range smp.snaps[:min(100, len(smp.snaps))] {
 				fs, err := s.SnapshotFiles(snap)
@@ -298,7 +298,7 @@ func TestV28Formal(t *testing.T) {
 			}
 			return n, nil
 		},
-		"ContentKinds(全部)": func() (int, error) {
+		"ContentKinds(all)": func() (int, error) {
 			m, err := s.ContentKinds(snapOf)
 			return len(m), err
 		},

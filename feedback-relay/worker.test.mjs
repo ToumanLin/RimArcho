@@ -153,7 +153,7 @@ test("clean: a title from the body, long titles cut, line breaks folded", () => 
   assert.equal(clean({ body: "---\nRimArcho 0.9.0" }).title, "RimArcho 0.9.0");
   assert.equal(clean({ body: "Mods vanish\nafter saving" }).title, "Mods vanish");
   assert.equal(clean({ title: "a\nb", body: "" }).title, "a b");
-  const long = clean({ title: "长".repeat(300) }).title;
+  const long = clean({ title: "L".repeat(300) }).title;
   assert.equal(Array.from(long).length, LIMITS.title);
   assert.ok(long.endsWith("…"));
 });

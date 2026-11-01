@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 需要处理 (06 §5). The items, their wording and their actions are view.BuildNeeds (06 §1);
+// Can it run (06 §5). The items, their wording and their actions are view.BuildNeeds (06 §1);
 // here each action gets its key and the screen is drawn.
 
 type needKey struct {
@@ -109,7 +109,7 @@ func (m *model) actionKey(a view.Action, text string) needKey {
 		k.run = func(m *model) tea.Cmd { m.openPanel(a.Title, strings.Join(a.Lines, "\n")); return nil }
 	case view.ActVersionList:
 		k.run = func(m *model) tea.Cmd { return m.openVersionWarnings(a) }
-	case view.ActSubscribe: // 添加订阅 with the Workshop IDs: Steam or SteamCMD, the dry run, enter
+	case view.ActSubscribe: // add a subscription with the Workshop IDs: Steam or SteamCMD, the dry run, enter
 		k.run = func(m *model) tea.Cmd { return m.openAdd(strings.Join(a.Refs, " ")) }
 	case view.ActFold:
 		k.run = func(m *model) tea.Cmd {
@@ -219,7 +219,7 @@ func (m *model) doListAction(what string) tea.Cmd {
 	return m.requestDetail()
 }
 
-// listPreview is the palette's 预览排序 / 预览保存 / 预览启动: the dry run, to read.
+// listPreview is the palette's preview the sort / preview saving / preview the launch: the dry run, to read.
 func (m *model) listPreview(what string) tea.Cmd {
 	out, _ := m.run(what, "--dry-run")
 	title := map[string]string{view.ListSort: "preview the sort", view.ListSave: "preview saving", view.ListLaunch: "preview the launch"}[what]
@@ -240,7 +240,7 @@ func listTitle(what string) string {
 
 // ---- the screen ----
 
-// needLines draws 需要处理: a count line, then the groups with their items; the selected
+// needLines draws Can it run: a count line, then the groups with their items; the selected
 // item shows its keys.
 func (m *model) needLines(n int) []string {
 	p := &m.prob
@@ -413,7 +413,7 @@ func (m *model) sectionHead(sec, w int) string {
 	case live:
 		title = T("errors this run") // the window's title while the game runs (06 §2.4)
 	case hintsOnly && sec != view.SectionHint:
-		title = T("suggestions") // only hints: not a red 会让游戏出错
+		title = T("suggestions") // only hints: not a red Will cause errors
 	}
 	// its number among the sections shown: 1–4 jump to it (06 §3.5)
 	num := itoa(m.sectionNumber(sec)) + " "
@@ -422,7 +422,7 @@ func (m *model) sectionHead(sec, w int) string {
 	case sec == view.SectionBreak && !hintsOnly:
 		head = sDimS.Render(num) + sErrS.Render(title)
 	case sec == view.SectionHint:
-		// 可以留意 is RimArcho's own knowledge: the accent, not dimmed
+		// worth knowing is RimArcho's own knowledge: the accent, not dimmed
 		head = sDimS.Render(num) + sAccent.Render(title)
 	}
 	used := width.StringWidth(num + title)
@@ -439,7 +439,7 @@ func (m *model) sectionHead(sec, w int) string {
 		switch {
 		case live && m.live.Pack != "":
 			add("  "+Tf("pack %s", m.live.Pack), sDimS)
-		case live: // the title says it: 本次运行的报错
+		case live: // the title says it: errors this run
 		case m.prob.lastRun != "":
 			add("  "+m.prob.lastRun, sDimS)
 		}
@@ -514,7 +514,7 @@ func (m *model) sectionStep(d int) {
 	}
 }
 
-// autoFix is F, 自动修复 (06 §2.4, §5): the required mods that are installed get enabled and
+// autoFix is F, fix automatically (06 §2.4, §5): the required mods that are installed get enabled and
 // the list is sorted again, one undo step.
 func (m *model) autoFix() tea.Cmd {
 	if view.AutoFixCount(m.prob.base) == 0 {
@@ -563,7 +563,7 @@ func (m *model) needsKey(s string) tea.Cmd {
 		return m.startAnalyze()
 	case "F":
 		return m.autoFix()
-	case "c": // 订阅与更新, from any page (06 §3.5)
+	case "c": // subscriptions and updates, from any page (06 §3.5)
 		return m.openChangesOf("", "")
 	case "l":
 		return m.chooseLog()

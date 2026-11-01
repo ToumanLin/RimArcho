@@ -16,7 +16,7 @@ import (
 // PackRow is one pack on the screen.
 type PackRow struct {
 	Name   string `json:"name"`
-	Facts  string `json:"facts"` // "42 mods  1.2 GB  1.6  built 10 月 20 日"
+	Facts  string `json:"facts"` // "42 mods  1.2 GB  1.6  built Oct 20"
 	Played string `json:"played"`
 	Mods   int    `json:"mods"`
 	Size   string `json:"size"`
@@ -105,8 +105,8 @@ const (
 	LevelOff  = "off"  // a step that waits for an earlier one
 )
 
-// PackTextureOptions reads the window's texture choice: 0 off, 100 预转换 (full size), a
-// smaller percent 精简.
+// PackTextureOptions reads the window's texture choice: 0 off, 100 preconvert (full size), a
+// smaller percent resize.
 func PackTextureOptions(tex int) *textures.Options {
 	if tex <= 0 {
 		return nil

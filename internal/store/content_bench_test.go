@@ -7,9 +7,9 @@ import (
 	"testing"
 )
 
-// BenchmarkDerivedContent1354: the Mod 库存 content queries before v27 (GROUP BY and EXISTS
+// BenchmarkDerivedContent1354: the Mod library content queries before v27 (GROUP BY and EXISTS
 // over snapshot_file) and after (snapshot.kinds / langs), and the v27 migration, on 1354
-// current snapshots and 4864 in all with 200 file rows each (about the 98 万 rows of a real
+// current snapshots and 4864 in all with 200 file rows each (about the 980,000 rows of a real
 // library, 07 §6). Synthetic only:
 //
 //	go test ./internal/store -run '^$' -bench BenchmarkDerivedContent1354 -benchtime 20x -count 3

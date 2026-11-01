@@ -108,7 +108,7 @@ func (m *model) topBar() string {
 	pill := " " + envText + " "
 	add("  ", 2)
 	add(sPill.Render(pill), width.StringWidth(pill))
-	// the plan being edited (06 §9.1) and its "有未载入的外部版本" (04 §4.3)
+	// the plan being edited (06 §9.1) and its "an outside version has not been loaded" (04 §4.3)
 	if m.st != nil && m.st.Plan != nil {
 		t := T("list") + " " + m.st.Plan.Name
 		add("  "+sText.Render(t), 2+width.StringWidth(t))
@@ -196,7 +196,7 @@ func (m *model) liveStatus() (string, int) {
 		}
 		return s, w
 	case l != nil && l.NewLog != "":
-		// 08 §2 "游戏退出后": a new Player.log; 能不能跑 (shift+2) analyses it
+		// 08 §2 "after the game exits": a new Player.log; Can it run (shift+2) analyses it
 		return sAccent.Render("● "+l.NewLog) + sDimS.Render("  shift+2"), 2 + width.StringWidth(l.NewLog) + 9
 	}
 	return "", 0

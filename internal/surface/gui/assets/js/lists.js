@@ -1,5 +1,5 @@
 // The three lists (06 §2.5): virtual rows, the cursor, selection, search, dragging. The
-// board has three columns: 未启用 | 已启用 | 详情, with 暂存 and 历史 folded under 详情.
+// board has three columns: Not enabled | Enabled | details, with Staging and history folded under details.
 import { factText, S, $, $$, el, esc, col, cur, key, api, T, Tf, AREAS, ROW_H } from "./state.js";
 import { icon, sourceIcon, statusIcon } from "./icons.js";
 import { wireBadges } from "./badgepop.js";
@@ -47,7 +47,7 @@ export function setItems(k, items) {
   return keep ? key(keep) : "";
 }
 
-// The filter bar over 未启用 and 已启用 (06 §2.5): one search and one set of filters for both
+// The filter bar over Not enabled and Enabled (06 §2.5): one search and one set of filters for both
 // lists; S.bar is the bar (filterbar.js), S.barData its last answer (view.BarFilter).
 // Both lists ask at once: one call per bar state; only the latest call's answer counts.
 let barCall = null, barSig = "";
@@ -63,7 +63,7 @@ function fetchBar() {
 }
 export const barOn = () => !!(S.bar && S.bar.active());
 
-// refilter applies the column's query (view.Query in Go; the bar for 未启用 and 已启用) and
+// refilter applies the column's query (view.Query in Go; the bar for Not enabled and Enabled) and
 // keeps the cursor on keepKey.
 export async function refilter(k, keepKey) {
   const c = S.cols[k], gameRequest = S.envSeq, items = c.items;
@@ -121,7 +121,7 @@ export function acceptGhost(k, input) {
 
 // ---- drawing ----
 
-// ---- the folds under 详情: 暂存 and 历史 ----
+// ---- the folds under details: Staging and history ----
 
 // Staging is open while it holds mods, unless the player folded it; the history is folded
 // until opened. A choice is kept for the session (and in the browser's storage).
@@ -244,7 +244,7 @@ export function renderRows(k) {
 export let onHistory = () => {};
 export function setOnHistory(fn) { onHistory = fn; }
 
-// renderHistory: the history's fold under 详情 and staging (06 §2.5): its bar says how
+// renderHistory: the history's fold under details and staging (06 §2.5): its bar says how
 // many steps; open, it lists them, then the saved versions.
 export function renderHistory() {
   const area = $(".histarea");
@@ -318,7 +318,7 @@ export function pageDelta(k,direction) {
 // ---- wiring: scrolling, clicks, drags ----
 
 export function wireLists(ui) {
-  // the folds open and close from their bars; dropping on a folded 暂存's bar still stages
+  // the folds open and close from their bars; dropping on a folded Staging's bar still stages
   $('.area[data-area="2"] .head').addEventListener("click", (e) => {
     if (e.target.closest("button")) return;
     setStagingOpen(!stagingOpen());
@@ -354,7 +354,7 @@ export function wireLists(ui) {
     wireDrag(ui, k, box);
     wireBadges(k, box, (i) => { const c = S.cols[k]; return c.items[c.view[i]]; }, (it) => (S.board && S.board.status ? rowStatus(it) : 0));
     const input = $(`.area[data-area="${k}"] .search input`);
-    if (!input) continue; // 未启用 and 已启用 share the filter bar
+    if (!input) continue; // Not enabled and Enabled share the filter bar
     input.placeholder = T("search: words, tag:, author:, type:, has:, -not");
     // the grey completion after the query (06 §3.7): the typed text, invisible, then the rest
     const ghost = el("span", "ghost");

@@ -1,4 +1,4 @@
-// 能不能跑 in the GUI (06 §2.4, §5; 06 §10 G29): the two columns, an item's buttons, the
+// Can it run in the GUI (06 §2.4, §5; 06 §10 G29): the two columns, an item's buttons, the
 // confirmation asked in the item and the done lines an action leaves.
 import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
@@ -84,7 +84,7 @@ test('a confirmation is asked in the item, in place of its buttons', () => {
 });
 
 function layoutContext() {
-  // the status line: what a sort said, with its 撤销 link
+  // the status line: what a sort said, with its undo link
   const status = { childNodes: [{ nodeName: '#text', textContent: 'sorted, 2 moved ' }, { nodeName: 'A', textContent: 'undo' }],
     querySelector: (s) => (s === 'a' ? {} : null) };
   const context = createContext({ N: freshN(), S: { live: null, board: { env: 'e' } }, T: (s) => s,
@@ -105,7 +105,7 @@ test('the left column holds the three sections, the right the run; merged and ot
   assert.deepEqual(plain(c.N.cols.map((col) => col.map((x) => x.id))), [['x', 'h', 'q'], ['r']]);
   c.N.hintsShut = true;
   c.orderNeeds();
-  assert.deepEqual(plain(c.N.cols[0].map((x) => x.id)), ['x', 'q'], 'a shut 可以留意 keeps only its heading');
+  assert.deepEqual(plain(c.N.cols[0].map((x) => x.id)), ['x', 'q'], 'a shut Things to watch keeps only its heading');
 });
 
 test('what an action resolves stays as a done line where it was, with undo on the latest batch', () => {

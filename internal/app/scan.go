@@ -147,7 +147,7 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 			return nil, err
 		}
 	}
-	// The DDS RimArcho wrote next to mods' PNGs are not part of the mods (贴图优化).
+	// The DDS RimArcho wrote next to mods' PNGs are not part of the mods (Texture optimisation).
 	generated, err := a.Store.GeneratedFiles()
 	if err != nil {
 		return nil, err

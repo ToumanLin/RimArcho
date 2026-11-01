@@ -104,32 +104,3 @@ func subscriptionTaskText(t *app.Task, r *TaskRow, c map[string]int) {
 		}
 	}
 }
-
-func init() {
-	Register(map[string]string{
-		"subscribe %s":               "订阅 %s",
-		"completed %d, failed %d":    "完成 %d，失败 %d",
-		"completed %d, cancelled %d": "完成 %d，已取消 %d",
-		"no longer on the Workshop":  "已不在创意工坊",
-		"no longer on the Workshop (author deleted it or made it private)": "已不在创意工坊（作者删除或设为私有）",
-		"%d mods are no longer on the Workshop (deleted or private)":       "%d 个 Mod 已不在创意工坊（作者删除或设为私有）",
-		"%d mods: %s":                                       "%d 个 Mod：%s",
-		"account does not own this content":                 "账户未拥有此内容",
-		"not enough disk space or unable to write":          "磁盘不足或无法写入",
-		"connection failed or timed out":                    "连接失败或超时",
-		"SteamCMD exited before confirming the download":    "SteamCMD 异常退出，下载未确认",
-		"check the Steam password":                          "请检查 Steam 密码",
-		"Steam Guard verification required":                 "需要 Steam Guard 验证",
-		"Steam login failed":                                "Steam 登录失败",
-		"downloading %s":                                    "正在下载 %s",
-		"finishing the subscription":                        "正在完成订阅",
-		"access was denied; check account access":           "访问被拒绝，请检查账户权限",
-		"cancelling the download; completed items are kept": "正在取消下载，已完成的条目会保留",
-		"retry %d items":                                    "重试 %d 个",
-		"continue %d items":                                 "继续 %d 个",
-		"go to subscriptions and updates":                   "前往订阅与更新",
-		"nothing to retry":                                  "没有可重试的条目",
-		"cancelled":                                         "已取消",
-		"%s; %s":                                            "%s；%s",
-	})
-}

@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The editor's 排序规则 (06 §2.5): list, add, change (r:<n> stays), remove and restore.
+// The editor's Load-order rules (06 §2.5): list, add, change (r:<n> stays), remove and restore.
 func TestRulesFold(t *testing.T) {
 	view.SetLang("en")
 	e, s, _ := fixture(t)
@@ -47,7 +47,7 @@ func TestRulesFold(t *testing.T) {
 	if out := e.MustRun("rule", "list"); !strings.Contains(out, "r:1  top") {
 		t.Fatalf("cli list after change:\n%s", out)
 	}
-	// remove, then 撤销 puts it back with its ID
+	// remove, then undo puts it back with its ID
 	if text, err := s.RemoveRule(1); err != nil || text != "rule removed: Alpha loads as early as it can" {
 		t.Fatalf("remove %q %v", text, err)
 	}
@@ -70,7 +70,7 @@ func TestRulesFold(t *testing.T) {
 	if rules, _ = s.Rules(); rules.Rows[0].ID != 2 {
 		t.Fatalf("newest first, new number: %+v", rules.Rows)
 	}
-	// 只看当前列表: a rule shows there when one of its mods is enabled in the list
+	// only the current list: a rule shows there when one of its mods is enabled in the list
 	if !rules.Rows[1].InList {
 		t.Fatalf("Alpha is enabled, its rule is not in the list: %+v", rules.Rows[1])
 	}
@@ -148,7 +148,7 @@ func TestRuleEditCommand(t *testing.T) {
 	}
 }
 
-// 搜索文件 (06 §2.9): results by mod and file, pages, and a superseded search is dropped.
+// Search files (06 §2.9): results by mod and file, pages, and a superseded search is dropped.
 func TestFileSearchAPI(t *testing.T) {
 	view.SetLang("en")
 	_, s, _ := fixture(t)

@@ -12,7 +12,7 @@ import (
 )
 
 // 01 §4.1: every row of the write list (01 §4) says what uninstall does with it — a step in
-// backticks, or "无：" and why not — every step it names exists, and every step is in §4.
+// backticks, or "none:" and why not — every step it names exists, and every step is in §4.
 func TestUninstallCoversWriteList(t *testing.T) {
 	t.Parallel()
 	_, file, _, _ := runtime.Caller(0)
@@ -44,7 +44,7 @@ func TestUninstallCoversWriteList(t *testing.T) {
 		if !header {
 			header = true
 			if last := strings.TrimSpace(cells[len(cells)-1]); !strings.HasPrefix(last, "卸载") {
-				t.Fatalf("the write list has no 卸载 column: %q", last)
+				t.Fatalf("the write list has no uninstall column: %q", last)
 			}
 			continue
 		}
@@ -63,7 +63,7 @@ func TestUninstallCoversWriteList(t *testing.T) {
 			t.Errorf("row %q names no uninstall step: %q", cells[0], last)
 		}
 		if !named && !strings.HasPrefix(last, "无：") {
-			t.Errorf("row %q: no uninstall step and no reason (无：…): %q", cells[0], last)
+			t.Errorf("row %q: no uninstall step and no reason (none: …): %q", cells[0], last)
 		}
 	}
 	if rows < 15 {

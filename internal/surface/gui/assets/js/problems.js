@@ -1,5 +1,5 @@
 // The list's problems inside the editor: the top bar's "N problems" button opens a panel
-// with every item of 能不能跑, worst first, each with its fix, so the list can be put right
+// with every item of Can it run, worst first, each with its fix, so the list can be put right
 // without leaving it (06 §4.2). The panel follows S.board.problems: a list edit, a sort or
 // the background check (the list-problems event) redraw it in place.
 import { S, el, T, Tf, say, errText } from "./state.js";

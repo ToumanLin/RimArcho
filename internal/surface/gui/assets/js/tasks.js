@@ -1,5 +1,5 @@
-// 后台任务 (06 §2.16): what RimArcho does in the background, what waits and what each item
-// came to. Like Mod 库存: the filter bar and the tasks down the left; on the right the task's
+// Background tasks (06 §2.16): what RimArcho does in the background, what waits and what each item
+// came to. Like Mod library: the filter bar and the tasks down the left; on the right the task's
 // summary, then a table of every item it touched (06 §3.9: the headers sort, move, size and
 // pick columns). Not a popup: the work goes on while the player is on other pages, and the
 // sidebar's foot line and ctrl+j bring them back here. "tasks" events say the record

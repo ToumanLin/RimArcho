@@ -443,7 +443,7 @@ func whyCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		onto(ma, db)
 		onto(mb, da)
-		// Methods both mods patch with Harmony (05 §4.2: 共同补丁).
+		// Methods both mods patch with Harmony (05 §4.2: shared patches).
 		ha, _ := c.App.Store.HarmonyPatches(store.HarmonyFilter{Instance: ma.ID})
 		hb, _ := c.App.Store.HarmonyPatches(store.HarmonyFilter{Instance: mb.ID})
 		kinds := map[string][2][]string{}

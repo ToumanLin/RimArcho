@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/l10ndata"
+
 	"golang.org/x/net/publicsuffix"
 )
 
@@ -73,18 +75,8 @@ func Open(dir string) (*Session, error) {
 	}
 	s.accept(e.Cookies)
 	s.status = e.Status
-	switch s.status.State {
-	case "未连接":
-		s.status.State = "not connected"
-	case "需登录":
-		s.status.State = "login required"
-	case "需浏览器验证":
-		s.status.State = "browser verification required"
-	case "限额":
-		s.status.State = "rate limited"
-	case "可用":
-		s.status.State = "available"
-	}
+	s.status.State = l10ndata.LegacyEnglish(s.status.State)
+
 	if len(s.cookies) == 0 {
 		s.status.State = "login required"
 	}

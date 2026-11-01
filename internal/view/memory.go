@@ -83,32 +83,6 @@ func RefreshMemory(a *app.App, st *app.LoadoutState, old *Needs) *Needs {
 	return &n
 }
 
-func init() {
-	Register(map[string]string{
-		"RAM is tight: closing other apps leaves more room.":             "可用内存偏紧：关闭其他程序可以留出更多空间。",
-		"close other apps or reduce the list before launching.":          "关闭其他程序或减少 Mod 后再启动。",
-		"RAM may be insufficient":                                        "内存可能不足",
-		"launch with RAM risk":                                           "内存不足，启动游戏",
-		"launch with limited RAM":                                        "内存偏紧，启动游戏",
-		"launch anyway":                                                  "仍然启动",
-		"loading RAM needed":                                             "载入预计需要",
-		"RAM available now":                                              "当前可用内存",
-		"the list changed; review the updated estimate before launching": "列表已变化，请查看更新后的估算再启动",
-		"file estimates and OS memory snapshot":                          "文件估算与系统内存快照",
-		"RAM / VRAM":                                                     "内存 / 显存",
-		"refresh memory estimate":                                        "重新估算内存",
-		"not measured":                                                   "尚未估算",
-		"unavailable":                                                    "未读取到",
-		"RAM: loading needs %s; available now %s of %s":                  "内存：载入时需要 %s；当前可用 %s，共 %s",
-		"VRAM: estimated %s; dedicated capacity %s":                      "显存：预计 %s；显卡专用显存 %s",
-		"RAM may be insufficient: close other apps or reduce the list before launching.":                         "内存可能不足：建议关闭其他程序或减少 Mod 后再启动。",
-		"VRAM may be insufficient: optimize textures or reduce texture mods.":                                    "显存可能不足：建议优化贴图或减少贴图 Mod。",
-		"GPU: %s (by the system's preference)":                                                                   "显卡：%s（按系统优先级推测）",
-		"Saves and memory mods allocate themselves are not counted; a shortfall is a risk, not a certain crash.": "不含存档和 Mod 自行分配的内存；不足是风险，不一定崩溃。",
-		"Loading RAM budget %s": "载入时内存约 %s",
-	})
-}
-
 // MemoryLaunch binds a cached comparison to the exact environment/list snapshot.
 // It performs no file measurement on the page's paint or launch paths.
 type MemoryLaunch struct {

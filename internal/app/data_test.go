@@ -105,7 +105,7 @@ func TestCommunityDataEncoding(t *testing.T) {
 	}
 }
 
-// D1–D3 (04 §6.3): download, all-or-nothing replacement, and what the data adds to 需要处理.
+// D1–D3 (04 §6.3): download, all-or-nothing replacement, and what the data adds to Can it run.
 func TestCommunityData(t *testing.T) {
 	t.Parallel()
 	e := loadoutEnv(t)

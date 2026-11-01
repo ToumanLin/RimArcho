@@ -37,7 +37,7 @@ export async function observe() {
       pendingRegions:[...document.querySelectorAll('#screen [aria-busy="true"]')].map(e=>e.getAttribute('aria-label')||e.className),
       readError: document.querySelector('.page-read-error')?.innerText,
       blank: !document.querySelector('#app')?.firstElementChild,
-      noGame: !!S.board?.envs?.length && /no games? yet|还没有游戏/.test(screen?.textContent||''),
+      noGame: !!S.board?.envs?.length && /no games? yet|\u8fd8\u6ca1\u6709\u6e38\u620f/.test(screen?.textContent||''),
       sidebar: [...document.querySelectorAll('#nav [data-id]')].map(e => e.dataset.id),
       content: S.screen === null ? !!document.querySelector('#board .rows') && renderedColumns.every(col=>!col.expected || col.rendered>0) : !!screen?.innerText.trim(),
       navLayout:document.querySelector('#app')?.classList.contains('nav-top')?'top':'side',

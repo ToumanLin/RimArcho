@@ -24,15 +24,15 @@ function key(k, o = {}) {
 async function go(id) {
   if (id === "settings") $("#nav-settings").click();
   else if (id === "guide" || id === "uninstall") {
-    // pages under another: 环境's "add an environment", 设置's "uninstall RimArcho"
+    // pages under another: Games' "add an environment", settings's "uninstall RimArcho"
     await go(id === "guide" ? "env" : "settings");
-    const re = id === "guide" ? /添加环境|add an environment/i : /卸载|uninstall/i;
+    const re = id === "guide" ? /\u6dfb\u52a0\u73af\u5883|add an environment/i : /\u5378\u8f7d|uninstall/i;
     const b = [...document.querySelectorAll("#acts button, #screen button")].find((x) => re.test(x.textContent));
     if (!b) throw new Error("no way to " + id);
     b.click();
   }
   else {
-    // a sub-entry (全部 / 订阅与更新 / 添加订阅) shows once its parent is open
+    // a sub-entry (All / subscriptions and updates / add a subscription) shows once its parent is open
     let b = $(`#nav [data-id="${id}"]`);
     if (!b && (id === "changes" || id === "subscribe")) { $(`#nav [data-id="library"]`).click(); await wait(600); b = $(`#nav [data-id="${id}"]`); }
     b.click();
@@ -55,7 +55,7 @@ function notBase(screen) {
   const lw = lib.where();
   if (S.screen === "library" && / › /.test(lw)) out.push("details over the page");
   if (S.screen === "library" && $(".lib-detail.focus")) out.push("focus in the details");
-  if (S.screen === "library" && /selected|已选/.test(lw)) out.push("library selection");
+  if (S.screen === "library" && /selected|\u5df2\u9009/.test(lw)) out.push("library selection");
   if (S.screen === "changes" && $(".subs-sources")) out.push("sources open");
   if (S.screen === "changes" && $(".subs-scope .lib-cond")) out.push("one mod only");
   if (S.screen === "subscribe" && $(".subscribe-card")) out.push("pasted address");
@@ -75,41 +75,41 @@ const rowMenu = async (sel) => {
 };
 
 const SCENARIOS = [
-  ["启动 · help", "home", "home", async () => { key("?"); }],
-  ["能不能跑 · help", "needs", "needs", async () => { key("?"); }],
-  ["能不能跑 · an item's ⋯ menu (mouse)", "needs", "needs", async () => { const m = $(".need .more"); if (!m) throw new Error("no ⋯"); m.click(); }],
-  ["能不能跑 · palette", "needs", "needs", async () => { key("k", { ctrl: true }); }],
-  ["游戏日志 · help", "log", "log", async () => { key("?"); }],
-  ["游戏日志 · palette", "log", "log", async () => { key("k", { ctrl: true }); }],
-  ["Mod 库存 › 全部 · filter open, focus in it", "library", "library", async () => { key("\\"); await wait(300); }],
-  ["Mod 库存 › 全部 · filter open, focus on the rows", "library", "library", async () => { key("\\"); await wait(300); $(".lib-rows, .lib .rows").focus(); }],
-  ["Mod 库存 › 全部 · search typed", "library", "library", async () => { key("/"); await wait(100); const i = document.activeElement; i.value = "a"; i.dispatchEvent(new Event("input")); await wait(300); }],
-  ["Mod 库存 › 全部 · selection + details over the page", "library", "library", async () => { key("ArrowDown", { shift: true }); key("ArrowDown", { shift: true }); key("Enter"); await wait(200); }],
-  ["Mod 库存 › 全部 · selection + open filter + details", "library", "library", async () => { key("ArrowDown", { shift: true }); key("\\"); await wait(300); $(".lib-rows, .lib .rows").focus(); key("Enter"); await wait(200); }],
-  ["Mod 库存 › 全部 · search applied + selection + details + filter open, focus in it", "library", "library", async () => {
+  ["Start · help", "home", "home", async () => { key("?"); }],
+  ["Can it run · help", "needs", "needs", async () => { key("?"); }],
+  ["Can it run · an item's ⋯ menu (mouse)", "needs", "needs", async () => { const m = $(".need .more"); if (!m) throw new Error("no ⋯"); m.click(); }],
+  ["Can it run · palette", "needs", "needs", async () => { key("k", { ctrl: true }); }],
+  ["Game log · help", "log", "log", async () => { key("?"); }],
+  ["Game log · palette", "log", "log", async () => { key("k", { ctrl: true }); }],
+  ["Mod library > All · filter open, focus in it", "library", "library", async () => { key("\\"); await wait(300); }],
+  ["Mod library > All · filter open, focus on the rows", "library", "library", async () => { key("\\"); await wait(300); $(".lib-rows, .lib .rows").focus(); }],
+  ["Mod library > All · search typed", "library", "library", async () => { key("/"); await wait(100); const i = document.activeElement; i.value = "a"; i.dispatchEvent(new Event("input")); await wait(300); }],
+  ["Mod library > All · selection + details over the page", "library", "library", async () => { key("ArrowDown", { shift: true }); key("ArrowDown", { shift: true }); key("Enter"); await wait(200); }],
+  ["Mod library > All · selection + open filter + details", "library", "library", async () => { key("ArrowDown", { shift: true }); key("\\"); await wait(300); $(".lib-rows, .lib .rows").focus(); key("Enter"); await wait(200); }],
+  ["Mod library > All · search applied + selection + details + filter open, focus in it", "library", "library", async () => {
     key("/"); await wait(100); const i = document.activeElement; i.value = "a"; i.dispatchEvent(new Event("input")); await wait(300); key("Enter"); i.blur();
     $(".lib-rows").focus(); key("ArrowDown", { shift: true }); key("Enter"); await wait(300); key("\\"); await wait(300);
   }],
-  ["Mod 库存 › 全部 · row menu (menu key)", "library", "library", async () => { key("ContextMenu"); await wait(300); }],
-  ["Mod 库存 › 全部 · row menu (right click)", "library", "library", async () => { await rowMenu(".lib .lib-row"); }],
-  ["Mod 库存 › 全部 · selection + filters set, bar open, focus on the rows + details", "library", "library", async () => {
+  ["Mod library > All · row menu (menu key)", "library", "library", async () => { key("ContextMenu"); await wait(300); }],
+  ["Mod library > All · row menu (right click)", "library", "library", async () => { await rowMenu(".lib .lib-row"); }],
+  ["Mod library > All · selection + filters set, bar open, focus on the rows + details", "library", "library", async () => {
     key("ArrowDown", { shift: true }); key("\\"); await wait(300); key("Enter"); await wait(300); $(".lib-rows").focus(); key("Enter"); await wait(300);
   }],
-  ["Mod 库存 › 全部 · help", "library", "library", async () => { key("?"); }],
-  ["Mod 库存 › 订阅与更新 · help", "changes", "changes", async () => { key("?"); }],
-  ["Mod 库存 › 订阅与更新 · sources open", "changes", "changes", async () => { $(".subs-srcsum").click(); await wait(300); }],
-  ["Mod 库存 › 添加订阅 · an address pasted", "subscribe", "subscribe", async () => { const i = $(".subscribe-omni input"); i.focus(); i.value = "https://github.com/Example/colony"; i.dispatchEvent(new Event("input")); await wait(600); }],
-  ["方案 · selection + open filter + palette", "plan", "plan", async () => { key("ArrowDown", { shift: true }); key("\\"); await wait(300); key("k", { ctrl: true }); }],
-  ["方案 · filter open, focus on the rows", "plan", "plan", async () => { key("\\"); await wait(300); $('.area[data-area="1"] .rows').focus(); document.activeElement.blur(); }],
-  ["方案 · selection + search in staging", "plan", "plan", async () => { key("ArrowDown", { shift: true }); }],
-  ["方案 · row menu (right click)", "plan", "plan", async () => { await rowMenu('.area[data-area="1"] .row'); }],
-  ["方案 · full detail", "plan", "plan", async () => { key("Enter"); await wait(500); }],
-  ["整合包 · help", "packs", "packs", async () => { key("?"); }],
-  ["环境 · help", "env", "env", async () => { key("?"); }],
-  ["设置 · help", "settings", "settings", async () => { key("?"); }],
-  ["设置 › 卸载 · help", "uninstall", "uninstall", async () => { key("?"); }],
-  ["环境 › 添加环境 · download a version (SteamCMD) + help", "guide", "guide", async () => {
-    const seg = [...document.querySelectorAll("#screen .seg button")].find((b) => /下载|download/i.test(b.textContent));
+  ["Mod library > All · help", "library", "library", async () => { key("?"); }],
+  ["Mod library > Subscriptions and updates · help", "changes", "changes", async () => { key("?"); }],
+  ["Mod library > Subscriptions and updates · sources open", "changes", "changes", async () => { $(".subs-srcsum").click(); await wait(300); }],
+  ["Mod library > Add a subscription · an address pasted", "subscribe", "subscribe", async () => { const i = $(".subscribe-omni input"); i.focus(); i.value = "https://github.com/Example/colony"; i.dispatchEvent(new Event("input")); await wait(600); }],
+  ["Lists · selection + open filter + palette", "plan", "plan", async () => { key("ArrowDown", { shift: true }); key("\\"); await wait(300); key("k", { ctrl: true }); }],
+  ["Lists · filter open, focus on the rows", "plan", "plan", async () => { key("\\"); await wait(300); $('.area[data-area="1"] .rows').focus(); document.activeElement.blur(); }],
+  ["Lists · selection + search in staging", "plan", "plan", async () => { key("ArrowDown", { shift: true }); }],
+  ["Lists · row menu (right click)", "plan", "plan", async () => { await rowMenu('.area[data-area="1"] .row'); }],
+  ["Lists · full detail", "plan", "plan", async () => { key("Enter"); await wait(500); }],
+  ["Packs · help", "packs", "packs", async () => { key("?"); }],
+  ["Games · help", "env", "env", async () => { key("?"); }],
+  ["Settings · help", "settings", "settings", async () => { key("?"); }],
+  ["Settings > Uninstall · help", "uninstall", "uninstall", async () => { key("?"); }],
+  ["Games > Add a game · download a version (SteamCMD) + help", "guide", "guide", async () => {
+    const seg = [...document.querySelectorAll("#screen .seg button")].find((b) => /\u4e0b\u8f7d|download/i.test(b.textContent));
     if (!seg) throw new Error("no download segment");
     seg.click(); await wait(1500); key("?");
   }],

@@ -27,30 +27,30 @@ func runAlias(m *model, alias string) {
 }
 
 var escPages = []escPage{
-	{"能不能跑", tabProblems, func(m *model) { press(m, "@") }},
-	{"能不能跑，help", tabProblems, func(m *model) { pressAll(m, "@", "?") }},
-	{"能不能跑，palette", tabProblems, func(m *model) { press(m, "@"); m.update(ctrlK) }},
-	{"能不能跑，an item's keys armed", tabProblems, func(m *model) {
+	{"Can it run", tabProblems, func(m *model) { press(m, "@") }},
+	{"Can it run, help", tabProblems, func(m *model) { pressAll(m, "@", "?") }},
+	{"Can it run, palette", tabProblems, func(m *model) { press(m, "@"); m.update(ctrlK) }},
+	{"Can it run, an item's keys armed", tabProblems, func(m *model) {
 		press(m, "@")
 		m.arm("x", "press x again", func(*model) tea.Cmd { return nil })
 	}},
-	{"游戏日志，choose a log", tabList, func(m *model) { press(m, "#") }},
-	{"Mod 库存 › 全部", tabLibrary, func(m *model) { press(m, "^") }},
-	{"Mod 库存 › 全部，filter open", tabLibrary, func(m *model) { pressAll(m, "^", `\`) }},
-	{"Mod 库存 › 全部，search typed", tabLibrary, func(m *model) { pressAll(m, "^", "/"); typeIn(m, "a") }},
-	{"Mod 库存 › 全部，filters set, filter open", tabLibrary, func(m *model) { pressAll(m, "^", "/"); typeIn(m, "a"); pressAll(m, "enter", `\`) }},
-	{"Mod 库存 › 全部，selection + details over the page", tabLibrary, func(m *model) { pressAll(m, "^", "shift+down", "shift+down", "enter") }},
-	{"Mod 库存 › 全部，selection + filters + details", tabLibrary, func(m *model) {
+	{"Game log, choose a log", tabList, func(m *model) { press(m, "#") }},
+	{"Mod library > All", tabLibrary, func(m *model) { press(m, "^") }},
+	{"Mod library > All, filter open", tabLibrary, func(m *model) { pressAll(m, "^", `\`) }},
+	{"Mod library > All, search typed", tabLibrary, func(m *model) { pressAll(m, "^", "/"); typeIn(m, "a") }},
+	{"Mod library > All, filters set, filter open", tabLibrary, func(m *model) { pressAll(m, "^", "/"); typeIn(m, "a"); pressAll(m, "enter", `\`) }},
+	{"Mod library > All, selection + details over the page", tabLibrary, func(m *model) { pressAll(m, "^", "shift+down", "shift+down", "enter") }},
+	{"Mod library > All, selection + filters + details", tabLibrary, func(m *model) {
 		pressAll(m, "^", "/")
 		typeIn(m, "a")
 		pressAll(m, "enter", "shift+down", "enter")
 	}},
-	{"Mod 库存 › 全部，filters set + selection + details + filter open", tabLibrary, func(m *model) {
+	{"Mod library > All, filters set + selection + details + filter open", tabLibrary, func(m *model) {
 		pressAll(m, "^", "/")
 		typeIn(m, "a")
 		pressAll(m, "enter", "shift+down", "enter", `\`)
 	}},
-	{"Mod 库存 › 全部，focus in a copy's details", tabLibrary, func(m *model) {
+	{"Mod library > All, focus in a copy's details", tabLibrary, func(m *model) {
 		press(m, "^")
 		for i := 0; i < 4 && !m.libr.detail; i++ {
 			pressAll(m, "right", "right")
@@ -59,27 +59,27 @@ var escPages = []escPage{
 			}
 		}
 	}},
-	{"Mod 库存 › 全部，row menu", tabLibrary, func(m *model) { press(m, "^"); pressKey(m, tea.KeyF10) }},
-	{"Mod 库存 › 全部，help", tabLibrary, func(m *model) { pressAll(m, "^", "?") }},
-	{"Mod 库存 › 订阅与更新", tabChanges, func(m *model) { press(m, "c") }},
-	{"Mod 库存 › 订阅与更新，one mod's + help", tabChanges, func(m *model) {
+	{"Mod library > All, row menu", tabLibrary, func(m *model) { press(m, "^"); pressKey(m, tea.KeyF10) }},
+	{"Mod library > All, help", tabLibrary, func(m *model) { pressAll(m, "^", "?") }},
+	{"Mod library > Subscriptions and updates", tabChanges, func(m *model) { press(m, "c") }},
+	{"Mod library > Subscriptions and updates, one mod's + help", tabChanges, func(m *model) {
 		m.openChangesOf(m.current().id, m.current().name)
 		press(m, "?")
 	}},
-	{"Mod 库存 › 搜索文件", tabSearch, func(m *model) { runAlias(m, "search files") }},
-	{"Mod 库存 › 搜索文件，searched + back in the box", tabSearch, func(m *model) {
+	{"Mod library > Search files", tabSearch, func(m *model) { runAlias(m, "search files") }},
+	{"Mod library > Search files, searched + back in the box", tabSearch, func(m *model) {
 		runAlias(m, "search files")
 		typeIn(m, "Harmony")
 		pressAll(m, "enter", "/")
 	}},
-	{"排序规则", tabRules, func(m *model) { runAlias(m, "load-order rules") }},
-	{"排序规则，the form open", tabRules, func(m *model) { press(m, "r") }},
-	{"启动", tabHome, func(m *model) { press(m, "!") }},
-	{"整合包", tabList, func(m *model) { press(m, "%") }},
-	{"贴图优化", tabList, func(m *model) { press(m, "&") }},
-	{"设置", tabList, func(m *model) { runAlias(m, "settings") }},
-	{"卸载，the typed confirmation", tabList, func(m *model) { runAlias(m, "uninstall"); press(m, "enter") }},
-	{"方案，help", tabList, func(m *model) { press(m, "?") }},
+	{"Load-order rules", tabRules, func(m *model) { runAlias(m, "load-order rules") }},
+	{"Load-order rules, the form open", tabRules, func(m *model) { press(m, "r") }},
+	{"Start", tabHome, func(m *model) { press(m, "!") }},
+	{"Packs", tabList, func(m *model) { press(m, "%") }},
+	{"Texture optimisation", tabList, func(m *model) { press(m, "&") }},
+	{"Settings", tabList, func(m *model) { runAlias(m, "settings") }},
+	{"Uninstall, the typed confirmation", tabList, func(m *model) { runAlias(m, "uninstall"); press(m, "enter") }},
+	{"Lists, help", tabList, func(m *model) { press(m, "?") }},
 }
 
 // atBase: the page shown has nothing over it, nothing selected and no open filter (06 §11
@@ -98,7 +98,7 @@ func atBase(m *model, page int) bool {
 func TestT20EscBackPages(t *testing.T) {
 	t.Parallel()
 	e, _ := v3Fixture(t)
-	e.WriteFile(filepath.Join(e.UserData, "Player.log"), "RimWorld 1.6.4633 rev1261\n") // 游戏日志 has a log to choose
+	e.WriteFile(filepath.Join(e.UserData, "Player.log"), "RimWorld 1.6.4633 rev1261\n") // game log has a log to choose
 	e.WriteFile(filepath.Join(e.Root, "LocalAppData", "RimArcho", "steamcmd", "steamcmd.exe"), "MZ")
 	for _, s := range escPages {
 		t.Run(s.name, func(t *testing.T) {

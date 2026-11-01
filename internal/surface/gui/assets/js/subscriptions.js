@@ -1,8 +1,8 @@
-// Mod 库 › 订阅与更新 (06 §2.9): one list and a detail. The list is what waits for the player
+// Mod library › subscriptions and updates (06 §2.9): one list and a detail. The list is what waits for the player
 // to update (Git, download pages, SteamCMD, Workshop items Steam has not downloaded), then
 // what already changed (the change history: one row per mod, by tier; new and gone; earlier
 // days). A scope bar above it picks the current list or every mod; one line under it sums
-// up the sources. Mod 库 › 添加订阅 is its own page (openAdd). Data: API.SubscriptionsPage
+// up the sources. Mod library › add a subscription is its own page (openAdd). Data: API.SubscriptionsPage
 // (view.BuildSubscriptions, the history from modchanges.Build).
 import { S, $, el, api, T, Tf, say, errText } from "./state.js";
 import { pathContent } from "./fields.js";
@@ -25,7 +25,7 @@ export function initSubscriptions(u, helpers) {
   ({ beginPageRead, page, area, button, act, seg } = helpers);
 }
 
-// listenPaste: a paste on 订阅与更新 (not in a field) takes the address to 添加订阅. Added
+// listenPaste: a paste on subscriptions and updates (not in a field) takes the address to add a subscription. Added
 // with the page's first visit.
 let listening = false;
 function listenPaste() {
@@ -142,7 +142,7 @@ function focusSel() {
   if (row) { row.focus({ preventScroll: true }); row.scrollIntoView({ block: "nearest" }); }
 }
 
-// scopeBar: 列表「…」 / 所有 Mod and the start of the range; or the one-mod condition.
+// scopeBar: list "…" / every mod and the start of the range; or the one-mod condition.
 function scopeBar() {
   const bar = el("div", "card subs-scope");
   const h = V.data?.history || {};
@@ -167,7 +167,7 @@ function toggleScope() {
   changes();
 }
 
-// listCard: 等你更新, 已经更新, earlier days; the sources line under them.
+// listCard: waiting for you to update, already updated, earlier days; the sources line under them.
 function listCard() {
   const card = el("section", "card subs-list");
   const box = el("div", "scroll");
@@ -272,7 +272,7 @@ function sourcesLine() {
   return foot;
 }
 
-// sourcesPanel: each source: its mods, the last check and its result, the account line, 检查.
+// sourcesPanel: each source: its mods, the last check and its result, the account line, check.
 function sourcesPanel() {
   const box = el("div", "subs-sources");
   for (const s of V.data?.sources || []) {
@@ -397,7 +397,7 @@ function changeDetail(card, r) {
   s.append(el("div", "subs-say word-facts", r.text));
   if (r.tier === 1) {
     const n = el("div", "subs-alert");
-    n.append(ic("warn"), el("span", "word-facts", T("Look at 能不能跑 before launching: this change can stop the game from loading.")));
+    n.append(ic("warn"), el("span", "word-facts", T("Look at Can it run before launching: this change can stop the game from loading.")));
     s.append(n);
   }
   const details = (r.details || []);
@@ -478,7 +478,7 @@ async function openSource(r) {
   try { say("ok", await api.OpenSubscriptionSource(r.ref)); } catch (e) { say("fail", errText(e)); }
 }
 
-// lock: a copy in the lock library, the dry run first (as on Mod 库, 06 §6).
+// lock: a copy in the lock library, the dry run first (as on Mod library, 06 §6).
 async function lock(ref) {
   let p;
   try { p = await api.LibraryPreview("pin", [ref]); } catch (e) { return say("fail", errText(e)); }
@@ -587,9 +587,9 @@ export function changesKey(e) {
   if (k === "p" && has("lock")) { done(); return changeAct(it.r, "lock"); }
 }
 
-// ---- Mod 库 › 添加订阅 ----
+// ---- Mod library › add a subscription ----
 
-// openAdd shows the add page; a paste on 订阅与更新 arrives filled in.
+// openAdd shows the add page; a paste on subscriptions and updates arrives filled in.
 export async function openAdd() {
   const read = beginPageRead("subscribe");
   let data = null;

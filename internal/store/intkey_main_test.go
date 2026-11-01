@@ -279,8 +279,8 @@ func TestIntKeyResearch(t *testing.T) {
 			name string
 			run  func() (time.Duration, error)
 		}{
-			{"写入30个快照清单", func() (time.Duration, error) { return ikWriteSnapshots(c, smp.manifests) }},
-			{"写入30个Def集合", func() (time.Duration, error) { return ikWriteDefSets(c, smp.defSets) }},
+			{"write 30 snapshot manifests", func() (time.Duration, error) { return ikWriteSnapshots(c, smp.manifests) }},
+			{"write 30 Def sets", func() (time.Duration, error) { return ikWriteDefSets(c, smp.defSets) }},
 		} {
 			var ds []time.Duration
 			for k := 0; k < rounds+1; k++ {

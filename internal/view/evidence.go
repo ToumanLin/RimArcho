@@ -9,18 +9,18 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/known"
 )
 
-// 能不能跑's sections and evidence (06 §2.4): the items are shown in sections, and each says
+// Can it run's sections and evidence (06 §2.4): the items are shown in sections, and each says
 // where its claim comes from.
 
 // Sections, in screen order. The GUI's left column holds the first three (what checking
 // the files and the shared logs found), its right column the run's errors; the TUI lists
 // them in the same order.
 const (
-	SectionBreak     = iota // 会让游戏出错: the list's problems, dependencies, conflicts
-	SectionHint             // 可以留意: what shared logs taught (EvCorpus); not counted
-	SectionConfirm          // 要你确认: identity questions, outside changes of the list
-	SectionRun              // 上次运行的报错: this run (while the game runs), then the last run
-	SectionElsewhere        // not on the page: Mod 库存 or 贴图优化 handles it (Needs.Elsewhere)
+	SectionBreak     = iota // Will cause errors: the list's problems, dependencies, conflicts
+	SectionHint             // worth knowing: what shared logs taught (EvCorpus); not counted
+	SectionConfirm          // for you to confirm: identity questions, outside changes of the list
+	SectionRun              // errors from the last run: this run (while the game runs), then the last run
+	SectionElsewhere        // not on the page: Mod library or Texture optimisation handles it (Needs.Elsewhere)
 )
 
 // SectionTitles are the sections' headings (English; T translates them).
@@ -62,7 +62,7 @@ var evidenceLabels = map[string]string{
 }
 
 // Evidence is the chip on an item: its kind in words and the concrete source
-// ("About.xml modDependencies", "log:E3 · 10 月 19 日 21:04").
+// ("About.xml modDependencies", "log:E3 · Oct 19 21:04").
 type Evidence struct {
 	Cutoff string `json:"cutoff,omitempty"`
 	Kind   string `json:"kind"`
@@ -181,7 +181,7 @@ var (
 	corpusOwnRe     = regexp.MustCompile(`^log corpus: (\d+) of (\d+) shared logs that enable `)
 )
 
-// corpusEvidence is the 社区日志 chip: what share of the shared logs showed the error.
+// corpusEvidence is the community logs chip: what share of the shared logs showed the error.
 func corpusEvidence(p *app.Problem) *Evidence {
 	share := func(a, b string) string {
 		x, y := atoi(a), atoi(b)

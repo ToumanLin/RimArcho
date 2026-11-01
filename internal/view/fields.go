@@ -11,8 +11,8 @@ import (
 )
 
 // The detail's one field list (06 §4.1, §2.9): the plan editor's detail and a copy's
-// detail on Mod 库存 show the same list, one row per field. In the window a value copies
-// itself when clicked ("已复制"); Act is the row's own button.
+// detail on Mod library show the same list, one row per field. In the window a value copies
+// itself when clicked ("copied"); Act is the row's own button.
 
 // Field kinds.
 const (
@@ -29,7 +29,7 @@ const (
 	FieldVersions  = "versions"
 	FieldUpdated   = "updated"
 	FieldPlayed    = "played"
-	FieldTextures  = "textures" // 贴图优化: the DDS RimArcho wrote (Mod 库存)
+	FieldTextures  = "textures" // Texture optimisation: the DDS RimArcho wrote (Mod library)
 	FieldLanguages = "languages"
 	FieldDeps      = "deps"
 	FieldConflicts = "conflicts"
@@ -37,10 +37,10 @@ const (
 
 // Field acts: what the row's button does.
 const (
-	ActFolder = "folder" // 打开位置
-	ActURL    = "url"    // 打开页面
-	ActSteam  = "steam"  // Steam 客户端页面
-	ActTags   = "tags"   // 编辑 (the tag bar)
+	ActFolder = "folder" // open the location
+	ActURL    = "url"    // open the page
+	ActSteam  = "steam"  // Steam client page
+	ActTags   = "tags"   // edit (the tag bar)
 )
 
 // Field is one row of the field list.
@@ -164,7 +164,7 @@ func Conflicts(st *app.LoadoutState, d *DetailData) []Dep {
 	return out
 }
 
-// LibFields is a copy's field list on Mod 库存: the editor's fields with the library's in
+// LibFields is a copy's field list on Mod library: the editor's fields with the library's in
 // between (state, used in, size, versions, update date, last played). The note is above
 // the list (CopyNote), not a row.
 func LibFields(a *app.App, lib *app.Library, i *app.LibInstance, d *DetailData) []Field {
@@ -209,11 +209,11 @@ func LibFields(a *app.App, lib *app.Library, i *app.LibInstance, d *DetailData) 
 	return fs
 }
 
-// LongDate is a date with the year: 2026 年 10 月 21 日 / Oct 21, 2026.
+// LongDate is a localized date with the year, such as Oct 21, 2026.
 func LongDate(t time.Time) string {
 	t = t.Local()
 	if Lang() == "zh" {
-		return t.Format("2006 年 1 月 2 日")
+		return t.Format(localeExtra("zh", "@date.long"))
 	}
 	return t.Format("Jan 2, 2006")
 }

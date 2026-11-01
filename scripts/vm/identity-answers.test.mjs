@@ -30,7 +30,7 @@ test('all three surfaces separate a quiet why control from the three equal answe
     const context = createContext({ el, box, pinned: true, reasonsOf: () => [item],
       runNeed: (it, a) => calls.push(a), needWrite: (a) => a.kind === 'answer' ? 'answer' : '', hide() {},
       archo: {}, T: (s) => s, Tf: (s) => s, N: { cur: [0, 0], open: new Set(), ask: null }, markNeeds() {},
-      // 能不能跑's card (screens.js): the cursor, done lines and the other column
+      // Can it run's card (screens.js): the cursor, done lines and the other column
       setCur() {}, snapshot() {}, doAction() {}, jumpTo() {}, linkBlock: () => el('div'), confirmRow: () => el('div'),
       statusIcon: () => '', subject: () => '', actionWrite: (a) => a.kind === 'answer' ? 'answer' : '',
       needActionWrite: (a) => a.kind === 'answer' ? 'answer' : '',

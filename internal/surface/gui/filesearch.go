@@ -7,7 +7,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 搜索文件 (06 §2.9): one search at a time. A newer search or 停止 cancels the one before,
+// Search files (06 §2.9): one search at a time. A newer search or stop cancels the one before,
 // whose answer is then dropped (06 §3.1 rule 9). The search runs in Wails' calling goroutine
 // on a private read session: neither the editor's lock nor a page reader waits for it.
 type fileSearch struct {
@@ -73,7 +73,7 @@ func (s *API) BeginFileSearch() uint64 {
 	return w.request
 }
 
-// StopFileSearch is 停止 (and leaving the page): the search request ends.
+// StopFileSearch is stop (and leaving the page): the search request ends.
 func (s *API) StopFileSearch(request uint64) {
 	w := &s.search
 	w.mu.Lock()
@@ -102,7 +102,7 @@ func (s *API) ModCandidates(text string) ([]view.RuleMod, error) {
 	return view.RuleCandidates(s.a, text, "")
 }
 
-// stopFileSearch: the player left 搜索文件; its search is no longer wanted.
+// stopFileSearch: the player left Search files; its search is no longer wanted.
 func (s *API) stopFileSearch() {
 	w := &s.search
 	w.mu.Lock()

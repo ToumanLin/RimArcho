@@ -125,8 +125,8 @@ try {
     let installs = 0;
     handlers.set("ApplySetting", () => { installs++; return ["queued"]; });
     for (const [name, bytes] of [["steamcmd", -1], ["todds", 12345], ["wezterm", 45678]]) {
-      handlers.set("Settings", () => [{ title: "外部工具", items: [{ label: name, actions: [
-        { label: "安装工具", argv: ["deps", "install", name], confirm: "Download tool?" }] }] }]);
+      handlers.set("Settings", () => [{ title: "External tools", items: [{ label: name, actions: [
+        { label: "Install tool", argv: ["deps", "install", name], confirm: "Download tool?" }] }] }]);
       handlers.set("ToolInstallOffer", () => ({ url: "https://fixture.invalid/" + name + ".zip", dir: "C:/fixture/" + name, bytes }));
       await screens.settings(); await settle();
       const before = installs;
@@ -149,8 +149,8 @@ try {
     pop.initPopups({ renderWhere() {}, renderHeads() {} });
     const groups = ["1.6", "1.7"].map(version => ({ game: "RimWorld " + version, path: "D:/games/" + version,
       rows: [{ name: "_Archo_env_old_" + version, path: "D:/games/" + version + "/Mods/_Archo_env_old_" + version,
-        target: "D:/very long library folder/".repeat(8) + "KnownMod", reason: "目标不存在", action: "保留" }] }));
-    const preview = groups.map(g => ({ ...g, rows: g.rows.map(r => ({ ...r, action: "将删除" })) }));
+        target: "D:/very long library folder/".repeat(8) + "KnownMod", reason: "target missing", action: "keep" }] }));
+    const preview = groups.map(g => ({ ...g, rows: g.rows.map(r => ({ ...r, action: "will delete" })) }));
     handlers.set("Needs", () => ({ items: [{ title: "Links", text: "Links", why: "raw evidence must be hidden", section: 0,
       counted: true, status: 2, linkGroups: groups, actions: [{ kind: "repair-links", label: "Repair", confirm: "Confirm",
       refs: ["fixture-preview"], linkGroups: preview }] }] }));
@@ -163,7 +163,7 @@ try {
     assert(target.scrollWidth <= target.clientWidth + 1, "long path overflows row");
     document.querySelector("#screen .need .acts button").click(); await settle();
     assert(document.querySelectorAll("#popup .link-game").length === 2, "preview lost game groups");
-    assert([...document.querySelectorAll("#popup .link-tag")].every(n => n.textContent === "将删除"), "preview action tag is wrong");
+    assert([...document.querySelectorAll("#popup .link-tag")].every(n => n.textContent === "will delete"), "preview action tag is wrong");
     assert(document.querySelector("#popup .link-row .link-path:nth-child(3)").dataset.path === groups[0].rows[0].target, "preview lost full path");
     pop.close(); popup.remove();
     handlers.set("Needs", () => ({ items: [] }));
@@ -229,7 +229,7 @@ try {
       emit("tasks", { ended: { kind: "source-check" } }); await settle();
       assert(sel()?.dataset.key === "d:Oct 21", "a task refresh lost the selection");
       key("+");
-      assert(went.at(-1) === "subscribe", "+ did not go to 添加订阅");
+      assert(went.at(-1) === "subscribe", "+ did not go to Add a subscription");
       await screens.changes({ id: "git-id", name: "Git fixture" }); await settle();
       assert(reads.at(-1)[1] === "git-id" && document.querySelector(".subs-scope .lib-cond") && screens.changesFiltered(), "one-mod view lost");
       assert(document.activeElement.closest(".subs-list"), "one-mod view did not land in the list");
@@ -240,7 +240,7 @@ try {
       assert(reads.at(-1).join() === "false," && document.activeElement.closest(".subs-list"), "home lost the current-list landing");
       await screens.openAdd(); await settle();
       const box = document.querySelector(".subscribe-omni input");
-      assert(box && box === document.activeElement, "添加订阅 did not focus the paste box");
+      assert(box && box === document.activeElement, "Add a subscription did not focus the paste box");
       assert(document.querySelectorAll(".subscribe-tile").length === 3, "source cards missing");
     } finally { ui.go = go; }
     pop.close(); popup.remove();

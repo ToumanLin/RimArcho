@@ -294,7 +294,7 @@ func (a *App) SourceSearch(st *LoadoutState, mods []*store.Mod, pattern string, 
 	return a.SourceSearchContext(context.Background(), st, mods, pattern, re, limit, budget, progress)
 }
 
-// SourceSearchContext is SourceSearch that stops when ctx ends (the GUI's 停止, a newer
+// SourceSearchContext is SourceSearch that stops when ctx ends (the GUI's stop, a newer
 // search): decompiling stops between assemblies and the search between files.
 func (a *App) SourceSearchContext(ctx context.Context, st *LoadoutState, mods []*store.Mod, pattern string, re *regexp.Regexp, limit int, budget time.Duration, progress func(string)) (*SourceSearchResult, error) {
 	res := &SourceSearchResult{}

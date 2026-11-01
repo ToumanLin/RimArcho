@@ -11,9 +11,9 @@ import (
 )
 
 // The filter bar (06 §2.5, §2.9): one search line and the filters in force as chips, over
-// 未启用 and 已启用 together in the editor (view.FilterBoard) and over the table in Mod 库存
+// Not enabled and Enabled together in the editor (view.FilterBoard) and over the table in Mod library
 // (view.BuildLibrary). `\` opens the groups, one line each: ↑↓ a group, ←→ a value, enter
-// or space keeps it, x or - leaves it out, typing finds a value of the group ("更多…"),
+// or space keeps it, x or - leaves it out, typing finds a value of the group ("more…"),
 // esc closes. The search line takes the words of §3.7; tab takes the grey completion.
 
 // barState is a page's bar.
@@ -79,7 +79,7 @@ func (b *barState) lineCount() int {
 
 // ---- the editor ----
 
-// refilterBar applies the bar to 未启用 and 已启用 (the cursors stay on their mods).
+// refilterBar applies the bar to Not enabled and Enabled (the cursors stay on their mods).
 func (m *model) refilterBar() {
 	for _, k := range []colKind{cInactive, cActive} {
 		m.refilterCol(k, m.cols[k].curID())
@@ -341,7 +341,7 @@ func (m *model) barView(w int) []string {
 		used += cells
 	}
 	if m.tab == tabLibrary {
-		add(sDimS.Render("1 "), 2) // Mod 库存's first area (06 §3.5)
+		add(sDimS.Render("1 "), 2) // Mod library's first area (06 §3.5)
 	}
 	add(sDimS.Render(ic.search+" "), 2)
 	switch {
@@ -465,7 +465,7 @@ func (m *model) barView(w int) []string {
 	return out
 }
 
-// valText: "美化 48", "-本地 37" (left out), "1.6 当前游戏 388".
+// valText: "Visuals 48", "-local 37" (left out), "1.6 this game 388".
 func valText(v view.LibChoice) string {
 	t := v.Label
 	if v.On == -1 {

@@ -24,7 +24,7 @@ param(
     [int]$DevToolsPort = 9222,   # inside the guest, on 127.0.0.1
     [int]$ForwardPort = 9223,    # what the host connects to
     [switch]$Interactive,       # exec: run a window runner in the signed-in desktop session
-    [switch]$StandardUser,       # run guest programs as 新玩家 instead of the logged-in Player
+    [switch]$StandardUser,       # run guest programs as the standard test user instead of the logged-in Player
     [string]$Monitor = ''        # build: bundle this Archo Monitor mod folder instead of building monitor/
 )
 $ErrorActionPreference = 'Stop'

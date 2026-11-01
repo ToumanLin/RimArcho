@@ -26,7 +26,7 @@ func launchHintNow(a *app.App) *LaunchHint {
 
 // Whole-list actions (06 §6): sort, save and launch act on one key or click and say what
 // they did (sort: u undoes it). The preview is the CLI's dry run (read-only), reached from
-// the palette (预览排序 / 预览保存 / 预览启动) or `archo … --dry-run`; it never asks to go on.
+// the palette (preview the sort / preview saving / preview the launch) or `archo … --dry-run`; it never asks to go on.
 
 // Whole-list actions.
 const (

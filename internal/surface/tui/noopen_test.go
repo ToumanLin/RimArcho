@@ -1,6 +1,6 @@
 package tui
 
-// Tests never open the file manager or the browser: a test that runs 打开位置 / 打开网页
+// Tests never open the file manager or the browser: a test that runs open the location / open page
 // (TestEveryOpRuns runs every op) would otherwise start Explorer on a temporary folder that
 // is gone by the time it looks, and open real Workshop pages.
 func init() {

@@ -59,7 +59,7 @@ func (m *model) space() tea.Cmd {
 func (m *model) applied(err error) bool {
 	m.reload()
 	if m.tab == tabLibrary {
-		m.loadLibrary() // a plan op from Mod 库存 (m, space)
+		m.loadLibrary() // a plan op from Mod library (m, space)
 	}
 	if err != nil {
 		m.say(sayFail, m.humanize(err.Error()))

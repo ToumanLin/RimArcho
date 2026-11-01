@@ -25,8 +25,8 @@ func cursorOn(t *testing.T, m *model, name string) {
 }
 
 // 06 §3.5: ctrl+o opens the cursor's mod's folder, ctrl+w its Workshop page (the status
-// line says when it has no Workshop ID), C the 变化 page narrowed to its Lineage; the
-// same in Mod 库存.
+// line says when it has no Workshop ID), C the Subscriptions and updates page narrowed to its Lineage; the
+// same in Mod library.
 func TestShortcutsFolderWorkshopChanges(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)
@@ -94,10 +94,10 @@ func TestShortcutsFolderWorkshopChanges(t *testing.T) {
 	}
 	press(m, "esc")
 	if m.tab != tabList {
-		t.Fatal("esc leaves 变化")
+		t.Fatal("esc leaves Subscriptions and updates")
 	}
 
-	// Mod 库存: the cursor's Lineage
+	// Mod library: the cursor's Lineage
 	m.openLibrary()
 	for i, r := range m.libr.page.Rows {
 		if r.Name == "Alpha" {

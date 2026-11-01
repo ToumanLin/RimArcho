@@ -1,4 +1,4 @@
-// 启动 (06 §2.3): edits not yet written to the game get 保存 in the launch block's corner, a
+// Start (06 §2.3): edits not yet written to the game get save in the launch block's corner, a
 // button of its own (w); nothing when there is nothing to save or the game runs.
 import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
@@ -26,7 +26,7 @@ function launchContext(live = null) {
 }
 const plan = { kind: 'plan', current: true, unsaved: 3 };
 
-test('3 unsaved edits: 保存 beside ▶, not inside it; a click saves without launching', () => {
+test('3 unsaved edits: Save beside ▶, not inside it; a click saves without launching', () => {
   const { context, calls } = launchContext();
   const s = context.launchStep(plan);
   const block = s.children.find((n) => n.className === 'hm-launch');
@@ -43,7 +43,7 @@ test('3 unsaved edits: 保存 beside ▶, not inside it; a click saves without l
   assert.deepEqual(calls, ['save']);
 });
 
-test('nothing to save, another row, or the game running: no 保存', () => {
+test('nothing to save, another row, or the game running: no Save', () => {
   for (const [f, live] of [[{ ...plan, unsaved: 0 }, null], [{ ...plan, current: false }, null], [{ kind: 'pack', unsaved: 3 }, null], [plan, { running: true, errors: 0 }]]) {
     const { context } = launchContext(live);
     const s = context.launchStep(f);

@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 后台任务 (06 §2.16): Mod 库's file and Steam actions run in app.Tasks' lanes, one item
+// Background tasks (06 §2.16): Mod library's file and Steam actions run in app.Tasks' lanes, one item
 // at a time, each item through the same single-item action as before (view.LibDo); the
 // window's own jobs (scan, analysis, packs, textures, downloads) report into the same
 // record. "tasks" events say the record changed (at most every 500 ms); a task of a lane
@@ -78,7 +78,7 @@ func (s *API) tasksChanged() {
 	})
 }
 
-// taskItem runs one item of a lane's task: Mod 库's action on one copy.
+// taskItem runs one item of a lane's task: Mod library's action on one copy.
 func (s *API) taskItem(kind, ref string) error {
 	if view.TaskLane(kind) == app.LaneFiles {
 		s.filesMu.RLock()
@@ -156,7 +156,7 @@ func (s *API) submitTask(kind string, refs []string) (string, error) {
 	return strings.TrimSpace(view.Tf("%s, %s: in the %s queue", view.TaskTitle(kind), t.Obj, ln) + "  " + note), nil
 }
 
-// Tasks is the 后台任务 page (and the sidebar's line).
+// Tasks is the Background tasks page (and the sidebar's line).
 func (s *API) Tasks() *view.TaskPage {
 	defer perftrace.Span("Tasks")()
 	return view.BuildTasks(s.tasks.List(), time.Now())
@@ -167,7 +167,7 @@ func (s *API) TasksSeen() {
 	s.tasks.MarkSeen()
 }
 
-// TaskAct runs a task action (view.TaskAct's ID) on tasks; ref picks one item (重试 one).
+// TaskAct runs a task action (view.TaskAct's ID) on tasks; ref picks one item (retry one).
 func (s *API) TaskAct(act string, ids []string, ref string) (string, error) {
 	if len(ids) == 0 && act != "clear" && act != "undo" {
 		return "", errors.New(view.T("no task"))
@@ -334,65 +334,11 @@ func (s *API) endSelf(id string, err error, text string) {
 	s.tasks.Finish(id, app.TaskDone, text)
 }
 
-func init() {
-	view.Register(map[string]string{
-		"%s, %s: in the %s queue":                                  "%s，%s：已排进%s队列",
-		"Steam did not confirm it (%s)":                            "Steam 没有确认（%s）",
-		"no task":                                                  "没有选中任务",
-		"%s cannot be stopped part way":                            "%s 不能中途停止",
-		"cancelled %s, %s: nothing was touched":                    "已取消 %s，%s：什么都没动",
-		"%s, %s stops after the item it is on; what is done stays": "%s，%s 做完手上这一项就停，做完的留着",
-		"stopping %d tasks":                                        "正在停止 %d 个任务",
-		"a scan is running":                                        "正在扫描",
-		"a check is running":                                       "正在检查",
-		"do it again from its page":                                "到它的页面上再做一次",
-		"it is the next one already":                               "已经是下一个要做的",
-		"it is the last one already":                               "已经排在最后",
-		"moved one place sooner":                                   "往前排了一位",
-		"moved one place later":                                    "往后排了一位",
-		"took %d off the record (no file is touched)":              "从记录里去掉 %d 项（文件不受影响）",
-		"no task is done":                                          "没有完成的任务",
-		"%s cannot do that now":                                    "%s 现在不能这样做",
-		"copied %s":                                                "已复制 %s",
-		"copy the name":                                            "复制名字",
-		"default columns":                                          "恢复默认列",
-		"drag to resize, double click: back to the default":        "拖动改大小，双击恢复",
-		"every item":                                               "每一项",
-		"leave out":                                                "去掉",
-		"narrower: %s":                                             "变窄“%s”",
-		"no task matches the filter, esc clears it":                "没有符合筛选的任务，esc 清掉筛选",
-		"pick a task":                                              "选一个任务",
-		"only these":                                               "只看这些",
-		"pick a value":                                             "选值",
-		"queue":                                                    "队列",
-		"search tasks and mod names":                               "搜索任务、Mod 名",
-		"see it in the mod library":                                "在 Mod 库里看",
-		"sort and columns":                                         "排序和列",
-		"sorted by %s":                                             "按%s排序",
-		"sort by %s":                                               "按%s排序",
-		"started":                                                  "开始",
-		"tasks":                                                    "任务",
-		"took":                                                     "用时",
-		"try only this one again":                                  "只重试这一项",
-		"what RimArcho does in the background; pick a task to see every item it touched and how it went": "RimArcho 在后台做的事。选一个任务，右边是它碰过的每一项和结果。",
-		"wider: %s":                 "加宽“%s”",
-		"now":                       "现在",
-		"earlier":                   "更早",
-		"mod":                       "Mod",
-		"result":                    "结果",
-		"reason":                    "原因",
-		"location":                  "位置",
-		"state":                     "状态",
-		"time":                      "时间",
-		"put %d back on the record": "放回记录 %d 项",
-	})
-}
-
 const steamChunk = 50
 
-// taskBatch runs a whole lane task at once when its kind allows (app.Tasks.Batch): 移到回收站
-// and 取消隐藏 use the CLI app actions, including link lifecycle and affected game scans;
-// 退订 and 重新订阅 check every item and hand Steam 50 at a time. The rest (锁定, 移入锁定库…)
+// taskBatch runs a whole lane task at once when its kind allows (app.Tasks.Batch): move to the recycle bin
+// and unhide use the CLI app actions, including link lifecycle and affected game scans;
+// unsubscribe and resubscribe check every item and hand Steam 50 at a time. The rest (lock, move into the lock library…)
 // need a scan after each item to know the new copy, and go one by one.
 func (s *API) taskBatch(kind string, refs []string, b app.BatchCalls) bool {
 	if kind == view.OpSubRemove || kind == view.OpSubRemoveFast {

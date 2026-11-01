@@ -1,6 +1,6 @@
 // Steam credit (02 §3.4): mods a "subscribe all" downloaded with SteamCMD give their authors no
 // subscription. After three game sessions that used them, ask once whether to replace that
-// batch with Steam subscriptions, little by little in the background; 不用了 never asks again.
+// batch with Steam subscriptions, little by little in the background; no thanks never asks again.
 import { S, api, T, Tf, say, errText } from "./state.js";
 import * as pop from "./popups.js";
 

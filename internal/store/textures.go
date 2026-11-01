@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// schemaV16: the DDS files RimArcho writes next to a mod's PNGs (08 §5.2, 贴图优化). A file
+// schemaV16: the DDS files RimArcho writes next to a mod's PNGs (08 §5.2, Texture optimisation). A file
 // is recorded as pending before the encoder runs and done once checked, so files of a run
 // that was cut short are still known (and cleaned, and left out of the mod's fingerprint).
 // texture_mod is the mod's snapshot when its textures were last optimised: when it changes

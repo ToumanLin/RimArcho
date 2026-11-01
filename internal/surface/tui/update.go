@@ -37,7 +37,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	defer m.fsLeft() // leaving 搜索文件 stops its search (06 §3.1 rule 9)
+	defer m.fsLeft() // leaving Search files stops its search (06 §3.1 rule 9)
 	if m.uninstallRun != nil {
 		switch msg := msg.(type) {
 		case uninstallStepMsg, uninstallDoneMsg:
@@ -214,7 +214,7 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 	case m.rulesTyping():
 		return m.rulesKey(k) // the rule's form
 	case m.tab == tabChanges && k.Paste:
-		return m.openAdd(string(k.Runes)) // a pasted address goes to 添加订阅 (06 §2.9 ctrl+v)
+		return m.openAdd(string(k.Runes)) // a pasted address goes to add a subscription (06 §2.9 ctrl+v)
 	case (m.tab == tabList || m.tab == tabLibrary) && m.curBar().typing:
 		return m.barTypeKey(k)
 	case (m.tab == tabList || m.tab == tabLibrary) && m.curBar().open:
@@ -331,7 +331,7 @@ func (m *model) listKey(s string) tea.Cmd {
 	case "/", "ctrl+f":
 		m.detailFocus = false
 		if m.focus == cStaging {
-			m.editing = true // 暂存 keeps its own search
+			m.editing = true // Staging keeps its own search
 			return nil
 		}
 		m.bar.typing = true
@@ -410,7 +410,7 @@ func (m *model) listKey(s string) tea.Cmd {
 		m.act(T("redid the change"), "redo")
 		return m.requestDetail()
 	case "L":
-		return m.goLaunch() // 启动 first, as in the window (06 §2.5)
+		return m.goLaunch() // Start first, as in the window (06 §2.5)
 	case "x":
 		if it := c.cur(); it != nil && it.id != "" {
 			m.act(Tf("switched the version of %s", it.name), "swap", it.ref)
@@ -443,7 +443,7 @@ func (m *model) listKey(s string) tea.Cmd {
 		}
 		return nil
 	case "r":
-		// 排序规则 with the form for this mod (06 §2.5): the window's rules card
+		// Load-order rules with the form for this mod (06 §2.5): the window's rules card
 		it := c.cur()
 		if it == nil || it.id == "" {
 			m.say(sayInfo, T("choose a mod in the lists first"))

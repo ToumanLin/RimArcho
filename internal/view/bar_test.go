@@ -27,7 +27,7 @@ func barBoard() *Board {
 	return b
 }
 
-// The bar filters 未启用 and 已启用 together; values of one group are "or", groups "and",
+// The bar filters Not enabled and Enabled together; values of one group are "or", groups "and",
 // a leading "-" leaves out (06 §2.5).
 func TestFilterBoard(t *testing.T) {
 	t.Parallel()

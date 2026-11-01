@@ -14,11 +14,11 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 )
 
-// What must never appear on the 需要处理 screen (06 §5): problem codes, #refs and the other
+// What must never appear on the Can it run screen (06 §5): problem codes, #refs and the other
 // reference forms of the CLI.
 var leakRe = regexp.MustCompile(`\b(?:dep|order|official|incompat|pkg|patch|version|log|harmony|def|mod|entry)\.[a-z][a-z-]+\b|#[a-z0-9]{4,5}\b|L#[a-z0-9]+|@\{|\bpkg:|\bp:[0-9a-f]{6}\b|\blog:E?\d|\bscan:\d|\bq:\d|\br:\d`)
 
-// T8 (06 §11) on a copy of a real data directory: every item of 需要处理 reads as one
+// T8 (06 §11) on a copy of a real data directory: every item of Can it run reads as one
 // sentence in plain words, has keys, and each key does something (opens a view or a
 // preview, or acts and says so); no code or #ref is on the screen. The data directory is
 // copied again into a temp dir first, so the keys' edits land nowhere that is kept.

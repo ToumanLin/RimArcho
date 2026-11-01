@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
-// uninstall (05 §4.2, 01 §4's 卸载 column): a dry run unless --yes. MCP has only the dry run
+// uninstall (05 §4.2, 01 §4's uninstall column): a dry run unless --yes. MCP has only the dry run
 // (preview_uninstall, 05 §5.2): removing RimArcho is the player's decision alone.
 func init() {
 	register(&Command{Name: "uninstall", Summary: "remove what RimArcho put on this machine and restore what it changed (a dry run; --yes runs it)", MaxArgs: 0, Run: uninstallCmd,

@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// K12 (08 §5.3): a pack's links left in Mods/ are one item in 要你确认, counted, with one
+// K12 (08 §5.3): a pack's links left in Mods/ are one item in for you to confirm, counted, with one
 // action that removes the links; the home page's launch tab says it.
 func TestPackLinksNeed(t *testing.T) {
 	view.SetLang("en")
@@ -61,7 +61,7 @@ func TestPackLinksNeed(t *testing.T) {
 	}
 }
 
-// Two folders of one packageId in Mods/ (08 §3): an item in 会让游戏出错; with RimArcho's link
+// Two folders of one packageId in Mods/ (08 §3): an item in Will cause errors; with RimArcho's link
 // among them the action changes the plan, with only the player's folders it lists them.
 func TestModsDuplicateNeed(t *testing.T) {
 	view.SetLang("en")
@@ -96,7 +96,7 @@ func TestModsDuplicateNeed(t *testing.T) {
 			kinds[it.Title] = it.Actions[0].Kind
 		}
 	}
-	// 收进锁定库 first, for the player's folders and beside RimArcho's link alike (08 §3)
+	// move into the lock library first, for the player's folders and beside RimArcho's link alike (08 §3)
 	if kinds["Mods/ holds Same twice"] != view.ActMoveLocked || kinds["Mods/ holds CmdOnly twice"] != view.ActMoveLocked {
 		t.Fatalf("first actions: %v", kinds)
 	}

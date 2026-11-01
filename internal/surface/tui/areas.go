@@ -168,7 +168,7 @@ func (m *model) popupName() string {
 	case m.cmdOn:
 		return T("command line")
 	case m.prompt != nil:
-		return strings.TrimRight(strings.TrimSpace(m.prompt.label), ":：")
+		return strings.TrimRight(strings.TrimSpace(m.prompt.label), ":\uff1a")
 	case m.panel != nil:
 		return m.panel.title
 	case m.editing, (m.tab == tabList || m.tab == tabLibrary) && m.curBar().typing:

@@ -54,6 +54,7 @@ $utf8 = New-Object System.Text.UTF8Encoding($false)
 $xml = [System.IO.File]::ReadAllText((Join-Path $here "About\About.xml"), $utf8).Replace('$VERSION$', $Version)
 [System.IO.File]::WriteAllText((Join-Path $about "About.xml"), $xml, $utf8)
 Copy-Item (Join-Path $here "LoadFolders.xml") $Out
+Copy-Item -LiteralPath (Join-Path $here "Languages") -Destination $Out -Recurse
 Copy-Item (Join-Path $repo "LICENSE") $Out
 foreach ($gv in "1.5", "1.6", "1.7") {
     $dir = Join-Path $Out "$gv\Assemblies"

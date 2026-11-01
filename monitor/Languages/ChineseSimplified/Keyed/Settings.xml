@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+  <ArchoMonitor_RecordMessages>记录信息级消息</ArchoMonitor_RecordMessages>
+  <ArchoMonitor_RecordMessagesTip>下次启动生效。默认关闭：信息消息最多，记录它们最费时。</ArchoMonitor_RecordMessagesTip>
+  <ArchoMonitor_Log>日志</ArchoMonitor_Log>
+  <ArchoMonitor_Entries>条目</ArchoMonitor_Entries>
+  <ArchoMonitor_HooksNotInstalled>未挂上的钩子</ArchoMonitor_HooksNotInstalled>
+</LanguageData>

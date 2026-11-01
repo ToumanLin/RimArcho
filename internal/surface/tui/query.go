@@ -31,7 +31,7 @@ func (m *model) matcher(q string) (func(*item) bool, func(*item) bool) {
 func (m *model) refilterCol(k colKind, keepID string) {
 	c := &m.cols[k]
 	if k != cStaging {
-		// 未启用 and 已启用 follow the filter bar (06 §2.5); 暂存 keeps its own search
+		// Not enabled and Enabled follow the filter bar (06 §2.5); Staging keeps its own search
 		c.view = c.view[:0]
 		if r := m.barResult(); r != nil && m.bar.active() {
 			c.view = append(c.view, r.Rows[k]...)

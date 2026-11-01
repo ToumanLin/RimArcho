@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
-// 设置 › 反馈 (06 §2.14): a GitHub issue written in RimArcho, sent through the feedback
+// Settings > Feedback (06 §2.14): a GitHub issue written in RimArcho, sent through the feedback
 // relay (no GitHub account needed) or opened in the browser. RimArcho, the game and the
 // system always go with it; the enabled mods, the paths and the game log's errors only when
 // the player ticks them, and the page shows the whole text first.
@@ -41,7 +41,7 @@ type FeedbackAttach struct {
 	Sections []feedback.Section `json:"sections"`
 	// Pending: the game log is still being analysed; ask again.
 	Pending bool `json:"pending,omitempty"`
-	// Send: RimArcho has a feedback relay, so 发送 is offered (feedback.RelayURL).
+	// Send: RimArcho has a feedback relay, so send is offered (feedback.RelayURL).
 	Send bool `json:"send,omitempty"`
 }
 
@@ -123,7 +123,7 @@ func feedbackPaths(a *app.App, st *app.LoadoutState) []string {
 	return append(out, "RimArcho: "+a.Home)
 }
 
-// feedbackLog is the newest Player.log's error groups as the 日志 page lists them, at most
+// feedbackLog is the newest Player.log's error groups as the Game log page lists them, at most
 // 40, each one line.
 func feedbackLog(a *app.App, st *app.LoadoutState) ([]string, bool) {
 	p, err := BuildLogPage(a, st, "", nil)
@@ -253,58 +253,4 @@ type CommunityLink struct {
 // CommunityLinks: the GitHub repository and the Discord server.
 func CommunityLinks() []CommunityLink {
 	return []CommunityLink{{Label: "Discord", URL: feedback.Discord}, {Label: "GitHub", URL: feedback.Repo}}
-}
-
-func init() {
-	Register(map[string]string{
-		"feedback":                     "反馈",
-		"bugs and suggestions…":        "问题和建议…",
-		"enabled mods":                 "启用的 Mod",
-		"paths":                        "路径",
-		"no game yet":                  "还没有游戏",
-		"no game log yet":              "还没有游戏日志",
-		"list “%s”, %d mods":           "列表“%s”，%d 个",
-		"enabled mods (list “%s”, %d)": "启用的 Mod（列表“%s”，%d 个）",
-		"the game, its data, the mod folders and RimArcho's data; your user name becomes %USERPROFILE%": "游戏、游戏数据、Mod 文件夹和 RimArcho 的数据；用户名换成 %USERPROFILE%",
-		"the errors in Player.log of %s":     "%s 的 Player.log 里的错误",
-		"game log errors (Player.log of %s)": "游戏日志里的错误（%s 的 Player.log）",
-		"… %d more error groups":             "…还有 %d 组报错",
-		"no errors":                          "没有报错",
-		"The full text was too long for the link; RimArcho copied it. Paste it here.": "全文太长，放不进链接，RimArcho 已经复制好了，请粘贴在这里。",
-		"community":            "社区",
-		"bugs and suggestions": "问题和建议",
-		"storage":              "存储",
-		"updates":              "更新",
-		// the GUI page (feedback.js)
-		"attach":            "附带",
-		"basic information": "基本信息",
-		"always attached":   "总是附带",
-		"title":             "标题",
-		"what happened":     "说明",
-		"what happened, and what you expected; steps to make it happen again help":                                     "发生了什么，你希望怎样；能重现的话写下步骤",
-		"the game log is still being analysed…":                                                                        "游戏日志还在分析…",
-		"opens GitHub in the browser; nothing is sent until you submit it there":                                       "在浏览器里打开 GitHub，在那里提交前什么都不会发出去",
-		"too long for a link: the link carries the title and the basics, and the full text is copied for you to paste": "太长，放不进链接：链接只带标题和基本信息，全文会先复制好，在 GitHub 的正文里粘贴",
-		"copy the text":                "复制全文",
-		"open GitHub":                  "打开 GitHub",
-		"copy and open GitHub":         "复制全文并打开 GitHub",
-		"opened GitHub in the browser": "已在浏览器里打开 GitHub",
-		"opened GitHub; paste the copied text into the issue": "已打开 GitHub，把复制的全文粘贴到正文里",
-		// sending through the relay
-		"RimArcho has no feedback relay; open GitHub instead":                          "RimArcho 没有反馈中转，请打开 GitHub 提交",
-		"write a title or what happened first":                                         "先写标题或说明",
-		"… %d more lines":                                                              "…还有 %d 行",
-		"could not reach the feedback relay: %v":                                       "连不上反馈中转：%v",
-		"one report a minute; send it again in a moment":                               "一分钟只能发一条，稍后再发",
-		"this computer has sent enough reports today; send it tomorrow or open GitHub": "这台电脑今天发的反馈够多了，明天再发，或打开 GitHub 提交",
-		"RimArcho has had too many reports today; send it tomorrow or open GitHub":     "今天收到的反馈太多了，明天再发，或打开 GitHub 提交",
-		"the report is too long; untick an attachment or shorten the contact":          "太长了，取消一项附带或缩短联系方式",
-		"the feedback relay could not file it (%s); open GitHub instead":               "反馈中转没能提交（%s），请打开 GitHub 提交",
-		"contact (optional, not public)":                                               "联系方式（可选，不公开）",
-		"Discord name or email, so the maintainer can ask you more":                    "Discord 名字或邮箱，方便维护者追问",
-		"public on GitHub": "会公开在 GitHub 上",
-		"send":             "发送",
-		"sending…":         "发送中…",
-		"sent as #%d":      "已发送，GitHub 上是 #%d",
-	})
 }

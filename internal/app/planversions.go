@@ -209,7 +209,7 @@ var versionTokRe = regexp.MustCompile(`^(\d+\.\d+)(?:\s*[-–~]\s*(\d+\.\d+))?$`
 // ParseVersions reads "1.5 1.6", "1.5-1.7", "1.4,1.6–1.7" into sorted, distinct versions.
 func ParseVersions(args []string) ([]string, error) {
 	text := strings.Join(args, " ")
-	text = strings.NewReplacer(",", " ", "，", " ", "、", " ", " - ", "-", " – ", "–").Replace(text)
+	text = strings.NewReplacer(",", " ", "\uff0c", " ", "\u3001", " ", " - ", "-", " – ", "–").Replace(text)
 	seen := map[string]bool{}
 	var out []string
 	for _, tok := range strings.Fields(text) {

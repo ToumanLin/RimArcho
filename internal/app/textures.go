@@ -23,7 +23,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
-// 贴图优化 (08 §5.2, docs/research/贴图优化-DDS.md): the DDS of a mod's PNGs, written next to
+// Texture optimisation (08 §5.2, docs/research/贴图优化-DDS.md): the DDS of a mod's PNGs, written next to
 // them. The game (1.6 and 1.7) loads a .dds in place of the .png of the same name: no PNG to
 // decode at start, and opaque textures take half the video memory (BC1, where the game makes
 // BC7 or DXT5 of a PNG). The PNGs stay; RimArcho records every file it writes and only ever
@@ -950,7 +950,7 @@ func (a *App) StaleTextures(ix *Index) []*store.Mod {
 	return out
 }
 
-// TextureSummary is what Mod 库存 shows for a copy: RimArcho's DDS files and bytes, the
+// TextureSummary is what Mod library shows for a copy: RimArcho's DDS files and bytes, the
 // scale they were made at, and whether the mod changed since.
 type TextureSummary struct {
 	Files int   `json:"files"`
@@ -987,8 +987,8 @@ func (a *App) TextureSummaries() map[string]TextureSummary {
 }
 
 // HasPNGTextures reports whether a copy had PNGs under a Textures/ folder at its last scan
-// (from the stored file lists, cached until a scan changes the snapshots): Mod 库存 offers
-// 优化贴图 for those copies only.
+// (from the stored file lists, cached until a scan changes the snapshots): Mod library offers
+// optimise textures for those copies only.
 func (a *App) HasPNGTextures(m *store.Mod) bool {
 	if m == nil || m.SnapID == 0 {
 		return false
@@ -998,7 +998,7 @@ func (a *App) HasPNGTextures(m *store.Mod) bool {
 
 // pngSnapshots is the set of snapshots with PNG textures, read again only when a scan
 // changed the snapshots. Checking that (SnapshotsKey counts the snapshots) costs a table
-// scan, so a caller going through many mods takes the set once (Mod 库存: once per mod made
+// scan, so a caller going through many mods takes the set once (Mod library: once per mod made
 // opening the page take 0.4 s on 3,500 instances).
 func (a *App) pngSnapshots() map[int64]bool {
 	if k := a.Store.SnapshotsKey(); a.pngSnaps == nil || a.pngSnapsKey != k {

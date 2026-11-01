@@ -7,7 +7,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The plan editor's 排序规则 (06 §2.5, 04 §6.1): the player's load-order rules. They are
+// The plan editor's Load-order rules (06 §2.5, 04 §6.1): the player's load-order rules. They are
 // global; a change reaches the sort and the problems through the database's change key.
 
 // RuleSpec is a rule as the editor's form sends it: A and B are references (L#…, #…).
@@ -45,7 +45,7 @@ func (s *API) SaveRule(id int64, r RuleSpec) (string, error) {
 	return text, nil
 }
 
-// RemoveRule deletes a rule at once; RestoreRule (the status line's 撤销) puts it back.
+// RemoveRule deletes a rule at once; RestoreRule (the status line's undo) puts it back.
 func (s *API) RemoveRule(id int64) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

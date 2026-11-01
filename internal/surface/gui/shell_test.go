@@ -213,7 +213,7 @@ func TestOpenListKeepsCurrent(t *testing.T) {
 		t.Fatalf("a new list is open, not current: %+v", sh.Plans)
 	}
 	if kids := sh.Nav[1].Items[0].Kids; len(kids) != 3 || kids[0].ID != view.PagePlans || kids[1].ID != def.Page {
-		t.Fatalf("全部列表 first, then the current list: %+v", kids)
+		t.Fatalf("All lists first, then the current list: %+v", kids)
 	}
 	if h := api.Home(); h.Featured < 0 || h.Rows[h.Featured].Name != def.Name {
 		t.Fatalf("the launch page features the open list: %+v", h)

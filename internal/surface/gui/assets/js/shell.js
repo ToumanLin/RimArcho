@@ -12,7 +12,7 @@ import { initWindowChrome, placeWindowControls } from "./window-chrome.js";
 
 let ui = null;
 
-// Where the navigation sits (06 §2.1): at the side (the sidebar, groups 在玩 / 库) or at the
+// Where the navigation sits (06 §2.1): at the side (the sidebar, groups Playing / Library) or at the
 // top (the same entries as one strip over the page: the groups are separators, an entry's
 // sub-entries a dropdown). The toggle heads the sidebar, or ends the strip; ctrl+b. The
 // choice is kept in ui.gui.nav ("top", or empty for the side).
@@ -151,15 +151,15 @@ export function shellFailed(next) {
 // current is the sidebar ID of what is shown: a page, the open plan (the editor and its
 // full detail), or one pack.
 export function current() {
-  // 编译成整合包 is the current plan's sub-page (06 §2.1)
+  // Create a pack is the current plan's sub-page (06 §2.1)
   // the full detail belongs to the list it was opened from (06 §4.2)
   if (S.screen === "full" && S.fullFrom === "library") return "library";
   if (!S.screen || S.screen === "full" || S.screen === "build") return (S.shell && S.shell.plan && S.shell.plan.page) || "plan";
   if (S.screen === "packs" && S.packFocus) return "pack:" + S.packFocus;
-  // a list's export: under 列表管理, or under the list when the editor opened it (06 §2.17)
+  // a list's export: under Manage lists, or under the list when the editor opened it (06 §2.17)
   if (S.screen === "plan-export" && S.planExport) return S.planExport.from === "editor" ? "plan:" + S.planExport.id : "plans";
   if (S.screen === "plan-import") return "plans"; // 06 §2.17
-  // 卸载 RimArcho is under 设置
+  // uninstall RimArcho is under settings
   if (S.screen === "uninstall" || S.screen === "uninstall-progress" || S.screen === "feedback") return "settings";
   // adding an environment belongs to the environment page
   if (S.screen === "guide" && S.guideFrom === "env") return "env";
@@ -174,7 +174,7 @@ export function sync() {
 
 // inGameMark: which plan the game's ModsConfig.xml holds (04 §1.3) is a small mark on that
 // plan's sub-entry (the home card says it in words), only when there are several plans to
-// tell apart; its tooltip says "游戏里现在是：<方案> v<n>". null when there is nothing to mark.
+// tell apart; its tooltip says "the game now uses: <list> v<n>". null when there is nothing to mark.
 function inGameMark(isInGame) {
   const sh = S.shell;
   if (!isInGame || !sh || !sh.inGame || !sh.plans || sh.plans.length < 2) return null;
@@ -213,7 +213,7 @@ function renderSide() {
       nav.append(el("div", "grp", g.title));
       for (const it of g.items || []) {
         const kids = it.kids || [];
-        // a pack left out of the capped sub-entries still keeps 整合包 open
+        // a pack left out of the capped sub-entries still keeps pack open
         const kidOn = kids.some((k) => k.id === cur) || (it.id === "packs" && String(cur).startsWith("pack:"));
         const on = it.id === cur || kidOn;
         // only the open entry shows its sub-entries (06 §2.1)
@@ -232,13 +232,13 @@ function renderSide() {
           c.onclick = (e) => { if (layout === "top") { e.stopPropagation(); kidMenu(b, false); } };
           b.append(c);
         }
-        // Only 能不能跑 carries a number (06 §2.1): the board's count between two Shell
+        // Only Can it run carries a number (06 §2.1): the board's count between two Shell
         // calls, plus this run's errors
         const badge = it.id === "needs" && S.board ? S.board.needs + liveCount() : it.badge;
         let n = null;
         if (badge) b.append(n = el("span", "badge-n num", String(badge)));
         bump("nav:" + it.id, n, badge || 0);
-        // 列表 opens its first sub-entry, the current list (06 §2.1)
+        // list opens its first sub-entry, the current list (06 §2.1)
         b.onclick = () => ui.go(it.id === "plan" ? (kids.find((k) => k.current) || kids.find((k) => k.id !== "plans") || { id: "plans" }).id : it.id);
         nav.append(b);
         if (kids.length) nav.append(kidList(it, kids, cur, hls.get(it.id)));
@@ -285,7 +285,7 @@ function kidList(it, kids, cur, hl) {
     kb.title = k.label;
     const g = inGameMark(k.inGame);
     if (g) kb.append(g);
-    // a plan's "有未载入的外部版本" (04 §4.3)
+    // a plan's "an outside version has not been loaded" (04 §4.3)
     if (k.mark) { const m = el("span", "mark"); m.title = k.mark; kb.append(m); kb.title = k.label + T("; ") + k.mark; }
     kb.onclick = () => ui.go(k.id);
     if (it.id === "plan" && !k.add) {
@@ -315,8 +315,8 @@ export function crumbs() {
 }
 
 // renderCrumbs: the breadcrumb names the page (there is no other title), and the chip
-// beside it says what the page is about: the environment, and on 能不能跑 the plan too.
-// The home page spans every environment, and Mod 库存 (全部 and 变化) every copy on the
+// beside it says what the page is about: the environment, and on Can it run the plan too.
+// The home page spans every environment, and Mod library (All and Subscriptions and updates) every copy on the
 // machine: no chip there.
 function renderCrumbs() {
   const env = $("#env");
@@ -338,7 +338,7 @@ function renderCrumbs() {
     tabs = owner.kids;
     cs = cs.slice(((sh && sh.crumbs && sh.crumbs[cur]) || []).length);
   } else if (layout === "top" && ((sh && sh.crumbs && sh.crumbs[cur]) || []).length > 1) {
-    cs = cs.slice(1); // the group (在玩, 库) is not shown at the top
+    cs = cs.slice(1); // the group (Playing, Library) is not shown at the top
   }
   const sig = JSON.stringify([tabs && tabs.map((k) => k.id + k.label), cs]);
   const on = tabs ? tabs.findIndex((k) => k.id === cur) : -1;

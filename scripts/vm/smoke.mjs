@@ -30,13 +30,13 @@ async function onPage(name, id, act, ms = 5000) {
 try {
   const [title, host] = await c.evaluate("[document.title, location.host]");
   report(title === "RimArcho" && host === "wails.localhost", "window loaded", `${title} @ ${host}`);
-  const onboarding = await c.evaluate("!!document.querySelector('.page.guide, [data-screen=guide]') || /开始使用|Get started/.test(document.body.innerText.slice(0, 300))");
+  const onboarding = await c.evaluate("!!document.querySelector('.page.guide, [data-screen=guide]') || /\u5f00\u59cb\u4f7f\u7528|Get started/.test(document.body.innerText.slice(0, 300))");
   if (onboarding) report(false, "past first-run guide", "the guide is open: no game added yet");
 
-  await onPage("shift+1 opens 启动", "home", () => c.key("Shift+Digit1"));
+  await onPage("shift+1 opens Start", "home", () => c.key("Shift+Digit1"));
   const photo = await until(() => c.evaluate("document.querySelector('#app').classList.contains('photo')"), 60000);
-  report(!!photo, "menu background shown on 启动", "plain background after 60 s");
-  await onPage("shift+2 opens 能不能跑", "needs", () => c.key("Shift+Digit2"));
+  report(!!photo, "menu background shown on Start", "plain background after 60 s");
+  await onPage("shift+2 opens Can it run", "needs", () => c.key("Shift+Digit2"));
   await onPage("alt+← goes back", "home", () => c.key("Alt+ArrowLeft"));
   await onPage("alt+→ goes forward", "needs", () => c.key("Alt+ArrowRight"));
   await onPage("mouse back button goes back", "home", () => c.mouse("back"));

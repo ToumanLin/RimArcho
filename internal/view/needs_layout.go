@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/env"
 )
 
-// How 能不能跑 lays its items out (06 §2.4, §5): what merges into the sort item, what the
+// How Can it run lays its items out (06 §2.4, §5): what merges into the sort item, what the
 // two columns say about each other, and what other pages handle.
 
 // mergeIntoSort: weak order preferences and order cycles are what sorting settles anyway.
@@ -91,7 +91,7 @@ func needLine(n Need) string {
 }
 
 // elsewhere counts what another page handles (SectionElsewhere): hidden and locked mods
-// in Mod 库存 (searched by their states), out-of-date converted textures in 贴图优化.
+// in Mod library (searched by their states), out-of-date converted textures in Texture optimisation.
 func elsewhere(items []Need) []Elsewhere {
 	lib, tex := 0, 0
 	for _, it := range items {
@@ -132,7 +132,7 @@ func currentLinksFirst(items []Need, gameRoot string) {
 	}
 }
 
-// NeedsLead is 能不能跑's lead sentence (06 §2.4): the open list's verdict from the
+// NeedsLead is Can it run's lead sentence (06 §2.4): the open list's verdict from the
 // counted items before the start (sections 1–3) and of the runs (the last section), and
 // whether the files were never checked or only suggestions are left. GUI screens.js
 // needsLead writes the same.
@@ -153,7 +153,7 @@ func NeedsLead(plan string, before, runs int, never, suggestions bool) string {
 	return Tf("%s can run: nothing to handle.", plan)
 }
 
-// AutoFixCount is how many items 自动修复 (F) resolves: required mods that are installed but
+// AutoFixCount is how many items fix automatically (F) resolves: required mods that are installed but
 // not enabled (CompleteDependencies enables them), and the sort it runs after (06 §5).
 // 0: there is nothing it can fix, and the action is not offered.
 func AutoFixCount(items []Need) int {

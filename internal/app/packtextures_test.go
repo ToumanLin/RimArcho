@@ -13,7 +13,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
-// 预转换 in a pack (08 §5.2): the copies' PNGs become DDS and the PNGs go; a key that failed
+// preconvert in a pack (08 §5.2): the copies' PNGs become DDS and the PNGs go; a key that failed
 // keeps its PNGs and loses its DDS; the author's DDS and its PNG stay; the mod itself is
 // never touched; pack.json and origin.json say what was done.
 func TestPackTextures(t *testing.T) {
