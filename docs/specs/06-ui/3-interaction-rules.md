@@ -160,7 +160,7 @@ Global:
 - Search is part of the shared filter bar (§2.5) and filters Disabled and Enabled together, with immediate results. Enter ends input, but the filter remains until Esc clears it. The heading shows `Enabled 12 / 485`. Staging has a separate search with the same rules.
 - The old Tab behavior of jumping to the next matching list is unnecessary because both lists are filtered together. Tab only accepts ghost completion.
 
-A query consists of space-separated words. All free words must match (AND). Structured conditions use OR within the same key and AND across keys; exclusions remove matches individually:
+A query consists of space-separated words. All free words must match (AND). Structured conditions use OR within the same key and AND across keys; repeated `lists:` conditions must all match the same copy. Exclusions remove matches individually:
 
 | Syntax | Meaning |
 | --- | --- |
@@ -168,6 +168,7 @@ A query consists of space-separated words. All free words must match (AND). Stru
 | `name:word` / `author:word` / `tag:word` | Match only the name including its alias, author, or tag, respectively. tag: matches the prefix of any word in a tag: tag:facial finds Facial Hair and Facial Animation, tag:animation finds only the latter, and tag:"facial hair" finds only the former |
 | `id:value` | Match a package ID substring, an exact Workshop ID, or a `#reference` |
 | `tags:value` | Select an exact tag; filter clicks use this syntax too. The old tag: prefix query remains supported |
+| `lists:"<name>"` | Keep the exact Mod copies enabled by the named list, case-insensitively. Quote names containing spaces. Unknown names match nothing; `-lists:"<name>"` excludes its copies. Repeated lists require membership in every named list. Staged entries and packs do not count. Completion offers real list names |
 | `source:value` | Match the directory role official, workshop, local, steamcmd, locked, or other, or a stable custom-directory alias (02 §0.2) |
 | `content:value` | Match assembly, xml, or language content |
 | `type:value` legacy | Match sources official, workshop, local, copy, git, or steamcmd; or content assembly (has a DLL), xml (no DLL, also xml-only), or language (language files only, also language-pack) |

@@ -12,11 +12,11 @@ import (
 // (LibGroup, LibChoice, LibCond), so both pages draw them with one component.
 //
 // A filter is "group:value" ("-group:value" leaves out). Within a group the values are
-// "or", between groups "and", as in Mod library (06 §2.9). The search box is the column search
+// "or" (lists require every value), between groups "and", as in Mod library (06 §2.9). The search box is the column search
 // of §3.7 and may hold tag: type: has: version: words of its own.
 
 // BarKeys are the editor bar's groups in the order shown.
-var BarKeys = []string{"tag", "source", "location", "version", "content", "has"}
+var BarKeys = []string{"lists", "tag", "source", "location", "version", "content", "has"}
 
 // barValues are the fixed values of a group, in the order shown (tags and versions come
 // from the rows).
@@ -76,6 +76,14 @@ func (c barCond) passes(it *Item, f MatchFacts, skip string) bool {
 		if k == skip {
 			continue
 		}
+		if k == "lists" {
+			for _, t := range ts {
+				if !termMatch(t, it, f) {
+					return false
+				}
+			}
+			continue
+		}
 		if !slices.ContainsFunc(ts, func(t term) bool { return termMatch(t, it, f) }) {
 			return false
 		}
@@ -91,6 +99,8 @@ func (c barCond) passes(it *Item, f MatchFacts, skip string) bool {
 // barRowValues are a row's values for a group.
 func barRowValues(it *Item, key string, f MatchFacts) []string {
 	switch key {
+	case "lists":
+		return it.Lists
 	case "tag":
 		return it.Tags
 	case "source":
@@ -150,10 +160,18 @@ func FilterBoard(b *Board, search string, filters []string, f MatchFacts, groups
 	}
 	sort.Slice(vers, func(i, j int) bool { return versionNewer(vers[i], vers[j]) })
 	out.Complete = CompleteQueryWith(search, tags, vers)
+	if b.Lists != nil {
+		out.Complete = completeLists(search, b.Lists.Names, out.Complete, b.Lists.Edited)
+	}
 	counts := map[string]map[string]int{}
 	shown := map[string]map[string]string{} // group → lower value → as shown
 	for _, k := range BarKeys {
 		counts[k], shown[k] = map[string]int{}, map[string]string{}
+	}
+	if b.Lists != nil {
+		for _, name := range b.Lists.Names {
+			shown["lists"][strings.ToLower(name)] = name
+		}
 	}
 	for col := 0; col < 2; col++ {
 		items := b.Cols[col]
@@ -209,7 +227,11 @@ func FilterBoard(b *Board, search string, filters []string, f MatchFacts, groups
 	for _, k := range BarKeys {
 		g := LibGroup{Key: k, Title: barKeyTitle(k)}
 		for lv, v := range shown[k] {
-			g.Values = append(g.Values, LibChoice{Filter: k + ":" + v, Label: boardValueText(b, k, v), Count: counts[k][lv], On: on[k+":"+lv], Cur: k == "version" && v == game})
+			if k == "lists" && b.Lists != nil && strings.EqualFold(v, b.Lists.Edited) {
+				continue // the list being edited is not an available-list choice
+			}
+			cur := k == "version" && v == game || k == "lists" && b.Lists != nil && strings.EqualFold(v, b.Lists.Current)
+			g.Values = append(g.Values, LibChoice{Filter: k + ":" + v, Label: boardValueText(b, k, v), Count: counts[k][lv], On: on[k+":"+lv], Cur: cur})
 		}
 		sortBar(k, g.Values)
 		out.Groups = append(out.Groups, g)
@@ -243,7 +265,7 @@ func sortBar(k string, vs []LibChoice) {
 		switch k {
 		case "version":
 			return versionNewer(val(a), val(b))
-		case "tag", "location":
+		case "lists", "tag", "location":
 			if a.Count != b.Count {
 				return a.Count > b.Count
 			}
@@ -254,7 +276,7 @@ func sortBar(k string, vs []LibChoice) {
 }
 
 func barKeyTitle(k string) string {
-	return map[string]string{"tag": T("tags"), "source": T("library source"), "location": T("location"), "version": T("supported versions"), "content": T("content"), "has": T("has")}[k]
+	return map[string]string{"lists": T("lists"), "tag": T("tags"), "source": T("library source"), "location": T("location"), "version": T("supported versions"), "content": T("content"), "has": T("has")}[k]
 }
 
 func barValueText(k, v string) string {

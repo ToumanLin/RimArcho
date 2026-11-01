@@ -36,6 +36,10 @@ test("suggestions omit locations and result counts, and quote the full value", a
   const candidate=q.suggestions(groups,"tags:Fa",7)[0];
   assert.equal(candidate.token,'tags:"Facial Hair"'); assert.equal(candidate.label,""); assert.equal("count" in candidate,false);
   assert.equal(q.suggestions(groups,"source:l",8)[0].label,"本地");
+  groups.unshift({key:"lists",title:"lists",values:[{filter:"lists:Main colony",label:"Main colony",count:1,cur:true}]});
+  const list=q.suggestions(groups,'-lists:"Ma',10)[0];
+  assert.equal(list.token,'-lists:"Main colony"');assert.equal(list.label,"");
+  assert.equal(q.setQueryFilter('tags:"Facial Hair"','lists:Main colony',1),'tags:"Facial Hair" lists:"Main colony"');
 });
 test("virtual row boundaries account for group headings; an enabled copy keeps one line", async () => {
   const q = await loadModules("./listgeometry.js", {});

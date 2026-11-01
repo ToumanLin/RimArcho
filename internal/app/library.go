@@ -54,7 +54,7 @@ const (
 var LibSources = []string{LibWorkshop, LibLocal, LibLocked, LibSteamCMD, LibGit, LibPage, LibExtra, LibMonitor}
 
 // Library filter keys (LibQuery Include / Exclude are "key:value").
-var LibKeys = []string{"tag", "source", "location", "version", "state", "used", "updated", "content", "has", "name", "author", "id"}
+var LibKeys = []string{"lists", "tag", "source", "location", "version", "state", "used", "updated", "content", "has", "name", "author", "id"}
 
 // LibAges are the updated: values (06 §2.9): within a week, a month, half a year, and
 // older. They nest: a copy updated three days ago is in week, month and half-year.
@@ -108,8 +108,9 @@ type LibInstance struct {
 	Versions []string
 	States   []string // LibStates order
 	UsedIn   []LibUse
-	InPlan   bool // the current plan uses it
-	Staged   bool // in the current plan's staging (06 §2.5)
+	Lists    []string // enabled-list names, shared with Library.Lists.ByInstance
+	InPlan   bool     // the current plan uses it
+	Staged   bool     // in the current plan's staging (06 §2.5)
 	// Played: the newest launch whose list held it (launch records, 08 §1).
 	Played  time.Time
 	Changed time.Time // the newest scan that recorded a change
@@ -218,6 +219,7 @@ func (l *LibLineage) Changed() time.Time {
 
 // Library is an environment's inventory.
 type Library struct {
+	Lists    *ListMembership
 	Env      *env.Environment
 	GameMM   string
 	Lineages []*LibLineage // by name
@@ -258,10 +260,11 @@ func (a *App) library(st *LoadoutState, only string) (*Library, error) {
 	ix := st.Ix
 	selected := func(m *store.Mod) bool { return only == "" || m.LineageID == only }
 	lib := &Library{Env: ix.Env, GameMM: st.GameMM(), St: st}
-	used, err := a.libUses(st)
+	used, lists, err := a.libUses(st)
 	if err != nil {
 		return nil, err
 	}
+	lib.Lists = lists
 	played, err := a.libPlayed(st)
 	if err != nil {
 		return nil, err
@@ -335,6 +338,7 @@ func (a *App) library(st *LoadoutState, only string) (*Library, error) {
 		}
 	}
 	add := func(m *store.Mod, i *LibInstance) {
+		i.Lists = lib.Lists.ByInstance[m.ID]
 		l := lineage(m.LineageID)
 		l.Instances = append(l.Instances, i)
 		l.Alias, l.Note, l.Tags = m.Alias, m.Note, m.Tags
@@ -611,38 +615,22 @@ func libHere(envs []libEnv) func(id string) string {
 
 // libUses maps each instance to the plans (lists are shared by every game) and packs
 // that use it.
-func (a *App) libUses(st *LoadoutState) (map[string][]LibUse, error) {
-	out := map[string][]LibUse{}
+func (a *App) libUses(st *LoadoutState) (map[string][]LibUse, *ListMembership, error) {
 	envs, err := a.libEnvs(st)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	out, lists, err := a.listUses(st, envs)
+	if err != nil {
+		return nil, nil, err
 	}
 	names := map[string]libEnv{}
 	for _, le := range envs {
 		names[le.e.Name] = le
 	}
-	here := libHere(envs)
-	ps, err := a.Store.Plans()
-	if err != nil {
-		return nil, err
-	}
-	for _, p := range ps {
-		l := st.List
-		if st.Plan == nil || p.ID != st.Plan.ID {
-			if l, err = a.planList(p); err != nil {
-				return nil, err
-			}
-		}
-		u := LibUse{Kind: "plan", Name: p.Name, PlanID: p.ID, Current: st.Plan != nil && p.ID == st.Plan.ID}
-		for _, e := range l {
-			if id := here(e.Instance); id != "" && !slices.ContainsFunc(out[id], func(x LibUse) bool { return x.Value() == u.Value() }) {
-				out[id] = append(out[id], u)
-			}
-		}
-	}
 	packs, err := a.Packs()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	for _, p := range packs {
 		le, ok := names[p.Env]
@@ -659,7 +647,7 @@ func (a *App) libUses(st *LoadoutState) (map[string][]LibUse, error) {
 	for _, us := range out {
 		sortUses(us)
 	}
-	return out, nil
+	return out, lists, nil
 }
 
 // libPlayed maps each instance to the newest launch whose list held it: a plan's launch by
@@ -760,7 +748,7 @@ func IsTagSep(c byte) bool { return c == ' ' || c == '-' || c == '_' || c == '/'
 
 // LibQuery selects and orders the library: search words (all must match: names, package
 // id, authors, alias, tags, note, Workshop ID, folder), filters "key:value" (one key's
-// values are alternatives, different keys must all hold; Exclude drops what has any of
+// values are alternatives except lists, which require every value; different keys must all hold; Exclude drops what has any of
 // its values) and a sort: name, size, changed, played.
 type LibQuery struct {
 	Search           string
@@ -822,6 +810,8 @@ func libValues(l *LibLineage, i *LibInstance, key string, now time.Time) []strin
 		return libAges(i.Updated, now)
 	case "tag":
 		return l.Tags
+	case "lists":
+		return i.Lists
 	case "source":
 		if len(i.DirectoryValues) > 0 {
 			return i.DirectoryValues
@@ -935,6 +925,14 @@ func (q LibQuery) cond() (*libCond, error) {
 // passes: the instance holds every key's included values but skip's, and none excluded.
 func (c *libCond) passes(l *LibLineage, i *LibInstance, skip string) bool {
 	for k, want := range c.inc {
+		if k == "lists" && k != skip {
+			for name := range want {
+				if !c.has(l, i, k, map[string]bool{name: true}) {
+					return false
+				}
+			}
+			continue
+		}
 		if k != skip && !c.has(l, i, k, want) {
 			return false
 		}
@@ -1025,6 +1023,12 @@ func (lib *Library) Filter(q LibQuery) (*LibResult, error) {
 		counts[k] = map[string]int{}
 	}
 	all := map[string]map[string]string{} // key → lower value → as shown
+	all["lists"] = map[string]string{}
+	if lib.Lists != nil {
+		for _, name := range lib.Lists.Names {
+			all["lists"][strings.ToLower(name)] = name
+		}
+	}
 	for _, l := range lib.Lineages {
 		for _, i := range l.Instances {
 			for _, k := range LibKeys {
@@ -1106,6 +1110,10 @@ func sortFacet(k string, vs []LibFacetValue, lib *Library) {
 	}
 	rank := func(v string) int {
 		switch k {
+		case "lists":
+			if lib.Lists != nil && strings.EqualFold(v, lib.Lists.Current) {
+				return -1
+			}
 		case "source":
 			if strings.HasPrefix(v, LibLocal+"-") { // a game's Mods/ (local-main) sorts as local
 				v = LibLocal

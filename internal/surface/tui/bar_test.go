@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ToumanLin/RimArcho/internal/view"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -64,6 +65,29 @@ func TestBarGroups(t *testing.T) {
 		if g.Key == "version" && (len(g.Values) == 0 || !g.Values[0].Cur) {
 			t.Fatalf("version group %+v", g.Values)
 		}
+	}
+}
+
+func TestListsBarKeyboard(t *testing.T) {
+	t.Parallel()
+	e, _ := fixture(t)
+	e.MustRun("plan", "new", "Other colony", "--from", "current")
+	m := direct(t, e, 160, 40)
+	press(m, `\`)
+	if len(m.bar.groups) == 0 || m.bar.groups[0].Key != "lists" {
+		t.Fatalf("first group: %+v", m.bar.groups)
+	}
+	press(m, "enter")
+	if !slices.Equal(m.bar.filters, []string{"lists:Other colony"}) || len(m.cols[cActive].view) != 3 {
+		t.Fatalf("list include: %v, %v", m.bar.filters, viewNames(m, cActive))
+	}
+	press(m, "x")
+	if !slices.Equal(m.bar.filters, []string{"-lists:Other colony"}) || len(m.cols[cActive].view) != 0 {
+		t.Fatalf("list exclusion: %v, %v", m.bar.filters, viewNames(m, cActive))
+	}
+	text := valText(view.LibChoice{Filter: "lists:Main colony", Label: "Main colony", Cur: true, Count: 3})
+	if !strings.Contains(text, T("current list")) || strings.Contains(text, T("this game")) {
+		t.Fatalf("current-list marker: %s", text)
 	}
 }
 

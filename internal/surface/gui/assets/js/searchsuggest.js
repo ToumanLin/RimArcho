@@ -33,12 +33,12 @@ export function suggestions(groups, text, caret) {
     return value.toLowerCase().includes(part) || (v.label || "").toLowerCase().includes(part);
   }).map((v) => {
     const value = v.filter.slice(v.filter.indexOf(":") + 1);
-    return { token: prefix + typedKey + ":" + quoteValue(value), label: v.label === value ? "" : v.label, key: false };
+    return { token: prefix + typedKey + ":" + (key === "lists" ? '"' + value + '"' : quoteValue(value)), label: v.label === value ? "" : v.label, key: false };
   });
 }
 export function setQueryFilter(text, filter, on) {
   const at = filter.indexOf(":"), key = filter.slice(0, at).replace(/^tags$/, "tag"), value = filter.slice(at + 1);
   const parts = queryParts(text).filter((p) => !(p.key === key && (p.value.toLowerCase() === value.toLowerCase() || !p.value))).map((p) => p.raw);
-  if (on) parts.push((on < 0 ? "-" : "") + (key === "tag" ? "tags" : key) + ":" + quoteValue(value));
+  if (on) parts.push((on < 0 ? "-" : "") + (key === "tag" ? "tags" : key) + ":" + (key === "lists" ? '"' + value + '"' : quoteValue(value)));
   return parts.join(" ");
 }
