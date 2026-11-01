@@ -75,7 +75,7 @@ func WorkshopUpdatePreview(a *app.App, ref string) (*Preview, error) {
 	return &Preview{What: OpSubUpdate, Title: T("update subscription"), Apply: true, Lines: lines}, nil
 }
 
-// SourceCheckResult checks one source of subscriptions and updates (check, 06 §2.9) and words the result as
+// SourceCheckResult checks one source of updates (check, 06 §2.9) and words the result as
 // the page does: "everything is up to date" or "N updates available", never "check complete"; a failure keeps its reason.
 func SourceCheckResult(a *app.App, kind string, pageReader ...func(string) (*subscribe.PageInfo, error)) (string, error) {
 	if err := a.CheckSubscriptionSource(kind, pageReader...); err != nil {

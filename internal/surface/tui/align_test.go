@@ -175,9 +175,9 @@ func TestWindowNames(t *testing.T) {
 	}
 	press(m, "c")
 	s := screen(m)
-	for _, w := range []string{"mod library › subscriptions and updates", "2 waiting for you to update", "3 already updated", "a every mod"} {
+	for _, w := range []string{"mod library › updates", "2 waiting for you to update", "3 already updated", "a every mod"} {
 		if !strings.Contains(s, w) {
-			t.Fatalf("Subscriptions and updates has no %q:\n%s", w, s)
+			t.Fatalf("Updates has no %q:\n%s", w, s)
 		}
 	}
 	press(m, "^")

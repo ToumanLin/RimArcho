@@ -540,7 +540,7 @@ func taskTarget(t *app.Task) string {
 func TaskTargetName(target string) string {
 	switch {
 	case target == PageChanges:
-		return T("subscriptions and updates")
+		return T("updates")
 	case target == PageNeeds:
 		return T("can it run")
 	case target == PagePacks || strings.HasPrefix(target, "pack:"):
@@ -621,7 +621,7 @@ func taskActs(t *app.Task, c map[string]int) []TaskAct {
 	a = append(a, TaskAct{ID: "goto", Label: Tf("go to %s", TaskTargetName(taskTarget(t))), Key: taskKeyGoto})
 	if t.Kind == TaskSubscribe && t.Ended() && len(a) == 1 {
 		a[0].Primary = true
-		a[0].Label = T("go to subscriptions and updates")
+		a[0].Label = T("go to updates")
 	}
 	if t.Lane == app.LaneFiles && len(t.Items) == 1 {
 		a = append(a, TaskAct{ID: "folder", Label: T("open the folder"), Key: taskKeyFolder})

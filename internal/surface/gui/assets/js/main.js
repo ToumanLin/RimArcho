@@ -905,7 +905,7 @@ function historyChooser() {
 }
 let onHistoryPick = () => {};
 
-// changesOfCursor: the Subscriptions and updates page with only the cursor's mod (C; the detail's link).
+// changesOfCursor: the Updates page with only the cursor's mod (C; the detail's link).
 function changesOfCursor() {
   const it = actionContext().sel[0];
   if (it && it.id) document.dispatchEvent(new CustomEvent("changes-of", { detail: { id: it.id, name: it.name } }));
@@ -1039,7 +1039,7 @@ function onKey(e) {
     return;
   }
   // tab / shift+tab: the next / previous page under the same sidebar entry (Mod library's All and
-  // Subscriptions and updates, the plans); the full detail keeps tab for its sub-sections (06 §3.5)
+  // Updates, the plans); the full detail keeps tab for its sub-sections (06 §3.5)
   // (on the pages with forms, settings and the like, tab keeps moving the focus)
   // Pages with adjustable cards keep native tab order to reach their gaps (06 §3.1).
   if (e.target.closest?.('[role="separator"]') && k === "Tab") return;
@@ -1072,7 +1072,7 @@ function onKey(e) {
     if (S.screen === "textures") return tex.key(e);
     if (S.screen === "search") return fileSearch.key(e);
     if (S.screen === "log" || S.screen === "changes") return scr.logsKey(e);
-    // add a subscription: the form takes its keys; esc outside it goes back to subscriptions and updates
+    // add a subscription: the form takes its keys; esc outside it goes back to updates
     if (S.screen === "subscribe") { if (k === "Escape") { e.preventDefault(); go("changes"); } return; }
     if (S.screen === "full") return scr.fullKey(e);
     return;
@@ -1268,7 +1268,7 @@ async function start() {
     await edited(() => api.RunOp("separate", [e.detail]), false, [e.detail]);
     detailFollow(true);
   });
-  // a detail's see all in change history: Subscriptions and updates with only that mod's Lineage (06 §2.9)
+  // a detail's see all in change history: Updates with only that mod's Lineage (06 §2.9)
   document.addEventListener("changes-of", async (e) => { shell.navigated(); await scr.changes(e.detail); renderWhere(); renderHints(); });
   // the enabled list's head: import / export
   $("#board").addEventListener("click", (e) => {
@@ -1307,6 +1307,7 @@ async function start() {
   });
   // a task's o on a mod: Mod library searching for it (06 §2.16)
   document.addEventListener("library-search", async (e) => { shell.navigated(); await library.openSearch(e.detail); renderWhere(); });
+  document.addEventListener("library-instance", async (e) => { shell.navigated(); await library.openInstance(e.detail); renderWhere(); });
   tasksPage.refreshFoot();
   on("guide", (ev) => guide.guideEvent(ev));
   on("download", (ev) => guide.downloadEvent(ev));

@@ -61,8 +61,8 @@ var escPages = []escPage{
 	}},
 	{"Mod library > All, row menu", tabLibrary, func(m *model) { press(m, "^"); pressKey(m, tea.KeyF10) }},
 	{"Mod library > All, help", tabLibrary, func(m *model) { pressAll(m, "^", "?") }},
-	{"Mod library > Subscriptions and updates", tabChanges, func(m *model) { press(m, "c") }},
-	{"Mod library > Subscriptions and updates, one mod's + help", tabChanges, func(m *model) {
+	{"Mod library > Updates", tabChanges, func(m *model) { press(m, "c") }},
+	{"Mod library > Updates, one mod's + help", tabChanges, func(m *model) {
 		m.openChangesOf(m.current().id, m.current().name)
 		press(m, "?")
 	}},

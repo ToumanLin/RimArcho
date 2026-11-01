@@ -237,7 +237,7 @@ func TestRescanRunsOutOfProcessAndCommandLine(t *testing.T) {
 	// The command help also shows its name before the asynchronous result panel opens.
 	waitAll(t, tm, "archo list --active", "workspace: 3 active")
 	keys(tm, "esc", "c")
-	waitAll(t, tm, "subscriptions and updates", "the last scan", "nothing changed")
+	waitAll(t, tm, "updates", "the last scan", "nothing changed")
 	keys(tm, "esc")
 	m := finish(t, tm)
 	if *scans != 2 || m.tab != tabList {

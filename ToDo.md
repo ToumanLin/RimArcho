@@ -3,68 +3,80 @@
 Things to research, not yet decided. Once decided, put them in the specifications (implementation plans in 01 §5); research goes in docs/research/.
 
 ## GUI
-按键和说明文字形式一样会令人困惑: confirm enter -> confirm [enter↵]
 
-### subscription and updates
-wording: subscription and updates -> updates
-chg39展开的列表令人困惑, chg40的警告放在这里毫无意义, "no longer on the workshop"是什么意思
-chg95 1 New, 是什么new了也不说
-sub29下面的列表应该超链接到mod library对应mod
+Keys and their explanations look confusingly similar: confirm enter should read confirm [enter↵].
 
-### search file
-search files的界面做得非常差, 令玩家困惑, 建议还是以32:68的默认比例来做, 左栏搜索栏/筛选栏卡片, 左栏下方是match到的mod instance和对应文件tree, 右栏展示该文件的详细内容
-提供的搜索选项也很烂, 比如search scope, 默认当前列表但也不能选择其它列表, 也不能基于mod来源tag,版本(排除同mod其它版本文件)等搜索, 本来在mod library就已经做得很好的filter这也可以用上; 搜索反编译代码是搜对应mod, 那如果对应mod有多个instance呢?困惑
-提供的搜索结果展示也很烂, 比如提供的地址竟然是相对地址, 玩家搜到的结果也没法直接打开对应文件或文件夹
-完全没有思考玩家用这个界面是要干什么
-, 做个mock up网页我看下
+### Updates
 
-## 反编译
-反编译功能有两个作用, 其一是研究Mod冲突原因, 其二是创作mod
-当前把反编译程序集存放在cache的想法应该重新思考, 给我个方案
+The Updates page feedback is specified in 06 §2.9.
 
-## 研究如何展示/修改/管理mod config
-mod config很重要, 决定了一个mod的内容如何被游玩, 在游戏中, mod config会显示成界面, 但是在游戏外只是plain xml.
+### Search files
 
-## 无障碍
-无障碍不是给有障碍人群用的, 是给AI agent在不截屏的情况下用的, 无障碍应该也有验收标准
+The search interface confuses players. Consider a default 32:68 split: a search/filter card at the upper left, matching Mod instances and their file tree below it, and detailed file contents on the right.
 
-## save analysis
-### 存档管理
-预览：殖民地名, 游戏内日期, 叙事者和难度, 游玩时长, 殖民者数, 存档大小, 使用的mod列表
-使用 RimSaves 的文件夹逻辑按殖民地分组：它把文件夹名写进文件名，格式是 文件夹#§#存档名.rws。按殖民地分组时必须识别这个前缀，否则用过 RimSaves 的玩家的存档会被分乱
-重命名、复制存档
-清理建议
+Search options need review. The default scope is the current list, but players cannot choose another list or filter by Mod source, tag, or version to exclude other copies' files. Reuse the Mod library's filter approach. Searching decompiled code targets a Mod, but it is unclear which instance is searched when the Mod has multiple copies.
 
-### 使用的mod列表
-存档 Mod 列表 对存档的影响
-列出存档里属于 Mod X 的东西，比如"3 个 X 种族小人、12 个建筑、1 个派系、1 个 WorldComponent", 
-补上 §3.3 的漏洞：提取 Class 后，带 Comp 或 Component 的"功能型"Mod 其实会在存档里留痕，至少能部分判断它有没有被用过
-回答社区最常问的"中途能不能删这个 Mod"
-当前 Mod 列表对比存档 mod 列表
+Search results also need review: addresses are relative and players cannot directly open the corresponding file or folder. Design around what players want to do with their results, and prepare a web mockup for review.
 
-### 检测存档损坏
-文件层面：截断（没有 </savegame>，多半是崩溃时存的）、0 字节、XML 损坏。游戏运行时正在写的档不能报成损坏，要先看 08 §4 的运行检测。
-引用层面：静态收集存档里定义过的 loadID 和被引用的 loadID，找出指向不存在对象的引用。这相当于提前发现读档时的 Could not resolve reference。
-来源层面：
-Class="..." 指向的类型在已装的程序集里不存在。读档一定报错，最严重。
-Def 找不到来源（§1.5 已经记了"找不到来源"），应该升级为风险提示。
-和日志联动：Monitor 已经记录 context.save，可以把上次读这个档时的 save-load 错误挂到存档卡片上。这样静态检查和实际读档两份证据会显示在一起。
-待你决定：要不要做修复，即生成一份修好的副本（去掉错误引用、去掉缺失 Mod 的东西）。
+## Decompilation
 
-### 游玩回顾（给问题三准备数据）
-把一个殖民地的多份存档串成时间线：游戏内天数、真实游玩时长、人数、财富、死亡。
-研究进度表（§1.4 里待定的那项）；DLC 也算进"没玩到"。
-记出现次数，不只记"出现过"。成本很低，能看出玩得多深，可选。
+Decompilation serves two purposes: investigating Mod conflicts and creating Mods. Reconsider storing decompiled assemblies in the cache and propose an approach.
+
+## Research displaying, editing, and managing Mod configuration
+
+Mod configuration determines how a Mod's content is played. In the game it has an interface; outside the game it is plain XML.
+
+## Accessibility
+
+Accessibility is intended to let AI agents operate without screenshots. Define acceptance criteria for it.
+
+## Save analysis
+
+### Save management
+
+Preview the colony name, in-game date, storyteller and difficulty, play time, colonist count, save size, and Mod list.
+
+Group saves by colony using RimSaves' folder logic. RimSaves stores the folder name in the filename as folder#§#save-name.rws. Recognize that prefix so its users' saves are not grouped incorrectly.
+
+Support renaming and copying saves, and offer cleanup suggestions.
+
+### Mods used by a save
+
+Explain the effect of the save's Mod list. List objects belonging to Mod X, for example 3 colonists of its race, 12 buildings, 1 faction, and 1 WorldComponent.
+
+Close the gap in 10 §3.3: after extracting Class, functional Mods with Comp or Component classes leave traces in saves, so their usage can be determined at least partially.
+
+Answer the common community question of whether a Mod can be removed mid-playthrough. Compare the current Mod list with the save's Mod list.
+
+### Detect save corruption
+
+At the file level, detect truncation (no </savegame>, often saved during a crash), empty files, and malformed XML. Do not report a save as corrupt while the game is writing it; check running-game detection in 08 §4 first.
+
+At the reference level, collect defined and referenced loadIDs statically and find references to nonexistent objects. This can reveal Could not resolve reference before loading.
+
+At the source level, Class="..." pointing to a type absent from installed assemblies will fail on load and is the most severe case. An unresolved Def source (already recorded in 10 §1.5) should become a risk warning.
+
+Connect the checks to logs: Monitor already records context.save, so attach save-load errors from the last attempt to the save card, showing static checks alongside actual loading evidence.
+
+Undecided: whether to generate a repaired copy by removing invalid references and objects belonging to missing Mods.
+
+### Playthrough review (data for the third question)
+
+Join multiple saves of a colony into a timeline: in-game days, real play time, population, wealth, and deaths.
+
+Include research progress (the undecided item in 10 §1.4) and DLC in content not yet played.
+
+Optionally count occurrences instead of only recording that something appeared. This costs little and can show how deeply the content was played.
 
 ## Archo Agent
-Archo should be a Mod development agent that can take action, not just translate or tag
-暂定使用Pi agent魔改版
-具体怎么做需要研究
 
-# Deferred 
+Archo should be a Mod development agent that can take action, not just translate or tag. Tentatively use a modified Pi agent; the approach needs research.
+
+# Deferred
+
 ## TUI
-TUI 缺乏导航栏
-TUI 使用卡顿
+
+The TUI lacks a navigation bar and feels slow during use.
 
 ## Loading animation
 Maybe add a UI loading animation--low priority for now

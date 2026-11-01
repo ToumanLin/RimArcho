@@ -181,7 +181,7 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 		{ID: PagePlan, Label: T("lists"), Kids: planKids},
 		{ID: PagePacks, Label: T("packs"), Kids: packKids},
 		// Below the packs (2026-10-28). The entry opens All, its first sub-entry (06 §2.9).
-		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all mods")}, {ID: PageChanges, Label: T("subscriptions and updates")}, {ID: PageSubscribe, Label: T("add a subscription")}, {ID: PageSearch, Label: T("search files")}}},
+		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all mods")}, {ID: PageChanges, Label: T("updates")}, {ID: PageSubscribe, Label: T("add a subscription")}, {ID: PageSearch, Label: T("search files")}}},
 		// what the game loads faster (08 §5.2)
 		{ID: PageTextures, Label: T("texture optimisation")},
 		{ID: PageEnv, Label: T("game")},
@@ -286,7 +286,7 @@ type Home struct {
 	LastRunDay    string `json:"lastRunDay,omitempty"`
 	LastRunErrors int    `json:"lastRunErrors"`
 	// Changes is the current plan's changes since it was last played (06 §2.3): one
-	// sentence that opens Subscriptions and updates with that scope and time.
+	// sentence that opens Updates with that scope and time.
 	Changes *modchanges.Home `json:"changes,omitempty"`
 	// Featured is the row of what is applied now (PickFeatured): the large card with
 	// ▶ launch game; -1 when there is none.

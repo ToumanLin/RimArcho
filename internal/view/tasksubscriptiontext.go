@@ -8,14 +8,11 @@ import (
 
 func subscriptionReason(it app.TaskItem, full bool) string {
 	kind := it.FailureKind
-	if kind == "" && strings.Contains(it.Why, "no longer on the Workshop") {
+	if kind == "" && (strings.Contains(it.Why, "removed from the Workshop") || strings.Contains(it.Why, "no longer on the Workshop")) {
 		kind = "missing"
 	}
 	if kind == "missing" {
-		if full {
-			return T("no longer on the Workshop (author deleted it or made it private)")
-		}
-		return T("no longer on the Workshop")
+		return T("removed from the Workshop (the author deleted it or made it private)")
 	}
 	if kind == "" && (it.Why == "the Steam client is offline" || strings.Contains(it.Why, "(code 3)")) {
 		kind = "offline"
@@ -78,8 +75,8 @@ func subscriptionTaskText(t *app.Task, r *TaskRow, c map[string]int) {
 	}
 	var lines []string
 	for _, reason := range order {
-		if reason == T("no longer on the Workshop (author deleted it or made it private)") {
-			lines = append(lines, Tf("%d mods are no longer on the Workshop (deleted or private)", groups[reason]))
+		if reason == T("removed from the Workshop (the author deleted it or made it private)") {
+			lines = append(lines, Tf("%d mods are removed from the Workshop (the author deleted it or made it private)", groups[reason]))
 		} else {
 			lines = append(lines, Tf("%d mods: %s", groups[reason], reason))
 		}

@@ -14,8 +14,8 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// add a subscription (06 §2.9, §9.1): Mod library's paste box as a page of its own (+ on subscriptions and updates, the
-// palette, a paste on subscriptions and updates). What is typed or pasted is recognised the way the window
+// add a subscription (06 §2.9, §9.1): Mod library's paste box as a page of its own (+ on updates, the
+// palette, a paste on updates). What is typed or pasted is recognised the way the window
 // recognises it (subscribe.Detect); under it a card asks only the one decision that source
 // needs (↑↓), shows the --dry-run text, and enter queues subscribe as a background task (06
 // §2.16). A download page is subscribed through its single Git repository; its other ways —
@@ -397,11 +397,11 @@ func (m *model) addPairs() [][2]string {
 	if s.apply {
 		pairs = append(pairs, [2]string{"enter", T("subscribe")})
 	}
-	pairs = append(pairs, [2]string{"esc", T("clear, then back to subscriptions and updates")})
+	pairs = append(pairs, [2]string{"esc", T("clear, then back to updates")})
 	return pairs
 }
 
-// ---- subscriptions and updates's actions ----
+// ---- updates's actions ----
 
 // checkSources queues check for updates of sources (K: every one with mods; enter: the row's).
 func (m *model) checkSources(keys []string) tea.Cmd {

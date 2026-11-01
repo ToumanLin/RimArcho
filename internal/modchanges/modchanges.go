@@ -12,6 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/render"
 	"github.com/ToumanLin/RimArcho/internal/scan"
+	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
@@ -87,15 +88,16 @@ type Row struct {
 	WorkshopID string   `json:"workshopId,omitempty"`
 	Actions    []Action `json:"actions,omitempty"`
 	InPlan     bool     `json:"inPlan,omitempty"`
+	Present    bool     `json:"present,omitempty"` // the library can select this installed copy
 }
 
 // HasFiles: the raw file list has something to compare.
 func (r *Row) HasFiles() bool { return r.Before != 0 && r.After != 0 && r.Before != r.After }
 
-// Group is the one summary row of new and gone mods ("2 new · 1 gone").
+// Group names newly found and removed mods, including the name for a single mod.
 type Group struct {
 	Text string `json:"text"`
-	Rows []Row  `json:"rows"` // Text is "new" / "gone"
+	Rows []Row  `json:"rows"` // Each row explains where the mod was found or removed.
 }
 
 // Day is one day of the older changes.
@@ -346,21 +348,24 @@ func (b *changeBuilder) build(evs []*store.Event) ([]Row, *Group) {
 	byName(gone)
 	g := &Group{}
 	var parts []string
-	ws := 0
+	var subscriptions, mods []Row
 	for _, r := range arrived {
-		if r.Text == tx.T("new subscription") {
-			ws++
+		if r.Text == tx.T("new subscription from Workshop") {
+			subscriptions = append(subscriptions, r)
+		} else {
+			mods = append(mods, r)
 		}
 	}
-	if ws > 0 {
-		parts = append(parts, tx.Tf(plural(ws, "%d new subscription", "%d new subscriptions"), ws))
+	part := func(rs []Row, single, multiple string) {
+		if len(rs) == 1 {
+			parts = append(parts, tx.Tf(single, rs[0].Mod))
+		} else if len(rs) > 1 {
+			parts = append(parts, tx.Tf(multiple, len(rs)))
+		}
 	}
-	if n := len(arrived) - ws; n > 0 {
-		parts = append(parts, tx.Tf("%d new", n))
-	}
-	if len(gone) > 0 {
-		parts = append(parts, tx.Tf("%d gone", len(gone)))
-	}
+	part(subscriptions, "1 new subscription: %s", "%d new subscriptions")
+	part(mods, "1 new mod: %s", "%d new mods")
+	part(gone, "1 mod removed: %s", "%d mods removed")
 	g.Text = strings.Join(parts, tx.T(" · "))
 	g.Rows = append(arrived, gone...)
 	return rows, g
@@ -375,6 +380,7 @@ func (b *changeBuilder) mod(id string, evs []*store.Event, info map[int64]*store
 	r := Row{ID: id, Ref: ix.Ref(id), Mod: tx.T("a removed mod"), InPlan: st.List.Index(id) >= 0}
 	if m != nil {
 		r.Mod = m.DisplayName()
+		r.Present = m.Status == identity.Live
 		if isNumber(m.WorkshopID()) {
 			r.WorkshopID = m.WorkshopID()
 		}
@@ -393,19 +399,25 @@ func (b *changeBuilder) mod(id string, evs []*store.Event, info map[int64]*store
 	}
 	last := evs[len(evs)-1].Kind
 	if last == identity.EvDisappeared || kinds[identity.EvDisappeared] && !kinds[identity.EvReappeared] {
-		r.Tier, r.Text = TierWatch, tx.T("no longer here")
+		r.Tier, r.Text = TierWatch, tx.T("removed from the mod folder")
+		if m != nil && m.Kind == source.Local {
+			r.Text = tx.T("removed from the Mods folder")
+		}
 		if r.InPlan {
 			r.Tier = TierLaunch
-			r.Text = tx.T("gone; the plan uses it")
+			r.Text = tx.Tf("%s; the current list uses it", r.Text)
 		}
 		r.TierText = TierText(tx, r.Tier)
 		return r, identity.EvDisappeared
 	}
 	if kinds[identity.EvDiscovered] || kinds[identity.EvCopied] {
 		r.Tier, r.TierText = TierContent, TierText(tx, TierContent)
-		r.Text = tx.T("newly added")
+		r.Text = tx.T("found in a mod folder")
+		if m != nil && m.Kind == source.Local {
+			r.Text = tx.T("found in the Mods folder")
+		}
 		if m != nil && m.Kind.WorkshopLike() {
-			r.Text = tx.T("new subscription")
+			r.Text = tx.T("new subscription from Workshop")
 		}
 		if kinds[identity.EvCopied] {
 			r.Text = tx.T("a new copy")

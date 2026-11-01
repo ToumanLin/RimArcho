@@ -172,13 +172,13 @@ try {
     const sourceKeys = ["workshop", "steamcmd", "git", "page", "local"];
     const change = (id, tier, text) => ({ id, ref: "#" + id, mod: id.toUpperCase(), tier, tierText: ["", "affects launch", "worth a look", "content only"][tier], text, details: [text + " in detail"], before: 1, after: 2, workshopId: "123", actions: [{ kind: "lock", label: "lock this version", key: "p" }] });
     const data = { sources: sourceKeys.map(key => ({ key, name: key, count: key === "local" ? 3 : 1, checked: "10:00", result: "cached", account: ["steamcmd", "page"].includes(key) ? "offline account" : "" })),
-      summary: { line: "checked 4 sources, the last at 10:00", failures: 2, failed: "2 no longer on the Workshop" },
+      summary: { line: "checked 4 sources, the last at 10:00, 1 check failed", failures: 1 },
       pending: [{ id: "git-id", ref: "git-ref", name: "Git fixture", kind: "git", source: "Git", installed: "abc", available: "def", usedIn: ["Colony"], inPlan: true, tracking: "the default branch", opens: "compare" },
         { id: "page-id", ref: "page-ref", name: "Page fixture", kind: "page", source: "download page", installed: "1", available: "2", usedIn: ["Other"] }],
       recent: [],
       history: { plan: "Colony", since: "since last played", rows: [change("vef", 1, "code changed"), change("tex", 3, "textures +3 MB")],
-        arrivals: { text: "1 new", rows: [{ ...change("new", 3, "new"), text: "new" }] }, older: [{ day: "Oct 21", rows: [change("old", 2, "Defs changed")] }] } };
-    data.sources[0].failures = [{ label: "2 no longer on the Workshop", items: ["Fixture (123): deleted or private", "Other fixture (456): deleted or private"] }];
+        arrivals: { text: "1 new mod: NEW", rows: [{ ...change("new", 3, "found in the Mods folder"), present: true }] }, older: [{ day: "Oct 21", rows: [change("old", 2, "Defs changed")] }] } };
+    data.sources[0].failures = [{ label: "connection timed out", items: ["Fixture: connection timed out"] }];
     let reads = [], checks = [], previews = [], updates = [], went = [];
     handlers.set("SubscriptionsPage", (library, of) => { reads.push([library, of]); return data; });
     handlers.set("CheckSubscriptionSource", kind => { checks.push(kind); return "queued"; });
@@ -198,7 +198,7 @@ try {
       assert(rows().filter(r => r.dataset.key.startsWith("p:")).length === 1, "the list scope shows only the current list's updates");
       assert(document.querySelector(".subs-hidden")?.textContent.includes("1"), "hidden updates are not counted");
       assert(sel()?.dataset.key === "p:git-ref" && detail().includes("Git fixture") && detail().includes("the default branch"), "first update not selected and detailed");
-      assert(document.querySelector(".subs-foot").textContent.includes("checked 4 sources") && document.querySelector(".subs-failed"), "sources line");
+      assert(document.querySelector(".subs-foot").textContent.includes("checked 4 sources") && !document.querySelector(".subs-failed"), "sources line");
       for (const n of [1, 2]) { screens.areaKey(new KeyboardEvent("keydown", { key: String(n), cancelable: true })); assert(document.activeElement.closest("[data-area]")?.dataset.area === String(n), "area key " + n); }
       screens.areaKey(new KeyboardEvent("keydown", { key: "1", cancelable: true }));
       key("ArrowDown"); await settle();
@@ -215,13 +215,12 @@ try {
       assert(document.querySelector(".subs-detail .subscribe-update"), "download page update has no file choice");
       assert(document.querySelector(".subs-detail .subs-dhead .btn.primary").disabled, "download page update can run without files");
       document.querySelector(".subs-srcsum").click(); await settle();
-      assert(document.querySelectorAll(".subs-src").length === 5, "sources do not open in place");
-      const failures = document.querySelector(".subs-src details");
-      assert(failures && !failures.open, "failure group open on entry");
+      assert(document.querySelectorAll(".subs-detail .subs-src").length === 5 && !document.querySelector(".subs-list .subs-sources"), "checks did not open in the detail");
+      assert(detail().includes("Fixture: connection timed out"), "failure names and reasons missing");
       [...document.querySelectorAll(".subs-src")][2].querySelector(".btn.small").click(); await settle();
       assert(checks.join() === "git", "check did not queue the git source");
       key("Escape"); await settle();
-      assert(!document.querySelector(".subs-sources"), "esc left the sources open");
+      assert(sel()?.dataset.key === "sources", "esc changed the selected source summary");
       key("K"); await settle();
       assert(checks.slice(1).join() === "workshop,steamcmd,git,page", "check for updates did not queue every source");
       document.querySelector('[data-key="d:Oct 21"]').click(); await settle();

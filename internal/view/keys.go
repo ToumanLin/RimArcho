@@ -94,7 +94,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 	}
 	if page == ChangesPage {
 		if !tui {
-			out = append(out, r("+", "subscribe…"), r("U", "update all"), r("u / C", "update / view changes"), r("ctrl+a / ctrl+space / shift+↑↓", "select updates"), r("tab / shift+tab", "the next field or button"))
+			out = append(out, r("+", "add a subscription"), r("K", "check for updates"), r("U", "update all"), r("u", "update"), r("1 / 2", "list / details"), r("tab / shift+tab", "the next field or button"))
 		} else {
 			// 06 §9.1: the subscription actions, each a background task (06 §2.16)
 			out = append(out,
@@ -103,9 +103,10 @@ func KeyHelp(page string, tui bool) []KeyRow {
 				r("u / U", "update this one / every one shown (dry run first)"),
 				r("Del", "remove the subscription (dry run first)"),
 			)
+			out = append(out, r("1 / 2 / 3", "sources, waiting for you to update, already updated"))
 		}
 		out = append(out,
-			r("1 / 2 / 3", "sources, waiting for you to update, already updated"),
+			r("l", "show in the mod library"),
 			r("↑↓ / PgUp PgDn", "move"),
 			r("enter", "open or close a mod's changes"),
 			r("i", "the raw file list"),
@@ -115,7 +116,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("D", "see dependencies (can it run)"),
 			r("S", "sort the list"),
 			r("p", "lock this version (dry run first)"),
-			r("esc", "close the panel, clear selection, then show every mod"),
+			r("esc", "show every mod"),
 		)
 	}
 	if page == SubscribePage && tui { // the window's form is buttons and native fields
@@ -125,7 +126,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("tab", "the branch, tag or commit name"),
 			r("enter", "subscribe, once the dry run is shown"),
 			r("ctrl+u", "clear the box"),
-			r("esc", "clear, then back to subscriptions and updates"),
+			r("esc", "clear, then back to updates"),
 		)
 	}
 	if page == PackPages {
@@ -227,7 +228,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 		out = append(out, r("alt+← / alt+→", "page back / forward"), r("ctrl+b", "navigation at the side / at the top"), r("ctrl+j", "background tasks; again goes back"), r("ctrl+\\", "reference numbers on every control, text and image"))
 	}
 	out = append(out,
-		r(pick("c / l", "c"), pick("subscriptions and updates, game log", "subscriptions and updates")),
+		r(pick("c / l", "c"), pick("updates, game log", "updates")),
 		r("ctrl+k", "command palette"),
 		r("?", "this help"),
 	)

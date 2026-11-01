@@ -11,7 +11,7 @@ func WorkshopResultText(code int) string {
 		// sign-in with the same account (VM run B11)
 		return "the Steam client is offline"
 	case 9:
-		return "no longer on the Workshop (deleted or private)"
+		return workshopMissing
 	case 15:
 		return "access denied"
 	case 16:

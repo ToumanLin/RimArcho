@@ -1,6 +1,6 @@
-// Mod library › subscriptions and updates (06 §2.9): one list and a detail. The list is what waits for the player
+// Mod library › updates (06 §2.9): one list and a detail. The list is what waits for the player
 // to update (Git, download pages, SteamCMD, Workshop items Steam has not downloaded), then
-// what already changed (the change history: one row per mod, by tier; new and gone; earlier
+// installed copies removed from the Workshop, then what already changed (one row per mod; earlier
 // days). A scope bar above it picks the current list or every mod; one line under it sums
 // up the sources. Mod library › add a subscription is its own page (openAdd). Data: API.SubscriptionsPage
 // (view.BuildSubscriptions, the history from modchanges.Build).
@@ -10,14 +10,15 @@ import * as pop from "./popups.js";
 import { icon } from "./icons.js";
 import { wireSeparator } from "./separator.js";
 import { addForm, pageUpdate } from "./subscribe.js";
+import { libraryLink, openLibraryInstance } from "./librarylink.js";
 
 let ui = null;
 // the page helpers of screens.js (given at init: screens.js re-exports this module)
 let beginPageRead, page, area, button, act, seg;
 // library: every mod (else the current list); of: only one mod's Lineage ({id, name});
 // sel: the selected item's key; days: earlier days opened; raw: file lists read (by row);
-// sources: the sources line is open; landing: focus the list after the next draw.
-const V = { data: null, library: false, of: null, sel: "", days: new Set(), raw: new Map(), sources: false, landing: false, items: [] };
+// landing: focus the list after the next draw.
+const V = { data: null, library: false, of: null, sel: "", days: new Set(), raw: new Map(), landing: false, items: [] };
 let pasted = "";
 
 export function initSubscriptions(u, helpers) {
@@ -25,7 +26,7 @@ export function initSubscriptions(u, helpers) {
   ({ beginPageRead, page, area, button, act, seg } = helpers);
 }
 
-// listenPaste: a paste on subscriptions and updates (not in a field) takes the address to add a subscription. Added
+// listenPaste: a paste on updates (not in a field) takes the address to add a subscription. Added
 // with the page's first visit.
 let listening = false;
 function listenPaste() {
@@ -60,7 +61,7 @@ export function changesPlan() { V.library = false; V.of = null; V.sel = ""; V.la
 // mod, undefined keeps what it shows.
 export async function changes(of) {
   listenPaste();
-  if (S.screen !== "changes") { V.sources = false; V.raw.clear(); }
+  if (S.screen !== "changes") { V.raw.clear(); }
   if (of?.id) V.landing = true;
   if (of !== undefined && (of && of.id) !== (V.of && V.of.id)) { V.of = of; V.sel = ""; V.days.clear(); }
   const read = beginPageRead("changes");
@@ -81,10 +82,17 @@ function shownPending() {
   return { rows, hidden: all.length - rows.length };
 }
 
+function shownGone() {
+  const all = V.data?.gone || [];
+  if (V.of) return all.filter(r => r.id === V.of.id);
+  return V.library ? all : all.filter(r => r.inPlan);
+}
+
 // items: every row of the list, in order; each knows what its detail shows.
 function buildItems() {
   const h = V.data?.history || {}, out = [];
   for (const r of shownPending().rows) out.push({ key: "p:" + r.ref, t: "pending", r });
+  for (const r of shownGone()) out.push({ key: "gone:" + r.id, t: "gone", r });
   if (!V.of) {
     for (const r of h.rows || []) out.push({ key: "r:now:" + rowKey(r), t: "change", r });
     if (h.arrivals) out.push({ key: "g:now", t: "group", g: h.arrivals });
@@ -95,6 +103,7 @@ function buildItems() {
     for (const r of d.rows || []) out.push({ key: "r:" + d.day + ":" + rowKey(r), t: "change", r, day: d.day });
     if (d.arrivals) out.push({ key: "g:" + d.day, t: "group", g: d.arrivals, day: d.day });
   }
+  out.push({ key: "sources", t: "sources" });
   return out;
 }
 
@@ -191,6 +200,11 @@ function listCard() {
   }
   let section = "";
   for (const it of V.items) {
+    if (it.t === "sources") continue;
+    if (it.t === "gone") {
+      if (section !== "gone") { section = "gone"; head(T("won't update any more"), shownGone().length); }
+      box.append(row(it)); continue;
+    }
     if (it.t === "pending") { box.append(row(it)); continue; }
     if (it.t !== "day" && !it.day && section !== "now") {
       section = "now";
@@ -207,7 +221,6 @@ function listCard() {
     box.append(el("div", "subs-empty muted", V.data.history.noScan ? T("no scan yet (R scans)") : T("nothing changed")));
   }
   card.append(box);
-  if (V.sources) card.append(sourcesPanel());
   card.append(sourcesLine());
   return card;
 }
@@ -223,6 +236,9 @@ function row(it) {
     name.textContent = r.name;
     meta.append(ic(SRC_ICON[r.kind] || "local"), el("span", "", r.source), el("span", "", r.installed + " → " + r.available));
     if (r.kind === "page") right.append(el("span", "pill", T("choose a file")));
+  } else if (it.t === "gone") {
+    name.textContent = it.r.name;
+    meta.textContent = T("removed from the Workshop");
   } else if (it.t === "change") {
     name.textContent = it.r.mod;
     meta.textContent = it.r.text;
@@ -230,8 +246,7 @@ function row(it) {
   } else if (it.t === "group") {
     name.textContent = it.g.text;
     name.classList.add("plain");
-    meta.textContent = (it.g.rows || []).map((r) => r.mod).join(T(", "));
-    right.append(el("span", "tier content", T("new and gone")));
+    if ((it.g.rows || []).length > 1) meta.textContent = it.g.rows.map(r => r.mod).join(T(", "));
   } else {
     name.textContent = it.d.day;
     meta.textContent = Tf("%d mods", (it.d.rows || []).length + ((it.d.arrivals && it.d.arrivals.rows) || []).length);
@@ -259,46 +274,44 @@ function toggleDay(day) {
   focusSel();
 }
 
-// sourcesLine: the one line that sums up the sources; it opens their rows in place.
+// The saved source summary is a list item; its detail uses the full right column.
 function sourcesLine() {
-  const s = V.data?.summary || {};
   const foot = el("div", "subs-foot");
-  const b = el("button", "subs-srcsum");
-  b.type = "button";
-  b.append(ic("rescan"), el("span", "word-facts", s.line || T("sources not checked yet")), el("span", "chev", V.sources ? "▾" : "▸"));
-  b.onclick = () => { V.sources = !V.sources; draw(); };
+  const b = el("button", "subs-row subs-srcsum" + (V.sel === "sources" ? " sel" : ""));
+  b.type = "button"; b.dataset.key = "sources";
+  b.append(ic("rescan"), el("span", "word-facts", V.data?.summary?.line || T("sources not checked yet")));
+  b.onclick = () => pick("sources");
+  b.onfocus = () => { if (V.sel !== "sources") pick("sources", true); };
   foot.append(b);
-  if (s.failed) { const f = el("span", "warn subs-failed word-facts"); f.append(ic("warn"), el("span", "", s.failed)); foot.append(f); }
   return foot;
 }
 
-// sourcesPanel: each source: its mods, the last check and its result, the account line, check.
-function sourcesPanel() {
-  const box = el("div", "subs-sources");
-  for (const s of V.data?.sources || []) {
+function sourcesDetail(card) {
+  detailHead(card, T("Update checks"), []);
+  const box = el("div", "scroll subs-sources");
+  // a source without mods has nothing to check (the local one checks the Mods folder)
+  for (const s of (V.data?.sources || []).filter((s) => s.count || s.key === "local")) {
     const r = el("div", "subs-src");
     const l = el("div", "l");
     const n = el("div", "n");
     n.append(ic(SRC_ICON[s.key] || "local"), el("b", "", s.name), el("span", "muted", Tf("%d mods", s.count)));
-    l.append(n, el("div", "muted word-facts", [s.checked, s.result].filter(Boolean).join("  ")));
-    if (s.account) {
+    l.append(n, el("div", "muted word-facts", [s.checked || T("not checked yet"), s.result].filter(Boolean).join("  ")));
+    if (s.account && ["steamcmd", "page"].includes(s.key)) {
       const a = el("div", "word-facts acct");
       a.append(el("span", "", s.account), button(T("accounts") + " →", "", () => goAccounts(), "link"));
       l.append(a);
     }
     for (const g of s.failures || []) {
-      const d = el("details", "source-failures");
-      d.append(el("summary", "", g.label));
-      const ul = el("ul");
-      for (const item of g.items) ul.append(el("li", "word-facts", item));
-      d.append(ul);
-      l.append(d);
+      for (const item of g.items) l.append(el("div", "word-facts", item));
     }
-    r.append(l);
-    if (s.count || s.key === "local") r.append(button(T("check"), "", async () => { try { say("ok", await api.CheckSubscriptionSource(s.key)); } catch (e) { say("fail", errText(e)); } }, "small"));
+    const check = button(T("check"), "", async () => {
+      try { say("ok", await api.CheckSubscriptionSource(s.key)); }
+      catch (e) { say("fail", errText(e)); }
+    }, "small");
+    r.append(l, check);
     box.append(r);
   }
-  return box;
+  card.append(box);
 }
 
 async function goAccounts() {
@@ -324,6 +337,8 @@ function fillDetail(card) {
   if (it.t === "pending") pendingDetail(card, it.r);
   else if (it.t === "change") changeDetail(card, it.r);
   else if (it.t === "group") groupDetail(card, it.g);
+  else if (it.t === "gone") goneDetail(card, it.r);
+  else if (it.t === "sources") sourcesDetail(card);
   else dayDetail(card, it.d);
 }
 
@@ -382,9 +397,21 @@ function pendingDetail(card, r) {
   const acts = el("div", "subs-acts");
   if (r.opens) acts.append(button(r.opens === "compare" ? T("compare on the website") : r.opens === "notes" ? T("Workshop change notes") : T("open the source page"), "ctrl+w", () => openSource(r), "line small"));
   acts.append(button(T("lock this version first"), "p", () => lock(r.ref), "small", "pin"));
-  acts.append(button(T("show in the mod library"), "", () => document.dispatchEvent(new CustomEvent("library-search", { detail: r.name })), "small"));
+  acts.append(button(T("show in the mod library"), "l", () => openLibraryInstance(r.id), "small"));
   const keep = section(body, T("keep the old one"));
   keep.append(el("div", "muted subs-note", T("Updating replaces this copy. To keep the old one, lock this version first.")), acts);
+  card.append(body);
+}
+
+function goneDetail(card, r) {
+  detailHead(card, r.name, []);
+  const body = el("div", "scroll subs-gone");
+  body.append(el("p", "word-facts", T("The author deleted the Workshop page or made it private; your installed copy still works, but Steam will never update it.")),
+    el("p", "word-facts", T("After unsubscribing, you cannot download it again; lock this version to keep it.")));
+  const acts = el("div", "subs-acts");
+  acts.append(button(T("lock this version"), "p", () => lock(r.ref), "small", "pin"),
+    button(T("show in the mod library"), "l", () => openLibraryInstance(r.id), "small"));
+  body.append(acts);
   card.append(body);
 }
 
@@ -419,12 +446,12 @@ function changeDetail(card, r) {
 }
 
 function groupDetail(card, g) {
-  detailHead(card, T("new and gone"), [g.text]);
+  detailHead(card, g.text, []);
   const body = el("div", "scroll");
   const s = section(body, T("mods"));
   for (const r of g.rows || []) {
     const line = el("div", "subs-line");
-    line.append(el("span", "tier " + (TIER[r.tier] || "content"), r.text), el("span", "word-facts", r.mod));
+    line.append(r.present ? libraryLink(r.id, r.mod) : el("span", "word-facts", r.mod), el("span", "muted word-facts", r.text));
     s.append(line);
   }
   card.append(body);
@@ -518,6 +545,8 @@ async function changeAct(r, kind) {
 export function changesHints() {
   const it = selected();
   const out = [{ key: "↑↓", label: T("move") }];
+  if (["pending", "gone"].includes(it?.t)) out.push({ key: "p", label: T("lock this version") }, { key: "l", label: T("show in the mod library") });
+  if (it?.t === "sources" || it?.t === "group") out.push({ key: "tab", label: T("the next field or button") }, { key: "enter", label: T("open") });
   if (it?.t === "pending") out.push({ key: "u", label: T("update") }, ...(it.r.opens ? [{ key: "ctrl+w", label: T("open the source page") }] : []));
   if (it?.t === "change") {
     if (hasFiles(it.r)) out.push({ key: "i", label: T("files") });
@@ -553,7 +582,6 @@ export function changesKey(e) {
   const k = e.key, ctrl = e.ctrlKey || e.metaKey;
   const done = () => e.preventDefault();
   if (k === "Escape") {
-    if (V.sources) { done(); V.sources = false; return draw(); }
     if (V.of) { done(); return changes(null).then(() => ui.renderHints()); }
     return;
   }
@@ -563,7 +591,7 @@ export function changesKey(e) {
   if (k === "U" && !ctrl) { done(); return updateRows(shownPending().rows); }
   if (k === "a" && !ctrl && !V.of) { done(); return toggleScope(); }
   if (k === "R" && !ctrl) { done(); return ui.cmd("rescan"); }
-  if (!ctrl && !e.altKey && move(k)) return done();
+  if (!ctrl && !e.altKey && !e.target?.closest?.(".subs-detail") && move(k)) return done();
   const it = selected();
   if (!it) return;
   if (ctrl) {
@@ -572,6 +600,11 @@ export function changesKey(e) {
     if (lk === "w" && it.t === "change" && it.r.workshopId) { done(); return changeAct(it.r, "workshop"); }
     if (lk === "w" && it.t === "pending" && it.r.opens) { done(); return openSource(it.r); }
     return;
+  }
+  if (["pending", "gone"].includes(it.t) && k === "l") { done(); return openLibraryInstance(it.r.id); }
+  if (it.t === "gone" && k === "p") { done(); return lock(it.r.ref); }
+  if (["sources", "group"].includes(it.t) && k === "Enter" && e.target?.closest?.(".subs-list")) {
+    done(); return $("#screen .subs-detail")?.querySelector("button:not(:disabled)")?.focus();
   }
   if (it.t === "pending") {
     if (k === "u") { done(); return updateRows([it.r]); }
@@ -589,7 +622,7 @@ export function changesKey(e) {
 
 // ---- Mod library › add a subscription ----
 
-// openAdd shows the add page; a paste on subscriptions and updates arrives filled in.
+// openAdd shows the add page; a paste on updates arrives filled in.
 export async function openAdd() {
   const read = beginPageRead("subscribe");
   let data = null;
@@ -610,5 +643,5 @@ export async function openAdd() {
 }
 
 export function addHints() {
-  return [{ key: "ctrl+v", label: T("paste an address") }, { key: "enter", label: T("subscribe") }, { key: "esc", label: T("clear, then back to subscriptions and updates") }];
+  return [{ key: "ctrl+v", label: T("paste an address") }, { key: "enter", label: T("subscribe") }, { key: "esc", label: T("clear, then back to updates") }];
 }

@@ -97,20 +97,24 @@
       "opens": "notes"
     }
   ],
+  "gone": [],
   "recent": [
     {
+      "id": "id",
       "name": "Git Mod",
       "kind": "git",
       "source": "Git",
       "added": "2026-10-01"
     },
     {
+      "id": "id",
       "name": "Page Mod",
       "kind": "page",
       "source": "download page / LoversLab",
       "added": "2026-10-01"
     },
     {
+      "id": "id",
       "name": "SteamCMD Mod",
       "kind": "steamcmd",
       "source": "SteamCMD",
@@ -135,11 +139,12 @@
         ],
         "before": 4,
         "after": 7,
-        "inPlan": true
+        "inPlan": true,
+        "present": true
       }
     ],
     "arrivals": {
-      "text": "2 new",
+      "text": "2 new mods",
       "rows": [
         {
           "id": "iqmu47fjmbqywa6apifny7vptq",
@@ -147,9 +152,10 @@
           "mod": "Git Mod",
           "tier": 3,
           "tierText": "content only",
-          "text": "newly added",
+          "text": "found in a mod folder",
           "after": 5,
-          "inPlan": true
+          "inPlan": true,
+          "present": true
         },
         {
           "id": "gptocty4kohl7lt6o2nlt45rwe",
@@ -157,9 +163,10 @@
           "mod": "Page Mod",
           "tier": 3,
           "tierText": "content only",
-          "text": "newly added",
+          "text": "found in a mod folder",
           "after": 6,
-          "inPlan": true
+          "inPlan": true,
+          "present": true
         }
       ]
     },

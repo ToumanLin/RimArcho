@@ -293,6 +293,7 @@
   "the choices changed since this count; 扫描统计 counts again": "选项改过了，下面是按之前选项的统计；点「扫描统计」重新统计",
   "the current list now uses %s": "当前列表现在用 %s",
   "the folder is not there": "文件夹不在了",
+  "this copy is no longer in the Mod library": "这个副本已不在 Mod 库中",
   "the game ignores this copy": "游戏会忽略这一份",
   "the game may show its old textures: convert them again, or remove them": "游戏可能显示旧贴图：重新转换，或清除贴图优化",
   "the game version changed; reopen the version warnings": "游戏版本已改变，请重新打开版本提醒清单。",

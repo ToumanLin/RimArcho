@@ -58,7 +58,7 @@ func TestKeyTable(t *testing.T) {
 	if m.st.Plan.Name != "default" {
 		t.Fatalf("shift+tab: plan %s", m.st.Plan.Name)
 	}
-	// shift+2 Can it run, shift+6 Mod library, tab Subscriptions and updates, tab back, shift+4 list
+	// shift+2 Can it run, shift+6 Mod library, tab Updates, tab back, shift+4 list
 	press(m, "@")
 	if m.tab != tabProblems {
 		t.Fatalf("@: tab %d", m.tab)

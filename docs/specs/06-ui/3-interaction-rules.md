@@ -97,7 +97,7 @@ The editor and Mod inventory > all share **one key table**, as the player confir
 | `Del` | Unsubscribe the Workshop copy or delete an owned copy, with a dry run before confirmation |
 | Menu key, `shift+F10` | Open the context menu at the cursor (§8.5) |
 | `shift+1`–`shift+8` | Visit the 8 sidebar entries: launch, needs, log, lists (opening the current list), packs, inventory, textures, and environments. GUI physical keys work in any keyboard layout; the TUI receives `!@#$%^&*` in the US layout. ! and # are no longer separate shortcuts |
-| `tab`, `shift+tab` | Visit the next or previous sibling subpage. Inventory cycles through all ↔ subscriptions / updates ↔ add ↔ search; the TUI uses the same order, including search since 2026-10-31. Plans open for editing without changing the current plan (04 §1.3). Packs cycle through packs, starting with the first pack from the list. In search, Tab first accepts ghost completion. Forms such as subscriptions, settings, and build use normal focus movement; full details use Tab to switch their own pages |
+| `tab`, `shift+tab` | Visit the next or previous sibling subpage. Inventory cycles through all ↔ updates ↔ add ↔ search; the TUI uses the same order, including search since 2026-10-31. Plans open for editing without changing the current plan (04 §1.3). Packs cycle through packs, starting with the first pack from the list. In search, Tab first accepts ghost completion. Forms such as subscriptions, settings, and build use normal focus movement; full details use Tab to switch their own pages |
 
 Editor only:
 
@@ -109,7 +109,7 @@ Editor only:
 | `S` / `w` / `L` | Sort, save, or launch the whole plan. Sorting is undoable, and previews are in the panel. L visits launch with the launch button focused; another L executes it. The TUI behaves the same since 2026-10-31 (§2.5, §9.1) |
 | `i` / `e` | Import or export in the GUI; TUI i toggles technical details |
 | `R` / `A` | Rescan or recheck files. Since 2026-10-31, TUI A also works in the editor; it previously worked only in needs |
-| `c` / `C` | Open subscriptions / updates for all Mods, or only the cursor Mod's Lineage (§2.9) |
+| `c` / `C` | Open updates for all Mods, or only the cursor Mod's Lineage (§2.9) |
 | `H` | Open the picker for history steps and versions. The TUI also has this since 2026-10-31, alongside area 3 history |
 | `<` `>` `=` | Narrow, widen, or reset the focused column |
 | `r` | Add a rule for the cursor Mod through the sorting-rules form (§2.5), in the GUI left column or a TUI secondary screen. In full details, r refetches the Workshop description |
@@ -119,13 +119,13 @@ Global:
 
 | Key | Action |
 | --- | --- |
-| `c` | Open subscriptions / updates for all Mods |
+| `c` | Open updates for all Mods |
 | `l` | Open the game log; in TUI needs, open the log picker |
 | `ctrl+k` | Open the command panel |
 | `alt+←` / `alt+→` | Go back or forward in the GUI (§3.1 rule 11) |
 | `ctrl+b` | Switch between side and top navigation in the GUI (§2.1) |
 | `ctrl+\` | Toggle GUI reference-number mode. Give every control, paragraph, image, and chart a thin red box and an upper-left number in white on red: the page abbreviation plus a sequence number, such as lib12, so feedback can say change lib12. Count only rendered objects that are visible and uncovered, in page order. Numbers are contiguous and update on scroll. The overlay does not block clicks or change the layout |
-| `1`–`9` | Focus page areas, available on every page since 2026-10-22, with numbered headings like editor areas 1–4. Launch has 1 game, 2 list-pack, 3 launch (§2.3); inventory has 1 filters, 2 table, 3 details; subscriptions has 1 waiting-updated list, 2 details. Needs uses displayed section order and selects the first item in the section. The log has 1 errors and 2 raw text, with arrows scrolling focused raw text. Environments has 1 all, then settings groups; settings uses its groups, and build uses its sections. The GUI gives the selected area an accent border. TUI needs and inventory follow the same rule: 1 opens filters, and 3 opens copy details, filling the screen when space is limited |
+| `1`–`9` | Focus page areas, available on every page since 2026-10-22, with numbered headings like editor areas 1–4. Launch has 1 game, 2 list-pack, 3 launch (§2.3); inventory has 1 filters, 2 table, 3 details; Updates has 1 waiting-updated list, 2 details. Needs uses displayed section order and selects the first item in the section. The log has 1 errors and 2 raw text, with arrows scrolling focused raw text. Environments has 1 all, then settings groups; settings uses its groups, and build uses its sections. The GUI gives the selected area an accent border. TUI needs and inventory follow the same rule: 1 opens filters, and 3 opens copy details, filling the screen when space is limited |
 | `:` | Open the unified GUI panel from any page, like ctrl+k; open the TUI command line (§9.4) |
 | `?` | Show all keys for the current page |
 | `q` | Quit the TUI |

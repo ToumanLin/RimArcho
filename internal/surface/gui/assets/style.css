@@ -1836,7 +1836,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
   .link-tag { justify-self: end; }
 }
 
-/* ---- Mod library › subscriptions and updates (06 §2.9): the scope bar and the list on the left, the detail ---- */
+/* ---- Mod library › updates (06 §2.9): the scope bar and the list on the left, the detail ---- */
 .page.fill.subs-page { display: flex; flex-direction: column; }
 .subs { flex: 1; min-height: 0; display: grid; grid-template-columns: var(--subs-side, clamp(320px, 34%, 460px)) var(--card-gap) minmax(0, 1fr); }
 .subs-split { align-self: stretch; margin: 0; }
@@ -1869,18 +1869,16 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .tier.launch { background: var(--red-soft); color: var(--red); }
 .tier.watch { background: var(--amber-soft); color: var(--amber); }
 .subs-foot { flex: none; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-top: var(--hairline) solid var(--line-2); font-size: 12px; color: var(--muted); min-width: 0; }
-.subs-srcsum { height: 24px; display: inline-flex; align-items: center; gap: 6px; padding: 0 6px; border-radius: var(--r-sm); color: var(--muted); min-width: 0; }
-.subs-srcsum:hover { background: var(--pill); color: var(--fg); }
-.subs-srcsum .ic, .subs-failed .ic { display: inline-flex; }
-.subs-srcsum .chev { color: var(--faint); }
-.subs-failed { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.subs-sources { flex: none; max-height: 45%; overflow-y: auto; border-top: var(--hairline) solid var(--line-2); padding: 4px 6px; }
+.subs-srcsum { display: flex; align-items: center; gap: 6px; padding: 6px; margin: 0; width: 100%; color: var(--muted); font-size: 12px; }
+.subs-srcsum .ic { display: inline-flex; flex: none; }
+.subs-srcsum .word-facts { overflow-wrap: anywhere; }
+.subs-sources { padding: 4px 6px; }
 .subs-src { display: flex; align-items: flex-start; gap: 8px; padding: 7px 8px; border-radius: var(--r-sm); }
 .subs-src:hover { background: var(--card-2); }
 .subs-src .l { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
-.subs-src .n { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.subs-src .n { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; }
 .subs-src .n .ic { display: inline-flex; color: var(--faint); }
-.subs-src .acct { display: flex; align-items: center; gap: 6px; color: var(--fg-2); }
+.subs-src .acct { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--fg-2); }
 .subs-detail { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
 .subs-detail > .scroll { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 8px; }
 .subs-dhead { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px 12px; border-bottom: var(--hairline) solid var(--line-2); }
@@ -1903,6 +1901,9 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .subs-say { color: var(--fg); }
 .subs-line { display: flex; align-items: baseline; gap: 8px; color: var(--fg-2); font-size: 13px; min-width: 0; }
 .subs-line .tier { font-size: 12px; }
+.subs-line { flex-wrap: wrap; }
+.subs-line .link { padding: 0; }
+.subs-gone { padding: 0 16px; font-size: 13px; }
 .subs-alert { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: var(--r-sm); background: var(--amber-soft); color: var(--fg-2); font-size: 12px; }
 .subs-alert .ic { display: inline-flex; color: var(--amber); }
 .subs-detail pre.lines.files { padding: 6px 0; border-top: 0; max-height: 360px; overflow: auto; }
@@ -1951,7 +1952,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .subscribe-tile .st { color: var(--muted); font-size: 12px; }
 .subscribe-local { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 14px; border: var(--hairline) dashed var(--line); border-radius: var(--r-lg); color: var(--muted); font-size: 12px; }
 .subscribe-recent .r { display: flex; align-items: baseline; gap: 10px; padding: 4px 2px; font-size: 12px; }
-.subscribe-recent .r b { color: var(--fg-2); font-weight: 500; }
+.subscribe-recent .r .link { padding: 0; font-weight: 500; }
 @media (max-width: 900px) { .subscribe-tiles { grid-template-columns: minmax(0, 1fr); } }
 
 /* Approved editor layout: information left, load order centre, available copies right. */

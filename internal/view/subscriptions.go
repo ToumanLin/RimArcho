@@ -24,8 +24,6 @@ type SubscriptionSource struct {
 type SourceFailureGroup struct {
 	Label string   `json:"label"`
 	Items []string `json:"items"`
-	// Gone: items no longer on the Workshop. Steam answered, so they are not failed checks.
-	Gone bool `json:"gone,omitempty"`
 }
 
 // PendingUpdate is one row of waiting for you to update (06 §2.9) and its detail.
@@ -52,15 +50,23 @@ type PendingUpdate struct {
 	Opens string `json:"opens,omitempty"`
 }
 
-// SourceSummary is the one line under the list that replaces the sources section.
+// RemovedSubscription is an installed copy whose Workshop page was deleted or made private.
+type RemovedSubscription struct {
+	ID     string `json:"id"`
+	Ref    string `json:"ref"`
+	Name   string `json:"name"`
+	InPlan bool   `json:"inPlan,omitempty"`
+}
+
+// SourceSummary is the selectable Update checks row. Only real check failures count here.
 type SourceSummary struct {
-	Line     string `json:"line"`               // "checked 4 sources, the last at …"
-	Failures int    `json:"failures,omitempty"` // items listed by the last runs, gone ones included
-	Failed   string `json:"failed,omitempty"`   // "2 no longer on the Workshop"
+	Line     string `json:"line"`
+	Failures int    `json:"failures,omitempty"`
 }
 
 // RecentSubscription is one of the newest subscriptions RimArcho installed (add a subscription).
 type RecentSubscription struct {
+	ID     string `json:"id"`
 	Name   string `json:"name"`
 	Kind   string `json:"kind"`
 	Source string `json:"source"`
@@ -68,11 +74,12 @@ type RecentSubscription struct {
 }
 
 type SubscriptionsPage struct {
-	Sources []SubscriptionSource `json:"sources"`
-	Summary SourceSummary        `json:"summary"`
-	Pending []PendingUpdate      `json:"pending"`
-	Recent  []RecentSubscription `json:"recent"`
-	History *modchanges.Page     `json:"history"`
+	Sources []SubscriptionSource  `json:"sources"`
+	Summary SourceSummary         `json:"summary"`
+	Pending []PendingUpdate       `json:"pending"`
+	Gone    []RemovedSubscription `json:"gone"`
+	Recent  []RecentSubscription  `json:"recent"`
+	History *modchanges.Page      `json:"history"`
 }
 
 func BuildSubscriptions(a *app.App, st *app.LoadoutState, o modchanges.Opts) (*SubscriptionsPage, error) {
@@ -90,39 +97,28 @@ func BuildSubscriptionsFromLibrary(a *app.App, st *app.LoadoutState, o modchange
 	if err != nil {
 		return nil, err
 	}
-	p := &SubscriptionsPage{History: history, Pending: []PendingUpdate{}}
+	p := &SubscriptionsPage{History: history, Pending: []PendingUpdate{}, Gone: []RemovedSubscription{}}
 	keys := []string{app.LibWorkshop, app.LibSteamCMD, app.LibGit, app.LibPage, app.LibLocal}
 	names := []string{T("Steam Workshop (client)"), "SteamCMD", "Git", T("download page / LoversLab"), T("local (no source)")}
 	checks := map[string]app.SourceCheck{}
+	gone := map[string]map[string]bool{}
 	for i, key := range keys {
 		c := a.SubscriptionSourceCheck(key)
 		checks[key] = c
 		r := SubscriptionSource{Key: key, Name: names[i], Result: T("not checked yet")}
 		if !c.At.IsZero() {
 			r.Checked, r.Result = a.FormatTime(c.At), Text(c.Result)
-			groups := map[string]int{}
+			gone[key] = map[string]bool{}
 			for _, failure := range c.Failures {
+				if failure.Gone() {
+					gone[key][failure.ID] = true
+					continue
+				}
 				reason := failure.Reason
 				if failure.Code != 0 {
 					reason = app.WorkshopResultText(failure.Code)
 				}
-				groupKey := reason
-				at, ok := groups[groupKey]
-				if !ok {
-					at = len(r.Failures)
-					groups[groupKey] = at
-					r.Failures = append(r.Failures, SourceFailureGroup{})
-				}
-				g := &r.Failures[at]
-				g.Items = append(g.Items, failure.Name+" ("+failure.ID+"): "+Text(reason))
-				g.Label = Tf("%d: %s", len(g.Items), Text(reason))
-				if failure.Gone() {
-					g.Gone = true
-					g.Label = Tf("%d no longer on the Workshop", len(g.Items))
-				}
-			}
-			if n := app.CheckFailures(c.Failures); n > 0 {
-				r.Result = Tf("%d failed", n)
+				addSourceFailure(&r, failure.Name, Text(reason))
 			}
 		}
 		if key == app.LibSteamCMD {
@@ -151,7 +147,14 @@ func BuildSubscriptionsFromLibrary(a *app.App, st *app.LoadoutState, o modchange
 						s.Result = Text(sub.CheckError)
 					}
 				}
+				if sub := inst.Subscription; sub != nil && sub.CheckError != "" && inst.Mod != nil && !inst.Missing() {
+					addSourceFailure(s, l.Name, Text(sub.CheckError))
+				}
 				if inst.Mod == nil || inst.Missing() || s.Key == app.LibLocal {
+					continue
+				}
+				if gone[s.Key][inst.WorkshopID] {
+					p.Gone = append(p.Gone, RemovedSubscription{ID: inst.Mod.ID, Ref: inst.Ref, Name: l.Name, InPlan: inst.InPlan})
 					continue
 				}
 				r := PendingUpdate{ID: inst.Mod.ID, Ref: inst.Ref, Name: l.Name, Source: s.Name, Kind: s.Key, Installed: "—", Available: "—", UsedIn: []string{}, InPlan: inst.InPlan}
@@ -193,29 +196,46 @@ func BuildSubscriptionsFromLibrary(a *app.App, st *app.LoadoutState, o modchange
 	}
 	for i := range p.Sources {
 		s := &p.Sources[i]
-		if s.Result == T("check complete") {
-			n := 0
-			for _, update := range p.Pending {
-				if update.Kind == s.Key {
-					n++
-				}
+		n := 0
+		for _, update := range p.Pending {
+			if update.Kind == s.Key {
+				n++
 			}
+		}
+		if s.Result == T("check complete") || s.Result == T("up to date") {
 			s.Result = UpdateCheckResult(n, "check complete")
 		}
+		failed := 0
+		for _, g := range s.Failures {
+			failed += len(g.Items)
+		}
+		if failed == 1 {
+			s.Result = T("1 check failed")
+		} else if failed > 1 {
+			s.Result = Tf("%d checks failed", failed)
+		}
 	}
+
 	p.Recent = recentSubscriptions(a, lib.Lineages)
 	p.Summary = sourceSummary(a, p.Sources, checks)
 	return p, nil
 }
 
-// sourceSummary words the sources in one line: how many were checked and when the last was,
-// and the failures of the last checks.
+// addSourceFailure groups reasons without hiding the affected mod names.
+func addSourceFailure(s *SubscriptionSource, name, reason string) {
+	for i := range s.Failures {
+		if s.Failures[i].Label == reason {
+			s.Failures[i].Items = append(s.Failures[i].Items, name+": "+reason)
+			return
+		}
+	}
+	s.Failures = append(s.Failures, SourceFailureGroup{Label: reason, Items: []string{name + ": " + reason}})
+}
+
 func sourceSummary(a *app.App, sources []SubscriptionSource, checks map[string]app.SourceCheck) SourceSummary {
 	var sum SourceSummary
 	var last time.Time
 	n := 0
-	var groups []SourceFailureGroup
-	gone := 0
 	for _, s := range sources {
 		if s.Key == app.LibLocal {
 			continue
@@ -228,23 +248,16 @@ func sourceSummary(a *app.App, sources []SubscriptionSource, checks map[string]a
 		}
 		for _, g := range s.Failures {
 			sum.Failures += len(g.Items)
-			if g.Gone {
-				gone += len(g.Items)
-			}
-			groups = append(groups, g)
 		}
 	}
 	sum.Line = T("sources not checked yet")
 	if n > 0 {
 		sum.Line = Tf("checked %d sources, the last at %s", n, a.FormatTime(last))
 	}
-	switch {
-	case len(groups) == 1:
-		sum.Failed = groups[0].Label
-	case sum.Failures > gone:
-		sum.Failed = Tf("%d checks failed", sum.Failures-gone)
-	case gone > 0:
-		sum.Failed = Tf("%d no longer on the Workshop", gone)
+	if sum.Failures == 1 {
+		sum.Line = Tf("%s, 1 check failed", sum.Line)
+	} else if sum.Failures > 1 {
+		sum.Line = Tf("%s, %d checks failed", sum.Line, sum.Failures)
 	}
 	return sum
 }
@@ -360,7 +373,7 @@ func recentSubscriptions(a *app.App, ls []*app.LibLineage) []RecentSubscription 
 				continue
 			}
 			if sub := inst.Subscription; sub != nil && !sub.InstalledAt.IsZero() {
-				recent = append(recent, added{RecentSubscription{Name: l.Name, Kind: inst.Source, Source: name, Added: a.FormatDate(sub.InstalledAt)}, sub.InstalledAt})
+				recent = append(recent, added{RecentSubscription{ID: inst.Mod.ID, Name: l.Name, Kind: inst.Source, Source: name, Added: a.FormatDate(sub.InstalledAt)}, sub.InstalledAt})
 			}
 		}
 	}

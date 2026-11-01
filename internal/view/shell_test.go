@@ -81,7 +81,7 @@ func TestNavAndPath(t *testing.T) {
 		"plans":       "library=plan / lists=plan / all lists=plans",
 		"needs":       "playing=home / can it run=needs",
 		"log":         "playing=home / game log=log",
-		"changes":     "library=plan / mod library=library / subscriptions and updates=changes",
+		"changes":     "library=plan / mod library=library / updates=changes",
 		"library":     "library=plan / mod library=library / all mods=library",
 		"pack:Main":   "library=plan / packs=packs / Main=pack:Main",
 		"settings":    "settings=settings",

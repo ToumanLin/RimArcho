@@ -38,9 +38,9 @@ changes: 4 mods (library, the last scan · Oct 2 12:00)
       author: Tester → New Author
   content only:
     #xamx  Gamma  its folder moved
-  new and gone: 1 new · 1 gone:
+  1 new mod: Alpha · 1 mod removed: Leftover:
     #tmxx  Alpha     a new copy
-    #ekgo  Leftover  no longer here
+    #ekgo  Leftover  removed from the mod folder
 
 $ archo changes #a6o7
 changes: 2 mods (#a6o7)
@@ -51,8 +51,8 @@ changes: 2 mods (#a6o7)
         renamed from Beta
         author: Tester → New Author
   Oct 1 10:00:
-    new and gone: 1 new subscription:
-      #a6o7  Beta Reborn  new subscription
+    1 new subscription: Beta Reborn:
+      #a6o7  Beta Reborn  new subscription from Workshop
 
 $ archo mod pkg:tester.alpha
 pkg:tester.alpha matches 3 instances; pick one
@@ -134,11 +134,11 @@ changes: 3 mods (#ekgo)
       #ekgo  Leftover  came back; package id changed: tester.leftover → tester.leftover2
         About/LoadFolders 1 changed
   Oct 2 12:00:
-    new and gone: 1 gone:
-      #ekgo  Leftover  no longer here
+    1 mod removed: Leftover:
+      #ekgo  Leftover  removed from the Mods folder
   Oct 1 10:00:
-    new and gone: 1 new:
-      #ekgo  Leftover  newly added
+    1 new mod: Leftover:
+      #ekgo  Leftover  found in the Mods folder
 
 $ archo lineage split #tmxx
 #tmxx Alpha  split
@@ -178,7 +178,7 @@ changes: 4 mods (library, since scan 2)
       About/LoadFolders 1 changed
   content only:
     #xamx  Gamma  its folder moved
-  new and gone: 1 new:
+  1 new mod: Alpha:
     #tmxx  Alpha  a new copy
 
 $ archo gc --dry-run

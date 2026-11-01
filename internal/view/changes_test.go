@@ -148,7 +148,7 @@ func TestChangesPage(t *testing.T) {
 
 	// The whole library: Delta too, and the new mod as the summary row.
 	lib, _ := view.BuildChanges(e.App, st, modchanges.Opts{Library: true})
-	if got := names(lib.Rows); !slices.Contains(got, "Delta") || lib.Arrivals == nil || lib.Arrivals.Text != "1 new subscription" {
+	if got := names(lib.Rows); !slices.Contains(got, "Delta") || lib.Arrivals == nil || lib.Arrivals.Text != "1 new subscription: Newcomer" {
 		t.Fatalf("library rows %v, arrivals %+v", got, lib.Arrivals)
 	}
 	// Delta is not in the plan: the same kind of change is only worth a look.

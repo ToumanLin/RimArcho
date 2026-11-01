@@ -5,7 +5,7 @@
 //     copy's actions (the six copy ops and the plan's, view.OpTable);
 //   3 used in: the plans and packs that use each copy, and the current plan, with its key;
 //   4 the field list (a click copies a value);
-//   5 history: the newest changes and the way to Subscriptions and updates;
+//   5 history: the newest changes and the way to Updates;
 //   6 technical information: Defs, patches, Harmony, rules, every change (view.Sections, which other parts
 //     of RimArcho add to: this page draws whatever sections come).
 // ← → step to the previous / next mod of the list it came from, esc goes back there, 1–6
