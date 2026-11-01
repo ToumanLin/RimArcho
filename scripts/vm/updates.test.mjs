@@ -16,6 +16,7 @@ const stubs = {
  'state.js': `export const S={screen:'changes',screenSeq:0,envSeq:0,busy:{}};
  export const $=s=>document.querySelector(s);
  export const el=(tag,cls='',text='')=>{const e=document.createElement(tag);e.className=cls;e.textContent=text;return e;};
+ export const keyCaps=k=>el('kbd','',k);
  export const T=s=>s, Tf=(s,...a)=>{let i=0;return s.replace(/%[sd]/g,()=>a[i++]);};
  export const errText=e=>e.message, say=(...a)=>window.messages.push(a);
  export const api=new Proxy({},{get:(_,name)=>(...a)=>window.api[name](...a)});`,

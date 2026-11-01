@@ -16,7 +16,7 @@ const all = (node) => [node, ...node.children.flatMap(all)];
 
 function launchContext(live = null) {
   const calls = [];
-  const context = createContext({ el, T: (s) => s, Tf: (s, ...a) => s.replace(/%[ds]/g, () => a.shift()),
+  const context = createContext({ el, keyCaps: (k) => el("kbd", "", k), T: (s) => s, Tf: (s, ...a) => s.replace(/%[ds]/g, () => a.shift()),
     S: { live, busy: {} }, launching: 0, arrived: false, note: () => null,
     running: () => !!(live && live.running), launch: () => calls.push('launch'), save: () => calls.push('save'),
     step: (n, cls) => el('section', 'hm-step ' + cls) });

@@ -94,7 +94,7 @@ test('row and panel answers use the same confirmation before any mutation', asyn
 function panelContext(read) {
   let root;
   const picked = [];
-  const context = createContext({ el, S: { popup: null }, T: (s) => s,
+  const context = createContext({ el, keyCaps: (k) => el("kbd", "", k), S: { popup: null }, T: (s) => s,
     Tf: (s, ...args) => s.replace(/%[ds]/g, () => args.shift()),
     api: { IdentityWhy: read },
     copyablePath: (node, path) => { node.title = path; node.dataset.path = path; },

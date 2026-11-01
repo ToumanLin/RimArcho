@@ -11,7 +11,7 @@ function harness() {
       click() { return this.onclick({ preventDefault() {}, stopPropagation() {} }); } };
   }
   const calls = [], state = { screen: 'needs', busy: {} };
-  const context = createContext({ S: state, el, T: x => x, Tf: (s, n) => s.replace('%d', n),
+  const context = createContext({ S: state, el, keyCaps: (k) => el("kbd", "", k), T: x => x, Tf: (s, n) => s.replace('%d', n),
     document: { createTextNode: text => ({ textContent: text }) },
     api: { OpenURL: async url => calls.push(['url', url]) }, say() {}, errText: String,
     statusIcon: n => `icon:${n}` });
