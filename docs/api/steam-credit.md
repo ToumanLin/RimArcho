@@ -1,6 +1,6 @@
 # Steam credit：GUI API 合同
 
-后端入口在 `internal/surface/gui/credit.go`、`subscribe.go`；业务规则归 [02 §3.4](../specs/02-环境身份与扫描.md#34-订阅git下载页steamcmd2026-10-24)。这是 Wails GUI 方法，错误沿用现有 Promise reject；没有新增 HTTP 路由。前端弹窗由 `assets/js/credit.js` 调用。
+后端入口在 `internal/surface/gui/credit.go`、`subscribe.go`；业务规则归 [02 §3.4](../specs/02-environments-identity-and-scanning.md#34-订阅git下载页steamcmd2026-10-24)。这是 Wails GUI 方法，错误沿用现有 Promise reject；没有新增 HTTP 路由。前端弹窗由 `assets/js/credit.js` 调用。
 
 ## 全部订阅
 

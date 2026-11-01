@@ -1,0 +1,402 @@
+# archo.db 里的文本 ID 和路径改成整数：研究
+
+2026-10-30。回答 `ToDo.md`“研究：archo.db 里的文本 ID 和路径改成整数”的 5 个问题。只研究和测量，**没有改正式的表结构和迁移**，规格先不改，等看过结论再定。分支 `claude/db-intkey-research-77d962`，起点 `64e7182`（dev/1.0，schema v26，`codex/fact-share` 和 `codex/db-maintenance` 都已合入）。只用合成数据，没有读写 `%APPDATA%\RimArcho`、真实游戏或 Mod 目录。
+
+## 结论
+
+在一个和 ToDo 真实库行数相同的合成库（245.5 MB）上：
+
+| 问题 | 推荐 | 关键数字 |
+| --- | --- | --- |
+| 1 代理键放在哪 | **不加 Instance 整数键。** v26 的 `fact_set` 已经是事实表的映射表，事实行只带整数 `set_id` | 加整数键只省 0.99 MB（0.4%）；剩下的 Instance 文本总共 0.85 MB |
+| 2 路径表的粒度 | **不建全局 / 每个 Mod 的路径表。** 事实表的文件路径改成“每个事实集合一份文件列表”（`fact_set.files` + 行里存下标）；文件清单按快照存（问题 3）。旧路径不需要单独清理：列表跟着集合删，清单跟着 02 §7.1 删 | 单做集合文件列表 −38.9 MB（−15.8%）；和问题 3 一起 −92.9 MB（−37.8%）。全局路径表只再多省 4.5 MB，却要整理时多扫 0.43 秒、写清单慢约 2 倍 |
+| 3 非语义文件压缩块 | **做。** 每个快照一个 zstd 块（前缀压缩的路径 + 大小，不存 mtime，DLL 留在行里），快照加 `kinds`、`langs` 两列在扫描时算好 | −51.4 MB（−20.9%）；Mod 库存首次打开的内容类型 + PNG 查询 **263 + 22 → 约 3 毫秒**；日志找贴图 +40–50 毫秒；日志找 DLL 快约 3 倍 |
+| 4 未启用 Mod 只存名字层 | **不做。** `archo def`、两种日志说明、详情的 Defs 都要显示未启用 Mod 的 file:line，缺父模板的提供方要 MayRequire；只有 parent / abstract 没人读 | 单做 −25.3 MB，但文件路径改成下标后只剩 −2.4 MB（1.6%）；只清 parent / abstract −2.7 MB |
+| 5 会不会变慢、迁移多久 | 推荐方案下，按名字查 Def、读缓存 Def、增量扫描都在噪声范围内；页面加载变快 | 转换 8.4–11.3 秒（一个事务，不 VACUUM），之后整理的 VACUUM 1.6–1.9 秒；真实库行数相同，估计同一量级，启动时要显示进度 |
+
+另有三处代码和文档不一致或可单独修的问题（§1、§7.2）：`def_fact` 早已没有 `instance_id`；非语义行的 mtime 没人读；`Store.InstanceFiles` 从 v14 起找不到工坊 Mod；`Store.DefsNamed` 的执行计划让每次按名字查 Def 慢了约 30 倍。
+
+## 1. 先更正 ToDo 的前提（代码与文档不一致）
+
+ToDo 的数字来自 2026-10-29 只读测量的 10 天真实库（443 MB）。对照现在的代码：
+
+1. **`def_fact` 已经没有 `instance_id`。** v26（`store.schemaV26`）把事实行改成只带整数 `set_id`，所属 Instance 记在 `fact_set(id, instance_id, kind, content_key)` 里。ToDo 里“`instance_id` 共 19.8 MB，还在两个索引里各存一遍”是 v26 之前的结构。现在事实、快照、分析、事件几张表里剩下的 Instance 文本合计约 **0.85 MB**（§3）。
+2. **非语义文件行的 mtime 没有任何代码读。** ToDo 说“72% 的行只用于增量扫描的 mtime 比较”。实际上增量扫描只对语义文件复用哈希：`scan.ComputeSkip` 只在 `IsSemantic(rel)` 且上次有哈希时比较 size + mtime（`internal/scan/fingerprint.go:115-117`），`Store.CurrentFiles` 只读 `hash IS NOT NULL` 的行。非语义行（贴图、音频、Languages 等）的 mtime 只被写入和复制。这些行真正的读者是按路径查的功能（§5.1）。
+3. **`Store.InstanceFiles` 只查环境私有的 Mod。** 它用 `i.environment_id=?`（`internal/store/files.go:9`），而 v14（2026-10-22）之后共用文件夹（工坊、SteamCMD 等）里的 Instance 的 `environment_id` 是空串。这个函数 10-21 写成，早于 v14，之后没改，也没有测试。结果：日志归因里“谁带了这张贴图 / 这个 DLL”（`logrefs.go:410`、`logrefs.go:517`、`logcallers.go:294`）找不到工坊 Mod。像是 v14 的回归，不在本任务范围，没有修。本研究的基准按应有的 `environment_id IN ('', ?)` 测（查得更多、更慢）。
+4. **07 §6.2 记的“190 个不同 Name 查询 5.589 毫秒”已经不成立**，见 §7.2。
+
+## 2. 方法
+
+### 2.1 合成库
+
+测量代码是 `internal/store/intkey_research_test.go`（合成库）、`intkey_convert_test.go`（原型转换）、`intkey_query_test.go`（查询和写入）、`intkey_main_test.go`（主流程）里的 `TestIntKeyResearch`，只有设了 `RIMARCHO_INTKEY_BENCH=1` 才跑，不进正式代码路径。它用 `testkit.New` 建一个真实的 v26 库（全部迁移、索引、触发器），再按真实库的形状批量写入：
+
+| 项 | ToDo 的真实库 | 合成库 |
+| --- | ---: | ---: |
+| Instance | 1354（07 §6 的真实环境：官方 6、本地 74、工坊 1274） | 1354（同样分布），482 个启用 |
+| `snapshot_file` 行 | 98 万 | 973,764（4,864 个快照：当前 1354 个加历史快照） |
+| `rel_path` 总量 / 平均 | 59.6 MB / 约 61 B | 56.9 MB / 58.4 B，不同的路径 271,102 条 |
+| 非语义行占比 | 72% | 71.7%（697,889 行） |
+| `def_fact` 行 | 76 万 | 771,016（1,603 个 Def 集合），启用的 Mod 占 40.4% |
+| `def_fact.file` 总量 / 平均 | 33.6 MB / 44 B | 34.8 MB / 45.1 B，不同的文件 49,941 个（平均每个文件 15.4 个 Def） |
+| `type_fact`、`harmony_*` | 约 20 万 | 207,073 + 30,462 + 1,275 |
+| 其他 | — | `patch_fact` 16,299（3 个分析槽位），`finding` 2,100，`content_state` 2,708 |
+
+路径按真实 Mod 的样子生成，比如 `1.6/Defs/ThingDefs_Buildings/XYZ_Buildings_Kamelvan.xml`、`Textures/Things/Building/Furniture/XYZ_Torix/XYZ_Torix_north.png`、`Languages/ChineseSimplified (简体中文)/DefInjected/ThingDef/…`。45% 的 Mod 有版本目录，其中 40% 有 `1.7/`，1.7 用单独的集合，其余 Mod 两个版本共用一个集合（约 82% 共用，这是假设，没有真实库的比例）。历史快照在当前清单上改 5% 的语义文件、删 1% 的文件、加 0.5%。
+
+**这个合成库的 `ContentKinds` 首次查询是 236–294 毫秒，真实库实测 246 毫秒（07 §6.2）**，说明文件清单的形状接近真实。
+
+### 2.2 原型结构
+
+每个原型从基线库 `VACUUM INTO` 一份副本，在副本上一个事务里做转换（也就是迁移）并计时，checkpoint 后 `VACUUM`，再用 `dbstat` 统计每张表和索引。查询照 `internal/store` 现有的 SQL 写，每个原型改成对应的形状，结果做校验和，和基线比较：除了故意删字段的原型（表里标 `*`），结果都一致。
+
+| 名字 | 改了什么 |
+| --- | --- |
+| `v26` | 基线（现在的结构） |
+| `v26-copy` | 没改结构的副本，和其他原型用同样方式打开：噪声的参照 |
+| `ik` | Instance 整数代理键：`instance_key(n INTEGER PRIMARY KEY, id TEXT UNIQUE)`；`fact_set`、`content_state`、`patch_fact` 改存整数 |
+| `path-global` | 全局路径表 `path(id INTEGER PRIMARY KEY, rel TEXT UNIQUE)`；事实表的 `file` 和 `snapshot_file.rel_path` 改成整数 |
+| `path-hash` | 同上，路径表不用文本唯一索引，改用 64 位哈希列加索引：`path(id, h, rel)` + `path_h(h)` |
+| `ik+path-mod` | 每个 Mod 一张路径表：`mod_path(inst, id, rel, PRIMARY KEY(inst,id)) WITHOUT ROWID`（需要 `ik`） |
+| `setfiles` | 每个事实集合一份文件列表：`fact_set.files`（JSON 数组），事实行存下标；读取时按集合读一次列表，在 Go 里换回路径 |
+| `blob` | 非语义行（DLL 除外）改成每个快照一个 zstd 块：路径前缀压缩 + 大小，不存 mtime；快照加 `kinds`（内容类型位）、`langs`（语言目录）两列，转换和写快照时算好 |
+| `blob-dedup` | 同上，内容相同的块只存一份（`file_blob` 按 xxh3-128 去重） |
+| `slim-names` | 未启用 Mod 的 Def 只留类型、defName、Name（清空 `file`、`line`、`parent`、`abstract`、`may_require*`） |
+| `slim-parent` | 未启用 Mod 的 Def 只清空 `parent`、`abstract`（未启用的这两个字段没人读，§6） |
+| `combo-global` | `blob-dedup` + `path-global` + `slim-parent` |
+| `combo-hash` | `blob-dedup` + `path-hash` + `slim-parent` |
+| `combo-ik-mod` | `blob-dedup` + `ik+path-mod` + `slim-parent` |
+| `combo-names` | `blob-dedup` + `path-hash` + `slim-names` |
+| `combo-setfiles` | `blob-dedup` + `setfiles` + `slim-parent` |
+
+**口径**：Windows 11 / Ryzen 9 7950X / 63 GB / Go 1.27.2 / modernc SQLite，默认页缓存（2 MB），OS 文件缓存热。每个查询先跑一次做预热和校验，再跑 3 轮取中位数；快的查询在一轮里重复到至少 30 毫秒再求平均（Windows 时钟约 0.5 毫秒一跳）。写入在事务里做完后回滚。共跑了 4 次（run 1–4），表里给出各次的范围。机器上同时开着 VM，还有别的会话在编译、测试，**结构完全相同的 `v26` 和 `v26-copy` 之间也会差 20–40%，个别查询在不同次之间差近 2 倍**，所以只有成倍的差别才算数。大小是 VACUUM 之后的，每次都一样，不受噪声影响。
+
+## 3. 问题 1：代理键放在哪
+
+**推荐：不再给 Instance 加整数代理键。** 问题里的两个选项，“事实表单独一张映射表”就是 v26 的 `fact_set`：事实行只带 `set_id`（1–2 字节的整数），集合记着它属于哪个 Instance。
+
+| 结构 | 库大小 | 变化 | 迁移 |
+| --- | ---: | ---: | ---: |
+| `v26` | 245.47 MB | — | — |
+| `ik` | 244.48 MB | **−0.99 MB（−0.4%）** | 0.07–0.09 秒 |
+
+查询都在噪声范围内（§7.1 的 `ik` 一列）。剩下的 Instance 文本合计 0.85 MB，在 `fact_set`（1,895 行）、`content_state`（2,708 行）、`snapshot`（4,864 行）、`patch_fact`（16,299 行）、`finding`、`change_event` 里；最多的 `patch_fact` 是按分析槽位存的，槽位清理时就删了。
+
+整数键和身份规则的关系（代码核对：`internal/store/mutate.go`、`migrate14.go`、`linkedinstances.go`、`identityrefs.go`）：
+
+- **same 回答**：留下的是旧的候选（墓碑）那一行和它的文本 ID，新 Instance 那一行删掉；`snapshot`、`change_event`、`instance_alias` 的 `instance_id` 从新 ID 改到候选 ID，方案（`workspace`、`workspace_undo`、`loadout_version`）和启动记录的列表指纹由 `rewriteInstanceLists`（`identityrefs.go`）改写。新 Instance 的 `fact_set` / `content_state` 不改写，留给 `PruneFacts` 删，下次分析重建（AnalysisKey 含 Instance ID 和快照哈希）。换成整数键，这些 UPDATE 只是换一列，不会更简单。
+- **v14 合并、`MergeLinkedInstances`**：同样按文本 ID 改写，留下活着的、最早的那一份；被并掉那份的事实整份删除。
+- **Lineage 拆分 / 合并**：只改 `instance.lineage_id`，不碰 Instance ID，和代理键无关。
+- **对外的引用都是文本**：方案 JSON、`id_alias`、`log_cache` 的报告、整合包清单、`#a3f9` 短引用（05 §2）。整数键只能是库内部的第二个身份，每条改写身份的路径都要同步它。
+- **迁移时键会不会变**：整数键只在库内部用、不出库，迁移时重新编号是安全的；`fact_set.id` 也一样（v26 迁移本来就重新编号）。进程内按整数缓存的东西（`ContentKinds` 的缓存键是 `(snapshot_id, scan_id)`）只活在一个进程里。
+
+只有选“每个 Mod 一张路径表”（§4）时才需要整数 Instance 键：用 26 字节的文本 ID 做 `mod_path` 的前缀，27 万条路径要多出约 7 MB。§4 不推荐那种做法。
+
+## 4. 问题 2：路径表的粒度
+
+### 4.1 单独做路径表（文件清单不压缩）
+
+| 结构 | 库大小 | 变化 | `def_fact` | DLL 事实 | `snapshot_file` | 路径表 / 列表 | 转换 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `v26` | 245.47 | — | 114.67 | 33.75 | 84.04 | — | — |
+| `path-global` | 187.81 | −57.7（−23.5%） | 81.04 | 27.45 | 28.49 | 37.81 | 7.0–7.2 秒 |
+| `path-hash` | 176.03 | −69.4（−28.3%） | 81.04 | 27.45 | 28.49 | 26.03 | 10.1–10.6 秒 |
+| `ik+path-mod` | 165.81 | −79.7（−32.5%） | 79.94 | 27.08 | 27.24 | 19.53 | 10.3–12.2 秒 |
+| `setfiles` | 206.56 | −38.9（−15.8%） | 79.81 | 26.89 | 84.04 | +2.8（集合 + 版本视图 1.09 → 3.90） | 3.4–4.5 秒 |
+
+单位 MB。全局表的文本唯一索引（`sqlite_autoindex_path_1`）本身就有 18.9 MB，路径文本存了两遍；哈希索引只要 4.6 MB。每个 Mod 一张最小，因为不需要按文本查的索引，写入时把这个 Mod 的路径整份读进内存。`setfiles` 只改事实表，事实那边和全局表省得一样多（`def_fact` 79.8 vs 81.0 MB），文件清单不动。
+
+**代价**：路径改成整数以后，按路径模式查的功能都要先连接路径表拿到文本。
+
+| 查询（毫秒） | `v26` | `path-global` | `path-hash` | `ik+path-mod` |
+| --- | ---: | ---: | ---: | ---: |
+| `ContentKinds` 全部、无缓存（Mod 库存首次打开） | 236–294 | 398–443 | 524–618 | 626–777 |
+| `SnapshotsWithPNG` 全部 | 21–31 | 47–52 | 67–89 | 31 |
+| `InstanceFiles("%Textures/%")`（日志找贴图） | 115–209 | 295–481 | 328–357 | 314–338 |
+| `InstanceFiles("%x.dll")` × 20（日志找 DLL） | 1,435–1,812 | 4,599–4,759 | 4,950–8,050 | 1,500–1,728 |
+| 写 30 个快照清单 | 20–32 | 75–86 | 197–214 | 26–39 |
+
+所以清单这边**路径表不能单独上**：Mod 库存首次打开会再慢 0.1–0.5 秒，离 06 §10 的 200 毫秒门槛更远。要和 §5 的派生列、压缩块一起做；一起做以后，清单里只剩语义文件和 DLL 的行（11 MB），路径表的收益也只剩几 MB（§8）。
+
+### 4.2 选哪种粒度
+
+- **每个快照一张**：就是现在的 `snapshot_file`，路径按快照各存一遍。97 万行里只有 27 万条不同的路径（历史快照大多相同），清单这边省不下来；要让 `def_fact.file` 指向快照的文件行，还会把事实的寿命绑在清单上：02 §7.1 会删旧快照的清单，而一个旧集合可能还被另一个游戏版本的 `content_state` 引用。**不采用**，没有单独做原型。对非语义文件，§5 的“每个快照一个压缩块”是这一粒度的压缩版，采用。
+- **每个 Mod 一张**：最小，但要整数 Instance 键（§3）；same 回答、v14 合并、链接合并把一个 Instance 的快照挪给另一个时，挪过去的文件行带着原 Mod 的路径编号，必须重编；`CachedDefs`（每次分析都读全部未启用 Mod 的缓存 Def）从 494–613 变成 1,039–1,114 毫秒，`DefsOf` 也慢，因为每行都要按 `(inst, id)` 再查一次。**不采用**。
+- **全局一张**：身份合并时什么都不用改，路径跨 Mod、跨快照只存一遍。代价是写入时每条路径要先查表（写清单慢 2–4 倍），整理时要多扫一遍所有引用（§4.3）。
+- **每个事实集合一份文件列表**（`setfiles`，本次加测，不在原来的三个选项里）：集合是按内容键建的、建好以后不变，事实行也只属于它，所以列表和事实同生同死：**不需要清理、身份合并时不用重编、写入时不用查表**。读的时候按集合读一次列表；集合不变，可以按 `set_id` 缓存。
+
+**推荐：事实表用每个集合一份文件列表，文件清单用每个快照一个压缩块（§5），不建全局或每个 Mod 的路径表。** 两种做法和压缩块组合后的比较：
+
+| | `combo-setfiles` | `combo-global` |
+| --- | ---: | ---: |
+| 库大小 | **152.58 MB**（−92.9，−37.8%） | 148.12 MB（−97.4，−39.7%） |
+| `snapshot_file` | 21.77（语义行和 DLL 仍是文本） | 11.03（改成路径编号） |
+| 路径表 / 列表 | 2.8（在 `fact_set` 里） | 7.52 |
+| 整理时清理旧路径 | 不需要 | 每次 0.42–0.68 秒 |
+| 写 30 个快照清单（毫秒） | 16.9–22.7 | 44.1–50.0 |
+| 转换 | 8.4–11.3 秒 | 7.9–8.6 秒（run 4 机器忙时 14.3） |
+
+全局路径表多省 4.5 MB（1.8%），换来一张全局表、一个整理步骤和写入时的查表，不值得。
+
+### 4.3 旧路径什么时候清理
+
+按推荐做法不需要单独的规则：
+
+- 集合的文件列表在 `fact_set` 那一行里，集合被 `PruneFacts` 删掉时一起没了（03 §3：没有版本视图引用的集合立即删除）。Mod 更新后，旧集合在所有版本视图都换成新集合时删除。
+- 非语义文件的压缩块跟着快照的文件清单走，保留规则就是 02 §7.1（当前快照、未回答提问、每个 Instance 最近 3 次更新的前后快照），`Store.Maintain` 第 1 步删清单时一起删。
+
+如果改选全局路径表，清理放在 `Store.Maintain`（02 §7.2）第 1、2 步之后、同一个事务里：删掉没有任何行引用的路径（`DELETE FROM path WHERE id NOT IN (SELECT path_id FROM snapshot_file UNION ALL SELECT file_id FROM def_fact … )`）。实测（没有可删的也要扫一遍引用）：清单不压缩时 0.83–0.92 秒，和压缩块一起做时 0.42–0.68 秒。保存分析和扫描时不做这一步，路径表在两次整理之间只增不减。
+
+## 5. 问题 3：非语义文件改成每个快照一个压缩块
+
+### 5.1 先查清按路径查的读者
+
+| 读者 | 要的行 | 什么时候 | 范围 | 改成压缩块后 |
+| --- | --- | --- | --- | --- |
+| `Store.CurrentFiles`（增量扫描） | 只要语义行 | 扫描 | 环境的全部当前快照 | 不变 |
+| `semanticSet`、`SourceSemantics`（对账、比较、重新绑定来源） | 只要语义行 | 扫描、玩家操作 | 一个快照 / 一个来源 | 不变 |
+| `Store.ContentKinds`（`content.go`；Mod 库存、`type:` / `has:` 筛选） | 任意 `.dll`、Defs/Patches 里的 XML、Languages | 页面加载，进程内按快照缓存 | 全部当前快照 | 改读快照上写入时算好的 `kinds` |
+| `Store.SnapshotsWithPNG` / `SnapshotsWithPNGFor`（`textures.go`、`content.go`；Mod 库存、贴图页） | `%textures/%.png` | 页面加载，按 `SnapshotsKey` 缓存 | 全部 / 指定快照 | 改读 `kinds` 的 PNG 位 |
+| `Store.Languages`（`library.go`；详情字段） | `%languages/%` | 打开详情 | 一个快照 | 改读快照的 `langs` |
+| `Store.InstanceFiles`（`files.go`；日志找贴图 / DLL 的提供方） | 按模式 | 分析日志，结果进 `log_cache` | 全部活着的当前快照 | `.dll` 仍是行，照旧查；贴图要解开全部当前快照的块 |
+| `Store.SnapshotFiles`（`changes.go`；变更页的文件差异） | 全部行的路径、大小、哈希（不要 mtime） | 打开变更页 / 点一行 | 两个快照 | 行 + 解开两个块 |
+| `persist.go`（同内容新外部状态时复制、mtime 变了时重写） | 全部 | 扫描 | 一个快照 | 复制块（去重时只加一个引用） |
+| `maintenance.go`、`mutate.go`、`envs.go` | 删除 | 整理、gc、删环境 | — | 连块一起删 |
+
+`files search` / MCP `search_files`（`internal/modsearch`）走磁盘，不读 `snapshot_file`。非语义行的 `size` 只有变更页用（显示大小差异），`mtime` 没人用（§1）。
+
+### 5.2 数字
+
+| 结构 | 库大小 | 变化 | `snapshot_file` | 压缩块 | 转换 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `v26` | 245.47 | — | 84.04 | — | — |
+| `blob` | 195.09 | −50.4（−20.5%） | 21.77 | 11.89 | 4.0–5.6 秒 |
+| `blob-dedup` | 194.11 | −51.4（−20.9%） | 21.77 | 10.91 | 4.2–4.3 秒 |
+
+69.8 万条非语义行（不含 DLL）的路径文本 45.7 MB，前缀压缩 + 大小后 19.4 MB，再 zstd 后 **10.1 MB（每条约 14.5 字节）**。连 mtime 一起存的话 zstd 后是 15.2 MB，多一半，所以不存。4,864 个块里内容相同的约三分之一（去重后存 3,312 个）。合成数据的历史快照每次都改动 1.5% 的路径；真实库里只换 DLL 或 XML 的更新可能更多，去重的收益也许更大，但这里只省 1 MB。
+
+| 查询（毫秒） | `v26` | `blob-dedup` | `combo-setfiles` |
+| --- | ---: | ---: | ---: |
+| `ContentKinds` 全部、无缓存 | 236–294 | **4.5–5.8** | **1.9–2.7** |
+| `SnapshotsWithPNG` 全部 | 21–31 | 3.9–4.6 | 0.9–1.1 |
+| `Languages` × 100 | 11.6–21.1 | 0.57–0.65 | 0.82–0.87 |
+| `InstanceFiles("%Textures/%")` | 115–209 | 142–166 | 159–211 |
+| `InstanceFiles("%x.dll")` × 20 | 1,435–1,812 | 436–512 | 424–607 |
+| `SnapshotFiles` × 100（变更页） | 17–28 | 12.7–14.7 | 15.2–18.3 |
+| `CurrentFiles`（增量扫描） | 95–137 | 79–91 | 75–122 |
+| 写 30 个快照清单 | 20–32 | 14.0–14.5 | 16.9–22.7 |
+
+**推荐：做，配派生列；块里不放 DLL，不存 mtime；去重可选。** 页面加载上最大的收益其实来自派生列：Mod 库存首次打开的内容类型从约 260 毫秒降到几毫秒（真实库 246 毫秒，07 §6.2）。这一条不依赖压缩块，可以先单独做：快照加 `kinds`、`langs` 两列，扫描写快照时算，迁移时补算。变慢的只有日志找贴图（+40–50 毫秒，一份日志一次，结果进 `log_cache`）。DLL 留在行里，是因为日志按名字找 DLL 是每个缺失的程序集查一次，如果 DLL 也在块里，20 次就要解开 2 万多个块；留在行里以后，要扫的行少了，反而快约 3 倍。
+
+## 6. 问题 4：未启用的 Mod 只存 Def 的名字层
+
+### 6.1 哪些功能读未启用 Mod 的哪些字段（代码核对）
+
+| 功能 | 读的字段 |
+| --- | --- |
+| `target-inactive`（`analyze/facts.go` 的 `knowledge`、`reasons`） | 类型、defName、Name。补丁模拟和父模板展开只用启用的 Mod；未启用的只进一份用完就扔的草稿文档 |
+| `archo def X` / MCP `get_def` 的 “also-in (not enabled)” | **file:line**（`cmds/content.go:141`） |
+| 日志 xref-missing：“defines … at file:line but is not enabled”（`app/logs.go:758-771`） | 类型、**file、line** |
+| 日志缺父模板：“provides the abstract def … (file:line)”（`app/logs.go:811-818`） | **file、line** |
+| 详情的 Defs 一节（`view/detail.go:333` 调 `archo def --mod`，任何 Mod） | 类型、defName、Name、**file、line** |
+| 缺失父模板的提供方（`app/parentproblems.go:147`） | **MayRequire / MayRequireAny**（`Loaded`） |
+| `why`、`explain_relation` | 类型、defName、Name |
+| `Parent`、`Abstract` | **未启用的 Mod 没有任何代码读**：只显示启用的，`defFindings` 也只看启用的 |
+
+没有任何代码沿 ParentName → Name 在事实表里找继承链。
+
+### 6.2 数字
+
+| 结构 | 库大小 | 变化 | `def_fact` |
+| --- | ---: | ---: | ---: |
+| `v26` | 245.47 | — | 114.67 |
+| `slim-names` | 220.19 | −25.3（−10.3%） | 89.39 |
+| `slim-parent` | 242.81 | −2.7（−1.1%） | 112.01 |
+| `combo-hash`（压缩块 + 哈希路径表 + `slim-parent`） | 146.26 | — | 78.33 |
+| `combo-names`（同上，但 `slim-names`） | 143.88 | 比上一行再少 2.4 | 75.95 |
+
+**推荐：不做。** 名字层单独能省 25 MB，省的主要是 `file` 文本；文件路径改成下标以后只剩 2.4 MB（1.6%）。代价是上表 4 处玩家看得到的输出丢掉 file:line，缺失父模板的提供方也会判断错（没有 MayRequire）。另外，集合按 `(Instance, 种类, 内容键)` 共用（`ensureFactSet` 用 `ON CONFLICT DO NOTHING`）：同一个 Mod 在一个方案里启用、另一个方案里没启用时内容键相同，只有名字层的集合会被启用那边拿去用。要做就得另设一个集合种类，两边各存一份，反而更大。只清 parent / abstract 不改变任何输出，但只省 2.7 MB，同样要另设种类，也不值得。
+
+## 7. 问题 5：查询、页面加载和迁移
+
+### 7.1 全部查询
+
+毫秒，run 1–3 的范围（`*` 表示故意删了字段、结果和基线不同；`defName` / `Name` 两行是现在的 SQL，`CROSS JOIN` 两行见 §7.2）：
+
+| 毫秒 | `v26` | `v26-copy` | `ik` | `path-global` | `ik+path-mod` | `blob-dedup` | `combo-global` |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| defName×100 | 85.8–92.8 | 84.1–93.4 | 93.1–93.7 | 86.5–91.5 | 127–157 | 120–135 | 88.0–92.4* |
+| Name×190 | 153–185 | 155–163 | 165–174 | 156–169 | 206–229 | 197–208 | 149–160* |
+| defName×100(CROSS JOIN) | 2.1–2.7 | 2.2–2.3 | 2.6 | 2.6 | 4.5 | 2.7 | 2.4–2.8* |
+| Name×190(CROSS JOIN) | 4.7–6.5 | 5.0–5.4 | 5.2 | 6.3 | 9.2 | 5.8 | 5.2–6.0* |
+| DefsOf×100 | 79.7–89.5 | 77.8–78.6 | 77.4–81.1 | 88.1–89.8 | 135–161 | 92.7–99.4 | 78.2–80.1* |
+| DefCounts(全表) | 65.8–70.1 | 62.2–64.1 | 52.9–56.4 | 67.8–89.3 | 57.0–72.4 | 75.8–87.1 | 62.0–64.5 |
+| CachedDefs(未启用全部) | 536–613 | 494–515 | 541–555 | 594–1030 | 1039–1114 | 585–662 | 518–530* |
+| TypeOwners×100 | 2.1–2.9 | 1.9–2.0 | 2.4–3.0 | 2.6–2.9 | 3.2–3.8 | 2.5–2.6 | 2.3–2.7 |
+| HarmonyPatches(全部) | 58.7–108 | 57.5–58.1 | 59.4–84.0 | 63.4–116 | 77.5–112 | 67.2–79.8 | 61.8–66.6 |
+| CurrentFiles(增量扫描) | 94.5–137 | 96.1–107 | 95.2–109 | 115–142 | 192–197 | 79.1–91.1 | 110–115 |
+| SemanticSet×100 | 8.2–14.8 | 6.8–7.9 | 7.4–7.6 | 10.9–15.1 | 17.0–18.5 | 6.3–7.1 | 8.3–10.7 |
+| SnapshotFiles×100(变更页) | 17.4–28.0 | 16.4–17.8 | 16.0–16.3 | 34.7–35.2 | 45.9–53.9 | 12.7–14.7 | 15.4–17.2 |
+| InstanceFiles(%Textures/%) | 115–209 | 121–130 | 120–125 | 295–481 | 314–338 | 142–166 | 164–168 |
+| InstanceFiles(%x.dll)×20 | 1435–1812 | 1323–1499 | 1394–1407 | 4599–4759 | 1500–1728 | 436–512 | 787–1149 |
+| ContentKinds(全部,无缓存) | 236–294 | 235–266 | 245–256 | 398–443 | 626–777 | 4.5–5.8 | 5.7–7.5 |
+| SnapshotsWithPNG(全部) | 20.9–31.0 | 20.6–32.7 | 21.9–23.4 | 46.5–52.2 | 30.8–30.9 | 3.9–4.6 | 4.6–5.7 |
+| Languages×100(详情) | 11.6–21.1 | 10.7–14.1 | 11.0–11.1 | 25.4–27.0 | 16.3–17.8 | 0.57–0.65 | 0.73–0.95 |
+| 写入30个快照清单 | 20.2–32.1 | 20.4–31.2 | 22.0–22.7 | 74.6–85.5 | 26.4–38.5 | 14.0–14.5 | 44.1–49.8 |
+| 写入30个Def集合 | 56.9–112 | 57.6–98.4 | 56.5–58.5 | 59.4–71.4 | 60.0–61.5 | 56.9–58.2 | 72.1–88.0 |
+
+`setfiles` 类原型在 run 4 单独测（Def 查询改成每次调用按集合读一次列表、在 Go 里换回路径，不跨调用缓存；run 3 用 SQL 的 `json_extract` 每行解析一次，`DefsOf` 慢到 499–607 毫秒，那是原型写法的问题）。run 4 时机器更忙，同一结构的数字比 run 1–3 高 20–40%，所以只和同一次的 `v26-copy` 比：
+
+| 毫秒（run 4） | `v26-copy` | `setfiles` | `combo-setfiles` | `combo-global` |
+| --- | ---: | ---: | ---: | ---: |
+| defName×100 | 86.5 | 90.2 | 125* | 153* |
+| Name×190 | 153 | 162 | 183* | 250* |
+| defName×100(CROSS JOIN) | 2.1 | 9.0 | 12.9* | 5.2* |
+| Name×190(CROSS JOIN) | 5.6 | 19.7 | 30.9* | 10.3* |
+| DefsOf×100 | 109 | 87.6 | 98.6* | 130* |
+| CachedDefs(未启用全部) | 724 | 574 | 925* | 927* |
+| HarmonyPatches(全部) | 73.4 | 65.3 | 116 | 109 |
+| CurrentFiles(增量扫描) | 127 | 93.4 | 122 | 195 |
+| InstanceFiles(%Textures/%) | 183 | 119 | 211 | 275 |
+| InstanceFiles(%x.dll)×20 | 1693 | 2111 | 607 | 1245 |
+| ContentKinds(全部,无缓存) | 261 | 401 | 2.7 | 7.7 |
+| 写入30个快照清单 | 27.9 | 39.5 | 22.7 | 50.0 |
+| 写入30个Def集合 | 54.4 | 95.3 | 89.2 | 110 |
+
+按名字查 Def 用了 `CROSS JOIN` 以后，每次调用多读一次集合列表：`setfiles` 约多 70 微秒，`combo-setfiles` 约多 110–130 微秒；按 `set_id` 缓存列表就没有这部分（集合不变）。`HarmonyPatches` 在原型里仍用 `json_extract`，是上限。
+
+### 7.2 现有的一个慢查询（和本题无关，但影响首次日志）
+
+`Store.DefsNamed`（`def`、日志归因、缺失父模板都用它）的 SQL 是 `… FROM def_fact f JOIN content_state c ON c.def_set_id=f.set_id WHERE f.name=? AND c.game_mm=? ORDER BY c.instance_id, f.rowid`。`EXPLAIN QUERY PLAN`：
+
+```
+JOIN:       SEARCH c USING INDEX content_state_mm (game_mm=?)
+            SEARCH f USING INDEX def_fact_named (name=? AND set_id=?)
+CROSS JOIN: SEARCH f USING INDEX def_fact_named (name=?)
+            SEARCH c USING INDEX content_state_def (def_set_id=? AND game_mm=?)
+```
+
+为了少排一次序，SQLite 先把这个版本的 1,354 行 `content_state` 都走一遍，每行再查一次 Name 索引。改成 `CROSS JOIN`（`TypeOwners` 已经这样写），结果相同：190 次 Name 查询 **153–185 → 4.7–6.5 毫秒**，100 次 defName **84–93 → 2.1–2.7 毫秒**。10-29 的事实共用报告测的是 5.6 毫秒，那是 B1 修复（`6c67849`，加了 `ORDER BY c.instance_id`）之前。真实日志有 190 个缺父模板簇时，这一项单独就占首次日志 500 毫秒门槛（07 §6 的“MCP 新日志后第一次 `list_problems` / `analyze_log`”）的三分之一。和整数键无关，可以单独修。
+
+### 7.3 对照 06 §10 和 07 §6 的门槛
+
+推荐方案（`combo-setfiles`）对页面和命令的影响，数字取自 §7.1：
+
+| 路径 | 门槛 | `v26` | 推荐方案 | 判断 |
+| --- | --- | ---: | ---: | --- |
+| Mod 库存首次打开：内容类型 + PNG | 切换页面 ≤ 200 毫秒 | 257–325 | 2.8–3.8 | 变快；现在单这一项就超门槛 |
+| 详情：语言（一个快照） | 单次交互 ≤ 50 毫秒 | 0.12–0.21 | 0.01 | 不变 |
+| 变更页：两个快照的文件差异 | 切换页面 ≤ 200 毫秒 | 0.35–0.56 | 0.30–0.37 | 不变 |
+| 首次日志：找贴图 + 20 个 DLL + 190 个 Name | ≤ 500 毫秒（07 §6） | 1,700–2,200 | 770–1,000 | 变快但仍超；大头是 DLL 查找和 Name 查询（§7.2），与本题无关。合成库的 DLL 查找按全部 1354 个 Mod 的环境范围测，比现在的代码查得多（§1 第 3 条） |
+| 分析：读全部未启用 Mod 的缓存 Def | 无单独门槛（07 §6：有索引的分析 7.8 秒） | 494–724 | 702–925 | 原型多了一次逐行字符串拆分，正式实现直接按下标取，应更接近基线；最坏 +0.2–0.4 秒 |
+| 增量扫描：读语义行 | ≤ 3 秒（07 §6） | 95–137 | 75–122 | 不变 |
+| 扫描写清单（30 个快照） | — | 20–32 | 16.9–22.7 | 不变或略快 |
+| 保存分析（30 个 Def 集合） | — | 54–112 | 71.8–89.2 | 噪声范围内 |
+
+内存：原型没有在常驻进程里加缓存。有了派生列，`ContentKinds` 的进程内缓存可以去掉；如果按集合缓存文件列表，要设上限或随 IndexKey 失效（06 §10“不长期占内存”）。
+
+### 7.4 迁移要多久
+
+在 245 MB 的合成库上，一个事务完成转换（随库启动自动升级，和 v26 一样不 VACUUM）：
+
+| 转换 | 耗时 | 转换后、整理前的文件 | 其中在用 | 之后整理的 VACUUM |
+| --- | ---: | ---: | ---: | ---: |
+| `ik` | 0.07–0.09 秒 | 248.9 MB | 244.5 MB | 1.9–2.0 秒 |
+| `setfiles` | 3.4–4.5 秒 | 294.1 MB | 206.6 MB | 1.6–1.7 秒 |
+| `blob-dedup` | 4.2–4.3 秒 | 256.4 MB | 201.6 MB | 2.0–2.3 秒 |
+| `combo-global` | 7.9–8.6 秒（run 4：14.3） | 256.6 MB | 152.7 MB | 1.2–2.5 秒 |
+| **`combo-setfiles`（推荐）** | **8.4–11.3 秒** | 256.4 MB | 162.7 MB | 1.6–1.9 秒 |
+| `combo-ik-mod` | 8.8–9.2 秒 | 255.4 MB | 146.6 MB | 1.2–1.3 秒 |
+
+耗时和这几张表的行数成正比，不和库总大小成正比；ToDo 的真实库行数与合成库相同，估计也在 10 秒左右。v26 升级在 76 万行的合成库上是 4.33 秒（07 §6），在 VM 的 54 MB 真实库上首次打开（含升级）1.7 秒；这一步更久，启动时要显示进度（“正在升级数据库…”），不能让窗口看起来卡住。转换期间文件先变大（整理前约 256 MB，WAL 另算），由之后的自动整理回收；空间检查沿用 02 §7.2 的“两倍库大小 + 64 MiB”。本次 `D:\RimArcho-test\dbint` 的峰值约 500 MB（基线库 + 一份转换中的副本 + WAL）。
+
+迁移的限制：`Store.Open` 的连接开着外键（`foreign_keys(1)`），事务里不能关。`fact_set` 是父表，**不能删了重建**（会级联删光事实），只能 `ALTER TABLE ADD COLUMN`；子表（`def_fact` 等）可以“建新表、复制、删旧表、改名”。原型是关着外键做的，正式迁移要按这个限制写。推荐方案正好只给 `fact_set` 加列。
+
+## 8. 推荐方案
+
+| 结构 | 库大小 | 相对 v26 |
+| --- | ---: | ---: |
+| `v26` | 245.47 MB | — |
+| 只做派生列（`kinds`、`langs`） | 约 245 MB（每个快照多两列，未单独测） | 页面加载的收益全拿到 |
+| `blob-dedup`（压缩块 + 派生列） | 194.11 MB | −20.9% |
+| **`combo-setfiles`** | **152.58 MB** | **−37.8%** |
+| `combo-global`（另加全局路径表） | 148.12 MB | −39.7% |
+
+1. 快照加 `kinds`（DLL、Defs/Patches XML、Languages、贴图 PNG 四个位）和 `langs`（语言目录，按现在 `Languages` 的规则）。扫描写快照时算，迁移时补算。`ContentKinds`、`SnapshotsWithPNG*`、`Languages` 改读它们。
+2. 非语义文件（DLL 除外）从 `snapshot_file` 移到每个快照一个压缩块：按 `rel_path` 排序、前缀压缩、存大小、zstd，不存 mtime。新表 `snapshot_list(snapshot_id INTEGER PRIMARY KEY, n, data)`；去重（`file_blob` 按内容哈希）可选。`InstanceFiles` 贴图分支、`SnapshotFiles`、`persist.go` 的复制和重写、02 §7.1 的清理、gc、删环境跟着改。
+3. `fact_set` 加 `files`（JSON 数组或换行分隔），`def_fact`、`type_fact`、`harmony_fact`、`harmony_id`、`assembly_fact` 的 `file TEXT` 换成列表下标。保存时按集合建列表；读取时按集合读一次列表。
+4. 不加 Instance 整数键，不做名字层，不建全局路径表。
+5. 独立的小修，可以先做：`Store.DefsNamed` 改 `CROSS JOIN`（§7.2）；`Store.InstanceFiles` 改成 `environment_id IN ('', ?)`（§1 第 3 条，要补测试）。
+
+## 9. 建议写进 01 §5 的实现计划
+
+（2026-10-31：已按 §10 的决定写进 01 §5.1 第 24 步。第 1 步派生列先做完，成了 schema v27；压缩块和集合文件列表顺延为一个 v28，等 §12 的 VM 实测之后再做，不去重。）
+
+在 §5.1 的实施步骤表加一步（编号按当时的表）：
+
+| # | 步骤 | 依赖 | 规格 |
+| --- | --- | --- | --- |
+| 24 | **archo.db 体积（schema v27）**：快照加 `kinds`、`langs`（扫描时算，迁移时补算），内容类型、PNG、语言改读它们；非语义文件（DLL 除外）改成每个快照一个 zstd 压缩块 `snapshot_list`（前缀压缩路径 + 大小，不存 mtime），`snapshot_file` 只留语义文件和 DLL；`fact_set` 加 `files`，事实行的 `file` 换成下标；迁移一个事务完成，启动时显示进度，不 VACUUM，不删重建 `fact_set`。不加 Instance 整数键，不做名字层。合成库 245 → 153 MB，Mod 库存首次打开的内容类型 260 → 3 毫秒（research 2026-10-30_archo-db-integer-keys） | — | 02 §4.3、§7、§7.1、§7.2，03 §2、§3，07 §6 |
+
+做的时候按这个顺序，每一步能单独合并：
+
+1. **派生列**（独立，收益最大）：`snapshot` 加两列；`insertSnapshot` 写入时算；迁移补算全部快照；`ContentKinds`、`SnapshotsWithPNG`、`SnapshotsWithPNGFor`、`Languages` 改读；`ContentKinds` 的进程内缓存可删。测试：现有的内容类型、贴图、语言测试保持通过；新增“只有 `About.xml.disabled` / 版本目录下的 Languages / 任意位置的 DLL”的派生值与旧 SQL 等价。
+2. **压缩块**：`snapshot_list`（加去重时还有 `file_blob`）；`insertFiles` 拆成行和块；`insertSnapshot` 复制上一个快照时复制块；mtime 刷新只重写语义行；`InstanceFiles` 的贴图分支解开当前快照的块；`SnapshotFiles` 合并行和块；02 §7.1 的清理、`gc`、`DeleteEnv` 连块一起删；`Maintain --dry-run` 的计数包括块。测试：`modchanges` 的文件差异与旧结构逐字一致；迁移前后 `SnapshotFiles` 等价；整理后受保护的清单仍完整。
+3. **集合文件列表**：`saveContent`、`saveHarmony` 按集合建列表；`DefsOf`、`DefsNamed`、`CachedDefs`、`HarmonyPatches`、`Assemblies`、`TypeOwners` 按下标换回路径（集合不变，可按 `set_id` 缓存，要有上限）。迁移按 v26 的做法逐表重建子表，保留 rowid 顺序。测试：沿用 `TestMigrateV26*` 的查询等价测试，加上 `TestDefsNamedOrderIndependentOfWrites`。
+4. **规格与基线**：02 §4.3 / §7 的表结构和“`snapshot_file.mtime` 只服务于增量扫描”改为现状；02 §7.1 写明块跟着清单保留；03 §3 写集合的文件列表；07 §6.2 记合成基准；`docs/release-vm-tests.md` 加一行：在 VM 真实库上看升级耗时、升级前后大小、Mod 库存首次打开。
+5. **基准**：`TestIntKeyResearch` 留作参照；实现后把它的 `combo-setfiles` 路径换成正式代码，或另写一个只测正式结构的 opt-in 基准。
+
+## 10. 用户的决定（2026-10-31）
+
+当时的问题和回答：
+
+1. 采用推荐方案还是另加全局路径表？**采用推荐方案**：集合文件列表 + 每个快照一个压缩块。不建全局路径表，不加 Instance 整数键，不做名字层。
+2. 压缩块要不要去重？**不去重。**
+3. 派生列要不要先单独做一步？**要**：已做，schema v27（`8b38732`，合成基准见 07 §6.2）。
+4. `DefsNamed` 的计划和 `InstanceFiles` 的范围要不要现在修？**先修这两个**，在派生列之前：已在另外两个分支修（`DefsNamed`、`InstanceFiles` 各一个，合进 dev/1.0）。
+5. 定方案前要不要先在 VM 的真实库上量一次？**要**，在改表之前（§12）。
+
+**对 §8 数字的更正**：表里的 `combo-setfiles`（152.58 MB）用的是去重的压缩块（`blob-dedup`），还带着 `slim-parent`（清掉未启用 Mod 的 parent / abstract）。按上面的决定，这两项都不做，相应的大小加回约 1.0 MB（去重，§5.2）和 2.7 MB（§6.2），所以定下来的结构在合成库上约 156 MB（−36%）。§12 在 VM 里量的就是这个结构：`blob` + `setfiles`，不去重，不清字段。
+
+## 11. 复现
+
+```powershell
+$base = 'D:\RimArcho-test\dbint'
+$env:GOCACHE = (go env GOCACHE)          # 先记下，下面改 LOCALAPPDATA 后 Go 会换缓存目录
+$env:TEMP = "$base\tmp"; $env:TMP = $env:TEMP
+$env:APPDATA = "$base\appdata"; $env:LOCALAPPDATA = "$base\localappdata"; $env:USERPROFILE = "$base\profile"
+Remove-Item Env:RIMARCHO_HOME -ErrorAction SilentlyContinue
+$env:RIMARCHO_INTKEY_BENCH = '1'
+$env:RIMARCHO_INTKEY_DISK_ROOT = $base    # 超过 RIMARCHO_INTKEY_DISK_MB（默认 1400）就失败
+go test ./internal/store -run '^TestIntKeyResearch$' -v -count=1 -timeout 60m
+# 只跑部分结构：$env:RIMARCHO_INTKEY_LAYOUTS = 'v26-copy,combo-setfiles'；小规模试跑：$env:RIMARCHO_INTKEY_SCALE = '0.05'
+```
+
+一次完整运行 6–9 分钟。测试结束时 `t.TempDir()` 自动删除所有库。四次运行的原始输出在同名目录 [`2026-10-30_archo-db-integer-keys-evidence/`](2026-10-30_archo-db-integer-keys-evidence/)（`run1.log`–`run4.log`，`run4` 只跑 `setfiles` 类）。
+
+**不足**：合成数据的路径、每个文件的 Def 数、历史快照的改动比例是按真实库的总量调出来的，不是真实分布；真实路径的前缀相似度和去重比例会影响压缩块的大小。只测了后端查询，没有测 GUI 端到端和原生窗口，也没有在 VM 里跑。机器负载带来的噪声见 §2.2。
+
+## 12. VM 真实库实测（2026-10-30）
+
+在测试 VM（Win11-Player-Test，4 vCPU / 8 GB）快照 `RimArcho-Real-Vulkan` 的真实库上测，测完还原到这个快照。真实库只在 VM 里碰：用 `sqlite3 -readonly .backup` 复制一份，所有升级和转换都在副本上做，`APPDATA`、`LOCALAPPDATA`、`TEMP` 指到 VM 里的工作目录；测完核对真实 `archo.db` 和 ModsConfig.xml 的 MD5 没变。宿主上只留下数字（`2026-10-30_archo-db-integer-keys-evidence/vm-*.txt`，不含 Mod 名字）。脚本是同一目录的 `vm-measure.ps1`，转换是 `TestIntKeyConvertFile`（`RIMARCHO_INTKEY_DB` 指向副本）。
+
+**这个库**：快照里的 RimArcho 是 schema 18，库 53.6 MB；1271 个当前快照、共 1285 个快照、239,350 行文件清单（78% 是会进压缩块的非语义行）、80,355 条 Def 事实。它没有 DLL 事实（`type_fact`、`assembly_fact` 都是 0 行），比宿主那个 443 MB 的库小得多。
+
+| 项 | 数字 |
+| --- | --- |
+| v26 构建（dev/1.0 `295cb45`）第一次打开：18 → 26 升级 | 825 毫秒（整个 `archo db status` 进程）；库 53.6 → 62.2 MB（含 WAL，v26 迁移不 VACUUM） |
+| v27 构建（`8b38732`）第一次打开：26 → 27 升级 | **317 毫秒**（同上，进程启动本身约 33 毫秒）；库大小不变 |
+| `archo library`（Mod 库存的视图模型，每次一个新进程，5 次） | v26 **315–373 毫秒** → v27 **89–98 毫秒**；两个构建的输出逐行相同 |
+| 其中内容类型（1271 个当前快照，5 次取最好） | 旧查询 **206.8 → 2.0 毫秒**；可转换贴图 18.5 → 1.1 毫秒 |
+| v27 整理后的大小 | 37.2 MB：`snapshot_file` 20.6、`def_fact` 12.1、快照 2.3、集合与版本视图 1.0 |
+| 原型转换（压缩块不去重 + 集合文件列表，即 §10 定下的结构） | **1.09 秒**（一个事务）；之后的 VACUUM 0.18 秒 |
+| 转换后的大小 | **19.6 MB（−47%）**：`snapshot_file` 20.6 → 4.2、压缩块 1.65（1285 个块，路径文本 12.1 MB 前缀压缩成 3.7 MB，zstd 后 1.4 MB）、`def_fact` 12.1 → 8.6、集合 + 版本视图 1.0 → 1.6 |
+| 校验 | 187,775 行进了压缩块，解开后还是 187,775 行 |
+
+和合成库比：这个库的压缩块只有 1285 个快照（合成库 4864 个，历史快照多），所以按比例省得更多（−47%，合成库约 −36%）；没有 DLL 事实，事实表那边省的也少一些。转换耗时和行数成正比：24 万行 1.1 秒，合成库 97 万行 8–11 秒，宿主那个真实库按行数估计也在 10 秒左右，所以 v28 升级仍要显示进度。
+
+还没测：宿主那个 443 MB、启用几百个 Mod、有 DLL 事实的库（按规则不复制到宿主）；GUI 里点开 Mod 库存的整帧时间（这里测的是同一个视图模型的 CLI 进程）。
+
+## 13. 正式实现（2026-10-31，schema v28）
+
+§10 的方案已按 §9 第 2、3 步实现（分支 `claude/db-v28-6b0a03`）：规格见 02 §7、§7.1–§7.2，03 §3，合成基准见 07 §6.2（`TestV28Formal`：同一个合成库 v27 245.5 → v28 156.2 MB，与 `combo-setfiles` 修正后的约 156 MB 一致；正式迁移 4.7 秒）。块的分法（没有哈希、也不是 `.dll` 的文件）和列表的建法与原型相同；与原型不同的是列表的读法：每个集合读一次、在 Go 里换回路径并缓存，不在 SQL 里逐行 `json_extract`。原型在本报告的 harness 里 Def 类查询的校验和与 v26 不同（`DIFF`），在 v27 基线上同样如此，是原型的问题；正式实现的等价性由 `TestMigrateV28` 和 `TestFileListsMatchRows` 检查。harness 在 `RIMARCHO_INTKEY_SCALE=0.02` 时 `ikPlanLibrary` 不会结束（候选太少），用 0.05。

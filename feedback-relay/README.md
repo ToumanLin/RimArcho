@@ -48,7 +48,7 @@ RimArcho 里还没填中转地址时，反馈页只给“打开 GitHub”这一�
 
 6. （可选）在仓库的 Issues → Labels 里建一个 `feedback` 标签。不建也行：GitHub 拒绝这个标签时，Worker 会不带标签再开一次。
 
-7. **在 VM 里真实发送一次**（[发布前 VM 测试](../docs/发布前VM测试.md) 里有这一行）：
+7. **在 VM 里真实发送一次**（[发布前 VM 测试](../docs/release-vm-tests.md) 里有这一行）：
    1. 先设好环境变量 `RIMARCHO_FEEDBACK_RELAY=https://rimarcho-feedback.<你的子域>.workers.dev/report`，再启动 RimArcho。
    2. 设置 › 反馈：标题写“中转测试”，联系方式随便填，点“发送”。
    3. 看到“已发送”和 issue 号以后，在 GitHub 上核对：

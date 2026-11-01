@@ -38,9 +38,9 @@ const $=id=>document.getElementById(id);
 const store={get(key){try{return localStorage.getItem('rimarcho-docs:'+key)}catch{return null}},set(key,value){try{localStorage.setItem('rimarcho-docs:'+key,value)}catch{}}};
 let active=null,raw=false,query='',observer=null,font=Math.max(13,Math.min(22,Number(store.get('font'))||16));
 let theme=store.get('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');
-const groupNames={'':'总览',specs:'功能规格','specs/06-界面':'界面与交互',research:'研究笔记',design:'设计草案'};
-const groups=['','specs','specs/06-界面','research','design'];
-const groupOf=doc=>doc.path.startsWith('specs/06-界面/')?'specs/06-界面':doc.path.split('/').length===1?'':doc.path.split('/')[0];
+const groupNames={'':'总览',specs:'功能规格','specs/06-ui':'界面与交互',research:'研究笔记',design:'设计草案'};
+const groups=['','specs','specs/06-ui','research','design'];
+const groupOf=doc=>doc.path.startsWith('specs/06-ui/')?'specs/06-ui':doc.path.split('/').length===1?'':doc.path.split('/')[0];
 function element(tag,cls,text){const el=document.createElement(tag);if(cls)el.className=cls;if(text!==undefined)el.textContent=text;return el}
 function setTheme(){document.documentElement.dataset.theme=theme;$('theme').textContent=theme==='dark'?'浅色':'深色';store.set('theme',theme)}
 setTheme();
@@ -63,7 +63,7 @@ function highlight(){
 }
 function render(path,anchor='',keepScroll=false){
   const previousScroll=window.scrollY;
-  active=docs.find(d=>d.path===path)||docs.find(d=>d.path==='00-顶层设计.md')||docs[0];if(!active)return;
+  active=docs.find(d=>d.path===path)||docs.find(d=>d.path==='00-top-level-design.md')||docs[0];if(!active)return;
   document.title=active.title+' · RimArcho 文档';store.set('last',active.path);$('breadcrumb').textContent='docs / '+active.path;
   const count=active.source.replace(/\s/g,'').length;$('metadata').replaceChildren(element('span','','MARKDOWN'),element('span','',`${count.toLocaleString()} 字 · 约 ${Math.max(1,Math.ceil(count/650))} 分钟`),element('span','',`文件更新 ${active.modified.slice(0,10)}`));
   $('source').textContent=raw?'阅读':'源码';$('source').setAttribute('aria-pressed',String(raw));$('content').style.fontSize=font+'px';$('toc').replaceChildren();if(observer)observer.disconnect();

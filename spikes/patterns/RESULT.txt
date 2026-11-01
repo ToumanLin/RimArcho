@@ -1,9 +1,9 @@
-Spike patterns — error pattern library v0 (docs/research/00-日志语料顶层设计.md §3 G5)
+Spike patterns — error pattern library v0 (docs/research/00-log-corpus-design.md §3 G5)
 Run: 2026-10-21, local machine. Input: spikes/hugslogs parsed.jsonl, regenerated with the fixed
 mod-list parser (ef86650; upload time, mod lists), and corpusrun results-v3.jsonl (clusters with RimArcho's v3 attribution), 6,734 logs of 1.6. Output:
 patterns-v0.json (aggregates only: no gist ids, no mod lists, mod-specific patterns need >= 10 logs
 from >= 5 sessions, templates that look like paths or user data are dropped). Draft of how it
-would enter the product: docs/research/01-范式库接入草案.md.
+would enter the product: docs/research/01-pattern-library-integration-draft.md.
 
 == Method
 

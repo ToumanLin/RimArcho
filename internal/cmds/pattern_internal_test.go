@@ -12,7 +12,7 @@ import (
 )
 
 // A mod-specific pattern is shown only when the cluster's own attribution names that mod as
-// source; the generic kind is shown either way (01-范式库接入草案.md §3).
+// source; the generic kind is shown either way (01-pattern-library-integration-draft.md §3).
 func TestClusterPatterns(t *testing.T) {
 	p := patterns.Load().Get("m:krkr.rocketman:e84d5a3b")
 	if p == nil {

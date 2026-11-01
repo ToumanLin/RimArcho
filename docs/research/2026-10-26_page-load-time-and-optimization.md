@@ -1,0 +1,819 @@
+# 页面加载耗时与优化研究
+
+研究日期：2026-10-26（本机 PDT）。代码：`dev/0.9.0`，`81017d8`。本报告记录当前实现的观测和优化建议，未实施优化、未提交代码。
+
+## 1. 结论与阅读口径
+
+最明显的等待来自“手动统计全部 Mod 贴图”（首次 **78.9 秒**，复测 **2.5 秒**）、卸载预览（真实目录 **4.5 秒**）、下载游戏版本信息（匿名 SteamCMD **2.8–2.9 秒**）。在 1.6 环境查看共享的 1.7 日志，还需先补齐跨版本分析，本次隔离数据库中的直接分析耗时 **30.3 秒**。1.6“需要处理”页原分析已过期，从首次展示到自动分析完成并返回新结果实测 **35.2 秒**。这些都不能用异步 API 立即返回的时间替代最终数据就绪时间。
+
+高频页面中，订阅与更新页热缓存仍为 **0.56–0.74 秒**，添加订阅页也走同一重路径；新进程首次打开全库范围为 **1.45 秒**。Mod 库热缓存约 **0.19–0.20 秒 + 22–26 ms JSON 编码**，一次传送约 **5.4 MB**；新进程首次约 **1.46 秒**。启动页首次进入约 **0.75 秒**，重复进入约 **0.17–0.20 秒**。方案管理主面板目前为几十至一百多毫秒，不能沿用此前优化前的秒级判断。
+
+建议优先：①拆轻添加订阅并复用订阅页库存读取；②复用卸载预览尺寸缓存；③减少 Mod 库全量 DTO/筛选条重复构建；④按快照增量维护贴图统计与占用统计；⑤启动页/工作区复用同一次读取的分析结果。具体收益是研究目标范围，见第 7 节，未经修改后的对照验证。
+
+**数字均为后端数据就绪时间，不是 GUI 端到端实测。** 没有启动 GUI、截图或假造 DOM/绘制时间。所有纯本地标签、折叠、菜单都单列映射；“增量后端 0”表示无需新请求，不表示屏幕渲染耗时为零。没有真实数据或需要登录/执行写操作的节点标为未测，并给出测量路径。
+
+## 2. 数据、隔离与方法
+
+### 2.1 实际数据
+
+| 项目 | 本次样本 |
+| --- | --- |
+| 机器 | Ryzen 9 7950X，16 核 / 32 逻辑线程；约 63 GiB RAM；Windows 11 Pro 10.0.26200 |
+| 工具 | Go 1.27.2 windows/amd64；当前仓库 GUI 包内临时 Go 测试，直接调用真实 API；图片用 `PageHandler` + `httptest` |
+| 数据目录 | `%APPDATA%\RimArcho`，本机展开为 `C:\Users\Touman_Lin\AppData\Roaming\RimArcho` |
+| 数据库 | 335,196,160 B；6,523 instance、6,791 snapshot、950,168 snapshot_file、601,193 def_fact、1,727 finding、9,455 change_event |
+| 可见 Mod | 两环境 Index 均为 6,506；不等同于全表行数（墓碑/环境归属等过滤） |
+| 游戏 main | `D:\SteamLibrary\steamapps\common\RimWorld`，1.7.4990 rev1069；当前方案 1；工作区列表 481 项 |
+| 游戏 1.6 | `D:\rimworld16`，1.6.4871 rev590；当前方案 4；工作区列表 56 项 |
+| 方案 | 1 default；2 Test；3 default (1.6)；4 Multiplayer Modpack 1.6 (Stable)；5 The Progression Modpack [UPDATED 1.7]。全局共享，两环境均可看到 5 个 |
+| 其他 | 4 plan_collection；2 log_cache；texture_file 为 0；真实 packs 目录无包 |
+
+先读了 [顶层设计](../00-top-level-design.md)、[架构](../00a-architecture.md)、[工程规格](../specs/07-technology-and-engineering.md) 和 [界面规格](../specs/06-ui/README.md)，随后以实际路由与调用为准枚举。GUI 是 Wails v3 + 原生 ES modules；薄 API → `internal/view` → `internal/app` → SQLite/磁盘。这里的直接调用绕过 Wails 桥接，不会把 Go 耗时误称为画面加载时间。
+
+### 2.2 冷、首次进入、热的定义
+
+- **C（会话冷）**：新 `app.Open` / `newAPI`，不预先读 Workspace，单次调用。数据库打开时间在计时外；保留已有持久缓存；同一测试进程可能复用进程级内容缓存。不能称为进程冷、OS 冷或首次安装。
+- **E（首次进入）**：另一新 API 先完成 Workspace，再第一次打开目标页。通常更接近应用已打开后点击侧栏的路径。Workspace 完成时间不重复计入目标页。
+- **H（热）**：同一 API 的后续 5 次调用中位数。表中 C/E 各 1 次，H 为 5 次；样本量不足以推导 p95。跨页顺序和磁盘缓存可使 C 小于 E，不能据此判定倒退。
+- **P（进程冷）**：单独编译测试程序，每次启动新进程，直接调用目标 API，无预读 Index/Loadout。main 每项 3 个独立进程，取中位数及范围；OS 文件缓存仍保留。
+- **异步最终**：Workspace 等 `environment` 完成事件；Build、PlanLoadCost、Textures 等最终结果。本测试每 1 ms 轮询；前端 Build 实际每 50 ms、贴图/占用每 100 ms 轮询，显示结果还会增加约 0–50 / 0–100 ms，再加桥接与渲染。
+- JSON 时间另计：`json.Marshal` 在 API 返回后测量，不含 JS 解码、DOM、图片解码。Windows 小时间出现 0，统一记作 `<1 ms`。
+
+测量串行执行；profile 与主要计时分开。分阶段样本各 3 次，记录中位数；阶段会改变缓存温度，累计调用也可能重叠，不能把它们直接求和作为页面总耗时。没有清空 Windows 文件缓存或为了制造“冷”而删除真实缓存。
+
+### 2.3 隔离与副作用边界
+
+通过 SQLite 只读连接的 `backup()` 建立 `.cache/page-load-20261026/home/archo.db`，复制 config.toml、tasks.json 和真实 cache；游戏、Mod 与日志继续读真实路径。原始备份 SHA-256 为 `6a9abaf587854829581a3b4adfb2aa2595f6ff50adcced7e6fc80e86ca70fa1b`。所有正常 API 的数据库/缓存写入落在副本。账户会话/cookie目录未复制，所以Settings账户状态不等于保留真实已登录会话的场景；生产设置页若恰逢4小时自动站点验证，还可能多一次最长10秒网络等待，本次未覆盖。未复制 WebView/WezTerm 等宿主目录，所以又使用副本 Store + 真实 `Home` 直接调用已审查为只读的 `PlanUninstall` 补测目录尺寸；未调用 `Uninstall` / `UninstallRun`。
+
+主轮次禁用 HTTP、SteamWorker 和自动 AnalyzeRunner，避免后台扫描/分析污染计时，因而体现“现有扫描结果下打开页面”。**SteamCMDRun 与 SteamWorker 是不同通道**：`GuideDownloadInfo` 仍真实执行了匿名 `app_info_update` / `app_info_print 294100`，返回 21 个公开分支，这是表中约 3 秒的来源。没有登录真实 Steam 账号，没有订阅、退订、删除、安装工具、部署或启动游戏。随后仅对 Harmony 公开描述做了少量无登录 HTTP 读取，结果见第 5 节。日志跨版本分析另在副本显式运行并单列，未将原先被禁用后的错误返回当作就绪。
+
+`%APPDATA%\RimArcho\refnums` 本次不存在，DB 中亦无 `ui.gui.refnums` 记录，无法核实 `hom22` 等具体编号。以下只引用 [refnums.js](../../internal/surface/gui/assets/js/refnums.js) 的真实前缀，不编造数字。
+
+## 3. 当前页面树与逐节点测量映射
+
+入口依据：[navigation.js](../../internal/surface/gui/assets/js/navigation.js) 的 `openPage/go`、[shell.go](../../internal/surface/gui/shell.go) 的 Nav、各页的 `api.*` 调用。树中的 `L` 表示已由父 payload 提供，进入该子节点无需新后端请求（C/H 增量均 0，DOM 未测）；`U` 表示第 6 节说明的未测路径。任意搜索词、每条数据行和每个按钮状态不另算无穷多个页面，列出它们的入口类型与代表性实测。
+
+```text
+RimArcho GUI
+├─ 全局外壳 / 侧栏 / 面包屑 / 环境和方案选择 → Init、Shell、Workspace（表 A）
+│  ├─ 跨环境切换 / 打开另一方案 → Workspace；实际切换动作未对真实配置执行
+│  ├─ 命令面板 → Palette；帮助 / 快捷键弹窗 → Keys（表 C）
+│  ├─ 选择 / 输入 / 通用确认 / 文本弹窗 / 右键菜单 → L；动态内容见对应页 API
+│  └─ 表格列显隐 / 列顺序 / 菜单 / 拖拽分隔条 → L；读保存的 Setting 很小，保存未执行
+├─ 启动 [hom] → Home + HomeBackground 并发（表 A）
+│  ├─ 游戏选择、该游戏方案/包卡片、上次运行、状态与变化 → 父 payload
+│  ├─ 隐藏/展开问题、键盘焦点、同一数据内的卡片切换 → L
+│  └─ 背景 JPEG → /bg（表 F）；选用其他游戏/方案会写选择，本次用目标环境会话模拟读取
+├─ 能不能跑 / 需要处理 [run] → Needs（表 A）
+│  ├─ 会坏档/无法运行、上次运行错误、需确认、隐藏 Mod 四分区 → L
+│  ├─ 更多操作、选择禁用对象、身份确认选择、证据文本 → 父数据或 Inspect（表G）
+│  └─ 日志 / Mod 详情跳转 → 对应独立节点；重新检查属于 Analyze 操作（U）
+├─ Mod 库
+│  ├─ 全部 [lib] → Library（表 A）
+│  │  ├─ 搜索 harmony / 来源 workshop 筛选 / 排序 → Library，代表值已测
+│  │  ├─ 家族展开、副本行、列菜单 / facet 菜单 → L；本地虚拟滚动不减少传输数据
+│  │  ├─ 右侧详情 → Detail + LibraryFields（表 C / D），工坊详情按需补取（表 F）
+│  │  └─ 副本操作预览/确认 → LibraryPreview / OpPreview（表G单Mod；其他范围U）；标签/备注/位置见公共弹窗
+│  ├─ 订阅与更新 [chg] → SubscriptionsPage（表 A）
+│  │  ├─ 当前列表 / 全部 Mod / 单 Mod 家族范围 → 三个独立请求均已测
+│  │  ├─ 待更新 / 已更新、按日期折叠、来源状态、选中项详情 → L
+│  │  ├─ 文件变化明细展开 → ChangeFiles，真实前后快照补测（表 F）
+│  │  └─ 来源检查 / 更新 / 重新下载 / 取消订阅预览与确认 → 表G单Mod预览；任务执行U
+│  └─ 添加订阅 [sub] → SubscriptionsPage(false, "")（表 A）
+│     ├─ 自动识别 Workshop / Git / 网页 / LoversLab、Steam/SteamCMD方式 → 本地表单 L
+│     ├─ Workshop 确认预览 → SubscribePreview（表 F，仅 --dry-run）
+│     ├─ 网页元数据 / Git branch/tag/commit / LoversLab文件、协议与认证页 → U / 公共网页失败样本表 F
+│     └─ 选择下载目录/zip、认证文件 / 原生站点登录窗口 → U
+├─ 列表
+│  ├─ 当前/指定列表编辑器 [edt] → Workspace（表 A）
+│  │  ├─ 未启用 / 已启用 / 暂存三栏及选择、排序菜单 → 父数据 L
+│  │  ├─ 栏内搜索 → Filter；顶部跨栏筛选及 facet → BarFilter（表 D）
+│  │  ├─ 右侧详情 → Detail + LibraryCopy（表 C / D）
+│  │  ├─ 历史抽屉 → History；副本选择 → ModCopies；行操作 → RowOps
+│  │  ├─ 标签编辑 → TagCandidates；移动到位置 → PosOptions；备注输入 → ModNote
+│  │  └─ 排序 / 写入游戏 / 启动预览 → Preview(sort/save/launch)（表 C），未应用动作
+│  ├─ 全部列表 [lst] → PlanManage，全部 5 个方案分别已测（表 B）
+│  │  ├─ 名称 / 游戏版本 chips / 关注合集 / 关注模式 / 差异与缺失条目 → 父 payload L
+│  │  ├─ 占用统计面板及 Top 明细 → PlanLoadCost → PlanLoadCostMeasure（表 B / D）
+│  │  ├─ 关注合集自动检查（过 10 min）→ PlanCheck（U，网络分支未混入主面板）
+│  │  ├─ 新建/复制/草稿 → CheckPlanName、PlanSources / PlanFroms（表 C）
+│  │  │  ├─ 空白 / 现有列表、游戏版本 / 从存档来源选项 → PlanSources 返回；选项切换 L
+│  │  │  └─ 导入文件/文本/合集预览 → ExchangeInfo、ImportPreviewFor（表 C；合集 U）
+│  │  └─ 重命名 / 删除确认 → CheckPlanName、RemovePlanWarn（表 C / D），未应用
+│  ├─ 导入 [imp] → ExchangeInfo；选格式/目标/粘贴/预览 → ImportPreviewFor
+│  │  └─ 合并/替换/新建、缺失订阅选择 → 预览数据 L；应用/订阅/原生选择器 U
+│  ├─ 导出 [exp] → PlanExport + ExchangeInfo（表 C / D）
+│  │  ├─ archo / rimsort / rml / rimcrow-xml / rimcrow / text / modsconfig / workshop → 8格式均已测
+│  │  └─ 输出文本、复制/保存结果及覆盖确认 → L / U（未写剪贴板或导出文件）
+│  └─ 创建整合包 [bld] → BuildPage → BuildPageResult（表 A / D）
+│     ├─ 名称检查 → PackNameCheck；目的路径、步骤、阻止原因 → 父 payload
+│     ├─ 不转换 / 100 / 80 / 75 / 60 / 50 / 40 / 25% → 切选项仅 L，点击“扫描统计”才重新请求
+│     ├─ 先看清单 → PackDryRun（表 F）
+│     └─ 编译进度 / 错误 / 继续未完成包 / 完成包 → U（不实际构建）
+├─ 整合包 [pak] → Packs（表 A，真实为空）
+│  ├─ 单包 pack:<name> / Mod表 / 说明 / 存档等详情 → Pack（U，无真实样本）
+│  ├─ 未完成构建条目 / 进度 → U，无真实样本
+│  └─ 启动检查、导出预览 / 删除确认 → PackLaunch / PackExport / PackRemovePreview（U）
+├─ 贴图优化 [tex] → TexturesInfo(plan/all)（表 A）
+│  ├─ 当前列表 / 全部范围、比例和编码器选择 → TexturesInfo 或已有本地选项
+│  ├─ 手动“统计”→ Textures → TextureMeasure，含全库首轮78.9s（表 A / D）
+│  ├─ 统计行详情 / 展开 / 进度 → 已返回 payload L
+│  └─ 工具安装确认 / 转换 / 清理 / 停止及结果 → U（未执行）
+├─ 游戏环境 [env] → Environment（表 A）
+│  ├─ 路径 / 版本 / 启动方式 / 存档 / 参数编辑 → 已有组数据 L；原生路径选择 U
+│  ├─ 删除环境确认 → EnvRemovePreview（表 C），不执行删除
+│  └─ 添加环境 → 引导 [gui]
+├─ 设置 [set] → Settings + Backgrounds + Tasks 并发（表 A）
+│  ├─ 外观：主题、强调色 → Settings 同一次返回；打开选项 L（实际修改会写配置，未测）
+│  ├─ 启动页背景 → Backgrounds(initial/complete)
+│  │  ├─ 游戏、每个背景Mod、自选图片分组标签 → L；缩略/大图 /bg → 表 F
+│  │  └─ 暗化、模糊、焦点、收藏、轮播选项 → 已有数据；选图/删除/保存未执行
+│  ├─ RimArcho 管理目录 → Settings；检查目录弹窗 → Directories
+│  │  └─ 更改/移动位置确认 → DirectoryMovePreview（U），路径选择 U
+│  ├─ Mod 文件夹 → Settings；添加/移除确认 L，未应用
+│  ├─ 账户 → Settings 中状态；登录/忘记/网页登录/Steam验证弹窗 → U
+│  ├─ 外部工具 → Settings 中状态；安装信息确认 ToolInstallOffer → U
+│  ├─ 界面 / 社区数据 / 数据库 / 缓存 / 游戏日志 → Settings 同一请求的6组，增量 L
+│  │  └─ 缓存清理 / 数据库清理 / 日志重读等确认 → 已有文本 L；执行及结果 U
+│  └─ 卸载 [del] → UninstallPlan（表 A / F）
+│     ├─ 保留副本/包/存档/游戏、目的目录、备份恢复选项 → 每改答案重新 UninstallPlan
+│     └─ 最终确认 → L；执行进度 / 结果 / 退出 → U（绝不执行）
+├─ 日志 [log] → LogPage（表 A / F）
+│  ├─ Player.log / Player-prev.log / ArchoMonitor.log 及伴随监控区域 → 3文件均补测
+│  ├─ 错误簇列表、筛选/排序、选择 → 已有 Rows L
+│  ├─ 证据原文 + 社区模式卡 → LogCluster + LogPattern（串行 reader，表 F）
+│  └─ 实时监控区 → LogMonitor / Live；本次无正在运行游戏（表 C / D，无数据说明）
+├─ 任务 [tsk] → Tasks（表 A）
+│  ├─ 状态 / 队列 / 时间 / 搜索筛选、各列菜单 → L
+│  └─ 任务行详情 / 子项 / 失败文本展开 → 已有 payload L；重试/取消/清理结果 U
+├─ 引导 [gui] → Tasks + GuideFind（表 A）
+│  ├─ 初次/添加游戏、探测到的游戏与手输路径确认 → GuideFind / GuideGame（表 F）
+│  ├─ 下载游戏：公开分支/目录/账户选择 → GuideDownloadInfo；下拉选项 L
+│  │  └─ SteamCMD安装 / 下载进度 / 登录确认 → U
+│  ├─ 读取Mod进度 → GuideScan（U：是真扫描操作，不是只读页面）
+│  └─ 从哪里开始：游戏列表/列表导入/包或合集 → L；导入复用 imp，包解压 U
+└─ Mod 完整详情 [ful]（独立入口）→ Detail + ModCopies + Sections 并发（表 D）
+   ├─ Mod说明 / 副本 / 用在何处 / 字段 / 历史 / 技术信息六卡 → 同一次结果
+   ├─ 技术的 Def / Patch / Harmony / 规则 / 历史标签 → Sections 一次返回全部；切标签 L
+   ├─ 选择副本/说明缓存或远程补取 → 相应 Detail / ModCopies（表 C / F）
+   └─ 标签/位置/备注/操作预览、全部变化跳转 → 复用相应节点
+```
+
+设置的 11 个基础分组是一次 `Settings()` 返回，不是 11 个后台路由；背景组件独立。当前没有注册的未来“回顾/存档管理/值得玩/Archo”等规划页不计入当前页面数。TUI 使用同一 `internal/view`，本报告范围为上述 GUI 页面；TUI 绘制与终端启动时间未冒充 GUI 数据。
+
+## 4. 每页与子入口耗时表
+
+所有单位 ms；每环境单元格为 **C / E / H**。H 是 5 次中位数。附加表则明确为 **E₀ / H₃**（预热工作区后首次 / 随后3次中位数）。主要来源是代码链与第 5 节分阶段证据，不是仅凭时间猜测。
+
+### 表 A：主要页面
+
+| 页面 / 后端调用 | main：C / E / H | 1.6：C / E / H | 主要来源、就绪边界 |
+| --- | --- | --- | --- |
+| 全局初始化 Init | <1 / <1 / <1 | <1 / <1 / <1 | 静态描述/设置；额外 JSON 约0.5ms |
+| 编辑器/环境工作区 Workspace | 419.5 / 284.6 / 281.6 | 376.8 / 263.0 / 260.5 | 完成事件；Index、Board、Needs、Shell；约1.33MB |
+| 启动 hom：Home | 1003.0 / 753.3 / 169.5 | 803.6 / 754.0 / 198.1 | 独立log reader、当前方案Board/Needs、其他方案与环境 |
+| 启动背景 HomeBackground | 125.7 / 2.5 / <1 | 129.1 / 2.0 / <1 | 首次Index/背景设置；JPEG另计 |
+| 侧栏 Shell | 279.2 / 105.1 / 6.5 | 246.5 / 79.7 / 7.5 | boardState、Needs、方案/包行；热可复用 |
+| 能不能跑 run：Needs | 605.2 / 273.1 / 120.2 | 508.9 / 237.4 / 78.6 | 载入分析/日志、磁盘副本/链接检查、BuildNeeds |
+| Mod库 lib：全部 Library | 1600.6 / 687.2 / 200.1 | 869.8 / 686.2 / 191.6 | 库存构建/全量视图；JSON约5.4MB另计 |
+| lib：搜索 harmony | 591.1 / 534.6 / 68.8 | 621.5 / 496.7 / 57.8 | 同一库存，仍构建匹配视图/全量facets |
+| lib：来源筛选 workshop | 669.0 / 516.7 / 103.4 | 639.2 / 545.3 / 95.0 | 同上；非仅前端筛选 |
+| 更新 chg：当前方案 | 649.2 / 618.3 / 595.5 | 564.4 / 541.2 / 560.1 | SubscriptionsPage；新reader、BuildChanges、全Library |
+| 更新 chg：全部库 | 697.5 / 759.0 / 735.4 | 633.1 / 656.6 / 636.3 | 同上；勿用旧 Changes API 数字替代 |
+| 更新 chg：单Mod | 547.4 / 559.4 / 562.6 | 534.7 / 568.9 / 672.9 | 同上；范围缩小仍建全库 |
+| 添加订阅 sub：账户/最近项 | 612.1 / 579.6 / 605.5 | 572.7 / 562.3 / 656.9 | 与SubscriptionsPage同链，不是纯表单开销 |
+| 整合包 pak：列表 | 5.8 / 1.5 / 1.1 | 5.9 / 1.5 / 1.5 | 真实0包；只代表空列表 |
+| 创建包 bld：不转贴图最终 | 358.7 / 278.4 / 271.3 | 464.8 / 396.7 / 393.2 | 异步BuildPage，问题检查、空间/清单 |
+| bld：100%贴图扫描最终 | 310.2 / 278.6 / 274.8 | 17336.2 / 780.8 / 779.6 | 1.6首轮补纹理信息；切比例本身不触发此项 |
+| 全部列表 lst：默认主面板 | 185.6 / 37.0 / 35.3 | 262.6 / 118.4 / 100.7 | 局部部署预览，统计面板另计 |
+| lst：默认方案占用统计最终 | 426.4 / 316.7 / 311.1 | 586.3 / 197.5 / 172.7 | 目录stamp遍历、缓存校验、资源计数 |
+| 导出 exp：默认格式 | 177.8 / 2.0 / 2.5 | 138.8 / 1.0 / 1.1 | 方案序列化；8格式表D |
+| 导入 imp：页面信息 | <1 / <1 / <1 | <1 / <1 / <1 | 格式/导入能力描述 |
+| imp：文本预览 | 161.7 / 2.5 / 2.0 | 168.1 / 1.0 / 1.0 | 2个packageId样本；实际导入未应用 |
+| 游戏环境 env | 4.8 / 1.0 / 1.5 | 5.8 / <1 / 1.1 | 环境设置组，不重建全Board |
+| 设置 set：Settings主体 | 225.6 / 194.2 / 183.7 | 151.4 / 191.3 / 160.0 | 每次detachedReader；Index/工具/目录等，背景与Tasks并发另计 |
+| set：背景初始选项 | 131.6 / 2.0 / 1.0 | 107.0 / 2.0 / 1.5 | 已有缓存、首次可能同步Index；未等后台提取 |
+| set：背景后台全部准备完成 | 301.4 / 30.8 / 33.1 | 134.6 / 32.9 / 32.2 | 等workers；持久图缓存保留，不是无图缓存首次解码 |
+| 贴图 tex：方案页初始信息 | 151.1 / 2.5 / 1.5 | 148.8 / 1.5 / 1.0 | 不读贴图内容，仅targets/工具 |
+| tex：全库页初始信息 | 170.5 / 3.1 / 2.0 | 137.6 / 5.7 / 5.6 | 同上；统计另计 |
+| tex：方案统计最终 | 826.4 / 203.0 / 233.2 | 215.8 / 77.9 / 79.8 | CollectCached、目录/PNG头缓存、MakePlan |
+| 任务 tsk | 1.3 / <1 / <1 | <1 / 1.4 / <1 | 当前历史/队列快照；本次无真实任务执行 |
+| 引导 gui：现有游戏探测 | 6.8 / 2.5 / 1.5 | 5.6 / 1.5 / 2.2 | 检测路径、版本文件 |
+| gui：下载版本信息 | 2946.7 / 2830.7 / 2868.5 | 3057.6 / 2720.5 / 2795.9 | 真实匿名SteamCMD公开分支查询 |
+| 日志 log：默认文件 | 355.0 / 213.7 / 4.1 | 未就绪（禁用分析；表F补测） | main有效；1.6原轮次分析被禁用，见表F，错误返回不算就绪 |
+| log：第二候选文件 | 618.1 / 196.6 / 6.1 | 未就绪（禁用分析；表F补测） | API按LogFiles第二项；本机为Player-prev；1.6同上 |
+| 卸载 del：预览 | 7663.8 / 4470.2 / 4508.3 | 4152.9 / 4572.8 / 4219.3 | 副本Home；真实Home补测见表F；逐目录尺寸与链接检查 |
+
+### 表 B：全部真实方案的主面板与占用统计
+
+方案 `PlanManage(id)` 为 C/E/H；占用统计直接 `App.PlanLoadCost` 分阶段三次中位数，已使用真实目录、保留持久缓存，属于单独诊断而非端到端。环境不同会解析不同版本的LoadFolders，统计项数可与工作区条目数不同（DLC/去重/可用资源规则）。
+
+| 方案 | main 主面板 C/E/H | 1.6 主面板 C/E/H | main 占用统计 | 1.6 占用统计 |
+| --- | --- | --- | --- | --- |
+| 1 default | 275.1 / 33.7 / 39.1 | 232.1 / 91.3 / 102.6 | 244.6 | 280.5 |
+| 2 Test | 256.7 / 46.5 / 39.7 | 308.5 / 101.5 / 104.2 | 74.9 | 70.9 |
+| 3 default (1.6) | 222.3 / 43.6 / 34.4 | 208.9 / 85.9 / 107.2 | 22.6 | 22.9 |
+| 4 Multiplayer Modpack 1.6 (Stable) | 226.8 / 46.2 / 45.4 | 287.2 / 160.8 / 153.4 | 145.7 | 143.1 |
+| 5 The Progression Modpack [UPDATED 1.7] | 259.8 / 67.8 / 68.4 | 307.9 / 151.2 / 151.4 | 325.1 | 364.0 |
+
+占用统计缓存并非零工作量。例如main方案1第三轮仍为430命中/44重测，方案5为527/43；1.6方案5首轮454命中/259重测，后两轮671/42。不能把总耗时全部归为缓存miss，也不能称此次已实现全量命中对照。
+
+### 表 C：详情、弹窗、编辑器与设置子请求
+
+| 子入口 / API | main：C / E / H | 1.6：C / E / H | 方法 / 备注 |
+| --- | --- | --- | --- |
+| Mod缓存详情 Detail | 301.3 / 166.3 / 6.7 | 259.1 / 141.0 / 7.2 | Harmony有效数据；About/已缓存Workshop解析，网络补取表F |
+| 副本选择 ModCopies | 204.8 / 40.4 / <1 | 133.8 / 34.1 / <1 | Harmony真实副本 |
+| 编辑器副本字段 LibraryCopy | 192.8 / 39.8 / <1 | 140.3 / 32.2 / <1 | 与Detail并发复合表D |
+| 库右侧字段 LibraryFields | 176.8 / 41.2 / <1 | 144.7 / 38.3 / <1 | 同上 |
+| 完整详情技术 Sections | 203.6 / 172.8 / 176.3 | 149.5 / 137.7 / 143.0 | Harmony；新reader、全标签文本及Humanize |
+| 标签候选 TagCandidates | 171.4 / 1.0 / <1 | 125.0 / <1 / 1.0 | 单Mod；候选空也是有效结果 |
+| 移动位置 PosOptions | 186.7 / 7.6 / 4.5 | 128.5 / 1.5 / 1.2 | 单Mod，空搜索，before=false |
+| 行菜单 RowOps | 161.2 / 37.3 / <1 | 144.6 / 32.6 / <1 | 已启用栏Harmony |
+| 命令面板 Palette | 164.9 / 3.4 / 1.5 | 126.2 / 3.1 / 2.5 | 空query |
+| 快捷键帮助 Keys | <1 / <1 / <1 | <1 / 1.0 / <1 | plan页；不同页为静态表变化 |
+| 历史 History | 不适用 / 19.4 / 17.3 | 不适用 / <1 / <1 | C没有board，null不算完成；仅E/H有效 |
+| 排序预览 Preview(sort) | 194.5 / 6.8 / 7.0 | 141.2 / 1.5 / 1.0 | 不实际排序 |
+| 写入预览 Preview(save) | 203.7 / 37.2 / 28.9 | 174.8 / 47.7 / 27.7 | 不写ModsConfig |
+| 启动预览 Preview(launch) | 339.6 / 158.2 / 39.7 | 239.0 / 136.8 / 42.6 | 不启动游戏 |
+| 新建来源 PlanSources | 173.0 / 1.0 / 1.5 | 123.3 / 1.5 / 1.0 | 当前方案来源/版本/存档选项 |
+| 新建名称校验 CheckPlanName | 152.6 / 1.0 / 1.0 | 136.5 / 1.5 / 1.5 | 合法new list，无写入 |
+| 旧新建来源 PlanFroms | 153.3 / <1 / <1 | 134.3 / <1 / <1 | 已存在入口兼容数据 |
+| 删除环境确认 EnvRemovePreview | <1 / 1.0 / <1 | 1.0 / <1 / 1.0 | 当前环境，只读 |
+| 目录检查 Directories | 1.9 / 1.0 / <1 | <1 / <1 / <1 | 只读目录摘要 |
+| 实时监控 LogMonitor | 175.7 / <1 / <1 | 132.9 / <1 / <1 | 无运行游戏：返回空，不代表有监控数据场景 |
+
+### 表 D：组合入口、选项与全库统计补测
+
+E₀/H₃各为工作区预热后的首次/3次中位数；没有独立C样本的组合不伪造冷时间，冷成本可查表C的组成请求。并发组合已实际调用，不能直接把单项时长相加。
+
+| 节点 | main E₀ / H₃ | 1.6 E₀ / H₃ | 说明 |
+| --- | --- | --- | --- |
+| Full/Harmony | 236.1 / 189.3 | 164.5 / 166.5 | 完整详情Promise.all，6卡/技术各tab共享 |
+| Panel/editor | 158.0 / 7.5 | 138.9 / 12.5 | Detail + LibraryCopy并发 |
+| Panel/library | 159.9 / 6.0 | 127.3 / 10.1 | Detail + LibraryFields并发 |
+| Full/largeDefs | 222.7 / 196.8 | 失败：no mod | main按def_fact最多实例取样；1.6该实例不在本环境Index，失败不算完成 |
+| Sections/largeDefs | 193.8 / 215.2 | 失败：no mod | 同上，main输出约13.6KB；并非所有大Def都同等开销 |
+| Export/archo | 3.0 / 2.5 | 2.5 / 1.2 | 导出文本 |
+| Export/rimsort | 1.5 / 1.5 | 1.5 / 1.0 | 导出文本 |
+| Export/rml | 3.4 / 1.6 | 1.2 / 1.0 | 导出文本 |
+| Export/rimcrow-xml | 2.5 / 1.0 | 2.0 / <1 | 导出文本 |
+| Export/rimcrow | 3.1 / 2.8 | <1 / 1.5 | 导出文本 |
+| Export/text | 2.5 / 1.5 | 1.5 / 1.0 | 导出文本 |
+| Export/modsconfig | 1.5 / 1.6 | 1.6 / 1.6 | 导出文本 |
+| Export/workshop | 2.0 / 1.8 | <1 / 1.0 | 导出文本 |
+| Build/80 | 277.0 / 295.9 | 784.0 / 775.7 | 显式“扫描统计”；选择比例本身无需请求 |
+| Build/75 | 283.9 / 306.0 | 800.7 / 767.3 | 显式“扫描统计”；选择比例本身无需请求 |
+| Build/60 | 283.2 / 273.2 | 883.8 / 819.3 | 显式“扫描统计”；选择比例本身无需请求 |
+| Build/50 | 288.1 / 298.4 | 847.3 / 825.8 | 显式“扫描统计”；选择比例本身无需请求 |
+| Build/40 | 307.3 / 277.1 | 793.5 / 760.4 | 显式“扫描统计”；选择比例本身无需请求 |
+| Build/25 | 301.6 / 278.6 | 884.4 / 830.3 | 显式“扫描统计”；选择比例本身无需请求 |
+| Textures/all | 78861.8 / 2553.9 | 2280.1 / 2481.1 | 两环境共享同一批纹理文件/cache；main首次78.9s，1.6已经被main预热 |
+| Filter/inactive | 107.5 / 6.1 | 91.9 / 8.5 | 未启用栏harmony搜索，主过滤结果不是重载全Board |
+| BarFilter | 338.4 / 398.1 | 330.7 / 311.9 | 跨栏筛选+facets，约1.08MB结果，值得优化 |
+| RemovePlanWarn | 1.5 / 1.0 | <1 / 1.0 | 删除当前方案的只读提示 |
+| Live | 33.3 / 35.0 | 23.7 / 24.0 | 无游戏运行的probe；只代表空闲状态 |
+
+### 表 E：独立进程首次请求（main）
+
+P 是3个新进程的中位数 [最小, 最大]；进程/数据库打开均在API计时外，OS缓存未清。JSON列也取3次中位数。
+
+| 目标 | P ms [范围] | JSON ms |
+| --- | --- | --- |
+| Workspace | 424.2 [414.1, 429.1] | 5.6 |
+| Home | 843.6 [842.7, 855.0] | <1 |
+| Library | 1459.0 [1454.4, 1506.3] | 21.3 |
+| SubscriptionsPage | 1452.3 [1451.1, 1464.1] | 2.0 |
+| Settings | 213.6 [197.6, 284.2] | <1 |
+
+## 5. 来源拆分、有效性校验与慢页排序
+
+### 表 F：真实文件、日志和外部读取补测
+
+| 节点 | 首次 / 后续 ms | 数据与边界 |
+| --- | --- | --- |
+| ChangeFiles 11009 → 14785 | 7.6 / 5.1 | 65条文件差异，后续3次中位数；真实change_event |
+| ChangeFiles 11007 → 14781 | <1 / <1 | 8条差异 |
+| ChangeFiles 1427 → 14780 | 7.1 / 6.5 | 138条差异 |
+| ChangeFiles 1043 → 14777 | <1 / <1 | 16条差异；最新5条事件有重复对，只列一次 |
+| 真实Home卸载计划 | 4512.9 / 4446.3 / 4555.2 | 三次独立reader，10个步骤；中位数4512.9；未执行卸载 |
+| Harmony Preview HTTP | 68.8 / 0.5 | 200，41,807 B；已有磁盘缩略图缓存，不是无缓存生成 |
+| 背景 thumb HTTP | 52.7 / <1 | 200，23,479 B；已有JPEG缓存 |
+| 背景 full HTTP | <1 / <1 | 200，255,479 B；同图；浏览器解码未测 |
+| Harmony工坊详情强制刷新 | 412.2 | 无登录，24个Workshop文本块；随后缓存读取134.0、139.6，均无错误 |
+| SubscriptionPage公开网页 | 253.3 / 270.7 | 请求成功到达解析阶段但“no version or modification date”，属于错误就绪，不是成功网页预览基线 |
+| Workshop订阅dry-run预览 | main 151.9 / 147.3；1.6 140.3 / 151.1 | 返回1条订阅计划，apply仅是可执行标志；没有调用Subscribe |
+| PackNameCheck | main <1 / <1；1.6 <1 / <1 | 新合法名字，未创建包 |
+| PackDryRun | main 104.2 / 5.2；1.6 298.0 / 221.4 | main因缺依赖返回阻止信息；1.6返回真实dry-run清单；两者工作量不同 |
+| ModNote | 两环境 <1 / <1 | 当前备注为空，有效空字符串 |
+| GuideGame真实路径 | main <1 / <1；1.6 5.6 / <1 | 分别成功返回1.7、1.6版本和路径信息 |
+| main Player.log | 333.2 / 3.1 | 9簇；同reader再进；与表A独立样本，不取代C |
+| main Player-prev.log | 11.9 / 5.1 | 26簇；此前Player.log已读，reader已温热 |
+| main ArchoMonitor.log | 4.6 / 5.2 | 26行；同上 |
+| 1.6补齐日志1.7分析 | 30296.0 | 在副本显式App.Analyze；不含生产子进程启动/GUI轮询，作为完整就绪额外前提 |
+| 1.6 Player.log（分析后） | 339.2 / 5.1 | 9簇；不能把原轮次禁用分析的4.6ms算完成 |
+| 1.6 Player-prev.log（分析后） | 177.1 / 7.2 | 26簇 |
+| 1.6 ArchoMonitor.log（分析后） | 5.9 / 8.7 | 26行 |
+| 证据 + 模式卡，main三个日志 | 53.4 / 3.6 / 222.2 | 分别选真实首簇E4、E17、E17；18/13/18行；后两张社区卡存在 |
+| 证据 + 模式卡，1.6三个日志 | 40.2 / 41.9 / 190.7 | 19/14/21行；LogCluster与LogPattern共用logRead锁，前端并发也会串行 |
+
+原轮次用相同snapshot测得的 `ChangeFiles` 空差异、`LibraryPreview("lock")` 无此操作的错误，以及1.6“大Def实例”不存在的失败，均未作为成功性能数据。原 `LogPattern/LogCluster("E1")` 也不作为有证据内容基线，以上使用实际返回的簇校验。
+
+### 表 G：页面并发依赖、分析最终就绪及操作弹窗补齐
+
+下面在主轮次之后补测；副本已完成日志跨版本分析与1.6当前方案分析，不能用这批数字替换原Stale场景。页面组合确实以goroutine并发请求，C/E各1次，H为随后3次中位数；不含JSON编码。Settings组合仅等待Backgrounds初始选项，后台全部图片准备见表A。
+
+| 页面组合 | main C / E / H ms | 1.6 C / E / H ms |
+| --- | --- | --- |
+| hom：Home + HomeBackground + Setting(hidden) | 833.8 / 648.3 / 162.5 | 762.1 / 641.2 / 196.9 |
+| set：Settings + Backgrounds + Tasks | 299.7 / 226.3 / 214.7 | 158.1 / 167.3 / 165.3 |
+
+1.6 Needs补测沿真实`Needs → startAnalyze → analyze事件 → Needs`路径，runner仅替换为独立App在副本内直接Analyze（避开启动GUI/子进程）：207.0ms先返回`stale=true`的62项；34771.3ms收到分析成功；35191.6ms取得`stale=false/never=false`的62项。随后三次74.9/70.9/76.5ms，中位数74.9ms。**即使项数相同，旧结果与最终新分析也必须分开。** 生产子进程启动、IPC和前端刷新调度尚未包括；此样本给出了后台实际工作量，不能宣称是生产完整端到端35.2秒。
+
+以下用main工作区及真实Harmony `#nvxs`，单副本，首次/随后3次中位数；只有`LibraryPreview`，从未调用`LibraryDo`。`apply=false`为预览中的真实拒绝/无事可做，只计该分支，不代表成功执行准备。编辑器`OpPreview`转换ID为ref后直接调用同一LibraryPreview，可复用该依赖时间，但转换开销未独立计时。
+
+| LibraryPreview操作 | 首次 / H₃ ms | apply / 行数 | 解释 |
+| --- | --- | --- | --- |
+| pin | 8.9 / <1 | true / 3 | 仅dry-run，计划可展示；不执行 |
+| pin-update | <1 / <1 | false / 1 | 当前工坊副本/禁用Steam工具下拒绝或无工作，不计成功基线 |
+| unpin | <1 / <1 | false / 1 | 当前工坊副本/禁用Steam工具下拒绝或无工作，不计成功基线 |
+| unhide | <1 / <1 | false / 1 | 当前工坊副本/禁用Steam工具下拒绝或无工作，不计成功基线 |
+| move | <1 / <1 | false / 1 | 当前工坊副本/禁用Steam工具下拒绝或无工作，不计成功基线 |
+| delete | 304.0 / 253.7 | true / 2 | 仅dry-run，计划可展示；不执行 |
+| unsubscribe | 1.0 / 1.0 | false / 1 | 当前工坊副本/禁用Steam工具下拒绝或无工作，不计成功基线 |
+| resubscribe | <1 / <1 | false / 2 | 当前工坊副本/禁用Steam工具下拒绝或无工作，不计成功基线 |
+| textures | 29.9 / 28.6 | false / 4 | 当前工坊副本/禁用Steam工具下拒绝或无工作，不计成功基线 |
+| textures-clean | 25.2 / 27.1 | false / 1 | 当前工坊副本/禁用Steam工具下拒绝或无工作，不计成功基线 |
+| subscription-remove | 502.0 / 480.6 | true / 3 | 仅dry-run，计划可展示；不执行 |
+| subscription-update | 238.0 / 216.7 | true / 4 | 仅dry-run，计划可展示；不执行 |
+
+订阅移除预览热480.6ms、删除预览热253.7ms，本身也是>200ms的慢弹窗；它们使用的dry-run及“哪些方案受影响”统计应按当前ref/方案集合缩小读取范围（`view/library.go LibPreview/usedWarning`），避免逐选中项重复Loadout/PlansUsing。首批优化P1/P4可共享此处只读库存与方案反向索引；多选按批查询，不能缓存最终删除许可。
+
+| Inspect证据命令 | 首次 / H₃ ms | 文本行数 |
+| --- | --- | --- |
+| `mod/#nvxs` | 101.8 / 7.1 | 23 |
+| `patches/--mod/#nvxs` | 2.6 / 1.6 | 3 |
+| `def/--mod/#nvxs` | 2.9 / 1.0 | 1 |
+| `harmony/--mod/#nvxs` | 13.0 / 11.8 | 3 |
+| `problems` | 173.5 / 9.9 | 37 |
+| `folder/check` | 1.0 / 1.0 | 11 |
+
+证据仅为这些真实命令结果；Def/Patch的行数可为空或只有摘要，不推导所有Mod的大输出性能。
+
+### 5.1 分阶段耗时证据
+
+| 独立诊断阶段（三次中位数） | main ms | 1.6 ms | 对总耗时的含义 |
+| --- | --- | --- | --- |
+| Index/cold | 152.3 | 115.7 | DB载入、字段/索引组装；不等于全磁盘重扫 |
+| Loadout/after-index | 32.0 | 22.8 | 解析方案与依赖/LoadFolders等 |
+| ReadSession | 5.7 | 6.6 | 新SQLite连接开销本身远小于重建Index |
+| ReadIndex/copy | 3.0 | 3.0 | 已有不可变索引快照复制已有实现，可供其他慢页借鉴 |
+| Loadout/after-copy | 32.8 | 22.4 | 复制Index仍须构建当前Loadout |
+| Library/build-warm-index | 491.7 | 398.1 | 先得到Index后首次库存聚合；并非BuildLibrary视图 |
+| Library/rebuild | 247.6 | 225.5 | 同reader再建库存仍不是0 |
+| Library/render-all | 192.1 | 176.7 | BuildLibrary全量DTO/ops/facets，不含JSON |
+| Library/render-filter | 74.2 | 56.1 | harmony过滤的视图构建 |
+| Library/JSON | 26.7 | 24.7 | 分阶段样本编码约24–27ms |
+| Changes/after-index | 47.8 | 14.2 | 旧BuildChanges，仅作为Subscriptions内部阶段证据 |
+| Subscriptions/after-index | 271.2 | 238.7 | 同一预热reader；和每次fresh API不同 |
+| ModsCopies/disk | 6.6 | 31.3 | 独立磁盘副本检查；1.6目录情况不同 |
+| GameLinks/disk | 25.4 | 24.7 | 链接检查；Problems热分支未必完整重跑此链 |
+| Problems/first | 96.7 | 39.7 | 首次问题聚合，含缓存和磁盘分支 |
+| Problems/hot-with-disk | 4.7 | 6.7 | Problems已有缓存后仍有磁盘检查 |
+| Needs/view | 2.5 | 1.2 | BuildNeeds本身很小，主要等待在其输入准备 |
+| Board/view | 142.8 | 162.1 | 同一会话预热后的Board生成 |
+| Settings/Dependencies | 16.2 | 13.4 | 工具定位/版本读取，已有版本cache |
+| Settings/Caches | 2.5 | 2.7 | 缓存目录WalkDir统计并非此数据下设置页主瓶颈 |
+| Settings/Folders | 3.0 | 3.2 | 文件夹组 |
+| Settings/All | 19.6 | 19.9 | 同App已有Index等状态后完整SettingsPage |
+| Home/first | 698.8 | 589.4 | 读过上述阶段后的首次Home；不与表A算同一温度 |
+| Home/hot | 172.3 | 222.9 | 重复生成启动页仍有工作 |
+
+实测主轮次Library/all热编码main为约22.2 ms，1.6约26.2 ms；payload分别5,355,970 B、5,335,776 B。搜索仍约1.65 MB、来源筛选约2.60 MB。Workspace约1.33 MB、编码约4.6 ms。相比之下订阅全库仅约0.37 MB、编码约1.5 ms，因此订阅页优先减重后端重建，库页还应减传输与对象构造。
+
+### 5.2 磁盘、XML、网络、重复计算和锁分别在哪里
+
+**库存/订阅重复计算。** [SubscriptionsPage](../../internal/surface/gui/subscriptions.go) 每次 `detachedReader → Loadout → BuildSubscriptions`；[BuildSubscriptions](../../internal/view/subscriptions.go) 先构建变化再调用 `App.Library()` 全库存。只看单Mod也不会跳过全库；添加订阅只需账户/最近条目，却先构建同一数据。新连接5–7ms并非全部问题，Index 116–152ms、库存首次398–492ms、重复225–248ms才更值得处理。[readers.go](../../internal/surface/gui/readers.go) 和 [readsession.go](../../internal/app/readsession.go) 已有 `ReadIndex/readInventorySession` 模式，不需要共享可变App来省成本。
+
+**CPU与锁证据。** 单独对 main `SubscriptionsPage(true, "")` 连续12次取CPU/mutex profile，含一次Workspace准备；9.93s壁钟、14.15 CPU秒。`BuildSubscriptions` 累计7.21 CPU秒、`App.Library` 5.28、SQLite VDBE 4.18、`Loadout` 2.03、`Index/loadIndex` 1.57、`ContentKinds` 1.03；这些是嵌套累计采样，不能相加，且不代表页面各阶段壁钟百分比。GC drain累计3.77 CPU秒，支持减少临时全库对象的方向。mutex profile的1.86秒聚合等待主要是runtime/GC锁，**没有证据把当前串行订阅慢页归因为API主互斥锁等待**。代码能证明某些并发请求串行，无法从这份单页profile推导真实GUI并发p95。
+
+**XML/About。** 页面使用扫描保存在DB里的decl/analysis，不是每次递归解析全部磁盘XML。`Index` 的懒声明读取与Loadout仍有解析/组装成本，本次没有独立给 `encoding/xml` 插桩，不能报一个虚构“XML占比”。30.3秒跨版本分析才是真正需要读Def/Patch/程序集并模拟的前提；应与现有分析下展示页面区分。首轮贴图78.9秒及Build100首次17.3秒与PNG头/尺寸持久缓存、不同目标范围有关，**不是XML解析时间**；未做系统调用逐文件追踪，二者细分的精确占比仍待专项profile。
+
+**贴图与占用统计。** [app/textures.go](../../internal/app/textures.go) 的 `readTextureMod → CollectCached → MakePlan` 遍历纹理目录并统计，缓存命中省PNG头读取而不省全部目录遍历；[Collect](../../internal/textures/collect.go) 读取Textures树及每个文件信息。[loadcost.go](../../internal/app/loadcost.go) 在 `cache.Get` **之前**用 `loadCostStamp/fsscan.Walk` 遍历Textures/Sounds/Defs/Patches/Languages/Assemblies；已有最多8个Mod worker，不应无证据再加大并行。不同方案仍有失效条目，缓存key/失效源可继续专项排查。
+
+**Home/Workspace。** [shell.go Home](../../internal/surface/gui/shell.go) 通过独立 `logRead` reader构建Board、readNeeds、方案/包，再AddOtherEnvs；部分数据重复求值。[problems.go](../../internal/app/problems.go) 即使问题缓存存在仍检查副本/链接/遗留包；Needs视图本身仅1–3ms。`shellLocked(nil)` 也会再次取Needs。该读取兼顾用户在外部修改Mod的事实，优化应采用一次操作内复用或有失效的短缓存。
+
+**设置/详情。** [api.go Sections/Settings](../../internal/surface/gui/api.go) 使用新reader，已预热App的SettingsPage约20ms，而GUI API热仍160–184ms，差值包含新状态重建。Settings缓存目录统计仅约3ms，不宜首先优化它。完整详情 [fulldetail.js](../../internal/surface/gui/assets/js/fulldetail.js) `Promise.all(Detail, ModCopies, Sections)` 后才finish；技术页的全部命令与Humanize在进入时做完，导致本来很快的详情必须等Sections的143–176ms。
+
+**卸载。** [uninstall.go sizeOf](../../internal/app/uninstall.go) 已有“每个App测一次尺寸”的缓存；但GUI [UninstallPlan](../../internal/surface/gui/uninstall.go) 每次新建detached reader，缓存随调用丢弃，改复选框又扫描尺寸。真实Home三次仍4.4–4.6秒，副本首轮7.7秒不应当作稳定磁盘冷基线。
+
+**网络。** [gamedl.go GameBranches](../../internal/app/gamedl.go) 会经SteamCMD匿名公开查询并持有 `accounts.Lock(exe)`，这里3秒同时包括进程启动/SteamCMD/网络，未逐项拆秒。详情强制刷新成功为412ms，缓存fetch仍134–140ms，说明详情自己的短生命周期reader重建也有成本。一般网页解析成功条件与Workshop描述API不同，本次公共页元数据样本失败，不能混为同一路径。
+
+### 5.3 慢节点排序
+
+以下按主要观察的完整就绪等待排序，不将不同温度拼成统一排行榜。高频表内H为main/1.6热中位数；异步结果加前端轮询时间才接近用户感知。
+
+| 顺序 | 节点 | 本次等待 | 类型 |
+| --- | --- | --- | --- |
+| 1 | 全库贴图手动统计 | 首次78.862s；H 2.554 / 2.481s | 极慢首次+热遍历；不是贴图初始页 |
+| 2 | Needs过期分析 / 跨版本日志前提 | Needs最终35.192s；日志直接分析30.296s + 页面构建 | 副本内in-process runner；生产还有子进程启动，未测其开销 |
+| 3 | 创建包100%贴图统计 | 1.6 C 17.336s；H 0.275 / 0.780s | 首轮目标纹理缓存；手动扫描统计 |
+| 4 | 卸载预览 | 真实Home中位数4.513s | 每次改答案都能复现 |
+| 5 | 下载游戏版本信息 | H 2.869 / 2.796s | SteamCMD公开分支查询 |
+| 6 | 订阅与更新全库 | P 1.452s；H 0.735 / 0.636s | 高频纯读取，收益明确 |
+| 7 | 添加订阅 / 当前 / 单Mod更新 | H 0.56–0.67s | 小页面也全库重建 |
+| 8 | 首次Mod库全部 | P 1.459s；E 0.687s | 库存+DTO；H仍约0.2s和编码 |
+| 9 | 启动页首次进入 | E 0.753 / 0.754s；H 0.170 / 0.198s | 独立reader、跨方案/环境 |
+| 10 | 订阅移除dry-run弹窗 | main H 0.481s | 单Harmony预览，无真实取消订阅 |
+| 11 | 创建包不转换 | H 0.271 / 0.393s | 预检查，不含实际构建 |
+| 12 | 编辑器顶部筛选条 | H 0.398 / 0.312s | 重建facets/约1.08MB对象 |
+| 13 | Workspace | H 0.282 / 0.261s | Board/Needs/Shell总快照 |
+| 14 | 方案占用统计 | main当前H0.311s；最大方案诊断0.325/0.364s | stamp扫描，失效再测 |
+| 15 | 删除dry-run弹窗 | main H 0.254s | 单Harmony，未调用删除 |
+| 16 | 方案贴图统计 | H 0.233 / 0.080s | 取决于方案目标纹理数 |
+| 17 | 完整详情/技术、设置 | 通常0.15–0.20s | 接近200ms；大内容与并发还需GUI验证 |
+
+## 6. 没有成功数值的节点，以及如何估算/补测
+
+| 节点 | 未测原因 | 可执行的测法 / 进入到就绪模型 |
+| --- | --- | --- |
+| 所有L子标签/选项/折叠/纯确认弹窗 | 无独立handler，后端增量C/H均0；未启动GUI | 在现有JS `beginPageRead/read.finish` 或点击回调前后 `performance.mark`，再用两次requestAnimationFrame测绘制；保留父payload准备时间，单列DOM。不能给未经测量的“16ms必达”承诺 |
+| 原生文件/目录/程序选择器、账户窗口、Steam验证码/网页登录 | 必须有GUI/人工操作；不应自动触发真实账号交互 | 只计“打开→首个可用控件”的时间，人工思考/输入另计；UI自动化或Wails/native回调计时，需专门允许启动窗口，本次未做 |
+| 成功的普通网页/Git/LoversLab分支与文件页 | URL/认证/远端内容决定成本；本次仅有公开页元数据失败样本 | 对用户实际来源做无账号/已授权只读API，冷指无持久元数据、热保留缓存；HTTP DNS/TLS/TTFB/body + 解析分别计时；需要登录的文件列表不以公共错误代替。表F失败已明确 |
+| 关注合集刷新 PlanCheck、导入Workshop合集 | 主面板先ready，再网络检查；本轮禁网控制后台变量，未取实际远程结果 | 用4条真实plan_collection的只读公开读取，记录首屏PlanManage与全量集合ready两个时间，隔离Store记录缓存；不同集合大小单列，不可用本地表单2ms推断 |
+| Pack详情/未完成包/包启动检查、包导出与移除预览 | 真实packs为空；创建合成包不等于真实用户样本 | 有包后依次测 `Pack/PackRemovePreview`、PackExport预览及安全启动检查；分别计manifest解码、Mod表、目录尺寸。首屏≈manifest+视图，最终≈首屏+明细扫描；本次不给数值范围 |
+| DirectoryMovePreview、LibraryPreview/OpPreview、Needs Inspect的其余输入组合 | 路径/操作/选择数量/证据种类决定成本；表G已测全部12类LibPreview的单Mod分支及6类Inspect，未测任意路径/多选/所有证据实例 | 使用副本配置，合法目标路径、单Mod/100Mod/全选各测cold/hot，只调用dry-run。返回拒绝也应单列，禁止执行Apply/Run。此前错误lock样本已排除 |
+| 重新扫描、首次导入包、安装/构建/贴图转换、任务执行/重试/取消/卸载结果 | 是操作后的状态页，需产生写行为；不是进入页只读加载 | 进度壳的后端数据已由Tasks/事件给出；完整结果时间由操作持续时间决定。仅在隔离输出目录进行专项吞吐测试，不能把按钮排队返回当完成 |
+| 当前真实游戏运行监控 | 测试时未运行游戏；LogMonitor为空 | 在用户已有游戏运行时被动轮询，分probe、文件尾增量解析、归因/展示；本次不为测量启动游戏 |
+| 网络图片/img首次下载、无持久背景缓存首次Unity解码 | 保留了真实缓存；图片HTTP仅测了有效缓存命中 | 在副本中仅移走目标缓存项，保留真实资源不动；测下载/解码缩放/JPEG编码/磁盘写，再测HTTP和浏览器decode；大量图需并发上限与取消统计 |
+| OS真正冷盘/安装后首次扫描 | 未清系统缓存，已有335MB索引库；会显著改变题目基线 | 重启后固定顺序采样，或独立克隆VM；记录读盘字节/磁盘队列/杀软影响。不能用本文C充当清空全部缓存后的加载时间 |
+
+这些限制不是将未测项按“很快”归零。当前已成功测量的读取入口见各表，全部有限UI节点都有数据依赖或上述补测路径；尚未取得成功样本的分支不声称已经完成全GUI端到端覆盖。
+
+## 7. 优化清单（收益 / 成本排序）
+
+收益范围为基于当前实测阶段可移除的工作量和目标，**不是已实现的加速结果**。以真实外部文件改变后的正确失效为约束，不缓存删除/部署授权结论。
+
+| 优先级 | 证据 → 具体方案 | 预期收益 / 验收目标 | 改动范围（相对internal/的文件 / 函数） | 成本与风险 |
+| --- | --- | --- | --- | --- |
+| P1 | sub只有账户/最近项却调用全BuildSubscriptions；新增轻量AddSubscriptionInfo；chg使用readInventorySession/ReadIndex，按环境、快照、范围与change key复用只读库存 | sub热约0.6s→目标30–50ms以内；chg减少116–152ms索引重建+225–248ms重复库存；热目标150–300ms，需实测 | `surface/gui/subscriptions.go SubscriptionsPage`、`assets/js/subscriptions.js openAdd`、`view/subscriptions.go BuildSubscriptions`、`gui/readers.go` / `app/readsession.go` | 小至中；不能共享可变App/DB迭代器，必须在scan/任务/环境/方案/标签备注变更后失效；先做轻sub可独立交付 |
+| P2 | 卸载已有App.sizeOf缓存被每次detachedReader丢弃；保留专用预览reader或本次预览的尺寸map，选项改动只重组计划；尺寸可后台渐入 | 用户连续改选项可省大部分4.5s目录遍历；目标热<100–300ms，首次路径摘要先出 | `gui/uninstall.go UninstallPlan`、`app/uninstall.go PlanUninstall/sizeOf` | 小至中；缓存仅字节估计，不缓存删除判定；执行前全量重新验证路径/进程/归属；外部大小变化标记估计并可刷新 |
+| P3 | 公开分支每次启动SteamCMD；按appID/tool身份作5–10min TTL+singleflight，旧数据先展示后刷新 | 热分支信息2.8s→本地<10–30ms；首次仍后台约3s | `app/gamedl.go GameBranches`、`gui/shell.go GuideDownloadInfo`、`assets/js/guide.js` | 小；分支新增短暂延迟、失败不覆盖旧数据；保留accounts.Lock，不能绕过SteamCMD串行锁 |
+| P4 | Library热BuildLibrary约177–192ms、5.4MB；缓存静态行/ops，详情按选中读取，facets一次聚合；BarFilter复用相同计数/查询索引 | 库热后端目标80–120ms以内；payload目标降50–80%（先列字段审计验证）；BarFilter目标50–100ms以内 | `view/library.go BuildLibrary/libInst`、`gui/library.go library/Library`、`view/columns.go` / `view/bar.go`、`gui/ops.go BarFilter`、`assets/js/library.js/lists.js` | 中；行操作可用性随当前方案/任务/标签改变，不能仅按snapshot缓存；保留可访问字段；不要用已有DOM虚拟化冒充传输优化 |
+| P5 | 全库贴图首轮78.9s、热2.5s，loadcost命中前仍Walk；按snapshot+LoadFolders+游戏MM+活动package集合维护摘要，只重扫变更Mod；先显示上次统计、后台核验 | 相同输入再次进入目标50–150ms以内；全库首轮仍需I/O，渐进可见；若90%快照未变，重测工作量目标降约90%，非保证等比例壁钟 | `app/textures.go TextureSummaryProgress/readTextureMod`、`textures/cache.go CollectCached`、`app/loadcost.go PlanLoadCost/loadCostStamp`、`gui/textures.go`、`gui/planmanage.go` | 中至大；根目录mtime不能代表子文件变化；需扫描事件/文件监视或短TTL+后台递归验证、工具/算法版本key；外部DDS归属仍须安全检查 |
+| P6 | Home另建Board/Needs并跨方案环境重复取值；Workspace的Shell又可重复needs；一次读取上下文memo，传已得Needs给shell，按输入key复用Board/PlanProblems | 首次减少一个或多个116–162ms阶段，目标E<350–500ms、H<80–120ms；Workspace节省重复聚合，需profile确认实际可去掉量 | `gui/shell.go Home/shellLocked`、`gui/api.go needsLocked`、`gui/environment.go`、`app/problems.go`、`view/shell.go BuildHome/AddOtherEnvs` | 中；当前/打开方案不同，不可复用错方案；日志更新、外部链接变化必须失效；长TTL会遮住新问题 |
+| P7 | 完整详情Promise.all等全部Sections；先发Detail/Copies，再按技术tab懒加载/缓存Sections；设置采用独立reader但复用Index | ful先显示主要说明/副本约10–50ms（已有reader时），避免等143–176ms；Settings热从160–184ms向20–50ms靠近 | `assets/js/fulldetail.js full`、`gui/api.go Sections/Settings`、`view/detail.go Sections`、`gui/readers.go` | 小至中；渐进区需准确loading，不把首屏当全部ready；section缓存key含snapshot、gameMM、分析版本、语言；readIndex复制需保证一致性 |
+| P8 | 跨版本日志需30.3s分析；按环境+方案集合指纹+日志MM缓存分析，发现版本冲突后后台排队，日志先给原文/簇再渐进归因；LogCluster/Pattern合并读取共享一次报告 | 首次30s工作本身不保证减少，二次避免重做；证据190–222ms路径目标<20–50ms；按profile判断解析/归因重复 | `app/logs.go EnsureLogAnalysis`、`app/analysis.go EnsureAnalysis`、`gui/api.go LogPage/LogCluster/LogPattern`、`view/logpage.go` | 中至大；当前已有pending/持久缓存，应补缺失key与复用，不能再造一层同功能缓存；后台分析须尊重128/子进程内存限制与取消 |
+
+按**收益/成本**看，低频下载页的P3可很快落地；按**用户最常遇到的等待**，推荐近期实际推进这5项：
+
+1. **轻量添加订阅 + chg只读库存复用（P1）**：高频、证据明确，先拆轻接口，再测旧/新订阅页。
+2. **卸载预览保留尺寸缓存（P2）**：已有缓存设计可直接接续，连续点选不应每次等4.5秒。
+3. **库列表DTO/筛选条减重（P4）**：同时改善Go构建、5.4MB桥接与WebView端对象处理。
+4. **贴图/占用统计按Mod快照增量（P5）**：处理最长78.9秒等待，先交付上次结果+后台校验，再做增量正确性。
+5. **Home/Workspace一次读取内复用（P6）**：改善日常启动/切页，先用阶段和CPU profile明确重复后合并。
+
+P7可作为小补丁穿插；P8先安排跨版本key和避免重复分析的专项观测。没有建议“给所有页面统一全局缓存”或盲目增加goroutine：这会牺牲外部Mod变更可见性、放大内存/磁盘竞争。
+
+### 7.1 与最近已有优化的关系
+
+- `bfc8d93`（“只看同packageId的副本，不再重建全部Mod的登记表”）：`app/deploy.go regWith` 已收窄候选。当前PlanManage主面板热35–153ms，表B是优化后的基线，不应重复提出已经完成的全库registry修复。值得借鉴的是“按当前范围做局部查询”，直接用于Subscriptions单Mod/当前方案分支。
+- `93b5639`：当前 `app/library.go` 已按folder构建Mods/duplicate map，`store/content.go ContentKinds` 已有按snapshot/scans缓存。仍有新的App/reader、热视图重建和payload成本；P1/P4应复用现有缓存并补失效边界，不再建议实现同一folder map或重复缓存ContentKinds。
+- `ReadIndex`、库存reader、PNG header cache、异步测量/取消、最多8个loadcost workers都已存在。优化应先贯通这些已有路径；当前基线不足以支持改SQLite驱动、引入ORM/前端框架或增加依赖。
+
+## 8. 复现与研究产物
+
+原始观测保留在本机被git忽略的 `.cache/page-load-20261026/`：`results.jsonl`（910条，65种入口×两环境×C/E/H）、`run.log`、`detail.log`、`process.log`、`supplement.log`、`logpreviews.log`、`public.log`、`sub.cpu`、`sub.mutex`、`needsfinal.log`、`groups.log`。报告自带汇总，不依赖这些缓存文件才能阅读。原始文件含本机路径，不上传外部服务。
+
+临时测量文件为 `internal/surface/gui/research_pageload_test.go`，完成后删除；本次仅新增本报告，没有业务代码修改，也没有commit。清理时工作区还出现了另一份 `2026-10-26_steamcmd-parallel-downloads.md`，非本次产物，未改动或删除；最终没有遗留研究测试源码。下附完整测量源码可供在同一版本复现，保留它是为了测试恢复后仍可审查测量口径。
+
+复现步骤：
+
+1. 确认分支/提交，关闭会改变Mod/日志的后台任务；记录硬件、游戏版本、方案/索引数量和已有cache状态。
+2. 以SQLite只读备份创建新的隔离Home，复制配置、tasks、cache、空packs；不要直接把研究Home指向真实 `%APPDATA%\RimArcho`。示例备份代码如下，`dst`应是新目录。
+
+```python
+from pathlib import Path
+import os, sqlite3, shutil
+src = Path(os.environ["APPDATA"]) / "RimArcho"
+dst = Path(".cache/page-load-repeat/home")
+dst.mkdir(parents=True, exist_ok=False)
+with sqlite3.connect((src / "archo.db").as_uri()+"?mode=ro", uri=True) as a:
+    with sqlite3.connect(dst / "archo.db") as b:
+        a.backup(b)
+for name in ("config.toml", "tasks.json"):
+    if (src / name).exists(): shutil.copy2(src / name, dst / name)
+shutil.copytree(src / "cache", dst / "cache")
+(dst / "packs").mkdir()
+```
+
+3. 将下方源码临时保存到上述Go测试路径。原样运行主测量会包含匿名SteamCMD分支查询；`TestResearchPublicAndAssets`仅做公开HTTP，`TestResearchLogAndPreviews`在副本做一次实际分析。调整固定Harmony ID/真实环境名后再跑补测；实际样本换了不能直接用本报告快照ID。
+
+```powershell
+$env:RIMARCHO_RESEARCH_HOME = (Resolve-Path .cache/page-load-repeat/home).Path
+$env:RIMARCHO_RESEARCH_OUTPUT = Join-Path (Resolve-Path .cache/page-load-repeat).Path 'results.jsonl'
+go test ./internal/surface/gui -run '^TestResearchPageLoads$' -count=1 -timeout 20m -v
+go test ./internal/surface/gui -run '^TestResearch(Breakdown|Extras|Validate)$' -count=1 -timeout 20m -v
+# 补测互相串行执行，避免CPU/I/O干扰
+go test ./internal/surface/gui -run '^TestResearch(Supplement|LogAndPreviews|PublicAndAssets|NeedsFinal|PageGroups)$' -count=1 -timeout 20m -v
+# 真进程冷：每个方法启动3个新进程，不用PageLoads的预读准备路径
+go test -c -o .cache/page-load-repeat/gui.test.exe ./internal/surface/gui
+foreach ($method in @('Workspace','Home','Library','SubscriptionsPage','Settings')) {
+    $env:RIMARCHO_RESEARCH_ENV = 'main'
+    $env:RIMARCHO_RESEARCH_PROFILE = $method
+    foreach ($run in 1..3) {
+        & .cache/page-load-repeat/gui.test.exe '-test.run=^TestResearchIndependent$' '-test.v'
+    }
+}
+$env:RIMARCHO_RESEARCH_PROFILE = 'SubscriptionsPage'
+& .cache/page-load-repeat/gui.test.exe '-test.run=^TestResearchProfile$' '-test.cpuprofile=.cache/page-load-repeat/sub.cpu' '-test.mutexprofile=.cache/page-load-repeat/sub.mutex'
+go tool pprof -top -cum .cache/page-load-repeat/gui.test.exe .cache/page-load-repeat/sub.cpu
+# 只移除本次新增的临时研究源码；保留报告
+git diff --check
+git status --short
+```
+
+附录源码中的 `AnalyzeRunner/SteamWorker` 禁用、公开HTTP单独开启、JSON单独计时和异步最终轮询是测量契约的一部分。它不是用于提交的测试，亦不应添加到常规CI自动触网。
+
+<details>
+<summary>完整临时测量源码（研究完成后已从业务目录移除）</summary>
+
+```go
+
+package gui
+
+import (
+ "context"
+ "encoding/json"
+ "errors"
+ "fmt"
+ "net/http"
+ "net/http/httptest"
+ "os"
+ "path/filepath"
+ "reflect"
+ "runtime"
+ "runtime/debug"
+ "sort"
+ "strings"
+ "testing"
+ "time"
+
+ "github.com/ToumanLin/RimArcho/internal/app"
+ "github.com/ToumanLin/RimArcho/internal/view"
+ "github.com/ToumanLin/RimArcho/internal/modchanges"
+)
+
+type researchTransport struct{}
+func (researchTransport) RoundTrip(*http.Request)(*http.Response,error){return nil,errors.New("research: network disabled")}
+type researchCase struct {name, method string; args []any; async string}
+type researchRow struct {Env,Name,Mode string; Run int; HandlerMS,JSONMS float64; Bytes int; Error string `json:",omitempty"`}
+func researchInvoke(s *API, c researchCase)(any,error){
+ if c.async=="full" || c.async=="editor-panel" || c.async=="library-panel" {
+  id:=c.args[0].(string)
+  calls:=[]researchCase{{method:"Detail",args:[]any{id,false,false,false}}}
+  switch c.async{case "full":calls=append(calls,researchCase{method:"ModCopies",args:[]any{id}},researchCase{method:"Sections",args:[]any{id}});case "editor-panel":calls=append(calls,researchCase{method:"LibraryCopy",args:[]any{id}});case "library-panel":calls=append(calls,researchCase{method:"LibraryFields",args:[]any{id}})}
+  type res struct{v any;e error};ch:=make(chan res,len(calls))
+  for _,call:=range calls{go func(){v,e:=researchInvoke(s,call);ch<-res{v,e}}()};vs:=[]any{};var err error
+  for range calls{v:=<-ch;vs=append(vs,v.v);if v.e!=nil{err=v.e}};return vs,err
+ }
+ if c.async=="workspace" {
+  ch:=make(chan *EnvironmentResult,1)
+  s.emit=func(n string,v any){if n=="environment"{ch<-v.(*EnvironmentResult)}}
+  s.environment.mu.Lock();seq:=s.environment.readSeq+1;s.environment.mu.Unlock()
+  if !s.Workspace(seq){return nil,errors.New("workspace rejected")}
+  select{case v:=<-ch: if v.Error!=""{return v,errors.New(v.Error)};return v,nil;case <-time.After(2*time.Minute):return nil,errors.New("workspace timeout")}
+ }
+ if c.async=="build" {id,e:=s.BuildPage(c.args[0].(int));if e!=nil{return nil,e};for {p,e:=s.BuildPageResult(id);if e!=nil||p!=nil{return p,e};time.Sleep(time.Millisecond)}}
+ if c.async=="cost" {p,e:=s.PlanLoadCost(c.args[0].(int64));if e!=nil{return nil,e};for {p=s.PlanLoadCostMeasure(p.Request);if p==nil{return nil,errors.New("lost cost")};if !p.Loading {if p.Error!=""{return p,errors.New(p.Error)};return p,nil};time.Sleep(time.Millisecond)}}
+ if c.async=="texture" {p,e:=s.Textures(c.args[0].(string),100);if e!=nil{return nil,e};for {p=s.TextureMeasure(p.Request);if p==nil{return nil,errors.New("lost texture")};if !p.Loading {if p.Error!=""{return p,errors.New(p.Error)};return p,nil};time.Sleep(time.Millisecond)}}
+ if c.async=="background" {s.Backgrounds();s.bgRead.workers.Wait();s.mu.Lock();out:=append([]app.Background(nil),s.bgs...);s.mu.Unlock();return out,nil}
+ m:=reflect.ValueOf(s).MethodByName(c.method);if !m.IsValid(){return nil,fmt.Errorf("no method %s",c.method)}
+ ins:=make([]reflect.Value,len(c.args));for i,v:=range c.args{if v==nil {ins[i]=reflect.Zero(m.Type().In(i))}else{ins[i]=reflect.ValueOf(v)}}
+ vals:=m.Call(ins);var out any
+ for _,v:=range vals{if v.Type().Implements(reflect.TypeOf((*error)(nil)).Elem()){if !v.IsNil(){return out,v.Interface().(error)}}else{out=v.Interface()}}
+ return out,nil
+}
+func researchOpen(t *testing.T, env string)(*API,func()){
+ a,e:=app.Open(os.Getenv("RIMARCHO_RESEARCH_HOME"));if e!=nil{t.Fatal(e)}
+ a.EnvName=env;a.LazyLog=true;a.LogCacheOnly=true
+ a.HTTP=&http.Client{Transport:researchTransport{},Timeout:5*time.Second}
+ a.AnalyzeRunner=func(string,func(string))error{return errors.New("research: analysis launch disabled")}
+ a.SteamWorker=func(string,[]string)(string,error){return "",errors.New("research: Steam disabled")}
+ tuneProcess(a)
+ s:=newAPI(a);s.busy["analyze"]=true
+ return s,func(){s.Close();a.Close()}
+}
+func TestResearchPageLoads(t *testing.T){
+ if os.Getenv("RIMARCHO_RESEARCH_HOME")==""{t.Skip("research only")}
+ view.SetLang("zh");debug.SetMemoryLimit(MemoryLimit)
+ out,e:=os.OpenFile(os.Getenv("RIMARCHO_RESEARCH_OUTPUT"),os.O_CREATE|os.O_WRONLY|os.O_APPEND,0600);if e!=nil{t.Fatal(e)};defer out.Close();enc:=json.NewEncoder(out)
+ envs:=[]string{"main","1.6"};if x:=os.Getenv("RIMARCHO_RESEARCH_ENV");x!=""{envs=[]string{x}}
+ for _,env:=range envs{
+ s,done:=researchOpen(t,env);st,e:=s.a.Loadout();if e!=nil{t.Fatal(e)}
+ plan:=st.Plan.ID
+ ids:=[]string{};for _,m:=range st.Ix.Mods{if m.WorkshopID()!=""&&m.SnapID>0{ids=append(ids,m.ID)}};sort.Strings(ids)
+ id:=ids[0];for _,m:=range st.Ix.Mods{if strings.Contains(strings.ToLower(m.Name),"harmony"){id=m.ID;break}}
+ ref:=st.Ix.Ref(id);snap:=st.Ix.ByID[id].SnapID
+ plans,_:=s.a.Plans();logs:=view.LogFiles(s.a,st)
+ fmt.Printf("DATA env=%s plan=%d mods=%d representative=%s snapshot=%d logs=%d cpus=%d\n",env,plan,len(st.Ix.Mods),ref,snap,len(logs),runtime.NumCPU())
+ logpath:="";if len(logs)>0{logpath=logs[0].Path}
+ done()
+ c:=func(n,m string,args ...any)researchCase{return researchCase{name:n,method:m,args:args}}
+ cases:=[]researchCase{
+ c("Init","Init"), {name:"Workspace",async:"workspace"},c("Home","Home"),c("HomeBackground","HomeBackground"),c("Shell","Shell"),c("Needs","Needs"),
+ c("Library/all","Library","",[]string{},""),c("Library/search","Library","harmony",[]string{},""),c("Library/filter","Library","",[]string{"source:workshop"},""),
+ c("Subscriptions/plan","SubscriptionsPage",false,""),c("Subscriptions/library","SubscriptionsPage",true,""),c("Subscriptions/mod","SubscriptionsPage",false,id),
+ c("Changes/plan","Changes",false,""),c("Changes/library","Changes",true,""),c("Changes/mod","Changes",false,id),c("ChangeFiles","ChangeFiles",snap,snap),
+ c("AddSubscription/data","SubscriptionsPage",false,""),c("Packs","Packs"),
+ {name:"Build/off",async:"build",args:[]any{0}},{name:"Build/100",async:"build",args:[]any{100}},
+ c("PlanManage","PlanManage",int64(0)),c("PlanSources","PlanSources",plan),c("CheckPlanName","CheckPlanName","new list","new list",int64(0)),c("PlanFroms","PlanFroms"),
+ {name:"PlanLoadCost",async:"cost",args:[]any{plan}},
+ c("PlanExport/default","PlanExport",plan,""),c("ExchangeInfo","ExchangeInfo"),c("ImportPreview/text","ImportPreviewFor",plan,"text","ludeon.rimworld\nbrrainz.harmony"),
+ c("Environment","Environment"),c("EnvRemovePreview","EnvRemovePreview",env),c("Settings","Settings"),c("Directories","Directories"),c("Backgrounds/initial","Backgrounds"),{name:"Backgrounds/complete",async:"background"},
+ c("TexturesInfo/plan","TexturesInfo","plan",100),c("TexturesInfo/all","TexturesInfo","all",100),
+ {name:"Textures/plan",async:"texture",args:[]any{"plan"}},
+ c("Tasks","Tasks"),c("GuideFind","GuideFind"),c("GuideDownloadInfo","GuideDownloadInfo"),
+ c("LogPage","LogPage",""),c("LogMonitor","LogMonitor",logpath),c("LogPattern","LogPattern",logpath,"E1"),c("LogCluster","LogCluster",logpath,"E1"),
+ c("Detail/cached","Detail",id,false,false,false),c("ModCopies","ModCopies",id),c("LibraryCopy","LibraryCopy",id),c("LibraryFields","LibraryFields",id),c("Sections","Sections",id),
+ c("TagCandidates","TagCandidates",[]string{id}),c("PosOptions","PosOptions",[]string{id},"",false),c("RowOps","RowOps",1,id),c("Palette","Palette",""),c("Keys","Keys","plan"),c("History","History"),
+ c("Preview/sort","Preview","sort"),c("Preview/save","Preview","save"),c("Preview/launch","Preview","launch"),
+ c("UninstallPlan","UninstallPlan",view.UninstallChoice{KeepLocked:true}),
+ }
+ for _,p:=range plans{cases=append(cases,c(fmt.Sprintf("PlanManage/id%d",p.ID),"PlanManage",p.ID))}
+ if len(logs)>1{cases=append(cases,c("LogPage/previous","LogPage",logs[1].Path))}
+ for _,x:=range cases{
+  if filter:=os.Getenv("RIMARCHO_RESEARCH_MATCH");filter!=""&&x.name!=filter{continue}
+  for _,mode:=range []string{"cold","entry"}{ if os.Getenv("RIMARCHO_RESEARCH_COLDONLY")=="1" && mode!="cold"{continue}
+   s,close:=researchOpen(t,env)
+   if mode=="entry"{if _,e:=researchInvoke(s,researchCase{async:"workspace"});e!=nil{t.Fatal(e)}}
+   n:=1;if mode=="entry"{n=6}
+   for i:=0;i<n;i++{start:=time.Now();v,e:=researchInvoke(s,x);elapsed:=time.Since(start);jt:=time.Now();b,je:=json.Marshal(v);jms:=float64(time.Since(jt).Nanoseconds())/1e6
+    label:=mode;if i>0{label="hot"}
+    row:=researchRow{Env:env,Name:x.name,Mode:label,Run:i,HandlerMS:float64(elapsed.Nanoseconds())/1e6,JSONMS:jms,Bytes:len(b)};if e!=nil{row.Error=e.Error()};if je!=nil{row.Error=je.Error()}
+    enc.Encode(row)
+    if i==0{fmt.Printf("RESULT %s %s %s %.3f ms json=%.3f bytes=%d err=%s\n",env,x.name,label,row.HandlerMS,row.JSONMS,row.Bytes,row.Error)}
+   };close()
+  }
+ }
+ }
+}
+
+// Detailed phase timings over an independent session, without frontend polling.
+func TestResearchPhases(t *testing.T){
+ if os.Getenv("RIMARCHO_RESEARCH_HOME")==""{t.Skip()}
+ _=context.Background();_=filepath.Separator
+}
+func TestResearchBreakdown(t *testing.T){
+ if os.Getenv("RIMARCHO_RESEARCH_HOME")==""{t.Skip()};view.SetLang("zh")
+ for _,env:=range []string{"main","1.6"}{
+ for run:=0;run<3;run++{
+  s,close:=researchOpen(t,env);a:=s.a
+  phase:=func(name string,f func()){start:=time.Now();f();fmt.Printf("PHASE %s %d %s %.3f\n",env,run,name,float64(time.Since(start).Nanoseconds())/1e6)}
+  phase("Index/cold",func(){_,_=a.Index()})
+  phase("Loadout/after-index",func(){_,_=a.Loadout()})
+  st,_:=a.Loadout()
+  phase("ModsCopies/disk",func(){_=a.ModsCopies(st.Ix)})
+  phase("GameLinks/disk",func(){_,_=a.InspectGameLinks()})
+  phase("Problems/first",func(){_,_=a.Problems(false,nil)})
+  ps,_:=a.Problems(false,nil)
+  phase("Needs/view",func(){_=view.BuildNeeds(a,st,ps)})
+  phase("Problems/hot-with-disk",func(){_,_=a.Problems(false,nil)})
+  phase("Board/view",func(){_,_=view.BuildBoard(a)})
+  phase("Shell/hot",func(){_=s.Shell()})
+  var r *app.App
+  phase("ReadSession",func(){r,_=a.ReadSession()})
+  r.EnvName=env
+  phase("ReadIndex/copy",func(){r.ReadIndex(a)})
+  phase("Loadout/after-copy",func(){_,_=r.Loadout()})
+  var lib *app.Library
+  phase("Library/build-warm-index",func(){lib,_=r.Library()})
+  var page *view.LibPage
+  phase("Library/render-all",func(){page,_=view.BuildLibrary(lib,"",nil,"")})
+  phase("Library/JSON",func(){_,_=json.Marshal(page)})
+  phase("Library/render-filter",func(){_,_=view.BuildLibrary(lib,"harmony",nil,"")})
+  phase("Library/rebuild",func(){_,_=r.Library()})
+  phase("Changes/after-index",func(){_,_=view.BuildChanges(r,st,modchanges.Opts{})})
+  phase("Subscriptions/after-index",func(){_,_=view.BuildSubscriptions(r,st,modchanges.Opts{})})
+  phase("Settings/Caches",func(){_=a.Caches()})
+  phase("Settings/DBInfo",func(){_,_=a.DBInfo()})
+  phase("Settings/Dependencies",func(){_=view.DependencyGroup(a)})
+  phase("Settings/Directories",func(){_=view.DirectoryGroup(a)})
+  phase("Settings/Folders",func(){_=view.FolderGroup(a)})
+  phase("Settings/Accounts",func(){_=view.AccountGroup(a)})
+  phase("Settings/Monitor",func(){_,_=a.MonitorState()})
+  phase("Settings/All",func(){_=view.SettingsPage(a,nil)})
+  phase("Home/first",func(){_=s.Home()})
+  phase("Home/hot",func(){_=s.Home()})
+  for _,p:=range mustPlans(a){phase(fmt.Sprintf("PlanLoadCost/id%d",p),func(){cost,e:=a.PlanLoadCost(context.Background(),p,nil);if e==nil{fmt.Printf("COST env=%s id=%d mods=%d cached=%d measured=%d\n",env,p,cost.Mods,cost.Cached,cost.Measured)}else{fmt.Printf("COSTERROR %v\n",e)}})}
+  r.Close();close()
+ }
+ }
+}
+func mustPlans(a *app.App)[]int64{ps,_:=a.Plans();out:=[]int64{};for _,p:=range ps{out=append(out,p.ID)};return out}
+func TestResearchProfile(t *testing.T){
+ if os.Getenv("RIMARCHO_RESEARCH_HOME")==""{t.Skip()}
+ view.SetLang("zh");s,close:=researchOpen(t,"main");defer close();_,_=researchInvoke(s,researchCase{async:"workspace"})
+ method:=os.Getenv("RIMARCHO_RESEARCH_PROFILE");args:=[]any{}
+ switch method {case "Library":args=[]any{"",[]string{},""};case "SubscriptionsPage":args=[]any{true,""};case "PlanManage":args=[]any{int64(0)}}
+ for i:=0;i<12;i++{_,e:=researchInvoke(s,researchCase{method:method,args:args});if e!=nil{t.Fatal(e)}}
+}
+func TestResearchExtras(t *testing.T){
+ if os.Getenv("RIMARCHO_RESEARCH_HOME")==""{t.Skip()};view.SetLang("zh")
+ for _,env:=range []string{"main","1.6"}{
+  s,close:=researchOpen(t,env);st,_:=s.a.Loadout();plan:=st.Plan.ID;id:=""
+  for _,m:=range st.Ix.Mods{if m.Name=="Harmony"{id=m.ID;break}}
+  var big string;s.a.Store.DB.QueryRow("select instance_id from def_fact where game_mm=? group by instance_id order by count(*) desc limit 1",st.GameMM()).Scan(&big)
+  cases:=[]researchCase{{name:"Full/Harmony",async:"full",args:[]any{id}},{name:"Panel/editor",async:"editor-panel",args:[]any{id}},{name:"Panel/library",async:"library-panel",args:[]any{id}}}
+  if big!=""{cases=append(cases,researchCase{name:"Full/largeDefs",async:"full",args:[]any{big}},researchCase{name:"Sections/largeDefs",method:"Sections",args:[]any{big}})}
+  for _,f:=range view.ExportFormats(s.a){cases=append(cases,researchCase{name:"Export/"+f.ID,method:"PlanExport",args:[]any{plan,f.ID}})}
+  for _,tex:=range []int{80,75,60,50,40,25}{cases=append(cases,researchCase{name:fmt.Sprintf("Build/%d",tex),async:"build",args:[]any{tex}})}
+  cases=append(cases,researchCase{name:"Textures/all",async:"texture",args:[]any{"all"}},researchCase{name:"Filter/inactive",method:"Filter",args:[]any{0,"harmony"}},researchCase{name:"BarFilter",method:"BarFilter",args:[]any{"",[]string{},true}},researchCase{name:"RemovePlanWarn",method:"RemovePlanWarn",args:[]any{plan}},researchCase{name:"Live",method:"Live"})
+  close()
+  for _,c:=range cases{
+   s,close:=researchOpen(t,env);_,_=researchInvoke(s,researchCase{async:"workspace"})
+   for i:=0;i<4;i++{start:=time.Now();v,e:=researchInvoke(s,c);ms:=float64(time.Since(start).Nanoseconds())/1e6;j:=time.Now();b,_:=json.Marshal(v);jms:=float64(time.Since(j).Nanoseconds())/1e6;fmt.Printf("EXTRA %s %s %d %.3f json=%.3f bytes=%d err=%v\n",env,c.name,i,ms,jms,len(b),e)};close()
+  }
+ }
+}
+
+func TestResearchValidate(t *testing.T){
+ if os.Getenv("RIMARCHO_RESEARCH_HOME")==""{t.Skip()}
+ view.SetLang("zh")
+ for _,env:=range []string{"main","1.6"}{
+ s,close:=researchOpen(t,env);_,_=researchInvoke(s,researchCase{async:"workspace"});st,_:=s.a.Loadout()
+ n:=s.Needs();fmt.Printf("VALID %s active=%d mods=%d NeedsNever=%v NeedsStale=%v needsItems=%d\n",env,len(st.List),len(st.Ix.Mods),n.Never,n.Stale,len(n.Items))
+ for _,f:=range view.LogFiles(s.a,st){p,e:=s.LogPage(f.Path);if p!=nil{fmt.Printf("VALIDLOG %s %s rows=%d pending=%s err=%v\n",env,filepath.Base(f.Path),len(p.Rows),p.Pending,e)}else{fmt.Printf("VALIDLOG %s nil %v\n",env,e)}}
+ for _,g:=range s.Settings(){fmt.Printf("GROUP %s %s rows=%d\n",env,g.Title,len(g.Items))}
+ d:=s.GuideDownloadInfo();fmt.Printf("VALIDGUIDE %s branches=%d error=%s\n",env,len(d.Branches),d.Error)
+ close()
+ }
+}
+
+func TestResearchIndependent(t *testing.T){
+ if os.Getenv("RIMARCHO_RESEARCH_HOME")==""{t.Skip()};view.SetLang("zh");debug.SetMemoryLimit(MemoryLimit)
+ env:=os.Getenv("RIMARCHO_RESEARCH_ENV");if env==""{env="main"}
+ method:=os.Getenv("RIMARCHO_RESEARCH_PROFILE");c:=researchCase{name:method,method:method}
+ switch method{case "Workspace":c.async="workspace";case "Library":c.args=[]any{"",[]string{},""};case "SubscriptionsPage":c.args=[]any{true,""};case "UninstallPlan":c.args=[]any{view.UninstallChoice{KeepLocked:true}}}
+ s,close:=researchOpen(t,env);defer close()
+ start:=time.Now();v,e:=researchInvoke(s,c);ms:=float64(time.Since(start).Nanoseconds())/1e6;j:=time.Now();b,_:=json.Marshal(v)
+ fmt.Printf("PROCESS %s %s %.3f json=%.3f bytes=%d err=%v\n",env,method,ms,float64(time.Since(j).Nanoseconds())/1e6,len(b),e)
+}
+func TestResearchSupplement(t *testing.T){
+ if os.Getenv("RIMARCHO_RESEARCH_HOME")==""{t.Skip()};view.SetLang("zh")
+ s,close:=researchOpen(t,"main");defer close();_,_=researchInvoke(s,researchCase{async:"workspace"})
+ rows,e:=s.a.Store.DB.Query(`select before_snapshot,after_snapshot from change_event where before_snapshot>0 and after_snapshot>0 and before_snapshot<>after_snapshot order by id desc limit 5`);if e!=nil{t.Fatal(e)}
+ type pair struct{b,a int64};pairs:=[]pair{};for rows.Next(){var p pair;rows.Scan(&p.b,&p.a);pairs=append(pairs,p)};rows.Close()
+ for _,p:=range pairs{for i:=0;i<4;i++{start:=time.Now();files:=s.ChangeFiles(p.b,p.a);fmt.Printf("DIFF %d %d %d %.3f files=%d\n",p.b,p.a,i,float64(time.Since(start).Nanoseconds())/1e6,len(files))}}
+ for i:=0;i<3;i++{r,e:=s.a.ReadSession();if e!=nil{t.Fatal(e)};r.Home=filepath.Join(os.Getenv("APPDATA"),"RimArcho");start:=time.Now();p,e:=r.PlanUninstall(app.UninstallOptions{KeepLocked:true});fmt.Printf("REALHOME uninstall %d %.3f steps=%d err=%v\n",i,float64(time.Since(start).Nanoseconds())/1e6,len(p.Steps),e);r.Close()}
+ st,_:=s.a.Loadout();id:="";for _,m:=range st.Ix.Mods{if m.Name=="Harmony"{id=m.ID;break}}
+ h,_:=PageHandler(s)
+ for _,path:=range []string{"/preview/"+id}{for i:=0;i<4;i++{rr:=httptest.NewRecorder();start:=time.Now();h.ServeHTTP(rr,httptest.NewRequest("GET",path,nil));fmt.Printf("ASSET %s %d %.3f status=%d bytes=%d\n",path,i,float64(time.Since(start).Nanoseconds())/1e6,rr.Code,rr.Body.Len())}}
+}
+
+func TestResearchLogAndPreviews(t *testing.T){
+ if os.Getenv("RIMARCHO_RESEARCH_HOME")==""{t.Skip()};view.SetLang("zh")
+ for _,env:=range []string{"main","1.6"}{
+ s,close:=researchOpen(t,env);_,_=researchInvoke(s,researchCase{async:"workspace"});st,_:=s.a.Loadout()
+ id:="";for _,m:=range st.Ix.Mods{if m.Name=="Harmony"{id=m.ID;break}}
+ cases:=[]researchCase{{name:"PackNameCheck",method:"PackNameCheck",args:[]any{"research-preview"}},{name:"PackDryRun",method:"PackDryRun",args:[]any{"research-preview",0}},{name:"ModNote",method:"ModNote",args:[]any{id}},{name:"GuideGame",method:"GuideGame",args:[]any{st.Ix.Env.GameRoot}},{name:"SubscribePreview/workshop",method:"SubscribePreview",args:[]any{SubscriptionRequest{Kind:"workshop",URL:st.Ix.ByID[id].WorkshopID()}}},{name:"LibraryPreview/lock",method:"LibraryPreview",args:[]any{"lock",[]string{st.Ix.Ref(id)}}}}
+ for _,c:=range cases{for i:=0;i<4;i++{start:=time.Now();v,e:=researchInvoke(s,c);b,_:=json.Marshal(v);fmt.Printf("SAFE %s %s %d %.3f bytes=%d err=%v payload=%s\n",env,c.name,i,float64(time.Since(start).Nanoseconds())/1e6,len(b),e,string(b[:min(120,len(b))]))}}
+ logs:=view.LogFiles(s.a,st)
+ if env=="1.6" && len(logs)>0{r,_:=s.logSession();r.GameVersion=app.LogMM(app.LogVersionOf(logs[0].Path));start:=time.Now();_,e:=r.Analyze(nil);fmt.Printf("LOGANALYSIS %s %.3f mm=%s err=%v\n",env,float64(time.Since(start).Nanoseconds())/1e6,r.GameVersion,e);r.GameVersion="";r.Store.MM=st.GameMM()}
+ for _,f:=range logs{for i:=0;i<4;i++{start:=time.Now();p,e:=s.LogPage(f.Path);if e!=nil{fmt.Printf("LOGFINAL %s %s error=%v\n",env,filepath.Base(f.Path),e);break};fmt.Printf("LOGFINAL %s %s %d %.3f rows=%d pending=%s\n",env,filepath.Base(f.Path),i,float64(time.Since(start).Nanoseconds())/1e6,len(p.Rows),p.Pending)
+ if i==0 && len(p.Rows)>0{cid:=p.Rows[0].ID;start=time.Now();lines,e:=s.LogCluster(f.Path,cid);card:=s.LogPattern(f.Path,cid);fmt.Printf("LOGEVIDENCE %s %s %.3f cluster=%s lines=%d card=%v err=%v\n",env,filepath.Base(f.Path),float64(time.Since(start).Nanoseconds())/1e6,cid,len(lines),card!=nil,e)}}}
+ close()
+ }
+}
+func TestResearchPublicAndAssets(t *testing.T){
+ if os.Getenv("RIMARCHO_RESEARCH_HOME")==""{t.Skip()};view.SetLang("zh");s,close:=researchOpen(t,"main");defer close();_,_=researchInvoke(s,researchCase{async:"workspace"})
+ s.a.HTTP=&http.Client{Timeout:12*time.Second};id:="#nvxs"
+ for i:=0;i<3;i++{start:=time.Now();p,e:=s.Detail(id,false,true,i==0);n:=0;note:="";if p!=nil{n=len(p.Workshop);note=p.Note};fmt.Printf("PUBLIC Detail %d %.3f blocks=%d note=%s err=%v\n",i,float64(time.Since(start).Nanoseconds())/1e6,n,note,e)}
+ for i:=0;i<3;i++{start:=time.Now();p,e:=s.SubscriptionPage("https://steamcommunity.com/sharedfiles/filedetails/?id=2009463077");n:="";if p!=nil{n=p.Name};fmt.Printf("PUBLIC Page %d %.3f name=%s err=%v\n",i,float64(time.Since(start).Nanoseconds())/1e6,n,e)}
+ s.Backgrounds();s.bgRead.workers.Wait();p:=s.Backgrounds();h,_:=PageHandler(s)
+ for _,g:=range p.Groups{if len(g.Items)==0{continue};b:=g.Items[0];for _,path:=range []string{b.Thumb,b.Full}{if path==""{continue};for i:=0;i<3;i++{rr:=httptest.NewRecorder();start:=time.Now();h.ServeHTTP(rr,httptest.NewRequest("GET",path,nil));fmt.Printf("BGASSET %d %.3f status=%d bytes=%d\n",i,float64(time.Since(start).Nanoseconds())/1e6,rr.Code,rr.Body.Len())}};break}
+}
+func TestResearchNeedsFinal(t *testing.T){
+ if os.Getenv("RIMARCHO_RESEARCH_HOME")==""{t.Skip()};view.SetLang("zh");s,close:=researchOpen(t,"1.6");defer close();_,_=researchInvoke(s,researchCase{async:"workspace"})
+ ch:=make(chan map[string]any,1);s.emit=func(n string,v any){if n=="analyze"{if m,ok:=v.(map[string]any);ok&&m["done"]==true{ch<-m}}}
+ s.a.AnalyzeRunner=func(env string,progress func(string))error{a,e:=app.Open(os.Getenv("RIMARCHO_RESEARCH_HOME"));if e!=nil{return e};defer a.Close();a.EnvName=env;_,e=a.Analyze(progress);return e};s.busy["analyze"]=false
+ start:=time.Now();n:=s.Needs();fmt.Printf("NEEDSFINAL initial %.3f stale=%v never=%v items=%d\n",float64(time.Since(start).Nanoseconds())/1e6,n.Stale,n.Never,len(n.Items))
+ if n.Stale||n.Never{select{case e:=<-ch:fmt.Printf("NEEDSFINAL event %.3f value=%v\n",float64(time.Since(start).Nanoseconds())/1e6,e);case <-time.After(3*time.Minute):t.Fatal("analysis timeout")}}
+ n=s.Needs();fmt.Printf("NEEDSFINAL complete %.3f stale=%v never=%v items=%d\n",float64(time.Since(start).Nanoseconds())/1e6,n.Stale,n.Never,len(n.Items))
+ for i:=0;i<3;i++{start=time.Now();n=s.Needs();fmt.Printf("NEEDSFINAL hot %d %.3f stale=%v items=%d\n",i,float64(time.Since(start).Nanoseconds())/1e6,n.Stale,len(n.Items))}
+}
+func TestResearchPageGroups(t *testing.T){
+ if os.Getenv("RIMARCHO_RESEARCH_HOME")==""{t.Skip()};view.SetLang("zh")
+ for _,env:=range []string{"main","1.6"}{for _,page:=range []string{"HomeGroup","SettingsGroup"}{for _,mode:=range []string{"cold","entry"}{
+ s,close:=researchOpen(t,env);if mode=="entry"{_,_=researchInvoke(s,researchCase{async:"workspace"})};n:=1;if mode=="entry"{n=4}
+ for i:=0;i<n;i++{cs:=[]researchCase{};if page=="HomeGroup"{cs=[]researchCase{{method:"Home"},{method:"HomeBackground"},{method:"Setting",args:[]any{"ui.gui.home.hidden"}}}}else{cs=[]researchCase{{method:"Settings"},{method:"Backgrounds"},{method:"Tasks"}}};start:=time.Now();ch:=make(chan error,len(cs));for _,c:=range cs{go func(){_,e:=researchInvoke(s,c);ch<-e}()};for range cs{if e:=<-ch;e!=nil{t.Fatal(e)}};fmt.Printf("PAGEGROUP %s %s %s %d %.3f\n",env,page,mode,i,float64(time.Since(start).Nanoseconds())/1e6)};close()
+ }}}
+ s,close:=researchOpen(t,"main");defer close();_,_=researchInvoke(s,researchCase{async:"workspace"});id:="#nvxs";ref:="#nvxs"
+ for _,kind:=range []string{"pin","pin-update","unpin","unhide","move","delete","unsubscribe","resubscribe","textures","textures-clean","subscription-remove","subscription-update"}{for i:=0;i<4;i++{start:=time.Now();p,e:=s.LibraryPreview(kind,[]string{ref});apply:=false;n:=0;if p!=nil{apply=p.Apply;n=len(p.Lines)};fmt.Printf("ACTION %s %d %.3f apply=%v lines=%d err=%v\n",kind,i,float64(time.Since(start).Nanoseconds())/1e6,apply,n,e)}}
+ for _,argv:=range [][]string{{"mod",id},{"patches","--mod",ref},{"def","--mod",ref},{"harmony","--mod",ref},{"problems"},{"folder","check"}}{for i:=0;i<4;i++{start:=time.Now();lines,e:=s.Inspect(argv);fmt.Printf("INSPECT %s %d %.3f lines=%d err=%v\n",strings.Join(argv,"/"),i,float64(time.Since(start).Nanoseconds())/1e6,len(lines),e)}}
+}
+
+
+```
+
+</details>

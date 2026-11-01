@@ -1,4 +1,4 @@
-// Spike P0 of the log corpus research (docs/research/00-日志语料顶层设计.md §10):
+// Spike P0 of the log corpus research (docs/research/00-log-corpus-design.md §10):
 // can HugsLib logs be collected in bulk, what do their sections look like, how many survive
 // cleaning, and are there enough repeat uploads (sessions) to mine fix evidence from.
 //

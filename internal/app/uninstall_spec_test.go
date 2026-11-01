@@ -16,7 +16,7 @@ import (
 func TestUninstallCoversWriteList(t *testing.T) {
 	t.Parallel()
 	_, file, _, _ := runtime.Caller(0)
-	b, err := os.ReadFile(filepath.Join(filepath.Dir(file), "..", "..", "docs", "specs", "01-范围与状态.md"))
+	b, err := os.ReadFile(filepath.Join(filepath.Dir(file), "..", "..", "docs", "specs", "01-scope-and-status.md"))
 	if err != nil {
 		t.Fatal(err)
 	}

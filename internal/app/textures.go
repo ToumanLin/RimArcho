@@ -23,7 +23,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
-// 贴图优化 (08 §5.2, docs/research/贴图优化-DDS.md): the DDS of a mod's PNGs, written next to
+// 贴图优化 (08 §5.2, docs/research/dds-texture-optimization.md): the DDS of a mod's PNGs, written next to
 // them. The game (1.6 and 1.7) loads a .dds in place of the .png of the same name: no PNG to
 // decode at start, and opaque textures take half the video memory (BC1, where the game makes
 // BC7 or DXT5 of a PNG). The PNGs stay; RimArcho records every file it writes and only ever
