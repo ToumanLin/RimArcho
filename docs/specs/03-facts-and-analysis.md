@@ -53,7 +53,7 @@ Assemblies use a separate key, `analyze.AssemblyKey`: the snapshot hash, the rel
 
 **On-demand declarations**. The declaration layer uses no subprocess and stores no results in the database. Its results are cached in-process together with plan reads. The key combines `Store.ChangeKey()` (`PRAGMA data_version` + `total_changes()`), the environment ID, and the size and modification time of ModsConfig.xml. Frequent interface refreshes and detail panels reuse this cache.
 
-**GUI list snapshots**. The editor and can it run share finding snapshots in memory. List edits update the declaration layer synchronously. The content layers retain their previous results, marked as updating, while logs and analysis are completed in the background. See [06 §8.7](06-ui/8-gui-technology.md#87-%E5%88%97%E8%A1%A8%E9%97%AE%E9%A2%98%E4%B8%8E-needs-%E7%BC%93%E5%AD%98-api) for the keys, invalidation conditions, and event contract.
+**GUI list snapshots**. The editor and can it run share finding snapshots in memory. List edits update the declaration layer synchronously. The content layers retain their previous results, marked as updating, while logs and analysis are completed in the background. See [06 §8.7](06-ui/8-gui-technology.md#87-list-findings-and-needs-cache-api) for the keys, invalidation conditions, and event contract.
 
 **On demand**. Stale parts are checked and rebuilt only when can it run opens, the plan editor's details need findings, or the CLI or MCP requests content information. The problems, def, patches, and harmony commands rebuild stale analysis through subprocesses. The mod, status, and why commands stay fast by using only stored results (`--no-analyze` also prevents problems from rebuilding).
 
@@ -478,6 +478,8 @@ See 08 §4 for game detection. While the game runs:
 > Status: added 2026-10-21. Decision: RimArcho bundles the in-game helper Archo Monitor, enabled in plans by default (04 §1.5) and installed with releases (08 §9).
 
 Only the game knows what `Player.log` cannot say: which file or `Def` was loading when an error occurred, which Mod owns an assembly or Harmony patch in the stack, and how many errors occurred after the logging limit. Archo Monitor (`packageId` `toumanlin.archomonitor`) records these in-game as JSON lines in a companion log. Its behavior follows RimCrow Companion 0.3.12; the decompiled code was read only to understand behavior and format, and the implementation was written independently. No code was borrowed from the projects it credits: BetterModSort (Apache-2.0), LogAfterDefError (MIT), BetterLog (MPL-2.0), or Mod Error Checker (no public license). About.xml credits them all.
+
+Archo Monitor settings use RimWorld Keyed translations and follow the game language. Package the `Languages` directory with the mod; build and test requirements are in 07 §4–§5.
 
 #### 6.7.1 What Is Captured
 

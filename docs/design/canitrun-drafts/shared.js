@@ -135,7 +135,7 @@ function shell(page, badge, hints, status = "") {
   $("#nav").innerHTML = `<div class="grp">playing</div>${it("start")}${it("can it run", `<span class="badge-n" id="badge">${badge}</span>`, true)}${it("game log")}
     <div class="grp">library</div>${it("lists")}${it("packs")}${it("the library")}${it("texture optimisation")}${it("game")}
     <div class="grp">not played yet</div>${it("play review")}<div class="grp">worth playing</div>${it("play goals")}`;
-  $("#top").innerHTML = `<span class="crumb">can it run</span><span class="chip">${PLAN}　${GAME}</span>`;
+  $("#top").innerHTML = `<span class="crumb">can it run</span><span class="chip">${PLAN}  ${GAME}</span>`;
   $("#hints").innerHTML = hints.map(([k, t]) => `<span><span class="k">${k}</span>${t}</span>`).join("");
   $("#status").textContent = status;
 }

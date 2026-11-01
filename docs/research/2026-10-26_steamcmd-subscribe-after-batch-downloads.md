@@ -16,7 +16,7 @@ Speed is not the decision criterion for this goal. Initial four-item active-clie
 
 ## 2. Scope, current state, and prior research
 
-Read [workspace rules](../../../AGENTS.md), [architecture](../00a-architecture.md), [02 §3.4](../specs/02-environments-identity-and-scanning.md#34-%E8%AE%A2%E9%98%85git%E4%B8%8B%E8%BD%BD%E9%A1%B5steamcmd2026-10-24), [login session research](2026-10-24_login-sessions-loverslab-steamcmd.md), [parallel download research](2026-10-26_steamcmd-parallel-downloads.md). Do not repeat its process parallelism, shared-library races, or 25-item batching findings. Work on `codex/steamcmd-batch` is outside this report's implementation scope; proposals should build on its batch executor.
+Read [workspace rules](../../../AGENTS.md), [architecture](../00a-architecture.md), [02 §3.4](../specs/02-environments-identity-and-scanning.md#34-subscriptions-git-download-pages-steamcmd-2026-10-24), [login session research](2026-10-24_login-sessions-loverslab-steamcmd.md), [parallel download research](2026-10-26_steamcmd-parallel-downloads.md). Do not repeat its process parallelism, shared-library races, or 25-item batching findings. Work on `codex/steamcmd-batch` is outside this report's implementation scope; proposals should build on its batch executor.
 
 The workspace initially contained two untracked reports: parallel downloads and page-load time/optimization; both retained. The user clarified that other tasks' changes in `.claude/worktrees/` are outside this task.
 

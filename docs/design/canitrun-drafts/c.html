@@ -119,7 +119,7 @@ function draw() {
   };
   grp("do", "ready to do", "sec-break", `<span class="r">u undoes each step</span>`);
   grp("choose", "for you to choose", "sec-confirm", `<span class="r">choose one to finish</span>`);
-  html += `<section class="sec-run"><h2 class="label">errors from the last run<span class="n">${LOGS.length}</span><span class="r">${LASTRUN}　older Sep 29 1.5 log collapsed</span></h2><div class="card">`;
+  html += `<section class="sec-run"><h2 class="label">errors from the last run<span class="n">${LOGS.length}</span><span class="r">${LASTRUN}  older Sep 29 1.5 log collapsed</span></h2><div class="card">`;
   let phase = "";
   for (const it of LOGS) {
     if (it.phase !== phase) html += `<div class="phase">${it.phase}</div>`;

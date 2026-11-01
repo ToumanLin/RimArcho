@@ -18,7 +18,7 @@ surface/tui   (Bubble Tea)        surface/gui   (Wails services + assets/*.html|
 
 | File | Content | Main functions |
 | --- | --- | --- |
-| `text.go` | Chinese and English string tables; TUI / GUI each add their key descriptions through `Register`; language detection (`lang_windows.go`, `lang_other.go`) | `T`, `Tf`, `Table`, `SetLang`, `Lang`, `Register` |
+| `text.go` | Language selection and lookup; language detection (`lang_windows.go`, `lang_other.go`); English interface overrides in `enText` | `T`, `Tf`, `Table`, `ExtraText`, `SetLang`, `Lang` |
 | `columns.go` | Mods in each of the three columns; each row's number, source type, name (alias first), status, dimming, and unsaved state | `BuildBoard`, `ModItem`, `RowStatus`, `SourceKind`, `SourceText` |
 | `query.go` | Search syntax parsing and matching, subsequence fallback, content type cache (§3.7) | `ParseQuery`, `Query.Filter`, `Subsequence`, `ContentCache.Get` |
 | `needs.go`, `evidence.go` | Groups and sections for can it run (`Section`, `SectionOf`; items outside this page use `SectionElsewhere` / `Needs.Elsewhere`), links between columns (`Need.Related`), plain wording (`Text`: one sentence; GUI cards: `Title` / `Why`), evidence (`Evidence{Kind, Label, Source}`), merging rules, counts, row status; **one-step actions are data** (`Action{Kind, …}`), with the interface choosing the key or button; `Do` performs data mutations (§5) | `BuildNeeds`, `Do`, `Humanize`, `TokName`, `EdgeWords`, `ShortDate`, `WorkshopSearch`; page lead and automatic fix count (`needs_layout.go`: `NeedsLead`, `AutoFixCount`) |
@@ -44,5 +44,5 @@ surface/tui   (Bubble Tea)        surface/gui   (Wails services + assets/*.html|
 Rules:
 1. Business rules belong only in `app` or `view`. A surface-level condition such as "if this is a Workshop Mod, then…" is a defect.
 2. The same operation in both interfaces calls the same function. Given the same state, TUI and GUI receive identical `Needs`, `Board`, and detail data (G1).
-3. There is one copy of the text (`view.Text`). One call gives the GUI the entire table for the current language.
+3. Interface translations live in feature JSON files under `internal/l10ndata/locale/<language>/`, embedded with `go:embed`. Add a locale directory to bundle another language. `view` owns selection and lookup; GUI receives the selected base and supplemental tables.
 4. Every disk-writing action meets three conditions: it has a preview (`--dry-run`, "preview…" in the interface command panel), can be undone or explains beforehand why it cannot, and reports its result in the status line (01 §4). Only actions beyond RimArcho's undo require confirmation first (§6).

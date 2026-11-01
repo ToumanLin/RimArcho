@@ -119,7 +119,7 @@ This was decided on 2026-10-22. Both languages of the GUI and TUI use the player
 
 English UI text is the translation lookup key, so changing it also requires changing the callers. Keys supplied by app and modchanges in CLI wording, such as the current plan, remain unchanged; `view.enText` overrides their UI display. History operation names such as checkout, swap, and restore come from app operation codes and are mapped to player wording by stepWords.
 
-The internal/surface/cli TestWording check (`view.WordingProblems`) reads all translation maps and the command panel. It fails if the Chinese contains a term in the final column below, or if the English contains plan, environment, upstream, workspace, swap, pinned, checkout, or not written. It also fails when two maps translate the same English key differently, because later registration overwrites the earlier translation. Necessary exceptions are recorded in wordingExempt, for example decompilation.
+The internal/surface/cli TestWording check (`view.WordingProblems`) checks locale resources and command names. It fails if the Chinese contains a term in the final column below, or if the English contains plan, environment, upstream, workspace, swap, pinned, checkout, or not written. Conflicting duplicate keys within or across JSON files fail tests, including supplemental resources; identical duplicate values are allowed. English interface overrides remain in `view.enText`. Necessary exceptions are recorded in wordingExempt, for example decompilation.
 
 | Domain concept | UI wording | English | Avoid |
 | --- | --- | --- | --- |

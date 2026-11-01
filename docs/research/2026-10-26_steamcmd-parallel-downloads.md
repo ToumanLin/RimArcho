@@ -21,7 +21,7 @@ Three rounds with four small public Mods: four fully isolated processes took med
 
 ## 2. Current implementation: batch additions, per-item updates
 
-Code snapshot: RimArcho `dev/0.9.0`, HEAD `81017d85f73f504ed59d4701c94ccd907363d8f6`. Read [workspace rules](../../../AGENTS.md), [architecture](../00a-architecture.md), [session research](2026-10-24_login-sessions-loverslab-steamcmd.md), [subscription spec §3.4](../specs/02-environments-identity-and-scanning.md#34-%E8%AE%A2%E9%98%85git%E4%B8%8B%E8%BD%BD%E9%A1%B5steamcmd2026-10-24). Earlier recommendations do not replace source: account actions/locks already exist.
+Code snapshot: RimArcho `dev/0.9.0`, HEAD `81017d85f73f504ed59d4701c94ccd907363d8f6`. Read [workspace rules](../../../AGENTS.md), [architecture](../00a-architecture.md), [session research](2026-10-24_login-sessions-loverslab-steamcmd.md), [subscription spec §3.4](../specs/02-environments-identity-and-scanning.md#34-subscriptions-git-download-pages-steamcmd-2026-10-24). Earlier recommendations do not replace source: account actions/locks already exist.
 
 ### 2.1 Entry points, processes, result parsing
 

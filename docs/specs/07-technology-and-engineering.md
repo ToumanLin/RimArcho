@@ -18,7 +18,7 @@
 | KeyValues | Custom `internal/vdf` | Reads `libraryfolders.vdf` and `appworkshop_*.acf` |
 | Hash | xxh3-128 (zeebo/xxh3 v1.1.0) | Fast |
 | Pack files (2026-10-24) | `.archopack` format 2: standard library `archive/tar` + klauspost/compress v1.20.3 `zstd` (`SpeedBetterCompression`, 8 MB window, single-thread encoding; decoding uses `WithDecoderLowmem`, one thread, 64 MB window limit), copy digests SHA-256 (standard library); standard library reads format 1 ZIP | Rationale and measurements in 08 §5.1 |
-| Game menu backgrounds (2026-10-24) | `internal/menubg`: klauspost/compress v1.20.3 (1.7 ZIP zstd method 93) + custom Unity SerializedFile / ResourceManager / Texture2D range reads (no ZIP in 1.6) + woozymasta/bcn v0.7.0 (BC1 / BC3 / BC7, MIT); standard library for RGBA32 | Pure Go, no external runtime tools; decode and resize by row; retain official preview if extraction fails. Resource selection, support boundaries and cache rules: [06 §2.14](06-ui/2.11-other-pages.md#214-%E8%AE%BE%E7%BD%AE) |
+| Game menu backgrounds (2026-10-24) | `internal/menubg`: klauspost/compress v1.20.3 (1.7 ZIP zstd method 93) + custom Unity SerializedFile / ResourceManager / Texture2D range reads (no ZIP in 1.6) + woozymasta/bcn v0.7.0 (BC1 / BC3 / BC7, MIT); standard library for RGBA32 | Pure Go, no external runtime tools; decode and resize by row; retain official preview if extraction fails. Resource selection, support boundaries and cache rules: [06 §2.14](06-ui/2.11-other-pages.md#214-settings) |
 | Character width | mattn/go-runewidth v0.0.31 (`EastAsianWidth` disabled) | Chinese alignment; see §8.2 |
 | System interfaces | golang.org/x/sys | Path resolution, process table, recycle bin, hidden child-process windows |
 | Git (subscriptions, 02 §3.4) | go-git v5 (github.com/go-git/go-git/v5, pure Go) | Players need not install Git; `CGO_ENABLED=0` unchanged. Only anonymous HTTPS / local fetch, shallow clone, ls-remote and checkout. System `git` rejected: most players do not have it; discovery and output parsing vary by version. Tests create bare repositories in temporary directories with go-git, without networking |
@@ -52,7 +52,8 @@ internal/
   rules/              Community rule data
   bbcode/             Workshop description BBCode parsing
   app/                Operations behind commands: environments, scan pipeline, reference resolution, plans, analysis, logs, packs, launch, running-game detection
-  view/               Surface-independent view models (shared by TUI and GUI, 06 §1)
+  l10ndata/            Embedded feature JSON translations under locale/<language>/; add a locale directory to bundle another language (06 §1)
+  view/               Surface-independent view models; language selection and lookup shared by TUI and GUI (06 §1)
   cmds/               Single command table: argument parsing, execution, outline text (05 §1)
   render/             Outline text rendering (05 §3)
   surface/cli|mcp|tui|gui/   Surfaces
@@ -153,7 +154,9 @@ Automatic renewal reuses the single original-site settings-page GET in `subscrib
 | Concurrency | `app/concurrent_test.go`: two connections to one data directory; external changes update `ChangeKey`, edits from a stale view do not overwrite them (G8) |
 | Real corpus | Optional tests run only with environment variables: `RIMARCHO_REAL_HOME` (data directory) + `RIMARCHO_EXE` (archo for children) for TUI memory; `RIMARCHO_IDLE_SECONDS` changes idle duration; `RIMARCHO_NO_BROWSE` skips browsing; `RIMARCHO_LOG_VERSION` specifies log replay major/minor version; `RIMARCHO_REAL_COPY` (data directory **copy**) for T1; `RIMARCHO_WORKSHOP_CACHE` replays real Workshop descriptions. Measurement programs in `spikes/` (`tuimem`, `tuistart`, `mcplat`, `mcpcheck`, `analyzereal`, `logreal`, `logfirst`, etc.) |
 
-**Archo Monitor** (03 §6.7, 08 §9): in-game behavior requires game testing. Game-independent tests live in `monitor/test` (`dotnet run -c Release -p:GameVersion=1.7`): message splitting, fingerprints, stack-frame parsing, JSON writing, deduplication and count lines, rotation. RimArcho-side reading, pairing, evidence and installation: L5–L14 in 03 §7, M1–M8 in 08 §8.
+`l10ndata.TestSourceLanguage` scans tracked source files and falls back to a repository walk when Git is unavailable. Han characters and fullwidth punctuation fail the test outside the centralized, documented exceptions in `internal/l10ndata/source_language_test.go`.
+
+**Archo Monitor** (03 §6.7, 08 §9): in-game behavior requires game testing. Game-independent tests live in `monitor/test` (`dotnet run -c Release -p:GameVersion=1.7`): message splitting, fingerprints, stack-frame parsing, JSON writing, deduplication and count lines, rotation. RimArcho-side reading, pairing, evidence and installation: L5–L14 in 03 §7, M1–M8 in 08 §8. Package the `Languages` directory with the mod and verify that settings labels and tooltips follow English and Simplified Chinese game language, retaining the info-message setting (03 §6.7).
 
 In the test VM, `scripts/vm/round.ps1` automates a whole game round (new colony, play, save, load, return to main menu, exit) and checks phase order, save name, and whether the game uses RimArcho's bundled Monitor. Test-only Archo Drive controls the game (`scripts/vm/drive`, excluded from releases), without screenshots; see `scripts/vm/README.md`. Like `release.ps1`, `vm.ps1 build` builds Monitor from `monitor/`. Before a round, run `archo monitor install`, then place the driver: any content change replaces the entire development Monitor folder, removing the driver too.
 

@@ -1,6 +1,6 @@
 # needs cache and list-problems API measurements
 
-Measured on 2026-10-27. The interface contract is in [06 §8.7](../specs/06-ui/8-gui-technology.md#87-%E5%88%97%E8%A1%A8%E9%97%AE%E9%A2%98%E4%B8%8E-needs-%E7%BC%93%E5%AD%98-api). This records one validation with real content; these figures are not latency guarantees for every machine.
+Measured on 2026-10-27. The interface contract is in [06 §8.7](../specs/06-ui/8-gui-technology.md#87-list-findings-and-needs-cache-api). This records one validation with real content; these figures are not latency guarantees for every machine.
 
 ## Data and method
 

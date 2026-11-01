@@ -106,40 +106,12 @@ var sourceLanguageDirectories = map[string]string{
 	"monitor/Languages/":        "RimWorld Keyed language resources.",
 }
 
-// TODO(l10n): remove after the docs translation merges
-var temporarySourceLanguageExceptions = map[string]string{
-	"docs/":                               "The parallel docs worktree owns translation and path renames.",
-	"*.md":                                "The parallel docs worktree owns Markdown files.",
-	"internal/loadcost/":                  "Owned by heavy-calib, outside this task.",
-	"internal/app/uninstall_spec_test.go": "Checks headings in the current Chinese specification; lead must update it with translated docs.",
-}
-
-// TODO(l10n): remove after the docs translation merges
-// Preserve these document references until lead applies L0's path renames.
-var temporaryDocumentReferences = []string{
-	"01-\u8303\u56f4\u4e0e\u72b6\u6001.md",
-	"01-\u8303\u5f0f\u5e93\u63a5\u5165\u8349\u6848.md",
-	"docs/research/00-\u65e5\u5fd7\u8bed\u6599\u9876\u5c42\u8bbe\u8ba1.md",
-	"docs/research/01-\u8303\u5f0f\u5e93\u63a5\u5165\u8349\u6848.md",
-	"docs/research/2026-10-30_archo-db-\u6574\u6570\u952e.md",
-	"docs/research/\u8d34\u56fe\u4f18\u5316-DDS.md",
-	"docs/\u53d1\u5e03\u524dVM\u6d4b\u8bd5.md",
-}
-
 func sourceLanguageExempt(path string) bool {
 	if _, ok := sourceLanguageFiles[path]; ok {
 		return true
 	}
 	for prefix := range sourceLanguageDirectories {
 		if strings.HasPrefix(path, prefix) {
-			return true
-		}
-	}
-	for pattern := range temporarySourceLanguageExceptions {
-		if pattern == "*.md" && strings.HasSuffix(strings.ToLower(path), ".md") {
-			return true
-		}
-		if strings.HasSuffix(pattern, "/") && strings.HasPrefix(path, pattern) || path == pattern {
 			return true
 		}
 	}
@@ -158,9 +130,6 @@ func sourceLanguageLines(data []byte) []int {
 	}
 	var lines []int
 	for index, line := range strings.Split(string(data), "\n") {
-		for _, reference := range temporaryDocumentReferences {
-			line = strings.ReplaceAll(line, reference, "")
-		}
 		for _, r := range line {
 			if sourceLanguageRune(r) {
 				lines = append(lines, index+1)

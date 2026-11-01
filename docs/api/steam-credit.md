@@ -1,6 +1,6 @@
 # Steam credit: GUI API contract
 
-Backend entry points: `internal/surface/gui/credit.go`, `subscribe.go`; business rules belong to [02 §3.4](../specs/02-environments-identity-and-scanning.md#34-%E8%AE%A2%E9%98%85git%E4%B8%8B%E8%BD%BD%E9%A1%B5steamcmd2026-10-24). These are Wails GUI methods; errors use existing Promise rejection. No new HTTP routes. The frontend dialog calls them from `assets/js/credit.js`.
+Backend entry points: `internal/surface/gui/credit.go`, `subscribe.go`; business rules belong to [02 §3.4](../specs/02-environments-identity-and-scanning.md#34-subscriptions-git-download-pages-steamcmd-2026-10-24). These are Wails GUI methods; errors use existing Promise rejection. No new HTTP routes. The frontend dialog calls them from `assets/js/credit.js`.
 
 #%23 Subscribe all
 

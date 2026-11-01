@@ -1,5 +1,7 @@
 # Unity 1.6 memory calibration (2026-10-31)
 
+Extended by [2026-11-01 Unity 1.6 heavy-texture memory](2026-11-01_unity16-heavy-texture-memory.md) (payloads up to 7.5 GiB).
+
 Measured target: Win11-Player-Test, RimWorld 1.6.4871 rev591, 8 GiB RAM, Unity 2022.3.35f1 / D3D11 / VMware SVGA 3D. Texture compression enabled. Restored `RimArcho-Real-Vulkan` at start and end; only the vanilla group after restoration is called "first". Subsequent lists shared the same guest session without reboot, so are not strictly cold-cache runs. 1.7 and video memory are outside this calibration.
 
 ## Metrics and method
