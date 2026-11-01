@@ -6,59 +6,59 @@
 
 ### 8.1 Delivery
 
-One source tree, linked twice:
+The same source tree is linked twice:
 
 | File | Subsystem | Double-click | Purpose |
 | --- | --- | --- | --- |
-| `archo.exe` | Console | TUI in default terminal (§9.2) | CLI, `archo mcp`, `archo tui`; `archo gui` starts GUI |
-| `RimArcho.exe` | Windows GUI (`-H windowsgui`, no console window) | GUI | Player's double-click entry, accepts `--env <name>`; with command arguments runs as CLI for GUI scan / analysis subprocesses |
+| `archo.exe` | Console | TUI in the default terminal (§9.2) | CLI, `archo mcp`, and `archo tui`; `archo gui` starts the GUI |
+| `RimArcho.exe` | Windows GUI (`-H windowsgui`, no console window) | GUI | The player's double-click entry, accepting `--env <name>`; command arguments run as the CLI for GUI scan and analysis subprocesses |
 
-- Both share data directory / database and may run together (multiprocess SQLite WAL). On focus, GUI compares `Stamp()` (database state, `ChangeKey`), reloading if changed; edits from stale views never overwrite the other's changes (G8).
-- `archo gui` starts adjacent `RimArcho.exe` and immediately returns if present; otherwise runs GUI in current process.
-- First opening an old database migrates it (seconds). After 300 ms, `RimArcho.exe` shows a small nonclosable progress window before the main window; TUI / CLI write one stderr line. Rules: 02 §7, startup upgrade progress.
-- Releases contain both executables (sizes: 07 §6).
+- Both executables share the data directory and database and may run together; SQLite WAL supports multiple processes. When the GUI gains focus, it compares `Stamp()` (the database state, `ChangeKey`) and reloads if it changed. An edit from a stale view never overwrites the other process's changes (G8).
+- If an adjacent `RimArcho.exe` exists, `archo gui` starts it and immediately returns. Otherwise, it runs the GUI in the current process.
+- The first opening of an old database migrates it, which takes a few seconds. If this exceeds 300 ms, `RimArcho.exe` shows a small progress window before the main window; this window cannot be closed. The TUI and CLI write one line to stderr. See the startup upgrade progress rules in 02 §7.
+- Releases contain both executables; see 07 §6 for their sizes.
 
 ### 8.2 Frontend
 
-- Wails `v3.0.0-beta.28` (v3 is beta; pinned, validate upgrades separately). No CGO (`CGO_ENABLED=0`).
-- Plain HTML + CSS + native JavaScript (ES modules). **No framework, npm, or build step**. `internal/surface/gui/assets/`: `index.html`, `style.css`, `js/` containing `api.js` `state.js` `lists.js` `detail.js` `screens.js` `popups.js` `exchange.js` `icons.js` `shell.js` `home.js` `guide.js` `plans.js` `motion.js` `main.js`; embedded in exe with `go:embed`.
-- Go calls: handwritten `api.js` uses `import { Call } from "/wails/runtime.js"`, `Call.ByName`, and `Proxy` to assemble `github.com/ToumanLin/RimArcho/internal/surface/gui.API.<method>`. No `wails3` generated bindings; only `go build` required.
-- `internal/surface/gui`: `api.go` (Wails service, methods only call view), `gui.go` (window, `/preview/`, `/img/` local handlers, CSP, icon routes), `exchange.go` (import / export dialogs), `text.go`.
-- Go → frontend: Wails events (`scan` complete, `analyze` progress / complete, `pack` build progress). Frontend polls `Live` for runtime status (§2.16.1 G01).
-- Virtual scrolling creates visible rows only.
-- **Page reads** (§3.1 rule 9, enter before reading): **every page** uses `beginPageRead` to navigate and show a skeleton before waiting: launch, can it run, changes, packs / build preview, settings, environments, guide, uninstall preview, library, editor, game log, texture optimization, all lists, background tasks, full-screen details. Same-page refresh keeps content; switching Mods / packs shows matching placeholders so old-object actions cannot be clicked. Validate page code, request sequence, environment, plan on every read; late success / error cannot overwrite new pages. Only latest repeated request accepted; failures end loading and permit retry. Delayed Workshop descriptions in full-screen details use the same checks. Polling, retries, detail / subscription debounce, idle session release: §2.16.1.
-- **Preview action state**: reread preview after pack type / texture choices change; even shortcuts cannot build from old previews while pending. Remove old confirmation buttons while re-estimating uninstall selection; show next actions only after complete results.
-- First stylesheet rule: `[hidden]{display:none !important}`; overlay container `display:flex` otherwise overrides hidden, leaving an invisible click-blocking mask.
-- WebView2 data: `<data directory>/webview2`, not `%APPDATA%\RimArcho.exe`.
-- Development-only `spikes/guidev` drives pages with the same API on 127.0.0.1 for browser debugging; `-assets <directory>` reads disk assets, refresh to see edits. Not shipped.
-- `/dev/pagecheck` uses mocked APIs to check immediate feedback, late results / errors, reentry, failed retries; also variable-height large logs / keyboard positioning. Real frontend modules, no product database.
+- The GUI uses Wails `v3.0.0-beta.28`. Version 3 is still beta, so this version is pinned and upgrades require separate validation. CGO is not required (`CGO_ENABLED=0`).
+- The frontend uses plain HTML, CSS, and native JavaScript ES modules. **It has no framework, npm dependency, or build step.** The files are in `internal/surface/gui/assets/`: `index.html`, `style.css`, and `js/` containing `api.js`, `state.js`, `lists.js`, `detail.js`, `screens.js`, `popups.js`, `exchange.js`, `icons.js`, `shell.js`, `home.js`, `guide.js`, `plans.js`, `motion.js`, and `main.js`. They are embedded in the executable with `go:embed`.
+- To call Go, the handwritten `api.js` uses `import { Call } from "/wails/runtime.js"` and `Call.ByName`. A `Proxy` assembles the full method name, `github.com/ToumanLin/RimArcho/internal/surface/gui.API.<method>`. There are no `wails3`-generated bindings; building requires only `go build`.
+- In `internal/surface/gui`, `api.go` provides the Wails service, whose methods only call view; `gui.go` owns the window, `/preview/` and `/img/` local image handlers, CSP, and icon routes; `exchange.go` provides import and export dialogs; and `text.go` supplies text.
+- Go sends Wails events to the frontend: `scan` for scan completion, `analyze` for analysis progress and completion, and `pack` for build progress. The frontend polls `Live` for game runtime status (§2.16.1 G01).
+- Virtual scrolling creates only visible rows.
+- **Page reads** follow §3.1 rule 9, entering before reading. **Every page** uses `beginPageRead` to navigate and show a skeleton before waiting for data: launch, can it run, changes, packs and build preview, settings, environments, guide, uninstall preview, library, editor, game log, texture optimization, all lists, background tasks, and full-screen details. A same-page refresh keeps the displayed content. Switching Mods or packs shows corresponding placeholders so the old object's actions cannot still be clicked. Each read validates the page code, request sequence, environment, and plan. A late success or error cannot overwrite a new page. Repeated requests on the same page accept only the latest result; a failure ends loading and allows a retry. Delayed Workshop descriptions in full-screen details follow the same checks. See §2.16.1 for polling, read retries, detail and subscription-detection debouncing, and idle-session release.
+- **Preview action state:** changing the pack type or texture choices rereads the preview. While it is pending, even a shortcut cannot start a build from the old preview. Re-estimating an uninstall selection removes the old confirmation buttons; the next actions appear only after the complete result arrives.
+- The first stylesheet rule is `[hidden]{display:none !important}`. Without it, an overlay container's `display:flex` overrides hidden and leaves an invisible mask that intercepts every click.
+- WebView2 stores user data in `<data directory>/webview2`, not `%APPDATA%\RimArcho.exe`.
+- The development-only `spikes/guidev` serves pages through the same API on 127.0.0.1 for browser debugging. With `-assets <directory>`, it reads page files from disk so refreshing shows edits. It is not shipped.
+- `/dev/pagecheck` uses mocked APIs to check immediate page feedback, late results and errors, reentry, and retries after failure. It also covers variable-height large logs and keyboard positioning. It uses the real frontend modules without connecting to the product database.
 
-**Windows window**: borderless main window with WebView2 composition hosting, retaining Wails default decorations / resizing. `window-chrome.js` minimizes, maximizes / restores, closes. Browser debug pages / other platforms retain their native window form without these buttons. Blank space in top navigation row drags, double-click maximizes / restores; buttons, links, inputs, splitters never drag the window. Maximize uses Wails native hit region for Win11 Snap Layouts. Wails / Windows handle edge resize, Aero Snap, maximized work area, shadows, corners; verify in VM. Close must call `Window.Close()` and cancellable `WindowClosing`, sharing interception with Alt+F4 / taskbar close; never call application quit. Buttons follow page light / dark theme; placement §2.2.
+**The Windows main window** is borderless and uses WebView2 composition hosting while retaining Wails' default window decorations and resizing support. `window-chrome.js` provides minimize, maximize/restore, and close controls. Browser debug pages and other platforms retain their existing window form without these buttons. Blank space in the topmost navigation row drags the window, and double-clicking maximizes or restores it. Buttons, links, inputs, and splitters do not drag the window. The maximize button uses Wails' native hit region for Win11 Snap Layouts. Wails and Windows handle edge resizing, Aero Snap, the maximized work area, shadows, and corners; these require VM verification. Close must call `Window.Close()` to trigger the cancellable `WindowClosing`, sharing the close interception used by Alt+F4 and the taskbar. It must not call the application quit interface. Buttons follow the page's light or dark theme; see §2.2 for their placement.
 
-Controls allow Wails system info to arrive after the page; add buttons once Windows is confirmed asynchronously, keeping current navigation position. Do not delay first paint.
+Window-control initialization allows Wails system information to arrive after the page. Once Windows is confirmed asynchronously, the buttons are added in the current navigation position. First paint does not wait for that information.
 
 ### 8.3 Security
 
-- CSP: `default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'`. Wails works with `script-src 'self'`, no `unsafe-eval`.
-- Workshop descriptions / images are external: Go parses BBCode blocks, frontend builds elements with `textContent`, **never inserts external text as HTML**. Images only through `/img/` from local cache, never direct remote URLs.
-- Links open system browser; `OpenURL` refuses non-http(s).
-- On Windows, Wails intercepts WebView2 resources, opening no TCP ports.
-- Settings executes only commands allowed by `view.SettingCommand` (§2.14).
+- The page's CSP is `default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'`. Wails works under `script-src 'self'` without `unsafe-eval`.
+- Workshop descriptions and images are external content. Go parses descriptions into BBCode blocks, and the frontend builds elements using `textContent`; it **never inserts external text as HTML**. Images are read only from the local cache through `/img/`, never directly from remote URLs.
+- Links open in the system browser. `OpenURL` refuses non-http(s) URLs.
+- On Windows, Wails intercepts WebView2 resources and opens no TCP port.
+- Settings runs only commands allowed by `view.SettingCommand` (§2.14).
 
 ### 8.4 Long tasks
 
-- Unified command panel `RunCLI` immediately returns task state; `CommandStatus` reads latest result. `command.go` worker owns independent App session, cancelled and awaited on close. Normal commands use `cmds.Check` / `ExecuteContext`; scan / analysis use no-console `ChildCommandContext`, preserving text / exit code. Arguments passed directly, no shell. Completion, history, parsing share `internal/cmdline` (§3.5).
+- In the unified command panel, `RunCLI` immediately returns the task state, and `CommandStatus` reads the latest result. The worker in `command.go` owns an independent App session; closing the window cancels it and waits for release. Ordinary commands use `cmds.Check` and `ExecuteContext`. Scanning and analysis use `ChildCommandContext` to start subprocesses without a console, preserving the original text and exit code. Arguments are passed directly without a shell. Completion, history, and parsing share `internal/cmdline` (§3.5).
 
-- Scan / analysis subprocesses: `archo scan`, `archo analyze`, `app.ChildScan` / `ChildAnalyze`, `CREATE_NO_WINDOW`; progress events to status, no blocking. Same in TUI, including `:scan`.
-- Startup: show indexed list immediately, incremental scan in background; first-time scan starts automatically.
-- Adding game (§2.15, §2.8): scan / first analysis in subprocesses; guide / other pages usable; skeletons until game data ready. Go GUI methods do no work likely exceeding about 100ms inline; goroutines / subprocesses return events (§3.1 rule 9).
-- `Workspace` reads list / sidebar / history together, returning events. Unchanged needs key reuses full workspace snapshot. Rebuild reuses separate read session, detached index / editor-row cache, builds in short WAL read-only snapshot, never loads full library under page lock. Sidebar shares needs; publishing checks environment, request sequence, list edit generation, input key.
-- Pack builds background, progress to build page, stoppable (§2.6).
-- These and library file / Steam actions become background tasks (§2.16, `app.Tasks`): running, queued, past in one place, persisted to `<data directory>/tasks.json`.
+- Scanning and analysis run in subprocesses: `archo scan`, `archo analyze`, and `app.ChildScan` and `ChildAnalyze`, with `CREATE_NO_WINDOW`. Events push progress to the status line without blocking the interface. The TUI does the same, including `:scan`.
+- At startup, an existing index lets the list appear immediately, followed by an incremental background scan. If no scan has ever run, scanning starts automatically.
+- When adding a game (§2.15, §2.8), scanning and the first analysis run in subprocesses so the guide and other pages remain usable. The new game's pages show skeletons until its data is ready. Go GUI methods do not perform inline work likely to exceed about 100ms; longer work uses goroutines or subprocesses and returns results through events (§3.1 rule 9).
+- `Workspace` reads the list, sidebar, and history together and returns them through events. An unchanged needs key reuses the full workspace snapshot. A rebuild reuses a separate read session, detached index, and editor-row cache, building within a short-lived WAL read-only snapshot. It does not load the entire library while holding the page lock. The sidebar shares the same needs result. Publication checks the environment, request sequence, list edit generation, and input key.
+- Pack builds run in the background, push progress to the build page, and can be stopped (§2.6).
+- All these operations, plus library file and Steam actions, are recorded as background tasks (§2.16, `app.Tasks`). Running, queued, and past work appears in one place, with results persisted to `<data directory>/tasks.json`.
 
 ### 8.5 Mouse
 
-Mouse actions are another trigger for editor verbs:
+In the plan editor, mouse actions are another way to trigger the same verbs:
 
 | Action | Keyboard | Mouse |
 | --- | --- | --- |
@@ -76,64 +76,64 @@ Mouse actions are another trigger for editor verbs:
 | History | `H`, `u` / `ctrl+r` | Click history step |
 | Page back / forward (§3.1 rule 11) | `alt+←` / `alt+→` | XButton1 / XButton2 |
 
-- **Drag rules**: Disabled / Staging to an Enabled row places at its number; below last row appends; within Enabled moves; to Staging stages; Enabled to Disabled disables; Staging to Disabled unstages without enabling (`view.Unstage`). Press / release same row is click. Status describes drop target; `esc` cancels drag. Release applies, `u` undoes.
-- **Context menu** (editor / inventory): shared action table / group order, keys at right, applicable only (`view.RowOps` / `view.CopyOps`, names / keys from `view.OpTable`):
-  1. Plan (editor only, whole group absent in inventory): `space` enable / disable / put back, `m`, `t`, `x`, remove from all plans;
-  2. Organize: tags `g`, note `n`;
-  3. Open: folder `ctrl+o`, Workshop `ctrl+w`;
-  4. Versions: lock this version, update locked version, unlock, back up locked version;
-  5. Disk: restore, clear existing converted textures, resubscribe / subscription-source actions, red unsubscribe / delete (`Del`) last. Inventory has no single-Mod DDS conversion; resubscribe confirmation explains folder is first moved to recycle bin, then Steam redownloads; conditions §2.9, cleanup verification / Steam 08 §10.
+- **Drag rules:** dragging from Disabled or Staging onto an Enabled row places the Mod at that row's number. Dropping below the last row appends it; dragging within Enabled moves it. Dragging to Staging stages it; dragging from Enabled to Disabled disables it; dragging from Staging to Disabled removes it from staging without enabling it (`view.Unstage`). Pressing and releasing on the same row is a click. The status line describes the drop target during the drag; `esc` cancels. Releasing applies the change, and `u` undoes it.
+- **The context menu** is shared by the editor and inventory. It uses the same action table and group order, shows each key on the right, and lists only applicable actions (`view.RowOps` and `view.CopyOps`, with names and keys from `view.OpTable`):
+  1. Plan actions appear only in the editor; the inventory omits the whole group: `space` to enable, disable, or put back, then `m`, `t`, `x`, and remove from all plans.
+  2. Organize includes tags `g` and note `n`.
+  3. Open includes the folder `ctrl+o` and Workshop page `ctrl+w`.
+  4. Versions includes lock this version, update locked version, unlock, and back up locked version.
+  5. Disk includes restore, clear existing converted textures, resubscribe, and subscription-source actions, with red unsubscribe / delete (`Del`) last. The inventory offers no single-Mod DDS conversion. The resubscribe confirmation explains that RimArcho first moves the folder to the recycle bin, then Steam downloads it again. See §2.9 for the conditions and 08 §10 for cleanup verification and Steam calls.
 
-  Thin line between groups. Menu key / `shift+F10` opens on cursor row, first item focused; `↑↓` / `tab` moves, `enter` executes, `esc` closes; displayed keys execute directly. Multiselection shows only batch-capable actions (folder, page, note, position, switch copy require one).
-- Arrows, wheel, single-click never mutate (§3.1 rule 1); only double-click, drag, buttons, verbs do.
-- **GUI / TUI differences** (2026-10-24): page history / `alt+←` / `alt+→` GUI only; TUI keeps page switching / technical stack return, no side-button handling.
-- TUI mouse: click cursor, `ctrl+click` add selection, `shift+click` range, drag column gap to resize, click detail area to focus, wheel scroll details. No Mod drag or rectangle selection.
+  A thin line separates groups. The Menu key or `shift+F10` opens the menu on the cursor row with the first item focused. The `↑↓` keys or `tab` move between items, `enter` executes, and `esc` closes. The displayed keys also execute directly. With multiple selections, only actions that support a batch appear; folder, page, note, position, and switching copy require a single item.
+- Arrow keys, the wheel, and a single click never change data (§3.1 rule 1). Only double-clicks, drags, buttons, and verb keys do.
+- **GUI and TUI differences** (2026-10-24): page history and `alt+←` / `alt+→` are GUI-only. The TUI keeps its existing page switching and technical-page stack return and does not handle mouse side buttons.
+- In the TUI, clicking moves the cursor, `ctrl+click` adds a selection, `shift+click` selects a range, and dragging the blank column gap resizes columns. Clicking the detail area focuses it; the wheel scrolls details. The TUI supports neither dragging Mods nor rectangle selection.
 
 ### 8.6 Icons and Windows resources
 
-- **Artwork** (outline-glow revision 2026-10-25): `internal/icon/portrait.svg`, 1024×1024 vector, rounded dark `#1B1D23` background, radius 0.22 side length. Full image ≥ 48px; head / hair / face only ≤ 40px, viewbox x 120–910, y 170–960, recognizable in taskbar; face-only crop too tight, merely skin at small sizes.
-- **Renderer**: dependency-free small SVG renderer `internal/icon/svgr.go`, element-tree drawing: `<g>` inherited fill / stroke; matrix, translate, scale, rotate, skewX/Y; paths, rounded / plain rectangles, circles, ellipses, lines, polylines, polygons; nonzero / evenodd fills; rounded stroke joins; solid / linear / radial gradients in user / bounding-box coordinates with gradientTransform; opacity / fill-opacity / stroke-opacity; clip-path; only feGaussianBlur filters. defs / clipPath / gradients / filters render only when referenced. 4× supersampling; all sizes through 256px about 1 second.
-- **No committed binaries**: public repository contains no binaries. `icon.PNG(size)` antialiased per-pixel supersampling for window / resources; `icon.SVG(size)` same vector composition generates `/icon.svg` (256), `/icon-small.svg` (16) favicons.
-- **Window icon**: Wails first reads exe icon group ID 3, then supplied PNG fallback. Release does no rendering; development without `.syso` renders system large-icon size (`SM_CXICON`, 32px at 100%), immediately `FreeOSMemory`. Previously 256px cost 43 MB heap (32 MB float64 4× buffer) just for 32px icon, with Go retaining memory afterward.
-- Release calls `go run ./scripts/winres`, writing `cmd/archo/rsrc_windows_amd64.syso`, COFF resource with icons / version info; ignored by `.gitignore`, not committed.
-- **Icon group ID 3**: Wails reads ID 3, Explorer first group; same group. Sizes 16, 20, 24, 32, 40, 48, 64, 256, one PNG each.
-- **Version info**: `FileVersion` / `ProductVersion` release version, `ProductName` RimArcho; `FileDescription` RimArcho command line for `archo.exe`, RimArcho for `RimArcho.exe`. Same package builds both; release script writes `.syso` separately between builds.
-- **Without resources**, development / `spikes/guidev` uses `application.Options.Icon` PNG (256 px) fallback.
+- **The artwork**, revised with an outline glow on 2026-10-25, is `internal/icon/portrait.svg`, a 1024×1024 vector on a rounded dark `#1B1D23` background. The radius is 0.22 of the side length. Sizes of 48px and above show the full image; sizes of 40px and below show only the head, including hair and face, in viewbox x 120–910, y 170–960. This remains recognizable on the taskbar. A face-only crop is too tight and becomes a patch of skin at small sizes.
+- **The renderer** is the small dependency-free SVG renderer in `internal/icon/svgr.go`. It draws the element tree, supporting `<g>` inheritance of fill and stroke; matrix, translate, scale, rotate, and skewX/Y transforms; paths, plain and rounded rectangles, circles, ellipses, lines, polylines, and polygons; nonzero and evenodd fills; rounded stroke joins; solid colors and linear and radial gradients in user or bounding-box coordinates, including gradientTransform; opacity, fill-opacity, and stroke-opacity; and clip-path. Filters support only feGaussianBlur. Content inside defs, clipPath, gradients, and filters is drawn only when referenced. The renderer uses 4× supersampling; all sizes through 256px take about 1 second.
+- **Binaries are not committed** to the public repository. `icon.PNG(size)` uses antialiased per-pixel supersampling for the window icon and resources. `icon.SVG(size)` provides the same vector composition; it generates the page favicons `/icon.svg` (256) and `/icon-small.svg` (16).
+- **The window icon** comes first from the executable's icon group ID 3, with the supplied PNG as fallback. Release builds therefore do no rendering. A development build without `.syso` renders one icon at the system large-icon size (`SM_CXICON`, 32px at 100% scaling), then immediately calls `FreeOSMemory`. The old 256px render used 43 MB of heap, including a 32 MB float64 buffer at 4× supersampling, merely to produce a 32px icon; Go then retained that memory.
+- The release script calls `go run ./scripts/winres` to write `cmd/archo/rsrc_windows_amd64.syso`, a COFF resource object containing the icons and version information. The `.syso` is excluded by `.gitignore` and is not committed.
+- **Icon group ID 3** is the group Wails reads for the window. Explorer reads the first group, which is the same group. It contains one PNG at each size: 16, 20, 24, 32, 40, 48, 64, and 256.
+- **Version information** sets `FileVersion` and `ProductVersion` to the release version and `ProductName` to RimArcho. `FileDescription` is RimArcho command line for `archo.exe` and RimArcho for `RimArcho.exe`. Both executables are built from the same package; the release script writes a separate `.syso` between the two builds.
+- **Without resources**, development builds and `spikes/guidev` use the PNG in `application.Options.Icon` (256 px) as fallback.
 
 
 ### 8.7 List findings and needs cache API
 
-Editor / can it run share backend snapshot. Entries `API.Needs`, `API.ListProblems`, `Board.problems`; structs [`view.Needs`](../../../internal/view/needs.go), [`view.ListProblems`](../../../internal/view/listproblems.go); cache [`gui/needscache.go`](../../../internal/surface/gui/needscache.go).
+The editor and Can it run read the same backend snapshot. The entry points are `API.Needs`, `API.ListProblems`, and `Board.problems`. The structures are defined in [`view.Needs`](../../../internal/view/needs.go) and [`view.ListProblems`](../../../internal/view/listproblems.go); the cache is implemented in [`gui/needscache.go`](../../../internal/surface/gui/needscache.go).
 
-**When to call**:
+**Calls occur at the following points:**
 
-- Workspace `environment` event already has `board.problems`; use directly for first paint.
-- Can it run calls `Needs()`; editor-only calls `ListProblems()`, same cache.
-- Edits returning `view.Result`, e.g. `Toggle`, `Stage`, `Unstage`, `MoveBy`, `Place`, `StageAll`, include summary in `result.problems`. String-returning `Undo`, `Redo`, `DoAction` publish same structure via `list-problems`.
-- Background log / content completion also emits `list-problems`; retain `analyze` progress / completion events. No extra request just to refresh markers. Open can it run redraws with `Needs()` on events, preserving cursor; reread on game exit (`Live` running → stopped) replaces this run with full analysis. Previously sidebar alone refreshed, stale page kept mid-run time until leaving / returning (VM 2026-10-28).
+- The Workspace `environment` event already includes `board.problems`, which is used directly for first paint.
+- Opening Can it run calls `Needs()`. Reading only the editor's findings calls `ListProblems()`. Both use the same cache.
+- Edits returning `view.Result`, such as `Toggle`, `Stage`, `Unstage`, `MoveBy`, `Place`, and `StageAll`, include an updated summary in `result.problems`. String-returning operations such as `Undo`, `Redo`, and `DoAction` publish the same structure through `list-problems`.
+- Completing background log or content analysis also emits `list-problems`; the `analyze` progress and completion events remain. No extra request is needed just to refresh markers. If Can it run is open, it redraws with `Needs()` on the event and preserves the cursor. It also rereads when the game exits (`Live` changes from running to stopped), so the completed analysis replaces Current run. Previously, only the sidebar refreshed and the page retained a mid-run timestamp until the player left and returned (VM 2026-10-28).
 
-Main `ListProblems` JSON fields:
+The main `ListProblems` JSON fields are:
 
 | Field | Purpose |
 | --- | --- |
-| `environment`, `plan` | Environment ID / open list ID filter late pre-navigation events; launch still reads current list |
-| `listVersion` | List-content fingerprint |
-| `revision` | Cache input fingerprint; same input reused, no lexicographic comparison |
-| `sequence` | Increasing API-session publication number; same environment / list accepts only ≥ displayed sequence |
-| `updating`, `error?` | Retain previous content findings with `updating=true` while completing; failure retains findings and error text |
-| `count`, `severity` | Shared needs count / maximum `error` / `warning` / `info`; hidden maintenance / muted info follow needs counting |
-| `mods` | Instance-ID index; `count`, `severity`, `summary`, `problemIds`; absent Mods have no displayable findings |
-| `items` | Full list-level `Need` array, each finding once, lookup by `problemIds` |
-| `status`, `reasons` | Snapshot row icons / per-Mod explanations by Instance ID; replace directly on event, never rebuild from `items` aggregate titles / actions (version warnings §5) |
+| `environment`, `plan` | The environment ID and open-list ID filter late events from before navigation; Launch still reads the current list. |
+| `listVersion` | The fingerprint of the list content used for this result. |
+| `revision` | The cache input fingerprint; identical inputs are reused. Do not compare it lexicographically. |
+| `sequence` | An increasing publication number within the API session; for the same environment and list, accept only a sequence at least as large as the displayed one. |
+| `updating`, `error?` | While background work completes, retain the previous content findings with `updating=true`. On failure, retain the findings and return the error text. |
+| `count`, `severity` | The shared needs count and maximum severity, `error` / `warning` / `info`; hidden maintenance and muted information items follow needs counting rules. |
+| `mods` | An Instance-ID index whose values contain `count`, `severity`, `summary`, and `problemIds`. An absent Mod has no displayable finding. |
+| `items` | The full list-level `Need` array, with each finding sent once and looked up through `problemIds`. |
+| `status`, `reasons` | Row icons and per-Mod explanations from the same snapshot, keyed by Instance ID. Replace these directly on an event; do not rebuild them from `items` aggregate titles or actions (version warnings: §5). |
 
-`version-mute` / `version-unmute` `refs` are package references; `gameVersion` target major.minor. `version-list` carries only `gameVersion`, `versionMuted`; opening reads `API.VersionWarnings` → `view.ReadVersionWarnings`, returning title, all actions, groups with `{id, name, supported, action}` rows. Rows excluded from normal Board / Needs. Individual / group / all actions still `DoAction(action, 0)`; batch ignore uses `confirm` / `warn`; interaction §5.
+For `version-mute` / `version-unmute`, `refs` contains package references and `gameVersion` is the target major.minor version. The `version-list` action carries only `gameVersion` and `versionMuted`. Opening it reads `API.VersionWarnings` → `view.ReadVersionWarnings`, which returns the title, all actions, groups, and their `{id, name, supported, action}` rows. These rows are excluded from normal Board and Needs responses. Individual, group, and all-item operations still use `DoAction(action, 0)`; batch ignore follows `confirm` and `warn`. See §5 for the interaction.
 
-`Need` adds `id`, optional `target`, `requiredBy`. Dependency `target`: packageId trimmed, case-normalized, `_steam` removed, directory aliases resolved via registry; `requiredBy`: `{id, name}` array. Declared / corpus missing dependencies and patches with disabled targets merge by target; all requiring Mods own the finding. If an existing uninstalled list entry covers the dependency, attach ownership to its aggregate item. Strong order findings still merge into one automatic-sort item; individual strong constraints also have `move`.
+`Need` adds `id`, optional `target`, and `requiredBy` to its original fields. A dependency's `target` is the packageId after trimming whitespace, normalizing case, removing `_steam`, and resolving directory aliases through the registry. The `requiredBy` field is an array of `{id, name}`. Declared dependencies, corpus-inferred missing dependencies, and patches with disabled targets can merge by target; every requiring Mod receives ownership of the finding. If an existing uninstalled list entry covers the dependency, ownership attaches to that entry's aggregate item. Strong ordering findings still merge into one automatic-sort item; individual strong constraints also have a `move` action.
 
-**Execute**: pass full `item.actions` Action to `DoAction(action, option)`, not ID alone. `id` identifies; `kind`, `refs`, `after`, `options` retain arguments. `choose-disable` option zero-based; other data actions `0`. `enable` positions dependencies by constraints; `move` one `refs` / `after`; `sort` direct; `subscribe` existing task queue. DLC store via `open-url`. Surface dispatches `view`, `list`, `fold`, `save`; confirmation still `confirm` / `warn`.
+**To execute an action**, pass the full Action object from `item.actions` to `DoAction(action, option)`. The `id` identifies the action; execution arguments remain in the original `kind`, `refs`, `after`, `options`, and other fields. Passing only the ID is insufficient. For `choose-disable`, `option` is the zero-based option index; other data actions use `0`. The `enable` action positions dependencies by constraints, `move` uses one `refs` and `after`, `sort` sorts directly, and `subscribe` enters the existing task queue. DLC store links use `open-url`. Interface actions such as `view`, `list`, `fold`, and `save` are still dispatched by the surface, and confirmations still follow `confirm` and `warn`.
 
-**Use installed copies**: `API.UseInstalled(packageIDs []string) (*view.Result, error)` binds missing open-list entries, preserves positions, batch undoable; semantics / refusal 04 §4.2. packageId array accepts case / whitespace / `_steam`, not Instance refs; empty no-op. Result `text`, `undo`, `problems` follow edit contract. Can it run separates `MissingMods.CanEnable` as can use installed copies; primary `kind: "use-installed"`, packageId `refs`, `undo: true`, `key: "space"`, `label`, `done`, action `id`, no `confirm` / `warn`. Full action to `DoAction(action, 0)` returns string / publishes problems, or `refs` to `UseInstalled` returns edit result. Only no-copy entries keep subscribe / remove. Sort Outcome `missingMods` unchanged, frontend offers fixes via `canEnable`.
+**Using installed copies:** `API.UseInstalled(packageIDs []string) (*view.Result, error)` binds missing entries in the open list, preserves their positions, and is undoable as a batch. See 04 §4.2 for semantics and refusal rules. Its argument is a packageId array accepting case differences, surrounding whitespace, and `_steam` suffixes, rather than Instance references. An empty array changes nothing. The result's `text`, `undo`, and `problems` follow the edit contract above. Can it run separates `MissingMods.CanEnable` entries as can use installed copies. The primary action has `kind: "use-installed"`, a packageId array in `refs`, `undo: true`, `key: "space"`, and `label`, `done`, and action `id`, without `confirm` or `warn`. Passing the full action to `DoAction(action, 0)` returns a string and publishes the problems event; passing `refs` to `UseInstalled` returns an edit result. Only entries without an available copy retain subscribe and remove actions. The sort Outcome's `missingMods` contract is unchanged; the frontend offers repair through `canEnable`.
 
-**Cache bounds**: at most eight environment / list / game-version / language slots per API session. Inputs also list content, database change key, scan snapshot / analyzer version (`AnalysisKey`), log path / size / mtime, freshly checked directories / game links. Workspace reuses full Board / Shell / History; rebuild with separate connection, no main lock held.
+**Cache bounds:** each API session retains at most eight slots keyed by environment, list, game version, and language. Inputs also include list content, the database change key, scan snapshot and analyzer version (`AnalysisKey`), log path, size and mtime, and freshly checked directory and game-link states. Workspace reuses the full Board, Shell, and History. Rebuilding uses a separate connection without holding the main lock.
 
-List edits use `App.IncrementalProblems`: synchronously recalculate declarations, retain reusable content findings, immediately remove old `patch.no-match` for newly enabled targets. Later log reads / full analysis use independent sessions / existing analysis subprocess, revalidate inputs before publish; stale work never overwrites edits. Content analysis still uses enabled-set slots, per-Mod content-keyed Def / assembly facts; patch simulation depends on order / whole document, still recomputed in background.
+List edits use `App.IncrementalProblems` to synchronously recalculate the declaration layer while retaining reusable findings from the previous content layer. Old `patch.no-match` hints for newly enabled targets are removed immediately. Subsequent log reads and full analysis run in independent sessions or the existing analysis subprocess. Inputs are rechecked before publication, so stale work cannot overwrite newer edits. Content analysis still uses slots saved by enabled set and Def and assembly facts saved by each Mod's content key. Patch simulation depends on order and the whole document and is still recalculated in the background.

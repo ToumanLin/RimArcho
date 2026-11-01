@@ -4,17 +4,17 @@
 
 ## 7. Visual design
 
-**Principles**, refined minimalism like magpie / Linear:
-1. **No borders in TUI.** Areas separated only by blank space, two-cell indentation, muted subheadings, no boxes / rules. GUI uses magpie cards: quiet base, hairline borders (`--hairline`, §7.3), 12px corners.
-2. **One accent.** Accent, success green, error red, warning amber only. Accent for what is being operated: cursor, selected name, focused heading, input prompt.
-3. **Most text gray.** Secondary / faint for most characters; only current object bright.
-4. **Cursor faint background / changed color; selection faint accent.** Cursor row faint, focused name accent, TUI adds ▸; selected rows faint accent. Solid backgrounds only pills, current environment / focused filter. **No left vertical line / color strip on any box, row, card for selection, cursor, emphasis** (2026-10-23: template-like, no information). TUI same, full-row accent tint, deeper selected cursor.
-5. **Bold indicates identity only**, Mod names / headings. No italics, underline, inversion.
-6. **No developer terms**: finding codes, #id, decl, lineage only in technical / CLI / MCP. Exception: package ID default details. Names §7.2.
-7. **Still interface**: TUI no animation / spinner; … in status for work. GUI motion only explains changes / destinations (§7.1), short, all disabled with `prefers-reduced-motion`.
-8. **One TUI line per row**, no line spacing; ellipsize overflow and state hidden count, e.g. 12 more. Details wrap (§4.1).
+**Principles** follow the refined minimalism of magpie and Linear:
+1. **The TUI has no borders.** Blank space, two-cell indentation, and muted subheadings separate areas; there are no boxes or rules. The GUI uses magpie cards: a quiet base with hairline borders (`--hairline`, §7.3) and 12px corners.
+2. **Use one accent.** The palette has an accent, success green, error red, and warning amber. The accent marks what the player is operating: the cursor, selected name, focused heading, or input prompt.
+3. **Most text is gray.** Most characters use the secondary or faint color; only the object being operated is bright.
+4. **The cursor uses a faint background and a changed text color; selection uses a faint accent background.** The cursor row has a faint background, and its name becomes accent-colored when focused; the TUI also adds ▸. Selected rows use a faint accent background. Solid backgrounds are reserved for pills, such as the current environment or focused filter. **Do not add a left vertical line or color strip to any box, row, or card to indicate selection, the cursor, or emphasis.** This was decided on 2026-10-23 because such strips looked like a template and conveyed no information. The TUI follows the same rule: selected rows have a full-row accent tint, with a deeper tint for the selected cursor row.
+5. **Bold indicates identity only**, such as Mod names and headings. Do not use italics, underlining, or inverted colors.
+6. **Hide developer terms.** Finding codes, #id, decl, and lineage belong only in technical information, the CLI, or MCP. The exception is the package ID, shown in details by default. See §7.2 for interface names.
+7. **Keep the interface still.** The TUI has no animations or spinners; the status line uses … for work in progress. GUI motion only explains what changed or where something went (§7.1). It is brief and is disabled under `prefers-reduced-motion`.
+8. **Each TUI row occupies one line**, with no line spacing. Ellipsize overflow and state the hidden count, for example 12 more. Detail text wraps (§4.1).
 
-**TUI dark palette**:
+**The TUI dark palette** uses the following colors:
 
 | Role | Value | Use |
 | --- | --- | --- |
@@ -22,50 +22,50 @@
 | Secondary | `#7C8290` | Explanations, hints, authors |
 | Faint | `#4A4F5A` | Numbers, subheadings, unfocused content |
 | Accent | `#A5B4FC` | Cursor, selected names, focused headings, prompt |
-| Pill | `#2C2E4A` | Current environment / focused filter |
-| Focused row | `#1A1C24` | Cursor in focused area |
-| Selected row | `#232539` | Whole row incl. wrapped continuation |
-| Selected cursor | `#303450` | Focused selected cursor incl. continuation |
+| Pill | `#2C2E4A` | Current environment or focused filter |
+| Focused row | `#1A1C24` | Cursor in the focused area |
+| Selected row | `#232539` | The whole selected row, including wrapped continuation lines |
+| Selected cursor | `#303450` | The whole selected cursor row in the focused area, including continuation lines |
 | Success | `#7EE2A8` | ✓ result |
-| Warning | `#F2C46D` | Warning icons; magpie has no warning, Mod management must distinguish breaks / may be wrong |
-| Error | `#FF8A80` | Error icons / failed results |
+| Warning | `#F2C46D` | Warning icons; magpie has no warning color, but Mod management must distinguish a failure from a possible problem |
+| Error | `#FF8A80` | Error icons and failed results |
 
-TUI dark only, terminal background; ConPTY cannot reliably detect background, same reason as §9.2 color detection; no automatic light theme.
+The TUI has only a dark palette and uses the terminal's background. ConPTY cannot reliably detect the terminal background, for the same reason as the color-detection limitation in §9.2, so the TUI does not automatically switch to a light theme.
 
-**Log colors** (§2.10): exception to gray text, use game's log-window colors: Error red `#ff6666`, Warning yellow `#ffeb04`, Message white; Mod message `<color>` retained. Light theme changes contrast, not hue. Only raw log rows; UI text / icons retain palette.
+**Log colors** (§2.10) are an exception to gray text. Raw log rows use the game's log-window colors: Error red `#ff6666`, Warning yellow `#ffeb04`, and Message white. A Mod message's `<color>` is retained. The light theme adjusts contrast without changing the hue. Interface text and icons retain the palette above.
 
-**GUI palette**: magpie `app.css` MIT, copyright atop `style.css`, CSS variables; **settings > interface day / night controls effective theme** (2026-10-24, §7.4). Dark: background `--bg #1a1a1e`, card `--card #232327`, pill `--pill #2d2d33`, line `--line #333339`, text `--fg #ededf1`, secondary `--fg-2 #b9b9c1`, `--muted #8b8b94`, faint `--faint #56565f`, accent `--accent #a5b4fc`, soft `--accent-soft #2b2c47`, selected `--sel #33345a`, success `--green #6fd99b`, error `--red #f28b82`, warning `--amber #f2b544`, log `--log #f5a97f`. Light: `style.css` :root, accent #4f46e5. 28px rows, 13px text.
+**The GUI palette** comes from magpie's `app.css`, under MIT, with the copyright notice at the top of `style.css`. CSS variables define the colors. **The day/night control in settings > interface determines the effective theme** (2026-10-24, §7.4). The dark values are background `--bg #1a1a1e`, card `--card #232327`, pill `--pill #2d2d33`, line `--line #333339`, text `--fg #ededf1`, secondary `--fg-2 #b9b9c1`, `--muted #8b8b94`, faint `--faint #56565f`, accent `--accent #a5b4fc`, soft accent `--accent-soft #2b2c47`, selection `--sel #33345a`, success `--green #6fd99b`, error `--red #f28b82`, warning `--amber #f2b544`, and log `--log #f5a97f`. The light values are in `style.css` :root, with accent #4f46e5. Rows are 28px high with 13px text.
 
-**Card spacing** (2026-10-22): all horizontal / vertical rounded-card gaps `--card-gap` 4px, no other value: editor columns / third-column details-staging-history / left filters and list-details, inventory filter / table, log / changes columns, tasks columns / right cards, all-lists columns. **Space-sharing card gaps draggable** (§3.1 rule 10, 2026-10-23), double-click reset, persist `ui.gui.<page>.*`; new cards must include splitters. Content-height stacked needs / settings / six full-details sections no drag. Visible gap stays 4px, hit area extends `--grab` 3px into each card, about 10px; resize cursor, accent hairline hover (§7.3), double-click unchanged. Sidebar right edge remains 6px inside sidebar.
+**Card spacing** was defined on 2026-10-22. All horizontal and vertical gaps between rounded cards use `--card-gap`, 4px, with no other value. This covers the editor columns; details, staging, and history in the third column; left filters and the list or details below them; inventory filters and table; log and change-history columns; task columns and right-side cards; and All lists columns. **Gaps between cards sharing a fixed space are draggable** (§3.1 rule 10, 2026-10-23). Double-clicking resets them, and sizes persist in `ui.gui.<page>.*`. New cards of this kind must include splitters. Gaps between content-height cards stacked down the page are not draggable: Can it run sections, settings groups, and the six full-detail sections. A draggable gap remains visibly 4px wide, but its hit area extends `--grab`, 3px, into each card, for about 10px total. The resize cursor, accent hairline on hover (§7.3), and double-click reset remain. The sidebar's right-edge hit area remains 6px inside the sidebar.
 
-**Fonts**: sizes §7.3. TUI player's terminal (§9.2); GUI system Segoe UI Variable Text, Segoe UI, Microsoft YaHei UI; tabular numbers, Cascadia Mono code.
+**Fonts:** see §7.3 for sizes. The TUI uses the player's terminal font (§9.2). The GUI uses the system fonts Segoe UI Variable Text, Segoe UI, and Microsoft YaHei UI, with tabular numbers and Cascadia Mono for code.
 
-**Wording**:
-- Short verb-first Chinese UI sentences, e.g. enable Vehicle Framework, not perform enable operation.
-- Short muted subheadings: Enabled 485, description, needs.
-- Empty states one sentence / key: staging is empty; t stages selected mods.
-- No middle-dot separators (§7.3).
-- Unknown faint —, never unknown.
-- Every UI string has Chinese translation; GUI tests check every used string.
+**Wording** follows these rules:
+- The Chinese UI uses short sentences beginning with a verb, for example enable Vehicle Framework rather than perform enable operation.
+- Subheadings are short and muted, such as Enabled 485, description, and needs.
+- An empty state has one sentence that identifies the key to use, for example staging is empty; t stages selected mods.
+- Do not use middle-dot separators (§7.3).
+- An unknown value appears as a faint — rather than the word unknown.
+- Every UI string has a Chinese translation; GUI tests check every string used by the pages.
 
-**Icons**: TUI defaults compatibility Unicode; ui.icons nerd uses Nerd Font Font Awesome 4 U+F000–U+F2E0, included in all Nerd Fonts (§9.3). GUI simple custom SVG `js/icons.js`, matching meanings:
+**Icons:** the TUI defaults to the compatibility Unicode characters below. With ui.icons nerd, it uses Nerd Font's Font Awesome 4 range, U+F000–U+F2E0, which all Nerd Fonts include (§9.3). The GUI uses simple custom SVGs in `js/icons.js`, with the same meanings.
 
 | Meaning | Nerd Font | Compatibility | Color |
 | --- | --- | --- | --- |
-| Official Core / DLC source | shield `U+F132` | `⬥` U+2B25 | Faint |
-| Workshop incl. SteamCMD | steam `U+F1B6` | `◉` U+25C9 | Faint |
+| Official source: Core and DLC | shield `U+F132` | `⬥` U+2B25 | Faint |
+| Workshop including SteamCMD | steam `U+F1B6` | `◉` U+25C9 | Faint |
 | Local | folder `U+F07B` | `▢` U+25A2 | Faint |
 | Locked Workshop copy | clone `U+F24D` | `⬦` U+2B26 | Faint |
 | Git | git `U+F1D3` | `∆` U+2206 | Faint |
-| Error, load failure | times-circle `U+F057` | `⨯` U+2A2F | Error red |
-| Warning, possible issue | exclamation-triangle `U+F071` | `!` | Amber |
-| Corpus hint, counting §5 | info-circle `U+F05A` | `ⓘ` U+24D8 | Secondary; GUI circled i |
+| Error causing load failure | times-circle `U+F057` | `⨯` U+2A2F | Error red |
+| Warning of a possible issue | exclamation-triangle `U+F071` | `!` | Amber |
+| Corpus hint; counting follows §5 | info-circle `U+F05A` | `ⓘ` U+24D8 | Secondary; a circled i in the GUI |
 | Last-run error | bug `U+F188` | `◍` U+25CD | Error red |
 | Unloadable disabled residue | ban `U+F05E` | `◌` U+25CC | Faint |
 | No problem | Hidden | Hidden | — |
-| Different from game's list | circle `U+F111` | `⬤` U+2B24 | Accent |
+| Different from the game's list | circle `U+F111` | `⬤` U+2B24 | Accent |
 | Locked, Core immovable | lock `U+F023` | Hidden | Faint |
-| Update / change | refresh `U+F021` | `⇣` U+21E3 | Secondary |
+| Update or change | refresh `U+F021` | `⇣` U+21E3 | Secondary |
 | Dependency | link `U+F0C1` | `›` U+203A | Secondary |
 | Staging | inbox `U+F01C` | `◫` U+25EB | Secondary |
 | Launch | play `U+F04B` | `►` U+25BA | Text |
@@ -73,71 +73,71 @@ TUI dark only, terminal background; ConPTY cannot reliably detect background, sa
 | Automatic sort | sort-amount-asc `U+F160` | `↨` U+21A8 | Text |
 | Search | search `U+F002` | `/` | Secondary |
 
-- At most source / status two icons; status for findings / corpus hints, absent otherwise. GUI hover explains, click pins (§4.2), `--pop-bg`, hairline, `--shadow`, selectable text (§3.1 rule 13).
-- Lock currently omitted: Core position via `official.order` finding.
-- Shared cursor ▸, success ✓, prompt ❯, progress …, all one cell. Failure times-circle full, ⨯ compat; Cascadia Mono lacks ✗.
-- Compat glyphs East Asian Neutral N, width 1 with either runewidth EastAsianWidth value, present / one cell in default Cascadia Mono. Nerd private-use icons and … Ambiguous A; RimArcho must disable EastAsianWidth. Terminals rendering ambiguous width 2, e.g. WezTerm treat_east_asian_ambiguous_width_as_wide / some CJK consoles, misalign Nerd; use compat. `TestIconWidths` verifies both one cell.
+- A row has at most two icons: source and status. A status icon appears for a finding or corpus hint and is absent otherwise. In the GUI, hovering explains it and clicking pins the explanation (§4.2). The popover uses `--pop-bg`, a hairline, and `--shadow`; its text is selectable (§3.1 rule 13).
+- The lock icon is currently omitted; the `official.order` finding expresses Core's position.
+- Both modes share the cursor ▸, success ✓, prompt ❯, and progress … markers, all drawn in one cell. Failure uses times-circle in full mode and ⨯ in compatibility mode; Cascadia Mono lacks ✗.
+- Compatibility glyphs have East Asian Neutral width N. Their width is 1 with either value of runewidth's EastAsianWidth, and default Cascadia Mono has a one-cell glyph for each. Nerd private-use icons and … have Ambiguous width A, so RimArcho must disable EastAsianWidth when measuring. A terminal that renders ambiguous characters in 2 cells, such as WezTerm with treat_east_asian_ambiguous_width_as_wide or some CJK consoles, will misalign Nerd icons; use compatibility mode there. `TestIconWidths` verifies that both icon sets occupy one cell.
 
-**App icon**: player-supplied `internal/icon/portrait.svg`, 1024×1024 vector, #4f46e5 outline glow; also Archo image (§8.6).
+**The app icon** is the player-supplied `internal/icon/portrait.svg`, a 1024×1024 vector with a #4f46e5 outline glow. It is also Archo's image (§8.6).
 
-**Bow mark** (2026-10-25): portrait's upper-left bow used where portrait too small. GUI simplified `js/icons.js` bowMark, three wings / knot, lower-left glow matching portrait; bowMark(24) extra light face per wing, bowMark(16) solid. Fixed brand colors independent of chosen accent: light glow #4f46e5, dark #a5b4fc with #4a4d5c gray outline so black wings remain visible. Currently 14px preceding Archo name, 16px drawing, game-log Archo log analysis card / ask Archo to analyze button; future Archo task rows too (§2.11). Portrait for large panel etc. No sidebar mark (2026-10-25, §2.1).
+**The bow mark** (2026-10-25) uses the portrait's upper-left bow where the portrait would be too small to recognize. The GUI draws a simplified version through bowMark in `js/icons.js`: three wings and a knot, with a lower-left glow matching the portrait's lighting. bowMark(24) adds a light face to each wing; bowMark(16) uses solid shapes. The brand colors are fixed regardless of the chosen accent. In the light theme the glow is #4f46e5; in the dark theme it is #a5b4fc with a #4a4d5c gray outline so the black wings remain visible. It is currently a 14px mark before the Archo name, using the 16px drawing, in the game-log Archo log analysis card and ask Archo to analyze button. Future Archo task rows will also use it (§2.11). The portrait is reserved for larger displays such as the Archo panel. The sidebar has no mark, as decided on 2026-10-25 (§2.1).
 
-**Choice controls** (§3.10): selected segment `--seg-thumb` / `--seg-edge`, unselected text `--ctl-fg`. Single-choice right arrow; menu field name atop, current checked left / rounded highlight, separate keyboard focus background. Card colors / hairline / menu shadow, shared theme variables.
+**Choice controls** follow §3.10. A selected segment uses `--seg-thumb` and `--seg-edge`, and unselected text uses `--ctl-fg`. A single-choice button has a right-side arrow. Its menu shows the field name at the top, a check to the left of the current option, and a rounded highlight. Keyboard focus has a separate background. The panel uses card colors, a hairline, and the menu shadow; both themes share the existing variables.
 
 ### 7.1 Motion (GUI)
 
-Four `style.css` :root durations; entry / movement ease-out `--ease` cubic-bezier(.2, .8, .2, 1), base 250ms; exits faster, `--ease-in` cubic-bezier(.4, 0, 1, 1):
+Four durations are defined in `style.css` :root. Entry and movement use the ease-out curve `--ease`, cubic-bezier(.2, .8, .2, 1), with a 250ms base. Exits are faster and use `--ease-in`, cubic-bezier(.4, 0, 1, 1).
 
 | Variable | Duration | Use |
 | --- | --- | --- |
 | `--t-press` | 120ms | Hover, press, color fades |
-| `--t-enter` | 200ms | Page / menu / status entry |
-| `--t-exit` | 150ms | Menu close, card collapse, ease-in |
+| `--t-enter` | 200ms | Page, menu, and status entry |
+| `--t-exit` | 150ms | Menu close and card collapse, with ease-in |
 | `--t-layout` | 250ms | Row movement, sidebar highlight, expansion, number pulse |
 
-Menu close / card content collapse use exit / ease-in; layout / `motion.js` FLIP share 250ms.
+Menu closing and card-content collapse use the exit duration and ease-in curve. Layout movement and FLIP in `motion.js` share the 250ms timing.
 
-Motion inventory, js/motion.js / `style.css` motion:
-- **Page entry** fades / rises 4px; same-page redraw after action / subview no motion.
-- **Sidebar highlight** slides old to new, size changes immediately, position only animated; own child highlight within same entry.
-- **Sidebar children** grid row 0fr → 1fr, layout duration, entry fade, arrow rotates 90°. Old collapse / new expansion simultaneous, following entries move smoothly. Highlight goes directly to final destination computed from expanding / collapsing children by motion.js. Collapsed children excluded from tab order.
-- **List changes**, enable / disable / move / sort / undo / drag: record visible Mod row positions, FLIP surviving rows after redraw; affected rows (if unknown, moved / new rows) flash soft accent, fade about 400ms. Only rendered virtual rows, dozens; one style calculation per batch.
-- **Numbers**: badge / count, list headings, needs sections, unsaved softly pulse on change.
-- **Status** new sentence slides up.
-- **Loading** lazy game log / details / full-detail pages shimmer placeholders, no loading… text; screen readers retain old text.
-- **Cards / overlays** existing slight scale fade retained.
+The motion inventory is implemented in js/motion.js and the motion section of `style.css`:
+- **Page entry** fades in and rises 4px. A redraw of the same page after an action or subview switch has no motion.
+- **The sidebar highlight** slides from the old entry to the new one. Its size changes immediately; only its position is animated. Children have their own highlight that slides within the same entry.
+- **Sidebar children** expand their grid row from 0fr to 1fr using the layout duration, fade in using the entry duration, and rotate the arrow 90°. The old children collapse while the new children expand, and following entries move smoothly. The highlight slides directly to the final destination that motion.js computes from the expanding and collapsing children. Collapsed children are excluded from the tab order.
+- **List changes** include enabling, disabling, moving, sorting, undoing, and dragging. Before an action, the visible Mod rows' positions are recorded. After redraw, surviving rows move from their old positions using FLIP. Affected rows flash a soft accent and fade over about 400ms; if the affected rows are unknown, moved or new rows flash. Only the rendered virtual rows, a few dozen, are processed, with one style calculation per batch.
+- **Numbers** softly pulse on change: sidebar badges and counts, list headings, Can it run section counts, and the unsaved count.
+- **The status line** slides each new sentence in from below.
+- **Loading placeholders** shimmer in lazily loaded game logs, log details, and full-detail pages without loading… text. Screen readers retain the original text.
+- **Cards and overlays** retain their existing slight scale and fade.
 
-Rules:
-- Continuous / moving animation only opacity / transform for WebView2 compositing, no relayout / repaint. Flash fading overlay, not background-color animation; shimmer / progress moving gradient layers. Exceptions: one-off 120ms hover colors, few sidebar grid rows once at 250ms.
-- No `backdrop-filter` blur: WebView2 repaints it every frame.
+The following rules apply:
+- Continuous or moving animations change only opacity and transform so WebView2 can composite without relayout or repaint. A flash uses a fading overlay instead of animating the background color; shimmer and progress use moving gradient layers. The exceptions are one-off 120ms hover-color transitions and the few sidebar grid rows expanding once over 250ms.
+- Do not use `backdrop-filter` blur; WebView2 repaints it on every frame.
 - Under `prefers-reduced-motion: reduce`, CSS sets all animation and transition durations to 0; `motion.js` skips FLIP, flashing, pulsing, and sliding.
-- Scrolling no animations: 1341 rows, 400 consecutive scrolls, none running, visible-row redraw median 0.5ms in development.
+- Scrolling triggers no animations. In a development measurement with 1341 rows and 400 consecutive scrolls, no animations were running and the visible-row redraw median was 0.5ms.
 
 ### 7.2 Interface wording
 
-Decided 2026-10-22. GUI / TUI in both languages use player wording; code / CLI / MCP / specs keep domain names: plan, environment, Instance. Thus spec plan becomes UI list.
+This was decided on 2026-10-22. Both languages of the GUI and TUI use the player's wording. Code, the CLI, MCP, and specifications keep domain names such as plan, environment, and Instance. A plan in the specification is therefore a list in the UI.
 
-English UI text is translation lookup key; changing English requires callers too. app / modchanges CLI-worded keys, e.g. the current plan, stay; `view.enText` overrides UI display. History operation names checkout / swap / restore mapped by stepWords.
+English UI text is the translation lookup key, so changing it also requires changing the callers. Keys supplied by app and modchanges in CLI wording, such as the current plan, remain unchanged; `view.enText` overrides their UI display. History operation names such as checkout, swap, and restore come from app operation codes and are mapped to player wording by stepWords.
 
-Check: internal/surface/cli TestWording (`view.WordingProblems`) reads all translation maps / panel. Chinese forbidden terms in final column, English plan / environment / upstream / workspace / swap / pinned / checkout / not written fail; conflicting translations for one English key also fail, because later registration overwrites. Necessary exceptions in wordingExempt, e.g. decompilation.
+The internal/surface/cli TestWording check (`view.WordingProblems`) reads all translation maps and the command panel. It fails if the Chinese contains a term in the final column below, or if the English contains plan, environment, upstream, workspace, swap, pinned, checkout, or not written. It also fails when two maps translate the same English key differently, because later registration overwrites the earlier translation. Necessary exceptions are recorded in wordingExempt, for example decompilation.
 
 | Domain concept | UI wording | English | Avoid |
 | --- | --- | --- | --- |
 | Plan / loadout | Current / new list, list history | list | plan, workspace |
 | Enabled portion | Enabled | Enabled | enabled list |
 | Three editor lists | Areas: Enabled, Disabled, Staging | areas | list, ambiguous with plan |
-| Add / remove plan entry, editor / library same | Enable / disable, disable in every list | enable / disable; disable in every list | add to current plan, take out, remove from plan |
+| Add or remove a plan entry, the same in the editor and library | Enable / disable, disable in every list | enable / disable; disable in every list | add to current plan, take out, remove from plan |
 | Staging / stage restore | Stage / put back | stage / put back | — |
-| save | Save changes / no changes, N unsaved, saved versions | save; save changes / no changes; N unsaved; saved versions | write to game, unwritten, not yet written, written versions |
+| save | Save; the editor button says Save changes / no changes, the count says N unsaved, and versions are saved versions | save; save changes / no changes; N unsaved; saved versions | write to game, unwritten, not yet written, written versions |
 | checkout | Go back to this version; history step go back | go back to this version | load version, load list |
 | External ModsConfig changes | Use outside change | use the outside change | load into list |
 | Environment | Game; `env remove` removes the game without changing files | game; remove the game | environment, delete environment |
-| Source | Mod folders in settings, source in filters / details, Workshop / local | mod folders; source | — |
+| Source | Mod folders in settings, source in filters and details, such as Workshop or local | mod folders; source | — |
 | Instance | This one, another copy, N copies | this one, another copy | instance, Instance |
 | Lineage | Copies of same Mod | copies of the same mod | Lineage |
-| Copy | Only RimArcho-made lock-library / pack copies | copy | calling original Workshop installation a copy |
-| pin / unpin / pin --update | Lock, unlock, update locked version, keep old; source locked version | lock this version / unlock / update the locked version | pin, including other tools' pins |
-| Upstream changed after lock | Newer version, use Workshop version | a newer version is out | upstream, original updated, use original; original means Core / DLC |
+| Copy | Only copies made by RimArcho in the lock library or a pack | copy | calling original Workshop installation a copy |
+| pin / unpin / pin --update | Lock this version / unlock / update the locked version; retain the old copy, and show locked version as the source | lock this version / unlock / update the locked version | pin, including other tools' pins |
+| Upstream changed after lock | Newer version, use Workshop version | a newer version is out | upstream, original updated, use original; original means Core and DLC |
 | library move-to-locked | Move into lock library | move into the lock library | collect into lock library, back up locked version |
 | swap | Switch version… | switch version… | replace with another copy, replace instance |
 | unhide | Unhide | unhide | restore to game |
@@ -146,59 +146,59 @@ Check: internal/surface/cli TestWording (`view.WordingProblems`) reads all trans
 | Allowed game versions (04 §1.6) | Game versions / reset default | game versions; reset to default | allowed / compatible versions |
 | plan follow / unfollow / sync (04 §9.6) | Follow collection, unlink, catch up; add new only / also disable removed | follow a Steam collection / unlink / catch up with the collection; add new only / also disable removed | subscribe collection, subscription only for Steam Mods; sync |
 | Build pack | Create / recreate / unfinished pack | create a pack | compile |
-| Full / light pack | Pack always includes files; list-only RimArcho list, export format / pack export list | pack; RimArcho list | full pack, light pack |
+| Full / light pack | A pack always includes files; list-only sharing exports a RimArcho list, an export format also available through the pack page's export list action | pack; RimArcho list | full pack, light pack |
 
 ### 7.3 Visual rules
 
-Launch (§2.3) exception: own sizes / rules / radii, exempt rules 1, 3, 4; four sizes 12px, 17px, 26px, responsive headline (2026-10-28).
+Launch (§2.3) is an exception: its sizes, rules, and radii follow its own design and are exempt from rules 1, 3, and 4. It still has four font sizes: 12px, 17px, 26px, and a responsive headline (2026-10-28).
 
-Decided 2026-10-23, GUI; TUI exceptions per rule. Checks below.
+These rules were decided on 2026-10-23 for the GUI. Each rule states any TUI exception. The checks are listed below.
 
-1. **Two radii**: --r-lg 12px cards / panels / menus; --r-sm 6px buttons / inputs / chips / thumbnails / small blocks. Single-select / segmented outer frames lg. Circles / pills 50% / 999px excluded. No third value, stylesheet variables.
-2. **Concentric nested corners**: inner within 8px of outer edge, inner radius = outer minus padding, including switch thumb / menu options. Card-edge blocks 6px gap, 12−6=6, consistent with rule 1; distant blocks exempt.
-3. **Hairlines only**: all borders / separators / menu group rules --hairline; `resolution >= 2dppx` 0.5px, 100% / 150% 1px, lighter than --line, since 0.5px blurs / disappears there. No ≥2px; hover splitters accent hairline; quotes indent / muted, no line.
-4. **Four font sizes, minimum 12px**:
+1. **Use two radii.** --r-lg is 12px for cards, panels, and menus. --r-sm is 6px for buttons, inputs, chips, thumbnails, and other small blocks. Single-choice buttons and segmented outer frames use the large radius. Circles and pills using 50% or 999px are excluded. There is no third value; the stylesheet uses the radius variables throughout.
+2. **Nested corners are concentric.** When an inner element is within 8px of an outer edge, its radius equals the outer radius minus the padding. This also applies to switch thumbs and menu options. A card-edge block has a 6px gap, so 12−6=6, consistent with rule 1. Blocks farther from the edge are exempt.
+3. **Use hairlines only.** All borders, separators, and menu-group rules use --hairline: 0.5px at `resolution >= 2dppx`, or 1px at 100% and 150% scaling, in a color lighter than --line. At those scales, 0.5px would blur or disappear. Do not use lines of 2px or more. Splitter hover lines use an accent hairline; quotes use indentation and muted text without a line.
+4. **Use four font sizes, with a minimum of 12px.**
 
    | Size | Use |
    | --- | --- |
-   | 12px | Secondary, tables, subheads, sidebar groups / children, badges, chips |
-   | 13px | Body, rows, buttons, sidebar entries |
+   | 12px | Secondary text, tables, subheadings, sidebar groups and children, badges, chips |
+   | 13px | Body text, rows, buttons, sidebar entries |
    | 15px | Breadcrumbs, page names, summary titles |
    | 32px | Launch headline only |
 
-   Use weight / color / spacing for more hierarchy, no extra sizes. TUI single terminal size, inapplicable.
-5. **No middle-dot separators**. Parallel facts spaced, GUI 12px / TUI 2 cells; sentence commas, ranges en dash, hierarchy slash / ›. Hint groups wider: GUI 16px / TUI 3 cells. Spec titles exempt; UI examples use two spaces.
-6. **No left vertical / color bars** (§7 principle 4). Quotes 14px indentation / muted, no line. Sidebar child tree guide retained, not selection (§2.1).
-7. **No explanatory filler**. Keep sentence only if removing it loses information needed now. Head (§2.2) status / conclusion, e.g. Main colony not ready: fix these 2 problems, plus actions; never page-purpose explanation. Safety text, e.g. no game-file writes, in confirmation / tooltip. Empty state one sentence (§7 wording).
-8. **Eyebrows only informative**: category / context absent from title. Launch no type / game eyebrow since 2026-10-26, already in 01 / 02 (§2.3). No uppercase English labels. Heading numbers only meaningful focus keys 1–9 (§3.5).
-9. **Optical alignment**:
-   - Icons visual-centered in full row-height boxes, not baseline.
+   Add hierarchy through weight, color, or spacing, without extra sizes. This rule does not apply to the TUI, which has one terminal font size.
+5. **Do not use middle-dot separators.** Space parallel facts apart by 12px in the GUI or 2 cells in the TUI. Use commas in sentences, an en dash for ranges, and a slash or › for hierarchy. Hint groups have wider spacing: 16px in the GUI or 3 cells in the TUI. Specification titles are exempt because they are not UI text; UI examples in the specifications use two spaces to represent spacing.
+6. **Do not add left vertical lines or color bars** (§7 principle 4). Quotes use 14px indentation and muted text without a line. The sidebar child tree guide remains because it does not indicate selection (§2.1).
+7. **Omit explanatory filler.** Keep a sentence only if removing it would lose information the player needs now. The page heading (§2.2) contains the current status or conclusion, such as Main colony not ready: fix these 2 problems, and page actions. It does not explain the page's purpose. Safety text, such as no game-file writes, belongs in a confirmation or tooltip. An empty state remains one sentence (§7 wording).
+8. **Use eyebrows only when informative.** Text above the main title supplies a category or context absent from that title. Launch has had no type or game eyebrow since 2026-10-26 because 01 and 02 already identify them (§2.3). Do not add uppercase English labels. Heading numbers are useful only as the focus keys 1–9 (§3.5); omit numbers that have no corresponding key.
+9. **Align optically.**
+   - Center icons visually with the text in boxes as high as the row, rather than aligning to the baseline.
    - All numbers use `tabular-nums`; numeric columns are right-aligned.
-   - Round icons 1px larger than square peers.
-   - Equal button padding, icon side 2px less for optical centering.
-   - Align icons / names / right counts throughout column, as sidebar (§2.1).
-10. **Motion** ease-out entry / movement, base 250ms, values §7.1.
-11. **No text overlap** (2026-10-24): text stays in own column at any width, wraps / ellipsizes with full hover. Addresses §3.1 rule 12 never cover neighbors; narrow windows wrap right controls below, not over explanations. TUI truncates to width, likewise no overlap.
-12. **Two page widths by shape** (2026-10-28): multicolumn list / details full-window, 12px side padding, draggable resettable widths like editor 38/31/31: inventory, log list 62%, needs left 55% / two columns since 2026-10-29, all lists list 38%, packs, subscriptions, tasks. Single column centered 960px reading width so labels / values close: games, textures, settings. Others guide / uninstall / build / exchange retain 1200px. Two `.page:is(...)` stylesheet rules.
+   - Round icons are 1px larger than square icons on the same row.
+   - Button padding is equal on both sides, except that the icon side has 2px less to center the combined icon and text visually.
+   - Align icons, names, and right-side counts to the same edges throughout a column, as in the sidebar (§2.1).
+10. **Motion** uses ease-out for entry and movement, with a 250ms base. See §7.1 for the values.
+11. **Text must not overlap** (2026-10-24). At any width, text stays in its own column, wrapping or ellipsizing with the full text on hover. Addresses follow §3.1 rule 12 and never cover adjacent text, inputs, or buttons. In narrow windows, right-side controls wrap below the explanation. The TUI truncates to the terminal width and likewise prevents overlap.
+12. **Page width follows the page's shape** (2026-10-28). Pages with multiple list and detail columns fill the window with 12px side padding and draggable widths that reset on double-click, like the editor's 38% / 31% / 31% split. These include inventory, game log (list 62%), Can it run (left 55%, two columns since 2026-10-29), All lists (list 38%), packs, subscriptions, and tasks. Single-column games, textures, and settings pages share a centered 960px reading width so labels and values stay close. Guide, uninstall, build, and exchange pages retain 1200px for now. Two `.page:is(...)` stylesheet rules implement these widths.
 
-**Checks**:
-- GUI TestStyleRules reads `style.css`: only var(--r-lg), var(--r-sm), 50%, 999px, inherit, calculated inner choice radii; only table's font sizes; only var(--hairline), 0 / none to remove. Reports line / value. No border-left / border-right or `box-shadow: inset` accent bars.
-- TestWording (§7.2) checks no middle dots in translation maps / `view.Text` (`view.WordingTextProblems`) and GUI literals.
+**Checks** enforce the rules:
+- The GUI TestStyleRules reads `style.css`. It permits only var(--r-lg), var(--r-sm), 50%, 999px, inherit, and the calculated inner choice radii; only the table's font sizes; and only var(--hairline), with 0 or none to remove a line. It reports the source line and invalid value. It prohibits border-left, border-right, or `box-shadow: inset` accent bars.
+- TestWording (§7.2) also rejects middle dots in translation maps and `view.Text` (`view.WordingTextProblems`), including GUI literals.
 
 ### 7.4 Accent themes (GUI, 2026-10-24)
 
-- Settings > interface > accent (`ui.accent`, 06 §2.14): default leaves existing indigo unchanged; 15 Radix Colors 3.0.0 scales: indigo, blue, cyan, teal, green, grass, orange, amber, red, crimson, pink, plum, purple, violet, iris. Each 12 light <name> / dark <name>Dark levels in assets/js/accent.js with MIT notice.
-- **Only four accent variables change**, success / error / amber / grays unchanged, §7 principle 2:
+- Settings > interface > accent (`ui.accent`, 06 §2.14) offers default, which leaves the existing indigo values unchanged without overriding variables, and 15 Radix Colors 3.0.0 scales: indigo, blue, cyan, teal, green, grass, orange, amber, red, crimson, pink, plum, purple, violet, and iris. Each has 12 light <name> levels and 12 dark <name>Dark levels. The original values are in assets/js/accent.js with the MIT notice.
+- **Only four accent variables change.** Success green, error red, warning amber, and grays retain their values, following §7 principle 2:
 
   | Variable | Light | Dark |
   | --- | --- | --- |
-  | --accent, fill / border / cursor | 9 | 11 |
-  | --accent-soft, pills / cursor tint | 3 | 3 |
+  | --accent, fill, border, and cursor | 9 | 11 |
+  | --accent-soft, pills and cursor tint | 3 | 3 |
   | --sel, selection | 4 | 5 |
-  | --accent-fg, text on fill | White, amber level 12 | 1 |
+  | --accent-fg, text on fill | White; level 12 for amber | 1 |
 
-  Also expose all 12 levels as `--accent-1` … `--accent-12`; accent text level 11 `var(--accent-11, var(--accent))`, clearer on white than level 9.
-- **Day / night** (2026-10-24): `ui.theme` auto default follows OS, light / dark manual. Gray, log, accent share effective theme. Restore local cached theme before styles to avoid flash, `Init.theme` syncs database; disabled local storage still uses startup data.
-- **Immediate**: Init includes accent, root inline vars before first paint; setting change refetch / apply without reload; manual light / dark swaps immediately, OS changes apply only with `ui.theme=auto`. Swatches actual effective --accent, ring / ✓ selected, hover / adjacent name. Default removes inline vars. TUI retains the §7 palette.
-- Known: some light scales' level-9 white contrast <4.5:1, Radix tradeoff; 13px medium buttons unchanged for now.
-- `internal/surface/gui/accent_test.go` verifies 12+12 valid colors per choice, new CSS passes TestStyleRules.
+  All 12 levels are also exposed as `--accent-1` … `--accent-12`. Accent text uses level 11, `var(--accent-11, var(--accent))`, which is clearer on white than level 9.
+- **Day/night selection** (2026-10-24) uses `ui.theme`: auto is the default and follows the OS; light and dark are manual choices. Grays, log colors, and accents use the same effective theme. A manual theme ignores system changes. The local cached theme is restored before styles load to avoid a flash, then `Init.theme` synchronizes the database value. If local storage is disabled, startup data still supplies the theme.
+- **Changes apply immediately.** Init includes accent, and the root inline variables are set before first paint. Changing a setting refetches and applies the values without reloading the page. Manual light or dark selection switches immediately; OS changes apply only with `ui.theme=auto`. Swatches show the actual effective --accent color. A ring and ✓ mark the selection, and hover and adjacent text show the name. Default removes the inline variables. The TUI retains the §7 palette.
+- A known limitation is that white on level 9 in some light scales has contrast below 4.5:1, a Radix tradeoff. Buttons retain 13px medium text for now.
+- `internal/surface/gui/accent_test.go` verifies that each choice has 12+12 valid colors in accent.js. New CSS rules also pass TestStyleRules.

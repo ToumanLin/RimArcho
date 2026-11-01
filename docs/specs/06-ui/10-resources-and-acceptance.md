@@ -4,26 +4,26 @@
 
 ## 10. Resource targets
 
-**Pages must load fast and use little memory.** This is a key difference between RimArcho and RimCrow (400–500 MB resident, 07 §6); new features must not sacrifice it:
+**Pages must load fast and use little memory.** This is a key difference between RimArcho and RimCrow, which uses 400–500 MB while resident (07 §6). New features must not sacrifice it:
 
-- **Show the page first.** Show existing data on navigation. Fill slow parts (files, analysis, network, Steam) in the background without blocking pages or keys.
-- **Do not retain memory indefinitely.** Release page data on leaving (07 §8.3); cap caches or invalidate on data changes; idle memory must not grow with usage time.
-- **The table sets merge thresholds.** Do not merge changes exceeding any threshold. For page loading, lists, scans, or caches, measure before / after and record numbers in the commit description and 07 §6.
+- **Show the page first.** On navigation, show existing data immediately. Fill in slow parts, such as file reads, analysis, network access, and Steam, in the background without blocking the page or keys.
+- **Do not retain memory indefinitely.** Release a page's data when leaving it (07 §8.3). Caches must have a limit or become invalid when their data changes. Idle memory must not grow with usage time.
+- **The table sets merge thresholds.** Do not merge a change that exceeds any threshold. When changing page loading, lists, scans, or caches, measure before and after and record the numbers in the commit description and 07 §6.
 
 | Metric | Target | Measured |
 | --- | --- | --- |
 | TUI: archo working set after 10 idle minutes | ≤ 80 MB | 07 §6 |
-| TUI: each key response (1354 Mods, scrolling and filtering) | ≤ 50 ms | 07 §6 |
-| GUI: idle Go memory (private working set) | ≤ 80 MB | 07 §6 |
-| GUI: total memory (Go + WebView2, Task Manager Memory metric, 10 idle minutes) | ≤ 200 MB | 07 §6 |
-| GUI: cold start to interactive list | ≤ 1.5 seconds | 07 §6 |
-| GUI: page switch to interactive content (1354 Mods) | ≤ 200 ms; file-reading pages show structure and existing data first | Editor 106 ms (07 §6); other pages unmeasured |
-| GUI: single interaction (call + redraw) | ≤ 50 ms | 07 §6 |
-| GUI: launch background (§2.3, §2.14) | No change in Go idle memory | 2026-10-22 development debug server: generated 58 thumbnails (about 8.6 seconds), Private 77 MB before, 75 MB 6 seconds after |
+| TUI: each key response with 1354 Mods, scrolling and filtering | ≤ 50 ms | 07 §6 |
+| GUI: idle Go memory, measured as private working set | ≤ 80 MB | 07 §6 |
+| GUI: total memory, Go + WebView2, using Task Manager's Memory metric after 10 idle minutes | ≤ 200 MB | 07 §6 |
+| GUI: cold start to an interactive list | ≤ 1.5 seconds | 07 §6 |
+| GUI: page switch to interactive content with 1354 Mods | ≤ 200 ms; pages that read files show their structure and existing data first | Editor: 106 ms (07 §6); other pages are unmeasured |
+| GUI: a single interaction, including the call and redraw | ≤ 50 ms | 07 §6 |
+| GUI: launch background (§2.3, §2.14) | No change in Go idle memory | On the 2026-10-22 development debug server, generating 58 thumbnails took about 8.6 seconds. Private memory was 77 MB before and 75 MB 6 seconds after completion |
 
-- 00's proposed 80 MB applies only to the Go process; WebView2 cannot fit this range. TUI runs in the player's terminal, whose process is excluded (§9.2). Both remain far below RimCrow (07 §6).
-- On minimize, GUI sets WebView2 memory target to low, restoring normal on restore (07 §8.3): after using Mod inventory, minimizing reduced total 151 → 103 MB.
-- Without WebView2 (rare stripped systems), show an explanation and Microsoft download link, never download automatically; `archo.exe` TUI remains usable.
+- The 80 MB proposed in 00 applies only to the Go process; WebView2 cannot fit within that range. The TUI runs in the player's terminal, whose process is excluded (§9.2). Both remain far below RimCrow (07 §6).
+- On minimize, the GUI sets WebView2's memory target to low, restoring normal when the window returns (07 §8.3). After using inventory, minimizing reduced total memory from 151 → 103 MB.
+- If WebView2 is unavailable, as on a few stripped systems, show an explanation and a Microsoft download link without downloading automatically. The player can still use the `archo.exe` TUI.
 
 ## 11. Acceptance
 
@@ -31,88 +31,88 @@
 
 | # | Scenario | Expected | Status |
 | --- | --- | --- | --- |
-| T1 | Four-area scrolling / search with 1354 Mods, including CJK | Each key ≤ 50 ms | Passed |
-| T2 | Terminal widths 160, 130, 100, 78 | Correct §2.5 degradation, all operations usable (`TestBreakpointsAndCJK`) | Passed |
-| T3 | Chinese names / aliases | Correct alignment, no split characters, no U+FFFD | Passed |
-| T4 | New user enables, sorts, launches without docs | Within 5 minutes, human usability test | Unverified |
-| T5 | Idle 10 minutes | archo working set ≤ 80 MB | Passed |
-| T7 | Long descriptions, paths, mixed Chinese / English details | Widths 24–80, detail area / full-screen, technical info expanded / collapsed: correct wrapping within width (`TestT7Wrapping`, `TestWrap`) | Passed |
-| T8 | Real environment | Every can it run item understandable in one plain sentence, with executable key; no finding codes / `#id`; top count equals counted items (`TestT8NeedsReal`) | Passed |
-| T9 | Stage 20 Mods, put all back | Every original position restored (`TestStagingT9`) | Passed |
-| T13 | Select two Mods, `g`, no typing, just `→` `enter` | Add second candidate tag to both, repeat removes it (`TestT13TagBar`) | Passed |
-| T15 | In full-screen details, `↓` to bottom, `→` | Next Mod, content starts at top (`TestT15FullScreenNext`) | Passed |
-| T16 | Resize columns, enable name wrapping, restart | Width / wrapping persist; details ≥ 40 cells; `=` resets (`TestT16WidthsPersist`) | Passed |
-| T17 | 1000 random navigation keys in every state, including `PgUp` / `PgDn`, shift / ctrl arrows, wheel | List, staging, tags, undo stack unchanged (`TestT17ArrowsOnlyNavigate`, 15 states) | Passed |
-| T18 | Script §3 key sequences for 6 tasks below | No more keys than table, correct results (`TestT18TaskSteps`) | Passed |
-| T19 | Render every state, including 5 overlays / full-screen details | Position line always gives focused area / position, including overlay names (`TestT19PositionLine`) | Passed |
-| T20 | Repeat `esc` from any state until stable | At most 3 to base: current page, no selection / overlay, collapsed filter bar (`TestT20EscBack`: 15 editor states + 7 nested; `TestT20EscBackPages`: 27 states across launch, can it run, game log, Mod inventory > all, subscriptions and updates, search files, sorting rules, packs, texture optimization, settings, uninstall; `TestT20PagesBuilt` verifies each state really built) | Passed |
-| T21 | Start TUI without arguments | Current plan editor; command panel reaches every TUI page in §9.1 | Passed |
-| T22 | Two plans in one environment; command-panel switch | Editor shows other plan's list, staging, history | Passed |
-| T24 | GUI alignment (§9.1, §9.5): every command-panel action responds; top / breadcrumbs use GUI names can it run and mod library > subscriptions and updates; file search covers open list's enabled Mods, results Mod → file → line, toggle and rerun, stop on leaving; rules `r` add, `Del` delete, immediate `u` restore, `a` scope; editor `H` picker, narrow `4` details, details `?`; `shift+1` / editor `L` visit launch, only `L` there launches; `P` opens without changing current, top says launching X; `T` stages all outside Staging | All correct (`TestWindowNames`, `TestFileSearchPage`, `TestFileSearchLeaveStops`, `TestRulesScreen`, `TestEditorKeysOfTheWindow`, `TestStartPage`, `TestOpenListIsNotCurrent`, `TestStageAllKey`) | Passed |
-| T23 | `:` (§9.4): `pl`, `tab`, choose `plan new`, add name; `enable`, `tab` completes cursor Mod; `↑` recalls; invalid flags; multiline command | Correct candidates / help; usage error preserves input, red error; single line status / multiline panel; quoted name one argument; background execution without blocking; history survives restart (`TestCmdLine*`) | Passed |
+| T1 | Scroll and search four areas with 1354 Mods, including CJK | Each key responds in ≤ 50 ms | Passed |
+| T2 | Use terminal widths 160, 130, 100, and 78 | The layout degrades correctly under §2.5, and all operations remain usable (`TestBreakpointsAndCJK`) | Passed |
+| T3 | Use Chinese names and aliases | Alignment is correct; truncation never splits a character or produces U+FFFD | Passed |
+| T4 | A new user enables, sorts, and launches without reading docs | Complete within 5 minutes in a human usability test | Unverified |
+| T5 | Remain idle for 10 minutes | The archo working set is ≤ 80 MB | Passed |
+| T7 | Show long descriptions, long paths, and mixed Chinese and English in details | At widths 24–80, the detail area and full-screen view wrap within the width, with technical information expanded or collapsed (`TestT7Wrapping`, `TestWrap`) | Passed |
+| T8 | Use a real environment | Each can it run item is understandable in one plain sentence and has an executable key. The UI shows no finding codes or `#id`, and the top count equals the counted items (`TestT8NeedsReal`) | Passed |
+| T9 | Stage 20 Mods, then put them all back | Each Mod returns to its original position (`TestStagingT9`) | Passed |
+| T13 | Select two Mods, press `g`, then only `→` `enter` without typing | The second candidate tag is added to both; repeating removes it (`TestT13TagBar`) | Passed |
+| T15 | In full-screen details, press `↓` to the bottom, then `→` | The next Mod opens with its content at the top (`TestT15FullScreenNext`) | Passed |
+| T16 | Resize columns, enable name wrapping, then restart | Widths and wrapping persist; details have ≥ 40 cells, and `=` resets widths (`TestT16WidthsPersist`) | Passed |
+| T17 | Send 1000 random navigation keys in every state, including `PgUp` / `PgDn`, shift and ctrl arrows, and the wheel | The list, staging, tags, and undo stack remain unchanged (`TestT17ArrowsOnlyNavigate`, 15 states) | Passed |
+| T18 | Script the §3 key sequences for the 6 tasks below | Each task uses no more keys than the table allows and produces the correct result (`TestT18TaskSteps`) | Passed |
+| T19 | Render every state, including 5 overlays and full-screen details | The position line always shows the focused area and position, with any overlay name (`TestT19PositionLine`) | Passed |
+| T20 | Repeat `esc` from any state until nothing changes | At most 3 presses reach the base state: the current page, no selection or overlay, and collapsed filters. `TestT20EscBack` covers 15 editor states plus 7 nested states. `TestT20EscBackPages` covers 27 states across launch, can it run, game log, Mod inventory > all, subscriptions and updates, search files, sorting rules, packs, texture optimization, settings, and uninstall. `TestT20PagesBuilt` verifies that each state was actually built | Passed |
+| T21 | Start the TUI without arguments | The current plan's editor opens, and the command panel reaches every TUI page in §9.1 | Passed |
+| T22 | Switch through the command panel between two plans in one environment | The editor shows the other plan's list, staging, and history | Passed |
+| T24 | Align with the GUI (§9.1, §9.5): every command-panel action responds; the top bar and breadcrumbs use GUI names such as can it run and mod library > subscriptions and updates. Search covers the open list's enabled Mods, groups Mod → file → line, reruns after a toggle, and stops on leaving. Rules use `r` to add, `Del` to delete, immediate `u` to restore, and `a` for scope. Check the editor's `H` picker, narrow-screen `4` details, and full-details `?`. `shift+1` and editor `L` visit launch, where only `L` launches. `P` opens a list without changing the current list, and the top bar says launching X. Outside Staging, `T` stages all | All behavior is correct (`TestWindowNames`, `TestFileSearchPage`, `TestFileSearchLeaveStops`, `TestRulesScreen`, `TestEditorKeysOfTheWindow`, `TestStartPage`, `TestOpenListIsNotCurrent`, `TestStageAllKey`) | Passed |
+| T23 | Use `:` (§9.4): type `pl`, press `tab`, choose `plan new`, and complete the name; after `enable`, use `tab` to complete the cursor Mod; use `↑` to recall history; enter invalid arguments; run a multiline command | Candidates and help are correct. Usage errors retain the input and show red text. Single-line results use status; multiline results open a panel. A quoted name is one argument. Commands run in the background without blocking, and history survives restart (`TestCmdLine*`) | Passed |
 
-T11 / T12 were removed with session picking; T6 / T14 (thumbnails) and T10 (download WezTerm) with removal of the WezTerm host / images on 2026-10-30 (§9.2).
+T11 and T12 were removed with session picking. T6 and T14 (thumbnails), and T10 (download WezTerm), were removed with the WezTerm host and images on 2026-10-30 (§9.2).
 
 T18 tasks (+ name means typing a few characters):
 
 | Task | Keys |
 | --- | --- |
-| Enable known-name Mod at suitable position, focus Enabled | `/` name `tab` `space`: 3 keys + name |
-| Move Mod behind another, 120 positions apart | `m` name `enter`: 2 keys + name |
-| Disable 3 nonadjacent Mods | `↑↓` movement plus 3 `ctrl+space`, `space`: movement + 4 |
-| Read current Mod description | `PgDn` `PgDn`: 2 keys |
-| Add common tag to 5 consecutive Mods | `shift+↓` 4 times, `g` `→` `enter`: 7 keys |
-| Stage half the Mods to investigate findings | `shift+↓` N times, `t` |
+| Enable a known-name Mod at a suitable position, with focus in Enabled | `/` name `tab` `space`: 3 keys + name |
+| Move a Mod behind another, 120 positions apart | `m` name `enter`: 2 keys + name |
+| Disable 3 nonadjacent Mods | `↑↓` movement plus 3 `ctrl+space`, then `space`: movement + 4 |
+| Read the current Mod's full description | `PgDn` `PgDn`: 2 keys |
+| Add a common tag to 5 consecutive Mods | `shift+↓` 4 times, then `g` `→` `enter`: 7 keys |
+| Stage half the Mods to investigate findings | `shift+↓` N times, then `t` |
 
 ### GUI
 
 | # | Scenario | Expected | Status |
 | --- | --- | --- | --- |
-| G1 | Same synthetic environment state | TUI / GUI columns / needs exactly match `view.BuildBoard` / `view.BuildNeeds`; GUI Go mutations use typed view / app calls, `cmds.Execute` only §1 read-only text / user commands (`gui.TestSameViewModels`) | Passed |
-| G2 | Scroll / filter 1354 Mods | Each interaction ≤ 50 ms | Passed |
-| G3 | Each keyboard, mouse, drag, context-menu action | Same result as TUI, every step `u` undoable (`gui.TestVerbsAndUndo`) | Passed |
-| G4 | 1000 random clicks, scrolls, arrows | Database / three columns unchanged (§3.1 rule 1) | Passed |
-| G5 | Repeat `esc` anywhere | At most 3 to base; subscriptions / updates collapse sources then clear single-Mod condition; add subscription clears paste then returns | Existing pages: `spikes/guidev/esccheck.js`; new panels / selection / record conditions: `/dev/pagecheck` |
-| G6 | Workshop description with scripts, `onerror`, `javascript:`, remote images | No execution / loading; literal text, images from local cache | Passed |
-| G7 | Real environment can it run | Same list as TUI, executable button per item | Passed |
-| G8 | TUI / GUI open together, edit in one | Other refreshes on focus without overwriting (`app` concurrency tests) | Passed |
-| G9 | Idle 10 minutes | §10 targets met | Passed |
-| G10 | Double-click `RimArcho.exe` | Direct GUI, no console, scan / analysis subprocesses no windows | Passed |
-| G11 | Every sidebar entry | Only current children expand; breadcrumbs match location, every level clickable | Passed |
-| G12 | Home, two environments / three plans / one pack | Last-played order; row status equals plan can it run error count; launch disabled with explanation while running | Partial: ordering, each plan row, runtime disable passed; two environments untested |
-| G13 | can it run | Left errors / hints / confirmation, right last-run errors, TUI same order one column; hidden / locked Mods and stale textures bottom links only; badge counts actionable items, excludes hints; evidence chips | Passed: GUI `TestNeedsSectionsAndEvidence`; TUI `TestG13NeedsSectionsTUI`, `TestNeedsSectionsLive`, `TestNeedsMergedAndElsewhere`, both icon modes; view `TestCorpusNeeds`, `TestHiddenModsNotCounted`, `TestNeedsElsewhereAndLinks` |
-| G29 | Buttons / finished items (2026-10-29) | All actions bottom buttons, no `⋯`; one button per choice; inline confirmation; vanished completed item retained as ✓ …, newest undoable has undo; last-run / related left items cross-link | Passed: GUI `scripts/vm/needs.test.mjs`, `identity-answers.test.mjs`; view `TestNeedsRelated`, `TestNeedsSortAlso`; native window / real data pending VM |
-| G14 | Create pack with error findings | Build disabled with specific findings; see the list first writes nothing | Passed (`gui.TestBuildPageG14`; browser checked on data copy) |
-| G15 | Guide, two environments, RimSort import | Both checked environments created; import preview then first plan on confirm | Implemented (`guide.js`, §2.15), unverified |
-| G16 | Open Archo anywhere | Right panel, `esc` closes, page state unchanged | Pending (1.1) |
-| G17 | Runtime status, sidebar row removed 2026-10-30 | Launch page running within 3 seconds; new errors update badge without dialog; new log counted automatically on exit (`TestReadNewLogCountsTheRun`) | Passed; pre-removal record: 2026-10-22 development server `-fakegame`, 1.6 seconds after start showed game running since 03:51 and badge 1, absent from top bar; row vanished on exit. TUI status right: `TestLiveGame`, `TestStatusLineAfterGame` |
-| G18 | All lists, four lists, one followed collection changed | Clicking lists opens all lists; ungrouped left; current / make current at row right; version changes expose reset to default / undo; catch up undo returns original in one step; no ModsConfig.xml writes here | Implemented |
-| G19 | Export from all lists and editor | Breadcrumbs library / lists / <list> / export; every format exactly matches `archo loadout export --format`; `esc` returns to origin | Implemented |
-| G21 | Add 2000+ Mod game, switch to it, rapidly change texture options on build / texture pages | Each click responds within 100ms; sidebar / other pages usable during scan / switch / measurement; only conflicting actions disabled; latest value wins (§3.1 rule 9) | Partial: synthetic 2100 Mods allow navigation during scan / first analysis, final rapid-switch state correct; stale measurements cannot overwrite build / texture options, `/dev/pagecheck`; real 2000+ game / native window unverified |
-| G22 | Every sidebar entry | New page skeleton / old content first, fill on arrival; late results cannot overwrite new page (§8.2) | Passed headless Chrome `/dev/pagecheck`: immediate feedback, late success / error isolation, failure retries, same-page refresh, environment / plan checks, old virtual rows inert during editor / library object changes |
-| G23 | New list, import, load history, see list first | No dialogs: right-column new list, import subpage, inline list; history loads without confirmation, `u` undoes (§3.1 rule 7) | Passed in `spikes/guidev`: right form, import subpage (share code / test Steam collection), history / undo; inline list (`codex/ui-tables`) |
-| G24 | Every pair of space-sharing cards | Drag splitter, double-click reset, tab then arrows resize, persists (§3.1 rule 10) | Passed `gui.TestSeparators`; headless `spikes/guidev/gapcheck.cjs` measured 14 splitters: editor, expanded staging / history, three filter bars, library, log, tasks, lists, sidebar; drag, hit area, 40px keys, double-click / Enter reset, restart persistence, narrow disable. Synthetic log / empty tasks, real GUI settings API |
-| G25 | `TestStyleRules`, `TestWording` | Two radii, four font sizes ≥ 12px, hairlines only, no left accent bars, no `·` in UI (§7.3) | Passed: style tests check radii / font shorthand / variables / hairlines / accent bars, report line / value; wording checks Chinese-English tables, command panel, Go UI literals, GUI JS; CLI retains format |
-| G26 | A→B→C, back twice, forward once, new page; side buttons / `alt+←/→`; overlays, details, deleted pages, uninstall lock | §3.1 rule 11: no duplicates, truncate branches, skip invalid pages, late results never reclaim page, address stays Wails / dev server, navigation never mutates data | Partial (2026-10-24 headless Chrome `/dev/pagecheck`): history, side-event interception / deduplication, keys, invalid pages, overlays, details, guide end, uninstall lock, late isolation; native WebView2 physical side buttons unverified |
-| G27 | Subscriptions / updates unified waiting / updated list with details, scope, source summary; add subpage; home / detail changes links | Read-only source / account status in inline sources; queued checks / updates, preview / runtime refusal; scope filters both groups, counts hidden updates; paste recognizes Git / LoversLab / other page / Workshop, one decision and `--dry-run`; home / detail scope preserved; no all-page subscription entry | Automated view fixture / golden, GUI API, `spikes/guidev/pagecheck`; real Steam / SteamCMD / LoversLab / native window unverified |
+| G1 | Use the same synthetic environment state | TUI and GUI columns and needs exactly match `view.BuildBoard` / `view.BuildNeeds`. GUI Go mutations use typed view and app calls; `cmds.Execute` only serves the §1 read-only text and player commands (`gui.TestSameViewModels`) | Passed |
+| G2 | Scroll and filter 1354 Mods | Each interaction takes ≤ 50 ms | Passed |
+| G3 | Perform every keyboard, mouse, drag, and context-menu action | Results match the TUI, and `u` undoes every step (`gui.TestVerbsAndUndo`) | Passed |
+| G4 | Make 1000 random clicks, scrolls, and arrow presses | The database and three columns remain unchanged (§3.1 rule 1) | Passed |
+| G5 | Repeat `esc` anywhere | At most 3 presses reach the base state. Subscriptions first collapses sources, then clears the single-Mod condition. Add clears the paste box before returning | Existing pages are covered by `spikes/guidev/esccheck.js`; `/dev/pagecheck` covers new panels, selection, and record conditions |
+| G6 | Show a Workshop description containing scripts, `onerror`, `javascript:`, and remote images | Nothing executes or loads remotely. Text remains literal, and images come from the local cache | Passed |
+| G7 | Open can it run in a real environment | The list matches the TUI, with an executable button for each item | Passed |
+| G8 | Open the TUI and GUI together as two processes, then edit in one | The other refreshes on focus without overwriting the edit (`app` concurrency tests) | Passed |
+| G9 | Remain idle for 10 minutes | The §10 targets are met | Passed |
+| G10 | Double-click `RimArcho.exe` | The GUI opens directly without a console; scan and analysis subprocesses create no windows | Passed |
+| G11 | Open every sidebar entry | Only the current entry's children expand. Breadcrumbs match the sidebar location, and every level is clickable | Passed |
+| G12 | Open home with two environments, three plans, and one pack | Rows follow last-played order, and each status matches that plan's can it run error count. Launch is disabled with an explanation while the game runs | Partially passed: ordering, one row per plan, and runtime disabling passed; two environments remain untested |
+| G13 | Open can it run | The GUI has errors, hints, and confirmation on the left, and last-run errors on the right; the TUI uses the same order in one column. Hidden or locked Mods and stale textures only have bottom links. The badge counts actionable items, excluding hints, and every item has evidence chips | Passed: GUI `TestNeedsSectionsAndEvidence`; TUI `TestG13NeedsSectionsTUI`, `TestNeedsSectionsLive`, and `TestNeedsMergedAndElsewhere` in both icon modes; view `TestCorpusNeeds`, `TestHiddenModsNotCounted`, and `TestNeedsElsewhereAndLinks` |
+| G29 | Check can it run buttons and completed items (2026-10-29) | Every action is a bottom button, without `⋯`; each choice has a button. Confirmation is inline. A completed item that disappears remains as ✓ …, with undo on the latest undoable item. Last-run errors and related left items link to each other | Passed: GUI `scripts/vm/needs.test.mjs`, `identity-answers.test.mjs`; view `TestNeedsRelated`, `TestNeedsSortAlso`. Native-window and real-data checks remain pending in the VM |
+| G14 | Open create a pack with error-level findings | Build is disabled with the specific findings, and see the list first writes nothing | Passed (`gui.TestBuildPageG14`; also checked in a browser on a data copy) |
+| G15 | Use the guide with two environments and a RimSort import | Both checked environments are created. Import shows a preview, then creates the first plan after confirmation | Implemented (`guide.js`, §2.15), unverified |
+| G16 | Open Archo from any page | The right panel opens; `esc` closes it without changing page state | Pending (1.1) |
+| G17 | Check runtime status after the sidebar row's removal on 2026-10-30 | Launch shows running within 3 seconds. New errors update the badge without a dialog, and a new log is counted automatically on exit (`TestReadNewLogCountsTheRun`) | Passed. Before removal, the 2026-10-22 development server with `-fakegame` showed game running since 03:51 and badge 1 after 1.6 seconds, without a top-bar entry; the row vanished on exit. TUI status appears at the right: `TestLiveGame`, `TestStatusLineAfterGame` |
+| G18 | Open all lists with four lists, one following a changed collection | Clicking lists opens all lists, with no grouping on the left. Each row has current or make current at the right. Changing allowed versions exposes reset to default and status undo. Catch up returns to the original list with one undo. No action here writes ModsConfig.xml | Implemented |
+| G19 | Open export from all lists and the editor | Breadcrumbs are library / lists / <list> / export. Every format exactly matches `archo loadout export --format`, and `esc` returns to the originating page | Implemented |
+| G21 | Add a game with 2000+ Mods, switch to it, and rapidly change texture options on the build and texture pages | Every click responds within 100ms. Navigation and other pages remain usable during scanning, switching, and measurement. Only conflicting actions are disabled, and only the latest value is computed (§3.1 rule 9) | Partially passed: with synthetic 2100 Mods, navigation works during scanning and first analysis, and rapid switches end in the correct state. Stale measurements cannot overwrite build or texture options (`/dev/pagecheck`). A real 2000+ Mod game and native window remain unverified |
+| G22 | Open every sidebar entry | The new page's skeleton or previous content appears first, then fills when data arrives. Late results cannot overwrite a newer page (§8.2) | Passed in headless Chrome `/dev/pagecheck`: immediate feedback, isolation of late success and errors, failure retries, same-page refresh, environment and plan checks, and inert old virtual rows during editor or library object changes |
+| G23 | Create a list, import, load history, and see the list first | No dialogs: new list uses the right column, import a subpage, and the preview an inline section. History loads without confirmation, and `u` undoes it (§3.1 rule 7) | Passed in `spikes/guidev`: the right form, import subpage with a share code and test Steam collection, and history loading with undo. The inline preview is in `codex/ui-tables` |
+| G24 | Test every pair of cards sharing space | Dragging resizes; double-click resets; tab and arrows resize; sizes persist after reopening (§3.1 rule 10) | Passed `gui.TestSeparators`. Headless `spikes/guidev/gapcheck.cjs` measured 14 splitters across the editor, expanded staging and history, three filter bars, library, log, tasks, lists, and sidebar. It covered dragging, the expanded hit area, 40px keys, double-click and Enter reset, restart persistence, and disabling in narrow windows. Log cards and empty tasks used synthetic data; the real GUI settings API saved values |
+| G25 | Run `TestStyleRules` and `TestWording` | Use two radii and four font sizes, all ≥ 12px, with hairlines only, no left accent bars, and no `·` in UI text (§7.3) | Passed: style tests check radii, font sizes including shorthand and variables, hairlines, and accent bars, reporting the line and value. Wording tests check Chinese-English tables, the command panel, Go UI literals, and GUI JS. CLI output retains its format |
+| G26 | Navigate A→B→C, back twice, forward once, then to a new page; use side buttons and `alt+←/→`; test overlays, details, deleted pages, and uninstall locks | Follow §3.1 rule 11: avoid duplicate records, truncate forward branches, skip invalid pages, prevent late results reclaiming the page, keep the Wails or development-server address, and never mutate data through navigation | Partially passed on 2026-10-24 in headless Chrome `/dev/pagecheck`: history, side-event interception and deduplication, keys, invalid pages, overlays, details, guide completion, uninstall locking, and late-result isolation. Physical side buttons in native WebView2 remain unverified |
+| G27 | Open subscriptions with its unified waiting and updated list, details, scope, and source summary; use Add and home or detail changes links | Source and account status are read-only in inline source rows. Checks and updates queue; updates preview and refuse a running game. Scope filters both groups and counts hidden updates. Pasting recognizes Git, LoversLab, other pages, and Workshop, asks one decision, and shows `--dry-run`. Home and detail links preserve scope. All has no subscription entry | Automated view fixtures and golden tests, GUI API, and `spikes/guidev/pagecheck` cover this. Real Steam, SteamCMD, LoversLab, and the native window remain unverified |
 
-| G28 | Shared editor / library filters, multiple Mod versions | Query text sole condition; only common tags / source / content groups; popup / ghost text / Tab completion without counts; consistent copy abstractions; 38:31:31 columns, swap / undo, Space / staging | Automated `TestEditorFilterBehavior`, `TestTypedBarConditions`, `TestDirectorySourceIdentityAndCopyFilters`, `TestCopyCaptionsAcrossPages`; production GUI dev server + isolated game: clicks, completion, blur collapse, swap / undo, Space / staging; native WebView2 unverified |
-| G30 | Editor rules, current / all, `r` add, edit, delete, undo | Above history; default enabled-list Mods only; all scope includes all, counts update; inline `r` form excludes self; edit retains `r:<n>`; undo restores deleted number; form keys cannot affect list; order findings / badge refresh | Automated `TestRulesFold` incl. `InList`, `TestRulesIgnoreRow`, `TestRuleCandidates`, `TestRuleEditCommand`; guidev synthetic clicks / keys cover scope, add, edit, delete, undo; native WebView2 unverified |
-| G31 | Mod library > search files | Enter searches, new invalidates old, esc / leave stops; Mod → file → line pagination; click path copies; C# only named Mods | Automated `TestFileSearchAPI`, guidev synthetic fixtures; C# needs ilspycmd, not tested on fixtures |
+| G28 | Use shared editor and library filters with multiple Mod versions | The query text is the sole condition. Only common tags, source, and content groups expand. The popup, ghost text, and Tab completion show no counts. Copy abstractions agree. Check 38:31:31 columns, swap and undo, Space, and staging | Automated `TestEditorFilterBehavior`, `TestTypedBarConditions`, `TestDirectorySourceIdentityAndCopyFilters`, and `TestCopyCaptionsAcrossPages`. The production GUI development server with an isolated game verified clicks, completion, collapse on blur, swap and undo, Space, and staging. Native WebView2 remains unverified |
+| G30 | Use editor rules: current or all scope, `r` add, edit, delete, and undo | Rules appear above history and default to enabled-list Mods only. All scope includes every rule, and counts follow scope. The inline r form's candidates exclude the current Mod. Editing retains `r:<n>`; undo restores the deleted number. Form keys cannot affect the list, and changes refresh order findings and the badge | Automated `TestRulesFold`, including `InList`, `TestRulesIgnoreRow`, `TestRuleCandidates`, and `TestRuleEditCommand`. Guidev synthetic clicks and keys cover scope, add, edit, delete, and undo. Native WebView2 remains unverified |
+| G31 | Open Mod library > search files | Enter searches, a new search invalidates the old one, and esc or leaving stops it. Results paginate as Mod → file → line. Clicking a path copies it. C# only searches named Mods | Automated `TestFileSearchAPI` and guidev synthetic fixtures cover this. C# requires ilspycmd and was not tested on the fixtures |
 
 ### History area and settings
 
 | # | Scenario | Expected | Status |
 | --- | --- | --- | --- |
-| P1 | Change language in settings | Immediate, persists restart | Unverified |
-| P2 | Clear thumbnails | Zero size, rebuilt on demand (`TestSettingsCommands`) | Passed |
-| P3 | `db backup` | Openable copy, original unaffected (`TestSettingsCommands`) | Passed |
-| P4 | Settings submits disallowed command | Refused, not executed; confirmation where required | Unverified |
+| P1 | Change the language in settings | The change applies immediately and persists after restart | Unverified |
+| P2 | Clear thumbnails | The cache size becomes zero, and thumbnails rebuild on demand (`TestSettingsCommands`) | Passed |
+| P3 | Run `db backup` | The copy can be opened, and the original database is unaffected (`TestSettingsCommands`) | Passed |
+| P4 | Submit a disallowed command from settings | Refuse without executing; actions that require confirmation must confirm first | Unverified |
 
 ### Icons
 
 | # | Scenario | Expected | Status |
 | --- | --- | --- | --- |
-| G18 | Both release executables | Portrait in Explorer, version / description in properties | Unverified |
-| G19 | Window | Taskbar / Alt+Tab icons; `go build` without `.syso` also has icon; Windows interaction §8.2 | Unverified |
-| G20 | 16 px icon | Recognizable head only, hair and face | Unverified |
+| G18 | Inspect both release executables | Explorer shows the portrait, and properties show the version and description | Unverified |
+| G19 | Open the window | Taskbar and Alt+Tab show the window icon, including a `go build` development build without `.syso`. See §8.2 for Windows interaction | Unverified |
+| G20 | Inspect the 16 px icon | Only the head, including hair and face, appears and remains recognizable | Unverified |
