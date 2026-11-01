@@ -52,7 +52,7 @@ type SourceFailure struct {
 	Code             int
 }
 
-// Gone: Steam answered that the item is no longer on the Workshop (deleted or private).
+// Gone: Steam answered that the item is removed from the Workshop (the author deleted it or made it private).
 func (f SourceFailure) Gone() bool { return f.Code == 9 }
 
 // CheckFailures counts the items that could not be checked, leaving out the gone ones.

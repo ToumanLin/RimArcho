@@ -65,7 +65,7 @@ A wide Mod column occupies the left. Copies, Used in, Fields, and History occupy
 | 2 | Copies | Every instance in the Mod's Lineage (`API.ModCopies` → `view.LibRow`): source, status, current-plan presence, size, version, folder, and the player's note or a muted generated note. The selected raised copy with a left accent shows the inventory's six copy actions and plan actions in `view.OpTable` order, listing only applicable actions. |
 | 3 | Used in | The plans and packs using each copy, its current-plan presence, and the space action to add, remove, or swap it |
 | 4 | Fields | The §4.1 field list; clicking a value copies it |
-| 5 | History | Recent changes; all changes opens subscriptions and updates filtered to this Lineage |
+| 5 | History | Recent changes; all changes opens updates filtered to this Lineage |
 | 6 | Technical | One tab per `view.Sections` section: Def, patches, Harmony, rules, full history, and future sections such as manual Harmony targets or log-pattern cards. The renderer handles sections without knowing their concrete kinds; a new data section adds a tab. |
 
 The current technical sections are:

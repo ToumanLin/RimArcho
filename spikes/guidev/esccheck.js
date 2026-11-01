@@ -32,7 +32,7 @@ async function go(id) {
     b.click();
   }
   else {
-    // a sub-entry (All / subscriptions and updates / add a subscription) shows once its parent is open
+    // a sub-entry (All / updates / add a subscription) shows once its parent is open
     let b = $(`#nav [data-id="${id}"]`);
     if (!b && (id === "changes" || id === "subscribe")) { $(`#nav [data-id="library"]`).click(); await wait(600); b = $(`#nav [data-id="${id}"]`); }
     b.click();
@@ -96,8 +96,8 @@ const SCENARIOS = [
     key("ArrowDown", { shift: true }); key("\\"); await wait(300); key("Enter"); await wait(300); $(".lib-rows").focus(); key("Enter"); await wait(300);
   }],
   ["Mod library > All · help", "library", "library", async () => { key("?"); }],
-  ["Mod library > Subscriptions and updates · help", "changes", "changes", async () => { key("?"); }],
-  ["Mod library > Subscriptions and updates · sources open", "changes", "changes", async () => { $(".subs-srcsum").click(); await wait(300); }],
+  ["Mod library > Updates · help", "changes", "changes", async () => { key("?"); }],
+  ["Mod library > Updates · update checks selected", "changes", "changes", async () => { $(".subs-srcsum").click(); await wait(300); }],
   ["Mod library > Add a subscription · an address pasted", "subscribe", "subscribe", async () => { const i = $(".subscribe-omni input"); i.focus(); i.value = "https://github.com/Example/colony"; i.dispatchEvent(new Event("input")); await wait(600); }],
   ["Lists · selection + open filter + palette", "plan", "plan", async () => { key("ArrowDown", { shift: true }); key("\\"); await wait(300); key("k", { ctrl: true }); }],
   ["Lists · filter open, focus on the rows", "plan", "plan", async () => { key("\\"); await wait(300); $('.area[data-area="1"] .rows').focus(); document.activeElement.blur(); }],

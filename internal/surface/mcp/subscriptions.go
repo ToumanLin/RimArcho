@@ -6,7 +6,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 )
 
-// subscriptions and updates (02 §3.4, 06 §2.9): subscriptions RimArcho installs and updates itself — Git
+// updates (02 §3.4, 06 §2.9): subscriptions RimArcho installs and updates itself — Git
 // repositories, download pages, Workshop items downloaded with SteamCMD — as one tool over
 // archo subscribe (05 §1.2). update replaces installed files and remove moves folders to
 // the recycle bin, so it is marked destructive; add, check and update reach Git hosts, web

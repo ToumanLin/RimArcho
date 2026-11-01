@@ -563,7 +563,7 @@ func (m *model) needsKey(s string) tea.Cmd {
 		return m.startAnalyze()
 	case "F":
 		return m.autoFix()
-	case "c": // subscriptions and updates, from any page (06 §3.5)
+	case "c": // updates, from any page (06 §3.5)
 		return m.openChangesOf("", "")
 	case "l":
 		return m.chooseLog()

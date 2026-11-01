@@ -1245,7 +1245,7 @@ func (s *API) Inspect(argv []string) ([]string, error) {
 
 // ---- changes (06 §2.9) ----
 
-// Changes is the Subscriptions and updates page: the current plan's mods since it was last played, or the whole
+// Changes is the Updates page: the current plan's mods since it was last played, or the whole
 // library; of (an instance ID) narrows it to that mod's Lineage, every change by day.
 func (s *API) Changes(library bool, of string) (*modchanges.Page, error) {
 	r, err := s.detachedReader()
@@ -1277,7 +1277,7 @@ func (s *API) ChangeFiles(before, after int64) []string {
 	return view.ChangeFiles(s.a, before, after)
 }
 
-// OpenChangeNotes opens a Workshop item's change notes (ctrl+w on Subscriptions and updates).
+// OpenChangeNotes opens a Workshop item's change notes (ctrl+w on Updates).
 func (s *API) OpenChangeNotes(ws string) (string, error) {
 	if !view.IsNumber(ws) {
 		return "", errors.New(view.T("no Workshop ID: not a Workshop mod"))

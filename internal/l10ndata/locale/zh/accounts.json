@@ -1,6 +1,6 @@
 {
   "%d failed": "%d 个失败",
-  "%d no longer on the Workshop": "%d 个已从工坊消失",
+  "%d no longer on the Workshop": "%d 个 Mod 已从创意工坊下架（作者删除或设为私有）",
   "%d: %s": "%d：%s",
   "%s (%s %q) is subscribed already at %s": "%s（%s %q）已订阅于 %s",
   "%s Workshop items could not be checked": "%s 个工坊条目未能检查",
@@ -129,7 +129,7 @@
   "new link path is occupied or inaccessible: %s": "新链接位置已占用或无法访问：%s",
   "no About/About.xml": "没有 About/About.xml",
   "no downloadable files recognized; use your browser": "未识别到可下载文件，请使用浏览器",
-  "no longer on the Workshop (deleted or private)": "工坊里已找不到（被删除或设为私有）",
+  "no longer on the Workshop (deleted or private)": "已从创意工坊下架（作者删除或设为私有）",
   "not a Workshop URL: %s": "不是工坊网址：%s",
   "not connected": "未连接",
   "note: SteamCMD signs in as %s, the account the Steam client is signed in with: Steam is signed out until you restart it": "注意：SteamCMD 会用 %s 登录，也就是 Steam 客户端正在用的账号：Steam 会被挤下线，重启后才回来",

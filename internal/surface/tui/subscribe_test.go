@@ -136,15 +136,15 @@ func TestAddSubscriptionPage(t *testing.T) {
 	if list := tasksOnRecord(t, e); len(list) != 1 || list[0].Kind != view.TaskSubscribe || list[0].State != app.TaskDone {
 		t.Fatalf("record: %+v", list)
 	}
-	// esc on the empty box goes back to subscriptions and updates
+	// esc on the empty box goes back to updates
 	key(m, tea.KeyMsg{Type: tea.KeyEsc})
 	if m.tab != tabChanges {
 		t.Fatalf("esc on an empty box: tab %d", m.tab)
 	}
-	// a paste on subscriptions and updates opens add a subscription with it: Workshop IDs ask Steam or SteamCMD
+	// a paste on updates opens add a subscription with it: Workshop IDs ask Steam or SteamCMD
 	key(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("2009463077 818773962"), Paste: true})
 	if m.tab != tabSubscribe || m.add.kind != "workshop" || !strings.Contains(addText(m), "download with SteamCMD") {
-		t.Fatalf("paste on Subscriptions and updates: tab %d %+v", m.tab, m.add)
+		t.Fatalf("paste on Updates: tab %d %+v", m.tab, m.add)
 	}
 	// a download page without a single repository: the files are chosen in the window
 	m.add = addState{text: "https://example.invalid/mods/colony", shown: "https://example.invalid/mods/colony", kind: "page", info: "Colony 1.2"}
@@ -157,7 +157,7 @@ func TestAddSubscriptionPage(t *testing.T) {
 	}
 }
 
-// 06 §2.9: on subscriptions and updates, K checks every source with mods, u updates a waiting one (its dry
+// 06 §2.9: on updates, K checks every source with mods, u updates a waiting one (its dry
 // run first; refused while a game runs), Del removes a subscription — each a background task.
 func TestSubscriptionsPageActions(t *testing.T) {
 	e, g := subscriptionEnv(t)

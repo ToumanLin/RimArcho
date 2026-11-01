@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// subscriptions and updates (06 §2.9, §9.1): three simple lists. 1 the sources (enter checks one, K every
+// updates (06 §2.9, §9.1): three simple lists. 1 the sources (enter checks one, K every
 // one with mods); 2 the updates waiting for the player (u updates one, U every one shown —
 // the dry run first, then a background task, refused while a game runs; Del removes the
 // subscription; p locks this version first; ctrl+w opens the source page); 3 the change
@@ -31,6 +31,7 @@ const (
 	chDay                // an older day (expands)
 	chSource             // a subscription source (enter checks it)
 	chPending            // an update waiting for the player
+	chGone               // an installed copy removed from the Workshop
 )
 
 type chRow struct {
@@ -39,6 +40,7 @@ type chRow struct {
 	mod  *modchanges.Row
 	src  *view.SubscriptionSource
 	pend *view.PendingUpdate
+	gone *view.RemovedSubscription
 	key  string // what enter expands; the row's identity across reloads
 }
 
@@ -87,6 +89,11 @@ func (c *chState) build() {
 		for i := range c.subscriptions.Sources {
 			s := &c.subscriptions.Sources[i]
 			c.rows = append(c.rows, chRow{text: fmt.Sprintf("  %s  %d  %s  %s  %s", s.Name, s.Count, s.Checked, s.Result, s.Account), kind: chSource, src: s, key: "src:" + s.Key})
+			for _, failure := range s.Failures {
+				for _, item := range failure.Items {
+					add("    "+item, chDim)
+				}
+			}
 		}
 		add("2 "+T("waiting for you to update"), chHead) // the window's names (06 §2.9)
 		for i := range c.subscriptions.Pending {
@@ -95,6 +102,25 @@ func (c *chState) build() {
 		}
 		if len(c.subscriptions.Pending) == 0 {
 			add("  "+T("no known updates; check a source above"), chDim)
+		}
+	}
+	if c.subscriptions != nil {
+		heading := false
+		for i := range c.subscriptions.Gone {
+			r := &c.subscriptions.Gone[i]
+			if c.of != "" && c.of != r.ID || c.of == "" && !c.library && !r.InPlan {
+				continue
+			}
+			if !heading {
+				add(T("won't update any more"), chHead)
+				heading = true
+			}
+			k := "gone:" + r.ID
+			c.rows = append(c.rows, chRow{text: "  " + r.Name + "  " + T("removed from the Workshop"), kind: chGone, gone: r, key: k})
+			if c.open[k] {
+				add("    "+T("The author deleted the Workshop page or made it private; your installed copy still works, but Steam will never update it."), chDim)
+				add("    "+T("After unsubscribing, you cannot download it again; lock this version to keep it."), chDim)
+			}
 		}
 	}
 	add("3 "+T("already updated"), chHead)
@@ -189,7 +215,7 @@ func (c *chState) group(g *modchanges.Group, where, ind string) {
 
 // selectable rows are the sources, the updates, the mods, the groups and the days.
 func (r chRow) selectable() bool {
-	return r.kind == chMod || r.kind == chGroup || r.kind == chDay || r.kind == chSource || r.kind == chPending
+	return r.kind == chMod || r.kind == chGroup || r.kind == chDay || r.kind == chSource || r.kind == chPending || r.kind == chGone
 }
 
 // home puts the cursor where the page starts: the first update waiting, else the first
@@ -291,6 +317,28 @@ func (m *model) changesKey(s string) tea.Cmd {
 	}
 	if r != nil && r.kind == chSource && s == "enter" {
 		return m.checkSources([]string{r.src.Key})
+	}
+	if r != nil && r.gone != nil {
+		g := r.gone
+		if s == "l" {
+			return m.openLibraryInstance(g.ID)
+		}
+		if s == "p" {
+			return m.arm("p", Tf("p again locks this version of %s (a copy in the lock library)", g.Name), func(m *model) tea.Cmd {
+				m.act(Tf("locked %s", g.Name), "pin", g.Ref)
+				m.reload()
+				m.loadChanges()
+				return nil
+			})
+		}
+	}
+	if s == "l" {
+		if pend != nil {
+			return m.openLibraryInstance(pend.ID)
+		}
+		if mod != nil && mod.Present {
+			return m.openLibraryInstance(mod.ID)
+		}
 	}
 	if pend != nil {
 		switch s {
@@ -450,7 +498,7 @@ func (c *chState) shownPending() []view.PendingUpdate {
 	return out
 }
 
-// changesPairs: the hint line of subscriptions and updates — what the cursor's row can do, then the page's
+// changesPairs: the hint line of updates — what the cursor's row can do, then the page's
 // own keys (06 §2.9 keys).
 func (m *model) changesPairs() [][2]string {
 	c := &m.chg
@@ -463,7 +511,10 @@ func (m *model) changesPairs() [][2]string {
 	case r == nil:
 	case r.kind == chSource:
 		pairs = append(pairs, [2]string{"enter", T("check this source")})
+	case r.kind == chGone:
+		pairs = append(pairs, [2]string{"enter", T("open")}, [2]string{"p", T("lock this version")}, [2]string{"l", T("show in the mod library")})
 	case r.kind == chPending:
+		later = append(later, [2]string{"l", T("show in the mod library")})
 		pairs = append(pairs, [2]string{"u", T("update subscription")})
 		if r.pend.Kind != app.LibWorkshop {
 			pairs = append(pairs, [2]string{"Del", T("remove subscription")})
@@ -473,6 +524,9 @@ func (m *model) changesPairs() [][2]string {
 			later = append(later, [2]string{"ctrl+w", T("open the source page")})
 		}
 	case r.kind == chMod:
+		if r.mod.Present {
+			later = append(later, [2]string{"l", T("show in the mod library")})
+		}
 		pairs = append(pairs, [2]string{"enter", T("open")})
 		if r.mod.HasFiles() {
 			pairs = append(pairs, [2]string{"i", T("files")})

@@ -45,7 +45,7 @@ const (
 	tabProblems
 	tabChanges
 	tabLibrary   // Mod library (06 §2.9), from the palette
-	tabSubscribe // Mod library › add a subscription (06 §2.9): + on subscriptions and updates
+	tabSubscribe // Mod library › add a subscription (06 §2.9): + on updates
 	tabSearch    // Mod library › Search files (06 §2.9)
 	tabRules     // Load-order rules (06 §2.5): r in the editor
 	tabHome      // Start (06 §2.3): shift+1, and the editor's L

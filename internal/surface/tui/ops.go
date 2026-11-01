@@ -226,7 +226,7 @@ func (m *model) goPage(n int) tea.Cmd {
 }
 
 // subPage is tab / shift+tab: the next page under the same sidebar entry (Mod library › All →
-// subscriptions and updates → add a subscription → Search files; the plans under list, which opens that plan).
+// updates → add a subscription → Search files; the plans under list, which opens that plan).
 func (m *model) subPage(d int) tea.Cmd {
 	switch m.tab {
 	case tabLibrary:

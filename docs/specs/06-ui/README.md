@@ -14,7 +14,7 @@ Section numbers run through all of 06. Find the file by number:
 | [1-layers-and-view-models](1-layers-and-view-models.md) | Layers and shared view models (§1) |
 | [2.1-navigation-and-launch](2.1-navigation-and-launch.md) | Information architecture; sidebar, top bar, launch, can it run (§2–2.4) |
 | [2.5-plans-and-packs](2.5-plans-and-packs.md) | Plan editor, building, packs, environments (§2.5–2.8) |
-| [2.9-inventory-and-logs](2.9-inventory-and-logs.md) | Mod inventory, subscriptions and updates, game log (§2.9–2.10) |
+| [2.9-inventory-and-logs](2.9-inventory-and-logs.md) | Mod inventory, updates, game log (§2.9–2.10) |
 | [2.11-other-pages](2.11-other-pages.md) | Review, worth playing, Archo, settings, first-run guide, background tasks, all lists (§2.11–2.17) |
 | [2.16-scheduled-behavior](2.16-scheduled-behavior.md) | Scheduled behavior table and pending items (§2.16.1) |
 | [3-interaction-rules](3-interaction-rules.md) | Interaction rules (§3) |

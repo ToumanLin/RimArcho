@@ -704,7 +704,7 @@ func changesCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	tiered(root, p.Rows)
 	if g := p.Arrivals; g != nil {
-		rows(root.Section("new and gone: "+g.Text), g.Rows)
+		rows(root.Section(g.Text), g.Rows)
 	}
 	if len(p.Rows) == 0 && p.Arrivals == nil && p.Of == "" {
 		root.Add("nothing changed")
@@ -720,7 +720,7 @@ func changesCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			dn := sec.Section(day.Day)
 			tiered(dn, day.Rows)
 			if g := day.Arrivals; g != nil {
-				rows(dn.Section("new and gone: "+g.Text), g.Rows)
+				rows(dn.Section(g.Text), g.Rows)
 			}
 		}
 	}

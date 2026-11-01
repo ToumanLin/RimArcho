@@ -73,6 +73,15 @@ export async function openSearch(q) {
   await open();
 }
 
+// openInstance clears filters and selects the exact copy, expanding its Lineage if needed.
+export async function openInstance(id) {
+  const b = bar();
+  b.search = ""; b.filters = []; b.input.value = "";
+  L.sel.clear(); L.full = false; L.focus = "rows";
+  const read = beginPageRead("library", { retry: () => openInstance(id) });
+  await load(true, undefined, read, id);
+}
+
 // relang: the language changed; the page is drawn again in it, where it was (the column
 // titles come again with the page data).
 export async function relang() {
@@ -97,9 +106,9 @@ function bar() {
   return L.bar;
 }
 
-async function load(fresh, focusRef, read = null) {
+async function load(fresh, focusRef, read = null, focusID = "") {
   if (!read && S.screen !== "library") return;
-  read ||= beginPageRead("library", { retry: () => load(fresh, focusRef) });
+  read ||= beginPageRead("library", { retry: () => load(fresh, focusRef, null, focusID) });
   const b = bar();
   let p, saved;
   try {
@@ -107,6 +116,12 @@ async function load(fresh, focusRef, read = null) {
   } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
   L.page = p;
+  if (focusID) {
+    const copy = (p.rows || []).flatMap(r => r.insts).find(i => i.id === focusID);
+    focusRef = copy?.ref;
+    if (focusRef) L.sel = new Set([focusRef]);
+    else say("fail", T("the folder is not there"));
+  }
   if (focusRef) for (const r of p.rows || []) if (r.insts.some((i) => i.ref === focusRef)) L.open.add(r.id);
   ops.setTable(p.opTable);
   if (!L.cols) L.cols = mergeColumns(columnDefs(), saved);

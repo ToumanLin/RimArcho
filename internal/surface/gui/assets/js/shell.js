@@ -316,7 +316,7 @@ export function crumbs() {
 
 // renderCrumbs: the breadcrumb names the page (there is no other title), and the chip
 // beside it says what the page is about: the environment, and on Can it run the plan too.
-// The home page spans every environment, and Mod library (All and Subscriptions and updates) every copy on the
+// The home page spans every environment, and Mod library (All and Updates) every copy on the
 // machine: no chip there.
 function renderCrumbs() {
   const env = $("#env");

@@ -151,7 +151,7 @@ func (m *model) detailLayout(o detailOpts) []dline {
 		for _, l := range wrap(view.HistoryLine(d.Events), w-2) {
 			add("  " + sSecond.Render(fit(l, w-2)))
 		}
-		// the whole history of its Lineage is on the Subscriptions and updates page (06 §2.9)
+		// the whole history of its Lineage is on the Updates page (06 §2.9)
 		for _, l := range wrap(T("see all in change history")+", C", w-2) {
 			add("  " + sDimS.Render(l))
 		}

@@ -207,6 +207,33 @@ func (m *model) openLibrary() tea.Cmd {
 	return nil
 }
 
+// openLibraryInstance selects a specific installed copy, clearing filters that could hide it.
+func (m *model) openLibraryInstance(id string) tea.Cmd {
+	m.libr.bar = barState{}
+	m.libr.full, m.libr.detail = false, false
+	m.openLibrary()
+	l := &m.libr
+	if l.page == nil {
+		return nil
+	}
+	for _, r := range l.page.Rows {
+		for _, inst := range r.Insts {
+			if inst.ID == id {
+				l.open[r.ID] = true
+				l.marked = map[string]bool{inst.Ref: true}
+			}
+		}
+	}
+	l.flatten()
+	for i, x := range l.flat {
+		if x.inst >= 0 && l.page.Rows[x.row].Insts[x.inst].ID == id {
+			l.cursor = i
+			break
+		}
+	}
+	return nil
+}
+
 // ---- running ops ----
 
 // runLibOp runs an op on the targets that have it (06 §2.9).

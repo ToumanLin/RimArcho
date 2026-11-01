@@ -2,7 +2,7 @@
   "@date.long": "2006 年 1 月 2 日",
   "@date.short": "%d 月 %d 日",
   "@palette.analyze": "重新检查文件",
-  "@palette.changes": "订阅与更新",
+  "@palette.changes": "更新",
   "@palette.cli": "运行 archo 命令",
   "@palette.details": "详情",
   "@palette.env": "切换游戏",

@@ -4,6 +4,10 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- Mod library's Subscriptions and updates page is now Updates in the GUI, TUI, and tool descriptions. The source summary selects Update checks in the detail pane, with per-source results, failed Mod names and reasons, and account links only where needed.
+- Workshop items removed by their author or made private appear under Won't update any more, with a short explanation and actions to lock this version or open its exact copy in Mod library. They do not count as failed checks.
+- Change-history titles now say what was added or removed and name single Mods, including CLI/MCP output. History and Recently added names, plus pending-update library actions, open the exact installed copy even when versions share a name.
+
 - Interface translations moved into language files. Archo Monitor settings now follow the game language. Mod roles on the game log page use normal brackets in English.
 - Documentation is now in English, with a new Chinese README (`README.zh-CN.md`).
 - Unity 1.6 RAM estimates now use heavy-texture VM measurements up to 7.5 GiB, reducing high-payload resident and loading budgets; larger loads remain extrapolated.

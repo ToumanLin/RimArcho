@@ -38,7 +38,7 @@ var Commands = []Command{
 	{"undo", "@palette.undo", "undo", "u"},
 	{"redo", "@palette.redo", "redo", "ctrl+r"},
 	{"needs", "@palette.needs", "can it run", "@ shift+2 problems needs attention"},
-	{"changes", "@palette.changes", "subscriptions and updates", "c subscriptions updates history"},
+	{"changes", "@palette.changes", "updates", "c subscriptions updates history"},
 	{"library", "@palette.library", "mod library", "all mods, copies, sizes, filter, clean up"},
 	{"subscribe", "@palette.subscribe", "add a subscription", "+ Git repository download page LoversLab Workshop SteamCMD"},
 	{"rescan", "@palette.rescan", "rescan", "R scan"},

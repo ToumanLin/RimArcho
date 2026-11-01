@@ -1,5 +1,5 @@
 // The pages over the board (the sidebar's entries, 06 §2.1): Can it run (06 §2.4, §5), the
-// game log (§2.10), Mod library › Subscriptions and updates (§2.9), the full detail (§4.2), packs, the environment
+// game log (§2.10), Mod library › Updates (§2.9), the full detail (§4.2), packs, the environment
 // and settings. The pages are side by side: esc does not go from one to another (06 §3.1);
 // esc leaves only the full detail, back to the plan. A page's actions sit in the top bar.
 import { choiceControl } from "./choices.js";
@@ -925,7 +925,7 @@ export function analyzeEvent(ev) {
   if (S.screen === "needs" && ev.done) needs(true);
 }
 
-// ---- game log (06 §2.10) and Mod library › Subscriptions and updates (§2.9) ----
+// ---- game log (06 §2.10) and Mod library › Updates (§2.9) ----
 // tab: 0 the Player.log clusters, 1 the companion log's entries (mcur, open: their cursor
 // and the entries whose details are open).
 const L = { env: null, path: "", page: null, loading: false, pending: "", error: "", cur: 0, target: "", targetLine: "", detail: new Map(), seq: 0, els: [], tab: 0, tabPick: null, mcur: 0, open: new Set(), want: "", list: null, views: [], view: null, viewPath: "" };
@@ -1408,7 +1408,7 @@ function patternCard(c) {
   return d;
 }
 
-// ---- Mod library › subscriptions and updates and add a subscription (06 §2.9): subscriptions.js ----
+// ---- Mod library › updates and add a subscription (06 §2.9): subscriptions.js ----
 export { changes, changesHints, changesFiltered, changesPlan, openAdd, addHints } from "./subscriptions.js";
 
 export function rescanButton(label) {

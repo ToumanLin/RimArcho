@@ -1,10 +1,11 @@
 // Mod library › add a subscription (06 §2.9): one paste box. What is pasted is recognised (a Git repository,
 // a LoversLab file page, another web page, Workshop links or IDs); the card below asks only
 // the one decision that source needs and shows the --dry-run text before subscribe. Also the
-// file choice a download-page update needs (pageUpdate, in the subscriptions and updates detail).
+// file choice a download-page update needs (pageUpdate, in the updates detail).
 import { pathContent, editablePath } from "./fields.js";
 import { el, api, T, Tf, errText, say } from "./state.js";
 import * as pop from "./popups.js";
+import { libraryLink } from "./librarylink.js";
 
 // button runs an action once at a time: disabled with "…" while it runs.
 const button = (label, run, cls = "", enabled = () => true) => {
@@ -96,7 +97,7 @@ export function importPicker(onChange = () => {}) {
   return { el: row, value: () => value };
 }
 
-// pageUpdate is the subscriptions and updates detail's file choice for a download-page subscription: the
+// pageUpdate is the updates detail's file choice for a download-page subscription: the
 // LoversLab files with the session, or files downloaded in the browser (previewed, then
 // confirmed: it replaces the installed one).
 export function pageUpdate(ref, done) {
@@ -119,7 +120,7 @@ export function pageUpdate(ref, done) {
   return root;
 }
 
-// addForm is the add a subscription page's body. ctx: data (the subscriptions and updates page data, for the account
+// addForm is the add a subscription page's body. ctx: data (the updates page data, for the account
 // lines and the recent subscriptions), back() (esc on an empty box), done() after queuing.
 export function addForm(ctx = {}) {
   const root = el("div", "subscribe-add");
@@ -157,7 +158,7 @@ export function addForm(ctx = {}) {
     list.append(el("div", "subscribe-sub", T("recently added")));
     for (const r of recent) {
       const row = el("div", "r");
-      row.append(el("b", "", r.name), el("span", "muted", r.source), el("span", "faint", r.added));
+      row.append(libraryLink(r.id, r.name), el("span", "muted", r.source), el("span", "faint", r.added));
       list.append(row);
     }
     below.append(list);
@@ -283,7 +284,7 @@ export function addForm(ctx = {}) {
   return {
     el: root,
     focus: () => field.focus(),
-    // setText fills the box (a paste on subscriptions and updates) and recognises it at once.
+    // setText fills the box (a paste on updates) and recognises it at once.
     setText: (t) => { field.value = t || ""; recognise(); },
   };
 }

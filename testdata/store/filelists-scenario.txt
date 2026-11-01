@@ -37,8 +37,8 @@ changes: 6 mods (pkg:test.alpha)
         Defs 1 changed; textures +22 B · in all +23 B
         updated on the Workshop Jan 1
   Oct 1 11:00:
-    new and gone: 1 new subscription:
-      #6olp  Alpha  new subscription
+    1 new subscription: Alpha:
+      #6olp  Alpha  new subscription from Workshop
 
 ## file diffs
 files 1 → 5
