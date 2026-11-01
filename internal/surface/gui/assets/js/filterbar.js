@@ -1,9 +1,9 @@
 // The filter bar (06 §2.5, §2.9): one component for the plan editor and Mod library > All.
 // One row: the query (grey completion, Tab takes it) and a "filter" toggle (also `\`).
-// Clicked conditions edit the same query. Open, it shows tags, source and content:
+// Clicked conditions edit the same query. Open, it shows lists, tags, source and content:
 // the values most used first with their counts, then a button to expand the rest. A left
 // click (enter, space) keeps a value, a right click (x) leaves it out, again drops it; the
-// game's own version is marked. The keyboard reaches all of it: `\` opens the bar with the
+// current list and game's own version are marked. The keyboard reaches all of it: `\` opens the bar with the
 // focus on its first value, ↑↓ go between groups, ←→ between values, a letter types into
 // the main query with that group key, esc closes it.
 //
@@ -56,7 +56,7 @@ export function createBar(opts) {
   let wantFocus = false;
 
   const data = () => opts.data() || {};
-  const groups = () => (data().groups || []).filter((g) => g.key !== "location").sort((a,b)=>{const order=["tag","source","content"];return (order.includes(a.key)?order.indexOf(a.key):9)-(order.includes(b.key)?order.indexOf(b.key):9);});
+  const groups = () => (data().groups || []).filter((g) => g.key !== "location").sort((a,b)=>{const order=["lists","tag","source","content"];return (order.includes(a.key)?order.indexOf(a.key):9)-(order.includes(b.key)?order.indexOf(b.key):9);});
   function showGhost() {
     candidates = suggestions(groups(), inp.value, inp.selectionStart ?? inp.value.length);
     choice = Math.min(choice, Math.max(0,candidates.length-1));
@@ -205,8 +205,10 @@ export function createBar(opts) {
     if (opts.width) root.style.setProperty("--fbar-w", opts.width() + "px");
     const keep = panel.contains(document.activeElement) ? document.activeElement.dataset.at : null;
     panel.innerHTML = "";
-    (d.groups || []).forEach((g, gi) => {
-      if (!["tag","source","content"].includes(g.key)) return;
+    const ordered = groups();
+    ordered.forEach((g) => {
+      const gi = (d.groups || []).indexOf(g);
+      if (!["lists","tag","source","content"].includes(g.key)) return;
       const vals = lineOf(g);
       if (!vals.length) return;
       const t = el("span", "fbar-gt", g.title);
@@ -215,7 +217,7 @@ export function createBar(opts) {
       vals.forEach((v, vi) => {
         const x = el("button", "fbar-v" + (v.on === 1 ? " on" : v.on === -1 ? " ex" : "") + (v.cur ? " cur" : ""));
         x.append(el("span", "l", v.label));
-        if (v.cur) x.append(el("span", "curv", T("this game")));
+        if (v.cur) x.append(el("span", "curv", T(g.key === "lists" ? "current list" : "this game")));
         x.append(el("span", "n", String(v.count)));
         x.title = v.label + "\n" + T("left click: only these, right click or x: leave these out");
         x.dataset.at = gi + ":" + vi;

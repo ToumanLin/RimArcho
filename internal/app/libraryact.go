@@ -250,7 +250,7 @@ func hasOrigin(dir string) bool {
 
 // usedBy names the plans that use an instance (every environment of this game).
 func (a *App) usedBy(st *LoadoutState, id string) ([]string, error) {
-	uses, err := a.libUses(st)
+	uses, _, err := a.libUses(st)
 	if err != nil {
 		return nil, err
 	}

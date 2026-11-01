@@ -43,7 +43,7 @@ func ManageLibraryArgv(in ManageLibraryIn) []string {
 type LibraryIn struct {
 	Env     string   `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Search  string   `json:"search,omitempty" jsonschema:"words that must all appear in a name, package id, author, alias, tag, note, Workshop ID or folder"`
-	Include []string `json:"include,omitempty" jsonschema:"key:value filters to keep (keys tag, source, location, version, state, used, updated); location is a registered source folder path; values of one key are alternatives, different keys must all hold"`
+	Include []string `json:"include,omitempty" jsonschema:"key:value filters to keep (keys lists, tag, tags, source, location, version, state, used, updated); lists is a case-insensitive list name; location is a registered source folder path; values of one key are alternatives, different keys must all hold"`
 	Exclude []string `json:"exclude,omitempty" jsonschema:"key:value filters to drop"`
 	Sort    string   `json:"sort,omitempty" jsonschema:"name (default), size, state, source, used, updated, version, author, tags, changed or played; a leading - reverses"`
 	Lineage string   `json:"lineage,omitempty" jsonschema:"one mod (L#…, #…, pkg:…, ws:…): every copy with path, states, plans and last launch"`

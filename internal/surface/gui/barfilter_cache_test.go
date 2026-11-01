@@ -49,3 +49,33 @@ func TestBarFilterReusesWorkspaceRowsAndInvalidates(t *testing.T) {
 		t.Fatalf("filter kept stale index: %+v", result.Rows)
 	}
 }
+
+func TestBarFilterRefreshesOtherListMembership(t *testing.T) {
+	e, api, events := fixture(t)
+	api.Workspace(1)
+	first := environmentResult(t, events, 1)
+	if first.Error != "" || first.Stale {
+		t.Fatalf("workspace: %+v", first)
+	}
+	e.MustRun("plan", "new", "Other colony", "--from", "current")
+	result, err := api.BarFilter(`lists:"Other colony"`, nil, true)
+	if err != nil || len(result.Rows[1]) != len(first.Board.Cols[1]) {
+		t.Fatalf("new list membership: %+v, %v", result, err)
+	}
+	other, err := e.App.Store.PlanByName("Other colony")
+	if err != nil || other == nil {
+		t.Fatalf("other list: %v", err)
+	}
+	e.App.OpenPlan = other.ID
+	e.MustRun("disable", first.Board.Cols[1][1].Ref)
+	e.App.OpenPlan = 0
+	result, err = api.BarFilter(`lists:"Other colony"`, nil, true)
+	if err != nil || len(result.Rows[1]) != len(first.Board.Cols[1])-1 {
+		t.Fatalf("changed membership stayed cached: %+v, %v", result, err)
+	}
+	e.MustRun("plan", "rename", "Other colony", "Renamed colony")
+	result, err = api.BarFilter(`lists:"Renamed colony"`, nil, true)
+	if err != nil || len(result.Rows[1]) != len(first.Board.Cols[1])-1 {
+		t.Fatalf("renamed list stayed cached: %+v, %v", result, err)
+	}
+}

@@ -472,7 +472,11 @@ func valText(v view.LibChoice) string {
 		t = "-" + t
 	}
 	if v.Cur {
-		t += " (" + T("this game") + ")"
+		marker := "this game"
+		if strings.HasPrefix(v.Filter, "lists:") {
+			marker = "current list"
+		}
+		t += " (" + T(marker) + ")"
 	}
 	return t + " " + itoa(v.Count)
 }

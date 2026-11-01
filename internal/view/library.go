@@ -54,7 +54,7 @@ type LibChoice struct {
 	Label  string `json:"label"`
 	Count  int    `json:"count"`
 	On     int    `json:"on,omitempty"`
-	Cur    bool   `json:"cur,omitempty"` // the environment's game version (listed first, marked)
+	Cur    bool   `json:"cur,omitempty"` // the current list or game's version (listed first, marked)
 }
 
 // LibCond is a filter in force.
@@ -224,7 +224,7 @@ func LibSourceText(s string) string {
 }
 
 func libKeyTitle(k string) string {
-	return map[string]string{"content": T("content"), "has": T("has"), "name": T("name"), "author": T("author"), "id": T("package"), "tag": T("tags"), "source": T("library source"), "location": T("location"), "version": T("supported versions"), "state": T("state"), "used": T("used in"), "updated": T("update date")}[k]
+	return map[string]string{"lists": T("lists"), "content": T("content"), "has": T("has"), "name": T("name"), "author": T("author"), "id": T("package"), "tag": T("tags"), "source": T("library source"), "location": T("location"), "version": T("supported versions"), "state": T("state"), "used": T("used in"), "updated": T("update date")}[k]
 }
 
 func libUseText(v string) string {
@@ -358,7 +358,7 @@ func LibSplitQuery(text string) (words string, filters []string) {
 // library's keys): keys from the second letter, then tag words, sources, versions, states
 // and the plans and packs in use.
 func CompleteLibrary(text string, lib *app.Library) string {
-	return completeWith(text, app.LibKeys, func(k string) []string {
+	completion := completeWith(text, app.LibKeys, func(k string) []string {
 		switch k {
 		case "source":
 			return app.LibSources
@@ -398,6 +398,10 @@ func CompleteLibrary(text string, lib *app.Library) string {
 		}
 		return out
 	})
+	if lib.Lists != nil {
+		return completeLists(text, lib.Lists.Names, completion, "")
+	}
+	return completion
 }
 
 // BuildLibrary builds the page for a query. filters are "key:value", "-key:value" to exclude;
@@ -481,6 +485,9 @@ func BuildLibrary(lib *app.Library, search string, filters []string, sort string
 				}
 			}
 			c := LibChoice{Filter: f.Key + ":" + v.Value, Label: label, Count: v.Count, On: v.On}
+			if f.Key == "lists" && lib.Lists != nil && strings.EqualFold(v.Value, lib.Lists.Current) {
+				c.Cur = true
+			}
 			if f.Key == "version" && v.Value == lib.GameMM {
 				// the game's own version first, marked (06 §2.9)
 				c.Cur = true

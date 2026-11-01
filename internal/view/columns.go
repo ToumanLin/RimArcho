@@ -36,6 +36,7 @@ const StatusHint = -1
 
 // Item is one row of a column.
 type Item struct {
+	Lists       []string          `json:"-"`
 	Lineage     string            `json:"lineage,omitempty"`
 	CopyLabel   string            `json:"copyLabel,omitempty"`
 	CopyCount   int               `json:"copyCount,omitempty"`
@@ -68,15 +69,16 @@ type Item struct {
 
 // Board is the three columns and the counts around them.
 type Board struct {
-	St          *app.LoadoutState `json:"-"`
-	Cols        [3][]Item         `json:"cols"`
-	EnvName     string            `json:"env"`
-	GameVersion string            `json:"gameVersion"`
-	Unsaved     int               `json:"unsaved"`   // workspace changes since the last save
-	Missing     int               `json:"missing"`   // entries with no installed mod
-	Questions   int               `json:"questions"` // open identity questions
-	Changes     int               `json:"changes"`   // events of the last scan
-	LastEvents  map[string]int    `json:"lastEvents,omitempty"`
+	Lists       *app.ListMembership `json:"-"`
+	St          *app.LoadoutState   `json:"-"`
+	Cols        [3][]Item           `json:"cols"`
+	EnvName     string              `json:"env"`
+	GameVersion string              `json:"gameVersion"`
+	Unsaved     int                 `json:"unsaved"`   // workspace changes since the last save
+	Missing     int                 `json:"missing"`   // entries with no installed mod
+	Questions   int                 `json:"questions"` // open identity questions
+	Changes     int                 `json:"changes"`   // events of the last scan
+	LastEvents  map[string]int      `json:"lastEvents,omitempty"`
 }
 
 // BuildBoard builds the columns from the workspace (synced with ModsConfig.xml) and
@@ -84,6 +86,10 @@ type Board struct {
 func BuildBoard(a *app.App) (*Board, error) {
 	staged, st, err := a.Staged()
 	b := &Board{St: st}
+	if err != nil {
+		return b, err
+	}
+	b.Lists, err = a.ListsFor(st)
 	if err != nil {
 		return b, err
 	}
@@ -148,6 +154,7 @@ func BuildBoard(a *app.App) (*Board, error) {
 	for k := range b.Cols {
 		for i := range b.Cols[k] {
 			it := &b.Cols[k][i]
+			it.Lists = b.Lists.ByInstance[it.ID]
 			m := st.Ix.ByID[it.ID]
 			if m == nil {
 				continue
