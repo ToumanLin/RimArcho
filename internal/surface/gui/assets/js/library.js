@@ -120,7 +120,7 @@ async function load(fresh, focusRef, read = null, focusID = "") {
     const copy = (p.rows || []).flatMap(r => r.insts).find(i => i.id === focusID);
     focusRef = copy?.ref;
     if (focusRef) L.sel = new Set([focusRef]);
-    else say("fail", T("the folder is not there"));
+    else say("fail", T("this copy is no longer in the Mod library"));
   }
   if (focusRef) for (const r of p.rows || []) if (r.insts.some((i) => i.ref === focusRef)) L.open.add(r.id);
   ops.setTable(p.opTable);

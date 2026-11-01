@@ -210,7 +210,7 @@ func BuildSubscriptionsFromLibrary(a *app.App, st *app.LoadoutState, o modchange
 			failed += len(g.Items)
 		}
 		if failed == 1 {
-			s.Result = Tf("1 check failed: %s", s.Failures[0].Label)
+			s.Result = T("1 check failed")
 		} else if failed > 1 {
 			s.Result = Tf("%d checks failed", failed)
 		}

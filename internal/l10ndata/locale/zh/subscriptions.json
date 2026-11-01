@@ -230,7 +230,7 @@
   "%d mods are removed from the Workshop (the author deleted it or made it private)": "%d 个 Mod 已从创意工坊下架（作者删除或设为私有）",
   "The author deleted the Workshop page or made it private; your installed copy still works, but Steam will never update it.": "作者删除了创意工坊页面或将其设为私有；已安装的版本仍可使用，但 Steam 不会再更新它。",
   "After unsubscribing, you cannot download it again; lock this version to keep it.": "退订后将无法重新下载；锁定这个版本即可保留。",
-  "1 check failed: %s": "1 个检查失败：%s",
+  "1 check failed": "1 个检查失败",
   "%s, 1 check failed": "%s，1 个检查失败",
   "%s, %d checks failed": "%s，%d 个检查失败",
   "1 new subscription: %s": "1 个新订阅：%s",

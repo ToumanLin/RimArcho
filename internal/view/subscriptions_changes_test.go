@@ -149,7 +149,7 @@ func TestRemovedWorkshopSectionUsesInstalledCopiesAndSavedChecks(t *testing.T) {
 	if inPlan != 1 {
 		t.Fatalf("scope membership: %+v", p.Gone)
 	}
-	if p.Sources[0].Result != "1 check failed: connection timed out" || len(p.Sources[0].Failures) != 1 || !strings.Contains(p.Sources[0].Failures[0].Items[0], "Network failure") {
+	if p.Sources[0].Result != "1 check failed" || len(p.Sources[0].Failures) != 1 || !strings.Contains(p.Sources[0].Failures[0].Items[0], "Network failure") {
 		t.Fatal(p.Sources[0])
 	}
 	if p.Sources[1].Result != "everything is up to date" || len(p.Sources[1].Failures) != 0 {

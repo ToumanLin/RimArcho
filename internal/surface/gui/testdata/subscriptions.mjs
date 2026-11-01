@@ -14,7 +14,7 @@ async function setup(overrides = {}) {
   const data = {
     summary: { line: "checked 4 sources, the last at 10:42, 1 check failed", failures: 1 },
     sources: [
-      { key: "workshop", name: "Steam Workshop", count: 2, checked: "10:42", result: "1 check failed: timed out", failures: [{ label: "timed out", items: ["Network Mod: timed out"] }] },
+      { key: "workshop", name: "Steam Workshop", count: 2, checked: "10:42", result: "1 check failed", failures: [{ label: "timed out", items: ["Network Mod: timed out"] }] },
       { key: "steamcmd", name: "SteamCMD", count: 1, result: "everything is up to date", account: "not logged in" },
       { key: "git", name: "Git", count: 1, result: "everything is up to date" },
       { key: "page", name: "LoversLab", count: 1, result: "everything is up to date", account: "logged in" },

@@ -289,7 +289,8 @@ function sourcesLine() {
 function sourcesDetail(card) {
   detailHead(card, T("Update checks"), []);
   const box = el("div", "scroll subs-sources");
-  for (const s of V.data?.sources || []) {
+  // a source without mods has nothing to check (the local one checks the Mods folder)
+  for (const s of (V.data?.sources || []).filter((s) => s.count || s.key === "local")) {
     const r = el("div", "subs-src");
     const l = el("div", "l");
     const n = el("div", "n");
@@ -297,17 +298,16 @@ function sourcesDetail(card) {
     l.append(n, el("div", "muted word-facts", [s.checked || T("not checked yet"), s.result].filter(Boolean).join("  ")));
     if (s.account && ["steamcmd", "page"].includes(s.key)) {
       const a = el("div", "word-facts acct");
-      a.append(el("span", "", s.account), button(T("accounts") + " →", "enter", () => goAccounts(), "link"));
+      a.append(el("span", "", s.account), button(T("accounts") + " →", "", () => goAccounts(), "link"));
       l.append(a);
     }
     for (const g of s.failures || []) {
       for (const item of g.items) l.append(el("div", "word-facts", item));
     }
-    const check = button(T("check"), "enter", async () => {
+    const check = button(T("check"), "", async () => {
       try { say("ok", await api.CheckSubscriptionSource(s.key)); }
       catch (e) { say("fail", errText(e)); }
     }, "small");
-    check.disabled = !s.count && s.key !== "local";
     r.append(l, check);
     box.append(r);
   }
