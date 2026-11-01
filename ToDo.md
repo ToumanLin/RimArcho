@@ -4,23 +4,21 @@ Things to research, not yet decided. Once decided, put them in the specification
 
 ## GUI
 
-Keys and their explanations look confusingly similar: confirm enter should read confirm [enter↵].
-
-### Updates
-
-The Updates page feedback is specified in 06 §2.9.
-
 ### Search files
 
 The search interface confuses players. Consider a default 32:68 split: a search/filter card at the upper left, matching Mod instances and their file tree below it, and detailed file contents on the right.
 
 Search options need review. The default scope is the current list, but players cannot choose another list or filter by Mod source, tag, or version to exclude other copies' files. Reuse the Mod library's filter approach. Searching decompiled code targets a Mod, but it is unclear which instance is searched when the Mod has multiple copies.
 
-Search results also need review: addresses are relative and players cannot directly open the corresponding file or folder. Design around what players want to do with their results, and prepare a web mockup for review.
+Search results also need review: addresses are relative and players cannot directly open the corresponding file or folder. Design around what players want to do with their results.
+
+2026-11-01: mockup for review at https://claude.ai/artifact/Xh4rTagnS8p6UnqHysR2tx (Def / Text / C# code views). Waiting for the owner's feedback before the spec (06 §2.9) changes.
 
 ## Decompilation
 
 Decompilation serves two purposes: investigating Mod conflicts and creating Mods. Reconsider storing decompiled assemblies in the cache and propose an approach.
+
+2026-11-01: proposal in [research/2026-11-01_decompile-storage.md](docs/research/2026-11-01_decompile-storage.md) (a durable source library including the game's own code, plus separate Mod projects). Three decisions wait for the owner.
 
 ## Research displaying, editing, and managing Mod configuration
 
