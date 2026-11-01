@@ -4,9 +4,11 @@ package cmds_test
 // Regenerate with: go test ./internal/cmds -update
 
 import (
+	"encoding/binary"
 	"flag"
 	"fmt"
 	"github.com/ToumanLin/RimArcho/internal/machine"
+	"hash/crc32"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -460,5 +462,26 @@ func TestGoldenMemory(t *testing.T) {
 	e.App.MemoryProbe = func() machine.Memory {
 		return machine.Memory{TotalRAM: 8 << 30, AvailableRAM: 1 << 30, SampledAt: time.Unix(100, 0), Adapters: []machine.Adapter{{Name: "Fixture GPU", Dedicated: 1 << 30}}}
 	}
-	runGolden(t, "memory", e, []step{cmd("plan", "cost")})
+	runGolden(t, "memory", e, []step{
+		cmd("plan", "cost"),
+		act(func(e *testkit.Env) {
+			// Header-only synthetic PNGs declare a 4 GiB mip payload without pixel data.
+			header := make([]byte, 33)
+			copy(header, "\x89PNG\r\n\x1a\n")
+			binary.BigEndian.PutUint32(header[8:], 13)
+			copy(header[12:], "IHDR")
+			binary.BigEndian.PutUint32(header[16:], 16384)
+			binary.BigEndian.PutUint32(header[20:], 16384)
+			header[24], header[25] = 8, 6
+			binary.BigEndian.PutUint32(header[29:], crc32.ChecksumIEEE(header[12:29]))
+			mod := testkit.Mod{PackageID: "tester.heavy", Name: "Heavy texture fixture", Files: map[string]string{}}
+			for i := 0; i < 12; i++ {
+				mod.Files[fmt.Sprintf("Textures/Heavy/%02d.png", i)] = string(header)
+			}
+			e.AddWorkshop("3102", mod)
+			e.MustRun("scan")
+			e.MustRun("enable", ref(e, "Heavy texture fixture"))
+		}),
+		cmd("plan", "cost"),
+	})
 }

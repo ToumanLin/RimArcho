@@ -266,7 +266,7 @@ func TestLibFields(t *testing.T) {
 	}
 }
 
-// 06 §2.9: 退订 is a confirmed action through the Steam client; when Steam is out of reach
+// 06 §2.9: unsubscribe is a confirmed action through the Steam client; when Steam is out of reach
 // LibDo answers OpenPages (the window opens the page and says so).
 func TestLibSteam(t *testing.T) {
 	t.Parallel()

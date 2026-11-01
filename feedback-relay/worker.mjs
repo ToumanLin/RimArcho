@@ -1,5 +1,5 @@
-// RimArcho's feedback relay (06 §2.14 反馈; deploying it: README.md). A Cloudflare Worker
-// that files a report sent from RimArcho's 设置 › 反馈 as an issue in the public
+// RimArcho's feedback relay (06 §2.14 Feedback; deploying it: README.md). A Cloudflare Worker
+// that files a report sent from RimArcho's Settings > Feedback as an issue in the public
 // repository, so a player without a GitHub account can report. The GitHub App's key lives
 // only here, as a Worker secret; RimArcho carries nothing but this Worker's address.
 //
@@ -126,7 +126,7 @@ function limit(v, dflt) {
 // set (or that does not exist) is dropped rather than losing the report.
 export async function createIssue(env, report, fetchFn, now) {
   const token = await installationToken(env, fetchFn, now);
-  let body = report.body + "\n\n---\n<sub>Sent from RimArcho's 反馈 page, without a GitHub account.";
+  let body = report.body + "\n\n---\n<sub>Sent from RimArcho's Feedback page, without a GitHub account.";
   if (report.contact) body += " The sender left a contact for the maintainer.";
   body += "</sub>\n";
   const labels = String(env.LABEL || "").split(",").map((s) => s.trim()).filter(Boolean);

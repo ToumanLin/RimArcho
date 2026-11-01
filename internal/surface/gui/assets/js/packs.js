@@ -1,7 +1,7 @@
 import { choiceControl } from "./choices.js";
-// 整合包 (06 §2.6, §2.7, 08 §5): the packs (the sidebar's 整合包), each pack's own page
-// (its sub-entries), and 编译成整合包, the plan's sub-page: on the left the name and the
-// things building does, on the right the summary and 编译, disabled with the reason when
+// pack (06 §2.6, §2.7, 08 §5): the packs (the sidebar's pack), each pack's own page
+// (its sub-entries), and Create a pack, the plan's sub-page: on the left the name and the
+// things building does, on the right the summary and create, disabled with the reason when
 // something stops the build (G14); the builds cut short below. A pack's list alone is
 // exported from its page as a RimArcho list (E).
 // Data: API.Packs (view.PackRows, view.UnfinishedRows), API.Pack (view.BuildPackPage),
@@ -61,7 +61,7 @@ function drawModRows() {
   }
 }
 
-// ---- the list (整合包) ----
+// ---- the list (pack) ----
 
 async function loadList(current = () => true) {
   const l = await api.Packs();
@@ -102,7 +102,7 @@ function markList() {
   if (L.els[L.cur]) L.els[L.cur].scrollIntoView({ block: "nearest" });
 }
 
-// ---- one pack (a sub-entry of 整合包) ----
+// ---- one pack (a sub-entry of pack) ----
 
 export async function pack(name) {
   const read = beginPageRead("packs", { replace: !P || P.name !== name });
@@ -147,7 +147,7 @@ async function launch() {
   await launchPack(P.name);
 }
 
-// launchPack plays a pack (here and on 启动): when Mods/ holds another version of one of its
+// launchPack plays a pack (here and on Start): when Mods/ holds another version of one of its
 // mods that can move into the lock library, one confirmation lists the moves, then it goes
 // on (08 §5.3).
 export async function launchPack(name) {
@@ -275,7 +275,7 @@ export function packEvent(ev) {
   factText(card.querySelector(".sub"), T("creating"), ev.text);
 }
 
-// ---- 编译成整合包 (the plan's sub-page) ----
+// ---- Create a pack (the plan's sub-page) ----
 
 // build opens the page: the check is quick, the sizes need every mod's folder walked, so
 // the page shows at once and the sizes follow. again: a redraw keeps the name typed.
@@ -304,7 +304,7 @@ export async function build(again = false) {
 }
 
 // setTex changes the textures choice. Counting what it converts reads every PNG, so it
-// waits for 扫描统计 (measureBuild): until then the step says so, and the pack can be
+// waits for count the textures (measureBuild): until then the step says so, and the pack can be
 // created anyway (the build checks the drive itself).
 function setTex(tex) {
   if (!B.page || B.tex === tex) return;
@@ -317,7 +317,7 @@ function setTex(tex) {
 // texMeasured: the page's facts are for the choice on screen.
 const texMeasured = () => !!B.page && B.page.tex === B.tex;
 
-// blocker is why 编译 cannot go now. A page measured with another textures choice still
+// blocker is why create cannot go now. A page measured with another textures choice still
 // tells everything but the encoder, which it knows apart (toolOk).
 function blocker(p) {
   let why = p.ok ? "" : p.why, toGo = p.toGo || "", toNeeds = !!p.toNeeds;
@@ -336,7 +336,7 @@ function texStep(s, p) {
     : T("pick a choice, then “count the textures” to see how many PNG become DDS and the size after");
   if (B.tex > 0 && !p.toolOk) {
     out.level = "bad"; out.go = "textures";
-    out.more = [T("the DDS encoder (todds) is not installed: install it in 库 › 贴图优化")];
+    out.more = [T("the DDS encoder (todds) is not installed: install it in Library > Texture optimisation")];
   }
   return out;
 }
@@ -389,7 +389,7 @@ function syncMeasure() {
     step.classList.remove("bad", "warn");
     const text = step.querySelector(".x");
     text.replaceChildren(B.error ? el("span", "err", B.error) : shimmer(T("checking the list…"), key === "textures" ? 3 : 1));
-    // a failed count keeps 扫描统计, to try again
+    // a failed count keeps count the textures, to try again
     step.querySelectorAll(B.loading ? "ul, button" : "ul").forEach((n) => n.remove());
   }
   const size = $("#pk-size");
@@ -485,7 +485,7 @@ function drawBuild() {
     sc2.append(r);
   });
   if (S.packBuild) {
-    // this window's build: where it is, and 停止 (what it copied is removed)
+    // this window's build: where it is, and stop (what it copied is removed)
     const pw = el("div", "progwrap bd-prog");
     const name = S.packBuild.name;
     pw.append(progressBox(S.packBuild), button(T("stop"), "", async () => {
@@ -496,7 +496,7 @@ function drawBuild() {
   steps.append(sc2);
   left.append(basics, steps);
 
-  // the summary and 编译
+  // the summary and create
   const side = el("aside", "card bd-side");
   side.append(el("div", "h", B.name || p.plan));
   const kv = el("div", "bd-kv");
@@ -550,8 +550,8 @@ function drawBuild() {
   if (focusName) { const n = $("#pk-name"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
 }
 
-// syncButton: 编译 is enabled only when nothing stops the build; the line under it says
-// what does, and the check's problems lead to 能不能跑 (G14).
+// syncButton: create is enabled only when nothing stops the build; the line under it says
+// what does, and the check's problems lead to Can it run (G14).
 function syncButton() {
   const p = B.page;
   const go1 = $(".bd-go"), why = $(".bd-why"), err = $(".bd-err"), head = $(".bd-side .h");

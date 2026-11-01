@@ -14,7 +14,7 @@ func TestPatternTextCovered(t *testing.T) {
 			continue
 		}
 		for _, s := range append([]string{p.Summary}, p.Causes...) {
-			if _, ok := zhText[s]; !ok {
+			if _, ok := locales["zh"]().Text[s]; !ok {
 				t.Errorf("%s: no Chinese text for %q", p.ID, s)
 			}
 		}
@@ -22,7 +22,7 @@ func TestPatternTextCovered(t *testing.T) {
 			w, ok := fixWords[f]
 			if !ok {
 				t.Errorf("%s: no words for fix %q", p.ID, f)
-			} else if _, ok := zhText[w]; !ok {
+			} else if _, ok := locales["zh"]().Text[w]; !ok {
 				t.Errorf("no Chinese text for %q", w)
 			}
 		}

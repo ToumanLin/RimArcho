@@ -22,7 +22,7 @@ import (
 
 // ---- counts ----
 
-// BreakCount is the number of items in 能不能跑's "会让游戏出错" group: the list's own
+// BreakCount is the number of items in Can it run's "Will cause errors" group: the list's own
 // problems, missing dependencies and conflicts (06 §2.4). The home page's state counts it.
 func BreakCount(n *Needs) int {
 	c := 0
@@ -34,7 +34,7 @@ func BreakCount(n *Needs) int {
 	return c
 }
 
-// PackLinksText is the title of 能不能跑's item for a pack's links left in Mods/ ("" when
+// PackLinksText is the title of Can it run's item for a pack's links left in Mods/ ("" when
 // there is none).
 func PackLinksText(n *Needs) string {
 	for _, it := range n.Items {
@@ -47,7 +47,7 @@ func PackLinksText(n *Needs) string {
 	return ""
 }
 
-// LastRunErrors is the number of the last run's errors in 能不能跑.
+// LastRunErrors is the number of the last run's errors in Can it run.
 func LastRunErrors(n *Needs) int {
 	c := 0
 	for _, it := range n.Items {
@@ -83,10 +83,10 @@ const (
 	PageChanges  = "changes"
 	PageLog      = "log"
 	PageSettings = "settings"
-	PageTextures = "textures" // 贴图优化 (08 §5.2), under 库
-	// PageSubscribe: Mod 库 › 添加订阅 (06 §2.9)
+	PageTextures = "textures" // Texture optimisation (08 §5.2), under Library
+	// PageSubscribe: Mod library › add a subscription (06 §2.9)
 	PageSubscribe = "subscribe"
-	// PageSearch: Mod 库 › 搜索文件 (06 §2.9)
+	// PageSearch: Mod library › Search files (06 §2.9)
 	PageSearch = "search"
 )
 
@@ -94,21 +94,21 @@ const (
 type NavItem struct {
 	ID    string    `json:"id"`
 	Label string    `json:"label"`
-	Badge int       `json:"badge,omitempty"` // 能不能跑: the actionable items (06 §5)
+	Badge int       `json:"badge,omitempty"` // Can it run: the actionable items (06 §5)
 	Key   string    `json:"key,omitempty"`   // shift+1–8
 	Kids  []NavItem `json:"kids,omitempty"`
-	// Mark is a plan's "有未载入的外部版本" (04 §4.3); Current the current plan (the one
+	// Mark is a plan's "an outside version has not been loaded" (04 §4.3); Current the current plan (the one
 	// launched, listed first); Open the plan being edited; InGame the plan the game's
 	// ModsConfig.xml holds (a small mark when there are several).
 	Mark    string `json:"mark,omitempty"`
 	Current bool   `json:"current,omitempty"`
 	Open    bool   `json:"open,omitempty"`
 	InGame  bool   `json:"inGame,omitempty"`
-	// Add: the entry opens a dialog ("+ 新方案"), not a page.
+	// Add: the entry opens a dialog ("+ new list"), not a page.
 	Add bool `json:"add,omitempty"`
 }
 
-// NavLists is how many lists the sidebar shows under 列表; the rest are in 全部列表.
+// NavLists is how many lists the sidebar shows under list; the rest are in all lists.
 const NavLists = 4
 
 // navPlans picks the sidebar's lists: the current one first, then the one open in the
@@ -143,14 +143,14 @@ type NavGroup struct {
 	Items []NavItem `json:"items"`
 }
 
-// Nav builds the sidebar: the 在玩 and 库 entries in the shift+1–8 order, every plan and "+ 新方案"
-// under 方案, every pack under 整合包. 没玩到 and 值得玩 have no pages yet (10) and are
+// Nav builds the sidebar: the Playing and Library entries in the shift+1–8 order, every plan and "+ new list"
+// under Lists, every pack under pack. not played yet and Worth playing have no pages yet (10) and are
 // left out.
 func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
-	// 全部列表 comes first, where every list is and new lists are made; then at most
+	// all lists comes first, where every list is and new lists are made; then at most
 	// NavLists lists: the current one, the one open in the editor, then the most recently
-	// used. 列表 itself opens the current list (06 §2.1, §2.17).
-	// When some are left out, 全部列表 says how many there are.
+	// used. list itself opens the current list (06 §2.1, §2.17).
+	// When some are left out, all lists says how many there are.
 	all := T("all lists")
 	if len(plans) > NavLists {
 		all = Tf("all lists (%d)", len(plans))
@@ -159,7 +159,7 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	for _, p := range navPlans(plans) {
 		planKids = append(planKids, NavItem{ID: p.Page, Label: p.Name, Mark: p.ConflictText, Current: p.Current, Open: p.Open, InGame: p.InGame})
 	}
-	// Packs the same way: at most NavLists, the most recently played; with more, 全部整合包
+	// Packs the same way: at most NavLists, the most recently played; with more, Allpack
 	// with their number comes first.
 	var packKids []NavItem
 	shown := slices.Clone(packs)
@@ -180,7 +180,7 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	library := []NavItem{
 		{ID: PagePlan, Label: T("lists"), Kids: planKids},
 		{ID: PagePacks, Label: T("packs"), Kids: packKids},
-		// Below the packs (2026-10-28). The entry opens 全部, its first sub-entry (06 §2.9).
+		// Below the packs (2026-10-28). The entry opens All, its first sub-entry (06 §2.9).
 		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all mods")}, {ID: PageChanges, Label: T("subscriptions and updates")}, {ID: PageSubscribe, Label: T("add a subscription")}, {ID: PageSearch, Label: T("search files")}}},
 		// what the game loads faster (08 §5.2)
 		{ID: PageTextures, Label: T("texture optimisation")},
@@ -239,7 +239,7 @@ const (
 // HomeOK is a row that is ready to play (LevelOK is "", which reads as "not checked").
 const HomeOK = "ok"
 
-// HomeRow is one row of "正在玩": a plan or a pack, its state, and what launches it.
+// HomeRow is one row of "playing now": a plan or a pack, its state, and what launches it.
 type HomeRow struct {
 	Memory      *MemoryLaunch `json:"memory,omitempty"`
 	GameVersion string        `json:"gameVersion"`
@@ -254,17 +254,17 @@ type HomeRow struct {
 	Facts   string `json:"facts"`
 	Mode    string `json:"mode,omitempty"`
 	Unsaved int    `json:"unsaved,omitempty"`
-	// Played is "played 10 月 20 日" or "never played".
+	// Played is "played Oct 20" or "never played".
 	Played string `json:"played"`
 	// A plan's row: its ID and page, whether it is the one being edited, its
-	// "有未载入的外部版本" mark, and whether the game holds it now.
+	// "an outside version has not been loaded" mark, and whether the game holds it now.
 	Plan    int64  `json:"plan,omitempty"`
 	Page    string `json:"page,omitempty"`
 	Current bool   `json:"current,omitempty"`
 	Mark    string `json:"mark,omitempty"`
 	InGame  bool   `json:"inGame,omitempty"`
 	// Links: the current plan's row when a pack's links are left in Mods/ (08 §5.3), the
-	// sentence of its 能不能跑 item; the launch button's tab shows it.
+	// sentence of its Can it run item; the launch button's tab shows it.
 	Links string `json:"links,omitempty"`
 	// EnvName is its environment, Versions the game versions it runs on ("1.7"; a pack's
 	// from its mods, "1.5–1.6"), Mods its number of mods; OtherEnv: not the current
@@ -280,19 +280,19 @@ type HomeRow struct {
 type Home struct {
 	Error string    `json:"error,omitempty"`
 	Rows  []HomeRow `json:"rows"`
-	// LastRun: "the list · 10 月 20 日 19:41" ("" when no run was read: the line is
-	// hidden); LastRunDay its day; LastRunErrors its errors in 能不能跑.
+	// LastRun: "the list · Oct 20 19:41" ("" when no run was read: the line is
+	// hidden); LastRunDay its day; LastRunErrors its errors in Can it run.
 	LastRun       string `json:"lastRun,omitempty"`
 	LastRunDay    string `json:"lastRunDay,omitempty"`
 	LastRunErrors int    `json:"lastRunErrors"`
 	// Changes is the current plan's changes since it was last played (06 §2.3): one
-	// sentence that opens 变化 with that scope and time.
+	// sentence that opens Subscriptions and updates with that scope and time.
 	Changes *modchanges.Home `json:"changes,omitempty"`
 	// Featured is the row of what is applied now (PickFeatured): the large card with
-	// ▶ 启动游戏; -1 when there is none.
+	// ▶ launch game; -1 when there is none.
 	Featured int `json:"featured"`
 	// Launch is the current plan's most likely trouble (Needs.Launch): the tab under the
-	// launch button says it with its reason and opens 能不能跑. It never blocks.
+	// launch button says it with its reason and opens Can it run. It never blocks.
 	Launch *LaunchHint `json:"launch,omitempty"`
 	// Update is the line about a new RimArcho at the top right (07 §5.1); nil when there is none.
 	Update *SelfUpdateLine `json:"update,omitempty"`

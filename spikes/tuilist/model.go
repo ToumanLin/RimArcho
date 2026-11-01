@@ -177,7 +177,7 @@ func (m model) line(r row, sel bool) string {
 // View renders header + (h-2) list rows + footer = h lines total.
 func (m model) View() string {
 	var b strings.Builder
-	b.WriteString(hdrStyle.Render(m.line(row{0, "Name 名称", "packageId", "Status"}, false)))
+	b.WriteString(hdrStyle.Render(m.line(row{0, "Name", "packageId", "Status"}, false)))
 	b.WriteByte('\n')
 	p := m.page()
 	end := m.off + p

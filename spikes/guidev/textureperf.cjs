@@ -56,7 +56,7 @@ const [exe, home, output] = process.argv.slice(2);
         }); observer.observe(document.querySelector('#screen'), { childList: true, subtree: true, attributes: true });
         p.restore = () => { observer.disconnect(); long.disconnect(); document.createElement = origCreate; window.fetch = origFetch; };
         await tex.open();
-        // the page opens without reading textures: 扫描统计 starts the count
+        // the page opens without reading textures: count the textures starts the count
         [...document.querySelectorAll('#screen .tex-foot button')].find(b => !b.disabled && b !== document.querySelector('#screen .tex-foot button:last-child'))?.click();
       });
       await page.waitForFunction(() => window.texPerf.paintedMs, null, { timeout: 600000 }).catch(async e => { fs.writeFileSync(output, JSON.stringify(await page.evaluate(() => ({screen:document.querySelector('#screen').textContent.slice(0,200),p:{...window.texPerf,restore:undefined}})),null,2)); throw e; });

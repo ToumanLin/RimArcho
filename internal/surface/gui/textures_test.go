@@ -100,7 +100,7 @@ func TestTextureMeasureReturnsBeforeDiskAndRejectsLateResults(t *testing.T) {
 	}
 }
 
-// 贴图优化 in the window: the page, a run in the background (the call returns at once, the
+// Texture optimisation in the window: the page, a run in the background (the call returns at once, the
 // pages answer, a second run is refused), its progress and its end as "textures" events, in
 // the interface's words.
 func TestTexturesBackground(t *testing.T) {
@@ -163,7 +163,7 @@ func TestTexturesBackground(t *testing.T) {
 	if strings.Join(got, " ") != "textures optimize --plan --scale 50" {
 		t.Fatalf("args %v", got)
 	}
-	// Mod 库存's selection
+	// Mod library's selection
 	release = make(chan struct{})
 	close(release)
 	api.LibraryDo(view.OpTextures, []string{"#abc"})

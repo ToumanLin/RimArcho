@@ -272,7 +272,7 @@ func (c *ContentCache) Get(a *app.App, st *app.LoadoutState) (map[string]int, er
 // TagMatch: v names tag when, ignoring case, it starts at the beginning of one of the tag's
 // words (06 §3.7): "facial" finds "Facial Hair" and "Facial Animation", "animation" and
 // "anim" find "Facial Animation", "facial hair" finds "Facial Hair"; "air" does not.
-// The rule is app.TagMatch, so Mod 库存's tag: filter (app.Library) matches the same way.
+// The rule is app.TagMatch, so Mod library's tag: filter (app.Library) matches the same way.
 func TagMatch(tag, v string) bool { return app.TagMatch(tag, v) }
 
 func isTagSep(c byte) bool { return app.IsTagSep(c) }
@@ -306,7 +306,7 @@ func CompleteQueryWith(q string, tags, versions []string) string {
 }
 
 // completeWith is CompleteQuery for a set of fields (in the order offered) and their
-// values; Mod 库存's search box uses it with its own keys (CompleteLibrary).
+// values; Mod library's search box uses it with its own keys (CompleteLibrary).
 func completeWith(q string, fields []string, values func(field string) []string) string {
 	if q == "" || strings.HasSuffix(q, " ") || strings.Count(q, "\"")%2 == 1 {
 		return ""

@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/l10ndata"
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
@@ -16,7 +17,7 @@ var configKeys = map[string][]string{
 	"updates.auto":     {"on", "off"},
 	"updates.interval": {"normal", "frequent", "relaxed"},
 	"ui.accent":        {"default", "indigo", "blue", "cyan", "teal", "green", "grass", "orange", "amber", "red", "crimson", "pink", "plum", "purple", "violet", "iris"},
-	"ui.lang":          {"auto", "en", "zh"},
+	"ui.lang":          l10ndata.LanguageCodes(),
 	"ui.theme":         {"auto", "light", "dark"},
 	"ui.icons":         {"compat", "nerd"}, // nerd: the player's terminal already uses a Nerd Font
 	"ui.mouse":         {"on", "off"},
@@ -75,7 +76,7 @@ var freeKeys = map[string]struct {
 }
 
 // DefaultPinnedTags is the preset of common tags (06 §3.8).
-const DefaultPinnedTags = "框架,美化,服装,种族,武器,建筑,家具,QoL,平衡,剧情,性能,语言包,测试中,待删除"
+var DefaultPinnedTags = l10ndata.DefaultPinnedTags
 
 // Setting returns a setting of the app, or its default.
 func Setting(a *app.App, key string) string {
@@ -113,7 +114,7 @@ func SettingKeys() []string {
 
 func init() {
 	register(&Command{Name: "config get", Args: "[<key>]", Summary: "show settings", MaxArgs: 1, Run: configGetCmd})
-	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto|en|zh; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris; ui.icons: compat|nerd; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
+	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris; ui.icons: compat|nerd; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
 }
 
 // ConfigValue returns a setting, or its default.

@@ -17,7 +17,7 @@ import (
 // game versions (04 §1.6), the Steam collections it follows (04 §9.6) and how to share it.
 // Reading the page never uses the network; CheckPlanFollows does, when the page asks.
 
-// PagePlans is the sidebar's 列表 › 列表管理.
+// PagePlans is the sidebar's list › Manage lists.
 const PagePlans = "plans"
 
 // PlanManage is the page.
@@ -35,7 +35,7 @@ type PlanManageRow struct {
 	Current bool   `json:"current,omitempty"`
 	InGame  bool   `json:"inGame,omitempty"`
 	Mark    string `json:"mark,omitempty"` // an outside change not used yet
-	Meta    string `json:"meta"`           // "1.5–1.7  412 mods  played 10 月 21 日"
+	Meta    string `json:"meta"`           // "1.5–1.7  412 mods  played Oct 21"
 	Follows int    `json:"follows,omitempty"`
 	Changed bool   `json:"changed,omitempty"` // a followed collection changed
 }
@@ -53,7 +53,7 @@ type FollowRow struct {
 	ID           string   `json:"id"`
 	Title        string   `json:"title"`
 	Items        int      `json:"items"`
-	Meta         string   `json:"meta"` // "1.5–1.7  412 mods  played 10 月 21 日"
+	Meta         string   `json:"meta"` // "1.5–1.7  412 mods  played Oct 21"
 	NotInstalled int      `json:"notInstalled,omitempty"`
 	Missing      []string `json:"missing,omitempty"` // their Workshop links
 	Changes      string   `json:"changes,omitempty"` // "3 new, 1 dropped"; "" unchanged
@@ -87,7 +87,7 @@ func workshopLink(id string) string {
 	return "https://steamcommunity.com/sharedfiles/filedetails/?id=" + id
 }
 
-// whenText is "today 14:02", "yesterday 14:02" or "10 月 21 日".
+// whenText is "today 14:02", "yesterday 14:02" or "Oct 21".
 func whenText(t time.Time) string {
 	t = t.Local()
 	now := time.Now()

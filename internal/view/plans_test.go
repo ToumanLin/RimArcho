@@ -151,7 +151,7 @@ func TestPlanVerbs(t *testing.T) {
 	}
 }
 
-// The status line's "游戏里现在是" follows the write record; a plan's conflict mark shows
+// The status line's "the game now uses" follows the write record; a plan's conflict mark shows
 // on its row, the sidebar and the home page.
 func TestInGameAndMarks(t *testing.T) {
 	e, _, _ := shellEnv(t)
@@ -189,7 +189,7 @@ func TestInGameAndMarks(t *testing.T) {
 	}
 	nav := view.Nav(0, rows, nil)
 	kids := nav[1].Items[0].Kids
-	// 全部列表 first, then the current list (列表 opens it), then the open one (06 §2.1)
+	// all lists first, then the current list (list opens it), then the open one (06 §2.1)
 	if len(kids) != 3 || kids[0].ID != view.PagePlans || kids[2].Mark == "" || !kids[2].Open || !kids[1].Current {
 		t.Fatalf("plan kids %+v", kids)
 	}
@@ -254,7 +254,7 @@ func TestHomePerPlan(t *testing.T) {
 	}
 }
 
-// The sidebar keeps 全部列表 first and shows NavLists lists at most: the current one,
+// The sidebar keeps all lists first and shows NavLists lists at most: the current one,
 // then the most recently used (06 §2.1).
 func TestNavRecentLists(t *testing.T) {
 	now := time.Now()

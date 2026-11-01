@@ -1,7 +1,7 @@
-// Mod 库 › 添加订阅 (06 §2.9): one paste box. What is pasted is recognised (a Git repository,
+// Mod library › add a subscription (06 §2.9): one paste box. What is pasted is recognised (a Git repository,
 // a LoversLab file page, another web page, Workshop links or IDs); the card below asks only
-// the one decision that source needs and shows the --dry-run text before 订阅. Also the
-// file choice a download-page update needs (pageUpdate, in the 订阅与更新 detail).
+// the one decision that source needs and shows the --dry-run text before subscribe. Also the
+// file choice a download-page update needs (pageUpdate, in the subscriptions and updates detail).
 import { pathContent, editablePath } from "./fields.js";
 import { el, api, T, Tf, errText, say } from "./state.js";
 import * as pop from "./popups.js";
@@ -96,7 +96,7 @@ export function importPicker(onChange = () => {}) {
   return { el: row, value: () => value };
 }
 
-// pageUpdate is the 订阅与更新 detail's file choice for a download-page subscription: the
+// pageUpdate is the subscriptions and updates detail's file choice for a download-page subscription: the
 // LoversLab files with the session, or files downloaded in the browser (previewed, then
 // confirmed: it replaces the installed one).
 export function pageUpdate(ref, done) {
@@ -119,7 +119,7 @@ export function pageUpdate(ref, done) {
   return root;
 }
 
-// addForm is the 添加订阅 page's body. ctx: data (the 订阅与更新 page data, for the account
+// addForm is the add a subscription page's body. ctx: data (the subscriptions and updates page data, for the account
 // lines and the recent subscriptions), back() (esc on an empty box), done() after queuing.
 export function addForm(ctx = {}) {
   const root = el("div", "subscribe-add");
@@ -163,7 +163,7 @@ export function addForm(ctx = {}) {
     below.append(list);
   }
 
-  // card: what was recognised, its one decision, the dry run and 订阅.
+  // card: what was recognised, its one decision, the dry run and subscribe.
   const recognise = () => {
     clearTimeout(timer);
     const my = ++seq, text = field.value.trim(), kind = detect(text);
@@ -283,13 +283,13 @@ export function addForm(ctx = {}) {
   return {
     el: root,
     focus: () => field.focus(),
-    // setText fills the box (a paste on 订阅与更新) and recognises it at once.
+    // setText fills the box (a paste on subscriptions and updates) and recognises it at once.
     setText: (t) => { field.value = t || ""; recognise(); },
   };
 }
 
-// updateFromForm opens pageUpdate in place at the top of host (Mod 库 and the details, where a
-// download-page copy's 更新 needs the new files); esc or 关闭 closes it.
+// updateFromForm opens pageUpdate in place at the top of host (Mod library and the details, where a
+// download-page copy's update needs the new files); esc or close closes it.
 export function updateFromForm(host, ref, close, onApplied = () => {}) {
   host.querySelector(".subscribe-form")?.remove();
   const root = el("section", "subscribe-form");

@@ -14,10 +14,10 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 添加订阅 (06 §2.9, §9.1): Mod 库存's paste box as a page of its own (+ on 订阅与更新, the
-// palette, a paste on 订阅与更新). What is typed or pasted is recognised the way the window
+// add a subscription (06 §2.9, §9.1): Mod library's paste box as a page of its own (+ on subscriptions and updates, the
+// palette, a paste on subscriptions and updates). What is typed or pasted is recognised the way the window
 // recognises it (subscribe.Detect); under it a card asks only the one decision that source
-// needs (↑↓), shows the --dry-run text, and enter queues 订阅 as a background task (06
+// needs (↑↓), shows the --dry-run text, and enter queues subscribe as a background task (06
 // §2.16). A download page is subscribed through its single Git repository; its other ways —
 // LoversLab files with the session, a zip or folder downloaded in the browser — need the
 // window's file chooser and session, so the card says so and gives the command.
@@ -42,7 +42,7 @@ const addDebounce = 250 * time.Millisecond
 
 type addTick struct{ seq int }
 
-// openAdd shows 添加订阅 with text in the box ("" an empty box).
+// openAdd shows add a subscription with text in the box ("" an empty box).
 func (m *model) openAdd(text string) tea.Cmd {
 	m.panel, m.insp, m.full = nil, nil, false
 	m.add = addState{text: text}
@@ -183,7 +183,7 @@ func (m *model) runSubscribe() func(a *app.App, argv []string) (string, int) {
 	return m.tasks.runSub
 }
 
-// addKey: the keys of 添加订阅. Letters go into the box (or the name field); ↑↓ choose, enter
+// addKey: the keys of add a subscription. Letters go into the box (or the name field); ↑↓ choose, enter
 // subscribes once the dry run is shown, esc clears the box and then goes back.
 func (m *model) addKey(k tea.KeyMsg) tea.Cmd {
 	s := &m.add
@@ -262,7 +262,7 @@ func (m *model) addKey(k tea.KeyMsg) tea.Cmd {
 	return nil
 }
 
-// subscribeNow queues 订阅 when the dry run of the card's decision is shown and allowed.
+// subscribeNow queues subscribe when the dry run of the card's decision is shown and allowed.
 func (m *model) subscribeNow() tea.Cmd {
 	s := &m.add
 	r, ok := s.request()
@@ -318,7 +318,7 @@ func (s *addState) nameHint() string {
 	return "full commit SHA"
 }
 
-// addLines draws 添加订阅: the box, then the card (or what the box accepts).
+// addLines draws add a subscription: the box, then the card (or what the box accepts).
 func (m *model) addLines(n int) []string {
 	s := &m.add
 	inner := max(m.w-4, 10)
@@ -384,7 +384,7 @@ func (m *model) addLines(n int) []string {
 	return out
 }
 
-// addPairs: the hint line of 添加订阅.
+// addPairs: the hint line of add a subscription.
 func (m *model) addPairs() [][2]string {
 	s := &m.add
 	pairs := [][2]string{}
@@ -401,9 +401,9 @@ func (m *model) addPairs() [][2]string {
 	return pairs
 }
 
-// ---- 订阅与更新's actions ----
+// ---- subscriptions and updates's actions ----
 
-// checkSources queues 检查更新 of sources (K: every one with mods; enter: the row's).
+// checkSources queues check for updates of sources (K: every one with mods; enter: the row's).
 func (m *model) checkSources(keys []string) tea.Cmd {
 	if len(keys) == 0 {
 		m.say(sayInfo, T("no subscriptions to check"))
@@ -435,7 +435,7 @@ func (c *chState) allSources() []string {
 	return keys
 }
 
-// updatePending previews 更新 of the rows and queues it on enter (u one, U every one shown).
+// updatePending previews update of the rows and queues it on enter (u one, U every one shown).
 // Download pages need the new files chosen in the window: they are left out and said so.
 // Refused while a game runs (the dry run says so and enter does nothing).
 func (m *model) updatePending(rows []view.PendingUpdate) tea.Cmd {
@@ -505,7 +505,7 @@ func (m *model) updatePending(rows []view.PendingUpdate) tea.Cmd {
 	})
 }
 
-// removeSubscription previews 撤掉订阅 (the folder goes to the recycle bin; lists using it
+// removeSubscription previews remove subscription (the folder goes to the recycle bin; lists using it
 // are warned about) and queues it on enter.
 func (m *model) removeSubscription(ref, name string) tea.Cmd {
 	return m.previewPanel(T("remove subscription")+"  "+name, func(a *app.App) ([]string, bool) {
@@ -542,7 +542,7 @@ func (m *model) previewPanel(title string, dry func(a *app.App) ([]string, bool)
 }
 
 // subscriptionOf: the instance is a subscription RimArcho keeps (Git, download page,
-// SteamCMD), so 撤掉订阅 applies.
+// SteamCMD), so remove subscription applies.
 func (m *model) subscriptionOf(id string) bool {
 	if m.st == nil {
 		return false
@@ -551,7 +551,7 @@ func (m *model) subscriptionOf(id string) bool {
 	return mod != nil && m.app.SubscriptionOf(mod) != nil
 }
 
-// openSource opens what 打开来源页 shows for a pending update: the compare view or the
+// openSource opens what open the source page shows for a pending update: the compare view or the
 // repository / download page, or the Workshop change notes.
 func (m *model) openSource(r *view.PendingUpdate) tea.Cmd {
 	if r.Kind == app.LibWorkshop || r.Kind == app.LibSteamCMD {
@@ -569,15 +569,4 @@ func (m *model) openSource(r *view.PendingUpdate) tea.Cmd {
 		return nil
 	}
 	return m.open(view.SubscriptionSourceURL(rec))
-}
-
-func init() {
-	view.Register(map[string]string{
-		"nothing to subscribe here yet": "这里还没有可订阅的",
-		"wait for the dry run":          "等预览出来",
-		"dry run…":                      "预览中…",
-		"downloaded files and LoversLab downloads are chosen in the window":                                             "下载好的文件和 LoversLab 下载要在窗口里选",
-		"a download page needs the new files: choose them in the window, or archo subscribe update --from <zip|folder>": "下载页要先选新下载的文件：在窗口里选，或 archo subscribe update --from <zip|文件夹>",
-		"check this source": "检查这个来源",
-	})
 }

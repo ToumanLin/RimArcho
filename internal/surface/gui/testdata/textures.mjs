@@ -41,7 +41,7 @@ async function setup() {
     assert.ok(b, `no button ${label}`);
     b.onclick();
   };
-  // open shows the encoder and the mods; 扫描统计 starts the count.
+  // open shows the encoder and the mods; count the textures starts the count.
   const count = async () => { h.tex.open(); await flush(); click("count the textures"); };
   const h = { screen, timers, requests, polls, messages, S, tex, infos, click, count, created: () => created };
   return h;

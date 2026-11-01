@@ -69,7 +69,7 @@ type LinkGroup struct {
 	Game string    `json:"game"`
 	Path string    `json:"path"`
 	Rows []LinkRow `json:"rows"`
-	// Current: the current environment's game (能不能跑 shows it first, 06 §2.4).
+	// Current: the current environment's game (Can it run shows it first, 06 §2.4).
 	Current bool `json:"current,omitempty"`
 }
 type LinkRow struct {

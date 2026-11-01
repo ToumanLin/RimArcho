@@ -59,7 +59,7 @@ export async function showDetail(it, staged) {
   box.dataset.ref = it.id;
   f.copies(editorCopies(it));
   if (!same) f.head(it.name, "", it.id);
-  // the copy's note and actions come from Mod 库存's data, rebuilt after an edit: not while
+  // the copy's note and actions come from Mod library's data, rebuilt after an edit: not while
   // edits are on their way (the reload after the last one draws the details again)
   if (!S.editing) api.LibraryCopy(it.id).then((i) => { if (current() && i) f.inst(i); }, () => {});
   try {
@@ -94,14 +94,14 @@ function editorCopies(it) {
   }));
 }
 
-// detailFrame lays out a copy's details, the same on the plan editor and on Mod 库存 (06
+// detailFrame lays out a copy's details, the same on the plan editor and on Mod library (06
 // §4.1, §2.9), top to bottom: the copies to choose from (the editor), the copy's note, its
 // picture, name and authors, where it comes from and its version, the field list, the
 // copy's actions, the description, the history. Each part is filled when its data comes:
 //   head(name, authors, id)  what the row already knows
 //   inst(row)                the copy's library row: its note and its ops
 //   detail(d)                the Detail: header, fields, description, history
-//   fields(list)             a field list of its own (Mod 库存's, with its extra fields)
+//   fields(list)             a field list of its own (Mod library's, with its extra fields)
 // o: fieldActs(d, row), run(code, row), noteSaved(), noteLeave(), tech (the full detail's
 // link), ownFields (the fields come through fields(), not with the Detail).
 export function detailFrame(box, sc, o = {}) {
@@ -282,7 +282,7 @@ export function noteEl(i, o = {}) {
   return box;
 }
 
-// renderDetail draws a detail into box (scrolled by sc). Mod 库存 (06 §2.9) draws its
+// renderDetail draws a detail into box (scrolled by sc). Mod library (06 §2.9) draws its
 // copies' details with it; opts.page leaves out what acts on the plan's selection (the tag
 // editor, the full detail).
 export function renderDetail(d, box, sc, keepScroll, opts = {}) {
@@ -295,7 +295,7 @@ export function renderDetail(d, box, sc, keepScroll, opts = {}) {
   box.append(img, el("h1", "", d.name));
   if (d.authors) box.append(el("div", "who", d.authors));
   if (d.version) box.append(versionNotice(d.version));
-  // a copy's details on Mod 库存 draw their own note, actions and field list (06 §2.9)
+  // a copy's details on Mod library draw their own note, actions and field list (06 §2.9)
   if (!opts.page) {
     const facts = el("div", "facts");
     facts.innerHTML = sourceIcon(d.kind);
@@ -358,7 +358,7 @@ export function renderDetail(d, box, sc, keepScroll, opts = {}) {
   }
   box.append(desc);
   if (d.history && !opts.noHistory) {
-    // the three newest here; the whole history of its Lineage on 变化 (06 §2.9)
+    // the three newest here; the whole history of its Lineage on Subscriptions and updates (06 §2.9)
     const all = el("div", "sub link", T("see all in change history"));
     all.onclick = () => document.dispatchEvent(new CustomEvent("changes-of", { detail: { id: d.id, name: d.name } }));
     box.append(el("div", "sub", T("history")), el("div", "history word-facts", d.history), all);

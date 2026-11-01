@@ -80,7 +80,7 @@ func (s *API) detachedReader() (*app.App, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.a.Uninstalled {
-		return nil, errors.New("RimArcho 已卸载，账户操作已停用")
+		return nil, errors.New("RimArcho was uninstalled; account operations are disabled")
 	}
 	r, err := s.a.ReadSession()
 	if err != nil {
@@ -99,7 +99,7 @@ func (s *API) subscriptionSession() (*app.App, string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.a.Uninstalled {
-		return nil, "", errors.New("RimArcho 已卸载，账户操作已停用")
+		return nil, "", errors.New("RimArcho was uninstalled; account operations are disabled")
 	}
 	w := &s.subRead
 	if e, err := s.a.Env(); w.a != nil && (err != nil || w.a.EnvName != e.Name) {

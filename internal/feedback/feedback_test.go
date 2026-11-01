@@ -7,7 +7,7 @@ import (
 )
 
 func draft() Draft {
-	return Draft{Title: "背景 + 纯色", Text: "启动页背景只剩纯色。", Basic: []string{"RimArcho 0.9.0", "RimWorld 1.6.4633"}, Paste: "全文已复制，请粘贴在这里。"}
+	return Draft{Title: "Background + solid colour", Text: "The start page background is only a solid colour.", Basic: []string{"RimArcho 0.9.0", "RimWorld 1.6.4633"}, Paste: "The full text is copied; paste it here."}
 }
 
 // read decodes a link back to its title and body.
@@ -31,13 +31,13 @@ func TestComposeShortCarriesEverything(t *testing.T) {
 		t.Fatalf("short draft should fit: full=%v len=%d", r.Full, len(r.URL))
 	}
 	title, body := read(t, r.URL)
-	if title != "背景 + 纯色" {
+	if title != "Background + solid colour" {
 		t.Fatalf("title %q (a + must stay a +)", title)
 	}
 	if body != r.Body {
 		t.Fatalf("link body differs from Body:\n%s\n---\n%s", body, r.Body)
 	}
-	for _, want := range []string{"启动页背景只剩纯色。\n\n---\nRimArcho 0.9.0\nRimWorld 1.6.4633\n", "<summary>Mods &lt;2&gt;</summary>", "a ''' b"} {
+	for _, want := range []string{"The start page background is only a solid colour.\n\n---\nRimArcho 0.9.0\nRimWorld 1.6.4633\n", "<summary>Mods &lt;2&gt;</summary>", "a ''' b"} {
 		if !strings.Contains(r.Body, want) {
 			t.Fatalf("body lacks %q:\n%s", want, r.Body)
 		}
@@ -66,14 +66,14 @@ func TestComposeLongFallsBackToPaste(t *testing.T) {
 		t.Fatal("the full body (to copy) keeps every section")
 	}
 	// The player's own text too long: only the note and the basic lines go in the link.
-	d.Sections, d.Text = nil, strings.Repeat("很长的说明。", 400)
+	d.Sections, d.Text = nil, strings.Repeat("A long description.", 400)
 	r = Compose(d)
 	_, body = read(t, r.URL)
-	if r.Full || len(r.URL) > MaxURL || strings.Contains(body, "很长的说明") || !strings.Contains(body, d.Paste) {
+	if r.Full || len(r.URL) > MaxURL || strings.Contains(body, "A long description") || !strings.Contains(body, d.Paste) {
 		t.Fatalf("text too long: full=%v len=%d body=%q", r.Full, len(r.URL), body)
 	}
 	// Even an absurd title is cut to fit.
-	d.Title = strings.Repeat("标", 2000)
+	d.Title = strings.Repeat("T", 2000)
 	if r = Compose(d); len(r.URL) > MaxURL {
 		t.Fatalf("title not shortened: %d", len(r.URL))
 	}

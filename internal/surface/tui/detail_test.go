@@ -177,7 +177,7 @@ func TestT13TagBar(t *testing.T) {
 	press(m, "g")
 	press(m, "right")
 	if s := ansi.Strip(m.View()); !strings.Contains(s, "[✓美化]") {
-		t.Fatalf("no [✓美化]:\n%s", s)
+		t.Fatalf("no the checked Visuals tag:\n%s", s)
 	}
 	press(m, "enter")
 	if got := tagged("美化"); got != "" {
@@ -233,7 +233,7 @@ func TestWrapKinsoku(t *testing.T) {
 		"中文后面跟英文标点.还有(括号)和逗号,以及问号?结束",
 	}
 	for _, text := range texts {
-		for w := 8; w <= 40; w++ { // below that a glued group (吗？」) may not fit at all
+		for w := 8; w <= 40; w++ { // below that a word glued to CJK closing marks may not fit at all
 			lines := wrapSpans([]bbcode.Span{{Text: text}}, w, lipgloss.NewStyle())
 			var all strings.Builder
 			for i, l := range lines {
@@ -255,7 +255,7 @@ func TestWrapKinsoku(t *testing.T) {
 			}
 		}
 	}
-	// the case from the review: "…日志\n。必须…" becomes "…日\n志。必须…"
+	// Regression: wrapping must keep CJK closing marks with the preceding character.
 	lines := wrapSpans([]bbcode.Span{{Text: "支持从游戏获取更加详细的日志。必须放在"}}, 28, lipgloss.NewStyle())
 	if got := strings.TrimRight(ansi.Strip(lines[1]), " "); !strings.HasPrefix(got, "志。") {
 		t.Fatalf("second line %q", got)

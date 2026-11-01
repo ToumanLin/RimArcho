@@ -68,7 +68,7 @@ func TestOpsReachable(t *testing.T) {
 			}
 		}
 	}
-	// 退订 / 删除 last, in red
+	// unsubscribe / delete last, in red
 	tab := OpTable()
 	for _, o := range tab[len(tab)-2:] {
 		if !o.Danger || o.Key != "Del" {

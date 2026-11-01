@@ -1,7 +1,7 @@
 import { editablePath, copyablePath, pathContent } from "./fields.js";
 // The first-run guide (06 §2.15): three steps, each with a way back.
-//   1. find the game: 已有的游戏 — what detection finds (tick several), or a folder
-//      chosen in the native dialog; or 下载一个版本 — a branch, a folder and an optional
+//   1. find the game: existing games — what detection finds (tick several), or a folder
+//      chosen in the native dialog; or download a version — a branch, a folder and an optional
 //      account override, downloaded by SteamCMD in its own window (08 §11);
 //   2. read the mods: a scan per environment in a child process, with its progress (a game
 //      added once the shared mod folders were read: only its own Data/ and Mods/);

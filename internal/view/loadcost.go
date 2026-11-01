@@ -69,7 +69,7 @@ func PlanLoadCost(r *app.LoadCost) *PlanCost {
 	} else {
 		p.Notes = []string{
 			T("Textures use DXT or RGBA32 with mipmaps; all textures load into VRAM. The upper bound includes static atlas copies."),
-			T("1.6 RAM is calibrated against test runs with 250–500 mods; VRAM follows the loading rules only."),
+			T("1.6 RAM is calibrated with up to 7.5 GiB of textures; larger loads are extrapolated. VRAM follows loading rules only."),
 			T("Sounds: files up to 300 KiB are decoded into RAM; larger clips stream."),
 		}
 	}

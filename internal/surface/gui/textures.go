@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 贴图优化 (08 §5.2, 06 §2.13): its page, and the runs of Mod 库存's 优化贴图. A run takes
+// Texture optimisation (08 §5.2, 06 §2.13): its page, and the runs of Mod library's optimise textures. A run takes
 // minutes, so it is an `archo textures optimize` child, like a scan: the window keeps
 // working, and "textures" events carry its progress (TextureEvent) and its end.
 
@@ -170,7 +170,7 @@ func (s *API) TexturesInstall() (string, error) {
 	return settingQueued(s.queueSettingTaskLocked(view.TaskTodds, nil, "")), nil
 }
 
-// TexturesRun starts converting: the mods refs (Mod 库存's selection), else scope "plan" or
+// TexturesRun starts converting: the mods refs (Mod library's selection), else scope "plan" or
 // "all"; scale a percent (100: full size). One run at a time.
 func (s *API) TexturesRun(scope string, scale int, refs []string) (string, error) {
 	s.mu.Lock()

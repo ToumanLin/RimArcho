@@ -437,7 +437,7 @@ func TestLaunchPlans(t *testing.T) {
 	}
 	e.MustRun("env", "set", "main", "--launch", "direct")
 	e.MustRun("enable", refOf(t, e, "B", ""))
-	// Edits since the last write do not block: the launch writes them (08 §2 "删除了什么").
+	// Edits since the last write do not block: the launch writes them (08 §2 "what was removed").
 	if out, code := e.Run("launch", "--force"); code == 0 {
 		t.Fatalf("launch --force must be gone:\n%s", out)
 	}

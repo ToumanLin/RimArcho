@@ -12,6 +12,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/accounts"
 	"github.com/ToumanLin/RimArcho/internal/deps"
+	"github.com/ToumanLin/RimArcho/internal/l10ndata"
 )
 
 func (a *App) AccountsDir() string { return filepath.Join(a.LocalDir(), "accounts") }
@@ -44,7 +45,7 @@ func (a *App) SteamAccountStatus() SteamAccountStatus {
 	if hasRecord {
 		s.State, s.Verified = saved.State, saved.Verified
 		s.LoggedIn, s.OwnsRimWorld, s.OwnershipChecked = saved.LoggedIn, saved.OwnsRimWorld, saved.OwnershipChecked
-		if saved.State == "最近登录成功，需时再验证" {
+		if l10ndata.LegacyEnglish(saved.State) == "signed in" {
 			s.LoggedIn = true
 		}
 	}

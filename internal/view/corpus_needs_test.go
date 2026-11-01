@@ -11,9 +11,9 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The log corpus in 能不能跑 (06 §2.4, §5): an undeclared prerequisite with the dependencies,
+// The log corpus in Can it run (06 §2.4, §5): an undeclared prerequisite with the dependencies,
 // a known-bad pair with the conflicts, a mod's own known error as a dimmed note, each with
-// the 社区日志 chip and its measured share; weak order preferences folded, dimmed and not
+// the community logs chip and its measured share; weak order preferences folded, dimmed and not
 // counted; the launch hint is the first LaunchChecks code with a counted item.
 func TestCorpusNeeds(t *testing.T) {
 	view.SetLang("en")
@@ -81,9 +81,9 @@ func TestCorpusNeeds(t *testing.T) {
 		t.Errorf("count %d, want 0: %+v", n.Count, n.Items)
 	}
 	for _, it := range []*view.Need{dep, pair, own, weak} {
-		// 可以留意 (06 §2.4): nothing sorts here, so the weak preferences are a hint too
+		// worth knowing (06 §2.4): nothing sorts here, so the weak preferences are a hint too
 		if it.Section != view.SectionHint || it.Into != "" {
-			t.Errorf("not in 可以留意: %+v", it)
+			t.Errorf("not in Things to watch: %+v", it)
 		}
 		if it.Status != view.StatusHint || it.Evidence.Cutoff != "2040-03" || !strings.Contains(it.Evidence.Label, "2040-03") {
 			t.Errorf("hint or cutoff: %+v", it)

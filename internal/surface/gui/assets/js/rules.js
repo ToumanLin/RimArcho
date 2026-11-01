@@ -1,10 +1,10 @@
 import { choiceControl } from "./choices.js";
-// The plan editor's 排序规则 (06 §2.5, 04 §6.1): a fold above 历史 in the left column. Rules
+// The plan editor's Load-order rules (06 §2.5, 04 §6.1): a fold above history in the left column. Rules
 // are global (every list and game shares them); the fold shows those with a mod enabled in
-// the current list (只看当前列表, the default) or all of them, and its bar counts what it
-// shows. Each row has 编辑 and 删除; the form adds or changes one in place (no popup,
+// the current list (only the current list, the default) or all of them, and its bar counts what it
+// shows. Each row has edit and delete; the form adds or changes one in place (no popup,
 // 06 §3.1 rule 7). r opens the form for the mod at the cursor. Removing is at once, with
-// 撤销 in the status line (u right after, too); rules are not list edits, so they are not in
+// undo in the status line (u right after, too); rules are not list edits, so they are not in
 // the list's undo stack.
 import { $, el, api, T, errText, say } from "./state.js";
 import { icon } from "./icons.js";
@@ -65,13 +65,13 @@ export async function refreshRules() {
   draw();
 }
 
-// showRules is the palette's 排序规则: the fold opens and takes the focus.
+// showRules is the palette's Load-order rules: the fold opens and takes the focus.
 export function showRules() {
   if (!R.open) setOpen(true);
   requestAnimationFrame(() => $(".rules-scope button.on", area())?.focus({ preventScroll: true }));
 }
 
-// startRule is r (and the fold's 加一条规则): the form for a new rule about mod it.
+// startRule is r (and the fold's add a rule): the form for a new rule about mod it.
 export function startRule(it) {
   if (!it || !it.id) return say("", T("choose a mod in the lists first"));
   R.form = { id: 0, kind: "after", a: { ref: it.id, name: it.name }, b: null, note: "" };

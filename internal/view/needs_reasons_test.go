@@ -31,7 +31,7 @@ func TestRowIconsHaveReasons(t *testing.T) {
 	if len(n.Status) == 0 {
 		t.Fatalf("no row icons: %+v", n.Items)
 	}
-	// The pinned popover offers 能不能跑's actions: a reason has the actions of its item.
+	// The pinned popover offers Can it run's actions: a reason has the actions of its item.
 	acts := 0
 	for _, rs := range n.Reasons {
 		for _, r := range rs {

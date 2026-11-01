@@ -25,7 +25,7 @@ func TestIntKeyConvertFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Logf("OPEN %s schema=%s", time.Since(begin).Round(time.Millisecond), s.Meta("schema_version"))
-	// The Mod 库存 content lookups on the real rows: the queries before v27 and the columns.
+	// The Mod library content lookups on the real rows: the queries before v27 and the columns.
 	snaps := map[string]int64{}
 	rows, err := s.DB.Query(`SELECT id, current_snapshot_id FROM instance WHERE current_snapshot_id IS NOT NULL`)
 	if err != nil {

@@ -664,7 +664,7 @@ func parse(id, created string, raw []byte) Record {
 			sec = ""
 			continue
 		case strings.HasPrefix(l, "Platform information:"):
-			sec = "" // never kept (design §5 "明确不收集")
+			sec = "" // never kept (design §5 "explicitly excluded")
 			continue
 		}
 		switch sec {

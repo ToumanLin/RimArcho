@@ -47,7 +47,7 @@ export async function drive(ctx) {
     }
     for(let i=1;i<batch.statuses.length;i++){
       const a=batch.statuses[i-1],b=batch.statuses[i];
-      if(a.text&&!/loading|checking|正在|加载/i.test(a.text)&&/loading|加载/i.test(b.text)&&a.inputCount===b.inputCount)fail('results not overwritten by loading',{label,a,b});
+      if(a.text&&!/loading|checking|\u6b63\u5728|\u52a0\u8f7d/i.test(a.text)&&/loading|\u52a0\u8f7d/i.test(b.text)&&a.inputCount===b.inputCount)fail('results not overwritten by loading',{label,a,b});
     }
     return s;
   }

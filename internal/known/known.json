@@ -534,7 +534,7 @@
     "abstract ArchonexusBuilding"
    ],
    "class": "xml-load",
-   "example": "xml-load|XML error: Could not find parent node named \"…\" for node \"…\". Full node: \u003cThingDef ParentName=\"…\"\u003e\u003cdefName\u003eRKK_Building_WhiteMoonA\u003c/defName\u003e\u003clabel\u003e？？？\u003c/label\u003e\u003cthingClass\u003eRatkinKnights.RKK_TrailStar_WhiteMoonA\u003c/thingClass\u003e\u003cdescription\u003e？？？\u003c/descript",
+   "example": "xml-load|XML error: Could not find parent node named \"…\" for node \"…\". Full node: \u003cThingDef ParentName=\"…\"\u003e\u003cdefName\u003eRKK_Building_WhiteMoonA\u003c/defName\u003e\u003clabel\u003e\uff1f\uff1f\uff1f\u003c/label\u003e\u003cthingClass\u003eRatkinKnights.RKK_TrailStar_WhiteMoonA\u003c/thingClass\u003e\u003cdescription\u003e\uff1f\uff1f\uff1f\u003c/descript",
    "loadAfter": true,
    "fix": {
     "pairs": 17,
@@ -12920,8 +12920,8 @@
    ],
    "class": "patch-failed",
    "templates": [
-    "patch-failed|[简易科技] Patch operation Verse.PatchOperationRemove(/Defs/ThingDef[defName=…]/costList) failed",
-    "patch-failed|[简易科技] Verse.PatchOperationRemove(xpath=\"…\"): Failed to find a node with the given xpath"
+    "patch-failed|[\u7b80\u6613\u79d1\u6280] Patch operation Verse.PatchOperationRemove(/Defs/ThingDef[defName=…]/costList) failed",
+    "patch-failed|[\u7b80\u6613\u79d1\u6280] Verse.PatchOperationRemove(xpath=\"…\"): Failed to find a node with the given xpath"
    ],
    "logs": 10,
    "players": 9,

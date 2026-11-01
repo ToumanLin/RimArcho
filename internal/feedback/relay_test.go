@@ -78,23 +78,23 @@ func TestRelayURL(t *testing.T) {
 
 // A long mod list is cut from its end, says how many lines went, and the body fits.
 func TestSendBody(t *testing.T) {
-	d := Draft{Text: "说明", Basic: []string{"RimArcho dev"}, More: "… 还有 %d 行"}
+	d := Draft{Text: "Description", Basic: []string{"RimArcho dev"}, More: "… %d more lines"}
 	if d.SendBody(MaxBody) != d.Body() {
 		t.Fatal("a short body is sent whole")
 	}
 	var mods, log []string
 	for i := 1; i <= 2000; i++ {
-		mods = append(mods, fmt.Sprintf("%d. 模组 %d  author.mod%d  %d", i, i, i, 1000000000+i))
+		mods = append(mods, fmt.Sprintf("%d. Mod %d  author.mod%d  %d", i, i, i, 1000000000+i))
 	}
 	for i := 1; i <= 40; i++ {
 		log = append(log, fmt.Sprintf("E%d ×1  Could not resolve cross-reference", i))
 	}
 	d.Sections = []Section{{Heading: "mods", Lines: mods}, {Heading: "log", Lines: log}}
 	b := d.SendBody(MaxBody)
-	if units(b) > MaxBody || !strings.Contains(b, "1. 模组 1  ") || !strings.Contains(b, "E40 ×1") {
+	if units(b) > MaxBody || !strings.Contains(b, "1. Mod 1  ") || !strings.Contains(b, "E40 ×1") {
 		t.Fatalf("fits, keeps the start of the list and the whole log: %d units", units(b))
 	}
-	if !strings.Contains(b, "… 还有 ") || strings.Contains(b, "2000. 模组") || !strings.HasSuffix(b, "</details>\n") {
+	if !strings.Contains(b, "more lines") || strings.Contains(b, "2000. Mod") || !strings.HasSuffix(b, "</details>\n") {
 		t.Fatalf("says how many went, and the folds stay closed:\n%s", b[len(b)-300:])
 	}
 	if got := truncate("a😀b", 2); got != "a" {

@@ -14,7 +14,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// 06 §2.14, §9.1: 卸载 RimArcho in the palette shows the plan; enter asks for the word; any
+// 06 §2.14, §9.1: uninstall RimArcho in the palette shows the plan; enter asks for the word; any
 // other word cancels, "uninstall" runs it, and after it every key quits.
 func TestUninstallPalette(t *testing.T) {
 	t.Parallel()

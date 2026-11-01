@@ -19,7 +19,7 @@ import (
 func TestAfterExitScript(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
-	data := filepath.Join(root, "数据 100% & co")
+	data := filepath.Join(root, "Data 100% & co")
 	outside := filepath.Join(root, "outside")
 	write := func(p, s string) {
 		t.Helper()

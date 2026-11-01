@@ -89,7 +89,7 @@ func TestEnvModelSharedWorkshop(t *testing.T) {
 	if st.List.Index(ws) < 0 {
 		t.Fatal("main's plan lost the shared mod")
 	}
-	// Mod 库存: "用在" names each list once, whichever game uses it.
+	// Mod library: "used in" names each list once, whichever game uses it.
 	e.MustRun("env", "use", "old")
 	e.MustRun("enable", "#"+ws[:6])
 	e.MustRun("env", "use", "main")

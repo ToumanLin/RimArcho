@@ -6,7 +6,7 @@ import (
 )
 
 // PlanCheck is a plan's state for its home-page row (06 §2.3), from stored results only:
-// it never runs an analysis or parses a log (03 §3 "按方案缓存多份").
+// it never runs an analysis or parses a log (03 §3 "cache per list").
 type PlanCheck struct {
 	PlanID int64 `json:"planId"`
 	// Count is BreakCount of the plan's Needs: the actionable items that break the game.

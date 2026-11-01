@@ -22,7 +22,7 @@ func libAt(t *testing.T, m *model, name string) {
 	t.Fatalf("no row %q", name)
 }
 
-// 06 §2.9, §9.1: Mod 库存 is the window's page in text: the filter bar (the editor's),
+// 06 §2.9, §9.1: Mod library is the window's page in text: the filter bar (the editor's),
 // the Lineage rows, the cursor's copy on the right; esc backs out a level at a time.
 func TestLibraryList(t *testing.T) {
 	t.Parallel()

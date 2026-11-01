@@ -11,7 +11,7 @@ import (
 )
 
 // A pack's textures (08 §5.2): after the copy, each mod's PNGs are converted to DDS in the
-// pack and the PNGs deleted — 预转换 at full size, 精简 when scaled. The copy is the pack's
+// pack and the PNGs deleted — preconvert at full size, resize when scaled. The copy is the pack's
 // own, so the game version is known and nothing needs recording: what could not be
 // converted keeps its PNG.
 

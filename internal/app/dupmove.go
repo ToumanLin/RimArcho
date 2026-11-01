@@ -15,7 +15,7 @@ import (
 // or a plan's _Archo_ deploy), and Mods/ already holds a plain folder with the same
 // packageId and other content. Two of them would make the game report an error, so instead
 // of refusing outright RimArcho offers to move that folder into the lock library (the
-// existing 收进锁定库: renamed on one volume, else copied, checked and the original recycled;
+// existing move into the lock library: renamed on one volume, else copied, checked and the original recycled;
 // its instance and every plan that uses it stay the same) and then to link the copy needed.
 
 // DuplicateMove is one folder in the way.

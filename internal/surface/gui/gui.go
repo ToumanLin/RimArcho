@@ -36,7 +36,7 @@ func Run(o Options) error {
 	perftrace.Mark("gui-enter")
 	a := o.App
 	view.SetLang(cmds.Setting(a, "ui.lang"))
-	a.LazyLog = true // the newest log is parsed when 需要处理 opens (as in the TUI)
+	a.LazyLog = true // the newest log is parsed when Can it run opens (as in the TUI)
 	a.LogCacheOnly = true
 	tuneProcess(a)
 	api := newAPI(a)

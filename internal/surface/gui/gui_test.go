@@ -2,6 +2,7 @@ package gui
 
 import (
 	"io/fs"
+	"maps"
 	"regexp"
 	"sort"
 	"strings"
@@ -13,11 +14,12 @@ import (
 var textRe = regexp.MustCompile(`\bTf?\("((?:[^"\\]|\\.)*)"`)
 
 // Every string the page translates has a Chinese entry (06 §7; the page has no table of
-// its own: it gets view.Table).
+// its own: it gets view.Table and view.ExtraText).
 func TestPageTextTranslated(t *testing.T) {
 	view.SetLang("zh")
 	t.Cleanup(func() { view.SetLang("en") })
-	table := view.Table()
+	table := maps.Clone(view.Table())
+	maps.Copy(table, view.ExtraText())
 	var missing []string
 	fs.WalkDir(assets, "assets/js", func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(p, ".js") {

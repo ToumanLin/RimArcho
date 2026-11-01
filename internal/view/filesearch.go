@@ -15,7 +15,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// 搜索文件 (06 §2.9): what `archo files search` (03 §5.5) and `archo source search`
+// Search files (06 §2.9): what `archo files search` (03 §5.5) and `archo source search`
 // (03 §5.4) find, for the GUI. Nothing is indexed; every search reads the files again, and
 // the page cancels a search it no longer wants.
 

@@ -120,7 +120,7 @@ func (m *model) histLabel() string {
 	return T("go back to here")
 }
 
-// chooseHistory is H: every step and version as a chooser, the window's 历史 picker
+// chooseHistory is H: every step and version as a chooser, the window's history picker
 // (06 §2.5); enter goes there, as enter in the history area does. It works whatever the
 // staging area holds.
 func (m *model) chooseHistory() tea.Cmd {

@@ -38,14 +38,3 @@ var analyzeLines = []struct {
 	{regexp.MustCompile(`^patches: (\d+)/(\d+) operations$`), "patches: %d/%d operations"},
 	{regexp.MustCompile(`^done: (\d+) failed operations, (\d+) findings, (\S+)$`), "done: %d failed operations, %d findings, %s"},
 }
-
-func init() {
-	Register(map[string]string{
-		"defs: %d/%d files":                           "Def 文件 %d/%d",
-		"defs: %d files, %d defs from %d active mods": "%[3]d 个启用的 Mod：%[1]d 个文件，%[2]d 个 Def",
-		"defs: %d inactive mods indexed (%d cached)":  "已索引 %d 个未启用的 Mod（%d 个来自缓存）",
-		"patches: %d files, %d operations":            "Patch：%d 个文件，%d 个操作",
-		"patches: %d/%d operations":                   "Patch 操作 %d/%d",
-		"done: %d failed operations, %d findings, %s": "完成：%d 个操作失败，%d 个发现，用时 %s",
-	})
-}

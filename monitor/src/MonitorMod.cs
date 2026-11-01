@@ -40,14 +40,14 @@ namespace ArchoMonitor
         {
             var l = new Listing_Standard();
             l.Begin(inRect);
-            l.CheckboxLabeled("记录信息级消息 / Record info messages (Log.Message)", ref Settings.recordMessages,
-                "下次启动生效。默认关闭：信息消息最多，记录它们最费时。\nTakes effect at the next start. Off by default: info messages are the most frequent.", 0f, 1f);
+            l.CheckboxLabeled("ArchoMonitor_RecordMessages".Translate(), ref Settings.recordMessages,
+                "ArchoMonitor_RecordMessagesTip".Translate(), 0f, 1f);
             l.Gap(12f);
-            l.Label("日志 / Log: " + (Writer.Path ?? "-"));
-            l.Label("条目 / Entries: " + Writer.EntryCount);
+            l.Label("ArchoMonitor_Log".Translate() + ": " + (Writer.Path ?? "-"));
+            l.Label("ArchoMonitor_Entries".Translate() + ": " + Writer.EntryCount);
             if (Monitor.Skipped.Count > 0)
             {
-                l.Label("未挂上的钩子 / Hooks not installed: " + string.Join(", ", Monitor.Skipped.ToArray()));
+                l.Label("ArchoMonitor_HooksNotInstalled".Translate() + ": " + string.Join(", ", Monitor.Skipped.ToArray()));
             }
             l.End();
         }

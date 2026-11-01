@@ -9,7 +9,7 @@ import (
 )
 
 // P3 (04 §1.6): the game now is not among the versions the list allows: one counted item in
-// 要你确认; "add 1.6" allows it and the item goes. Launching is not stopped by it.
+// for you to confirm; "add 1.6" allows it and the item goes. Launching is not stopped by it.
 func TestGameNotAllowedNeed(t *testing.T) {
 	view.SetLang("en")
 	e := testkit.New(t)

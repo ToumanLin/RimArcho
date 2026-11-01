@@ -18,7 +18,7 @@ func viewNames(m *model, k colKind) []string {
 }
 
 // 06 §2.5: `\` opens the bar's groups; ↑↓ a group, typing finds a value, enter keeps it, x
-// leaves it out, esc closes; the filter holds for 未启用 and 已启用 together.
+// leaves it out, esc closes; the filter holds for Not enabled and Enabled together.
 func TestBarGroups(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)
@@ -95,7 +95,7 @@ func TestBarMoves(t *testing.T) {
 	if got := activeNames(t, e); got != "Alpha, Core, Harmony" {
 		t.Fatalf("K with a filter: %s", got)
 	}
-	// enabling from a filtered 未启用: the place the order wants, in the full list
+	// enabling from a filtered Not enabled: the place the order wants, in the full list
 	press(m, "esc")
 	press(m, "/")
 	typeIn(m, "beta")

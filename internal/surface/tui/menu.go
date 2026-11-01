@@ -10,8 +10,8 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The row menu (06 §8.5): the same groups and order on the editor and Mod 库存, each op
-// with its key on the right, only the ops that apply, 退订 / 删除 last in red. The menu key
+// The row menu (06 §8.5): the same groups and order on the editor and Mod library, each op
+// with its key on the right, only the ops that apply, unsubscribe / delete last in red. The menu key
 // or shift+F10 opens it at the cursor's row, a right click at the pointer; ↑↓ choose, enter
 // runs, esc closes.
 //

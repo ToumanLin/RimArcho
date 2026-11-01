@@ -24,7 +24,7 @@ import (
 // mods since that plan was last played; older changes follow by day.
 
 // Text words the page: T translates an English string (the identity for English), Date
-// writes a day ("10 月 21 日" / "Oct 21").
+// writes a day (a locale-appropriate date such as "Oct 21").
 type Text struct {
 	T    func(string) string
 	Date func(time.Time) string
@@ -40,9 +40,9 @@ func English(loc *time.Location) Text {
 
 // Tiers: what a change means for the player.
 const (
-	TierLaunch  = 1 // 会影响启动
-	TierWatch   = 2 // 留意
-	TierContent = 3 // 只是内容
+	TierLaunch  = 1 // affects startup
+	TierWatch   = 2 // watch
+	TierContent = 3 // content only
 )
 
 // TierText names a tier.
@@ -58,10 +58,10 @@ func TierText(tx Text, t int) string {
 
 // Row actions (06 §2.9), each with its key on the page.
 const (
-	ActWorkshop = "workshop" // 打开网页: the Workshop change notes (ctrl+w)
-	ActDeps     = "deps"     // 看依赖: 能不能跑 (D)
-	ActSort     = "sort"     // 排序 (S)
-	ActLock     = "lock"     // 锁定这个版本 (p)
+	ActWorkshop = "workshop" // open page: the Workshop change notes (ctrl+w)
+	ActDeps     = "deps"     // see dependencies: Can it run (D)
+	ActSort     = "sort"     // sort (S)
+	ActLock     = "lock"     // lock this one (p)
 )
 
 // Action is a row's action.
@@ -854,7 +854,7 @@ func (b *changeBuilder) files(before, after int64) ([]fileGroup, int64, bool) {
 	return out, delta, false
 }
 
-// groupText: "Defs 改了 4 个、新增 1 个，贴图 +3.2 MB · 共 +3.4 MB".
+// groupText: "Defs: 4 changed, 1 added; textures +3.2 MB; total +3.4 MB".
 func groupText(tx Text, gs []fileGroup, delta int64) string {
 	if len(gs) == 0 {
 		return ""

@@ -31,7 +31,7 @@ var copyText = func(s string) error {
 	return c.Run()
 }
 
-// feedbackPanel is 设置 › 反馈 in the terminal (06 §2.14, §9): the same attachments as the
+// feedbackPanel is Settings > Feedback in the terminal (06 §2.14, §9): the same attachments as the
 // window, m / p / l tick them, the whole text below. s sends it through the feedback relay
 // (asked for the title, what happened and a contact on the input line; only when RimArcho
 // has a relay); enter opens GitHub with it filled in (the title and text are written there).
@@ -131,17 +131,8 @@ func (m *model) askFeedback(at *view.FeedbackAttach) tea.Cmd {
 	return nil
 }
 
-// feedbackSentMsg is the relay's answer to s in 反馈.
+// feedbackSentMsg is the relay's answer to s in Feedback.
 type feedbackSentMsg struct {
 	sent feedback.Sent
 	err  error
-}
-
-func init() {
-	view.Register(map[string]string{
-		"r: again": "r 再看一次",
-		"s: send it here, no GitHub account needed":                                  "s 在这里发送，不用 GitHub 账号",
-		"enter: open GitHub with this text; write the title and what happened there": "enter 用这段文字打开 GitHub，标题和说明在那里写",
-		"enter: copy the text and open GitHub; paste it into the issue":              "enter 复制全文并打开 GitHub，粘贴到正文里",
-	})
 }

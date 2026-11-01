@@ -129,7 +129,7 @@ func TestVerbsAndUndo(t *testing.T) {
 	}
 }
 
-// 06 §6: sort, write and launch act on one click (no confirmation); sort offers 撤销, and
+// 06 §6: sort, write and launch act on one click (no confirmation); sort offers undo, and
 // a refusal comes back with the commands that resolve it, writing nothing.
 func TestRunAtOnce(t *testing.T) {
 	t.Parallel()
@@ -171,7 +171,7 @@ func TestRunAtOnce(t *testing.T) {
 	if _, err := api.Run("rm"); err == nil {
 		t.Fatal("Run took an unknown action")
 	}
-	// The preview stays reachable (the palette's 预览启动) and starts nothing.
+	// The preview stays reachable (the palette's preview the launch) and starts nothing.
 	if p, err := api.Preview(view.ListLaunch); err != nil || len(p.Lines) == 0 || len(e.Launched) != 0 {
 		t.Fatalf("launch preview: %+v %v", p, err)
 	}
@@ -347,8 +347,8 @@ func TestPackUnfinishedRows(t *testing.T) {
 	}
 }
 
-// G14 (06 §2.6): with an error-level problem the build page disables 编译 and says why,
-// pointing to 能不能跑; 先看清单 writes nothing; once fixed, 编译 is enabled with the sizes.
+// G14 (06 §2.6): with an error-level problem the build page disables create and says why,
+// pointing to Can it run; see the list first writes nothing; once fixed, create is enabled with the sizes.
 func TestBuildPageG14(t *testing.T) {
 	t.Parallel()
 	e, api, _ := fixture(t)
@@ -378,7 +378,7 @@ func TestBuildPageG14(t *testing.T) {
 	if !p.Ok || p.Why != "" || p.Before == "" || p.After == "" || p.Mods != 2 || p.Steps[0].Level == view.LevelBad {
 		t.Fatalf("fixed: %+v", p)
 	}
-	// Textures (08 §5.2): a step of the build with the choices; without todds, 编译 says
+	// Textures (08 §5.2): a step of the build with the choices; without todds, create says
 	// to install it there; with an encoder the step says what it converts.
 	if p.Steps[2].Kind != "textures" || p.Tex != 0 || len(p.TexChoices) != 8 {
 		t.Fatalf("textures step: %+v", p.Steps[2])
@@ -421,7 +421,7 @@ func TestBuildPageG14(t *testing.T) {
 		t.Fatalf("pack table sort values absent from JSON: %s", wire)
 	}
 	// its list alone, as a RimArcho list (no dialog here: the path is typed); the guide's
-	// 打开 unpacks packs only, a list goes through the import preview
+	// open unpacks packs only, a list goes through the import preview
 	list := filepath.Join(e.Root, "one.archolist.json")
 	if text, err := api.PackExport("one", list, true); err != nil || !strings.Contains(text, "exported the list") {
 		t.Fatalf("export the list: %q %v", text, err)

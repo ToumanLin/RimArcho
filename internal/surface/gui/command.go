@@ -121,7 +121,7 @@ func (s *API) RunCLI(line string) (CommandResult, error) {
 	w.cancel = cancel
 	w.result = CommandResult{Sequence: w.result.Sequence + 1, Line: line, Running: true}
 	initial := w.result
-	// Only a command still running after a second gets a row in 后台任务 (where it can be
+	// Only a command still running after a second gets a row in Background tasks (where it can be
 	// stopped); quick ones answer in the panel and leave no record.
 	var taskMu sync.Mutex
 	task, finished := "", false

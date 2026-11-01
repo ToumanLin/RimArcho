@@ -20,7 +20,7 @@ func TestHintOnlySectionHeading(t *testing.T) {
 	}
 }
 
-// 可以留意 keeps its name though it holds only hints; what merged into another item and what
+// worth knowing keeps its name though it holds only hints; what merged into another item and what
 // another page handles are not items of their own; the other page is a faint last line
 // (06 §2.4).
 func TestNeedsMergedAndElsewhere(t *testing.T) {
@@ -34,7 +34,7 @@ func TestNeedsMergedAndElsewhere(t *testing.T) {
 		{ID: "hid", Section: view.SectionElsewhere, Text: "Hidden One is hidden", Counted: true},
 		{ID: "hint", Section: view.SectionHint, Text: "often needs Lib", Status: view.StatusHint},
 	})
-	m.prob.elsewhere = []view.Elsewhere{{Page: "library", Count: 1, Text: "1 hidden or leftover mod: Mod 库存"}}
+	m.prob.elsewhere = []view.Elsewhere{{Page: "library", Count: 1, Text: "1 hidden or leftover mod: Mod library"}}
 	if len(m.prob.items) != 2 {
 		t.Fatalf("items %+v", m.prob.items)
 	}

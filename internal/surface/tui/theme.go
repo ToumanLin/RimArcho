@@ -73,7 +73,7 @@ type icons struct {
 	err, warn, logErr, unloadable, hint       string
 	unsaved, lock, update, dep, staging       string
 	play, save, sort, search, fail            string
-	// the evidence chips of 能不能跑 (06 §2.4): declared, inferred, log, community, your rule,
+	// the evidence chips of Can it run (06 §2.4): declared, inferred, log, community, your rule,
 	// shared logs (the log corpus)
 	evDeclared, evInferred, evLog, evCommunity, evRule, evCorpus string
 }

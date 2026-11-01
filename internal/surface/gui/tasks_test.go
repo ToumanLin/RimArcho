@@ -32,7 +32,7 @@ func endedTask(t *testing.T, api *API, kind string) view.TaskRow {
 	return view.TaskRow{}
 }
 
-// Mod 库's actions on folders are background tasks (06 §2.16): queued, one item at a time,
+// Mod library's actions on folders are background tasks (06 §2.16): queued, one item at a time,
 // one failure does not stop the rest, every item keeps its result.
 func TestLibraryActionIsATask(t *testing.T) {
 	t.Parallel()
@@ -109,7 +109,7 @@ func hasAct(r view.TaskRow, id string) bool {
 	return false
 }
 
-// 移到回收站 runs as one batch (06 §2.16): every item checked, the folders moved together,
+// move to the recycle bin runs as one batch (06 §2.16): every item checked, the folders moved together,
 // one failure kept on its item, and the library rescanned once at the end.
 func TestTrashBatch(t *testing.T) {
 	t.Parallel()
