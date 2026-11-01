@@ -334,6 +334,9 @@ func (m *model) cmdSubmit() tea.Cmd {
 	m.cmdOn = false
 	l.text, l.cur = nil, 0
 	switch {
+	case len(argv) == 3 && argv[0] == "source" && argv[1] == "decompile" && argv[2] == "--active":
+		m.remember(line)
+		return m.queueSourceDecompile(envName)
 	case len(argv) == 1 && argv[0] == "scan" && (envName == "" || envName == m.envName):
 		m.remember(line)
 		return m.startScan() // never scan inside the TUI process (06 §8.2)

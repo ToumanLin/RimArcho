@@ -24,7 +24,7 @@ func init() {
 	register(&Command{Name: "db backup", Summary: "write a consistent copy of the database to <data>/backups", MaxArgs: 0, Run: dbBackupCmd})
 	register(&Command{Name: "db vacuum", Summary: "clean old file lists and compact the database", Flags: []Flag{{Name: "dry-run", Help: "preview old file cleanup without changing the database"}}, MaxArgs: 0, Run: dbVacuumCmd})
 	register(&Command{Name: "cache status", Summary: "the caches and their sizes", MaxArgs: 0, Run: cacheStatusCmd})
-	register(&Command{Name: "cache clear", Args: "<kind>", Summary: "empty one cache (previews, workshop, images, source, logs); rebuilt on demand", MinArgs: 1, MaxArgs: 1, Run: cacheClearCmd})
+	register(&Command{Name: "cache clear", Args: "<kind>", Summary: "empty one cache (previews, workshop, images, textures, logs); rebuilt on demand", MinArgs: 1, MaxArgs: 1, Run: cacheClearCmd})
 }
 
 func mb(n int64) string { return render.Size(n) }

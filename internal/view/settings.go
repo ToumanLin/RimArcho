@@ -83,6 +83,7 @@ func SettingTask(argv []string) string {
 		return ""
 	}
 	return map[string]string{
+		"source decompile": TaskSourceDecompile, "source clean": TaskSourceClean,
 		"data update": TaskData, "cache clear": TaskCache,
 		"db backup": TaskBackup, "db vacuum": TaskVacuum,
 	}[strings.Join(argv[:2], " ")]
@@ -91,6 +92,8 @@ func SettingTask(argv []string) string {
 // TaskPending is the action's label while this kind runs or waits.
 func TaskPending(kind string) string {
 	switch kind {
+	case TaskSourceDecompile:
+		return T("decompiling…")
 	case TaskSubscribe:
 		return T("subscribe")
 	case TaskSubscriptionFrom:
@@ -360,7 +363,7 @@ func SettingCommand(argv []string) error {
 		two += " " + argv[1]
 	}
 	switch two {
-	case "env set", "env rebind", "folder add", "folder remove", "folder set", "folder move", "config set", "db backup", "db vacuum", "cache clear", "data update", "deps install", "deps remove":
+	case "env set", "env rebind", "folder add", "folder remove", "folder set", "folder move", "config set", "db backup", "db vacuum", "cache clear", "data update", "deps install", "deps remove", "source clean", "source decompile":
 		return nil
 	}
 	if argv[0] == "gc" {

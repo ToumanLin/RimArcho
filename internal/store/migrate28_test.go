@@ -338,7 +338,7 @@ func TestMigrateV28(t *testing.T) {
 	if filled < len(before)*3/4 {
 		t.Fatalf("only %d of %d reads return anything", filled, len(before))
 	}
-	if q1(t, s, `SELECT value FROM meta WHERE key='schema_version'`) != "28" {
+	if q1(t, s, `SELECT value FROM meta WHERE key='schema_version'`) != fmt.Sprint(SchemaVersion) {
 		t.Fatal("version")
 	}
 	if got := q1(t, s, `SELECT coalesce(sum(n),0) FROM snapshot_list`); got != fmt.Sprint(listed) || listed == 0 {
@@ -353,7 +353,7 @@ func TestMigrateV28(t *testing.T) {
 	if got := q1(t, s, `SELECT count(*) FROM sqlite_master WHERE name LIKE '%_v27' OR name LIKE 'set_file_v28'`); got != "0" {
 		t.Fatal("old tables left", got)
 	}
-	if len(reports) < 2 || reports[0].From != 27 || reports[0].To != 28 {
+	if len(reports) < 2 || reports[0].From != 27 || reports[0].To != SchemaVersion {
 		t.Fatalf("progress %v", reports)
 	}
 	last := reports[len(reports)-1]

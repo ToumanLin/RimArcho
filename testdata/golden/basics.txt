@@ -24,7 +24,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     problems ignore <p:ref>                   ignore a problem until its mod changes
     problems unignore <p:ref>                 stop ignoring a problem
     files search <pattern>                    search the effective content of enabled mods
-    source <ref>                              decompile a mod's assemblies on demand (ilspycmd; cached per DLL hash)
+    source <ref>                              decompile a mod's assemblies into the Source library (ilspycmd)
     source search <pattern>                   search decompiled C# (uncached assemblies are decompiled first)
     analyze                                   rebuild the Def and Patch facts (normally run on demand as a child process)
     changes [<ref>]                           what changed in the mods, one row per mod (default: the current plan since it was last played)
@@ -126,7 +126,10 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     db backup                                 write a consistent copy of the database to <data>/backups
     db vacuum                                 clean old file lists and compact the database
     cache status                              the caches and their sizes
-    cache clear <kind>                        empty one cache (previews, workshop, images, source, logs); rebuilt on demand
+    cache clear <kind>                        empty one cache (previews, workshop, images, textures, logs); rebuilt on demand
+    source game                               read the current game's code from the Source library
+    source decompile                          decompile the current list's mods into the Source library
+    source clean                              preview or remove unused Source library folders
     subscribe git <url>                       install a Git mod and track its branch, tag or commit
     subscribe list                            list installed subscriptions and their last update check
     subscribe page <url>                      inspect a download page or install its Git repository or a downloaded archive

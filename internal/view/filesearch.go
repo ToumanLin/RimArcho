@@ -23,6 +23,7 @@ import (
 type FileSearchReq struct {
 	Pattern string   `json:"pattern"`
 	Code    bool     `json:"code"` // decompiled C# instead of the mods' files
+	Game    bool     `json:"game"` // include the current game's code (backend only)
 	Regex   bool     `json:"regex"`
 	Case    bool     `json:"case"`
 	Word    bool     `json:"word"`
@@ -51,11 +52,12 @@ type FileSearchLine struct {
 
 // FileSearchFile is a file with its matching lines on this page.
 type FileSearchFile struct {
-	Rel   string           `json:"rel"`
-	Path  string           `json:"path"`
-	Count int              `json:"count"`
-	More  int              `json:"more,omitempty"` // matching lines in the file not shown
-	Lines []FileSearchLine `json:"lines"`
+	Shared string           `json:"shared,omitempty"`
+	Rel    string           `json:"rel"`
+	Path   string           `json:"path"`
+	Count  int              `json:"count"`
+	More   int              `json:"more,omitempty"` // matching lines in the file not shown
+	Lines  []FileSearchLine `json:"lines"`
 }
 
 // FileSearchMod is a mod with its files on this page.
@@ -125,7 +127,7 @@ func FileSearch(ctx context.Context, a *app.App, q FileSearchReq, progress func(
 			}
 		}
 	}
-	if len(mods) == 0 {
+	if len(mods) == 0 && !(q.Code && q.Game) {
 		return nil, errors.New(T("no mods to search"))
 	}
 	if q.Code {
@@ -224,7 +226,7 @@ func codeSearch(ctx context.Context, a *app.App, st *app.LoadoutState, mods []*s
 		}
 	}
 	limit := q.Page * FileSearchPerPage
-	res, err := a.SourceSearchContext(ctx, st, mods, q.Pattern, re, limit+1, CodeSearchBudget, progress)
+	res, err := a.SourceSearchContext(ctx, st, mods, q.Pattern, re, limit+1, CodeSearchBudget, progress, q.Game)
 	if err != nil {
 		if errors.Is(err, app.ErrNoILSpy) {
 			return nil, errors.New(T("searching C# needs ilspycmd: dotnet tool install --global ilspycmd (it needs the .NET SDK)"))
@@ -245,14 +247,29 @@ func codeSearch(ctx context.Context, a *app.App, st *app.LoadoutState, mods []*s
 	for _, h := range hits {
 		if n := len(page.Mods); n == 0 || page.Mods[n-1].ID != h.Instance {
 			name := h.Instance
+			if strings.HasPrefix(h.Instance, "game:") {
+				name = "RimWorld " + st.Ix.Env.GameVersion
+			}
 			if m := st.Ix.ByID[h.Instance]; m != nil {
 				name = m.DisplayName()
 			}
 			page.Mods = append(page.Mods, FileSearchMod{ID: h.Instance, Name: name, Pos: st.Position(h.Instance), Count: counts[h.Instance]})
 		}
 		mod := &page.Mods[len(page.Mods)-1]
-		if n := len(mod.Files); n == 0 || mod.Files[n-1].Rel != h.File {
-			mod.Files = append(mod.Files, FileSearchFile{Rel: h.File, Path: h.Path, Lines: []FileSearchLine{}})
+		if n := len(mod.Files); n == 0 || mod.Files[n-1].Path != h.Path {
+			shared := ""
+			if len(h.Shared) > 1 {
+				var names []string
+				for _, id := range h.Shared {
+					name := st.Ix.Ref(id)
+					if m := st.Ix.ByID[id]; m != nil {
+						name = m.DisplayName() + " (" + m.SourceLabel + ", " + name + ")"
+					}
+					names = append(names, name)
+				}
+				shared = Tf("same code in: %s", strings.Join(names, ", "))
+			}
+			mod.Files = append(mod.Files, FileSearchFile{Rel: h.File, Path: h.Path, Shared: shared, Lines: []FileSearchLine{}})
 		}
 		f := &mod.Files[len(mod.Files)-1]
 		f.Count++
@@ -266,14 +283,22 @@ func codeSearch(ctx context.Context, a *app.App, st *app.LoadoutState, mods []*s
 }
 
 // SearchFolder is the folder a result's file is in, for opening it (ctrl+o on a result):
-// only a file inside mod id's folder, or a decompiled file in RimArcho's C# cache.
-func SearchFolder(ix *app.Index, home, id, path string) (string, error) {
+// only a file inside mod id's folder, or in the resolved Source library root.
+func SearchFolder(ix *app.Index, libraryRoot, id, path string) (string, error) {
 	inside := func(root string) bool {
-		rel, err := filepath.Rel(root, path)
-		return err == nil && rel != "." && !strings.HasPrefix(rel, "..") && !filepath.IsAbs(rel)
+		realRoot, err := filepath.EvalSymlinks(root)
+		if err != nil {
+			return false
+		}
+		realPath, err := filepath.EvalSymlinks(path)
+		if err != nil {
+			return false
+		}
+		rel, err := filepath.Rel(realRoot, realPath)
+		return err == nil && rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel)
 	}
 	m := ix.ByID[id]
-	if m == nil || !inside(ix.ModDir(m)) && !inside(filepath.Join(home, "cache", "source")) {
+	if !(m != nil && inside(ix.ModDir(m))) && !((m != nil || strings.HasPrefix(id, "game:")) && inside(libraryRoot)) {
 		return "", errors.New(T("the folder is not there"))
 	}
 	dir := filepath.Dir(path)

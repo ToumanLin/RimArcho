@@ -37,12 +37,13 @@ const (
 	UnSaves      = "saves"      // the "own" save folders and save backups in the data folder
 	UnGames      = "games"      // game folders downloaded with SteamCMD
 	UnSteamCMD   = "steamcmd"   // the SteamCMD RimArcho downloaded
+	UnSource     = "source"     // relocated, regenerable source library
 	UnData       = "data"       // %APPDATA%\RimArcho and %LOCALAPPDATA%\RimArcho
 	UnProgram    = "program"    // the program files
 )
 
 // UninstallSteps lists every step in order.
-var UninstallSteps = []string{UnAccounts, UnLinks, UnModsConfig, UnTextures, UnLocked, UnMonitor, UnPacks, UnSaves, UnGames, UnSteamCMD, UnData, UnProgram}
+var UninstallSteps = []string{UnAccounts, UnLinks, UnModsConfig, UnTextures, UnLocked, UnMonitor, UnPacks, UnSaves, UnGames, UnSteamCMD, UnSource, UnData, UnProgram}
 
 // What happens to an item.
 const (
@@ -535,9 +536,11 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 	}
 	add(UnSteamCMD, scmd)
 
+	sourceRoot := a.SourceDir()
+
 	// Kept and moved things must not land where the data folders are deleted.
 	for _, dst := range []struct{ dir, what string }{{p.SavesTo, "saves"}, {p.PacksTo, "packs"}} {
-		if source.Within(dst.dir, a.Home) || source.Within(dst.dir, p.Local) {
+		if source.Within(dst.dir, a.Home) || source.Within(dst.dir, p.Local) || source.Within(directoryReal(dst.dir), directoryReal(sourceRoot)) {
 			if p.Problem == "" {
 				p.Problem = fmt.Sprintf("the %s would be moved to %s, which is deleted too; pick a folder outside RimArcho's folders", dst.what, dst.dir)
 			}
@@ -598,6 +601,21 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 			}
 		}
 	}
+	sourceCovered := false
+	for _, dir := range p.AfterExit.Dirs {
+		sourceCovered = sourceCovered || source.Within(sourceRoot, dir)
+	}
+	// A source library inside a deleted data folder goes with it; a relocated one is its own
+	// step, and a link there blocks the uninstall with the reason on the page.
+	if !sourceCovered && dirExists(sourceRoot) {
+		if err := a.checkUninstallSource(sourceRoot); err != nil {
+			if p.Problem == "" {
+				p.Problem = err.Error()
+			}
+		} else {
+			add(UnSource, []*UninstallItem{{Path: sourceRoot, Do: DoDelete, Bytes: sizeOf(sourceRoot)}})
+		}
+	}
 	add(UnData, data)
 
 	// 10. the program
@@ -629,6 +647,9 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 	add(UnProgram, prog)
 	var incoming *incomingLinkCheck
 	for _, step := range p.Steps {
+		if step.Key == UnSource {
+			continue // Source removal never changes links outside the recorded library.
+		}
 		for _, it := range step.Items {
 			if it.Do == DoTrash || it.Do == DoMove || it.Do == DoDelete {
 				// All targets in this plan use one fresh incoming-link observation.
@@ -881,6 +902,9 @@ func (a *App) uninstallItem(step string, it *UninstallItem) error {
 	case DoTrash:
 		return a.ToTrash(it.Path)
 	case DoDelete:
+		if step == UnSource {
+			return a.uninstallSource(it.Path)
+		}
 		return a.withIncomingLinks(it.Path, "", func() error { return removeTree(it.Path) })
 	case DoDDS:
 		return a.deleteTexturesIn(it.Path)

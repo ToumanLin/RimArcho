@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -77,7 +78,7 @@ func (a *App) ManagedDirectories() ([]ManagedDirectory, error) {
 		}
 		out = append(out, d)
 	}
-	for _, x := range []struct{ id, label, path string }{{"lock", "Lock library", a.LockDir()}, {"packs", "Packs", a.PacksDir()}, {"monitor", "Archo Monitor", a.MonitorDir()}, {SubscribedLabel, "Subscriptions", a.SubscribedDir()}} {
+	for _, x := range []struct{ id, label, path string }{{"lock", "Lock library", a.LockDir()}, {"source", "Source library", a.SourceDir()}, {"packs", "Packs", a.PacksDir()}, {"monitor", "Archo Monitor", a.MonitorDir()}, {SubscribedLabel, "Subscriptions", a.SubscribedDir()}} {
 		configuredPack := x.id == "packs" && a.Store.Meta("cfg:pack.dir") != ""
 		d := a.directoryState(x.id, x.id, x.label, x.path, used[x.id] || configuredPack || a.Store.Meta(directoryKey(x.id)) != "")
 		for _, s := range ss {
@@ -172,10 +173,10 @@ func (a *App) managedDirectory(id string) (*ManagedDirectory, error) {
 }
 
 func (a *App) validateDirectory(d *ManagedDirectory, path string) error {
-	if d.ID == "packs" {
-		// The default packs directory is deliberately below Home.
-		if directoriesOverlap(path, a.Home) && env.PathKey(path) != env.PathKey(filepath.Join(a.Home, "packs")) {
-			return fmt.Errorf("the packs directory overlaps the data directory")
+	if d.ID == "packs" || d.ID == "source" {
+		// These managed directories default to their own child of Home.
+		if directoriesOverlap(path, a.Home) && env.PathKey(path) != env.PathKey(filepath.Join(a.Home, d.ID)) {
+			return fmt.Errorf("the %s directory overlaps the data directory", d.ID)
 		}
 	} else if directoriesOverlap(path, a.Home) {
 		return fmt.Errorf("the directory overlaps the data directory")
@@ -224,6 +225,13 @@ func (a *App) validateDirectory(d *ManagedDirectory, path string) error {
 // It keeps source and instance IDs even when content has changed, and clears any
 // pending sample-based rebind. The target must already exist; nothing is created.
 func (a *App) SetDirectory(id, path string) error {
+	if id == "source" {
+		release, err := a.sourceAccess(context.Background(), true, false)
+		if err != nil {
+			return err
+		}
+		defer release()
+	}
 	d, err := a.managedDirectory(id)
 	if err != nil {
 		return err
@@ -343,7 +351,7 @@ func (a *App) setDirectoryRecords(d *ManagedDirectory, path string) error {
 				return err
 			}
 		}
-		key := map[string]string{"lock": "lock.dir", "packs": "pack.dir", "monitor": "monitor.dir", SubscribedLabel: "subscribed.dir"}[d.ID]
+		key := map[string]string{"lock": "lock.dir", "source": "source.dir", "packs": "pack.dir", "monitor": "monitor.dir", SubscribedLabel: "subscribed.dir"}[d.ID]
 		if key != "" {
 			if err := a.Store.SetMeta("cfg:"+key, path); err != nil {
 				return err
@@ -386,6 +394,13 @@ func (a *App) PlanDirectoryMove(id, path string) (*LinkLifecyclePlan, error) {
 // MoveDirectory detaches incoming links before a rename or checked copy/recycle,
 // updates the records, then recreates entries at their new locations.
 func (a *App) MoveDirectory(id, path string) (copied bool, err error) {
+	if id == "source" {
+		release, err := a.sourceAccess(context.Background(), true, false)
+		if err != nil {
+			return false, err
+		}
+		defer release()
+	}
 	d, err := a.managedDirectory(id)
 	if err != nil {
 		return false, err

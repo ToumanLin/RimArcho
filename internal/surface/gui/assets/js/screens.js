@@ -1748,6 +1748,16 @@ function renderSettingActions(right, actions, run, item) {
         finally { b.disabled = false; }
         return;
       }
+      if (a.argv[0] === "source" && a.argv[1] === "clean") {
+        b.disabled = true;
+        try {
+          const p = await api.SourceLibraryUnused();
+          if (!p.folders) say("ok", T("the source library has no unused folders"));
+          else pop.confirm(a.label, [Tf("%d unused folders, %s", p.folders, p.size)], a.label, () => submit());
+        } catch (e) { say("fail", errText(e)); }
+        finally { b.disabled = false; }
+        return;
+      }
       if (a.confirm) pop.confirm(a.label, [a.confirm], a.label, () => submit()); else submit();
     }, "", a.argv.join(" "));
     b.dataset.settingAction = a.argv.join(" ");

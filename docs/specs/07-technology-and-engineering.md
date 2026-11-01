@@ -116,7 +116,9 @@ The `RIMARCHO_HOME` environment variable overrides this table (used by tests and
 | --- | --- |
 | `config.toml` | Reads only `tombstone_days` (default 90); writes defaults on first launch. Other settings live in the database meta table (`cfg:<key>`, 05 §4.2) |
 | `archo.db` (and WAL) | All facts, identities, plans, history, findings and log attribution cache |
-| `cache/` | `previews/` (thumbnails), `workshop/<Workshop ID>.json` (Workshop descriptions), `workshop-img/` (description images), `source/<first 20 sha256 characters>/` (decompiled full projects; `<hash>.types/<Type>.cs` for one type), community data (`communityRules.json`, `steamDB.json` compressed into `steamDB.index.json`, `replacements.json.gz`); `loadcost-v1.json` (per-Mod list loading measurements, keyed by Mod directory, stamped by the loading-directory list fingerprint; 2026-10-24). `cache clear` clears any category; rebuild on demand |
+| `cache/` | `previews/` (thumbnails), `workshop/<Workshop ID>.json` (Workshop descriptions), `workshop-img/` (description images), community data (`communityRules.json`, `steamDB.json` compressed into `steamDB.index.json`, `replacements.json.gz`); `loadcost-v1.json` (per-Mod list loading measurements, keyed by Mod directory, stamped by the loading-directory list fingerprint; 2026-10-24). `cache clear` clears supported categories; rebuild on demand |
+| `source/` | Default managed Source library; `folder set source` / `folder move source` persist another root. Mod projects: `mods/<lowercase filesystem-safe packageId>/<DLL stem> <first 6 hash hex>/`; a prefix collision extends the suffix without moving existing code. Game projects: `game/<build>/Assembly-CSharp/`. Type-only files live in the same DLL folder under `.types/<type-key>/`. Identity, publication and retention: 03 §5.4. Library-relative records survive relocation; contents are never exported or attached |
+| `source-library.lock` | Coordinates source readers/decompilers with relocation and cleanup across processes; artifact locks live in the library's `.locks/` |
 | `logs/` | `gui.log`, `pack-build.log` (older versions also leave `wezterm-start.log`) |
 | `backups/` | Database backups `archo-YYYYMMDD-HHMMSS.db` (local time); save backups `saves/YYYYMMDD-HHMMSS/` (10 §4.4, unimplemented, same time format as database backups) |
 | `packs/` | Packs (08 §5) |
@@ -237,6 +239,8 @@ Checks are automatic; installation needs player confirmation (01 §4). Code: `in
 - **cgo threshold**: consider cgo SQLite (mattn/go-sqlite3) only if TUI idle working set exceeds 65 MB (expected private commit 25–35 MB; costs mingw-w64 for every build and simple cross-compilation).
 
 ### 6.2 Summary table
+
+2026-11-01, Source library Settings size lookup (Windows / Ryzen 9 7950X, synthetic 300 assemblies and 6,000 generated files, `BenchmarkSourceLibrarySize -benchtime=200ms -count=3 -benchmem`, median of three): previous filesystem walk **12.84 ms / 4,751,730 B allocated**, stored accounting **0.021 ms / 592 B allocated** per lookup. Setup is outside the timed work; this measures the size lookup only. Settings does not walk generated code. Full native-window timing and working set remain VM acceptance checks under 06 §10.
 
 2026-11-01, Updates page synthetic before/after benchmark (Windows / headless Chrome, 1354 pending copies, existing page reply, median of 20 alternating rounds after 5 warm-ups, including synchronous layout): page draw **132.6 → 121.9 ms**, End-key selection and detail draw **38.1 → 36.4 ms**. Each page visit used one `SubscriptionsPage` call; selecting the source summary added no read. The fixture uses the production page modules with synthetic API and unrelated-widget stubs (`scripts/vm/updates.test.mjs`); this measures frontend overhead only. Native WebView2 working set and end-to-end backend loading remain VM acceptance checks under 06 §10.
 

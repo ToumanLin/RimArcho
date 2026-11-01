@@ -63,7 +63,7 @@ func (a *App) DBVacuum() (before, after int64, err error) {
 
 // Cache is one kind of cached data.
 type Cache struct {
-	Kind  string // previews, workshop, images, source, logs
+	Kind  string // previews, workshop, images, textures, logs
 	Desc  string
 	Bytes int64
 	Files int
@@ -75,7 +75,6 @@ var cacheKinds = []struct{ kind, dir, desc string }{
 	{"previews", "previews", "mod thumbnails"},
 	{"workshop", "workshop", "Workshop descriptions"},
 	{"images", "workshop-img", "images in descriptions"},
-	{"source", "source", "decompiled C#"},
 	{"textures", "textures", "PNG header cache"},
 	{"logs", "", "Player.log analyses"},
 }

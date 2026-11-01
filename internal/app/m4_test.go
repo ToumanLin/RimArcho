@@ -98,7 +98,9 @@ func TestSourceCache(t *testing.T) {
 	if out := e.MustRun("source", modA); !strings.Contains(out, "ModA.dll  cached") || len(f.calls) != 1 {
 		t.Fatalf("second call uses the cache (calls %v):\n%s", f.calls, out)
 	}
-	os.RemoveAll(filepath.Join(e.Home, "cache", "source"))
+	os.RemoveAll(e.App.SourceDir())
+	// Locate a recreated managed root explicitly before regenerating its contents.
+	e.MkdirAll(e.App.SourceDir())
 	if out := e.MustRun("source", modA); !strings.Contains(out, "decompiled now") || len(f.calls) != 2 {
 		t.Fatalf("deleted cache is rebuilt (calls %v):\n%s", f.calls, out)
 	}
