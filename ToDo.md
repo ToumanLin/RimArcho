@@ -2,8 +2,8 @@
 
 Things to research, not yet decided. Once decided, put them in the specifications (implementation plans in 01 §5); research goes in docs/research/.
 
-## Memory estimates for texture-heavy lists are extrapolated
-Now calibrated up to 7.5 GiB texture payload (2026-11-01): above 3 GiB the coefficient drops to 1.3–1.6×. The 720 list (~24–27 GiB) estimates 36–52 GiB resident, still extrapolated ~3.5×. The guest pagefile could not be raised without a reboot. Next: a machine with ≥64 GB RAM, or a VM cold boot with a large pagefile (needs the user's Windows sign-in).
+## 1.6 memory on a real graphics card is inferred
+Calibrated in the VM up to 7.5 GiB texture payload (2026-11-01). Most of the VM's texture RAM is the driver's copy, which the VMware adapter (no dedicated VRAM) commits as process memory; the model now counts it as VRAM and adds back only what does not fit in 90% of the card (research: unity16-texture-memory-breakdown). The 720 list: 36–52 GiB resident without dedicated VRAM, 15–30 GiB with a 24 GiB card. Next: run 1.6 once on a PC with a discrete GPU and compare Task Manager's "Commit size" and "Dedicated GPU memory" with the estimate (vanilla: about 0.9 GiB commit, 0.66 GiB dedicated).
 
 ## Loading animation
 Maybe add a UI loading animation--low priority for now
