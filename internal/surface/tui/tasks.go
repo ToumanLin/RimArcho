@@ -33,7 +33,7 @@ func (m *model) queueSourceDecompile(envName string) tea.Cmd {
 				}
 			})
 		})
-		return view.T("the current list's mods are in the Source library"), err
+		return view.T("the current list's mods are in the source library"), err
 	})
 }
 

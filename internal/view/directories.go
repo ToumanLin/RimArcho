@@ -17,7 +17,7 @@ func DirectoryLabel(d app.ManagedDirectory) string {
 	case "lock":
 		return T("lock library")
 	case "source":
-		return T("Source library")
+		return T("source library")
 	case "packs":
 		return T("where packs are kept")
 	case "monitor":
@@ -57,7 +57,7 @@ func DirectoryGroup(a *app.App) SettingGroup {
 		if d.ID == "source" {
 			item.ValueNote = SizeText(a.Store.SourceLibraryBytes())
 			item.Actions = []SettingAction{
-				{Label: T("remove unused"), Argv: []string{"source", "clean", "--yes"}, Confirm: T("remove unused Source library folders")},
+				{Label: T("remove unused"), Argv: []string{"source", "clean", "--yes"}, Confirm: T("remove unused folders from the source library")},
 				{Label: T("decompile the current list's mods"), Argv: []string{"source", "decompile", "--active"}},
 			}
 		}

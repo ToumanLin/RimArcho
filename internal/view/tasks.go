@@ -200,7 +200,7 @@ func TaskTitle(kind string) string {
 	case TaskSourceDecompile:
 		return T("decompile the current list's mods")
 	case TaskSourceClean:
-		return T("remove unused Source library folders")
+		return T("remove unused folders from the source library")
 	}
 	if l := opLabel(kind); l != "" {
 		return l

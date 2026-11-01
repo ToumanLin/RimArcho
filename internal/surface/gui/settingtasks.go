@@ -103,7 +103,7 @@ func (s *API) runSettingTask(a *app.App, id, kind string, argv []string) (string
 				}
 			})
 		})
-		return view.T("the current list's mods are in the Source library"), err
+		return view.T("the current list's mods are in the source library"), err
 	case view.TaskVacuum:
 		defer s.free.soon()
 		if len(argv) != 2 {

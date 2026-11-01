@@ -276,7 +276,7 @@ func sourceDecompileCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil {
 		return nil, noILSpy(err)
 	}
-	d, _ := render.New("the current list's mods are in the Source library")
+	d, _ := render.New("the current list's mods are in the source library")
 	return d, nil
 }
 
@@ -290,7 +290,7 @@ func sourceCleanCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if remove {
 		verb = "removed"
 	}
-	d, root := render.New(fmt.Sprintf("Source library: %d folders %s, %d bytes", p.Folders, verb, p.Bytes))
+	d, root := render.New(fmt.Sprintf("source library: %d folders %s, %s", p.Folders, verb, render.Size(p.Bytes)))
 	for _, path := range p.Paths {
 		root.Add(path)
 	}

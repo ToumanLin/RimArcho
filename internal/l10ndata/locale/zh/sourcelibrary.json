@@ -1,11 +1,12 @@
 {
-  "Source library": "源码库",
+  "source library": "源码库",
   "remove unused": "移除未使用项",
-  "remove unused Source library folders": "移除未使用的源码库文件夹",
+  "remove unused folders from the source library": "移除未使用的源码库文件夹",
   "decompile the current list's mods": "反编译当前列表的 Mod",
   "decompiling…": "正在反编译…",
   "removed %d folders (%s)": "已移除 %d 个文件夹（%s）",
-  "the current list's mods are in the Source library": "当前列表的 Mod 已加入源码库",
-  "%d unused folders (%s bytes)": "%d 个未使用的文件夹（%s 字节）",
-  "same code in: %s": "以下副本代码相同：%s"
+  "the current list's mods are in the source library": "当前列表的 Mod 已加入源码库",
+  "%d unused folders, %s": "%d 个未使用的文件夹，%s",
+  "same code in: %s": "以下副本代码相同：%s",
+  "the source library has no unused folders": "源码库中没有未使用的文件夹"
 }
