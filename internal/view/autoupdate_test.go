@@ -32,10 +32,11 @@ func TestAutomaticSettingsOnlyControlsAndHumanIntervals(t *testing.T) {
 			}
 			e.MustRun("config", "set", "updates.interval", preset.value)
 			g := view.AutomaticGroup(e.App)
-			if len(g.Items) != 2 || strings.Contains(g.Note, "LoversLab") {
+			// Version and the automatic field have moved into About; intervals remain here.
+			if len(g.Items) != 1 || g.Items[0].Label != view.T("check interval") || strings.Contains(g.Note, "LoversLab") {
 				t.Fatal(g)
 			}
-			want := view.Tf("While RimArcho is open: check mods and community data %s, tools %s.", intervals[0], intervals[1]) + " " + view.T("Mod and tool updates wait for your click.")
+			want := view.Tf("While RimArcho is open: check mods, community data and RimArcho %s, tools %s.", intervals[0], intervals[1]) + " " + view.T("Mod, tool and RimArcho updates wait for your click.")
 			if g.Note != want {
 				t.Fatalf("%s/%s: %s, want %s", lang, preset.value, g.Note, want)
 			}
@@ -51,7 +52,7 @@ func TestAutomaticSettingsOnlyControlsAndHumanIntervals(t *testing.T) {
 		}
 	}
 	view.SetLang("zh")
-	if got := view.AutomaticGroup(e.App).Items[0].ChoiceLabels; !reflect.DeepEqual(got, []string{"开", "关"}) {
+	if got := view.AboutGroup(e.App).Items[1].ChoiceLabels; !reflect.DeepEqual(got, []string{"开", "关"}) {
 		t.Fatal(got)
 	}
 	for _, g := range view.SettingsPage(e.App, nil) {
@@ -86,8 +87,8 @@ func TestAutomaticDatesBelongToTheirSubjects(t *testing.T) {
 		date := view.Tf("last checked %s", e.App.FormatTime(e.Now()))
 		for _, g := range view.SettingsPage(e.App, nil) {
 			switch g.Title {
-			case view.T("automatic checks"):
-				if strings.Contains(g.Note, date) || len(g.Items) != 2 {
+			case view.T("updates"):
+				if strings.Contains(g.Note, date) || len(g.Items) != 1 {
 					t.Fatal(g)
 				}
 			case view.T("external tools"), view.T("community data"):
@@ -157,6 +158,47 @@ func TestCheckResultsShowUpdates(t *testing.T) {
 		}
 		if got := view.Text(message); got != want {
 			t.Fatal(got)
+		}
+	}
+}
+
+func TestAboutSettingsOrderAndUniqueControls(t *testing.T) {
+	e, _, _ := shellEnv(t)
+	defer view.SetLang("en")
+	for _, lang := range []string{"en", "zh"} {
+		view.SetLang(lang)
+		groups := view.SettingsPage(e.App, nil)
+		if groups[0].Title != view.T("about") || len(groups[0].Items) != 4 {
+			t.Fatal(groups[0])
+		}
+		counts := map[string]int{}
+		for _, g := range groups {
+			if g.Title == view.T("community") {
+				t.Fatal("duplicate community group", g)
+			}
+			for _, it := range g.Items {
+				if it.Label == "RimArcho" {
+					counts["version"]++
+				}
+				if strings.Join(it.Argv, " ") == "config set updates.auto {}" {
+					counts["auto"]++
+					if g.Title != view.T("about") {
+						t.Fatal(g)
+					}
+				}
+				for _, action := range it.Actions {
+					if strings.Join(action.Argv, " ") == "update --check" {
+						counts["check"]++
+					}
+				}
+			}
+		}
+		if counts["version"] != 1 || counts["auto"] != 1 || counts["check"] > 1 {
+			t.Fatal(counts)
+		}
+		links := groups[0].Items[3].Links
+		if len(links) != 2 || links[0].Label != "Discord" || links[0].URL != "https://discord.gg/HF2GVyurQs" || links[1].Label != "GitHub" {
+			t.Fatal(links)
 		}
 	}
 }

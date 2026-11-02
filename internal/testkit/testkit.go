@@ -22,6 +22,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/machine"
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
@@ -88,6 +89,7 @@ func (e *Env) Open() {
 	if err != nil {
 		e.T.Fatal(err)
 	}
+	a.MemoryProbe = func() machine.Memory { return machine.Memory{} }
 	a.Now = func() time.Time { return e.now }
 	a.Rand = rand.NewChaCha8([32]byte{'r', 'i', 'm', 'a', 'r', 'c', 'h', 'o'})
 	a.Loc = time.UTC
@@ -102,7 +104,7 @@ func (e *Env) Open() {
 	a.AfterExitFunc = func(app.AfterExit) error { return nil }
 	// No bundled Archo Monitor unless a test brings one (08 §9).
 	a.MonitorBundle = app.MonitorNone
-	// The DDS encoder is only what a test brings (贴图优化), never one on PATH.
+	// The DDS encoder is only what a test brings (Texture optimisation), never one on PATH.
 	a.ToddsNoPath = true
 	// The host's own Steam client is never asked who is signed in.
 	a.SteamSignedIn = func() (string, bool) { return "", false }
@@ -243,8 +245,8 @@ func (e *Env) CopyTree(src, dst string) {
 	e.stamp(dst)
 }
 
-// stamp gives a mod folder the fake clock's time, so what reads folder times (Mod 库存's
-// 更新日期, 06 §2.9) is reproducible.
+// stamp gives a mod folder the fake clock's time, so what reads folder times (Mod library's
+// update date, 06 §2.9) is reproducible.
 func (e *Env) stamp(dir string) {
 	os.Chtimes(dir, e.now, e.now)
 }

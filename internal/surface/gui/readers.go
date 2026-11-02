@@ -80,7 +80,7 @@ func (s *API) detachedReader() (*app.App, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.a.Uninstalled {
-		return nil, errors.New("RimArcho 已卸载，账户操作已停用")
+		return nil, errors.New("RimArcho was uninstalled; account operations are disabled")
 	}
 	r, err := s.a.ReadSession()
 	if err != nil {
@@ -99,7 +99,7 @@ func (s *API) subscriptionSession() (*app.App, string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.a.Uninstalled {
-		return nil, "", errors.New("RimArcho 已卸载，账户操作已停用")
+		return nil, "", errors.New("RimArcho was uninstalled; account operations are disabled")
 	}
 	w := &s.subRead
 	if e, err := s.a.Env(); w.a != nil && (err != nil || w.a.EnvName != e.Name) {
@@ -206,7 +206,9 @@ func (s *API) logSession() (*app.App, error) {
 
 // Close releases the page reader's database connection (also used by the dev harness).
 func (s *API) Close() {
+	s.closeCommand()
 	s.closeProblemProviders()
+	s.closeFileSearch()
 	if s.branchCancel != nil {
 		s.branchCancel()
 	}
@@ -224,6 +226,8 @@ func (s *API) Close() {
 	}
 	s.mu.Unlock()
 	s.needsJobs.Wait()
+	// RimArcho's own update: a swap of the program files that has begun ends whole (W04).
+	app.WaitSelfSwap(30 * time.Second)
 	creditDone := make(chan struct{})
 	go func() { s.creditWG.Wait(); close(creditDone) }()
 	select {
@@ -264,7 +268,9 @@ func (s *API) Close() {
 		s.texCancel = nil
 	}
 	s.mu.Unlock()
+	// Wait for a library build that still holds the gate.
 	s.libGate.Lock()
+	//lint:ignore SA2001 barrier, nothing to guard
 	s.libGate.Unlock()
 	for _, w := range []*logReader{&s.libRead, &s.plansRead, &s.workspaceReader, &s.indexRead} {
 		w.mu.Lock()

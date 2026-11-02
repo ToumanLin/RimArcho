@@ -1,7 +1,7 @@
 $ archo uninstall
 uninstall: dry run, nothing changed
   accounts: forget account sessions before removing tools or data; external SteamCMD caches stay untouched
-    forget      $ROOT/LocalAppData/RimArcho/accounts  — 忘记账户会话：删除站点会话与临时登录目录，并清理受管 SteamCMD 的已知认证缓存（所有缓存账户）；外部缓存不接管。不可恢复，不撤销其他设备。
+    forget      $ROOT/LocalAppData/RimArcho/accounts  — Forget account sessions: delete site sessions and temporary login folders, and clear known authentication caches for all accounts in managed SteamCMD. External caches stay under their owner's control. This cannot be undone and does not sign out other devices.
   links: delete 2 links in the games' Mods/ (never their targets); 1 folder named like one but not a link: left alone
     unlink      $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_locked_1001_local → $ROOT/LocalAppData/RimArcho/locked/1001_local
     left alone  $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_mine  — not a link: left alone
@@ -22,7 +22,7 @@ uninstall: dry run, nothing changed
   steamcmd: delete the SteamCMD RimArcho downloaded, <size>
     delete      $ROOT/LocalAppData/RimArcho/steamcmd  <size>
   data: once RimArcho has closed, delete its data: database, settings, caches, the Steam runtime folder (2 folders), <size>
-    after exit  $ROOT/ArchoHome  <size>  — includes the downloaded WezTerm
+    after exit  $ROOT/ArchoHome  <size>
     after exit  $ROOT/LocalAppData/RimArcho  <size>  — includes the downloaded todds
   program: once RimArcho has closed, delete the program
     after exit  $ROOT/Program  <size>  — only RimArcho's own files; the folder goes when nothing else is in it
@@ -32,7 +32,7 @@ next:
 $ archo uninstall --keep-locked --remove-packs --remove-saves --remove-games --restore-modsconfig-backup
 uninstall: dry run, nothing changed
   accounts: forget account sessions before removing tools or data; external SteamCMD caches stay untouched
-    forget      $ROOT/LocalAppData/RimArcho/accounts  — 忘记账户会话：删除站点会话与临时登录目录，并清理受管 SteamCMD 的已知认证缓存（所有缓存账户）；外部缓存不接管。不可恢复，不撤销其他设备。
+    forget      $ROOT/LocalAppData/RimArcho/accounts  — Forget account sessions: delete site sessions and temporary login folders, and clear known authentication caches for all accounts in managed SteamCMD. External caches stay under their owner's control. This cannot be undone and does not sign out other devices.
   links: delete 2 links in the games' Mods/ (never their targets); 1 folder named like one but not a link: left alone
     unlink      $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_locked_1001_local → $ROOT/LocalAppData/RimArcho/locked/1001_local
     left alone  $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_mine  — not a link: left alone
@@ -53,7 +53,7 @@ uninstall: dry run, nothing changed
   steamcmd: delete the SteamCMD RimArcho downloaded, <size>
     delete      $ROOT/LocalAppData/RimArcho/steamcmd  <size>
   data: once RimArcho has closed, delete its data: database, settings, caches, the Steam runtime folder (2 folders), <size>
-    after exit  $ROOT/ArchoHome  <size>  — includes the downloaded WezTerm
+    after exit  $ROOT/ArchoHome  <size>
     after exit  $ROOT/LocalAppData/RimArcho  <size>  — includes the downloaded todds
   program: once RimArcho has closed, delete the program
     after exit  $ROOT/Program  <size>  — only RimArcho's own files; the folder goes when nothing else is in it
@@ -63,7 +63,7 @@ next:
 $ archo uninstall --keep-locked --locked-to old --remove-games
 uninstall: dry run, nothing changed
   accounts: forget account sessions before removing tools or data; external SteamCMD caches stay untouched
-    forget      $ROOT/LocalAppData/RimArcho/accounts  — 忘记账户会话：删除站点会话与临时登录目录，并清理受管 SteamCMD 的已知认证缓存（所有缓存账户）；外部缓存不接管。不可恢复，不撤销其他设备。
+    forget      $ROOT/LocalAppData/RimArcho/accounts  — Forget account sessions: delete site sessions and temporary login folders, and clear known authentication caches for all accounts in managed SteamCMD. External caches stay under their owner's control. This cannot be undone and does not sign out other devices.
   links: delete 2 links in the games' Mods/ (never their targets); 1 folder named like one but not a link: left alone
     unlink      $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_locked_1001_local → $ROOT/LocalAppData/RimArcho/locked/1001_local
     left alone  $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_mine  — not a link: left alone
@@ -84,7 +84,7 @@ uninstall: dry run, nothing changed
   steamcmd: delete the SteamCMD RimArcho downloaded, <size>
     delete      $ROOT/LocalAppData/RimArcho/steamcmd  <size>
   data: once RimArcho has closed, delete its data: database, settings, caches, the Steam runtime folder (2 folders), <size>
-    after exit  $ROOT/ArchoHome  <size>  — includes the downloaded WezTerm
+    after exit  $ROOT/ArchoHome  <size>
     after exit  $ROOT/LocalAppData/RimArcho  <size>  — includes the downloaded todds
   program: once RimArcho has closed, delete the program
     after exit  $ROOT/Program  <size>  — only RimArcho's own files; the folder goes when nothing else is in it
@@ -98,7 +98,7 @@ usage: archo uninstall [--dry-run] [--yes] [--keep-locked] [--locked-to <env>] [
 $ archo uninstall --yes
 uninstalled: RimArcho's folders and program are deleted once this command ends
   accounts: forget account sessions before removing tools or data; external SteamCMD caches stay untouched
-    done   forget      $ROOT/LocalAppData/RimArcho/accounts  — 忘记账户会话：删除站点会话与临时登录目录，并清理受管 SteamCMD 的已知认证缓存（所有缓存账户）；外部缓存不接管。不可恢复，不撤销其他设备。
+    done   forget      $ROOT/LocalAppData/RimArcho/accounts  — Forget account sessions: delete site sessions and temporary login folders, and clear known authentication caches for all accounts in managed SteamCMD. External caches stay under their owner's control. This cannot be undone and does not sign out other devices.
   links: delete 2 links in the games' Mods/ (never their targets); 1 folder named like one but not a link: left alone
     done   unlink      $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_locked_1001_local → $ROOT/LocalAppData/RimArcho/locked/1001_local
            left alone  $ROOT/Steam/steamapps/common/RimWorld/Mods/_Archo_mine  — not a link: left alone
@@ -119,7 +119,7 @@ uninstalled: RimArcho's folders and program are deleted once this command ends
   steamcmd: delete the SteamCMD RimArcho downloaded
     done   delete      $ROOT/LocalAppData/RimArcho/steamcmd
   data: once RimArcho has closed, delete its data: database, settings, caches, the Steam runtime folder (2 folders)
-    later  after exit  $ROOT/ArchoHome  — includes the downloaded WezTerm
+    later  after exit  $ROOT/ArchoHome
     later  after exit  $ROOT/LocalAppData/RimArcho  — includes the downloaded todds
   program: once RimArcho has closed, delete the program
     later  after exit  $ROOT/Program  — only RimArcho's own files; the folder goes when nothing else is in it

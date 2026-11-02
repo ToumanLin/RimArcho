@@ -16,7 +16,8 @@ func TestPalScore(t *testing.T) {
 		want int
 	}{
 		{"so", it("自动排序", "sort", ""), 4},                    // the English alias, prefix
-		{"排序", it("自动排序", "sort", ""), 3},                    // the Chinese name, substring
+		{"排序", it("自动排序", "sort", ""), 4},                    // the Chinese name's head noun, suffix
+		{"动排", it("自动排序", "sort", ""), 3},                    // substring
 		{"srt", it("自动排序", "sort", ""), 2},                   // subsequence
 		{"brrainz", it("Harmony", "", "brrainz.harmony"), 1}, // description only
 		{"xyz", it("Harmony", "", "brrainz.harmony"), 0},
@@ -58,7 +59,7 @@ func TestPalette(t *testing.T) {
 	m.update(ctrlK)
 	typeIn(m, "排序")
 	if r := m.pal.results[0]; r.name != "自动排序" {
-		t.Fatalf("排序: first result %q", r.name)
+		t.Fatalf("sort: first result %q", r.name)
 	}
 	m.update(tea.KeyMsg{Type: tea.KeyCtrlU})
 	typeIn(m, "save")
@@ -81,7 +82,7 @@ func TestPalette(t *testing.T) {
 	}
 	// a command runs: needs attention
 	m.update(ctrlK)
-	typeIn(m, "needs")
+	typeIn(m, "can it run")
 	m.update(tea.KeyMsg{Type: tea.KeyEnter})
 	if m.tab != tabProblems {
 		t.Fatal("needs attention did not open")

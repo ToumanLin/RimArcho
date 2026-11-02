@@ -3,8 +3,6 @@ package gui
 import (
 	"archive/zip"
 	"bytes"
-	"crypto/sha256"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -83,45 +81,6 @@ func TestDependencySettingTasksInstallRemoveAndRetry(t *testing.T) {
 	waitSettingEnd(t, events, retry.ID)
 	if e.App.SteamCMDPath() == "" {
 		t.Fatal("retry did not reinstall SteamCMD")
-	}
-}
-
-func TestWezTermSettingsTask(t *testing.T) {
-	t.Parallel()
-	e, api, events := fixture(t)
-	const name = "WezTerm-windows-20990101-a"
-	var buf bytes.Buffer
-	zw := zip.NewWriter(&buf)
-	w, _ := zw.Create(name + "/wezterm-gui.exe")
-	w.Write([]byte("fake"))
-	zw.Close()
-	z := buf.Bytes()
-	sum := sha256.Sum256(z)
-	var srv *httptest.Server
-	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/repos/wezterm/wezterm/releases/latest":
-			fmt.Fprintf(w, `{"tag_name":"test","assets":[{"name":"%[1]s.zip","browser_download_url":"%[2]s/zip","size":%[3]d},{"name":"%[1]s.zip.sha256","browser_download_url":"%[2]s/sha"}]}`, name, srv.URL, len(z))
-		case "/zip":
-			w.Write(z)
-		case "/sha":
-			fmt.Fprintf(w, "%x", sum)
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	defer srv.Close()
-	e.App.WezTermAPI = srv.URL
-	if _, err := api.ApplySetting([]string{"deps", "install", deps.WezTerm}, ""); err != nil {
-		t.Fatal(err)
-	}
-	r := endedTask(t, api, view.TaskWezTerm)
-	waitSettingEnd(t, events, r.ID)
-	if r.State != app.TaskDone || r.Obj != deps.WezTerm || r.Target != view.PageSettings || r.Pct != 100 {
-		t.Fatalf("WezTerm task %+v", r)
-	}
-	if _, err := os.Stat(filepath.Join(e.App.Home, deps.WezTerm, name, "wezterm-gui.exe")); err != nil {
-		t.Fatal(err)
 	}
 }
 

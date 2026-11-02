@@ -24,6 +24,7 @@ type LoadCostTop struct {
 // PlanCost contains only display text and navigation targets.
 type PlanCost struct {
 	Summary string        `json:"summary"`
+	Loading string        `json:"loadingBudget"`
 	Detail  string        `json:"detail"`
 	Mods    string        `json:"mods"`
 	Parts   []LoadCostRow `json:"parts"`
@@ -40,15 +41,22 @@ func costRange(low, high int64) string {
 
 // PlanLoadCost renders a completed measurement without reading the filesystem.
 func PlanLoadCost(r *app.LoadCost) *PlanCost {
+	// 1.6: VRAM that the graphics card cannot hold (all of it without one) is RAM too.
+	heldLow, heldHigh := r.VRAMInRAM()
 	p := &PlanCost{
-		Summary: Tf("RAM about %s  VRAM about %s", costRange(r.RAMLow+r.Baseline.RAM, r.RAMHigh+r.Baseline.RAM), costRange(r.VRAMLow+r.Baseline.VRAM, r.VRAMHigh+r.Baseline.VRAM)),
+		Summary: Tf("RAM about %s  VRAM about %s", costRange(r.RAMLow+r.Baseline.RAM+heldLow, r.RAMHigh+r.Baseline.RAM+heldHigh), costRange(r.VRAMLow+r.Baseline.VRAM, r.VRAMHigh+r.Baseline.VRAM)),
+		Loading: Tf("Loading RAM budget %s", costRange(r.LoadingRAMLow+r.Baseline.RAM+heldLow, r.LoadingRAMHigh+r.Baseline.RAM+heldHigh)),
 		Detail:  Tf("Vanilla and DLC about %s / %s; mods about %s / %s", SizeText(r.Baseline.RAM), SizeText(r.Baseline.VRAM), costRange(r.RAMLow, r.RAMHigh), costRange(r.VRAMLow, r.VRAMHigh)),
 		Mods:    Tf("%d mods", r.Mods),
 		Parts:   []LoadCostRow{}, Top: []LoadCostTop{},
 	}
-	categories := map[string]string{"textures": "textures", "dds": "DDS", "sounds": "sounds", "defs": "Defs", "patches": "Patches", "assemblies": "assemblies"}
+	categories := map[string]string{"textures": "textures", "dds": "DDS", "sounds": "sounds", "defs": "Defs", "patches": "Patches", "assemblies": "assemblies", "mod overhead": "mod overhead"}
 	for _, part := range r.Parts {
-		p.Parts = append(p.Parts, LoadCostRow{T(categories[part.Key]), Tf("%d files", part.Count), SizeText(part.Bytes), costRange(part.RAMLow, part.RAMHigh), costRange(part.VRAMLow, part.VRAMHigh)})
+		count := Tf("%d files", part.Count)
+		if part.Key == "mod overhead" {
+			count = Tf("%d mods", part.Count)
+		}
+		p.Parts = append(p.Parts, LoadCostRow{T(categories[part.Key]), count, SizeText(part.Bytes), costRange(part.RAMLow, part.RAMHigh), costRange(part.VRAMLow, part.VRAMHigh)})
 	}
 	for _, m := range r.Top {
 		p.Top = append(p.Top, LoadCostTop{m.Name, m.Ref, m.Page, SizeText(m.RAMHigh), SizeText(m.VRAMHigh)})
@@ -58,12 +66,17 @@ func PlanLoadCost(r *app.LoadCost) *PlanCost {
 			T("Textures: the range is measured on 1.7 with 100–484 mods (0.9–2.6× the BC7 + mipmap size in VRAM, 1.5–3.5× in RAM); first launches sit lower, later launches higher."),
 			T("The game uploads textures on demand and starts evicting at a share of the graphics card's memory, so a smaller card shows less VRAM."),
 			T("Sounds: decoded clips up to 2 MiB stay in RAM; larger clips stream."),
+			T("The 1.7 loading reserve is uncalibrated."),
 		}
 	} else {
 		p.Notes = []string{
 			T("Textures use DXT or RGBA32 with mipmaps; all textures load into VRAM. The upper bound includes static atlas copies."),
-			T("Not measured on 1.6: this range follows the game's loading rules only."),
+			T("1.6 keeps no RAM copy of loaded textures. Texture RAM is the engine and Mono memory that grows with them; VRAM the graphics card cannot hold, or all of it without a dedicated card (as in a VM), is added to RAM."),
+			T("Calibrated in a VM with up to 7.5 GiB of textures; larger loads are extrapolated. On a real graphics card the RAM / VRAM split is inferred, not yet measured."),
 			T("Sounds: files up to 300 KiB are decoded into RAM; larger clips stream."),
+		}
+		if heldHigh > 0 {
+			p.Notes = append(p.Notes, Tf("RAM includes %s of VRAM held in system memory on this computer.", costRange(heldLow, heldHigh)))
 		}
 	}
 	p.Notes = append(p.Notes,

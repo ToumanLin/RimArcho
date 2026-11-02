@@ -13,8 +13,8 @@ const (
 // Coef holds all model coefficients. Texture rates are bytes per pixel; unknown
 // dimensions are pixels per file byte, with a geometric mip-chain multiplier.
 // The Tex17 rates multiply the 1.7 texture payload (BC7 with mips, plus DDS payload);
-// they are measured, not derived: docs/research/2026-10-24_小文件读取与加载占用.md §4.
-// RAM rates multiply texture VRAM, XML/DLL bytes, or sound bytes.
+// they are measured, not derived: docs/research/2026-10-24_small-file-reads-and-load-memory.md §4.
+// RAM rates multiply the texture payload, XML/DLL bytes, or sound bytes.
 // Sound16Decoded rates multiply PCM16 bytes; streamed sounds use a fixed buffer.
 // AIFF-family and unreadable WAV files approximate PCM16 by file size.
 // Re-measure cached Mods after changing audio thresholds or CompressedPCM16.
@@ -30,7 +30,13 @@ var Coef = struct {
 	Tex17VRAMHigh           float64
 	Tex17RAMLow             float64
 	Tex17RAMHigh            float64
+	TextureRAM16Low         float64
 	TextureRAM16High        float64
+	TextureRAM16Knee        int64
+	TextureRAM16TailLow     float64
+	TextureRAM16TailHigh    float64
+	TextureGPU16            float64
+	UsableVRAM              float64
 	CompressedPCM16         float64
 	Sound16FileLimit        int64
 	Sound17PCM16Limit       int64
@@ -54,12 +60,27 @@ var Coef = struct {
 	UnknownMips:             4.0 / 3,
 	// 1.7, RTX 4090, 100 / 250 / 484 mods, first and later launches: VRAM 0.9–2.6× and
 	// private bytes 1.5–3.5× the payload (the engine also keeps Vulkan host memory).
-	Tex17VRAMLow:        0.9,
-	Tex17VRAMHigh:       2.6,
-	Tex17RAMLow:         1.5,
-	Tex17RAMHigh:        3.5,
-	TextureRAM16High:    0.10, // 1.6 (not measured): transient/staging RAM; lower bound is zero.
-	CompressedPCM16:     11,   // OGG/MP3: roughly 128 kbit/s versus 1411 kbit/s PCM16.
+	Tex17VRAMLow:  0.9,
+	Tex17VRAMHigh: 2.6,
+	Tex17RAMLow:   1.5,
+	Tex17RAMHigh:  3.5,
+	// Unity 1.6 VM calibration: 2026-10-31 baseline and light/texture groups,
+	// extended on 2026-11-01 to 7.5 GiB combined texture payload. Above the
+	// original 3 GiB coverage, retained private bytes grow more slowly.
+	// See docs/research/2026-11-01_unity16-heavy-texture-memory.md.
+	TextureRAM16Low:      1.6,
+	TextureRAM16High:     1.8,
+	TextureRAM16Knee:     3 << 30,
+	TextureRAM16TailLow:  1.3,
+	TextureRAM16TailHigh: 1.6,
+	// Part of that VM curve is the driver's copy of each texture: GPU memory, which
+	// the VMware adapter (no dedicated VRAM) commits as process memory. Per payload
+	// byte, committed GPU memory grew by TextureGPU16; Estimate moves it to VRAM and
+	// Spill returns the share that does not fit in UsableVRAM of the dedicated memory.
+	// See docs/research/2026-11-01_unity16-texture-memory-breakdown.md.
+	TextureGPU16:        1.2,
+	UsableVRAM:          0.9, // Assumption: other programs and the desktop keep about a tenth.
+	CompressedPCM16:     11,  // OGG/MP3: roughly 128 kbit/s versus 1411 kbit/s PCM16.
 	Sound16FileLimit:    300 << 10,
 	Sound17PCM16Limit:   2 << 20,
 	Sound16DecodedLow:   1, // PCM16 versus float32 at the upper bound.
@@ -120,12 +141,26 @@ func Estimate(g Game, mods []Mod) Report {
 	vLow := png + unknown*c.UnknownPixelsLow
 	vHigh := png + unknown*c.UnknownPixelsHigh
 	dLow, dHigh := float64(m.DDS.Bytes), float64(m.DDS.Bytes)
-	// RAM per texture part: 1.6 only transient copies; 1.7 measured rates of the payload.
+	// 1.6 keeps small originals resident beside their static atlas copy.
 	if g == Game16 {
 		vHigh += float64(m.PNGSmall512Pixels) * c.AtlasBytesPerPixel
 	}
-	tRAMLow, tRAMHigh := 0.0, vHigh*c.TextureRAM16High
-	dRAMLow, dRAMHigh := 0.0, dHigh*c.TextureRAM16High
+	rateLow, rateHigh := c.TextureRAM16Low, c.TextureRAM16High
+	if g == Game16 {
+		// PNG and DDS share one curve; attribute the result by payload share.
+		rateLow = textureRAM16Rate(vLow+dLow, c.TextureRAM16Low, c.TextureRAM16TailLow)
+		rateHigh = textureRAM16Rate(vHigh+dHigh, c.TextureRAM16High, c.TextureRAM16TailHigh)
+	}
+	tRAMLow, tRAMHigh := vLow*rateLow, vHigh*rateHigh
+	dRAMLow, dRAMHigh := dLow*rateLow, dHigh*rateHigh
+	if g == Game16 {
+		// The calibrated curve includes the driver's copy (committed GPU memory in the
+		// VM). Report it as VRAM; RAM keeps the engine and Mono share.
+		gpu := c.TextureGPU16
+		tRAMLow, tRAMHigh = math.Max(0, tRAMLow-vLow*gpu), math.Max(0, tRAMHigh-vHigh*gpu)
+		dRAMLow, dRAMHigh = math.Max(0, dRAMLow-dLow*gpu), math.Max(0, dRAMHigh-dHigh*gpu)
+		vLow, vHigh, dLow, dHigh = vLow*gpu, vHigh*gpu, dLow*gpu, dHigh*gpu
+	}
 	if g == Game17 {
 		tRAMLow, tRAMHigh = vLow*c.Tex17RAMLow, vHigh*c.Tex17RAMHigh
 		dRAMLow, dRAMHigh = dLow*c.Tex17RAMLow, dHigh*c.Tex17RAMHigh
@@ -156,6 +191,10 @@ func Estimate(g Game, mods []Mod) Report {
 		part("patches", m.Patches, float64(m.Patches.Bytes)*c.PatchesLow, float64(m.Patches.Bytes)*c.PatchesHigh, 0, 0),
 		part("assemblies", m.Assemblies, float64(m.Assemblies.Bytes)*c.AssembliesLow, float64(m.Assemblies.Bytes)*c.AssembliesHigh, 0, 0),
 	}}
+	if g == Game16 {
+		// Fixed per non-official Mod: fitted separately using equal-count texture groups.
+		r.Parts = append(r.Parts, part("mod overhead", Files{Count: len(mods)}, float64(len(mods))*(1.8*(1<<20)), float64(len(mods))*(2.5*(1<<20)), 0, 0))
+	}
 	for _, p := range r.Parts {
 		r.RAMLow += p.RAMLow
 		r.RAMHigh += p.RAMHigh
@@ -163,6 +202,14 @@ func Estimate(g Game, mods []Mod) Report {
 		r.VRAMHigh += p.VRAMHigh
 	}
 	return r
+}
+
+func textureRAM16Rate(payload, initial, tail float64) float64 {
+	knee := float64(Coef.TextureRAM16Knee)
+	if payload <= knee {
+		return initial
+	}
+	return (knee*initial + (payload-knee)*tail) / payload
 }
 
 func part(key string, files Files, rLow, rHigh, vLow, vHigh float64) Part {

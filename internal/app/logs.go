@@ -116,7 +116,7 @@ type logCacheEntry struct {
 
 // DropLogCaches forgets the parsed log report and the problem set built with it; the next
 // read takes the stored report from the database again (the GUI calls it when the player
-// leaves 需要处理 or 日志, 07 §8.3).
+// leaves Can it run or Game log, 07 §8.3).
 func (a *App) DropLogCaches() {
 	a.logCache = nil
 	a.prCache, a.prKey = nil, ""
@@ -131,8 +131,9 @@ var ErrLogNotCached = errors.New("log not analysed yet")
 // logCacheVersion invalidates stored reports when attribution changes.
 // 7: both the companion log (dev, 4) and the G1/G7 attribution rules (master, 6); 8: no
 // nearby messages for entries only the companion log has; 9: observed phase boundaries
-// and counts from both logs; 10: a left-out provider of a missing def before patchers.
-const logCacheVersion = 10
+// and counts from both logs; 10: a left-out provider of a missing def before patchers;
+// 11: texture and assembly providers in the shared mod folders (Store.InstanceFiles).
+const logCacheVersion = 11
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a

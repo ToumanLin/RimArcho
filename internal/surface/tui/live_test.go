@@ -44,7 +44,7 @@ func TestLiveGame(t *testing.T) {
 	if line := ansi.Strip(m.statusLine()); !strings.HasPrefix(line, "✓ done") || !strings.Contains(line, Tf("game running since %s", since)) {
 		t.Fatalf("status line with a message %q", line)
 	}
-	// this run leads its section, 上次运行的报错 (06 §2.4)
+	// this run leads its section, errors from the last run (06 §2.4)
 	first := -1
 	for i, it := range m.prob.items {
 		if it.section == view.SectionRun {
@@ -167,7 +167,7 @@ func TestTopBarLaunchBlocked(t *testing.T) {
 }
 
 // G17 in the TUI: with no game running the status line says nothing about it, unless a new
-// Player.log waits to be analysed; then it says so and which key opens 能不能跑.
+// Player.log waits to be analysed; then it says so and which key opens Can it run.
 func TestStatusLineAfterGame(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)

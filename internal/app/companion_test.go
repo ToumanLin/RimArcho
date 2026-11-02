@@ -148,7 +148,7 @@ func TestLogAnalysisWithMonitor(t *testing.T) {
 	if !tick.OnlyCompanion || tick.Count != 1234 || tick.First.Top() == nil {
 		t.Fatalf("monitor-only: only %v count %d", tick.OnlyCompanion, tick.Count)
 	}
-	// The problem carries the file for the chip in 能不能跑 (06 §2.4).
+	// The problem carries the file for the chip in Can it run (06 §2.4).
 	if out := e.MustRun("log", "--file", pl, "--cluster", "E1"); !strings.Contains(out, "ArchoMonitor.log") {
 		t.Fatalf("archo log:\n%s", out)
 	}

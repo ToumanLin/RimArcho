@@ -120,12 +120,47 @@ func (m *model) histLabel() string {
 	return T("go back to here")
 }
 
+// chooseHistory is H: every step and version as a chooser, the window's history picker
+// (06 §2.5); enter goes there, as enter in the history area does. It works whatever the
+// staging area holds.
+func (m *model) chooseHistory() tea.Cmd {
+	if m.st == nil {
+		return nil
+	}
+	items, err := view.HistoryItems(m.app, m.st)
+	if err != nil {
+		m.say(sayFail, m.humanize(err.Error()))
+		return nil
+	}
+	if len(items) < 2 {
+		m.say(sayInfo, T("no history yet"))
+		return nil
+	}
+	p := &panel{title: T("history")}
+	for i, it := range items {
+		label := it.Text
+		switch it.Kind {
+		case "version":
+			label = T("saved versions") + "  " + label
+		case "now":
+			p.choice = i
+		}
+		p.choices = append(p.choices, label)
+	}
+	p.onPickAt = func(m *model, i int) tea.Cmd { return m.histGoTo(items[i]) }
+	m.panel = p
+	return nil
+}
+
 // histGo goes to the cursor's row at once: a step, or a version loaded into the list.
 func (m *model) histGo() tea.Cmd {
 	if m.histCur >= len(m.hist) {
 		return nil
 	}
-	h := m.hist[m.histCur]
+	return m.histGoTo(m.hist[m.histCur])
+}
+
+func (m *model) histGoTo(h view.HistItem) tea.Cmd {
 	switch h.Kind {
 	case "now":
 		return nil

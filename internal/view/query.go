@@ -19,7 +19,7 @@ type term struct {
 	neg   bool
 }
 
-var queryFields = map[string]bool{"name": true, "author": true, "tag": true, "id": true, "type": true, "has": true, "version": true, "location": true, "tags": true, "source": true, "content": true}
+var queryFields = map[string]bool{"name": true, "author": true, "tag": true, "id": true, "type": true, "has": true, "version": true, "location": true, "tags": true, "source": true, "content": true, "lists": true}
 
 // Query is a parsed column search.
 type Query struct{ terms []term }
@@ -155,6 +155,8 @@ func termMatch(t term, it *Item, f MatchFacts) bool {
 		return slices.ContainsFunc(it.Tags, func(tg string) bool { return strings.EqualFold(tg, v) })
 	case "version":
 		return slices.Contains(it.Versions, v)
+	case "lists":
+		return slices.ContainsFunc(it.Lists, func(name string) bool { return strings.EqualFold(name, v) })
 	case "location":
 		return v != "" && strings.EqualFold(it.Location, v)
 	case "id":
@@ -272,13 +274,13 @@ func (c *ContentCache) Get(a *app.App, st *app.LoadoutState) (map[string]int, er
 // TagMatch: v names tag when, ignoring case, it starts at the beginning of one of the tag's
 // words (06 §3.7): "facial" finds "Facial Hair" and "Facial Animation", "animation" and
 // "anim" find "Facial Animation", "facial hair" finds "Facial Hair"; "air" does not.
-// The rule is app.TagMatch, so Mod 库存's tag: filter (app.Library) matches the same way.
+// The rule is app.TagMatch, so Mod library's tag: filter (app.Library) matches the same way.
 func TagMatch(tag, v string) bool { return app.TagMatch(tag, v) }
 
 func isTagSep(c byte) bool { return app.IsTagSep(c) }
 
 // queryFieldOrder is the order completion offers fields in when several share a prefix.
-var queryFieldOrder = []string{"name", "author", "tag", "id", "type", "has", "version", "location"}
+var queryFieldOrder = []string{"lists", "name", "author", "tag", "id", "type", "has", "version", "location"}
 
 // queryValues are the fixed values of type: and has: (06 §3.7), in the order offered.
 var queryValues = map[string][]string{
@@ -306,7 +308,7 @@ func CompleteQueryWith(q string, tags, versions []string) string {
 }
 
 // completeWith is CompleteQuery for a set of fields (in the order offered) and their
-// values; Mod 库存's search box uses it with its own keys (CompleteLibrary).
+// values; Mod library's search box uses it with its own keys (CompleteLibrary).
 func completeWith(q string, fields []string, values func(field string) []string) string {
 	if q == "" || strings.HasSuffix(q, " ") || strings.Count(q, "\"")%2 == 1 {
 		return ""
@@ -334,6 +336,42 @@ func completeWith(q string, fields []string, values func(field string) []string)
 		if strings.HasPrefix(f, low) {
 			return f[len(low):] + ":"
 		}
+	}
+	return ""
+}
+
+// completeLists retains quotes and completes whole list names, including spaces.
+func completeLists(q string, names []string, fallback, omit string) string {
+	inQuote, start := false, 0
+	for i, r := range q {
+		if r == '"' {
+			inQuote = !inQuote
+		} else if unicode.IsSpace(r) && !inQuote {
+			start = i + len(string(r))
+		}
+	}
+	token := strings.TrimPrefix(q[start:], "-")
+	field, value, ok := strings.Cut(token, ":")
+	if !ok || !strings.EqualFold(field, "lists") {
+		return fallback
+	}
+	quoted := strings.HasPrefix(value, "\"")
+	if quoted && strings.HasSuffix(value[1:], "\"") {
+		return ""
+	}
+	prefix := strings.TrimPrefix(value, "\"")
+	for _, name := range names {
+		if omit != "" && strings.EqualFold(name, omit) || len(prefix) > len(name) || !strings.EqualFold(name[:len(prefix)], prefix) {
+			continue
+		}
+		if !quoted && strings.ContainsAny(name, " \t\r\n") {
+			continue // a suffix cannot insert an opening quote
+		}
+		suffix := name[len(prefix):]
+		if quoted {
+			suffix += "\""
+		}
+		return suffix
 	}
 	return ""
 }

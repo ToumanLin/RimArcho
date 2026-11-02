@@ -3,9 +3,9 @@ package view
 import "github.com/ToumanLin/RimArcho/internal/app"
 
 // LaunchHint is the most likely trouble of a launch (06 §2.3): the first code of
-// app.LaunchChecks (most predictive first, 03 §4.3.1) that has a counted item in 能不能跑, in
+// app.LaunchChecks (most predictive first, 03 §4.3.1) that has a counted item in Can it run, in
 // that item's words, with the check's one-line reason from the log corpus. It never blocks
-// a launch; it says where to look. Only items 能不能跑 shows are used, so following the hint
+// a launch; it says where to look. Only items Can it run shows are used, so following the hint
 // always lands on something the player can act on.
 type LaunchHint struct {
 	Text  string `json:"text"`  // the item's title, "… and 2 more like it" when there are several

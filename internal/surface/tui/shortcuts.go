@@ -11,8 +11,8 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The editor's and Mod 库存's shortcuts for one mod (06 §3.5): ctrl+o its folder, ctrl+w its
-// Workshop page, C the 变化 page narrowed to its Lineage.
+// The editor's and Mod library's shortcuts for one mod (06 §3.5): ctrl+o its folder, ctrl+w its
+// Workshop page, C the Updates page narrowed to its Lineage.
 
 // openFolderOf shows an instance's folder in the file manager.
 func (m *model) openFolderOf(id string) tea.Cmd {
@@ -82,7 +82,7 @@ func (m *model) workshopOf(id string) string {
 	return ""
 }
 
-// openChangesOf opens 变化 with only the changes of the instance's Lineage; "" every mod.
+// openChangesOf opens Updates with only the changes of the instance's Lineage; "" every mod.
 func (m *model) openChangesOf(id, name string) tea.Cmd {
 	m.chg.of, m.chg.ofName = id, name
 	m.chg.cursor, m.chg.off = 0, 0
@@ -90,7 +90,7 @@ func (m *model) openChangesOf(id, name string) tea.Cmd {
 	m.loadChanges()
 	if id != "" {
 		for i, r := range m.chg.rows {
-			if r.text == "3 "+T("change history") {
+			if r.text == "3 "+T("already updated") {
 				m.chg.cursor, m.chg.off = i, i
 				break
 			}

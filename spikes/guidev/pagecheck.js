@@ -11,6 +11,7 @@ import * as home from "/js/home.js";
 import * as packs from "/js/packs.js";
 import * as guide from "/js/guide.js";
 import * as uninstall from "/js/uninstall.js";
+import * as feedback from "/js/feedback.js";
 import * as full from "/js/fulldetail.js";
 import { setText } from "/js/api.js";
 import * as ops from "/js/ops.js";
@@ -124,8 +125,8 @@ try {
     let installs = 0;
     handlers.set("ApplySetting", () => { installs++; return ["queued"]; });
     for (const [name, bytes] of [["steamcmd", -1], ["todds", 12345], ["wezterm", 45678]]) {
-      handlers.set("Settings", () => [{ title: "外部工具", items: [{ label: name, actions: [
-        { label: "安装工具", argv: ["deps", "install", name], confirm: "Download tool?" }] }] }]);
+      handlers.set("Settings", () => [{ title: "External tools", items: [{ label: name, actions: [
+        { label: "Install tool", argv: ["deps", "install", name], confirm: "Download tool?" }] }] }]);
       handlers.set("ToolInstallOffer", () => ({ url: "https://fixture.invalid/" + name + ".zip", dir: "C:/fixture/" + name, bytes }));
       await screens.settings(); await settle();
       const before = installs;
@@ -148,8 +149,8 @@ try {
     pop.initPopups({ renderWhere() {}, renderHeads() {} });
     const groups = ["1.6", "1.7"].map(version => ({ game: "RimWorld " + version, path: "D:/games/" + version,
       rows: [{ name: "_Archo_env_old_" + version, path: "D:/games/" + version + "/Mods/_Archo_env_old_" + version,
-        target: "D:/very long library folder/".repeat(8) + "KnownMod", reason: "目标不存在", action: "保留" }] }));
-    const preview = groups.map(g => ({ ...g, rows: g.rows.map(r => ({ ...r, action: "将删除" })) }));
+        target: "D:/very long library folder/".repeat(8) + "KnownMod", reason: "target missing", action: "keep" }] }));
+    const preview = groups.map(g => ({ ...g, rows: g.rows.map(r => ({ ...r, action: "will delete" })) }));
     handlers.set("Needs", () => ({ items: [{ title: "Links", text: "Links", why: "raw evidence must be hidden", section: 0,
       counted: true, status: 2, linkGroups: groups, actions: [{ kind: "repair-links", label: "Repair", confirm: "Confirm",
       refs: ["fixture-preview"], linkGroups: preview }] }] }));
@@ -162,7 +163,7 @@ try {
     assert(target.scrollWidth <= target.clientWidth + 1, "long path overflows row");
     document.querySelector("#screen .need .acts button").click(); await settle();
     assert(document.querySelectorAll("#popup .link-game").length === 2, "preview lost game groups");
-    assert([...document.querySelectorAll("#popup .link-tag")].every(n => n.textContent === "将删除"), "preview action tag is wrong");
+    assert([...document.querySelectorAll("#popup .link-tag")].every(n => n.textContent === "will delete"), "preview action tag is wrong");
     assert(document.querySelector("#popup .link-row .link-path:nth-child(3)").dataset.path === groups[0].rows[0].target, "preview lost full path");
     pop.close(); popup.remove();
     handlers.set("Needs", () => ({ items: [] }));
@@ -171,13 +172,13 @@ try {
     const sourceKeys = ["workshop", "steamcmd", "git", "page", "local"];
     const change = (id, tier, text) => ({ id, ref: "#" + id, mod: id.toUpperCase(), tier, tierText: ["", "affects launch", "worth a look", "content only"][tier], text, details: [text + " in detail"], before: 1, after: 2, workshopId: "123", actions: [{ kind: "lock", label: "lock this version", key: "p" }] });
     const data = { sources: sourceKeys.map(key => ({ key, name: key, count: key === "local" ? 3 : 1, checked: "10:00", result: "cached", account: ["steamcmd", "page"].includes(key) ? "offline account" : "" })),
-      summary: { line: "checked 4 sources, the last at 10:00", failures: 2, failed: "2 no longer on the Workshop" },
+      summary: { line: "checked 4 sources, the last at 10:00, 1 check failed", failures: 1 },
       pending: [{ id: "git-id", ref: "git-ref", name: "Git fixture", kind: "git", source: "Git", installed: "abc", available: "def", usedIn: ["Colony"], inPlan: true, tracking: "the default branch", opens: "compare" },
         { id: "page-id", ref: "page-ref", name: "Page fixture", kind: "page", source: "download page", installed: "1", available: "2", usedIn: ["Other"] }],
       recent: [],
       history: { plan: "Colony", since: "since last played", rows: [change("vef", 1, "code changed"), change("tex", 3, "textures +3 MB")],
-        arrivals: { text: "1 new", rows: [{ ...change("new", 3, "new"), text: "new" }] }, older: [{ day: "Oct 21", rows: [change("old", 2, "Defs changed")] }] } };
-    data.sources[0].failures = [{ label: "2 no longer on the Workshop", items: ["Fixture (123): deleted or private", "Other fixture (456): deleted or private"] }];
+        arrivals: { text: "1 new mod: NEW", rows: [{ ...change("new", 3, "found in the Mods folder"), present: true }] }, older: [{ day: "Oct 21", rows: [change("old", 2, "Defs changed")] }] } };
+    data.sources[0].failures = [{ label: "connection timed out", items: ["Fixture: connection timed out"] }];
     let reads = [], checks = [], previews = [], updates = [], went = [];
     handlers.set("SubscriptionsPage", (library, of) => { reads.push([library, of]); return data; });
     handlers.set("CheckSubscriptionSource", kind => { checks.push(kind); return "queued"; });
@@ -197,7 +198,7 @@ try {
       assert(rows().filter(r => r.dataset.key.startsWith("p:")).length === 1, "the list scope shows only the current list's updates");
       assert(document.querySelector(".subs-hidden")?.textContent.includes("1"), "hidden updates are not counted");
       assert(sel()?.dataset.key === "p:git-ref" && detail().includes("Git fixture") && detail().includes("the default branch"), "first update not selected and detailed");
-      assert(document.querySelector(".subs-foot").textContent.includes("checked 4 sources") && document.querySelector(".subs-failed"), "sources line");
+      assert(document.querySelector(".subs-foot").textContent.includes("checked 4 sources") && !document.querySelector(".subs-failed"), "sources line");
       for (const n of [1, 2]) { screens.areaKey(new KeyboardEvent("keydown", { key: String(n), cancelable: true })); assert(document.activeElement.closest("[data-area]")?.dataset.area === String(n), "area key " + n); }
       screens.areaKey(new KeyboardEvent("keydown", { key: "1", cancelable: true }));
       key("ArrowDown"); await settle();
@@ -214,13 +215,12 @@ try {
       assert(document.querySelector(".subs-detail .subscribe-update"), "download page update has no file choice");
       assert(document.querySelector(".subs-detail .subs-dhead .btn.primary").disabled, "download page update can run without files");
       document.querySelector(".subs-srcsum").click(); await settle();
-      assert(document.querySelectorAll(".subs-src").length === 5, "sources do not open in place");
-      const failures = document.querySelector(".subs-src details");
-      assert(failures && !failures.open, "failure group open on entry");
+      assert(document.querySelectorAll(".subs-detail .subs-src").length === 5 && !document.querySelector(".subs-list .subs-sources"), "checks did not open in the detail");
+      assert(detail().includes("Fixture: connection timed out"), "failure names and reasons missing");
       [...document.querySelectorAll(".subs-src")][2].querySelector(".btn.small").click(); await settle();
       assert(checks.join() === "git", "check did not queue the git source");
       key("Escape"); await settle();
-      assert(!document.querySelector(".subs-sources"), "esc left the sources open");
+      assert(sel()?.dataset.key === "sources", "esc changed the selected source summary");
       key("K"); await settle();
       assert(checks.slice(1).join() === "workshop,steamcmd,git,page", "check for updates did not queue every source");
       document.querySelector('[data-key="d:Oct 21"]').click(); await settle();
@@ -228,7 +228,7 @@ try {
       emit("tasks", { ended: { kind: "source-check" } }); await settle();
       assert(sel()?.dataset.key === "d:Oct 21", "a task refresh lost the selection");
       key("+");
-      assert(went.at(-1) === "subscribe", "+ did not go to 添加订阅");
+      assert(went.at(-1) === "subscribe", "+ did not go to Add a subscription");
       await screens.changes({ id: "git-id", name: "Git fixture" }); await settle();
       assert(reads.at(-1)[1] === "git-id" && document.querySelector(".subs-scope .lib-cond") && screens.changesFiltered(), "one-mod view lost");
       assert(document.activeElement.closest(".subs-list"), "one-mod view did not land in the list");
@@ -239,13 +239,14 @@ try {
       assert(reads.at(-1).join() === "false," && document.activeElement.closest(".subs-list"), "home lost the current-list landing");
       await screens.openAdd(); await settle();
       const box = document.querySelector(".subscribe-omni input");
-      assert(box && box === document.activeElement, "添加订阅 did not focus the paste box");
+      assert(box && box === document.activeElement, "Add a subscription did not focus the paste box");
       assert(document.querySelectorAll(".subscribe-tile").length === 3, "source cards missing");
     } finally { ui.go = go; }
     pop.close(); popup.remove();
     handlers.set("Home", () => ({ rows: [], featured: -1 }));
     handlers.set("SubscriptionsPage", () => ({ sources: [], pending: [], history: { rows: [] } }));
   });
+  handlers.set("FeedbackCompose", () => ({ body: "fixture", url: "https://github.com/ToumanLin/RimArcho/issues/new", full: true }));
   const pages = [
     ["home", "Home", () => home.home(), { rows: [], featured: -1 }],
     ["needs", "Needs", () => screens.needs(), { items: [] }],
@@ -257,6 +258,7 @@ try {
     ["build", "BuildPage", () => packs.build(), 1],
     ["guide", "GuideFind", () => guide.start(), []],
     ["uninstall", "UninstallPlan", () => uninstall.open(), { steps: [] }],
+    ["feedback", "FeedbackAttach", () => feedback.open(), { basic: [], parts: [], sections: [] }],
     ["full", "ModCopies", () => full.full("library", "fixture"), { row: null }],
     [null, "Workspace", editor, workspace],
     ["library", "Library", () => library.open(), { rows: [], columns: [] }],

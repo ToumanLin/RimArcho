@@ -1,10 +1,7 @@
 package tui
 
 import (
-	"bytes"
 	"fmt"
-	"image"
-	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,7 +9,6 @@ import (
 	"regexp"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/bbcode"
 	tea "github.com/charmbracelet/bubbletea"
@@ -81,7 +77,7 @@ func TestDetailContent(t *testing.T) {
 			t.Fatalf("detail lacks %q:\n%s", want, got)
 		}
 	}
-	// the full-screen detail lists each image (no WezTerm: as text)
+	// The full-screen detail lists each image as text.
 	if full := plainLines(m.detailLayout(detailOpts{width: 50, full: true})); !strings.Contains(full, "[image  i.imgur.com]") || strings.Contains(full, "images ×") {
 		t.Fatalf("full-screen images:\n%s", full)
 	}
@@ -102,7 +98,7 @@ func TestDetailContent(t *testing.T) {
 	if !m.full {
 		t.Fatal("enter")
 	}
-	lines, _ := m.fullLines(16)
+	lines := m.fullLines(16)
 	all := m.detailLayout(detailOpts{width: m.w - 4, full: true})
 	if strings.Contains(plainLines(all), "enter shows all") || len(all) <= 16 {
 		t.Fatalf("full detail: %d lines", len(all))
@@ -111,7 +107,7 @@ func TestDetailContent(t *testing.T) {
 		t.Fatalf("scroll line %q", ansi.Strip(lines[len(lines)-1]))
 	}
 	press(m, "end")
-	lines, _ = m.fullLines(16)
+	lines = m.fullLines(16)
 	if !strings.Contains(ansi.Strip(lines[len(lines)-1]), "100%") {
 		t.Fatalf("after G: %q", ansi.Strip(lines[len(lines)-1]))
 	}
@@ -136,44 +132,6 @@ func TestDetailContent(t *testing.T) {
 	runCmd(m, m.loadData(m.current().id, false, false))
 	if got := plainLines(m.detailLayout(detailOpts{width: 60})); !strings.Contains(got, "offline (workshop.fetch)") {
 		t.Fatalf("offline note missing:\n%s", got)
-	}
-}
-
-func TestImageWriter(t *testing.T) {
-	t.Parallel()
-	var buf bytes.Buffer
-	w := &imgWriter{Writer: &buf}
-	w.set([]placement{{row: 5, col: 10, cols: 4, rows: 2, seq: []byte("<IMG>")}})
-	w.Write([]byte("frame1"))
-	out := buf.String()
-	if !strings.Contains(out, "frame1\x1b7\x1b[?25h\x1b[5;10H<IMG>\x1b[?25l\x1b8") || !strings.HasPrefix(out, "\x1b[?2026h") || !strings.HasSuffix(out, "\x1b[?2026l") {
-		t.Fatalf("draw: %q", out)
-	}
-	buf.Reset()
-	w.set(nil)
-	w.Write([]byte("frame2"))
-	if out := buf.String(); !strings.Contains(out, "\x1b[5;10H\x1b[4X\x1b[6;10H\x1b[4X") || strings.Contains(out, "<IMG>") {
-		t.Fatalf("clear: %q", out)
-	}
-	buf.Reset()
-	w.Write([]byte("frame3"))
-	if out := buf.String(); strings.Contains(out, "X") {
-		t.Fatalf("cleared twice: %q", out)
-	}
-}
-
-func TestImgRows(t *testing.T) {
-	t.Parallel()
-	for _, c := range []struct{ w, h, cols, want int }{
-		{1600, 900, 60, 15}, // 16:9: 60 × 13/30 × 9/16 = 14.6
-		{500, 500, 40, 18},  // square
-		{300, 900, 40, 20},  // tall: capped
-		{0, 0, 60, 15},      // unknown: as 16:9
-		{2000, 50, 60, 1},   // a thin banner: at least one row
-	} {
-		if got := imgRows(c.w, c.h, c.cols, 20); got != c.want {
-			t.Errorf("imgRows(%d,%d,%d) = %d, want %d", c.w, c.h, c.cols, got, c.want)
-		}
 	}
 }
 
@@ -219,7 +177,7 @@ func TestT13TagBar(t *testing.T) {
 	press(m, "g")
 	press(m, "right")
 	if s := ansi.Strip(m.View()); !strings.Contains(s, "[✓美化]") {
-		t.Fatalf("no [✓美化]:\n%s", s)
+		t.Fatalf("no the checked Visuals tag:\n%s", s)
 	}
 	press(m, "enter")
 	if got := tagged("美化"); got != "" {
@@ -275,7 +233,7 @@ func TestWrapKinsoku(t *testing.T) {
 		"中文后面跟英文标点.还有(括号)和逗号,以及问号?结束",
 	}
 	for _, text := range texts {
-		for w := 8; w <= 40; w++ { // below that a glued group (吗？」) may not fit at all
+		for w := 8; w <= 40; w++ { // below that a word glued to CJK closing marks may not fit at all
 			lines := wrapSpans([]bbcode.Span{{Text: text}}, w, lipgloss.NewStyle())
 			var all strings.Builder
 			for i, l := range lines {
@@ -297,129 +255,10 @@ func TestWrapKinsoku(t *testing.T) {
 			}
 		}
 	}
-	// the case from the review: "…日志\n。必须…" becomes "…日\n志。必须…"
+	// Regression: wrapping must keep CJK closing marks with the preceding character.
 	lines := wrapSpans([]bbcode.Span{{Text: "支持从游戏获取更加详细的日志。必须放在"}}, 28, lipgloss.NewStyle())
 	if got := strings.TrimRight(ansi.Strip(lines[1]), " "); !strings.HasPrefix(got, "志。") {
 		t.Fatalf("second line %q", got)
-	}
-}
-
-func previewPNG(t *testing.T, path string, w, h int) {
-	img := image.NewRGBA(image.Rect(0, 0, w, h))
-	for i := range img.Pix {
-		img.Pix[i] = 90
-	}
-	var b bytes.Buffer
-	png.Encode(&b, img)
-	os.MkdirAll(filepath.Dir(path), 0o755)
-	if err := os.WriteFile(path, b.Bytes(), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
-// T6 (06 §11, §12.4): a mod with Preview.png shows its thumbnail at once; moving on erases
-// the image's 18×5 cells (the block is as tall as the image) in the same write; scrolling never draws another mod's thumbnail;
-// with ui.preview_dwell_ms set, the thumbnail waits until the cursor rests that long.
-func TestT6Thumbnail(t *testing.T) {
-	e, _ := fixture(t)
-	previewPNG(t, filepath.Join(e.Workshop, "1001", "About", "Preview.png"), 1600, 900)
-	m := direct(t, e, 160, 40)
-	var buf bytes.Buffer
-	m.images = &imgWriter{Writer: &buf}
-	frame := func() string {
-		m.View()
-		buf.Reset()
-		m.images.Write([]byte("F"))
-		return buf.String()
-	}
-	press(m, "home")
-	press(m, "down") // Alpha, with a 16:9 Preview.png
-	id := m.current().id
-	if m.thumbShown != id {
-		t.Fatalf("no dwell, yet not shown: %q", m.thumbShown)
-	}
-	runCmd(m, m.imageCmds(m.visibleDetail()))
-	out := frame()
-	if !strings.Contains(out, "1337;File=inline=1") || !strings.Contains(out, "width=18;height=5;preserveAspectRatio=0") {
-		t.Fatalf("thumbnail: %.200q", out)
-	}
-	m.View()
-	ps := m.images.cur
-	if len(ps) != 1 || ps[0].cols != 18 || ps[0].rows != 5 {
-		t.Fatalf("placement %+v", ps)
-	}
-	p := ps[0]
-	// the text beside it starts after the block
-	if l := ansi.Strip(m.lastLines[0].text); !strings.HasPrefix(l, strings.Repeat(" ", 20)+"Alpha") {
-		t.Fatalf("header %q", l)
-	}
-	// the block is as tall as the image: line 5 is no longer an empty part of it
-	if l := m.lastLines; len(l) < 6 || strings.HasPrefix(ansi.Strip(l[5].text), strings.Repeat(" ", 20)) {
-		t.Fatalf("block taller than the image:\n%s", plainLines(m.lastLines))
-	}
-	// moving on: no image, and its 18×5 cells erased in the same write, nothing below
-	press(m, "down")
-	out = frame()
-	if strings.Contains(out, "1337;File") {
-		t.Fatal("thumbnail kept after moving on")
-	}
-	for r := 0; r < 5; r++ {
-		if want := fmt.Sprintf("\x1b[%d;%dH\x1b[18X", p.row+r, p.col); !strings.Contains(out, want) {
-			t.Fatalf("row %d of the image not erased: %q", r, out)
-		}
-	}
-	if strings.Contains(out, fmt.Sprintf("\x1b[%d;%dH\x1b[18X", p.row+5, p.col)) {
-		t.Fatal("erased below the image")
-	}
-	// scrolling: a thumbnail only ever on its own mod, at once from the cache
-	for i := 0; i < 20; i++ {
-		press(m, map[bool]string{true: "up", false: "down"}[i%2 == 0])
-		out := frame()
-		if on := m.current().id == id; on != strings.Contains(out, "1337;File") {
-			t.Fatalf("step %d: on Alpha %v, drawn %v", i, on, !on)
-		}
-	}
-	// with a dwell: gone when the selection changes, back after a rest of that length
-	m.dwell = 150 * time.Millisecond
-	press(m, "home")
-	press(m, "down") // Alpha
-	if out := frame(); strings.Contains(out, "1337;File") {
-		t.Fatal("thumbnail drawn before the dwell")
-	}
-	t0 := time.Now()
-	msg := m.thumbDwell()() // the tick press scheduled, made again
-	if d := time.Since(t0); d < 150*time.Millisecond || d > 600*time.Millisecond {
-		t.Fatalf("dwell %v", d)
-	}
-	old := m.thumbSeq
-	press(m, "down")
-	m.update(thumbTick{old, id}) // stale: changes nothing
-	if out := frame(); strings.Contains(out, "1337;File") {
-		t.Fatal("stale thumbnail")
-	}
-	press(m, "up")
-	m.update(msg) // stale too
-	if m.thumbShown == id {
-		t.Fatal("a stale tick showed the thumbnail")
-	}
-	m.update(thumbTick{m.thumbSeq, id})
-	if out := frame(); !strings.Contains(out, "1337;File") {
-		t.Fatal("no thumbnail after the dwell")
-	}
-	m.dwell = 0
-	// a mod without Preview.png: after the dwell the block says so
-	press(m, "home")
-	press(m, "down")
-	press(m, "down") // Harmony
-	m.update(thumbTick{m.thumbSeq, m.current().id})
-	runCmd(m, m.imageCmds(m.visibleDetail()))
-	m.View()
-	if got := plainLines(m.lastLines); !strings.Contains(got, "no preview") {
-		t.Fatalf("no preview note:\n%s", got)
-	}
-	// the cache: one PNG under cache/previews
-	if fs, _ := filepath.Glob(filepath.Join(e.App.Home, "cache", "previews", "*.png")); len(fs) != 1 {
-		t.Fatalf("cache files %v", fs)
 	}
 }
 
@@ -469,8 +308,8 @@ func TestFullSections(t *testing.T) {
 }
 
 // T7 (06 §11): a long description, a long path and mixed Chinese and English all wrap
-// within the column at every width, in the column and the full screen, with or without
-// the thumbnail block; nothing is cut off with "…" except the column's "enter shows all".
+// within the column at every width and in the full screen; only the column's
+// "enter shows all" may cut the text.
 func TestT7Wrapping(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)
@@ -488,28 +327,57 @@ func TestT7Wrapping(t *testing.T) {
 	m.dd.About = bbcode.Parse("中文 English 混排的 About 简介，含一个很长的路径 C:\\Users\\Someone\\AppData\\Roaming\\RimArcho\\cache\\workshop\\1001.json 以及标点。")
 	m.detailTech = true
 	m.detail = []string{"#abcd Alpha", "  path: D:\\SteamLibrary\\steamapps\\workshop\\content\\294100\\1001\\Defs\\ThingDefs\\VeryLongFileNameForTesting.xml", "  files: 12 (34 KB)"}
-	var buf bytes.Buffer
-	for _, cfg := range []struct{ images, tech bool }{{false, true}, {true, true}, {false, false}, {true, false}} {
-		images := cfg.images
-		m.detailTech = cfg.tech
-		if images {
-			m.images = &imgWriter{Writer: &buf}
-		}
+	for _, tech := range []bool{false, true} {
+		m.detailTech = tech
 		for w := 24; w <= 80; w++ {
 			for _, full := range []bool{false, true} {
-				o := detailOpts{width: w, descMax: 12, images: images, full: full, techText: m.detail}
+				o := detailOpts{width: w, descMax: 12, full: full, techText: m.detail}
 				if full {
 					o.descMax = 0
 				}
 				for i, l := range m.detailLayout(o) {
 					if cw := lipgloss.Width(l.text); cw > w {
-						t.Fatalf("images=%v full=%v w=%d line %d is %d cells: %q", images, full, w, i, cw, ansi.Strip(l.text))
+						t.Fatalf("tech=%v full=%v w=%d line %d is %d cells: %q", tech, full, w, i, cw, ansi.Strip(l.text))
 					}
 					if p := ansi.Strip(l.text); strings.Contains(p, "…") && !strings.Contains(p, T("… enter shows all")) {
-						t.Fatalf("images=%v full=%v w=%d line %d cut: %q", images, full, w, i, p)
+						t.Fatalf("tech=%v full=%v w=%d line %d cut: %q", tech, full, w, i, p)
 					}
 				}
 			}
+		}
+	}
+}
+
+func TestDetailTextOnly(t *testing.T) {
+	e, _ := fixture(t)
+	m := direct(t, e, 160, 40)
+	press(m, "home")
+	press(m, "down")
+	runCmd(m, m.loadData(m.current().id, false, false))
+	m.dd.Desc.Show = "workshop"
+	m.dd.Workshop = bbcode.Parse("[url=https://example.org/docs]Read [b]the guide[/b][/url] now.\n[img]https://images.example.org/a.png[/img]\n[img]https://images.example.org/b.png[/img]")
+	for _, full := range []bool{false, true} {
+		layout := m.detailLayout(detailOpts{width: 80, full: full})
+		text := plainLines(layout)
+		var raw strings.Builder
+		for _, line := range layout {
+			raw.WriteString(line.text)
+		}
+		if !strings.HasPrefix(text, "Alpha\n") {
+			t.Fatalf("header is indented: %q", text)
+		}
+		if !strings.Contains(text, "Read the guide (example.org) now.") || strings.Count(text, "(example.org)") != 1 {
+			t.Fatalf("link domain: %s", text)
+		}
+		if strings.Contains(raw.String(), "\x1b]1337;") || strings.Contains(raw.String(), "\x1b]8;") {
+			t.Fatalf("terminal image or hyperlink escape: %q", text)
+		}
+		if full {
+			if strings.Count(text, "[image  images.example.org]") != 2 || strings.Contains(text, "images ×") {
+				t.Fatal(text)
+			}
+		} else if strings.Count(text, "[images ×2]") != 1 || strings.Contains(text, "images.example.org") {
+			t.Fatal(text)
 		}
 	}
 }

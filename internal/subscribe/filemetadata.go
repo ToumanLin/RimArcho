@@ -12,7 +12,7 @@ var archiveName = regexp.MustCompile(`(?i)[^\s<>"/]+\.(?:zip|7z|rar|tar|gz|rwpkg
 
 func genericFileLabel(name string) bool {
 	switch strings.ToLower(strings.TrimSpace(name)) {
-	case "download this file", "download", "download file", "download files", "下载文件":
+	case "download this file", "download", "download file", "download files", "\u4e0b\u8f7d\u6587\u4ef6":
 		return true
 	}
 	return false

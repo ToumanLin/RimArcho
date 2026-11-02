@@ -11,7 +11,7 @@ let MarkdownIt;
 for (const name of candidates) {
   try { MarkdownIt = require(name); break; } catch (e) { if (e.code !== 'MODULE_NOT_FOUND') throw e; }
 }
-if (!MarkdownIt) throw new Error('请安装 markdown-it，或通过命令参数传入模块的绝对路径。');
+if (!MarkdownIt) throw new Error('Install markdown-it, or pass its absolute module path as an argument.');
 const md = new MarkdownIt({ html: false, linkify: true, typographer: false });
 function walk(dir) {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
@@ -30,4 +30,4 @@ const data = JSON.stringify(docs).replace(/</g, '\\u003c').replace(/\u2028/g, '\
 const output = template.replace('/*__DOCUMENTS__*/[]', () => data);
 fs.mkdirSync(outputDir, { recursive: true });
 fs.writeFileSync(outputFile, output, 'utf8');
-console.log(`已生成 .cache/docs-reader/rimarcho-docs-reader.html：${docs.length} 篇文档，${Buffer.byteLength(output).toLocaleString()} 字节。`);
+console.log(`Generated .cache/docs-reader/rimarcho-docs-reader.html: ${docs.length} documents, ${Buffer.byteLength(output).toLocaleString()} bytes.`);

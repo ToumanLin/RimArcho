@@ -140,9 +140,17 @@ func reg[In any](name string, readOnly, destructive bool, desc string, argv func
 		},
 		add: func(s *sdk.Server, run func(context.Context, string, []string) (*sdk.CallToolResult, any, error), t *sdk.Tool) {
 			sdk.AddTool(s, t, func(ctx context.Context, _ *sdk.CallToolRequest, in In) (*sdk.CallToolResult, any, error) {
-				return run(ctx, reflect.ValueOf(in).FieldByName("Env").String(), argv(in))
+				return run(ctx, envOf(in), argv(in))
 			})
 		}}
+}
+
+// envOf is a call's env argument; "" (the current environment) when the tool has none.
+func envOf(in any) string {
+	if f := reflect.ValueOf(in).FieldByName("Env"); f.IsValid() {
+		return f.String()
+	}
+	return ""
 }
 
 // flags appends --name value / --name for set options.
@@ -176,13 +184,19 @@ func argv(words ...string) *builder { return &builder{a: append([]string{}, word
 
 // ---- tool arguments ----
 
+// GuideIn is the guide tool: a workflow or a tool name (05 §5.3). The guide is the same in
+// every environment, so it takes no env.
+type GuideIn struct {
+	Topic string `json:"topic,omitempty" jsonschema:"diagnose, errors, plans, words, or a tool name; empty lists the topics"`
+}
+
 type StatusIn struct {
-	Env  string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env  string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Show string `json:"show,omitempty" jsonschema:"overview (default), envs, folders (the shared mod folders), settings, data (community data), db or cache"`
 }
 
 type FindIn struct {
-	Env    string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env    string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Query  string `json:"query,omitempty" jsonschema:"words to match against name, packageId, author, workshop id or folder; empty lists mods"`
 	Active bool   `json:"active,omitempty" jsonschema:"list the enabled mods in load order (ignored with query)"`
 	Filter string `json:"filter,omitempty" jsonschema:"list filter: source:<label|kind> status:live|tombstone|all residue unloadable copies pkg:<id> ws:<id> or words"`
@@ -190,12 +204,12 @@ type FindIn struct {
 }
 
 type RefIn struct {
-	Env string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Ref string `json:"ref" jsonschema:"a mod reference: #<id>, L#<lineage>, pkg:<packageId>, ws:<workshopId> or src:<label>"`
 }
 
 type DefIn struct {
-	Env         string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env         string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Def         string `json:"def,omitempty" jsonschema:"Type/defName (ThingDef/Gun_Revolver), Type@Name for abstract parents, def:… or a bare defName"`
 	Mod         string `json:"mod,omitempty" jsonschema:"list the defs of this mod instead (#id, pkg:…)"`
 	All         bool   `json:"all,omitempty"`
@@ -203,7 +217,7 @@ type DefIn struct {
 }
 
 type PatchesIn struct {
-	Env         string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env         string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Mod         string `json:"mod,omitempty" jsonschema:"only this mod's operations (#id, pkg:…)"`
 	Target      string `json:"target,omitempty" jsonschema:"Type/defName of a touched def, or part of an XPath"`
 	Failed      bool   `json:"failed,omitempty" jsonschema:"only operations that matched nothing (patch.no-match), with reasons"`
@@ -212,7 +226,7 @@ type PatchesIn struct {
 }
 
 type HarmonyIn struct {
-	Env         string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env         string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Mod         string `json:"mod,omitempty" jsonschema:"this mod's assemblies and patches (#id, pkg:…)"`
 	Target      string `json:"target,omitempty" jsonschema:"patched method, e.g. Verse.Pawn.Tick; partial names search"`
 	Shared      bool   `json:"shared,omitempty" jsonschema:"methods patched by several mods (with mod: those involving it)"`
@@ -221,14 +235,14 @@ type HarmonyIn struct {
 }
 
 type WhyIn struct {
-	Env         string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env         string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	A           string `json:"a" jsonschema:"first mod reference"`
 	B           string `json:"b" jsonschema:"second mod reference"`
 	GameVersion string `json:"game_version,omitempty" jsonschema:"analyse for another game major.minor than the environment's, e.g. 1.6"`
 }
 
 type ProblemsIn struct {
-	Env         string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env         string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Subject     string `json:"subject,omitempty" jsonschema:"only problems involving this mod"`
 	Code        string `json:"code,omitempty" jsonschema:"code or prefix: dep, order, patch.no-match, harmony, log …"`
 	Severity    string `json:"severity,omitempty" jsonschema:"exactly this severity: error, warning or info"`
@@ -243,7 +257,7 @@ type ProblemsIn struct {
 }
 
 type ChangesIn struct {
-	Env     string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env     string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Ref     string `json:"ref,omitempty" jsonschema:"one mod's history"`
 	Library bool   `json:"library,omitempty" jsonschema:"every mod, not only the current plan's"`
 	Since   string `json:"since,omitempty" jsonschema:"scan:<n>, <days>d or YYYY-MM-DD"`
@@ -251,7 +265,7 @@ type ChangesIn struct {
 }
 
 type LogIn struct {
-	Env         string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env         string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Cluster     string `json:"cluster,omitempty" jsonschema:"one cluster in full (E3 or log:E3): frames, Harmony lines, attribution, next steps"`
 	Text        string `json:"text,omitempty" jsonschema:"analyse this pasted log excerpt or stack trace instead of Player.log"`
 	File        string `json:"file,omitempty" jsonschema:"another log file path"`
@@ -263,7 +277,7 @@ type LogIn struct {
 }
 
 type FilesIn struct {
-	Env           string   `json:"env,omitempty" jsonschema:"another environment by name (default: current)"`
+	Env           string   `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Pattern       string   `json:"pattern" jsonschema:"text, defName, or Go regular expression to find"`
 	Mod           string   `json:"mod,omitempty" jsonschema:"one mod reference; pkg: prefers its enabled copy"`
 	Mods          []string `json:"mods,omitempty" jsonschema:"mod references to search, including inactive copies"`
@@ -312,19 +326,20 @@ func FilesArgv(in FilesIn) []string {
 }
 
 type SourceIn struct {
-	Env    string   `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Game   bool     `json:"game,omitempty" jsonschema:"read the current game's code; with search, include it alongside the selected mods"`
+	Env    string   `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Ref    string   `json:"ref,omitempty" jsonschema:"decompile this mod (with type: one type) — #id or pkg:…"`
 	Type   string   `json:"type,omitempty" jsonschema:"full type name to show, e.g. MyMod.HarmonyPatches.Pawn_Tick"`
 	Search string   `json:"search,omitempty" jsonschema:"search decompiled C# for this text instead"`
 	In     []string `json:"in,omitempty" jsonschema:"mods to search (default: the mods the newest log and Harmony warnings implicate)"`
-	Scope  string   `json:"scope,omitempty" jsonschema:"active: search every enabled mod (decompiles everything not cached; can take many minutes)"`
+	Scope  string   `json:"scope,omitempty" jsonschema:"active: search every enabled mod (decompiles missing library projects; can take many minutes)"`
 	Regex  bool     `json:"regex,omitempty"`
 	All    bool     `json:"all,omitempty"`
-	Budget int      `json:"budget,omitempty" jsonschema:"seconds to spend decompiling before searching what is cached (default 10)"`
+	Budget int      `json:"budget,omitempty" jsonschema:"seconds to dispatch new decompiles; running work finishes (default 10)"`
 }
 
 type EditIn struct {
-	Env     string   `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env     string   `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Action  string   `json:"action" jsonschema:"enable, disable, move, swap, sort, undo, redo, checkout, stage, unstage, restore or ignore_external"`
 	Refs    []string `json:"refs,omitempty" jsonschema:"mods to enable/disable; for move and swap the first is the mod (swap: optional second = the instance to use)"`
 	At      int      `json:"at,omitempty" jsonschema:"enable at / move to this 1-based position"`
@@ -337,7 +352,7 @@ type EditIn struct {
 }
 
 type DescribeIn struct {
-	Env     string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env     string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Ref     string `json:"ref" jsonschema:"a mod reference (#id, pkg:…, ws:…)"`
 	Source  string `json:"source,omitempty" jsonschema:"auto (default), about, workshop or both"`
 	Refresh bool   `json:"refresh,omitempty" jsonschema:"fetch the Workshop page again"`
@@ -345,7 +360,7 @@ type DescribeIn struct {
 }
 
 type PlayerIn struct {
-	Env    string   `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env    string   `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Action string   `json:"action" jsonschema:"tag_add, tag_remove, alias, note (the mod's), copy_note (one copy's own, 06 §2.9)"`
 	Refs   []string `json:"refs" jsonschema:"the mods (tag actions: one or more; alias and note: exactly one)"`
 	Tags   []string `json:"tags,omitempty" jsonschema:"tag_add / tag_remove: the tags"`
@@ -353,20 +368,20 @@ type PlayerIn struct {
 }
 
 type CopyIn struct {
-	Env  string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env  string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Ref  string `json:"ref" jsonschema:"the mod to copy (#id, pkg:…)"`
 	Name string `json:"name,omitempty" jsonschema:"folder name under Mods/ (default <folder>_local)"`
 	Git  bool   `json:"git,omitempty" jsonschema:"make the copy a git repository with a baseline commit, so edits can be diffed"`
 }
 
 type SaveIn struct {
-	Env            string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env            string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	DryRun         bool   `json:"dry_run,omitempty" jsonschema:"show what would be written without writing"`
 	MoveDuplicates bool   `json:"move_duplicates,omitempty" jsonschema:"first move plain Mods/ folders holding another version of a mod RimArcho links into the lock library (the refusal names them; show the dry run first)"`
 }
 
 type RuleIn struct {
-	Env    string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env    string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Action string `json:"action,omitempty" jsonschema:"add (default), list or remove"`
 	Rule   string `json:"rule,omitempty" jsonschema:"remove: the rule ref r:<n> from action=list"`
 	Kind   string `json:"kind,omitempty" jsonschema:"add: after, before, incompatible, attach (A B), top, bottom (A) or ignore (target)"`
@@ -377,7 +392,7 @@ type RuleIn struct {
 }
 
 type PinIn struct {
-	Env           string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env           string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Ref           string `json:"ref" jsonschema:"the mod to lock (#id, pkg:…); with update: the locked copy or its upstream"`
 	Name          string `json:"name,omitempty" jsonschema:"folder name under Mods/ (default <folder>_local; update picks a free one)"`
 	Git           bool   `json:"git,omitempty" jsonschema:"make the copy a git repository with a baseline commit, so edits can be diffed"`
@@ -388,7 +403,7 @@ type PinIn struct {
 }
 
 type UnpinIn struct {
-	Env    string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env    string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Ref    string `json:"ref" jsonschema:"the locked copy or its upstream (#id, pkg:…)"`
 	DryRun bool   `json:"dry_run,omitempty" jsonschema:"show what would change"`
 }
@@ -417,6 +432,7 @@ func gv(b *builder, mm string) []string { return b.str("game-version", mm).a }
 
 func toolList() []tool {
 	return []tool{
+		reg("guide", true, false, descGuide, func(in GuideIn) []string { return argv("guide").pos(in.Topic).a }),
 		reg("status", true, false, descStatus, func(in StatusIn) []string { return StatusArgv(in) }),
 		reg("find_mods", true, false, descFind, func(in FindIn) []string {
 			if in.Query != "" {
@@ -560,7 +576,10 @@ func SourceArgv(in SourceIn) []string {
 		if budget == 0 {
 			budget = 10
 		}
-		return b.flag("regex", in.Regex).flag("all", in.All).num("budget", budget).a
+		return b.flag("game", in.Game).flag("regex", in.Regex).flag("all", in.All).num("budget", budget).a
+	}
+	if in.Game {
+		return argv("source", "game").str("type", in.Type).flag("all", in.All).a
 	}
 	return argv("source").pos(in.Ref).str("type", in.Type).flag("all", in.All).a
 }

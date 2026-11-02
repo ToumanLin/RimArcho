@@ -7,43 +7,7 @@ import (
 	"strings"
 )
 
-// retired are the words the interface no longer uses (06 §7.2), each with the word that
-// replaced it. The code, the CLI and the specs keep their own names (plan, environment,
-// instance…); the player only sees the new ones.
-var retired = []struct{ Old, New string }{
-	{"方案", "列表"},
-	{"启用列表", "已启用 / 列表"},
-	{"工作区", "当前列表"},
-	{"实例", "这一份"},
-	{"Instance", "这一份"},
-	{"Lineage", "同一个 Mod 的几份"},
-	{"上游", "有新版本 / 工坊版"},
-	{"原版有更新", "有新版本（原版是 Core 和 DLC）"},
-	{"改用原版", "改用工坊版（原版是 Core 和 DLC）"},
-	{"使用原版", "改用工坊版（原版是 Core 和 DLC）"},
-	{"库存", "Mod 库"},
-	{"环境", "游戏"},
-	{"编译", "创建"},
-	{"收进锁定库", "移入锁定库"},
-	{"备份锁定", "移入锁定库"},
-	{"已固定", "已锁定"},
-	{"固定在", "锁定在"},
-	{"固定的副本", "锁定的那份"},
-	{"换成另一份", "切换版本…"},
-	{"替换实例", "切换版本…"},
-	{"写入游戏", "保存"},
-	{"未写入", "未保存"},
-	{"还没写入游戏", "未保存"},
-	{"写入过的版本", "保存过的版本"},
-	{"载入版本", "回到旧版"},
-	{"载入列表", "回到这一版 / 采用外部修改"},
-	{"载入到列表", "采用外部修改"},
-	{"恢复给游戏", "取消隐藏"},
-	{"拿掉", "停用"},
-	{"轻包", "RimArcho 列表（导出整合包的列表）"},
-	{"完整包", "整合包"},
-}
-
+// The Chinese replacements live under @retired in the language resources (06 §7.2).
 // retiredEn are the English words the interface no longer uses: list, game, a newer
 // version, switch version, locked, go back to a version, and the
 // light / full pack (a pack is always full; its list alone is a RimArcho list).
@@ -51,12 +15,27 @@ var retiredEn = regexp.MustCompile(`(?i)\b(plans?|environments?|upstream|workspa
 
 // wordingExempt are texts whose Chinese is right although it holds a retired word.
 var wordingExempt = map[string]bool{
-	"decompiled C#": true, // 反编译
+	"assemblies decompiled now: %d; they stay in the source library": true,
+	"read-only: decompiled code from the source library":             true,
+	"decompiled C#":                     true, // decompilation
+	"decompile the current list's mods": true,
+	"decompiling…":                      true,
 	"the mod was built for another version of the game or of the target mod": true, // a DLL compiled for another version
 }
 
 // WordingTextProblems checks text from surface-specific literals as well as tables.
 func WordingTextProblems(where, text string) []string {
+	// The approved search-files design uses these separators (06 §2.9).
+	switch text {
+	case "searching %d of %d mods · %d matches so far", "%d matches in %d files of %d mods · %s s",
+		"UTF-8 · XML", "UTF-8 · C#":
+		return nil
+	}
+	for _, key := range []string{"searching %d of %d mods · %d matches so far", "%d matches in %d files of %d mods · %s s"} {
+		if text == locales["zh"]().Text[key] || text == localeExtra("zh", key) {
+			return nil
+		}
+	}
 	if strings.ContainsRune(text, '\u00b7') {
 		return []string{fmt.Sprintf("%s: %q uses a middle dot (06 §7.3)", where, text)}
 	}
@@ -67,11 +46,16 @@ func WordingTextProblems(where, text string) []string {
 // two tables translate differently (the later table wins and the other text is lost). It
 // sees the tables of every package linked in, so call it where all surfaces are.
 func WordingProblems() []string {
+	zh := locales["zh"]()
 	var out []string
 	check := func(where, zh string) {
-		for _, r := range retired {
-			if strings.Contains(zh, r.Old) {
-				out = append(out, fmt.Sprintf("%s: %q uses %q (write %q)", where, zh, r.Old, r.New))
+		for old, replacement := range locales["zh"]().ExtraText {
+			if !strings.HasPrefix(old, "@retired.") {
+				continue
+			}
+			old = strings.TrimPrefix(old, "@retired.")
+			if strings.Contains(zh, old) {
+				out = append(out, fmt.Sprintf("%s: %q uses %q (write %q)", where, zh, old, replacement))
 			}
 		}
 	}
@@ -80,7 +64,7 @@ func WordingProblems() []string {
 			out = append(out, fmt.Sprintf("%s: the English %q uses %q", where, en, w))
 		}
 	}
-	for k, v := range zhText {
+	for k, v := range zh.Text {
 		out = append(out, WordingTextProblems("key", k)...)
 		out = append(out, WordingTextProblems(k, v)...)
 		if !wordingExempt[k] {
@@ -92,20 +76,32 @@ func WordingProblems() []string {
 		}
 		checkEn("key", en)
 	}
+	for key, value := range zh.ExtraText {
+		if strings.HasPrefix(key, "@") {
+			continue
+		}
+		out = append(out, WordingTextProblems("key", key)...)
+		out = append(out, WordingTextProblems(key, value)...)
+		check(key, value)
+		checkEn("key", key)
+	}
 	for k, v := range enText {
 		out = append(out, WordingTextProblems("English key", k)...)
 		out = append(out, WordingTextProblems(k, v)...)
 		checkEn(k, v)
 	}
 	for _, c := range Commands {
-		out = append(out, WordingTextProblems("palette "+c.ID, c.Zh)...)
+		out = append(out, WordingTextProblems("palette "+c.ID, localeExtra("zh", c.Key))...)
 		out = append(out, WordingTextProblems("palette "+c.ID, c.En)...)
-		check("palette "+c.ID, c.Zh)
+		check("palette "+c.ID, localeExtra("zh", c.Key))
 		checkEn("palette "+c.ID, c.En)
 	}
-	for k, v := range clashes {
-		out = append(out, fmt.Sprintf("%q is translated twice: %q and %q", k, v[0], v[1]))
+	for name, load := range locales {
+		for k, v := range load().Clashes {
+			out = append(out, fmt.Sprintf("%s: %q is translated twice: %q and %q", name, k, v[0], v[1]))
+		}
 	}
+
 	sort.Strings(out)
 	return out
 }

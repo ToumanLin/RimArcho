@@ -10,8 +10,8 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The ops of a row, the same on the editor and Mod 库存 (06 §3.5, §8.5, view.OpTable): each
-// op code has one runner here, so a key, the row menu and Mod 库存's detail all run the same.
+// The ops of a row, the same on the editor and Mod library (06 §3.5, §8.5, view.OpTable): each
+// op code has one runner here, so a key, the row menu and Mod library's detail all run the same.
 
 // library is the library as of the board's build (the editor's rows ask it for their copy's
 // version and disk ops).
@@ -79,7 +79,7 @@ func (m *model) runEditorOp(code string) tea.Cmd {
 	return m.libOp(code, refsOf(sel), named(sel))
 }
 
-// libOp runs an op of the version and disk groups (and the plan ops of Mod 库存) on copies:
+// libOp runs an op of the version and disk groups (and the plan ops of Mod library) on copies:
 // one that changes files shows its dry run first and runs on enter (06 §6).
 func (m *model) libOp(code string, refs []string, what string) tea.Cmd {
 	o := view.OpOf(code)
@@ -107,7 +107,7 @@ func (m *model) libOp(code string, refs []string, what string) tea.Cmd {
 }
 
 // libDo runs a library action and says what it did; Steam out of reach opens the pages.
-// The subscription actions (检查更新, 更新, 撤掉订阅) are background tasks, as in the window
+// The subscription actions (check for updates, update, remove subscription) are background tasks, as in the window
 // (06 §2.16).
 func (m *model) libDo(code string, refs []string) tea.Cmd {
 	if code == view.OpSubCheck || code == view.OpSubUpdate || code == view.OpSubRemove {
@@ -199,13 +199,12 @@ func (m *model) selectAll() tea.Cmd {
 // characters of the US layout.
 var navKeys = map[string]int{"!": 1, "@": 2, "#": 3, "$": 4, "%": 5, "^": 6, "&": 7, "*": 8}
 
-// goPage opens the n-th sidebar entry: 启动 能不能跑 游戏日志 方案 整合包 Mod 库存 贴图优化 环境.
+// goPage opens the n-th sidebar entry: Start Can it run game log Lists pack Mod library Texture optimisation Games.
 func (m *model) goPage(n int) tea.Cmd {
 	m.full, m.insp, m.panel = false, nil, nil
 	switch n {
 	case 1:
-		m.say(sayInfo, T("the start page is in the window only, ctrl+k goes anywhere"))
-		return nil
+		return m.openHome()
 	case 2:
 		m.tab = tabProblems
 		return m.ensureProblems()
@@ -226,15 +225,20 @@ func (m *model) goPage(n int) tea.Cmd {
 	return nil
 }
 
-// subPage is tab / shift+tab: the next page under the same sidebar entry (Mod 库存 › 全部 →
-// 订阅与更新 → 添加订阅; the plans under 方案, which makes that plan current).
+// subPage is tab / shift+tab: the next page under the same sidebar entry (Mod library › All →
+// updates → add a subscription → Search files; the plans under list, which opens that plan).
 func (m *model) subPage(d int) tea.Cmd {
 	switch m.tab {
 	case tabLibrary:
 		if d < 0 {
-			return m.openAdd("")
+			return m.openSearch()
 		}
 		return m.openChangesOf("", "")
+	case tabSearch:
+		if d < 0 {
+			return m.openAdd("")
+		}
+		return m.openLibrary()
 	case tabChanges:
 		if d < 0 {
 			return m.openLibrary()
@@ -252,7 +256,7 @@ func (m *model) subPage(d int) tea.Cmd {
 				at = i
 			}
 		}
-		return m.usePlan(rows[(at+d+len(rows))%len(rows)].ID)
+		return m.openPlan(rows[(at+d+len(rows))%len(rows)].ID)
 	}
 	return nil
 }
@@ -269,6 +273,12 @@ func (m *model) helpPage() tea.Cmd {
 		page = view.ChangesPage
 	case tabSubscribe:
 		page = view.SubscribePage
+	case tabSearch:
+		page = view.PageSearch
+	case tabRules:
+		page = view.RulesPage
+	case tabHome:
+		page = "home"
 	}
 	rows := view.KeyHelp(page, true)
 	w := 0

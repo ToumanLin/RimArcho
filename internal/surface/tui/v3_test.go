@@ -266,8 +266,8 @@ func TestT19PositionLine(t *testing.T) {
 		"move to":         `Enabled  2 / \d+ › move to…$`,
 		"preview":         `Enabled  1 / \d+ › preview the sort$`,
 		"help":            `Enabled  1 / \d+ › all keys$`,
-		"needs attention": `› needs attention  1 / \d+`,
-		"recent changes":  `› subscriptions and updates`,
+		"needs attention": `› can it run  1 / \d+`,
+		"recent changes":  `› updates`,
 	}
 	for _, s := range v3States {
 		t.Run(s.name, func(t *testing.T) {

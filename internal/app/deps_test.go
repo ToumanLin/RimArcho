@@ -3,8 +3,6 @@ package app_test
 import (
 	"archive/zip"
 	"bytes"
-	"crypto/sha256"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -86,7 +84,7 @@ func TestRemoveSteamCMDProtectsContent(t *testing.T) {
 }
 
 func TestRemoveDepStaysInsideManagedDirectory(t *testing.T) {
-	for _, name := range []string{deps.Todds, deps.WezTerm} {
+	for _, name := range []string{deps.Todds} {
 		t.Run(name, func(t *testing.T) {
 			e := testkit.New(t)
 			e.App.TextureEncoder = &texEnc{}
@@ -96,9 +94,6 @@ func TestRemoveDepStaysInsideManagedDirectory(t *testing.T) {
 			}
 			i := e.App.Deps().Status(name)
 			exe := "todds.exe"
-			if name == deps.WezTerm {
-				exe = "wezterm-gui.exe"
-			}
 			e.WriteFile(filepath.Join(i.Dir, exe), "tool")
 			sibling := i.Dir + "-other"
 			e.WriteFile(filepath.Join(sibling, "keep.txt"), "keep")
@@ -164,7 +159,7 @@ func TestInstallDepSteamCMDOwnDirectoryAndRemove(t *testing.T) {
 
 func TestRemoveDepRefusesExternalCopies(t *testing.T) {
 	t.Parallel()
-	for _, name := range []string{deps.Todds, deps.SteamCMD, deps.WezTerm} {
+	for _, name := range []string{deps.Todds, deps.SteamCMD} {
 		t.Run(name, func(t *testing.T) {
 			e := testkit.New(t)
 			e.App.SteamCMDNoPath = true
@@ -185,96 +180,13 @@ func TestRemoveDepRefusesExternalCopies(t *testing.T) {
 	}
 }
 
-func TestRemoveDepRefusesPATHAndProgramFiles(t *testing.T) {
-	for _, src := range []string{"path", "program-files"} {
-		t.Run(src, func(t *testing.T) {
-			e := testkit.New(t)
-			dir := filepath.Join(e.Root, "external")
-			p := filepath.Join(dir, "wezterm-gui.exe")
-			t.Setenv("PATH", dir)
-			for _, key := range []string{"ProgramW6432", "ProgramFiles", "LOCALAPPDATA"} {
-				t.Setenv(key, "")
-			}
-			if src == "program-files" {
-				p = filepath.Join(dir, "WezTerm", "wezterm-gui.exe")
-				t.Setenv("PATH", "")
-				t.Setenv("ProgramFiles", dir)
-			}
-			e.WriteFile(p, "external")
-			i := e.App.Deps().Status(deps.WezTerm)
-			if i.Source != src || i.Own {
-				t.Fatalf("status %+v", i)
-			}
-			if err := e.App.RemoveDep(deps.WezTerm); err == nil {
-				t.Fatal("removed external copy")
-			}
-			if _, err := os.Stat(p); err != nil {
-				t.Fatal(err)
-			}
-		})
-	}
-}
-
-func TestInstallDepWezTermAndRemove(t *testing.T) {
-	e := testkit.New(t)
-	const name = "WezTerm-windows-20990101-a"
-	var buf bytes.Buffer
-	zw := zip.NewWriter(&buf)
-	w, _ := zw.Create(name + "/wezterm-gui.exe")
-	w.Write([]byte("portable"))
-	zw.Close()
-	z := buf.Bytes()
-	sum := sha256.Sum256(z)
-	var srv *httptest.Server
-	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/repos/wezterm/wezterm/releases/latest":
-			fmt.Fprintf(w, `{"tag_name":"test","assets":[{"name":"%[1]s.zip","browser_download_url":"%[2]s/zip","size":%[3]d},{"name":"%[1]s.zip.sha256","browser_download_url":"%[2]s/sha"}]}`, name, srv.URL, len(z))
-		case "/zip":
-			w.Write(z)
-		case "/sha":
-			fmt.Fprintf(w, "%x", sum)
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	defer srv.Close()
-	e.App.WezTermAPI = srv.URL
-	var done int64
-	p, err := e.App.InstallDep(deps.WezTerm, func(n, total int64) { done = n })
-	if err != nil || done != int64(len(z)) {
-		t.Fatalf("install %s, progress %d: %v", p, done, err)
-	}
-	if p != filepath.Join(e.App.Home, deps.WezTerm, name, "wezterm-gui.exe") {
-		t.Fatal(p)
-	}
-	// Only the portable copy is visible for removal, regardless of the test machine.
-	t.Setenv("PATH", "")
-	for _, key := range []string{"ProgramW6432", "ProgramFiles", "LOCALAPPDATA"} {
-		t.Setenv(key, "")
-	}
-	i := e.App.Deps().Status(deps.WezTerm)
-	if !i.OK || !i.Own || i.Version != "20990101-a" {
-		t.Fatalf("portable status %+v", i)
-	}
-	if err := e.App.RemoveDep(deps.WezTerm); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(i.Dir); !os.IsNotExist(err) {
-		t.Fatalf("portable directory remains: %v", err)
-	}
-}
-
-func TestDepFontUnknownAndMissingRefusals(t *testing.T) {
+func TestDepUnknownAndMissingRefusals(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
-	if _, err := e.App.InstallDep(deps.Font, nil); err == nil || err.Error() != "the font ships with RimArcho; reinstall the release zip" {
-		t.Fatalf("font install: %v", err)
-	}
 	if _, err := e.App.InstallDep("unknown", nil); err == nil || !strings.Contains(err.Error(), "unknown dependency") {
 		t.Fatalf("unknown install: %v", err)
 	}
-	for _, name := range []string{deps.Font, "unknown", deps.Todds} {
+	for _, name := range []string{"unknown", deps.Todds} {
 		if err := e.App.RemoveDep(name); err == nil {
 			t.Fatalf("removed %s", name)
 		}

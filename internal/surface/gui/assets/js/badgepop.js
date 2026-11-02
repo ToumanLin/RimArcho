@@ -11,7 +11,7 @@ box.setAttribute("role", "tooltip");
 let shown = null; // { k, key } of the row whose badge the popover is for
 let pinned = false;
 let hideTimer = 0;
-// run(item, action) and write(action) come from 能不能跑 (screens.js): the pinned popover
+// run(item, action) and write(action) come from Can it run (screens.js): the pinned popover
 // offers an item's actions as that page does.
 let runNeed = null, needWrite = () => "";
 export function setNeedRunner(run, write) { runNeed = run; needWrite = write; }
@@ -120,7 +120,7 @@ export function wireBadges(k, rows, item, status) {
 }
 
 // listen hooks the popover and the page once, when the first list is wired (the module
-// also loads where there is no list, e.g. 能不能跑 setting the runner).
+// also loads where there is no list, e.g. Can it run setting the runner).
 let listening = false;
 function listen() {
   if (listening) return;

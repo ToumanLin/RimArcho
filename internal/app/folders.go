@@ -15,7 +15,7 @@ import (
 // from Steam), SteamCMD folders, other folders, and RimArcho's own Archo Monitor folder and
 // lock library. Their instances, and everything the player says about them, are the same
 // whichever game is played. They are managed in one place: `archo folder`, the settings
-// page's "Mod 文件夹".
+// page's "Mod folders".
 
 func dirExists(p string) bool {
 	st, err := os.Stat(p)

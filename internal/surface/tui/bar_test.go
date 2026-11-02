@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ToumanLin/RimArcho/internal/view"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -18,7 +19,7 @@ func viewNames(m *model, k colKind) []string {
 }
 
 // 06 §2.5: `\` opens the bar's groups; ↑↓ a group, typing finds a value, enter keeps it, x
-// leaves it out, esc closes; the filter holds for 未启用 and 已启用 together.
+// leaves it out, esc closes; the filter holds for Not enabled and Enabled together.
 func TestBarGroups(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)
@@ -67,6 +68,29 @@ func TestBarGroups(t *testing.T) {
 	}
 }
 
+func TestListsBarKeyboard(t *testing.T) {
+	t.Parallel()
+	e, _ := fixture(t)
+	e.MustRun("plan", "new", "Other colony", "--from", "current")
+	m := direct(t, e, 160, 40)
+	press(m, `\`)
+	if len(m.bar.groups) == 0 || m.bar.groups[0].Key != "lists" {
+		t.Fatalf("first group: %+v", m.bar.groups)
+	}
+	press(m, "enter")
+	if !slices.Equal(m.bar.filters, []string{"lists:Other colony"}) || len(m.cols[cActive].view) != 3 {
+		t.Fatalf("list include: %v, %v", m.bar.filters, viewNames(m, cActive))
+	}
+	press(m, "x")
+	if !slices.Equal(m.bar.filters, []string{"-lists:Other colony"}) || len(m.cols[cActive].view) != 0 {
+		t.Fatalf("list exclusion: %v, %v", m.bar.filters, viewNames(m, cActive))
+	}
+	text := valText(view.LibChoice{Filter: "lists:Main colony", Label: "Main colony", Cur: true, Count: 3})
+	if !strings.Contains(text, T("current list")) || strings.Contains(text, T("this game")) {
+		t.Fatalf("current-list marker: %s", text)
+	}
+}
+
 // 06 §3.5: J / K while the bar filters move past the next shown row; space and m keep the
 // full order's places.
 func TestBarMoves(t *testing.T) {
@@ -95,7 +119,7 @@ func TestBarMoves(t *testing.T) {
 	if got := activeNames(t, e); got != "Alpha, Core, Harmony" {
 		t.Fatalf("K with a filter: %s", got)
 	}
-	// enabling from a filtered 未启用: the place the order wants, in the full list
+	// enabling from a filtered Not enabled: the place the order wants, in the full list
 	press(m, "esc")
 	press(m, "/")
 	typeIn(m, "beta")

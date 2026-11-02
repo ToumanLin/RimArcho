@@ -58,8 +58,11 @@ func (r *releaser) soon() {
 // page readers keep their change-keyed caches for the next visit.
 func (s *API) Leave(page string) {
 	defer perftrace.Span("Leave")()
-	if page == "plans" {
+	if page == "plans" || page == "needs" || page == "home" {
 		s.cancelLoadCost(false)
+	}
+	if page == "search" {
+		s.stopFileSearch()
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()

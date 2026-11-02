@@ -19,7 +19,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 )
 
-// Mod 库存 (06 §2.9): every mod on this machine for the environment, one Lineage with each
+// Mod library (06 §2.9): every mod on this machine for the environment, one Lineage with each
 // of its Instances, where it lives, how big it is, which plans and packs use it and what is
 // wrong with it. The interfaces (CLI `library`, MCP list_library, the GUI page, the TUI
 // list) all filter the same Library with the same LibQuery.
@@ -54,7 +54,7 @@ const (
 var LibSources = []string{LibWorkshop, LibLocal, LibLocked, LibSteamCMD, LibGit, LibPage, LibExtra, LibMonitor}
 
 // Library filter keys (LibQuery Include / Exclude are "key:value").
-var LibKeys = []string{"tag", "source", "location", "version", "state", "used", "updated", "content", "has", "name", "author", "id"}
+var LibKeys = []string{"lists", "tag", "source", "location", "version", "state", "used", "updated", "content", "has", "name", "author", "id"}
 
 // LibAges are the updated: values (06 §2.9): within a week, a month, half a year, and
 // older. They nest: a copy updated three days ago is in week, month and half-year.
@@ -108,8 +108,9 @@ type LibInstance struct {
 	Versions []string
 	States   []string // LibStates order
 	UsedIn   []LibUse
-	InPlan   bool // the current plan uses it
-	Staged   bool // in the current plan's staging (06 §2.5)
+	Lists    []string // enabled-list names, shared with Library.Lists.ByInstance
+	InPlan   bool     // the current plan uses it
+	Staged   bool     // in the current plan's staging (06 §2.5)
 	// Played: the newest launch whose list held it (launch records, 08 §1).
 	Played  time.Time
 	Changed time.Time // the newest scan that recorded a change
@@ -125,9 +126,9 @@ type LibInstance struct {
 	Note             *store.CopyNote
 	UpstreamUpdates  int
 	UpstreamWorkshop bool
-	// Textures: the DDS RimArcho wrote next to this copy's PNGs (贴图优化; nil: none).
+	// Textures: the DDS RimArcho wrote next to this copy's PNGs (Texture optimisation; nil: none).
 	Textures *TextureSummary
-	// PNG: the copy has PNGs under a Textures/ folder (its last scan), so 优化贴图 applies.
+	// PNG: the copy has PNGs under a Textures/ folder (its last scan), so optimise textures applies.
 	PNG bool
 }
 
@@ -218,6 +219,7 @@ func (l *LibLineage) Changed() time.Time {
 
 // Library is an environment's inventory.
 type Library struct {
+	Lists    *ListMembership
 	Env      *env.Environment
 	GameMM   string
 	Lineages []*LibLineage // by name
@@ -255,14 +257,33 @@ func (a *App) LibraryFor(ref string) (*Library, error) {
 }
 
 func (a *App) library(st *LoadoutState, only string) (*Library, error) {
+	return a.buildLibrary(st, only, false, false)
+}
+
+func (a *App) buildLibrary(st *LoadoutState, only string, search, snapshot bool) (*Library, error) {
 	ix := st.Ix
 	selected := func(m *store.Mod) bool { return only == "" || m.LineageID == only }
 	lib := &Library{Env: ix.Env, GameMM: st.GameMM(), St: st}
-	used, err := a.libUses(st)
+	var used map[string][]LibUse
+	var lists *ListMembership
+	var err error
+	if snapshot {
+		var envs []libEnv
+		envs, err = a.libEnvs(st)
+		if err == nil {
+			used, lists, err = a.listUses(st, envs)
+		}
+	} else {
+		used, lists, err = a.libUses(st)
+	}
 	if err != nil {
 		return nil, err
 	}
-	played, err := a.libPlayed(st)
+	lib.Lists = lists
+	played := map[string]time.Time{}
+	if !snapshot {
+		played, err = a.libPlayed(st)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -280,7 +301,7 @@ func (a *App) library(st *LoadoutState, only string) (*Library, error) {
 		return nil, err
 	}
 	notes, err := a.Store.CopyNotes(ix.Env.ID, instances...)
-	texs := a.TextureSummaries() // 贴图优化: the DDS RimArcho wrote into each copy
+	texs := a.textureSummariesAtIndex(ix) // Texture optimisation: the DDS RimArcho wrote into each copy
 	if err != nil {
 		return nil, err
 	}
@@ -306,6 +327,13 @@ func (a *App) library(st *LoadoutState, only string) (*Library, error) {
 		return nil, err
 	}
 	srcKind := a.libSourceKinds(ix)
+	if search {
+		for _, s := range ix.Sources {
+			if s.Kind == source.Official {
+				srcKind[s.ID] = "official"
+			}
+		}
+	}
 	byLin := map[string]*LibLineage{}
 	lineage := func(id string) *LibLineage {
 		l := byLin[id]
@@ -335,6 +363,7 @@ func (a *App) library(st *LoadoutState, only string) (*Library, error) {
 		}
 	}
 	add := func(m *store.Mod, i *LibInstance) {
+		i.Lists = lib.Lists.ByInstance[m.ID]
 		l := lineage(m.LineageID)
 		l.Instances = append(l.Instances, i)
 		l.Alias, l.Note, l.Tags = m.Alias, m.Note, m.Tags
@@ -344,9 +373,11 @@ func (a *App) library(st *LoadoutState, only string) (*Library, error) {
 		}
 	}
 	staged := map[string]bool{}
-	if items, _, err := a.Staged(); err == nil {
-		for _, it := range items {
-			staged[it.Instance] = true
+	if !snapshot {
+		if items, _, err := a.Staged(); err == nil {
+			for _, it := range items {
+				staged[it.Instance] = true
+			}
 		}
 	}
 	var png map[int64]bool
@@ -359,14 +390,16 @@ func (a *App) library(st *LoadoutState, only string) (*Library, error) {
 		}
 	}
 	for _, m := range ix.Mods {
-		if !selected(m) || m.Status != identity.Live || m.Kind == source.Official || srcKind[m.SourceID] == "" {
+		if !selected(m) || m.Status != identity.Live || (!search && m.Kind == source.Official) || srcKind[m.SourceID] == "" {
 			continue
 		}
 		i := &LibInstance{Mod: m, Ref: ix.Ref(m.ID), Source: srcKind[m.SourceID], WorkshopID: m.WorkshopID(), Path: ix.ModDir(m),
 			Bytes: m.TotalSize, Sized: m.SnapID != 0 && (m.FileCount > 0 || m.TotalSize > 0),
 			UsedIn: used[m.ID], InPlan: st.List.Index(m.ID) >= 0, Staged: staged[m.ID], Played: played[m.ID], Changed: changed[m.ID], Locked: locks[m.ID],
 			Authors: strings.TrimSpace(m.Authors), Note: notes[m.ID]}
-		i.Subscription = a.SubscriptionOf(m)
+		if !snapshot {
+			i.Subscription = a.SubscriptionOf(m)
+		}
 		if r := i.Subscription; r != nil {
 			if r.Kind == "git" || r.Kind == "page" {
 				i.Source = r.Kind
@@ -386,8 +419,10 @@ func (a *App) library(st *LoadoutState, only string) (*Library, error) {
 		}
 		if m.ACFTimeUpdated > 0 {
 			i.Updated = time.Unix(m.ACFTimeUpdated, 0).UTC()
-		} else if fi, err := os.Stat(i.Path); err == nil {
-			i.Updated = fi.ModTime().UTC()
+		} else if !snapshot {
+			if fi, err := os.Stat(i.Path); err == nil {
+				i.Updated = fi.ModTime().UTC()
+			}
 		}
 		for _, v := range strings.Fields(strings.ReplaceAll(m.SupportedVersions, ",", " ")) {
 			if !slices.Contains(i.Versions, v) {
@@ -395,7 +430,9 @@ func (a *App) library(st *LoadoutState, only string) (*Library, error) {
 			}
 		}
 		i.Created = libCreated(m)
-		i.Spare = m.Kind.GameMods() && (live[m.LineageID] > 1 || m.Origin != "" || dupIn(m.ID)) && !ix.ModIsLink(m)
+		if !snapshot {
+			i.Spare = m.Kind.GameMods() && (live[m.LineageID] > 1 || m.Origin != "" || dupIn(m.ID)) && !ix.ModIsLink(m)
+		}
 		if i.Locked != nil {
 			since := i.Created
 			if i.Note != nil && i.Note.Made != nil {
@@ -411,10 +448,10 @@ func (a *App) library(st *LoadoutState, only string) (*Library, error) {
 		}
 		add(m, i)
 	}
-	// Subscribed Workshop items with no folder (06 §2.9: "幽灵"). A tombstone of the item
+	// Subscribed Workshop items with no folder (06 §2.9: "missing Workshop items"). A tombstone of the item
 	// keeps its name and lineage.
 	for _, s := range ix.Sources {
-		if s.Kind != source.Workshop || s.Status == source.StatusRetired {
+		if search || s.Kind != source.Workshop || s.Status == source.StatusRetired {
 			continue
 		}
 		acf := scan.ReadACF(s.Root)
@@ -611,38 +648,22 @@ func libHere(envs []libEnv) func(id string) string {
 
 // libUses maps each instance to the plans (lists are shared by every game) and packs
 // that use it.
-func (a *App) libUses(st *LoadoutState) (map[string][]LibUse, error) {
-	out := map[string][]LibUse{}
+func (a *App) libUses(st *LoadoutState) (map[string][]LibUse, *ListMembership, error) {
 	envs, err := a.libEnvs(st)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
+	}
+	out, lists, err := a.listUses(st, envs)
+	if err != nil {
+		return nil, nil, err
 	}
 	names := map[string]libEnv{}
 	for _, le := range envs {
 		names[le.e.Name] = le
 	}
-	here := libHere(envs)
-	ps, err := a.Store.Plans()
-	if err != nil {
-		return nil, err
-	}
-	for _, p := range ps {
-		l := st.List
-		if st.Plan == nil || p.ID != st.Plan.ID {
-			if l, err = a.planList(p); err != nil {
-				return nil, err
-			}
-		}
-		u := LibUse{Kind: "plan", Name: p.Name, PlanID: p.ID, Current: st.Plan != nil && p.ID == st.Plan.ID}
-		for _, e := range l {
-			if id := here(e.Instance); id != "" && !slices.ContainsFunc(out[id], func(x LibUse) bool { return x.Value() == u.Value() }) {
-				out[id] = append(out[id], u)
-			}
-		}
-	}
 	packs, err := a.Packs()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	for _, p := range packs {
 		le, ok := names[p.Env]
@@ -659,7 +680,7 @@ func (a *App) libUses(st *LoadoutState) (map[string][]LibUse, error) {
 	for _, us := range out {
 		sortUses(us)
 	}
-	return out, nil
+	return out, lists, nil
 }
 
 // libPlayed maps each instance to the newest launch whose list held it: a plan's launch by
@@ -822,6 +843,8 @@ func libValues(l *LibLineage, i *LibInstance, key string, now time.Time) []strin
 		return libAges(i.Updated, now)
 	case "tag":
 		return l.Tags
+	case "lists":
+		return i.Lists
 	case "source":
 		if len(i.DirectoryValues) > 0 {
 			return i.DirectoryValues
@@ -1025,6 +1048,12 @@ func (lib *Library) Filter(q LibQuery) (*LibResult, error) {
 		counts[k] = map[string]int{}
 	}
 	all := map[string]map[string]string{} // key → lower value → as shown
+	all["lists"] = map[string]string{}
+	if lib.Lists != nil {
+		for _, name := range lib.Lists.Names {
+			all["lists"][strings.ToLower(name)] = name
+		}
+	}
 	for _, l := range lib.Lineages {
 		for _, i := range l.Instances {
 			for _, k := range LibKeys {
@@ -1106,6 +1135,10 @@ func sortFacet(k string, vs []LibFacetValue, lib *Library) {
 	}
 	rank := func(v string) int {
 		switch k {
+		case "lists":
+			if lib.Lists != nil && strings.EqualFold(v, lib.Lists.Current) {
+				return -1
+			}
 		case "source":
 			if strings.HasPrefix(v, LibLocal+"-") { // a game's Mods/ (local-main) sorts as local
 				v = LibLocal

@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
-// 设置 › 卸载 RimArcho (06 §2.14): the plan as both interfaces show it — one row per step, the
+// settings › uninstall RimArcho (06 §2.14): the plan as both interfaces show it — one row per step, the
 // player's choices on the rows that have them, then the same rows as the report.
 
 // UninstallChoice is the player's answers (app.UninstallOptions for the page).
@@ -32,12 +32,13 @@ func (c UninstallChoice) Options() app.UninstallOptions {
 
 // UninstallPage is the plan, or after a run the report.
 type UninstallPage struct {
-	Steps    []UnStep `json:"steps"`
-	Envs     []string `json:"envs"`     // where kept copies can go
-	LockedTo string   `json:"lockedTo"` // the environment they go to
-	SavesTo  string   `json:"savesTo"`
-	PacksTo  string   `json:"packsTo"`
-	Blocked  string   `json:"blocked,omitempty"` // why it cannot run now
+	Steps        []UnStep               `json:"steps"`
+	Confirmation *UninstallConfirmation `json:"confirmation,omitempty"`
+	Envs         []string               `json:"envs"`     // where kept copies can go
+	LockedTo     string                 `json:"lockedTo"` // the environment they go to
+	SavesTo      string                 `json:"savesTo"`
+	PacksTo      string                 `json:"packsTo"`
+	Blocked      string                 `json:"blocked,omitempty"` // why it cannot run now
 	// After a run.
 	Ran    bool   `json:"ran,omitempty"`
 	Failed int    `json:"failed,omitempty"`
@@ -70,15 +71,16 @@ type UnItem struct {
 }
 
 var unTitles = map[string]string{
-	app.UnAccounts: "忘记账户会话",
-	app.UnLinks:    "RimArcho's links", app.UnModsConfig: "the games' mod lists", app.UnLocked: "lock library copies",
+	app.UnAccounts: "account sessions", app.UnTextures: "optimized textures",
+	app.UnLinks: "RimArcho's links", app.UnModsConfig: "the games' mod lists", app.UnLocked: "lock library copies",
 	app.UnMonitor: "Archo Monitor", app.UnPacks: "packs", app.UnSaves: "own saves", app.UnGames: "downloaded games",
 	app.UnSteamCMD: "SteamCMD", app.UnData: "RimArcho's data", app.UnProgram: "the program",
+	app.UnSource: "source library",
 }
 
 var unVerbs = map[string]string{
-	"forget-accounts": "忘记会话",
-	app.DoUnlink:      "unlink", app.DoClean: "clean", app.DoRestore: "put the backup back", app.DoTrash: "recycle bin", app.DoMove: "move",
+	"forget-accounts": "forget sessions", app.DoDDS: "delete recorded DDS directly",
+	app.DoUnlink: "unlink", app.DoClean: "clean", app.DoRestore: "put the backup back", app.DoTrash: "recycle bin", app.DoMove: "move",
 	app.DoKeep: "keep", app.DoDelete: "delete", app.DoLater: "after closing", app.DoLeave: "left alone",
 }
 
@@ -138,6 +140,9 @@ func UninstallView(p *app.UninstallPlan, ran bool) *UninstallPage {
 		}
 		pg.Steps = append(pg.Steps, st)
 	}
+	if !ran {
+		pg.Confirmation = uninstallConfirmation(p)
+	}
 	if ran {
 		if pg.Failed > 0 {
 			pg.Result = Tf("%d steps failed; RimArcho's data stays so you can run it again", pg.Failed)
@@ -182,7 +187,9 @@ func uninstallText(p *app.UninstallPlan, s *app.UninstallStep) string {
 	}
 	switch s.Key {
 	case app.UnAccounts:
-		return "先忘记账户会话；外部 SteamCMD 缓存不接管，失败时保留工具和数据。"
+		return T("forget account sessions first; external SteamCMD caches stay; tools and data stay if this fails")
+	case app.UnTextures:
+		add(app.DoDDS, "delete recorded DDS in %d mod folders; original textures stay")
 	case app.UnLinks:
 		add(app.DoUnlink, "delete %d links in the games' Mods folders; the folders they point to stay")
 		add(app.DoLeave, "%d folders named like them are not links: left alone")
@@ -211,6 +218,8 @@ func uninstallText(p *app.UninstallPlan, s *app.UninstallStep) string {
 	case app.UnData:
 		add(app.DoLater, "once RimArcho has closed, delete its database, settings and caches (%d folders)")
 		add(app.DoLeave, "%d folders kept")
+	case app.UnSource:
+		add(app.DoDelete, "delete generated code; it can be recreated")
 	case app.UnProgram:
 		add(app.DoLater, "once RimArcho has closed, delete the program")
 		add(app.DoLeave, "the program stays")

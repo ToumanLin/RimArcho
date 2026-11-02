@@ -6,9 +6,11 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Plans in the TUI (04 §1.3, 06 §9.1): the editor is always the current plan's. P (or the
-// palette's "plans") opens a chooser: go to another plan, make a new one, rename or delete
-// the current one. Every verb is the view function the window calls too.
+// Plans in the TUI (04 §1.3, 06 §9.1), as in the window: P (or the palette's "plans"), the
+// palette's list entries and tab in the editor open a list without making it current;
+// the top bar then says which list launches. P's make current, saving it or launching it makes
+// it current. P also makes a new list, renames or deletes the open one. Every verb is the
+// view function the window calls too.
 
 // planChanged: the board shows another list now; cursors, searches and the selection
 // belonged to the old one.
@@ -25,7 +27,7 @@ func (m *model) planChanged(text string) tea.Cmd {
 	return m.requestDetail()
 }
 
-// usePlan switches to a plan (no game file is written).
+// usePlan makes a plan current (no game file is written).
 func (m *model) usePlan(id int64) tea.Cmd {
 	_, t, err := view.UsePlan(m.app, id)
 	if err != nil {
@@ -33,6 +35,22 @@ func (m *model) usePlan(id int64) tea.Cmd {
 		return nil
 	}
 	return m.planChanged(t)
+}
+
+// openPlan shows a plan in the editor; the current one, which launches, stays.
+func (m *model) openPlan(id int64) tea.Cmd {
+	p, err := view.OpenPlan(m.app, id)
+	if err != nil {
+		m.say(sayFail, m.humanize(err.Error()))
+		return nil
+	}
+	cmd := m.planChanged("")
+	if m.launches != "" {
+		m.say(sayInfo, Tf("the game is launched with %s; this list is only open here", m.launches))
+	} else {
+		m.say(sayOK, Tf("list %s", p.Name))
+	}
+	return cmd
 }
 
 // choosePlan is P: every plan (enter goes to it), then new, rename and delete.
@@ -68,12 +86,16 @@ func (m *model) choosePlan() tea.Cmd {
 		}
 		id := r.ID
 		add(label, func(m *model) tea.Cmd {
-			if r.Current && r.Open {
+			if r.Open {
 				m.tab, m.full, m.insp = tabList, false, nil
 				return nil
 			}
-			return m.usePlan(id)
+			return m.openPlan(id)
 		})
+	}
+	if cur != nil && !cur.Current {
+		id := cur.ID
+		add(T("make current")+"  "+cur.Name, func(m *model) tea.Cmd { return m.usePlan(id) })
 	}
 	add(T("new list…"), func(m *model) tea.Cmd { return m.newPlan() })
 	if cur != nil {

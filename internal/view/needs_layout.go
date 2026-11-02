@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/env"
 )
 
-// How 能不能跑 lays its items out (06 §2.4, §5): what merges into the sort item, what the
+// How Can it run lays its items out (06 §2.4, §5): what merges into the sort item, what the
 // two columns say about each other, and what other pages handle.
 
 // mergeIntoSort: weak order preferences and order cycles are what sorting settles anyway.
@@ -91,7 +91,7 @@ func needLine(n Need) string {
 }
 
 // elsewhere counts what another page handles (SectionElsewhere): hidden and locked mods
-// in Mod 库存 (searched by their states), out-of-date converted textures in 贴图优化.
+// in Mod library (searched by their states), out-of-date converted textures in Texture optimisation.
 func elsewhere(items []Need) []Elsewhere {
 	lib, tex := 0, 0
 	for _, it := range items {
@@ -130,4 +130,49 @@ func currentLinksFirst(items []Need, gameRoot string) {
 			order(items[i].Actions[j].LinkGroups)
 		}
 	}
+}
+
+// NeedsLead is Can it run's lead sentence (06 §2.4): the open list's verdict from the
+// counted items before the start (sections 1–3) and of the runs (the last section), and
+// whether the files were never checked or only suggestions are left. GUI screens.js
+// needsLead writes the same.
+func NeedsLead(plan string, before, runs int, never, suggestions bool) string {
+	if plan == "" {
+		plan = T("the list")
+	}
+	switch {
+	case before > 0:
+		return Tf("%s is not safe to play yet: %d to handle before you start, %d error groups in the last run", plan, before, runs)
+	case runs > 0:
+		return Tf("%s: %d error groups in the last run", plan, runs)
+	case never:
+		return Tf("%s: the mods' files are not checked yet.", plan)
+	case suggestions:
+		return Tf("%s can run; suggestions below may help if you see errors.", plan)
+	}
+	return Tf("%s can run: nothing to handle.", plan)
+}
+
+// AutoFixCount is how many items fix automatically (F) resolves: required mods that are installed but
+// not enabled (CompleteDependencies enables them), and the sort it runs after (06 §5).
+// 0: there is nothing it can fix, and the action is not offered.
+func AutoFixCount(items []Need) int {
+	enable, sorts := 0, 0
+	for _, it := range items {
+		if !it.Counted || it.Into != "" {
+			continue
+		}
+		for _, a := range it.Actions {
+			switch {
+			case a.Kind == ActEnable && it.Target != "":
+				enable++
+			case a.Kind == ActSort:
+				sorts++
+			}
+		}
+	}
+	if enable == 0 {
+		return 0
+	}
+	return enable + sorts
 }

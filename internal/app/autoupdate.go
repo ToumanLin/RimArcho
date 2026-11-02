@@ -9,10 +9,11 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/accounts"
+	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 )
 
-var AutomaticKinds = []string{"session", "mods", "tools", "data"}
+var AutomaticKinds = []string{"session", "mods", "tools", "data", "self"}
 
 type AutomaticStatus struct {
 	Kind      string    `json:"kind"`
@@ -20,6 +21,9 @@ type AutomaticStatus struct {
 	Completed time.Time `json:"completed"`
 	Pending   int       `json:"pending"`
 	State     string    `json:"state"`
+	// Latest is the newest RimArcho release the "self" check found (07 §5.1): a notice is
+	// due again when it changes even though Pending stays 1.
+	Latest string `json:"latest,omitempty"`
 }
 
 func (a *App) AutomaticEnabled() bool { return a.Store.Meta("cfg:updates.auto") != "off" }
@@ -72,6 +76,15 @@ func (a *App) AutomaticDue(kind string) bool {
 			interval = min(interval, max(5*time.Minute, expiry.Sub(a.Now())/2))
 		}
 	}
+	if kind == "self" {
+		// A development build has no release to compare with; a manual check counts too.
+		if _, ok := selfupdate.Compare(a.SelfVersionNow(), a.SelfVersionNow()); !ok {
+			return false
+		}
+		if c := a.SelfUpdateInfo().Checked; c.After(last) {
+			last = c
+		}
+	}
 	if kind == "data" {
 		// A manual download/check satisfies the automatic schedule too.
 		infos := a.DataStatus()
@@ -100,9 +113,19 @@ func (a *App) AutomaticDue(kind string) bool {
 // RunAutomatic records attempts before I/O, using compare-and-swap to coalesce
 // concurrent windows. Callbacks allow surface task tracking and synthetic tests.
 func (a *App) RunAutomatic(ctx context.Context, kind string, run func(context.Context) (int, string, error)) (bool, error) {
+	return a.runAutomatic(ctx, kind, run, false)
+}
+
+// RunAutomaticNow runs a check the player asked for (`archo update --check`, the window's
+// "check for updates"): recorded like the automatic one, without its switch or interval.
+func (a *App) RunAutomaticNow(ctx context.Context, kind string) (bool, error) {
+	return a.runAutomatic(ctx, kind, nil, true)
+}
+
+func (a *App) runAutomatic(ctx context.Context, kind string, run func(context.Context) (int, string, error), now bool) (bool, error) {
 	key := "automatic:" + kind
 	old := a.Store.Meta(key)
-	if ctx.Err() != nil || !a.AutomaticDue(kind) {
+	if ctx.Err() != nil || !now && !a.AutomaticDue(kind) {
 		return false, ctx.Err()
 	}
 	s := a.AutomaticStatus(kind)
@@ -129,6 +152,12 @@ func (a *App) RunAutomatic(ctx context.Context, kind string, run func(context.Co
 	defer func() { a.checkContext = previousCtx }()
 	pending, state, checkErr := run(ctx)
 	s.Pending, s.State = pending, state
+	if kind == "self" {
+		s.Latest = ""
+		if r := a.SelfUpdateInfo().Release; r != nil {
+			s.Latest = r.Version
+		}
+	}
 	if checkErr != nil && s.State == "" {
 		s.State = "check unavailable offline"
 	}
@@ -196,6 +225,8 @@ func (a *App) automaticCheck(ctx context.Context, kind string) (int, string, err
 			return a.AutomaticStatus(kind).Pending, "check unavailable offline", err
 		}
 		return 0, "available", err
+	case "self":
+		return a.CheckSelfUpdate(ctx)
 	case "data":
 		_, err := a.UpdateData(nil, false)
 		if err != nil {

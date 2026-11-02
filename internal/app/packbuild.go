@@ -30,7 +30,7 @@ const (
 
 // The steps of a build, in order.
 const (
-	StepCheck    = "check"    // the list: nothing left to fix (需要处理)
+	StepCheck    = "check"    // the list: nothing left to fix (Can it run)
 	StepMeasure  = "measure"  // sizes, free space
 	StepCopy     = "copy"     // the mods, without other game versions' folders
 	StepTextures = "textures" // the copies' PNGs to DDS (when asked)

@@ -16,7 +16,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 )
 
-const workshopMissing = "no longer on the Workshop (deleted or private)"
+const workshopMissing = "removed from the Workshop (the author deleted it or made it private)"
 
 // WorkshopCalls observes one subscription operation, regardless of its internal batches.
 type WorkshopCalls struct {

@@ -1,0 +1,137 @@
+=== RUN   TestIntKeyResearch
+    intkey_main_test.go:85: PLAN mods=1354 defsPerFile=15.4 typesPerDLL=298 defSets=1603
+    intkey_main_test.go:86: BUILD 9.072s
+    intkey_main_test.go:162: ROWS instance=1354 snapshot=4864 snapshot_file=973764 fact_set=1895 content_state=2708 def_fact=771016 type_fact=207073 harmony_fact=30462 harmony_id=1275 assembly_fact=680 patch_fact=16299 finding=2100
+    intkey_main_test.go:163: SHAPE snapshot_file rel_path=56.9MB (avg 58.4 B) non-semantic=697889 (71.7%, rel 45.7MB) distinct_rel=271102 | def_fact file=34.8MB (avg 45.1 B) distinct_file=49941 active_defs=311274 (40.4%) | instance-id text in fact_set+content_state+patch_fact+snapshot+finding+change_event=0.85MB
+    intkey_main_test.go:167: DISK after build: 260 MB
+    intkey_research_test.go:749: SIZE v26 file=245.47MB live=245.47MB | def_fact=114.67 dll_facts=33.75 snapshot_file=84.04 file_blobs=0.00 paths=0.00 sets+state+keys=1.09 analysis=5.57 snapshot=5.17 other=1.18
+    intkey_research_test.go:754: SIZE v26 top: snapshot_file=84.04 def_fact=80.66 def_fact_lookup=24.08 type_fact=15.70 type_fact_lookup=9.71 def_fact_set=8.39 harmony_fact=5.60 snapshot=5.00 patch_fact=3.97 type_fact_set=2.25 def_fact_named=1.53 finding=0.96 patch_fact_analysis=0.59 content_state=0.34
+    intkey_main_test.go:237: DISK during v26: 260 MB
+    intkey_main_test.go:242: PLAN v26 Name JOIN: 9062SEARCH c USING INDEX content_state_mm (game_mm=?) ; 16061SEARCH f USING INDEX def_fact_named (name=? AND set_id=?) ; 4600USE TEMP B-TREE FOR LAST TERM OF ORDER BY
+    intkey_main_test.go:242: PLAN v26 Name CROSS JOIN: 9061SEARCH f USING INDEX def_fact_named (name=?) ; 16061SEARCH c USING INDEX content_state_def (def_set_id=? AND game_mm=?) ; 3900USE TEMP B-TREE FOR ORDER BY
+    intkey_main_test.go:275: QUERY v26 | defName×100 | 120.803ms | rows=96 | base
+    intkey_main_test.go:275: QUERY v26 | Name×190 | 183.622ms | rows=193 | base
+    intkey_main_test.go:275: QUERY v26 | defName×100(CROSS JOIN) | 2.201ms | rows=96 | base
+    intkey_main_test.go:275: QUERY v26 | Name×190(CROSS JOIN) | 4.921ms | rows=193 | base
+    intkey_main_test.go:275: QUERY v26 | DefsOf×100 | 79.423ms | rows=60428 | base
+    intkey_main_test.go:275: QUERY v26 | DefCounts(whole table) | 82.502ms | rows=1277 | base
+    intkey_main_test.go:275: QUERY v26 | CachedDefs(all disabled) | 554.085ms | rows=429390 | base
+    intkey_main_test.go:275: QUERY v26 | TypeOwners×100 | 2.915ms | rows=83 | base
+    intkey_main_test.go:275: QUERY v26 | HarmonyPatches(all) | 67.279ms | rows=25198 | base
+    intkey_main_test.go:275: QUERY v26 | CurrentFiles(incremental scan) | 101.225ms | rows=77252 | base
+    intkey_main_test.go:275: QUERY v26 | SemanticSet×100 | 11.762ms | rows=8176 | base
+    intkey_main_test.go:275: QUERY v26 | SnapshotFiles×100(changes page) | 18.153ms | rows=30977 | base
+    intkey_main_test.go:275: QUERY v26 | InstanceFiles(%Textures/%) | 127.391ms | rows=174419 | base
+    intkey_main_test.go:275: QUERY v26 | InstanceFiles(%x.dll)×20 | 1.524729s | rows=359 | base
+    intkey_main_test.go:275: QUERY v26 | ContentKinds(all, uncached) | 251.943ms | rows=1354 | base
+    intkey_main_test.go:275: QUERY v26 | SnapshotsWithPNG(all) | 20.965ms | rows=1298 | base
+    intkey_main_test.go:275: QUERY v26 | Languages×100(details) | 14.705ms | rows=64 | base
+    intkey_main_test.go:294: WRITE v26 | write 30 snapshot manifests | 22.5ms
+    intkey_main_test.go:294: WRITE v26 | write 30 Def sets | 64.5ms
+    intkey_main_test.go:212: CONVERT v26-copy convert=1ms file_before_vacuum=245.5MB live_before_vacuum=245.5MB vacuum=1.956s
+    intkey_research_test.go:749: SIZE v26-copy file=245.47MB live=245.47MB | def_fact=114.67 dll_facts=33.75 snapshot_file=84.04 file_blobs=0.00 paths=0.00 sets+state+keys=1.09 analysis=5.57 snapshot=5.17 other=1.18
+    intkey_research_test.go:754: SIZE v26-copy top: snapshot_file=84.04 def_fact=80.66 def_fact_lookup=24.08 type_fact=15.70 type_fact_lookup=9.71 def_fact_set=8.39 harmony_fact=5.60 snapshot=5.00 patch_fact=3.97 type_fact_set=2.25 def_fact_named=1.53 finding=0.96 patch_fact_analysis=0.59 content_state=0.34
+    intkey_main_test.go:237: DISK during v26-copy: 497 MB
+    intkey_main_test.go:242: PLAN v26-copy Name JOIN: 9062SEARCH c USING INDEX content_state_mm (game_mm=?) ; 16061SEARCH f USING INDEX def_fact_named (name=? AND set_id=?) ; 4600USE TEMP B-TREE FOR LAST TERM OF ORDER BY
+    intkey_main_test.go:242: PLAN v26-copy Name CROSS JOIN: 9061SEARCH f USING INDEX def_fact_named (name=?) ; 16061SEARCH c USING INDEX content_state_def (def_set_id=? AND game_mm=?) ; 3900USE TEMP B-TREE FOR ORDER BY
+    intkey_main_test.go:275: QUERY v26-copy | defName×100 | 86.531ms | rows=96 | same
+    intkey_main_test.go:275: QUERY v26-copy | Name×190 | 153.012ms | rows=193 | same
+    intkey_main_test.go:275: QUERY v26-copy | defName×100(CROSS JOIN) | 2.125ms | rows=96 | same
+    intkey_main_test.go:275: QUERY v26-copy | Name×190(CROSS JOIN) | 5.576ms | rows=193 | same
+    intkey_main_test.go:275: QUERY v26-copy | DefsOf×100 | 109.176ms | rows=60428 | same
+    intkey_main_test.go:275: QUERY v26-copy | DefCounts(whole table) | 95.531ms | rows=1277 | same
+    intkey_main_test.go:275: QUERY v26-copy | CachedDefs(all disabled) | 723.989ms | rows=429390 | same
+    intkey_main_test.go:275: QUERY v26-copy | TypeOwners×100 | 2.386ms | rows=83 | same
+    intkey_main_test.go:275: QUERY v26-copy | HarmonyPatches(all) | 73.357ms | rows=25198 | same
+    intkey_main_test.go:275: QUERY v26-copy | CurrentFiles(incremental scan) | 127.098ms | rows=77252 | same
+    intkey_main_test.go:275: QUERY v26-copy | SemanticSet×100 | 14.422ms | rows=8176 | same
+    intkey_main_test.go:275: QUERY v26-copy | SnapshotFiles×100(changes page) | 33.417ms | rows=30977 | same
+    intkey_main_test.go:275: QUERY v26-copy | InstanceFiles(%Textures/%) | 182.771ms | rows=174419 | same
+    intkey_main_test.go:275: QUERY v26-copy | InstanceFiles(%x.dll)×20 | 1.692522s | rows=359 | same
+    intkey_main_test.go:275: QUERY v26-copy | ContentKinds(all, uncached) | 261.192ms | rows=1354 | same
+    intkey_main_test.go:275: QUERY v26-copy | SnapshotsWithPNG(all) | 26.236ms | rows=1298 | same
+    intkey_main_test.go:275: QUERY v26-copy | Languages×100(details) | 14.126ms | rows=64 | same
+    intkey_main_test.go:294: WRITE v26-copy | write 30 snapshot manifests | 27.9ms
+    intkey_main_test.go:294: WRITE v26-copy | write 30 Def sets | 54.4ms
+    intkey_main_test.go:212: CONVERT setfiles convert=4.511s file_before_vacuum=294.1MB live_before_vacuum=206.6MB vacuum=1.631s
+    intkey_research_test.go:749: SIZE setfiles file=206.56MB live=206.56MB | def_fact=79.81 dll_facts=26.89 snapshot_file=84.04 file_blobs=0.00 paths=0.00 sets+state+keys=3.90 analysis=5.57 snapshot=5.17 other=1.18
+    intkey_research_test.go:754: SIZE setfiles top: snapshot_file=84.04 def_fact=45.81 def_fact_lookup=24.08 type_fact=9.79 type_fact_lookup=9.71 def_fact_set=8.39 snapshot=5.00 harmony_fact=4.70 patch_fact=3.97 fact_set=3.03 type_fact_set=2.25 def_fact_named=1.53 finding=0.96 patch_fact_analysis=0.59
+    intkey_main_test.go:237: DISK during setfiles: 460 MB
+    intkey_main_test.go:242: PLAN setfiles Name JOIN: 9062SEARCH c USING INDEX content_state_mm (game_mm=?) ; 16061SEARCH f USING INDEX def_fact_named (name=? AND set_id=?) ; 4900USE TEMP B-TREE FOR LAST TERM OF ORDER BY
+    intkey_main_test.go:242: PLAN setfiles Name CROSS JOIN: 9061SEARCH f USING INDEX def_fact_named (name=?) ; 16061SEARCH c USING INDEX content_state_def (def_set_id=? AND game_mm=?) ; 4200USE TEMP B-TREE FOR ORDER BY
+    intkey_main_test.go:275: QUERY setfiles | defName×100 | 90.233ms | rows=96 | same
+    intkey_main_test.go:275: QUERY setfiles | Name×190 | 162.394ms | rows=193 | same
+    intkey_main_test.go:275: QUERY setfiles | defName×100(CROSS JOIN) | 9.033ms | rows=96 | same
+    intkey_main_test.go:275: QUERY setfiles | Name×190(CROSS JOIN) | 19.665ms | rows=193 | same
+    intkey_main_test.go:275: QUERY setfiles | DefsOf×100 | 87.551ms | rows=60428 | same
+    intkey_main_test.go:275: QUERY setfiles | DefCounts(whole table) | 76.581ms | rows=1277 | same
+    intkey_main_test.go:275: QUERY setfiles | CachedDefs(all disabled) | 573.524ms | rows=429390 | same
+    intkey_main_test.go:275: QUERY setfiles | TypeOwners×100 | 3.077ms | rows=83 | same
+    intkey_main_test.go:275: QUERY setfiles | HarmonyPatches(all) | 65.292ms | rows=25198 | same
+    intkey_main_test.go:275: QUERY setfiles | CurrentFiles(incremental scan) | 93.394ms | rows=77252 | same
+    intkey_main_test.go:275: QUERY setfiles | SemanticSet×100 | 7.41ms | rows=8176 | same
+    intkey_main_test.go:275: QUERY setfiles | SnapshotFiles×100(changes page) | 17.819ms | rows=30977 | same
+    intkey_main_test.go:275: QUERY setfiles | InstanceFiles(%Textures/%) | 118.633ms | rows=174419 | same
+    intkey_main_test.go:275: QUERY setfiles | InstanceFiles(%x.dll)×20 | 2.110787s | rows=359 | same
+    intkey_main_test.go:275: QUERY setfiles | ContentKinds(all, uncached) | 401.084ms | rows=1354 | same
+    intkey_main_test.go:275: QUERY setfiles | SnapshotsWithPNG(all) | 38.578ms | rows=1298 | same
+    intkey_main_test.go:275: QUERY setfiles | Languages×100(details) | 22.158ms | rows=64 | same
+    intkey_main_test.go:294: WRITE setfiles | write 30 snapshot manifests | 39.5ms
+    intkey_main_test.go:294: WRITE setfiles | write 30 Def sets | 95.3ms
+    intkey_main_test.go:212: CONVERT combo-global convert=14.275s file_before_vacuum=256.6MB live_before_vacuum=152.7MB vacuum=2.535s
+    intkey_main_test.go:230: PATHGC combo-global 675ms deleted=0
+    intkey_main_test.go:233: BLOB combo-global lists=4864 stored_blobs=3312 raw=19.4MB raw+mtime=23.5MB zstd=10.1MB zstd+mtime=15.2MB stored=9.1MB
+    intkey_research_test.go:749: SIZE combo-global file=148.12MB live=148.12MB | def_fact=78.33 dll_facts=27.32 snapshot_file=11.03 file_blobs=10.91 paths=7.52 sets+state+keys=1.09 analysis=5.57 snapshot=5.17 other=1.18
+    intkey_research_test.go:754: SIZE combo-global top: def_fact=44.33 def_fact_lookup=24.08 snapshot_file=11.03 file_blob=10.77 type_fact=10.16 type_fact_lookup=9.71 def_fact_set=8.39 snapshot=5.00 harmony_fact=4.76 patch_fact=3.97 path=3.77 sqlite_autoindex_path_1=3.75 type_fact_set=2.25 def_fact_named=1.53
+    intkey_main_test.go:237: DISK during combo-global: 404 MB
+    intkey_main_test.go:242: PLAN combo-global Name JOIN: 10062SEARCH c USING INDEX content_state_mm (game_mm=?) ; 17061SEARCH f USING INDEX def_fact_named (name=? AND set_id=?) ; 25045SEARCH p USING INTEGER PRIMARY KEY (rowid=?) LEFT-JOIN ; 5700USE TEMP B-TREE FOR LAST TERM OF ORDER BY
+    intkey_main_test.go:242: PLAN combo-global Name CROSS JOIN: 10061SEARCH f USING INDEX def_fact_named (name=?) ; 17061SEARCH c USING INDEX content_state_def (def_set_id=? AND game_mm=?) ; 25045SEARCH p USING INTEGER PRIMARY KEY (rowid=?) LEFT-JOIN ; 5000USE TEMP B-TREE FOR ORDER BY
+    intkey_main_test.go:275: QUERY combo-global | defName×100 | 153.388ms | rows=96 | DIFF
+    intkey_main_test.go:275: QUERY combo-global | Name×190 | 249.905ms | rows=193 | DIFF
+    intkey_main_test.go:275: QUERY combo-global | defName×100(CROSS JOIN) | 5.155ms | rows=96 | DIFF
+    intkey_main_test.go:275: QUERY combo-global | Name×190(CROSS JOIN) | 10.346ms | rows=193 | DIFF
+    intkey_main_test.go:275: QUERY combo-global | DefsOf×100 | 129.922ms | rows=60428 | DIFF
+    intkey_main_test.go:275: QUERY combo-global | DefCounts(whole table) | 101.383ms | rows=1277 | same
+    intkey_main_test.go:275: QUERY combo-global | CachedDefs(all disabled) | 927.478ms | rows=429390 | DIFF
+    intkey_main_test.go:275: QUERY combo-global | TypeOwners×100 | 5.429ms | rows=83 | same
+    intkey_main_test.go:275: QUERY combo-global | HarmonyPatches(all) | 109.232ms | rows=25198 | same
+    intkey_main_test.go:275: QUERY combo-global | CurrentFiles(incremental scan) | 195.285ms | rows=77252 | same
+    intkey_main_test.go:275: QUERY combo-global | SemanticSet×100 | 15.532ms | rows=8176 | same
+    intkey_main_test.go:275: QUERY combo-global | SnapshotFiles×100(changes page) | 26.228ms | rows=30977 | same
+    intkey_main_test.go:275: QUERY combo-global | InstanceFiles(%Textures/%) | 275.331ms | rows=174419 | same
+    intkey_main_test.go:275: QUERY combo-global | InstanceFiles(%x.dll)×20 | 1.245243s | rows=359 | same
+    intkey_main_test.go:275: QUERY combo-global | ContentKinds(all, uncached) | 7.711ms | rows=1354 | same
+    intkey_main_test.go:275: QUERY combo-global | SnapshotsWithPNG(all) | 7.118ms | rows=1298 | same
+    intkey_main_test.go:275: QUERY combo-global | Languages×100(details) | 916µs | rows=64 | same
+    intkey_main_test.go:294: WRITE combo-global | write 30 snapshot manifests | 50ms
+    intkey_main_test.go:294: WRITE combo-global | write 30 Def sets | 110.3ms
+    intkey_main_test.go:212: CONVERT combo-setfiles convert=11.288s file_before_vacuum=256.4MB live_before_vacuum=162.7MB vacuum=1.911s
+    intkey_main_test.go:233: BLOB combo-setfiles lists=4864 stored_blobs=3312 raw=19.4MB raw+mtime=23.5MB zstd=10.1MB zstd+mtime=15.2MB stored=9.1MB
+    intkey_research_test.go:749: SIZE combo-setfiles file=152.58MB live=152.58MB | def_fact=77.19 dll_facts=26.89 snapshot_file=21.77 file_blobs=10.91 paths=0.00 sets+state+keys=3.90 analysis=5.57 snapshot=5.17 other=1.18
+    intkey_research_test.go:754: SIZE combo-setfiles top: def_fact=43.18 def_fact_lookup=24.08 snapshot_file=21.77 file_blob=10.77 type_fact=9.79 type_fact_lookup=9.71 def_fact_set=8.39 snapshot=5.00 harmony_fact=4.70 patch_fact=3.97 fact_set=3.03 type_fact_set=2.25 def_fact_named=1.53 finding=0.96
+    intkey_main_test.go:237: DISK during combo-setfiles: 408 MB
+    intkey_main_test.go:242: PLAN combo-setfiles Name JOIN: 9062SEARCH c USING INDEX content_state_mm (game_mm=?) ; 16061SEARCH f USING INDEX def_fact_named (name=? AND set_id=?) ; 4900USE TEMP B-TREE FOR LAST TERM OF ORDER BY
+    intkey_main_test.go:242: PLAN combo-setfiles Name CROSS JOIN: 9061SEARCH f USING INDEX def_fact_named (name=?) ; 16061SEARCH c USING INDEX content_state_def (def_set_id=? AND game_mm=?) ; 4200USE TEMP B-TREE FOR ORDER BY
+    intkey_main_test.go:275: QUERY combo-setfiles | defName×100 | 124.823ms | rows=96 | DIFF
+    intkey_main_test.go:275: QUERY combo-setfiles | Name×190 | 182.901ms | rows=193 | DIFF
+    intkey_main_test.go:275: QUERY combo-setfiles | defName×100(CROSS JOIN) | 12.898ms | rows=96 | DIFF
+    intkey_main_test.go:275: QUERY combo-setfiles | Name×190(CROSS JOIN) | 30.875ms | rows=193 | DIFF
+    intkey_main_test.go:275: QUERY combo-setfiles | DefsOf×100 | 98.56ms | rows=60428 | DIFF
+    intkey_main_test.go:275: QUERY combo-setfiles | DefCounts(whole table) | 82.778ms | rows=1277 | same
+    intkey_main_test.go:275: QUERY combo-setfiles | CachedDefs(all disabled) | 925.121ms | rows=429390 | DIFF
+    intkey_main_test.go:275: QUERY combo-setfiles | TypeOwners×100 | 5.767ms | rows=83 | same
+    intkey_main_test.go:275: QUERY combo-setfiles | HarmonyPatches(all) | 115.66ms | rows=25198 | same
+    intkey_main_test.go:275: QUERY combo-setfiles | CurrentFiles(incremental scan) | 122.264ms | rows=77252 | same
+    intkey_main_test.go:275: QUERY combo-setfiles | SemanticSet×100 | 9.644ms | rows=8176 | same
+    intkey_main_test.go:275: QUERY combo-setfiles | SnapshotFiles×100(changes page) | 18.342ms | rows=30977 | same
+    intkey_main_test.go:275: QUERY combo-setfiles | InstanceFiles(%Textures/%) | 211.492ms | rows=174419 | same
+    intkey_main_test.go:275: QUERY combo-setfiles | InstanceFiles(%x.dll)×20 | 606.927ms | rows=359 | same
+    intkey_main_test.go:275: QUERY combo-setfiles | ContentKinds(all, uncached) | 2.748ms | rows=1354 | same
+    intkey_main_test.go:275: QUERY combo-setfiles | SnapshotsWithPNG(all) | 1.145ms | rows=1298 | same
+    intkey_main_test.go:275: QUERY combo-setfiles | Languages×100(details) | 818µs | rows=64 | same
+    intkey_main_test.go:294: WRITE combo-setfiles | write 30 snapshot manifests | 22.7ms
+    intkey_main_test.go:294: WRITE combo-setfiles | write 30 Def sets | 89.2ms
+--- PASS: TestIntKeyResearch (232.23s)
+PASS
+ok  	github.com/ToumanLin/RimArcho/internal/store	232.428s
+exit=0

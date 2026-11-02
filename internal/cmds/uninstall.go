@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
-// uninstall (05 §4.2, 01 §4's 卸载 column): a dry run unless --yes. MCP has only the dry run
+// uninstall (05 §4.2, 01 §4's uninstall column): a dry run unless --yes. MCP has only the dry run
 // (preview_uninstall, 05 §5.2): removing RimArcho is the player's decision alone.
 func init() {
 	register(&Command{Name: "uninstall", Summary: "remove what RimArcho put on this machine and restore what it changed (a dry run; --yes runs it)", MaxArgs: 0, Run: uninstallCmd,
@@ -170,6 +170,8 @@ func UninstallStepText(p *app.UninstallPlan, s *app.UninstallStep) string {
 	case app.UnData:
 		add(app.DoLater, "folder", "once RimArcho has closed, delete its data: database, settings, caches, the Steam runtime folder ({n})"+size)
 		add(app.DoLeave, "folder", "{n} kept")
+	case app.UnSource:
+		add(app.DoDelete, "folder", "delete the generated source library ({n}); it can be recreated"+size)
 	case app.UnProgram:
 		add(app.DoLater, "folder", "once RimArcho has closed, delete the program")
 		add(app.DoLeave, "folder", "the program stays")
@@ -229,13 +231,34 @@ func UninstallOutline(n *render.Node, p *app.UninstallPlan, all, done bool) {
 // ParseUninstall reads an `uninstall …` command line's answers (the TUI's typed
 // confirmation); --yes and --dry-run are ignored.
 func ParseUninstall(argv []string) (app.UninstallOptions, error) {
-	c, rest := lookup(argv)
-	if c == nil || c.Name != "uninstall" {
-		return app.UninstallOptions{}, &UsageError{Msg: "not an uninstall command"}
-	}
-	a, err := parse(c, rest)
+	a, err := uninstallArgs(argv)
 	if err != nil {
 		return app.UninstallOptions{}, err
 	}
 	return UninstallOptions(a), nil
+}
+
+// ParseUninstallRequest distinguishes execution from a preview for embedded command
+// lines. Executions must use the surface's guarded uninstall worker (06 §2.14).
+func ParseUninstallRequest(argv []string) (app.UninstallOptions, bool, error) {
+	a, err := uninstallArgs(argv)
+	if err != nil {
+		return app.UninstallOptions{}, false, err
+	}
+	if a.Bool("yes") && a.Bool("dry-run") {
+		return app.UninstallOptions{}, false, &UsageError{Msg: "--yes runs it, --dry-run shows it: pick one"}
+	}
+	return UninstallOptions(a), a.Bool("yes"), nil
+}
+
+func uninstallArgs(argv []string) (*Args, error) {
+	c, rest := lookup(argv)
+	if c == nil || c.Name != "uninstall" {
+		return nil, &UsageError{Msg: "not an uninstall command"}
+	}
+	a, err := parse(c, rest)
+	if err != nil {
+		return nil, err
+	}
+	return a, nil
 }

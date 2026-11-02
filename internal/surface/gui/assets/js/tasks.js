@@ -1,11 +1,11 @@
-// 后台任务 (06 §2.16): what RimArcho does in the background, what waits and what each item
-// came to. Like Mod 库存: the filter bar and the tasks down the left; on the right the task's
+// Background tasks (06 §2.16): what RimArcho does in the background, what waits and what each item
+// came to. Like Mod library: the filter bar and the tasks down the left; on the right the task's
 // summary, then a table of every item it touched (06 §3.9: the headers sort, move, size and
 // pick columns). Not a popup: the work goes on while the player is on other pages, and the
 // sidebar's foot line and ctrl+j bring them back here. "tasks" events say the record
 // changed; a lane task that ended also brings its result for the status line.
 import { pathContent } from "./fields.js";
-import { factText, S, $, el, api, T, Tf, errText, say } from "./state.js";
+import { factText, S, $, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { beginPageRead, page, act as pageAct, area } from "./screens.js";
 import { createBar } from "./filterbar.js";
 import * as pop from "./popups.js";
@@ -395,7 +395,7 @@ function drawSum() {
   for (const a of r.acts) {
     const b = el("button", "btn" + (a.primary ? " primary" : "") + (a.danger ? " danger" : ""), a.label);
     b.dataset.act = a.id;
-    b.append(el("kbd", "", a.key));
+    b.append(keyCaps(a.key));
     acts.append(b);
   }
   box.append(acts);
@@ -427,7 +427,7 @@ function drawItems() {
     factText(els.none, r ? [r.noItems, r.line] : []);
     if (r) {
       const g = r.acts.find((a) => a.id === "goto");
-      if (g) { const b = el("button", "btn", g.label); b.append(el("kbd", "", g.key)); b.onclick = () => run("goto", [r]); els.none.append(el("br"), b); }
+      if (g) { const b = el("button", "btn", g.label); b.append(keyCaps(g.key)); b.onclick = () => run("goto", [r]); els.none.append(el("br"), b); }
     }
     return;
   }

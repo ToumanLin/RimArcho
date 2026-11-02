@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// G13 in the TUI (06 §2.4): 能不能跑 shows the four sections in order with their counts,
+// G13 in the TUI (06 §2.4): Can it run shows the four sections in order with their counts,
 // every item with its evidence chip, and the top bar's number equals the counted items,
 // the running game's errors included.
 func TestG13NeedsSectionsTUI(t *testing.T) {
@@ -68,7 +68,7 @@ func TestNeedsPhaseHeadingsAreNotCursorItems(t *testing.T) {
 	}
 }
 
-// The running game's errors come after 会让游戏出错, under 上次运行的报错 marked "this run";
+// The running game's errors come after Will cause errors, under errors from the last run marked "this run";
 // ← → jump between the sections, and the top bar counts them too.
 func TestNeedsSectionsLive(t *testing.T) {
 	t.Parallel()
@@ -85,8 +85,13 @@ func TestNeedsSectionsLive(t *testing.T) {
 	m.Update(liveTick{})
 	press(m, "@")
 	s := ansi.Strip(m.View())
-	brk, run := strings.Index(s, T(view.SectionTitles[view.SectionBreak])), strings.Index(s, T(view.SectionTitles[view.SectionRun])+"  ")
-	if brk < 0 || run < brk || !strings.Contains(s[run:], T("this run")) {
+	brk, run := strings.Index(s, T(view.SectionTitles[view.SectionBreak])), strings.Index(s, T("errors this run")+"  ")
+	title := s[run:]
+	if i := strings.IndexByte(title, '\n'); i >= 0 {
+		title = title[:i]
+	}
+	// the window's title while the game runs, not followed by "this run" again
+	if brk < 0 || run < brk || strings.Count(title, T("this run")) != 1 {
 		t.Fatalf("sections out of order:\n%s", s)
 	}
 	both := false
@@ -112,29 +117,45 @@ func TestNeedsSectionsLive(t *testing.T) {
 	if got, want := m.needCount(), countedNeeds(m); got != want || got <= m.prob.need {
 		t.Fatalf("top bar %d, counted items %d (analysis alone %d)", got, want, m.prob.need)
 	}
-	if !strings.Contains(s, Tf("%d to handle", m.needCount())) {
-		t.Fatalf("the head's count is not the top bar's %d:\n%s", m.needCount(), s)
+	// the window's lead sentence: what to handle before the start and the run's groups add
+	// up to the top bar's number
+	before, runs := 0, 0
+	for _, it := range m.prob.items {
+		switch {
+		case it.counted && it.section == view.SectionRun:
+			runs++
+		case it.counted:
+			before++
+		}
+	}
+	if before+runs != m.needCount() || !strings.Contains(s, view.NeedsLead(m.st.Plan.Name, before, runs, false, false)) {
+		t.Fatalf("the head's counts %d + %d are not the top bar's %d:\n%s", before, runs, m.needCount(), s)
 	}
 	press(m, "home")
+	press(m, "right")
+	if it := m.prob.items[m.prob.cursor]; it.section != view.SectionHint {
+		t.Fatalf("first → should reach memory hint: %+v", it)
+	}
 	press(m, "right")
 	if it := m.prob.items[m.prob.cursor]; it.section != view.SectionRun || it.group != view.GroupThisRun {
 		t.Fatalf("→ went to %+v", it)
 	}
 	press(m, "left")
+	press(m, "left")
 	if m.prob.cursor != 0 {
 		t.Fatalf("← went to %d", m.prob.cursor)
 	}
 	// the number keys go to the n-th section shown, whose heading carries the number
-	press(m, "2")
+	press(m, "3")
 	if it := m.prob.items[m.prob.cursor]; it.section != view.SectionRun {
-		t.Fatalf("2 went to %+v", it)
+		t.Fatalf("3 went to %+v", it)
 	}
-	if s := ansi.Strip(m.View()); !strings.Contains(s, "2 "+T(view.SectionTitles[view.SectionRun])) {
+	if s := ansi.Strip(m.View()); !strings.Contains(s, "3 "+T("errors this run")) {
 		t.Fatalf("no number on the section:\n%s", s)
 	}
 }
 
-// 06 §3.5: Mod 库存's areas are numbered, 1 the filter, 2 the table, 3 the details.
+// 06 §3.5: Mod library's areas are numbered, 1 the filter, 2 the table, 3 the details.
 func TestLibraryAreaKeys(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)

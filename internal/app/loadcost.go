@@ -44,13 +44,22 @@ type ModCost struct {
 
 type LoadCost struct {
 	loadcost.Report
-	Game     loadcost.Game    `json:"game"`
-	Mods     int              `json:"mods"`
-	Measured int              `json:"measured"`
-	Cached   int              `json:"cached"`
-	Baseline LoadCostBaseline `json:"baseline"`
-	Top      []TopMod         `json:"top"`
-	PerMod   []ModCost        `json:"perMod"`
+	LoadingRAMLow  int64            `json:"loadingRAMLow"`
+	LoadingRAMHigh int64            `json:"loadingRAMHigh"`
+	Capacity       MemoryAssessment `json:"capacity"`
+	Game           loadcost.Game    `json:"game"`
+	Mods           int              `json:"mods"`
+	Measured       int              `json:"measured"`
+	Cached         int              `json:"cached"`
+	Baseline       LoadCostBaseline `json:"baseline"`
+	Top            []TopMod         `json:"top"`
+	PerMod         []ModCost        `json:"perMod"`
+}
+
+// VRAMInRAM is the share of the resident VRAM estimate (baseline included) held in
+// system memory on the hardware Capacity was assessed with; RAM shown to players adds it.
+func (r *LoadCost) VRAMInRAM() (low, high int64) {
+	return loadcost.Spill(r.Game, r.VRAMLow+r.Baseline.VRAM, r.VRAMHigh+r.Baseline.VRAM, r.Capacity.Hardware.VRAM())
 }
 
 // PlanLoadCost measures the selected plan, using its own enabled entries.
@@ -76,6 +85,10 @@ func (a *App) PlanLoadCost(ctx context.Context, planID int64, progress func(done
 	ps, err := a.PlanState(st, p)
 	if err != nil {
 		return nil, err
+	}
+	mm := ps.GameMM()
+	if mm == "" {
+		return nil, fmt.Errorf("cannot estimate memory: game version is unknown for %s; rescan the selected game (archo scan) and retry", st.Ix.Env.Name)
 	}
 	var mods []*store.Mod
 	active, seen := map[string]bool{}, map[string]bool{}
@@ -103,14 +116,14 @@ func (a *App) PlanLoadCost(ctx context.Context, planID int64, progress func(done
 		if real, err := source.RealPath(dir); err == nil {
 			dir = real
 		}
-		res := content.Resolve(dir, m.Decl().LoadFolders, st.GameMM(), func(pkg string) bool {
+		res := content.Resolve(dir, m.Decl().LoadFolders, mm, func(pkg string) bool {
 			return active[strings.TrimSuffix(strings.ToLower(pkg), "_steam")]
 		})
 		ref := st.Ix.Ref(m.ID)
 		targets = append(targets, target{packageID: m.PackageID, dir: dir, folders: res.Folders, top: TopMod{Name: m.DisplayName(), Ref: ref, Page: m.ID}})
 	}
 	g := loadcost.Game16
-	if st.GameMM() != "" && !env.VersionLess(st.GameMM(), "1.7") {
+	if !env.VersionLess(mm, "1.7") {
 		g = loadcost.Game17
 	}
 	r := &LoadCost{Game: g, Mods: len(targets), PerMod: make([]ModCost, len(targets))}
@@ -200,6 +213,14 @@ send:
 		return nil, fmt.Errorf("save load cost cache: %w", saveErr)
 	}
 	r.Report = loadcost.Estimate(g, measured)
+	r.LoadingRAMLow, r.LoadingRAMHigh = loadcost.LoadingBudget(g, r.Report, measured)
+	r.Capacity = AssessMemory(a.measuredMemory(), r)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if err := a.saveMemoryEstimate(ps, r); err != nil {
+		return nil, err
+	}
 	seenTop := map[string]bool{}
 	for _, ram := range []bool{false, true} {
 		slices.SortStableFunc(top, func(a, b TopMod) int {
@@ -227,7 +248,7 @@ send:
 
 func loadCostStamp(ctx context.Context, folders []string) ([16]byte, error) {
 	h := xxh3.New()
-	h.WriteString("loadcost/v1")
+	h.WriteString("loadcost/v2")
 	for _, folder := range folders {
 		h.WriteString("\x00" + folder + "\x00")
 		t, err := fsscan.Walk(ctx, folder, fsscan.Options{

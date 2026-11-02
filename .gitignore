@@ -8,6 +8,7 @@
 # caches / local data
 /.cache/
 /tmp/
+.wrangler/
 *.db
 *.db-wal
 *.db-shm

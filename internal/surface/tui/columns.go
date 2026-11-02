@@ -187,6 +187,13 @@ func (m *model) reload() {
 		}
 		return
 	}
+	// a list only open here: the top bar says which one launches (04 §1.3)
+	m.launches, m.launchesID = "", 0
+	if m.app.OpenPlan != 0 && st.Plan != nil {
+		if p, _ := m.app.Store.CurrentPlan(st.Ix.Env.ID); p != nil && p.ID != st.Plan.ID {
+			m.launches, m.launchesID = p.Name, p.ID
+		}
+	}
 	m.boardSeq++
 	m.board, m.barCache = &boardRef{b: b, seq: m.boardSeq}, nil
 	m.envName, m.gameVer = b.EnvName, b.GameVersion
@@ -228,9 +235,8 @@ func (m *model) rowStatus(it *item) int { return view.RowStatus(&it.v, m.prob.st
 
 // ---- drawing ----
 
-// columnLines draws the list columns and the detail column into rows 2…h-4, and returns
-// the detail's image placements.
-func (m *model) columnLines(n int) ([]string, []placement) {
+// columnLines draws the list columns and the detail column into rows 2…h-4.
+func (m *model) columnLines(n int) []string {
 	l := m.layout()
 	out := make([]string, n)
 	cells := make([][]string, len(l.slots))
@@ -238,9 +244,8 @@ func (m *model) columnLines(n int) ([]string, []placement) {
 		cells[i] = m.drawColumn(s, n, l.tabs)
 	}
 	var detail []string
-	var ps []placement
 	if l.detailW > 0 {
-		detail, ps = m.detailLines(l.detailW, n, l.detailX)
+		detail = m.detailLines(l.detailW, n)
 	}
 	for y := 0; y < n; y++ {
 		var b strings.Builder
@@ -258,7 +263,7 @@ func (m *model) columnLines(n int) ([]string, []placement) {
 		}
 		out[y] = b.String()
 	}
-	return out, ps
+	return out
 }
 
 // drawColumn returns n lines of exactly s.w cells: the title, then the rows.

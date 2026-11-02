@@ -1,6 +1,6 @@
 package app
 
-// Uninstall (01 §4's 卸载 column, 05 §4.2 `archo uninstall`, 06 §2.14): undo every row of
+// Uninstall (01 §4's uninstall column, 05 §4.2 `archo uninstall`, 06 §2.14): undo every row of
 // the write list. The plan is computed first and shown as a dry run; Uninstall carries it
 // out. What holds the player's things (lock library copies, packs, saves, downloaded games)
 // is a choice; RimArcho's own folders are deleted; the data folders and the program go last,
@@ -25,24 +25,25 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// The steps, in the order they run. 01 §4's 卸载 column names them.
+// The steps, in the order they run. 01 §4's uninstall column names them.
 const (
 	UnAccounts   = "accounts"   // forget sessions before removing tools or data
 	UnLinks      = "links"      // _Archo_ and !ArchoPack_ links in each game's Mods/
 	UnModsConfig = "modsconfig" // ModsConfig.xml in each user data folder RimArcho wrote
-	UnTextures   = "textures"   // the DDS RimArcho wrote next to mods' PNGs (贴图优化)
+	UnTextures   = "textures"   // the DDS RimArcho wrote next to mods' PNGs (Texture optimisation)
 	UnLocked     = "locked"     // the lock library's copies
 	UnMonitor    = "monitor"    // Archo Monitor's folder
 	UnPacks      = "packs"      // packs and the saves inside them
 	UnSaves      = "saves"      // the "own" save folders and save backups in the data folder
 	UnGames      = "games"      // game folders downloaded with SteamCMD
 	UnSteamCMD   = "steamcmd"   // the SteamCMD RimArcho downloaded
+	UnSource     = "source"     // relocated, regenerable source library
 	UnData       = "data"       // %APPDATA%\RimArcho and %LOCALAPPDATA%\RimArcho
 	UnProgram    = "program"    // the program files
 )
 
 // UninstallSteps lists every step in order.
-var UninstallSteps = []string{UnAccounts, UnLinks, UnModsConfig, UnTextures, UnLocked, UnMonitor, UnPacks, UnSaves, UnGames, UnSteamCMD, UnData, UnProgram}
+var UninstallSteps = []string{UnAccounts, UnLinks, UnModsConfig, UnTextures, UnLocked, UnMonitor, UnPacks, UnSaves, UnGames, UnSteamCMD, UnSource, UnData, UnProgram}
 
 // What happens to an item.
 const (
@@ -193,7 +194,9 @@ func (a *App) DefaultPacksTo() string { return filepath.Join(a.KeepBase(), "RimA
 
 // releaseFiles are what the release zip puts next to the program (07 §5); only these are
 // deleted from the program folder, and the folder only when nothing else is left in it.
-var releaseFiles = []string{"archo.exe", "RimArcho.exe", "README.md", "CHANGELOG.md", "LICENSE", "fonts", "monitor"}
+// Releases before this one shipped fonts/, so uninstall still removes it if present;
+// .archo-update is what RimArcho's own update leaves there (07 §5.1).
+var releaseFiles = []string{"archo.exe", "RimArcho.exe", "README.md", "CHANGELOG.md", "LICENSE", "fonts", "monitor", UpdateDirName}
 
 // downloadedGame reports whether a game folder was downloaded with SteamCMD: force_install_dir
 // leaves steamapps/appmanifest_294100.acf inside it (a Steam library keeps the manifest beside
@@ -249,7 +252,7 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 			p.Steps = append(p.Steps, &UninstallStep{Key: key, Items: items})
 		}
 	}
-	add(UnAccounts, []*UninstallItem{{Path: a.AccountsDir(), Do: "forget-accounts", Note: "忘记账户会话：删除站点会话与临时登录目录，并清理受管 SteamCMD 的已知认证缓存（所有缓存账户）；外部缓存不接管。不可恢复，不撤销其他设备。"}})
+	add(UnAccounts, []*UninstallItem{{Path: a.AccountsDir(), Do: "forget-accounts", Note: "Forget account sessions: delete site sessions and temporary login folders, and clear known authentication caches for all accounts in managed SteamCMD. External caches stay under their owner's control. This cannot be undone and does not sign out other devices."}})
 
 	// Where kept lock library copies go: a game that is not itself removed.
 	var lockEnv *env.Environment
@@ -533,9 +536,11 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 	}
 	add(UnSteamCMD, scmd)
 
+	sourceRoot := a.SourceDir()
+
 	// Kept and moved things must not land where the data folders are deleted.
 	for _, dst := range []struct{ dir, what string }{{p.SavesTo, "saves"}, {p.PacksTo, "packs"}} {
-		if source.Within(dst.dir, a.Home) || source.Within(dst.dir, p.Local) {
+		if source.Within(dst.dir, a.Home) || source.Within(dst.dir, p.Local) || source.Within(directoryReal(dst.dir), directoryReal(sourceRoot)) {
 			if p.Problem == "" {
 				p.Problem = fmt.Sprintf("the %s would be moved to %s, which is deleted too; pick a folder outside RimArcho's folders", dst.what, dst.dir)
 			}
@@ -574,7 +579,7 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 		data = append(data, it)
 	}
 	// Name only managed tools actually covered by the scheduled data deletions.
-	for _, name := range []string{deps.Todds, deps.WezTerm} {
+	for _, name := range []string{deps.Todds} {
 		i := a.Deps().Status(name)
 		if !i.Own {
 			continue
@@ -587,9 +592,6 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 			continue
 		}
 		label := name
-		if name == deps.WezTerm {
-			label = "WezTerm"
-		}
 		for _, it := range data {
 			if it.Do == DoLater && source.Within(i.Dir, it.Path) {
 				if it.Note != "" {
@@ -597,6 +599,21 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 				}
 				it.Note += "includes the downloaded " + label
 			}
+		}
+	}
+	sourceCovered := false
+	for _, dir := range p.AfterExit.Dirs {
+		sourceCovered = sourceCovered || source.Within(sourceRoot, dir)
+	}
+	// A source library inside a deleted data folder goes with it; a relocated one is its own
+	// step, and a link there blocks the uninstall with the reason on the page.
+	if !sourceCovered && dirExists(sourceRoot) {
+		if err := a.checkUninstallSource(sourceRoot); err != nil {
+			if p.Problem == "" {
+				p.Problem = err.Error()
+			}
+		} else {
+			add(UnSource, []*UninstallItem{{Path: sourceRoot, Do: DoDelete, Bytes: sizeOf(sourceRoot)}})
 		}
 	}
 	add(UnData, data)
@@ -630,6 +647,9 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 	add(UnProgram, prog)
 	var incoming *incomingLinkCheck
 	for _, step := range p.Steps {
+		if step.Key == UnSource {
+			continue // Source removal never changes links outside the recorded library.
+		}
 		for _, it := range step.Items {
 			if it.Do == DoTrash || it.Do == DoMove || it.Do == DoDelete {
 				// All targets in this plan use one fresh incoming-link observation.
@@ -814,7 +834,7 @@ func (a *App) Uninstall(o UninstallOptions, progress func(UninstallProgress)) (*
 				it.Err = err.Error()
 				failed = true
 				if s.Key == UnAccounts {
-					return p, errors.New("忘记账户会话失败；已保留工具和数据，请关闭登录窗口后重试")
+					return p, errors.New("could not forget account sessions; tools and data were kept; close the login window and retry")
 				}
 			} else if it.Do != DoKeep && it.Do != DoLeave {
 				it.Done = true
@@ -882,6 +902,9 @@ func (a *App) uninstallItem(step string, it *UninstallItem) error {
 	case DoTrash:
 		return a.ToTrash(it.Path)
 	case DoDelete:
+		if step == UnSource {
+			return a.uninstallSource(it.Path)
+		}
 		return a.withIncomingLinks(it.Path, "", func() error { return removeTree(it.Path) })
 	case DoDDS:
 		return a.deleteTexturesIn(it.Path)

@@ -6,6 +6,7 @@ import { factText, S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { page, button, beginPageRead } from "./screens.js";
 import * as pop from "./popups.js";
 import { getChoices } from "./credit.js";
+import { copyablePath, editablePath } from "./fields.js";
 
 let ui = null;
 export function initExchange(u) {
@@ -65,21 +66,16 @@ export const hintList = () => [{ key: "tab", label: T("import destination") }, {
 function importSource(body) {
   body.append(el("div", "xc-note", T("RimArcho, RimSort, RimCrow and RimWorld lists, share codes, packageIds or workshop links. Nothing changes before you confirm.")));
 
-  // a file: the window's open dialog, a typed path, or a dropped file
+  // A selected file is read-only; choosing another file starts another preview.
   const file = section(body, T("from a file"));
   const row = el("div", "xc-row");
-  const path = el("input", "xc-input");
-  path.placeholder = T("a file path: .xml .rml .json .txt, a save (.rws)");
-  path.spellcheck = false;
-  const read = el("button", "btn", T("read"));
-  read.onclick = () => path.value.trim() && preview("file", path.value.trim());
-  path.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); read.click(); } });
+  const path = el("span", "xc-selected-file");
   {
     const pick = el("button", "btn primary", T("choose a file…"));
     pick.onclick = async () => {
       let f = "";
       try { f = await api.PickImportFile(); } catch (e) { return say("fail", errText(e)); }
-      if (f) { path.value = f; preview("file", f); }
+      if (f && S.screen === "plan-import") { path.textContent = f; editablePath(copyablePath(path, f), () => pick.click(), true); preview("file", f); }
       else if (!info.dialogs) fileInput.click();
     };
     const fileInput = el("input"); fileInput.type = "file"; fileInput.hidden = true;
@@ -87,7 +83,7 @@ function importSource(body) {
     fileInput.onchange = () => { if (fileInput.files[0]) readFile(fileInput.files[0]); };
     row.append(pick, fileInput);
   }
-  row.append(path, read);
+  row.append(path);
 
 
 

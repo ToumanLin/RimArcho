@@ -7,7 +7,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
-// What the player can do with a row in the plan editor or Mod 库存 › 全部
+// What the player can do with a row in the plan editor or Mod library > All
 // (06 §3.5, §8.5): one table of operations with their label, key and menu group, and per
 // row only the codes that apply. The right-click menu, the hint line, a copy's detail
 // buttons, the selection bar and the keys all come from it, and the label table goes to the
@@ -20,11 +20,11 @@ type Op struct {
 	// Key runs it ("" only from the menu: the menu key or shift+F10 opens the menu, so the
 	// keyboard reaches every op).
 	Key   string `json:"key,omitempty"`
-	Group int    `json:"group"` // the menu's group: 1 列表 2 整理 3 打开 4 版本 5 磁盘
+	Group int    `json:"group"` // the menu's group: 1 list 2 organise 3 open 4 supported versions 5 disk
 	// Confirm: it changes files, so the dry run shows first (LibPreview).
 	Confirm bool `json:"confirm,omitempty"`
 	Danger  bool `json:"danger,omitempty"` // red, last in the menu
-	// Detail: a button in a copy's detail (Mod 库).
+	// Detail: a button in a copy's detail (Mod library).
 	Detail bool `json:"detail,omitempty"`
 	// One: it acts on one row at a time (the folder, a page, a note, a position).
 	One bool `json:"one,omitempty"`
@@ -32,41 +32,41 @@ type Op struct {
 
 // Op codes. The library's LibDo takes the codes of groups 1, 4 and 5.
 const (
-	OpEnable    = "enable"     // 启用 (the editor's 未启用)
-	OpAdd       = "add"        // 启用 (Mod 库: into the current list)
-	OpUse       = "use"        // 在当前列表里用这一份: the current plan uses another copy of the mod
-	OpDisable   = "disable"    // 停用 (the editor's 已启用)
-	OpTakeOut   = "take-out"   // 停用 (Mod 库: out of the current list)
-	OpPutBack   = "put-back"   // 放回列表 (暂存)
-	OpEnableAt  = "enable-at"  // 启用到…
-	OpMoveTo    = "move-to"    // 移动到…
-	OpStage     = "stage"      // 放进暂存
-	OpSwap      = "swap"       // 切换版本…
-	OpRemove    = "remove"     // 在所有列表里停用
-	OpTags      = "tags"       // 标签
-	OpNote      = "note"       // 备注 (Mod 库: this copy's note)
-	OpSeparate  = "separate"   // 不列为副本
-	OpFolder    = "folder"     // 打开文件夹
-	OpWorkshop  = "workshop"   // 打开工坊页面
-	OpSteam     = "steam"      // Steam 客户端页面
-	OpPin       = "pin"        // 锁定这个版本
-	OpPinUpdate = "pin-update" // 更新至工坊版本
-	OpUnpin     = "unpin"      // 解除锁定
-	OpMove      = "move"       // 移入锁定库
-	OpUnhide    = "unhide"     // 取消隐藏
+	OpEnable    = "enable"     // enable (the editor's Not enabled)
+	OpAdd       = "add"        // enable (Mod library: into the current list)
+	OpUse       = "use"        // use this one in the current list: the current plan uses another copy of the mod
+	OpDisable   = "disable"    // disable (the editor's Enabled)
+	OpTakeOut   = "take-out"   // disable (Mod library: out of the current list)
+	OpPutBack   = "put-back"   // put back (Staging)
+	OpEnableAt  = "enable-at"  // enable at…
+	OpMoveTo    = "move-to"    // move to…
+	OpStage     = "stage"      // stage
+	OpSwap      = "swap"       // switch version…
+	OpRemove    = "remove"     // disable in every list
+	OpTags      = "tags"       // a tag
+	OpNote      = "note"       // a note (Mod library: this copy's note)
+	OpSeparate  = "separate"   // do not list as a copy
+	OpFolder    = "folder"     // open the folder
+	OpWorkshop  = "workshop"   // open the Workshop page
+	OpSteam     = "steam"      // Steam client page
+	OpPin       = "pin"        // lock this one
+	OpPinUpdate = "pin-update" // update to the Workshop version
+	OpUnpin     = "unpin"      // unlock
+	OpMove      = "move"       // move into the lock library
+	OpUnhide    = "unhide"     // unhide
 	OpResub     = "resubscribe"
-	OpUnsub     = "unsubscribe"    // 退订, through the Steam client
-	OpDelete    = "delete"         // 移到回收站
-	OpTextures  = "textures"       // 优化贴图: the DDS of its PNGs next to them (08 §5.2)
-	OpTexClean  = "textures-clean" // 清除贴图优化: the DDS RimArcho wrote go
+	OpUnsub     = "unsubscribe"    // unsubscribe, through the Steam client
+	OpDelete    = "delete"         // move to the recycle bin
+	OpTextures  = "textures"       // optimise textures: the DDS of its PNGs next to them (08 §5.2)
+	OpTexClean  = "textures-clean" // remove the converted textures: the DDS RimArcho wrote go
 	OpSubRemove = "subscription-remove"
 	OpSubCheck  = "subscription-check"
 	OpSubUpdate = "subscription-update"
 	OpSubPage   = "subscription-page"
 )
 
-// opTable is every op in menu order (06 §8.5): within a group in this order, and 退订 /
-// 删除 last of all.
+// opTable is every op in menu order (06 §8.5): within a group in this order, and unsubscribe /
+// delete last of all.
 var opTable = []Op{
 	{Code: OpEnable, Key: "space", Group: 1},
 	{Code: OpAdd, Key: "space", Group: 1},
@@ -155,9 +155,9 @@ type Where int
 
 const (
 	Nowhere  Where = iota // another environment's, a missing item, a copy that cannot be loaded
-	Disabled              // installed here, not enabled (未启用)
-	Enabled               // in the load order (已启用)
-	Staged                // in staging (暂存)
+	Disabled              // installed here, not enabled (Not enabled)
+	Enabled               // in the load order (Enabled)
+	Staged                // in staging (Staging)
 )
 
 // WhereOf is where the copy is in the current plan.
@@ -180,14 +180,15 @@ const (
 	EditorPage  = "plan"
 	LibraryPage = "library"
 	ChangesPage = "changes"
-	// SubscribePage is Mod 库存 › 添加订阅 (06 §2.9).
+	// SubscribePage is Mod library › add a subscription (06 §2.9).
 	SubscribePage = "subscribe"
 	PackPages     = "packs" // the packs, and each pack's page
-	BuildPageID   = "build" // 编译成整合包
+	BuildPageID   = "build" // Create a pack
+	RulesPage     = "rules" // the TUI's Load-order rules screen (06 §9.1)
 )
 
 // CopyOps are the codes that apply to a copy now, in menu order (06 §8.5): the plan ops by
-// where it is, 标签 and 备注, 打开, the version ops and the disk ops (06 §2.9's 动作).
+// where it is, a tag and a note, open, the version ops and the disk ops (06 §2.9 actions).
 func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page string) []string {
 	has := func(s string) bool { return slices.Contains(i.States, s) }
 	plans := slices.ContainsFunc(i.UsedIn, func(u app.LibUse) bool { return u.Kind == "plan" })
@@ -238,7 +239,7 @@ func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page strin
 		}
 	}
 	if m != nil {
-		ks = append(ks, OpTags, OpNote) // the editor: the mod's note; Mod 库存: this copy's
+		ks = append(ks, OpTags, OpNote) // the editor: the mod's note; Mod library: this copy's
 	}
 	if live && others > 0 {
 		ks = append(ks, OpSeparate)
@@ -265,7 +266,7 @@ func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page strin
 	if live && has(app.LibHidden) {
 		ks = append(ks, OpUnhide)
 	}
-	// 贴图优化: a copy with PNG textures (not RimArcho's own mod)
+	// Texture optimisation: a copy with PNG textures (not RimArcho's own mod)
 	if page != LibraryPage && live && i.PNG && i.Path != "" && i.Source != app.LibMonitor && !has(app.LibHidden) && !has(app.LibResidue) {
 		ks = append(ks, OpTextures)
 	}

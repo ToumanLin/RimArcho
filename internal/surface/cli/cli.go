@@ -4,6 +4,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/accounts"
@@ -18,7 +20,6 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/buildinfo"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/env"
-	"github.com/ToumanLin/RimArcho/internal/host"
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
 	"github.com/ToumanLin/RimArcho/internal/surface/gui"
 	"github.com/ToumanLin/RimArcho/internal/surface/mcp"
@@ -49,7 +50,7 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	if len(argv) == 1 && (argv[0] == "--version" || argv[0] == "-v") {
 		argv = []string{"version"}
 	}
-	envName, here, rest, err := globalFlags(argv)
+	envName, rest, err := globalFlags(argv)
 	var openPlan string
 	if err == nil {
 		openPlan, rest, err = openPlanFlag(rest)
@@ -58,13 +59,24 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "error:", err)
 		return cmds.ExitUsage
 	}
-	ap, err := app.Open(env.AppHome())
+	// A database upgrade runs inside app.Open; show it (02 §7): RimArcho.exe has no console,
+	// so it gets a small window; the TUI's line follows ui.lang.
+	home := env.AppHome()
+	tuiMode := buildinfo.GUI != "1" && (len(rest) == 0 || len(rest) == 1 && rest[0] == "tui")
+	up := &upgradeReport{window: buildinfo.GUI == "1", lang: buildinfo.GUI == "1" || tuiMode, dbPath: filepath.Join(home, "archo.db"), stderr: stderr}
+	ap, err := app.OpenWith(home, app.OpenOptions{Upgrade: up.progress})
+	up.finish(err == nil)
 	if err != nil {
 		fmt.Fprintln(stderr, "error:", err)
 		return cmds.ExitError
 	}
 	defer ap.Close()
 	ap.EnvName, ap.PlanName = envName, openPlan
+	interactive := len(rest) == 0 || len(rest) == 1 && (rest[0] == "gui" || rest[0] == "tui")
+	if interactive {
+		// What an update left in the program folder (07 §5.1); never delays the first paint.
+		go ap.CleanSelfUpdate()
+	}
 	if (len(rest) == 0 && buildinfo.GUI == "1") || (len(rest) == 1 && rest[0] == "gui") {
 		// RimArcho.exe (a double click) or `archo gui` (06 §8.1).
 		if err := runGUI(ap, len(rest) == 1); err != nil {
@@ -73,19 +85,16 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 		}
 		return cmds.ExitOK
 	}
-	if wantsHost(rest, here) {
-		// A bare `archo` (a double click): run the TUI in RimArcho's WezTerm host when it is
-		// there or the player agrees to download it (06 §9.2).
-		if launched, err := runHost(ap, envName, stdout); err != nil {
-			fmt.Fprintln(stderr, "error:", err)
-		} else if launched {
-			return cmds.ExitOK
-		}
-	}
 	if len(rest) == 0 || (len(rest) == 1 && rest[0] == "tui") {
-		// No command, or `archo tui` (what the WezTerm host runs, 06 §9.2): the TUI.
+		// No command, or `archo tui`: run the TUI in the current terminal.
 		// Scans run as a child process of this executable.
-		if err := tui.Run(tui.Options{App: ap, ScanOnStart: true}); err != nil {
+		err := tui.Run(tui.Options{App: ap, ScanOnStart: true})
+		var restart *tui.Restart
+		if errors.As(err, &restart) {
+			ap.Close() // the new version may upgrade the database
+			return restartTUI(restart.Exe, argv, stderr)
+		}
+		if err != nil {
 			fmt.Fprintln(stderr, "error:", err)
 			return cmds.ExitError
 		}
@@ -102,7 +111,8 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 		return cmds.ExitOK
 	}
 	ctx := context.Background()
-	if len(rest) >= 2 && rest[0] == "test" && rest[1] == "run" {
+	// Ctrl+C stops a test run, or an update waiting for the other RimArcho to close.
+	if len(rest) >= 2 && rest[0] == "test" && rest[1] == "run" || rest[0] == "update" {
 		var stop context.CancelFunc
 		ctx, stop = signal.NotifyContext(ctx, os.Interrupt)
 		defer stop()
@@ -115,6 +125,24 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 		io.WriteString(stdout, out)
 	}
 	return code
+}
+
+// restartTUI runs the updated archo in this terminal with the same arguments and returns
+// its exit code (07 §5.1). Windows cannot replace a running process, so this one waits; the
+// new one leaves the old program file for the next start to remove.
+func restartTUI(exe string, argv []string, stderr io.Writer) int {
+	c := exec.Command(exe, argv...)
+	c.Stdin, c.Stdout, c.Stderr = os.Stdin, os.Stdout, os.Stderr
+	c.Env = append(os.Environ(), app.UpdatedFromEnv+"="+strconv.Itoa(os.Getpid()))
+	if err := c.Run(); err != nil {
+		var exit *exec.ExitError
+		if errors.As(err, &exit) {
+			return exit.ExitCode()
+		}
+		fmt.Fprintln(stderr, "error: RimArcho was updated, but the new version did not start:", err)
+		return cmds.ExitError
+	}
+	return cmds.ExitOK
 }
 
 // runGUI opens the GUI. `archo gui` hands over to RimArcho.exe next to it when there is
@@ -139,46 +167,18 @@ func runGUI(ap *app.App, fromConsole bool) error {
 	return gui.Run(gui.Options{App: ap})
 }
 
-// wantsHost: only a bare `archo` may start the WezTerm host; `archo tui` (what the host
-// runs), `archo --here`, every CLI command and `archo mcp` never do (06 §9.2).
-func wantsHost(rest []string, here bool) bool { return len(rest) == 0 && !here }
-
-// runHost is replaced in tests.
-var runHost = func(ap *app.App, envName string, out io.Writer) (bool, error) {
-	exe, err := os.Executable()
-	if err != nil {
-		return false, err
-	}
-	var args []string
-	if envName != "" {
-		args = []string{"--env", envName}
-	}
-	h := &host.Host{
-		Finder: ap.Deps(),
-		Home:   ap.Home, ProgramDir: filepath.Dir(exe), Exe: exe, Args: args, API: host.GitHubAPI,
-		Out: out, Getenv: os.Getenv, LookPath: exec.LookPath,
-		Start:   func(name string, args ...string) error { return startAlive(ap.Home, name, args...) },
-		Pref:    func() string { return ap.Store.Meta("cfg:terminal.host") },
-		SetPref: func(v string) error { return ap.Store.SetMeta("cfg:terminal.host", v) },
-	}
-	if st, err := os.Stdin.Stat(); err == nil && st.Mode()&os.ModeCharDevice != 0 {
-		h.In = os.Stdin // a console to ask on
-	}
-	return h.Run()
-}
-
 // globalFlags removes --env <name> / --env=<name> and --here from argv.
-func globalFlags(argv []string) (envName string, here bool, rest []string, err error) {
+func globalFlags(argv []string) (envName string, rest []string, err error) {
 	for i := 0; i < len(argv); i++ {
 		a := argv[i]
 		switch {
 		case a == "--":
-			return envName, here, append(rest, argv[i:]...), nil
+			return envName, append(rest, argv[i:]...), nil
 		case a == "--here" && len(rest) == 0:
-			here = true // only before a command: `archo --here` (06 §9.2)
+			// Accepted before a command for compatibility with old shortcuts; running here is always the default.
 		case a == "--env":
 			if i+1 >= len(argv) {
-				return "", false, nil, fmt.Errorf("--env needs a name")
+				return "", nil, fmt.Errorf("--env needs a name")
 			}
 			envName = argv[i+1]
 			i++
@@ -188,7 +188,7 @@ func globalFlags(argv []string) (envName string, here bool, rest []string, err e
 			rest = append(rest, a)
 		}
 	}
-	return envName, here, rest, nil
+	return envName, rest, nil
 }
 
 // openPlanFlag removes --open-plan <name> / --open-plan=<name>: the command acts on that

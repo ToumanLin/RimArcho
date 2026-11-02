@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+  <ArchoMonitor_RecordMessages>Record info messages (Log.Message)</ArchoMonitor_RecordMessages>
+  <ArchoMonitor_RecordMessagesTip>Takes effect at the next start. Off by default: info messages are the most frequent.</ArchoMonitor_RecordMessagesTip>
+  <ArchoMonitor_Log>Log</ArchoMonitor_Log>
+  <ArchoMonitor_Entries>Entries</ArchoMonitor_Entries>
+  <ArchoMonitor_HooksNotInstalled>Hooks not installed</ArchoMonitor_HooksNotInstalled>
+</LanguageData>

@@ -14,7 +14,7 @@ import (
 // Import and export of the mod list (04 §9): the page previews a list before anything
 // changes, and applies it as one undoable step; export writes a file or copies text.
 // The file dialogs and the clipboard are the window's (Wails); the development harness
-// has none, so every path can also be typed.
+// has none; local-path editing belongs to the desktop window.
 
 // native is what the window offers beyond the page; nil in the harness and in tests.
 type native interface {
@@ -48,7 +48,7 @@ var listFilters = [][2]string{
 	{"All files (*.*)", "*.*"},
 }
 
-// Exchange says what the page can use: native dialogs, and where typed paths start.
+// Exchange says what the page can use: native dialogs and the default export directory.
 type Exchange struct {
 	Dialogs bool                `json:"dialogs"`
 	Dir     string              `json:"dir"`
@@ -64,10 +64,10 @@ func (s *API) ExchangeInfo() *Exchange {
 
 // PickFolder shows the folder dialog (the guide's game folder, the settings page's folders),
 // starting at start when it exists; "" when it was cancelled. Without a window (the
-// development harness) it is an error: the path is typed instead.
+// development harness) it is an error: select paths in the desktop window.
 func (s *API) PickFolder(start string) (string, error) {
 	if s.x.native == nil {
-		return "", errors.New(view.T("no folder dialog here; type the path"))
+		return "", errors.New(view.T("no folder dialog here; use the desktop window"))
 	}
 	start = strings.Trim(strings.TrimSpace(start), `"'`)
 	for start != "" {
@@ -84,10 +84,10 @@ func (s *API) PickFolder(start string) (string, error) {
 	return s.x.native.openDir(view.T("choose a folder"), start)
 }
 
-// PickProgram chooses an external tool's executable; every path can also be typed.
+// PickProgram chooses an external tool's executable in the native file dialog.
 func (s *API) PickProgram() (string, error) {
 	if s.x.native == nil {
-		return "", errors.New(view.T("no file dialog here; type the path"))
+		return "", errors.New(view.T("no file dialog here; use the desktop window"))
 	}
 	return s.x.native.openFile(view.T("choose a program"), nil)
 }
@@ -98,6 +98,14 @@ func (s *API) PickImportFile() (string, error) {
 		return "", nil
 	}
 	return s.x.native.openFile(view.T("import a mod list"), listFilters)
+}
+
+// PickPackFile selects an archive for the guide; cancellation leaves the guide unchanged.
+func (s *API) PickPackFile() (string, error) {
+	if s.x.native == nil {
+		return "", errors.New(view.T("no file dialog here; use the desktop window"))
+	}
+	return s.x.native.openFile(view.T("choose a pack"), [][2]string{{"RimArcho pack (*.archopack)", "*.archopack"}})
 }
 
 // PickExportFile shows the save dialog for a format; "" when it was cancelled.
@@ -209,7 +217,7 @@ func (s *API) ExportCopy(format string) (*Copied, error) {
 type wailsNative struct{ app *application.App }
 
 func (w wailsNative) openFile(title string, filters [][2]string) (string, error) {
-	d := w.app.Dialog.OpenFile().SetTitle(title).CanChooseFiles(true)
+	d := w.app.Dialog.OpenFile().SetTitle(title).CanChooseFiles(true).CanChooseDirectories(false)
 	for _, f := range filters {
 		d.AddFilter(f[0], f[1])
 	}

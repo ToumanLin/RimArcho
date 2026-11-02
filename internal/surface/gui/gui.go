@@ -36,7 +36,7 @@ func Run(o Options) error {
 	perftrace.Mark("gui-enter")
 	a := o.App
 	view.SetLang(cmds.Setting(a, "ui.lang"))
-	a.LazyLog = true // the newest log is parsed when 需要处理 opens (as in the TUI)
+	a.LazyLog = true // the newest log is parsed when Can it run opens (as in the TUI)
 	a.LogCacheOnly = true
 	tuneProcess(a)
 	api := newAPI(a)
@@ -51,26 +51,33 @@ func Run(o Options) error {
 	iconDone()
 	debug.FreeOSMemory() // the drawing's buffers
 	w := application.New(application.Options{
-		Name:     "RimArcho",
-		Icon:     ico, // used when the exe has no icon resource (development builds, 06 §8.6)
-		Services: []application.Service{application.NewService(api)},
-		Assets:   application.AssetOptions{Handler: page},
+		Name:       "RimArcho",
+		Icon:       ico, // used when the exe has no icon resource (development builds, 06 §8.6)
+		Services:   []application.Service{application.NewService(api)},
+		Assets:     application.AssetOptions{Handler: page},
+		ShouldQuit: api.allowClose,
 		Windows: application.WindowsOptions{
 			// WebView2's profile lives in RimArcho's data directory, not %APPDATA%\RimArcho.exe.
 			WebviewUserDataPath:   filepath.Join(a.Home, "webview2"),
 			AdditionalBrowserArgs: BrowserArgs(cmds.Setting(a, "ui.gpu") != "off"),
+			WndProcInterceptor:    api.uninstallSessionEnd,
 		},
 	})
 	api.emit = func(name string, data any) { w.Event.Emit(name, data) }
 	api.x.native = wailsNative{w}
 	api.quit = w.Quit
 	frame := newWindowTheme(cmds.Setting(a, "ui.theme"))
+	// Composition hosting lets Windows hit-test our maximize button for Snap Layouts.
+	frame.options.WebView2CompositionHosting = true
 	win := w.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title: "RimArcho", Width: 1440, Height: 880, MinWidth: 720, MinHeight: 480, URL: perfURL(),
+		Frameless:                  runtime.GOOS == "windows",
 		BackgroundColour:           frame.background,
 		Windows:                    frame.options,
 		DefaultContextMenuDisabled: true, // the page draws its own (06 §8.5)
 	})
+	win.RegisterHook(events.Common.WindowClosing, api.guardWindowClose)
+	api.uninstall.shutdownBlock = uninstallShutdownBlock(win)
 	win.OnWindowEvent(events.Common.WindowShow, func(*application.WindowEvent) { perftrace.Mark("window-show") })
 	win.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) { perftrace.Mark("webview-runtime-ready") })
 	api.windowTheme = frame.bind(win)

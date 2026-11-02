@@ -1,8 +1,8 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>能不能跑 · C 按要做的事</title>
+<title>can it run · C By action</title>
 <link rel="stylesheet" href="shared.css">
 <style>
   .step { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 4px 12px; padding: 14px 16px; align-items: start; }
@@ -56,24 +56,24 @@
 // choices are answered in place. The number is the steps left, plus the log's groups.
 const L = (id) => `${statusIcon(byId[id].st)}<span>${nm(byId[id].title)}</span>`;
 const STEPS = [
-  { g: "do", id: "sort", t: "自动排序", act: ["自动排序", "S"], done: "已排序",
-    covers: [L("official"), L("order") + ' <button class="btn link" data-fold="order">展开</button>'],
-    also: "顺带满足 5 条较弱的顺序要求；3 个 Mod 的循环要求按优先级处理（放弃“RimHUD 排在 Real Ruins 之后”）。" },
-  { g: "do", id: "enable", t: "启用 2 个 Mod", act: ["启用这 2 个", "space"], done: "已启用 2 个",
-    covers: [`${statusIcon("err")}<span>${nm("⟦Vanilla Expanded Framework⟧")}<span class="muted">${nm("⟦VFE - Mechanoids⟧")}、${nm("⟦Vanilla Furniture Expanded⟧")} 需要它</span></span>`,
-      `${statusIcon("warn")}<span>${nm("⟦Rimefeller⟧")}<span class="muted">${nm("⟦Dubs Bad Hygiene⟧")} 的 6 个补丁针对它</span></span>`] },
-  { g: "do", id: "sub", t: "订阅 3 个没安装的 Mod", act: ["全部订阅…", "s"], more: [["从列表中移除", "x"]], done: "已开始订阅（后台任务）",
-    covers: [`<span>${byId.missing.fold.map(nm).join("、")}</span>`], also: "订阅并下载后会自动回到列表里的位置。" },
-  { g: "do", id: "links", t: "修复 2 个断掉的链接", act: ["修复…", "R"], done: "已修复", links: true },
-  { g: "do", id: "pack", t: "移除整合包「战锤 40K」留在 Mods/ 的 14 个链接", act: ["移除链接", "r"], done: "已移除", also: "从 RimArcho 启动列表时也会移除它们。" },
+  { g: "do", id: "sort", t: "sort automatically", act: ["sort automatically", "S"], done: "sorted",
+    covers: [L("official"), L("order") + ' <button class="btn link" data-fold="order">expand</button>'],
+    also: "Also satisfies 5 weak order requirements; handles cycles among 3 mods by priority (drops RimHUD after Real Ruins)." },
+  { g: "do", id: "enable", t: "enable 2 mods", act: ["enable these 2", "space"], done: "enabled 2",
+    covers: [`${statusIcon("err")}<span>${nm("⟦Vanilla Expanded Framework⟧")}<span class="muted">${nm("⟦VFE - Mechanoids⟧")}, ${nm("⟦Vanilla Furniture Expanded⟧")} need it</span></span>`,
+      `${statusIcon("warn")}<span>${nm("⟦Rimefeller⟧")}<span class="muted">${nm("⟦Dubs Bad Hygiene⟧")} : 6 patches target it</span></span>`] },
+  { g: "do", id: "sub", t: "subscribe to 3 missing mods", act: ["subscribe to all…", "s"], more: [["remove it from the list", "x"]], done: "subscription started (background task)",
+    covers: [`<span>${byId.missing.fold.map(nm).join(", ")}</span>`], also: "After subscribing and downloading, they return to their positions in the list." },
+  { g: "do", id: "links", t: "repair 2 broken links", act: ["repair…", "R"], done: "repaired", links: true },
+  { g: "do", id: "pack", t: "remove 14 links left in Mods/ by pack Warhammer 40K", act: ["remove the links", "r"], done: "removed", also: "Launching a list from RimArcho also removes them." },
   { g: "choose", id: "incompat", t: byId.incompat.title, why: byId.incompat.why,
-    opts: [["停用 Combat Extended", "改写整个战斗系统；2 个启用的 Mod 需要它"], ["停用 Yayo's Combat 3", "较轻的战斗调整；没有 Mod 需要它"]] },
+    opts: [["disable Combat Extended", "rewrites combat; 2 enabled mods need it"], ["disable Yayo's Combat 3", "lighter combat changes; no mods need it"]] },
   { g: "choose", id: "dup", t: byId.dup.title, why: byId.dup.why,
-    opts: [["保留工坊那份", "10 月 20 日更新 · 工坊 2009463077"], ["保留本地那份", "Mods/AllowTool-old · 3 月 2 日"]] },
+    opts: [["keep the Workshop copy", "updated Oct 20 · Workshop 2009463077"], ["keep the local copy", "Mods/AllowTool-old · Mar 2"]] },
   { g: "choose", id: "ident", t: byId.ident.title, why: byId.ident.why, eq: true, whyLink: true,
-    opts: [["是同一个", "合并成一个 Mod，变化历史接在一起"], ["是副本", "记为同一个 Mod 的另一份"], ["无关", "以后不再问"]] },
-  { g: "choose", id: "extern", t: byId.extern.title, why: byId.extern.why, act: ["看差异", "d"],
-    opts: [["载入游戏里的改动", "替换这个列表现在的内容"], ["保留这个列表", "游戏里的改动不要了"]] },
+    opts: [["same", "merge into one mod and join change histories"], ["a copy", "record as another copy of the same mod"], ["unrelated", "do not ask again"]] },
+  { g: "choose", id: "extern", t: byId.extern.title, why: byId.extern.why, act: ["see the changes", "d"],
+    opts: [["use the outside change", "replace this list's current content"], ["keep this list", "discard outside changes"]] },
 ];
 const LOGS = ITEMS.filter((it) => it.sec === "run" && !it.old);
 const HINTS = [byId.version, byId.combo, byId.obs];
@@ -82,29 +82,29 @@ let cur = 0, hintsOpen = false, foldOrder = false;
 const ROWS = () => [...STEPS.map((s) => ({ k: "step", s })), ...LOGS.map((it) => ({ k: "log", it })), ...(hintsOpen ? HINTS.map((it) => ({ k: "hint", it })) : [])];
 const left = () => STEPS.filter((s) => !done.has(s.id)).length;
 
-shell("c", left() + LOGS.length, [["↑↓", "移动"], ["← →", "换组"], ["enter", "做这一步"], ["u", "撤销"], ["A", "重新检查"]],
-  "C：按要做的事排。同一个动作能解决的合成一步；选择题就地回答。数字 = 剩下的步数 + 日志里的报错组。");
+shell("c", left() + LOGS.length, [["↑↓", "move"], ["← →", "change group"], ["enter", "do this step"], ["u", "undo"], ["A", "recheck"]],
+  "C: ordered by work to do. Merge items solved by one action into a step; answer choices inline. Count = remaining steps + log error groups.");
 
 function head() {
   const n = left(), all = STEPS.length;
-  $("#head").innerHTML = `<p class="lead">${n ? `<b>${PLAN}</b>还要做 ${n} 件事才能放心玩，上次运行还有 ${LOGS.length} 组报错` : `<b>${PLAN}</b>该做的都做了，上次运行还有 ${LOGS.length} 组报错`}</p>
+  $("#head").innerHTML = `<p class="lead">${n ? `<b>${PLAN}</b>${n} steps left before playing; ${LOGS.length} error groups last run` : `<b>${PLAN}</b>all steps done; ${LOGS.length} error groups last run`}</p>
     <div class="page-acts"><span class="progress"><span class="bar"><i style="width:${((all - n) / all) * 100}%"></i></span>${all - n}/${all}</span>
-    <button class="btn primary small" id="quick">${ic("wand")} 做 ① ②（排序并启用）</button><button class="btn small">${ic("refresh")} 重新检查文件</button></div>`;
-  $("#quick").onclick = () => { ["sort", "enable"].forEach((id) => done.set(id, STEPS.find((s) => s.id === id).done)); toast("会执行：启用 2 个 Mod 并自动排序（u 撤销）"); draw(); };
+    <button class="btn primary small" id="quick">${ic("wand")} do ① ② (sort and enable)</button><button class="btn small">${ic("refresh")} recheck files</button></div>`;
+  $("#quick").onclick = () => { ["sort", "enable"].forEach((id) => done.set(id, STEPS.find((s) => s.id === id).done)); toast("would run: enable 2 mods and sort (u undo)"); draw(); };
   setBadge(n + LOGS.length);
 }
 function stepHTML(s, i, k) {
   const d = done.get(s.id);
   const num = d ? ic("check") : "①②③④⑤⑥⑦⑧⑨"[k];
   let acts = "";
-  if (d) acts = `<button class="btn small" data-undo="${s.id}">撤销<kbd>u</kbd></button>`;
+  if (d) acts = `<button class="btn small" data-undo="${s.id}">undo<kbd>u</kbd></button>`;
   else if (s.act) acts = `<button class="btn ${s.g === "do" ? "primary" : "line"} small" data-do="${s.id}">${esc(s.act[0])}<kbd>${s.act[1]}</kbd></button>` + (s.more || []).map(([l, key]) => `<button class="btn line small" data-t="${l}">${l}<kbd>${key}</kbd></button>`).join("");
   const covers = s.covers ? `<ul class="covers">${s.covers.map((c) => `<li>${c}</li>`).join("")}</ul>` : "";
   const fold = s.id === "sort" && foldOrder ? `<ul class="fold">${byId.order.fold.map((f) => `<li>${nm(f)}</li>`).join("")}</ul>` : "";
   const why = s.why ? `<div class="why muted" style="margin-top:2px">${nm(s.why)}</div>` : "";
   const links = s.links ? linkRows(byId.links.links) : "";
   const opts = s.opts && !d ? `<div class="opts">${s.opts.map(([t, dd]) => `<button class="opt" data-pick="${s.id}" data-l="${esc(t)}"><b>${esc(t)}</b><span>${esc(dd)}</span></button>`).join("")}</div>` : "";
-  const wl = s.whyLink && !d ? `<div><button class="btn link" data-t="打开“为什么这样问”">为什么这样问</button></div>` : "";
+  const wl = s.whyLink && !d ? `<div><button class="btn link" data-t="open why this question">why this question?</button></div>` : "";
   return `<div class="step ${d ? "done" : ""}" data-i="${i}"><div class="num">${num}</div>
     <div><div class="stitle">${s.g === "do" ? esc(s.t) : nm(s.t)}</div>${d ? `<div class="donesay">${esc(d)}</div>` : ""}${why}${covers}${fold}${s.also ? `<div class="also">${esc(s.also)}</div>` : ""}${links}${wl}</div>
     <div class="sacts">${acts}</div>${opts}</div>`;
@@ -117,18 +117,18 @@ function draw() {
     const n = ss.filter((s) => !done.has(s.id)).length;
     html += `<section class="${cls}"><h2 class="label">${title}<span class="n">${n}</span>${r}</h2><div class="card">${ss.map((s) => stepHTML(s, i++, STEPS.indexOf(s))).join("")}</div></section>`;
   };
-  grp("do", "可以直接做", "sec-break", `<span class="r">每一步都能用 u 撤销</span>`);
-  grp("choose", "要你来选", "sec-confirm", `<span class="r">选一个就算做完</span>`);
-  html += `<section class="sec-run"><h2 class="label">上次运行的报错<span class="n">${LOGS.length}</span><span class="r">${LASTRUN}　更早的日志 9 月 29 日 1.5 已折叠</span></h2><div class="card">`;
+  grp("do", "ready to do", "sec-break", `<span class="r">u undoes each step</span>`);
+  grp("choose", "for you to choose", "sec-confirm", `<span class="r">choose one to finish</span>`);
+  html += `<section class="sec-run"><h2 class="label">errors from the last run<span class="n">${LOGS.length}</span><span class="r">${LASTRUN}  older Sep 29 1.5 log collapsed</span></h2><div class="card">`;
   let phase = "";
   for (const it of LOGS) {
     if (it.phase !== phase) html += `<div class="phase">${it.phase}</div>`;
     phase = it.phase;
-    html += needHTML(it, i++, { extra: it.relates ? `<div class="rel">它的前置 ${nm("⟦Vanilla Expanded Framework⟧")} 没有启用，第 ② 步会启用它</div>` : "" });
+    html += needHTML(it, i++, { extra: it.relates ? `<div class="rel">its dependency ${nm("⟦Vanilla Expanded Framework⟧")} is disabled; step ② enables it</div>` : "" });
   }
   html += `</div></section>`;
-  html += `<section class="sec-hint"><h2 class="label fold-head ${hintsOpen ? "open" : ""}" id="hintHead"><span class="chev">${ic("chev")}</span>可以留意<span class="n">${HINTS.length}</span><span class="r">不计数</span></h2>${hintsOpen ? `<div class="card">${HINTS.map((it) => needHTML(it, i++)).join("")}</div>` : ""}</section>`;
-  html += `<div class="moved"><button>${ic("arrow")} 3 个隐藏的 Mod 在 Mod 库 › 全部</button><button>${ic("arrow")} 游戏「1.5 测试」有 1 个链接要看，在 游戏</button></div>`;
+  html += `<section class="sec-hint"><h2 class="label fold-head ${hintsOpen ? "open" : ""}" id="hintHead"><span class="chev">${ic("chev")}</span>worth knowing<span class="n">${HINTS.length}</span><span class="r">not counted</span></h2>${hintsOpen ? `<div class="card">${HINTS.map((it) => needHTML(it, i++)).join("")}</div>` : ""}</section>`;
+  html += `<div class="moved"><button>${ic("arrow")} 3 hidden mods in mod library › all</button><button>${ic("arrow")} game 1.5 test has 1 link to check, on games</button></div>`;
   $("#page").innerHTML = html;
   $("#hintHead").onclick = () => { hintsOpen = !hintsOpen; draw(); };
   mark();
@@ -141,18 +141,18 @@ $("#page").addEventListener("click", (e) => {
   const row = e.target.closest("[data-i]"); if (row) { cur = +row.dataset.i; mark(); }
   const b = e.target.closest("button"); if (!b) return;
   const S = (id) => STEPS.find((s) => s.id === id);
-  if (b.dataset.do) { done.set(b.dataset.do, S(b.dataset.do).done); toast(`会执行：${S(b.dataset.do).act[0]}`); draw(); }
-  else if (b.dataset.undo) { done.delete(b.dataset.undo); toast("已撤销"); draw(); }
-  else if (b.dataset.pick) { done.set(b.dataset.pick, `已选：${b.dataset.l}`); toast(`会执行：${b.dataset.l}`); draw(); }
+  if (b.dataset.do) { done.set(b.dataset.do, S(b.dataset.do).done); toast(`would run: ${S(b.dataset.do).act[0]}`); draw(); }
+  else if (b.dataset.undo) { done.delete(b.dataset.undo); toast("undone"); draw(); }
+  else if (b.dataset.pick) { done.set(b.dataset.pick, `selected: ${b.dataset.l}`); toast(`would run: ${b.dataset.l}`); draw(); }
   else if (b.dataset.fold) { foldOrder = !foldOrder; draw(); }
-  else if (b.dataset.t) toast(`会执行：${b.dataset.t}`);
-  else if (b.dataset.a !== undefined) toast("会执行：打开游戏日志");
+  else if (b.dataset.t) toast(`would run: ${b.dataset.t}`);
+  else if (b.dataset.a !== undefined) toast("would run: open game log");
 });
 const group = (i) => { const r = ROWS()[i]; return r.k === "step" ? r.s.g : r.k; };
 keyNav(() => ROWS().length, () => cur, (i) => { cur = i; mark(); }, group, (i) => {
   const r = ROWS()[i];
-  if (r.k === "step" && r.s.act && !done.has(r.s.id) && r.s.g === "do") { done.set(r.s.id, r.s.done); draw(); toast(`会执行：${r.s.act[0]}`); }
-  else toast("会执行：" + (r.k === "step" ? "（先选一个）" : r.it.acts[0].l));
+  if (r.k === "step" && r.s.act && !done.has(r.s.id) && r.s.g === "do") { done.set(r.s.id, r.s.done); draw(); toast(`would run: ${r.s.act[0]}`); }
+  else toast("would run: " + (r.k === "step" ? " (choose one first)" : r.it.acts[0].l));
 });
 draw();
 </script>

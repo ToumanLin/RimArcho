@@ -178,7 +178,7 @@ func (d ModsDuplicate) Names() string {
 }
 
 // duplicateFindings are the Mods/ duplicates the pack links finding does not cover: each a
-// pkg.duplicate-mods error (06 §2.4 会让游戏出错).
+// pkg.duplicate-mods error (06 §2.4 Will cause errors).
 func (a *App) duplicateFindings(st *LoadoutState, dups []ModsDuplicate) []*finding.Finding {
 	var out []*finding.Finding
 	copies := a.ModsCopies(st.Ix)
@@ -222,7 +222,7 @@ func (a *App) duplicateFindings(st *LoadoutState, dups []ModsDuplicate) []*findi
 		default:
 			f.Suggestions = []string{"move all but one of them out of Mods/ (RimArcho does not move folders it did not make)"}
 		}
-		// First choice: move a plain folder into the lock library (收进锁定库), where plans
+		// First choice: move a plain folder into the lock library (move into the lock library), where plans
 		// still choose it; the one beside RimArcho's link, else one the current plan does not
 		// use, preferring one the game ignores (not the first).
 		if mv := a.folderToMove(st, d, copies); mv != nil {

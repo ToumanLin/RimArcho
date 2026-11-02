@@ -27,6 +27,18 @@ export const S = {
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
+// keyCaps draws a key label as key caps, never as plain words beside a label (06 §7.3 rule 13):
+// "ctrl+o ctrl+w" is two caps, and enter shows ↵.
+const KEY_TEXT = { enter: "enter ↵" };
+export function keyCaps(keys) {
+  const parts = String(keys).split(" ").filter(Boolean);
+  const cap = (k) => el("kbd", "", KEY_TEXT[k] || k);
+  if (parts.length === 1) return cap(parts[0]);
+  const s = el("span", "keys");
+  s.append(...parts.map(cap));
+  return s;
+}
+
 export function el(tag, cls, text) {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
@@ -111,7 +123,7 @@ export const idsOf = (its) => its.filter((it) => it.id).map((it) => it.id);
 export const refsOf = (its) => its.map((it) => it.ref);
 export function named(its) {
   if (its.length === 1) return its[0].name;
-  return S.start && S.start.lang === "zh" ? `${its.length} 个 Mod` : `${its.length} mods`;
+  return Tf("%d mods", its.length);
 }
 
 // slideThumb moves a switch's raised thumb under its open choice (magpie's view switch):

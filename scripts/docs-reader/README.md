@@ -1,25 +1,25 @@
-# 离线文档阅读器
+# Offline documentation reader
 
-双击 `.cache/docs-reader/rimarcho-docs-reader.html` 即可阅读。页面内置生成时的全部 Markdown 文档，无需启动服务器、联网或安装浏览器扩展。
+Double-click `.cache/docs-reader/rimarcho-docs-reader.html` to read. The page embeds all Markdown documents as of generation time; no server, network connection or browser extension is needed.
 
-生成的整库快照放在已被 Git 忽略的 `.cache/` 目录，不放入 `docs/`，也不命名为 `index.html`，以减少其他 agent 搜索和读取源文档时将其载入上下文的机会。原始 Markdown 是文档的唯一维护来源。
+The generated repository snapshot lives in the Git-ignored `.cache/` directory, not in `docs/` or a file named `index.html`, to reduce the chance that other agents load it into context while searching or reading source documents. Original Markdown is the only maintained documentation source.
 
-支持全文搜索与正文高亮、章节目录、文档间相对链接、浏览器前进后退、源码查看、字号调整、深浅色主题、打印和窄屏布局。上次阅读的文档、主题和字号会在浏览器允许本地存储时保存。
+Supports full-text search and body highlighting, a section table of contents, relative links between documents, browser back/forward, source viewing, font-size adjustment, light/dark themes, printing and narrow layouts. The last document, theme and font size are saved when the browser allows local storage.
 
-## 更新文档快照
+## Update the documentation snapshot
 
-在 RimArcho 仓库根目录运行：
+Run from the RimArcho repository root:
 
 ```powershell
 node scripts/docs-reader/build.cjs
 ```
 
-生成器优先使用已安装的 `markdown-it`，也能使用当前工作区已有的 `../RimModManager/frontend/node_modules/markdown-it`。在其他环境可指定模块路径：
+The generator prefers an installed `markdown-it` and can also use the existing `../RimModManager/frontend/node_modules/markdown-it` in this workspace. Elsewhere, specify the module path:
 
 ```powershell
 node scripts/docs-reader/build.cjs "C:/path/to/node_modules/markdown-it"
 ```
 
-只重新生成 `.cache/docs-reader/rimarcho-docs-reader.html`，不会修改原始文档。修改页面样式和交互请编辑 `template.html` 后重新生成。
+Only `.cache/docs-reader/rimarcho-docs-reader.html` is regenerated; source documents are unchanged. To change page styles and interactions, edit `template.html` and regenerate.
 
-文档图片和指向代码、界面草图等文件的链接仍引用仓库原始文件；保留仓库目录结构即可访问。HTML 中的文字、表格和代码块可以单独离线阅读。Markdown 原始 HTML 按文本显示，避免文档中的标签和脚本被执行。
+Document images and links to code, UI drafts and other files still reference the original repository files; keep the repository directory structure to access them. Text, tables and code blocks in the HTML can be read offline on their own. Raw HTML in Markdown is displayed as text to prevent document tags and scripts from executing.

@@ -73,15 +73,3 @@ func entryName(st *app.LoadoutState, e loadout.Entry) string {
 	}
 	return T("a removed mod")
 }
-
-func init() {
-	Register(map[string]string{
-		"your list":                      "你的列表",
-		"%s and %s are the same":         "%s 和 %s 一样",
-		"%s → %s: %d changes":            "%s → %s：%d 处不同",
-		"+ %s (only in %s, position %d)": "+ %s（只在%s里，第 %d 个）",
-		"− %s (only in %s)":              "− %s（只在%s里）",
-		"↕ %s: position %d → %d":         "↕ %s：第 %d 个 → 第 %d 个",
-		"⇄ %s: another copy (was %s)":    "⇄ %s：换了一个副本（原来是 %s）",
-	})
-}

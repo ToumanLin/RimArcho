@@ -1,4 +1,4 @@
-// Mod 库存 › 全部 (06 §2.9): what is on this machine. The same layout as the plan editor:
+// Mod library > All (06 §2.9): what is on this machine. The same layout as the plan editor:
 // the filter bar on top of a table, the details in a column on the right. The table is like
 // a file manager's details view: one row per Lineage (opening to its copies), columns the
 // player sorts (click a header, again reverses), moves (drag a header), sizes (drag its
@@ -7,7 +7,7 @@
 // comes from view.BuildLibrary through API.Library; each copy carries only the codes of
 // its ops (view.CopyOps), the labels and keys are the page's op table, sent once. The table
 // draws only the rows in view, so 1350+ Lineages stay smooth.
-import { S, $, el, api, T, Tf, errText, say } from "./state.js";
+import { S, $, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { on } from "./api.js";
 import { icon } from "./icons.js";
 import { detailFrame } from "./detail.js";
@@ -56,7 +56,7 @@ export function initLibrary(u) {
   addEventListener("resize", () => { if (S.screen === "library") drawRows(); });
 }
 
-// open shows the page (the sidebar's Mod 库存 › 全部).
+// open shows the page (the sidebar's Mod library > All).
 export async function open() {
   if (S.screen !== "library") { L.full = false; L.focus = "rows"; }
   const read = beginPageRead("library", { retry: open });
@@ -71,6 +71,15 @@ export async function openSearch(q) {
   b.input.value = q;
   L.cur = 0;
   await open();
+}
+
+// openInstance clears filters and selects the exact copy, expanding its Lineage if needed.
+export async function openInstance(id) {
+  const b = bar();
+  b.search = ""; b.filters = []; b.input.value = "";
+  L.sel.clear(); L.full = false; L.focus = "rows";
+  const read = beginPageRead("library", { retry: () => openInstance(id) });
+  await load(true, undefined, read, id);
 }
 
 // relang: the language changed; the page is drawn again in it, where it was (the column
@@ -97,9 +106,9 @@ function bar() {
   return L.bar;
 }
 
-async function load(fresh, focusRef, read = null) {
+async function load(fresh, focusRef, read = null, focusID = "") {
   if (!read && S.screen !== "library") return;
-  read ||= beginPageRead("library", { retry: () => load(fresh, focusRef) });
+  read ||= beginPageRead("library", { retry: () => load(fresh, focusRef, null, focusID) });
   const b = bar();
   let p, saved;
   try {
@@ -107,6 +116,12 @@ async function load(fresh, focusRef, read = null) {
   } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
   L.page = p;
+  if (focusID) {
+    const copy = (p.rows || []).flatMap(r => r.insts).find(i => i.id === focusID);
+    focusRef = copy?.ref;
+    if (focusRef) L.sel = new Set([focusRef]);
+    else say("fail", T("this copy is no longer in the Mod library"));
+  }
   if (focusRef) for (const r of p.rows || []) if (r.insts.some((i) => i.ref === focusRef)) L.open.add(r.id);
   ops.setTable(p.opTable);
   if (!L.cols) L.cols = mergeColumns(columnDefs(), saved);
@@ -156,7 +171,7 @@ function build() {
   const sizer = el("div", "lib-sizer");
   rows.append(th, sizer);
   main.append(head, rows);
-  // the left column, as the editor's 未启用: the filter bar on top, then the details (the
+  // the left column, as the editor's Not enabled: the filter bar on top, then the details (the
   // editor's detail card) filling the rest (06 §2.9)
   const detail = el("section", "area detail lib-detail");
   const dhead = el("div", "head");
@@ -467,7 +482,7 @@ function setFull(v) {
 
 let detailSeq = 0, frame = null;
 // drawDetail: the cursor's copy in the details, laid out as the editor's (detail.js
-// detailFrame): its note, picture and name, where it comes from, Mod 库存's field list, its
+// detailFrame): its note, picture and name, where it comes from, Mod library's field list, its
 // actions, the description and history (06 §2.9). A Workshop page not read yet is fetched
 // straight away.
 async function drawDetail() {
@@ -563,12 +578,12 @@ function drawBar() {
     const b = el("button", "btn" + (o.danger ? " danger" : ""), o.label);
     if (copies.length < L.sel.size) b.append(el("span", "faint", " " + copies.length));
     if (o.group !== 3) b.dataset.envWrite = c;
-    if (o.key) b.append(el("kbd", "", o.key));
+    if (o.key) b.append(keyCaps(o.key));
     b.onclick = () => run(c, copies);
     bar.append(b);
   }
   const x = el("button", "btn quiet", T("clear the selection"));
-  x.append(el("kbd", "", "esc"));
+  x.append(keyCaps("esc"));
   x.onclick = () => { L.sel.clear(); els.rows.dataset.sig = ""; drawRows(); drawBar(); hints(); };
   bar.append(x);
 }

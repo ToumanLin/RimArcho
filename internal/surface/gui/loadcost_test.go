@@ -2,6 +2,8 @@ package gui
 
 import (
 	"context"
+	"github.com/ToumanLin/RimArcho/internal/machine"
+	"github.com/ToumanLin/RimArcho/internal/view"
 	"os/exec"
 	"testing"
 	"time"
@@ -76,5 +78,53 @@ func TestPlanCostMeasurementCancelsOlderRequests(t *testing.T) {
 			t.Fatal("measurement did not finish")
 		case <-time.After(time.Millisecond):
 		}
+	}
+}
+
+func TestMemoryCapacityReachesNeedsWithoutBlockingPage(t *testing.T) {
+	e, api, _ := fixture(t)
+	e.App.MemoryProbe = func() machine.Memory {
+		return machine.Memory{TotalRAM: 8 << 30, AvailableRAM: 1, SampledAt: time.Now(), Adapters: []machine.Adapter{{Name: "fixture", Dedicated: 1}}}
+	}
+	before := api.Needs()
+	if before.Memory == nil || before.Memory.Estimated {
+		t.Fatalf("first page should show unknown estimate: %+v", before.Memory)
+	}
+	api.costMeasure.disk.Lock()
+	p, err := api.PlanLoadCost(0)
+	if err != nil || p == nil || !p.Loading {
+		t.Fatalf("background request %+v %v", p, err)
+	}
+	stampResponds(t, api)
+	api.costMeasure.disk.Unlock()
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		p = api.PlanLoadCostMeasure(p.Request)
+		if p == nil {
+			t.Fatal("measurement disappeared")
+		}
+		if !p.Loading {
+			break
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if p.Loading || p.Error != "" {
+		t.Fatalf("measurement %+v", p)
+	}
+	after := api.Needs()
+	if after.Memory == nil || !after.Memory.Estimated || after.Memory.RAMSeverity != "severe" {
+		t.Fatalf("comparison not refreshed: %+v", after.Memory)
+	}
+	found := false
+	for _, it := range after.Items {
+		if it.Kind == "memory.capacity" {
+			found = true
+			if it.Status != view.StatusErr || !it.Counted {
+				t.Fatalf("RAM icon/count %+v", it)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("comparison item missing")
 	}
 }

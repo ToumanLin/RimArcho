@@ -23,15 +23,3 @@ func EnvRemovalLines(r *app.EnvRemoval) []string {
 	}
 	return out
 }
-
-func init() {
-	Register(map[string]string{
-		"remove game %s":  "移除游戏 %s",
-		"remove the game": "移除游戏",
-		"RimArcho forgets: %d launch records, %d mods read from its Data/ and Mods/, its history; lists are shared by every game and stay": "RimArcho 忘掉：%d 条启动记录、从它的 Data/ 和 Mods/ 读到的 %d 个 Mod，以及它的历史；列表是所有游戏共用的，会保留",
-		"stays: the game folder, every mod and save; the shared mod folders and what you noted on mods":                                    "保留：游戏文件夹、所有 mod 和存档；共享的 Mod 文件夹和你给 mod 记下的内容",
-		"then %s is in use": "之后使用 %s",
-		"no game is left":   "之后不再有游戏",
-		"removed game %s":   "已移除游戏 %s",
-	})
-}

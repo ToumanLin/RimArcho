@@ -114,6 +114,9 @@ func (m *matcher) search(ctx context.Context, j fileJob, o Options, scratch *[]b
 			end += start
 		}
 		hit := Match{Line: line, Col: start - lineStart + 1, Text: snippet(string(b[lineStart:end]), 160)}
+		if o.LineMode {
+			hit.Text = matchSnippet(string(b[lineStart:end]), start-lineStart, 160)
+		}
 		if binary {
 			hit.Line = 0
 		}
@@ -124,12 +127,33 @@ func (m *matcher) search(ctx context.Context, j fileJob, o Options, scratch *[]b
 		if len(m.prefix) > 0 && !bytes.Contains(b, m.prefix) {
 			return found
 		}
-		for _, hit := range m.re.FindAllIndex(b, -1) {
-			if ctx.Err() != nil {
-				return fileHits{err: ctx.Err()}
+		if o.LineMode {
+			for start := 0; start < len(b); {
+				if ctx.Err() != nil {
+					return fileHits{err: ctx.Err()}
+				}
+				end := bytes.IndexByte(b[start:], '\n')
+				if end < 0 {
+					end = len(b)
+				} else {
+					end += start
+				}
+				if hit := m.re.FindIndex(b[start:end]); hit != nil {
+					add(start + hit[0])
+				}
+				if len(found.matches) >= o.PerFile {
+					break
+				}
+				start = end + 1
 			}
-			if !m.word || boundary(b, hit[0], hit[1]) {
-				add(hit[0])
+		} else {
+			for _, hit := range m.re.FindAllIndex(b, -1) {
+				if ctx.Err() != nil {
+					return fileHits{err: ctx.Err()}
+				}
+				if !m.word || boundary(b, hit[0], hit[1]) {
+					add(hit[0])
+				}
 			}
 		}
 	} else {
@@ -153,6 +177,9 @@ func (m *matcher) search(ctx context.Context, j fileJob, o Options, scratch *[]b
 				continue
 			}
 			add(start)
+			if o.LineMode && len(found.matches) >= o.PerFile {
+				break
+			}
 			if o.Def {
 				at = end
 				continue
@@ -199,4 +226,28 @@ func snippet(s string, limit int) string {
 		end--
 	}
 	return s[:end] + "..."
+}
+
+// UI snippets keep the matching part visible even on long/minified XML lines.
+// The CLI continues to use its established leading-line snippet.
+func matchSnippet(s string, at, limit int) string {
+	if len(s) <= limit {
+		return strings.TrimSpace(s)
+	}
+	start := max(0, at-limit/3)
+	for start > 0 && !utf8.RuneStart(s[start]) {
+		start--
+	}
+	end := min(len(s), start+limit-6)
+	for end > start && end < len(s) && !utf8.RuneStart(s[end]) {
+		end--
+	}
+	text := s[start:end]
+	if start > 0 {
+		text = "..." + text
+	}
+	if end < len(s) {
+		text += "..."
+	}
+	return strings.TrimSpace(text)
 }

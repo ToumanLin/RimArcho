@@ -3,14 +3,15 @@ import { test } from "node:test";
 import { Element, loadModules, event, flush } from "./dom.mjs";
 
 async function setup() {
-  const copied = [], browser = [], timers = [];
-  let native = true;
+  const copied = [], browser = [], timers = new Map();
+  let native = true, serial = 0;
   const document = { activeElement: null };
   const el = (tag, cls, text) => new Element(tag, cls, text);
   const fields = await loadModules("./fields.js", {
     "./state.js": { el, esc: s => s, api: {}, T: s => s === "copied" ? "已复制" : s, errText: e => e.message, say() {} },
     "/wails/runtime.js": { Clipboard: { SetText: async text => { if (!native) throw Error("no native clipboard"); copied.push(text); } } },
-  }, { document, navigator: { clipboard: { writeText: async text => browser.push(text) } }, setTimeout: fn => timers.push(fn) });
+  }, { document, navigator: { clipboard: { writeText: async text => browser.push(text) } },
+    setTimeout: fn => { timers.set(++serial, fn); return serial; }, clearTimeout: id => timers.delete(id) });
   const root = el("div");
   return { ...fields, el, root, copied, browser, timers, noNative: () => { native = false; } };
 }
@@ -27,61 +28,69 @@ test("path markers preserve spaces, relative paths, mixed facts and repeated pat
   assert.equal(h.pathContent(h.el("div"), "saved to lists/export.json", ["lists/export.json"]).querySelector(".path-copy").dataset.path, "lists/export.json");
 });
 
-test("fallback recognizes absolute paths while prose, URLs, keys and IDs stay plain", async () => {
+test("fallback recognises rooted paths and complete URLs without treating keys or IDs as paths", async () => {
   const h = await setup();
-  for (const path of ["C:\\Games\\RimWorld", "\\\\server\\share\\mods", "/home/player/mods"]) {
+  for (const path of ["C:\\Games\\RimWorld", "\\\\server\\share\\mods", "/home/player/mods", "https://example.invalid/a/b?x=1&y=2#section"]) {
     assert.equal(h.pathContent(h.el("div"), path).querySelector(".path-copy").dataset.path, path);
   }
   assert.equal(h.pathContent(h.el("div"), "backup written to C:\\data\\archo.db").querySelector(".path-copy").dataset.path, "C:\\data\\archo.db");
-  for (const text of ["https://example.com/a/b", "ctrl+/", "↑↓ / enter", "1.6 / 1.7", "ludeon.rimworld", "Mods/", "from github.com/a/b", "moving mods"]) {
+  for (const text of ["ctrl+/", "↑↓ / enter", "1.6 / 1.7", "ludeon.rimworld", "Mods/", "from github.com/a/b", "moving mods"]) {
     assert.equal(h.pathContent(h.el("div"), text).querySelector(".path-copy"), null, text);
   }
 });
 
-test("click, enter and space copy the full value locally and show feedback", async () => {
+test("address text has no copy action; its button copies the full payload and resets feedback", async () => {
   const h = await setup(), path = "D:\\a very long path\\mod";
   const node = h.copyablePath(h.el("span", "", "D:\\…\\mod"), path);
   h.root.append(node);
-  assert.equal(node.tabIndex, 0);
-  assert.equal(node.attributes.role, "button");
-  assert.ok(node.title.includes(path) && node.title.includes("click to copy"));
-  for (const type of ["click", "keydown", "keydown"]) {
-    const key = h.copied.length === 1 ? "Enter" : " ";
+  assert.equal(node.attributes.role, undefined);
+  assert.equal(node.title, path);
+  node.dispatchEvent(event("", { type: "click" }));
+  node.dispatchEvent(event("Enter", { type: "keydown" }));
+  await flush(); assert.deepEqual(h.copied, []);
+  const button = node.querySelector(".address-copy");
+  assert.equal(button.tagName, "BUTTON"); assert.equal(button.type, "button");
+  assert.equal(button.title, "copy");
+  for (let i = 0; i < 3; i++) {
     let prevented = false, stopped = false;
-    node.dispatchEvent(event(key, { type, preventDefault() { prevented = true; }, stopPropagation() { stopped = true; } }));
+    button.dispatchEvent(event("", { type: "click", preventDefault() { prevented = true; }, stopPropagation() { stopped = true; } }));
     await flush();
     assert.ok(prevented && stopped);
-    assert.equal(h.root.querySelectorAll(".copied").length, 1);
-    assert.equal(h.root.querySelector(".copied").textContent, "已复制");
+    assert.equal(button.dataset.copied, "true");
+    assert.equal(button.querySelector(".address-status").textContent, "已复制");
+    assert.equal(h.timers.size, 1);
   }
   assert.deepEqual(h.copied, [path, path, path]);
   for (const key of ["Escape", "ArrowDown", "PageDown", "Tab"]) {
-    node.dispatchEvent(event(key, { type: "keydown", preventDefault() { assert.fail(key); }, stopPropagation() { assert.fail(key); } }));
+    button.dispatchEvent(event(key, { type: "keydown", preventDefault() { assert.fail(key); }, stopPropagation() { assert.fail(key); } }));
   }
-  for (const fn of h.timers) fn();
-  assert.equal(h.root.querySelector(".copied"), null);
-  h.noNative();
-  await h.copy(path, node);
-  assert.deepEqual(h.browser, [path]);
+  for (const fn of h.timers.values()) fn();
+  assert.equal(button.dataset.copied, undefined); assert.equal(button.title, "copy");
+  h.noNative(); await h.copy(path, button); assert.deepEqual(h.browser, [path]);
 });
 
-test("a click that ends a text selection inside the path keeps the selection instead of copying", async () => {
-  const copied = [];
-  let sel = null;
-  const el = (tag, cls, text) => new Element(tag, cls, text);
-  const fields = await loadModules("./fields.js", {
-    "./state.js": { el, esc: s => s, api: {}, T: s => s, errText: e => e.message, say() {} },
-    "/wails/runtime.js": { Clipboard: { SetText: async text => { copied.push(text); } } },
-  }, { document: { activeElement: null }, getSelection: () => sel, setTimeout() {} });
-  const root = el("div");
-  const node = fields.copyablePath(el("span", "", "D:\mods\A"), "D:\mods\A");
-  root.append(node);
-  sel = { isCollapsed: false, toString: () => "mods", anchorNode: node };
-  node.dispatchEvent(event("", { type: "click", preventDefault() {}, stopPropagation() {} }));
-  await flush();
-  assert.deepEqual(copied, []);
-  sel = { isCollapsed: true, toString: () => "", anchorNode: null };
-  node.dispatchEvent(event("", { type: "click", preventDefault() {}, stopPropagation() {} }));
-  await flush();
-  assert.deepEqual(copied, ["D:\mods\A"]);
+test("decorating an existing address twice leaves one copy button and retains its display label", async () => {
+  const h = await setup();
+  const node = h.copyablePath(h.el("span", "", "Defs/file.xml"), "D:/mods/Alpha/Defs/file.xml");
+  h.copyablePath(node, "D:/mods/Alpha/Defs/file.xml");
+  assert.equal(node.querySelectorAll(".address-copy").length, 1);
+  assert.equal(node.querySelector(".address-text").dataset.address, "Defs/file.xml");
+});
+
+test("middle ellipsis fits measured width and restores the original when there is space", async () => {
+  const { middleEllipsis } = await loadModules("./address.js", {});
+  const measure = text => Array.from(text).reduce((n, c) => n + (/[^\x00-\x7f]/.test(c) ? 14 : 7), 0);
+  for (const text of ["C:\\Fixture\\Games\\RimWorld\\Mods\\Alpha\\Defs\\items.xml", "\\\\server\\share\\模组\\中文目录\\😀纹理.png", "https://example.invalid/project/data/rules.json?branch=main&lang=zh"]) {
+    for (const width of [14, 35, 100, 240, 400]) {
+      const shown = middleEllipsis(text, width, measure);
+      assert.ok(measure(shown) <= width, shown);
+      assert.ok(!shown.includes("\uFFFD"));
+      if (shown.includes("…")) {
+        const [head, tail] = shown.split("…");
+        assert.ok(text.startsWith(head) && text.endsWith(tail));
+      }
+    }
+    assert.equal(middleEllipsis(text, measure(text), measure), text);
+  }
+  assert.equal(middleEllipsis("short", 1, measure), "");
 });

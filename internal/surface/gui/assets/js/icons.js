@@ -2,7 +2,7 @@
 const svg = (body, cls = "") => `<svg class="i ${cls}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
 
 export const icon = {
-  // 贴图优化: a picture
+  // Texture optimisation: a picture
   textures: svg('<rect x="2.2" y="2.8" width="11.6" height="10.4" rx="1.8"/><circle cx="5.8" cy="6.2" r="1.2"/><path d="M2.6 11.6l3.6-3.2 2.6 2.2 2-1.6 2.8 2.4"/>'),
   official: svg('<path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/>'),
   workshop: svg('<circle cx="8" cy="8" r="5.6"/><circle cx="8" cy="8" r="2"/>'),
@@ -25,10 +25,10 @@ export const icon = {
   env: svg('<rect x="2" y="2.8" width="12" height="8.4" rx="1.6"/><path d="M5.6 13.6h4.8M8 11.2v2.4"/>'),
   library: svg('<rect x="2.4" y="2.6" width="3" height="10.8" rx=".8"/><rect x="6.5" y="2.6" width="3" height="10.8" rx=".8"/><path d="M11 3.4l2.6-.6 1.4 10-2.6.6z"/>'),
   log: svg('<path d="M4 1.8h5.2L12.4 5v9.2H4z"/><path d="M9 1.8V5h3.4M6 8h4.4M6 10.6h4.4"/>'),
-  settings: svg('<circle cx="8" cy="8" r="2.2"/><path d="M8 1.6v2M8 12.4v2M1.6 8h2M12.4 8h2M3.5 3.5l1.4 1.4M11.1 11.1l1.4 1.4M3.5 12.5l1.4-1.4M11.1 4.9l1.4-1.4"/>'),
+  settings: svg('<path d="M5.60 3.84L6.76 3.36L6.69 1.84L9.31 1.84L9.24 3.36L10.40 3.84L10.40 3.84L11.39 4.61L12.68 3.78L13.99 6.05L12.64 6.76L12.80 8.00L12.80 8.00L12.64 9.24L13.99 9.95L12.68 12.22L11.39 11.39L10.40 12.16L10.40 12.16L9.24 12.64L9.31 14.16L6.69 14.16L6.76 12.64L5.60 12.16L5.60 12.16L4.61 11.39L3.32 12.22L2.01 9.95L3.36 9.24L3.20 8.00L3.20 8.00L3.36 6.76L2.01 6.05L3.32 3.78L4.61 4.61L5.60 3.84Z"/><circle cx="8" cy="8" r="2.1"/>'),
   play: svg('<path d="M5 3.2v9.6L12.6 8z"/>', "fill"),
   plus: svg('<path d="M8 3v10M3 8h10"/>'),
-  // 后台任务: stacked bars, the work in a queue
+  // Background tasks: stacked bars, the work in a queue
   tasks: svg('<path d="M3 4.5h10M3 8h10M3 11.5h6"/>'),
   chev: svg('<path d="M6 4l4 4-4 4"/>'),
   // the list management page (06 §2.17)

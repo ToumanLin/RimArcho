@@ -56,7 +56,7 @@ func TestTasksItemsGoOnAfterAFailure(t *testing.T) {
 		t.Fatalf("retry state %s", g.State)
 	}
 	// The failed item belongs to the retry now: a second press finds nothing (VM run B1,
-	// where 继续剩下的 pressed twice ran ten deletions twice).
+	// where continue the rest pressed twice ran ten deletions twice).
 	if _, err := ts.Again(sub.ID, ItemFail, "", "1 mod"); err == nil {
 		t.Fatal("the same items were taken again")
 	}

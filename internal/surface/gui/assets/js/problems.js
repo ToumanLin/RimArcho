@@ -1,8 +1,8 @@
 // The list's problems inside the editor: the top bar's "N problems" button opens a panel
-// with every item of 能不能跑, worst first, each with its fix, so the list can be put right
+// with every item of Can it run, worst first, each with its fix, so the list can be put right
 // without leaving it (06 §4.2). The panel follows S.board.problems: a list edit, a sort or
 // the background check (the list-problems event) redraw it in place.
-import { S, el, T, Tf, say, errText } from "./state.js";
+import { S, el, T, Tf, say, errText, keyCaps } from "./state.js";
 import { api } from "./api.js";
 import { statusIcon } from "./icons.js";
 import { needText, needParts, needEvidence } from "./needtext.js";
@@ -34,7 +34,7 @@ export function chip() {
   const its = items(), n = problemCount(its);
   if (!p || (!n && !its.some((it) => it.status === -1))) { if (isOpen()) close(); return null; }
   const b = el("button", "chip prob " + (n ? (p.severity === "error" ? "err" : "warn") : "hint") + (p.updating ? " updating" : "") + (isOpen() ? " on" : ""));
-  b.append(el("span", "dot"), el("span", "t", n ? Tf("%d problems", n) : T("suggestions")), el("kbd", "", "p"));
+  b.append(el("span", "dot"), el("span", "t", n ? Tf("%d problems", n) : T("suggestions")), keyCaps("p"));
   b.title = T(n ? "what is wrong with this list, and the fixes" : "suggestions") + T("; ") + "p";
   b.onclick = (e) => { e.stopPropagation(); toggle(b); };
   return b;

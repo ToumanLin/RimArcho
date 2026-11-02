@@ -13,9 +13,10 @@ var openWorld = map[string]bool{"get_description": true, "exchange_list": true, 
 
 func manageTools() []tool {
 	return []tool{
-		reg("check_links", true, false, "Read fresh link health and ownership evidence for the selected game, or all known games. Does not change files.\nExample: check_links {\"all\":true} → JSON links with path, target, reason, evidence and action; check failures set isError.", func(in LinksCheckIn) []string { return argv("links", "check").flag("all", in.All).flag("json", true).a }),
-		reg("repair_links", false, true, "Preview with dry_run; execution requires explicit player confirm=true. Removes eligible links or completes ledger recovery, including reattaching links and finishing recorded relocation metadata; never deletes targets. Unproven removals require explicit include paths. Refuses running games.\nExample: repair_links {\"all\":true,\"dry_run\":true,\"confirm\":false} → JSON preview, with no files changed. After player approval: repair_links {\"all\":true,\"confirm\":true} → JSON links and removed paths.", LinksRepairArgv),
+		reg("check_links", true, false, descCheckLinks, func(in LinksCheckIn) []string { return argv("links", "check").flag("all", in.All).flag("json", true).a }),
+		reg("repair_links", false, true, descRepairLinks, LinksRepairArgv),
 		reg("test_run", false, false, descTestRun, TestRunArgv),
+		reg("estimate_memory", true, false, descMemory, MemoryArgv),
 		reg("manage_rules", false, false, descRules, func(in RuleIn) []string { return RulesArgv(in) }),
 		reg("ignore_problem", false, false, descIgnore, func(in IgnoreIn) []string { return IgnoreArgv(in) }),
 		reg("mute_version_warnings", false, false, descVersionMute, VersionMuteArgv),
@@ -29,7 +30,7 @@ func manageTools() []tool {
 }
 
 type TestRunIn struct {
-	Env            string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env            string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Plan           string `json:"plan,omitempty" jsonschema:"plan name or plan:name (default: the environment's current plan)"`
 	Map            bool   `json:"map,omitempty" jsonschema:"load a quick test map instead of the main menu"`
 	TimeoutSeconds int    `json:"timeout_seconds,omitempty" jsonschema:"maximum run time in seconds (default 600)"`
@@ -195,18 +196,18 @@ func first(refs []string) string {
 // ---- tool arguments ----
 
 type IgnoreIn struct {
-	Env  string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env  string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Ref  string `json:"ref" jsonschema:"the problem: p:<hex> as printed by list_problems"`
 	Undo bool   `json:"undo,omitempty" jsonschema:"stop ignoring it (problems unignore)"`
 }
 
 type ScanIn struct {
-	Env  string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env  string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Full bool   `json:"full,omitempty" jsonschema:"re-hash every semantic file instead of trusting unchanged sizes and times"`
 }
 
 type ExchangeIn struct {
-	Env    string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env    string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Action string `json:"action" jsonschema:"export, import or collection"`
 	Format string `json:"format,omitempty" jsonschema:"export: text (default), archo (a RimArcho list: each mod with its version), modsconfig, rimsort, rml, rimcrow, rimcrow-xml or workshop (Markdown Workshop links, for subscribing by hand)"`
 	Out    string `json:"out,omitempty" jsonschema:"export: write to this new file (never overwrites); default: return the text"`
@@ -215,7 +216,7 @@ type ExchangeIn struct {
 }
 
 type PackIn struct {
-	Env            string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env            string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Action         string `json:"action" jsonschema:"list, check, build, launch, export, import, remove, stop or unlink"`
 	Name           string `json:"name,omitempty" jsonschema:"the pack (check, build, launch, export, remove, stop)"`
 	File           string `json:"file,omitempty" jsonschema:"check: an archive to verify without extracting; export: the new .archopack (or with list .archolist.json) file; import: the file to read"`
@@ -229,7 +230,7 @@ type PackIn struct {
 }
 
 type IdentityIn struct {
-	Env      string   `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env      string   `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Action   string   `json:"action" jsonschema:"list, why, resolve, split or merge"`
 	Question string   `json:"question,omitempty" jsonschema:"why / resolve: the question ref q:<n> from action=list"`
 	Answer   string   `json:"answer,omitempty" jsonschema:"resolve: same (the same mod came back), copy (a copy of it) or unrelated"`
@@ -238,14 +239,14 @@ type IdentityIn struct {
 }
 
 type HiddenIn struct {
-	Env    string `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env    string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Action string `json:"action" jsonschema:"unhide or trash"`
 	Ref    string `json:"ref" jsonschema:"the hidden or unsubscribed mod (#id, ws:…)"`
 	DryRun bool   `json:"dry_run,omitempty" jsonschema:"show what would change, change nothing"`
 }
 
 type MaintenanceIn struct {
-	Env                  string   `json:"env,omitempty" jsonschema:"another environment by name (default: the current one)"`
+	Env                  string   `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Action               string   `json:"action" jsonschema:"data_update, import_rimcrow, vacuum or gc"`
 	Datasets             []string `json:"datasets,omitempty" jsonschema:"data_update: rules, steamdb, replacements (default: all)"`
 	DB                   string   `json:"db,omitempty" jsonschema:"import_rimcrow: RimCrow's data\\mod_manager.db"`

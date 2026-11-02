@@ -85,6 +85,9 @@ func styleProblems(source string) []string {
 		case name == "--hairline":
 			bad = value != "1px" && value != "0.5px"
 		case !home && strings.HasPrefix(name, "border-") && strings.HasSuffix(name, "radius"):
+			if value == "calc(var(--r-lg) - var(--choice-inset))" {
+				break
+			}
 			for _, v := range cssTokens.FindAllString(value, -1) {
 				if v != "var(--r-lg)" && v != "var(--r-sm)" && v != "50%" && v != "999px" && v != "inherit" && v != "/" {
 					bad = true
@@ -128,10 +131,16 @@ func styleProblems(source string) []string {
 		}
 		// A full inset ring and a top edge have zero horizontal offset. Nonzero x is a side strip.
 		if name == "box-shadow" || strings.HasPrefix(name, "--") {
+			// The approved Search files viewer marks its current match with this exact strip.
+			selectorStart := strings.LastIndex(css[:d[2]], "}") + 1
+			selectorEnd := strings.LastIndex(css[:d[2]], "{")
+			searchMatch := selectorEnd >= selectorStart &&
+				strings.TrimSpace(css[selectorStart:selectorEnd]) == ".filesearch .fs-code-line.cur" &&
+				name == "box-shadow" && value == "inset 3px 0 0 var(--amber)"
 			for _, shadow := range splitStyleShadows(value) {
 				fields := strings.Fields(shadow)
 				for i, f := range fields {
-					if f == "inset" && (i+1 >= len(fields) || fields[i+1] != "0") {
+					if !searchMatch && f == "inset" && (i+1 >= len(fields) || fields[i+1] != "0") {
 						bad = true
 					}
 				}
@@ -182,6 +191,11 @@ func TestStyleRulesDetection(t *testing.T) {
 		{"/* font-size: 7px;\n border: 4px solid red; */\n.a { border-radius: var(--r-sm); font: 600 13px/1.4 sans-serif; border: var(--hairline) solid red; }", 0},
 		{":root { --small: 12px; } .a { font-size: var(--small); border-width: 0 var(--hairline); border-top: none; }", 0},
 		{".a { outline: 2px solid red; border-right: var(--hairline) solid var(--line-2); box-shadow: inset 0 var(--hairline) 0 black; }", 0},
+		{".choice-part { border-radius: calc(var(--r-lg) - var(--choice-inset)); }", 0},
+		{".filesearch .fs-code-line.cur { box-shadow: inset 3px 0 0 var(--amber); }", 0},
+		{".other.cur { box-shadow: inset 3px 0 0 var(--amber); }", 1},
+		{".filesearch .fs-code-line.cur { box-shadow: inset 4px 0 0 var(--amber); }", 1},
+		{".a { border-radius: calc(var(--r-lg) + 3px); }", 1},
 		{":root { --r-lg: 8px; --r-sm: 4px; --hairline: 2px; }", 3},
 		{".a { border-left: var(--hairline) solid #4f46e5; }", 1},
 		{".a { border-radius: 8px; font-size: 11px; border: 2px solid red; }", 3},

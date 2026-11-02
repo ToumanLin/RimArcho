@@ -2,7 +2,6 @@ package store
 
 import (
 	"database/sql"
-	"fmt"
 	"github.com/ToumanLin/RimArcho/internal/analyze"
 	"os"
 	"path/filepath"
@@ -68,7 +67,7 @@ func TestMigrateV26FactViews(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	before, err := scanDefs(rows)
+	before, err := scanLegacyDefs(rows)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,6 +193,22 @@ func TestMigrateV26Scale(t *testing.T) {
 	}
 	t.Logf("MIGRATION compacted=%d bytes", info.Size())
 	if len(fs) > 0 && fs[0].Type != "ThingDef" {
-		t.Fatal(fmt.Sprintf("bad migrated fact: %+v", fs[0]))
+		t.Fatalf("bad migrated fact: %+v", fs[0])
 	}
+}
+
+// scanLegacyDefs reads Def rows that still carry their file path (before v28).
+func scanLegacyDefs(rows *sql.Rows) ([]analyze.DefFact, error) {
+	defer rows.Close()
+	var out []analyze.DefFact
+	for rows.Next() {
+		var f analyze.DefFact
+		var abs int
+		if err := rows.Scan(&f.Instance, &f.Type, &f.DefName, &f.Name, &f.Parent, &abs, &f.File, &f.Line, &f.MayRequire, &f.MayRequireAny); err != nil {
+			return nil, err
+		}
+		f.Abstract = abs != 0
+		out = append(out, f)
+	}
+	return out, rows.Err()
 }

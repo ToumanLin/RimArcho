@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"strconv"
@@ -67,6 +68,10 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 		return func(m *model) tea.Cmd { return m.openLibrary() }
 	case "subscribe":
 		return func(m *model) tea.Cmd { return m.openAdd("") }
+	case "search-files":
+		return func(m *model) tea.Cmd { return m.openSearch() }
+	case "rules":
+		return func(m *model) tea.Cmd { return m.openRules(nil) }
 	case "rescan":
 		return func(m *model) tea.Cmd { return m.startScan() }
 	case "analyze":
@@ -99,12 +104,14 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 	case "tech":
 		return list("i")
 	case "tags":
-		return list("#")
+		return list("g")
 	case "cli":
 		return func(m *model) tea.Cmd {
 			m.tab = tabList
 			return m.key(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(":")})
 		}
+	case "tasks":
+		return func(m *model) tea.Cmd { m.showTasks(); return nil }
 	case "packs":
 		// The packs as text (08 §5); build and play them with the commands shown.
 		return func(m *model) tea.Cmd {
@@ -140,13 +147,18 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 		// The settings page as text (06 §2.14); each value says the command that changes it.
 		return func(m *model) tea.Cmd {
 			var b strings.Builder
-			for _, g := range append(view.EnvGroups(m.app, m.st), view.SettingsPage(m.app, m.st)...) {
+			groups := view.SettingsPage(m.app, m.st)
+			groups = slices.Insert(groups, 1, view.EnvGroups(m.app, m.st)...)
+			for _, g := range groups {
 				b.WriteString(g.Title + "\n")
 				if g.Note != "" {
 					fmt.Fprintf(&b, "  %s\n", g.Note)
 				}
 				for _, it := range g.Items {
 					value := it.Value
+					if it.URL != "" {
+						value = it.URL
+					}
 					for i, choice := range it.Choices {
 						if choice == value && i < len(it.ChoiceLabels) {
 							value = it.ChoiceLabels[i]
@@ -158,6 +170,9 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 						fmt.Fprintf(&b, "  %s", it.ValueNote)
 					}
 					b.WriteString("\n")
+					for _, link := range it.Links {
+						fmt.Fprintf(&b, "    %s: %s\n", link.Label, link.URL)
+					}
 					if it.Note != "" {
 						fmt.Fprintf(&b, "    %s\n", it.Note)
 					}
@@ -168,7 +183,15 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 						fmt.Fprintf(&b, "    : archo %s\n", strings.Join(it.MoveArgv, " "))
 					}
 					for _, a := range it.Actions {
-						fmt.Fprintf(&b, "    %s  : archo %s\n", a.Label, strings.Join(a.Argv, " "))
+						if a.Argv[0] == "feedback" { // a panel, not a command (06 §2.14)
+							fmt.Fprintf(&b, "    %s  ctrl+k %s\n", a.Label, T("feedback"))
+							continue
+						}
+						argv := strings.Join(a.Argv, " ")
+						if a.Argv[len(a.Argv)-1] == "" {
+							argv += strconv.Quote("")
+						}
+						fmt.Fprintf(&b, "    %s  : archo %s\n", a.Label, argv)
 					}
 				}
 				b.WriteString("\n")
@@ -176,8 +199,12 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 			m.openPanel(T("settings"), b.String())
 			return nil
 		}
+	case "feedback":
+		return func(m *model) tea.Cmd { return m.feedbackPanel(view.FeedbackOptions{}) }
 	case "uninstall":
 		return func(m *model) tea.Cmd { return m.uninstallPanel() }
+	case "update":
+		return func(m *model) tea.Cmd { return m.selfUpdatePanel() }
 	case "textures":
 		return func(m *model) tea.Cmd { return m.texturesPanel() }
 	case "help":
@@ -223,7 +250,7 @@ func (m *model) palAll() []palItem {
 	if rows, err := view.PlanRows(m.app); err == nil {
 		for _, e := range view.PlanEntries(rows) {
 			id := view.PlanOfPage(e.ID)
-			out = append(out, palItem{kind: palPlan, name: e.Name, alias: e.Alias, desc: e.Desc, run: func(m *model) tea.Cmd { return m.usePlan(id) }})
+			out = append(out, palItem{kind: palPlan, name: e.Name, alias: e.Alias, desc: e.Desc, run: func(m *model) tea.Cmd { return m.openPlan(id) }})
 		}
 	}
 	seen := map[string]bool{}

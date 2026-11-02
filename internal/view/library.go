@@ -15,7 +15,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Mod 库存 › 全部 (06 §2.9) for both interfaces: the filter groups, one row per Lineage with
+// Mod library > All (06 §2.9) for both interfaces: the filter groups, one row per Lineage with
 // its Instances, the right column's size · state · used-in, and each Instance's actions as
 // data. The filtering itself is app.Library's, shared with `archo library`.
 
@@ -54,7 +54,7 @@ type LibChoice struct {
 	Label  string `json:"label"`
 	Count  int    `json:"count"`
 	On     int    `json:"on,omitempty"`
-	Cur    bool   `json:"cur,omitempty"` // the environment's game version (listed first, marked)
+	Cur    bool   `json:"cur,omitempty"` // the current list or game's version (listed first, marked)
 }
 
 // LibCond is a filter in force.
@@ -64,8 +64,8 @@ type LibCond struct {
 	Exclude bool   `json:"exclude,omitempty"`
 }
 
-// LibCells are a row's table cells (06 §2.9): 名称 大小 状态 来源 用在, and from the
-// header's menu 更新日期 版本 作者 标签 上次游玩. State is only one worth acting on.
+// LibCells are a row's table cells (06 §2.9): name size state library source used in, and from the
+// header's menu update date supported versions author a tag last played. State is only one worth acting on.
 type LibCells struct {
 	Name    string `json:"name"`
 	Size    string `json:"size"`
@@ -112,7 +112,7 @@ type LibInstRow struct {
 	SubscriptionKind string `json:"subscriptionKind,omitempty"`
 	ID               string `json:"id"` // the instance ("" for a subscribed item RimArcho never saw)
 	Ref              string `json:"ref"`
-	Label            string `json:"label"` // 工坊  本地  锁定版本  26/10/21 14:27 …
+	Label            string `json:"label"` // workshop  local  locked version  26/10/21 14:27 …
 	// Cells: Name and Source use the abstract copy caption; paths live in fields.
 	LibCells
 	// Note is the copy's own note (the player's or an agent's); Auto what RimArcho knows
@@ -147,18 +147,18 @@ func (e *OpenPages) Error() string { return e.Msg }
 
 // Library action kinds: the op codes (ops.go) that LibDo runs.
 const (
-	LibEnable    = OpAdd       // 加入当前方案
-	LibRemove    = OpRemove    // 从所有方案里拿掉
-	LibPin       = OpPin       // 锁定版本
-	LibPinUpdate = OpPinUpdate // 更新至工坊版本
-	LibUnpin     = OpUnpin     // 解除锁定
-	LibUnhide    = OpUnhide    // 恢复
-	LibUnsub     = OpUnsub     // 退订, through the Steam client
-	LibDelete    = OpDelete    // 删除 (to the recycle bin)
-	LibResub     = OpResub     // 重新订阅, through the Steam client
-	LibMove      = OpMove      // 备份锁定版本 (收进锁定库)
-	LibFolder    = OpFolder    // 打开文件夹
-	LibWorkshop  = OpWorkshop  // 打开网页
+	LibEnable    = OpAdd       // addcurrent list
+	LibRemove    = OpRemove    // disable in every list
+	LibPin       = OpPin       // locked version
+	LibPinUpdate = OpPinUpdate // update to the Workshop version
+	LibUnpin     = OpUnpin     // unlock
+	LibUnhide    = OpUnhide    // restore
+	LibUnsub     = OpUnsub     // unsubscribe, through the Steam client
+	LibDelete    = OpDelete    // delete (to the recycle bin)
+	LibResub     = OpResub     // resubscribe, through the Steam client
+	LibMove      = OpMove      // back uplocked version (move into the lock library)
+	LibFolder    = OpFolder    // open the folder
+	LibWorkshop  = OpWorkshop  // open page
 	// LibTrash is the old name of LibDelete.
 	LibTrash        = LibDelete
 	OpSubRemoveFast = "subscription-remove-fast"
@@ -224,7 +224,7 @@ func LibSourceText(s string) string {
 }
 
 func libKeyTitle(k string) string {
-	return map[string]string{"content": T("content"), "has": T("has"), "name": T("name"), "author": T("author"), "id": T("package"), "tag": T("tags"), "source": T("library source"), "location": T("location"), "version": T("supported versions"), "state": T("state"), "used": T("used in"), "updated": T("update date")}[k]
+	return map[string]string{"lists": T("lists"), "content": T("content"), "has": T("has"), "name": T("name"), "author": T("author"), "id": T("package"), "tag": T("tags"), "source": T("library source"), "location": T("location"), "version": T("supported versions"), "state": T("state"), "used": T("used in"), "updated": T("update date")}[k]
 }
 
 func libUseText(v string) string {
@@ -358,7 +358,7 @@ func LibSplitQuery(text string) (words string, filters []string) {
 // library's keys): keys from the second letter, then tag words, sources, versions, states
 // and the plans and packs in use.
 func CompleteLibrary(text string, lib *app.Library) string {
-	return completeWith(text, app.LibKeys, func(k string) []string {
+	completion := completeWith(text, app.LibKeys, func(k string) []string {
 		switch k {
 		case "source":
 			return app.LibSources
@@ -398,6 +398,10 @@ func CompleteLibrary(text string, lib *app.Library) string {
 		}
 		return out
 	})
+	if lib.Lists != nil {
+		return completeLists(text, lib.Lists.Names, completion, "")
+	}
+	return completion
 }
 
 // BuildLibrary builds the page for a query. filters are "key:value", "-key:value" to exclude;
@@ -464,6 +468,27 @@ func BuildLibrary(lib *app.Library, search string, filters []string, sort string
 	}
 	p.Size = render.Size(bytes)
 	p.Lead = ""
+	p.Groups = libraryGroups(lib, res)
+	for _, f := range filters {
+		ex := strings.HasPrefix(f, "-")
+		k, v, err := app.ParseLibFilter(strings.TrimPrefix(f, "-"))
+		if err != nil {
+			continue
+		}
+		p.Conds = append(p.Conds, LibCond{Filter: f, Label: libKeyTitle(k) + " " + libValueText(k, v, lib.GameMM), Exclude: ex})
+	}
+	for _, c := range LibColumns {
+		p.Columns = append(p.Columns, LibColumn{Key: c.Key, Title: LibColumnTitle(c.Key), Shown: c.Shown})
+	}
+	for _, s := range app.LibSorts {
+		p.Sorts = append(p.Sorts, LibChoice{Filter: s, Label: map[string]string{"name": T("name"), "size": T("size"), "changed": T("last changed"), "played": T("last played")}[s]})
+	}
+	return p, nil
+}
+
+// libraryGroups shares filter labels and counts without constructing copy actions.
+func libraryGroups(lib *app.Library, res *app.LibResult) []LibGroup {
+	var groups []LibGroup
 	for _, f := range res.Facets {
 		g := LibGroup{Key: f.Key, Title: libKeyTitle(f.Key)}
 		for _, v := range f.Values {
@@ -481,6 +506,9 @@ func BuildLibrary(lib *app.Library, search string, filters []string, sort string
 				}
 			}
 			c := LibChoice{Filter: f.Key + ":" + v.Value, Label: label, Count: v.Count, On: v.On}
+			if f.Key == "lists" && lib.Lists != nil && strings.EqualFold(v.Value, lib.Lists.Current) {
+				c.Cur = true
+			}
 			if f.Key == "version" && v.Value == lib.GameMM {
 				// the game's own version first, marked (06 §2.9)
 				c.Cur = true
@@ -489,23 +517,9 @@ func BuildLibrary(lib *app.Library, search string, filters []string, sort string
 			}
 			g.Values = append(g.Values, c)
 		}
-		p.Groups = append(p.Groups, g)
+		groups = append(groups, g)
 	}
-	for _, f := range filters {
-		ex := strings.HasPrefix(f, "-")
-		k, v, err := app.ParseLibFilter(strings.TrimPrefix(f, "-"))
-		if err != nil {
-			continue
-		}
-		p.Conds = append(p.Conds, LibCond{Filter: f, Label: libKeyTitle(k) + " " + libValueText(k, v, lib.GameMM), Exclude: ex})
-	}
-	for _, c := range LibColumns {
-		p.Columns = append(p.Columns, LibColumn{Key: c.Key, Title: LibColumnTitle(c.Key), Shown: c.Shown})
-	}
-	for _, s := range app.LibSorts {
-		p.Sorts = append(p.Sorts, LibChoice{Filter: s, Label: map[string]string{"name": T("name"), "size": T("size"), "changed": T("last changed"), "played": T("last played")}[s]})
-	}
-	return p, nil
+	return groups
 }
 
 func libInst(lib *app.Library, l *app.LibLineage, i *app.LibInstance) LibInstRow {
@@ -597,8 +611,8 @@ func lineageAuthor(l *app.LibLineage) string {
 	return ""
 }
 
-// CopyNoteAuto is RimArcho's first version of a copy's note (06 §2.9): "锁定版本创建于 10 月
-// 21 日，为方案「测试」创建；之后上游有 2 次更新；原因：…" ("" when it knows nothing). The
+// CopyNoteAuto is RimArcho's first version of a copy's note (06 §2.9): "locked version created on Oct
+// 21 for list Test; two newer versions since; reason: …" ("" when it knows nothing). The
 // player's note replaces it; editing starts from it.
 func CopyNoteAuto(i *app.LibInstance) string {
 	var parts []string
@@ -940,7 +954,7 @@ func LibDo(a *app.App, kind string, refs []string) (string, error) {
 	return Tf("%s: %s", libActionLabel(kind), what), nil
 }
 
-// LibPlan runs a plan op of Mod 库存 on copies (06 §2.9): space adds and enables, or takes
+// LibPlan runs a plan op of Mod library on copies (06 §2.9): space adds and enables, or takes
 // out of the current plan, or puts back from staging; t stages; x uses this copy (the plan
 // had another) or swaps for another. Each is the editor's verb, one undo step.
 func LibPlan(a *app.App, kind string, refs []string) (*Result, error) {
@@ -981,7 +995,7 @@ func LibPlan(a *app.App, kind string, refs []string) (*Result, error) {
 	return nil, fmt.Errorf("unknown action %s", kind)
 }
 
-// libCopyName: the mod's name and which copy ("Harmony（锁定版本）").
+// libCopyName: the mod's name and which copy ("Harmony (locked version)").
 func libCopyName(st *app.LoadoutState, m *store.Mod) string {
 	return Tf("%s (%s)", m.DisplayName(), SourceText(m))
 }
@@ -1016,7 +1030,7 @@ func SteamPages(kind string, err error) *OpenPages {
 	return &OpenPages{Msg: msg, URLs: u.URLs}
 }
 
-// SteamAction is the Steam client's action for a Mod 库 op.
+// SteamAction is the Steam client's action for a Mod library op.
 func SteamAction(kind string) string {
 	if kind == LibResub {
 		return steamworks.Resubscribe
@@ -1054,7 +1068,7 @@ func SetModNote(a *app.App, ref, text string) (string, error) {
 	return Tf("saved the note of %s", name), nil
 }
 
-// LibDoes reports whether LibDo runs op kind (the plan ops, 从所有方案里拿掉, the version and
+// LibDoes reports whether LibDo runs op kind (the plan ops, disable in every list, the version and
 // disk ops); the rest are the interface's own (a page, a folder, a note, a position).
 func LibDoes(kind string) bool {
 	switch kind {
@@ -1064,8 +1078,8 @@ func LibDoes(kind string) bool {
 	return libConfirm[kind]
 }
 
-// LibCopy is one copy's row (its note and ops, as Mod 库存 shows them), found by instance
-// id or ref: the plan editor's details draw it like Mod 库存's (06 §2.9, §4.1). nil when
+// LibCopy is one copy's row (its note and ops, as Mod library shows them), found by instance
+// id or ref: the plan editor's details draw it like Mod library's (06 §2.9, §4.1). nil when
 // the library does not have it.
 func LibCopy(lib *app.Library, ref string) *LibInstRow {
 	for _, l := range lib.Lineages {

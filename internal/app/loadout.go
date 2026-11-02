@@ -999,7 +999,7 @@ type SaveResult struct {
 	Running *RunningGame
 }
 
-// Save writes the workspace to ModsConfig.xml without starting the game (08 §2 "写入游戏":
+// Save writes the workspace to ModsConfig.xml without starting the game (08 §2 "writegame":
 // steps 1–5 and 7). It is allowed while the game runs; the game reads the file on its next
 // start.
 func (a *App) Save(dryRun bool) (*SaveResult, error) { return a.SaveWith(dryRun, false) }
@@ -1311,7 +1311,51 @@ func (a *App) AddRule(spec RuleSpec) (*store.UserRule, error) {
 	if err != nil {
 		return nil, err
 	}
-	r := &store.UserRule{Kind: spec.Kind, Note: spec.Note, Created: a.Now().UTC()}
+	r, err := ix.resolveRule(spec)
+	if err != nil {
+		return nil, err
+	}
+	r.Created = a.Now().UTC()
+	if _, err := a.Store.AddRule(ix.Env.ID, r); err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+// UpdateRule replaces rule r:<id> with spec; the ID and creation time stay (04 §6.1).
+func (a *App) UpdateRule(id int64, spec RuleSpec) (*store.UserRule, error) {
+	ix, err := a.Index()
+	if err != nil {
+		return nil, err
+	}
+	rs, err := a.Store.Rules(ix.Env.ID)
+	if err != nil {
+		return nil, err
+	}
+	var old *store.UserRule
+	for _, r := range rs {
+		if r.ID == id {
+			old = r
+		}
+	}
+	if old == nil {
+		return nil, fmt.Errorf("no rule r:%d (archo rule list)", id)
+	}
+	r, err := ix.resolveRule(spec)
+	if err != nil {
+		return nil, err
+	}
+	r.ID, r.Created = id, old.Created
+	if _, err := a.Store.UpdateRule(r); err != nil {
+		return nil, err
+	}
+	return r, nil
+}
+
+// resolveRule checks a typed rule and resolves its references to lineages.
+func (ix *Index) resolveRule(spec RuleSpec) (*store.UserRule, error) {
+	var err error
+	r := &store.UserRule{Kind: spec.Kind, Note: spec.Note}
 	switch spec.Kind {
 	case order.RuleAfter, order.RuleBefore, order.RuleIncompatible, order.RuleAttach:
 		if r.A, err = ix.ResolveLineage(spec.A); err != nil {
@@ -1336,9 +1380,6 @@ func (a *App) AddRule(spec RuleSpec) (*store.UserRule, error) {
 		}
 	default:
 		return nil, fmt.Errorf("unknown rule kind %q (after, before, incompatible, attach, top, bottom, ignore)", spec.Kind)
-	}
-	if _, err := a.Store.AddRule(ix.Env.ID, r); err != nil {
-		return nil, err
 	}
 	return r, nil
 }

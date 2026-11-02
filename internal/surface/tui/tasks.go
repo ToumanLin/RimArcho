@@ -1,8 +1,10 @@
 package tui
 
 import (
+	"context"
 	"errors"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -14,11 +16,32 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 后台任务 (06 §2.16) in the terminal: the subscription actions (添加订阅, 检查更新, 更新,
-// 撤掉订阅) queue into app.Tasks — the record and lanes the window uses, <data>/tasks.json —
+func (m *model) queueSourceDecompile(envName string) tea.Cmd {
+	ts := m.taskList()
+	return m.queueSelf(view.TaskSourceDecompile, m.envName, []string{"source", "decompile", "--active"}, func(a *app.App, id string) (string, error) {
+		if envName != "" {
+			a.EnvName = envName
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		ts.SetStop(id, func() error { cancel(); return nil })
+		err := a.DecompileActive(ctx, func(done, total int, file string) {
+			ts.Update(id, func(t *app.Task) {
+				t.Done, t.Total, t.Phase = done, total, file
+				if total > 0 {
+					t.Frac = float64(done) / float64(total)
+				}
+			})
+		})
+		return view.T("the current list's mods are in the source library"), err
+	})
+}
+
+// Background tasks (06 §2.16) in the terminal: the subscription actions (add a subscription, check for updates, update,
+// remove subscription) queue into app.Tasks — the record and lanes the window uses, <data>/tasks.json —
 // and run on their own database session, so the screen never waits for Git, a web page,
-// Steam or a folder move. The TUI has no task page yet: the status line says when a task is
-// queued and how it ended, and the window's 后台任务 page shows the record.
+// Steam or a folder move. The status line says when a task is queued and how it ended; the
+// palette's Background tasks shows the record as text (showTasks), and the window's page acts on it.
 
 // taskEndedMsg: a background task ended.
 type taskEndedMsg struct{ t app.Task }
@@ -112,7 +135,7 @@ func (r *taskRunner) session() (*app.App, error) {
 	return a, nil
 }
 
-// item runs one item of a lane task: Mod 库's action on one copy (检查更新, 更新).
+// item runs one item of a lane task: Mod library's action on one copy (check for updates, update).
 func (r *taskRunner) item(kind, ref string) error {
 	a, err := r.session()
 	if err != nil {
@@ -126,7 +149,7 @@ func (r *taskRunner) item(kind, ref string) error {
 	return nil
 }
 
-// batch runs 撤掉订阅 as one task: every folder checked, moved, then one scan (the window's
+// batch runs remove subscription as one task: every folder checked, moved, then one scan (the window's
 // batchRemoveSubscriptions).
 func (r *taskRunner) batch(kind string, refs []string, b app.BatchCalls) bool {
 	if kind != view.OpSubRemove {
@@ -148,7 +171,7 @@ func (r *taskRunner) batch(kind string, refs []string, b app.BatchCalls) bool {
 	return true
 }
 
-// submitLane queues a files-lane op (检查更新, 更新, 撤掉订阅) on copies and says so.
+// submitLane queues a files-lane op (check for updates, update, remove subscription) on copies and says so.
 func (m *model) submitLane(kind string, refs, names []string) tea.Cmd {
 	if len(refs) == 0 {
 		return nil
@@ -177,6 +200,9 @@ func (m *model) queueSelf(kind, obj string, args []string, run func(a *app.App, 
 		ts.Update(id, func(t *app.Task) { t.Phase = view.TaskPending(kind) })
 		text, err := run(a, id)
 		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				return "", err
+			}
 			return "", errors.New(view.Humanize(nil, err.Error()))
 		}
 		return text, nil
@@ -231,4 +257,31 @@ func (m *model) closeTasks() {
 	if ts != nil {
 		ts.Close()
 	}
+}
+
+// showTasks is Background tasks as text (06 §9.1): the record the window and this TUI share, by
+// group, a task a line with how it ended. Stopping and retrying stay in the window.
+func (m *model) showTasks() {
+	p := view.BuildTasks(m.taskList().List(), time.Now())
+	titles := map[string]string{"run": "running", "queue": "queued", "today": "today", "yesterday": "yesterday", "earlier": "earlier"}
+	var b strings.Builder
+	group := ""
+	for _, r := range p.Rows {
+		if r.Group != group {
+			if group != "" {
+				b.WriteString("\n")
+			}
+			group = r.Group
+			b.WriteString(T(titles[group]) + "\n")
+		}
+		line := "  " + r.StateText + "  " + view.TaskStatus(r)
+		if r.Time != "" {
+			line += "  " + r.Time
+		}
+		b.WriteString(line + "\n")
+	}
+	if len(p.Rows) == 0 {
+		b.WriteString(T("nothing has run in the background yet") + "\n")
+	}
+	m.openPanel(T("background tasks"), b.String())
 }

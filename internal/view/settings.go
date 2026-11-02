@@ -20,7 +20,7 @@ type SettingItem struct {
 	// Path markers identify filesystem text independently of editing/status text.
 	ValuePath bool     `json:"valuePath,omitempty"`
 	NotePaths []string `json:"notePaths,omitempty"`
-	// Edit: "path", "text", "choice", "swatches" or "segments" (Choices). The new
+	// Edit: "directory", "path", "url", "text", "choice", "swatches" or "segments". The new
 	// value replaces {} in Argv; "" has no editor, only Actions.
 	Edit string `json:"edit,omitempty"`
 	// EditValue separates an editable path from its displayed status/version.
@@ -28,14 +28,26 @@ type SettingItem struct {
 	File      bool     `json:"file,omitempty"` // choose a program file rather than a directory
 	Choices   []string `json:"choices,omitempty"`
 	// ChoiceLabels are the words shown for Choices (same order); empty shows the values.
-	ChoiceLabels []string        `json:"choiceLabels,omitempty"`
-	Argv         []string        `json:"argv,omitempty"`
-	MoveArgv     []string        `json:"moveArgv,omitempty"`
-	Directory    string          `json:"directory,omitempty"`
-	Note         string          `json:"note,omitempty"`
-	Hover        string          `json:"hover,omitempty"`
-	ValueNote    string          `json:"valueNote,omitempty"`
-	Actions      []SettingAction `json:"actions,omitempty"`
+	ChoiceLabels []string `json:"choiceLabels,omitempty"`
+	Argv         []string `json:"argv,omitempty"`
+	MoveArgv     []string `json:"moveArgv,omitempty"`
+	Directory    string   `json:"directory,omitempty"`
+	Note         string   `json:"note,omitempty"`
+	Hover        string   `json:"hover,omitempty"`
+	ValueNote    string   `json:"valueNote,omitempty"`
+	// URL: the value is a web page; the interfaces open it in the browser (Community, 06 §2.14).
+	URL     string          `json:"url,omitempty"`
+	Links   []CommunityLink `json:"links,omitempty"`
+	Actions []SettingAction `json:"actions,omitempty"`
+	// Details fold under the row (06 §3.1 rule 7): RimArcho's release notes.
+	Details *SettingDetails `json:"details,omitempty"`
+}
+
+// SettingDetails is text folded under a row: Summary opens it, Link is where it came from.
+type SettingDetails struct {
+	Summary string `json:"summary"`
+	Text    string `json:"text"`
+	Link    string `json:"link,omitempty"`
 }
 
 // SettingAction is a button: a command, confirmed first when Confirm is set.
@@ -50,12 +62,18 @@ type SettingAction struct {
 
 // SettingTask identifies commands that queue after confirmation (06 §2.14, 06 §2.16).
 func SettingTask(argv []string) string {
+	if len(argv) > 0 && argv[0] == "update" {
+		if len(argv) == 1 {
+			return TaskSelfUpdate
+		}
+		return TaskSelfCheck
+	}
 	if len(argv) == 3 && argv[0] == "deps" {
 		if argv[1] == "remove" {
 			return TaskDepRemove
 		}
 		if argv[1] == "install" {
-			return map[string]string{deps.Todds: TaskTodds, deps.SteamCMD: TaskSteamCMD, deps.WezTerm: TaskWezTerm}[argv[2]]
+			return map[string]string{deps.Todds: TaskTodds, deps.SteamCMD: TaskSteamCMD}[argv[2]]
 		}
 	}
 	if len(argv) > 0 && argv[0] == "gc" {
@@ -65,6 +83,7 @@ func SettingTask(argv []string) string {
 		return ""
 	}
 	return map[string]string{
+		"source decompile": TaskSourceDecompile, "source clean": TaskSourceClean,
 		"data update": TaskData, "cache clear": TaskCache,
 		"db backup": TaskBackup, "db vacuum": TaskVacuum,
 	}[strings.Join(argv[:2], " ")]
@@ -73,16 +92,22 @@ func SettingTask(argv []string) string {
 // TaskPending is the action's label while this kind runs or waits.
 func TaskPending(kind string) string {
 	switch kind {
+	case TaskSourceDecompile:
+		return T("decompiling…")
 	case TaskSubscribe:
 		return T("subscribe")
 	case TaskSubscriptionFrom:
 		return T("updating…")
-	case TaskSteamCMD, TaskTodds, TaskWezTerm:
+	case TaskSteamCMD, TaskTodds:
 		return T("downloading…")
 	case TaskDepRemove:
 		return T("removing…")
 	case TaskData:
 		return T("updating…")
+	case TaskSelfUpdate:
+		return T("installing…")
+	case TaskSelfCheck:
+		return T("checking…")
 	case TaskBackup:
 		return T("backing up…")
 	case TaskVacuum:
@@ -159,7 +184,7 @@ func EnvGroups(a *app.App, st *app.LoadoutState) []SettingGroup {
 	}}}
 }
 
-// FolderGroup is the settings page's "Mod 文件夹" (02 §0): the folders every environment
+// FolderGroup is the settings page's "Mod folders" (02 §0): the folders every environment
 // shares. The Workshop folder can be moved; SteamCMD and other folders added and removed;
 // RimArcho's own folders (Archo Monitor, the lock library) are shown.
 func FolderGroup(a *app.App) SettingGroup {
@@ -217,39 +242,55 @@ func FolderGroup(a *app.App) SettingGroup {
 	return g
 }
 
-// SettingsPage starts with every managed directory. Game launch and save options
-// also remain available on the environment page.
+// SettingsPage is the settings page's groups (06 §2.14): About, Interface, Accounts, update,
+// Folders, game log, external tools, community data, Storage and, last, uninstall. The GUI and
+// the TUI show them in this order. Game launch and save options are on the environment page.
 func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
-	folders := FolderGroup(a)
-	// Existing folders have one row, with relocation controls, in DirectoryGroup.
-	var add []SettingItem
-	for _, item := range folders.Items {
-		if item.Value == "" {
-			add = append(add, item)
-		}
-	}
-	folders.Items = add
-	out := []SettingGroup{{Title: T("appearance"), Items: []SettingItem{
-		{Label: T("accent colour"), Value: cmds.Setting(a, "ui.accent"), Edit: "swatches", Choices: cmds.SettingChoices("ui.accent"),
-			ChoiceLabels: []string{T("default"), T("indigo"), T("blue"), T("cyan"), T("teal"), T("green"), T("grass"), T("orange"), T("amber"), T("red"), T("crimson"), T("pink"), T("plum"), T("purple"), T("violet"), T("iris")},
-			Argv:         []string{"config", "set", "ui.accent", "{}"}},
-		{Label: T("day/night theme"), Value: cmds.Setting(a, "ui.theme"), Edit: "segments", Choices: cmds.SettingChoices("ui.theme"),
-			ChoiceLabels: []string{T("follow system"), T("light"), T("dark")}, Argv: []string{"config", "set", "ui.theme", "{}"}},
-	}}, DirectoryGroup(a), folders, AccountGroup(a)}
-	out = append(out, DependencyGroup(a))
-	out = append(out, AutomaticGroup(a))
-	lang := cmds.Setting(a, "ui.lang")
 	gpuNote := ""
 	if cmds.Setting(a, "ui.gpu") == "off" {
 		gpuNote = T("takes effect next time you open RimArcho")
 	}
-	out = append(out, SettingGroup{Title: T("interface"), Items: []SettingItem{
-		{Label: T("language"), Value: lang, Edit: "choice", Choices: []string{"auto", "zh", "en"}, Argv: []string{"config", "set", "ui.lang", "{}"}},
-		{Label: T("Workshop descriptions"), Value: cmds.Setting(a, "workshop.fetch"), Edit: "choice", Choices: []string{"on", "off"}, ChoiceLabels: []string{T("on"), T("off")}, Argv: []string{"config", "set", "workshop.fetch", "{}"}},
-		{Label: T("images in descriptions"), Value: cmds.Setting(a, "workshop.images"), Edit: "choice", Choices: []string{"on", "off"}, ChoiceLabels: []string{T("on"), T("off")}, Argv: []string{"config", "set", "workshop.images", "{}"}},
-		{Label: T("GPU acceleration"), Value: cmds.Setting(a, "ui.gpu"), Edit: "choice", Choices: []string{"on", "off"}, ChoiceLabels: []string{T("on"), T("off")}, Argv: []string{"config", "set", "ui.gpu", "{}"},
-			Hover: T("uses about 20–35 MB less memory and draws in software"), ValueNote: gpuNote},
-	}})
+	onOff := func(label, key string) SettingItem {
+		return SettingItem{Label: label, Value: cmds.Setting(a, key), Edit: "choice", Choices: []string{"on", "off"}, ChoiceLabels: []string{T("on"), T("off")}, Argv: []string{"config", "set", key, "{}"}}
+	}
+	gpu := onOff(T("GPU acceleration"), "ui.gpu")
+	gpu.Hover, gpu.ValueNote = T("uses about 20–35 MB less memory and draws in software"), gpuNote
+	// Start page background closes this card in the GUI (it is not a setting command).
+	out := []SettingGroup{AboutGroup(a), {Title: T("interface"), Items: []SettingItem{
+		{Label: T("language"), Value: cmds.Setting(a, "ui.lang"), Edit: "choice", Choices: languageChoices(), ChoiceLabels: languageLabels(), Argv: []string{"config", "set", "ui.lang", "{}"}},
+		{Label: T("day/night theme"), Value: cmds.Setting(a, "ui.theme"), Edit: "segments", Choices: cmds.SettingChoices("ui.theme"),
+			ChoiceLabels: []string{T("follow system"), T("light"), T("dark")}, Argv: []string{"config", "set", "ui.theme", "{}"}},
+		{Label: T("accent colour"), Value: cmds.Setting(a, "ui.accent"), Edit: "swatches", Choices: cmds.SettingChoices("ui.accent"),
+			ChoiceLabels: []string{T("default"), T("indigo"), T("blue"), T("cyan"), T("teal"), T("green"), T("grass"), T("orange"), T("amber"), T("red"), T("crimson"), T("pink"), T("plum"), T("purple"), T("violet"), T("iris")},
+			Argv:         []string{"config", "set", "ui.accent", "{}"}},
+		onOff(T("Workshop descriptions"), "workshop.fetch"),
+		onOff(T("images in descriptions"), "workshop.images"),
+		gpu,
+	}}, AccountGroup(a), AutomaticGroup(a)}
+
+	// RimArcho's folders, each with relocation controls, then adding a mod folder.
+	folders := DirectoryGroup(a)
+	folders.Title = T("folders")
+	for _, item := range FolderGroup(a).Items {
+		if item.Value == "" {
+			folders.Items = append(folders.Items, item)
+		}
+	}
+	out = append(out, folders)
+
+	mon := SettingItem{Label: T("add Archo Monitor to lists"), Value: cmds.Setting(a, "monitor.default"), Edit: "choice", Choices: []string{"on", "off"},
+		ChoiceLabels: []string{T("on"), T("off")}, Argv: []string{"config", "set", "monitor.default", "{}"}, Hover: T("new lists, and every sort")}
+	if s, err := a.MonitorState(); err == nil {
+		v := T("not installed")
+		if len(s.Installed) > 0 {
+			v = s.Installed[0]
+		}
+		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon, {Label: T("Archo Monitor installed"), Value: v, Note: s.Dir, NotePaths: []string{s.Dir}}}})
+	} else {
+		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon}})
+	}
+	out = append(out, DependencyGroup(a))
+
 	data := SettingGroup{Title: T("community data")}
 	status := a.DataStatus()
 	checked := a.AutomaticStatus("data").Checked
@@ -269,37 +310,28 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		if di := status[d.Key]; di != nil {
 			v = Tf("%d entries  %s", di.Entries, ShortDate(di.Fetched))
 		}
-		data.Items = append(data.Items, SettingItem{Label: T(d.Desc), Value: a.DataSource(d), Edit: "text", Argv: []string{"config", "set", "data." + d.Key + ".url", "{}"},
+		data.Items = append(data.Items, SettingItem{Label: T(d.Desc), Value: a.DataSource(d), Edit: "url", Argv: []string{"config", "set", "data." + d.Key + ".url", "{}"},
 			Note: v})
 	}
 	data.Items = append(data.Items, SettingItem{Label: T("update the community data"), Actions: []SettingAction{{Label: T("update now"), Argv: []string{"data", "update"},
 		Confirm: T("RimArcho downloads the three files from their sources (about 50 MB)")}}})
 	out = append(out, data)
+
+	// Storage: the database and the caches, what takes room on the disk.
 	db, _ := a.DBInfo()
-	out = append(out, SettingGroup{Title: T("database"), Items: []SettingItem{
-		{Label: T("size"), Value: SizeText(db.Bytes), Note: db.Path, NotePaths: []string{db.Path}, Actions: []SettingAction{
+	storage := SettingGroup{Title: T("storage"), Items: []SettingItem{
+		{Label: T("database"), Value: SizeText(db.Bytes), Note: db.Path, NotePaths: []string{db.Path}, Actions: []SettingAction{
 			{Label: T("back up"), Argv: []string{"db", "backup"}},
 			{Label: T("compact"), Argv: []string{"db", "vacuum"}},
 			{Label: T("remove old tombstones"), Argv: []string{"gc"}, Confirm: T("mods gone for longer than the tombstone time are forgotten")},
 		}},
-	}})
-	caches := SettingGroup{Title: T("caches")}
+	}}
 	for _, c := range a.Caches() {
-		caches.Items = append(caches.Items, SettingItem{Label: T(c.Desc), Value: Tf("%s  %d items", SizeText(c.Bytes), c.Files),
+		storage.Items = append(storage.Items, SettingItem{Label: T(c.Desc), Value: Tf("%s  %d items", SizeText(c.Bytes), c.Files),
 			Actions: []SettingAction{{Label: T("clear"), Argv: []string{"cache", "clear", c.Kind}}}})
 	}
-	out = append(out, caches)
-	mon := SettingItem{Label: T("add Archo Monitor to lists"), Value: cmds.Setting(a, "monitor.default"), Edit: "choice", Choices: []string{"on", "off"},
-		ChoiceLabels: []string{T("on"), T("off")}, Argv: []string{"config", "set", "monitor.default", "{}"}, Hover: T("new lists, and every sort")}
-	if s, err := a.MonitorState(); err == nil {
-		v := T("not installed")
-		if len(s.Installed) > 0 {
-			v = s.Installed[0]
-		}
-		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon, {Label: T("Archo Monitor installed"), Value: v, Note: s.Dir, NotePaths: []string{s.Dir}}}})
-	} else {
-		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon}})
-	}
+	out = append(out, storage)
+
 	// Last: its own page with the plan (the interfaces open it; archo uninstall is not a
 	// settings command).
 	out = append(out, SettingGroup{Title: T("uninstall"), Items: []SettingItem{
@@ -320,17 +352,6 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	return out
 }
 
-func init() {
-	Register(map[string]string{
-		"downloading…": "正在下载…",
-		"updating…":    "正在更新…",
-		"backing up…":  "正在备份…",
-		"compacting…":  "正在压缩…",
-		"clearing…":    "正在清理…",
-		"removing…":    "正在移除…",
-	})
-}
-
 // SettingCommand checks that argv is one of the settings page's commands (the interfaces
 // run nothing else from it).
 func SettingCommand(argv []string) error {
@@ -342,10 +363,13 @@ func SettingCommand(argv []string) error {
 		two += " " + argv[1]
 	}
 	switch two {
-	case "env set", "env rebind", "folder add", "folder remove", "folder set", "folder move", "config set", "db backup", "db vacuum", "cache clear", "data update", "deps install", "deps remove":
+	case "env set", "env rebind", "folder add", "folder remove", "folder set", "folder move", "config set", "db backup", "db vacuum", "cache clear", "data update", "deps install", "deps remove", "source clean", "source decompile":
 		return nil
 	}
 	if argv[0] == "gc" {
+		return nil
+	}
+	if argv[0] == "update" && (len(argv) == 1 || len(argv) == 2 && argv[1] == "--check") {
 		return nil
 	}
 	return fmt.Errorf("not a settings command: %s", strings.Join(argv, " "))

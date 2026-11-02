@@ -127,7 +127,7 @@ func (a *App) writerPlan(st *LoadoutState, mcs *store.ModsConfigState) (*store.P
 }
 
 // ExternalConflict is a plan's external ModsConfig.xml version that was not loaded because
-// the plan had changed since it was written (04 §4.3: "有未载入的外部版本").
+// the plan had changed since it was written (04 §4.3: "an outside version has not been loaded").
 type ExternalConflict struct {
 	Plan    *store.Plan
 	Env     *env.Environment // the plan's environment

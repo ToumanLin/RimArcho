@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// schemaV16: the DDS files RimArcho writes next to a mod's PNGs (08 §5.2, 贴图优化). A file
+// schemaV16: the DDS files RimArcho writes next to a mod's PNGs (08 §5.2, Texture optimisation). A file
 // is recorded as pending before the encoder runs and done once checked, so files of a run
 // that was cut short are still known (and cleaned, and left out of the mod's fingerprint).
 // texture_mod is the mod's snapshot when its textures were last optimised: when it changes
@@ -234,11 +234,10 @@ func (s *Store) SnapshotsKey() string {
 }
 
 // SnapshotsWithPNG are the current snapshots with a PNG under a Textures/ folder (the copies
-// whose textures can be converted). Each instance's file rows are read until the first PNG,
-// through the primary key; cache the result with SnapshotsKey.
+// whose textures can be converted), from snapshot.kinds; cache the result with SnapshotsKey.
 func (s *Store) SnapshotsWithPNG() (map[int64]bool, error) {
-	rows, err := s.DB.Query(`SELECT i.current_snapshot_id FROM instance i WHERE i.current_snapshot_id IS NOT NULL
-		AND EXISTS(SELECT 1 FROM snapshot_file f WHERE f.snapshot_id=i.current_snapshot_id AND f.rel_path LIKE '%textures/%.png')`)
+	rows, err := s.DB.Query(`SELECT i.current_snapshot_id FROM instance i JOIN snapshot s ON s.id=i.current_snapshot_id
+		WHERE s.kinds & ? != 0`, HasPNG)
 	if err != nil {
 		return nil, err
 	}

@@ -1,15 +1,19 @@
+import { closeChoiceMenu } from "./choices.js";
 // Popups (06 §3.1 rule 5): the command palette, the tag bar, the position input, a
 // confirmation, a text or choice panel, help. Each has a title, shows in the position
 // line, closes with esc, and never nests: opening one closes the other.
 import { pathContent, copyablePath } from "./fields.js";
-import { S, $, el, esc, api, T, Tf, errText, say } from "./state.js";
+import { S, $, el, esc, api, T, Tf, errText, say, keyCaps } from "./state.js";
+import { buildCommandPanel } from "./command-panel.js";
 
 let ui = null;
 export function initPopups(u) { ui = u; }
 
 export function open(kind, title, build) {
+  closeChoiceMenu();
   close();
   const box = $("#popup");
+  box.classList.remove("command-dock");
   box.innerHTML = "";
   const pop = el("div", "pop");
   box.append(pop);
@@ -26,6 +30,7 @@ export function close() {
   S.popup = null;
   const box = $("#popup");
   box.hidden = true;
+  box.classList.remove("command-dock");
   box.innerHTML = "";
   ui.renderWhere();
   ui.renderHeads();
@@ -87,18 +92,11 @@ function inputLine(pop, prompt, placeholder) {
 
 // ---- the command palette (06 §3.5) ----
 export function palette() {
+  if (S.popup?.kind === "palette") { close(); return; }
+  hideMenu();
   open("palette", T("command palette"), (pop, p) => {
-    const inp = inputLine(pop, "❯", T("a command, a mod, a game"));
-    const run = (o) => { close(); ui.palette(o); };
-    optionList(pop, p, [], (d, o) => {
-      d.append(el("span", "", o.name));
-      if (o.kind === 0 && o.alias !== o.name) d.append(el("span", "dim", o.alias));
-      d.append(el("span", "d", o.kind === 0 ? o.desc.split(" ")[0] : o.kind === 2 ? T("game") : o.kind === 3 ? T("list") : o.desc));
-    }, run, inp);
-    const refresh = async () => p.redraw(await api.Palette(inp.value));
-    inp.addEventListener("input", refresh);
-    inp.addEventListener("keydown", (e) => { if (e.ctrlKey && e.key === "u") { inp.value = ""; refresh(); e.preventDefault(); } });
-    refresh();
+    $("#popup").classList.add("command-dock");
+    buildCommandPanel(pop, p, { close, pick: ui.palette, reload: ui.commandDone || ui.reload, uninstall: ui.uninstallStarted });
   });
 }
 
@@ -226,11 +224,13 @@ export function panel(title, content, goLabel, go, cls = "", envWrite = "") {
     body.append(content);
     pop.append(body);
     const btns = el("div", "btns");
-    const no = el("button", "", (go ? T("cancel") : T("close")) + "  esc");
+    const no = el("button", "", go ? T("cancel") : T("close"));
+    no.append(keyCaps("esc"));
     no.onclick = close;
     btns.append(no);
     if (go) {
-      const yes = el("button", "go", goLabel + "  enter");
+      const yes = el("button", "go", goLabel);
+      yes.append(keyCaps("enter"));
       if (envWrite) yes.dataset.envWrite = envWrite;
       yes.onclick = () => { close(); go(); };
       btns.append(yes);
@@ -293,7 +293,8 @@ export async function identity(question, run) {
     }
     pop.append(body);
     const btns = el("div", "btns");
-    const leave = el("button", "identity-close", T("close") + "  esc");
+    const leave = el("button", "identity-close", T("close"));
+    leave.append(keyCaps("esc"));
     leave.onclick = close; btns.append(leave);
     const answers = el("div", "identity-answer-buttons");
     const pick = (action) => { close(); run(action); };
@@ -322,14 +323,15 @@ export async function identity(question, run) {
 
 // choose offers a few choices; pick gets the chosen index. other is a second action on
 // the highlighted choice ({key, label, run}), shown under the list (the environment
-// chooser's 删除环境).
+// chooser's remove game).
 export function choose(title, labels, pick, current = 0, other = null) {
   open("choose", title, (pop, p) => {
     pop.append(el("div", "ttl", title));
     optionList(pop, p, labels.map((l, i) => ({ l, i })), (d, o) => d.append(el("span", "word-facts", o.l)), (o) => { close(); pick(o.i); });
     if (other) {
       const btns = el("div", "btns");
-      const b = el("button", "word-facts", other.label + "  " + (other.key === "Delete" ? "del" : other.key));
+      const b = el("button", "", other.label);
+      b.append(keyCaps(other.key === "Delete" ? "del" : other.key));
       if (other.envWrite) b.dataset.envWrite = other.envWrite;
       const run = () => { const i = p.opts[p.sel] && p.opts[p.sel].i; close(); if (i !== undefined) other.run(i); };
       b.onclick = run;
@@ -361,7 +363,7 @@ export function ask(title, placeholder, done, value = null) {
 }
 
 // help: the keys of the page it is asked on (06 §3.1 rule 4, view.KeyHelp): the plan
-// editor and Mod 库存 share one table, then each page's own.
+// editor and Mod library share one table, then each page's own.
 export async function help(page = "plan") {
   let rows = [];
   try { rows = await api.Keys(page === "full" ? "plan" : page); } catch { rows = []; }
@@ -378,6 +380,7 @@ export async function help(page = "plan") {
 // works it as the mouse does: ↑↓ (or tab) move, enter runs, esc closes; it opens with the
 // first item focused when the menu key or shift+F10 opened it (keys = true).
 export function menu(x, y, actions, keys = false) {
+  closeChoiceMenu();
   const m = $("#menu");
   m.innerHTML = "";
   for (const a of actions) {
@@ -461,7 +464,8 @@ export async function problem(ref, run, actionWrite) {
         b.onclick = () => { close(); run(act); };
         btns.append(b);
       }
-      const back = el("button", "", T("close") + "  esc");
+      const back = el("button", "", T("close"));
+      back.append(keyCaps("esc"));
       back.onclick = close;
       btns.append(back);
       box.append(btns);
@@ -501,4 +505,43 @@ export async function problem(ref, run, actionWrite) {
   } catch (e) {
     if (current()) { close(); say("fail", errText(e)); }
   }
+}
+
+// B1: separate needed/available values; Enter follows focus, initially Cancel.
+export function memoryConfirm(memory, go) {
+  open("memory", T("RAM may be insufficient"), (pop, p) => {
+    pop.classList.add("memory-confirm");
+    pop.setAttribute("role", "dialog");
+    pop.setAttribute("aria-modal", "true");
+    pop.setAttribute("aria-label", T("RAM may be insufficient"));
+    pop.append(el("div", "ttl", T("RAM may be insufficient")));
+    const values = el("div", "memory-values");
+    for (const [label, value] of [["loading RAM needed", memory.needed], ["RAM available now", memory.available]]) {
+      const cell = el("div");
+      cell.append(el("div", "muted", T(label)), el("strong", "num", value));
+      values.append(cell);
+    }
+    const body = el("div", "body");
+    body.append(values, el("p", "", T("close other apps or reduce the list before launching.")));
+    pop.append(body);
+    const buttons = el("div", "btns");
+    const cancel = el("button", "memory-cancel", T("cancel"));
+    const yes = el("button", "go", T("launch anyway"));
+    yes.dataset.envWrite = "launch";
+    cancel.onclick = close;
+    let accepted = false;
+    yes.onclick = () => { if (accepted || S.popup !== p) return; accepted = true; close(); go(); };
+    buttons.append(cancel, yes); pop.append(buttons);
+    cancel.focus();
+    p.keys = e => {
+      if (["Tab", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+        e.preventDefault();
+        (document.activeElement === cancel ? yes : cancel).focus();
+      } else if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        (document.activeElement === yes ? yes : cancel).click();
+      }
+      return true;
+    };
+  });
 }

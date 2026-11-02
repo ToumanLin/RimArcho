@@ -8,7 +8,6 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/accounts"
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
-	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
@@ -27,6 +26,11 @@ func (s *API) queueSettingTaskLocked(kind string, argv []string, env string, res
 	}
 	if env != "" {
 		snapshot.EnvName = env
+	}
+	if kind == view.TaskSourceDecompile && snapshot.OpenPlan == 0 && snapshot.PlanName == "" {
+		if e, err := snapshot.Env(); err == nil {
+			snapshot.OpenPlan = snapshot.Store.CurrentPlanID(e.ID)
+		}
 	}
 	obj := "RimArcho"
 	if len(argv) == 3 && argv[0] == "deps" {
@@ -60,6 +64,9 @@ func (s *API) queueSettingTaskLocked(kind string, argv []string, env string, res
 		}
 		s.mu.Unlock()
 		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				return "", err
+			}
 			return "", errors.New(view.Humanize(nil, err.Error()))
 		}
 		return text, nil
@@ -77,6 +84,26 @@ func (s *API) runSettingTask(a *app.App, id, kind string, argv []string) (string
 		})
 	}
 	switch kind {
+	case view.TaskSourceDecompile, view.TaskSourceClean:
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		s.tasks.SetStop(id, func() error { cancel(); return nil })
+		if kind == view.TaskSourceClean {
+			p, err := a.CleanSourceLibrary(ctx, true)
+			if err != nil {
+				return "", err
+			}
+			return view.Tf("removed %d folders (%s)", p.Folders, view.SizeText(p.Bytes)), nil
+		}
+		err := a.DecompileActive(ctx, func(done, total int, file string) {
+			s.tasks.Update(id, func(t *app.Task) {
+				t.Done, t.Total, t.Phase = done, total, file
+				if total > 0 {
+					t.Frac = float64(done) / float64(total)
+				}
+			})
+		})
+		return view.T("the current list's mods are in the source library"), err
 	case view.TaskVacuum:
 		defer s.free.soon()
 		if len(argv) != 2 {
@@ -112,13 +139,15 @@ func (s *API) runSettingTask(a *app.App, id, kind string, argv []string) (string
 		return view.T("Steam will download this Workshop update"), a.UpdateWorkshopClient(argv[1], false)
 	case view.TaskSubscribe, view.TaskSubscriptionFrom:
 		return s.runSubscriptionTask(a, id, kind, argv)
-	case view.TaskSteamCMD, view.TaskTodds, view.TaskWezTerm:
+	case view.TaskSelfCheck:
+		return s.runSelfCheck(a)
+	case view.TaskSelfUpdate:
+		return s.runSelfUpdate(a, id)
+	case view.TaskSteamCMD, view.TaskTodds:
 		var path string
 		var err error
 		if len(argv) == 3 && argv[0] == "deps" && argv[1] == "install" {
 			path, err = a.InstallDep(argv[2], progress)
-		} else if kind == view.TaskWezTerm {
-			path, err = a.InstallDep(deps.WezTerm, progress)
 		} else if kind == view.TaskSteamCMD {
 			path, err = a.InstallSteamCMDProgress(progress)
 		} else {
@@ -158,12 +187,4 @@ func executeSettingTask(a *app.App, argv []string) (string, error) {
 	}
 	line, _, _ := strings.Cut(text, "\n")
 	return line, nil
-}
-
-func init() {
-	view.Register(map[string]string{
-		"downloaded to %s":       "已下载到 %s",
-		"%s: %d entries":         "%s：%d 条",
-		"community data updated": "社区数据已更新",
-	})
 }

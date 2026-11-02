@@ -1,19 +1,20 @@
-// 启动 (06 §2.3), on a Swiss grid: what is applied is one large headline that fits its
+// Start (06 §2.3), on a Swiss grid: what is applied is one large headline that fits its
 // width (its mods and last play below), the last game and the changes since it was last
 // played in the top right, and under a rule three steps read left to right — 01 the game,
-// 02 that game's lists and packs, 03 ▶ 启动游戏 with the applied list's problem under it
-// in one line; edits not yet written to the game get 保存 in the block's corner (w).
+// 02 that game's lists and packs, 03 ▶ launch game with the applied list's problem under it
+// in one line; edits not yet written to the game get save in the block's corner (w).
 // Picking a game or a row applies it at once
 // (its environment and plan become current; a pack becomes the featured item); it writes
 // no game file. Picking the applied row again opens it. The problem can be hidden; it
 // comes back when the row, its game, its mods or its problem change.
 // Data: API.Home (view.BuildHome, view.AddOtherEnvs, view.PickFeatured) and
 // API.HomeBackground (the image, its dimming, blur and focus; 06 §2.14).
-import { S, el, api, T, Tf, errText, say } from "./state.js";
+import { S, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { openScreen, page, changesPlan, beginPageRead } from "./screens.js";
 import { launchPack } from "./packs.js";
 import { withEnvironmentSwitch } from "./environment.js";
 import { places, slideFrom } from "./motion.js";
+import { memoryConfirm } from "./popups.js";
 
 let ui = null;
 export function initHome(u) {
@@ -38,6 +39,7 @@ const shown = { game: null, row: null, note: false, drawn: false };
 const markY = new Map();
 
 let homeRetries = 0, homeRetryTimer = null;
+let memoryTimer = null, launchPending = false;
 export async function home({ keep = false } = {}) {
   clearTimeout(homeRetryTimer);
   const read = beginPageRead("home", { keep, retry: () => home() });
@@ -61,6 +63,7 @@ export async function home({ keep = false } = {}) {
   if (f) picks.set(f.envName, key(f));
   draw();
   read.finish();
+  refreshHomeMemory(next);
 }
 
 // retryHome reads the page again after 1, 2, 4, 8 s, then every 10 s, for about a minute
@@ -109,7 +112,7 @@ function focusStep(n) {
 export function homeKey(e) {
   const k = e.key, f = pendingRow || applied();
   if (/^[1-3]$/.test(k) && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) { e.preventDefault(); focusStep(k); return; }
-  // 保存 is its own button: enter on it saves, as a click does
+  // save is its own button: enter on it saves, as a click does
   if ((k === "Enter" || k === " ") && document.activeElement?.matches(".hm-save")) return;
   if (k === "w" && !e.ctrlKey && !e.altKey && !e.metaKey) {
     if (canSave(f)) { e.preventDefault(); save(); }
@@ -137,7 +140,7 @@ export function homeKey(e) {
   launch(f);
 }
 
-// (w, 保存, is on its button while there is something to save: the line holds seven)
+// (w, save, is on its button while there is something to save: the line holds seven)
 export function hintList() {
   return [{ key: "1–3", label: T("column") }, { key: "↑↓", label: T("list") }, { key: "←→", label: T("game") }, { key: "enter", label: T("edit") }, { key: "L", label: T("launch") },
     { key: "shift+1–8", label: T("pages") }, { key: "?", label: T("all keys") }];
@@ -156,8 +159,8 @@ async function save() {
   if (S.screen === "home") home({ keep: true });
 }
 
-// focusLaunch is the editor's 启动游戏 (06 §2.5): the current plan becomes the applied row
-// (it usually is; a pack applied here gives way) and the focus goes to ▶ 启动游戏, so L or
+// focusLaunch is the editor's launch game (06 §2.5): the current plan becomes the applied row
+// (it usually is; a pack applied here gives way) and the focus goes to ▶ launch game, so L or
 // enter starts the game.
 export async function focusLaunch() {
   if (!data) return;
@@ -179,7 +182,7 @@ function draw() {
   const before = places(sc.querySelector(".page.home"), ".hm-pick");
   sc.innerHTML = "";
   setBackdrop(bg);
-  // no page actions: rescanning is Mod 库's, a new plan is 方案's
+  // no page actions: rescanning is Mod library's, a new plan is Lists's
   const w = page("home", "");
   sc.append(w);
   const f = applied();
@@ -347,20 +350,21 @@ function rowStep(f, env, moved) {
   return s;
 }
 
-// 03: ▶ 启动游戏 (the one block of colour on the page) and the problem under it.
+// 03: ▶ launch game (the one block of colour on the page) and the problem under it.
 function launchStep(f) {
   const s = step("03", "hm-s3", T("launch"));
   const live = running(), starting = !live && launching > Date.now();
-  const b = el("button", "hm-go" + (live ? " running" : "") + (starting ? " starting" : "") + (arrived ? " arrived" : ""));
+  const severity = !live && !starting ? f?.memory?.assessment?.ramSeverity : "";
+  const b = el("button", "hm-go" + (["severe", "warning"].includes(severity) ? " memory-" + severity : "") + (live ? " running" : "") + (starting ? " starting" : "") + (arrived ? " arrived" : ""));
   b.dataset.envWrite = "launch";
   arrived = false;
   const top = el("div", "top");
-  const title = el("span", "title", live ? T("the game is running") : starting ? T("starting…") : T("launch the game"));
+  const title = el("span", "title", live ? T("the game is running") : starting ? T("starting…") : T(severity === "severe" ? "launch with RAM risk" : severity === "warning" ? "launch with limited RAM" : "launch the game"));
   if (live) title.prepend(el("span", "dot"));
   top.append(title);
-  if (!live) top.append(el("kbd", "", "L"));
+  if (!live) top.append(keyCaps("L"));
   // 01 and 02 already say what starts; the block adds only the edits that launching saves,
-  // and they can be saved alone: 保存 sits in the block's corner, beside it, not in it
+  // and they can be saved alone: save sits in the block's corner, beside it, not in it
   const saving = !starting && canSave(f);
   const sub = live ? (S.live.errors ? Tf("%d errors", S.live.errors) : T("no errors yet")) : f && f.unsaved && !saving ? Tf("%d unsaved", f.unsaved) : "";
   const bottom = el("div", "bottom");
@@ -377,7 +381,7 @@ function launchStep(f) {
   if (saving) {
     const sv = el("button", "hm-save");
     sv.dataset.envWrite = "save";
-    sv.append(el("span", "num", Tf("save %d changes", f.unsaved)), el("kbd", "", "w"));
+    sv.append(el("span", "num", Tf("save %d changes", f.unsaved)), keyCaps("w"));
     sv.title = T("write these edits to the game's mod list now, without launching; launching saves them too");
     sv.onclick = () => save();
     block.append(sv);
@@ -410,7 +414,7 @@ function note(r) {
   if (hidden === fp) return null;
   const wrap = el("div", "hm-note" + (p.bad ? " bad" : "") + (shown.note ? "" : " enter"));
   const inner = el("div"), box = el("div", "box");
-  // one line; the reason and its log numbers are on hover and on 能不能跑
+  // one line; the reason and its log numbers are on hover and on Can it run
   const what = el(p.go ? "button" : "div", "what", (p.bad ? "▲  " : "") + p.what);
   what.title = [p.what, p.why].filter(Boolean).join("\n");
   if (p.go) what.onclick = () => ui.go("needs");
@@ -460,7 +464,7 @@ function pickGame(env) {
   if (r) apply(r);
 }
 
-// apply: 应用 (06 §2.3) — the row becomes the applied one. The page stays as it is: the
+// apply: apply (06 §2.3) — the row becomes the applied one. The page stays as it is: the
 // squares move to the pick at once, and ▶ shows the switch (another game: "switching to
 // main…", which can take a while; another row: "applying X…") until the new page is read,
 // then the new pick comes in on it.
@@ -533,7 +537,17 @@ function activity() {
     const go = c.noScan ? () => ui.cmd("rescan") : () => { changesPlan(); ui.go("changes"); };
     box.append(actLine(c.title, c.text, go));
   }
+  // a new RimArcho (07 §5.1): opens its row in settings, where it is installed
+  if (data.update) box.append(actLine(data.update.title, data.update.text, goSelfUpdate));
   return box;
+}
+
+async function goSelfUpdate() {
+  await ui.go("settings");
+  const row = document.querySelector('[data-setting-action="update"]')?.closest("[data-setting-row]")
+    || document.querySelector('[data-setting-action="update --check"]')?.closest("[data-setting-row]");
+  row?.scrollIntoView({ block: "center" });
+  row?.querySelector("button")?.focus({ preventScroll: true });
 }
 
 function actLine(title, text, go) {
@@ -544,15 +558,69 @@ function actLine(title, text, go) {
   return b;
 }
 
-// launch is the applied row's L (08 §2, §5.3): the plan launches at once, as the pack
-// does on the packs page. ▶ says it is starting until the game's live state arrives.
+// Late estimates must belong to the row, environment and list that are still shown.
+async function refreshHomeMemory(expected) {
+  clearTimeout(memoryTimer);
+  const r = applied(), env = S.envSeq;
+  const current = () => S.screen === "home" && data === expected && S.envSeq === env && applied() === r;
+  if (!r || r.kind !== "plan" || !r.current || !current()) return;
+  try {
+    let m = await api.HomeMemory();
+    if (!current() || m?.env !== r.envName || m?.plan !== r.plan) return;
+    r.memory = m;
+    if (!S.popup) draw();
+    if (!m.assessment.estimated || m.assessment.stale) {
+      const first = await api.PlanLoadCost(r.plan);
+      if (!current()) return;
+      while (current()) {
+        await new Promise(resolve => setTimeout(resolve, 250));
+        if (!current()) return;
+        const result = await api.PlanLoadCostMeasure(first.request);
+        if (!current() || !result || result.error) return;
+        if (result.loading) continue;
+        m = await api.HomeMemory();
+        if (!current() || m?.env !== r.envName || m?.plan !== r.plan || m.token !== r.memory.token) return;
+        r.memory = m;
+        if (!S.popup) draw();
+        break;
+      }
+    }
+  } catch { /* Unknown estimates retain the ordinary launch button. */ }
+  if (current()) memoryTimer = setTimeout(() => refreshHomeMemory(expected), 30000);
+}
+
+// Launch the applied row after checking its current RAM comparison (08 §2, §5.3).
 async function launch(r) {
   if (S.busy.env) return say("busy", Tf("switching to %s…", S.busy.env));
-  launching = Date.now() + 4000;
-  draw();
-  setTimeout(() => { if (S.screen === "home" && launching && launching <= Date.now()) { launching = 0; draw(); } }, 4100);
-  try {
-    if (r.kind !== "plan") await launchPack(r.name);
-    else if (await ui.run("launch") === "asked") { launching = 0; draw(); }
-  } catch (e) { launching = 0; draw(); say("fail", errText(e)); }
+  if (launchPending || running() || launching > Date.now()) return;
+  const expected = data, env = S.envSeq;
+  const current = () => S.screen === "home" && data === expected && S.envSeq === env && applied() === r;
+  const start = async (approved = null) => {
+    if (!current()) return;
+    launchPending = true;
+    try {
+      if (r.kind === "plan") {
+        let m = null;
+        try { m = await api.HomeMemory(); } catch { /* unavailable means unknown */ }
+        if (!current()) return;
+        if ((approved && !m) || (m && (m.env !== r.envName || m.plan !== r.plan || (approved && m.token !== approved) || (!approved && r.memory?.token && m.token !== r.memory.token)))) {
+          say("busy", T("the list changed; review the updated estimate before launching"));
+          home({ keep: true });
+          return;
+        }
+        if (!approved && m?.assessment?.ramSeverity === "severe") {
+          r.memory = m;
+          memoryConfirm(m, () => start(m.token));
+          return;
+        }
+      }
+      launching = Date.now() + 4000;
+      draw();
+      setTimeout(() => { if (S.screen === "home" && launching && launching <= Date.now()) { launching = 0; draw(); } }, 4100);
+      if (r.kind !== "plan") await launchPack(r.name);
+      else if (await ui.run("launch") === "asked") { launching = 0; draw(); }
+    } catch (e) { launching = 0; if (current()) draw(); say("fail", errText(e)); }
+    finally { launchPending = false; }
+  };
+  await start();
 }

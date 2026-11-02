@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 )
 
-// SubscribeRequest is what the 添加订阅 card decided (06 §2.9): the source and its one
+// SubscribeRequest is what the add a subscription card decided (06 §2.9): the source and its one
 // choice. The window sends it as JSON; the TUI builds it from its card.
 type SubscribeRequest struct {
 	Kind     string `json:"kind"`
@@ -51,7 +51,7 @@ func SubscribeArgv(r SubscribeRequest) ([]string, error) {
 	return args, nil
 }
 
-// WorkshopUpdatePreview is the confirmation of 更新 for a Workshop item the Steam client
+// WorkshopUpdatePreview is the confirmation of update for a Workshop item the Steam client
 // keeps (06 §2.9): installed → latest, and that Steam downloads it. Refused while a game
 // runs, like the update itself.
 func WorkshopUpdatePreview(a *app.App, ref string) (*Preview, error) {
@@ -75,8 +75,8 @@ func WorkshopUpdatePreview(a *app.App, ref string) (*Preview, error) {
 	return &Preview{What: OpSubUpdate, Title: T("update subscription"), Apply: true, Lines: lines}, nil
 }
 
-// SourceCheckResult checks one source of 订阅与更新 (检查, 06 §2.9) and words the result as
-// the page does: "都是最新的" or "N 个有更新", never "检查完成"; a failure keeps its reason.
+// SourceCheckResult checks one source of updates (check, 06 §2.9) and words the result as
+// the page does: "everything is up to date" or "N updates available", never "check complete"; a failure keeps its reason.
 func SourceCheckResult(a *app.App, kind string, pageReader ...func(string) (*subscribe.PageInfo, error)) (string, error) {
 	if err := a.CheckSubscriptionSource(kind, pageReader...); err != nil {
 		return "", err
@@ -97,7 +97,7 @@ func SourceCheckResult(a *app.App, kind string, pageReader ...func(string) (*sub
 	return "", nil
 }
 
-// TaskQueuedText is the status line after queuing a task: "更新订阅，Git Mod：已排进文件队列".
+// TaskQueuedText is the status line after queuing a task: "update subscription, Git Mod: queued in files".
 func TaskQueuedText(t app.Task) string {
 	lane, _ := TaskLaneText(t.Lane)
 	return Tf("%s, %s: in the %s queue", TaskTitle(t.Kind), t.Obj, lane)

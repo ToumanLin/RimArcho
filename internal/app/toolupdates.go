@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/deps"
-	"github.com/ToumanLin/RimArcho/internal/host"
 	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
@@ -63,7 +62,7 @@ func (a *App) recordToolInstalled(name string) {
 		return
 	}
 	s.Installed = installed
-	s.Pending = newerToolVersion(name, installed, s.Latest)
+	s.Pending = newerToolVersion(installed, s.Latest)
 	if !s.Pending {
 		s.State = "up to date"
 	}
@@ -71,7 +70,7 @@ func (a *App) recordToolInstalled(name string) {
 	_ = a.Store.SetMeta("tool-update:"+name, string(b))
 	status := a.AutomaticStatus("tools")
 	status.Pending = 0
-	for _, n := range []string{deps.SteamCMD, deps.Todds, deps.WezTerm} {
+	for _, n := range []string{deps.SteamCMD, deps.Todds} {
 		if a.ToolUpdate(n).Pending {
 			status.Pending++
 		}
@@ -81,11 +80,10 @@ func (a *App) recordToolInstalled(name string) {
 }
 
 // Reuses the dependency finder's cached version probes; never downloads a tool.
-// The bundled font ships with RimArcho and has no independent update channel.
 func (a *App) CheckToolUpdates(ctx context.Context) (int, string, error) {
 	var failures []error
 	pending := 0
-	for _, name := range []string{deps.SteamCMD, deps.Todds, deps.WezTerm} {
+	for _, name := range []string{deps.SteamCMD, deps.Todds} {
 		if ctx.Err() != nil {
 			return pending, "check interrupted", ctx.Err()
 		}
@@ -106,16 +104,8 @@ func (a *App) CheckToolUpdates(ctx context.Context) (int, string, error) {
 			b, err = a.readToolRelease(ctx, steamCMDManifest)
 			latest = steamManifestVersion(b)
 		} else {
-			api := host.GitHubAPI
-			if a.WezTermAPI != "" {
-				api = a.WezTermAPI
-			}
-			repo := "wezterm/wezterm"
-			if name == deps.Todds {
-				repo = "todds-encoder/todds"
-			}
 			var b []byte
-			b, err = a.readToolRelease(ctx, strings.TrimRight(api, "/")+"/repos/"+repo+"/releases/latest")
+			b, err = a.readToolRelease(ctx, "https://api.github.com/repos/todds-encoder/todds/releases/latest")
 			var release struct {
 				Tag        string `json:"tag_name"`
 				Draft      bool   `json:"draft"`
@@ -137,7 +127,7 @@ func (a *App) CheckToolUpdates(ctx context.Context) (int, string, error) {
 			failures = append(failures, err)
 		} else {
 			s.Latest = latest
-			s.Pending = newerToolVersion(name, s.Installed, latest)
+			s.Pending = newerToolVersion(s.Installed, latest)
 			s.Compatible = name != deps.Todds || strings.TrimPrefix(latest, "v") == textures.ToddsVersion
 			s.State = "up to date"
 			if s.Installed == "" {
@@ -182,14 +172,11 @@ func (a *App) readToolRelease(ctx context.Context, target string) ([]byte, error
 	return b, err
 }
 
-func newerToolVersion(name, installed, latest string) bool {
+func newerToolVersion(installed, latest string) bool {
 	installed = strings.TrimPrefix(strings.TrimSpace(installed), "v")
 	latest = strings.TrimPrefix(latest, "v")
 	if installed == "" || installed == latest {
 		return false
-	}
-	if name == deps.WezTerm {
-		return latest > installed
 	}
 	numbers := func(s string) []int64 {
 		var out []int64

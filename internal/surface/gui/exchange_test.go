@@ -1,6 +1,7 @@
 package gui
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -44,5 +45,47 @@ func TestExchangeAPI(t *testing.T) {
 	c, err := api.ExportCopy("rimcrow")
 	if err != nil || c.Copied || !strings.HasPrefix(c.Text, "RC-") {
 		t.Fatalf("copy: %v %+v", err, c)
+	}
+}
+
+// Native adapter fake: exercise selection/cancellation without opening an OS dialog.
+type selectionNative struct {
+	picked, title, start string
+	filters              [][2]string
+}
+
+func (n *selectionNative) openFile(title string, filters [][2]string) (string, error) {
+	n.title, n.filters = title, filters
+	return n.picked, nil
+}
+func (n *selectionNative) openDir(title, start string) (string, error) {
+	n.title, n.start = title, start
+	return n.picked, nil
+}
+func (n *selectionNative) saveFile(string, string, [][2]string) (string, error) { return "", nil }
+func (n *selectionNative) setClipboard(string) bool                             { return false }
+func (n *selectionNative) clipboard() (string, bool)                            { return "", false }
+
+func TestNativeAddressSelections(t *testing.T) {
+	e, api, _ := fixture(t)
+	n := &selectionNative{picked: filepath.Join(e.Root, "合成目录", "new")}
+	api.x.native = n
+	selected, err := api.PickFolder(filepath.Join(e.Root, "missing", "nested"))
+	if err != nil || selected != n.picked || n.start != e.Root || n.title != view.T("choose a folder") {
+		t.Fatal(selected, err, n)
+	}
+	selected, err = api.PickProgram()
+	if err != nil || selected != n.picked || n.title != view.T("choose a program") || len(n.filters) != 0 {
+		t.Fatal(selected, err, n)
+	}
+	selected, err = api.PickPackFile()
+	if err != nil || selected != n.picked || n.title != view.T("choose a pack") || len(n.filters) != 1 || n.filters[0][1] != "*.archopack" {
+		t.Fatal(selected, err, n)
+	}
+	n.picked = ""
+	for _, pick := range []func() (string, error){func() (string, error) { return api.PickFolder(e.Root) }, api.PickProgram, api.PickImportFile, api.PickPackFile} {
+		if path, err := pick(); err != nil || path != "" {
+			t.Fatal(path, err)
+		}
 	}
 }

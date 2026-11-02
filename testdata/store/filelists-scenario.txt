@@ -1,0 +1,420 @@
+
+## changes --library --all
+changes: 0 mods (library, the last scan · Oct 1 18:00)
+  nothing changed
+  earlier:
+    Oct 1:
+      worth a look:
+        #6olp  Alpha  code changed; Defs changed; textures, sounds, translations changed
+          code 1 changed, 1 new; Defs 1 changed; textures +108 B; sounds −300 B; translations 2 new, 2 deleted · in all −184 B
+          updated on the Workshop Jan 1
+
+## changes test.alpha
+changes: 6 mods (pkg:test.alpha)
+  Oct 1 16:00:
+    worth a look:
+      #6olp  Alpha  Defs changed; textures changed
+        Defs 1 changed; textures +26 B · in all +26 B
+        updated on the Workshop Jan 1
+  Oct 1 15:00:
+    worth a look:
+      #6olp  Alpha  Defs changed; textures, translations changed
+        Defs 1 changed; textures +25 B; translations 2 new, 2 deleted · in all +25 B
+        updated on the Workshop Jan 1
+  Oct 1 14:00:
+    worth a look:
+      #6olp  Alpha  code changed; Defs changed; textures, sounds changed
+        code 1 changed; Defs 1 changed; textures +24 B; sounds −300 B · in all −274 B
+        updated on the Workshop Jan 1
+  Oct 1 13:00:
+    worth a look:
+      #6olp  Alpha  code changed; Defs changed; textures changed
+        code 1 new; Defs 1 changed; textures +11 B · in all +16 B
+        updated on the Workshop Jan 1
+  Oct 1 12:00:
+    worth a look:
+      #6olp  Alpha  Defs changed; textures changed
+        Defs 1 changed; textures +22 B · in all +23 B
+        updated on the Workshop Jan 1
+  Oct 1 11:00:
+    1 new subscription: Alpha:
+      #6olp  Alpha  new subscription from Workshop
+
+## file diffs
+files 1 → 5
+  ~ Defs/ThingDefs/Things.xml  +1 B
+  ~ Textures/Things/A/a_north.png  +1 B
+  + Textures/Things/A/new_1.png  21 B
+files 5 → 6
+  + Assemblies/B.dll  5 B
+  ~ Defs/ThingDefs/Things.xml
+  ~ Textures/Things/A/a_north.png  +1 B
+  + Textures/Things/A/new_2.png  22 B
+  - Textures/中文/图.png
+files 6 → 7
+  ~ Defs/ThingDefs/Things.xml
+  ~ Libs/Native.DLL  +2 B
+  - Sounds/Click.ogg
+  ~ Textures/Things/A/a_north.png  +1 B
+  + Textures/Things/A/new_3.png  23 B
+files 7 → 8
+  ~ Defs/ThingDefs/Things.xml
+  + Languages/English (US)/DefInjected/ThingDef/A.xml  16 B
+  + Languages/English (US)/Keyed/A.xml  16 B
+  - Languages/English/DefInjected/ThingDef/A.xml
+  - Languages/English/Keyed/A.xml
+  ~ Textures/Things/A/a_north.png  +1 B
+  + Textures/Things/A/new_4.png  24 B
+files 8 → 9
+  ~ Defs/ThingDefs/Things.xml
+  ~ Textures/Things/A/a_north.png  +1 B
+  + Textures/Things/A/new_5.png  25 B
+
+## snapshot files
+snapshot 1: 18 files
+  1.6/defs/extra.xml | 1.6/Defs/Extra.xml 61 hash=true
+  1.6/textures/ui/icon.png | 1.6/Textures/UI/Icon.png 9 hash=false
+  about/about.xml | About/About.xml 213 hash=true
+  about/preview.png | About/Preview.png 7 hash=true
+  assemblies/a.dll | Assemblies/A.dll 5 hash=true
+  defs/thingdefs/things.xml | Defs/ThingDefs/Things.xml 61 hash=true
+  languages/chinesesimplified (简体中文)/keyed/a.xml | Languages/ChineseSimplified (简体中文)/Keyed/A.xml 16 hash=false
+  languages/english/definjected/thingdef/a.xml | Languages/English/DefInjected/ThingDef/A.xml 16 hash=false
+  languages/english/keyed/a.xml | Languages/English/Keyed/A.xml 16 hash=false
+  libs/native.dll | Libs/Native.DLL 6 hash=false
+  loadfolders.xml | LoadFolders.xml 63 hash=true
+  news/readme.txt | News/readme.txt 5 hash=false
+  patches/a.xml | Patches/A.xml 9 hash=true
+  sounds/click.ogg | Sounds/Click.ogg 300 hash=false
+  textures/things/a/a_east.png.meta | Textures/Things/A/a_east.png.meta 4 hash=false
+  textures/things/a/a_north.png | Textures/Things/A/a_north.png 40 hash=false
+  textures/things/a/a_south.png | Textures/Things/A/a_south.PNG 41 hash=false
+  textures/中文/图.png | Textures/中文/图.png 12 hash=false
+snapshot 2: 6 files
+  about/about.xml | About/About.xml 211 hash=true
+  defs/recipedefs/beta.xml | Defs/RecipeDefs/beta.xml 67 hash=true
+  defs/thingdefs/beta.xml | Defs/ThingDefs/beta.xml 64 hash=true
+  languages/english/keyed/beta.xml | Languages/English/Keyed/beta.xml 16 hash=false
+  patches/beta.xml | Patches/beta.xml 109 hash=true
+  textures/things/beta/a.png | Textures/Things/beta/a.png 64 hash=false
+snapshot 3: 2 files
+  about/about.xml | About/About.xml 241 hash=true
+  defs/thingdefs/items.xml | Defs/ThingDefs/Items.xml 59 hash=true
+snapshot 4: 6 files
+  about/about.xml | About/About.xml 213 hash=true
+  defs/recipedefs/local.xml | Defs/RecipeDefs/local.xml 68 hash=true
+  defs/thingdefs/local.xml | Defs/ThingDefs/local.xml 65 hash=true
+  languages/english/keyed/local.xml | Languages/English/Keyed/local.xml 16 hash=false
+  patches/local.xml | Patches/local.xml 110 hash=true
+  textures/things/local/a.png | Textures/Things/local/a.png 64 hash=false
+snapshot 5: 19 files
+  1.6/defs/extra.xml | 1.6/Defs/Extra.xml 61 hash=true
+  1.6/textures/ui/icon.png | 1.6/Textures/UI/Icon.png 9 hash=false
+  about/about.xml | About/About.xml 213 hash=true
+  about/preview.png | About/Preview.png 7 hash=true
+  assemblies/a.dll | Assemblies/A.dll 5 hash=true
+  defs/thingdefs/things.xml | Defs/ThingDefs/Things.xml 62 hash=true
+  languages/chinesesimplified (简体中文)/keyed/a.xml | Languages/ChineseSimplified (简体中文)/Keyed/A.xml 16 hash=false
+  languages/english/definjected/thingdef/a.xml | Languages/English/DefInjected/ThingDef/A.xml 16 hash=false
+  languages/english/keyed/a.xml | Languages/English/Keyed/A.xml 16 hash=false
+  libs/native.dll | Libs/Native.DLL 6 hash=false
+  loadfolders.xml | LoadFolders.xml 63 hash=true
+  news/readme.txt | News/readme.txt 5 hash=false
+  patches/a.xml | Patches/A.xml 9 hash=true
+  sounds/click.ogg | Sounds/Click.ogg 300 hash=false
+  textures/things/a/a_east.png.meta | Textures/Things/A/a_east.png.meta 4 hash=false
+  textures/things/a/a_north.png | Textures/Things/A/a_north.png 41 hash=false
+  textures/things/a/a_south.png | Textures/Things/A/a_south.PNG 41 hash=false
+  textures/things/a/new_1.png | Textures/Things/A/new_1.png 21 hash=false
+  textures/中文/图.png | Textures/中文/图.png 12 hash=false
+snapshot 6: 20 files
+  1.6/defs/extra.xml | 1.6/Defs/Extra.xml 61 hash=true
+  1.6/textures/ui/icon.png | 1.6/Textures/UI/Icon.png 9 hash=false
+  about/about.xml | About/About.xml 213 hash=true
+  about/preview.png | About/Preview.png 7 hash=true
+  assemblies/a.dll | Assemblies/A.dll 5 hash=true
+  assemblies/b.dll | Assemblies/B.dll 5 hash=true
+  defs/thingdefs/things.xml | Defs/ThingDefs/Things.xml 62 hash=true
+  languages/chinesesimplified (简体中文)/keyed/a.xml | Languages/ChineseSimplified (简体中文)/Keyed/A.xml 16 hash=false
+  languages/english/definjected/thingdef/a.xml | Languages/English/DefInjected/ThingDef/A.xml 16 hash=false
+  languages/english/keyed/a.xml | Languages/English/Keyed/A.xml 16 hash=false
+  libs/native.dll | Libs/Native.DLL 6 hash=false
+  loadfolders.xml | LoadFolders.xml 63 hash=true
+  news/readme.txt | News/readme.txt 5 hash=false
+  patches/a.xml | Patches/A.xml 9 hash=true
+  sounds/click.ogg | Sounds/Click.ogg 300 hash=false
+  textures/things/a/a_east.png.meta | Textures/Things/A/a_east.png.meta 4 hash=false
+  textures/things/a/a_north.png | Textures/Things/A/a_north.png 42 hash=false
+  textures/things/a/a_south.png | Textures/Things/A/a_south.PNG 41 hash=false
+  textures/things/a/new_1.png | Textures/Things/A/new_1.png 21 hash=false
+  textures/things/a/new_2.png | Textures/Things/A/new_2.png 22 hash=false
+snapshot 7: 20 files
+  1.6/defs/extra.xml | 1.6/Defs/Extra.xml 61 hash=true
+  1.6/textures/ui/icon.png | 1.6/Textures/UI/Icon.png 9 hash=false
+  about/about.xml | About/About.xml 213 hash=true
+  about/preview.png | About/Preview.png 7 hash=true
+  assemblies/a.dll | Assemblies/A.dll 5 hash=true
+  assemblies/b.dll | Assemblies/B.dll 5 hash=true
+  defs/thingdefs/things.xml | Defs/ThingDefs/Things.xml 62 hash=true
+  languages/chinesesimplified (简体中文)/keyed/a.xml | Languages/ChineseSimplified (简体中文)/Keyed/A.xml 16 hash=false
+  languages/english/definjected/thingdef/a.xml | Languages/English/DefInjected/ThingDef/A.xml 16 hash=false
+  languages/english/keyed/a.xml | Languages/English/Keyed/A.xml 16 hash=false
+  libs/native.dll | Libs/Native.DLL 8 hash=false
+  loadfolders.xml | LoadFolders.xml 63 hash=true
+  news/readme.txt | News/readme.txt 5 hash=false
+  patches/a.xml | Patches/A.xml 9 hash=true
+  textures/things/a/a_east.png.meta | Textures/Things/A/a_east.png.meta 4 hash=false
+  textures/things/a/a_north.png | Textures/Things/A/a_north.png 43 hash=false
+  textures/things/a/a_south.png | Textures/Things/A/a_south.PNG 41 hash=false
+  textures/things/a/new_1.png | Textures/Things/A/new_1.png 21 hash=false
+  textures/things/a/new_2.png | Textures/Things/A/new_2.png 22 hash=false
+  textures/things/a/new_3.png | Textures/Things/A/new_3.png 23 hash=false
+snapshot 8: 21 files
+  1.6/defs/extra.xml | 1.6/Defs/Extra.xml 61 hash=true
+  1.6/textures/ui/icon.png | 1.6/Textures/UI/Icon.png 9 hash=false
+  about/about.xml | About/About.xml 213 hash=true
+  about/preview.png | About/Preview.png 7 hash=true
+  assemblies/a.dll | Assemblies/A.dll 5 hash=true
+  assemblies/b.dll | Assemblies/B.dll 5 hash=true
+  defs/thingdefs/things.xml | Defs/ThingDefs/Things.xml 62 hash=true
+  languages/chinesesimplified (简体中文)/keyed/a.xml | Languages/ChineseSimplified (简体中文)/Keyed/A.xml 16 hash=false
+  languages/english (us)/definjected/thingdef/a.xml | Languages/English (US)/DefInjected/ThingDef/A.xml 16 hash=false
+  languages/english (us)/keyed/a.xml | Languages/English (US)/Keyed/A.xml 16 hash=false
+  libs/native.dll | Libs/Native.DLL 8 hash=false
+  loadfolders.xml | LoadFolders.xml 63 hash=true
+  news/readme.txt | News/readme.txt 5 hash=false
+  patches/a.xml | Patches/A.xml 9 hash=true
+  textures/things/a/a_east.png.meta | Textures/Things/A/a_east.png.meta 4 hash=false
+  textures/things/a/a_north.png | Textures/Things/A/a_north.png 44 hash=false
+  textures/things/a/a_south.png | Textures/Things/A/a_south.PNG 41 hash=false
+  textures/things/a/new_1.png | Textures/Things/A/new_1.png 21 hash=false
+  textures/things/a/new_2.png | Textures/Things/A/new_2.png 22 hash=false
+  textures/things/a/new_3.png | Textures/Things/A/new_3.png 23 hash=false
+  textures/things/a/new_4.png | Textures/Things/A/new_4.png 24 hash=false
+snapshot 9: 22 files
+  1.6/defs/extra.xml | 1.6/Defs/Extra.xml 61 hash=true
+  1.6/textures/ui/icon.png | 1.6/Textures/UI/Icon.png 9 hash=false
+  about/about.xml | About/About.xml 213 hash=true
+  about/preview.png | About/Preview.png 7 hash=true
+  assemblies/a.dll | Assemblies/A.dll 5 hash=true
+  assemblies/b.dll | Assemblies/B.dll 5 hash=true
+  defs/thingdefs/things.xml | Defs/ThingDefs/Things.xml 62 hash=true
+  languages/chinesesimplified (简体中文)/keyed/a.xml | Languages/ChineseSimplified (简体中文)/Keyed/A.xml 16 hash=false
+  languages/english (us)/definjected/thingdef/a.xml | Languages/English (US)/DefInjected/ThingDef/A.xml 16 hash=false
+  languages/english (us)/keyed/a.xml | Languages/English (US)/Keyed/A.xml 16 hash=false
+  libs/native.dll | Libs/Native.DLL 8 hash=false
+  loadfolders.xml | LoadFolders.xml 63 hash=true
+  news/readme.txt | News/readme.txt 5 hash=false
+  patches/a.xml | Patches/A.xml 9 hash=true
+  textures/things/a/a_east.png.meta | Textures/Things/A/a_east.png.meta 4 hash=false
+  textures/things/a/a_north.png | Textures/Things/A/a_north.png 45 hash=false
+  textures/things/a/a_south.png | Textures/Things/A/a_south.PNG 41 hash=false
+  textures/things/a/new_1.png | Textures/Things/A/new_1.png 21 hash=false
+  textures/things/a/new_2.png | Textures/Things/A/new_2.png 22 hash=false
+  textures/things/a/new_3.png | Textures/Things/A/new_3.png 23 hash=false
+  textures/things/a/new_4.png | Textures/Things/A/new_4.png 24 hash=false
+  textures/things/a/new_5.png | Textures/Things/A/new_5.png 25 hash=false
+snapshot 10: 22 files
+  1.6/defs/extra.xml | 1.6/Defs/Extra.xml 61 hash=true
+  1.6/textures/ui/icon.png | 1.6/Textures/UI/Icon.png 9 hash=false
+  about/about.xml | About/About.xml 213 hash=true
+  about/preview.png | About/Preview.png 7 hash=true
+  assemblies/a.dll | Assemblies/A.dll 5 hash=true
+  assemblies/b.dll | Assemblies/B.dll 5 hash=true
+  defs/thingdefs/things.xml | Defs/ThingDefs/Things.xml 62 hash=true
+  languages/chinesesimplified (简体中文)/keyed/a.xml | Languages/ChineseSimplified (简体中文)/Keyed/A.xml 16 hash=false
+  languages/english (us)/definjected/thingdef/a.xml | Languages/English (US)/DefInjected/ThingDef/A.xml 16 hash=false
+  languages/english (us)/keyed/a.xml | Languages/English (US)/Keyed/A.xml 16 hash=false
+  libs/native.dll | Libs/Native.DLL 8 hash=false
+  loadfolders.xml | LoadFolders.xml 63 hash=true
+  news/readme.txt | News/readme.txt 5 hash=false
+  patches/a.xml | Patches/A.xml 9 hash=true
+  textures/things/a/a_east.png.meta | Textures/Things/A/a_east.png.meta 4 hash=false
+  textures/things/a/a_north.png | Textures/Things/A/a_north.png 45 hash=false
+  textures/things/a/a_south.png | Textures/Things/A/a_south.PNG 41 hash=false
+  textures/things/a/new_1.png | Textures/Things/A/new_1.png 21 hash=false
+  textures/things/a/new_2.png | Textures/Things/A/new_2.png 22 hash=false
+  textures/things/a/new_3.png | Textures/Things/A/new_3.png 23 hash=false
+  textures/things/a/new_4.png | Textures/Things/A/new_4.png 24 hash=false
+  textures/things/a/new_5.png | Textures/Things/A/new_5.png 25 hash=false
+
+## instance files
+like "%Textures/%"
+  6olp7fgo6czvxggasyleorllzu: 1.6/Textures/UI/Icon.png, Textures/Things/A/a_east.png.meta, Textures/Things/A/a_north.png, Textures/Things/A/a_south.PNG, Textures/Things/A/new_1.png, Textures/Things/A/new_2.png, Textures/Things/A/new_3.png, Textures/Things/A/new_4.png, Textures/Things/A/new_5.png
+  hnygmz74fjpn7e7ywjloava5ay: Textures/Things/beta/a.png
+  z3bw4x23mssmp3btznj4fvgsfi: Textures/Things/local/a.png
+like "%a.dll"
+  6olp7fgo6czvxggasyleorllzu: Assemblies/A.dll
+like "%native.dll"
+  6olp7fgo6czvxggasyleorllzu: Libs/Native.DLL
+like "%.png"
+  6olp7fgo6czvxggasyleorllzu: 1.6/Textures/UI/Icon.png, About/Preview.png, Textures/Things/A/a_north.png, Textures/Things/A/a_south.PNG, Textures/Things/A/new_1.png, Textures/Things/A/new_2.png, Textures/Things/A/new_3.png, Textures/Things/A/new_4.png, Textures/Things/A/new_5.png
+  hnygmz74fjpn7e7ywjloava5ay: Textures/Things/beta/a.png
+  z3bw4x23mssmp3btznj4fvgsfi: Textures/Things/local/a.png
+like "%/a\\_%"
+like "Languages/_%/Keyed/%"
+  6olp7fgo6czvxggasyleorllzu: Languages/ChineseSimplified (简体中文)/Keyed/A.xml, Languages/English (US)/Keyed/A.xml
+  hnygmz74fjpn7e7ywjloava5ay: Languages/English/Keyed/beta.xml
+  z3bw4x23mssmp3btznj4fvgsfi: Languages/English/Keyed/local.xml
+like "%中文%"
+  6olp7fgo6czvxggasyleorllzu: Languages/ChineseSimplified (简体中文)/Keyed/A.xml
+like "%"
+  6olp7fgo6czvxggasyleorllzu: 1.6/Defs/Extra.xml, 1.6/Textures/UI/Icon.png, About/About.xml, About/Preview.png, Assemblies/A.dll, Assemblies/B.dll, Defs/ThingDefs/Things.xml, Languages/ChineseSimplified (简体中文)/Keyed/A.xml, Languages/English (US)/DefInjected/ThingDef/A.xml, Languages/English (US)/Keyed/A.xml, Libs/Native.DLL, LoadFolders.xml, News/readme.txt, Patches/A.xml, Textures/Things/A/a_east.png.meta, Textures/Things/A/a_north.png, Textures/Things/A/a_south.PNG, Textures/Things/A/new_1.png, Textures/Things/A/new_2.png, Textures/Things/A/new_3.png, Textures/Things/A/new_4.png, Textures/Things/A/new_5.png
+  hnygmz74fjpn7e7ywjloava5ay: About/About.xml, Defs/RecipeDefs/beta.xml, Defs/ThingDefs/beta.xml, Languages/English/Keyed/beta.xml, Patches/beta.xml, Textures/Things/beta/a.png
+  nyh3itfwmwkkbbv5igwkdlqd7e: About/About.xml, Defs/ThingDefs/Items.xml
+  z3bw4x23mssmp3btznj4fvgsfi: About/About.xml, Defs/RecipeDefs/local.xml, Defs/ThingDefs/local.xml, Languages/English/Keyed/local.xml, Patches/local.xml, Textures/Things/local/a.png
+
+## maintenance
+dry run: files=37 err=<nil>
+run: files=37 err=<nil>
+snapshot 1: none
+snapshot 2: 6 files
+  about/about.xml | About/About.xml 211 hash=true
+  defs/recipedefs/beta.xml | Defs/RecipeDefs/beta.xml 67 hash=true
+  defs/thingdefs/beta.xml | Defs/ThingDefs/beta.xml 64 hash=true
+  languages/english/keyed/beta.xml | Languages/English/Keyed/beta.xml 16 hash=false
+  patches/beta.xml | Patches/beta.xml 109 hash=true
+  textures/things/beta/a.png | Textures/Things/beta/a.png 64 hash=false
+snapshot 3: 2 files
+  about/about.xml | About/About.xml 241 hash=true
+  defs/thingdefs/items.xml | Defs/ThingDefs/Items.xml 59 hash=true
+snapshot 4: 6 files
+  about/about.xml | About/About.xml 213 hash=true
+  defs/recipedefs/local.xml | Defs/RecipeDefs/local.xml 68 hash=true
+  defs/thingdefs/local.xml | Defs/ThingDefs/local.xml 65 hash=true
+  languages/english/keyed/local.xml | Languages/English/Keyed/local.xml 16 hash=false
+  patches/local.xml | Patches/local.xml 110 hash=true
+  textures/things/local/a.png | Textures/Things/local/a.png 64 hash=false
+snapshot 5: none
+snapshot 6: 20 files
+  1.6/defs/extra.xml | 1.6/Defs/Extra.xml 61 hash=true
+  1.6/textures/ui/icon.png | 1.6/Textures/UI/Icon.png 9 hash=false
+  about/about.xml | About/About.xml 213 hash=true
+  about/preview.png | About/Preview.png 7 hash=true
+  assemblies/a.dll | Assemblies/A.dll 5 hash=true
+  assemblies/b.dll | Assemblies/B.dll 5 hash=true
+  defs/thingdefs/things.xml | Defs/ThingDefs/Things.xml 62 hash=true
+  languages/chinesesimplified (简体中文)/keyed/a.xml | Languages/ChineseSimplified (简体中文)/Keyed/A.xml 16 hash=false
+  languages/english/definjected/thingdef/a.xml | Languages/English/DefInjected/ThingDef/A.xml 16 hash=false
+  languages/english/keyed/a.xml | Languages/English/Keyed/A.xml 16 hash=false
+  libs/native.dll | Libs/Native.DLL 6 hash=false
+  loadfolders.xml | LoadFolders.xml 63 hash=true
+  news/readme.txt | News/readme.txt 5 hash=false
+  patches/a.xml | Patches/A.xml 9 hash=true
+  sounds/click.ogg | Sounds/Click.ogg 300 hash=false
+  textures/things/a/a_east.png.meta | Textures/Things/A/a_east.png.meta 4 hash=false
+  textures/things/a/a_north.png | Textures/Things/A/a_north.png 42 hash=false
+  textures/things/a/a_south.png | Textures/Things/A/a_south.PNG 41 hash=false
+  textures/things/a/new_1.png | Textures/Things/A/new_1.png 21 hash=false
+  textures/things/a/new_2.png | Textures/Things/A/new_2.png 22 hash=false
+snapshot 7: 20 files
+  1.6/defs/extra.xml | 1.6/Defs/Extra.xml 61 hash=true
+  1.6/textures/ui/icon.png | 1.6/Textures/UI/Icon.png 9 hash=false
+  about/about.xml | About/About.xml 213 hash=true
+  about/preview.png | About/Preview.png 7 hash=true
+  assemblies/a.dll | Assemblies/A.dll 5 hash=true
+  assemblies/b.dll | Assemblies/B.dll 5 hash=true
+  defs/thingdefs/things.xml | Defs/ThingDefs/Things.xml 62 hash=true
+  languages/chinesesimplified (简体中文)/keyed/a.xml | Languages/ChineseSimplified (简体中文)/Keyed/A.xml 16 hash=false
+  languages/english/definjected/thingdef/a.xml | Languages/English/DefInjected/ThingDef/A.xml 16 hash=false
+  languages/english/keyed/a.xml | Languages/English/Keyed/A.xml 16 hash=false
+  libs/native.dll | Libs/Native.DLL 8 hash=false
+  loadfolders.xml | LoadFolders.xml 63 hash=true
+  news/readme.txt | News/readme.txt 5 hash=false
+  patches/a.xml | Patches/A.xml 9 hash=true
+  textures/things/a/a_east.png.meta | Textures/Things/A/a_east.png.meta 4 hash=false
+  textures/things/a/a_north.png | Textures/Things/A/a_north.png 43 hash=false
+  textures/things/a/a_south.png | Textures/Things/A/a_south.PNG 41 hash=false
+  textures/things/a/new_1.png | Textures/Things/A/new_1.png 21 hash=false
+  textures/things/a/new_2.png | Textures/Things/A/new_2.png 22 hash=false
+  textures/things/a/new_3.png | Textures/Things/A/new_3.png 23 hash=false
+snapshot 8: 21 files
+  1.6/defs/extra.xml | 1.6/Defs/Extra.xml 61 hash=true
+  1.6/textures/ui/icon.png | 1.6/Textures/UI/Icon.png 9 hash=false
+  about/about.xml | About/About.xml 213 hash=true
+  about/preview.png | About/Preview.png 7 hash=true
+  assemblies/a.dll | Assemblies/A.dll 5 hash=true
+  assemblies/b.dll | Assemblies/B.dll 5 hash=true
+  defs/thingdefs/things.xml | Defs/ThingDefs/Things.xml 62 hash=true
+  languages/chinesesimplified (简体中文)/keyed/a.xml | Languages/ChineseSimplified (简体中文)/Keyed/A.xml 16 hash=false
+  languages/english (us)/definjected/thingdef/a.xml | Languages/English (US)/DefInjected/ThingDef/A.xml 16 hash=false
+  languages/english (us)/keyed/a.xml | Languages/English (US)/Keyed/A.xml 16 hash=false
+  libs/native.dll | Libs/Native.DLL 8 hash=false
+  loadfolders.xml | LoadFolders.xml 63 hash=true
+  news/readme.txt | News/readme.txt 5 hash=false
+  patches/a.xml | Patches/A.xml 9 hash=true
+  textures/things/a/a_east.png.meta | Textures/Things/A/a_east.png.meta 4 hash=false
+  textures/things/a/a_north.png | Textures/Things/A/a_north.png 44 hash=false
+  textures/things/a/a_south.png | Textures/Things/A/a_south.PNG 41 hash=false
+  textures/things/a/new_1.png | Textures/Things/A/new_1.png 21 hash=false
+  textures/things/a/new_2.png | Textures/Things/A/new_2.png 22 hash=false
+  textures/things/a/new_3.png | Textures/Things/A/new_3.png 23 hash=false
+  textures/things/a/new_4.png | Textures/Things/A/new_4.png 24 hash=false
+snapshot 9: 22 files
+  1.6/defs/extra.xml | 1.6/Defs/Extra.xml 61 hash=true
+  1.6/textures/ui/icon.png | 1.6/Textures/UI/Icon.png 9 hash=false
+  about/about.xml | About/About.xml 213 hash=true
+  about/preview.png | About/Preview.png 7 hash=true
+  assemblies/a.dll | Assemblies/A.dll 5 hash=true
+  assemblies/b.dll | Assemblies/B.dll 5 hash=true
+  defs/thingdefs/things.xml | Defs/ThingDefs/Things.xml 62 hash=true
+  languages/chinesesimplified (简体中文)/keyed/a.xml | Languages/ChineseSimplified (简体中文)/Keyed/A.xml 16 hash=false
+  languages/english (us)/definjected/thingdef/a.xml | Languages/English (US)/DefInjected/ThingDef/A.xml 16 hash=false
+  languages/english (us)/keyed/a.xml | Languages/English (US)/Keyed/A.xml 16 hash=false
+  libs/native.dll | Libs/Native.DLL 8 hash=false
+  loadfolders.xml | LoadFolders.xml 63 hash=true
+  news/readme.txt | News/readme.txt 5 hash=false
+  patches/a.xml | Patches/A.xml 9 hash=true
+  textures/things/a/a_east.png.meta | Textures/Things/A/a_east.png.meta 4 hash=false
+  textures/things/a/a_north.png | Textures/Things/A/a_north.png 45 hash=false
+  textures/things/a/a_south.png | Textures/Things/A/a_south.PNG 41 hash=false
+  textures/things/a/new_1.png | Textures/Things/A/new_1.png 21 hash=false
+  textures/things/a/new_2.png | Textures/Things/A/new_2.png 22 hash=false
+  textures/things/a/new_3.png | Textures/Things/A/new_3.png 23 hash=false
+  textures/things/a/new_4.png | Textures/Things/A/new_4.png 24 hash=false
+  textures/things/a/new_5.png | Textures/Things/A/new_5.png 25 hash=false
+snapshot 10: 22 files
+  1.6/defs/extra.xml | 1.6/Defs/Extra.xml 61 hash=true
+  1.6/textures/ui/icon.png | 1.6/Textures/UI/Icon.png 9 hash=false
+  about/about.xml | About/About.xml 213 hash=true
+  about/preview.png | About/Preview.png 7 hash=true
+  assemblies/a.dll | Assemblies/A.dll 5 hash=true
+  assemblies/b.dll | Assemblies/B.dll 5 hash=true
+  defs/thingdefs/things.xml | Defs/ThingDefs/Things.xml 62 hash=true
+  languages/chinesesimplified (简体中文)/keyed/a.xml | Languages/ChineseSimplified (简体中文)/Keyed/A.xml 16 hash=false
+  languages/english (us)/definjected/thingdef/a.xml | Languages/English (US)/DefInjected/ThingDef/A.xml 16 hash=false
+  languages/english (us)/keyed/a.xml | Languages/English (US)/Keyed/A.xml 16 hash=false
+  libs/native.dll | Libs/Native.DLL 8 hash=false
+  loadfolders.xml | LoadFolders.xml 63 hash=true
+  news/readme.txt | News/readme.txt 5 hash=false
+  patches/a.xml | Patches/A.xml 9 hash=true
+  textures/things/a/a_east.png.meta | Textures/Things/A/a_east.png.meta 4 hash=false
+  textures/things/a/a_north.png | Textures/Things/A/a_north.png 45 hash=false
+  textures/things/a/a_south.png | Textures/Things/A/a_south.PNG 41 hash=false
+  textures/things/a/new_1.png | Textures/Things/A/new_1.png 21 hash=false
+  textures/things/a/new_2.png | Textures/Things/A/new_2.png 22 hash=false
+  textures/things/a/new_3.png | Textures/Things/A/new_3.png 23 hash=false
+  textures/things/a/new_4.png | Textures/Things/A/new_4.png 24 hash=false
+  textures/things/a/new_5.png | Textures/Things/A/new_5.png 25 hash=false
+files 1 → 5
+  (file lists no longer stored)
+files 5 → 6
+  (file lists no longer stored)
+files 6 → 7
+  ~ Defs/ThingDefs/Things.xml
+  ~ Libs/Native.DLL  +2 B
+  - Sounds/Click.ogg
+  ~ Textures/Things/A/a_north.png  +1 B
+  + Textures/Things/A/new_3.png  23 B
+files 7 → 8
+  ~ Defs/ThingDefs/Things.xml
+  + Languages/English (US)/DefInjected/ThingDef/A.xml  16 B
+  + Languages/English (US)/Keyed/A.xml  16 B
+  - Languages/English/DefInjected/ThingDef/A.xml
+  - Languages/English/Keyed/A.xml
+  ~ Textures/Things/A/a_north.png  +1 B
+  + Textures/Things/A/new_4.png  24 B
+files 8 → 9
+  ~ Defs/ThingDefs/Things.xml
+  ~ Textures/Things/A/a_north.png  +1 B
+  + Textures/Things/A/new_5.png  25 B

@@ -54,10 +54,10 @@ func subscriptionEnv(t *testing.T) (*testkit.Env, *testkit.GitRepo) {
 	return e, g
 }
 
-// addText is what 添加订阅 shows.
+// addText is what add a subscription shows.
 func addText(m *model) string { return strings.Join(m.addLines(40), "\n") }
 
-// tasksOnRecord reads <data>/tasks.json, where the window's 后台任务 page finds them.
+// tasksOnRecord reads <data>/tasks.json, where the window's Background tasks page finds them.
 func tasksOnRecord(t *testing.T, e *testkit.Env) []app.Task {
 	b, err := os.ReadFile(filepath.Join(e.Home, "tasks.json"))
 	if err != nil {
@@ -70,8 +70,8 @@ func tasksOnRecord(t *testing.T, e *testkit.Env) []app.Task {
 	return list
 }
 
-// 06 §2.9, §9.1: 添加订阅 recognises a pasted address as the window does, asks the one
-// decision that source needs, shows the dry run, and enter queues 订阅 as a background task
+// 06 §2.9, §9.1: add a subscription recognises a pasted address as the window does, asks the one
+// decision that source needs, shows the dry run, and enter queues subscribe as a background task
 // (06 §2.16) that installs the mod.
 func TestAddSubscriptionPage(t *testing.T) {
 	e, g := subscriptionEnv(t)
@@ -88,7 +88,7 @@ func TestAddSubscriptionPage(t *testing.T) {
 	press(m, "c")
 	key(m, runes("+"))
 	if m.tab != tabSubscribe || !strings.Contains(addText(m), "Git repository") {
-		t.Fatalf("+ did not open 添加订阅: tab %d\n%s", m.tab, addText(m))
+		t.Fatalf("+ did not open Add a subscription: tab %d\n%s", m.tab, addText(m))
 	}
 	key(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("not an address"), Paste: true})
 	if !strings.Contains(addText(m), "Not recognised") {
@@ -136,15 +136,15 @@ func TestAddSubscriptionPage(t *testing.T) {
 	if list := tasksOnRecord(t, e); len(list) != 1 || list[0].Kind != view.TaskSubscribe || list[0].State != app.TaskDone {
 		t.Fatalf("record: %+v", list)
 	}
-	// esc on the empty box goes back to 订阅与更新
+	// esc on the empty box goes back to updates
 	key(m, tea.KeyMsg{Type: tea.KeyEsc})
 	if m.tab != tabChanges {
 		t.Fatalf("esc on an empty box: tab %d", m.tab)
 	}
-	// a paste on 订阅与更新 opens 添加订阅 with it: Workshop IDs ask Steam or SteamCMD
+	// a paste on updates opens add a subscription with it: Workshop IDs ask Steam or SteamCMD
 	key(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("2009463077 818773962"), Paste: true})
 	if m.tab != tabSubscribe || m.add.kind != "workshop" || !strings.Contains(addText(m), "download with SteamCMD") {
-		t.Fatalf("paste on 订阅与更新: tab %d %+v", m.tab, m.add)
+		t.Fatalf("paste on Updates: tab %d %+v", m.tab, m.add)
 	}
 	// a download page without a single repository: the files are chosen in the window
 	m.add = addState{text: "https://example.invalid/mods/colony", shown: "https://example.invalid/mods/colony", kind: "page", info: "Colony 1.2"}
@@ -157,7 +157,7 @@ func TestAddSubscriptionPage(t *testing.T) {
 	}
 }
 
-// 06 §2.9: on 订阅与更新, K checks every source with mods, u updates a waiting one (its dry
+// 06 §2.9: on updates, K checks every source with mods, u updates a waiting one (its dry
 // run first; refused while a game runs), Del removes a subscription — each a background task.
 func TestSubscriptionsPageActions(t *testing.T) {
 	e, g := subscriptionEnv(t)

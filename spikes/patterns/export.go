@@ -2,7 +2,7 @@ package main
 
 // Export: the product's embedded pattern data (internal/patterns/patterns.json) from the
 // research dataset, and a check that the product matcher classifies every corpus cluster as
-// this spike does (01-范式库接入草案.md §5: research and product must agree).
+// this spike does (01-pattern-library-integration-draft.md §5: research and product must agree).
 //
 //	go run ./spikes/patterns -export internal/patterns/patterns.json -dataset spikes/patterns/patterns-v0.json
 //	go run ./spikes/patterns -verify <corpusrun results.jsonl>

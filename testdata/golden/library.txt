@@ -9,6 +9,7 @@ library: 5 mods, 6 copies, 2.6 KB (env:main · 1.6)
 $ archo library --facets
 library: 5 mods, 6 copies, 2.6 KB (env:main · 1.6)
   filters:
+    lists: default 1
     tag: QoL 1
     source: workshop 5, local-main 1
     location: $ROOT/Steam/steamapps/common/RimWorld/Mods 1, $ROOT/Steam/steamapps/workshop/content/294100 5
@@ -53,6 +54,7 @@ next:
 $ archo library --include tag:QoL --facets
 library: 1 of 5 mods match (tag:QoL)
   filters:
+    lists: default 0
     tag: +QoL 1
     source: workshop 1, local-main 0
     location: $ROOT/Steam/steamapps/common/RimWorld/Mods 0, $ROOT/Steam/steamapps/workshop/content/294100 1
@@ -97,7 +99,7 @@ ws:5300 Workshop item 5300  [1 copy, —]
     states: subscribed, not on disk
 
 $ archo library --include colour:red
-error: bad filter "colour:red": want key:value with key tag, source, location, version, state, used, updated, content, has, name, author, id
+error: bad filter "colour:red": want key:value with key lists, tag, source, location, version, state, used, updated, content, has, name, author, id
 [exit 1]
 
 $ archo library --include state:hidden

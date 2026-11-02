@@ -17,12 +17,18 @@ import (
 )
 
 func init() {
-	register(&Command{Name: "source", Args: "<ref>", Summary: "decompile a mod's assemblies on demand (ilspycmd; cached per DLL hash)", MinArgs: 1, MaxArgs: 1, Run: sourceCmd,
+	register(&Command{Name: "source", Args: "<ref>", Summary: "decompile a mod's assemblies into the Source library (ilspycmd)", MinArgs: 1, MaxArgs: 1, Run: sourceCmd,
 		Flags: []Flag{{Name: "type", Value: "<Namespace.Type>"}, {Name: "all"}}})
+	register(&Command{Name: "source game", Summary: "read the current game's code from the Source library", Run: sourceGameCmd,
+		Flags: []Flag{{Name: "type", Value: "<Namespace.Type>"}, {Name: "all"}}})
+	register(&Command{Name: "source decompile", Summary: "decompile the current list's mods into the Source library", Run: sourceDecompileCmd,
+		Flags: []Flag{{Name: "active", Help: "decompile every enabled mod"}}})
+	register(&Command{Name: "source clean", Summary: "preview or remove unused Source library folders", Run: sourceCleanCmd,
+		Flags: []Flag{{Name: "dry-run", Help: "preview folder count and size"}, {Name: "yes", Help: "remove the unused folders"}}})
 	register(&Command{Name: "source search", Args: "<pattern>", Summary: "search decompiled C# (uncached assemblies are decompiled first)", MinArgs: 1, MaxArgs: 1, Run: sourceSearchCmd,
 		Flags: []Flag{{Name: "in", Value: "<ref>", Multi: true}, {Name: "implicated", Help: "the mods the newest log and the Harmony warnings point at"},
 			{Name: "active", Help: "every enabled mod (prints an estimate first; needs --yes)"}, {Name: "yes", Help: "confirm decompiling every enabled mod"},
-			{Name: "regex"}, {Name: "all"}, {Name: "budget", Value: "<seconds>", Help: "stop decompiling after this long and search what is cached"}}})
+			{Name: "game", Help: "include the current game's Assembly-CSharp.dll"}, {Name: "regex"}, {Name: "all"}, {Name: "budget", Value: "<seconds>", Help: "stop starting decompiles after this long; running work finishes"}}})
 }
 
 func noILSpy(err error) error {
@@ -33,20 +39,38 @@ func noILSpy(err error) error {
 }
 
 func sourceCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	return sourceReadCmd(c, a, false)
+}
+
+func sourceGameCmd(c *Ctx, a *Args) (*render.Doc, error) { return sourceReadCmd(c, a, true) }
+
+func sourceReadCmd(c *Ctx, a *Args, game bool) (*render.Doc, error) {
 	st, err := c.App.Loadout()
 	if err != nil {
 		return nil, err
 	}
-	m, err := st.Ix.ResolveOne(a.Pos[0])
-	if err != nil {
-		return nil, err
+	var ds []*app.SourceDLL
+	label, ref := "RimWorld "+st.Ix.Env.GameVersion, "game"
+	if game {
+		var d *app.SourceDLL
+		d, err = c.App.GameSourceDLL(st)
+		if err == nil {
+			ds = []*app.SourceDLL{d}
+		}
+	} else {
+		var m *store.Mod
+		m, err = st.Ix.ResolveOne(a.Pos[0])
+		if err != nil {
+			return nil, err
+		}
+		label, ref = modLabel(st.Ix, m.ID), st.Ix.Ref(m.ID)
+		ds, err = c.App.SourceDLLs(st, m)
 	}
-	ds, err := c.App.SourceDLLs(st, m)
 	if err != nil {
 		return nil, err
 	}
 	if len(ds) == 0 {
-		d, root := render.New(modLabel(st.Ix, m.ID) + "  no assemblies to decompile")
+		d, root := render.New(label + "  no assemblies to decompile")
 		root.Add("the effective content has no Assemblies/*.dll (or only known libraries such as 0Harmony.dll)")
 		return d, nil
 	}
@@ -57,7 +81,7 @@ func sourceCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			return nil, noILSpy(err)
 		}
 		lines := strings.Split(strings.TrimRight(src, "\n"), "\n")
-		d, root := render.New(fmt.Sprintf("%s  %s  (%d lines)", modLabel(st.Ix, m.ID), t, len(lines)))
+		d, root := render.New(fmt.Sprintf("%s  %s  (%d lines)", label, t, len(lines)))
 		root.KV("file", path)
 		code := root.Section("source")
 		limit := 34
@@ -66,14 +90,14 @@ func sourceCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		for i, l := range lines {
 			if i >= limit {
-				code.Addf("… %d more lines (archo source %s --type %s --all)", len(lines)-limit, st.Ix.Ref(m.ID), t)
+				code.Addf("… %d more lines (archo source %s --type %s --all)", len(lines)-limit, ref, t)
 				break
 			}
 			code.Addf("%4d  %s", i+1, strings.ReplaceAll(strings.TrimRight(l, "\r"), "\t", "    "))
 		}
 		return d, nil
 	}
-	d, root := render.New(fmt.Sprintf("%s  %d assemblies", modLabel(st.Ix, m.ID), len(ds)))
+	d, root := render.New(fmt.Sprintf("%s  %d assemblies", label, len(ds)))
 	sec := root.Section("assemblies")
 	for _, x := range ds {
 		was := x.Cached
@@ -97,7 +121,11 @@ func sourceCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		sec.Addf("%s  %s, %d .cs files  %s", x.File, state, n, x.Dir)
 	}
-	d.AddNext(fmt.Sprintf("archo source search \"<pattern>\" --in %s", st.Ix.Ref(m.ID)))
+	if game {
+		d.AddNext("archo source search \"<pattern>\" --game")
+	} else {
+		d.AddNext(fmt.Sprintf("archo source search \"<pattern>\" --in %s", ref))
+	}
 	return d, nil
 }
 
@@ -106,12 +134,17 @@ func sourceCmd(c *Ctx, a *Args) (*render.Doc, error) {
 func activeEstimate(c *Ctx, st *app.LoadoutState, mods []*store.Mod, pattern string) (*render.Doc, error) {
 	var total, todo int
 	var bytes int64
+	seen := map[string]bool{}
 	for _, m := range mods {
 		ds, err := c.App.SourceDLLs(st, m)
 		if err != nil {
 			return nil, err
 		}
 		for _, x := range ds {
+			if seen[x.Hash] {
+				continue
+			}
+			seen[x.Hash] = true
 			total++
 			if !x.Cached {
 				todo++
@@ -125,7 +158,7 @@ func activeEstimate(c *Ctx, st *app.LoadoutState, mods []*store.Mod, pattern str
 		return nil, nil
 	}
 	d, root := render.New(fmt.Sprintf("source search --active: %d assemblies in %d enabled mods, %d not decompiled yet", total, len(mods), todo))
-	root.KV("estimate", fmt.Sprintf("%.0f MB of DLLs → about %.0f MB of cache, roughly %d min with ilspycmd", float64(bytes)/(1<<20), 3*float64(bytes)/(1<<20), (todo*3/2+59)/60))
+	root.KV("estimate", fmt.Sprintf("%.0f MB of DLLs → about %.0f MB in the Source library, roughly %d min with ilspycmd", float64(bytes)/(1<<20), 3*float64(bytes)/(1<<20), (todo*3/2+59)/60))
 	root.Add("nothing was decompiled; confirm with --yes, or narrow the scope with --in / --implicated")
 	d.AddNext(fmt.Sprintf("archo source search %q --active --yes", pattern), fmt.Sprintf("archo source search %q --implicated", pattern))
 	return d, nil
@@ -152,7 +185,7 @@ func sourceSearchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			mods = append(mods, st.Ix.ByID[id])
 		}
 		scope = fmt.Sprintf("%d implicated mods", len(mods))
-		if len(mods) == 0 {
+		if len(mods) == 0 && !a.Bool("game") {
 			d, root := render.New("source search: no implicated mods (no error clusters in the newest log, no Harmony warnings)")
 			root.Add("name the mods with --in <ref>, or search every enabled mod with --active --yes")
 			return d, nil
@@ -169,6 +202,8 @@ func sourceSearchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 				return d, err
 			}
 		}
+	case a.Bool("game"):
+		scope = "the game"
 	default:
 		return nil, &UsageError{Msg: "source search needs a scope: --in <ref>, --implicated, or --active --yes"}
 	}
@@ -187,7 +222,10 @@ func sourceSearchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		budget = time.Duration(n) * time.Second
 	}
 	limit := boolLimit(a, render.DefaultLimit)
-	res, err := c.App.SourceSearch(st, mods, a.Pos[0], re, limit, budget, progress())
+	if a.Bool("game") && scope != "the game" {
+		scope += " and the game"
+	}
+	res, err := c.App.SourceSearchContext(context.Background(), st, mods, a.Pos[0], re, limit, budget, progress(), a.Bool("game"))
 	if err != nil {
 		return nil, noILSpy(err)
 	}
@@ -204,13 +242,60 @@ func sourceSearchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		if len(t) > 140 {
 			t = t[:137] + "..."
 		}
-		lst.Addf("%s  %s:%d  %s", st.Ix.Ref(h.Instance), h.File, h.Line, t)
+		ref := st.Ix.Ref(h.Instance)
+		if strings.HasPrefix(h.Instance, "game:") {
+			ref = "game"
+		}
+		lst.Addf("%s  %s:%d  %s", ref, h.Path, h.Line, t)
+		if len(h.Shared) > 1 {
+			copies := make([]string, 0, len(h.Shared))
+			for _, id := range h.Shared {
+				copies = append(copies, modLabel(st.Ix, id))
+			}
+			lst.Addf("same code in: %s", strings.Join(copies, ", "))
+		}
 	}
 	if len(res.Hits) == 0 {
 		lst.Add("(none)")
 	}
 	if res.Total > len(res.Hits) {
 		lst.Addf("… %d more (add --all)", res.Total-len(res.Hits))
+	}
+	return d, nil
+}
+
+func sourceDecompileCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	if !a.Bool("active") {
+		return nil, &UsageError{Msg: "source decompile requires --active"}
+	}
+	err := c.App.DecompileActive(context.Background(), func(done, total int, file string) {
+		if p := progress(); p != nil {
+			p(fmt.Sprintf("decompiled %d/%d assemblies: %s", done, total, file))
+		}
+	})
+	if err != nil {
+		return nil, noILSpy(err)
+	}
+	d, _ := render.New("the current list's mods are in the source library")
+	return d, nil
+}
+
+func sourceCleanCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	remove := a.Bool("yes") && !a.Bool("dry-run")
+	p, err := c.App.CleanSourceLibrary(context.Background(), remove)
+	if err != nil {
+		return nil, err
+	}
+	verb := "unused"
+	if remove {
+		verb = "removed"
+	}
+	d, root := render.New(fmt.Sprintf("source library: %d folders %s, %s", p.Folders, verb, render.Size(p.Bytes)))
+	for _, path := range p.Paths {
+		root.Add(path)
+	}
+	if !remove && p.Folders > 0 {
+		d.AddNext("archo source clean --yes")
 	}
 	return d, nil
 }

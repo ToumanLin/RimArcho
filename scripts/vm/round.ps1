@@ -1,7 +1,7 @@
 # One real game round in the Player-Test VM, with no screenshots and no clicks: launch from
 # RimArcho, main menu, a new colony, play, save, load that save, play, main menu, delete the
 # save (the guest's saves sync to the player's Steam Cloud), quit to the desktop
-# (docs/发布前VM测试.md, "真的进游戏"). Archo Drive (scripts/vm/drive) plays it
+# (docs/release-vm-tests.md, "launch the actual game"). Archo Drive (scripts/vm/drive) plays it
 # inside the game; this script places it, launches, waits, collects the evidence and checks
 # the driver's steps and Archo Monitor's phases. Prints PASS / FAIL / NOTE lines; exit code =
 # number of failures. See README.md, "Game rounds".
@@ -296,7 +296,7 @@ $player = if ($start -and $start.playerLog) { $start.playerLog } else { '' }
 if (-not $player -and $mon) { try { $player = ($mon[0] | ConvertFrom-Json).context.playerLog } catch { } }
 if (-not $player) { $player = Join-Path $data 'Player.log' }
 @((ReadShared $player) -split "`r?`n" | Where-Object { $_.Contains('[Archo Monitor]') }) | Set-Content -Encoding UTF8 "$run\player-phases.txt"
-# What RimArcho makes of the run: the checks in docs/发布前VM测试.md read these.
+# What RimArcho makes of the run: the checks in docs/release-vm-tests.md read these.
 & $archo problems 2>&1 | Out-File -Encoding UTF8 "$run\problems.txt"
 & $archo log 2>&1 | Out-File -Encoding UTF8 "$run\log.txt"
 Remove-Item -Recurse -Force "$run\drive", "$run\drive.zip" -ErrorAction SilentlyContinue

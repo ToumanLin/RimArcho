@@ -159,7 +159,7 @@ func TestLogBelongsToLaunch(t *testing.T) {
 	}
 }
 
-// B11 and "来源不明": without a launch record the log belongs to the plan last written to
+// B11 and "unknown source": without a launch record the log belongs to the plan last written to
 // the game before it; with neither it is of unknown source, stale, and the header says so.
 func TestLogWriteRecordAndUnknown(t *testing.T) {
 	t.Parallel()

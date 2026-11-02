@@ -30,7 +30,7 @@ test('all three surfaces separate a quiet why control from the three equal answe
     const context = createContext({ el, box, pinned: true, reasonsOf: () => [item],
       runNeed: (it, a) => calls.push(a), needWrite: (a) => a.kind === 'answer' ? 'answer' : '', hide() {},
       archo: {}, T: (s) => s, Tf: (s) => s, N: { cur: [0, 0], open: new Set(), ask: null }, markNeeds() {},
-      // 能不能跑's card (screens.js): the cursor, done lines and the other column
+      // Can it run's card (screens.js): the cursor, done lines and the other column
       setCur() {}, snapshot() {}, doAction() {}, jumpTo() {}, linkBlock: () => el('div'), confirmRow: () => el('div'),
       statusIcon: () => '', subject: () => '', actionWrite: (a) => a.kind === 'answer' ? 'answer' : '',
       needActionWrite: (a) => a.kind === 'answer' ? 'answer' : '',
@@ -94,7 +94,7 @@ test('row and panel answers use the same confirmation before any mutation', asyn
 function panelContext(read) {
   let root;
   const picked = [];
-  const context = createContext({ el, S: { popup: null }, T: (s) => s,
+  const context = createContext({ el, keyCaps: (k) => el("kbd", "", k), S: { popup: null }, T: (s) => s,
     Tf: (s, ...args) => s.replace(/%[ds]/g, () => args.shift()),
     api: { IdentityWhy: read },
     copyablePath: (node, path) => { node.title = path; node.dataset.path = path; },

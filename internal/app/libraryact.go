@@ -16,7 +16,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// The Mod 库存 actions that are not already somewhere else (06 §2.9): taking mods out of
+// The Mod library actions that are not already somewhere else (06 §2.9): taking mods out of
 // every plan, and moving a spare copy out of Mods/ into the lock library.
 
 // PlanRemoval is one plan a removal changed: one undo step in that plan.
@@ -26,7 +26,7 @@ type PlanRemoval struct {
 	Removed int
 }
 
-// RemoveFromPlans takes the instances out of every plan that has them (the plans Mod 库存
+// RemoveFromPlans takes the instances out of every plan that has them (the plans Mod library
 // lists under "used in"; lists are shared by every game). Each plan gets one undo step;
 // nothing is written to the game.
 func (a *App) RemoveFromPlans(refs []string) ([]PlanRemoval, error) {
@@ -198,7 +198,7 @@ func upstreamOf(ix *Index, m *store.Mod) *store.Mod {
 }
 
 // writeOrigin gives a moved spare copy the lock library's marker: its upstream (the
-// lineage's Workshop copy, else itself) and its own content as the snapshot, so "上游有更新"
+// lineage's Workshop copy, else itself) and its own content as the snapshot, so "a newer version is out"
 // means the upstream's content differs from the copy's (04 §7.3).
 func (a *App) writeOrigin(ix *Index, m *store.Mod, dir string) error {
 	o := scan.Origin{InstanceID: m.ID, LineageID: m.LineageID, WorkshopID: m.DeclaredWorkshop, SnapshotHash: hex.EncodeToString(m.SnapHash),
@@ -207,7 +207,7 @@ func (a *App) writeOrigin(ix *Index, m *store.Mod, dir string) error {
 		o.InstanceID, o.WorkshopID = up.ID, up.WorkshopID()
 	}
 	b, _ := json.MarshalIndent(o, "", "  ")
-	// RimArcho's marker is not an update of the mod: the folder keeps its time (更新日期).
+	// RimArcho's marker is not an update of the mod: the folder keeps its time (update date).
 	fi, _ := os.Stat(dir)
 	if err := os.MkdirAll(filepath.Join(dir, ".rimarcho"), 0o755); err != nil {
 		return err
@@ -250,7 +250,7 @@ func hasOrigin(dir string) bool {
 
 // usedBy names the plans that use an instance (every environment of this game).
 func (a *App) usedBy(st *LoadoutState, id string) ([]string, error) {
-	uses, err := a.libUses(st)
+	uses, _, err := a.libUses(st)
 	if err != nil {
 		return nil, err
 	}

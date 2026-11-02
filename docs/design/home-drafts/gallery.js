@@ -1,8 +1,8 @@
 const variants = {
-  original: ['原版对照', '直接运行现有 home.js、shell.js 和 style.css：跨游戏的最近列表在左，动态在左下，启动在右下。'],
-  a: ['A · 底部并排', '保留原版最近列表与背景，把右下角启动区展开为「游戏 → 列表 / 整合包 → 启动游戏」一行。'],
-  b: ['B · 上部并排', '同样的三个控件移到页面左上，先选游戏和列表，下面仍是跨游戏的最近列表；动态留在左下。'],
-  c: ['C · 分列选择', '左列选择游戏，中列显示该游戏的列表与整合包，右下启动；这一版把原来混排的跨游戏内容分开。'],
+  original: ['Original comparison', 'Runs existing home.js, shell.js and style.css directly: recent lists across games on the left, activity bottom-left, launch bottom-right.'],
+  a: ['A · Bottom row', 'Keeps original recent lists and background, expanding bottom-right launch into one row: game → list / pack → launch game.'],
+  b: ['B · Top row', 'Moves the same three controls to top-left: choose game and list first, recent lists across games below; activity stays bottom-left.'],
+  c: ['C · Columns', 'Choose game left, its lists and packs in the middle, launch bottom-right; separates previously mixed cross-game content.'],
 };
 const params = new URLSearchParams(location.search);
 let design = Object.hasOwn(variants, params.get('design')) ? params.get('design') : 'a';

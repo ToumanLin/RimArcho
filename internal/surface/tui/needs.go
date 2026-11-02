@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 需要处理 (06 §5). The items, their wording and their actions are view.BuildNeeds (06 §1);
+// Can it run (06 §5). The items, their wording and their actions are view.BuildNeeds (06 §1);
 // here each action gets its key and the screen is drawn.
 
 type needKey struct {
@@ -97,13 +97,19 @@ func (m *model) actionKey(a view.Action, text string) needKey {
 		k.run = func(m *model) tea.Cmd { return m.open(a.URL) }
 	case view.ActLocateDirectory:
 		k.run = func(m *model) tea.Cmd { return m.locateDirectory(a.Refs[0], a.Label) }
-	case view.ActProblem, view.ActView, view.ActGameLog, view.ActManageLists: // the TUI has no list management page: its CLI view
+	case view.ActView:
+		if len(a.Argv) >= 2 && a.Argv[0] == "plan" && a.Argv[1] == "cost" {
+			k.run = func(m *model) tea.Cmd { return m.startMemoryEstimate(true) }
+		} else {
+			k.run = func(m *model) tea.Cmd { return m.openInspect(a.Argv) }
+		}
+	case view.ActProblem, view.ActGameLog, view.ActManageLists: // the TUI has no list management page: its CLI view
 		k.run = func(m *model) tea.Cmd { return m.openInspect(a.Argv) }
 	case view.ActList:
 		k.run = func(m *model) tea.Cmd { m.openPanel(a.Title, strings.Join(a.Lines, "\n")); return nil }
 	case view.ActVersionList:
 		k.run = func(m *model) tea.Cmd { return m.openVersionWarnings(a) }
-	case view.ActSubscribe: // 添加订阅 with the Workshop IDs: Steam or SteamCMD, the dry run, enter
+	case view.ActSubscribe: // add a subscription with the Workshop IDs: Steam or SteamCMD, the dry run, enter
 		k.run = func(m *model) tea.Cmd { return m.openAdd(strings.Join(a.Refs, " ")) }
 	case view.ActFold:
 		k.run = func(m *model) tea.Cmd {
@@ -188,6 +194,14 @@ func (m *model) open(u string) tea.Cmd {
 // listAction is S, w and L (06 §6): it acts at once and says what it did; sort adds "u
 // undoes". A refusal says why and opens a panel with the commands that resolve it.
 func (m *model) listAction(what string) tea.Cmd {
+	if what == view.ListLaunch {
+		if c := m.currentLaunchMemory(); c != nil && c.Assessment.RAMSeverity == "severe" {
+			return m.confirmMemoryLaunch(c)
+		}
+	}
+	return m.doListAction(what)
+}
+func (m *model) doListAction(what string) tea.Cmd {
 	o := view.Run(m.app, what)
 	m.reload()
 	m.detailRef = ""
@@ -205,7 +219,7 @@ func (m *model) listAction(what string) tea.Cmd {
 	return m.requestDetail()
 }
 
-// listPreview is the palette's 预览排序 / 预览保存 / 预览启动: the dry run, to read.
+// listPreview is the palette's preview the sort / preview saving / preview the launch: the dry run, to read.
 func (m *model) listPreview(what string) tea.Cmd {
 	out, _ := m.run(what, "--dry-run")
 	title := map[string]string{view.ListSort: "preview the sort", view.ListSave: "preview saving", view.ListLaunch: "preview the launch"}[what]
@@ -226,24 +240,34 @@ func listTitle(what string) string {
 
 // ---- the screen ----
 
-// needLines draws 需要处理: a count line, then the groups with their items; the selected
+// needLines draws Can it run: a count line, then the groups with their items; the selected
 // item shows its keys.
 func (m *model) needLines(n int) []string {
 	p := &m.prob
 	w := m.w
 	items := p.items
-	need := m.needCount() // the top bar's number: the analysis' and this run's (06 §2.4)
-	head := Tf("%d to handle", need)
-	if need == 0 {
-		head = T("nothing to handle")
+	// the window's lead sentence (view.NeedsLead), then the state of the check; A is on
+	// the hint line
+	before, runs, hints := 0, 0, false
+	for _, it := range items {
+		switch {
+		case it.counted && it.section == view.SectionRun:
+			runs++
+		case it.counted:
+			before++
+		}
+		hints = hints || it.status == statusHint
 	}
+	plan := ""
+	if m.st != nil && m.st.Plan != nil {
+		plan = m.st.Plan.Name
+	}
+	head := view.NeedsLead(plan, before, runs, p.never, hints)
 	switch {
 	case m.analyzing:
 		head += "   " + T("checking the mods' files…")
-	case p.never:
-		head += "   " + T("the mods' files are not checked yet, A checks them")
 	case p.stale:
-		head += "   " + T("the files changed since the last check, A checks again")
+		head += "   " + T("the files changed since the last check")
 	}
 	out := []string{"  " + sText.Render(fit(head, w-2)), ""}
 	if len(items) == 0 {
@@ -384,8 +408,12 @@ func (m *model) sectionHead(sec, w int) string {
 		}
 	}
 	title := T(view.SectionTitles[sec])
-	if hintsOnly && sec != view.SectionHint {
-		title = T("suggestions")
+	live := sec == view.SectionRun && m.live != nil && m.live.Running
+	switch {
+	case live:
+		title = T("errors this run") // the window's title while the game runs (06 §2.4)
+	case hintsOnly && sec != view.SectionHint:
+		title = T("suggestions") // only hints: not a red Will cause errors
 	}
 	// its number among the sections shown: 1–4 jump to it (06 §3.5)
 	num := itoa(m.sectionNumber(sec)) + " "
@@ -394,7 +422,7 @@ func (m *model) sectionHead(sec, w int) string {
 	case sec == view.SectionBreak && !hintsOnly:
 		head = sDimS.Render(num) + sErrS.Render(title)
 	case sec == view.SectionHint:
-		// 可以留意 is RimArcho's own knowledge: the accent, not dimmed
+		// worth knowing is RimArcho's own knowledge: the accent, not dimmed
 		head = sDimS.Render(num) + sAccent.Render(title)
 	}
 	used := width.StringWidth(num + title)
@@ -409,10 +437,9 @@ func (m *model) sectionHead(sec, w int) string {
 	}
 	if sec == view.SectionRun {
 		switch {
-		case m.live != nil && m.live.Running && m.live.Pack != "":
+		case live && m.live.Pack != "":
 			add("  "+Tf("pack %s", m.live.Pack), sDimS)
-		case m.live != nil && m.live.Running:
-			add("  "+T("this run"), sDimS)
+		case live: // the title says it: errors this run
 		case m.prob.lastRun != "":
 			add("  "+m.prob.lastRun, sDimS)
 		}
@@ -487,6 +514,21 @@ func (m *model) sectionStep(d int) {
 	}
 }
 
+// autoFix is F, fix automatically (06 §2.4, §5): the required mods that are installed get enabled and
+// the list is sorted again, one undo step.
+func (m *model) autoFix() tea.Cmd {
+	if view.AutoFixCount(m.prob.base) == 0 {
+		m.say(sayInfo, T("nothing to fix automatically"))
+		return nil
+	}
+	if m.verb(view.CompleteDependencies(m.app)) {
+		m.prob.loaded = false
+		m.say(sayOK, m.status+Tf(", %s", T("u undoes")))
+		return m.ensureProblems()
+	}
+	return nil
+}
+
 func (m *model) needsKey(s string) tea.Cmd {
 	p := &m.prob
 	switch s {
@@ -519,19 +561,27 @@ func (m *model) needsKey(s string) tea.Cmd {
 		return nil
 	case "A":
 		return m.startAnalyze()
+	case "F":
+		return m.autoFix()
+	case "c": // updates, from any page (06 §3.5)
+		return m.openChangesOf("", "")
 	case "l":
 		return m.chooseLog()
-	}
-	if p.cursor >= len(p.items) {
-		return nil
 	}
 	if s == " " {
 		s = "space"
 	}
-	for _, k := range p.items[p.cursor].keys {
-		if k.key == s {
-			return k.run(m)
+	if p.cursor < len(p.items) {
+		for _, k := range p.items[p.cursor].keys {
+			if k.key == s {
+				return k.run(m)
+			}
 		}
+	}
+	if s == "u" || s == "ctrl+z" { // undo what an item or F just did, as in the window
+		m.act(T("undid the last change"), "undo")
+		m.prob.loaded = false
+		return m.ensureProblems()
 	}
 	return nil
 }

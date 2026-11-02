@@ -2,7 +2,7 @@ package view
 
 import "github.com/ToumanLin/RimArcho/internal/app"
 
-// The key table (06 §3.5): the plan editor and Mod 库存 › 全部 share one, the page's own keys
+// The key table (06 §3.5): the plan editor and Mod library > All share one, the page's own keys
 // come after it, and `?` lists the keys of the page it is pressed on, the same for the GUI
 // and the TUI but for the few each writes in §8.5 and §9.1.
 
@@ -61,7 +61,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 				r(pick("← → / 1–4", "← → / 1–4 / h l"), "go to an area"),
 				r("J K / alt+J K", "move down / up 1 (10); with a filter, past the rows shown"),
 				r("T", "put everything back from staging; elsewhere, stage everything enabled"),
-				r("S / w / L", pick("sort, save, to the launch page (the palette previews them)", "sort, save, launch (the palette previews them)")),
+				r("S / w / L", "sort, save, to the launch page (the palette previews them)"),
 				r(pick("i / e", "e"), pick("import, export the mod list", "export the mod list")),
 				r("R / A", "rescan, check the files again"),
 				r("P / E", "lists, games"),
@@ -69,11 +69,11 @@ func KeyHelp(page string, tui bool) []KeyRow {
 				r("H", "the history: steps and versions"),
 				r("C", "this mod's changes"),
 				r("< > =", "column width (= resets)"),
+				r("r", "add a rule"),
 			)
 			if tui {
 				out = append(out,
 					r("i", "technical information in the details"),
-					r("r", "add a rule"),
 					r("z", "wrap names"),
 					r("[ ]", "switch area (narrow)"),
 				)
@@ -94,7 +94,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 	}
 	if page == ChangesPage {
 		if !tui {
-			out = append(out, r("+", "subscribe…"), r("U", "update all"), r("u / C", "update / view changes"), r("ctrl+a / ctrl+space / shift+↑↓", "select updates"), r("tab / shift+tab", "the next field or button"))
+			out = append(out, r("+", "add a subscription"), r("K", "check for updates"), r("U", "update all"), r("u", "update"), r("1 / 2", "list / details"), r("tab / shift+tab", "the next field or button"))
 		} else {
 			// 06 §9.1: the subscription actions, each a background task (06 §2.16)
 			out = append(out,
@@ -103,19 +103,20 @@ func KeyHelp(page string, tui bool) []KeyRow {
 				r("u / U", "update this one / every one shown (dry run first)"),
 				r("Del", "remove the subscription (dry run first)"),
 			)
+			out = append(out, r("1 / 2 / 3", "sources, waiting for you to update, already updated"))
 		}
 		out = append(out,
-			r("1 / 2 / 3", "sources, updates, history"),
+			r("l", "show in the mod library"),
 			r("↑↓ / PgUp PgDn", "move"),
 			r("enter", "open or close a mod's changes"),
 			r("i", "the raw file list"),
 			r("a", "the current list / the whole library"),
 			r("ctrl+w", "the Workshop change notes"),
 			r("ctrl+o", "open the location"),
-			r("D", "see dependencies (能不能跑)"),
+			r("D", "see dependencies (can it run)"),
 			r("S", "sort the list"),
 			r("p", "lock this version (dry run first)"),
-			r("esc", "close the panel, clear selection, then show every mod"),
+			r("esc", "show every mod"),
 		)
 	}
 	if page == SubscribePage && tui { // the window's form is buttons and native fields
@@ -125,7 +126,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("tab", "the branch, tag or commit name"),
 			r("enter", "subscribe, once the dry run is shown"),
 			r("ctrl+u", "clear the box"),
-			r("esc", "clear, then back to subscriptions and updates"),
+			r("esc", "clear, then back to updates"),
 		)
 	}
 	if page == PackPages {
@@ -166,6 +167,40 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("menu / shift+F10 / right click", "the row's menu: everything it can do"),
 		)
 	}
+	if page == RulesPage { // the TUI's Load-order rules screen (06 §9.1); the window's card has buttons
+		out = append(out,
+			r("↑↓ / PgUp PgDn / Home End", "move the cursor"),
+			r("a", "only the current list / all load-order rules"),
+			r("r", "add a rule for the mod at the editor's cursor"),
+			r("enter", "change the rule"),
+			r("Del / u", "remove the rule; u right after puts it back"),
+			r("o", "show its mod in the list"),
+			r("tab / shift+tab", "in the form: the next / previous field"),
+			r("← →", "in the form: the kind"),
+			r("esc", "close the form; back to the editor"),
+		)
+	}
+	if page == PageSearch { // Search files (06 §2.9)
+		out = append(out,
+			r("/  ctrl+f", "search"),
+			r("alt+c / alt+r", "case, regex"),
+			r("tab", "complete"),
+		)
+		if tui {
+			out = append(out, r("enter", "in the box: search; on a result: open its folder"), r("↑↓", "fields"))
+		} else {
+			out = append(out, r("enter", "in a field: search; on a result: open the file"), r("\\", "filter"), r("n / N", "next / previous match"), r("alt+z", "wrap lines"))
+		}
+		out = append(out,
+			r("↑↓ / j k / PgUp PgDn / Home End", "move the cursor"),
+			r("← →", "collapse / expand"),
+			r("ctrl+o", "open the folder"),
+		)
+		if !tui { // the terminal selects text itself (06 §3.1 rule 12)
+			out = append(out, r("ctrl+c", "copy the path"))
+		}
+		out = append(out, r("esc", "stop the search; in the box: leave it"))
+	}
 	if !tui && (page == LibraryPage || page == "packs" || page == "textures") {
 		out = append(out, r("s / < > =", "the headers: sort and columns; < > = changes or resets the sorted column's width"))
 	}
@@ -173,22 +208,27 @@ func KeyHelp(page string, tui bool) []KeyRow {
 		// The launch page has three numbered columns (06 §2.3).
 		out = append(out, r("1–3", "focus the page's areas (the numbers in their headings)"),
 			r("w", "save the current list's edits to the game without launching (while there are any)"))
-	} else if page != EditorPage {
+	} else if page == "home" {
+		// The terminal's is one column: the current list and its launch key (06 §9.1).
+		out = append(out, r("L / enter", "launch the game"),
+			r("w", "save the current list's edits to the game without launching (while there are any)"),
+			r("P", "lists"), r("esc", "back"))
+	} else if page != EditorPage && page != RulesPage { // Load-order rules is one list
 		out = append(out, r("1–9", "focus the page's areas (the numbers in their headings)"))
 	}
 	tabText := "next / previous page under the same sidebar entry"
 	if page == ChangesPage && !tui {
 		tabText = "the next field or button"
 	}
-	out = append(out,
-		r("tab / shift+tab", tabText),
-		r("shift+1–8", "go to a page in the sidebar"),
-	)
+	if page != RulesPage { // its tab is the form's (above)
+		out = append(out, r("tab / shift+tab", tabText))
+	}
+	out = append(out, r("shift+1–8", "go to a page in the sidebar"))
 	if !tui {
 		out = append(out, r("alt+← / alt+→", "page back / forward"), r("ctrl+b", "navigation at the side / at the top"), r("ctrl+j", "background tasks; again goes back"), r("ctrl+\\", "reference numbers on every control, text and image"))
 	}
 	out = append(out,
-		r(pick("c / l", "c"), pick("subscriptions and updates, game log", "subscriptions and updates")),
+		r(pick("c / l", "c"), pick("updates, game log", "updates")),
 		r("ctrl+k", "command palette"),
 		r("?", "this help"),
 	)

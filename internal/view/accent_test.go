@@ -31,7 +31,7 @@ func TestAccentSettingsRow(t *testing.T) {
 					if lang == "zh" {
 						label, labels = "强调色", zhLabels
 					}
-					if group.Title != view.T("appearance") || item.Label != label || item.Edit != "swatches" || item.Value != value ||
+					if group.Title != view.T("interface") || item.Label != label || item.Edit != "swatches" || item.Value != value ||
 						!slices.Equal(item.Choices, choices) || !slices.Equal(item.ChoiceLabels, labels) || view.SettingCommand(item.Argv) != nil {
 						t.Fatalf("%s accent row: %+v in %s", lang, item, group.Title)
 					}
@@ -50,11 +50,11 @@ func TestAppearanceThemeRow(t *testing.T) {
 	for _, lang := range []string{"en", "zh"} {
 		view.SetLang(lang)
 		groups := view.SettingsPage(e.App, nil)
-		if groups[0].Title != view.T("appearance") {
+		if groups[0].Title != view.T("about") || groups[1].Title != view.T("interface") {
 			t.Fatalf("first group: %s", groups[0].Title)
 		}
 		found := 0
-		for _, item := range groups[0].Items {
+		for _, item := range groups[1].Items {
 			if strings.Join(item.Argv, " ") != "config set ui.theme {}" {
 				continue
 			}

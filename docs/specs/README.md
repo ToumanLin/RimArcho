@@ -1,31 +1,32 @@
-# RimArcho 规格
+# RimArcho Specifications
 
-顶层设计与决策记录见 [00-顶层设计](../00-顶层设计.md)，架构见 [00a-架构](../00a-架构.md)。改哪一块，先读那一块的规格，再对着它链接的代码核对。
+For top-level design and decision records, see [00-Top-level design](../00-top-level-design.md); for architecture, see [00a-Architecture](../00a-architecture.md). Before changing an area, read its specification, then check the code it links to.
 
-| 文件 | 内容 |
+| File | Contents |
 | --- | --- |
-| [01-范围与状态](01-范围与状态.md) | 各版本做什么、不做什么、写文件清单（安全底线）、待办与待验证 |
-| [02-环境身份与扫描](02-环境身份与扫描.md) | 环境、来源、扫描、对账、Lineage、变更事件、存储 |
-| [03-事实与分析](03-事实与分析.md) | 生效内容、Def / Patch / Harmony 分析、问题目录、日志归因 |
-| [04-方案与排序](04-方案与排序.md) | 方案、编辑、历史、写入游戏、排序、规则、锁定版本、导入导出 |
-| [05-语义接口与MCP](05-语义接口与MCP.md) | 工具层、引用、文本格式、CLI、MCP |
-| [06-界面/](06-界面/README.md) | 侧栏与页面、交互规则、详情、视觉、GUI 与 TUI 的技术（按章节拆成多个文件） |
-| [07-技术栈与工程](07-技术栈与工程.md) | 技术栈、代码结构、测试、发布、性能目标与实测基线、游戏行为备忘 |
-| [08-启动与整合包](08-启动与整合包.md) | 启动模型、链接部署、游戏运行检测、整合包、隐藏的 Mod、回收站 |
-| [09-Archo](09-Archo.md) | 内置 AI 助手（1.1） |
-| [10-没玩到与值得玩](10-没玩到与值得玩.md) | 存档读取、没碰过的内容、存档管理（1.1）；值得玩（远期） |
+| [01-Scope and status](01-scope-and-status.md) | Version scope, exclusions, file write list (safety boundary), pending work and validation |
+| [02-Environments, identity and scanning](02-environments-identity-and-scanning.md) | Environments, sources, scanning, reconciliation, Lineage, change events, storage |
+| [03-Facts and analysis](03-facts-and-analysis.md) | Effective content, Def / Patch / Harmony analysis, finding catalog, log attribution |
+| [04-Plans and sorting](04-plans-and-sorting.md) | Plans, editing, history, writing to the game, sorting, rules, locked versions, import and export |
+| [05-Semantic interface and MCP](05-semantic-interface-and-mcp.md) | Tool layer, references, text formats, CLI, MCP |
+| [06-ui/](06-ui/README.md) | Sidebar and pages, interaction rules, details, visual design, GUI and TUI technology (split by section) |
+| [07-Technology and engineering](07-technology-and-engineering.md) | Technology, code structure, tests, releases, performance targets and measured baselines, game behavior notes |
+| [08-Launch and packs](08-launch-and-packs.md) | Launch model, link deployment, game process detection, packs, hidden Mods, recycle bin |
+| [09-Archo](09-Archo.md) | Built-in AI assistant (1.1) |
+| [10-Unplayed and worth playing](10-unplayed-and-worth-playing.md) | Save reading, untouched content, save management (1.1); worth playing (long term) |
 
-日志语料研究是另一条线，见 [research/](../research/)；界面草图见 [design/](../design/)。
+Log corpus research is a separate track; see [research/](../research/). Interface mockups are in [design/](../design/).
 
-## 引用
+## References
 
-规格之间、代码注释里都用 `NN §x.y` 引用（如 `06 §2.9`）。章节号属于整份规格，不属于文件：一份规格拆成文件夹后，章节号不变，引用不用改，按文件夹 README 的表找文件。改章节号时要同步更新代码注释和其他规格里的引用。
+Use `NN §x.y` references between specifications and in code comments (for example, `06 §2.9`). Section numbers belong to the whole specification, not the file: when a specification is split into a directory, section numbers and references stay unchanged. Find the file in that directory's README table. When changing section numbers, update references in code comments and other specifications too.
 
-## 维护
+## Maintenance
 
-- **一件事只写在一处。** 别处要用就引用 `NN §x.y`，不抄一遍。抄过去的两份迟早不一样。
-- **改行为就改规格，放在同一个提交里。** 改了职责、接口、存储格式、状态变化、写哪些文件、失败时怎么办、兼容规则，都要改负责它的那一节。不改这些的重构不用动规格。
-- **写现在的样子。** 已实现的写成现状；还没做的标“待实现”“草案”“待定”，或放进 01 §5 的待办。只是想法、还没定的，放 research/ 或 design/，不进规格。决策的理由写进 00 §6 决策记录，规格里只写结论。
-- **指向代码，不复述代码。** 写文件、类型、函数名（如 `view.Nav`），写签名表达不了的含义和约束；会经常变的实现细节不写。
-- **变长了就拆。** 一个文件超过约 500 行，或者装进了互不相干的几块，就拆成同名文件夹：`README.md` 放状态、依据和文件表，其余文件按章节分，文件名以起始章节号开头（如 `2.9-库存与日志.md`），章节号不变。每个文件开头一行写它属于哪份规格。
-- **验收跟着规格走。** 每份规格末尾的“验收”写这块怎么检查，提交时说明跑了哪些、哪些没跑。
+- Write documentation in English; Chinese belongs only in language files, `docs/glossary.md`, and `README.zh-CN.md`.
+- **Write each fact in one place.** Elsewhere, reference `NN §x.y` instead of copying it. Copies will eventually diverge.
+- **Update the specification with behavior changes, in the same commit.** Changes to responsibilities, interfaces, storage formats, state transitions, file writes, failure handling, or compatibility rules must update the section that owns them. Refactoring that changes none of these needs no specification update.
+- **Describe the current state.** Describe implemented behavior as it is; label unfinished work "not implemented", "draft", or "undecided", or put it in 01 §5. Ideas without a decision belong in research/ or design/, not specifications. Decision rationale belongs in 00 §6; specifications record only the conclusions.
+- **Point to code; do not repeat it.** Name files, types, and functions (for example, `view.Nav`), and describe meanings and constraints their signatures cannot express. Omit implementation details that change often.
+- **Split files that grow too long.** If a file exceeds about 500 lines or covers unrelated areas, split it into a directory with the same name: put status, basis, and a file table in `README.md`; split other files by section, with filenames starting with their first section number (for example, `2.9-inventory-and-logs.md`). Keep section numbers unchanged. Start each file with a line naming its parent specification.
+- **Acceptance follows the specification.** The "Acceptance" section at the end of each specification describes how to check that area. State which checks ran and which did not when submitting changes.

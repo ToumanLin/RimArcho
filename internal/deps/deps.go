@@ -13,19 +13,17 @@ import (
 )
 
 const (
-	Font     = "font"
 	Todds    = "todds"
 	SteamCMD = "steamcmd"
-	WezTerm  = "wezterm"
 )
 
 // Names is the display order used by All.
-var Names = []string{Font, Todds, SteamCMD, WezTerm}
+var Names = []string{Todds, SteamCMD}
 
 // Info describes the selected copy. Own means it is in RimArcho's download directory.
 // Dir is always the managed installation directory, even when another copy is selected.
 type Info struct {
-	// Source is config, own, path, program-files, bundled, or empty when missing.
+	// Source is config, own, path, or empty when missing.
 	Name, Path, Version, Source string
 	OK, Own                     bool
 	Err, ConfigKey, Dir         string
@@ -36,12 +34,11 @@ type Info struct {
 // disables PATH discovery. Version overrides version probes for tests.
 // Do not change fields concurrently with calls to its methods.
 type Finder struct {
-	Home, LocalDir, ProgramDir string
-	Setting                    func(key string) string
-	LookPath                   func(string) (string, error)
-	ProgramFiles               []string
-	Version                    func(name, path string) (string, error)
-	probes                     probeCache
+	LocalDir string
+	Setting  func(key string) string
+	LookPath func(string) (string, error)
+	Version  func(name, path string) (string, error)
+	probes   probeCache
 }
 
 type probeCache struct {
@@ -101,27 +98,6 @@ func (f *Finder) Status(name string) Info {
 		return true
 	}
 	switch name {
-	case Font:
-		i.Dir = filepath.Join(f.ProgramDir, "fonts")
-		i.Path, i.Source = i.Dir, "bundled"
-		count := 0
-		err := filepath.WalkDir(i.Dir, func(p string, d os.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			ext := strings.ToLower(filepath.Ext(p))
-			if !d.IsDir() && (ext == ".ttf" || ext == ".otf") {
-				count++
-			}
-			return nil
-		})
-		i.OK = err == nil && count > 0
-		if i.OK {
-			i.Version = fmt.Sprintf("%d font files", count)
-		} else {
-			i.Err = "the bundled font is missing"
-		}
-		return i
 	case Todds:
 		i.ConfigKey, i.Dir, i.Installable = "textures.todds", filepath.Join(f.LocalDir, Todds), true
 		if !selectPath(textures.FindTodds(setting(i.ConfigKey)), "config") &&
@@ -145,36 +121,6 @@ func (f *Finder) Status(name string) Info {
 				selectPath(path("steamcmd"), "path")
 			}
 		}
-	case WezTerm:
-		i.ConfigKey, i.Dir, i.Installable = "wezterm.path", filepath.Join(f.Home, WezTerm), true
-		if p := setting(i.ConfigKey); isFile(p) {
-			selectPath(p, "config")
-		}
-		if i.Path == "" {
-			selectPath(path("wezterm-gui"), "path")
-		}
-		for _, pf := range f.ProgramFiles {
-			if i.Path != "" {
-				break
-			}
-			p := filepath.Join(pf, "WezTerm", "wezterm-gui.exe")
-			if isFile(p) {
-				selectPath(p, "program-files")
-			}
-		}
-		if i.Path == "" {
-			if p := filepath.Join(i.Dir, "wezterm-gui.exe"); isFile(p) {
-				selectPath(p, "own")
-			} else {
-				ms, _ := filepath.Glob(filepath.Join(i.Dir, "*", "wezterm-gui.exe"))
-				for j := len(ms) - 1; j >= 0; j-- {
-					if isFile(ms[j]) {
-						selectPath(ms[j], "own")
-						break
-					}
-				}
-			}
-		}
 	default:
 		i.Err = fmt.Sprintf("unknown dependency %q", name)
 		return i
@@ -185,7 +131,7 @@ func (f *Finder) Status(name string) Info {
 	}
 	i.Own = i.Source == "own" && owned(i.Dir, i.Path)
 	i.OK = true
-	if name == Todds || name == WezTerm {
+	if name == Todds {
 		v, err := f.version(name, i.Path)
 		i.Version = v
 		if err != nil {
@@ -242,13 +188,8 @@ func (f *Finder) version(name, path string) (string, error) {
 	p = probe{size: s.Size(), mtime: s.ModTime().UnixNano()}
 	if f.Version != nil {
 		p.version, p.err = f.Version(name, path)
-	} else if name == Todds {
-		p.version, p.err = (&textures.Todds{Path: path, Prepare: hideWindow}).Version()
 	} else {
-		p.version = strings.TrimPrefix(filepath.Base(filepath.Dir(path)), "WezTerm-windows-")
-		if p.version == filepath.Base(filepath.Dir(path)) {
-			p.version = ""
-		}
+		p.version, p.err = (&textures.Todds{Path: path, Prepare: hideWindow}).Version()
 	}
 	c.entries[key] = p
 	return p.version, p.err

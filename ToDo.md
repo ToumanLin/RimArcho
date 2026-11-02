@@ -1,53 +1,86 @@
 # ToDo
 
-待研究、还没定的事。定了就写进规格（实现计划放 01 §5），研究过程放 docs/research/。
+Things to research, not yet decided. Once decided, put them in the specifications (implementation plans in 01 §5); research goes in docs/research/.
 
-## 研究：archo.db 里的文本 ID 和路径改成整数
+## GUI
 
-**起因**：2026-10-29 只读测量了一个用了 10 天的库，443 MB。其中分析事实和文件清单里，大量空间花在重复的文本上：
+### Search files
 
-| 表 | 行数 | 重复文本 |
-| --- | --- | --- |
-| `def_fact` | 76 万 | `file` 共 33.6 MB（平均 44 字节）；`instance_id` 共 19.8 MB（26 字节），还在两个索引里各存一遍 |
-| `snapshot_file` | 98 万 | `rel_path` 共 59.6 MB，占表的三分之二；其中 72% 的行只用于增量扫描的 mtime 比较 |
-| `type_fact`、`harmony_*` | 20 万 | 同样带 `instance_id`、`file` |
+The search interface confuses players. Consider a default 32:68 split: a search/filter card at the upper left, matching Mod instances and their file tree below it, and detailed file contents on the right.
 
-**粗估**：`instance_id` 换成整数代理键，`file` / `rel_path` 换成路径表里的整数，剩下的事实表还能再小三成左右。
+Search options need review. The default scope is the current list, but players cannot choose another list or filter by Mod source, tag, or version to exclude other copies' files. Reuse the Mod library's filter approach. Searching decompiled code targets a Mod, but it is unclear which instance is searched when the Mod has multiple copies.
 
-**要回答的问题**：
-- 代理键放在哪：`instance` 加整数列，还是事实表单独一张映射表？还要考虑 `id_alias`、身份合并（same 回答）、Lineage 拆分，以及迁移时键会不会变。
-- 路径表的粒度：全局一张、按 Mod 一张、还是按快照一张？Mod 更新后旧路径何时清理（和旧快照文件清单的保留规则一起看）。
-- `snapshot_file` 的非语义文件是否改成每个快照一个压缩块，只在增量扫描时整块读。需要先确认 `files.go`、贴图（`textures/%.png`）、`languages/` 这些按路径查的查询怎么办。
-- 未启用的 Mod 是否只存 Def 的名字层（类型、defName、Name），不存 `file` / `line` / `parent`。需要先确认 `target-inactive`、缺失父模板的提供方等功能是否需要完整字段。
-- 查询和页面加载会不会变慢（06 §10、07 §6），迁移要多久（以 76 万行事实、98 万行文件清单的规模实测）。
+Search results also need review: addresses are relative and players cannot directly open the corresponding file or folder. Design around what players want to do with their results.
 
-**前置**：先合并事实跨版本共用（`codex/fact-share`）和自动整理（`codex/db-maintenance`），在它们之后的结构上测量。
+2026-11-01: mockup for review at https://claude.ai/artifact/Xh4rTagnS8p6UnqHysR2tx (Def / Text / C# code views). Waiting for the owner's feedback before the spec (06 §2.9) changes.
 
-## 列表编辑器`用户排序规则`, 文件搜索页面
-RimArhco有`用户排序规则`, `rg搜索`功能, 只是我们没有做任何GUI入口给它
+## Decompilation
 
-## 计时器和定期行为的重新整理
-在规格里加一张定时行为总表
-1. 内存释放计时器
-2. 自动检查更新:(扫描mod库, 检查变动, 拉取github,loverslab等上游的更新, 自动更新社区数据, 依赖项, RimArcho自己的自动更新)
+Decompilation serves two purposes: investigating Mod conflicts and creating Mods. Reconsider storing decompiled assemblies in the cache and propose an approach.
 
-## RimArcho自动更新
-需要做RimArcho的自动更新 
+2026-11-01: decided in [research/2026-11-01_decompile-storage.md](docs/research/2026-11-01_decompile-storage.md): a durable source library including the game's own code; being implemented. Mod projects are deferred (New Mod Project below).
 
-## TUI
-TUI不再渲染图片, 不再使用WezTerm
-TUI的界面应该更新和GUI尽量一致
-增加输入框允许玩家输入指令
+## Research displaying, editing, and managing Mod configuration
 
-## 设置页
-增加反馈选项, 反馈内容可以发送到github issue
-增加社区链接, 如Discord, github
-设置页面重新排序, 将常用的放到一起
+Mod configuration determines how a Mod's content is played. In the game it has an interface; outside the game it is plain XML.
 
-## 本地化
-docs应该做英语的
+## Accessibility
 
-## MCP
-精简MCP指令, 做到渐进式披露
+Accessibility is intended to let AI agents operate without screenshots. Define acceptance criteria for it.
+
+## New Mod Project
+Allow player to initialize a new mod project
+
+## Save analysis
+
+### Save management
+
+Preview the colony name, in-game date, storyteller and difficulty, play time, colonist count, save size, and Mod list.
+
+Group saves by colony using RimSaves' folder logic. RimSaves stores the folder name in the filename as folder#§#save-name.rws. Recognize that prefix so its users' saves are not grouped incorrectly.
+
+Support renaming and copying saves, and offer cleanup suggestions.
+
+### Mods used by a save
+
+Explain the effect of the save's Mod list. List objects belonging to Mod X, for example 3 colonists of its race, 12 buildings, 1 faction, and 1 WorldComponent.
+
+Close the gap in 10 §3.3: after extracting Class, functional Mods with Comp or Component classes leave traces in saves, so their usage can be determined at least partially.
+
+Answer the common community question of whether a Mod can be removed mid-playthrough. Compare the current Mod list with the save's Mod list.
+
+### Detect save corruption
+
+At the file level, detect truncation (no </savegame>, often saved during a crash), empty files, and malformed XML. Do not report a save as corrupt while the game is writing it; check running-game detection in 08 §4 first.
+
+At the reference level, collect defined and referenced loadIDs statically and find references to nonexistent objects. This can reveal Could not resolve reference before loading.
+
+At the source level, Class="..." pointing to a type absent from installed assemblies will fail on load and is the most severe case. An unresolved Def source (already recorded in 10 §1.5) should become a risk warning.
+
+Connect the checks to logs: Monitor already records context.save, so attach save-load errors from the last attempt to the save card, showing static checks alongside actual loading evidence.
+
+Undecided: whether to generate a repaired copy by removing invalid references and objects belonging to missing Mods.
+
+### Playthrough review (data for the third question)
+
+Join multiple saves of a colony into a timeline: in-game days, real play time, population, wealth, and deaths.
+
+Include research progress (the undecided item in 10 §1.4) and DLC in content not yet played.
+
+Optionally count occurrences instead of only recording that something appeared. This costs little and can show how deeply the content was played.
 
 ## Archo Agent
+
+Archo should be a Mod development agent that can take action, not just translate or tag. Tentatively use a modified Pi agent; the approach needs research.
+
+# Deferred
+
+## TUI
+
+The TUI lacks a navigation bar and feels slow during use.
+
+## Loading animation
+Maybe add a UI loading animation--low priority for now
+
+## 1.6 memory on a real graphics card is inferred
+Calibrated in the VM up to 7.5 GiB texture payload (2026-11-01). Most of the VM's texture RAM is the driver's copy, which the VMware adapter (no dedicated VRAM) commits as process memory; the model now counts it as VRAM and adds back only what does not fit in 90% of the card (research: unity16-texture-memory-breakdown). The 720 list: 36–52 GiB resident without dedicated VRAM, 15–30 GiB with a 24 GiB card. Deferred (2026-11-01): the estimate is good enough for now, so no real-hardware run is planned. If false warnings are ever reported, run 1.6 once on a PC with a discrete GPU and compare Task Manager's "Commit size" and "Dedicated GPU memory" with the estimate (vanilla: about 0.9 GiB commit, 0.66 GiB dedicated).

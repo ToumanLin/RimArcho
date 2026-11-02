@@ -40,6 +40,7 @@ export class Element {
   set textContent(t) { this.innerHTML = ""; this.text = t; }
   get textContent() { return this.text + this.children.map((n) => n.textContent).join(""); }
   setAttribute(k, v) { this.attributes[k] = v; }
+  removeAttribute(k) { delete this.attributes[k]; }
   focus() {}
   blur() {}
   setSelectionRange() {}
@@ -88,15 +89,16 @@ export class Element {
 }
 
 Element.TEXT_NODE = 3;
+Element.ELEMENT_NODE = 1;
 
 export async function loadModules(entry, deps, globals = {}) {
   deps["/wails/runtime.js"] ||= {};
   const state = deps["./state.js"];
-  if (state) { state.esc ||= s => String(s); state.T ||= s => s; }
+  if (state) { state.esc ||= s => String(s); state.T ||= s => s; state.keyCaps ||= k => (state.el ? state.el("kbd", "", k) : new Element("kbd")); }
   const document = globals.document || {};
   document.createElement ||= state?.el || (tag => new Element(tag));
   globals = { ...globals, document };
-  const context = createContext({ Node: Element, ...globals }), cache = new Map();
+  const context = createContext({ Node: Element, ResizeObserver: class { observe() {} unobserve() {} }, MutationObserver: class { observe() {} }, ...globals }), cache = new Map();
   let factFactory;
   if (state?.el && !state.factText) {
     const source = await readFile(new URL("../assets/js/state.js", import.meta.url), "utf8");

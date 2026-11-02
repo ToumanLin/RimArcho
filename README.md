@@ -1,3 +1,5 @@
+English | [&#31616;&#20307;&#20013;&#25991;](README.zh-CN.md)
+
 # RimArcho
 
 <img src="docs/assets/rimarcho.svg" width="96" alt="RimArcho icon: Archo chan">
@@ -78,9 +80,9 @@ archo env add main --detected    # registers them as environment "main"
 archo scan                       # reads every mod folder (incremental afterwards)
 ```
 
-Then double-click `RimArcho.exe` for the window, or run `archo` for the terminal UI (in RimArcho's
-WezTerm host; `archo --here` uses the current terminal). `archo gui` opens the window from a
-terminal. The window needs Microsoft Edge WebView2, which Windows 10 and 11 already have.
+Then double-click `RimArcho.exe` for the window, or run `archo` for the terminal UI (in the
+terminal you start it from; a double click opens Windows' default terminal). `archo gui` opens the
+window from a terminal. The window needs Microsoft Edge WebView2, which Windows 10 and 11 already have.
 
 Useful next steps:
 

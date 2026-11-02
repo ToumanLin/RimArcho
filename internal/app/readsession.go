@@ -28,6 +28,7 @@ func (a *App) WorkspaceSnapshot() { a.workspaceSnapshot = true }
 // ReadOptions refreshes the invocation settings without discarding a reader's caches.
 // Neither App may be in use while its options are copied.
 func (b *App) ReadOptions(a *App) {
+	b.MemoryProbe = a.MemoryProbe
 	b.Home, b.Config, b.Now, b.Rand, b.Loc = a.Home, a.Config, a.Now, a.Rand, a.Loc
 	b.Detect, b.FreeSpace, b.Decompile = a.Detect, a.FreeSpace, a.Decompile
 	b.EnvName, b.GameVersion = a.EnvName, a.GameVersion
@@ -44,9 +45,10 @@ func (b *App) ReadOptions(a *App) {
 	b.SteamCMDStart, b.SteamCMDRun, b.SteamCMDPoll = a.SteamCMDStart, a.SteamCMDRun, a.SteamCMDPoll
 	b.SteamCMDWait = a.SteamCMDWait
 	b.TextureEncoder, b.ToddsNoPath, b.ToddsZip = a.TextureEncoder, a.ToddsNoPath, a.ToddsZip
-	b.WezTermAPI = a.WezTermAPI
 	b.UninstallExe, b.UninstallKeepBase, b.ArchoProbe = a.UninstallExe, a.UninstallKeepBase, a.ArchoProbe
-	b.UninstallLog = a.UninstallLog
+	b.UninstallLog, b.AfterExitFunc = a.UninstallLog, a.AfterExitFunc
+	b.SelfUpdateAPI, b.SelfVersion, b.SelfProgram = a.SelfUpdateAPI, a.SelfVersion, a.SelfProgram
+	b.SelfVersionOf, b.SelfOthers, b.SelfWaitPoll = a.SelfVersionOf, a.SelfOthers, a.SelfWaitPoll
 }
 
 // AdoptReadState transfers a finished worker's index/workspace to the GUI session,

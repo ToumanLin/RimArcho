@@ -49,40 +49,34 @@ func insertSnapshot(tx *sql.Tx, instanceID string, scanID int64, ob *scan.Observ
 		manifest, acfTime, acfSize = ob.ACF.Manifest, ob.ACF.TimeUpdated, ob.ACF.Size
 	}
 	h := ob.FP.SnapshotHash
+	copied := ob.FP.Files == nil && ob.FP.Count > 0
+	var kinds int
+	var langs string
+	if copied { // same paths as prevSnap
+		if err := tx.QueryRow(`SELECT kinds, langs FROM snapshot WHERE id=?`, prevSnap).Scan(&kinds, &langs); err != nil && err != sql.ErrNoRows {
+			return 0, err
+		}
+	} else {
+		rels := make([]string, len(ob.FP.Files))
+		for i, f := range ob.FP.Files {
+			rels[i] = f.Rel
+		}
+		kinds, langs = deriveContent(rels)
+	}
 	res, err := tx.Exec(`INSERT INTO snapshot(instance_id, scan_id, snapshot_hash, package_id, package_id_raw, name, authors,
 		workshop_id_declared, supported_versions, decl_blob, acf_manifest, acf_time_updated, acf_size, git_head, origin,
-		file_count, total_size, semantic_count) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		file_count, total_size, semantic_count, kinds, langs) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		instanceID, scanID, h[:], d.PackageID, d.PackageIDRaw, d.Name, strings.Join(d.Authors, ", "), d.PublishedFileID,
 		strings.Join(d.SupportedVersions, " "), string(blob), manifest, acfTime, acfSize, ob.GitHead, origin,
-		ob.FP.Count, ob.FP.TotalSize, len(ob.FP.Semantic))
+		ob.FP.Count, ob.FP.TotalSize, len(ob.FP.Semantic), kinds, langs)
 	if err != nil {
 		return 0, err
 	}
 	id, _ := res.LastInsertId()
-	if ob.FP.Files == nil && ob.FP.Count > 0 {
-		_, err = tx.Exec(`INSERT INTO snapshot_file(snapshot_id, rel_path, size, mtime, hash)
-			SELECT ?, rel_path, size, mtime, hash FROM snapshot_file WHERE snapshot_id=?`, id, prevSnap)
-		return id, err
+	if copied {
+		return id, copyFiles(tx, id, prevSnap)
 	}
 	return id, insertFiles(tx, id, ob.FP.Files)
-}
-
-func insertFiles(tx *sql.Tx, snapID int64, files []scan.File) error {
-	st, err := tx.Prepare(`INSERT OR REPLACE INTO snapshot_file(snapshot_id, rel_path, size, mtime, hash) VALUES(?,?,?,?,?)`)
-	if err != nil {
-		return err
-	}
-	defer st.Close()
-	for _, f := range files {
-		var h any
-		if f.HasHash {
-			h = f.Hash[:]
-		}
-		if _, err := st.Exec(snapID, f.Rel, f.Size, f.MTime, h); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // ApplyScan persists one reconciliation result in a single transaction.
@@ -166,7 +160,7 @@ func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identi
 			snapID = a.Prev.ID
 			if ob.FP.Hashed > 0 && ob.FP.Files != nil {
 				// Same content, newer mtimes: refresh the cache so the next scan can skip hashing.
-				if _, err = tx.Exec(`DELETE FROM snapshot_file WHERE snapshot_id=?`, snapID); err != nil {
+				if _, err = deleteFiles(tx, `=?`, snapID); err != nil {
 					return err
 				}
 				if err = insertFiles(tx, snapID, ob.FP.Files); err != nil {

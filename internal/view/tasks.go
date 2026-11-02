@@ -8,12 +8,12 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 )
 
-// 后台任务 (06 §2.16): the record of app.Tasks as the page shows it. The rows go by group
+// Background tasks (06 §2.16): the record of app.Tasks as the page shows it. The rows go by group
 // (running, waiting, today, yesterday, earlier); a row carries its summary, its actions
 // (with their keys) and its items, so the page draws without asking again.
 
 // Task kinds of RimArcho's own jobs (the lane "self"); the files and Steam lanes' kinds
-// are Mod 库's ops (LibDelete, LibUnsub, …).
+// are Mod library's ops (LibDelete, LibUnsub, …).
 const (
 	TaskAutomatic        = "automatic-check"
 	TaskCreditReplace    = "steam-credit-replace"
@@ -27,13 +27,14 @@ const (
 	TaskDownload         = "download"
 	TaskSteamCMD         = "install-steamcmd"
 	TaskTodds            = "install-todds"
-	TaskWezTerm          = "install-wezterm"
 	TaskDepRemove        = "remove-dependency"
 	TaskData             = "data-update"
 	TaskCache            = "cache-clear"
 	TaskBackup           = "db-backup"
 	TaskVacuum           = "db-vacuum"
 	TaskGC               = "gc"
+	TaskSourceDecompile  = "source-decompile"
+	TaskSourceClean      = "source-clean"
 	TaskSubscribe        = "subscribe"
 	TaskSourceCheck      = "source-check"
 	TaskWorkshopUpdate   = "workshop-update"
@@ -49,13 +50,13 @@ const (
 // IsSettingTask identifies maintenance tasks shared by settings and the guide.
 func IsSettingTask(kind string) bool {
 	switch kind {
-	case TaskSourceCheck, TaskWorkshopUpdate, TaskSubscribe, TaskSubscriptionFrom, TaskSteamCMD, TaskTodds, TaskWezTerm, TaskDepRemove, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC:
+	case TaskSourceDecompile, TaskSourceClean, TaskSourceCheck, TaskWorkshopUpdate, TaskSubscribe, TaskSubscriptionFrom, TaskSteamCMD, TaskTodds, TaskDepRemove, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC, TaskSelfUpdate, TaskSelfCheck:
 		return true
 	}
 	return false
 }
 
-// TaskLane returns the lane a Mod 库 op runs in ("" when it is not a background task:
+// TaskLane returns the lane a Mod library op runs in ("" when it is not a background task:
 // plan edits run at once).
 func TaskLane(kind string) string {
 	switch kind {
@@ -99,7 +100,7 @@ type TaskRow struct {
 	Steps     []TaskStep    `json:"steps,omitempty"`
 	Acts      []TaskAct     `json:"acts"`
 	Items     []TaskItemRow `json:"items,omitempty"`
-	Counts    string        `json:"counts,omitempty"` // "完成 12  失败 2"
+	Counts    string        `json:"counts,omitempty"` // "done 12  failed 2"
 	NoItems   string        `json:"noItems,omitempty"`
 	Target    string        `json:"target,omitempty"` // the page o opens
 	Seen      bool          `json:"seen"`
@@ -148,6 +149,8 @@ type TaskItemRow struct {
 // TaskTitle names a kind.
 func TaskTitle(kind string) string {
 	switch kind {
+	case "command":
+		return T("archo command")
 	case TaskAutomatic:
 		return T("automatic checks")
 	case OpSubRemoveFast:
@@ -178,8 +181,10 @@ func TaskTitle(kind string) string {
 		return T("download SteamCMD")
 	case TaskTodds:
 		return T("download todds…")
-	case TaskWezTerm:
-		return T("download WezTerm")
+	case TaskSelfUpdate:
+		return T("update RimArcho")
+	case TaskSelfCheck:
+		return T("check for RimArcho updates")
 	case TaskDepRemove:
 		return T("remove external tool")
 	case TaskData:
@@ -192,6 +197,10 @@ func TaskTitle(kind string) string {
 		return T("compact the database")
 	case TaskGC:
 		return T("remove old tombstones")
+	case TaskSourceDecompile:
+		return T("decompile the current list's mods")
+	case TaskSourceClean:
+		return T("remove unused folders from the source library")
 	}
 	if l := opLabel(kind); l != "" {
 		return l
@@ -265,7 +274,7 @@ func dayGroup(ms int64, now time.Time) string {
 	return "earlier"
 }
 
-// DurText: "12 秒", "3 分 34 秒".
+// DurText: "12 sec", "3 min 34 sec".
 func DurText(d time.Duration) string {
 	s := int(d.Round(time.Second) / time.Second)
 	if s < 60 {
@@ -514,7 +523,7 @@ func taskTarget(t *app.Task) string {
 		return PageChanges
 	case TaskAccount:
 		return PageSettings
-	case TaskSteamCMD, TaskTodds, TaskWezTerm, TaskDepRemove, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC:
+	case TaskSourceDecompile, TaskSourceClean, TaskSteamCMD, TaskTodds, TaskDepRemove, TaskData, TaskCache, TaskBackup, TaskVacuum, TaskGC, TaskSelfUpdate, TaskSelfCheck:
 		return PageSettings
 	case TaskScan:
 		return PageChanges
@@ -537,7 +546,7 @@ func taskTarget(t *app.Task) string {
 func TaskTargetName(target string) string {
 	switch {
 	case target == PageChanges:
-		return T("subscriptions and updates")
+		return T("updates")
 	case target == PageNeeds:
 		return T("can it run")
 	case target == PagePacks || strings.HasPrefix(target, "pack:"):
@@ -554,7 +563,7 @@ func TaskTargetName(target string) string {
 
 // TaskCanStop says which self tasks stop part way (a pack build, a texture run).
 func TaskCanStop(kind string) bool {
-	return kind == TaskCreditReplace || kind == TaskPack || kind == TaskTextures || kind == TaskTexClean
+	return kind == TaskSourceDecompile || kind == TaskSourceClean || kind == TaskCreditReplace || kind == TaskPack || kind == TaskTextures || kind == TaskTexClean
 }
 
 // handedOver counts the items a new task took over.
@@ -570,7 +579,7 @@ func handedOver(t *app.Task) int {
 
 func taskActs(t *app.Task, c map[string]int) []TaskAct {
 	var a []TaskAct
-	// items a new task took over (重试, 继续剩下的) are not offered again
+	// items a new task took over (retry, continue the rest) are not offered again
 	retry, left := 0, 0
 	for _, it := range t.Items {
 		switch {
@@ -618,7 +627,7 @@ func taskActs(t *app.Task, c map[string]int) []TaskAct {
 	a = append(a, TaskAct{ID: "goto", Label: Tf("go to %s", TaskTargetName(taskTarget(t))), Key: taskKeyGoto})
 	if t.Kind == TaskSubscribe && t.Ended() && len(a) == 1 {
 		a[0].Primary = true
-		a[0].Label = T("go to subscriptions and updates")
+		a[0].Label = T("go to updates")
 	}
 	if t.Lane == app.LaneFiles && len(t.Items) == 1 {
 		a = append(a, TaskAct{ID: "folder", Label: T("open the folder"), Key: taskKeyFolder})
@@ -627,74 +636,4 @@ func taskActs(t *app.Task, c map[string]int) []TaskAct {
 		a = append(a, TaskAct{ID: "forget", Label: T("take off the record"), Key: taskKeyForget, Danger: true})
 	}
 	return a
-}
-
-func init() {
-	Register(map[string]string{
-		"continue replacement":    "继续替换",
-		"handed to a new task":    "已交给新的任务",
-		"%d handed to a new task": "%d 项已交给新的任务",
-		"clear cache":             "清除缓存",
-		"back up the database":    "备份数据库",
-		"compact the database":    "压缩数据库",
-		"scan the mods":           "扫描 Mod",
-		"check whether it runs":   "检查能不能跑",
-		"download the game":       "下载游戏",
-		"files":                   "文件",
-		"one at a time, in order": "一次一项，按顺序做",
-		"handed to the running Steam client one by one":                "一项一项交给正在运行的 Steam 客户端",
-		"one of each kind at a time; different kinds can run together": "同一种一次一个，不同种可以同时",
-		"queued":                             "排队中",
-		"running":                            "进行中",
-		"done":                               "完成",
-		"failed":                             "失败",
-		"partly done":                        "部分完成",
-		"stopped":                            "已停止",
-		"waiting for Steam":                  "等 Steam 开始下载",
-		"downloading %d%%":                   "下载中 %d%%",
-		"Steam is downloading %d of %d":      "Steam 正在下载 %d / %d",
-		"working on it":                      "正在做",
-		"not touched":                        "没动",
-		"yesterday":                          "昨天",
-		"%d s":                               "%d 秒",
-		"%d min %d s":                        "%d 分 %d 秒",
-		"textures":                           "贴图",
-		"copy, leaving out what is not used": "复制并去掉用不到的",
-		"put it in place":                    "放好",
-		"background: %d":                     "后台 %d 项",
-		"background tasks":                   "后台任务",
-		"all %d done":                        "%d 项都完成了",
-		"nothing was touched":                "什么都没动",
-		"%d done, %d left untouched":         "完成 %d 项，%d 项没动",
-		"%d done, %d failed":                 "%d 个完成，%d 个失败",
-		"stopped when the window closed":     "窗口关闭时停止",
-		"on %s":                              "正在处理 %s",
-		"waiting for Steam: %s":              "等 Steam 处理 %s",
-		"waiting in the %s queue for the one before": "排在%s队列，等前一项做完",
-		"this task has no result per item":           "这个任务没有逐项的结果",
-		"stop the rest":                              "停止后续",
-		"cancel the wait":                            "取消排队",
-		"sooner":                                     "往前排",
-		"later":                                      "往后排",
-		"try the %d failed again":                    "重试失败的 %d 项",
-		"do the %d left":                             "继续剩下的 %d 项",
-		"go to %s":                                   "去%s",
-		"take off the record":                        "从记录里去掉",
-	})
-}
-
-func init() {
-	Register(map[string]string{
-		"the task's items":                                                "这个任务的每一项",
-		"back to the tasks":                                               "回到任务",
-		"stop the rest / cancel the wait":                                 "停止后续 / 取消排队",
-		"try the failed again / do the ones left":                         "重试失败的 / 继续剩下的",
-		"a waiting task later / sooner":                                   "排队的任务往后 / 往前",
-		"go to the page it changed":                                       "去它改动的页面",
-		"take off the record, put it back":                                "从记录里去掉，放回",
-		"take the done ones off the record":                               "清除已完成",
-		"the items' headers: sort and columns, the sorted column's width": "每一项的表头：排序和列，排序列的宽度",
-		"select tasks":                                                    "选择任务",
-		"background tasks; again goes back":                               "后台任务；再按一次回去",
-	})
 }

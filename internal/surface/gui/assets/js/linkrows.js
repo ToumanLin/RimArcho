@@ -4,9 +4,7 @@ import { copyablePath } from "./fields.js";
 // Preserve the leaf of long paths; the full value is available to copy and hover.
 function path(value, label = value) {
   const node = el("span", "link-path");
-  const cut = Math.max(0, label.length - 28);
-  node.append(el("span", "link-path-start", label.slice(0, cut)), el("span", "link-path-end", label.slice(cut)));
-  node.title = value;
+  node.textContent = label;
   return copyablePath(node, value);
 }
 

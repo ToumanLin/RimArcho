@@ -267,6 +267,14 @@ func rewriteInstances14(tx *sql.Tx, m map[string]string) error {
 		return nil
 	}
 	olds := sortedKeys(m)
+	useTable := "source_cache"
+	var library int
+	if err := tx.QueryRow(`SELECT count(*) FROM sqlite_master WHERE name='source_use' AND type='table'`).Scan(&library); err != nil {
+		return err
+	}
+	if library > 0 {
+		useTable = "source_use"
+	}
 	for _, old := range olds {
 		keep := m[old]
 		if err := deleteInstanceFacts(tx, old); err != nil {
@@ -280,8 +288,8 @@ func rewriteInstances14(tx *sql.Tx, m map[string]string) error {
 			`UPDATE change_event SET instance_id=?2 WHERE instance_id=?1`,
 			`UPDATE identity_question SET instance_id=?2 WHERE instance_id=?1`,
 			`UPDATE identity_question SET candidate_instance_id=?2 WHERE candidate_instance_id=?1`,
-			`UPDATE OR IGNORE source_cache SET instance_id=?2 WHERE instance_id=?1`,
-			`DELETE FROM source_cache WHERE instance_id=?1`,
+			`UPDATE OR IGNORE ` + useTable + ` SET instance_id=?2 WHERE instance_id=?1`,
+			`DELETE FROM ` + useTable + ` WHERE instance_id=?1`,
 			`DELETE FROM instance WHERE id=?1`,
 			`INSERT OR REPLACE INTO id_alias(old_id, new_id, kind) VALUES(?1, ?2, 'instance')`,
 		} {

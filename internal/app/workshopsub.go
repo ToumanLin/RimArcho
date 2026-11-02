@@ -459,11 +459,7 @@ func statOf(p string) os.FileInfo {
 	return fi
 }
 
-// steamWorkerProcess starts `<this executable> steam-worker …` in dir, with a time limit.
-func steamWorkerProcess(dir string, args []string) (string, error) {
-	return steamWorkerProcessContext(context.Background(), dir, args)
-}
-
+// steamWorkerProcessContext starts `<this executable> steam-worker …` in dir, with a time limit.
 func steamWorkerProcessContext(parent context.Context, dir string, args []string) (string, error) {
 	exe, err := os.Executable()
 	if err != nil {

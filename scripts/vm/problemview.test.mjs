@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 function fixture(overrides={}) {
   const document = {activeElement: null};
   class Element {
-    constructor(tag, cls='', text='') { this.tag=tag; this.className=cls; this.textContent=text; this.children=[]; this.dataset={}; this.classList={add: c=>this.className+=' '+c}; this.scrollTop=0; this.clientHeight=100; }
+    constructor(tag, cls='', text='') { this.tag=tag; this.className=cls; this.textContent=text; this.children=[]; this.dataset={}; this.classList={add: c=>this.className+=' '+c,remove:c=>this.className=this.className.split(' ').filter(x=>x!==c).join(' ')}; this.scrollTop=0; this.clientHeight=100; }
     append(...children) { this.children.push(...children); }
     set innerHTML(value) { assert.equal(value,''); this.children=[]; }
     querySelectorAll(tag) { return this.children.flatMap(x=>typeof x==='string'?[]:[...(x.tag===tag?[x]:[]),...x.querySelectorAll(tag)]); }
@@ -18,7 +18,7 @@ function fixture(overrides={}) {
   let resolve, reject;
   const pending=new Promise((a,b)=>{resolve=a;reject=b;});
   const calls=[];
-  const ctx=createContext({S,document,el:(...args)=>new Element(...args),$:()=>box,T:s=>s,api:{ProblemDetail:()=>pending,...overrides},say:(...x)=>calls.push(x),errText:String});
+  const ctx=createContext({closeChoiceMenu:()=>false,S,document,el:(...args)=>new Element(...args),keyCaps:k=>new Element('kbd','',k),$:()=>box,T:s=>s,api:{ProblemDetail:()=>pending,...overrides},say:(...x)=>calls.push(x),errText:String});
   const src=readFileSync(new URL('../../internal/surface/gui/assets/js/popups.js',import.meta.url),'utf8').replace(/^import .*;\r?$/gm,'').replace(/\bexport /g,'');
   runInContext(src,ctx);
   ctx.initPopups({renderWhere(){},renderHeads(){}});

@@ -205,3 +205,36 @@ func TestLogSaveRefPrefersLeftOutProvider(t *testing.T) {
 	}
 	t.Fatal("no Lib_Gun cluster")
 }
+
+// A disabled mod in a shared folder (here the Workshop; no environment ID since v14, 02 §0)
+// that ships the missing texture or assembly is named as the provider, like one in Mods/
+// (03 §6.2).
+func TestLogProvidersInSharedFolders(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	e.AddWorkshop("3003", testkit.Mod{PackageID: "tester.wslib", Name: "WsLib", Author: "Tester", Files: map[string]string{
+		"Textures/UI/Ws/Badge.png": "png",
+		"Assemblies/WsExtra.dll":   "MZ",
+	}})
+	e.AddEnv(false)
+	e.MustRun("scan")
+	if _, err := e.App.EnsureAnalysis(nil); err != nil {
+		t.Fatal(err)
+	}
+	rep, err := e.App.AnalyzeLogText(`RimWorld 1.6.4633 rev1261
+Could not load Texture2D at 'UI/Ws/Badge' in any active mod or in base resources.
+FileNotFoundException: Cannot resolve dependency to assembly 'WsExtra, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null' because it has not been preloaded. When using the ReflectionOnly APIs, dependent assemblies must be pre-loaded or loaded on demand through the ReflectionOnlyAssemblyResolve event.
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct{ sub, text string }{
+		{"UI/Ws/Badge", "ships Textures/UI/Ws/Badge.png but is not enabled"},
+		{"assembly 'WsExtra", "ships Assemblies/WsExtra.dll but is not enabled"},
+	} {
+		roles, text := ruleCluster(t, e, rep, c.sub)
+		if roles["tester.wslib"] != "dependency" || !strings.Contains(text, c.text) {
+			t.Errorf("%s: candidates %v, want tester.wslib as dependency with %q\n%s", c.sub, roles, c.text, text)
+		}
+	}
+}

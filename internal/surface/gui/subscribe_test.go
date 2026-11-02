@@ -26,7 +26,7 @@ func TestSubscriptionForm(t *testing.T) {
 	if err != nil {
 		t.Skip("node is needed for subscription form behavior tests")
 	}
-	if out, err := exec.Command(node, "--experimental-vm-modules", "--test", "testdata/subscribe.mjs").CombinedOutput(); err != nil {
+	if out, err := exec.Command(node, "--experimental-vm-modules", "--test", "testdata/subscribe.mjs", "testdata/subscriptions.mjs").CombinedOutput(); err != nil {
 		t.Fatalf("subscription form: %v\n%s", err, out)
 	}
 }

@@ -2,13 +2,12 @@ package cmds
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"slices"
 	"sort"
-	"strconv"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/l10ndata"
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
@@ -18,18 +17,13 @@ var configKeys = map[string][]string{
 	"updates.auto":     {"on", "off"},
 	"updates.interval": {"normal", "frequent", "relaxed"},
 	"ui.accent":        {"default", "indigo", "blue", "cyan", "teal", "green", "grass", "orange", "amber", "red", "crimson", "pink", "plum", "purple", "violet", "iris"},
-	"ui.lang":          {"auto", "en", "zh"},
+	"ui.lang":          l10ndata.LanguageCodes(),
 	"ui.theme":         {"auto", "light", "dark"},
-	"ui.icons":         {"auto", "nerd", "compat"}, // auto: Nerd Font icons in the WezTerm host (06 §9.3)
+	"ui.icons":         {"compat", "nerd"}, // nerd: the player's terminal already uses a Nerd Font
 	"ui.mouse":         {"on", "off"},
 	// 06 §4.3: whether descriptions and their images may be fetched from the Steam Workshop
 	"workshop.fetch":  {"on", "off"},
 	"workshop.images": {"on", "off"},
-	// 06 §9.2: auto asks once whether to download WezTerm; none (a "no") runs in the
-	// current terminal; wezterm always uses the host.
-	"terminal.host": {"auto", "wezterm", "none"},
-	// 06 §9.4: off draws no images at all in the TUI
-	"ui.previews": {"on", "off"},
 	// 04 §1.5: add Archo Monitor to new plans (and to each plan once on upgrade)
 	"monitor.default": {"on", "off"},
 	// 06 §2.14: off starts the window's WebView2 without GPU acceleration (less memory,
@@ -44,15 +38,6 @@ var freeKeys = map[string]struct {
 }{
 	// Empty uses anonymous; passwords and Steam Guard codes stay in SteamCMD.
 	"steamcmd.account": {"", app.ValidSteamCMDAccount},
-	"wezterm.path": {"", func(v string) error {
-		if v == "" {
-			return nil
-		}
-		if st, err := os.Stat(v); err != nil || st.IsDir() {
-			return fmt.Errorf("wezterm.path must be an existing program file")
-		}
-		return nil
-	}},
 	// a steamcmd the player already has; "" finds RimArcho's own copy, then PATH
 	"steamcmd.path": {"", func(v string) error {
 		if v != "" && !filepath.IsAbs(v) {
@@ -88,28 +73,25 @@ var freeKeys = map[string]struct {
 		}
 		return nil
 	}},
-	// how long the cursor must rest on a mod before its thumbnail is drawn
-	"ui.preview_dwell_ms": {"0", func(v string) error {
-		if n, err := strconv.Atoi(v); err != nil || n < 0 || n > 5000 {
-			return fmt.Errorf("ui.preview_dwell_ms must be a number of milliseconds from 0 to 5000")
-		}
-		return nil
-	}},
 }
 
 // DefaultPinnedTags is the preset of common tags (06 §3.8).
-const DefaultPinnedTags = "框架,美化,服装,种族,武器,建筑,家具,QoL,平衡,剧情,性能,语言包,测试中,待删除"
+var DefaultPinnedTags = l10ndata.DefaultPinnedTags
 
 // Setting returns a setting of the app, or its default.
 func Setting(a *app.App, key string) string {
-	if v := a.Store.Meta("cfg:" + key); v != "" {
+	v := a.Store.Meta("cfg:" + key)
+	if vs := configKeys[key]; len(vs) > 0 {
+		if slices.Contains(vs, v) {
+			return v
+		}
+		return vs[0]
+	}
+	if v != "" {
 		return v
 	}
 	if f, ok := freeKeys[key]; ok {
 		return f.def
-	}
-	if vs := configKeys[key]; len(vs) > 0 {
-		return vs[0]
 	}
 	return ""
 }
@@ -117,15 +99,8 @@ func Setting(a *app.App, key string) string {
 // SettingChoices returns the allowed values in display order, with the default first.
 func SettingChoices(key string) []string { return slices.Clone(configKeys[key]) }
 
-func init() {
-	register(&Command{Name: "config get", Args: "[<key>]", Summary: "show settings", MaxArgs: 1, Run: configGetCmd})
-	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto|en|zh; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris; ui.icons: auto|nerd|compat; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; terminal.host: auto|wezterm|none; ui.previews: on|off; ui.gpu: on|off; ui.preview_dwell_ms: 0–5000; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; wezterm.path: an existing WezTerm program, or empty for discovery)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
-}
-
-// ConfigValue returns a setting, or its default.
-func ConfigValue(c *Ctx, key string) string { return Setting(c.App, key) }
-
-func configGetCmd(c *Ctx, a *Args) (*render.Doc, error) {
+// SettingKeys are every setting `config get` lists, sorted.
+func SettingKeys() []string {
 	keys := make([]string, 0, len(configKeys)+len(freeKeys))
 	for k := range configKeys {
 		keys = append(keys, k)
@@ -134,6 +109,19 @@ func configGetCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
+	return keys
+}
+
+func init() {
+	register(&Command{Name: "config get", Args: "[<key>]", Summary: "show settings", MaxArgs: 1, Run: configGetCmd})
+	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris; ui.icons: compat|nerd; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
+}
+
+// ConfigValue returns a setting, or its default.
+func ConfigValue(c *Ctx, key string) string { return Setting(c.App, key) }
+
+func configGetCmd(c *Ctx, a *Args) (*render.Doc, error) {
+	keys := SettingKeys()
 	if len(a.Pos) == 1 {
 		if !slices.Contains(keys, a.Pos[0]) {
 			return nil, &UsageError{Msg: fmt.Sprintf("unknown setting %q (known: %v)", a.Pos[0], keys)}

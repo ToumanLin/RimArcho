@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 订阅与更新 (06 §2.9, §9.1): three simple lists. 1 the sources (enter checks one, K every
+// updates (06 §2.9, §9.1): three simple lists. 1 the sources (enter checks one, K every
 // one with mods); 2 the updates waiting for the player (u updates one, U every one shown —
 // the dry run first, then a background task, refused while a game runs; Del removes the
 // subscription; p locks this version first; ctrl+w opens the source page); 3 the change
@@ -19,9 +19,9 @@ import (
 // since that plan was last played (a: the whole library); new and gone mods are one summary
 // row; older changes follow by day. enter expands a row (the grouped summary, then every
 // fact), i shows its raw file list. ctrl+w opens the Workshop change notes, ctrl+o the
-// folder, S sorts, D goes to 能不能跑 for dependencies, p locks this version (twice: it
-// copies files), Del removes a subscription RimArcho keeps. + (or a paste) goes to 添加订阅;
-// tab / shift+tab go to the other pages of Mod 库存.
+// folder, S sorts, D goes to Can it run for dependencies, p locks this version (twice: it
+// copies files), Del removes a subscription RimArcho keeps. + (or a paste) goes to add a subscription;
+// tab / shift+tab go to the other pages of Mod library.
 
 const (
 	chHead    = iota + 1 // a heading
@@ -31,6 +31,7 @@ const (
 	chDay                // an older day (expands)
 	chSource             // a subscription source (enter checks it)
 	chPending            // an update waiting for the player
+	chGone               // an installed copy removed from the Workshop
 )
 
 type chRow struct {
@@ -39,6 +40,7 @@ type chRow struct {
 	mod  *modchanges.Row
 	src  *view.SubscriptionSource
 	pend *view.PendingUpdate
+	gone *view.RemovedSubscription
 	key  string // what enter expands; the row's identity across reloads
 }
 
@@ -87,8 +89,13 @@ func (c *chState) build() {
 		for i := range c.subscriptions.Sources {
 			s := &c.subscriptions.Sources[i]
 			c.rows = append(c.rows, chRow{text: fmt.Sprintf("  %s  %d  %s  %s  %s", s.Name, s.Count, s.Checked, s.Result, s.Account), kind: chSource, src: s, key: "src:" + s.Key})
+			for _, failure := range s.Failures {
+				for _, item := range failure.Items {
+					add("    "+item, chDim)
+				}
+			}
 		}
-		add("2 "+T("pending updates"), chHead)
+		add("2 "+T("waiting for you to update"), chHead) // the window's names (06 §2.9)
 		for i := range c.subscriptions.Pending {
 			r := &c.subscriptions.Pending[i]
 			c.rows = append(c.rows, chRow{text: "  " + r.Name + "  " + r.Source + "  " + r.Installed + " → " + r.Available + "  " + strings.Join(r.UsedIn, ", "), kind: chPending, pend: r, key: "pend:" + r.ID})
@@ -97,14 +104,33 @@ func (c *chState) build() {
 			add("  "+T("no known updates; check a source above"), chDim)
 		}
 	}
-	add("3 "+T("change history"), chHead)
+	if c.subscriptions != nil {
+		heading := false
+		for i := range c.subscriptions.Gone {
+			r := &c.subscriptions.Gone[i]
+			if c.of != "" && c.of != r.ID || c.of == "" && !c.library && !r.InPlan {
+				continue
+			}
+			if !heading {
+				add(T("won't update any more"), chHead)
+				heading = true
+			}
+			k := "gone:" + r.ID
+			c.rows = append(c.rows, chRow{text: "  " + r.Name + "  " + T("removed from the Workshop"), kind: chGone, gone: r, key: k})
+			if c.open[k] {
+				add("    "+T("The author deleted the Workshop page or made it private; your installed copy still works, but Steam will never update it."), chDim)
+				add("    "+T("After unsubscribing, you cannot download it again; lock this version to keep it."), chDim)
+			}
+		}
+	}
+	add("3 "+T("already updated"), chHead)
 	switch {
 	case c.of != "":
 		add(Tf("only %s", c.ofName)+"  "+T("esc shows every mod"), chHead)
-	case c.library:
-		add(T("the whole library")+"  "+p.Since+"  "+T("a: only the current list"), chHead)
+	case c.library: // the window's scope bar: list "…" / every mod, a switches
+		add(T("every mod")+"  "+p.Since+"  a "+Tf("list “%s”", p.Plan), chHead)
 	default:
-		add(Tf("list %s", p.Plan)+"  "+p.Since+"  "+T("a: the whole library"), chHead)
+		add(Tf("list “%s”", p.Plan)+"  "+p.Since+"  a "+T("every mod"), chHead)
 	}
 	if p.NoScan {
 		add("  "+T("no scan yet (R scans)"), chDim)
@@ -189,7 +215,7 @@ func (c *chState) group(g *modchanges.Group, where, ind string) {
 
 // selectable rows are the sources, the updates, the mods, the groups and the days.
 func (r chRow) selectable() bool {
-	return r.kind == chMod || r.kind == chGroup || r.kind == chDay || r.kind == chSource || r.kind == chPending
+	return r.kind == chMod || r.kind == chGroup || r.kind == chDay || r.kind == chSource || r.kind == chPending || r.kind == chGone
 }
 
 // home puts the cursor where the page starts: the first update waiting, else the first
@@ -291,6 +317,28 @@ func (m *model) changesKey(s string) tea.Cmd {
 	}
 	if r != nil && r.kind == chSource && s == "enter" {
 		return m.checkSources([]string{r.src.Key})
+	}
+	if r != nil && r.gone != nil {
+		g := r.gone
+		if s == "l" {
+			return m.openLibraryInstance(g.ID)
+		}
+		if s == "p" {
+			return m.arm("p", Tf("p again locks this version of %s (a copy in the lock library)", g.Name), func(m *model) tea.Cmd {
+				m.act(Tf("locked %s", g.Name), "pin", g.Ref)
+				m.reload()
+				m.loadChanges()
+				return nil
+			})
+		}
+	}
+	if s == "l" {
+		if pend != nil {
+			return m.openLibraryInstance(pend.ID)
+		}
+		if mod != nil && mod.Present {
+			return m.openLibraryInstance(mod.ID)
+		}
 	}
 	if pend != nil {
 		switch s {
@@ -450,8 +498,8 @@ func (c *chState) shownPending() []view.PendingUpdate {
 	return out
 }
 
-// changesPairs: the hint line of 订阅与更新 — what the cursor's row can do, then the page's
-// own keys (06 §2.9 按键).
+// changesPairs: the hint line of updates — what the cursor's row can do, then the page's
+// own keys (06 §2.9 keys).
 func (m *model) changesPairs() [][2]string {
 	c := &m.chg
 	var r *chRow
@@ -463,7 +511,10 @@ func (m *model) changesPairs() [][2]string {
 	case r == nil:
 	case r.kind == chSource:
 		pairs = append(pairs, [2]string{"enter", T("check this source")})
+	case r.kind == chGone:
+		pairs = append(pairs, [2]string{"enter", T("open")}, [2]string{"p", T("lock this version")}, [2]string{"l", T("show in the mod library")})
 	case r.kind == chPending:
+		later = append(later, [2]string{"l", T("show in the mod library")})
 		pairs = append(pairs, [2]string{"u", T("update subscription")})
 		if r.pend.Kind != app.LibWorkshop {
 			pairs = append(pairs, [2]string{"Del", T("remove subscription")})
@@ -473,6 +524,9 @@ func (m *model) changesPairs() [][2]string {
 			later = append(later, [2]string{"ctrl+w", T("open the source page")})
 		}
 	case r.kind == chMod:
+		if r.mod.Present {
+			later = append(later, [2]string{"l", T("show in the mod library")})
+		}
 		pairs = append(pairs, [2]string{"enter", T("open")})
 		if r.mod.HasFiles() {
 			pairs = append(pairs, [2]string{"i", T("files")})
@@ -483,6 +537,9 @@ func (m *model) changesPairs() [][2]string {
 	default:
 		pairs = append(pairs, [2]string{"enter", T("open")})
 	}
+	if len(c.shownPending()) > 1 {
+		pairs = append(pairs, [2]string{"U", T("update all")})
+	}
 	pairs = append(append(pairs, [2]string{"K", T("check for updates")}, [2]string{"+", T("add a subscription")}), later...)
 	switch {
 	case c.of != "":
@@ -490,13 +547,7 @@ func (m *model) changesPairs() [][2]string {
 	case c.library:
 		pairs = append(pairs, [2]string{"a", T("the current plan")}, [2]string{"esc", T("back")})
 	default:
-		pairs = append(pairs, [2]string{"a", T("the whole library")}, [2]string{"esc", T("back")})
+		pairs = append(pairs, [2]string{"a", T("every mod")}, [2]string{"esc", T("back")})
 	}
 	return pairs
-}
-
-func init() {
-	view.Register(map[string]string{
-		"not a subscription RimArcho keeps: Steam's are unsubscribed in the mod library": "不是 RimArcho 管的订阅：Steam 的订阅在 Mod 库里退订",
-	})
 }

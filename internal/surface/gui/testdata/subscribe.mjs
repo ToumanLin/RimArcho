@@ -3,11 +3,12 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { Element, loadModules, deferred, event, flush } from "./dom.mjs";
 
-// 添加订阅 (06 §2.9): the paste box recognises the source, asks one decision, shows the dry
+// add a subscription (06 §2.9): the paste box recognises the source, asks one decision, shows the dry
 // run and only then subscribes; a download-page update needs the player's files.
 async function setup(data = null) {
   const calls = [], confirmations = [], messages = [];
   let backs = 0, dones = 0;
+  const opened = [];
   const el = (tag, cls, text) => {
     const e = new Element(tag, cls, text);
     e.value = ""; e.checked = false;
@@ -29,7 +30,7 @@ async function setup(data = null) {
     "./state.js": { el, api, T: (s) => s, Tf: (s, ...a) => { let i = 0; return s.replace(/%[sd]/g, () => a[i++]); }, errText: (e) => e.message, say: (...a) => messages.push(a) },
     "./popups.js": { confirm: (...args) => confirmations.push(args) },
   };
-  const mod = await loadModules("./subscribe.js", deps, { URL, setTimeout, clearTimeout });
+  const mod = await loadModules("./subscribe.js", deps, { URL, setTimeout, clearTimeout, document: { dispatchEvent: e => opened.push(e.detail) }, CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init.detail; } } });
   const form = mod.addForm({ data, back: () => backs++, done: () => dones++ });
   const root = form.el;
   // a button by its own label (key hints are separate children)
@@ -37,7 +38,7 @@ async function setup(data = null) {
   const option = (label, host = root) => host.querySelectorAll(".opt").find((b) => b.querySelector(".nm")?.textContent === label);
   const click = async (label, host = root) => { const b = button(label, host) || option(label, host); assert.ok(b, label); if (!b.disabled) await b.onclick(); await flush(); };
   const paste = async (text) => { form.setText(text); await flush(); await flush(); };
-  return { mod, form, root, api, calls, confirmations, messages, button, option, click, paste, el, backs: () => backs, dones: () => dones };
+  return { mod, form, root, api, opened, calls, confirmations, messages, button, option, click, paste, el, backs: () => backs, dones: () => dones };
 }
 
 // The table is shared with the Go copy (subscribe.Detect), which the TUI and MCP use.
@@ -152,4 +153,13 @@ test("a download-page update previews the chosen files and replaces only after c
   assert.ok(!h.calls.some(([method]) => method === "from"));
   await h.confirmations[0][3]();
   assert.deepEqual(h.calls.at(-1), ["from", "#example", "downloaded-folder"]);
+});
+
+test("recent names open the exact installed instance when names match", async () => {
+  const h = await setup({ recent: [{id:"copy-a",name:"Same name",source:"Git",added:"today"},{id:"copy-b",name:"Same name",source:"Git",added:"yesterday"}] });
+  const links = h.root.querySelectorAll(".subscribe-recent button");
+  assert.equal(links.length,2);
+  assert.ok(links.every(x => x.type === "button"), "native buttons support Tab and Enter");
+  links[1].onclick(); links[0].onclick();
+  assert.deepEqual(h.opened,["copy-b","copy-a"]);
 });

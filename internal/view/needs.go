@@ -18,7 +18,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// 需要处理 (06 §5): what the player can act on, grouped by where the problem is, each item one
+// Can it run (06 §5): what the player can act on, grouped by where the problem is, each item one
 // sentence in plain words with the actions that fix it. No problem codes and no #refs appear
 // here: they stay in the technical information, the CLI and MCP. The top bar's number is
 // the number of counted items (06 §2.2).
@@ -115,7 +115,7 @@ type Action struct {
 	LinkGroups []LinkGroup `json:"linkGroups,omitempty"`
 }
 
-// Need is one item of 需要处理.
+// Need is one item of Can it run.
 type Need struct {
 	ID           string     `json:"id"`
 	Target       string     `json:"target,omitempty"`
@@ -151,7 +151,7 @@ type Need struct {
 	Kind string `json:"kind,omitempty"`
 	// Also: lines about what merged into this item (weak order preferences, cycles: 06 §5).
 	Also []string `json:"also,omitempty"`
-	// Into: the item this one is shown inside on 能不能跑 (its ID); the editor's panel and
+	// Into: the item this one is shown inside on Can it run (its ID); the editor's panel and
 	// the CLI still list it on its own.
 	Into string `json:"into,omitempty"`
 	// Related: items of the other column about the same mod (06 §5: the columns point at
@@ -167,15 +167,16 @@ type Need struct {
 
 // Needs is the screen's content and what it means for the rest of the interface.
 type Needs struct {
-	Environment string         `json:"environment,omitempty"`
-	Plan        int64          `json:"plan,omitempty"`
-	ListVersion string         `json:"listVersion,omitempty"`
-	Sequence    uint64         `json:"sequence"`
-	Revision    string         `json:"revision,omitempty"`
-	Updating    bool           `json:"updating"`
-	Error       string         `json:"error,omitempty"`
-	Items       []Need         `json:"items"`
-	Status      map[string]int `json:"status"` // each mod's row icon
+	Memory      *app.MemoryAssessment `json:"memory,omitempty"`
+	Environment string                `json:"environment,omitempty"`
+	Plan        int64                 `json:"plan,omitempty"`
+	ListVersion string                `json:"listVersion,omitempty"`
+	Sequence    uint64                `json:"sequence"`
+	Revision    string                `json:"revision,omitempty"`
+	Updating    bool                  `json:"updating"`
+	Error       string                `json:"error,omitempty"`
+	Items       []Need                `json:"items"`
+	Status      map[string]int        `json:"status"` // each mod's row icon
 	// Reasons say why a row has its icon: the items behind it, worst first (06 §4.2: the
 	// badge's hover / pinned popover).
 	Reasons map[string][]Reason `json:"reasons,omitempty"`
@@ -185,11 +186,11 @@ type Needs struct {
 	// Launch is the most likely trouble of a launch (app.LaunchChecks among the counted
 	// items), for the launch page's tab and the TUI's launch line (06 §2.3); nil when none.
 	Launch *LaunchHint `json:"launch,omitempty"`
-	// LastRun says which run wrote the last-run log: "the list · 9 月 29 日 19:41" or
+	// LastRun says which run wrote the last-run log: "the list · Sep 29 19:41" or
 	// "pack X · …" (08 §5.3: a pack's errors are not the list's).
 	LastRun    string `json:"lastRun,omitempty"`
-	LastRunDay string `json:"lastRunDay,omitempty"` // its day: "10 月 21 日"
-	// Elsewhere: what is not on 能不能跑 but handled on another page (SectionElsewhere),
+	LastRunDay string `json:"lastRunDay,omitempty"` // its day: "Oct 21"
+	// Elsewhere: what is not on Can it run but handled on another page (SectionElsewhere),
 	// one line each at the bottom of the page (06 §2.4).
 	Elsewhere []Elsewhere `json:"elsewhere,omitempty"`
 }
@@ -200,7 +201,7 @@ type Related struct {
 	Text string `json:"text"`
 }
 
-// Elsewhere is one line at the bottom of 能不能跑: how many items another page handles.
+// Elsewhere is one line at the bottom of Can it run: how many items another page handles.
 // Page is "library" (Query: the search it opens with) or "textures".
 type Elsewhere struct {
 	Page  string `json:"page"`
@@ -210,7 +211,7 @@ type Elsewhere struct {
 }
 
 // Reason is one item behind a row's status icon: its status, its one-line text and the
-// same actions 能不能跑 offers for it (the pinned popover's buttons, 06 §4.2).
+// same actions Can it run offers for it (the pinned popover's buttons, 06 §4.2).
 type Reason struct {
 	Content  *NeedContent `json:"content,omitempty"`
 	Evidence *Evidence    `json:"evidence,omitempty"`
@@ -234,15 +235,20 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 	missing := a.MissingMods(st)
 	n.Items = append(mergeDependencies(st, buildItems(a, st, ps, missing)), directoryNeeds(a)...)
 	n.Items = append(n.Items, linkNeeds(a, ps.GameLinks)...)
+	capacity := a.CachedMemoryAssessment(st)
+	n.Memory = &capacity
+	n.Items = append(n.Items, MemoryNeed(capacity, st.Plan.ID))
 	var names *needNameIndex
 	if len(n.Items) > 0 {
 		names = newNeedNames(a, st, missing)
 	}
 	for i := range n.Items {
-		n.Items[i].Section = SectionOf(n.Items[i].Group)
+		if n.Items[i].code != "memory.capacity" {
+			n.Items[i].Section = SectionOf(n.Items[i].Group)
+		}
 		n.Items[i].Kind = n.Items[i].code
 		if ev := n.Items[i].Evidence; ev != nil && ev.Kind == EvCorpus {
-			// what shared logs taught: a hint, not counted; on 能不能跑 it is 可以留意 (06 §5)
+			// what shared logs taught: a hint, not counted; on Can it run it is worth knowing (06 §5)
 			n.Items[i].Status = StatusHint
 			n.Items[i].Counted = false
 			if n.Items[i].Section == SectionBreak {
@@ -844,7 +850,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 
 // packLinksNeed: a pack's links left in Mods/ (08 §5.3). Launching from RimArcho removes
 // them anyway, so it is something to decide, not something that breaks the game: in
-// 要你确认, with one action that removes only the links (no confirmation: launching the
+// for you to confirm, with one action that removes only the links (no confirmation: launching the
 // pack makes them again).
 func packLinksNeed(p *app.Problem) Need {
 	var packs []string
@@ -932,7 +938,7 @@ func modsDuplicateNeed(st *app.LoadoutState, p *app.Problem, ids []string) Need 
 		n.Actions = []Action{{Kind: ActList, Key: "enter", Label: T("see which"), Title: Tf("Mods/ holds %s twice", pkg), Lines: where}}
 	}
 	if move != nil {
-		// 收进锁定库 first: the plain folder leaves Mods/, plans keep it (08 §3)
+		// move into the lock library first: the plain folder leaves Mods/, plans keep it (08 §3)
 		n.Why = T("move the plain folder into the lock library: it leaves Mods/, and lists that use it keep it and get it through a link")
 		n.Actions = append([]Action{*move}, n.Actions...)
 	}
@@ -1285,11 +1291,11 @@ func Humanize(st *app.LoadoutState, s string) string {
 	})
 }
 
-// ShortDate: "Oct 17" / "10 月 17 日".
+// ShortDate: a locale-appropriate short date, such as "Oct 17".
 func ShortDate(t time.Time) string {
 	t = t.Local()
 	if Lang() == "zh" {
-		return fmt.Sprintf("%d 月 %d 日", int(t.Month()), t.Day())
+		return fmt.Sprintf(localeExtra("zh", "@date.short"), int(t.Month()), t.Day())
 	}
 	return t.Format("Jan 2")
 }

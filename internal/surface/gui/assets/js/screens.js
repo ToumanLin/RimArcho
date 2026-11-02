@@ -1,10 +1,11 @@
-// The pages over the board (the sidebar's entries, 06 §2.1): 能不能跑 (06 §2.4, §5), the
-// game log (§2.10), Mod 库 › 变化 (§2.9), the full detail (§4.2), packs, the environment
+// The pages over the board (the sidebar's entries, 06 §2.1): Can it run (06 §2.4, §5), the
+// game log (§2.10), Mod library › Updates (§2.9), the full detail (§4.2), packs, the environment
 // and settings. The pages are side by side: esc does not go from one to another (06 §3.1);
 // esc leaves only the full detail, back to the plan. A page's actions sit in the top bar.
+import { choiceControl } from "./choices.js";
 import { linkRows } from "./linkrows.js";
-import { copyablePath, pathContent } from "./fields.js";
-import { factText, S, $, el, api, T, Tf, errText, say, cur, slideThumb } from "./state.js";
+import { copyablePath, editablePath, pathContent } from "./fields.js";
+import { factText, S, $, el, api, T, Tf, errText, say, cur, slideThumb, keyCaps } from "./state.js";
 import { icon, bowMark } from "./icons.js";
 import { statusIcon } from "./icons.js";
 import { bump, shimmer } from "./motion.js";
@@ -22,6 +23,8 @@ import { setVersionRunner } from "./versionwarnings.js";
 import { openVersionList } from "./versionpanel.js";
 
 let ui = null;
+// hintsChanged redraws the hint line after a page's own state changed what it lists.
+export const hintsChanged = () => ui && ui.renderHints();
 export function initScreens(u) {
   ui = u;
   initNeedText(u);
@@ -31,6 +34,8 @@ export function initScreens(u) {
     if (ev?.notice) say(ev.kind === "session" ? "warn" : "ok", ev.notice);
     if (S.screen === "settings") refreshSettingTasks(true);
     if (S.screen === "changes" && ev?.kind === "mods") changes();
+    // a new RimArcho puts its line on the launch page (06 §2.3); found rarely, so redraw
+    if (S.screen === "home" && ev?.kind === "self" && ev?.notice) ui.reload();
   });
   on("tasks", (ev) => {
     if (S.screen === "settings") refreshSettingTasks(!!ev?.ended);
@@ -67,7 +72,7 @@ export function openScreen(name) {
   sc.hidden = false;
   sc.removeAttribute("aria-busy");
   sc.replaceChildren();
-  // While the game switches, or when coming back to a page kept warm (06 §2.4: 能不能跑,
+  // While the game switches, or when coming back to a page kept warm (06 §2.4: Can it run,
   // the editor's other half) for the same game and list, the last drawing shows at once
   // and the page reads again behind it.
   const sameContext = WARM.has(name) && pageContexts.get(name) === JSON.stringify([S.board?.env, S.shell?.plan?.id]);
@@ -218,7 +223,7 @@ export function page(cls, lead, ...right) {
 }
 
 // ---- numbered areas (06 §3.5): on every page 1–9 focus its areas, as 1–4 do in the editor;
-// each area's heading shows its number ("1 会让游戏出错") ----
+// each area's heading shows its number ("1 breaks the game") ----
 let areas = [];
 let onArea = 0; // the area last picked on this page: a redraw keeps its mark
 export function resetAreas() { areas = []; }
@@ -262,7 +267,7 @@ export function archoMark() {
 export function button(label, keyName, run, cls = "", envWrite = "") {
   const b = el("button", "btn " + cls, label);
   if (envWrite) b.dataset.envWrite = envWrite;
-  if (keyName) b.append(el("kbd", "", keyName));
+  if (keyName) b.append(keyCaps(keyName));
   b.onclick = (e) => { e.stopPropagation(); run(); };
   return b;
 }
@@ -310,13 +315,13 @@ function moveIn(curIdx, n, k) {
   return null;
 }
 
-// ---- 能不能跑 (06 §2.4, §5): two columns ----
-// Left (开始之前): 会让游戏出错, 可以留意, 要你确认, what checking the mods' files and the
-// shared logs found. Right (上次玩的时候): the run's errors, this run first while the game
+// ---- Can it run (06 §2.4, §5): two columns ----
+// Left (before you start): breaks the game, worth knowing, for you to confirm, what checking the mods' files and the
+// shared logs found. Right (when you last played): the run's errors, this run first while the game
 // runs. Each item is a card: a bold line, a plain sentence, what belongs to it (link rows,
 // its parts, Also, links to the other column), then all its actions as buttons with the
 // evidence on the right of that row; no ⋯ menu. An action that needs a confirmation asks in
-// the item; the items an action resolved stay in place as one line with 撤销.
+// the item; the items an action resolved stay in place as one line with undo.
 const SECTIONS = ["breaks the game", "worth knowing", "for you to confirm", "errors from the last run"];
 const SECTION_CLS = ["break", "worth", "confirm", "run"];
 const COL_SECS = [[0, 1, 2], [3]]; // view.Section*: the left column's, then the right's
@@ -330,7 +335,7 @@ const N = { data: null, cols: [[], []], cur: [0, 0], at: ["", ""], col: 0, open:
   hintsShut: false, done: [], batch: 0, before: null, ready: false, result: null, ask: null, others: false, env: "" };
 
 // archo is the hook for the Archo panel (06 §2.13, 1.1): when set, an item can be handed
-// to it ("Archo 在看"). Nothing sets it yet.
+// to it ("Archo is watching"). Nothing sets it yet.
 export const archo = { ask: null };
 
 export function liveChanged() {
@@ -381,6 +386,27 @@ export async function needs(keepCursor) {
   orderNeeds();
   drawNeeds();
   read.finish();
+  if (!data.memory?.estimated || data.memory?.stale) refreshMemoryEstimate(read);
+}
+
+let memoryRead = 0;
+async function refreshMemoryEstimate(read) {
+  const token = ++memoryRead;
+  const env = N.data.environment, plan = N.data.plan, list = N.data.listVersion;
+  const current = () => token === memoryRead && S.screen === "needs" && N.data.environment === env && N.data.plan === plan && N.data.listVersion === list && (!read || read.current());
+  try {
+    const first = await api.PlanLoadCost(plan || 0);
+    if (!first || !current()) return;
+    let result = first;
+    while (result?.loading && current()) {
+      await new Promise(resolve => setTimeout(resolve, 250));
+      if (!current()) return;
+      result = await api.PlanLoadCostMeasure(first.request);
+    }
+    if (!result || !current()) return;
+    if (result.error) { say("fail", result.error); return; }
+    needs(true);
+  } catch (e) { if (current()) say("fail", errText(e)); }
 }
 
 // snapshot: the rows as they are before an action that changes something.
@@ -391,7 +417,7 @@ function snapshot() {
     kind: x.kind || "", dim: !!x.dim, col: ci, after: i ? c[i - 1].id : "", title: x.done ? x.title : (x.title || x.text) })));
 }
 
-// statusNow: what the status line says, and whether it offers 撤销.
+// statusNow: what the status line says, and whether it offers undo.
 function statusNow() {
   const st = $("#status");
   return { text: st ? [...st.childNodes].filter((n) => n.nodeName !== "A").map((n) => n.textContent).join("").trim() : "",
@@ -425,7 +451,7 @@ function settleDone(data) {
   }
 }
 
-// undoBatch: the done lines that 撤销 brings back (the last action that u can undo).
+// undoBatch: the done lines that undo brings back (the last action that u can undo).
 function undoBatch() {
   for (let i = N.done.length - 1; i >= 0; i--) if (N.done[i].undo) return N.done[i].batch;
   return 0;
@@ -523,7 +549,7 @@ function needSection(si, rows, ci, shut, live) {
   const h = el("h2", "label", T(title));
   const n = rows.filter((x) => !x.done && x.counted).length;
   if (si === 1) {
-    // 可以留意 folds and opens by its heading (06 §2.4)
+    // worth knowing folds and opens by its heading (06 §2.4)
     const all = (N.data.items || []).filter((x) => x.section === 1 && !x.into).length;
     h.prepend(el("span", "fold-chev" + (shut ? "" : " open"), "›"));
     h.append(el("span", "n num muted", String(all)));
@@ -589,7 +615,7 @@ function autoFix() {
 function needCard(it, ci, i) {
   if (it.done) return doneLine(it, ci, i);
   const quiet = it.dim && it.section !== 1;
-  const row = el("div", "need" + (quiet ? " dimmed" : ""));
+  const row = el("div", "need" + (quiet ? " dimmed" : "") + (it.kind === "memory.capacity" ? " memory-capacity" : ""));
   row.dataset.id = it.id || "";
   const top = el("div", "top");
   const body = el("div", "body");
@@ -635,7 +661,7 @@ function needCard(it, ci, i) {
   for (const a of acts) {
     if (a.kind === "fold") continue;
     if (a.kind === "view" && a.argv?.[0] === "identity" && a.argv?.[1] === "why") {
-      // 为什么这样问: a quiet link under the sentence, apart from the three answers
+      // why this question?: a quiet link under the sentence, apart from the three answers
       const b = button(a.label, "", pick(a), "identity-why", actionWrite(a));
       if (a.title) b.title = a.title;
       body.append(b);
@@ -696,7 +722,7 @@ function jumpTo(id) {
 }
 
 // doneLine: an item the last actions resolved (06 §5): ✓, what the status line said, its
-// title; the latest that u can undo has 撤销.
+// title; the latest that u can undo has undo.
 function doneLine(d, ci, i) {
   const row = el("div", "need done");
   row.dataset.id = d.id;
@@ -768,7 +794,7 @@ setVersionRunner((it, a) => runAction(it, a));
 export const runNeedAction = (it, a) => runAction(it, a);
 export const needActionWrite = actionWrite;
 
-// runAction runs an item's action. here: from 能不能跑 itself, where a confirmation is
+// runAction runs an item's action. here: from Can it run itself, where a confirmation is
 // asked in the item, a choice is its buttons, and what the action resolves stays as done
 // lines (06 §5); the editor's panel and popover ask in a dialog.
 async function runAction(it, act, here = false) {
@@ -794,6 +820,7 @@ async function runAction(it, act, here = false) {
       L.tabPick = 0;
       return gameLog(act.logPath || "", true);
     case "view":
+      if (act.argv?.[0] === "plan" && act.argv?.[1] === "cost") return refreshMemoryEstimate();
       if (act.argv?.[0] === "identity" && act.argv?.[1] === "why") {
         return pop.identity(act.question, (answer) => runAction(it, answer, here));
       }
@@ -898,7 +925,7 @@ export function analyzeEvent(ev) {
   if (S.screen === "needs" && ev.done) needs(true);
 }
 
-// ---- 游戏日志 (06 §2.10) and Mod 库 › 变化 (§2.9) ----
+// ---- game log (06 §2.10) and Mod library › Updates (§2.9) ----
 // tab: 0 the Player.log clusters, 1 the companion log's entries (mcur, open: their cursor
 // and the entries whose details are open).
 const L = { env: null, path: "", page: null, loading: false, pending: "", error: "", cur: 0, target: "", targetLine: "", detail: new Map(), seq: 0, els: [], tab: 0, tabPick: null, mcur: 0, open: new Set(), want: "", list: null, views: [], view: null, viewPath: "" };
@@ -1072,7 +1099,7 @@ function drawGameLog() {
   const dscroll = el("div", "scroll", "");
   dscroll.tabIndex = -1;
   det.append(dscroll);
-  // Archo 日志分析: what the shared logs say about the picked error, its own card under the
+  // Archo log analysis: what the shared logs say about the picked error, its own card under the
   // log text (06 §2.10); hidden while nothing matches
   const ana = el("section", "card col ana-card");
   ana.hidden = true;
@@ -1317,7 +1344,7 @@ function showLines(box, lines, card) {
 }
 
 // logSplits: the gap between the list and the right side drags the list's width; the gap
-// under Archo 日志分析 drags its height. Kept in ui.gui.log.left / ui.gui.log.ana;
+// under Archo log analysis drags its height. Kept in ui.gui.log.left / ui.gui.log.ana;
 // double-click goes back to the default.
 const LOG_LEFT = "ui.gui.log.left", LOG_ANA = "ui.gui.log.ana";
 const logSize = { left: null, ana: null };
@@ -1342,7 +1369,7 @@ function logSplits(grid, list, vs, ana, hs) {
   wire(hs, "ana", "y", () => ana.getBoundingClientRect().height, () => [80, grid.clientHeight - 140]);
 }
 
-// setAna fills the Archo 日志分析 card with a pattern card, or hides it (null).
+// setAna fills the Archo log analysis card with a pattern card, or hides it (null).
 function setAna(card) {
   const ana = $("#screen .ana-card");
   if (!ana) return;
@@ -1381,7 +1408,7 @@ function patternCard(c) {
   return d;
 }
 
-// ---- Mod 库存 › 订阅与更新 and 添加订阅 (06 §2.9): subscriptions.js ----
+// ---- Mod library › updates and add a subscription (06 §2.9): subscriptions.js ----
 export { changes, changesHints, changesFiltered, changesPlan, openAdd, addHints } from "./subscriptions.js";
 
 export function rescanButton(label) {
@@ -1429,7 +1456,7 @@ export function logsKey(e) {
   return changesKey(e);
 }
 
-// ---- the full detail (06 §4.2): one page for the editor and Mod 库存 (fulldetail.js) ----
+// ---- the full detail (06 §4.2): one page for the editor and Mod library (fulldetail.js) ----
 export { full, fullKey, fullSection } from "./fulldetail.js";
 
 // ---- settings (06 §2.14) ----
@@ -1448,10 +1475,12 @@ export async function settings() {
   sc.innerHTML = "";
   const w = page("settings", "");
   sc.append(w);
-  const appearance = groups.filter(g => g.items?.some(it => it.edit === "swatches"));
-  renderGroups(w, appearance, settings);
-  w.querySelector(".settings")?.append(bg);
-  renderGroups(w, groups.filter(g => !appearance.includes(g)), settings);
+  // Groups in view.SettingsPage's order (the TUI's too); Start page background closes the card that
+  // holds the accent colour.
+  for (const g of groups) {
+    renderGroups(w, [g], settings);
+    if (g.items?.some(it => it.edit === "swatches")) w.lastElementChild.append(bg);
+  }
   markSettingTasks(tasks);
   sc.scrollTop = top;
   read.finish();
@@ -1475,7 +1504,16 @@ async function refreshSettingTasks(values = false) {
       if (!row) continue;
       const note = row.querySelector(".setting-note"), value = row.querySelector(".setting-value");
       if (note) { factText(note, { text: it.note || "", paths: it.notePaths }); note.hidden = !it.note; }
-      if (value) factText(value, { text: it.value || "", paths: it.valuePath ? [it.value] : [] });
+      if (value) factText(value, { text: it.value || "", paths: it.valuePath || it.edit === "url" ? [it.value] : [] });
+      settingPathPicker(row, it, settings);
+      const valueNote = row.querySelector(".setting-value-note");
+      if (valueNote) { valueNote.textContent = it.valueNote || ""; valueNote.hidden = !it.valueNote; }
+      const folded = row.nextElementSibling?.classList.contains("setting-details") ? row.nextElementSibling : null;
+      if (JSON.stringify(it.details || null) !== (folded?.dataset.details || "null")) {
+        const open = !!folded?.open;
+        folded?.remove();
+        if (it.details) { const d = settingDetails(it.details); d.open = open; row.after(d); }
+      }
       const actions = JSON.stringify(it.actions || []);
       if (row.dataset.settingActions !== actions) {
         row.querySelectorAll("[data-setting-action]").forEach(b => b.remove());
@@ -1506,59 +1544,51 @@ export async function checkDirectories() {
   for (const d of missing) {
     const row = el("div", "set");
     const left = el("div", "l");
-    left.append(el("div", "name", d.label), copyablePath(el("div", "sub", d.path), d.path));
-    row.append(left, button(T("locate"), "", () => directoryPrompt(d, false, async () => { await ui.reload(); checkDirectories(); })));
+    const choose = () => directoryPrompt(d, false, async () => { await ui.reload(); checkDirectories(); });
+    left.append(el("div", "name", d.label), editablePath(copyablePath(el("div", "sub", d.path), d.path), choose));
+    row.append(left, button(T("locate"), "", choose));
     body.append(row);
   }
   pop.panel(T("some directories need their new location"), body, T("skip for now"), () => {});
 }
 
 function directoryPrompt(d, moving, after) {
-  pop.open("directory", d.label, (box, p) => {
-    box.append(el("div", "ttl", d.label), copyablePath(el("p", "sub", d.path), d.path));
-    const input = el("input", "field");
-    input.spellcheck = false;
-    input.placeholder = T("new directory path");
-    const error = el("div", "err");
-    const actions = el("div", "actions");
-    let busy = false;
-    let previewedPath = "";
-    const affected = el("pre", "sub");
-    const apply = async () => {
-      const path = input.value.trim();
-      if (!path || busy) return;
-      busy = true;
-      error.textContent = "";
+  const popup = S.popup;
+  return chooseLocalPath(d.path, async selected => {
+    if (!moving) {
       try {
-        if (moving && previewedPath !== path) {
-          const links = await api.DirectoryMovePreview(d.id, path);
-          affected.textContent = [d.path + " → " + path, ...(links || [])].join("\n");
-          previewedPath = path;
-          applyButton.textContent = T("confirm move");
-          busy = false;
-          return;
-        }
-        const lines = await api.ApplySetting(["folder", moving ? "move" : "set", d.id, "{}"], path);
-        pop.close();
+        const lines = await api.ApplySetting(["folder", "set", d.id, "{}"], selected);
+        if (S.popup === popup) pop.close();
         say("ok", lines?.[0] || T("done"));
         if (after) await after();
-      } catch (e) { error.textContent = errText(e); busy = false; }
-    };
-    if (moving) box.append(el("p", "sub", T("move this directory and its files to the new path?")));
-    const applyButton = button(T(moving ? "preview move" : "locate"), "", apply, "primary", "apply-setting");
-    input.addEventListener("input", () => {
-      previewedPath = "";
-      affected.textContent = "";
-      applyButton.textContent = T(moving ? "preview move" : "locate");
-    });
-    actions.append(button(T(moving ? "choose parent folder…" : "choose…"), "", () => pickFolder(d.path, path => {
-      input.value = moving ? path.replace(/[\\/]$/, "") + "/" + d.path.split(/[\\/]/).pop() : path;
-    })),
-      applyButton, button(T("skip for now"), "", () => pop.close()));
-    box.append(input, affected, error, actions);
-    p.keys = e => { if (e.key === "Enter") { e.preventDefault(); apply(); return true; } return false; };
-    setTimeout(() => input.focus(), 0);
+      } catch (e) { say("fail", errText(e)); }
+      return;
+    }
+    // Moving chooses the parent folder, then keeps the original preview/confirmation.
+    const path = selected.replace(/[\\/]$/, "") + "/" + d.path.replace(/[\\/]$/, "").split(/[\\/]/).pop();
+    const screen = S.screen, epoch = S.screenSeq;
+    try {
+      const links = await api.DirectoryMovePreview(d.id, path);
+      if (S.screen !== screen || S.screenSeq !== epoch) return;
+      pop.confirm(d.label, [T("move this directory and its files to the new path?"), d.path + " → " + path, ...(links || [])], T("confirm move"), async () => {
+        try {
+          const lines = await api.ApplySetting(["folder", "move", d.id, "{}"], path);
+          say("ok", lines?.[0] || T("done"));
+          if (after) await after();
+        } catch (e) { say("fail", errText(e)); }
+      });
+    } catch (e) { say("fail", errText(e)); }
   });
+}
+
+// Reattach picker actions when background task results replace address text.
+function settingPathPicker(row, it, again) {
+  if (it.edit !== "directory" && it.edit !== "path") return;
+  const choose = it.edit === "directory"
+    ? () => directoryPrompt({ id: it.directory, label: it.label, path: it.value }, false, async () => { await ui.reload(); again(); })
+    : () => chooseLocalPath(it.editValue ?? it.value ?? "", value => settingRunner(again)(it.argv, value), { file: !!it.file });
+  editablePath(row.querySelector(".setting-value"), choose, !!it.file);
+  if (it.file) editablePath(row.querySelector(".setting-note"), choose, true);
 }
 
 // settingRunner runs a setting's command, then redraws the page with again.
@@ -1601,12 +1631,10 @@ function renderGroups(w, groups, again) {
         row.classList.add("appearance-row");
         right.append(appearanceControl(it, () => ui.reaccent()));
       } else if (it.edit === "choice") {
-        const s = el("select");
-        for (const [i, c] of it.choices.entries()) {
-          const o = el("option", "", (it.choiceLabels && it.choiceLabels[i]) || c);
-          o.value = c;
-          if (c === it.value) o.selected = true;
-          s.append(o);
+        const s = choiceControl(it.label, it.choices.map((c, i) => ({ value: c, label: it.choiceLabels?.[i] || c })), it.value);
+        if (it.note) {
+          note.id = s.id + "-note";
+          s.setAttribute("aria-describedby", note.id);
         }
         // A new language: the page's text again, in place (main.js relang).
         s.onchange = () => run(it.argv, s.value,
@@ -1618,6 +1646,16 @@ function renderGroups(w, groups, again) {
         const after = async () => { await ui.reload(); again(); };
         right.append(value, button(T("locate"), "", () => directoryPrompt(d, false, after), "", "apply-setting"),
           button(T("move to…"), "", () => directoryPrompt(d, true, after), "", "apply-setting"));
+      } else if (it.edit === "path") {
+        right.append(factText(el("span", "muted setting-value"), { text: it.value || "", paths: it.valuePath ? [it.value] : [] }));
+        const adding = it.argv[0] === "folder" && it.argv[1] === "add";
+        right.append(button(T(adding ? "add…" : "change…"), "", () => chooseLocalPath(it.editValue ?? it.value ?? "",
+          value => run(it.argv, value), { file: !!it.file }), "", "apply-setting"));
+      } else if (it.edit === "url") {
+        right.append(factText(el("span", "muted setting-value"), { text: it.value, paths: [it.value] }),
+          button(T("change…"), "", () => urlPrompt(it.label, it.value, value => run(it.argv, value)), "", "apply-setting"));
+      } else if (it.links?.length) {
+        for (const link of it.links) right.append(button(link.label, "", () => api.OpenURL(link.url).catch(e => say("fail", errText(e))), "community-link"));
       } else if (it.edit) {
         const inp = el("input", "field");
         inp.value = it.editValue ?? it.value ?? "";
@@ -1626,28 +1664,49 @@ function renderGroups(w, groups, again) {
         inp.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); ok.click(); } };
         if (it.editValue !== undefined) right.append(factText(el("span", "muted setting-value"), { text: it.value || "", paths: it.valuePath ? [it.value] : [] }));
         right.append(inp);
-        // Apply the file or folder chosen through the window's dialog.
-        if (it.edit === "path") right.append(button(T("choose…"), "", async () => {
-          if (!it.file) return pickFolder(inp.value, (p) => run(it.argv, p));
-          try { const p = await api.PickProgram(); if (p) run(it.argv, p); } catch (e) { say("fail", errText(e)); }
-        }, "", "apply-setting"));
         right.append(ok);
+      } else if (it.url) {
+        // Community: a web page, opened in the browser (06 §2.14)
+        const value = document.createElement("span"); value.textContent = it.value || it.url;
+        const b = button("↗", "", () => api.OpenURL(it.url).catch(e => say("fail", errText(e))), "link");
+        b.title = T("open the web page"); b.setAttribute("aria-label", T("open the web page"));
+        right.append(copyablePath(value, it.url), b);
       } else {
         right.append(factText(el("span", "muted setting-value"), { text: it.value || "", paths: it.valuePath ? [it.value] : [] }));
       }
-      if (it.valueNote) right.append(el("span", "muted word-facts", it.valueNote));
+      const valueNote = el("span", "muted word-facts setting-value-note", it.valueNote || "");
+      valueNote.hidden = !it.valueNote;
+      right.append(valueNote);
       renderSettingActions(right, it.actions, run, it);
       row.append(left, right);
+      settingPathPicker(row, it, again);
       card.append(row);
+      if (it.details) card.append(settingDetails(it.details));
     }
     w.append(card);
   }
 }
 
+// settingDetails folds text under its row (06 §3.1 rule 7): RimArcho's release notes.
+function settingDetails(d) {
+  const box = el("details", "setting-details");
+  box.dataset.details = JSON.stringify(d);
+  box.append(el("summary", "", d.summary));
+  if (d.text) box.append(el("pre", "sub", d.text.replace(/\r\n/g, "\n")));
+  if (d.link) {
+    const row = el("div", "setting-release-link");
+    const a = copyablePath(el("span", "sub", d.link), d.link);
+    const open = button("↗", "", () => api.OpenURL(d.link).catch(e => say("fail", errText(e))), "link");
+    open.title = T("open the web page"); open.setAttribute("aria-label", open.title);
+    row.append(a, open); box.append(row);
+  }
+  return box;
+}
+
 function renderSettingActions(right, actions, run, item) {
   for (const a of actions || []) {
-    // 卸载 RimArcho is its own page with the plan; every other action is a command
-    if (a.argv[0] === "uninstall") {
+    // uninstall RimArcho and Feedback are their own pages; every other action is a command
+    if (a.argv[0] === "uninstall" || a.argv[0] === "feedback") {
       const b = button(a.label, "", () => ui.go(a.argv[0]));
       b.dataset.settingAction = a.argv.join(" ");
       right.append(b); continue;
@@ -1673,7 +1732,7 @@ function renderSettingActions(right, actions, run, item) {
         form.onsubmit = e => {
           e.preventDefault(); e.stopPropagation();
           const name = input.value.trim();
-          if (!name || /^(anonymous|匿名)$/i.test(name)) { say("fail", T("enter a Steam account name first")); input.focus(); return; }
+          if (!name || /^(anonymous|\u533f\u540d)$/i.test(name)) { say("fail", T("enter a Steam account name first")); input.focus(); return; }
           close(); submit(name);
         };
         form.onkeydown = e => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(); } else if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); form.requestSubmit(); } };
@@ -1685,6 +1744,16 @@ function renderSettingActions(right, actions, run, item) {
           const offer = await api.ToolInstallOffer(a.argv[2]);
           pop.confirm(a.label, [a.confirm, Tf("source: %s", offer.url), Tf("target folder: %s", offer.dir),
             offer.bytes > 0 ? Tf("size: %s bytes", offer.bytes) : T("size unknown")], a.label, () => submit());
+        } catch (e) { say("fail", errText(e)); }
+        finally { b.disabled = false; }
+        return;
+      }
+      if (a.argv[0] === "source" && a.argv[1] === "clean") {
+        b.disabled = true;
+        try {
+          const p = await api.SourceLibraryUnused();
+          if (!p.folders) say("ok", T("the source library has no unused folders"));
+          else pop.confirm(a.label, [Tf("%d unused folders, %s", p.folders, p.size)], a.label, () => submit());
         } catch (e) { say("fail", errText(e)); }
         finally { b.disabled = false; }
         return;
@@ -1701,13 +1770,56 @@ function renderSettingActions(right, actions, run, item) {
   }
 }
 
-// pickFolder opens the window's folder dialog at start and calls then with the folder
-// chosen (nothing when cancelled). Without a window (the development harness) it says so:
-// every path can be typed.
+// Native selection is the only GUI local-path editor. Ignore cancelled or late results.
+let choosingPath = false;
+export async function chooseLocalPath(value, done, { file = false } = {}) {
+  if (choosingPath) return;
+  choosingPath = true;
+  const screen = S.screen, epoch = S.screenSeq;
+  let path;
+  try { path = file ? await api.PickProgram() : await api.PickFolder(value || ""); }
+  catch (e) { if (S.screen === screen && S.screenSeq === epoch) say("fail", errText(e)); }
+  finally { choosingPath = false; }
+  if (path && S.screen === screen && S.screenSeq === epoch) return done(path);
+}
+
+export function urlPrompt(title, value, done) {
+  const focused = document.activeElement;
+  pop.open("url", title, (box, p) => {
+    box.classList.add("url-editor");
+    box.setAttribute("role", "dialog"); box.setAttribute("aria-modal", "true"); box.setAttribute("aria-label", title);
+    box.append(el("div", "ttl", title));
+    const input = el("input", "field");
+    input.value = value; input.type = "url"; input.spellcheck = false;
+    input.setAttribute("aria-label", title);
+    const error = el("div", "err"); error.setAttribute("role", "alert");
+    const apply = () => {
+      const next = input.value.trim();
+      try {
+        const url = new URL(next);
+        if (!/^https?:\/\//i.test(next) || !["http:", "https:"].includes(url.protocol) || !url.hostname || /\s/.test(next)) throw new Error();
+      } catch {
+        error.textContent = T("enter a complete HTTP or HTTPS URL");
+        input.setAttribute("aria-invalid", "true"); input.focus(); return;
+      }
+      pop.close(); done(next);
+    };
+    input.oninput = () => { error.textContent = ""; input.removeAttribute("aria-invalid"); };
+    const body = el("div", "body"); body.append(input, error);
+    const actions = el("div", "btns");
+    actions.append(button(T("cancel"), "", () => pop.close()), button(T("OK"), "", apply, "primary", "apply-setting"));
+    box.append(body, actions);
+    p.keys = e => {
+      if (e.key === "Enter" && e.target === input) { e.preventDefault(); apply(); }
+      return true;
+    };
+    p.onclose = () => focused?.isConnected && focused.focus({ preventScroll: true });
+    requestAnimationFrame(() => { if (S.popup === p) input.focus(); });
+  });
+}
+
 export async function pickFolder(start, then) {
-  let p;
-  try { p = await api.PickFolder(start || ""); } catch (e) { say("fail", errText(e)); return; }
-  if (p) then(p);
+  return chooseLocalPath(start, then);
 }
 
 // ---- the environment (the pill on the left of the top bar) ----

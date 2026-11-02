@@ -12,55 +12,61 @@ import (
 // Command is one palette command; each interface maps the ID to what it does.
 type Command struct {
 	ID   string `json:"id"`
-	Zh   string `json:"-"`
+	Key  string `json:"-"`
 	En   string `json:"alias"`
 	Desc string `json:"desc"` // the TUI key and a few words, matched last
 }
 
 // Name is the command's name in the interface language.
 func (c Command) Name() string {
-	if Lang() == "zh" {
-		return c.Zh
+	if lang := Lang(); lang != "en" {
+		if name := localeExtra(lang, c.Key); name != c.Key {
+			return name
+		}
 	}
 	return c.En
 }
 
 // Commands of the main screen.
 var Commands = []Command{
-	{"sort", "自动排序", "sort", "S"},
-	{"save", "保存", "save", "w save ModsConfig.xml"},
-	{"launch", "启动游戏", "launch", "L RimWorld"},
-	{"preview-sort", "预览排序", "preview the sort", "S dry run"},
-	{"preview-save", "预览保存", "preview saving", "w dry run ModsConfig.xml"},
-	{"preview-launch", "预览启动", "preview the launch", "L dry run"},
-	{"undo", "撤销", "undo", "u"},
-	{"redo", "重做", "redo", "ctrl+r"},
-	{"needs", "需要处理", "needs attention", "! problems"},
-	{"changes", "订阅与更新", "subscriptions and updates", "c subscriptions updates history"},
-	{"library", "Mod 库", "mod library", "all mods, copies, sizes, filter, clean up"},
-	{"subscribe", "添加订阅", "add a subscription", "+ Git repository download page LoversLab Workshop SteamCMD"},
-	{"rescan", "重新扫描", "rescan", "R scan"},
-	{"analyze", "重新检查文件", "check the files again", "A analyze"},
-	{"log", "选择日志", "choose a log", "Player.log"},
-	{"env", "切换游戏", "switch game", "E env environment"},
-	{"plans", "列表", "lists", "P switch, new, rename, delete a list"},
-	{"new-plan", "新列表", "new list", "+ list copy import"},
-	{"restore-all", "全部从暂存放回", "put all back", "T staging"},
-	{"stage-all", "把已启用的全部放进暂存", "stage everything enabled", "T in the window"},
-	{"import", "导入列表", "import a list", "i RimSort RimCrow .rml share code collection"},
-	{"export", "导出列表", "export the list", "e RimArcho RimSort RimCrow .rml share code"},
-	{"filter", "筛选这一列", "filter", "/ search"},
-	{"details", "详情", "details", "enter"},
-	{"tech", "技术信息", "technical information", "i"},
-	{"tags", "编辑标签", "tags", "#"},
-	{"packs", "整合包", "packs", "build, play"},
-	{"settings", "设置", "settings", "paths, language, data, caches"},
-	{"cli", "运行 archo 命令", "command line", ": archo"},
-	{"uninstall", "卸载 RimArcho", "uninstall RimArcho", "remove what RimArcho put on this machine"},
-	{"textures", "贴图优化", "texture optimisation", "convert mods' PNG textures to DDS"},
-	{"tasks", "后台任务", "background tasks", "ctrl+j running waiting failed queue"},
-	{"help", "帮助", "help", "?"},
-	{"quit", "退出", "quit", "q"},
+	{"sort", "@palette.sort", "sort", "S"},
+	{"save", "@palette.save", "save", "w save ModsConfig.xml"},
+	{"launch", "@palette.launch", "launch", "L RimWorld"},
+	{"preview-sort", "@palette.preview-sort", "preview the sort", "S dry run"},
+	{"preview-save", "@palette.preview-save", "preview saving", "w dry run ModsConfig.xml"},
+	{"preview-launch", "@palette.preview-launch", "preview the launch", "L dry run"},
+	{"undo", "@palette.undo", "undo", "u"},
+	{"redo", "@palette.redo", "redo", "ctrl+r"},
+	{"needs", "@palette.needs", "can it run", "@ shift+2 problems needs attention"},
+	{"changes", "@palette.changes", "updates", "c subscriptions updates history"},
+	{"library", "@palette.library", "mod library", "all mods, copies, sizes, filter, clean up"},
+	{"subscribe", "@palette.subscribe", "add a subscription", "+ Git repository download page LoversLab Workshop SteamCMD"},
+	{"rescan", "@palette.rescan", "rescan", "R scan"},
+	{"analyze", "@palette.analyze", "check the files again", "A analyze"},
+	{"log", "@palette.log", "game log", "l Player.log choose a log"},
+	{"env", "@palette.env", "switch game", "E env environment"},
+	{"plans", "@palette.plans", "lists", "P switch, new, rename, delete a list"},
+	{"new-plan", "@palette.new-plan", "new list", "+ list copy import"},
+	{"restore-all", "@palette.restore-all", "put all back", "T staging"},
+	{"stage-all", "@palette.stage-all", "stage everything enabled", "T in the window"},
+	{"import", "@palette.import", "import a list", "i RimSort RimCrow .rml share code collection"},
+	{"export", "@palette.export", "export the list", "e RimArcho RimSort RimCrow .rml share code"},
+	{"filter", "@palette.filter", "filter", "/ search"},
+	{"details", "@palette.details", "details", "enter"},
+	{"tech", "@palette.tech", "technical information", "i"},
+	{"tags", "@palette.tags", "tags", "g"},
+	{"packs", "@palette.packs", "packs", "build, play"},
+	{"settings", "@palette.settings", "settings", "paths, language, data, caches"},
+	{"cli", "@palette.cli", "command line", ": archo"},
+	{"update", "@palette.update", "update RimArcho", "new version release notes install upgrade"},
+	{"feedback", "@palette.feedback", "feedback", "GitHub issue report a bug suggestion"},
+	{"uninstall", "@palette.uninstall", "uninstall RimArcho", "remove what RimArcho put on this machine"},
+	{"textures", "@palette.textures", "texture optimisation", "convert mods' PNG textures to DDS"},
+	{"search-files", "@palette.search-files", "search files", "grep rg Def patch C# source decompile"},
+	{"rules", "@palette.rules", "load-order rules", "r rule after before incompatible top bottom"},
+	{"tasks", "@palette.tasks", "background tasks", "ctrl+j running waiting failed queue"},
+	{"help", "@palette.help", "help", "?"},
+	{"quit", "@palette.quit", "quit", "q"},
 }
 
 // Palette entry kinds, in tie order. A plan entry switches to that plan (its ID is
@@ -82,8 +88,9 @@ type PalEntry struct {
 	Score int    `json:"-"`
 }
 
-// PalScore ranks one candidate for q (lower case): 4 prefix, 3 substring, 2 subsequence,
-// 1 description, 0 no match.
+// PalScore ranks one candidate for q (lower case): 4 prefix or suffix, 3 substring, 2
+// subsequence, 1 description, 0 no match. A suffix counts as a prefix: a Chinese name ends
+// in its head noun, the sort query matches both automatic sorting and load-order rules.
 func PalScore(q string, e PalEntry) int {
 	if q == "" {
 		return 1
@@ -95,7 +102,7 @@ func PalScore(q string, e PalEntry) int {
 			continue
 		}
 		switch {
-		case strings.HasPrefix(f, q):
+		case strings.HasPrefix(f, q), strings.HasSuffix(f, q):
 			best = max(best, 4)
 		case strings.Contains(f, q):
 			best = max(best, 3)

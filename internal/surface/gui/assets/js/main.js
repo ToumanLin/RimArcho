@@ -11,7 +11,7 @@ import "./window-theme.js";
 import "./refnums.js";
 import "./fulltitle.js";
 import { applyAccent } from "./accent.js";
-import { factText, S, $, $$, el, esc, T, Tf, errText, say, clearSay, undoStatus, col, cur, selection, key, idsOf, refsOf, named, AREAS } from "./state.js";
+import { factText, S, $, $$, el, esc, T, Tf, errText, say, clearSay, undoStatus, col, cur, selection, key, idsOf, refsOf, named, AREAS, keyCaps } from "./state.js";
 import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, pageDelta, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn } from "./lists.js";
 import { createBar } from "./filterbar.js";
 import { followDetail, showDetail, scrollDetail } from "./detail.js";
@@ -39,6 +39,8 @@ import { wireSeparator } from "./separator.js";
 import { go, openPage, initNavigation, pageEntering, pageEntered, wireHistory } from "./navigation.js";
 import { checkCredit, getChoices } from "./credit.js";
 import * as problems from "./problems.js";
+import * as fileSearch from "./filesearch.js";
+import { initRules, refreshRules, startRule, showRules } from "./rules.js";
 
 // ---- loading ----
 
@@ -89,6 +91,7 @@ async function reload(snapshot = null, read = null) {
   await Promise.all([0, 1, 2].map((k) => refilter(k, keep[k])));
   if (!current()) return;
   if (!read) { render(); detailFollow(); }
+  refreshRules();
   await scr.logEnvironmentChanged();
   return true;
 }
@@ -111,7 +114,7 @@ async function relang() {
   archoTheme.apply(s.theme);
   applyAccent(s.accent);
   S.start = s;
-  setText(s.text);
+  setText(s.text, s.extraText);
   document.documentElement.lang = s.lang;
   const screen = S.screen;
   const top = $("#screen").scrollTop;
@@ -150,7 +153,7 @@ function renderTop() {
   $("#planhead .lead").textContent = Tf("%d enabled, in the order the game loads them", col(1).items.length);
 }
 
-// goLaunch is the editor's 启动游戏 (and its L): the game starts from 启动, so it opens that
+// goLaunch is the editor's launch game (and its L): the game starts from Start, so it opens that
 // page with this list applied — launching it from its editor makes it current — and the
 // focus on its launch button (06 §2.5).
 // exportCurrent is the editor's e: the current list's export sub-page (06 §2.5, §2.17).
@@ -168,16 +171,16 @@ async function goLaunch() {
   await homePage.focusLaunch();
 }
 
-// planActions: the list's actions in the top bar (06 §2.5): its "有未载入的外部版本" mark,
+// planActions: the list's actions in the top bar (06 §2.5): its "an outside version has not been loaded" mark,
 // how many entries are not saved to the game yet, rename and delete, import / export (the
-// list's page in 全部列表), save, and set current or launch. Undo sits beside sort in the
+// list's page in all lists), save, and set current or launch. Undo sits beside sort in the
 // enabled list's head.
 function planActions() {
   const u = (S.board && S.board.unsaved) || 0;
   const btn = (label, k, run, cls = "", envWrite = "") => {
     const b = el("button", "btn " + cls, label);
     if (envWrite) b.dataset.envWrite = envWrite;
-    if (k) { b.append(el("kbd", "", k)); b.title = k; }
+    if (k) { b.append(keyCaps(k)); b.title = k; }
     b.onclick = (e) => { e.stopPropagation(); run(); };
     return b;
   };
@@ -212,7 +215,7 @@ function planActions() {
     c.title = Tf("the game is launched with %s; this list is only open here", S.shell.current.name) + T("; ") + T("no game file is written");
     out.push(c);
   } else {
-    // 启动 opens 启动, where the game starts (06 §2.5)
+    // Start opens Start, where the game starts (06 §2.5)
     const l = btn(T("launch"), "L", goLaunch, "primary", "launch");
     l.title = T("opens the launch page, where the game starts") + T("; ") + "L";
     out.push(l);
@@ -220,7 +223,7 @@ function planActions() {
   return out;
 }
 
-// manageCurrent opens 全部列表 with the open list selected: its import, export and sharing.
+// manageCurrent opens all lists with the open list selected: its import, export and sharing.
 function manageCurrent() {
   const p = S.shell && S.shell.plan;
   if (p) planManage.select(p.id);
@@ -229,8 +232,8 @@ function manageCurrent() {
 
 let lastList = 1;
 
-// The sidebar's entries in shift+1–8 order, 在玩 then 库 (06 §3.5; view.Nav).
-// "plan" is 列表: like a click on it, the current list (06 §2.1).
+// The sidebar's entries in shift+1–8 order, Playing then Library (06 §3.5; view.Nav).
+// "plan" is list: like a click on it, the current list (06 §2.1).
 const NAV = ["home", "needs", "log", "plan", "packs", "library", "textures", "env"];
 const navTarget = (id) => id !== "plan" ? id : ((S.shell && S.shell.plans) || []).find((p) => p.current)?.page || "plans";
 
@@ -302,6 +305,7 @@ function renderHints() {
   if (S.screen === "full") list = fullPage.fullHints();
   else if (S.screen === "library") list = library.hintList();
   else if (S.screen === "tasks") list = tasksPage.hintList();
+  else if (S.screen === "search") list = fileSearch.hintList();
   else if (S.screen === "changes") list = scr.changesHints();
   else if (S.screen === "log") list = scr.logHints();
   else if (S.screen === "subscribe") list = scr.addHints();
@@ -316,12 +320,12 @@ function renderHints() {
   if (c && c.sel.size && !S.screen) h.append(el("span", "accent", Tf("%d selected", c.sel.size)));
   list.slice(0, 7).forEach((a) => {
     const group = el("span", "hint-group");
-    group.append(el("b", "", a.key), " " + a.label);
+    group.append(keyCaps(a.key), " " + a.label);
     h.append(group);
   });
   if (c && c.sel.size && !S.screen) {
     const group = el("span", "hint-group");
-    group.append(el("b", "", "esc"), " " + T("clear the selection"));
+    group.append(keyCaps("esc"), " " + T("clear the selection"));
     h.append(group);
   }
 }
@@ -346,7 +350,7 @@ function focusArea(k) {
   S.focus = k;
   if (k < 3) lastList = k;
   S.anchor = -1;
-  // 暂存 is folded under 详情: going to it opens it
+  // Staging is folded under details: going to it opens it
   if (k === 2 && !stagingOpen()) setStagingOpen(true);
   renderLists();
   renderWhere();
@@ -457,8 +461,8 @@ function take(k, keys) {
   return out;
 }
 
-// put adds rows to column k: 已启用 at a 1-based place (0: the end), 未启用 in its order
-// (official first, then by name), 暂存 at the end. The cursor goes to the first.
+// put adds rows to column k: Enabled at a 1-based place (0: the end), Not enabled in its order
+// (official first, then by name), Staging at the end. The cursor goes to the first.
 function put(k, its, at = 0) {
   if (!its.length) return;
   const c = S.cols[k];
@@ -481,7 +485,7 @@ function put(k, its, at = 0) {
   relist(k, shown, key(its[0]));
 }
 
-// relist renumbers 已启用 and rebuilds a column's view: every row, or while it is filtered
+// relist renumbers Enabled and rebuilds a column's view: every row, or while it is filtered
 // the rows it showed and the ones that came in (Go filters again after the reload).
 function relist(k, shown, keepKey, keepAt = 0) {
   const c = S.cols[k];
@@ -494,8 +498,8 @@ function relist(k, shown, keepKey, keepAt = 0) {
   c.cursor = Math.max(0, Math.min(at, c.view.length - 1));
 }
 
-// moveLocal: the selection leaves column from for column to (at: 已启用's place). The focus
-// follows the rows only within 已启用.
+// moveLocal: the selection leaves column from for column to (at: Enabled's place). The focus
+// follows the rows only within Enabled.
 function moveLocal(from, to, keys, at = 0) {
   if (!S.cols[from] || !keys.length) return false;
   const its = take(from, keys);
@@ -504,8 +508,8 @@ function moveLocal(from, to, keys, at = 0) {
   return true;
 }
 
-// toggleLocal is space: 已启用 → 未启用 (an entry with no mod only leaves), else into
-// 已启用 at its end (Go then puts it where the rules say; the reload slides it there).
+// toggleLocal is space: Enabled → Not enabled (an entry with no mod only leaves), else into
+// Enabled at its end (Go then puts it where the rules say; the reload slides it there).
 function toggleLocal(k, its) {
   const mods = its.filter((it) => it.id).map(key);
   if (k !== 1) return moveLocal(k, 1, mods);
@@ -646,7 +650,7 @@ async function drop(from, to, items, at) {
 }
 
 // run: sort, save and launch act at once and say what they did (06 §6); sort
-// offers 撤销. A refusal says why in the status line and shows the commands that resolve it.
+// offers undo. A refusal says why in the status line and shows the commands that resolve it.
 // A launch with required mods missing asks once (VM run B8); run says "asked" then.
 async function run(what, anyway = false) {
   const before = motion.snapshot();
@@ -672,7 +676,7 @@ async function run(what, anyway = false) {
 // replacement. One window says it all and one button fixes all it can: installed mods are
 // enabled or put in place (one undo step each), the rest are subscribed after the usual
 // Steam / SteamCMD choice. A broken cycle is settled by the sort itself and only noted on
-// 能不能跑, so it asks nothing here.
+// Can it run, so it asks nothing here.
 function offerAfterSort(o) {
   const deps = o.missingDependencies || [], absent = o.missingMods || [], repl = o.replacements || [];
   const enable = deps.filter((m) => m.kind === "installed");
@@ -726,21 +730,22 @@ export function confirmMoves(o, again, then) {
   });
 }
 
-// preview: the dry run of sort, save or launch, to read (the palette's 预览…); nothing to confirm.
+// preview: the dry run of sort, save or launch, to read (the palette's preview…); nothing to confirm.
 async function preview(what) {
   try { const p = await api.Preview(what); pop.text(p.title, p.lines); } catch (e) { say("fail", errText(e)); }
 }
 
 // cmd runs a palette command (view.Commands).
 async function cmd(id) {
+  if (uninst.locked()) return;
   if (environmentReason() && ["launch", "sort", "save", "undo", "redo", "restore-all", "stage-all", "rescan", "analyze"].includes(id)) return say("busy", environmentReason());
   // A page replaces the page shown once its data is in: the mod list never shows between.
-  const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", subscribe: "subscribe", library: "library", log: "log", settings: "settings", packs: "packs", build: "build", "env-page": "env", uninstall: "uninstall", textures: "textures", tasks: "tasks" };
+  const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", subscribe: "subscribe", library: "library", log: "log", settings: "settings", packs: "packs", build: "build", "env-page": "env", uninstall: "uninstall", feedback: "feedback", textures: "textures", tasks: "tasks", "search-files": "search" };
   if (pages[id]) return go(pages[id]);
   // the list's own actions show the list; the rest work on any page
-  if (["filter", "details", "tech", "tags"].includes(id) && scr.closeScreen()) renderWhere();
+  if (["filter", "details", "tech", "tags", "rules"].includes(id) && scr.closeScreen()) renderWhere();
   switch (id) {
-    // from the editor, 启动 opens the launch page, as L does there (06 §2.5)
+    // from the editor, Start opens the launch page, as L does there (06 §2.5)
     case "launch": return S.screen ? run(id) : goLaunch();
     case "sort": case "save": return run(id);
     case "preview-sort": case "preview-save": case "preview-launch": return preview(id.slice(8));
@@ -755,6 +760,7 @@ async function cmd(id) {
     case "plans": return plans.chooser();
     case "new-plan": return plans.newPlan();
     case "filter": return startSearch();
+    case "rules": return showRules();
     case "details": return verb("full");
     case "tech": return verb("full");
     case "tags": return verb("tags");
@@ -798,11 +804,12 @@ async function refreshEnvironment() {
 }
 
 function commandLine() {
-  pop.ask(T("run an archo command"), "list --filter tag:ui", async (line) => {
-    const out = await api.RunCLI(line);
-    pop.text("archo " + line, out);
-    reload();
-  });
+  pop.palette();
+}
+
+async function commandDone() {
+  // Commands can change the current game, open list, language or theme.
+  await relang();
 }
 
 async function paletteChoice(o) {
@@ -867,7 +874,7 @@ function searchKey(k, e, inp) {
     if (acceptGhost(k, inp)) { e.preventDefault(); e.stopPropagation(); return; }
   }
   if (e.key === "ArrowLeft" || e.key === "Home" || e.key === "End") setTimeout(() => showGhost(k));
-  // 未启用 and 已启用 share the filter bar: tab only takes the completion here (06 §3.7)
+  // Not enabled and Enabled share the filter bar: tab only takes the completion here (06 §3.7)
   if (e.key === "Tab") { e.preventDefault(); e.stopPropagation(); return; }
   if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); moveCursor(e.key === "ArrowDown" ? 1 : -1, false); }
   e.stopPropagation();
@@ -898,7 +905,7 @@ function historyChooser() {
 }
 let onHistoryPick = () => {};
 
-// changesOfCursor: the 变化 page with only the cursor's mod (C; the detail's link).
+// changesOfCursor: the Updates page with only the cursor's mod (C; the detail's link).
 function changesOfCursor() {
   const it = actionContext().sel[0];
   if (it && it.id) document.dispatchEvent(new CustomEvent("changes-of", { detail: { id: it.id, name: it.name } }));
@@ -927,13 +934,13 @@ function subPage(d) {
     const kids = (it.kids || []).filter((x) => !x.add);
     const i = kids.findIndex((x) => x.id === cur);
     if (i >= 0 && kids.length > 1) return go(kids[(i + d + kids.length) % kids.length].id);
-    // the entry's own page that is not one of its sub-entries (整合包's list): to the first
+    // the entry's own page that is not one of its sub-entries (pack's list): to the first
     // or the last of them
     if (i < 0 && it.id === cur && kids.length) return go(kids[d > 0 ? 0 : kids.length - 1].id);
   }
 }
 
-// ---- the row menu (06 §8.5): the same groups and order as Mod 库存's, from view.RowOps ----
+// ---- the row menu (06 §8.5): the same groups and order as Mod library's, from view.RowOps ----
 
 async function openRowMenu(x, y, keys) {
   const { k, sel } = actionContext();
@@ -956,7 +963,7 @@ function menuAtCursor() {
 }
 
 // rowOp runs an op of the menu on the object: the plan's own as their verbs, the version
-// and disk ops as Mod 库存 runs them (a dry run first when they change files).
+// and disk ops as Mod library runs them (a dry run first when they change files).
 async function rowOp(code, only = null) {
   const verbs = { enable: "toggle", disable: "toggle", "put-back": "toggle", "enable-at": "move", "move-to": "move", stage: "stage", swap: "swap", tags: "tags", note: "note", folder: "folder", workshop: "workshop-id", steam: "steam" };
   if (verbs[code] && !only) return verb(verbs[code]);
@@ -998,11 +1005,22 @@ async function delKey() {
 function onKey(e) {
   if (e.isComposing || e.defaultPrevented) return;
   const k = e.key;
+  if (uninst.locked()) {
+    // Native focus/activation and copying still work on the progress/report page.
+    if (k === "Tab" || (e.altKey && k === "F4") || (e.ctrlKey && k.toLowerCase() === "c") ||
+        (["Enter", " "].includes(k) && document.activeElement?.closest("#screen button, #screen summary"))) return;
+    e.preventDefault();
+    return;
+  }
+  const typing = document.activeElement?.matches("input,textarea,select,[contenteditable=true]");
+  if (!e.altKey && ((e.ctrlKey || e.metaKey) && !e.shiftKey && k.toLowerCase() === "k" || k === ":" && !e.ctrlKey && !e.metaKey && !typing && !S.popup)) {
+    e.preventDefault(); pop.palette(); return;
+  }
   // a menu opened with the mouse does not hold the focus: esc still closes it first (G5)
   if (k === "Escape" && !$("#menu").hidden) { e.preventDefault(); pop.hideMenu(); return; }
   // ctrl+b moves the navigation between the side and the top, on every page (06 §2.1)
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && k.toLowerCase() === "b") { e.preventDefault(); shell.toggleNav(); return; }
-  // ctrl+j: 后台任务 from any page; again goes back (06 §2.16)
+  // ctrl+j: Background tasks from any page; again goes back (06 §2.16)
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && k.toLowerCase() === "j" && !S.popup) { e.preventDefault(); shell.navigated(); tasksPage.toggle(); renderWhere(); return; }
   // Native tab order reaches paths, including the first one; activation stays local.
   if (k === "Tab" && (S.popup ? $("#popup") : S.screen ? $("#screen") : $("#detail"))?.querySelector(".path-copy")) return;
@@ -1020,8 +1038,8 @@ function onKey(e) {
     if (NAV[+dig[1] - 1]) go(navTarget(NAV[+dig[1] - 1]));
     return;
   }
-  // tab / shift+tab: the next / previous page under the same sidebar entry (Mod 库存's 全部 and
-  // 变化, the plans); the full detail keeps tab for its sub-sections (06 §3.5)
+  // tab / shift+tab: the next / previous page under the same sidebar entry (Mod library's All and
+  // Updates, the plans); the full detail keeps tab for its sub-sections (06 §3.5)
   // (on the pages with forms, settings and the like, tab keeps moving the focus)
   // Pages with adjustable cards keep native tab order to reach their gaps (06 §3.1).
   if (e.target.closest?.('[role="separator"]') && k === "Tab") return;
@@ -1052,8 +1070,9 @@ function onKey(e) {
     if (S.screen === "needs") return scr.needsKey(e);
     if (S.screen === "library") return library.key(e);
     if (S.screen === "textures") return tex.key(e);
+    if (S.screen === "search") return fileSearch.key(e);
     if (S.screen === "log" || S.screen === "changes") return scr.logsKey(e);
-    // 添加订阅: the form takes its keys; esc outside it goes back to 订阅与更新
+    // add a subscription: the form takes its keys; esc outside it goes back to updates
     if (S.screen === "subscribe") { if (k === "Escape") { e.preventDefault(); go("changes"); } return; }
     if (S.screen === "full") return scr.fullKey(e);
     return;
@@ -1120,6 +1139,7 @@ function onKey(e) {
     "/": () => startSearch(), "\\": () => S.bar.toggle(), c: () => go("changes"), l: () => go("log"), R: () => cmd("rescan"), A: () => cmd("analyze"),
     H: () => historyChooser(), C: () => changesOfCursor(), "<": () => widthKey(-1), ">": () => widthKey(1), "=": () => widthKey(0),
     E: () => go("env"), P: () => plans.chooser(), "?": () => pop.help("plan"), ":": () => commandLine(), i: () => exchange(0), e: () => exportCurrent(),
+    r: () => startRule(actionContext().sel[0]),
   };
   // shift+letter is the capital letter even where the key reports it in lower case
   const kk = e.shiftKey && /^[a-z]$/.test(k) ? k.toUpperCase() : k;
@@ -1161,7 +1181,7 @@ function wireSplits() {
       else card.style.removeProperty("--stack-size");
     };
     wireSeparator(gap, {
-      axis: "y", direction: -1, key: "ui.gui.plan." + (card.dataset.area === "2" ? "stage" : "history"),
+      axis: "y", direction: -1, key: "ui.gui.plan." + (card.dataset.area === "2" ? "stage" : card.classList.contains("rulesarea") ? "rules" : "history"),
       enabled: () => card.classList.contains("open") && !card.hidden,
       range: () => [72, stack.clientHeight - 148 - [...stack.querySelectorAll(".fold")]
         .filter((other) => other !== card).reduce((h, other) => h + other.getBoundingClientRect().height, 0)],
@@ -1182,7 +1202,7 @@ async function loadWidths() {
 
 const ui = {
   reload, refreshEnvironment, relang, reaccent, render, pageEntering, pageEntered, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go, useEnv,
-  palette: paletteChoice, selectionItems: selection, planMenu: (id, x, y) => plans.menuAt(id, x, y),
+  palette: paletteChoice, commandDone, uninstallStarted: () => uninst.restore(), selectionItems: selection, planMenu: (id, x, y) => plans.menuAt(id, x, y),
   menu: (x, y) => openRowMenu(x, y, false),
   detailFollow: (f) => detailFollow(f),
   newList: (from) => planManage.newList(from),
@@ -1191,6 +1211,7 @@ const ui = {
   resumeGuide: () => guide.resume(),
   manageLists: (id = 0) => { planManage.select(id); return go("plans"); },
   edited: (call, undoable = true) => edited(call, undoable),
+  ruleTarget: () => actionContext().sel[0],
   afterImport: null, // the first-run guide's next step once an import is applied
 };
 
@@ -1199,7 +1220,7 @@ async function start() {
   archoTheme.apply(s.theme);
   applyAccent(s.accent);
   S.start = s;
-  setText(s.text);
+  setText(s.text, s.extraText);
   document.documentElement.lang = s.lang;
   initNavigation(ui);
   wireHistory();
@@ -1222,6 +1243,7 @@ async function start() {
   $("#board .barhost").replaceWith(S.bar.el);
   $('.area[data-area="3"] > .head').addEventListener("click", () => { if (S.bar.fills()) S.bar.toggle(false); });
   wireLists(ui);
+  initRules(ui);
   wireSplits();
   document.addEventListener("keydown", onKey);
   document.addEventListener("verb", (e) => { const v = e.detail; v === "needs" ? go("needs") : verb(v); });
@@ -1246,7 +1268,7 @@ async function start() {
     await edited(() => api.RunOp("separate", [e.detail]), false, [e.detail]);
     detailFollow(true);
   });
-  // a detail's 在变化记录查看全部: 变化 with only that mod's Lineage (06 §2.9)
+  // a detail's see all in change history: Updates with only that mod's Lineage (06 §2.9)
   document.addEventListener("changes-of", async (e) => { shell.navigated(); await scr.changes(e.detail); renderWhere(); renderHints(); });
   // the enabled list's head: import / export
   $("#board").addEventListener("click", (e) => {
@@ -1272,6 +1294,7 @@ async function start() {
   });
   on("pack", (ev) => packsPage.packEvent(ev));
   on("uninstall", (ev) => uninst.event(ev));
+  on("uninstall-close-blocked", () => uninst.closeBlocked());
   on("textures", (ev) => tex.event(ev));
   on("tasks", (ev) => tasksPage.event(ev));
   document.addEventListener("task-ended", (e) => {
@@ -1282,15 +1305,16 @@ async function start() {
     if (S.screen === "home") homePage.home({ keep: true });
     if (S.screen === "settings") refreshBackgrounds();
   });
-  // a task's o on a mod: Mod 库存 searching for it (06 §2.16)
+  // a task's o on a mod: Mod library searching for it (06 §2.16)
   document.addEventListener("library-search", async (e) => { shell.navigated(); await library.openSearch(e.detail); renderWhere(); });
+  document.addEventListener("library-instance", async (e) => { shell.navigated(); await library.openInstance(e.detail); renderWhere(); });
   tasksPage.refreshFoot();
   on("guide", (ev) => guide.guideEvent(ev));
   on("download", (ev) => guide.downloadEvent(ev));
   // launching waits (up to ten seconds) for a background Steam credit switch to finish
   on("launch-wait", (ev) => say("busy", ev.text));
   // the background check of the open list finished: the problems button, the panel and the
-  // row icons follow without reading the lists again; an open 能不能跑 shows the new answer
+  // row icons follow without reading the lists again; an open Can it run shows the new answer
   // (VM run 2026-10-28: after the game exited it kept the run's old time until revisited)
   on("list-problems", (ev) => {
     if (!problems.event(ev)) return;
@@ -1302,6 +1326,7 @@ async function start() {
     try { if (S.board && (await api.Stamp()) !== S.board.stamp) await reload(); } catch { /* keep the page */ }
     checkCredit();
   });
+  if (await uninst.restore()) { shell.settle(); return; }
   // The start page needs only Workspace's shell and board. The editor behind it gets its
   // filter answer (the bar's first one reads every mod's content) and its rows afterwards,
   // so the first page does not wait for them.
@@ -1331,7 +1356,7 @@ async function start() {
 }
 
 // A history row (06 §2.5): a click goes there at once. Loading a version is one step: the
-// list it replaces stays in the history and 撤销 brings it back.
+// list it replaces stays in the history and undo brings it back.
 onHistoryPick = (h) => goHistory(h);
 setOnHistory((h) => goHistory(h));
 async function goHistory(h) {
@@ -1342,8 +1367,8 @@ async function goHistory(h) {
   await reload();
 }
 
-// pollLive follows the running game every two seconds (06 §2.1): its errors lead 能不能跑
-// (and its badge), 启动 says it runs, and launching waits until it exits (08 §4). A new
+// pollLive follows the running game every two seconds (06 §2.1): its errors lead Can it run
+// (and its badge), Start says it runs, and launching waits until it exits (08 §4). A new
 // Player.log (the game exited, or ran without RimArcho) is read once when it appears.
 async function pollLive() {
   try {
@@ -1356,15 +1381,15 @@ async function pollLive() {
     if (l.running) scr.logLive();
     if (was !== !!l.running) homePage.liveChanged();
     // the game exited: a session that used SteamCMD mods may make a credit question due;
-    // an open 能不能跑 reads again, so the full analysis of the run replaces its items
+    // an open Can it run reads again, so the full analysis of the run replaces its items
     // (03 §6.6; VM run 2026-10-28: it kept the run's mid-way time and items)
     if (was && !l.running) { checkCredit(); if (S.screen === "needs") scr.needs(true); }
   } catch { /* the next poll tries again */ }
   setTimeout(pollLive, 2000);
 }
 
-// readNewLog: the run's log counts without a visit to 能不能跑 (06 §2.1; until 2026-10-30
-// the sidebar's foot said "分析本次日志" and waited for a click). The pages showing it
+// readNewLog: the run's log counts without a visit to Can it run (06 §2.1; until 2026-10-30
+// the sidebar's foot said "analyse this run's log" and waited for a click). The pages showing it
 // read again.
 async function readNewLog() {
   try {

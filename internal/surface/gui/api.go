@@ -19,6 +19,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/modchanges"
 	"github.com/ToumanLin/RimArcho/internal/perftrace"
+	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
@@ -36,10 +37,11 @@ type API struct {
 	emit            func(name string, data any) // Wails events; nil in tests
 	open            func(url string) error      // the system browser
 	openDir         func(dir string) error      // the file manager (nil: the system's)
-	lib             *app.Library                // Mod 库存, as of libAt
+	lib             *app.Library                // Mod library, as of libAt
 	libAt           string
 	libGate         sync.Mutex // coalesces full inventory builds, never acquired by edits
 	problemLookup   problemLookup
+	search          fileSearch // Search files (filesearch.go)
 	subRead         subscriptionReader
 	copyRead        inventoryReader
 	libRead         logReader
@@ -68,7 +70,9 @@ type API struct {
 	logPath   string           // the log page's Player.log and its clusters' first lines
 	logLinks  map[string]string
 	x         exchange // import and export (exchange.go)
-	free      releaser // returns memory to the OS after heavy work (memory.go)
+	// removedRule is the rule the editor removed last, for its undo (rules.go).
+	removedRule *store.UserRule
+	free        releaser // returns memory to the OS after heavy work (memory.go)
 	// bgs are the environment bgsEnv's backgrounds; bgPick the image rotation chose for
 	// this window (background.go)
 	bgs    []app.Background
@@ -86,7 +90,7 @@ type API struct {
 	autoWG          sync.WaitGroup
 	quit            func()     // closes the window (nil in the harness and in tests)
 	windowTheme     func(bool) // synchronises the native frame with the resolved page scheme
-	// tasks is the 后台任务 record and its lanes (tasks.go, 06 §2.16)
+	// tasks is the Background tasks record and its lanes (tasks.go, 06 §2.16)
 	tasks        *app.Tasks
 	taskEv       taskEvents
 	creditID     string
@@ -102,6 +106,7 @@ type API struct {
 	texMeasure    textureMeasurement
 	logRead       logReader
 	texRead       logReader
+	feedback      feedbackState
 	costMeasure   loadCostMeasurement
 	accountMu     sync.Mutex
 	accountActive bool
@@ -109,6 +114,7 @@ type API struct {
 	ll            *subscribe.LoversLab
 	llFiles       map[string]loverDownload
 
+	uninstall      uninstallState
 	uninstallSizes app.UninstallSizeCache
 	uninstallRead  logReader
 
@@ -118,6 +124,7 @@ type API struct {
 	ScanRunner func(env string) (string, error)
 
 	subRevision atomic.Uint64 // completed tasks may change files without a DB write
+	command     commandWorker
 }
 
 func newAPI(a *app.App) *API {
@@ -185,12 +192,13 @@ func (s *API) checkMonitor() {
 
 // Start is what the page needs once: the language, its text table, the commands.
 type Start struct {
-	Lang     string            `json:"lang"`
-	Accent   string            `json:"accent"`
-	Theme    string            `json:"theme"`
-	Text     map[string]string `json:"text"`
-	Commands []view.Command    `json:"commands"`
-	Version  string            `json:"version"`
+	Lang      string            `json:"lang"`
+	Accent    string            `json:"accent"`
+	Theme     string            `json:"theme"`
+	Text      map[string]string `json:"text"`
+	ExtraText map[string]string `json:"extraText,omitempty"`
+	Commands  []view.Command    `json:"commands"`
+	Version   string            `json:"version"`
 	// Ops is the op table both pages' menus, hint lines and keys come from (06 §8.5).
 	Ops []view.Op `json:"ops"`
 }
@@ -200,7 +208,7 @@ func (s *API) Init() *Start {
 	defer perftrace.Span("Init")()
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return &Start{Lang: view.Lang(), Accent: cmds.Setting(s.a, "ui.accent"), Theme: cmds.Setting(s.a, "ui.theme"), Text: view.Table(), Commands: view.Commands, Version: buildinfo.String(), Ops: view.OpTable()}
+	return &Start{Lang: view.Lang(), Accent: cmds.Setting(s.a, "ui.accent"), Theme: cmds.Setting(s.a, "ui.theme"), Text: view.Table(), ExtraText: view.ExtraText(), Commands: view.Commands, Version: buildinfo.String(), Ops: view.OpTable()}
 }
 
 // ---- the board ----
@@ -312,7 +320,7 @@ func (s *API) PackNameCheck(name string) string {
 	return ""
 }
 
-// PackDryRun is 先看清单，不写磁盘: the text of archo pack build --dry-run (nothing is written).
+// PackDryRun is preview the file list without writing to disk: the text of archo pack build --dry-run (nothing is written).
 func (s *API) PackDryRun(name string, tex int) []string {
 	r, err := s.detachedReader()
 	if err != nil {
@@ -356,7 +364,7 @@ func (s *API) PackExport(name, file string, list bool) (string, error) {
 	}
 	if file == "" {
 		if s.x.native == nil {
-			return "", errors.New(view.T("no file dialog here; type the path"))
+			return "", errors.New(view.T("no file dialog here; use the desktop window"))
 		}
 		f, err := s.x.native.saveFile(view.T("export the pack"), name+ext, [][2]string{{"*" + ext, "*" + ext}, {"All files (*.*)", "*.*"}})
 		if err != nil || f == "" {
@@ -934,7 +942,7 @@ func (s *API) Swap(id string) (string, error) {
 	return s.text(view.Swap(s.a, st, id))
 }
 
-// Preview is the dry run of sort, save or launch (the palette's 预览…; 06 §6).
+// Preview is the dry run of sort, save or launch (the palette's preview…; 06 §6).
 func (s *API) Preview(what string) (*view.Preview, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -1019,7 +1027,7 @@ func (s *API) SetTag(ids []string, tag string, remove bool) (string, error) {
 	return s.text(view.Tf("tags of %s: %s", o.What, msg), err)
 }
 
-// ---- 需要处理 (06 §5) ----
+// ---- Can it run (06 §5) ----
 
 // Needs builds the screen. Opening it includes the newest log (parsing it if needed) and
 // starts the files' check when it is stale, as the TUI does.
@@ -1029,7 +1037,8 @@ func (s *API) Needs() *view.Needs {
 	if c, key := s.cachedNeedsLocked(); c != nil {
 		if c.key == key {
 			s.refreshNeedsLocked(c)
-			n := c.n
+			st, _ := s.a.Loadout()
+			n := view.RefreshMemory(s.a, st, c.n)
 			if c.eager && n.Error == "" && (n.Stale || n.Never) && !s.busy["analyze"] {
 				s.startAnalyze()
 			}
@@ -1044,6 +1053,8 @@ func (s *API) Needs() *view.Needs {
 		}
 		n.Updating = true
 		s.refreshNeedsLocked(c)
+		st, _ := s.a.Loadout()
+		n = *view.RefreshMemory(s.a, st, &n)
 		s.mu.Unlock()
 		return &n
 	}
@@ -1076,9 +1087,9 @@ func (s *API) Needs() *view.Needs {
 }
 
 // ReadNewLog reads Player.log once when it is newer than the last launch and the last log
-// read (app.NewLog): the game exited, or ran without RimArcho. Then 能不能跑's badge counts
-// that run without a visit (06 §2.1; the sidebar's "分析本次日志" line asked for one until
-// 2026-10-30). Like opening 能不能跑 it parses the log, records it as read and lets the
+// read (app.NewLog): the game exited, or ran without RimArcho. Then Can it run's badge counts
+// that run without a visit (06 §2.1; the sidebar's "analyse this run's log" line asked for one until
+// 2026-10-30). Like opening Can it run it parses the log, records it as read and lets the
 // memory go again soon; it starts no analysis. It reports whether it read one.
 func (s *API) ReadNewLog() bool {
 	defer perftrace.Span("ReadNewLog")()
@@ -1234,7 +1245,7 @@ func (s *API) Inspect(argv []string) ([]string, error) {
 
 // ---- changes (06 §2.9) ----
 
-// Changes is the 变化 page: the current plan's mods since it was last played, or the whole
+// Changes is the Updates page: the current plan's mods since it was last played, or the whole
 // library; of (an instance ID) narrows it to that mod's Lineage, every change by day.
 func (s *API) Changes(library bool, of string) (*modchanges.Page, error) {
 	r, err := s.detachedReader()
@@ -1266,7 +1277,7 @@ func (s *API) ChangeFiles(before, after int64) []string {
 	return view.ChangeFiles(s.a, before, after)
 }
 
-// OpenChangeNotes opens a Workshop item's change notes (ctrl+w on 变化).
+// OpenChangeNotes opens a Workshop item's change notes (ctrl+w on Updates).
 func (s *API) OpenChangeNotes(ws string) (string, error) {
 	if !view.IsNumber(ws) {
 		return "", errors.New(view.T("no Workshop ID: not a Workshop mod"))
@@ -1325,7 +1336,7 @@ func (s *API) Logs() []string {
 	return out
 }
 
-// LogPage analyses a log for the 日志 tab (the newest when path is empty).
+// LogPage analyses a log for the Game log tab (the newest when path is empty).
 func (s *API) LogPage(path string) (*view.LogPage, error) {
 	// Serialise log reads with each other, not with the board, navigation or textures.
 	// Keeping this reader also preserves pending cross-version analysis between polls.
@@ -1419,7 +1430,7 @@ func (s *API) LogPattern(path, id string) *view.PatternCard {
 	return view.PatternCardOf(r, st, path, id)
 }
 
-// SelectLog picks the log whose errors join 需要处理.
+// SelectLog picks the log whose errors join Can it run.
 func (s *API) SelectLog(path string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -1582,27 +1593,6 @@ func (s *API) Palette(query string) []view.PalEntry {
 	return out
 }
 
-// RunCLI runs a line the player typed as an archo command (the palette's command line).
-func (s *API) RunCLI(line string) []string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	argv := splitArgs(line)
-	if len(argv) > 0 && argv[0] == "archo" {
-		argv = argv[1:]
-	}
-	if len(argv) == 0 || argv[0] == "mcp" || argv[0] == "tui" || argv[0] == "gui" {
-		return []string{view.T("not a command here")}
-	}
-	text, _ := cmds.Execute(s.a, argv)
-	s.board, s.needs = nil, nil
-	st := s.boardState()
-	var out []string
-	for _, l := range strings.Split(strings.TrimRight(text, "\n"), "\n") {
-		out = append(out, view.Humanize(st, l))
-	}
-	return out
-}
-
 // OpenURL opens an http(s) link in the system browser (links in descriptions, the
 // Workshop page).
 func (s *API) OpenURL(raw string) error {
@@ -1663,30 +1653,4 @@ func firstLine(s string) string {
 		return s[:i]
 	}
 	return s
-}
-
-// splitArgs splits a command line on spaces, keeping "quoted words" together.
-func splitArgs(line string) []string {
-	var out []string
-	var cur strings.Builder
-	in, has := false, false
-	for _, r := range line {
-		switch {
-		case r == '"':
-			in, has = !in, true
-		case r == ' ' && !in:
-			if has {
-				out = append(out, cur.String())
-				cur.Reset()
-				has = false
-			}
-		default:
-			cur.WriteRune(r)
-			has = true
-		}
-	}
-	if has {
-		out = append(out, cur.String())
-	}
-	return out
 }

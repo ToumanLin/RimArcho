@@ -1,0 +1,266 @@
+=== RUN   TestIntKeyResearch
+    intkey_main_test.go:85: PLAN mods=1354 defsPerFile=15.4 typesPerDLL=298 defSets=1603
+    intkey_main_test.go:86: BUILD 8.711s
+    intkey_main_test.go:162: ROWS instance=1354 snapshot=4864 snapshot_file=973764 fact_set=1895 content_state=2708 def_fact=771016 type_fact=207073 harmony_fact=30462 harmony_id=1275 assembly_fact=680 patch_fact=16299 finding=2100
+    intkey_main_test.go:163: SHAPE snapshot_file rel_path=56.9MB (avg 58.4 B) non-semantic=697889 (71.7%, rel 45.7MB) distinct_rel=271102 | def_fact file=34.8MB (avg 45.1 B) distinct_file=49941 active_defs=311274 (40.4%) | instance-id text in fact_set+content_state+patch_fact+snapshot+finding+change_event=0.85MB
+    intkey_main_test.go:167: DISK after build: 258 MB
+    intkey_research_test.go:749: SIZE v26 file=245.47MB live=245.47MB | def_fact=114.67 dll_facts=33.75 snapshot_file=84.04 file_blobs=0.00 paths=0.00 sets+state+keys=1.09 analysis=5.57 snapshot=5.17 other=1.18
+    intkey_research_test.go:754: SIZE v26 top: snapshot_file=84.04 def_fact=80.66 def_fact_lookup=24.08 type_fact=15.70 type_fact_lookup=9.71 def_fact_set=8.39 harmony_fact=5.60 snapshot=5.00 patch_fact=3.97 type_fact_set=2.25 def_fact_named=1.53 finding=0.96 patch_fact_analysis=0.59 content_state=0.34
+    intkey_main_test.go:214: DISK during v26: 258 MB
+    intkey_main_test.go:247: QUERY v26 | defName×100 | 92.763ms | rows=96 | base
+    intkey_main_test.go:247: QUERY v26 | Name×190 | 165.209ms | rows=193 | base
+    intkey_main_test.go:247: QUERY v26 | DefsOf×100 | 79.685ms | rows=60428 | base
+    intkey_main_test.go:247: QUERY v26 | DefCounts(whole table) | 69.984ms | rows=1277 | base
+    intkey_main_test.go:247: QUERY v26 | CachedDefs(all disabled) | 536.292ms | rows=429390 | base
+    intkey_main_test.go:247: QUERY v26 | TypeOwners×100 | 2.133ms | rows=83 | base
+    intkey_main_test.go:247: QUERY v26 | HarmonyPatches(all) | 61.65ms | rows=25198 | base
+    intkey_main_test.go:247: QUERY v26 | CurrentFiles(incremental scan) | 112.201ms | rows=77252 | base
+    intkey_main_test.go:247: QUERY v26 | SemanticSet×100 | 10.471ms | rows=8176 | base
+    intkey_main_test.go:247: QUERY v26 | SnapshotFiles×100(changes page) | 19.37ms | rows=30977 | base
+    intkey_main_test.go:247: QUERY v26 | InstanceFiles(%Textures/%) | 114.517ms | rows=174419 | base
+    intkey_main_test.go:247: QUERY v26 | InstanceFiles(%x.dll)×20 | 1.435372s | rows=359 | base
+    intkey_main_test.go:247: QUERY v26 | ContentKinds(all, uncached) | 263.121ms | rows=1354 | base
+    intkey_main_test.go:247: QUERY v26 | SnapshotsWithPNG(all) | 22.346ms | rows=1298 | base
+    intkey_main_test.go:247: QUERY v26 | Languages×100(details) | 12.441ms | rows=64 | base
+    intkey_main_test.go:266: WRITE v26 | write 30 snapshot manifests | 22.6ms
+    intkey_main_test.go:266: WRITE v26 | write 30 Def sets | 58.9ms
+    intkey_main_test.go:208: CONVERT ik convert=73ms file_before_vacuum=248.9MB live_before_vacuum=244.5MB vacuum=1.925s
+    intkey_research_test.go:749: SIZE ik file=244.48MB live=244.48MB | def_fact=114.67 dll_facts=33.75 snapshot_file=84.04 file_blobs=0.00 paths=0.00 sets+state+keys=0.91 analysis=4.76 snapshot=5.17 other=1.18
+    intkey_research_test.go:754: SIZE ik top: snapshot_file=84.04 def_fact=80.66 def_fact_lookup=24.08 type_fact=15.70 type_fact_lookup=9.71 def_fact_set=8.39 harmony_fact=5.60 snapshot=5.00 patch_fact=3.57 type_fact_set=2.25 def_fact_named=1.53 finding=0.96 harmony_fact_set=0.31 content_state=0.27
+    intkey_main_test.go:214: DISK during ik: 494 MB
+    intkey_main_test.go:247: QUERY ik | defName×100 | 93.654ms | rows=96 | same
+    intkey_main_test.go:247: QUERY ik | Name×190 | 164.981ms | rows=193 | same
+    intkey_main_test.go:247: QUERY ik | DefsOf×100 | 77.444ms | rows=60428 | same
+    intkey_main_test.go:247: QUERY ik | DefCounts(whole table) | 52.884ms | rows=1277 | same
+    intkey_main_test.go:247: QUERY ik | CachedDefs(all disabled) | 540.67ms | rows=429390 | same
+    intkey_main_test.go:247: QUERY ik | TypeOwners×100 | 2.391ms | rows=83 | same
+    intkey_main_test.go:247: QUERY ik | HarmonyPatches(all) | 59.412ms | rows=25198 | same
+    intkey_main_test.go:247: QUERY ik | CurrentFiles(incremental scan) | 95.23ms | rows=77252 | same
+    intkey_main_test.go:247: QUERY ik | SemanticSet×100 | 7.351ms | rows=8176 | same
+    intkey_main_test.go:247: QUERY ik | SnapshotFiles×100(changes page) | 16.019ms | rows=30977 | same
+    intkey_main_test.go:247: QUERY ik | InstanceFiles(%Textures/%) | 119.512ms | rows=174419 | same
+    intkey_main_test.go:247: QUERY ik | InstanceFiles(%x.dll)×20 | 1.407174s | rows=359 | same
+    intkey_main_test.go:247: QUERY ik | ContentKinds(all, uncached) | 255.655ms | rows=1354 | same
+    intkey_main_test.go:247: QUERY ik | SnapshotsWithPNG(all) | 21.882ms | rows=1298 | same
+    intkey_main_test.go:247: QUERY ik | Languages×100(details) | 11.055ms | rows=64 | same
+    intkey_main_test.go:266: WRITE ik | write 30 snapshot manifests | 22.7ms
+    intkey_main_test.go:266: WRITE ik | write 30 Def sets | 58.5ms
+    intkey_main_test.go:208: CONVERT path-global convert=6.955s file_before_vacuum=332.6MB live_before_vacuum=194.0MB vacuum=1.559s
+    intkey_research_test.go:749: SIZE path-global file=187.81MB live=187.81MB | def_fact=81.04 dll_facts=27.45 snapshot_file=28.49 file_blobs=0.00 paths=37.81 sets+state+keys=1.09 analysis=5.57 snapshot=5.17 other=1.18
+    intkey_research_test.go:754: SIZE path-global top: def_fact=47.04 snapshot_file=28.49 def_fact_lookup=24.08 path=18.93 sqlite_autoindex_path_1=18.89 type_fact=10.27 type_fact_lookup=9.71 def_fact_set=8.39 snapshot=5.00 harmony_fact=4.77 patch_fact=3.97 type_fact_set=2.25 def_fact_named=1.53 finding=0.96
+    intkey_main_test.go:214: DISK during path-global: 440 MB
+    intkey_main_test.go:247: QUERY path-global | defName×100 | 91.519ms | rows=96 | same
+    intkey_main_test.go:247: QUERY path-global | Name×190 | 169.279ms | rows=193 | same
+    intkey_main_test.go:247: QUERY path-global | DefsOf×100 | 88.142ms | rows=60428 | same
+    intkey_main_test.go:247: QUERY path-global | DefCounts(whole table) | 67.754ms | rows=1277 | same
+    intkey_main_test.go:247: QUERY path-global | CachedDefs(all disabled) | 593.957ms | rows=429390 | same
+    intkey_main_test.go:247: QUERY path-global | TypeOwners×100 | 2.649ms | rows=83 | same
+    intkey_main_test.go:247: QUERY path-global | HarmonyPatches(all) | 63.391ms | rows=25198 | same
+    intkey_main_test.go:247: QUERY path-global | CurrentFiles(incremental scan) | 115.007ms | rows=77252 | same
+    intkey_main_test.go:247: QUERY path-global | SemanticSet×100 | 10.854ms | rows=8176 | same
+    intkey_main_test.go:247: QUERY path-global | SnapshotFiles×100(changes page) | 34.684ms | rows=30977 | same
+    intkey_main_test.go:247: QUERY path-global | InstanceFiles(%Textures/%) | 295.34ms | rows=174419 | same
+    intkey_main_test.go:247: QUERY path-global | InstanceFiles(%x.dll)×20 | 4.599429s | rows=359 | same
+    intkey_main_test.go:247: QUERY path-global | ContentKinds(all, uncached) | 398.133ms | rows=1354 | same
+    intkey_main_test.go:247: QUERY path-global | SnapshotsWithPNG(all) | 46.478ms | rows=1298 | same
+    intkey_main_test.go:247: QUERY path-global | Languages×100(details) | 25.361ms | rows=64 | same
+    intkey_main_test.go:266: WRITE path-global | write 30 snapshot manifests | 74.6ms
+    intkey_main_test.go:266: WRITE path-global | write 30 Def sets | 59.4ms
+    intkey_main_test.go:208: CONVERT path-hash convert=10.606s file_before_vacuum=318.5MB live_before_vacuum=179.9MB vacuum=1.833s
+    intkey_research_test.go:749: SIZE path-hash file=176.03MB live=176.03MB | def_fact=81.04 dll_facts=27.45 snapshot_file=28.49 file_blobs=0.00 paths=26.03 sets+state+keys=1.09 analysis=5.57 snapshot=5.17 other=1.18
+    intkey_research_test.go:754: SIZE path-hash top: def_fact=47.04 snapshot_file=28.49 def_fact_lookup=24.08 path=21.43 type_fact=10.27 type_fact_lookup=9.71 def_fact_set=8.39 snapshot=5.00 harmony_fact=4.77 path_h=4.60 patch_fact=3.97 type_fact_set=2.25 def_fact_named=1.53 finding=0.96
+    intkey_main_test.go:214: DISK during path-hash: 429 MB
+    intkey_main_test.go:247: QUERY path-hash | defName×100 | 115.453ms | rows=96 | same
+    intkey_main_test.go:247: QUERY path-hash | Name×190 | 209.812ms | rows=193 | same
+    intkey_main_test.go:247: QUERY path-hash | DefsOf×100 | 99.546ms | rows=60428 | same
+    intkey_main_test.go:247: QUERY path-hash | DefCounts(whole table) | 71.906ms | rows=1277 | same
+    intkey_main_test.go:247: QUERY path-hash | CachedDefs(all disabled) | 675.538ms | rows=429390 | same
+    intkey_main_test.go:247: QUERY path-hash | TypeOwners×100 | 4.126ms | rows=83 | same
+    intkey_main_test.go:247: QUERY path-hash | HarmonyPatches(all) | 82.094ms | rows=25198 | same
+    intkey_main_test.go:247: QUERY path-hash | CurrentFiles(incremental scan) | 177.275ms | rows=77252 | same
+    intkey_main_test.go:247: QUERY path-hash | SemanticSet×100 | 15.53ms | rows=8176 | same
+    intkey_main_test.go:247: QUERY path-hash | SnapshotFiles×100(changes page) | 43.705ms | rows=30977 | same
+    intkey_main_test.go:247: QUERY path-hash | InstanceFiles(%Textures/%) | 356.906ms | rows=174419 | same
+    intkey_main_test.go:247: QUERY path-hash | InstanceFiles(%x.dll)×20 | 4.953512s | rows=359 | same
+    intkey_main_test.go:247: QUERY path-hash | ContentKinds(all, uncached) | 523.751ms | rows=1354 | same
+    intkey_main_test.go:247: QUERY path-hash | SnapshotsWithPNG(all) | 66.619ms | rows=1298 | same
+    intkey_main_test.go:247: QUERY path-hash | Languages×100(details) | 33.054ms | rows=64 | same
+    intkey_main_test.go:266: WRITE path-hash | write 30 snapshot manifests | 214ms
+    intkey_main_test.go:266: WRITE path-hash | write 30 Def sets | 100.6ms
+    intkey_main_test.go:208: CONVERT ik+path-mod convert=10.264s file_before_vacuum=331.9MB live_before_vacuum=171.9MB vacuum=1.743s
+    intkey_research_test.go:749: SIZE ik+path-mod file=165.81MB live=165.81MB | def_fact=79.94 dll_facts=27.08 snapshot_file=27.24 file_blobs=0.00 paths=19.53 sets+state+keys=0.91 analysis=4.76 snapshot=5.17 other=1.18
+    intkey_research_test.go:754: SIZE ik+path-mod top: def_fact=45.93 snapshot_file=27.24 def_fact_lookup=24.08 mod_path=19.53 type_fact=9.95 type_fact_lookup=9.71 def_fact_set=8.39 snapshot=5.00 harmony_fact=4.73 patch_fact=3.57 type_fact_set=2.25 def_fact_named=1.53 finding=0.96 harmony_fact_set=0.31
+    intkey_main_test.go:214: DISK during ik+path-mod: 419 MB
+    intkey_main_test.go:247: QUERY ik+path-mod | defName×100 | 126.633ms | rows=96 | same
+    intkey_main_test.go:247: QUERY ik+path-mod | Name×190 | 229.175ms | rows=193 | same
+    intkey_main_test.go:247: QUERY ik+path-mod | DefsOf×100 | 160.759ms | rows=60428 | same
+    intkey_main_test.go:247: QUERY ik+path-mod | DefCounts(whole table) | 72.447ms | rows=1277 | same
+    intkey_main_test.go:247: QUERY ik+path-mod | CachedDefs(all disabled) | 1.038528s | rows=429390 | same
+    intkey_main_test.go:247: QUERY ik+path-mod | TypeOwners×100 | 3.165ms | rows=83 | same
+    intkey_main_test.go:247: QUERY ik+path-mod | HarmonyPatches(all) | 77.487ms | rows=25198 | same
+    intkey_main_test.go:247: QUERY ik+path-mod | CurrentFiles(incremental scan) | 192.448ms | rows=77252 | same
+    intkey_main_test.go:247: QUERY ik+path-mod | SemanticSet×100 | 18.524ms | rows=8176 | same
+    intkey_main_test.go:247: QUERY ik+path-mod | SnapshotFiles×100(changes page) | 53.86ms | rows=30977 | same
+    intkey_main_test.go:247: QUERY ik+path-mod | InstanceFiles(%Textures/%) | 313.828ms | rows=174419 | same
+    intkey_main_test.go:247: QUERY ik+path-mod | InstanceFiles(%x.dll)×20 | 1.727833s | rows=359 | same
+    intkey_main_test.go:247: QUERY ik+path-mod | ContentKinds(all, uncached) | 776.838ms | rows=1354 | same
+    intkey_main_test.go:247: QUERY ik+path-mod | SnapshotsWithPNG(all) | 30.814ms | rows=1298 | same
+    intkey_main_test.go:247: QUERY ik+path-mod | Languages×100(details) | 16.308ms | rows=64 | same
+    intkey_main_test.go:266: WRITE ik+path-mod | write 30 snapshot manifests | 26.4ms
+    intkey_main_test.go:266: WRITE ik+path-mod | write 30 Def sets | 60ms
+    intkey_main_test.go:208: CONVERT blob convert=3.962s file_before_vacuum=257.4MB live_before_vacuum=202.6MB vacuum=2.053s
+    intkey_main_test.go:210: BLOB blob lists=4864 stored_blobs=0 raw=19.4MB raw+mtime=23.5MB zstd=10.1MB zstd+mtime=15.2MB stored=10.1MB
+    intkey_research_test.go:749: SIZE blob file=195.09MB live=195.09MB | def_fact=114.67 dll_facts=33.75 snapshot_file=21.77 file_blobs=11.89 paths=0.00 sets+state+keys=1.09 analysis=5.57 snapshot=5.17 other=1.18
+    intkey_research_test.go:754: SIZE blob top: def_fact=80.66 def_fact_lookup=24.08 snapshot_file=21.77 type_fact=15.70 snapshot_list=11.89 type_fact_lookup=9.71 def_fact_set=8.39 harmony_fact=5.60 snapshot=5.00 patch_fact=3.97 type_fact_set=2.25 def_fact_named=1.53 finding=0.96 patch_fact_analysis=0.59
+    intkey_main_test.go:214: DISK during blob: 447 MB
+    intkey_main_test.go:247: QUERY blob | defName×100 | 123.259ms | rows=96 | same
+    intkey_main_test.go:247: QUERY blob | Name×190 | 214.484ms | rows=193 | same
+    intkey_main_test.go:247: QUERY blob | DefsOf×100 | 104.407ms | rows=60428 | same
+    intkey_main_test.go:247: QUERY blob | DefCounts(whole table) | 89.664ms | rows=1277 | same
+    intkey_main_test.go:247: QUERY blob | CachedDefs(all disabled) | 720.27ms | rows=429390 | same
+    intkey_main_test.go:247: QUERY blob | TypeOwners×100 | 3.212ms | rows=83 | same
+    intkey_main_test.go:247: QUERY blob | HarmonyPatches(all) | 99.675ms | rows=25198 | same
+    intkey_main_test.go:247: QUERY blob | CurrentFiles(incremental scan) | 168.774ms | rows=77252 | same
+    intkey_main_test.go:247: QUERY blob | SemanticSet×100 | 11.75ms | rows=8176 | same
+    intkey_main_test.go:247: QUERY blob | SnapshotFiles×100(changes page) | 20.64ms | rows=30977 | same
+    intkey_main_test.go:247: QUERY blob | InstanceFiles(%Textures/%) | 167.693ms | rows=174419 | same
+    intkey_main_test.go:247: QUERY blob | InstanceFiles(%x.dll)×20 | 413.033ms | rows=359 | same
+    intkey_main_test.go:247: QUERY blob | ContentKinds(all, uncached) | 5.617ms | rows=1354 | same
+    intkey_main_test.go:247: QUERY blob | SnapshotsWithPNG(all) | 4.212ms | rows=1298 | same
+    intkey_main_test.go:247: QUERY blob | Languages×100(details) | 632µs | rows=64 | same
+    intkey_main_test.go:266: WRITE blob | write 30 snapshot manifests | 15.4ms
+    intkey_main_test.go:266: WRITE blob | write 30 Def sets | 58.1ms
+    intkey_main_test.go:208: CONVERT blob-dedup convert=4.226s file_before_vacuum=256.4MB live_before_vacuum=201.6MB vacuum=1.988s
+    intkey_main_test.go:210: BLOB blob-dedup lists=4864 stored_blobs=3312 raw=19.4MB raw+mtime=23.5MB zstd=10.1MB zstd+mtime=15.2MB stored=9.1MB
+    intkey_research_test.go:749: SIZE blob-dedup file=194.11MB live=194.11MB | def_fact=114.67 dll_facts=33.75 snapshot_file=21.77 file_blobs=10.91 paths=0.00 sets+state+keys=1.09 analysis=5.57 snapshot=5.17 other=1.18
+    intkey_research_test.go:754: SIZE blob-dedup top: def_fact=80.66 def_fact_lookup=24.08 snapshot_file=21.77 type_fact=15.70 file_blob=10.77 type_fact_lookup=9.71 def_fact_set=8.39 harmony_fact=5.60 snapshot=5.00 patch_fact=3.97 type_fact_set=2.25 def_fact_named=1.53 finding=0.96 patch_fact_analysis=0.59
+    intkey_main_test.go:214: DISK during blob-dedup: 446 MB
+    intkey_main_test.go:247: QUERY blob-dedup | defName×100 | 120.472ms | rows=96 | same
+    intkey_main_test.go:247: QUERY blob-dedup | Name×190 | 208.131ms | rows=193 | same
+    intkey_main_test.go:247: QUERY blob-dedup | DefsOf×100 | 99.438ms | rows=60428 | same
+    intkey_main_test.go:247: QUERY blob-dedup | DefCounts(whole table) | 87.097ms | rows=1277 | same
+    intkey_main_test.go:247: QUERY blob-dedup | CachedDefs(all disabled) | 661.939ms | rows=429390 | same
+    intkey_main_test.go:247: QUERY blob-dedup | TypeOwners×100 | 2.489ms | rows=83 | same
+    intkey_main_test.go:247: QUERY blob-dedup | HarmonyPatches(all) | 79.82ms | rows=25198 | same
+    intkey_main_test.go:247: QUERY blob-dedup | CurrentFiles(incremental scan) | 91.144ms | rows=77252 | same
+    intkey_main_test.go:247: QUERY blob-dedup | SemanticSet×100 | 6.342ms | rows=8176 | same
+    intkey_main_test.go:247: QUERY blob-dedup | SnapshotFiles×100(changes page) | 14.676ms | rows=30977 | same
+    intkey_main_test.go:247: QUERY blob-dedup | InstanceFiles(%Textures/%) | 165.935ms | rows=174419 | same
+    intkey_main_test.go:247: QUERY blob-dedup | InstanceFiles(%x.dll)×20 | 512.245ms | rows=359 | same
+    intkey_main_test.go:247: QUERY blob-dedup | ContentKinds(all, uncached) | 5.757ms | rows=1354 | same
+    intkey_main_test.go:247: QUERY blob-dedup | SnapshotsWithPNG(all) | 4.644ms | rows=1298 | same
+    intkey_main_test.go:247: QUERY blob-dedup | Languages×100(details) | 573µs | rows=64 | same
+    intkey_main_test.go:266: WRITE blob-dedup | write 30 snapshot manifests | 14.5ms
+    intkey_main_test.go:266: WRITE blob-dedup | write 30 Def sets | 56.9ms
+    intkey_main_test.go:208: CONVERT slim-names convert=601ms file_before_vacuum=245.5MB live_before_vacuum=245.5MB vacuum=1.733s
+    intkey_research_test.go:749: SIZE slim-names file=220.19MB live=220.19MB | def_fact=89.39 dll_facts=33.75 snapshot_file=84.04 file_blobs=0.00 paths=0.00 sets+state+keys=1.09 analysis=5.57 snapshot=5.17 other=1.18
+    intkey_research_test.go:754: SIZE slim-names top: snapshot_file=84.04 def_fact=55.38 def_fact_lookup=24.08 type_fact=15.70 type_fact_lookup=9.71 def_fact_set=8.39 harmony_fact=5.60 snapshot=5.00 patch_fact=3.97 type_fact_set=2.25 def_fact_named=1.53 finding=0.96 patch_fact_analysis=0.59 content_state=0.34
+    intkey_main_test.go:214: DISK during slim-names: 471 MB
+    intkey_main_test.go:247: QUERY slim-names | defName×100 | 83.504ms | rows=96 | DIFF
+    intkey_main_test.go:247: QUERY slim-names | Name×190 | 155.367ms | rows=193 | DIFF
+    intkey_main_test.go:247: QUERY slim-names | DefsOf×100 | 62.126ms | rows=60428 | DIFF
+    intkey_main_test.go:247: QUERY slim-names | DefCounts(whole table) | 61.224ms | rows=1277 | same
+    intkey_main_test.go:247: QUERY slim-names | CachedDefs(all disabled) | 396.667ms | rows=429390 | DIFF
+    intkey_main_test.go:247: QUERY slim-names | TypeOwners×100 | 1.982ms | rows=83 | same
+    intkey_main_test.go:247: QUERY slim-names | HarmonyPatches(all) | 56.348ms | rows=25198 | same
+    intkey_main_test.go:247: QUERY slim-names | CurrentFiles(incremental scan) | 93.475ms | rows=77252 | same
+    intkey_main_test.go:247: QUERY slim-names | SemanticSet×100 | 6.233ms | rows=8176 | same
+    intkey_main_test.go:247: QUERY slim-names | SnapshotFiles×100(changes page) | 14.066ms | rows=30977 | same
+    intkey_main_test.go:247: QUERY slim-names | InstanceFiles(%Textures/%) | 112.548ms | rows=174419 | same
+    intkey_main_test.go:247: QUERY slim-names | InstanceFiles(%x.dll)×20 | 1.403016s | rows=359 | same
+    intkey_main_test.go:247: QUERY slim-names | ContentKinds(all, uncached) | 242.069ms | rows=1354 | same
+    intkey_main_test.go:247: QUERY slim-names | SnapshotsWithPNG(all) | 20.446ms | rows=1298 | same
+    intkey_main_test.go:247: QUERY slim-names | Languages×100(details) | 10.179ms | rows=64 | same
+    intkey_main_test.go:266: WRITE slim-names | write 30 snapshot manifests | 19ms
+    intkey_main_test.go:266: WRITE slim-names | write 30 Def sets | 49ms
+    intkey_main_test.go:208: CONVERT slim-parent convert=631ms file_before_vacuum=245.5MB live_before_vacuum=245.5MB vacuum=2.14s
+    intkey_research_test.go:749: SIZE slim-parent file=242.81MB live=242.81MB | def_fact=112.01 dll_facts=33.75 snapshot_file=84.04 file_blobs=0.00 paths=0.00 sets+state+keys=1.09 analysis=5.57 snapshot=5.17 other=1.18
+    intkey_research_test.go:754: SIZE slim-parent top: snapshot_file=84.04 def_fact=78.00 def_fact_lookup=24.08 type_fact=15.70 type_fact_lookup=9.71 def_fact_set=8.39 harmony_fact=5.60 snapshot=5.00 patch_fact=3.97 type_fact_set=2.25 def_fact_named=1.53 finding=0.96 patch_fact_analysis=0.59 content_state=0.34
+    intkey_main_test.go:214: DISK during slim-parent: 493 MB
+    intkey_main_test.go:247: QUERY slim-parent | defName×100 | 95.355ms | rows=96 | DIFF
+    intkey_main_test.go:247: QUERY slim-parent | Name×190 | 170.644ms | rows=193 | DIFF
+    intkey_main_test.go:247: QUERY slim-parent | DefsOf×100 | 73.633ms | rows=60428 | DIFF
+    intkey_main_test.go:247: QUERY slim-parent | DefCounts(whole table) | 68.944ms | rows=1277 | same
+    intkey_main_test.go:247: QUERY slim-parent | CachedDefs(all disabled) | 492.626ms | rows=429390 | DIFF
+    intkey_main_test.go:247: QUERY slim-parent | TypeOwners×100 | 1.95ms | rows=83 | same
+    intkey_main_test.go:247: QUERY slim-parent | HarmonyPatches(all) | 61.528ms | rows=25198 | same
+    intkey_main_test.go:247: QUERY slim-parent | CurrentFiles(incremental scan) | 96.823ms | rows=77252 | same
+    intkey_main_test.go:247: QUERY slim-parent | SemanticSet×100 | 7.115ms | rows=8176 | same
+    intkey_main_test.go:247: QUERY slim-parent | SnapshotFiles×100(changes page) | 16.49ms | rows=30977 | same
+    intkey_main_test.go:247: QUERY slim-parent | InstanceFiles(%Textures/%) | 117.92ms | rows=174419 | same
+    intkey_main_test.go:247: QUERY slim-parent | InstanceFiles(%x.dll)×20 | 1.416283s | rows=359 | same
+    intkey_main_test.go:247: QUERY slim-parent | ContentKinds(all, uncached) | 233.43ms | rows=1354 | same
+    intkey_main_test.go:247: QUERY slim-parent | SnapshotsWithPNG(all) | 21.232ms | rows=1298 | same
+    intkey_main_test.go:247: QUERY slim-parent | Languages×100(details) | 10.749ms | rows=64 | same
+    intkey_main_test.go:266: WRITE slim-parent | write 30 snapshot manifests | 19.1ms
+    intkey_main_test.go:266: WRITE slim-parent | write 30 Def sets | 49.9ms
+    intkey_main_test.go:208: CONVERT combo-hash convert=8.454s file_before_vacuum=256.4MB live_before_vacuum=150.4MB vacuum=1.257s
+    intkey_main_test.go:210: BLOB combo-hash lists=4864 stored_blobs=3312 raw=19.4MB raw+mtime=23.5MB zstd=10.1MB zstd+mtime=15.2MB stored=9.1MB
+    intkey_research_test.go:749: SIZE combo-hash file=146.26MB live=146.26MB | def_fact=78.33 dll_facts=27.32 snapshot_file=11.03 file_blobs=10.91 paths=5.66 sets+state+keys=1.09 analysis=5.57 snapshot=5.17 other=1.18
+    intkey_research_test.go:754: SIZE combo-hash top: def_fact=44.33 def_fact_lookup=24.08 snapshot_file=11.03 file_blob=10.77 type_fact=10.16 type_fact_lookup=9.71 def_fact_set=8.39 snapshot=5.00 harmony_fact=4.76 path=4.44 patch_fact=3.97 type_fact_set=2.25 def_fact_named=1.53 path_h=1.22
+    intkey_main_test.go:214: DISK during combo-hash: 400 MB
+    intkey_main_test.go:247: QUERY combo-hash | defName×100 | 89.756ms | rows=96 | DIFF
+    intkey_main_test.go:247: QUERY combo-hash | Name×190 | 150.662ms | rows=193 | DIFF
+    intkey_main_test.go:247: QUERY combo-hash | DefsOf×100 | 75.399ms | rows=60428 | DIFF
+    intkey_main_test.go:247: QUERY combo-hash | DefCounts(whole table) | 60.587ms | rows=1277 | same
+    intkey_main_test.go:247: QUERY combo-hash | CachedDefs(all disabled) | 540.52ms | rows=429390 | DIFF
+    intkey_main_test.go:247: QUERY combo-hash | TypeOwners×100 | 2.549ms | rows=83 | same
+    intkey_main_test.go:247: QUERY combo-hash | HarmonyPatches(all) | 59.999ms | rows=25198 | same
+    intkey_main_test.go:247: QUERY combo-hash | CurrentFiles(incremental scan) | 108.893ms | rows=77252 | same
+    intkey_main_test.go:247: QUERY combo-hash | SemanticSet×100 | 7.521ms | rows=8176 | same
+    intkey_main_test.go:247: QUERY combo-hash | SnapshotFiles×100(changes page) | 15.662ms | rows=30977 | same
+    intkey_main_test.go:247: QUERY combo-hash | InstanceFiles(%Textures/%) | 144.284ms | rows=174419 | same
+    intkey_main_test.go:247: QUERY combo-hash | InstanceFiles(%x.dll)×20 | 928.36ms | rows=359 | same
+    intkey_main_test.go:247: QUERY combo-hash | ContentKinds(all, uncached) | 5.61ms | rows=1354 | same
+    intkey_main_test.go:247: QUERY combo-hash | SnapshotsWithPNG(all) | 4.46ms | rows=1298 | same
+    intkey_main_test.go:247: QUERY combo-hash | Languages×100(details) | 617µs | rows=64 | same
+    intkey_main_test.go:266: WRITE combo-hash | write 30 snapshot manifests | 45.2ms
+    intkey_main_test.go:266: WRITE combo-hash | write 30 Def sets | 92.6ms
+    intkey_main_test.go:208: CONVERT combo-ik-mod convert=9.194s file_before_vacuum=255.4MB live_before_vacuum=146.6MB vacuum=1.221s
+    intkey_main_test.go:210: BLOB combo-ik-mod lists=4864 stored_blobs=3312 raw=19.4MB raw+mtime=23.5MB zstd=10.1MB zstd+mtime=15.2MB stored=9.1MB
+    intkey_research_test.go:749: SIZE combo-ik-mod file=141.99MB live=141.99MB | def_fact=77.29 dll_facts=27.07 snapshot_file=10.68 file_blobs=10.91 paths=4.03 sets+state+keys=0.91 analysis=4.76 snapshot=5.17 other=1.18
+    intkey_research_test.go:754: SIZE combo-ik-mod top: def_fact=43.28 def_fact_lookup=24.08 file_blob=10.77 snapshot_file=10.68 type_fact=9.94 type_fact_lookup=9.71 def_fact_set=8.39 snapshot=5.00 harmony_fact=4.72 mod_path=4.03 patch_fact=3.57 type_fact_set=2.25 def_fact_named=1.53 finding=0.96
+    intkey_main_test.go:214: DISK during combo-ik-mod: 396 MB
+    intkey_main_test.go:247: QUERY combo-ik-mod | defName×100 | 97.006ms | rows=96 | DIFF
+    intkey_main_test.go:247: QUERY combo-ik-mod | Name×190 | 181.125ms | rows=193 | DIFF
+    intkey_main_test.go:247: QUERY combo-ik-mod | DefsOf×100 | 138.541ms | rows=60428 | DIFF
+    intkey_main_test.go:247: QUERY combo-ik-mod | DefCounts(whole table) | 54.935ms | rows=1277 | same
+    intkey_main_test.go:247: QUERY combo-ik-mod | CachedDefs(all disabled) | 712.206ms | rows=429390 | DIFF
+    intkey_main_test.go:247: QUERY combo-ik-mod | TypeOwners×100 | 2.92ms | rows=83 | same
+    intkey_main_test.go:247: QUERY combo-ik-mod | HarmonyPatches(all) | 82.279ms | rows=25198 | same
+    intkey_main_test.go:247: QUERY combo-ik-mod | CurrentFiles(incremental scan) | 171.382ms | rows=77252 | same
+    intkey_main_test.go:247: QUERY combo-ik-mod | SemanticSet×100 | 21.809ms | rows=8176 | same
+    intkey_main_test.go:247: QUERY combo-ik-mod | SnapshotFiles×100(changes page) | 27.889ms | rows=30977 | same
+    intkey_main_test.go:247: QUERY combo-ik-mod | InstanceFiles(%Textures/%) | 216.386ms | rows=174419 | same
+    intkey_main_test.go:247: QUERY combo-ik-mod | InstanceFiles(%x.dll)×20 | 483.474ms | rows=359 | same
+    intkey_main_test.go:247: QUERY combo-ik-mod | ContentKinds(all, uncached) | 7.607ms | rows=1354 | same
+    intkey_main_test.go:247: QUERY combo-ik-mod | SnapshotsWithPNG(all) | 5.861ms | rows=1298 | same
+    intkey_main_test.go:247: QUERY combo-ik-mod | Languages×100(details) | 881µs | rows=64 | same
+    intkey_main_test.go:266: WRITE combo-ik-mod | write 30 snapshot manifests | 27ms
+    intkey_main_test.go:266: WRITE combo-ik-mod | write 30 Def sets | 96.7ms
+    intkey_main_test.go:208: CONVERT combo-names convert=9.408s file_before_vacuum=256.4MB live_before_vacuum=150.4MB vacuum=1.224s
+    intkey_main_test.go:210: BLOB combo-names lists=4864 stored_blobs=3312 raw=19.4MB raw+mtime=23.5MB zstd=10.1MB zstd+mtime=15.2MB stored=9.1MB
+    intkey_research_test.go:749: SIZE combo-names file=143.88MB live=143.88MB | def_fact=75.95 dll_facts=27.32 snapshot_file=11.03 file_blobs=10.91 paths=5.66 sets+state+keys=1.09 analysis=5.57 snapshot=5.17 other=1.18
+    intkey_research_test.go:754: SIZE combo-names top: def_fact=41.94 def_fact_lookup=24.08 snapshot_file=11.03 file_blob=10.77 type_fact=10.16 type_fact_lookup=9.71 def_fact_set=8.39 snapshot=5.00 harmony_fact=4.76 path=4.44 patch_fact=3.97 type_fact_set=2.25 def_fact_named=1.53 path_h=1.22
+    intkey_main_test.go:214: DISK during combo-names: 398 MB
+    intkey_main_test.go:247: QUERY combo-names | defName×100 | 101.752ms | rows=96 | DIFF
+    intkey_main_test.go:247: QUERY combo-names | Name×190 | 180.508ms | rows=193 | DIFF
+    intkey_main_test.go:247: QUERY combo-names | DefsOf×100 | 78.645ms | rows=60428 | DIFF
+    intkey_main_test.go:247: QUERY combo-names | DefCounts(whole table) | 72.857ms | rows=1277 | same
+    intkey_main_test.go:247: QUERY combo-names | CachedDefs(all disabled) | 455.132ms | rows=429390 | DIFF
+    intkey_main_test.go:247: QUERY combo-names | TypeOwners×100 | 2.372ms | rows=83 | same
+    intkey_main_test.go:247: QUERY combo-names | HarmonyPatches(all) | 62.07ms | rows=25198 | same
+    intkey_main_test.go:247: QUERY combo-names | CurrentFiles(incremental scan) | 101.847ms | rows=77252 | same
+    intkey_main_test.go:247: QUERY combo-names | SemanticSet×100 | 6.648ms | rows=8176 | same
+    intkey_main_test.go:247: QUERY combo-names | SnapshotFiles×100(changes page) | 14.83ms | rows=30977 | same
+    intkey_main_test.go:247: QUERY combo-names | InstanceFiles(%Textures/%) | 156.388ms | rows=174419 | same
+    intkey_main_test.go:247: QUERY combo-names | InstanceFiles(%x.dll)×20 | 818.721ms | rows=359 | same
+    intkey_main_test.go:247: QUERY combo-names | ContentKinds(all, uncached) | 5.063ms | rows=1354 | same
+    intkey_main_test.go:247: QUERY combo-names | SnapshotsWithPNG(all) | 4.495ms | rows=1298 | same
+    intkey_main_test.go:247: QUERY combo-names | Languages×100(details) | 606µs | rows=64 | same
+    intkey_main_test.go:266: WRITE combo-names | write 30 snapshot manifests | 43.1ms
+    intkey_main_test.go:266: WRITE combo-names | write 30 Def sets | 79.8ms
+--- PASS: TestIntKeyResearch (383.49s)
+PASS
+ok  	github.com/ToumanLin/RimArcho/internal/store	383.693s
+exit=0

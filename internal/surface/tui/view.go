@@ -21,7 +21,6 @@ func (m *model) View() string {
 	lines[0] = m.topBar()
 	body := h - 4 // rows 2 … h-3
 	var content []string
-	var ps []placement
 	switch {
 	case m.loadErr != nil:
 		content = []string{"", "  " + sErrS.Render(fit(T("error: ")+m.loadErr.Error(), m.w-2)),
@@ -41,29 +40,39 @@ func (m *model) View() string {
 		content = m.libraryLines(body)
 	case m.tab == tabSubscribe:
 		content = m.addLines(body)
+	case m.tab == tabSearch:
+		content = m.fsLines(body)
+	case m.tab == tabRules:
+		content = m.rulesLines(body)
+	case m.tab == tabHome:
+		content = m.homeLines(body)
 	case m.full:
-		content, ps = m.fullLines(body)
+		content = m.fullLines(body)
 	case m.pos != nil:
 		// The position input sits under the columns, which give it their last lines.
 		sheet := m.posLines(m.w)
 		bar := m.barView(m.w)
-		content, ps = m.columnLines(max(body-len(bar)-len(sheet)-1, 3))
+		content = m.columnLines(max(body-len(bar)-len(sheet)-1, 3))
 		content = append(append(append(bar, content...), ""), sheet...)
-		ps = shiftPlacements(ps, len(bar))
 	default:
 		bar := m.barView(m.w)
-		content, ps = m.columnLines(max(body-len(bar), 3))
+		content = m.columnLines(max(body-len(bar), 3))
 		content = append(bar, content...)
-		ps = shiftPlacements(ps, len(bar))
-	}
-	if m.images != nil {
-		m.images.set(ps) // an empty list clears the images of the previous screen
 	}
 	for i := 0; i < body && i < len(content); i++ {
 		lines[2+i] = content[i]
 	}
 	lines[h-2] = m.statusLine()
 	lines[h-1] = m.hintLine()
+	if m.cmdOn {
+		// the command line over the last lines: candidates, explanation, input (06 §9.4)
+		cl := m.cmdLines()
+		for i, l := range cl {
+			if r := h - len(cl) + i; r >= 1 {
+				lines[r] = l
+			}
+		}
+	}
 	if m.menu != nil {
 		m.overlayMenu(lines)
 	}
@@ -99,17 +108,21 @@ func (m *model) topBar() string {
 	pill := " " + envText + " "
 	add("  ", 2)
 	add(sPill.Render(pill), width.StringWidth(pill))
-	// the plan being edited (06 §9.1) and its "有未载入的外部版本" (04 §4.3)
+	// the plan being edited (06 §9.1) and its "an outside version has not been loaded" (04 §4.3)
 	if m.st != nil && m.st.Plan != nil {
 		t := T("list") + " " + m.st.Plan.Name
 		add("  "+sText.Render(t), 2+width.StringWidth(t))
+		if m.launches != "" { // only open here: launching plays the current list
+			t := Tf("launching plays %s", m.launches)
+			add("  "+sDimS.Render(t), 2+width.StringWidth(t))
+		}
 		if m.st.WS != nil && m.st.WS.Conflict != 0 && m.w >= 110 {
 			t := Tf("an outside change is not used yet (v%d)", m.st.WS.Conflict)
 			add("  "+sWarnS.Render(t), 2+width.StringWidth(t))
 		}
 	}
 	if n := m.needCount(); n > 0 {
-		t := Tf("needs attention %d", n)
+		t := Tf("can it run %d", n)
 		add("  "+sWarnS.Render(t), 2+width.StringWidth(t))
 	}
 	// (the running game is on the status line, 06 §9.1)
@@ -183,7 +196,7 @@ func (m *model) liveStatus() (string, int) {
 		}
 		return s, w
 	case l != nil && l.NewLog != "":
-		// 08 §2 "游戏退出后": a new Player.log; 能不能跑 (shift+2) analyses it
+		// 08 §2 "after the game exits": a new Player.log; Can it run (shift+2) analyses it
 		return sAccent.Render("● "+l.NewLog) + sDimS.Render("  shift+2"), 2 + width.StringWidth(l.NewLog) + 9
 	}
 	return "", 0
@@ -203,6 +216,9 @@ func (m *model) statusText(w int) string {
 	}
 	if text == "" && m.analyzing {
 		text, kind = T("analyzing…"), sayBusy
+	}
+	if text == "" && m.cmdBusy != "" {
+		text, kind = Tf("running archo %s…", m.cmdBusy), sayBusy
 	}
 	if text == "" {
 		return ""
@@ -260,8 +276,17 @@ func (m *model) hintLine() string {
 		pairs = [][2]string{{"↑↓", T("scroll")}, {"←→", T("previous / next mod")}, {"tab", T("sections")}, {"g", T("tags")}, {"ctrl+w", T("Workshop page")}, {"esc", T("back")}, {"?", T("all keys")}}
 	case m.tab == tabProblems:
 		pairs = [][2]string{{"↑↓", T("choose")}, {"esc", T("back")}, {"l", T("choose a log")}, {"A", T("check the files again")}} // each item shows its own keys
+		if n := view.AutoFixCount(m.prob.base); n > 0 {
+			pairs = append([][2]string{{"F", Tf("fix %d automatically", n)}}, pairs...) // the window's main action
+		}
 	case m.tab == tabSubscribe:
 		pairs = m.addPairs()
+	case m.tab == tabSearch:
+		pairs = m.fsPairs()
+	case m.tab == tabRules:
+		pairs = m.rulesPairs()
+	case m.tab == tabHome:
+		pairs = m.homePairs()
 	case m.tab == tabChanges:
 		pairs = m.changesPairs()
 	case m.tab == tabLibrary && (m.libr.full || m.libr.detail):
@@ -342,6 +367,12 @@ func (m *model) panelLines(n int) []string {
 	inner := max(m.w-4, 10)
 	var out []string
 	if p.choices != nil {
+		for _, line := range p.lines {
+			out = append(out, "  "+sText.Render(fit(line, inner)))
+		}
+		if len(p.lines) > 0 {
+			out = append(out, "")
+		}
 		for i, c := range p.choices {
 			if i == p.choice {
 				out = append(out, "  "+sAccent.Render(markSel+" ")+sSel.Render(fit(c, inner-2)))
@@ -378,12 +409,11 @@ func (m *model) descMax() int {
 	return 12
 }
 
-// detailLines draws the detail column (w wide, n lines, starting at 0-based column x) and
-// returns its image placements. The first line is the area title, "4 details", or the
+// detailLines draws the detail column (w wide, n lines). Its first line is "4 details", or the
 // mod's name once scrolled; in the accent colour when area 4 has the focus (06 §3.2).
-func (m *model) detailLines(w, n, x int) ([]string, []placement) {
+func (m *model) detailLines(w, n int) []string {
 	m.syncDetailOff()
-	lines := m.detailLayout(detailOpts{width: w, descMax: m.descMax(), images: m.inlineImages(), techText: m.detail})
+	lines := m.detailLayout(detailOpts{width: w, descMax: m.descMax(), techText: m.detail})
 	m.lastLines = lines
 	// The scroll is kept as asked until the mod's details have loaded: PgDn pressed while
 	// the description is still on its way would otherwise be lost.
@@ -402,14 +432,10 @@ func (m *model) detailLines(w, n, x int) ([]string, []placement) {
 		st = sAccent
 	}
 	out := []string{sDimS.Render("4 ") + st.Render(fit(title, w-2))}
-	var ps []placement
 	for i := off; i < len(lines) && len(out) < n; i++ {
 		out = append(out, lines[i].text)
-		if p, ok := m.place(lines[i], len(out)-1, n, x+1); ok { // x is 0-based
-			ps = append(ps, p)
-		}
 	}
-	return out, ps
+	return out
 }
 
 var _ = fmt.Sprint

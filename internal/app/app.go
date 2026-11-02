@@ -21,6 +21,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/ids"
+	"github.com/ToumanLin/RimArcho/internal/machine"
 	"github.com/ToumanLin/RimArcho/internal/perftrace"
 	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/textures"
@@ -39,6 +40,8 @@ tombstone_days = 90
 
 // App is one opened RimArcho data directory.
 type App struct {
+	// MemoryProbe replaces cached hardware observations in synthetic tests.
+	MemoryProbe       func() machine.Memory
 	checkContext      context.Context // automatic worker cancellation; never shared with pages
 	dataKey           string          // community data generation read by this connection's compact indexes
 	workspaceSnapshot bool
@@ -137,15 +140,13 @@ type App struct {
 	FindTool func(name string) (path string, ok bool)
 	pageRepo func(string) string // resolved-repository override in local tests
 	SteamAPI string
-	// 贴图优化 (textures.go): TextureEncoder replaces todds, ToddsZip its download URL,
+	// Texture optimisation (textures.go): TextureEncoder replaces todds, ToddsZip its download URL,
 	// ToddsNoPath leaves PATH out when looking for it (tests).
 	TextureEncoder textures.Encoder
 	ToddsZip       string
 	ToddsNoPath    bool
-	// WezTermAPI replaces the portable release endpoint in tests.
-	WezTermAPI string
-	depFinder  *deps.Finder
-	depFake    bool
+	depFinder      *deps.Finder
+	depFake        bool
 	// SteamCollectionAPI reads Workshop collections (04 §9.5); "" is the public endpoint.
 	SteamCollectionAPI string
 	// Uninstall (uninstall.go): UninstallExe is the program to remove ("" this one; a
@@ -159,6 +160,16 @@ type App struct {
 	AfterExitFunc     func(AfterExit) error
 	// Uninstalled is set once an uninstall has run: every command is refused after it.
 	Uninstalled bool
+	// Self-update (selfupdate.go, 07 §5.1), all for tests: SelfUpdateAPI replaces GitHub's
+	// API root, SelfVersion the running version, SelfProgram the program folder,
+	// SelfVersionOf asking the new program its version, SelfOthers listing the other
+	// RimArcho processes in a folder, SelfWaitPoll how often that is asked while waiting.
+	SelfUpdateAPI string
+	SelfVersion   string
+	SelfProgram   string
+	SelfVersionOf func(ctx context.Context, exe string) (string, error)
+	SelfOthers    func(dir string) []*GameRun
+	SelfWaitPoll  time.Duration
 
 	analyzing *pendingAnalysis
 
@@ -167,7 +178,7 @@ type App struct {
 	ixCache  *Index
 	linkInst *linkInstances // InspectGameLinks, keyed like ixCache
 	ixKey    string
-	// pngSnaps: the snapshots with PNG textures (贴图优化), until the snapshots change
+	// pngSnaps: the snapshots with PNG textures (Texture optimisation), until the snapshots change
 	pngSnaps           map[int64]bool
 	pngSnapsKey        string
 	stCache            *LoadoutState
@@ -185,7 +196,17 @@ type App struct {
 }
 
 // Open opens (creating if needed) the data directory home.
-func Open(home string) (*App, error) {
+func Open(home string) (*App, error) { return OpenWith(home, OpenOptions{}) }
+
+// OpenOptions are the optional parts of opening the data directory.
+type OpenOptions struct {
+	// Upgrade receives the progress of a database upgrade while Open runs one (02 §7);
+	// the surfaces show it (cli.upgradeReport).
+	Upgrade func(store.UpgradeProgress)
+}
+
+// OpenWith is Open with options.
+func OpenWith(home string, o OpenOptions) (*App, error) {
 	defer perftrace.Span("app-open")()
 	if err := os.MkdirAll(home, 0o755); err != nil {
 		return nil, err
@@ -199,12 +220,22 @@ func Open(home string) (*App, error) {
 		return nil, err
 	}
 	dbDone := perftrace.Span("db-open-migrate")
-	st, err := store.Open(filepath.Join(home, "archo.db"))
+	st, err := store.OpenUpgrading(filepath.Join(home, "archo.db"), o.Upgrade)
 	dbDone()
 	if err != nil {
 		return nil, err
 	}
 	a := &App{Home: home, Store: st, Config: cfg, Now: time.Now, Rand: rand.Reader, Loc: time.Local}
+	if st.Meta("source-library:legacy-cleared") == "" {
+		if err := os.RemoveAll(filepath.Join(home, "cache", "source")); err != nil {
+			st.Close()
+			return nil, fmt.Errorf("remove legacy source cache: %w", err)
+		}
+		if err := st.SetMeta("source-library:legacy-cleared", "true"); err != nil {
+			st.Close()
+			return nil, err
+		}
+	}
 	// The interfaces check the managed directories at each start (ManagedDirectories is
 	// read after Open, once overrides such as LockBase are installed); it never blocks.
 	// Older installations have no usage metadata. Packs are under Home or an

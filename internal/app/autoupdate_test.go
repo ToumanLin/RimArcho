@@ -119,7 +119,7 @@ func TestAutomaticCommunityDataConditionalChecksAndFailure(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
 		if fail {
-			http.Error(w, "offline", 503)
+			http.Error(w, "offline", http.StatusServiceUnavailable)
 			return
 		}
 		if conditional {
@@ -196,7 +196,7 @@ func TestAutomaticSteamCMDModsCheckOnlyAndKeepsPendingOffline(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
 		if fail {
-			http.Error(w, "offline", 503)
+			http.Error(w, "offline", http.StatusServiceUnavailable)
 			return
 		}
 		fmt.Fprintf(w, `{"response":{"publishedfiledetails":[{"publishedfileid":"1002","result":1,"time_updated":%d}]}}`, e.Now().Add(time.Hour).Unix())
@@ -245,7 +245,7 @@ func TestAutomaticToolVersionsAndOfflineRetention(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
 		if failed {
-			http.Error(w, "offline", 503)
+			http.Error(w, "offline", http.StatusServiceUnavailable)
 			return
 		}
 		switch r.URL.Path {
@@ -259,10 +259,9 @@ func TestAutomaticToolVersionsAndOfflineRetention(t *testing.T) {
 		}
 	}))
 	defer srv.Close()
-	e.App.WezTermAPI = srv.URL
 	base := e.App.HTTP.Transport
 	e.App.HTTP.Transport = automaticTestTransport(func(r *http.Request) (*http.Response, error) {
-		if strings.Contains(r.URL.Host, "steamstatic.com") {
+		if strings.Contains(r.URL.Host, "steamstatic.com") || r.URL.Host == "api.github.com" {
 			req, err := http.NewRequestWithContext(r.Context(), r.Method, srv.URL+r.URL.Path, nil)
 			if err != nil {
 				return nil, err
@@ -349,37 +348,5 @@ func TestAutomaticGitAndAuthenticatedPageChecksNeverInstall(t *testing.T) {
 	r, err := subscribe.Read(folder)
 	if err != nil || r.Installed != "1.0" || r.Latest != "2.0" {
 		t.Fatal("page check changed installed version or missed update", r, err)
-	}
-}
-
-func TestAutomaticWezTermVersionWithoutExecutingTool(t *testing.T) {
-	// Force the real finder down its managed-copy path without host discovery.
-	e := testkit.New(t)
-	t.Setenv("PATH", "")
-	for _, key := range []string{"ProgramW6432", "ProgramFiles", "LOCALAPPDATA"} {
-		t.Setenv(key, e.Root)
-	}
-	path := filepath.Join(e.Home, "wezterm", "WezTerm-windows-20240101-000000-fixture", "wezterm-gui.exe")
-	e.WriteFile(path, "fixture, never execute")
-	e.App.SteamCMDNoPath = true
-	calls := 0
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls++
-		if r.URL.Path != "/repos/wezterm/wezterm/releases/latest" {
-			t.Error("unexpected tool lookup", r.URL)
-		}
-		io.WriteString(w, `{"tag_name":"20240203-110809-fixture"}`)
-	}))
-	defer srv.Close()
-	e.App.WezTermAPI = srv.URL
-	if ran, err := e.App.RunAutomatic(context.Background(), "tools", nil); !ran || err != nil {
-		t.Fatal(ran, err)
-	}
-	if s := e.App.ToolUpdate("wezterm"); !s.Pending || !s.Compatible || s.Installed != "20240101-000000-fixture" || calls != 1 {
-		t.Fatal(s, calls)
-	}
-	b, _ := os.ReadFile(path)
-	if string(b) != "fixture, never execute" {
-		t.Fatal("check changed tool")
 	}
 }

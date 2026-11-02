@@ -48,14 +48,14 @@ const server = http.createServer((req, res) => {
     results.push('PASS esc abandons the new-list form');
     await page.locator('.pm-row.on').focus(); await page.keyboard.press('i');
     await page.locator('.pm-import textarea').waitFor();
-    assert((await page.locator('#crumbs').innerText()).replace(/\s/g,'').endsWith('库/列表/导入'), 'import breadcrumb');
+    assert((await page.locator('#crumbs').innerText()).replace(/\s/g,'').endsWith('Library/Lists/Import'), 'import breadcrumb');
     assert(!await state(async () => (await import('/js/state.js')).S.popup), 'import opened a popup');
     await page.keyboard.press('Escape'); await page.locator('.pm-list').waitFor();
     results.push('PASS import breadcrumb, management selection and esc return');
     const code = await state(async () => (await (await import('/js/state.js')).api.ExportCopy('rimcrow')).text);
     await page.locator('.pm-row.on').focus(); await page.keyboard.press('i');
     await page.locator('.pm-import textarea').fill(code);
-    await page.locator('.xc-body button').filter({hasText:'预览'}).click();
+    await page.locator('.xc-body button').filter({hasText:'preview'}).click();
     await page.locator('.xc-preview input.xc-input').waitFor();
     assert(await page.locator('.xc-preview input[type=radio]').count() === 3, 'not three destinations');
     await page.locator('.xc-preview input.xc-input').fill(shareName);
@@ -64,7 +64,7 @@ const server = http.createServer((req, res) => {
     results.push('PASS share code: preview, three destinations, import, selected result');
     await page.locator('.pm-row.on').focus(); await page.keyboard.press('i');
     await page.locator('.pm-import textarea').fill('https://steamcommunity.com/sharedfiles/filedetails/?id=3000000001');
-    await page.locator('.xc-body button').filter({hasText:'预览'}).click();
+    await page.locator('.xc-body button').filter({hasText:'preview'}).click();
     const follow = page.locator('.xc-preview input[type=checkbox]'); await follow.waitFor();
     await page.screenshot({path:'tmp/dialog-check/collection-import.png'});
     assert(await follow.isChecked(), 'collection follow is not on by default');

@@ -27,7 +27,7 @@ func fixture(t *testing.T) (*Finder, map[string]string) {
 	t.Helper()
 	dir := t.TempDir()
 	settings := map[string]string{}
-	f := &Finder{Home: filepath.Join(dir, "home"), LocalDir: filepath.Join(dir, "local"), ProgramDir: filepath.Join(dir, "program"),
+	f := &Finder{LocalDir: filepath.Join(dir, "local"),
 		Setting: func(k string) string { return settings[k] }, Version: func(name, path string) (string, error) { return textures.ToddsVersion, nil }}
 	return f, settings
 }
@@ -113,56 +113,8 @@ func TestSteamCMDOrderWithoutRunningIt(t *testing.T) {
 	}
 }
 
-func TestWezTermOrderAndPortableVersion(t *testing.T) {
-	f, settings := fixture(t)
-	f.Version = nil
-	configured := file(t, filepath.Join(t.TempDir(), "custom.exe"))
-	fromPath := file(t, filepath.Join(t.TempDir(), "wezterm-gui.exe"))
-	pf := t.TempDir()
-	f.ProgramFiles = []string{pf}
-	programFiles := file(t, filepath.Join(pf, "WezTerm", "wezterm-gui.exe"))
-	flat := file(t, filepath.Join(f.Home, WezTerm, "wezterm-gui.exe"))
-	file(t, filepath.Join(f.Home, WezTerm, "WezTerm-windows-20230101-a", "wezterm-gui.exe"))
-	newest := file(t, filepath.Join(f.Home, WezTerm, "WezTerm-windows-20240203-b", "wezterm-gui.exe"))
-	settings["wezterm.path"] = configured
-	f.LookPath = func(string) (string, error) {
-		if isFile(fromPath) {
-			return fromPath, nil
-		}
-		return "", errors.New("missing")
-	}
-	for _, tc := range []struct {
-		path, source, version string
-		own                   bool
-	}{
-		{configured, "config", "", false}, {fromPath, "path", "", false}, {programFiles, "program-files", "", false},
-		{flat, "own", "", true}, {newest, "own", "20240203-b", true},
-	} {
-		i := f.Status(WezTerm)
-		if i.Path != tc.path || i.Source != tc.source || i.Version != tc.version || i.Own != tc.own || !i.OK {
-			t.Fatalf("got %+v, want %+v", i, tc)
-		}
-		if err := os.Remove(tc.path); err != nil {
-			t.Fatal(err)
-		}
-	}
-}
-
-func TestFontAllAndUnknown(t *testing.T) {
+func TestAllAndUnknown(t *testing.T) {
 	f, _ := fixture(t)
-	if i := f.Status(Font); i.OK || i.Installable || i.Own || i.ConfigKey != "" {
-		t.Fatalf("missing font %+v", i)
-	}
-	file(t, filepath.Join(f.ProgramDir, "fonts", "README.txt"))
-	if f.Status(Font).OK {
-		t.Fatal("non-font counts as font")
-	}
-	file(t, filepath.Join(f.ProgramDir, "fonts", "Maple.ttf"))
-	file(t, filepath.Join(f.ProgramDir, "fonts", "nested", "Maple.OTF"))
-	i := f.Status(Font)
-	if !i.OK || i.Version != "2 font files" || i.Source != "bundled" {
-		t.Fatalf("font %+v", i)
-	}
 	var names []string
 	for _, i := range f.All() {
 		names = append(names, i.Name)

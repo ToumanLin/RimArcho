@@ -2,7 +2,6 @@ package app
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,7 +9,6 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/accounts"
 	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/env"
-	"github.com/ToumanLin/RimArcho/internal/host"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/textures"
 )
@@ -24,24 +22,13 @@ func (a *App) Deps() *deps.Finder {
 		a.depFake = fake
 	}
 	f := a.depFinder
-	f.Home, f.LocalDir = a.Home, a.LocalDir()
-	exe, _ := os.Executable()
-	f.ProgramDir = filepath.Dir(exe)
+	f.LocalDir = a.LocalDir()
 	f.Setting = func(key string) string { return a.Store.Meta("cfg:" + key) }
 	f.LookPath = func(name string) (string, error) {
 		if name == "todds" && a.ToddsNoPath || name == "steamcmd" && a.SteamCMDNoPath {
 			return "", exec.ErrNotFound
 		}
 		return exec.LookPath(name)
-	}
-	f.ProgramFiles = nil
-	for _, key := range []string{"ProgramW6432", "ProgramFiles", "LOCALAPPDATA"} {
-		if dir := os.Getenv(key); dir != "" {
-			if key == "LOCALAPPDATA" {
-				dir = filepath.Join(dir, "Programs")
-			}
-			f.ProgramFiles = append(f.ProgramFiles, dir)
-		}
 	}
 	if fake {
 		f.Version = func(name, path string) (string, error) {
@@ -62,13 +49,6 @@ func (a *App) InstallDep(name string, progress func(done, total int64)) (path st
 			a.recordToolInstalled(name)
 		}
 	}()
-	if name == deps.WezTerm {
-		unlock := accounts.Lock(a.Deps().Status(name).Dir)
-		defer unlock()
-		if err := toolIdle(name); err != nil {
-			return "", err
-		}
-	}
 	switch name {
 	case deps.Todds:
 		return a.InstallToddsProgress(progress)
@@ -86,22 +66,13 @@ func (a *App) InstallDep(name string, progress func(done, total int64)) (path st
 			return info.Path, p.Wait()
 		}
 		return a.installSteamCMDProgress(a.Deps().Status(name).Dir, progress)
-	case deps.WezTerm:
-		api := a.WezTermAPI
-		if api == "" {
-			api = host.GitHubAPI
-		}
-		h := &host.Host{Home: a.Home, API: api, HTTP: a.HTTP, Out: io.Discard}
-		return h.DownloadProgress(progress)
-	case deps.Font:
-		return "", fmt.Errorf("the font ships with RimArcho; reinstall the release zip")
 	default:
 		return "", fmt.Errorf("unknown dependency %q", name)
 	}
 }
 
-// RemoveDep removes only the selected managed copy, never a configured external,
-// PATH or Program Files copy. It leaves configuration and other copies unchanged.
+// RemoveDep removes only the selected managed copy, never a configured external
+// or PATH copy. It leaves configuration and other copies unchanged.
 func (a *App) RemoveDep(name string) error {
 	i := a.Deps().Status(name)
 	key := i.Dir
@@ -193,17 +164,6 @@ func (a *App) OfferDep(name string) (*SteamCMDOffer, error) {
 		return offer, err
 	case deps.Todds:
 		offer := a.OfferTodds()
-		return &SteamCMDOffer{URL: offer.URL, Dir: dir, Bytes: offer.Bytes}, nil
-	case deps.WezTerm:
-		api := a.WezTermAPI
-		if api == "" {
-			api = host.GitHubAPI
-		}
-		h := &host.Host{Home: a.Home, API: api, HTTP: a.HTTP, Out: io.Discard}
-		offer, err := h.Offer()
-		if err != nil {
-			return nil, err
-		}
 		return &SteamCMDOffer{URL: offer.URL, Dir: dir, Bytes: offer.Bytes}, nil
 	default:
 		return nil, fmt.Errorf("unknown installable dependency %q", name)

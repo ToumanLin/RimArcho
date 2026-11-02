@@ -25,7 +25,7 @@ func TestSubscriptionTaskTextAndActions(t *testing.T) {
 	if strings.Contains(r.Say, "http") || strings.Contains(r.Say, "failed:") || strings.Count(r.Say, "作者删除或设为私有") != 1 || len(strings.Split(r.Say, "\n")) != 3 {
 		t.Fatalf("summary %q", r.Say)
 	}
-	if r.Items[1].Why != "已不在创意工坊" || r.Items[0].Why != "" || r.Items[1].WorkshopURL != "https://steamcommunity.com/sharedfiles/filedetails/?id=2" {
+	if r.Items[1].Why != "已从创意工坊下架（作者删除或设为私有）" || r.Items[0].Why != "" || r.Items[1].WorkshopURL != "https://steamcommunity.com/sharedfiles/filedetails/?id=2" {
 		t.Fatalf("items %+v", r.Items)
 	}
 	for _, a := range r.Acts {
@@ -40,7 +40,7 @@ func TestSubscriptionTaskTextAndActions(t *testing.T) {
 		if a.ID == "retry" {
 			t.Fatal("permanent failure offers retry")
 		}
-		if a.ID == "goto" && (!a.Primary || a.Label != "前往订阅与更新") {
+		if a.ID == "goto" && (!a.Primary || a.Label != "前往更新") {
 			t.Fatalf("goto %+v", a)
 		}
 	}
@@ -57,7 +57,7 @@ func TestSubscriptionTaskTextAndActions(t *testing.T) {
 	}
 	SetLang("en")
 	r = BuildTasks([]app.Task{task}, time.Now()).Rows[0]
-	if r.Title != "subscribe Named Mod" || r.Items[0].Why != "no longer on the Workshop" {
+	if r.Title != "subscribe Named Mod" || r.Items[0].Why != "removed from the Workshop (the author deleted it or made it private)" {
 		t.Fatalf("English %+v", r)
 	}
 }

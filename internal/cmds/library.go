@@ -9,12 +9,12 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Mod 库存 (06 §2.9): every mod on this machine, one line per Lineage; --lineage shows each
+// Mod library (06 §2.9): every mod on this machine, one line per Lineage; --lineage shows each
 // copy. The GUI page, the TUI list and MCP list_library filter the same app.Library.
 func init() {
 	flags := []Flag{
 		{Name: "search", Value: "<words>", Help: "all words in a name, package id, author, alias, tag, note, Workshop ID or folder"},
-		{Name: "include", Value: "<key:value>", Multi: true, Help: "keep copies with this value; keys tag, source, location (source folder path), version, state, used, updated (week, month, half-year, older); one key's values: either, different keys: all"},
+		{Name: "include", Value: "<key:value>", Multi: true, Help: "keep copies with this value; keys lists (list name), tag, tags (exact tag), source, location (source folder path), version, state, used, updated (week, month, half-year, older); one key's values: either, different keys: all"},
 		{Name: "exclude", Value: "<key:value>", Multi: true, Help: "drop copies with this value"},
 		{Name: "sort", Value: "name|size|state|source|used|updated|version|author|tags|changed|played", Help: "default name; a leading - reverses"},
 		{Name: "lineage", Value: "<ref>", Help: "one mod: every copy with its path, states, plans and last launch"},

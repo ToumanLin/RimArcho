@@ -110,7 +110,15 @@ func TestSubscriptionsThreeSections(t *testing.T) {
 			}
 		}
 	}
+	for _, recent := range p.Recent {
+		if recent.ID == "" || st.Ix.ByID[recent.ID] == nil {
+			t.Fatalf("recent subscription lacks its exact installed instance: %+v", recent)
+		}
+	}
 	// Instance IDs are incidental to the section contents.
+	for i := range p.Recent {
+		p.Recent[i].ID = "id"
+	}
 	for i := range p.Pending {
 		p.Pending[i].ID, p.Pending[i].Ref = "id", "ref"
 	}
@@ -228,23 +236,16 @@ func TestWorkshopFailureReasonsAndGrouping(t *testing.T) {
 		t.Fatal(err)
 	}
 	row := page.Sources[0]
-	// The two gone items are listed but are not failures.
-	if row.Result != "9 个失败" {
-		t.Fatal(row.Result)
+	// Removed Workshop pages are not check failures and have their own installed-copy rows.
+	if row.Result != view.Tf("%d checks failed", 9) || len(row.Failures) != 9 || len(page.Gone) != 2 {
+		t.Fatalf("removed/check sections: %+v / %+v", row, page.Gone)
 	}
-	found := false
-	for _, group := range row.Failures {
-		if group.Label == "2 个已从工坊消失" {
-			found = true
-			if len(group.Items) != 2 || !strings.Contains(group.Items[0], "工坊里已找不到（被删除或设为私有）") {
-				t.Fatal(group)
-			}
+	for _, gone := range page.Gone {
+		if gone.ID == "" || gone.Ref == "" || !strings.HasPrefix(gone.Name, "Fixture ") {
+			t.Fatalf("removed copy lacks identity: %+v", gone)
 		}
 	}
-	if !found || len(row.Failures) != 10 {
-		t.Fatal(row)
-	}
-	if page.Summary.Failed != "9 个检查失败" {
+	if page.Summary.Failures != 9 || !strings.Contains(page.Summary.Line, view.Tf("%d checks failed", 9)) {
 		t.Fatal(page.Summary)
 	}
 	for _, code := range []int{2, 15, 16, 20, 24, 25, 26, 41, 84, 999} {
@@ -255,7 +256,7 @@ func TestWorkshopFailureReasonsAndGrouping(t *testing.T) {
 	}
 }
 
-// 打开来源页 (06 §2.9): two commits on GitHub / GitLab open their compare view; otherwise the
+// open the source page (06 §2.9): two commits on GitHub / GitLab open their compare view; otherwise the
 // repository or the download page.
 func TestSubscriptionSourceURL(t *testing.T) {
 	t.Parallel()

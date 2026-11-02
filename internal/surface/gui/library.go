@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Mod 库存 › 全部 (06 §2.9). The library is built once per database state; each filter
+// Mod library > All (06 §2.9). The library is built once per database state; each filter
 // click only filters it again.
 
 // inventoryKey includes invocation options as well as database changes (opening a
@@ -243,7 +243,7 @@ var openDir = func(dir string) error {
 	return exec.Command("xdg-open", dir).Start()
 }
 
-// ModCopies is the full detail's Mod 库存 part (06 §4.2): the Lineage row of the mod with
+// ModCopies is the full detail's Mod library part (06 §4.2): the Lineage row of the mod with
 // the instance id (or the copy ref), every copy with its state, place, size, version, note,
 // plans and ops, and the op table they refer to.
 type ModCopies struct {

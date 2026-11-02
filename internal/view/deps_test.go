@@ -40,12 +40,6 @@ func TestExternalToolsSettings(t *testing.T) {
 			}
 			for j, it := range g.Items {
 				name := deps.Names[j]
-				if name == deps.Font {
-					if it.Edit != "" || len(it.Actions) != 0 || it.Value == "" {
-						t.Fatalf("font controls %+v", it)
-					}
-					continue
-				}
 				if it.Edit != "path" || it.EditValue == nil || !it.File || view.SettingCommand(it.Argv) != nil {
 					t.Fatalf("path editor %+v", it)
 				}
@@ -56,9 +50,6 @@ func TestExternalToolsSettings(t *testing.T) {
 					if it.Value != view.T("installed") || !strings.Contains(it.Note, path) || len(it.Actions) != 2 || *it.EditValue != "" {
 						t.Fatalf("own SteamCMD %+v", it)
 					}
-				}
-				if name == deps.WezTerm && !strings.Contains(it.Note, view.T("only needed for the terminal interface (archo tui)")) {
-					t.Fatal(it.Note)
 				}
 				for _, act := range it.Actions {
 					if view.SettingCommand(act.Argv) != nil || act.Task == "" || act.Pending == "" || act.Confirm == "" || !view.IsSettingTask(act.Task) {
@@ -79,9 +70,17 @@ func TestExternalToolConfiguredEditValue(t *testing.T) {
 	e.WriteFile(external, "external")
 	e.MustRun("config", "set", "steamcmd.path", external)
 	g := view.DependencyGroup(e.App)
-	it := g.Items[2]
-	if it.EditValue == nil || *it.EditValue != external || len(it.Actions) != 1 || !strings.Contains(it.Note, external) {
+	it := g.Items[1]
+	if it.EditValue == nil || *it.EditValue != external || len(it.Actions) != 2 || !strings.Contains(it.Note, external) {
 		t.Fatalf("configured row %+v", it)
+	}
+	reset := it.Actions[1]
+	if reset.Label != view.T("use default") || view.SettingCommand(reset.Argv) != nil {
+		t.Fatal(reset)
+	}
+	e.MustRun(reset.Argv...)
+	if next := view.DependencyGroup(e.App).Items[1]; next.EditValue == nil || *next.EditValue != "" {
+		t.Fatal(next)
 	}
 }
 
@@ -91,7 +90,7 @@ func TestSteamCMDRemovalHiddenWhenItHoldsMods(t *testing.T) {
 	dir := filepath.Join(e.App.LocalDir(), deps.SteamCMD)
 	e.WriteFile(filepath.Join(dir, "steamcmd.exe"), "tool")
 	e.WriteFile(filepath.Join(dir, "steamapps", "workshop", "content", "294100", "123", "keep.txt"), "mod")
-	it := view.DependencyGroup(e.App).Items[2]
+	it := view.DependencyGroup(e.App).Items[1]
 	if len(it.Actions) != 1 || it.Actions[0].Argv[1] != "install" {
 		t.Fatalf("unsafe removal offered: %+v", it.Actions)
 	}

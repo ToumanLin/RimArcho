@@ -48,11 +48,3 @@ func missingRequired(a *app.App) []string {
 	}
 	return out
 }
-
-func init() {
-	Register(map[string]string{
-		"required mods are missing": "缺少前置 Mod",
-		"the game will not load the mods below and may reset its mod list to the base game:": "下面这些 Mod 游戏不会加载，还可能把 Mod 列表重置成只有本体和 DLC：",
-		"launch anyway": "仍然启动",
-	})
-}

@@ -80,7 +80,7 @@ func Compute(dir string, prev map[string]File) (Fingerprint, error) {
 }
 
 // ComputeSkip is Compute leaving out the files RimArcho wrote into the folder (lower-cased
-// Rel; the DDS of 贴图优化), so writing them is not an update of the mod.
+// Rel; the DDS of Texture optimisation), so writing them is not an update of the mod.
 func ComputeSkip(dir string, prev map[string]File, generated func(realDir string) map[string]bool) (Fingerprint, error) {
 	var fp Fingerprint
 	fp.Semantic = SemanticSet{}

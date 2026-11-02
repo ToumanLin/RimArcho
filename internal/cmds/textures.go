@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
-// 贴图优化 (08 §5.2): the DDS of mods' PNGs, written next to them. The game loads the DDS in
+// Texture optimisation (08 §5.2): the DDS of mods' PNGs, written next to them. The game loads the DDS in
 // their place; the PNGs stay. Packs convert their own copies (pack build --textures).
 func init() {
 	// an existing todds (a folder or the program, e.g. RimSort's); "" is RimArcho's own copy

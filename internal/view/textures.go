@@ -8,14 +8,14 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
-// 贴图优化 (08 §5.2, 06 §2.13): the page that converts the current plan's (or every mod's)
-// PNG textures to DDS next to them, and takes them back; Mod 库存 does the same per copy
+// Texture optimisation (08 §5.2, 06 §2.13): the page that converts the current plan's (or every mod's)
+// PNG textures to DDS next to them, and takes them back; Mod library does the same per copy
 // (OpTextures, OpTexClean), packs on their own copies (PackPreview's textures step).
 
 // TextureScales are the choices offered, full size first.
 var TextureScales = []int{100, 80, 75, 60, 50, 40, 25, 20}
 
-// TextureScaleLabel names a choice: 原尺寸 or a percent.
+// TextureScaleLabel names a choice: full size or a percent.
 func TextureScaleLabel(s int) string {
 	if s <= 0 || s >= 100 {
 		return T("full size")
@@ -23,7 +23,7 @@ func TextureScaleLabel(s int) string {
 	return Tf("%d%%", s)
 }
 
-// TexturePage is the 贴图优化 page.
+// TexturePage is the Texture optimisation page.
 type TexturePage struct {
 	Loading bool `json:"loading,omitempty"`
 	// Measured: the textures were read (Scope, Scale say with what). The page opens with
@@ -209,7 +209,7 @@ func TextureProgressText(p app.TextureProgress) string {
 	return s
 }
 
-// TextureFields are a copy's 贴图 line in Mod 库存's detail ("" none).
+// TextureFields are a copy's textures line in Mod library's detail ("" none).
 func TextureField(i *app.LibInstance) string {
 	t := i.Textures
 	if t == nil || t.Files == 0 {

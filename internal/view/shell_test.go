@@ -43,7 +43,7 @@ func TestNavAndPath(t *testing.T) {
 	}
 	g := view.Nav(n.Count, plans, []view.PackRow{{Name: "Main"}})
 	if len(g) != 2 || g[0].Title != "playing" || g[1].Title != "library" {
-		t.Fatalf("two groups, 在玩 and 库 (06 §2.1): %+v", g)
+		t.Fatalf("two groups, Playing and Library (06 §2.1): %+v", g)
 	}
 	var ids, keys []string
 	for _, gr := range g {
@@ -60,7 +60,7 @@ func TestNavAndPath(t *testing.T) {
 	if g[0].Items[1].Badge != n.Count || n.Count == 0 {
 		t.Fatalf("badge %d, needs %d", g[0].Items[1].Badge, n.Count)
 	}
-	// only 能不能跑 carries a number (06 §2.1)
+	// only Can it run carries a number (06 §2.1)
 	for _, gr := range g {
 		for _, it := range gr.Items {
 			if it.ID != view.PageNeeds && it.Badge != 0 {
@@ -81,7 +81,7 @@ func TestNavAndPath(t *testing.T) {
 		"plans":       "library=plan / lists=plan / all lists=plans",
 		"needs":       "playing=home / can it run=needs",
 		"log":         "playing=home / game log=log",
-		"changes":     "library=plan / mod library=library / subscriptions and updates=changes",
+		"changes":     "library=plan / mod library=library / updates=changes",
 		"library":     "library=plan / mod library=library / all mods=library",
 		"pack:Main":   "library=plan / packs=packs / Main=pack:Main",
 		"settings":    "settings=settings",

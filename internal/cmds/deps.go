@@ -10,7 +10,7 @@ import (
 
 func init() {
 	register(&Command{Name: "deps", Summary: "show external dependencies: status, version, path and source", MaxArgs: 0, Run: depsCmd})
-	register(&Command{Name: "deps install", Args: "<name>", Summary: "download todds, steamcmd or wezterm into RimArcho's own folder", MinArgs: 1, MaxArgs: 1, Run: depsInstallCmd})
+	register(&Command{Name: "deps install", Args: "<name>", Summary: "download todds or steamcmd into RimArcho's own folder", MinArgs: 1, MaxArgs: 1, Run: depsInstallCmd})
 	register(&Command{Name: "deps remove", Args: "<name>", Summary: "remove only RimArcho's own downloaded dependency", MinArgs: 1, MaxArgs: 1, Run: depsRemoveCmd})
 }
 
@@ -21,7 +21,7 @@ func depsCmd(c *Ctx, _ *Args) (*render.Doc, error) {
 		status := "not installed"
 		if i.OK {
 			status = "installed"
-		} else if i.Path != "" && i.Name != deps.Font {
+		} else if i.Path != "" {
 			status = "unavailable"
 		}
 		s.KV("status", status)

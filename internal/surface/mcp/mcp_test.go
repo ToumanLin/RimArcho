@@ -55,12 +55,14 @@ func TestToolsAndAnnotations(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[string]string{ // name → expected annotation: ro, write, destructive
+		"guide":  "ro", // 05 §5.3: the detail behind the short descriptions
 		"status": "ro", "find_mods": "ro", "get_mod": "ro", "get_def": "ro", "get_patches": "ro", "get_harmony": "ro",
 		"explain_relation": "ro", "list_problems": "ro", "list_changes": "ro", "analyze_log": "ro", "search_files": "ro",
 		"read_source": "ro", "edit_loadout": "write", "copy_local": "write", "save_loadout": "destructive", "add_rule": "write",
 		"get_description": "ro", "set_player_data": "write",
-		"test_run":    "write",
-		"check_links": "ro", "repair_links": "destructive",
+		"test_run":        "write",
+		"estimate_memory": "ro",
+		"check_links":     "ro", "repair_links": "destructive",
 		// 05 §1.2: the player actions that only had CLI commands.
 		"manage_rules": "write", "ignore_problem": "write", "scan": "write", "exchange_list": "write",
 		"mute_version_warnings": "write",
@@ -68,13 +70,13 @@ func TestToolsAndAnnotations(t *testing.T) {
 		"pin_mod": "write", "unpin_mod": "write",
 		// 0.9: launching, plans and their history.
 		"launch_game": "destructive", "manage_plans": "destructive", "plan_history": "ro",
-		// 06 §2.9: Mod 库存.
+		// 06 §2.9: Mod library.
 		"list_library": "ro", "manage_library": "destructive",
 		// 02 §3.4: subscriptions RimArcho installs and updates (Git, download pages, SteamCMD).
 		"manage_subscriptions": "destructive",
 		// Uninstall: only its dry run (05 §5.2).
 		"preview_uninstall": "ro",
-		// 贴图优化 (08 §5.2).
+		// Texture optimisation (08 §5.2).
 		"manage_textures": "destructive",
 	}
 	openWorld := map[string]bool{"get_description": true, "exchange_list": true, "maintenance": true, "manage_subscriptions": true}
@@ -97,9 +99,9 @@ func TestToolsAndAnnotations(t *testing.T) {
 		case a.OpenWorldHint == nil || *a.OpenWorldHint != openWorld[tl.Name]:
 			t.Errorf("%s: openWorldHint %v, want %v", tl.Name, a.OpenWorldHint, openWorld[tl.Name])
 		}
-		// 05 §5.3: every description gives an example call with output.
-		if !strings.Contains(tl.Description, "Example: "+tl.Name+" {") {
-			t.Errorf("%s: description has no example call", tl.Name)
+		// 05 §5.3: every tool's guide topic gives an example call with output.
+		if text, ok := cmds.Guide(tl.Name); tl.Name != "guide" && (!ok || !strings.Contains(text, "Example: "+tl.Name+" {")) {
+			t.Errorf("%s: no guide topic with an example call", tl.Name)
 		}
 	}
 	for n := range want {
@@ -108,11 +110,14 @@ func TestToolsAndAnnotations(t *testing.T) {
 		}
 	}
 	r := cs.InitializeResult()
-	if r == nil || !strings.Contains(r.Instructions, "analyze_log") {
-		t.Fatal("server instructions missing the diagnosis workflow")
+	if r == nil || !strings.Contains(r.Instructions, "analyze_log") || !strings.Contains(r.Instructions, "guide topic=diagnose") {
+		t.Fatal("server instructions do not lead to the diagnosis workflow")
 	}
-	if !strings.Contains(r.Instructions, "Save loading") || !strings.Contains(r.Instructions, "pattern=<id>") {
-		t.Error("server instructions missing the pattern checklist")
+	if text, _ := cmds.Guide("diagnose"); !strings.Contains(text, "Classify the failure") || !strings.Contains(text, "guide topic=errors") {
+		t.Error("guide topic diagnose is not the diagnosis workflow")
+	}
+	if text, _ := cmds.Guide("errors"); !strings.Contains(text, "Save loading") || !strings.Contains(text, "pattern=<id>") {
+		t.Error("guide topic errors is not the pattern checklist")
 	}
 	// Every destructive tool is named in the instructions' list; "unsaved" is gone (04 §3).
 	for n, kind := range want {
@@ -141,6 +146,10 @@ func TestCLIParity(t *testing.T) {
 		cli  []string
 	}{
 		{"status", nil, []string{"status"}},
+		{"guide", nil, []string{"guide"}},
+		{"guide", map[string]any{"topic": "diagnose"}, []string{"guide", "diagnose"}},
+		{"guide", map[string]any{"topic": "search_files"}, []string{"guide", "search_files"}},
+		{"guide", map[string]any{"topic": "nope"}, []string{"guide", "nope"}},
 		{"find_mods", map[string]any{"query": "mod"}, []string{"find", "mod"}},
 		{"find_mods", map[string]any{"active": true}, []string{"list", "--active"}},
 		{"get_mod", map[string]any{"ref": modA}, []string{"mod", modA}},

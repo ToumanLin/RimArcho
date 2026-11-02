@@ -8,15 +8,15 @@ import (
 )
 
 // The filter bar of the plan editor (06 §2.5, §3.7): one search box and one set of filters
-// for 未启用 and 已启用 together. The bar's groups and values are the same JSON as Mod 库存's
+// for Not enabled and Enabled together. The bar's groups and values are the same JSON as Mod library's
 // (LibGroup, LibChoice, LibCond), so both pages draw them with one component.
 //
 // A filter is "group:value" ("-group:value" leaves out). Within a group the values are
-// "or", between groups "and", as in Mod 库存 (06 §2.9). The search box is the column search
+// "or", between groups "and", as in Mod library (06 §2.9). The search box is the column search
 // of §3.7 and may hold tag: type: has: version: words of its own.
 
 // BarKeys are the editor bar's groups in the order shown.
-var BarKeys = []string{"tag", "source", "location", "version", "content", "has"}
+var BarKeys = []string{"lists", "tag", "source", "location", "version", "content", "has"}
 
 // barValues are the fixed values of a group, in the order shown (tags and versions come
 // from the rows).
@@ -26,7 +26,7 @@ var barValues = map[string][]string{
 	"has":     {"problem", "error", "note", "alias"},
 }
 
-// BarFilter is the bar's result: the matching rows of 未启用 and 已启用 (indexes into the
+// BarFilter is the bar's result: the matching rows of Not enabled and Enabled (indexes into the
 // columns), and the groups when asked for (the bar is open).
 type BarFilter struct {
 	Rows     [2][]int   `json:"rows"`
@@ -91,6 +91,8 @@ func (c barCond) passes(it *Item, f MatchFacts, skip string) bool {
 // barRowValues are a row's values for a group.
 func barRowValues(it *Item, key string, f MatchFacts) []string {
 	switch key {
+	case "lists":
+		return it.Lists
 	case "tag":
 		return it.Tags
 	case "source":
@@ -127,9 +129,9 @@ func BarNeedsContent(search string, filters []string, groups bool) bool {
 	return false
 }
 
-// FilterBoard applies the bar to 未启用 and 已启用. groups adds the groups with their counts:
+// FilterBoard applies the bar to Not enabled and Enabled. groups adds the groups with their counts:
 // each group's counts ignore that group's own choices, so its other values say what adding
-// them would bring (as Mod 库存's). game is the environment's version ("1.6"), listed first
+// them would bring (as Mod library's). game is the environment's version ("1.6"), listed first
 // and marked.
 func FilterBoard(b *Board, search string, filters []string, f MatchFacts, groups bool, game string) *BarFilter {
 	out := &BarFilter{Conds: []LibCond{}}
@@ -150,10 +152,18 @@ func FilterBoard(b *Board, search string, filters []string, f MatchFacts, groups
 	}
 	sort.Slice(vers, func(i, j int) bool { return versionNewer(vers[i], vers[j]) })
 	out.Complete = CompleteQueryWith(search, tags, vers)
+	if b.Lists != nil {
+		out.Complete = completeLists(search, b.Lists.Names, out.Complete, b.Lists.Edited)
+	}
 	counts := map[string]map[string]int{}
 	shown := map[string]map[string]string{} // group → lower value → as shown
 	for _, k := range BarKeys {
 		counts[k], shown[k] = map[string]int{}, map[string]string{}
+	}
+	if b.Lists != nil {
+		for _, name := range b.Lists.Names {
+			shown["lists"][strings.ToLower(name)] = name
+		}
 	}
 	for col := 0; col < 2; col++ {
 		items := b.Cols[col]
@@ -209,7 +219,11 @@ func FilterBoard(b *Board, search string, filters []string, f MatchFacts, groups
 	for _, k := range BarKeys {
 		g := LibGroup{Key: k, Title: barKeyTitle(k)}
 		for lv, v := range shown[k] {
-			g.Values = append(g.Values, LibChoice{Filter: k + ":" + v, Label: boardValueText(b, k, v), Count: counts[k][lv], On: on[k+":"+lv], Cur: k == "version" && v == game})
+			if k == "lists" && b.Lists != nil && strings.EqualFold(v, b.Lists.Edited) {
+				continue // the list being edited is not an available-list choice
+			}
+			cur := k == "version" && v == game || k == "lists" && b.Lists != nil && strings.EqualFold(v, b.Lists.Current)
+			g.Values = append(g.Values, LibChoice{Filter: k + ":" + v, Label: boardValueText(b, k, v), Count: counts[k][lv], On: on[k+":"+lv], Cur: cur})
 		}
 		sortBar(k, g.Values)
 		out.Groups = append(out.Groups, g)
@@ -243,7 +257,7 @@ func sortBar(k string, vs []LibChoice) {
 		switch k {
 		case "version":
 			return versionNewer(val(a), val(b))
-		case "tag", "location":
+		case "lists", "tag", "location":
 			if a.Count != b.Count {
 				return a.Count > b.Count
 			}
@@ -254,7 +268,7 @@ func sortBar(k string, vs []LibChoice) {
 }
 
 func barKeyTitle(k string) string {
-	return map[string]string{"tag": T("tags"), "source": T("library source"), "location": T("location"), "version": T("supported versions"), "content": T("content"), "has": T("has")}[k]
+	return map[string]string{"lists": T("lists"), "tag": T("tags"), "source": T("library source"), "location": T("location"), "version": T("supported versions"), "content": T("content"), "has": T("has")}[k]
 }
 
 func barValueText(k, v string) string {
@@ -275,7 +289,7 @@ func barValueText(k, v string) string {
 
 // StepAt is where J / K put the mods while the list shows only some rows: past the next
 // shown row (d rows for alt+J / alt+K), so the moving rows trade places with the rows the
-// player sees. visible are the shown rows of 已启用 (by load position, 1-based, in order);
+// player sees. visible are the shown rows of Enabled (by load position, 1-based, in order);
 // moving the positions of the mods that move. The answer is a 1-based place in the list
 // without the moving mods (Place, MoveBlock); 0 when there is nowhere to go.
 // With every row shown and a block of neighbouring rows it is MoveBy's place.

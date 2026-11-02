@@ -74,6 +74,8 @@ func main() {
 	assets := flag.String("assets", "", "serve the page's files from this folder (edits show on reload)")
 	steam := flag.String("steam-api", "", "local Steam fixture server URL (collection at /collection, titles at /api)")
 	fake := flag.String("fakegame", "", "while this file exists the current environment's game counts as running (started at its time)")
+	selfVersion := flag.String("version", "", "act as this release for RimArcho's own update (07 §5.1); RIMARCHO_UPDATE_API names a test release server")
+	selfProgram := flag.String("program", "", "with -version: the program folder an install replaces (a test folder, never a real install)")
 	flag.Parse()
 	if !strings.HasPrefix(*addr, "127.0.0.1:") {
 		log.Fatal("loopback only")
@@ -95,6 +97,12 @@ func main() {
 	}
 	view.SetLang(l)
 	a.LazyLog, a.LogCacheOnly = true, true
+	if *selfVersion != "" {
+		if *selfProgram == "" {
+			log.Fatal("-version needs -program: a test folder for the install to replace")
+		}
+		a.SelfVersion, a.SelfProgram = *selfVersion, *selfProgram
+	}
 	a.Launcher = func(string, []string, string) error { return fmt.Errorf("launching is off in the dev harness") }
 	if *fake != "" {
 		// the sidebar's running game (06 §2.1, G17) without starting RimWorld

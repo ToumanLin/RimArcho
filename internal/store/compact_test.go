@@ -136,12 +136,12 @@ func bigWrite(t *testing.T, s *Store, n int) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ins, err := tx.Prepare(`INSERT INTO def_fact(set_id,def_type,def_name,file,line) VALUES(?,?,?,?,?)`)
+	ins, err := tx.Prepare(`INSERT INTO def_fact(set_id,def_type,def_name,file_ix,line) VALUES(?,?,?,?,?)`)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for i := 0; i < n; i++ {
-		if _, err := ins.Exec(id, "ThingDef", fmt.Sprintf("Def_%d", i), "1.6/Defs/ThingDefs/Things.xml", i); err != nil {
+		if _, err := ins.Exec(id, "ThingDef", fmt.Sprintf("Def_%d", i), 0, i); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -161,7 +161,7 @@ func TestTruncateWAL(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	bigWrite(t, s, 250000)
+	bigWrite(t, s, 330000)
 	if n := fileSize(path + "-wal"); n < 20<<20 {
 		t.Fatalf("WAL after the write is %d bytes; the test needs it above the 16 MB limit", n)
 	}
@@ -176,7 +176,7 @@ func TestTruncateWAL(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer r.Close()
-	bigWrite(t, s, 250000)
+	bigWrite(t, s, 330000)
 	tx, err := r.DB.Begin()
 	if err != nil {
 		t.Fatal(err)
@@ -197,6 +197,37 @@ func TestTruncateWAL(t *testing.T) {
 	}
 }
 
+// 03 §3: Def lookups by name start from the name index and then find each set's version
+// view. With a plain JOIN, the ORDER BY made SQLite walk the version's whole content_state
+// and probe the name index once per row (07 §6.2).
+func TestDefsNamedPlanStartsFromName(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "archo.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	for _, c := range []struct{ q, outer string }{
+		{defsByDefNameQ, "SEARCH f USING INDEX def_fact_lookup (def_name=?)"},
+		{defsByNameQ, "SEARCH f USING INDEX def_fact_named (name=?)"},
+	} {
+		rows, err := s.DB.Query(`EXPLAIN QUERY PLAN `+c.q, "a", "1.7")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var plan []string
+		for rows.Next() {
+			var id, parent, unused int
+			var detail string
+			rows.Scan(&id, &parent, &unused, &detail)
+			plan = append(plan, detail)
+		}
+		rows.Close()
+		if len(plan) < 2 || plan[0] != c.outer || !strings.HasPrefix(plan[1], "SEARCH c USING INDEX content_state_def (def_set_id=? AND game_mm=?)") {
+			t.Errorf("%s:\n%s", c.q, strings.Join(plan, "\n"))
+		}
+	}
+}
+
 // 03 §3: every fact query still finds an index after v25 dropped the single-column ones.
 func TestFactQueriesUseIndexes(t *testing.T) {
 	s, err := Open(filepath.Join(t.TempDir(), "archo.db"))
@@ -211,7 +242,7 @@ func TestFactQueriesUseIndexes(t *testing.T) {
 		`SELECT c.instance_id,count(*)` + defView + `WHERE c.game_mm='1.7' GROUP BY c.instance_id`,
 		`DELETE FROM fact_set WHERE instance_id='a'`,
 		`DELETE FROM def_fact WHERE set_id=1`,
-		`SELECT DISTINCT c.instance_id,f.file FROM type_fact f CROSS JOIN content_state c ON c.dll_set_id=f.set_id WHERE f.type_name IN ('a','b') AND c.game_mm='1.7'`,
+		`SELECT DISTINCT c.instance_id,f.set_id,f.file_ix FROM type_fact f CROSS JOIN content_state c ON c.dll_set_id=f.set_id WHERE f.type_name IN ('a','b') AND c.game_mm='1.7'`,
 		`DELETE FROM type_fact WHERE set_id=1`,
 		`SELECT * FROM harmony_fact f JOIN content_state c ON c.dll_set_id=f.set_id WHERE c.game_mm='1.7' AND f.target='a'`,
 		`SELECT * FROM harmony_fact f JOIN content_state c ON c.dll_set_id=f.set_id WHERE c.game_mm='1.7' AND c.instance_id='a'`,

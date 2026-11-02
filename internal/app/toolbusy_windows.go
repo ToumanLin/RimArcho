@@ -19,7 +19,7 @@ func toolIdle(name string) error {
 	pe.Size = uint32(unsafe.Sizeof(pe))
 	for err = windows.Process32First(snap, &pe); err == nil; err = windows.Process32Next(snap, &pe) {
 		exe := strings.ToLower(windows.UTF16ToString(pe.ExeFile[:]))
-		if strings.TrimSuffix(exe, ".exe") == name || name == "wezterm" && (exe == "wezterm-gui.exe" || exe == "wezterm-mux-server.exe") {
+		if strings.TrimSuffix(exe, ".exe") == name {
 			return errors.New("tool is in use; close it before updating or removing it")
 		}
 	}

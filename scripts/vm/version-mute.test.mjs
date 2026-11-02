@@ -14,7 +14,7 @@ function element(tag, cls, text) {
 
 test('background problem updates use the individual reasons from Go', () => {
   const S = { board: { problems: { environment: 'game', sequence: 1 } }, shell: { plan: { id: 7 } } };
-  const context = createContext({ S, el: element });
+  const context = createContext({ S, el: element, keyCaps: (k) => element("kbd", "", k) });
   runInContext(js('problems') + '\nglobalThis.applyEvent = event;', context);
   const reasons = { a: [{ text: 'does not list 1.7 (lists 1.6)', actions: [{ kind: 'version-mute' }] }] };
   const payload = { environment: 'game', plan: 7, sequence: 2, count: 1, status: { a: 2 }, reasons,
@@ -59,7 +59,7 @@ function panelHarness() {
       all: action(groups.flatMap(g => g.rows.map(r => r.id)), undo, true, undo ? 'restore all' : 'ignore all') };
   }
   const api = { async VersionWarnings(mm, undo) { reads.push([mm, undo]); return data(undo); } };
-  const context = createContext({ el, S, document, pop, api, T: s => s, errText: String });
+  const context = createContext({ el, keyCaps: (k) => el("kbd", "", k), S, document, pop, api, T: s => s, errText: String });
   runInContext(js('versionpanel') + '\nglobalThis.openList=openVersionList;', context);
   const run = async (_, a) => { calls.push(a); for (const id of a.refs) { if (a.kind === 'version-unmute') ignored.delete(id); else ignored.add(id); } };
   const open = undo => context.openList({ title: 'version list', gameVersion: '1.7', versionMuted: undo }, run, id => shown.push(id));

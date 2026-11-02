@@ -7,7 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// 06 §3.5: one key table for the editor and Mod 库存; ? lists the page's keys; shift+1…7
+// 06 §3.5: one key table for the editor and Mod library; ? lists the page's keys; shift+1…7
 // (the characters of the US layout) go to pages; tab / shift+tab go to the next page under
 // the same sidebar entry.
 func TestKeyTable(t *testing.T) {
@@ -58,7 +58,7 @@ func TestKeyTable(t *testing.T) {
 	if m.st.Plan.Name != "default" {
 		t.Fatalf("shift+tab: plan %s", m.st.Plan.Name)
 	}
-	// shift+2 能不能跑, shift+6 Mod 库存, tab 变化, tab back, shift+4 列表
+	// shift+2 Can it run, shift+6 Mod library, tab Updates, tab back, shift+4 list
 	press(m, "@")
 	if m.tab != tabProblems {
 		t.Fatalf("@: tab %d", m.tab)
@@ -79,17 +79,22 @@ func TestKeyTable(t *testing.T) {
 		t.Fatalf("tab in changes: %d", m.tab)
 	}
 	pressKey(m, tea.KeyTab) // letters go into the paste box: tab is the key itself
+	if m.tab != tabSearch {
+		t.Fatalf("tab in Add a subscription: %d", m.tab)
+	}
+	pressKey(m, tea.KeyTab) // the search box has the keys too: tab is still the next page
 	if m.tab != tabLibrary {
-		t.Fatalf("tab in 添加订阅: %d", m.tab)
+		t.Fatalf("tab in Search files: %d", m.tab)
 	}
 	press(m, "$")
 	if m.tab != tabList {
 		t.Fatalf("$: tab %d", m.tab)
 	}
 	press(m, "!")
-	if !strings.Contains(m.status, "window") {
-		t.Fatalf("!: %q", m.status)
+	if m.tab != tabHome {
+		t.Fatalf("!: tab %d", m.tab)
 	}
+	press(m, "esc")
 	// enter opens and closes the full detail
 	press(m, "enter")
 	if !m.full {

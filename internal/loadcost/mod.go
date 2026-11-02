@@ -28,6 +28,7 @@ type Sound struct {
 // Mod contains measurements only, so callers can cache it as JSON independently
 // of the model. Sounds is keyed by lower-case extension, including the dot.
 type Mod struct {
+	MaxPNGDecode      int64            `json:"maxPngDecode"`
 	PNG               Files            `json:"png"`
 	PNGPixels         int64            `json:"pngPixels"`
 	PNGPixelsMip      int64            `json:"pngPixelsMip"`
@@ -46,6 +47,7 @@ type Mod struct {
 
 // Plus adds measurements without retaining any maps owned by o.
 func (m *Mod) Plus(o Mod) {
+	m.MaxPNGDecode = max(m.MaxPNGDecode, o.MaxPNGDecode)
 	m.PNG.add(o.PNG)
 	m.PNGPixels += o.PNGPixels
 	m.PNGPixelsMip += o.PNGPixelsMip

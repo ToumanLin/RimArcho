@@ -25,13 +25,14 @@ func TestEstimate(t *testing.T) {
 		game Game
 		want Report
 	}{
-		{Game16, Report{132097, 133662, 2160, 2780, []Part{
-			{"textures", 5, 141, 0, 238, 1760, 2380},
-			{"dds", 1, 400, 0, 40, 400, 400},
+		{Game16, Report{2020397, 2756492, 2592, 3336, []Part{
+			{"textures", 5, 141, 704, 1428, 2112, 2856},
+			{"dds", 1, 400, 160, 240, 480, 480},
 			{"sounds", 5, 1100, 131692, 132312, 0, 0},
 			{"defs", 2, 100, 300, 800, 0, 0},
 			{"patches", 1, 11, 5, 22, 0, 0},
 			{"assemblies", 1, 50, 100, 250, 0, 0},
+			{"mod overhead", 1, 0, 1887436, 2621440, 0, 0},
 		}}},
 		{Game17, Report{3815, 9632, 1674, 5668, []Part{
 			{"textures", 5, 141, 2190, 6230, 1314, 4628},
@@ -50,11 +51,16 @@ func TestEstimate(t *testing.T) {
 			var merged Mod
 			merged.Plus(modelMod())
 			merged.Plus(modelMod())
-			if separate, combined := Estimate(tc.game, []Mod{modelMod(), modelMod()}), Estimate(tc.game, []Mod{merged}); !reflect.DeepEqual(separate, combined) {
+			separate, combined := Estimate(tc.game, []Mod{modelMod(), modelMod()}), Estimate(tc.game, []Mod{merged})
+			if tc.game == Game16 {
+				if !reflect.DeepEqual(separate.Parts[:6], combined.Parts[:6]) || separate.Parts[6].Count != 2 || combined.Parts[6].Count != 1 {
+					t.Fatal("resource aggregation or per-Mod count changed")
+				}
+			} else if !reflect.DeepEqual(separate, combined) {
 				t.Fatalf("separate and combined estimates differ: %+v, %+v", separate, combined)
 			}
 			empty := Estimate(tc.game, nil)
-			if empty.RAMLow != 0 || empty.RAMHigh != 0 || empty.VRAMLow != 0 || empty.VRAMHigh != 0 || len(empty.Parts) != 6 {
+			if empty.RAMLow != 0 || empty.RAMHigh != 0 || empty.VRAMLow != 0 || empty.VRAMHigh != 0 || len(empty.Parts) != 6+map[Game]int{Game16: 1}[tc.game] {
 				t.Fatalf("empty estimate: %+v", empty)
 			}
 		})

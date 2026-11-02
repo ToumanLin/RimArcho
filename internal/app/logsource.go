@@ -145,7 +145,7 @@ func (a *App) judge(st *LoadoutState, r *LogRun) {
 }
 
 // monitorSwapOnly reports whether the plan's list differs from the played one only in which
-// Archo Monitor version sits at the same place (08 §9 "更新"): the monitor update does not
+// Archo Monitor version sits at the same place (08 §9 "update"): the monitor update does not
 // change what the run's errors describe, so the log stays counted (03 §6.4). The played
 // list is the version the launch or write names, checked against its fingerprint.
 func (a *App) monitorSwapOnly(st *LoadoutState, src *RunSource) bool {

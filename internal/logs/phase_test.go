@@ -7,14 +7,6 @@ import (
 	"testing"
 )
 
-func phaseTotals(cs []PhaseCount) map[string]int {
-	out := map[string]int{}
-	for _, c := range cs {
-		out[PhaseName(c.Phase)] += c.Count
-	}
-	return out
-}
-
 func TestPlayerPhases(t *testing.T) {
 	const texture = "Could not load Texture2D at 'Things/Example/Empty' for def 'Example'"
 	// A synthetic save-loading failure: the phase is the marker, not its error class.

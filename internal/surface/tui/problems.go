@@ -2,6 +2,7 @@ package tui
 
 import (
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -9,23 +10,25 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Loading 需要处理 (06 §5; the items and the screen are in needs.go), the analysis in a child
+// Loading Can it run (06 §5; the items and the screen are in needs.go), the analysis in a child
 // process (A) and the choice of log (l).
 
 type probState struct {
-	items       []need
-	cursor, off int
-	stale       bool
-	never       bool
-	loaded      bool
-	countsKey   string
+	memoryReading bool
+	memoryAt      time.Time
+	items         []need
+	cursor, off   int
+	stale         bool
+	never         bool
+	loaded        bool
+	countsKey     string
 	// status is each mod's row icon and need the top bar's number: the counted items of
-	// 需要处理 (06 §7, §4.2, §7).
+	// Can it run (06 §7, §4.2, §7).
 	status map[string]int
 	need   int
 	open   map[string]bool // folded items shown open (enter), by text
 	base   []view.Need     // the analysis' items; the running game's lead them (06 §2.1)
-	// lastRun says which run the last-run section is from ("the list · 9 月 29 日 19:41")
+	// lastRun says which run the last-run section is from ("the list · Sep 29 19:41")
 	lastRun string
 	// elsewhere is what this page leaves to another page (view.Needs.Elsewhere, 06 §2.4)
 	elsewhere []view.Elsewhere
@@ -43,17 +46,20 @@ type analyzeDoneMsg struct{ err error }
 type AnalyzeRunner func(envName string, progress func(string)) error
 
 func (m *model) ensureProblems() tea.Cmd {
+	before := m.status
 	// The player looks at problems now: include the newest log, parsing it if needed.
 	m.app.LazyLog, m.app.LogCacheOnly = false, false
 	m.loadProblems()
 	if (m.prob.stale || m.prob.never) && !m.analyzing {
-		return m.startAnalyze()
+		cmd := m.startAnalyze()
+		m.analyzeQuiet, m.status = true, before
+		return tea.Batch(cmd, m.startMemoryEstimate(false))
 	}
-	return nil
+	return m.startMemoryEstimate(false)
 }
 
 // loadProblems reads the problems (declaration layer now, Def/Patch layers as stored) and
-// builds the items of 需要处理 from them (06 §5).
+// builds the items of Can it run from them (06 §5).
 func (m *model) loadProblems() {
 	ps, err := m.app.Problems(false, nil)
 	p := &m.prob
@@ -88,7 +94,7 @@ func (m *model) composeNeeds() {
 	p.cursor = min(p.cursor, max(len(p.items)-1, 0))
 }
 
-// needCount is the top bar's "needs attention" number (06 §2.2): problems, identity
+// needCount is the top bar's "Can it run N" number (06 §2.2): problems, identity
 // questions, an external change of the list, a list saved for another game version, and
 // the running game's errors, so it equals the counted items of the screen (06 §2.4).
 func (m *model) needCount() int {
@@ -118,7 +124,7 @@ func (m *model) startAnalyze() tea.Cmd {
 	if m.analyzing || m.loadErr != nil {
 		return nil
 	}
-	m.analyzing = true
+	m.analyzing, m.analyzeQuiet = true, false
 	m.status = T("analyzing…")
 	run, name := m.opts.Analyze, m.envName
 	if run == nil {
@@ -149,13 +155,15 @@ func (m *model) startAnalyze() tea.Cmd {
 func (m *model) analyzeMsg(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case analyzeLineMsg:
-		m.status = T("analyzing…") + " " + strings.TrimPrefix(msg.line, "progress: ")
+		if !m.analyzeQuiet {
+			m.status = T("analyzing…") + " " + strings.TrimPrefix(msg.line, "progress: ")
+		}
 		return m.analyzeWait
 	case analyzeDoneMsg:
 		m.analyzing = false
 		if msg.err != nil {
 			m.openPanel(T("analysis failed"), msg.err.Error())
-		} else {
+		} else if !m.analyzeQuiet {
 			m.status = T("analysis done")
 		}
 		m.reload()

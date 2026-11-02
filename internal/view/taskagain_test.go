@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 )
 
-// A stopped batch whose rest a new task took over offers no second 继续剩下的 (VM run B1:
+// A stopped batch whose rest a new task took over offers no second continue the rest (VM run B1:
 // pressed twice, the same ten deletions ran twice and all failed).
 func TestStoppedBatchHandedOverOffersNoResume(t *testing.T) {
 	SetLang("zh")

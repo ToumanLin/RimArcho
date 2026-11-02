@@ -56,7 +56,7 @@ type Pack struct {
 	Textures *PackTextures `json:"textures,omitempty"`
 }
 
-// PackTextures is what a build did to the copies' textures: 预转换 at full size, 精简 when
+// PackTextures is what a build did to the copies' textures: preconvert at full size, resize when
 // scaled. The PNGs of the textures converted are gone from the pack; those that could not
 // be converted (or share a name with a DDS or another format) keep their PNG.
 type PackTextures struct {
@@ -70,8 +70,8 @@ type PackTextures struct {
 	DDSBytes  int64  `json:"dds_bytes"`        // the DDS written
 }
 
-// TextureLabel names a texture option the way the interface does: 预转换 at full size,
-// 精简 when scaled (2026-10-22).
+// TextureLabel names a texture option the way the interface does: preconvert at full size,
+// resize when scaled (2026-10-22).
 func TextureLabel(o textures.Options) string {
 	if o = o.Normal(); o.Scale == 100 {
 		return "pre-convert"
@@ -180,7 +180,7 @@ type PackBuild struct {
 	Pack     *Pack
 	Dir      string
 	DryRun   bool
-	Blockers []string // why it cannot be built (需要处理)
+	Blockers []string // why it cannot be built (Can it run)
 	Moved    int      // entries the sort moved
 	// Measured: what the copy needs, and what the packs drive has (-1: unknown). A build is
 	// refused when Free < Need + SpaceMargin.
@@ -204,7 +204,7 @@ type BuildOptions struct {
 	DryRun   bool
 	Progress func(BuildProgress) // each step, and while copying
 	// Textures converts the copies' PNGs to DDS and deletes them (nil: they are copied as
-	// they are). Full size is 预转换, a scale 精简.
+	// they are). Full size is preconvert, a scale resize.
 	Textures *textures.Options
 }
 

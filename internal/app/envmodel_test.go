@@ -89,7 +89,7 @@ func TestEnvModelSharedWorkshop(t *testing.T) {
 	if st.List.Index(ws) < 0 {
 		t.Fatal("main's plan lost the shared mod")
 	}
-	// Mod 库存: "用在" names each list once, whichever game uses it.
+	// Mod library: "used in" names each list once, whichever game uses it.
 	e.MustRun("env", "use", "old")
 	e.MustRun("enable", "#"+ws[:6])
 	e.MustRun("env", "use", "main")
@@ -352,9 +352,9 @@ func downgradeWithTwin(t *testing.T, e *testkit.Env) map[string]string {
 			n := e.App.NewID()
 			twin[x.id] = n
 			res, err := db.Exec(`INSERT INTO snapshot(instance_id, scan_id, snapshot_hash, package_id, package_id_raw, name, authors, workshop_id_declared,
-				supported_versions, decl_blob, acf_manifest, acf_time_updated, acf_size, git_head, origin, file_count, total_size, semantic_count)
+				supported_versions, decl_blob, acf_manifest, acf_time_updated, acf_size, git_head, origin, file_count, total_size, semantic_count, kinds, langs)
 				SELECT ?, scan_id, snapshot_hash, package_id, package_id_raw, name, authors, workshop_id_declared, supported_versions, decl_blob,
-				acf_manifest, acf_time_updated, acf_size, git_head, origin, file_count, total_size, semantic_count FROM snapshot WHERE id=?`, n, x.snap)
+				acf_manifest, acf_time_updated, acf_size, git_head, origin, file_count, total_size, semantic_count, kinds, langs FROM snapshot WHERE id=?`, n, x.snap)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -374,7 +374,9 @@ func downgradeWithTwin(t *testing.T, e *testkit.Env) map[string]string {
 	exec(`DROP TABLE id_alias`)
 	exec(`DROP TABLE texture_file`) // v16
 	exec(`DROP TABLE texture_mod`)
-	exec(`DROP TABLE plan_collection`)                        // v17
+	exec(`DROP TABLE plan_collection`)             // v17
+	exec(`ALTER TABLE snapshot DROP COLUMN kinds`) // v27
+	exec(`ALTER TABLE snapshot DROP COLUMN langs`)
 	exec(`DROP TABLE version_mute`)                           // v23
 	exec(`ALTER TABLE identity_question DROP COLUMN summary`) // v22
 	exec(`ALTER TABLE workspace_undo DROP COLUMN staging`)    // v21

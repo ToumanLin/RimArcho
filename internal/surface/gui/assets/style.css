@@ -91,7 +91,10 @@ button, select, kbd, svg, #side, #crumbs, .envchip, #hints, .area .head, .hbar, 
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: default; }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 input { font: inherit; color: var(--fg); background: transparent; border: 0; outline: 0; width: 100%; }
-kbd { font: 12px var(--font); color: var(--faint); margin-left: 6px; }
+/* Key labels are key caps, so a key never reads as a word of the label beside it (06 §7.3 rule 13). */
+kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 6px; font: 500 12px/16px var(--code); color: var(--muted);
+  text-align: center; white-space: nowrap; border: var(--hairline) solid var(--line); border-radius: var(--r-sm); background: var(--card-2); box-shadow: 0 1px 0 var(--line); }
+.keys { display: inline-flex; gap: 3px; } .keys kbd { margin-left: 0; }
 .grow { flex: 1; }
 .num { font-variant-numeric: tabular-nums; }
 .dim, .faint { color: var(--faint); } .second, .muted { color: var(--muted); } .accent { color: var(--accent-11, var(--accent)); }
@@ -118,7 +121,7 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 body.resizing, body.resizing * { cursor: col-resize !important; }
 /* The sidebar follows magpie's: 212px (184px in a smaller window), 10px sides, entries
    30px high with the icon, the name and the count on the same edges in every row. */
-/* No name or icon at the top (the window's title bar has them) and no empty head: the
+/* No name or icon at the top and no empty head: the
    sidebar starts with its first group title, level with the top bar's breadcrumb. */
 #nav { position: relative; flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 2px 10px 10px; display: flex; flex-direction: column; gap: 1px; }
 /* the toggle heads the sidebar, level with the top bar; in the rail it stays at the top */
@@ -126,6 +129,16 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .navtoggle { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-sm); color: var(--muted); transition: background var(--t-press), color var(--t-press); }
 .navtoggle:hover { background: var(--pill); color: var(--fg); }
 .navtoggle svg.i { width: 15px; height: 15px; }
+/* Wails handles native drag/resize. Interactive descendants inherit no-drag,
+   including their SVGs. The maximize region enables Windows 11 Snap Layouts. */
+#app.window-chrome #top, #app.window-chrome .side-head,
+#app.window-chrome.nav-top #side { --wails-draggable: drag; }
+#app.window-chrome :is(button, a, input, textarea, select, [contenteditable], [role="button"], [role="separator"]),
+#app.window-chrome #side-split { --wails-draggable: no-drag; }
+.window-controls { display: flex; align-items: center; gap: 0; flex: none; margin-left: auto; padding-left: 8px; }
+.window-controls .window-control { flex: none; width: 36px; height: 32px; border-radius: inherit; border-left: var(--hairline) solid var(--line); }
+.window-controls .window-control:last-child:hover { color: var(--bg); background: var(--red); }
+.window-maximize { --wails-non-client-region: maximize; }
 /* the bow, RimArcho's mark (06 §7) */
 .bow { display: block; width: 100%; height: 100%; overflow: visible; }
 .bow .bow-halo { stroke: var(--bow-halo); }
@@ -170,13 +183,13 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .side-foot { flex: none; padding: 8px 10px 10px; border-top: var(--hairline) solid var(--line-2); display: flex; flex-direction: column; gap: 6px; }
 /* the navigation at the top (06 §2.1): the same entries as one strip over the page. The
    toggle ends it on the left; the groups are thin separators; an entry's sub-entries are a
-   dropdown from its chevron (↓ on the keyboard); 设置 at the right
+   dropdown from its chevron (↓ on the keyboard); settings at the right
    end. The raised highlight and the badge stay; a narrow window scrolls the strip. */
 #app.nav-top { grid-template-columns: minmax(0, 1fr); grid-template-rows: 46px minmax(0, 1fr); }
 #app.nav-top #side { grid-row: 1; flex-direction: row; align-items: center; gap: 4px; padding: 0 10px; border-right: 0; border-bottom: var(--hairline) solid var(--line-2); }
 #app.nav-top #main { grid-column: 1; grid-row: 2; }
 #app.nav-top .side-head { height: auto; padding: 0; }
-#app.nav-top #nav { flex: 1 1 auto; flex-direction: row; justify-content: safe center; align-items: center; gap: 2px; padding: 0 4px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+#app.nav-top #nav { flex: 1 1 auto; min-width: 0; flex-direction: row; justify-content: safe center; align-items: center; gap: 2px; padding: 0 4px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
 #app.nav-top #nav .grp { display: none; }
 #app.nav-top .nav-item { width: auto; padding: 0 12px; }
 #app.nav-top .nav-item .ic, #app.nav-top .nav-item .chev { display: none; }
@@ -212,7 +225,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .page-acts .unwritten { color: var(--accent-11, var(--accent)); font-size: 12px; white-space: nowrap; margin-right: 2px; }
 .page-acts .unwritten::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: 1px; }
 #top #env { flex: 0 1 auto; }
-/* the chip beside the page's name: the environment (and the plan on 能不能跑) */
+/* the chip beside the page's name: the environment (and the plan on Can it run) */
 .envchip { height: 20px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: var(--r-sm); background: var(--pill); color: var(--fg-2); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; transition: background var(--t-press), color var(--t-press); }
 .envchip:hover, .envchip.on { background: var(--pill-hover); color: var(--fg); }
 /* a page's actions: quiet icon + text, no border (06 §2.2) */
@@ -252,7 +265,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .page .btn.danger:hover, .page-acts .btn.danger:hover, .btn.danger:hover { color: var(--red); background: var(--red-soft); border-color: transparent; }
 .btn.small { height: 22px; padding: 0 8px; font-size: 12px; }
 .btn kbd { margin-left: 6px; }
-.btn.primary kbd { color: inherit; opacity: .6; }
+.btn.primary kbd, .pop .btns button.go kbd { color: inherit; border-color: currentColor; background: transparent; box-shadow: none; opacity: .7; }
 .btn:disabled { opacity: .6; pointer-events: none; }
 .btn .ic { display: inline-flex; margin-right: 5px; }
 .btn .ic.spin svg { animation: spin .9s linear infinite; }
@@ -264,15 +277,15 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .area .head .acts .btn:hover { border-color: var(--muted); color: var(--fg); }
 .area .head .acts .btn.hot { color: var(--accent-11, var(--accent)); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 
-/* ---- the board: three columns (06 §2.5): 未启用 | 已启用 | 详情, with 暂存 and 历史 folded
-   under 详情 in the third column ---- */
+/* ---- the board: three columns (06 §2.5): Not enabled | Enabled | details, with Staging and history folded
+   under details in the third column ---- */
 #board { display: grid; min-height: 0; padding: 0 12px 6px; grid-template-columns: var(--c0, 38fr) var(--card-gap) var(--c1, 31fr) var(--card-gap) var(--c2, 31fr); }
 #board > .fcol { grid-column: 1; } #board > [data-split="0"] { grid-column: 2; }
 #board > [data-area="1"] { grid-column: 3; } #board > [data-split="1"] { grid-column: 4; }
 #board > .editor-right { grid-column: 5; } #board > * { grid-row: 1; }
 .stack { display: flex; flex-direction: column; gap: var(--card-gap); min-width: 0; min-height: 0; }
 .stack > .detail { flex: 1 1 0; min-height: 140px; }
-/* a fold is its bar until opened; open, it takes a share of the column under 详情 */
+/* a fold is its bar until opened; open, it takes a share of the column under details */
 .stack > .fold { flex: none; }
 .stack > .fold.open { flex: 0 1 auto; max-height: 38%; min-height: 72px; }
 .fold > .head { cursor: pointer; }
@@ -286,6 +299,38 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .histarea .hbar { width: 100%; text-align: left; }
 .histbody { flex: 1; min-height: 0; overflow-y: auto; padding: 0 10px 6px; }
 .histbody .hist { margin-top: 4px; }
+/* Load-order rules (rules.js, 06 §2.5): the player's rules, each a sentence with its note; edit / delete
+   show on hover or focus; the form adds or changes a rule in place */
+.rulesarea .hbar { width: 100%; text-align: left; }
+.rulesbody { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 10px 8px; }
+.rule { position: relative; padding: 5px 8px; border-radius: var(--r-sm); }
+.rule:hover, .rule:focus-within { background: var(--pill); }
+.rule-t { color: var(--fg); line-height: 1.45; padding-right: 96px; }
+.rule-n { color: var(--muted); font-size: 12px; margin-top: 1px; padding-right: 96px; }
+.rule-mod { color: inherit; font-weight: 600; padding: 0; text-align: left; }
+.rule-mod:hover { color: var(--accent-11, var(--accent)); }
+.rule-gone { color: var(--faint); }
+.rule-acts { position: absolute; top: 4px; right: 6px; display: none; gap: 2px; }
+.rule:hover .rule-acts, .rule:focus-within .rule-acts { display: inline-flex; }
+.rule-add { margin-top: 4px; }
+.rule-add .ic svg.i { width: 11px; height: 11px; }
+.rule-form { display: flex; flex-direction: column; gap: 6px; padding: 8px; margin: 2px 0 6px; border: var(--hairline) solid var(--line-2); border-radius: var(--r-sm); background: var(--card-2); }
+.rule-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rule-a, .rule-fixed { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.rule-fixed { font-weight: 400; white-space: normal; }
+.rule-kind, .rule-b input, .rule-note { height: 26px; background: var(--card); color: var(--fg); border: var(--hairline) solid var(--line-2); border-radius: var(--r-sm); padding: 0 8px; font-size: 13px; }
+.rule-kind:focus, .rule-b input:focus, .rule-note:focus { border-color: var(--accent); }
+.rule-b { position: relative; flex: 1 1 160px; min-width: 0; }
+.rule-b input { width: 100%; }
+.rule-cands { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px); background: var(--card); border-radius: var(--r-lg); box-shadow: var(--shadow); overflow: hidden; }
+.rule-cands:empty { display: none; }
+.rule-cand { display: flex; gap: 8px; width: 100%; padding: 5px 9px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rule-cand .p { margin-left: auto; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+.rule-cand:hover, .rule-cand.on { background: var(--accent-soft); color: var(--accent-11, var(--accent)); }
+.rule-form-acts { display: flex; justify-content: flex-end; gap: 6px; }
+.rules-scope { display: flex; padding: 3px; margin: 2px 0 4px; }
+.rules-scope > .thumb { top: 3px; bottom: 3px; }
+.rules-scope button { flex: 1 1 0; justify-content: center; padding: 0 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .area { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--card); border: var(--hairline) solid var(--line-2); border-radius: var(--r-lg); overflow: hidden; transition: border-color var(--t-press); }
 .area.focus { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .area .head { display: flex; align-items: baseline; gap: 8px; padding: 9px 12px 6px; color: var(--faint); white-space: nowrap; overflow: hidden; border-bottom: var(--hairline) solid var(--line-2); }
@@ -361,7 +406,17 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .frow .v { flex: 1; min-width: 0; color: var(--fg-2); overflow-wrap: anywhere; display: flex; flex-wrap: wrap; gap: 2px 0; align-items: baseline; }
 .frow.deps .v, .frow.conflicts .v { flex-direction: column; align-items: flex-start; }
 .copy { cursor: pointer; }
-.path-copy { min-width: 0; max-width: 100%; overflow-wrap: anywhere; white-space: normal; }
+.path-copy { display: inline-flex; align-items: center; gap: 4px; min-width: min(100%, 200px); max-width: 100%; vertical-align: bottom; white-space: nowrap; }
+.address-text { display: inline-grid; min-width: 0; overflow: hidden; white-space: pre; }
+.address-text::before { content: attr(data-address); visibility: hidden; grid-area: 1 / 1; overflow: hidden; }
+.address-label { grid-area: 1 / 1; min-width: 0; overflow: hidden; }
+.address-copy { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 24px; height: 24px; border-radius: var(--r-sm); color: var(--muted); cursor: pointer; }
+.address-pick { cursor: pointer; border-radius: var(--r-sm); }
+.address-pick:hover { color: var(--accent-11, var(--accent)); background: var(--pill); }
+.address-pick:focus-visible { outline: var(--hairline) solid var(--accent); outline-offset: -1px; }
+.address-copy:hover { background: var(--pill-hover); color: var(--fg); }
+.address-copy[data-copied] { color: var(--green); }
+.address-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .copy:hover { color: var(--accent-11, var(--accent)); }
 .copy:focus-visible { outline: var(--hairline) solid var(--accent); outline-offset: 2px; }
 .frow .dep { display: flex; align-items: center; gap: 5px; }
@@ -393,7 +448,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 /* page width by shape (06 §7.3 rule 12): list-and-detail pages fill the window like the
    editor and the library; one-column pages share one reading width */
 .page:is(.logs, .pm-page, .packs, .subs-page, .needs) { padding-left: 12px; padding-right: 12px; }
-.page:is(.env, .textures, .settings) { padding-left: max(20px, calc(50% - 480px)); padding-right: max(20px, calc(50% - 480px)); }
+.page:is(.env, .textures, .settings, .feedback) { padding-left: max(20px, calc(50% - 480px)); padding-right: max(20px, calc(50% - 480px)); }
 @keyframes view-in { from { opacity: 0; transform: translateY(4px); } }
 .head-right { display: flex; align-items: center; gap: 8px; }
 .note { padding: 0 4px; font-size: 12px; }
@@ -431,7 +486,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .cols .col { display: flex; flex-direction: column; min-height: 0; transition: border-color var(--t-press); }
 .cols .col.focus { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .cols .col .scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 6px; }
-/* the log page's right side: the log text, and under it the Archo 日志分析 card */
+/* the log page's right side: the log text, and under it the Archo log analysis card */
 .cols.logcols { grid-template-columns: minmax(260px, var(--log-left, 62fr)) var(--card-gap) minmax(320px, 38fr); gap: 0; }
 .logsplit { margin: 0; }
 .logside { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
@@ -447,7 +502,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 @media (max-width: 900px) { .cols.three, .cols.two, .cols.logcols { grid-template-columns: 1fr; } .logsplit { display: none; } .page.fill { height: auto; } .cols .col .scroll { max-height: 60vh; } }
 
-/* 能不能跑 (06 §2.4): two columns that scroll on their own, each a stack of sections; a
+/* Can it run (06 §2.4): two columns that scroll on their own, each a stack of sections; a
    section is a card of items, its heading stays at the top of its column */
 .cols.needcols { grid-template-columns: minmax(320px, var(--needs-left, 55fr)) var(--card-gap) minmax(300px, 45fr); gap: 0; }
 .needcol { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
@@ -461,7 +516,7 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 .need-sec.break > h2.label { color: var(--red); }
 .need-sec.run > h2.label { color: var(--log); }
 .need-sec.confirm > h2.label { color: var(--amber); }
-/* 可以留意: what shared logs taught, RimArcho's own knowledge: the accent, not dimmed */
+/* worth knowing: what shared logs taught, RimArcho's own knowledge: the accent, not dimmed */
 .need-sec.worth > h2.label { color: var(--accent-11, var(--accent)); cursor: pointer; }
 .need-sec.worth .need-ic { color: var(--accent-11, var(--accent)); }
 .need-sec > h2.label .fold-chev { display: inline-block; width: 12px; color: var(--faint); transition: transform var(--t-press); }
@@ -561,7 +616,7 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 .page-acts .chip.prob.hint { color: var(--muted); background: var(--pill); }
 @media (max-width: 760px) { .need .top { flex-wrap: wrap; } }
 
-/* 日志 */
+/* Game log */
 .lrow { display: flex; gap: 10px; padding: 8px 10px; border-radius: var(--r-sm); align-items: flex-start; }
 .lrow:hover { background: var(--card-2); }
 .lrow.cur { background: var(--accent-soft); }
@@ -574,7 +629,7 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 .lrow .mods { margin-left: auto; color: var(--accent-11, var(--accent)); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .lrow .text { margin-top: 3px; color: var(--fg-2); font-size: 12px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 .detail-card .scroll { padding: 12px 14px; }
-/* 游戏日志's file picker and the companion section (06 §2.10) */
+/* game log's file picker and the companion section (06 §2.10) */
 .btn.picker { display: inline-flex; align-items: center; gap: 8px; }
 .btn.picker .chev { color: var(--faint); font-size: 12px; }
 #menu button.sub { padding-left: 22px; color: var(--muted); }
@@ -652,8 +707,8 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .prog .ptext { margin-top: 5px; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prog .ptext.bad { color: var(--red); white-space: pre-wrap; }
 
-/* 编译成整合包 (06 §2.6): the name, the kind and the four steps on the left; the summary
-   and 编译 on the right; the builds cut short below */
+/* Create a pack (06 §2.6): the name, the kind and the four steps on the left; the summary
+   and create on the right; the builds cut short below */
 .bd-cols { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
 .bd-left { flex: 999 1 440px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .bd-left > .sec:first-child { margin-top: 0; }
@@ -670,7 +725,7 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .bd-step .b { flex: 1; min-width: 0; }
 .bd-step .t { font-weight: 600; }
 .bd-step .x { color: var(--fg-2); overflow-wrap: anywhere; }
-.bd-step select.bd-tex { flex: none; width: auto; min-width: 200px; height: 28px; margin: 4px 0 6px; padding: 0 6px; font: inherit; }
+.bd-step .bd-tex { flex: none; width: auto; min-width: 200px; height: 28px; margin: 4px 0 6px; padding: 0 6px; font: inherit; }
 .bd-step ul { margin: 6px 0 0; padding-left: 18px; font-size: 12px; color: var(--fg-2); user-select: text; }
 .bd-step li { overflow-wrap: anywhere; }
 .bd-step .btn { flex: none; height: 28px; padding: 0 12px; border-radius: var(--r-sm); font-size: 13px; }
@@ -710,6 +765,11 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .settings .set .r > .field { min-width: 140px; }
 .settings .set .r { flex-wrap: wrap; row-gap: 6px; }
 .settings .group-note { padding: 8px 14px; font-size: 12px; color: var(--muted); border-bottom: var(--hairline) solid var(--line-2); }
+/* RimArcho's release notes, folded under its row (07 §5.1) */
+.settings .setting-details { padding: 0 14px 10px; font-size: 12px; }
+.settings .setting-details > summary { cursor: pointer; color: var(--muted); width: max-content; }
+.settings .setting-details > pre { margin: 6px 0; max-height: 320px; overflow: auto; white-space: pre-wrap; font: inherit; }
+.settings .setting-details > a { color: var(--muted); }
 
 /* ---- motion (06 §7.1): opacity and transform only ---- */
 /* a changed row flashes accent-soft: an overlay that fades, not an animated background */
@@ -743,7 +803,7 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 #status.warn::before { content: "⚠ "; color: var(--amber); }
 #status a { color: var(--accent-11, var(--accent)); cursor: pointer; margin-left: 8px; }
 #hints { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
-#hints b { color: var(--fg-2); font-weight: 500; }
+#hints kbd, #hints .keys { margin: 0 4px 0 0; } #hints kbd { color: var(--fg-2); }
 #hints .sep { color: var(--faint); margin: 0 6px; }
 
 /* ---- popups (06 §3.1 rule 5) and the context menu: magpie's popovers ---- */
@@ -768,9 +828,21 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .pop .opt { display: flex; gap: 10px; padding: 6px 10px; border-radius: var(--r-sm); align-items: baseline; }
 .pop .opt.on { background: var(--pill); }
 .pop .opt .d { color: var(--faint); margin-left: auto; white-space: nowrap; font-size: 12px; }
+#popup.command-dock { bottom: 30px; padding: 12px 0; align-items: flex-end; }
+.command-panel { display: flex; flex-direction: column; max-height: 100%; }
+.command-head { display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-bottom: var(--hairline) solid var(--line-2); color: var(--muted); }
+.command-head > span { margin-right: auto; }
+.command-head, .command-panel .in, .command-foot { flex: none; }
+.command-output { min-height: 0; max-height: 40vh; overflow: auto; margin: 0; padding: 12px 14px; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.6 var(--code); color: var(--fg-2); }
+.command-panel .opts { min-height: 0; max-height: 25vh; border-bottom: var(--hairline) solid var(--line-2); }
+.command-panel .opt { width: 100%; text-align: left; }
+.command-panel .opt > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.command-panel .opt .d { max-width: 45%; overflow: hidden; text-overflow: ellipsis; }
+.command-foot { padding: 7px 14px; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.command-foot.err { color: var(--red); }
 .pop .body { padding: 12px 16px; max-height: 60vh; overflow-y: auto; }
 .pop .btns { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 14px; border-top: var(--hairline) solid var(--line-2); }
-.pop .btns button { height: 27px; padding: 0 12px; border-radius: var(--r-sm); font-size: 12px; }
+.pop .btns button { display: inline-flex; align-items: center; height: 27px; padding: 0 12px; border-radius: var(--r-sm); font-size: 12px; }
 .pop.version-panel { width: min(800px, 94vw); }
 .version-panel .version-head, .version-panel .version-group { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .version-panel .version-head { padding: 14px 16px; border-bottom: var(--hairline) solid var(--line-2); }
@@ -795,7 +867,7 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .help b { color: var(--fg); font-weight: 500; white-space: nowrap; }
 .help span { color: var(--muted); }
 
-/* a narrow window: the third column goes first (enter opens the full detail; 暂存 and 历史
+/* a narrow window: the third column goes first (enter opens the full detail; Staging and history
    are reached by their keys and the command palette) */
 @media (max-width: 680px) { #board { grid-template-columns: minmax(0,1fr) var(--card-gap) minmax(0,1fr); } #board > .editor-left, #board [data-split="0"] { display: none; } #board > [data-area="1"] {grid-column:1} #board > [data-split="1"] {grid-column:2} #board > .editor-right {grid-column:3} }
 
@@ -805,8 +877,8 @@ svg.i.fill { fill: currentColor; }
 .packs .pack.hl { background: var(--accent-soft); }
 
 /* home: special case, 06 §7.3 */
-/* ---- 启动 (06 §2.3): like the game's main menu — the plans and packs down the left over a
-   background image, the last run and scan under them, ▶ 启动游戏 in the bottom right with the
+/* ---- Start (06 §2.3): like the game's main menu — the plans and packs down the left over a
+   background image, the last run and scan under them, ▶ launch game in the bottom right with the
    applied list's problem tucked under it like a tab ---- */
 #main { position: relative; }
 #top, #body { z-index: 1; }
@@ -832,8 +904,8 @@ svg.i.fill { fill: currentColor; }
 #app.photo #board { visibility: hidden; }
 :root[data-scheme="dark"] #app.photo #crumbs .crumb.last { text-shadow: 0 1px 8px rgba(0, 0, 0, .5); }
 
-/* 启动 (06 §2.3) on a 12-column grid: the headline carries the page; under a rule the three
-   steps read left to right; ▶ 启动游戏 is the one block of colour. */
+/* Start (06 §2.3) on a 12-column grid: the headline carries the page; under a rule the three
+   steps read left to right; ▶ launch game is the one block of colour. */
 .page.home { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: auto minmax(0, 1fr) auto auto;
   gap: 12px 24px; padding: 8px 48px 36px; overflow-y: auto; font-variant-numeric: normal; }
 .page.home::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: 10px; }
@@ -859,7 +931,7 @@ svg.i.fill { fill: currentColor; }
 .hm-floor { display: none; grid-column: 1 / 13; grid-row: 3 / 5; margin: -64px -48px -36px; pointer-events: none;
   background: linear-gradient(180deg, rgba(var(--photo-shade), 0), rgba(var(--photo-shade), .8) 64px); }
 #app.photo .hm-floor { display: block; }
-/* 启动 is the root page and its headline names what is applied: no breadcrumb */
+/* Start is the root page and its headline names what is applied: no breadcrumb */
 #app:has(.page.home) #crumbs > :is(.crumb, .sep) { display: none; }
 .hm-step { grid-row: 4; position: relative; padding-top: 16px; min-width: 0; }
 .hm-s1 { grid-column: 1 / 4; } .hm-s2 { grid-column: 4 / 9; } .hm-s3 { grid-column: 9 / 13; }
@@ -868,7 +940,7 @@ svg.i.fill { fill: currentColor; }
 .hm-step:focus-within h3 b { color: var(--accent-11, var(--accent)); } /* The number is the focus key (06 §7.3). */
 /* Startup hints use 16px gaps (06 §2.3); the shared renderer supplies the separators. */
 #app:has(.page.home) #hints .sep { display: inline-block; width: 0; overflow: hidden; margin: 0 8px; }
-#app:has(.page.home) #hints b { color: var(--fg); }
+#app:has(.page.home) #hints kbd { color: var(--fg); }
 /* A column holds about six rows and scrolls past them; the padding keeps the square on its
    left inside the scroller. The applied row is first (home.js), so it never starts hidden. */
 .hm-picks { position: relative; display: flex; flex-direction: column; max-height: 241px; overflow-y: auto; overscroll-behavior: contain;
@@ -921,7 +993,7 @@ svg.i.fill { fill: currentColor; }
 .hm-go.arrived::before { content: ""; position: absolute; inset: 0; background: var(--accent-fg); opacity: 0; animation: hm-flash 400ms var(--ease); pointer-events: none; }
 .hm-pick.leaving { animation: hm-leave var(--t-exit) var(--ease-in) forwards; }
 .hm-go .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--green); margin-right: 10px; animation: hm-blink 1.4s infinite; }
-/* 保存 in the block's lower left, where "N 项未保存" was: a button of its own beside ▶ (not
+/* save in the block's lower left, where "N unsaved" was: a button of its own beside ▶ (not
    inside it), drawn like the block's L key so the block stays the page's one colour */
 .hm-launch { position: relative; }
 .hm-save { position: absolute; left: 18px; bottom: 16px; max-width: calc(100% - 96px); display: inline-flex; align-items: center; gap: 8px; height: 26px; padding: 0 6px 0 10px;
@@ -975,7 +1047,7 @@ svg.i.fill { fill: currentColor; }
 }
 /* end home */
 
-/* ---- 设置 › 启动页背景 (06 §2.14): the launch page in small, the controls beside it, the
+/* ---- settings › Start page background (06 §2.14): the launch page in small, the controls beside it, the
    images by group below ---- */
 .bg-card { padding: 18px 20px; display: flex; flex-direction: column; }
 .bg-head { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 28px; }
@@ -1166,11 +1238,11 @@ details.xc-sec > summary { cursor: pointer; }
 .xc-way .xc-input { width: 100%; }
 .plan-pop .in .pr { flex: none; }
 
-/* ---- Mod 库存 (06 §2.9): the filters, one row per Lineage, and size · state · used-in on
+/* ---- Mod library (06 §2.9): the filters, one row per Lineage, and size · state · used-in on
    the right of every row; a copy's details take the right column's place ---- */
 /* the list scrolls inside its card at every width, so only the rows in view are drawn */
 .page.fill.library { height: 100%; }
-/* the left column (the filter bar, then the details) as wide as the editor's 未启用; the
+/* the left column (the filter bar, then the details) as wide as the editor's Not enabled; the
    table takes the rest of the page, which is as wide as the window (no centred cap) */
 .page.library { padding-left: 12px; padding-right: 12px; }
 .lib { flex: 1; min-height: 0; display: grid; grid-template-columns: var(--lib-side, calc((100% - 2 * var(--card-gap)) * .38)) var(--card-gap) minmax(0, 1fr); position: relative; }
@@ -1211,7 +1283,7 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .lib-row.open { background: var(--accent-soft); }
 .lib-row.open .t { color: var(--accent-11, var(--accent)); }
 .lib-row .c { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 12px; color: var(--muted); }
-/* a cell's facts stay on the row's one line ("锁定版本  2026/10/27 22:02" wrapped and spilled
+/* a cell's facts stay on the row's one line ("locked version  2026/10/27 22:02" wrapped and spilled
    over the rows above and below); what does not fit is cut, the title has it all */
 .lib-row .c.word-facts { flex-wrap: nowrap; }
 .lib-row .c.word-facts > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -1264,7 +1336,7 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .lib-bar .btn.quiet { margin-left: auto; border-color: transparent; background: none; box-shadow: none; }
 @media (prefers-reduced-motion: reduce) { .lib-bar, .fbar-panel { animation: none; } .lib-row .chev svg { transition: none; } }
 
-/* ---- the filter bar (06 §2.5, §2.9): the plan editor and Mod 库存 share it ---- */
+/* ---- the filter bar (06 §2.5, §2.9): the plan editor and Mod library share it ---- */
 .fbar { position: relative; flex: none; z-index: 6; }
 .fbar-row { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 6px; border-bottom: var(--hairline) solid var(--line-2); }
 .fbar-search { flex: 1; min-width: 90px; position: relative; }
@@ -1298,9 +1370,9 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .fbar-v.cur .l { color: var(--fg); font-weight: 600; }
 .fbar-v .curv { font-size: 12px; line-height: 15px; padding: 0 4px; border-radius: var(--r-sm); background: var(--accent-soft); color: var(--accent-11, var(--accent)); }
 /* open, the bar grows down its column (06 §2.5, §2.9): the groups stacked, each group's
-   values wrapping; what was under it (未启用's rows, Mod 库存's details) shrinks to its
+   values wrapping; what was under it (Not enabled's rows, Mod library's details) shrinks to its
    title bar at the bottom, a click on which (or \, esc) closes the bar again */
-/* the bar is a card of its own over the column's other card (未启用, the details); the
+/* the bar is a card of its own over the column's other card (Not enabled, the details); the
    --card-gap between them is the gap that shares the column */
 .fcol { display: flex; flex-direction: column; gap: var(--card-gap); min-width: 0; min-height: 0; }
 .fcol > .area { flex: 1; min-height: 0; }
@@ -1318,18 +1390,18 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .fbar-gap::after { content: ""; position: absolute; left: 12px; right: 12px; top: 50%; height: var(--hairline); transform: translateY(-50%); border-radius: var(--r-sm); background: transparent; transition: background var(--t-press); }
 .fbar-gap:hover::after, .fbar-gap.drag::after { background: var(--accent); }
 /* filling the column, the bar leaves the card below only its title, a slim card at the
-   bottom like 暂存 and 历史: a click on it gives the column back */
+   bottom like Staging and history: a click on it gives the column back */
 .fcol:has(> .fbar.open.fill) > .area { flex: none; }
 .fcol:has(> .fbar.open.fill) > .area > :not(.head) { display: none; }
 .fcol:has(> .fbar.open.fill) > .area > .head { border-bottom: 0; cursor: pointer; }
 
-/* the row menu (06 §8.5): groups split by a hairline, keys on the right, 退订 / 删除 in red */
+/* the row menu (06 §8.5): groups split by a hairline, keys on the right, unsubscribe / delete in red */
 #menu hr { border: 0; border-top: var(--hairline) solid var(--line-2); margin: 3px 4px; }
 #menu button.danger { color: var(--red); }
 #menu button.danger:hover, #menu button.danger:focus { background: var(--red-soft); }
 #menu button:focus { outline: 0; background: var(--pill); }
 
-/* 设置 › 卸载 RimArcho (06 §2.14): one row per step, the answer inline, the items folded */
+/* settings › uninstall RimArcho (06 §2.14): one row per step, the answer inline, the items folded */
 .uninstall .un-step + .un-step { border-top: var(--hairline) solid var(--line-2); }
 .uninstall .un-step .set { border-top: 0; }
 .uninstall .un-toggle { display: flex; gap: 6px; align-items: center; cursor: pointer; white-space: nowrap; }
@@ -1351,7 +1423,29 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .page .btn.primary.danger-go:disabled { opacity: .45; cursor: default; }
 .uninstall .set .sub { white-space: normal; }
 
-/* 库 › 贴图优化 (08 §5.2): settings rows, the run's foot, the mods table */
+/* Settings > Feedback (06 §2.14): what the player writes, the attachments, the whole text */
+.fb-form { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; }
+.fb-field { display: flex; flex-direction: column; gap: 6px; font-weight: 500; }
+.fb-field .field { flex: none; width: 100%; font-weight: 400; }
+.fb-field .fb-title { height: 30px; }
+.fb-field .fb-text { height: auto; min-height: 120px; padding: 7px 9px; resize: vertical; font: inherit; line-height: 1.5; }
+.fb-check { display: flex; gap: 8px; align-items: center; cursor: pointer; width: max-content; max-width: 100%; }
+.fb-check input { flex: none; width: 15px; height: 15px; margin: 0; accent-color: var(--accent); }
+.fb-check input:disabled { cursor: default; }
+.feedback .set .l .setting-note { white-space: normal; padding-left: 23px; }
+.fb-prev { padding: 12px 14px 14px; max-height: 420px; overflow: auto; display: flex; flex-direction: column; gap: 12px; user-select: text; cursor: text; }
+.fb-p-title { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.fb-p-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.fb-p-head { color: var(--muted); font-size: 12px; font-weight: 600; }
+summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
+.fb-p-lines { margin-top: 4px; padding-left: 14px; font-size: 12px; color: var(--fg-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+.fb-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 14px 0 24px; }
+.fb-foot .m { flex: 1 1 260px; min-width: 0; color: var(--muted); font-size: 12px; }
+.fb-foot .m.warn { color: var(--amber); }
+/* "public on GitHub" beside preview: a note, not part of the uppercase heading */
+.fb-public { margin-left: 12px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--faint); }
+
+/* Library > Texture optimisation (08 §5.2): settings rows, the run's foot, the mods table */
 .textures .set .sub { white-space: normal; }
 /* 06 §2.13: offscreen texture cells need no layout/paint during background estimates. */
 .tex-rows .data-row { content-visibility: auto; contain-intrinsic-size: auto 30px; }
@@ -1377,7 +1471,7 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .packpv .packtex { display: flex; gap: 8px; align-items: center; margin: 0 0 10px; }
 .packpv .packtex select { height: 26px; background: var(--card-2); color: var(--fg); border: var(--hairline) solid var(--line-2); border-radius: var(--r-sm); padding: 0 6px; font: inherit; }
 
-/* ---- the full detail (06 §4.2): one page for the editor and Mod 库存. The mod on the left,
+/* ---- the full detail (06 §4.2): one page for the editor and Mod library. The mod on the left,
    wide; its copies, where they are used, the fields and the history on the right; the
    technical information under both, full width. Each part is a numbered card (1–6). ---- */
 .page.mod-page { padding-left: max(20px, calc(50% - 720px)); padding-right: max(20px, calc(50% - 720px)); }
@@ -1426,7 +1520,7 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .fd-desc .desc s { color: var(--faint); }
 .fd-desc .desc .link { color: var(--accent-11, var(--accent)); cursor: pointer; }
 
-/* ---- 后台任务 (06 §2.16): the filter bar and the tasks on the left; the task's summary over
+/* ---- Background tasks (06 §2.16): the filter bar and the tasks on the left; the task's summary over
    a table of every item it touched on the right. The selection is a tint, never a bar on
    the left (06 §7 rule 4). ---- */
 .page.fill.tasks { height: 100%; padding-left: 12px; padding-right: 12px; }
@@ -1526,7 +1620,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 }
 @media (prefers-reduced-motion: reduce) { .mini i, .tasks-line .ring circle.v { transition: none; } }
 
-/* ---- 列表管理 (06 §2.17): the lists on the left, the picked one on the right ---- */
+/* ---- Manage lists (06 §2.17): the lists on the left, the picked one on the right ---- */
 .pm { display: grid; grid-template-columns: minmax(270px, 320px) minmax(0, 1fr); gap: var(--card-gap); align-items: start; }
 .pm-list { position: sticky; top: 0; max-height: calc(100vh - 140px); display: flex; flex-direction: column; }
 .pm-list .scroll { overflow-y: auto; padding: 6px 0; }
@@ -1625,7 +1719,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .pm-new .pm-sub { color: var(--fg-2); }
 .pm-fields { min-width: 0; border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 14px; }
 .pm-field { display: flex; flex-direction: column; gap: 7px; min-width: 0; font-weight: 500; }
-.pm-field > input, .pm-field > select, .pm-field > textarea { font-weight: 400; width: 100%; color: var(--fg); }
+.pm-field > input, .pm-field > .choice-control, .pm-field > textarea { font-weight: 400; width: 100%; color: var(--fg); }
 .pm-field .xc-input { flex: none; height: 34px; }
 .pm-modes { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: var(--hairline) solid var(--line-2); padding-bottom: 10px; }
 .pm-modes .on { color: var(--accent); background: var(--accent-soft); }
@@ -1643,7 +1737,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .pm-new label.xc-sec { display: grid; gap: 8px; }
 .pm-new .xc-check .xc-input { flex: 1; min-width: 140px; }
 .pm-new .xc-check input[type=radio], .pm-import input[type=radio], .pm-import input[type=checkbox] { flex: none; width: auto; }
-/* The title renames in place (double-click, F2, 改名); 设为当前 sits beside it (06 §2.17). */
+/* The title renames in place (double-click, F2, rename); make current sits beside it (06 §2.17). */
 .pm-head h2.pm-title { cursor: text; border-radius: var(--r-sm); padding: 1px 4px; margin-left: -4px; }
 .pm-head h2.pm-title:hover { background: var(--pill); }
 .pm-rename { display: grid; gap: 4px; min-width: 0; flex: 1; max-width: 360px; }
@@ -1673,7 +1767,8 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 @media (max-width: 760px) { .pm-page > .pm { grid-template-columns: minmax(0, 1fr); gap: var(--card-gap); } .pm-split { display: none; } }
 .pm-split { align-self: stretch; margin: 0; }
 #board > .stack { gap: var(--card-gap); }
-.stack > .stack-split { margin: 0; }
+/* the split takes the place of the stack's gap: cards stay --card-gap apart, as columns do */
+.stack > .stack-split { margin: calc(-1 * var(--card-gap)) 0; }
 .stack > .fold.open.stack-sized { flex: 0 1 var(--stack-size); height: var(--stack-size); max-height: none; }
 .stack-split:has(+ [hidden]) { display: none; }
 .stack-split[aria-disabled="true"] { cursor: default; pointer-events: none; }
@@ -1697,7 +1792,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .envrow { flex-wrap: wrap; }
 .envrow .l { flex-basis: 240px; }
 .envrow .sub.word-facts { white-space: normal; overflow: visible; }
-.word-facts > .path-copy { min-width: 0; }
+.word-facts > .path-copy { min-width: min(100%, 200px); }
 .uninstall .un-item { flex-wrap: wrap; }
 .uninstall .un-item .p { white-space: normal; overflow-wrap: anywhere; }
 #popup .set { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
@@ -1732,8 +1827,6 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .link-game > .link-path { color: var(--muted); }
 .link-row { display: grid; grid-template-columns: minmax(100px, 1fr) auto minmax(100px, 2fr) minmax(120px, 1fr) auto; align-items: center; gap: 8px; padding: 8px 0; border-top: var(--hairline) solid var(--line); font-size: 13px; }
 .link-path { display: inline-flex; min-width: 0; max-width: 100%; vertical-align: bottom; }
-.link-path-start { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.link-path-end { flex-shrink: 0; max-width: 100%; overflow: hidden; white-space: nowrap; }
 .link-arrow, .link-reason { color: var(--muted); }
 .link-tag { border-radius: 999px; background: var(--line); padding: 2px 8px; font-size: 12px; white-space: nowrap; }
 .pop.link-repair { width: min(1000px, 90vw); }
@@ -1743,7 +1836,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
   .link-tag { justify-self: end; }
 }
 
-/* ---- Mod 库 › 订阅与更新 (06 §2.9): the scope bar and the list on the left, the detail ---- */
+/* ---- Mod library › updates (06 §2.9): the scope bar and the list on the left, the detail ---- */
 .page.fill.subs-page { display: flex; flex-direction: column; }
 .subs { flex: 1; min-height: 0; display: grid; grid-template-columns: var(--subs-side, clamp(320px, 34%, 460px)) var(--card-gap) minmax(0, 1fr); }
 .subs-split { align-self: stretch; margin: 0; }
@@ -1776,18 +1869,16 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .tier.launch { background: var(--red-soft); color: var(--red); }
 .tier.watch { background: var(--amber-soft); color: var(--amber); }
 .subs-foot { flex: none; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-top: var(--hairline) solid var(--line-2); font-size: 12px; color: var(--muted); min-width: 0; }
-.subs-srcsum { height: 24px; display: inline-flex; align-items: center; gap: 6px; padding: 0 6px; border-radius: var(--r-sm); color: var(--muted); min-width: 0; }
-.subs-srcsum:hover { background: var(--pill); color: var(--fg); }
-.subs-srcsum .ic, .subs-failed .ic { display: inline-flex; }
-.subs-srcsum .chev { color: var(--faint); }
-.subs-failed { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.subs-sources { flex: none; max-height: 45%; overflow-y: auto; border-top: var(--hairline) solid var(--line-2); padding: 4px 6px; }
+.subs-srcsum { display: flex; align-items: center; gap: 6px; padding: 6px; margin: 0; width: 100%; color: var(--muted); font-size: 12px; }
+.subs-srcsum .ic { display: inline-flex; flex: none; }
+.subs-srcsum .word-facts { overflow-wrap: anywhere; }
+.subs-sources { padding: 4px 6px; }
 .subs-src { display: flex; align-items: flex-start; gap: 8px; padding: 7px 8px; border-radius: var(--r-sm); }
 .subs-src:hover { background: var(--card-2); }
 .subs-src .l { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
-.subs-src .n { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.subs-src .n { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; }
 .subs-src .n .ic { display: inline-flex; color: var(--faint); }
-.subs-src .acct { display: flex; align-items: center; gap: 6px; color: var(--fg-2); }
+.subs-src .acct { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--fg-2); }
 .subs-detail { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
 .subs-detail > .scroll { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 8px; }
 .subs-dhead { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px 12px; border-bottom: var(--hairline) solid var(--line-2); }
@@ -1810,6 +1901,9 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .subs-say { color: var(--fg); }
 .subs-line { display: flex; align-items: baseline; gap: 8px; color: var(--fg-2); font-size: 13px; min-width: 0; }
 .subs-line .tier { font-size: 12px; }
+.subs-line { flex-wrap: wrap; }
+.subs-line .link { padding: 0; }
+.subs-gone { padding: 0 16px; font-size: 13px; }
 .subs-alert { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: var(--r-sm); background: var(--amber-soft); color: var(--fg-2); font-size: 12px; }
 .subs-alert .ic { display: inline-flex; color: var(--amber); }
 .subs-detail pre.lines.files { padding: 6px 0; border-top: 0; max-height: 360px; overflow: auto; }
@@ -1817,7 +1911,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .page .btn.link:hover { background: var(--accent-soft); }
 @media (max-width: 900px) { .subs { grid-template-columns: minmax(0, 1fr); gap: var(--card-gap); } .subs-split { display: none; } .page.fill.subs-page { height: auto; } .subs-list > .scroll { max-height: 60vh; } }
 
-/* ---- Mod 库 › 添加订阅 (06 §2.9): one paste box, what it recognised, the source cards ---- */
+/* ---- Mod library › add a subscription (06 §2.9): one paste box, what it recognised, the source cards ---- */
 .subscribe-page { height: 100%; overflow-y: auto; }
 .subscribe-add { max-width: 760px; margin: 0 auto; padding: 8px 0 24px; display: flex; flex-direction: column; gap: 12px; }
 .subscribe-omni { display: flex; align-items: center; height: 44px; padding: 0 14px; border: var(--hairline) solid var(--line); border-radius: var(--r-lg); background: var(--card); transition: border-color var(--t-press), box-shadow var(--t-press); }
@@ -1858,12 +1952,14 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .subscribe-tile .st { color: var(--muted); font-size: 12px; }
 .subscribe-local { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 14px; border: var(--hairline) dashed var(--line); border-radius: var(--r-lg); color: var(--muted); font-size: 12px; }
 .subscribe-recent .r { display: flex; align-items: baseline; gap: 10px; padding: 4px 2px; font-size: 12px; }
-.subscribe-recent .r b { color: var(--fg-2); font-weight: 500; }
+.subscribe-recent .r .link { padding: 0; font-weight: 500; }
 @media (max-width: 900px) { .subscribe-tiles { grid-template-columns: minmax(0, 1fr); } }
 
 /* Approved editor layout: information left, load order centre, available copies right. */
 .editor-right > .area:not(.fold) {flex:1;min-height:0;}
 .editor-left > .histarea {flex:none;}
+.editor-left > .rulesarea {flex:none;}
+.editor-left > .rulesarea.open:not(.stack-sized) {max-height:40%;}
 .editor-left > .histarea.open:not(.stack-sized) {flex:0 1 25%;height:25%;max-height:25%;}
 .fcol:has(> .fbar.open.fill) > .area {min-height:0;}
 .fbar {overflow:visible;}
@@ -1966,3 +2062,170 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .identity-files { padding-left: 20px; margin: 6px 0 0; overflow-wrap: anywhere; font-size: 13px; }
 .identity-answer-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .identity-comparison .btns { flex-wrap: wrap; justify-content: space-between; }
+
+/* Search files (06 §2.9): the approved 32:68 query/tree and file view. */
+.page.filesearch { padding: 0; display: grid; grid-template-columns: minmax(260px,var(--fs-side,32%)) var(--card-gap) minmax(0,1fr); gap: 0; height: 100%; min-height: 0; overflow: hidden; }
+.filesearch .fs-left { display: flex; flex-direction: column; gap: var(--card-gap); min-width: 0; min-height: 0; }
+.filesearch .fs-query { flex: none; padding: 8px; z-index: 7; }
+.filesearch .fs-fields { display: flex; flex-direction: column; gap: 6px; }
+.filesearch .fs-field { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.filesearch .fs-label { width: 44px; flex: none; padding-left: 4px; color: var(--muted); font-size: 12px; }
+.filesearch .fs-text-box { display: flex; align-items: center; flex: 1; min-width: 0; height: 28px; border-radius: var(--r-sm); background: var(--pill); padding-left: 9px; }
+.filesearch .fs-input { width: 100%; min-width: 0; flex: 1; height: 28px; border: 0; padding: 0; background: transparent; font: 13px var(--code); }
+.filesearch .fs-toggle { flex: none; height: 24px; min-width: 24px; padding: 0 5px; font: 12px var(--code); gap: 4px; }
+.filesearch .fs-toggle kbd { font-size: 12px; padding: 0 3px; }
+.filesearch .fs-toggle[aria-pressed="true"],.filesearch .fs-wrap[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-11,var(--accent)); }
+.filesearch .fbar { flex: 1; min-width: 0; z-index: auto; }
+.filesearch .fbar.open { height: auto; }
+.filesearch .fbar-row { height: 28px; padding: 0; border: 0; }
+.filesearch .fbar-search { min-width: 0; }
+.filesearch .fbar-search input,.filesearch .fbar-ghost { font: 13px var(--code); }
+.filesearch .fbar-search input { height: 28px; }
+.filesearch .fbar-clear { padding: 0 3px; }
+.filesearch .fbar-count { color: var(--accent-11,var(--accent)); font-weight: 600; }
+.filesearch .fbar.open .fbar-panel { margin: 6px -8px -8px; max-height: 260px; padding: 8px 10px 10px; border-top: var(--hairline) solid var(--line-2); border-radius: var(--r-lg); }
+.filesearch .fbar-gap { display: none; }
+.filesearch .fbar-suggestions { min-width: min(280px,calc(100vw - 100px)); }
+.filesearch .fs-validation { margin: 0 0 0 50px; font-size: 12px; color: var(--red); }
+.filesearch .fs-results { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 0; overflow: hidden; }
+.filesearch .fs-result-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; padding: 8px 12px 4px; }
+.filesearch .fs-result-head h2 { font-size: 13px; font-weight: 600; margin: 0; }
+.filesearch .fs-summary { font-size: 12px; }
+.filesearch .fs-stop { margin-left: auto; height: 22px; }
+.filesearch .fs-notes { flex: none; max-height: 120px; overflow: auto; }
+.filesearch .fs-note { font-size: 12px; margin: 0; padding: 0 12px 6px; overflow-wrap: anywhere; }
+.filesearch .fs-tree { overflow: auto; flex: 1; min-height: 0; padding: 0 4px 6px; }
+.filesearch .fs-tree-row { display: flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border: 0; border-radius: var(--r-sm); background: transparent; text-align: left; font-size: 12px; line-height: 24px; min-width: 0; }
+.filesearch .fs-tree-row.fs-mod { font-size: 13px; }
+.filesearch .fs-mod-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.filesearch .fs-copy { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.filesearch .fs-count { margin-left: auto; flex: none; font-size: 12px; font-variant-numeric: tabular-nums; }
+.filesearch .fs-tree-row.fs-file { padding-left: 14px; }
+.filesearch .fs-chevron { flex: none; width: 12px; color: var(--faint); transform-origin: center; }
+.filesearch .fs-chevron.open { transform: rotate(90deg); }
+.filesearch .fs-chevron.none { visibility: hidden; }
+.filesearch .fs-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.filesearch .fs-tree-row.fs-line { padding-left: 32px; font: 12px/24px var(--code); }
+.filesearch .fs-line-number { flex: none; min-width: 34px; text-align: right; padding-right: 10px; font-variant-numeric: tabular-nums; }
+.filesearch .fs-line-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.filesearch button.fs-tree-row:hover { background: var(--pill); }
+.filesearch button.fs-tree-row.cur { background: var(--sel); }
+.filesearch .fs-empty { margin: 8px; font-size: 12px; }
+.filesearch .fs-widen { color: var(--accent-11,var(--accent)); margin: 0 8px; }
+.filesearch .fs-viewer { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+.filesearch .fs-view-empty { margin: 14px 16px; font-size: 12px; }
+.filesearch .fs-view-head { padding: 14px 16px 12px; border-bottom: var(--hairline) solid var(--line-2); display: flex; flex-direction: column; gap: 7px; flex: none; }
+.filesearch .fs-view-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.filesearch .fs-view-title h2 { margin: 0; font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.filesearch .fs-view-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.filesearch .fs-view-actions .btn { height: 26px; font-size: 12px; }
+.filesearch .fs-view-path { font: 12px var(--code); min-width: 0; overflow-wrap: anywhere; }
+.filesearch .fs-code { flex: 1; overflow: auto; min-height: 0; padding: 8px 0; font: 12px/1.7 var(--code); }
+.filesearch .fs-code-line { display: flex; white-space: pre; min-height: 20.4px; padding-right: 16px; }
+.filesearch .fs-code-number { width: 52px; flex: none; text-align: right; padding-right: 16px; color: var(--faint); user-select: none; }
+.filesearch .fs-code-text { min-width: max-content; }
+.filesearch .fs-code-line.hit { background: color-mix(in srgb,var(--amber) 10%,transparent); }
+.filesearch .fs-code-line.hit .fs-code-number { color: var(--amber); }
+.filesearch .fs-code-line.cur { background: color-mix(in srgb,var(--amber) 20%,transparent); box-shadow: inset 3px 0 0 var(--amber); }
+.filesearch mark { background: color-mix(in srgb,var(--amber) 65%,var(--card)); color: var(--fg); border-radius: var(--r-sm); }
+.filesearch .fs-code.wrap .fs-code-line { white-space: pre-wrap; }
+.filesearch .fs-code.wrap .fs-code-text { min-width: 0; overflow-wrap: anywhere; }
+.filesearch .fs-view-note { margin: 0; padding: 4px 16px; font-size: 12px; }
+.filesearch .fs-view-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 8px 16px; border-top: var(--hairline) solid var(--line-2); font-size: 12px; color: var(--muted); flex: none; }
+.filesearch .fs-view-foot .btn { height: 24px; font-size: 12px; }
+.filesearch .fs-file-type { margin-left: auto; }
+.filesearch .fs-syntax-tag { color: var(--accent-11,var(--accent)); }
+.filesearch .fs-syntax-attribute { color: var(--amber); }
+.filesearch .fs-syntax-string { color: var(--green); }
+.filesearch .fs-syntax-comment { color: var(--muted); }
+.filesearch .fs-syntax-keyword { color: var(--accent-11,var(--accent)); }
+.filesearch .fs-syntax-number { color: var(--red); }
+@media(max-width:899px) {
+ .page.filesearch { display: flex; flex-direction: column; height: auto; overflow: visible; gap: var(--card-gap); }
+ .filesearch .fs-split { display: none; }
+ .filesearch .fs-tree { height: 320px; flex: none; }
+ .filesearch .fs-code { height: 480px; flex: none; }
+ .filesearch .fs-view-actions { margin-left: 0; }
+}
+/* ---- shared choice controls (06 §3.10, §7): off/on and single-value menus ---- */
+.choice-control { display: inline-flex; align-items: center; flex: 0 1 auto; min-width: 0; max-width: 100%; height: 30px; border: var(--hairline) solid var(--line-2); border-radius: var(--r-lg); background: var(--pill); color: var(--fg); font: inherit; font-weight: 400; user-select: none; transition: background var(--t-press), border-color var(--t-press); }
+.choice-control:hover:not(:disabled) { background: var(--pill-hover); }
+.choice-control:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.choice-control:disabled { opacity: .45; }
+.choice-switch { --choice-inset: 3px; padding: var(--choice-inset); gap: 2px; }
+.choice-part { display: flex; align-items: center; justify-content: center; height: 100%; min-width: 38px; padding: 0 10px; border-radius: calc(var(--r-lg) - var(--choice-inset)); color: var(--ctl-fg); }
+.choice-part.on { color: var(--fg); background: var(--seg-thumb); box-shadow: var(--seg-edge); }
+.choice-select { justify-content: space-between; gap: 12px; padding: 0 10px; text-align: left; }
+.choice-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.choice-arrow { display: inline-flex; align-items: center; justify-content: center; flex: none; color: var(--muted); transform: rotate(90deg); }
+.choice-arrow svg.i { display: block; vertical-align: initial; }
+.choice-select[aria-expanded="true"] { background: var(--pill-hover); }
+.choice-select[aria-expanded="true"] .choice-arrow { transform: rotate(270deg); }
+.choice-menu { --choice-inset: 5px; position: fixed; inset: auto; margin: 0; z-index: 30; display: flex; flex-direction: column; width: max-content; max-width: calc(100vw - 16px); max-height: min(340px, calc(100vh - 16px)); padding: var(--choice-inset); border: var(--hairline) solid var(--line-2); border-radius: var(--r-lg); box-shadow: var(--shadow); background: var(--card); color: var(--fg); font: 13px/1.4 var(--font); overflow: hidden; user-select: none; }
+.choice-title { flex: none; padding: 5px 8px 7px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.choice-options { overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
+.choice-option { display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 5px 8px; border-radius: calc(var(--r-lg) - var(--choice-inset)); }
+.choice-option[aria-selected="true"] { background: var(--pill); }
+.choice-option.active { background: var(--pill-hover); outline: var(--hairline) solid var(--line); outline-offset: calc(-1 * var(--hairline)); }
+.choice-option[aria-disabled="true"] { opacity: .45; }
+.choice-check { flex: 0 0 14px; text-align: center; }
+.choice-label { min-width: 0; overflow-wrap: anywhere; }
+.settings .set .r > .choice-control { flex-shrink: 1; }
+.pm-field > .choice-control { width: 100%; }
+
+/* Uninstall owns the page until its report (06 §2.14). */
+.uninstall-exclusive :is(#nav, #nav-settings, #tasks-line) { pointer-events: none; opacity: .45; }
+.uninstall-exclusive #crumbs, .uninstall-exclusive #env, .uninstall-exclusive #hints { pointer-events: none; }
+.uninstall-exclusive #hints { visibility: hidden; }
+.un-progress-page { width: min(640px, 100%); margin-inline: auto; padding: 0 20px 24px; min-height: 65vh; justify-content: center; }
+.un-progress { display: flex; flex-direction: column; gap: var(--card-gap); padding: 24px; text-align: center; }
+.un-progress p { margin: 0; }
+.un-progress progress { width: 100%; accent-color: var(--accent); }
+.un-close-notice { color: var(--amber); }
+
+.un-progress-steps { padding: 14px 18px; }
+.un-progress-steps summary { cursor: pointer; color: var(--muted); width: max-content; }
+.un-progress-steps ol { margin: 12px 0 0; padding-left: 22px; }
+.un-progress-steps li { padding: 5px 0; overflow-wrap: anywhere; }
+.un-progress-steps li > span { display: block; }
+.un-progress-steps li[aria-current] { color: var(--accent-11, var(--accent)); }
+.un-progress-steps li.pending { color: var(--muted); }
+.un-progress-steps li.done > span:first-child::after { content: " ✓"; color: var(--green); }
+.pop.un-confirm { width: min(640px, 94vw); }
+.un-confirm h2 { margin: 0; font-weight: 600; }
+.un-summary + .un-summary { margin-top: var(--card-gap); }
+.un-summary h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
+.un-summary-row { display: flex; flex-direction: column; gap: 3px; padding: 6px 0; overflow-wrap: anywhere; }
+.un-summary-row strong { font-weight: 500; }
+.un-summary p { margin: 8px 0 0; overflow-wrap: anywhere; }
+.pop.un-confirm .btns .danger-go { background: var(--red); border-color: var(--red); color: #fff; }
+
+/* Address rows keep their full payload behind a single-line display (06 §3.1). */
+.settings .set .r > .setting-value { flex: 1 1 240px; min-width: 0; }
+.settings .set .r > .setting-value:has(.path-copy), .settings .set .r > .setting-value.path-copy { min-width: min(100%, 240px); }
+.settings .setting-value > .path-copy { flex: 1; }
+.settings .set .l .setting-note.word-facts > .path-copy { min-width: min(100%, 200px); }
+.settings .community-link { border-radius: 999px; }
+.pop.url-editor { width: min(480px, 92vw); }
+.url-editor .field { width: 100%; }
+.url-editor .err:not(:empty) { margin-top: 8px; }
+.frow:has(.path-copy) { flex-wrap: wrap; }
+.frow:has(.path-copy) .v { flex-basis: 200px; }
+.settings .set .r > .btn { flex: none; }
+.setting-release-link { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.pm-file, .xc-selected-file { min-width: 0; max-width: 100%; }
+.guide .typed, .uninstall .un-ask { flex-wrap: wrap; }
+.guide .typed > .path-copy { flex: 1 1 200px; }
+@media (max-width: 620px) {
+  .settings .set { flex-wrap: wrap; gap: 6px; }
+  .settings .set .l, .settings .set .r { flex-basis: 100%; }
+}
+
+/* RAM comparison and launch risk (06 §2.3–2.4). */
+.hm-go.memory-warning { background: var(--amber-soft); color: var(--amber); }
+.hm-go.memory-severe { background: var(--red-soft); color: var(--red); }
+.need.memory-capacity .why { white-space: pre-line; }
+.memory-confirm .memory-values { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--card-gap); padding: 12px 0; }
+.memory-confirm .memory-values strong { display: block; margin-top: 8px; font-size: 15px; }
+.memory-confirm .memory-cancel:focus, .memory-confirm .go:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (max-width: 480px) { .memory-confirm .memory-values { grid-template-columns: 1fr; } }

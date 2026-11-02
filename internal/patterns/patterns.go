@@ -1,4 +1,4 @@
-// Package patterns is the error pattern library (docs/research/00-日志语料顶层设计.md §3 G5,
+// Package patterns is the error pattern library (docs/research/00-log-corpus-design.md §3 G5,
 // §9): kinds of Player.log problems seen in public HugsLib logs, with a recognition rule over
 // the cluster template (internal/logs), how often they occur, their usual causes, the
 // diagnosis route (which tools to call next) and the fix types.

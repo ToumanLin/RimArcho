@@ -24,7 +24,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     problems ignore <p:ref>                   ignore a problem until its mod changes
     problems unignore <p:ref>                 stop ignoring a problem
     files search <pattern>                    search the effective content of enabled mods
-    source <ref>                              decompile a mod's assemblies on demand (ilspycmd; cached per DLL hash)
+    source <ref>                              decompile a mod's assemblies into the Source library (ilspycmd)
     source search <pattern>                   search decompiled C# (uncached assemblies are decompiled first)
     analyze                                   rebuild the Def and Patch facts (normally run on demand as a child process)
     changes [<ref>]                           what changed in the mods, one row per mod (default: the current plan since it was last played)
@@ -53,7 +53,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     plan use <name>                           make a plan current (writes no game file)
     plan rename <old> <new>                   rename a plan (its history stays)
     plan remove <name>                        delete a plan and its history (not the last one)
-    plan cost [<plan>]                        estimate a plan's loaded RAM and VRAM ranges
+    plan cost [<plan>]                        estimate resident/loading RAM and VRAM, compare with hardware capacity
     stage list                                staged mods, with the place each one came from
     stage add <ref…>                          stage mods (enabled ones leave the Loadout and remember their place)
     stage drop <ref…>                         take mods out of staging without enabling them
@@ -65,6 +65,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     note <ref> [<text>]                       attach a plain-text note to a mod (all its copies), or with --copy to this copy only
     tag add|remove <ref> <tag…> | list        tags for filtering (list --filter tag:<tag>)
     rule add after|before|incompatible|attach <A> <B> | top|bottom <A> | ignore <constraint>  add a user rule
+    rule edit <r:n> after|before|incompatible|attach <A> <B> | top|bottom <A> | ignore <constraint>  replace a user rule; r:<n> stays
     rule list                                 list user rules
     rule remove <r:n>                         delete a user rule
     launch                                    save the list and start the game (one game at a time)
@@ -77,7 +78,8 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     lineage merge <ref> <ref>                 merge the second lineage into the first
     gc                                        remove expired tombstones and superseded snapshots
     config get [<key>]                        show settings
-    config set <key> <value>                  change a setting (updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto|en|zh; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris; ui.icons: auto|nerd|compat; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; terminal.host: auto|wezterm|none; ui.previews: on|off; ui.gpu: on|off; ui.preview_dwell_ms: 0–5000; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; wezterm.path: an existing WezTerm program, or empty for discovery)
+    config set <key> <value>                  change a setting (updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris; ui.icons: compat|nerd; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program)
+    guide [<topic>]                           the agent guide behind the MCP tools: a workflow (diagnose, errors, plans, words) or one tool's full reference
     mcp                                       serve the MCP tools over stdio (for Claude Code, Codex and other agents)
     gui                                       open the desktop window (RimArcho.exe does this on a double click)
     version                                   print the RimArcho version
@@ -86,7 +88,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     data update [<dataset>…]                  download the community data (rules, steamdb, replacements); automatic checks can also refresh it while the window is open
     data status                               the community data: source, version, when it was fetched, entries
     deps                                      show external dependencies: status, version, path and source
-    deps install <name>                       download todds, steamcmd or wezterm into RimArcho's own folder
+    deps install <name>                       download todds or steamcmd into RimArcho's own folder
     deps remove <name>                        remove only RimArcho's own downloaded dependency
     env branches                              list RimWorld's Steam branches (versions) SteamCMD can download
     env download <branch>                     download a RimWorld version with SteamCMD and add it as an environment (anonymous by default)
@@ -124,7 +126,10 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     db backup                                 write a consistent copy of the database to <data>/backups
     db vacuum                                 clean old file lists and compact the database
     cache status                              the caches and their sizes
-    cache clear <kind>                        empty one cache (previews, workshop, images, source, logs); rebuilt on demand
+    cache clear <kind>                        empty one cache (previews, workshop, images, textures, logs); rebuilt on demand
+    source game                               read the current game's code from the Source library
+    source decompile                          decompile the current list's mods into the Source library
+    source clean                              preview or remove unused Source library folders
     subscribe git <url>                       install a Git mod and track its branch, tag or commit
     subscribe list                            list installed subscriptions and their last update check
     subscribe page <url>                      inspect a download page or install its Git repository or a downloaded archive
@@ -136,6 +141,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     textures optimize [<mod>...]              write the DDS of mods' PNG textures next to them (the game loads them instead; the PNGs stay)
     textures clean [<mod>...]                 delete the DDS RimArcho wrote (only those; the game goes back to the PNGs)
     textures tool                             the DDS encoder (todds): where it is, or --install to download it
+    update                                    check GitHub for a newer RimArcho and install it; the data folder is not touched (07 §5.1)
     workshop unsubscribe <ref…>               unsubscribe in Steam: Steam deletes the Workshop folder (refused while the game runs; plans that use it show it missing)
     workshop subscribe <ref…>                 subscribe again in Steam to an unsubscribed leftover
     workshop resubscribe <ref…>               resubscribe and wait for Steam to download mods; local edits are lost (refused while the game runs)

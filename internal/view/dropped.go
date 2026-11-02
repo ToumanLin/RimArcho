@@ -49,15 +49,3 @@ func droppedNeed(a *app.App, st *app.LoadoutState) *Need {
 			{Kind: ActKeepOutside, Key: "I", Label: T("keep the change"), Done: Tf("v%d is kept", to)},
 		}}
 }
-
-func init() {
-	Register(map[string]string{
-		"ModsConfig.xml was changed outside RimArcho: %s left the list":                                    "ModsConfig.xml 在 RimArcho 之外被改了：%s 不在列表里了",
-		"the game resets its list when mods fail to load; RimArcho loaded the change as v%d. Left out: %s": "Mod 加载失败时游戏会重置自己的列表；RimArcho 已把这次修改载入为 v%d。少了：%s",
-		"v%d → v%d":             "v%d → v%d",
-		"put back v%d":          "恢复 v%d",
-		"the list is v%d again": "列表已恢复为 v%d",
-		"keep the change":       "保留这次修改",
-		"v%d is kept":           "已保留 v%d",
-	})
-}
