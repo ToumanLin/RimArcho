@@ -4,6 +4,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- Search files follows the card rules: the query, results and file view are cards 1–3 (the digit keys focus them), the left column starts at 38% of the page, and while the filter panel is open it scrolls inside the query card, whose height drags (38% by default, double-click restores). With text selected in the file view, ctrl+c copies that text.
+
 - Search files shows searching… while discovering its scope and one not found summary for empty results. The source-library note appears only when the run decompiled assemblies.
 
 - Search files now has search/files/mods fields with shared library filters, streaming results and stoppable C# searches including Core. The window adds a bounded file viewer, highlighted matches and persistent wrapping; the TUI shares the fields and streaming tree. CLI/MCP search flags and output are unchanged.

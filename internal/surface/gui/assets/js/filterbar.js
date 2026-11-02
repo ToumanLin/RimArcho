@@ -305,8 +305,10 @@ export function createBar(opts) {
     opts.resized && opts.resized();
     separator.refresh();
   };
-  b.nudge = (d) => b.setH(height() + d);
-  const separator = opts.noPanel
+  // A page whose card holds more than the bar (Search files) owns the gap below the card:
+  // it passes noGap and its own nudge for ctrl+↑↓.
+  b.nudge = (d) => (opts.nudge ? opts.nudge(d) : b.setH(height() + d));
+  const separator = opts.noPanel || opts.noGap
     ? {
         refresh() {}
       }
@@ -350,7 +352,8 @@ export function createBar(opts) {
     root.isConnected &&
     t instanceof Node &&
     t.isConnected &&
-    !(opts.focusRoot?.() || root).contains(t) &&
+    // focusRoot may be several elements: a card and the gap that resizes it
+    ![].concat(opts.focusRoot?.() || root).some((r) => r?.contains(t)) &&
     !(t.closest && t.closest("#menu"));
   let pointerOutside = false;
   const down = (e) => {
@@ -397,7 +400,8 @@ export function createBar(opts) {
     if (count) {
       tog.insertBefore(el("span", "fbar-count", String(count)), tog.lastChild);
     }
-    tog.hidden = gap.hidden = !!opts.noPanel;
+    tog.hidden = !!opts.noPanel;
+    gap.hidden = !!(opts.noPanel || opts.noGap);
     clear.hidden = !inp.value;
     tog.classList.toggle("on", b.open);
     panel.hidden = !b.open;

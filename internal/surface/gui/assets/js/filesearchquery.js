@@ -6,7 +6,9 @@ import { queryParts } from "./searchsuggest.js";
 const kinds = ["C#", "Defs", "patches", "About", "translations", "textures", "sounds"];
 
 // Keep both filter inputs together so panel writes and completion share one lifecycle.
-export function createQuery(X, queryCard, { run, shortcuts, stop, focusResults, visible, consume }) {
+// layout runs when the filter panel opens or closes; nudge is ctrl+↑↓ in the panel and gap is
+// the element under this card that resizes it (using it keeps the panel open).
+export function createQuery(X, queryCard, { run, shortcuts, stop, focusResults, visible, consume, layout, nudge, gap }) {
   let textInput, filesBar, modsBar, validation;
   // Route file kinds to their own input while retaining the shared panel protocol.
   function fileGroup(target = false) {
@@ -137,12 +139,15 @@ export function createQuery(X, queryCard, { run, shortcuts, stop, focusResults, 
       targets: {
         files: filesBar
       },
-      focusRoot: () => queryCard,
+      focusRoot: () => [queryCard, gap],
       deferOutside: true,
-      splitKey: "ui.gui.search.filters",
+      noGap: true,
+      nudge,
       count: () => queryParts(X.files).length + queryParts(X.mods).length,
       change: (onlyOpen, reason) => {
-        if (!onlyOpen) {
+        if (onlyOpen) {
+          layout?.();
+        } else {
           X.mods = modsBar.input.value;
           refreshFilters();
           if (reason === "filter" && X.text.trim()) {
