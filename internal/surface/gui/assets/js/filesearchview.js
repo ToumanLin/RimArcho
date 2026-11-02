@@ -54,9 +54,13 @@ export function createViewer(X, viewerCard, visible) {
     codeRows?.destroy();
     codeRows = null;
     viewerCard.replaceChildren();
+    // The card's number (area 3) is drawn again with each file.
+    const num = () => (viewerCard.dataset.area ? [el("span", "anum", viewerCard.dataset.area)] : []);
     if (!X.selected) {
       fileText = null;
-      viewerCard.append(el("p", "fs-view-empty muted", T("select a file")));
+      const empty = el("p", "fs-view-empty muted");
+      empty.append(...num(), T("select a file"));
+      viewerCard.append(empty);
       return;
     }
     const file = X.selected,
@@ -68,7 +72,9 @@ export function createViewer(X, viewerCard, visible) {
       button(T("open file"), "enter", () => openFile(false), "small primary"),
       button(T("show in folder"), "ctrl+o", () => openFile(true), "small")
     );
-    top.append(el("h2", "", name), actions);
+    const title = el("h2");
+    title.append(...num(), name);
+    top.append(title, actions);
     const where = el("div", "fs-view-path");
     where.textContent = file.path;
     copyablePath(where, file.path);
@@ -174,8 +180,19 @@ export function createViewer(X, viewerCard, visible) {
     codeRows?.destroy();
     codeRows = null;
   }
+  // Key 3: the file text when there is one (the arrows then scroll it), else its actions.
+  function focus() {
+    const target = viewerCard.querySelector(".fs-code") || viewerCard.querySelector(".fs-view-actions .btn");
+    if (target) {
+      target.focus({ preventScroll: true });
+    } else {
+      viewerCard.tabIndex = -1;
+      viewerCard.focus({ preventScroll: true });
+    }
+  }
   return {
     draw,
+    focus,
     readFile,
     markSelected,
     nextMatch,

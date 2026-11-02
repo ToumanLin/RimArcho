@@ -59,8 +59,18 @@ export const beginPageRead = () => ({
       throw e;
     }
   }),
-  page = (cls) => el("div", "page " + cls),
-  area = () => {},
+  page = (cls) => {
+    window.areaCount = 0;
+    return el("div", "page " + cls);
+  },
+  // like screens.area: number the card and its heading
+  area = (box, head) => {
+    const n = String(++window.areaCount);
+    box.dataset.area = n;
+    if (head) {
+      head.prepend(el("span", "anum", n));
+    }
+  },
   hintsChanged = () => {
     (window.hintHistory ||= []).push(window.fs?.hintList() || []);
   };
@@ -528,6 +538,72 @@ fs.run();
           await c.evaluate(`document.querySelectorAll(".fs-tree-row").length < 100;
 `)
         );
+      });
+      await t.test("cards are numbered; 38:62 defaults; the query gap drags only with the panel open", async () => {
+        await c.call("Emulation.setDeviceMetricsOverride", {
+          width: 1440,
+          height: 800,
+          deviceScaleFactor: 1,
+          mobile: false
+        });
+        await sleep(60);
+        assert.deepEqual(
+          await c.evaluate(`[".fs-query", ".fs-results", ".fs-viewer"].map(
+  (s) => document.querySelector(s + " .anum")?.textContent
+);
+`),
+          ["1", "2", "3"]
+        );
+        const sizes = `(() => {
+  const l = document.querySelector(".fs-left").getBoundingClientRect(),
+    p = document.querySelector(".page.filesearch").getBoundingClientRect(),
+    q = document.querySelector(".fs-query").getBoundingClientRect(),
+    g = document.querySelector(".fs-vsplit");
+  return {
+    side: Math.round((l.width / p.width) * 100),
+    query: Math.round((q.height / l.height) * 100),
+    open: !!document.querySelector(".fs-left.filters-open"),
+    gapEnabled: g.tabIndex === 0
+  };
+})();
+`;
+        if ((await c.evaluate(sizes)).open) {
+          await c.click(".fs-query .fbar-tog");
+        }
+        let s = await c.evaluate(sizes);
+        assert.equal(s.side, 38);
+        assert.equal(s.open, false);
+        assert.equal(s.gapEnabled, false, "a card that follows its fields has no draggable gap");
+        await c.click(".fs-query .fbar-tog");
+        await sleep(60);
+        s = await c.evaluate(sizes);
+        assert.equal(s.open, true);
+        assert.equal(s.query, 38);
+        assert.equal(s.gapEnabled, true);
+        // pressing the gap is part of card 1: the panel stays open
+        await c.click(".fs-vsplit");
+        await sleep(60);
+        assert.equal((await c.evaluate(sizes)).open, true);
+        const before = await c.evaluate(`document.querySelector(".fs-query").getBoundingClientRect().height;
+`);
+        await c.evaluate(`document.querySelector(".fs-vsplit").focus();
+`);
+        await c.key("ArrowDown");
+        await sleep(60);
+        assert.equal(
+          await c.evaluate(`Math.round(document.querySelector(".fs-query").getBoundingClientRect().height);
+`),
+          Math.round(before + 40)
+        );
+        assert.equal(
+          await c.evaluate(`calls.some((x) => x[0] === "setting" && x[1] === "ui.gui.search.filters" && +x[2] > 0);
+`),
+          true
+        );
+        await c.key("Enter");
+        await sleep(60);
+        assert.equal((await c.evaluate(sizes)).query, 38);
+        await c.click(".fs-query .fbar-tog");
       });
       await t.test("responsive split and input layout stay inside cards", async () => {
         for (const width of [1440, 1000, 899, 375]) {

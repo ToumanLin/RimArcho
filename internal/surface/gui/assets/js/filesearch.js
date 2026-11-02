@@ -55,7 +55,8 @@ export async function open() {
   root = page("filesearch", "");
   root.replaceChildren();
   const left = el("div", "fs-left"),
-    gap = el("div", "fs-split");
+    gap = el("div", "fs-split"),
+    vgap = el("div", "hsplit fs-vsplit");
   queryCard = el("section", "card fs-query");
   resultsCard = el("section", "card fs-results");
   viewerCard = el("section", "card fs-viewer");
@@ -66,29 +67,70 @@ export async function open() {
     stop,
     focusResults,
     visible,
-    consume
+    consume,
+    gap: vgap,
+    layout: () => placeQuery(),
+    nudge: (d) => setQuery(queryCard.getBoundingClientRect().height + d, true)
   });
   results = createResults(X, resultsCard, viewer, query, {
     key,
     stop,
     run
   });
-  left.append(queryCard, resultsCard);
+  left.append(queryCard, vgap, resultsCard);
   root.append(left, gap, viewerCard);
   $("#screen").replaceChildren(root);
-  area(queryCard, null, focusInput);
-  area(resultsCard, null, focusResults);
   query.buildQuery();
   results.buildResults();
+  // Cards 1 query, 2 results, 3 file (06 §3.1): the digit keys focus them.
+  area(queryCard, queryCard.querySelector(".fs-field"), focusInput);
+  area(resultsCard, resultsCard.querySelector(".fs-result-head"), focusResults);
+  area(viewerCard, null, viewer.focus);
   viewer.draw();
+  // The gap under the query card drags while the filter panel is open; closed, the card
+  // follows its three fields (06 §3.1 rule 10). Default 38% of the column.
+  let queryH = null;
+  const placeQuery = () => {
+    const open = !!query.modsBar?.open;
+    left.classList.toggle("filters-open", open);
+    left.style.setProperty("--fs-query-h", queryH === null ? "38%" : queryH + "px");
+    vsep.refresh();
+  };
+  const queryRange = () => [160, Math.max(160, left.clientHeight - 140)];
+  const setQuery = (v, save) => {
+    const [min, max] = queryRange();
+    queryH = Math.round(Math.max(min, Math.min(max, v)));
+    placeQuery();
+    if (save) {
+      api.SetSetting("ui.gui.search.filters", String(queryH)).catch(() => {});
+    }
+  };
+  const vsep = wireSeparator(vgap, {
+    axis: "y",
+    key: "ui.gui.search.filters",
+    enabled: () => innerWidth >= 900 && !!query.modsBar?.open,
+    range: queryRange,
+    get: () => queryCard.getBoundingClientRect().height,
+    set: (v) => setQuery(v, false),
+    reset: () => {
+      queryH = null;
+      placeQuery();
+    },
+    serialize: () => (queryH === null ? "" : String(queryH)),
+    restore: (v) => {
+      queryH = v && Number.isFinite(+v) ? +v : null;
+      placeQuery();
+    }
+  });
+  placeQuery();
   let side = null;
   const width = () => root.getBoundingClientRect().width;
-  const place = () => root.style.setProperty("--fs-side", side === null ? "32%" : side + "px");
+  const place = () => root.style.setProperty("--fs-side", side === null ? "38%" : side + "px");
   wireSeparator(gap, {
     key: "ui.gui.search.side",
     enabled: () => innerWidth >= 900,
     range: () => [260, Math.max(260, width() - 300)],
-    get: () => side ?? width() * 0.32,
+    get: () => side ?? width() * 0.38,
     set: (v) => {
       side = v;
       place();
@@ -317,6 +359,14 @@ export function key(e) {
     return false;
   }
   if ((k === "Enter" || k === " ") && e.target?.closest?.("button") && !results.element?.contains(e.target)) {
+    return false;
+  }
+  // Card 3 focused on the file text: the arrows and page keys scroll it.
+  if (e.target?.closest?.(".fs-code") && /^(Arrow(Up|Down|Left|Right)|Page(Up|Down)|Home|End)$/.test(k)) {
+    return false;
+  }
+  // ctrl+c over selected file text copies that text, not the path.
+  if (ctrl && k.toLowerCase() === "c" && e.target?.closest?.(".fs-code") && String(getSelection())) {
     return false;
   }
   if (k === "\\") {

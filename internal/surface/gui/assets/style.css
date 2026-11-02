@@ -2063,13 +2063,21 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .identity-answer-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .identity-comparison .btns { flex-wrap: wrap; justify-content: space-between; }
 
-/* Search files (06 §2.9): the approved 32:68 query/tree and file view. */
-.page.filesearch { padding: 0; display: grid; grid-template-columns: minmax(260px,var(--fs-side,32%)) var(--card-gap) minmax(0,1fr); gap: 0; height: 100%; min-height: 0; overflow: hidden; }
-.filesearch .fs-left { display: flex; flex-direction: column; gap: var(--card-gap); min-width: 0; min-height: 0; }
+/* Search files (06 §2.9): cards 1 query and 2 results on the left (38%), 3 the file view. While
+   the filter panel is open the gap under the query card drags its height (38% of the column). */
+.page.filesearch { padding: 0; display: grid; grid-template-columns: minmax(260px,var(--fs-side,38%)) var(--card-gap) minmax(0,1fr); gap: 0; height: 100%; min-height: 0; overflow: hidden; }
+.filesearch .fs-left { display: flex; flex-direction: column; gap: 0; min-width: 0; min-height: 0; }
+.filesearch .fs-left:not(.filters-open) > .fs-vsplit { cursor: default; pointer-events: none; }
 .filesearch .fs-query { flex: none; padding: 8px; z-index: 7; }
+.filesearch .fs-left.filters-open > .fs-query { height: var(--fs-query-h); min-height: 160px; display: flex; flex-direction: column; }
+.filesearch .fs-left.filters-open .fs-fields { flex: 1; min-height: 0; }
+.filesearch .fs-left.filters-open .fs-fields > .fbar.open { flex: 1; min-height: 0; }
 .filesearch .fs-fields { display: flex; flex-direction: column; gap: 6px; }
 .filesearch .fs-field { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.filesearch .fs-field > .anum { flex: none; width: 10px; margin: 0; text-align: right; }
 .filesearch .fs-label { width: 44px; flex: none; padding-left: 4px; color: var(--muted); font-size: 12px; }
+.filesearch .fs-field:not(:has(> .anum)) > .fs-label, .filesearch .fs-query .fbar-row > .fs-label { margin-left: 16px; }
+.filesearch .fs-result-head > .anum { margin-right: 0; }
 .filesearch .fs-text-box { display: flex; align-items: center; flex: 1; min-width: 0; height: 28px; border-radius: var(--r-sm); background: var(--pill); padding-left: 9px; }
 .filesearch .fs-input { width: 100%; min-width: 0; flex: 1; height: 28px; border: 0; padding: 0; background: transparent; font: 13px var(--code); }
 .filesearch .fs-toggle { flex: none; height: 24px; min-width: 24px; padding: 0 5px; font: 12px var(--code); gap: 4px; }
@@ -2083,10 +2091,10 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .filesearch .fbar-search input { height: 28px; }
 .filesearch .fbar-clear { padding: 0 3px; }
 .filesearch .fbar-count { color: var(--accent-11,var(--accent)); font-weight: 600; }
-.filesearch .fbar.open .fbar-panel { margin: 6px -8px -8px; max-height: 260px; padding: 8px 10px 10px; border-top: var(--hairline) solid var(--line-2); border-radius: var(--r-lg); }
+.filesearch .fbar.open .fbar-panel { margin: 6px -8px -8px; padding: 8px 10px 10px; border-top: var(--hairline) solid var(--line-2); border-radius: var(--r-lg); }
 .filesearch .fbar-gap { display: none; }
 .filesearch .fbar-suggestions { min-width: min(280px,calc(100vw - 100px)); }
-.filesearch .fs-validation { margin: 0 0 0 50px; font-size: 12px; color: var(--red); }
+.filesearch .fs-validation { margin: 0 0 0 66px; font-size: 12px; color: var(--red); }
 .filesearch .fs-results { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 0; overflow: hidden; }
 .filesearch .fs-result-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; padding: 8px 12px 4px; }
 .filesearch .fs-result-head h2 { font-size: 13px; font-weight: 600; margin: 0; }
@@ -2142,7 +2150,10 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .filesearch .fs-syntax-number { color: var(--red); }
 @media(max-width:899px) {
  .page.filesearch { display: flex; flex-direction: column; height: auto; overflow: visible; gap: var(--card-gap); }
- .filesearch .fs-split { display: none; }
+ .filesearch .fs-split, .filesearch .fs-vsplit { display: none; }
+ .filesearch .fs-left { gap: var(--card-gap); }
+ .filesearch .fs-left.filters-open > .fs-query { height: auto; }
+ .filesearch .fbar.open .fbar-panel { max-height: 260px; }
  .filesearch .fs-tree { height: 320px; flex: none; }
  .filesearch .fs-code { height: 480px; flex: none; }
  .filesearch .fs-view-actions { margin-left: 0; }
