@@ -2,7 +2,12 @@
 
 All notable changes to RimArcho. Versions follow semantic versioning; the MVP is 0.5.0.
 
-## 0.9.0 — plans and launching (unreleased)
+## 1.0.0 — 2026-11-02
+
+The first public release. It contains everything below: 0.5.0 to 0.9.0 were development milestones
+and were not released on their own.
+
+## 0.9.0 — plans and launching (development milestone, in 1.0.0)
 
 - The window no longer grows while it sits on the launch page: refreshing the launch memory comparison every 30 seconds reuses the page's data instead of rereading the whole Mod list (30 MB and about 95 ms per refresh for 6,574 Mods, now 0.2 MB and 3–4 ms). Pages unused for 5 minutes (Mod library, list management, Mod details, texture optimization, uninstall) give their memory back; opening one again reads it anew.
 - The window's pages now share one copy of the Mod index instead of one each: with 6,574 Mods its own (Go) memory after visiting every page went from 120 to 74 MB, and to about 65 MB once unused pages close. Left in front without mouse or keyboard input for 2 minutes, the window also asks WebView2 to trim its memory, as it already did in the background; the next input brings it back.
@@ -1419,7 +1424,7 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
   reads); only the window uses a logged-in session.
 - Followed collections are checked when list management opens, not yet on a schedule.
 
-## 0.8.0 — toward 1.0 (unreleased)
+## 0.8.0 — toward 1.0 (development milestone, in 1.0.0)
 
 Specs: `docs/specs/` (rewritten 2026-10-21; the old `10-1.0\u5b9e\u73b0.md` (Unicode escapes) was folded into them). Section
 numbers below are the current ones.
@@ -1527,7 +1532,7 @@ numbers below are the current ones.
 - The Enabled list's position column is as wide as its longest number.
 - About.xml, LoadFolders.xml and Defs saved as UTF-16 are read (02 §4.3).
 
-## 0.7.0 — the window (unreleased)
+## 0.7.0 — the window (development milestone, in 1.0.0)
 
 ### Icon (08 §15)
 - The author's portrait artwork (`internal/icon/portrait.svg`) on a dark rounded base; below
@@ -1560,7 +1565,7 @@ numbers below are the current ones.
 - Children of the window (scan, analysis) open no console window.
 - Typed app calls for tags, alias and note (`SetTags`, `SetAlias`, `SetNote`).
 
-## 0.5.0 — MVP (unreleased)
+## 0.5.0 — MVP (development milestone, in 1.0.0)
 
 ### M5: local copies, RimCrow import, exchange, polish
 - `copy-local <ref> [--name] [--git]` copies a mod into `Mods/`, writes `.rimarcho/origin.json`
