@@ -1016,13 +1016,6 @@ func eventText(tx Text, kind string) string {
 	return tx.T("updated")
 }
 
-func plural(n int, one, many string) string {
-	if n == 1 {
-		return one
-	}
-	return many
-}
-
 // Count is the number of mods on the page: the rows and new and gone, in range and older.
 func (p *Page) Count() int {
 	n := len(p.Rows) + len(groupRows(p.Arrivals))

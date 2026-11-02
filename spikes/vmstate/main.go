@@ -20,6 +20,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
+	"github.com/ToumanLin/RimArcho/internal/machine"
 	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/view"
 	_ "modernc.org/sqlite"
@@ -338,6 +339,9 @@ func snapshot(home string, openPlan ...string) any {
 	// Compute declaration + stored-analysis problems through the normal app/view code,
 	// with a read-only DB and persisted-workspace mode: no startup/import/recovery writes.
 	a := &app.App{Home: home, Store: &store.Store{DB: db}, Now: time.Now, Rand: rand.Reader, Loc: time.UTC, LazyLog: true, LogCacheOnly: true, MonitorBundle: app.MonitorNone}
+	// The snapshot describes the home, not this machine: free RAM changes between
+	// observations, and a slow hardware query reads as unavailable.
+	a.MemoryProbe = func() machine.Memory { return machine.Memory{} }
 	if len(openPlan) > 0 {
 		a.PlanName = openPlan[0]
 	}

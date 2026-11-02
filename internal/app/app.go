@@ -193,7 +193,6 @@ type App struct {
 	planPS             map[int64]*planProblems // PlanProblems, by plan
 
 	logCache          *logCacheEntry
-	harmonyDir        string
 	subscriptionCache map[string]subscriptionCacheEntry
 }
 
