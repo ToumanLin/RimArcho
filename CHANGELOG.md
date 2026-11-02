@@ -4,6 +4,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- The window no longer grows while it sits on the launch page: refreshing the launch memory comparison every 30 seconds reuses the page's data instead of rereading the whole Mod list (30 MB and about 95 ms per refresh for 6,574 Mods, now 0.2 MB and 3–4 ms). Pages unused for 5 minutes (Mod library, list management, Mod details, texture optimization, uninstall) give their memory back; opening one again reads it anew.
+
 - Search files follows the card rules: the query, results and file view are cards 1–3 (the digit keys focus them), the left column starts at 38% of the page, and while the filter panel is open it scrolls inside the query card, whose height drags (38% by default, double-click restores). With text selected in the file view, ctrl+c copies that text.
 
 - Search files shows searching… while discovering its scope and one not found summary for empty results. The source-library note appears only when the run decompiled assemblies.

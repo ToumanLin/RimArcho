@@ -742,6 +742,7 @@ func (s *API) Detail(id string, staged, fetch, refresh bool) (*Detail, error) {
 		w := &s.detailRead
 		w.mu.Lock()
 		defer w.mu.Unlock()
+		defer s.retainReader(w)
 		s.mu.Lock()
 		if w.a == nil {
 			w.a, err = s.readInventorySession()
