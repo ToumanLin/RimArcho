@@ -15,10 +15,6 @@ func TestListsFilterCopiesAndGroups(t *testing.T) {
 	e.MustRun("plan", "rename", "default", "Main colony")
 	e.MustRun("plan", "new", "Other colony", "--from", "current")
 	e.MustRun("plan", "new", "Empty list")
-	lib, err := e.App.Library()
-	if err != nil {
-		t.Fatal(err)
-	}
 	lock := libRow(t, libPage(t, e, ""), "Lockable")
 	var enabled, spare string
 	for _, i := range lock.Insts {
@@ -40,7 +36,7 @@ func TestListsFilterCopiesAndGroups(t *testing.T) {
 	}
 	e.MustRun("enable", spare)
 	e.MustRun("plan", "use", "Main colony")
-	lib, err = e.App.Library()
+	lib, err := e.App.Library()
 	if err != nil {
 		t.Fatal(err)
 	}
