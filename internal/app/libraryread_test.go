@@ -2,9 +2,11 @@ package app_test
 
 import (
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -46,10 +48,16 @@ func TestLibraryForMatchesFullLineage(t *testing.T) {
 	}
 }
 
-func TestReadIndexOwnsLazyDeclarationsAndAdoption(t *testing.T) {
+// Read sessions share an index's Mods (07 §8.3); their lazy declarations keep loading
+// after the session the index came from closes, and after adoption.
+func TestReadIndexSharesModsBeyondItsSource(t *testing.T) {
 	t.Parallel()
 	e := libFixture(t)
-	ix, err := e.App.Index()
+	w, err := e.App.ReadSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wx, err := w.Index()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,22 +66,36 @@ func TestReadIndexOwnsLazyDeclarationsAndAdoption(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer r.Close()
-	r.ReadIndex(e.App)
+	r.ReadIndex(w)
 	rx, err := r.Index()
 	if err != nil {
 		t.Fatal(err)
 	}
-	id := ix.Mods[0].ID
-	original, copy := ix.ByID[id], rx.ByID[id]
-	if original == copy || ix.Env == rx.Env || ix.Sources[0] == rx.Sources[0] {
-		t.Fatal("mutable index state shared")
+	id := wx.Mods[0].ID
+	m := rx.ByID[id]
+	if m != wx.ByID[id] || wx.Env == rx.Env {
+		t.Fatal("the reader should share the Mods and own its environment")
 	}
-	original.DeclBlob, copy.DeclBlob = "", ""
-	if copy.Decl().PackageID == "" || original.DeclBlob != "" {
-		t.Fatal("reader did not own lazy declaration")
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
 	}
-	// Adopt and close the worker just as Workspace does. Future declaration reads
-	// and localized lists must use the surviving session.
+	// Sessions read shared declarations concurrently.
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for _, x := range rx.Mods {
+				x.ForgetDecl()
+				if x.SnapID != 0 && x.Decl().PackageID == "" {
+					t.Error("a shared Mod read its declaration from the closed source session")
+					return
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	// Adopt and close the worker just as Workspace does.
 	if _, err := r.Loadout(); err != nil {
 		t.Fatal(err)
 	}
@@ -81,9 +103,32 @@ func TestReadIndexOwnsLazyDeclarationsAndAdoption(t *testing.T) {
 	if err := r.Close(); err != nil {
 		t.Fatal(err)
 	}
-	copy.DeclBlob = ""
-	if copy.Decl().PackageID == "" {
+	m.ForgetDecl()
+	if m.Decl().PackageID == "" {
 		t.Fatal("adopted mod still reads the closed worker DB")
+	}
+	if err := e.App.Store.LoadDecls(rx.Mods); err != nil || !m.DeclLoaded() {
+		t.Fatalf("batch load: %v", err)
+	}
+}
+
+// Without the declaration connection (an App not from Open) a reader loads its own index.
+func TestReadIndexWithoutDeclConnection(t *testing.T) {
+	t.Parallel()
+	e := libFixture(t)
+	src := &app.App{Store: e.App.Store}
+	src.ReadOptions(e.App)
+	if _, err := src.Index(); err != nil {
+		t.Fatal(err)
+	}
+	r, err := e.App.ReadSession()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	r.ReadIndex(src)
+	if r.IndexCached() {
+		t.Fatal("an App without the declaration connection took a shared index")
 	}
 }
 

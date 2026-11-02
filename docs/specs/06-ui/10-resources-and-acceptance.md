@@ -22,7 +22,7 @@
 | GUI: launch background (§2.3, §2.14) | No change in Go idle memory | On the 2026-10-22 development debug server, generating 58 thumbnails took about 8.6 seconds. Private memory was 77 MB before and 75 MB 6 seconds after completion |
 
 - The 80 MB proposed in 00 applies only to the Go process; WebView2 cannot fit within that range. The TUI runs in the player's terminal, whose process is excluded (§9.2). Both remain far below RimCrow (07 §6).
-- On minimize, the GUI sets WebView2's memory target to low, restoring normal when the window returns (07 §8.3). After using inventory, minimizing reduced total memory from 151 → 103 MB.
+- On minimize, after the window has been in the background for 1 minute (for example while the game runs), and after 2 minutes in front without input, the GUI sets WebView2's memory target to low, restoring normal on input or when the window is active again (07 §8.3, 06 §2.16.1 M08). After using inventory, minimizing reduced total memory from 151 → 103 MB.
 - If WebView2 is unavailable, as on a few stripped systems, show an explanation and a Microsoft download link without downloading automatically. The player can still use the `archo.exe` TUI.
 
 ## 11. Acceptance

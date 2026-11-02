@@ -5,6 +5,7 @@ package loadout
 
 import (
 	"encoding/json"
+	"slices"
 	"sort"
 	"strings"
 
@@ -94,7 +95,13 @@ type Registry struct {
 	byID     map[string]*Candidate
 	Rejected []*Candidate // duplicates the game refuses to register (pkg.duplicate-installed)
 	byPkg    map[string][]*Candidate
+	given    []Candidate // the candidates as passed, in their order
 }
+
+// Given returns the candidates the registry was built from, in the order passed. A
+// Registry is never changed after NewRegistry, so sessions may share one; the slice is
+// clipped, so appending to it copies.
+func (r *Registry) Given() []Candidate { return slices.Clip(r.given) }
 
 func kindRank(k source.Kind) int {
 	switch k {
@@ -107,7 +114,8 @@ func kindRank(k source.Kind) int {
 	}
 }
 
-// NewRegistry registers candidates in game order.
+// NewRegistry registers candidates in game order. It keeps cands for Given: the caller
+// must not change them afterwards.
 func NewRegistry(cands []Candidate) *Registry {
 	cs := append([]Candidate(nil), cands...)
 	sort.SliceStable(cs, func(i, j int) bool {
@@ -117,7 +125,7 @@ func NewRegistry(cands []Candidate) *Registry {
 		return cs[i].Folder < cs[j].Folder
 	})
 	r := &Registry{byToken: map[string]*Candidate{}, byFolder: map[string]*Candidate{}, token: map[string]string{},
-		byID: map[string]*Candidate{}, byPkg: map[string][]*Candidate{}}
+		byID: map[string]*Candidate{}, byPkg: map[string][]*Candidate{}, given: slices.Clip(cands)}
 	for i := range cs {
 		c := &cs[i]
 		r.byID[c.ID] = c

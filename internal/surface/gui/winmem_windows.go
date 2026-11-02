@@ -9,8 +9,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/events"
 )
 
-// While the window is minimised WebView2's memory target is "low" (07 §8.3): WebView2 then
-// trims what it can, and goes back to normal when the window is restored.
+// WebView2's memory target follows the window (winmem_policy.go). This file reaches it.
 //
 // Wails beta.28 does not expose it. Its internal binding of ICoreWebView2_19 lists only the
 // interface's own two methods after IUnknown, so it would call get_Settings; the call here
@@ -26,21 +25,26 @@ const (
 	// put_MemoryUsageTargetLevel: IUnknown (3), then ICoreWebView2 (58) and _2 … _18 (7, 5,
 	// 4, 2, 1, 1, 7, 9, 2, 3, 3, 1, 3, 4, 3, 1, 2), then _19's get (1).
 	slotPutMemoryTarget = 3 + 58 + 7 + 5 + 4 + 2 + 1 + 1 + 7 + 9 + 2 + 3 + 3 + 1 + 3 + 4 + 3 + 1 + 2 + 1
-
-	memoryTargetNormal = 0 // COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL
-	memoryTargetLow    = 1
 )
 
-// lowMemoryWhenMinimised sets the memory target to low on minimise and back to normal on
-// restore.
-func lowMemoryWhenMinimised(w *application.WebviewWindow) {
-	set := func(level uintptr) func(*application.WindowEvent) {
-		return func(*application.WindowEvent) {
-			application.InvokeAsync(func() { setMemoryTarget(webviewOf(w), level) })
-		}
+// lowMemoryWhenAway wires the window's events to the memory target policy; the page's
+// input reaches it through API.PageInput.
+func lowMemoryWhenAway(w *application.WebviewWindow) *memoryTarget {
+	m := &memoryTarget{set: func(level uintptr) {
+		application.InvokeAsync(func() { setMemoryTarget(webviewOf(w), level) })
+	}}
+	on := func(e events.WindowEventType, f func()) {
+		w.OnWindowEvent(e, func(*application.WindowEvent) { f() })
 	}
-	w.OnWindowEvent(events.Windows.WindowMinimise, set(memoryTargetLow))
-	w.OnWindowEvent(events.Windows.WindowUnMinimise, set(memoryTargetNormal))
+	on(events.Windows.WindowInactive, m.Inactive)
+	on(events.Windows.WindowActive, m.Active)
+	on(events.Windows.WindowClickActive, m.Active)
+	on(events.Windows.WindowSetFocus, m.Active) // also when activation carried no event
+	on(events.Windows.WindowMinimise, m.Minimised)
+	on(events.Windows.WindowUnMinimise, m.Restored)
+	on(events.Windows.WindowClosing, m.Stop)
+	m.Input() // the idle wait starts with the window
+	return m
 }
 
 // webviewOf is the window's ICoreWebView2: WebviewWindow.impl (*windowsWebviewWindow)

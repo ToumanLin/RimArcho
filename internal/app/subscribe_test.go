@@ -566,9 +566,12 @@ func TestUpdateWorkshopJunctionCacheAndRetiredSource(t *testing.T) {
 			if err != nil || len(ss) != 1 {
 				t.Fatalf("subscription: %+v %v", ss, err)
 			}
-			mod := *ss[0].Mod
+			mod, err := e.App.Store.Mod(ss[0].Mod.ID) // a separate copy to move
+			if err != nil || mod == nil {
+				t.Fatalf("mod: %v %v", mod, err)
+			}
 			mod.RealPath = filepath.Join(alias, "8100")
-			cached := e.App.SubscriptionOf(&mod)
+			cached := e.App.SubscriptionOf(mod)
 			if cached == nil {
 				t.Fatal("no alias provenance cached")
 			}
@@ -600,7 +603,7 @@ func TestUpdateWorkshopJunctionCacheAndRetiredSource(t *testing.T) {
 			if err := os.Chtimes(filepath.Join(target, subscribe.File), stamp.ModTime(), stamp.ModTime()); err != nil {
 				t.Fatal(err)
 			}
-			if got := e.App.SubscriptionOf(&mod); got == nil || got.Installed != e.Now().Format(time.RFC3339) || got.Installed == cached.Installed {
+			if got := e.App.SubscriptionOf(mod); got == nil || got.Installed != e.Now().Format(time.RFC3339) || got.Installed == cached.Installed {
 				t.Fatalf("stale alias cache: %+v", got)
 			}
 			folders, err := e.App.Folders()

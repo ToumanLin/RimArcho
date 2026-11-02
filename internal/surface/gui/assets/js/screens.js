@@ -62,8 +62,12 @@ export function openScreen(name) {
   if (fresh) S.screenSeq++;
   if (fresh) onArea = 0;
   const previous = $("#screen");
+  // Only warm pages come back from their last drawing, so only they keep it: any other
+  // page held here stays in memory with its listeners and data (07 §8.3). The others
+  // show their skeleton first (06 §3.1), including while a game switch runs.
   if (fresh && S.screen && previous.children.length && !pageLoading()) {
-    pageCache.set(S.screen, { nodes: [...previous.childNodes], top: previous.scrollTop });
+    if (WARM.has(S.screen)) pageCache.set(S.screen, { nodes: [...previous.childNodes], top: previous.scrollTop });
+    else pageCache.delete(S.screen);
   }
   left(name);
   S.screen = name;

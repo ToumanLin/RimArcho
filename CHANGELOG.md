@@ -2,7 +2,16 @@
 
 All notable changes to RimArcho. Versions follow semantic versioning; the MVP is 0.5.0.
 
-## 0.9.0 — plans and launching (unreleased)
+## 1.0.0 — 2026-11-02
+
+The first public release. It contains everything below: 0.5.0 to 0.9.0 were development milestones
+and were not released on their own.
+
+## 0.9.0 — plans and launching (development milestone, in 1.0.0)
+
+- The window no longer grows while it sits on the launch page: refreshing the launch memory comparison every 30 seconds reuses the page's data instead of rereading the whole Mod list (30 MB and about 95 ms per refresh for 6,574 Mods, now 0.2 MB and 3–4 ms). Pages unused for 5 minutes (Mod library, list management, Mod details, texture optimization, uninstall) give their memory back; opening one again reads it anew.
+- The window's pages now share one copy of the Mod index instead of one each: with 6,574 Mods its own (Go) memory after visiting every page went from 120 to 74 MB, and to about 65 MB once unused pages close. Left in front without mouse or keyboard input for 2 minutes, the window also asks WebView2 to trim its memory, as it already did in the background; the next input brings it back.
+- The window uses less memory with many Mods: its pages share one copy of the list registry and game links instead of one each, and only pages that open instantly keep their content cached. After a minute in the background (for example while playing), and at once when minimised, it asks WebView2 to trim its memory; it returns to normal when the window is active again. With 6,574 Mods: 290 → about 160 MB in the background, 325 → 290 MB after visiting every page.
 
 - Search files follows the card rules: the query, results and file view are cards 1–3 (the digit keys focus them), the left column starts at 38% of the page, and while the filter panel is open it scrolls inside the query card, whose height drags (38% by default, double-click restores). With text selected in the file view, ctrl+c copies that text.
 
@@ -1415,7 +1424,7 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
   reads); only the window uses a logged-in session.
 - Followed collections are checked when list management opens, not yet on a schedule.
 
-## 0.8.0 — toward 1.0 (unreleased)
+## 0.8.0 — toward 1.0 (development milestone, in 1.0.0)
 
 Specs: `docs/specs/` (rewritten 2026-10-21; the old `10-1.0\u5b9e\u73b0.md` (Unicode escapes) was folded into them). Section
 numbers below are the current ones.
@@ -1523,7 +1532,7 @@ numbers below are the current ones.
 - The Enabled list's position column is as wide as its longest number.
 - About.xml, LoadFolders.xml and Defs saved as UTF-16 are read (02 §4.3).
 
-## 0.7.0 — the window (unreleased)
+## 0.7.0 — the window (development milestone, in 1.0.0)
 
 ### Icon (08 §15)
 - The author's portrait artwork (`internal/icon/portrait.svg`) on a dark rounded base; below
@@ -1556,7 +1565,7 @@ numbers below are the current ones.
 - Children of the window (scan, analysis) open no console window.
 - Typed app calls for tags, alias and note (`SetTags`, `SetAlias`, `SetNote`).
 
-## 0.5.0 — MVP (unreleased)
+## 0.5.0 — MVP (development milestone, in 1.0.0)
 
 ### M5: local copies, RimCrow import, exchange, polish
 - `copy-local <ref> [--name] [--git]` copies a mod into `Mods/`, writes `.rimarcho/origin.json`

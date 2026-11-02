@@ -19,6 +19,7 @@ import (
 func (s *API) UninstallPlan(c view.UninstallChoice) (*view.UninstallPage, error) {
 	s.uninstallRead.mu.Lock()
 	defer s.uninstallRead.mu.Unlock()
+	defer s.retainReader(&s.uninstallRead)
 	r, err := s.uninstallSession()
 	if err != nil {
 		return nil, err
