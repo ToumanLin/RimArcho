@@ -81,7 +81,7 @@ func Run(o Options) error {
 	win.OnWindowEvent(events.Common.WindowShow, func(*application.WindowEvent) { perftrace.Mark("window-show") })
 	win.OnWindowEvent(events.Common.WindowRuntimeReady, func(*application.WindowEvent) { perftrace.Mark("webview-runtime-ready") })
 	api.windowTheme = frame.bind(win)
-	lowMemoryWhenMinimised(win)
+	lowMemoryWhenAway(win)
 	perftrace.Mark("window-run")
 	return w.Run()
 }

@@ -329,7 +329,8 @@ func (a *App) registry(ix *Index) (*loadout.Registry, map[string][]store.Alias, 
 			all = append(all[:len(all):len(all)], deployCandidate(m))
 		}
 	}
-	return loadout.NewRegistry(all), aliases, all, deploy, nil
+	reg := sharedRegistry(all)
+	return reg, aliases, reg.Given(), deploy, nil
 }
 
 func (a *App) sync(st *LoadoutState) error {
