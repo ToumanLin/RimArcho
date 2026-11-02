@@ -61,11 +61,17 @@ func TestMaintenanceYieldsAndPageDoesNotWait(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("maintenance did not reach vacuum")
 	}
-	start := time.Now()
-	if b := api.Board(); b.Error != "" {
-		t.Fatal(b.Error)
-	}
-	if time.Since(start) > 200*time.Millisecond {
+	// A page blocked by maintenance would wait until release, which comes only after
+	// this read: the bound catches that without timing a cold read on a slow runner.
+	board := make(chan string, 1)
+	go func() { board <- api.Board().Error }()
+	select {
+	case msg := <-board:
+		if msg != "" {
+			t.Fatal(msg)
+		}
+	case <-time.After(10 * time.Second):
+		close(release)
 		t.Fatal("maintenance blocked page")
 	}
 	id := api.tasks.Begin("test", "foreground", nil)
