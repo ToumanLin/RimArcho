@@ -184,7 +184,7 @@ These rules were decided on 2026-10-23 for the GUI. Each rule states any TUI exc
 
 **Checks** enforce the rules:
 - The GUI TestStyleRules reads `style.css`. It permits only var(--r-lg), var(--r-sm), 50%, 999px, inherit, and the calculated inner choice radii; only the table's font sizes; and only var(--hairline), with 0 or none to remove a line. It reports the source line and invalid value. It prohibits border-left, border-right, or `box-shadow: inset` accent bars.
-- TestWording (§7.2) also rejects middle dots in translation maps and `view.Text` (`view.WordingTextProblems`), including GUI literals.
+- TestWording (§7.2) also rejects middle dots in translation maps and `view.Text` (`view.WordingTextProblems`), including GUI literals. The approved Search files summary and UTF-8 file-type labels (§2.9) are narrow exceptions.
 
 ### 7.4 Accent themes (GUI, 2026-10-24)
 

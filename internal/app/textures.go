@@ -961,6 +961,12 @@ type TextureSummary struct {
 
 // TextureSummaries maps instance IDs to their optimised textures (only those with any).
 func (a *App) TextureSummaries() map[string]TextureSummary {
+	return a.textureSummariesAtIndex(nil)
+}
+
+// A stored-inventory reader supplies its index so this metadata lookup cannot
+// trigger normal index loading and filesystem alias repair.
+func (a *App) textureSummariesAtIndex(ix *Index) map[string]TextureSummary {
 	// from the files recorded: a run that was stopped wrote some and no mod record
 	counts, err := a.Store.TextureCounts()
 	if err != nil || len(counts) == 0 {
@@ -975,7 +981,10 @@ func (a *App) TextureSummaries() map[string]TextureSummary {
 		}
 		out[id] = s
 	}
-	if ix, err := a.Index(); err == nil {
+	if ix == nil {
+		ix, _ = a.Index()
+	}
+	if ix != nil {
 		for id, s := range out {
 			if l, ok := last[id]; ok && ix.ByID[id] != nil && !bytes.Equal(ix.ByID[id].SnapHash, l.SnapHash) {
 				s.Stale = true

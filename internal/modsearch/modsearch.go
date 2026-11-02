@@ -93,6 +93,9 @@ type Options struct {
 	PerFile                    int      // Kept matching lines per file, before paging; zero means 5.
 	Workers                    int      // Zero clamps GOMAXPROCS to [4,16].
 	FS                         FS
+	// LineMode bounds UI regex matching to one match operation per line. It also
+	// stops collecting after PerFile; CLI/MCP totals retain their existing rules.
+	LineMode bool
 }
 
 // Match is one matching line, or a binary asset path (Line=0). Col is a 1-based byte column.

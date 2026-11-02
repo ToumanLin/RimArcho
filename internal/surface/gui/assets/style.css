@@ -2063,43 +2063,90 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .identity-answer-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .identity-comparison .btns { flex-wrap: wrap; justify-content: space-between; }
 
-/* Search files (filesearch.js) */
-.page.filesearch { padding: 0 max(12px, calc(50% - 480px)) 24px; }
-.filesearch .fs-query { padding: 12px 14px; }
-.filesearch .fs-input-row { display: flex; align-items: center; gap: 6px; }
-.filesearch .fs-input { flex: 1; min-width: 80px; height: 30px; padding: 0 8px; border-radius: var(--r-sm); background: var(--card-2); border: var(--hairline) solid var(--line); }
-.filesearch .fs-toggle { min-width: 30px; padding: 0 6px; }
-.filesearch :is(.fs-toggle, .fs-kind)[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-11, var(--accent)); border-color: var(--accent-soft); }
-.filesearch .fs-options { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
-.filesearch .fs-label { flex: none; width: 32px; font-size: 12px; }
-.filesearch .fs-mod-chip { display: inline-flex; gap: 8px; align-items: center; max-width: 100%; overflow-wrap: anywhere; }
-.filesearch .fs-mod-chip button { flex: none; color: var(--muted); }
-.filesearch .fs-picker { flex: 1; min-width: 160px; max-width: 360px; }
-.filesearch .fs-mod-input { padding: 4px 8px; border-radius: var(--r-sm); background: var(--card-2); border: var(--hairline) solid var(--line); }
-.filesearch .fs-candidates { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
-.filesearch .fs-candidate { justify-content: flex-start; text-align: left; height: auto; min-height: 26px; white-space: normal; overflow-wrap: anywhere; }
-.filesearch .fs-candidate.cur { background: var(--pill); }
-.filesearch .fs-results { padding: 6px; }
-.filesearch .fs-results > h2 { margin: 4px 8px 8px; font-size: 13px; font-weight: 600; }
-.filesearch .fs-mod-head { display: flex; align-items: baseline; gap: 12px; padding: 10px 8px 5px; }
-.filesearch .fs-position { width: 30px; flex: none; text-align: right; font-size: 12px; }
-.filesearch .fs-mod-name { min-width: 0; overflow-wrap: anywhere; color: var(--accent-11, var(--accent)); text-decoration: none; }
-.filesearch .fs-mod-name:hover { text-decoration: underline; }
-.filesearch .fs-count { margin-left: auto; flex: none; font-size: 12px; }
-.filesearch .fs-row { min-width: 0; padding: 4px 8px; border-radius: var(--r-sm); user-select: text; }
-.filesearch .fs-row.cur { background: var(--pill); }
-.filesearch .fs-row:focus-visible { outline: var(--hairline) solid var(--accent); outline-offset: -1px; }
-.filesearch .fs-file { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; font-size: 12px; }
-.filesearch .fs-path { flex: 1; min-width: 100px; font-family: var(--code); }
-.filesearch .fs-line { display: flex; gap: 12px; font: 12px/1.6 var(--code); }
-.filesearch .fs-line-number { flex: none; width: 42px; text-align: right; }
-.filesearch .fs-line-content { flex: 1; min-width: 0; }
-.filesearch .fs-context { display: block; white-space: pre-wrap; overflow-wrap: anywhere; }
-.filesearch .fs-text { white-space: pre-wrap; overflow-wrap: anywhere; }
-.filesearch mark { background: var(--accent-soft); color: var(--accent-11, var(--accent)); }
-.filesearch :is(.fs-note, .fs-empty) { margin: 8px; overflow-wrap: anywhere; }
-.filesearch .fs-note { font-size: 12px; }
-.filesearch .fs-paging { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px; padding: 12px 8px 6px; }
+/* Search files (06 §2.9): the approved 32:68 query/tree and file view. */
+.page.filesearch { padding: 0; display: grid; grid-template-columns: minmax(260px,var(--fs-side,32%)) var(--card-gap) minmax(0,1fr); gap: 0; height: 100%; min-height: 0; overflow: hidden; }
+.filesearch .fs-left { display: flex; flex-direction: column; gap: var(--card-gap); min-width: 0; min-height: 0; }
+.filesearch .fs-query { flex: none; padding: 8px; z-index: 7; }
+.filesearch .fs-fields { display: flex; flex-direction: column; gap: 6px; }
+.filesearch .fs-field { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.filesearch .fs-label { width: 44px; flex: none; padding-left: 4px; color: var(--muted); font-size: 12px; }
+.filesearch .fs-text-box { display: flex; align-items: center; flex: 1; min-width: 0; height: 28px; border-radius: var(--r-sm); background: var(--pill); padding-left: 9px; }
+.filesearch .fs-input { width: 100%; min-width: 0; flex: 1; height: 28px; border: 0; padding: 0; background: transparent; font: 13px var(--code); }
+.filesearch .fs-toggle { flex: none; height: 24px; min-width: 24px; padding: 0 5px; font: 12px var(--code); gap: 4px; }
+.filesearch .fs-toggle kbd { font-size: 12px; padding: 0 3px; }
+.filesearch .fs-toggle[aria-pressed="true"],.filesearch .fs-wrap[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-11,var(--accent)); }
+.filesearch .fbar { flex: 1; min-width: 0; z-index: auto; }
+.filesearch .fbar.open { height: auto; }
+.filesearch .fbar-row { height: 28px; padding: 0; border: 0; }
+.filesearch .fbar-search { min-width: 0; }
+.filesearch .fbar-search input,.filesearch .fbar-ghost { font: 13px var(--code); }
+.filesearch .fbar-search input { height: 28px; }
+.filesearch .fbar-clear { padding: 0 3px; }
+.filesearch .fbar-count { color: var(--accent-11,var(--accent)); font-weight: 600; }
+.filesearch .fbar.open .fbar-panel { margin: 6px -8px -8px; max-height: 260px; padding: 8px 10px 10px; border-top: var(--hairline) solid var(--line-2); border-radius: var(--r-lg); }
+.filesearch .fbar-gap { display: none; }
+.filesearch .fbar-suggestions { min-width: min(280px,calc(100vw - 100px)); }
+.filesearch .fs-validation { margin: 0 0 0 50px; font-size: 12px; color: var(--red); }
+.filesearch .fs-results { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 0; overflow: hidden; }
+.filesearch .fs-result-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; padding: 8px 12px 4px; }
+.filesearch .fs-result-head h2 { font-size: 13px; font-weight: 600; margin: 0; }
+.filesearch .fs-summary { font-size: 12px; }
+.filesearch .fs-stop { margin-left: auto; height: 22px; }
+.filesearch .fs-notes { flex: none; max-height: 120px; overflow: auto; }
+.filesearch .fs-note { font-size: 12px; margin: 0; padding: 0 12px 6px; overflow-wrap: anywhere; }
+.filesearch .fs-tree { overflow: auto; flex: 1; min-height: 0; padding: 0 4px 6px; }
+.filesearch .fs-tree-row { display: flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border: 0; border-radius: var(--r-sm); background: transparent; text-align: left; font-size: 12px; line-height: 24px; min-width: 0; }
+.filesearch .fs-tree-row.fs-mod { font-size: 13px; }
+.filesearch .fs-mod-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.filesearch .fs-copy { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.filesearch .fs-count { margin-left: auto; flex: none; font-size: 12px; font-variant-numeric: tabular-nums; }
+.filesearch .fs-tree-row.fs-file { padding-left: 14px; }
+.filesearch .fs-chevron { flex: none; width: 12px; color: var(--faint); transform-origin: center; }
+.filesearch .fs-chevron.open { transform: rotate(90deg); }
+.filesearch .fs-chevron.none { visibility: hidden; }
+.filesearch .fs-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.filesearch .fs-tree-row.fs-line { padding-left: 32px; font: 12px/24px var(--code); }
+.filesearch .fs-line-number { flex: none; min-width: 34px; text-align: right; padding-right: 10px; font-variant-numeric: tabular-nums; }
+.filesearch .fs-line-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.filesearch button.fs-tree-row:hover { background: var(--pill); }
+.filesearch button.fs-tree-row.cur { background: var(--sel); }
+.filesearch .fs-empty { margin: 8px; font-size: 12px; }
+.filesearch .fs-widen { color: var(--accent-11,var(--accent)); margin: 0 8px; }
+.filesearch .fs-viewer { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+.filesearch .fs-view-empty { margin: 14px 16px; font-size: 12px; }
+.filesearch .fs-view-head { padding: 14px 16px 12px; border-bottom: var(--hairline) solid var(--line-2); display: flex; flex-direction: column; gap: 7px; flex: none; }
+.filesearch .fs-view-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.filesearch .fs-view-title h2 { margin: 0; font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.filesearch .fs-view-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.filesearch .fs-view-actions .btn { height: 26px; font-size: 12px; }
+.filesearch .fs-view-path { font: 12px var(--code); min-width: 0; overflow-wrap: anywhere; }
+.filesearch .fs-code { flex: 1; overflow: auto; min-height: 0; padding: 8px 0; font: 12px/1.7 var(--code); }
+.filesearch .fs-code-line { display: flex; white-space: pre; min-height: 20.4px; padding-right: 16px; }
+.filesearch .fs-code-number { width: 52px; flex: none; text-align: right; padding-right: 16px; color: var(--faint); user-select: none; }
+.filesearch .fs-code-text { min-width: max-content; }
+.filesearch .fs-code-line.hit { background: color-mix(in srgb,var(--amber) 10%,transparent); }
+.filesearch .fs-code-line.hit .fs-code-number { color: var(--amber); }
+.filesearch .fs-code-line.cur { background: color-mix(in srgb,var(--amber) 20%,transparent); }
+.filesearch mark { background: color-mix(in srgb,var(--amber) 65%,var(--card)); color: var(--fg); border-radius: var(--r-sm); }
+.filesearch .fs-code.wrap .fs-code-line { white-space: pre-wrap; }
+.filesearch .fs-code.wrap .fs-code-text { min-width: 0; overflow-wrap: anywhere; }
+.filesearch .fs-view-note { margin: 0; padding: 4px 16px; font-size: 12px; }
+.filesearch .fs-view-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 8px 16px; border-top: var(--hairline) solid var(--line-2); font-size: 12px; color: var(--muted); flex: none; }
+.filesearch .fs-view-foot .btn { height: 24px; font-size: 12px; }
+.filesearch .fs-file-type { margin-left: auto; }
+.filesearch .fs-syntax-tag { color: var(--accent-11,var(--accent)); }
+.filesearch .fs-syntax-attribute { color: var(--amber); }
+.filesearch .fs-syntax-string { color: var(--green); }
+.filesearch .fs-syntax-comment { color: var(--muted); }
+.filesearch .fs-syntax-keyword { color: var(--accent-11,var(--accent)); }
+.filesearch .fs-syntax-number { color: var(--red); }
+@media(max-width:899px) {
+ .page.filesearch { display: flex; flex-direction: column; height: auto; overflow: visible; gap: var(--card-gap); }
+ .filesearch .fs-split { display: none; }
+ .filesearch .fs-tree { height: 320px; flex: none; }
+ .filesearch .fs-code { height: 480px; flex: none; }
+ .filesearch .fs-view-actions { margin-left: 0; }
+}
 /* ---- shared choice controls (06 §3.10, §7): off/on and single-value menus ---- */
 .choice-control { display: inline-flex; align-items: center; flex: 0 1 auto; min-width: 0; max-width: 100%; height: 30px; border: var(--hairline) solid var(--line-2); border-radius: var(--r-lg); background: var(--pill); color: var(--fg); font: inherit; font-weight: 400; user-select: none; transition: background var(--t-press), border-color var(--t-press); }
 .choice-control:hover:not(:disabled) { background: var(--pill-hover); }

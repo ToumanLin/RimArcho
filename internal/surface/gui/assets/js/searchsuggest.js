@@ -19,10 +19,12 @@ export function queryContext(text, caret) {
   const part = queryParts(text).find((p) => caret >= p.start && caret <= p.end);
   return part ? { start: part.start, end: part.end, text: text.slice(part.start, caret) } : { start: caret, end: caret, text: "" };
 }
-export function suggestions(groups, text, caret) {
+export function suggestions(groups, text, caret, bare = false) {
   const ctx = queryContext(text, caret), negative = ctx.text.startsWith("-");
   const token = negative ? ctx.text.slice(1) : ctx.text, at = token.indexOf(":");
   const prefix = negative ? "-" : "";
+  if (bare) return groups.flatMap(g => g.values || []).filter(v => v.filter.toLowerCase().startsWith(token.toLowerCase()))
+    .map(v => ({token:prefix + v.filter,label:"",key:false}));
   if (at < 0) return groups.filter((g) => g.key !== "location" && (g.key.startsWith(token.toLowerCase()) || (g.title || "").toLowerCase().includes(token.toLowerCase())))
     .map((g) => ({ token: prefix + (g.key === "tag" ? "tags" : g.key) + ":", label: g.title, key: true }));
   const typedKey = token.slice(0, at), key = typedKey === "tags" ? "tag" : typedKey.toLowerCase();
@@ -37,6 +39,11 @@ export function suggestions(groups, text, caret) {
   });
 }
 export function setQueryFilter(text, filter, on) {
+  if (!filter.includes(":")) {
+    const parts = queryParts(text).filter(p => p.key || p.value.toLowerCase() !== filter.toLowerCase()).map(p => p.raw);
+    if (on) parts.push((on < 0 ? "-" : "") + filter);
+    return parts.join(" ");
+  }
   const at = filter.indexOf(":"), key = filter.slice(0, at).replace(/^tags$/, "tag"), value = filter.slice(at + 1);
   const parts = queryParts(text).filter((p) => !(p.key === key && (p.value.toLowerCase() === value.toLowerCase() || !p.value))).map((p) => p.raw);
   if (on) parts.push((on < 0 ? "-" : "") + (key === "tag" ? "tags" : key) + ":" + (key === "lists" ? '"' + value + '"' : quoteValue(value)));

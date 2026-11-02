@@ -56,9 +56,9 @@ export function createBar(opts) {
   let wantFocus = false;
 
   const data = () => opts.data() || {};
-  const groups = () => (data().groups || []).filter((g) => g.key !== "location").sort((a,b)=>{const order=["lists","tag","source","content"];return (order.includes(a.key)?order.indexOf(a.key):9)-(order.includes(b.key)?order.indexOf(b.key):9);});
+  const groups = () => (data().groups || []).filter((g) => g.key !== "location").sort((a,b)=>{const order=["files","lists","tag","source","content"];return (order.includes(a.key)?order.indexOf(a.key):9)-(order.includes(b.key)?order.indexOf(b.key):9);});
   function showGhost() {
-    candidates = suggestions(groups(), inp.value, inp.selectionStart ?? inp.value.length);
+    candidates = suggestions(groups().filter(g=>!g.target), inp.value, inp.selectionStart ?? inp.value.length, opts.bare);
     choice = Math.min(choice, Math.max(0,candidates.length-1));
     const visible = suggestOpen && !composing && document.activeElement === inp;
     popup.hidden = !visible;
@@ -66,7 +66,7 @@ export function createBar(opts) {
     popup.replaceChildren();
     if (visible) {
       const h = el("div", "fbar-suggestion-head");
-      h.append(el("span", "", T(queryContext(inp.value, inp.selectionStart ?? inp.value.length).text.includes(":") ? "available values" : "available keys")), el("span", "", "↑↓  Tab"));
+      h.append(el("span", "", T(opts.bare || queryContext(inp.value, inp.selectionStart ?? inp.value.length).text.includes(":") ? "available values" : "available keys")), keyCaps("↑↓ tab"));
       popup.append(h);
       const list = el("div", "fbar-suggestion-list");
       list.id = listID;
@@ -99,12 +99,12 @@ export function createBar(opts) {
   }
   b.showGhost = showGhost;
   let timer = 0;
-  function change(text, show = false) {
+  function change(text, show = false, reason = "input") {
     clearTimeout(timer);
     inp.value = b.search = text;
     b.filters = [];
     suggestOpen = show; choice = 0;
-    opts.change(); showGhost();
+    opts.change(false,reason); showGhost();
   }
   function accept(i) {
     const c = candidates[i]; if (!c) return;
@@ -123,6 +123,7 @@ export function createBar(opts) {
   inp.addEventListener("compositionend",()=>{composing=false;change(inp.value,true);});
   inp.onkeydown = (e) => {
     e.stopPropagation(); if (composing || e.isComposing) return;
+    if (opts.key?.(e)) return;
     if (e.key === "Tab" && !e.shiftKey && suggestOpen && candidates.length) {e.preventDefault();accept(choice);return;}
     if ((e.key === "ArrowDown" || e.key === "ArrowUp") && candidates.length) {
       e.preventDefault();suggestOpen=true;choice=(choice+(e.key==="ArrowDown"?1:candidates.length-1))%candidates.length;showGhost();popup.querySelector(".fbar-suggestion.on")?.scrollIntoView({block:"nearest"});return;
@@ -131,12 +132,18 @@ export function createBar(opts) {
       e.preventDefault();if(suggestOpen){suggestOpen=false;showGhost();return;}
       if (inp.value) change("");inp.blur();opts.leave?.();return;
     }
-    if (e.key === "Enter") {e.preventDefault();change(inp.value);inp.blur();opts.leave?.();return;}
-    if (e.key === "\\") {e.preventDefault();b.toggle();return;}
+    if (e.key === "Enter") {e.preventDefault();change(inp.value);if(opts.submit)opts.submit();else{inp.blur();opts.leave?.();}return;}
+    if (e.key === "\\") {e.preventDefault();if(opts.toggle)opts.toggle();else b.toggle();return;}
     if (["ArrowLeft","ArrowRight","Home","End"].includes(e.key)) setTimeout(showGhost);
   };
   tog.onclick = () => b.toggle();
-  b.set = (f,on) => change(setQueryFilter(inp.value,f,on));
+  b.set = (f,on,g) => {
+    const target = g?.target && opts.targets?.[g.target];
+    if (target) return target.set(f,on);
+    change(setQueryFilter(inp.value,f,on),false,"filter");
+  };
+  b.setText = (text) => { inp.value=b.search=text;showGhost(); };
+  b.type = (text) => { change(text,true);inp.focus();inp.setSelectionRange(text.length,text.length);showGhost(); };
   b.clear = () => change("");
   b.active = () => !!(b.search.trim() || b.filters.length);
   // null follows the default 35% share; a number is a saved height, 0 fills the column.
@@ -162,7 +169,7 @@ export function createBar(opts) {
     separator.refresh();
   };
   b.nudge = (d) => b.setH(height() + d);
-  const separator = wireSeparator(gap, {
+  const separator = opts.noPanel ? {refresh(){}} : wireSeparator(gap, {
     axis: "y", key: KEY, enabled: () => b.open,
     range: () => [120, colH() - 34],
     get: height,
@@ -173,21 +180,30 @@ export function createBar(opts) {
   b.fills = () => b.open && b.h === 0;
 
   b.toggle = (v = !b.open) => {
+    if (opts.noPanel) return;
     b.open = v;
+    if (v) wantFocus = true;
     draw();
     opts.change(true);
-    if (v) {suggestOpen=false;showGhost();wantFocus = true;} // once the groups are in (draw)
+    if (v) {suggestOpen=false;showGhost();}
     else if (root.contains(document.activeElement)) { document.activeElement.blur(); opts.leave && opts.leave(); }
   };
   // the open bar folds the moment the focus leaves it: a click elsewhere, tab, a key that
   // moves the focus (06 §3.1 rule 8); what it filters stays in force on its one line
-  const left = (t) => b.open && root.isConnected && t instanceof Node && !root.contains(t) && !(t.closest && t.closest("#menu"));
-  document.addEventListener("mousedown", (e) => { if (left(e.target)) b.toggle(false); }, true);
-  document.addEventListener("focusin", (e) => { if (left(e.target)) b.toggle(false); });
+  const left = (t) => b.open && root.isConnected && t instanceof Node && !(opts.focusRoot?.() || root).contains(t) && !(t.closest && t.closest("#menu"));
+  let pointerOutside=false;
+  const down=e=>{pointerOutside=left(e.target);};
+  const mouse = (e) => { pointerOutside=false;if (left(e.target)) b.toggle(false); };
+  const focus = (e) => { if (!pointerOutside && left(e.target)) b.toggle(false); };
+  const outsideEvent=opts.deferOutside?"click":"mousedown";
+  if(opts.deferOutside)document.addEventListener("mousedown",down,true);
+  document.addEventListener(outsideEvent, mouse, !opts.deferOutside);
+  document.addEventListener("focusin", focus);
+  b.destroy = () => {clearTimeout(timer);document.removeEventListener("mousedown",down,true);document.removeEventListener(outsideEvent,mouse,!opts.deferOutside);document.removeEventListener("focusin",focus);};
   b.focus = () => { inp.focus(); inp.select(); };
   b.focused = () => root.contains(document.activeElement);
 
-  const available = (g) => (g.values || []).filter((v) => v.count > 0 || v.on);
+  const available = (g) => (g.values || []).filter((v) => g.noCounts || v.count > 0 || v.on);
   const lineOf = (g) => {
     const vals = available(g);
     return expanded.has(g.key) ? vals : vals.slice(0, LINE).concat(vals.slice(LINE).filter((v) => v.on));
@@ -196,6 +212,9 @@ export function createBar(opts) {
   function draw() {
     const d = data();
     tog.replaceChildren(el("span", "", T("filter")),keyCaps("\\"));
+    const count = opts.count?.();
+    if (count) tog.insertBefore(el("span","fbar-count",String(count)),tog.lastChild);
+    tog.hidden=gap.hidden=!!opts.noPanel;
     clear.hidden=!inp.value;
     tog.classList.toggle("on", b.open);
     panel.hidden = !b.open;
@@ -208,7 +227,7 @@ export function createBar(opts) {
     const ordered = groups();
     ordered.forEach((g) => {
       const gi = (d.groups || []).indexOf(g);
-      if (!["lists","tag","source","content"].includes(g.key)) return;
+      if (!["files","lists","tag","source","content"].includes(g.key)) return;
       const vals = lineOf(g);
       if (!vals.length) return;
       const t = el("span", "fbar-gt", g.title);
@@ -218,12 +237,12 @@ export function createBar(opts) {
         const x = el("button", "fbar-v" + (v.on === 1 ? " on" : v.on === -1 ? " ex" : "") + (v.cur ? " cur" : ""));
         x.append(el("span", "l", v.label));
         if (v.cur) x.append(el("span", "curv", T(g.key === "lists" ? "current list" : "this game")));
-        x.append(el("span", "n", String(v.count)));
+        if (!g.noCounts) x.append(el("span", "n", String(v.count)));
         x.title = v.label + "\n" + T("left click: only these, right click or x: leave these out");
         x.dataset.at = gi + ":" + vi;
         x.tabIndex = -1;
-        x.onclick = () => b.set(v.filter, v.on === 1 ? 0 : 1);
-        x.oncontextmenu = (e) => { e.preventDefault(); b.set(v.filter, v.on === -1 ? 0 : -1); };
+        x.onclick = () => b.set(v.filter, v.on === 1 ? 0 : 1,g);
+        x.oncontextmenu = (e) => { e.preventDefault(); b.set(v.filter, v.on === -1 ? 0 : -1,g); };
         x.onkeydown = (e) => valueKey(e, gi, vi, v);
         line.append(x);
       });
@@ -261,20 +280,23 @@ export function createBar(opts) {
     items[v].focus();
   }
   function valueKey(e, gi, vi, v) {
+    if (opts.key?.(e)) return;
     const k = e.key;
     const li = lines().findIndex((l) => +l.dataset.g === gi);
     if (k === "ArrowLeft" || k === "ArrowRight") { e.preventDefault(); e.stopPropagation(); return focusValue(li, vi + (k === "ArrowRight" ? 1 : -1)); }
     // ctrl+↑↓: the gap (what a drag does)
     if ((e.ctrlKey || e.metaKey) && (k === "ArrowUp" || k === "ArrowDown")) { e.preventDefault(); e.stopPropagation(); return b.nudge(k === "ArrowDown" ? 40 : -40); }
     if (k === "ArrowUp" || k === "ArrowDown") { e.preventDefault(); e.stopPropagation(); return focusValue(li + (k === "ArrowDown" ? 1 : -1), vi); }
-    if (k === "Enter" || k === " ") { e.preventDefault(); e.stopPropagation(); cur = { g: li, v: vi }; return b.set(v.filter, v.on === 1 ? 0 : 1); }
-    if (k === "x" || k === "X" || k === "-" || k === "Delete") { e.preventDefault(); e.stopPropagation(); cur = { g: li, v: vi }; return b.set(v.filter, v.on === -1 ? 0 : -1); }
+    if (k === "Enter" || k === " ") { e.preventDefault(); e.stopPropagation(); cur = { g: li, v: vi }; return b.set(v.filter, v.on === 1 ? 0 : 1,(data().groups || [])[gi]); }
+    if (k === "x" || k === "X" || k === "-" || k === "Delete") { e.preventDefault(); e.stopPropagation(); cur = { g: li, v: vi }; return b.set(v.filter, v.on === -1 ? 0 : -1,(data().groups || [])[gi]); }
     if (k === "Escape" || k === "\\") { e.preventDefault(); e.stopPropagation(); return b.toggle(false); }
     if (k === "/" ) { e.preventDefault(); e.stopPropagation(); return b.focus(); }
     // Typing from a group continues in the one query input.
     if (k.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
       e.preventDefault(); e.stopPropagation();
       const g = (data().groups || [])[gi];
+      const target = g.target && opts.targets?.[g.target];
+      if (target) {const prefix=target.input.value.trimEnd();target.type((prefix?prefix+" ":"")+k);return;}
       const prefix = inp.value.trimEnd();
       change((prefix ? prefix + " " : "") + (g.key === "tag" ? "tags" : g.key) + ":" + k, true);
       inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); showGhost();

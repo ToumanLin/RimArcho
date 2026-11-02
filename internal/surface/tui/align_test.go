@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -18,93 +19,76 @@ import (
 
 func screen(m *model) string { return ansi.Strip(m.View()) }
 
-// Search files: reached by tab from add a subscription and from the palette; typing goes into the box, enter
-// searches the open list's enabled mods, the results are mod → file → line, and the options
-// change the search at once.
+// Search files: all three fields accept text; options restart the shared search.
 func TestFileSearchPage(t *testing.T) {
 	view.SetLang("en")
 	e, _ := fixture(t)
 	m := direct(t, e, 160, 40)
 	runAlias(m, "search files")
-	if m.tab != tabSearch {
-		t.Fatalf("palette: tab %d", m.tab)
+	if m.tab != tabSearch || m.fs.files != view.FileSearchDefaultFiles || !strings.HasPrefix(m.fs.mods, `lists:"`) {
+		t.Fatalf("defaults: %+v", m.fs)
 	}
-	s := screen(m)
-	if !strings.Contains(s, "mod library › search files") || !strings.Contains(s, view.Tf("the %d mods %s enables", 3, m.st.Plan.Name)) {
-		t.Fatalf("page:\n%s", s)
-	}
-	// letters, ? and q are the box's
 	key(m, runes("alpha_Thing?q"))
 	if m.fs.text != "alpha_Thing?q" || m.quitting || m.panel != nil {
-		t.Fatalf("typing: %q quit %v panel %v", m.fs.text, m.quitting, m.panel != nil)
+		t.Fatalf("typing: %q", m.fs.text)
 	}
 	key(m, tea.KeyMsg{Type: tea.KeyBackspace})
 	key(m, tea.KeyMsg{Type: tea.KeyBackspace})
 	key(m, tea.KeyMsg{Type: tea.KeyEnter})
 	if m.fs.running || m.fs.page == nil {
-		t.Fatalf("search did not end: running %v page %v status %q", m.fs.running, m.fs.page, m.status)
+		t.Fatalf("running %v page %+v", m.fs.running, m.fs.page)
 	}
-	s = screen(m)
-	if !strings.Contains(s, "Alpha") || !strings.Contains(s, "Defs/ThingDefs/alpha.xml") || !strings.Contains(s, "alpha_Thing") {
-		t.Fatalf("results:\n%s", s)
+	text := screen(m)
+	for _, want := range []string{"mod library › search files", "Alpha", "Defs/ThingDefs/alpha.xml", "alpha_Thing"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("missing %s:\n%s", want, text)
+		}
 	}
-	// the cursor is on the file row, never on the mod's head
-	if r := m.fs.rows[m.fs.cursor]; !r.cursor || r.file < 0 {
-		t.Fatalf("cursor on %+v", r)
+	if row := m.fs.rows[m.fs.cursor]; !row.cursor || row.file < 0 {
+		t.Fatalf("cursor %+v", row)
 	}
-	// ↓ goes to the kind row; ← → and space switch a kind and search again
 	key(m, tea.KeyMsg{Type: tea.KeyDown})
 	if m.fs.row != 1 || m.fs.results {
-		t.Fatalf("↓: row %d results %v", m.fs.row, m.fs.results)
+		t.Fatal("down did not reach files")
 	}
-	for i := 0; i < 2; i++ { // past files, C# code to Defs
-		key(m, tea.KeyMsg{Type: tea.KeyRight})
+	key(m, tea.KeyMsg{Type: tea.KeyCtrlU})
+	key(m, runes("patches"))
+	key(m, tea.KeyMsg{Type: tea.KeyEnter})
+	if len(m.fs.rows) != 0 || !strings.Contains(screen(m), "not found") {
+		t.Fatalf("patches:\n%s", screen(m))
 	}
-	key(m, tea.KeyMsg{Type: tea.KeySpace, Runes: []rune(" ")})
-	if m.fs.kinds["defs"] {
-		t.Fatal("space did not leave out Defs")
+	key(m, tea.KeyMsg{Type: tea.KeyCtrlU})
+	key(m, runes("De"))
+	key(m, tea.KeyMsg{Type: tea.KeyTab})
+	if m.fs.files != "Defs" {
+		t.Fatalf("files completion %q", m.fs.files)
 	}
-	if len(m.fs.rows) != 0 || !strings.Contains(screen(m), "nothing found") {
-		t.Fatalf("without Defs:\n%s", screen(m))
-	}
-	key(m, tea.KeyMsg{Type: tea.KeySpace, Runes: []rune(" ")})
-	// alt+r is the regex, from any row
+	key(m, tea.KeyMsg{Type: tea.KeyEnter})
 	key(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r"), Alt: true})
 	if !m.fs.regex || len(m.fs.rows) == 0 {
-		t.Fatalf("alt+r: regex %v rows %d", m.fs.regex, len(m.fs.rows))
+		t.Fatal("regex did not rerun")
 	}
-	// C# code wants a named mod first
-	key(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("2"), Alt: true})
-	if !m.fs.code || !strings.Contains(m.status, "named mods") {
-		t.Fatalf("alt+2: code %v status %q", m.fs.code, m.status)
-	}
-	key(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("1"), Alt: true})
-	// + Mod on the scope row names a mod: typing finds it, enter adds it
 	key(m, tea.KeyMsg{Type: tea.KeyDown})
 	if m.fs.row != 2 {
-		t.Fatalf("↓: row %d", m.fs.row)
+		t.Fatal("down did not reach mods")
 	}
+	key(m, tea.KeyMsg{Type: tea.KeyCtrlU})
+	m.fs.text = "beta_Thing"
 	key(m, tea.KeyMsg{Type: tea.KeyEnter})
-	if !m.fs.picking {
-		t.Fatal("enter on + Mod did not open the name box")
+	if !strings.Contains(screen(m), "Beta") {
+		t.Fatalf("blank mods did not include disabled copy:\n%s", screen(m))
 	}
-	key(m, runes("bet"))
-	if len(m.fs.cands) == 0 || m.fs.cands[0].Name != "Beta" {
-		t.Fatalf("candidates %+v", m.fs.cands)
-	}
+	key(m, tea.KeyMsg{Type: tea.KeyCtrlU})
+	key(m, runes("name:Alpha"))
 	key(m, tea.KeyMsg{Type: tea.KeyEnter})
-	if len(m.fs.mods) != 1 || m.fs.mods[0].Name != "Beta" || m.fs.picking {
-		t.Fatalf("named %+v picking %v", m.fs.mods, m.fs.picking)
+	if len(m.fs.rows) != 0 {
+		t.Fatal("library query did not scope copies")
 	}
-	if strings.Contains(screen(m), "Alpha") {
-		t.Fatalf("the search still covers the list:\n%s", screen(m))
-	}
-	// esc: back to the box, the results, then the editor; at most 3 (06 §11 T20)
 	key(m, tea.KeyMsg{Type: tea.KeyEsc})
 	key(m, tea.KeyMsg{Type: tea.KeyEsc})
 	key(m, tea.KeyMsg{Type: tea.KeyEsc})
 	if m.tab != tabList {
-		t.Fatalf("esc ×3: tab %d", m.tab)
+		t.Fatalf("esc ×3: %d", m.tab)
 	}
 }
 
@@ -122,6 +106,26 @@ func TestFileSearchLeaveStops(t *testing.T) {
 	key(m, tea.KeyMsg{Type: tea.KeyShiftTab})
 	if m.tab != tabSubscribe || m.fs.running || m.fs.cancel != nil {
 		t.Fatalf("tab %d running %v", m.tab, m.fs.running)
+	}
+}
+
+func TestFileSearchEscapeStopsAndKeepsResults(t *testing.T) {
+	view.SetLang("en")
+	e, _ := fixture(t)
+	m := direct(t, e, 160, 40)
+	m.openSearch()
+	m.fs.text = "alpha_Thing"
+	key(m, tea.KeyMsg{Type: tea.KeyEnter})
+	count := len(m.fs.rows)
+	if count == 0 {
+		t.Fatal("no initial results")
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	m.fs.cancel = cancel
+	m.fs.running = true
+	key(m, tea.KeyMsg{Type: tea.KeyEsc})
+	if ctx.Err() == nil || m.fs.running || len(m.fs.rows) != count {
+		t.Fatal("escape did not preserve stopped results")
 	}
 }
 

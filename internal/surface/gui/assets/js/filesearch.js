@@ -1,480 +1,358 @@
-// Mod library › Search files (06 §2.9, 03 §5.4–5.5).
-import { S, $, el, api, T, Tf, errText, say } from "./state.js";
-import { beginPageRead, page, area, button, seg, hintsChanged } from "./screens.js";
+// Mod library › Search files (06 §2.9). Query completion and filters are shared with the library.
+import { S, $, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
+import { beginPageRead, page, area, button, hintsChanged } from "./screens.js";
 import { copyablePath, copy } from "./fields.js";
+import { createBar } from "./filterbar.js";
+import { queryParts } from "./searchsuggest.js";
+import { wireSeparator } from "./separator.js";
+import { virtualRows } from "./virtualrows.js";
+import { syntaxParts } from "./searchsyntax.js";
 
-const defaults = ["defs", "patches", "about"];
-const X = { text: "", code: false, regex: false, case: false, word: false, def: false,
-  kinds: new Set(defaults), mods: [], info: "", result: null, at: null, cursor: 0,
-  rows: [], running: false, request: null, seq: 0, visit: 0, progress: "",
-  timer: null, candidatesTimer: null, candidatesSeq: 0, picker: false, candidates: [], pick: 0 };
-let root, queryCard, resultsCard, observer;
-let begins = Promise.resolve();
-const visible = () => S.screen === "search" && root?.isConnected;
+const kinds = ["C#", "Defs", "patches", "About", "translations", "textures", "sounds"];
+const X = {text:"",files:"Defs patches About",mods:"",case:false,regex:false,initialized:false,env:null,
+  groups:[],modsFound:[],byID:new Map(),rows:[],expanded:new Set(),cursor:0,selected:null,line:0,
+  at:null,update:null,running:false,request:null,since:0,seq:0,visit:0,readSeq:0,filterSeq:0,
+  wrap:false,wrapTouched:false,timer:0,filterTimer:0};
+let root, queryCard, resultsCard, viewerCard, tree, summary, notes, stopButton, validation;
+let textInput, filesBar, modsBar, treeRows, codeRows, observer;
+let begins=Promise.resolve();
+const visible=()=>S.screen==="search" && root?.isConnected;
+const consume=e=>{e.preventDefault();e.stopPropagation();};
 
 export async function open() {
   leave();
-  const read = beginPageRead("search", { label: "loading…", retry: open });
-  const visit = ++X.visit;
-  root = page("filesearch", "");
-  queryCard = el("section", "card fs-query");
-  resultsCard = el("section", "card fs-results");
-  const title = el("h2", "", T("results"));
-  resultsCard.append(title);
-  area(queryCard, null, focusInput);
-  area(resultsCard, title, focusResults);
-  root.append(queryCard, resultsCard);
+  const visit=++X.visit;
+  const read=beginPageRead("search",{label:"loading…",retry:open});
+  root=page("filesearch","");root.replaceChildren();
+  const left=el("div","fs-left"),gap=el("div","fs-split");
+  queryCard=el("section","card fs-query");
+  resultsCard=el("section","card fs-results");
+  viewerCard=el("section","card fs-viewer");
+  left.append(queryCard,resultsCard);root.append(left,gap,viewerCard);
   $("#screen").replaceChildren(root);
-  drawQuery(); drawResults(); drawHead();
-  // The shared screen calls Go's Leave; observe its replacement to clear local timers too.
-  observer = new MutationObserver(() => { if (!visible()) leave(); });
-  observer.observe($("#screen"), { childList: true });
+  area(queryCard,null,focusInput);area(resultsCard,null,focusResults);
+  buildQuery();buildResults();drawViewer();
+  let side=null;
+  const width=()=>root.getBoundingClientRect().width;
+  const place=()=>root.style.setProperty("--fs-side",side===null?"32%":side+"px");
+  wireSeparator(gap,{key:"ui.gui.search.side",enabled:()=>innerWidth>=900,
+    range:()=>[260,Math.max(260,width()-300)],get:()=>side??width()*.32,
+    set:v=>{side=v;place();},reset:()=>{side=null;place();},serialize:()=>side===null?"":String(side),
+    restore:v=>{side=v && Number.isFinite(+v)?+v:null;place();}});
+  place();
+  observer=new MutationObserver(()=>{if(!visible())leave();});
+  observer.observe($("#screen"),{childList:true});
   read.finish();
+  api.Setting("ui.gui.search.wrap").then(v=>{
+    if(visible() && visit===X.visit && !X.wrapTouched){X.wrap=v==="true";applyWrap();}
+  }).catch(()=>{});
   try {
-    const info = await api.FileSearchInfo();
-    if (!read.current() || visit !== X.visit) return;
-    X.info = info;
-    const scope = root.querySelector(".fs-default-scope");
-    if (scope) scope.textContent = info;
-  } catch (e) { if (read.current() && visit === X.visit) say("fail", errText(e)); }
-}
-
-function drawHead() {
-  if (!visible()) return;
+    const info=await api.FileSearchInfo();
+    if(!visible() || visit!==X.visit)return;
+    if(!X.initialized || X.env!==S.envSeq){X.files=info.files;X.mods=info.mods;X.env=S.envSeq;X.initialized=true;}
+    X.groups=info.groups || [];
+    filesBar.setText(X.files);modsBar.setText(X.mods);refreshPanel();
+    if(X.mods!==info.mods)refreshFilters();
+  } catch(e){if(visible() && visit===X.visit)say("fail",errText(e));}
   hintsChanged();
-  root.querySelector(":scope > .page-head")?.remove();
-  const lead = X.running ? X.progress || T("searching…") : X.result?.summary || "";
-  if (!lead && !X.running) return;
-  const head = el("div", "page-head");
-  const text = el("p", "lead");
-  text.textContent = lead;
-  text.setAttribute("aria-live", "polite");
-  head.append(text);
-  if (X.running) {
-    const actions = el("div", "page-acts");
-    actions.append(button(T("stop"), "esc", () => stop(), "quiet"));
-    head.append(actions);
-  }
-  root.prepend(head);
 }
 
-function toggle(label, name, title, shortcut) {
-  const b = button(label, "", () => change(() => { X[name] = !X[name]; }), "small fs-toggle");
-  b.dataset.option = name;
-  b.title = title + " (" + shortcut + ")";
-  b.setAttribute("aria-label", title);
-  b.setAttribute("aria-pressed", String(X[name] || X.def && (name === "case" || name === "word")));
-  b.disabled = X.def && (name === "case" || name === "word");
-  b.hidden = X.code && name !== "regex";
-  return b;
+function fileGroup(target=false) {
+  const parts=queryParts(X.files.trim() || "Defs patches About");
+  return {key:"files",title:T("files"),noCounts:true,...(target?{target:"files"}:{}),
+    values:kinds.map(value=>({filter:value,label:T(value),count:0,
+      on:parts.find(p=>p.value.toLowerCase()===value.toLowerCase())?.negative?-1:
+        parts.some(p=>p.value.toLowerCase()===value.toLowerCase())?1:0}))};
 }
-
-function drawQuery() {
-  const old = document.activeElement;
-  const focus = queryCard.contains(old) ? old?.dataset.focus : null;
-  const selection = old?.tagName === "INPUT" ? [old.selectionStart, old.selectionEnd] : null;
-  queryCard.replaceChildren();
-  const top = el("div", "fs-input-row");
-  top.append(el("span", "anum", "1"));
-  const input = el("input", "fs-input");
-  input.type = "text";
-  input.placeholder = T("text to find");
-  input.setAttribute("aria-label", T("text to find"));
-  input.dataset.focus = "query";
-  input.value = X.text;
-  input.oninput = () => { X.text = input.value; };
-  input.onkeydown = e => {
-    if (e.isComposing) return;
-    if (shortcuts(e)) { e.stopPropagation(); return; }
-    if (e.key === "Enter") { consume(e); run(); }
-    else if (e.key === "Escape") { consume(e); if (X.running) stop(); else { input.blur(); queryCard.focus(); } }
-    else if (e.key === "ArrowDown" && !e.altKey && !e.ctrlKey && !e.metaKey) { consume(e); focusResults(); }
+function panelData() {return {groups:[fileGroup(true),...X.groups]};}
+function fieldRow(label,content) {
+  const row=el("div","fs-field"),name=el("label","fs-label",T(label));
+  const input=content.tagName==="INPUT"?content:content.querySelector("input");
+  if(input){input.id="fs-"+label;input.setAttribute("aria-label",T(label));name.htmlFor=input.id;}
+  row.append(name,content);return row;
+}
+function buildQuery() {
+  const fields=el("div","fs-fields"),top=el("div","fs-text-box");
+  textInput=el("input","fs-input");textInput.spellcheck=false;textInput.value=X.text;textInput.placeholder=T("text to find");
+  textInput.oninput=()=>{X.text=textInput.value;};
+  textInput.onkeydown=e=>{
+    if(e.isComposing)return;
+    if(shortcuts(e)){e.stopPropagation();return;}
+    if(e.key==="Enter"){consume(e);run();}
+    else if(e.key==="ArrowDown"){consume(e);filesBar.focus();}
+    else if(e.key==="Escape"){consume(e);if(X.running)stop();else{ textInput.blur();focusResults(); }}
   };
-  top.append(input,
-    toggle("Aa", "case", T("case sensitive"), "alt+c"),
-    toggle("ab", "word", T("whole word"), "alt+w"),
-    toggle(".*", "regex", T("regular expression"), "alt+r"),
-    toggle("Def", "def", T("Def name"), "alt+d"));
-  queryCard.tabIndex = -1;
-  queryCard.append(top);
-  const kinds = el("div", "fs-options");
-  kinds.append(el("span", "muted fs-label", T("kind")));
-  kinds.append(seg([T("files"), T("C# code")], X.code ? 1 : 0,
-    i => change(() => { X.code = i === 1; }), ["alt+1", "alt+2"]));
-  if (!X.code) {
-    const choices = [["defs", "Defs"], ["patches", T("patches")], ["about", "About"],
-      ["languages", T("translations")], ["textures", T("textures")],
-      ["sounds", T("sounds")], ["assemblies", T("assemblies")]];
-    for (const [kind, label] of choices) {
-      const b = button(label, "", () => change(() => {
-        if (X.kinds.has(kind)) X.kinds.delete(kind); else X.kinds.add(kind);
-      }), "small fs-kind");
-      b.dataset.focus = kind;
-      b.setAttribute("aria-pressed", String(X.kinds.has(kind)));
-      kinds.append(b);
+  top.append(textInput);
+  for(const [name,label,title,key] of [["case","Aa","case sensitive","alt+c"],["regex",".*","regular expression","alt+r"]]){
+    const b=button(label,"",()=>toggle(name),"quiet small fs-toggle");
+    b.dataset.option=name;b.title=T(title);b.setAttribute("aria-label",T(title));
+    b.append(keyCaps(key));b.setAttribute("aria-pressed",String(X[name]));top.append(b);
+  }
+  fields.append(fieldRow("search",top));
+  const key=e=>{if(e.key==="Escape"&&X.running){consume(e);stop();return true;}return shortcuts(e);};
+  filesBar=createBar({bare:true,noPanel:true,placeholder:T("files"),data:()=>({groups:[fileGroup()]}),
+    change:(_open,reason)=>{X.files=filesBar.input.value;validateKinds();refreshPanel();if(reason==="filter"&&X.text.trim())run();},
+    submit:run,key,toggle:()=>modsBar.toggle()});
+  fields.append(fieldRow("files",filesBar.el));
+  validation=el("p","fs-validation");validation.hidden=true;validation.id="fs-file-error";filesBar.input.setAttribute("aria-describedby",validation.id);
+  fields.append(validation);
+  modsBar=createBar({placeholder:T("mods"),data:panelData,targets:{files:filesBar},focusRoot:()=>queryCard,deferOutside:true,
+    splitKey:"ui.gui.search.filters",count:()=>queryParts(X.files).length+queryParts(X.mods).length,
+    change:(onlyOpen,reason)=>{if(!onlyOpen){X.mods=modsBar.input.value;refreshFilters();if(reason==="filter"&&X.text.trim())run();}},
+    submit:run,key,leave:focusResults});
+  const modsLabel=el("label","fs-label",T("mods"));modsLabel.htmlFor="fs-mods";
+  modsBar.input.id="fs-mods";modsBar.input.setAttribute("aria-label",T("mods"));
+  modsBar.el.querySelector(".fbar-row").prepend(modsLabel);
+  fields.append(modsBar.el);queryCard.append(fields);
+  filesBar.setText(X.files);modsBar.setText(X.mods);refreshPanel();
+}
+function validateKinds(){
+  const unknown=X.files.trim().split(/\s+/).filter(Boolean).find(w=>!kinds.some(k=>k.toLowerCase()===w.replace(/^-/,'').toLowerCase()));
+  validation.textContent=unknown?Tf("unknown file kind: %s",unknown):"";
+  validation.hidden=!unknown;filesBar.input.setAttribute("aria-invalid",String(!!unknown));
+  return !unknown;
+}
+function refreshPanel(){modsBar?.draw();filesBar?.draw();}
+function refreshFilters(){
+  clearTimeout(X.filterTimer);const seq=++X.filterSeq,visit=X.visit,query=X.mods;
+  X.filterTimer=setTimeout(async()=>{
+    try{const data=await api.FileSearchFilters(query);
+      if(!visible()||visit!==X.visit||seq!==X.filterSeq)return;
+      X.groups=data.groups||[];refreshPanel();
+    }catch(e){if(visible()&&seq===X.filterSeq)say("fail",errText(e));}
+  },90);
+}
+function toggle(name){X[name]=!X[name];queryCard.querySelector(`[data-option="${name}"]`)?.setAttribute("aria-pressed",String(X[name]));if(X.text.trim())run();}
+function request(){return {pattern:X.text,files:X.files,modsQuery:X.mods,case:X.case,regex:X.regex};}
+
+function buildResults(){
+  const head=el("div","fs-result-head");
+  summary=el("span","fs-summary muted");summary.setAttribute("aria-live","polite");
+  stopButton=button(T("stop"),"esc",stop,"quiet small fs-stop");stopButton.hidden=true;
+  head.append(el("h2","",T("results")),summary,stopButton);
+  notes=el("div","fs-notes muted");
+  tree=el("div","fs-tree");tree.tabIndex=0;tree.setAttribute("role","tree");tree.setAttribute("aria-label",T("results"));
+  tree.onkeydown=e=>{if(key(e))e.stopPropagation();};
+  resultsCard.append(head,notes,tree);
+}
+export function applyDeltas(deltas){
+  for(const delta of deltas || []){
+    let mod=X.byID.get(delta.id);
+    if(!mod){mod={id:delta.id,name:delta.name,copy:delta.copy,count:0,files:[]};X.byID.set(mod.id,mod);X.modsFound.push(mod);}
+    const file={...delta.file,mod,id:delta.id+"\n"+delta.file.path};
+    mod.files.push(file);mod.count+=file.count;
+  }
+}
+function flatten(){
+  const rows=[];
+  for(const mod of X.modsFound){
+    rows.push({type:"mod",mod});
+    for(const file of mod.files){
+      rows.push({type:"file",mod,file,line:0});
+      if(X.expanded.has(file.id))for(const hit of file.lines || [])rows.push({type:"line",mod,file,line:hit.line,hit});
     }
   }
-  queryCard.append(kinds);
-  const scope = el("div", "fs-options fs-scope");
-  scope.append(el("span", "muted fs-label", T("scope")));
-  if (!X.mods.length) scope.append(el("span", "chip muted fs-default-scope", X.info));
-  for (const mod of X.mods) {
-    const chip = el("span", "chip fs-mod-chip");
-    chip.append(document.createTextNode(mod.name));
-    const remove = el("button", "", "×");
-    remove.setAttribute("aria-label", T("remove") + " " + mod.name);
-    remove.onclick = () => change(() => { X.mods = X.mods.filter(m => m.id !== mod.id); });
-    chip.append(remove); scope.append(chip);
-  }
-  if (X.picker) {
-    const picker = el("div", "fs-picker");
-    const name = el("input", "fs-mod-input");
-    name.placeholder = T("mod name");
-    name.setAttribute("aria-label", T("mod name"));
-    name.setAttribute("role", "combobox");
-    name.setAttribute("aria-expanded", "true");
-    name.setAttribute("aria-controls", "fs-candidates");
-    name.setAttribute("aria-autocomplete", "list");
-    name.dataset.focus = "mod";
-    name.oninput = () => candidates(name.value);
-    name.onkeydown = e => {
-      if (e.isComposing) return;
-      if (e.key === "Escape") { consume(e); closePicker(); }
-      else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-        consume(e);
-        X.pick = Math.max(0, Math.min(X.candidates.length - 1, X.pick + (e.key === "ArrowDown" ? 1 : -1)));
-        drawCandidates();
-      } else if (e.key === "Enter") { consume(e); addMod(X.candidates[X.pick]); }
-    };
-    picker.append(name, el("div", "fs-candidates"));
-    picker.lastChild.id = "fs-candidates";
-    picker.lastChild.setAttribute("role", "listbox");
-    scope.append(picker);
-    queueMicrotask(() => { if (name.isConnected) name.focus(); });
-    candidates("");
-  } else {
-    const add = button(T("+ Mod"), "", () => { X.picker = true; drawQuery(); }, "small");
-    add.dataset.focus = "add";
-    scope.append(add);
-  }
-  queryCard.append(scope);
-  if (focus && !X.picker) {
-    const next = queryCard.querySelector(`[data-focus="${focus}"]`);
-    next?.focus({ preventScroll: true });
-    if (selection && next?.tagName === "INPUT") next.setSelectionRange(...selection);
-  }
+  return rows;
 }
-
-function change(apply) {
-  apply(); drawQuery();
-  if (X.text.trim()) run();
-  else if (X.running) stop(false);
-}
-
-function closePicker() {
-  X.picker = false; ++X.candidatesSeq;
-  clearTimeout(X.candidatesTimer); X.candidatesTimer = null;
-  drawQuery(); queryCard.querySelector('[data-focus="add"]')?.focus();
-}
-
-function candidates(text) {
-  const n = ++X.candidatesSeq;
-  clearTimeout(X.candidatesTimer);
-  X.candidates = []; X.pick = 0; drawCandidates();
-  X.candidatesTimer = setTimeout(async () => {
-    X.candidatesTimer = null;
-    try {
-      const mods = await api.ModCandidates(text);
-      if (n !== X.candidatesSeq || !visible() || !X.picker) return;
-      X.candidates = (mods || []).filter(m => m.id && !X.mods.some(x => x.id === m.id)).slice(0, 6);
-      X.pick = 0; drawCandidates();
-    } catch (e) { if (n === X.candidatesSeq && visible()) say("fail", errText(e)); }
-  }, 120);
-}
-
-function drawCandidates() {
-  const box = root?.querySelector(".fs-candidates");
-  if (!box) return;
-  box.replaceChildren();
-  X.candidates.forEach((m, i) => {
-    const b = button(m.name, "", () => addMod(m), "fs-candidate" + (i === X.pick ? " cur" : ""));
-    b.id = "fs-candidate-" + i;
-    b.setAttribute("role", "option");
-    b.setAttribute("aria-selected", String(i === X.pick));
-    b.tabIndex = -1;
-    box.append(b);
-  });
-  const input = root.querySelector(".fs-mod-input");
-  if (X.candidates.length) input?.setAttribute("aria-activedescendant", "fs-candidate-" + X.pick);
-  else input?.removeAttribute("aria-activedescendant");
-}
-
-function addMod(mod) {
-  if (!mod) return;
-  X.mods.push({ id: mod.id, name: mod.name });
-  closePicker();
-  if (X.text.trim()) run();
-}
-
-function request(pageNumber) {
-  const kinds = [...X.kinds];
-  return { pattern: X.text.trim(), code: X.code, regex: X.regex,
-    case: !X.code && (X.case || X.def), word: !X.code && (X.word || X.def), def: !X.code && X.def,
-    kinds: kinds.length === defaults.length && defaults.every(k => X.kinds.has(k)) ? [] : kinds,
-    mods: X.mods.map(m => m.id), page: pageNumber };
-}
-
-async function run(pageNumber = 1) {
-  if (!visible()) return;
-  const q = request(pageNumber);
-  if (!q.pattern || q.code && !q.mods.length || !q.code && !X.kinds.size) {
-    if (X.running) stop(false);
-    if (q.pattern && X.result) { X.result = null; X.at = null; drawResults(); drawHead(); }
-    say("fail", !q.pattern ? T("type what to look for") : q.code ?
-      T("C# code searches only named mods: add one with + Mod first") : T("choose a file kind"));
+function many(file){return file.count>1 && file.lines?.some(l=>l.line>0);}
+function drawTree(){
+  const saved=treeRows?.snapshot(),selected=X.rows[X.cursor];treeRows?.destroy();treeRows=null;
+  X.rows=flatten();
+  if(selected?.file){const i=X.rows.findIndex(r=>r.file?.id===selected.file.id&&r.line===selected.line);if(i>=0)X.cursor=i;}
+  X.cursor=Math.max(0,Math.min(X.rows.length-1,X.cursor));
+  tree.replaceChildren();
+  if(!X.rows.length){
+    if(X.update?.done && !X.update.error){tree.append(el("p","fs-empty muted",T("not found")));
+      if(X.update.hint){tree.append(el("p","fs-note muted",X.update.hint));if(X.at?.modsQuery.trim())tree.append(button(T("search every installed copy"),"",()=>{X.mods="";modsBar.setText("");refreshFilters();run();},"quiet small fs-widen"));}}
     return;
   }
-  // a refusal (or failure) of an earlier search is not about this one
-  if ($("#status")?.classList.contains("fail")) say("", "");
-  const seq = ++X.seq, visit = X.visit, screenSeq = S.screenSeq;
-  const current = () => visible() && seq === X.seq && visit === X.visit && screenSeq === S.screenSeq;
-  clearTimeout(X.timer); X.timer = null;
-  X.running = true; X.request = null; X.progress = "";
-  drawHead();
-  try {
-    const n = await (begins = begins.catch(() => {}).then(() => api.BeginFileSearch()));
-    if (!current()) { api.StopFileSearch(n).catch(() => {}); return; }
-    X.request = n;
-    poll(n, current);
-    const result = await api.FileSearch(q, n);
-    if (!current() || n !== X.request) return;
-    X.result = result; X.at = q; X.cursor = 0;
-    drawResults();
-  } catch (e) {
-    if (!current()) return;
-    if (!/context cancel(?:ed|led)/i.test(errText(e))) say("fail", errText(e));
-  } finally {
-    if (current()) {
-      X.running = false; X.request = null;
-      clearTimeout(X.timer); X.timer = null;
-      drawHead();
-    }
+  const sizes=new Float64Array(X.rows.length).fill(24);
+  treeRows=virtualRows(tree,X.rows.length,renderTreeRow,{heights:sizes});
+  if(saved)tree.scrollTop=saved.scrollTop;
+  if(!X.selected){const first=X.rows.findIndex(r=>r.type==="file");if(first>=0)selectRow(first,false);}
+  treeRows.select(X.cursor,false);
+}
+function renderTreeRow(i){
+  const row=X.rows[i],node=el(row.type==="mod"?"div":"button","fs-tree-row fs-"+row.type);
+  node.setAttribute("role","treeitem");node.setAttribute("aria-level",String(row.type==="mod"?1:row.type==="file"?2:3));
+  if(row.type==="mod"){
+    node.append(el("span","fs-mod-name",row.mod.name),el("span","fs-copy muted",row.mod.copy),el("span","fs-count muted",String(row.mod.count)));
+    node.setAttribute("aria-expanded","true");return node;
   }
-}
-
-function poll(n, current) {
-  X.timer = setTimeout(async () => {
-    X.timer = null;
-    if (!current() || !X.running || n !== X.request) return;
-    try {
-      const progress = await api.FileSearchProgress(n);
-      if (!current() || !X.running || n !== X.request) return;
-      if (progress !== X.progress) { X.progress = progress; drawHead(); }
-    } catch { /* the search itself reports errors */ }
-    if (current() && X.running && n === X.request) poll(n, current);
-  }, 300);
-}
-
-function stop(announce = true) {
-  const n = X.request;
-  ++X.seq; X.running = false; X.request = null;
-  clearTimeout(X.timer); X.timer = null;
-  if (n !== null) api.StopFileSearch(n).catch(e => { if (visible()) say("fail", errText(e)); });
-  drawHead();
-  if (announce) say("ok", T("stopped"));
-}
-
-export function leave() {
-  ++X.seq; ++X.visit; ++X.candidatesSeq;
-  clearTimeout(X.timer); clearTimeout(X.candidatesTimer);
-  X.timer = X.candidatesTimer = null;
-  if (X.request !== null) api.StopFileSearch(X.request).catch(() => {});
-  X.running = false; X.request = null; X.picker = false;
-  observer?.disconnect(); observer = null;
-}
-
-function drawResults() {
-  const heading = resultsCard.querySelector(":scope > h2");
-  resultsCard.replaceChildren(heading);
-  resultsCard.tabIndex = -1;
-  resultsCard.setAttribute("aria-label", T("results"));
-  X.rows = [];
-  const p = X.result;
-  if (!p) return;
-  for (const mod of p.mods || []) {
-    const head = el("div", "fs-mod-head");
-    head.append(el("span", "fs-position muted", mod.pos || ""));
-    const link = el("a", "fs-mod-name", mod.name);
-    link.href = "#";
-    link.onclick = async e => {
-      e.preventDefault();
-      const visit = X.visit;
-      try {
-        const fullPage = await import("./fulldetail.js");
-        if (visible() && visit === X.visit) fullPage.full("search", mod.id);
-      } catch (error) { if (visible()) say("fail", errText(error)); }
-    };
-    head.append(link, el("span", "muted fs-count", Tf("%d matches", mod.count)));
-    resultsCard.append(head);
-    for (const file of mod.files || []) {
-      const row = resultRow(mod, file, "fs-file");
-      const path = el("span", "fs-path");
-      path.textContent = file.rel;
-      copyablePath(path, file.path);
-      path.addEventListener("click", () => setCursor(X.rows.findIndex(r => r.node === row), false));
-      row.append(path);
-      if (file.shared) row.append(el("span", "muted", file.shared));
-      if (file.count !== mod.count) row.append(el("span", "muted fs-count", Tf("%d matches", file.count)));
-      if (file.more) row.append(el("span", "muted", Tf("+%d matches not shown", file.more)));
-      resultsCard.append(row);
-      for (const line of file.lines || []) {
-        const r = resultRow(mod, file, "fs-line");
-        r.append(el("span", "muted fs-line-number", line.line || ""));
-        const content = el("div", "fs-line-content");
-        if (line.role || line.within) {
-          const label = el("span", "muted fs-context");
-          label.textContent = [line.role, line.within].filter(Boolean).join("  ");
-          content.append(label);
-        }
-        const text = el("span", "fs-text");
-        highlight(text, line.text, X.at);
-        content.append(text); r.append(content); resultsCard.append(r);
-      }
-    }
+  node.tabIndex=-1;
+  const selected=X.rows[X.cursor]===row;
+  node.classList.toggle("selected",selected);node.setAttribute("aria-selected",String(selected));
+  if(row.type==="file"){
+    const expandable=many(row.file),expanded=X.expanded.has(row.file.id);
+    const chevron=el("span","fs-chevron"+(expanded?" open":"")+(!expandable?" none":""),"›");chevron.setAttribute("aria-hidden","true");
+    const path=el("span","fs-path"),at=row.file.rel.lastIndexOf("/");
+    path.append(el("span","muted",row.file.rel.slice(0,at+1)),document.createTextNode(row.file.rel.slice(at+1)));
+    node.append(chevron,path,el("span","fs-count muted",String(row.file.count)));
+    if(expandable)node.setAttribute("aria-expanded",String(expanded));
+    node.onclick=()=>{if(expandable){expanded?X.expanded.delete(row.file.id):X.expanded.add(row.file.id);}selectRow(i,false);drawTree();tree.focus({preventScroll:true});};
+  }else{
+    node.append(el("span","fs-line-number muted",String(row.line)));
+    const text=el("span","fs-line-text");
+    appendParts(text,row.hit.parts || [{text:row.hit.text}],false);node.append(text);
+    node.onclick=()=>{selectRow(i,false);tree.focus({preventScroll:true});};
   }
-  if (!X.rows.length) {
-    resultsCard.append(el("p", "muted fs-empty", T("nothing found")));
-    if (p.hint) resultsCard.append(el("p", "muted fs-note", p.hint));
-  }
-  for (const note of p.notes || []) resultsCard.append(el("p", "muted fs-note", note));
-  if (p.page > 1 || p.more) {
-    const paging = el("div", "fs-paging");
-    const prev = button(T("previous page"), "[", () => run(p.page - 1));
-    const next = button(T("next page"), "]", () => run(p.page + 1));
-    prev.disabled = p.page <= 1; next.disabled = !p.more;
-    paging.append(prev, el("span", "muted", Tf("page %d", p.page)), next);
-    resultsCard.append(paging);
-  }
-  setCursor(Math.min(X.cursor, X.rows.length - 1), false);
-  hintsChanged();
-}
-
-function resultRow(mod, file, cls) {
-  const node = el("div", "fs-row " + cls);
-  const i = X.rows.length;
-  node.tabIndex = -1;
-  node.onclick = () => { setCursor(i, false); node.focus({ preventScroll: true }); };
-  node.onfocus = () => setCursor(i, false);
-  X.rows.push({ node, modID: mod.id, path: file.path });
   return node;
 }
-
-function highlight(node, text, q) {
-  text = String(text ?? "");
-  if (!q?.pattern) { node.textContent = text; return; }
-  const ranges = [];
-  const whole = q.def || q.word;
-  const boundary = (a, b) => !whole || (!/[\w]/.test(text[a - 1] || "") && !/[\w]/.test(text[b] || ""));
-  if (q.regex && !q.def) {
-    try {
-      const re = new RegExp(q.pattern, q.case ? "g" : "gi");
-      for (const m of text.matchAll(re)) if (m[0].length && boundary(m.index, m.index + m[0].length)) ranges.push([m.index, m.index + m[0].length]);
-    } catch { /* Go uses RE2; a pattern may not be supported by JavaScript. */ }
-  } else {
-    const source = q.case || q.def ? text : text.toLowerCase();
-    const pattern = q.case || q.def ? q.pattern : q.pattern.toLowerCase();
-    for (let at = 0; at <= source.length - pattern.length;) {
-      const start = source.indexOf(pattern, at);
-      if (start < 0) break;
-      const end = start + pattern.length;
-      if (boundary(start, end)) ranges.push([start, end]);
-      at = end;
-    }
-  }
-  let at = 0;
-  for (const [a, b] of ranges) {
-    node.append(document.createTextNode(text.slice(at, a)));
-    const mark = el("mark"); mark.textContent = text.slice(a, b); node.append(mark); at = b;
-  }
-  node.append(document.createTextNode(text.slice(at)));
+function drawStatus(){
+  summary.textContent=X.update?.summary || "";stopButton.hidden=!X.running;
+  notes.replaceChildren(...(X.update?.notes || []).map(text=>el("p","fs-note",text)));
+  if(X.update?.error)notes.append(el("p","fs-note fail",X.update.error));
+  hintsChanged();
 }
-
-function setCursor(i, scroll = true) {
-  X.rows[X.cursor]?.node.classList.remove("cur");
-  X.cursor = Math.max(0, i);
-  const row = X.rows[X.cursor]?.node;
-  row?.classList.add("cur");
-  if (scroll && row) { row.focus({ preventScroll: true }); row.scrollIntoView({ block: "nearest" }); }
+export async function run(){
+  X.text=textInput.value;X.files=filesBar.input.value;X.mods=modsBar.input.value;
+  if(!validateKinds())return;
+  if(!X.text.trim()){say("fail",T("type what to look for"));return;}
+  const q=request(),seq=++X.seq,visit=X.visit;
+  clearTimeout(X.timer);X.running=true;X.stopWanted=false;X.request=null;X.since=0;
+  X.at=q;X.modsFound=[];X.byID.clear();X.rows=[];X.expanded.clear();X.cursor=0;X.selected=null;X.line=0;
+  X.update={summary:"",done:false};++X.readSeq;drawTree();drawViewer();drawStatus();
+  const current=()=>visible()&&visit===X.visit&&seq===X.seq;
+  try{
+    const n=await(begins=begins.catch(()=>{}).then(()=>api.BeginFileSearch()));
+    if(!current()){api.StopFileSearch(n).catch(()=>{});return;}
+    X.request=n;await api.StartFileSearch(q,n);
+    if(X.stopWanted)await api.StopFileSearch(n);
+    if(current())poll(seq,visit,n);
+  }catch(e){if(current()){X.running=false;say("fail",errText(e));drawStatus();}}
 }
-function focusResults() {
-  if (X.rows.length) setCursor(X.cursor);
-  else resultsCard?.focus();
+async function poll(seq,visit,n){
+  if(!visible()||seq!==X.seq||visit!==X.visit)return;
+  try{
+    const update=await api.FileSearchUpdate(n,X.since);
+    if(!visible()||seq!==X.seq||visit!==X.visit)return;
+    X.since=update.next;X.update=update;X.running=!update.done;
+    if(update.deltas?.length){applyDeltas(update.deltas);drawTree();}
+    else if(update.done && !X.rows.length)drawTree();
+    drawStatus();
+    if(!update.done)X.timer=setTimeout(()=>poll(seq,visit,n),300);
+  }catch(e){if(visible()&&seq===X.seq){X.running=false;drawStatus();say("fail",errText(e));}}
 }
-export function focusInput() {
-  const input = root?.querySelector(".fs-input");
-  input?.focus(); input?.select();
+function stop(){X.stopWanted=true;if(X.running && X.request!==null)api.StopFileSearch(X.request).catch(e=>say("fail",errText(e)));}
+export function leave(){
+  ++X.seq;++X.visit;++X.readSeq;++X.filterSeq;
+  clearTimeout(X.timer);clearTimeout(X.filterTimer);
+  if(X.request!==null)api.StopFileSearch(X.request).catch(()=>{});
+  X.request=null;X.running=false;X.selected=null;fileText=null;X.update=null;X.modsFound=[];X.byID.clear();X.rows=[];X.expanded.clear();
+  observer?.disconnect();observer=null;treeRows?.destroy();treeRows=null;codeRows?.destroy();codeRows=null;
+  filesBar?.destroy();modsBar?.destroy();filesBar=modsBar=null;
 }
-function consume(e) { e.preventDefault(); e.stopPropagation(); }
-
-function shortcuts(e) {
-  const k = e.key.toLowerCase(), ctrl = e.ctrlKey || e.metaKey;
-  if (ctrl && !e.altKey && k === "f" || !ctrl && !e.altKey && e.key === "/" && e.target.tagName !== "INPUT") {
-    e.preventDefault(); focusInput(); return true;
-  }
-  if (!e.altKey || ctrl || e.shiftKey) return false;
-  if (k === "1" || k === "2") { e.preventDefault(); change(() => { X.code = k === "2"; }); return true; }
-  const name = { c: "case", w: "word", r: "regex", d: "def" }[k];
-  if (!name || X.code && name !== "regex" || X.def && (name === "case" || name === "word")) return false;
-  e.preventDefault(); change(() => { X[name] = !X[name]; }); return true;
+function focusResults(){tree?.focus();if(X.rows.length && X.rows[X.cursor]?.type==="mod")selectRow(X.rows.findIndex(r=>r.type==="file"));}
+export function focusInput(){textInput?.focus();textInput?.select();}
+function selectRow(i,reveal=true){
+  const row=X.rows[i];if(!row?.file)return;
+  X.cursor=i;treeRows?.select(i,reveal);
+  const changed=X.selected?.id!==row.file.id;
+  X.selected=row.file;X.line=row.type==="line"?row.line:(row.file.lines?.[0]?.line||0);
+  // Selection reads just this file; repeated line selections reuse its bounded text.
+  if(changed)readFile(row.file);else markSelected();
 }
-
-export function key(e) {
-  if (shortcuts(e)) return true;
-  const k = e.key, ctrl = e.ctrlKey || e.metaKey;
-  if (k === "Escape") {
-    if (X.picker) closePicker(); else if (X.running) stop(); else return false;
-    e.preventDefault(); return true;
+let fileText=null;
+async function readFile(file){
+  const seq=++X.readSeq,visit=X.visit;fileText=null;drawViewer();
+  try{
+    const data=await api.ReadSearchFile(file.mod.id,file.path,X.at);
+    if(!visible()||seq!==X.readSeq||visit!==X.visit)return;
+    fileText=data;drawViewer();markSelected();
+  }catch(e){if(visible()&&seq===X.readSeq)say("fail",errText(e));}
+}
+function appendParts(node,parts,syntax=true){
+  for(const part of parts){
+    if(part.hit){const mark=el("mark");mark.textContent=part.text;node.append(mark);}
+    else if(syntax)for(const token of syntaxParts(part.text,fileText?.type?.includes("C#")?"cs":"xml")){const span=el("span",token.cls);span.textContent=token.text;node.append(span);}
+    else node.append(document.createTextNode(part.text));
   }
-  if (e.altKey) return false;
-  const row = X.rows[X.cursor];
-  if (ctrl && k.toLowerCase() === "c" && row) {
-    if (globalThis.getSelection()?.toString()) return false;
-    e.preventDefault(); copy(row.path, row.node).catch(error => say("fail", errText(error))); return true;
+}
+function drawViewer(){
+  codeRows?.destroy();codeRows=null;viewerCard.replaceChildren();
+  if(!X.selected){fileText=null;viewerCard.append(el("p","fs-view-empty muted",T("select a file")));return;}
+  const file=X.selected,head=el("div","fs-view-head"),top=el("div","fs-view-title"),actions=el("div","fs-view-actions");
+  const name=file.path.split(/[\\/]/).pop();
+  actions.append(button(T("open file"),"enter",()=>openFile(false),"small primary"),button(T("show in folder"),"ctrl+o",()=>openFile(true),"small"));
+  top.append(el("h2","",name),actions);
+  const where=el("div","fs-view-path");where.textContent=file.path;copyablePath(where,file.path);
+  head.append(top,where);viewerCard.append(head);
+  if(!fileText || fileText.binary)return;
+  const body=el("div","fs-code"+(X.wrap?" wrap":""));body.tabIndex=0;body.setAttribute("role","region");body.setAttribute("aria-label",T("file contents"));
+  viewerCard.append(body);
+  codeRows=virtualRows(body,fileText.lines.length,i=>{
+    const row=fileText.lines[i],node=el("div","fs-code-line"),text=el("span","fs-code-text");
+    node.dataset.line=String(row.number);node.classList.toggle("hit",fileText.hits.includes(row.number));
+    node.append(el("span","fs-code-number",String(row.number)));appendParts(text,row.parts);node.append(text);
+    return node;
+  },{heights:new Float64Array(fileText.lines.length).fill(20.4)});
+  if(fileText.note)viewerCard.append(el("p","fs-view-note muted",fileText.note));
+  const foot=el("div","fs-view-foot"),match=el("span","fs-match-position");
+  if(fileText.hits.length){
+    foot.append(match,button(T("next"),"n",()=>nextMatch(1),"quiet small"),button(T("previous"),"N",()=>nextMatch(-1),"quiet small"));
   }
-  if ((k === "Enter" && !ctrl || ctrl && k.toLowerCase() === "o") && row) {
-    // Native controls (Mod links, copyable paths and paging) keep their own activation.
-    if (k === "Enter" && e.target.closest?.("button, a, .path-copy")) return false;
-    e.preventDefault();
-    api.OpenSearchFolder(row.modID, row.path).then(() => { if (visible()) say("ok", T("opened the folder")); },
-      error => { if (visible()) say("fail", errText(error)); });
-    return true;
+  foot.append(el("span","fs-file-type muted",fileText.source?T("read-only: decompiled code from the source library"):fileText.type));
+  const wrap=button(T("wrap lines"),"alt+z",toggleWrap,"quiet small fs-wrap");wrap.setAttribute("aria-pressed",String(X.wrap));foot.append(wrap);viewerCard.append(foot);
+  markSelected();
+}
+function markSelected(){
+  if(!fileText)return;
+  const at=fileText.hits.indexOf(X.line),label=viewerCard.querySelector(".fs-match-position");
+  if(label)label.textContent=Tf("match %d of %d",at<0?1:at+1,fileText.hits.length);
+  const index=fileText.lines.findIndex(l=>l.number===X.line);
+  if(index>=0)codeRows?.select(index);
+  // Virtual rows use cur for the selected file line, with no extra count sentence.
+}
+function nextMatch(d){if(!fileText?.hits.length)return;const hits=fileText.hits,at=hits.indexOf(X.line);X.line=hits[(Math.max(0,at)+d+hits.length)%hits.length];markSelected();}
+function toggleWrap(){X.wrap=!X.wrap;X.wrapTouched=true;applyWrap();api.SetSetting("ui.gui.search.wrap",String(X.wrap)).catch(e=>say("fail",errText(e)));}
+function applyWrap(){viewerCard?.querySelector(".fs-code")?.classList.toggle("wrap",X.wrap);viewerCard?.querySelector(".fs-wrap")?.setAttribute("aria-pressed",String(X.wrap));}
+function openFile(folder){const file=X.selected;if(!file)return;(folder?api.OpenSearchFolder(file.mod.id,file.path):api.OpenSearchFile(file.mod.id,file.path)).catch(e=>say("fail",errText(e)));}
+function shortcuts(e){
+  const ctrl=e.ctrlKey||e.metaKey,k=e.key.toLowerCase();
+  if(ctrl&&!e.altKey&&k==="f"){consume(e);focusInput();return true;}
+  if(e.altKey&&!ctrl){
+    if(k==="c"||k==="r"){consume(e);toggle(k==="c"?"case":"regex");return true;}
+    if(k==="z"){consume(e);toggleWrap();return true;}
   }
-  if (ctrl || e.shiftKey) return false;
-  if ((k === "[" || k === "]") && X.result) {
-    e.preventDefault();
-    if (k === "[" && X.result.page > 1) run(X.result.page - 1);
-    if (k === "]" && X.result.more) run(X.result.page + 1);
-    return true;
+  return false;
+}
+export function key(e){
+  if(shortcuts(e))return true;
+  const k=e.key,ctrl=e.ctrlKey||e.metaKey;
+  if(k==="Escape"&&X.running){consume(e);stop();return true;}
+  if(e.target?.tagName==="INPUT"||e.altKey)return false;
+  if((k==="Enter"||k===" ")&&e.target?.closest?.("button")&&!tree?.contains(e.target))return false;
+  if(k==="\\"){consume(e);modsBar.toggle();return true;}
+  if(k==="/"){consume(e);focusInput();return true;}
+  if(ctrl&&k.toLowerCase()==="o"&&X.selected){consume(e);openFile(true);return true;}
+  if(ctrl&&k.toLowerCase()==="c"&&X.selected){consume(e);copy(X.selected.path);return true;}
+  if(k==="Enter"&&X.selected){consume(e);openFile(false);return true;}
+  if((k==="n"||k==="N")&&fileText?.hits.length){consume(e);nextMatch(k==="n"?1:-1);return true;}
+  const row=X.rows[X.cursor];
+  if(!row)return false;
+  if((k==="ArrowRight"||k==="ArrowLeft")&&row.file){
+    consume(e);
+    if(k==="ArrowRight"&&many(row.file))X.expanded.add(row.file.id);
+    if(k==="ArrowLeft"){X.expanded.delete(row.file.id);const i=X.rows.findIndex(r=>r.type==="file"&&r.file.id===row.file.id);if(i>=0)X.cursor=i;}
+    drawTree();return true;
   }
-  if (!row) return false;
-  let i = X.cursor;
-  const step = Math.max(1, Math.floor(($("#screen").clientHeight - 100) / (row.node.getBoundingClientRect().height || 28)));
-  if (k === "ArrowDown" || k === "j") i++;
-  else if (k === "ArrowUp" || k === "k") i--;
-  else if (k === "PageDown") i += step;
-  else if (k === "PageUp") i -= step;
-  else if (k === "Home") i = 0;
-  else if (k === "End") i = X.rows.length - 1;
+  let i=X.cursor,d=0;
+  if(k==="ArrowDown"||k==="j")d=1;
+  else if(k==="ArrowUp"||k==="k")d=-1;
+  else if(k==="Home"){i=0;d=1;}
+  else if(k==="End"){i=X.rows.length-1;d=-1;}
+  else if(k==="PageDown")d=Math.max(1,Math.floor(tree.clientHeight/24));
+  else if(k==="PageUp")d=-Math.max(1,Math.floor(tree.clientHeight/24));
   else return false;
-  e.preventDefault(); setCursor(Math.max(0, Math.min(X.rows.length - 1, i))); return true;
+  consume(e);
+  if(k!=="Home"&&k!=="End")i=Math.max(0,Math.min(X.rows.length-1,i+d));
+  while(X.rows[i]?.type==="mod"){const next=i+(d<0?-1:1);if(next<0||next>=X.rows.length)return true;i=next;}
+  selectRow(i);return true;
 }
-
-export function hintList() {
-  const hints = [{ key: "/ ctrl+f", label: T("search") }];
-  if (X.running) hints.push({ key: "esc", label: T("stop") });
-  if (X.rows.length) hints.push({ key: "↑↓ j k", label: T("move the cursor") },
-    { key: "enter ctrl+o", label: T("open the folder") }, { key: "ctrl+c", label: T("copy the path") });
-  if (X.result && (X.result.page > 1 || X.result.more)) hints.push({ key: "[ ]", label: T("previous / next page") });
-  hints.push({ key: "?", label: T("all keys") });
-  return hints;
+export function hintList(){
+  const list=[{key:"↑↓",label:T("move the cursor")}];
+  if(X.selected)list.push({key:"enter",label:T("open file")},{key:"ctrl+o",label:T("show in folder")},{key:"ctrl+c",label:T("copy the path")});
+  if(fileText?.hits.length)list.push({key:"n N",label:T("next / previous match")});
+  if(X.running)list.push({key:"esc",label:T("stop")});
+  list.push({key:"\\",label:T("filter")},{key:"?",label:T("all keys")});return list;
 }

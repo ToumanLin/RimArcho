@@ -257,15 +257,33 @@ func (a *App) LibraryFor(ref string) (*Library, error) {
 }
 
 func (a *App) library(st *LoadoutState, only string) (*Library, error) {
+	return a.buildLibrary(st, only, false, false)
+}
+
+func (a *App) buildLibrary(st *LoadoutState, only string, search, snapshot bool) (*Library, error) {
 	ix := st.Ix
 	selected := func(m *store.Mod) bool { return only == "" || m.LineageID == only }
 	lib := &Library{Env: ix.Env, GameMM: st.GameMM(), St: st}
-	used, lists, err := a.libUses(st)
+	var used map[string][]LibUse
+	var lists *ListMembership
+	var err error
+	if snapshot {
+		var envs []libEnv
+		envs, err = a.libEnvs(st)
+		if err == nil {
+			used, lists, err = a.listUses(st, envs)
+		}
+	} else {
+		used, lists, err = a.libUses(st)
+	}
 	if err != nil {
 		return nil, err
 	}
 	lib.Lists = lists
-	played, err := a.libPlayed(st)
+	played := map[string]time.Time{}
+	if !snapshot {
+		played, err = a.libPlayed(st)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -283,7 +301,7 @@ func (a *App) library(st *LoadoutState, only string) (*Library, error) {
 		return nil, err
 	}
 	notes, err := a.Store.CopyNotes(ix.Env.ID, instances...)
-	texs := a.TextureSummaries() // Texture optimisation: the DDS RimArcho wrote into each copy
+	texs := a.textureSummariesAtIndex(ix) // Texture optimisation: the DDS RimArcho wrote into each copy
 	if err != nil {
 		return nil, err
 	}
@@ -309,6 +327,13 @@ func (a *App) library(st *LoadoutState, only string) (*Library, error) {
 		return nil, err
 	}
 	srcKind := a.libSourceKinds(ix)
+	if search {
+		for _, s := range ix.Sources {
+			if s.Kind == source.Official {
+				srcKind[s.ID] = "official"
+			}
+		}
+	}
 	byLin := map[string]*LibLineage{}
 	lineage := func(id string) *LibLineage {
 		l := byLin[id]
@@ -348,9 +373,11 @@ func (a *App) library(st *LoadoutState, only string) (*Library, error) {
 		}
 	}
 	staged := map[string]bool{}
-	if items, _, err := a.Staged(); err == nil {
-		for _, it := range items {
-			staged[it.Instance] = true
+	if !snapshot {
+		if items, _, err := a.Staged(); err == nil {
+			for _, it := range items {
+				staged[it.Instance] = true
+			}
 		}
 	}
 	var png map[int64]bool
@@ -363,14 +390,16 @@ func (a *App) library(st *LoadoutState, only string) (*Library, error) {
 		}
 	}
 	for _, m := range ix.Mods {
-		if !selected(m) || m.Status != identity.Live || m.Kind == source.Official || srcKind[m.SourceID] == "" {
+		if !selected(m) || m.Status != identity.Live || (!search && m.Kind == source.Official) || srcKind[m.SourceID] == "" {
 			continue
 		}
 		i := &LibInstance{Mod: m, Ref: ix.Ref(m.ID), Source: srcKind[m.SourceID], WorkshopID: m.WorkshopID(), Path: ix.ModDir(m),
 			Bytes: m.TotalSize, Sized: m.SnapID != 0 && (m.FileCount > 0 || m.TotalSize > 0),
 			UsedIn: used[m.ID], InPlan: st.List.Index(m.ID) >= 0, Staged: staged[m.ID], Played: played[m.ID], Changed: changed[m.ID], Locked: locks[m.ID],
 			Authors: strings.TrimSpace(m.Authors), Note: notes[m.ID]}
-		i.Subscription = a.SubscriptionOf(m)
+		if !snapshot {
+			i.Subscription = a.SubscriptionOf(m)
+		}
 		if r := i.Subscription; r != nil {
 			if r.Kind == "git" || r.Kind == "page" {
 				i.Source = r.Kind
@@ -390,8 +419,10 @@ func (a *App) library(st *LoadoutState, only string) (*Library, error) {
 		}
 		if m.ACFTimeUpdated > 0 {
 			i.Updated = time.Unix(m.ACFTimeUpdated, 0).UTC()
-		} else if fi, err := os.Stat(i.Path); err == nil {
-			i.Updated = fi.ModTime().UTC()
+		} else if !snapshot {
+			if fi, err := os.Stat(i.Path); err == nil {
+				i.Updated = fi.ModTime().UTC()
+			}
 		}
 		for _, v := range strings.Fields(strings.ReplaceAll(m.SupportedVersions, ",", " ")) {
 			if !slices.Contains(i.Versions, v) {
@@ -399,7 +430,9 @@ func (a *App) library(st *LoadoutState, only string) (*Library, error) {
 			}
 		}
 		i.Created = libCreated(m)
-		i.Spare = m.Kind.GameMods() && (live[m.LineageID] > 1 || m.Origin != "" || dupIn(m.ID)) && !ix.ModIsLink(m)
+		if !snapshot {
+			i.Spare = m.Kind.GameMods() && (live[m.LineageID] > 1 || m.Origin != "" || dupIn(m.ID)) && !ix.ModIsLink(m)
+		}
 		if i.Locked != nil {
 			since := i.Created
 			if i.Note != nil && i.Note.Made != nil {
@@ -418,7 +451,7 @@ func (a *App) library(st *LoadoutState, only string) (*Library, error) {
 	// Subscribed Workshop items with no folder (06 §2.9: "missing Workshop items"). A tombstone of the item
 	// keeps its name and lineage.
 	for _, s := range ix.Sources {
-		if s.Kind != source.Workshop || s.Status == source.StatusRetired {
+		if search || s.Kind != source.Workshop || s.Status == source.StatusRetired {
 			continue
 		}
 		acf := scan.ReadACF(s.Root)

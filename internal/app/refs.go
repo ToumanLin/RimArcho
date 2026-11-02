@@ -74,6 +74,10 @@ func (a *App) IndexCached() bool {
 }
 
 func (a *App) loadIndex(e *env.Environment) (*Index, error) {
+	return a.readIndex(e, true)
+}
+
+func (a *App) readIndex(e *env.Environment, repair bool) (*Index, error) {
 	mods, err := a.Store.Mods(e.ID)
 	if err != nil {
 		return nil, err
@@ -82,11 +86,13 @@ func (a *App) loadIndex(e *env.Environment) (*Index, error) {
 	if err != nil {
 		return nil, err
 	}
-	if repaired, err := a.repairSharedLinkInstances(mods, srcs); err != nil {
-		return nil, err
-	} else if repaired {
-		if mods, err = a.Store.Mods(e.ID); err != nil {
+	if repair {
+		if repaired, err := a.repairSharedLinkInstances(mods, srcs); err != nil {
 			return nil, err
+		} else if repaired {
+			if mods, err = a.Store.Mods(e.ID); err != nil {
+				return nil, err
+			}
 		}
 	}
 	lins, err := a.Store.Lineages(e.ID)

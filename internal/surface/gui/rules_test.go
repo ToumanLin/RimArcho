@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 	"github.com/ToumanLin/RimArcho/internal/view"
@@ -152,38 +153,51 @@ func TestRuleEditCommand(t *testing.T) {
 func TestFileSearchAPI(t *testing.T) {
 	view.SetLang("en")
 	_, s, _ := fixture(t)
-	if scope, err := s.FileSearchInfo(); err != nil || !strings.Contains(scope, "mods") {
-		t.Fatalf("scope %q %v", scope, err)
+	if scope, err := s.FileSearchInfo(); err != nil || !strings.HasPrefix(scope.Mods, `lists:"`) {
+		t.Fatalf("scope %+v %v", scope, err)
 	}
-	n := s.BeginFileSearch()
-	p, err := s.FileSearch(view.FileSearchReq{Pattern: "alpha_thing"}, n)
-	if err != nil {
-		t.Fatal(err)
+	search := func(q view.FileSearchReq) view.FileSearchUpdate {
+		t.Helper()
+		n := s.BeginFileSearch()
+		if _, err := s.StartFileSearch(q, n); err != nil {
+			t.Fatal(err)
+		}
+		deadline := time.Now().Add(5 * time.Second)
+		for time.Now().Before(deadline) {
+			p, err := s.FileSearchUpdate(n, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if p.Done {
+				return p
+			}
+			time.Sleep(time.Millisecond)
+		}
+		t.Fatal("search did not finish")
+		return view.FileSearchUpdate{}
 	}
-	if len(p.Mods) != 1 || p.Mods[0].Name != "Alpha" || len(p.Mods[0].Files) != 1 || p.Mods[0].Files[0].Lines[0].Line != 1 || !strings.HasSuffix(p.Mods[0].Files[0].Path, "alpha.xml") || p.More {
-		t.Fatalf("page %+v", p)
+	info, _ := s.FileSearchInfo()
+	p := search(view.FileSearchReq{Pattern: "alpha_thing", ModsQuery: info.Mods})
+	if p.Error != "" || len(p.Deltas) != 1 || p.Deltas[0].Name != "Alpha" || p.Deltas[0].File.Lines[0].Line != 1 {
+		t.Fatalf("update %+v", p)
 	}
-	// Beta is not enabled: named, it is searched
-	if p, _ := s.FileSearch(view.FileSearchReq{Pattern: "beta_thing"}, n); len(p.Mods) != 0 || p.Hint == "" {
-		t.Fatalf("not enabled searched %+v", p)
+	if p := search(view.FileSearchReq{Pattern: "beta_thing", ModsQuery: info.Mods}); len(p.Deltas) != 0 || p.Hint == "" {
+		t.Fatalf("list scope %+v", p)
 	}
-	beta := ""
-	if c, _ := s.ModCandidates("beta"); len(c) == 1 {
-		beta = c[0].ID
+	if p := search(view.FileSearchReq{Pattern: "beta_thing"}); len(p.Deltas) != 1 || p.Deltas[0].Name != "Beta" {
+		t.Fatalf("all copies %+v", p)
 	}
-	if p, _ := s.FileSearch(view.FileSearchReq{Pattern: "beta_thing", Mods: []string{beta}}, n); len(p.Mods) != 1 {
-		t.Fatalf("named mod %q not searched %+v", beta, p)
-	}
-	if _, err := s.FileSearch(view.FileSearchReq{Pattern: "  "}, n); err == nil {
+	if p := search(view.FileSearchReq{Pattern: "  "}); p.Error == "" {
 		t.Fatal("empty pattern searched")
 	}
+	n := s.BeginFileSearch()
 	// a newer search supersedes this request
 	s.BeginFileSearch()
-	if _, err := s.FileSearch(view.FileSearchReq{Pattern: "alpha"}, n); !errors.Is(err, context.Canceled) {
+	if _, err := s.StartFileSearch(view.FileSearchReq{Pattern: "alpha"}, n); !errors.Is(err, context.Canceled) {
 		t.Fatalf("old request answered: %v", err)
 	}
 	// opening a result's folder: only inside the mod
-	if err := s.OpenSearchFolder(p.Mods[0].ID, `C:\Windows\win.ini`); err == nil {
+	if err := s.OpenSearchFolder(p.Deltas[0].ID, `C:\Windows\win.ini`); err == nil {
 		t.Fatal("opened a folder outside the mod")
 	}
 }

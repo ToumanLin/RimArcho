@@ -183,17 +183,17 @@ func KeyHelp(page string, tui bool) []KeyRow {
 	if page == PageSearch { // Search files (06 §2.9)
 		out = append(out,
 			r("/  ctrl+f", "search"),
-			r("enter", "in the box: search; on a result: open its folder"),
-			r("alt+c / alt+w / alt+r / alt+d", "case, whole word, regex, Def name"),
-			r("alt+1 / alt+2", "files / C# code"),
+			r("alt+c / alt+r", "case, regex"),
+			r("tab", "complete"),
 		)
 		if tui {
-			// the kind and scope rows are chips (06 §9.1)
-			out = append(out, r("↓ ↑ / ← → / space", "the kind and scope rows: go to a chip, switch it"))
+			out = append(out, r("enter", "in the box: search; on a result: open its folder"), r("↑↓", "fields"))
+		} else {
+			out = append(out, r("enter", "in a field: search; on a result: open the file"), r("\\", "filter"), r("n / N", "next / previous match"), r("alt+z", "wrap lines"))
 		}
 		out = append(out,
 			r("↑↓ / j k / PgUp PgDn / Home End", "move the cursor"),
-			r("[ ]", "previous / next page"),
+			r("← →", "collapse / expand"),
 			r("ctrl+o", "open the folder"),
 		)
 		if !tui { // the terminal selects text itself (06 §3.1 rule 12)

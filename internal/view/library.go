@@ -468,6 +468,27 @@ func BuildLibrary(lib *app.Library, search string, filters []string, sort string
 	}
 	p.Size = render.Size(bytes)
 	p.Lead = ""
+	p.Groups = libraryGroups(lib, res)
+	for _, f := range filters {
+		ex := strings.HasPrefix(f, "-")
+		k, v, err := app.ParseLibFilter(strings.TrimPrefix(f, "-"))
+		if err != nil {
+			continue
+		}
+		p.Conds = append(p.Conds, LibCond{Filter: f, Label: libKeyTitle(k) + " " + libValueText(k, v, lib.GameMM), Exclude: ex})
+	}
+	for _, c := range LibColumns {
+		p.Columns = append(p.Columns, LibColumn{Key: c.Key, Title: LibColumnTitle(c.Key), Shown: c.Shown})
+	}
+	for _, s := range app.LibSorts {
+		p.Sorts = append(p.Sorts, LibChoice{Filter: s, Label: map[string]string{"name": T("name"), "size": T("size"), "changed": T("last changed"), "played": T("last played")}[s]})
+	}
+	return p, nil
+}
+
+// libraryGroups shares filter labels and counts without constructing copy actions.
+func libraryGroups(lib *app.Library, res *app.LibResult) []LibGroup {
+	var groups []LibGroup
 	for _, f := range res.Facets {
 		g := LibGroup{Key: f.Key, Title: libKeyTitle(f.Key)}
 		for _, v := range f.Values {
@@ -496,23 +517,9 @@ func BuildLibrary(lib *app.Library, search string, filters []string, sort string
 			}
 			g.Values = append(g.Values, c)
 		}
-		p.Groups = append(p.Groups, g)
+		groups = append(groups, g)
 	}
-	for _, f := range filters {
-		ex := strings.HasPrefix(f, "-")
-		k, v, err := app.ParseLibFilter(strings.TrimPrefix(f, "-"))
-		if err != nil {
-			continue
-		}
-		p.Conds = append(p.Conds, LibCond{Filter: f, Label: libKeyTitle(k) + " " + libValueText(k, v, lib.GameMM), Exclude: ex})
-	}
-	for _, c := range LibColumns {
-		p.Columns = append(p.Columns, LibColumn{Key: c.Key, Title: LibColumnTitle(c.Key), Shown: c.Shown})
-	}
-	for _, s := range app.LibSorts {
-		p.Sorts = append(p.Sorts, LibChoice{Filter: s, Label: map[string]string{"name": T("name"), "size": T("size"), "changed": T("last changed"), "played": T("last played")}[s]})
-	}
-	return p, nil
+	return groups
 }
 
 func libInst(lib *app.Library, l *app.LibLineage, i *app.LibInstance) LibInstRow {
