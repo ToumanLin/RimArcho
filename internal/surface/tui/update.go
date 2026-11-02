@@ -113,7 +113,10 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, msg.apply(m)
 	case fsTickMsg:
 		if m.fs.running && msg.seq == m.fs.seq {
-			return m, fsNext(msg.seq) // redraws the progress
+			m.fsPoll()
+			if m.fs.running {
+				return m, fsNext(msg.seq)
+			}
 		}
 		return m, nil
 	case addTick:

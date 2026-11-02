@@ -190,10 +190,13 @@ func TestSourceLibrarySharedIdentityAndTypes(t *testing.T) {
 	if strings.Count(out, "same code in:") != 1 || !strings.Contains(out, whole) {
 		t.Fatalf("CLI attribution/path:\n%s", out)
 	}
-	page, err := view.FileSearch(context.Background(), e.App, view.FileSearchReq{Pattern: "AllComps.Remove(", Code: true, Mods: []string{a.ID, b.ID}}, nil)
-	if err != nil || len(page.Mods) != 1 || !strings.Contains(page.Mods[0].Files[0].Shared, "same code in:") {
-		t.Fatalf("view attribution %+v %v", page, err)
+	run := view.NewFileSearchRun()
+	run.Search(context.Background(), e.App, view.FileSearchReq{Pattern: "AllComps.Remove(", Files: "C#", ModsQuery: "id:" + a.PackageID})
+	update := run.Update(0)
+	if update.Error != "" || update.Mods != 2 || len(update.Deltas) != 2 {
+		t.Fatalf("per-copy source results %+v", update)
 	}
+
 }
 
 func TestSourceLibraryRelocation(t *testing.T) {

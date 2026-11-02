@@ -80,20 +80,20 @@ var Coef = struct {
 	// See docs/research/2026-11-01_unity16-texture-memory-breakdown.md.
 	TextureGPU16:        1.2,
 	UsableVRAM:          0.9, // Assumption: other programs and the desktop keep about a tenth.
-	CompressedPCM16:      11, // OGG/MP3: roughly 128 kbit/s versus 1411 kbit/s PCM16.
-	Sound16FileLimit:     300 << 10,
-	Sound17PCM16Limit:    2 << 20,
-	Sound16DecodedLow:    1, // PCM16 versus float32 at the upper bound.
-	Sound16DecodedHigh:   2,
-	Sound16StreamBuffer:  64 << 10,
-	Sound17ResidentLow:   1, // File bytes of the decoded-size-selected subset.
-	Sound17ResidentHigh:  1.5,
-	DefsLow:              3,
-	DefsHigh:             8,
-	PatchesLow:           0.5, // The merged XmlDocument is freed after loading.
-	PatchesHigh:          2,
-	AssembliesLow:        2,
-	AssembliesHigh:       5,
+	CompressedPCM16:     11,  // OGG/MP3: roughly 128 kbit/s versus 1411 kbit/s PCM16.
+	Sound16FileLimit:    300 << 10,
+	Sound17PCM16Limit:   2 << 20,
+	Sound16DecodedLow:   1, // PCM16 versus float32 at the upper bound.
+	Sound16DecodedHigh:  2,
+	Sound16StreamBuffer: 64 << 10,
+	Sound17ResidentLow:  1, // File bytes of the decoded-size-selected subset.
+	Sound17ResidentHigh: 1.5,
+	DefsLow:             3,
+	DefsHigh:            8,
+	PatchesLow:          0.5, // The merged XmlDocument is freed after loading.
+	PatchesHigh:         2,
+	AssembliesLow:       2,
+	AssembliesHigh:      5,
 }
 
 // Part attributes a range to one resource category. Bytes is on-disk size,

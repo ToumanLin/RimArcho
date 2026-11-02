@@ -2,155 +2,105 @@ package tui
 
 import (
 	"context"
-	"regexp"
+	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/view"
+	tea "github.com/charmbracelet/bubbletea"
 	"strings"
 	"sync"
 	"time"
-
-	tea "github.com/charmbracelet/bubbletea"
-
-	"github.com/ToumanLin/RimArcho/internal/app"
-	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Mod library › Search files (06 §2.9, §9.1): the window's page in the terminal, on the same
-// view.FileSearch. Area 1 is the query: the box, then the kind row (files / C# code and the
-// file kinds) and the scope row (the open list's mods, or the mods named with + Mod); ↑↓
-// go between the rows, ←→ between a row's chips, space or enter switches one. Area 2 is
-// the results: ↑↓ move over the files and lines, enter or ctrl+o opens the file's folder,
-// [ ] turn the page. A new search, esc while one runs, and leaving the page cancel it
-// (06 §3.1 rule 9). The terminal selects text itself, so there is no ctrl+c copy (06 §3.1
-// rule 12).
-
-// fsDefaults are the kinds searched when the player picked none (FileSearchReq.Kinds empty).
-var fsDefaults = []string{"defs", "patches", "about"}
-
-// fsTick refreshes a running search's progress (06 §2.16.1 G17).
+// Search files shares the window's three fields and bounded streaming model.
 const fsTick = 300 * time.Millisecond
 
 type fsTickMsg struct{ seq int }
-
-// fsRow is one line of the results: a mod's head (no cursor), a file, or a matching line.
 type fsRow struct {
-	mod     int // index in the page's Mods
-	file    int // -1 for the mod's head
-	line    int // -1 for the file's row
-	cursor  bool
-	dirPath string // the file the row opens the folder of
-	modID   string
+	mod, file, line int
+	cursor          bool
+	dirPath, modID  string
 }
-
 type fsState struct {
-	text                     string
-	code, regex, cs, wd, def bool
-	kinds                    map[string]bool
-	mods                     []view.RuleMod // named mods; empty: the open list's enabled mods
-	info                     string         // the default scope in words
-
-	results bool // area 2 has the focus
-	row     int  // area 1: 0 the box, 1 the kinds, 2 the scope
-	chip    int  // the chip under the cursor on rows 1 and 2
-
-	picking bool // + Mod: the name box and its candidates
-	pick    string
-	cands   []view.RuleMod
-	candAt  int
-
-	page   *view.FileSearchPage
-	at     view.FileSearchReq // the request page answers
-	rows   []fsRow
-	cursor int // index in rows (a row with cursor)
-	off    int
-
-	running  bool
-	seq      int
-	cancel   context.CancelFunc
-	progress *fsProgress
+	text, files, mods string
+	regex, cs         bool
+	initialized       bool
+	results           bool
+	editing           bool
+	row, caret        int
+	page              *view.FileSearchPage
+	at                view.FileSearchReq
+	rows              []fsRow
+	cursor, off       int
+	expanded          map[string]bool
+	running           bool
+	seq, since        int
+	cancel            context.CancelFunc
+	run               *view.FileSearchRun
+	status            view.FileSearchUpdate
+	lib               *app.Library
+	gate              *sync.Mutex
 }
 
-// fsProgress is the decompiling's progress, written by the search's goroutine.
-type fsProgress struct {
-	mu sync.Mutex
-	s  string
-}
-
-func (p *fsProgress) set(s string) { p.mu.Lock(); p.s = s; p.mu.Unlock() }
-func (p *fsProgress) get() string {
-	if p == nil {
-		return ""
-	}
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	return p.s
-}
-
-// openSearch shows Search files, its box focused; what was typed before is kept.
 func (m *model) openSearch() tea.Cmd {
 	m.panel, m.insp, m.full = nil, nil, false
 	s := &m.fs
-	if s.kinds == nil {
-		s.kinds = map[string]bool{}
-		for _, k := range fsDefaults {
-			s.kinds[k] = true
+	m.tab = tabSearch
+	if !s.initialized {
+		lib, err := m.app.FileSearchLibrary()
+		if err != nil {
+			m.say(sayFail, m.humanize(err.Error()))
+			return nil
+		}
+		info, err := view.BuildFileSearchInfo(lib, "", true)
+		if err != nil {
+			m.say(sayFail, m.humanize(err.Error()))
+			return nil
+		}
+		s.files, s.mods, s.lib = info.Files, info.Mods, lib
+		s.initialized = true
+		if s.gate == nil {
+			s.gate = &sync.Mutex{}
 		}
 	}
-	m.tab = tabSearch
-	s.results, s.row, s.chip, s.picking = false, 0, 0, false
-	if info, err := view.FileSearchScope(m.app); err == nil {
-		s.info = info
-	}
+	s.results, s.editing, s.row = false, true, 0
+	s.caret = len([]rune(s.text))
 	return nil
 }
-
-// fsLeft: the page was left; its search is no longer wanted.
 func (m *model) fsLeft() {
-	if m.tab != tabSearch && m.fs.running {
+	if m.tab != tabSearch {
 		m.fsStop(false)
+		m.fs.page = nil
+		m.fs.rows = nil
+		m.fs.run = nil
+		m.fs.lib = nil
+		m.fs.initialized = false
 	}
 }
-
-// fsRequest is the page's question for page n (the window's request()).
-func (s *fsState) request(n int) view.FileSearchReq {
-	q := view.FileSearchReq{Pattern: strings.TrimSpace(s.text), Code: s.code, Regex: s.regex, Page: n}
-	if !s.code {
-		q.Case, q.Word, q.Def = s.cs || s.def, s.wd || s.def, s.def
-		defaults := len(s.kinds) == len(fsDefaults)
-		for _, k := range fsDefaults {
-			defaults = defaults && s.kinds[k]
-		}
-		if !defaults {
-			for _, k := range view.FileSearchKinds {
-				if s.kinds[k.Kind] {
-					q.Kinds = append(q.Kinds, k.Kind)
-				}
-			}
-		}
+func (s *fsState) field() *string {
+	switch s.row {
+	case 1:
+		return &s.files
+	case 2:
+		return &s.mods
+	default:
+		return &s.text
 	}
-	for _, mod := range s.mods {
-		q.Mods = append(q.Mods, mod.ID)
-	}
-	return q
 }
-
-// fsRun searches page n in the background; the search before is cancelled and its answer
-// dropped.
-func (m *model) fsRun(n int) tea.Cmd {
+func (s *fsState) request() view.FileSearchReq {
+	return view.FileSearchReq{Pattern: s.text, Files: s.files, ModsQuery: s.mods, Case: s.cs, Regex: s.regex}
+}
+func (m *model) fsRun() tea.Cmd {
 	s := &m.fs
-	q := s.request(n)
-	refuse := ""
-	switch {
-	case q.Pattern == "":
-		refuse = T("type what to look for")
-	case q.Code && len(q.Mods) == 0:
-		refuse = T("C# code searches only named mods: add one with + Mod first")
-	case !q.Code && len(s.kinds) == 0:
-		refuse = T("choose a file kind")
+	q := s.request()
+	if _, _, err := view.ParseFileSearchKinds(q.Files); err != nil {
+		m.say(sayFail, err.Error())
+		return nil
 	}
-	if refuse != "" {
-		if s.running {
-			m.fsStop(false)
-		}
-		m.say(sayFail, refuse)
+	if strings.TrimSpace(q.Pattern) == "" {
+		m.say(sayFail, T("type what to look for"))
+		return nil
+	}
+	if _, err := view.SearchExpression(q); err != nil {
+		m.say(sayFail, err.Error())
 		return nil
 	}
 	if s.cancel != nil {
@@ -159,68 +109,123 @@ func (m *model) fsRun(n int) tea.Cmd {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.seq++
 	seq := s.seq
-	s.running, s.cancel, s.progress = true, cancel, &fsProgress{}
-	prog := s.progress
+	s.running, s.cancel, s.run, s.since = true, cancel, view.NewFileSearchRun(), 0
+	s.page = &view.FileSearchPage{Mods: []view.FileSearchMod{}}
+	s.at = q
+	s.rows = nil
+	s.cursor = 0
+	s.off = 0
+	s.expanded = map[string]bool{}
+	run := s.run
+	if s.gate == nil {
+		s.gate = &sync.Mutex{}
+	}
+	gate := s.gate
 	search := m.bg(func(a *app.App) func(m *model) tea.Cmd {
-		page, err := view.FileSearch(ctx, a, q, prog.set)
+		gate.Lock()
+		run.Search(ctx, a, q)
+		gate.Unlock()
+		cancel()
 		return func(m *model) tea.Cmd {
-			s := &m.fs
-			if s.seq != seq {
-				return nil
+			if m.fs.seq == seq {
+				m.fsPoll()
 			}
-			stopped := ctx.Err() != nil
-			cancel()
-			s.running, s.cancel = false, nil
-			if stopped {
-				return nil
-			}
-			if err != nil {
-				m.say(sayFail, m.humanize(err.Error()))
-				return nil
-			}
-			s.page, s.at = page, q
-			s.buildRows()
-			s.cursor, s.off = s.firstCursor(), 0
 			return nil
 		}
 	})
 	return tea.Batch(search, fsNext(seq))
 }
-
 func fsNext(seq int) tea.Cmd {
 	return tea.Tick(fsTick, func(time.Time) tea.Msg { return fsTickMsg{seq} })
 }
-
-// fsStop is esc while a search runs (and leaving the page).
+func (m *model) fsPoll() {
+	s := &m.fs
+	if s.run == nil {
+		return
+	}
+	u := s.run.Update(s.since)
+	s.status = u
+	s.since = u.Next
+	if s.page == nil {
+		s.page = &view.FileSearchPage{}
+	}
+	for _, d := range u.Deltas {
+		mi := -1
+		for i := range s.page.Mods {
+			if s.page.Mods[i].ID == d.ID {
+				mi = i
+				break
+			}
+		}
+		if mi < 0 {
+			s.page.Mods = append(s.page.Mods, view.FileSearchMod{ID: d.ID, Name: d.Name, Copy: d.Copy})
+			mi = len(s.page.Mods) - 1
+		}
+		mod := &s.page.Mods[mi]
+		mod.Files = append(mod.Files, d.File)
+		mod.Count += d.File.Count
+	}
+	s.page.Summary, s.page.Hint, s.page.Notes = u.Summary, u.Hint, u.Notes
+	if len(u.Deltas) > 0 {
+		s.buildRows()
+	}
+	if u.Done {
+		s.running = false
+		s.cancel = nil
+		if u.Error != "" {
+			m.say(sayFail, m.humanize(u.Error))
+		}
+	}
+}
 func (m *model) fsStop(announce bool) {
 	s := &m.fs
-	s.seq++
 	if s.cancel != nil {
 		s.cancel()
 	}
-	s.running, s.cancel = false, nil
+	if s.run != nil {
+		m.fsPoll()
+	}
+	if s.running && s.page != nil {
+		s.page.Summary = Tf("stopped: %d matches in %d of %d mods", s.status.Matches, s.status.Searched, s.status.Total)
+	}
+	s.seq++
+	s.running = false
+	s.cancel = nil
 	if announce {
 		m.say(sayOK, T("stopped"))
 	}
 }
-
-// buildRows flattens the page: each mod's head, then its files and their lines.
+func fsFileKey(mod string, file view.FileSearchFile) string { return mod + "\n" + file.Path }
 func (s *fsState) buildRows() {
-	s.rows = s.rows[:0]
+	var selected fsRow
+	if s.cursor < len(s.rows) {
+		selected = s.rows[s.cursor]
+	}
+	s.rows = nil
 	if s.page == nil {
 		return
 	}
 	for mi, mod := range s.page.Mods {
 		s.rows = append(s.rows, fsRow{mod: mi, file: -1, line: -1, modID: mod.ID})
-		for fi, f := range mod.Files {
-			s.rows = append(s.rows, fsRow{mod: mi, file: fi, line: -1, cursor: true, dirPath: f.Path, modID: mod.ID})
-			for li := range f.Lines {
-				s.rows = append(s.rows, fsRow{mod: mi, file: fi, line: li, cursor: true, dirPath: f.Path, modID: mod.ID})
+		for fi, file := range mod.Files {
+			s.rows = append(s.rows, fsRow{mod: mi, file: fi, line: -1, cursor: true, dirPath: file.Path, modID: mod.ID})
+			if len(file.Lines) == 1 || s.expanded[fsFileKey(mod.ID, file)] {
+				for li, hit := range file.Lines {
+					if hit.Line > 0 {
+						s.rows = append(s.rows, fsRow{mod: mi, file: fi, line: li, cursor: true, dirPath: file.Path, modID: mod.ID})
+					}
+				}
 			}
 		}
 	}
+	s.cursor = s.firstCursor()
+	for i, r := range s.rows {
+		if r.cursor && r.modID == selected.modID && r.dirPath == selected.dirPath && r.line == selected.line {
+			s.cursor = i
+			break
+		}
+	}
 }
-
 func (s *fsState) firstCursor() int {
 	for i, r := range s.rows {
 		if r.cursor {
@@ -229,14 +234,11 @@ func (s *fsState) firstCursor() int {
 	}
 	return 0
 }
-
-// step moves the results' cursor d rows that take one (06 §3.1 rule 1: it only moves).
 func (s *fsState) step(d int) {
 	if len(s.rows) == 0 {
 		return
 	}
-	i := s.cursor
-	dir := 1
+	i, dir := s.cursor, 1
 	if d < 0 {
 		dir, d = -1, -d
 	}
@@ -252,304 +254,6 @@ func (s *fsState) step(d int) {
 	}
 	s.cursor = i
 }
-
-// ---- keys ----
-
-// fsTyping: the box has the keys (letters go into it, 06 §2.9).
-func (m *model) fsTyping() bool {
-	s := &m.fs
-	return m.tab == tabSearch && (s.picking || !s.results && s.row == 0)
-}
-
-// fsOption: alt+c alt+w alt+r alt+d switch case, whole word, regex and Def name; alt+1
-// alt+2 files and C# code; in either area, as in the window.
-func (m *model) fsOption(k string) (tea.Cmd, bool) {
-	s := &m.fs
-	switch k {
-	case "alt+1", "alt+2":
-		return m.fsChange(func() { s.code = k == "alt+2" }), true
-	case "alt+r":
-		return m.fsChange(func() { s.regex = !s.regex }), true
-	case "alt+d":
-		if s.code {
-			return nil, true
-		}
-		return m.fsChange(func() { s.def = !s.def }), true
-	case "alt+c", "alt+w":
-		if s.code || s.def {
-			return nil, true // Def name decides them; C# never tells case (06 §2.9)
-		}
-		if k == "alt+c" {
-			return m.fsChange(func() { s.cs = !s.cs }), true
-		}
-		return m.fsChange(func() { s.wd = !s.wd }), true
-	}
-	return nil, false
-}
-
-// fsChange applies an option; with something typed, it searches again.
-func (m *model) fsChange(apply func()) tea.Cmd {
-	apply()
-	s := &m.fs
-	s.chip = min(s.chip, len(m.fsChips(s.row))-1)
-	if strings.TrimSpace(s.text) != "" {
-		return m.fsRun(1)
-	}
-	if s.running {
-		m.fsStop(false)
-	}
-	return nil
-}
-
-// fsTypeKey: the keys while the box (or + Mod's name box) has them.
-func (m *model) fsTypeKey(k tea.KeyMsg) tea.Cmd {
-	s := &m.fs
-	if cmd, ok := m.fsOption(k.String()); ok {
-		return cmd
-	}
-	if s.picking {
-		return m.fsPickKey(k)
-	}
-	switch k.Type {
-	case tea.KeyRunes, tea.KeySpace:
-		text := strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ").Replace(string(k.Runes))
-		if k.Type == tea.KeySpace {
-			text = " "
-		}
-		s.text += text
-		return nil
-	case tea.KeyBackspace:
-		if r := []rune(s.text); len(r) > 0 {
-			s.text = string(r[:len(r)-1])
-		}
-		return nil
-	case tea.KeyCtrlU:
-		s.text = ""
-		return nil
-	case tea.KeyEnter:
-		return m.fsRun(1)
-	case tea.KeyDown:
-		s.row, s.chip = 1, 0
-		return nil
-	case tea.KeyEsc:
-		if s.running {
-			m.fsStop(true)
-			return nil
-		}
-		s.results = true // leave the box; the text stays
-		return nil
-	case tea.KeyTab:
-		return m.subPage(1)
-	case tea.KeyShiftTab:
-		return m.subPage(-1)
-	}
-	return nil
-}
-
-// fsPickKey: + Mod's name box: type a name, ↑↓ choose, enter adds, esc closes.
-func (m *model) fsPickKey(k tea.KeyMsg) tea.Cmd {
-	s := &m.fs
-	switch k.Type {
-	case tea.KeyRunes, tea.KeySpace:
-		if k.Type == tea.KeySpace {
-			s.pick += " "
-		} else {
-			s.pick += string(k.Runes)
-		}
-	case tea.KeyBackspace:
-		if r := []rune(s.pick); len(r) > 0 {
-			s.pick = string(r[:len(r)-1])
-		}
-	case tea.KeyCtrlU:
-		s.pick = ""
-	case tea.KeyUp:
-		s.candAt = max(s.candAt-1, 0)
-		return nil
-	case tea.KeyDown:
-		s.candAt = min(s.candAt+1, max(len(s.cands)-1, 0))
-		return nil
-	case tea.KeyEnter, tea.KeyTab:
-		if s.candAt < len(s.cands) {
-			s.mods = append(s.mods, s.cands[s.candAt])
-			s.picking, s.pick, s.cands = false, "", nil
-			s.chip = len(s.mods) // stays on + Mod
-			if strings.TrimSpace(s.text) != "" {
-				return m.fsRun(1)
-			}
-		}
-		return nil
-	case tea.KeyEsc:
-		s.picking, s.pick, s.cands = false, "", nil
-		return nil
-	default:
-		return nil
-	}
-	s.cands = m.fsCandidates(s.pick)
-	s.candAt = 0
-	return nil
-}
-
-// fsCandidates: mods to name for text, the ones already named left out (6 at most).
-func (m *model) fsCandidates(text string) []view.RuleMod {
-	list, err := view.RuleCandidates(m.app, text, "")
-	if err != nil {
-		m.say(sayFail, m.humanize(err.Error()))
-		return nil
-	}
-	var out []view.RuleMod
-	for _, c := range list {
-		named := c.ID == ""
-		for _, x := range m.fs.mods {
-			named = named || x.ID == c.ID
-		}
-		if !named {
-			out = append(out, c)
-		}
-	}
-	return out
-}
-
-// fsChip is one chip of the kind or scope row.
-type fsChip struct {
-	label string
-	on    bool
-	off   bool // greyed: cannot be switched now
-	do    func(m *model) tea.Cmd
-}
-
-// fsChips are row r's chips (1 the kinds, 2 the scope).
-func (m *model) fsChips(r int) []fsChip {
-	s := &m.fs
-	var out []fsChip
-	switch r {
-	case 1:
-		out = append(out,
-			fsChip{label: T("files"), on: !s.code, do: func(m *model) tea.Cmd { return m.fsChange(func() { m.fs.code = false }) }},
-			fsChip{label: T("C# code"), on: s.code, do: func(m *model) tea.Cmd { return m.fsChange(func() { m.fs.code = true }) }})
-		if !s.code {
-			for _, k := range view.FileSearchKinds {
-				kind := k.Kind
-				label := k.Label
-				if label != "Defs" && label != "About" { // names the window does not translate
-					label = T(label)
-				}
-				out = append(out, fsChip{label: label, on: s.kinds[kind], do: func(m *model) tea.Cmd {
-					return m.fsChange(func() {
-						if m.fs.kinds[kind] {
-							delete(m.fs.kinds, kind)
-						} else {
-							m.fs.kinds[kind] = true
-						}
-					})
-				}})
-			}
-		}
-	case 2:
-		for i, mod := range s.mods {
-			i := i
-			out = append(out, fsChip{label: mod.Name + " ×", on: true, do: func(m *model) tea.Cmd {
-				return m.fsChange(func() { m.fs.mods = append(m.fs.mods[:i:i], m.fs.mods[i+1:]...) })
-			}})
-		}
-		out = append(out, fsChip{label: T("+ Mod"), do: func(m *model) tea.Cmd {
-			m.fs.picking, m.fs.pick, m.fs.cands, m.fs.candAt = true, "", nil, 0
-			return nil
-		}})
-	}
-	return out
-}
-
-// fsKey: the page's keys when the box does not have them.
-func (m *model) fsKey(s string) tea.Cmd {
-	f := &m.fs
-	if cmd, ok := m.fsOption(s); ok {
-		return cmd
-	}
-	switch s {
-	case "esc":
-		switch {
-		case f.running:
-			m.fsStop(true)
-		case !f.results:
-			f.row = 0 // back to the box
-		default:
-			m.tab = tabList // the TUI has no sidebar: the editor (06 §9.1)
-			return m.requestDetail()
-		}
-		return nil
-	case "/", "ctrl+f", "1":
-		f.results, f.row = false, 0
-		return nil
-	case "2":
-		f.results = true
-		return nil
-	case "[":
-		if f.page != nil && f.page.Page > 1 {
-			return m.fsRun(f.page.Page - 1)
-		}
-		return nil
-	case "]":
-		if f.page != nil && f.page.More {
-			return m.fsRun(f.page.Page + 1)
-		}
-		return nil
-	}
-	if !f.results {
-		return m.fsRowKey(s)
-	}
-	page := max(m.h-12, 1)
-	switch s {
-	case "up", "k":
-		f.step(-1)
-	case "down", "j":
-		f.step(1)
-	case "pgup":
-		f.step(-page)
-	case "pgdown":
-		f.step(page)
-	case "home":
-		f.cursor = f.firstCursor()
-	case "end":
-		f.step(len(f.rows))
-	case "enter", "ctrl+o":
-		if f.cursor < len(f.rows) && f.rows[f.cursor].cursor {
-			m.fsOpenFolder(f.rows[f.cursor])
-		}
-	}
-	return nil
-}
-
-// fsRowKey: the kind and scope rows of area 1.
-func (m *model) fsRowKey(s string) tea.Cmd {
-	f := &m.fs
-	chips := m.fsChips(f.row)
-	switch s {
-	case "up", "k":
-		f.row = max(f.row-1, 0)
-		f.chip = 0
-	case "down", "j":
-		if f.row == 2 {
-			f.results = true
-		} else {
-			f.row++
-			f.chip = 0
-		}
-	case "left", "h":
-		f.chip = max(f.chip-1, 0)
-	case "right", "l":
-		f.chip = min(f.chip+1, len(chips)-1)
-	case " ", "enter", "x", "delete":
-		if f.chip < len(chips) && !chips[f.chip].off {
-			if (s == "x" || s == "delete") && f.row != 2 {
-				return nil
-			}
-			return chips[f.chip].do(m)
-		}
-	}
-	return nil
-}
-
-// fsOpenFolder opens the folder of a result's file (view.SearchFolder says which may open).
 func (m *model) fsOpenFolder(r fsRow) {
 	ix, err := m.app.Index()
 	if err == nil {
@@ -564,288 +268,137 @@ func (m *model) fsOpenFolder(r fsRow) {
 	}
 	if err != nil {
 		m.say(sayFail, m.humanize(err.Error()))
-		return
+	} else {
+		m.say(sayOK, T("opened the folder"))
 	}
-	m.say(sayOK, T("opened the folder"))
 }
-
-// ---- drawing ----
-
-// fsLines draws the page in n lines.
 func (m *model) fsLines(n int) []string {
-	f := &m.fs
-	inner := max(m.w-4, 20)
-	num := func(a int, on bool) string {
-		if on {
-			return sAccent.Render(itoa(a) + " ")
+	s := &m.fs
+	w := max(m.w-4, 20)
+	out := []string{}
+	for i, label := range []string{T("search"), T("files"), T("mods")} {
+		text := []string{s.text, s.files, s.mods}[i]
+		current := !s.results && s.row == i
+		if current && s.editing {
+			chars := []rune(text)
+			at := max(0, min(s.caret, len(chars)))
+			text = string(chars[:at]) + "_" + string(chars[at:])
 		}
-		return sDimS.Render(itoa(a) + " ")
-	}
-	// area 1: the box and its toggles
-	box := f.text
-	if !f.results && f.row == 0 && !f.picking {
-		box += "_"
-	}
-	var toggles []string
-	tog := func(label, key string, on, off bool) {
-		st := sDimS
-		switch {
-		case off:
-			st = sDimS.Strikethrough(true)
-		case on:
-			st = sSel
+		st := sSecond
+		if current {
+			st = sText
 		}
-		toggles = append(toggles, st.Render(label)+sDimS.Render(" "+key))
-	}
-	if !f.code {
-		tog("Aa", "alt+c", f.cs || f.def, f.def)
-		tog("ab", "alt+w", f.wd || f.def, f.def)
-	}
-	tog(".*", "alt+r", f.regex, false)
-	if !f.code {
-		tog("Def", "alt+d", f.def, false)
-	}
-	right := strings.Join(toggles, "  ")
-	rw := width.StringWidth(stripANSIWidth(right))
-	prompt := sDimS.Render(markPrompt + " ")
-	if !f.results && f.row == 0 {
-		prompt = sAccent.Render(markPrompt + " ")
-	}
-	boxW := max(inner-rw-4, 10)
-	out := []string{num(1, !f.results) + prompt + sText.Render(fit(box, boxW)) + "  " + right}
-	if box == "" || box == "_" {
-		out[0] = num(1, !f.results) + prompt + sDimS.Render(fit(T("text to find")+"_", boxW)) + "  " + right
-	}
-	for r := 1; r <= 2; r++ {
-		label := T("kind")
-		if r == 2 {
-			label = T("scope")
+		prefix := "  "
+		if i == 0 {
+			prefix = sDimS.Render("1 ")
 		}
-		line := "  " + sDimS.Render(fit(label, 6)) + "  "
-		if r == 2 && len(f.mods) == 0 {
-			line += sSecond.Render(f.info) + "   "
+		line := prefix + sDimS.Render(fit(label, 7)) + st.Render(text)
+		if current && s.editing {
+			line += sDimS.Render(m.fsComplete())
 		}
-		for i, c := range m.fsChips(r) {
-			cur := !f.results && f.row == r && i == f.chip && !f.picking
-			st := sSecond
-			switch {
-			case c.off:
-				st = sDimS
-			case c.on:
-				st = sText
+		if i == 0 {
+			flag := func(label string, on bool) string {
+				if on {
+					return sSel.Render(label)
+				}
+				return sDimS.Render(label)
 			}
-			label := c.label
-			if c.on && r == 1 {
-				label = "✓" + label
-			}
-			if cur {
-				line += sAccent.Render(markSel) + sSel.Render(label) + "  "
-			} else {
-				line += " " + st.Render(label) + "  "
-			}
+			line += "  " + flag("Aa alt+c", s.cs) + "  " + flag(".* alt+r", s.regex)
 		}
-		out = append(out, width.Truncate(line, m.w-2, "…"))
+		out = append(out, width.Truncate(line, w, "…"))
 	}
-	if f.picking {
-		out = append(out, "    "+sAccent.Render(markPrompt+" ")+sText.Render(fit(f.pick+"_", inner-6)))
-		for i, c := range f.cands {
-			name := c.Name
-			if c.Pos > 0 {
-				name += "  " + sDimS.Render(itoa(c.Pos))
-			}
-			if i == f.candAt {
-				out = append(out, "      "+sAccent.Render(markSel+" ")+sSel.Render(c.Name)+strings.TrimPrefix(name, c.Name))
-			} else {
-				out = append(out, "        "+sText.Render(c.Name)+strings.TrimPrefix(name, c.Name))
-			}
-		}
-		if strings.TrimSpace(f.pick) != "" && len(f.cands) == 0 {
-			out = append(out, "        "+sDimS.Render(T("nothing matches")))
-		}
+	if _, _, err := view.ParseFileSearchKinds(s.files); err != nil {
+		out = append(out, "  "+sWarnS.Render(err.Error()))
 	}
 	out = append(out, "")
-	// area 2: the results
-	head := num(2, f.results) + sDimS.Render(T("results"))
-	if f.results {
-		head = num(2, true) + sAccent.Render(T("results"))
+	title := sDimS.Render("2 " + T("results"))
+	if s.results {
+		title = sAccent.Render("2 " + T("results"))
 	}
-	switch {
-	case f.running:
-		lead := f.progress.get()
-		if lead == "" {
-			lead = T("searching…")
-		}
-		head += "  " + sSecond.Render(markBusy+" "+lead) + sDimS.Render("  esc "+T("stop"))
-	case f.page != nil && f.page.Summary != "":
-		head += "  " + sSecond.Render(f.page.Summary)
+	if s.page != nil {
+		title += "  " + sSecond.Render(s.page.Summary)
 	}
-	out = append(out, width.Truncate(head, m.w-2, "…"))
+	if s.running {
+		title += sDimS.Render("  esc " + T("stop"))
+	}
+	out = append(out, width.Truncate(title, w, "…"))
+	body := m.fsResultLines(w)
 	rows := max(n-len(out)-1, 1)
-	body := m.fsResultLines(inner)
-	if f.cursor < f.off {
-		f.off = f.cursor
+	if s.cursor < s.off {
+		s.off = s.cursor
 	}
-	if f.cursor >= f.off+rows {
-		f.off = f.cursor - rows + 1
+	if s.cursor >= s.off+rows {
+		s.off = s.cursor - rows + 1
 	}
-	f.off = max(0, min(f.off, len(body)-rows))
-	out = append(out, window(body, f.off, rows)...)
-	return out
+	s.off = max(0, min(s.off, len(body)-rows))
+	return append(out, window(body, s.off, rows)...)
 }
-
-// fsResultLines are the results' lines, one per row, then the notes.
 func (m *model) fsResultLines(w int) []string {
-	f := &m.fs
-	p := f.page
-	if p == nil {
+	s := &m.fs
+	if s.page == nil {
 		return nil
 	}
 	var out []string
-	for i, r := range f.rows {
-		mod := p.Mods[r.mod]
-		cur := f.results && i == f.cursor
+	for i, row := range s.rows {
+		mod := s.page.Mods[row.mod]
+		cur := s.results && i == s.cursor
 		mark := "  "
 		if cur {
 			mark = sAccent.Render(markSel) + " "
 		}
 		switch {
-		case r.file < 0:
-			pos := ""
-			if mod.Pos > 0 {
-				pos = itoa(mod.Pos)
-			}
-			out = append(out, "  "+sDimS.Render(width.FillLeft(pos, 4))+"  "+sBold.Render(mod.Name)+"  "+sDimS.Render(Tf("%d matches", mod.Count)))
-		case r.line < 0:
-			file := mod.Files[r.file]
-			text := file.Rel
-			if file.Shared != "" {
-				text += "  " + file.Shared
+		case row.file < 0:
+			out = append(out, width.Truncate("  "+sBold.Render(mod.Name)+"  "+sDimS.Render(mod.Copy+"  "+itoa(mod.Count)), w, "…"))
+		case row.line < 0:
+			file := mod.Files[row.file]
+			chev := " "
+			if len(file.Lines) > 1 {
+				chev = "›"
+				if s.expanded[fsFileKey(mod.ID, file)] {
+					chev = "⌄"
+				}
 			}
 			st := sText
 			if cur {
 				st = sSel
 			}
-			line := "      " + mark + st.Render(text)
-			if file.Count != mod.Count {
-				line += "  " + sDimS.Render(Tf("%d matches", file.Count))
-			}
-			if file.More > 0 {
-				line += "  " + sDimS.Render(Tf("+%d matches not shown", file.More))
-			}
-			out = append(out, width.Truncate(line, w+2, "…"))
+			out = append(out, width.Truncate("    "+mark+sDimS.Render(chev+" ")+st.Render(file.Rel)+"  "+sDimS.Render(itoa(file.Count)), w, "…"))
 		default:
-			l := mod.Files[r.file].Lines[r.line]
-			ctx := strings.TrimSpace(l.Role + "  " + l.Within)
-			line := "        " + mark + sDimS.Render(width.FillLeft(lineNo(l.Line), 5)) + "  "
-			if ctx != "" {
-				line += sDimS.Render(ctx) + "  "
+			hit := mod.Files[row.file].Lines[row.line]
+			text := ""
+			for _, part := range hit.Parts {
+				if part.Hit {
+					text += sWarnS.Bold(true).Render(part.Text)
+				} else {
+					text += sSecond.Render(part.Text)
+				}
 			}
-			room := max(w+2-width.StringWidth(stripANSIWidth(line)), 8)
-			line += highlight(strings.TrimSpace(l.Text), f.at, room, cur)
-			out = append(out, line)
+			if len(hit.Parts) == 0 {
+				text = sSecond.Render(hit.Text)
+			}
+			out = append(out, width.Truncate("      "+mark+sDimS.Render(itoa(hit.Line)+"  ")+text, w, "…"))
 		}
 	}
-	if len(f.rows) == 0 {
-		out = append(out, "  "+sSecond.Render(T("nothing found")))
-		if p.Hint != "" {
-			out = append(out, "  "+sDimS.Render(width.Truncate(p.Hint, w, "…")))
+	if len(s.rows) == 0 && !s.running {
+		if s.page.Hint != "" {
+			out = append(out, "  "+sDimS.Render(width.Truncate(s.page.Hint, w-2, "…")))
 		}
 	}
-	for _, note := range p.Notes {
-		out = append(out, "  "+sDimS.Render(width.Truncate(note, w, "…")))
-	}
-	if p.Page > 1 || p.More {
-		var parts []string
-		if p.Page > 1 {
-			parts = append(parts, "[ "+T("previous page"))
-		}
-		parts = append(parts, Tf("page %d", p.Page))
-		if p.More {
-			parts = append(parts, "] "+T("next page"))
-		}
-		out = append(out, "", "  "+sDimS.Render(strings.Join(parts, "   ")))
+	for _, note := range s.page.Notes {
+		out = append(out, "  "+sDimS.Render(width.Truncate(note, w-2, "…")))
 	}
 	return out
 }
-
-func lineNo(n int) string {
-	if n == 0 {
-		return ""
-	}
-	return itoa(n)
-}
-
-// highlight marks what q matched in text, cut to w cells.
-func highlight(text string, q view.FileSearchReq, w int, cur bool) string {
-	text = width.Truncate(text, w, "…")
-	base := sSecond
-	if cur {
-		base = sText
-	}
-	var ranges [][2]int
-	switch {
-	case q.Pattern == "":
-	case q.Regex && !q.Def:
-		expr := q.Pattern
-		if !q.Case {
-			expr = "(?i)" + expr
-		}
-		if re, err := regexp.Compile(expr); err == nil {
-			for _, r := range re.FindAllStringIndex(text, -1) {
-				if r[1] > r[0] {
-					ranges = append(ranges, [2]int{r[0], r[1]})
-				}
-			}
-		}
-	default:
-		src, pat := text, q.Pattern
-		if !q.Case && !q.Def {
-			src, pat = strings.ToLower(text), strings.ToLower(pat)
-		}
-		for at := 0; len(pat) > 0 && len(src) == len(text); {
-			i := strings.Index(src[at:], pat)
-			if i < 0 {
-				break
-			}
-			ranges = append(ranges, [2]int{at + i, at + i + len(pat)})
-			at += i + len(pat)
-		}
-	}
-	var b strings.Builder
-	at := 0
-	for _, r := range ranges {
-		b.WriteString(base.Render(text[at:r[0]]))
-		b.WriteString(sWarnS.Bold(true).Render(text[r[0]:r[1]]))
-		at = r[1]
-	}
-	b.WriteString(base.Render(text[at:]))
-	return b.String()
-}
-
-// fsPairs: the hint line of Search files.
 func (m *model) fsPairs() [][2]string {
-	f := &m.fs
-	switch {
-	case f.picking:
-		return [][2]string{{T("type"), T("mod name")}, {"↑↓", T("choose")}, {"enter", T("add")}, {"esc", T("close")}}
-	case !f.results && f.row == 0:
-		pairs := [][2]string{{"enter", T("search")}, {"↓", T("kind") + " / " + T("scope")}, {"alt+c alt+w alt+r alt+d", T("case, whole word, regex, Def name")}}
-		if f.running {
-			pairs = append(pairs, [2]string{"esc", T("stop")})
-		}
-		return append(pairs, [2]string{"?", T("all keys")})
-	case !f.results:
-		return [][2]string{{"←→", T("choose")}, {"space", T("switch it")}, {"↑↓", T("kind") + " / " + T("scope")}, {"/", T("search")}, {"?", T("all keys")}}
+	s := &m.fs
+	pairs := [][2]string{{"1 /", T("search")}, {"2", T("results")}}
+	if !s.results {
+		pairs = append(pairs, [2]string{"↑↓", T("fields")}, [2]string{"enter", T("search")}, [2]string{"tab", T("complete")}, [2]string{"alt+c alt+r", T("case, regex")})
+	} else if len(s.rows) > 0 {
+		pairs = append(pairs, [2]string{"↑↓", T("move the cursor")}, [2]string{"←→", T("collapse / expand")}, [2]string{"enter ctrl+o", T("open the folder")})
 	}
-	pairs := [][2]string{{"/", T("search")}}
-	if f.running {
+	if s.running {
 		pairs = append(pairs, [2]string{"esc", T("stop")})
-	}
-	if len(f.rows) > 0 {
-		pairs = append(pairs, [2]string{"↑↓", T("move the cursor")}, [2]string{"enter ctrl+o", T("open the folder")})
-	}
-	if f.page != nil && (f.page.Page > 1 || f.page.More) {
-		pairs = append(pairs, [2]string{"[ ]", T("previous / next page")})
 	}
 	return append(pairs, [2]string{"?", T("all keys")})
 }

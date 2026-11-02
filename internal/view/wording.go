@@ -15,15 +15,27 @@ var retiredEn = regexp.MustCompile(`(?i)\b(plans?|environments?|upstream|workspa
 
 // wordingExempt are texts whose Chinese is right although it holds a retired word.
 var wordingExempt = map[string]bool{
+	"assemblies decompiled now: %d; they stay in the source library": true,
+	"read-only: decompiled code from the source library":             true,
 	"decompiled C#":                     true, // decompilation
 	"decompile the current list's mods": true,
 	"decompiling…":                      true,
-	"%d assemblies are not decompiled yet: search again to go on":            true,
 	"the mod was built for another version of the game or of the target mod": true, // a DLL compiled for another version
 }
 
 // WordingTextProblems checks text from surface-specific literals as well as tables.
 func WordingTextProblems(where, text string) []string {
+	// The approved search-files design uses these separators (06 §2.9).
+	switch text {
+	case "searching %d of %d mods · %d matches so far", "%d matches in %d files of %d mods · %s s",
+		"UTF-8 · XML", "UTF-8 · C#":
+		return nil
+	}
+	for _, key := range []string{"searching %d of %d mods · %d matches so far", "%d matches in %d files of %d mods · %s s"} {
+		if text == locales["zh"]().Text[key] || text == localeExtra("zh", key) {
+			return nil
+		}
+	}
 	if strings.ContainsRune(text, '\u00b7') {
 		return []string{fmt.Sprintf("%s: %q uses a middle dot (06 §7.3)", where, text)}
 	}
