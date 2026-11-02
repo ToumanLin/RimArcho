@@ -124,3 +124,43 @@ var links = struct {
 	sync.Mutex
 	m map[string]weak.Pointer[linkInstances]
 }{m: map[string]weak.Pointer[linkInstances]{}}
+
+// declReads is the read connection that lazy declaration reads of shared index Mods use.
+// One per opened data directory: its read sessions share it, it opens on first use and
+// closes with the App that opened the directory. Snapshot rows never change their
+// declaration, so any connection reads the same one.
+type declReads struct {
+	mu     sync.Mutex
+	path   string
+	s      *store.Store
+	closed bool
+}
+
+// declStore is the declaration connection, or nil (an App not from Open, or closing).
+func (a *App) declStore() *store.Store {
+	d := a.decl
+	if d == nil {
+		return nil
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.s == nil && !d.closed {
+		s, err := store.OpenSession(d.path)
+		if err != nil {
+			return nil
+		}
+		s.DB.Exec("PRAGMA cache_size=-256")
+		d.s = s
+	}
+	return d.s
+}
+
+func (d *declReads) close() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.closed = true
+	if d.s != nil {
+		d.s.Close()
+		d.s = nil
+	}
+}

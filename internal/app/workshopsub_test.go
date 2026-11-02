@@ -162,7 +162,7 @@ func TestWorkshopResubscribe(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	original := *st.Ix.ByID[id]
+	lineage := st.Ix.ByID[id].LineageID
 	before := slices.Clone(st.List)
 	var calls [][]string
 	fake := fakeSteamWorker(&calls)
@@ -216,7 +216,7 @@ func TestWorkshopResubscribe(t *testing.T) {
 		t.Fatal(err)
 	}
 	m := st.Ix.ByID[id]
-	if m == nil || m.LineageID != original.LineageID || m.WorkshopID() != "8100" || st.Ix.ModDir(m) != folder || m.Name != "Repair downloaded" || m.Status != "live" {
+	if m == nil || m.LineageID != lineage || m.WorkshopID() != "8100" || st.Ix.ModDir(m) != folder || m.Name != "Repair downloaded" || m.Status != "live" {
 		t.Fatalf("identity after redownload: %+v", m)
 	}
 	if !source.IsLink(incoming) {

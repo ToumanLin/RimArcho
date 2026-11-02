@@ -27,8 +27,9 @@ const (
 	slotPutMemoryTarget = 3 + 58 + 7 + 5 + 4 + 2 + 1 + 1 + 7 + 9 + 2 + 3 + 3 + 1 + 3 + 4 + 3 + 1 + 2 + 1
 )
 
-// lowMemoryWhenAway wires the window's events to the memory target policy.
-func lowMemoryWhenAway(w *application.WebviewWindow) {
+// lowMemoryWhenAway wires the window's events to the memory target policy; the page's
+// input reaches it through API.PageInput.
+func lowMemoryWhenAway(w *application.WebviewWindow) *memoryTarget {
 	m := &memoryTarget{set: func(level uintptr) {
 		application.InvokeAsync(func() { setMemoryTarget(webviewOf(w), level) })
 	}}
@@ -42,6 +43,8 @@ func lowMemoryWhenAway(w *application.WebviewWindow) {
 	on(events.Windows.WindowMinimise, m.Minimised)
 	on(events.Windows.WindowUnMinimise, m.Restored)
 	on(events.Windows.WindowClosing, m.Stop)
+	m.Input() // the idle wait starts with the window
+	return m
 }
 
 // webviewOf is the window's ICoreWebView2: WebviewWindow.impl (*windowsWebviewWindow)

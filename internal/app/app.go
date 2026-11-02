@@ -176,6 +176,8 @@ type App struct {
 	dataIdx *dataIndex // community data indexes (04 §6.3), loaded on first use
 
 	ixCache  *Index
+	decl     *declReads     // shared with read sessions (shared.go)
+	ownDecl  bool           // this App opened the directory and closes decl
 	linkInst *linkInstances // InspectGameLinks, keyed like ixCache
 	ixKey    string
 	// pngSnaps: the snapshots with PNG textures (Texture optimisation), until the snapshots change
@@ -226,6 +228,7 @@ func OpenWith(home string, o OpenOptions) (*App, error) {
 		return nil, err
 	}
 	a := &App{Home: home, Store: st, Config: cfg, Now: time.Now, Rand: rand.Reader, Loc: time.Local}
+	a.decl, a.ownDecl = &declReads{path: st.Path}, true
 	if st.Meta("source-library:legacy-cleared") == "" {
 		if err := os.RemoveAll(filepath.Join(home, "cache", "source")); err != nil {
 			st.Close()
@@ -257,7 +260,12 @@ func OpenWith(home string, o OpenOptions) (*App, error) {
 }
 
 // Close releases the database.
-func (a *App) Close() error { return a.Store.Close() }
+func (a *App) Close() error {
+	if a.ownDecl {
+		a.decl.close()
+	}
+	return a.Store.Close()
+}
 
 // LoadConfig reads the small TOML subset RimArcho uses: `key = value` lines and comments.
 func LoadConfig(path string) (Config, error) {

@@ -88,8 +88,9 @@ type API struct {
 	autoOnce        sync.Once
 	maintenanceOnce sync.Once
 	autoWG          sync.WaitGroup
-	quit            func()     // closes the window (nil in the harness and in tests)
-	windowTheme     func(bool) // synchronises the native frame with the resolved page scheme
+	quit            func()        // closes the window (nil in the harness and in tests)
+	windowTheme     func(bool)    // synchronises the native frame with the resolved page scheme
+	memTarget       *memoryTarget // WebView2's memory target (winmem_policy.go); nil off Windows and in tests
 	// tasks is the Background tasks record and its lanes (tasks.go, 06 §2.16)
 	tasks        *app.Tasks
 	taskEv       taskEvents

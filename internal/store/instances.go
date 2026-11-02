@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/identity"
@@ -41,7 +42,7 @@ type Mod struct {
 	Authors           string
 	DeclaredWorkshop  string
 	SupportedVersions string
-	DeclBlob          string
+	DeclBlob          string // set by full queries; others load it on demand (Decl, LoadDecls)
 	ACFManifest       string
 	ACFTimeUpdated    int64
 	ACFSize           int64
@@ -51,24 +52,39 @@ type Mod struct {
 	TotalSize         int64
 	SemanticCount     int
 
-	store *Store // for loading DeclBlob on demand (lite queries)
+	// An index's Mods can be shared by several sessions of one process (07 §8.3), so the
+	// lazily loaded declaration and the connection it is read from are atomic. Nothing
+	// else in a Mod changes once its index is built.
+	lazy  atomic.Pointer[string] // declaration loaded on demand
+	store atomic.Pointer[Store]  // where Decl loads it; must stay open while the Mod is used
 }
 
-// BindMods transfers lazy declaration reads when an idle reader's index is adopted.
+// BindMods makes later lazy declaration reads of mods use s, for example when the
+// connection they came from is about to close.
 func (s *Store) BindMods(mods []*Mod) {
 	for _, m := range mods {
-		m.store = s
+		if m.store.Load() != s {
+			m.store.Store(s)
+		}
 	}
 }
 
-// ReadCopy detaches a mod's lazy declarations and slices from another session.
-func (s *Store) ReadCopy(m *Mod) *Mod {
-	c := *m
-	c.Tags = append([]string(nil), m.Tags...)
-	c.SnapHash = append([]byte(nil), m.SnapHash...)
-	c.store = s
-	return &c
+// declBlob is the declaration loaded so far ("" when not yet loaded).
+func (m *Mod) declBlob() string {
+	if m.DeclBlob != "" {
+		return m.DeclBlob
+	}
+	if p := m.lazy.Load(); p != nil {
+		return *p
+	}
+	return ""
 }
+
+// DeclLoaded reports whether the declaration is in memory.
+func (m *Mod) DeclLoaded() bool { return m.declBlob() != "" }
+
+// ForgetDecl drops a declaration loaded on demand (tests and memory measurements).
+func (m *Mod) ForgetDecl() { m.lazy.Store(nil) }
 
 // WorkshopID is the folder name under workshop-like sources, else the declared ID.
 func (m *Mod) WorkshopID() string {
@@ -91,11 +107,14 @@ func (m *Mod) DisplayName() string {
 
 // Decl decodes the stored declaration, loading it first if the Mod came from a lite query.
 func (m *Mod) Decl() scan.Decl {
-	if m.DeclBlob == "" && m.store != nil && m.SnapID != 0 {
-		m.store.DB.QueryRow(`SELECT decl_blob FROM snapshot WHERE id=?`, m.SnapID).Scan(&m.DeclBlob)
+	blob := m.declBlob()
+	if s := m.store.Load(); blob == "" && s != nil && m.SnapID != 0 {
+		if s.DB.QueryRow(`SELECT decl_blob FROM snapshot WHERE id=?`, m.SnapID).Scan(&blob) == nil && blob != "" {
+			m.lazy.Store(&blob) // snapshot rows never change their declaration
+		}
 	}
 	var d scan.Decl
-	json.Unmarshal([]byte(m.DeclBlob), &d)
+	json.Unmarshal([]byte(blob), &d)
 	return d
 }
 
@@ -201,7 +220,7 @@ func (s *Store) mods(envID, cols string) ([]*Mod, error) {
 		if err != nil {
 			return nil, err
 		}
-		m.store = s
+		m.store.Store(s)
 		out = append(out, m)
 	}
 	return out, rows.Err()
@@ -212,7 +231,7 @@ func (s *Store) LoadDecls(ms []*Mod) error {
 	need := map[int64][]*Mod{}
 	var ids []any
 	for _, m := range ms {
-		if m.DeclBlob == "" && m.SnapID != 0 {
+		if !m.DeclLoaded() && m.SnapID != 0 {
 			if need[m.SnapID] == nil {
 				ids = append(ids, m.SnapID)
 			}
@@ -229,8 +248,11 @@ func (s *Store) LoadDecls(ms []*Mod) error {
 			var id int64
 			var blob string
 			rows.Scan(&id, &blob)
+			if blob == "" {
+				continue
+			}
 			for _, m := range need[id] {
-				m.DeclBlob = blob
+				m.lazy.Store(&blob)
 			}
 		}
 		rows.Close()
