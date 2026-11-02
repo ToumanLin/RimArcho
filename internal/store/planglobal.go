@@ -164,7 +164,7 @@ func (s *Store) ElsewhereMods(envID string) ([]*Mod, error) {
 		if err != nil {
 			return nil, err
 		}
-		m.store = s
+		m.store.Store(s)
 		out = append(out, m)
 	}
 	return out, rows.Err()

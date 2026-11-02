@@ -28,6 +28,7 @@ func (s *API) library() (*app.Library, error) {
 	defer s.libGate.Unlock()
 	s.libRead.mu.Lock()
 	defer s.libRead.mu.Unlock()
+	defer s.retainReader(&s.libRead)
 	s.mu.Lock()
 	key := s.inventoryKey()
 	if s.lib != nil && s.libAt == key {
@@ -81,6 +82,7 @@ func (s *API) refreshInventorySession(r *app.App) {
 }
 
 type inventoryReader struct {
+	idleUse  // the copy-detail reader only (idlereaders.go)
 	mu       sync.Mutex
 	a        *app.App
 	lib      *app.Library
@@ -93,6 +95,7 @@ func (s *API) withCopyLibrary(ref string, read func(*app.App, *app.Library) erro
 	w := &s.copyRead
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	defer s.retainCopy()
 	s.mu.Lock()
 	key := s.inventoryKey()
 	var err error

@@ -127,6 +127,7 @@ func (s *API) measureTextures(ctx context.Context, request uint64, scope string,
 	defer s.free.soon()
 	s.texRead.mu.Lock()
 	defer s.texRead.mu.Unlock()
+	defer s.retainReader(&s.texRead)
 	if ctx.Err() != nil {
 		return
 	}

@@ -268,5 +268,6 @@ func (a *App) recoverLinkRecords(row store.ManagedLink) error {
 		return err
 	}
 	a.ixCache, a.stCache, a.prCache, a.linkInst = nil, nil, nil, nil
+	forgetLinks(a.Store)
 	return nil
 }

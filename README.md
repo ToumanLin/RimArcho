@@ -2,7 +2,7 @@ English | [&#31616;&#20307;&#20013;&#25991;](README.zh-CN.md)
 
 # RimArcho
 
-<img src="docs/assets/rimarcho.svg" width="96" alt="RimArcho icon: Archo chan">
+<img src="docs/assets/portrait_fixed_1.svg" width="96" alt="RimArcho icon: Archo chan" align="center">
 
 A one-stop RimWorld launcher that understands its players. Pick your mods, put them in order, check
 that the game will run, launch it, and find out why when something breaks, all in one place. It is

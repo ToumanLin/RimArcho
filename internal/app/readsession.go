@@ -3,19 +3,20 @@ package app
 import (
 	"strings"
 
-	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // ReadSession gives a slow page its own database connection and application caches.
 // Call while the original App is locked; the returned App is used by one reader at a
-// time and must be closed. No Index, Loadout or analysis cache is shared between them.
+// time and must be closed. Sessions share only read-only data: an index's contents
+// (ReadIndex), list registries and game links (shared.go); Loadout and analysis caches
+// stay per session.
 func (a *App) ReadSession() (*App, error) {
 	s, err := store.OpenSession(a.Store.Path)
 	if err != nil {
 		return nil, err
 	}
-	b := &App{Store: s}
+	b := &App{Store: s, decl: a.decl}
 	b.ReadOptions(a)
 	s.DB.Exec("PRAGMA cache_size=-256")
 	return b, nil
@@ -68,7 +69,11 @@ func (a *App) AdoptReadState(r *App) {
 	}
 	a.prCache, a.prKey = nil, ""
 	if a.ixCache != nil {
-		a.Store.BindMods(a.ixCache.Mods)
+		if d := a.declStore(); d != nil {
+			d.BindMods(a.ixCache.Mods)
+		} else {
+			a.Store.BindMods(a.ixCache.Mods)
+		}
 		a.ixCache.store = a.Store
 	}
 	a.Store.MM = r.Store.MM
@@ -83,9 +88,13 @@ func (a *App) AdoptReadSnapshot(r *App) {
 	a.OpenPlan, a.PlanName = r.OpenPlan, r.PlanName
 }
 
-// ReadIndex copies a warm index into an idle reader. Call with the source App locked.
-// Only the immutable shorteners are shared; lazy Mod declarations use the reader's DB.
-// List edits on the source connection do not invalidate this detached index.
+// ReadIndex gives an idle reader the warm index of a. Call with a locked. The reader gets
+// its own Index (environment, session for foreign-list lookups) over the same Mods, maps,
+// lineages and sources: they are not changed once built, and their lazy declarations are
+// read through the process's long-lived declaration connection, so a source session that
+// closes later does not leave them reading a closed connection (07 §8.3). Without that
+// connection the reader loads its own index when it needs one. List edits on a's
+// connection do not invalidate the shared index.
 func (b *App) ReadIndex(a *App) {
 	if !a.IndexCached() {
 		return
@@ -93,36 +102,16 @@ func (b *App) ReadIndex(a *App) {
 	if b.ixCache != nil && b.ixKey == a.ixKey {
 		return
 	}
-	if b.ixKey != a.ixKey || b.ixCache == nil {
-		x := *a.ixCache
-		x.store = b.Store
-		e := *x.Env
-		x.Env = &e
-		x.Mods = make([]*store.Mod, 0, len(x.Mods))
-		x.ByID = make(map[string]*store.Mod, len(a.ixCache.ByID))
-		x.ByLineage = make(map[string][]*store.Mod, len(a.ixCache.ByLineage))
-		for _, m := range a.ixCache.Mods {
-			c := b.Store.ReadCopy(m)
-			x.Mods = append(x.Mods, c)
-			x.ByID[c.ID] = c
-			x.ByLineage[c.LineageID] = append(x.ByLineage[c.LineageID], c)
-		}
-		x.own = make(map[string]*store.Mod, len(a.ixCache.own))
-		for pkg, m := range a.ixCache.own {
-			x.own[pkg] = x.ByID[m.ID]
-		}
-		x.Lineages = make(map[string]*store.Lineage, len(a.ixCache.Lineages))
-		for id, l := range a.ixCache.Lineages {
-			c := *l
-			x.Lineages[id] = &c
-		}
-		x.Sources = make([]*source.Source, 0, len(a.ixCache.Sources))
-		for _, src := range a.ixCache.Sources {
-			c := *src
-			x.Sources = append(x.Sources, &c)
-		}
-		b.ixCache, b.stCache = &x, nil
+	d := a.declStore()
+	if d == nil {
+		return
 	}
+	d.BindMods(a.ixCache.Mods)
+	x := *a.ixCache
+	x.store = b.Store
+	e := *x.Env
+	x.Env = &e
+	b.ixCache, b.stCache = &x, nil
 	// Keep the generation we actually copied. A concurrent writer may have
 	// committed since then; stamping the copy with its newer key would hide it.
 	b.ixKey = a.ixKey

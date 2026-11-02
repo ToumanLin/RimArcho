@@ -13,6 +13,7 @@ import (
 )
 
 type logReader struct {
+	idleUse // expiring readers only (idlereaders.go)
 	mu      sync.Mutex
 	a       *app.App
 	board   *view.Board
@@ -151,6 +152,7 @@ func (s *API) refreshPageIndex(a *app.App) error {
 	w := &s.indexRead
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	defer s.retainReader(w)
 	if w.a == nil {
 		var err error
 		w.a, err = a.ReadSession()
@@ -272,35 +274,19 @@ func (s *API) Close() {
 	s.libGate.Lock()
 	//lint:ignore SA2001 barrier, nothing to guard
 	s.libGate.Unlock()
-	for _, w := range []*logReader{&s.libRead, &s.plansRead, &s.workspaceReader, &s.indexRead} {
+	for _, w := range []*logReader{&s.libRead, &s.plansRead, &s.workspaceReader, &s.indexRead, &s.detailRead} {
 		w.mu.Lock()
-		if w.a != nil {
-			w.a.Close()
-			w.a = nil
-		}
+		w.release() // also stops an idle expiry
 		w.mu.Unlock()
 	}
-	s.detailRead.mu.Lock()
-	if s.detailRead.a != nil {
-		s.detailRead.a.Close()
-		s.detailRead.a = nil
-	}
-	s.detailRead.mu.Unlock()
 	s.subRead.mu.Lock()
 	s.subRead.release()
 	s.subRead.mu.Unlock()
 	s.copyRead.mu.Lock()
-	if s.copyRead.a != nil {
-		s.copyRead.a.Close()
-		s.copyRead.a = nil
-	}
-	s.copyRead.lib = nil
+	s.copyRead.release()
 	s.copyRead.mu.Unlock()
 	s.uninstallRead.mu.Lock()
-	if s.uninstallRead.a != nil {
-		s.uninstallRead.a.Close()
-		s.uninstallRead.a = nil
-	}
+	s.uninstallRead.release()
 	s.uninstallRead.mu.Unlock()
 	s.logRead.mu.Lock()
 	defer s.logRead.mu.Unlock()
@@ -310,10 +296,7 @@ func (s *API) Close() {
 	}
 	s.texRead.mu.Lock()
 	defer s.texRead.mu.Unlock()
-	if s.texRead.a != nil {
-		s.texRead.a.Close()
-		s.texRead.a = nil
-	}
+	s.texRead.release()
 }
 
 // beginTextureRead supersedes an older request before it can queue more disk reads.

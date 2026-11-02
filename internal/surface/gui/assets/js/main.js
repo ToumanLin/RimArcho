@@ -9,6 +9,7 @@ import { phase as perfPhase } from "./perf.js";
 import { api, on, setText } from "./api.js";
 import "./window-theme.js";
 import "./refnums.js";
+import "./activity.js";
 import "./fulltitle.js";
 import { applyAccent } from "./accent.js";
 import { factText, S, $, $$, el, esc, T, Tf, errText, say, clearSay, undoStatus, col, cur, selection, key, idsOf, refsOf, named, AREAS, keyCaps } from "./state.js";

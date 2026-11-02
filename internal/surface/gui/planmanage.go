@@ -123,6 +123,7 @@ func (s *API) cancelLoadCost(close bool) {
 func (s *API) PlanManage(sel int64) (*view.PlanManage, error) {
 	s.plansRead.mu.Lock()
 	defer s.plansRead.mu.Unlock()
+	defer s.retainReader(&s.plansRead)
 	s.mu.Lock()
 	r, err := s.inventorySession(&s.plansRead)
 	s.mu.Unlock()

@@ -72,7 +72,8 @@ func TestSubscriptionInventoryReuseAndInvalidation(t *testing.T) {
 	}
 	read(false, "")
 	first := api.subRead.lib
-	if api.subRead.a == e.App || api.subRead.a.Store.DB == e.App.Store.DB || first.St.Ix.ByID[m.ID] == m {
+	// Its own session and connection; the index's Mods may be shared (07 §8.3), its Index not.
+	if api.subRead.a == e.App || api.subRead.a.Store.DB == e.App.Store.DB || first.St.Ix == ix || first.St.Ix.Env == ix.Env {
 		t.Fatal("subscription reader shares mutable application/index state")
 	}
 	for _, scope := range []struct {

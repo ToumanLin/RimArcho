@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -105,7 +106,7 @@ func (a *App) readIndex(e *env.Environment, repair bool) (*Index, error) {
 	}
 	for _, m := range mods {
 		if p := pd[m.LineageID]; p != nil {
-			m.Alias, m.Note, m.Tags = p.Alias, p.Note, p.Tags
+			m.Alias, m.Note, m.Tags = p.Alias, p.Note, slices.Clip(p.Tags)
 		}
 	}
 	if mods, srcs, err = a.withElsewhere(e, mods, srcs); err != nil {
@@ -128,10 +129,15 @@ func (a *App) readIndex(e *env.Environment, repair bool) (*Index, error) {
 		lids = append(lids, id)
 	}
 	ix.inst, ix.lin = ids.NewShortener(iids), ids.NewShortener(lids)
+	// Read sessions share what is built here (ReadIndex): clipped slices make an append
+	// by any of them copy instead of writing into the shared array.
+	ix.Mods = slices.Clip(ix.Mods)
 	SortMods(ix.Mods)
-	for _, l := range ix.ByLineage {
+	for id, l := range ix.ByLineage {
 		SortMods(l)
+		ix.ByLineage[id] = slices.Clip(l)
 	}
+	ix.Sources = slices.Clip(ix.Sources)
 	return ix, nil
 }
 

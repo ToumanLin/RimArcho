@@ -273,6 +273,10 @@ func (a *App) linkInstances() (*linkInstances, error) {
 	if c := a.linkInst; c != nil && c.key == key {
 		return c, nil
 	}
+	if c := sharedLinks(a.Store, key); c != nil {
+		a.linkInst = c
+		return c, nil
+	}
 	ms, err := a.Store.LinkMods()
 	if err != nil {
 		return nil, err
@@ -287,6 +291,7 @@ func (a *App) linkInstances() (*linkInstances, error) {
 		li.byName[strings.ToLower(DeployPrefix+"env_"+m.ID)] = m
 	}
 	a.linkInst = li
+	shareLinks(a.Store, li)
 	return li, nil
 }
 
