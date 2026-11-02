@@ -15,8 +15,8 @@ var retiredEn = regexp.MustCompile(`(?i)\b(plans?|environments?|upstream|workspa
 
 // wordingExempt are texts whose Chinese is right although it holds a retired word.
 var wordingExempt = map[string]bool{
-	"%d assemblies decompiled now; they stay in the source library": true,
-	"read-only: decompiled code from the source library":            true,
+	"assemblies decompiled now: %d; they stay in the source library": true,
+	"read-only: decompiled code from the source library":             true,
 	"decompiled C#":                     true, // decompilation
 	"decompile the current list's mods": true,
 	"decompiling…":                      true,

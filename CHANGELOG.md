@@ -4,6 +4,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 0.9.0 — plans and launching (unreleased)
 
+- Search files shows searching… while discovering its scope and one not found summary for empty results. The source-library note appears only when the run decompiled assemblies.
+
 - Search files now has search/files/mods fields with shared library filters, streaming results and stoppable C# searches including Core. The window adds a bounded file viewer, highlighted matches and persistent wrapping; the TUI shares the fields and streaming tree. CLI/MCP search flags and output are unchanged.
 
 - Uninstall now lists a relocated source library and its size, then deletes its generated code. Libraries already covered by data-folder deletion are counted once; linked library paths are refused.

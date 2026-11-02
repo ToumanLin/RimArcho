@@ -85,12 +85,12 @@ func (s *fsState) field() *string {
 		return &s.text
 	}
 }
-func (s *fsState) request(_ int) view.FileSearchReq {
+func (s *fsState) request() view.FileSearchReq {
 	return view.FileSearchReq{Pattern: s.text, Files: s.files, ModsQuery: s.mods, Case: s.cs, Regex: s.regex}
 }
-func (m *model) fsRun(_ int) tea.Cmd {
+func (m *model) fsRun() tea.Cmd {
 	s := &m.fs
-	q := s.request(1)
+	q := s.request()
 	if _, _, err := view.ParseFileSearchKinds(q.Files); err != nil {
 		m.say(sayFail, err.Error())
 		return nil
@@ -380,7 +380,6 @@ func (m *model) fsResultLines(w int) []string {
 		}
 	}
 	if len(s.rows) == 0 && !s.running {
-		out = append(out, "  "+sSecond.Render(T("not found")))
 		if s.page.Hint != "" {
 			out = append(out, "  "+sDimS.Render(width.Truncate(s.page.Hint, w-2, "…")))
 		}

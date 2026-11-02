@@ -8,7 +8,7 @@
   "not searched: %s": "未搜索：%s",
   "other game versions": "其他游戏版本",
   "the mods field limits copies": "Mod 栏会限制搜索哪些副本",
-  "%d assemblies decompiled now; they stay in the source library": "本次反编译了 %d 个程序集；代码会保留在源码库",
+  "assemblies decompiled now: %d; they stay in the source library": "本次反编译了 %d 个程序集；代码会保留在源码库",
   "file exceeds the 2 MiB search limit; open it to search further": "文件超过 2 MiB 搜索上限；请打开文件继续查找",
   "file cut at the viewer limit (1 MiB, 10,000 lines or 5,000 highlights); open the file to read more": "预览已达到上限（1 MiB、10,000 行或 5,000 处高亮）；请打开文件继续阅读",
   "the file is not there": "文件已不存在",
@@ -26,5 +26,6 @@
   "complete": "补全",
   "case, regex": "区分大小写、正则",
   "in a field: search; on a result: open the file": "在输入栏中：搜索；在结果上：打开文件",
-  "collapse / expand": "收起 / 展开"
+  "collapse / expand": "收起 / 展开",
+  "searching…": "正在搜索…"
 }

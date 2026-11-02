@@ -19,7 +19,7 @@ func (m *model) fsOption(k string) (tea.Cmd, bool) {
 		return nil, false
 	}
 	if strings.TrimSpace(s.text) != "" {
-		return m.fsRun(1), true
+		return m.fsRun(), true
 	}
 	return nil, true
 }
@@ -88,7 +88,7 @@ func (m *model) fsTypeKey(k tea.KeyMsg) tea.Cmd {
 	case tea.KeyEnd:
 		s.caret = len(runes)
 	case tea.KeyEnter:
-		return m.fsRun(1)
+		return m.fsRun()
 	case tea.KeyUp:
 		if s.row > 0 {
 			s.row--

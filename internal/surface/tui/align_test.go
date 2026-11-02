@@ -54,7 +54,7 @@ func TestFileSearchPage(t *testing.T) {
 	key(m, tea.KeyMsg{Type: tea.KeyCtrlU})
 	key(m, runes("patches"))
 	key(m, tea.KeyMsg{Type: tea.KeyEnter})
-	if len(m.fs.rows) != 0 || !strings.Contains(screen(m), "not found") {
+	if len(m.fs.rows) != 0 || strings.Count(screen(m), "not found") != 1 {
 		t.Fatalf("patches:\n%s", screen(m))
 	}
 	key(m, tea.KeyMsg{Type: tea.KeyCtrlU})
@@ -99,7 +99,7 @@ func TestFileSearchLeaveStops(t *testing.T) {
 	m := direct(t, e, 160, 40)
 	m.openSearch()
 	m.fs.text = "x"
-	m.fsRun(1) // not drained: it is still running
+	m.fsRun() // not drained: it is still running
 	if !m.fs.running {
 		t.Fatal("not running")
 	}

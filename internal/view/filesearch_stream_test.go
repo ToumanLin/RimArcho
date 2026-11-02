@@ -224,12 +224,12 @@ func TestFileSearchCoreAndStop(t *testing.T) {
 	if u.Error != "" || u.Matches != 1 || u.Deltas[0].Name != "Core" {
 		t.Fatalf("Core source %+v", u)
 	}
-	if !strings.Contains(strings.Join(u.Notes, " "), "1 assemblies") {
+	if !strings.Contains(strings.Join(u.Notes, " "), "assemblies decompiled now: 1;") {
 		t.Fatalf("decompile note %v", u.Notes)
 	}
 	run = view.NewFileSearchRun()
 	run.Search(context.Background(), e.App, view.FileSearchReq{Pattern: "Needle", Files: "C#", ModsQuery: "id:ludeon.rimworld"})
-	if u = run.Update(0); u.Matches != 1 || !strings.Contains(strings.Join(u.Notes, " "), "0 assemblies") {
+	if u = run.Update(0); u.Matches != 1 || strings.Contains(strings.Join(u.Notes, " "), "assemblies decompiled now") {
 		t.Fatalf("cache not reused %+v", u)
 	}
 }

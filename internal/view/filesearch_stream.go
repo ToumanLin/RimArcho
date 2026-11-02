@@ -148,12 +148,16 @@ func (r *FileSearchRun) Update(since int) FileSearchUpdate {
 		end = time.Now()
 	}
 	switch {
+	case !u.Done && u.Total == 0:
+		u.Summary = T("searching…")
 	case !u.Done:
 		u.Summary = Tf("searching %d of %d mods · %d matches so far", u.Searched, u.Total, u.Matches)
 	case u.Capped:
 		u.Summary = Tf("%d matches collected; narrow the search", u.Matches)
 	case u.Stopped:
 		u.Summary = Tf("stopped: %d matches in %d of %d mods", u.Matches, u.Searched, u.Total)
+	case u.Matches == 0 && u.Error == "":
+		u.Summary = T("not found")
 	default:
 		u.Summary = Tf("%d matches in %d files of %d mods · %s s", u.Matches, u.Files, u.Mods, fmt.Sprintf("%.1f", end.Sub(r.start).Seconds()))
 	}
@@ -400,12 +404,14 @@ func (r *FileSearchRun) search(ctx context.Context, a *app.App, q FileSearchReq)
 				return nil
 			})
 		}, finished, r.note)
-		r.mu.Lock()
-		if len(r.status.Notes) == 8 {
-			r.status.Notes = r.status.Notes[:7]
+		if decompiled > 0 {
+			r.mu.Lock()
+			if len(r.status.Notes) == 8 {
+				r.status.Notes = r.status.Notes[:7]
+			}
+			r.status.Notes = append(r.status.Notes, Tf("assemblies decompiled now: %d; they stay in the source library", decompiled))
+			r.mu.Unlock()
 		}
-		r.status.Notes = append(r.status.Notes, Tf("%d assemblies decompiled now; they stay in the source library", decompiled))
-		r.mu.Unlock()
 		if err != nil {
 			return err
 		}

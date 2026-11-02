@@ -2126,7 +2126,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .filesearch .fs-code-text { min-width: max-content; }
 .filesearch .fs-code-line.hit { background: color-mix(in srgb,var(--amber) 10%,transparent); }
 .filesearch .fs-code-line.hit .fs-code-number { color: var(--amber); }
-.filesearch .fs-code-line.cur { background: color-mix(in srgb,var(--amber) 20%,transparent); }
+.filesearch .fs-code-line.cur { background: color-mix(in srgb,var(--amber) 20%,transparent); box-shadow: inset 3px 0 0 var(--amber); }
 .filesearch mark { background: color-mix(in srgb,var(--amber) 65%,var(--card)); color: var(--fg); border-radius: var(--r-sm); }
 .filesearch .fs-code.wrap .fs-code-line { white-space: pre-wrap; }
 .filesearch .fs-code.wrap .fs-code-text { min-width: 0; overflow-wrap: anywhere; }
