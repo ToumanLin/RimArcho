@@ -116,7 +116,7 @@ next:
 rules: 1 (env:main)
   r:1  after  L#gpto B  L#u2mx Harmony  test
 
-> add_rule {"action":"remove","rule":"r:1"}
+> manage_rules {"action":"remove","rule":"r:1"}
 r:1 removed
 
 > ignore_problem {"ref":"p:c86d19"}

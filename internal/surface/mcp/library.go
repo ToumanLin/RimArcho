@@ -8,7 +8,7 @@ func libraryTools() []tool {
 		reg("list_library", true, false, descLibrary, func(in LibraryIn) []string { return LibraryArgv(in) }),
 		// Moving a folder out of Mods/ changes the game's folder (a recycle-bin copy on another
 		// volume), so the tool is marked destructive.
-		reg("manage_library", false, true, descManageLibrary, func(in ManageLibraryIn) []string { return ManageLibraryArgv(in) }),
+		reg("manage_library", false, true, descManageLibrary, func(in ManageLibraryIn) []string { return ManageLibraryArgv(in) }).allOnly(),
 	}
 }
 

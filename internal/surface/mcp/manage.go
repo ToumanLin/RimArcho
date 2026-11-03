@@ -13,19 +13,19 @@ var openWorld = map[string]bool{"get_description": true, "exchange_list": true, 
 
 func manageTools() []tool {
 	return []tool{
-		reg("check_links", true, false, descCheckLinks, func(in LinksCheckIn) []string { return argv("links", "check").flag("all", in.All).flag("json", true).a }),
-		reg("repair_links", false, true, descRepairLinks, LinksRepairArgv),
+		reg("check_links", true, false, descCheckLinks, func(in LinksCheckIn) []string { return argv("links", "check").flag("all", in.All).flag("json", true).a }).allOnly(),
+		reg("repair_links", false, true, descRepairLinks, LinksRepairArgv).allOnly(),
 		reg("test_run", false, false, descTestRun, TestRunArgv),
-		reg("estimate_memory", true, false, descMemory, MemoryArgv),
+		reg("estimate_memory", true, false, descMemory, MemoryArgv).allOnly(),
 		reg("manage_rules", false, false, descRules, func(in RuleIn) []string { return RulesArgv(in) }),
 		reg("ignore_problem", false, false, descIgnore, func(in IgnoreIn) []string { return IgnoreArgv(in) }),
-		reg("mute_version_warnings", false, false, descVersionMute, VersionMuteArgv),
+		reg("mute_version_warnings", false, false, descVersionMute, VersionMuteArgv).allOnly(),
 		reg("scan", false, false, descScan, func(in ScanIn) []string { return argv("scan").flag("full", in.Full).a }),
-		reg("exchange_list", false, false, descExchange, func(in ExchangeIn) []string { return ExchangeArgv(in) }),
-		reg("manage_packs", false, true, descPacks, func(in PackIn) []string { return PackArgv(in) }),
-		reg("resolve_identity", false, true, descIdentity, func(in IdentityIn) []string { return IdentityArgv(in) }),
-		reg("manage_hidden", false, true, descHidden, func(in HiddenIn) []string { return HiddenArgv(in) }),
-		reg("maintenance", false, true, descMaintenance, func(in MaintenanceIn) []string { return MaintenanceArgv(in) }),
+		reg("exchange_list", false, false, descExchange, func(in ExchangeIn) []string { return ExchangeArgv(in) }).allOnly(),
+		reg("manage_packs", false, true, descPacks, func(in PackIn) []string { return PackArgv(in) }).allOnly(),
+		reg("resolve_identity", false, true, descIdentity, func(in IdentityIn) []string { return IdentityArgv(in) }).allOnly(),
+		reg("manage_hidden", false, true, descHidden, func(in HiddenIn) []string { return HiddenArgv(in) }).allOnly(),
+		reg("maintenance", false, true, descMaintenance, func(in MaintenanceIn) []string { return MaintenanceArgv(in) }).allOnly(),
 	}
 }
 
@@ -71,7 +71,7 @@ func StatusArgv(in StatusIn) []string {
 	return []string{"status: unknown show " + fmt.Sprintf("%q", in.Show)}
 }
 
-// RulesArgv maps manage_rules (and its old name add_rule): add by default.
+// RulesArgv maps manage_rules: add by default.
 func RulesArgv(in RuleIn) []string {
 	switch in.Action {
 	case "", "add":

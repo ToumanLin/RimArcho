@@ -27,9 +27,30 @@ var AnalyzeWait = 10 * time.Second
 
 func ptr[T any](v T) *T { return &v }
 
+// Group is a set of tools `archo mcp --tools` serves (05 §5.1): Core by default, All for
+// every tool. Each tool's group is part of its row in the tool table.
+type Group string
+
+const (
+	Core Group = "core" // the agent's tools: diagnosis, plan edits, saving, launching, testing
+	All  Group = "all"  // Core plus the player's management tools
+)
+
+// ParseGroup reads a --tools value; "" is Core.
+func ParseGroup(s string) (Group, error) {
+	switch Group(s) {
+	case "", Core:
+		return Core, nil
+	case All:
+		return All, nil
+	}
+	return "", fmt.Errorf("unknown --tools value %q: use core or all", s)
+}
+
 // tool is one MCP tool: annotations, description and the argv builder.
 type tool struct {
 	name        string
+	group       Group // Core, or All for a tool only `--tools all` serves
 	readOnly    bool
 	destructive bool
 	desc        string
@@ -142,8 +163,8 @@ func heartbeat(ctx context.Context, req *sdk.CallToolRequest) (context.Context, 
 	return ctx, func() { close(done); <-finished }
 }
 
-// New builds the server with every tool of 05 §5.2.
-func New(a *app.App) *Server {
+// New builds the server with the tools of group g (05 §5.2): Core, or All for every tool.
+func New(a *app.App, g Group) *Server {
 	s := &Server{app: a}
 	// 05 §5.1: a first call that needs the analysis returns what is ready after 10 s.
 	if a.AnalyzeWait == 0 {
@@ -151,6 +172,9 @@ func New(a *app.App) *Server {
 	}
 	s.srv = sdk.NewServer(&sdk.Implementation{Name: "rimarcho", Version: buildinfo.Version}, &sdk.ServerOptions{Instructions: Instructions})
 	for _, t := range Tools() {
+		if t.group == All && g != All {
+			continue
+		}
 		// Only the tools in openWorld may reach the network; everything else stays local.
 		ann := &sdk.ToolAnnotations{ReadOnlyHint: t.readOnly, OpenWorldHint: ptr(openWorld[t.name])}
 		if !t.readOnly {
@@ -164,14 +188,14 @@ func New(a *app.App) *Server {
 // SDK returns the underlying SDK server (for in-memory tests).
 func (s *Server) SDK() *sdk.Server { return s.srv }
 
-// Run serves stdio until the client disconnects.
-func Run(ctx context.Context, a *app.App) error {
-	return New(a).srv.Run(ctx, &sdk.StdioTransport{})
+// Run serves group g's tools over stdio until the client disconnects.
+func Run(ctx context.Context, a *app.App, g Group) error {
+	return New(a, g).srv.Run(ctx, &sdk.StdioTransport{})
 }
 
 // reg builds a tool whose arguments of type In map to argv.
 func reg[In any](name string, readOnly, destructive bool, desc string, argv func(In) []string) tool {
-	return tool{name: name, readOnly: readOnly, destructive: destructive, desc: desc,
+	return tool{name: name, group: Core, readOnly: readOnly, destructive: destructive, desc: desc,
 		in: reflect.TypeOf((*In)(nil)).Elem(),
 		argvOf: func(raw []byte) ([]string, error) {
 			var in In
@@ -190,6 +214,9 @@ func reg[In any](name string, readOnly, destructive bool, desc string, argv func
 			})
 		}}
 }
+
+// allOnly moves a tool to All: only `archo mcp --tools all` serves it.
+func (t tool) allOnly() tool { t.group = All; return t }
 
 // envOf is a call's env argument; "" (the current environment) when the tool has none.
 func envOf(in any) string {
@@ -413,13 +440,6 @@ type PlayerIn struct {
 	Text   string   `json:"text,omitempty" jsonschema:"alias / note / copy_note: the text; empty clears it"`
 }
 
-type CopyIn struct {
-	Env  string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
-	Ref  string `json:"ref" jsonschema:"the mod to copy (#id, pkg:…)"`
-	Name string `json:"name,omitempty" jsonschema:"folder name under Mods/ (default <folder>_local)"`
-	Git  bool   `json:"git,omitempty" jsonschema:"make the copy a git repository with a baseline commit, so edits can be diffed"`
-}
-
 type SaveIn struct {
 	Env            string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	DryRun         bool   `json:"dry_run,omitempty" jsonschema:"show what would be written without writing"`
@@ -520,21 +540,16 @@ func toolList() []tool {
 		reg("save_loadout", false, true, descSave, func(in SaveIn) []string {
 			return argv("save").flag("dry-run", in.DryRun).flag("move-duplicates", in.MoveDuplicates).a
 		}),
-		reg("copy_local", false, false, descCopy, func(in CopyIn) []string {
-			return argv("copy-local", in.Ref).str("name", in.Name).flag("git", in.Git).a
-		}),
-		reg("set_player_data", false, false, descPlayer, func(in PlayerIn) []string { return PlayerArgv(in) }),
-		// add_rule is the old name of manage_rules, kept as an alias (05 §6).
-		reg("add_rule", false, false, descRuleAlias, func(in RuleIn) []string { return RulesArgv(in) }),
+		reg("set_player_data", false, false, descPlayer, func(in PlayerIn) []string { return PlayerArgv(in) }).allOnly(),
 		reg("pin_mod", false, false, descPin, func(in PinIn) []string {
 			return argv("pin", in.Ref).str("name", in.Name).flag("git", in.Git).flag("update", in.Update).flag("move-to-library", in.MoveToLibrary).str("reason", in.Reason).flag("dry-run", in.DryRun).a
 		}),
-		reg("preview_uninstall", true, false, descUninstall, UninstallArgv),
+		reg("preview_uninstall", true, false, descUninstall, UninstallArgv).allOnly(),
 		reg("unpin_mod", false, false, descUnpin, func(in UnpinIn) []string { return argv("unpin", in.Ref).flag("dry-run", in.DryRun).a }),
 	}
 }
 
-// Tools returns the tool table.
+// Tools returns the whole tool table, every group.
 func Tools() []tool {
 	return append(append(append(append(append(toolList(), manageTools()...), planTools()...), libraryTools()...), subscriptionTools()...), textureTools()...)
 }
@@ -543,6 +558,7 @@ func Tools() []tool {
 // harnesses that drive the tools without an MCP client (spikes/agenteval).
 type ToolDoc struct {
 	Name, Description string
+	Group             Group
 	ReadOnly          bool
 	Params            []ParamDoc
 }
@@ -553,11 +569,11 @@ type ParamDoc struct {
 	Required         bool
 }
 
-// Catalog lists every tool with its parameters (the env parameter is left out).
+// Catalog lists every tool (both groups) with its parameters (the env parameter is left out).
 func Catalog() []ToolDoc {
 	var out []ToolDoc
 	for _, t := range Tools() {
-		d := ToolDoc{Name: t.name, Description: t.desc, ReadOnly: t.readOnly}
+		d := ToolDoc{Name: t.name, Description: t.desc, Group: t.group, ReadOnly: t.readOnly}
 		for i := 0; i < t.in.NumField(); i++ {
 			f := t.in.Field(i)
 			name, opts, _ := strings.Cut(f.Tag.Get("json"), ",")
@@ -580,7 +596,7 @@ func Catalog() []ToolDoc {
 	return out
 }
 
-// ArgvFor maps a tool call (name and JSON arguments) to the CLI argv the server would run.
+// ArgvFor maps a tool call to any tool (both groups) (name and JSON arguments) to the CLI argv the server would run.
 // Unknown argument names are an error.
 func ArgvFor(name string, args []byte) ([]string, error) {
 	for _, t := range Tools() {

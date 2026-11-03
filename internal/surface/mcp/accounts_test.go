@@ -36,7 +36,7 @@ func TestAccountBoundaryNoSecretsInMCP(t *testing.T) {
 			t.Fatal("credential capability exposed", field)
 		}
 	}
-	if out, code := mcp.New(e.App).Execute("", []string{"account", "loverslab", "login"}); code == 0 {
+	if out, code := mcp.New(e.App, mcp.All).Execute("", []string{"account", "loverslab", "login"}); code == 0 {
 		t.Fatal("MCP executed player account action", out)
 	}
 }

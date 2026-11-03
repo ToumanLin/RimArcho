@@ -1,6 +1,6 @@
 # 05 · Semantic Interface and MCP
 
-> Status: the CLI and MCP are implemented (41 MCP tools, including the aliases `add_rule` and `copy_local` and the guide tool). The 1.1 save tools and a few reference forms are not yet implemented; each is marked below.
+> Status: the CLI and MCP are implemented (40 MCP tools including the guide tool; `archo mcp` serves the 26 core tools by default and all 40 with `--tools all`, §5.1). The 1.1 save tools and a few reference forms are not yet implemented; each is marked below.
 > Basis: 00 and 00a; the command semantics in 02, 03, 04, and 08; and 09 (Archo uses the same tools).
 
 ## 1. One Command and Tool Layer
@@ -32,6 +32,8 @@ AI assistants are a second user class (00 §3.2), so **every action available to
 
 When adding a player action, add its CLI command and MCP tool at the same time. Tool writes use the same operation functions and undo history (04 §3).
 
+Every tool exists, but `archo mcp` serves only the core group by default (§5.1, §5.2), because each listed tool costs agent context on every turn. The tools for these actions are served only by `archo mcp --tools all`; a core session can run the same CLI commands: packs (`manage_packs`), subscriptions (`manage_subscriptions`), library actions (`manage_library`), list exchange (`exchange_list`), textures (`manage_textures`), the memory estimate (`estimate_memory`), maintenance (`maintenance`), identity answers (`resolve_identity`), hidden Mods (`manage_hidden`), links (`check_links`, `repair_links`), version reminders (`mute_version_warnings`), player data (`set_player_data`) and the uninstall preview (`preview_uninstall`). A new tool joins the core group only when agents need it to diagnose, edit, save, launch or test a plan.
+
 The following table maps player actions to tools. Missing tools are marked **not implemented**:
 
 | Player action | Current state | Target |
@@ -41,7 +43,7 @@ The following table maps player actions to tools. Missing tools are marked **not
 | Write to the game without launching | The `save_loadout` description now says save without launching. | Complete |
 | View history, compare versions, and check out a version (04 §3) | Complete | Read-only `plan_history` provides log, diff, and steps; checkout uses `edit_loadout`. |
 | Handle outside changes: view the diff, load, or ignore (04 §4.3) | Complete | Use `loadout diff v<n> workspace`, `loadout checkout v<n>`, or `loadout ignore-external`. The tools are `plan_history action=diff`, `edit_loadout action=checkout` / `ignore_external`. |
-| Lock, unlock, and update a locked version (04 §7) | Complete | `pin_mod` maps to `pin`, creates a locked copy, and swaps it into the current plan. `copy_local` remains an alias. `unpin_mod` unlocks the version. `pin --update <instance>` updates it through `pin_mod`. |
+| Lock, unlock, and update a locked version (04 §7) | Complete | `pin_mod` maps to `pin`, creates a locked copy, and swaps it into the current plan. `unpin_mod` unlocks the version. `pin --update <instance>` updates it through `pin_mod`. |
 | Build, list, launch, export, import, remove, or stop building packs, and remove leftover links (08 §5) | Complete | `manage_packs`, `destructiveHint: true` |
 | Ignore/unignore findings (03 §4.2) | Complete | `ignore_problem` |
 | Mute or restore Mod version reminders for a game version (03 §4.2) | Complete | `mute_version_warnings`; `undo=true` restores them. Ask the player before muting in bulk. |
@@ -50,7 +52,7 @@ The following table maps player actions to tools. Missing tools are marked **not
 | List, filter, and sort the inventory; move copies to the lock library or remove them from all plans (06 §2.9) | Complete | The CLI provides library, move-to-locked, and remove-from-plans. `list_library` is read-only; `manage_library` is a mutation with `destructiveHint: true` because it moves `Mods` folders. Adding to the current plan uses `edit_loadout`; locking, updating, and unlocking use `pin_mod` and `unpin_mod`; restoring visibility and recycling use `manage_hidden`. |
 | List subscriptions; add Git, page, or Workshop subscriptions (using SteamCMD if needed); check, update, and remove them (02 §3.4, 06 §2.9) | Complete (2026-10-30) | The CLI provides `subscribe list/git/page/workshop/check/update/remove`. `manage_subscriptions` has `destructiveHint: true` because updates replace files and removal recycles folders; it also has `openWorldHint: true`. Detect the origin from url as the window paste field does (`subscribe.Detect`, with a shared test table). LoversLab sessions are player-only and have no tools: the agent reads public pages, while the player downloads files and supplies from. Steam manages updates for client Workshop items; unsubscribe and resubscribe use `manage_library`. |
 | Import and export lists and compare Workshop collections (04 §9) | Complete | `exchange_list`; importing is one undoable plan edit. |
-| List and delete user rules | Complete | `manage_rules`; `add_rule` remains an alias. |
+| List and delete user rules | Complete | `manage_rules` |
 | Restore visibility or recycle hidden `Mods` (08 §6, §7) | Complete | `manage_hidden`, `destructiveHint: true` |
 | Manage environments and settings | Complete (status show=envs/settings/data/db/cache) | Read-only queries are part of status. Changes are player-only because they affect RimArcho's own configuration broadly. |
 | Update community data, import RimCrow data, maintain and vacuum the database, and run gc | Complete | maintenance, `destructiveHint: true` |
@@ -181,7 +183,7 @@ next:
 | --- | --- |
 | archo (no arguments), `archo tui` | Open the TUI in the current terminal. Double-clicking `archo.exe` uses the Windows default terminal (06 §9.2). Legacy `archo --here` is accepted with the same effect. |
 | `archo gui` | Open the desktop window. Delegate to the adjacent `RimArcho.exe` and return immediately if it exists; otherwise run in-process. |
-| `archo mcp` | Run the stdio MCP server (§5). |
+| `archo mcp [--tools core\|all]` | Run the stdio MCP server (§5) with the core tools (default) or all tools (§5.1). |
 | `archo <command> [arguments]` | Execute one command and exit. |
 | `--env <name>` / `--env=<name>` | Use another environment for this command only. |
 | `--open-plan <name>` / `--open-plan=<name>` | Use another plan for this command only, without changing the current plan (04 §1.3; used by GUI analysis and pack subprocesses). Saving or launching makes that plan current. |
@@ -300,6 +302,7 @@ An environment may have several plans (04 §1). The commands are:
 ### 5.1 Transport and Lifecycle
 
 - Only stdio is supported (`StdioTransport`); no network ports are opened. stdout carries only protocol messages.
+- **Tool groups.** `archo mcp` serves the core group (§5.2): the 26 tools for diagnosis, plan edits, saving, launching, test runs, locking, rules and ignoring problems. `archo mcp --tools all` (or `--tools=all`) serves all 40, adding the player's management tools (§1.2). `--tools core` is the default. Another value, an unknown flag or a positional argument is a usage error (exit 2) before the data folder is opened; `archo mcp --help` shows the flag. A tool outside the served group is an unknown tool to the client. The group of each tool is part of its row in `Tools()`; `Tools()`, `Catalog()` and `ArgvFor()` still cover every tool for harnesses (`spikes/agenteval`), and `ToolDoc.Group` names its group. Measured on synthetic data: core `tools/list` is 27,435 bytes, all is 43,039 bytes.
 - The server is named rimarcho and uses the release version. It sends the `Instructions` from §5.3 during initialization.
 - The server is not resident: the process exits when the harness closes the session.
 - The server starts in the current environment. A tool's env parameter switches environments for that call and restores the previous environment afterward.
@@ -339,11 +342,9 @@ Annotations follow the MCP specification; the external harness decides whether t
 | `manage_plans` | `plan list/new/use/rename/remove --yes`, `loadout import --new` | false | true |
 | `plan_history` | `loadout log`, diff, and history (`action=steps`) | true | — |
 | `pin_mod` | pin (ref, name, git, update, `move_to_library`, reason, and `dry_run`); reason is stored in the copy's origin and shown in its copy notes (06 §2.9). | false | false |
-| `copy_local` | The old name for pin (ref, name, and git) | false | false |
 | `unpin_mod` | unpin (ref and `dry_run`) | false | false |
 | `set_player_data` | The action is `tag_add` or `tag_remove` (refs and tags), alias or note (text; an empty string clears it), or `copy_note` (the note for one copy, using note `<reference>` `<text>` --copy; an empty string clears it, 06 §2.9). | false | false |
 | `manage_rules` | `rule add/list/remove` (action, kind, a, b, target, note, and rule) | false | false |
-| `add_rule` | The old name for `manage_rules`, with action defaulting to add | false | false |
 | `ignore_problem` | `problems ignore` or unignore (undo) | false | false |
 | `mute_version_warnings` | `problems mute-version` or `unmute-version` (refs, `game_version`, and undo); see 03 §4.2 for the scope. | false | false |
 | `scan` | scan (full) | false | false |
@@ -357,7 +358,9 @@ Annotations follow the MCP specification; the external harness decides whether t
 | `manage_subscriptions` | The action is list (the default, using subscribe list), add, check, update, or remove. Add uses URL or kind to choose `subscribe git <url> [--branch\|--tag\|--commit]`, `subscribe page <url> [--git] [--from]`, or `subscribe workshop <ID…> [--steamcmd]`. Check uses subscribe check with refs, or all subscriptions if refs is absent. Update uses subscribe update with refs or all, and from, and refuses while a game is running. Remove uses `subscribe remove`. Add, update, and remove accept `dry_run`. | false | true |
 | `preview_uninstall` | `uninstall --dry-run` (`keep_locked`, `locked_to`, `remove_packs`, `packs_to`, `remove_saves`, `saves_to`, `remove_games`, `restore_modsconfig_backup`, and all); never pass --yes. | true | — |
 
-The authoritative tools and annotations are `Tools()` in `internal/surface/mcp/server.go`, including aliases. `destructiveHint: true` applies to `save_loadout`, `launch_game`, `manage_plans`, `manage_packs`, `resolve_identity`, `manage_hidden`, `manage_library`, `manage_subscriptions`, `manage_textures`, `repair_links`, and maintenance. Add tools still missing from §1.2 in the same way.
+**Groups.** Core (served by default): `guide`, `status`, `find_mods`, `get_mod`, `get_description`, `get_def`, `get_patches`, `get_harmony`, `explain_relation`, `list_problems`, `list_changes`, `analyze_log`, `search_files`, `read_source`, `edit_loadout`, `save_loadout`, `launch_game`, `test_run`, `pin_mod`, `unpin_mod`, `manage_plans`, `plan_history`, `manage_rules`, `ignore_problem`, `scan`, `list_library`. Only with `--tools all`: `manage_subscriptions`, `manage_packs`, `manage_library`, `exchange_list`, `manage_textures`, `estimate_memory`, `maintenance`, `resolve_identity`, `manage_hidden`, `check_links`, `repair_links`, `mute_version_warnings`, `set_player_data`, `preview_uninstall` (`TestToolGroups`).
+
+The authoritative tools, groups and annotations are `Tools()` in `internal/surface/mcp/server.go`. `destructiveHint: true` applies to `save_loadout`, `launch_game`, `manage_plans`, `manage_packs`, `resolve_identity`, `manage_hidden`, `manage_library`, `manage_subscriptions`, `manage_textures`, `repair_links`, and maintenance. Add tools still missing from §1.2 in the same way.
 
 **Description revisions** are complete. The descriptions before 2026-10-21 disagreed with the code; the old descriptions are retained here as a record:
 
@@ -366,7 +369,7 @@ The authoritative tools and annotations are `Tools()` in `internal/surface/mcp/s
 | `save_loadout` | Refuses when ModsConfig.xml changed outside RimArcho. | **Did not refuse**: it backed up and overwrote the file directly. Outside changes were detected only on read, loaded as an external version, and marked as a conflict. | Save without launch: write the current plan into ModsConfig.xml, with a backup, atomic replacement, and the current game version. Sync `_Archo_` links and remove pack links. This changes the list the game will read next, so ask the player and preview the diff with `dry_run=true` first. Refuse unresolved outside conflicts (04 §4.3), offering commands to view the diff, load it, or ignore it. Still write while the game runs, explaining that it reads the list on the next launch. |
 | `edit_loadout` | Change RimArcho's workspace Loadout … nothing reaches the game until `save_loadout` | It changed the environment's sole workspace. | Edit the current plan with immediate persistence and an undo for each step. Write no game files until save or launch. The checkout action was added; there is no plan parameter yet (§4.3). |
 | `status` | The example said unsaved edits. | It showed the difference between the workspace and the latest version. | Say differences from the game list, and list the plans. |
-| `copy_local` | The Loadout is not changed: call `edit_loadout` action=swap … | It did not change the plan. | Create a locked version as an independent copy and swap it into the current plan, leaving other plans unchanged. Workshop updates do not affect it. |
+| `copy_local` (removed in 1.0.1; now `pin_mod`) | The Loadout is not changed: call `edit_loadout` action=swap … | It did not change the plan. | Create a locked version as an independent copy and swap it into the current plan, leaving other plans unchanged. Workshop updates do not affect it. |
 
 ### 5.3 Progressive Disclosure: Instructions, Tool Descriptions and guide
 
@@ -374,14 +377,14 @@ On connection, the agent reads only `Instructions`, each tool's short descriptio
 
 | Layer | Read when | Contents | Code |
 | --- | --- | --- | --- |
-| `Instructions` | Initialization | Explain what RimArcho knows and that output references (`#id`, `L#id`, `pkg:`, `ws:`, `def:Type/name`, `p:<hex>`, `log:E<n>`, `r:<n>`, and `pattern:<id>`) can be passed directly to other tools. Results are limited to 24 KB; narrow the scope with `mod=`, `target=`, a cluster, or a pattern instead of `all=true` (corpus G7). Start with status. For an error or crash, read guide topic=diagnose first and state the two key rules: a patcher or mentioned Mod is not the cause without further evidence; without a source, the cause is undetermined. Editing tools change only the current plan and do not touch the game until save_loadout or launch_game; use pin_mod before editing Mod files. For destructive tools (`save_loadout`, `launch_game`, `manage_plans`, `manage_packs`, `resolve_identity`, `manage_hidden`, `manage_library`, `manage_subscriptions`, `manage_textures`, `repair_links`, and maintenance), show a preview if supported, then obtain the player's agreement before calling. End by explaining how to use guide. | `Instructions` in `internal/surface/mcp/desc.go` |
+| `Instructions` | Initialization | Explain what RimArcho knows and that output references (`#id`, `L#id`, `pkg:`, `ws:`, `def:Type/name`, `p:<hex>`, `log:E<n>`, `r:<n>`, and `pattern:<id>`) can be passed directly to other tools. Results are limited to 24 KB; narrow the scope with `mod=`, `target=`, a cluster, or a pattern instead of `all=true` (corpus G7). Start with status. For an error or crash, read guide topic=diagnose first and state the two key rules: a patcher or mentioned Mod is not the cause without further evidence; without a source, the cause is undetermined. Editing tools change only the current plan and do not touch the game until save_loadout or launch_game; use pin_mod before editing Mod files. For destructive tools (`save_loadout`, `launch_game`, `manage_plans`, `manage_packs`, `resolve_identity`, `manage_hidden`, `manage_library`, `manage_subscriptions`, `manage_textures`, `repair_links`, and maintenance), show a preview if supported, then obtain the player's agreement before calling. Say in one sentence that the player's management tools (packs, subscriptions, library actions, textures, memory estimate, maintenance, identity, hidden Mods, links, player data, uninstall preview) are served only by `archo mcp --tools all`, and that otherwise the agent uses the archo CLI. End by explaining how to use guide. | `Instructions` in `internal/surface/mcp/desc.go` |
 | Tool descriptions | `tools/list` | Use 1–3 sentences to explain what the tool does, when to use it or another tool, and what it writes. Explicitly state any requirement for `dry_run` and player approval. Do not include examples or explain each parameter; the schema owns those descriptions. | `desc*` in `desc.go` |
 | guide topics | guide call | Provide workflows: diagnose (the full workflow below), errors (the `patternChecklist`, 03 §6.8), plans (plans and versions, inventory, subscriptions, textures, and pinning before file edits), and words (UI names when talking to the player, 06 §7.2). Provide a topic for each tool name with its full actions, parameter details, edge cases, one example call, and the first lines of example output. | `internal/cmds/guide.go`, `guide_tools.go`, `guide_patterns.go` |
 
 - The reader is an agent. With no skills loaded, `Instructions`, tool descriptions, and on-demand guide topics must be sufficient to complete the former error-debugging and assembly-inspector workflows (I4). Archo uses the same content (09 §2.1).
-- The context has a budget (`TestInitialContextBudget`, I13): `Instructions` ≤2000 characters, each description ≤320 characters, and the combined total ≤12000 characters. The `tools/list` JSON, including the schema, is limited to ≤48 KB. Keep new descriptions as short as the existing ones and put details in the guide topic. If a budget increase is necessary, explain it in the commit. Keep parameter descriptions short too; env always uses environment name (default: current).
-- With no topic, guide lists all topics. An unknown topic is a usage error (exit 2 and `isError`), with text listing the workflow topics. Return topic text verbatim, bypassing `ShellSafe` so that # references in example JSON are preserved.
-- No tools have been merged. The `add_rule` and `copy_local` aliases are retained under §6. Each has a one-sentence description pointing to the new name; the original explanation and examples remain in its guide topic.
+- The context has a budget (`TestInitialContextBudget`, I13). For the default core group: `Instructions` ≤2000 characters, each description ≤320 characters, and the combined total ≤12000 characters. The `tools/list` JSON of all tools (`--tools all`), including the schema, is limited to ≤48 KB. Keep new descriptions as short as the existing ones and put details in the guide topic. If a budget increase is necessary, explain it in the commit. Keep parameter descriptions short too; env always uses environment name (default: current).
+- With no topic, guide lists all topics. Its tool list puts the tools only `--tools all` serves on a separate line, only with archo mcp --tools all, so the text is the same on every surface and in either group (I1; `cmds.AllOnlyTools`, kept in step with `Tools()` by `TestToolGroups`). Their guide topics remain available to a core session. An unknown topic is a usage error (exit 2 and `isError`), with text listing the workflow topics. Return topic text verbatim, bypassing `ShellSafe` so that # references in example JSON are preserved.
+- No tools have been merged. The aliases `copy_local` (old name of `pin_mod`) and `add_rule` (old name of `manage_rules`) were removed in 1.0.1 (§6); calling them is an unknown tool.
 - Every MCP tool except guide itself needs a same-name guide topic containing Example: `<tool-name>` { (`TestToolsAndAnnotations`).
 
 The tool schema's `game_version` and env must be **direct fields**. The SDK does not expand embedded structs when inferring the schema, so embedded fields are rejected as unknown properties. Tools without env (guide and `preview_uninstall`) run in the current environment.
@@ -419,18 +422,19 @@ The following table gives the tool guide highlights. See `internal/cmds/guide_to
 | `read_source` | Inspect a patch class or the type containing a frame. Prefer short, specific search patterns. Use `scope="active"` only when the player requests it, because it can cover hundreds of assemblies and take many minutes. If ilspycmd is missing, the text explains installation; it is never installed automatically. |
 | `edit_loadout` | Edit the plan, with an undo for each step. |
 | `save_loadout` | §5.2 |
-| `copy_local` | Copy a Workshop Mod before editing it because Steam overwrites Workshop files. Do not copy links outside the folder or the upstream `.git`, and never overwrite an existing folder. |
+| `pin_mod` | Copy a Workshop Mod before editing it because Steam overwrites Workshop files. Do not copy links outside the folder or the upstream `.git`, and never overwrite an existing folder. |
 | `get_description` | Learn what a Mod does before recommending it. Fetch Workshop text on demand and cache it until the item updates. The player can disable network access with `workshop.fetch`. |
 | `set_player_data` | Set tags (used by `list --filter tag:<t>` and TUI `tag:` search), aliases, and notes on the Lineage, shared by all copies. `copy_note` belongs to one copy and explains why it is retained. It does not touch the game. |
 | `manage_subscriptions` | Use it to install a Mod from Git, a download page, or SteamCMD, or to check subscription updates. Check before update; preview add, update, and remove with dry-run first. The player downloads page files and supplies from; the agent does not log in to LoversLab. Use `manage_library` for client Workshop items. Pin the old version before updating if it should be retained. |
-| `add_rule` | Ignore wrong-direction About.xml or community constraints to break `order.cycle`. Rules affect sorting and order findings but do not themselves reorder the plan. |
+| `manage_rules` | Ignore wrong-direction About.xml or community constraints to break `order.cycle`. Rules affect sorting and order findings but do not themselves reorder the plan. |
 
 ## 6. Stability
 
 - English output keywords, such as `depends:`, `evidence:`, `next:`, and finding codes, are part of the interface. Record changes in CHANGELOG (07 §5).
 - Reference formats are stable. Instance IDs are independent of paths and package IDs (02); p: references are stable across analyses. A log finding key retains only the last three segments of the absolute path, so its references and ignore records remain valid after the library directory moves. Pattern references `pattern:g:<id>` and `pattern:m:<packageId>:<hash>` are stable within a dataset version. Generic IDs persist across versions; a Mod-specific hash comes from its template and remains unchanged while the template is unchanged.
 - Append new fields without changing the meaning of existing lines.
-- When renaming an MCP tool, retain the old name as an alias for at least one minor version.
+- When renaming an MCP tool, retain the old name as an alias for at least one minor version. The 0.9.0 renames `copy_local` → `pin_mod` and `add_rule` → `manage_rules` kept their aliases through the 1.0.0 release (2026-11-02, which contains 0.9.0); 1.0.1 removes both aliases.
+- Moving a tool between the core and all groups (§5.1) changes what a default session lists: record it in CHANGELOG like a rename.
 
 ## 7. Acceptance
 

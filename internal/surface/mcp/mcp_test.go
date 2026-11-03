@@ -16,12 +16,19 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// connect serves e.App over in-memory transports and returns a client session.
+// connect serves e.App with every tool (--tools all) over in-memory transports and
+// returns a client session.
 func connect(t *testing.T, e *testkit.Env) *sdk.ClientSession {
+	t.Helper()
+	return connectGroup(t, e, mcp.All)
+}
+
+// connectGroup is connect for one tool group.
+func connectGroup(t *testing.T, e *testkit.Env, g mcp.Group) *sdk.ClientSession {
 	t.Helper()
 	ctx := context.Background()
 	ct, st := sdk.NewInMemoryTransports()
-	srv := mcp.New(e.App)
+	srv := mcp.New(e.App, g)
 	if _, err := srv.SDK().Connect(ctx, st, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +65,7 @@ func TestToolsAndAnnotations(t *testing.T) {
 		"guide":  "ro", // 05 §5.3: the detail behind the short descriptions
 		"status": "ro", "find_mods": "ro", "get_mod": "ro", "get_def": "ro", "get_patches": "ro", "get_harmony": "ro",
 		"explain_relation": "ro", "list_problems": "ro", "list_changes": "ro", "analyze_log": "ro", "search_files": "ro",
-		"read_source": "ro", "edit_loadout": "write", "copy_local": "write", "save_loadout": "destructive", "add_rule": "write",
+		"read_source": "ro", "edit_loadout": "write", "save_loadout": "destructive",
 		"get_description": "ro", "set_player_data": "write",
 		"test_run":        "write",
 		"estimate_memory": "ro",
@@ -195,7 +202,6 @@ func TestCLIParity(t *testing.T) {
 		{"ignore_problem", map[string]any{"ref": "p:000000"}, []string{"problems", "ignore", "p:000000"}},
 		{"pin_mod", map[string]any{"ref": modA, "dry_run": true}, []string{"pin", modA, "--dry-run"}},
 		{"pin_mod", map[string]any{"ref": modA, "update": true}, []string{"pin", modA, "--update"}},
-		{"copy_local", map[string]any{"ref": modA, "name": "x/y"}, []string{"copy-local", modA, "--name", "x/y"}},
 		{"unpin_mod", map[string]any{"ref": modA, "dry_run": true}, []string{"unpin", modA, "--dry-run"}},
 		// 0.9: the read-only side of plans and history (write actions: TestGoldenManageTools).
 		{"plan_history", nil, []string{"loadout", "log"}},
@@ -367,8 +373,8 @@ func TestWriteTools(t *testing.T) {
 	if out, isErr := call(t, cs, "save_loadout", nil); isErr || !strings.Contains(e.ReadModsConfig(), "tester.lib") {
 		t.Fatalf("save:\n%s", out)
 	}
-	if out, isErr := call(t, cs, "add_rule", map[string]any{"kind": "after", "a": "pkg:tester.modc", "b": "pkg:tester.modb"}); isErr || !strings.Contains(out, "r:1") {
-		t.Fatalf("add_rule:\n%s", out)
+	if out, isErr := call(t, cs, "manage_rules", map[string]any{"kind": "after", "a": "pkg:tester.modc", "b": "pkg:tester.modb"}); isErr || !strings.Contains(out, "r:1") {
+		t.Fatalf("manage_rules:\n%s", out)
 	}
 	for _, tool := range []string{"edit_loadout", "manage_rules", "exchange_list", "manage_packs", "resolve_identity", "manage_hidden", "maintenance", "manage_plans", "plan_history"} {
 		args := map[string]any{"action": "bogus"}

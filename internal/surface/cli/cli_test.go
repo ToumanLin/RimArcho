@@ -1,8 +1,13 @@
 package cli
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/ToumanLin/RimArcho/internal/cmds"
+	"github.com/ToumanLin/RimArcho/internal/surface/mcp"
 )
 
 // --open-plan names the list a command acts on without making it current (04 §1.3).
@@ -41,5 +46,30 @@ func TestHereCompatibility(t *testing.T) {
 		if err != nil || env != tc.env || strings.Join(rest, " ") != tc.rest {
 			t.Fatalf("%q: env=%q rest=%q err=%v", tc.argv, env, rest, err)
 		}
+	}
+}
+
+// archo mcp [--tools core|all] (05 §5.1): core by default; a bad flag or value is a usage
+// error before the data folder is opened.
+func TestMCPToolsFlag(t *testing.T) {
+	for argv, want := range map[string]mcp.Group{"mcp": mcp.Core, "mcp --tools core": mcp.Core, "mcp --tools all": mcp.All, "mcp --tools=all": mcp.All} {
+		if g, err := mcpGroup(strings.Fields(argv)); err != nil || g != want {
+			t.Errorf("%s: %q %v, want %q", argv, g, err, want)
+		}
+	}
+	home := filepath.Join(t.TempDir(), "home")
+	t.Setenv("RIMARCHO_HOME", home)
+	for _, argv := range []string{"mcp --tools full", "mcp --tools", "mcp --tool all", "mcp extra"} {
+		var out, errOut strings.Builder
+		if code := Run(strings.Fields(argv), &out, &errOut); code != cmds.ExitUsage || !strings.Contains(errOut.String(), "usage: archo mcp [--tools core|all]") {
+			t.Errorf("%s: exit %d, stderr %q", argv, code, errOut.String())
+		}
+	}
+	if _, err := os.Stat(home); !os.IsNotExist(err) {
+		t.Errorf("a usage error opened the data folder: %v", err)
+	}
+	var out, errOut strings.Builder
+	if code := Run([]string{"mcp", "--help"}, &out, &errOut); code != cmds.ExitOK || !strings.Contains(out.String(), "--tools core|all") {
+		t.Errorf("mcp --help: exit %d\n%s%s", code, out.String(), errOut.String())
 	}
 }

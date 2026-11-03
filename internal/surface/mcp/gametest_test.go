@@ -100,7 +100,7 @@ func TestTestRunToolProgress(t *testing.T) {
 	var got []*sdk.ProgressNotificationParams
 	ctx := context.Background()
 	ct, st := sdk.NewInMemoryTransports()
-	if _, err := mcp.New(e.App).SDK().Connect(ctx, st, nil); err != nil {
+	if _, err := mcp.New(e.App, mcp.Core).SDK().Connect(ctx, st, nil); err != nil {
 		t.Fatal(err)
 	}
 	c := sdk.NewClient(&sdk.Implementation{Name: "test", Version: "0"}, &sdk.ClientOptions{

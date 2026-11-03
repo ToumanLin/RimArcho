@@ -94,18 +94,17 @@ RimArcho 每次启动都会检查这些目录。缺失或变动时会询问新�
 
 ## 接入 agent（`archo mcp`）
 
-`archo mcp` 通过 stdio 提供 RimArcho 工具：
+`archo mcp` 通过 stdio 提供 RimArcho 工具。默认只提供 agent 诊断和修复 Mod 列表所需的核心工具：读取 Mod、Def、Patch、Harmony 补丁、日志和 C# 源码；编辑、保存和启动方案；测试运行；锁定版本；规则和忽略问题。`archo mcp --tools all` 还会提供玩家的管理工具：整合包、订阅、Mod 库操作、贴图优化、内存估算、维护、身份确认、隐藏的 Mod、链接修复、标签和备注，以及卸载预览。只有希望 agent 也处理这些事时才加 `--tools all`：每个工具在每轮对话都会占用上下文。
 
-- 只读：`status`、`find_mods`、`get_mod`、`get_def`、`get_patches`、`get_harmony`、`explain_relation`、`list_problems`、`list_changes`、`analyze_log`、`search_files`、`read_source`
-- 写入：`edit_loadout`、`copy_local`、`add_rule`，以及唯一标记为破坏性操作的 `save_loadout`
-
-每个工具的返回值与对应 CLI 命令的输出完全相同。工具描述和服务说明解释了诊断流程，因此 agent 不需要额外技能。只读工具带有 `readOnlyHint` 标记，客户端可据此自动批准。
+每个工具的返回值与对应 CLI 命令的输出完全相同。工具描述和服务说明解释了诊断流程，`guide` 工具给出每个工具的完整说明，因此 agent 不需要额外技能。只读工具带有 `readOnlyHint` 标记，客户端可据此自动批准；会写入游戏或 Mod 文件的工具带有 `destructiveHint` 标记。
 
 **Claude Code**，在终端里运行：
 
 ```
 claude mcp add rimarcho -- C:\Tools\RimArcho\archo.exe mcp
 ```
+
+需要管理工具时：`claude mcp add rimarcho -- C:\Tools\RimArcho\archo.exe mcp --tools all`。
 
 或写入项目的 `.mcp.json`：
 
@@ -124,6 +123,8 @@ claude mcp add rimarcho -- C:\Tools\RimArcho\archo.exe mcp
 command = 'C:\Tools\RimArcho\archo.exe'
 args = ["mcp"]
 ```
+
+在 `.mcp.json` 和 `config.toml` 里写 `"args": ["mcp", "--tools", "all"]` 即同时提供管理工具。
 
 然后可以问：“我的日志有 `Patch operation … failed` 报错，是哪个 Mod 出问题了？”或粘贴堆栈。工具调用可传入 `env` 使用另一个环境，传入 `game_version` 按另一个游戏版本分析。
 

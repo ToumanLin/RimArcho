@@ -14,7 +14,7 @@ import (
 // page subscriptions are read publicly, and files come from a zip or folder (from).
 func subscriptionTools() []tool {
 	return []tool{
-		reg("manage_subscriptions", false, true, descManageSubscriptions, SubscriptionsArgv),
+		reg("manage_subscriptions", false, true, descManageSubscriptions, SubscriptionsArgv).allOnly(),
 	}
 }
 

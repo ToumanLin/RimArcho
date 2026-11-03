@@ -22,7 +22,7 @@ Call a tool with Bash, exactly like this (single quotes around the JSON):
 Rules:
 - Use only this command for facts. Do not read, list or search any other file or folder (no
   Read/Grep/Glob/ls/cat on the disk, no web), except this brief and writing your answer file.
-- Read-only tools only: the write tools (edit_loadout, save_loadout, copy_local …) are not
+- Read-only tools only: the write tools (edit_loadout, save_loadout, pin_mod …) are not
   available.
 - Spend your effort where it decides the answer; stop when the evidence decides it or cannot.
   An honest "unknown" is better than a guess: many errors cannot be pinned on a mod, and

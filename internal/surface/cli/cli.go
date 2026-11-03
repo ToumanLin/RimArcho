@@ -59,6 +59,16 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "error:", err)
 		return cmds.ExitUsage
 	}
+	// `archo mcp [--tools core|all]` (05 §5.1); `archo mcp --help` runs as a command. A bad
+	// flag fails before the data folder is opened.
+	serveMCP := len(rest) > 0 && rest[0] == "mcp" && !(len(rest) > 1 && (rest[len(rest)-1] == "--help" || rest[len(rest)-1] == "-h"))
+	var group mcp.Group
+	if serveMCP {
+		if group, err = mcpGroup(rest); err != nil {
+			fmt.Fprintln(stderr, "error:", err)
+			return cmds.ExitUsage
+		}
+	}
 	// A database upgrade runs inside app.Open; show it (02 §7): RimArcho.exe has no console,
 	// so it gets a small window; the TUI's line follows ui.lang.
 	home := env.AppHome()
@@ -102,9 +112,9 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	}
 	cmds.Progress = func(line string) { fmt.Fprintln(stderr, line) }
 	cmds.Stream = func(line string) { fmt.Fprintln(stdout, line) }
-	if rest[0] == "mcp" && len(rest) == 1 {
+	if serveMCP {
 		// MCP over stdio (05 §5): stdout carries only protocol messages.
-		if err := mcp.Run(context.Background(), ap); err != nil {
+		if err := mcp.Run(context.Background(), ap, group); err != nil {
 			fmt.Fprintln(stderr, "error:", err)
 			return cmds.ExitError
 		}
@@ -232,4 +242,18 @@ func steamWorker(argv []string, stdout io.Writer) int {
 		ids = append(ids, id)
 	}
 	return steamworks.Worker(argv[0], ids, stdout)
+}
+
+// mcpGroup reads `archo mcp [--tools core|all]` (05 §5.1); a bad flag or value is a usage error.
+func mcpGroup(rest []string) (mcp.Group, error) {
+	v, err := cmds.MCPTools(rest)
+	if err != nil {
+		return "", err
+	}
+	g, err := mcp.ParseGroup(v)
+	if err != nil {
+		c, _ := cmds.Find([]string{"mcp"})
+		return "", &cmds.UsageError{Msg: err.Error(), Cmd: c}
+	}
+	return g, nil
 }
