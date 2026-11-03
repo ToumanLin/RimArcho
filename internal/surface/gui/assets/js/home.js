@@ -9,6 +9,7 @@
 // comes back when the row, its game, its mods or its problem change.
 // Data: API.Home (view.BuildHome, view.AddOtherEnvs, view.PickFeatured) and
 // API.HomeBackground (the image, its dimming, blur and focus; 06 §2.14).
+import { progress } from "./feedbacksemantics.js";
 import { S, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { openScreen, page, changesPlan, beginPageRead } from "./screens.js";
 import { launchPack } from "./packs.js";
@@ -371,6 +372,7 @@ function launchStep(f) {
   bottom.append(el("span", "sub num", sub));
   if (!live) bottom.append(el("span", "arrow", "→"));
   b.append(top, bottom);
+  if (starting) b.setAttribute("aria-busy", "true");
   // one game at a time (08 §4)
   b.disabled = live || !f;
   if (live) b.title = T("a game is already running");
@@ -514,8 +516,7 @@ function showSwitch(r) {
   top.append(el("span", "title", gameMoved ? Tf("switching to %s…", r.envName) : Tf("applying %s…", r.name)));
   bottom.append(el("span", "sub num", gameMoved ? T("loading the game, please wait…") : ""));
   const bar = el("span", "bar");
-  bar.setAttribute("role", "progressbar");
-  bar.setAttribute("aria-label", top.textContent);
+  progress(bar, top);
   b.replaceChildren(top, bottom, bar);
   b.setAttribute("aria-busy", "true");
 }

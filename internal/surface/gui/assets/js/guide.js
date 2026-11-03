@@ -1,3 +1,4 @@
+import { fieldError, progress } from "./feedbacksemantics.js";
 import { editablePath, copyablePath, pathContent } from "./fields.js";
 // The first-run guide (06 §2.15): three steps, each with a way back.
 //   1. find the game: existing games — what detection finds (tick several), or a folder
@@ -24,7 +25,7 @@ let session = 0, activeSession = null;
 export const historySession = () => activeSession;
 
 const STEPS = ["find the game", "read the mods", "where to start"];
-const G = { step: 0, way: 0, games: [], picked: new Set(), added: [], scan: null, typed: "", error: "" };
+const G = { step: 0, way: 0, games: [], picked: new Set(), added: [], scan: null, typed: "", error: "", errorFrom: null };
 // The download way: SteamCMD's info (DownloadInfo), the choices, and a run's progress.
 const D = { info: null, loading: false, branch: "", dir: "", dirTyped: false, account: "", run: null };
 const C = { id: "", row: null, submitting: false };
@@ -251,7 +252,7 @@ function download(card) {
     const bar = el("div", "bar" + (row?.pct > 0 ? "" : " busy"));
     const fill = el("i");
     fill.style.width = (row?.pct || 0) + "%";
-    bar.append(fill); prog.append(bar); card.append(prog);
+    bar.append(fill); progress(bar, card.querySelector(".dl-state"), row?.count || row?.pct > 0 ? row.pct : undefined); prog.append(bar); card.append(prog);
     return footer(card);
   }
   if (D.run) return downloading(card, D.run);
@@ -259,6 +260,7 @@ function download(card) {
     card.append(el("div", "dl-note", T("asking Steam which versions RimWorld has… (SteamCMD may update itself first)")));
     const prog = el("div", "prog");
     const b = el("div", "bar busy");
+    progress(b, card.querySelector(".dl-note"));
     b.append(el("i"));
     prog.append(b);
     card.append(prog);
@@ -340,6 +342,7 @@ function downloading(card, r) {
   const fill = el("i");
   fill.style.width = (r.end && r.ok ? 100 : Math.round(r.percent || 0)) + "%";
   bar.append(fill);
+  progress(bar, head, r.end && r.ok ? 100 : r.total > 0 ? r.percent : undefined);
   prog.append(bar);
   card.append(prog);
   if (r.error) card.append(el("div", "dl-note err", r.error));
@@ -350,7 +353,7 @@ function downloading(card, r) {
 
 // downloadEvent is a "download" event: SteamCMD's progress, then the end.
 export function downloadEvent(ev) {
-  if (!D.run) return;
+  if (!D.run || D.run.end) return;
   if (ev.end) {
     Object.assign(D.run, { end: true, ok: ev.ok, error: ev.error || "", env: ev.env || "" });
     draw();
@@ -385,7 +388,7 @@ async function scanAll() {
 
 // guideEvent is a "guide" event: an environment started, ended, or all are done.
 export function guideEvent(ev) {
-  if (!G.scan) return;
+  if (!G.scan || G.scan.done) return;
   if (ev.done) {
     G.scan.done = true;
     S.busy.scan = false;
@@ -415,6 +418,7 @@ function step2(card) {
   const fill = el("i");
   fill.style.width = (s.rows.length ? Math.round(100 * doneN / s.rows.length) : 100) + "%";
   bar.append(fill);
+  progress(bar, card.querySelector(".guide-q"), s.rows.length ? doneN : undefined, s.rows.length);
   prog.append(bar);
   card.append(prog);
   const again = s.done && !s.ok ? button(T("scan again"), "", () => scanAll()) : null;
@@ -439,21 +443,26 @@ function step3(card) {
   const open = button(T("open"), "", async () => {
     const v = src.value.trim();
     if (!v) return src.focus();
-    if (!/^https?:\/\//i.test(v)) { G.error = T("enter a complete HTTP or HTTPS URL"); return draw(); }
+    if (!/^https?:\/\//i.test(v)) { G.error = T("enter a complete HTTP or HTTPS URL"); G.errorFrom = ["url", G.error]; return draw(); }
     ui.afterImport = () => finish(""); return importFrom("text", v);
   });
   src.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); open.click(); } };
   const row = el("div", "typed");
-  row.append(button(T("choose a pack…"), "", async () => {
+  const pick = button(T("choose a pack…"), "", async () => {
     const session = activeSession;
     try {
       const path = await api.PickPackFile();
       if (path && S.screen === "guide" && activeSession === session) await finish(await api.PackImport(path));
-    } catch (e) { if (S.screen === "guide" && activeSession === session) { G.error = errText(e); draw(); } }
-  }), src, open);
+    } catch (e) { if (S.screen === "guide" && activeSession === session) { G.error = errText(e); G.errorFrom = ["pack", G.error]; draw(); } }
+  });
+  row.append(pick, src, open);
   ways.append(way(T("open a pack or a Steam collection"), T("choose a pack (.archopack), or paste a Steam Workshop collection link"), row));
   card.append(ways);
   footer(card, button(T("skip"), "", () => finish("")));
+  const error = card.querySelector(".guide-foot .err");
+  // the footer's error belongs to the field that caused it, while it is still that error
+  const from = (k) => () => G.errorFrom?.[0] === k && G.errorFrom[1] === G.error;
+  if (error) { fieldError(src, error, from("url")); fieldError(pick, error, from("pack")); }
 }
 
 function way(title, text, action) {

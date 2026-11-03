@@ -4,6 +4,7 @@
 // pick columns). Not a popup: the work goes on while the player is on other pages, and the
 // sidebar's foot line and ctrl+j bring them back here. "tasks" events say the record
 // changed; a lane task that ended also brings its result for the status line.
+import { progress } from "./feedbacksemantics.js";
 import { pathContent } from "./fields.js";
 import { factText, S, $, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { beginPageRead, page, act as pageAct, area } from "./screens.js";
@@ -286,12 +287,14 @@ function drawList(list) {
   const box = els.rows;
   const keep = new Map([...box.querySelectorAll(".tk-row")].map((e) => [e.dataset.id, e]));
   const frag = document.createDocumentFragment();
-  let last = "";
+  let last = "", groupLabel;
   for (const r of list) {
     if (r.group !== last) {
       const n = list.filter((x) => x.group === r.group).length;
       const g = el("div", "group tk-group");
-      g.append(el("span", "", T(GROUP_TITLE[r.group])), el("span", "n", String(n)));
+      groupLabel = el("span", "", T(GROUP_TITLE[r.group]));
+      groupLabel.id = "task-group-" + r.group;
+      g.append(groupLabel, el("span", "n", String(n)));
       frag.append(g);
       last = r.group;
     }
@@ -303,16 +306,22 @@ function drawList(list) {
       e.dataset.sig = sig;
       e.innerHTML = "";
       const l1 = el("div", "l1");
+      l1.id = "task-title-" + r.id;
       l1.append(el("span", "t", r.title), el("span", "o", r.obj));
+      e.setAttribute("role", "group");
+      for (const [i, text] of [...l1.children].entries()) text.id = l1.id + "-" + i;
+      e.setAttribute("aria-labelledby", [...l1.children].map(n => n.id).join(" "));
       const l2 = el("div", "l2");
       if (r.group === "run") {
-        l2.append(mini(r), el("span", "pn num", r.count || r.pct + "%"));
+        l2.append(mini(r, l1), el("span", "pn num", r.count || r.pct + "%"));
       } else if (r.group !== "queue") {
-        l2.append(stateWord(r));
+        const state = stateWord(r); state.id = "task-state-" + r.id;
+        l2.append(state);
       }
       l2.append(el("span", "txt word-facts", r.line || ""));
       e.append(l1, el("span", "tm num", r.time || ""), l2);
     }
+    e.setAttribute("aria-describedby", r.group === "run" || r.group === "queue" ? groupLabel.id : "task-state-" + r.id);
     frag.append(e);
   }
   if (!list.length) frag.append(el("div", "empty-state", X.page.rows.length ? T("no task matches the filter, esc clears it") : T("nothing has run in the background yet")));
@@ -337,12 +346,16 @@ function slide(before) {
     e.animate([{ transform: `translateY(${d}px)` }, { transform: "none" }], { duration: 260, easing: "cubic-bezier(.2,.8,.2,1)" });
   }
 }
-function mini(r) {
+function taskProgress(node, r, label) {
+  const count = /^(\d+)\s*\/\s*(\d+)$/.exec(r.count || "");
+  return progress(node, [...label.children], count ? +count[1] : r.pct > 0 || r.state === "done" ? r.pct : undefined, count ? +count[2] : 100, r.count || "");
+}
+function mini(r, label) {
   const m = el("span", "mini s-" + r.state);
   const i = el("i");
   i.style.width = r.pct + "%";
   m.append(i);
-  return m;
+  return taskProgress(m, r, label);
 }
 function stateWord(r) {
   const s = el("span", "stw s-" + r.state);
@@ -361,13 +374,14 @@ function targets() {
 
 function drawSum() {
   const r = current(), box = els.sum;
-  const sig = r ? JSON.stringify([r.id, r.say, r.pct, r.dur, r.steps, r.acts, r.time]) : "";
+  const sig = r ? JSON.stringify([r.id, r.title, r.obj, r.state, r.say, r.pct, r.count, r.dur, r.steps, r.acts, r.time]) : "";
   if (box.dataset.sig === sig) return;
   box.dataset.sig = sig;
   box.innerHTML = "";
   if (!r) { box.append(el("div", "empty-state", T("pick a task"))); return; }
   const top = el("div", "top");
-  const h = el("h3", "", r.title);
+  const h = el("h3");
+  h.append(el("span", "t", r.title));
   h.append(el("span", "o", r.obj));
   top.append(h);
   const summary = el("p", "say" + (r.kind === "subscribe" ? "" : " word-facts") + " s-" + r.state, r.say);
@@ -379,6 +393,7 @@ function drawSum() {
     const i = el("i");
     i.style.width = r.pct + "%";
     b.append(i);
+    taskProgress(b, r, h);
     p.append(b);
     box.append(p);
   }
@@ -450,6 +465,7 @@ function drawItems() {
       else pathContent(cell, it.ref);
       e.append(cell);
     }
+    for (const bar of e.querySelectorAll(".tk-dl")) progress(bar, e.querySelector(".c-name") || bar, it.got || 0, it.downloadSize, bar.title);
     table.row(e, i);
     els.ibody.append(e);
   });

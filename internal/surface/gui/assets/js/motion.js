@@ -180,7 +180,7 @@ export function statusIn(s) {
 export function shimmer(label, n = 4) {
   const box = document.createElement("div");
   box.className = "skel";
-  box.setAttribute("role", "status");
+  box.setAttribute("role", "progressbar");
   box.setAttribute("aria-label", label);
   box.title = label;
   for (let i = 0; i < n; i++) {

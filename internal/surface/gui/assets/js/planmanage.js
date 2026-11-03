@@ -1,3 +1,4 @@
+import { fieldError, fieldStatusError, progress } from "./feedbacksemantics.js";
 import { choiceControl } from "./choices.js";
 // Manage lists (06 §2.17): the sidebar's list › Manage lists. On the left every list of the game, on the
 // right the picked one: its game versions (04 §1.6), the Steam Workshop collections it
@@ -200,7 +201,7 @@ function renameField(p) {
   const inp = el("input", "xc-input pm-title-input");
   inp.value = p.name; inp.spellcheck = false;
   inp.setAttribute("aria-label", T("rename the list"));
-  const why = el("div", "plan-why"); why.setAttribute("role", "alert");
+  const why = el("div", "plan-why"); why.setAttribute("role", "alert"); fieldError(inp, why);
   let seq = 0, done = false;
   const check = async () => {
     const n = ++seq;
@@ -372,7 +373,7 @@ function newForm() {
   const label = el("label", "pm-field", T("new list name"));
   const name = el("input", "xc-input pm-name"); name.value = draft.name; name.spellcheck = false;
   label.append(name);
-  const why = el("div", "plan-why", draft.error || ""); why.setAttribute("role", "alert");
+  const why = el("div", "plan-why", draft.error || ""); why.setAttribute("role", "alert"); fieldError(name, why);
   // One main button: in an import it reads the content first (preview), then it creates.
   const main = button(T("create and edit"), "enter", () => go(), "primary", "create-plan");
   const active = () => M.draft === draft && M.form === form && M.creating && S.screen === "plans" && draft.env === game();
@@ -528,13 +529,19 @@ function inlineImport(draft, active, updateButtons) {
   text.placeholder = T("a share code (RC-…), a Steam Workshop collection link, a Rentry link, or a list copied from RimSort or RimCrow");
   text.setAttribute("aria-label", T("paste"));
   box.append(text);
-  const status = el("div", "pm-note", draft.importing ? T("reading the list…") : ""); status.setAttribute("role", "status");
-  const error = el("div", "plan-why", imp.error || ""); error.setAttribute("role", "alert");
+  const status = el("div", "pm-note", draft.importing ? T("reading the list…") : ""); status.setAttribute("role", draft.importing ? "progressbar" : "status");
+  const reading = value => {
+    status.textContent = value;
+    if (value) progress(status, status);
+    else { status.setAttribute("role", "status"); status.removeAttribute("aria-labelledby"); }
+  };
+  reading(status.textContent);
+  const error = el("div", "plan-why", imp.error || ""); error.setAttribute("role", "alert"); fieldError(text, error); fieldError(pickBtn, error);
   const preview = el("div", "pm-inline-preview");
   box.append(status, error, preview);
   function invalidate() {
     M.importSeq++; draft.importing = false; imp.preview = null; imp.error = "";
-    preview.replaceChildren(); status.textContent = ""; error.textContent = ""; updateButtons();
+    preview.replaceChildren(); reading(""); error.textContent = ""; updateButtons();
   }
   text.oninput = () => { imp.text = text.value; if (text.value && imp.path) { imp.path = ""; showFile(); } invalidate(); };
   async function read(kind, value, fileName) {
@@ -542,13 +549,13 @@ function inlineImport(draft, active, updateButtons) {
     const n = ++M.importSeq, env = S.envSeq;
     const current = () => active() && n === M.importSeq && env === S.envSeq;
     imp.preview = null; imp.error = ""; draft.importing = true;
-    preview.replaceChildren(); error.textContent = ""; status.textContent = T("reading the list…"); updateButtons();
+    preview.replaceChildren(); error.textContent = ""; reading(T("reading the list…")); updateButtons();
     try {
       const p = await api.ImportPreviewFor(selected(), kind, value);
       if (!current()) return;
       if (fileName) p.source = fileName;
       imp.preview = p; imp.kind = kind; imp.value = value; draft.importing = false;
-      status.textContent = ""; renderPreview(); updateButtons();
+      reading(""); renderPreview(); updateButtons();
       // the list's own title names the new list, unless the player named it
       const base = p.name || (fileName || (kind === "file" ? value : "")).replace(/^.*[\\/]/, "").replace(/\.[^.]*$/, "");
       if (base && !draft.nameTouched) {
@@ -557,7 +564,7 @@ function inlineImport(draft, active, updateButtons) {
       }
     } catch (e) {
       if (!current()) return;
-      draft.importing = false; imp.error = errText(e); error.textContent = imp.error; status.textContent = ""; updateButtons();
+      draft.importing = false; imp.error = errText(e); error.textContent = imp.error; reading(""); updateButtons();
     }
   }
   async function readFile(f) {
@@ -631,7 +638,7 @@ function costSection(p) {
   if (C.page && !C.page.loading) showCost(C.page, p.id);
   else {
     const pending = el("div", "skel");
-    pending.setAttribute("aria-label", T("Loaded memory (estimate)"));
+    progress(pending, s.querySelector(".pm-sub"));
     pending.setAttribute("aria-busy", "true");
     pending.append(el("span", "bar"), el("span", "bar"));
     C.progress = el("div", "muted pm-note", C.page?.progress || "");
@@ -763,7 +770,7 @@ function follows(p) {
     go.disabled = true;
     say("busy", T("reading the collection…"));
     let t;
-    try { t = await api.PlanFollow(p.id, link, "add"); } catch (e) { go.disabled = false; return say("fail", errText(e)); }
+    try { t = await api.PlanFollow(p.id, link, "add"); } catch (e) { go.disabled = false; say("fail", errText(e)); fieldStatusError(inp, $("#status")); return; }
     await open();
     say("ok", t);
   };

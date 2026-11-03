@@ -5,6 +5,7 @@ import { choiceControl } from "./choices.js";
 // encoder (todds) is downloaded only after the player saw where from and how big.
 // Reading every PNG takes a while, so the page opens with only the encoder and the mods:
 // count the textures reads them, and changing a choice never does (the last count stays, marked old).
+import { progress } from "./feedbacksemantics.js";
 import { pathContent } from "./fields.js";
 import { factText, S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { beginPageRead, pageLoading, page, button } from "./screens.js";
@@ -14,7 +15,7 @@ import { textureColumns } from "./tabledefs.js";
 
 // info: the encoder and the mods (no texture read); page: the last count, at: what it was
 // counted with; old: the textures changed since (a run, a clean).
-const X = { scope: "plan", scale: 100, info: null, page: null, at: null, old: false, prog: null, seq: 0, infoSeq: 0, loading: false, error: "" };
+const X = { scope: "plan", scale: 100, info: null, page: null, at: null, old: false, prog: null, ended: false, seq: 0, infoSeq: 0, loading: false, error: "" };
 
 const context = () => JSON.stringify([S.board?.env, S.shell?.plan?.id]);
 // counted: the count on screen is for the choices on screen.
@@ -51,6 +52,7 @@ async function readInfo(entryRead = null) {
 // event is a "textures" event: the run's progress, then its end.
 export function event(ev) {
   if (ev.done) {
+    X.ended = true;
     X.prog = null;
     if (X.page) X.old = true;
     say(ev.ok ? "ok" : "fail", ev.ok ? ev.text : ev.error);
@@ -282,7 +284,8 @@ function foot(I, p) {
     const fill = el("i");
     fill.style.width = Math.round((X.prog.frac || 0) * 100) + "%";
     bar.append(fill);
-    w.append(bar, el("div", "ptext word-facts", X.prog.text || T("converting textures")));
+    const text = el("div", "ptext word-facts", X.prog.text || T("converting textures"));
+    w.append(bar, text); progress(bar, text, Number.isFinite(X.prog.frac) ? X.prog.frac : undefined, 1);
     f.append(w, button(T("stop"), "", async () => {
       try { say("ok", await api.TexturesStop()); } catch (e) { say("fail", errText(e)); }
     }));
@@ -309,9 +312,14 @@ function convert() {
   const lines = counted() ? [...(X.page.estFacts || [])] : [T("not counted yet: only new or changed PNGs are converted, those already done are skipped")];
   lines.push(T("the PNGs stay; RimArcho writes a .dds next to each and can take them all back"));
   pop.confirm(T("convert textures to DDS"), lines, T("convert"), async () => {
-    try { say("ok", await api.TexturesRun(X.scope, X.scale, [])); } catch (e) { say("fail", errText(e)); return; }
-    X.prog = { text: T("converting textures"), frac: 0 };
-    draw();
+    X.ended = false;
+    let text;
+    try { text = await api.TexturesRun(X.scope, X.scale, []); } catch (e) { say("fail", errText(e)); return; }
+    // a run that ended before this reply keeps its outcome; progress that came first stays
+    if (X.ended) return;
+    say("ok", text);
+    X.prog ||= { text: T("converting textures") };
+    if (S.screen === "textures") draw();
   });
 }
 

@@ -279,7 +279,7 @@ try {
         const d = deferred(); handlers.set(method, () => d.promise);
         const pending = open(); await Promise.resolve();
         assert(S.screen === screen, method + " waited before navigation");
-        assert(document.querySelector('#screen [role="status"]') || document.querySelector('#screen[aria-busy="true"]'), method + " has no feedback");
+        assert(document.querySelector('#screen [role="progressbar"]') || document.querySelector('#screen[aria-busy="true"]'), method + " has no feedback");
         screens.openScreen("other");
         if (fail) d.reject(new Error("late " + method)); else d.resolve(payload);
         await pending;
@@ -635,7 +635,7 @@ try {
     const old = deferred(), fresh = deferred();
     handlers.set("TexturesInfo", () => old.promise);
     const p1 = textures.open(); await Promise.resolve();
-    assert(S.screen === "textures" && document.querySelector('#screen [role="status"]')?.getAttribute("aria-label") === "loading…", "textures did not show loading immediately");
+    assert(S.screen === "textures" && document.querySelector('#screen [role="progressbar"]')?.getAttribute("aria-label") === "loading…", "textures did not show loading immediately");
     screens.closeScreen(); handlers.set("TexturesInfo", () => fresh.promise);
     const p2 = textures.open(); await Promise.resolve();
     old.resolve({}); await p1;
@@ -646,7 +646,7 @@ try {
   await test("log opens immediately and ignores late replies", async () => {
     const d = deferred(); handlers.set("LogPage", () => d.promise);
     const pending = screens.gameLog("", true);
-    assert(S.screen === "log" && document.querySelector('#screen [role="status"]')?.getAttribute("aria-label") === "reading the log…", "log did not show loading immediately");
+    assert(S.screen === "log" && document.querySelector('#screen [role="progressbar"]')?.getAttribute("aria-label") === "reading the log…", "log did not show loading immediately");
     screens.openScreen("other"); d.resolve({ path: "old" }); await pending;
     assert(S.screen === "other", "late log reply reopened log");
   });
@@ -955,6 +955,7 @@ try {
     assert(S.screen === before && writes === 0, "history escaped uninstall lock");
   });
   for (const method of writeMethods) handlers.delete(method);
+  await (await import("./feedbackcheck.js")).checkFeedback({ handlers, test, assert, deferred });
   output.dataset.result = "pass";
   const preview = document.createElement("button");
   preview.textContent = "Preview environment switching animation";

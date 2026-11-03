@@ -4,6 +4,7 @@
 // New (empty, a copy, a version, an import) opens management; delete asks for confirmation.
 // Every verb is a view call through the API (view.NewPlan, UsePlan, OpenPlan, RenamePlan,
 // RemovePlan, ImportAsPlan).
+import { fieldError } from "./feedbacksemantics.js";
 import { S, $, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import * as pop from "./popups.js";
 
@@ -69,6 +70,7 @@ function nameField(box, value, self) {
   inp.value = value || "";
   row.append(inp);
   const why = el("div", "plan-why");
+  fieldError(inp, why);
   box.append(row, why);
   let seq = 0;
   const check = async () => {

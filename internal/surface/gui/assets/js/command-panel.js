@@ -1,4 +1,5 @@
 // Shared search/CLI panel (06 §3.5); closing preserves draft and the last output.
+import { fieldError } from "./feedbacksemantics.js";
 import { S, el, api, T, errText } from "./state.js";
 import { copy } from "./fields.js";
 let draft = "", result = null, paint = null, polling = false, afterRun = null;
@@ -27,11 +28,15 @@ export function buildCommandPanel(pop, p, { close, pick, reload, uninstall }) {
   foot.setAttribute("role", "status"); row.append(el("span", "pr", "❯"), input);
   pop.append(head, output, list, row, foot);
   let options = [], selected = 0, sequence = 0, historyAt = -1, historyDraft = "", completion = null, error = "";
+  fieldError(input, foot, () => !!error || !!(result && !result.running && result.code));
   const paintResult = () => {
     if (!live()) return;
     output.hidden = !result?.output; output.textContent = result?.output || ""; copyButton.hidden = !result?.output;
     foot.classList.toggle("err", !!error || !!(result && !result.running && result.code));
-    foot.textContent = error || (result?.running ? T("running…") : result ? `exit ${result.code}` : "Tab " + T("complete") + "  ↑↓ " + T("history") + "  Ctrl+N/P  Enter  Esc");
+    const text = error || (result?.running ? T("running…") : result ? `exit ${result.code}` : "Tab " + T("complete") + "  ↑↓ " + T("history") + "  Ctrl+N/P  Enter  Esc");
+    foot.setAttribute("role", foot.classList.contains("err") ? "alert" : "status");
+    foot.setAttribute("aria-busy", String(!!result?.running));
+    if (text !== foot.textContent) foot.textContent = text;
   };
   copyButton.onclick = () => copy(result?.output || "", copyButton);
   const run = async () => {
