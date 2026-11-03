@@ -33,6 +33,7 @@ const (
 	FieldLanguages = "languages"
 	FieldDeps      = "deps"
 	FieldConflicts = "conflicts"
+	FieldSettings  = "settings" // the Mod's settings files; the act opens Mod library › Mod settings
 )
 
 // Field acts: what the row's button does.
@@ -41,6 +42,8 @@ const (
 	ActURL    = "url"    // open the page
 	ActSteam  = "steam"  // Steam client page
 	ActTags   = "tags"   // edit (the tag bar)
+	// ActSettings opens Mod library › Mod settings at Target's files (06 §2.9)
+	ActSettings = "settings"
 )
 
 // Field is one row of the field list.
@@ -55,7 +58,8 @@ type Field struct {
 	Act     string        `json:"act,omitempty"`
 	ActAt   string        `json:"actLabel,omitempty"`
 	URL     string        `json:"url,omitempty"`
-	Extra   string        `json:"extra,omitempty"` // the alias's original name
+	Extra   string        `json:"extra,omitempty"`  // the alias's original name
+	Target  string        `json:"target,omitempty"` // the instance ActSettings opens
 	Actions []FieldAction `json:"actions,omitempty"`
 }
 
@@ -108,9 +112,15 @@ func headFields(st *app.LoadoutState, mod *store.Mod) []Field {
 	return fs
 }
 
-// tailFields: languages, dependencies, conflicts.
+// tailFields: settings files, languages, dependencies, conflicts.
 func tailFields(a *app.App, st *app.LoadoutState, mod *store.Mod, d *DetailData) []Field {
 	var fs []Field
+	if st != nil {
+		if paths := app.SettingsFilesOf(st, mod); len(paths) > 0 {
+			fs = append(fs, Field{Kind: FieldSettings, Label: T("mod settings"), Value: storedText(paths),
+				Act: ActSettings, ActAt: T("open"), Target: mod.ID})
+		}
+	}
 	if a != nil && mod.SnapID != 0 {
 		if ls, err := a.Store.Languages(mod.SnapID); err == nil && len(ls) > 0 {
 			fs = append(fs, Field{Kind: FieldLanguages, Label: T("languages"), Value: strings.Join(ls, "  "), List: ls})
@@ -123,6 +133,17 @@ func tailFields(a *app.App, st *app.LoadoutState, mod *store.Mod, d *DetailData)
 		fs = append(fs, Field{Kind: FieldConflicts, Label: T("conflicts with"), Value: depNames(cs), Items: cs})
 	}
 	return fs
+}
+
+// storedText is how many values settings files store, as the settings row says it.
+func storedText(paths []string) string {
+	n := 0
+	for _, p := range paths {
+		if sc, err := app.ReadSettingsFile(p); err == nil {
+			n += len(sc.Values)
+		}
+	}
+	return Tf("%d stored values", n)
 }
 
 func depNames(ds []Dep) string {

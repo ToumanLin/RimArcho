@@ -41,6 +41,7 @@ import { go, openPage, initNavigation, pageEntering, pageEntered, wireHistory } 
 import { checkCredit, getChoices } from "./credit.js";
 import * as problems from "./problems.js";
 import * as fileSearch from "./filesearch.js";
+import * as modSettings from "./modsettings.js";
 import { initRules, refreshRules, startRule, showRules } from "./rules.js";
 
 // ---- loading ----
@@ -307,6 +308,7 @@ function renderHints() {
   else if (S.screen === "library") list = library.hintList();
   else if (S.screen === "tasks") list = tasksPage.hintList();
   else if (S.screen === "search") list = fileSearch.hintList();
+  else if (S.screen === "mod-settings") list = modSettings.hintList();
   else if (S.screen === "changes") list = scr.changesHints();
   else if (S.screen === "log") list = scr.logHints();
   else if (S.screen === "subscribe") list = scr.addHints();
@@ -741,7 +743,7 @@ async function cmd(id) {
   if (uninst.locked()) return;
   if (environmentReason() && ["launch", "sort", "save", "undo", "redo", "restore-all", "stage-all", "rescan", "analyze"].includes(id)) return say("busy", environmentReason());
   // A page replaces the page shown once its data is in: the mod list never shows between.
-  const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", subscribe: "subscribe", library: "library", log: "log", settings: "settings", packs: "packs", build: "build", "env-page": "env", uninstall: "uninstall", feedback: "feedback", textures: "textures", tasks: "tasks", "search-files": "search" };
+  const pages = { home: "home", needs: "needs", logs: "log", changes: "changes", subscribe: "subscribe", library: "library", log: "log", settings: "settings", packs: "packs", build: "build", "env-page": "env", uninstall: "uninstall", feedback: "feedback", textures: "textures", tasks: "tasks", "search-files": "search", "mod-settings": "mod-settings" };
   if (pages[id]) return go(pages[id]);
   // the list's own actions show the list; the rest work on any page
   if (["filter", "details", "tech", "tags", "rules"].includes(id) && scr.closeScreen()) renderWhere();
@@ -1072,6 +1074,7 @@ function onKey(e) {
     if (S.screen === "library") return library.key(e);
     if (S.screen === "textures") return tex.key(e);
     if (S.screen === "search") return fileSearch.key(e);
+    if (S.screen === "mod-settings") return modSettings.key(e);
     if (S.screen === "log" || S.screen === "changes") return scr.logsKey(e);
     // add a subscription: the form takes its keys; esc outside it goes back to updates
     if (S.screen === "subscribe") { if (k === "Escape") { e.preventDefault(); go("changes"); } return; }
@@ -1249,6 +1252,8 @@ async function start() {
   wireSplits();
   document.addEventListener("keydown", onKey);
   document.addEventListener("verb", (e) => { const v = e.detail; v === "needs" ? go("needs") : verb(v); });
+  // a detail's settings row: Mod library › Mod settings at that Mod's files (06 §2.9)
+  document.addEventListener("open-mod-settings", (e) => { modSettings.focusMod(e.detail); go("mod-settings"); });
   document.addEventListener("editor-full",()=>fullPage.full("plan",S.detail?.id));
   document.addEventListener("editor-use-copy", async (e) => {
     if(environmentReason())return say("busy",environmentReason());

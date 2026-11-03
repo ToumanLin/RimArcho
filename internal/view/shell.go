@@ -88,6 +88,8 @@ const (
 	PageSubscribe = "subscribe"
 	// PageSearch: Mod library › Search files (06 §2.9)
 	PageSearch = "search"
+	// PageModSettings: Mod library › Mod settings (06 §2.9 "Mod settings")
+	PageModSettings = "mod-settings"
 )
 
 // NavItem is one sidebar entry. Kids show only under the open entry.
@@ -181,7 +183,7 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 		{ID: PagePlan, Label: T("lists"), Kids: planKids},
 		{ID: PagePacks, Label: T("packs"), Kids: packKids},
 		// Below the packs (2026-10-28). The entry opens All, its first sub-entry (06 §2.9).
-		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all mods")}, {ID: PageChanges, Label: T("updates")}, {ID: PageSubscribe, Label: T("add a subscription")}, {ID: PageSearch, Label: T("search files")}}},
+		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all mods")}, {ID: PageChanges, Label: T("updates")}, {ID: PageSubscribe, Label: T("add a subscription")}, {ID: PageSearch, Label: T("search files")}, {ID: PageModSettings, Label: T("mod settings")}}},
 		// what the game loads faster (08 §5.2)
 		{ID: PageTextures, Label: T("texture optimisation")},
 		{ID: PageEnv, Label: T("game")},

@@ -201,7 +201,14 @@ func KeyHelp(page string, tui bool) []KeyRow {
 		}
 		out = append(out, r("esc", "stop the search; in the box: leave it"))
 	}
-	if !tui && (page == LibraryPage || page == "packs" || page == "textures") {
+	if page == PageModSettings && !tui { // Mod settings (06 §2.9); the TUI's is a panel
+		out = append(out,
+			r("↑↓ / j k / PgUp PgDn / Home End", "move the cursor; the values show the cursor's file"),
+			r("1 / 2", "focus the table / the values"),
+			r("ctrl+o", "open the Config folder"),
+		)
+	}
+	if !tui && (page == LibraryPage || page == "packs" || page == "textures" || page == PageModSettings) {
 		out = append(out, r("s / < > =", "the headers: sort and columns; < > = changes or resets the sorted column's width"))
 	}
 	if page == "home" && !tui {

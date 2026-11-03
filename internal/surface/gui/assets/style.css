@@ -449,7 +449,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .page.fill { height: 100%; min-height: 0; padding-bottom: 8px; }
 /* page width by shape (06 §7.3 rule 12): list-and-detail pages fill the window like the
    editor and the library; one-column pages share one reading width */
-.page:is(.logs, .pm-page, .packs, .subs-page, .needs) { padding-left: 12px; padding-right: 12px; }
+.page:is(.logs, .pm-page, .packs, .subs-page, .needs, .modsettings) { padding-left: 12px; padding-right: 12px; }
 .page:is(.env, .textures, .settings, .feedback) { padding-left: max(20px, calc(50% - 480px)); padding-right: max(20px, calc(50% - 480px)); }
 @keyframes view-in { from { opacity: 0; transform: translateY(4px); } }
 .head-right { display: flex; align-items: center; gap: 8px; }
@@ -1910,6 +1910,29 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .subs-alert .ic { display: inline-flex; color: var(--amber); }
 .subs-detail pre.lines.files { padding: 6px 0; border-top: 0; max-height: 360px; overflow: auto; }
 .page .btn.link { border-color: transparent; background: none; box-shadow: none; }
+
+/* ---- Mod library › Mod settings (06 §2.9): the settings files on the left, the values ---- */
+.page.fill.modsettings { display: flex; flex-direction: column; }
+.ms { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(320px, var(--ms-side, 55%)) var(--card-gap) minmax(0, 1fr); }
+.ms-split { align-self: stretch; margin: 0; }
+.ms .data-table { max-height: none; min-height: 0; }
+.data-row.ms-defaults .cell:not(.n) { color: var(--faint); }
+.ms-detail { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.ms-dhead { display: flex; flex-direction: column; gap: 6px; flex: none; padding: 14px 16px 12px; border-bottom: var(--hairline) solid var(--line-2); }
+.ms-dhead h2 { margin: 0; font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.ms-dhead .facts { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--muted); font-size: 12px; }
+.ms-type { font-family: var(--code); }
+.ms-path { min-width: 0; font: 12px var(--code); }
+.ms-body { flex: 1; min-height: 0; overflow: auto; padding: 10px 16px 12px; outline: none; }
+.ms-body:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.ms-values { display: grid; grid-template-columns: minmax(120px, max-content) minmax(0, 1fr); gap: 4px 16px; margin: 0 0 10px; font-size: 13px; }
+.ms-values dt { color: var(--muted); font: 12px var(--code); overflow-wrap: anywhere; }
+.ms-values dd { margin: 0; color: var(--fg-2); overflow-wrap: anywhere; }
+.ms-values dd.text { font: 12px var(--code); }
+.ms-values dd.fixed { color: var(--muted); }
+.ms-note { margin: 4px 0; font-size: 12px; }
+.ms-note.err { color: var(--red); }
+@media (max-width: 900px) { .ms { grid-template-columns: minmax(0, 1fr); gap: var(--card-gap); } .ms-split { display: none; } .page.fill.modsettings { height: auto; } .ms .data-table { max-height: 60vh; } }
 .page .btn.link:hover { background: var(--accent-soft); }
 @media (max-width: 900px) { .subs { grid-template-columns: minmax(0, 1fr); gap: var(--card-gap); } .subs-split { display: none; } .page.fill.subs-page { height: auto; } .subs-list > .scroll { max-height: 60vh; } }
 

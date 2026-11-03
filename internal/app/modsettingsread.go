@@ -340,3 +340,24 @@ func (r *settingsReader) of(m *store.Mod, folder string) ModSettingsMod {
 	}
 	return sm
 }
+
+// SettingsFilesOf is the paths of m's settings files under the folder the game sees it under
+// (st's registry), from the Config folder alone: no Archo Monitor record, so a detail can ask
+// on every cursor move (06 §4.1). nil when the game does not see m or there are none.
+func SettingsFilesOf(st *LoadoutState, m *store.Mod) []string {
+	folder, root := st.Reg.Folder(m.ID), st.Ix.Env.UserDataRoot
+	if folder == "" || root == "" {
+		return nil
+	}
+	stem := strings.ToLower(settingsStem(folder))
+	stems := map[string]bool{stem: true}
+	for _, f := range allFolders(settingsFolders(st.Ix, st.Aliases)) {
+		stems[strings.ToLower(settingsStem(f))] = true
+	}
+	var paths []string
+	for _, fi := range readSettingsFiles(filepath.Join(root, "Config"), stems)[stem] {
+		paths = append(paths, filepath.Join(fi.dir, fi.name))
+	}
+	sort.Strings(paths)
+	return paths
+}

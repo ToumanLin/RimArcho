@@ -211,7 +211,7 @@ As decided on 2026-10-23, **every data-table header** follows Windows Explorer's
 - The header context menu can sort by the column, widen or narrow it, show or hide each column, and reset the columns. The name column is always visible.
 - For keyboard access (§3.1 rule 6), s opens the same menu at the sorted column, and < > = resize or reset that column.
 - Column order, widths, and visibility are stored per table in `ui.gui.<table>.columns`.
-- These rules are implemented for the inventory (library), task items (`tasks.items`, §2.16), pack list (packs, §2.7), Mods within a pack (`pack.mods`, §2.7), and texture list (textures, §2.13).
+- These rules are implemented for the inventory (library), task items (`tasks.items`, §2.16), pack list (packs, §2.7), Mods within a pack (`pack.mods`, §2.7), texture list (textures, §2.13), and Mod settings (`modsettings`, §2.9).
 - New tables must follow this section.
 
 ### 3.10 Choice controls (GUI)

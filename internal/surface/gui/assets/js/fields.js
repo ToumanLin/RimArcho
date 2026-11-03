@@ -153,6 +153,8 @@ export function fieldList(fields, acts = {}) {
       b.onclick = () => {
         if (a.act === "url") return api.OpenURL(f.url).then(() => say("ok", T("opened the page")), (e) => say("fail", errText(e)));
         if (a.act === "steam") return api.OpenSteamWorkshop("ws:" + f.value).then((t) => say("ok", t), (e) => say("fail", errText(e)));
+        // Mod library › Mod settings at this Mod's files (main.js opens it)
+        if (a.act === "settings") return document.dispatchEvent(new CustomEvent("open-mod-settings", { detail: f.target }));
         if (acts[a.act]) return acts[a.act](f);
       };
       r.append(b);

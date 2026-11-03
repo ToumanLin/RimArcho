@@ -63,6 +63,7 @@ var Commands = []Command{
 	{"uninstall", "@palette.uninstall", "uninstall RimArcho", "remove what RimArcho put on this machine"},
 	{"textures", "@palette.textures", "texture optimisation", "convert mods' PNG textures to DDS"},
 	{"search-files", "@palette.search-files", "search files", "grep rg Def patch C# source decompile"},
+	{"mod-settings", "@palette.mod-settings", "mod settings", "Mod options configuration Config window values"},
 	{"rules", "@palette.rules", "load-order rules", "r rule after before incompatible top bottom"},
 	{"tasks", "@palette.tasks", "background tasks", "ctrl+j running waiting failed queue"},
 	{"help", "@palette.help", "help", "?"},

@@ -70,6 +70,8 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 		return func(m *model) tea.Cmd { return m.openAdd("") }
 	case "search-files":
 		return func(m *model) tea.Cmd { return m.openSearch() }
+	case "mod-settings":
+		return func(m *model) tea.Cmd { return m.modSettingsPanel() }
 	case "rules":
 		return func(m *model) tea.Cmd { return m.openRules(nil) }
 	case "rescan":

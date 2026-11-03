@@ -30,6 +30,7 @@ surface/tui   (Bubble Tea)        surface/gui   (Wails services + assets/*.html|
 | `tags.go` | Tag candidates (§3.8) | `TagCandidates`, `PinnedTags` |
 | `rules.go` | Editor sorting rules (§2.5): one sentence per rule (clickable Mod names), form kinds and candidates for the other Mod, add / edit / delete / restore | `BuildRules`, `RuleCandidates`, `SaveRule`, `RemoveRule`, `RestoreRule` |
 | `filesearch*.go` | Mod library > search files (§2.9): bounded streaming Mod → file → lines and restricted file viewer, shared with TUI | `FileSearchRun`, `BuildFileSearchInfo`, `ReadSearchFile`, `SearchFolder` |
+| `modsettings.go` | Mod library > Mod settings (§2.9): one row per settings file of the current list, and one file's stored values as text | `ModSettingsRows`, `ModSettingsFileDetail`, `SettingText` |
 | `verbs.go` | Verbs: enable / disable, stage, put back, move, place at a position, position input candidates (§3.5, §3.6) | `Toggle`, `Stage`, `Unstage`, `StageAll`, `MoveBy`, `Place`, `PosOptions`, `ObjectOf`, `Positions`, `PlacedText`, `NowAt` |
 | `preview.go` | Sort, save, launch: direct execution and read-only preview (§6); undo, redo, put all back, switch copies | `Run`, `Outcome`, `RefusalLines`, `DryRun`, `Apply`, `UndoRedo`, `RestoreAll`, `Swap` |
 | `palette.go` | Command table (Chinese names + English aliases, **command IDs rather than keys**), scoring and ranking (§3.5) | `Commands`, `PalScore`, `PalRank` |
