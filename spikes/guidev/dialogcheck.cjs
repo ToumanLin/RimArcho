@@ -32,6 +32,8 @@ const server = http.createServer((req, res) => {
     const name = page.locator('.pm-new input.pm-name'); await name.waitFor();
     assert(await name.evaluate(e => e === document.activeElement), 'new name is not focused');
     assert(await page.locator('.pm-new .pm-modes button').count() === 4, 'not four starting points');
+    const newCrumbs = (await page.locator('#crumbs').innerText()).replace(/\s/g,'');
+    assert(/library\/lists\/alllists(\(\d+\))?\/newlist$/i.test(newCrumbs), 'new-list breadcrumb: ' + newCrumbs);
     const existing = await state(async () => (await import('/js/state.js')).S.shell.plan.name);
     await name.fill(existing);
     await page.waitForFunction(() => document.querySelector('.pm-new .plan-why')?.textContent.length > 0);
@@ -41,7 +43,7 @@ const server = http.createServer((req, res) => {
     await page.waitForFunction(async value => { const {S} = await import('/js/state.js'); return !S.screen && S.shell?.plan?.name === value; }, newName);
     await page.waitForFunction(value => document.querySelector('#status')?.textContent.includes(value), newName);
     assert(!await state(async () => (await import('/js/state.js')).S.popup), 'creation opened a popup');
-    results.push('PASS new list: focus, four sources, duplicate check, Enter creates and opens editor');
+    results.push('PASS new list: breadcrumb, focus, four sources, duplicate check, Enter creates and opens editor');
     await open('plans'); await page.locator('.pm-row.on').focus(); await page.keyboard.press('n');
     await name.waitFor(); await name.focus(); await page.keyboard.press('Escape');
     await page.waitForFunction(() => !document.querySelector('.pm-new'));
@@ -58,12 +60,19 @@ const server = http.createServer((req, res) => {
     await page.locator('.xc-body button').filter({hasText:'preview'}).click();
     await page.locator('.xc-preview input.xc-input').waitFor();
     assert(await page.locator('.xc-preview input[type=radio]').count() === 3, 'not three destinations');
-    await page.keyboard.press('Escape'); await page.waitForFunction(async () => !(await import('/js/state.js')).S.screen);
-    await page.keyboard.press('i'); await page.locator('.pm-import textarea').fill('https://steamcommunity.com/sharedfiles/filedetails/?id=3000000001');
+    const shareName = 'Browser share import ' + Date.now();
+    await page.locator('.xc-preview input.xc-input').fill(shareName); await page.keyboard.press('Enter');
+    await page.waitForFunction(async value => { const {S} = await import('/js/state.js'); return !S.screen && S.shell?.plan?.name === value; }, shareName);
+    await editor(); await page.keyboard.press('i'); await page.locator('.pm-import textarea').fill('https://steamcommunity.com/sharedfiles/filedetails/?id=3000000001');
     await page.locator('.xc-body button').filter({hasText:'preview'}).click();
     const follow = page.locator('.xc-preview input[type=checkbox]'); await follow.waitFor();
     assert(await follow.isChecked(), 'collection follow is not on by default');
-    await page.keyboard.press('Escape'); await page.waitForFunction(async () => !(await import('/js/state.js')).S.screen);
+    await page.locator('.xc-preview .btn.primary[data-env-write="import-apply"]').click();
+    await page.waitForFunction(async () => { const {S} = await import('/js/state.js'); return !S.screen && S.shell?.plan?.name === 'Fixture collection'; });
+    await open('plans'); await page.locator('.pm-row').filter({hasText:'Fixture collection'}).first().click();
+    await page.waitForFunction(() => document.querySelector('.pm-detail')?.innerText.includes('Fixture collection'));
+    results.push('PASS share code and Steam fixture collection: import creates the list and opens it; the followed collection shows in All lists');
+    await editor();
     await page.keyboard.press('e'); await page.locator('.pm-export').waitFor();
     await page.keyboard.press('Escape'); await page.waitForFunction(async () => !(await import('/js/state.js')).S.screen);
     results.push('PASS inline management import; editor import/export; share-code destinations; fixture collection follow; Esc returns');
@@ -80,13 +89,15 @@ const server = http.createServer((req, res) => {
     await page.keyboard.press('Enter');
     await page.waitForFunction(async value => (await import('/js/state.js')).S.board.cols[1].map(r => r.name).join(',') !== value, before);
     assert(!await state(async () => (await import('/js/state.js')).S.popup), 'history asked for confirmation');
+    assert(await page.locator('#status a').count() === 1, 'history has no undo');
     await page.keyboard.press('u');
     await page.waitForFunction(async value => (await import('/js/state.js')).S.board.cols[1].map(r => r.name).join(',') === value, before);
     assert(fs.readFileSync(gamePath,'utf8') === game, 'forms or checkout wrote game files');
-    results.push('PASS history version: Enter checks out directly and u restores; game file unchanged');
+    results.push('PASS history version: Enter checks out directly, status undo and u restore; game file unchanged');
     await page.evaluate(async () => { (await import('/js/guide.js')).resume(); await (await import('/js/exchange.js')).exchange(); });
     await page.locator('.pm-import textarea').waitFor(); await page.keyboard.press('Escape');
     await page.waitForFunction(async () => (await import('/js/state.js')).S.screen === 'guide');
+    assert(!await state(async () => (await import('/js/state.js')).S.popup), 'guide import opened a popup');
     await open('plans');
     await page.evaluate(() => {
       const files = new DataTransfer(); files.items.add(new File(['tester.b'], 'dropped.txt', {type:'text/plain'}));
@@ -95,7 +106,7 @@ const server = http.createServer((req, res) => {
     await page.locator('.xc-preview input[type=radio]').first().waitFor();
     assert((await page.locator('.xc-preview').innerText()).includes('dropped.txt'), 'dropped file not previewed');
     await page.keyboard.press('Escape'); await page.locator('.pm-list').waitFor();
-    results.push('PASS guide uses shared import page and resumes on Esc; file drop opens preview');
+    results.push('PASS guide uses the shared import page without a popup and resumes on Esc; file drop opens preview');
     // A1: secondary pages own the only exposed main, and the editor returns intact.
     for (const destination of ["home", "library", "needs", "plans", "env", "settings", "tasks", "plan"]) {
       await page.evaluate(async id => { await (await import('/js/navigation.js')).go(id); }, destination);
@@ -135,7 +146,9 @@ const server = http.createServer((req, res) => {
       }, kind);
       const dialog = page.locator('#popup [role=dialog]');
       await page.waitForFunction(() => document.querySelector('#popup [role=dialog]')?.contains(document.activeElement));
-      if (['confirm', 'path', 'memory', 'uninstall'].includes(kind)) assert(await dialog.locator('.btns button').first().evaluate(e => e === document.activeElement), kind + ': initial focus is not Cancel');
+      // A confirmation starts on the dialog itself (Enter confirms, as its key cap says); the RAM warning and uninstall on Cancel.
+      if (['confirm', 'path'].includes(kind)) assert(await dialog.evaluate(e => e === document.activeElement), kind + ': initial focus is not the dialog');
+      if (['memory', 'uninstall'].includes(kind)) assert(await dialog.locator('.btns button').first().evaluate(e => e === document.activeElement), kind + ': initial focus is not Cancel');
       assert(await dialog.getAttribute('aria-modal') === 'true', kind + ': modal');
       assert(await dialog.evaluate(e => !!document.getElementById(e.getAttribute('aria-labelledby'))?.textContent), kind + ': existing title');
       assert(await page.locator('#main').evaluate(e => e.inert), kind + ': inert background');
@@ -149,10 +162,20 @@ const server = http.createServer((req, res) => {
       assert(await page.locator('#nav-settings').evaluate(e => e === document.activeElement), kind + ': opener restored');
     }
     await editor();
-    await page.evaluate(async () => (await import('/js/popups.js')).confirm('delete the list', ['Synthetic deletion warning'], 'delete', () => { window.a11yAccepted = true; }));
+    const deletion = () => page.evaluate(async () => { window.a11yAccepted = false; (await import('/js/popups.js')).confirm('delete the list', ['Synthetic deletion warning'], 'delete', () => { window.a11yAccepted = true; }); });
+    // Tab reaches Cancel first; Enter there cancels. Enter on the dialog confirms (the enter key cap).
+    await deletion(); await page.keyboard.press('Tab');
+    assert(await page.locator('#popup .btns button').first().evaluate(e => e === document.activeElement), 'Tab did not reach Cancel first');
     await page.keyboard.press('Enter');
-    assert(!await page.evaluate(() => window.a11yAccepted), 'default Enter accepted deletion');
-    assert(!await state(async () => (await import('/js/state.js')).S.popup), 'default Enter did not cancel');
+    assert(!await page.evaluate(() => window.a11yAccepted), 'Enter on Cancel accepted deletion');
+    assert(!await state(async () => (await import('/js/state.js')).S.popup), 'Enter on Cancel did not close');
+    await deletion(); await page.keyboard.press('Enter');
+    assert(await page.evaluate(() => window.a11yAccepted), 'Enter on the dialog did not confirm');
+    // ctrl+\ (reference numbers) still works over a dialog.
+    await deletion(); await page.keyboard.press('Control+Backslash');
+    await page.locator('.refnums').waitFor({state:'attached'});
+    await page.keyboard.press('Control+Backslash'); await page.keyboard.press('Escape');
+    assert(!await state(async () => (await import('/js/state.js')).S.popup), 'Esc after reference numbers did not close');
     await page.evaluate(async () => {
       const opener = document.createElement('button'); opener.textContent = 'Synthetic opener'; document.querySelector('#board').append(opener); opener.focus();
       (await import('/js/popups.js')).confirm('delete the list', ['Synthetic deletion warning'], 'delete', () => {});
@@ -170,7 +193,7 @@ const server = http.createServer((req, res) => {
     await page.keyboard.press('Control+b'); await page.keyboard.press('Control+k');
     assert(await page.locator('#popup .command-panel').count() === 1 && await page.locator('#popup [aria-modal=true]').count() === 0 && !await page.locator('#main').evaluate(e => e.inert), 'command panel became modal');
     await page.keyboard.press('Escape');
-    results.push('PASS A6/A15: confirmations, path warning, RAM, URL, rename, ask and uninstall; initial focus, Tab/Shift+Tab, inert, Esc, restore, safe Enter; Back, layout shortcut and nonmodal command panel');
+    results.push('PASS A6/A15: confirmations, path warning, RAM, URL, rename, ask and uninstall; initial focus, Tab/Shift+Tab, inert, Esc, restore; Enter confirms, Enter on Cancel cancels, ctrl+backslash passes; Back, layout shortcut and nonmodal command panel');
     async function dialogVisible() { return await page.locator('#popup [role=dialog]').isVisible(); }
     assert(errors.length === 0, 'browser errors: ' + errors.join('; '));
     await page.screenshot({path:path.join(checkRoot, 'editor.png')});

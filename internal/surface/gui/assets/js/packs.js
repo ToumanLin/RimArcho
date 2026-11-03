@@ -393,8 +393,9 @@ function syncMeasure() {
     step.classList.remove("bad", "warn");
     const text = step.querySelector(".x");
     text.replaceChildren(B.error ? el("span", "err", B.error) : shimmer(T("checking the list…"), key === "textures" ? 3 : 1));
-    // a failed count keeps count the textures, to try again
-    step.querySelectorAll(B.loading ? "ul, button" : "ul").forEach((n) => n.remove());
+    // a failed count keeps count the textures, to try again; the step's own buttons go while
+    // counting, never the textures choice in its body (it keeps its value and focus)
+    step.querySelectorAll(B.loading ? "ul, :scope > button" : "ul").forEach((n) => n.remove());
   }
   const size = $("#pk-size");
   if (size) size.replaceChildren(B.error ? el("span", "err", B.error) : shimmer(T("checking the list…"), 1));

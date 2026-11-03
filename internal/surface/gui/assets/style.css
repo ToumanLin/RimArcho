@@ -441,6 +441,8 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 
 /* ---- pages (the sidebar's entries): a head, then cards; centred within 1200px like magpie's ---- */
 #screen { position: absolute; inset: 0; background: var(--bg); overflow-y: auto; z-index: 10; }
+/* focus lands on the page or a confirmation itself only to keep it in the dialog or page (06 §11 A1, A6); no ring */
+#board:focus, #screen:focus, .pop:focus { outline: none; }
 .page { padding: 0 max(20px, calc(50% - 600px)) 24px; display: flex; flex-direction: column; gap: var(--card-gap); }
 /* a new page fades in and rises 4px; a redraw of the page shown does not */
 .page.enter { animation: view-in var(--t-enter) var(--ease); }

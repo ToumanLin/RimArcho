@@ -192,6 +192,7 @@ The TUI retains its editor full-screen details with Tab subsections and its inve
 - **Confirm actions that RimArcho cannot undo.**
   - The TUI requires the same key twice. The first press shows ✗ press R again: … in the status line; repeating the key executes, while another key cancels and reports cancelled.
   - The GUI dialog shows `view.Action.Warn`; Can it run uses inline confirmation (§5).
+  - The GUI dialog is modal (§11 A6): focus starts on the dialog itself, so `enter` confirms as the confirm button's key cap shows, while `tab` reaches Cancel first and `enter` there cancels; `esc` cancels; the page behind is inert; on close, focus returns to the opener, or to the page if the opener is gone. The RAM warning and the uninstall confirmation start on Cancel and have no `enter` key cap. Prompts (URL, rename, note) start in their field. `ctrl+b`, `ctrl+k` and `ctrl+\` still work over a dialog.
   - These actions currently include deleting a plan; identity answers s/c/u, whose Lineage merge or split cannot be undone; unhide and unpin, which rename About.xml; trash, recycling a pack, or deleting files copied by an unfinished build; and settings actions to forget a folder, download about 50 MB of community data, or run gc.
 - **Recycle and rename actions** unhide, unpin, and trash show a --dry-run preview before confirmation (08 §6, §7).
 - **Uninstall** shows a preview followed by one confirmation. See §2.14 for its contents and focus, and 01 §4.1 for its scope.

@@ -32,6 +32,8 @@ Accessibility is intended to let AI agents operate without screenshots. Define a
 
 2026-11-02: criteria defined as 06 §11 A1–A18, with a baseline in [research/2026-11-02_gui-accessibility.md](docs/research/2026-11-02_gui-accessibility.md). Nothing passes in full. Desktop agents already read the page through COM UIA (A17 partial; the baseline's "only the window" came from the .NET client). Next: hide the editor behind secondary pages, give lists and tables row semantics, and give dialogs a focus boundary.
 
+2026-11-02 (later): those three are done (A1, A6, A8, A9, A15 pass). Next: name the remaining fields and icons (A2, A10), tell same-name controls apart (A5), menu and command-panel semantics (A7), progress and messages as status (A11, A12).
+
 ## New Mod Project
 Allow player to initialize a new mod project
 

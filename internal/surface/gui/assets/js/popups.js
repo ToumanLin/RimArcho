@@ -25,6 +25,8 @@ function modal(pop, p) {
   pop.addEventListener("keydown", e => {
     if (e.isComposing) return;
     if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && ["b", "k"].includes(e.key.toLowerCase())) return;
+    // ctrl+\ shows the reference numbers (refnums.js, on the window) over a dialog too.
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.code === "Backslash" || e.key === "\\" || e.key === "|")) return;
     e.stopPropagation();
     if (e.key === "Escape") { e.preventDefault(); close(); return; }
     if (e.key === "Tab") {
@@ -32,7 +34,9 @@ function modal(pop, p) {
         .filter(n => n.tabIndex >= 0 && !n.disabled && !n.closest("[inert]") && n.checkVisibility());
       const i = controls.indexOf(document.activeElement);
       e.preventDefault();
-      (controls[(i + (e.shiftKey ? controls.length - 1 : 1)) % controls.length] || pop).focus();
+      // From the dialog itself (a confirmation's start), Tab goes to the first control, shift+Tab to the last.
+      const next = i < 0 ? (e.shiftKey ? controls.length - 1 : 0) : (i + (e.shiftKey ? controls.length - 1 : 1)) % controls.length;
+      (controls[next] || pop).focus();
       return;
     }
     if ((e.key === "Enter" || e.key === " ") && e.target.closest("button")) {
@@ -48,7 +52,11 @@ function modal(pop, p) {
       document.querySelector('#screen[role="main"], #board:not([inert])');
     target?.focus({ preventScroll: true, focusVisible: target === opener && p.openerFocusVisible });
   };
-  const initial = pop.querySelector('input:not([type=checkbox]):not([type=radio])') || pop.querySelector(".btns button");
+  // A confirmation starts on the dialog itself: Enter confirms, as its enter key cap says, and
+  // no button is pre-selected; Tab reaches Cancel. A prompt starts in its field; the RAM warning
+  // and uninstall on their Cancel, as they always have.
+  if (p.kind === "confirm") pop.tabIndex = -1;
+  const initial = p.kind === "confirm" ? pop : pop.querySelector('input:not([type=checkbox]):not([type=radio])') || pop.querySelector(".btns button");
   if (initial?.matches("input")) requestAnimationFrame(() => { if (S.popup === p) initial.focus({ preventScroll: true }); });
   else initial?.focus({ preventScroll: true, focusVisible: false });
 }
@@ -289,10 +297,8 @@ export function panel(title, content, goLabel, go, cls = "", envWrite = "") {
     }
     pop.append(btns);
     p.keys = (e) => {
-      if (e.key === "Enter" && go) {
-        e.preventDefault();
-        document.activeElement?.closest("button")?.click();
-      }
+      // Enter on a focused button presses it (the modal handler); anywhere else it confirms.
+      if (e.key === "Enter" && go) { e.preventDefault(); pop.querySelector(".btns .go").click(); }
       else if (e.key === "PageDown") body.scrollTop += body.clientHeight * 0.9;
       else if (e.key === "PageUp") body.scrollTop -= body.clientHeight * 0.9;
       else if (e.key === "ArrowDown") body.scrollTop += 40;

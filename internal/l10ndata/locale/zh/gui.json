@@ -1,5 +1,4 @@
 {
-  "breadcrumbs": "面包屑导航",
   "%d enabled, in the order the game loads them": "启用了 %d 个，按游戏加载的顺序",
   "%d mods": "%d 个 Mod",
   "%d mods found": "找到 %d 个 Mod",
@@ -63,6 +62,7 @@
   "background set": "已换背景",
   "between areas: enable, disable, stage; within Enabled: reorder": "在各区之间：启用、停用、暂存；在“已启用”内：调整顺序",
   "blur": "模糊",
+  "breadcrumbs": "面包屑导航",
   "cancelled %s, %s: nothing was touched": "已取消 %s，%s：什么都没动",
   "center": "居中",
   "choose a pack": "选择整合包",
