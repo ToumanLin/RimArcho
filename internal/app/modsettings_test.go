@@ -256,3 +256,71 @@ func TestModSettingsHugsLib(t *testing.T) {
 		t.Fatalf("a hidden setting is shown:\n%s", out)
 	}
 }
+
+// 06 §2.9, 01 §4: archo mod-settings set changes stored simple values after a backup; a dry
+// run writes nothing; a Mod with several files names one; a running game refuses.
+func TestModSettingsSet(t *testing.T) {
+	t.Parallel()
+	e := loadoutEnv(t)
+	scanNow(t, e)
+	cfg := filepath.Join(e.UserData, "Config", "Mod_1001_AMod.xml")
+	const file = `<?xml version="1.0" encoding="utf-8"?>
+<SettingsBlock>
+  <ModSettings Class="A.Settings">
+    <on>True</on>
+    <scale>0.5</scale>
+    <count>3</count>
+    <names>
+      <li>x</li>
+    </names>
+  </ModSettings>
+</SettingsBlock>
+`
+	e.WriteFile(cfg, file)
+	out := e.MustRun("mod-settings", "set", "pkg:tester.a", "on=off", "--dry-run")
+	if !strings.Contains(out, "would change 1 value in Mod_1001_AMod.xml") || !strings.Contains(out, "on: True → False") || !strings.Contains(out, "archo mod-settings set "+strings.TrimPrefix(refOf(t, e, "A", source.Workshop), "#")+" on=off") {
+		t.Fatalf("dry run:\n%s", out)
+	}
+	if readFile(t, cfg) != file {
+		t.Fatal("the dry run wrote")
+	}
+	out = e.MustRun("mod-settings", "set", "pkg:tester.a", "on=off", "scale=2", "--reset", "count")
+	for _, want := range []string{"changed 3 values", "scale: 0.5 → 2.0", "count: 3 → removed (the Mod uses its default)", "backup:"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in:\n%s", want, out)
+		}
+	}
+	want := strings.NewReplacer("<on>True</on>", "<on>False</on>", "<scale>0.5</scale>", "<scale>2.0</scale>", "\n    <count>3</count>", "").Replace(file)
+	if got := readFile(t, cfg); got != want {
+		t.Fatalf("file:\n%s\nwant\n%s", got, want)
+	}
+	if readFile(t, cfg+".rimarcho.bak") != file {
+		t.Fatal("the backup is not the file before the change")
+	}
+	for _, c := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"names=y"}, "change it in the game"},
+		{[]string{"other=1"}, "does not store it"},
+		{[]string{"scale=1,5"}, "decimal point"},
+		{[]string{"scale"}, "write <name>=<value>"},
+		{nil, "nothing to change"},
+	} {
+		if out, code := e.Run(append([]string{"mod-settings", "set", "pkg:tester.a"}, c.args...)...); code == 0 || !strings.Contains(out, c.want) {
+			t.Fatalf("%v: %d\n%s", c.args, code, out)
+		}
+	}
+	// with a HugsLib pack too, the file is named
+	e.WriteFile(filepath.Join(e.UserData, "HugsLib", "ModSettings.xml"), `<settings><tester.a><raids>True</raids></tester.a></settings>`)
+	if out, code := e.Run("mod-settings", "set", "pkg:tester.a", "raids=off"); code == 0 || !strings.Contains(out, "has 2 settings files; name one: AMod, hugslib:tester.a") {
+		t.Fatalf("two files: %d\n%s", code, out)
+	}
+	if out := e.MustRun("mod-settings", "set", "pkg:tester.a", "raids=off", "--file", "hugslib:tester.a"); !strings.Contains(out, "raids: True → False") {
+		t.Fatalf("a HugsLib value:\n%s", out)
+	}
+	e.App.GameProbe = func(string) *app.GameRun { return &app.GameRun{PID: 9} }
+	if out, code := e.Run("mod-settings", "set", "pkg:tester.a", "on=on", "--file", "AMod"); code == 0 || !strings.Contains(out, "the game is running") {
+		t.Fatalf("a running game: %d\n%s", code, out)
+	}
+}

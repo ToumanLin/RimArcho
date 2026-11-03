@@ -78,6 +78,7 @@ static class Tests
             new HugsLibPack { Id = "APack", PackageId = "a.mod", Folder = "A", Title = "A mod", Handles = new System.Collections.Generic.List<HugsLibHandle> {
                 new HugsLibHandle { Name = "raids", Title = "Raids", Description = "More raids", Value = "True", Default = "False", Type = "Boolean" },
                 new HugsLibHandle { Name = "seen", Value = "3", Default = "0", Type = "Int32", Hidden = true },
+                new HugsLibHandle { Name = "mode", Title = "Mode", Value = "Hard", Default = "Normal", Type = "Mode", Choices = new[] { "Easy", "Normal", "Hard" } },
             } },
         });
         Writer.Close();
@@ -123,9 +124,10 @@ static class Tests
         Check(hugs.GetProperty("kind").GetString() == "hugslib", "hugslib line: " + lines[8]);
         var pack = hugs.GetProperty("context").GetProperty("hugslib")[0];
         var handles = pack.GetProperty("settings");
-        Check(pack.GetProperty("id").GetString() == "APack" && pack.GetProperty("packageId").GetString() == "a.mod" && pack.GetProperty("full").GetBoolean() && handles.GetArrayLength() == 2, "hugslib pack");
+        Check(pack.GetProperty("id").GetString() == "APack" && pack.GetProperty("packageId").GetString() == "a.mod" && pack.GetProperty("full").GetBoolean() && handles.GetArrayLength() == 3, "hugslib pack");
         Check(handles[0].GetProperty("title").GetString() == "Raids" && handles[0].GetProperty("default").GetString() == "False" && !handles[0].TryGetProperty("hidden", out _), "hugslib setting");
         Check(!handles[1].TryGetProperty("title", out _) && handles[1].GetProperty("hidden").GetBoolean() && handles[1].GetProperty("type").GetString() == "Int32", "hidden hugslib setting");
+        Check(!handles[0].TryGetProperty("choices", out _) && handles[2].GetProperty("choices").GetArrayLength() == 3 && handles[2].GetProperty("choices")[2].GetString() == "Hard", "enum choices");
         var exit = JsonDocument.Parse(lines[9]).RootElement;
         Check(exit.GetProperty("kind").GetString() == "exit", "exit line");
         Directory.Delete(dir, true);

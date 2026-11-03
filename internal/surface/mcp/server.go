@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -281,6 +282,33 @@ type RefIn struct {
 	Ref string `json:"ref" jsonschema:"a mod reference: #<id>, L#<lineage>, pkg:<packageId>, ws:<workshopId> or src:<label>"`
 }
 
+// ModSettingsSetIn is set_mod_settings: archo mod-settings set (06 §2.9 "Mod settings").
+type ModSettingsSetIn struct {
+	Env    string            `json:"env,omitempty" jsonschema:"environment name (default: current)"`
+	Ref    string            `json:"ref" jsonschema:"the mod: #<id>, L#<lineage>, pkg:<packageId>, ws:<workshopId>"`
+	File   string            `json:"file,omitempty" jsonschema:"which settings when the Mod has several: its Mod class or hugslib:<pack>, as get_mod_settings names them"`
+	Set    map[string]string `json:"set,omitempty" jsonschema:"setting name (or HugsLib title) → new value: on/off, a number, one line of text, a HugsLib choice"`
+	Reset  []string          `json:"reset,omitempty" jsonschema:"settings whose stored value is removed: the Mod uses its default"`
+	DryRun bool              `json:"dry_run,omitempty" jsonschema:"check and show the change without writing"`
+}
+
+// ModSettingsSetArgv maps set_mod_settings to its command (set pairs in name order).
+func ModSettingsSetArgv(in ModSettingsSetIn) []string {
+	b := argv("mod-settings", "set", in.Ref)
+	names := make([]string, 0, len(in.Set))
+	for k := range in.Set {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+	for _, k := range names {
+		b.a = append(b.a, k+"="+in.Set[k])
+	}
+	for _, r := range in.Reset {
+		b.str("reset", r)
+	}
+	return b.str("file", in.File).flag("dry-run", in.DryRun).a
+}
+
 // ModSettingsIn is get_mod_settings: archo mod-settings (06 §2.9 "Mod settings").
 type ModSettingsIn struct {
 	Env string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
@@ -551,6 +579,7 @@ func toolList() []tool {
 			return argv("save").flag("dry-run", in.DryRun).flag("move-duplicates", in.MoveDuplicates).a
 		}),
 		reg("set_player_data", false, false, descPlayer, func(in PlayerIn) []string { return PlayerArgv(in) }).allOnly(),
+		reg("set_mod_settings", false, false, descModSettingsSet, func(in ModSettingsSetIn) []string { return ModSettingsSetArgv(in) }).allOnly(),
 		reg("pin_mod", false, false, descPin, func(in PinIn) []string {
 			return argv("pin", in.Ref).str("name", in.Name).flag("git", in.Git).flag("update", in.Update).flag("move-to-library", in.MoveToLibrary).str("reason", in.Reason).flag("dry-run", in.DryRun).a
 		}),

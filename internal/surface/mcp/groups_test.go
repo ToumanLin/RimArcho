@@ -41,8 +41,8 @@ func TestToolGroups(t *testing.T) {
 		t.Errorf("core tools:\n got %v\nwant %v", got, want)
 	}
 	all := listed(t, connect(t, e))
-	if len(all) != 41 || len(mcp.Tools()) != 41 {
-		t.Errorf("all: %d tools listed, table %d; want 41", len(all), len(mcp.Tools()))
+	if len(all) != 42 || len(mcp.Tools()) != 42 {
+		t.Errorf("all: %d tools listed, table %d; want 42", len(all), len(mcp.Tools()))
 	}
 	// The table, the catalog and the guide's marking agree on every tool's group.
 	for _, d := range mcp.Catalog() {
@@ -60,8 +60,8 @@ func TestToolGroups(t *testing.T) {
 			t.Errorf("%s: not served by --tools all", d.Name)
 		}
 	}
-	if len(cmds.AllOnlyTools) != 41-len(coreTools) {
-		t.Errorf("cmds.AllOnlyTools has %d tools, want %d", len(cmds.AllOnlyTools), 41-len(coreTools))
+	if len(cmds.AllOnlyTools) != 42-len(coreTools) {
+		t.Errorf("cmds.AllOnlyTools has %d tools, want %d", len(cmds.AllOnlyTools), 42-len(coreTools))
 	}
 	// A core client still calls a core tool and cannot call an all-only one.
 	cs := connectGroup(t, e, mcp.Core)

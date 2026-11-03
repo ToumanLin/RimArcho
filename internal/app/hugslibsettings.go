@@ -122,7 +122,8 @@ type HugsLibRow struct {
 	Name        string // the element name
 	Title       string // HugsLib's dialog title ("" unknown)
 	Description string
-	Type        string // the value type's simple name ("" unknown)
+	Type        string   // the value type's simple name ("" unknown)
+	Choices     []string // an enum's names, from the record
 	Value       SettingValue
 	Default     SettingValue // valid when Recorded
 	Recorded    bool         // the record names it
@@ -145,7 +146,7 @@ func HugsLibRows(rec *SeenHugsLibPack, sc *SettingsContent) (rows []HugsLibRow, 
 				hidden++
 				continue
 			}
-			row := HugsLibRow{Name: h.Name, Title: h.Title, Description: h.Description, Type: h.Type, Recorded: true,
+			row := HugsLibRow{Name: h.Name, Title: h.Title, Description: h.Description, Type: h.Type, Choices: h.Choices, Recorded: true,
 				Default: SettingValue{Key: h.Name}}
 			classifySetting(&row.Default, h.Default, childCount{})
 			row.Value = row.Default

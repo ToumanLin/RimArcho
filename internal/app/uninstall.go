@@ -982,10 +982,24 @@ func restoreModsConfig(path string) error {
 
 func removeBackup(path string) error {
 	os.Remove(path + ".rimarcho.tmp")
+	removeSettingsBackups(filepath.Dir(path))
 	if err := os.Remove(path + loadout.BackupSuffix); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	return nil
+}
+
+// removeSettingsBackups removes the backups RimArcho made before changing Mod settings
+// (06 §2.9) in a user data folder's Config folder (configDir): Config/Mod_*.xml.rimarcho.bak
+// and HugsLib's. The changed values stay: they are the player's.
+func removeSettingsBackups(configDir string) {
+	ents, _ := os.ReadDir(configDir)
+	for _, e := range ents {
+		if n := e.Name(); strings.HasPrefix(n, "Mod_") && strings.HasSuffix(n, ".xml"+loadout.BackupSuffix) && e.Type().IsRegular() {
+			os.Remove(filepath.Join(configDir, n))
+		}
+	}
+	os.Remove(filepath.Join(filepath.Dir(configDir), HugsLibSettingsFile+loadout.BackupSuffix))
 }
 
 // replaceFile writes a temporary file beside path and renames it over (no backup: the

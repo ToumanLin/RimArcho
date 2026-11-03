@@ -32,7 +32,7 @@ AI assistants are a second user class (00 §3.2), so **every action available to
 
 When adding a player action, add its CLI command and MCP tool at the same time. Tool writes use the same operation functions and undo history (04 §3).
 
-Every tool exists, but `archo mcp` serves only the core group by default (§5.1, §5.2), because each listed tool costs agent context on every turn. The tools for these actions are served only by `archo mcp --tools all`; a core session can run the same CLI commands: packs (`manage_packs`), subscriptions (`manage_subscriptions`), library actions (`manage_library`), list exchange (`exchange_list`), textures (`manage_textures`), the memory estimate (`estimate_memory`), maintenance (`maintenance`), identity answers (`resolve_identity`), hidden Mods (`manage_hidden`), links (`check_links`, `repair_links`), version reminders (`mute_version_warnings`), player data (`set_player_data`) and the uninstall preview (`preview_uninstall`). A new tool joins the core group only when agents need it to diagnose, edit, save, launch or test a plan.
+Every tool exists, but `archo mcp` serves only the core group by default (§5.1, §5.2), because each listed tool costs agent context on every turn. The tools for these actions are served only by `archo mcp --tools all`; a core session can run the same CLI commands: packs (`manage_packs`), subscriptions (`manage_subscriptions`), library actions (`manage_library`), list exchange (`exchange_list`), textures (`manage_textures`), the memory estimate (`estimate_memory`), maintenance (`maintenance`), identity answers (`resolve_identity`), hidden Mods (`manage_hidden`), links (`check_links`, `repair_links`), version reminders (`mute_version_warnings`), player data (`set_player_data`), Mod settings changes (`set_mod_settings`) and the uninstall preview (`preview_uninstall`). A new tool joins the core group only when agents need it to diagnose, edit, save, launch or test a plan.
 
 The following table maps player actions to tools. Missing tools are marked **not implemented**:
 
@@ -210,7 +210,8 @@ Commands and output call a plan Loadout / plan. The editing commands below act o
 | | `list [--active] [--filter <expression>] [--all]` | List `Mods`. Active lists the current plan in load order. Filters accept `source:``<label\|kind>`, `status:live\|tombstone\|all`, residue, unloadable, copies, `pkg:`, `ws:`, `tag:`, `lineage:`, and plain words. By default, list only live Instances. |
 | | `find <words…> [--all]` | Search by name, alias, package ID, author, Workshop ID, or folder. |
 | | `mod <reference> [--diff <reference>]` | Show Mod details; the diff option lists semantic files that differ from another Instance. A Mod with settings gets a settings section (06 §2.9 "Mod settings"). |
-| | `mod-settings [<reference>] [--all]` | Mod settings, read only (06 §2.9 "Mod settings"): the current list's Mods that have settings, or what one Mod's settings files store. |
+| | `mod-settings [<reference>] [--all]` | Mod settings (06 §2.9 "Mod settings"): the current list's Mods that have settings, or what one Mod's settings files and HugsLib packs store. |
+| | `mod-settings set <reference> [<name>=<value>…] [--reset <name>]… [--file <key>] [--dry-run]` | Change a Mod's simple settings values while no game runs, after backing the file up (06 §2.9 "Changing values"). |
 | | `describe <reference> [--source auto\|about\|workshop\|both] [--refresh] [--offline]` | Show the `About` description (descriptionsByVersion for the game version) and the Workshop description (BBCode converted to plain text, with images as `[image: URL]`). See 06 §4.3 for auto selection, networking, and caching. Offline reads only the cache. |
 | | `def [<Type/defName>] [--mod <reference>] [--all]` | List the definers and patchers of a Def in load order, marking the effective one, or list all `Defs` in a Mod. |
 | | `patches [--mod <reference>] [--target <Type/defName \| XPath-fragment>] [--failed] [--all]` | Show patch operations and simulation results. Failed lists only patches with no match and their reasons (03 §4.4). |
@@ -345,6 +346,7 @@ Annotations follow the MCP specification; the external harness decides whether t
 | `plan_history` | `loadout log`, diff, and history (`action=steps`) | true | — |
 | `pin_mod` | pin (ref, name, git, update, `move_to_library`, reason, and `dry_run`); reason is stored in the copy's origin and shown in its copy notes (06 §2.9). | false | false |
 | `unpin_mod` | unpin (ref and `dry_run`) | false | false |
+| `set_mod_settings` | mod-settings set (ref; set as `name=value` pairs in name order; each reset; file; `dry_run`) | false | false |
 | `set_player_data` | The action is `tag_add` or `tag_remove` (refs and tags), alias or note (text; an empty string clears it), or `copy_note` (the note for one copy, using note `<reference>` `<text>` --copy; an empty string clears it, 06 §2.9). | false | false |
 | `manage_rules` | `rule add/list/remove` (action, kind, a, b, target, note, and rule) | false | false |
 | `ignore_problem` | `problems ignore` or unignore (undo) | false | false |
@@ -413,7 +415,8 @@ The following table gives the tool guide highlights. See `internal/cmds/guide_to
 | `status` | Use it first in a session. For one Mod, use `get_mod`; for the findings themselves, use `list_problems`. |
 | `find_mods` | Search by name, package ID, author, Workshop ID, or folder. A package ID may identify several Instances; the output lists a reference for every candidate. Use `get_mod` next. |
 | `get_mod` | Get all facts for one Instance. An ambiguous reference returns candidates rather than choosing one arbitrarily. |
-| `get_mod_settings` | Read what a Mod's settings files and HugsLib packs store, its settings window and HugsLib titles and defaults as Archo Monitor last saw them, or which Mods of the current list have settings; values change only in the game. |
+| `get_mod_settings` | Read what a Mod's settings files and HugsLib packs store, its settings window and HugsLib titles and defaults as Archo Monitor last saw them, or which Mods of the current list have settings. |
+| `set_mod_settings` | Change simple settings values (on/off, numbers, one line of text, a HugsLib choice) or reset them, with the game closed; the file is backed up first. |
 | `get_def` | Use it for No ThingDef named X, duplicate Defs, or which Mod wins. |
 | `get_patches` | Use it for a logged Patch operation failed; `failed=true` gives the reason. |
 | `get_harmony` | Use it for PREFIX/POSTFIX stack lines or `Mods` touching `Pawn.Tick`; next, use `read_source` on the patch class. A bool-returning prefix may skip the original method. Patches applied in code through `Harmony.Patch` are marked as not statically resolvable. |

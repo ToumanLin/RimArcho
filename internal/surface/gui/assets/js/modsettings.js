@@ -1,7 +1,8 @@
 // Mod library › Mod settings (06 §2.9 "Mod settings"): the current list's Mods that have
-// settings, one row per settings file (its window's title, how many values it stores, its
-// size), and on the right what the cursor's file stores. Read only: values change in the
-// game's settings window. The table follows 06 §3.9; the gap between the cards drags (§3.1).
+// settings, one row per settings file or HugsLib pack (its window's title, how many values
+// it stores, its size), and on the right what the cursor's file stores. On/off, numbers, text
+// and HugsLib choices change there while no game runs; the rest in the game. The table
+// follows 06 §3.9; the gap between the cards drags (§3.1).
 import { pathContent } from "./fields.js";
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { beginPageRead, page, area, act } from "./screens.js";
@@ -46,7 +47,7 @@ function build() {
   const sc = $("#screen");
   sc.innerHTML = "";
   const mods = new Set(p.rows.map((r) => r.instance)).size;
-  const lead = p.rows.length ? Tf("%d mods of %s have settings; read only: change values in the game", mods, p.plan) : "";
+  const lead = p.rows.length ? Tf("%d mods of %s have settings", mods, p.plan) : "";
   const w = page("fill modsettings", lead, act(T("open the Config folder"), "export", () => openFolder(), "ctrl+o"));
   tableCard = detailCard = null; rowEls = [];
   if (!p.rows.length) {
@@ -180,12 +181,17 @@ function drawDetail(d, keep = false) {
     if (!d.window.full) body.append(el("p", "ms-note muted", T("the window draws more than Archo Monitor keeps")));
     if (d.values?.length || d.exists) body.append(el("h3", "ms-sub", T("stored in the file")));
   }
+  const editing = d.editable && !d.loading && !X.page?.locked;
+  if (d.editable && X.page?.locked) body.append(el("p", "ms-note ms-locked", X.page.locked));
   if (d.values?.length) {
     const kv = el("dl", "ms-values");
     for (const v of d.values) {
-      const dd = el("dd", "ms-v " + v.kind + (v.fixed ? " fixed" : "") + (v.atDefault ? " at-default" : ""), v.text);
+      const dd = el("dd", "ms-v " + v.kind + (v.fixed ? " fixed" : "") + (v.atDefault ? " at-default" : ""));
+      if (editing && v.edit) dd.append(editor(d, v));
+      else dd.append(document.createTextNode(v.text));
       if (v.default) dd.append(el("span", "ms-def", Tf("default %s", v.default)));
-      dd.title = dd.textContent;
+      if (editing && v.edit && v.stored) dd.append(resetButton(d, v));
+      dd.title = v.text + (v.default ? "  " + Tf("default %s", v.default) : "");
       const dt = el("dt", v.name ? "ms-title" : "", v.key);
       dt.title = [v.name, v.help].filter(Boolean).join("\n") || v.key;
       kv.append(dt, dd);
@@ -196,6 +202,99 @@ function drawDetail(d, keep = false) {
   detailCard.append(head, body);
   body.scrollTop = top;
   if (focused) body.focus({ preventScroll: true });
+}
+
+// editor is a value's control: a switch for on/off, a list for a choice, else the value as a
+// button that turns into a field (Enter saves, Esc leaves it).
+function editor(d, v) {
+  const name = v.name || v.key;
+  const label = Tf("change %s", v.key);
+  if (v.edit === "bool") {
+    const on = v.value.toLowerCase() === "true";
+    const b = el("button", "ms-edit ms-switch" + (on ? " on" : ""), v.text);
+    b.type = "button";
+    b.setAttribute("role", "switch");
+    b.setAttribute("aria-checked", String(on));
+    b.setAttribute("aria-label", v.key);
+    b.dataset.name = name;
+    b.onclick = () => change(d, v, on ? "False" : "True");
+    return b;
+  }
+  if (v.edit === "choice") {
+    const s = el("select", "ms-edit ms-choice");
+    s.setAttribute("aria-label", v.key);
+    s.dataset.name = name;
+    for (const c of v.choices || []) {
+      const o = el("option", "", c);
+      o.value = c;
+      s.append(o);
+    }
+    s.value = v.value;
+    s.onchange = () => change(d, v, s.value);
+    return s;
+  }
+  const b = el("button", "ms-edit ms-field", v.text);
+  b.type = "button";
+  b.title = label;
+  b.setAttribute("aria-label", label);
+  b.dataset.name = name;
+  b.onclick = () => {
+    const input = el("input", "ms-input");
+    input.type = "text";
+    input.inputMode = v.edit === "text" ? "text" : "decimal";
+    input.value = v.value;
+    input.setAttribute("aria-label", v.key);
+    input.dataset.name = name;
+    let done = false;
+    const leave = () => { if (!done) { done = true; input.replaceWith(b); b.focus({ preventScroll: true }); } };
+    input.onkeydown = (e) => {
+      if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); done = true; change(d, v, input.value); }
+      else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); leave(); }
+    };
+    input.onblur = () => leave();
+    b.replaceWith(input);
+    input.focus();
+    input.select();
+  };
+  return b;
+}
+
+function resetButton(d, v) {
+  const b = el("button", "ms-reset", T("reset"));
+  b.type = "button";
+  b.title = T("remove the stored value: the Mod uses its default");
+  b.setAttribute("aria-label", Tf("reset %s to its default", v.key));
+  b.onclick = () => change(d, v, "", true);
+  return b;
+}
+
+// change writes one value (06 §2.9): the reply's file replaces the values, and the row's
+// count follows; a refusal reads the file again.
+async function change(d, v, value, reset = false) {
+  const r = X.rows.find((x) => x.key === d.key);
+  if (!r) return;
+  const name = v.name || v.key;
+  let res;
+  try {
+    res = await api.SetModSetting(r.instance, r.class, name, value, v.stored ? v.value : "", reset);
+  } catch (e) {
+    say("fail", errText(e));
+    X.detail = null;
+    showDetail(0);
+    return;
+  }
+  say("ok", res.message, false, res.backup ? [res.backup] : []);
+  if (res.detail && X.at === d.key) {
+    X.detail = res.detail;
+    drawDetail(res.detail, true);
+    detailCard?.querySelector(`[data-name="${CSS.escape(name)}"]`)?.focus({ preventScroll: true });
+  }
+  if (res.detail?.exists !== undefined) {
+    r.exists = res.detail.exists || res.detail.stored > 0;
+    r.count = res.detail.stored;
+    r.values = String(res.detail.stored);
+    drawRows();
+  }
 }
 
 async function openFolder() {

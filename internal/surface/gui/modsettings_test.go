@@ -1,10 +1,12 @@
 package gui
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -62,7 +64,7 @@ func TestModSettingsPage(t *testing.T) {
 	if d.Type != "Alpha.Settings" || strings.Join(got, " ") != "on=on scale=0.5 names=list of 2" || !d.Values[2].Fixed || d.Values[0].Fixed {
 		t.Fatalf("values: %+v", d)
 	}
-	if !strings.Contains(strings.Join(d.Notes, "\n"), "read only") {
+	if !strings.Contains(strings.Join(d.Notes, "\n"), "backed up first") {
 		t.Fatalf("notes: %q", d.Notes)
 	}
 	if d, err := api.ModSettingsFile(r.Instance, "Gone"); err != nil || d.Error == "" {
@@ -85,4 +87,52 @@ func TestModSettingsPage(t *testing.T) {
 	if row == nil || row.Value != "4 stored values" || row.Act != view.ActSettings || row.Target != r.Instance {
 		t.Fatalf("detail settings row: %+v", row)
 	}
+
+	// Values change while no game runs, after a backup; the reply reads the file again.
+	if !d.Editable || d.Values[0].Edit != "bool" || d.Values[1].Edit != "number" || d.Values[2].Edit != "" || !d.Values[0].Stored {
+		t.Fatalf("editors: %+v", d)
+	}
+	e.App.GameProbe = func(string) *app.GameRun { return nil }
+	cfg := filepath.Join(e.UserData, "Config", "Mod_1001_AlphaMod.xml")
+	ch, err := api.SetModSetting(r.Instance, r.Class, "on", "off", "True", false)
+	if err != nil || ch.Message != "on is now off; the previous file is kept as Mod_1001_AlphaMod.xml.rimarcho.bak" || ch.Detail.Values[0].Value != "False" {
+		t.Fatalf("change: %+v %v", ch, err)
+	}
+	if got := readText(t, cfg); !strings.Contains(got, "<on>False</on><scale>0.5</scale>") {
+		t.Fatalf("file: %s", got)
+	}
+	if got := readText(t, cfg+".rimarcho.bak"); !strings.Contains(got, "<on>True</on>") {
+		t.Fatalf("backup: %s", got)
+	}
+	if _, err := api.SetModSetting(r.Instance, r.Class, "on", "on", "True", false); err == nil || !strings.Contains(err.Error(), "changed since it was read") {
+		t.Fatalf("a stale page: %v", err)
+	}
+	if _, err := api.SetModSetting(r.Instance, r.Class, "scale", "1,5", "0.5", false); err == nil || !strings.Contains(err.Error(), "decimal point") {
+		t.Fatalf("a bad number: %v", err)
+	}
+	// HugsLib: a choice is one of the record's
+	ch, err = api.SetModSetting(p.Rows[1].Instance, p.Rows[1].Class, "mode", "Brutal", "", false)
+	if err == nil {
+		t.Fatalf("a value not among the choices: %+v", ch)
+	}
+	if ch, err = api.SetModSetting(p.Rows[1].Instance, p.Rows[1].Class, "raids", "", "True", true); err != nil || ch.Message != "Raids is back to its default; the previous file is kept as ModSettings.xml.rimarcho.bak" {
+		t.Fatalf("HugsLib reset: %+v %v", ch, err)
+	}
+	// a running game locks the page and refuses
+	e.App.GameProbe = func(string) *app.GameRun { return &app.GameRun{PID: 7} }
+	if p, err := api.ModSettings(); err != nil || p.Locked == "" {
+		t.Fatalf("locked: %+v %v", p, err)
+	}
+	if _, err := api.SetModSetting(r.Instance, r.Class, "on", "on", "False", false); err == nil || !strings.Contains(err.Error(), "the game is running") {
+		t.Fatalf("a running game: %v", err)
+	}
+}
+
+func readText(t *testing.T, path string) string {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
 }

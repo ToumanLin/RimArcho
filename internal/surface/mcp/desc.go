@@ -19,6 +19,8 @@ const descStatus = `Overview of the current environment: game version, mods per 
 
 const descModSettings = `Mod settings, read only. No ref: the current list's Mods that have settings (window title, file, or defaults when there is none yet). ref: what one Mod's files and HugsLib packs store (a missing value is at its default; lists summarised), plus window labels and HugsLib titles and defaults as Archo Monitor saw them.`
 
+const descModSettingsSet = `Change a Mod's simple settings values with the game closed: on/off, numbers, one line of text, a HugsLib choice; reset removes a stored value. Config files: only values the file stores. Backs the file up to <file>.rimarcho.bak first. Next: get_mod_settings.`
+
 const descFind = `Find mods by name, packageId, author, workshop id or folder (query), or list them (no query; active=true: enabled mods in load order). A packageId can match several copies: each candidate is listed with its ref. Next: get_mod.`
 
 const descMod = `Everything about one mod instance: enabled state and position, lineage (other copies), declared dependencies / load order / incompatibilities, content counts, its problems, its path. Refs: #<id>, L#<id>, pkg:<packageId>, ws:<workshopId>; an ambiguous ref returns the candidates.`

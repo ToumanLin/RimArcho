@@ -388,13 +388,14 @@ type HugsLibPack struct {
 // HugsLibSetting is one HugsLib setting: its element name, what HugsLib's dialog shows, and
 // its value and default as text.
 type HugsLibSetting struct {
-	Name        string `json:"name"`
-	Title       string `json:"title,omitempty"`
-	Description string `json:"description,omitempty"`
-	Value       string `json:"value"`
-	Default     string `json:"default"`
-	Type        string `json:"type"` // the value type's simple name: Boolean, Int32, an enum's
-	Hidden      bool   `json:"hidden,omitempty"`
+	Name        string   `json:"name"`
+	Title       string   `json:"title,omitempty"`
+	Description string   `json:"description,omitempty"`
+	Value       string   `json:"value"`
+	Default     string   `json:"default"`
+	Type        string   `json:"type"` // the value type's simple name: Boolean, Int32, an enum's
+	Hidden      bool     `json:"hidden,omitempty"`
+	Choices     []string `json:"choices,omitempty"` // an enum's names (at most 50)
 }
 
 // MonitorRecords is what an Archo Monitor log recorded about Mod settings past an offset: the

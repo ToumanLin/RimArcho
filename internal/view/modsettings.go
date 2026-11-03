@@ -1,6 +1,7 @@
 package view
 
 import (
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -9,14 +10,15 @@ import (
 )
 
 // Mod library › Mod settings (06 §2.9 "Mod settings"): the current list's Mods that have
-// settings, one row per settings file or HugsLib settings pack, and what one stores. Read
-// only: values change in the game's settings window.
+// settings, one row per settings file or HugsLib settings pack, and what one stores. Simple
+// values change here while no game runs (app.EditModSettings); the rest in the game.
 
 // ModSettingsPage is the page's table.
 type ModSettingsPage struct {
 	Plan   string           `json:"plan"`
 	Config string           `json:"config"` // the Config folder read
 	Rows   []ModSettingsRow `json:"rows"`
+	Locked string           `json:"locked,omitempty"` // why values cannot change now (a game runs)
 }
 
 // ModSettingsRow is one Mod class's settings file, or one HugsLib pack.
@@ -75,20 +77,23 @@ func settingsTitle(f *app.ModSettingsFile) string {
 
 // ModSettingsDetail is what one settings file or HugsLib pack stores.
 type ModSettingsDetail struct {
-	Key    string       `json:"key"`
-	Kind   string       `json:"kind,omitempty"` // "hugslib": a HugsLib pack
-	Name   string       `json:"name"`
-	Title  string       `json:"title"`
-	Class  string       `json:"class"` // the Mod class (the file name's last part)
-	Type   string       `json:"type"`  // the settings type the file names
-	File   string       `json:"file"`
-	Path   string       `json:"path"`
-	Folder string       `json:"folder"` // the folder the game sees the Mod under
-	Exists bool         `json:"exists"`
-	Error  string       `json:"error,omitempty"`
-	Stored int          `json:"stored"` // values the file stores
-	Values []SettingRow `json:"values"`
-	Notes  []string     `json:"notes"`
+	Key    string `json:"key"`
+	Kind   string `json:"kind,omitempty"` // "hugslib": a HugsLib pack
+	Name   string `json:"name"`
+	Title  string `json:"title"`
+	Class  string `json:"class"` // the Mod class (the file name's last part)
+	Type   string `json:"type"`  // the settings type the file names
+	File   string `json:"file"`
+	Path   string `json:"path"`
+	Folder string `json:"folder"` // the folder the game sees the Mod under
+	Exists bool   `json:"exists"`
+	Error  string `json:"error,omitempty"`
+	Stored int    `json:"stored"` // values the file stores
+	// Editable: the values whose Edit is set can change here (the file reads; a Config file
+	// exists).
+	Editable bool         `json:"editable"`
+	Values   []SettingRow `json:"values"`
+	Notes    []string     `json:"notes"`
 	// Window is what the game's settings window drew when the player last opened it (Archo
 	// Monitor, 03 §6.7.1); nil when never seen.
 	Window *SettingsWindowView `json:"window,omitempty"`
@@ -123,6 +128,13 @@ type SettingRow struct {
 	AtDefault bool   `json:"atDefault,omitempty"`
 	Help      string `json:"help,omitempty"`
 	Name      string `json:"name,omitempty"`
+	// Edit is how the value changes here (app.SettingEditor): bool, integer, number, text or
+	// choice (Choices); "" read only. Value is the text the control starts from, Stored
+	// whether the file stores it (its old text then is Value, else "").
+	Edit    string   `json:"edit,omitempty"`
+	Choices []string `json:"choices,omitempty"`
+	Value   string   `json:"value,omitempty"`
+	Stored  bool     `json:"stored,omitempty"`
 }
 
 // ModSettingsFileDetail reads one of sm's files (class: its Mod class).
@@ -158,9 +170,10 @@ func ModSettingsFileDetail(sm *app.ModSettingsMod, class string) *ModSettingsDet
 		d.Error = Tf("cannot read the file: %v", err)
 		return d
 	}
-	d.Type, d.Stored = sc.Class, len(sc.Values)
+	d.Type, d.Stored, d.Editable = sc.Class, len(sc.Values), true
 	for _, v := range sc.Values {
-		d.Values = append(d.Values, SettingRow{Key: v.Key, Kind: v.Kind, Text: SettingText(v), Fixed: !v.Simple()})
+		d.Values = append(d.Values, SettingRow{Key: v.Key, Kind: v.Kind, Text: SettingText(v), Fixed: !v.Simple(),
+			Edit: app.ConfigEditor(v).Kind, Value: v.Value, Stored: true})
 	}
 	if len(sc.Values) == 0 {
 		d.Notes = append(d.Notes, T("the file stores no value: every value is at its default"))
@@ -173,7 +186,7 @@ func ModSettingsFileDetail(sm *app.ModSettingsMod, class string) *ModSettingsDet
 	if d.Window != nil {
 		d.Notes = append(d.Notes, T("the window part shows the game's window as it was when you last opened it"))
 	}
-	d.Notes = append(d.Notes, T("read only: change values in the game's Mod settings window"))
+	d.Notes = append(d.Notes, T("on/off, numbers and text change here while the game is closed; the file is backed up first"))
 	return d
 }
 
@@ -186,10 +199,12 @@ func hugsLibDetail(d *ModSettingsDetail, f *app.ModSettingsFile) {
 		d.Error = Tf("cannot read the file: %v", err)
 		return
 	}
-	d.Stored = len(sc.Values)
+	d.Stored, d.Editable = len(sc.Values), true
 	rows, hidden := app.HugsLibRows(f.HugsLib, sc)
 	for _, r := range rows {
-		row := SettingRow{Key: r.Name, Kind: r.Value.Kind, Text: SettingText(r.Value), Fixed: !r.Value.Simple(), Help: r.Description, AtDefault: !r.Stored}
+		ed := app.HugsLibEditor(r)
+		row := SettingRow{Key: r.Name, Kind: r.Value.Kind, Text: SettingText(r.Value), Fixed: !r.Value.Simple(), Help: r.Description, AtDefault: !r.Stored,
+			Edit: ed.Kind, Choices: ed.Choices, Value: r.Value.Value, Stored: r.Stored}
 		if r.Title != "" {
 			row.Key, row.Name = r.Title, r.Name
 		}
@@ -210,7 +225,50 @@ func hugsLibDetail(d *ModSettingsDetail, f *app.ModSettingsFile) {
 	if hidden > 0 {
 		d.Notes = append(d.Notes, Tf("%d settings the Mod keeps out of its window are not shown", hidden))
 	}
-	d.Notes = append(d.Notes, T("read only: change values in HugsLib's Mod settings window"))
+	d.Notes = append(d.Notes, T("on/off, numbers, text and choices change here while the game is closed; the file is backed up first"))
+}
+
+// SettingErrorText is a refused change as the page says it.
+func SettingErrorText(e *app.SettingInputError) string {
+	switch e.Code {
+	case "bool":
+		return Tf("%q is not on or off", e.Input)
+	case "integer":
+		return Tf("%q is not a whole number (RimArcho writes this value only as one)", e.Input)
+	case "number":
+		return Tf("%q is not a number (write a decimal point, not a comma)", e.Input)
+	case "line":
+		return T("the text must be one line")
+	case "choice":
+		return Tf("%q is not one of %s", e.Input, strings.Join(e.Choices, ", "))
+	case "fixed":
+		return T("RimArcho cannot change this value: change it in the game")
+	case "unknown":
+		return T("the file no longer has this setting: it has been read again")
+	case "changed":
+		return T("the file changed since it was read: it has been read again")
+	case "nofile":
+		return T("the Mod has no settings file yet: change a setting in the game once")
+	case "running":
+		return T("the game is running: close it first, or change the value in the game")
+	}
+	return e.Error()
+}
+
+// SettingsWriteText says what a change wrote: label is the setting as the page names it,
+// now its value as shown after.
+func SettingsWriteText(w *app.SettingsWrite, label, now string) string {
+	if len(w.Changes) == 0 {
+		return T("nothing changed: the value was already so")
+	}
+	msg := Tf("%s is now %s", label, now)
+	if w.Changes[0].Removed {
+		msg = Tf("%s is back to its default", label)
+	}
+	if w.Backup != "" {
+		msg = Tf("%s; the previous file is kept as %s", msg, filepath.Base(w.Backup))
+	}
+	return msg
 }
 
 func windowView(w *app.SeenSettingsWindow) *SettingsWindowView {

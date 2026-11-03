@@ -66,7 +66,7 @@ func TestToolsAndAnnotations(t *testing.T) {
 		"status": "ro", "find_mods": "ro", "get_mod": "ro", "get_mod_settings": "ro", "get_def": "ro", "get_patches": "ro", "get_harmony": "ro",
 		"explain_relation": "ro", "list_problems": "ro", "list_changes": "ro", "analyze_log": "ro", "search_files": "ro",
 		"read_source": "ro", "edit_loadout": "write", "save_loadout": "destructive",
-		"get_description": "ro", "set_player_data": "write",
+		"get_description": "ro", "set_player_data": "write", "set_mod_settings": "write",
 		"test_run":        "write",
 		"estimate_memory": "ro",
 		"check_links":     "ro", "repair_links": "destructive",

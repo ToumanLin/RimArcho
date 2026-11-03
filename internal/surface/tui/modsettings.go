@@ -11,7 +11,8 @@ import (
 )
 
 // Mod settings from the command palette (06 §2.9 "Mod settings"): the current list's Mods
-// that have settings as a panel, with up to settingsShown values of each file. Read only.
+// that have settings as a panel, with up to settingsShown values of each file. The panel
+// only reads: values change on the GUI page, with archo mod-settings set, or in the game.
 
 const settingsShown = 10
 
@@ -29,7 +30,7 @@ func (m *model) modSettingsPanel() tea.Cmd {
 func modSettingsText(l *app.ModSettingsList) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s: %s\n", T("folder"), l.Config)
-	b.WriteString(T("read only: change values in the game's Mod settings window") + "\n")
+	b.WriteString(T("change simple values on the GUI's Mod settings page, with archo mod-settings set, or in the game") + "\n")
 	if len(l.Mods) == 0 {
 		b.WriteString("\n" + T("no Mod of this list has a settings file, and Archo Monitor recorded no settings window yet") + "\n")
 		return b.String()

@@ -24,6 +24,7 @@ namespace ArchoMonitor
         internal string Value, Default; // as HugsLib writes them (ToString)
         internal string Type;  // the value type's simple name
         internal bool Hidden;  // never shown in the dialog
+        internal string[] Choices; // an enum's names; null otherwise
     }
 
     // HugsLibRecord writes, once per session after the start-up work queued with the main menu
@@ -35,7 +36,7 @@ namespace ArchoMonitor
     internal static class HugsLibRecord
     {
         internal const int MaxHandles = 300;
-        const int MaxText = 300;
+        const int MaxText = 300, MaxChoices = 50;
         static bool queued;
 
         internal static void Queue()
@@ -81,6 +82,7 @@ namespace ArchoMonitor
                         foreach (object h in handles)
                         {
                             if (hp.Handles.Count >= MaxHandles) break;
+                            var type = Prop(h, "ValueType") as Type;
                             hp.Handles.Add(new HugsLibHandle
                             {
                                 Name = Prop(h, "Name") as string ?? "",
@@ -88,7 +90,8 @@ namespace ArchoMonitor
                                 Description = Cut(Prop(h, "Description") as string),
                                 Value = Cut(Text(Prop(h, "Value"))),
                                 Default = Cut(Text(Prop(h, "DefaultValue"))),
-                                Type = (Prop(h, "ValueType") as Type)?.Name ?? "",
+                                Type = type?.Name ?? "",
+                                Choices = Choices(type),
                                 Hidden = Prop(h, "NeverVisible") is bool b && b,
                             });
                         }
@@ -109,6 +112,18 @@ namespace ArchoMonitor
         static object Prop(object o, string name)
         {
             try { return o == null ? null : AccessTools.Property(o.GetType(), name)?.GetValue(o, null); }
+            catch { return null; }
+        }
+
+        // Choices is an enum's names (at most MaxChoices, else none); null for other types.
+        static string[] Choices(Type t)
+        {
+            try
+            {
+                if (t == null || !t.IsEnum) return null;
+                string[] names = Enum.GetNames(t);
+                return names.Length <= MaxChoices ? names : null;
+            }
             catch { return null; }
         }
 

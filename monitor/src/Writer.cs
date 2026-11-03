@@ -337,6 +337,7 @@ namespace ArchoMonitor
                     if (!string.IsNullOrEmpty(h.Description)) j.Str("description", h.Description);
                     j.Str("value", h.Value).Str("default", h.Default).Str("type", h.Type);
                     if (h.Hidden) j.Bool("hidden", true);
+                    if (h.Choices != null) j.List("choices", h.Choices);
                     j.Close();
                 }
                 j.EndArr().Close();

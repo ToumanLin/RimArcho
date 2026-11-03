@@ -41,6 +41,9 @@ func uninstallFixture(t *testing.T) *unFix {
 	e.MustRun("save")
 	e.MustRun("save") // a second write: the backup now holds a list RimArcho wrote
 	f.bak = readFile(t, e.ModsConfig+".rimarcho.bak")
+	// a settings change RimArcho made, with its backups (06 §2.9)
+	e.WriteFile(filepath.Join(e.UserData, "Config", "Mod_1001_AMod.xml.rimarcho.bak"), "<SettingsBlock/>")
+	e.WriteFile(filepath.Join(e.UserData, "HugsLib", "ModSettings.xml.rimarcho.bak"), "<settings/>")
 
 	f.local = filepath.Join(e.Root, "LocalAppData", "RimArcho")
 	f.lock = filepath.Join(f.local, "locked")
@@ -163,6 +166,9 @@ func TestUninstallDefaults(t *testing.T) {
 	}
 	if exists(f.ModsConfig + ".rimarcho.bak") {
 		t.Fatal("the backup is RimArcho's: it goes")
+	}
+	if exists(filepath.Join(f.UserData, "Config", "Mod_1001_AMod.xml.rimarcho.bak")) || exists(filepath.Join(f.UserData, "HugsLib", "ModSettings.xml.rimarcho.bak")) {
+		t.Fatal("the settings backups are RimArcho's: they go")
 	}
 	if exists(copyDir) || len(f.trashed) != 1 || f.trashed[0] != copyDir {
 		t.Fatalf("the lock library copy goes to the recycle bin: %v", f.trashed)
