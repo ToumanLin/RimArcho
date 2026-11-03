@@ -36,7 +36,7 @@ func modSettingsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		ref := ix.Ref(m.ID)
 		if len(sm.Files) == 0 {
-			d, _ := render.New(fmt.Sprintf("%s %s: no settings known (no settings file for folder %s, and Archo Monitor saw no settings window)", ref, sm.Name, sm.Folder))
+			d, _ := render.New(fmt.Sprintf("%s %s: no settings known (no settings file for folder %s, no HugsLib settings, and Archo Monitor saw no settings window)", ref, sm.Name, sm.Folder))
 			return d, nil
 		}
 		d, root := render.New(fmt.Sprintf("%s %s: settings (folder %s)", ref, sm.Name, sm.Folder))
@@ -51,11 +51,7 @@ func modSettingsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	var rows [][]string
 	for _, sm := range l.Mods {
 		for _, f := range sm.Files {
-			title := f.Title
-			if title == "" {
-				title = "-"
-			}
-			rows = append(rows, []string{ix.Ref(sm.Instance), sm.Name, title, f.File, fileState(f)})
+			rows = append(rows, []string{ix.Ref(sm.Instance), sm.Name, fileTitle(f), f.File, fileState(f)})
 		}
 	}
 	root.AddColumns(rows)
@@ -68,9 +64,27 @@ func modSettingsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	return d, nil
 }
 
+// fileTitle is the settings window's title, or HugsLib and the pack's entry.
+func fileTitle(f app.ModSettingsFile) string {
+	switch {
+	case f.Kind == app.SettingsKindHugsLib && f.Title != "":
+		return "HugsLib: " + f.Title
+	case f.Kind == app.SettingsKindHugsLib:
+		return "HugsLib (" + f.Class + ")"
+	case f.Title == "":
+		return "-"
+	}
+	return f.Title
+}
+
 func fileState(f app.ModSettingsFile) string {
-	if !f.Exists {
+	switch {
+	case !f.Exists && f.Kind == app.SettingsKindHugsLib:
+		return "defaults (HugsLib stores none)"
+	case !f.Exists:
 		return "defaults (no file yet)"
+	case f.Kind == app.SettingsKindHugsLib:
+		return "stored"
 	}
 	return render.Size(f.Size)
 }
@@ -78,6 +92,10 @@ func fileState(f app.ModSettingsFile) string {
 // settingsFiles adds what each of a Mod's settings files stores, at most limit values each.
 func settingsFiles(root *render.Node, sm *app.ModSettingsMod, limit int, expand string) {
 	for _, f := range sm.Files {
+		if f.Kind == app.SettingsKindHugsLib {
+			hugsLibSection(root, &f, limit, expand)
+			continue
+		}
 		head := f.File
 		if f.Title != "" {
 			head = fmt.Sprintf("%q  %s", f.Title, f.File)
@@ -90,7 +108,7 @@ func settingsFiles(root *render.Node, sm *app.ModSettingsMod, limit int, expand 
 			n.Add("no file: the Mod uses its defaults until its settings are changed in the game")
 			continue
 		}
-		sc, err := app.ReadSettingsFile(f.Path)
+		sc, err := f.Read()
 		if err != nil {
 			n.Add("cannot read: " + err.Error())
 			continue
@@ -107,6 +125,56 @@ func settingsFiles(root *render.Node, sm *app.ModSettingsMod, limit int, expand 
 		if !sc.Simple {
 			n.Add("lists and nested values are read only: change them in the game")
 		}
+	}
+}
+
+// hugsLibSection adds a HugsLib pack: with Archo Monitor's record every setting with its
+// title, value and default; without, the values HugsLib stores.
+func hugsLibSection(root *render.Node, f *app.ModSettingsFile, limit int, expand string) {
+	head := fmt.Sprintf("HugsLib settings %s  %s", f.Class, f.File)
+	if f.Title != "" {
+		head = fmt.Sprintf("HugsLib %q (%s)  %s", f.Title, f.Class, f.File)
+	}
+	n := root.Section(head)
+	sc, err := f.Read()
+	if err != nil {
+		n.Add("cannot read: " + err.Error())
+		return
+	}
+	rows, hidden := app.HugsLibRows(f.HugsLib, sc)
+	if len(rows) == 0 {
+		n.Add("every value is the Mod's default (HugsLib stores none)")
+	}
+	title := fmt.Sprintf("stored values (%d; a value at its default is not stored)", len(sc.Values))
+	if f.HugsLib != nil {
+		changed := 0
+		for _, r := range rows {
+			if r.Stored {
+				changed++
+			}
+		}
+		title = fmt.Sprintf("settings (%d changed; titles and defaults as Archo Monitor saw them %s)", changed, f.HugsLib.Seen.Local().Format("2006-01-02"))
+	}
+	vals := n
+	if len(rows) > 0 {
+		vals = n.Section(title)
+	}
+	for _, r := range rows {
+		line := r.Name + ": " + settingText(r.Value)
+		if r.Title != "" {
+			line = fmt.Sprintf("%s (%s): %s", r.Title, r.Name, settingText(r.Value))
+		}
+		switch {
+		case r.Stored && r.Recorded:
+			line += "  [default " + settingText(r.Default) + "]"
+		case r.Recorded:
+			line += "  [default]"
+		}
+		vals.Add(line)
+	}
+	vals.Truncate(limit, expand)
+	if hidden > 0 {
+		n.Add(fmt.Sprintf("%s the Mod keeps out of its window not shown", render.Plural(hidden, "setting")))
 	}
 }
 

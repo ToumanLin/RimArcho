@@ -123,6 +123,7 @@ type companionLine struct {
 		Save          string            `json:"save"`
 		Settings      []SettingsFile    `json:"settings"`
 		Window        *SettingsWindow   `json:"window"`
+		HugsLib       []HugsLibPack     `json:"hugslib"`
 	} `json:"context"`
 	Source string `json:"source"`
 	Schema int    `json:"schema"`
@@ -189,7 +190,7 @@ func (c *Companion) line(b []byte) *CompanionEntry {
 			c.Settings = j.Context.Settings
 		}
 		return nil
-	case "settings-window": // a record (ReadMonitorRecords), not an entry
+	case "settings-window", "hugslib": // records (ReadMonitorRecords), not entries
 		return nil
 	case "phase":
 		if j.Source == "archo-monitor" && ValidPhase(j.Context.Phase) {
@@ -372,13 +373,39 @@ type SettingsWindow struct {
 	Controls []SettingsControl `json:"controls"`
 }
 
+// HugsLibPack is one HugsLib settings pack as Archo Monitor recorded it once start-up work
+// was done (03 §6.7.1): its identifier (its element in HugsLib/ModSettings.xml), the Mod it
+// belongs to and its settings.
+type HugsLibPack struct {
+	ID        string           `json:"id"`
+	PackageID string           `json:"packageId"` // "" when Monitor found no owner
+	Folder    string           `json:"folder"`
+	Title     string           `json:"title"` // its entry in HugsLib's settings dialog
+	Full      bool             `json:"full"`  // false: Monitor stopped at its limit
+	Settings  []HugsLibSetting `json:"settings"`
+}
+
+// HugsLibSetting is one HugsLib setting: its element name, what HugsLib's dialog shows, and
+// its value and default as text.
+type HugsLibSetting struct {
+	Name        string `json:"name"`
+	Title       string `json:"title,omitempty"`
+	Description string `json:"description,omitempty"`
+	Value       string `json:"value"`
+	Default     string `json:"default"`
+	Type        string `json:"type"` // the value type's simple name: Boolean, Int32, an enum's
+	Hidden      bool   `json:"hidden,omitempty"`
+}
+
 // MonitorRecords is what an Archo Monitor log recorded about Mod settings past an offset: the
-// settings record written at the main menu and the settings windows the player opened.
+// settings record written at the main menu, the HugsLib record and the settings windows the
+// player opened.
 type MonitorRecords struct {
 	Session string
 	Game    string
 	Started time.Time
 	Files   []SettingsFile // nil while the record is not past the offset (or not written yet)
+	HugsLib []HugsLibPack  // nil likewise, and without HugsLib
 	Windows []RecordedWindow
 	End     int64 // the offset after the last whole line: where the next read starts
 }
@@ -421,8 +448,7 @@ func ReadMonitorRecords(path string, from map[string]int64) (*MonitorRecords, er
 			return mr, nil
 		}
 		mr.End += int64(len(l))
-		settings, window := bytes.Contains(l, []byte(`"kind":"settings"`)), bytes.Contains(l, []byte(`"kind":"settings-window"`))
-		if !settings && !window {
+		if !bytes.Contains(l, []byte(`"kind":"settings"`)) && !bytes.Contains(l, []byte(`"kind":"settings-window"`)) && !bytes.Contains(l, []byte(`"kind":"hugslib"`)) {
 			continue
 		}
 		var j companionLine
@@ -432,6 +458,8 @@ func ReadMonitorRecords(path string, from map[string]int64) (*MonitorRecords, er
 		switch {
 		case j.Kind == "settings":
 			mr.Files = append([]SettingsFile{}, j.Context.Settings...)
+		case j.Kind == "hugslib":
+			mr.HugsLib = append([]HugsLibPack{}, j.Context.HugsLib...)
 		case j.Kind == "settings-window" && j.Context.Window != nil:
 			at, _ := time.ParseInLocation("2006-01-02 15:04:05.000", j.Timestamp, time.Local)
 			mr.Windows = append(mr.Windows, RecordedWindow{SettingsWindow: *j.Context.Window, At: at})

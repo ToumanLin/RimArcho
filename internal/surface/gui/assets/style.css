@@ -1933,6 +1933,9 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .ms-sub { margin: 4px 0 8px; font-size: 12px; font-weight: 600; color: var(--muted); }
 .ms-values dt.ms-head { grid-column: 1 / -1; margin-top: 6px; color: var(--fg-2); font: 600 12px var(--font); }
 .ms-values dd.button { color: var(--muted); }
+.ms-values dt.ms-title { font: 13px var(--font); }
+.ms-values dd.at-default { color: var(--muted); }
+.ms-def { margin-left: 10px; color: var(--muted); font: 12px var(--font); }
 .ms-note { margin: 4px 0; font-size: 12px; }
 .ms-note.err { color: var(--red); }
 @media (max-width: 900px) { .ms { grid-template-columns: minmax(0, 1fr); gap: var(--card-gap); } .ms-split { display: none; } .page.fill.modsettings { height: auto; } .ms .data-table { max-height: 60vh; } }

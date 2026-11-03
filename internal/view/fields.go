@@ -116,8 +116,8 @@ func headFields(st *app.LoadoutState, mod *store.Mod) []Field {
 func tailFields(a *app.App, st *app.LoadoutState, mod *store.Mod, d *DetailData) []Field {
 	var fs []Field
 	if st != nil {
-		if paths := app.SettingsFilesOf(st, mod); len(paths) > 0 {
-			fs = append(fs, Field{Kind: FieldSettings, Label: T("mod settings"), Value: storedText(paths),
+		if n, ok := app.StoredSettingsOf(st, mod); ok {
+			fs = append(fs, Field{Kind: FieldSettings, Label: T("mod settings"), Value: Tf("%d stored values", n),
 				Act: ActSettings, ActAt: T("open"), Target: mod.ID})
 		}
 	}
@@ -133,17 +133,6 @@ func tailFields(a *app.App, st *app.LoadoutState, mod *store.Mod, d *DetailData)
 		fs = append(fs, Field{Kind: FieldConflicts, Label: T("conflicts with"), Value: depNames(cs), Items: cs})
 	}
 	return fs
-}
-
-// storedText is how many values settings files store, as the settings row says it.
-func storedText(paths []string) string {
-	n := 0
-	for _, p := range paths {
-		if sc, err := app.ReadSettingsFile(p); err == nil {
-			n += len(sc.Values)
-		}
-	}
-	return Tf("%d stored values", n)
 }
 
 func depNames(ds []Dep) string {

@@ -37,9 +37,14 @@ func modSettingsText(l *app.ModSettingsList) string {
 	for i := range l.Mods {
 		sm := &l.Mods[i]
 		for _, f := range sm.Files {
-			d := view.ModSettingsFileDetail(sm, f.Class)
+			d := view.ModSettingsFileDetail(sm, f.Key())
 			head := sm.Name
-			if f.Title != "" {
+			switch {
+			case f.Kind == app.SettingsKindHugsLib && f.Title != "":
+				head += "  HugsLib “" + f.Title + "”"
+			case f.Kind == app.SettingsKindHugsLib:
+				head += "  HugsLib"
+			case f.Title != "":
 				head += "  “" + f.Title + "”"
 			}
 			fmt.Fprintf(&b, "\n%s  %s\n", head, f.File)
@@ -63,7 +68,7 @@ func modSettingsText(l *app.ModSettingsList) string {
 			switch {
 			case d.Error != "":
 				fmt.Fprintf(&b, "  %s\n", d.Error)
-			case !d.Exists:
+			case !d.Exists && d.Kind == "":
 				fmt.Fprintf(&b, "  %s\n", T("defaults (no file yet)"))
 			case len(d.Values) == 0:
 				fmt.Fprintf(&b, "  %s\n", T("the file stores no value: every value is at its default"))
@@ -73,7 +78,14 @@ func modSettingsText(l *app.ModSettingsList) string {
 					fmt.Fprintf(&b, "  … %d\n", len(d.Values)-settingsShown)
 					break
 				}
-				fmt.Fprintf(&b, "  %s: %s\n", v.Key, v.Text)
+				switch {
+				case v.Default != "":
+					fmt.Fprintf(&b, "  %s: %s  (%s)\n", v.Key, v.Text, Tf("default %s", v.Default))
+				case v.AtDefault:
+					fmt.Fprintf(&b, "  %s: %s  (%s)\n", v.Key, v.Text, T("default"))
+				default:
+					fmt.Fprintf(&b, "  %s: %s\n", v.Key, v.Text)
+				}
 			}
 		}
 	}

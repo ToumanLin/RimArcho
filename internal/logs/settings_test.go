@@ -18,11 +18,14 @@ const settingsError = `{"timestamp":"2026-11-03 10:00:30.000","level":"ERROR","m
 const settingsWindowLine = `{"timestamp":"2026-11-03 10:05:00.000","level":"INFO","message":"[Archo Monitor] settings window A","details":"","count":1,"context":{"window":{"packageId":"a.mod","folder":"A","class":"AMod","file":"Mod_A_AMod.xml","title":"A","full":true,"controls":[{"kind":"label","label":"General"},{"kind":"checkbox","label":"Raids","value":"False"},{"kind":"slider","label":"Scale","value":"0.75","min":"0","max":"2"}]}},"source":"archo-monitor","schema":1,"kind":"settings-window"}
 `
 
+const hugsLibLine = `{"timestamp":"2026-11-03 10:01:01.000","level":"INFO","message":"[Archo Monitor] hugslib 1","details":"","count":1,"context":{"hugslib":[{"id":"APack","packageId":"a.mod","folder":"A","title":"A options","full":true,"settings":[{"name":"raids","title":"Raids","value":"True","default":"False","type":"Boolean"},{"name":"seen","value":"3","default":"0","type":"Int32","hidden":true}]}]},"source":"archo-monitor","schema":1,"kind":"hugslib"}
+`
+
 // 03 §6.7.1: the settings records are read, not taken for entries. ReadMonitorRecords has no
 // settings record before the main menu, and reads a live log again only past its last read.
 func TestMonitorSettingsRecord(t *testing.T) {
 	c := NewCompanion("x")
-	c.Feed([]byte(settingsSession+settingsError+settingsLine+settingsWindowLine), true)
+	c.Feed([]byte(settingsSession+settingsError+settingsLine+hugsLibLine+settingsWindowLine), true)
 	if len(c.Entries) != 1 || c.BadLines != 0 || len(c.Settings) != 2 || c.Settings[0].Folder != "!ArchoPack_x_1" || !c.Settings[1].Stored {
 		t.Fatalf("entries %d, bad %d, settings %+v", len(c.Entries), c.BadLines, c.Settings)
 	}
@@ -54,11 +57,18 @@ func TestMonitorSettingsRecord(t *testing.T) {
 	if mr.End != int64(len(settingsSession+settingsError+settingsLine+settingsError)) {
 		t.Fatalf("a half-written line is not read: end %d", mr.End)
 	}
+	if mr.HugsLib != nil {
+		t.Fatalf("no HugsLib record yet: %+v", mr.HugsLib)
+	}
 	read[mr.Session] = mr.End
-	write(settingsSession + settingsError + settingsLine + settingsError + settingsWindowLine)
+	write(settingsSession + settingsError + settingsLine + settingsError + hugsLibLine + settingsWindowLine)
 	mr, err = ReadMonitorRecords(path, read)
-	if err != nil || mr == nil || mr.Files != nil || len(mr.Windows) != 1 {
+	if err != nil || mr == nil || mr.Files != nil || len(mr.Windows) != 1 || len(mr.HugsLib) != 1 {
 		t.Fatalf("past the record: %+v, %v", mr, err)
+	}
+	if p := mr.HugsLib[0]; p.ID != "APack" || p.PackageID != "a.mod" || p.Title != "A options" || !p.Full || len(p.Settings) != 2 ||
+		p.Settings[0].Default != "False" || p.Settings[0].Title != "Raids" || !p.Settings[1].Hidden || p.Settings[1].Type != "Int32" {
+		t.Fatalf("HugsLib pack %+v", p)
 	}
 	w := mr.Windows[0]
 	if w.Class != "AMod" || !w.Full || len(w.Controls) != 3 || w.Controls[2].Kind != "slider" || w.Controls[2].Max != "2" || w.Controls[0].Value != "" || w.At.IsZero() {

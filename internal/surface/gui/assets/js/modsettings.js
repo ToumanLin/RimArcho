@@ -154,9 +154,10 @@ function drawDetail(d, keep = false) {
   const head = el("div", "ms-dhead");
   head.append(el("h2", "word-facts", d.name));
   const facts = el("div", "facts");
-  if (d.title) facts.append(el("span", "word-facts", Tf("settings window: %s", d.title)));
+  if (d.kind === "hugslib") facts.append(el("span", "word-facts", d.title ? Tf("HugsLib: %s", d.title) : "HugsLib"));
+  else if (d.title) facts.append(el("span", "word-facts", Tf("settings window: %s", d.title)));
   if (d.type) facts.append(el("span", "ms-type", d.type));
-  if (d.values?.length) facts.append(el("span", "", Tf("%d stored values", d.values.length)));
+  if (d.stored) facts.append(el("span", "", Tf("%d stored values", d.stored)));
   if (facts.childNodes.length) head.append(facts);
   head.append(d.path ? pathContent(el("div", "ms-path"), d.path, [d.path]) : el("div", "ms-path muted", d.file || ""));
   const body = el("div", "ms-body");
@@ -182,9 +183,12 @@ function drawDetail(d, keep = false) {
   if (d.values?.length) {
     const kv = el("dl", "ms-values");
     for (const v of d.values) {
-      const dd = el("dd", "ms-v " + v.kind + (v.fixed ? " fixed" : ""), v.text);
-      dd.title = v.text;
-      kv.append(el("dt", "", v.key), dd);
+      const dd = el("dd", "ms-v " + v.kind + (v.fixed ? " fixed" : "") + (v.atDefault ? " at-default" : ""), v.text);
+      if (v.default) dd.append(el("span", "ms-def", Tf("default %s", v.default)));
+      dd.title = dd.textContent;
+      const dt = el("dt", v.name ? "ms-title" : "", v.key);
+      dt.title = [v.name, v.help].filter(Boolean).join("\n") || v.key;
+      kv.append(dt, dd);
     }
     body.append(kv);
   }

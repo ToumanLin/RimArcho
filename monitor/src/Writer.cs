@@ -318,6 +318,39 @@ namespace ArchoMonitor
             }
         }
 
+        // WriteHugsLib writes the HugsLib record (03 §6.7.1): one line, kind hugslib, with
+        // context.hugslib listing each settings pack and its settings.
+        internal static void WriteHugsLib(IList<HugsLibPack> packs)
+        {
+            var j = new Json().Head(DateTime.Now, "INFO", "[Archo Monitor] hugslib " + packs.Count);
+            j.Str("details", "").Num("count", 1);
+            j.Raw("context").Open().Raw("hugslib").Arr();
+            foreach (var p in packs)
+            {
+                j.Next().Open().Str("id", p.Id).Str("packageId", p.PackageId).Str("folder", p.Folder).Str("title", p.Title)
+                    .Bool("full", p.Handles.Count < HugsLibRecord.MaxHandles);
+                j.Raw("settings").Arr();
+                foreach (var h in p.Handles)
+                {
+                    j.Next().Open().Str("name", h.Name);
+                    if (!string.IsNullOrEmpty(h.Title)) j.Str("title", h.Title);
+                    if (!string.IsNullOrEmpty(h.Description)) j.Str("description", h.Description);
+                    j.Str("value", h.Value).Str("default", h.Default).Str("type", h.Type);
+                    if (h.Hidden) j.Bool("hidden", true);
+                    j.Close();
+                }
+                j.EndArr().Close();
+            }
+            j.EndArr().Close().Kind("hugslib");
+            lock (sync)
+            {
+                if (closed || w == null) return;
+                FlushDirty(true);
+                WriteLine(j.End(), force: true);
+                Flush();
+            }
+        }
+
         // Close writes the remaining counts and the exit line (Application.quitting, ProcessExit).
         internal static void Close()
         {

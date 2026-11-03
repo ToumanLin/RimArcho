@@ -15,15 +15,17 @@ import (
 
 // Archo Monitor's settings records (03 §6.7.1) name, for one run, the folder each Mod class
 // was seen under and the settings file it read, and what each settings window the player
-// opened drew. ArchoMonitor.log keeps only two runs, so RimArcho keeps what it has read per
+// opened drew, and HugsLib's settings packs. ArchoMonitor.log keeps only two runs, so RimArcho keeps what it has read per
 // save-data root in meta "mod-settings:<root>": a folder name used long ago still leads to
-// its settings (08 §3), and a window's labels stay after its run is gone (06 §2.9).
+// its settings (08 §3), and a window's labels and HugsLib's titles and defaults stay after
+// their run is gone (06 §2.9).
 
 // seenSessionsMax bounds the session ids remembered as read; seenWindowsMax the windows kept
 // (the newest).
 const (
 	seenSessionsMax = 10
 	seenWindowsMax  = 80
+	seenPacksMax    = 200
 )
 
 type settingsSeen struct {
@@ -31,6 +33,7 @@ type settingsSeen struct {
 	Read     map[string]int64     `json:"read,omitempty"` // session → bytes of its log read
 	Files    []SeenSettingsFile   `json:"files"`
 	Windows  []SeenSettingsWindow `json:"windows,omitempty"`
+	HugsLib  []SeenHugsLibPack    `json:"hugslib,omitempty"`
 }
 
 // SeenSettingsFile is a settings file Archo Monitor recorded, with the newest run it was
@@ -44,6 +47,13 @@ type SeenSettingsFile struct {
 // SeenSettingsWindow is the newest record of what a Mod class's settings window drew.
 type SeenSettingsWindow struct {
 	logs.SettingsWindow
+	Game string    `json:"game,omitempty"`
+	Seen time.Time `json:"seen"`
+}
+
+// SeenHugsLibPack is the newest record of a HugsLib settings pack.
+type SeenHugsLibPack struct {
+	logs.HugsLibPack
 	Game string    `json:"game,omitempty"`
 	Seen time.Time `json:"seen"`
 }
@@ -88,6 +98,9 @@ func (a *App) monitorSeen(root string) settingsSeen {
 		}
 		for _, w := range mr.Windows {
 			seen.mergeWindow(w, mr.Game)
+		}
+		for _, p := range mr.HugsLib {
+			seen.mergePack(p, mr.Game, mr.Started)
 		}
 		seen.Read[mr.Session] = mr.End
 		changed = true
@@ -147,6 +160,26 @@ func (s *settingsSeen) mergeWindow(w logs.RecordedWindow, game string) {
 	if len(s.Windows) > seenWindowsMax {
 		sort.SliceStable(s.Windows, func(i, j int) bool { return s.Windows[i].Seen.After(s.Windows[j].Seen) })
 		s.Windows = s.Windows[:seenWindowsMax]
+	}
+}
+
+// mergePack keeps p as its pack's record unless a newer one is kept, and at most seenPacksMax
+// packs.
+func (s *settingsSeen) mergePack(p logs.HugsLibPack, game string, at time.Time) {
+	if p.ID == "" {
+		return
+	}
+	rec := SeenHugsLibPack{HugsLibPack: p, Game: game, Seen: at}
+	if i := slices.IndexFunc(s.HugsLib, func(o SeenHugsLibPack) bool { return strings.EqualFold(o.ID, p.ID) }); i >= 0 {
+		if !at.Before(s.HugsLib[i].Seen) {
+			s.HugsLib[i] = rec
+		}
+		return
+	}
+	s.HugsLib = append(s.HugsLib, rec)
+	if len(s.HugsLib) > seenPacksMax {
+		sort.SliceStable(s.HugsLib, func(i, j int) bool { return s.HugsLib[i].Seen.After(s.HugsLib[j].Seen) })
+		s.HugsLib = s.HugsLib[:seenPacksMax]
 	}
 }
 

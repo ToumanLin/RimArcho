@@ -40,7 +40,7 @@ Listed by who can do what; status refers to the current code.
 | Handle hidden Mods (About.xml.disabled) and unsubscribed residue | 08 §6 | Implemented |
 | See all owned Mods on one page: copies per Lineage, locations, sizes, and usage; filter and clean up | 06 §2.9 | Implemented (GUI mod library › all; CLI `library`; MCP `list_library`, `manage_library`; TUI list and details) |
 | Unsubscribe and resubscribe to Workshop items through Steam | 08 §10 | Implemented (real calls await validation, §5.2) |
-| See which Mods of the current list have settings and what their settings files store | 06 §2.9 | Implemented, read only (GUI mod library › Mod settings; CLI `mod-settings`; MCP `get_mod_settings`; TUI panel). Editing simple values is planned (research 2026-11-02_mod-settings) |
+| See which Mods of the current list have settings and what their settings files and HugsLib packs store | 06 §2.9 | Implemented, read only (GUI mod library › Mod settings; CLI `mod-settings`; MCP `get_mod_settings`; TUI panel). Editing simple values is planned (research 2026-11-02_mod-settings) |
 | See what a Mod's changes mean for the player (affects launch / watch / content only), scoped by default to the current plan since the last play session | 06 §2.9 | Implemented |
 | Record live logs through Archo Monitor while the game runs | 08 §9, 03 §6.7 | Implemented |
 | Do everything by keyboard that can be done by mouse (shared keys and context menus for the editor and Mod inventory) | 06 §3.1 | Implemented |

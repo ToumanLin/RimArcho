@@ -10,6 +10,7 @@ namespace ArchoMonitor
         {
             Change("menu");
             SettingsRecord.Write();
+            HugsLibRecord.Queue();
         }
 
         internal static void Save(string __0) { Change("save", __0); }

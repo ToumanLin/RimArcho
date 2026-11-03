@@ -33,5 +33,12 @@
   "%s (%s to %s)": "%s（%s 到 %s）",
   "in the game's window (%s)": "游戏里的窗口（%s）",
   "the window draws more than Archo Monitor keeps": "窗口内容超出了 Archo Monitor 记录的上限",
-  "stored in the file": "文件里存的"
+  "stored in the file": "文件里存的",
+  "HugsLib: %s": "HugsLib：%s",
+  "titles and defaults as Archo Monitor saw them (%s); a grey value is at its default": "标题和默认值是 Archo Monitor 记下的（%s）；灰色的值是默认值",
+  "HugsLib stores no value of this Mod: every value is at its default": "HugsLib 没有存这个 Mod 的值：每个值都是默认值",
+  "with Archo Monitor, the game's next start adds every setting's title and default": "装了 Archo Monitor 后，下次启动游戏就能看到每项设置的标题和默认值",
+  "%d settings the Mod keeps out of its window are not shown": "有 %d 项设置 Mod 不在窗口里显示，这里也不显示",
+  "read only: change values in HugsLib's Mod settings window": "只读：要改值，去 HugsLib 的 Mod 设置窗口",
+  "default %s": "默认 %s"
 }

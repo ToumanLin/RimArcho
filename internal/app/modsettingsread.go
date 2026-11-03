@@ -38,8 +38,13 @@ type ModSettingsMod struct {
 	Files     []ModSettingsFile
 }
 
-// ModSettingsFile is one Mod class's settings file.
+// ModSettingsFile is one Mod class's settings file, or one of the Mod's HugsLib settings
+// packs.
 type ModSettingsFile struct {
+	// Kind is "" for a Config file and SettingsKindHugsLib for a HugsLib pack: Class is then
+	// the pack's identifier, File and Path HugsLib's settings file, Exists whether the file
+	// stores the pack, and Title its entry in HugsLib's dialog.
+	Kind   string
 	Class  string    // the Mod class: the file name's last part
 	Title  string    // the settings window's title, from Archo Monitor ("" unknown)
 	File   string    // name in Config/
@@ -50,6 +55,25 @@ type ModSettingsFile struct {
 	// Window is what the settings window drew when the player last opened it (Archo Monitor);
 	// nil when never seen.
 	Window *SeenSettingsWindow
+	// HugsLib is Archo Monitor's record of a HugsLib pack (titles, defaults); nil when never
+	// recorded.
+	HugsLib *SeenHugsLibPack
+}
+
+// Key names f among its Mod's files: the Mod class, or "hugslib:" and the pack's identifier.
+func (f *ModSettingsFile) Key() string {
+	if f.Kind == SettingsKindHugsLib {
+		return "hugslib:" + f.Class
+	}
+	return f.Class
+}
+
+// Read reads what f stores.
+func (f *ModSettingsFile) Read() (*SettingsContent, error) {
+	if f.Kind == SettingsKindHugsLib {
+		return readHugsLibPack(f.Path, f.Class)
+	}
+	return ReadSettingsFile(f.Path)
 }
 
 // SettingValue is one value stored in a settings file.
@@ -273,19 +297,24 @@ func (a *App) ModSettingsOf(m *store.Mod) (*ModSettingsMod, error) {
 }
 
 // settingsReader holds what finding a Mod's settings files reads once: the Config folder's
-// files and Archo Monitor's records.
+// files, HugsLib's settings file and Archo Monitor's records.
 type settingsReader struct {
-	cfg     string
-	seen    []SeenSettingsFile
-	windows []SeenSettingsWindow
-	files   map[string]map[string]settingsFileInfo // stem → class → file
+	cfg      string
+	seen     []SeenSettingsFile
+	windows  []SeenSettingsWindow
+	files    map[string]map[string]settingsFileInfo // stem → class → file
+	hugsPath string
+	hugs     []SeenHugsLibPack
+	hugsFile map[string]*hugsStored // lower-case pack id → stored
 }
 
 // settingsReader reads ix's environment's Config folder; folders are those asked about.
 func (a *App) settingsReader(ix *Index, aliases map[string][]store.Alias, folders []string) *settingsReader {
 	root := ix.Env.UserDataRoot
 	ms := a.monitorSeen(root)
-	r := &settingsReader{cfg: filepath.Join(root, "Config"), seen: ms.Files, windows: ms.Windows}
+	r := &settingsReader{cfg: filepath.Join(root, "Config"), seen: ms.Files, windows: ms.Windows,
+		hugsPath: filepath.Join(root, HugsLibSettingsFile), hugs: ms.HugsLib}
+	r.hugsFile, _ = readHugsLibFile(r.hugsPath) // unreadable: packs are listed from the record alone
 	known := settingsFolders(ix, aliases)
 	addSeenFolders(known, r.seen)
 	stems := map[string]bool{}
@@ -355,13 +384,72 @@ func (r *settingsReader) of(m *store.Mod, folder string) ModSettingsMod {
 		}
 		sm.Files = append(sm.Files, *f)
 	}
+	sm.Files = append(sm.Files, r.packsOf(pkg)...)
 	return sm
 }
 
-// SettingsFilesOf is the paths of m's settings files under the folder the game sees it under
-// (st's registry), from the Config folder alone: no Archo Monitor record, so a detail can ask
-// on every cursor move (06 §4.1). nil when the game does not see m or there are none.
-func SettingsFilesOf(st *LoadoutState, m *store.Mod) []string {
+// packsOf is package pkg's HugsLib packs: those Archo Monitor recorded as its, and the one
+// the file stores under its package id (HugsLib's default identifier).
+func (r *settingsReader) packsOf(pkg string) []ModSettingsFile {
+	var out []ModSettingsFile
+	add := func(id string) *ModSettingsFile {
+		for i := range out {
+			if strings.EqualFold(out[i].Class, id) {
+				return &out[i]
+			}
+		}
+		f := ModSettingsFile{Kind: SettingsKindHugsLib, Class: id, File: HugsLibSettingsFile, Path: r.hugsPath}
+		if st := r.hugsFile[strings.ToLower(id)]; st != nil {
+			f.Class, f.Exists = st.ID, true
+		}
+		out = append(out, f)
+		return &out[len(out)-1]
+	}
+	for i := range r.hugs {
+		p := &r.hugs[i]
+		if p.PackageID == "" || packageBase(strings.ToLower(p.PackageID)) != pkg {
+			continue
+		}
+		f := add(p.ID)
+		f.HugsLib, f.Title, f.Seen = p, p.Title, p.Seen
+	}
+	for id, st := range r.hugsFile {
+		if packageBase(id) == pkg {
+			add(st.ID)
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool { return strings.ToLower(out[i].Class) < strings.ToLower(out[j].Class) })
+	return out
+}
+
+// StoredSettingsOf is how many values m's settings store, and whether it has any: its
+// Config files under the folder the game sees it under (st's registry) and the HugsLib pack
+// under its package id. No Archo Monitor record is read, so a detail can ask on every cursor
+// move (06 §4.1).
+func StoredSettingsOf(st *LoadoutState, m *store.Mod) (n int, ok bool) {
+	paths := settingsFilesOf(st, m)
+	for _, p := range paths {
+		if sc, err := ReadSettingsFile(p); err == nil {
+			n += len(sc.Values)
+		}
+	}
+	ok = len(paths) > 0
+	if root := st.Ix.Env.UserDataRoot; root != "" && m.PackageID != "" && st.Reg.Folder(m.ID) != "" {
+		packs, _ := readHugsLibFile(filepath.Join(root, HugsLibSettingsFile))
+		pkg := packageBase(strings.ToLower(m.PackageID))
+		for id, p := range packs {
+			if packageBase(id) == pkg {
+				n += len(p.Values)
+				ok = true
+			}
+		}
+	}
+	return n, ok
+}
+
+// settingsFilesOf is the paths of m's Config files under the folder the game sees it under;
+// nil when the game does not see m or there are none.
+func settingsFilesOf(st *LoadoutState, m *store.Mod) []string {
 	folder, root := st.Reg.Folder(m.ID), st.Ix.Env.UserDataRoot
 	if folder == "" || root == "" {
 		return nil
