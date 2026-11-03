@@ -373,7 +373,7 @@ The `mod-report` and other categories are informational and do not appear in the
 
 ### 6.2 Evidence
 
-Attribution uses the fact store: effective content, `Defs`, Patch simulation results, `TypeDef`, and `HarmonyId`. Match Mod names from About.xml; the game prints `[Name]`, not the player's aliases. Core and DLC (the `ludeon.rimworld` prefix) never become sources through text matches or `Def` ownership.
+Attribution uses the fact store: effective content, `Defs`, Patch simulation results, `TypeDef`, and `HarmonyId`. `TypeDef` and `HarmonyId` exist only after an analysis, so before attributing, `archo log` and MCP `analyze_log` bring the environment's analysis up to date for its own logs and pasted text (`App.EnsureAttributionAnalysis`; 05 §5.1 bounds the MCP wait, after which the output says `analysis: still computing`), and a test run does the same for the tested plan (08 §12). Without this, a freshly scanned environment named no Mod for `static constructor of T` (MCP eval c3, 2026-11-02). Logs of unknown or other games still trigger no analysis (§6.4). The assembly list for string-literal referrers comes from the analysis too, so the same refresh lets a texture path that only a Mod's C# code names (`ContentFinder<Texture2D>.Get("X")`, no stack) find that Mod (c3: `Designator_ExtinguishFires` → Smart Firefight, likely). Match Mod names from About.xml; the game prints `[Name]`, not the player's aliases. Core and DLC (the `ludeon.rimworld` prefix) never become sources through text matches or `Def` ownership.
 
 Use the following evidence, strongest first:
 

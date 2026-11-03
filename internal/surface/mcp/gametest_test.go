@@ -52,6 +52,17 @@ func TestTestRunToolReport(t *testing.T) {
 	if err != nil || string(saved) != out {
 		t.Fatalf("tool result differs from report.json: %v", err)
 	}
+	out, isErr = call(t, cs, "test_run", map[string]any{"env": "main", "timeout_seconds": 5})
+	var repeated app.TestRunReport
+	if !isErr || json.Unmarshal([]byte(out), &repeated) != nil || repeated.Baseline == nil ||
+		repeated.Baseline.RunDir != r.RunDir || repeated.Baseline.New != 0 || repeated.Baseline.Present != 35 || repeated.Baseline.Gone != 0 {
+		t.Fatalf("unchanged faulty run must retain isError and count every cluster: %s", out)
+	}
+	for _, c := range repeated.Clusters {
+		if c.Delta != "present" {
+			t.Fatalf("repeated cluster: %+v", c)
+		}
+	}
 	_, isErr = call(t, cs, "test_run", map[string]any{"timeout_seconds": -1})
 	if !isErr {
 		t.Fatal("negative timeout accepted")

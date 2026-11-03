@@ -27,7 +27,9 @@ func loadLog(c *Ctx, a *Args) (*app.LogReport, *app.LoadoutState, error) {
 		return nil, nil, err
 	}
 	if t := a.Str("text"); t != "" {
-		if err := c.App.EnsureLogAnalysis(st, app.TextLogVersion(t), progress()); err != nil && !errors.Is(err, app.ErrStillComputing) {
+		if err := c.App.EnsureAttributionAnalysis(st, "", app.TextLogVersion(t), progress()); errors.Is(err, app.ErrStillComputing) {
+			c.logPending = true
+		} else if err != nil {
 			return nil, nil, err
 		}
 		r, err := c.App.AnalyzeLogText(t)
@@ -47,15 +49,21 @@ func loadLog(c *Ctx, a *Args) (*app.LogReport, *app.LoadoutState, error) {
 			return nil, nil, fmt.Errorf("no Player.log found for %s under %s (archo log --file <path>)", st.GameMM(), st.Ix.Env.UserDataRoot)
 		}
 	}
-	if err := c.App.EnsureLogFileAnalysis(st, path, progress()); err != nil && !errors.Is(err, app.ErrStillComputing) {
+	if err := c.App.EnsureAttributionAnalysis(st, path, "", progress()); errors.Is(err, app.ErrStillComputing) {
+		c.logPending = true
+	} else if err != nil {
 		return nil, nil, err
 	}
 	r, err := c.App.AnalyzeLog(path)
 	return r, st, err
 }
 
-// analysedAs says when a log was attributed against its own game version (03 §6.4).
-func analysedAs(root *render.Node, r *app.LogReport) {
+// analysedAs says when a log was attributed against its own game version (03 §6.4), and
+// when the analysis was still running (MCP waits 10 s, 05 §5.1).
+func analysedAs(c *Ctx, root *render.Node, r *app.LogReport) {
+	if c.logPending {
+		root.KV("analysis", "still computing in the background: type, Harmony and patch evidence may be missing; run again in a few seconds")
+	}
 	if r.AnalysedAs != "" {
 		root.KV("analysed", fmt.Sprintf("as %s (log version); environment is %s", r.AnalysedAs, r.EnvMM))
 	}
@@ -91,7 +99,7 @@ func logCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if id := strings.TrimPrefix(a.Str("cluster"), "log:"); id != "" {
 		for _, lc := range r.Clusters {
 			if lc.ID == id {
-				return clusterDoc(ix, r, lc), nil
+				return clusterDoc(c, ix, r, lc), nil
 			}
 		}
 		return nil, &app.RefError{Ref: "log:" + id, Hint: "archo log lists the clusters"}
@@ -126,7 +134,7 @@ func logCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			classes = append(classes, fmt.Sprintf("%s %d", k, byClass[k]))
 		}
 	}
-	analysedAs(root, r)
+	analysedAs(c, root, r)
 	root.KV("classes", strings.Join(classes, ", "))
 	if len(r.Phases) > 0 {
 		phases := root.Section("phases")
@@ -183,7 +191,7 @@ func clusterLine(ix *app.Index, lc *app.LogCluster) string {
 	return fmt.Sprintf("log:%s %s x%d%s  %s%s%s", lc.ID, lc.Class, lc.Count, logs.PhaseSummary(lc.Phases), msg, who, patternTag(ix, lc))
 }
 
-func clusterDoc(ix *app.Index, r *app.LogReport, lc *app.LogCluster) *render.Doc {
+func clusterDoc(c *Ctx, ix *app.Index, r *app.LogReport, lc *app.LogCluster) *render.Doc {
 	at := ""
 	if len(lc.Lines) > 0 && lc.Lines[0] > 0 { // 0: only the companion log has it
 		at = fmt.Sprintf("  first at %s:%d", r.Label, lc.Lines[0])
@@ -198,7 +206,7 @@ func clusterDoc(ix *app.Index, r *app.LogReport, lc *app.LogCluster) *render.Doc
 	if len(msg) > 1200 {
 		msg = msg[:1197] + "..."
 	}
-	analysedAs(root, r)
+	analysedAs(c, root, r)
 	root.KV("message", msg)
 	extra := 0
 	for _, x := range lc.First.Extra {
@@ -298,7 +306,7 @@ func logSince(c *Ctx, a *Args, st *app.LoadoutState, r *app.LogReport, cur app.L
 		root.KV("since", since)
 	}
 	root.KV("cursor", r.Cursor)
-	analysedAs(root, r)
+	analysedAs(c, root, r)
 	lst := root.Section("list")
 	for _, l := range lines {
 		lst.Add(l)

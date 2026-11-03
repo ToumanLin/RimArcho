@@ -4,6 +4,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 1.0.1 (unreleased)
 
+- `archo test run` / MCP `test_run` compare error clusters with the previous run of the same plan and map mode: JSON adds `baseline` (`new`, `present`, `gone` counts), `delta` on each cluster and a `gone` list; the text marks new clusters and lists the gone ones. A fixed error is now visible even when unrelated errors remain. The exit code and MCP `isError` are unchanged: any error cluster still fails.
+- Log attribution names the Mod whose assembly defines a type in "static constructor of T" (and other type evidence) in a freshly scanned environment: `test_run` brings the tested plan's analysis up to date after the game exits (JSON `analysis_error` if that fails), and `archo log` / MCP `analyze_log` do the same for the environment's own logs and pasted text. Before, they used only a stored analysis, so a Harmony patch failing in a Mod's static constructor, or a texture path named only in a Mod's code, came back with no Mod. While the MCP wait (10 s) runs out, `analyze_log` says `analysis: still computing`.
 - MCP: long tool calls send a progress notification every 10 seconds when the client asks for progress; for `test_run` it names the current step, such as waiting for the game to load. Clients that restart their request timeout on progress, such as Pi, no longer give up on `test_run` after 60 seconds. Giving up cancelled the call, which closed the game before it could report.
 
 ## 1.0.0 — 2026-11-02

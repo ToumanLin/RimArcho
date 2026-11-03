@@ -146,8 +146,17 @@ Example: repair_links {"all":true,"dry_run":true,"confirm":false} → JSON previ
 Example: estimate_memory {"plan": "raid night"}
 Output: RAM loading budget, current available / total physical RAM, VRAM estimate / dedicated capacity, severity and GPU-selection caveat.`},
 	{"test_run", `Launch the game directly with a plan in isolated test data, wait for the main menu (or a quick test map with map=true), capture startup errors, then stop the process. This can take minutes (timeout_seconds defaults to 600). Never touches the player's saves, configuration or logs, and never writes the game directory. Refuses while a game is already running. Mod folders the game cannot see are reported as missing; no links are created. Returns a JSON report with status, timings, peak memory, missing mods and error clusters attributed against the tested plan. Keeps the newest 10 run directories and reuses the test data's caches. Use to check whether a plan can finish loading; status menu/map with no error clusters is success.
+Before attributing, it brings the tested plan's analysis up to date after the game closes (assembly types name the Mod in a static constructor error); analysis_error says when that failed.
+Compare the report with the previous eligible run of this plan and map mode (08 §12). With a baseline, delta=new marks an error cluster absent before and delta=present marks one that remains; gone lists errors that disappeared, so it can show that a fix worked while unrelated errors remain. baseline.new/present/gone count all error clusters, including those beyond the 30 listed. Without an earlier eligible run, baseline, delta and gone are omitted. Comparison does not change success: an unchanged faulty list still fails.
 Example: test_run {"plan": "small", "timeout_seconds": 300}
-  {"env":"main","plan":"plan:small","status":"menu","load_seconds":42.5,"clusters_total":0}`},
+  {"env":"main","plan":"plan:small","status":"menu","clusters_total":10,"baseline":{"run_dir":"<home>/tests/<env>/runs/20261103-035136","status":"menu","new":1,"present":9,"gone":2}}
+CLI text (archo test run small):
+  new exception x1: Exception: newly added failure
+  compared with run 20261103-035136 (menu): 1 new, 9 present, 2 gone
+  gone: 2
+    exception x1: Exception: fixed failure
+Without a baseline:
+  compared with: no earlier run of this plan`},
 	{"manage_rules", `User rules on load order (shared by every Loadout of the environment): action=add with kind after|before (A must load after/before B), incompatible (A B), attach (A always right after B), top / bottom (A only: load A as early / late as its constraints allow; a preference, like the community loadTop/loadBottom), or ignore (target = a constraint ref printed by sort or list_problems, e.g. decl:#ab12:loadafter:other.pkg, to drop a wrong About.xml/community constraint — this is how an order.cycle is broken); action=list shows the rules with their r:<n> refs; action=remove rule=r:<n> deletes one. Rules apply to sort and to the order problems; they do not reorder by themselves (edit_loadout action=sort does). Writes RimArcho's database only, never game files. add_rule is the old name of this tool.
 Example: manage_rules {"action": "add", "kind": "after", "a": "#76gh", "b": "pkg:brrainz.harmony", "note": "needs its patches"}
   r:1 added

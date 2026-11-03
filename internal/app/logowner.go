@@ -97,3 +97,25 @@ func (a *App) EnsureLogFileAnalysis(st *LoadoutState, path string, progress func
 	}
 	return a.EnsureLogAnalysis(st, LogVersionOf(path), progress)
 }
+
+// EnsureAttributionAnalysis is what `archo log` (and MCP analyze_log) runs before
+// attributing a log: EnsureLogFileAnalysis, and for this environment's own logs of its own
+// version the environment's analysis too. Assembly types and Harmony IDs come only from the
+// analysis (03 §6.2); without it "static constructor of T" names no mod (MCP eval c3,
+// 2026-11-02). path "" is pasted text of version textVersion. Unknown and foreign logs
+// trigger nothing, as before (03 §6.4).
+func (a *App) EnsureAttributionAnalysis(st *LoadoutState, path, textVersion string, progress func(string)) error {
+	version := textVersion
+	if path != "" {
+		own, err := a.logOwner(st, path)
+		if err != nil || !own {
+			return err
+		}
+		version = LogVersionOf(path)
+	}
+	if mm := LogMM(version); a.GameVersion == "" && mm != "" && mm != st.GameMM() {
+		return a.EnsureLogAnalysis(st, version, progress)
+	}
+	_, err := a.EnsureAnalysis(progress)
+	return err
+}
