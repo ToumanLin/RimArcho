@@ -21,7 +21,14 @@ Allow player to initialize a new mod project
 
 Mod configuration determines how a Mod's content is played. In the game it has an interface; outside the game it is plain XML.
 
-2026-11-02: researched in [research/2026-11-02_mod-settings.md](docs/research/2026-11-02_mod-settings.md). First finding: settings files are named after the folder the game sees, so `_Archo_` and `!ArchoPack_` links fork a Mod's settings (01 §5.3). Proposal: read-only inventory first, then settings transfer on deployment, then safe editing; profiles wait on the scoping questions at the end of the research.
+2026-11-02: researched in [research/2026-11-02_mod-settings.md](docs/research/2026-11-02_mod-settings.md). First finding: settings files are named after the folder the game sees, so `_Archo_` and `!ArchoPack_` links fork a Mod's settings (01 §5.3). Direction (simplified 2026-11-02, no tricks, low player load):
+
+- Settings follow the Mod: when a deployment name changes, RimArcho copies the settings to the new name before launch, without asking and without overwriting.
+- Archo Monitor records which settings file each Mod uses and what its settings window shows when the player opens it.
+- RimArcho reads simple files (on/off, numbers, text, a choice) itself; it can change only those, only with the game closed, with a backup. Everything else is read-only: change it in the game.
+- One Mod settings page for the current list.
+
+Open: where the page sits. Not now: profiles, exports, cleanup.
 
 ## Accessibility
 

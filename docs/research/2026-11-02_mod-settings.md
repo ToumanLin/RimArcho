@@ -1,8 +1,8 @@
 # Mod settings: storage, deployment and editing (research, 2026-11-02)
 
-Status: research and proposal; no product decision or implementation. Based on worktree `claude/mod-config-a11y`, HEAD `f57470b4`. The owner must decide profile scope before implementation.
+Status: research; the direction at the end was simplified on 2026-11-02 after the owner's review. Not implemented. Based on worktree `claude/mod-config-a11y`, HEAD `f57470b4`.
 
-**The first issue to fix is settings identity during deployment.** In both inspected game versions, ordinary Mod settings are named after the folder the game sees and the Mod subclass's simple name. Deploying the same Mod through `_Archo_…`, `_Archo_env_…` or `!ArchoPack_…` changes that filename. RimArcho creates the links without translating settings filenames. Existing settings stay on disk, but the new registration usually starts with defaults and can write a separate file. Packs copy the old filenames unchanged, so “copy first-play settings” does not reliably carry ordinary Mod settings into a pack. A settings browser and explicit transfer/backup would be useful before general forms inferred from code.
+**The first issue to fix is settings identity during deployment.** In both inspected game versions, ordinary Mod settings are named after the folder the game sees and the Mod subclass's simple name. Deploying the same Mod through `_Archo_…`, `_Archo_env_…` or `!ArchoPack_…` changes that filename. RimArcho creates the links without translating settings filenames. Existing settings stay on disk, but the new registration usually starts with defaults and can write a separate file. Packs copy the old filenames unchanged, so “copy first-play settings” does not reliably carry ordinary Mod settings into a pack. The direction (end of this report) keeps it simple for players: settings follow the Mod, Archo Monitor reports which file each Mod uses and what its settings window shows, RimArcho reads simple files itself, and one page shows them.
 
 ## Evidence and limits
 
@@ -236,59 +236,18 @@ Largest files:
 
 These are **candidate stale identities**. Three of the four numeric candidates have the same Class under another installed numeric identity, supporting rename/replacement possibilities, not whole-Mod uninstallation. Other roots, locked copies, retired environments and manual renames were not exhaustively reconciled. A complete count of truly uninstalled Mods could not be determined. HugsLib's separate settings file is 44,508 bytes, root settings, three groups; outside the Config counts.
 
-## Proposal: inspect first, preserve identity before general editing
+## Direction (simplified 2026-11-02)
 
-Everything below is proposed, not implemented. F1/E1–E3 leads to explicit filename mapping/transfers; F2/E3–E4 leads to framework-aware copying. E4–E5 leads to conservative editing/cleanup with uncertain ownership visible.
+RimArcho plays no tricks and keeps the player's load low. The player sees Mods and their settings; filenames, variants, frameworks and schemas stay out of the interface. This replaces the earlier phased proposal (inventory, transfer, safe editing, profiles and seven owner questions). Four parts:
 
-### Display across surfaces
+1. **Settings follow the Mod.** RimArcho fixes F1 and F2 without asking. Before launch, if the file the game will read for a deployed Mod is missing and the same Mod has a settings file under a name it was used with before, RimArcho copies that file to the new name. The original stays; an existing file is never overwritten; of several earlier files, the newest wins. A pack's first play copies settings under the names its links use and copies `HugsLib/`; test runs do the same for the names they deploy. Monitor's record (2) says which names a Mod was used with. Until then RimArcho derives them from its own deployment names (08 §3) and the Workshop folder.
+2. **Archo Monitor reports what the game knows** (03 §6.7). It already runs in the game; it adds two records to the companion log:
+   - On reaching the main menu: for each loaded Mod with a settings window, its packageId, the folder name the game uses, the settings file it reads and writes (as `LoadedModManager` builds the name) and the window's title.
+   - When the player opens a Mod's settings window: what the window draws, once per opening. That means headings and labels, and each control's kind (checkbox, slider, number or text field, choice), current value and range. HugsLib settings carry their own title, description, value and default, so Monitor reads them without a window.
+   - Limits: only windows the player has opened; controls a Mod draws by hand appear as their text only. Monitor runs no Mod code beyond what the game runs anyway.
+3. **RimArcho reads simple files itself.** A standard file whose stored values are flat (on/off, numbers, text, a choice) is shown directly. Its labels come from Monitor's record when there is one, otherwise from the keys. Only these values can be changed in RimArcho, and only while no game runs. RimArcho backs the file up automatically and leaves the values it does not understand untouched. Reset removes the stored value so the Mod's default applies. Everything else is read-only, with a note to change it in the game.
+4. **One Mod settings page.** It lists the current list's Mods that have settings. Selecting one shows its settings as the game shows them (Monitor) or as read from the file. Mod details link to it. CLI and MCP read the same, read-only at first.
 
-Put a **Mod settings** action on shared full Mod details (06 §4.2), reachable from list/inventory. A view under mod library (06 §2.9) supplies the cross-Mod file list, unknown files and backups. RimArcho's Settings (06 §2.14) can link there and open the selected game's Config folder. Identify the game/userdata root or pack being inspected; shared roots must visibly be shared.
+Not planned now: settings profiles per list, settings in plan exports, cleanup of settings left by uninstalled Mods, forms inferred from decompiled code. Open: where the page sits (Mod library or its own sidebar entry), and whether a Mod's locked copies in one Lineage share settings (default: yes, settings follow the Mod).
 
-Start with filename, size/time, owner/confidence, the current launch's expected filename, other variants, read errors and a read-only XML tree/raw preview. Unknown fields remain inspectable. Explain “this copy will use a different settings file” before launch when applicable. List all files for multi-handle Mods; group framework clients inside their shared file rather than inventing one disk file per client.
-
-TUI uses the same list/details through its command panel, with navigable tree/full paths; read-only first, no key bindings chosen here. CLI could use `archo mod-settings list/show/diff`; MCP could add `read_mod_settings`, returning the same text through the shared command layer (05 §1). Names are provisional. Use stable file references constrained to the selected userdata root instead of arbitrary writable paths. Future mutations need explicit actions, dry-run support and surface parity.
-
-Typed forms come later: extract supported patterns from the exact effective DLL/content hash and game build using the source library (03 §5.4). Show provenance/confidence and the default states in §4. Resolve Keyed labels when proved; otherwise show keys. Do not decompile the library on page opening. Enumerate cheaply, parse selected files, bound preview/tree size and make optional inference cancellable to meet 06 §10 / 07 §6.
-
-### Editing and management safeguards
-
-1. **Exclude running games.** Before mutation, recheck 08 §4 across environments/shared userdata roots. Refuse unknown process state; FileShare.None is insufficient. Recheck file identity/hash after preview for outside edits.
-2. **Back up first.** Keep original bytes and a manifest of root, game build, Mod/Instance/Lineage, visible folder, handle/class, source DLL hash and time. Backup failure means no edit. Retention/location remain decisions; restore also backs up current state.
-3. **Validate and atomically replace.** Disable external entities/DTDs; bound parsing; validate supported types, finite numbers/enums/bounds and dictionary cardinality. Write/flush a same-directory temporary file, then replace. Revalidate roots/paths and refuse traversal, redirected files or unsafe links. New files require ownership evidence. Product writes need a new 01 §4 entry.
-4. **Preserve unknown content.** Change only the selected scalar/node; retain unknown nodes/attributes, ordering and untouched text. Do not serialize through a struct that drops keys. If preservation is unsafe, retain read-only and offer export/open externally. Valid XML is not proof that the game/Mod accepts it.
-5. **Offer narrow useful edits.** Known bools/enums/numeric/string scalars with recovered semantics, removal of known keys to inherit defaults, explicit backed-up whole-file reset. Exclude arbitrary Class edits, deep objects, Def references and collection restructuring from the first editor. Explain the game can drop unknown keys on its next write.
-6. **Separate cleanup from disablement.** Disabled, absent from current list, unmatched filename and uninstalled differ. Show candidate evidence/variants and require selection. Backup/recycle instead of permanent deletion, after extending write/recycle boundaries. Do not remove shared framework files because one client vanished; per-client cleanup needs adapters.
-7. **Transfer identity explicitly.** Resolve old/new visible folders, owning instance/lineage, Mod handle and class/schema; preview copying to the filename the next launch reads. Preserve source. Never silently pick a variant or overwrite a destination. PackageId/Class alone is insufficient. Using raw Workshop IDs as deployment names is not a general fix: separate copies and registration rules still require distinct identity.
-
-Reset means “remove selected persisted state and let this Mod build construct defaults”, not “write a guessed empty object”. Explain restart requirements and whether a framework group or whole file is selected. Backup/restore must distinguish standard files, framework groups and custom stores; unknown stores stay excluded by default.
-
-### Profiles, exports and version boundaries
-
-Profile scope is **undecided**. The owner must choose per-game versus global availability before a schema is selected. Physical settings apply to a userdata directory that several environments may share; keep this explicit regardless of profile catalog scope. Per-list/per-plan settings could be launch-applied snapshots, or lists could keep shared live files with manual restore. Do not silently switch contents when merely browsing/changing a list.
-
-For an approved profile design, record game major/minor/build and Mod content identity; isolate 1.6/1.7 profile application by default. This would be RimArcho policy: both games currently share default Config. Cross-version restore needs preview and explicit compatibility decisions; Class equality is insufficient.
-
-Plan exports could optionally carry selected snapshots/provenance, excluding absolute user paths, saves, caches and decompiled game code. Pack build/import could carry a settings snapshot plus destination-name mapping and HugsLib/MSF/XML Extensions adapters, initialized once into pack userdata. Sharing is opt-in because settings can hold personal paths/presets. Exclude unknown custom files until identified; never automatically export all Config/userdata.
-
-### Phases and owner decisions
-
-| Phase | Smallest useful outcome | Specs to change if approved |
-| --- | --- | --- |
-| A: read-only inventory | Open Config, standard/framework list/preview, expected-name/variant diagnostics, ownership uncertainty, backup export | 03 §4 if prelaunch findings; 05 §4/§5; 06 §2.9/§4.2/§9; 01 §4 and 07 §3 for backup storage |
-| B: preserve deployment settings | Explicit one-time transfer across registrations; fix pack first-play mapping; define test copying/cleanup | 08 §3/§5.3/§12; 04 §4.2/§7; 02 §2.4; 01 §4; shared actions in 05/06 |
-| C: safe management/editing | Supported scalar edits with preservation; backed-up reset/restore/selected cleanup; framework group adapters | 01 §4; 03 §5.4 inference; 05 §4/§5; 06 §2.9/§4.2/§6; 07 §3; 08 §4/§7 |
-| D: optional profiles/export | Only after scope decisions: launch application, version policy, optional pack/plan settings | 02 §0/§2.4; 04 §1/§3/§9; 08 §2/§5; 05/06; 10 only for later save-specific settings |
-
-Implementation phases require CHANGELOG/release-VM-test updates under AGENTS.md. VM acceptance must cover numeric→Archo→pack transitions, divergent variants, handle/class renames, shared userdata, malformed scalars/files, default/absent/unknown keys, dictionaries, HugsLib groups, stale test files, 1.6/1.7 and a running game. Unit fixtures must be synthetic; actual game reading belongs only in the VM.
-
-Owner decisions still required:
-
-1. Per-game or global profiles; list-owned or reusable snapshots? Until answered, do not choose storage scope.
-2. Offer transfers at launch when exactly one compatible source exists, or keep migration separate? What wins when destination exists?
-3. Share settings for locked copies in one Lineage or keep independent states? What evidence permits transfer across a changed DLL/handle/class?
-4. Capture pack settings at build or first launch? Which framework groups initially, and how should initialization failures/retries work?
-5. Faithful framework settings or clean test runs? Sweep stale isolated Mod files every run?
-6. Which typed patterns/frameworks first; should unsupported data remain read-only? Backup location/retention?
-7. Is conservative candidate cleanup enough, or must complete source/Lineage reconciliation precede orphan removal?
-
-Unverified: live game/patch behavior, arbitrary-Mod/framework schema compatibility on 1.7, truly uninstalled counts, arbitrary custom-store ownership/formats, and external backup-Mod capabilities. These gaps do not affect the statically verified folder-name problem. All seven questions have evidence or explicit limits; the proposal is ready for a later owner decision.
+Implementation needs the usual CHANGELOG and release-VM-test rows. VM acceptance: a Mod moved from Workshop to an `_Archo_` copy and into a pack keeps its settings; an existing file is never overwritten; Monitor's records match the files and windows; a simple value edited in RimArcho shows in the game; a running game blocks edits.
