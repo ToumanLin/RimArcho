@@ -6,7 +6,7 @@ Dated investigation and proposal, 2026-11-02. This document defines screenshot-f
 
 The GUI does not yet meet screenshot-free operation criteria. All 22 sampled page/form states fail shared checks for page identity, control semantics, states/context, feedback and stable targeting. Twenty states have no unnamed recognized action-role nodes; Add subscription and Games each have one. This name-only success does not cover custom actions missing an action role.
 
-Native UIA Control view exposed only the RimArcho window in both sampled states. CDP exposed page content, but also the editor retained behind secondary pages. The canonical 485-Mod export exposed 26,894 nodes; its full-tree calls took 848.9, 581.7 and 533.1 ms. Other sampled pages exposed 433–1,223 nodes and took at most 34.9 ms per call.
+The .NET UIA client's Control view exposed only the RimArcho window in both sampled states; the COM client sees the page (correction in gap 1). CDP exposed page content, but also the editor retained behind secondary pages. The canonical 485-Mod export exposed 26,894 nodes; its full-tree calls took 848.9, 581.7 and 533.1 ms. Other sampled pages exposed 433–1,223 nodes and took at most 34.9 ms per call.
 
 ## Agent scenarios and the MCP boundary
 
@@ -139,7 +139,7 @@ A11Y-2 counts recognized action-role nodes; A11Y-3 audits omitted custom actions
 | guide | U | F | F | U | U | U | F | U | P |
 | uninstall | U | F | F | U | U | U | F | F | P |
 
-A11Y-2 passed its name-only check in 20/22 states; A11Y-18 passed measured size/transfer subchecks in 21/22. Overscan bounds are supported by source, but viewport capacity was not independently swept. A11Y-17 failed in both native samples; other cells remain U. A11Y-13/14 are U throughout because a complete action matrix was not executed. Base-state N under A11Y-6 is superseded by the failing interaction samples below when those modal components are opened.
+A11Y-2 passed its name-only check in 20/22 states; A11Y-18 passed measured size/transfer subchecks in 21/22. Overscan bounds are supported by source, but viewport capacity was not independently swept. A11Y-17 failed in both .NET-client samples (the COM client sees the page, gap 1); other cells remain U. A11Y-13/14 are U throughout because a complete action matrix was not executed. Base-state N under A11Y-6 is superseded by the failing interaction samples below when those modal components are opened.
 
 ### Interaction observations
 
@@ -153,7 +153,7 @@ A11Y-2 passed its name-only check in 20/22 states; A11Y-18 passed measured size/
 | General `popups.confirm` warning with no-op callback | No dialog/alertdialog; initial focus stayed on background language control; Tab moved in the background; Esc dismissed it | A11Y-6 F; `general-confirm*.ax.json`; production renderer, no destructive operation |
 | Failure through `state.say` | Ordinary text, no status/alert for that failure; appended undo anchor has no href/role | A11Y-12 F; `failure-status.ax.json`; renderer test, not a real failing scan/build |
 | Ctrl+K, then three Esc | Named/focused command input and status footer; popup dismissed and editor cursor retained | Partial A11Y-15 success; A11Y-7 F for generic result collection; `command-panel.ax.json`, `recovery-three-esc.ax.json` |
-| Native uninstall preview and library | Only one UIA Window, `RimArcho`, class `WailsWebviewWindow`, not offscreen; Window/Transform patterns only; zero descendants or Invoke/Value/Selection patterns | A11Y-17 F; traversals 61/62 ms; `uninstall-native.uia.json`, `library-native.uia.json`. Native row names/counts/states could not be compared |
+| Native uninstall preview and library (.NET client; see the correction in gap 1) | Only one UIA Window, `RimArcho`, class `WailsWebviewWindow`, not offscreen; Window/Transform patterns only; zero descendants or Invoke/Value/Selection patterns | A11Y-17 F; traversals 61/62 ms; `uninstall-native.uia.json`, `library-native.uia.json`. Native row names/counts/states could not be compared |
 
 ### Coverage limits and unreached variants
 
@@ -204,7 +204,7 @@ Paths in this table are relative to `internal/surface/gui/assets/` unless fully 
 
 ## Gaps in blocking order
 
-1. **Native UIA exposes no content controls in either sampled state (A11Y-17).** Desktop agents can identify the window but cannot discover its page. Cause (confirmed in code during review): `internal/surface/gui/gui.go:71` turns on `WebView2CompositionHosting` for Snap Layouts. With a composition controller the host window must answer `WM_GETOBJECT` with the provider from `ICoreWebView2CompositionController2.get_AutomationProvider`; Wails `v3.0.0-beta.28` binds that method (`internal/webview2/pkg/webview2/ICoreWebView2CompositionController2.go:37`) but never calls it and does not handle `WM_GETOBJECT`. Fix this before relying on CDP improvements.
+1. **~~Native UIA exposes no content controls (A11Y-17).~~ Corrected the same day: this was the .NET client, not the window.** The baseline's walker was .NET Framework `System.Windows.Automation`. The COM client (`CUIAutomation` / `CUIAutomation8`), which desktop agents and screen readers use, sees 533 elements on the library and 516 on settings in the unchanged build. The page sits in WebView2's own child window `Chrome_WidgetWin_1` ("RimArcho - Web content", msedge.dll provider, WebView2's process). Names, the language dropdown's value and expanded state agree with CDP; `InvokePattern` and `ExpandCollapsePattern` work. A `WM_GETOBJECT` bridge returning `ICoreWebView2CompositionController2.get_AutomationProvider` (slot 11) was built and measured: every COM call returned `S_OK`, but neither client's tree changed (COM 533 → 533; .NET 0 → 0), so it was not merged. Evidence and the patch: `D:\RimArcho-test\uia-provider\` (`REPORT.md`, `bridge.patch`). Remaining A11Y-17 work: compare a dialog and list rows; columnheaders appear as UIA DataItems because they have no table (A11Y-8).
 2. **Active-page boundaries and inactive content are wrong (A11Y-1/3/4/5).** Secondary pages expose the editor and its only main landmark; navigation state is CSS-only. Name the active content, hide/inert inactive pages and expose current navigation to reduce wrong-target risk everywhere.
 3. **Lists/tables do not identify records, selection and cells reliably (A11Y-4/8/9/16).** Add coherent collection/row/cell semantics, filtered totals, absolute indices, current/selected state and record identity while retaining virtualization. The footer is useful but insufficient.
 4. **Modal and popup focus is unreliable (A11Y-6/7/15).** General confirmations lack a dialog boundary/initial focus; URL prompts allow sidebar focus. Apply a shared modal focus/restore contract and separate nonmodal collection semantics; preserve working dropdown cancellation.
@@ -232,7 +232,7 @@ The adopted specification should own the requirements and link to dated measurem
 ## Open decisions
 
 - Is native UIA mandatory for the first release of accessibility support? This proposal says yes for desktop agents; CDP-only development operation is a separately labelled capability.
-- Missing UIA content: answered in review, see gap 1 (composition hosting without provider forwarding). Still open: forward the provider from RimArcho's window code or patch Wails, and recheck Snap Layouts either way.
+- Missing UIA content: answered, see gap 1 (a .NET client limit; COM UIA sees the page). No window change needed.
 - Which stable record reference should the provider expose, and in which UIA/CDP property, while keeping names readable? Backend DOM IDs, generated `choice-*` IDs and positional refnums are unsuitable persistence contracts.
 - Are 2,000 nodes /2 MiB /200 ms the right initial VM budgets? They cover normal sampled pages but are new proposals. Validate populated long logs, large findings and exports before adoption.
 - Should shortcuts use accessible descriptions, shortcut properties or named help routes? Keycaps often become computed-name content; avoid obscuring intent or duplicate announcements.
