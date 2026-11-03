@@ -143,22 +143,27 @@ issues appear there as warnings. CLI users can run `archo folder check`, then
 
 ## Connecting an agent (`archo mcp`)
 
-`archo mcp` serves the RimArcho tools over stdio:
-
-- read-only: `status`, `find_mods`, `get_mod`, `get_def`, `get_patches`, `get_harmony`,
-  `explain_relation`, `list_problems`, `list_changes`, `analyze_log`, `search_files`, `read_source`
-- writing: `edit_loadout`, `copy_local`, `add_rule`, and `save_loadout`, which is the only tool marked
-  destructive
+`archo mcp` serves the RimArcho tools over stdio. By default it serves the core tools an agent
+needs to diagnose and fix a Mod list: reading Mods, Defs, Patches, Harmony patches, the log and
+C# source; editing, saving and launching the plan; test runs; locking versions; rules and ignored
+problems. `archo mcp --tools all` also serves the player's management tools: packs,
+subscriptions, library actions, texture optimisation, the memory estimate, maintenance, identity
+answers, hidden Mods, link repair, tags and notes, and the uninstall preview. Add `--tools all`
+to the command only when you want the agent to do those too; every tool costs context on each
+turn.
 
 Each tool returns exactly what the matching CLI command prints. The tool descriptions and the server
-instructions explain the diagnosis workflow, so the agent needs no extra skill. Read-only tools are
-annotated `readOnlyHint`, which lets the client auto-approve them.
+instructions explain the diagnosis workflow, and the `guide` tool gives each tool's full reference,
+so the agent needs no extra skill. Read-only tools are annotated `readOnlyHint`, which lets the
+client auto-approve them; tools that write game or Mod files are annotated `destructiveHint`.
 
 **Claude Code**, from a terminal:
 
 ```
 claude mcp add rimarcho -- C:\Tools\RimArcho\archo.exe mcp
 ```
+
+With the management tools: `claude mcp add rimarcho -- C:\Tools\RimArcho\archo.exe mcp --tools all`.
 
 Or in a project's `.mcp.json`:
 
@@ -177,6 +182,8 @@ Or in a project's `.mcp.json`:
 command = 'C:\Tools\RimArcho\archo.exe'
 args = ["mcp"]
 ```
+
+In `.mcp.json` and `config.toml`, `"args": ["mcp", "--tools", "all"]` serves the management tools too.
 
 Then ask, for example: "My log has `Patch operation … failed` errors, which mod is wrong?" or
 paste a stack trace. To use another environment, a tool call can pass `env`. To analyse as another

@@ -10,6 +10,7 @@ const Instructions = `RimArcho knows one RimWorld installation: every mod instan
 Start with status. For a game error or crash, read guide topic=diagnose before concluding: it says how to classify the error, which tool gives which evidence and how to report. In short: analyze_log (text= for a pasted log), then analyze_log cluster=E<n>; a patcher or a mentioned mod is not the cause without further evidence, and with no source the cause is undecided.
 Editing tools act on the current plan and never touch the game until save_loadout or launch_game. Never edit Workshop files in place: pin_mod first, then edit the copy.
 Tools marked destructive (save_loadout, launch_game, manage_plans, manage_packs, resolve_identity, manage_hidden, manage_library, manage_subscriptions, manage_textures, repair_links, maintenance) write game or mod files, start the game or are hard to undo: show the dry run where there is one and ask the player before the real call.
+The player's management tools (packs, subscriptions, library actions, textures, memory estimate, maintenance, identity, hidden mods, links, player data, uninstall preview) are served only by archo mcp --tools all; otherwise use the archo CLI (guide topic=<tool name> gives the command).
 guide topic=<tool name> gives a tool's full reference (every action, parameter details, an example call and output); guide alone lists the other topics: errors (kinds the workflow does not cover), plans, words (what the interface calls things, for talking to the player).`
 
 const descGuide = `Read-only help: a tool's full reference (topic=<tool name>: every action, parameter details, an example call and output) or a workflow (diagnose, errors, plans, words). No topic lists them.`
@@ -54,15 +55,11 @@ const descHistory = `The current plan's history (read-only): log lists its versi
 
 const descPin = `Lock a version of a mod: copy it into RimArcho's lock library and use the copy in the current plan (one undoable edit), so Workshop updates stop reaching it. Do this before editing a mod's files. update=true remakes it from the updated upstream; dry_run=true previews.`
 
-const descCopy = `Old name of pin_mod (fewer arguments, same behaviour). Use pin_mod.`
-
 const descUnpin = `Unlock a locked version: the current plan uses the upstream (usually Workshop) copy again; the locked copy stays. dry_run=true previews.`
 
 const descPlayer = `The player's own data on mods, in RimArcho's database: tags, alias and note (shared by every copy of a mod), copy_note (one copy's own note). Nothing reaches the game.`
 
 const descRules = `User load-order rules: add (after, before, incompatible, attach, top, bottom, or ignore a wrong About.xml / community constraint — how an order.cycle is broken), list, remove. Rules guide sort and the order problems; they do not reorder by themselves.`
-
-const descRuleAlias = `Old name of manage_rules (action defaults to add). Use manage_rules.`
 
 const descIgnore = `Ignore a problem (p:<hex>) until its mod's files change; undo=true stops ignoring it. Only after the player decided the problem is fine: ask first.`
 

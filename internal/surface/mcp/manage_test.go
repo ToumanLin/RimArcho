@@ -167,7 +167,7 @@ func manageSteps(e *testkit.Env) []func() manageStep {
 			return manageStep{"manage_rules", map[string]any{"action": "add", "kind": "after", "a": a, "b": b, "note": "test"}, []string{"rule", "add", "after", a, b, "--note", "test"}}
 		},
 		s("manage_rules", map[string]any{"action": "list"}, "rule", "list"),
-		s("add_rule", map[string]any{"action": "remove", "rule": "r:1"}, "rule", "remove", "r:1"),
+		s("manage_rules", map[string]any{"action": "remove", "rule": "r:1"}, "rule", "remove", "r:1"),
 		func() manageStep {
 			ignored = problem("mod.hidden")
 			return manageStep{"ignore_problem", map[string]any{"ref": ignored}, []string{"problems", "ignore", ignored}}

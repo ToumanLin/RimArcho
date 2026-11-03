@@ -105,19 +105,9 @@ Example: save_loadout {"dry_run": true}
   save (dry run): 2 changes
     added  #b21c  Harmony  at 1
     moved  #a3f9  Combat Extended  34 → 35`},
-	{"copy_local", `Old name of pin_mod (same arguments except update, move_to_library and dry_run; same behaviour): lock a mod by copying it into RimArcho's lock library and using the copy in the current plan. Prefer pin_mod.
-Example: copy_local {"ref": "#ipv5", "git": true}
-  #ipv5 Yayo's Combat 3 locked: copied to C:\Users\me\AppData\Local\RimArcho\locked\main\2854006492_local
-    copy: #k2v8  (same lineage, origin marker .rimarcho/origin.json)
-    files: 130 (1.5 MB)`},
 	{"set_player_data", `Change the player's own data on mods (shared by all copies of a mod): action=tag_add / tag_remove (tags on one or more refs; tags are what list --filter tag:<t> and the TUI's tag: search use), alias (the name RimArcho shows; text "" clears), note (free text; "" clears), copy_note (a note on one copy only, e.g. why this locked version exists; list_library lineage=… shows it, and RimArcho's own first version until one is written). Nothing reaches the game.
 Example: set_player_data {"action": "tag_add", "refs": ["#uuhe", "#vpcd"], "tags": ["vehicles"]}
   tagged 2 mods: vehicles`},
-	{"add_rule", `Old name of manage_rules (same arguments; action defaults to add), kept for one minor version. Use manage_rules.
-Example: add_rule {"kind": "ignore", "target": "decl:#iqmu:loadafter:tester.y"}
-  r:1 added
-    r:1  ignore  decl:#iqmu:loadafter:tester.y
-  next:`},
 	{"pin_mod", `Create a locked version of a mod (usually a Workshop item) before editing it, or so Workshop updates stop reaching it: the mod is copied into RimArcho's lock library (outside the game folder; src:locked) with .rimarcho/origin.json (origin instance, lineage, workshop id, snapshot), stays in the same lineage, and replaces the original in the current plan only (one undoable edit; nothing is swapped when the original is not enabled). The game sees the copy only through an _Archo_ link in Mods/ that save_loadout or a launch creates, so several copies can coexist and each plan uses its own. git=true adds a repository with a baseline commit so every edit can be diffed. Links that point outside the mod folder and the upstream .git are not copied; an existing folder is never overwritten (a taken name gets a suffix). update=true remakes it when list_problems reports mod.pinned "has been updated": shows the changed files, copies the upstream's current content to a new folder and swaps it in; the old copy stays. move_to_library=true moves a copy RimArcho made in Mods/ before the library existed into the library (update does this on its own). Undo with unpin_mod. Never edit Workshop files in place — Steam overwrites them.
 Example: pin_mod {"ref": "#ipv5", "git": true}
   #ipv5 Yayo's Combat 3 locked: copied to C:\Users\me\AppData\Local\RimArcho\locked\main\2854006492_local
@@ -157,7 +147,7 @@ CLI text (archo test run small):
     exception x1: Exception: fixed failure
 Without a baseline:
   compared with: no earlier run of this plan`},
-	{"manage_rules", `User rules on load order (shared by every Loadout of the environment): action=add with kind after|before (A must load after/before B), incompatible (A B), attach (A always right after B), top / bottom (A only: load A as early / late as its constraints allow; a preference, like the community loadTop/loadBottom), or ignore (target = a constraint ref printed by sort or list_problems, e.g. decl:#ab12:loadafter:other.pkg, to drop a wrong About.xml/community constraint — this is how an order.cycle is broken); action=list shows the rules with their r:<n> refs; action=remove rule=r:<n> deletes one. Rules apply to sort and to the order problems; they do not reorder by themselves (edit_loadout action=sort does). Writes RimArcho's database only, never game files. add_rule is the old name of this tool.
+	{"manage_rules", `User rules on load order (shared by every Loadout of the environment): action=add with kind after|before (A must load after/before B), incompatible (A B), attach (A always right after B), top / bottom (A only: load A as early / late as its constraints allow; a preference, like the community loadTop/loadBottom), or ignore (target = a constraint ref printed by sort or list_problems, e.g. decl:#ab12:loadafter:other.pkg, to drop a wrong About.xml/community constraint — this is how an order.cycle is broken); action=list shows the rules with their r:<n> refs; action=remove rule=r:<n> deletes one. Rules apply to sort and to the order problems; they do not reorder by themselves (edit_loadout action=sort does). Writes RimArcho's database only, never game files.
 Example: manage_rules {"action": "add", "kind": "after", "a": "#76gh", "b": "pkg:brrainz.harmony", "note": "needs its patches"}
   r:1 added
     r:1  after  L#gpto B  L#u2mx Harmony  needs its patches

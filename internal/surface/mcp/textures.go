@@ -7,7 +7,7 @@ import "fmt"
 // tool: RimArcho only goes online when the player asks (01 §4).
 func textureTools() []tool {
 	return []tool{
-		reg("manage_textures", false, true, descTextures, TexturesArgv),
+		reg("manage_textures", false, true, descTextures, TexturesArgv).allOnly(),
 	}
 }
 

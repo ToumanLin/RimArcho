@@ -8,10 +8,12 @@ import (
 	"unicode/utf8"
 
 	"github.com/ToumanLin/RimArcho/internal/cmds"
+	"github.com/ToumanLin/RimArcho/internal/surface/mcp"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
 // 05 §5.3: what a client reads when it connects stays short; the detail is in guide topics.
+// The character limits apply to the default (core) tools; the tools/list size to all of them.
 // Raise a limit only on purpose, after making the new text as short as the rest.
 const (
 	maxInstructions = 2000     // characters
@@ -22,7 +24,7 @@ const (
 
 func TestInitialContextBudget(t *testing.T) {
 	e := testkit.New(t)
-	cs := connect(t, e)
+	cs := connectGroup(t, e, mcp.Core)
 	res, err := cs.ListTools(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
@@ -42,11 +44,17 @@ func TestInitialContextBudget(t *testing.T) {
 	if brief > maxBrief {
 		t.Errorf("Instructions and descriptions: %d characters, limit %d", brief, maxBrief)
 	}
-	list, _ := json.Marshal(res)
-	if len(list) > maxToolsList {
-		t.Errorf("tools/list: %d bytes, limit %d", len(list), maxToolsList)
+	core, _ := json.Marshal(res)
+	all, err := connect(t, e).ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
 	}
-	t.Logf("instructions %d + descriptions %d = %d characters; tools/list %d bytes; %d tools", instr, brief-instr, brief, len(list), len(res.Tools))
+	list, _ := json.Marshal(all)
+	if len(list) > maxToolsList {
+		t.Errorf("tools/list (--tools all): %d bytes, limit %d", len(list), maxToolsList)
+	}
+	t.Logf("core: instructions %d + descriptions %d = %d characters; tools/list %d bytes, %d tools; all: tools/list %d bytes, %d tools",
+		instr, brief-instr, brief, len(core), len(res.Tools), len(list), len(all.Tools))
 }
 
 // Every guide topic the topic list names is served by the guide tool, and the list names

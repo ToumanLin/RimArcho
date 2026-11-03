@@ -16,6 +16,16 @@ func init() {
 		MaxArgs: 1, Run: guideCmd})
 }
 
+// AllOnlyTools are the MCP tools only `archo mcp --tools all` serves (05 §5.2): the
+// player's management tools. The topic list marks them the same way on every surface (I1);
+// TestToolGroups (internal/surface/mcp) keeps this in step with the MCP tool table.
+var AllOnlyTools = map[string]bool{
+	"manage_subscriptions": true, "manage_packs": true, "manage_library": true, "exchange_list": true,
+	"manage_textures": true, "estimate_memory": true, "maintenance": true, "resolve_identity": true,
+	"manage_hidden": true, "check_links": true, "repair_links": true, "mute_version_warnings": true,
+	"set_player_data": true, "preview_uninstall": true,
+}
+
 // guideTopics are the workflow topics, in the order the topic list shows them.
 var guideTopics = []struct{ name, summary, text string }{
 	{"diagnose", "the workflow for a game error or crash: classify it, which tool for which evidence, how to report", guideDiagnose},
@@ -60,11 +70,16 @@ func guideCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		rows = append(rows, []string{"<tool>", "an MCP tool's full reference: every action, parameter details, an example call and output"})
 		root.AddColumns(rows)
-		var tools []string
+		var tools, more []string
 		for _, g := range toolGuides {
-			tools = append(tools, g.name)
+			if AllOnlyTools[g.name] {
+				more = append(more, g.name)
+			} else {
+				tools = append(tools, g.name)
+			}
 		}
 		root.KV("tools", strings.Join(tools, ", "))
+		root.KV("only with archo mcp --tools all", strings.Join(more, ", "))
 		return d, nil
 	}
 	topic := strings.TrimSpace(a.Pos[0])
