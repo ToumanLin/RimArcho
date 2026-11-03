@@ -281,6 +281,13 @@ type RefIn struct {
 	Ref string `json:"ref" jsonschema:"a mod reference: #<id>, L#<lineage>, pkg:<packageId>, ws:<workshopId> or src:<label>"`
 }
 
+// ModSettingsIn is get_mod_settings: archo mod-settings (06 §2.9 "Mod settings").
+type ModSettingsIn struct {
+	Env string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
+	Ref string `json:"ref,omitempty" jsonschema:"a mod reference (#<id>, L#<lineage>, pkg:<packageId>, ws:<workshopId>): its stored values; empty lists the current list's Mods that have settings"`
+	All bool   `json:"all,omitempty" jsonschema:"no truncation"`
+}
+
 type DefIn struct {
 	Env         string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Def         string `json:"def,omitempty" jsonschema:"Type/defName (ThingDef/Gun_Revolver), Type@Name for abstract parents, def:… or a bare defName"`
@@ -507,6 +514,9 @@ func toolList() []tool {
 			return argv("list").flag("active", in.Active).str("filter", in.Filter).flag("all", in.All).a
 		}),
 		reg("get_mod", true, false, descMod, func(in RefIn) []string { return []string{"mod", in.Ref} }),
+		reg("get_mod_settings", true, false, descModSettings, func(in ModSettingsIn) []string {
+			return argv("mod-settings").pos(in.Ref).flag("all", in.All).a
+		}),
 		reg("get_description", true, false, descDescribe, func(in DescribeIn) []string {
 			return argv("describe", in.Ref).str("source", in.Source).flag("refresh", in.Refresh).flag("offline", in.Offline).a
 		}),

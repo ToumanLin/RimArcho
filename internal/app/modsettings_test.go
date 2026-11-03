@@ -141,3 +141,38 @@ func TestSettingsFromMonitorRecord(t *testing.T) {
 		t.Fatalf("copy %q", got)
 	}
 }
+
+// 06 §2.9 "Mod settings", 05 §4: the current list's Mods with settings (a file, or a window
+// Archo Monitor saw), one Mod's stored values, and the same in archo mod.
+func TestModSettingsCommand(t *testing.T) {
+	t.Parallel()
+	e := loadoutEnv(t)
+	scanNow(t, e)
+	e.MustRun("enable", "pkg:tester.b")
+	e.WriteFile(filepath.Join(e.UserData, "ArchoMonitor.log"),
+		`{"timestamp":"2026-11-03 10:00:00.000","level":"INFO","message":"[Archo Monitor] session 0123456789ab","details":"","count":1,"context":{"session":"0123456789ab","version":"0.10.0","game":"1.6.4633 rev1261"},"source":"archo-monitor","schema":1,"kind":"session"}`+"\n"+
+			`{"timestamp":"2026-11-03 10:01:00.000","level":"INFO","message":"[Archo Monitor] settings 2","details":"","count":1,"context":{"settings":[{"packageId":"tester.a","folder":"1001","class":"AMod","file":"Mod_1001_AMod.xml","title":"A settings","stored":true},{"packageId":"tester.b","folder":"B","class":"BMod","file":"Mod_B_BMod.xml","title":"B options","stored":true}]},"source":"archo-monitor","schema":1,"kind":"settings"}`+"\n")
+	e.WriteFile(filepath.Join(e.UserData, "Config", "Mod_1001_AMod.xml"),
+		`<SettingsBlock><ModSettings Class="A.Settings"><fast>True</fast><speed>2.5</speed><things><li>x</li></things></ModSettings></SettingsBlock>`)
+
+	out := e.MustRun("mod-settings")
+	if !strings.Contains(out, "mod settings: 2 Mods in plan:") || !strings.Contains(out, "A settings") || !strings.Contains(out, "Mod_1001_AMod.xml") ||
+		!strings.Contains(out, "B options") || !strings.Contains(out, "defaults (no file yet)") || strings.Contains(out, "Harmony") {
+		t.Fatalf("list:\n%s", out)
+	}
+	out = e.MustRun("mod-settings", "pkg:tester.a")
+	for _, want := range []string{`"A settings"  Mod_1001_AMod.xml:`, "stored values (3;", "fast: True (on/off)", "speed: 2.5", "things: 1 item (list)", "read only: change them in the game"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in:\n%s", want, out)
+		}
+	}
+	if out := e.MustRun("mod-settings", "pkg:tester.b"); !strings.Contains(out, "the Mod uses its defaults") {
+		t.Fatalf("B:\n%s", out)
+	}
+	if out := e.MustRun("mod", "pkg:tester.a"); !strings.Contains(out, "settings:") || !strings.Contains(out, "speed: 2.5") {
+		t.Fatalf("archo mod:\n%s", out)
+	}
+	if out := e.MustRun("mod", "pkg:brrainz.harmony"); strings.Contains(out, "settings:") {
+		t.Fatalf("Harmony has no settings:\n%s", out)
+	}
+}

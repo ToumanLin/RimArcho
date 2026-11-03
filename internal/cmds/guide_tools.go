@@ -22,6 +22,13 @@ Example: get_mod {"ref": "pkg:ceteam.combatextended"}
   #a3f9 Combat Extended  [active 34/212, workshop ws:2890901044]
     status: live
     package: ceteam.combatextended`},
+	{"get_mod_settings", `Mod settings as the game reads them, read only ("mod-settings", 06 §2.9). Without ref: the current list's Mods that have settings, one row per Mod class: ref, name, the settings window's title (from Archo Monitor, "-" before it saw one), the file in Config/ and its size, or "defaults (no file yet)". With ref: each file's stored values (on/off, numbers, text; lists, dictionaries and nested values summarised as counts). A file stores only values that differ from the Mod's defaults, so a missing value is at its default, not missing. The folder in the file name is the one the game sees the Mod under, so a copy linked under another name has its own file (RimArcho copies settings across on save and launch, 08 §3). Changing values is the game's: open the Mod's settings window. all=true lifts the 30-row limit.
+Example: get_mod_settings {"ref": "pkg:mehni.pickupandhaul"}
+  #k2f1 Pick Up And Haul: settings (folder 1279012058)
+    "Pick Up And Haul"  Mod_1279012058_Modbase.xml:
+      stored values (2; a value at its default is not stored):
+        allowAnimals: False (on/off)
+        maximumOccupiedCapacityToConsiderHauling: 0.7`},
 	{"get_description", `A mod's description: About.xml and the Steam Workshop page (BBCode rendered as plain text; images as [image: url]). The Workshop text is fetched for this one mod on demand and cached until the item is updated; offline=true uses the cache only, and the user can turn fetching off (config workshop.fetch). source=auto shows the Workshop text when About.xml is short or the same, both otherwise. Use it to learn what a mod does before suggesting it.
 Example: get_description {"ref": "#uuhe"}
   description of #uuhe Vehicle Framework

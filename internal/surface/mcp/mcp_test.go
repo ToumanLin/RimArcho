@@ -63,7 +63,7 @@ func TestToolsAndAnnotations(t *testing.T) {
 	}
 	want := map[string]string{ // name → expected annotation: ro, write, destructive
 		"guide":  "ro", // 05 §5.3: the detail behind the short descriptions
-		"status": "ro", "find_mods": "ro", "get_mod": "ro", "get_def": "ro", "get_patches": "ro", "get_harmony": "ro",
+		"status": "ro", "find_mods": "ro", "get_mod": "ro", "get_mod_settings": "ro", "get_def": "ro", "get_patches": "ro", "get_harmony": "ro",
 		"explain_relation": "ro", "list_problems": "ro", "list_changes": "ro", "analyze_log": "ro", "search_files": "ro",
 		"read_source": "ro", "edit_loadout": "write", "save_loadout": "destructive",
 		"get_description": "ro", "set_player_data": "write",
@@ -160,6 +160,8 @@ func TestCLIParity(t *testing.T) {
 		{"find_mods", map[string]any{"query": "mod"}, []string{"find", "mod"}},
 		{"find_mods", map[string]any{"active": true}, []string{"list", "--active"}},
 		{"get_mod", map[string]any{"ref": modA}, []string{"mod", modA}},
+		{"get_mod_settings", map[string]any{}, []string{"mod-settings"}},
+		{"get_mod_settings", map[string]any{"ref": modA, "all": true}, []string{"mod-settings", modA, "--all"}},
 		{"get_def", map[string]any{"def": "ThingDef/Lib_Gun"}, []string{"def", "ThingDef/Lib_Gun"}},
 		{"get_patches", map[string]any{"failed": true}, []string{"patches", "--failed"}},
 		{"get_harmony", map[string]any{"target": "Verse.Pawn.Tick"}, []string{"harmony", "--target", "Verse.Pawn.Tick"}},

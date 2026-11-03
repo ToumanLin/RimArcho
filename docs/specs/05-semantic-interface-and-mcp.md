@@ -1,6 +1,6 @@
 # 05 · Semantic Interface and MCP
 
-> Status: the CLI and MCP are implemented (40 MCP tools including the guide tool; `archo mcp` serves the 26 core tools by default and all 40 with `--tools all`, §5.1). The 1.1 save tools and a few reference forms are not yet implemented; each is marked below.
+> Status: the CLI and MCP are implemented (41 MCP tools including the guide tool; `archo mcp` serves the 27 core tools by default and all 41 with `--tools all`, §5.1). The 1.1 save tools and a few reference forms are not yet implemented; each is marked below.
 > Basis: 00 and 00a; the command semantics in 02, 03, 04, and 08; and 09 (Archo uses the same tools).
 
 ## 1. One Command and Tool Layer
@@ -209,7 +209,8 @@ Commands and output call a plan Loadout / plan. The editing commands below act o
 | Queries | status | Show the current environment overview: game version, Mod counts per source, residue, Lineages, last scan, changes, the plan's enabled and missing counts and differences from the game list, a ModsConfig version-mismatch notice, finding counts, and game-running state. |
 | | `list [--active] [--filter <expression>] [--all]` | List `Mods`. Active lists the current plan in load order. Filters accept `source:``<label\|kind>`, `status:live\|tombstone\|all`, residue, unloadable, copies, `pkg:`, `ws:`, `tag:`, `lineage:`, and plain words. By default, list only live Instances. |
 | | `find <words…> [--all]` | Search by name, alias, package ID, author, Workshop ID, or folder. |
-| | `mod <reference> [--diff <reference>]` | Show Mod details; the diff option lists semantic files that differ from another Instance. |
+| | `mod <reference> [--diff <reference>]` | Show Mod details; the diff option lists semantic files that differ from another Instance. A Mod with settings gets a settings section (06 §2.9 "Mod settings"). |
+| | `mod-settings [<reference>] [--all]` | Mod settings, read only (06 §2.9 "Mod settings"): the current list's Mods that have settings, or what one Mod's settings files store. |
 | | `describe <reference> [--source auto\|about\|workshop\|both] [--refresh] [--offline]` | Show the `About` description (descriptionsByVersion for the game version) and the Workshop description (BBCode converted to plain text, with images as `[image: URL]`). See 06 §4.3 for auto selection, networking, and caching. Offline reads only the cache. |
 | | `def [<Type/defName>] [--mod <reference>] [--all]` | List the definers and patchers of a Def in load order, marking the effective one, or list all `Defs` in a Mod. |
 | | `patches [--mod <reference>] [--target <Type/defName \| XPath-fragment>] [--failed] [--all]` | Show patch operations and simulation results. Failed lists only patches with no match and their reasons (03 §4.4). |
@@ -302,7 +303,7 @@ An environment may have several plans (04 §1). The commands are:
 ### 5.1 Transport and Lifecycle
 
 - Only stdio is supported (`StdioTransport`); no network ports are opened. stdout carries only protocol messages.
-- **Tool groups.** `archo mcp` serves the core group (§5.2): the 26 tools for diagnosis, plan edits, saving, launching, test runs, locking, rules and ignoring problems. `archo mcp --tools all` (or `--tools=all`) serves all 40, adding the player's management tools (§1.2). `--tools core` is the default. Another value, an unknown flag or a positional argument is a usage error (exit 2) before the data folder is opened; `archo mcp --help` shows the flag. A tool outside the served group is an unknown tool to the client. The group of each tool is part of its row in `Tools()`; `Tools()`, `Catalog()` and `ArgvFor()` still cover every tool for harnesses (`spikes/agenteval`), and `ToolDoc.Group` names its group. Measured on synthetic data: core `tools/list` is 27,435 bytes, all is 43,039 bytes.
+- **Tool groups.** `archo mcp` serves the core group (§5.2): the 27 tools for diagnosis (Mod settings included), plan edits, saving, launching, test runs, locking, rules and ignoring problems. `archo mcp --tools all` (or `--tools=all`) serves all 41, adding the player's management tools (§1.2). `--tools core` is the default. Another value, an unknown flag or a positional argument is a usage error (exit 2) before the data folder is opened; `archo mcp --help` shows the flag. A tool outside the served group is an unknown tool to the client. The group of each tool is part of its row in `Tools()`; `Tools()`, `Catalog()` and `ArgvFor()` still cover every tool for harnesses (`spikes/agenteval`), and `ToolDoc.Group` names its group. Measured on synthetic data: core `tools/list` is 27,435 bytes, all is 43,039 bytes.
 - The server is named rimarcho and uses the release version. It sends the `Instructions` from §5.3 during initialization.
 - The server is not resident: the process exits when the harness closes the session.
 - The server starts in the current environment. A tool's env parameter switches environments for that call and restores the previous environment afterward.
@@ -324,6 +325,7 @@ Annotations follow the MCP specification; the external harness decides whether t
 | `status` | status | true | — |
 | `find_mods` | Use find when query is present; otherwise use list (active and filter). | true | — |
 | `get_mod` | mod | true | — |
+| `get_mod_settings` | mod-settings (ref, all) | true | — |
 | `get_description` | describe (source, refresh, and offline) | true | — |
 | `get_def` | def (def, mod, all, and `game_version`) | true | — |
 | `get_patches` | patches (mod, target, failed, all, and `game_version`) | true | — |
@@ -358,7 +360,7 @@ Annotations follow the MCP specification; the external harness decides whether t
 | `manage_subscriptions` | The action is list (the default, using subscribe list), add, check, update, or remove. Add uses URL or kind to choose `subscribe git <url> [--branch\|--tag\|--commit]`, `subscribe page <url> [--git] [--from]`, or `subscribe workshop <ID…> [--steamcmd]`. Check uses subscribe check with refs, or all subscriptions if refs is absent. Update uses subscribe update with refs or all, and from, and refuses while a game is running. Remove uses `subscribe remove`. Add, update, and remove accept `dry_run`. | false | true |
 | `preview_uninstall` | `uninstall --dry-run` (`keep_locked`, `locked_to`, `remove_packs`, `packs_to`, `remove_saves`, `saves_to`, `remove_games`, `restore_modsconfig_backup`, and all); never pass --yes. | true | — |
 
-**Groups.** Core (served by default): `guide`, `status`, `find_mods`, `get_mod`, `get_description`, `get_def`, `get_patches`, `get_harmony`, `explain_relation`, `list_problems`, `list_changes`, `analyze_log`, `search_files`, `read_source`, `edit_loadout`, `save_loadout`, `launch_game`, `test_run`, `pin_mod`, `unpin_mod`, `manage_plans`, `plan_history`, `manage_rules`, `ignore_problem`, `scan`, `list_library`. Only with `--tools all`: `manage_subscriptions`, `manage_packs`, `manage_library`, `exchange_list`, `manage_textures`, `estimate_memory`, `maintenance`, `resolve_identity`, `manage_hidden`, `check_links`, `repair_links`, `mute_version_warnings`, `set_player_data`, `preview_uninstall` (`TestToolGroups`).
+**Groups.** Core (served by default): `guide`, `status`, `find_mods`, `get_mod`, `get_mod_settings`, `get_description`, `get_def`, `get_patches`, `get_harmony`, `explain_relation`, `list_problems`, `list_changes`, `analyze_log`, `search_files`, `read_source`, `edit_loadout`, `save_loadout`, `launch_game`, `test_run`, `pin_mod`, `unpin_mod`, `manage_plans`, `plan_history`, `manage_rules`, `ignore_problem`, `scan`, `list_library`. Only with `--tools all`: `manage_subscriptions`, `manage_packs`, `manage_library`, `exchange_list`, `manage_textures`, `estimate_memory`, `maintenance`, `resolve_identity`, `manage_hidden`, `check_links`, `repair_links`, `mute_version_warnings`, `set_player_data`, `preview_uninstall` (`TestToolGroups`).
 
 The authoritative tools, groups and annotations are `Tools()` in `internal/surface/mcp/server.go`. `destructiveHint: true` applies to `save_loadout`, `launch_game`, `manage_plans`, `manage_packs`, `resolve_identity`, `manage_hidden`, `manage_library`, `manage_subscriptions`, `manage_textures`, `repair_links`, and maintenance. Add tools still missing from §1.2 in the same way.
 
@@ -411,6 +413,7 @@ The following table gives the tool guide highlights. See `internal/cmds/guide_to
 | `status` | Use it first in a session. For one Mod, use `get_mod`; for the findings themselves, use `list_problems`. |
 | `find_mods` | Search by name, package ID, author, Workshop ID, or folder. A package ID may identify several Instances; the output lists a reference for every candidate. Use `get_mod` next. |
 | `get_mod` | Get all facts for one Instance. An ambiguous reference returns candidates rather than choosing one arbitrarily. |
+| `get_mod_settings` | Read what a Mod's settings files store, or which Mods of the current list have settings; values change only in the game. |
 | `get_def` | Use it for No ThingDef named X, duplicate Defs, or which Mod wins. |
 | `get_patches` | Use it for a logged Patch operation failed; `failed=true` gives the reason. |
 | `get_harmony` | Use it for PREFIX/POSTFIX stack lines or `Mods` touching `Pawn.Tick`; next, use `read_source` on the patch class. A bool-returning prefix may skip the original method. Patches applied in code through `Harmony.Patch` are marked as not statically resolvable. |

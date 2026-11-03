@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -152,5 +153,51 @@ func TestCopyHugsLib(t *testing.T) {
 	}
 	if s := readText(t, filepath.Join(to, "HugsLib", "ModSettings.xml")); s != "<settings>pack</settings>" {
 		t.Fatalf("replaced the pack's: %q", s)
+	}
+}
+
+// What a settings file stores: flat values as values; lists, dictionaries, nested objects
+// and nulls summarised (research 2026-11-02_mod-settings §4).
+func TestParseSettings(t *testing.T) {
+	t.Parallel()
+	sc, err := parseSettings(strings.NewReader(`<?xml version="1.0" encoding="utf-8"?>
+<SettingsBlock>
+  <ModSettings Class="PickUpAndHaul.Settings">
+    <allowAnimals>False</allowAnimals>
+    <ratio>0.8</ratio>
+    <tiny>1E-05</tiny>
+    <name>Hauler &amp; co</name>
+    <empty />
+    <nan>NaN</nan>
+    <items><li>Steel</li><li>Wood</li></items>
+    <data><keys><li>a</li><li>b</li><li>c</li></keys><values><li>1</li><li>2</li><li>3</li></values></data>
+    <inner><x>1</x><y>2</y></inner>
+    <gone IsNull="True" />
+  </ModSettings>
+</SettingsBlock>`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []SettingValue{
+		{Key: "allowAnimals", Kind: "bool", Value: "False"},
+		{Key: "ratio", Kind: "number", Value: "0.8"},
+		{Key: "tiny", Kind: "number", Value: "1E-05"},
+		{Key: "name", Kind: "text", Value: "Hauler & co"},
+		{Key: "empty", Kind: "text", Value: ""},
+		{Key: "nan", Kind: "text", Value: "NaN"},
+		{Key: "items", Kind: "list", Items: 2},
+		{Key: "data", Kind: "map", Items: 3},
+		{Key: "inner", Kind: "object", Items: 2},
+		{Key: "gone", Kind: "null"},
+	}
+	if sc.Class != "PickUpAndHaul.Settings" || sc.Simple || !reflect.DeepEqual(sc.Values, want) {
+		t.Fatalf("class %q simple %v\n%+v", sc.Class, sc.Simple, sc.Values)
+	}
+	sc, err = parseSettings(strings.NewReader(`<SettingsBlock><ModSettings Class="X" /></SettingsBlock>`))
+	if err != nil || !sc.Simple || len(sc.Values) != 0 {
+		t.Fatalf("defaults only: %+v, %v", sc, err)
+	}
+	if _, err := parseSettings(strings.NewReader(`<ModsConfigData><activeMods/></ModsConfigData>`)); err == nil {
+		t.Fatal("read another kind of file")
 	}
 }

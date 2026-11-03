@@ -599,6 +599,12 @@ func modDoc(c *Ctx, ix *app.Index, m *store.Mod) (*render.Doc, error) {
 			}
 		}
 	}
+	// Its settings as the game reads them now (06 §2.9 "Mod settings").
+	if m.Status == identity.Live && m.Kind != source.Official {
+		if sm, err := c.App.ModSettingsOf(m); err == nil && len(sm.Files) > 0 {
+			settingsFiles(root.Section("settings"), sm, 10, "archo mod-settings "+ref)
+		}
+	}
 	if decl.ParseError != "" {
 		root.KV("warning", "About.xml: "+decl.ParseError)
 	}
