@@ -211,7 +211,7 @@ func (s *API) TexturesRun(scope string, scale int, refs []string) (string, error
 		obj = view.T("every installed mod")
 	}
 	task := s.beginSelf(view.TaskTextures, obj, func() error { _, err := s.TexturesStop(); return err })
-	go s.watchTextures(task, args, run)
+	go s.watchTextures(task, obj, args, run)
 	return view.T("converting textures") + "  " + view.T("it goes on in the background"), nil
 }
 
@@ -221,7 +221,7 @@ var (
 	texFailedRe  = regexp.MustCompile(`^failed: (\d+) `)
 )
 
-func (s *API) watchTextures(task string, args []string, run func([]string, func(string)) ([]string, error)) {
+func (s *API) watchTextures(task, obj string, args []string, run func([]string, func(string)) ([]string, error)) {
 	lines, err := run(args, func(l string) {
 		p, ok := cmds.ParseTextureProgress(l)
 		if !ok {
@@ -239,7 +239,7 @@ func (s *API) watchTextures(task string, args []string, run func([]string, func(
 	})
 	ev := TextureEvent{Done: true, Ok: err == nil, Frac: 1}
 	if err != nil {
-		ev.Error = view.Humanize(nil, err.Error())
+		ev.Error = failedText(view.TaskTextures, obj, view.Humanize(nil, err.Error()))
 	} else {
 		ev.Text = textureDoneText(lines)
 	}

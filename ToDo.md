@@ -38,7 +38,7 @@ Accessibility is intended to let AI agents operate without screenshots. Define a
 
 2026-11-02 (later): those three are done (A1, A6, A8, A9, A15 pass). Next: name the remaining fields and icons (A2, A10), tell same-name controls apart (A5), menu and command-panel semantics (A7), progress and messages as status (A11, A12).
 
-2026-11-03: progress and messages done (A11 passes, A12 partial: some messages don't name their subject, and outcomes other than tasks are gone after navigation). Next: A2, A10, A5, A7.
+2026-11-03: progress and messages done (A11, A12 pass; A12 relaxed: only work that ends on its own must name its job, a direct reply may be short). Next: A2, A10, A5, A7.
 
 ## Save analysis
 

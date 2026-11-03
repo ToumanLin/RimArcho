@@ -451,13 +451,14 @@ func (s *API) watchBuild(task, name, tmp string, run func(string) error) {
 				for i, l := range lines {
 					lines[i] = view.T(strings.TrimPrefix(strings.TrimSpace(l), "error: "))
 				}
-				ev.Error = strings.Join(lines, "\n")
+				reason := strings.Join(lines, "\n")
+				ev.Error = failedText(view.TaskPack, name, reason)
 				s.tasks.Update(task, func(t *app.Task) { t.Step = last.Step })
 				end := app.TaskFailed
 				if s.tasks.StopAsked(task) {
 					end = app.TaskStopped
 				}
-				s.tasks.Finish(task, end, ev.Error)
+				s.tasks.Finish(task, end, reason)
 			} else {
 				s.tasks.Update(task, func(t *app.Task) { t.Step = 5 })
 				s.endSelf(task, nil, ev.Text)
@@ -1469,13 +1470,11 @@ func (s *API) Scan() bool {
 		s.mu.Unlock()
 		ev := map[string]any{"ok": err == nil}
 		if err != nil {
-			ev["error"] = view.Humanize(nil, firstLine(out)+" "+err.Error())
+			reason := view.Humanize(nil, firstLine(out)+" "+err.Error())
+			ev["error"] = failedText(view.TaskScan, env, reason)
+			s.endSelf(task, errors.New(reason), "")
 		} else {
 			ev["text"] = view.T("scan complete")
-		}
-		if err != nil {
-			s.endSelf(task, errors.New(ev["error"].(string)), "")
-		} else {
 			s.endSelf(task, nil, ev["text"].(string))
 		}
 		s.free.soon()
@@ -1545,7 +1544,7 @@ func (s *API) startAnalyze() bool {
 		s.endSelf(task, err, view.T("analysis done"))
 		ev := map[string]any{"done": true, "ok": err == nil}
 		if err != nil {
-			ev["error"] = err.Error()
+			ev["error"] = failedText(view.TaskAnalyze, obj, err.Error())
 		}
 		s.send("analyze", ev)
 	}()

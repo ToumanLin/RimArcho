@@ -47,7 +47,7 @@ func (s *API) startTasks() {
 	ts.Changed = s.tasksChanged
 	ts.Ended = func(t app.Task) {
 		s.subRevision.Add(1)
-		if t.Lane == app.LaneSelf && !view.IsSettingTask(t.Kind) && t.Kind != view.TaskAccount && t.Kind != view.TaskSiteDownload && t.Kind != view.TaskCreditReplace {
+		if t.Lane == app.LaneSelf && !view.IsSettingTask(t.Kind) && t.Kind != view.TaskAccount && t.Kind != view.TaskSiteDownload && t.Kind != view.TaskCreditReplace && t.Kind != view.TaskTexClean {
 			return // its own event says how it ended
 		}
 		r := view.BuildTasks([]app.Task{t}, time.Now()).Rows[0]
@@ -323,6 +323,12 @@ func (s *API) TaskAct(act string, ids []string, ref string) (string, error) {
 // beginSelf records one of the window's own jobs.
 func (s *API) beginSelf(kind, obj string, stop func() error) string {
 	return s.tasks.Begin(kind, obj, stop)
+}
+
+// failedText is a job's failure for the status line. It can arrive while the player does something
+// else, so it names the job as a task row does (06 §11 A12); the task record keeps the bare reason.
+func failedText(kind, obj, reason string) string {
+	return view.TaskStatus(view.TaskRow{Title: view.TaskTitle(kind), Obj: obj, Line: reason})
 }
 
 // endSelf ends it: done, or failed with the reason.
