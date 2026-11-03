@@ -1,6 +1,7 @@
 package cmds
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sort"
@@ -29,6 +30,30 @@ func init() {
 }
 
 func progress() func(string) { return Progress }
+
+type progressKey struct{}
+
+// WithProgress returns a context whose commands also send their progress lines to f.
+// The MCP server uses it to put the current step into its progress notifications (05 §5.1).
+func WithProgress(ctx context.Context, f func(string)) context.Context {
+	return context.WithValue(ctx, progressKey{}, f)
+}
+
+// progressCtx is progress() plus the receiver WithProgress attached to the command's context.
+func (c *Ctx) progressCtx() func(string) {
+	var f func(string)
+	if c.Context != nil {
+		f, _ = c.Context.Value(progressKey{}).(func(string))
+	}
+	g := Progress
+	switch {
+	case f == nil:
+		return g
+	case g == nil:
+		return f
+	}
+	return func(line string) { g(line); f(line) }
+}
 
 func analyzeCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	app.SetAnalyzeLimits()

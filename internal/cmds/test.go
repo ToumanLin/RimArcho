@@ -23,7 +23,7 @@ func init() {
 }
 
 func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
-	o := app.TestRunOptions{Env: args.Str("env"), Map: args.Bool("map"), Progress: progress()}
+	o := app.TestRunOptions{Env: args.Str("env"), Map: args.Bool("map"), Progress: c.progressCtx()}
 	if len(args.Pos) > 0 {
 		o.Plan = args.Pos[0]
 	}

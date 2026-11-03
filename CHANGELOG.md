@@ -2,6 +2,10 @@
 
 All notable changes to RimArcho. Versions follow semantic versioning; the MVP is 0.5.0.
 
+## 1.0.1 (unreleased)
+
+- MCP: long tool calls send a progress notification every 10 seconds when the client asks for progress; for `test_run` it names the current step, such as waiting for the game to load. Clients that restart their request timeout on progress, such as Pi, no longer give up on `test_run` after 60 seconds. Giving up cancelled the call, which closed the game before it could report.
+
 ## 1.0.0 — 2026-11-02
 
 The first public release. It contains everything below: 0.5.0 to 0.9.0 were development milestones
