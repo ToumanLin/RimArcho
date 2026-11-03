@@ -281,8 +281,10 @@ function drawHead() {
   h.append(el("span", "anum", "2"));
   const n = p.shown === p.total ? Tf("%d mods", p.total) : Tf("%d of %d mods", p.shown, p.total);
   h.classList.add("word-facts");
-  h.append(el("span", "lib-count", n), el("span", "faint", p.size));
-  table.draw(els.rows, els.th);
+  const title = el("span", "lib-count", n);
+  title.id = "library-count";
+  h.append(title, el("span", "faint", p.size));
+  table.draw(els.rows, els.th, { role: "treegrid", labelledby: title.id, count: L.flat.length, multiselectable: true });
 }
 
 // ---- the rows ----
@@ -296,22 +298,31 @@ function drawRows() {
   const sig = [a, b, L.cur, L.sel.size, L.flat.length, shownRef, [...L.sel].join(",")].join("|");
   if (box.dataset.sig === sig) return;
   box.dataset.sig = sig;
+  table.count(L.flat.length);
   for (const n of [...box.querySelectorAll(".lib-row")]) n.remove();
   if (!L.flat.length) {
     const p = L.page;
+    box.removeAttribute("aria-activedescendant");
     box.append(el("div", "lib-row empty", p.total ? T("no mod matches") : T("no mods yet (R scans the mod folders)")));
     return;
   }
   const frag = document.createDocumentFragment();
   for (let k = a; k < b; k++) frag.append(rowEl(L.flat[k], k));
   box.append(frag);
+  const active = box.querySelector(".lib-row.cur");
+  if (active) box.setAttribute("aria-activedescendant", active.id);
+  else box.removeAttribute("aria-activedescendant");
 }
 
 function rowEl(x, k) {
   const r = el("div", "lib-row " + x.t + (x.lone ? " lone" : "") + (k === L.cur ? " cur" : ""));
+  r.id = "library-row-" + encodeURIComponent(rowKey(x));
+  r.setAttribute("aria-level", x.t === "lin" || x.lone ? "1" : "2");
+  if (x.t === "lin") r.setAttribute("aria-expanded", String(isOpen(x.r)));
   r.style.top = HEAD + k * ROW + "px";
   const selected = x.t === "inst" ? L.sel.has(x.i.ref) : x.r.insts.every((i) => L.sel.has(i.ref)) && x.r.insts.length;
   if (selected) r.classList.add("sel");
+  r.setAttribute("aria-selected", String(!!selected));
   // the cells: a Lineage's from its row, a copy's from the copy (a lone copy is its Lineage)
   const cells = x.t === "lin" || x.lone ? x.r : x.i;
   for (const c of shownCols()) {
@@ -323,6 +334,12 @@ function rowEl(x, k) {
     else if (v) cell.title = v;
     r.append(cell);
   }
+  const name = r.querySelector(".name .t");
+  if (name) {
+    name.id = r.id + "-name";
+    r.setAttribute("aria-labelledby", name.id);
+  }
+  table.row(r, k);
   r.onclick = (e) => click(k, e);
   r.ondblclick = () => { if (x.t === "lin") toggle(x.r); };
   r.oncontextmenu = (e) => {
@@ -340,12 +357,15 @@ function nameCell(x) {
   if (x.t === "lin") {
     const c = el("span", "chev" + (L.open.has(x.r.id) || x.r.insts.length < x.r.copies ? " down" : ""));
     c.innerHTML = icon.chev;
+    c.setAttribute("aria-hidden", "true");
     c.onclick = (e) => { e.stopPropagation(); toggle(x.r); };
     left.append(c, el("span", "t", x.r.name));
   } else if (x.lone) {
     left.append(el("span", "t", x.r.name));
   } else {
-    left.append(el("span", "tree", "└"), el("span", "t kind", x.i.label || x.i.name));
+    const branch = el("span", "tree", "└");
+    branch.setAttribute("aria-hidden", "true");
+    left.append(branch, el("span", "t kind", x.i.label || x.i.name));
   }
   return left;
 }

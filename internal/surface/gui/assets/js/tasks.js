@@ -432,7 +432,8 @@ function drawItems() {
     return;
   }
   const vis = X.cols.filter((c) => c.shown);
-  table.draw(els.items, els.th);
+  els.ihead.querySelector(".t").id = "task-items-heading";
+  table.draw(els.iscroll, els.th, { role: "grid", labelledby: "task-items-heading", count: r.items.length });
   const rows = itemRows();
   X.icur = Math.max(0, Math.min(X.icur, rows.length - 1));
   els.ibody.innerHTML = "";
@@ -449,6 +450,7 @@ function drawItems() {
       else pathContent(cell, it.ref);
       e.append(cell);
     }
+    table.row(e, i);
     els.ibody.append(e);
   });
 }
