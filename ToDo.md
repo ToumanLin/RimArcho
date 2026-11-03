@@ -24,6 +24,8 @@ Decompilation serves two purposes: investigating Mod conflicts and creating Mods
 
 Mod configuration determines how a Mod's content is played. In the game it has an interface; outside the game it is plain XML.
 
+2026-11-02: researched in [research/2026-11-02_mod-settings.md](docs/research/2026-11-02_mod-settings.md). First finding: settings files are named after the folder the game sees, so `_Archo_` and `!ArchoPack_` links fork a Mod's settings (01 §5.3). Proposal: read-only inventory first, then settings transfer on deployment, then safe editing; profiles wait on the scoping questions at the end of the research.
+
 ## Accessibility
 
 Accessibility is intended to let AI agents operate without screenshots. Define acceptance criteria for it.
