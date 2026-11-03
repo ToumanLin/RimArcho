@@ -111,6 +111,9 @@ func TestTestRunPlanConfigVisibilityAndReport(t *testing.T) {
 	e.WriteFile(filepath.Join(e.UserData, "Config", "Prefs.xml"), string(prefs))
 	e.WriteFile(filepath.Join(e.UserData, "Config", "KeyPrefs.xml"), "<KeyPrefs/>")
 	e.WriteFile(filepath.Join(e.UserData, "Config", "ModSettings.xml"), "<Settings>keep</Settings>")
+	// Linked is seen through another tool's link now; its settings were saved under its
+	// RimArcho link name (08 §3).
+	e.WriteFile(filepath.Join(e.UserData, "Config", "Mod__Archo_extra_Linked_LinkedMod.xml"), "<linked/>")
 	e.WriteFile(filepath.Join(e.UserData, "Config", "Knowledge.xml"), "player knowledge")
 	e.WriteFile(filepath.Join(e.UserData, "Config", "skip.txt"), "not config")
 	e.WriteFile(filepath.Join(e.UserData, "Logs", "Player.log"), "player log")
@@ -166,12 +169,13 @@ func TestTestRunPlanConfigVisibilityAndReport(t *testing.T) {
 		t.Fatalf("test config %+v", config)
 	}
 	for path, want := range map[string]string{
-		filepath.Join(e.UserData, "Config", "Prefs.xml"):     string(prefs),
-		filepath.Join(e.UserData, "Config", "KeyPrefs.xml"):  "<KeyPrefs/>",
-		filepath.Join(data, "Config", "ModSettings.xml"):     "<Settings>keep</Settings>",
-		filepath.Join(data, "ShaderCache", "keep"):           "cached",
-		filepath.Join(e.UserData, "Config", "Knowledge.xml"): "player knowledge",
-		filepath.Join(e.UserData, "Logs", "Player.log"):      "player log",
+		filepath.Join(e.UserData, "Config", "Prefs.xml"):                string(prefs),
+		filepath.Join(e.UserData, "Config", "KeyPrefs.xml"):             "<KeyPrefs/>",
+		filepath.Join(data, "Config", "ModSettings.xml"):                "<Settings>keep</Settings>",
+		filepath.Join(data, "Config", "Mod_ExistingLink_LinkedMod.xml"): "<linked/>",
+		filepath.Join(data, "ShaderCache", "keep"):                      "cached",
+		filepath.Join(e.UserData, "Config", "Knowledge.xml"):            "player knowledge",
+		filepath.Join(e.UserData, "Logs", "Player.log"):                 "player log",
 	} {
 		b, err := os.ReadFile(path)
 		if err != nil || string(b) != want {
@@ -180,6 +184,9 @@ func TestTestRunPlanConfigVisibilityAndReport(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(data, "Config", "skip.txt")); !os.IsNotExist(err) {
 		t.Fatal("copied non-XML settings")
+	}
+	if _, err := os.Stat(filepath.Join(e.UserData, "Config", "Mod_ExistingLink_LinkedMod.xml")); !os.IsNotExist(err) {
+		t.Fatal("a test run wrote the player's Config")
 	}
 	if len(progress) < 3 || len(e.Launched) != 0 || e.ReadModsConfig() != before {
 		t.Fatalf("progress %v; ordinary launches %v; player config changed", progress, e.Launched)

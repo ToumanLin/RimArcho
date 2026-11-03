@@ -216,6 +216,14 @@ func (a *App) prepareTestConfig(st *LoadoutState, data string, protected []strin
 				return err
 			}
 		}
+		// Settings follow the Mod (08 §3): what a launch would copy, written here only.
+		job := listSettings(st, testRunSeen(st), filepath.Join(root, "Config"))
+		job.write = cfg
+		for _, c := range carryModSettings(job, func(path string) error { return testRunPath(data, path, protected) }) {
+			if c.Err != "" {
+				return fmt.Errorf("test run: copying %s's settings: %s", c.Mod, c.Err)
+			}
+		}
 	}
 	var known []string
 	for _, m := range st.Ix.Mods {
@@ -241,7 +249,26 @@ func (a *App) prepareTestConfig(st *LoadoutState, data string, protected []strin
 }
 
 func testRunMissing(st *LoadoutState) []TestRunMissing {
-	parents, linked := map[string]bool{}, map[string]bool{}
+	seen := testRunSeen(st)
+	missing := []TestRunMissing{}
+	for _, entry := range st.List {
+		m := st.Ix.ByID[entry.Instance]
+		if m == nil {
+			missing = append(missing, TestRunMissing{PackageID: entry.Missing, Name: entry.Missing})
+			continue
+		}
+		if m.Kind != source.Official && seen[m.ID] == "" {
+			missing = append(missing, TestRunMissing{PackageID: m.PackageID, Name: m.DisplayName()})
+		}
+	}
+	return missing
+}
+
+// testRunSeen maps each listed Mod a test run's game sees to the folder it sees it under.
+// Test runs make no links (08 §12): it is the Mod's folder in Data/, Mods/ or the Workshop,
+// or the name of a link in Mods/ to it.
+func testRunSeen(st *LoadoutState) map[string]string {
+	parents, linked := map[string]bool{}, map[string]string{}
 	roots := []string{filepath.Join(st.Ix.Env.GameRoot, "Data"), filepath.Join(st.Ix.Env.GameRoot, "Mods")}
 	for _, s := range st.Ix.Sources {
 		if s.Kind == source.Workshop && s.Status != source.StatusRetired {
@@ -262,26 +289,27 @@ func testRunMissing(st *LoadoutState) []TestRunMissing {
 		}
 		if info, err := os.Stat(path); err == nil && info.IsDir() {
 			if real, err := source.RealPath(path); err == nil {
-				linked[env.PathKey(real)] = true
+				linked[env.PathKey(real)] = f.Name()
 			}
 		}
 	}
-	missing := []TestRunMissing{}
+	seen := map[string]string{}
 	for _, entry := range st.List {
 		m := st.Ix.ByID[entry.Instance]
-		if m == nil {
-			missing = append(missing, TestRunMissing{PackageID: entry.Missing, Name: entry.Missing})
-			continue
-		}
-		if m.Kind == source.Official {
+		if m == nil || m.Kind == source.Official {
 			continue
 		}
 		real, err := source.RealPath(st.Ix.ModDir(m))
-		if err != nil || !parents[env.PathKey(filepath.Dir(real))] && !linked[env.PathKey(real)] {
-			missing = append(missing, TestRunMissing{PackageID: m.PackageID, Name: m.DisplayName()})
+		if err != nil {
+			continue
+		}
+		if parents[env.PathKey(filepath.Dir(real))] {
+			seen[m.ID] = filepath.Base(real)
+		} else if name := linked[env.PathKey(real)]; name != "" {
+			seen[m.ID] = name
 		}
 	}
-	return missing
+	return seen
 }
 
 func (a *App) testRunLog(st *LoadoutState, r *TestRunReport) error {

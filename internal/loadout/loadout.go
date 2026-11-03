@@ -158,6 +158,14 @@ func (r *Registry) Known(id string) bool { _, ok := r.byID[id]; return ok }
 // Token is the ModsConfig.xml identifier of a registered instance ("" if not registered).
 func (r *Registry) Token(id string) string { return r.token[id] }
 
+// Folder is the folder name the game sees a candidate under ("" if it is none).
+func (r *Registry) Folder(id string) string {
+	if c := r.byID[id]; c != nil {
+		return c.Folder
+	}
+	return ""
+}
+
 // SamePackage returns the other candidates declaring id's packageId.
 func (r *Registry) SamePackage(id string) []*Candidate {
 	c := r.byID[id]

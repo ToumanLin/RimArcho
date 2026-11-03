@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -739,10 +740,36 @@ type PackLaunch struct {
 	Copied     []string        // settings files copied from the environment on the first run
 	InMods     []string        // mods whose copy already in Mods/ (the same content) stands in for the pack's
 	Moved      []DuplicateMove // folders moved into the lock library first (or, in a dry run, to move)
+	// Settings: Mod settings copied to the file names the pack's links give them (08 §3,
+	// §5.3 step 4); in a dry run, the ones that would be.
+	Settings []SettingsCarry
 }
 
 func packLink(name string) bool {
 	return strings.HasPrefix(strings.ToLower(name), strings.ToLower(source.PackLinkPrefix))
+}
+
+// packSettings is where a pack launch takes Mod settings from (08 §5.3 step 4): the pack's
+// own Config first, then the environment's, under every folder name the environment knows
+// the package by; each Mod gets the name the game sees it under in this run.
+func packSettings(st *LoadoutState, p *Pack, reg *loadout.Registry, useLocal map[string]*store.Mod, userData string) settingsJob {
+	cfg := filepath.Join(userData, "Config")
+	folders := settingsFolders(st.Ix, st.Aliases)
+	job := settingsJob{read: []string{cfg}, have: cfg, write: cfg, known: allFolders(folders)}
+	if root := st.Ix.Env.UserDataRoot; root != "" {
+		job.read = append(job.read, filepath.Join(root, "Config"))
+	}
+	for _, pe := range p.Entries {
+		if pe.Official || pe.PackageID == "" {
+			continue
+		}
+		id := "pack:" + pe.Folder
+		if m := useLocal[pe.Folder]; m != nil {
+			id = m.ID
+		}
+		job.mods = append(job.mods, settingsMod{name: pe.Name, folder: reg.Folder(id), old: folders[packageBase(strings.ToLower(pe.PackageID))]})
+	}
+	return job
 }
 
 func packLinkName(pack, folder string) string {
@@ -917,7 +944,9 @@ func (a *App) launchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 	if r.Plan, err = a.gamePlan(e, r.UserData); err != nil {
 		return nil, err
 	}
+	settings := packSettings(st, p, reg, useLocal, r.UserData)
 	if dryRun {
+		r.Settings = planModSettings(settings)
 		return r, nil
 	}
 	if err := a.checkRoots(mods); err != nil {
@@ -941,6 +970,16 @@ func (a *App) launchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 			}
 		}
 	}
+	// Settings follow the Mod (§5.3 step 4): HugsLib's while the pack has none, and each
+	// Mod's under the name its link gives it.
+	if e.UserDataRoot != "" {
+		hl, err := copyHugsLib(e.UserDataRoot, r.UserData)
+		if err != nil {
+			log.Printf("pack %s: copying HugsLib settings: %v", name, err)
+		}
+		r.Copied = append(r.Copied, hl...)
+	}
+	r.Settings = carryModSettings(settings, nil)
 	var known []string
 	for _, m := range installedOfficial(st.Ix.Mods) {
 		if m.PackageID != "ludeon.rimworld" {

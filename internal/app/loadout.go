@@ -993,6 +993,9 @@ type SaveResult struct {
 	// (08 §2 step 7).
 	Unchanged bool
 	Links     []LinkChange // Mods/ links created or removed first (08 §3)
+	// Settings: Mod settings copied to the file names the Mods' folders now give them
+	// (08 §3); in a dry run, the ones that would be.
+	Settings []SettingsCarry
 	// Launch is the game command (launch only).
 	Launch *LaunchPlan
 	// Running is a game that reads this ModsConfig.xml and is running now (save only): it
@@ -1161,7 +1164,9 @@ func (a *App) writeGame(st *LoadoutState, dryRun, launch, move bool, creditFrom 
 	default:
 		r.Source = "user"
 	}
+	settings := listSettings(st, nil, filepath.Dir(st.FilePath))
 	if dryRun {
+		r.Settings = planModSettings(settings)
 		return r, nil
 	}
 	if err := a.checkUserData(filepath.Dir(st.FilePath)); err != nil { // own saves live in the data directory (02 §0)
@@ -1178,6 +1183,8 @@ func (a *App) writeGame(st *LoadoutState, dryRun, launch, move bool, creditFrom 
 	if r.Backup, err = loadout.WriteFile(st.FilePath, data); err != nil {
 		return nil, err
 	}
+	// Settings follow the Mod (08 §3): a Mod seen under a new folder gets its settings.
+	r.Settings = carryModSettings(settings, nil)
 	now := a.Now().UTC()
 	n := 0
 	if r.Unchanged {

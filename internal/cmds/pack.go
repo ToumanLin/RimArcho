@@ -240,6 +240,7 @@ func packLaunchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if len(r.Copied) > 0 {
 		root.KV("settings", "copied from the environment: "+strings.Join(r.Copied, ", "))
 	}
+	settingsKV(root, r.Settings, r.DryRun)
 	root.KV("command", r.Plan.Command())
 	return d, nil
 }

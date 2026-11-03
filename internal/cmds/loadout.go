@@ -426,6 +426,36 @@ func saveCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	return d, nil
 }
 
+// settingsKV lists the Mod settings copied to the file names the Mods' folders now give
+// them (08 §3). Nothing is shown when nothing moved.
+func settingsKV(root *render.Node, cs []app.SettingsCarry, dryRun bool) {
+	if len(cs) == 0 {
+		return
+	}
+	failed := 0
+	for _, c := range cs {
+		if c.Err != "" {
+			failed++
+		}
+	}
+	head := fmt.Sprintf("copied %s to the names their folders now give them; the old files stay", render.Plural(len(cs)-failed, "settings file"))
+	if dryRun {
+		head = fmt.Sprintf("would copy %s to the names their folders now give them", render.Plural(len(cs), "settings file"))
+	}
+	if failed > 0 {
+		head += fmt.Sprintf("; %d could not be copied", failed)
+	}
+	n := root.KV("Mod settings", head)
+	for _, c := range cs {
+		line := c.Mod + ": " + c.From + " → " + c.To
+		if c.Err != "" {
+			line += " (not copied: " + c.Err + ")"
+		}
+		n.Add(line)
+	}
+	n.Truncate(10, "")
+}
+
 // writeBody is what save and launch write (08 §2, one preview for both dry runs): the file,
 // its version rewrite, the entries, the Mods/ links and the changes since the newest version.
 func writeBody(c *Ctx, root *render.Node, r *app.SaveResult) {
@@ -463,6 +493,7 @@ func writeBody(c *Ctx, root *render.Node, r *app.SaveResult) {
 			ln.Add(what)
 		}
 	}
+	settingsKV(root, r.Settings, r.DryRun)
 	base := "workspace"
 	if r.State.Latest != nil {
 		base = fmt.Sprintf("v%d", r.State.Latest.N)

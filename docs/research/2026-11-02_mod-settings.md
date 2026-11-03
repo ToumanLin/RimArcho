@@ -85,9 +85,9 @@ Unknown nodes are not automatically rejected: `ExposeData` requests particular l
 | Local copy `_1234567890_` | `Mod__1234567890__ExampleMod.xml` |
 | Extra/SteamCMD source label `cmd`, relative folder `1234567890` | `Mod__Archo_cmd_1234567890_ExampleMod.xml` |
 | Another game's local copy | `Mod__Archo_env_<InstanceID>_ExampleMod.xml` |
-| Pack `Colony`, bundled folder `1234567890` | `Mod_!ArchoPack_Colony_1234567890_ExampleMod.xml` |
+| Pack `Colony`, bundled folder `1234567890` | `Mod__ArchoPack_Colony_1234567890_ExampleMod.xml` |
 
-This is a derived example, not a newly created host file. `DeployName` sanitizes the source label **and `m.Rel`**, replacing `/`, `\` and `:` (`internal/app/deploy.go:26`). `source.Elsewhere` uses `envLinkPrefix + m.ID`; the prefix is `_Archo_env_` (`envlinks.go:21`). `deployCandidate` registers that folder as local (`deploy.go:98`). Windows `source.CreateLink` creates a junction (`internal/source/link_windows.go:68`); the game's folder-name property does not resolve it back to the physical target name.
+This is a derived example, not a newly created host file. Correction 2026-11-03: `GenText.GetInvalidFilenameCharacters` adds `/\{}<>:*|!@#$%^&*?` to the platform's invalid characters, so the pack row's `!` becomes `_` (this table first said `Mod_!ArchoPack_…`). `DeployName` sanitizes the source label **and `m.Rel`**, replacing `/`, `\` and `:` (`internal/app/deploy.go:26`). `source.Elsewhere` uses `envLinkPrefix + m.ID`; the prefix is `_Archo_env_` (`envlinks.go:21`). `deployCandidate` registers that folder as local (`deploy.go:98`). Windows `source.CreateLink` creates a junction (`internal/source/link_windows.go:68`); the game's folder-name property does not resolve it back to the physical target name.
 
 The impact is conditional:
 
