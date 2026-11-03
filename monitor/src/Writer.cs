@@ -268,6 +268,28 @@ namespace ArchoMonitor
             }
         }
 
+        // WriteSettings writes the settings record (03 §6.7.1): one line, kind settings, with
+        // context.settings listing each Mod class's settings file.
+        internal static void WriteSettings(IList<SettingsFile> files)
+        {
+            var j = new Json().Head(DateTime.Now, "INFO", "[Archo Monitor] settings " + files.Count);
+            j.Str("details", "").Num("count", 1);
+            j.Raw("context").Open().Raw("settings").Arr();
+            foreach (var f in files)
+            {
+                j.Next().Open().Str("packageId", f.PackageId).Str("folder", f.Folder).Str("class", f.Class)
+                    .Str("file", f.File).Str("title", f.Title).Bool("stored", f.Stored).Close();
+            }
+            j.EndArr().Close().Kind("settings");
+            lock (sync)
+            {
+                if (closed || w == null) return;
+                FlushDirty(true);
+                WriteLine(j.End(), force: true);
+                Flush();
+            }
+        }
+
         // Close writes the remaining counts and the exit line (Application.quitting, ProcessExit).
         internal static void Close()
         {
@@ -347,6 +369,27 @@ namespace ArchoMonitor
         {
             sb.Append('}');
             first = false;
+            return this;
+        }
+
+        // Arr opens an array after Raw(key); Next separates its elements.
+        internal Json Arr()
+        {
+            sb.Append('[');
+            first = true;
+            return this;
+        }
+
+        internal Json EndArr()
+        {
+            sb.Append(']');
+            first = false;
+            return this;
+        }
+
+        internal Json Next()
+        {
+            Comma();
             return this;
         }
 

@@ -64,9 +64,13 @@ static class Tests
         Check(Writer.Seen(Level.Error, text), "same entry in save phase");
         Check(Writer.WritePhase("play"), "play phase flushes save counts");
         Check(Writer.Seen(Level.Error, text), "same entry while playing");
+        Writer.WriteSettings(new System.Collections.Generic.List<SettingsFile> {
+            new SettingsFile { PackageId = "a.mod", Folder = "!ArchoPack_x_1", Class = "AMod", File = "Mod__ArchoPack_x_1_AMod.xml", Title = "A \"quoted\"", Stored = true },
+            new SettingsFile { PackageId = "b.mod", Folder = "2", Class = "BMod", File = "Mod_2_BMod.xml", Title = "", Stored = true },
+        });
         Writer.Close();
         var lines = File.ReadAllLines(Path.Combine(dir, "ArchoMonitor.log"));
-        Check(lines.Length == 7, "7 lines, got " + lines.Length);
+        Check(lines.Length == 8, "8 lines, got " + lines.Length);
         var first = JsonDocument.Parse(lines[0]).RootElement;
         Check(first.GetProperty("message").GetString() == c.Message, "message round trip");
         Check(first.GetProperty("count").GetInt32() == 1 && first.GetProperty("total").GetInt32() == 1, "first count");
@@ -89,7 +93,14 @@ static class Tests
         Check(JsonDocument.Parse(lines[4]).RootElement.GetProperty("context").GetProperty("phase").GetString() == "play", "play boundary");
         var playCount = JsonDocument.Parse(lines[5]).RootElement;
         Check(playCount.GetProperty("count").GetInt32() == 1 && playCount.GetProperty("total").GetInt32() == 6, "play count");
-        var exit = JsonDocument.Parse(lines[6]).RootElement;
+        var settings = JsonDocument.Parse(lines[6]).RootElement;
+        Check(settings.GetProperty("kind").GetString() == "settings" && settings.GetProperty("source").GetString() == "archo-monitor", "settings line: " + lines[6]);
+        var files = settings.GetProperty("context").GetProperty("settings");
+        Check(files.GetArrayLength() == 2, "two settings files");
+        Check(files[0].GetProperty("folder").GetString() == "!ArchoPack_x_1" && files[0].GetProperty("file").GetString() == "Mod__ArchoPack_x_1_AMod.xml", "settings file");
+        Check(files[0].GetProperty("title").GetString() == "A \"quoted\"" && files[0].GetProperty("stored").GetBoolean(), "settings title");
+        Check(files[1].GetProperty("class").GetString() == "BMod" && files[1].GetProperty("title").GetString() == "", "settings without a window");
+        var exit = JsonDocument.Parse(lines[7]).RootElement;
         Check(exit.GetProperty("kind").GetString() == "exit", "exit line");
         Directory.Delete(dir, true);
 

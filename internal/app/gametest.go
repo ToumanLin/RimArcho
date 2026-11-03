@@ -217,7 +217,7 @@ func (a *App) prepareTestConfig(st *LoadoutState, data string, protected []strin
 			}
 		}
 		// Settings follow the Mod (08 §3): what a launch would copy, written here only.
-		job := listSettings(st, testRunSeen(st), filepath.Join(root, "Config"))
+		job := a.listSettings(st, testRunSeen(st), filepath.Join(root, "Config"))
 		job.write = cfg
 		for _, c := range carryModSettings(job, func(path string) error { return testRunPath(data, path, protected) }) {
 			if c.Err != "" {

@@ -69,8 +69,9 @@ type Companion struct {
 	Version   string // Archo Monitor's version
 	Game      string // the game version the session line names
 	Started   time.Time
-	Ended     time.Time // the exit line's time: the game closed normally
-	Full      bool      // the monitor stopped adding entries (32 MiB, 03 §6.7.3)
+	Ended     time.Time      // the exit line's time: the game closed normally
+	Full      bool           // the monitor stopped adding entries (32 MiB, 03 §6.7.3)
+	Settings  []SettingsFile // the settings record written at the main menu
 	BadLines  int
 	Entries   []*CompanionEntry
 
@@ -120,6 +121,7 @@ type companionLine struct {
 		Game          string            `json:"game"`
 		Phase         string            `json:"phase"`
 		Save          string            `json:"save"`
+		Settings      []SettingsFile    `json:"settings"`
 	} `json:"context"`
 	Source string `json:"source"`
 	Schema int    `json:"schema"`
@@ -180,6 +182,11 @@ func (c *Companion) line(b []byte) *CompanionEntry {
 		return nil
 	case "full":
 		c.Full = true
+		return nil
+	case "settings":
+		if j.Source == "archo-monitor" {
+			c.Settings = j.Context.Settings
+		}
 		return nil
 	case "phase":
 		if j.Source == "archo-monitor" && ValidPhase(j.Context.Phase) {
@@ -331,6 +338,57 @@ func FirstSession(path string) string {
 		return ""
 	}
 	return j.Context.Session
+}
+
+// SettingsFile is one Mod class's settings file as Archo Monitor recorded it when the main
+// menu first opened (03 §6.7.1): the folder the game saw the Mod under and the file it reads.
+type SettingsFile struct {
+	PackageID string `json:"packageId"`
+	Folder    string `json:"folder"`
+	Class     string `json:"class"`
+	File      string `json:"file"`
+	Title     string `json:"title"`  // the settings window's title; "" without a window
+	Stored    bool   `json:"stored"` // the Mod reads its settings through the game
+}
+
+// MonitorSettings is an Archo Monitor log's settings record and the session it belongs to.
+type MonitorSettings struct {
+	Session string
+	Game    string
+	Started time.Time
+	Files   []SettingsFile
+}
+
+// ReadMonitorSettings reads the settings record of an Archo Monitor log, reading only up to
+// it. It is nil when the file has no session line or the game never reached the main menu.
+func ReadMonitorSettings(path string) (*MonitorSettings, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	r := bufio.NewReaderSize(io.LimitReader(f, 256<<20), 64<<10)
+	var ms *MonitorSettings
+	for n := 0; ; n++ {
+		l, err := r.ReadBytes('\n')
+		if n == 0 {
+			var j companionLine
+			if json.Unmarshal(bytes.TrimSpace(l), &j) != nil || j.Kind != "session" {
+				return nil, nil
+			}
+			at, _ := time.ParseInLocation("2006-01-02 15:04:05.000", j.Timestamp, time.Local)
+			ms = &MonitorSettings{Session: j.Context.Session, Game: j.Context.Game, Started: at}
+		} else if bytes.Contains(l, []byte(`"kind":"settings"`)) {
+			var j companionLine
+			if json.Unmarshal(bytes.TrimSpace(l), &j) == nil && j.Kind == "settings" && j.Source == "archo-monitor" {
+				ms.Files = j.Context.Settings
+				return ms, nil
+			}
+		}
+		if err != nil {
+			return nil, nil
+		}
+	}
 }
 
 // pseudoFile reports RimCrow's non-file entries of relatedFiles.

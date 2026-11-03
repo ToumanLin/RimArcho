@@ -108,3 +108,36 @@ func TestPackSettingsFollowTheMod(t *testing.T) {
 		t.Fatalf("the pack's settings were replaced: %q", got)
 	}
 }
+
+// 03 §6.7.1, 08 §3: a folder only Archo Monitor saw (a copy since deleted) still leads to the
+// Mod's settings, also after its log has rotated away.
+func TestSettingsFromMonitorRecord(t *testing.T) {
+	t.Parallel()
+	e := loadoutEnv(t)
+	scanNow(t, e)
+	e.WriteFile(filepath.Join(e.UserData, "ArchoMonitor-prev.log"),
+		`{"timestamp":"2026-10-01 10:00:00.000","level":"INFO","message":"[Archo Monitor] session 0123456789ab","details":"","count":1,"context":{"session":"0123456789ab","version":"0.10.0","game":"1.6.4633 rev1261"},"source":"archo-monitor","schema":1,"kind":"session"}`+"\n"+
+			`{"timestamp":"2026-10-01 10:01:00.000","level":"INFO","message":"[Archo Monitor] settings 1","details":"","count":1,"context":{"settings":[{"packageId":"tester.a","folder":"A old copy","class":"AMod","file":"Mod_A old copy_AMod.xml","title":"A","stored":true}]},"source":"archo-monitor","schema":1,"kind":"settings"}`+"\n")
+	cfg := filepath.Join(e.UserData, "Config")
+	e.WriteFile(filepath.Join(cfg, "Mod_A old copy_AMod.xml"), "<SettingsBlock>old copy</SettingsBlock>")
+
+	if out := e.MustRun("save"); !strings.Contains(out, "A: Mod_A old copy_AMod.xml → Mod_1001_AMod.xml") {
+		t.Fatalf("save:\n%s", out)
+	}
+	seen := e.App.MonitorSettings(e.UserData)
+	if len(seen) != 1 || seen[0].Folder != "A old copy" || seen[0].Title != "A" || seen[0].Game != "1.6.4633 rev1261" {
+		t.Fatalf("kept record %+v", seen)
+	}
+
+	os.Remove(filepath.Join(e.UserData, "ArchoMonitor-prev.log"))
+	os.Remove(filepath.Join(cfg, "Mod_1001_AMod.xml"))
+	e.MustRun("disable", "pkg:tester.a")
+	e.MustRun("save")
+	e.MustRun("enable", "pkg:tester.a")
+	if out := e.MustRun("save"); !strings.Contains(out, "Mod_A old copy_AMod.xml → Mod_1001_AMod.xml") {
+		t.Fatalf("after the log rotated away:\n%s", out)
+	}
+	if got := readFile(t, filepath.Join(cfg, "Mod_1001_AMod.xml")); got != "<SettingsBlock>old copy</SettingsBlock>" {
+		t.Fatalf("copy %q", got)
+	}
+}

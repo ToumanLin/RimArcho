@@ -112,10 +112,12 @@ func allFolders(folders map[string][]string) []string {
 }
 
 // listSettings is the job for what the list loads, reading and writing cfg: each instance
-// with the folder the game sees it under and the package's other folders. The folder is the
-// registry's (what a write makes of Mods/), or seen's for a test run, which uses Mods/ as it is.
-func listSettings(st *LoadoutState, seen map[string]string, cfg string) settingsJob {
+// with the folder the game sees it under and the package's other folders, including those
+// Archo Monitor recorded in cfg's save-data root. The folder is the registry's (what a write
+// makes of Mods/), or seen's for a test run, which uses Mods/ as it is.
+func (a *App) listSettings(st *LoadoutState, seen map[string]string, cfg string) settingsJob {
 	folders := settingsFolders(st.Ix, st.Aliases)
+	addSeenFolders(folders, a.MonitorSettings(filepath.Dir(cfg)))
 	job := settingsJob{read: []string{cfg}, have: cfg, write: cfg, known: allFolders(folders)}
 	for _, en := range st.List {
 		m := st.Ix.ByID[en.Instance]

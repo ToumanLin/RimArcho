@@ -751,14 +751,18 @@ func packLink(name string) bool {
 
 // packSettings is where a pack launch takes Mod settings from (08 §5.3 step 4): the pack's
 // own Config first, then the environment's, under every folder name the environment knows
-// the package by; each Mod gets the name the game sees it under in this run.
-func packSettings(st *LoadoutState, p *Pack, reg *loadout.Registry, useLocal map[string]*store.Mod, userData string) settingsJob {
+// the package by or Archo Monitor saw it under in either; each Mod gets the name the game
+// sees it under in this run.
+func (a *App) packSettings(st *LoadoutState, p *Pack, reg *loadout.Registry, useLocal map[string]*store.Mod, userData string) settingsJob {
 	cfg := filepath.Join(userData, "Config")
 	folders := settingsFolders(st.Ix, st.Aliases)
-	job := settingsJob{read: []string{cfg}, have: cfg, write: cfg, known: allFolders(folders)}
+	addSeenFolders(folders, a.MonitorSettings(userData))
+	read := []string{cfg}
 	if root := st.Ix.Env.UserDataRoot; root != "" {
-		job.read = append(job.read, filepath.Join(root, "Config"))
+		addSeenFolders(folders, a.MonitorSettings(root))
+		read = append(read, filepath.Join(root, "Config"))
 	}
+	job := settingsJob{read: read, have: cfg, write: cfg, known: allFolders(folders)}
 	for _, pe := range p.Entries {
 		if pe.Official || pe.PackageID == "" {
 			continue
@@ -944,7 +948,7 @@ func (a *App) launchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 	if r.Plan, err = a.gamePlan(e, r.UserData); err != nil {
 		return nil, err
 	}
-	settings := packSettings(st, p, reg, useLocal, r.UserData)
+	settings := a.packSettings(st, p, reg, useLocal, r.UserData)
 	if dryRun {
 		r.Settings = planModSettings(settings)
 		return r, nil

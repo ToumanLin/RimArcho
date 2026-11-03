@@ -1164,7 +1164,7 @@ func (a *App) writeGame(st *LoadoutState, dryRun, launch, move bool, creditFrom 
 	default:
 		r.Source = "user"
 	}
-	settings := listSettings(st, nil, filepath.Dir(st.FilePath))
+	settings := a.listSettings(st, nil, filepath.Dir(st.FilePath))
 	if dryRun {
 		r.Settings = planModSettings(settings)
 		return r, nil
