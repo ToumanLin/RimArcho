@@ -37,13 +37,14 @@ function drawPackRows() {
   packCard.innerHTML = "";
   const head = el("div", "lib-th");
   packCard.append(head);
-  packTable.draw(packCard, head);
+  packTable.draw(packCard, head, { count: L.rows.length });
   L.els = [];
   L.rows.forEach((r, i) => {
     const row = el("div", "data-row link" + (i === L.cur ? " cur" : ""));
     row.setAttribute("role", "row");
     for (const c of packTable.visible()) row.append(el("span", "cell" + (c.key === "name" ? " n" : "") + (packTable.column(c.key).num ? " num" : ""), String(r[c.key] ?? "—")));
     row.onclick = () => ui.go("pack:" + r.name);
+    packTable.row(row, i);
     L.els.push(row); packCard.append(row);
   });
 }
@@ -52,11 +53,12 @@ function drawModRows() {
   modCard.innerHTML = "";
   const head = el("div", "lib-th");
   modCard.append(head);
-  modTable.draw(modCard, head);
-  for (const m of modTable.sorted(P.mods)) {
+  modTable.draw(modCard, head, { labelledby: "pack-mods-heading", count: P.mods.length });
+  for (const [i, m] of modTable.sorted(P.mods).entries()) {
     const row = el("div", "data-row");
     row.setAttribute("role", "row");
     for (const c of modTable.visible()) row.append(el("span", "cell" + (c.key === "name" ? " n" : "") + (modTable.column(c.key).num ? " num" : ""), String(m[c.key] || "—")));
+    modTable.row(row, i);
     modCard.append(row);
   }
 }
@@ -131,7 +133,9 @@ export async function pack(name) {
     w.querySelector(".page-head").after(note);
   }
   const sec = el("section", "sec");
-  sec.append(el("h2", "label", T("the mods, in load order")));
+  const heading = el("h2", "label", T("the mods, in load order"));
+  heading.id = "pack-mods-heading";
+  sec.append(heading);
   const card = modCard = el("div", "card data-table pack-mods");
   card.tabIndex = 0;
   card.setAttribute("role", "table");

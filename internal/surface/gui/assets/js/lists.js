@@ -7,6 +7,7 @@ import { listGeometry, rowAt } from "./listgeometry.js";
 import { bump } from "./motion.js";
 import { beginPageRead, pageLoading } from "./screens.js";
 
+const rowID = (k, it) => `editor-${k}-${encodeURIComponent(key(it))}`;
 const rowsEl = (k) => $(`.area[data-area="${k}"] .rows`);
 
 // The editor lives under the page overlay; old virtual rows must stay inert until its
@@ -162,8 +163,22 @@ export function renderHeads() {
     const c = S.cols[k];
     const filtered = k < 2 ? barOn() : !!c.query.trim();
     const n = filtered ? Tf("%d / %d", c.view.length, c.items.length) : `${c.items.length}`;
-    h.innerHTML = `<span class="n">${k + 1}</span><span class="t">${esc(T(AREAS[k]))}</span><span class="num">${n}</span>` +
+    const markup = `<span class="n">${k + 1}</span><span class="t">${esc(T(AREAS[k]))}</span><span class="num">${n}</span>` +
       (c.query && !c.searching ? `<span class="q">${esc(c.query)}</span>` : "") + (k === 1 ? listActions() : "") + (k === 2 ? chev() : "");
+    // Retain the collection's visible label while only cursor/focus changes.
+    if (h.listMarkup !== markup) {
+      h.innerHTML = markup;
+      h.listMarkup = markup;
+      $(".t", h).id = `editor-heading-${k}`;
+    }
+    const box = rowsEl(k);
+    if (box.getAttribute("role") !== "listbox") {
+      box.setAttribute("role", "listbox");
+      box.setAttribute("aria-labelledby", `editor-heading-${k}`);
+      box.setAttribute("aria-multiselectable", "true");
+    }
+    if (!S.screen && !S.popup && S.focus === k &&
+        (document.activeElement === document.body || document.activeElement.matches("#board .rows, #board .detail .scroll"))) box.focus({ preventScroll: true });
     bump("head:" + k, $(".num", h), n);
     const s = $(".search", a);
     if (!s) continue;
@@ -196,6 +211,7 @@ export function renderRows(k) {
   if (!pad || !pad.classList.contains("pad")) {
     box.innerHTML = "";
     pad = el("div", "pad");
+    pad.setAttribute("aria-hidden", "true");
     box.appendChild(pad);
     pools[k].clear();
   }
@@ -215,9 +231,16 @@ export function renderRows(k) {
   for (let i = first; i < last; i++) {
     const it = c.items[c.view[i]];
     let d = pool.get(i);
-    const sig = rowSig(k, i, it) + `:${layout.tops[i]}:${layout.heights[i]}:${layout.heads[i]}`;
+    const sig = rowSig(k, i, it) + `:${layout.tops[i]}:${layout.heights[i]}:${layout.heads[i]}:${c.view.length}`;
     if (d && d.dataset.sig === sig) continue;
     if (!d) { d = el("div", "row"); box.appendChild(d); pool.set(i, d); }
+    d.id = rowID(k, it);
+    d.setAttribute("role", "option");
+    // Preserve the hover title without announcing the name again as a description.
+    d.setAttribute("aria-description", "");
+    d.setAttribute("aria-setsize", String(c.view.length));
+    d.setAttribute("aria-posinset", String(i + 1));
+    d.setAttribute("aria-selected", String(c.sel.has(key(it))));
     d.dataset.sig = sig;
     d.dataset.i = i;
     d.style.transform = ""; // a slide (motion.js) belongs to the mod the row showed before
@@ -236,8 +259,19 @@ export function renderRows(k) {
       $(".t",d).textContent="└ " + it.copyLabel;
       if (layout.heads[i]) { d.classList.add("copy-group-start"); d.prepend(el("span","editor-copy-head",it.name)); }
     }
+    $(".t", d).id = d.id + "-name";
+    // A grouped copy shows only "└ <copy>"; its name carries the Mod, as the group head does.
+    if (d.classList.contains("copy-item")) { d.removeAttribute("aria-labelledby"); d.setAttribute("aria-label", it.name + ", " + it.copyLabel); }
+    else { d.removeAttribute("aria-label"); d.setAttribute("aria-labelledby", d.id + "-name"); }
+    // The visible note on the name's line (not installed, which copy) describes the row.
+    const note = $(".src", d);
+    if (note) { note.id = d.id + "-note"; d.setAttribute("aria-describedby", note.id); } else d.removeAttribute("aria-describedby");
     d.title = it.name + (it.missing ? "  " + it.ref.replace(/^pkg:/, "") + "  " + T(it.canUse ? "installed copy available" : "not installed") : it.gone ? "  " + T("not installed") : it.copyCount > 1 && it.copyLabel ? "  " + it.copyLabel : "");
   }
+  const active = pool.get(c.cursor);
+  if (active) {
+    if (box.getAttribute("aria-activedescendant") !== active.id) box.setAttribute("aria-activedescendant", active.id);
+  } else box.removeAttribute("aria-activedescendant");
 }
 
 // onHistory runs when a history row is clicked (main.js sets it).
@@ -337,6 +371,7 @@ export function wireLists(ui) {
       const r = e.target.closest(".row");
       if (!r || e.button !== 0) return;
       ui.click(k, +r.dataset.i, e);
+      box.focus({ preventScroll: true });
     });
     box.addEventListener("dblclick", (e) => {
       const r = e.target.closest(".row");

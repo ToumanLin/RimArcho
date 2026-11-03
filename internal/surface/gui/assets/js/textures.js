@@ -229,7 +229,7 @@ function textureRows(p, old = null) {
   t.setAttribute("role", "table");
   t.hidden = !(p.rows || []).length;
   const head = el("div", "lib-th");
-  textureTable.draw(t, head);
+  textureTable.draw(t, head, { count: (p.rows || []).length });
   // Keep the pointer capture target during updates (06 §3.9).
   if (old && old.children[0].dataset.columns === head.dataset.columns) textureTable.adopt(t, old.children[0]);
   else if (old) old.children[0].replaceWith(head);
@@ -259,7 +259,7 @@ function textureRows(p, old = null) {
     nodes.push(tr);
   }
   // Reuse untouched cells and their shimmer; sorting moves only existing rows (06 §2.13).
-  nodes.forEach((row, i) => { if (t.children[i + 1] !== row) t.insertBefore(row, t.children[i + 1] || null); });
+  nodes.forEach((row, i) => { textureTable.row(row, i); if (t.children[i + 1] !== row) t.insertBefore(row, t.children[i + 1] || null); });
   while (t.children.length > nodes.length + 1) t.lastChild.remove();
   return t;
 }

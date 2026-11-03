@@ -71,8 +71,16 @@ export function createTable({ key, columns, state = { cols: null, sort: "name", 
     if (x == null) { const b = (head.querySelector(".th.on") || head).getBoundingClientRect(); x = b.left; y = b.bottom; }
     pop.menu(x, y, acts, keys);
   }
-  function draw(box, th) {
+  function draw(box, th, options = {}) {
     root = box; head = th;
+    root.setAttribute("role", options.role || root.getAttribute("role") || "table");
+    // A table is named by its own visible heading; a page's only table needs none (the main region is named).
+    if (options.labelledby) root.setAttribute("aria-labelledby", options.labelledby);
+    if (options.multiselectable) root.setAttribute("aria-multiselectable", "true");
+    if (options.count != null) count(options.count);
+    root.setAttribute("aria-colcount", String(visible().length));
+    head.setAttribute("role", "row");
+    head.setAttribute("aria-rowindex", "1");
     layout();
     head.innerHTML = "";
     head.title = T("drag to move, right click: columns");
@@ -81,10 +89,16 @@ export function createTable({ key, columns, state = { cols: null, sort: "name", 
       const d = def(c.key), active = state.sort === c.key;
       const cell = el("div", "th " + (d.cls || "") + (active ? " on" : "") + (d.num ? " r" : ""));
       cell.dataset.k = c.key;
+      cell.id = key + "-column-" + c.key;
       cell.setAttribute("role", "columnheader");
+      cell.setAttribute("aria-colindex", String(visible().indexOf(c) + 1));
       cell.setAttribute("aria-sort", active ? (state.dir * d.dir > 0 ? "ascending" : "descending") : "none");
       cell.append(el("span", "lbl", T(d.title)));
-      if (active) cell.append(el("span", "arrow", state.dir * d.dir > 0 ? "▲" : "▼"));
+      if (active) {
+        const arrow = el("span", "arrow", state.dir * d.dir > 0 ? "▲" : "▼");
+        arrow.setAttribute("aria-hidden", "true");
+        cell.append(arrow);
+      }
       const rz = el("span", "rz");
       rz.ondblclick = (e) => { e.preventDefault(); e.stopPropagation(); size(c.key, 0); };
       cell.append(rz);
@@ -123,8 +137,20 @@ export function createTable({ key, columns, state = { cols: null, sort: "name", 
     }
     head.oncontextmenu = (e) => { e.preventDefault(); focusTable(); menu(e.clientX, e.clientY); };
   }
+  function count(n) { root.setAttribute("aria-rowcount", String(n + 1)); }
+  function row(node, index) {
+    node.setAttribute("role", "row");
+    node.setAttribute("aria-rowindex", String(index + 2));
+    const grid = ["grid", "treegrid"].includes(root.getAttribute("role"));
+    [...node.children].forEach((cell, i) => {
+      cell.setAttribute("role", grid ? "gridcell" : "cell");
+      cell.setAttribute("aria-colindex", String(i + 1));
+      if (cell.title === cell.textContent) cell.setAttribute("aria-description", "");
+    });
+    return node;
+  }
   return {
-    state, visible, draw, menu, size, move, sortBy, column: def,
+    state, visible, draw, row, count, menu, size, move, sortBy, column: def,
     adopt(box, th) { root = box; head = th; layout(); },
     async load() {
       if (!reading) reading = api.Setting(key).catch(() => "").then((saved) => { state.cols = mergeColumns(defs(), saved); });

@@ -40,6 +40,7 @@ export class Element {
   set textContent(t) { this.innerHTML = ""; this.text = t; }
   get textContent() { return this.text + this.children.map((n) => n.textContent).join(""); }
   setAttribute(k, v) { this.attributes[k] = v; }
+  getAttribute(k) { return this.attributes[k] ?? null; }
   removeAttribute(k) { delete this.attributes[k]; }
   focus() {}
   blur() {}

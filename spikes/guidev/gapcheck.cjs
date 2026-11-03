@@ -103,12 +103,15 @@ cli('scan');
     }
     await filter('#board .fbar', 'ui.gui.filter.split:plan', editor);
     const expandStack = () => page.evaluate(async () => {
+      const { S } = await import('/js/state.js');
+      S.history = [{ kind: 'undo', text: 'Fixture edit' }, { kind: 'now', text: 'now' }];
+      (await import('/js/lists.js')).renderHistory();
       (await import('/js/lists.js')).setStagingOpen(true);
       const history = document.querySelector('#board .histarea');
       if (!history.classList.contains('open')) history.querySelector('.hbar').click();
     });
     await expandStack(); await settle();
-    for (const [i, name] of [[0, 'stage'], [1, 'history']]) await check(`#board .stack-split:nth-of-type(${i ? 2 : 1})`, 'ui.gui.plan.' + name, async () => { await reloadEditor(); await expandStack(); }, true);
+    for (const [target, name] of [['[data-area="2"]', 'stage'], ['.histarea', 'history']]) await check(`#board .stack-split:has(+ ${target})`, 'ui.gui.plan.' + name, async () => { await reloadEditor(); await expandStack(); }, true);
     await open('library'); await check('.lib-split', 'ui.gui.library.side', () => open('library'));
     await filter('.lib .fbar', 'ui.gui.filter.split:library', () => open('library'));
     await open('tasks');
