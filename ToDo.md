@@ -2,23 +2,20 @@
 
 Things to research, not yet decided. Once decided, put them in the specifications (implementation plans in 01 §5); research goes in docs/research/.
 
-## GUI
-
-### Search files
-
-The search interface confuses players. Consider a default 32:68 split: a search/filter card at the upper left, matching Mod instances and their file tree below it, and detailed file contents on the right.
-
-Search options need review. The default scope is the current list, but players cannot choose another list or filter by Mod source, tag, or version to exclude other copies' files. Reuse the Mod library's filter approach. Searching decompiled code targets a Mod, but it is unclear which instance is searched when the Mod has multiple copies.
-
-Search results also need review: addresses are relative and players cannot directly open the corresponding file or folder. Design around what players want to do with their results.
-
-2026-11-01: mockup for review at https://claude.ai/artifact/Xh4rTagnS8p6UnqHysR2tx (Def / Text / C# code views). Waiting for the owner's feedback before the spec (06 §2.9) changes.
+## MCP测试
+基于日志语料的真实mod保存日志和测试题
 
 ## Decompilation
 
 Decompilation serves two purposes: investigating Mod conflicts and creating Mods. Reconsider storing decompiled assemblies in the cache and propose an approach.
 
 2026-11-01: decided in [research/2026-11-01_decompile-storage.md](docs/research/2026-11-01_decompile-storage.md): a durable source library including the game's own code; being implemented. Mod projects are deferred (New Mod Project below).
+
+### Decompilation management
+管理反编译完成的mod instance
+
+## New Mod Project
+Allow player to initialize a new mod project
 
 ## Research displaying, editing, and managing Mod configuration
 
@@ -33,9 +30,6 @@ Accessibility is intended to let AI agents operate without screenshots. Define a
 2026-11-02: criteria defined as 06 §11 A1–A18, with a baseline in [research/2026-11-02_gui-accessibility.md](docs/research/2026-11-02_gui-accessibility.md). Nothing passes in full. Desktop agents already read the page through COM UIA (A17 partial; the baseline's "only the window" came from the .NET client). Next: hide the editor behind secondary pages, give lists and tables row semantics, and give dialogs a focus boundary.
 
 2026-11-02 (later): those three are done (A1, A6, A8, A9, A15 pass). Next: name the remaining fields and icons (A2, A10), tell same-name controls apart (A5), menu and command-panel semantics (A7), progress and messages as status (A11, A12).
-
-## New Mod Project
-Allow player to initialize a new mod project
 
 ## Save analysis
 
