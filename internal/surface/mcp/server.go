@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -32,10 +33,13 @@ type tool struct {
 	readOnly    bool
 	destructive bool
 	desc        string
-	add         func(s *sdk.Server, run func(context.Context, string, []string) (*sdk.CallToolResult, any, error), t *sdk.Tool)
+	add         func(s *sdk.Server, run runFunc, t *sdk.Tool)
 	in          reflect.Type                       // the argument struct
 	argvOf      func(raw []byte) ([]string, error) // JSON arguments → argv, as a tool call does
 }
+
+// runFunc runs one tool call's argv (Server.run).
+type runFunc func(context.Context, *sdk.CallToolRequest, string, []string) (*sdk.CallToolResult, any, error)
 
 // Server serialises tool calls on one App (it is not safe for concurrent use).
 type Server struct {
@@ -87,13 +91,55 @@ func ClipOutput(out string) string {
 	return out[:cut] + fmt.Sprintf("\n… output clipped at %d KB of %d KB (%d more lines): narrow the call (mod=, target=, pattern, cluster) instead of all=true\n", cut>>10, len(out)>>10, rest)
 }
 
-func (s *Server) run(ctx context.Context, env string, argv []string) (*sdk.CallToolResult, any, error) {
+func (s *Server) run(ctx context.Context, req *sdk.CallToolRequest, env string, argv []string) (*sdk.CallToolResult, any, error) {
+	ctx, stop := heartbeat(ctx, req)
 	out, code := s.executeContext(ctx, env, argv)
+	stop()
 	// Test reports already limit clusters; clipping their JSON would corrupt it.
 	if len(argv) < 2 || (argv[0] != "test" || argv[1] != "run") && argv[0] != "links" {
 		out = ClipOutput(out)
 	}
 	return &sdk.CallToolResult{Content: []sdk.Content{&sdk.TextContent{Text: out}}, IsError: code == cmds.ExitError || code == cmds.ExitUsage}, nil, nil
+}
+
+// ProgressEvery is how often a running tool call sends a progress notification (05 §5.1).
+var ProgressEvery = 10 * time.Second
+
+// heartbeat sends a progress notification every ProgressEvery until stop is called, when
+// the client asked for progress. Clients that restart their request timeout on progress
+// (Pi does, after 60 s) then wait for a test run instead of cancelling it, which stops
+// the game. The message is the command's latest progress line, with the elapsed time.
+func heartbeat(ctx context.Context, req *sdk.CallToolRequest) (context.Context, func()) {
+	if req == nil || req.Session == nil || req.Params == nil || req.Params.GetProgressToken() == nil {
+		return ctx, func() {}
+	}
+	token := req.Params.GetProgressToken()
+	var step atomic.Pointer[string]
+	ctx = cmds.WithProgress(ctx, func(line string) { step.Store(&line) })
+	done, finished := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(finished)
+		start := time.Now()
+		tick := time.NewTicker(ProgressEvery)
+		defer tick.Stop()
+		for n := 1; ; n++ {
+			select {
+			case <-done:
+				return
+			case <-ctx.Done():
+				return
+			case <-tick.C:
+			}
+			msg := "running"
+			if p := step.Load(); p != nil {
+				msg = strings.TrimPrefix(*p, "progress: ")
+			}
+			msg = fmt.Sprintf("%s (%ds)", msg, int(time.Since(start).Seconds()))
+			req.Session.NotifyProgress(ctx, &sdk.ProgressNotificationParams{ProgressToken: token, Progress: float64(n), Message: msg})
+		}
+	}()
+	// Waiting for the goroutine keeps every notification before the result.
+	return ctx, func() { close(done); <-finished }
 }
 
 // New builds the server with every tool of 05 §5.2.
@@ -138,9 +184,9 @@ func reg[In any](name string, readOnly, destructive bool, desc string, argv func
 			}
 			return argv(in), nil
 		},
-		add: func(s *sdk.Server, run func(context.Context, string, []string) (*sdk.CallToolResult, any, error), t *sdk.Tool) {
-			sdk.AddTool(s, t, func(ctx context.Context, _ *sdk.CallToolRequest, in In) (*sdk.CallToolResult, any, error) {
-				return run(ctx, envOf(in), argv(in))
+		add: func(s *sdk.Server, run runFunc, t *sdk.Tool) {
+			sdk.AddTool(s, t, func(ctx context.Context, req *sdk.CallToolRequest, in In) (*sdk.CallToolResult, any, error) {
+				return run(ctx, req, envOf(in), argv(in))
 			})
 		}}
 }

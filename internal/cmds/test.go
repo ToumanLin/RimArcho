@@ -3,6 +3,7 @@ package cmds
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -23,7 +24,7 @@ func init() {
 }
 
 func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
-	o := app.TestRunOptions{Env: args.Str("env"), Map: args.Bool("map"), Progress: progress()}
+	o := app.TestRunOptions{Env: args.Str("env"), Map: args.Bool("map"), Progress: c.progressCtx()}
 	if len(args.Pos) > 0 {
 		o.Plan = args.Pos[0]
 	}
@@ -65,7 +66,11 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 	}
 	clusters := root.Section(fmt.Sprintf("error clusters: %d", r.ClustersTotal))
 	for _, cluster := range r.Clusters {
-		n := clusters.Addf("%s x%d: %s", cluster.Class, cluster.Count, cluster.Message)
+		prefix := ""
+		if cluster.Delta == "new" {
+			prefix = "new "
+		}
+		n := clusters.Addf("%s%s x%d: %s", prefix, cluster.Class, cluster.Count, cluster.Message)
 		if cluster.Class == gametest.ClassSettings {
 			n.KV("source", "game preferences")
 			continue
@@ -78,6 +83,15 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 	}
 	if more := r.ClustersTotal - len(r.Clusters); more > 0 {
 		clusters.Addf("… %d more (full log: %s)", more, r.LogPath)
+	}
+	if b := r.Baseline; b != nil {
+		root.Addf("compared with run %s (%s): %d new, %d present, %d gone", filepath.Base(b.RunDir), b.Status, b.New, b.Present, b.Gone)
+		gone := root.Section(fmt.Sprintf("gone: %d", b.Gone))
+		for _, cluster := range r.Gone {
+			gone.Addf("%s x%d: %s", cluster.Class, cluster.Count, cluster.Message)
+		}
+	} else {
+		root.Add("compared with: no earlier run of this plan")
 	}
 	root.KV("attribution", r.Attribution)
 	root.KV("run dir", r.RunDir)

@@ -189,8 +189,8 @@ func TestTestRunPlanConfigVisibilityAndReport(t *testing.T) {
 		t.Fatalf("current plan/environment changed: %+v, %v", after, err)
 	}
 	b, err := os.ReadFile(filepath.Join(r.RunDir, "report.json"))
-	var saved app.TestRunReport
-	if err != nil || json.Unmarshal(b, &saved) != nil || !reflect.DeepEqual(&saved, r) {
+	wantJSON, marshalErr := json.MarshalIndent(r, "", "  ")
+	if err != nil || marshalErr != nil || string(b) != string(append(wantJSON, '\n')) {
 		t.Fatalf("saved report %s: %v", b, err)
 	}
 	dirs, err := os.ReadDir(filepath.Join(base, "runs"))

@@ -307,6 +307,7 @@ An environment may have several plans (04 §1). The commands are:
 - Each tool builds a CLI argv and returns the text from `cmds.Execute` unchanged. Exit codes 1 and 2 set `isError`. Exit code 3, an ambiguous reference, is a normal result because the text lists the candidates.
 - Calls that require analysis wait according to 06 §2.16.1 W01; the CLI has no time limit. If the analysis subprocess exceeds the wait bound, return declaration-level findings with still computing in the background. The subprocess continues, and the next call gets its results. Meanwhile, `get_def`, `get_patches`, and `get_harmony` use the previous, stale analysis if available.
 - A `read_source` call with search has a default budget of 10 seconds. It reports how many assemblies remain to be decompiled and says still computing; run again.
+- **Progress.** When a tool call carries a progress token, the server sends `notifications/progress` every 10 seconds until the result. Each one has a count that rises by 1 and a message: the command's latest progress line (`test_run`: preparing test data, waiting for the game to load, analysing the log), or running, then the elapsed seconds. Nothing is sent after the result, and a call without a token gets none. Clients that restart their request timeout on progress therefore wait for `test_run` instead of cancelling it. Pi 1.4 asks for progress on every call and cancels after 60 s without any. A cancelled `test_run` stops the game (08 §12). A client whose timeout ignores progress still needs a limit above the run's length.
 
 ### 5.2 Tool Table
 
@@ -334,7 +335,7 @@ Annotations follow the MCP specification; the external harness decides whether t
 | `save_loadout` | save (`dry_run`) | false | true |
 | `launch_game` | launch (`dry_run`) | false | true |
 | `estimate_memory` | plan cost [`<list>`] shows the resident scope, loading budget, RAM and VRAM capacity comparisons, unknown values, and severity; see 06 §2.4 for the definitions. It writes only a disposable estimate cache. | true | false |
-| `test_run` | `test run --json` (env, plan, map, and `timeout_seconds`) may take several minutes to launch the game. It isolates player saves, configuration, and logs (08 §12); `openWorldHint: false`. | false | false |
+| `test_run` | `test run --json` (env, plan, map, and `timeout_seconds`) may take several minutes to launch the game; it sends progress every 10 seconds (§5.1). It isolates player saves, configuration, and logs (08 §12); `openWorldHint: false`. | false | false |
 | `manage_plans` | `plan list/new/use/rename/remove --yes`, `loadout import --new` | false | true |
 | `plan_history` | `loadout log`, diff, and history (`action=steps`) | true | — |
 | `pin_mod` | pin (ref, name, git, update, `move_to_library`, reason, and `dry_run`); reason is stored in the copy's origin and shown in its copy notes (06 §2.9). | false | false |

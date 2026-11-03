@@ -35,11 +35,13 @@ type TestRunMissing struct {
 }
 
 type TestRunCluster struct {
+	key        string
 	Class      string   `json:"class"`
 	Message    string   `json:"message"`
 	Count      int      `json:"count"`
 	Mods       []string `json:"mods"`
 	Confidence string   `json:"confidence"`
+	Delta      string   `json:"delta,omitempty"`
 }
 
 type TestRunReport struct {
@@ -57,9 +59,13 @@ type TestRunReport struct {
 	LogPath       string           `json:"log_path"`
 	Args          []string         `json:"args"`
 	Attribution   string           `json:"attribution"`
-	Counts        map[string]int   `json:"counts"` // clusters per class, before the limit
+	AnalysisError string           `json:"analysis_error,omitempty"` // attributed without a fresh analysis
+	Counts        map[string]int   `json:"counts"`                   // clusters per class, before the limit
 	Clusters      []TestRunCluster `json:"clusters"`
 	ClustersTotal int              `json:"clusters_total"`
+	Baseline      *TestRunBaseline `json:"baseline,omitempty"`
+	Gone          []TestRunCluster `json:"gone,omitempty"`
+	clusterKeys   []string
 }
 
 // Success is the CLI/MCP outcome: the target was reached without error clusters.
@@ -164,10 +170,17 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (*TestRunReport, er
 		Requested: len(st.List), Missing: missing, RunDir: runDir, LogPath: raw.LogPath,
 		Args: raw.Args, Attribution: "tested-plan", Counts: map[string]int{}, Clusters: []TestRunCluster{},
 	}
+	// Attribution reads assembly types and Harmony IDs from the analysis (03 §6.2); a
+	// test run is often the first command in a fresh environment. After the game exits,
+	// so the measured load is not slowed by it.
+	if err := a.ensureTestAnalysis(ctx, st, o.Progress); err != nil {
+		r.AnalysisError = err.Error()
+	}
 	if o.Progress != nil {
 		o.Progress("analysing test log")
 	}
 	analysisErr := a.testRunLog(st, r)
+	compareTestRun(r)
 	b, saveErr := json.MarshalIndent(r, "", "  ")
 	if saveErr == nil {
 		saveErr = os.WriteFile(filepath.Join(runDir, "report.json"), append(b, '\n'), 0o644)
@@ -305,6 +318,7 @@ func (a *App) testRunLog(st *LoadoutState, r *TestRunReport) error {
 			continue
 		}
 		r.ClustersTotal++
+		r.clusterKeys = append(r.clusterKeys, lc.Key)
 		if len(r.Clusters) == 30 {
 			continue
 		}
@@ -320,9 +334,41 @@ func (a *App) testRunLog(st *LoadoutState, r *TestRunReport) error {
 			}
 		}
 		message, _, _ := strings.Cut(lc.First.Message, "\n")
-		r.Clusters = append(r.Clusters, TestRunCluster{Class: class, Message: strings.TrimSuffix(message, "\r"), Count: lc.Count, Mods: mods, Confidence: confidence})
+		r.Clusters = append(r.Clusters, TestRunCluster{key: lc.Key, Class: class, Message: strings.TrimSuffix(message, "\r"), Count: lc.Count, Mods: mods, Confidence: confidence})
 	}
 	return nil
+}
+
+// ensureTestAnalysis brings the tested plan's Def/Patch/Harmony analysis up to date,
+// waiting without the MCP bound (05 §5.1): the test run's report depends on it.
+func (a *App) ensureTestAnalysis(ctx context.Context, st *LoadoutState, progress func(string)) error {
+	if p := a.analyzing; p != nil { // a background analysis from an earlier call
+		select {
+		case <-p.done:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		a.analyzing = nil
+	}
+	if s, err := a.analysisOf(st, false); err == nil && s.Fresh {
+		return nil
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if progress != nil {
+		progress("analysing the plan's mods for attribution")
+	}
+	open, name := a.OpenPlan, a.PlanName
+	a.OpenPlan, a.PlanName = st.Plan.ID, ""
+	defer func() { a.OpenPlan, a.PlanName = open, name }()
+	if a.AnalyzeRunner != nil {
+		return a.AnalyzeRunner(st.Ix.Env.Name, progress)
+	}
+	if a.AnalyzeExe != "" {
+		return ChildAnalyzeExe(a.AnalyzeExe, a.Home, st.Ix.Env.Name, st.Plan.Name, "", progress)
+	}
+	return ChildAnalyze(a.Home, st.Ix.Env.Name, st.Plan.Name, "", progress)
 }
 
 func testRunPath(root, path string, protected []string) error {

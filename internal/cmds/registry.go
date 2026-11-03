@@ -60,6 +60,8 @@ type Ctx struct {
 	st     *app.LoadoutState
 	stErr  error
 	stDone bool
+	// logPending: the log was attributed while the analysis was still computing.
+	logPending bool
 }
 
 // Loadout returns the workspace, loaded once per command (nil if unavailable).
