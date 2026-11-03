@@ -1,4 +1,5 @@
 {
+  "breadcrumbs": "面包屑导航",
   "%d enabled, in the order the game loads them": "启用了 %d 个，按游戏加载的顺序",
   "%d mods": "%d 个 Mod",
   "%d mods found": "找到 %d 个 Mod",

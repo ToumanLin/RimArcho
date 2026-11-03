@@ -1226,6 +1226,7 @@ async function start() {
   initNavigation(ui);
   wireHistory();
   pop.initPopups(ui);
+  pop.wireModalFocus();
   scr.initScreens(ui);
   problems.initProblems(ui);
   shell.initShell(ui);

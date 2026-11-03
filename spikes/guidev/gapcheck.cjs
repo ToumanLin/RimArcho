@@ -4,8 +4,8 @@
 // npm install --prefix tmp/gap-check --no-package-lock playwright-core@1.58.2
 // node spikes/guidev/gapcheck.cjs
 const fs = require('fs'), path = require('path'), { spawn, execFileSync } = require('child_process');
-const { chromium } = require(path.resolve('tmp/gap-check/node_modules/playwright-core'));
-const root = path.resolve('tmp/gap-check'), fixture = path.join(root, 'fixture');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || path.resolve('tmp/gap-check/node_modules/playwright-core'));
+const root = path.resolve(process.env.RIMARCHO_CHECK_ROOT || 'tmp/gap-check'), fixture = path.join(root, 'fixture');
 const game = path.join(fixture, 'Game'), data = path.join(fixture, 'UserData'), home = path.join(fixture, 'Home');
 const write = (file, value) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, value); };
 const assert = (ok, message) => { if (!ok) throw new Error(message); };
@@ -108,7 +108,7 @@ cli('scan');
       if (!history.classList.contains('open')) history.querySelector('.hbar').click();
     });
     await expandStack(); await settle();
-    for (const [i, name] of [[0, 'stage'], [1, 'history']]) await check(`#board .stack-split:nth-of-type(${i ? 2 : 1})`, 'ui.gui.plan.' + name, async () => { await reloadEditor(); await expandStack(); }, true);
+    for (const [i, name] of [[0, 'stage'], [1, 'history']]) await check(i ? "#board .stack-split:has(+ .histarea)" : '#board .stack-split:has(+ .area[data-area="2"])', 'ui.gui.plan.' + name, async () => { await reloadEditor(); await expandStack(); }, true);
     await open('library'); await check('.lib-split', 'ui.gui.library.side', () => open('library'));
     await filter('.lib .fbar', 'ui.gui.filter.split:library', () => open('library'));
     await open('tasks');

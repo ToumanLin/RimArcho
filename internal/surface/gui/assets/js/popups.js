@@ -6,12 +6,59 @@ import { pathContent, copyablePath } from "./fields.js";
 import { S, $, el, esc, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { buildCommandPanel } from "./command-panel.js";
 
+const MODALS = new Set(["url", "memory", "uninstall-confirm", "plan-rename", "ask"]);
 let ui = null;
+let modalFocus = null;
+// Wire browser focus separately from popup construction, as with lists and history.
+export function wireModalFocus() { modalFocus = modal; }
+
+function modal(pop, p) {
+  const title = pop.querySelector(".ttl"), body = pop.querySelector(".body");
+  pop.setAttribute("role", "dialog");
+  pop.setAttribute("aria-modal", "true");
+  pop.removeAttribute("aria-label");
+  if (title) { title.id = "popup-title"; pop.setAttribute("aria-labelledby", title.id); }
+  if (body) { body.id = "popup-message"; pop.setAttribute("aria-describedby", body.id); }
+  p.background = [...$("#app").children].filter(n => n.id !== "popup").map(n => [n, n.inert]);
+  for (const [n] of p.background) n.inert = true;
+  // Capture before local handlers (including the uninstall dialog's older Tab cycle).
+  pop.addEventListener("keydown", e => {
+    if (e.isComposing) return;
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && ["b", "k"].includes(e.key.toLowerCase())) return;
+    e.stopPropagation();
+    if (e.key === "Escape") { e.preventDefault(); close(); return; }
+    if (e.key === "Tab") {
+      const controls = [...pop.querySelectorAll('button, input, select, textarea, a[href], [tabindex]')]
+        .filter(n => n.tabIndex >= 0 && !n.disabled && !n.closest("[inert]") && n.checkVisibility());
+      const i = controls.indexOf(document.activeElement);
+      e.preventDefault();
+      (controls[(i + (e.shiftKey ? controls.length - 1 : 1)) % controls.length] || pop).focus();
+      return;
+    }
+    if ((e.key === "Enter" || e.key === " ") && e.target.closest("button")) {
+      e.preventDefault();
+      if (!e.repeat) e.target.closest("button").click();
+      return;
+    }
+    p.keys?.(e);
+  }, true);
+  p.restoreFocus = () => {
+    const opener = p.opener;
+    const target = opener?.isConnected && !opener.closest("[inert]") && opener.checkVisibility() && opener !== document.body && !opener.disabled ? opener :
+      document.querySelector('#screen[role="main"], #board:not([inert])');
+    target?.focus({ preventScroll: true, focusVisible: target === opener && p.openerFocusVisible });
+  };
+  const initial = pop.querySelector('input:not([type=checkbox]):not([type=radio])') || pop.querySelector(".btns button");
+  if (initial?.matches("input")) requestAnimationFrame(() => { if (S.popup === p) initial.focus({ preventScroll: true }); });
+  else initial?.focus({ preventScroll: true, focusVisible: false });
+}
+
 export function initPopups(u) { ui = u; }
 
 export function open(kind, title, build) {
   closeChoiceMenu();
   close();
+  const opener = document.activeElement;
   const box = $("#popup");
   box.classList.remove("command-dock");
   box.innerHTML = "";
@@ -19,14 +66,17 @@ export function open(kind, title, build) {
   box.append(pop);
   box.hidden = false;
   box.onmousedown = (e) => { if (e.target === box) close(); };
-  S.popup = { kind, title, keys: null };
-  build(pop, S.popup);
+  const p = S.popup = { kind, title, keys: null, opener, openerFocusVisible: opener?.matches?.(":focus-visible") };
+  build(pop, p);
+  if (p.modal || MODALS.has(kind)) { p.modal = true; modalFocus?.(pop, p); }
   ui.renderWhere();
 }
 
 export function close() {
   if (!S.popup) return;
-  S.popup.onclose?.();
+  const p = S.popup;
+  for (const [n, inert] of p.background || []) n.inert = inert;
+  p.onclose?.();
   S.popup = null;
   const box = $("#popup");
   box.hidden = true;
@@ -34,6 +84,7 @@ export function close() {
   box.innerHTML = "";
   ui.renderWhere();
   ui.renderHeads();
+  p.restoreFocus?.();
 }
 
 // popupKey handles a key while a popup is open; true when it took it.
@@ -218,6 +269,7 @@ export async function libraryConfirm(kind, refs, label, done) {
 // panel is a confirmation whose body is an element (the pack build's steps); cls widens it.
 export function panel(title, content, goLabel, go, cls = "", envWrite = "") {
   open("confirm", title, (pop, p) => {
+    p.modal = !!go;
     if (cls) pop.classList.add(cls);
     pop.append(el("div", "ttl", title));
     const body = el("div", "body");
@@ -237,7 +289,10 @@ export function panel(title, content, goLabel, go, cls = "", envWrite = "") {
     }
     pop.append(btns);
     p.keys = (e) => {
-      if (e.key === "Enter" && go) { e.preventDefault(); pop.querySelector(".btns .go").click(); }
+      if (e.key === "Enter" && go) {
+        e.preventDefault();
+        document.activeElement?.closest("button")?.click();
+      }
       else if (e.key === "PageDown") body.scrollTop += body.clientHeight * 0.9;
       else if (e.key === "PageUp") body.scrollTop -= body.clientHeight * 0.9;
       else if (e.key === "ArrowDown") body.scrollTop += 40;
@@ -511,9 +566,6 @@ export async function problem(ref, run, actionWrite) {
 export function memoryConfirm(memory, go) {
   open("memory", T("RAM may be insufficient"), (pop, p) => {
     pop.classList.add("memory-confirm");
-    pop.setAttribute("role", "dialog");
-    pop.setAttribute("aria-modal", "true");
-    pop.setAttribute("aria-label", T("RAM may be insufficient"));
     pop.append(el("div", "ttl", T("RAM may be insufficient")));
     const values = el("div", "memory-values");
     for (const [label, value] of [["loading RAM needed", memory.needed], ["RAM available now", memory.available]]) {

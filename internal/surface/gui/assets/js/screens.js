@@ -57,6 +57,26 @@ function left(next) {
   }
 }
 
+// The screen covers the editor; retain its DOM and cursor without exposing it (A1).
+let editorFocus = null;
+let editorCovered = false;
+export function syncPageAccessibility() {
+  const screen = $("#screen"), board = $("#board");
+  if (!screen || !board) return;
+  const covered = !screen.hidden;
+  if (covered && !editorCovered && (board.contains(document.activeElement) || $("#planhead")?.contains(document.activeElement))) editorFocus = document.activeElement;
+  board.inert = covered;
+  if ($("#planhead")) $("#planhead").inert = covered;
+  if (covered) screen.setAttribute("role", "main");
+  else screen.removeAttribute("role");
+  if (!covered && editorCovered && !S.screen && editorFocus) {
+    const target = editorFocus.isConnected ? editorFocus : board;
+    target.focus({ preventScroll: true });
+    editorFocus = null;
+  }
+  editorCovered = covered;
+}
+
 export function openScreen(name) {
   fresh = S.screen !== name;
   if (fresh) S.screenSeq++;
@@ -155,8 +175,7 @@ export function beginPageRead(name, { replace = false, keep = false, label = "lo
     w.append(card); sc.append(w);
   }
   sc.setAttribute("aria-busy", "true");
-  if (board) board.inert = !sc.hidden;
-  if (editor && $("#planhead")) $("#planhead").inert = !sc.hidden;
+  syncPageAccessibility();
   // A read behind the editor already on screen (after sort, an edit, undo) keeps the status
   // line: it says what the action did, which "loading…" would wipe.
   if (editor && sc.hidden && !warmEditor && !same) say("busy", T(label));
@@ -1788,14 +1807,12 @@ export async function chooseLocalPath(value, done, { file = false } = {}) {
 }
 
 export function urlPrompt(title, value, done) {
-  const focused = document.activeElement;
   pop.open("url", title, (box, p) => {
     box.classList.add("url-editor");
-    box.setAttribute("role", "dialog"); box.setAttribute("aria-modal", "true"); box.setAttribute("aria-label", title);
     box.append(el("div", "ttl", title));
     const input = el("input", "field");
     input.value = value; input.type = "url"; input.spellcheck = false;
-    input.setAttribute("aria-label", title);
+    input.setAttribute("aria-labelledby", "popup-title");
     const error = el("div", "err"); error.setAttribute("role", "alert");
     const apply = () => {
       const next = input.value.trim();
@@ -1817,7 +1834,6 @@ export function urlPrompt(title, value, done) {
       if (e.key === "Enter" && e.target === input) { e.preventDefault(); apply(); }
       return true;
     };
-    p.onclose = () => focused?.isConnected && focused.focus({ preventScroll: true });
     requestAnimationFrame(() => { if (S.popup === p) input.focus(); });
   });
 }

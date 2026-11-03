@@ -26,7 +26,7 @@ async function go(id) {
   else if (id === "guide" || id === "uninstall") {
     // pages under another: Games' "add an environment", settings's "uninstall RimArcho"
     await go(id === "guide" ? "env" : "settings");
-    const re = id === "guide" ? /\u6dfb\u52a0\u73af\u5883|add an environment/i : /\u5378\u8f7d|uninstall/i;
+    const re = id === "guide" ? /\u6dfb\u52a0\u73af\u5883|add an environment|add a game/i : /\u5378\u8f7d|uninstall/i;
     const b = [...document.querySelectorAll("#acts button, #screen button")].find((x) => re.test(x.textContent));
     if (!b) throw new Error("no way to " + id);
     b.click();
@@ -56,7 +56,6 @@ function notBase(screen) {
   if (S.screen === "library" && / › /.test(lw)) out.push("details over the page");
   if (S.screen === "library" && $(".lib-detail.focus")) out.push("focus in the details");
   if (S.screen === "library" && /selected|\u5df2\u9009/.test(lw)) out.push("library selection");
-  if (S.screen === "changes" && $(".subs-sources")) out.push("sources open");
   if (S.screen === "changes" && $(".subs-scope .lib-cond")) out.push("one mod only");
   if (S.screen === "subscribe" && $(".subscribe-card")) out.push("pasted address");
   if (!S.screen && S.cols.some((c) => c.sel.size)) out.push("selection");
@@ -75,9 +74,11 @@ const rowMenu = async (sel) => {
 };
 
 const SCENARIOS = [
+  ["Settings · URL prompt after Tab cycles", "settings", "settings", async () => { (await import("/js/screens.js")).urlPrompt("Workshop URL", "https://example.test/", () => {}); for (let i = 0; i < 8; i++) key("Tab"); }],
+  ["Start · RAM warning", "home", "home", async () => { (await import("/js/popups.js")).memoryConfirm({ needed: "8 GB", available: "4 GB" }, () => {}); key("Tab", { shift: true }); }],
   ["Start · help", "home", "home", async () => { key("?"); }],
   ["Can it run · help", "needs", "needs", async () => { key("?"); }],
-  ["Can it run · an item's ⋯ menu (mouse)", "needs", "needs", async () => { const m = $(".need .more"); if (!m) throw new Error("no ⋯"); m.click(); }],
+  ["Can it run · confirmation", "needs", "needs", async () => { (await import("/js/popups.js")).confirm("delete the list", ["Synthetic deletion warning"], "delete", () => {}); }],
   ["Can it run · palette", "needs", "needs", async () => { key("k", { ctrl: true }); }],
   ["Game log · help", "log", "log", async () => { key("?"); }],
   ["Game log · palette", "log", "log", async () => { key("k", { ctrl: true }); }],

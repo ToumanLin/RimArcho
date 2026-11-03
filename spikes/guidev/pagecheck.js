@@ -24,7 +24,11 @@ import { withEnvironmentSwitch } from "/js/environment.js";
 const output = document.querySelector("#results"), results = [];
 const assert = (ok, message) => { if (!ok) throw new Error(message); };
 const settle = async () => { for (let i = 0; i < 5; i++) await new Promise(requestAnimationFrame); };
-const key = (name) => screens.logsKey(new KeyboardEvent("keydown", { key: name, cancelable: true }));
+const key = (name) => {
+  const target = document.querySelector("#screen");
+  target.addEventListener("keydown", screens.logsKey, { once: true });
+  target.dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true }));
+};
 const deferred = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; };
 const visibleSelection = () => {
   const row = document.querySelector(".lrow.cur"), scroll = row?.closest(".scroll");
@@ -133,7 +137,8 @@ try {
       document.querySelector('[data-setting-action="deps install ' + name + '"]').click(); await settle();
       assert(installs === before && !popup.hidden, "download began without confirmation");
       const text = popup.textContent;
-      assert(text.includes("https://fixture.invalid/" + name + ".zip") && text.includes("C:/fixture/" + name), "missing URL or directory");
+      const addresses = [...popup.querySelectorAll("[title]")].map(n => n.title).join("\n");
+      assert(addresses.includes("https://fixture.invalid/" + name + ".zip") && addresses.includes("C:/fixture/" + name), "missing URL or directory");
       assert(text.includes(bytes > 0 ? Tf("size: %s bytes", bytes) : T("size unknown")), "missing size");
       popup.querySelector(".btns .go").click(); await settle();
       assert(installs === before + 1, "confirmed installation did not run");
@@ -161,7 +166,7 @@ try {
     const target = document.querySelector("#screen .link-row .link-path:nth-child(3)");
     assert(target.dataset.path === groups[0].rows[0].target && target.title.includes(groups[0].rows[0].target), "full target lost");
     assert(target.scrollWidth <= target.clientWidth + 1, "long path overflows row");
-    document.querySelector("#screen .need .acts button").click(); await settle();
+    await screens.runNeedAction({}, { kind: "repair-links", label: "Repair", confirm: "Confirm", linkGroups: preview }); await settle();
     assert(document.querySelectorAll("#popup .link-game").length === 2, "preview lost game groups");
     assert([...document.querySelectorAll("#popup .link-tag")].every(n => n.textContent === "will delete"), "preview action tag is wrong");
     assert(document.querySelector("#popup .link-row .link-path:nth-child(3)").dataset.path === groups[0].rows[0].target, "preview lost full path");
@@ -866,7 +871,7 @@ try {
   });
   await test("direct import and task entry points record completion, expired guide sessions cannot reopen", async () => {
     await nav.go("home"); await nav.go("plan-import");
-    const field = document.querySelector("#screen input:not([type=file])"); field.value = "unsaved input";
+    const field = document.querySelector("#screen textarea"); field.value = "unsaved input";
     await tasks.toggle(); assert(S.screen === "tasks", "tasks did not open");
     await nav.travel(-1); assert(S.screen === "plan-import" && !S.popup, "import was not restored as normal navigation");
     await nav.travel(-1); assert(S.screen === "home", "import return missing");
