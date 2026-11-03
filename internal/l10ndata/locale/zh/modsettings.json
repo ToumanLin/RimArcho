@@ -27,5 +27,11 @@
   "settings window: %s": "设置窗口：%s",
   "%d mods of %s have settings; read only: change values in the game": "%d 个 Mod 有设置（列表：%s）；只读：要改值，去游戏里改",
   "a Mod's settings file appears once its settings are changed in the game": "在游戏里改过一个 Mod 的设置后，它的设置文件才会出现",
-  "no Mod of this list has a settings file, and Archo Monitor recorded no settings window yet": "这个列表里没有 Mod 有设置文件，Archo Monitor 也还没记录到设置窗口"
+  "no Mod of this list has a settings file, and Archo Monitor recorded no settings window yet": "这个列表里没有 Mod 有设置文件，Archo Monitor 也还没记录到设置窗口",
+  "the window part shows the game's window as it was when you last opened it": "窗口部分是你上次打开游戏设置窗口时它的样子",
+  "chosen": "已选",
+  "%s (%s to %s)": "%s（%s 到 %s）",
+  "in the game's window (%s)": "游戏里的窗口（%s）",
+  "the window draws more than Archo Monitor keeps": "窗口内容超出了 Archo Monitor 记录的上限",
+  "stored in the file": "文件里存的"
 }

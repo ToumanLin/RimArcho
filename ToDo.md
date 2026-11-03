@@ -24,7 +24,7 @@ Mod configuration determines how a Mod's content is played. In the game it has a
 2026-11-02: researched in [research/2026-11-02_mod-settings.md](docs/research/2026-11-02_mod-settings.md). First finding: settings files are named after the folder the game sees, so `_Archo_` and `!ArchoPack_` links fork a Mod's settings (01 §5.3). Direction (simplified 2026-11-02, no tricks, low player load):
 
 - Settings follow the Mod: when a deployment name changes, RimArcho copies the settings to the new name before launch, without asking and without overwriting. Implemented 2026-11-03 (08 §3, §5.3 step 4, §12); real-game check in the release VM tests.
-- Archo Monitor records which settings file each Mod uses and what its settings window shows when the player opens it. The file record is implemented 2026-11-03 (Monitor 0.10.0, 03 §6.7.1); the window record is not.
+- Archo Monitor records which settings file each Mod uses and what its settings window shows when the player opens it. The file record is implemented 2026-11-03 (Monitor 0.10.0, 03 §6.7.1), the window record too (Monitor 0.11.0); HugsLib handles are not yet.
 - RimArcho reads simple files (on/off, numbers, text, a choice) itself; it can change only those, only with the game closed, with a backup. Everything else is read-only: change it in the game.
 - One Mod settings page for the current list. Implemented 2026-11-03, read only, as Mod library › Mod settings (06 §2.9), with `archo mod-settings` and MCP `get_mod_settings`.
 

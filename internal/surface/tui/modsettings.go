@@ -43,6 +43,23 @@ func modSettingsText(l *app.ModSettingsList) string {
 				head += "  “" + f.Title + "”"
 			}
 			fmt.Fprintf(&b, "\n%s  %s\n", head, f.File)
+			if w := d.Window; w != nil {
+				fmt.Fprintf(&b, "  %s\n", Tf("in the game's window (%s)", w.Seen))
+				for j, c := range w.Controls {
+					if j == settingsShown {
+						fmt.Fprintf(&b, "    … %d\n", len(w.Controls)-settingsShown)
+						break
+					}
+					switch c.Kind {
+					case "label":
+						fmt.Fprintf(&b, "    %s\n", c.Label)
+					case "button":
+						fmt.Fprintf(&b, "    [%s]\n", c.Label)
+					default:
+						fmt.Fprintf(&b, "    %s: %s\n", c.Label, c.Text)
+					}
+				}
+			}
 			switch {
 			case d.Error != "":
 				fmt.Fprintf(&b, "  %s\n", d.Error)

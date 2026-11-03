@@ -164,6 +164,21 @@ function drawDetail(d, keep = false) {
   body.setAttribute("aria-label", T("stored values"));
   if (d.loading) body.append(el("p", "ms-note muted", T("reading…")));
   if (d.error) body.append(el("p", "ms-note err", d.error));
+  // the game's window as Archo Monitor saw it, then what the file stores
+  if (d.window) {
+    body.append(el("h3", "ms-sub", Tf("in the game's window (%s)", d.window.seen)));
+    const kv = el("dl", "ms-values ms-window");
+    for (const c of d.window.controls) {
+      if (c.kind === "label") { kv.append(el("dt", "ms-head", c.label)); continue; }
+      const dt = el("dt", "", c.kind === "button" ? "" : c.label || "—");
+      const dd = el("dd", "ms-v " + c.kind, c.kind === "button" ? "[" + c.label + "]" : c.text);
+      dd.title = dd.textContent;
+      kv.append(dt, dd);
+    }
+    body.append(kv);
+    if (!d.window.full) body.append(el("p", "ms-note muted", T("the window draws more than Archo Monitor keeps")));
+    if (d.values?.length || d.exists) body.append(el("h3", "ms-sub", T("stored in the file")));
+  }
   if (d.values?.length) {
     const kv = el("dl", "ms-values");
     for (const v of d.values) {

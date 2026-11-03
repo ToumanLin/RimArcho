@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/logs"
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
@@ -82,6 +83,9 @@ func settingsFiles(root *render.Node, sm *app.ModSettingsMod, limit int, expand 
 			head = fmt.Sprintf("%q  %s", f.Title, f.File)
 		}
 		n := root.Section(head)
+		if f.Window != nil {
+			windowSection(n, f.Window, limit, expand)
+		}
 		if !f.Exists {
 			n.Add("no file: the Mod uses its defaults until its settings are changed in the game")
 			continue
@@ -104,6 +108,47 @@ func settingsFiles(root *render.Node, sm *app.ModSettingsMod, limit int, expand 
 			n.Add("lists and nested values are read only: change them in the game")
 		}
 	}
+}
+
+// windowSection adds what the game's settings window drew when the player last opened it
+// (Archo Monitor): headings, and each control with its value, at most limit controls.
+func windowSection(n *render.Node, w *app.SeenSettingsWindow, limit int, expand string) {
+	win := n.Section(fmt.Sprintf("the game's window (seen %s; labels as the game drew them, values as they were then)", w.Seen.Local().Format("2006-01-02")))
+	at, shown := win, 0
+	for i, c := range w.Controls {
+		if limit > 0 && shown == limit {
+			win.Add(fmt.Sprintf("… %d more (%s)", len(w.Controls)-i, expand))
+			break
+		}
+		if c.Kind == "label" {
+			at = win.Section(c.Label)
+			continue
+		}
+		shown++
+		at.Add(windowText(c))
+	}
+	if !w.Full {
+		win.Add("the window draws more than Archo Monitor keeps")
+	}
+}
+
+// windowText is one control of a settings window as the CLI shows it.
+func windowText(c logs.SettingsControl) string {
+	label := c.Label
+	if label == "" {
+		label = "-"
+	}
+	switch c.Kind {
+	case "button":
+		return "[" + c.Label + "] (button)"
+	case "slider":
+		if c.Min != "" {
+			return fmt.Sprintf("%s: %s (slider %s to %s)", label, c.Value, c.Min, c.Max)
+		}
+	case "text":
+		return fmt.Sprintf("%s: %q (text)", label, c.Value)
+	}
+	return fmt.Sprintf("%s: %s (%s)", label, c.Value, c.Kind)
 }
 
 // settingText is a stored value as the CLI shows it.

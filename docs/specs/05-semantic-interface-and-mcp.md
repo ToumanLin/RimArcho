@@ -413,7 +413,7 @@ The following table gives the tool guide highlights. See `internal/cmds/guide_to
 | `status` | Use it first in a session. For one Mod, use `get_mod`; for the findings themselves, use `list_problems`. |
 | `find_mods` | Search by name, package ID, author, Workshop ID, or folder. A package ID may identify several Instances; the output lists a reference for every candidate. Use `get_mod` next. |
 | `get_mod` | Get all facts for one Instance. An ambiguous reference returns candidates rather than choosing one arbitrarily. |
-| `get_mod_settings` | Read what a Mod's settings files store, or which Mods of the current list have settings; values change only in the game. |
+| `get_mod_settings` | Read what a Mod's settings files store and its settings window as Archo Monitor last saw it, or which Mods of the current list have settings; values change only in the game. |
 | `get_def` | Use it for No ThingDef named X, duplicate Defs, or which Mod wins. |
 | `get_patches` | Use it for a logged Patch operation failed; `failed=true` gives the reason. |
 | `get_harmony` | Use it for PREFIX/POSTFIX stack lines or `Mods` touching `Pawn.Tick`; next, use `read_source` on the patch class. A bool-returning prefix may skip the original method. Patches applied in code through `Harmony.Patch` are marked as not statically resolvable. |

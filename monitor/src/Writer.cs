@@ -290,6 +290,34 @@ namespace ArchoMonitor
             }
         }
 
+        // WriteSettingsWindow writes what a settings window drew when it opened (03 §6.7.1): one
+        // line, kind settings-window, with context.window naming the Mod's settings file and the
+        // controls in drawing order.
+        internal static void WriteSettingsWindow(SettingsFile f, IList<SettingsControl> controls)
+        {
+            var j = new Json().Head(DateTime.Now, "INFO", "[Archo Monitor] settings window " + f.Title);
+            j.Str("details", "").Num("count", 1);
+            j.Raw("context").Open().Raw("window").Open().Str("packageId", f.PackageId).Str("folder", f.Folder).Str("class", f.Class)
+                .Str("file", f.File).Str("title", f.Title).Bool("full", controls.Count < SettingsWindow.MaxControls);
+            j.Raw("controls").Arr();
+            foreach (var c in controls)
+            {
+                j.Next().Open().Str("kind", c.Kind);
+                if (!string.IsNullOrEmpty(c.Label)) j.Str("label", c.Label);
+                if (!string.IsNullOrEmpty(c.Value)) j.Str("value", c.Value);
+                if (!string.IsNullOrEmpty(c.Min)) j.Str("min", c.Min).Str("max", c.Max);
+                j.Close();
+            }
+            j.EndArr().Close().Close().Kind("settings-window");
+            lock (sync)
+            {
+                if (closed || w == null) return;
+                FlushDirty(true);
+                WriteLine(j.End(), force: true);
+                Flush();
+            }
+        }
+
         // Close writes the remaining counts and the exit line (Application.quitting, ProcessExit).
         internal static void Close()
         {

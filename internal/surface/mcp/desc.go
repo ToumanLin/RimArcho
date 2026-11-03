@@ -17,7 +17,7 @@ const descGuide = `Read-only help: a tool's full reference (topic=<tool name>: e
 
 const descStatus = `Overview of the current environment: game version, mods per source, the current plan and how it differs from the game's list, whether a game runs, problem counts, pending updates. Call first in a session. show=envs|folders|settings|data|db|cache gives one read-only page of RimArcho's setup instead.`
 
-const descModSettings = `Mod settings, read only. No ref: the current list's Mods that have settings (window title, file, or defaults when there is none yet). ref: the values one Mod's settings files store; a file stores only values that differ from the Mod's defaults, lists and nested values are summarised.`
+const descModSettings = `Mod settings, read only. No ref: the current list's Mods that have settings (window title, file, or defaults when there is none yet). ref: what one Mod's files store (a missing value is at its default; lists summarised) and the game's window labels as Archo Monitor last saw them.`
 
 const descFind = `Find mods by name, packageId, author, workshop id or folder (query), or list them (no query; active=true: enabled mods in load order). A packageId can match several copies: each candidate is listed with its ref. Next: get_mod.`
 

@@ -24,7 +24,9 @@ namespace ArchoMonitor
     // name the game builds for GetSettings.
     internal static class SettingsRecord
     {
-        static bool written;
+        static bool written, looked;
+        static FieldInfo stored;
+        static MethodInfo name;
 
         internal static void Write()
         {
@@ -32,14 +34,12 @@ namespace ArchoMonitor
             written = true;
             try
             {
-                FieldInfo stored = AccessTools.Field(typeof(Mod), "modSettings");
-                MethodInfo name = AccessTools.Method(typeof(LoadedModManager), "GetSettingsFilename", new[] { typeof(string), typeof(string) });
                 var files = new List<SettingsFile>();
                 foreach (Mod m in LoadedModManager.ModHandles)
                 {
                     try
                     {
-                        var f = Read(m, stored, name);
+                        var f = Describe(m);
                         if (f.HasValue) files.Add(f.Value);
                     }
                     catch (Exception e) { Writer.Failure(e); }
@@ -49,8 +49,16 @@ namespace ArchoMonitor
             catch (Exception e) { Writer.Failure(e); }
         }
 
-        static SettingsFile? Read(Mod m, FieldInfo stored, MethodInfo name)
+        // Describe is m's settings file, or null when m has neither a settings window nor
+        // settings read through the game.
+        internal static SettingsFile? Describe(Mod m)
         {
+            if (!looked)
+            {
+                looked = true;
+                stored = AccessTools.Field(typeof(Mod), "modSettings");
+                name = AccessTools.Method(typeof(LoadedModManager), "GetSettingsFilename", new[] { typeof(string), typeof(string) });
+            }
             ModContentPack content = m?.Content;
             if (content == null) return null;
             string title = "";

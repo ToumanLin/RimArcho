@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/logs"
 )
 
 // Mod library › Mod settings (06 §2.9 "Mod settings"): the current list's Mods that have
@@ -73,6 +74,24 @@ type ModSettingsDetail struct {
 	Error  string       `json:"error,omitempty"`
 	Values []SettingRow `json:"values"`
 	Notes  []string     `json:"notes"`
+	// Window is what the game's settings window drew when the player last opened it (Archo
+	// Monitor, 03 §6.7.1); nil when never seen.
+	Window *SettingsWindowView `json:"window,omitempty"`
+}
+
+// SettingsWindowView is a settings window as Archo Monitor saw it.
+type SettingsWindowView struct {
+	Seen     string      `json:"seen"` // the date it was seen
+	Full     bool        `json:"full"` // false: the window drew more than Monitor keeps
+	Controls []WindowRow `json:"controls"`
+}
+
+// WindowRow is one thing the window drew: a heading (Kind label), a button, or a control
+// with its value as text.
+type WindowRow struct {
+	Kind  string `json:"kind"`
+	Label string `json:"label"`
+	Text  string `json:"text"`
 }
 
 // SettingRow is one stored value as the page shows it.
@@ -98,8 +117,14 @@ func ModSettingsFileDetail(sm *app.ModSettingsMod, class string) *ModSettingsDet
 		return d
 	}
 	d.Title, d.File, d.Path, d.Exists = f.Title, f.File, f.Path, f.Exists
+	if f.Window != nil {
+		d.Window = windowView(f.Window)
+	}
 	if !f.Exists {
 		d.Notes = []string{T("no file yet: the Mod uses its defaults until its settings are changed in the game")}
+		if d.Window != nil {
+			d.Notes = append(d.Notes, T("the window part shows the game's window as it was when you last opened it"))
+		}
 		return d
 	}
 	sc, err := app.ReadSettingsFile(f.Path)
@@ -119,8 +144,46 @@ func ModSettingsFileDetail(sm *app.ModSettingsMod, class string) *ModSettingsDet
 	if !sc.Simple {
 		d.Notes = append(d.Notes, T("lists, dictionaries and nested values are shown as counts"))
 	}
+	if d.Window != nil {
+		d.Notes = append(d.Notes, T("the window part shows the game's window as it was when you last opened it"))
+	}
 	d.Notes = append(d.Notes, T("read only: change values in the game's Mod settings window"))
 	return d
+}
+
+func windowView(w *app.SeenSettingsWindow) *SettingsWindowView {
+	v := &SettingsWindowView{Seen: LongDate(w.Seen), Full: w.Full, Controls: []WindowRow{}}
+	for _, c := range w.Controls {
+		v.Controls = append(v.Controls, WindowRow{Kind: c.Kind, Label: c.Label, Text: WindowText(c)})
+	}
+	return v
+}
+
+// WindowText is a control's value as shown: on/off, a chosen choice, a slider's value and
+// range, text in quotes; "" for headings and buttons.
+func WindowText(c logs.SettingsControl) string {
+	switch c.Kind {
+	case "checkbox":
+		if strings.EqualFold(c.Value, "true") {
+			return T("on")
+		}
+		return T("off")
+	case "radio":
+		if strings.EqualFold(c.Value, "true") {
+			return T("chosen")
+		}
+		return ""
+	case "slider":
+		if c.Min != "" {
+			return Tf("%s (%s to %s)", c.Value, c.Min, c.Max)
+		}
+		return c.Value
+	case "text":
+		return `"` + c.Value + `"`
+	case "number":
+		return c.Value
+	}
+	return ""
 }
 
 // SettingText is a stored value as the page shows it.

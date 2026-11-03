@@ -47,6 +47,9 @@ type ModSettingsFile struct {
 	Exists bool      // false: the Mod uses its defaults (nothing changed yet)
 	Size   int64     // bytes, when it exists
 	Seen   time.Time // when Archo Monitor last recorded it (zero: never)
+	// Window is what the settings window drew when the player last opened it (Archo Monitor);
+	// nil when never seen.
+	Window *SeenSettingsWindow
 }
 
 // SettingValue is one value stored in a settings file.
@@ -272,15 +275,17 @@ func (a *App) ModSettingsOf(m *store.Mod) (*ModSettingsMod, error) {
 // settingsReader holds what finding a Mod's settings files reads once: the Config folder's
 // files and Archo Monitor's records.
 type settingsReader struct {
-	cfg   string
-	seen  []SeenSettingsFile
-	files map[string]map[string]settingsFileInfo // stem → class → file
+	cfg     string
+	seen    []SeenSettingsFile
+	windows []SeenSettingsWindow
+	files   map[string]map[string]settingsFileInfo // stem → class → file
 }
 
 // settingsReader reads ix's environment's Config folder; folders are those asked about.
 func (a *App) settingsReader(ix *Index, aliases map[string][]store.Alias, folders []string) *settingsReader {
 	root := ix.Env.UserDataRoot
-	r := &settingsReader{cfg: filepath.Join(root, "Config"), seen: a.MonitorSettings(root)}
+	ms := a.monitorSeen(root)
+	r := &settingsReader{cfg: filepath.Join(root, "Config"), seen: ms.Files, windows: ms.Windows}
 	known := settingsFolders(ix, aliases)
 	addSeenFolders(known, r.seen)
 	stems := map[string]bool{}
@@ -328,6 +333,18 @@ func (r *settingsReader) of(m *store.Mod, folder string) ModSettingsMod {
 	}
 	for _, fi := range r.files[strings.ToLower(settingsStem(folder))] {
 		add(fi.class)
+	}
+	// a window the player opened: its class has settings even before Monitor's record of it
+	for i := range r.windows {
+		w := &r.windows[i]
+		if packageBase(strings.ToLower(w.PackageID)) != pkg {
+			continue
+		}
+		f := add(w.Class)
+		f.Window = w
+		if f.Title == "" {
+			f.Title = w.Title
+		}
 	}
 	sort.Strings(order)
 	for _, k := range order {

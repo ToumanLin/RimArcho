@@ -5,6 +5,7 @@ import (
 	"log"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -12,17 +13,24 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/logs"
 )
 
-// Archo Monitor's settings record (03 §6.7.1) names, for one run, the folder each Mod class
-// was seen under and the settings file it read. ArchoMonitor.log keeps only two runs, so
-// RimArcho keeps every record it has read per save-data root in meta "mod-settings:<root>":
-// a folder name used long ago still leads to its settings (08 §3).
+// Archo Monitor's settings records (03 §6.7.1) name, for one run, the folder each Mod class
+// was seen under and the settings file it read, and what each settings window the player
+// opened drew. ArchoMonitor.log keeps only two runs, so RimArcho keeps what it has read per
+// save-data root in meta "mod-settings:<root>": a folder name used long ago still leads to
+// its settings (08 §3), and a window's labels stay after its run is gone (06 §2.9).
 
-// seenSessionsMax bounds the session ids remembered as read.
-const seenSessionsMax = 10
+// seenSessionsMax bounds the session ids remembered as read; seenWindowsMax the windows kept
+// (the newest).
+const (
+	seenSessionsMax = 10
+	seenWindowsMax  = 80
+)
 
 type settingsSeen struct {
-	Sessions []string           `json:"sessions"` // read, oldest first
-	Files    []SeenSettingsFile `json:"files"`
+	Sessions []string             `json:"sessions"`       // whose settings record was merged, oldest first
+	Read     map[string]int64     `json:"read,omitempty"` // session → bytes of its log read
+	Files    []SeenSettingsFile   `json:"files"`
+	Windows  []SeenSettingsWindow `json:"windows,omitempty"`
 }
 
 // SeenSettingsFile is a settings file Archo Monitor recorded, with the newest run it was
@@ -33,31 +41,62 @@ type SeenSettingsFile struct {
 	Seen time.Time `json:"seen"`
 }
 
+// SeenSettingsWindow is the newest record of what a Mod class's settings window drew.
+type SeenSettingsWindow struct {
+	logs.SettingsWindow
+	Game string    `json:"game,omitempty"`
+	Seen time.Time `json:"seen"`
+}
+
 func settingsSeenKey(root string) string { return "mod-settings:" + env.PathKey(root) }
 
-// MonitorSettings is everything Archo Monitor recorded about Mod settings in the save-data
-// root, after reading the records of its logs not read before.
-func (a *App) MonitorSettings(root string) []SeenSettingsFile {
+// MonitorSettings is every settings file Archo Monitor recorded in the save-data root, after
+// reading what its logs added since the last read.
+func (a *App) MonitorSettings(root string) []SeenSettingsFile { return a.monitorSeen(root).Files }
+
+// monitorSeen reads the records Archo Monitor's logs added since the last read into the kept
+// history and returns it.
+func (a *App) monitorSeen(root string) settingsSeen {
+	var seen settingsSeen
 	if root == "" {
-		return nil
+		return seen
 	}
 	key := settingsSeenKey(root)
-	var seen settingsSeen
 	if v := a.Store.Meta(key); v != "" {
 		_ = json.Unmarshal([]byte(v), &seen)
 	}
+	if seen.Read == nil {
+		seen.Read = map[string]int64{}
+	}
 	changed := false
+	live := map[string]bool{}
 	for _, name := range []string{logs.MonitorPrevLog, logs.MonitorLog} {
-		ms, err := logs.ReadMonitorSettings(filepath.Join(root, name))
-		if err != nil || ms == nil || ms.Session == "" || slices.Contains(seen.Sessions, ms.Session) {
+		mr, err := logs.ReadMonitorRecords(filepath.Join(root, name), seen.Read)
+		if err != nil || mr == nil || mr.Session == "" {
 			continue
 		}
-		seen.merge(ms)
-		seen.Sessions = append(seen.Sessions, ms.Session)
-		if n := len(seen.Sessions); n > seenSessionsMax {
-			seen.Sessions = seen.Sessions[n-seenSessionsMax:]
+		live[mr.Session] = true
+		if mr.End == seen.Read[mr.Session] {
+			continue
 		}
+		if mr.Files != nil && !slices.Contains(seen.Sessions, mr.Session) {
+			seen.merge(mr)
+			seen.Sessions = append(seen.Sessions, mr.Session)
+			if n := len(seen.Sessions); n > seenSessionsMax {
+				seen.Sessions = seen.Sessions[n-seenSessionsMax:]
+			}
+		}
+		for _, w := range mr.Windows {
+			seen.mergeWindow(w, mr.Game)
+		}
+		seen.Read[mr.Session] = mr.End
 		changed = true
+	}
+	for s := range seen.Read {
+		if !live[s] { // its log is gone: it is never read again
+			delete(seen.Read, s)
+			changed = true
+		}
 	}
 	if changed {
 		if b, err := json.Marshal(seen); err == nil {
@@ -66,21 +105,21 @@ func (a *App) MonitorSettings(root string) []SeenSettingsFile {
 			}
 		}
 	}
-	return seen.Files
+	return seen
 }
 
-func (s *settingsSeen) merge(ms *logs.MonitorSettings) {
+func (s *settingsSeen) merge(mr *logs.MonitorRecords) {
 	at := map[string]int{}
 	for i, f := range s.Files {
 		at[seenKey(f.SettingsFile)] = i
 	}
-	for _, f := range ms.Files {
+	for _, f := range mr.Files {
 		if f.PackageID == "" || f.Folder == "" || f.Class == "" {
 			continue
 		}
-		rec := SeenSettingsFile{SettingsFile: f, Game: ms.Game, Seen: ms.Started}
+		rec := SeenSettingsFile{SettingsFile: f, Game: mr.Game, Seen: mr.Started}
 		if i, ok := at[seenKey(f)]; ok {
-			if !ms.Started.Before(s.Files[i].Seen) {
+			if !mr.Started.Before(s.Files[i].Seen) {
 				s.Files[i] = rec
 			}
 			continue
@@ -90,8 +129,34 @@ func (s *settingsSeen) merge(ms *logs.MonitorSettings) {
 	}
 }
 
+// mergeWindow keeps w as its Mod class's window unless a newer one is kept, and at most
+// seenWindowsMax windows.
+func (s *settingsSeen) mergeWindow(w logs.RecordedWindow, game string) {
+	if w.PackageID == "" || w.Class == "" {
+		return
+	}
+	rec := SeenSettingsWindow{SettingsWindow: w.SettingsWindow, Game: game, Seen: w.At}
+	k := windowKey(w.PackageID, w.Class)
+	if i := slices.IndexFunc(s.Windows, func(o SeenSettingsWindow) bool { return windowKey(o.PackageID, o.Class) == k }); i >= 0 {
+		if !w.At.Before(s.Windows[i].Seen) {
+			s.Windows[i] = rec
+		}
+		return
+	}
+	s.Windows = append(s.Windows, rec)
+	if len(s.Windows) > seenWindowsMax {
+		sort.SliceStable(s.Windows, func(i, j int) bool { return s.Windows[i].Seen.After(s.Windows[j].Seen) })
+		s.Windows = s.Windows[:seenWindowsMax]
+	}
+}
+
 func seenKey(f logs.SettingsFile) string {
 	return strings.ToLower(f.PackageID + "\x00" + f.Folder + "\x00" + f.Class)
+}
+
+// windowKey is a Mod class across its folders: the window is the Mod's, wherever it was seen.
+func windowKey(pkg, class string) string {
+	return packageBase(strings.ToLower(pkg)) + "\x00" + strings.ToLower(class)
 }
 
 // addSeenFolders adds the folders Archo Monitor saw each package under to folders (per

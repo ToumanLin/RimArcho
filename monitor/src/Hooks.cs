@@ -38,6 +38,7 @@ namespace ArchoMonitor
             PhasePatch(h, "RimWorld.Planet.WorldGenerator", "GenerateWorld", prefix: "New", args: null, anyArgs: true);
             PhasePatch(h, "Verse.Game", "InitNewGame", prefix: "New");
             PhasePatch(h, "Verse.Game", "FinalizeInit", postfix: "Play");
+            SettingsWindow.Install(h);
         }
 
         static void PhasePatch(Harmony h, string type, string method, string prefix = null, string postfix = null, Type[] args = null, bool anyArgs = false)

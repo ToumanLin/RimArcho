@@ -122,6 +122,7 @@ type companionLine struct {
 		Phase         string            `json:"phase"`
 		Save          string            `json:"save"`
 		Settings      []SettingsFile    `json:"settings"`
+		Window        *SettingsWindow   `json:"window"`
 	} `json:"context"`
 	Source string `json:"source"`
 	Schema int    `json:"schema"`
@@ -187,6 +188,8 @@ func (c *Companion) line(b []byte) *CompanionEntry {
 		if j.Source == "archo-monitor" {
 			c.Settings = j.Context.Settings
 		}
+		return nil
+	case "settings-window": // a record (ReadMonitorRecords), not an entry
 		return nil
 	case "phase":
 		if j.Source == "archo-monitor" && ValidPhase(j.Context.Phase) {
@@ -351,42 +354,87 @@ type SettingsFile struct {
 	Stored    bool   `json:"stored"` // the Mod reads its settings through the game
 }
 
-// MonitorSettings is an Archo Monitor log's settings record and the session it belongs to.
-type MonitorSettings struct {
+// SettingsControl is one thing a settings window drew (03 §6.7.1): a label, or a control
+// with its value and, for a slider, its range.
+type SettingsControl struct {
+	Kind  string `json:"kind"` // label, checkbox, radio, slider, text, number, button
+	Label string `json:"label,omitempty"`
+	Value string `json:"value,omitempty"`
+	Min   string `json:"min,omitempty"`
+	Max   string `json:"max,omitempty"`
+}
+
+// SettingsWindow is what a Mod's settings window drew in the first frame after the player
+// opened it, with the Mod's settings file.
+type SettingsWindow struct {
+	SettingsFile
+	Full     bool              `json:"full"` // false: Monitor stopped at its limit
+	Controls []SettingsControl `json:"controls"`
+}
+
+// MonitorRecords is what an Archo Monitor log recorded about Mod settings past an offset: the
+// settings record written at the main menu and the settings windows the player opened.
+type MonitorRecords struct {
 	Session string
 	Game    string
 	Started time.Time
-	Files   []SettingsFile
+	Files   []SettingsFile // nil while the record is not past the offset (or not written yet)
+	Windows []RecordedWindow
+	End     int64 // the offset after the last whole line: where the next read starts
 }
 
-// ReadMonitorSettings reads the settings record of an Archo Monitor log, reading only up to
-// it. It is nil when the file has no session line or the game never reached the main menu.
-func ReadMonitorSettings(path string) (*MonitorSettings, error) {
+// RecordedWindow is a settings window record and when it was written.
+type RecordedWindow struct {
+	SettingsWindow
+	At time.Time
+}
+
+// ReadMonitorRecords reads an Archo Monitor log's settings records after from[session]
+// bytes of it (all of it for a session not in from): a live log is read again only from
+// where the last read stopped. A last line still being written waits. nil without a session
+// line.
+func ReadMonitorRecords(path string, from map[string]int64) (*MonitorRecords, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	r := bufio.NewReaderSize(io.LimitReader(f, 256<<20), 64<<10)
-	var ms *MonitorSettings
-	for n := 0; ; n++ {
-		l, err := r.ReadBytes('\n')
-		if n == 0 {
-			var j companionLine
-			if json.Unmarshal(bytes.TrimSpace(l), &j) != nil || j.Kind != "session" {
-				return nil, nil
-			}
-			at, _ := time.ParseInLocation("2006-01-02 15:04:05.000", j.Timestamp, time.Local)
-			ms = &MonitorSettings{Session: j.Context.Session, Game: j.Context.Game, Started: at}
-		} else if bytes.Contains(l, []byte(`"kind":"settings"`)) {
-			var j companionLine
-			if json.Unmarshal(bytes.TrimSpace(l), &j) == nil && j.Kind == "settings" && j.Source == "archo-monitor" {
-				ms.Files = j.Context.Settings
-				return ms, nil
-			}
+	const most = 256 << 20
+	r := bufio.NewReaderSize(io.LimitReader(f, most), 64<<10)
+	first, err := r.ReadBytes('\n')
+	var j companionLine
+	if err != nil || json.Unmarshal(bytes.TrimSpace(first), &j) != nil || j.Kind != "session" {
+		return nil, nil
+	}
+	at, _ := time.ParseInLocation("2006-01-02 15:04:05.000", j.Timestamp, time.Local)
+	mr := &MonitorRecords{Session: j.Context.Session, Game: j.Context.Game, Started: at, End: int64(len(first))}
+	if off := from[mr.Session]; off > mr.End {
+		if _, err := f.Seek(off, io.SeekStart); err != nil {
+			return nil, err
 		}
+		r.Reset(io.LimitReader(f, most))
+		mr.End = off
+	}
+	for {
+		l, err := r.ReadBytes('\n')
 		if err != nil {
-			return nil, nil
+			return mr, nil
+		}
+		mr.End += int64(len(l))
+		settings, window := bytes.Contains(l, []byte(`"kind":"settings"`)), bytes.Contains(l, []byte(`"kind":"settings-window"`))
+		if !settings && !window {
+			continue
+		}
+		var j companionLine
+		if json.Unmarshal(bytes.TrimSpace(l), &j) != nil || j.Source != "archo-monitor" {
+			continue
+		}
+		switch {
+		case j.Kind == "settings":
+			mr.Files = append([]SettingsFile{}, j.Context.Settings...)
+		case j.Kind == "settings-window" && j.Context.Window != nil:
+			at, _ := time.ParseInLocation("2006-01-02 15:04:05.000", j.Timestamp, time.Local)
+			mr.Windows = append(mr.Windows, RecordedWindow{SettingsWindow: *j.Context.Window, At: at})
 		}
 	}
 }

@@ -176,3 +176,41 @@ func TestModSettingsCommand(t *testing.T) {
 		t.Fatalf("Harmony has no settings:\n%s", out)
 	}
 }
+
+// 03 §6.7.1, 06 §2.9: a settings window Archo Monitor saw shows in archo mod-settings, read
+// from where the last read of the live log stopped; it stays after its log is gone, and a
+// window alone puts its Mod in the list.
+func TestModSettingsWindow(t *testing.T) {
+	t.Parallel()
+	e := loadoutEnv(t)
+	scanNow(t, e)
+	e.MustRun("enable", "pkg:tester.b")
+	session := `{"timestamp":"2026-11-03 10:00:00.000","level":"INFO","message":"[Archo Monitor] session 0123456789ab","details":"","count":1,"context":{"session":"0123456789ab","version":"0.11.0","game":"1.6.4633 rev1261"},"source":"archo-monitor","schema":1,"kind":"session"}` + "\n" +
+		`{"timestamp":"2026-11-03 10:01:00.000","level":"INFO","message":"[Archo Monitor] settings 1","details":"","count":1,"context":{"settings":[{"packageId":"tester.a","folder":"1001","class":"AMod","file":"Mod_1001_AMod.xml","title":"A settings","stored":true}]},"source":"archo-monitor","schema":1,"kind":"settings"}` + "\n"
+	log := filepath.Join(e.UserData, "ArchoMonitor.log")
+	e.WriteFile(log, session)
+	if out := e.MustRun("mod-settings"); strings.Contains(out, "B window") {
+		t.Fatalf("before any window:\n%s", out)
+	}
+	windows := `{"timestamp":"2026-11-03 10:05:00.000","level":"INFO","message":"[Archo Monitor] settings window A settings","details":"","count":1,"context":{"window":{"packageId":"tester.a","folder":"1001","class":"AMod","file":"Mod_1001_AMod.xml","title":"A settings","full":true,"controls":[{"kind":"label","label":"General"},{"kind":"checkbox","label":"Raids","value":"False"},{"kind":"slider","label":"Scale","value":"0.75","min":"0","max":"2"},{"kind":"button","label":"Reset"}]}},"source":"archo-monitor","schema":1,"kind":"settings-window"}` + "\n" +
+		`{"timestamp":"2026-11-03 10:06:00.000","level":"INFO","message":"[Archo Monitor] settings window B window","details":"","count":1,"context":{"window":{"packageId":"tester.b","folder":"B","class":"BMod","file":"Mod_B_BMod.xml","title":"B window","full":false,"controls":[{"kind":"text","label":"Name","value":"Bob"}]}},"source":"archo-monitor","schema":1,"kind":"settings-window"}` + "\n"
+	e.WriteFile(log, session+windows)
+	out := e.MustRun("mod-settings", "pkg:tester.a")
+	for _, want := range []string{"the game's window (seen 2026-11-03", "General:", "Raids: False (checkbox)", "Scale: 0.75 (slider 0 to 2)", "[Reset] (button)"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q in:\n%s", want, out)
+		}
+	}
+	if out := e.MustRun("mod-settings"); !strings.Contains(out, "B window") {
+		t.Fatalf("a window alone lists its Mod:\n%s", out)
+	}
+	// the next run rotates the log away: the window stays
+	e.WriteFile(filepath.Join(e.UserData, "ArchoMonitor-prev.log"), "")
+	e.WriteFile(log, strings.ReplaceAll(session, "0123456789ab", "ba9876543210"))
+	out = e.MustRun("mod-settings", "pkg:tester.b")
+	for _, want := range []string{`Name: "Bob" (text)`, "the window draws more than Archo Monitor keeps", "the Mod uses its defaults"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q after the log rotated:\n%s", want, out)
+		}
+	}
+}
