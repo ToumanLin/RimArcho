@@ -46,7 +46,7 @@ export const Events = { On: (n, f) => { (subs[n] = subs[n] || []).push(f); } };
 //go:embed esccheck.js
 var escCheck string
 
-//go:embed pagecheck.html pagecheck.js pagecheck-runtime.js
+//go:embed pagecheck.html pagecheck.js pagecheck-runtime.js feedbackcheck.js
 var pageCheck embed.FS
 
 type hub struct {
@@ -124,7 +124,7 @@ func main() {
 	}
 	mux := http.NewServeMux()
 	mux.Handle("/dev/pagecheck", http.RedirectHandler("/dev/pagecheck.html", http.StatusTemporaryRedirect))
-	for _, name := range []string{"pagecheck.html", "pagecheck.js", "pagecheck-runtime.js"} {
+	for _, name := range []string{"pagecheck.html", "pagecheck.js", "pagecheck-runtime.js", "feedbackcheck.js"} {
 		mux.HandleFunc("/dev/"+name, func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Cache-Control", "no-store")
 			if *assets != "" {

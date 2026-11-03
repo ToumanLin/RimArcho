@@ -2,6 +2,7 @@
 // own .rml, share codes, Rentry and Workshop collections. An import is previewed first —
 // what is installed, what is missing and where to get it, what the enabled list becomes —
 // and applied as one undo step; nothing here writes ModsConfig.xml (that stays save).
+import { fieldError } from "./feedbacksemantics.js";
 import { factText, S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { page, button, beginPageRead } from "./screens.js";
 import * as pop from "./popups.js";
@@ -64,6 +65,7 @@ export const hintList = () => [{ key: "tab", label: T("import destination") }, {
 // ---- import, step 1: where the list comes from ----
 
 function importSource(body) {
+  const result = $("#screen .xc-preview");
   body.append(el("div", "xc-note", T("RimArcho, RimSort, RimCrow and RimWorld lists, share codes, packageIds or workshop links. Nothing changes before you confirm.")));
 
   // A selected file is read-only; choosing another file starts another preview.
@@ -72,6 +74,7 @@ function importSource(body) {
   const path = el("span", "xc-selected-file");
   {
     const pick = el("button", "btn primary", T("choose a file…"));
+    fieldError(pick, result, () => result.dataset.fieldError === "file");
     pick.onclick = async () => {
       let f = "";
       try { f = await api.PickImportFile(); } catch (e) { return say("fail", errText(e)); }
@@ -93,6 +96,7 @@ function importSource(body) {
   ta.spellcheck = false;
   ta.placeholder = T("a list from RimSort or RimCrow, a share code (RC-…), a Rentry link, or a Steam Workshop collection link");
   ta.value = pasted;
+  fieldError(ta, result, () => result.dataset.fieldError === "text");
   ta.oninput = () => { pasted = ta.value; };
   const btns = el("div", "xc-row end");
   const clip = el("button", "btn", T("paste from the clipboard"));
@@ -127,11 +131,12 @@ async function preview(kind, src, fileName) {
   const active = session, seq = ++previewSeq;
   const current = () => S.screen === "plan-import" && session === active && S.screenSeq === active.epoch && seq === previewSeq;
   if (!body) return;
+  delete body.dataset.fieldError;
   say("busy", kind === "text" && /^\s*\S+\s*$/.test(src) && /steamcommunity|rentry|^\s*\d{6,}\s*$/.test(src) ? T("reading the link…") : T("reading the list…"));
   let p;
   body.hidden = false; body.textContent = T("reading the list…");
   try { p = await api.ImportPreviewFor(active.target, kind, src); }
-  catch (e) { if (current()) { body.textContent = errText(e); say("fail", errText(e)); } return; }
+  catch (e) { if (current()) { body.dataset.fieldError = fileName || kind === "file" ? "file" : "text"; body.textContent = errText(e); say("fail", errText(e)); } return; }
   if (!current()) return;
   say("", "");
   if (fileName) p.source = fileName;
@@ -148,7 +153,7 @@ async function preview(kind, src, fileName) {
   const free = await api.CheckPlanName(base, "", 0).catch(() => ({ free: base }));
   if (!current()) return;
   name.value = free.free;
-  const why = el("div", "plan-why");
+  const why = el("div", "plan-why"); fieldError(name, why);
   const submit = button(T("import"), "enter", perform, "primary", "import-apply");
   submit.title = T("does not write game files");
   const options = [["new", T("import as a new list"), Tf("%d mods; the current list stays as it is", p.total)],

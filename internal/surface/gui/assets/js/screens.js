@@ -2,6 +2,7 @@
 // game log (§2.10), Mod library › Updates (§2.9), the full detail (§4.2), packs, the environment
 // and settings. The pages are side by side: esc does not go from one to another (06 §3.1);
 // esc leaves only the full detail, back to the plan. A page's actions sit in the top bar.
+import { fieldError, fieldStatusError } from "./feedbacksemantics.js";
 import { choiceControl } from "./choices.js";
 import { linkRows } from "./linkrows.js";
 import { copyablePath, editablePath, pathContent } from "./fields.js";
@@ -1616,12 +1617,12 @@ function settingPathPicker(row, it, again) {
 
 // settingRunner runs a setting's command, then redraws the page with again.
 function settingRunner(again) {
-  return async (argv, value, after, background = false) => {
+  return async (argv, value, after, background = false, field = null) => {
     const screen = S.screen, epoch = S.screenSeq;
     try {
       const out = argv[0] === "account" ? (argv[1] === "steamcmd" && argv[2] === "login" ? await api.SteamLogin(value) : await api.AccountAction(argv[1], argv[2])) : await api.ApplySetting(argv, value || "");
       say("ok", (out && out[0]) || T("done"));
-    } catch (e) { if (S.screen === screen && S.screenSeq === epoch) say("fail", errText(e)); return; }
+    } catch (e) { if (S.screen === screen && S.screenSeq === epoch) { say("fail", errText(e)); if (field) fieldStatusError(field, $("#status")); } return; }
     if (S.screen !== screen || S.screenSeq !== epoch) return;
     if (background) return refreshSettingTasks(true);
     if (after) return after();
@@ -1683,7 +1684,11 @@ function renderGroups(w, groups, again) {
         const inp = el("input", "field");
         inp.value = it.editValue ?? it.value ?? "";
         inp.spellcheck = false;
-        const ok = button(T("apply"), "", () => run(it.argv, inp.value.trim()), "", "apply-setting");
+        const label = left.querySelector(".name");
+        // Groups can contain repeated labels; the relationship itself stays local.
+        label.id = "setting-" + encodeURIComponent(g.title + "/" + it.label);
+        inp.setAttribute("aria-labelledby", label.id);
+        const ok = button(T("apply"), "", () => run(it.argv, inp.value.trim(), null, false, inp), "", "apply-setting");
         inp.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); ok.click(); } };
         if (it.editValue !== undefined) right.append(factText(el("span", "muted setting-value"), { text: it.value || "", paths: it.valuePath ? [it.value] : [] }));
         right.append(inp);
@@ -1755,7 +1760,7 @@ function renderSettingActions(right, actions, run, item) {
         form.onsubmit = e => {
           e.preventDefault(); e.stopPropagation();
           const name = input.value.trim();
-          if (!name || /^(anonymous|\u533f\u540d)$/i.test(name)) { say("fail", T("enter a Steam account name first")); input.focus(); return; }
+          if (!name || /^(anonymous|\u533f\u540d)$/i.test(name)) { say("fail", T("enter a Steam account name first")); fieldStatusError(input, $("#status")); input.focus(); return; }
           close(); submit(name);
         };
         form.onkeydown = e => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(); } else if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); form.requestSubmit(); } };
@@ -1813,7 +1818,7 @@ export function urlPrompt(title, value, done) {
     const input = el("input", "field");
     input.value = value; input.type = "url"; input.spellcheck = false;
     input.setAttribute("aria-labelledby", "popup-title");
-    const error = el("div", "err"); error.setAttribute("role", "alert");
+    const error = el("div", "err"); error.setAttribute("role", "alert"); const syncError = fieldError(input, error);
     const apply = () => {
       const next = input.value.trim();
       try {
@@ -1821,11 +1826,11 @@ export function urlPrompt(title, value, done) {
         if (!/^https?:\/\//i.test(next) || !["http:", "https:"].includes(url.protocol) || !url.hostname || /\s/.test(next)) throw new Error();
       } catch {
         error.textContent = T("enter a complete HTTP or HTTPS URL");
-        input.setAttribute("aria-invalid", "true"); input.focus(); return;
+        syncError(); input.focus(); return;
       }
       pop.close(); done(next);
     };
-    input.oninput = () => { error.textContent = ""; input.removeAttribute("aria-invalid"); };
+    input.oninput = () => { error.textContent = ""; syncError(); };
     const body = el("div", "body"); body.append(input, error);
     const actions = el("div", "btns");
     actions.append(button(T("cancel"), "", () => pop.close()), button(T("OK"), "", apply, "primary", "apply-setting"));

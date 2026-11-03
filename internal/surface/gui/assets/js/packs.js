@@ -6,6 +6,7 @@ import { choiceControl } from "./choices.js";
 // exported from its page as a RimArcho list (E).
 // Data: API.Packs (view.PackRows, view.UnfinishedRows), API.Pack (view.BuildPackPage),
 // API.BuildPage (view.BuildPageOf), API.PackDryRun (archo pack build --dry-run).
+import { fieldError, progress } from "./feedbacksemantics.js";
 import { copyablePath, pathContent } from "./fields.js";
 import { factText, S, $, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { shimmer } from "./motion.js";
@@ -204,13 +205,15 @@ async function removePack() {
 
 // ---- builds running or cut short ----
 
-function progressBox(p) {
+function progressBox(p, label) {
   const w = el("div", "prog");
   const bar = el("div", "bar" + (p.error ? " bad" : ""));
   const fill = el("i");
   fill.style.width = Math.round((p.frac || 0) * 100) + "%";
   bar.append(fill);
-  w.append(bar, el("div", "ptext word-facts" + (p.error ? " bad" : ""), p.error || p.text || ""));
+  const text = el("div", "ptext word-facts" + (p.error ? " bad" : ""), p.error || p.text || "");
+  w.append(bar, text);
+  progress(bar, label || text, Number.isFinite(p.frac) ? p.frac : undefined, 1);
   return w;
 }
 
@@ -239,7 +242,7 @@ function buildCard(u) {
   card.append(head);
   if (u.running) {
     const body = el("div", "progwrap");
-    body.append(progressBox(u.progress || { frac: 0, text: "" }));
+    body.append(progressBox(u.progress || { text: "" }, left.querySelector(".name")));
     card.append(body);
   }
   return card;
@@ -262,9 +265,11 @@ function redraw() {
 
 // packEvent is a "pack" event: the progress of the build this window started, and its end
 // (a finished build opens its page).
+let buildEnded = "";
 export function packEvent(ev) {
   S.packBuild = ev.done ? null : ev;
   if (ev.done) {
+    buildEnded = ev.name;
     say(ev.ok ? "ok" : "fail", ev.ok ? ev.text : ev.error);
     ui.reload();
     if (ev.ok && S.screen === "build") return ui.go("pack:" + ev.name);
@@ -275,7 +280,7 @@ export function packEvent(ev) {
   const card = document.querySelector(`.card.build[data-build="${CSS.escape(ev.name)}"]`);
   if (!card) return list();
   const body = card.querySelector(".progwrap");
-  if (body) { body.innerHTML = ""; body.append(progressBox(ev)); }
+  if (body) { body.innerHTML = ""; body.append(progressBox(ev, card.querySelector(".name"))); }
   factText(card.querySelector(".sub"), T("creating"), ev.text);
 }
 
@@ -421,6 +426,7 @@ function drawBuild() {
   const w = page("build", "",
     button(T("cancel"), "esc", () => ui.go("plan")));
   const cols = el("div", "bd-cols");
+  const why = el("div", "bd-why");
   const left = el("div", "bd-left");
 
   // the name
@@ -447,7 +453,8 @@ function drawBuild() {
     if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); if (B.dry !== null) closeDryRun(); else name.blur(); }
   };
   nameRow.append(el("span", "k", T("name")), name);
-  bc.append(nameRow, el("div", "bd-err", ""));
+  const nameError = el("div", "bd-err", ""); fieldError(name, nameError);
+  bc.append(nameRow, nameError);
   basics.append(bc);
 
   // the four things building does; while it builds, where it is
@@ -493,7 +500,7 @@ function drawBuild() {
     // this window's build: where it is, and stop (what it copied is removed)
     const pw = el("div", "progwrap bd-prog");
     const name = S.packBuild.name;
-    pw.append(progressBox(S.packBuild), button(T("stop"), "", async () => {
+    pw.append(progressBox(S.packBuild, why), button(T("stop"), "", async () => {
       try { say("ok", await api.PackStop(name)); } catch (e) { say("fail", errText(e)); }
     }));
     sc2.append(pw);
@@ -525,7 +532,6 @@ function drawBuild() {
   go1.dataset.envWrite = "pack-build";
   go1.append(T("create pack"), keyCaps("B"));
   go1.onclick = () => go();
-  const why = el("div", "bd-why");
   const dry = button(T("see the list first, write nothing"), "V", () => dryRun());
   dry.classList.add("bd-dry");
   dry.setAttribute("aria-expanded", String(B.dry !== null));
@@ -591,7 +597,11 @@ function go() {
 }
 
 async function startBuild(name) {
-  try { say("ok", await api.PackBuild(name, B.tex || 0)); } catch (e) { return say("fail", errText(e)); }
+  buildEnded = "";
+  let text;
+  try { text = await api.PackBuild(name, B.tex || 0); } catch (e) { return say("fail", errText(e)); }
+  // a build that failed at once keeps its failure on the line; the reply came after it
+  if (buildEnded !== name) say("ok", text);
   redraw();
 }
 

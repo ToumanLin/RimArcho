@@ -12,7 +12,7 @@ import "./refnums.js";
 import "./activity.js";
 import "./fulltitle.js";
 import { applyAccent } from "./accent.js";
-import { factText, S, $, $$, el, esc, T, Tf, errText, say, clearSay, undoStatus, col, cur, selection, key, idsOf, refsOf, named, AREAS, keyCaps } from "./state.js";
+import { factText, S, $, $$, el, esc, T, Tf, errText, say, clearSay, undoStatus, busyStart, col, cur, selection, key, idsOf, refsOf, named, AREAS, keyCaps } from "./state.js";
 import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, pageDelta, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn } from "./lists.js";
 import { createBar } from "./filterbar.js";
 import { followDetail, showDetail, scrollDetail } from "./detail.js";
@@ -752,10 +752,10 @@ async function cmd(id) {
     case "preview-sort": case "preview-save": case "preview-launch": return preview(id.slice(8));
     case "undo": case "redo": case "restore-all": case "stage-all": return verb(id);
     case "rescan":
-      if (await api.Scan()) { S.busy.scan = true; say("busy", T("scanning…")); scr.busyChanged(); }
+      await busyStart("scan", T("scanning…"), () => api.Scan(), () => scr.busyChanged());
       return;
     case "analyze":
-      if (await api.Analyze()) { S.busy.analyze = true; say("busy", T("checking the mods' files…")); }
+      await busyStart("analyze", T("checking the mods' files…"), () => api.Analyze());
       return;
     case "env": return chooseEnv();
     case "plans": return plans.chooser();

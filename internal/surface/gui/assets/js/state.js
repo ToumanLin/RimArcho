@@ -1,4 +1,5 @@
 // The page's state and the helpers every part uses.
+import { progress, clearStatusError } from "./feedbacksemantics.js";
 import { api, T, Tf } from "./api.js";
 import { statusIn } from "./motion.js";
 import { pathContent } from "./fields.js";
@@ -82,11 +83,28 @@ export function errText(e) {
 let undoLink = false;
 export function say(kind, text, undo = false, paths = []) {
   const s = $("#status");
+  s.setAttribute("role", kind === "fail" ? "alert" : "status");
+  s.setAttribute("aria-live", kind === "fail" ? "assertive" : "polite");
+  s.setAttribute("aria-atomic", "true");
+  s.setAttribute("aria-busy", kind === "busy" ? "true" : "false");
+  // Repeating an unchanged outcome must not deliver the same message twice.
+  if (s.dataset.kind === (kind || "") && s.dataset.message === (text || "") && undoLink === undo) return;
+  clearStatusError();
+  s.dataset.kind = kind || "";
+  s.dataset.message = text || "";
   s.className = kind || "";
   factText(s, { text: text || "", paths });
+  if (kind === "busy" && s.firstElementChild) {
+    const label = s.firstElementChild;
+    // the busy text itself is the progressbar, with the count it shows (06 §11 A11)
+    const count = /(\d+)\s*\/\s*(\d+)/.exec(text);
+    progress(label, label, count ? +count[1] : undefined, count ? +count[2] : 100);
+  }
   undoLink = undo;
   if (undo && text) {
     const a = el("a", "", T("undo"));
+    a.setAttribute("role", "button");
+    a.tabIndex = -1;
     // undo is true (the current list's undo) or the function that undoes this one thing
     a.onclick = typeof undo === "function" ? () => undo() : () => document.dispatchEvent(new CustomEvent("verb", { detail: "undo" }));
     s.appendChild(a);
@@ -100,6 +118,23 @@ export function undoStatus() {
 }
 export function clearSay() {
   if (!S.busy.scan && !S.busy.analyze && !S.busy.env) say("", "");
+}
+
+// busyStart shows the start before the reply (06 §11 A11); a refused start takes back only its own line.
+// The work's events end it: S.busy[name] goes false and its outcome takes the line.
+export async function busyStart(name, text, request, changed = () => {}) {
+  if (S.busy[name]) return false;
+  S.busy[name] = true;
+  say("busy", text);
+  changed();
+  let ok = false;
+  try { ok = await request(); } catch (e) { S.busy[name] = false; say("fail", errText(e)); changed(); return false; }
+  if (!ok && S.busy[name]) {
+    S.busy[name] = false;
+    if ($("#status").dataset.message === text) say("", "");
+    changed();
+  }
+  return ok;
 }
 
 // ---- columns ----
