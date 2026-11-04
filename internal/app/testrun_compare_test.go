@@ -78,16 +78,17 @@ func TestTestRunComparison(t *testing.T) {
 		t.Fatalf("gone: %+v", second.Gone)
 	}
 	for _, c := range second.Gone {
-		if c.Mods == nil || len(c.Mods) != 0 || c.Confidence != "" || c.Delta != "" {
+		// Unattributed here; the earlier report's confidence is kept (TestTestRunGoneKeepsAttribution).
+		if c.Mods == nil || len(c.Mods) != 0 || c.Delta != "" || c.Before != "" {
 			t.Fatalf("gone attribution: %+v", c)
 		}
 		switch c.Message {
 		case "Exception: Dropped":
-			if c.Count != 2 {
+			if c.Count != 2 || c.Confidence != first.Clusters[0].Confidence {
 				t.Fatalf("gone occurrences: %+v", c)
 			}
 		case strings.TrimSpace(settings):
-			if c.Class != gametest.ClassSettings {
+			if c.Class != gametest.ClassSettings || c.Confidence != "certain" {
 				t.Fatalf("gone settings: %+v", c)
 			}
 		default:
