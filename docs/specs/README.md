@@ -23,7 +23,7 @@ Use `NN §x.y` references between specifications and in code comments (for examp
 
 ## Maintenance
 
-- Write documentation in English; Chinese belongs only in language files, `docs/glossary.md`, and `README.zh-CN.md`.
+- Write documentation in English; Chinese belongs only in language files, `docs/glossary.md`, and `README.zh-CN.md`; a name quoted verbatim (an account, a Mod, a path) may appear inside an inline `code` span.
 - **Write each fact in one place.** Elsewhere, reference `NN §x.y` instead of copying it. Copies will eventually diverge.
 - **Update the specification with behavior changes, in the same commit.** Changes to responsibilities, interfaces, storage formats, state transitions, file writes, failure handling, or compatibility rules must update the section that owns them. Refactoring that changes none of these needs no specification update.
 - **Describe the current state.** Describe implemented behavior as it is; label unfinished work "not implemented", "draft", or "undecided", or put it in 01 §5. Ideas without a decision belong in research/ or design/, not specifications. Decision rationale belongs in 00 §6; specifications record only the conclusions.
