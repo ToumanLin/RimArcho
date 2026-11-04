@@ -327,10 +327,25 @@ func ExecuteContext(ctx context.Context, ap *app.App, argv []string) (string, in
 			return render.ShellSafe("error: " + ue.Error() + "\n"), ExitUsage
 		}
 		// Errors suggest commands too ("x is not enabled (archo enable #x)").
-		return render.ShellSafe("error: " + err.Error() + "\n"), ExitError
+		msg := err.Error()
+		var re *app.RefError
+		if IsMCP(ctx) && errors.As(err, &re) && re.Find != "" {
+			msg = strings.Replace(msg, re.Error(), re.MCPError(), 1)
+		}
+		return render.ShellSafe("error: " + msg + "\n"), ExitError
 	}
 	return doc.String(), cctx.ExitCode
 }
+
+type mcpKey struct{}
+
+// ForMCP marks a command as an MCP tool call. The text stays the CLI's, except that a
+// reference matching nothing suggests the find_mods tool instead of archo find (05 §3.3):
+// agents never ran the CLI to recover (MCP review 2026-11-04 §2.3).
+func ForMCP(ctx context.Context) context.Context { return context.WithValue(ctx, mcpKey{}, true) }
+
+// IsMCP reports whether ctx is an MCP tool call (ForMCP).
+func IsMCP(ctx context.Context) bool { v, _ := ctx.Value(mcpKey{}).(bool); return v }
 
 // Help lists every command.
 func Help() *render.Doc {
@@ -344,7 +359,7 @@ func Help() *render.Doc {
 		rows = append(rows, []string{u, c.Summary})
 	}
 	root.Section("commands").AddColumns(rows)
-	root.KV("references", "#<id> instance, L#<id> lineage, pkg:<packageId>, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>, pattern:<id> error pattern")
+	root.KV("references", "#<id> instance, L#<id> lineage, pkg:<packageId> or the bare packageId, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>, pattern:<id> error pattern")
 	root.KV("global flags", "--env <name> (use another environment for this command)")
 	return d
 }

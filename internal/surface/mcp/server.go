@@ -83,7 +83,7 @@ func (s *Server) executeContext(ctx context.Context, env string, argv []string) 
 		s.app.EnvName = env
 		defer func() { s.app.EnvName = prev }()
 	}
-	out, code := cmds.ExecuteContext(ctx, s.app, argv)
+	out, code := cmds.ExecuteContext(cmds.ForMCP(ctx), s.app, argv)
 	if len(argv) >= 2 && argv[0] == "config" && argv[1] == "get" && s.app.Store.Meta("cfg:steamcmd.account") != "" {
 		lines := strings.Split(out, "\n")
 		for i, line := range lines {

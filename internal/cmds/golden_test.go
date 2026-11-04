@@ -169,6 +169,8 @@ func TestGoldenBasics(t *testing.T) {
 		cmd("mod", "pkg:tester.alpha"),
 		cmd("mod", "pkg:nope"),
 		cmd("mod", "Alpha"),
+		cmd("mod", "Tester.Alpha"),
+		cmd("mod", "khamenman.outfitstandsplus"),
 		cmd("changes"),
 		cmd("scan"),
 		cmd("changes"),
