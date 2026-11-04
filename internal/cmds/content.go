@@ -41,6 +41,14 @@ func analysed(c *Ctx) (*app.LoadoutState, *app.AnalysisState, error) {
 	return st, s, nil
 }
 
+// notAnalysed answers --mod for a mod outside the current list. Patches and Harmony are
+// analysed only for the list (03 §5), so a count of 0 would say the mod has none.
+func notAnalysed(what string) *render.Doc {
+	d, root := render.New(what + ": not analysed (not in the current list)")
+	root.Add("patches and Harmony are analysed only for the mods in the current list; add it to see them")
+	return d
+}
+
 func modLabel(ix *app.Index, id string) string {
 	m := ix.ByID[id]
 	if m == nil {
@@ -238,6 +246,9 @@ func patchesCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			return nil, err
 		}
 		f.Instance = m.ID
+		if st.Position(m.ID) == 0 {
+			return notAnalysed("patches"), nil
+		}
 	}
 	if t := a.Str("target"); t != "" {
 		if typ, name, byName := parseDefRef(t); typ != "" && !strings.ContainsAny(name, "/[") {

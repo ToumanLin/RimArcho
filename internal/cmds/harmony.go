@@ -51,6 +51,9 @@ func harmonyCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			return nil, err
 		}
 		inst = m.ID
+		if a.Str("target") == "" && st.Position(m.ID) == 0 {
+			return notAnalysed("harmony"), nil
+		}
 	}
 	stale := func(root *render.Node) {
 		if !s.Fresh {

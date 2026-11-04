@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 1.0.1 (unreleased)
 
+- A Mod's full details › technical information: for a Mod that is not in the current list, patches and Harmony showed 0 and "no assemblies", even when the Mod has patch files and DLLs. RimArcho analyses those only for the current list, so the tabs now say "not analysed (not in the current list)" with no count. `archo patches --mod`, `archo harmony --mod` and MCP `get_patches` / `get_harmony` with a Mod answer the same. Defs are still counted for every Mod.
 - Databases from pre-1.0 development builds are no longer upgraded. RimArcho refuses to open one and says to move `archo.db` away to start with a new database; the file is left unchanged. `RimArcho.exe` now shows this, and any other failure to open its database, in an error dialog instead of closing without a word. Databases from 1.0.0 are unaffected.
 - Sidebar lists: opening a list that is not the current one no longer moves it up under All lists. The four lists follow the order you enabled them: the current list first, then the one enabled before it, and so on; lists never enabled follow by their last edit or launch.
 - Plan editor: the details pane no longer leaves a blank band of about 18 px between its header and the "copies" list when the Mod has several copies.
