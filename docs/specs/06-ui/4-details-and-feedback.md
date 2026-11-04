@@ -81,7 +81,7 @@ The current technical sections are:
 The keys follow the shared table in §3.5:
 - Left/right moves to the previous or next Mod in the source list, moving that list's cursor. In the editor, it skips uninstalled entries.
 - Esc or backspace returns to the source page with the cursor on the last viewed Mod.
-- `↑↓`, `j` / `k`, `PgUp` / `PgDn`, and `Home` / `End` scroll. The `tab` / `shift+tab` keys change technical tabs; 1–6 focus cards.
+- `↑↓`, `j` / `k`, `PgUp` / `PgDn`, and `Home` / `End` scroll. In the GUI, `tab` / `shift+tab` move the focus, reaching the technical tabs and the address copy buttons (§3.5); in the TUI they go to the next or previous section. 1–6 focus cards.
 - The [ and ] keys select another copy. Menu or shift+F10 opens that copy's context menu. The space, m, t, x, g, n, Del, ctrl+o, and ctrl+w keys act on the selected copy as in the inventory (§3.5).
 - The hints show left/right previous/next, esc back, space <action>, [ ] another copy, F10 menu, 1–6 sections, and ? all keys.
 

@@ -196,6 +196,8 @@ function build() {
   const list = el("section", "area tk-list");
   const lhead = el("div", "head");
   const rows = el("div", "tk-rows");
+  rows.setAttribute("role", "grid");
+  rows.setAttribute("aria-multiselectable", "true");
   rows.tabIndex = -1;
   list.append(lhead, rows);
   side.append(bar().el, list);
@@ -282,6 +284,8 @@ function draw() {
 function drawList(list) {
   els.lhead.innerHTML = "";
   els.lhead.append(el("span", "anum", "2"), el("span", "t", T("tasks")), el("span", "num", String(list.length)));
+  els.lhead.querySelector(".t").id = "tasks-heading";
+  els.rows.setAttribute("aria-labelledby", "tasks-heading");
   if (X.bar.active()) els.lhead.append(el("span", "q", T("filtered")));
   const before = still() ? null : rects();
   const box = els.rows;
@@ -300,28 +304,33 @@ function drawList(list) {
     }
     let e = keep.get(r.id);
     if (!e) { e = el("div", "tk-row"); e.dataset.id = r.id; }
+    e.id = "task-row-" + encodeURIComponent(r.id);
+    e.setAttribute("aria-selected", String(X.sel.has(r.id)));
     e.className = "tk-row st-" + r.state + (r.id === X.cur ? " cur" : "") + (X.sel.has(r.id) ? " sel" : "");
     const sig = JSON.stringify([r.title, r.obj, r.time, r.line, r.count, r.pct, r.state]);
     if (e.dataset.sig !== sig) {
       e.dataset.sig = sig;
       e.innerHTML = "";
       const l1 = el("div", "l1");
-      l1.id = "task-title-" + r.id;
+      l1.id = "task-title-" + encodeURIComponent(r.id);
       l1.append(el("span", "t", r.title), el("span", "o", r.obj));
-      e.setAttribute("role", "group");
+      e.setAttribute("role", "row");
       for (const [i, text] of [...l1.children].entries()) text.id = l1.id + "-" + i;
       e.setAttribute("aria-labelledby", [...l1.children].map(n => n.id).join(" "));
       const l2 = el("div", "l2");
       if (r.group === "run") {
         l2.append(mini(r, l1), el("span", "pn num", r.count || r.pct + "%"));
       } else if (r.group !== "queue") {
-        const state = stateWord(r); state.id = "task-state-" + r.id;
+        const state = stateWord(r); state.id = "task-state-" + encodeURIComponent(r.id);
         l2.append(state);
       }
-      l2.append(el("span", "txt word-facts", r.line || ""));
-      e.append(l1, el("span", "tm num", r.time || ""), l2);
+      const line = el("span", "txt word-facts", r.line || ""), time = el("span", "tm num", r.time || "");
+      line.id = e.id + "-line"; time.id = e.id + "-time";
+      l2.append(line);
+      e.append(l1, time, l2);
     }
-    e.setAttribute("aria-describedby", r.group === "run" || r.group === "queue" ? groupLabel.id : "task-state-" + r.id);
+    // A grid row hides its text children from UIA; the state, the line and the time describe it.
+    e.setAttribute("aria-describedby", [r.group === "run" || r.group === "queue" ? groupLabel.id : "task-state-" + encodeURIComponent(r.id), e.id + "-line", e.id + "-time"].join(" "));
     frag.append(e);
   }
   if (!list.length) frag.append(el("div", "empty-state", X.page.rows.length ? T("no task matches the filter, esc clears it") : T("nothing has run in the background yet")));

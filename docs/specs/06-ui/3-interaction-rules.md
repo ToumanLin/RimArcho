@@ -8,7 +8,7 @@ These rules apply in full to the plan editor and Mod inventory > all. The two pa
 
 ### 3.1 Rules
 
-1. **Arrows only navigate; they never change data.** Except in the GUI off / on segmented controls (§3.10), `↑↓←→` only move the cursor, change focus, or scroll. They never move Mods, enable them, or apply tags. GUI clicks and the mouse wheel likewise do not change data.
+1. **Arrows only navigate; they never change data.** Except in the GUI off / on segmented controls (§3.10) and on a focused slider (the background's dim and blur, §2.11), which set their own value as native controls do, `↑↓←→` only move the cursor, change focus, or scroll. They never move Mods, enable them, or apply tags. GUI clicks and the mouse wheel likewise do not change data.
 2. **Verb keys perform actions immediately, and `u` undoes them.** An action applies to the selected instances, or to the cursor row if nothing is selected. It does not enter a mode or require a separate drop or cancel step. Each verb performs one app edit and creates one undo step.
 3. **The current position is always visible.** The position line identifies the focused area, cursor index, selection count, and any open overlay (§3.2).
 4. **Available destinations are always visible.** The hint line lists up to 7 actions available for the current objects. `?` lists all actions, and `ctrl+k` can take the player anywhere from any location.
@@ -60,7 +60,7 @@ The editor has four focus areas: `1` Disabled, `2` Enabled, `3` Staging / histor
 | Overlay: panel, tags, position | Move among options | Move among options |
 
 - `PgUp` / `PgDn` move the list cursor one page, and `Home` / `End` move it to the ends (decided 2026-10-22, for both pages). With details focused, these keys scroll the details instead. The mouse wheel scrolls details wherever the pointer is; it does not move the list cursor. Use keys or clicks to navigate lists.
-- From details, `←` returns to the list containing the displayed Mod, rather than always returning to area 3. At a width of 130 columns, Staging is not visible, and area 3 would show another Mod when arriving from Enabled. From Staging, area 3, `→` still enters area 4. Arrows do not wrap. Only arrows and `1`–`4` change areas; tab changes subpages under the same sidebar entry (§3.5).
+- From details, `←` returns to the list containing the displayed Mod, rather than always returning to area 3. At a width of 130 columns, Staging is not visible, and area 3 would show another Mod when arriving from Enabled. From Staging, area 3, `→` still enters area 4. Arrows do not wrap. Only arrows and `1`–`4` change areas; tab moves the focus in the GUI and changes subpages in the TUI (§3.5).
 - In the TUI, `j` `k` mean down and up, and `h` `l` mean left and right. Home / End go to the list ends; `g` now opens tags, and `G` is unused.
 - The description initially shows only 12 lines. Scrolling or focusing details reveals the full description. A PgDn pressed before details finish loading is retained until they are ready.
 
@@ -97,7 +97,7 @@ The editor and Mod inventory > all share **one key table**, as the player confir
 | `Del` | Unsubscribe the Workshop copy or delete an owned copy, with a dry run before confirmation |
 | Menu key, `shift+F10` | Open the context menu at the cursor (§8.5) |
 | `shift+1`–`shift+8` | Visit the 8 sidebar entries: launch, needs, log, lists (opening the current list), packs, inventory, textures, and environments. GUI physical keys work in any keyboard layout; the TUI receives `!@#$%^&*` in the US layout. ! and # are no longer separate shortcuts |
-| `tab`, `shift+tab` | Visit the next or previous sibling subpage. Inventory cycles through all ↔ updates ↔ add ↔ search; the TUI uses the same order, including search since 2026-10-31. Plans open for editing without changing the current plan (04 §1.3). Packs cycle through packs, starting with the first pack from the list. In search, Tab first accepts ghost completion. Forms such as subscriptions, settings, and build use normal focus movement; full details use Tab to switch their own pages |
+| `tab`, `shift+tab` | GUI (decided 2026-11-03): move the focus to the next or previous control, as on a web page, including the address copy buttons (§3.1 rule 12); in a search field Tab first accepts the ghost completion (§3.7). Sub-pages are switched with the sidebar, the breadcrumb or the command panel. TUI: visit the next or previous sibling subpage. Inventory cycles through all ↔ updates ↔ add ↔ search, including search since 2026-10-31. Plans open for editing without changing the current plan (04 §1.3). Packs cycle through packs, starting with the first pack from the list; full details use Tab to switch their own pages |
 
 Editor only:
 

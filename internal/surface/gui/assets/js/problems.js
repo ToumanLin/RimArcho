@@ -37,7 +37,7 @@ export function chip() {
   const b = el("button", "chip prob " + (n ? (p.severity === "error" ? "err" : "warn") : "hint") + (p.updating ? " updating" : "") + (isOpen() ? " on" : ""));
   b.append(el("span", "dot"), el("span", "t", n ? Tf("%d problems", n) : T("suggestions")), keyCaps("p"));
   b.title = T(n ? "what is wrong with this list, and the fixes" : "suggestions") + T("; ") + "p";
-  b.setAttribute("aria-haspopup", "dialog"); b.setAttribute("aria-expanded", String(isOpen())); b.setAttribute("aria-controls", box.id);
+  b.setAttribute("aria-haspopup", "dialog"); b.setAttribute("aria-expanded", String(isOpen())); if (isOpen()) b.setAttribute("aria-controls", box.id);
   b.onclick = (e) => { e.stopPropagation(); toggle(b, e.detail === 0); };
   return b;
 }
@@ -48,7 +48,7 @@ export function toggle(at, keys = true) {
   if (!anchor) return say("", T("nothing to fix in this list"));
   back = document.activeElement;
   draw();
-  anchor.classList.add("on"); anchor.setAttribute("aria-expanded", "true");
+  anchor.classList.add("on"); anchor.setAttribute("aria-expanded", "true"); anchor.setAttribute("aria-controls", box.id);
   if (keys) box.focus({ preventScroll: true, focusVisible: false });
 }
 
@@ -57,7 +57,7 @@ export function toggle(at, keys = true) {
 export function close(restore = false) {
   restore ||= box.contains(document.activeElement);
   box.remove();
-  if (anchor) { anchor.classList.remove("on"); anchor.setAttribute("aria-expanded", "false"); }
+  if (anchor) { anchor.classList.remove("on"); anchor.setAttribute("aria-expanded", "false"); anchor.removeAttribute("aria-controls"); }
   const to = back?.isConnected && back !== document.body ? back : document.querySelector('#screen[role="main"], #board:not([inert])');
   if (restore && to?.isConnected) to.focus({ preventScroll: true, focusVisible: false });
   anchor = null; back = null;

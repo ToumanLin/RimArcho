@@ -312,6 +312,7 @@ export function seg(names, on, pick, keys) {
   s.append(el("span", "thumb"));
   names.forEach((n, i) => {
     const b = el("button", i === on ? "on word-facts" : "word-facts", n);
+    b.setAttribute("aria-pressed", String(i === on));
     if (keys) b.title = keys[i];
     b.onclick = () => pick(i);
     s.append(b);
@@ -324,7 +325,7 @@ export function seg(names, on, pick, keys) {
 export function setSeg(s, i) {
   if (!s) return;
   const bs = [...s.querySelectorAll(":scope > button")];
-  bs.forEach((b, j) => b.classList.toggle("on", j === i));
+  bs.forEach((b, j) => { b.classList.toggle("on", j === i); b.setAttribute("aria-pressed", String(j === i)); });
   slideThumb(s, bs[i]);
 }
 
@@ -575,10 +576,15 @@ function needSection(si, rows, ci, shut, live) {
   if (si === 1) {
     // worth knowing folds and opens by its heading (06 §2.4)
     const all = (N.data.items || []).filter((x) => x.section === 1 && !x.into).length;
-    h.prepend(el("span", "fold-chev" + (shut ? "" : " open"), "›"));
-    h.append(el("span", "n num muted", String(all)));
+    const toggle = el("button", "need-fold");
+    toggle.tabIndex = -1;
+    const chev = el("span", "fold-chev" + (shut ? "" : " open"), "›");
+    chev.setAttribute("aria-hidden", "true"); // the state is aria-expanded
+    toggle.append(chev, ...h.childNodes, el("span", "n num muted", String(all)));
+    toggle.setAttribute("aria-expanded", String(!shut));
     h.onclick = () => { N.hintsShut = !N.hintsShut; orderNeeds(); drawNeeds(); };
-    h.title = T(shut ? "show" : "hide");
+    toggle.title = T(shut ? "show" : "hide");
+    h.append(toggle);
   } else if (n) {
     const c = el("span", "n num", String(n));
     h.classList.add("word-facts");
@@ -1106,13 +1112,18 @@ function drawGameLog() {
     L.list = virtualRows(scroll, rows.length, (i) => {
       const r = rows[i];
       const row = el("div", "lrow" + (r.info ? " dimmed" : ""));
+      row.id = "log-row-" + encodeURIComponent(JSON.stringify([p.path, r.cluster || r.id]));
+      row.setAttribute("role", "group");
       const ic = el("span", "ic");
       ic.innerHTML = statusIcon(r.status);
       const body = el("div", "body");
       const top = el("div", "top");
       top.append(el("span", "chip", r.class), el("span", "count", "×" + r.count));
       if (r.mods) top.append(el("span", "mods", r.mods));
-      body.append(top, logText(r));
+      const message = logText(r);
+      message.id = row.id + "-message";
+      row.setAttribute("aria-labelledby", message.id);
+      body.append(top, message);
       row.append(ic, body);
       row.onclick = () => { L.cur = i; markLog(true); };
       return phaseRow(row, r.phaseStart);
@@ -1639,6 +1650,7 @@ function settingRunner(again) {
 // renderGroups draws setting groups (view.SettingGroup) as labelled cards.
 function renderGroups(w, groups, again) {
   const run = settingRunner(again);
+  const ids = new Set();
   for (const g of groups) {
     const lab = el("div", "label section", g.title);
     w.append(lab);
@@ -1648,10 +1660,19 @@ function renderGroups(w, groups, again) {
     for (const it of g.items || []) {
       const row = el("div", "set");
       row.dataset.settingRow = g.title + "/" + it.label;
+      // The row's record: its key, directory, command or link; the label only as a last resort.
+      const identity = it.key || it.directory || JSON.stringify(it.argv || it.actions?.[0]?.argv) || it.url || JSON.stringify(it.links?.map(l => l.url)) || row.dataset.settingRow;
+      row.id = "setting-row-" + encodeURIComponent(identity);
+      for (let n = 2; ids.has(row.id); n++) row.id = "setting-row-" + encodeURIComponent(identity) + "-" + n;
+      ids.add(row.id);
+      row.setAttribute("role", "group");
       row.dataset.settingActions = JSON.stringify(it.actions || []);
       row.title = it.hover || "";
       const left = el("div", "l");
-      left.append(el("div", "name", it.label));
+      const label = el("div", "name", it.label);
+      label.id = row.id + "-label";
+      row.setAttribute("aria-labelledby", label.id);
+      left.append(label);
       const note = factText(el("div", "sub setting-note"), { text: it.note || "", paths: it.notePaths });
       note.hidden = !it.note;
       left.append(note);
@@ -1689,9 +1710,6 @@ function renderGroups(w, groups, again) {
         const inp = el("input", "field");
         inp.value = it.editValue ?? it.value ?? "";
         inp.spellcheck = false;
-        const label = left.querySelector(".name");
-        // Groups can contain repeated labels; the relationship itself stays local.
-        label.id = "setting-" + encodeURIComponent(g.title + "/" + it.label);
         inp.setAttribute("aria-labelledby", label.id);
         const ok = button(T("apply"), "", () => run(it.argv, inp.value.trim(), null, false, inp), "", "apply-setting");
         inp.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); ok.click(); } };

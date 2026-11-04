@@ -248,5 +248,156 @@ export async function checkFeedback({ handlers, test, assert, deferred }) {
     document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
     assert(document.activeElement === picker && menu.hidden, 'log menu Esc restoration');
   });
+  await test('A4: segmented state follows a programmatic switch before the next frame', async () => {
+    const {seg, setSeg} = await import('/js/screens.js');
+    const strip = seg(['Fixture first', 'Fixture second'], 0, () => {});
+    document.querySelector('#screen').replaceChildren(strip);
+    const buttons = [...strip.querySelectorAll('button')];
+    assert(buttons[0].getAttribute('aria-pressed') === 'true' && buttons[1].getAttribute('aria-pressed') === 'false', 'initial segment state');
+    setSeg(strip, 1);
+    assert(buttons[0].getAttribute('aria-pressed') === 'false' && buttons[1].getAttribute('aria-pressed') === 'true', 'changed segment state');
+  });
+  await test('A5/A16: equal setting labels retain distinct identities and local action context', async () => {
+    const screens = await import('/js/screens.js');
+    handlers.set('Settings', () => [{title:'Fixture settings',items:[
+      {label:'Same label',edit:'text',value:'one',argv:['config','set','fixture / one','{}']},
+      {label:'Same label',edit:'text',value:'two',argv:['config','set','fixture / two','{}']},
+      {key:'fixture.account',label:'Fixture account',actions:[{label:'log in',argv:['account','fixture','login']}]},
+    ]}]);
+    handlers.set('Backgrounds', () => ({setting:{key:'plain',focus:'center',stars:[],files:[]},groups:[{name:'game',items:[{key:'plain',label:'plain'}]}]}));
+    handlers.set('Tasks', () => ({rows:[]}));
+    await screens.settings();
+    const rows = [...document.querySelectorAll('.settings > .set')];
+    assert(rows.length === 3 && new Set(rows.map(r=>r.id)).size === 3 && rows.every(r=>r.id && !/\s/.test(r.id)), 'setting record ids');
+    assert(rows.every(r=>r.getAttribute('role') === 'group' && r.querySelector('.name').id === r.getAttribute('aria-labelledby')), 'setting row context');
+    assert(rows[0].querySelector('input').getAttribute('aria-labelledby') === rows[0].getAttribute('aria-labelledby'), 'field label no longer local');
+    assert(rows[2].querySelector('button').textContent === 'log in', 'child verb got noisier');
+  });
+  await test('A5: both search filters keep their clear action inside their visible field label', async () => {
+    const {createQuery} = await import('/js/filesearchquery.js');
+    const card=document.createElement('div');document.querySelector('#screen').replaceChildren(card);
+    const query=createQuery({text:'fixture',files:'About',mods:'Fixture Mod',groups:[]},card,{run(){},shortcuts(){},stop(){},focusResults(){},visible(){return true;},consume(){},layout(){}});
+    query.buildQuery();
+    for (const input of [query.filesBar.input,query.modsBar.input]) {
+      const group=input.closest('[role=group]'),label=group && document.getElementById(group.getAttribute('aria-labelledby'));
+      assert(label && label.textContent === input.getAttribute('aria-label') && group.contains(input), 'filter context missing');
+      assert(group.querySelector('button'), 'clear action left the field');
+    }
+    query.destroy();
+  });
+  await test('A4/A16: task selection is independent of the cursor and survives a group transition', async () => {
+    const record=(id)=>({id,title:'Same task',obj:'Same Mod',group:'today',state:'fail',stateText:'failed',line:'Fixture refusal',time:'12:00',items:[],steps:[],acts:[{id:'retry',label:'try again',key:'r'}]});
+    let rows=[record('fixture task / one'),record('fixture task / two')];
+    handlers.set('Tasks',()=>({rows,running:0,queued:0}));
+    await tasks.open();
+    const press=(key,ctrlKey=false)=>tasks.key(new KeyboardEvent('keydown',{key,ctrlKey,cancelable:true}));
+    press('Escape');press('2');press('Home');press(' ',true);
+    const selected=document.querySelector('.tk-row[aria-selected=true]'),identity=selected.id;
+    assert(selected.getAttribute('role') === 'row' && selected.closest('[role=grid]').getAttribute('aria-multiselectable') === 'true', 'unsupported selection structure');
+    const described=selected.getAttribute('aria-describedby').split(' ').map(id=>document.getElementById(id)?.textContent).join(' ');
+    assert(described.includes('failed') && described.includes('Fixture refusal') && described.includes('12:00'), 'grid row lost its line or time: '+described);
+    press('ArrowDown');
+    assert(document.getElementById(identity).getAttribute('aria-selected') === 'true' && !document.getElementById(identity).classList.contains('cur'), 'cursor changed selection');
+    press(' ',true);
+    assert(document.querySelectorAll('.tk-row[aria-selected=true]').length === 2, 'multi-selection missing');
+    rows=rows.map(r=>({...r,group:'queue',state:'queue'}));await tasks.event({});
+    for (const row of document.querySelectorAll('.tk-row')) {
+      assert(!/\s/.test(row.id) && row.getAttribute('aria-selected') === 'true', 'selection or identity lost on refresh');
+      for (const attr of ['aria-labelledby','aria-describedby']) for (const id of row.getAttribute(attr).split(' ')) assert(document.getElementById(id), 'task reference dangling');
+    }
+    assert(document.getElementById(identity) && document.querySelector('.tk-sum button'), 'task identity or actions lost');
+    press('Escape');assert(!document.querySelector('.tk-row[aria-selected=true]'), 'Esc did not clear selection');
+  });
+  await test('A16: duplicate pack names and texture names use caller-owned record ids after sorting', async () => {
+    handlers.set('Packs',()=>({rows:[{name:'Fixture / A',mods:1},{name:'Fixture / B',mods:1}]}));
+    await packs.list();
+    const ids=[...document.querySelectorAll('.data-row')].map(r=>r.id);
+    assert(ids.length===2 && new Set(ids).size===2 && ids.every(id=>id && !/\s/.test(id)), 'pack ids');
+    handlers.set('Pack',()=>({name:'Fixture / A',facts:[],mods:[{key:'pkg.a/folder one',name:'Same Mod',order:1},{key:'pkg.b/folder two',name:'Same Mod',order:2}]}));
+    await packs.pack('Fixture / A');
+    const rows=[...document.querySelectorAll('.pack-mods .data-row')];
+    assert(rows.length===2 && rows[0].id!==rows[1].id && rows.every(r=>r.id && !r.hasAttribute('aria-label')), 'duplicate pack-entry identity or extra name');
+    const {createTable}=await import('/js/datatable.js');
+    const table=createTable({key:'fixture.columns',columns:[{key:'name',title:'name',w:120}],redraw(){}});
+    const box=document.createElement('div'),head=document.createElement('div');box.append(head);table.draw(box,head);
+    const row=document.createElement('div');row.append(document.createElement('span'));table.row(row,0,'fixture-texture-one');
+    table.row(row,3,'fixture-texture-two');
+    assert(row.id==='fixture-texture-two' && row.getAttribute('aria-rowindex')==='5', 'recycled row kept prior identity');
+  });
+  await test('A16: search row ids retain Mod and file identity across expansion', async () => {
+    const {createResults}=await import('/js/filesearchtree.js');
+    const card=document.createElement('div');document.querySelector('#screen').replaceChildren(card);card.style.height='300px';
+    const X={byID:new Map(),modsFound:[],rows:[],cursor:0,expanded:new Set(),selected:null};
+    const result=createResults(X,card,{readFile(){},markSelected(){}},{},{key(){},stop(){},run(){}});
+    result.buildResults();
+    const file={path:'About/About.xml',rel:'About/About.xml',count:2,lines:[{line:1,text:'match one'},{line:2,text:'match two'}]};
+    result.applyDeltas([{id:'mod / one',name:'Same Mod',file},{id:'mod / two',name:'Same Mod',file}]);result.drawTree();
+    await new Promise(requestAnimationFrame);
+    let files=[...card.querySelectorAll('.fs-file')];
+    assert(files.length===2 && files[0].id!==files[1].id, 'same file in different Mods shares id');
+    const identity=files[0].id;files[0].click();await new Promise(requestAnimationFrame);
+    files=[...card.querySelectorAll('.fs-file')];
+    const lines=[...card.querySelectorAll('.fs-line')];
+    assert(files.some(r=>r.id===identity) && lines.length===2 && lines[0].id!==lines[1].id, 'expanded file or match identity lost');
+    assert([...card.querySelectorAll('[id]')].every(r=>!/\s/.test(r.id)), 'search id contains whitespace');result.destroy();
+  });
+  await test('A10: unsaved facts compose with an existing copy description and clear after save', async () => {
+    const lists=await import('/js/lists.js');
+    S.screen='';S.board={env:'fixture',status:{}};
+    const it={id:'fixture-mod',name:'Same Mod',ref:'#fixture',kind:'local',pos:1,copyCount:2,copyLabel:'local copy',unsaved:true};
+    lists.setItems(1,[it]);S.cols[1].view=[0];lists.renderRows(1);
+    let row=document.getElementById('editor-1-fixture-mod');
+    assert(row.getAttribute('aria-description')==='local copy; unsaved' && !row.hasAttribute('aria-describedby'), 'unsaved replaced or duplicated copy description');
+    it.unsaved=false;lists.renderRows(1);row=document.getElementById('editor-1-fixture-mod');
+    assert(row.getAttribute('aria-description')==='local copy', 'saved row retained unsaved');
+    lists.setStagingOpen(true);assert(document.querySelector('[data-area="2"] .head').getAttribute('aria-expanded')==='true', 'staging opened without state');
+    lists.setStagingOpen(false);assert(document.querySelector('[data-area="2"] .head').getAttribute('aria-expanded')==='false', 'staging closed without state');
+  });
+  await test('A5: closed filter suggestions never retain a missing controlled list', async () => {
+    const {createBar}=await import('/js/filterbar.js');
+    const bar=createBar({data:()=>({groups:[]})});document.querySelector('#screen').replaceChildren(bar.el);
+    assert(!bar.input.hasAttribute('aria-controls'), 'closed combobox has a missing list');
+    bar.input.focus();bar.input.dispatchEvent(new Event('input',{bubbles:true}));
+    if(bar.input.hasAttribute('aria-controls'))assert(document.getElementById(bar.input.getAttribute('aria-controls')), 'open suggestion reference missing');
+    bar.input.blur();
+    assert(!bar.input.hasAttribute('aria-controls'), 'blurred combobox retained suggestions');bar.destroy();
+  });
+  await test('Search disclosure retains the provider key target until the event has finished', async () => {
+    const search=await import('/js/filesearch.js');
+    handlers.set('FileSearchInfo',()=>({files:'About',mods:'',groups:[]}));
+    handlers.set('BeginFileSearch',()=>42);handlers.set('StartFileSearch',()=>true);handlers.set('StopFileSearch',()=>true);
+    handlers.set('ReadSearchFile',()=>({lines:[]}));
+    handlers.set('FileSearchUpdate',()=>({done:true,next:1,summary:'2 matches',deltas:[{id:'fixture-mod',name:'Fixture Mod',file:{path:'About/About.xml',rel:'About/About.xml',count:2,lines:[{line:1,text:'fixture'},{line:2,text:'fixture'}]}}]}));
+    S.envSeq=9001;await search.open();
+    const input=document.querySelector('.fs-text-box input');input.value='fixture';input.dispatchEvent(new Event('input',{bubbles:true}));
+    await search.run();await new Promise(resolve=>setTimeout(resolve,0));
+    const file=document.querySelector('.fs-file');assert(file,'fixture file missing');
+    file.focus();const expand=new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true,cancelable:true});file.dispatchEvent(expand);
+    assert(expand.defaultPrevented && file.isConnected,'provider expansion removed its target during dispatch');
+    await new Promise(requestAnimationFrame);
+    const opened=document.getElementById(file.id);assert(opened?.getAttribute('aria-expanded')==='true','expansion did not render');
+    const collapse=new KeyboardEvent('keydown',{key:'ArrowLeft',bubbles:true,cancelable:true});opened.dispatchEvent(collapse);
+    assert(collapse.defaultPrevented && opened.isConnected,'provider collapse removed its target during dispatch');
+    await new Promise(requestAnimationFrame);
+    assert(document.getElementById(file.id)?.getAttribute('aria-expanded')==='false','collapse did not render');search.leave();
+  });
+  await test('Library disclosure uses the existing chevron while ordinary row clicks still open a copy', async () => {
+    const library=await import('/js/library.js');
+    handlers.set('Library',()=>({shown:2,total:2,columns:[{key:'name',title:'mod',shown:true}],rows:[
+      {id:'fixture-lineage',name:'Same Mod',copies:2,insts:[{id:'one',ref:'#one',label:'local'},{id:'two',ref:'#two',label:'workshop'}]},
+      {id:'fixture-next',name:'Next Mod',copies:1,single:true,insts:[{id:'next',ref:'#next',name:'Next Mod'}]},
+    ]}));
+    await library.open();
+    await library.relang();
+    let row=document.querySelector('.lib-row.lin'),chevron=row.querySelector('.chev');
+    assert(!row.hasAttribute('aria-expanded') && chevron.getAttribute('role')==='button' && chevron.tabIndex===-1,'state remains on a non-toggle row or changes Tab order');
+    assert(document.getElementById(chevron.getAttribute('aria-labelledby')).textContent==='Same Mod','disclosure name not local');
+    chevron.click();row=document.querySelector('.lib-row.lin');
+    assert(row.querySelector('.chev').getAttribute('aria-expanded')==='false','chevron failed to collapse');
+    row.click();row=document.querySelector('.lib-row.lin');
+    assert(row.querySelector('.chev').getAttribute('aria-expanded')==='true' && document.querySelector('.lib-row.inst.cur'),'row click changed');
+    row.querySelector('.chev').click();document.querySelector('.lib-row.lin .chev').click();
+    assert(document.querySelector('.lib-row.lin .chev').getAttribute('aria-expanded')==='true','repeated native toggle route failed');
+  });
   say('', '');
 }

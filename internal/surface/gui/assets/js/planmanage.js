@@ -718,6 +718,7 @@ function versions(p) {
   const on = p.versions.filter((c) => c.on).map((c) => c.v);
   for (const c of p.versions) {
     const b = el("button", "v" + (c.on ? " on" : ""), c.v);
+    b.setAttribute("aria-pressed", String(!!c.on));
     if (c.game) b.append(el("span", "cur"));
     b.dataset.envWrite = "plan-versions";
     b.title = c.tip;
@@ -975,6 +976,7 @@ function drawExport() {
   const list = el("div", "fmts");
   d.formats.forEach((f, i) => {
     const b = el("button", "fmt" + (f.id === d.format ? " on" : ""));
+    b.setAttribute("aria-pressed", String(f.id === d.format));
     b.append(el("span", "rd"));
     const nm = el("span", "nm", f.name);
     if (i === 0) nm.append(el("small", "", T("recommended")));
@@ -1012,7 +1014,7 @@ function drawExport() {
 async function choose(id) {
   if (id === X.format) return;
   X.format = id;
-  document.querySelectorAll("#screen .fmt").forEach((b, i) => b.classList.toggle("on", X.data.formats[i].id === id));
+  document.querySelectorAll("#screen .fmt").forEach((b, i) => { const on = X.data.formats[i].id === id; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
   api.SetSetting(FORMAT_KEY, id).catch(() => {});
   let d;
   try { d = await api.PlanExport(X.id, id); } catch (e) { return say("fail", errText(e)); }

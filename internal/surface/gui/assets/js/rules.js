@@ -111,6 +111,7 @@ function draw() {
   const rows = shown();
   const n = rows.length;
   const bar = $(".hbar", a);
+  bar.setAttribute("aria-expanded", String(R.open));
   bar.replaceChildren(el("span", "t", T("load-order rules")));
   if (n) bar.append(el("span", "num", String(n)));
   const chev = el("span", "fold-chev"); chev.innerHTML = icon.chev; bar.append(chev);
@@ -152,7 +153,11 @@ function modName(m) {
 function row(r) {
   const d = el("div", "rule");
   d.dataset.id = r.id;
+  d.id = "rule-row-" + encodeURIComponent(r.id);
+  d.setAttribute("role", "group");
   const t = el("div", "rule-t");
+  t.id = d.id + "-text";
+  d.setAttribute("aria-labelledby", t.id);
   for (const p of r.parts) t.append(p.mod === 1 ? modName(r.a) : p.mod === 2 ? modName(r.b) : p.text);
   d.append(t);
   if (r.note) d.append(el("div", "rule-n", r.note));

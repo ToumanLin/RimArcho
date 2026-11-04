@@ -141,7 +141,9 @@ function toggleHistory() { fold.hist = !fold.hist; keepFolds(); applyFolds(); re
 
 function applyFolds() {
   $('.area[data-area="2"]').classList.toggle("open", stagingOpen());
+  $('.area[data-area="2"] .head').setAttribute("aria-expanded", String(stagingOpen()));
   $(".histarea").classList.toggle("open", fold.hist);
+  $(".histarea .hbar").setAttribute("aria-expanded", String(fold.hist));
   $(".histarea").hidden = !(S.history && S.history.length > 1);
 }
 
@@ -237,7 +239,7 @@ export function renderRows(k) {
     d.id = rowID(k, it);
     d.setAttribute("role", "option");
     // Preserve the hover title without announcing the name again as a description.
-    d.setAttribute("aria-description", "");
+    d.setAttribute("aria-description", [it.missing || it.gone ? T(it.canUse ? "installed copy available" : "not installed") : k === 1 && it.copyCount > 1 ? it.copyLabel : "", it.unsaved ? T("unsaved") : ""].filter(Boolean).join("; "));
     d.setAttribute("aria-setsize", String(c.view.length));
     d.setAttribute("aria-posinset", String(i + 1));
     d.setAttribute("aria-selected", String(c.sel.has(key(it))));
@@ -264,8 +266,7 @@ export function renderRows(k) {
     if (d.classList.contains("copy-item")) { d.removeAttribute("aria-labelledby"); d.setAttribute("aria-label", it.name + ", " + it.copyLabel); }
     else { d.removeAttribute("aria-label"); d.setAttribute("aria-labelledby", d.id + "-name"); }
     // The visible note on the name's line (not installed, which copy) describes the row.
-    const note = $(".src", d);
-    if (note) { note.id = d.id + "-note"; d.setAttribute("aria-describedby", note.id); } else d.removeAttribute("aria-describedby");
+    d.removeAttribute("aria-describedby");
     d.title = it.name + (it.missing ? "  " + it.ref.replace(/^pkg:/, "") + "  " + T(it.canUse ? "installed copy available" : "not installed") : it.gone ? "  " + T("not installed") : it.copyCount > 1 && it.copyLabel ? "  " + it.copyLabel : "");
   }
   const active = pool.get(c.cursor);

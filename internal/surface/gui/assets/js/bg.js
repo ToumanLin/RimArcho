@@ -93,6 +93,7 @@ function controls() {
   const seg = el("div", "bg-seg");
   for (const [v, l] of [["left", T("left")], ["center", T("center")], ["right", T("right")]]) {
     const b = el("button", v === B().focus ? "on" : "", l);
+    b.setAttribute("aria-pressed", String(v === B().focus));
     b.onclick = () => save({ focus: v });
     seg.append(b);
   }
@@ -138,6 +139,7 @@ function tabs() {
   const t = el("div", "bg-tabs");
   P.groups.forEach((g, i) => {
     const b = el("button", "bg-tab" + (i === tab ? " on" : ""));
+    b.setAttribute("aria-pressed", String(i === tab));
     b.append(el("span", "", g.name), el("em", "num", g.files ? (g.items.length ? String(g.items.length) : "+") : String(g.items.length)));
     b.onclick = () => { tab = i; kb = 0; draw(); };
     t.append(b);

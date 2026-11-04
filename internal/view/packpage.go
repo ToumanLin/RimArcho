@@ -249,6 +249,7 @@ func textureStep(r *app.PackBuild, tex int) BuildStep {
 
 // PackPageEntry is one mod of a pack's page.
 type PackPageEntry struct {
+	Key   string `json:"key"` // package and pack folder, independent of load order
 	Name  string `json:"name"`
 	Order int    `json:"order"`
 	Bytes int64  `json:"bytes"`
@@ -316,7 +317,7 @@ func BuildPackPage(a *app.App, name string) (*PackPage, error) {
 		pg.Facts = append(pg.Facts, Tf("played %s", ShortDate(p.LastPlayed)))
 	}
 	for i, e := range p.Entries {
-		r := PackPageEntry{Name: e.Name, Order: i + 1, Bytes: e.Bytes}
+		r := PackPageEntry{Key: strconv.Quote(e.PackageID) + "/" + strconv.Quote(e.Folder), Name: e.Name, Order: i + 1, Bytes: e.Bytes}
 		switch {
 		case e.Official:
 			r.Note = T("from the game")

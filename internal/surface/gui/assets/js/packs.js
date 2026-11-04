@@ -45,7 +45,7 @@ function drawPackRows() {
     row.setAttribute("role", "row");
     for (const c of packTable.visible()) row.append(el("span", "cell" + (c.key === "name" ? " n" : "") + (packTable.column(c.key).num ? " num" : ""), String(r[c.key] ?? "—")));
     row.onclick = () => ui.go("pack:" + r.name);
-    packTable.row(row, i);
+    packTable.row(row, i, "pack-row-" + encodeURIComponent(r.name));
     L.els.push(row); packCard.append(row);
   });
 }
@@ -59,7 +59,7 @@ function drawModRows() {
     const row = el("div", "data-row");
     row.setAttribute("role", "row");
     for (const c of modTable.visible()) row.append(el("span", "cell" + (c.key === "name" ? " n" : "") + (modTable.column(c.key).num ? " num" : ""), String(m[c.key] || "—")));
-    modTable.row(row, i);
+    modTable.row(row, i, "pack-mod-row-" + encodeURIComponent(JSON.stringify([P.name, m.key])));
     modCard.append(row);
   }
 }
@@ -670,8 +670,7 @@ export function hintList() {
       { key: "esc", label: T("back to the list") }, ...tail];
   }
   if (S.packFocus) {
-    return [{ key: "L", label: T("play") }, { key: "e", label: T("export") }, { key: "E", label: T("export the list") }, { key: "Del", label: T("move to the recycle bin") },
-      { key: "tab", label: T("next pack") }, ...tail];
+    return [{ key: "L", label: T("play") }, { key: "e", label: T("export") }, { key: "E", label: T("export the list") }, { key: "Del", label: T("move to the recycle bin") }, ...tail];
   }
-  return [{ key: "↑↓", label: T("move") }, { key: "enter", label: T("open") }, { key: "B", label: T("create a pack") }, { key: "tab", label: T("first pack") }, ...tail];
+  return [{ key: "↑↓", label: T("move") }, { key: "enter", label: T("open") }, { key: "B", label: T("create a pack") }, ...tail];
 }

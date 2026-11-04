@@ -48,7 +48,7 @@ func AccountGroup(a *app.App) SettingGroup {
 	action := func(service, verb, label, confirm string) SettingAction {
 		return SettingAction{Label: T(label), Argv: []string{"account", service, verb}, Confirm: T(confirm)}
 	}
-	steam := SettingItem{Label: "SteamCMD", Note: SteamAccountLine(s)}
+	steam := SettingItem{Key: "account.steamcmd", Label: "SteamCMD", Note: SteamAccountLine(s)}
 	if s.Managed || s.Path == "" {
 		label := "log in"
 		if s.LoggedIn {
@@ -74,7 +74,7 @@ func AccountGroup(a *app.App) SettingGroup {
 	if a.Store.Meta("account:loverslab:consent") != "true" && a.Store.Meta("account:loverslab:enabled") != "true" {
 		confirm = "LoversLab contains adult content and has its own access conditions and rules. Use your own account and follow the site's rules and file licenses. Login cookies are encrypted for your Windows user on this device; passwords stay on the site."
 	}
-	ll := SettingItem{Label: "LoversLab", Note: line, Actions: []SettingAction{action("loverslab", "login", label, confirm)}}
+	ll := SettingItem{Key: "account.loverslab", Label: "LoversLab", Note: line, Actions: []SettingAction{action("loverslab", "login", label, confirm)}}
 	if line != "" {
 		checked := a.AutomaticStatus("session").Checked
 		if session, err := accounts.Open(a.AccountsDir()); err == nil && session.Status().Verified.After(checked) {

@@ -141,7 +141,8 @@ export function createTable({ key, columns, state = { cols: null, sort: "name", 
     head.oncontextmenu = (e) => { e.preventDefault(); focusTable(); menu(e.clientX, e.clientY); };
   }
   function count(n) { root.setAttribute("aria-rowcount", String(n + 1)); }
-  function row(node, index) {
+  function row(node, index, identity) {
+    if (identity != null) node.id = identity;
     node.setAttribute("role", "row");
     node.setAttribute("aria-rowindex", String(index + 2));
     const grid = ["grid", "treegrid"].includes(root.getAttribute("role"));

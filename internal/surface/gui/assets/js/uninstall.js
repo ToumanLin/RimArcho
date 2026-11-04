@@ -66,6 +66,9 @@ function stepRow(pg, s) {
   const row = el("div", "set");
   const l = el("div", "l");
   l.append(el("div", "name", s.title));
+  l.firstChild.id = "uninstall-step-" + encodeURIComponent(s.key);
+  box.setAttribute("role", "group");
+  box.setAttribute("aria-labelledby", l.firstChild.id);
   l.append(el("div", "sub word-facts", s.text + (s.size ? "  " + s.size : "")));
   const r = el("div", "r");
   if (s.toggle && !pg.ran) {

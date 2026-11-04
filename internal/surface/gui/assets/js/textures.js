@@ -261,7 +261,7 @@ function textureRows(p, old = null) {
     nodes.push(tr);
   }
   // Reuse untouched cells and their shimmer; sorting moves only existing rows (06 §2.13).
-  nodes.forEach((row, i) => { textureTable.row(row, i); if (t.children[i + 1] !== row) t.insertBefore(row, t.children[i + 1] || null); });
+  nodes.forEach((row, i) => { textureTable.row(row, i, "texture-row-" + encodeURIComponent(row.dataset.ref)); if (t.children[i + 1] !== row) t.insertBefore(row, t.children[i + 1] || null); });
   while (t.children.length > nodes.length + 1) t.lastChild.remove();
   return t;
 }

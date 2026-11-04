@@ -42,6 +42,9 @@ export function createQuery(X, queryCard, { run, shortcuts, stop, focusResults, 
   function fieldRow(label, content) {
     const row = el("div", "fs-field"),
       name = el("label", "fs-label", T(label));
+    name.id = "fs-label-" + encodeURIComponent(label);
+    row.setAttribute("role", "group");
+    row.setAttribute("aria-labelledby", name.id);
     const input = content.tagName === "INPUT" ? content : content.querySelector("input");
     if (input) {
       input.id = "fs-" + label;
@@ -160,6 +163,9 @@ export function createQuery(X, queryCard, { run, shortcuts, stop, focusResults, 
       leave: focusResults
     });
     const modsLabel = el("label", "fs-label", T("mods"));
+    modsLabel.id = "fs-label-mods";
+    modsBar.el.setAttribute("role", "group");
+    modsBar.el.setAttribute("aria-labelledby", modsLabel.id);
     modsLabel.htmlFor = "fs-mods";
     modsBar.input.id = "fs-mods";
     modsBar.input.setAttribute("aria-label", T("mods"));

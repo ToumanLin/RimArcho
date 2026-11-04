@@ -12,7 +12,7 @@ func DependencyGroup(a *app.App) SettingGroup {
 	g := SettingGroup{Title: T("external tools"), Note: lastChecked(a, a.AutomaticStatus("tools").Checked)}
 	labels := map[string]string{deps.Todds: "todds", deps.SteamCMD: "SteamCMD"}
 	for _, i := range a.Deps().All() {
-		item := SettingItem{Label: labels[i.Name], Value: T("not installed"), Note: i.Path, NotePaths: []string{i.Path}}
+		item := SettingItem{Key: "tool." + i.Name, Label: labels[i.Name], Value: T("not installed"), Note: i.Path, NotePaths: []string{i.Path}}
 		if i.Version != "" {
 			item.Value = i.Version
 		} else if i.OK {

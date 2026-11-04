@@ -38,7 +38,6 @@ export function createBar(opts) {
   box.append(popup);
   inp.setAttribute("role", "combobox");
   inp.setAttribute("aria-autocomplete", "both");
-  inp.setAttribute("aria-controls", listID);
   const clear = el("button", "fbar-clear", "×");
   clear.title = T("clear");
   clear.onclick = () => {
@@ -84,6 +83,7 @@ export function createBar(opts) {
     );
     choice = Math.min(choice, Math.max(0, candidates.length - 1));
     const visible = suggestOpen && !composing && document.activeElement === inp;
+    if (visible) inp.setAttribute("aria-controls", listID); else inp.removeAttribute("aria-controls");
     popup.hidden = !visible;
     inp.setAttribute("aria-expanded", String(visible));
     popup.replaceChildren();

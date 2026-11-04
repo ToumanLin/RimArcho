@@ -208,9 +208,13 @@ function draw(loading) {
 function copyCard(x) {
   const on = x.ref === F.copy;
   const b = el("div", "fd-copy" + (on ? " on" : ""));
+  b.setAttribute("role", "group");
+  b.setAttribute("aria-current", String(on));
   b.tabIndex = -1;
   const top = el("div", "top");
   top.append(el("span", "lbl", x.label));
+  top.firstChild.id = "full-copy-" + encodeURIComponent(x.ref);
+  b.setAttribute("aria-labelledby", top.firstChild.id);
   if (x.state) top.append(el("span", "chip st " + (x.code || ""), x.state));
   if (x.inPlan) top.append(el("span", "chip cur", T("in the current list")));
   b.append(top);
@@ -320,7 +324,6 @@ export async function fullKey(e) {
     }
     return;
   }
-  if (k === "Tab" && (F.secs || []).length) { e.preventDefault(); const n = F.secs.length; F.tab = (F.tab + (e.shiftKey ? n - 1 : 1)) % n; return draw(false); }
   if (k === "[" || k === "]") {
     e.preventDefault();
     const cs = copies();

@@ -415,7 +415,8 @@ export function key(e) {
         X.cursor = i;
       }
     }
-    results.drawTree();
+    // UIA Expand/Collapse dispatches a key to the row; retain its native target until dispatch ends.
+    requestAnimationFrame(() => { if (visible()) results.drawTree(); });
     return true;
   }
   let i = X.cursor,

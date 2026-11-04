@@ -94,7 +94,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 	}
 	if page == ChangesPage {
 		if !tui {
-			out = append(out, r("+", "add a subscription"), r("K", "check for updates"), r("U", "update all"), r("u", "update"), r("1 / 2", "list / details"), r("tab / shift+tab", "the next field or button"))
+			out = append(out, r("+", "add a subscription"), r("K", "check for updates"), r("U", "update all"), r("u", "update"), r("1 / 2", "list / details"))
 		} else {
 			// 06 §9.1: the subscription actions, each a background task (06 §2.16)
 			out = append(out,
@@ -130,9 +130,11 @@ func KeyHelp(page string, tui bool) []KeyRow {
 		)
 	}
 	if page == PackPages {
+		out = append(out, r("↑↓ / enter", "the packs: move, open one"))
+		if tui {
+			out = append(out, r("tab / shift+tab", "the next / previous pack"))
+		}
 		out = append(out,
-			r("↑↓ / enter", "the packs: move, open one"),
-			r("tab / shift+tab", "the next / previous pack"),
 			r("L", "play the pack"),
 			r("e", "export the pack to a file"),
 			r("E", "export only its list, each mod with its version"),
@@ -223,8 +225,10 @@ func KeyHelp(page string, tui bool) []KeyRow {
 	} else if page != EditorPage && page != RulesPage { // Load-order rules is one list
 		out = append(out, r("1–9", "focus the page's areas (the numbers in their headings)"))
 	}
+	// The GUI's tab moves the focus on every page (it reaches the address copy buttons); the
+	// terminal's goes to the next sub-page (06 §3.5).
 	tabText := "next / previous page under the same sidebar entry"
-	if page == ChangesPage && !tui {
+	if !tui {
 		tabText = "the next field or button"
 	}
 	if page != RulesPage { // its tab is the form's (above)

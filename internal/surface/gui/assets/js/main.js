@@ -930,19 +930,6 @@ function widthKey(d) {
   for (const j of [0, 1, 2]) renderRows(j);
 }
 
-// subPage: tab / shift+tab go to the next / previous page under the open sidebar entry.
-function subPage(d) {
-  const cur = shell.current();
-  for (const g of (S.shell && S.shell.nav) || []) for (const it of g.items || []) {
-    const kids = (it.kids || []).filter((x) => !x.add);
-    const i = kids.findIndex((x) => x.id === cur);
-    if (i >= 0 && kids.length > 1) return go(kids[(i + d + kids.length) % kids.length].id);
-    // the entry's own page that is not one of its sub-entries (pack's list): to the first
-    // or the last of them
-    if (i < 0 && it.id === cur && kids.length) return go(kids[d > 0 ? 0 : kids.length - 1].id);
-  }
-}
-
 // ---- the row menu (06 §8.5): the same groups and order as Mod library's, from view.RowOps ----
 
 async function openRowMenu(x, y, keys) {
@@ -1041,12 +1028,10 @@ function onKey(e) {
     if (NAV[+dig[1] - 1]) go(navTarget(NAV[+dig[1] - 1]));
     return;
   }
-  // tab / shift+tab: the next / previous page under the same sidebar entry (Mod library's All and
-  // Updates, the plans); the full detail keeps tab for its sub-sections (06 §3.5)
-  // (on the pages with forms, settings and the like, tab keeps moving the focus)
+  // tab / shift+tab move the focus on every page, as on a web page (06 §3.5); sub-pages are
+  // switched with the sidebar, the breadcrumb or the command panel.
   // Pages with adjustable cards keep native tab order to reach their gaps (06 §3.1).
   if (e.target.closest?.('[role="separator"]') && k === "Tab") return;
-  if (k === "Tab" && !e.ctrlKey && !e.altKey && S.screen === "packs") { e.preventDefault(); return subPage(e.shiftKey ? -1 : 1); }
   if (!S.screen && scr.pageLoading()) {
     if ((e.ctrlKey || e.metaKey) && k === "k") { e.preventDefault(); pop.palette(); }
     return;

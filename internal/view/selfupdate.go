@@ -33,7 +33,7 @@ func SelfUpdateHome(a *app.App) *SelfUpdateLine {
 // version, what the last check found, its notes folded under the row, and the buttons.
 func SelfUpdateItem(a *app.App) SettingItem {
 	cur := a.SelfVersionNow()
-	it := SettingItem{Label: "RimArcho", Value: cur}
+	it := SettingItem{Key: "archo.version", Label: "RimArcho", Value: cur}
 	if _, ok := selfupdate.Compare(cur, cur); !ok {
 		it.ValueNote = T("a development build is not updated")
 		return it

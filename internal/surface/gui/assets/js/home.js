@@ -312,6 +312,7 @@ function gameStep(env) {
   list.append(el("span", "hm-mark"));
   for (const g of shownFirst(games(), (g) => g.name === env)) {
     const b = el("button", "hm-pick" + (g.name === env ? " on" : ""));
+    b.setAttribute("aria-pressed", String(g.name === env));
     b.dataset.game = g.name;
     b.dataset.id = "game|" + g.name;
     b.title = g.version;
@@ -332,6 +333,7 @@ function rowStep(f, env, moved) {
   shownFirst(rowsOf(env), (r) => f && key(r) === key(f)).forEach((r, i) => {
     const on = f && key(r) === key(f);
     const b = el("button", "hm-pick" + (on ? " on" : ""));
+    b.setAttribute("aria-pressed", String(!!on));
     b.dataset.key = key(r);
     b.dataset.id = "row|" + key(r);
     b.style.setProperty("--d", i);
@@ -502,8 +504,8 @@ function showSwitch(r) {
   const root = document.querySelector(".page.home");
   if (!root) return;
   const gameMoved = !applied() || applied().envName !== r.envName;
-  root.querySelectorAll(".hm-s1 .hm-pick").forEach((b) => b.classList.toggle("on", b.dataset.game === r.envName));
-  if (!gameMoved) root.querySelectorAll(".hm-s2 .hm-pick").forEach((b) => b.classList.toggle("on", b.dataset.key === key(r)));
+  root.querySelectorAll(".hm-s1 .hm-pick").forEach((b) => { const on = b.dataset.game === r.envName; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
+  if (!gameMoved) root.querySelectorAll(".hm-s2 .hm-pick").forEach((b) => { const on = b.dataset.key === key(r); b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
   else root.querySelectorAll(".hm-s2 .hm-pick").forEach((b) => b.classList.add("leaving"));
   placeMarks(false);
   const b = root.querySelector(".hm-go");

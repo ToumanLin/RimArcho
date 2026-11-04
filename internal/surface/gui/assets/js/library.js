@@ -318,7 +318,6 @@ function rowEl(x, k) {
   const r = el("div", "lib-row " + x.t + (x.lone ? " lone" : "") + (k === L.cur ? " cur" : ""));
   r.id = "library-row-" + encodeURIComponent(rowKey(x));
   r.setAttribute("aria-level", x.t === "lin" || x.lone ? "1" : "2");
-  if (x.t === "lin") r.setAttribute("aria-expanded", String(isOpen(x.r)));
   r.style.top = HEAD + k * ROW + "px";
   const selected = x.t === "inst" ? L.sel.has(x.i.ref) : x.r.insts.every((i) => L.sel.has(i.ref)) && x.r.insts.length;
   if (selected) r.classList.add("sel");
@@ -357,7 +356,10 @@ function nameCell(x) {
   if (x.t === "lin") {
     const c = el("span", "chev" + (L.open.has(x.r.id) || x.r.insts.length < x.r.copies ? " down" : ""));
     c.innerHTML = icon.chev;
-    c.setAttribute("aria-hidden", "true");
+    c.setAttribute("role", "button");
+    c.tabIndex = -1;
+    c.setAttribute("aria-expanded", String(isOpen(x.r)));
+    c.setAttribute("aria-labelledby", "library-row-" + encodeURIComponent(rowKey(x)) + "-name");
     c.onclick = (e) => { e.stopPropagation(); toggle(x.r); };
     left.append(c, el("span", "t", x.r.name));
   } else if (x.lone) {

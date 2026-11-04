@@ -15,6 +15,7 @@ import (
 
 // SettingItem is one row of the settings page.
 type SettingItem struct {
+	Key   string `json:"key,omitempty"` // stable identity for rows without a setting command
 	Label string `json:"label"`
 	Value string `json:"value"`
 	// Path markers identify filesystem text independently of editing/status text.
@@ -175,7 +176,7 @@ func EnvGroups(a *app.App, st *app.LoadoutState) []SettingGroup {
 	return []SettingGroup{{Title: T("this game"), Items: []SettingItem{
 		{Label: T("game folder"), Value: e.GameRoot, ValuePath: true, Edit: "path", Argv: []string{"env", "set", e.Name, "--game", "{}"},
 			Note: T("RimArcho checks that the mods are still the same before it moves them over")},
-		{Label: T("game version"), Value: version},
+		{Key: "game.version", Label: T("game version"), Value: version},
 		{Label: T("start the game through"), Value: e.Launch, Edit: "choice", Choices: []string{"steam", "direct"},
 			ChoiceLabels: []string{"Steam", T("the game's own exe")}, Argv: []string{"env", "set", e.Name, "--launch", "{}"}},
 		saves,
@@ -285,7 +286,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		if len(s.Installed) > 0 {
 			v = s.Installed[0]
 		}
-		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon, {Label: T("Archo Monitor installed"), Value: v, Note: s.Dir, NotePaths: []string{s.Dir}}}})
+		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon, {Key: "monitor.installed", Label: T("Archo Monitor installed"), Value: v, Note: s.Dir, NotePaths: []string{s.Dir}}}})
 	} else {
 		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon}})
 	}
