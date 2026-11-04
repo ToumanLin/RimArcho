@@ -2,8 +2,8 @@
 
 Things to research, not yet decided. Once decided, put them in the specifications (implementation plans in 01 §5); research goes in docs/research/.
 
-## MCP测试
-基于日志语料的真实mod保存日志和测试题
+## MCP test&improve
+Baed on benchmark exam on real mod list and error log from corpus research
 
 ## Decompilation
 
@@ -12,7 +12,7 @@ Decompilation serves two purposes: investigating Mod conflicts and creating Mods
 2026-11-01: decided in [research/2026-11-01_decompile-storage.md](docs/research/2026-11-01_decompile-storage.md): a durable source library including the game's own code; being implemented. Mod projects are deferred (New Mod Project below).
 
 ### Decompilation management
-管理反编译完成的mod instance
+manage decompiled mod instance
 
 ## New Mod Project
 Allow player to initialize a new mod project
@@ -38,7 +38,7 @@ Accessibility is intended to let AI agents operate without screenshots. Define a
 
 2026-11-02 (later): those three are done (A1, A6, A8, A9, A15 pass). Next: name the remaining fields and icons (A2, A10), tell same-name controls apart (A5), menu and command-panel semantics (A7), progress and messages as status (A11, A12).
 
-2026-11-03: progress and messages done (A11, A12 pass; A12 relaxed: only work that ends on its own must name its job, a direct reply may be short). Next: A2, A10, A5, A7.
+2026-11-03: progress and messages done (A11, A12 pass; A12 relaxed: only work that ends on its own must name its job, a direct reply may be short). Then ten rows were relaxed to what an agent needs (A3 and A14 merged into A13, export exempt from A18). Next: A2, A7, then measure A13; A5 and A10 in their narrower form.
 
 ## Save analysis
 
