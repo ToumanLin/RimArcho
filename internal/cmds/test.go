@@ -80,6 +80,9 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 			mods = strings.Join(cluster.Mods, ", ")
 		}
 		n.KV("mods", mods+" ("+cluster.Confidence+")")
+		if cluster.Note != "" {
+			n.KV("note", cluster.Note)
+		}
 	}
 	if more := r.ClustersTotal - len(r.Clusters); more > 0 {
 		clusters.Addf("… %d more (full log: %s)", more, r.LogPath)

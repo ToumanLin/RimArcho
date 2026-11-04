@@ -18,6 +18,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/logs"
+	"github.com/ToumanLin/RimArcho/internal/patterns"
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
@@ -42,6 +43,9 @@ type TestRunCluster struct {
 	Mods       []string `json:"mods"`
 	Confidence string   `json:"confidence"`
 	Delta      string   `json:"delta,omitempty"`
+	// Note: "common, unattributed: …" for a cluster no mod is named for whose kind is in more
+	// than 5% of public logs (patterns.CommonUnattributed, 03 §6.8).
+	Note string `json:"note,omitempty"`
 }
 
 type TestRunReport struct {
@@ -361,8 +365,12 @@ func (a *App) testRunLog(st *LoadoutState, r *TestRunReport) error {
 				}
 			}
 		}
+		note := ""
+		if !settings {
+			note = patterns.Load().CommonUnattributed(class, lc.Template, len(lc.Attr) > 0)
+		}
 		message, _, _ := strings.Cut(lc.First.Message, "\n")
-		r.Clusters = append(r.Clusters, TestRunCluster{key: lc.Key, Class: class, Message: strings.TrimSuffix(message, "\r"), Count: lc.Count, Mods: mods, Confidence: confidence})
+		r.Clusters = append(r.Clusters, TestRunCluster{key: lc.Key, Class: class, Message: strings.TrimSuffix(message, "\r"), Count: lc.Count, Mods: mods, Confidence: confidence, Note: note})
 	}
 	return nil
 }

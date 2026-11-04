@@ -7,6 +7,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/logs"
+	"github.com/ToumanLin/RimArcho/internal/patterns"
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
@@ -150,9 +151,13 @@ func logCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 	}
 	lst := root.Section("list")
+	var noise []*app.LogCluster
 	for _, lc := range r.Clusters {
 		if logs.Informational(lc.Class) && !a.Bool("all") {
 			hidden++
+			if lc.Class == logs.ClassNoise {
+				noise = append(noise, lc)
+			}
 			continue
 		}
 		shown++
@@ -163,7 +168,7 @@ func logCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	lst.Truncate(boolLimit(a, render.DefaultLimit), "archo log --all")
 	if hidden > 0 {
-		root.KV("hidden", fmt.Sprintf("%d informational clusters (archo log --all)", hidden))
+		root.KV("hidden", fmt.Sprintf("%d informational clusters (archo log --all)%s", hidden, noiseNote(noise)))
 	}
 	for _, lc := range r.Clusters {
 		if !logs.Informational(lc.Class) {
@@ -172,6 +177,22 @@ func logCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 	}
 	return d, nil
+}
+
+// noiseNote names the hidden clusters that are known noise (logs.KnownNoise), so that a reader
+// of the raw log knows those lines were recognised: "; known noise, not mod problems: log:E5
+// material made in code, log:E6 translation error count".
+func noiseNote(noise []*app.LogCluster) string {
+	var parts []string
+	for _, lc := range noise {
+		if n := logs.KnownNoise(lc.First.Message); n != nil {
+			parts = append(parts, "log:"+lc.ID+" "+n.Label)
+		}
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "; known noise, not mod problems: " + strings.Join(parts, ", ")
 }
 
 func clusterLine(ix *app.Index, lc *app.LogCluster) string {
@@ -187,6 +208,8 @@ func clusterLine(ix *app.Index, lc *app.LogCluster) string {
 			who += fmt.Sprintf(", +%d", len(lc.Attr)-1)
 		}
 		who += ")"
+	} else if commonUnattributed(lc) != "" {
+		who = "  (" + patterns.CommonLabel + ")"
 	}
 	return fmt.Sprintf("log:%s %s x%d%s  %s%s%s", lc.ID, lc.Class, lc.Count, logs.PhaseSummary(lc.Phases), msg, who, patternTag(ix, lc))
 }
@@ -260,6 +283,9 @@ func clusterDoc(c *Ctx, ix *app.Index, r *app.LogReport, lc *app.LogCluster) *re
 		conf += " (" + lc.Why + ")"
 	}
 	root.KV("confidence", conf)
+	if note := commonUnattributed(lc); note != "" {
+		root.KV("note", note)
+	}
 	addClusterPatterns(root, ix, lc)
 	if len(lc.Checklist) > 0 {
 		cl := root.Section("checklist")
@@ -282,9 +308,13 @@ func logSince(c *Ctx, a *Args, st *app.LoadoutState, r *app.LogReport, cur app.L
 	}
 	shown, hidden := 0, 0
 	var lines []string
+	var noise []*app.LogCluster
 	for _, lc := range s.New {
 		if logs.Informational(lc.Class) && !a.Bool("all") {
 			hidden++
+			if lc.Class == logs.ClassNoise {
+				noise = append(noise, lc)
+			}
 			continue
 		}
 		shown++
@@ -316,7 +346,7 @@ func logSince(c *Ctx, a *Args, st *app.LoadoutState, r *app.LogReport, cur app.L
 	}
 	lst.Truncate(boolLimit(a, render.DefaultLimit), "archo log --all --since "+since)
 	if hidden > 0 {
-		root.KV("hidden", fmt.Sprintf("%d informational clusters (--all)", hidden))
+		root.KV("hidden", fmt.Sprintf("%d informational clusters (--all)%s", hidden, noiseNote(noise)))
 	}
 	if s.Moved != "" {
 		d.AddNext("archo log --prev --since " + since)
