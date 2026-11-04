@@ -78,6 +78,9 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 			n.KV("before", "not in the player's log")
 		}
 		testClusterMods(n, cluster)
+		if cluster.Note != "" {
+			n.KV("note", cluster.Note)
+		}
 	}
 	if more := r.ClustersTotal - len(r.Clusters); more > 0 {
 		clusters.Addf("… %d more (full log: %s)", more, r.LogPath)

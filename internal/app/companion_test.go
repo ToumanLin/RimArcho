@@ -289,9 +289,10 @@ func TestLiveLogMonitorFirst(t *testing.T) {
 	}
 }
 
-// A line Player.log has as noise is in Player.log: the monitor's entry for it (with a stack,
-// so it passes the noise filter) is not an error of its own, as in the full analysis (VM run
-// 2026-10-28 listed "Translation data … 9 errors" under ArchoMonitor.log while the game ran).
+// A line Player.log has as noise is in Player.log: the monitor's entry for it (with a stack)
+// is not an error of its own, as in the full analysis (VM run 2026-10-28 listed "Translation
+// data … 9 errors" under ArchoMonitor.log while the game ran). Since the translation count is
+// known noise (03 §6.1) both copies are one informational noise cluster.
 func TestLiveLogMonitorNoise(t *testing.T) {
 	t.Parallel()
 	e := setup(t, false)
@@ -317,10 +318,17 @@ func TestLiveLogMonitorNoise(t *testing.T) {
 	if _, err := lv.Close(e.App); err != nil {
 		t.Fatal(err)
 	}
+	n := 0
 	for _, c := range lv.Clusters() {
-		if strings.HasPrefix(c.Template, "Translation data") || c.Report != nil && strings.HasPrefix(c.Report.First.Message, "Translation data") {
-			t.Fatalf("noise listed: only %v class %s", c.OnlyCompanion, c.Class)
+		if strings.Contains(c.Template, "Translation data") || c.Report != nil && strings.HasPrefix(c.Report.First.Message, "Translation data") {
+			n++
+			if c.OnlyCompanion || c.Class != logs.ClassNoise || !logs.Informational(c.Class) {
+				t.Fatalf("noise listed as an error: only %v class %s", c.OnlyCompanion, c.Class)
+			}
 		}
+	}
+	if n > 1 {
+		t.Fatalf("noise split into %d clusters", n)
 	}
 }
 

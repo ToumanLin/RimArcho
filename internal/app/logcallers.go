@@ -342,6 +342,9 @@ func nearMessages(lf *logs.File, e *logs.Entry) []string {
 		if len(m) > 200 {
 			m = m[:197] + "..."
 		}
+		if n := logs.KnownNoise(x.Message); n != nil {
+			m += "  (known noise: " + n.Label + ")"
+		}
 		out = append(out, fmt.Sprintf("%s:%d %s", mark, x.Line, m))
 	}
 	for i := max(0, idx-4); i < idx; i++ {

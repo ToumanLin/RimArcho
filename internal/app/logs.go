@@ -132,8 +132,9 @@ var ErrLogNotCached = errors.New("log not analysed yet")
 // 7: both the companion log (dev, 4) and the G1/G7 attribution rules (master, 6); 8: no
 // nearby messages for entries only the companion log has; 9: observed phase boundaries
 // and counts from both logs; 10: a left-out provider of a missing def before patchers;
-// 11: texture and assembly providers in the shared mod folders (Store.InstanceFiles).
-const logCacheVersion = 11
+// 11: texture and assembly providers in the shared mod folders (Store.InstanceFiles); 12: known
+// noise (logs.ClassNoise) and its note.
+const logCacheVersion = 12
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a
@@ -832,6 +833,10 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 		} else if m := ctxNameRe.FindStringSubmatch(texts); m != nil {
 			cx.definedBy(lc, m[1], true, "is the abstract def the XML error is in")
 		}
+	case logs.ClassNoise:
+		if n := logs.KnownNoise(e.Message); n != nil {
+			lc.Details = append(lc.Details, n.Note)
+		}
 	case logs.ClassMaterial:
 		if m := shaderRe.FindStringSubmatch(e.Message); m != nil {
 			// The shader lives in a mod's asset bundle (compressed) or in the game: its name is not
@@ -1088,7 +1093,7 @@ var logSeverity = map[string]string{
 	logs.ClassException: finding.Error, logs.ClassHarmony: finding.Error, logs.ClassXMLLoad: finding.Error,
 	logs.ClassPatchFailed: finding.Warning, logs.ClassXrefMissing: finding.Warning, logs.ClassMaterial: finding.Warning,
 	logs.ClassTexture: finding.Warning, logs.ClassSave: finding.Warning,
-	logs.ClassModReport: finding.Info, logs.ClassOther: finding.Info,
+	logs.ClassModReport: finding.Info, logs.ClassOther: finding.Info, logs.ClassNoise: finding.Info,
 }
 
 // findingKey keeps a log problem's ref (and an ignore of it) stable across logs and

@@ -28,15 +28,51 @@ const (
 	ClassSave        = "save-load"
 	ClassModReport   = "mod-report"
 	ClassOther       = "other"
+	// ClassNoise: a known engine line that reads like a problem but that no def, file or mod
+	// setting causes (KnownNoise).
+	ClassNoise = "noise"
 )
 
 // Classes lists the classes from most to least severe, for display.
 var Classes = []string{ClassException, ClassHarmony, ClassXMLLoad, ClassPatchFailed, ClassXrefMissing,
-	ClassMaterial, ClassTexture, ClassSave, ClassModReport, ClassOther}
+	ClassMaterial, ClassTexture, ClassSave, ClassModReport, ClassOther, ClassNoise}
 
 // Informational reports classes that are context rather than problems: a mod reporting on itself
-// ("[Mod] … not found, skipping") and unclassified lines.
-func Informational(class string) bool { return class == ClassModReport || class == ClassOther }
+// ("[Mod] … not found, skipping"), unclassified lines and known noise.
+func Informational(class string) bool {
+	return class == ClassModReport || class == ClassOther || class == ClassNoise
+}
+
+// Noise is a known engine line that reads like a problem but has no cause an agent can find in
+// a def, a file or the list (MCP transcript review 2026-11-04 §2.2: agents chased both in most
+// runs). Such lines are clustered as ClassNoise, informational.
+type Noise struct {
+	ID     string // short id
+	Prefix string // the message starts with it (cheap test before re)
+	Label  string // a few words for a list line
+	Note   string // what it is, honestly; shown in a cluster's detail and next to nearby lines
+	re     *regexp.Regexp
+}
+
+// knownNoise: the message, not the stack, decides (a companion log's copy carries a stack).
+var knownNoise = []*Noise{
+	{ID: "solid-color-material", Prefix: "Material 'SolidColorMat-", Label: "material made in code",
+		Note: "known noise: a material made in code (SolidColorMaterials, named SolidColorMat-<shader>-<colour>) had its main texture read or set, and its shader has no _MainTex; no def or file causes it, so searching defs or files (uiIconColor, the shader name) finds nothing. Harmless unless something visibly renders wrong",
+		re:   regexp.MustCompile(`^Material 'SolidColorMat-[^']*' with Shader '[^']*' doesn't have a texture property`)},
+	{ID: "translation-count", Prefix: "Translation data for language ", Label: "translation error count",
+		Note: "informational: the game's count of problems in the active language's translation files (the game's and every mod's Languages folder: duplicate keys, injections for defs or fields that are not loaded); they affect only text, never loading, and do not cause the other errors in this log. The count names no mod; the game lists the entries when a translation report is generated, as the message says",
+		re:   regexp.MustCompile(`^Translation data for language .* has \d+ errors`)},
+}
+
+// KnownNoise returns the known-noise kind of a message, nil if none.
+func KnownNoise(message string) *Noise {
+	for _, n := range knownNoise {
+		if strings.HasPrefix(message, n.Prefix) && n.re.MatchString(message) {
+			return n
+		}
+	}
+	return nil
+}
 
 // Frame is one stack frame.
 type Frame struct {
@@ -437,6 +473,8 @@ func resolveRefs(f *File) {
 func Classify(e *Entry) string {
 	m := e.Message
 	switch {
+	case KnownNoise(m) != nil:
+		return ClassNoise
 	case strings.Contains(m, "] Patch operation ") || strings.HasPrefix(m, "Patch operation ") ||
 		strings.HasPrefix(m, "Verse.PatchOperation") && strings.Contains(m, "): Failed"):
 		return ClassPatchFailed
@@ -482,7 +520,7 @@ var (
 	// Engine and framework status lines that read like errors but are not. One ^ before all
 	// the branches (here and above): with a ^ in each branch Go retries the pattern at every
 	// offset of a long message.
-	noiseRe = regexp.MustCompile(`^(?:Shader '[^']*': fallback shader '[^']*' not found|Translation data for language .* has \d+ errors|\[XML Extensions\] \d+ total patch operations run|Curl error \d+: Callback aborted|Mod .* is missing supported versions list in About\.xml)`)
+	noiseRe = regexp.MustCompile(`^(?:Shader '[^']*': fallback shader '[^']*' not found|\[XML Extensions\] \d+ total patch operations run|Curl error \d+: Callback aborted|Mod .* is missing supported versions list in About\.xml)`)
 )
 
 // hasExceptionStack reports frames other than a Waylith caller stack.
@@ -537,7 +575,7 @@ func interesting(e *Entry) (bool, string) {
 		return false, ""
 	}
 	c := Classify(e)
-	if hasExceptionStack(e) || !Informational(c) {
+	if hasExceptionStack(e) || !Informational(c) || c == ClassNoise {
 		return true, c
 	}
 	l := strings.ToLower(e.Message)
