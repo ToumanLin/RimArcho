@@ -129,6 +129,7 @@ export function addForm(ctx = {}) {
   const field = el("input");
   field.type = "text"; field.spellcheck = false;
   field.placeholder = T("paste a GitHub repository, a LoversLab file page, a Workshop link or ID");
+  field.setAttribute("aria-label", T("add a subscription")); // the page title; the placeholder says what to paste
   box.append(field);
   const result = el("div", "subscribe-result");
   const below = el("div", "subscribe-below");
