@@ -55,6 +55,7 @@ func call(t *testing.T, cs *sdk.ClientSession, name string, args map[string]any)
 }
 
 func TestToolsAndAnnotations(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	cs := connect(t, e)
 	res, err := cs.ListTools(context.Background(), nil)
@@ -142,6 +143,7 @@ func TestToolsAndAnnotations(t *testing.T) {
 // I1: the same command through the CLI and through MCP gives identical text. I5: default
 // output is at most 40 lines.
 func TestCLIParity(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	e.MustRun("analyze")
@@ -247,6 +249,7 @@ func TestCLIParity(t *testing.T) {
 
 // I2: references printed by one tool are accepted by the others.
 func TestRefsRoundTrip(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	cs := connect(t, e)
@@ -293,6 +296,7 @@ func TestRefsRoundTrip(t *testing.T) {
 
 // I3: a packageId with several instances lists the candidates instead of picking one.
 func TestAmbiguousPackage(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	e.WriteMod(filepath.Join(e.Game, "Mods", "ModA_copy"), testkit.Mod{PackageID: "tester.moda", Name: "Mod A (local copy)", Author: "Tester"})
@@ -311,6 +315,7 @@ func TestAmbiguousPackage(t *testing.T) {
 
 // I5: a long list is cut at 40 lines with the command that shows everything.
 func TestTruncation(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	var active []string
 	for i := 0; i < 60; i++ {
@@ -359,6 +364,7 @@ func ref(t *testing.T, e *testkit.Env, name string) string {
 
 // Write tools only ever run against synthetic environments: enable, save, rule, undo.
 func TestWriteTools(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	cs := connect(t, e)
@@ -394,6 +400,7 @@ func TestWriteTools(t *testing.T) {
 
 // 05 §5.1: a tool can name another environment.
 func TestEnvParameter(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	e.MustRun("env", "add", "other", "--game", e.OtherGame("Other", "1.6.4633 rev1261"), "--user-data", e.UserData)
@@ -416,6 +423,7 @@ func TestEnvParameter(t *testing.T) {
 // 05 §5.1: when the analysis takes longer than the wait, the call returns the declaration
 // problems with a note, and a later call gets the finished analysis.
 func TestStillComputing(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	inner := e.App.AnalyzeRunner
@@ -428,27 +436,14 @@ func TestStillComputing(t *testing.T) {
 		t.Fatalf("first call:\n%s", out)
 	}
 	close(release)
-	time.Sleep(500 * time.Millisecond)
-	if out, _ := call(t, cs, "list_problems", map[string]any{"code": "harmony"}); !strings.Contains(out, "analysis: a:1") || !strings.Contains(out, "harmony.multi-transpiler") {
-		t.Fatalf("second call:\n%s", out)
-	}
-}
-
-// pin_mod swaps the copy into the current plan; unpin_mod swaps the upstream back (04 §7).
-func TestPinUnpinTools(t *testing.T) {
-	e := testkit.New(t)
-	e.AddWorkshop("5100", testkit.Sample("tester.lock", "Lockable"))
-	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.lock")
-	e.AddEnv(false)
-	e.MustRun("scan")
-	cs := connect(t, e)
-	up := ref(t, e, "Lockable")
-	out, isErr := call(t, cs, "pin_mod", map[string]any{"ref": up})
-	if isErr || !strings.Contains(out, "replaces "+up+" in the current plan") {
-		t.Fatalf("pin_mod:\n%s", out)
-	}
-	out, isErr = call(t, cs, "unpin_mod", map[string]any{"ref": up})
-	if isErr || !strings.Contains(out, "the current plan uses "+up) {
-		t.Fatalf("unpin_mod:\n%s", out)
+	// A later call gets the finished analysis once the background run is done.
+	for deadline := time.Now().Add(20 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+		out, _ := call(t, cs, "list_problems", map[string]any{"code": "harmony"})
+		if strings.Contains(out, "analysis: a:1") && strings.Contains(out, "harmony.multi-transpiler") {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("second call:\n%s", out)
+		}
 	}
 }

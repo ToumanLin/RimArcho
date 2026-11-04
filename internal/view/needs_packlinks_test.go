@@ -13,7 +13,7 @@ import (
 // K12 (08 §5.3): a pack's links left in Mods/ are one item in for you to confirm, counted, with one
 // action that removes the links; the home page's launch tab says it.
 func TestPackLinksNeed(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("2009463077", testkit.Mod{PackageID: "brrainz.harmony", Name: "Harmony"})
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "brrainz.harmony")
@@ -64,7 +64,7 @@ func TestPackLinksNeed(t *testing.T) {
 // Two folders of one packageId in Mods/ (08 §3): an item in Will cause errors; with RimArcho's link
 // among them the action changes the plan, with only the player's folders it lists them.
 func TestModsDuplicateNeed(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddEnv(true)
 	cmdDir := filepath.Join(e.SteamCMD, "8888")

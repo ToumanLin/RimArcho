@@ -4,21 +4,9 @@ import (
 	"context"
 	"github.com/ToumanLin/RimArcho/internal/machine"
 	"github.com/ToumanLin/RimArcho/internal/view"
-	"os/exec"
 	"testing"
 	"time"
 )
-
-func TestPlanCostPageRequests(t *testing.T) {
-	t.Parallel()
-	node, err := exec.LookPath("node")
-	if err != nil {
-		t.Skip("node is needed for the list measurement regression tests")
-	}
-	if out, err := exec.Command(node, "--experimental-vm-modules", "--test", "testdata/planmanage.mjs").CombinedOutput(); err != nil {
-		t.Fatalf("list measurement page: %v\n%s", err, out)
-	}
-}
 
 func TestPlanCostMeasurementCancelsOlderRequests(t *testing.T) {
 	t.Parallel()
@@ -82,6 +70,7 @@ func TestPlanCostMeasurementCancelsOlderRequests(t *testing.T) {
 }
 
 func TestMemoryCapacityReachesNeedsWithoutBlockingPage(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	e.App.MemoryProbe = func() machine.Memory {
 		return machine.Memory{TotalRAM: 8 << 30, AvailableRAM: 1, SampledAt: time.Now(), Adapters: []machine.Adapter{{Name: "fixture", Dedicated: 1}}}

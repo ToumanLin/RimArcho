@@ -136,6 +136,7 @@ func TestManageSubscriptions(t *testing.T) {
 // The argv of each add form: the source recognised from url as the paste box does (06 §2.9),
 // or the kind given.
 func TestManageSubscriptionsArgv(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		in   mcp.ManageSubscriptionsIn
 		want []string

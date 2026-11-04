@@ -12,6 +12,7 @@ import (
 )
 
 func TestAccountBoundaryNoSecretsInMCP(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.MustRun("config", "set", "steamcmd.account", "fixture-player")
 	e.WriteFile(filepath.Join(e.App.AccountsDir(), "loverslab.session"), "offline-cookie-sentinel")

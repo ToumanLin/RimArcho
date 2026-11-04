@@ -44,9 +44,10 @@ snapshot, restoration and cross-game redo result. Both passed after the fixes.
 
 Coverage includes identical older versions with five origin kinds and existing
 redo history; exact stored Core restoration; localized undo/redo results and
-history differences; and batch commit/undo and cancel. GUI and TUI each add
-`TestHistoryIdenticalCheckoutIsNoOp`; the existing GUI changed-checkout test also
-asserts that a real edit still advertises undo. Existing staging regression tests
+history differences; and batch commit/undo and cancel. The TUI adds
+`TestHistoryArea/identical_checkout_is_a_no-op`; the GUI covers the identical checkout at
+the start of `TestHistoryCheckoutUndo`, which also asserts that a real edit still
+advertises undo. Existing staging regression tests
 passed. Both edited JavaScript files passed `node --check`.
 
 `go test ./...` passed for the complete repository (exit 0), with `GOFLAGS=-p=1`

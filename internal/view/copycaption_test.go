@@ -11,6 +11,7 @@ import (
 
 func TestCopyCaptionsAcrossPages(t *testing.T) {
 	view.SetLang("zh")
+	t.Cleanup(func() { view.SetLang("en") }) // parallel tests rely on the default language
 	e := libEnv(t)
 	e.MustRun("pin", "ws:5100")
 	e.WriteMod(filepath.Join(e.Game, "Mods", "Lockable Copy"), testkit.Sample("tester.lock", "Legacy Lockable"))

@@ -67,6 +67,7 @@ func TestUninstallPalette(t *testing.T) {
 }
 
 func TestUninstallIgnoresQuitKeysWhileWorkerRuns(t *testing.T) {
+	t.Parallel()
 	for _, commandLine := range []bool{false, true} {
 		name := "panel"
 		if commandLine {
@@ -133,6 +134,7 @@ func testUninstallQuitKeys(t *testing.T, commandLine bool) {
 // More progress than the queue can hold must not prevent completion if the
 // terminal stops consuming input/output halfway through the uninstall.
 func TestUninstallWorkerFinishesWithoutTerminal(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 140, 40)
 	for i := 0; i < 20; i++ {
@@ -158,6 +160,7 @@ func TestUninstallWorkerFinishesWithoutTerminal(t *testing.T) {
 }
 
 func TestUninstallChangedAnswersRequireReview(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 140, 40)
 	m.uninstallPanel()
@@ -180,6 +183,7 @@ func TestUninstallChangedAnswersRequireReview(t *testing.T) {
 }
 
 func TestUninstallReviewsQuotedDestination(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 140, 40)
 	destination := filepath.Join(e.Root, "synthetic kept packs")

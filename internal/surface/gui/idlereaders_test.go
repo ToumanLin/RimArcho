@@ -66,6 +66,7 @@ func TestHomeMemoryReusesLaunchReader(t *testing.T) {
 }
 
 func TestIdlePageReadersClose(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	api.Board()
 	if _, err := api.Library("", nil, ""); err != nil {

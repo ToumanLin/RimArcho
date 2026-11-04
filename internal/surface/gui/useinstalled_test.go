@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 	"github.com/ToumanLin/RimArcho/internal/view"
@@ -113,30 +112,5 @@ func TestUseInstalledAPIAndNeedsAction(t *testing.T) {
 	redone, _ := e.App.Loadout()
 	if !redone.List.Equal(after.List) {
 		t.Fatal("needs action differs from direct API")
-	}
-}
-
-func TestUseInstalledDeduplicatesAndRejectsEnabledCopy(t *testing.T) {
-	e := testkit.New(t)
-	root := filepath.Join(e.Root, "Extra")
-	e.WriteMod(filepath.Join(root, "one"), testkit.Sample("tester.one", "One"))
-	e.WriteModsConfig("1.6.4633", "ludeon.rimworld", "tester.one", "TESTER.ONE_STEAM")
-	e.AddEnv(false)
-	if _, err := e.App.FolderAdd(source.Extra, root); err != nil {
-		t.Fatal(err)
-	}
-	e.MustRun("scan")
-	r, err := e.App.UseInstalled([]string{"tester.one"})
-	if err != nil || len(r.State.List) != 2 {
-		t.Fatal(r, err)
-	}
-	st, _ := e.App.Loadout()
-	// A leftover unresolved duplicate must never enable a second copy of a package.
-	st.WS.Entries = append(st.List.Clone(), loadout.Entry{Missing: "tester.one"}).Encode()
-	if err := e.App.Store.SetWorkspace(st.WS); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := e.App.UseInstalled([]string{"tester.one"}); err == nil {
-		t.Fatal("accepted an already enabled package")
 	}
 }

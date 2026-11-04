@@ -11,7 +11,7 @@ import (
 // P3 (04 §1.6): the game now is not among the versions the list allows: one counted item in
 // for you to confirm; "add 1.6" allows it and the item goes. Launching is not stopped by it.
 func TestGameNotAllowedNeed(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("2009463077", testkit.Mod{PackageID: "brrainz.harmony", Name: "Harmony"})
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "brrainz.harmony")

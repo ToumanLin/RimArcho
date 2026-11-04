@@ -36,6 +36,7 @@ func shellEnv(t *testing.T) (*testkit.Env, *view.Board, *view.Needs) {
 }
 
 func TestNavAndPath(t *testing.T) {
+	t.Parallel()
 	e, _, n := shellEnv(t)
 	plans, err := view.PlanRows(e.App)
 	if err != nil || len(plans) != 1 {
@@ -94,6 +95,7 @@ func TestNavAndPath(t *testing.T) {
 }
 
 func TestBuildHome(t *testing.T) {
+	t.Parallel()
 	e, b, n := shellEnv(t)
 	if view.BreakCount(n) != 1 {
 		t.Fatalf("break count %d: %+v", view.BreakCount(n), n.Items)
@@ -175,7 +177,7 @@ func TestBuildHome(t *testing.T) {
 }
 
 func TestFindAndAddGames(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e := testkit.New(t)
 	gs := view.FindGames(e.App)
 	if len(gs) != 1 || gs[0].Name != "1.6" || gs[0].Launch != "steam" || gs[0].Workshop == "" || gs[0].Env != "" || gs[0].Version == "" {

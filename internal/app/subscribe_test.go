@@ -327,6 +327,7 @@ func TestSubscribedDirectoryMove(t *testing.T) {
 }
 
 func TestUpdateWorkshopGroups(t *testing.T) {
+	t.Parallel()
 	e := setup(t, true)
 	roots := []string{
 		filepath.Join(e.Root, "batch library A", "steamapps", "workshop", "content", "294100"),
@@ -510,6 +511,7 @@ func TestUpdateWorkshopGitOrdering(t *testing.T) {
 }
 
 func TestUpdateWorkshopGroupsAcrossSkippedPages(t *testing.T) {
+	t.Parallel()
 	e := setup(t, true)
 	e.WriteMod(filepath.Join(e.SteamCMD, "8100"), testkit.Sample("group.first", "A Workshop"))
 	e.WriteMod(filepath.Join(e.SteamCMD, "8200"), testkit.Sample("group.last", "C Workshop"))
@@ -544,6 +546,7 @@ func TestUpdateWorkshopGroupsAcrossSkippedPages(t *testing.T) {
 }
 
 func TestUpdateWorkshopJunctionCacheAndRetiredSource(t *testing.T) {
+	t.Parallel()
 	for _, retired := range []bool{false, true} {
 		t.Run(fmt.Sprint(retired), func(t *testing.T) {
 			e := setup(t, false)

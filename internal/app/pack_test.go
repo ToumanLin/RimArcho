@@ -27,25 +27,19 @@ func packEnv(t *testing.T) *testkit.Env {
 	return e
 }
 
-// K2: a pack is not built while something needs fixing (here: a list entry not installed).
-func TestPackBuildBlocked(t *testing.T) {
-	t.Parallel()
-	e := packEnv(t)
-	out, code := e.Run("pack", "build", "first")
-	if code == 0 || !strings.Contains(out, "not installed: pkg:gone.mod") {
-		t.Fatalf("exit %d\n%s", code, out)
-	}
-	if _, err := os.Stat(filepath.Join(e.Home, "packs", "first")); err == nil {
-		t.Fatal("a blocked build wrote a pack")
-	}
-}
-
-// K1, K3, K4, K6: build without other versions' folders; a dry-run launch writes nothing; a
+// K2, K1, K3, K4, K6: a pack is not built while something needs fixing (a list entry not
+// installed); build without other versions' folders; a dry-run launch writes nothing; a
 // launch links the copies, writes the pack's own list and leaves the environment's alone; a
 // scan ignores the pack's links; saving the normal list removes them.
 func TestPackBuildAndLaunch(t *testing.T) {
 	t.Parallel()
 	e := packEnv(t)
+	if out, code := e.Run("pack", "build", "first"); code == 0 || !strings.Contains(out, "not installed: pkg:gone.mod") {
+		t.Fatalf("K2: exit %d\n%s", code, out)
+	}
+	if _, err := os.Stat(filepath.Join(e.Home, "packs", "first")); err == nil {
+		t.Fatal("K2: a blocked build wrote a pack")
+	}
 	e.MustRun("disable", "pkg:gone.mod")
 	e.MustRun("enable", "pkg:tester.versions")
 	e.MustRun("save")

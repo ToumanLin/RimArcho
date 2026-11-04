@@ -23,6 +23,7 @@ const (
 )
 
 func TestInitialContextBudget(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	cs := connectGroup(t, e, mcp.Core)
 	res, err := cs.ListTools(context.Background(), nil)
@@ -60,6 +61,7 @@ func TestInitialContextBudget(t *testing.T) {
 // Every guide topic the topic list names is served by the guide tool, and the list names
 // every tool but guide itself.
 func TestGuideTopics(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	cs := connect(t, e)
 	out, isErr := call(t, cs, "guide", nil)

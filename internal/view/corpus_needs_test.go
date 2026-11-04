@@ -16,6 +16,7 @@ import (
 // the community logs chip and its measured share; weak order preferences folded, dimmed and not
 // counted; the launch hint is the first LaunchChecks code with a counted item.
 func TestCorpusNeeds(t *testing.T) {
+	// Not parallel: known.SetForTesting replaces the process-wide corpus.
 	view.SetLang("en")
 	defer known.SetForTesting(&known.Data{
 		Cutoff:  "2040-03",
@@ -104,7 +105,7 @@ func TestCorpusNeeds(t *testing.T) {
 // The pattern card of a log cluster (06 §2.10): community background  in the player's
 // words; the CLI's English pattern section is left out of the text the interfaces show.
 func TestPatternCard(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("2009463077", testkit.Mod{PackageID: "brrainz.harmony", Name: "Harmony"})
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "brrainz.harmony")

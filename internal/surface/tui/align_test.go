@@ -19,120 +19,117 @@ import (
 
 func screen(m *model) string { return ansi.Strip(m.View()) }
 
-// Search files: all three fields accept text; options restart the shared search.
+// Search files (one fixture; searching does not change it).
 func TestFileSearchPage(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e, _ := fixture(t)
-	m := direct(t, e, 160, 40)
-	runAlias(m, "search files")
-	if m.tab != tabSearch || m.fs.files != view.FileSearchDefaultFiles || !strings.HasPrefix(m.fs.mods, `lists:"`) {
-		t.Fatalf("defaults: %+v", m.fs)
-	}
-	key(m, runes("alpha_Thing?q"))
-	if m.fs.text != "alpha_Thing?q" || m.quitting || m.panel != nil {
-		t.Fatalf("typing: %q", m.fs.text)
-	}
-	key(m, tea.KeyMsg{Type: tea.KeyBackspace})
-	key(m, tea.KeyMsg{Type: tea.KeyBackspace})
-	key(m, tea.KeyMsg{Type: tea.KeyEnter})
-	if m.fs.running || m.fs.page == nil {
-		t.Fatalf("running %v page %+v", m.fs.running, m.fs.page)
-	}
-	text := screen(m)
-	for _, want := range []string{"mod library › search files", "Alpha", "Defs/ThingDefs/alpha.xml", "alpha_Thing"} {
-		if !strings.Contains(text, want) {
-			t.Fatalf("missing %s:\n%s", want, text)
+	// All three fields accept text; options restart the shared search.
+	t.Run("page", func(t *testing.T) {
+		m := direct(t, e, 160, 40)
+		runAlias(m, "search files")
+		if m.tab != tabSearch || m.fs.files != view.FileSearchDefaultFiles || !strings.HasPrefix(m.fs.mods, `lists:"`) {
+			t.Fatalf("defaults: %+v", m.fs)
 		}
-	}
-	if row := m.fs.rows[m.fs.cursor]; !row.cursor || row.file < 0 {
-		t.Fatalf("cursor %+v", row)
-	}
-	key(m, tea.KeyMsg{Type: tea.KeyDown})
-	if m.fs.row != 1 || m.fs.results {
-		t.Fatal("down did not reach files")
-	}
-	key(m, tea.KeyMsg{Type: tea.KeyCtrlU})
-	key(m, runes("patches"))
-	key(m, tea.KeyMsg{Type: tea.KeyEnter})
-	if len(m.fs.rows) != 0 || strings.Count(screen(m), "not found") != 1 {
-		t.Fatalf("patches:\n%s", screen(m))
-	}
-	key(m, tea.KeyMsg{Type: tea.KeyCtrlU})
-	key(m, runes("De"))
-	key(m, tea.KeyMsg{Type: tea.KeyTab})
-	if m.fs.files != "Defs" {
-		t.Fatalf("files completion %q", m.fs.files)
-	}
-	key(m, tea.KeyMsg{Type: tea.KeyEnter})
-	key(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r"), Alt: true})
-	if !m.fs.regex || len(m.fs.rows) == 0 {
-		t.Fatal("regex did not rerun")
-	}
-	key(m, tea.KeyMsg{Type: tea.KeyDown})
-	if m.fs.row != 2 {
-		t.Fatal("down did not reach mods")
-	}
-	key(m, tea.KeyMsg{Type: tea.KeyCtrlU})
-	m.fs.text = "beta_Thing"
-	key(m, tea.KeyMsg{Type: tea.KeyEnter})
-	if !strings.Contains(screen(m), "Beta") {
-		t.Fatalf("blank mods did not include disabled copy:\n%s", screen(m))
-	}
-	key(m, tea.KeyMsg{Type: tea.KeyCtrlU})
-	key(m, runes("name:Alpha"))
-	key(m, tea.KeyMsg{Type: tea.KeyEnter})
-	if len(m.fs.rows) != 0 {
-		t.Fatal("library query did not scope copies")
-	}
-	key(m, tea.KeyMsg{Type: tea.KeyEsc})
-	key(m, tea.KeyMsg{Type: tea.KeyEsc})
-	key(m, tea.KeyMsg{Type: tea.KeyEsc})
-	if m.tab != tabList {
-		t.Fatalf("esc ×3: %d", m.tab)
-	}
-}
-
-// Leaving Search files cancels its search (06 §3.1 rule 9).
-func TestFileSearchLeaveStops(t *testing.T) {
-	view.SetLang("en")
-	e, _ := fixture(t)
-	m := direct(t, e, 160, 40)
-	m.openSearch()
-	m.fs.text = "x"
-	m.fsRun() // not drained: it is still running
-	if !m.fs.running {
-		t.Fatal("not running")
-	}
-	key(m, tea.KeyMsg{Type: tea.KeyShiftTab})
-	if m.tab != tabSubscribe || m.fs.running || m.fs.cancel != nil {
-		t.Fatalf("tab %d running %v", m.tab, m.fs.running)
-	}
-}
-
-func TestFileSearchEscapeStopsAndKeepsResults(t *testing.T) {
-	view.SetLang("en")
-	e, _ := fixture(t)
-	m := direct(t, e, 160, 40)
-	m.openSearch()
-	m.fs.text = "alpha_Thing"
-	key(m, tea.KeyMsg{Type: tea.KeyEnter})
-	count := len(m.fs.rows)
-	if count == 0 {
-		t.Fatal("no initial results")
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	m.fs.cancel = cancel
-	m.fs.running = true
-	key(m, tea.KeyMsg{Type: tea.KeyEsc})
-	if ctx.Err() == nil || m.fs.running || len(m.fs.rows) != count {
-		t.Fatal("escape did not preserve stopped results")
-	}
+		key(m, runes("alpha_Thing?q"))
+		if m.fs.text != "alpha_Thing?q" || m.quitting || m.panel != nil {
+			t.Fatalf("typing: %q", m.fs.text)
+		}
+		key(m, tea.KeyMsg{Type: tea.KeyBackspace})
+		key(m, tea.KeyMsg{Type: tea.KeyBackspace})
+		key(m, tea.KeyMsg{Type: tea.KeyEnter})
+		if m.fs.running || m.fs.page == nil {
+			t.Fatalf("running %v page %+v", m.fs.running, m.fs.page)
+		}
+		text := screen(m)
+		for _, want := range []string{"mod library › search files", "Alpha", "Defs/ThingDefs/alpha.xml", "alpha_Thing"} {
+			if !strings.Contains(text, want) {
+				t.Fatalf("missing %s:\n%s", want, text)
+			}
+		}
+		if row := m.fs.rows[m.fs.cursor]; !row.cursor || row.file < 0 {
+			t.Fatalf("cursor %+v", row)
+		}
+		key(m, tea.KeyMsg{Type: tea.KeyDown})
+		if m.fs.row != 1 || m.fs.results {
+			t.Fatal("down did not reach files")
+		}
+		key(m, tea.KeyMsg{Type: tea.KeyCtrlU})
+		key(m, runes("patches"))
+		key(m, tea.KeyMsg{Type: tea.KeyEnter})
+		if len(m.fs.rows) != 0 || strings.Count(screen(m), "not found") != 1 {
+			t.Fatalf("patches:\n%s", screen(m))
+		}
+		key(m, tea.KeyMsg{Type: tea.KeyCtrlU})
+		key(m, runes("De"))
+		key(m, tea.KeyMsg{Type: tea.KeyTab})
+		if m.fs.files != "Defs" {
+			t.Fatalf("files completion %q", m.fs.files)
+		}
+		key(m, tea.KeyMsg{Type: tea.KeyEnter})
+		key(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("r"), Alt: true})
+		if !m.fs.regex || len(m.fs.rows) == 0 {
+			t.Fatal("regex did not rerun")
+		}
+		key(m, tea.KeyMsg{Type: tea.KeyDown})
+		if m.fs.row != 2 {
+			t.Fatal("down did not reach mods")
+		}
+		key(m, tea.KeyMsg{Type: tea.KeyCtrlU})
+		m.fs.text = "beta_Thing"
+		key(m, tea.KeyMsg{Type: tea.KeyEnter})
+		if !strings.Contains(screen(m), "Beta") {
+			t.Fatalf("blank mods did not include disabled copy:\n%s", screen(m))
+		}
+		key(m, tea.KeyMsg{Type: tea.KeyCtrlU})
+		key(m, runes("name:Alpha"))
+		key(m, tea.KeyMsg{Type: tea.KeyEnter})
+		if len(m.fs.rows) != 0 {
+			t.Fatal("library query did not scope copies")
+		}
+		key(m, tea.KeyMsg{Type: tea.KeyEsc})
+		key(m, tea.KeyMsg{Type: tea.KeyEsc})
+		key(m, tea.KeyMsg{Type: tea.KeyEsc})
+		if m.tab != tabList {
+			t.Fatalf("esc ×3: %d", m.tab)
+		}
+	})
+	// Leaving Search files cancels its search (06 §3.1 rule 9).
+	t.Run("leave stops", func(t *testing.T) {
+		m := direct(t, e, 160, 40)
+		m.openSearch()
+		m.fs.text = "x"
+		m.fsRun() // not drained: it is still running
+		if !m.fs.running {
+			t.Fatal("not running")
+		}
+		key(m, tea.KeyMsg{Type: tea.KeyShiftTab})
+		if m.tab != tabSubscribe || m.fs.running || m.fs.cancel != nil {
+			t.Fatalf("tab %d running %v", m.tab, m.fs.running)
+		}
+	})
+	t.Run("escape stops and keeps results", func(t *testing.T) {
+		m := direct(t, e, 160, 40)
+		m.openSearch()
+		m.fs.text = "alpha_Thing"
+		key(m, tea.KeyMsg{Type: tea.KeyEnter})
+		count := len(m.fs.rows)
+		if count == 0 {
+			t.Fatal("no initial results")
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		m.fs.cancel = cancel
+		m.fs.running = true
+		key(m, tea.KeyMsg{Type: tea.KeyEsc})
+		if ctx.Err() == nil || m.fs.running || len(m.fs.rows) != count {
+			t.Fatal("escape did not preserve stopped results")
+		}
+	})
 }
 
 // H lists every step and version, and enter goes there; A checks the files; 4 on a screen
 // with no detail column opens the full-screen detail (06 §2.5, §3.5).
 func TestEditorKeysOfTheWindow(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 160, 40)
 	press(m, "1")
@@ -171,7 +168,7 @@ func TestEditorKeysOfTheWindow(t *testing.T) {
 
 // The window's names on the TUI's pages (06 §2.1, §2.9).
 func TestWindowNames(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 160, 40)
 	if top := strings.Split(screen(m), "\n")[0]; strings.Contains(top, "needs attention") {
@@ -219,7 +216,7 @@ func TestWindowNames(t *testing.T) {
 // the candidates; the rule is listed under only the current list; Del removes it, u puts it back with
 // its number; enter changes it; letters in the form are the form's.
 func TestRulesScreen(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 160, 40)
 	press(m, "2")
@@ -297,7 +294,7 @@ func TestRulesScreen(t *testing.T) {
 // F on Can it run enables the installed requirement and sorts; the check Can it run then starts
 // by itself says so in the head and leaves the status line's undo hint alone (06 §2.4).
 func TestAutoFixKeepsTheUndoHint(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e, _ := fixture(t)
 	g := testkit.Sample("tester.g", "Gamma")
 	g.Deps = []string{"tester.b"}
@@ -337,7 +334,7 @@ func TestAutoFixKeepsTheUndoHint(t *testing.T) {
 // Start (06 §2.3, §9.1): shift+1 and the editor's L open it; it shows the current list and
 // ▶ launch game, and only L there launches.
 func TestStartPage(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 160, 40)
 	key(m, runes("!"))
@@ -362,7 +359,7 @@ func TestStartPage(t *testing.T) {
 // Lists are opened, not switched to (04 §1.3): P opens another list, the top bar says which
 // one launches, make current or the editor's L makes it current.
 func TestOpenListIsNotCurrent(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e, _ := fixture(t)
 	e.MustRun("plan", "new", "second")
 	m := direct(t, e, 160, 40)
@@ -402,7 +399,7 @@ func TestOpenListIsNotCurrent(t *testing.T) {
 
 // T (06 §3.5): in staging everything goes back; elsewhere every enabled mod is staged.
 func TestStageAllKey(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 160, 40)
 	m.focus = cActive

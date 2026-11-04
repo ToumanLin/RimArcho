@@ -9,6 +9,7 @@ import (
 )
 
 func TestDirectorySettingsAndWarning(t *testing.T) {
+	t.Parallel()
 	e, _, _ := shellEnv(t)
 	dirs, err := e.App.ManagedDirectories()
 	if err != nil {

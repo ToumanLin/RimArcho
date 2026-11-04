@@ -20,5 +20,5 @@ Pages must load quickly and use little memory. Requirements and thresholds: 06 ย
 
 ## Tests
 
-- `go test ./...`, `node --test "scripts/vm/*.test.mjs" "feedback-relay/*.test.mjs"`.
+- `go test -count=1 ./...` (`-count=1` skips the test cache, whose file-access recording is slow on Windows), `node --test "scripts/vm/*.test.mjs" "feedback-relay/*.test.mjs"`.
 - Automated tests use only synthetic data (`internal/testkit`). Touch real games, Mods and `%APPDATA%\RimArcho` only inside the VM ([scripts/vm/README.md](scripts/vm/README.md); safety rules: 07 ยง4).

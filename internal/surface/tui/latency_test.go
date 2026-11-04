@@ -87,8 +87,8 @@ func report(t *testing.T, lat map[string][]time.Duration) time.Duration {
 
 // 06 §11 T1 on a synthetic environment of 1354 mods (485 enabled, CJK names among them).
 func TestT1KeyLatency1354(t *testing.T) {
-	if testing.Short() {
-		t.Skip("builds and scans 1354 mods")
+	if os.Getenv("RIMARCHO_SCALE_TESTS") == "" {
+		t.Skip("set RIMARCHO_SCALE_TESTS=1: builds and scans 1354 mods (about a minute)")
 	}
 	e := testkit.New(t)
 	active := []string{"ludeon.rimworld"}

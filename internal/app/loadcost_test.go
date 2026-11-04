@@ -146,6 +146,7 @@ func TestPlanLoadCostMissingLoadFolder(t *testing.T) {
 }
 
 func TestPlanLoadCostUsesSelectedEnvironmentVersion(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	dir := e.AddWorkshop("3199", testkit.Sample("tester.versions", "Versions"))
 	e.WriteFile(filepath.Join(dir, "LoadFolders.xml"), "<loadFolders><v1.6><li>1.6</li></v1.6><v1.7><li>1.7</li></v1.7></loadFolders>")

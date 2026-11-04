@@ -12,6 +12,7 @@ import (
 )
 
 func TestUninstallRelocatedSourceLibrary(t *testing.T) {
+	t.Parallel()
 	f := uninstallFixture(t)
 	root := filepath.Join(f.Root, "Moved source")
 	f.WriteFile(filepath.Join(f.App.SourceDir(), "game", "1.6", "Assembly-CSharp", "Pawn.cs"), "generated source")
@@ -54,6 +55,7 @@ func TestUninstallRelocatedSourceLibrary(t *testing.T) {
 }
 
 func TestUninstallSourceLibraryCoveredByData(t *testing.T) {
+	t.Parallel()
 	for _, local := range []bool{false, true} {
 		t.Run(map[bool]string{false: "home", true: "local"}[local], func(t *testing.T) {
 			f := uninstallFixture(t)
@@ -82,6 +84,7 @@ func TestUninstallSourceLibraryCoveredByData(t *testing.T) {
 }
 
 func TestUninstallRefusesSourceLibraryLinks(t *testing.T) {
+	t.Parallel()
 	for _, kind := range []string{"root", "ancestor", "child"} {
 		t.Run(kind, func(t *testing.T) {
 			f := uninstallFixture(t)
@@ -127,6 +130,7 @@ func TestUninstallRefusesSourceLibraryLinks(t *testing.T) {
 }
 
 func TestUninstallRechecksSourceLibraryBeforeDeletion(t *testing.T) {
+	t.Parallel()
 	for _, changed := range []string{"link", "record"} {
 		t.Run(changed, func(t *testing.T) {
 			f := uninstallFixture(t)

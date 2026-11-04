@@ -127,6 +127,7 @@ func TestLogPageMonitor(t *testing.T) {
 
 // 06 §2.10: while the game runs, the section comes from the live tracker's companion log.
 func TestLiveMonitor(t *testing.T) {
+	t.Parallel()
 	e, player, _ := realRun(t)
 	e.App.GameProbe = func(root string) *app.GameRun {
 		if root == e.Game {
@@ -164,6 +165,7 @@ func TestLiveMonitor(t *testing.T) {
 
 // A run without the monitor's log, and no monitor installed: one line says so, no action.
 func TestLogPageNoMonitor(t *testing.T) {
+	t.Parallel()
 	e, player, monitor := realRun(t)
 	if err := os.Remove(monitor); err != nil {
 		t.Fatal(err)
@@ -183,6 +185,7 @@ func TestLogPageNoMonitor(t *testing.T) {
 
 // A new monitor must replace the tracker's old RimCrow section even before its next poll.
 func TestLogPagePrefersNewMonitor(t *testing.T) {
+	t.Parallel()
 	e, player, monitor := realRun(t)
 	content, err := os.ReadFile(monitor)
 	if err != nil {
@@ -242,6 +245,7 @@ func TestLogPagePrefersNewMonitor(t *testing.T) {
 }
 
 func TestLogPageRejectsStaleCrow(t *testing.T) {
+	t.Parallel()
 	e, player, monitor := realRun(t)
 	prev := filepath.Join(filepath.Dir(player), "Player-prev.log")
 	if err := os.Rename(player, prev); err != nil {

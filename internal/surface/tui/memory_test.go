@@ -11,6 +11,7 @@ import (
 )
 
 func TestMemoryTUIBackgroundComparison(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	e.App.MemoryProbe = func() machine.Memory {
 		return machine.Memory{TotalRAM: 8 << 30, AvailableRAM: 1, SampledAt: time.Now(), Adapters: []machine.Adapter{{Name: "fixture", Dedicated: 1}}}
@@ -43,6 +44,7 @@ func TestMemoryTUIBackgroundComparison(t *testing.T) {
 }
 
 func TestMemoryLaunchCancelApproveAndStale(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	e.MustRun("sort")
 	e.App.MemoryProbe = func() machine.Memory {

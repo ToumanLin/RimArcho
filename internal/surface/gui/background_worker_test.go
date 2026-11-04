@@ -265,6 +265,7 @@ func TestMissingAndBrokenAssetsKeepOfficialPreview(t *testing.T) {
 }
 
 func TestMenuCachedArtPublishedBeforeMissingExtraction(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	menuGame(t, e.Game)
 	cache := filepath.Join(e.App.Home, "cache", "backgrounds")
@@ -312,6 +313,7 @@ func TestMenuCachedArtPublishedBeforeMissingExtraction(t *testing.T) {
 }
 
 func TestMenuWorkerUsesOtherRegisteredGame(t *testing.T) {
+	t.Parallel()
 	e, api, events := fixture(t)
 	menuGame(t, e.Game)
 	if err := os.WriteFile(filepath.Join(e.Game, "Assets.zip"), []byte("selected source is broken"), 0644); err != nil {

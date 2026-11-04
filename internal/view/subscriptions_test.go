@@ -168,7 +168,7 @@ func TestSubscriptionsThreeSections(t *testing.T) {
 }
 
 func TestSubscriptionSourceStates(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e := testkit.New(t)
 	e.App.SteamCMDNoPath = true
 	e.WriteFile(filepath.Join(e.App.LocalDir(), "steamcmd", "steamcmd.exe"), "fixture executable")

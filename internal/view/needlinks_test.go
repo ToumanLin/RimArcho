@@ -80,7 +80,7 @@ func TestNeedLinksAcrossSurfaces(t *testing.T) {
 }
 
 func TestMissingAndFoldedNameLinks(t *testing.T) {
-	SetLang("en")
+	t.Parallel()
 	e, st := linkFixture(t)
 	ps := &app.ProblemSet{List: []*app.Problem{{Finding: &finding.Finding{Code: "dep.missing",
 		Subjects: []string{"pkg:tester.absent"}, Claim: "requires Absent Framework (pkg:tester.absent)",
@@ -128,6 +128,7 @@ func TestMissingAndFoldedNameLinks(t *testing.T) {
 }
 
 func TestNeedLinksLimitedToItem(t *testing.T) {
+	t.Parallel()
 	e, st := linkFixture(t)
 	a, _ := st.Ix.ResolveOne("pkg:tester.m0")
 	b, _ := st.Ix.ResolveOne("pkg:tester.m1")
@@ -177,7 +178,7 @@ func TestNeedLinksLimitedToItem(t *testing.T) {
 }
 
 func TestNeedLinksKeepEachProblemsMissingTarget(t *testing.T) {
-	SetLang("en")
+	t.Parallel()
 	e, st := linkFixture(t)
 	a, _ := st.Ix.ResolveOne("pkg:tester.m0")
 	ps := &app.ProblemSet{}
@@ -213,7 +214,7 @@ func TestNeedLinksKeepEachProblemsMissingTarget(t *testing.T) {
 }
 
 func TestCorpusAndDeclaredDependenciesStaySeparate(t *testing.T) {
-	SetLang("en")
+	t.Parallel()
 	e, st := linkFixture(t)
 	a, _ := st.Ix.ResolveOne("pkg:tester.m0")
 	b, _ := st.Ix.ResolveOne("pkg:tester.m1")
@@ -253,6 +254,7 @@ func TestCorpusAndDeclaredDependenciesStaySeparate(t *testing.T) {
 }
 
 func TestCorpusCutoffComesFromEmbeddedData(t *testing.T) {
+	// Not parallel: known.SetForTesting replaces the process-wide corpus.
 	if known.Get().Cutoff == "" {
 		t.Fatal("embedded corpus must carry its cutoff")
 	}

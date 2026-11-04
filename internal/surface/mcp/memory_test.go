@@ -13,6 +13,7 @@ import (
 )
 
 func TestMemoryToolParityAndSeverity(t *testing.T) {
+	t.Parallel()
 	got, err := mcp.ArgvFor("estimate_memory", []byte(`{"plan":"small"}`))
 	if err != nil || !reflect.DeepEqual(got, []string{"plan", "cost", "small"}) {
 		t.Fatalf("argv %v %v", got, err)
@@ -37,6 +38,7 @@ func TestMemoryToolParityAndSeverity(t *testing.T) {
 }
 
 func TestMemoryToolRAMLevels(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddEnv(false)
 	e.MustRun("scan")

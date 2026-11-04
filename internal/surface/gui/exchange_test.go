@@ -67,6 +67,7 @@ func (n *selectionNative) setClipboard(string) bool                             
 func (n *selectionNative) clipboard() (string, bool)                            { return "", false }
 
 func TestNativeAddressSelections(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	n := &selectionNative{picked: filepath.Join(e.Root, "合成目录", "new")}
 	api.x.native = n

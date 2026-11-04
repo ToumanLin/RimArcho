@@ -349,6 +349,7 @@ func TestT7Wrapping(t *testing.T) {
 }
 
 func TestDetailTextOnly(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 160, 40)
 	press(m, "home")

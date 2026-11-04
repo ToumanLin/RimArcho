@@ -9,6 +9,7 @@ import (
 )
 
 func TestGoldenDeps(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.App.SteamCMDNoPath = true
 	e.WriteFile(filepath.Join(e.App.LocalDir(), deps.SteamCMD, "steamcmd.exe"), "fake")

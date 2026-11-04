@@ -10,6 +10,7 @@ import (
 )
 
 func TestVersionMuteDetailRefresh(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.WriteFile(filepath.Join(e.Game, "Version.txt"), "1.7.5000 rev1")
 	e.AddWorkshop("1001", testkit.Mod{PackageID: "tester.a", Name: "Alpha", Supported: []string{"1.6"}})

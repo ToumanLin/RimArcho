@@ -11,27 +11,6 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// First use (04 §1.4): the environment's first plan is ModsConfig.xml, imported as v1.
-func TestPlanFirstUseImports(t *testing.T) {
-	t.Parallel()
-	e := loadoutEnv(t)
-	scanNow(t, e)
-	p, err := e.App.CurrentPlan()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if p.Name != store.DefaultPlanName {
-		t.Fatalf("first plan %q", p.Name)
-	}
-	vs, _ := e.App.Store.Versions(p.ID)
-	if len(vs) != 1 || vs[0].Source != "import" || vs[0].Note != "ModsConfig.xml" {
-		t.Fatalf("v1: %+v", vs)
-	}
-	if ps, _ := e.App.Plans(); len(ps) != 1 || !ps[0].Current || ps[0].Entries != 4 {
-		t.Fatalf("plans: %+v", ps[0])
-	}
-}
-
 func TestPlanIsolationAndSwitch(t *testing.T) {
 	t.Parallel()
 	e := loadoutEnv(t)

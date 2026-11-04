@@ -48,6 +48,7 @@ func TestG13NeedsSectionsTUI(t *testing.T) {
 }
 
 func TestNeedsPhaseHeadingsAreNotCursorItems(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 160, 40)
 	press(m, "@")

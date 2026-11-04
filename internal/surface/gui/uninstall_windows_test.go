@@ -3,6 +3,7 @@ package gui
 import "testing"
 
 func TestUninstallSessionEnd(t *testing.T) {
+	t.Parallel()
 	s := &API{}
 	if _, handled := s.uninstallSessionEnd(0, wmQueryEndSession, 0, 0); handled {
 		t.Fatal("idle session end intercepted")

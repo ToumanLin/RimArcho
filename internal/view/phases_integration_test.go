@@ -12,7 +12,7 @@ import (
 )
 
 func TestPhaseGroupsAndLogSeparators(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e := testkit.New(t)
 	e.WriteMod(filepath.Join(e.Game, "Mods", "Alpha"), testkit.Sample("phase.alpha", "Alpha Props"))
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "phase.alpha")

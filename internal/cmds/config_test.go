@@ -10,6 +10,7 @@ import (
 
 // Settings with free values (06 §3.8, §12.4): a default, a check, and set/get.
 func TestFreeSettings(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	if v := cmds.Setting(e.App, "tags.pinned"); !strings.HasPrefix(v, "框架,美化,") {
 		t.Fatalf("tags.pinned default: %q", v)
@@ -24,6 +25,7 @@ func TestFreeSettings(t *testing.T) {
 }
 
 func TestEnumeratedSettingDefaults(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	for _, tc := range []struct{ key, stored, want string }{
 		{"ui.icons", "", "compat"},

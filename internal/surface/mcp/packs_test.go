@@ -11,6 +11,7 @@ import (
 )
 
 func TestPackCheckTool(t *testing.T) {
+	t.Parallel()
 	for _, in := range []mcp.PackIn{{Action: "check", Name: "pack"}, {Action: "check", File: "file.archopack"}} {
 		ref := in.Name
 		if in.File != "" {

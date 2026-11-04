@@ -10,7 +10,7 @@ import (
 
 // Hidden mods are listed on Can it run but not counted in the sidebar's number (06 §2.1).
 func TestHiddenModsNotCounted(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("2009463077", testkit.Mod{PackageID: "brrainz.harmony", Name: "Harmony"})
 	dir := e.AddWorkshop("1002", testkit.Sample("tester.h", "Hidden One"))

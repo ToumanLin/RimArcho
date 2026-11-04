@@ -9,6 +9,7 @@ import (
 )
 
 func TestSearchNextPreservesScope(t *testing.T) {
+	t.Parallel()
 	command, _ := lookup([]string{"files", "search"})
 	a, err := parse(command, []string{"--mod", "#one", "--mod", "pkg:a.b", "--regex", "--case", "--word", "--def", "--kind", "defs,patches", "--languages", "--lang", "English", "--lang", "Chinese Simplified", "--all-versions", "--game", "without", "--mode", "files", "--limit", "3", "--per-file", "2", "--game-version", "1.5", "--page", "1", "--", "--Odd 'Target' $name"})
 	if err != nil {

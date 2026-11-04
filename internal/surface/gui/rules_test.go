@@ -110,8 +110,7 @@ func TestRulesIgnoreRow(t *testing.T) {
 }
 
 // The second mod's candidates: by name, one per mod, never the rule's own mod.
-func TestRuleCandidates(t *testing.T) {
-	_, s, _ := fixture(t)
+func ruleCandidates(t *testing.T, _ *testkit.Env, s *API) {
 	c, err := s.RuleCandidates("a", "pkg:tester.a")
 	if err != nil {
 		t.Fatal(err)
@@ -131,6 +130,7 @@ func TestRuleCandidates(t *testing.T) {
 
 // archo rule edit keeps r:<n>.
 func TestRuleEditCommand(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("2009463077", testkit.Mod{PackageID: "brrainz.harmony", Name: "Harmony"})
 	e.AddWorkshop("1001", testkit.Sample("tester.a", "Alpha"))

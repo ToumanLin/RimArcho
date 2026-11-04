@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/machine"
 	"github.com/ToumanLin/RimArcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // Start is the fake clock's initial time.
@@ -75,8 +77,45 @@ func New(t testing.TB) *Env {
 		strings.ReplaceAll(e.Steam, `\`, `\\`)))
 	e.WriteFile(filepath.Join(e.UserData, "Config", "ModsConfig.xml"),
 		"<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<ModsConfigData>\n  <version>1.6.4633 rev1261</version>\n  <activeMods>\n    <li>ludeon.rimworld</li>\n  </activeMods>\n</ModsConfigData>\n")
+	e.WriteFile(filepath.Join(e.Home, "archo.db"), string(emptySchema(t)))
 	e.Open()
 	return e
+}
+
+var schemaOnce struct {
+	sync.Once
+	db  []byte
+	err error
+}
+
+// emptySchema is a new database file at the current schema version, built once per test
+// process. Creating the schema runs every migration step's SQL (about 30 ms); copying the
+// file is much cheaper, and app.Open then opens it like any existing database.
+func emptySchema(t testing.TB) []byte {
+	t.Helper()
+	schemaOnce.Do(func() {
+		dir, err := os.MkdirTemp("", "testkit-schema-")
+		if err != nil {
+			schemaOnce.err = err
+			return
+		}
+		defer os.RemoveAll(dir)
+		path := filepath.Join(dir, "archo.db")
+		s, err := store.Open(path)
+		if err != nil {
+			schemaOnce.err = err
+			return
+		}
+		if err := s.Close(); err != nil {
+			schemaOnce.err = err
+			return
+		}
+		schemaOnce.db, schemaOnce.err = os.ReadFile(path)
+	})
+	if schemaOnce.err != nil {
+		t.Fatal(schemaOnce.err)
+	}
+	return schemaOnce.db
 }
 
 // Open (re)opens the RimArcho data directory with deterministic clock and IDs.
@@ -114,6 +153,8 @@ func (e *Env) Open() {
 		return nil
 	}
 	a.TestGameStart = func(*exec.Cmd) error { return fmt.Errorf("test game starter not configured") }
+	// Workshop retries do not sleep through the real 5 s / 15 s backoff.
+	a.SteamCMDWait = func(time.Duration) {}
 	// The Def/Patch analysis runs in-process instead of an `archo analyze` child.
 	a.AnalyzeRunner = app.InProcessAnalyze(a)
 	// Never go online: a test that needs a remote serves it on loopback (httptest) and points

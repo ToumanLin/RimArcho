@@ -352,6 +352,7 @@ func TestUninstallRefused(t *testing.T) {
 }
 
 func TestUninstallExecutionSkipsDirectorySizes(t *testing.T) {
+	t.Parallel()
 	f := uninstallFixture(t)
 	o := app.UninstallOptions{KeepLocked: true}
 	preview, err := f.App.PlanUninstall(o)

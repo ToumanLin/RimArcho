@@ -39,6 +39,7 @@ func versionProblemCounts(t *testing.T, e *testkit.Env) (active, muted int) {
 }
 
 func TestVersionMuteMigrationAndStorage(t *testing.T) {
+	t.Parallel()
 	e := versionMuteEnv(t)
 	e.DowngradeFacts()
 	if _, err := e.App.Store.DB.Exec(`ALTER TABLE snapshot DROP COLUMN kinds; ALTER TABLE snapshot DROP COLUMN langs; DROP TABLE version_mute; UPDATE meta SET value='22' WHERE key='schema_version'`); err != nil {
@@ -71,6 +72,7 @@ func TestVersionMuteMigrationAndStorage(t *testing.T) {
 }
 
 func TestVersionMuteAcrossPlansGamesUpdatesAndCopies(t *testing.T) {
+	t.Parallel()
 	e := versionMuteEnv(t)
 	e.MustRun("problems", "mute-version", "pkg:tester.a")
 	e.MustRun("plan", "new", "other", "--from", "current")
@@ -126,6 +128,7 @@ func TestVersionMuteAcrossPlansGamesUpdatesAndCopies(t *testing.T) {
 }
 
 func TestVersionMuteCountsAndAtomicValidation(t *testing.T) {
+	t.Parallel()
 	e := versionMuteEnv(t)
 	st, err := e.App.Loadout()
 	if err != nil {

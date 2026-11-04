@@ -43,9 +43,28 @@ func names(items []view.Item) string {
 }
 
 // G1: the GUI shows view's structures; nothing is rebuilt in the surface.
+// The read-only checks share one fixture; subtests run in order, and the
+// first one sees the fixture untouched.
 func TestSameViewModels(t *testing.T) {
 	t.Parallel()
 	e, api, _ := fixture(t)
+	for _, c := range []struct {
+		name string
+		run  func(*testing.T, *testkit.Env, *API)
+	}{
+		{"Board", sameViewModels},
+		{"ShellAndHome", shellAndHome},
+		{"ModCopies", modCopies},
+		{"RuleCandidates", ruleCandidates},
+		{"DetailPageActions", detailPageActions},
+		{"PreviewAndInspect", previewAndInspect},
+		{"SteamWorkshop", steamWorkshop}, // last: replaces api.open
+	} {
+		t.Run(c.name, func(t *testing.T) { c.run(t, e, api) })
+	}
+}
+
+func sameViewModels(t *testing.T, e *testkit.Env, api *API) {
 	b := api.Board()
 	want, err := view.BuildBoard(e.App)
 	if err != nil {
@@ -177,9 +196,7 @@ func TestRunAtOnce(t *testing.T) {
 	}
 }
 
-func TestPreviewAndInspect(t *testing.T) {
-	t.Parallel()
-	_, api, _ := fixture(t)
+func previewAndInspect(t *testing.T, _ *testkit.Env, api *API) {
 	p, err := api.Preview(view.ListSort)
 	if err != nil || len(p.Lines) == 0 {
 		t.Fatalf("sort preview: %+v %v", p, err)
@@ -266,6 +283,7 @@ func TestStageAll(t *testing.T) {
 // answer while it copies, a second build is refused, and "pack" events carry the
 // progress and the end.
 func TestPackBuildBackground(t *testing.T) {
+	t.Parallel()
 	e, api, events := fixture(t)
 	release := make(chan struct{})
 	api.PackRunner = func(name string) error {

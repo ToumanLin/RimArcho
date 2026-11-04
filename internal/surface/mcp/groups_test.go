@@ -34,6 +34,7 @@ func listed(t *testing.T, cs *sdk.ClientSession) []string {
 }
 
 func TestToolGroups(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	want := slices.Clone(coreTools)
 	slices.Sort(want)
@@ -74,6 +75,7 @@ func TestToolGroups(t *testing.T) {
 }
 
 func TestParseGroup(t *testing.T) {
+	t.Parallel()
 	for in, want := range map[string]mcp.Group{"": mcp.Core, "core": mcp.Core, "all": mcp.All} {
 		if g, err := mcp.ParseGroup(in); err != nil || g != want {
 			t.Errorf("ParseGroup(%q) = %q, %v; want %q", in, g, err, want)
@@ -88,6 +90,7 @@ func TestParseGroup(t *testing.T) {
 
 // The aliases copy_local and add_rule are gone (05 §6): no group serves them.
 func TestRemovedAliases(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	cs := connect(t, e)
 	for _, name := range []string{"copy_local", "add_rule"} {

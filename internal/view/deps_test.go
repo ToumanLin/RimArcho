@@ -65,6 +65,7 @@ func TestExternalToolsSettings(t *testing.T) {
 }
 
 func TestExternalToolConfiguredEditValue(t *testing.T) {
+	t.Parallel()
 	e, _, _ := shellEnv(t)
 	external := filepath.Join(e.Root, "external", "steamcmd.exe")
 	e.WriteFile(external, "external")
@@ -85,6 +86,7 @@ func TestExternalToolConfiguredEditValue(t *testing.T) {
 }
 
 func TestSteamCMDRemovalHiddenWhenItHoldsMods(t *testing.T) {
+	t.Parallel()
 	e, _, _ := shellEnv(t)
 	e.App.SteamCMDNoPath = true
 	dir := filepath.Join(e.App.LocalDir(), deps.SteamCMD)

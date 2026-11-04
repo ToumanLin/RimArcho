@@ -10,7 +10,7 @@ import (
 // A list entry with nothing installed shows a name when one is known, and a mod removed
 // from disk keeps its name and says it is gone.
 func TestMissingRowsKeepTheModName(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e := testkit.New(t)
 	dir := e.AddWorkshop("3000000001", testkit.Mod{PackageID: "tester.gone", Name: "Gone Mod"})
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.gone", "tester.never")

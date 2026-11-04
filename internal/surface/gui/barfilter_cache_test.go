@@ -7,6 +7,7 @@ import (
 )
 
 func TestBarFilterReusesWorkspaceRowsAndInvalidates(t *testing.T) {
+	t.Parallel()
 	e, api, events := fixture(t)
 	api.Workspace(1)
 	first := environmentResult(t, events, 1)
@@ -51,6 +52,7 @@ func TestBarFilterReusesWorkspaceRowsAndInvalidates(t *testing.T) {
 }
 
 func TestBarFilterRefreshesOtherListMembership(t *testing.T) {
+	t.Parallel()
 	e, api, events := fixture(t)
 	api.Workspace(1)
 	first := environmentResult(t, events, 1)

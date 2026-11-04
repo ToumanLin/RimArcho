@@ -10,6 +10,7 @@ import (
 )
 
 func TestForeignLogCLIParity(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	text := e.HarmonyLogFixture()
 	other := filepath.Join(e.Root, "other-game")

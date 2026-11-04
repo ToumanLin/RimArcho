@@ -20,6 +20,7 @@ import (
 )
 
 func TestTestRunToolReport(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddEnv(false)
 	e.MustRun("scan")

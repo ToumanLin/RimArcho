@@ -38,6 +38,7 @@ func lineText(m *model) string { return string(m.cmdl.text) }
 
 // 06 §9.4: quotes keep spaces in one argument, backslashes stay (Windows paths), # is text.
 func TestCmdLineWords(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		in   string
 		want []string

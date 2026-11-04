@@ -10,6 +10,7 @@ import (
 )
 
 func TestParentProblemRefParity(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("1001", testkit.Mod{PackageID: "test.child", Name: "Child", Files: map[string]string{"Defs/Child.xml": `<Defs><HediffDef ParentName="Base"><defName>Illness</defName></HediffDef></Defs>`}})
 	e.WriteModsConfig("1.6", "ludeon.rimworld", "test.child")
@@ -39,6 +40,7 @@ func TestParentProblemRefParity(t *testing.T) {
 }
 
 func TestProblemRefKeepsExpansionAndGameVersion(t *testing.T) {
+	t.Parallel()
 	got := mcp.ProblemsArgv(mcp.ProblemsIn{Ref: "p:123456", All: true, GameVersion: "1.6"})
 	want := []string{"problems", "--ref", "p:123456", "--all", "--game-version", "1.6"}
 	if !reflect.DeepEqual(got, want) {

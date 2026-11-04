@@ -5,7 +5,7 @@
 # built by monitor/build.ps1 (needs the .NET SDK 10; game references come from NuGet) and
 # shipped under monitor/ArchoMonitor/.
 #
-#   pwsh scripts/release.ps1 -Version 0.5.0            # tests (-short), then dist/archo-0.5.0-windows-amd64.zip and .zip.sha256
+#   pwsh scripts/release.ps1 -Version 0.5.0            # tests, then dist/archo-0.5.0-windows-amd64.zip and .zip.sha256
 #   pwsh scripts/release.ps1 -Version 0.5.0 -SkipTests
 #
 # Nothing outside dist/ is written; the script never pushes or publishes.
@@ -33,10 +33,10 @@ if (-not $SkipTests) {
     # Test product code and build helpers, plus the maintained corpus-tool suites.
     # tmp/ is disposable diagnostics; other spikes are development/measurement programs.
     # Keep tested spikes explicit so local experiments cannot enter the release gate.
-    # -short skips long performance checks; omit it for scan or TUI speed changes.
+    # Scale checks run only with RIMARCHO_SCALE_TESTS=1; set it for scan or TUI speed changes.
     # -count=1 reruns tests without recording the costly Windows file-access test cache.
-    Write-Host "go test -short -count=1 ./internal/... ./cmd/... ./scripts/... ./spikes/hugslogs ./spikes/corpuslabel"
-    go test -short -count=1 ./internal/... ./cmd/... ./scripts/... ./spikes/hugslogs ./spikes/corpuslabel
+    Write-Host "go test -count=1 ./internal/... ./cmd/... ./scripts/... ./spikes/hugslogs ./spikes/corpuslabel"
+    go test -count=1 ./internal/... ./cmd/... ./scripts/... ./spikes/hugslogs ./spikes/corpuslabel
     if ($LASTEXITCODE -ne 0) { throw "tests failed" }
 }
 

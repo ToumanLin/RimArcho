@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -20,18 +19,8 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-func TestSubscriptionForm(t *testing.T) {
-	t.Parallel()
-	node, err := exec.LookPath("node")
-	if err != nil {
-		t.Skip("node is needed for subscription form behavior tests")
-	}
-	if out, err := exec.Command(node, "--experimental-vm-modules", "--test", "testdata/subscribe.mjs", "testdata/subscriptions.mjs").CombinedOutput(); err != nil {
-		t.Fatalf("subscription form: %v\n%s", err, out)
-	}
-}
-
 func TestSubscriptionAPITasks(t *testing.T) {
+	// Not parallel: testkit.NewGitRepo uses t.Setenv.
 	e, api, events := fixture(t)
 	g := testkit.NewGitRepo(t, "")
 	r := SubscriptionRequest{Kind: "git", URL: g.Bare, RefType: "branch", Ref: "main"}

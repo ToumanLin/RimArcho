@@ -22,6 +22,7 @@ import (
 // ways: no word starts with "#"; PowerShell's own parser, where "#" starts a comment,
 // reads the same words; and the command runs with its references as printed.
 func TestPrintedCommandsSurviveShells(t *testing.T) {
+	t.Parallel()
 	e := problemsFixture(t)
 	ix, err := e.App.Index()
 	if err != nil {

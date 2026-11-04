@@ -276,10 +276,22 @@ func TestTexturesStaleAndFailures(t *testing.T) {
 	}
 }
 
-// The commands: status, a dry run, the run, clean (05 §4.2).
+// The commands: status, a dry run, the run, clean (05 §4.2). First the refusals: Core, and a
+// run while the game runs (a dry run is still allowed).
 func TestTexturesCLI(t *testing.T) {
 	t.Parallel()
 	e, _, dir := texSetup(t)
+	if _, err := e.App.OptimizeTextures(app.TextureRun{Refs: []string{"pkg:ludeon.rimworld"}}); err == nil || !strings.Contains(err.Error(), "part of the game") {
+		t.Fatalf("core: %v", err)
+	}
+	e.App.GameProbe = func(string) *app.GameRun { return &app.GameRun{PID: 42} }
+	if _, err := e.App.OptimizeTextures(app.TextureRun{Refs: []string{"pkg:tester.tex"}}); !errors.Is(err, app.ErrGameRuns) {
+		t.Fatalf("game: %v", err)
+	}
+	if _, err := e.App.OptimizeTextures(app.TextureRun{Refs: []string{"pkg:tester.tex"}, DryRun: true}); err != nil {
+		t.Fatalf("a dry run while the game runs: %v", err)
+	}
+	e.App.GameProbe = func(string) *app.GameRun { return nil }
 	out := e.MustRun("textures", "status", "pkg:tester.tex")
 	if !strings.Contains(out, "textures of 1 mods: 4 PNGs") || !strings.Contains(out, "1 DDS of its own") || !strings.Contains(out, "3 to convert") {
 		t.Fatalf("status:\n%s", out)
@@ -305,22 +317,6 @@ func TestTexturesCLI(t *testing.T) {
 	e.MustRun("textures", "clean", "--all")
 	if exists(filepath.Join(dir, "Textures", "Things", "A.dds")) {
 		t.Fatal("clean left a DDS")
-	}
-}
-
-// A game running, Core, and a DDS that appeared since the plan are refused.
-func TestTexturesRefusals(t *testing.T) {
-	t.Parallel()
-	e, _, _ := texSetup(t)
-	if _, err := e.App.OptimizeTextures(app.TextureRun{Refs: []string{"pkg:ludeon.rimworld"}}); err == nil || !strings.Contains(err.Error(), "part of the game") {
-		t.Fatalf("core: %v", err)
-	}
-	e.App.GameProbe = func(string) *app.GameRun { return &app.GameRun{PID: 42} }
-	if _, err := e.App.OptimizeTextures(app.TextureRun{Refs: []string{"pkg:tester.tex"}}); !errors.Is(err, app.ErrGameRuns) {
-		t.Fatalf("game: %v", err)
-	}
-	if _, err := e.App.OptimizeTextures(app.TextureRun{Refs: []string{"pkg:tester.tex"}, DryRun: true}); err != nil {
-		t.Fatalf("a dry run while the game runs: %v", err)
 	}
 }
 

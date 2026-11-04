@@ -41,18 +41,29 @@ func marker(id, path string) string {
 
 const unityHead = "Mono path[0] = 'x'\nRimWorld 1.6.4633 rev1261\n"
 
+// writeLog writes a file, creating its folder; the companion tests need no environment.
+func writeLog(t *testing.T, p, content string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // L9, L6, L12: which companion log belongs to a Player.log.
 func TestCompanionFor(t *testing.T) {
 	t.Parallel()
-	e := testkit.New(t)
-	root := filepath.Join(e.Root, "userdata")
+	dir := t.TempDir()
+	root := filepath.Join(dir, "userdata")
 	am, amPrev := filepath.Join(root, "ArchoMonitor.log"), filepath.Join(root, "ArchoMonitor-prev.log")
-	e.WriteFile(am, sessionLine(t, "bbbbbbbbbbbb"))
-	e.WriteFile(amPrev, sessionLine(t, "aaaaaaaaaaaa"))
+	writeLog(t, am, sessionLine(t, "bbbbbbbbbbbb"))
+	writeLog(t, amPrev, sessionLine(t, "aaaaaaaaaaaa"))
 	cur, prev := filepath.Join(root, "Player.log"), filepath.Join(root, "Player-prev.log")
-	e.WriteFile(cur, unityHead+marker("bbbbbbbbbbbb", am))
+	writeLog(t, cur, unityHead+marker("bbbbbbbbbbbb", am))
 	// The previous run's marker names ArchoMonitor.log: it was renamed since.
-	e.WriteFile(prev, unityHead+marker("aaaaaaaaaaaa", am))
+	writeLog(t, prev, unityHead+marker("aaaaaaaaaaaa", am))
 	if got := app.CompanionFor(cur); got != am {
 		t.Fatalf("current: %q", got)
 	}
@@ -61,25 +72,25 @@ func TestCompanionFor(t *testing.T) {
 	}
 	// 1.7 writes Player.log under Logs/; the companion is in the data root above.
 	logs17 := filepath.Join(root, "Logs", "Player.log")
-	e.WriteFile(logs17, "=== Waylith log ===\n2026-10-21 14:05:01.000 INFO [Mods] "+marker("bbbbbbbbbbbb", ""))
+	writeLog(t, logs17, "=== Waylith log ===\n2026-10-21 14:05:01.000 INFO [Mods] "+marker("bbbbbbbbbbbb", ""))
 	if got := app.CompanionFor(logs17); got != am {
 		t.Fatalf("1.7: %q", got)
 	}
 	// A pack on 1.6: Player.log stays in the default folder, the marker names the pack's file.
-	pack := filepath.Join(e.Root, "packs", "p", "userdata", "ArchoMonitor.log")
-	e.WriteFile(pack, sessionLine(t, "cccccccccccc"))
-	packLog := filepath.Join(e.Root, "default", "Player.log")
-	e.WriteFile(packLog, unityHead+marker("cccccccccccc", pack))
+	pack := filepath.Join(dir, "packs", "p", "userdata", "ArchoMonitor.log")
+	writeLog(t, pack, sessionLine(t, "cccccccccccc"))
+	packLog := filepath.Join(dir, "default", "Player.log")
+	writeLog(t, packLog, unityHead+marker("cccccccccccc", pack))
 	if got := app.CompanionFor(packLog); got != pack {
 		t.Fatalf("pack: %q", got)
 	}
 
 	// No marker: RimCrow's log of the same generation; the old RMM name too (L6).
-	other := filepath.Join(e.Root, "other")
+	other := filepath.Join(dir, "other")
 	crow := filepath.Join(other, "RMM_Realtime.log")
-	e.WriteFile(crow, `{"timestamp":"2026-10-21 14:05:03.120","level":"ERROR","message":"x","count":1,"context":{}}`+"\n")
+	writeLog(t, crow, `{"timestamp":"2026-10-21 14:05:03.120","level":"ERROR","message":"x","count":1,"context":{}}`+"\n")
 	pl := filepath.Join(other, "Player.log")
-	e.WriteFile(pl, unityHead)
+	writeLog(t, pl, unityHead)
 	at := time.Now().Add(time.Second)
 	for _, p := range []string{pl, crow} {
 		if err := os.Chtimes(p, at, at); err != nil {
@@ -381,20 +392,20 @@ func TestCompanionUniqueSession(t *testing.T) {
 	t.Parallel()
 	for _, currentMarked := range []bool{false, true} {
 		t.Run(map[bool]string{false: "previous marker wins", true: "duplicate marker prefers current"}[currentMarked], func(t *testing.T) {
-			e := testkit.New(t)
-			cur, prev := filepath.Join(e.Root, "Player.log"), filepath.Join(e.Root, "Player-prev.log")
-			monitor := filepath.Join(e.Root, "ArchoMonitor.log")
-			e.WriteFile(monitor, sessionLine(t, "aaaaaaaaaaaa"))
+			root := t.TempDir()
+			cur, prev := filepath.Join(root, "Player.log"), filepath.Join(root, "Player-prev.log")
+			monitor := filepath.Join(root, "ArchoMonitor.log")
+			writeLog(t, monitor, sessionLine(t, "aaaaaaaaaaaa"))
 			head := unityHead
 			if currentMarked {
 				head += marker("aaaaaaaaaaaa", monitor)
 			}
-			e.WriteFile(cur, head)
-			alias := filepath.Join(e.Root, "monitor-alias.log")
+			writeLog(t, cur, head)
+			alias := filepath.Join(root, "monitor-alias.log")
 			if err := os.Link(monitor, alias); err != nil {
 				t.Fatal(err)
 			}
-			e.WriteFile(prev, unityHead+marker("aaaaaaaaaaaa", alias))
+			writeLog(t, prev, unityHead+marker("aaaaaaaaaaaa", alias))
 			at := time.Now().Add(time.Second)
 			for _, p := range []string{cur, monitor} {
 				if err := os.Chtimes(p, at, at); err != nil {
@@ -455,21 +466,21 @@ func TestCompanionConservativeStart(t *testing.T) {
 	t.Parallel()
 	for _, hasPrev := range []bool{false, true} {
 		t.Run(map[bool]string{false: "no start evidence", true: "previous run boundary"}[hasPrev], func(t *testing.T) {
-			e := testkit.New(t)
+			root := t.TempDir()
 			end := time.Date(2026, 10, 21, 14, 5, 0, 0, time.Local)
-			player, crow := filepath.Join(e.Root, "Player.log"), filepath.Join(e.Root, "RimCrow_Realtime.log")
+			player, crow := filepath.Join(root, "Player.log"), filepath.Join(root, "RimCrow_Realtime.log")
 			head := unityHead
 			if hasPrev {
 				head += "Started:   " + end.Add(-time.Hour).Format("2006-01-02 15:04:05.000 -07:00") + "\n"
 			}
-			e.WriteFile(player, head)
-			e.WriteFile(crow, `{"timestamp":"2026-10-21 14:05:00.000","message":"ready"}`+"\n")
+			writeLog(t, player, head)
+			writeLog(t, crow, `{"timestamp":"2026-10-21 14:05:00.000","message":"ready"}`+"\n")
 			if err := os.Chtimes(player, end, end); err != nil {
 				t.Fatal(err)
 			}
 			if hasPrev {
-				prev := filepath.Join(e.Root, "Player-prev.log")
-				e.WriteFile(prev, unityHead)
+				prev := filepath.Join(root, "Player-prev.log")
+				writeLog(t, prev, unityHead)
 				at := end.Add(-time.Second)
 				if err := os.Chtimes(prev, at, at); err != nil {
 					t.Fatal(err)

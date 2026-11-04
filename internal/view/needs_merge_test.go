@@ -9,6 +9,7 @@ import (
 )
 
 func TestDependenciesMergeByCanonicalTarget(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("1001", testkit.Mod{PackageID: "test.a", Name: "A"})
 	e.AddWorkshop("1002", testkit.Mod{PackageID: "test.b", Name: "B"})

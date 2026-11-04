@@ -7,6 +7,7 @@ import (
 )
 
 func TestSteamCMDLoginPrefillsInlineName(t *testing.T) {
+	t.Parallel()
 	e, _, _ := shellEnv(t)
 	e.App.SteamCMDNoPath = true
 	for _, value := range []string{"", "player", "anonymous"} {

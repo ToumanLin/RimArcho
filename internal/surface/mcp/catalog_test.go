@@ -10,6 +10,7 @@ import (
 )
 
 func TestCatalogAndArgvFor(t *testing.T) {
+	t.Parallel()
 	cat := mcp.Catalog()
 	if len(cat) != len(mcp.Tools()) {
 		t.Fatalf("catalog has %d tools, server %d", len(cat), len(mcp.Tools()))
@@ -62,6 +63,7 @@ func TestCatalogAndArgvFor(t *testing.T) {
 }
 
 func TestClipOutput(t *testing.T) {
+	t.Parallel()
 	short := "a\nb\n"
 	if mcp.ClipOutput(short) != short {
 		t.Error("short output changed")
@@ -74,6 +76,7 @@ func TestClipOutput(t *testing.T) {
 }
 
 func TestFilesSchemaAndArgv(t *testing.T) {
+	t.Parallel()
 	var search *mcp.ToolDoc
 	for _, tool := range mcp.Catalog() {
 		if tool.Name == "search_files" {

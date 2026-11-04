@@ -11,6 +11,7 @@ import (
 )
 
 func TestPatchInspectionFocusesAffectedChanges(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("1001", testkit.Mod{PackageID: "test.child", Name: "Child", Files: map[string]string{
 		"Patches/A.xml": `<Patch><Operation Class="PatchOperationAdd"><xpath>Defs/ThingDef[defName="Target"]</xpath><value><label>changed</label></value></Operation></Patch>`,

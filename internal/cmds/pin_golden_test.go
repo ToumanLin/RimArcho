@@ -11,6 +11,7 @@ import (
 // Locked versions (04 §7): pin into the lock library, the upstream update warning,
 // pin --update, the _Archo_ link on save, unpin.
 func TestGoldenPin(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	m := testkit.Sample("tester.lock", "Lockable")
 	m.Files = map[string]string{"Defs/a.xml": "<Defs><ThingDef><defName>A</defName></ThingDef></Defs>"}

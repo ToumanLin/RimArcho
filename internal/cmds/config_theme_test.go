@@ -8,6 +8,7 @@ import (
 )
 
 func TestThemeSetting(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	choices := []string{"auto", "light", "dark"}
 	if !slices.Equal(cmds.SettingChoices("ui.theme"), choices) || cmds.Setting(e.App, "ui.theme") != "auto" {

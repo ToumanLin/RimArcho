@@ -1,7 +1,6 @@
 package gui
 
 import (
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -52,17 +51,6 @@ func TestSettingFilesystemPathMarkers(t *testing.T) {
 		if len(item.NotePaths) != 1 {
 			t.Fatalf("dependency mixes its path into unmarked facts: %+v", item)
 		}
-	}
-}
-
-func TestCopyablePaths(t *testing.T) {
-	t.Parallel()
-	node, err := exec.LookPath("node")
-	if err != nil {
-		t.Skip("node is needed for path interaction tests")
-	}
-	if out, err := exec.Command(node, "--experimental-vm-modules", "--test", "testdata/paths.mjs").CombinedOutput(); err != nil {
-		t.Fatalf("copyable paths: %v\n%s", err, out)
 	}
 }
 

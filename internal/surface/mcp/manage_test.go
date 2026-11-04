@@ -272,6 +272,7 @@ func manageSteps(e *testkit.Env) []func() manageStep {
 // matching CLI command on an identical one: the texts must be the same (I1), and the MCP
 // transcript is compared with testdata/golden/mcp_manage.txt.
 func TestGoldenManageTools(t *testing.T) {
+	t.Parallel()
 	em, ec := manageEnv(t), manageEnv(t)
 	cs := connect(t, em)
 	sm, sc := manageSteps(em), manageSteps(ec)

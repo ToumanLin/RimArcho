@@ -12,6 +12,7 @@ import (
 )
 
 func TestLinkToolsConfirmationAndAnnotations(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddEnv(false)
 	link := filepath.Join(e.Game, "Mods", "_Archo_unproven")

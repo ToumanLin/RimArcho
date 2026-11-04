@@ -106,6 +106,7 @@ func TestLogSince(t *testing.T) {
 // L7 with Archo Monitor: the cursor covers ArchoMonitor.log too, so an entry only the
 // monitor saw (the game stopped writing Player.log) and a count that grew there show up.
 func TestLogSinceMonitor(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	root := filepath.Join(e.Root, "userdata")

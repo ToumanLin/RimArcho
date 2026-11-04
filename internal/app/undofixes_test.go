@@ -11,6 +11,7 @@ import (
 )
 
 func TestIdenticalCheckoutIsNoOp(t *testing.T) {
+	t.Parallel()
 	for _, kind := range []string{"import", "external", "save", "checkout", "edited"} {
 		t.Run(kind, func(t *testing.T) {
 			e := loadoutEnv(t)
@@ -78,6 +79,7 @@ func TestIdenticalCheckoutIsNoOp(t *testing.T) {
 // The list already is the external version it was kept from, so checking that version
 // out resolves the conflict; nothing else changes and there is still nothing to undo.
 func TestIdenticalCheckoutClearsItsConflict(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	scanNow(t, e)
 	st, err := e.App.Loadout()
@@ -108,6 +110,7 @@ func TestIdenticalCheckoutClearsItsConflict(t *testing.T) {
 }
 
 func TestCrossGameSortUndoPreservesBindings(t *testing.T) {
+	t.Parallel()
 	e := loadoutEnv(t)
 	e.WriteModsConfig("1.6.4633", "ludeon.rimworld", "tester.a", "brrainz.harmony")
 	scanNow(t, e)

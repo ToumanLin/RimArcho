@@ -14,6 +14,7 @@ import (
 )
 
 func TestNeedsCacheKeyInputs(t *testing.T) {
+	t.Parallel()
 	e, s, _ := fixture(t)
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -78,6 +79,7 @@ func TestNeedsCacheKeyInputs(t *testing.T) {
 }
 
 func TestNeedsEditSharesIncrementalSnapshotAndUndo(t *testing.T) {
+	t.Parallel()
 	e, s, _ := fixture(t)
 	// This test inspects the synchronous result; no background publication may race it.
 	s.needsClosed = true
@@ -135,32 +137,8 @@ func TestNeedsEditSharesIncrementalSnapshotAndUndo(t *testing.T) {
 	}
 }
 
-func TestNeedsCacheBoundedAndWorkspaceReused(t *testing.T) {
-	_, s, events := fixture(t)
-	s.Board()
-	if !s.Workspace(1) {
-		t.Fatal("workspace rejected")
-	}
-	r := environmentResult(t, events, 1)
-	if !s.Workspace(2) {
-		t.Fatal("workspace rejected")
-	}
-	next := environmentResult(t, events, 2)
-	if r.Board.Problems.Revision != next.Board.Problems.Revision || r.Shell.Env != next.Shell.Env {
-		t.Fatal("cached workspace differs")
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for i := 0; i < 12; i++ {
-		s.a.GameVersion = fmt.Sprintf("1.%d", i)
-		s.needsLocked()
-	}
-	if len(s.needsCache) > 8 {
-		t.Fatal("unbounded needs cache")
-	}
-}
-
 func TestNeedsIncrementalKeepsContentThroughEnableUndo(t *testing.T) {
+	t.Parallel()
 	e, s, _ := fixture(t)
 	s.needsClosed = true
 	_ = s.needsLocked()
@@ -206,6 +184,7 @@ func TestNeedsIncrementalKeepsContentThroughEnableUndo(t *testing.T) {
 }
 
 func TestNeedsBackgroundCannotPublishAnOlderEdit(t *testing.T) {
+	t.Parallel()
 	e, s, _ := fixture(t)
 	e.App.AnalyzeRunner = func(string, func(string)) error { return errors.New("fixture: analysis intentionally unavailable") }
 	s.emit = func(string, any) {}
@@ -231,6 +210,7 @@ func TestNeedsBackgroundCannotPublishAnOlderEdit(t *testing.T) {
 }
 
 func TestNeedsDetachedLinkActionsUseReceivingSession(t *testing.T) {
+	t.Parallel()
 	e, s, _ := fixture(t)
 	s.needsClosed = true
 	// Consume a different token in the main session before the reader starts at 1.
@@ -260,6 +240,7 @@ func TestNeedsDetachedLinkActionsUseReceivingSession(t *testing.T) {
 }
 
 func TestWorkspaceAdoptsOneNeedsSnapshotAndRefreshesAfterEdit(t *testing.T) {
+	t.Parallel()
 	_, s, events := fixture(t)
 	s.needsClosed = true
 	read := func(request uint64) *EnvironmentResult {
@@ -287,7 +268,7 @@ func TestWorkspaceAdoptsOneNeedsSnapshotAndRefreshesAfterEdit(t *testing.T) {
 	s.mu.Lock()
 	reused := s.workspace == cached
 	s.mu.Unlock()
-	if !reused || warm.Board.Problems.Sequence != first.Board.Problems.Sequence {
+	if !reused || warm.Board.Problems.Sequence != first.Board.Problems.Sequence || warm.Shell.Env != first.Shell.Env {
 		t.Fatal("unchanged needs key rebuilt workspace")
 	}
 	a, err := s.a.Loadout()
@@ -308,5 +289,14 @@ func TestWorkspaceAdoptsOneNeedsSnapshotAndRefreshesAfterEdit(t *testing.T) {
 	}
 	if next.Board.Problems.Count != edit.Problems.Count || next.Board.Problems.Sequence <= first.Board.Problems.Sequence {
 		t.Fatal("workspace lost edit problems or sequence")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := 0; i < 12; i++ {
+		s.a.GameVersion = fmt.Sprintf("1.%d", i)
+		s.needsLocked()
+	}
+	if len(s.needsCache) > 8 {
+		t.Fatal("unbounded needs cache")
 	}
 }

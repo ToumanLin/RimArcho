@@ -11,6 +11,7 @@ import (
 )
 
 func TestListsFilterCopiesAndGroups(t *testing.T) {
+	t.Parallel()
 	e := libEnv(t)
 	e.MustRun("plan", "rename", "default", "Main colony")
 	e.MustRun("plan", "new", "Other colony", "--from", "current")

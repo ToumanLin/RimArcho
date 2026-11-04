@@ -8,6 +8,7 @@ import (
 )
 
 func TestHomeMemoryUsesCurrentListAndInvalidatesEdits(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	available := int64(1)
 	e.App.MemoryProbe = func() machine.Memory {

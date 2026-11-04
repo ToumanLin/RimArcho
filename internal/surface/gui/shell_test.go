@@ -12,9 +12,7 @@ import (
 )
 
 // The sidebar's badge is the board's needs count, and every page has its breadcrumb (G11).
-func TestShellAndHome(t *testing.T) {
-	t.Parallel()
-	_, api, _ := fixture(t)
+func shellAndHome(t *testing.T, _ *testkit.Env, api *API) {
 	b := api.Board()
 	sh := api.Shell()
 	if sh.Envs != 1 || sh.Env != "main  1.6" {

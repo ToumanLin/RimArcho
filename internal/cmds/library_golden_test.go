@@ -13,6 +13,7 @@ import (
 // Mod library (06 §2.9): the list, filters, one lineage, removing from every plan, and moving a
 // spare copy out of Mods/ into the lock library.
 func TestGoldenLibrary(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	ws := e.AddWorkshop("5100", testkit.Sample("tester.lock", "Lockable"))
 	e.AddWorkshop("5200", testkit.Sample("tester.idle", "Idle"))

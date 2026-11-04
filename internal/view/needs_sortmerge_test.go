@@ -14,7 +14,7 @@ import (
 // Items made after the problem loop once took the last problem's code (the cycle's), so
 // the order item merged into itself and vanished from the page.
 func TestNeedsSortMergeEndToEnd(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("2009463077", testkit.Mod{PackageID: "brrainz.harmony", Name: "Harmony"})
 	gamma := testkit.Sample("tester.gamma", "Gamma")

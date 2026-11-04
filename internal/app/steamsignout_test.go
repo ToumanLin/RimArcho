@@ -16,6 +16,7 @@ import (
 // VM run B11: SteamCMD signing in with the account the Steam client uses signs the client
 // out; the dry run says so, and Steam's "offline" (code 3) says what it is.
 func TestSteamCMDSameAccountAndOffline(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, "steamcmd.exe"), true }
 	note := fmt.Sprintf(app.SteamSignOutNote, "player")

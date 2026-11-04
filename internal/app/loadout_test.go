@@ -77,6 +77,20 @@ func TestLoadoutImportHealAndEdits(t *testing.T) {
 	if out := e.MustRun("status"); !strings.Contains(out, "loadout: 4 active (1 missing entries), same as v1 (import)") {
 		t.Fatal(out)
 	}
+	// First use (04 §1.4): the first plan is ModsConfig.xml, imported as v1.
+	p, err := e.App.CurrentPlan()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Name != store.DefaultPlanName {
+		t.Fatalf("first plan %q", p.Name)
+	}
+	if vs, _ := e.App.Store.Versions(p.ID); len(vs) != 1 || vs[0].Source != "import" || vs[0].Note != "ModsConfig.xml" {
+		t.Fatalf("v1: %+v", vs)
+	}
+	if ps, _ := e.App.Plans(); len(ps) != 1 || !ps[0].Current || ps[0].Entries != 4 {
+		t.Fatalf("plans: %+v", ps)
+	}
 	e.MustRun("enable", refOf(t, e, "B", ""), "--after", refOf(t, e, "Harmony", ""))
 	e.MustRun("disable", "pkg:gone.mod")
 	e.MustRun("move", refOf(t, e, "A", ""), "--to", "2")
@@ -220,6 +234,10 @@ func TestExternalChangeAndConflict(t *testing.T) {
 	if out := e.MustRun("loadout", "log"); strings.Contains(out, "pending:") {
 		t.Fatalf("conflict should clear on checkout:\n%s", out)
 	}
+	if st, _ := e.App.Loadout(); st.WS.Conflict != 0 {
+		t.Fatalf("conflict mark left after checkout: v%d", st.WS.Conflict)
+	}
+	e.MustRun("save") // the checkout unblocks saving
 }
 
 func TestHistoryCheckoutUndoSource(t *testing.T) {

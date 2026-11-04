@@ -10,6 +10,7 @@ import (
 // TestGoldenHarmonyLog covers the Harmony layer (C5 multi-transpiler, C6 manual-only) and
 // log attribution (B1 patch failure, B2 cross-reference, B3 Pawn.Tick patchers, B4 repeats).
 func TestGoldenHarmonyLog(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	runGolden(t, "harmonylog", e, []step{

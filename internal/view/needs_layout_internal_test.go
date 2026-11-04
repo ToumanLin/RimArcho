@@ -10,7 +10,7 @@ import (
 // Weak order preferences and cycles merge into the item that sorts (06 §5); without one
 // they are hints of their own.
 func TestNeedsSortAlso(t *testing.T) {
-	SetLang("en")
+	t.Parallel()
 	build := func(withHost bool) []Need {
 		var items []Need
 		if withHost {
@@ -50,7 +50,7 @@ func TestNeedsSortAlso(t *testing.T) {
 // The last run's error groups and the left column's items about the same mod point at
 // each other (06 §5).
 func TestNeedsRelated(t *testing.T) {
-	SetLang("en")
+	t.Parallel()
 	items := []Need{
 		{ID: "need:dep", Group: GroupDeps, Section: SectionBreak, code: "dep.inactive", Title: "Mech needs VEF, but it is not enabled", RequiredBy: []ModOwner{{ID: "m1"}, {ID: "m3"}}},
 		{ID: "need:hint", Group: GroupConflict, Section: SectionHint, code: "mod.known-error", Text: "Furniture often errs", Mods: []string{"m1"}},
@@ -78,7 +78,7 @@ func TestNeedsRelated(t *testing.T) {
 // What other pages handle is counted into one line each (06 §2.4); the current game's
 // links come first.
 func TestNeedsElsewhereAndLinks(t *testing.T) {
-	SetLang("en")
+	t.Parallel()
 	items := []Need{
 		{Section: SectionElsewhere, code: "mod.hidden"}, {Section: SectionElsewhere, code: "mod.pinned"},
 		{Section: SectionElsewhere, code: "texture.stale"}, {Section: SectionBreak, code: "official.order"},

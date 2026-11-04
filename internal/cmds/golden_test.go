@@ -147,6 +147,7 @@ func populate(e *testkit.Env) {
 }
 
 func TestGoldenBasics(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	populate(e)
 	runGolden(t, "basics", e, []step{
@@ -178,6 +179,7 @@ func TestGoldenBasics(t *testing.T) {
 }
 
 func TestGoldenLifecycle(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	populate(e)
 	e.AddEnv(true)
@@ -236,6 +238,7 @@ func TestGoldenLifecycle(t *testing.T) {
 }
 
 func TestGoldenRebind(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	populate(e)
 	e.AddEnv(false)
@@ -265,6 +268,7 @@ func TestGoldenRebind(t *testing.T) {
 }
 
 func TestGoldenLoadout(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	populate(e)
 	// X and Y declare loadAfter each other (S2); "Versioned" depends on Harmony.
@@ -325,6 +329,7 @@ func TestGoldenLoadout(t *testing.T) {
 // Several plans per environment (04 §1, 05 §4.3): each has its own list, undo stack,
 // versions and staging; switching writes no game file.
 func TestGoldenPlans(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	populate(e)
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "brrainz.harmony", "tester.alpha", "gone.mod")
@@ -377,6 +382,7 @@ func TestGoldenPlans(t *testing.T) {
 }
 
 func TestGoldenProblems(t *testing.T) {
+	t.Parallel()
 	e := problemsFixture(t)
 	firstRef := func(code string) step {
 		return func(e *testkit.Env) []string {
@@ -454,6 +460,7 @@ func problemsFixture(t *testing.T) *testkit.Env {
 }
 
 func TestGoldenMemory(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddEnv(false)
 	e.AddWorkshop("3101", testkit.Sample("tester.memory", "Memory fixture"))

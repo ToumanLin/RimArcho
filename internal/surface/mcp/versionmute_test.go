@@ -11,6 +11,7 @@ import (
 )
 
 func TestVersionMuteTool(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.WriteFile(filepath.Join(e.Game, "Version.txt"), "1.7.5000 rev1")
 	e.AddWorkshop("1001", testkit.Mod{PackageID: "tester.a", Name: "Alpha", Supported: []string{"1.6"}})
@@ -41,6 +42,7 @@ func TestVersionMuteTool(t *testing.T) {
 }
 
 func TestVersionMuteArgv(t *testing.T) {
+	t.Parallel()
 	got := mcp.VersionMuteArgv(mcp.VersionMuteIn{Refs: []string{"pkg:tester.a", "#abcd"}, GameVersion: "1.7", Undo: true})
 	want := []string{"problems", "unmute-version", "pkg:tester.a", "#abcd", "--game-version", "1.7"}
 	if !reflect.DeepEqual(got, want) {
@@ -52,6 +54,7 @@ func TestVersionMuteArgv(t *testing.T) {
 }
 
 func TestIncludeMutedOlderVersionTool(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.WriteFile(filepath.Join(e.Game, "Version.txt"), "1.7.5000 rev1")
 	e.AddWorkshop("1001", testkit.Mod{PackageID: "tester.old", Name: "Old mod", Supported: []string{"1.5"}})

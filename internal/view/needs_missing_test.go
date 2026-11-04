@@ -11,7 +11,7 @@ import (
 // Entries the list has but nothing installed matches (an imported list) are one item with
 // one action for all of them, and a mod needing one of them adds no item of its own (06 §5).
 func TestMissingEntriesAreOneItem(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("2009463077", testkit.Mod{PackageID: "brrainz.harmony", Name: "Harmony"})
 	e.AddWorkshop("3000000001", testkit.Mod{PackageID: "tester.user", Name: "User", Deps: []string{"tester.gone1"}})

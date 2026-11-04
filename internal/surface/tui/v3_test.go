@@ -19,7 +19,7 @@ import (
 // v3Fixture: the fixture plus P001 … P125 enabled after it, and Late (loads after P050),
 // not enabled. P001 has a long description.
 func v3Fixture(t *testing.T) (*testkit.Env, *model) {
-	e, _ := fixture(t)
+	e := fixtureFiles(t)
 	pkgs := []string{"ludeon.rimworld", "tester.a", "brrainz.harmony"}
 	for i := 1; i <= 125; i++ {
 		pkg := fmt.Sprintf("tester.p%03d", i)
@@ -405,7 +405,8 @@ func TestPositionInput(t *testing.T) {
 // the search to the next list with matches.
 func TestSearchOtherLists(t *testing.T) {
 	t.Parallel()
-	_, m := v3Fixture(t)
+	e, _ := fixture(t)
+	m := direct(t, e, 160, 40)
 	press(m, "2")
 	press(m, "/")
 	typeIn(m, "beta")

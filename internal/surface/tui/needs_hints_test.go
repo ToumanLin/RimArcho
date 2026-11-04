@@ -8,7 +8,7 @@ import (
 )
 
 func TestHintOnlySectionHeading(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	m := &model{}
 	m.prob.items = []need{{section: view.SectionBreak, status: statusHint}}
 	if got := m.sectionHead(view.SectionBreak, 100); !strings.Contains(got, "suggestions") || strings.Contains(got, "breaks the game") {
@@ -24,7 +24,7 @@ func TestHintOnlySectionHeading(t *testing.T) {
 // another page handles are not items of their own; the other page is a faint last line
 // (06 §2.4).
 func TestNeedsMergedAndElsewhere(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 100, 40)
 	press(m, "@")

@@ -62,6 +62,7 @@ func TestRemovalCommitWaitsForConcurrentWriter(t *testing.T) {
 }
 
 func TestSubscriptionRemovalCommitsBeforeCancellation(t *testing.T) {
+	t.Parallel()
 	e := setup(t, true)
 	for _, id := range []string{"7701", "7702"} {
 		e.WriteMod(filepath.Join(e.SteamCMD, id), testkit.Sample("remove."+id, "Remove "+id))
@@ -101,6 +102,7 @@ func TestSubscriptionRemovalCommitsBeforeCancellation(t *testing.T) {
 }
 
 func TestParallelRemovalKeepsValidItemsAndFastSkipsRecycler(t *testing.T) {
+	t.Parallel()
 	e := setup(t, true)
 	path := filepath.Join(e.SteamCMD, "7703")
 	e.WriteMod(path, testkit.Sample("remove.fast", "Fast"))
@@ -116,6 +118,7 @@ func TestParallelRemovalKeepsValidItemsAndFastSkipsRecycler(t *testing.T) {
 }
 
 func TestParallelRemovalWithIncomingLinks(t *testing.T) {
+	t.Parallel()
 	e := setup(t, true)
 	for _, id := range []string{"7711", "7712"} {
 		e.WriteMod(filepath.Join(e.SteamCMD, id), testkit.Sample("linked."+id, "Linked "+id))
@@ -145,6 +148,7 @@ func TestParallelRemovalWithIncomingLinks(t *testing.T) {
 }
 
 func TestTrashAndUnhideReconcileIncomingEnvironments(t *testing.T) {
+	t.Parallel()
 	for _, unhide := range []bool{false, true} {
 		name := "trash"
 		if unhide {

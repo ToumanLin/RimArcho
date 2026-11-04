@@ -40,6 +40,7 @@ func mustPlans(t *testing.T, a *app.App) []view.PlanRow {
 // 04 §1.3 through the view verbs both interfaces call: new (empty, a copy, a version, an
 // import) switches to the new plan; rename keeps the history; the last plan cannot go.
 func TestPlanVerbs(t *testing.T) {
+	t.Parallel()
 	e, _, _ := shellEnv(t)
 	a := e.App
 	rows := mustPlans(t, a)
@@ -154,6 +155,7 @@ func TestPlanVerbs(t *testing.T) {
 // The status line's "the game now uses" follows the write record; a plan's conflict mark shows
 // on its row, the sidebar and the home page.
 func TestInGameAndMarks(t *testing.T) {
+	t.Parallel()
 	e, _, _ := shellEnv(t)
 	a := e.App
 	if g := view.InGame(a); g != nil {
@@ -258,6 +260,7 @@ func TestHomePerPlan(t *testing.T) {
 // then the others by when they were last enabled, then the never enabled ones by last
 // use. The list open in the editor keeps its place (06 §2.1).
 func TestNavRecentLists(t *testing.T) {
+	t.Parallel()
 	now := time.Now()
 	var rows []view.PlanRow
 	for i := range 6 {
@@ -289,6 +292,7 @@ func TestNavRecentLists(t *testing.T) {
 // With more than NavLists lists or packs, the sidebar says how many there are and shows
 // the most recently played packs only.
 func TestNavCapsAndCounts(t *testing.T) {
+	t.Parallel()
 	now := time.Now()
 	var rows []view.PlanRow
 	var packs []view.PackRow

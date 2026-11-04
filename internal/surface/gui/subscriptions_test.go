@@ -241,6 +241,7 @@ func TestSubscriptionReadDoesNotBlockEditsAndRechecksAfterOvertake(t *testing.T)
 }
 
 func TestSubscriptionReaderSeesSourceRecordChanges(t *testing.T) {
+	// Not parallel: testkit.NewGitRepo uses t.Setenv.
 	e, api, _ := fixture(t)
 	g := testkit.NewGitRepo(t, "")
 	op, err := e.App.SubscribeGit(g.Bare, "branch", "main", false)

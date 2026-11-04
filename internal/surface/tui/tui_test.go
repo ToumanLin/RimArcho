@@ -26,6 +26,14 @@ func init() { lipgloss.SetColorProfile(termenv.Ascii) }
 // fixture: Core, Harmony, A (depends on Harmony), B, a CJK-named mod, and a ModsConfig.xml
 // listing Core, A, Harmony (A before its dependency, so sort has work to do).
 func fixture(t *testing.T) (*testkit.Env, *int) {
+	e := fixtureFiles(t)
+	e.MustRun("scan")
+	scans := new(int)
+	return e, scans
+}
+
+// fixtureFiles is fixture without its scan, for fixtures that add more mods and scan once.
+func fixtureFiles(t *testing.T) *testkit.Env {
 	e := testkit.New(t)
 	e.AddWorkshop("2009463077", testkit.Mod{PackageID: "brrainz.harmony", Name: "Harmony"})
 	a := testkit.Sample("tester.a", "Alpha")
@@ -36,9 +44,7 @@ func fixture(t *testing.T) (*testkit.Env, *int) {
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.a", "brrainz.harmony")
 	e.WriteFile(filepath.Join(e.Steam, "steam.exe"), "")
 	e.AddEnv(false)
-	e.MustRun("scan")
-	scans := new(int)
-	return e, scans
+	return e
 }
 
 func start(t *testing.T, e *testkit.Env, scans *int, w, h int) *teatest.TestModel {
@@ -116,6 +122,32 @@ func waitAll(t *testing.T, tm *teatest.TestModel, want ...string) {
 			}
 		}
 		return true
+	}, teatest.WithDuration(waitLimit), teatest.WithCheckInterval(20*time.Millisecond))
+}
+
+// waitAnalyzed waits for one stretch of output that shows every string and a Can it run
+// heading drawn after the background analysis finished: its last heading neither says the
+// files are being checked nor that they were never checked (needs.go). The heading is
+// redrawn when the analysis ends, so this is the end of the analysis, not a fixed wait.
+func waitAnalyzed(t *testing.T, tm *teatest.TestModel, want ...string) {
+	t.Helper()
+	leads := []string{"to handle before you start", "error groups in the last run", "not checked yet",
+		"can run; suggestions", "can run: nothing to handle"}
+	teatest.WaitFor(t, tm.Output(), func(b []byte) bool {
+		for _, w := range want {
+			if !bytes.Contains(b, []byte(w)) {
+				return false
+			}
+		}
+		at := -1
+		for _, l := range leads {
+			at = max(at, bytes.LastIndex(b, []byte(l)))
+		}
+		if at < 0 {
+			return false
+		}
+		head := b[at:min(len(b), at+120)]
+		return !bytes.Contains(head, []byte("checking the mods")) && !bytes.Contains(head, []byte("not checked yet"))
 	}, teatest.WithDuration(waitLimit), teatest.WithCheckInterval(20*time.Millisecond))
 }
 
@@ -556,7 +588,7 @@ func findNeed(m *model, sub string) int {
 // requirements and the automatic resolution in words; a dependency that is installed but
 // not enabled is one item in "missing dependencies" that space enables.
 func TestNeedsView(t *testing.T) {
-	// Not parallel: waits a fixed time for background work, which is too short under load.
+	t.Parallel()
 	e, scans := fixture(t)
 	for _, p := range [][2]string{{"X", "tester.y"}, {"Y", "tester.x"}} {
 		m := testkit.Sample("tester."+strings.ToLower(p[0]), p[0])
@@ -571,8 +603,7 @@ func TestNeedsView(t *testing.T) {
 	tm := start(t, e, scans, 140, 40)
 	waitFor(t, tm, "Enabled")
 	keys(tm, "@")
-	waitFor(t, tm, "sorting keeps the strongest constraints")
-	time.Sleep(300 * time.Millisecond)
+	waitAnalyzed(t, tm, "sorting keeps the strongest constraints")
 	fm := finish(t, tm)
 	if fm.prob.never || fm.prob.stale {
 		t.Fatal("analysis did not complete")
@@ -598,8 +629,7 @@ func TestNeedsView(t *testing.T) {
 	keys(tm, "enter")
 	waitFor(t, tm, "set aside by sorting")
 	keys(tm, "esc", "x")
-	keys(tm, "g")
-	time.Sleep(100 * time.Millisecond)
+	keys(tm, "g") // keys are handled in order before finish's q; x and g run no background work
 	fm2 := finish(t, tm)
 	if findNeed(fm2, "sorting keeps the strongest constraints") < 0 {
 		t.Fatalf("automatic cycle note absent: %q", needItems(fm2))
@@ -685,14 +715,13 @@ func TestChangesView(t *testing.T) {
 // 06 §2.4, §7.3: the current log's errors are one item per mod under "last run"; a stale
 // log is one dim row that is not counted.
 func TestNeedsLogs(t *testing.T) {
-	// Not parallel: waits a fixed time for background work, which is too short under load.
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	scans := new(int)
 	tm := start(t, e, scans, 160, 50)
 	keys(tm, "@")
-	waitFor(t, tm, "last run")
-	time.Sleep(200 * time.Millisecond)
+	waitAnalyzed(t, tm, "last run")
 	fm := finish(t, tm)
 	last := 0
 	for _, it := range fm.prob.items {

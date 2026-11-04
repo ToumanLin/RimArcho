@@ -149,6 +149,7 @@ func TestSubscribeCancelPreservesSuccessAndResumesRemaining(t *testing.T) {
 }
 
 func TestSubscriptionRetrySkipsPermanentFailures(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	exe := filepath.Join(e.Root, "steamcmd.exe")
 	e.App.FindTool = func(string) (string, bool) { return exe, true }
@@ -200,6 +201,7 @@ func TestSubscriptionRetrySkipsPermanentFailures(t *testing.T) {
 }
 
 func TestBulkSubscriptionStaysOneTaskAcrossProcesses(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	exe := filepath.Join(e.Root, "steamcmd.exe")
 	e.App.FindTool = func(string) (string, bool) { return exe, true }

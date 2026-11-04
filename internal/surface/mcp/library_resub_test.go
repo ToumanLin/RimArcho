@@ -6,6 +6,7 @@ import (
 )
 
 func TestManageLibraryResubscribe(t *testing.T) {
+	t.Parallel()
 	for _, dry := range []bool{false, true} {
 		want := []string{"workshop", "resubscribe", "ws:8100", "ws:8200"}
 		if dry {

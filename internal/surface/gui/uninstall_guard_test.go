@@ -15,6 +15,7 @@ import (
 )
 
 func TestUninstallGuardsNativeCloseAndQuit(t *testing.T) {
+	t.Parallel()
 	for _, commandLine := range []bool{false, true} {
 		name := "page"
 		if commandLine {
@@ -117,6 +118,7 @@ func testUninstallCloseGuard(t *testing.T, commandLine bool) {
 }
 
 func TestUninstallFailureReleasesCloseGuard(t *testing.T) {
+	t.Parallel()
 	e, s, _ := fixture(t)
 	done := make(chan struct{})
 	e.App.AfterExitFunc = func(app.AfterExit) error { return errors.New("synthetic cleanup failure") }
@@ -142,6 +144,7 @@ func TestUninstallFailureReleasesCloseGuard(t *testing.T) {
 }
 
 func TestCloseBeforeUninstallPreventsStartup(t *testing.T) {
+	t.Parallel()
 	_, s, _ := fixture(t)
 	if !s.allowClose() {
 		t.Fatal("normal close changed")

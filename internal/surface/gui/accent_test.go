@@ -3,7 +3,6 @@ package gui
 import (
 	"encoding/json"
 	"io/fs"
-	"os/exec"
 	"regexp"
 	"slices"
 	"testing"
@@ -11,17 +10,6 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
-
-func TestAccentRuntime(t *testing.T) {
-	t.Parallel()
-	node, err := exec.LookPath("node")
-	if err != nil {
-		t.Skip("node is needed for accent behavior tests")
-	}
-	if out, err := exec.Command(node, "--experimental-vm-modules", "--test", "testdata/accent.mjs").CombinedOutput(); err != nil {
-		t.Fatalf("accent: %v\n%s", err, out)
-	}
-}
 
 func TestAccentScales(t *testing.T) {
 	t.Parallel()

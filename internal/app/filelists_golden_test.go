@@ -22,6 +22,7 @@ var updateFileLists = flag.Bool("update-filelists", false, "rewrite testdata/sto
 // blocks); v28 must reproduce it byte for byte: the change history and its file diffs, each
 // snapshot's file list, the log lookups of textures and DLLs, and what maintenance prunes.
 func TestFileListsMatchRows(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddEnv(false)
 	files := map[string]string{

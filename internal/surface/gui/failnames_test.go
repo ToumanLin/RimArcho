@@ -14,6 +14,7 @@ import (
 // task record, which shows the job beside it, keeps the bare reason. Texture cleanup, which
 // has no event of its own, says how it ended through the task record.
 func TestBackgroundEndsNameTheirJob(t *testing.T) {
+	t.Parallel()
 	_, api, events := fixture(t)
 	wait := func(prefix, want string) string {
 		deadline := time.After(10 * time.Second)

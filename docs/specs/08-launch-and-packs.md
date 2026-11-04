@@ -393,7 +393,7 @@ Refuse other paths (`ErrNotInTrashList`, `TestTrashAllowList`).
 | # | Scenario | Expected | Status |
 | --- | --- | --- | --- |
 | K1 | Three Mods, one with 1.5 and 1.6 directories, in a 1.6 environment | Include only 1.6 and shared content; record omitted directories and bytes in the manifest (`TestPackBuildAndLaunch`) | Pass |
-| K2 | Build with nonsorting errors or missing entries | Refuse and list them (`TestPackBuildBlocked`); sorting-only findings permit the build | Pass |
+| K2 | Build with nonsorting errors or missing entries | Refuse and list them (`TestPackBuildAndLaunch`); sorting-only findings permit the build | Pass |
 | K3 | `pack launch --dry-run` | List `+ !ArchoPack_…`, the ModsConfig path and arguments; no writes or launch | Pass |
 | K4 | After `pack launch` | The environment's ModsConfig is unchanged; the pack's `userdata/Config/ModsConfig.xml` contains its list; the command includes `-savedatafolder=<pack>/userdata`; each bundled Mod has a link | Pass |
 | K5 | Import a pack list into another environment | Correctly group the same version, another version and uninstalled Mods (`TestPackExportImport`) | Pass |
