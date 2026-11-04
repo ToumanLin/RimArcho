@@ -332,7 +332,7 @@ export async function fullKey(e) {
   if (ops.menuKey(e) && c) {
     e.preventDefault();
     const b = (document.querySelector("#screen .fd-copy.on") || sc).getBoundingClientRect();
-    return ops.openMenu(b.left + 24, b.top + 24, c.ops || [], runOp, true);
+    return ops.openMenu(b.left + 24, b.top + 24, c.ops || [], runOp, true, { name: F.row?.name || F.d?.name, opener: sc });
   }
   if (ctrl && c && ["o", "w", "s"].includes(k.toLowerCase())) { e.preventDefault(); return runOp({ o: "folder", w: "workshop", s: "steam" }[k.toLowerCase()]); }
   if (!ctrl && !e.altKey && c) {

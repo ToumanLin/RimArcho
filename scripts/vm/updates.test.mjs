@@ -22,7 +22,7 @@ const stubs = {
  export const api=new Proxy({},{get:(_,name)=>(...a)=>window.api[name](...a)});`,
  'api.js': `export const on=()=>{};`,
  'fields.js': `export const pathContent=()=>{},editablePath=()=>{};`,
- 'popups.js': `export const confirm=(...a)=>window.confirmations.push(a);`,
+ 'popups.js': `export const menuOpener=n=>n; export const confirm=(...a)=>window.confirmations.push(a);`,
  'separator.js': `export const wireSeparator=()=>{};`,
  'detail.js': `export function detailFrame(box){return {head(){},inst(i){box.textContent=i.label;},fields(){},detail(){},error(){},fetching(){}};}`,
  'filterbar.js': `import {el} from './state.js';export function createBar(){const input=el('input'),root=el('div','fbar'),row=el('div','fbar-row');row.append(input);root.append(row);return {el:root,input,search:'',filters:[],draw(){},focus(){input.focus();}};}`,

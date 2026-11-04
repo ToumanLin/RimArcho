@@ -611,7 +611,7 @@ function drawBar() {
 // menuAt: the row menu (06 §8.5), the same groups as the editor's.
 function menuAt(x, y, keys = false) {
   const by = opsOf(selected());
-  ops.openMenu(x, y, [...by.keys()], (c) => run(c, by.get(c)), keys);
+  ops.openMenu(x, y, [...by.keys()], (c) => run(c, by.get(c)), keys, { name: L.flat[L.cur]?.r.name, opener: els.rows });
 }
 
 // menuAtCursor: the menu key or shift+F10 open the menu at the cursor's row.

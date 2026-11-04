@@ -144,4 +144,4 @@ export function chooser() {
 }
 
 // menuAt opens a plan's actions as a context menu.
-export function menuAt(id, x, y) { pop.menu(x, y, actions(id)); }
+export function menuAt(id, x, y, opener, keys = false) { pop.menu(x, y, actions(id), keys, { name: planOf(id)?.name, opener }); }

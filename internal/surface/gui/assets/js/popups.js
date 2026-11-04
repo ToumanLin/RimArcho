@@ -103,9 +103,33 @@ export function popupKey(e) {
   return true;
 }
 
+// linkOpener points the popup's opener at its list while it is open; closing puts back what it
+// pointed at, so a row does not keep pointing at the next popup's list.
+function linkOpener(p, id) {
+  const o = p.opener;
+  if (!o || o === document.body) return;
+  const was = o.getAttribute("aria-controls"), prev = p.onclose;
+  o.setAttribute("aria-controls", id);
+  p.onclose = () => { if (was == null) o.removeAttribute("aria-controls"); else o.setAttribute("aria-controls", was); prev?.(); };
+}
+
 // optionList: a list of options moved with the arrows (both pairs, 06 §3.3).
 function optionList(pop, p, opts, render, pick, input) {
   const list = el("div", "opts");
+  list.id = "popup-options";
+  list.setAttribute("role", "listbox");
+  const title = pop.querySelector(".ttl");
+  if (title) { title.id = "popup-options-title"; list.setAttribute("aria-labelledby", title.id); }
+  const owner = input || list;
+  if (input) {
+    input.setAttribute("role", "combobox");
+    input.setAttribute("aria-controls", list.id);
+    input.setAttribute("aria-expanded", "true");
+    input.setAttribute("aria-autocomplete", "list");
+    if (title) input.setAttribute("aria-labelledby", title.id);
+  } else list.tabIndex = -1;
+  p.restoreFocus = () => { if (p.opener?.isConnected) p.opener.focus({ preventScroll: true, focusVisible: p.openerFocusVisible }); };
+  linkOpener(p, list.id);
   pop.append(list);
   p.sel = 0;
   p.opts = opts;
@@ -113,12 +137,18 @@ function optionList(pop, p, opts, render, pick, input) {
     list.innerHTML = "";
     p.opts.forEach((o, i) => {
       const d = el("div", "opt" + (i === p.sel ? " on" : ""));
+      d.id = "popup-option-" + i;
+      d.setAttribute("role", "option");
+      d.setAttribute("aria-selected", String(i === p.sel));
+      d.setAttribute("aria-posinset", String(i + 1));
+      d.setAttribute("aria-setsize", String(p.opts.length));
       render(d, o);
       d.onmousemove = () => { if (p.sel !== i) { p.sel = i; draw(); } };
       d.onclick = () => pick(o, i);
       list.append(d);
     });
     const on = list.children[p.sel];
+    if (on) owner.setAttribute("aria-activedescendant", on.id); else owner.removeAttribute("aria-activedescendant");
     if (on) on.scrollIntoView({ block: "nearest" });
   };
   p.redraw = (opts) => { if (opts) { p.opts = opts; p.sel = Math.min(p.sel, Math.max(opts.length - 1, 0)); } draw(); };
@@ -135,6 +165,7 @@ function optionList(pop, p, opts, render, pick, input) {
     return false; // typing goes to the input
   };
   draw();
+  if (!input) list.focus({ preventScroll: true, focusVisible: false });
 }
 
 function inputLine(pop, prompt, placeholder) {
@@ -169,6 +200,13 @@ export async function tags(items, after) {
     pop.append(el("div", "ttl", Tf("tags of %s", items.length === 1 ? items[0].name : Tf("%d mods", items.length))));
     const inp = inputLine(pop, "✎", T("type a new tag, or pick one"));
     const chips = el("div", "chips");
+    const title = pop.querySelector(".ttl"); title.id = "tag-title";
+    chips.id = "tag-options"; chips.setAttribute("role", "listbox"); chips.setAttribute("aria-labelledby", title.id);
+    inp.setAttribute("role", "combobox"); inp.setAttribute("aria-controls", chips.id);
+    inp.setAttribute("aria-labelledby", title.id); inp.setAttribute("aria-expanded", String(cands.length > 0));
+    inp.setAttribute("aria-autocomplete", "list");
+    linkOpener(p, chips.id);
+    p.restoreFocus = () => { if (p.opener?.isConnected) p.opener.focus({ preventScroll: true, focusVisible: p.openerFocusVisible }); };
     pop.append(chips);
     p.sel = -1;
     const draw = () => {
@@ -176,13 +214,17 @@ export async function tags(items, after) {
       cands.forEach((c, i) => {
         const all = c.have === ids.length, some = c.have > 0 && !all;
         const b = el("button", "c" + (i === p.sel ? " on" : ""));
-        if (all || some) b.append(el("span", "h", all ? "✓" : "~"));
+        b.id = "tag-option-" + i; b.setAttribute("role", "option");
+        b.setAttribute("aria-selected", String(i === p.sel)); b.setAttribute("aria-checked", some ? "mixed" : String(all));
+        b.setAttribute("aria-posinset", String(i + 1)); b.setAttribute("aria-setsize", String(cands.length));
+        if (all || some) { const mark = el("span", "h", all ? "✓" : "~"); mark.setAttribute("aria-hidden", "true"); b.append(mark); }
         b.append(c.tag);
         b.dataset.envWrite = "tags";
         b.title = all ? T("enter removes it") : T("enter gives it to all");
         b.onclick = () => apply(c.tag, all);
         chips.append(b);
       });
+      if (p.sel >= 0) inp.setAttribute("aria-activedescendant", "tag-option-" + p.sel); else inp.removeAttribute("aria-activedescendant");
     };
     const apply = async (tag, remove) => {
       close();
@@ -437,20 +479,41 @@ export async function help(page = "plan") {
 }
 
 // ---- the context menu (06 §8.5): the same actions as the hint line ----
-// An item {label, key, run, cls}; {sep: true} draws a hairline between groups. The keyboard
+// An item {label, key, run, cls, checked?, disabled?, current?}; {sep: true} draws a hairline between groups. The keyboard
 // works it as the mouse does: ↑↓ (or tab) move, enter runs, esc closes; it opens with the
 // first item focused when the menu key or shift+F10 opened it (keys = true).
-export function menu(x, y, actions, keys = false) {
+// Link the visible opener before opening too, so agents can discover its menu.
+export function menuOpener(node) {
+  node.setAttribute("aria-haspopup", "menu");
+  node.setAttribute("aria-expanded", "false");
+  node.setAttribute("aria-controls", "menu");
+  return node;
+}
+let menuFocus = null;
+// back: where esc returns, an element or a function (the opener by default).
+export function menu(x, y, actions, keys = false, { name, opener = document.activeElement, back = opener } = {}) {
   closeChoiceMenu();
+  hideMenu();
   const m = $("#menu");
   m.innerHTML = "";
+  m.tabIndex = -1;
+  m.setAttribute("role", "menu");
+  m.setAttribute("aria-label", name || "");
   for (const a of actions) {
-    if (a.sep) { if (m.lastChild && m.lastChild.tagName !== "HR") m.append(el("hr")); continue; }
+    if (a.sep) { if (m.lastChild && m.lastChild.tagName !== "HR") { const hr = el("hr"); hr.setAttribute("role", "separator"); m.append(hr); } continue; }
     const b = el("button", a.cls || "");
+    b.setAttribute("role", a.checked == null ? "menuitem" : "menuitemcheckbox");
+    if (a.checked != null) b.setAttribute("aria-checked", String(a.checked));
+    if (a.current) b.setAttribute("aria-current", "page");
+    b.disabled = !!a.disabled;
     b.append(el("span", "", a.label));
-    if (a.key) b.append(el("span", "key", a.key));
+    if (a.key) {
+      const key = el("span", "key", a.key);
+      if (a.checked != null) key.setAttribute("aria-hidden", "true");
+      b.append(key);
+    }
     if (a.envWrite) b.dataset.envWrite = a.envWrite;
-    b.onclick = () => { hideMenu(); a.run(); };
+    b.onclick = () => { hideMenu(true); a.run(); };
     m.append(b);
   }
   if (m.lastChild && m.lastChild.tagName === "HR") m.lastChild.remove();
@@ -460,34 +523,45 @@ export function menu(x, y, actions, keys = false) {
   const r = m.getBoundingClientRect();
   m.style.left = Math.max(6, Math.min(x, innerWidth - r.width - 6)) + "px";
   m.style.top = Math.max(6, Math.min(y, innerHeight - r.height - 6)) + "px";
-  const back = document.activeElement;
+  menuFocus = { opener, back, visible: opener?.matches?.(":focus-visible") };
+  if (opener) { menuOpener(opener); opener.setAttribute("aria-expanded", "true"); }
   m.onkeydown = (e) => {
-    const bs = [...m.querySelectorAll("button")];
+    const bs = [...m.querySelectorAll("button:not(:disabled)")];
     const i = bs.indexOf(document.activeElement);
     if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Tab" || e.key === "Home" || e.key === "End") {
       e.preventDefault();
       const d = e.key === "ArrowUp" || (e.key === "Tab" && e.shiftKey) ? -1 : 1;
       const j = e.key === "Home" ? 0 : e.key === "End" ? bs.length - 1 : (i + d + bs.length) % bs.length;
-      bs[j].focus();
+      bs[j]?.focus();
     } else if (e.key === "Escape" || e.key === "ContextMenu" || (e.key === "F10" && e.shiftKey)) {
       e.preventDefault();
-      hideMenu();
-      if (back && back.focus) back.focus();
+      hideMenu(true);
     } else if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       if (i >= 0) bs[i].click();
     } else {
       // a key the menu shows runs its item
       const hit = actions.find((a) => !a.sep && a.key && a.key.split(" / ").some((k) => k.toLowerCase() === e.key.toLowerCase()));
-      if (hit) { e.preventDefault(); bs[actions.filter((a) => !a.sep).indexOf(hit)].click(); }
+      if (hit && !hit.disabled) { e.preventDefault(); m.querySelectorAll("button")[actions.filter((a) => !a.sep).indexOf(hit)].click(); }
     }
     e.stopPropagation();
   };
-  if (keys) m.querySelector("button").focus();
+  if (keys) {
+    const first = m.querySelector("button:not(:disabled)");
+    if (first) first.focus(); else m.focus({ focusVisible: false });
+  }
   setTimeout(() => document.addEventListener("mousedown", hideMenuOutside, { once: true }), 0);
 }
 function hideMenuOutside(e) { if (!$("#menu").contains(e.target)) hideMenu(); else document.addEventListener("mousedown", hideMenuOutside, { once: true }); }
-export function hideMenu() { const m = $("#menu"); m.inert = true; m.hidden = true; }
+export function hideMenu(restore = false) {
+  const m = $("#menu"), focus = menuFocus;
+  m.inert = true; m.hidden = true;
+  menuFocus = null;
+  focus?.opener?.setAttribute("aria-expanded", "false");
+  if (!restore || !focus?.back) return;
+  if (typeof focus.back === "function") focus.back();
+  else if (focus.back.isConnected) focus.back.focus({ preventScroll: true, focusVisible: focus.visible });
+}
 
 // A player-requested temporary decision panel (06 §3.1 rule 7).
 export async function problem(ref, run, actionWrite) {

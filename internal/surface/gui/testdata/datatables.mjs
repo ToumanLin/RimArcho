@@ -10,7 +10,7 @@ async function setup() {
   const $ = (s) => s === "#screen" ? screen : screen.querySelector(s);
   const deps = {
     "./state.js": { S, $, el, api, T: (s) => s, Tf: (s, ...args) => { let i = 0; return s.replace(/%[sd]/g, () => args[i++]); }, errText: (e) => e.message, say() {} },
-    "./popups.js": { menu: (...args) => menus.push(args), text() { throw Error("preview must stay inline"); } },
+    "./popups.js": { menuOpener: n => n, menu: (...args) => menus.push(args), text() { throw Error("preview must stay inline"); } },
     "./motion.js": { shimmer: () => el("span", "skel") },
     "./screens.js": {
       page: (cls) => el("div", cls), area() {},

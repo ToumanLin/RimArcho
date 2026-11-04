@@ -7,6 +7,7 @@ const source = (name) => readFileSync(new URL(`../../internal/surface/gui/assets
 const part = (text, start, end) => text.slice(text.indexOf(start), text.indexOf(end, text.indexOf(start)));
 function el(tag, cls = '', text = '') {
   const node = { tag, className: cls, textContent: text, children: [], dataset: {},
+    setAttribute(name, value) { (this.attributes ||= {})[name] = String(value); },
     append(...children) { this.children.push(...children); },
     prepend(...children) { this.children.unshift(...children); }, focus() { this.focused = true; },
   };

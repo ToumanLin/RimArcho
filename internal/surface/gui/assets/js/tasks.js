@@ -522,7 +522,7 @@ function itemMenu(x, y, keys) {
   if (it.workshopURL) acts.push({ label: T("open the Workshop page"), run: () => api.OpenURL(it.workshopURL).catch((e) => say("fail", errText(e))) });
   if (it.state === "fail" && !it.permanent) acts.push({ sep: true }, { label: T("try only this one again"), key: "r", run: () => run("retry", [t], it.ref) });
   acts.push({ label: T("copy the name"), key: "ctrl+c", run: () => copy(it.name) });
-  pop.menu(x, y, acts, keys);
+  pop.menu(x, y, acts, keys, { name: it.name, opener: els.iscroll });
 }
 function copy(text) {
   navigator.clipboard.writeText(text).then(() => say("ok", Tf("copied %s", text))).catch(() => {});
@@ -568,7 +568,7 @@ function taskMenu(x, y, keys) {
     acts.push({ label: a.label, key: a.key, cls: a.danger ? "danger" : "", run: () => run(a.id, targets()) });
   }
   if (r.items && r.items.length) acts.unshift({ label: T("every item"), key: "enter", run: () => focusItems() }, { sep: true });
-  pop.menu(x, y, acts, keys);
+  pop.menu(x, y, acts, keys, { name: [r.title, r.obj].filter(Boolean).join(" "), opener: els.rows });
 }
 
 // run: a task action (the buttons, the menus and the keys all come here).

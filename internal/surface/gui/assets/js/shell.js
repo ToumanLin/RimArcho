@@ -83,7 +83,10 @@ function navKey(e) {
     return;
   }
   if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); b.click(); return; }
-  if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); b.blur(); }
+  if (e.key === "Escape") {
+    e.preventDefault(); e.stopPropagation();
+    if (!$("#menu").hidden) pop.hideMenu(true); else b.blur();
+  }
 }
 
 // kidMenu: an entry's sub-entries as a dropdown under it (the top layout).
@@ -91,7 +94,17 @@ function kidMenu(b, keys) {
   const it = navItem(b.dataset.id);
   if (!it || !it.kids) return;
   const r = b.getBoundingClientRect();
-  pop.menu(r.left, r.bottom + 4, it.kids.map((k) => ({ label: k.label, cls: k.id === current() ? "on" : "", run: () => ui.go(k.id) })), keys);
+  pop.menu(r.left, r.bottom + 4, it.kids.map((k) => ({ label: k.label, cls: k.id === current() ? "on" : "", current: k.id === current(), run: () => ui.go(k.id) })), keys, { name: it.label, opener: b });
+}
+
+function planMenuButton(b, id) {
+  pop.menuOpener(b);
+  b.oncontextmenu = (e) => { e.preventDefault(); e.stopPropagation(); ui.planMenu(id, e.clientX, e.clientY, b, e.button === 0); };
+  b.addEventListener("keydown", e => {
+    if (e.key !== "ContextMenu" && !(e.key === "F10" && e.shiftKey)) return;
+    e.preventDefault(); e.stopPropagation(); const r = b.getBoundingClientRect();
+    ui.planMenu(id, r.left, r.bottom, b, true);
+  });
 }
 
 // kidOwner: the entry whose sub-pages include the page shown (or that is the page shown).
@@ -226,6 +239,7 @@ function renderSide() {
         if (it.id === cur && (layout === "top" || !kids.some(k => k.id === cur))) b.setAttribute("aria-current", "page");
         if (layout === "top" && kidOn && it.id !== cur) b.setAttribute("aria-current", "location");
         if (kids.length && layout === "side") b.setAttribute("aria-expanded", String(on));
+        if (kids.length && layout === "top") pop.menuOpener(b);
         // the label is the tooltip in the compact rail (magpie's); the key follows it
         b.title = it.label + (it.key ? T("; ") + it.key.replace("shift", "Shift") : "");
         const ic = el("span", "ic");
@@ -303,7 +317,7 @@ function kidList(it, kids, cur, hl) {
     if (k.mark) { const m = el("span", "mark"); m.title = k.mark; kb.append(m); kb.title = k.label + T("; ") + k.mark; }
     kb.onclick = () => ui.go(k.id);
     if (it.id === "plan" && !k.add) {
-      kb.oncontextmenu = (e) => { e.preventDefault(); ui.planMenu(+k.id.slice(5), e.clientX, e.clientY); };
+      planMenuButton(kb, +k.id.slice(5));
     }
     box.append(kb);
   }
@@ -389,7 +403,7 @@ function renderCrumbs() {
     if (owner.id === "plan") {
       [...s.querySelectorAll(":scope > button")].forEach((b, i) => {
         const k = tabs[i];
-        if (!k.add) b.oncontextmenu = (e) => { e.preventDefault(); ui.planMenu(+k.id.slice(5), e.clientX, e.clientY); };
+        if (!k.add) planMenuButton(b, +k.id.slice(5));
       });
     }
     nav.append(s);

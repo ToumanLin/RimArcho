@@ -1182,18 +1182,23 @@ function filePicker(files) {
   const shown = (L.tab === 1 && files.find((f) => f.of === L.path)) || files.find((f) => f.path === L.path) || files[0];
   const b = el("button", "btn quiet picker");
   b.append(el("span", "", shown.label), el("span", "muted num", shown.when || ""), el("span", "chev", "⌄"));
+  pop.menuOpener(b);
   b.onclick = (e) => {
     e.stopPropagation();
     const r = b.getBoundingClientRect();
     pop.menu(r.left, r.bottom + 4, files.map((f) => ({
-      label: f.label, key: f.when, cls: (f.of ? "sub" : "") + ((f.of ? f.of === L.path && L.tab === 1 : f.path === L.path && L.tab === 0) ? " on" : ""),
+      label: f.label, key: f.when, current: f.of ? f.of === L.path && L.tab === 1 : f.path === L.path && L.tab === 0, cls: (f.of ? "sub" : "") + ((f.of ? f.of === L.path && L.tab === 1 : f.path === L.path && L.tab === 0) ? " on" : ""),
       run: () => {
         L.tab = f.of ? 1 : 0;
         if ((f.of || f.path) === L.path) return drawGameLog();
         L.path = f.of || f.path; L.page = null; L.cur = 0; L.mcur = 0; L.tabPick = L.tab;
         gameLog(L.path);
       },
-    })));
+    })), e.detail === 0, { name: shown.label, opener: b });
+  };
+  b.onkeydown = e => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    e.preventDefault(); e.stopPropagation(); if (!e.repeat) b.click();
   };
   return b;
 }

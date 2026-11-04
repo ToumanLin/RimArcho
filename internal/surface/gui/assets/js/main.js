@@ -955,7 +955,7 @@ async function openRowMenu(x, y, keys) {
   else try { codes = await api.RowOps(k, it.id); } catch { codes = []; }
   const n = S.focus < 3 ? selection().length : 1;
   if (n > 1) codes = codes.filter((c) => !ops.op(c).one);
-  ops.openMenu(x, y, codes, (c) => rowOp(c), keys);
+  ops.openMenu(x, y, codes, (c) => rowOp(c), keys, { name: it.name, opener: $(`.area[data-area="${k}"] .rows`) });
 }
 
 function menuAtCursor() {
@@ -1020,7 +1020,7 @@ function onKey(e) {
     e.preventDefault(); pop.palette(); return;
   }
   // a menu opened with the mouse does not hold the focus: esc still closes it first (G5)
-  if (k === "Escape" && !$("#menu").hidden) { e.preventDefault(); pop.hideMenu(); return; }
+  if (k === "Escape" && !$("#menu").hidden) { e.preventDefault(); pop.hideMenu(true); return; }
   // ctrl+b moves the navigation between the side and the top, on every page (06 §2.1)
   if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && k.toLowerCase() === "b") { e.preventDefault(); shell.toggleNav(); return; }
   // ctrl+j: Background tasks from any page; again goes back (06 §2.16)
@@ -1206,7 +1206,7 @@ async function loadWidths() {
 
 const ui = {
   reload, refreshEnvironment, relang, reaccent, render, pageEntering, pageEntered, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go, useEnv,
-  palette: paletteChoice, commandDone, uninstallStarted: () => uninst.restore(), selectionItems: selection, planMenu: (id, x, y) => plans.menuAt(id, x, y),
+  palette: paletteChoice, commandDone, uninstallStarted: () => uninst.restore(), selectionItems: selection, planMenu: (id, x, y, opener, keys) => plans.menuAt(id, x, y, opener, keys),
   menu: (x, y) => openRowMenu(x, y, false),
   detailFollow: (f) => detailFollow(f),
   newList: (from) => planManage.newList(from),

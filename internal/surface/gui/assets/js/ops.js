@@ -40,9 +40,9 @@ export function menuItems(codes, run) {
 }
 
 // openMenu shows the row menu at x, y (keys: opened from the keyboard, the first item focused).
-export function openMenu(x, y, codes, run, keys = false) {
+export function openMenu(x, y, codes, run, keys = false, context) {
   const items = menuItems(codes, run);
-  if (items.length) pop.menu(x, y, items, keys);
+  if (items.length) pop.menu(x, y, items, keys, context);
 }
 
 // keyed: the op of codes that key runs ("space", "m", "Del" …), in menu order; for space

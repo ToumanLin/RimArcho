@@ -66,10 +66,11 @@ export function createTable({ key, columns, state = { cols: null, sort: "name", 
       { label: Tf("widen %s", T(d.title)), key: ">", run: () => size(k, 24) },
       { label: Tf("narrow %s", T(d.title)), key: "<", run: () => size(k, -24) },
       { label: Tf("reset width: %s", T(d.title)), key: "=", run: () => size(k, 0) }, { sep: true });
-    for (const c of cols()) if (!def(c.key).fixed) acts.push({ label: T(def(c.key).title), key: c.shown ? "✓" : "", run: () => { c.shown = !c.shown; changed(); } });
+    for (const c of cols()) if (!def(c.key).fixed) acts.push({ label: T(def(c.key).title), key: c.shown ? "✓" : "", checked: c.shown, run: () => { c.shown = !c.shown; changed(); } });
     acts.push({ sep: true }, { label: T("reset the columns"), run: () => { state.cols = mergeColumns(defs(), ""); changed(); } });
     if (x == null) { const b = (head.querySelector(".th.on") || head).getBoundingClientRect(); x = b.left; y = b.bottom; }
-    pop.menu(x, y, acts, keys);
+    // the header opens it; esc goes back to the rows, where the keys work (06 §3.9)
+    pop.menu(x, y, acts, keys, { name: T(d.title), opener: head.querySelector(`[data-k="${k}"]`) || root, back: focusTable });
   }
   function draw(box, th, options = {}) {
     root = box; head = th;
@@ -91,6 +92,8 @@ export function createTable({ key, columns, state = { cols: null, sort: "name", 
       cell.dataset.k = c.key;
       cell.id = key + "-column-" + c.key;
       cell.setAttribute("role", "columnheader");
+      cell.tabIndex = -1;
+      pop.menuOpener(cell);
       cell.setAttribute("aria-colindex", String(visible().indexOf(c) + 1));
       cell.setAttribute("aria-sort", active ? (state.dir * d.dir > 0 ? "ascending" : "descending") : "none");
       cell.append(el("span", "lbl", T(d.title)));

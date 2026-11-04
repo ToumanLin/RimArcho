@@ -159,5 +159,94 @@ export async function checkFeedback({ handlers, test, assert, deferred }) {
     text = document.querySelector('.xc-text'); pick = document.querySelector('.xc-body .xc-row .primary');
     assert(text.getAttribute('aria-invalid') === 'true' && !pick.hasAttribute('aria-invalid'), 'paste failure assigned to file chooser');
   });
+  await test('A7: shared menus name their target, expose checks/disabled items and restore their opener', async () => {
+    const pop = await import('/js/popups.js');
+    let menu = document.querySelector('#menu');
+    if (!menu) { menu = document.createElement('div'); menu.id = 'menu'; menu.hidden = true; document.body.append(menu); }
+    const opener = document.createElement('button'); opener.textContent = 'Fixture Mod'; document.body.append(opener);
+    pop.menuOpener(opener); opener.focus(); let runs = 0;
+    const actions = [{ label: 'Open', key: 'o', run: () => runs++ }, { sep: true },
+      { label: 'Size', checked: true, key: '✓', run: () => runs++ },
+      { label: 'Date', checked: false, run: () => runs++ }, { label: 'Unavailable', disabled: true, run: () => runs++ }];
+    pop.menu(100, 100, actions, true, { name: opener.textContent, opener });
+    const buttons = [...menu.querySelectorAll('button')];
+    assert(menu.getAttribute('role') === 'menu' && menu.getAttribute('aria-label') === 'Fixture Mod', 'menu role/name');
+    assert(opener.getAttribute('aria-controls') === menu.id && opener.getAttribute('aria-expanded') === 'true', 'menu/opener link');
+    assert(buttons[1].getAttribute('role') === 'menuitemcheckbox' && buttons[1].getAttribute('aria-checked') === 'true' && buttons[2].getAttribute('aria-checked') === 'false', 'checked states');
+    assert(buttons[3].disabled && menu.querySelector('[role=separator]') && document.activeElement === buttons[0], 'disabled/separator/initial focus');
+    const key = key => document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+    key('End'); assert(document.activeElement === buttons[2] && runs === 0, 'navigation committed or reached disabled item');
+    key('Home'); key('Enter'); assert(runs === 1 && menu.hidden && document.activeElement === opener, 'menu item did not run exactly once');
+    pop.menu(100, 100, actions, true, { name: 'Fixture Mod', opener }); key('Escape');
+    assert(menu.hidden && document.activeElement === opener && opener.getAttribute('aria-expanded') === 'false', 'key menu Esc restoration');
+    pop.menu(100, 100, actions, false, { name: 'Fixture Mod', opener }); pop.hideMenu(true);
+    assert(document.activeElement === opener && opener.getAttribute('aria-expanded') === 'false', 'mouse menu Esc restoration');
+    let backs = 0; pop.menu(100, 100, actions, true, { name: 'Fixture Mod', opener, back: () => backs++ }); key('Escape');
+    assert(backs === 1 && menu.hidden && opener.getAttribute('aria-expanded') === 'false', 'Esc did not use the menu back function');
+    pop.menu(100, 100, [actions[4]], true, { name: 'Fixture Mod', opener });
+    key('ArrowDown'); assert(document.activeElement === menu && runs === 1, 'all-disabled menu lost focus or executed');
+    key('Escape'); assert(document.activeElement === opener, 'all-disabled menu did not restore focus');
+    opener.remove();
+  });
+  await test('A7: command results expose the active option and navigation never executes', async () => {
+    const pop = await import('/js/popups.js'); const { buildCommandPanel } = await import('/js/command-panel.js');
+    pop.close(); const opener = document.createElement('button'); opener.textContent = 'Fixture opener'; document.body.append(opener); opener.focus();
+    handlers.set('Palette', () => [{ id: 'fixture-one', name: 'Fixture One', desc: 'Fixture One' }, { id: 'fixture-two', name: 'Fixture Two', desc: 'second' }]);
+    handlers.set('CommandStatus', () => ({})); let runs = 0;
+    pop.open('palette', 'command palette', (box, p) => buildCommandPanel(box, p, { close: pop.close, pick: () => runs++ }));
+    await new Promise(r => setTimeout(r, 20));
+    const input = document.querySelector('.command-panel input'); input.value = ''; input.dispatchEvent(new Event('input'));
+    await new Promise(r => setTimeout(r, 20));
+    input.focus(); // Previous import checks can still have an animation-frame focus queued.
+    const list = document.getElementById(input.getAttribute('aria-controls'));
+    const active = () => document.getElementById(input.getAttribute('aria-activedescendant'));
+    assert(input.getAttribute('role') === 'combobox' && list.getAttribute('role') === 'listbox' && list.getAttribute('aria-labelledby') === 'command-panel-title', 'command combo/list name');
+    assert(active().getAttribute('aria-selected') === 'true' && active().textContent === 'Fixture OneFixture One' && active().lastElementChild.getAttribute('aria-hidden') === 'true', 'initial active option');
+    S.popup.keys(new KeyboardEvent('keydown', { key: 'n', ctrlKey: true, cancelable: true }));
+    assert(active().textContent === 'Fixture Twosecond' && list.querySelectorAll('[aria-selected=true]').length === 1 && runs === 0, 'result navigation committed/selected wrong option');
+    assert(active().getAttribute('aria-posinset') === '2' && active().getAttribute('aria-setsize') === '2', 'option position/size');
+    S.popup.keys(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
+    assert(runs === 1 && !S.popup && document.activeElement === opener, 'command result did not run exactly once/restore focus: ' + runs + '/' + S.popup?.kind + '/' + document.activeElement?.outerHTML);
+    opener.remove();
+  });
+  await test('A7: plan/sort/game choosers expose options without committing on arrows', async () => {
+    const pop = await import('/js/popups.js'); let runs = 0;
+    const opener = document.createElement('button'); opener.textContent = 'Fixture chooser'; document.body.append(opener); opener.focus();
+    pop.choose('Fixture choices', ['Alpha', 'Beta'], () => runs++, 1);
+    const list = document.querySelector('#popup [role=listbox]');
+    assert(document.activeElement === list && list.getAttribute('aria-labelledby') && document.getElementById(list.getAttribute('aria-activedescendant')).textContent === 'Beta', 'chooser initial role/name/focus/active');
+    S.popup.keys(new KeyboardEvent('keydown', { key: 'ArrowUp', cancelable: true }));
+    assert(runs === 0 && list.querySelector('[aria-selected=true]').textContent === 'Alpha', 'chooser arrows committed');
+    assert(opener.getAttribute('aria-controls') === list.id, 'chooser opener link');
+    pop.popupKey(new KeyboardEvent('keydown', { key: 'Escape' }));
+    assert(document.activeElement === opener && runs === 0 && !opener.hasAttribute('aria-controls'), 'chooser Esc did not restore or left its list link'); opener.remove();
+  });
+  await test('A7: the version-warning dialog contains named entries and Esc restores its opener', async () => {
+    const pop = await import('/js/popups.js'); pop.close();
+    const opener = document.createElement('button'); opener.textContent = 'Fixture versions'; document.body.append(opener); opener.focus();
+    const action = { kind: 'version-mute', label: 'ignore' }; let runs = 0;
+    handlers.set('VersionWarnings', () => ({ title: 'Fixture version warnings', all: action, groups: [{ title: 'Fixture group', action,
+      rows: [{ id: 'fixture-one', name: 'Fixture One', supported: '1.6', action }, { id: 'fixture-two', name: 'Fixture Two', supported: '1.5', action }] }] }));
+    await (await import('/js/versionpanel.js')).openVersionList({ title: 'Fixture versions', gameVersion: '1.7' }, () => runs++, () => runs++);
+    const box = document.querySelector('.version-panel'), list = box.querySelector('[role=list]');
+    assert(box.getAttribute('role') === 'dialog' && document.getElementById(box.getAttribute('aria-labelledby')).textContent === 'Fixture version warnings', 'version dialog name');
+    assert(list.querySelectorAll('[role=listitem]').length === 2 && opener.getAttribute('aria-controls') === box.id, 'version list/opener link');
+    S.popup.keys(new KeyboardEvent('keydown', { key: 'ArrowDown', cancelable: true }));
+    assert(runs === 0, 'version-list arrows committed'); pop.popupKey(new KeyboardEvent('keydown', { key: 'Escape' }));
+    assert(document.activeElement === opener && opener.getAttribute('aria-expanded') === 'false', 'version-list Esc restoration'); opener.remove();
+  });
+  await test('A7: the log picker opens from Enter without the page consuming it', async () => {
+    const pop = await import('/js/popups.js'); pop.close(); pop.hideMenu();
+    handlers.set('LogPage', () => ({ path: 'fixture-log', files: [{ path: 'fixture-log', label: 'Player.log', when: '12:00' },
+      { path: 'fixture-previous', label: 'Previous Player.log', when: '11:00' }], rows: [], sections: [], monitors: [] }));
+    await (await import('/js/screens.js')).gameLog('fixture-log', true);
+    const picker = document.querySelector('.picker'); picker.focus();
+    const e = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }); picker.dispatchEvent(e);
+    const menu = document.querySelector('#menu');
+    assert(e.defaultPrevented && !menu.hidden && menu.getAttribute('aria-label') === 'Player.log', 'log picker Enter did not open its named menu');
+    assert(document.activeElement === menu.querySelector('button') && menu.querySelector('[aria-current=page]'), 'log picker initial focus/current file');
+    document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    assert(document.activeElement === picker && menu.hidden, 'log menu Esc restoration');
+  });
   say('', '');
 }

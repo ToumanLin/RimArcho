@@ -21,7 +21,11 @@ export function buildCommandPanel(pop, p, { close, pick, reload, uninstall }) {
   pop.classList.add("command-panel");
   const head = el("div", "command-head"), output = el("pre", "command-output"), list = el("div", "opts"), row = el("div", "in"), input = el("input"), foot = el("div", "command-foot");
   const copyButton = el("button", "btn", T("copy")), dismiss = el("button", "btn", "×");
-  head.append(el("span", "", T("command palette")), copyButton, dismiss);
+  const title = el("span", "", T("command palette")); title.id = "command-panel-title";
+  head.append(title, copyButton, dismiss);
+  list.id = "command-results"; list.setAttribute("role", "listbox"); list.setAttribute("aria-labelledby", title.id);
+  input.setAttribute("role", "combobox"); input.setAttribute("aria-controls", list.id);
+  input.setAttribute("aria-autocomplete", "list"); input.setAttribute("aria-expanded", "false");
   dismiss.setAttribute("aria-label", T("close")); dismiss.onclick = close;
   output.tabIndex = 0; input.spellcheck = false; input.value = draft;
   input.placeholder = T("a command, a mod, a game"); input.setAttribute("aria-label", input.placeholder);
@@ -67,10 +71,21 @@ export function buildCommandPanel(pop, p, { close, pick, reload, uninstall }) {
     list.replaceChildren();
     options.forEach((o, i) => {
       const item = el("button", "opt" + (i === selected ? " on" : "")); item.type = "button";
-      item.append(el("span", "", o.name)); if (o.desc) item.append(el("span", "d", o.desc));
+      item.id = "command-result-" + i;
+      item.setAttribute("role", "option"); item.setAttribute("aria-selected", String(i === selected));
+      item.setAttribute("aria-posinset", String(i + 1)); item.setAttribute("aria-setsize", String(options.length));
+      item.append(el("span", "", o.name));
+      if (o.desc) {
+        const desc = el("span", "d", o.desc);
+        if (o.desc === o.name) desc.setAttribute("aria-hidden", "true");
+        item.append(desc);
+      }
       item.onclick = () => choose(o); item.onmousemove = () => { if (selected !== i) { selected = i; draw(); } }; list.append(item);
     });
-    list.children[selected]?.scrollIntoView({ block: "nearest" });
+    const active = list.children[selected];
+    input.setAttribute("aria-expanded", String(options.length > 0));
+    if (active) input.setAttribute("aria-activedescendant", active.id); else input.removeAttribute("aria-activedescendant");
+    active?.scrollIntoView({ block: "nearest" });
   };
   const refresh = async () => {
     const n = ++sequence, text = input.value;
