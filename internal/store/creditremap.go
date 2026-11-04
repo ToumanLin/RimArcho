@@ -119,7 +119,7 @@ func (s *Store) RemapCreditPlans(plans []int64, old, target string, now time.Tim
 		if _, err := tx.Exec(`INSERT INTO meta(key,value) VALUES(?, '1') ON CONFLICT(key) DO UPDATE SET value=CAST(value AS INTEGER)+1`, CreditRemapKey); err != nil {
 			return err
 		}
-		return mergeCopyNote14(tx, old, target)
+		return mergeCopyNote(tx, old, target)
 	})
 }
 

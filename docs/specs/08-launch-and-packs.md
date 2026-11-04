@@ -87,7 +87,7 @@ Mods may live in directories the game does not read: SteamCMD download directori
 
 **Deployable.** An Instance is deployable if its source is `steamcmd` or `extra`, it is live, it is neither residue nor `unloadable`, and it is not already visible to the game through a non-RimArcho alias in official `Data/`, `Mods/` or Workshop directories (02 §3.3). A deployable Instance can be enabled directly.
 
-**Link names.** A link is named `Mods/_Archo_<source label>_<directory name>`. Replace `/`, `\` and `:` in the label and directory name with `_`. Deployable sources are shared Mod folders with globally unique labels (02 §3.1), so the same Instance has the same link name in every game. If the v14 migration renamed a label, the next write to the game replaces the old link name under the rules below. The `_Archo_` prefix means "managed by RimArcho" and is matched case-insensitively.
+**Link names.** A link is named `Mods/_Archo_<source label>_<directory name>`. Replace `/`, `\` and `:` in the label and directory name with `_`. Deployable sources are shared Mod folders with globally unique labels (02 §3.1), so the same Instance has the same link name in every game. If a label changes, the next write to the game replaces the old link name under the rules below. The `_Archo_` prefix means "managed by RimArcho" and is matched case-insensitively.
 
 **Deployment timing.** When launching a plan or writing to the game (§2 step 3), create any missing links for the plan's deployable Instances. Delete `_Archo_` links that are absent from the plan or point to the wrong recorded Instance. Remove links before creating them so that old links with the same name can be replaced. `--dry-run` only lists the changes. Editing a plan never touches `Mods/`.
 
@@ -464,7 +464,7 @@ If none is found, treat Monitor as absent: do not install it or add it to a plan
 
 1. Read the bundled Monitor's version and content fingerprint (each file's relative path, size and SHA-256).
 2. If the target directory is absent, assemble `<target>.archo-tmp` and rename it into place. If it exists with the same fingerprint, leave it unchanged. If its content differs, do not overwrite a stable version (one without `-`); explain "same version, different content". Replace a prerelease version, such as `0.9.0-dev`, only when no game is running: assemble the new directory, rename the old one to `<target>.archo-old`, then delete that old directory, which is RimArcho's own artifact. Otherwise, defer the replacement until next time.
-3. If there is no Monitor source, register a shared `extra` source (02 §0) with the label `monitor` and the Monitor directory as its root. First check that it and the data directory or any source root do not contain one another. All environments use this single source. Before 0.9.0, each environment had its own; migration v14 merges them by root.
+3. If there is no Monitor source, register a shared `extra` source (02 §0) with the label `monitor` and the Monitor directory as its root. First check that it and the data directory or any source root do not contain one another. All environments use this single source.
 4. Scan once if files were copied or a source was registered.
 5. Update old versions in existing plans as described below, then add Monitor by default under 04 §1.5.
 

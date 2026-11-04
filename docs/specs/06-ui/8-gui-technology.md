@@ -15,7 +15,7 @@ The same source tree is linked twice:
 
 - Both executables share the data directory and database and may run together; SQLite WAL supports multiple processes. When the GUI gains focus, it compares `Stamp()` (the database state, `ChangeKey`) and reloads if it changed. An edit from a stale view never overwrites the other process's changes (G8).
 - If an adjacent `RimArcho.exe` exists, `archo gui` starts it and immediately returns. Otherwise, it runs the GUI in the current process.
-- The first opening of an old database migrates it, which takes a few seconds. If this exceeds 300 ms, `RimArcho.exe` shows a small progress window before the main window; this window cannot be closed. The TUI and CLI write one line to stderr. See the startup upgrade progress rules in 02 §7.
+- When a database needs upgrade steps (none exist yet), the first opening runs them. If this exceeds 300 ms, `RimArcho.exe` shows a small progress window before the main window; this window cannot be closed. The TUI and CLI write one line to stderr. See the startup upgrade progress rules in 02 §7.
 - Releases contain both executables; see 07 §6 for their sizes.
 
 ### 8.2 Frontend

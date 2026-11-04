@@ -67,20 +67,20 @@ func (s *Store) MergeLinkedInstances(replace map[string]string) error {
 		if err := remapHistoryStages(tx, pending, nil); err != nil {
 			return err
 		}
-		if err := rewriteInstances14(tx, pending); err != nil {
+		if err := rewriteInstances(tx, pending); err != nil {
 			return err
 		}
-		if err := rewriteOrigins14(tx, pending, lineages); err != nil {
+		if err := rewriteOrigins(tx, pending, lineages); err != nil {
 			return err
 		}
 		if len(lineages) > 0 {
-			if err := rewriteLineages14(tx, lineages); err != nil {
+			if err := rewriteLineages(tx, lineages); err != nil {
 				return err
 			}
-			if err := mergePlayerData14(tx, lineages); err != nil {
+			if err := mergePlayerData(tx, lineages); err != nil {
 				return err
 			}
-			if err := mergeRules14(tx, lineages); err != nil {
+			if err := mergeRules(tx, lineages); err != nil {
 				return err
 			}
 		}

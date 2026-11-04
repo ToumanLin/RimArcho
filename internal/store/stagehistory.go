@@ -8,8 +8,6 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 )
 
-const schemaV21 = `ALTER TABLE workspace_undo ADD COLUMN staging TEXT;`
-
 // lockHistory reserves the SQLite writer before reading history/staging. In WAL
 // mode a deferred read transaction cannot upgrade after a background analysis
 // commits; busy_timeout only helps when the write reservation is acquired first.

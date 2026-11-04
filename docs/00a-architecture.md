@@ -123,4 +123,4 @@ Direct benefit: when an author changes packageId, plans and user rules stay conn
 - The same Workshop ID in both Steam Workshop and SteamCMD directories: two Instances, one Lineage.
 - A very old Mod with no packageId: derive a temporary package ID by game rules, marked inferred (02 §4.5).
 - The player moves the game and deletes Mods at the same time: rebind the source first; remaining gaps become identity questions.
-- Two environments share a Workshop directory: Workshop is a Mod folder shared by all environments, with one Instance and Lineage per Mod; migration v14 merges pre-0.9.0 per-environment copies (02 §0.1).
+- Two environments share a Workshop directory: Workshop is a Mod folder shared by all environments, with one Instance and Lineage per Mod (02 §0).

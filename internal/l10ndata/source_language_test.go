@@ -33,7 +33,7 @@ var sourceLanguageFiles = map[string]string{
 	"internal/store/content_test.go":                         "Exercises Chinese interface output, legacy Chinese data, or CJK names and paths.",
 	"internal/store/derived_scan_test.go":                    "Exercises Chinese interface output, legacy Chinese data, or CJK names and paths.",
 	"internal/store/intkey_research_test.go":                 "Exercises Chinese interface output, legacy Chinese data, or CJK names and paths.",
-	"internal/store/migrate28_test.go":                       "Exercises Chinese interface output, legacy Chinese data, or CJK names and paths.",
+	"internal/store/filelist_test.go":                        "Exercises Chinese interface output, legacy Chinese data, or CJK names and paths.",
 	"internal/surface/gui/credit_test.go":                    "Exercises Chinese interface output, legacy Chinese data, or CJK names and paths.",
 	"internal/surface/gui/exchange_test.go":                  "Exercises Chinese interface output, legacy Chinese data, or CJK names and paths.",
 	"internal/surface/gui/linkhealth_test.go":                "Exercises Chinese interface output, legacy Chinese data, or CJK names and paths.",

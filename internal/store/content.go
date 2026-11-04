@@ -16,66 +16,6 @@ const (
 	contentKinds = HasDLL | HasDefsPatch | HasLanguages
 )
 
-// schemaV27: what a snapshot's file list says about its content, computed when the snapshot
-// is written (02 §4.3). A snapshot's paths never change (another file list hashes to another
-// snapshot), so the columns stay right for its whole life, also after 02 §7.1 drops its rows.
-const schemaV27 = `
-ALTER TABLE snapshot ADD COLUMN kinds INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE snapshot ADD COLUMN langs TEXT NOT NULL DEFAULT '';
-`
-
-// migrateV27 fills kinds and langs from the stored file rows, in their primary-key order.
-func migrateV27(tx *sql.Tx) error {
-	rows, err := tx.Query(`SELECT snapshot_id, rel_path FROM snapshot_file ORDER BY snapshot_id, rel_path`)
-	if err != nil {
-		return err
-	}
-	type derived struct {
-		id    int64
-		kinds int
-		langs string
-	}
-	var out []derived
-	var cur int64
-	var d deriver
-	flush := func() {
-		if k, l := d.result(); k != 0 || l != "" {
-			out = append(out, derived{cur, k, l})
-		}
-		d = deriver{}
-	}
-	for rows.Next() {
-		var id int64
-		var rel string
-		if err := rows.Scan(&id, &rel); err != nil {
-			rows.Close()
-			return err
-		}
-		if id != cur {
-			flush()
-			cur = id
-		}
-		d.add(rel)
-	}
-	err = rows.Err()
-	rows.Close()
-	if err != nil {
-		return err
-	}
-	flush()
-	st, err := tx.Prepare(`UPDATE snapshot SET kinds=?, langs=? WHERE id=?`)
-	if err != nil {
-		return err
-	}
-	defer st.Close()
-	for _, x := range out {
-		if _, err := st.Exec(x.kinds, x.langs, x.id); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // deriveContent computes snapshot.kinds and snapshot.langs from a file list.
 func deriveContent(rels []string) (kinds int, langs string) {
 	rels = append([]string(nil), rels...)

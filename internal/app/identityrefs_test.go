@@ -194,32 +194,3 @@ func TestResolveSameReferenceRewriteRollback(t *testing.T) {
 		t.Fatal("failed merge deleted mod")
 	}
 }
-
-func TestMigrateIdentityQuestionSummary(t *testing.T) {
-	t.Parallel()
-	e, q := identityReferenceFixture(t)
-	before, err := e.App.Store.QuestionByID(q.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if before.ComparisonSummary().Common != 4 {
-		t.Fatal("new question has no summary")
-	}
-	// Simulate the prior released shape; migration must reconstruct the same summary
-	// from stored snapshots while leaving the question and player decisions alone.
-	e.DowngradeFacts()
-	if _, err := e.App.Store.DB.Exec(`ALTER TABLE snapshot DROP COLUMN kinds; ALTER TABLE snapshot DROP COLUMN langs; DROP TABLE version_mute; ALTER TABLE identity_question DROP COLUMN summary; UPDATE meta SET value='21' WHERE key='schema_version'`); err != nil {
-		t.Fatal(err)
-	}
-	e.Open()
-	after, err := e.App.Store.QuestionByID(q.ID)
-	if err != nil || after.Summary != before.Summary || after.Status != before.Status || after.ScanID != before.ScanID {
-		t.Fatalf("migration=%+v err=%v", after, err)
-	}
-	if e.App.Store.Meta("schema_version") != fmt.Sprint(store.SchemaVersion) {
-		t.Fatal("migration not complete")
-	}
-	if got := e.MustRun("identity"); got != e.MustRun("identity", "list") {
-		t.Fatal("bare identity does not list questions")
-	}
-}

@@ -8,26 +8,6 @@ import (
 	"time"
 )
 
-// schemaV16: the DDS files RimArcho writes next to a mod's PNGs (08 §5.2, Texture optimisation). A file
-// is recorded as pending before the encoder runs and done once checked, so files of a run
-// that was cut short are still known (and cleaned, and left out of the mod's fingerprint).
-// texture_mod is the mod's snapshot when its textures were last optimised: when it changes
-// (an update), its DDS may show old textures.
-const schemaV16 = `
-CREATE TABLE IF NOT EXISTS texture_file(
-  path_key TEXT PRIMARY KEY, path TEXT NOT NULL, instance_id TEXT NOT NULL, mod_dir TEXT NOT NULL,
-  rel TEXT NOT NULL, src_size INTEGER NOT NULL DEFAULT 0, src_mtime INTEGER NOT NULL DEFAULT 0,
-  dds_size INTEGER NOT NULL DEFAULT 0, dds_mtime INTEGER NOT NULL DEFAULT 0,
-  scale INTEGER NOT NULL DEFAULT 100, mips INTEGER NOT NULL DEFAULT 1,
-  state TEXT NOT NULL, made_at INTEGER NOT NULL);
-CREATE INDEX IF NOT EXISTS texture_file_inst ON texture_file(instance_id);
-CREATE INDEX IF NOT EXISTS texture_file_dir ON texture_file(mod_dir);
-CREATE TABLE IF NOT EXISTS texture_mod(
-  instance_id TEXT PRIMARY KEY, snap_hash BLOB, scale INTEGER NOT NULL DEFAULT 100,
-  mips INTEGER NOT NULL DEFAULT 1, files INTEGER NOT NULL DEFAULT 0, bytes INTEGER NOT NULL DEFAULT 0,
-  made_at INTEGER NOT NULL);
-`
-
 // TextureFile is one DDS RimArcho wrote.
 type TextureFile struct {
 	Path       string // absolute

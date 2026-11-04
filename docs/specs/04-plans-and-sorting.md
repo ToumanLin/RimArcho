@@ -51,13 +51,12 @@ Data not owned by plans:
 
 GUI centralizes these actions on all lists (06 §2.17). Commands: `archo plan list`, `archo plan new <name> [--from current|v<n>|<file>]`, `archo plan use <name>`, `archo plan rename <old> <new>`, `archo plan remove <name>`. Other CLI/MCP plan commands (`enable`, `sort`, `loadout log`, etc.) target the current plan (05 §4).
 
-### 1.4 First use and migration
+### 1.4 First use
 
 - When an environment is first read without a current plan (`environment.current_plan = 0`):
   - If ModsConfig.xml still matches a plan's last write (hash equals write record), make that plan current; create none.
   - If ModsConfig.xml is absent (for example, a new game with own saves) and plans exist, make the most recently edited plan current; create none.
   - Otherwise read ModsConfig.xml and create a plan, v1 source `import`, note `ModsConfig.xml` (absent file: empty list, note `no ModsConfig.xml`). Name `default`; if taken, environment name, then numbered (`1.6 2`). First-run guide also offers "move over from RimSort or RimCrow" or "open a pack or a Steam collection" (06 §2.15).
-- Existing database migration (v10 → v11): each environment's workspace, undo stack, versions and staging become its first `default` plan. Each `loadout_tag` name becomes a new plan with that version's list and a fresh `import` history entry; delete `loadout_tag`. Rewrite `modsconfig_state` by environment user data directory, writer set to its first plan; for shared directories retain the latest write. Rename a `default` tag to `default (tag)`; discard tags pointing to missing versions.
 
 ### 1.5 Archo Monitor added by default
 
@@ -80,7 +79,7 @@ Decided 2026-10-23, implemented. Each plan records **allowed game versions** (ma
   - Empty intersection: use only creation version.
   - Defaults are not stored; recalculate from the current list on every read, so enabling/disabling Mods changes them.
 - **Player overrides**: store the chosen set, which need not be continuous. It no longer follows Mods until reset.
-- **Storage**: add `created_game` (creation game major/minor) and `versions` (comma-separated selection, empty = default) to `plan`. On migration, take existing plans' `created_game` from their environment's game version then.
+- **Storage**: `plan.created_game` (creation game major/minor) and `plan.versions` (comma-separated selection, empty = default).
 - **Copying plans** copies the player's selection. **Import** uses `versions` from RimArcho lists if present (§9.3), otherwise defaults; `created_game` is the current environment version.
 - **Uses**:
   - Show plan versions on launch and all lists (06 §2.3, §2.17).
@@ -100,7 +99,7 @@ Decided 2026-10-25, implemented. Player feedback (translated): "I created three 
 - **Other games' `Mods/` are usable in every game** (decided 2026-10-25): each game index also loads live Mods from other games' `Mods/` (excluding `_Archo_*` links), with in-memory source type `elsewhere` (`source.Elsewhere`, not stored; label `local-<environment name>`, `app.withElsewhere`). They appear in mod library (source `local-<environment name>`, location that game's `Mods/`, 02 §0 item 11) and editor Disabled. Once enabled, they deploy like SteamCMD/extra-folder Mods: save links them into this game's `Mods/` as `_Archo_env_<Instance ID>` (`DeployName`), retained on save/disable (same links as game-switch links). If this game already has an Instance of the same folder (a previously scanned link became a local Instance), show only this game's copy. If this game's `Mods/` has the same package ID, read the other game's plan entry as this game's copy (`Index.Elsewhere`, "retain target copy with same package ID" in 02 §0 item 14). Read-only Data/ is not shared across games. Test: `TestOtherGamesModsUsableAnywhere`.
 - **Write records** also store the written game (`modsconfig_state.writer_env`). Resolve outside changes in that game (§4.3); "in the game now" includes its name when another game sharing the directory wrote it.
 - **Deleting an environment** preserves plans: rewrite entries referencing its own Instances in workspaces, versions and undo steps to packageIds before deleting Instances (`store.keepLists`).
-- **v19 migration**: add `writer_env` to `modsconfig_state`, using the writer plan's environment then. For duplicate names across environments, oldest retains its name; others become `<name> (<environment name>)`, numbered if still conflicting. Invalid current-plan references switch to that environment's oldest plan. Tests: `TestPlansSharedAcrossGames`, `TestPlanStore`, migration tests.
+- Tests: `TestPlansSharedAcrossGames`, `TestPlanStore`.
 
 ## 2. Editing
 
@@ -427,7 +426,7 @@ A locked version fixes **one Mod** to specific content, unaffected by Workshop u
 
 | Form | Shape | Detection |
 | --- | --- | --- |
-| Created by RimArcho | Copy directory in **lock library**, with `.rimarcho/origin.json`; Workshop unchanged. Setting `lock.dir`, default `%LOCALAPPDATA%\RimArcho\locked`, shared by all environments (02 §0), registered as shared `extra` source (`src:locked`). Copies, like upstream, are global records usable by any game's plan. Pre-0.9.0 per-environment `<lock.dir>/<environment>` subdirectories migrate to shared folders `src:locked-<environment>`, files unmoved, copies still locked versions. Game sees them only through `_Archo_` links (08 §3) | Scan reads `origin.json`, merges into same Lineage under R5, marks "confirmed" (02 §5.1). `origin_instance` is upstream. Older `Mods/` copies with `origin.json` still count |
+| Created by RimArcho | Copy directory in **lock library**, with `.rimarcho/origin.json`; Workshop unchanged. Setting `lock.dir`, default `%LOCALAPPDATA%\RimArcho\locked`, shared by all environments (02 §0), registered as shared `extra` source (`src:locked`). Copies, like upstream, are global records usable by any game's plan. Pre-0.9.0 per-environment `<lock.dir>/<environment>` subdirectories are shared folders `src:locked-<environment>`; their copies are still locked versions. Game sees them only through `_Archo_` links (08 §3) | Scan reads `origin.json`, merges into same Lineage under R5, marks "confirmed" (02 §5.1). `origin_instance` is upstream. Older `Mods/` copies with `origin.json` still count |
 | RimCrow style | Workshop `About/About.xml` renamed to `About.xml.disabled` (invisible to game), local copy in `Mods/` (often `_<WorkshopID>_`) | Same Lineage has an about-disabled Workshop Instance and another live, loadable non-Workshop Instance (RimCrow copy, `Mods/` copy or deployed copy all count; prefer enabled if several). Workshop is upstream |
 
 - Locked versions produce `mod.pinned` (info, 03 §4.3), **no longer** `mod.unloadable`. List shows "locked": copy is effective, Workshop is "upstream".
@@ -644,7 +643,6 @@ Decided 2026-10-23, implemented (checks when opening all lists, due conditions i
 | V7 | V6 but A edited again after write | A records `external` and conflict; diff/load/ignore available | Pass |
 | V8 | Two environments share user data; environment 1 writes, open 2 | No outside-change report | Pass |
 | V9 | Create (empty/current/v<n> copy), switch, rename, delete plans | Independent workspaces/undo/versions/staging; cannot delete last; switching writes no game files | Pass |
-| V10 | Migrate old database with `loadout_tag` | One plan/environment retains history; each tag becomes new plan | Pass |
 | V11 | `archo save` and plan launch | `save`: `user`; save directly after checkout: `undo`, note `restored v<n>`; launch: `launch`; writer is that plan | Partial pass (`user`, `undo`: `TestHistoryCheckoutUndoSource`; launch version/writer implemented, `internal/app/launch_test.go`; plan in launch record: `loglaunch_test.go`) |
 | V12 | Game write: `_steam`, version rewrite, backup, BOM/CRLF/unknown elements, missing entries | Per §4.1 | Pass (`TestSaveSteamSuffixVersionAndBackup`, `TestRenderPreservesUnknown`, `TestWriteFileBackupAtomic`, `TestRegistrySteamSuffix`) |
 | V13 | Import missing entry, install Mod, scan | Missing entry automatically becomes Instance | Pass (`TestLoadoutImportHealAndEdits`) |
