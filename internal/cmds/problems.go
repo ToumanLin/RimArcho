@@ -548,6 +548,8 @@ func logRunText(c *Ctx, r *app.LogRun) string {
 	}
 	switch {
 	case src == nil:
+	case r.Unknown && r.UnknownGame != "":
+		why = append(why, "source unknown: its game path "+r.UnknownGame+" is not this environment's game")
 	case r.Unknown:
 		why = append(why, "source unknown: no launch and no ModsConfig.xml write by RimArcho before it")
 	case r.OtherRun && r.OtherEnv != "":
@@ -593,9 +595,15 @@ func logRunLine(c *Ctx, r *app.LogRun, ps []*app.Problem, folded bool) string {
 		line += ", not counted"
 	}
 	if folded {
-		line += "  (" + logExpandCmd(r) + ")"
+		line += "  (" + logFoldedHint(r) + ")"
 	}
 	return line
+}
+
+// logFoldedHint names how to list a folded log's problems from the CLI and from MCP: the
+// output is the same for both, and agents otherwise guessed the MCP form (eval 2026-11-04).
+func logFoldedHint(r *app.LogRun) string {
+	return logExpandCmd(r) + "; MCP: list_problems code=log"
 }
 
 func logExpandCmd(r *app.LogRun) string {

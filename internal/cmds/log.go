@@ -59,11 +59,19 @@ func loadLog(c *Ctx, a *Args) (*app.LogReport, *app.LoadoutState, error) {
 	return r, st, err
 }
 
-// analysedAs says when a log was attributed against its own game version (03 §6.4), and
-// when the analysis was still running (MCP waits 10 s, 05 §5.1).
+// analysedAs says when a log was attributed against its own game version (03 §6.4), when
+// its game folder is no environment's (attributed against this one anyway), when the
+// analysis was still running (MCP waits 10 s, 05 §5.1) and when mods were not analysed.
 func analysedAs(c *Ctx, root *render.Node, r *app.LogReport) {
+	if st := c.Loadout(); st != nil {
+		if g := c.App.UnregisteredLogGame(st, r.Path); g != "" {
+			root.KV("game", fmt.Sprintf("log game path %s is not this environment's game; attributed against %s", g, envRef(st.Ix.Env)))
+		}
+	}
 	if c.logPending {
 		root.KV("analysis", "still computing in the background: type, Harmony and patch evidence may be missing; run again in a few seconds")
+	} else if r.Unanalysed > 0 {
+		root.KV("analysis", "assemblies not analysed yet for "+app.EnabledMods(r.Unanalysed)+": their types and Harmony IDs name no mod (archo analyze)")
 	}
 	if r.AnalysedAs != "" {
 		root.KV("analysed", fmt.Sprintf("as %s (log version); environment is %s", r.AnalysedAs, r.EnvMM))
