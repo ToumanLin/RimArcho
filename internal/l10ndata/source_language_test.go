@@ -18,6 +18,7 @@ import (
 var sourceLanguageFiles = map[string]string{
 	"docs/glossary.md":                                       "The bilingual terminology reference.",
 	"README.zh-CN.md":                                        "The Chinese README.",
+	"ToDo.md":                                                "The maintainer's working list; notes are written in whichever language is quicker.",
 	"monitor/About/About.xml":                                "RimWorld does not localize About.xml descriptions; keep the bilingual description.",
 	"internal/app/filelists_golden_test.go":                  "Exercises Chinese interface output, legacy Chinese data, or CJK names and paths.",
 	"internal/app/packname_test.go":                          "Exercises Chinese interface output, legacy Chinese data, or CJK names and paths.",
@@ -280,6 +281,9 @@ func TestSourceLanguageScanner(t *testing.T) {
 				t.Errorf("code file %q: code spans must not be exempt, got %v", c.text, got)
 			}
 		}
+	}
+	if !sourceLanguageExempt("ToDo.md") {
+		t.Fatal("the working list may contain Chinese")
 	}
 	if sourceLanguageExempt("internal/view/future.go") || sourceLanguageExempt("internal/view/new_test.go") {
 		t.Fatal("test and code directories must not be exempt")
