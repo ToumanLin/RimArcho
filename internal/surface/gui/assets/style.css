@@ -1330,6 +1330,9 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 /* the details, the same on both pages (detail.js detailFrame) */
 .lib-detail .mod-detail { padding: 0; }
 .md-copies .editor-copies { margin-top: 0; }
+/* the copies come first: the heading's own 18px top margin (a grid item's margin does not
+   collapse into the grid) would only add to the pane's padding. #detail beats the .sub rule. */
+#detail .md-copies .sub { margin-top: 0; }
 .md-acts .lib-acts { margin: 12px 0 4px; }
 .md-acts:empty, .md-note:empty, .md-copies:empty, .md-hist:empty, .md-more:empty { display: none; }
 .lib-fields .fields { margin-top: 4px; }
