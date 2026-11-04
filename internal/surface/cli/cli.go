@@ -78,6 +78,7 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	up.finish(err == nil)
 	if err != nil {
 		fmt.Fprintln(stderr, "error:", err)
+		up.openFailed(err)
 		return cmds.ExitError
 	}
 	defer ap.Close()

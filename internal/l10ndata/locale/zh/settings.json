@@ -38,6 +38,8 @@
   "The database upgrade did not finish.": "数据库升级没有完成。",
   "The database was upgraded in %.1f s.": "数据库升级完成，用时 %.1f 秒。",
   "The full text was too long for the link; RimArcho copied it. Paste it here.": "全文太长，放不进链接，RimArcho 已经复制好了，请粘贴在这里。",
+  "RimArcho could not open its database:\n%s": "RimArcho 无法打开它的数据库：\n%s",
+  "This database was made by a RimArcho development build from before 1.0, and this version cannot open it:\n%s\n\nMove or rename the file, then start RimArcho again to begin with a new database.": "这个数据库是 1.0 之前的 RimArcho 开发版建立的，当前版本无法打开：\n%s\n\n请移走或重命名这个文件，然后重新启动 RimArcho，就会建立新的数据库。",
   "Upgrading the RimArcho database (schema %d → %d)…": "正在升级 RimArcho 数据库（结构 %d → %d）…",
   "Upgrading the RimArcho database…": "正在升级 RimArcho 数据库…",
   "XML load error": "XML 加载错误",
