@@ -76,6 +76,10 @@ type LogReport struct {
 	// the environment's (EnvMM): the log's own version (03 §6.4).
 	AnalysedAs, EnvMM string
 	Clusters          []*LogCluster
+	// Unanalysed counts the enabled mods (Core and DLC aside) whose content and assemblies
+	// had not been analysed for the attributed version: their types and Harmony IDs could
+	// not name them (03 §6.2).
+	Unanalysed int `json:",omitempty"`
 	// Companion is the companion log read with it (03 §6.7.4); CompanionBad its bad lines.
 	Companion    string `json:",omitempty"`
 	CompanionBad int    `json:",omitempty"`
@@ -132,8 +136,9 @@ var ErrLogNotCached = errors.New("log not analysed yet")
 // 7: both the companion log (dev, 4) and the G1/G7 attribution rules (master, 6); 8: no
 // nearby messages for entries only the companion log has; 9: observed phase boundaries
 // and counts from both logs; 10: a left-out provider of a missing def before patchers;
-// 11: texture and assembly providers in the shared mod folders (Store.InstanceFiles).
-const logCacheVersion = 11
+// 11: texture and assembly providers in the shared mod folders (Store.InstanceFiles);
+// 12: "assemblies not analysed yet" instead of "no enabled mod defines it" (Unanalysed).
+const logCacheVersion = 12
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a
@@ -350,6 +355,45 @@ type attrCtx struct {
 	libMemo  map[string]string   // type → the one DLL file name its owners ship it in
 	asmMemo  map[string][]string // assembly base name (lower) → enabled mods loading it
 	lf       *logs.File          // the whole log (neighbouring lines)
+	// unanalysed: enabled non-official mods without analysed content (LogReport.Unanalysed).
+	unanalysed int
+}
+
+// notAnalysed qualifies a "nothing defines it" detail: when some enabled mods were never
+// analysed, their types are unknown, so the absence says nothing about them (03 §6.2).
+func (cx *attrCtx) notAnalysed() string {
+	if cx.unanalysed == 0 {
+		return ""
+	}
+	return "assemblies not analysed yet (" + EnabledMods(cx.unanalysed) + ")"
+}
+
+// EnabledMods is "1 enabled mod" or "N enabled mods".
+func EnabledMods(n int) string {
+	if n == 1 {
+		return "1 enabled mod"
+	}
+	return fmt.Sprintf("%d enabled mods", n)
+}
+
+// unanalysedMods counts the enabled mods, Core and DLC aside, that have no analysed
+// content for the version attributed against.
+func (a *App) unanalysedMods(st *LoadoutState) int {
+	keys, err := a.Store.ContentKeys()
+	if err != nil {
+		return 0
+	}
+	n := 0
+	for _, e := range st.List {
+		m := st.Ix.ByID[e.Instance]
+		if m == nil || strings.HasPrefix(strings.ToLower(m.PackageID), "ludeon.rimworld") {
+			continue
+		}
+		if keys[m.ID] == "" {
+			n++
+		}
+	}
+	return n
 }
 
 type dirOwner struct {
@@ -411,6 +455,9 @@ func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails [
 			}
 		}
 	}
+	a.Store.MM = st.GameMM()
+	cx.unanalysed = a.unanalysedMods(st)
+	rep.Unanalysed = cx.unanalysed
 	// Map the multi-line patch-failure records (file + description) onto entries by line.
 	failAt := map[string]analyze.LogFailure{}
 	for _, f := range fails {
@@ -878,7 +925,11 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 				lc.add(id, RolePatcher, fmt.Sprintf("log harmony:%s#%s %q (%s)", target, p.Kind, "- "+strings.ToUpper(p.Kind)+" "+p.Owner, via))
 			}
 			if len(ids) == 0 {
-				lc.Details = append(lc.Details, fmt.Sprintf("harmony owner %q on %s: no installed mod matches", p.Owner, target))
+				d := fmt.Sprintf("harmony owner %q on %s: no installed mod matches", p.Owner, target)
+				if na := cx.notAnalysed(); na != "" {
+					d += " (" + na + ")"
+				}
+				lc.Details = append(lc.Details, d)
 			}
 			lc.next("archo harmony --target " + strings.ReplaceAll(target, "+", "."))
 		}
@@ -1273,6 +1324,9 @@ type LogRun struct {
 	OtherEnv  string // the other environment's name, when that is the reason
 	Changed   bool   // the plan's enabled list changed since that run
 	Unknown   bool   // no launch or write record matches: the source is unknown
+	// UnknownGame: with Unknown, the game folder the log's header names when no
+	// environment has it (UnregisteredLogGame).
+	UnknownGame string `json:",omitempty"`
 	// Pending: a cache-only problem list (status, mod) found no stored report; the log's
 	// problems are not in the list until a log or problems command analyses it.
 	Pending bool

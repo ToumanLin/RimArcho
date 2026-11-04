@@ -125,6 +125,7 @@ func (a *App) judge(st *LoadoutState, r *LogRun) {
 	switch {
 	case src.Unknown:
 		r.Unknown = true
+		r.UnknownGame = a.UnregisteredLogGame(st, r.Path)
 	case src.Pack != "":
 		r.OtherRun = true
 	case src.EnvID != "" && src.EnvID != st.Ix.Env.ID:
