@@ -55,6 +55,9 @@ type PlanRow struct {
 	// UsedAt is the list's last use: its last change or launch, whichever is later. The
 	// sidebar shows the most recently used lists (06 §2.1).
 	UsedAt time.Time `json:"-"`
+	// Enabled is the list's place in the enable history (1: the most recently enabled; 0:
+	// never). The sidebar orders lists by it (06 §2.1).
+	Enabled int `json:"-"`
 }
 
 // PlanRows lists the current environment's plans: the current one first, then the others
@@ -68,7 +71,7 @@ func PlanRows(a *app.App) ([]PlanRow, error) {
 	var out []PlanRow
 	for _, p := range ps {
 		r := PlanRow{ID: p.ID, Page: PlanPage(p.ID), Name: p.Name, Current: p.Current, Open: p.Open, Entries: p.Entries, Versions: p.Versions,
-			Played: T("never played"), PlayedAt: p.LastPlayed, InGame: g != nil && g.PlanID == p.ID}
+			Played: T("never played"), PlayedAt: p.LastPlayed, InGame: g != nil && g.PlanID == p.ID, Enabled: p.Enabled}
 		r.UsedAt = p.Updated
 		if p.LastPlayed.After(r.UsedAt) {
 			r.UsedAt = p.LastPlayed

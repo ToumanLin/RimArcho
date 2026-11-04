@@ -113,14 +113,15 @@ type NavItem struct {
 // NavLists is how many lists the sidebar shows under list; the rest are in all lists.
 const NavLists = 4
 
-// navPlans picks the sidebar's lists: the current one first, then the one open in the
-// editor, then the most recently used, NavLists at most, the current one always.
+// navPlans picks the sidebar's lists: the current one first, then the others in the order
+// they were last enabled, then the never enabled ones by last use; NavLists at most.
+// Opening a list in the editor does not move it (06 §2.1).
 func navPlans(plans []PlanRow) []PlanRow {
 	rank := func(p PlanRow) int {
 		switch {
 		case p.Current:
 			return 0
-		case p.Open:
+		case p.Enabled > 0:
 			return 1
 		}
 		return 2
@@ -128,6 +129,9 @@ func navPlans(plans []PlanRow) []PlanRow {
 	out := slices.Clone(plans)
 	slices.SortStableFunc(out, func(a, b PlanRow) int {
 		if c := cmp.Compare(rank(a), rank(b)); c != 0 {
+			return c
+		}
+		if c := cmp.Compare(a.Enabled, b.Enabled); c != 0 {
 			return c
 		}
 		return b.UsedAt.Compare(a.UsedAt)
@@ -150,8 +154,8 @@ type NavGroup struct {
 // left out.
 func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	// all lists comes first, where every list is and new lists are made; then at most
-	// NavLists lists: the current one, the one open in the editor, then the most recently
-	// used. list itself opens the current list (06 §2.1, §2.17).
+	// NavLists lists: the current one, then the others by when they were last enabled.
+	// list itself opens the current list (06 §2.1, §2.17).
 	// When some are left out, all lists says how many there are.
 	all := T("all lists")
 	if len(plans) > NavLists {

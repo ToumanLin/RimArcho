@@ -28,6 +28,9 @@ type PlanInfo struct {
 	Entries    int  // list length, missing entries included
 	Versions   int
 	LastPlayed time.Time // zero: never launched
+	// Enabled is the list's place in the enable history: 1 for the most recently enabled,
+	// 0 when never enabled (06 §2.1).
+	Enabled int
 }
 
 // CurrentPlan returns the environment's current plan, creating the first one from
@@ -51,9 +54,10 @@ func (a *App) Plans() ([]*PlanInfo, error) {
 		return nil, err
 	}
 	cur := a.Store.CurrentPlanID(st.Ix.Env.ID)
+	enabled := a.enableRanks()
 	var out []*PlanInfo
 	for _, p := range ps {
-		pi := &PlanInfo{Plan: p, Current: p.ID == cur, Open: p.ID == st.Plan.ID, Versions: a.Store.VersionCount(p.ID), LastPlayed: a.Store.LastPlanLaunch(p.ID)}
+		pi := &PlanInfo{Plan: p, Current: p.ID == cur, Open: p.ID == st.Plan.ID, Versions: a.Store.VersionCount(p.ID), LastPlayed: a.Store.LastPlanLaunch(p.ID), Enabled: enabled[p.ID]}
 		if pi.Open {
 			pi.Entries = len(st.List)
 		} else if ws, err := a.Store.Workspace(p.ID); err != nil {
@@ -66,6 +70,15 @@ func (a *App) Plans() ([]*PlanInfo, error) {
 	return out, nil
 }
 
+// enableRanks maps a list ID to its place in the enable history, from 1.
+func (a *App) enableRanks() map[int64]int {
+	out := map[int64]int{}
+	for i, id := range a.Store.PlansEnabled() {
+		out[id] = i + 1
+	}
+	return out
+}
+
 // PlansIn lists every plan with another game's current one marked, without loading that
 // game: each list's length comes from its workspace (the home page lists every game, and
 // lists are shared by all of them, 06 §2.3).
@@ -75,9 +88,10 @@ func (a *App) PlansIn(envID string) ([]*PlanInfo, error) {
 		return nil, err
 	}
 	cur := a.Store.CurrentPlanID(envID)
+	enabled := a.enableRanks()
 	var out []*PlanInfo
 	for _, p := range ps {
-		pi := &PlanInfo{Plan: p, Current: p.ID == cur, Open: p.ID == cur, Versions: a.Store.VersionCount(p.ID), LastPlayed: a.Store.LastPlanLaunch(p.ID)}
+		pi := &PlanInfo{Plan: p, Current: p.ID == cur, Open: p.ID == cur, Versions: a.Store.VersionCount(p.ID), LastPlayed: a.Store.LastPlanLaunch(p.ID), Enabled: enabled[p.ID]}
 		if ws, err := a.Store.Workspace(p.ID); err != nil {
 			return nil, err
 		} else if ws != nil {

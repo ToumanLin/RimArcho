@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -143,10 +144,43 @@ func (s *Store) CurrentPlanID(envID string) int64 {
 	return id
 }
 
-// SetCurrentPlan selects an environment's current plan. It writes no game file.
+// SetCurrentPlan selects an environment's current plan and moves it to the front of the
+// enable history (PlansEnabled). It writes no game file.
 func (s *Store) SetCurrentPlan(envID string, planID int64) error {
-	_, err := s.DB.Exec(`UPDATE environment SET current_plan=? WHERE id=?`, planID, envID)
-	return err
+	if _, err := s.DB.Exec(`UPDATE environment SET current_plan=? WHERE id=?`, planID, envID); err != nil {
+		return err
+	}
+	ids := []int64{planID}
+	for _, id := range s.PlansEnabled() {
+		if id != planID {
+			ids = append(ids, id)
+		}
+	}
+	return s.SetMeta(metaPlansEnabled, joinIDs(ids))
+}
+
+// metaPlansEnabled holds the enable history: list IDs, the most recently enabled first,
+// in any game (lists are shared, 04 §1.7). The sidebar orders lists by it (06 §2.1).
+const metaPlansEnabled = "plans-enabled"
+
+// PlansEnabled is the enable history, the most recently enabled list first. Lists never
+// enabled since it was kept are not in it; deleted ones may be.
+func (s *Store) PlansEnabled() []int64 {
+	var out []int64
+	for _, f := range strings.Fields(s.Meta(metaPlansEnabled)) {
+		if id, err := strconv.ParseInt(f, 10, 64); err == nil {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+func joinIDs(ids []int64) string {
+	fs := make([]string, len(ids))
+	for i, id := range ids {
+		fs[i] = strconv.FormatInt(id, 10)
+	}
+	return strings.Join(fs, " ")
 }
 
 // CurrentPlan returns the environment's current plan — any list, lists being shared by

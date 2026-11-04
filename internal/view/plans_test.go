@@ -255,21 +255,34 @@ func TestHomePerPlan(t *testing.T) {
 }
 
 // The sidebar keeps all lists first and shows NavLists lists at most: the current one,
-// then the most recently used (06 §2.1).
+// then the others by when they were last enabled, then the never enabled ones by last
+// use. The list open in the editor keeps its place (06 §2.1).
 func TestNavRecentLists(t *testing.T) {
 	now := time.Now()
 	var rows []view.PlanRow
 	for i := range 6 {
 		rows = append(rows, view.PlanRow{Page: "plan:" + itoa(i), Name: itoa(i), UsedAt: now.Add(time.Duration(i) * time.Hour)})
 	}
-	rows[0].Current = true // the oldest, still shown
-	kids := view.Nav(0, rows, nil)[1].Items[0].Kids
-	var got []string
-	for _, k := range kids {
-		got = append(got, k.Label)
+	label := func() string {
+		kids := view.Nav(0, rows, nil)[1].Items[0].Kids
+		if kids[0].ID != view.PagePlans {
+			t.Fatalf("head %+v", kids[0])
+		}
+		var got []string
+		for _, k := range kids {
+			got = append(got, k.Label)
+		}
+		return strings.Join(got, ",")
 	}
-	if strings.Join(got, ",") != "all lists (6),0,5,4,3" || kids[0].ID != view.PagePlans {
-		t.Fatalf("sidebar lists %v", got)
+	rows[0].Current = true // the oldest, still shown
+	if got := label(); got != "all lists (6),0,5,4,3" {
+		t.Fatalf("by use: %s", got)
+	}
+	// Enabled 0 now, 2 before it, 1 before that; 3 is open in the editor.
+	rows[0].Enabled, rows[2].Enabled, rows[1].Enabled = 1, 2, 3
+	rows[3].Open = true
+	if got := label(); got != "all lists (6),0,2,1,5" {
+		t.Fatalf("by enable: %s", got)
 	}
 }
 
