@@ -48,7 +48,7 @@ The multi-version layout of the real Mods stays as it is; c3 and c5 need the age
 
 ## Harness status (2026-11-02)
 
-- VM snapshot `RimArcho-Eval-Staged3` (UID 11, live, `新玩家` signed in on the desktop; Staged2, UID 10, without autologon, is its parent): game 1.6.4871 junctioned into `C:\Eval\RimWorld`, non-Workshop Mods in `C:\Eval\lib`, Archo build in `C:\Eval\tools`, Git for Windows (the shell Pi's `bash` tool needs), `ilspycmd` on the machine PATH. Each run reverts to it; see `scripts/mcp-eval/README.md`.
+- VM snapshot `RimArcho-Eval-Staged3` (UID 11, live, `NewPlayer(Chinese)` signed in on the desktop; Staged2, UID 10, without autologon, is its parent): game 1.6.4871 junctioned into `C:\Eval\RimWorld`, non-Workshop Mods in `C:\Eval\lib`, Archo build in `C:\Eval\tools`, Git for Windows (the shell Pi's `bash` tool needs), `ilspycmd` on the machine PATH. Each run reverts to it; see `scripts/mcp-eval/README.md`.
 - Pi reaches the model through a host port proxy 192.168.86.1:3425 (netsh portproxy + firewall rule "RimArcho-eval-VM-to-model-gateway"); remove both after the evaluation.
 - Pi 1.4.0 has native MCP: group A registers `archo mcp` with exposure `direct`; group B runs with `--no-mcp` and has no `archo.exe` on disk.
 - Staging hides the answer: `guest/overlay.ps1` writes the faulty files into the Mod's real folder with the replaced file's timestamps, every Mod in `Mods\` is a junction, and the staging package and scripts are deleted before Pi starts. `run-case.ps1` holds a mutex so two runs never share the VM.
@@ -60,7 +60,7 @@ Harness defects found by the pilots and fixed (earlier pilot results are void an
 3. Culprit scoring read only the `culprit` list of `answer.json`. A right explanation now counts too (`culpritVia: explanation`, checked by hand).
 4. The agent could read the staging package (`C:\Eval\pkg\<case>\overlay`, `manifest.json`) and see that the broken Mod was the only folder that was not a junction. Three runs did. Fixed as described above.
 5. Two pilots once ran at the same time and reverted the VM under each other. Fixed by the mutex.
-6. Pi ran in session 0 (vmrun without `-interactive`), so any game the agent started, through `test_run` or by hand, had no display and hung at `Screen: DX11 could not switch resolution` (peak 128 MB, timeout after 600 s). The same game in the desktop session reaches the main menu in 42 s (2.4 GB). `run-case.ps1` now starts Pi with `-interactive`, which needs `新玩家` to be the signed-in user. Snapshot `RimArcho-Eval-Staged3` (UID 11, live) adds autologon for `新玩家` and was taken with it signed in. Every pilot before this fix (both groups) ran without a working game.
+6. Pi ran in session 0 (vmrun without `-interactive`), so any game the agent started, through `test_run` or by hand, had no display and hung at `Screen: DX11 could not switch resolution` (peak 128 MB, timeout after 600 s). The same game in the desktop session reaches the main menu in 42 s (2.4 GB). `run-case.ps1` now starts Pi with `-interactive`, which needs `NewPlayer(Chinese)` to be the signed-in user. Snapshot `RimArcho-Eval-Staged3` (UID 11, live) adds autologon for `NewPlayer(Chinese)` and was taken with it signed in. Every pilot before this fix (both groups) ran without a working game.
 
 ### Pilot, case c1 (before fixes 1 to 4; to redo)
 
@@ -96,7 +96,7 @@ Observations (one run per cell, so only leads):
 Two causes, both needed for a working `test_run` in the eval:
 
 1. **Archo (fixed, branch `claude/test-run-progress`).** Pi 1.4 asks for progress on every MCP call and restarts its 60 s timer on each progress notification. `archo mcp` now sends one every 10 s while a call runs, with the current step (05 §5.1). Checked in the VM with Pi's own MCP client (`guest/probe-testrun.mjs`, no model): the call stayed open for 600 s with 60 notifications and returned the report.
-2. **Harness (fixed).** The game hung in session 0 (defect 6). `run-case.ps1 -Archo <exe>` now pushes the evaluated build and starts Pi with `-interactive` in `新玩家`'s desktop (snapshot Staged3).
+2. **Harness (fixed).** The game hung in session 0 (defect 6). `run-case.ps1 -Archo <exe>` now pushes the evaluated build and starts Pi with `-interactive` in `NewPlayer(Chinese)`'s desktop (snapshot Staged3).
 
 End to end with both fixes (c3 staged, Pi's MCP client, no model): `test_run` returned `menu` after 93 s (load 84 s, peak 4.3 GB, 9 progress notifications) with the injected fault as an `exception` cluster: `Error in static constructor of SmartFirefight.Startup … Undefined target method`.
 
