@@ -133,6 +133,9 @@ func (a *App) InstallToddsProgress(progress func(done, total int64)) (string, er
 	if a.ToddsZip == "" && int64(len(b)) != textures.ToddsZipSize {
 		return "", fmt.Errorf("the todds download is %d bytes, the release lists %d: not the file RimArcho expects", len(b), textures.ToddsZipSize)
 	}
+	if a.ToddsZip == "" && fmt.Sprintf("%x", sha256.Sum256(b)) != textures.ToddsZipSHA256 {
+		return "", errors.New("the todds download does not match the 0.4.1 release: not the file RimArcho expects")
+	}
 	zr, err := zip.NewReader(bytes.NewReader(b), int64(len(b)))
 	if err != nil {
 		return "", fmt.Errorf("the todds download is not a zip: %w", err)

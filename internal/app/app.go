@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"github.com/ToumanLin/RimArcho/internal/netcfg"
 	"io"
 	"net/http"
 	"os"
@@ -227,6 +228,7 @@ func OpenWith(home string, o OpenOptions) (*App, error) {
 		return nil, err
 	}
 	a := &App{Home: home, Store: st, Config: cfg, Now: time.Now, Rand: rand.Reader, Loc: time.Local}
+	a.ApplyNetwork()
 	a.decl, a.ownDecl = &declReads{path: st.Path}, true
 	if st.Meta("source-library:legacy-cleared") == "" {
 		if err := os.RemoveAll(filepath.Join(home, "cache", "source")); err != nil {
@@ -345,4 +347,9 @@ func (a *App) FormatDate(t time.Time) string {
 		return "-"
 	}
 	return t.In(a.Loc).Format("2006-01-02")
+}
+
+// ApplyNetwork hands the network settings to the process's requests (07 §2.2).
+func (a *App) ApplyNetwork() {
+	netcfg.Configure(netcfg.Settings{Proxy: a.Store.Meta("cfg:network.proxy"), Mirror: a.Store.Meta("cfg:network.github_mirror")})
 }

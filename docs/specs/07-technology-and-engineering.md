@@ -102,6 +102,22 @@ app.RemoveDep(name)                      // Delete only own copy; see 01 §4
 - CLI: `archo deps` (status, versions, paths, sources), `archo deps install <name>`, `archo deps remove <name>`. Settings buttons run the same commands; downloads enter background tasks (06 §2.16).
 - Tests: `internal/deps` uses temporary directories and fake `LookPath` / `Version` to check discovery order, version caching and `Own`; `internal/app/deps_test.go` checks that `RemoveDep` refuses copies it does not own.
 
+### 2.2 Network: proxy and GitHub mirror (`internal/netcfg`, 2026-11-04)
+
+Some of RimArcho's hosts are often unreachable in mainland China: `raw.githubusercontent.com` (community data), `api.github.com` and `github.com` releases (self-update, todds), and at times `steamcommunity.com` and `api.steampowered.com`. Players there usually run a proxy tool (Clash, v2rayN) in system-proxy mode, which sets the Windows per-user proxy. WebView2 follows that proxy, but Go ignores it, so the window's pages loaded while RimArcho's own downloads failed.
+
+`netcfg.Install` (called once in `cli.Run`, so in `archo.exe`, `RimArcho.exe` and their child processes) replaces `http.DefaultTransport` with a wrapper. Every client without a transport of its own goes through it; test clients (`testkit`, `App.HTTP`) keep their own. `app.OpenWith` and `config set network.*` pass the settings to `netcfg.Configure`, so a change applies at once in the running process.
+
+| Setting | Values | Behavior |
+| --- | --- | --- |
+| `network.proxy` | `system` (default), `off`, or a proxy URL (`http://`, `https://`, `socks5://`; a bare `host:port` is HTTP) | `system`: `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY` first, then the Windows proxy (`HKCU\…\Internet Settings`: `ProxyEnable`, `ProxyServer` including per-scheme `http=…;https=…;socks=…`, `ProxyOverride` with `*` wildcards and `<local>`), read at most every 5 seconds. PAC scripts (`AutoConfigURL`) are not read. Loopback never goes through a proxy. |
+| `network.github_mirror` | empty (default) or a prefix (`https://gh-proxy.org/`) or a template with `{url}` | GET and HEAD to `github.com`, `api.github.com`, `codeload.github.com`, `raw.githubusercontent.com`, `objects.githubusercontent.com`, `release-assets.githubusercontent.com`, `gist.githubusercontent.com` go to the mirror first. A mirror that fails to connect, gives no headers within 15 seconds, or answers ≥ 400 is followed by the direct request. `Authorization` and `Cookie` headers are not sent to the mirror. |
+
+- A failed request to a non-loopback host adds what to set: the proxy, and for GitHub hosts the mirror. The error still unwraps to its cause and keeps `Timeout()`.
+- A mirror sees and serves the files it relays. todds' final release zip is pinned by SHA-256 (`textures.ToddsZipSHA256`), so a mirror cannot swap it. Self-update checks the zip against the release's checksum file, but both come through the mirror, so the player trusts the mirror for updates; the settings description says to use a trusted one. Community data is parsed and rejected when malformed (04 §6).
+- Not covered: SteamCMD (its own networking), the login windows (WebView2, system proxy), and the feedback relay's host. RimCrow's hosts-file overrides and automatic mirror catalogs are not adopted: the proxy setting covers most players, and mirror lists need upkeep.
+- Tests: `internal/netcfg` (mirror first, fallback on 502 and on a closed port, POST and other hosts untouched, system-proxy parsing and bypass, error hint) dial only loopback; `TestNetworkSettings` checks `config set` validation and the settings rows.
+
 ## 3. Data locations
 
 | Platform | Directory |

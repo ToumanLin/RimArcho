@@ -244,5 +244,14 @@
   "what happened, and what you expected; steps to make it happen again help": "发生了什么，你希望怎样；能重现的话写下步骤",
   "write a title or what happened first": "先写标题或说明",
   "… %d more error groups": "…还有 %d 组报错",
-  "… %d more lines": "…还有 %d 行"
+  "… %d more lines": "…还有 %d 行",
+  "network": "网络",
+  "proxy": "代理",
+  "direct": "直连",
+  "through %s": "经由 %s",
+  "now: %s": "当前：%s",
+  "none: GitHub directly": "无：直连 GitHub",
+  "GitHub mirror": "GitHub 镜像",
+  "system follows the Windows proxy (Clash, v2rayN in system proxy mode); off goes direct; or a proxy such as http://127.0.0.1:7890 or socks5://127.0.0.1:7891": "system 跟随 Windows 代理（Clash、v2rayN 的系统代理模式）；off 直连；也可填代理地址，如 http://127.0.0.1:7890 或 socks5://127.0.0.1:7891",
+  "tried before GitHub for community data, updates and todds, e.g. https://gh-proxy.org/; empty goes to GitHub directly. Use one you trust: updates come through it": "社区数据、更新和 todds 先走镜像再走 GitHub，例如 https://gh-proxy.org/；留空则直连 GitHub。请使用可信的镜像：软件更新也经由它下载"
 }

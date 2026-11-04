@@ -7,6 +7,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/deps"
+	"github.com/ToumanLin/RimArcho/internal/netcfg"
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
@@ -244,7 +245,7 @@ func FolderGroup(a *app.App) SettingGroup {
 }
 
 // SettingsPage is the settings page's groups (06 §2.14): About, Interface, Accounts, update,
-// Folders, game log, external tools, community data, Storage and, last, uninstall. The GUI and
+// Folders, game log, network, external tools, community data, Storage and, last, uninstall. The GUI and
 // the TUI show them in this order. Game launch and save options are on the environment page.
 func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	gpuNote := ""
@@ -290,7 +291,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	} else {
 		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon}})
 	}
-	out = append(out, DependencyGroup(a))
+	out = append(out, NetworkGroup(a), DependencyGroup(a))
 
 	data := SettingGroup{Title: T("community data")}
 	status := a.DataStatus()
@@ -351,6 +352,29 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		}
 	}
 	return out
+}
+
+// NetworkGroup: the proxy and the GitHub mirror for RimArcho's own downloads (07 §2.2).
+// The window's Workshop pages follow the Windows system proxy on their own.
+func NetworkGroup(a *app.App) SettingGroup {
+	proxy := cmds.Setting(a, "network.proxy")
+	via := netcfg.Describe("https://github.com/")
+	now := T("direct")
+	if via != "direct" {
+		now = Tf("through %s", via)
+	}
+	mirror := cmds.Setting(a, "network.github_mirror")
+	mv := mirror
+	if mv == "" {
+		mv = T("none: GitHub directly")
+	}
+	return SettingGroup{Title: T("network"), Items: []SettingItem{
+		{Label: T("proxy"), Value: proxy, Edit: "text", Argv: []string{"config", "set", "network.proxy", "{}"},
+			ValueNote: Tf("now: %s", now),
+			Note:      T("system follows the Windows proxy (Clash, v2rayN in system proxy mode); off goes direct; or a proxy such as http://127.0.0.1:7890 or socks5://127.0.0.1:7891")},
+		{Label: T("GitHub mirror"), Value: mv, EditValue: &mirror, Edit: "text", Argv: []string{"config", "set", "network.github_mirror", "{}"},
+			Note: T("tried before GitHub for community data, updates and todds, e.g. https://gh-proxy.org/; empty goes to GitHub directly. Use one you trust: updates come through it")},
+	}}
 }
 
 // SettingCommand checks that argv is one of the settings page's commands (the interfaces
