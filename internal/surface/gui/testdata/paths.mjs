@@ -69,6 +69,28 @@ test("address text has no copy action; its button copies the full payload and re
   h.noNative(); await h.copy(path, button); assert.deepEqual(h.browser, [path]);
 });
 
+test("detail identifiers copy only from their trailing icon, like addresses", async () => {
+  const h = await setup();
+  const box = h.fieldList([
+    { kind: "id", label: "Archo ID", value: "#4k2p" },
+    { kind: "package", label: "package ID", value: "ceteam.combatextended" },
+    { kind: "workshop", label: "Workshop", value: "2890901044" },
+    { kind: "alias", label: "alias", value: "CE" },
+  ]);
+  const [id, pkg, ws, alias] = box.querySelectorAll(".frow");
+  for (const [row, value] of [[id, "#4k2p"], [pkg, "ceteam.combatextended"], [ws, "2890901044"]]) {
+    const node = row.querySelector(".path-copy");
+    assert.equal(node.dataset.path, value);
+    assert.equal(node.attributes.role, undefined);
+    node.dispatchEvent(event("", { type: "click" }));
+    node.dispatchEvent(event("Enter", { type: "keydown" }));
+    await flush(); assert.deepEqual(h.copied, []);
+    node.querySelector(".address-copy").dispatchEvent(event("", { type: "click" }));
+    await flush(); assert.deepEqual(h.copied, [value]); h.copied.length = 0;
+  }
+  assert.equal(alias.querySelector(".address-copy"), null);
+});
+
 test("decorating an existing address twice leaves one copy button and retains its display label", async () => {
   const h = await setup();
   const node = h.copyablePath(h.el("span", "", "Defs/file.xml"), "D:/mods/Alpha/Defs/file.xml");

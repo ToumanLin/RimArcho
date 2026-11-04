@@ -399,13 +399,12 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 :is(#detail, .lib-desc, .mod-detail) .facts { color: var(--faint); margin-top: 4px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 12px; }
 :is(#detail, .lib-desc, .mod-detail) .state { margin: 12px 0; display: flex; gap: 8px; align-items: flex-start; }
 :is(#detail, .lib-desc, .mod-detail) .state button { color: var(--accent-11, var(--accent)); }
-/* the detail's one field list (fields.js, 06 §4.1): a click on a value copies it */
+/* the detail's one field list (fields.js, 06 §4.1): addresses and identifiers copy from their trailing icon */
 .fields { margin: 8px 0 14px; font-size: 13px; }
 .frow { position: relative; display: flex; gap: 12px; align-items: baseline; padding: 2px 0; }
 .frow .k { width: 64px; flex: none; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .frow .v { flex: 1; min-width: 0; color: var(--fg-2); overflow-wrap: anywhere; display: flex; flex-wrap: wrap; gap: 2px 0; align-items: baseline; }
 .frow.deps .v, .frow.conflicts .v { flex-direction: column; align-items: flex-start; }
-.copy { cursor: pointer; }
 .path-copy { display: inline-flex; align-items: center; gap: 4px; min-width: min(100%, 200px); max-width: 100%; vertical-align: bottom; white-space: nowrap; }
 .address-text { display: inline-grid; min-width: 0; overflow: hidden; white-space: pre; }
 .address-text::before { content: attr(data-address); visibility: hidden; grid-area: 1 / 1; overflow: hidden; }
@@ -417,8 +416,6 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .address-copy:hover { background: var(--pill-hover); color: var(--fg); }
 .address-copy[data-copied] { color: var(--green); }
 .address-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.copy:hover { color: var(--accent-11, var(--accent)); }
-.copy:focus-visible { outline: var(--hairline) solid var(--accent); outline-offset: 2px; }
 .frow .dep { display: flex; align-items: center; gap: 5px; }
 .frow .fact { flex: none; color: var(--accent-11, var(--accent)); font-size: 12px; padding: 0 2px; }
 .frow .fact:hover { text-decoration: underline; }

@@ -1,5 +1,5 @@
 // The detail's one field list (06 §4.1, §2.9): the plan editor's detail and a copy's
-// detail on Mod library draw view.Field rows with it. Address rows have a copy icon;
+// detail on Mod library draw view.Field rows with it. Address and identifier rows have a copy icon;
 // a row's own action opens the location, the page, or the tag bar.
 import { el, esc, api, T, errText, say } from "./state.js";
 import { icon } from "./icons.js";
@@ -8,7 +8,7 @@ import * as rt from "/wails/runtime.js";
 
 const Clipboard = rt.Clipboard || { SetText: () => Promise.reject(new Error("no clipboard")) };
 
-// Address fields get a copy button; identifiers retain their existing copy action.
+// Addresses and identifiers show their value with a trailing copy icon.
 const copyable = new Set(["id", "package", "path", "workshop", "subscription-url", "subscription-repo"]);
 
 // Address text stays selectable; only its trailing icon copies the full value.
@@ -16,7 +16,6 @@ export function copyablePath(node, path) {
   if (!path) return node;
   const display = node.querySelector(".address-text")?.dataset.address ?? (node.textContent || path);
   node.replaceChildren(addressLabel(display));
-  node.classList.remove("copy");
   node.classList.add("path-copy");
   node.dataset.path = path;
   node.removeAttribute("tabindex");
@@ -126,21 +125,8 @@ export function fieldList(fields, acts = {}) {
         v.append(el("span", "chip", t));
       }
     } else {
-      const t = el("span", copyable.has(f.kind) && f.value ? "copy" : "", f.value || "—");
-      if (f.value && copyable.has(f.kind)) {
-        if (["path", "subscription-url", "subscription-repo"].includes(f.kind)) copyablePath(t, f.value);
-        else {
-          t.tabIndex = 0; t.setAttribute("role", "button"); t.title = T("click to copy");
-          t.onclick = () => {
-            const selection = globalThis.getSelection?.();
-            if (!selection || selection.isCollapsed || !t.contains(selection.anchorNode)) copy(f.value, t);
-          };
-          t.onkeydown = e => {
-            if (e.key !== "Enter" && e.key !== " ") return;
-            e.preventDefault(); e.stopPropagation(); if (!e.repeat) copy(f.value, t);
-          };
-        }
-      }
+      const t = el("span", "", f.value || "—");
+      if (f.value && copyable.has(f.kind)) copyablePath(t, f.value);
       v.append(t);
       if (f.extra) v.append(el("span", "dim", `  (${f.extra})`));
     }
