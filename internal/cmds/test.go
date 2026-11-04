@@ -71,24 +71,40 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 			prefix = "new "
 		}
 		n := clusters.Addf("%s%s x%d: %s", prefix, cluster.Class, cluster.Count, cluster.Message)
-		if cluster.Class == gametest.ClassSettings {
-			n.KV("source", "game preferences")
-			continue
+		switch cluster.Before {
+		case "present":
+			n.KV("before", "in the player's log")
+		case "absent":
+			n.KV("before", "not in the player's log")
 		}
-		mods := "no mod identified"
-		if len(cluster.Mods) > 0 {
-			mods = strings.Join(cluster.Mods, ", ")
+		testClusterMods(n, cluster)
+		if cluster.Note != "" {
+			n.KV("note", cluster.Note)
 		}
-		n.KV("mods", mods+" ("+cluster.Confidence+")")
 	}
 	if more := r.ClustersTotal - len(r.Clusters); more > 0 {
 		clusters.Addf("… %d more (full log: %s)", more, r.LogPath)
+	}
+	if p := r.PlayerLog; p == nil {
+		root.Add("compared with the player's log: none found")
+	} else if p.Error != "" {
+		root.Addf("compared with the player's log %s: %s", p.Path, p.Error)
+	} else {
+		line := fmt.Sprintf("compared with the player's log %s: %d present, %d absent, %d fixed", p.Path, p.Present, p.Absent, p.Fixed)
+		if p.Unreached > 0 {
+			line += fmt.Sprintf(", %d not reached by this run", p.Unreached)
+		}
+		root.Add(line)
+		fixed := root.Section(fmt.Sprintf("fixed: %d", p.Fixed))
+		for _, cluster := range r.Fixed {
+			testClusterMods(fixed.Addf("%s x%d: %s", cluster.Class, cluster.Count, cluster.Message), cluster)
+		}
 	}
 	if b := r.Baseline; b != nil {
 		root.Addf("compared with run %s (%s): %d new, %d present, %d gone", filepath.Base(b.RunDir), b.Status, b.New, b.Present, b.Gone)
 		gone := root.Section(fmt.Sprintf("gone: %d", b.Gone))
 		for _, cluster := range r.Gone {
-			gone.Addf("%s x%d: %s", cluster.Class, cluster.Count, cluster.Message)
+			testClusterMods(gone.Addf("%s x%d: %s", cluster.Class, cluster.Count, cluster.Message), cluster)
 		}
 	} else {
 		root.Add("compared with: no earlier run of this plan")
@@ -96,4 +112,19 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 	root.KV("attribution", r.Attribution)
 	root.KV("run dir", r.RunDir)
 	return d, nil
+}
+
+func testClusterMods(n *render.Node, cluster app.TestRunCluster) {
+	if cluster.Class == gametest.ClassSettings {
+		n.KV("source", "game preferences")
+		return
+	}
+	if cluster.Confidence == "" && len(cluster.Mods) == 0 {
+		return // a gone cluster of an earlier report that did not list it
+	}
+	mods := "no mod identified"
+	if len(cluster.Mods) > 0 {
+		mods = strings.Join(cluster.Mods, ", ")
+	}
+	n.KV("mods", mods+" ("+cluster.Confidence+")")
 }

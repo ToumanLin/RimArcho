@@ -7,6 +7,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/logs"
+	"github.com/ToumanLin/RimArcho/internal/patterns"
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
@@ -58,11 +59,19 @@ func loadLog(c *Ctx, a *Args) (*app.LogReport, *app.LoadoutState, error) {
 	return r, st, err
 }
 
-// analysedAs says when a log was attributed against its own game version (03 §6.4), and
-// when the analysis was still running (MCP waits 10 s, 05 §5.1).
+// analysedAs says when a log was attributed against its own game version (03 §6.4), when
+// its game folder is no environment's (attributed against this one anyway), when the
+// analysis was still running (MCP waits 10 s, 05 §5.1) and when mods were not analysed.
 func analysedAs(c *Ctx, root *render.Node, r *app.LogReport) {
+	if st := c.Loadout(); st != nil {
+		if g := c.App.UnregisteredLogGame(st, r.Path); g != "" {
+			root.KV("game", fmt.Sprintf("log game path %s is not this environment's game; attributed against %s", g, envRef(st.Ix.Env)))
+		}
+	}
 	if c.logPending {
 		root.KV("analysis", "still computing in the background: type, Harmony and patch evidence may be missing; run again in a few seconds")
+	} else if r.Unanalysed > 0 {
+		root.KV("analysis", "assemblies not analysed yet for "+app.EnabledMods(r.Unanalysed)+": their types and Harmony IDs name no mod (archo analyze)")
 	}
 	if r.AnalysedAs != "" {
 		root.KV("analysed", fmt.Sprintf("as %s (log version); environment is %s", r.AnalysedAs, r.EnvMM))
@@ -150,9 +159,13 @@ func logCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 	}
 	lst := root.Section("list")
+	var noise []*app.LogCluster
 	for _, lc := range r.Clusters {
 		if logs.Informational(lc.Class) && !a.Bool("all") {
 			hidden++
+			if lc.Class == logs.ClassNoise {
+				noise = append(noise, lc)
+			}
 			continue
 		}
 		shown++
@@ -163,7 +176,7 @@ func logCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	lst.Truncate(boolLimit(a, render.DefaultLimit), "archo log --all")
 	if hidden > 0 {
-		root.KV("hidden", fmt.Sprintf("%d informational clusters (archo log --all)", hidden))
+		root.KV("hidden", fmt.Sprintf("%d informational clusters (archo log --all)%s", hidden, noiseNote(noise)))
 	}
 	for _, lc := range r.Clusters {
 		if !logs.Informational(lc.Class) {
@@ -172,6 +185,22 @@ func logCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 	}
 	return d, nil
+}
+
+// noiseNote names the hidden clusters that are known noise (logs.KnownNoise), so that a reader
+// of the raw log knows those lines were recognised: "; known noise, not mod problems: log:E5
+// material made in code, log:E6 translation error count".
+func noiseNote(noise []*app.LogCluster) string {
+	var parts []string
+	for _, lc := range noise {
+		if n := logs.KnownNoise(lc.First.Message); n != nil {
+			parts = append(parts, "log:"+lc.ID+" "+n.Label)
+		}
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "; known noise, not mod problems: " + strings.Join(parts, ", ")
 }
 
 func clusterLine(ix *app.Index, lc *app.LogCluster) string {
@@ -187,6 +216,8 @@ func clusterLine(ix *app.Index, lc *app.LogCluster) string {
 			who += fmt.Sprintf(", +%d", len(lc.Attr)-1)
 		}
 		who += ")"
+	} else if commonUnattributed(lc) != "" {
+		who = "  (" + patterns.CommonLabel + ")"
 	}
 	return fmt.Sprintf("log:%s %s x%d%s  %s%s%s", lc.ID, lc.Class, lc.Count, logs.PhaseSummary(lc.Phases), msg, who, patternTag(ix, lc))
 }
@@ -260,6 +291,9 @@ func clusterDoc(c *Ctx, ix *app.Index, r *app.LogReport, lc *app.LogCluster) *re
 		conf += " (" + lc.Why + ")"
 	}
 	root.KV("confidence", conf)
+	if note := commonUnattributed(lc); note != "" {
+		root.KV("note", note)
+	}
 	addClusterPatterns(root, ix, lc)
 	if len(lc.Checklist) > 0 {
 		cl := root.Section("checklist")
@@ -282,9 +316,13 @@ func logSince(c *Ctx, a *Args, st *app.LoadoutState, r *app.LogReport, cur app.L
 	}
 	shown, hidden := 0, 0
 	var lines []string
+	var noise []*app.LogCluster
 	for _, lc := range s.New {
 		if logs.Informational(lc.Class) && !a.Bool("all") {
 			hidden++
+			if lc.Class == logs.ClassNoise {
+				noise = append(noise, lc)
+			}
 			continue
 		}
 		shown++
@@ -316,7 +354,7 @@ func logSince(c *Ctx, a *Args, st *app.LoadoutState, r *app.LogReport, cur app.L
 	}
 	lst.Truncate(boolLimit(a, render.DefaultLimit), "archo log --all --since "+since)
 	if hidden > 0 {
-		root.KV("hidden", fmt.Sprintf("%d informational clusters (--all)", hidden))
+		root.KV("hidden", fmt.Sprintf("%d informational clusters (--all)%s", hidden, noiseNote(noise)))
 	}
 	if s.Moved != "" {
 		d.AddNext("archo log --prev --since " + since)

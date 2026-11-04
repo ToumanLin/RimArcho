@@ -315,7 +315,9 @@ func TestTestRunSettingsReport(t *testing.T) {
 	}
 	e.App.TestGameStart = fakeTestGame(t, "menu", "XML error: unknown field in type PrefsData\n")
 	out, code = e.Run("test", "run", "--timeout", "5s", "--settle", "1ms")
-	if code != 1 || !strings.Contains(out, "settings x1:") || !strings.Contains(out, "source: game preferences") || strings.Contains(out, "mods:") {
+	// The only mods line is the gone ThingDef error's, attributed in the earlier report.
+	if code != 1 || !strings.Contains(out, "settings x1:") || !strings.Contains(out, "source: game preferences") ||
+		strings.Count(out, "mods:") != 1 || !strings.Contains(out, "mods: SettingsOwner (likely)") {
 		t.Fatalf("settings text report: exit %d: %s", code, out)
 	}
 }

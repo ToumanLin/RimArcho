@@ -233,7 +233,7 @@ func statusCmd(c *Ctx, a *Args) (*render.Doc, error) {
 						lp = append(lp, p)
 					}
 				}
-				text += ": " + shortCounts(lp) + ", not counted (archo problems --code log --all)"
+				text += ": " + shortCounts(lp) + ", not counted (" + logFoldedHint(r) + ")"
 			}
 			root.KV("log", text)
 		}

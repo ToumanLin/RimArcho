@@ -17,7 +17,7 @@ Example: find_mods {"query": "combat extended"}
   mods matching "combat extended": 2
     #a3f9  Combat Extended  [active 34/212, workshop ws:2890901044]
     #d10b  Combat Extended  [local CE_local]`},
-	{"get_mod", `Everything about one mod instance: enabled state and position, package and lineage (other copies), declared dependencies/load order/incompatibilities, content counts (defs, patches, assemblies, Harmony patches), its current problems and its location on disk. Refs: #<id> (instance), L#<id> (lineage: ambiguous if several copies), pkg:<packageId>, ws:<workshopId>. An ambiguous ref returns the candidates instead of picking one.
+	{"get_mod", `Everything about one mod instance: enabled state and position, package and lineage (other copies), declared dependencies/load order/incompatibilities, content counts (defs, patches, assemblies, Harmony patches), its current problems and its location on disk. Refs: #<id> (instance), L#<id> (lineage: ambiguous if several copies), pkg:<packageId> or the bare packageId (any case), ws:<workshopId>. An ambiguous ref returns the candidates instead of picking one.
 Example: get_mod {"ref": "pkg:ceteam.combatextended"}
   #a3f9 Combat Extended  [active 34/212, workshop ws:2890901044]
     status: live
@@ -149,15 +149,20 @@ Example: estimate_memory {"plan": "raid night"}
 Output: RAM loading budget, current available / total physical RAM, VRAM estimate / dedicated capacity, severity and GPU-selection caveat.`},
 	{"test_run", `Launch the game directly with a plan in isolated test data, wait for the main menu (or a quick test map with map=true), capture startup errors, then stop the process. This can take minutes (timeout_seconds defaults to 600). Never touches the player's saves, configuration or logs, and never writes the game directory. Refuses while a game is already running. Mod folders the game cannot see are reported as missing; no links are created. Returns a JSON report with status, timings, peak memory, missing mods and error clusters attributed against the tested plan. Keeps the newest 10 run directories and reuses the test data's caches. Use to check whether a plan can finish loading; status menu/map with no error clusters is success.
 Before attributing, it brings the tested plan's analysis up to date after the game closes (assembly types name the Mod in a static constructor error); analysis_error says when that failed.
-Compare the report with the previous eligible run of this plan and map mode (08 §12). With a baseline, delta=new marks an error cluster absent before and delta=present marks one that remains; gone lists errors that disappeared, so it can show that a fix worked while unrelated errors remain. baseline.new/present/gone count all error clusters, including those beyond the 30 listed. Without an earlier eligible run, baseline, delta and gone are omitted. Comparison does not change success: an unchanged faulty list still fails.
+Compare the report with the player's log, the one analyze_log reads by default, whenever it exists, so the first run of a plan is compared too: before=present marks an error cluster already in the player's log and before=absent one it does not have; fixed lists the player's error clusters this run no longer has, with their mods and confidence. player_log counts present, absent and fixed over all clusters, and unreached counts the player's clusters this run could not show (it stopped before its target, or they happened only after loading a save or in play).
+Also compare with the previous eligible run of this plan and map mode (08 §12). With a baseline, delta=new marks an error cluster absent before and delta=present marks one that remains; gone lists errors that disappeared, with the mods and confidence attributed then. baseline.new/present/gone count all error clusters, including those beyond the 30 listed. Without an earlier eligible run, baseline, delta and gone are omitted. Comparison does not change success: an unchanged faulty list still fails, and so does a fix that leaves unrelated errors of the player's log.
 Example: test_run {"plan": "small", "timeout_seconds": 300}
-  {"env":"main","plan":"plan:small","status":"menu","clusters_total":10,"baseline":{"run_dir":"<home>/tests/<env>/runs/20261103-035136","status":"menu","new":1,"present":9,"gone":2}}
+  {"env":"main","plan":"plan:small","status":"menu","clusters_total":1,"clusters":[{"class":"exception","message":"Exception: old noise","count":1,"mods":[],"confidence":"possible","before":"present"}],"player_log":{"path":"<user data>/Player.log","present":1,"absent":0,"fixed":1},"fixed":[{"class":"exception","message":"Exception: the fault","count":3,"mods":["Mod A"],"confidence":"likely"}]}
 CLI text (archo test run small):
-  new exception x1: Exception: newly added failure
-  compared with run 20261103-035136 (menu): 1 new, 9 present, 2 gone
-  gone: 2
-    exception x1: Exception: fixed failure
-Without a baseline:
+  exception x1: Exception: old noise
+    before: in the player's log
+  compared with the player's log <user data>/Player.log: 1 present, 0 absent, 1 fixed
+  fixed: 1
+    exception x3: Exception: the fault
+      mods: Mod A (likely)
+  compared with run 20261103-035136 (menu): 0 new, 1 present, 1 gone
+Without a player's log or a baseline:
+  compared with the player's log: none found
   compared with: no earlier run of this plan`},
 	{"manage_rules", `User rules on load order (shared by every Loadout of the environment): action=add with kind after|before (A must load after/before B), incompatible (A B), attach (A always right after B), top / bottom (A only: load A as early / late as its constraints allow; a preference, like the community loadTop/loadBottom), or ignore (target = a constraint ref printed by sort or list_problems, e.g. decl:#ab12:loadafter:other.pkg, to drop a wrong About.xml/community constraint — this is how an order.cycle is broken); action=list shows the rules with their r:<n> refs; action=remove rule=r:<n> deletes one. Rules apply to sort and to the order problems; they do not reorder by themselves (edit_loadout action=sort does). Writes RimArcho's database only, never game files.
 Example: manage_rules {"action": "add", "kind": "after", "a": "#76gh", "b": "pkg:brrainz.harmony", "note": "needs its patches"}

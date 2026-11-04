@@ -18,6 +18,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/logs"
+	"github.com/ToumanLin/RimArcho/internal/patterns"
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
@@ -41,31 +42,39 @@ type TestRunCluster struct {
 	Count      int      `json:"count"`
 	Mods       []string `json:"mods"`
 	Confidence string   `json:"confidence"`
-	Delta      string   `json:"delta,omitempty"`
+	Delta      string   `json:"delta,omitempty"`  // against the previous run: new / present
+	Before     string   `json:"before,omitempty"` // in the player's log: present / absent
+	// Note: "common, unattributed: …" for a cluster no mod is named for whose kind is in more
+	// than 5% of public logs (patterns.CommonUnattributed, 03 §6.8).
+	Note string `json:"note,omitempty"`
 }
 
 type TestRunReport struct {
-	Links         []*GameLink      `json:"links,omitempty"`
-	Env           string           `json:"env"`
-	Plan          string           `json:"plan"`
-	GameVersion   string           `json:"game_version"`
-	Status        string           `json:"status"`
-	LoadSeconds   float64          `json:"load_seconds"`
-	TotalSeconds  float64          `json:"total_seconds"`
-	PeakMemoryMB  int64            `json:"peak_memory_mb"`
-	Requested     int              `json:"requested"`
-	Missing       []TestRunMissing `json:"missing"`
-	RunDir        string           `json:"run_dir"`
-	LogPath       string           `json:"log_path"`
-	Args          []string         `json:"args"`
-	Attribution   string           `json:"attribution"`
-	AnalysisError string           `json:"analysis_error,omitempty"` // attributed without a fresh analysis
-	Counts        map[string]int   `json:"counts"`                   // clusters per class, before the limit
-	Clusters      []TestRunCluster `json:"clusters"`
-	ClustersTotal int              `json:"clusters_total"`
-	Baseline      *TestRunBaseline `json:"baseline,omitempty"`
-	Gone          []TestRunCluster `json:"gone,omitempty"`
+	Links         []*GameLink       `json:"links,omitempty"`
+	Env           string            `json:"env"`
+	Plan          string            `json:"plan"`
+	GameVersion   string            `json:"game_version"`
+	Status        string            `json:"status"`
+	LoadSeconds   float64           `json:"load_seconds"`
+	TotalSeconds  float64           `json:"total_seconds"`
+	PeakMemoryMB  int64             `json:"peak_memory_mb"`
+	Requested     int               `json:"requested"`
+	Missing       []TestRunMissing  `json:"missing"`
+	RunDir        string            `json:"run_dir"`
+	LogPath       string            `json:"log_path"`
+	Args          []string          `json:"args"`
+	Attribution   string            `json:"attribution"`
+	AnalysisError string            `json:"analysis_error,omitempty"` // attributed without a fresh analysis
+	Counts        map[string]int    `json:"counts"`                   // clusters per class, before the limit
+	Clusters      []TestRunCluster  `json:"clusters"`
+	ClustersTotal int               `json:"clusters_total"`
+	PlayerLog     *TestRunPlayerLog `json:"player_log,omitempty"`
+	Fixed         []TestRunCluster  `json:"fixed,omitempty"`
+	Baseline      *TestRunBaseline  `json:"baseline,omitempty"`
+	Gone          []TestRunCluster  `json:"gone,omitempty"`
 	clusterKeys   []string
+	// playerClusters: the player's log's error clusters by key, attributed (comparePlayerLog)
+	playerClusters map[string]TestRunCluster
 }
 
 // Success is the CLI/MCP outcome: the target was reached without error clusters.
@@ -180,6 +189,10 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (*TestRunReport, er
 		o.Progress("analysing test log")
 	}
 	analysisErr := a.testRunLog(st, r)
+	if o.Progress != nil {
+		o.Progress("comparing with the player's log")
+	}
+	a.comparePlayerLog(st, r)
 	compareTestRun(r)
 	b, saveErr := json.MarshalIndent(r, "", "  ")
 	if saveErr == nil {
@@ -355,16 +368,26 @@ func (a *App) testRunLog(st *LoadoutState, r *TestRunReport) error {
 		if settings {
 			confidence = finding.Certain
 		} else {
-			for _, at := range lc.Attr {
-				if m := st.Ix.ByID[at.Instance]; m != nil && !slices.Contains(mods, m.DisplayName()) {
-					mods = append(mods, m.DisplayName())
-				}
-			}
+			mods = testRunMods(st, lc)
 		}
-		message, _, _ := strings.Cut(lc.First.Message, "\n")
-		r.Clusters = append(r.Clusters, TestRunCluster{key: lc.Key, Class: class, Message: strings.TrimSuffix(message, "\r"), Count: lc.Count, Mods: mods, Confidence: confidence})
+		note := ""
+		if !settings {
+			note = patterns.Load().CommonUnattributed(class, lc.Template, len(lc.Attr) > 0)
+		}
+		r.Clusters = append(r.Clusters, TestRunCluster{key: lc.Key, Class: class, Message: firstLine(lc.First.Message), Count: lc.Count, Mods: mods, Confidence: confidence, Note: note})
 	}
 	return nil
+}
+
+// testRunMods names a cluster's candidate mods in attribution order.
+func testRunMods(st *LoadoutState, lc *LogCluster) []string {
+	mods := []string{}
+	for _, at := range lc.Attr {
+		if m := st.Ix.ByID[at.Instance]; m != nil && !slices.Contains(mods, m.DisplayName()) {
+			mods = append(mods, m.DisplayName())
+		}
+	}
+	return mods
 }
 
 // ensureTestAnalysis brings the tested plan's Def/Patch/Harmony analysis up to date,

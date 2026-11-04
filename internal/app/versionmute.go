@@ -2,7 +2,6 @@ package app
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/store"
@@ -26,8 +25,8 @@ func (a *App) SetVersionMute(refs []string, mm string, muted bool) error {
 	}
 	var packages []string
 	for _, ref := range refs {
-		// Explicit package references also allow undo after the mod was removed.
-		pkg, explicit := strings.CutPrefix(ref, "pkg:")
+		// Package references (pkg: or bare) also allow undo after the mod was removed.
+		pkg, explicit := PackageRef(ref)
 		if !explicit {
 			m, err := st.Ix.ResolveOne(ref)
 			if err != nil {

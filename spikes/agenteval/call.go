@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -290,7 +291,7 @@ func call(cfg *Config, run, id string, args []string) (int, error) {
 		}
 	}
 	rec.Argv = argv
-	out, code = cmds.Execute(a, argv) // what the MCP server returns for this tool call
+	out, code = cmds.ExecuteContext(cmds.ForMCP(context.Background()), a, argv) // what the MCP server returns for this tool call
 	out = mcp.ClipOutput(out)
 	fmt.Print(out)
 	return code, nil

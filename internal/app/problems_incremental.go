@@ -32,6 +32,7 @@ func (a *App) IncrementalProblems(previous *ProblemSet) (*ProblemSet, error) {
 		r := *old
 		r.Changed = false
 		r.Unknown = false
+		r.UnknownGame = ""
 		r.OtherRun = false
 		r.OtherEnv = ""
 		a.judge(st, &r)

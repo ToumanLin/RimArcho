@@ -19,6 +19,15 @@ function source(p) {
   throw new Error('no VM source for ' + p);
 }
 
+// The case log as the VM's player would have it: the sandbox game folder becomes the guest game C:\Eval\RimWorld,
+// in the Mono path lines too. archo reads `Mono path[0]` to tell whose game wrote a log (03 §6.4); without it, or
+// with a host path, the log has no known owner, so archo before 1.0.1 skipped the attribution analysis (review
+// 2026-11-04 §2.4). The sandbox's command line and save-folder lines would give the host layout away: dropped.
+export function vmLog(text) {
+  return text.replace(/D:([\\/])RimArcho-test[\\/]mcp-eval[\\/]run[\\/][\w-]+[\\/]game/gi, (m, s) => 'C:' + s + 'Eval' + s + 'RimWorld')
+    .split(/\r?\n/).filter(l => !/^Command line arguments:|^Save data folder overridden/.test(l)).join('\r\n');
+}
+
 for (const id of process.argv.slice(2)) {
   const caseDir = `${ROOT}/cases/${id}`; const c = loadCase(caseDir);
   const base = JSON.parse(fs.readFileSync(`${ROOT}/cases/base-mods.json`, 'utf8'));
@@ -30,9 +39,9 @@ for (const id of process.argv.slice(2)) {
   fs.writeFileSync(`${out}/manifest.json`, JSON.stringify(manifest, null, 1));
   fs.copyFileSync(`${ROOT}/run/${id}/userdata/Config/ModsConfig.xml`, `${out}/ModsConfig.xml`);
   for (const o of c.overlay || []) fs.cpSync(path.resolve(caseDir, o.files), `${out}/overlay/${o.pkg}`, {recursive: true});
-  let log = fs.readFileSync(`${caseDir}/Player.log`, 'utf8');
-  log = log.replace(/D:([\\/])RimArcho-test[\\/]mcp-eval[\\/]run[\\/][\w-]+[\\/]game/gi, (m, s) => 'C:' + s + 'Eval' + s + 'RimWorld')
-    .split(/\r?\n/).filter(l => !/^Command line arguments:|^Save data folder overridden|^Mono path|^Mono config path/.test(l)).join('\r\n');
+  const log = vmLog(fs.readFileSync(`${caseDir}/Player.log`, 'utf8'));
   fs.writeFileSync(`${out}/Player.log`, log);
-  console.log(id, manifest.length, 'mods;', manifest.filter(m => m.src.startsWith('lib:')).length, 'from lib;', /RimArcho-test/.test(log) ? 'LOG STILL HAS HOST PATHS' : 'log clean');
+  const owned = /^Mono path\[0\] = 'C:\/Eval\/RimWorld\/RimWorldWin64_Data\/Managed'/m.test(log);
+  console.log(id, manifest.length, 'mods;', manifest.filter(m => m.src.startsWith('lib:')).length, 'from lib;',
+    /RimArcho-test/.test(log) ? 'LOG STILL HAS HOST PATHS' : 'log clean;', owned ? 'game path C:\\Eval\\RimWorld' : 'NO GUEST GAME PATH');
 }

@@ -148,7 +148,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     workshop subscribe <ref…>                 subscribe again in Steam to an unsubscribed leftover
     workshop resubscribe <ref…>               resubscribe and wait for Steam to download mods; local edits are lost (refused while the game runs)
     workshop state <ref…>                     ask Steam for item state; without Steam, show local folders with account state unknown
-  references: #<id> instance, L#<id> lineage, pkg:<packageId>, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>, pattern:<id> error pattern
+  references: #<id> instance, L#<id> lineage, pkg:<packageId> or the bare packageId, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>, pattern:<id> error pattern
   global flags: --env <name> (use another environment for this command)
 
 $ archo status
@@ -311,11 +311,24 @@ next:
 [exit 3]
 
 $ archo mod pkg:nope
-error: pkg:nope matches nothing (archo find <words>)
+error: pkg:nope matches nothing (no mod has packageId nope; search with archo find nope)
 [exit 1]
 
 $ archo mod Alpha
-error: Alpha matches nothing (archo find <words>)
+error: Alpha matches nothing (search with archo find Alpha)
+[exit 1]
+
+$ archo mod Tester.Alpha
+Tester.Alpha matches 2 instances; pick one
+  #nyh3  Alpha       [workshop ws:3000000002]
+  #lqj2  Alpha Fork  [local Twin]
+next:
+  archo mod nyh3
+  archo mod lqj2
+[exit 3]
+
+$ archo mod khamenman.outfitstandsplus
+error: khamenman.outfitstandsplus matches nothing (no mod has packageId khamenman.outfitstandsplus; search with archo find outfitstandsplus)
 [exit 1]
 
 $ archo changes

@@ -119,7 +119,8 @@ func TestClassifyCorpusLines(t *testing.T) {
 		{"ERROR: Shader GodHand/ObjectOutline shader is not supported on this GPU (none of subshaders/fallbacks are suitable)", ClassOther, true},
 		{"Could not get load ID. We're asking for something which was never added during LoadingVars.", ClassSave, true},
 		{"Shader 'Camera+/Bordered': fallback shader 'Diffuse' not found", ClassOther, false},
-		{"Translation data for language English has 25 errors. Generate translation report for more info.", ClassOther, false},
+		// Known noise: an informational cluster with a note (KnownNoise), not dropped.
+		{"Translation data for language English has 25 errors. Generate translation report for more info.", ClassNoise, true},
 		{"[XML Extensions] 17555 total patch operations run in 199805ms, 4 failed", ClassModReport, false},
 	} {
 		e := &Entry{Message: c.msg}
@@ -128,6 +129,61 @@ func TestClassifyCorpusLines(t *testing.T) {
 		}
 		if got := Interesting(e); got != c.keep {
 			t.Errorf("%q: interesting %v, want %v", c.msg, got, c.keep)
+		}
+	}
+}
+
+// The solid-colour material made in code and the translation error count are known noise:
+// informational clusters with a note, whatever their stack (MCP transcript review 2026-11-04
+// §2.2). A material of a def's icon stays a material problem.
+func TestKnownNoise(t *testing.T) {
+	solid := "Material 'SolidColorMat-Custom/Solid Color-RGBA(0.000, 0.000, 0.000, 0.000)' with Shader 'Custom/Solid Color' doesn't have a texture property '_MainTex'"
+	trans := "Translation data for language English has 19 errors. Generate translation report for more info."
+	defMat := "Material 'MyMod_Icon' with Shader 'Custom/Solid Color' doesn't have a texture property '_MainTex'"
+	for _, c := range []struct {
+		msg, id string
+	}{
+		{solid, "solid-color-material"},
+		{"Material 'SolidColorMat-Standard-RGBA(1.000, 0.500, 0.000, 1.000)' with Shader 'Standard' doesn't have a texture property '_MainTex'", "solid-color-material"},
+		{trans, "translation-count"},
+		{"Translation data for language ChineseSimplified (Simplified Chinese) has 3 errors. Generate translation report for more info.", "translation-count"},
+		{defMat, ""},
+		{"Translation data for language English loaded.", ""},
+	} {
+		n := KnownNoise(c.msg)
+		got := ""
+		if n != nil {
+			got = n.ID
+		}
+		if got != c.id {
+			t.Errorf("%q: known noise %q, want %q", c.msg, got, c.id)
+		}
+		if n == nil {
+			continue
+		}
+		e := &Entry{Message: c.msg}
+		if Classify(e) != ClassNoise || !Interesting(e) || !Informational(ClassNoise) {
+			t.Errorf("%q: class %s, interesting %v: want an informational noise cluster", c.msg, Classify(e), Interesting(e))
+		}
+		if n.Note == "" || n.Label == "" || strings.Contains(n.Note, "uiIconColor but") {
+			t.Errorf("%s: note %q", n.ID, n.Note)
+		}
+	}
+	if c := Classify(&Entry{Message: defMat}); c != ClassMaterial {
+		t.Errorf("a def's material: class %s, want material", c)
+	}
+	// With a stack (the companion log's copy carries one) it is still noise.
+	f, err := Parse(strings.NewReader(solid + "\n" + solid + "\n" + trans + "\n  at Verse.Log.Error ()\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cs := Clusters(f)
+	if len(cs) != 2 || cs[0].Count != 2 {
+		t.Fatalf("clusters: %d, want the material x2 and the translation count", len(cs))
+	}
+	for _, c := range cs {
+		if c.Class != ClassNoise {
+			t.Errorf("%s: class %s", c.Key, c.Class)
 		}
 	}
 }

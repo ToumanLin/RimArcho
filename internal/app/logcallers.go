@@ -151,7 +151,11 @@ func (cx *attrCtx) callerRules(lc *LogCluster) {
 			lc.next(fmt.Sprintf("archo source %s --type %s", cx.st.Ix.Ref(id), outerType(t)))
 		}
 		if len(ids) == 0 {
-			lc.Details = append(lc.Details, fmt.Sprintf("failing type %s: no enabled mod's analysed assemblies define it (search_files / find_mods for its namespace)", t))
+			if na := cx.notAnalysed(); na != "" {
+				lc.Details = append(lc.Details, fmt.Sprintf("failing type %s: owner unknown, %s", t, na))
+			} else {
+				lc.Details = append(lc.Details, fmt.Sprintf("failing type %s: no enabled mod's analysed assemblies define it (search_files / find_mods for its namespace)", t))
+			}
 		}
 	}
 	// Mod frames outside a dispatch frame are callers.
@@ -341,6 +345,9 @@ func nearMessages(lf *logs.File, e *logs.Entry) []string {
 		m := x.Message
 		if len(m) > 200 {
 			m = m[:197] + "..."
+		}
+		if n := logs.KnownNoise(x.Message); n != nil {
+			m += "  (known noise: " + n.Label + ")"
 		}
 		out = append(out, fmt.Sprintf("%s:%d %s", mark, x.Line, m))
 	}

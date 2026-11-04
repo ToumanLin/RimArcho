@@ -682,13 +682,14 @@ func (a *App) enableList(st *LoadoutState, l loadout.List, refs []string, p Plac
 	return l, notes, nil
 }
 
-// Disable removes instances (or missing entries named by pkg:) from the workspace.
+// Disable removes instances (or missing entries named by a packageId) from the workspace.
 func (a *App) Disable(refs []string) (*EditResult, error) {
 	return a.edit("disable", func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
 		var notes []string
 		for _, ref := range refs {
 			ms, err := st.Ix.Resolve(ref)
-			if err != nil && strings.HasPrefix(strings.ToLower(ref), "pkg:") {
+			pkg, isPkg := PackageRef(ref)
+			if err != nil && isPkg {
 				ms, err = nil, nil
 			}
 			if err != nil {
@@ -700,7 +701,7 @@ func (a *App) Disable(refs []string) (*EditResult, error) {
 					l, found = remove(l, i), true
 				}
 			}
-			if pkg, ok := strings.CutPrefix(strings.ToLower(ref), "pkg:"); ok {
+			if isPkg && pkg != "" {
 				for i := len(l) - 1; i >= 0; i-- {
 					if l[i].Missing == pkg || l[i].Missing == pkg+"_steam" {
 						l, found = remove(l, i), true

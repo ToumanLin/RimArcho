@@ -572,7 +572,9 @@ func (cx *attrCtx) saveLoad(lc *LogCluster) {
 				found = true
 			}
 		}
-		if !found {
+		if na := cx.notAnalysed(); !found && na != "" {
+			lc.Details = append(lc.Details, "the holder "+t+": owner unknown, "+na)
+		} else if !found {
 			lc.Details = append(lc.Details, "the holder "+t+" is in no enabled mod's code")
 		}
 	case strings.HasPrefix(msg, "Could not find think node with key"):
