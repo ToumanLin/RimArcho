@@ -231,7 +231,7 @@ func searchMods(st *app.LoadoutState, refs []string) ([]*store.Mod, error) {
 		if err != nil {
 			return nil, err
 		}
-		if len(found) > 1 && strings.HasPrefix(strings.ToLower(strings.TrimSpace(ref)), "pkg:") {
+		if _, isPkg := app.PackageRef(ref); len(found) > 1 && isPkg {
 			var active []*store.Mod
 			for _, m := range found {
 				if st.Position(m.ID) > 0 {

@@ -17,7 +17,7 @@ Example: find_mods {"query": "combat extended"}
   mods matching "combat extended": 2
     #a3f9  Combat Extended  [active 34/212, workshop ws:2890901044]
     #d10b  Combat Extended  [local CE_local]`},
-	{"get_mod", `Everything about one mod instance: enabled state and position, package and lineage (other copies), declared dependencies/load order/incompatibilities, content counts (defs, patches, assemblies, Harmony patches), its current problems and its location on disk. Refs: #<id> (instance), L#<id> (lineage: ambiguous if several copies), pkg:<packageId>, ws:<workshopId>. An ambiguous ref returns the candidates instead of picking one.
+	{"get_mod", `Everything about one mod instance: enabled state and position, package and lineage (other copies), declared dependencies/load order/incompatibilities, content counts (defs, patches, assemblies, Harmony patches), its current problems and its location on disk. Refs: #<id> (instance), L#<id> (lineage: ambiguous if several copies), pkg:<packageId> or the bare packageId (any case), ws:<workshopId>. An ambiguous ref returns the candidates instead of picking one.
 Example: get_mod {"ref": "pkg:ceteam.combatextended"}
   #a3f9 Combat Extended  [active 34/212, workshop ws:2890901044]
     status: live
