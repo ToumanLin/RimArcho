@@ -61,7 +61,7 @@ Save reading has read-only tools in the tool layer (05 §1.2, §4.2, §5.2; not 
 
 ### 1.7 Read tiers, cache and background reading
 
-A save is read at three costs; each tier is computed and cached separately (not implemented):
+A save is read at three costs; each tier is computed and cached separately. L0 is implemented (`savefile.ReadHead`, cached in memory per App by path, size and mtime; `app.ListSaves`); L1 and its cache are not.
 
 | Tier | What | Cost | Used for |
 | --- | --- | --- | --- |
@@ -163,17 +163,17 @@ Evaluate in order:
 
 1. A RimSaves file name `<folder>#§#<save>.rws` puts the save in colony `<folder>`; the page shows `<save>` as its name.
 2. With L1 facts (§1.7), saves sharing world identity (world seed, world name and player faction name; exact fields await measurement) form one colony.
-3. Otherwise, group by file name after removing trailing numbers and the `Autosave-` prefix; regroup when L1 facts arrive.
+3. Otherwise, group by file name after removing trailing numbers and separators. An autosave (`Autosave-<n>`) names no colony: it joins the colony in the same folder whose save has the same Mod list and is nearest in time, else an "Autosaves" group. Regroup when L1 facts arrive.
 
 - Name a colony after its RimSaves folder, else the player faction, else the world. Order colonies by their latest save, and saves newest first.
 - Saves in a pack's folder belong to that pack (§4.2 rule 1). Colonies whose latest save matches no list form a separate "matches no list" group.
 
 ### 4.2 Matching a plan
 
-Evaluate in order and stop at the first match:
+Implemented (`app.ListSaves`, 2026-11-04). Evaluate in order and stop at the first match:
 
 1. Save is in a pack's save directory → that pack.
-2. Save modification time falls after a launch record (08 §1) and before the next launch, and that launch used this user data directory → that launch's plan.
+2. Save modification time falls after a launch record (08 §1) and before the next launch, and that launch used this user data directory → that launch's plan. A pack's launch does not match a save in a game folder (packs save in their own folder).
 3. Save `<modIds>` (enabled set resolved under 04 §4.2) exactly matches a version (04 §3) of a plan (`TokenFingerprint`) → that plan; if several match, choose the most recently played.
 4. No match → "matches no list".
 
@@ -183,7 +183,7 @@ Approximate matching for rule 3 (an enabled set differing by one or two entries)
 
 **Where it belongs**: game version and environment, the matched list or pack with the rule that matched it, and the location (folder and file).
 
-**Can it load?** compares the save with the matched list as it is now and lists only what needs attention. Passed checks are not listed.
+**Can it load?** compares the save with the matched list as it is now and lists only what needs attention. Passed checks are not listed. `app.CheckSave` implements the rows that need only the head (cut off, Mods, order, game version, no list); the rows needing the full read (malformed XML, classes, last load) are not implemented.
 
 | Item | Level | Consequence shown | Fix |
 | --- | --- | --- | --- |
@@ -207,13 +207,15 @@ Approximate matching for rule 3 (an enabled set differing by one or two entries)
 
 ### 4.4 Actions
 
+The actions are implemented in `internal/app/saveactions.go` (`FixSave`, `RenameSave`, `CopySave`, `BackupSaves`, `TrashSaves`); their commands and the page are not.
+
 | Action | What it does | Confirmation |
 | --- | --- | --- |
-| Fix | The Mod fixes of §4.3 as one reversible plan edit (04 §2.1), plus subscriptions; `--launch` launches afterwards | Not required; preview first (`--dry-run`) |
+| Fix | The Mod fixes of §4.3 as one reversible plan edit (04 §2.1): installed Mods enabled and Workshop Mods added as missing entries, each right after the nearest Mod before it in the save; optionally the list's Mods the save lacks disabled, and the shared Mods put in the save's order. The caller subscribes to the Workshop Mods; `--launch` launches afterwards | Not required; preview first (`--dry-run`) |
 | Re-enable missing Mods in the list | Add "installed but not enabled" entries back to the matching plan, positioned in save order; list uninstalled entries without acting on them | Not required; one reversible plan edit (04 §2.1) |
 | Create a list from this save's Mods | Create a plan containing the imported save list (same as `loadout import --new`, §1.3); retain and mark uninstalled entries, as with ModsConfig.xml import | Not required; the new plan's first version has source `import` |
 | Rename | Rename the file in place, inline as in 06 §2.17. Keep a RimSaves prefix; refuse an existing name | Not required |
-| Copy | Copy to `<name> (copy).rws` in the same folder, never overwriting | Not required |
+| Copy | Copy to `<name> (copy).rws` (then `(copy 2)`…) in the same folder, never overwriting, keeping the modification time so the copy sorts beside the original | Not required |
 | Back up | Copy to `<data directory>/backups/saves/<time>/`, preserving filenames. Allow multiple selections; one backup shares one time directory. Copy only; leave originals in place | Player confirmation required |
 | Move to the recycle bin | Use the recycle bin rules in 08 §7: save files are one of the three accepted categories. No permanent deletion | Player confirmation required |
 

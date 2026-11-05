@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
@@ -105,6 +106,11 @@ func (a *App) trashAllowed(path string) error {
 	if bk := filepath.Join(a.Home, "backups", "saves"); inside(bk) || samePath(p, bk) {
 		return nil
 	}
+	// A save in a pack's own folder: <packs>/<pack>/userdata/Saves/<file> (10 §4.4).
+	if dir := filepath.Dir(p); strings.EqualFold(filepath.Base(dir), "Saves") && strings.EqualFold(filepath.Base(filepath.Dir(dir)), "userdata") &&
+		samePath(filepath.Dir(filepath.Dir(filepath.Dir(dir))), realOrAbs(a.PacksDir())) {
+		return nil
+	}
 	envs, err := a.Store.Envs()
 	if err != nil {
 		return err
@@ -115,6 +121,8 @@ func (a *App) trashAllowed(path string) error {
 			return nil
 		case e.UserDataRoot != "" && inside(filepath.Join(e.UserDataRoot, "Saves")):
 			return nil
+		case e.UserDataRoot == "" && a.DefaultUserData() != "" && inside(filepath.Join(a.DefaultUserData(), "Saves")):
+			return nil // the game's default user data folder
 		case downloadedGame(e.GameRoot) && samePath(p, e.GameRoot):
 			return nil
 		}

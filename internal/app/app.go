@@ -186,6 +186,7 @@ type App struct {
 	pngSnapsKey        string
 	stCache            *LoadoutState
 	stKey              string
+	saveHeads          saveHeadCache // save heads by path, size and mtime (saves.go)
 	modsCopies         map[string]*modsCopiesCache
 	linkRepairPreviews map[string]*LinkRepairPlan
 	linkRepairSerial   uint64

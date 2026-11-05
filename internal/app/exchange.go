@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
-	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
@@ -19,6 +18,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/order"
+	"github.com/ToumanLin/RimArcho/internal/savefile"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
@@ -245,56 +245,18 @@ func ReadLoadoutFile(path string) (*ImportedList, error) {
 	return l, sc.Err()
 }
 
-// readSaveMeta reads <savegame><meta>: gameVersion, modIds and modNames, and stops there
-// (saves are tens of MB; the meta block comes first).
+// readSaveMeta reads a save's <meta> (savefile.ReadMeta) as an imported list: game
+// version, packageIds in load order, and their names for "not installed" entries.
 func readSaveMeta(r io.Reader) (*ImportedList, error) {
-	d := xml.NewDecoder(r)
-	d.Strict = false
-	d.CharsetReader = func(_ string, r io.Reader) (io.Reader, error) { return r, nil }
-	l := &ImportedList{Format: FormatSave, Names: map[string]string{}}
-	var path []string
-	var names []string
-	for {
-		t, err := d.Token()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
-		switch t := t.(type) {
-		case xml.StartElement:
-			path = append(path, t.Name.Local)
-		case xml.EndElement:
-			if len(path) > 0 {
-				path = path[:len(path)-1]
-			}
-			if t.Name.Local == "meta" {
-				for i, id := range l.Tokens {
-					if i < len(names) {
-						l.Names[id] = names[i]
-					}
-				}
-				return l, nil
-			}
-		case xml.CharData:
-			if len(path) < 3 || path[len(path)-1] != "li" || path[len(path)-3] != "meta" {
-				if len(path) >= 2 && path[len(path)-1] == "gameVersion" && path[len(path)-2] == "meta" {
-					l.Game = strings.TrimSpace(string(t))
-				}
-				continue
-			}
-			v := strings.TrimSpace(string(t))
-			switch path[len(path)-2] {
-			case "modIds":
-				l.Tokens = append(l.Tokens, strings.ToLower(v))
-			case "modNames":
-				names = append(names, v)
-			}
-		}
+	h, err := savefile.ReadMeta(r)
+	if err != nil {
+		return nil, err
 	}
-	if len(l.Tokens) == 0 {
-		return nil, errors.New("no <meta><modIds> in the save")
+	l := &ImportedList{Format: FormatSave, Names: map[string]string{}, Game: h.GameVersion, Tokens: h.ModIDs}
+	for i, id := range h.ModIDs {
+		if i < len(h.ModNames) {
+			l.Names[id] = h.ModNames[i]
+		}
 	}
 	return l, nil
 }

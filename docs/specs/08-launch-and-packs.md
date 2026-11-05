@@ -347,13 +347,13 @@ RimArcho does not permanently delete player content. Always move it to the syste
 | --- | --- | --- |
 | Mod folder | An Instance's real directory inside, but not equal to, its source root: a hidden or unsubscribed Workshop or SteamCMD copy (Steam redownloads subscribed ones), or the player's own `Mods/` or lock-library copy (refuse if the copy itself is a link). Enabled Mods and those used by plans only warn | `trash` (§6), mod library "delete" (06 §2.9), 1.2 unsubscribe |
 | Pack directory | `<pack name>/` under the pack directory | `pack remove` (§5.4) |
-| Save file | A save under the environment's user data `Saves/` (product rules in 10 §4) | Save management (not implemented) |
+| Save file | A save under the environment's user data `Saves/` or a pack's `userdata/Saves/` (product rules in 10 §4) | Save management (`app.TrashSaves`, 10 §4.4) |
 | Player content during uninstall | Lock-library copies (selected by default), packs, own-saves directories, `<data directory>/backups/saves/` and SteamCMD-downloaded games, only when the player chooses deletion. RimArcho-owned folders (data, Monitor and downloaded SteamCMD) are deleted directly rather than recycled | Uninstall (01 §4.1) |
 
 The single entry point `App.ToTrash` (`internal/app/trash.go`) enforces the path allowlist regardless of the caller. Caller-specific rules for enabled Mods, plan use and subscription are checked beforehand. The path allowlist is as follows; resolve links first, but reject a path that is itself a link:
 - A path inside, but not equal to, any source root (Workshop, SteamCMD, `Mods/`, the lock library or other Mod folders, in any environment), or inside any `<game directory>/Mods/`.
 - A direct child `<pack name>/` under the pack directory, excluding the root itself and folders inside packs.
-- A path inside any environment's user data `Saves/`, an own-saves directory `<data directory>/userdata/<environment name>`, or the save backups `<data directory>/backups/saves` and its descendants.
+- A path inside any environment's user data `Saves/` (the game's default user data folder when the environment names none), a pack's `userdata/Saves/`, an own-saves directory `<data directory>/userdata/<environment name>`, or the save backups `<data directory>/backups/saves` and its descendants.
 - An environment's game directory itself, only if it was downloaded by SteamCMD (`steamapps/appmanifest_294100.acf` exists).
 
 Refuse other paths (`ErrNotInTrashList`, `TestTrashAllowList`).
