@@ -5,11 +5,13 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
@@ -105,7 +107,16 @@ func (r *saveRefs) scrub(s string) string {
 	})
 }
 
-// runSavesGolden is runGolden with save references scrubbed in the command lines too.
+// elapsedRe is the reading time in saves index's first line.
+var elapsedRe = regexp.MustCompile(`\) in [0-9.]+(µs|ms|s|m[0-9.]+s)`)
+
+// progressRe is one --progress line of saves index.
+var progressRe = regexp.MustCompile(`^progress: saves (\d+)/(\d+) `)
+
+// runSavesGolden is runGolden with save references scrubbed in the command lines too. A
+// command with --progress has its progress lines (stderr) appended after its output:
+// saves are read in parallel, so the lines are checked to count 1/n…n/n in order, then
+// shown sorted with the count as n. Not for parallel tests when a step uses --progress.
 func runSavesGolden(t *testing.T, name string, e *testkit.Env, steps []step) {
 	t.Helper()
 	refs := &saveRefs{e: e, names: map[string]string{}}
@@ -116,15 +127,36 @@ func runSavesGolden(t *testing.T, name string, e *testkit.Env, steps []step) {
 		if args == nil {
 			continue
 		}
+		var progress []string
+		withProgress := slices.Contains(args, "--progress")
+		if withProgress {
+			cmds.Progress = func(l string) { progress = append(progress, l) } // called under IndexSaves' lock
+		}
 		out, code := e.Run(args...)
+		if withProgress {
+			cmds.Progress = nil
+		}
 		refs.learn()
 		fmt.Fprintf(&sb, "$ archo %s\n", refs.scrub(e.Scrub(strings.Join(args, " "))))
-		sb.WriteString(refs.scrub(e.Scrub(out)))
+		sb.WriteString(elapsedRe.ReplaceAllString(refs.scrub(e.Scrub(out)), ") in <time>"))
 		if code != 0 {
 			fmt.Fprintf(&sb, "[exit %d]\n", code)
 		}
+		var lines []string
+		for i, l := range progress {
+			m := progressRe.FindStringSubmatch(l)
+			if m == nil || m[1] != strconv.Itoa(i+1) || m[2] != strconv.Itoa(len(progress)) {
+				t.Errorf("archo %s: progress line %d of %d is %q", strings.Join(args, " "), i+1, len(progress), l)
+				continue
+			}
+			lines = append(lines, "[stderr] progress: saves n/"+m[2]+" "+refs.scrub(e.Scrub(l[len(m[0]):])))
+		}
+		slices.Sort(lines)
+		for _, l := range lines {
+			sb.WriteString(l + "\n")
+		}
 		sb.WriteString("\n")
-		if n := strings.Count(strings.TrimRight(out, "\n"), "\n") + 1; n > 40 {
+		if n := strings.Count(strings.TrimRight(out, "\n"), "\n") + 1; n > 40 && !slices.Contains(args, "--all") {
 			t.Errorf("archo %s: %d lines (05 §3.1: at most 40)", strings.Join(args, " "), n)
 		}
 	}

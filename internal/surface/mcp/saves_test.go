@@ -1,6 +1,9 @@
 package mcp_test
 
 import (
+	"encoding/base64"
+	"encoding/binary"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -39,11 +42,35 @@ func savesFixture(t *testing.T) *testkit.Env {
 	return e
 }
 
+// playedSave writes Rimward.rws: a colony read in full has a world, a faction, colonists, a
+// letter and a wealth series (the element paths internal/savefile reads).
+func playedSave(e *testkit.Env) {
+	raw := make([]byte, 8)
+	binary.LittleEndian.PutUint32(raw, math.Float32bits(9000))
+	binary.LittleEndian.PutUint32(raw[4:], math.Float32bits(12345))
+	pawn := func(id, nick, extra string) string {
+		return `<thing Class="Pawn"><def>Human</def><id>` + id + `</id><faction>Faction_1</faction><kindDef>Colonist</kindDef>` +
+			`<name Class="NameTriple"><first>` + nick + `</first><nick>` + nick + `</nick><last>Lee</last></name><story />` + extra + `</thing>`
+	}
+	body := `<info><realPlayTimeInteracting>7300</realPlayTimeInteracting></info>` +
+		`<storyteller><def>Cassandra</def><difficulty>Rough</difficulty></storyteller>` +
+		`<storyWatcher><statsRecord><numRaidsEnemy>4</numRaidsEnemy></statsRecord></storyWatcher>` +
+		`<history><archive><archivables><li Class="StandardLetter"><def>ThreatBig</def><label>Raid</label><arrivalTick>600000</arrivalTick></li></archivables></archive>` +
+		`<autoRecorderGroups><li><def>Wealth</def><recorders><li><def>Wealth_Total</def><records>` + base64.StdEncoding.EncodeToString(raw) +
+		`</records></li></recorders></li></autoRecorderGroups></history>` +
+		`<maps><li><uniqueID>0</uniqueID><things>` + pawn("Human1", "Mara", "") + pawn("Human2", "Kari", `<guest><guestStatus>Slave</guestStatus></guest>`) +
+		pawn("Human3", "Ozzie", `<healthTracker><healthState>Dead</healthState></healthTracker>`) + `</things></li></maps>`
+	e.WriteSave("Rimward.rws", testkit.SaveSpec{Mods: []string{"ludeon.rimworld", "tester.alpha", "tester.beta"}, World: "Ennawrin", Seed: "hollow", PRV: -7,
+		Faction: "New Arrivals", Ticks: 25*60000 + 1234, Body: body, ModTime: e.Now().Add(-5 * time.Hour)})
+}
+
 // I1 for the save tools: list_saves, get_save and manage_saves give the text of archo saves,
-// read-only calls and previews alike (10 SV15).
+// read-only calls and previews alike (10 SV15). get_save reads its save in full the first
+// time (the MCP call) and from the cache after (the CLI): the text is the same.
 func TestSaveToolsCLIParity(t *testing.T) {
 	t.Parallel()
 	e := savesFixture(t)
+	playedSave(e)
 	cs := connect(t, e)
 	backups := filepath.Join(e.Home, "backups", "saves")
 	cases := []struct {
@@ -60,6 +87,10 @@ func TestSaveToolsCLIParity(t *testing.T) {
 		{"get_save", map[string]any{"save": "Tundra 2.rws", "mods": true, "all": true}, []string{"saves", "show", "Tundra 2.rws", "--mods", "--all"}},
 		{"get_save", map[string]any{"save": "Broken"}, []string{"saves", "show", "Broken"}},
 		{"get_save", map[string]any{"save": "Nope"}, []string{"saves", "show", "Nope"}},
+		{"get_save", map[string]any{"save": "Rimward"}, []string{"saves", "show", "Rimward"}},
+		{"get_save", map[string]any{"save": "Rimward", "play": true}, []string{"saves", "show", "Rimward", "--play"}},
+		{"get_save", map[string]any{"save": "Rimward.rws", "play": true, "mods": true, "all": true}, []string{"saves", "show", "Rimward.rws", "--mods", "--play", "--all"}},
+		{"list_saves", map[string]any{"colony": "New Arrivals"}, []string{"saves", "list", "--colony", "New Arrivals"}},
 		{"manage_saves", map[string]any{"action": "fix", "saves": []string{"Tundra 2"}, "dry_run": true}, []string{"saves", "fix", "Tundra 2", "--dry-run"}},
 		{"manage_saves", map[string]any{"action": "fix", "saves": []string{"Tundra 2"}, "mods": []string{"tester.gamma"}, "order": true, "disable_added": true, "launch": true, "dry_run": true},
 			[]string{"saves", "fix", "Tundra 2", "--mod", "tester.gamma", "--disable-added", "--order", "--launch", "--dry-run"}},
@@ -97,6 +128,14 @@ func TestSaveToolsCLIParity(t *testing.T) {
 	}
 	if out := e.MustRun("loadout", "export"); strings.Contains(out, "tester.gamma") {
 		t.Errorf("a fix dry run changed the plan:\n%s", out)
+	}
+	// The played save was read in full: the list gives its day, its colony is its world's.
+	if got, _ := call(t, cs, "list_saves", nil); !strings.Contains(got, "New Arrivals  1 save") || !strings.Contains(got, "day 25") {
+		t.Errorf("list_saves after get_save:\n%s", got)
+	}
+	if got, _ := call(t, cs, "get_save", map[string]any{"save": "Rimward", "play": true}); !strings.Contains(got, "play: New Arrivals, day 25") ||
+		!strings.Contains(got, "colonists: 2 (1 slave), 1 dead") || !strings.Contains(got, "Ozzie  Human  dead") || !strings.Contains(got, "day 10  Raid") {
+		t.Errorf("get_save play=true:\n%s", got)
 	}
 }
 
@@ -179,6 +218,9 @@ func TestManageSavesArgv(t *testing.T) {
 	}
 	if got, _ := mcp.ArgvFor("get_save", []byte(`{"save":"Tundra 2","mods":true}`)); !slices.Equal(got, []string{"saves", "show", "Tundra 2", "--mods"}) {
 		t.Errorf("get_save → %q", got)
+	}
+	if got, _ := mcp.ArgvFor("get_save", []byte(`{"save":"Tundra 2","play":true,"all":true}`)); !slices.Equal(got, []string{"saves", "show", "Tundra 2", "--play", "--all"}) {
+		t.Errorf("get_save play → %q", got)
 	}
 	if got, _ := mcp.ArgvFor("list_saves", []byte(`{"mod":"#z3bw","attention":true}`)); !slices.Equal(got, []string{"saves", "list", "--mod", "#z3bw", "--attention"}) {
 		t.Errorf("list_saves → %q", got)

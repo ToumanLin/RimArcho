@@ -1,6 +1,6 @@
 # 10 · Unplayed and worth playing
 
-> Status: question two, "what haven't I played?", is a design specification for 1.1; §5 is for 1.2; §6 is a long-term direction. Implemented: reading the Mod list at the start of a save (§1.3), the save head (§1.7 L0), grouping and matching (§4.1, §4.2), the head-only rows of can it load (§4.3), the actions (§4.4) and the save commands and tools (§1.6). Everything else is unimplemented. The Saves page, its read tiers and its tools were decided on 2026-11-04 (§1.6, §1.7, §4; 06 §2.11).
+> Status: question two, "what haven't I played?", is a design specification for 1.1; §5 is for 1.2; §6 is a long-term direction. Implemented: reading the Mod list at the start of a save (§1.3), the save head (§1.7 L0), grouping and matching (§4.1, §4.2), the head-only rows of can it load (§4.3), the actions (§4.4), the save commands and tools (§1.6), the full read with its cache and `saves index` (§1.7 L1), and in the CLI and MCP the play facts (§4.3), the newest events and the change since the previous save (§4.5). Everything else is unimplemented. The Saves page, its read tiers and its tools were decided on 2026-11-04 (§1.6, §1.7, §4; 06 §2.11).
 > Basis: 00 (§2, §4), 00a, 03, 04, 06, 08, 09.
 
 Question two asks: **which installed Mods and content have gone unused across multiple playthroughs?** Read all saves without modifying them and map the Defs they reference back to their providing Mods. This analysis is deterministic and needs no AI; Archo participates only in interpreting results and making suggestions (09 §4).
@@ -61,7 +61,7 @@ Save reading has read-only tools in the tool layer (05 §1.2, §4.2, §5.2): `sa
 
 ### 1.7 Read tiers, cache and background reading
 
-A save is read at three costs; each tier is computed and cached separately. L0 is implemented (`savefile.ReadHead`, cached in memory per App by path, size and mtime; `app.ListSaves`). L1 is implemented in the core (`internal/app/saveread.go`): the cache, `archo saves index`, `Save.Summary` on every listed save with a valid cache row, `App.SaveFacts` for one save, and grouping by world (§4.1); the CLI, MCP and page do not show L1 facts yet.
+A save is read at three costs; each tier is computed and cached separately. L0 is implemented (`savefile.ReadHead`, cached in memory per App by path, size and mtime; `app.ListSaves`). L1 is implemented in the core (`internal/app/saveread.go`): the cache, `archo saves index`, `Save.Summary` on every listed save with a valid cache row, `App.SaveFacts` for one save, and grouping by world (§4.1). The CLI and MCP show L1 facts (`saves list` the in-game day, `saves show` the play facts; 05 §4.2); the page does not yet (06 §2.11).
 
 | Tier | What | Cost | Used for |
 | --- | --- | --- | --- |
@@ -72,7 +72,7 @@ A save is read at three costs; each tier is computed and cached separately. L0 i
 - L1 depends only on the file, so it is cached in the database (`save_cache`, 07 §3) by path, size, modification time and parser version, as gzip JSON like `log_cache`; it is not reread while all four are unchanged. Beside the facts the row keeps what lists need (ticks, world identity, world and player faction names, malformed), so listing reads no facts; `App.SaveFacts` loads one save's facts. A file whose size or modification time changes while it is read is being written: not stored. L2 depends on the current list and index, so it is not cached and is recomputed when either changes. L0 is read on demand.
 - L1 runs in a child process, `archo saves index` (05 §4.2), as background task kind `saves` (06 §2.16, §8.4): progress lines reach the status line and the task record, and each finished file is written to the cache at once, so a stopped run keeps what it read. The selected save is read first, then newest first, with 2–4 readers. Reading streams with constant memory; the child process keeps the GUI within its memory budget (06 §10).
 - A file modified in the last 5 seconds, or whose size changes between two reads, is **being written**: it gets no verdict and is read again later. The page rereads L0 when it opens and when a running game exits (08 §4).
-- CLI and MCP do not wait for the background run: `saves show` reads L1 for its one save inline; `saves list` reports saves without L1 as `meta only` and names `saves index`. Until L1 exists, every save is `meta only`, `saves show` says play facts are not read, and neither names `saves index`.
+- CLI and MCP do not wait for the background run: `saves show` reads L1 for its one save inline, before its load check, then lists the saves again when that read was new so the save sits in its world's colony; the previous save it compares with (§4.3) is used only from the cache. `saves list` never reads: it shows the day of saves with L1, `meta only` for the rest (a note counts them and names `saves index`) and `malformed` for saves whose read stopped early. A save being written is not read; `saves show` says so. Measured (2026-11-04, synthetic 25.8 MB save, Windows): the inline read takes about 0.1 s, plus about 0.14 s inside the first `open` of the freshly written file (most likely the antivirus scanning it); `saves show` from the cache takes about 2 ms, `saves list` 1 ms.
 
 ## 2. Content catalog
 
@@ -203,7 +203,7 @@ Approximate matching for rule 3 (an enabled set differing by one or two entries)
 
 **Mod list**: the save's Mods in load order, named from `<modNames>`; not-installed entries and reordered entries marked; the list's Mods missing from the save named after it.
 
-**Play facts** (L1): day and date, storyteller and difficulty, real play time, biome, wealth, colonists (with deaths), animals, research progress and raids survived, each with the change since the colony's previous save.
+**Play facts** (L1): day and date, storyteller and difficulty, real play time, biome, wealth, colonists (with deaths), animals, research progress and raids survived, each with the change since the colony's previous save. `saves show` (05 §4.2) shows them without biome (not read, §1.7) and with research as the current project and how many projects have progress (whether one is finished needs its cost from the Def, L2). The previous save is the next older save of the colony; the change is computed when its L1 read is cached and well formed and lists only what changed; with `--play` each colonist is marked `new` (absent from the previous save) or `died` (alive in it), matched by pawn ID. The page does not show play facts yet.
 
 ### 4.4 Actions
 
@@ -227,6 +227,8 @@ The actions are implemented in `internal/app/saveactions.go` (`FixSave`, `Rename
 ### 4.5 Timeline and events
 
 From the L1 facts of a colony's saves (and the game's own history records inside each save, if measurement confirms they hold a series): wealth and colonists over in-game days, one point per save, with deaths marked; events such as deaths, raids repelled and marriages, newest first. Fields await measurement. Counting occurrences instead of only presence is optional.
+
+Implemented in `saves show` (05 §4.2): the events are the letters of the game's archive (`Facts.Events`, the newest 200), shown newest first with their in-game day, label and LetterDef: 3 on one line by default, 6 with `--play`, all with `--play --all`; the change since the previous save is §4.3's. The timeline (one point per save) is not implemented.
 
 ### 4.6 What a Mod owns in a save
 
@@ -274,7 +276,8 @@ Two pages under "worth playing" in the sidebar: play goals and shared packs (06 
 | SV9 | Move to the recycle bin | Confirm first; enter system recycle bin; refuse while the game runs | Partial: confirmation passes (synthetic: `TestSaveFileActions`, `TestManageSavesActions`, golden `saves`); the real recycle bin and a running game are untested |
 | SV10 | Fix a save whose list lacks an installed Mod and a Workshop Mod | One reversible edit: the installed Mod enabled, the Workshop Mod added as a missing entry, each in save order. Until the download is scanned the save still reads "content will be lost", and fixing again only subscribes again (no edit) | Pass (synthetic: `TestFixSave`, golden `saves`) |
 | SV11 | Open Saves with no L1 cache | Left card, middle header and Mod list appear from L0 at once; the background task reads the selected save first | Unimplemented |
-| SV12 | A save written during a crash (no `</savegame>`) | Cut off, error, Recycle offered; a file still being written gets no verdict | Partial: cut off passes (synthetic: `TestCheckSave`); a file being written is untested |
+| SV12 | A save written during a crash (no `</savegame>`) | Cut off, error, Recycle offered; a file still being written gets no verdict | Pass (synthetic: `TestCheckSave`; being written, not read and no verdict: golden `saves_play`) |
 | SV13 | RimSaves name `Ashfall#§#Landing.rws` | Grouped under colony `Ashfall`, shown as `Landing` | Pass (synthetic: `TestSavesListGroupAndMatch`) |
 | SV14 | A save whose Mod with pawns is not installed | Error naming what is lost; Fix subscribes and enables it as one reversible edit | Unimplemented |
-| SV15 | `get_save` on MCP | Same text as `saves show`; each fix names its command or tool call | Pass (synthetic: `TestSaveToolsCLIParity`, golden `saves`) |
+| SV15 | `get_save` on MCP | Same text as `saves show`; each fix names its command or tool call | Pass (synthetic: `TestSaveToolsCLIParity` with `play`, golden `saves`) |
+| SV16 | `saves show` on a save not read in full, then `saves index` and `saves list` | The save is read inline and joins its world's colony; play facts as §4.3; the previous save is compared only once it is read; `saves list` shows `day N`, `meta only` with a note naming `saves index`, `malformed`; every call within 40 lines without `--all` | Pass (synthetic: golden `saves_play`, `TestSavePlayText`); real saves untested |
