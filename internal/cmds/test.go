@@ -60,9 +60,18 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 	root.KV("load", fmt.Sprintf("%.1fs (total %.1fs)", r.LoadSeconds, r.TotalSeconds))
 	root.KV("peak memory", fmt.Sprintf("%d MB", r.PeakMemoryMB))
 	root.KV("requested", fmt.Sprint(r.Requested))
+	if len(r.Linked) > 0 {
+		linked := root.Section(fmt.Sprintf("linked for this run (removed after it): %d", len(r.Linked)))
+		for _, name := range r.Linked {
+			linked.Add("Mods/" + name)
+		}
+	}
 	missing := root.Section(fmt.Sprintf("missing: %d", len(r.Missing)))
 	for _, m := range r.Missing {
-		missing.Add(m.PackageID + "  " + m.Name)
+		n := missing.Add(m.PackageID + "  " + m.Name)
+		if m.Reason != "" {
+			n.KV("not linked", m.Reason)
+		}
 	}
 	clusters := root.Section(fmt.Sprintf("error clusters: %d", r.ClustersTotal))
 	for _, cluster := range r.Clusters {

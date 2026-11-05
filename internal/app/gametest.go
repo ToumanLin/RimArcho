@@ -33,6 +33,7 @@ type TestRunOptions struct {
 type TestRunMissing struct {
 	PackageID string `json:"package_id"`
 	Name      string `json:"name"`
+	Reason    string `json:"reason,omitempty"` // why it could not be linked for the run
 }
 
 type TestRunCluster struct {
@@ -60,6 +61,7 @@ type TestRunReport struct {
 	PeakMemoryMB  int64             `json:"peak_memory_mb"`
 	Requested     int               `json:"requested"`
 	Missing       []TestRunMissing  `json:"missing"`
+	Linked        []string          `json:"linked,omitempty"` // Mods/ links made for this run and removed after it
 	RunDir        string            `json:"run_dir"`
 	LogPath       string            `json:"log_path"`
 	Args          []string          `json:"args"`
@@ -92,7 +94,7 @@ func (r *TestRunReport) Success() bool {
 
 // TestRun starts the executable directly, including for a Steam-launch environment.
 // The current plan and the player's config, saves and logs are left alone (08 §12).
-func (a *App) TestRun(ctx context.Context, o TestRunOptions) (*TestRunReport, error) {
+func (a *App) TestRun(ctx context.Context, o TestRunOptions) (_ *TestRunReport, err error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -143,10 +145,23 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (*TestRunReport, er
 	if o.Progress != nil {
 		o.Progress("preparing test data for " + PlanRef(st.Plan))
 	}
+	if err := os.MkdirAll(base, 0o755); err != nil {
+		return nil, err
+	}
+	// Links an interrupted run left, then this run's: the plan's Mods the game cannot see.
+	if err := a.removeTestLinks(base); err != nil {
+		return nil, err
+	}
+	mods, add, blocked := a.testRunLinks(st)
+	unlink, err := a.addTestLinks(base, mods, add)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { err = errors.Join(err, unlink()) }() // a no-op once removed below
 	if err := a.prepareTestConfig(st, data, protected); err != nil {
 		return nil, err
 	}
-	missing := testRunMissing(st)
+	missing := testRunMissing(st, blocked)
 	if err := os.MkdirAll(runs, 0o755); err != nil {
 		return nil, err
 	}
@@ -170,13 +185,15 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (*TestRunReport, er
 		GameRoot: e.GameRoot, GameVersion: e.GameVersion, DataDir: data, RunDir: runDir,
 		Map: o.Map, Timeout: o.Timeout, Settle: o.Settle, Start: a.TestGameStart,
 	})
+	// The game has exited (gametest.Run reaps it): take the links away before anything else.
+	unlinkErr := unlink()
 	if raw == nil {
-		return nil, runErr
+		return nil, errors.Join(runErr, unlinkErr)
 	}
 	r := &TestRunReport{
 		Env: e.Name, Plan: PlanRef(st.Plan), GameVersion: e.GameVersion, Status: raw.Status,
 		LoadSeconds: raw.LoadSeconds, TotalSeconds: raw.TotalSeconds, PeakMemoryMB: raw.PeakMemoryMB,
-		Requested: len(st.List), Missing: missing, RunDir: runDir, LogPath: raw.LogPath,
+		Requested: len(st.List), Missing: missing, Linked: linkNames(add), RunDir: runDir, LogPath: raw.LogPath,
 		Args: raw.Args, Attribution: "tested-plan", Counts: map[string]int{}, Clusters: []TestRunCluster{},
 	}
 	// Attribution reads assembly types and Harmony IDs from the analysis (03 §6.2); a
@@ -199,7 +216,7 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (*TestRunReport, er
 		saveErr = os.WriteFile(filepath.Join(runDir, "report.json"), append(b, '\n'), 0o644)
 	}
 	pruneErr := pruneTestRuns(runs, runDir)
-	return r, errors.Join(runErr, analysisErr, saveErr, pruneErr)
+	return r, errors.Join(runErr, unlinkErr, analysisErr, saveErr, pruneErr)
 }
 
 func (a *App) prepareTestConfig(st *LoadoutState, data string, protected []string) error {
@@ -261,7 +278,17 @@ func (a *App) prepareTestConfig(st *LoadoutState, data string, protected []strin
 	return os.WriteFile(path, b, 0o644)
 }
 
-func testRunMissing(st *LoadoutState) []TestRunMissing {
+func linkNames(cs []LinkChange) []string {
+	var out []string
+	for _, c := range cs {
+		out = append(out, c.Name)
+	}
+	slices.Sort(out)
+	return out
+}
+
+// testRunMissing lists the plan's Mods this run's game cannot see, after its links are made.
+func testRunMissing(st *LoadoutState, blocked map[string]string) []TestRunMissing {
 	seen := testRunSeen(st)
 	missing := []TestRunMissing{}
 	for _, entry := range st.List {
@@ -271,15 +298,15 @@ func testRunMissing(st *LoadoutState) []TestRunMissing {
 			continue
 		}
 		if m.Kind != source.Official && seen[m.ID] == "" {
-			missing = append(missing, TestRunMissing{PackageID: m.PackageID, Name: m.DisplayName()})
+			missing = append(missing, TestRunMissing{PackageID: m.PackageID, Name: m.DisplayName(), Reason: blocked[m.ID]})
 		}
 	}
 	return missing
 }
 
 // testRunSeen maps each listed Mod a test run's game sees to the folder it sees it under.
-// Test runs make no links (08 §12): it is the Mod's folder in Data/, Mods/ or the Workshop,
-// or the name of a link in Mods/ to it.
+// It is the Mod's folder in Data/, Mods/ or the Workshop, or the name of a link in Mods/
+// to it (including the links a test run makes, 08 §12).
 func testRunSeen(st *LoadoutState) map[string]string {
 	parents, linked := map[string]bool{}, map[string]string{}
 	roots := []string{filepath.Join(st.Ix.Env.GameRoot, "Data"), filepath.Join(st.Ix.Env.GameRoot, "Mods")}

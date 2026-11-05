@@ -76,7 +76,7 @@ func TestTestRunMissingFolders(t *testing.T) {
 		{PackageID: "mod6", Name: "mod6"}, {PackageID: "mod7", Name: "mod7"},
 		{PackageID: "not.installed", Name: "not.installed"},
 	}
-	if got := testRunMissing(st); !reflect.DeepEqual(got, want) {
+	if got := testRunMissing(st, nil); !reflect.DeepEqual(got, want) {
 		t.Fatalf("missing %+v, want %+v", got, want)
 	}
 }

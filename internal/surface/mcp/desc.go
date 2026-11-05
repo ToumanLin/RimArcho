@@ -8,7 +8,7 @@ package mcp
 // Instructions is sent to the client at initialisation.
 const Instructions = `RimArcho knows one RimWorld installation: every mod instance, the plans (named mod lists; one is current), Defs, simulated Patches, Harmony patches, Player.log error clusters and decompiled C#. Tools return outline text; its references (#id, L#id, pkg:, ws:, def:Type/name, p:<hex>, log:E<n>, r:<n>, pattern:<id>) pass straight to other tools. Results are capped at 24 KB: narrow with mod=, target=, a cluster or a pattern instead of all=true.
 Start with status. For a game error or crash, read guide topic=diagnose before concluding: it says how to classify the error, which tool gives which evidence and how to report. In short: analyze_log (text= for a pasted log), then analyze_log cluster=E<n>; a patcher or a mentioned mod is not the cause without further evidence, and with no source the cause is undecided.
-Editing tools act on the current plan and never touch the game until save_loadout or launch_game. Never edit Workshop files in place: pin_mod first, then edit the copy.
+Editing tools act on the current plan and never touch the game until save_loadout or launch_game. Never edit Workshop files in place: pin_mod first, edit the copy, then test_run (it tests the copy without saving).
 Tools marked destructive (save_loadout, launch_game, manage_plans, manage_packs, resolve_identity, manage_hidden, manage_library, manage_subscriptions, manage_textures, manage_saves, repair_links, maintenance) write game or mod files, start the game or are hard to undo: show the dry run where there is one and ask the player before the real call.
 The player's management tools (packs, subscriptions, library actions, textures, memory estimate, maintenance, identity, hidden mods, links, player data, save actions, uninstall preview) are served only by archo mcp --tools all; otherwise use the archo CLI (guide topic=<tool name> gives the command).
 guide topic=<tool name> gives a tool's full reference (every action, parameter details, an example call and output); guide alone lists the other topics: errors (kinds the workflow does not cover), plans, words (what the interface calls things, for talking to the player).`
@@ -51,7 +51,7 @@ const descSave = `Save the current plan to the game (ModsConfig.xml and RimArcho
 
 const descLaunch = `Save the current plan like save_loadout, then start the game. Refused while any game runs. Starts a program and changes the game's list: call with dry_run=true first, show the player and ask.`
 
-const descTestRun = `Start the game with a plan in isolated test data, wait for the main menu (map=true: a quick test map), capture startup errors, stop it, return a JSON report. Compares with the player's log (before, fixed) and the previous run (delta, gone). Takes minutes; never touches the player's saves, config, logs or game folder.`
+const descTestRun = `Start the game with a plan in isolated test data, wait for the main menu (map=true: a test map), capture startup errors, stop it, return a JSON report. Compares with the player's log (before, fixed) and the previous run (delta, gone). Takes minutes. Pinned copies are linked into Mods/ for the run only.`
 
 const descPlans = `The environment's plans (named mod lists): list, new, use (switch; writes no game file), rename, remove, import, versions, follow / unfollow / sync a Workshop collection. remove deletes a plan with its whole history: ask the player first, naming the plan.`
 
