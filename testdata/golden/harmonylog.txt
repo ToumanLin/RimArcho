@@ -373,6 +373,7 @@ pattern:g:xml.type-missing  XML names a C# class that no loaded assembly has
   causes:
     the framework mod that defines the class is not active or loads later
     the class was renamed in an update
+    a typo or wrong namespace in the mod's XML (Class="…", thingClass); analyze_log names that file and the nearest existing classes
   route:
     analyze_log cluster=E<n> (dependency candidates)
     search_files <class>

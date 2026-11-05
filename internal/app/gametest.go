@@ -48,6 +48,9 @@ type TestRunCluster struct {
 	// Note: "common, unattributed: …" for a cluster no mod is named for whose kind is in more
 	// than 5% of public logs (patterns.CommonUnattributed, 03 §6.8).
 	Note string `json:"note,omitempty"`
+	// Consequences: clusters that follow from this one's failed def file, folded into it and
+	// not listed (03 §6.3); they still count in counts and clusters_total.
+	Consequences int `json:"consequences,omitempty"`
 }
 
 type TestRunReport struct {
@@ -387,7 +390,7 @@ func (a *App) testRunLog(st *LoadoutState, r *TestRunReport) error {
 		}
 		r.ClustersTotal++
 		r.clusterKeys = append(r.clusterKeys, lc.Key)
-		if len(r.Clusters) == 30 {
+		if len(r.Clusters) == 30 || lc.ConsequenceOf != "" {
 			continue
 		}
 		mods := []string{}
@@ -401,7 +404,7 @@ func (a *App) testRunLog(st *LoadoutState, r *TestRunReport) error {
 		if !settings {
 			note = patterns.Load().CommonUnattributed(class, lc.Template, len(lc.Attr) > 0)
 		}
-		r.Clusters = append(r.Clusters, TestRunCluster{key: lc.Key, Class: class, Message: firstLine(lc.First.Message), Count: lc.Count, Mods: mods, Confidence: confidence, Note: note})
+		r.Clusters = append(r.Clusters, TestRunCluster{key: lc.Key, Class: class, Message: firstLine(lc.First.Message), Count: lc.Count, Mods: mods, Confidence: confidence, Note: note, Consequences: lc.Consequences})
 	}
 	return nil
 }

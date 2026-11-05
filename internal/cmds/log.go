@@ -160,12 +160,17 @@ func logCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	lst := root.Section("list")
 	var noise []*app.LogCluster
+	folded := 0
 	for _, lc := range r.Clusters {
 		if logs.Informational(lc.Class) && !a.Bool("all") {
 			hidden++
 			if lc.Class == logs.ClassNoise {
 				noise = append(noise, lc)
 			}
+			continue
+		}
+		if lc.ConsequenceOf != "" && !a.Bool("all") {
+			folded++ // listed under the failed def file's cluster (03 §6.3)
 			continue
 		}
 		shown++
@@ -178,8 +183,11 @@ func logCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if hidden > 0 {
 		root.KV("hidden", fmt.Sprintf("%d informational clusters (archo log --all)%s", hidden, noiseNote(noise)))
 	}
+	if folded > 0 {
+		root.KV("folded", fmt.Sprintf("%d clusters that follow from a def file that failed to load, counted on its row (archo log --all)", folded))
+	}
 	for _, lc := range r.Clusters {
-		if !logs.Informational(lc.Class) {
+		if !logs.Informational(lc.Class) && lc.ConsequenceOf == "" {
 			d.AddNext("archo log --cluster " + lc.ID)
 			break
 		}
@@ -218,6 +226,11 @@ func clusterLine(ix *app.Index, lc *app.LogCluster) string {
 		who += ")"
 	} else if commonUnattributed(lc) != "" {
 		who = "  (" + patterns.CommonLabel + ")"
+	}
+	if lc.Consequences > 0 {
+		who += fmt.Sprintf("  + %d consequent lines in %d clusters", lc.ConsequentLines, lc.Consequences)
+	} else if lc.ConsequenceOf != "" {
+		who = "  (consequence of log:" + lc.ConsequenceOf + ")"
 	}
 	return fmt.Sprintf("log:%s %s x%d%s  %s%s%s", lc.ID, lc.Class, lc.Count, logs.PhaseSummary(lc.Phases), msg, who, patternTag(ix, lc))
 }

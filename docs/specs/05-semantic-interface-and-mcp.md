@@ -140,6 +140,10 @@ If a player types `archo enable #nyh3` in PowerShell or bash, the shell treats t
   load-after: pkg:brrainz.harmony
   incompatible: pkg:mlie.yayoscombat3 (#51aa, active 51)
   content: defs 1240, patches 386, assemblies 3, harmony patches 214
+  assemblies:
+    Assemblies/CombatExtended.dll  2081280 B, 1406 types
+    Assemblies/0Harmony.dll  2243072 B, 1950 types, library
+    Assemblies/CETools.dll  31744 B, 12 types  same name as #b2c1   (asm.duplicate-name, 03 §4.3)
   problems: 2 error, 3 warning
     error incompat.active  #51aa Yayo's Combat 3 is active
     error log.exception    log:E3 attributed (role: patcher)
@@ -429,7 +433,7 @@ The following table gives the tool guide highlights. See `internal/cmds/guide_to
 | `get_mod` | Get all facts for one Instance. An ambiguous reference returns candidates rather than choosing one arbitrarily. |
 | `get_mod_settings` | Read what a Mod's settings files and HugsLib packs store, its settings window and HugsLib titles and defaults as Archo Monitor last saw them, or which Mods of the current list have settings. |
 | `set_mod_settings` | Change simple settings values (on/off, numbers, one line of text, a HugsLib choice) or reset them, with the game closed; the file is backed up first. |
-| `get_def` | Use it for No ThingDef named X, duplicate Defs, or which Mod wins. |
+| `get_def` | Use it for No ThingDef named X, duplicate Defs, or which Mod wins. A `log:` line says when the newest log reports the effective definition's file failed to load (03 §6.3). |
 | `get_patches` | Use it for a logged Patch operation failed; `failed=true` gives the reason. |
 | `get_harmony` | Use it for PREFIX/POSTFIX stack lines or `Mods` touching `Pawn.Tick`; next, use `read_source` on the patch class. A bool-returning prefix may skip the original method. Patches applied in code through `Harmony.Patch` are marked as not statically resolvable. |
 | `explain_relation` | Use it when a finding names two `Mods` or the user asks why A must come after B. |

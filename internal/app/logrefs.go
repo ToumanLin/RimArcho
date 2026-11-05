@@ -37,6 +37,9 @@ type refQuery struct {
 	// LayoutRoomDef). A file without it cannot hold the failing node: the same <F>V</F> in a
 	// GeneDef file is another def type (G6: selectionWeight in GeneDefs for a LayoutRoomDef).
 	ctx string
+	// class: a type name the log reports missing and nothing installed defines; matched as
+	// element text (<thingClass>NS.T</thingClass>) and as a Class="NS.T" attribute.
+	class bool
 }
 
 // ctxRootRe is the first element of a field error's Context.
@@ -45,6 +48,9 @@ var ctxRootRe = regexp.MustCompile(`Context: <([A-Za-z_][\w.]*)`)
 // referrerQuery is the lookup a cluster needs, if any.
 func referrerQuery(lc *LogCluster) *refQuery {
 	msg := lc.First.Message
+	if len(lc.missingTypes) > 0 {
+		return &refQuery{lc: lc, names: lc.missingTypes, class: true}
+	}
 	switch lc.Class {
 	case logs.ClassXrefMissing:
 		typ, name, ok := xrefName(msg)
@@ -165,6 +171,7 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 	text := map[string][]int{}  // element text → queries
 	elem := map[string][]int{}  // element name → queries (defs only)
 	lit := map[string][]int{}   // assembly string literal → queries
+	class := map[string][]int{} // Class="…" attribute value → queries
 	field := map[string][]int{} // element name + "\x00" + text → queries
 	for i, q := range qs {
 		for _, n := range q.names {
@@ -173,6 +180,9 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 				continue
 			}
 			text[n] = append(text[n], i)
+			if q.class {
+				class[n] = append(class[n], i)
+			}
 			if q.def != "" {
 				elem[n] = append(elem[n], i)
 			}
@@ -281,6 +291,15 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 							}
 						}
 					})
+					if len(class) > 0 {
+						classAttrs(b, func(v []byte, off int) {
+							for _, q := range class[string(v)] {
+								if _, ok := first[q]; !ok {
+									first[q] = hit{q, j.m.ID, j.rel, bytes.Count(b[:off], []byte{'\n'}) + 1, string(v)}
+								}
+							}
+						})
+					}
 				}
 				if len(first) > 0 {
 					mu.Lock()
@@ -375,6 +394,12 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 		}
 		if q.field != "" {
 			q.lc.add(h.inst, role, fmt.Sprintf("has <%s>%s</%s> %s", q.field, name, q.field, where))
+			continue
+		}
+		if q.class {
+			// Nothing installed defines the class: a typo or a wrong namespace in this XML, or
+			// a framework that is not installed (03 §6.2).
+			q.lc.add(h.inst, role, fmt.Sprintf("names class %s %s, which no installed mod defines", name, where))
 			continue
 		}
 		q.lc.add(h.inst, role, fmt.Sprintf("references %s %s", name, where))

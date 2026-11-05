@@ -2,6 +2,7 @@ package cmds
 
 import (
 	"fmt"
+	"path"
 	"slices"
 	"sort"
 	"strings"
@@ -141,6 +142,12 @@ func defCmd(c *Ctx, a *Args) (*render.Doc, error) {
 				line += "  ← effective"
 			}
 			sec.Add(line)
+		}
+		// The definition exists, but the game may not have loaded its file (03 §6.3).
+		if eff := active[len(active)-1].f; !byName {
+			if id := c.App.DefFileFailed(st, path.Base(eff.File)); id != "" {
+				root.KV("log", fmt.Sprintf("not loaded: the newest log says %s failed to load (%s); archo log --cluster %s", path.Base(eff.File), id, strings.TrimPrefix(id, "log:")))
+			}
 		}
 	}
 	if len(inactive) > 0 {

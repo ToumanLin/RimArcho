@@ -58,9 +58,16 @@ type LogCluster struct {
 	At            time.Time `json:",omitzero"`
 	Level         string    `json:",omitempty"`
 	OnlyCompanion bool      `json:",omitempty"`
+	// ConsequenceOf: the ID of the cluster whose failed def file this one follows from;
+	// Consequences and ConsequentLines count them on that cluster (03 §6.3).
+	ConsequenceOf                 string `json:",omitempty"`
+	Consequences, ConsequentLines int    `json:",omitempty"`
 	// providerOff: a missing reference whose def an installed mod defines but is not
 	// enabled. That mod is the reason, not a patcher on the stack (03 §6.3).
 	providerOff bool
+	// missingTypes: types the log reports missing that no installed mod defines; the XML
+	// naming them is searched for (refQuery.class, 03 §6.2).
+	missingTypes []string
 }
 
 // LogReport is an analysed log.
@@ -138,8 +145,10 @@ var ErrLogNotCached = errors.New("log not analysed yet")
 // and counts from both logs; 10: a left-out provider of a missing def before patchers;
 // 11: texture and assembly providers in the shared mod folders (Store.InstanceFiles); 12: known
 // noise (logs.ClassNoise) and its note; "assemblies not analysed yet" instead of "no enabled mod
-// defines it" (Unanalysed).
-const logCacheVersion = 12
+// defines it" (Unanalysed); 13: a missing type's XML referrer, nearest types, a same-name DLL that
+// loads first; consequences of a def file that failed to load (03 §6.2, §6.3); stack-less
+// "Tried to" errors, the game-error class and the lord rule.
+const logCacheVersion = 13
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a
@@ -358,6 +367,9 @@ type attrCtx struct {
 	lf       *logs.File          // the whole log (neighbouring lines)
 	// unanalysed: enabled non-official mods without analysed content (LogReport.Unanalysed).
 	unanalysed int
+
+	// dllMemo: DLL file name (lower) → the enabled mods' copies (shadowing).
+	dllMemo map[string][]*store.AssemblyRow
 }
 
 // notAnalysed qualifies a "nothing defines it" detail: when some enabled mods were never
@@ -478,6 +490,7 @@ func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails [
 		cx.referrers(qs)
 		cx.textureProviders(qs)
 	}
+	cx.consequences(rep)
 	for _, lc := range rep.Clusters {
 		// Source searches cover the cluster's candidates, not every enabled mod (03 §5.4).
 		if rep.HasPhases {
@@ -920,10 +933,21 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 			break
 		}
 		t := m[1] + m[2]
-		for _, id := range cx.types(t) {
+		ids := cx.types(t)
+		if len(ids) == 0 && !slices.Contains(lc.missingTypes, t) {
+			lc.missingTypes = append(lc.missingTypes, t)
+			if near := cx.nearTypes(t); len(near) > 0 {
+				lc.Details = append(lc.Details, "did you mean: "+strings.Join(near, ", "))
+			}
+		}
+		for _, id := range ids {
 			if cx.st.Position(id) == 0 {
 				lc.add(id, RoleDependency, "provides type "+t+" but is not enabled")
 				lc.next("archo enable " + ix.Ref(id))
+			} else if sh, why, prov := cx.shadowing(t, id); sh != "" {
+				lc.add(sh, RoleSource, why)
+				lc.add(id, RoleMentioned, prov)
+				lc.next("archo mod " + ix.Ref(sh))
 			} else {
 				lc.add(id, RoleMentioned, "provides type "+t+" and is enabled (a version mismatch?)")
 			}

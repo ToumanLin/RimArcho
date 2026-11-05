@@ -86,7 +86,7 @@ func (a *App) comparePlayerLog(st *LoadoutState, r *TestRunReport) {
 			continue
 		}
 		c := TestRunCluster{Class: lc.Class, Message: firstLine(lc.First.Message), Count: lc.Count,
-			Mods: testRunMods(st, lc), Confidence: lc.Confidence}
+			Mods: testRunMods(st, lc), Confidence: lc.Confidence, Consequences: lc.Consequences}
 		r.playerClusters[lc.Key] = c
 		if current[lc.Key] {
 			continue
@@ -96,7 +96,8 @@ func (a *App) comparePlayerLog(st *LoadoutState, r *TestRunReport) {
 			continue
 		}
 		pl.Fixed++
-		if len(r.Fixed) < testRunListLimit {
+		// A consequence of a failed def file is listed through its cause (03 §6.3).
+		if len(r.Fixed) < testRunListLimit && lc.ConsequenceOf == "" {
 			r.Fixed = append(r.Fixed, c)
 		}
 	}

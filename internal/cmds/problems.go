@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -431,6 +434,8 @@ func addModProblems(c *Ctx, ix *app.Index, m *store.Mod, root *render.Node) erro
 	if err != nil {
 		return err
 	}
+	var asmList *render.Node
+	var asms []*store.AssemblyRow
 	if s.Run != nil {
 		defs := c.App.Store.DefCount(m.ID)
 		ops, failed := c.App.Store.PatchCount(s.Run.ID, m.ID)
@@ -438,7 +443,7 @@ func addModProblems(c *Ctx, ix *app.Index, m *store.Mod, root *render.Node) erro
 		if failed > 0 {
 			line += fmt.Sprintf(" (%d failed)", failed)
 		}
-		if asms, _ := c.App.Store.Assemblies(m.ID); len(asms) > 0 {
+		if asms, _ = c.App.Store.Assemblies(m.ID); len(asms) > 0 {
 			hp, manual := 0, false
 			for _, a := range asms {
 				hp += a.Patches
@@ -453,6 +458,9 @@ func addModProblems(c *Ctx, ix *app.Index, m *store.Mod, root *render.Node) erro
 			line += "  [analysis stale]"
 		}
 		root.KV("content", line)
+		if len(asms) > 0 {
+			asmList = root.Section("assemblies")
+		}
 	}
 	c.App.LogCacheOnly = true // a mod page does not parse the log (stored report only)
 	ps, err := c.App.Problems(false, nil)
@@ -462,10 +470,34 @@ func addModProblems(c *Ctx, ix *app.Index, m *store.Mod, root *render.Node) erro
 	}
 	tok := finding.Inst(m.ID)
 	var mine []*app.Problem
+	sameName := map[string][]string{} // DLL file name (lower) → the other mods shipping one (asm.duplicate-name)
 	for _, p := range ps.List {
 		if contains(p.Subjects, tok) {
 			mine = append(mine, p)
+			if p.Code == "asm.duplicate-name" {
+				for _, s := range p.Subjects {
+					if s != tok {
+						sameName[p.Key] = append(sameName[p.Key], ix.Ref(finding.InstID(s)))
+					}
+				}
+			}
 		}
+	}
+	// Each assembly with its size and types; the game keeps the first copy of a name in load
+	// order, so a name another enabled mod also ships is marked (03 §4.3).
+	for _, a := range asms {
+		line := a.File
+		if fi, err := os.Stat(filepath.Join(ix.ModDir(m), filepath.FromSlash(a.File))); err == nil {
+			line += fmt.Sprintf("  %d B", fi.Size())
+		}
+		line += ", " + render.Plural(a.Types, "type")
+		if a.Skipped {
+			line += ", library"
+		}
+		if others := sameName[strings.ToLower(path.Base(a.File))]; len(others) > 0 {
+			line += "  same name as " + strings.Join(others, ", ")
+		}
+		asmList.Add(line)
 	}
 	if len(mine) == 0 {
 		return nil

@@ -91,7 +91,11 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 			n.KV("note", cluster.Note)
 		}
 	}
-	if more := r.ClustersTotal - len(r.Clusters); more > 0 {
+	folded := 0
+	for _, cluster := range r.Clusters {
+		folded += cluster.Consequences
+	}
+	if more := r.ClustersTotal - len(r.Clusters) - folded; more > 0 {
 		clusters.Addf("… %d more (full log: %s)", more, r.LogPath)
 	}
 	if p := r.PlayerLog; p == nil {
@@ -124,6 +128,9 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 }
 
 func testClusterMods(n *render.Node, cluster app.TestRunCluster) {
+	if cluster.Consequences > 0 {
+		n.KV("consequences", render.Plural(cluster.Consequences, "cluster")+" that follow from this def file failing to load, not listed")
+	}
 	if cluster.Class == gametest.ClassSettings {
 		n.KV("source", "game preferences")
 		return
