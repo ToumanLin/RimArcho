@@ -70,7 +70,13 @@ async function reload(snapshot = null, read = null) {
     const result = snapshot || await api.Workspace();
     if (!current() || result.stale) return;
     b = result.board; sh = result.shell; history = result.history;
-  } catch (e) { if (read) throw e; if (current()) { say("fail", errText(e)); retryRead(); } return; }
+  } catch (e) {
+    if (read) throw e;
+    // The first-run guide is the page for "no game yet": the read failing then is expected,
+    // not news (VM round 2026-11-05: "✗ no environment configured" under the guide).
+    if (current() && S.screen !== "guide") { say("fail", errText(e)); retryRead(); }
+    return;
+  }
   if (!current()) return;
   // A board that could not be read (a background job holding the data) has an error and no
   // columns: it must not replace the lists on screen, the sidebar's lists or the games.
