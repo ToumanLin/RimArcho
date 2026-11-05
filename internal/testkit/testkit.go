@@ -157,6 +157,7 @@ func (e *Env) Open() {
 	a.SteamCMDWait = func(time.Duration) {}
 	// The Def/Patch analysis runs in-process instead of an `archo analyze` child.
 	a.AnalyzeRunner = app.InProcessAnalyze(a)
+	a.SavesIndexRunner = app.InProcessSavesIndex(a)
 	// Never go online: a test that needs a remote serves it on loopback (httptest) and points
 	// the matching URL or client there. Anything else, such as a Workshop description fetched
 	// when a detail pane opens, fails at once instead of waiting on the network and writing

@@ -16,6 +16,14 @@ type SaveSpec struct {
 	SteamIDs []string // one per Mod; "" writes 0
 	CutOff   bool     // the file stops inside <game>, as after a crash
 	ModTime  time.Time
+
+	// The full read (10 §1.7 L1). Unset fields keep the token game block as it is.
+	Ticks   int64  // ticksGame; 0 writes 60000 (day 1)
+	World   string // world name; "" writes Synthetic
+	Seed    string // world seed; with it, persistentRandomValue PRV is written too
+	PRV     int
+	Faction string // the player faction's name (a PlayerColony faction)
+	Body    string // raw XML added at the end of <game>: pawns, things, Class="…" values
 }
 
 // SaveXML is the save's text.
@@ -37,6 +45,21 @@ func SaveXML(s SaveSpec) string {
 		fmt.Fprintf(&steam, "<li>%s</li>", sid)
 		fmt.Fprintf(&names, "<li>%s</li>", name)
 	}
+	ticks, world := s.Ticks, s.World
+	if ticks == 0 {
+		ticks = 60000
+	}
+	if world == "" {
+		world = "Synthetic"
+	}
+	info := "<name>" + world + "</name>"
+	if s.Seed != "" {
+		info += fmt.Sprintf("<seedString>%s</seedString><persistentRandomValue>%d</persistentRandomValue>", s.Seed, s.PRV)
+	}
+	factions := ""
+	if s.Faction != "" {
+		factions = "<factionManager><allFactions><li><def>PlayerColony</def><name>" + s.Faction + "</name><loadID>1</loadID></li></allFactions></factionManager>"
+	}
 	x := fmt.Sprintf(`<?xml version="1.0" encoding="utf-8"?>
 <savegame>
 	<meta>
@@ -46,11 +69,11 @@ func SaveXML(s SaveSpec) string {
 		<modNames>%s</modNames>
 	</meta>
 	<game>
-		<tickManager><ticksGame>60000</ticksGame></tickManager>
-		<world><info><name>Synthetic</name></info></world>
+		<tickManager><ticksGame>%d</ticksGame></tickManager>
+		<world><info>%s</info>%s</world>%s
 	</game>
 </savegame>
-`, game, ids.String(), steam.String(), names.String())
+`, game, ids.String(), steam.String(), names.String(), ticks, info, factions, s.Body)
 	if s.CutOff {
 		x = x[:strings.Index(x, "<world>")+len("<world><in")]
 	}

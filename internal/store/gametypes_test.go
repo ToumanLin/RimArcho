@@ -125,11 +125,11 @@ func TestGameAssemblyReplacedAndDeleted(t *testing.T) {
 	}
 }
 
-// The 29 → 30 step creates the same tables as schema.sql.
+// The steps from 29 (game types 29 → 30, save cache 30 → 31) create the same tables as schema.sql.
 func TestUpgradeGameTypes(t *testing.T) {
 	s, path := openTemp(t)
 	want := gameTypeDDL(t, s.DB)
-	for _, q := range []string{`DROP TABLE game_type`, `DROP TABLE game_assembly`, `UPDATE meta SET value='29' WHERE key='schema_version'`} {
+	for _, q := range []string{`DROP TABLE game_type`, `DROP TABLE game_assembly`, `DROP TABLE save_cache`, `UPDATE meta SET value='29' WHERE key='schema_version'`} {
 		if _, err := s.DB.Exec(q); err != nil {
 			t.Fatal(err)
 		}
@@ -156,7 +156,7 @@ func TestUpgradeGameTypes(t *testing.T) {
 
 func gameTypeDDL(t *testing.T, db *sql.DB) string {
 	t.Helper()
-	rows, err := db.Query(`SELECT name, sql FROM sqlite_master WHERE tbl_name IN ('game_assembly','game_type') AND sql IS NOT NULL ORDER BY name`)
+	rows, err := db.Query(`SELECT name, sql FROM sqlite_master WHERE tbl_name IN ('game_assembly','game_type','save_cache') AND sql IS NOT NULL ORDER BY name`)
 	if err != nil {
 		t.Fatal(err)
 	}

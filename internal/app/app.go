@@ -76,6 +76,9 @@ type App struct {
 	AnalyzeRunner func(envName string, progress func(string)) error
 	// AnalyzeExe is the archo executable the default runner starts; "" is this one.
 	AnalyzeExe string
+	// SavesIndexRunner reads saves into the full-read cache (10 §1.7), the given saves
+	// first; nil means the `archo saves index` child process. Tests run it in-process.
+	SavesIndexRunner func(first []string, progress func(string)) error
 	// FreeSpace tells the free space of a folder's drive for a pack build (tests); nil
 	// means DiskFree.
 	FreeSpace func(dir string) int64

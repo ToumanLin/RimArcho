@@ -23,6 +23,8 @@ func init() {
 		Flags: []Flag{{Name: "mod", Value: "<packageId>", Multi: true, Help: "only this Mod's fix"}, {Name: "disable-added", Help: "also disable the list's Mods the save lacks"},
 			{Name: "order", Help: "put the Mods both have in the save's order"}, {Name: "launch", Help: "then save the list to the game and start it (not while subscriptions download)"},
 			{Name: "dry-run", Help: "show what would change; change nothing"}}, Run: savesFix})
+	register(&Command{Name: "saves index", Args: "[<save…>]", Summary: "read new and changed saves in full into the cache, the named ones first (the Saves page runs it as a child process)", MaxArgs: -1,
+		Flags: []Flag{{Name: "only", Help: "only the named saves"}, {Name: "progress", Help: "a progress line per save on stderr"}}, Run: savesIndex})
 	register(&Command{Name: "saves rename", Args: "<save> <name>", Summary: "rename a save in its folder (keeps a RimSaves folder; refused while the game runs or when the name exists)", MinArgs: 2, MaxArgs: 2, Run: savesRename})
 	register(&Command{Name: "saves copy", Args: "<save>", Summary: "copy a save beside itself as <name> (copy), never overwriting", MinArgs: 1, MaxArgs: 1, Run: savesCopy})
 	yes := []Flag{{Name: "yes", Help: "do it (without it: only show the files and sizes)"}}
@@ -749,6 +751,66 @@ func fixArgv(s *app.Save, a *Args) []string {
 		}
 	}
 	return out
+}
+
+// ---- saves index ----
+
+func savesIndex(c *Ctx, a *Args) (*render.Doc, error) {
+	if a.Bool("only") && len(a.Pos) == 0 {
+		return nil, errors.New("--only needs the saves to read (archo saves index <save…> --only)")
+	}
+	var first []*app.Save
+	if len(a.Pos) > 0 {
+		ss, amb, err := findSaves(c, a.Pos)
+		if err != nil || amb != nil {
+			return amb, err
+		}
+		first = ss
+	}
+	l, err := c.App.ListSaves()
+	if err != nil {
+		return nil, err
+	}
+	order := l.IndexOrder(first)
+	if a.Bool("only") {
+		order = order[:len(first)]
+	}
+	var progress func(app.SaveIndexProgress)
+	if a.Bool("progress") && Progress != nil {
+		progress = func(p app.SaveIndexProgress) { Progress(app.SavesIndexLine(p)) }
+	}
+	r, err := c.App.IndexSaves(order, progress)
+	if err != nil {
+		return nil, err
+	}
+	pruned := 0
+	if len(a.Pos) == 0 {
+		if pruned, err = c.App.PruneSaveCache(l); err != nil {
+			return nil, err
+		}
+	}
+	head := fmt.Sprintf("saves index: read %s", render.Plural(r.Read, "save"))
+	if r.Read > 0 {
+		head += fmt.Sprintf(" (%s) in %s", render.Size(r.Bytes), app.Elapsed(r.Elapsed.Milliseconds()))
+	}
+	if r.Cached > 0 {
+		head += fmt.Sprintf("; %d already read", r.Cached)
+	}
+	d, root := render.New(head)
+	if r.Writing > 0 {
+		root.KV("being written", fmt.Sprintf("%d (read on a later run)", r.Writing))
+	}
+	for _, e := range r.Errs {
+		root.KV("error", e)
+	}
+	if len(r.Errs) > 0 {
+		c.ExitCode = ExitError
+	}
+	if pruned > 0 {
+		root.KV("removed", render.Plural(pruned, "cached read")+" of saves that are gone")
+	}
+	d.AddNext("archo saves list")
+	return d, nil
 }
 
 // ---- rename, copy, backup, trash ----

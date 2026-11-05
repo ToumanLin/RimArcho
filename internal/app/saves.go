@@ -57,6 +57,9 @@ type Save struct {
 	// Writing: modified within WritingWindow, or changed while its head was read.
 	Writing bool
 	Colony  *Colony
+	// Summary is the full read's summary (10 §1.7 L1) when the cache has a valid one;
+	// nil: read from the head only ("meta only"). SaveFacts gives the whole read.
+	Summary *SaveSummary
 
 	// The list it matches (10 §4.2): a plan, a pack, or neither.
 	Env   *env.Environment
@@ -81,7 +84,8 @@ type Colony struct {
 	Key   string  `json:"key"`
 	Name  string  `json:"name"`
 	Saves []*Save // newest first
-	// By: how the saves were grouped: "rimsaves" (folder prefix) or "name" (file name).
+	// By: how the saves were grouped: "rimsaves" (folder prefix), "world" (the full
+	// read's world identity) or "name" (file name).
 	By string `json:"by"`
 }
 
@@ -183,6 +187,9 @@ func (a *App) ListSaves() (*SaveList, error) {
 		}
 	}
 	a.readHeads(saves)
+	if err := a.attachSummaries(saves); err != nil {
+		return nil, err
+	}
 	m, err := a.newSaveMatcher()
 	if err != nil {
 		return nil, err
@@ -349,10 +356,12 @@ func (a *App) readHeads(saves []*Save) {
 
 // ---- grouping (10 §4.1) ----
 
-// groupColonies groups saves: a RimSaves folder first; else the file name without trailing
-// numbers. Autosaves carry no colony in their name, so each joins the colony in the same
-// folder whose save has the same Mods and is nearest in time; the rest form "Autosaves".
-// The full read (10 §1.7 L1) regroups by world identity.
+// groupColonies groups saves (10 §4.1): a RimSaves folder first; else the world identity
+// of the full read (10 §1.7 L1), named after the player faction, else the world; else the
+// file name without trailing numbers, where a save not read in full yet joins the world
+// colony whose saves have that name. Autosaves without a full read carry no colony in
+// their name, so each joins the colony in the same folder whose save has the same Mods
+// and is nearest in time; the rest form "Autosaves".
 func groupColonies(saves []*Save) []*Colony {
 	byKey := map[string]*Colony{}
 	var cols []*Colony
@@ -367,17 +376,39 @@ func groupColonies(saves []*Save) []*Colony {
 		s.Colony = c
 	}
 	folderKey := func(s *Save) string { return env.PathKey(s.Folder.Dir) }
-	var autos []*Save
+	nameKey := func(s *Save) string { return folderKey(s) + "|name:" + strings.ToLower(colonyBaseName(s.Name)) }
+	var autos, named []*Save
+	worldByName := map[string]*Colony{} // file-name key → the one world colony with saves of that name
 	for _, s := range saves {
 		switch {
 		case s.Prefix != "":
 			add(s, folderKey(s)+"|rimsaves:"+strings.ToLower(s.Prefix), s.Prefix, "rimsaves")
+		case s.Summary != nil && s.Summary.Identity != "":
+			name := s.Summary.Faction
+			if name == "" {
+				name = s.Summary.World
+			}
+			add(s, folderKey(s)+"|world:"+s.Summary.Identity, name, "world")
+			if !s.Auto {
+				k := nameKey(s)
+				if c, ok := worldByName[k]; !ok {
+					worldByName[k] = s.Colony
+				} else if c != s.Colony {
+					worldByName[k] = nil // two worlds share the name: do not guess
+				}
+			}
 		case s.Auto:
 			autos = append(autos, s)
 		default:
-			base := colonyBaseName(s.Name)
-			add(s, folderKey(s)+"|name:"+strings.ToLower(base), base, "name")
+			named = append(named, s)
 		}
+	}
+	for _, s := range named {
+		if c := worldByName[nameKey(s)]; c != nil {
+			add(s, c.Key, c.Name, c.By)
+			continue
+		}
+		add(s, nameKey(s), colonyBaseName(s.Name), "name")
 	}
 	for _, s := range autos {
 		var best *Save
@@ -397,6 +428,16 @@ func groupColonies(saves []*Save) []*Colony {
 	}
 	for _, c := range cols {
 		sort.SliceStable(c.Saves, func(i, j int) bool { return c.Saves[i].ModTime.After(c.Saves[j].ModTime) })
+		if c.By == "world" { // named as of its newest read save: the player may rename the faction
+			for _, s := range c.Saves {
+				if s.Summary != nil && s.Summary.Identity != "" {
+					if c.Name = s.Summary.Faction; c.Name == "" {
+						c.Name = s.Summary.World
+					}
+					break
+				}
+			}
+		}
 	}
 	sort.SliceStable(cols, func(i, j int) bool { return cols[i].Latest().ModTime.After(cols[j].Latest().ModTime) })
 	return cols

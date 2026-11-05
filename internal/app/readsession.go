@@ -35,6 +35,7 @@ func (b *App) ReadOptions(a *App) {
 	b.EnvName, b.GameVersion = a.EnvName, a.GameVersion
 	b.OpenPlan, b.PlanName = a.OpenPlan, a.PlanName
 	b.AnalyzeRunner, b.AnalyzeExe, b.AnalyzeWait = a.AnalyzeRunner, a.AnalyzeExe, a.AnalyzeWait
+	b.SavesIndexRunner = a.SavesIndexRunner
 	b.LazyLog, b.LogCacheOnly = a.LazyLog, a.LogCacheOnly
 	b.GameProbe, b.LockBase, b.MonitorBundle = a.GameProbe, a.LockBase, a.MonitorBundle
 	b.HTTP, b.SteamAPI = a.HTTP, a.SteamAPI

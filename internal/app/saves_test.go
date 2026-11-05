@@ -257,3 +257,92 @@ func TestSaveFileActions(t *testing.T) {
 		t.Fatalf("trash: %+v %v %v", r, err, trashed)
 	}
 }
+
+func TestSavesFullRead(t *testing.T) {
+	t.Parallel()
+	e := savesFixture(t)
+	now := e.Now()
+	world := testkit.SaveSpec{Mods: []string{"ludeon.rimworld", "tester.alpha", "tester.beta"}, World: "Ennawrin", Seed: "hollow", PRV: -7,
+		Faction: "New Arrivals", Ticks: 25*60000 + 1234, ModTime: now.Add(-4 * time.Hour)}
+	e.WriteSave("Rimward.rws", world)
+	world.Faction, world.Ticks, world.ModTime = "Iron Pact", 40*60000, now.Add(-3*time.Hour-30*time.Minute)
+	e.WriteSave("Landed 2.rws", world)
+
+	l, err := e.App.ListSaves()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range l.Saves() {
+		if s.Summary != nil {
+			t.Fatalf("%s: summary before any full read", s.Name)
+		}
+	}
+	rw, _ := l.Find("Rimward")
+	if order := l.IndexOrder([]*app.Save{rw}); order[0] != rw || order[1].Name != "Broken" || len(order) != len(l.Saves()) {
+		t.Fatalf("index order starts %s, %s", order[0].Name, order[1].Name)
+	}
+	var lines []string
+	if err := e.App.RunSavesIndex("", []string{"Rimward"}, func(line string) { lines = append(lines, line) }); err != nil {
+		t.Fatal(err)
+	}
+	if len(lines) != len(l.Saves()) {
+		t.Fatalf("progress %q", lines)
+	}
+	if done, total, ref, _, ok := app.ParseSavesIndexLine(lines[len(lines)-1]); !ok || done != total || !strings.HasPrefix(ref, "sv:") {
+		t.Fatalf("last line %q", lines[len(lines)-1])
+	}
+
+	l, err = e.App.ListSaves()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cols := map[string][]string{}
+	for _, c := range l.Colonies {
+		for _, s := range c.Saves {
+			cols[c.Name+" ("+c.By+")"] = append(cols[c.Name+" ("+c.By+")"], s.Name)
+			if s.Summary == nil {
+				t.Fatalf("%s: no summary after indexing", s.Name)
+			}
+		}
+	}
+	// One world, two file names: one colony named after the newest save's faction.
+	if got := cols["Iron Pact (world)"]; !slices.Equal(got, []string{"Landed 2", "Rimward"}) {
+		t.Fatalf("colonies %v", cols)
+	}
+	s, _ := l.Find("Rimward")
+	if s.Summary.Day != 25 || s.Summary.World != "Ennawrin" {
+		t.Fatalf("summary %+v", s.Summary)
+	}
+	if b, _ := l.Find("Broken"); !b.Summary.Malformed {
+		t.Fatal("the cut-off save is not malformed")
+	}
+	f, err := e.App.SaveFacts(s, false)
+	if err != nil || f == nil || f.Player.Name != "New Arrivals" || f.Day() != 25 {
+		t.Fatalf("facts %+v %v", f, err)
+	}
+
+	// Indexing again reads nothing; a save written since then has no summary, joins its
+	// world colony by name, and is read inline when asked for.
+	r, err := e.App.IndexSaves(l.IndexOrder(nil), nil)
+	if err != nil || r.Read != 0 || r.Cached != len(l.Saves()) {
+		t.Fatalf("second run %+v %v", r, err)
+	}
+	world.Faction, world.Ticks, world.ModTime = "Iron Pact", 41*60000, now.Add(-2*time.Minute)
+	e.WriteSave("Rimward 3.rws", world)
+	l, _ = e.App.ListSaves()
+	s, _ = l.Find("Rimward 3")
+	if s.Summary != nil || s.Colony.Name != "Iron Pact" {
+		t.Fatalf("new save: summary %+v colony %s", s.Summary, s.Colony.Name)
+	}
+	if f, err := e.App.SaveFacts(s, true); err != nil || f == nil || s.Summary == nil || s.Summary.Day != 41 {
+		t.Fatalf("inline read: %+v %v", s.Summary, err)
+	}
+
+	if err := os.Remove(s.Path); err != nil {
+		t.Fatal(err)
+	}
+	l, _ = e.App.ListSaves()
+	if n, err := e.App.PruneSaveCache(l); err != nil || n != 1 {
+		t.Fatalf("pruned %d %v", n, err)
+	}
+}

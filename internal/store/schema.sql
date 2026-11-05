@@ -205,3 +205,8 @@ CREATE TABLE game_type(
 CREATE INDEX game_type_assembly ON game_type(assembly_id);
 CREATE INDEX game_type_lookup ON game_type(type_name,assembly_id);
 CREATE INDEX game_type_named ON game_type(name,assembly_id);
+-- The full read of each save (10 §1.7 L1): the facts as gzip JSON, plus the summary lists need.
+CREATE TABLE save_cache(
+ path TEXT PRIMARY KEY, size INTEGER NOT NULL, mtime INTEGER NOT NULL, parser INTEGER NOT NULL,
+ ticks INTEGER NOT NULL DEFAULT 0, identity TEXT NOT NULL DEFAULT '', world TEXT NOT NULL DEFAULT '',
+ faction TEXT NOT NULL DEFAULT '', malformed INTEGER NOT NULL DEFAULT 0, facts BLOB NOT NULL);
