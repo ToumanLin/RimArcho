@@ -38,9 +38,19 @@ func runComparisonJSON(t *testing.T, e *testkit.Env, text string, flags ...strin
 	if code != wantCode {
 		t.Fatalf("run outcome: exit %d, want %d: %s", code, wantCode, out)
 	}
+	// report.json is the output plus the launch arguments (a later run's baseline needs
+	// them; readers do not).
 	saved, err := os.ReadFile(filepath.Join(r.RunDir, "report.json"))
-	if err != nil || string(saved) != out {
-		t.Fatalf("saved report differs: %v", err)
+	var stored app.TestRunReport
+	if err == nil {
+		err = json.Unmarshal(saved, &stored)
+	}
+	if err != nil || len(stored.Args) == 0 || strings.Contains(out, `"args"`) {
+		t.Fatalf("saved report: %v; output has args: %v", err, strings.Contains(out, `"args"`))
+	}
+	stored.Args = nil
+	if b, _ := json.MarshalIndent(&stored, "", "  "); string(b)+"\n" != out {
+		t.Fatalf("saved report differs from the output:\n%s\n%s", b, out)
 	}
 	if strings.Contains(out, `"key"`) || strings.Contains(out, `"clusterKeys"`) {
 		t.Fatal("comparison keys leaked into JSON")
@@ -54,7 +64,7 @@ func TestTestRunComparison(t *testing.T) {
 	settings := "XML error: unknown field in type PrefsData\n"
 	info := "[SafePatcher]The xPath: missing not found\nGUI Error: You are pushing more GUIClips than you are popping. Make sure they are balanced.\n"
 	first := runComparisonJSON(t, e, comparisonLog("Dropped", "Dropped", "Retained")+settings+info)
-	if first.Baseline != nil || len(first.Gone) != 0 || first.ClustersTotal != 3 {
+	if first.Baseline != nil || len(first.Gone) != 0 || first.ClustersTotal != 3 || len(first.Info) != 2 || first.Info[0].Count != 1 {
 		t.Fatalf("first run: %+v", first)
 	}
 	for _, c := range first.Clusters {

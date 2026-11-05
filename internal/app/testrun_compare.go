@@ -71,11 +71,13 @@ func (a *App) comparePlayerLog(st *LoadoutState, r *TestRunReport) {
 			pl.Absent++
 		}
 	}
-	for i := range r.Clusters {
-		c := &r.Clusters[i]
-		c.Before = "absent"
-		if before[c.key] {
-			c.Before = "present"
+	for _, list := range [][]TestRunCluster{r.Clusters, r.Info} {
+		for i := range list {
+			c := &list[i]
+			c.Before = "absent"
+			if before[c.key] {
+				c.Before = "present"
+			}
 		}
 	}
 	reached := r.Status == "menu" || r.Status == "map"
@@ -85,7 +87,7 @@ func (a *App) comparePlayerLog(st *LoadoutState, r *TestRunReport) {
 		if logs.Informational(lc.Class) || gametest.SettingsError(lc.First) {
 			continue
 		}
-		c := TestRunCluster{Class: lc.Class, Message: firstLine(lc.First.Message), Count: lc.Count,
+		c := TestRunCluster{Class: lc.Class, Message: shortMessage(lc.First.Message), Count: lc.Count,
 			Mods: testRunMods(st, lc), Confidence: lc.Confidence, Consequences: lc.Consequences}
 		if slices.Contains(lc.Details, ownArtNote) {
 			// Gone because files were added, not because the fault was fixed (MCP eval h2).
@@ -169,8 +171,9 @@ func compareTestRun(r *TestRunReport) {
 		if len(r.Gone) == testRunListLimit {
 			continue
 		}
-		g := TestRunCluster{Class: testRunClass(c), Message: firstLine(c.First.Message), Count: c.Count, Mods: []string{}}
-		if p, ok := attributed[goneKey(g.Class, g.Message, g.Count)]; ok && p.Mods != nil {
+		g := TestRunCluster{Class: testRunClass(c), Message: shortMessage(c.First.Message), Count: c.Count, Mods: []string{}}
+		// Earlier reports list the whole first line.
+		if p, ok := attributed[goneKey(g.Class, firstLine(c.First.Message), g.Count)]; ok && p.Mods != nil {
 			g.Mods, g.Confidence = p.Mods, p.Confidence
 		}
 		if p, ok := r.playerClusters[c.Key]; ok && len(g.Mods) == 0 && (len(p.Mods) > 0 || g.Confidence == "") {
