@@ -10,7 +10,7 @@ import (
 )
 
 // Known noise does not fail a test run, and an error cluster with no mod identified whose kind
-// is in more than 5% of public logs carries the "common, unattributed" note (MCP transcript
+// is in more than 5% of public logs carries the "common kind, no source found" note (MCP transcript
 // review 2026-11-04, P2: all 22 test_run results failed on the solid-colour material alone).
 func TestTestRunKnownNoise(t *testing.T) {
 	t.Parallel()
@@ -34,11 +34,11 @@ func TestTestRunKnownNoise(t *testing.T) {
 		t.Fatalf("def material: exit %d: %s", code, out)
 	}
 	if r.ClustersTotal != 1 || r.Clusters[0].Class != logs.ClassMaterial || len(r.Clusters[0].Mods) != 0 ||
-		!strings.HasPrefix(r.Clusters[0].Note, "common, unattributed: ") || !strings.Contains(r.Clusters[0].Note, "pattern:g:asset.maintex") {
+		!strings.HasPrefix(r.Clusters[0].Note, "common kind, no source found: ") || !strings.Contains(r.Clusters[0].Note, "pattern:g:asset.maintex") {
 		t.Fatalf("def material: %+v", r.Clusters)
 	}
 	out, _ = e.Run("test", "run", "--timeout", "5s", "--settle", "1ms")
-	if !strings.Contains(out, "note: common, unattributed: this kind is in 6.7% of public 1.6 logs") {
+	if !strings.Contains(out, "note: common kind, no source found: this kind is in 6.7% of public 1.6 logs") {
 		t.Fatalf("text report:\n%s", out)
 	}
 }

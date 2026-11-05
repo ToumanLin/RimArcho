@@ -45,7 +45,7 @@ type TestRunCluster struct {
 	Confidence string   `json:"confidence"`
 	Delta      string   `json:"delta,omitempty"`  // against the previous run: new / present
 	Before     string   `json:"before,omitempty"` // in the player's log: present / absent
-	// Note: "common, unattributed: …" for a cluster no mod is named for whose kind is in more
+	// Note: "common kind, no source found: …" for a cluster no mod is named for whose kind is in more
 	// than 5% of public logs (patterns.CommonUnattributed, 03 §6.8).
 	Note string `json:"note,omitempty"`
 	// Consequences: clusters that follow from this one's failed def file, folded into it and

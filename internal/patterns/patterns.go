@@ -226,8 +226,8 @@ func (d *Data) Common(p *Pattern) bool {
 }
 
 // CommonUnattributed is the label of a cluster that no attribution names a mod for and whose
-// generic (non-fallback) pattern is common: "common, unattributed: this kind is in 6.7% of
-// public 1.6 logs". "" otherwise. Fallback patterns only name the class and say nothing.
+// generic (non-fallback) pattern is common: "common kind, no source found: this kind is in
+// 6.7% of public 1.6 logs". "" otherwise. Fallback patterns only name the class and say nothing.
 func (d *Data) CommonUnattributed(class, template string, attributed bool) string {
 	if attributed {
 		return ""
@@ -239,8 +239,10 @@ func (d *Data) CommonUnattributed(class, template string, attributed bool) strin
 	return fmt.Sprintf("%s: this kind is in %.1f%% of public %s logs (%s)", CommonLabel, d.LogShare(g), d.Game, g.Ref())
 }
 
-// CommonLabel marks a common kind of error with no mod identified.
-const CommonLabel = "common, unattributed"
+// CommonLabel marks a common kind of error with no mod identified. It says what is known,
+// not that the cluster is background: in MCP eval round 2 the old "common, unattributed"
+// also marked the root cause of h1 and h5 and was read as "ignore" (P23).
+const CommonLabel = "common kind, no source found"
 
 // Seen says how often the pattern occurs: "22,998 of 40,326 public 1.6 logs".
 func (d *Data) Seen(p *Pattern) string {

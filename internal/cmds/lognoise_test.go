@@ -12,7 +12,7 @@ import (
 // The solid-colour material made in code and the translation error count are known noise:
 // hidden informational clusters, named in the hidden line, with an honest note and no
 // uiIconColor route. A def's texture-less material with no mod identified is labelled
-// "common, unattributed" (MCP transcript review 2026-11-04, P2; 03 §6.1, §6.8).
+// "common kind, no source found" (MCP transcript review 2026-11-04, P2; 03 §6.1, §6.8).
 func TestLogKnownNoiseAndCommon(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
@@ -30,7 +30,7 @@ func TestLogKnownNoiseAndCommon(t *testing.T) {
 	out := e.MustRun("log")
 	for _, want := range []string{
 		"log:E7 material x1  Material 'Tester_Icon'",
-		"(common, unattributed)  [pattern:g:asset.maintex]",
+		"(common kind, no source found)  [pattern:g:asset.maintex]",
 		"hidden: 2 informational clusters (archo log --all); known noise, not mod problems: log:E5 material made in code, log:E6 translation error count",
 	} {
 		if !strings.Contains(out, want) {
@@ -50,7 +50,7 @@ func TestLogKnownNoiseAndCommon(t *testing.T) {
 			t.Errorf("E5: missing %q in\n%s", want, solid)
 		}
 	}
-	for _, bad := range []string{"uiIconColor but no icon path", "search_files uiIconColor", "pattern:g:asset.maintex", "common, unattributed"} {
+	for _, bad := range []string{"uiIconColor but no icon path", "search_files uiIconColor", "pattern:g:asset.maintex", "common kind, no source found"} {
 		if strings.Contains(solid, bad) {
 			t.Errorf("E5: %q in\n%s", bad, solid)
 		}
@@ -62,7 +62,7 @@ func TestLogKnownNoiseAndCommon(t *testing.T) {
 
 	def := e.MustRun("log", "--cluster", "E7")
 	for _, want := range []string{
-		"note: common, unattributed: this kind is in 6.7% of public 1.6 logs (pattern:g:asset.maintex)",
+		"note: common kind, no source found: this kind is in 6.7% of public 1.6 logs (pattern:g:asset.maintex)",
 		// Nearby lines tag known noise.
 		"Translation data for language English has 19 errors. Generate translation report for more info.  (known noise: translation error count)",
 	} {
@@ -71,7 +71,7 @@ func TestLogKnownNoiseAndCommon(t *testing.T) {
 		}
 	}
 	// Attributed clusters are never labelled.
-	if strings.Count(out, "common, unattributed") != 1 {
+	if strings.Count(out, "common kind, no source found") != 1 {
 		t.Errorf("only E7 should be labelled:\n%s", out)
 	}
 }
