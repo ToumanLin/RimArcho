@@ -426,7 +426,12 @@ function startDrag() {
   const c = S.cols[k];
   const it = c.items[c.view[i]];
   if (!it || (!it.id && k !== 1)) return; // a missing Mod moves only within Enabled
-  if (!c.sel.has(key(it)) || S.focus !== k) ui.click(k, i, { shiftKey: false, ctrlKey: false });
+  // Dragging a row outside the selection drags that row alone; a plain click keeps the
+  // selection (16 §3.1), so clear it first or the old selection would move instead.
+  if (!c.sel.has(key(it)) || S.focus !== k) {
+    c.sel.clear();
+    ui.click(k, i, { shiftKey: false, ctrlKey: false });
+  }
   drag = { ui, from: k, items: ui.selectionItems(), to: -1, at: 0, x: 0, y: 0 };
   document.body.classList.add("row-dragging");
 }

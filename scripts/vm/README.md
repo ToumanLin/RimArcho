@@ -90,7 +90,8 @@ A script that does not end with `quit` leaves the game running when its last ste
 | A page's text, as the player reads it | `node scripts/vm/cdp.mjs <ip>:9223 text "#main"` |
 | The page, as the player sees it | `node scripts/vm/cdp.mjs <ip>:9223 shot page.png` |
 | The whole guest screen | `pwsh scripts/vm/vm.ps1 shot screen.png` |
-| Click a visible control with real input | `node scripts/vm/cdp.mjs <ip>:9223 click "#nav [data-id=home]"` |
+| Click a visible control (page event) | `node scripts/vm/cdp.mjs <ip>:9223 click "#nav [data-id=home]"` |
+| Click it with the real mouse, through Windows | `node scripts/vm/input.mjs <ip> realclick "#nav [data-id=home]"` |
 | Observe page state | `node scripts/vm/cdp.mjs <ip>:9223 eval "document.title"` |
 | A key press | `node scripts/vm/cdp.mjs <ip>:9223 key "Shift+Digit2"` |
 | A CLI command in the guest | `pwsh scripts/vm/vm.ps1 cli "env detect"` |
@@ -99,7 +100,37 @@ A script that does not end with `quit` leaves the game running when its last ste
 
 `<ip>` is the guest IP from `status`; it comes from DHCP, so don't hard-code it.
 
-DevTools is on only because `launch` sets `RIMARCHO_DEVTOOLS_PORT`; players never set it, so nothing listens. CDP key presses and clicks go to the page, not to Windows. Native dialogs (the folder picker) and anything else outside the WebView need the VMware window and computer use. The game is not one of these: use `round.ps1`.
+DevTools is on only because `launch` sets `RIMARCHO_DEVTOOLS_PORT`; players never set it, so nothing listens. CDP key presses and clicks go to the page, not to Windows. For anything that needs Windows input, use the input agent below. The game is not one of these: use `round.ps1`.
+
+## Real mouse and keyboard
+
+`input-agent.ps1` runs in the signed-in desktop session and sends real input with `SendInput`, so it reaches what CDP cannot: the native window frame (drag, edge resize, double-click, Aero Snap, `win+↑`, `alt+f4`), mouse-event drag and drop as a player does it, the clipboard, Windows Terminal (the TUI), native dialogs. `input.mjs` drives it from the host.
+
+```
+pwsh scripts/vm/vm.ps1 forward        # once per VM (again after a revert): adds port 9231 for the agent
+pwsh scripts/vm/vm.ps1 input start    # (re)start the agent; prints "input agent ready"
+pwsh scripts/vm/vm.ps1 input status   # running? its log
+pwsh scripts/vm/vm.ps1 input stop
+```
+
+| What | Command |
+| --- | --- |
+| Screen size, DPI, cursor, locked or not | `node scripts/vm/input.mjs <ip> screen` |
+| A process's windows: rect, client area, DPI, maximized, foreground | `node scripts/vm/input.mjs <ip> windows RimArcho` |
+| Bring a window to the front | `node scripts/vm/input.mjs <ip> focus WindowsTerminal` |
+| Click / drag at screen pixels | `node scripts/vm/input.mjs <ip> click 640 20` · `drag 300 10 900 10` |
+| Click / drag a page element with the real mouse | `node scripts/vm/input.mjs <ip> realclick "<selector>" [left\|right] [ctrl]` · `realdrag "<from>" "<to>" [holdMs]` |
+| Keys, to whatever window has focus | `node scripts/vm/input.mjs <ip> key ctrl+shift+k [repeat]` (also `win+up`, `alt+f4`, `KeyK`, `Digit2`) |
+| Type text (Unicode, Chinese too; bypasses the IME) | `node scripts/vm/input.mjs <ip> type "plan new 测试 列表"` |
+| Read / set the clipboard | `node scripts/vm/input.mjs <ip> clip` · `setclip <text>` |
+| The text a window shows through UI Automation (Windows Terminal: the TUI screen) | `node scripts/vm/input.mjs <ip> text WindowsTerminal` |
+
+In a test script, `connectReal(ip)` from `input.mjs` gives both connections and a calibration: `real.click(sel, { mods: ['ctrl'] })`, `real.drag(from, to, { holdMs, during })`, `real.input.key('esc')`, `real.cdp.evaluate(...)`. Calibration moves the real cursor to two points in RimArcho's window and reads where the page saw them, so page zoom, display scaling and the frameless frame need no special handling; call `real.recalibrate()` after moving or resizing the window. Read results with `cdp.mjs text` and `input.mjs text`, not screenshots.
+
+- The agent accepts one host connection at a time, with the token from `input start` (`D:\RimArcho-test\transfer\rimarcho\<VM>\input-token.txt`, or `RIMARCHO_VM_INPUT_TOKEN`). When the connection drops, it releases every key and button still held.
+- Input fails with "the guest screen is locked" while Windows shows the lock screen or a UAC prompt; sign in through the VMware window. A guest restart stops the agent: `input start` again.
+- `type` sends characters, not key strokes, so it does not test the IME. Typing Chinese through the IME still needs a person.
+- Display scaling for a 150% round: change it in the guest's Settings › Display, sign out and in, `input start`, recalibrate.
 
 ## Limits
 
