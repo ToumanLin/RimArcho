@@ -23,7 +23,7 @@ var AllOnlyTools = map[string]bool{
 	"manage_subscriptions": true, "manage_packs": true, "manage_library": true, "exchange_list": true,
 	"manage_textures": true, "estimate_memory": true, "maintenance": true, "resolve_identity": true,
 	"manage_hidden": true, "check_links": true, "repair_links": true, "mute_version_warnings": true,
-	"set_player_data": true, "set_mod_settings": true, "preview_uninstall": true,
+	"set_player_data": true, "set_mod_settings": true, "preview_uninstall": true, "manage_saves": true,
 }
 
 // guideTopics are the workflow topics, in the order the topic list shows them.

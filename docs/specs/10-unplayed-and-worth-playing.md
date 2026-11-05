@@ -1,6 +1,6 @@
 # 10 · Unplayed and worth playing
 
-> Status: question two, "what haven't I played?", is a design specification for 1.1; §5 is for 1.2; §6 is a long-term direction. Only reading the Mod list at the start of a save (§1.3) is implemented; everything else is unimplemented. The Saves page, its read tiers and its tools were decided on 2026-11-04 (§1.6, §1.7, §4; 06 §2.11).
+> Status: question two, "what haven't I played?", is a design specification for 1.1; §5 is for 1.2; §6 is a long-term direction. Implemented: reading the Mod list at the start of a save (§1.3), the save head (§1.7 L0), grouping and matching (§4.1, §4.2), the head-only rows of can it load (§4.3), the actions (§4.4) and the save commands and tools (§1.6). Everything else is unimplemented. The Saves page, its read tiers and its tools were decided on 2026-11-04 (§1.6, §1.7, §4; 06 §2.11).
 > Basis: 00 (§2, §4), 00a, 03, 04, 06, 08, 09.
 
 Question two asks: **which installed Mods and content have gone unused across multiple playthroughs?** Read all saves without modifying them and map the Defs they reference back to their providing Mods. This analysis is deterministic and needs no AI; Archo participates only in interpreting results and making suggestions (09 §4).
@@ -57,7 +57,7 @@ Saves are XML with a `<savegame>` root, starting with `<meta>`, followed by `<ga
 
 ### 1.6 Tools for Archo and external agents
 
-Save reading has read-only tools in the tool layer (05 §1.2, §4.2, §5.2; not implemented): `saves list` (`list_saves`), `saves show` (`get_save`) and `unplayed` (`list_unplayed`). Save-management actions are `manage_saves` (§4.4). A save reference is `sv:<hex>`, a short hash of the save's real path (05 §2); a file name or `<colony>/<save>` also resolves. Every fix in `saves show` names the command or tool call that performs it, so agents act through the existing tools (§4.3).
+Save reading has read-only tools in the tool layer (05 §1.2, §4.2, §5.2): `saves list` (`list_saves`), `saves show` (`get_save`) and `unplayed` (`list_unplayed`, not implemented). Save-management actions are `manage_saves` (§4.4). A save reference is `sv:<hex>`, a short hash of the save's real path (05 §2); a file name or `<colony>/<save>` also resolves. Every fix in `saves show` names the command or tool call that performs it, so agents act through the existing tools (§4.3).
 
 ### 1.7 Read tiers, cache and background reading
 
@@ -72,7 +72,7 @@ A save is read at three costs; each tier is computed and cached separately. L0 i
 - L1 depends only on the file, so it is cached in the database (`save_cache`, 07 §3) by path, size, modification time and parser version, as gzip JSON like `log_cache`; it is not reread while all four are unchanged. L2 depends on the current list and index, so it is not cached and is recomputed when either changes. L0 is read on demand.
 - L1 runs in a child process, `archo saves index` (05 §4.2), as background task kind `saves` (06 §2.16, §8.4): progress lines reach the status line and the task record, and each finished file is written to the cache at once, so a stopped run keeps what it read. The selected save is read first, then newest first, with 2–4 readers. Reading streams with constant memory; the child process keeps the GUI within its memory budget (06 §10).
 - A file modified in the last 5 seconds, or whose size changes between two reads, is **being written**: it gets no verdict and is read again later. The page rereads L0 when it opens and when a running game exits (08 §4).
-- CLI and MCP do not wait for the background run: `saves show` reads L1 for its one save inline; `saves list` reports saves without L1 as `meta only` and names `saves index`.
+- CLI and MCP do not wait for the background run: `saves show` reads L1 for its one save inline; `saves list` reports saves without L1 as `meta only` and names `saves index`. Until L1 exists, every save is `meta only`, `saves show` says play facts are not read, and neither names `saves index`.
 
 ## 2. Content catalog
 
@@ -199,7 +199,7 @@ Approximate matching for rule 3 (an enabled set differing by one or two entries)
 
 - Compare packageIds case-insensitively. For Workshop entries written as `<package ID>_steam`, strip the suffix before comparing (04 §4.1).
 - The verdict takes the highest level present: **loads with the list**, **loads, but content will be lost** (warnings) or **will not load cleanly** (errors). The quick-fix bar has at most one primary action: **Fix and launch** applies every Mod fix as one reversible plan edit, starts any subscriptions, previews, then launches (08 §2); for a cut-off save it is Recycle; for a save matching no list it is Make a list from this save.
-- `saves show` prints each item with its consequence and the command that performs the fix.
+- `saves show` prints each item with its consequence and the command that performs the fix (`fix: <label> (archo <command>)`), then the quick fix. Until §4.6, the consequence of a missing Mod is generic: what it added to the save is lost on load.
 
 **Mod list**: the save's Mods in load order, named from `<modNames>`; not-installed entries and reordered entries marked; the list's Mods missing from the save named after it.
 
@@ -207,7 +207,7 @@ Approximate matching for rule 3 (an enabled set differing by one or two entries)
 
 ### 4.4 Actions
 
-The actions are implemented in `internal/app/saveactions.go` (`FixSave`, `RenameSave`, `CopySave`, `BackupSaves`, `TrashSaves`); their commands and the page are not.
+The actions are implemented in `internal/app/saveactions.go` (`FixSave`, `RenameSave`, `CopySave`, `BackupSaves`, `TrashSaves`), with their commands and MCP tool (`internal/cmds/saves.go`, `manage_saves`; 05 §4.2, §5.2).
 
 | Action | What it does | Confirmation |
 | --- | --- | --- |
@@ -223,6 +223,7 @@ The actions are implemented in `internal/app/saveactions.go` (`FixSave`, `Rename
 - Both actions requiring confirmation follow 06 §6: list affected files and sizes first; execute only after the player clicks "confirm". Archo can request but cannot confirm for the player (09 §2.3). MCP previews with `dry_run=true` and executes with `confirm=true` (05 §5.2).
 - While the game runs (08 §4), refuse rename and recycle bin moves and explain "the game is running". Backups and copies work normally (read-only source access).
 - A colony with a cut-off save gets a cleanup hint offering to recycle it.
+- `saves fix --launch` launches only when the save can load and none of its Mods is still a missing entry of the list: a Workshop Mod the fix just subscribed is downloaded by Steam in the background, so the player scans and runs the fix again.
 
 ### 4.5 Timeline and events
 
@@ -270,11 +271,11 @@ Two pages under "worth playing" in the sidebar: play goals and shared packs (06 
 | SV5 | A Mod "appears" only in saves without it enabled | Does not count as having appeared | Unimplemented |
 | SV6 | 30 saves from one colony | Count as 1 colony | Unimplemented |
 | SV7 | Matching a save to a plan | Follow §4.2 order; unmatched saves enter "saves without a matching list" | Unimplemented |
-| SV8 | Back up a save without player confirmation | No files written; after confirmation, appears in `<data directory>/backups/saves/<time>/`, original unchanged | Unimplemented |
-| SV9 | Move to the recycle bin | Confirm first; enter system recycle bin; refuse while the game runs | Unimplemented |
+| SV8 | Back up a save without player confirmation | No files written; after confirmation, appears in `<data directory>/backups/saves/<time>/`, original unchanged | Pass (synthetic: `TestSaveFileActions`, `TestManageSavesActions`) |
+| SV9 | Move to the recycle bin | Confirm first; enter system recycle bin; refuse while the game runs | Partial: confirmation passes (synthetic: `TestSaveFileActions`, `TestManageSavesActions`, golden `saves`); the real recycle bin and a running game are untested |
 | SV10 | "Re-enable missing Mods in the list" | One reversible edit; only list uninstalled entries | Unimplemented |
 | SV11 | Open Saves with no L1 cache | Left card, middle header and Mod list appear from L0 at once; the background task reads the selected save first | Unimplemented |
 | SV12 | A save written during a crash (no `</savegame>`) | Cut off, error, Recycle offered; a file still being written gets no verdict | Unimplemented |
 | SV13 | RimSaves name `Ashfall#§#Landing.rws` | Grouped under colony `Ashfall`, shown as `Landing` | Unimplemented |
 | SV14 | A save whose Mod with pawns is not installed | Error naming what is lost; Fix subscribes and enables it as one reversible edit | Unimplemented |
-| SV15 | `get_save` on MCP | Same text as `saves show`; each fix names its command or tool call | Unimplemented |
+| SV15 | `get_save` on MCP | Same text as `saves show`; each fix names its command or tool call | Pass (synthetic: `TestSaveToolsCLIParity`, golden `saves`) |

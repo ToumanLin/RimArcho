@@ -590,7 +590,7 @@ func toolList() []tool {
 
 // Tools returns the whole tool table, every group.
 func Tools() []tool {
-	return append(append(append(append(append(toolList(), manageTools()...), planTools()...), libraryTools()...), subscriptionTools()...), textureTools()...)
+	return append(append(append(append(append(append(toolList(), manageTools()...), planTools()...), libraryTools()...), saveTools()...), subscriptionTools()...), textureTools()...)
 }
 
 // ToolDoc describes one tool as a client sees it (name, description, parameters): for

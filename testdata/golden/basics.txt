@@ -124,6 +124,13 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     plan sync <name> [<collection>]           catch a plan up with a collection it follows (one undoable edit; uses the network)
     problems mute-version <mod>…              ignore version warnings for these packages in every list and game; survives updates
     problems unmute-version <mod>…            restore version warnings for these packages
+    saves list                                colonies and their saves, newest first, each with its list and whether it loads with it
+    saves show <save>                         one save: where it belongs, can it load (each issue with its fix), how its Mods differ from the list
+    saves fix <save>                          the save's Mod fixes as one undoable edit of its list, then Workshop subscriptions; --launch starts it
+    saves rename <save> <name>                rename a save in its folder (keeps a RimSaves folder; refused while the game runs or when the name exists)
+    saves copy <save>                         copy a save beside itself as <name> (copy), never overwriting
+    saves backup <save…>                      copy saves into RimArcho's backups folder (confirm with --yes)
+    saves trash <save…>                       move saves to the recycle bin (confirm with --yes; refused while the game runs)
     db status                                 the database: path, size, backups
     db backup                                 write a consistent copy of the database to <data>/backups
     db vacuum                                 clean old file lists and compact the database
