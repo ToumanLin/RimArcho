@@ -602,6 +602,17 @@ func (lc *LogCluster) next(cmds ...string) {
 	}
 }
 
+// typeOrDeclaring is types, falling back to the declaring type of a Type.Method name.
+func (cx *attrCtx) typeOrDeclaring(t string) []string {
+	ids := cx.types(t)
+	if len(ids) == 0 {
+		if i := strings.LastIndexByte(t, '.'); i > 0 {
+			ids = cx.types(t[:i])
+		}
+	}
+	return ids
+}
+
 func (cx *attrCtx) types(t string) []string {
 	if r, ok := cx.typeMemo[t]; ok {
 		return r
@@ -701,7 +712,9 @@ var (
 	blockRe       = regexp.MustCompile(`^\[(.+?)\] Verse\.PatchOperation`)
 	modFolderRe   = regexp.MustCompile(`(?i)[\\/](?:294100|Mods)[\\/]([^\\/]+)[\\/](.+)$`)
 	wanterRe      = regexp.MustCompile(`found to give to ([\w.]+Def) ([^\s(]+)`)
-	typeTokRe     = regexp.MustCompile(`\b([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+)\b`)
+	// "Tried to add pawn X to lord with lord jobA but this pawn is already a member of lord with lord jobB."
+	lordAddRe = regexp.MustCompile(`^Tried to add pawn .* to lord with lord job ?\S+ but this pawn is already a member of lord`)
+	typeTokRe = regexp.MustCompile(`\b([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+)\b`)
 	// DefDatabase.GetNamed: "Failed to find Verse.ThingDef named X. There are N defs of this type loaded."
 	getNamedRe = regexp.MustCompile(`^Failed to find ([\w.]+Def) named ([^\s.]+(?:\.[^\s.]+)*)\. There are`)
 	texPathRe  = regexp.MustCompile(`^Could not load Texture2D at '([^']+)'|^Failed to find any textures at (\S+) while constructing`)
@@ -969,16 +982,21 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 		if logs.GameNamespace(t) || !strings.Contains(t, ".") {
 			continue
 		}
-		role := RoleMentioned
-		if strings.Contains(e.Message, "instantiating a mod of type "+t) || strings.Contains(e.Message, "static constructor of "+t) {
-			role = RoleSource
-		}
-		ids := cx.types(t)
-		if len(ids) == 0 {
-			// Type.Method: try the declaring type.
-			if i := strings.LastIndexByte(t, '.'); i > 0 {
-				ids = cx.types(t[:i])
+		ids := cx.typeOrDeclaring(t)
+		if u := logs.Unglue(t); len(ids) == 0 && u != t {
+			// "lord jobNs.LordJob_X": the game glued a word to the name.
+			if logs.GameNamespace(u) {
+				continue
 			}
+			t, ids = u, cx.typeOrDeclaring(u)
+		}
+		role := RoleMentioned
+		if strings.Contains(e.Message, "instantiating a mod of type "+t) || strings.Contains(e.Message, "static constructor of "+t) ||
+			// Lord.AddPawn: the code adding the pawn is the lord's own (its LordJob or LordToil).
+			// The other lord, the one the pawn is already in, did nothing wrong (Progression:
+			// Education's class lord in 9 corpus logs, against five different other lords).
+			lordAddRe.MatchString(e.Message) && (strings.Contains(e.Message, "to lord with lord job"+t+" ") || strings.Contains(e.Message, "to lord with lord job "+t+" ")) {
+			role = RoleSource
 		}
 		for _, id := range ids {
 			lc.add(id, role, "log message names type "+t)
@@ -1143,7 +1161,7 @@ func lastToken(desc string) string {
 var logSeverity = map[string]string{
 	logs.ClassException: finding.Error, logs.ClassHarmony: finding.Error, logs.ClassXMLLoad: finding.Error,
 	logs.ClassPatchFailed: finding.Warning, logs.ClassXrefMissing: finding.Warning, logs.ClassMaterial: finding.Warning,
-	logs.ClassTexture: finding.Warning, logs.ClassSave: finding.Warning,
+	logs.ClassTexture: finding.Warning, logs.ClassSave: finding.Warning, logs.ClassGameError: finding.Warning,
 	logs.ClassModReport: finding.Info, logs.ClassOther: finding.Info, logs.ClassNoise: finding.Info,
 }
 

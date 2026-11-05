@@ -26,8 +26,11 @@ const (
 	ClassMaterial    = "material"
 	ClassTexture     = "texture-missing"
 	ClassSave        = "save-load"
-	ClassModReport   = "mod-report"
-	ClassOther       = "other"
+	// ClassGameError: a 1.6 Log.Error line without a stack in the game's own wording ("Tried to
+	// …") that names a type outside the game (GameError).
+	ClassGameError = "game-error"
+	ClassModReport = "mod-report"
+	ClassOther     = "other"
 	// ClassNoise: a known engine line that reads like a problem but that no def, file or mod
 	// setting causes (KnownNoise).
 	ClassNoise = "noise"
@@ -35,7 +38,7 @@ const (
 
 // Classes lists the classes from most to least severe, for display.
 var Classes = []string{ClassException, ClassHarmony, ClassXMLLoad, ClassPatchFailed, ClassXrefMissing,
-	ClassMaterial, ClassTexture, ClassSave, ClassModReport, ClassOther, ClassNoise}
+	ClassMaterial, ClassTexture, ClassSave, ClassGameError, ClassModReport, ClassOther, ClassNoise}
 
 // Informational reports classes that are context rather than problems: a mod reporting on itself
 // ("[Mod] … not found, skipping"), unclassified lines and known noise.
@@ -502,6 +505,9 @@ func Classify(e *Entry) string {
 	if hasExceptionStack(e) || strings.Contains(m, "Exception") {
 		return ClassException
 	}
+	if GameError(e) {
+		return ClassGameError
+	}
 	if modReportRe.MatchString(m) && !levelWordRe.MatchString(m) {
 		return ClassModReport
 	}
@@ -549,6 +555,44 @@ func (e *Entry) Top() *Frame {
 
 var xmlRe = regexp.MustCompile(`XML error|XmlException|Exception parsing|Could not find parent node|parent node named|Duplicate def|Could not find a type named|Exception loading def from file|Exception reading .*\.xml|XML parse|failed to load|Could not find class|Exception loading .* from|is not a valid .*Def|DefOf field .* not found|Config error in`)
 
+// GameError reports a message without a stack in the game's own error wording ("Tried to add pawn
+// X to lord with lord jobNs.LordJob_Y but …") that names a type outside the game's namespaces.
+// 1.6 writes Log.Error without a stack, and these lines hold none of the problem words of
+// interesting; the corpus has 124,268 such lines naming mod types (2026-11-05).
+func GameError(e *Entry) bool {
+	if len(e.Frames) > 0 || !strings.HasPrefix(e.Message, "Tried to ") {
+		return false
+	}
+	for _, t := range typeTokRe.FindAllString(e.Message, -1) {
+		if strings.Contains(t, ".") && !GameNamespace(t) && !GameNamespace(Unglue(t)) {
+			return true
+		}
+	}
+	return false
+}
+
+// typeTokRe matches a dotted name in a message: Ns.Type, Ns.Type.Method.
+var typeTokRe = regexp.MustCompile(`\b[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+\b`)
+
+// Unglue drops a lower-case word that the game glued to a type name: "lord jobNs.LordJob_X"
+// prints "jobNs.LordJob_X". It returns t when there is nothing to drop. Callers try t first:
+// some namespaces start in lower case ("aRandomKiwi.RimThemes").
+func Unglue(t string) string {
+	dot := strings.IndexByte(t, '.')
+	if dot < 0 {
+		dot = len(t)
+	}
+	for i := 1; i < dot; i++ {
+		if t[i] >= 'A' && t[i] <= 'Z' {
+			if t[i-1] >= 'a' && t[i-1] <= 'z' && t[0] >= 'a' && t[0] <= 'z' {
+				return t[i:]
+			}
+			return t
+		}
+	}
+	return t
+}
+
 func hasFrame(e *Entry, method string) bool {
 	for _, fr := range e.Frames {
 		if fr.Method == method {
@@ -578,6 +622,9 @@ func interesting(e *Entry) (bool, string) {
 	if hasExceptionStack(e) || !Informational(c) || c == ClassNoise {
 		return true, c
 	}
+	if strings.HasPrefix(e.Message, "Tried to ") {
+		return true, c
+	}
 	l := strings.ToLower(e.Message)
 	for _, w := range []string{"error", "exception", "failed", "could not", "couldn't", "invalid", "missing", "not found"} {
 		if strings.Contains(l, w) {
@@ -588,9 +635,10 @@ func interesting(e *Entry) (bool, string) {
 }
 
 var (
-	normHex  = regexp.MustCompile(`0x[0-9A-Fa-f]+|\b[0-9a-f]{16,}\b`)
-	normNum  = regexp.MustCompile(`\d+`)
-	normPath = regexp.MustCompile(`[A-Za-z]:[\\/][^\s"'<>]*`)
+	normHex      = regexp.MustCompile(`0x[0-9A-Fa-f]+|\b[0-9a-f]{16,}\b`)
+	normNum      = regexp.MustCompile(`\d+`)
+	normLordPawn = regexp.MustCompile(`^(Tried to add pawn ).+?( to lord with lord job)`)
+	normPath     = regexp.MustCompile(`[A-Za-z]:[\\/][^\s"'<>]*`)
 )
 
 // Normalize turns a message into its cluster key part: numbers, addresses, IDs and paths
@@ -600,6 +648,8 @@ func Normalize(m string) string {
 		m = m[:300]
 	}
 	m = normPath.ReplaceAllString(m, "<path>")
+	// Lord.AddPawn repeats every tick for each pawn: one cluster, not one per pawn name.
+	m = normLordPawn.ReplaceAllString(m, "${1}<pawn>${2}")
 	m = normHex.ReplaceAllString(m, "<hex>")
 	m = normNum.ReplaceAllString(m, "#")
 	return m

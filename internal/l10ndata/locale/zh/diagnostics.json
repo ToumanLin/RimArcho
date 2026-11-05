@@ -63,6 +63,7 @@
   "Def and Patch XML estimates cover objects retained after loading; peak RAM during loading is higher.": "Def 和 Patch 的 XML 按读入后留下的对象估算；载入时的峰值更高",
   "Dubs Performance Analyzer reports its own status": "Dubs Performance Analyzer 在报告自己的状态",
   "Excludes saves, maps and growth during play.": "不算存档、地图和游戏运行中的增长",
+  "game errors naming mod code": "提到 Mod 代码的游戏报错",
   "GPU: %s (by the system's preference)": "显卡：%s（按系统优先级推测）",
   "HugsLib's own log upload failed (not a mod problem)": "HugsLib 自己上传日志失败（不是 Mod 的问题）",
   "JPG/PSD dimensions and audio without readable WAV headers are approximated; DDS disk size excludes its header.": "JPG / PSD 的尺寸、没有可读 WAV 头的音频按文件大小估算；DDS 的磁盘大小不含文件头",

@@ -122,6 +122,12 @@ func TestClassifyCorpusLines(t *testing.T) {
 		// Known noise: an informational cluster with a note (KnownNoise), not dropped.
 		{"Translation data for language English has 25 errors. Generate translation report for more info.", ClassNoise, true},
 		{"[XML Extensions] 17555 total patch operations run in 199805ms, 4 failed", ClassModReport, false},
+		// 1.6 Log.Error without a stack in the game's wording: kept; game-error when it names mod code,
+		// also when the game glued a word to the name ("lord jobNs.Type").
+		{"Tried to add pawn Ann to lord with lord jobProgressionEducation.LordJob_AttendClass but this pawn is already a member of lord with lord jobRecreationalSexWithEuterpe.LordJob_Birthday. Pawns can't be members of more than one lord at the same time.", ClassGameError, true},
+		{"Tried to register in RegisterforPostLoadInit when already registered: AdaptiveStorage.StorageGroup", ClassGameError, true},
+		{"Tried to add pawn Militor5 to lord with lord job but this pawn is already a member of lord with lord jobRimWorld.LordJob_MechanoidsDefend. Pawns can't be members of more than one lord at the same time.", ClassOther, true},
+		{"Tried to register the same load ID twice: Thing_Steel123, pathRelToParent=/things/li", ClassOther, true},
 	} {
 		e := &Entry{Message: c.msg}
 		if got := Classify(e); got != c.class {
@@ -274,5 +280,29 @@ func TestParseAbsFilePath(t *testing.T) {
 	}
 	if k0, _, _ := ClusterKey(f.Entries[0]); k0 == func() string { k, _, _ := ClusterKey(f.Entries[2]); return k }() {
 		t.Fatalf("two files share a cluster key %q", k0)
+	}
+}
+
+func TestUnglue(t *testing.T) {
+	for in, want := range map[string]string{
+		"jobProgressionEducation.LordJob_AttendClass": "ProgressionEducation.LordJob_AttendClass",
+		"jobRimWorld.LordJob_Joinable_Party":          "RimWorld.LordJob_Joinable_Party",
+		"RimWorld.LordJob_Joinable_Party":             "RimWorld.LordJob_Joinable_Party",
+		"aRandomKiwi.RimThemes":                       "RandomKiwi.RimThemes", // callers try the name first
+		"lowercase.only":                              "lowercase.only",
+		"ModA.Boot":                                   "ModA.Boot",
+	} {
+		if got := Unglue(in); got != want {
+			t.Errorf("Unglue(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// Lord.AddPawn errors of different pawns are one cluster.
+func TestNormalizeLordPawn(t *testing.T) {
+	a := Normalize("Tried to add pawn Big Red to lord with lord jobModA.LordJob_X but this pawn is already a member of lord with lord jobModB.LordJob_Y.")
+	b := Normalize("Tried to add pawn Ann to lord with lord jobModA.LordJob_X but this pawn is already a member of lord with lord jobModB.LordJob_Y.")
+	if a != b || !strings.Contains(a, "<pawn>") {
+		t.Errorf("keys differ or keep the name:\n%s\n%s", a, b)
 	}
 }

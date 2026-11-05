@@ -197,7 +197,7 @@ Uninstalled candidates come from the subject's dependency declarations (includin
 | `code` | Severity |
 | --- | --- |
 | `log.exception`, `log.harmony-stack`, `log.xml-load` | error |
-| `log.patch-failed`, `log.xref-missing`, `log.material`, `log.texture-missing`, `log.save-load` | warning |
+| `log.patch-failed`, `log.xref-missing`, `log.material`, `log.texture-missing`, `log.save-load`, `log.game-error` | warning |
 | `log.mod-report`, `log.other`, `log.noise` | info, excluded from finding list |
 
 #### 4.3.1 Severity Basis (Log Corpus, G4/G8)
@@ -349,7 +349,7 @@ The `files search` and `search_files` commands search only what the game actuall
 - Combine an XML Extensions block (`[Mod - Start of stack trace]` … `[End of stack trace]` … `Source file: <path>`) into one entry: `[Mod] <first-failure-line>`. Treat the rest as continuations and the path as `file:`.
 - The entry's location frame (`Top`) is the first exception frame, or the first caller frame (the code writing the log) if there is no exception.
 
-**Exclude engine or framework status lines from error clusters** when they have no exception stack. These include shader fallback messages (`Shader '…': fallback shader '…' not found`), XML Extensions statistics (`[XML Extensions] N total patch operations run`), `Curl error N: Callback aborted`, and `Mod … is missing supported versions list in About.xml`. These rules come from the corpus. Other `Unity` entries count as problems only if they have an exception stack, a noninformational category, or one of these terms: error, exception, failed, could not, couldn't, invalid, missing, or not found.
+**Exclude engine or framework status lines from error clusters** when they have no exception stack. These include shader fallback messages (`Shader '…': fallback shader '…' not found`), XML Extensions statistics (`[XML Extensions] N total patch operations run`), `Curl error N: Callback aborted`, and `Mod … is missing supported versions list in About.xml`. These rules come from the corpus. Other `Unity` entries count as problems only if they have an exception stack, a noninformational category, a message that starts with `Tried to ` (the game's wording for its own errors, which 1.6 writes without a stack; 977,467 such lines in the corpus held none of the terms, 2026-11-05), or one of these terms: error, exception, failed, could not, couldn't, invalid, missing, or not found.
 
 **Categories** are tested in this order:
 
@@ -364,6 +364,7 @@ The `files search` and `search_files` commands search only what the game actuall
 | `save-load` | An unresolved save reference: `Could not resolve reference to object with loadID`, `… is not deep-saved`, `Error in PostExposeData`, `Could not find think node with key`, `Exception loading … from save`, etc. |
 | `harmony-stack` | The stack contains Harmony patch lines. |
 | `exception` | There is an `Exception` stack, or the message contains `Exception`. |
+| `game-error` | No stack, the message starts with `Tried to `, and it names a dotted type outside the game namespaces (§6.2), also when the game glued a word to the name: `Tried to add pawn X to lord with lord jobNs.LordJob_Y but this pawn is already a member of lord with lord jobRimWorld.LordJob_Z`. The corpus has 124,268 such lines naming Mod types (2026-11-05): duplicate `RegisterforPostLoadInit` registrations, Mod lords adding pawns that are in another lord, uninitialised `DefOf`s. `Tried to …` lines that name only game types stay `other`. The pawn's name in the lord message is left out of the cluster key, so the message for every pawn is one cluster. |
 | `mod-report` | The Mod reports on itself with a prefix such as `[name]`, `<color=…>[name]`, `name :: `, or `MOD: `, excluding level words such as `ERROR:`. |
 | `other` | Everything else |
 
@@ -404,7 +405,7 @@ Use the following evidence, strongest first:
 | Missing types | For `Could not find type named NS.T` or `expected class 'NS.T'`, a disabled provider is dependency; an enabled provider is mentioned (a possible version mismatch). |
 | Harmony patch lines | A line such as `- PREFIX <owner>: …` is patcher evidence. Match the owner by patch type, Harmony ID, then `packageId`. If no match exists, state "no installed mod matches". |
 | Stack frame types | Match frames in nongame namespaces against `TypeDef`. The topmost Mod frame is source, and lower frames are mentioned. Game namespaces are `Verse.`, `RimWorld.`, `System.`, `UnityEngine.`, `HarmonyLib.`, `Mono.`, `Unity.`, `MonoMod.`, `Ionic.`, `LudeonTK.`, `Steamworks.`, `Waylith.`, `Brutal.`, and `RimWorldWaylith.`. |
-| Message type names | A type name is mentioned evidence. In "instantiating a mod of type T" or "static constructor of T", it identifies the source. |
+| Message type names | A type name is mentioned evidence. In "instantiating a mod of type T" or "static constructor of T", it identifies the source. So does the lord being added to in `Tried to add pawn X to lord with lord job T but this pawn is already a member of lord with lord job U`: code of T's lord adds the pawn without checking the lord it is already in; U is mentioned (Progression: Education's class lord in all 9 corpus logs of this error, against five different other lords). A name the game glued to the word before it (`jobNs.Type`) is matched without that word when the whole token matches no type. |
 
 ### 6.3 Roles and Output
 

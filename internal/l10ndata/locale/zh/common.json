@@ -118,6 +118,7 @@
   "Defs": "Def",
   "Disabled": "未启用",
   "Enabled": "已启用",
+  "game-error": "游戏报错",
   "GPU acceleration": "GPU 加速",
   "LoadFolders.xml changed": "LoadFolders.xml 改了",
   "Mods/ is on a FAT or exFAT drive, which cannot hold the link it needs": "Mods/ 在 FAT 或 exFAT 盘上，放不了它需要的链接",
