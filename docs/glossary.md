@@ -230,6 +230,15 @@ The domain/UI distinction follows [02 §1](specs/02-environments-identity-and-sc
 | 整合包 | pack |  | A fixed artifact compiled from a plan, with its own saves. |
 | 直接启动 | direct launch |  | Start the game executable directly. |
 
+## Saves
+
+| 中文 | 英文（文档里用的） | 英文界面上的叫法（和文档不一样时才填） | 说明（一句话，可空） |
+| --- | --- | --- | --- |
+| 翠象 | Aprimay |  | The first quadrum (days 1–15 of the year), as the game's Chinese translation names it. |
+| 赫象 | Jugust |  | The second quadrum (days 16–30). |
+| 素象 | Decembary |  | The fourth quadrum (days 46–60). |
+| 荼象 | Septober |  | The third quadrum (days 31–45). |
+
 ## Testing and VM
 
 | 中文 | 英文（文档里用的） | 英文界面上的叫法（和文档不一样时才填） | 说明（一句话，可空） |

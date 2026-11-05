@@ -298,10 +298,10 @@ func difficultyText(def string, permadeath bool) string {
 	return t
 }
 
-// quadrumName is the game's name of a quadrum (0 Aprimay … 3 Decembary), kept as the
-// game writes it in English.
+// quadrumName is the game's name of a quadrum (0 Aprimay … 3 Decembary), in the
+// interface language as the game's own translation names it (docs/glossary.md, Saves).
 func quadrumName(q int) string {
-	return [...]string{"Aprimay", "Jugust", "Septober", "Decembary"}[q&3]
+	return T([...]string{"Aprimay", "Jugust", "Septober", "Decembary"}[q&3])
 }
 
 // letterText is a letter's label without the game's rich-text tags.

@@ -127,3 +127,17 @@ func TestSaveDay(t *testing.T) {
 		t.Fatalf("rows %+v", r)
 	}
 }
+
+// The date names the quadrum as the game's translation does (not parallel: SetLang is global).
+func TestSavePlayDateZh(t *testing.T) {
+	defer view.SetLang("en")
+	c := colonyOf(25)
+	f := &savefile.Facts{TicksGame: 25 * savefile.TicksPerDay}
+	if p := view.SavePlayOf(c.Saves[0], f, nil, nil); p.Date != "11th of Jugust, 5500" {
+		t.Fatalf("en date %q", p.Date)
+	}
+	view.SetLang("zh")
+	if p := view.SavePlayOf(c.Saves[0], f, nil, nil); p.Date != "5500 年赫象 11 日" {
+		t.Fatalf("zh date %q", p.Date)
+	}
+}
