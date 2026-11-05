@@ -189,7 +189,7 @@ Approximate matching for rule 3 (an enabled set differing by one or two entries)
 | --- | --- | --- | --- |
 | Cut off: no `</savegame>` (L0) and not being written | Error | Can never load | Recycle; open the previous readable save |
 | Malformed XML (L1) | Error | Where reading stopped | Recycle; open the previous readable save |
-| A Mod in the save is not installed | Error when it owns pawns, factions, world components or classes in the save; otherwise warning | What it owns (§4.6), broken references, missing classes | Subscribe and enable (needs `<modSteamIds>`), else Make a list from this save |
+| A Mod in the save is not installed, whether the list lacks it or has it only as a missing entry (as after a fix, until Steam's download is scanned) | Error when it owns pawns, factions, world components or classes in the save; otherwise warning | What it owns (§4.6), broken references, missing classes | Subscribe and enable (needs `<modSteamIds>`; only Subscribe when the list has it already), else Make a list from this save |
 | A Mod in the save is installed but not enabled | As above | As above | Enable in the list, positioned in save order |
 | `Class="…"` with no type in installed assemblies or the game | Error | The type, and its Mod when known | The fix of that Mod's row |
 | The last load of this save had errors (a game log phase whose save name matches, 03 §6.7) | Error | Count and first message | Open the game log at that load |
@@ -212,7 +212,6 @@ The actions are implemented in `internal/app/saveactions.go` (`FixSave`, `Rename
 | Action | What it does | Confirmation |
 | --- | --- | --- |
 | Fix | The Mod fixes of §4.3 as one reversible plan edit (04 §2.1): installed Mods enabled and Workshop Mods added as missing entries, each right after the nearest Mod before it in the save; optionally the list's Mods the save lacks disabled, and the shared Mods put in the save's order. The caller subscribes to the Workshop Mods; `--launch` launches afterwards | Not required; preview first (`--dry-run`) |
-| Re-enable missing Mods in the list | Add "installed but not enabled" entries back to the matching plan, positioned in save order; list uninstalled entries without acting on them | Not required; one reversible plan edit (04 §2.1) |
 | Create a list from this save's Mods | Create a plan containing the imported save list (same as `loadout import --new`, §1.3); retain and mark uninstalled entries, as with ModsConfig.xml import | Not required; the new plan's first version has source `import` |
 | Rename | Rename the file in place, inline as in 06 §2.17. Keep a RimSaves prefix; refuse an existing name | Not required |
 | Copy | Copy to `<name> (copy).rws` (then `(copy 2)`…) in the same folder, never overwriting, keeping the modification time so the copy sorts beside the original | Not required |
@@ -270,12 +269,12 @@ Two pages under "worth playing" in the sidebar: play goals and shared packs (06 
 | SV4 | A Mod with only Patches and assemblies | Goes into "functional, excluded", not "never appeared" | Unimplemented |
 | SV5 | A Mod "appears" only in saves without it enabled | Does not count as having appeared | Unimplemented |
 | SV6 | 30 saves from one colony | Count as 1 colony | Unimplemented |
-| SV7 | Matching a save to a plan | Follow §4.2 order; unmatched saves enter "saves without a matching list" | Unimplemented |
+| SV7 | Matching a save to a plan | Follow §4.2 order; unmatched saves enter "saves without a matching list" | Partial: launch and same-Mods matches pass (synthetic: `TestSavesListGroupAndMatch`), pack saves in golden `saves`; unmatched saves untested |
 | SV8 | Back up a save without player confirmation | No files written; after confirmation, appears in `<data directory>/backups/saves/<time>/`, original unchanged | Pass (synthetic: `TestSaveFileActions`, `TestManageSavesActions`) |
 | SV9 | Move to the recycle bin | Confirm first; enter system recycle bin; refuse while the game runs | Partial: confirmation passes (synthetic: `TestSaveFileActions`, `TestManageSavesActions`, golden `saves`); the real recycle bin and a running game are untested |
-| SV10 | "Re-enable missing Mods in the list" | One reversible edit; only list uninstalled entries | Unimplemented |
+| SV10 | Fix a save whose list lacks an installed Mod and a Workshop Mod | One reversible edit: the installed Mod enabled, the Workshop Mod added as a missing entry, each in save order. Until the download is scanned the save still reads "content will be lost", and fixing again only subscribes again (no edit) | Pass (synthetic: `TestFixSave`, golden `saves`) |
 | SV11 | Open Saves with no L1 cache | Left card, middle header and Mod list appear from L0 at once; the background task reads the selected save first | Unimplemented |
-| SV12 | A save written during a crash (no `</savegame>`) | Cut off, error, Recycle offered; a file still being written gets no verdict | Unimplemented |
-| SV13 | RimSaves name `Ashfall#§#Landing.rws` | Grouped under colony `Ashfall`, shown as `Landing` | Unimplemented |
+| SV12 | A save written during a crash (no `</savegame>`) | Cut off, error, Recycle offered; a file still being written gets no verdict | Partial: cut off passes (synthetic: `TestCheckSave`); a file being written is untested |
+| SV13 | RimSaves name `Ashfall#§#Landing.rws` | Grouped under colony `Ashfall`, shown as `Landing` | Pass (synthetic: `TestSavesListGroupAndMatch`) |
 | SV14 | A save whose Mod with pawns is not installed | Error naming what is lost; Fix subscribes and enables it as one reversible edit | Unimplemented |
 | SV15 | `get_save` on MCP | Same text as `saves show`; each fix names its command or tool call | Pass (synthetic: `TestSaveToolsCLIParity`, golden `saves`) |

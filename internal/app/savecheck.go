@@ -24,7 +24,7 @@ const (
 	IssueCutOff       = "cut-off"       // no </savegame> at the end
 	IssueNoList       = "no-list"       // matches no list or pack
 	IssueGameVersion  = "game-version"  // made for another major.minor than the game
-	IssueNotInstalled = "not-installed" // a Mod in the save is not installed
+	IssueNotInstalled = "not-installed" // a Mod in the save is not installed (in the list or not)
 	IssueDisabled     = "disabled"      // installed but not in the list
 	IssueAdded        = "added"         // in the list, not in the save
 	IssueReordered    = "reordered"     // same Mods, another order
@@ -32,7 +32,7 @@ const (
 
 // Fix actions (10 §4.4).
 const (
-	FixSubscribe    = "subscribe"     // subscribe to a Workshop Mod and enable it
+	FixSubscribe    = "subscribe"     // subscribe to a Workshop Mod (and enable it when the list lacks it)
 	FixEnable       = "enable"        // enable an installed Mod in save order
 	FixAll          = "fix"           // every Mod fix, then launch
 	FixLaunch       = "launch"        // nothing to fix: launch the save's list
@@ -204,22 +204,29 @@ func (a *App) CheckSave(s *Save) (*SaveCheck, error) {
 	editable := s.Plan != nil
 	fixable := 0
 	for _, m := range c.Mods {
-		if m.InList || (!hasList && m.Instance != "") {
+		// A Mod the list has only as a missing entry (a fix added it, its download is not
+		// scanned yet) is as absent from the game as one the list lacks.
+		installed := m.Instance != ""
+		if installed && (m.InList || !hasList) {
 			continue
 		}
 		is := SaveIssue{Kind: IssueDisabled, Level: LevelWarning, Mods: []SaveMod{m}}
-		if m.Instance == "" {
+		if !installed {
 			is.Kind = IssueNotInstalled
 		}
 		if editable {
 			switch {
-			case m.Instance != "":
+			case installed:
 				is.Fixes = []SaveFix{{Action: FixEnable, Label: "Enable in the list", Command: "saves fix " + s.Ref + " --mod " + m.PackageID, Target: m.PackageID}}
 				fixable++
 			case m.SteamID != "":
-				is.Fixes = []SaveFix{{Action: FixSubscribe, Label: "Subscribe and enable", Command: "saves fix " + s.Ref + " --mod " + m.PackageID, Target: m.PackageID}}
+				label := "Subscribe and enable"
+				if m.InList {
+					label = "Subscribe"
+				}
+				is.Fixes = []SaveFix{{Action: FixSubscribe, Label: label, Command: "saves fix " + s.Ref + " --mod " + m.PackageID, Target: m.PackageID}}
 				fixable++
-			default:
+			case !m.InList:
 				is.Fixes = []SaveFix{newList}
 			}
 		}

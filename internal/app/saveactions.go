@@ -32,16 +32,22 @@ type SaveFixResult struct {
 	Plan       string
 	Enable     []SaveMod // installed Mods enabled
 	Subscribe  []SaveMod // Workshop Mods added as missing entries; the caller subscribes (SubscribeWorkshop)
+	Waiting    []SaveMod // Workshop Mods the list already has as missing entries: only subscribed again
 	Unresolved []SaveMod // not installed and without a Workshop ID: left out
 	Disable    []SaveMod
 	Reordered  int
-	Edit       *EditResult // nil for a dry run or when nothing changed
+	Edit       *EditResult // nil for a dry run or when the list did not change (no undo step)
+}
+
+// Changed reports whether the fix changes (or, for a dry run, would change) the list.
+func (r *SaveFixResult) Changed() bool {
+	return len(r.Enable)+len(r.Subscribe)+len(r.Disable)+r.Reordered > 0
 }
 
 // WorkshopIDs are the IDs to subscribe to.
 func (r *SaveFixResult) WorkshopIDs() []string {
 	var ids []string
-	for _, m := range r.Subscribe {
+	for _, m := range append(append([]SaveMod{}, r.Subscribe...), r.Waiting...) {
 		ids = append(ids, m.SteamID)
 	}
 	return ids
@@ -72,11 +78,14 @@ func (a *App) FixSave(s *Save, opt SaveFixOptions, dryRun bool) (*SaveFixResult,
 	r := &SaveFixResult{Save: s, Plan: s.Plan.Name}
 	var add []SaveMod
 	for _, m := range c.Mods {
-		if m.InList || (!all && !want[normPkg(m.PackageID)]) {
+		waiting := m.InList && m.Instance == "" && m.SteamID != ""
+		if m.InList && !waiting || (!all && !want[normPkg(m.PackageID)]) {
 			continue
 		}
 		delete(want, normPkg(m.PackageID))
 		switch {
+		case waiting:
+			r.Waiting = append(r.Waiting, m)
 		case m.Instance != "":
 			r.Enable = append(r.Enable, m)
 			add = append(add, m)
@@ -127,6 +136,9 @@ func (a *App) FixSave(s *Save, opt SaveFixOptions, dryRun bool) (*SaveFixResult,
 	})
 	if err != nil {
 		return nil, err
+	}
+	if r.Edit != nil && len(r.Edit.Changes) == 0 {
+		r.Edit = nil // edit records no step for an unchanged list
 	}
 	return r, nil
 }

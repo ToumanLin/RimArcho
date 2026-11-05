@@ -168,6 +168,22 @@ func TestFixSave(t *testing.T) {
 	if got := order(); !slices.Equal(got, []string{"ludeon.rimworld", "tester.alpha", "tester.gamma", "tester.gone", "tester.beta"}) {
 		t.Fatalf("after fix: %v", got)
 	}
+	// The Workshop Mod is now a missing entry: still not installed, so the save still loses
+	// its content, and fixing again only subscribes again (no list change, no undo step).
+	c, err := e.App.CheckSave(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Level != app.LevelWarning || c.Issues[0].Kind != app.IssueNotInstalled || c.Issues[0].Fixes[0].Label != "Subscribe" || c.Quick.Action != app.FixAll {
+		t.Fatalf("after fix: level %q issues %+v quick %+v", c.Level, c.Issues, c.Quick)
+	}
+	again, err := e.App.FixSave(s, app.SaveFixOptions{}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.Changed() || again.Edit != nil || len(again.Waiting) != 1 || !slices.Equal(again.WorkshopIDs(), []string{"99"}) {
+		t.Fatalf("fix again: %+v", again)
+	}
 	if _, err := e.App.FixSave(s, app.SaveFixOptions{Order: true}, false); err != nil {
 		t.Fatal(err)
 	}

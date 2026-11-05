@@ -436,6 +436,9 @@ func SaveFixText(r *app.SaveFixResult) string {
 	if n := len(r.Subscribe); n > 0 {
 		parts = append(parts, Tf("added %d to subscribe", n))
 	}
+	if n := len(r.Waiting); n > 0 {
+		parts = append(parts, Tf("%d in the list still to download", n))
+	}
 	if n := len(r.Disable); n > 0 {
 		parts = append(parts, Tf("disabled %d", n))
 	}

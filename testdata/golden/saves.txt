@@ -282,8 +282,8 @@ saves: 4 saves in 2 colonies (colony Tundra)
   Tundra  1 save, latest 2026-10-01 09:55
     sv:<pack:Tundra.rws>  Tundra      2026-10-01 09:55  meta only  pack P1                   loads, but content will be lost
   Tundra  3 saves, latest 2026-10-01 09:40
-    sv:<Autosave-1.rws>  Autosave-1  2026-10-01 09:40  meta only  plan:default (launch)     loads with the list
-    sv:<Tundra 2.rws>  Tundra 2    2026-10-01 09:30  meta only  plan:default (launch)     loads with the list
+    sv:<Autosave-1.rws>  Autosave-1  2026-10-01 09:40  meta only  plan:default (launch)     loads, but content will be lost
+    sv:<Tundra 2.rws>  Tundra 2    2026-10-01 09:30  meta only  plan:default (launch)     loads, but content will be lost
     sv:<Tundra.rws>  Tundra      2026-10-01 08:00  meta only  plan:default (same-mods)  loads with the list
   note: meta only: read from the save's head; in-game day and play facts are not read yet
 next:

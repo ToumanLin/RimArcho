@@ -44,6 +44,7 @@
   "usually safe: the same Mods load, only the order their patches apply in differs": "通常没问题：载入的 Mod 相同，只是补丁生效的顺序不同",
   "enabled %d Mods": "启用了 %d 个 Mod",
   "added %d to subscribe": "加入了 %d 个待订阅",
+  "%d in the list still to download": "列表里还有 %d 个待下载",
   "disabled %d": "停用了 %d 个",
   "moved %d into the save's order": "按存档顺序移动了 %d 个",
   "%d without a Workshop page left out": "%d 个没有工坊页面，没有加入",

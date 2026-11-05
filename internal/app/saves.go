@@ -226,11 +226,21 @@ func (l *SaveList) Find(ref string) (*Save, error) {
 	case 1:
 		return hits[0], nil
 	}
+	return nil, &AmbiguousSave{Ref: ref, Saves: hits}
+}
+
+// AmbiguousSave: a save reference matches several saves (05 §3.3), in listing order.
+type AmbiguousSave struct {
+	Ref   string
+	Saves []*Save
+}
+
+func (e *AmbiguousSave) Error() string {
 	var names []string
-	for _, s := range hits {
+	for _, s := range e.Saves {
 		names = append(names, s.Ref+" "+s.Colony.Name+"/"+s.Name)
 	}
-	return nil, fmt.Errorf("%s matches %d saves: %s", ref, len(hits), strings.Join(names, ", "))
+	return fmt.Sprintf("%s matches %d saves: %s", e.Ref, len(e.Saves), strings.Join(names, ", "))
 }
 
 // SaveRef is a save's reference: the first 3 bytes of sha1 of its real path, which stays

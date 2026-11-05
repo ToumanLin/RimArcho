@@ -53,20 +53,11 @@ func findSaves(c *Ctx, refs []string) ([]*app.Save, *render.Doc, error) {
 			}
 			continue
 		}
-		if errors.Is(err, app.ErrNoSave) {
+		var amb *app.AmbiguousSave
+		if !errors.As(err, &amb) {
 			return nil, nil, err
 		}
-		// Several saves match: Find on each save alone says which.
-		var hits []*app.Save
-		for _, s := range l.Saves() {
-			one := &app.SaveList{Colonies: []*app.Colony{{Saves: []*app.Save{s}}}}
-			if _, e := one.Find(ref); e == nil {
-				hits = append(hits, s)
-			}
-		}
-		if len(hits) < 2 {
-			return nil, nil, err
-		}
+		hits := amb.Saves
 		d, root := render.New(fmt.Sprintf("%s matches %d saves; pick one", ref, len(hits)))
 		var rows [][]string
 		for _, h := range hits {
@@ -169,7 +160,7 @@ func saveModLine(ix *app.Index, s *app.Save, m app.SaveMod) string {
 func modMark(chk *app.SaveCheck, m app.SaveMod) string {
 	hasList := chk.Save.Plan != nil || chk.Save.Pack != ""
 	switch {
-	case m.Instance == "" && !m.InList:
+	case m.Instance == "":
 		return "not installed"
 	case hasList && !m.InList:
 		return "not in the list"
@@ -571,9 +562,11 @@ func savesFix(c *Ctx, a *Args) (*render.Doc, error) {
 		return nil, err
 	}
 	plan := app.PlanRef(s.Plan)
-	changed := len(r.Enable)+len(r.Subscribe)+len(r.Disable)+r.Reordered > 0
+	changed := r.Changed()
 	var head string
 	switch {
+	case !changed && len(r.Waiting) > 0:
+		head = s.Ref + " " + s.Name + ": " + plan + " already has the save's Mods; " + render.Plural(len(r.Waiting), "Mod") + " still to download"
 	case !changed:
 		head = s.Ref + " " + s.Name + ": nothing to fix in " + plan
 	case dry:
@@ -597,6 +590,12 @@ func savesFix(c *Ctx, a *Args) (*render.Doc, error) {
 	if len(r.Subscribe) > 0 {
 		n := root.Section(verb("added (missing until downloaded)", "would add (missing until downloaded)"))
 		for _, m := range r.Subscribe {
+			n.Add(saveModLine(ix, s, m))
+		}
+	}
+	if len(r.Waiting) > 0 {
+		n := root.Section(verb("in the list, not installed: subscribed again", "in the list, not installed: would subscribe again"))
+		for _, m := range r.Waiting {
 			n.Add(saveModLine(ix, s, m))
 		}
 	}
@@ -640,7 +639,7 @@ func savesFix(c *Ctx, a *Args) (*render.Doc, error) {
 		})
 		n := root.Section("subscriptions")
 		names := map[string]string{}
-		for _, m := range r.Subscribe {
+		for _, m := range append(append([]app.SaveMod{}, r.Subscribe...), r.Waiting...) {
 			names[m.SteamID] = m.Name
 		}
 		if op != nil {
@@ -730,7 +729,7 @@ func savesFix(c *Ctx, a *Args) (*render.Doc, error) {
 			}
 		}
 	}
-	if dry && changed {
+	if dry && (changed || len(ids) > 0) {
 		d.AddNext("archo " + strings.Join(fixArgv(s, a), " "))
 	} else if !dry && !launch && changed && len(ids) == 0 {
 		d.AddNext("archo saves fix " + s.Ref + " --launch --dry-run")
