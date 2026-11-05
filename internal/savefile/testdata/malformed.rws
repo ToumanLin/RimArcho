@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<savegame>
+	<meta><gameVersion>1.6.4633 rev1261</gameVersion><modIds><li>ludeon.rimworld</li></modIds></meta>
+	<game>
+		<scenario><playerFaction><def>PlayerFaction</def><factionDef>PlayerColony</factionDef></playerFaction></scenario>
+		<tickManager><ticksGame>600000</ticksGame></tickManager>
+		<world>
+			<info><name>Rime</name><seedString>glacier</seedString></info>
+			<factionManager><allFactions><li><def>PlayerColony</def><name>Glacier</name><loadID>1</loadID></li></allFactions></factionManager>
+		</world>
+		<maps>
+			<li>
+				<uniqueID>0</uniqueID>
+				<things>
+					<thing Class="Pawn">
+						<def>Human</def>
+						<id>Human1</id>
+						<faction>Faction_1</faction>
+						<kindDef>Colonist</kindDef>
+						<name Class="NameTriple"><first>Ida</first><nick>Ida</nick><last>Moss</last></name>
+						<story />
+						<target>Thing_Missing1</target>
+					</thing>
+					<thing Class="Building_Door">
+						<def>Door</def>
+						<id>Door2</id>
+				</things>
+			</li>
+		</maps>
+	</game>
+</savegame>
