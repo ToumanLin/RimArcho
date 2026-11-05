@@ -9,16 +9,18 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
-// Saves (05 §4.2, 10 §4): list colonies and their saves, show one save against its list,
-// fix its list, rename, copy, back up and recycle. Play facts need the full read (10 §1.7
-// L1), which is not implemented: every save is read from its head only ("meta only").
+// Saves (05 §4.2, 10 §4): list colonies and their saves, show one save against its list
+// and its playthrough, fix its list, rename, copy, back up and recycle, read saves in full.
+// Lists use the cached full read (10 §1.7 L1) and never read; a save not read in full yet
+// is "meta only". saves show reads its one save in full inline.
 
 func init() {
 	register(&Command{Name: "saves list", Summary: "colonies and their saves, newest first, each with its list and whether it loads with it", MaxArgs: 0,
 		Flags: []Flag{{Name: "colony", Value: "<name>", Help: "only this colony"}, {Name: "mod", Value: "<ref>", Help: "only saves whose Mod list has this Mod"},
 			{Name: "attention", Help: "only saves with warnings or errors"}, {Name: "all", Help: "no truncation"}}, Run: savesList})
-	register(&Command{Name: "saves show", Args: "<save>", Summary: "one save: where it belongs, can it load (each issue with its fix), how its Mods differ from the list", MinArgs: 1, MaxArgs: 1,
-		Flags: []Flag{{Name: "mods", Help: "the save's whole Mod list"}, {Name: "all", Help: "no truncation"}}, Run: savesShow})
+	register(&Command{Name: "saves show", Args: "<save>", Summary: "one save: where it belongs, can it load (each issue with its fix), how its Mods differ from the list, the playthrough", MinArgs: 1, MaxArgs: 1,
+		Flags: []Flag{{Name: "mods", Help: "the save's whole Mod list"}, {Name: "play", Help: "the whole playthrough: every colonist, event and stat"},
+			{Name: "all", Help: "no truncation"}}, Run: savesShow})
 	register(&Command{Name: "saves fix", Args: "<save>", Summary: "the save's Mod fixes as one undoable edit of its list, then Workshop subscriptions; --launch starts it", MinArgs: 1, MaxArgs: 1,
 		Flags: []Flag{{Name: "mod", Value: "<packageId>", Multi: true, Help: "only this Mod's fix"}, {Name: "disable-added", Help: "also disable the list's Mods the save lacks"},
 			{Name: "order", Help: "put the Mods both have in the save's order"}, {Name: "launch", Help: "then save the list to the game and start it (not while subscriptions download)"},
@@ -34,6 +36,18 @@ func init() {
 
 // metaOnly marks a save without the full read: no in-game day or play facts (10 §1.7).
 const metaOnly = "meta only"
+
+// dayText is saves list's day column: the in-game day from the cached full read, else
+// meta only.
+func dayText(s *app.Save) string {
+	switch {
+	case s.Summary == nil:
+		return metaOnly
+	case s.Summary.Malformed:
+		return "malformed"
+	}
+	return fmt.Sprintf("day %d", s.Summary.Day)
+}
 
 // ---- references ----
 
@@ -397,7 +411,15 @@ func savesList(c *Ctx, a *Args) (*render.Doc, error) {
 		used += lines
 		plan = append(plan, shown{g: g, n: n, more: more})
 		for _, r := range g.rows[:n] {
-			cells = append(cells, []string{r.s.Ref, r.s.Name, saveTime(c, r.s), metaOnly, saveListText(r.s), r.chk.Verdict()})
+			cells = append(cells, []string{r.s.Ref, r.s.Name, saveTime(c, r.s), dayText(r.s), saveListText(r.s), r.chk.Verdict()})
+		}
+	}
+	unread := 0
+	for _, g := range groups {
+		for _, r := range g.rows {
+			if r.s.Summary == nil {
+				unread++
+			}
 		}
 	}
 	lines := render.Columns(cells)
@@ -429,7 +451,13 @@ func savesList(c *Ctx, a *Args) (*render.Doc, error) {
 			n.Addf("… %d more (archo saves list --colony %s)", p.more, quote(col.Name))
 		}
 	}
-	root.KV("note", metaOnly+": read from the save's head; in-game day and play facts are not read yet")
+	if unread > 0 {
+		what := "1 save is"
+		if unread > 1 {
+			what = fmt.Sprintf("%d saves are", unread)
+		}
+		root.KV("note", what+" "+metaOnly+": only the head is read, so no in-game day yet; archo saves index reads them in full")
+	}
 	if firstAttention != nil {
 		first = firstAttention
 	}
@@ -459,6 +487,17 @@ func savesShow(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil || amb != nil {
 		return amb, err
 	}
+	// The full read first (10 §1.7: inline for the one save), so the load check and the
+	// colony see it: a save read now may join its world's colony (10 §4.1).
+	had := s.Summary != nil
+	facts, ferr := c.App.SaveFacts(s, true)
+	if facts != nil && !had {
+		if l, err := c.App.ListSaves(); err == nil {
+			if again, err := l.Find(s.Path); err == nil {
+				s = again
+			}
+		}
+	}
 	chk, err := c.App.CheckSave(s)
 	if err != nil {
 		return nil, err
@@ -467,7 +506,7 @@ func savesShow(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil {
 		return nil, err
 	}
-	all := a.Bool("all")
+	all, play := a.Bool("all"), a.Bool("play")
 	limit := render.DefaultLimit
 	if all {
 		limit = 0
@@ -491,17 +530,66 @@ func savesShow(c *Ctx, a *Args) (*render.Doc, error) {
 	root.KV("list", matchText(s))
 	root.KV("file", s.Path)
 	root.KV("saved", saveTime(c, s)+", "+render.Size(s.Size))
-	root.KV("read", metaOnly+" (in-game day and play facts are not read yet)")
+	root.KV("read", readText(facts, s, ferr))
 
 	if chk.Level == "writing" {
 		root.KV("can it load", "no verdict: the file is being written; show it again when the game has saved")
 		return d, nil
 	}
-	if len(chk.Issues) == 0 {
+	if facts != nil {
+		var prev *playPrev
+		if p := previousSave(s); p != nil {
+			pf, err := c.App.SaveFacts(p, false)
+			if err != nil {
+				return nil, err
+			}
+			prev = &playPrev{save: p, facts: pf}
+		}
+		addPlay(root, s, facts, prev, play, limit)
+	}
+	// The rest shares the call's 40 lines (05 §3.1 rule 5): the load check's items first,
+	// then the Mod rows, keeping room for the quick fix, a few Mod rows and next:.
+	budget := 0
+	if !all {
+		budget = showLines
+	}
+	showMods, mods := s.Head != nil && (!play || facts == nil || a.Bool("mods")), a.Bool("mods")
+	modRows := len(chk.ListOnly)
+	for _, m := range chk.Mods {
+		if mods || modMark(chk, m) != "" {
+			modRows++
+		}
+	}
+	tail := 0
+	if chk.Quick != nil {
+		tail += 1 + 2 // quick fix:, next: and its command
+	}
+	minRows := min(modRows, 5)
+	if mods {
+		minRows = min(modRows, 15)
+	}
+	if showMods {
+		tail += 1 + minRows
+		if modRows > minRows {
+			tail++
+		}
+		if !mods && len(chk.Mods) > 0 {
+			tail++
+		}
+	}
+	switch {
+	case play && facts != nil:
+		// The playthrough in full: the load check shrinks to its verdict.
+		line := "yes, with the list as it is now"
+		if len(chk.Issues) > 0 {
+			line = chk.Verdict() + ": " + render.Plural(len(chk.Issues), "item")
+		}
+		root.KV("can it load", line+" (archo saves show "+s.Ref+")")
+	case len(chk.Issues) == 0:
 		root.KV("can it load", "yes, with the list as it is now")
-	} else {
+	default:
 		cn := root.KV("can it load", render.Plural(len(chk.Issues), "item"))
-		for _, is := range chk.Issues {
+		for i, is := range chk.Issues {
 			line := is.Level + " " + is.Kind
 			switch {
 			case is.Text != "":
@@ -511,7 +599,7 @@ func savesShow(c *Ctx, a *Args) (*render.Doc, error) {
 			case len(is.Mods) > 1:
 				line += "  " + render.Plural(len(is.Mods), "Mod")
 			}
-			n := cn.Add(line)
+			n := &render.Node{Line: line}
 			if len(is.Mods) > 1 {
 				for _, m := range is.Mods {
 					n.Add(saveModLine(ix, s, m))
@@ -522,14 +610,37 @@ func savesShow(c *Ctx, a *Args) (*render.Doc, error) {
 			for _, f := range is.Fixes {
 				n.KV("fix", fixLine(f))
 			}
+			more := 0
+			if i < len(chk.Issues)-1 {
+				more = 1
+			}
+			if budget > 0 && i > 0 && docLines(d)+nodeLines(n)+more+tail > budget {
+				cn.Addf("… %d more (archo saves show %s --all)", len(chk.Issues)-i, s.Ref)
+				break
+			}
+			cn.Children = append(cn.Children, n)
 		}
 	}
 	if chk.Quick != nil {
 		root.KV("quick fix", fixLine(*chk.Quick))
 	}
 
-	if s.Head != nil {
-		addSaveMods(root, ix, chk, a.Bool("mods"), limit, s)
+	if showMods {
+		rows := limit
+		if budget > 0 {
+			left := budget - docLines(d) - 1 // the mods: line
+			if chk.Quick != nil {
+				left -= 2
+			}
+			if !mods && len(chk.Mods) > 0 {
+				left-- // the whole list hint
+			}
+			if modRows > left {
+				left-- // … N more
+			}
+			rows = min(limit, max(left, minRows))
+		}
+		addSaveMods(root, ix, chk, mods, rows, s)
 	}
 	if q := chk.Quick; q != nil && strings.HasPrefix(q.Command, "saves fix ") {
 		d.AddNext("archo " + q.Command + " --dry-run")
@@ -537,6 +648,29 @@ func savesShow(c *Ctx, a *Args) (*render.Doc, error) {
 		d.AddNext("archo " + q.Command)
 	}
 	return d, nil
+}
+
+// showLines is saves show's line budget without --all (05 §3.1 rule 5).
+const showLines = 40
+
+// nodeLines counts the lines a node renders; docLines a whole document's, next: included.
+func nodeLines(n *render.Node) int {
+	c := 1
+	for _, k := range n.Children {
+		c += nodeLines(k)
+	}
+	return c
+}
+
+func docLines(d *render.Doc) int {
+	c := 0
+	for _, n := range d.Nodes {
+		c += nodeLines(n)
+	}
+	if len(d.Next) > 0 {
+		c += 1 + len(d.Next)
+	}
+	return c
 }
 
 // addSaveMods is the save's Mod list against the list (10 §4.3 "Mod list"): with full the

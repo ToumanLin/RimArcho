@@ -8,7 +8,7 @@ saves: 5 saves in 3 colonies
     sv:<Tundra.rws>  Tundra      2026-10-01 08:00  meta only  plan:default (same-mods)  loads with the list
   Ashfall  1 save, latest 2026-10-01 07:00
     sv:<Ashfall#§#Landing.rws>  Landing     2026-10-01 07:00  meta only  plan:default (same-mods)  loads with the list
-  note: meta only: read from the save's head; in-game day and play facts are not read yet
+  note: 5 saves are meta only: only the head is read, so no in-game day yet; archo saves index reads them in full
 next:
   archo saves show sv:<Broken.rws>
 
@@ -19,7 +19,7 @@ saves: 3 saves in 2 colonies (attention)
   Tundra  3 saves, latest 2026-10-01 09:40
     sv:<Autosave-1.rws>  Autosave-1  2026-10-01 09:40  meta only  plan:default (launch)  loads, but content will be lost
     sv:<Tundra 2.rws>  Tundra 2    2026-10-01 09:30  meta only  plan:default (launch)  loads, but content will be lost
-  note: meta only: read from the save's head; in-game day and play facts are not read yet
+  note: 3 saves are meta only: only the head is read, so no in-game day yet; archo saves index reads them in full
 next:
   archo saves show sv:<Broken.rws>
 
@@ -28,7 +28,7 @@ saves: 2 saves in 1 colony (mod tester.gone)
   Tundra  3 saves, latest 2026-10-01 09:40
     sv:<Autosave-1.rws>  Autosave-1  2026-10-01 09:40  meta only  plan:default (launch)  loads, but content will be lost
     sv:<Tundra 2.rws>  Tundra 2    2026-10-01 09:30  meta only  plan:default (launch)  loads, but content will be lost
-  note: meta only: read from the save's head; in-game day and play facts are not read yet
+  note: 2 saves are meta only: only the head is read, so no in-game day yet; archo saves index reads them in full
 next:
   archo saves show sv:<Autosave-1.rws>
 
@@ -37,7 +37,7 @@ saves: 2 saves in 1 colony (mod #z3bw)
   Tundra  3 saves, latest 2026-10-01 09:40
     sv:<Autosave-1.rws>  Autosave-1  2026-10-01 09:40  meta only  plan:default (launch)  loads, but content will be lost
     sv:<Tundra 2.rws>  Tundra 2    2026-10-01 09:30  meta only  plan:default (launch)  loads, but content will be lost
-  note: meta only: read from the save's head; in-game day and play facts are not read yet
+  note: 2 saves are meta only: only the head is read, so no in-game day yet; archo saves index reads them in full
 next:
   archo saves show sv:<Autosave-1.rws>
 
@@ -45,7 +45,7 @@ $ archo saves list --colony ashfall
 saves: 1 save in 1 colony (colony ashfall)
   Ashfall  1 save, latest 2026-10-01 07:00
     sv:<Ashfall#§#Landing.rws>  Landing  2026-10-01 07:00  meta only  plan:default (same-mods)  loads with the list
-  note: meta only: read from the save's head; in-game day and play facts are not read yet
+  note: 1 save is meta only: only the head is read, so no in-game day yet; archo saves index reads them in full
 next:
   archo saves show sv:<Ashfall#§#Landing.rws>
 
@@ -63,7 +63,10 @@ sv:<Tundra 2.rws> Tundra 2  [loads, but content will be lost]
   list: plan:default (saved after a launch of it)
   file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Tundra 2.rws
   saved: 2026-10-01 09:30, 573 B
-  read: meta only (in-game day and play facts are not read yet)
+  read: in full
+  play: day 1 (2nd of Aprimay, 5500)
+    colonists: unknown: no player faction found in the save
+    since Tundra sv:<Tundra.rws>: not compared: that save is not read in full yet (archo saves index)
   can it load: 3 items
     warning disabled  #z3bw Gamma
       consequence: installed but not in the list: what it added to the save is lost on load
@@ -90,7 +93,10 @@ sv:<Tundra 2.rws> Tundra 2  [loads, but content will be lost]
   list: plan:default (saved after a launch of it)
   file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Tundra 2.rws
   saved: 2026-10-01 09:30, 573 B
-  read: meta only (in-game day and play facts are not read yet)
+  read: in full
+  play: day 1 (2nd of Aprimay, 5500)
+    colonists: unknown: no player faction found in the save
+    since Tundra sv:<Tundra.rws>: not compared: that save is not read in full yet (archo saves index)
   can it load: 3 items
     warning disabled  #z3bw Gamma
       consequence: installed but not in the list: what it added to the save is lost on load
@@ -118,7 +124,9 @@ sv:<Broken.rws> Broken  [will not load cleanly]
   list: plan:default (saved after a launch of it)
   file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Broken.rws
   saved: 2026-10-01 09:50, 425 B
-  read: meta only (in-game day and play facts are not read yet)
+  read: stopped at line 11, byte 425: the file ends inside a tag (the facts below are from before that point)
+  play: day 1 (2nd of Aprimay, 5500)
+    colonists: unknown: no player faction found in the save
   can it load: 1 item
     error cut-off
       consequence: can never load: the file stops before its end (written during a crash?)
@@ -136,7 +144,9 @@ sv:<Ashfall#§#Landing.rws> Landing  [loads with the list]
   list: plan:default (same Mods as one of its versions)
   file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Ashfall#§#Landing.rws
   saved: 2026-10-01 07:00, 487 B
-  read: meta only (in-game day and play facts are not read yet)
+  read: in full
+  play: day 1 (2nd of Aprimay, 5500)
+    colonists: unknown: no player faction found in the save
   can it load: yes, with the list as it is now
   quick fix: Launch (archo saves fix sv:<Ashfall#§#Landing.rws> --launch)
   mods: 3 Mods in the save, the same as the list
@@ -176,7 +186,10 @@ sv:<Tundra 2.rws> Tundra 2  [loads, but content will be lost]
   list: plan:default (saved after a launch of it)
   file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Tundra 2.rws
   saved: 2026-10-01 09:30, 573 B
-  read: meta only (in-game day and play facts are not read yet)
+  read: in full
+  play: day 1 (2nd of Aprimay, 5500)
+    colonists: unknown: no player faction found in the save
+    since Tundra sv:<Tundra.rws>: not compared: that save is not read in full yet (archo saves index)
   can it load: 2 items
     warning not-installed  pkg:tester.gone Gone Mod (ws:99)
       consequence: what the Mod added to the save is lost on load
@@ -283,9 +296,9 @@ saves: 4 saves in 2 colonies (colony Tundra)
     sv:<pack:Tundra.rws>  Tundra      2026-10-01 09:55  meta only  pack P1                   loads, but content will be lost
   Tundra  3 saves, latest 2026-10-01 09:40
     sv:<Autosave-1.rws>  Autosave-1  2026-10-01 09:40  meta only  plan:default (launch)     loads, but content will be lost
-    sv:<Tundra 2.rws>  Tundra 2    2026-10-01 09:30  meta only  plan:default (launch)     loads, but content will be lost
+    sv:<Tundra 2.rws>  Tundra 2    2026-10-01 09:30  day 1      plan:default (launch)     loads, but content will be lost
     sv:<Tundra.rws>  Tundra      2026-10-01 08:00  meta only  plan:default (same-mods)  loads with the list
-  note: meta only: read from the save's head; in-game day and play facts are not read yet
+  note: 3 saves are meta only: only the head is read, so no in-game day yet; archo saves index reads them in full
 next:
   archo saves show sv:<pack:Tundra.rws>
 
@@ -297,7 +310,7 @@ $ archo saves list
 saves: 1 save in 1 colony (env:old)
   Outpost  1 save, latest 2026-10-01 06:00  [matches no list]
     sv:<Outpost.rws>  Outpost  2026-10-01 06:00  meta only  no list  loads, but content will be lost
-  note: meta only: read from the save's head; in-game day and play facts are not read yet
+  note: 1 save is meta only: only the head is read, so no in-game day yet; archo saves index reads them in full
 next:
   archo saves show sv:<Outpost.rws>
 
@@ -308,7 +321,9 @@ sv:<Outpost.rws> Outpost  [loads, but content will be lost]
   list: none (matches no list or pack)
   file: $ROOT/ArchoHome/userdata/old/Saves/Outpost.rws
   saved: 2026-10-01 06:00, 385 B
-  read: meta only (in-game day and play facts are not read yet)
+  read: in full
+  play: day 1 (2nd of Aprimay, 5500)
+    colonists: unknown: no player faction found in the save
   can it load: 2 items
     warning game-version  1.6.4633 rev1261 → 1.5.4409 rev1118
       consequence: the game converts it on load

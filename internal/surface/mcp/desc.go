@@ -97,8 +97,8 @@ const descUninstall = `Preview what uninstalling RimArcho would delete, move or 
 
 const descMemory = `Estimate resident RAM, loading RAM and VRAM for a plan. Available physical RAM below loading low is severe, below high warning, otherwise ok; unknown stays unknown. VRAM shortages warn only. Unity 1.6 RAM is VM-calibrated. Reads headers and caches estimates. Limits: guide estimate_memory.`
 
-const descListSaves = `Saves of every game and pack, grouped by colony, newest first: each with its sv: reference, the list it matches and whether it loads with that list. mod=<ref> finds the saves that use a Mod; attention=true keeps those with warnings or errors. Read-only.`
+const descListSaves = `Saves of every game and pack, grouped by colony, newest first: each with its sv: reference, in-game day, the list it matches and whether it loads with that list. mod=<ref> finds the saves that use a Mod; attention=true keeps those with warnings or errors. Read-only.`
 
-const descGetSave = `One save (sv:<hex>, file name or <colony>/<save>): where it belongs (game, list or pack and how it matched, file), can it load (each issue with its consequence and the command that fixes it), how its Mods differ from the list. For a save that will not load. Read-only.`
+const descGetSave = `One save (sv:<hex>, file name or <colony>/<save>): where it belongs, can it load (each issue with its consequence and the command that fixes it), how its Mods differ from the list, the playthrough (day, colonists, wealth, events; play=true in full). For a save that will not load. Read-only.`
 
 const descManageSaves = `Save actions: fix (the save's Mod fixes as one undoable edit of its list, subscribing missing Workshop Mods; launch=true then starts it), rename, copy, backup, trash (recycle bin). dry_run=true previews fix; backup and trash only preview unless confirm=true: ask the player first.`

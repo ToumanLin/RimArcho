@@ -1,0 +1,266 @@
+$ archo saves list
+saves: 4 saves in 2 colonies
+  Rimward  3 saves, latest 2026-10-01 09:59
+    sv:<Autosave-1.rws>  Autosave-1  2026-10-01 09:59  meta only  plan:default (same-mods)  being written
+    sv:<Rimward 2.rws>  Rimward 2   2026-10-01 06:00  meta only  plan:default (same-mods)  loads with the list
+    sv:<Rimward.rws>  Rimward     2026-10-01 05:00  meta only  plan:default (same-mods)  loads with the list
+  Glacier  1 save, latest 2026-10-01 04:00
+    sv:<Glacier.rws>  Glacier     2026-10-01 04:00  meta only  plan:default (same-mods)  loads with the list
+  note: 4 saves are meta only: only the head is read, so no in-game day yet; archo saves index reads them in full
+next:
+  archo saves show sv:<Autosave-1.rws>
+
+$ archo saves show Rimward 2
+sv:<Rimward 2.rws> Rimward 2  [loads with the list]
+  colony: Iron Pact (3 saves, latest Autosave-1 sv:<Autosave-1.rws>)
+  game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
+  list: plan:default (same Mods as one of its versions)
+  file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Rimward 2.rws
+  saved: 2026-10-01 06:00, 6.9 KB
+  read: in full
+  play: Iron Pact, day 25 (11th of Jugust, 5500), 3h 25m played
+    storyteller: Cassandra, difficulty Rough, permadeath
+    colonists: 11 (1 slave), 2 dead; animals 2, mechanoids 1, prisoners 1
+    stats: wealth 12,345, raids 22, big threats 30, colonists killed 2, colonists launched 0, greatest population 12
+    since Rimward sv:<Rimward.rws>: not compared: that save is not read in full yet (archo saves index)
+    events: day 24 Siege; day 23 Death: Ozzie; day 22 Refugee chased; … 5 more
+    (every colonist and event: archo saves show sv:<Rimward 2.rws> --play)
+  can it load: yes, with the list as it is now
+  quick fix: Launch (archo saves fix sv:<Rimward 2.rws> --launch)
+  mods: 2 Mods in the save, the same as the list
+    (the whole list: archo saves show sv:<Rimward 2.rws> --mods)
+next:
+  archo saves fix sv:<Rimward 2.rws> --launch --dry-run
+
+$ archo saves index --progress
+saves index: read 2 saves (4.3 KB) in <time>; 1 already read
+  being written: 1 (read on a later run)
+next:
+  archo saves list
+[stderr] progress: saves n/2 sv:<Glacier.rws> Glacier/Glacier
+[stderr] progress: saves n/2 sv:<Rimward.rws> Iron Pact/Rimward
+
+$ archo saves index
+saves index: read 0 saves; 3 already read
+  being written: 1 (read on a later run)
+next:
+  archo saves list
+
+$ archo saves list
+saves: 4 saves in 2 colonies
+  Iron Pact  3 saves, latest 2026-10-01 09:59
+    sv:<Autosave-1.rws>  Autosave-1  2026-10-01 09:59  meta only  plan:default (same-mods)  being written
+    sv:<Rimward 2.rws>  Rimward 2   2026-10-01 06:00  day 25     plan:default (same-mods)  loads with the list
+    sv:<Rimward.rws>  Rimward     2026-10-01 05:00  day 20     plan:default (same-mods)  loads with the list
+  Glacier Folk  1 save, latest 2026-10-01 04:00
+    sv:<Glacier.rws>  Glacier     2026-10-01 04:00  malformed  plan:default (same-mods)  will not load cleanly
+  note: 1 save is meta only: only the head is read, so no in-game day yet; archo saves index reads them in full
+next:
+  archo saves show sv:<Glacier.rws>
+
+$ archo saves show Rimward 2
+sv:<Rimward 2.rws> Rimward 2  [loads with the list]
+  colony: Iron Pact (3 saves, latest Autosave-1 sv:<Autosave-1.rws>)
+  game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
+  list: plan:default (same Mods as one of its versions)
+  file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Rimward 2.rws
+  saved: 2026-10-01 06:00, 6.9 KB
+  read: in full
+  play: Iron Pact, day 25 (11th of Jugust, 5500), 3h 25m played
+    storyteller: Cassandra, difficulty Rough, permadeath
+    colonists: 11 (1 slave), 2 dead; animals 2, mechanoids 1, prisoners 1
+    stats: wealth 12,345, raids 22, big threats 30, colonists killed 2, colonists launched 0, greatest population 12
+    since Rimward sv:<Rimward.rws> (day 20): colonists +8, dead +1, animals +1, mechanoids +1, prisoners +1, wealth +1,199, raids +2, big threats +3, colonists killed +1, greatest population +8
+    events: day 24 Siege; day 23 Death: Ozzie; day 22 Refugee chased; … 5 more
+    (every colonist and event: archo saves show sv:<Rimward 2.rws> --play)
+  can it load: yes, with the list as it is now
+  quick fix: Launch (archo saves fix sv:<Rimward 2.rws> --launch)
+  mods: 2 Mods in the save, the same as the list
+    (the whole list: archo saves show sv:<Rimward 2.rws> --mods)
+next:
+  archo saves fix sv:<Rimward 2.rws> --launch --dry-run
+
+$ archo saves show Rimward 2 --play
+sv:<Rimward 2.rws> Rimward 2  [loads with the list]
+  colony: Iron Pact (3 saves, latest Autosave-1 sv:<Autosave-1.rws>)
+  game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
+  list: plan:default (same Mods as one of its versions)
+  file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Rimward 2.rws
+  saved: 2026-10-01 06:00, 6.9 KB
+  read: in full
+  play: Iron Pact, day 25 (11th of Jugust, 5500), 3h 25m played
+    world: Ennawrin, scenario Crashlanded
+    storyteller: Cassandra, difficulty Rough, permadeath
+    stats: wealth 12,345, raids 22, big threats 30, colonists killed 2, colonists launched 0, greatest population 12
+    since Rimward sv:<Rimward.rws> (day 20): colonists +8, dead +1, animals +1, mechanoids +1, prisoners +1, wealth +1,199, raids +2, big threats +3, colonists killed +1, greatest population +8
+    research: MicroelectronicsBasics now; 2 projects with progress
+    colonists: 11 (1 slave), 2 dead; animals 2, mechanoids 1, prisoners 1
+      Mara   Human       map
+      Kari   Kurin_Race  map, slave
+      Ozzie  Human       dead        died
+      Bea    Human       dead
+      Pike   Human       map         new
+      Rosa   Human       map         new
+      Tomas  Human       map         new
+      Ivy    Human       map         new
+      Hugo   Human       map         new
+      Nell   Human       map         new
+      … 3 more (archo saves show sv:<Rimward 2.rws> --play --all)
+    events: 8 letters, newest first
+      day 24  Siege           ThreatBig
+      day 23  Death: Ozzie    Death
+      day 22  Refugee chased  PositiveEvent
+      day 21  Raid            ThreatBig
+      day 19  Cold snap       NegativeEvent
+      day 14  Death: Bea      Death
+      … 2 more (archo saves show sv:<Rimward 2.rws> --play --all)
+  can it load: yes, with the list as it is now (archo saves show sv:<Rimward 2.rws>)
+  quick fix: Launch (archo saves fix sv:<Rimward 2.rws> --launch)
+next:
+  archo saves fix sv:<Rimward 2.rws> --launch --dry-run
+
+$ archo saves show Rimward 2 --play --all
+sv:<Rimward 2.rws> Rimward 2  [loads with the list]
+  colony: Iron Pact (3 saves, latest Autosave-1 sv:<Autosave-1.rws>)
+  game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
+  list: plan:default (same Mods as one of its versions)
+  file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Rimward 2.rws
+  saved: 2026-10-01 06:00, 6.9 KB
+  read: in full
+  play: Iron Pact, day 25 (11th of Jugust, 5500), 3h 25m played
+    world: Ennawrin, scenario Crashlanded
+    storyteller: Cassandra, difficulty Rough, permadeath
+    stats: wealth 12,345, raids 22, big threats 30, colonists killed 2, colonists launched 0, greatest population 12
+    since Rimward sv:<Rimward.rws> (day 20): colonists +8, dead +1, animals +1, mechanoids +1, prisoners +1, wealth +1,199, raids +2, big threats +3, colonists killed +1, greatest population +8
+    research: MicroelectronicsBasics now; 2 projects with progress
+    colonists: 11 (1 slave), 2 dead; animals 2, mechanoids 1, prisoners 1
+      Mara   Human       map
+      Kari   Kurin_Race  map, slave
+      Ozzie  Human       dead        died
+      Bea    Human       dead
+      Pike   Human       map         new
+      Rosa   Human       map         new
+      Tomas  Human       map         new
+      Ivy    Human       map         new
+      Hugo   Human       map         new
+      Nell   Human       map         new
+      Otto   Human       map         new
+      Wren   Human       map         new
+      Yara   Human       map         new
+    events: 8 letters, newest first
+      day 24  Siege           ThreatBig
+      day 23  Death: Ozzie    Death
+      day 22  Refugee chased  PositiveEvent
+      day 21  Raid            ThreatBig
+      day 19  Cold snap       NegativeEvent
+      day 14  Death: Bea      Death
+      day 9   Raid            ThreatBig
+      day 3   Wanderer joins  PositiveEvent
+  can it load: yes, with the list as it is now (archo saves show sv:<Rimward 2.rws>)
+  quick fix: Launch (archo saves fix sv:<Rimward 2.rws> --launch)
+next:
+  archo saves fix sv:<Rimward 2.rws> --launch --dry-run
+
+$ archo saves show Rimward --play
+sv:<Rimward.rws> Rimward  [loads with the list]
+  colony: Iron Pact (3 saves, latest Autosave-1 sv:<Autosave-1.rws>)
+  game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
+  list: plan:default (same Mods as one of its versions)
+  file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Rimward.rws
+  saved: 2026-10-01 05:00, 3.5 KB
+  read: in full
+  play: New Arrivals, day 20 (6th of Jugust, 5500), 2h 05m played
+    world: Ennawrin, scenario Crashlanded
+    storyteller: Cassandra, difficulty Rough, permadeath
+    stats: wealth 11,146, raids 20, big threats 27, colonists killed 1, colonists launched 0, greatest population 4
+    research: Electricity now; 2 projects with progress
+    colonists: 3 (1 slave), 1 dead; animals 1, mechanoids 0, prisoners 0
+      Mara   Human       map
+      Kari   Kurin_Race  map, slave
+      Ozzie  Human       map
+      Bea    Human       dead
+    events: 4 letters, newest first
+      day 19  Cold snap       NegativeEvent
+      day 14  Death: Bea      Death
+      day 9   Raid            ThreatBig
+      day 3   Wanderer joins  PositiveEvent
+  can it load: yes, with the list as it is now (archo saves show sv:<Rimward.rws>)
+  quick fix: Launch (archo saves fix sv:<Rimward.rws> --launch)
+next:
+  archo saves fix sv:<Rimward.rws> --launch --dry-run
+
+$ archo saves show Glacier
+sv:<Glacier.rws> Glacier  [will not load cleanly]
+  colony: Glacier Folk (1 save)
+  game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
+  list: plan:default (same Mods as one of its versions)
+  file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Glacier.rws
+  saved: 2026-10-01 04:00, 767 B
+  read: stopped at line 11, byte 724: end tag </things> does not match <thing> (the facts below are from before that point)
+  play: Glacier Folk, day 10 (11th of Aprimay, 5500)
+    colonists: 0; animals 0, mechanoids 0, prisoners 0
+  can it load: 1 item
+    error malformed  line 11 (byte 724): end tag </things> does not match <thing>
+      consequence: can never load: its XML breaks off where reading stopped (written during a crash, or edited by hand?)
+      fix: Recycle (archo saves trash sv:<Glacier.rws>)
+  quick fix: Recycle (archo saves trash sv:<Glacier.rws>)
+  mods: 2 Mods in the save, the same as the list
+    (the whole list: archo saves show sv:<Glacier.rws> --mods)
+next:
+  archo saves trash sv:<Glacier.rws>
+
+$ archo saves show Autosave-1
+sv:<Autosave-1.rws> Autosave-1  [being written]
+  colony: Iron Pact (3 saves)
+  game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
+  list: plan:default (same Mods as one of its versions)
+  file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Autosave-1.rws
+  saved: 2026-10-01 09:59, 6.9 KB
+  read: not yet: the file is being written
+  can it load: no verdict: the file is being written; show it again when the game has saved
+
+$ archo saves list
+saves: 6 saves in 4 colonies
+  Iron Pact  3 saves, latest 2026-10-01 09:59
+    sv:<Autosave-1.rws>  Autosave-1  2026-10-01 09:59  meta only  plan:default (same-mods)  being written
+    sv:<Rimward 2.rws>  Rimward 2   2026-10-01 06:00  day 25     plan:default (same-mods)  loads with the list
+    sv:<Rimward.rws>  Rimward     2026-10-01 05:00  day 20     plan:default (same-mods)  loads with the list
+  Outpost  1 save, latest 2026-10-01 09:00  [matches no list]
+    sv:<Outpost.rws>  Outpost     2026-10-01 09:00  meta only  no list                   loads with the list
+  Glacier Folk  1 save, latest 2026-10-01 04:00
+    sv:<Glacier.rws>  Glacier     2026-10-01 04:00  malformed  plan:default (same-mods)  will not load cleanly
+  Rimward  1 save, latest 2026-10-01 03:00
+    sv:<pack:Rimward.rws>  Rimward     2026-10-01 03:00  meta only  pack P1                   loads, but content will be lost
+  note: 3 saves are meta only: only the head is read, so no in-game day yet; archo saves index reads them in full
+next:
+  archo saves show sv:<Glacier.rws>
+
+$ archo saves index Outpost --only --progress
+saves index: read 1 save (385 B) in <time>
+next:
+  archo saves list
+[stderr] progress: saves n/1 sv:<Outpost.rws> Outpost/Outpost
+
+$ archo saves index Rimward
+Rimward matches 2 saves; pick one
+  sv:<Rimward.rws>  Iron Pact/Rimward  $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Rimward.rws
+  sv:<pack:Rimward.rws>  Rimward/Rimward    $ROOT/ArchoHome/packs/P1/userdata/Saves/Rimward.rws
+next:
+  archo saves show sv:<Rimward.rws>
+  archo saves show sv:<pack:Rimward.rws>
+[exit 3]
+
+$ archo saves index --only
+error: --only needs the saves to read (archo saves index <save…> --only)
+[exit 1]
+
+$ archo saves list --colony Iron Pact
+saves: 3 saves in 1 colony (colony Iron Pact)
+  Iron Pact  3 saves, latest 2026-10-01 09:59
+    sv:<Autosave-1.rws>  Autosave-1  2026-10-01 09:59  meta only  plan:default (same-mods)  being written
+    sv:<Rimward 2.rws>  Rimward 2   2026-10-01 06:00  day 25     plan:default (same-mods)  loads with the list
+    sv:<Rimward.rws>  Rimward     2026-10-01 05:00  day 20     plan:default (same-mods)  loads with the list
+  note: 1 save is meta only: only the head is read, so no in-game day yet; archo saves index reads them in full
+next:
+  archo saves show sv:<Autosave-1.rws>
+
