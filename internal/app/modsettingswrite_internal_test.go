@@ -31,7 +31,6 @@ func TestEditConfigBytes(t *testing.T) {
 		{SettingEdit{Name: "count", Value: " 4 "}, "<count>3</count>", "<count>4</count>", "3", "4", false},
 		{SettingEdit{Name: "scale", Value: "1.25"}, "<scale>0.5</scale>", "<scale>1.25</scale>", "0.5", "1.25", false},
 		{SettingEdit{Name: "name", Value: "X <y>"}, "<name>Bob &amp; Co</name>", "<name>X &lt;y&gt;</name>", "Bob & Co", "X <y>", false},
-		{SettingEdit{Name: "empty", Value: "hi"}, "<empty />", "<empty>hi</empty>", "", "hi", false},
 		{SettingEdit{Name: "scale", Reset: true}, "\r\n    <scale>0.5</scale>", "", "0.5", "", true},
 		{SettingEdit{Name: "on", Value: "on", Old: ptr("True")}, "", "", "", "", false}, // no change
 	} {
@@ -65,6 +64,7 @@ func TestEditConfigBytes(t *testing.T) {
 		{SettingEdit{Name: "name", Value: "a\nb"}, "one line"},
 		{SettingEdit{Name: "names", Value: "x"}, "change it in the game"},
 		{SettingEdit{Name: "names", Reset: true}, "change it in the game"},
+		{SettingEdit{Name: "empty", Value: "hi"}, "change it in the game"}, // <empty /> may be an empty list
 		{SettingEdit{Name: "other", Value: "1"}, "does not store it"},
 		{SettingEdit{Name: "on", Value: "off", Old: ptr("False")}, "changed since it was read"},
 	} {

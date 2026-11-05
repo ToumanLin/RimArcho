@@ -129,6 +129,7 @@
   "lock this version first": "锁定现在这个版本",
   "never updates": "以后不更新",
   "new version available: %s": "有新版本：%s",
+  "new version available": "有新版本",
   "no account needed": "不需要账户",
   "no files on this page": "这个页面没有文件",
   "no known updates; check a source above": "没有已知更新，可在来源里检查更新",

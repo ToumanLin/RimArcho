@@ -14,6 +14,7 @@
   "a value missing from the file is at its default": "文件里没有的值就是默认值",
   "lists, dictionaries and nested values are shown as counts": "一组值、字典和嵌套的值只显示条数",
   "not set": "未设置",
+  "empty": "空",
   "list of %d": "一组 %d 项",
   "dictionary of %d": "字典 %d 项",
   "nested, %d fields": "嵌套 %d 个字段",

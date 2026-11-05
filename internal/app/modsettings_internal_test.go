@@ -183,7 +183,7 @@ func TestParseSettings(t *testing.T) {
 		{Key: "ratio", Kind: "number", Value: "0.8"},
 		{Key: "tiny", Kind: "number", Value: "1E-05"},
 		{Key: "name", Kind: "text", Value: "Hauler & co"},
-		{Key: "empty", Kind: "text", Value: ""},
+		{Key: "empty", Kind: "empty"}, // an empty list or an empty text: read-only
 		{Key: "nan", Kind: "text", Value: "NaN"},
 		{Key: "items", Kind: "list", Items: 2},
 		{Key: "data", Kind: "map", Items: 3},

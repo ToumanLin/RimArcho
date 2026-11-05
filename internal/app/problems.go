@@ -541,6 +541,12 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 			}
 			f := &finding.Finding{Code: "pkg.duplicate-installed", Severity: finding.Info, Key: p, Subjects: []string{inst(subj.ID)},
 				Claim: fmt.Sprintf("%d copies of pkg:%s are installed", len(ins), p)}
+			anyLoadable := false
+			for _, m := range ins {
+				if st.Reg.Loadable(m.ID) {
+					anyLoadable = true
+				}
+			}
 			for _, m := range ins {
 				if m != subj {
 					f.Subjects = append(f.Subjects, inst(m.ID))
@@ -548,12 +554,16 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 				note := "installed"
 				if activePos[m.ID] > 0 {
 					note = fmt.Sprintf("enabled at %d", activePos[m.ID])
-				} else if !st.Reg.Loadable(m.ID) {
+				} else if !st.Reg.Loadable(m.ID) && anyLoadable {
 					note = "ignored by the game (another copy wins)"
 				}
 				f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Inferred, Ref: inst(m.ID), Text: fmt.Sprintf("src:%s %s", m.SourceLabel, note)})
 			}
-			f.Suggestions = []string{"archo swap " + inst(subj.ID)}
+			// swap needs an enabled copy (host round 2026-11-05: `archo swap` on a copy that is not
+			// in the list fails with "not enabled").
+			if len(as) == 1 {
+				f.Suggestions = []string{"archo swap " + inst(subj.ID)}
+			}
 			add(f)
 		}
 	}

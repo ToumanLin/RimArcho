@@ -95,6 +95,31 @@ func issueKinds(c *app.SaveCheck) []string {
 	return out
 }
 
+// A Mod removed while it is still in the list: its entry stays, but the game cannot load
+// it, so the save's Kurin colonists are its, from the tombstone's facts (VM round
+// 2026-11-05, NewRatkinPlus unsubscribed while enabled).
+func TestCheckSaveOwnershipRemovedWhileListed(t *testing.T) {
+	t.Parallel()
+	e := ownersFixture(t)
+	spec := testkit.SaveSpec{Mods: []string{"ludeon.rimworld", "tester.alpha", "tester.kurin"}, Names: []string{"Core", "Alpha", "Kurin"},
+		SteamIDs: []string{"", "3000000002", "3000000005"}, Faction: "New Arrivals", Body: kurinBody}
+	writeOwnersSave(t, e, "Foxes.rws", spec)
+	if err := e.App.RunSavesIndex("", nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	e.Remove(filepath.Join(e.Workshop, "3000000005"))
+	e.Unsubscribe("3000000005")
+	e.MustRun("scan")
+	e.MustRun("analyze")
+	c := checkNamed(t, e, "Foxes")
+	if len(c.Issues) != 1 || c.Issues[0].Kind != app.IssueNotInstalled || c.Issues[0].Level != app.LevelError {
+		t.Fatalf("removed while listed: %v", issueKinds(c))
+	}
+	if o := c.Issues[0].Owns; o == nil || o.Inferred || len(o.Colonists) != 1 || o.Colonists[0].Race != "Kurin_Race" || len(o.Factions) != 1 {
+		t.Fatalf("owns %+v", o)
+	}
+}
+
 // What a Mod owns in a save (10 §4.6) and the rows of Can it load? that need the full read
 // (10 §4.3): the same save while Kurin is enabled, disabled and removed; a class no Mod
 // defines; malformed XML (SV14).

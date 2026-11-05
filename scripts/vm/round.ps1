@@ -20,6 +20,7 @@
 # 'vm.ps1 forward'. Evidence goes to D:\RimArcho-test\rounds\<run> (a few KB).
 [CmdletBinding()]
 param(
+    [string]$VMX = 'D:\VMs\Player-Test\Win11-Player-Test.vmx',   # which test VM (Player-Test, Eval-2, Eval-3)
     [ValidateSet('cli', 'gui')][string]$Launch = 'cli',
     [int]$Play = 120,                 # seconds of play before the save; half that after the load
     [string]$Difficulty = 'Peaceful',
@@ -35,7 +36,8 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 if ($PSVersionTable.PSVersion.Major -lt 7) { throw 'Run this with PowerShell 7 (pwsh)' }
-$vm = Join-Path $PSScriptRoot 'vm.ps1'
+$vmScript = Join-Path $PSScriptRoot 'vm.ps1'
+$vm = { & $vmScript @args -VMX $VMX }
 $work = 'C:\Users\Public\Documents\VM-Test'
 $archo = "$work\RimArcho\archo.exe"
 $transfer = 'D:\RimArcho-test\transfer\round'
@@ -51,7 +53,8 @@ function Say([string]$line) {
 function Guest([string]$name, [string]$body, [switch]$Interactive) {
     $file = Join-Path $transfer "$runName-$name.ps1"
     Set-Content -Encoding UTF8 -LiteralPath $file -Value ($guestLib + "`r`n" + $body)
-    @(& $vm exec $file -Interactive:$Interactive 2>$null) | ForEach-Object { $_.TrimStart([char]0xFEFF) }
+    $out = if ($Interactive) { & $vmScript exec $file -Interactive -VMX $VMX 2>$null } else { & $vmScript exec $file -VMX $VMX 2>$null }
+    @($out) | ForEach-Object { $_.TrimStart([char]0xFEFF) }
 }
 function Fill([string]$s) {
     $s.Replace('__RUN__', $guestRun).Replace('__WORK__', $work).Replace('__NAME__', $runName).Replace('__ARCHO__', $archo)
@@ -112,7 +115,7 @@ if ($left) { "FAIL cleanup: could not remove $($left -join ', ') (is the game st
 }
 
 # The VM and its Tools.
-$tools = try { (& 'D:\VMs\Setup\Invoke-VMRun.ps1' -VMX 'D:\VMs\Player-Test\Win11-Player-Test.vmx' -Command checkToolsState) 2>$null | Select-Object -Last 1 } catch { 'error' }
+$tools = try { (& 'D:\VMs\Setup\Invoke-VMRun.ps1' -VMX $VMX -Command checkToolsState) 2>$null | Select-Object -Last 1 } catch { 'error' }
 if ($tools -ne 'running') { Say "FAIL vm: tools running (tools: $tools)"; exit $script:fails }
 
 # The driver, for both engines.

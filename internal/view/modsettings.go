@@ -320,6 +320,8 @@ func SettingText(v app.SettingValue) string {
 		return `"` + v.Value + `"`
 	case "null":
 		return T("not set")
+	case "empty":
+		return T("empty")
 	case "list":
 		return Tf("list of %d", v.Items)
 	case "map":

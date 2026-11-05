@@ -263,8 +263,13 @@ func (a *App) saveOwnership(s *Save, st *LoadoutState, mm string, f *savefile.Fa
 			loaded[inst] = true
 		}
 	case s.Plan != nil:
+		// Only entries the game can see: a Mod removed while still in the list keeps its
+		// entry, and counting it as loaded hid everything it owns (VM round 2026-11-05: a
+		// save with 5 Ratkin colonists said nothing needed the unsubscribed Mod).
 		for _, e := range st.List {
-			loaded[e.Instance] = true
+			if st.Reg == nil || st.Reg.Known(e.Instance) {
+				loaded[e.Instance] = true
+			}
 		}
 		cover = map[string]bool{}
 		for _, m := range mods {

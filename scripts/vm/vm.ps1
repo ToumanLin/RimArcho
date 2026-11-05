@@ -19,7 +19,7 @@ param(
     [Parameter(Position = 1, ValueFromRemainingArguments = $true)][string[]]$Rest = @(),
     [string]$VMX = 'D:\VMs\Player-Test\Win11-Player-Test.vmx',
     [string]$Wrapper = 'D:\VMs\Setup\Invoke-VMRun.ps1',
-    [string]$Transfer = 'D:\RimArcho-test\transfer\rimarcho',
+    [string]$Transfer = '',      # guest scripts; default: a folder per VM, so several VMs can run at once
     [string]$GuestDir = 'C:\Users\Public\Documents\VM-Test\RimArcho',
     [int]$DevToolsPort = 9222,   # inside the guest, on 127.0.0.1
     [int]$ForwardPort = 9223,    # what the host connects to
@@ -30,7 +30,10 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $work = 'C:\Users\Public\Documents\VM-Test'
-New-Item -ItemType Directory -Force $Transfer | Out-Null
+# The build (RimArcho.zip) is shared by all VMs; the guest scripts are per VM.
+$shared = 'D:\RimArcho-test\transfer\rimarcho'
+if (-not $Transfer) { $Transfer = Join-Path $shared (Split-Path -Leaf (Split-Path -Parent $VMX)) }
+New-Item -ItemType Directory -Force $shared, $Transfer | Out-Null
 
 function VM([string]$cmd, [string[]]$a = @(), [switch]$Guest) {
     if ($Guest) { & $Wrapper -VMX $VMX -Guest -StandardUser:$StandardUser -Command $cmd -VMArgs $a }
@@ -110,13 +113,13 @@ switch ($Command) {
             New-Item -ItemType Directory -Force (Join-Path $out 'monitor') | Out-Null
             Copy-Item -Recurse -Force $mon (Join-Path $out 'monitor\ArchoMonitor')
             if ($monVer -ne $want) { Write-Warning "the bundled Archo Monitor is $monVer, but monitor/VERSION is $want" }
-            $zip = Join-Path $Transfer 'RimArcho.zip'
+            $zip = Join-Path $shared 'RimArcho.zip'
             Compress-Archive -Force -Path "$out\*" -DestinationPath $zip
             Write-Host "built $commit with Archo Monitor $monVer -> $zip ($([math]::Round((Get-Item $zip).Length/1MB,1)) MB)"
         } finally { Pop-Location }
     }
     'push' {
-        $zip = Join-Path $Transfer 'RimArcho.zip'
+        $zip = Join-Path $shared 'RimArcho.zip'
         $hash = (Get-FileHash $zip -Algorithm SHA256).Hash
         $s = Join-Path $Transfer 'unpack.ps1'
         @"

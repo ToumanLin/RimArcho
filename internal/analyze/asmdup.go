@@ -65,7 +65,7 @@ func asmDuplicates(active []*Mod, asms []*AssemblyFacts) []*Finding {
 		for _, a := range cs[1:] {
 			var mine []string
 			for _, t := range a.Types {
-				if !loaded[t] && !strings.Contains(t, "<") {
+				if !loaded[t] && !strings.Contains(t, "<") && !compilerType(t) {
 					mine = append(mine, t)
 				}
 			}
@@ -111,6 +111,14 @@ func asmDuplicates(active []*Mod, asms []*AssemblyFacts) []*Finding {
 		out = append(out, f)
 	}
 	return out
+}
+
+// compilerType: a type the compiler or a polyfill package adds to an assembly
+// (Microsoft.CodeAnalysis.EmbeddedAttribute, System.Runtime.CompilerServices.RefSafetyRulesAttribute).
+// No XML or patch names these, so a copy without them loses nothing (VM round 2026-11-05: the h2
+// warning stayed after Outfit Stands Plus was moved first, on these two types alone).
+func compilerType(t string) bool {
+	return strings.HasPrefix(t, "System.") || strings.HasPrefix(t, "Microsoft.")
 }
 
 func nTypes(n int) string {

@@ -79,7 +79,7 @@ func (f *ModSettingsFile) Read() (*SettingsContent, error) {
 // SettingValue is one value stored in a settings file.
 type SettingValue struct {
 	Key   string
-	Kind  string // bool, number, text; list, map, object, null (read-only)
+	Kind  string // bool, number, text; list, map, object, null, empty (read-only)
 	Value string // the stored text, for bool, number and text
 	Items int    // entries of a list, map or object
 }
@@ -200,6 +200,11 @@ type childCount struct {
 func classifySetting(v *SettingValue, text string, c childCount) {
 	switch {
 	case v.Kind == "null":
+	case c.kids == 0 && strings.TrimSpace(text) == "":
+		// <X /> is an empty list as well as an empty text: Scribe writes both so. Writing text
+		// into a list breaks the Mod's settings on load (VM round 2026-11-05: XML Extensions'
+		// PinnedMods), so it is read-only.
+		v.Kind = "empty"
 	case c.kids == 0:
 		s := strings.TrimSpace(text)
 		v.Value = s

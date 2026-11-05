@@ -36,11 +36,15 @@ func TestProblemsAllFoldsInfo(t *testing.T) {
 	*cmds.InfoFoldLimit = 1
 	defer func() { *cmds.InfoFoldLimit = old }()
 	out := e.MustRun("problems", "--all", "--no-analyze")
-	if !strings.Contains(out, "info order.cycle  2 problems  (archo problems --code order.cycle; MCP: list_problems code=order.cycle)") ||
+	if !strings.Contains(out, "info order.cycle  2 problems  (archo problems --code order.cycle --all; MCP: list_problems code=order.cycle all=true)") ||
 		strings.Count(out, "info order.cycle  ") != 1 {
 		t.Fatalf("folded:\n%s", out)
 	}
 	if code := e.MustRun("problems", "--code", "order.cycle", "--no-analyze"); strings.Count(code, "info order.cycle  ") != 2 || strings.Contains(code, "2 problems  (") {
 		t.Fatalf("--code is folded:\n%s", code)
+	}
+	// A truncated --code list points at --code … --all, not a bare --all that folds it again.
+	if got := cmds.ProblemsExpandCmd("harmony.shared-target", "", ""); got != "archo problems --code harmony.shared-target --all" {
+		t.Fatalf("expand: %s", got)
 	}
 }

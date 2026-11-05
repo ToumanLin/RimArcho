@@ -80,6 +80,23 @@ func analyzeCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	return d, nil
 }
 
+// problemsExpandCmd is the "… N more (…)" command of a truncated list. It keeps the filters:
+// `--code X` must not point at a bare --all, which folds X back into one row (VM round
+// 2026-11-05).
+func problemsExpandCmd(code, subject, sev string) string {
+	cmd := "archo problems"
+	if code != "" {
+		cmd += " --code " + code
+	}
+	if subject != "" {
+		cmd += " --subject " + subject
+	}
+	if sev != "" {
+		cmd += " --severity " + sev
+	}
+	return cmd + " --all"
+}
+
 // expand renders "@{id}" tokens as refs; the first mention of the subject gets its name.
 func expand(ix *app.Index, s, subject string) string {
 	named := false
@@ -288,7 +305,7 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			sel = keep
 			sort.Strings(codes)
 			for _, k := range codes {
-				folds = append(folds, fold{sevRank(finding.Info), fmt.Sprintf("info %s  %d problems  (archo problems --code %s; MCP: list_problems code=%s)", k, byCode[k], k, k)})
+				folds = append(folds, fold{sevRank(finding.Info), fmt.Sprintf("info %s  %d problems  (archo problems --code %s --all; MCP: list_problems code=%s all=true)", k, byCode[k], k, k)})
 			}
 		}
 	}
@@ -307,11 +324,7 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 	}
 	flush(99)
-	expandCmd := "archo problems --all"
-	if a.Str("subject") != "" {
-		expandCmd = "archo problems --subject " + a.Str("subject") + " --all"
-	}
-	lst.Truncate(limit, expandCmd)
+	lst.Truncate(limit, problemsExpandCmd(code, a.Str("subject"), sev))
 	if len(hidden) > 0 {
 		var hs []string
 		for _, k := range []string{"def.override", "patch.contested"} {

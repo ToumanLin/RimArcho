@@ -327,6 +327,8 @@ func settingText(v app.SettingValue) string {
 		return fmt.Sprintf("%q", v.Value)
 	case "null":
 		return "null"
+	case "empty":
+		return "empty (a list or a text; change it in the game)"
 	case "list":
 		return render.Plural(v.Items, "item") + " (list)"
 	case "map":
