@@ -1,6 +1,6 @@
 # RimArcho architecture
 
-> Status: rewritten 2026-10-21. The top-level design (00) covers what to build and for whom; this document covers system organization. Specific algorithms and rules are in `docs/specs/`.
+> Status: in force; describes the organization implemented in 1.0. The top-level design (00) covers what to build and for whom; this document covers how the system is organized. Algorithms and rules are in the specifications 01–18 ([specs/](specs/README.md)).
 > Principle: use RimCrow only as a source of requirements and edge cases; do not reuse its interface, navigation or module structure.
 
 ## 1. Domain model
@@ -20,7 +20,7 @@ Lineage (the family of "the same Mod": original, locked versions, local copies, 
 Rule (user / community / replacement rule; user rules attach to Lineage)
 Finding (conclusion + evidence[])
 LogRun (one Player.log, with error clusters attributed to Instance / Finding, belonging to a Launch)
-Save (one save: colony, enabled Mods at the time, referenced Defs; 1.1)
+Save (one save: colony, enabled Mods at the time, referenced Defs)
 ```
 
 - Plan entries point to Instance, not packageId: players choose "this copy".
@@ -51,7 +51,7 @@ Save (one save: colony, enabled Mods at the time, referenced Defs; 1.1)
 │ Facts: SQLite, updated incrementally by snapshot        │
 ├────────────────────────────────────────────────────────┤
 │ Collection: filesystem · ACF · ModsConfig · Player.log ·│
-│ .NET metadata · community data · saves (1.1)            │
+│ .NET metadata · community data · saves                  │
 └────────────────────────────────────────────────────────┘
 External: Steam client (subscriptions, downloads, launching), ilspycmd (source on demand), model providers (Archo, 1.1)
 ```
@@ -79,7 +79,7 @@ The same source links into two programs (17 §5):
 
 ## 4. Identity design rationale
 
-Specific rules are in 02. This section explains the reasons.
+The rules are in 04. This section explains the reasons.
 
 ### 4.1 No reliable natural primary key
 

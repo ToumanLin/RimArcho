@@ -206,7 +206,7 @@ func (a *App) Unpin(ref string, dryRun bool) (*FileOp, error) {
 var ErrNotTrashable = errors.New("not trashable")
 
 // Trash moves a copy of the player's own, or a hidden or unsubscribed workshop folder, to the recycle bin
-// (09 §5, §2.4), then rescans.
+// (09 §5, 02 §3), then rescans.
 func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 	st, err := a.Loadout()
 	if err != nil {

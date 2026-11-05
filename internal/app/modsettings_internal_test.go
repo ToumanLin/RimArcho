@@ -157,7 +157,7 @@ func TestCopyHugsLib(t *testing.T) {
 }
 
 // What a settings file stores: flat values as values; lists, dictionaries, nested objects
-// and nulls summarised (research 2026-11-02_mod-settings §4).
+// and nulls summarised (16 §2.9).
 func TestParseSettings(t *testing.T) {
 	t.Parallel()
 	sc, err := parseSettings(strings.NewReader(`<?xml version="1.0" encoding="utf-8"?>

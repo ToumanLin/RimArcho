@@ -52,4 +52,4 @@ As with community sorting rules: `archo data update` downloads `patterns-v<n>.js
 
 - `parsed.jsonl` omits Mod entries with `[v:…]` / `[ov:…]` (about 5%, but present in every log; HugsLib itself uses `[ov:]`). Fix this and regenerate the library before using Mod versions and "disappeared after an update" evidence.
 - Fallback patterns such as bare `NullReferenceException` need `StackShape` (innermost game method, and assembly owning the innermost Mod frame); v0 only has message templates.
-- Compare agent conclusions before and after integration using the evaluation dataset (00 §6.5), then decide the final `Instructions` wording.
+- Compare agent conclusions before and after integration using the evaluation dataset (`00-log-corpus-design.md` §6.5), then decide the final `Instructions` wording.

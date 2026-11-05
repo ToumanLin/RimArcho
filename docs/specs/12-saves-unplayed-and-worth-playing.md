@@ -1,7 +1,7 @@
 # 12 · Saves, unplayed and worth playing
 
-> Status: question two, "what haven't I played?", is a design specification for 1.1; §5 is for 1.2; §6 is a long-term direction. Implemented: reading the Mod list at the start of a save (§1.3), the save head (§1.7 L0), the full read with its cache and `saves index` (§1.7 L1), grouping and matching (§4.1, §4.2), can it load except the last load's errors (§4.3), what a Mod owns in a save (§4.6), the actions (§4.4), the save commands and tools (§1.6), the play facts (§4.3), the newest events and the change since the previous save (§4.5) in the CLI, MCP and the Saves page, and the page's timeline (§4.5). Everything else is unimplemented. The Saves page, its read tiers and its tools were decided on 2026-11-04 (§1.6, §1.7, §4; 16 §2.11).
-> Basis: 00 (§2, §4), 00a, 03, 04, 06, 08, 09.
+> Status: save reading (§1) and Saves (§4) are implemented in the CLI, MCP and GUI, except the items marked "not implemented" there. Question two, "what haven't I played?" (the content catalog §2, unused content §3, `unplayed`), is designed for 1.1 and not implemented; §5 is for 1.2; §6 is a long-term direction.
+> Basis: 00 (§2, §4), 00a, 02 §3, 05, 06, 07, 08, 09, 10, 15, 16.
 
 Question two asks: **which installed Mods and content have gone unused across multiple playthroughs?** Read all saves without modifying them and map the Defs they reference back to their providing Mods. This analysis is deterministic and needs no AI; Archo participates only in interpreting results and making suggestions (15 §4).
 
@@ -23,7 +23,7 @@ The answer to question two feeds question three: first establish what has gone u
 
 Read autosaves (`Autosave-*.rws`) like manual saves; label them "autosave" in the UI.
 
-### 1.3 Format and `<meta>` (implemented)
+### 1.3 Format and `<meta>`
 
 Saves are XML with a `<savegame>` root, starting with `<meta>`, followed by `<game>`:
 
@@ -36,10 +36,10 @@ Saves are XML with a `<savegame>` root, starting with `<meta>`, followed by `<ga
 ```
 
 - `<meta><modIds>` contains the packageIds enabled when saving, in load order; `<modNames>` corresponds one-to-one.
-- Reading rules (`readSaveMeta` in `internal/app/exchange.go`): stream parsing, non-strict mode, ignore the declared character set. Stop at `</meta>` without reading the tens of MB in `<game>`. Lowercase all packageIds, record `gameVersion`, and use `modNames` to name "not installed" entries. Missing `<meta><modIds>` returns `no <meta><modIds> in the save`.
-- Detection: treat a file as a save if its extension is `.rws` or its first 4096 bytes contain `<savegame`, regardless of any other extension (`ReadLoadoutFile`; `ParseList` in `listformats.go` also detects `<savegame`).
-- Current use is list import: `archo loadout import <save>` puts the save's Mod list into a plan as one reversible edit, without writing game files (07 §7). Test: `TestLoadoutExchange`.
-- `<modSteamIds>` is not read yet. The save head (§1.7 L0) will read it: a nonzero ID lets a not-installed entry offer Subscribe (§4.3); zero means a local or unknown Mod.
+- Reading rules (`savefile.ReadMeta`, used by the save head and by `readSaveMeta` in `internal/app/exchange.go`): stream parsing, non-strict mode, ignore the declared character set. Stop at `</meta>` without reading the tens of MB in `<game>`. Lowercase all packageIds, record `gameVersion`, and use `modNames` to name "not installed" entries. A save without `<meta><modIds>` gives `no <meta><modIds> in the save`.
+- Detection: a file is a save if its extension is `.rws` or its first 4096 bytes contain `<savegame`, whatever its extension (`ReadLoadoutFile`; `ParseList` in `listformats.go` also detects `<savegame`).
+- List import: `archo loadout import <save>` puts the save's Mod list into a plan as one reversible edit, without writing game files (07 §7). Test: `TestLoadoutExchange`.
+- `<modSteamIds>` is read by the save head (§1.7 L0), not by list import: a nonzero ID lets a not-installed entry offer Subscribe (§4.3); zero means a local or unknown Mod.
 
 ### 1.4 Extracting Def references
 
@@ -61,7 +61,7 @@ Save reading has read-only tools in the tool layer (13 §1.2, §4.2, 14 §2): `s
 
 ### 1.7 Read tiers, cache and background reading
 
-A save is read at three costs; each tier is computed and cached separately. L0 is implemented (`savefile.ReadHead`, cached in memory per App by path, size and mtime; `app.ListSaves`). L1 is implemented in the core (`internal/app/saveread.go`): the cache, `archo saves index`, `Save.Summary` on every listed save with a valid cache row, `App.SaveFacts` for one save, and grouping by world (§4.1). Can it load uses the cached facts for its malformed and class rows and for what a missing Mod owns (§4.3, §4.6). The CLI and MCP show L1 facts (`saves list` the in-game day, `saves show` the play facts; 13 §4.2); the page shows them too (16 §2.11): the in-game day on rows and the play facts and timeline in the right card.
+A save is read at three costs; each tier is computed and cached separately. L0: `savefile.ReadHead`, cached in memory per App by path, size and mtime (`app.ListSaves`). L1: `internal/app/saveread.go`, with the cache, `archo saves index`, `Save.Summary` on every listed save with a valid cache row, `App.SaveFacts` for one save, and grouping by world (§4.1). Can it load uses the cached facts for its malformed and class rows and for what a missing Mod owns (§4.3, §4.6). The CLI and MCP show L1 facts (`saves list` the in-game day, `saves show` the play facts; 13 §4.2), and so does the page (16 §2.11): the in-game day on rows, and the play facts and timeline in the right card.
 
 | Tier | What | Cost | Used for |
 | --- | --- | --- | --- |
@@ -72,7 +72,7 @@ A save is read at three costs; each tier is computed and cached separately. L0 i
 - L1 depends only on the file, so it is cached in the database (`save_cache`, 17 §3) by path, size, modification time and parser version, as gzip JSON like `log_cache`; it is not reread while all four are unchanged. Beside the facts the row keeps what lists need (ticks, world identity, world and player faction names, malformed), so listing reads no facts; `App.SaveFacts` loads one save's facts. A file whose size or modification time changes while it is read is being written: not stored. L2 depends on the current list and index, so it is not cached and is recomputed when either changes. L0 is read on demand.
 - L1 runs in a child process, `archo saves index` (13 §4.2), as background task kind `saves` (16 §2.16, §8.4): progress lines reach the status line and the task record, and each finished file is written to the cache at once, so a stopped run keeps what it read. The selected save is read first, then newest first, with 2–4 readers. Reading streams with constant memory; the child process keeps the GUI within its memory budget (16 §10). So that selecting never waits for the run, the GUI reads a selected save that is not read yet itself, one save at a time on its own session (16 §2.11); a save read by both is stored twice, the same row.
 - A file modified in the last 5 seconds, or whose size changes between two reads, is **being written**: it gets no verdict and is read again later. The page rereads L0 when it opens and when a running game exits (09 §4).
-- CLI and MCP do not wait for the background run: `saves show` reads L1 for its one save inline, before its load check, then lists the saves again when that read was new so the save sits in its world's colony; the previous save it compares with (§4.3) is used only from the cache. `saves list` never reads: it shows the day of saves with L1, `meta only` for the rest (a note counts them and names `saves index`) and `malformed` for saves whose read stopped early. A save being written is not read; `saves show` says so. Measured (2026-11-04, synthetic 25.8 MB save, Windows): the inline read takes about 0.1 s, plus about 0.14 s inside the first `open` of the freshly written file (most likely the antivirus scanning it); `saves show` from the cache takes about 2 ms, `saves list` 1 ms.
+- CLI and MCP do not wait for the background run: `saves show` reads L1 for its one save inline, before its load check, then lists the saves again when that read was new so the save sits in its world's colony; the previous save it compares with (§4.3) is used only from the cache. `saves list` never reads: it shows the day of saves with L1, `meta only` for the rest (a note counts them and names `saves index`) and `malformed` for saves whose read stopped early. A save being written is not read; `saves show` says so. Measured (synthetic 25.8 MB save, Windows): the inline read takes about 0.1 s, plus about 0.14 s inside the first `open` of the freshly written file (most likely the antivirus scanning it); `saves show` from the cache takes about 2 ms, `saves list` 1 ms.
 
 ## 2. Content catalog
 
@@ -111,7 +111,7 @@ Players do not know `ThingDef` or `IncidentDef`. The content catalog groups each
 | Scenarios | `ScenarioDef` | |
 | Not content | Other types, such as `KeyBindingDef`, `MainButtonDef`, `StatDef`, `JobDef`, `WorkGiverDef`, `ThinkTreeDef`, `SoundDef`, `DesignationCategoryDef`, `LetterDef` | Mechanics and UI; players do not "play" these |
 
-- This table is a draft. Subdividing `ThingDef` requires reading its fields (`race`, `category`, `apparel`, `plant`, `verbs`). Whether Def facts in 05 §5.1 currently carry these fields needs checking; add them if absent (unimplemented).
+- This table is a draft. Subdividing `ThingDef` requires reading its fields (`race`, `category`, `apparel`, `plant`, `verbs`). Def facts (05 §5.1) do not carry them (`def_fact` stores the type, name, parent and whether the Def is abstract); adding them is not implemented.
 - Inheritance: fields may come from a parent Def (`ParentName`); classify using inherited values.
 - Each Def belongs to one category: use the first matching row, top to bottom.
 - `PawnKindDef` is not a separate category: it forms part of factions and races.
@@ -155,7 +155,7 @@ Results need no AI. Archo may "interpret" this page: pick unused content worth t
 
 ## 4. Saves
 
-The Saves page is in the Library group (16 §2.11; moved out of Play review on 2026-11-04). A colony is not stored as an object of its own: it is the group of saves of one game. Facts about the colony are read from its **latest save** and shown once; an older save shows only how it differs.
+The Saves page is in the Library group (16 §2.11). A colony is not stored as an object of its own: it is the group of saves of one game. Facts about the colony are read from its **latest save** and shown once; an older save shows only how it differs.
 
 ### 4.1 Group by colony
 
@@ -170,20 +170,20 @@ Evaluate in order:
 
 ### 4.2 Matching a plan
 
-Implemented (`app.ListSaves`, 2026-11-04). Evaluate in order and stop at the first match:
+`app.ListSaves` evaluates these in order and stops at the first match:
 
 1. Save is in a pack's save directory → that pack.
 2. Save modification time falls after a launch record (09 §1) and before the next launch, and that launch used this user data directory → that launch's plan. A pack's launch does not match a save in a game folder (packs save in their own folder).
 3. Save `<modIds>` (enabled set resolved under 07 §4.2) exactly matches a version (07 §3) of a plan (`TokenFingerprint`) → that plan; if several match, choose the most recently played.
 4. No match → "matches no list".
 
-Approximate matching for rule 3 (an enabled set differing by one or two entries) is undecided; omit it initially to avoid false matches. Rules 1 and 2 may match a save whose Mods differ from the list; §4.3 lists those differences.
+Approximate matching for rule 3 (an enabled set differing by one or two entries) is undecided and not implemented, to avoid false matches. Rules 1 and 2 may match a save whose Mods differ from the list; §4.3 lists those differences.
 
 ### 4.3 Selecting a save
 
 **Where it belongs**: game version and environment, the matched list or pack with the rule that matched it, and the location (folder and file).
 
-**Can it load?** compares the save with the matched list as it is now and lists only what needs attention. Passed checks are not listed. `app.CheckSave` implements every row but the last load's: the rows needing only the head (cut off, Mods, order, game version, no list) always, and those needing the full read (malformed XML, classes, what a Mod owns) when the save's L1 facts are cached (§1.7; `CheckSave` never reads a save in full). Without them its rows and levels are those of the head alone.
+**Can it load?** compares the save with the matched list as it is now and lists only what needs attention. Passed checks are not listed. `app.CheckSave` implements every row except the last load's errors (not implemented): the rows needing only the head (cut off, Mods, order, game version, no list) always, and those needing the full read (malformed XML, classes, what a Mod owns) when the save's L1 facts are cached (§1.7; `CheckSave` never reads a save in full). Without them, the rows and levels are those of the head alone.
 
 | Item | Level | Consequence shown | Fix |
 | --- | --- | --- | --- |
@@ -217,7 +217,7 @@ The actions are implemented in `internal/app/saveactions.go` (`FixSave`, `Rename
 | Rename | Rename the file in place, inline as in 16 §2.17. Keep a RimSaves prefix; refuse an existing name | Not required |
 | Copy | Copy to `<name> (copy).rws` (then `(copy 2)`…) in the same folder, never overwriting, keeping the modification time so the copy sorts beside the original | Not required |
 | Back up | Copy to `<data directory>/backups/saves/<time>/`, preserving filenames. Allow multiple selections; one backup shares one time directory. Copy only; leave originals in place | Player confirmation required |
-| Move to the recycle bin | Use the recycle bin rules in 02 §3: save files are one of the three accepted categories. No permanent deletion | Player confirmation required |
+| Move to the recycle bin | Use the recycle bin rules in 02 §3: save files are one of its accepted categories. No permanent deletion | Player confirmation required |
 
 - `<time>` is local time, `YYYYMMDD-HHMMSS` like database backups (17 §3).
 - Both actions requiring confirmation follow 16 §6: list affected files and sizes first; execute only after the player clicks "confirm". Archo can request but cannot confirm for the player (15 §2.3). MCP previews with `dry_run=true` and executes with `confirm=true` (14 §2).
@@ -227,26 +227,26 @@ The actions are implemented in `internal/app/saveactions.go` (`FixSave`, `Rename
 
 ### 4.5 Timeline and events
 
-From the L1 facts of a colony's saves (and the game's own history records inside each save, if measurement confirms they hold a series): wealth and colonists over in-game days, one point per save, with deaths marked; events such as deaths, raids repelled and marriages, newest first. Fields await measurement. Counting occurrences instead of only presence is optional.
+From the L1 facts of a colony's saves and the game's own history records inside each save: wealth and colonists over in-game days, one point per save, with deaths marked; events such as deaths, raids repelled and marriages, newest first. Counting occurrences instead of only presence is optional (undecided).
 
-Implemented in `saves show` (13 §4.2): the events are the letters of the game's archive (`Facts.Events`, the newest 200), shown newest first with their in-game day, label and LetterDef: 3 on one line by default, 6 with `--play`, all with `--play --all`; the change since the previous save is §4.3's.
+In `saves show` (13 §4.2): the events are the letters of the game's archive (`Facts.Events`, the newest 200), shown newest first with their in-game day, label and LetterDef: 3 on one line by default, 6 with `--play`, all with `--play --all`; the change since the previous save is §4.3's.
 
-Implemented in the GUI (2026-11-04, 16 §2.11): the lines are the selected save's own `Wealth_Total` and `FreeColonists` records, spread evenly from day 0 to its day; each read save of the colony is a point at its in-game day (from its summary), on the selected save's wealth line where that reaches, so a save of another branch of play is placed on this save's history; death letters are marked; the events are the newest letters (any letter: raids, joiners, deaths), not counted. Only the selected save's facts are loaded, never every save's. The records are read from the game's code and unverified on real saves.
+In the GUI (16 §2.11): the lines are the selected save's own `Wealth_Total` and `FreeColonists` records, spread evenly from day 0 to its day; each read save of the colony is a point at its in-game day (from its summary), on the selected save's wealth line where that reaches, so a save of another branch of play is placed on this save's history; death letters are marked; the events are the newest letters (any letter: raids, joiners, deaths), not counted. Only the selected save's facts are loaded, never every save's. The records are read from the game's code and unverified on real saves.
 
 ### 4.6 What a Mod owns in a save
 
-Implemented for can it load (`internal/app/saveowners.go`, 2026-11-04; synthetic tests only, unverified on real saves). To state the consequence of a missing Mod, attribute the save's L1 facts (§1.7) to the Mods with a row of their own (not installed, or installed but not in the list). A Mod **owns** what the save needs and nothing the list loads provides: an object that a Mod the list loads, or the game, also provides is not lost.
+Implemented for can it load (`internal/app/saveowners.go`; tested on synthetic saves only, unverified on real saves). To state the consequence of a missing Mod, attribute the save's L1 facts (§1.7) to the Mods with a row of their own (not installed, or installed but not in the list). A Mod **owns** what the save needs and nothing the list loads provides: an object that a Mod the list loads, or the game, also provides is not lost.
 
 - **Defs**: each `<def>` value by Def facts (05 §2; batched, `store.DefDefiners`), as in §1.5: non-abstract definitions; of several defining Mods with rows, the last in the save's order. A Def the game generates from another at startup has no Def file and resolves by the Def it is made from: prefixes `Corpse_`, `Meat_`, `Blueprint_`, `Blueprint_Install_`, `Frame_`, `Techprint_`, `Psytrainer_`, `Neurotrainer_`, `Make_`, `Administer_`, suffixes `_Rough`, `_RoughHewn`, `_Smooth` (`DefGenerator`, 1.6). Counted per Def type with the number of `<def>` elements naming them, about one per object ("3 things, 1 hediff").
 - **Pawns** (the player's humanlike pawns, alive and dead) by their race Def; **factions** by their FactionDef, named by the faction's name. The facts count animals, mechanoids and prisoners without their races, so those are not attributed.
 - **Classes**: each `Class="…"` value; a generic one by its definition and each argument. The game's own types by `store.GameClassOwners` (05 §5.3); `System.` and `UnityEngine.` types count as present (not indexed; the runtime has them). Mod types by `store.TypeDefiners` in every form the game tries (17 §6 item 20): the value, and the value prefixed by each of `store.SaveNamespaces`; a simple name found nowhere is looked up as a nested type's inner name (`store.NestedTypeDefiners`). World and game components are among the classes: the facts do not say where a `Class` appeared, so they are not reported apart (not implemented; needs a scanner field).
-- **Which facts exist** (05 §3), and so what is certain: Def facts for every loadable installed Mod once an analysis of the game version has run; type facts only for Mods enabled when an analysis ran (a disabled Mod keeps them while its content is unchanged); a Mod removed from disk keeps its facts while its tombstone lasts (04 §2.5; inferred from the code and seen in synthetic tests: scan and analysis keep a tombstone's version view). A list entry the game cannot see (a Mod removed while still in the list) does not count as loaded, so what it owns is lost (VM round 2026-11-05: an unsubscribed race Mod still in the list owned nothing). Facts of any copy of the packageId count, in any environment of that game version (`store.PackageFactViews`). A Mod without facts of a kind (never installed, or disabled without type facts) is given, **inferred**, what nothing installed provides of that kind: the Defs no installed Mod defines and the classes no installed assembly nor the game defines. When several Mods lack facts, each is given all of it and says it may belong to the others. A Def no installed Mod defines may also be one a Mod update removed (§1.5), so a Mod whose inferred share is only Defs stays a warning.
+- **Which facts exist** (05 §3), and so what is certain: Def facts for every loadable installed Mod once an analysis of the game version has run; type facts only for Mods enabled when an analysis ran (a disabled Mod keeps them while its content is unchanged); a Mod removed from disk keeps its facts while its tombstone lasts (04 §2.5; inferred from the code and seen in synthetic tests: scan and analysis keep a tombstone's version view). A list entry the game cannot see (a Mod removed while still in the list) does not count as loaded, so what it owns is lost. Facts of any copy of the packageId count, in any environment of that game version (`store.PackageFactViews`). A Mod without facts of a kind (never installed, or disabled without type facts) is given, **inferred**, what nothing installed provides of that kind: the Defs no installed Mod defines and the classes no installed assembly nor the game defines. When several Mods lack facts, each is given all of it and says it may belong to the others. A Def no installed Mod defines may also be one a Mod update removed (§1.5), so a Mod whose inferred share is only Defs stays a warning.
 - **Unchecked**: when a Mod of the save that the list loads has no Def view, the Defs, pawns and factions are not checked; when one has no DLL view, or the game's types are not indexed (`GameTypesIndexed`), a class found nowhere is not concluded on (no class-missing row, nothing inferred), since it may be in the unindexed assembly. A Mod the list loads and the save does not have stored nothing in it, so its facts are not needed (a pack's copies all are: its Mods resolve by packageId). The row says what was not checked; with neither checked it is as without the full read. So analysing a list made from the save (16 §2.11) is enough to check it.
 - **Together**: the Mods that are not installed are one row on the page, so `SaveCheck.GoneOwns` is what they own together: what each owns by its own facts, plus what nothing installed provides once rather than once per Mod (`Among` counts only Mods outside the group). `SaveOwned.NoFacts` marks a Mod the database has nothing on (no Def view and no DLL view), which the page says.
 - **Names**: each `OwnedDefs` keeps the names of its Defs, most used first, at most 100 (`OwnedDefNames`), for the page's View.
 - Counts per kind ("3 colonists of race Kurin_Race (1 dead), 1 faction (Kurin Clan), 1 class (ModA.CompBroken), 3 things, 1 hediff") are `app.SaveOwned` on the row's `SaveIssue.Owns` (JSON `owns`); the text is `consequence()` in `internal/cmds/saves.go` (CLI and MCP) and `issueView()` / `goneView()` in `internal/view/saves.go` (the page).
 - Speed: `saves list` checks every save, so lookups are batched and kept per App while the database is unchanged (`saveOwnerMemo`); Defs are looked up only for saves with a Mod row. Measured in 18.
-- Not implemented: whether a Mod can be removed mid-playthrough (`saves list --mod`), which the same attribution answers.
+- Not implemented: whether a Mod can be removed mid-playthrough, which the same attribution answers. `saves list --mod` lists the saves whose Mod list has the Mod but does not say what removing it loses.
 
 ## 5. Playthrough themes and content conflicts (1.2)
 
@@ -280,12 +280,12 @@ Two pages under "worth playing" in the sidebar: play goals and shared packs (16 
 | # | Scenario | Expected | Status |
 | --- | --- | --- | --- |
 | SV1 | `loadout import` a save (`TestLoadoutExchange`) | Stop after `<meta>`; import 4 entries, 1 uninstalled with a name; no ModsConfig.xml writes; `undo` restores | Pass |
-| SV2 | Read all saves to extract Defs | Every save's size and modification time remain unchanged | Unimplemented |
+| SV2 | Read all saves to extract Defs | Every save's size and modification time remain unchanged | Untested (the full read, §1.7 L1, reads every save; no test checks the files afterwards) |
 | SV3 | Second analysis with no new saves | Use the cache without rereading saves | Pass for the full read (synthetic: `TestSavesFullRead`); unused content (§3) is unimplemented |
 | SV4 | A Mod with only Patches and assemblies | Goes into "functional, excluded", not "never appeared" | Unimplemented |
 | SV5 | A Mod "appears" only in saves without it enabled | Does not count as having appeared | Unimplemented |
 | SV6 | 30 saves from one colony | Count as 1 colony | Unimplemented |
-| SV7 | Matching a save to a plan | Follow §4.2 order; unmatched saves enter "saves without a matching list" | Partial: launch and same-Mods matches pass (synthetic: `TestSavesListGroupAndMatch`), pack saves in golden `saves`; unmatched saves untested |
+| SV7 | Matching a save to a plan | Follow §4.2 order; unmatched saves enter "matches no list" | Partial: launch and same-Mods matches pass (synthetic: `TestSavesListGroupAndMatch`), pack saves in golden `saves`; unmatched saves untested |
 | SV8 | Back up a save without player confirmation | No files written; after confirmation, appears in `<data directory>/backups/saves/<time>/`, original unchanged | Pass (synthetic: `TestSaveFileActions`, `TestManageSavesActions`) |
 | SV9 | Move to the recycle bin | Confirm first; enter system recycle bin; refuse while the game runs | Partial: confirmation passes (synthetic: `TestSaveFileActions`, `TestManageSavesActions`, golden `saves`); the real recycle bin and a running game are untested |
 | SV10 | Fix a save whose list lacks an installed Mod and a Workshop Mod | One reversible edit: the installed Mod enabled, the Workshop Mod added as a missing entry, each in save order. Until the download is scanned the save still reads "content will be lost", and fixing again only subscribes again (no edit) | Pass (synthetic: `TestFixSave`, golden `saves`) |

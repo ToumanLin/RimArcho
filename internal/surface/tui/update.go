@@ -291,7 +291,7 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 	return m.listKey(s)
 }
 
-// listKey: the keys of the list areas (16 §3.3, §13.6). The arrows only navigate.
+// listKey: the keys of the list areas (16 §3.3). The arrows only navigate.
 func (m *model) listKey(s string) tea.Cmd {
 	c := m.col()
 	switch s {
@@ -702,7 +702,7 @@ func (m *model) removeEnv(name string) {
 		}}
 }
 
-// ---- mouse (16 §3.3, §13.5) ----
+// ---- mouse (16 §3.3, §8.5) ----
 
 // hit returns the column slot and view index under a point (index -1: the title row or
 // below the last row; ok false: not over a list column).

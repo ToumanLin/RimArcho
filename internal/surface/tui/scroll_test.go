@@ -64,7 +64,7 @@ func TestT15FullScreenNext(t *testing.T) {
 	}
 }
 
-// 16 §3.2, §13.4: 4 (or → from Staging) focuses the detail; ↑↓ scroll it, the name stays
+// 16 §3.2: 4 (or → from Staging) focuses the detail; ↑↓ scroll it, the name stays
 // on top in the accent colour; ← and esc go back to the list it shows; a click focuses it
 // too. PgDn scrolls it from a list without moving the focus or the cursor.
 func TestDetailFocus(t *testing.T) {

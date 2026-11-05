@@ -10,7 +10,7 @@ RimArcho: a RimWorld launcher and Mod manager written in Go. `RimArcho.exe` is t
 
 ## After changing code, in the same commit
 
-1. **Specifications**: if behavior changes, update the section responsible for it. Follow "Maintenance" in specs/README.
+1. **Specifications**: if behavior changes, update the section responsible for it. Follow "Maintenance" in specs/README. `node scripts/docs-refs/refs.cjs check` lists `NN §x.y` references and doc links that point nowhere.
 2. **[CHANGELOG.md](CHANGELOG.md)**: add an entry to the topmost unreleased version. Include changes visible to players and changes to CLI / MCP output and tools.
 3. **[docs/release-vm-tests.md](docs/release-vm-tests.md)**: add a row for each new feature, key or dialog, or existing feature whose behavior changed. Before a release, test the entire table in the VM to find bugs.
 

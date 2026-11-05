@@ -170,7 +170,7 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		return problemShowCmd(c, &detail)
 	}
 	if !a.Bool("no-analyze") {
-		// The newest log is attributed against its own version (06 §4, 05 §6.3).
+		// The newest log is attributed against its own version (06 §3, §4).
 		if st, err := c.App.Loadout(); err == nil {
 			if p := c.App.ProblemLog(st); p != "" {
 				c.App.EnsureLogFileAnalysis(st, p, progress())

@@ -28,7 +28,7 @@ func TestData(t *testing.T) {
 	if !last.Fallback || last.Match != "." {
 		t.Errorf("last rule %s should be the catch-all fallback", last.ID)
 	}
-	// Privacy (00 §8): mod patterns only from enough logs and players, never paths.
+	// Privacy (docs/research/00-log-corpus-design.md §8): mod patterns only from enough logs and players, never paths.
 	for _, p := range d.Mod {
 		if p.Logs < 10 || p.Sessions < 5 {
 			t.Errorf("%s: %d logs, %d sessions", p.ID, p.Logs, p.Sessions)

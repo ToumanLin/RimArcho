@@ -33,7 +33,7 @@ var configKeys = map[string][]string{
 	"ui.gpu": {"on", "off"},
 }
 
-// freeKeys are settings with free values: their default and a check (16 §3.8, §12.4).
+// freeKeys are settings with free values: their default and a check (16 §3.8, §2.14).
 var freeKeys = map[string]struct {
 	def   string
 	check func(string) error

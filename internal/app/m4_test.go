@@ -160,7 +160,7 @@ func ref(t *testing.T, e *testkit.Env, name string) string {
 	return ""
 }
 
-// 05 §4.5/§6.2: skip-prefix is info until the newest log's stack passes through
+// 05 §4.5, 06 §2: skip-prefix is info until the newest log's stack passes through
 // the method; the newest Player.log joins the problems without --select.
 func TestSkipPrefixEscalation(t *testing.T) {
 	t.Parallel()

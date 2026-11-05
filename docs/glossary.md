@@ -19,7 +19,7 @@ The domain/UI distinction follows [03 §1](specs/03-environments-and-sources.md#
 | 工坊编号 | Workshop ID |  | The published file ID, distinct from package ID. |
 | 共用来源 | shared source |  | A source shared across game environments. |
 | 官方来源 | official source | official | The game's Data directory containing Core and DLC. |
-| 后补订阅 | subscribe after downloading |  | Historical SteamCMD/client workflow; distinguish subscription from downloading |
+| 后补订阅 | subscribe after downloading |  | Download with SteamCMD now, subscribe through Steam later to credit authors (11 §1); distinguish subscribing from downloading. |
 | 环境 | environment | game | An Environment owns one game directory and its save configuration. |
 | 环境来源 | environment source |  | An official or local source belonging to one environment. |
 | 快照 | snapshot |  | Metadata and content fingerprints from one scan of an instance. |
@@ -167,14 +167,14 @@ The domain/UI distinction follows [03 §1](specs/03-environments-and-sources.md#
 | 眉题 | eyebrow |  | Short contextual label above a heading. |
 | 面包屑 | breadcrumbs |  |  |
 | 命令面板 | command panel |  |  |
-| Mod 库存 | Mod inventory | mod library | The UI calls this page mod library. |
-| 能不能跑 | can it run |  | The exact English page name is lowercase. |
+| Mod 库 | Mod library | mod library | The page listing every installed Mod copy; the English page name is lowercase. |
+| 能不能跑 | Can it run | can it run | The page that checks whether the current plan can run; the English page name is lowercase. |
 | 强调色 | accent color |  |  |
+| 启动页 | Launch | start | The first page: choose a game and a list or pack, then launch it. |
 | 全屏详情 | full-screen details |  |  |
 | 上次运行 | last run |  |  |
 | 上次运行的报错 | errors from the last run |  |  |
 | 首次引导 | first-run guide |  |  |
-| 首页 | home |  |  |
 | 树形引导线 | tree guide |  | Sidebar child hierarchy, not a selection marker. |
 | 微光 | shimmer |  | Loading effect. |
 | 详情栏 | detail column |  |  |
@@ -182,7 +182,7 @@ The domain/UI distinction follows [03 §1](specs/03-environments-and-sources.md#
 | 悬停提示 | tooltip |  |  |
 | 虚拟列表 | virtual list |  | Render only visible rows. |
 | 续行 | continuation line |  | An additional display line belonging to one row. |
-| 需要处理 | needs attention |  |  |
+| 需要处理 | needs attention |  | A Mod's status in its details when it has problems; the page is Can it run. |
 | 要你确认 | for you to confirm |  |  |
 | 游戏日志 | game log |  |  |
 | 预览 | preview |  | Show the proposed changes before applying them. |
@@ -213,13 +213,13 @@ The domain/UI distinction follows [03 §1](specs/03-environments-and-sources.md#
 | 启动 | launch |  |  |
 | 启动参数 | launch arguments |  |  |
 | 启动记录 | launch record |  | A persisted Launch, distinct from a scanned log run. |
-| 轻包 | light pack |  | Historical term; current sharing uses a RimArcho list instead. |
+| 轻包 | light pack |  | Not a RimArcho term: list-only sharing exports a RimArcho list (16 §7.2). |
 | 入链 | inbound link |  | A link pointing into a directory affected by an operation. |
 | 私有字节 | private bytes |  | The Windows process memory counter. |
 | 贴图 | texture |  |  |
 | 贴图优化 | texture optimization |  |  |
 | 退订残留 | unsubscribed residue |  | Files left after a Workshop subscription is removed. |
-| 完整包 | full pack | pack | Historical distinction; current packs always include files. |
+| 完整包 | full pack | pack | Not a separate kind: every pack includes its files. |
 | 显存 | video memory |  |  |
 | 隐藏的 Mod | hidden mod |  | A Mod hidden from the game, not necessarily unsubscribed. |
 | 用户数据目录 | user data directory |  | Contains Config/ModsConfig.xml and saves. |

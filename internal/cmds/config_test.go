@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// Settings with free values (16 §3.8, §12.4): a default, a check, and set/get.
+// Settings with free values (16 §3.8, §2.14): a default, a check, and set/get.
 func TestFreeSettings(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)

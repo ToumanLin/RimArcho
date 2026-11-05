@@ -191,7 +191,7 @@ func parseSettings(r io.Reader) (*SettingsContent, error) {
 }
 
 // childCount is what a value's element holds: Scribe writes a list as <li> items and a
-// dictionary as <keys> and <values> lists (research 2026-11-02_mod-settings §4).
+// dictionary as <keys> and <values> lists (16 §2.9).
 type childCount struct {
 	kids, lis, keyItems  int
 	keys, values, inKeys bool

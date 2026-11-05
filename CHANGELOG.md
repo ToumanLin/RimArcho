@@ -1607,7 +1607,7 @@ numbers below are the current ones.
 
 ## 0.7.0 — the window (development milestone, in 1.0.0)
 
-### Icon (08 §15)
+### Icon (16 §8.6)
 - The author's portrait artwork (`internal/icon/portrait.svg`) on a dark rounded base; below
   48 px only the face is shown so it still reads in the taskbar. (It replaces the keystone arch
   drawn earlier the same day.)
@@ -1617,7 +1617,7 @@ numbers below are the current ones.
   release script writes the resource object with `go run ./scripts/winres`; no resource compiler is
   needed. The window, its title bar and the page header use the same icon.
 
-### Link deployment (15 §8)
+### Link deployment (09 §3)
 - Mods in SteamCMD and extra folders can be enabled. `save` links each one into `Mods/` as
   `_Archo_<source>_<folder>` before it writes ModsConfig.xml, and removes the link once the mod is
   disabled. `save --dry-run` and the save preview list the links. Windows uses junctions.
@@ -1631,7 +1631,7 @@ numbers below are the current ones.
 - The window and the TUI share one layer, `internal/view`: the columns, the search syntax, the
   details, needs attention with its actions, the changes, tags, the verbs and the position input, the
   palette and the interface text. Neither interface builds these itself.
-- The window follows the TUI's v3 rules (16 §13) and adds the mouse: click and modifier clicks,
+- The window follows the TUI's v3 rules (16 §3) and adds the mouse: click and modifier clicks,
   double-click, drag and drop between and within the lists, a context menu, resizable columns.
 - Workshop descriptions are built from parsed BBCode blocks and never inserted as HTML; images
   come only from RimArcho's cache. The page loads nothing remote and the window opens no port.

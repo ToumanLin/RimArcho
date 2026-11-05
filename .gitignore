@@ -17,7 +17,7 @@
 /spikes/wezterm-v0/
 /spikes/gui-v0/*.exe
 
-# generated Windows resources (08 §15.2)
+# generated Windows resources (16 §8.6)
 *.syso
 
 # Archo Monitor build output (17 §5)
