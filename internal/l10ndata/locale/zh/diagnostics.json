@@ -379,6 +379,7 @@
   "the author's requirement to load before another mod": "作者注明的先后顺序：在另一个 Mod 之前加载",
   "the author's requirements": "作者的前置要求",
   "the class was renamed in an update": "这个类在更新里改了名",
+  "a typo or wrong namespace in the mod's XML (Class=\"…\", thingClass); analyze_log names that file and the nearest existing classes": "Mod 的 XML 里类名拼错或命名空间写错（Class=\"…\"、thingClass）；analyze_log 会指出是哪个文件，并列出最接近的现有类",
   "the community's replacement list": "社区的替代品列表",
   "the cycle of %d mods is settled by priority; %s": "%d 个 Mod 的循环要求按优先级处理；%s",
   "the def was renamed or removed in an update": "定义在更新里改名或删掉了",

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"path"
 	"strings"
 	"time"
 
@@ -713,4 +714,103 @@ func (s *Store) DecompileRecords(instance string) ([]*DecompileRecord, error) {
 		out = append(out, &r)
 	}
 	return out, rows.Err()
+}
+
+// TypesUnder returns the distinct type names of Store.MM's analysed assemblies in the root
+// namespace root ("VanillaFurnitureEC" → "VanillaFurnitureEC.…"), each with the instances
+// defining it, at most limit names: the candidates a misspelled class is compared with
+// (03 §6.2, "did you mean").
+func (s *Store) TypesUnder(root string, limit int) (map[string][]string, error) {
+	rows, err := s.DB.Query(`SELECT DISTINCT f.type_name, c.instance_id FROM type_fact f CROSS JOIN content_state c ON c.dll_set_id=f.set_id
+ WHERE f.type_name >= ? AND f.type_name < ? AND instr(f.type_name,'<')=0 AND c.game_mm=? LIMIT ?`, root+".", root+"/", s.MM, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string][]string{}
+	for rows.Next() {
+		var name, inst string
+		if err := rows.Scan(&name, &inst); err != nil {
+			return nil, err
+		}
+		out[name] = append(out[name], inst)
+	}
+	return out, rows.Err()
+}
+
+// GameTypesUnder is TypesUnder for the game's own assemblies (any environment of Store.MM).
+func (s *Store) GameTypesUnder(root string, limit int) ([]string, error) {
+	rows, err := s.DB.Query(`SELECT DISTINCT g.type_name FROM game_type g JOIN game_assembly a ON a.id=g.assembly_id
+ WHERE g.type_name >= ? AND g.type_name < ? AND a.game_mm=? LIMIT ?`, root+".", root+"/", s.MM, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		out = append(out, name)
+	}
+	return out, rows.Err()
+}
+
+// DefsInFile returns the non-abstract Def facts of Store.MM that come from a file named base
+// (any folder, case-insensitive), for the instances in only: what is lost when the game
+// reports "Exception loading def from file <base>" (03 §6.3, consequences).
+func (s *Store) DefsInFile(base string, only map[string]bool) ([]analyze.DefFact, error) {
+	rows, err := s.DB.Query(`SELECT c.instance_id, s.id, s.files FROM fact_set s JOIN content_state c ON c.def_set_id=s.id
+ WHERE c.game_mm=? AND s.files LIKE ?`, s.MM, `%`+base+`"%`)
+	if err != nil {
+		return nil, err
+	}
+	type hit struct {
+		inst string
+		set  int64
+		ixs  []any
+	}
+	var hits []hit
+	for rows.Next() {
+		var inst, files string
+		var set int64
+		if err := rows.Scan(&inst, &set, &files); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		if !only[inst] {
+			continue
+		}
+		var list []string
+		if json.Unmarshal([]byte(files), &list) != nil {
+			continue
+		}
+		h := hit{inst: inst, set: set}
+		for i, f := range list {
+			if strings.EqualFold(path.Base(f), base) {
+				h.ixs = append(h.ixs, i)
+			}
+		}
+		if len(h.ixs) > 0 {
+			hits = append(hits, h)
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	var out []analyze.DefFact
+	for _, h := range hits {
+		r, err := s.DB.Query(`SELECT `+defCols+defView+` WHERE c.instance_id=? AND c.game_mm=? AND f.set_id=? AND f.abstract=0 AND f.def_name<>'' AND f.file_ix IN (`+placeholders(len(h.ixs))+`) ORDER BY f.rowid`,
+			append([]any{h.inst, s.MM, h.set}, h.ixs...)...)
+		if err != nil {
+			return nil, err
+		}
+		ds, err := s.scanDefs(r)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, ds...)
+	}
+	return out, nil
 }
