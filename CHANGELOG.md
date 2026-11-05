@@ -4,6 +4,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 1.0.1 (unreleased)
 
+- Can it run: after Sort, or after choosing which Mod of an incompatible pair to disable, the cards under errors from the last run no longer each turn into a ✓ row with its own undo.
+- Add subscription: the preview reads in the interface language (it was English in Chinese).
 - List editor: Space or Enter on a focused button (Delete, Rename and the others in the list's header) presses that button. Before, Space disabled the Mod under the cursor and Enter opened its details.
 - Cancelling a folder or file picker no longer shows `✗ cancelled by user`.
 - Copy buttons beside web addresses in text (the release notes in Settings › About) no longer copy the closing `)` of a Markdown link or a trailing full stop, which made the copied link a dead page.

@@ -60,6 +60,7 @@ var sourceLanguageFiles = map[string]string{
 	"internal/view/accounts_test.go":                         "Asserts Chinese interface text or searches Chinese tags and mod names.",
 	"internal/view/analyzeprogress_test.go":                  "Asserts Chinese interface text or searches Chinese tags and mod names.",
 	"internal/view/autoupdate_test.go":                       "Asserts Chinese interface text or searches Chinese tags and mod names.",
+	"internal/view/cliline_test.go":                          "Asserts Chinese interface text or searches Chinese tags and mod names.",
 	"internal/view/bar_test.go":                              "Asserts Chinese interface text or searches Chinese tags and mod names.",
 	"internal/view/companion_internal_test.go":               "Asserts Chinese interface text or searches Chinese tags and mod names.",
 	"internal/view/copycaption_test.go":                      "Asserts Chinese interface text or searches Chinese tags and mod names.",

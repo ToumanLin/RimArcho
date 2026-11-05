@@ -37,7 +37,7 @@ func subscriptionPreview(a *app.App, args []string, title string) *view.Preview 
 	st, _ := a.Loadout()
 	p := &view.Preview{What: "subscribe", Title: title, Apply: code == 0}
 	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
-		p.Lines = append(p.Lines, view.Humanize(st, line))
+		p.Lines = append(p.Lines, view.CLILine(st, line))
 	}
 	return p
 }

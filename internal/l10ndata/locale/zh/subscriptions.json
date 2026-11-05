@@ -245,5 +245,14 @@
   "removed from the mod folder": "已从 Mod 目录移除",
   "%s; the current list uses it": "%s；当前列表仍在使用它",
   "list / details": "列表 / 详情",
-  "show every mod": "显示全部 Mod"
+  "show every mod": "显示全部 Mod",
+  "dry run, nothing changed": "试运行，没有改动",
+  "affected link": "受影响的链接",
+  "%s subscriptions": "%s 个订阅",
+  "git": "Git",
+  "page": "页面",
+  "Steam downloads it; it appears after the next scan.": "由 Steam 下载；下次扫描后出现。",
+  "Git submodules are not downloaded.": "不下载 Git 子模块。",
+  "Git LFS content is not downloaded; LFS files remain pointers.": "不下载 Git LFS 内容；LFS 文件仍是指针。",
+  "Would subscribe through Steam; use SteamCMD only if Steam is unavailable.": "将通过 Steam 订阅；只在 Steam 不可用时用 SteamCMD。"
 }

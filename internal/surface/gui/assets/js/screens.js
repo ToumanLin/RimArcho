@@ -471,7 +471,9 @@ function settleDone(data) {
   const fresh = new Set((data.items || []).filter((it) => !had.has(it.id) && it.kind).map((it) => it.kind));
   const batch = ++N.batch;
   for (const r of before) {
-    if (r.done || now.has(r.id) || r.group === 6 || (r.dim && r.section === 3) || (r.kind && fresh.has(r.kind))) continue;
+    // A run's errors (last run 3, this run 6) are never what an action resolved: a list edit
+    // only makes the last run stale (VM round 2026-11-05: Sort put a ✓ on all 13 last-run cards).
+    if (r.done || now.has(r.id) || r.group === 3 || r.group === 6 || (r.dim && r.section === 3) || (r.kind && fresh.has(r.kind))) continue;
     N.done.push({ done: true, id: r.id, section: r.section, col: r.col, after: r.after, title: r.title, text: text || T("done"), batch, undo });
   }
 }
