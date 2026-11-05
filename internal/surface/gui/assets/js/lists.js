@@ -248,7 +248,6 @@ export function renderRows(k) {
     d.style.transform = ""; // a slide (motion.js) belongs to the mod the row showed before
     d.style.top = layout.tops[i] + "px";
     d.style.height = layout.heights[i] + "px";
-    d.draggable = !!it.id || k === 1;
     const st = S.board && S.board.status ? rowStatus(it) : 0;
     d.className = "row" + (i === c.cursor ? " cur" : "") + (c.sel.has(key(it)) ? " sel" : "") + (it.dim || it.missing ? " dimmed" : "");
     d.innerHTML = `<span class="m"></span>` + (k === 1 ? `<span class="p">${it.pos || ""}</span>` : "") +
@@ -360,6 +359,7 @@ export function wireLists(ui) {
     renderRows(2);
   });
   $(".histarea .hbar").addEventListener("click", () => toggleHistory());
+  wireDragWindow();
   for (const k of [0, 1, 2]) {
     const box = rowsEl(k);
     box.addEventListener("scroll", () => renderRows(k), { passive: true });
@@ -403,46 +403,111 @@ export function wireLists(ui) {
   }
 }
 
-// Dragging is another way to run a verb (06 §8.5): it acts on drop and u undoes it.
-let drag = null;
+// Dragging is another way to run a verb (06 §8.5): it acts on drop and u undoes it. It runs
+// on mouse events, not HTML drag and drop: under WebView2 composition hosting (06 §8.2) the
+// window has no OLE drop target, so a native drag starts but nothing can receive the drop.
+let press = null; // the pressed row, until the mouse moves far enough to drag it
+let drag = null; // { ui, from, items, to: area under the pointer or -1, at, x, y }
 const tip = el("div", "drop-tip");
+const dragFrom = 5; // px of movement that turn a press into a drag
+const scrollEdge = 28; // px from a list's top or bottom that scroll it during a drag
 
+// Capture: the press's click redraws the row, which can detach the element under the pointer.
 function wireDrag(ui, k, box) {
-  box.addEventListener("dragstart", (e) => {
+  box.addEventListener("mousedown", (e) => {
     const r = e.target.closest(".row");
-    if (!r) return;
-    const c = S.cols[k];
-    const it = c.items[c.view[+r.dataset.i]];
-    if (!c.sel.has(key(it)) || S.focus !== k) ui.click(k, +r.dataset.i, { shiftKey: false, ctrlKey: false });
-    const its = ui.selectionItems();
-    drag = { from: k, items: its };
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", its.map((x) => x.name).join("\n"));
-  });
-  box.addEventListener("dragend", () => { drag = null; clearDrop(); });
-  const area = box.closest(".area");
-  area.addEventListener("dragover", (e) => {
-    if (!drag) return;
-    e.preventDefault();
-    clearDrop();
-    area.classList.add("drop-target");
-    const t = dropTarget(k, box, e);
-    if (t.row) t.row.classList.add(t.before ? "drop-before" : "drop-after");
+    if (r && e.button === 0) press = { ui, k, i: +r.dataset.i, x: e.clientX, y: e.clientY };
+  }, true);
+}
+
+function startDrag() {
+  const { ui, k, i } = press;
+  press = null;
+  const c = S.cols[k];
+  const it = c.items[c.view[i]];
+  if (!it || (!it.id && k !== 1)) return; // a missing Mod moves only within Enabled
+  if (!c.sel.has(key(it)) || S.focus !== k) ui.click(k, i, { shiftKey: false, ctrlKey: false });
+  drag = { ui, from: k, items: ui.selectionItems(), to: -1, at: 0, x: 0, y: 0 };
+  document.body.classList.add("row-dragging");
+}
+
+// overDrop marks where a drop at the pointer would go; a list's edge scrolls it.
+function overDrop() {
+  clearDrop();
+  const { x, y } = drag;
+  const area = document.elementFromPoint(x, y)?.closest("#board .area[data-area]");
+  const k = area ? +area.dataset.area : -1;
+  drag.to = k >= 0 && k <= 2 ? k : -1;
+  if (drag.to < 0) return;
+  const box = rowsEl(k);
+  area.classList.add("drop-target");
+  const t = dropTarget(k, box, { clientY: y });
+  drag.at = t.at;
+  if (t.row) t.row.classList.add(t.before ? "drop-before" : "drop-after");
+  if (t.label) {
     tip.textContent = t.label;
-    tip.style.left = e.clientX + 14 + "px";
-    tip.style.top = e.clientY + 10 + "px";
+    tip.style.left = x + 14 + "px";
+    tip.style.top = y + 10 + "px";
     if (!tip.isConnected) document.body.appendChild(tip);
-  });
-  area.addEventListener("dragleave", (e) => { if (!area.contains(e.relatedTarget)) clearDrop(); });
-  area.addEventListener("drop", (e) => {
+  }
+  const b = box.getBoundingClientRect();
+  const step = y < b.top + scrollEdge ? -1 : y > b.bottom - scrollEdge && y < b.bottom ? 1 : 0;
+  if (step && !drag.scrolling) {
+    drag.scrolling = true;
+    requestAnimationFrame(() => {
+      if (!drag) return;
+      drag.scrolling = false;
+      const before = box.scrollTop;
+      box.scrollTop += step * ROW_H / 2;
+      if (box.scrollTop !== before) { renderRows(k); overDrop(); }
+    });
+  }
+}
+
+function endDrag() {
+  drag = null;
+  press = null;
+  document.body.classList.remove("row-dragging");
+  clearDrop();
+}
+
+// wireDragWindow follows a press or drag anywhere in the window (wireLists calls it once).
+function wireDragWindow() {
+  window.addEventListener("mousemove", (e) => {
+    if (press && !drag) {
+      if (!(e.buttons & 1)) { press = null; return; }
+      if (Math.abs(e.clientX - press.x) < dragFrom && Math.abs(e.clientY - press.y) < dragFrom) return;
+      startDrag();
+    }
     if (!drag) return;
     e.preventDefault();
-    const t = dropTarget(k, box, e);
-    const d = drag;
-    drag = null;
-    clearDrop();
-    ui.drop(d.from, k, d.items, t.at);
+    drag.x = e.clientX;
+    drag.y = e.clientY;
+    overDrop();
   });
+  window.addEventListener("mouseup", (e) => {
+    press = null;
+    if (!drag || e.button !== 0) return;
+    const d = drag;
+    endDrag();
+    // the click that may follow this mouseup ends the drag, not a click on what is under it
+    window.addEventListener("click", swallowClick, true);
+    setTimeout(() => window.removeEventListener("click", swallowClick, true), 0);
+    if (d.to >= 0) d.ui.drop(d.from, d.to, d.items, d.at);
+  });
+  // esc cancels a drag (06 §8.5), and so does leaving the window
+  window.addEventListener("keydown", (e) => {
+    if (!drag || e.key !== "Escape") return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    endDrag();
+  }, true);
+  window.addEventListener("blur", () => { if (drag || press) endDrag(); });
+}
+function swallowClick(e) {
+  e.stopPropagation();
+  e.preventDefault();
+  window.removeEventListener("click", swallowClick, true);
 }
 
 function clearDrop() {

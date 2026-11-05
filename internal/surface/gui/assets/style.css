@@ -380,6 +380,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .row.drop-before::before, .row.drop-after::after { content: ""; position: absolute; left: 6px; right: 6px; height: var(--hairline); background: var(--accent); border-radius: var(--r-sm); }
 .row.drop-before::before { top: -1px; } .row.drop-after::after { bottom: -1px; }
 .area.drop-target { border-color: var(--accent); }
+body.row-dragging, body.row-dragging * { cursor: grabbing !important; user-select: none !important; }
 .empty { color: var(--faint); padding: 14px; }
 .hist { margin-top: 14px; color: var(--fg); }
 .hist .hh { color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; margin: 12px 0 4px; }
