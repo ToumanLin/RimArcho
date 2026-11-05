@@ -35,6 +35,8 @@ Code touchpoints: a source choice in `internal/app/selfupdate.go`; in `internal/
 | Run SteamCMD as the check, read the version from the zip name | Needs SteamCMD and a download before the player confirmed anything; 07 §5.1 says a check never downloads. Rejected. |
 | Keep reading the version from GitHub, only download from the Workshop | Contradicts the ToDo and makes the Workshop lag a dependency. Rejected. |
 
+**Why not reuse the Mod update check.** **[C]** For SteamCMD Mods (`CheckSubscriptionSource`, `view/subscriptions.go`, `PendingSubscriptionUpdates`) RimArcho compares times only: the Web API `time_updated` against `max(ACF timeupdated, download time)`. It compares no hash with anything remote (`hcontent_file` is not read anywhere in the code). The xxh3-128 fingerprints in `internal/scan` describe the local folder (identity, snapshots, "did the Mod change"), not the remote item. The content comparison itself is SteamCMD's: on every `workshop_download_item` it compares the item's manifest with the one in `appworkshop_294100.acf` and transfers only changed chunks, or logs "has no changes". A time check is good enough for "something newer exists" on a Mod, but it carries no version, so RimArcho cannot tell whether it is already running what the item holds; that is why the version goes into a tag. Integrity is a separate step: the SHA-256 of the zip against the `.sha256` file (§1.4), plus Steam's own chunk hashes during the transfer.
+
 Metadata failure (offline, item missing, `result` not 1) makes the check fall back to GitHub and say so. Prerelease channel: **[I]** the Workshop has no channels, so prerelease builds (`-rc1`) keep checking GitHub; the item carries stable releases only.
 
 ### 1.3 Download
@@ -45,11 +47,11 @@ Metadata failure (offline, item missing, `result` not 1) makes the check fall ba
 2. **Private base folder**, for example `%LOCALAPPDATA%\RimArcho\steamcmd-self`, not `steamcmd-mods`. The Mods folder is a registered source (a Workshop item with `About.xml` there would show up as a Mod), and **[C]** two SteamCMD processes sharing a library lost records and still exited 0 (parallel-downloads §3.3). The instance lock `accounts.Lock(exe)` is shared with Mod downloads, so the two never run at once.
 3. **Reuse `runWorkshopBatches`** with one id. Do not call `downloadWorkshopGroup`: it registers sources, writes `source.json`, scans and manages links, none of which apply.
 4. **Confirm.** **[C]** SteamCMD exits 0 even when an item failed; trust only `Success. Downloaded item <id>` plus the presence of the zip and its `.sha256`.
-5. **Clean up the whole base folder after a successful swap.** **[I]** If the content is deleted but `appworkshop_294100.acf` stays, SteamCMD may log "has no changes" and download nothing (parallel-downloads §3.4); keep both or neither. Neither is simpler: each release is a new zip anyway.
+5. **Clean up the whole base folder after a successful swap.** SteamCMD decides what to transfer from the manifest recorded in the ACF, not from the files on disk. **[I]** If the content is deleted but `appworkshop_294100.acf` stays, it may log "has no changes" (parallel-downloads §3.4) and download nothing, leaving an empty folder; keep both or neither. Neither is simpler and costs one full download of a ~30 MB zip per release, which the maintainer expects to be quick. The "Confirm" check (item 4) catches the empty-folder case anyway: no zip, no success.
 6. **SteamCMD missing.** Today `downloadWorkshopGroup` stops with "install SteamCMD in Settings". For the updater: offer to install RimArcho's managed SteamCMD as part of the confirmed install (an extra download and write, so it belongs in the confirmation text, 01 §4), or fall back to GitHub.
 7. **Progress.** **[C]** The Workshop runner has no byte callback (parallel-downloads §2.1), so `SelfUpdateStep{Phase: "download"}` is indeterminate unless the staging folder's size is polled.
 
-**[C]** Measured cost (four small items, one Windows machine): SteamCMD start, anonymous connect and quit with no download about 6.7 s; first start with its own update about 9.2 s; a no-change rerun about 4.7 s. Throughput on one large download was not measured, so a download time for the zip is unknown.
+**[C]** Measured cost (four small items, one Windows machine): SteamCMD start, anonymous connect and quit with no download about 6.7 s; first start with its own update about 9.2 s; a no-change rerun about 4.7 s. Throughput on one large download was not measured here; the maintainer expects a ~30 MB zip to be quick (test 3 records the real number).
 
 ### 1.4 Verify
 
@@ -71,6 +73,7 @@ archo-<version>-windows-amd64.zip.sha256
 - **Versions.** The item's version tag is the launcher version. Monitor keeps its own `monitor/VERSION` (`modVersion` in About.xml), which often does not change between launcher releases.
 - **Monitor identity.** Today only Instances under the Monitor source count as Monitor (08 §9). A subscribed copy plus the `_Archo_monitor_` link would be two Mods with packageId `toumanlin.archomonitor` in the game. Count every Instance with that packageId as Monitor, keep "highest `modVersion` wins", and on a tie prefer the Workshop copy: it needs no link, so it also works when `Mods/` is on exFAT (08 §9 "FAT and exFAT").
 - 1.0.0 and 1.0.1 installs only know GitHub and keep updating from there until a version with the Workshop source is installed.
+- **Decided 2026-11-05 (maintainer):** a free-form version tag and an unlisted item are acceptable (tests 1 and 2 still confirm they work); the item keeps a valid Mod part so a subscriber's game sees a Mod, not a broken folder; prereleases stay on GitHub only.
 
 ### 1.6 First start from the Workshop folder
 

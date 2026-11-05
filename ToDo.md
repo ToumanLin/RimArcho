@@ -27,15 +27,17 @@ Things to research, not yet decided. Once decided, put them in the specification
 
 **更新**
 - 已订阅的玩家：Steam 会自动把新 zip 下到条目文件夹，RimArcho 直接从那里读取并校验，不需要 SteamCMD。
-- 未订阅的（GOG、GitHub 安装）：用匿名 SteamCMD 拉取条目，绝不用玩家的账号。
-- 版本号放在条目 tag 里（不行就改读标题），zip 名必须与之一致。
-- GitHub 保留，用于首次下载、预发布版和兜底。
+- 未订阅的（GOG、GitHub 安装）：用匿名 SteamCMD 拉取条目，绝不用玩家的账号。必须传 `SteamCMDAccount("anonymous")`，传空会取设置里的账号，和桌面 Steam 同号时会把 Steam 登出。下到专用目录（不是 Mod 用的 `steamcmd-mods`），复用 `runWorkshopBatches`，以 `Success. Downloaded item` 加文件存在为准（SteamCMD 失败也返回 0），换完后整个目录删掉。
+- 检查更新：一次 `GetPublishedFileDetails` 读 tag，不启动 SteamCMD。现有 Mod 更新检查只比时间戳（`time_updated` 对比 ACF 时间/下载时间），没有版本号，也不比远端哈希，自更新不能照搬。
+- 版本号放在条目 tag 里（已定：自由格式的 `v1.0.2` 和不公开条目都可接受，待测试验证；不行就改读标题），zip 名必须与之一致。
+- GitHub 保留，用于首次下载、预发布版和兜底。预发布版只走 GitHub，条目只放稳定版。
 - 建议同时加 ed25519 签名：维护者账号一旦被盗，`.sha256` 防不住。
 
 **上传**（维护者）：`archo workshop publish`，经 steam-worker 调 ISteamUGC 上传，不启动游戏；不放进 `release.ps1`。
 
 **进展**
 - 2026-11-05：完成调研。发布 zip 从 1.0.2 起带 `README.zh-CN.md` 和 `skills/`（代码已写，未提交）。
+- 2026-11-05：更新方式已定，写入规格 07 §5.1（标注"未实现"）：匿名 SteamCMD 拉取、版本号写 tag、预发布走 GitHub、条目带有效的 Mod 部分。约 30 MB 的 zip 预计下载很快，待测试 3 记录实际耗时。
 - 创意工坊部分尚未实现。
 - 下一步：先做上传工具，传一个不公开的测试条目，在 VM 里实测调研文档第 4 节的问题（tag 能否放版本、不公开条目能否匿名下载、订阅后 Monitor 是否正常加载且不报重复）。
 - 调研文档已按"Monitor 即条目"改好：条目内容和 Monitor 识别见 §1.5，首次启动搬家见 §1.6，订阅者直接从条目文件夹取更新见 §1.3。
