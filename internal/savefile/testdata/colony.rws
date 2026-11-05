@@ -1,0 +1,481 @@
+<?xml version="1.0" encoding="utf-8"?>
+<savegame>
+	<meta>
+		<gameVersion>1.6.4633 rev1261</gameVersion>
+		<modIds>
+			<li>ludeon.rimworld</li>
+			<li>tester.kurin</li>
+		</modIds>
+		<modSteamIds>
+			<li>0</li>
+			<li>3000000003</li>
+		</modSteamIds>
+		<modNames>
+			<li>Core</li>
+			<li>Kurin</li>
+		</modNames>
+	</meta>
+	<game>
+		<currentMapIndex>0</currentMapIndex>
+		<info>
+			<realPlayTimeInteracting>12345.5</realPlayTimeInteracting>
+			<permadeathMode>True</permadeathMode>
+			<startingTile>123</startingTile>
+			<startingAndOptionalPawns>
+				<li>Thing_Human10</li>
+				<li>Thing_Kurin_Race11</li>
+			</startingAndOptionalPawns>
+		</info>
+		<rules>
+			<disallowedDesignatorTypes />
+		</rules>
+		<scenario>
+			<name>Crashlanded</name>
+			<summary>Three crashlanded survivors.</summary>
+			<description>An &lt;old&gt; scenario &amp; its text.</description>
+			<playerFaction>
+				<def>PlayerFaction</def>
+				<factionDef>PlayerColony</factionDef>
+			</playerFaction>
+			<parts>
+				<li Class="ScenPart_ConfigPage_ConfigureStartingPawns">
+					<def>ConfigPage_ConfigureStartingPawns</def>
+					<pawnCount>3</pawnCount>
+				</li>
+			</parts>
+		</scenario>
+		<tickManager>
+			<ticksGame>25860000</ticksGame>
+			<gameStartAbsTick>300000</gameStartAbsTick>
+			<startingYear>5500</startingYear>
+		</tickManager>
+		<storyWatcher>
+			<statsRecord>
+				<numRaidsEnemy>22</numRaidsEnemy>
+				<numThreatsQueued>30</numThreatsQueued>
+				<colonistsKilled>1</colonistsKilled>
+			</statsRecord>
+			<watcherAdaptation />
+		</storyWatcher>
+		<researchManager>
+			<currentProj>MicroelectronicsBasics</currentProj>
+			<progress>
+				<keys>
+					<li>Electricity</li>
+					<li>Batteries</li>
+					<li>MicroelectronicsBasics</li>
+				</keys>
+				<values>
+					<li>1600</li>
+					<li>400</li>
+					<li>600.5</li>
+				</values>
+			</progress>
+		</researchManager>
+		<storyteller>
+			<def>Cassandra</def>
+			<difficulty>Rough</difficulty>
+			<incidentQueue />
+		</storyteller>
+		<history>
+			<archive>
+				<archivables>
+					<li Class="StandardLetter">
+						<ID>5</ID>
+						<def>ThreatBig</def>
+						<label>Raid</label>
+						<relatedFaction>Faction_3</relatedFaction>
+						<arrivalTick>1200000</arrivalTick>
+						<title>Raid</title>
+						<text>Raiders from Kingdom of Ash have arrived.</text>
+					</li>
+					<li Class="Message">
+						<def>NegativeEvent</def>
+						<ID>7</ID>
+						<text>Mara is starving.</text>
+						<startingTick>1300000</startingTick>
+					</li>
+					<li Class="DeathLetter">
+						<ID>6</ID>
+						<def>Death</def>
+						<label>Death: Ozzie</label>
+						<arrivalTick>24120000</arrivalTick>
+					</li>
+				</archivables>
+				<pinnedArchivables />
+			</archive>
+			<autoRecorderGroups>
+				<li>
+					<def>Wealth</def>
+					<recorders>
+						<li>
+							<def>Wealth_Total</def>
+							<records>
+AIA7RgBiakYAMPJGALAzSA==
+</records>
+						</li>
+						<li>
+							<def>Wealth_Items</def>
+							<recordsDeflate>
+BMBVSgQAFEbhs7T7cFYlghcDAwMDAwMDAwMDAwP9ZWJd88GU9LQwI2lhVmpOel6yICxKLUkvS1aEVak16XXJhrAptSW9LdkRdqX2
+pPclB8Kh1JH0seREOJU6kz6XXAiXUlfS15Ib4VbqTvpe8iA8Sj1JP0tehFepN+l3yYfwKfUl/S35EX6l/qQj+RcGUkPpkWTsZAA=
+</recordsDeflate>
+						</li>
+					</recorders>
+				</li>
+				<li>
+					<def>Population</def>
+					<recorders>
+						<li>
+							<def>FreeColonists</def>
+							<recordsDeflate>
+YmBwcGBgcHBgYGhwYGBY4MDAYOAIGAA=
+</recordsDeflate>
+						</li>
+					</recorders>
+				</li>
+			</autoRecorderGroups>
+		</history>
+		<taleManager>
+			<tales>
+				<li Class="Tale_SinglePawn">
+					<def>Wounded</def>
+					<id>3</id>
+					<date>2400000</date>
+				</li>
+			</tales>
+		</taleManager>
+		<questManager>
+			<quests>
+				<li>
+					<id>1</id>
+					<root>OpportunitySite_ItemStash</root>
+				</li>
+				<li>
+					<root>ThreatReward_Raid</root>
+				</li>
+			</quests>
+		</questManager>
+		<components>
+			<li Class="Kurin.GameComponent_Kurin">
+				<lastQuest>Quest_1</lastQuest>
+				<firstQuest>Quest_0</firstQuest>
+			</li>
+		</components>
+		<world>
+			<info>
+				<name>Tundra</name>
+				<planetCoverage>0.3</planetCoverage>
+				<seedString>hollow</seedString>
+				<persistentRandomValue>-123456</persistentRandomValue>
+				<initialMapSize>(250, 1, 250)</initialMapSize>
+			</info>
+			<grid>
+				<tileBiomeDeflate>
+AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHHIIIIJJJJKKKKLLLLMMMMNNNNOOOOPPPPQQQQRRRRSSSSTTTTUUUUVVVVWWWWXXXXYYYYZZZZ
+AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHHIIIIJJJJKKKKLLLLMMMMNNNNOOOOPPPPQQQQRRRRSSSSTTTTUUUUVVVVWWWWXXXXYYYYZZZZ
+AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHHIIIIJJJJKKKKLLLLMMMMNNNNOOOOPPPPQQQQRRRRSSSSTTTTUUUUVVVVWWWWXXXXYYYYZZZZ
+AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHHIIIIJJJJKKKKLLLLMMMMNNNNOOOOPPPPQQQQRRRRSSSSTTTTUUUUVVVVWWWWXXXXYYYYZZZZ
+AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHHIIIIJJJJKKKKLLLLMMMMNNNNOOOOPPPPQQQQRRRRSSSSTTTTUUUUVVVVWWWWXXXXYYYYZZZZ
+AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHHIIIIJJJJKKKKLLLLMMMMNNNNOOOOPPPPQQQQRRRRSSSSTTTTUUUUVVVVWWWWXXXXYYYYZZZZ
+</tileBiomeDeflate>
+			</grid>
+			<factionManager>
+				<allFactions>
+					<li>
+						<leader>Thing_Human10</leader>
+						<def>PlayerColony</def>
+						<name>New Arrivals</name>
+						<loadID>1</loadID>
+						<relations>
+							<li>
+								<other>Faction_3</other>
+								<kind>Hostile</kind>
+							</li>
+						</relations>
+					</li>
+					<li>
+						<leader>Thing_Human50</leader>
+						<def>OutlanderCivil</def>
+						<name>Kingdom of Ash</name>
+						<loadID>3</loadID>
+					</li>
+					<li>
+						<leader>null</leader>
+						<def>Ancients</def>
+						<name>Ancients</name>
+					</li>
+				</allFactions>
+				<toRemove />
+			</factionManager>
+			<ideoManager>
+				<ideos>
+					<li>
+						<name>Sun Way</name>
+						<precepts>
+							<li Class="Precept_Role">
+								<def>IdeoRole_Leader</def>
+								<ID>8</ID>
+							</li>
+						</precepts>
+						<id>2</id>
+					</li>
+				</ideos>
+			</ideoManager>
+			<worldPawns>
+				<pawnsForcefullyKeptAsWorldPawns>
+					<li>Thing_Human12</li>
+				</pawnsForcefullyKeptAsWorldPawns>
+				<pawnsAlive>
+					<li>
+						<def>Human</def>
+						<id>Human50</id>
+						<faction>Faction_3</faction>
+						<kindDef>Villager</kindDef>
+						<name Class="NameTriple">
+							<first>Ann</first>
+							<nick>Ann</nick>
+							<last>Other</last>
+						</name>
+						<story>
+							<childhood>Urbworld</childhood>
+						</story>
+						<ideo>
+							<ideo>Ideo_2</ideo>
+						</ideo>
+					</li>
+				</pawnsAlive>
+				<pawnsMothballed />
+				<pawnsDead>
+					<li>
+						<def>Human</def>
+						<id>Human12</id>
+						<faction>Faction_1</faction>
+						<kindDef>Colonist</kindDef>
+						<name Class="NameTriple">
+							<first>Oswald</first>
+							<nick>Ozzie</nick>
+							<last>Brown</last>
+						</name>
+						<story>
+							<childhood>VatGrown</childhood>
+						</story>
+						<healthTracker>
+							<healthState>Dead</healthState>
+						</healthTracker>
+					</li>
+				</pawnsDead>
+			</worldPawns>
+			<worldObjects>
+				<worldObjects>
+					<li Class="Settlement">
+						<def>Settlement</def>
+						<tile>123</tile>
+						<ID>4</ID>
+						<faction>Faction_1</faction>
+						<nameInt>Tundra Hollow</nameInt>
+					</li>
+					<li Class="Settlement">
+						<def>Settlement</def>
+						<tile>400</tile>
+						<ID>5</ID>
+						<faction>Faction_3</faction>
+						<nameInt>Ashgate</nameInt>
+					</li>
+					<li Class="Caravan">
+						<def>Caravan</def>
+						<tile>124</tile>
+						<ID>9</ID>
+						<faction>Faction_1</faction>
+						<name>Caravan 1</name>
+						<pawns>
+							<innerList>
+								<li>
+									<def>Human</def>
+									<id>Human13</id>
+									<faction>Faction_1</faction>
+									<kindDef>Colonist</kindDef>
+									<name Class="NameTriple">
+										<first>Pike</first>
+										<nick>Pike</nick>
+										<last>Gray</last>
+									</name>
+									<story />
+								</li>
+							</innerList>
+						</pawns>
+					</li>
+				</worldObjects>
+			</worldObjects>
+			<components>
+				<li Class="TileMutatorsCustomization" />
+			</components>
+		</world>
+		<maps>
+			<li>
+				<uniqueID>0</uniqueID>
+				<mapInfo>
+					<size>(250, 1, 250)</size>
+					<parent>WorldObject_4</parent>
+				</mapInfo>
+				<components>
+					<li Class="Kurin.MapComponent_Shrines" />
+				</components>
+				<compressedThingMapDeflate>
+ZZZZYYYYXXXXWWWWVVVVUUUUTTTTSSSSRRRRQQQQPPPPOOOONNNNMMMMLLLLKKKKJJJJIIIIHHHHGGGGFFFFEEEEDDDDCCCCBBBBAAAA
+</compressedThingMapDeflate>
+				<things>
+					<thing Class="Pawn">
+						<def>Human</def>
+						<id>Human10</id>
+						<map>0</map>
+						<pos>(1, 0, 1)</pos>
+						<faction>Faction_1</faction>
+						<kindDef>Colonist</kindDef>
+						<name Class="NameTriple">
+							<first>Mara</first>
+							<nick>Mara</nick>
+							<last>Lee</last>
+						</name>
+						<mindState>
+							<lastAttackedTarget>Thing_Human99</lastAttackedTarget>
+						</mindState>
+						<verbTracker>
+							<verbs>
+								<li Class="Verb_MeleeAttackDamage">
+									<loadID>Thing_Human10_0_Smash</loadID>
+								</li>
+							</verbs>
+						</verbTracker>
+						<carryTracker>
+							<innerContainer>
+								<innerList>
+									<li>
+										<def>Human</def>
+										<id>Human14</id>
+										<faction>Faction_1</faction>
+										<kindDef>Colonist</kindDef>
+										<name Class="NameTriple">
+											<first>Tiny</first>
+											<nick>Bub</nick>
+											<last>Lee</last>
+										</name>
+										<story>
+											<childhood>Baby</childhood>
+										</story>
+									</li>
+								</innerList>
+							</innerContainer>
+						</carryTracker>
+						<story>
+							<childhood>Urbworld</childhood>
+						</story>
+						<healthTracker>
+							<hediffSet>
+								<hediffs>
+									<li Class="Hediff_Injury">
+										<def>Cut</def>
+										<loadID>77</loadID>
+									</li>
+								</hediffs>
+							</hediffSet>
+						</healthTracker>
+						<training IsNull="True" />
+					</thing>
+					<thing Class="Pawn">
+						<def>Kurin_Race</def>
+						<id>Kurin_Race11</id>
+						<map>0</map>
+						<faction>Faction_1</faction>
+						<kindDef>Kurin_Colonist</kindDef>
+						<name Class="NameTriple">
+							<first>Ka&apos;ri</first>
+							<nick>Kari</nick>
+							<last>Fox</last>
+						</name>
+						<story>
+							<childhood>Kurin_Child</childhood>
+						</story>
+						<guest>
+							<guestStatus>Slave</guestStatus>
+						</guest>
+					</thing>
+					<thing Class="Pawn">
+						<def>Husky</def>
+						<id>Husky20</id>
+						<faction>Faction_1</faction>
+						<kindDef>Husky</kindDef>
+						<name Class="NameSingle">
+							<name>Rex</name>
+						</name>
+						<story IsNull="True" />
+						<training>
+							<learned />
+						</training>
+					</thing>
+					<thing Class="Pawn">
+						<def>Mech_Militor</def>
+						<id>Mech_Militor21</id>
+						<faction>Faction_1</faction>
+						<kindDef>Mech_Militor</kindDef>
+						<story IsNull="True" />
+						<training IsNull="True" />
+					</thing>
+					<thing Class="Pawn">
+						<def>Human</def>
+						<id>Human30</id>
+						<faction>Faction_3</faction>
+						<kindDef>Villager</kindDef>
+						<guest>
+							<hostFaction>Faction_1</hostFaction>
+							<guestStatus>Prisoner</guestStatus>
+						</guest>
+						<story />
+					</thing>
+					<thing Class="Pawn">
+						<def>Muffalo</def>
+						<id>Muffalo40</id>
+						<kindDef>Muffalo</kindDef>
+						<story IsNull="True" />
+					</thing>
+					<thing Class="Corpse">
+						<def>Corpse_Human</def>
+						<id>Corpse_Human41</id>
+						<innerContainer>
+							<innerList>
+								<li>
+									<def>Human</def>
+									<id>Human42</id>
+									<faction>Faction_1</faction>
+									<kindDef>Colonist</kindDef>
+									<name Class="NameTriple">
+										<first>Beatrice</first>
+										<nick>Bea</nick>
+										<last>Dee</last>
+									</name>
+									<story />
+									<healthTracker>
+										<healthState>Dead</healthState>
+									</healthTracker>
+								</li>
+							</innerList>
+						</innerContainer>
+					</thing>
+					<thing Class="Building_Bed">
+						<def>Bed</def>
+						<id>Bed60</id>
+						<stuff>WoodLog</stuff>
+						<faction>Faction_1</faction>
+					</thing>
+					<thing Class="Kurin.Building_Shrine">
+						<def>Kurin_Shrine</def>
+						<id>Kurin_Shrine61</id>
+						<faction>Faction_7</faction>
+						<target>Thing_Bed60</target>
+						<bill>Bill_Make_5</bill>
+					</thing>
+				</things>
+			</li>
+		</maps>
+	</game>
+</savegame>
