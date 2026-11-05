@@ -131,7 +131,7 @@ The `RIMARCHO_HOME` environment variable overrides this table (used by tests and
 | Content | Description |
 | --- | --- |
 | `config.toml` | Reads only `tombstone_days` (default 90); writes defaults on first launch. Other settings live in the database meta table (`cfg:<key>`, 05 §4.2) |
-| `archo.db` (and WAL) | All facts, identities, plans, history, findings and log attribution cache |
+| `archo.db` (and WAL) | All facts, identities, plans, history, findings, log attribution cache, and the save full-read cache (`save_cache`, 10 §1.7; not implemented) |
 | `cache/` | `previews/` (thumbnails), `workshop/<Workshop ID>.json` (Workshop descriptions), `workshop-img/` (description images), community data (`communityRules.json`, `steamDB.json` compressed into `steamDB.index.json`, `replacements.json.gz`); `loadcost-v1.json` (per-Mod list loading measurements, keyed by Mod directory, stamped by the loading-directory list fingerprint; 2026-10-24). `cache clear` clears supported categories; rebuild on demand |
 | `source/` | Default managed Source library; `folder set source` / `folder move source` persist another root. Mod projects: `mods/<lowercase filesystem-safe packageId>/<DLL stem> <first 6 hash hex>/`; a prefix collision extends the suffix without moving existing code. Game projects: `game/<build>/Assembly-CSharp/`. Type-only files live in the same DLL folder under `.types/<type-key>/`. Identity, publication and retention: 03 §5.4. Library-relative records survive relocation; contents are never exported or attached |
 | `source-library.lock` | Coordinates source readers/decompilers with relocation and cleanup across processes; artifact locks live in the library's `.locks/` |

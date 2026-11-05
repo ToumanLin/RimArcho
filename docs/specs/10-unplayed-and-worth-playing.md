@@ -1,6 +1,6 @@
 # 10 · Unplayed and worth playing
 
-> Status: question two, "what haven't I played?", is a design specification for 1.1; §5 is for 1.2; §6 is a long-term direction. Only reading the Mod list at the start of a save (§1.3) is implemented; everything else is unimplemented.
+> Status: question two, "what haven't I played?", is a design specification for 1.1; §5 is for 1.2; §6 is a long-term direction. Only reading the Mod list at the start of a save (§1.3) is implemented; everything else is unimplemented. The Saves page, its read tiers and its tools were decided on 2026-11-04 (§1.6, §1.7, §4; 06 §2.11).
 > Basis: 00 (§2, §4), 00a, 03, 04, 06, 08, 09.
 
 Question two asks: **which installed Mods and content have gone unused across multiple playthroughs?** Read all saves without modifying them and map the Defs they reference back to their providing Mods. This analysis is deterministic and needs no AI; Archo participates only in interpreting results and making suggestions (09 §4).
@@ -11,14 +11,14 @@ The answer to question two feeds question three: first establish what has gone u
 
 ### 1.1 Read-only
 
-- Save analysis is **read-only**: open saves for reading only, never write, rename or move them. Backups and recycle bin moves are separate save-management actions requiring player confirmation (§4.4, §4.5).
+- Save analysis is **read-only**: open saves for reading only, never write, rename or move them. Rename, copy, backup and recycle bin moves are separate save-management actions started by the player (§4.4).
 - Results stay local and are not uploaded. Only statistics are sent to the model, after consent (09 §3.2).
 
 ### 1.2 Save locations
 
 | Location | Belongs to |
 | --- | --- |
-| `<user data directory>/Saves/*.rws` | Environments using this user data directory, and plans launched in those environments. When environments share the game's default user data directory (02 §2.4), deduplicate by real path and read only once |
+| `<user data directory>/Saves/*.rws` (shared, own or custom user data directory: `app.Saves`, 02 §2.1) | Environments using this user data directory, and plans launched in those environments. When environments share the game's default user data directory (02 §2.4), deduplicate by real path and read only once |
 | `<data directory>/packs/<pack name>/userdata/Saves/*.rws` | This pack (packs use their own `-savedatafolder`, 08 §5.3) |
 
 Read autosaves (`Autosave-*.rws`) like manual saves; label them "autosave" in the UI.
@@ -39,14 +39,13 @@ Saves are XML with a `<savegame>` root, starting with `<meta>`, followed by `<ga
 - Reading rules (`readSaveMeta` in `internal/app/exchange.go`): stream parsing, non-strict mode, ignore the declared character set. Stop at `</meta>` without reading the tens of MB in `<game>`. Lowercase all packageIds, record `gameVersion`, and use `modNames` to name "not installed" entries. Missing `<meta><modIds>` returns `no <meta><modIds> in the save`.
 - Detection: treat a file as a save if its extension is `.rws` or its first 4096 bytes contain `<savegame`, regardless of any other extension (`ReadLoadoutFile`; `ParseList` in `listformats.go` also detects `<savegame`).
 - Current use is list import: `archo loadout import <save>` puts the save's Mod list into a plan as one reversible edit, without writing game files (04 §9). Test: `TestLoadoutExchange`.
-- `<modSteamIds>` is not read yet (undecided: whether save management should use it to locate Workshop entries for "what is missing now").
+- `<modSteamIds>` is not read yet. The save head (§1.7 L0) will read it: a nonzero ID lets a not-installed entry offer Subscribe (§4.3); zero means a local or unknown Mod.
 
 ### 1.4 Extracting Def references
 
 - Stream the entire save, collect text from all `<def>` elements and deduplicate it into "the set of defNames referenced by this save".
 - Whether to include other reference forms (research-name keys in research progress, `<kindDef>` and other fields not named `<def>`), and their exact element paths, will be decided after measurement (undecided).
-- Cache each save's results locally by (path, size, modification time); do not reread when all three are unchanged. Cache location follows 07 §3 (undecided).
-- Measured baseline in 07 §6: 202 local saves, 15–28 MB each; the latest has 1382 distinct `<def>` values, extracted in 0.11 seconds. At this rate, the first full read takes twenty-odd seconds; run it in the background with progress (06 §8.4). Thereafter read only new and changed saves.
+- Extraction is part of the full read (§1.7 L1), cached and run in the background as described there.
 
 ### 1.5 Mapping Defs back to Mods
 
@@ -58,13 +57,22 @@ Saves are XML with a `<savegame>` root, starting with `<meta>`, followed by `<ga
 
 ### 1.6 Tools for Archo and external agents
 
-Save reading must have corresponding read-only tools in the tool layer from 05, exposed in both CLI and MCP (unimplemented; command names undecided, to be settled when added to 05 §4). Suggested form:
+Save reading has read-only tools in the tool layer (05 §1.2, §4.2, §5.2; not implemented): `saves list` (`list_saves`), `saves show` (`get_save`) and `unplayed` (`list_unplayed`). Save-management actions are `manage_saves` (§4.4). A save reference is `sv:<hex>`, a short hash of the save's real path (05 §2); a file name or `<colony>/<save>` also resolves. Every fix in `saves show` names the command or tool call that performs it, so agents act through the existing tools (§4.3).
 
-| Suggested command | Purpose |
-| --- | --- |
-| `saves list [--colony <name>]` | List saves: colony, time, game version, enabled count, matching plan (§4.2) |
-| `saves show <save>` | A save's Mod list, matching plan, missing / extra Mods (§4.3) |
-| `unplayed [--group never\|partial\|functional] [--mod <ref>]` | Unused content (§3) |
+### 1.7 Read tiers, cache and background reading
+
+A save is read at three costs; each tier is computed and cached separately (not implemented):
+
+| Tier | What | Cost | Used for |
+| --- | --- | --- | --- |
+| **L0 head** | File path, size and modification time; `<meta>` (§1.3, plus `<modSteamIds>`); the last 64 bytes, checking for `</savegame>` | A few ms per save | Grouping by RimSaves prefix or file name (§4.1), list matching (§4.2), the Mod list and its differences, cut-off files (§4.3) |
+| **L1 full read** | One streaming pass over the whole file: colony identity (§4.1), in-game day, storyteller and difficulty, real play time, colonists, wealth history, all `<def>` values (§1.4), all `Class="…"` values, defined and referenced loadIDs, whether the XML is well formed. Exact element paths await measurement on real saves | About 0.1–0.3 s per 27 MB save (07 §6: 0.11 s for `<def>` extraction) | Grouping by world, consequences of missing Mods (§4.6), play facts and timeline (§4.5), unused content (§3) |
+| **L2 derived** | L1 joined with the current state: matched list, differences, Def and class attribution (§1.5, §4.6), last-load evidence from the game log (03 §6.7) | Milliseconds | Can it load (§4.3) |
+
+- L1 depends only on the file, so it is cached in the database (`save_cache`, 07 §3) by path, size, modification time and parser version, as gzip JSON like `log_cache`; it is not reread while all four are unchanged. L2 depends on the current list and index, so it is not cached and is recomputed when either changes. L0 is read on demand.
+- L1 runs in a child process, `archo saves index` (05 §4.2), as background task kind `saves` (06 §2.16, §8.4): progress lines reach the status line and the task record, and each finished file is written to the cache at once, so a stopped run keeps what it read. The selected save is read first, then newest first, with 2–4 readers. Reading streams with constant memory; the child process keeps the GUI within its memory budget (06 §10).
+- A file modified in the last 5 seconds, or whose size changes between two reads, is **being written**: it gets no verdict and is read again later. The page rereads L0 when it opens and when a running game exits (08 §4).
+- CLI and MCP do not wait for the background run: `saves show` reads L1 for its one save inline; `saves list` reports saves without L1 as `meta only` and names `saves index`.
 
 ## 2. Content catalog
 
@@ -145,16 +153,20 @@ Functional Mods do not enter the first two groups. Framework Mods (such as Harmo
 
 Results need no AI. Archo may "interpret" this page: pick unused content worth trying and explain why (09 §4.2, after 1.1). Send statistics, not saves, with consent under 09 §3.2.
 
-## 4. Save management
+## 4. Saves
 
-Under "not played yet › playthrough review › save management" (06 §2.11).
+The Saves page is in the Library group (06 §2.11; moved out of Play review on 2026-11-04). A colony is not stored as an object of its own: it is the group of saves of one game. Facts about the colony are read from its **latest save** and shown once; an older save shows only how it differs.
 
 ### 4.1 Group by colony
 
-- Group saves from the same colony. Derive colony identity from world and player-faction information in the save (for example, world seed, world name, player faction name); exact fields await measurement (undecided). If unavailable, group by filename after removing trailing numbers and the `Autosave-` prefix.
-- Name groups after the player faction or world; order saves newest first.
-- Show the matching plan and environment for each group (§4.2). Older saves without any matching plan form a separate "saves without a matching list" group.
-- Pack saves (§1.2) belong to that pack and show its name.
+Evaluate in order:
+
+1. A RimSaves file name `<folder>#§#<save>.rws` puts the save in colony `<folder>`; the page shows `<save>` as its name.
+2. With L1 facts (§1.7), saves sharing world identity (world seed, world name and player faction name; exact fields await measurement) form one colony.
+3. Otherwise, group by file name after removing trailing numbers and the `Autosave-` prefix; regroup when L1 facts arrive.
+
+- Name a colony after its RimSaves folder, else the player faction, else the world. Order colonies by their latest save, and saves newest first.
+- Saves in a pack's folder belong to that pack (§4.2 rule 1). Colonies whose latest save matches no list form a separate "matches no list" group.
 
 ### 4.2 Matching a plan
 
@@ -162,34 +174,61 @@ Evaluate in order and stop at the first match:
 
 1. Save is in a pack's save directory → that pack.
 2. Save modification time falls after a launch record (08 §1) and before the next launch, and that launch used this user data directory → that launch's plan.
-3. Save `<modIds>` (enabled set resolved under 04 §4.2) exactly matches a version (04 §3) of a plan → that plan; if several match, choose the most recently played.
-4. No match → "saves without a matching list".
+3. Save `<modIds>` (enabled set resolved under 04 §4.2) exactly matches a version (04 §3) of a plan (`TokenFingerprint`) → that plan; if several match, choose the most recently played.
+4. No match → "matches no list".
 
-Approximate matching (for example, an enabled set differing by one or two entries) is undecided; omit it initially to avoid false matches.
+Approximate matching for rule 3 (an enabled set differing by one or two entries) is undecided; omit it initially to avoid false matches. Rules 1 and 2 may match a save whose Mods differ from the list; §4.3 lists those differences.
 
 ### 4.3 Selecting a save
 
-Show:
+**Where it belongs**: game version and environment, the matched list or pack with the rule that matched it, and the location (folder and file).
 
-- Save time, game version (`<gameVersion>`), enabled count then;
-- Matching plan and environment (or pack), and the basis for the match (which rule in §4.2);
-- **What is missing now**: entries in the save's `<modIds>` not currently enabled in the matching plan. Divide into "installed but not enabled" and "not installed" (names from `<modNames>`);
-- **What is extra now**: entries currently enabled in the matching plan but absent from the save.
+**Can it load?** compares the save with the matched list as it is now and lists only what needs attention. Passed checks are not listed.
 
-Compare packageIds case-insensitively. For Workshop entries written as `<package ID>_steam`, strip the suffix before comparing (04 §4.1).
+| Item | Level | Consequence shown | Fix |
+| --- | --- | --- | --- |
+| Cut off: no `</savegame>` (L0) and not being written | Error | Can never load | Recycle; open the previous readable save |
+| Malformed XML (L1) | Error | Where reading stopped | Recycle; open the previous readable save |
+| A Mod in the save is not installed | Error when it owns pawns, factions, world components or classes in the save; otherwise warning | What it owns (§4.6), broken references, missing classes | Subscribe and enable (needs `<modSteamIds>`), else Make a list from this save |
+| A Mod in the save is installed but not enabled | As above | As above | Enable in the list, positioned in save order |
+| `Class="…"` with no type in installed assemblies or the game | Error | The type, and its Mod when known | The fix of that Mod's row |
+| The last load of this save had errors (a game log phase whose save name matches, 03 §6.7) | Error | Count and first message | Open the game log at that load |
+| A Mod in the list is not in the save | Information | Usually safe: it starts fresh in an existing save | Disable to match |
+| Same Mods in a different order | Information | Usually safe; patch order differs | Use the save's order |
+| Save made for another game version than the environment's | Warning | The game converts it on load | — |
+
+- Compare packageIds case-insensitively. For Workshop entries written as `<package ID>_steam`, strip the suffix before comparing (04 §4.1).
+- The verdict takes the highest level present: **loads with the list**, **loads, but content will be lost** (warnings) or **will not load cleanly** (errors). The quick-fix bar has at most one primary action: **Fix and launch** applies every Mod fix as one reversible plan edit, starts any subscriptions, previews, then launches (08 §2); for a cut-off save it is Recycle; for a save matching no list it is Make a list from this save.
+- `saves show` prints each item with its consequence and the command that performs the fix.
+
+**Mod list**: the save's Mods in load order, named from `<modNames>`; not-installed entries and reordered entries marked; the list's Mods missing from the save named after it.
+
+**Play facts** (L1): day and date, storyteller and difficulty, real play time, biome, wealth, colonists (with deaths), animals, research progress and raids survived, each with the change since the colony's previous save.
 
 ### 4.4 Actions
 
 | Action | What it does | Confirmation |
 | --- | --- | --- |
+| Fix | The Mod fixes of §4.3 as one reversible plan edit (04 §2.1), plus subscriptions; `--launch` launches afterwards | Not required; preview first (`--dry-run`) |
 | Re-enable missing Mods in the list | Add "installed but not enabled" entries back to the matching plan, positioned in save order; list uninstalled entries without acting on them | Not required; one reversible plan edit (04 §2.1) |
-| Create a list from this save's Mods | Create a plan containing the imported save list (same as `loadout import`, §1.3); retain and mark uninstalled entries, as with ModsConfig.xml import | Not required; the new plan's first version has source `import` |
-| back up | Copy to `<data directory>/backups/saves/<time>/`, preserving filenames. Allow multiple selections; one backup shares one time directory. Copy only; leave originals in place | Player confirmation required |
+| Create a list from this save's Mods | Create a plan containing the imported save list (same as `loadout import --new`, §1.3); retain and mark uninstalled entries, as with ModsConfig.xml import | Not required; the new plan's first version has source `import` |
+| Rename | Rename the file in place, inline as in 06 §2.17. Keep a RimSaves prefix; refuse an existing name | Not required |
+| Copy | Copy to `<name> (copy).rws` in the same folder, never overwriting | Not required |
+| Back up | Copy to `<data directory>/backups/saves/<time>/`, preserving filenames. Allow multiple selections; one backup shares one time directory. Copy only; leave originals in place | Player confirmation required |
 | Move to the recycle bin | Use the recycle bin rules in 08 §7: save files are one of the three accepted categories. No permanent deletion | Player confirmation required |
 
-- `<time>` is local time, formatted consistently with other backup directories (07 §3, undecided).
-- Both actions requiring confirmation follow 06 §6: list affected files and sizes first; execute only after the player clicks "confirm". Archo can request but cannot confirm for the player (09 §2.3).
-- While the game runs (08 §4), refuse recycle bin moves and explain "the game is running". Backups work normally (read-only source access).
+- `<time>` is local time, `YYYYMMDD-HHMMSS` like database backups (07 §3).
+- Both actions requiring confirmation follow 06 §6: list affected files and sizes first; execute only after the player clicks "confirm". Archo can request but cannot confirm for the player (09 §2.3). MCP previews with `dry_run=true` and executes with `confirm=true` (05 §5.2).
+- While the game runs (08 §4), refuse rename and recycle bin moves and explain "the game is running". Backups and copies work normally (read-only source access).
+- A colony with a cut-off save gets a cleanup hint offering to recycle it.
+
+### 4.5 Timeline and events
+
+From the L1 facts of a colony's saves (and the game's own history records inside each save, if measurement confirms they hold a series): wealth and colonists over in-game days, one point per save, with deaths marked; events such as deaths, raids repelled and marriages, newest first. Fields await measurement. Counting occurrences instead of only presence is optional.
+
+### 4.6 What a Mod owns in a save
+
+To state the consequence of a missing Mod, attribute the save's objects to Mods: Def references by §1.5; `Class="…"` values by the type index of Mod assemblies (`store.TypeOwners`) plus the game's own `Assembly-CSharp.dll`, which is not indexed today and must be added; pawns by their race Def, factions by their Def, world and game components by their class. Report counts per kind ("3 colonists of the Kurin race, 1 faction, 2 hediffs"). The same attribution answers whether a Mod can be removed mid-playthrough (`saves list --mod`).
 
 ## 5. Playthrough themes and content conflicts (1.2)
 
@@ -232,3 +271,8 @@ Two pages under "worth playing" in the sidebar: play goals and shared packs (06 
 | SV8 | Back up a save without player confirmation | No files written; after confirmation, appears in `<data directory>/backups/saves/<time>/`, original unchanged | Unimplemented |
 | SV9 | Move to the recycle bin | Confirm first; enter system recycle bin; refuse while the game runs | Unimplemented |
 | SV10 | "Re-enable missing Mods in the list" | One reversible edit; only list uninstalled entries | Unimplemented |
+| SV11 | Open Saves with no L1 cache | Left card, middle header and Mod list appear from L0 at once; the background task reads the selected save first | Unimplemented |
+| SV12 | A save written during a crash (no `</savegame>`) | Cut off, error, Recycle offered; a file still being written gets no verdict | Unimplemented |
+| SV13 | RimSaves name `Ashfall#§#Landing.rws` | Grouped under colony `Ashfall`, shown as `Landing` | Unimplemented |
+| SV14 | A save whose Mod with pawns is not installed | Error naming what is lost; Fix subscribes and enables it as one reversible edit | Unimplemented |
+| SV15 | `get_save` on MCP | Same text as `saves show`; each fix names its command or tool call | Unimplemented |

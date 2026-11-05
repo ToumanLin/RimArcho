@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>saves · B Three columns</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  #page { display: grid; grid-template-columns: 248px minmax(0, 11fr) minmax(0, 9fr); gap: 12px; overflow: hidden; padding-bottom: 12px; }
+  /* left: one card, search on top, colonies that expand to their saves */
+  #left { min-height: 0; display: flex; flex-direction: column; }
+  .search { flex: none; height: 38px; display: flex; align-items: center; gap: 6px; padding: 0 12px; border-bottom: var(--hairline) solid var(--line-2); color: var(--muted); }
+  .search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font: inherit; color: var(--fg); }
+  .search kbd { margin: 0; }
+  #tree { flex: 1; min-height: 0; overflow-y: auto; padding: 4px; }
+  .crow { width: 100%; height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 8px 0 4px; border-radius: 7px; font-weight: 600; }
+  .crow:hover { background: var(--pill); }
+  .crow .chv { display: inline-flex; color: var(--faint); transition: transform var(--t-press); }
+  .crow.open .chv { transform: rotate(90deg); }
+  .crow .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .crow .k { font-weight: 400; font-size: 12px; color: var(--faint); }
+  .saves { margin: 0 0 4px 15px; padding-left: 4px; border-left: var(--hairline) solid var(--line); }
+  .srow { width: 100%; height: 26px; display: flex; align-items: center; gap: 8px; padding: 0 8px; border-radius: 6px; font-size: 12.5px; color: var(--fg-2); }
+  .srow:hover { background: var(--pill); color: var(--fg); }
+  .srow.on { background: var(--sel); color: var(--fg); font-weight: 600; }
+  .srow .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .srow .d { font-size: 11.5px; color: var(--muted); font-weight: 400; }
+  .hit { background: color-mix(in srgb, var(--amber) 30%, transparent); border-radius: 2px; }
+  /* middle and right */
+  .pane { min-height: 0; overflow-y: auto; }
+  .ph { position: sticky; top: 0; z-index: 2; background: var(--card); padding: 12px 16px 12px; border-bottom: var(--hairline) solid var(--line-2); }
+  .ph .row1 { display: flex; align-items: center; gap: 8px; }
+  .ph h2 { margin: 0; font-size: 15px; }
+  .ph .acts { margin-left: auto; display: flex; gap: 2px; }
+  .kv { display: grid; grid-template-columns: 78px 1fr; gap: 4px 10px; font-size: 12.5px; margin: 10px 0 0; }
+  .kv dt { color: var(--muted); } .kv dd { margin: 0; color: var(--fg-2); min-width: 0; overflow-wrap: anywhere; }
+  /* can it load: quick fix, then one row per problem or change */
+  .fixbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: 10px; background: var(--amber-soft); }
+  .fixbar.broken { background: var(--red-soft); } .fixbar.ok { background: var(--green-soft); }
+  .fixbar .t { flex: 1 1 200px; font-weight: 600; }
+  .issues { margin-top: 6px; }
+  .iss { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 2px 8px; align-items: baseline; padding: 9px 0; border-top: var(--hairline) solid var(--line-2); }
+  .iss:first-child { border-top: 0; }
+  .iss .h { font-weight: 600; }
+  .iss .c { grid-column: 2; color: var(--fg-2); font-size: 12.5px; }
+  .iss .c code { font-size: 11.5px; }
+  .iss .f { grid-row: 1; grid-column: 3; display: flex; gap: 4px; }
+  .iss .sign { font: 600 12px var(--code); text-align: center; }
+  .iss .sign.m { color: var(--red); } .iss .sign.p { color: var(--green); } .iss .sign.o { color: var(--muted); }
+  .iss.safe .h { font-weight: 500; color: var(--fg-2); }
+  /* the save's Mod list, in load order */
+  .mods { margin: 0; padding: 0; list-style: none; font-size: 12.5px; columns: 2 220px; column-gap: 20px; }
+  .mods li { display: flex; gap: 8px; align-items: baseline; padding: 2px 0; break-inside: avoid; color: var(--fg-2); }
+  .mods li i { font-style: normal; font-size: 11px; color: var(--faint); width: 22px; text-align: right; flex: none; }
+  .mods li.gone { color: var(--red); } .mods li.moved b { font-weight: 400; color: var(--muted); font-size: 11px; }
+  .mods li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .more { margin-top: 6px; font-size: 12px; color: var(--muted); }
+  .ph2 { display: flex; align-items: baseline; gap: 8px; }
+  .ph2 h2 { margin: 0; font-size: 15px; }
+  .note { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  @media (max-width: 1180px) { #page { grid-template-columns: 220px minmax(0, 1fr) minmax(0, 1fr); } }
+  @media (max-width: 760px) { #page { display: block; } #left { height: 420px; margin-bottom: 12px; } .pane { margin-bottom: 12px; } }
+</style>
+</head>
+<body>
+<div class="review" id="review"></div>
+<div id="app">
+  <aside id="side"><div class="side-head">RimArcho</div><nav id="nav"></nav></aside>
+  <main id="main">
+    <div id="top"></div><div class="page-head" id="head"></div>
+    <div id="page">
+      <div class="card" id="left"><label class="search"><span id="qi"></span><input id="q" placeholder="Search colonies, saves, Mods" autocomplete="off"><kbd>/</kbd></label><div id="tree"></div></div>
+      <div class="pane card" id="mid"></div>
+      <div class="pane card" id="right"></div>
+    </div>
+    <div id="bottom"><span id="status"></span><span id="hints"></span></div>
+  </main>
+</div>
+<div id="toast"></div>
+<script src="shared.js"></script>
+<script>
+// B (revised twice, 2026-11-04). Left: colonies that expand to their saves, nothing else.
+// Middle: where the save belongs, what is wrong with it against the current list and how to fix it, its Mod list.
+// Right: everything about the playthrough (storyteller, play time, stats, people, events, timeline).
+$("#qi").outerHTML = ic("search");
+let cur = COLONIES[0], sel = latest(cur).id, q = "";
+const opened = new Set([cur.id]);
+shell("b", '<span class="crumb">Library</span><span class="muted">/</span><span class="crumb">Saves</span>',
+  [["/", "search"], ["↑↓", "save"], ["←→", "fold colony"], ["enter", "launch"]]);
+$("#head").innerHTML = `<p class="lead"><b>4 colonies</b> · 13 saves</p>
+  <div class="page-acts"><button class="btn line small" data-toast="would rescan all saves">Rescan</button></div>`;
+
+// ---- sample Mod lists in load order (the full lists are 6–214 long; the draft names the first ones) ----
+const MODBASE = {
+  tundra: ["Harmony", "Core", "Royalty", "Ideology", "Biotech", "HugsLib", "Vanilla Expanded Framework", "Medieval Overhaul", "Dubs Bad Hygiene", "Vanilla Furniture Expanded – Art",
+    "Allow Tool", "Pick Up And Haul", "Common Sense", "Replace Stuff", "Wall Light", "Numbers", "Character Editor", "Camera+", "Dubs Mint Menus", "Achtung!", "Vanilla Furniture Expanded", "Vanilla Weapons Expanded", "Simple Sidearms", "Mod Manager helpers"],
+  ashfall: ["Harmony", "Core", "Biotech", "HugsLib", "Humanoid Alien Races", "Kurin HAR", "Vanilla Expanded Framework", "Vanilla Genetics Expanded", "Allow Tool", "Pick Up And Haul", "Common Sense", "Numbers", "Camera+", "Achtung!"],
+  glacier: ["Harmony", "Core", "Royalty", "Camera+", "Numbers", "Allow Tool"],
+  sandy: ["Harmony", "Core", "Royalty", "Ideology", "HugsLib", "JecsTools", "Rimatomics", "Combat Extended", "Alpha Animals", "Rimefeller", "Vanilla Expanded Framework", "Save Our Ship 2", "Dubs Bad Hygiene", "RimFridge"],
+};
+const MOVED = { tundra: ["Allow Tool", "Pick Up And Haul", "Common Sense", "Numbers"] };
+const goneEver = (c) => c.uses.filter((u) => u.gone).map((u) => u.m);
+function modList(s) {
+  const c = s.c, base = MODBASE[c.id];
+  const list = base.filter((m) => !s.diff.added.includes(m) && (!goneEver(c).includes(m) || s.diff.gone.includes(m)));
+  return list.map((m, i) => ({ m, gone: s.diff.gone.includes(m) || (c.orphan && i % 3 === 2), moved: s.diff.moved && (MOVED[c.id] || []).includes(m) }));
+}
+
+// ---- problems and changes against the current list, each with consequence and fix ----
+function issues(s) {
+  const c = s.c, out = [], btn = (t, msg, cls = "line") => `<button class="btn ${cls} small" data-toast="${esc(msg)}">${t}</button>`;
+  const prevGood = c.saves.slice(c.saves.indexOf(s) + 1).find((x) => !x.trunc);
+  if (s.trunc) out.push({ st: "broken", h: "The file is cut off", c: "No <code>&lt;/savegame&gt;</code> at 9.1 MB of about 27 MB; the game crashed while writing it. It can never load.",
+    f: btn("Recycle…", "would ask, then recycle " + shownName(s)) + (prevGood ? btn(`Open ${esc(shownName(prevGood))}`, "would select " + shownName(prevGood), "") : "") });
+  if (c.orphan) out.push({ st: "broken", h: `Made in ${esc(c.ver.slice(0, 3))}; no game here runs it`, c: "31 of its 88 Mods are not installed. Loading it in 1.6 converts the save and drops what those Mods own.",
+    f: btn("Make a list from this save", "would create a list from this save's 88 Mods", "primary") });
+  else for (const m of s.diff.gone) {
+    const u = c.uses.find((x) => x.m === m), extra = [];
+    if (s.refs) extra.push(`${s.refs} references break`);
+    if (s.cls) extra.push(`class <code>${esc(s.cls)}</code> fails to load`);
+    out.push({ st: u && u.lv === "broken" ? "broken" : "warn", sign: "−", h: `${esc(m)} is not installed`,
+      c: `${u ? esc(u.o[0].toUpperCase() + u.o.slice(1)) + " will be removed on load" : "Its content will be removed on load"}${extra.length ? "; " + extra.join("; ") : ""}.`,
+      f: btn("Subscribe and enable", `would subscribe to ${m} and enable it in ${c.list}`) });
+  }
+  if (s.lastLoad && s.lastLoad.errors) out.push({ st: "broken", h: `Last load had ${s.lastLoad.errors} errors`, c: `${esc(s.lastLoad.when)} · <code>${esc(s.lastLoad.sample)}</code>`,
+    f: btn(`${ic("log")} Game log`, "would open the game log at this load", "") });
+  if (!c.orphan) {
+    const a = s.diff.added;
+    if (a.length) out.push({ st: "safe", sign: "+", h: a.length > 2 ? `16 Mods added since this save` : `${esc(a.join(", "))} added since this save`,
+      c: a.length > 2 ? `${esc(a.slice(0, 2).join(", "))} and 14 more. New Mods start fresh in an existing save; safe.` : "Interface only, nothing stored in saves; safe.",
+      f: btn("Disable to match", `would disable ${a.join(", ")} in ${c.list}`, "") });
+    if (s.diff.moved) out.push({ st: "safe", sign: "↕", h: `${s.diff.moved} Mods in a different order`, c: "Same Mods, so the save loads the same; only patch order differs.",
+      f: btn("Use the save's order", "would apply the save's load order to " + c.list, "") });
+  }
+  return out;
+}
+function quickFix(s, list) {
+  const c = s.c, bad = list.filter((i) => i.st === "broken"), warn = list.filter((i) => i.st === "warn");
+  if (s.trunc) return `<div class="fixbar broken"><span class="t">This save cannot be loaded</span><button class="btn line small" data-toast="would ask, then recycle ${esc(shownName(s))}">Recycle…</button></div>`;
+  if (c.orphan) return `<div class="fixbar broken"><span class="t">No list or game matches this save</span><button class="btn primary small" data-toast="would create a list from this save">Make a list from this save</button></div>`;
+  if (!bad.length && !warn.length) return `<div class="fixbar ok"><span class="t">Loads with “${esc(c.list)}” as it is</span><button class="btn line small" data-toast="would launch ${esc(c.list)}">${ic("play")} Launch</button></div>`;
+  const gone = s.diff.gone;
+  return `<div class="fixbar ${bad.length ? "broken" : ""}"><span class="t">${bad.length ? "Will not load cleanly" : "Loads, but content will be lost"}</span>
+    <button class="btn primary small" data-toast="would subscribe to ${esc(gone.join(", "))}, enable it in ${esc(c.list)}, then launch">Fix and launch</button></div>`;
+}
+
+// ---- left ----
+const lc = (s) => s.toLowerCase();
+const mark = (s) => { const t = esc(s); if (!q) return t; const i = lc(s).indexOf(q); return i < 0 ? t : esc(s.slice(0, i)) + `<span class="hit">${esc(s.slice(i, i + q.length))}</span>` + esc(s.slice(i + q.length)); };
+const usesMod = (c) => q && MODBASE[c.id].some((m) => lc(m).includes(q));
+const colMatch = (c) => !q || lc(c.name).includes(q) || usesMod(c) || c.saves.some((s) => lc(shownName(s)).includes(q));
+const saveMatch = (s) => !q || lc(s.c.name).includes(q) || usesMod(s.c) || lc(shownName(s)).includes(q);
+function drawLeft() {
+  const cs = COLONIES.filter(colMatch);
+  $("#tree").innerHTML = cs.map((c) => { const open = opened.has(c.id) || !!q;
+    return `<button class="crow ${open ? "open" : ""}" data-c="${c.id}"><span class="chv">${ic("chev")}</span><span class="n">${mark(c.name)}</span><span class="k">${c.saves.length}</span></button>
+      ${open ? `<div class="saves">${c.saves.filter(saveMatch).map((s) => `<button class="srow ${s.id === sel ? "on" : ""}" data-save="${s.id}"><span class="n">${mark(shownName(s))}</span><span class="d">day ${s.day}</span></button>`).join("")}</div>` : ""}`;
+  }).join("") || '<div class="empty">Nothing matches</div>';
+}
+
+// ---- middle ----
+function drawMid() {
+  const s = findSave(sel), c = s.c, list = issues(s);
+  const where = c.list ? (c.list.startsWith("pack · ") ? `pack <b>${esc(c.list.slice(7))}</b>` : `list <b>${esc(c.list)}</b>`) : '<span class="warn">no matching list</span>';
+  const mods = modList(s), shown = mods.slice(0, 24), added = c.orphan ? [] : s.diff.added;
+  $("#mid").innerHTML = `<div class="ph"><div class="row1"><h2>${esc(shownName(s))}</h2><span class="acts">${saveActs(s)}</span></div>
+      <dl class="kv"><dt>game</dt><dd>${esc(c.ver)} · ${esc(c.env)}</dd><dt>${c.list && c.list.startsWith("pack") ? "pack" : "list"}</dt><dd>${where.replace(/^(list|pack) /, "")}</dd>
+      <dt>location</dt><dd><code>${esc(c.folder.replace(/ ·.*$/, "").replace(/ \(isolated\)$/, ""))}/${esc(s.file)}</code></dd></dl></div>
+    <div class="sect"><h3>Can it load? <span class="r">against ${c.list ? "“" + esc(c.list) + "” now" : "the installed Mods"}</span></h3>
+      ${quickFix(s, list)}
+      ${list.length ? `<div class="issues">${list.map((i) => `<div class="iss ${i.st}">${i.sign ? `<span class="sign ${i.sign === "−" ? "m" : i.sign === "+" ? "p" : "o"}">${i.sign}</span>` : stIcon(i.st)}
+        <span class="h">${i.h}</span><span class="f">${i.f}</span><span class="c">${i.c}</span></div>`).join("")}</div>` : ""}</div>
+    ${s.trunc ? "" : `<div class="sect"><h3>Mod list <span class="r">${s.mods} in load order${s.diff.gone.length && !c.orphan ? ` · <span class="err">${s.diff.gone.length} not installed</span>` : ""}${s.diff.moved ? ` · ${s.diff.moved} reordered` : ""}</span></h3>
+      <ol class="mods">${shown.map((x, i) => `<li class="${x.gone ? "gone" : ""} ${x.moved ? "moved" : ""}"><i>${i + 1}</i><span>${esc(x.m)}</span>${x.gone ? '<span class="tagx broken">not installed</span>' : ""}${x.moved ? "<b>↕</b>" : ""}</li>`).join("")}</ol>
+      <div class="more">${s.mods > shown.length ? `<button class="btn link" data-toast="would show all ${s.mods}">Show all ${s.mods}</button> · ` : ""}<button class="btn link" data-toast="would create a list from this save's Mods">Make a list from this save</button>${added.length ? ` · not in the save but in the list: ${esc(added.slice(0, 2).join(", "))}${added.length > 2 ? "…" : ""}` : ""}</div></div>`}`;
+}
+
+// ---- right ----
+function drawRight() {
+  const s = findSave(sel), c = s.c, L = latest(c);
+  const [teller, diff] = c.story.split(" · ");
+  const w = Math.max(300, $("#right").clientWidth - 34);
+  $("#right").innerHTML = `<div class="ph"><div class="ph2"><h2>${esc(c.name)}</h2><span class="muted">day ${s.day} · ${esc(s.date)}</span></div>
+      <dl class="kv"><dt>storyteller</dt><dd>${esc(teller)}</dd><dt>difficulty</dt><dd>${esc(diff)}</dd><dt>played</dt><dd>${c.playH} h over ${L.day} in-game days</dd><dt>biome</dt><dd>${esc(c.biome)}</dd></dl></div>
+    <div class="sect"><h3>At this save <span class="r">change since the previous save</span></h3>${playHTML(s, { noEvents: true, noDay: true })}</div>
+    ${s.trunc ? "" : `<div class="sect"><h3>Events</h3>${playHTML(s, { noPeople: true }).replace(/^[\s\S]*?(<ul class="events">)/, "$1")}</div>`}
+    <div class="sect"><h3>Over time <span class="r">click a point to open that save</span></h3>${timelineSVG(c, sel, w, 110)}
+      <div class="note">${c.dead.length ? `${c.dead.length} death${c.dead.length > 1 ? "s" : ""}: ${esc(c.dead.join(", "))}` : "No deaths"}</div></div>`;
+  $$("#right [data-save]").forEach((n) => n.onclick = () => pickSave(n.dataset.save));
+}
+
+function drawAll() { drawLeft(); drawMid(); drawRight(); }
+function pickSave(id) { sel = id; cur = findSave(id).c; opened.add(cur.id); drawAll(); }
+$("#tree").onclick = (e) => {
+  const s = e.target.closest("[data-save]"); if (s) return pickSave(s.dataset.save);
+  const b = e.target.closest("[data-c]"); if (!b) return;
+  const c = COLONIES.find((x) => x.id === b.dataset.c);
+  if (opened.has(c.id) && c === cur) { opened.delete(c.id); drawLeft(); } else { opened.add(c.id); pickSave(latest(c).id); }
+};
+$("#q").oninput = (e) => { q = lc(e.target.value.trim()); drawLeft(); };
+addEventListener("keydown", (e) => {
+  if (e.target === $("#q")) { if (e.key === "Escape") { e.target.value = ""; q = ""; e.target.blur(); drawLeft(); } else if (e.key === "ArrowDown") e.target.blur(); else return; }
+  if (e.key === "/") { $("#q").focus(); e.preventDefault(); return; }
+  if (e.key === "ArrowLeft") { opened.delete(cur.id); return drawLeft(); }
+  if (e.key === "ArrowRight") { opened.add(cur.id); return drawLeft(); }
+  if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+  const vis = $$("#tree [data-save]").map((n) => n.dataset.save), i = vis.indexOf(sel);
+  if (vis.length) pickSave(vis[Math.max(0, Math.min(vis.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)))]);
+  e.preventDefault();
+});
+$("#status").textContent = "Left: colonies and their saves. Middle: where it belongs and what is wrong. Right: the playthrough.";
+drawAll();
+</script>
+</body>
+</html>

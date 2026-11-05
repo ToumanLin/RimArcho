@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>saves · B Three columns</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  #page { display: grid; grid-template-columns: 208px 300px minmax(0, 1fr); gap: 12px; overflow: hidden; padding-bottom: 12px; }
+  .pane { min-height: 0; overflow-y: auto; }
+  .pane.card { display: flex; flex-direction: column; }
+  .cap { position: sticky; top: 0; z-index: 2; padding: 10px 12px 6px; font-size: 12px; color: var(--muted); background: var(--card); }
+  #cols .cap { background: var(--bg); }
+  .crow { width: 100%; display: grid; grid-template-columns: 10px 1fr; gap: 0 8px; align-items: baseline; padding: 7px 10px; border-radius: 8px; }
+  .crow:hover { background: var(--pill); }
+  .crow.on { background: var(--card); box-shadow: 0 0 0 var(--hairline) var(--line); }
+  .crow .n { font-weight: 600; } .crow .m { grid-column: 2; font-size: 12px; color: var(--muted); }
+  .crow .dot { align-self: center; }
+  /* column 2: the colony's facts, once, then its saves */
+  .facts { padding: 12px 14px; border-bottom: var(--hairline) solid var(--line-2); }
+  .facts h2 { margin: 0 0 8px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  .facts h2 .spark { margin-left: auto; }
+  .kv { display: grid; grid-template-columns: 78px 1fr; gap: 3px 8px; font-size: 12px; }
+  .kv dt { color: var(--muted); } .kv dd { margin: 0; color: var(--fg-2); overflow: hidden; text-overflow: ellipsis; }
+  .srow { display: grid; grid-template-columns: 16px 1fr auto; gap: 1px 8px; padding: 8px 14px; border-top: var(--hairline) solid var(--line-2); cursor: default; }
+  .srow:first-of-type { border-top: 0; }
+  .srow:hover { background: var(--card-2); }
+  .srow.on { background: var(--sel); }
+  .srow .n { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; gap: 6px; align-items: center; }
+  .srow .d { font-size: 12px; color: var(--muted); text-align: right; white-space: nowrap; }
+  .srow .s { grid-column: 2 / -1; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .srow .s.warn { color: var(--amber); } .srow .s.broken { color: var(--red); }
+  /* column 3: one save */
+  #detail .dh { padding: 12px 16px 10px; border-bottom: var(--hairline) solid var(--line-2); position: sticky; top: 0; background: var(--card); z-index: 2; }
+  #detail .dh .row1 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  #detail .dh h2 { margin: 0; font-size: 15px; }
+  #detail .dh .meta { font-size: 12px; color: var(--muted); margin: 2px 0 10px; }
+  #detail .dh .acts { margin-left: auto; display: flex; gap: 2px; }
+  .same { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  @media (max-width: 1100px) { #page { grid-template-columns: 180px 260px minmax(0, 1fr); } }
+  @media (max-width: 760px) { #page { display: block; } .pane { margin-bottom: 12px; } }
+</style>
+</head>
+<body>
+<div class="review" id="review"></div>
+<div id="app">
+  <aside id="side"><div class="side-head">RimArcho</div><nav id="nav"></nav></aside>
+  <main id="main">
+    <div id="top"></div><div class="page-head" id="head"></div>
+    <div id="page"><div class="pane" id="cols"></div><div class="pane card" id="saves"></div><div class="pane card" id="detail"></div></div>
+    <div id="bottom"><span id="status"></span><span id="hints"></span></div>
+  </main>
+</div>
+<div id="toast"></div>
+<script src="shared.js"></script>
+<script>
+// B: everything on one screen, mail-client style. Colony facts sit once at the top of the save column;
+// the third column is always visible, so the deepest level costs no navigation at all.
+let cur = COLONIES[0], sel = latest(cur).id, tab = "load", focus = 1;
+shell("b-first", '<span class="crumb">Library</span><span class="muted">/</span><span class="crumb">Saves</span>',
+  [["1 2 3", "column"], ["↑↓", "move"], ["tab", "load / mods / colony"], ["enter", "launch"]]);
+$("#head").innerHTML = `<p class="lead"><b>4 colonies</b> · 13 saves · 1 needs attention before you load it</p>
+  <div class="page-acts"><button class="btn line small" data-toast="would rescan all saves">Rescan</button></div>`;
+
+function drawCols() {
+  const row = (c) => `<button class="crow ${c === cur ? "on" : ""}" data-c="${c.id}"><span class="dot ${latest(c).st}"></span><span class="n">${esc(c.name)}</span>
+    <span class="m">${esc(c.ver.slice(0, 3))} · ${c.saves.length} save${c.saves.length > 1 ? "s" : ""} · day ${latest(c).day}</span></button>`;
+  $("#cols").innerHTML = `<div class="cap">Colonies</div>${COLONIES.filter((c) => !c.orphan).map(row).join("")}<div class="cap">Matches no list</div>${COLONIES.filter((c) => c.orphan).map(row).join("")}`;
+}
+function drawSaves() {
+  const c = cur;
+  $("#saves").innerHTML = `<div class="facts"><h2>${esc(c.name)}${sparkSVG(c, 72, 20)}</h2>
+      <dl class="kv"><dt>game</dt><dd>${esc(c.ver)}</dd><dt>environment</dt><dd>${esc(c.env)}</dd><dt>list</dt><dd>${c.list ? esc(c.list) : '<span class="warn">matches no list</span>'}</dd>
+      <dt>folder</dt><dd title="${esc(c.folder)}">${esc(c.folder)}</dd><dt>story</dt><dd>${esc(c.story)}</dd><dt>played</dt><dd>${c.playH} h · ${latest(c).day} days</dd></dl>
+      ${c.list ? `<div style="margin-top:10px"><button class="btn primary small" data-toast="would launch ${esc(c.list)}">${ic("play")} Launch ${esc(c.list)}</button></div>` : ""}</div>
+    <div class="cap">${c.saves.length} saves <span class="faint">· newest first</span></div>
+    ${c.saves.map((s, i) => `<div class="srow ${s.id === sel ? "on" : ""}" data-save="${s.id}">${stIcon(s.st)}<span class="n">${esc(shownName(s))}${i === 0 ? '<span class="tagx latest">latest</span>' : ""}${s.auto ? '<span class="tagx">auto</span>' : ""}</span>
+      <span class="d">day ${s.day}</span><span class="s ${s.st === "ok" ? "" : s.st}">${esc(s.say)}</span></div>`).join("")}`;
+}
+function drawDetail() {
+  const s = findSave(sel), c = s.c, L = latest(c);
+  const tabs = [["load", "Can it load?"], ["mods", "Mods it uses"], ["colony", "Colony"]];
+  let body;
+  if (tab === "load") body = `<div class="sect">${verdictHTML(s)}</div><div class="sect">${checksHTML(s)}</div>`;
+  else if (tab === "mods") body = `<div class="sect"><h3>What the save uses <span class="r">can it be removed mid-playthrough?</span></h3>${usesHTML(c)}
+    ${s !== L ? '<div class="same">Read from this save; same as the latest save except where marked.</div>' : ""}</div>`;
+  else body = `<div class="sect"><h3>Day ${s.day} · ${esc(s.date)} <span class="r">${s === L ? "latest" : `${L.day - s.day} days before the latest`}</span></h3>${playHTML(s)}</div>
+    <div class="sect"><h3>Over time</h3>${timelineSVG(c, sel, Math.max(320, $("#detail").clientWidth - 34), 104)}</div>`;
+  $("#detail").innerHTML = `<div class="dh"><div class="row1">${stIcon(s.st)}<h2>${esc(shownName(s))}</h2>${s === L ? '<span class="tagx latest">latest</span>' : ""}<span class="acts">${saveActs(s)}</span></div>
+      <div class="meta">${esc(s.file)} · saved ${esc(s.saved)} · ${esc(s.size)} · ${s.mods} Mods</div>
+      <div class="seg">${tabs.map(([k, t]) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${t}${k === "load" && s.st !== "ok" ? ` <span class="dot ${s.st}"></span>` : ""}</button>`).join("")}</div></div>${body}`;
+  $$("[data-tab]").forEach((b) => b.onclick = () => { tab = b.dataset.tab; drawDetail(); });
+  $$(".timeline [data-save]").forEach((n) => n.onclick = () => { sel = n.dataset.save; drawSaves(); drawDetail(); });
+}
+function pickColony(c) { cur = c; sel = latest(c).id; drawCols(); drawSaves(); drawDetail(); }
+function pickSave(id) { sel = id; drawSaves(); drawDetail(); }
+$("#cols").onclick = (e) => { const b = e.target.closest("[data-c]"); if (b) pickColony(COLONIES.find((c) => c.id === b.dataset.c)); };
+$("#saves").onclick = (e) => { const r = e.target.closest(".srow"); if (r) pickSave(r.dataset.save); };
+addEventListener("keydown", (e) => {
+  if (e.key === "1" || e.key === "2" || e.key === "3") { focus = +e.key; return; }
+  if (e.key === "Tab") { const k = ["load", "mods", "colony"]; tab = k[(k.indexOf(tab) + (e.shiftKey ? 2 : 1)) % 3]; drawDetail(); e.preventDefault(); return; }
+  if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+  const d = e.key === "ArrowDown" ? 1 : -1;
+  if (focus === 1) pickColony(COLONIES[Math.max(0, Math.min(COLONIES.length - 1, COLONIES.indexOf(cur) + d))]);
+  else { const i = cur.saves.findIndex((s) => s.id === sel); pickSave(cur.saves[Math.max(0, Math.min(cur.saves.length - 1, i + d))].id); }
+  e.preventDefault();
+});
+$("#status").textContent = "Colony facts appear once, above its saves; the selected save fills the right column.";
+drawCols(); drawSaves(); drawDetail();
+</script>
+</body>
+</html>
