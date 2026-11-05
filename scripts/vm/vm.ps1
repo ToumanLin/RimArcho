@@ -13,6 +13,7 @@
 #   pwsh scripts/vm/vm.ps1 exec script.ps1   # run a PowerShell script in the guest, print its output
 #   pwsh scripts/vm/vm.ps1 cli "scan"        # run archo.exe <args> in the guest, print its output
 #   pwsh scripts/vm/vm.ps1 quitgame [sec]    # close the game's window like the title bar's X, wait for it to exit
+#   pwsh scripts/vm/vm.ps1 input start|stop|status  # real mouse and keyboard agent for input.mjs
 #   pwsh scripts/vm/vm.ps1 go                # build + push + launch
 param(
     [Parameter(Position = 0, Mandatory = $true)][string]$Command,
@@ -23,6 +24,8 @@ param(
     [string]$GuestDir = 'C:\Users\Public\Documents\VM-Test\RimArcho',
     [int]$DevToolsPort = 9222,   # inside the guest, on 127.0.0.1
     [int]$ForwardPort = 9223,    # what the host connects to
+    [int]$InputPort = 9230,      # input agent, inside the guest, on 127.0.0.1
+    [int]$InputForwardPort = 9231, # what input.mjs connects to
     [switch]$Interactive,       # exec: run a window runner in the signed-in desktop session
     [switch]$StandardUser,       # run guest programs as the standard test user instead of the logged-in Player
     [string]$Monitor = ''        # build: bundle this Archo Monitor mod folder instead of building monitor/
@@ -136,20 +139,23 @@ Expand-Archive -Force '$work\RimArcho.zip' '$GuestDir'
         Write-Host "pushed to $GuestDir"
     }
     'forward' {
-        # Admin in the guest: forward 0.0.0.0:$ForwardPort to the DevTools port and open the
-        # firewall for it. Test VM only (NAT network).
+        # Admin in the guest: forward 0.0.0.0:$ForwardPort to the DevTools port and
+        # 0.0.0.0:$InputForwardPort to the input agent, and open the firewall for both.
+        # Test VM only (NAT network).
         $s = Join-Path $Transfer 'forward.ps1'
         @"
-netsh interface portproxy delete v4tov4 listenport=$ForwardPort listenaddress=0.0.0.0 2>`$null | Out-Null
-netsh interface portproxy add v4tov4 listenport=$ForwardPort listenaddress=0.0.0.0 connectport=$DevToolsPort connectaddress=127.0.0.1
-if (-not (Get-NetFirewallRule -DisplayName 'RimArcho DevTools (test)' -ErrorAction SilentlyContinue)) {
-  New-NetFirewallRule -DisplayName 'RimArcho DevTools (test)' -Direction Inbound -Protocol TCP -LocalPort $ForwardPort -Action Allow -Profile Any | Out-Null
+foreach (`$p in @(@($ForwardPort, $DevToolsPort, 'RimArcho DevTools (test)'), @($InputForwardPort, $InputPort, 'RimArcho input agent (test)'))) {
+  netsh interface portproxy delete v4tov4 listenport=`$(`$p[0]) listenaddress=0.0.0.0 2>`$null | Out-Null
+  netsh interface portproxy add v4tov4 listenport=`$(`$p[0]) listenaddress=0.0.0.0 connectport=`$(`$p[1]) connectaddress=127.0.0.1
+  if (-not (Get-NetFirewallRule -DisplayName `$p[2] -ErrorAction SilentlyContinue)) {
+    New-NetFirewallRule -DisplayName `$p[2] -Direction Inbound -Protocol TCP -LocalPort `$p[0] -Action Allow -Profile Any | Out-Null
+  }
 }
 netsh interface portproxy show v4tov4
 "@ | Set-Content -Encoding UTF8 $s
         & $Wrapper -VMX $VMX -Guest -Command copyFileFromHostToGuest -VMArgs @($s, "$work\forward.ps1")
         & $Wrapper -VMX $VMX -Guest -Command runProgramInGuest -VMArgs @('C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "$work\forward.ps1")
-        Write-Host "host connects to $(GuestIP):$ForwardPort"
+        Write-Host "host connects to $(GuestIP):$ForwardPort (DevTools) and :$InputForwardPort (input agent)"
     }
     'prep' {
         # Once per VM (again after a snapshot revert): Windows turns the display off after 5
@@ -227,6 +233,54 @@ if (-not (Test-Path -LiteralPath `$log)) { "NOTE quitgame: no ArchoMonitor.log i
 if (`$last -match '"kind":"exit"') { 'PASS quitgame: Archo Monitor wrote its exit line' } else { "FAIL quitgame: ArchoMonitor.log does not end with an exit line (last: `$(if (`$last.Length -gt 120) { `$last.Substring(0, 120) } else { `$last }))" }
 "@ | Set-Content -Encoding UTF8 $s
         & $PSCommandPath exec $s -Interactive -VMX $VMX -Wrapper $Wrapper -Transfer $Transfer -GuestDir $GuestDir
+    }
+    'input' {
+        # The real-input agent (input-agent.ps1) in the signed-in desktop session; input.mjs
+        # drives it. A new token each start, kept in $Transfer for input.mjs.
+        $sub = if ($Rest.Count) { $Rest[0] } else { 'status' }
+        $pidFile = "$work\input-agent.pid"; $logFile = "$work\input-agent.log"
+        $stop = "`$old = Get-Content -LiteralPath '$pidFile' -ErrorAction SilentlyContinue; if (`$old) { Stop-Process -Id `$old -Force -ErrorAction SilentlyContinue; Remove-Item -LiteralPath '$pidFile' -ErrorAction SilentlyContinue; 'stopped agent ' + `$old } else { 'no agent running' }"
+        switch ($sub) {
+            'start' {
+                $agent = Join-Path $Transfer 'input-agent.ps1'
+                [IO.File]::WriteAllText($agent, [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'input-agent.ps1')), [Text.UTF8Encoding]::new($true))
+                try { VM createDirectoryInGuest @($work) -Guest *>$null } catch { }
+                ToGuest $agent "$work\input-agent.ps1"
+                $token = [guid]::NewGuid().ToString('N')
+                $s = Join-Path $Transfer 'input-start.ps1'
+                @"
+$stop
+Remove-Item -LiteralPath '$logFile' -ErrorAction SilentlyContinue
+& '$work\input-agent.ps1' -Port $InputPort -Token '$token' -PidFile '$pidFile' -LogFile '$logFile'
+"@ | Set-Content -Encoding UTF8 $s
+                PS1InGuest $s -Interactive -NoWait
+                Set-Content -Encoding ASCII -NoNewline -LiteralPath (Join-Path $Transfer 'input-token.txt') -Value $token
+                $ip = GuestIP
+                $env:RIMARCHO_VM_INPUT_TOKEN = $token
+                for ($i = 0; $i -lt 30; $i++) {
+                    $r = node (Join-Path $PSScriptRoot 'input.mjs') "${ip}:$InputForwardPort" ping 2>&1
+                    if ($LASTEXITCODE -eq 0) { Write-Host "input agent ready at ${ip}:$InputForwardPort"; return }
+                    Start-Sleep -Seconds 1
+                }
+                Write-Host "FAIL input agent did not answer at ${ip}:$InputForwardPort ($r). Run 'forward' once; 'input status' shows its log."
+                exit 1
+            }
+            'stop' {
+                $s = Join-Path $Transfer 'input-stop.ps1'
+                $stop | Set-Content -Encoding UTF8 $s
+                & $PSCommandPath exec $s -VMX $VMX -Wrapper $Wrapper -Transfer $Transfer -GuestDir $GuestDir
+            }
+            'status' {
+                $s = Join-Path $Transfer 'input-status.ps1'
+                @"
+`$old = Get-Content -LiteralPath '$pidFile' -ErrorAction SilentlyContinue
+if (`$old -and (Get-Process -Id `$old -ErrorAction SilentlyContinue)) { 'agent running: ' + `$old } else { 'agent not running' }
+if (Test-Path -LiteralPath '$logFile') { Get-Content -Encoding UTF8 -LiteralPath '$logFile' -Tail 15 }
+"@ | Set-Content -Encoding UTF8 $s
+                & $PSCommandPath exec $s -VMX $VMX -Wrapper $Wrapper -Transfer $Transfer -GuestDir $GuestDir
+            }
+            default { throw "input start|stop|status, not $sub" }
+        }
     }
     'go' {
         & $PSCommandPath build; & $PSCommandPath push; & $PSCommandPath launch
