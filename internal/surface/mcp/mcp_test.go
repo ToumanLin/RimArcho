@@ -86,8 +86,10 @@ func TestToolsAndAnnotations(t *testing.T) {
 		"preview_uninstall": "ro",
 		// Texture optimisation (08 §5.2).
 		"manage_textures": "destructive",
+		// Saves (10 §1.6, §4.4): a fix subscribes through Steam, so it is open-world.
+		"list_saves": "ro", "get_save": "ro", "manage_saves": "destructive",
 	}
-	openWorld := map[string]bool{"get_description": true, "exchange_list": true, "maintenance": true, "manage_subscriptions": true}
+	openWorld := map[string]bool{"get_description": true, "exchange_list": true, "maintenance": true, "manage_subscriptions": true, "manage_saves": true}
 	seen := map[string]bool{}
 	for _, tl := range res.Tools {
 		seen[tl.Name] = true
