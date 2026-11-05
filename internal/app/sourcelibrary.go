@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
@@ -254,22 +255,20 @@ func (a *App) GameSourceDLL(st *LoadoutState) (*SourceDLL, error) {
 	if build == "" {
 		return nil, fmt.Errorf("the current environment has no game build; configure its game version first")
 	}
-	for _, dir := range []string{filepath.Join(st.Ix.Env.GameRoot, "RimWorldWin64_Data", "Managed"), st.Ix.Env.GameRoot} {
-		p := filepath.Join(dir, "Assembly-CSharp.dll")
-		h, err := fileHash(p)
-		if errors.Is(err, os.ErrNotExist) {
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-		d := &SourceDLL{Instance: "game:" + st.Ix.Env.ID, File: "Assembly-CSharp.dll", Path: p, Hash: h, Kind: "game", GameBuild: build}
-		if err := a.locateSource(d); err != nil {
-			return nil, err
-		}
-		return d, nil
+	dir := env.ManagedDir(st.Ix.Env.GameRoot)
+	if dir == "" {
+		return nil, fmt.Errorf("Assembly-CSharp.dll not found in game folder %s", st.Ix.Env.GameRoot)
 	}
-	return nil, fmt.Errorf("Assembly-CSharp.dll not found in game folder %s", st.Ix.Env.GameRoot)
+	p := filepath.Join(dir, "Assembly-CSharp.dll")
+	h, err := fileHash(p)
+	if err != nil {
+		return nil, err
+	}
+	d := &SourceDLL{Instance: "game:" + st.Ix.Env.ID, File: "Assembly-CSharp.dll", Path: p, Hash: h, Kind: "game", GameBuild: build}
+	if err := a.locateSource(d); err != nil {
+		return nil, err
+	}
+	return d, nil
 }
 
 func sourceGameBuild(s string) string {

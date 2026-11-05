@@ -212,6 +212,7 @@ func (s *Store) DeleteEnv(envID string) error {
 			// Lists are shared by every game and stay (04 §1.1); keepLists already named
 			// this game's own mods in them by packageId.
 			`DELETE FROM launch WHERE environment_id=?`,
+			`DELETE FROM game_assembly WHERE environment_id=?`, // and its game_type rows
 			`DELETE FROM environment WHERE id=?`,
 		} {
 			args := make([]any, strings.Count(q, "?"))

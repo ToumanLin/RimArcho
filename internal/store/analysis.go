@@ -597,24 +597,39 @@ func (s *Store) Assemblies(instanceID string) ([]*AssemblyRow, error) {
 // TypeOwners returns the (instance, file) pairs defining a type full name. Nested types are
 // stored with '+'; stack frames may print either.
 func (s *Store) TypeOwners(name string) ([][2]string, error) {
-	alt := strings.ReplaceAll(name, ".", "+")
-	out, err := s.typeOwners(`f.type_name IN (?, ?)`, name, alt)
-	if err != nil {
-		return nil, err
+	var out [][2]string
+	err := nestedForms(name, func(names ...string) (bool, error) {
+		var err error
+		out, err = s.typeOwners(`f.type_name IN (`+placeholders(len(names))+`)`, anys(names)...)
+		return len(out) > 0, err
+	})
+	return out, err
+}
+
+// nestedForms calls look with the stored forms of a type name until one finds something:
+// the name as given together with every '.' turned into '+', then (a nested type printed
+// with dots) the last dots turned into '+' one at a time: "A.B.Outer.Inner" →
+// "A.B.Outer+Inner", then "A.B+Outer+Inner".
+func nestedForms(name string, look func(names ...string) (bool, error)) error {
+	if ok, err := look(name, strings.ReplaceAll(name, ".", "+")); ok || err != nil {
+		return err
 	}
-	if len(out) == 0 && strings.Contains(name, ".") {
-		// Nested types: try replacing the last dot(s) with '+' one at a time.
-		parts := strings.Split(name, ".")
-		for k := len(parts) - 1; k > 1 && len(out) == 0; k-- {
-			cand := strings.Join(parts[:k], ".") + "+" + strings.Join(parts[k:], "+")
-			r, err := s.TypeOwners0(cand)
-			if err != nil {
-				return nil, err
-			}
-			out = r
+	parts := strings.Split(name, ".")
+	for k := len(parts) - 1; k > 1; k-- {
+		cand := strings.Join(parts[:k], ".") + "+" + strings.Join(parts[k:], "+")
+		if ok, err := look(cand); ok || err != nil {
+			return err
 		}
 	}
-	return out, nil
+	return nil
+}
+
+func anys(ss []string) []any {
+	out := make([]any, len(ss))
+	for i, s := range ss {
+		out[i] = s
+	}
+	return out
 }
 
 // TypeOwners0 is TypeOwners for an exact stored name.
