@@ -1379,8 +1379,14 @@ type LogRun struct {
 	Pending bool
 }
 
-// Stale reports whether the log's problems describe another run or an earlier state.
-func (r *LogRun) Stale() bool { return r.OtherGame || r.OtherRun || r.Changed || r.Unknown }
+// Stale reports whether the log's problems describe another run or an earlier state. A log
+// of this game whose run no record matches (a Steam launch before RimArcho ever wrote the
+// list) is not stale: it is the only evidence there is, and leaving it out made status and
+// list_problems say "0 error" over a log with errors (MCP review round 2 P25). A log whose
+// header names a game folder no environment has stays stale.
+func (r *LogRun) Stale() bool {
+	return r.OtherGame || r.OtherRun || r.Changed || r.Unknown && r.UnknownGame != ""
+}
 
 func (a *App) logRun(st *LoadoutState, path, version string, mod time.Time) *LogRun {
 	r := &LogRun{Path: path, Label: filepath.Base(path), Version: version, ModTime: mod, MM: LogMM(version), EnvMM: st.GameMM()}

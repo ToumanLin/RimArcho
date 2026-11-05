@@ -48,7 +48,10 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 		c.ExitCode = ExitError
 	}
 	if args.Bool("json") {
-		b, err := json.MarshalIndent(r, "", "  ")
+		// The launch arguments are for report.json (a later run's baseline), not for readers.
+		out := *r
+		out.Args = nil
+		b, err := json.MarshalIndent(&out, "", "  ")
 		return &render.Doc{Raw: string(b) + "\n"}, err
 	}
 	d, root := render.New("test run: " + r.Plan + "  env:" + r.Env)
@@ -98,6 +101,19 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 	if more := r.ClustersTotal - len(r.Clusters) - folded; more > 0 {
 		clusters.Addf("… %d more (full log: %s)", more, r.LogPath)
 	}
+	if len(r.Info) > 0 {
+		info := root.Section(fmt.Sprintf("informational: %d", len(r.Info)))
+		for _, cluster := range r.Info {
+			line := fmt.Sprintf("%s x%d: %s", cluster.Class, cluster.Count, cluster.Message)
+			switch cluster.Before {
+			case "present":
+				line += "  (in the player's log)"
+			case "absent":
+				line += "  (not in the player's log)"
+			}
+			info.Add(line)
+		}
+	}
 	if p := r.PlayerLog; p == nil {
 		root.Add("compared with the player's log: none found")
 	} else if p.Error != "" {
@@ -110,7 +126,11 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 		root.Add(line)
 		fixed := root.Section(fmt.Sprintf("fixed: %d", p.Fixed))
 		for _, cluster := range r.Fixed {
-			testClusterMods(fixed.Addf("%s x%d: %s", cluster.Class, cluster.Count, cluster.Message), cluster)
+			n := fixed.Addf("%s x%d: %s", cluster.Class, cluster.Count, cluster.Message)
+			testClusterMods(n, cluster)
+			if cluster.Note != "" {
+				n.KV("note", cluster.Note)
+			}
 		}
 	}
 	if b := r.Baseline; b != nil {

@@ -49,8 +49,14 @@ func TestTestRunToolReport(t *testing.T) {
 	if len(r.Clusters) != 30 || r.ClustersTotal != 35 || len(out) < mcp.MaxOutput {
 		t.Fatalf("cluster limit or JSON output: %d/%d, %d bytes", len(r.Clusters), r.ClustersTotal, len(out))
 	}
+	// report.json also keeps the launch arguments, for a later run's baseline.
 	saved, err := os.ReadFile(filepath.Join(r.RunDir, "report.json"))
-	if err != nil || string(saved) != out {
+	var stored app.TestRunReport
+	if err == nil {
+		err = json.Unmarshal(saved, &stored)
+	}
+	stored.Args = nil
+	if b, _ := json.MarshalIndent(&stored, "", "  "); err != nil || string(b)+"\n" != out {
 		t.Fatalf("tool result differs from report.json: %v", err)
 	}
 	out, isErr = call(t, cs, "test_run", map[string]any{"env": "main", "timeout_seconds": 5})

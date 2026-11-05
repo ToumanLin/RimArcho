@@ -310,6 +310,15 @@ type PatchFilter struct {
 	FailedOnly bool
 	Target     string // "ThingDef/Gun_A": facts whose touched defs or XPath mention it
 	XPathPart  string // substring of the XPath
+	// DefName widens XPathPart: also facts whose touched defs (Targets) include a def of
+	// that name, and failed facts whose innermost XPath has XPathPart. A FindMod or
+	// Sequence has no XPath of its own; its nested operations are found this way (P26).
+	DefName string
+}
+
+// likeEscape escapes LIKE wildcards for ESCAPE '\'.
+func likeEscape(s string) string {
+	return strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(s)
 }
 
 // PatchFacts returns the Patch facts of a run, in load order of their files.
@@ -323,17 +332,21 @@ func (s *Store) PatchFacts(analysisID int64, f PatchFilter) ([]*analyze.PatchFac
 	if f.FailedOnly {
 		q += ` AND result='failed'`
 	}
-	if f.XPathPart != "" {
+	if f.XPathPart != "" && f.DefName != "" {
+		q += ` AND (instr(xpath, ?) > 0 OR instr(leaf, ?) > 0 OR ' ' || targets || ' ' LIKE ? ESCAPE '\')`
+		args = append(args, f.XPathPart, f.XPathPart, "%/"+likeEscape(f.DefName)+" %")
+	} else if f.XPathPart != "" {
 		q += ` AND instr(xpath, ?) > 0`
 		args = append(args, f.XPathPart)
 	}
 	if f.Target != "" {
-		q += ` AND (' ' || targets || ' ' LIKE ? OR instr(leaf, ?) > 0)`
+		// "_" in a def name is a LIKE wildcard: Lib_Gun must not match LibXGun.
+		q += ` AND (' ' || targets || ' ' LIKE ? ESCAPE '\' OR instr(leaf, ?) > 0)`
 		name := f.Target
 		if i := strings.IndexAny(name, "/@"); i >= 0 {
 			name = name[i+1:]
 		}
-		args = append(args, "% "+f.Target+" %", `"`+name+`"`)
+		args = append(args, "% "+likeEscape(f.Target)+" %", `"`+name+`"`)
 	}
 	rows, err := s.DB.Query(q+` ORDER BY rowid`, args...)
 	if err != nil {

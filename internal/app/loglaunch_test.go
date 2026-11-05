@@ -160,22 +160,27 @@ func TestLogBelongsToLaunch(t *testing.T) {
 }
 
 // B11 and "unknown source": without a launch record the log belongs to the plan last written to
-// the game before it; with neither it is of unknown source, stale, and the header says so.
+// the game before it; with neither it is of unknown source, the header says so, and it is
+// counted as the last run (MCP review round 2 P25: "0 error" over a log with errors).
 func TestLogWriteRecordAndUnknown(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	e.App.Store.DB.Exec(`DELETE FROM launch`)
 	r := logRun(t, e)
-	if !r.Unknown || !r.Stale() {
+	if !r.Unknown || r.Stale() {
 		t.Fatalf("no launch, no write: %+v", r)
 	}
 	out := e.MustRun("problems")
-	if !strings.Contains(out, "stale log (source unknown: no launch and no ModsConfig.xml write by RimArcho before it)") {
+	if !strings.Contains(out, "source unknown (no launch and no ModsConfig.xml write by RimArcho before it; counted as the last run)") || strings.Contains(out, "not counted") {
 		t.Fatal(out)
 	}
-	if strings.Contains(e.MustRun("status"), "current") {
-		t.Fatal("status counts an unknown log")
+	if strings.Contains(e.MustRun("status"), "0 error") {
+		t.Fatal("status does not count the log")
+	}
+	r.UnknownGame = "D:/elsewhere"
+	if !r.Stale() {
+		t.Fatal("a log of an unregistered game folder is counted")
 	}
 
 	// Written to the game (archo save) before the session that wrote the log; started from

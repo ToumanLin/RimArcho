@@ -3,6 +3,7 @@ package cmds
 import (
 	"fmt"
 	"path"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -59,6 +60,9 @@ func modLabel(ix *app.Index, id string) string {
 }
 
 // parseDefRef accepts "def:ThingDef/Gun_A", "ThingDef/Gun_A", "ThingDef@BaseGun" or "Gun_A".
+// defNameRe matches a bare def name, as opposed to an XPath fragment.
+var defNameRe = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
+
 func parseDefRef(s string) (typ, name string, byName bool) {
 	s = strings.TrimPrefix(s, "def:")
 	if i := strings.IndexByte(s, '@'); i >= 0 {
@@ -160,7 +164,7 @@ func defCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	target := typ + sep + name
 	pf := store.PatchFilter{Target: target}
 	if typ == "" {
-		pf = store.PatchFilter{XPathPart: `"` + name + `"`}
+		pf = store.PatchFilter{XPathPart: `"` + name + `"`, DefName: name}
 	}
 	pfs, err := c.App.Store.PatchFacts(s.Run.ID, pf)
 	if err != nil {
@@ -266,6 +270,11 @@ func patchesCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			f.Target = typ + sep + name
 		} else {
 			f.XPathPart = strings.TrimPrefix(t, "def:")
+			if defNameRe.MatchString(f.XPathPart) {
+				// A bare name also finds operations nested in FindMod or Sequence, which
+				// have no XPath of their own, by the defs they touched (P26).
+				f.DefName = f.XPathPart
+			}
 		}
 	}
 	pfs, err := c.App.Store.PatchFacts(s.Run.ID, f)
@@ -305,6 +314,9 @@ func patchesCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	d, root := render.New(head)
 	if !s.Fresh {
 		root.KV("analysis", "stale (archo analyze)")
+	}
+	if f.DefName != "" {
+		root.KV("target", fmt.Sprintf("operations whose XPath contains %s or that touched a def named %s, nested ones included; <Type>/%s matches that def only", f.DefName, f.DefName, f.DefName))
 	}
 	lst := root.Section("list")
 	if len(pfs) == 0 {

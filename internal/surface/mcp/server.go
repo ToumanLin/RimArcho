@@ -327,7 +327,7 @@ type DefIn struct {
 type PatchesIn struct {
 	Env         string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Mod         string `json:"mod,omitempty" jsonschema:"only this mod's operations (#id, pkg:…)"`
-	Target      string `json:"target,omitempty" jsonschema:"Type/defName of a touched def, or part of an XPath"`
+	Target      string `json:"target,omitempty" jsonschema:"Type/defName of a touched def; a bare defName also finds operations nested in FindMod/Sequence; or part of an XPath"`
 	Failed      bool   `json:"failed,omitempty" jsonschema:"only operations that matched nothing (patch.no-match), with reasons"`
 	All         bool   `json:"all,omitempty"`
 	GameVersion string `json:"game_version,omitempty" jsonschema:"analyse for another game major.minor than the environment's, e.g. 1.6"`

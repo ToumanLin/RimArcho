@@ -7,6 +7,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -171,6 +172,7 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 	text := map[string][]int{}  // element text → queries
 	elem := map[string][]int{}  // element name → queries (defs only)
 	lit := map[string][]int{}   // assembly string literal → queries
+	var paths []int             // texture queries: a literal can also be the start of the path
 	class := map[string][]int{} // Class="…" attribute value → queries
 	field := map[string][]int{} // element name + "\x00" + text → queries
 	for i, q := range qs {
@@ -189,6 +191,9 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 			if q.dll {
 				lit[n] = append(lit[n], i)
 			}
+		}
+		if q.dll && !q.code && q.def == "" && q.field == "" && !q.class {
+			paths = append(paths, i)
 		}
 	}
 	type job struct {
@@ -267,6 +272,21 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 					for _, s := range a.UserStrings() {
 						for _, q := range lit[s] {
 							first[q] = hit{q, j.m.ID, j.rel, 0, s}
+						}
+						// Code that builds the path: "OdysseyPatch/OutfitStands/OutfitStand_" + defName
+						// (MCP eval h2). Only a literal shaped like a path prefix counts.
+						if len(paths) > 0 && pathPrefix(s) {
+							for _, q := range paths {
+								if _, ok := first[q]; ok {
+									continue
+								}
+								for _, n := range qs[q].names {
+									if strings.HasPrefix(n, s) && n != s {
+										first[q] = hit{q, j.m.ID, j.rel, 0, s}
+										break
+									}
+								}
+							}
 						}
 					}
 				} else {
@@ -402,6 +422,10 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 			q.lc.add(h.inst, role, fmt.Sprintf("names class %s %s, which no installed mod defines", name, where))
 			continue
 		}
+		if h.line == 0 && !slices.Contains(q.names, name) {
+			q.lc.add(h.inst, role, fmt.Sprintf("builds the path from %q + … %s", name, where))
+			continue
+		}
 		q.lc.add(h.inst, role, fmt.Sprintf("references %s %s", name, where))
 	}
 	for i, q := range qs {
@@ -425,7 +449,7 @@ func (cx *attrCtx) rank(lc *LogCluster) {
 func (cx *attrCtx) textureProviders(qs []*refQuery) {
 	var need []*refQuery
 	for _, q := range qs {
-		if q.def == "" && q.field == "" && !hasSource(q.lc) {
+		if q.def == "" && q.field == "" && !q.class && (!hasSource(q.lc) || codeSource(q.lc)) {
 			need = append(need, q)
 		}
 	}
@@ -466,6 +490,12 @@ func (cx *attrCtx) textureProviders(qs []*refQuery) {
 			}
 		}
 		sort.Strings(ids)
+		if len(ids) == 0 && codeSource(q.lc) {
+			// The mod's own code asks for art nobody ships (MCP eval h2: the Odyssey Patch's
+			// outfit stand textures, in the log before and after the fix): a defect of that mod
+			// that only affects drawing. Adding the files elsewhere hides it but fixes nothing.
+			q.lc.Details = append(q.lc.Details, ownArtNote)
+		}
 		for _, inst := range ids {
 			if cx.st.Ix.ByID[inst] == nil || cx.official(inst) {
 				continue
@@ -479,6 +509,35 @@ func (cx *attrCtx) textureProviders(qs []*refQuery) {
 		}
 		cx.rank(q.lc)
 	}
+}
+
+// ownArtNote marks a missing texture that only its source mod's code asks for.
+const ownArtNote = "own art missing: the source mod's code asks for this texture and no installed mod ships it; a defect of that mod, rendering only (adding the file elsewhere hides it, it fixes nothing that loads)"
+
+// codeSource: the cluster's first candidate is a source by a string literal in its code.
+func codeSource(lc *LogCluster) bool {
+	if len(lc.Attr) == 0 || lc.Attr[0].Role != RoleSource {
+		return false
+	}
+	for _, ev := range lc.Attr[0].Evidence {
+		if strings.Contains(ev, " string literal)") {
+			return true
+		}
+	}
+	return false
+}
+
+// pathPrefix: a literal that can start a texture path built in code — it has a '/', ends in
+// '/', '_' or '-' and is at least 8 characters long.
+func pathPrefix(s string) bool {
+	if len(s) < 8 || !strings.Contains(s, "/") {
+		return false
+	}
+	switch s[len(s)-1] {
+	case '/', '_', '-':
+		return true
+	}
+	return false
 }
 
 // roUse is how a mod's code uses the ReflectionOnly APIs.

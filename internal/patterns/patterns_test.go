@@ -127,7 +127,7 @@ func TestLines(t *testing.T) {
 }
 
 // A cluster no mod is named for, of a kind in more than 5% of the public logs, is labelled
-// "common, unattributed" (MCP transcript review 2026-11-04, P2); rare kinds, fallback rules and
+// "common kind, no source found" (MCP transcript review 2026-11-04, P2); rare kinds, fallback rules and
 // attributed clusters are not.
 func TestCommonUnattributed(t *testing.T) {
 	d, err := patterns.Parse([]byte(`{"version":"t","game":"1.6","logs":1000,"clusters":100,
@@ -144,7 +144,7 @@ func TestCommonUnattributed(t *testing.T) {
 		attributed bool
 		want       string
 	}{
-		{"exception|Common thing", false, "common, unattributed: this kind is in 5.1% of public 1.6 logs (pattern:g:common)"},
+		{"exception|Common thing", false, "common kind, no source found: this kind is in 5.1% of public 1.6 logs (pattern:g:common)"},
 		{"exception|Common thing", true, ""},
 		{"exception|Edge thing", false, ""}, // exactly 5% is not more than 5%
 		{"exception|Rare thing", false, ""},

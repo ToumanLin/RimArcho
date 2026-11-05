@@ -45,7 +45,7 @@ type TestRunCluster struct {
 	Confidence string   `json:"confidence"`
 	Delta      string   `json:"delta,omitempty"`  // against the previous run: new / present
 	Before     string   `json:"before,omitempty"` // in the player's log: present / absent
-	// Note: "common, unattributed: …" for a cluster no mod is named for whose kind is in more
+	// Note: "common kind, no source found: …" for a cluster no mod is named for whose kind is in more
 	// than 5% of public logs (patterns.CommonUnattributed, 03 §6.8).
 	Note string `json:"note,omitempty"`
 	// Consequences: clusters that follow from this one's failed def file, folded into it and
@@ -54,24 +54,27 @@ type TestRunCluster struct {
 }
 
 type TestRunReport struct {
-	Links         []*GameLink       `json:"links,omitempty"`
-	Env           string            `json:"env"`
-	Plan          string            `json:"plan"`
-	GameVersion   string            `json:"game_version"`
-	Status        string            `json:"status"`
-	LoadSeconds   float64           `json:"load_seconds"`
-	TotalSeconds  float64           `json:"total_seconds"`
-	PeakMemoryMB  int64             `json:"peak_memory_mb"`
-	Requested     int               `json:"requested"`
-	Missing       []TestRunMissing  `json:"missing"`
-	Linked        []string          `json:"linked,omitempty"` // Mods/ links made for this run and removed after it
-	RunDir        string            `json:"run_dir"`
-	LogPath       string            `json:"log_path"`
-	Args          []string          `json:"args"`
-	Attribution   string            `json:"attribution"`
-	AnalysisError string            `json:"analysis_error,omitempty"` // attributed without a fresh analysis
-	Counts        map[string]int    `json:"counts"`                   // clusters per class, before the limit
-	Clusters      []TestRunCluster  `json:"clusters"`
+	Links         []*GameLink      `json:"links,omitempty"`
+	Env           string           `json:"env"`
+	Plan          string           `json:"plan"`
+	GameVersion   string           `json:"game_version"`
+	Status        string           `json:"status"`
+	LoadSeconds   float64          `json:"load_seconds"`
+	TotalSeconds  float64          `json:"total_seconds"`
+	PeakMemoryMB  int64            `json:"peak_memory_mb"`
+	Requested     int              `json:"requested"`
+	Missing       []TestRunMissing `json:"missing"`
+	Linked        []string         `json:"linked,omitempty"` // Mods/ links made for this run and removed after it
+	RunDir        string           `json:"run_dir"`
+	LogPath       string           `json:"log_path"`
+	Args          []string         `json:"args,omitempty"` // saved in report.json (map mode of a baseline); not in --json output
+	Attribution   string           `json:"attribution"`
+	AnalysisError string           `json:"analysis_error,omitempty"` // attributed without a fresh analysis
+	Counts        map[string]int   `json:"counts"`                   // clusters per class, before the limit
+	Clusters      []TestRunCluster `json:"clusters"`
+	// Info: the informational clusters (mod reports, other, known noise), one line each with
+	// before, so an agent need not reread the log for them (MCP review round 2 P24).
+	Info          []TestRunCluster  `json:"info,omitempty"`
 	ClustersTotal int               `json:"clusters_total"`
 	PlayerLog     *TestRunPlayerLog `json:"player_log,omitempty"`
 	Fixed         []TestRunCluster  `json:"fixed,omitempty"`
@@ -281,6 +284,16 @@ func (a *App) prepareTestConfig(st *LoadoutState, data string, protected []strin
 	return os.WriteFile(path, b, 0o644)
 }
 
+// shortMessage is a message's first line cut to 100 characters, for the lists whose entries
+// only identify a cluster (info, fixed, gone; MCP review round 2 P9).
+func shortMessage(msg string) string {
+	s := firstLine(msg)
+	if r := []rune(s); len(r) > 100 {
+		s = string(r[:97]) + "..."
+	}
+	return s
+}
+
 func linkNames(cs []LinkChange) []string {
 	var out []string
 	for _, c := range cs {
@@ -386,6 +399,9 @@ func (a *App) testRunLog(st *LoadoutState, r *TestRunReport) error {
 		}
 		r.Counts[class]++
 		if logs.Informational(class) {
+			if len(r.Info) < testRunListLimit {
+				r.Info = append(r.Info, TestRunCluster{key: lc.Key, Class: class, Message: shortMessage(lc.First.Message), Count: lc.Count})
+			}
 			continue
 		}
 		r.ClustersTotal++
@@ -403,6 +419,9 @@ func (a *App) testRunLog(st *LoadoutState, r *TestRunReport) error {
 		note := ""
 		if !settings {
 			note = patterns.Load().CommonUnattributed(class, lc.Template, len(lc.Attr) > 0)
+		}
+		if slices.Contains(lc.Details, ownArtNote) {
+			note = ownArtNote
 		}
 		r.Clusters = append(r.Clusters, TestRunCluster{key: lc.Key, Class: class, Message: firstLine(lc.First.Message), Count: lc.Count, Mods: mods, Confidence: confidence, Note: note, Consequences: lc.Consequences})
 	}
