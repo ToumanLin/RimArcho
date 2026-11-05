@@ -228,7 +228,7 @@ From the L1 facts of a colony's saves (and the game's own history records inside
 
 ### 4.6 What a Mod owns in a save
 
-To state the consequence of a missing Mod, attribute the save's objects to Mods: Def references by §1.5; `Class="…"` values by the type index of Mod assemblies (`store.TypeOwners`) plus the game's own `Assembly-CSharp.dll`, which is not indexed today and must be added; pawns by their race Def, factions by their Def, world and game components by their class. Report counts per kind ("3 colonists of the Kurin race, 1 faction, 2 hediffs"). The same attribution answers whether a Mod can be removed mid-playthrough (`saves list --mod`).
+To state the consequence of a missing Mod, attribute the save's objects to Mods: Def references by §1.5; `Class="…"` values by the type index of Mod assemblies (`store.TypeOwners`) plus the game's own assemblies (`store.GameClassOwners`, 03 §5.3; resolution order 07 §7 item 20); pawns by their race Def, factions by their Def, world and game components by their class. Report counts per kind ("3 colonists of the Kurin race, 1 faction, 2 hediffs"). The same attribution answers whether a Mod can be removed mid-playthrough (`saves list --mod`).
 
 ## 5. Playthrough themes and content conflicts (1.2)
 

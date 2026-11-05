@@ -221,6 +221,9 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 		e.GameVersion = v
 		a.Store.UpdateEnv(e)
 	}
+	if err := a.indexGameTypes(e); err != nil {
+		return nil, err
+	}
 
 	st := ScanStats{Events: map[string]int{}, Questions: len(res.Questions)}
 	for _, s := range listed {

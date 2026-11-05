@@ -194,3 +194,14 @@ CREATE INDEX type_fact_lookup ON type_fact(type_name,set_id);
 CREATE INDEX harmony_fact_set ON harmony_fact(set_id);
 CREATE INDEX harmony_id_set ON harmony_id(set_id);
 CREATE INDEX harmony_id_lookup ON harmony_id(id,set_id);
+-- The game's own managed assemblies per environment and the type names they define (03 §5.3).
+CREATE TABLE game_assembly(
+ id INTEGER PRIMARY KEY, environment_id TEXT NOT NULL, file TEXT NOT NULL, game_mm TEXT NOT NULL,
+ path TEXT NOT NULL, size INTEGER NOT NULL, mtime INTEGER NOT NULL, reader INTEGER NOT NULL,
+ types INTEGER NOT NULL DEFAULT 0, error TEXT NOT NULL DEFAULT '', UNIQUE(environment_id,file));
+CREATE TABLE game_type(
+ assembly_id INTEGER NOT NULL REFERENCES game_assembly(id) ON DELETE CASCADE,
+ type_name TEXT NOT NULL COLLATE NOCASE, ns TEXT NOT NULL, name TEXT NOT NULL);
+CREATE INDEX game_type_assembly ON game_type(assembly_id);
+CREATE INDEX game_type_lookup ON game_type(type_name,assembly_id);
+CREATE INDEX game_type_named ON game_type(name,assembly_id);

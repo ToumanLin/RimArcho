@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/content"
+	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/harmony"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
@@ -152,12 +153,8 @@ func (a *App) SourceDLLs(st *LoadoutState, m *store.Mod) ([]*SourceDLL, error) {
 // that holds 0Harmony.dll, plus the DLL's own folder.
 func (a *App) referenceDirs(st *LoadoutState, dll string) []string {
 	var out []string
-	root := st.Ix.Env.GameRoot
-	for _, d := range []string{filepath.Join(root, "RimWorldWin64_Data", "Managed"), root} {
-		if _, err := os.Stat(filepath.Join(d, "Assembly-CSharp.dll")); err == nil {
-			out = append(out, d)
-			break
-		}
+	if d := env.ManagedDir(st.Ix.Env.GameRoot); d != "" {
+		out = append(out, d)
 	}
 	out = append(out, filepath.Dir(dll))
 	harmonyDir := ""
