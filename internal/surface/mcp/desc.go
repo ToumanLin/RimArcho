@@ -39,7 +39,7 @@ const descProblems = `Static problems of the current plan: dependencies, incompa
 
 const descChanges = `What changed in the mods since the current plan was last played (or since=…), one row per mod, the changes that affect launch first. For "it worked yesterday"; ref=<mod> gives one mod's history.`
 
-const descLog = `Attribute Player.log errors to mods: clusters log:E<n> with candidate mods and their roles. text= analyses a pasted log or stack trace (use it whenever the user pastes one); cluster=E<n> shows one cluster in full; since=<cursor> polls a running game; pattern=<id> explains an error kind.`
+const descLog = `For any game error or crash, call this first, before reading Player.log yourself. Clusters log:E<n> with candidate mods and roles; a patcher or a mentioned mod is not the cause by itself. text= a pasted log or stack; cluster=E<n> one cluster in full; since=<cursor> polls a running game; pattern=<id> explains a kind.`
 
 const descFiles = `Text search in the files of the enabled mods as the game loads them (Defs/Patches/About by default, load order, shadowing). def=true finds a whole defName with its roles: defines, inherits, patches, references. For XML evidence; C# is read_source. Paged: follow next:.`
 
