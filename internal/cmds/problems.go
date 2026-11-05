@@ -583,6 +583,9 @@ func logRunText(c *Ctx, r *app.LogRun) string {
 	case r.Unknown && r.UnknownGame != "":
 		why = append(why, "source unknown: its game path "+r.UnknownGame+" is not this environment's game")
 	case r.Unknown:
+		if !r.Stale() {
+			return s + ", source unknown (no launch and no ModsConfig.xml write by RimArcho before it; counted as the last run)"
+		}
 		why = append(why, "source unknown: no launch and no ModsConfig.xml write by RimArcho before it")
 	case r.OtherRun && r.OtherEnv != "":
 		why = append(why, fmt.Sprintf("from %s in environment %s", run(), r.OtherEnv))

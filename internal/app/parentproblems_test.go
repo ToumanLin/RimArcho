@@ -122,9 +122,11 @@ func TestParentQuietLogAndGroupedIgnore(t *testing.T) {
 	run.Pending = true
 	check(false)
 	run.Pending = false
-	run.Unknown = true
+	run.Unknown = true // this game, no record: counted (P25)
+	check(true)
+	run.UnknownGame = "D:/elsewhere"
 	check(false)
-	run.Unknown = false
+	run.Unknown, run.UnknownGame = false, ""
 	run.Changed = true
 	check(false)
 	run.Changed = false
