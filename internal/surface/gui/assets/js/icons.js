@@ -22,6 +22,9 @@ export const icon = {
   needs: svg('<circle cx="8" cy="8" r="5.8"/><path d="M5.6 8.2l1.7 1.7 3.2-3.4"/>'),
   plan: svg('<path d="M5.5 4h8M5.5 8h8M5.5 12h8"/><circle cx="2.8" cy="4" r=".6"/><circle cx="2.8" cy="8" r=".6"/><circle cx="2.8" cy="12" r=".6"/>'),
   packs: svg('<path d="M2.4 5L8 2.4 13.6 5v6L8 13.6 2.4 11z"/><path d="M2.4 5L8 7.6 13.6 5M8 7.6v6"/>'),
+  // Saves (06 §2.11): a save file
+  saves: svg('<path d="M3 2.6h7.8l2.6 2.6v8.2H2.6V3z"/><path d="M5.2 2.6v3.2h5V2.6M5 13.4V9.2h6v4.2"/>'),
+  search: svg('<circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2l3.2 3.2"/>'),
   env: svg('<rect x="2" y="2.8" width="12" height="8.4" rx="1.6"/><path d="M5.6 13.6h4.8M8 11.2v2.4"/>'),
   library: svg('<rect x="2.4" y="2.6" width="3" height="10.8" rx=".8"/><rect x="6.5" y="2.6" width="3" height="10.8" rx=".8"/><path d="M11 3.4l2.6-.6 1.4 10-2.6.6z"/>'),
   log: svg('<path d="M4 1.8h5.2L12.4 5v9.2H4z"/><path d="M9 1.8V5h3.4M6 8h4.4M6 10.6h4.4"/>'),

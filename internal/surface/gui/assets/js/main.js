@@ -42,6 +42,7 @@ import { checkCredit, getChoices } from "./credit.js";
 import * as problems from "./problems.js";
 import * as fileSearch from "./filesearch.js";
 import * as modSettings from "./modsettings.js";
+import * as savesPage from "./saves.js";
 import { initRules, refreshRules, startRule, showRules } from "./rules.js";
 
 // ---- loading ----
@@ -309,6 +310,7 @@ function renderHints() {
   else if (S.screen === "tasks") list = tasksPage.hintList();
   else if (S.screen === "search") list = fileSearch.hintList();
   else if (S.screen === "mod-settings") list = modSettings.hintList();
+  else if (S.screen === "saves") list = savesPage.hintList();
   else if (S.screen === "changes") list = scr.changesHints();
   else if (S.screen === "log") list = scr.logHints();
   else if (S.screen === "subscribe") list = scr.addHints();
@@ -1060,6 +1062,7 @@ function onKey(e) {
     if (S.screen === "textures") return tex.key(e);
     if (S.screen === "search") return fileSearch.key(e);
     if (S.screen === "mod-settings") return modSettings.key(e);
+    if (S.screen === "saves") return savesPage.key(e);
     if (S.screen === "log" || S.screen === "changes") return scr.logsKey(e);
     // add a subscription: the form takes its keys; esc outside it goes back to updates
     if (S.screen === "subscribe") { if (k === "Escape") { e.preventDefault(); go("changes"); } return; }
@@ -1227,6 +1230,7 @@ async function start() {
   plans.initPlans(ui);
   library.initLibrary(ui);
   tasksPage.initTasks(ui);
+  savesPage.initSaves(ui);
   S.bar = createBar({ data: () => S.barData, change: () => barChanged(), splitKey: "ui.gui.filter.split:plan",
     column: () => $("#board > .fcol"), resized: () => renderRows(0), leave: () => focusArea(lastList < 2 ? lastList : 1),
     placeholder: T("search: words, tags:, source:, content:") + "  /" });
@@ -1371,7 +1375,7 @@ async function pollLive() {
     if (l.newLog && !hadNew) readNewLog();
     if (JSON.stringify(l.items) !== before) { scr.liveChanged(); shell.sync(); }
     if (l.running) scr.logLive();
-    if (was !== !!l.running) homePage.liveChanged();
+    if (was !== !!l.running) { homePage.liveChanged(); savesPage.liveChanged(!!l.running); }
     // the game exited: a session that used SteamCMD mods may make a credit question due;
     // an open Can it run reads again, so the full analysis of the run replaces its items
     // (03 §6.6; VM run 2026-10-28: it kept the run's mid-way time and items)

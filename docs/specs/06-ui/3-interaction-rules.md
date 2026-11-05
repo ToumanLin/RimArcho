@@ -96,7 +96,7 @@ The editor and Mod inventory > all share **one key table**, as the player confir
 | `u`, `ctrl+z` / `ctrl+y`, `ctrl+r` | Undo or redo in the editor |
 | `Del` | Unsubscribe the Workshop copy or delete an owned copy, with a dry run before confirmation |
 | Menu key, `shift+F10` | Open the context menu at the cursor (§8.5) |
-| `shift+1`–`shift+8` | Visit the 8 sidebar entries: launch, needs, log, lists (opening the current list), packs, inventory, textures, and environments. GUI physical keys work in any keyboard layout; the TUI receives `!@#$%^&*` in the US layout. ! and # are no longer separate shortcuts |
+| `shift+1`–`shift+8` | Visit the 8 sidebar entries: launch, needs, log, lists (opening the current list), packs, inventory, textures, and environments. Saves (2026-11-04) has none. GUI physical keys work in any keyboard layout; the TUI receives `!@#$%^&*` in the US layout. ! and # are no longer separate shortcuts |
 | `tab`, `shift+tab` | GUI (decided 2026-11-03): move the focus to the next or previous control, as on a web page, including the address copy buttons (§3.1 rule 12); in a search field Tab first accepts the ghost completion (§3.7). Sub-pages are switched with the sidebar, the breadcrumb or the command panel. TUI: visit the next or previous sibling subpage. Inventory cycles through all ↔ updates ↔ add ↔ search, including search since 2026-10-31. Plans open for editing without changing the current plan (04 §1.3). Packs cycle through packs, starting with the first pack from the list; full details use Tab to switch their own pages |
 
 Editor only:

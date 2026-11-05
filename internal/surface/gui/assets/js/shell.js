@@ -198,7 +198,7 @@ function inGameMark(isInGame) {
   return m;
 }
 
-const ICONS = { home: "home", needs: "needs", plan: "plan", packs: "packs", textures: "textures", env: "env", library: "library", log: "log" };
+const ICONS = { home: "home", needs: "needs", plan: "plan", packs: "packs", saves: "saves", textures: "textures", env: "env", library: "library", log: "log" };
 
 // The entry whose sub-entries were open when the sidebar was last drawn: a redraw starts
 // from it, so the sub-entries open and close with a transition (06 §7.1).

@@ -52,10 +52,11 @@ func TestNavAndPath(t *testing.T) {
 			ids, keys = append(ids, it.ID), append(keys, it.Key)
 		}
 	}
-	if strings.Join(ids, ",") != "home,needs,log,plan,packs,library,textures,env" {
+	if strings.Join(ids, ",") != "home,needs,log,plan,packs,saves,library,textures,env" {
 		t.Fatalf("order %v", ids)
 	}
-	if keys[0] != "shift+1" || keys[7] != "shift+8" {
+	// Saves has no shift key: shift+1–8 stay the eight entries the TUI also has (06 §3.5)
+	if keys[0] != "shift+1" || keys[5] != "" || keys[6] != "shift+6" || keys[8] != "shift+8" {
 		t.Fatalf("keys %v", keys)
 	}
 	if g[0].Items[1].Badge != n.Count || n.Count == 0 {

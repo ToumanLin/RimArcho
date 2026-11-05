@@ -1,0 +1,348 @@
+package gui
+
+import (
+	"errors"
+	"path/filepath"
+	"sync"
+	"time"
+
+	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/view"
+)
+
+// Saves (06 §2.11, 10 §4). The page reads on its own session (savesState.read), whose App
+// keeps the save heads cached by path, size and time (10 §1.7 L0), so coming back costs a
+// stat per save. Listing a cold library reads every head, which can take longer than a
+// call may (06 §8.4): SavesRead returns at once and the listing arrives as a "saves" event.
+// Selecting a save checks it against its list (SaveDetail, milliseconds). Actions run on
+// the window's session: fixes edit the save's list (one undo step), file actions change
+// the save's folder (rename, copy) or copy and recycle after the player confirmed.
+
+// savesState is the page's reader and its last listing. Lock order: read.mu, then mu.
+type savesState struct {
+	read logReader
+	mu   sync.Mutex
+	list *app.SaveList // the last listing: the saves that checks and actions name by ref
+	seq  uint64        // the newest listing asked for
+}
+
+// SavesEvent is a listing as the "saves" event carries it.
+type SavesEvent struct {
+	Request uint64          `json:"request"`
+	Page    *view.SavesPage `json:"page,omitempty"`
+	Error   string          `json:"error,omitempty"`
+}
+
+// savesSession is the page's reader, made on first use; call with read.mu held.
+func (s *API) savesSession() (*app.App, error) {
+	w := &s.saves.read
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.a.Uninstalled {
+		return nil, errors.New("RimArcho was uninstalled; account operations are disabled")
+	}
+	if s.needsClosed { // the window is closing: Close has released the readers
+		return nil, errors.New(view.T("the window is closing"))
+	}
+	if w.a == nil {
+		r, err := s.pageReader()
+		if err != nil {
+			return nil, err
+		}
+		w.a = r
+	} else {
+		s.refreshInventorySession(w.a)
+	}
+	w.a.AnalyzeExe, w.a.AnalyzeWait = s.Exe, 200*time.Millisecond
+	return w.a, nil
+}
+
+// SavesRead starts reading every save's head; the result is a "saves" event with this
+// request number (an older one is dropped by the page). It returns at once.
+func (s *API) SavesRead(request uint64) bool {
+	s.saves.mu.Lock()
+	if request > s.saves.seq {
+		s.saves.seq = request
+	}
+	s.saves.mu.Unlock()
+	go func() {
+		ev := s.listSaves(request)
+		s.send("saves", ev)
+	}()
+	return true
+}
+
+// listSaves reads the listing on the page's reader. A request older than the newest one
+// asked for is not read at all.
+func (s *API) listSaves(request uint64) *SavesEvent {
+	ev := &SavesEvent{Request: request}
+	w := &s.saves.read
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	defer s.retainReader(w)
+	s.saves.mu.Lock()
+	stale := request < s.saves.seq
+	s.saves.mu.Unlock()
+	if stale {
+		ev.Error = "stale"
+		return ev
+	}
+	r, err := s.savesSession()
+	if err != nil {
+		ev.Error = err.Error()
+		return ev
+	}
+	l, err := r.ListSaves()
+	if err != nil {
+		ev.Error = err.Error()
+		return ev
+	}
+	s.saves.mu.Lock()
+	s.saves.list = l
+	s.saves.mu.Unlock()
+	ev.Page = view.SavesRows(l)
+	return ev
+}
+
+// SavesSearch is the colonies whose saves hold a Mod matching q (06 §2.11): the page
+// matches colony and save names itself.
+func (s *API) SavesSearch(q string) []string {
+	s.saves.mu.Lock()
+	defer s.saves.mu.Unlock()
+	return view.SavesMatching(s.saves.list, q)
+}
+
+// findSave is a save of the last listing.
+func (s *API) findSave(ref string) (*app.Save, error) {
+	s.saves.mu.Lock()
+	l := s.saves.list
+	s.saves.mu.Unlock()
+	if l == nil {
+		return nil, errors.New(view.T("the saves are still being read"))
+	}
+	sv, err := l.Find(ref)
+	if errors.Is(err, app.ErrNoSave) {
+		return nil, errors.New(view.T("that save is gone; the list is read again"))
+	}
+	return sv, err
+}
+
+// SaveDetail is the selected save against its list (10 §4.3): the middle and right cards.
+func (s *API) SaveDetail(ref string) (*view.SaveDetail, error) {
+	sv, err := s.findSave(ref)
+	if err != nil {
+		return nil, err
+	}
+	w := &s.saves.read
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	defer s.retainReader(w)
+	r, err := s.savesSession()
+	if err != nil {
+		return nil, err
+	}
+	c, err := r.CheckSave(sv)
+	if err != nil {
+		return nil, err
+	}
+	g, _ := r.RunningGame()
+	return view.SaveDetailOf(c, g != nil), nil
+}
+
+// SaveFixReply is what a fix did: the status sentence, whether u undoes it, and the
+// Workshop items the page subscribes to next (through Subscribe, as missing Mods are).
+type SaveFixReply struct {
+	Text        string   `json:"text"`
+	Undo        bool     `json:"undo"`
+	WorkshopIDs []string `json:"workshopIds"`
+	Plan        int64    `json:"plan"`
+	Page        string   `json:"page"`
+}
+
+// SaveFix applies a save's Mod fixes to its list as one undoable edit (10 §4.4): mods
+// names the Mods to enable or subscribe (none: all of them), disableAdded and order the
+// other two fixes. The list opens in the editor first (not current, 04 §1.3), so the
+// status line's undo undoes this edit.
+func (s *API) SaveFix(ref string, mods []string, disableAdded, order bool) (*SaveFixReply, error) {
+	sv, err := s.findSave(ref)
+	if err != nil {
+		return nil, err
+	}
+	if sv.Plan == nil {
+		if sv.Pack != "" {
+			return nil, errors.New(view.Tf("%s is a save of pack %s, whose Mods do not change; make a list from this save instead", sv.Name, sv.Pack))
+		}
+		return nil, errors.New(view.T("this save matches no list; make a list from it instead"))
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.board, s.needs = nil, nil
+	if _, err := view.OpenPlan(s.a, sv.Plan.ID); err != nil {
+		return nil, err
+	}
+	r, err := s.a.FixSave(sv, app.SaveFixOptions{Mods: mods, DisableAdded: disableAdded, Order: order}, false)
+	if err != nil {
+		return nil, errors.New(view.Humanize(nil, err.Error()))
+	}
+	return &SaveFixReply{Text: view.SaveFixText(r), Undo: r.Edit != nil, WorkshopIDs: append([]string{}, r.WorkshopIDs()...),
+		Plan: sv.Plan.ID, Page: view.PlanPage(sv.Plan.ID)}, nil
+}
+
+// SaveFileReply is a rename or copy: the status sentence and the save to select.
+type SaveFileReply struct {
+	Text string `json:"text"`
+	Ref  string `json:"ref"`
+}
+
+// SaveNameProblem is what is wrong with a new name while the player types ("" none).
+func (s *API) SaveNameProblem(ref, name string) string {
+	sv, err := s.findSave(ref)
+	if err != nil {
+		return err.Error()
+	}
+	return view.SaveNameProblem(sv, name)
+}
+
+// SaveRename renames a save in its folder, keeping a RimSaves prefix (10 §4.4); refused
+// while a game runs.
+func (s *API) SaveRename(ref, name string) (*SaveFileReply, error) {
+	sv, err := s.findSave(ref)
+	if err != nil {
+		return nil, err
+	}
+	if p := view.SaveNameProblem(sv, name); p != "" {
+		return nil, errors.New(p)
+	}
+	s.mu.Lock()
+	to, err := s.a.RenameSave(sv, name)
+	s.mu.Unlock()
+	if err != nil {
+		return nil, saveErr(err)
+	}
+	_, shown := app.SplitSaveName(filepath.Base(to))
+	return &SaveFileReply{Text: view.Tf("renamed %s to %s", sv.Name, shown), Ref: app.SaveRef(to)}, nil
+}
+
+// SaveCopy copies a save next to itself as "<name> (copy)" (10 §4.4).
+func (s *API) SaveCopy(ref string) (*SaveFileReply, error) {
+	sv, err := s.findSave(ref)
+	if err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	to, err := s.a.CopySave(sv)
+	s.mu.Unlock()
+	if err != nil {
+		return nil, saveErr(err)
+	}
+	_, shown := app.SplitSaveName(filepath.Base(to))
+	return &SaveFileReply{Text: view.Tf("copied %s to %s", sv.Name, shown), Ref: app.SaveRef(to)}, nil
+}
+
+// SaveFilesReply is a backup's or recycling's preview (Preview) or result (Text).
+type SaveFilesReply struct {
+	Preview *view.SaveFilesPreview `json:"preview,omitempty"`
+	Text    string                 `json:"text,omitempty"`
+	Failed  bool                   `json:"failed,omitempty"`
+}
+
+func (s *API) savesOf(refs []string) ([]*app.Save, error) {
+	var out []*app.Save
+	for _, ref := range refs {
+		sv, err := s.findSave(ref)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, sv)
+	}
+	if len(out) == 0 {
+		return nil, errors.New(view.T("no save chosen"))
+	}
+	return out, nil
+}
+
+// SaveBackup copies saves to <data>/backups/saves/<time>/ (10 §4.4). Without yes it only
+// lists the files and their sizes for the page's confirmation (06 §6).
+func (s *API) SaveBackup(refs []string, yes bool) (*SaveFilesReply, error) {
+	saves, err := s.savesOf(refs)
+	if err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	r, err := s.a.BackupSaves(saves, yes)
+	s.mu.Unlock()
+	if err != nil {
+		return nil, saveErr(err)
+	}
+	if !yes {
+		return &SaveFilesReply{Preview: view.SaveBackupPreview(r)}, nil
+	}
+	return &SaveFilesReply{Text: view.SaveFilesText(r, true), Failed: len(r.Errs) > 0}, nil
+}
+
+// SaveTrash moves saves to the recycle bin (08 §7, 10 §4.4), refused while a game runs.
+// Without yes it only lists the files and their sizes.
+func (s *API) SaveTrash(refs []string, yes bool) (*SaveFilesReply, error) {
+	saves, err := s.savesOf(refs)
+	if err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	r, err := s.a.TrashSaves(saves, yes)
+	s.mu.Unlock()
+	if err != nil {
+		return nil, saveErr(err)
+	}
+	if !yes {
+		return &SaveFilesReply{Preview: view.SaveTrashPreview(r)}, nil
+	}
+	return &SaveFilesReply{Text: view.SaveFilesText(r, false), Failed: len(r.Errs) > 0}, nil
+}
+
+// SaveNewList makes a new list from the save's Mods, as All lists' "from a save" does
+// (04 §9, 10 §4.4): named after the colony, opened in the editor, not made current.
+func (s *API) SaveNewList(ref string) (*PlanDone, error) {
+	sv, err := s.findSave(ref)
+	if err != nil {
+		return nil, err
+	}
+	name := sv.Name
+	if sv.Colony != nil {
+		name = sv.Colony.Name
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p, t, err := view.NewPlan(s.a, view.FreePlanName(s.a, name), sv.Path)
+	if p == nil {
+		return s.planDone(0, t, err)
+	}
+	return s.planDone(p.ID, t, err)
+}
+
+// OpenSaveFolder shows the save's folder with its file selected where the system can.
+func (s *API) OpenSaveFolder(ref string) error {
+	sv, err := s.findSave(ref)
+	if err != nil {
+		return err
+	}
+	if s.openDir != nil {
+		return s.openDir(sv.Folder.Dir)
+	}
+	return openDir(sv.Folder.Dir)
+}
+
+// saveErr words the core's refusals for the status line.
+func saveErr(err error) error {
+	if errors.Is(err, app.ErrGameRunning) {
+		return errors.New(view.T("the game is running: close it first"))
+	}
+	return errors.New(view.Humanize(nil, err.Error()))
+}
+
+// leaveSaves forgets the listing when the player leaves the page (07 §8.3); the reader
+// and its head cache stay until it is idle (readerIdle).
+func (s *API) leaveSaves() {
+	s.saves.mu.Lock()
+	s.saves.list = nil
+	s.saves.mu.Unlock()
+}

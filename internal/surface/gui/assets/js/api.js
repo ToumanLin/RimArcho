@@ -18,6 +18,8 @@ const writesGame = new Set([
   "PlanSync", "PlanFollow", "PlanFollowMode", "PlanUnfollow", "PlanVersionsSet", "SetModNote", "SetTag",
   "LibraryDo", "LibrarySetNote", "Subscribe", "SubscriptionFrom", "CheckSubscriptionSource", "WorkshopUpdate", "Scan", "Analyze", "RemoveEnv", "ApplySetting", "AddMonitor",
   "PackLaunch", "PackBuild", "PackRemove", "PackRemoveUnfinished", "TexturesRun", "TexturesClean", "CreditAnswer", "CompleteDependencies", "ReplaceRecommended",
+  // Saves (06 §2.11): fixes edit the save's list, the file actions change its folder
+  "SaveFix", "SaveNewList", "SaveRename", "SaveCopy", "SaveTrash",
 ]);
 on("environment", (result) => {
   const p = pending.get(result.request);

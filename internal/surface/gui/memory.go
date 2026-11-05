@@ -64,6 +64,9 @@ func (s *API) Leave(page string) {
 	if page == "search" {
 		s.stopFileSearch()
 	}
+	if page == "saves" { // view.PageSaves
+		s.leaveSaves()
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	switch page {

@@ -207,7 +207,7 @@ Approximate matching for rule 3 (an enabled set differing by one or two entries)
 
 ### 4.4 Actions
 
-The actions are implemented in `internal/app/saveactions.go` (`FixSave`, `RenameSave`, `CopySave`, `BackupSaves`, `TrashSaves`), with their commands and MCP tool (`internal/cmds/saves.go`, `manage_saves`; 05 §4.2, §5.2).
+The actions are implemented in `internal/app/saveactions.go` (`FixSave`, `RenameSave`, `CopySave`, `BackupSaves`, `TrashSaves`), with their commands and MCP tool (`internal/cmds/saves.go`, `manage_saves`; 05 §4.2, §5.2) and the GUI page (06 §2.11).
 
 | Action | What it does | Confirmation |
 | --- | --- | --- |

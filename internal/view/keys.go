@@ -210,6 +210,15 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("ctrl+o", "open the Config folder"),
 		)
 	}
+	if page == PageSaves && !tui { // Saves (06 §2.11); the TUI has the saves commands
+		out = append(out,
+			r("/", "search colonies, saves and Mods; esc clears it"),
+			r("↑↓", "the previous / next save in the tree"),
+			r("← →", "fold / unfold the colony"),
+			r("enter", "the quick fix: fix and launch, launch, recycle or make a list"),
+			r("F2", "rename the save"),
+		)
+	}
 	if !tui && (page == LibraryPage || page == "packs" || page == "textures" || page == PageModSettings) {
 		out = append(out, r("s / < > =", "the headers: sort and columns; < > = changes or resets the sorted column's width"))
 	}
