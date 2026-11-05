@@ -2,6 +2,15 @@
 
 Things to research, not yet decided. Once decided, put them in the specifications (implementation plans in 01 §5); research goes in docs/research/.
 
+## review docs, delete unnecessary 
+
+## Mod library管理标签
+- Mod library左栏, 支持以Tag分组展示, 提供便捷批量增加删除Tag的方式
+
+## RimArcho安装
+- 在设置中提供从RimSort RimCrow导入数据库, 在初始化RimArcho的时候提供导入数据库功能, 自动解析到玩家电脑的RimSort RimCrow数据库地址
+- 初始化RimArcho的时候, 询问玩家是否将RimArcho管理的目录使用默认值在C盘local, 如果玩家C盘太满, 提示
+
 ## MCP test&improve
 Baed on benchmark exam on real mod list and error log from corpus research
 
@@ -15,62 +24,27 @@ Decompilation serves two purposes: investigating Mod conflicts and creating Mods
 manage decompiled mod instance
 
 ## New Mod Project
-Allow player to initialize a new mod project
+Allow player to initialize a new mod project with `about.xml`
+I suggest a new side bar group: developing
+developing
+/decompile
+/new mod project
+Developing would possibly need new tools such as Bash, ilspyCMD, .Net SDK, 
 
-## Research displaying, editing, and managing Mod configuration
-
-Mod configuration determines how a Mod's content is played. In the game it has an interface; outside the game it is plain XML.
-
-2026-11-02: researched in [research/2026-11-02_mod-settings.md](docs/research/2026-11-02_mod-settings.md). First finding: settings files are named after the folder the game sees, so `_Archo_` and `!ArchoPack_` links fork a Mod's settings (01 §5.3). Direction (simplified 2026-11-02, no tricks, low player load):
-
-- Settings follow the Mod: when a deployment name changes, RimArcho copies the settings to the new name before launch, without asking and without overwriting. Implemented 2026-11-03 (08 §3, §5.3 step 4, §12); real-game check in the release VM tests.
-- Archo Monitor records which settings file each Mod uses and what its settings window shows when the player opens it. The file record is implemented 2026-11-03 (Monitor 0.10.0, 03 §6.7.1), the window record and the HugsLib record too (Monitor 0.11.0; HugsLib packs show on the page).
-- RimArcho reads simple files (on/off, numbers, text, a choice) itself; it can change only those, only with the game closed, with a backup. Everything else is read-only: change it in the game. Implemented 2026-11-03 (06 §2.9 "Changing values"; GUI controls, `archo mod-settings set`, MCP `set_mod_settings`); real-game check in the release VM tests.
-- One Mod settings page for the current list. Implemented 2026-11-03 as Mod library › Mod settings (06 §2.9), with `archo mod-settings` and MCP `get_mod_settings`.
-
-Not now: profiles, exports, cleanup.
-
-## Accessibility
-
-Accessibility is intended to let AI agents operate without screenshots. Define acceptance criteria for it.
-
-2026-11-02: criteria defined as 06 §11 A1–A18, with a baseline in [research/2026-11-02_gui-accessibility.md](docs/research/2026-11-02_gui-accessibility.md). Nothing passes in full. Desktop agents already read the page through COM UIA (A17 partial; the baseline's "only the window" came from the .NET client). Next: hide the editor behind secondary pages, give lists and tables row semantics, and give dialogs a focus boundary.
-
-2026-11-02 (later): those three are done (A1, A6, A8, A9, A15 pass). Next: name the remaining fields and icons (A2, A10), tell same-name controls apart (A5), menu and command-panel semantics (A7), progress and messages as status (A11, A12).
-
-2026-11-03: progress and messages done (A11, A12 pass; A12 relaxed: only work that ends on its own must name its job, a direct reply may be short). Then ten rows were relaxed to what an agent needs (A3 and A14 merged into A13, export exempt from A18). Next: A2, A7, then measure A13; A5 and A10 in their narrower form.
+## Translation
+Auto translate mod details? Need to think about it.
 
 ## Save analysis
 
-### Save management
-
-Preview the colony name, in-game date, storyteller and difficulty, play time, colonist count, save size, and Mod list.
-
-Group saves by colony using RimSaves' folder logic. RimSaves stores the folder name in the filename as folder#§#save-name.rws. Recognize that prefix so its users' saves are not grouped incorrectly.
-
-Support renaming and copying saves, and offer cleanup suggestions.
-
-### Mods used by a save
-
-Explain the effect of the save's Mod list. List objects belonging to Mod X, for example 3 colonists of its race, 12 buildings, 1 faction, and 1 WorldComponent.
-
-Close the gap in 10 §3.3: after extracting Class, functional Mods with Comp or Component classes leave traces in saves, so their usage can be determined at least partially.
-
-Answer the common community question of whether a Mod can be removed mid-playthrough. Compare the current Mod list with the save's Mod list.
-
-### Detect save corruption
-
-At the file level, detect truncation (no </savegame>, often saved during a crash), empty files, and malformed XML. Do not report a save as corrupt while the game is writing it; check running-game detection in 08 §4 first.
-
-At the reference level, collect defined and referenced loadIDs statically and find references to nonexistent objects. This can reveal Could not resolve reference before loading.
-
-At the source level, Class="..." pointing to a type absent from installed assemblies will fail on load and is the most severe case. An unresolved Def source (already recorded in 10 §1.5) should become a risk warning.
-
-Connect the checks to logs: Monitor already records context.save, so attach save-load errors from the last attempt to the save card, showing static checks alongside actual loading evidence.
-
-Undecided: whether to generate a repaired copy by removing invalid references and objects belonging to missing Mods.
+### 1.1 剩余（10）
+- §1.4–1.5：从存档提取引用的 Def，映射回提供它的 Mod
+- §2 内容目录：Def 类型 → 内容类别的映射（现为草案）
+- §3 未使用的内容（1.1 核心答案）：三组分类、解读、功能型 Mod 的处理，Unplayed 分组下的 Play review 页面
+- §4.3 "上次加载的报错"
 
 ### Playthrough review (data for the third question)
+
+这个估计还得琢磨琢磨, 目前不满意
 
 Join multiple saves of a colony into a timeline: in-game days, real play time, population, wealth, and deaths.
 
@@ -83,6 +57,13 @@ Optionally count occurrences instead of only recording that something appeared. 
 Archo should be a Mod development agent that can take action, not just translate or tag. Tentatively use a modified Pi agent; the approach needs research.
 
 # Deferred
+
+## Auto Update
+RimArcho would need to publish to steam workshop, need to find a way to upload update without start the game; Auto update should pull from steamworkshop, not from github.
+
+## Research displaying, editing, and managing Mod configuration
+
+Not now: profiles, exports, cleanup.
 
 ## TUI
 
