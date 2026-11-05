@@ -116,6 +116,7 @@ type API struct {
 	llFiles       map[string]loverDownload
 
 	uninstall      uninstallState
+	saves          savesState // the Saves page's reader and listing (saves.go)
 	uninstallSizes app.UninstallSizeCache
 	uninstallRead  logReader
 

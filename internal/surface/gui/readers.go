@@ -274,7 +274,7 @@ func (s *API) Close() {
 	s.libGate.Lock()
 	//lint:ignore SA2001 barrier, nothing to guard
 	s.libGate.Unlock()
-	for _, w := range []*logReader{&s.libRead, &s.plansRead, &s.workspaceReader, &s.indexRead, &s.detailRead} {
+	for _, w := range []*logReader{&s.libRead, &s.plansRead, &s.workspaceReader, &s.indexRead, &s.detailRead, &s.saves.read} {
 		w.mu.Lock()
 		w.release() // also stops an idle expiry
 		w.mu.Unlock()

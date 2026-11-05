@@ -20,6 +20,7 @@ import * as tex from "./textures.js";
 import * as tasksPage from "./tasks.js";
 import * as fileSearch from "./filesearch.js";
 import * as modSettings from "./modsettings.js";
+import * as savesPage from "./saves.js";
 
 let ui;
 // The displayed shell can still name the previous plan while OpenPlan is in flight:
@@ -91,6 +92,7 @@ export async function openPage(id, plan = null, entry = null) {
     case "tasks": return tasksPage.open();
     case "search": return fileSearch.open();
     case "mod-settings": return modSettings.open();
+    case "saves": return savesPage.open();
     case "guide": return entry ? guide.resume() : guide.start(S.board && S.board.envs && S.board.envs.length ? "env" : "first");
   }
 }

@@ -186,6 +186,9 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	library := []NavItem{
 		{ID: PagePlan, Label: T("lists"), Kids: planKids},
 		{ID: PagePacks, Label: T("packs"), Kids: packKids},
+		// Saves (06 §2.11), after the packs since 2026-11-04. Its own name: the plain
+		// "saves" key is translated for settings rows; the sidebar's name is longer.
+		{ID: PageSaves, Label: extraName("@nav.saves", "saves")},
 		// Below the packs (2026-10-28). The entry opens All, its first sub-entry (06 §2.9).
 		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all mods")}, {ID: PageChanges, Label: T("updates")}, {ID: PageSubscribe, Label: T("add a subscription")}, {ID: PageSearch, Label: T("search files")}, {ID: PageModSettings, Label: T("mod settings")}}},
 		// what the game loads faster (08 §5.2)
@@ -196,11 +199,24 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	n := 0
 	for g := range groups {
 		for i := range groups[g].Items {
+			if groups[g].Items[i].ID == PageSaves {
+				continue // no shift key: shift+1–8 stay the eight pages the TUI also has (06 §3.5)
+			}
 			n++
 			groups[g].Items[i].Key = fmt.Sprintf("shift+%d", n)
 		}
 	}
 	return groups
+}
+
+// extraName is a name kept in the locale's supplemental table under key, en in English.
+func extraName(key, en string) string {
+	if lang := Lang(); lang != "en" {
+		if name := localeExtra(lang, key); name != key {
+			return name
+		}
+	}
+	return en
 }
 
 // NavPath is where a page sits in the sidebar: the group, the entry and the sub-entry's

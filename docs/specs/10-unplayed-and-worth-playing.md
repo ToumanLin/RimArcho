@@ -207,7 +207,7 @@ Approximate matching for rule 3 (an enabled set differing by one or two entries)
 
 ### 4.4 Actions
 
-The actions are implemented in `internal/app/saveactions.go` (`FixSave`, `RenameSave`, `CopySave`, `BackupSaves`, `TrashSaves`); their commands and the page are not.
+The actions are implemented in `internal/app/saveactions.go` (`FixSave`, `RenameSave`, `CopySave`, `BackupSaves`, `TrashSaves`); the GUI page uses them (06 §2.11, 2026-11-04); their commands are not implemented.
 
 | Action | What it does | Confirmation |
 | --- | --- | --- |
