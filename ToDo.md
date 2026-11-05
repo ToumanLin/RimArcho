@@ -7,9 +7,38 @@ Things to research, not yet decided. Once decided, put them in the specification
 ## Mod library管理标签
 - Mod library左栏, 支持以Tag分组展示, 提供便捷批量增加删除Tag的方式
 
-## RimArcho安装
-- 在设置中提供从RimSort RimCrow导入数据库, 在初始化RimArcho的时候提供导入数据库功能, 自动解析到玩家电脑的RimSort RimCrow数据库地址
-- 初始化RimArcho的时候, 询问玩家是否将RimArcho管理的目录使用默认值在C盘local, 如果玩家C盘太满, 提示
+## RimArcho安装与更新（创意工坊发布）
+原"RimArcho安装"和 Deferred 里的"Auto Update"合并为一个项目。调研：[research/2026-11-05_workshop-distribution.md](docs/research/2026-11-05_workshop-distribution.md)。
+
+**分发**：创意工坊条目名为 RimArcho，内容 = Archo Monitor 的 Mod 文件夹（About、LoadFolders、1.5/1.6/1.7）+ 发布 zip + `.sha256`。没有人只为 Monitor 订阅，条目就是 RimArcho 本身。
+
+**玩家步骤**：Steam 订阅 → 打开条目文件夹 → 解压 zip → 双击 `RimArcho.exe`。
+
+**首次启动**
+- 检测自己是否运行在创意工坊文件夹里（`steamapps/workshop/content/294100/<id>/`）。如果是，给出默认安装地址（可另选），把自己搬过去，再从新位置重启。Steam 更新或取消订阅时会改写、删除这个文件夹，所以程序不能留在那里。
+- 搬走后清理在条目文件夹里解压出来的文件，只留条目原本的内容。
+- 询问 RimArcho 管理的目录是否用默认值（C 盘 Local）；C 盘空间不足时提示。
+- 提供从 RimSort、RimCrow 导入数据库（自动找到它们在玩家电脑上的数据库位置）；设置里也有同样的入口。
+
+**Monitor**
+- 订阅得到的副本就是 Monitor。RimArcho 要把任何来源中 packageId 为 `toumanlin.archomonitor` 的副本都认作 Monitor，否则它和 `_Archo_monitor_` 链接会被报成重复 Mod。
+- 版本相同时优先用订阅的副本：不需要建链接，`Mods/` 在 exFAT 上也能用。
+- Monitor 版本（`monitor/VERSION`）与启动器版本相互独立。
+
+**更新**
+- 已订阅的玩家：Steam 会自动把新 zip 下到条目文件夹，RimArcho 直接从那里读取并校验，不需要 SteamCMD。
+- 未订阅的（GOG、GitHub 安装）：用匿名 SteamCMD 拉取条目，绝不用玩家的账号。
+- 版本号放在条目 tag 里（不行就改读标题），zip 名必须与之一致。
+- GitHub 保留，用于首次下载、预发布版和兜底。
+- 建议同时加 ed25519 签名：维护者账号一旦被盗，`.sha256` 防不住。
+
+**上传**（维护者）：`archo workshop publish`，经 steam-worker 调 ISteamUGC 上传，不启动游戏；不放进 `release.ps1`。
+
+**进展**
+- 2026-11-05：完成调研。发布 zip 从 1.0.2 起带 `README.zh-CN.md` 和 `skills/`（代码已写，未提交）。
+- 创意工坊部分尚未实现。
+- 下一步：先做上传工具，传一个不公开的测试条目，在 VM 里实测调研文档第 4 节的问题（tag 能否放版本、不公开条目能否匿名下载、订阅后 Monitor 是否正常加载且不报重复）。
+- 调研文档已按"Monitor 即条目"改好：条目内容和 Monitor 识别见 §1.5，首次启动搬家见 §1.6，订阅者直接从条目文件夹取更新见 §1.3。
 
 ## MCP test&improve
 Baed on benchmark exam on real mod list and error log from corpus research
@@ -57,9 +86,6 @@ Optionally count occurrences instead of only recording that something appeared. 
 Archo should be a Mod development agent that can take action, not just translate or tag. Tentatively use a modified Pi agent; the approach needs research.
 
 # Deferred
-
-## Auto Update
-RimArcho would need to publish to steam workshop, need to find a way to upload update without start the game; Auto update should pull from steamworkshop, not from github.
 
 ## Research displaying, editing, and managing Mod configuration
 
