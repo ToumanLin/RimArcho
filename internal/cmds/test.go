@@ -110,7 +110,11 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 		root.Add(line)
 		fixed := root.Section(fmt.Sprintf("fixed: %d", p.Fixed))
 		for _, cluster := range r.Fixed {
-			testClusterMods(fixed.Addf("%s x%d: %s", cluster.Class, cluster.Count, cluster.Message), cluster)
+			n := fixed.Addf("%s x%d: %s", cluster.Class, cluster.Count, cluster.Message)
+			testClusterMods(n, cluster)
+			if cluster.Note != "" {
+				n.KV("note", cluster.Note)
+			}
 		}
 	}
 	if b := r.Baseline; b != nil {

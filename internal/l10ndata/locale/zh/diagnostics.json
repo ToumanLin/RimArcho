@@ -405,6 +405,7 @@
   "the log does not say which mod they come from": "日志里看不出来自哪个 Mod。",
   "the mod or one of its dependencies is outdated": "Mod 或它的某个前置太旧",
   "the mod ships the file under another path or case": "Mod 的文件在另一个路径下，或大小写不同",
+  "the mod's own code asks for art it does not ship (a defect of that mod, rendering only; analyze_log says so)": "Mod 自己的代码要用一张它没带的图（是这个 Mod 自身的缺陷，只影响显示；analyze_log 会指出）",
   "the mod uses content from a mod that is not enabled, without declaring it: in shared logs it then errored in at least half of the cases": "这个 Mod 用到了没启用的 Mod 的内容，却没有声明：分享的日志里至少一半会出错",
   "the mod was built for another version of the game or of the target mod": "Mod 是为另一个版本的游戏或目标 Mod 编译的",
   "the mod was written for another game version": "Mod 是为另一个游戏版本写的",

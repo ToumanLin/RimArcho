@@ -404,6 +404,9 @@ func (a *App) testRunLog(st *LoadoutState, r *TestRunReport) error {
 		if !settings {
 			note = patterns.Load().CommonUnattributed(class, lc.Template, len(lc.Attr) > 0)
 		}
+		if slices.Contains(lc.Details, ownArtNote) {
+			note = ownArtNote
+		}
 		r.Clusters = append(r.Clusters, TestRunCluster{key: lc.Key, Class: class, Message: firstLine(lc.First.Message), Count: lc.Count, Mods: mods, Confidence: confidence, Note: note, Consequences: lc.Consequences})
 	}
 	return nil

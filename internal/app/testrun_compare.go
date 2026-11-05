@@ -87,6 +87,10 @@ func (a *App) comparePlayerLog(st *LoadoutState, r *TestRunReport) {
 		}
 		c := TestRunCluster{Class: lc.Class, Message: firstLine(lc.First.Message), Count: lc.Count,
 			Mods: testRunMods(st, lc), Confidence: lc.Confidence, Consequences: lc.Consequences}
+		if slices.Contains(lc.Details, ownArtNote) {
+			// Gone because files were added, not because the fault was fixed (MCP eval h2).
+			c.Note = ownArtNote
+		}
 		r.playerClusters[lc.Key] = c
 		if current[lc.Key] {
 			continue
