@@ -54,27 +54,27 @@ type TestRunCluster struct {
 }
 
 type TestRunReport struct {
-	Links         []*GameLink       `json:"links,omitempty"`
-	Env           string            `json:"env"`
-	Plan          string            `json:"plan"`
-	GameVersion   string            `json:"game_version"`
-	Status        string            `json:"status"`
-	LoadSeconds   float64           `json:"load_seconds"`
-	TotalSeconds  float64           `json:"total_seconds"`
-	PeakMemoryMB  int64             `json:"peak_memory_mb"`
-	Requested     int               `json:"requested"`
-	Missing       []TestRunMissing  `json:"missing"`
-	Linked        []string          `json:"linked,omitempty"` // Mods/ links made for this run and removed after it
-	RunDir        string            `json:"run_dir"`
-	LogPath       string            `json:"log_path"`
-	Args          []string          `json:"args,omitempty"` // saved in report.json (map mode of a baseline); not in --json output
-	Attribution   string            `json:"attribution"`
-	AnalysisError string            `json:"analysis_error,omitempty"` // attributed without a fresh analysis
-	Counts        map[string]int    `json:"counts"`                   // clusters per class, before the limit
-	Clusters      []TestRunCluster  `json:"clusters"`
+	Links         []*GameLink      `json:"links,omitempty"`
+	Env           string           `json:"env"`
+	Plan          string           `json:"plan"`
+	GameVersion   string           `json:"game_version"`
+	Status        string           `json:"status"`
+	LoadSeconds   float64          `json:"load_seconds"`
+	TotalSeconds  float64          `json:"total_seconds"`
+	PeakMemoryMB  int64            `json:"peak_memory_mb"`
+	Requested     int              `json:"requested"`
+	Missing       []TestRunMissing `json:"missing"`
+	Linked        []string         `json:"linked,omitempty"` // Mods/ links made for this run and removed after it
+	RunDir        string           `json:"run_dir"`
+	LogPath       string           `json:"log_path"`
+	Args          []string         `json:"args,omitempty"` // saved in report.json (map mode of a baseline); not in --json output
+	Attribution   string           `json:"attribution"`
+	AnalysisError string           `json:"analysis_error,omitempty"` // attributed without a fresh analysis
+	Counts        map[string]int   `json:"counts"`                   // clusters per class, before the limit
+	Clusters      []TestRunCluster `json:"clusters"`
 	// Info: the informational clusters (mod reports, other, known noise), one line each with
 	// before, so an agent need not reread the log for them (MCP review round 2 P24).
-	Info []TestRunCluster `json:"info,omitempty"`
+	Info          []TestRunCluster  `json:"info,omitempty"`
 	ClustersTotal int               `json:"clusters_total"`
 	PlayerLog     *TestRunPlayerLog `json:"player_log,omitempty"`
 	Fixed         []TestRunCluster  `json:"fixed,omitempty"`

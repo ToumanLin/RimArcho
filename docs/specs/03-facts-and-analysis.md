@@ -427,7 +427,7 @@ Use the following evidence, strongest first:
 - The first suggestion is `archo log --cluster E<n>`, followed by next steps such as `archo patches --mod <ref> --failed`, `archo harmony --target Verse.Pawn.Tick`, `archo source <ref> --type <type>`, `archo def <Type>/<name>`, or `archo enable <ref>`.
 - The key is the cluster key, with absolute paths reduced to their final three segments (§4.2).
 
-**Cluster details** (`archo log --cluster E<n>`, MCP, and the interface) include the complete message and continuations, plus messages around the first occurrence (nearby: 4 before and 3 after, ≤30 lines, truncated to 200 characters per message). This avoids another lookup in the raw log (corpus G7).
+**Cluster details** (`archo log --cluster E<n>`, MCP, and the interface) include the complete message and continuations, plus messages around the first occurrence (nearby: 4 before and 3 after, ≤30 lines, truncated to 200 characters per message). Lines of a transpiler's IL listing (`AdjustParms - ldfld …`, `IL_001a: ldarg.0`; `logs.ILDump`) are skipped and the next message counts instead (MCP review P13: a 4-line Head Apparel Tweaker dump opened every cluster's nearby block in 49 of 62 `analyze_log` calls). This avoids another lookup in the raw log (corpus G7).
 
 **Error patterns** (`pattern:<id>`, §6.8) appear on matching clusters as `[pattern:g:<id>]` at the end of the row and as a `pattern:` section in the details. Patterns provide background knowledge with community as the evidence source. They do not change attribution, roles, or confidence, or form standalone conclusions.
 

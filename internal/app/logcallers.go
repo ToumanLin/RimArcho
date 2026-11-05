@@ -5,6 +5,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -351,11 +352,30 @@ func nearMessages(lf *logs.File, e *logs.Entry) []string {
 		}
 		out = append(out, fmt.Sprintf("%s:%d %s", mark, x.Line, m))
 	}
-	for i := max(0, idx-4); i < idx; i++ {
+	// A transpiler's IL listing says nothing about the error (MCP review P13): skip it and
+	// look further, within the same 30 lines.
+	var before []int
+	for i := idx - 1; i >= 0 && len(before) < 4; i-- {
+		x := lf.Entries[i]
+		if x.Line > 0 && x.Line < e.Line-30 {
+			break
+		}
+		if !logs.ILDump(x.Message) {
+			before = append(before, i)
+		}
+	}
+	for _, i := range slices.Backward(before) {
 		add(lf.Entries[i], "before")
 	}
-	for i := idx + 1; i < len(lf.Entries) && i <= idx+3; i++ {
-		add(lf.Entries[i], "after")
+	for i, n := idx+1, 0; i < len(lf.Entries) && n < 3; i++ {
+		x := lf.Entries[i]
+		if x.Line > e.Line+30 {
+			break
+		}
+		if !logs.ILDump(x.Message) {
+			add(lf.Entries[i], "after")
+			n++
+		}
 	}
 	return out
 }
