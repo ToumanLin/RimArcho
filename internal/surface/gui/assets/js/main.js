@@ -1022,6 +1022,11 @@ function onKey(e) {
   if (k === "Escape" && S.screen === "plan-import") return importKey(e);
   if (k === "Escape" && S.screen === "plans") return planManage.key(e);
   if (document.activeElement && ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) return;
+  // A focused button, link or disclosure takes its own Enter and Space (native activation);
+  // the editor's space toggled the cursor Mod instead (VM round 2026-11-05: Space on the
+  // list header's Delete disabled a Mod). Editor rows are tree items, not buttons.
+  if ((k === "Enter" || k === " ") && !e.ctrlKey && !e.metaKey && !e.altKey &&
+      document.activeElement?.closest?.("button, summary, a[href], [role=button]")) return;
   if ((k === "u" || ((e.ctrlKey || e.metaKey) && k === "z")) && !S.busy.env && undoStatus()) { e.preventDefault(); return; }
   if (k !== "Shift" && k !== "Control" && k !== "Alt") clearSay();
   // shift+1–8: the sidebar's entries. By the physical key, so it works on any layout

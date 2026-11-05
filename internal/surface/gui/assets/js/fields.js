@@ -76,6 +76,18 @@ export function pathContent(node, text, paths = []) {
     span.textContent = value;
     node.append(copyablePath(span, path));
   };
+  // A web address ends before trailing punctuation and an unmatched ")": the one that closes
+  // a Markdown link ([text](https://…/CHANGELOG.md)) or a sentence's parenthesis (VM round
+  // 2026-11-05: the release notes' copy button copied ".../CHANGELOG.md)", a 404).
+  const urlEnd = url => {
+    if (!/^https?:\/\//i.test(url)) return url;
+    for (;;) {
+      const last = url.slice(-1);
+      if (".,;:!?".includes(last)) { url = url.slice(0, -1); continue; }
+      if (last === ")" && (url.match(/\(/g) || []).length < (url.match(/\)/g) || []).length) { url = url.slice(0, -1); continue; }
+      return url;
+    }
+  };
   const plain = value => {
     // Legacy command/task text has no metadata. Rooted paths and web addresses
     // need a clear boundary; shortcuts do not qualify.
@@ -86,7 +98,8 @@ export function pathContent(node, text, paths = []) {
       for (const m of part.matchAll(rooted)) {
         const start = m.index + m[1].length;
         if (start > at) node.append(part.slice(at, start));
-        append(m[2]); at = start + m[2].length;
+        const hit = urlEnd(m[2]);
+        append(hit); at = start + hit.length;
       }
       if (part.slice(at)) node.append(part.slice(at));
     }

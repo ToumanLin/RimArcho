@@ -4,6 +4,10 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 1.0.1 (unreleased)
 
+- List editor: Space or Enter on a focused button (Delete, Rename and the others in the list's header) presses that button. Before, Space disabled the Mod under the cursor and Enter opened its details.
+- Cancelling a folder or file picker no longer shows `✗ cancelled by user`.
+- Copy buttons beside web addresses in text (the release notes in Settings › About) no longer copy the closing `)` of a Markdown link or a trailing full stop, which made the copied link a dead page.
+- A failed move of a managed folder now says to set its new location with `archo folder set`, not `SetDirectory`.
 - Game log: a misspelled class of a patch operation (`<Operation Class="PatchOperationConditionl">`, also with a namespace) now names the Mod whose patch has it, and the error is an XML load error, shown by default. Before, `Could not find type named … from node …` was filed as other (hidden) with no Mod identified.
 - Game log page: after switching the interface language in place, the note beside the title ("its errors are in needs attention") also changes language; it also follows the log's state when the page redraws.
 - Can it load: a Mod unsubscribed or deleted while it was still in the list now says what the save loses without it (`loading without it loses 5 colonists of race Ratkin …`). Before, it said nothing in the save needed it.

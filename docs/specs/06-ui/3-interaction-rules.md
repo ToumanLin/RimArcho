@@ -75,7 +75,7 @@ The editor has four focus areas: `1` Disabled, `2` Enabled, `3` Staging / histor
 
 ### 3.5 Verb keys
 
-The editor and Mod inventory > all share **one key table**, as the player confirmed on 2026-10-22. The GUI and TUI use the same bindings except in §8.5 and §9.1. `?` displays the current page's `view.KeyHelp`.
+The editor and Mod inventory > all share **one key table**, as the player confirmed on 2026-10-22. The GUI and TUI use the same bindings except in §8.5 and §9.1. `?` displays the current page's `view.KeyHelp`. In the GUI a focused button, link or disclosure keeps its own Enter and Space (native activation), so the table's `space` and `enter` act only when no such control has the focus (VM round 2026-11-05: Space on the list header's Delete disabled the cursor Mod).
 
 | Key | Action on selected objects, otherwise the cursor row |
 | --- | --- |

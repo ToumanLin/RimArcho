@@ -213,6 +213,17 @@ func (s *API) ExportCopy(format string) (*Copied, error) {
 	return c, nil
 }
 
+// pickResult turns the dialog's "cancelled by user" error into an empty choice: cancelling a
+// picker changes nothing and is not a failure (VM round 2026-11-05: Settings › folders
+// showed "✗ cancelled by user", in English, after Cancel). The error is Wails' internal
+// cfd.ErrorCancelled, so it is matched by its text.
+func pickResult(path string, err error) (string, error) {
+	if err != nil && err.Error() == "cancelled by user" {
+		return "", nil
+	}
+	return path, err
+}
+
 // wailsNative is the window's dialogs and clipboard.
 type wailsNative struct{ app *application.App }
 
@@ -224,7 +235,7 @@ func (w wailsNative) openFile(title string, filters [][2]string) (string, error)
 	if win := w.app.Window.Current(); win != nil {
 		d.AttachToWindow(win)
 	}
-	return d.PromptForSingleSelection()
+	return pickResult(d.PromptForSingleSelection())
 }
 
 func (w wailsNative) openDir(title, start string) (string, error) {
@@ -235,7 +246,7 @@ func (w wailsNative) openDir(title, start string) (string, error) {
 	if win := w.app.Window.Current(); win != nil {
 		d.AttachToWindow(win)
 	}
-	return d.PromptForSingleSelection()
+	return pickResult(d.PromptForSingleSelection())
 }
 
 func (w wailsNative) saveFile(title, name string, filters [][2]string) (string, error) {
@@ -247,7 +258,7 @@ func (w wailsNative) saveFile(title, name string, filters [][2]string) (string, 
 	if win := w.app.Window.Current(); win != nil {
 		d.AttachToWindow(win)
 	}
-	return d.PromptForSingleSelection()
+	return pickResult(d.PromptForSingleSelection())
 }
 
 func (w wailsNative) setClipboard(text string) bool { return w.app.Clipboard.SetText(text) }

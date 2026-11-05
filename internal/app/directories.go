@@ -411,12 +411,12 @@ func (a *App) MoveDirectory(id, path string) (copied bool, err error) {
 		return false, err
 	}
 	if st, err := os.Stat(d.Path); err != nil {
-		return false, fmt.Errorf("old directory: %w; move it manually and use SetDirectory", err)
+		return false, fmt.Errorf("old directory: %w; move it manually, then set its new location (archo folder set)", err)
 	} else if !st.IsDir() {
 		return false, fmt.Errorf("old path is not a directory")
 	}
 	if source.IsLink(d.Path) {
-		return false, fmt.Errorf("the old directory is a link; move it manually and use SetDirectory")
+		return false, fmt.Errorf("the old directory is a link; move it manually, then set its new location (archo folder set)")
 	}
 	if directoriesOverlap(d.Path, path) {
 		return false, fmt.Errorf("old and new directories overlap")
@@ -466,14 +466,14 @@ func (a *App) MoveDirectory(id, path string) (copied bool, err error) {
 	if copied {
 		err = copyChecked(d.Path, path)
 		if err != nil {
-			return false, a.abortLinkLifecycle(links, fmt.Errorf("could not copy the directory: %w; move it manually and use SetDirectory", err))
+			return false, a.abortLinkLifecycle(links, fmt.Errorf("could not copy the directory: %w; move it manually, then set its new location (archo folder set)", err))
 		}
 		trashErr = a.trash(d.Path)
 	} else if err := os.Rename(d.Path, path); err != nil {
-		return false, a.abortLinkLifecycle(links, fmt.Errorf("could not safely rename the directory: %w; move it manually and use SetDirectory", err))
+		return false, a.abortLinkLifecycle(links, fmt.Errorf("could not safely rename the directory: %w; move it manually, then set its new location (archo folder set)", err))
 	}
 	if err := a.setDirectoryRecords(d, path); err != nil {
-		return copied, a.abortLinkLifecycle(links, fmt.Errorf("the directory was moved to %s, but updating records or links failed: %w; use SetDirectory with this location to finish", path, err))
+		return copied, a.abortLinkLifecycle(links, fmt.Errorf("the directory was moved to %s, but updating records or links failed: %w; set this location to finish (archo folder set)", path, err))
 	}
 	if err := a.finishLinkLifecycle(links); err != nil {
 		return copied, err

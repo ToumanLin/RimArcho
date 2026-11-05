@@ -34,6 +34,13 @@ test("fallback recognises rooted paths and complete URLs without treating keys o
     assert.equal(h.pathContent(h.el("div"), path).querySelector(".path-copy").dataset.path, path);
   }
   assert.equal(h.pathContent(h.el("div"), "backup written to C:\\data\\archo.db").querySelector(".path-copy").dataset.path, "C:\\data\\archo.db");
+  // A Markdown link's ")" and a sentence's full stop are not part of the address; a balanced
+  // pair inside it is (VM round 2026-11-05: release notes copied ".../CHANGELOG.md)").
+  for (const [text, url] of [["[notes](https://github.com/a/b/blob/v1/CHANGELOG.md)", "https://github.com/a/b/blob/v1/CHANGELOG.md"],
+    ["see https://example.invalid/x.", "https://example.invalid/x"],
+    ["https://en.wikipedia.org/wiki/A_(b)", "https://en.wikipedia.org/wiki/A_(b)"]]) {
+    assert.equal(h.pathContent(h.el("div"), text).querySelector(".path-copy").dataset.path, url, text);
+  }
   for (const text of ["ctrl+/", "↑↓ / enter", "1.6 / 1.7", "ludeon.rimworld", "Mods/", "from github.com/a/b", "moving mods"]) {
     assert.equal(h.pathContent(h.el("div"), text).querySelector(".path-copy"), null, text);
   }
