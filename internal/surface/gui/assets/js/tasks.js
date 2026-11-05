@@ -70,6 +70,16 @@ export function foot(p) {
   b.title = T("background tasks") + T("; ") + "ctrl+j";
 }
 
+// relang: the language changed (06 §2.14). The foot line is drawn again even though no task
+// changed, and the page, if open, is built again so its fixed labels follow.
+export async function relang() {
+  const b = $("#tasks-line");
+  if (b) b.dataset.sig = "";
+  if (S.screen !== "tasks") return refreshFoot();
+  els = null;
+  await load();
+}
+
 export async function refreshFoot() {
   try { const p = await api.Tasks(); foot(p); return p; } catch { return null; }
 }
@@ -131,7 +141,7 @@ function bar() {
       data: () => barData(),
       change: () => draw(),
       leave: () => focusList(),
-      placeholder: T("search tasks and mod names") + "  /",
+      placeholder: () => T("search tasks and mod names") + "  /",
     });
   }
   return X.bar;

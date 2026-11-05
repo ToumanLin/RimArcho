@@ -27,7 +27,9 @@ export function createBar(opts) {
   const box = el("div", "fbar-search");
   const inp = el("input");
   inp.spellcheck = false;
-  inp.placeholder = opts.placeholder || T("search");
+  // placeholder: a string, or a function so it follows a language change
+  const placeholder = () => (typeof opts.placeholder === "function" ? opts.placeholder() : opts.placeholder) || T("search");
+  inp.placeholder = placeholder();
   const ghost = el("span", "fbar-ghost");
   ghost.append(el("span", "typed"), el("span", "sfx"));
   ghost.setAttribute("aria-hidden", "true");
@@ -139,7 +141,7 @@ export function createBar(opts) {
       ghost.lastChild.textContent = sfx;
       ghost.style.transform = `translateX(${-inp.scrollLeft}px)`;
     }
-    inp.placeholder = !ghost.hidden ? "" : opts.placeholder || T("search");
+    inp.placeholder = !ghost.hidden ? "" : placeholder();
     clear.hidden = !inp.value;
   }
   b.showGhost = showGhost;

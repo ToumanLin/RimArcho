@@ -114,7 +114,7 @@ export function createQuery(X, queryCard, { run, shortcuts, stop, focusResults, 
     filesBar = createBar({
       bare: true,
       noPanel: true,
-      placeholder: T("files"),
+      placeholder: () => T("files"),
       data: () => ({
         groups: [fileGroup()]
       }),
@@ -137,7 +137,7 @@ export function createQuery(X, queryCard, { run, shortcuts, stop, focusResults, 
     filesBar.input.setAttribute("aria-describedby", validation.id);
     fields.append(validation);
     modsBar = createBar({
-      placeholder: T("mods"),
+      placeholder: () => T("mods"),
       data: panelData,
       targets: {
         files: filesBar

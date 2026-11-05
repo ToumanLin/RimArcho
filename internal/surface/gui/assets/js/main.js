@@ -125,7 +125,9 @@ async function relang() {
   detailFollow(true);
   if (screen === "full") { await step(0); await scr.full(); }
   else if (screen === "library") await library.relang();
-  else if (screen && screen !== "guide") await openPage(screen);
+  else if (screen && screen !== "guide" && screen !== "tasks") await openPage(screen);
+  await tasksPage.relang();
+  S.bar.showGhost(); // the editor's bar: its placeholder in the new language
   if (screen) $("#screen").scrollTop = top;
   render();
 }
@@ -1233,7 +1235,7 @@ async function start() {
   savesPage.initSaves(ui);
   S.bar = createBar({ data: () => S.barData, change: () => barChanged(), splitKey: "ui.gui.filter.split:plan",
     column: () => $("#board > .fcol"), resized: () => renderRows(0), leave: () => focusArea(lastList < 2 ? lastList : 1),
-    placeholder: T("search: words, tags:, source:, content:") + "  /" });
+    placeholder: () => T("search: words, tags:, source:, content:") + "  /" });
   $("#board .barhost").replaceWith(S.bar.el);
   $('.area[data-area="3"] > .head').addEventListener("click", () => { if (S.bar.fills()) S.bar.toggle(false); });
   wireLists(ui);

@@ -4,6 +4,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 1.0.1 (unreleased)
 
+- Switching the interface language now also changes "Background tasks" at the foot of the sidebar, and the search hints of the filter bars (list editor, Mod library, Background tasks, file search). Before, they kept the old language until RimArcho restarted.
+
 - Game log: a class the game cannot find now points at the Mod that names it. When no installed Mod defines the class, `archo log` and MCP `analyze_log` search the enabled Mods' Defs and patches for it (also in `Class="…"` attributes) and name that Mod and line as the likely source, with up to three similar existing classes (`did you mean: VanillaFurnitureEC.StatPart_Bin (#l4uq VanillaFurnitureEC.dll)`). Before, these errors said "no mod identified".
 - Two Mods that ship a DLL with the same name: the game loads only the first in load order, so classes that only the other copy has are missing. A new problem, `asm.duplicate-name` (a warning when classes are lost), names both Mods and the lost classes; a "could not find type" error in the log now names the Mod whose copy loads first as the likely source; `archo mod` / MCP `get_mod` list each assembly with its size and class count and mark a name another enabled Mod also ships.
 - Game log: when a def file fails to load (`Exception loading def from file …`), the errors that only follow from its missing defs (references to them, and config checks that read a null stat) are folded into that one error: its row says `+ N consequent lines in M clusters`, and `--all` still lists them, each marked as a consequence. `archo def` / MCP `get_def` says when the newest log reports that a def's file did not load, and test runs list only the root error.

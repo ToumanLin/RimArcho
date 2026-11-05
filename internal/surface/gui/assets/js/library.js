@@ -100,7 +100,7 @@ function bar() {
       data: () => L.page,
       change: () => { L.cur = 0; load(); },
       leave: () => els && els.rows.focus(),
-      placeholder: T("search: words, tags:, source:, content:") + "  /",
+      placeholder: () => T("search: words, tags:, source:, content:") + "  /",
     });
   }
   return L.bar;
