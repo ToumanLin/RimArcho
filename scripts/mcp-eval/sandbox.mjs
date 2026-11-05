@@ -4,11 +4,17 @@
 import fs from 'fs'; import path from 'path'; import {spawn, execFileSync} from 'child_process';
 
 const GAME = 'D:/rimworld16';
-const USERCFG = process.env.USERPROFILE + '/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Config';
+// Pinned 1.6 config templates (ModsConfig.xml: version and expansions; Prefs.xml). Never the host
+// player's live Config: once a 1.7 game rewrote it, every graded log gained PrefsData XML errors.
+const USERCFG = 'D:/RimArcho-test/mcp-eval/cases/base/Config';
 
+// submitted JSON may start with a BOM, and a one-item list may be a bare string (Windows PowerShell 5's
+// ConvertTo-Json does both): [].concat() turns either into a list
+const readJson = f => JSON.parse(fs.readFileSync(f, 'utf8').trimStart());
 export function loadCase(dir) { return JSON.parse(fs.readFileSync(path.join(dir, 'case.json'), 'utf8')); }
 
 // case.json: { id, base: "../base-mods.json", add: [{pkg, src}], overlay: [{pkg, folder, files: "overlay/<folder>"}], drop: [pkg] }
+// layerDir (a submission): files at <packageId>/<path>, ModsConfig.xml, enable.json (re-enabled Mods), delete.json (removed files)
 export function build(caseDir, runDir, layerDir) {
   const c = loadCase(caseDir);
   const base = JSON.parse(fs.readFileSync(path.resolve(caseDir, c.base), 'utf8'));
@@ -20,7 +26,9 @@ export function build(caseDir, runDir, layerDir) {
     else fs.copyFileSync(p, path.join(g, n));
   }
   const active = [];
-  const enable = layerDir && fs.existsSync(path.join(layerDir, 'enable.json')) ? JSON.parse(fs.readFileSync(path.join(layerDir, 'enable.json'), 'utf8')).map(p => p.toLowerCase()) : [];
+  const enable = layerDir && fs.existsSync(path.join(layerDir, 'enable.json')) ? [].concat(readJson(path.join(layerDir, 'enable.json'))).map(p => p.toLowerCase()) : [];
+  // delete.json: files the submission removes, as `<packageId>/<path in the Mod>`
+  const del = layerDir && fs.existsSync(path.join(layerDir, 'delete.json')) ? [].concat(readJson(path.join(layerDir, 'delete.json'))).map(f => String(f).replaceAll('\\', '/')) : [];
   const isDropped = m => c.drop?.some(d => d.toLowerCase() === m.pkg.toLowerCase()) && !enable.includes(m.pkg.toLowerCase());
   const mods = [...base];
   for (const a of c.add || []) { const i = a.before ? mods.findIndex(m => m.pkg.toLowerCase() === a.before.toLowerCase()) : -1; if (i >= 0) mods.splice(i, 0, a); else mods.push(a); }
@@ -30,7 +38,11 @@ export function build(caseDir, runDir, layerDir) {
     const ov = c.overlay?.find(o => o.pkg.toLowerCase() === m.pkg.toLowerCase());
     const dest = path.join(g, 'Mods', m.pkg);
     const layer = layerDir && fs.existsSync(path.join(layerDir, m.pkg)) ? path.join(layerDir, m.pkg) : null;
-    if (ov || layer) { copyDir(m.path, dest); if (ov) copyDir(path.resolve(caseDir, ov.files), dest); if (layer) copyDir(layer, dest); }
+    const gone = del.filter(f => f.toLowerCase().startsWith(m.pkg.toLowerCase() + '/')).map(f => f.slice(m.pkg.length + 1));
+    if (ov || layer || gone.length) {
+      copyDir(m.path, dest); if (ov) copyDir(path.resolve(caseDir, ov.files), dest); if (layer) copyDir(layer, dest);
+      for (const f of gone) fs.rmSync(path.join(dest, f), {force: true});
+    }
     else fs.symlinkSync(m.path, dest, 'junction');
   }
   if (layerDir && fs.existsSync(path.join(layerDir, 'ModsConfig.xml'))) {   // the submission changed the active list
@@ -42,7 +54,7 @@ export function build(caseDir, runDir, layerDir) {
   let x = fs.readFileSync(path.join(USERCFG, 'ModsConfig.xml'), 'utf8');
   x = x.replace(/<activeMods>[\s\S]*?<\/activeMods>/, '<activeMods>\n' + active.map(p => `    <li>${p.toLowerCase()}</li>`).join('\n') + '\n  </activeMods>');
   fs.writeFileSync(path.join(cfg, 'ModsConfig.xml'), x);
-  if (fs.existsSync(path.join(USERCFG, 'Prefs.xml'))) fs.copyFileSync(path.join(USERCFG, 'Prefs.xml'), path.join(cfg, 'Prefs.xml'));
+  fs.copyFileSync(path.join(USERCFG, 'Prefs.xml'), path.join(cfg, 'Prefs.xml'));
   return {game: g, userdata: path.join(runDir, 'userdata'), log: path.join(runDir, 'Player.log'), active};
 }
 

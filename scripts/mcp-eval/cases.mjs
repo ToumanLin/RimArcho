@@ -1,10 +1,13 @@
 // Generates the eval cases from the pristine real Mods: only the injected faults differ.
-// usage: node cases.mjs [outRoot]   (default D:/RimArcho-test/mcp-eval/cases)
+// usage: node cases.mjs [case...] [--out dir]   (default: every case, into D:/RimArcho-test/mcp-eval/cases)
 import fs from 'fs'; import path from 'path'; import {execFileSync} from 'child_process';
 
 const WS = 'D:/SteamLibrary/steamapps/workshop/content/294100';
 const LIB = 'D:/rimworld16/Mods';
-const OUT = process.argv[2] || 'D:/RimArcho-test/mcp-eval/cases';
+const args = process.argv.slice(2); const oi = args.indexOf('--out');
+const OUT = oi >= 0 ? args[oi + 1] : 'D:/RimArcho-test/mcp-eval/cases';
+const only = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--out');
+const want = id => !only.length || only.includes(id);
 
 const OSP = {pkg: 'khamenman.OutfitStandsPLus', dir: `${WS}/3545172389`, name: 'Outfit Stands Plus'};
 const ODY = {pkg: 'odysseypatch.1trickPwnyta', dir: `${LIB}/3578444636`, name: "1trickPwnyta's Odyssey Patch"};
@@ -24,7 +27,7 @@ function emit(id, spec, answer) {
 }
 
 // ---- Case 1: XML, a wrong class name in one Def (namespace typo) -----------------------------
-{
+if (want('c1')) {
   const rel = 'Defs/ThingDefs/Building_MendingOutfitStand.xml';
   let x = read(OSP.dir, rel);
   x = must(x, '<thingClass>OutfitStandsPlus.Things.MendingOutfitStand</thingClass>', '<thingClass>OutfitStandsPlus.Thing.MendingOutfitStand</thingClass>');
@@ -42,7 +45,7 @@ function emit(id, spec, answer) {
 // ---- Case 2: patch ordering conflict ----------------------------------------------------------
 // Outfit Stands Plus matches the stand by its thingClass; the Odyssey Patch mod rewrites that thingClass.
 // Listed before Outfit Stands Plus, the Odyssey Patch makes the xpath match nothing.
-{
+if (want('c2')) {
   const rel = 'Patches/OutfitStandsPlusPatches.xml';
   let x = read(OSP.dir, rel);
   x = must(x, '<xpath>/Defs/ThingDef[defName="Building_OutfitStand"]/comps</xpath>\n        <nomatch Class="PatchOperationAdd">\n            <xpath>/Defs/ThingDef[defName="Building_OutfitStand"]</xpath>',
@@ -71,7 +74,7 @@ function build(srcDir, outDll, edit) {
   execFileSync('dotnet', ['build', '-c', 'Release', '-nologo', '-v', 'q'], {cwd: tmp, stdio: 'pipe'});
   fs.mkdirSync(path.dirname(outDll), {recursive: true}); fs.copyFileSync(path.join(tmp, 'bin', 'SmartFirefight.dll'), outDll);
 }
-{
+if (want('c3')) {
   const SF = {pkg: 'DarkDaskin.SmartFirefight', dir: `${LIB}/3530229241`, name: 'Smart Firefight'};
   const src = path.join(SF.dir, 'Sources/SmartFirefight');
   const bad = (f, t) => f === 'Patch_GenSpawn_Spawn.cs' ? must(t, 'typeof(WipeMode), typeof(bool), typeof(bool)]', 'typeof(WipeMode), typeof(bool)]') : f === 'Startup.cs' ? t.replace('Harmony.DEBUG = true;', 'Harmony.DEBUG = false;') : t;
@@ -90,7 +93,7 @@ function build(srcDir, outDll, edit) {
 }
 
 // ---- Case 4: a required framework is installed but not enabled -------------------------------------
-{
+if (want('c4')) {
   const VEF = {pkg: 'OskarPotocki.VanillaFactionsExpanded.Core', name: 'Vanilla Expanded Framework'};
   fs.mkdirSync(path.join(OUT, 'c4', 'answer'), {recursive: true}); fs.writeFileSync(path.join(OUT, 'c4', 'answer', 'enable.json'), JSON.stringify([VEF.pkg]));
   emit('c4', {drop: [VEF.pkg]}, {
@@ -106,7 +109,7 @@ function build(srcDir, outDll, edit) {
 // ---- Case 5: wrong blame — the error names one Mod's Def, a different Mod's patch caused it --------------
 // 10x Carrying Capacity gets a "compat" patch that rewrites the research prerequisite of Outfit Stands Plus
 // with a misspelled Def name. The log blames Outfit Stands Plus' Defs; the patch lives in 10x Carrying Capacity.
-{
+if (want('c5')) {
   const X10 = {pkg: 'mlie.10xcarryingcapacity', dir: `${LIB}/2019000693`, name: '10x Carrying Capacity (Continued)'};
   const rel = 'Patches/Stats/Stats_Pawns_General.xml';
   const text = must(read(X10.dir, rel), '</Patch>', `  <!-- Compatibility: heavier carrying capacity means the mechanized stands need the stronger research gate. -->
@@ -128,6 +131,82 @@ function build(srcDir, outDll, edit) {
     faultClass: 'xml.cross-reference (wrong blame)',
     files: [`${X10.pkg}/${rel}`],
     fix: 'In the added Operation, OutfitStandsPlus_MechanizedOutfitStandResearch must read OutfitStandsPlus_MechanizedOutfitStandsResearch (missing s), or the Operation is removed.',
+  });
+}
+
+// ---- Harder cases (2026-11-04). Faults modelled on real 1.6 logs of the private corpus (aggregate counts only). ----------
+// Files keep their own line endings here, so a changed file does not stand out among its neighbours.
+const raw = (dir, rel) => fs.readFileSync(path.join(dir, rel), 'utf8');
+const VFE = {pkg: 'vanillaexpanded.vfecore', dir: `${WS}/1718190143`, name: 'Vanilla Furniture Expanded'};
+const VEF = {pkg: 'oskarpotocki.vanillafactionsexpanded.core', name: 'Vanilla Expanded Framework'};
+
+// Builds a Mod assembly from its sources with an SDK project (the Mods' own projects point at their authors' paths).
+// edit(rel, text) returns the file's new text, or null to leave the file out.
+function buildDll(srcDir, asmName, outDll, edit = (r, t) => t) {
+  const tmp = path.join(OUT, '_build', asmName + '-' + path.basename(path.dirname(path.dirname(outDll)))); fs.rmSync(tmp, {recursive: true, force: true});
+  for (const f of fs.readdirSync(srcDir, {recursive: true})) {
+    if (!f.endsWith('.cs') || /^(obj|bin)[\\/]/.test(f)) continue;
+    const t = edit(f.split('\\').join('/'), fs.readFileSync(path.join(srcDir, f), 'utf8'));
+    if (t !== null) { fs.mkdirSync(path.dirname(path.join(tmp, f)), {recursive: true}); fs.writeFileSync(path.join(tmp, f), t); }
+  }
+  const G = 'D:/rimworld16/RimWorldWin64_Data/Managed/';
+  const ref = n => `<Reference Include="${n}"><HintPath>${G}${n}.dll</HintPath><Private>false</Private></Reference>`;
+  fs.writeFileSync(path.join(tmp, asmName + '.csproj'), `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>netstandard2.1</TargetFramework><LangVersion>latest</LangVersion><AssemblyName>${asmName}</AssemblyName><GenerateAssemblyInfo>false</GenerateAssemblyInfo><OutDir>bin/</OutDir></PropertyGroup><ItemGroup>${['Assembly-CSharp', 'UnityEngine', 'UnityEngine.CoreModule', 'UnityEngine.IMGUIModule', 'UnityEngine.TextRenderingModule', 'UnityEngine.UIModule'].map(ref).join('')}<PackageReference Include="Lib.Harmony.Ref" Version="2.3.6" /></ItemGroup></Project>`);
+  execFileSync('dotnet', ['build', '-c', 'Release', '-nologo', '-v', 'q'], {cwd: tmp, stdio: 'pipe'});
+  fs.mkdirSync(path.dirname(outDll), {recursive: true}); fs.copyFileSync(path.join(tmp, 'bin', asmName + '.dll'), outDll);
+}
+
+// ---- h1: cascade — one Mod's patch drops a vanilla Def, and the errors that follow name other Mods' Defs -----------
+// Vanilla Furniture Expanded adds its StatPart_Bin to the vanilla Beauty StatDef. Misspelled (StatParts_Bin), the type
+// does not resolve and 1.6 drops the whole StatDef, as in the real ReGrowth logs ("Exception loading def from file
+// Biomes_*.xml: Could not find type named ..."); every Def that names Beauty then fails to resolve. The first error
+// names a vanilla file and no Mod. A case-only typo would not do: 1.6 looks types up ignoring case.
+if (want('h1')) {
+  const rel = '1.6/Patches/Core.xml';
+  const orig = raw(VFE.dir, rel);
+  put('h1', VFE.pkg, rel, must(orig, '<li Class="VanillaFurnitureEC.StatPart_Bin"/>', '<li Class="VanillaFurnitureEC.StatParts_Bin"/>'));
+  fixfile('h1', VFE.pkg, rel, orig);
+  emit('h1', {overlay: [{pkg: VFE.pkg, files: 'overlay/' + VFE.pkg}]}, {
+    culprit: [{pkg: VFE.pkg, name: VFE.name, role: 'its patch adds a misspelled class to the vanilla Beauty StatDef'}],
+    decoy: [{pkg: VEF.pkg, name: VEF.name, role: 'the framework Vanilla Furniture Expanded builds on; not involved'}],
+    required: [VFE.pkg],
+    faultClass: 'xml.type-missing (cascade)',
+    files: [`${VFE.pkg}/${rel}`],
+    fix: 'In 1.6/Patches/Core.xml the StatPart added to Beauty must read VanillaFurnitureEC.StatPart_Bin, or the operation is removed.',
+  });
+}
+
+// ---- h2: same-name assembly — a compatibility Mod ships a stale copy of another Mod's DLL -------------------------
+// The Odyssey Patch ships OutfitStandsPlus.dll in its Assemblies (a reference copied on build, a common modder
+// mistake), from before the Mending and Mechanized stands. It loads first; Mono's Assembly.LoadFrom then hands Outfit
+// Stands Plus the already loaded assembly of that name, so the stands' classes "do not exist" although Outfit Stands
+// Plus' own DLL has them.
+if (want('h2')) {
+  const stale = 'odysseypatch.1trickPwnyta/1.6/Assemblies/OutfitStandsPlus.dll';
+  buildDll(`${OSP.dir}/Source/OutfitStandsPlus`, 'OutfitStandsPlus', path.join(OUT, 'h2', 'overlay', stale),
+    (rel, t) => /^Things\/(Mending|Mechanized)OutfitStand\.cs$/.test(rel) ? null : t);
+  fs.mkdirSync(path.join(OUT, 'h2', 'answer'), {recursive: true}); fs.writeFileSync(path.join(OUT, 'h2', 'answer', 'delete.json'), JSON.stringify([stale]));
+  emit('h2', {add: [{pkg: ODY.pkg, name: ODY.name, path: ODY.dir, before: OSP.pkg}], overlay: [{pkg: ODY.pkg, files: 'overlay/' + ODY.pkg}]}, {
+    culprit: [{pkg: ODY.pkg, name: ODY.name, role: 'ships an old OutfitStandsPlus.dll that shadows the real one'}],
+    decoy: [{pkg: OSP.pkg, name: OSP.name, role: 'its Defs and DLL are correct; its assembly is shadowed'}],
+    required: [ODY.pkg],
+    faultClass: 'asm.duplicate-name (shadowed)',
+    files: [stale],
+    fix: 'Remove 1.6/Assemblies/OutfitStandsPlus.dll from the Odyssey Patch (or replace it with the current build), or load Outfit Stands Plus before the Odyssey Patch.',
+  });
+}
+
+// ---- h5: two unrelated faults in one start: c1 (Outfit Stands Plus) and c5 (10x Carrying Capacity) ------------------
+// c5's errors name Outfit Stands Plus' Defs, which also has c1's real fault: fixing one is not the end.
+if (want('h5')) {
+  const X10 = {pkg: 'mlie.10xcarryingcapacity', dir: `${LIB}/2019000693`, name: '10x Carrying Capacity (Continued)'};
+  for (const c of ['c1', 'c5']) for (const kind of ['overlay', 'answer']) fs.cpSync(path.join(OUT, c, kind), path.join(OUT, 'h5', kind), {recursive: true});
+  emit('h5', {overlay: [{pkg: OSP.pkg, files: 'overlay/' + OSP.pkg}, {pkg: X10.pkg, files: 'overlay/' + X10.pkg}]}, {
+    culprit: [{pkg: OSP.pkg, name: OSP.name, role: 'broken file (c1)'}, {pkg: X10.pkg, name: X10.name, role: 'its patch writes the misspelled research name (c5)'}],
+    required: [OSP.pkg, X10.pkg],
+    faultClass: 'two faults: xml.type-missing + xml.cross-reference (wrong blame)',
+    files: [`${OSP.pkg}/Defs/ThingDefs/Building_MendingOutfitStand.xml`, `${X10.pkg}/Patches/Stats/Stats_Pawns_General.xml`],
+    fix: 'Both c1 and c5 fixes.',
   });
 }
 

@@ -1,4 +1,4 @@
-# Per run, as the standard user: build the case's Mods folder, ModsConfig.xml and Player.log. param: case id, group (A|B)
+# Per run, as the standard user: build the case's Mods folder, ModsConfig.xml and Player.log. param: case id, group (A|B|N)
 # Every run starts from the snapshot, so Mods\ must be empty (never Remove-Item -Recurse over junctions).
 param([string]$Case, [string]$Group)
 $ErrorActionPreference = 'Stop'
@@ -17,12 +17,12 @@ $ud = "$env:USERPROFILE\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studi
 New-Item -ItemType Directory -Force "$ud\Config" | Out-Null
 Copy-Item "$pkg\ModsConfig.xml" "$ud\Config\ModsConfig.xml" -Force
 Copy-Item "$pkg\Player.log" "$ud\Player.log" -Force
-if ($Group -eq 'A') {
+if ($Group -ne 'N') {   # A (Pi) and B (dsh) both get Archo
   & C:\Eval\tools\archo.exe env add main --game C:\Eval\RimWorld --user-data $ud --launch direct 2>&1 | Out-File C:\Eval\setup-archo.log
   & C:\Eval\tools\archo.exe scan 2>&1 | Out-File -Append C:\Eval\setup-archo.log
 }
 'ready' | Set-Content C:\Eval\case-ready.txt
-if ($Group -eq 'B') {
-  # group B must not find Archo anywhere on disk
+if ($Group -eq 'N') {
+  # group N must not find Archo anywhere on disk
   Remove-Item C:\Eval\tools\archo.exe, C:\Users\Public\archo.exe -Force -EA 0
 }

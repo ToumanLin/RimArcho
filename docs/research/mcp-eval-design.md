@@ -9,9 +9,10 @@ Goal: measure how much `archo mcp` helps an agent find and fix a broken Mod, and
 | Game | RimWorld 1.6.4871 (`D:\rimworld16`; host env `env:1.6`) |
 | Player environment | plan `Test` of env `1.6`: 35 active Mods (Harmony, Archo Monitor, 5 DLCs, VEF, VFE, character/animation/hair Mods). Real Mod library, nothing cleaned: multi-version folders (1.2 to 1.6) stay |
 | Baseline noise (keep it) | `Player.log` already has 10 errors / 2 warnings from Mods that are not part of any task (ReGrowthCore, VTE, ReBuild... `Could not find class ... Trying to use ModSettingsFramework.PatchOperationWorker`). Agents must not blame these |
-| Agent | Pi, model `apikeyfan/deepseek-flash`, same system prompt, same limits (turns, tokens, wall clock) for A and B |
-| Group A | bash + file read/write + `dotnet` + `ilspycmd` + **Archo MCP** (`archo mcp`) |
-| Group B | the same, without Archo MCP and without the `archo` CLI. Gets `Player.log` path, the Mod folders and the game folder |
+| Agent | model `apikeyfan/deepseek-flash` through the magpie gateway, reasoning effort `high`, same task text and wall clock for every group |
+| Group A | Pi 1.4.0: bash + file read/write + `dotnet` + `ilspycmd` + **Archo MCP** (`archo mcp`, exposure `direct`) |
+| Group B (from 2026-11-04) | dsh 0.2.1-rc.5 (DeepSeek Harness, `--profile headless --json`, patch `scripts/mcp-eval/guest/dsh-eval.yml`): its own PowerShell, file and search tools, subagents, todo; the same **Archo MCP** (per-call timeout 15 min; dsh's default 60 s would cut `test_run` off). Web search and fetch, the session-title model call and telemetry are off; no approval prompts (`danger-full-access`, Pi has none either). dsh puts Archo's MCP server instructions into the system prompt; Pi 1.4 drops them (review P10), so the groups do not see the same Archo guidance |
+| Group N (Group B before 2026-11-04) | Pi without Archo MCP and without the `archo` CLI. Gets `Player.log` path, the Mod folders and the game folder. The c1 to c5 matrix (A 15/15, N 10/15) settled this comparison; the 2026-11-04 round compares harnesses on h1, h2 and h5 only |
 | Prompt | "The game logs errors / misbehaves with this Mod list. Find the Mod that causes it, then fix it. Hand in the rewritten XML or the recompiled DLL." No hint about the fault class |
 | Repeats | at least 3 runs per task per group (DeepSeek is stochastic) |
 
@@ -19,7 +20,7 @@ Goal: measure how much `archo mcp` helps an agent find and fix a broken Mod, and
 
 Each run starts from a clean image: the VM snapshot (preferred, no evidence can leak between runs) or, on the host, a fresh copy of the case directory plus an empty `%APPDATA%\RimArcho` and empty `Docs\`. Never run B after A in the same writable state: A leaves `archo.db`, Source-library decompilations and notes.
 
-The VM image has .NET SDK 8, `ilspycmd`, node, Pi and Git for Windows (snapshot `RimArcho-Eval-Staged3`, see Harness status).
+The VM image has .NET SDK 8, `ilspycmd`, Node 26, Pi, dsh and Git for Windows (snapshot `RimArcho-Eval-Staged4` = Staged3 plus Node 26.13.0 and dsh in `C:\Tools\npm`, 2026-11-04; see Harness status).
 
 ## Cases (built 2026-11-02)
 
@@ -34,6 +35,55 @@ Base environment: 34 of the 35 `Test` plan Mods (Archo Monitor removed for both 
 | c5 | Wrong blame | 10x Carrying Capacity gets a "compat" patch that rewrites the research prerequisite of Outfit Stands Plus' stands with a misspelled name | `Could not resolve cross-reference to ResearchProjectDef named OutfitStandsPlus_MechanizedOutfitStandResearch` (looks like an Outfit Stands Plus problem) | 10x Carrying Capacity (decoy: Outfit Stands Plus) | remove or fix the Operation (`...StandsResearch`) |
 
 The multi-version layout of the real Mods stays as it is; c3 and c5 need the agent to edit the folder the game really loads.
+
+### Harder cases (built 2026-11-04)
+
+c1 to c5 all name the culprit in the error line, or one hop from it; group A solved 15 of 15 (2026-11-04 matrix). The harder cases follow fault classes that the public 1.6 logs (40,326, private corpus; aggregate figures only) rarely attribute to their source Mod. Built with `node scripts/mcp-eval/cases.mjs h1 h2 h5`; each was reproduced in the real 1.6.4871 game (host sandbox), and its reference fix removes every injected error line.
+
+| # | Fault class | Injected fault (real Mods) | What the log shows | Right answer: culprit | Right answer: fix |
+| --- | --- | --- | --- | --- | --- |
+| h1 | Cascade from one patch | Vanilla Furniture Expanded's `1.6/Patches/Core.xml` adds `VanillaFurnitureEC.StatParts_Bin` (should be `StatPart_Bin`) to the vanilla `Beauty` StatDef. The type does not resolve, so 1.6 drops the whole StatDef (same shape as the real ReGrowth logs, `Exception loading def from file Biomes_*.xml`) | 1,618 lines: the first error names the vanilla file `Stats_Basics_General.xml` and no Mod; then 1,119 `Could not resolve cross-reference` lines, `Failed to find RimWorld.StatDef named Beauty` and dozens of `Config error in <vanilla Def>: defines the stat base more than once` | Vanilla Furniture Expanded (decoy: Vanilla Expanded Framework) | the class name restored, or the operation removed |
+| h2 | Same-name assembly | The Odyssey Patch (listed before Outfit Stands Plus) ships a stale `1.6/Assemblies/OutfitStandsPlus.dll`, built from Outfit Stands Plus' own source minus the Mending and Mechanized stands (a referenced DLL copied on build). Mono's `Assembly.LoadFrom` gives Outfit Stands Plus the already loaded assembly of that name | `Could not find a type named OutfitStandsPlus.Things.MendingOutfitStand` (and 3 more stands) plus 16 `Config error` lines, although Outfit Stands Plus' own DLL has those types; the Odyssey Patch's texture noise (as in c2) | the Odyssey Patch (decoy: Outfit Stands Plus) | the stale DLL deleted (`delete.json`) or replaced, or Outfit Stands Plus listed first |
+| h5 | Two faults at once | c1 and c5 together | both sets of errors; c5's errors name Outfit Stands Plus, which also has c1's real fault | Outfit Stands Plus and 10x Carrying Capacity | both fixes, each in its own Mod |
+
+Findings made while building them:
+
+- 1.6 looks up XML class names ignoring case (`GenTypes.GetTypeInAnyAssemblyRaw` calls `GetType(name, false, ignoreCase: true)`), so a case-only typo such as `VanillaFurnitureEc` loads cleanly. The ReGrowth logs' `RegrowthCore.BiomesKitControl` failure is therefore not the case difference itself.
+- A missing class in a list item fails the whole Def in 1.6 (`DirectXmlToObjectNew.ResolveTypeForNode` throws), not just the item as the older `DirectXmlToObject` path would.
+
+Pilot `h1-B-0` (dsh + Archo, 20 min limit, Staged4): culprit and fix right in 456 s, 49 model calls, 71 tool calls (Archo 23, `pwsh` 35, no `test_run`), 3.15 M tokens (96% cache reads). It confirmed the typo against the Mod's own `1.5/Patches/Core.xml`, which still has the right name: the multi-version layout leaves a reference copy in h1.
+
+### Round 2: Pi vs dsh, both with Archo (2026-11-04)
+
+18 runs (h1, h2, h5 × A = Pi, B = dsh × 3), 20 min limit, three VMs in parallel (`matrix.ps1`, 81 min), archo built from 5ae03605. Cost at CNY 0.5 / 1.0 / 0.01 per Mtok (input / output / cache read).
+
+| Group | Solved (culprit and fix) | Mean s (median) | Model calls | Tool calls (Archo) | Tokens | Cache hit | Cost per run |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| A Pi | 7/9 | 396 (301) | 32.7 | 43.0 (7.9) | 1.17 M | 95.6% | ¥0.047 |
+| B dsh | 9/9 | 374 (328) | 32.0 | 46.3 (14.8) | 1.66 M | 95.8% | ¥0.066 |
+
+| Case | A Pi | B dsh |
+| --- | --- | --- |
+| h1 cascade | 3/3, 294 s, Archo 11.0 | 3/3, 314 s, Archo 15.7 |
+| h2 same-name DLL | 2/3, 620 s (one timeout), Archo 5.0 | 3/3, 381 s, Archo 7.0 |
+| h5 two faults | 2/3, 274 s, Archo 7.7 | 3/3, 429 s, Archo 21.7 |
+
+The two failures are both Pi's:
+
+- **h2-A-2:** Pi followed the Odyssey Patch's texture noise (the decoy) and ran `grep -r` and `du` over the guest's whole Workshop folder (about 15 GB of subscribed Mods). The call outlived the 20 min limit.
+- **h5-A-2:** Pi fixed both faults but wrote them to `C:\Eval\work\submit` (relative to its working folder), then reported `C:\Eval\submit`, so nothing was handed in.
+
+dsh calls Archo about twice as often (14.8 against 7.9 per run) and uses 40% more tokens. Both groups ran `test_run` about once per run.
+
+With 3 runs per cell, the 9/9 against 7/9 difference is within chance. Accuracy does not separate the harnesses yet; the integration differences listed under Fixed conditions (server instructions, sandbox, runtime) weigh more.
+
+Fixes and findings from the round:
+
+- **Grader, BOM:** dsh writes JSON through Windows PowerShell 5, which adds a BOM and makes a one-item list a bare string. `grade.mjs` and `sandbox.mjs` now accept both. h1-B-1 was re-scored from its log; h2-B-3 was graded again after a crash.
+- **Leak:** agents can read their own transcript at `C:\Eval\out\transcript.jsonl` (h2-A-2 grepped it). No result depends on it; move the output out of the guest's reach before the next round.
+- **h1 shortcut:** its `1.5/Patches/Core.xml` keeps the right class name, which some runs used to confirm the typo.
+
+The submission format gained `delete.json` (files to remove, `<packageId>/<path>`), which h2's root fix needs; `task.md` describes it for every case. The time limit in `task.md` now follows `run-case.ps1 -Minutes`. Grading rules: h2 accepts a change under the Odyssey Patch's `1.6/Assemblies/` (a deletion counts) or `ModsConfig.xml`, with both Mods still enabled; h5 needs a change in each of the two Mods (`touchAll`).
 
 ## Grading
 

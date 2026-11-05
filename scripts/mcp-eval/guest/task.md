@@ -9,10 +9,11 @@ You have PowerShell, the .NET SDK (`dotnet`) and `ilspycmd` (a decompiler). The 
 ## What to hand in
 
 - Save every file you changed or rebuilt under `C:\Eval\submit`, at `<packageId>\<path inside that mod's folder>`. For example `C:\Eval\submit\some.package.id\Defs\Things.xml`, or a rebuilt assembly at `C:\Eval\submit\some.package.id\1.6\Assemblies\Some.dll`. A changed list of active mods goes to `C:\Eval\submit\ModsConfig.xml`.
+- To remove a file from a mod, list it in `C:\Eval\submit\delete.json`: `["<packageId>/<path inside that mod's folder>"]`.
 - Then write `C:\Eval\submit\answer.json`:
 
 ```json
 {"culprit": ["<packageId of each mod responsible>"], "explanation": "<one or two sentences>"}
 ```
 
-Your work is checked by starting the game with your files applied. You have about 15 minutes.
+Your work is checked by starting the game with your files applied. You have about {MINUTES} minutes.

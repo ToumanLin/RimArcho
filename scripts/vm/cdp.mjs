@@ -17,7 +17,8 @@ export async function connect(addr, { timeoutMs = 15000 } = {}) {
   const pending = new Map(), listeners = [];
   const rejectAll = why => { for (const p of pending.values()) { clearTimeout(p.timer); p.fail(Error(why)); } pending.clear(); };
   ws.onclose = () => rejectAll('DevTools disconnected');
-  ws.onerror = () => rejectAll('DevTools WebSocket error');
+  // an error on the open socket ends it; Node 26 fires it before close when the peer goes away
+  ws.onerror = () => rejectAll('DevTools disconnected (WebSocket error)');
   ws.onmessage = m => {
     const d = JSON.parse(m.data), p = pending.get(d.id);
     if (p) { clearTimeout(p.timer); pending.delete(d.id); d.error ? p.fail(Error(`${p.method}: ${JSON.stringify(d.error)}`)) : p.ok(d); }

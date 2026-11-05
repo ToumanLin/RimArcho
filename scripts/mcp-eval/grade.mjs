@@ -8,13 +8,19 @@ import {judge} from './logdiff.mjs';
 const ROOT = 'D:/RimArcho-test/mcp-eval';
 // A clean log is not enough: disabling the broken Mod, or patching around it elsewhere, also clears the log.
 //   keepEnabled: Mods that must stay in the active list; touch: the submission must change files under one of these prefixes
-//   (matched case-insensitively against `<packageId>/...`); `ModsConfig.xml` alone counts where the list is the fix.
+//   (matched case-insensitively against `<packageId>/...`, delete.json entries included); `ModsConfig.xml` alone counts
+//   where the list is the fix. touchAll: every prefix must be changed (one fault per prefix).
 const RULES = {
   c1: {keepEnabled: ['khamenman.OutfitStandsPLus'], touch: ['khamenman.OutfitStandsPLus/']},
   c2: {keepEnabled: ['khamenman.OutfitStandsPLus'], touch: ['khamenman.OutfitStandsPLus/', 'odysseypatch.1trickPwnyta/', 'ModsConfig.xml']},
   c3: {keepEnabled: ['DarkDaskin.SmartFirefight'], touch: ['DarkDaskin.SmartFirefight/1.6/Assemblies/']},   // the fault is in the DLL: it must be rebuilt
   c4: {keepEnabled: ['OskarPotocki.VanillaFactionsExpanded.Core'], touch: ['ModsConfig.xml']},
   c5: {keepEnabled: ['mlie.10xcarryingcapacity'], touch: ['mlie.10xcarryingcapacity/']},                       // patching Outfit Stands Plus would hide the symptom only
+  h1: {keepEnabled: ['vanillaexpanded.vfecore'], touch: ['vanillaexpanded.vfecore/']},
+  // the stale DLL can go (delete.json), be replaced, or lose the race (Outfit Stands Plus listed first)
+  h2: {keepEnabled: ['khamenman.OutfitStandsPLus', 'odysseypatch.1trickPwnyta'], touch: ['odysseypatch.1trickPwnyta/1.6/Assemblies/', 'ModsConfig.xml']},
+  // touchAll: each fault is fixed where it is
+  h5: {keepEnabled: ['khamenman.OutfitStandsPLus', 'mlie.10xcarryingcapacity'], touch: [], touchAll: ['khamenman.OutfitStandsPLus/', 'mlie.10xcarryingcapacity/']},
 };
 const resDir = path.resolve(process.argv[2]); const name = path.basename(resDir); const caseId = name.split('-')[0];
 const caseDir = `${ROOT}/cases/${caseId}`; const key = JSON.parse(fs.readFileSync(`${caseDir}/answer.json`, 'utf8'));
@@ -22,8 +28,10 @@ const layer = `${ROOT}/graded/${name}/layer`; fs.rmSync(`${ROOT}/graded/${name}`
 const result = {run: name, culprit: null, fix: null};
 
 if (fs.existsSync(`${resDir}/submit.zip`)) execFileSync('C:/Windows/System32/tar.exe', ['-xf', `${resDir}/submit.zip`, '-C', layer]);
-let answer = null; try { answer = JSON.parse(fs.readFileSync(`${layer}/answer.json`, 'utf8')); fs.rmSync(`${layer}/answer.json`); } catch {}
-const named = new Set((answer?.culprit || []).map(p => String(p).toLowerCase()));
+// a BOM is common (Windows PowerShell 5 writes UTF-8 with one) and JSON.parse rejects it
+const readJson = f => JSON.parse(fs.readFileSync(f, 'utf8').trimStart());
+let answer = null; try { answer = readJson(`${layer}/answer.json`); fs.rmSync(`${layer}/answer.json`); } catch {}
+const named = new Set([].concat(answer?.culprit || []).map(p => String(p).toLowerCase()));
 result.culpritNamed = [...named];
 result.culprit = key.required.every(p => named.has(p.toLowerCase()));
 result.culpritVia = result.culprit ? 'list' : null;
@@ -44,10 +52,13 @@ else {
   const j = judge(caseDir, log);
   result.fixClean = j.stillBroken.length === 0; result.newErrors = j.stillBroken.slice(0, 8);
   const rule = RULES[caseId] || {keepEnabled: [], touch: []};
-  const sub = result.submitted.map(f => f.replaceAll('\\', '/').toLowerCase());
+  // a deleted file counts as a change at its path
+  const deleted = fs.existsSync(`${layer}/delete.json`) ? [].concat(readJson(`${layer}/delete.json`)).map(String) : [];
+  const sub = [...result.submitted, ...deleted].map(f => f.replaceAll('\\', '/').toLowerCase());
   const cfg = sub.includes('modsconfig.xml') ? fs.readFileSync(`${layer}/ModsConfig.xml`, 'utf8').toLowerCase() : null;
   const stillOn = rule.keepEnabled.every(p => cfg === null || cfg.includes(`<li>${p.toLowerCase()}</li>`));
-  const touched = rule.touch.length === 0 || rule.touch.some(t => sub.some(f => f.startsWith(t.toLowerCase())));
+  const hit = t => sub.some(f => f.startsWith(t.toLowerCase()));
+  const touched = (rule.touch.length === 0 || rule.touch.some(hit)) && (rule.touchAll || []).every(hit);
   result.fix = result.fixClean && stillOn && touched;
   if (result.fixClean && !result.fix) result.fixNote = !stillOn ? 'log is clean only because the broken Mod was disabled' : 'log is clean but the fault was not fixed where it is (workaround elsewhere)';
 }
