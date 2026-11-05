@@ -38,6 +38,88 @@ func TestParsePastedStack(t *testing.T) {
 	}
 }
 
+// Unity's "Type:Method (args)" stacks in a 1.6 log: the stack Unity adds to every message when
+// full stack traces are on (logger frames dropped, the rest caller frames), Unity's own exception
+// stack after "[Ref X] Duplicate stacktrace" (exception frames), and a mod message with a stack
+// (caller frames, still not interesting). No frame line becomes an entry of its own.
+func TestParseUnityStacks(t *testing.T) {
+	text := "RimWorld 1.6.4633 rev1261\n" +
+		"Initializing new game\n" +
+		"UnityEngine.StackTraceUtility:ExtractStackTrace ()\n" +
+		"UnityEngine.DebugLogHandler:LogFormat (UnityEngine.LogType,UnityEngine.Object,string,object[])\n" +
+		"UnityEngine.Logger:Log (UnityEngine.LogType,object)\n" +
+		"UnityEngine.Debug:Log (object)\n" +
+		"Verse.Log:Message (string)\n" +
+		"Verse.Root/<>c:<Start>b__10_1 ()\n" +
+		"\n" +
+		"Error in static constructor of ModA.Boot: System.TypeInitializationException: The type initializer for 'ModA.Boot' threw an exception.\n" +
+		"[Ref 5CA72C60]\n" +
+		"  at Verse.StaticConstructorOnStartupUtility.CallAll () [0x00025] in <cb53cd4422904947932d33f561ad8d15>:0 \n" +
+		"UnityEngine.StackTraceUtility:ExtractStackTrace ()\n" +
+		"UnityEngine.Debug:LogError (object)\n" +
+		"Verse.Log:Error (string)\n" +
+		"Verse.StaticConstructorOnStartupUtility:CallAll ()\n" +
+		"(wrapper dynamic-method) MonoMod.Utils.DynamicMethodDefinition:Verse.Root.Update_Patch1 (Verse.Root)\n" +
+		"\n" +
+		"ArgumentOutOfRangeException: Index was out of range. Must be non-negative and less than the size of the collection.\n" +
+		"Parameter name: index\n" +
+		"[Ref DA333A7B] Duplicate stacktrace, see ref for original\n" +
+		"UnityEngine.GameObject:AddComponent(Type)\n" +
+		"ModB.Shots:<Make>b__3_0()\n" +
+		"System.Collections.Generic.List`1<Verse.Thing>:ForEach(System.Action`1<Verse.Thing>)\n" +
+		"System.Threading.Tasks.Parallel/<>c__DisplayClass33_0`2<System.Type, object>:<ForEachWorker>b__0 (int)\n" +
+		"HarmonyLib.CollectionExtensions:Do<System.Type> (System.Collections.Generic.IEnumerable`1<System.Type>,System.Action`1<System.Type>)\n" +
+		"MonoMod.Utils.DynamicMethodDefinition:Verse.Map.MapUpdate_Patch2(Map)\n" +
+		"\n" +
+		"GAGARIN: cache disabled\n" +
+		"Gagarin.LoadableXmlAsset_Constructor_Patch:Process():0\n"
+	f, err := Parse(strings.NewReader(text))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(f.Entries) != 5 {
+		for _, e := range f.Entries {
+			t.Logf("entry %q", e.Message)
+		}
+		t.Fatalf("entries %d, want 5", len(f.Entries))
+	}
+	msg, sc, exc, mod := f.Entries[1], f.Entries[2], f.Entries[3], f.Entries[4]
+	if len(msg.Frames) != 1 || !msg.Frames[0].Caller || msg.Top().Type != "Verse.Root" || msg.Top().Method != "Start" {
+		t.Fatalf("message frames %+v", msg.Frames)
+	}
+	if ok, _ := interesting(msg); ok {
+		t.Fatal("a message with a full stack trace is not a problem")
+	}
+	if len(sc.Frames) != 3 || sc.Frames[0].Caller || !sc.Frames[1].Caller || !sc.Frames[2].Caller ||
+		sc.Frames[2].Type != "Verse.Root" || sc.Frames[2].Method != "Update" || !sc.Frames[2].Patched {
+		t.Fatalf("static constructor frames %+v", sc.Frames)
+	}
+	want := [][2]string{{"UnityEngine.GameObject", "AddComponent"}, {"ModB.Shots", "Make"}, {"System.Collections.Generic.List`1", "ForEach"},
+		{"System.Threading.Tasks.Parallel", "ForEachWorker"}, {"HarmonyLib.CollectionExtensions", "Do"}, {"Verse.Map", "MapUpdate"}}
+	if !exc.Dup || len(exc.Frames) != len(want) {
+		t.Fatalf("exception frames %+v", exc.Frames)
+	}
+	for i, w := range want {
+		if fr := exc.Frames[i]; fr.Caller || fr.Type != w[0] || fr.Method != w[1] {
+			t.Errorf("frame %d = %s.%s caller %v, want %s.%s", i, fr.Type, fr.Method, fr.Caller, w[0], w[1])
+		}
+	}
+	if !exc.Frames[5].Patched || Classify(exc) != ClassException {
+		t.Fatalf("patched %v class %s", exc.Frames[5].Patched, Classify(exc))
+	}
+	if len(mod.Frames) != 1 || !mod.Frames[0].Caller || mod.Top().Type != "Gagarin.LoadableXmlAsset_Constructor_Patch" {
+		t.Fatalf("mod message frames %+v", mod.Frames)
+	}
+	if ok, _ := interesting(mod); ok {
+		t.Fatal("a mod's status message with a stack is not a problem")
+	}
+	for _, c := range Clusters(f) {
+		if strings.Contains(c.Template, ":") && !strings.Contains(c.Template, " ") {
+			t.Errorf("a frame line became a cluster: %q", c.Template)
+		}
+	}
+}
+
 // A 1.7 (Waylith) log: levels, logger frames removed from the caller stack, the exception stack
 // kept apart from the caller stack, the .NET 10 Harmony line form, INFO lines not clustered.
 func TestParseWaylith(t *testing.T) {

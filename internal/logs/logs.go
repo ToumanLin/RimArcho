@@ -83,7 +83,7 @@ type Frame struct {
 	Type    string // declaring type, compiler-generated parts removed; '+' kept for nesting
 	Method  string
 	Patched bool // a Harmony replacement (wrapper dynamic-method …_PatchN)
-	Caller  bool // Waylith: a frame of the stack that logged the message, not of an exception
+	Caller  bool // a frame of the stack that logged the message, not of an exception (Waylith, Unity's full stack traces)
 	Harmony []Patch
 }
 
@@ -102,6 +102,9 @@ type Entry struct {
 	Ref     string // "[Ref X]" this entry defines or points to
 	Dup     bool   // "Duplicate stacktrace, see ref for original"
 	Level   string // Waylith: INFO, WARN, ERROR …; "" for Unity logs, which carry no level
+	// unityCaller: a Unity "Type:Method (args)" stack began with StackTraceUtility:ExtractStackTrace,
+	// so its frames are the logging call's stack, not the exception's.
+	unityCaller bool
 }
 
 // File is a parsed log.
@@ -119,11 +122,15 @@ var (
 	wrapperRe = regexp.MustCompile(`^\s*(?:at )?\(wrapper ([\w-]+)\) (.+?)(?:\s*\(.*)?$`)
 	patchRe   = regexp.MustCompile(`^\s*- (PREFIX|POSTFIX|TRANSPILER|FINALIZER|ILMANIPULATOR) ([^:]+): (?:\S+ )?([^\s:(]+):([\w<>.` + "`" + `]+)\(`)
 	// A frame without "at " (inner exception stacks): Ns.Type.Method(args) or Ns.Type..ctor(args)
-	bareFrameRe   = regexp.MustCompile(`^([A-Za-z_][\w+<>` + "`" + `]*(?:\.[\w+<>` + "`" + `]+)*\.\.?[\w<>` + "`" + `]+) ?\([^()]*\)\s*$`)
-	refRe         = regexp.MustCompile(`^\[Ref ([0-9A-Fa-f]+)\]( Duplicate stacktrace)?`)
-	patchNumRe    = regexp.MustCompile(`_Patch\d+$`)
-	genericArgsRe = regexp.MustCompile(`\[[^\[\]]*\]`)
-	versionRe     = regexp.MustCompile(`RimWorld (\d+\.\d+\.\d+ rev\d+)`)
+	bareFrameRe = regexp.MustCompile(`^([A-Za-z_][\w+<>` + "`" + `]*(?:\.[\w+<>` + "`" + `]+)*\.\.?[\w<>` + "`" + `]+) ?\([^()]*\)\s*$`)
+	// Unity's own stack format: "Ns.Type/Nested:Method (args)", "List`1<Verse.Thing>:Add(Thing)",
+	// "MonoMod.Utils.DynamicMethodDefinition:Verse.Root.Update_Patch1 (Verse.Root)"; some end ":0".
+	unityFrameRe   = regexp.MustCompile(`^([A-Za-z_][\w.` + "`" + `/+<>-]*(?:, [\w.` + "`" + `/+<>-]+)*):([\w.<>` + "`" + `|$-]+(?:, [\w.` + "`" + `/+<>-]+)*) ?\([^()]*\)(?::\d+)?\s*$`)
+	unityGenericRe = regexp.MustCompile(`([\w` + "`" + `])<[^<>]*>`)
+	refRe          = regexp.MustCompile(`^\[Ref ([0-9A-Fa-f]+)\]( Duplicate stacktrace)?`)
+	patchNumRe     = regexp.MustCompile(`_Patch\d+$`)
+	genericArgsRe  = regexp.MustCompile(`\[[^\[\]]*\]`)
+	versionRe      = regexp.MustCompile(`RimWorld (\d+\.\d+\.\d+ rev\d+)`)
 
 	waylithLineRe  = regexp.MustCompile(`^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d+ +([A-Z]+) (?:\[[^\]]*\] )?(.*)$`)
 	waylithVerRe   = regexp.MustCompile(`^Version:\s+(\d+\.\d+\.\d+)\.(\d+)`)
@@ -131,10 +138,45 @@ var (
 	waylithPatchRe = regexp.MustCompile(`^\s*- (PREFIX|POSTFIX|TRANSPILER|FINALIZER|ILMANIPULATOR) ([^:]+): \S+ <- (.*)$`)
 )
 
-// loggerFrame reports a Waylith caller frame of the logging system itself.
+// loggerFrame reports a caller frame of the logging system itself.
 func loggerFrame(t string) bool {
 	t = strings.TrimPrefix(t, ".")
-	return strings.HasPrefix(t, "Brutal.Logging.") || t == "Verse.Log"
+	switch t {
+	case "Verse.Log", "UnityEngine.StackTraceUtility", "UnityEngine.DebugLogHandler", "UnityEngine.Logger", "UnityEngine.Debug":
+		return true
+	}
+	return strings.HasPrefix(t, "Brutal.Logging.")
+}
+
+// unityCallerFrame reports whether the next Unity-format frame of e belongs to the logging call:
+// after StackTraceUtility:ExtractStackTrace, or under a message that is not an exception. Unity's
+// own exception stacks ("ArgumentOutOfRangeException: …", "[Ref X] Duplicate stacktrace", frames)
+// stay exception frames.
+func unityCallerFrame(e *Entry) bool {
+	return e.unityCaller || e.Ref == "" && !hasExceptionStack(e) && !strings.Contains(e.Message, "Exception")
+}
+
+// unityMember turns Unity's "Type:Method" into the Mono form splitMember reads:
+// "Verse.Root/<>c:<Start>b__10_1" → "Verse.Root+<>c.<Start>b__10_1"; generic arguments go;
+// a Harmony replacement "MonoMod.Utils.DynamicMethodDefinition:Verse.Root.Update_Patch1" keeps
+// only the patched method's name.
+func unityMember(s string) string {
+	typ, method, _ := strings.Cut(s, ":")
+	if i := strings.IndexByte(method, '<'); i > 0 {
+		method = method[:i] // Do<System.Type>
+	}
+	if strings.HasSuffix(typ, "DynamicMethodDefinition") && strings.Contains(method, ".") {
+		return method
+	}
+	typ = strings.ReplaceAll(typ, "/", "+")
+	for {
+		t := unityGenericRe.ReplaceAllString(typ, "$1")
+		if t == typ {
+			break
+		}
+		typ = t
+	}
+	return typ + "." + strings.TrimPrefix(method, ".") // .ctor
 }
 
 func isContinuation(l string) bool {
@@ -154,7 +196,7 @@ func isContinuation(l string) bool {
 		strings.HasPrefix(l, "<0x") && strings.Contains(l, "> <unknown method>"):
 		return true
 	}
-	return bareFrameRe.MatchString(l)
+	return bareFrameRe.MatchString(l) || unityFrameRe.MatchString(l)
 }
 
 // Parse reads a Player.log. Very long lines (XML dumps) are cut at 4 KiB.
@@ -387,8 +429,24 @@ func addLine(e *Entry, l string) {
 		}
 		return
 	}
+	if m := unityFrameRe.FindStringSubmatch(l); m != nil {
+		s := unityMember(m[1] + ":" + m[2])
+		fr := Frame{Text: strings.TrimSpace(l), Patched: patchNumRe.MatchString(s), Caller: unityCallerFrame(e)}
+		fr.Type, fr.Method = splitMember(dedupePatched(s))
+		if loggerFrame(fr.Type) {
+			// StackTraceUtility:ExtractStackTrace heads the stack Unity adds to every message when
+			// the player turns full stack traces on.
+			e.unityCaller = e.unityCaller || fr.Type == "UnityEngine.StackTraceUtility"
+			return
+		}
+		e.Frames = append(e.Frames, fr)
+		return
+	}
 	if m := wrapperRe.FindStringSubmatch(l); m != nil {
 		fr := Frame{Text: strings.TrimSpace(l)}
+		if strings.Contains(m[2], ":") { // Unity's format, inside a Unity stack
+			m[2], fr.Caller = unityMember(m[2]), unityCallerFrame(e)
+		}
 		if m[1] == "dynamic-method" {
 			fr.Type, fr.Method = splitMember(dedupePatched(m[2]))
 			fr.Patched = true
@@ -560,7 +618,7 @@ var xmlRe = regexp.MustCompile(`XML error|XmlException|Exception parsing|Could n
 // 1.6 writes Log.Error without a stack, and these lines hold none of the problem words of
 // interesting; the corpus has 124,268 such lines naming mod types (2026-11-05).
 func GameError(e *Entry) bool {
-	if len(e.Frames) > 0 || !strings.HasPrefix(e.Message, "Tried to ") {
+	if hasExceptionStack(e) || !strings.HasPrefix(e.Message, "Tried to ") {
 		return false
 	}
 	for _, t := range typeTokRe.FindAllString(e.Message, -1) {
