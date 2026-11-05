@@ -21,6 +21,7 @@ const (
 	TaskAccount          = "account-operation"
 	TaskSiteDownload     = "site-download"
 	TaskAnalyze          = "analyze"
+	TaskSaves            = "saves" // the Saves page's full read of the saves (06 §2.11, 10 §1.7)
 	TaskPack             = "pack"
 	TaskTextures         = OpTextures
 	TaskTexClean         = OpTexClean
@@ -173,6 +174,8 @@ func TaskTitle(kind string) string {
 		return T("scan the mods")
 	case TaskAnalyze:
 		return T("check whether it runs")
+	case TaskSaves:
+		return T("read the saves")
 	case TaskPack:
 		return T("create a pack")
 	case TaskDownload:
@@ -529,6 +532,8 @@ func taskTarget(t *app.Task) string {
 		return PageChanges
 	case TaskAnalyze:
 		return PageNeeds
+	case TaskSaves:
+		return PageSaves
 	case TaskPack:
 		if t.State == app.TaskDone && t.Target != "" {
 			return "pack:" + t.Target
@@ -557,13 +562,16 @@ func TaskTargetName(target string) string {
 		return T("game")
 	case target == PageSettings:
 		return T("settings")
+	case target == PageSaves:
+		return T("saves")
 	}
 	return T("mod library")
 }
 
 // TaskCanStop says which self tasks stop part way (a pack build, a texture run).
 func TaskCanStop(kind string) bool {
-	return kind == TaskSourceDecompile || kind == TaskSourceClean || kind == TaskCreditReplace || kind == TaskPack || kind == TaskTextures || kind == TaskTexClean
+	return kind == TaskSourceDecompile || kind == TaskSourceClean || kind == TaskCreditReplace || kind == TaskPack || kind == TaskTextures || kind == TaskTexClean ||
+		kind == TaskSaves
 }
 
 // handedOver counts the items a new task took over.

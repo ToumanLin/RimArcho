@@ -12,8 +12,9 @@ import (
 
 // Saves (06 §2.11, 10 §4): the left card's colonies and their saves, and the selected
 // save's middle card (where it belongs, can it load, its Mod list) and right card (the
-// playthrough). Everything here comes from the save head (10 §1.7 L0) and the list it
-// matched; play facts wait for the full read (L1) and are left empty, never made up.
+// playthrough). The left card and the middle card come from the save head (10 §1.7 L0)
+// and the list it matched; the right card comes from the full read (L1, SavePlayOf) and is
+// left empty until the save is read, never made up.
 
 // PageSaves is the Saves page under Library (06 §2.1).
 const PageSaves = "saves"
@@ -40,9 +41,11 @@ type SaveColonyRow struct {
 type SaveRow struct {
 	Ref  string `json:"ref"`
 	Name string `json:"name"`
-	// When is the in-game day once the full read knows it, else the date it was saved.
-	When string `json:"when"`
-	Auto bool   `json:"auto,omitempty"`
+	// When is the in-game day once the full read knows it, else the date it was saved;
+	// Saved is that date when When is the day (the row's hover text).
+	When  string `json:"when"`
+	Saved string `json:"saved,omitempty"`
+	Auto  bool   `json:"auto,omitempty"`
 }
 
 // SavesRows makes the left card from a listing.
@@ -54,7 +57,11 @@ func SavesRows(l *app.SaveList) *SavesPage {
 	for _, c := range l.Colonies {
 		row := SaveColonyRow{Key: c.Key, Name: colonyName(c), Saves: []SaveRow{}}
 		for _, s := range c.Saves {
-			row.Saves = append(row.Saves, SaveRow{Ref: s.Ref, Name: s.Name, When: saveWhen(s), Auto: s.Auto})
+			r := SaveRow{Ref: s.Ref, Name: s.Name, When: saveWhen(s), Auto: s.Auto}
+			if d, ok := SaveDay(s); ok {
+				r.Saved, r.When = r.When, Tf("day %d", d)
+			}
+			row.Saves = append(row.Saves, r)
 		}
 		p.Saves += len(c.Saves)
 		p.Colonies = append(p.Colonies, row)
@@ -78,12 +85,21 @@ func colonyName(c *app.Colony) string {
 	return c.Name
 }
 
-// saveWhen is a save row's time: the date it was saved (the in-game day comes with L1).
+// saveWhen is the date a save was written.
 func saveWhen(s *app.Save) string {
 	if s.ModTime.IsZero() {
 		return ""
 	}
 	return ShortDate(s.ModTime)
+}
+
+// SaveDay is a save's in-game day from its full read's summary; false while it is not
+// read, or when a malformed file broke off before its time.
+func SaveDay(s *app.Save) (int, bool) {
+	if s.Summary == nil || s.Summary.Malformed && s.Summary.Ticks == 0 {
+		return 0, false
+	}
+	return s.Summary.Day, true
 }
 
 // SavesMatching lists the colonies whose saves hold a Mod whose packageId or name contains
@@ -152,9 +168,11 @@ type SaveDetail struct {
 	// Locked says why Rename and Recycle are off now (a game runs, the file is written).
 	Locked string `json:"locked,omitempty"`
 
-	// The right card. Play is nil until the full read (L1) has read the file; PlayNote
-	// then says why the card has no facts yet.
+	// The right card. Play is nil until the full read (L1) has read the file: Reading
+	// says it is being read (the card shows skeletons), else PlayNote says why it has no
+	// facts.
 	Play     *SavePlay `json:"play,omitempty"`
+	Reading  bool      `json:"reading,omitempty"`
 	PlayNote string    `json:"playNote,omitempty"`
 }
 
@@ -190,48 +208,11 @@ type SaveModView struct {
 	Moved   bool `json:"moved,omitempty"`
 }
 
-// SavePlay is the playthrough at this save, from the full read (10 §4.3 Play facts,
-// §4.5). Not filled yet: the L1 reader (savefile scan) supplies it.
-type SavePlay struct {
-	Day         string          `json:"day,omitempty"` // "day 214, 5th of Aprimay 5502"
-	Storyteller string          `json:"storyteller,omitempty"`
-	Difficulty  string          `json:"difficulty,omitempty"`
-	Played      string          `json:"played,omitempty"` // real play time
-	Biome       string          `json:"biome,omitempty"`
-	Stats       []SaveStat      `json:"stats,omitempty"`
-	Colonists   []SaveColonist  `json:"colonists,omitempty"`
-	Events      []string        `json:"events,omitempty"`
-	Timeline    []SaveTimepoint `json:"timeline,omitempty"`
-}
-
-// SaveStat is one number at this save and its change since the colony's previous save.
-type SaveStat struct {
-	Label  string `json:"label"`
-	Value  string `json:"value"`
-	Change string `json:"change,omitempty"`
-}
-
-// SaveColonist is one colonist; the dead are struck through.
-type SaveColonist struct {
-	Name string `json:"name"`
-	Dead bool   `json:"dead,omitempty"`
-}
-
-// SaveTimepoint is one save of the colony on the timeline; a click opens it.
-type SaveTimepoint struct {
-	Ref    string  `json:"ref"`
-	Day    int     `json:"day"`
-	Wealth float64 `json:"wealth"`
-	People int     `json:"people"`
-	Deaths int     `json:"deaths,omitempty"`
-}
-
 // SaveDetailOf makes the middle and right cards from a load check; running: a game runs.
 func SaveDetailOf(c *app.SaveCheck, running bool) *SaveDetail {
 	s := c.Save
 	d := &SaveDetail{Ref: s.Ref, Name: s.Name, File: s.File, Path: s.Path, Folder: filepath.Dir(s.Path), Prefix: s.Prefix,
-		Auto: s.Auto, Size: SizeText(s.Size), Bytes: s.Size, Issues: []SaveIssueView{}, Mods: []SaveModView{}, ListOnly: []string{},
-		PlayNote: T("play facts (day, storyteller, colonists, wealth, events) come with the full read of the save, which RimArcho does not do yet")}
+		Auto: s.Auto, Size: SizeText(s.Size), Bytes: s.Size, Issues: []SaveIssueView{}, Mods: []SaveModView{}, ListOnly: []string{}}
 	if s.Colony != nil {
 		d.Colony = colonyName(s.Colony)
 	}

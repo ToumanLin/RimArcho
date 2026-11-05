@@ -127,8 +127,8 @@ func TestSaveDetail(t *testing.T) {
 	if d.ListKind != "list" || d.List != "default" || d.ListID == 0 || d.Match != "the same Mods as a version of this list" || d.Game != "1.6.4633 rev1261" || d.Env == "" {
 		t.Fatalf("where it belongs: %+v", d)
 	}
-	if d.Play != nil || d.PlayNote == "" {
-		t.Fatal("play facts before the full read")
+	if d.Play != nil || d.Reading || d.PlayNote != "" {
+		t.Fatal("play facts from the head: the right card is the caller's (gui savePlay)")
 	}
 
 	// Mods missing and reordered: one row each, with its consequence and its own fix

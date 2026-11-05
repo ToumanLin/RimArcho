@@ -1,12 +1,14 @@
 package gui
 
 import (
+	"context"
 	"errors"
 	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/savefile"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -17,6 +19,15 @@ import (
 // Selecting a save checks it against its list (SaveDetail, milliseconds). Actions run on
 // the window's session: fixes edit the save's list (one undo step), file actions change
 // the save's folder (rename, copy) or copy and recycle after the player confirmed.
+//
+// The full read (10 §1.7 L1): after a listing that has saves not read yet, the background
+// task "saves" runs `archo saves index` in a child process, the selected save first, and
+// the page hears of what it read through "saves-read" events (relisted at most once a
+// second, so rows get their day and colonies regroup by world). The selected save never
+// waits for that run: SaveDetail of a save not read yet returns at once with skeletons
+// and reads that one save on its own session in a goroutine (readSelected), then sends
+// "saves-read" with its ref. The page holds the facts of the selected save and of its
+// colony's previous read save only (savesState.facts); listings carry summaries.
 
 // savesState is the page's reader and its last listing. Lock order: read.mu, then mu.
 type savesState struct {
@@ -24,6 +35,42 @@ type savesState struct {
 	mu   sync.Mutex
 	list *app.SaveList // the last listing: the saves that checks and actions name by ref
 	seq  uint64        // the newest listing asked for
+
+	// The full read.
+	stop    context.CancelFunc         // the background run's stop; nil when none runs
+	closed  bool                       // the window is closing: nothing new starts or is sent
+	jobs    sync.WaitGroup             // the run, the selected save's read and a pending event
+	facts   map[string]*savefile.Facts // by factsKey: the selected save's and its previous one's
+	failed  map[string]string          // by factsKey: why the selected save could not be read
+	reading string                     // factsKey of the save readSelected reads now ("" none)
+	next    *app.Save                  // the newest selection waiting for readSelected
+	fresh   []string                   // refs read since the last "saves-read" event
+	line    string                     // the run's newest progress, for the status line
+	dirty   bool                       // saves were read since the page was last relisted
+	timer   *time.Timer                // the next "saves-read" event, when one is due
+	sent    time.Time                  // when the last event went
+	listed  time.Time                  // when the page was last listed
+	// runner replaces the background run's child process (tests); set before use.
+	runner func(ctx context.Context, first []string, progress func(string)) error
+}
+
+// Throttles of the "saves-read" event (06 §2.16.1 G20): news at most every half second
+// (the selected save's own read at once), the listing at most once a second.
+const (
+	savesNewsEvery = 500 * time.Millisecond
+	savesListEvery = time.Second
+)
+
+// SavesReadEvent is the full read's news for the page: the saves read since the last
+// event (Refs), the run's progress for the status line (Line), the listing again with
+// their days and colonies (Page; nil when not relisted this time), and the run's end.
+type SavesReadEvent struct {
+	Refs  []string        `json:"refs,omitempty"`
+	Line  string          `json:"line,omitempty"`
+	Page  *view.SavesPage `json:"page,omitempty"`
+	Done  bool            `json:"done,omitempty"`
+	Text  string          `json:"text,omitempty"`
+	Error string          `json:"error,omitempty"`
 }
 
 // SavesEvent is a listing as the "saves" event carries it.
@@ -58,23 +105,28 @@ func (s *API) savesSession() (*app.App, error) {
 }
 
 // SavesRead starts reading every save's head; the result is a "saves" event with this
-// request number (an older one is dropped by the page). It returns at once.
-func (s *API) SavesRead(request uint64) bool {
+// request number (an older one is dropped by the page). It returns at once. When saves
+// are not read in full yet, the background read starts with first (the page's selected
+// save; "" or gone: the save the page selects, the first colony's newest).
+func (s *API) SavesRead(request uint64, first string) bool {
 	s.saves.mu.Lock()
 	if request > s.saves.seq {
 		s.saves.seq = request
 	}
 	s.saves.mu.Unlock()
 	go func() {
-		ev := s.listSaves(request)
+		ev, l := s.listSaves(request)
 		s.send("saves", ev)
+		if l != nil {
+			s.startSavesIndex(l, first)
+		}
 	}()
 	return true
 }
 
 // listSaves reads the listing on the page's reader. A request older than the newest one
 // asked for is not read at all.
-func (s *API) listSaves(request uint64) *SavesEvent {
+func (s *API) listSaves(request uint64) (*SavesEvent, *app.SaveList) {
 	ev := &SavesEvent{Request: request}
 	w := &s.saves.read
 	w.mu.Lock()
@@ -85,23 +137,24 @@ func (s *API) listSaves(request uint64) *SavesEvent {
 	s.saves.mu.Unlock()
 	if stale {
 		ev.Error = "stale"
-		return ev
+		return ev, nil
 	}
 	r, err := s.savesSession()
 	if err != nil {
 		ev.Error = err.Error()
-		return ev
+		return ev, nil
 	}
 	l, err := r.ListSaves()
 	if err != nil {
 		ev.Error = err.Error()
-		return ev
+		return ev, nil
 	}
 	s.saves.mu.Lock()
 	s.saves.list = l
+	s.saves.listed = time.Now()
 	s.saves.mu.Unlock()
 	ev.Page = view.SavesRows(l)
-	return ev
+	return ev, l
 }
 
 // SavesSearch is the colonies whose saves hold a Mod matching q (06 §2.11): the page
@@ -146,7 +199,9 @@ func (s *API) SaveDetail(ref string) (*view.SaveDetail, error) {
 		return nil, err
 	}
 	g, _ := r.RunningGame()
-	return view.SaveDetailOf(c, g != nil), nil
+	d := view.SaveDetailOf(c, g != nil)
+	s.savePlay(r, sv, d)
+	return d, nil
 }
 
 // SaveFixReply is what a fix did: the status sentence, whether u undoes it, and the
@@ -339,10 +394,11 @@ func saveErr(err error) error {
 	return errors.New(view.Humanize(nil, err.Error()))
 }
 
-// leaveSaves forgets the listing when the player leaves the page (07 §8.3); the reader
-// and its head cache stay until it is idle (readerIdle).
+// leaveSaves forgets the listing and the facts when the player leaves the page (07 §8.3);
+// the reader and its head cache stay until it is idle (readerIdle). A background read
+// goes on (it is a task, 06 §2.16); a selected save waiting to be read is dropped.
 func (s *API) leaveSaves() {
 	s.saves.mu.Lock()
-	s.saves.list = nil
+	s.saves.list, s.saves.facts, s.saves.failed, s.saves.next = nil, nil, nil, nil
 	s.saves.mu.Unlock()
 }
