@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Probe mod for a Unity build of RimWorld (1.6 and earlier). References come from the local game,
+    so the build works offline and needs no NuGet reference packs:
+      dotnet build -c Release -p:RimWorldDir=<game folder> -p:HarmonyDir=<Harmony mod folder>
+    scripts/probe.mjs build passes both.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>Probe</AssemblyName>
+    <RootNamespace>RimProbe</RootNamespace>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Optimize>true</Optimize>
+    <DebugType>none</DebugType>
+    <OutputPath>Assemblies\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- Use the game's own mscorlib instead of a .NET Framework reference pack. -->
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <NoStdLib>true</NoStdLib>
+    <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
+    <Managed>$(RimWorldDir)\RimWorldWin64_Data\Managed</Managed>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="src\**\*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="$(Managed)\mscorlib.dll" Private="false" />
+    <Reference Include="$(Managed)\System.dll" Private="false" />
+    <Reference Include="$(Managed)\System.Core.dll" Private="false" />
+    <Reference Include="$(Managed)\netstandard.dll" Private="false" />
+    <Reference Include="$(Managed)\Assembly-CSharp.dll" Private="false" />
+    <Reference Include="$(Managed)\UnityEngine.CoreModule.dll" Private="false" />
+    <Reference Include="$(Managed)\UnityEngine.IMGUIModule.dll" Private="false" />
+    <Reference Include="$(Managed)\UnityEngine.ScreenCaptureModule.dll" Private="false" />
+    <Reference Include="$(Managed)\UnityEngine.TextRenderingModule.dll" Private="false" />
+    <Reference Include="$(HarmonyDir)\Current\Assemblies\0Harmony.dll" Condition="Exists('$(HarmonyDir)\Current\Assemblies\0Harmony.dll')" Private="false" />
+    <Reference Include="$(HarmonyDir)\1.6\Assemblies\0Harmony.dll" Condition="!Exists('$(HarmonyDir)\Current\Assemblies\0Harmony.dll') And Exists('$(HarmonyDir)\1.6\Assemblies\0Harmony.dll')" Private="false" />
+  </ItemGroup>
+</Project>
