@@ -2,8 +2,9 @@
 // left the colonies, each opening to its saves as a tree (search on top, `/`); middle the
 // selected save: where it belongs, Can it load? with its quick fix and one row per problem,
 // and its Mod list; right the playthrough, whose facts come with the full read of the save
-// (10 §1.7 L1) and are not shown before. The listing reads every save's head, which can
-// take a while on a cold library, so it arrives as a "saves" event (06 §8.4).
+// (10 §1.7 L1): skeletons until it is read. The listing reads every save's head, which can
+// take a while on a cold library, so it arrives as a "saves" event (06 §8.4); the full read
+// runs as a background task and its news arrives as "saves-read" events.
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { on } from "./api.js";
 import { beginPageRead, page, area, act, button, hintsChanged } from "./screens.js";
@@ -36,6 +37,47 @@ on("saves", (ev) => {
   waiting.delete(ev.request);
   w(ev);
 });
+on("saves-read", (ev) => news(ev || {}));
+
+// news is the full read's progress (06 §2.11 "Loading"): the status line while the page
+// is open (never over a failure or a message with its undo), rows with their day and
+// colonies regrouped, and the selected save's play facts once it is read.
+function news(ev) {
+  if (S.screen !== "saves" || !X.page) return;
+  const st = $("#status"), quiet = !st || (st.dataset.kind !== "fail" && !st.querySelector("a"));
+  if (ev.line && quiet) say("busy", ev.line);
+  if (ev.done && (ev.error || quiet)) say(ev.error ? "fail" : "ok", ev.error || ev.text || "");
+  if (ev.page) update(ev.page);
+  if (X.sel && (ev.refs || []).includes(X.sel) && X.detail?.ref === X.sel && !X.detail.play && !X.detail.loading) refreshDetail();
+}
+
+// refreshDetail asks for the selected save's cards again after the full read; while the
+// rename field or a confirmation is open only the right card is redrawn, so neither loses
+// what the player is doing.
+async function refreshDetail() {
+  if (!X.renaming && !X.ask) { showDetail(0); return; }
+  const ref = X.sel, n = ++X.detailSeq;
+  let d;
+  try { d = await api.SaveDetail(ref); } catch { return; }
+  if (n !== X.detailSeq || S.screen !== "saves" || X.sel !== ref || X.detail?.ref !== ref) return;
+  Object.assign(X.detail, { play: d.play, reading: d.reading, playNote: d.playNote, colony: d.colony });
+  drawRight(true);
+}
+
+// update takes a newer listing from the full read: rows get their in-game day and colonies
+// regroup by world, while the selection and the colonies shown open (by their saves) stay.
+function update(p) {
+  const shown = new Set(X.page.colonies.filter((c) => X.open.has(c.key)).flatMap((c) => c.saves.map((s) => s.ref)));
+  const colony = colonyOf(X.sel)?.name;
+  X.open = new Set();
+  setPage(p);
+  for (const c of p.colonies) if (c.saves.some((s) => shown.has(s.ref))) X.open.add(c.key);
+  if (!leftCard?.isConnected) return;
+  const lead = $("#screen .page.saves .page-head .lead");
+  if (lead && p.lead) lead.textContent = p.lead;
+  drawLeft();
+  if (X.detail && !X.detail.loading && colonyOf(X.sel)?.name !== colony) refreshDetail();
+}
 
 // readList asks for the listing and waits for its event; a newer request makes it stale.
 function readList() {
@@ -47,7 +89,7 @@ function readList() {
       if (ev.error) return reject(new Error(ev.error));
       resolve(ev.page);
     });
-    api.SavesRead(n).then((ok) => { if (!ok) { waiting.delete(n); reject(new Error(T("the window is closing"))); } },
+    api.SavesRead(n, X.sel).then((ok) => { if (!ok) { waiting.delete(n); reject(new Error(T("the window is closing"))); } },
       (e) => { waiting.delete(n); reject(e); });
   });
 }
@@ -229,7 +271,8 @@ function drawLeft() {
       r.setAttribute("aria-level", "2");
       r.setAttribute("aria-selected", String(s.ref === X.sel));
       r.append(mark(s.name), el("span", "d", s.when || ""));
-      if (s.auto) r.title = T("autosave");
+      // the in-game day shows once the save is read; the date it was saved stays on hover
+      r.title = [s.auto ? T("autosave") : "", s.saved || ""].filter(Boolean).join("  ");
       box.append(r);
     }
     tree.append(box);
@@ -467,86 +510,169 @@ function modSection(d) {
   return s;
 }
 
-// drawRight is the playthrough (10 §4.3 Play facts, §4.5): nothing until the full read.
+// drawRight is the playthrough (10 §4.3 Play facts, §4.5; the draft's right column):
+// the colony, its day and date, storyteller, difficulty and play time; the numbers at this
+// save with their change since the colony's previous read save, the colonists; the
+// newest letters; the colony over time. Skeletons while the save is read.
 function drawRight(keep) {
   if (!rightCard) return;
   const d = X.detail;
+  const top = keep ? rightCard.querySelector(".sv-body")?.scrollTop || 0 : 0;
+  const focused = rightCard.contains(document.activeElement) ? document.activeElement.dataset?.key || "" : null;
   rightCard.replaceChildren();
   if (!d) return;
+  const p = d.play;
   const b = body();
   b.setAttribute("aria-label", T("the playthrough"));
   const head = el("div", "sv-head");
   const row = el("div", "sv-row1");
   row.append(el("h2", "sv-name", d.colony || ""));
-  if (d.play?.day) row.append(el("span", "muted", d.play.day));
+  if (p) row.append(el("span", "muted", [p.day, p.date].filter(Boolean).join("  ")));
   head.append(row);
+  if (p) {
+    const kv = el("dl", "sv-kv");
+    for (const [k, v] of [[T("storyteller"), p.storyteller], [T("difficulty"), p.difficulty], [T("play time"), p.played]]) {
+      if (v) kv.append(el("dt", "", k), el("dd", "", v));
+    }
+    if (kv.childNodes.length) head.append(kv);
+  }
   b.append(head);
   if (d.loading) { rightCard.append(b); return; }
-  if (d.play) b.append(...playSections(d.play));
-  else {
+  if (p) b.append(...playSections(p));
+  else if (d.reading) {
+    const sk = el("div", "sv-sect");
+    sk.append(shimmer(T("reading the save…"), 5));
+    b.append(sk);
+  } else {
     const s = el("div", "sv-sect");
     const kv = el("dl", "sv-kv");
     const c = colonyOf(d.ref);
     if (c) kv.append(el("dt", "", T("saves")), el("dd", "", String(c.saves.length)));
     if (d.saved) kv.append(el("dt", "", T("saved on")), el("dd", "", d.saved));
     if (d.size) kv.append(el("dt", "", T("size")), el("dd", "", d.size));
-    s.append(kv, el("p", "sv-note muted", d.playNote || ""));
+    s.append(kv);
+    if (d.playNote) s.append(el("p", "sv-note muted", d.playNote));
     b.append(s);
   }
   rightCard.append(b);
+  b.scrollTop = top;
+  if (focused !== null) (focused && b.querySelector(`[data-key="${CSS.escape(focused)}"]`) || b).focus({ preventScroll: true });
 }
 
-// playSections draws the full read's facts when the save has them (L1).
+// playSections draws the full read's facts (L1).
 function playSections(p) {
   const out = [];
-  const facts = el("div", "sv-sect");
-  const kv = el("dl", "sv-kv");
-  for (const [k, v] of [[T("storyteller"), p.storyteller], [T("difficulty"), p.difficulty], [T("play time"), p.played], [T("biome"), p.biome]]) {
-    if (v) kv.append(el("dt", "", k), el("dd", "", v));
+  const at = el("div", "sv-sect");
+  const h = el("h3", "", T("at this save"));
+  h.append(el("span", "r", p.since ? Tf("change since %s", p.since) : T("no earlier save of this colony is read")));
+  at.append(h);
+  if (p.note) at.append(el("p", "sv-note warn", p.note));
+  const grid = el("div", "sv-stats");
+  for (const st of p.stats || []) {
+    const tile = el("div", "sv-stat");
+    // paragraphs, so each number gets its reference number (ctrl+\)
+    tile.append(el("p", "n", st.value), el("p", "l", st.label));
+    if (st.change) tile.append(el("p", "d" + (st.down ? " neg" : st.change === "±0" ? " same" : ""), st.change));
+    grid.append(tile);
   }
-  facts.append(kv);
-  out.push(facts);
-  if (p.stats?.length) {
-    const s = el("div", "sv-sect");
-    const h = el("h3", "", T("at this save")); h.append(el("span", "r", T("change since the previous save")));
-    const dl = el("dl", "sv-kv sv-stats");
-    for (const st of p.stats) {
-      const dd = el("dd", "", st.value);
-      if (st.change) dd.append(el("span", "muted", "  " + st.change));
-      dl.append(el("dt", "", st.label), dd);
-    }
-    s.append(h, dl);
-    out.push(s);
-  }
+  at.append(grid);
   if (p.colonists?.length) {
-    const s = el("div", "sv-sect");
-    s.append(el("h3", "", T("colonists")));
     const ul = el("ul", "sv-people");
-    for (const c of p.colonists) ul.append(el("li", c.dead ? "dead" : "", c.name));
-    s.append(ul);
-    out.push(s);
+    ul.setAttribute("aria-label", T("colonists"));
+    for (const c of p.colonists) {
+      const li = el("li", "sv-person" + (c.dead ? " dead" : "") + (c.slave ? " slave" : ""), c.name);
+      if (c.dead) { li.setAttribute("aria-label", Tf("%s, dead", c.name)); li.title = T("dead"); }
+      else if (c.slave) { li.setAttribute("aria-label", Tf("%s, slave", c.name)); li.title = T("slave"); }
+      ul.append(li);
+    }
+    if (p.more) ul.append(el("li", "sv-person more", Tf("and %d more", p.more)));
+    at.append(ul);
   }
+  out.push(at);
   if (p.events?.length) {
     const s = el("div", "sv-sect");
-    s.append(el("h3", "", T("events")));
+    const eh = el("h3", "", T("events"));
+    eh.append(el("span", "r", T("newest first")));
     const ul = el("ul", "sv-events");
-    for (const e of p.events) ul.append(el("li", "", e));
-    s.append(ul);
+    for (const e of p.events) {
+      const li = el("li", e.death ? "death" : "");
+      li.append(el("span", "t", Tf("day %d", e.day)), el("span", "x", e.text));
+      ul.append(li);
+    }
+    s.append(eh, ul);
     out.push(s);
   }
-  if (p.timeline?.length) {
+  if (p.timeline) {
     const s = el("div", "sv-sect");
-    const h = el("h3", "", T("over time")); h.append(el("span", "r", T("a point opens its save")));
-    const line = el("div", "sv-time");
-    for (const t of p.timeline) {
-      const b = button(Tf("day %d", t.day), "", () => pick(t.ref), "small" + (t.ref === X.sel ? " on" : ""));
-      b.title = Tf("%d colonists", t.people);
-      line.append(b);
-    }
-    s.append(h, line);
+    const th = el("h3", "", T("over time"));
+    th.append(el("span", "r", T("a point opens its save")));
+    s.append(th, chart(p.timeline));
+    const dead = (p.colonists || []).filter((c) => c.dead).map((c) => c.name);
+    const legend = el("p", "sv-legend");
+    if (p.timeline.wealth) legend.append(el("span", "w", T("wealth")));
+    if (p.timeline.people) legend.append(el("span", "p", T("colonists")));
+    if (p.timeline.deaths?.length) legend.append(el("span", "x", T("deaths")));
+    const names = dead.join(T(", ")) + (p.dead > dead.length ? " " + Tf("and %d more", p.dead - dead.length) : "");
+    legend.append(el("span", "muted", p.dead ? Tf("%d dead: %s", p.dead, names) : T("no colonist has died")));
+    s.append(legend);
     out.push(s);
   }
   return out;
+}
+
+const SVG = "http://www.w3.org/2000/svg";
+function svgEl(tag, attrs, text) {
+  const n = document.createElementNS(SVG, tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, String(v));
+  if (text != null) n.textContent = text;
+  return n;
+}
+
+// kilo is wealth on the chart's hover text: 850, 12.4k, 1.2M.
+function kilo(v) {
+  if (v < 1000) return String(Math.round(v));
+  if (v < 1e4) return (Math.round(v / 100) / 10) + "k";
+  if (v < 1e6) return Math.round(v / 1000) + "k";
+  return (Math.round(v / 1e5) / 10) + "M";
+}
+
+// chart is the colony over in-game days (10 §4.5): this save's wealth (line and area) and
+// colonists (dashed) from its own history, a mark per death letter, and a point per read
+// save of the colony; a point opens its save. The tree reaches every save by keys, so the
+// points are for the mouse; the chart reads as one image.
+function chart(tl) {
+  const w = Math.max(240, (rightCard?.clientWidth || 360) - 34), h = 120, L = 12, R = 12, TOP = 10, B = 20;
+  const days = Math.max(1, tl.days), wealth = tl.wealth || [], people = tl.people || [];
+  const maxW = Math.max(1, ...wealth, ...tl.points.map((p) => p.wealth));
+  const maxP = Math.max(1, ...people);
+  const x = (d) => L + (Math.min(d, days) / days) * (w - L - R);
+  const y = (v, max) => h - B - (v / max) * (h - B - TOP);
+  const along = (vals, max) => vals.map((v, i) => `${x(tl.upto * i / Math.max(1, vals.length - 1)).toFixed(1)},${y(v, max).toFixed(1)}`).join(" ");
+  const svg = svgEl("svg", { class: "sv-chart", viewBox: `0 0 ${w} ${h}`, role: "img",
+    "aria-label": Tf("wealth and colonists over %d days, %d saves", days, tl.points.length) });
+  svg.append(svgEl("line", { class: "ax", x1: L, x2: w - R, y1: h - B, y2: h - B }));
+  for (const t of [...new Set([0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(f * days)))]) {
+    svg.append(svgEl("text", { x: x(t), y: h - 5, "text-anchor": t === 0 ? "start" : t === days ? "end" : "middle" }, Tf("day %d", t)));
+  }
+  for (const d of tl.deaths || []) svg.append(svgEl("line", { class: "ev", x1: x(d), x2: x(d), y1: TOP, y2: h - B }));
+  if (wealth.length > 1) {
+    const line = along(wealth, maxW);
+    svg.append(svgEl("polygon", { class: "area", points: `${x(0)},${h - B} ${line} ${x(tl.upto)},${h - B}` }));
+    svg.append(svgEl("polyline", { class: "ln", points: line }));
+  }
+  if (people.length > 1) svg.append(svgEl("polyline", { class: "pop", points: along(people, maxP) }));
+  for (const pt of tl.points) {
+    const on = pt.ref === X.sel, off = pt.wealth < 0;
+    const cx = x(pt.day), cy = off ? h - B : y(pt.wealth, maxW), r = pt.auto ? 3.5 : 5;
+    if (on) svg.append(svgEl("circle", { class: "ring", cx, cy, r: r + 4 }));
+    const c = svgEl("circle", { class: "pt" + (pt.auto ? " auto" : "") + (off ? " off" : "") + (on ? " sel" : ""), cx, cy, r });
+    c.dataset.save = pt.ref;
+    c.dataset.key = "point-" + pt.ref;
+    c.append(svgEl("title", {}, [pt.name, Tf("day %d", pt.day), off ? "" : Tf("wealth %s", kilo(pt.wealth))].filter(Boolean).join("  ")));
+    svg.append(c);
+  }
+  svg.onclick = (e) => { const c = e.target.closest?.("[data-save]"); if (c && c.dataset.save !== X.sel) pick(c.dataset.save); };
+  return svg;
 }
 
 // ---- actions (10 §4.4) ----

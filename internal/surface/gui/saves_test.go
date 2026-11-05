@@ -17,6 +17,7 @@ import (
 // actions show what they touch before they act.
 func TestSavesPage(t *testing.T) {
 	e, api, events := fixture(t)
+	lists, _ := savesDrain(events)
 	now := e.Now()
 	e.RecordLaunch(now.Add(-90 * time.Minute))
 	e.WriteSave("Colony.rws", testkit.SaveSpec{Mods: []string{"ludeon.rimworld", "tester.a"}, ModTime: now.Add(-2 * time.Hour)})
@@ -28,9 +29,9 @@ func TestSavesPage(t *testing.T) {
 	}
 	read := func() *view.SavesPage {
 		t.Helper()
-		api.SavesRead(7)
+		api.SavesRead(7, "")
 		select {
-		case ev := <-events:
+		case ev := <-lists:
 			if !strings.HasPrefix(ev, `saves {"request":7,"page":`) {
 				t.Fatalf("event %s", ev)
 			}

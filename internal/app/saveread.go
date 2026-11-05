@@ -2,6 +2,7 @@ package app
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -288,6 +289,13 @@ func ParseSavesIndexLine(line string) (done, total int, ref, name string, ok boo
 // default `archo saves index --progress` as a child process of exe, "" this executable),
 // reading the saves named by first (references) ahead of the rest.
 func (a *App) RunSavesIndex(exe string, first []string, progress func(string)) error {
+	return a.RunSavesIndexContext(context.Background(), exe, first, progress)
+}
+
+// RunSavesIndexContext is RunSavesIndex that ends the child process when ctx is done
+// (the GUI's stop and window close, 06 §2.16): each save it read is already stored. A
+// configured in-process runner (tests) is not interrupted.
+func (a *App) RunSavesIndexContext(ctx context.Context, exe string, first []string, progress func(string)) error {
 	if a.SavesIndexRunner != nil {
 		return a.SavesIndexRunner(first, progress)
 	}
@@ -300,12 +308,17 @@ func (a *App) RunSavesIndex(exe string, first []string, progress func(string)) e
 			return errors.New("saves index from a test binary: set App.SavesIndexRunner")
 		}
 	}
-	return ChildSavesIndex(exe, a.Home, first, progress)
+	return ChildSavesIndexContext(ctx, exe, a.Home, first, progress)
 }
 
 // ChildSavesIndex runs `<exe> saves index --progress [<first>…]` and streams its lines.
 func ChildSavesIndex(exe, home string, first []string, progress func(string)) error {
-	cmd := exec.Command(exe, append([]string{"saves", "index", "--progress"}, first...)...)
+	return ChildSavesIndexContext(context.Background(), exe, home, first, progress)
+}
+
+// ChildSavesIndexContext is ChildSavesIndex, killing the child when ctx is done.
+func ChildSavesIndexContext(ctx context.Context, exe, home string, first []string, progress func(string)) error {
+	cmd := exec.CommandContext(ctx, exe, append([]string{"saves", "index", "--progress"}, first...)...)
 	cmd.Env = append(os.Environ(), "RIMARCHO_HOME="+home)
 	hideWindow(cmd)
 	out, err := cmd.StdoutPipe()
@@ -325,6 +338,9 @@ func ChildSavesIndex(exe, home string, first []string, progress func(string)) er
 		}
 	}
 	if err := cmd.Wait(); err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		return fmt.Errorf("archo saves index: %v (%s)", err, last)
 	}
 	return nil
