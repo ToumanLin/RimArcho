@@ -190,6 +190,7 @@ type App struct {
 	stCache            *LoadoutState
 	stKey              string
 	saveHeads          saveHeadCache // save heads by path, size and mtime (saves.go)
+	saveOwners         saveOwnerMemo // Def and class lookups of save attribution (saveowners.go)
 	modsCopies         map[string]*modsCopiesCache
 	linkRepairPreviews map[string]*LinkRepairPlan
 	linkRepairSerial   uint64
