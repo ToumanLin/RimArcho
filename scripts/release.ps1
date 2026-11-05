@@ -1,6 +1,7 @@
 # Builds a release: archo.exe and RimArcho.exe (pure Go, no cgo, no runtime to install; the same
 # program, RimArcho.exe linked as a Windows GUI so a double click opens the window, 06 §8.1)
-# with the version stamped in through -ldflags, plus README, CHANGELOG and LICENSE.
+# with the version stamped in through -ldflags, plus README, CHANGELOG and LICENSE, and from
+# 1.0.2 on README.zh-CN.md and skills/.
 # Archo Monitor, the in-game companion mod (08 §9), is
 # built by monitor/build.ps1 (needs the .NET SDK 10; game references come from NuGet) and
 # shipped under monitor/ArchoMonitor/.
@@ -77,6 +78,22 @@ try {
 }
 
 Copy-Item README.md, CHANGELOG.md, LICENSE $out
+
+# README.zh-CN.md and skills/ (agent skills, such as rimworld-probe) from 1.0.2 on: 1.0.0's
+# own update rejects a zip with top-level entries it does not know, and 1.0.1 knows these
+# (selfupdate.Files). Only files tracked by git go in, never local build output.
+if ([version]($Version -replace '[-+].*$', '') -ge [version]"1.0.2") {
+    Copy-Item README.zh-CN.md $out
+    $skillFiles = @(git ls-files skills)
+    if ($LASTEXITCODE -ne 0 -or $skillFiles.Count -eq 0) { throw "git ls-files skills found nothing" }
+    foreach ($f in $skillFiles) {
+        $dest = Join-Path $out $f
+        New-Item -ItemType Directory -Force (Split-Path -Parent $dest) | Out-Null
+        Copy-Item $f $dest
+    }
+} else {
+    Write-Host "README.zh-CN.md and skills/ are packed from 1.0.2 on (older updaters reject them)"
+}
 
 # Archo Monitor (08 §9): built for 1.5, 1.6 and 1.7 with monitor/VERSION and shipped as
 # monitor/ArchoMonitor/, where RimArcho finds it next to the exe.

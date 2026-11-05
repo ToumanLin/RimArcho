@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -28,13 +29,13 @@ func swapFixture(t *testing.T) (program, stage, old string, original, staged map
 	program = t.TempDir()
 	stage, old = filepath.Join(program, "stage"), filepath.Join(program, "old")
 	original = map[string]string{Files[0]: "old command", "README.md": "old readme", "monitor/old.txt": "old monitor"}
-	if len(Files) == 6 {
+	if slices.Contains(Files, "RimArcho.exe") {
 		original["RimArcho.exe"] = "old gui"
 	}
 	staged = make(map[string]string)
 	for _, name := range Files {
-		if name == "monitor" {
-			staged["monitor/new.txt"] = "new monitor"
+		if name == "monitor" || name == "skills" {
+			staged[name+"/new.txt"] = "new " + name
 		} else {
 			staged[name] = "new " + name
 		}

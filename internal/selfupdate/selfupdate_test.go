@@ -129,8 +129,8 @@ func TestPlatformDefaults(t *testing.T) {
 	if err != nil || r.Zip.Name != name {
 		t.Fatalf("got %+v, %v", r, err)
 	}
-	if !reflect.DeepEqual(Files, releaseFiles(runtime.GOOS)) || !reflect.DeepEqual(releaseFiles("linux"), []string{"archo", "README.md", "CHANGELOG.md", "LICENSE", "monitor"}) ||
-		!reflect.DeepEqual(releaseFiles("windows"), []string{"archo.exe", "RimArcho.exe", "README.md", "CHANGELOG.md", "LICENSE", "monitor"}) {
+	if !reflect.DeepEqual(Files, releaseFiles(runtime.GOOS)) || !reflect.DeepEqual(releaseFiles("linux"), []string{"archo", "README.md", "README.zh-CN.md", "CHANGELOG.md", "LICENSE", "monitor", "skills"}) ||
+		!reflect.DeepEqual(releaseFiles("windows"), []string{"archo.exe", "RimArcho.exe", "README.md", "README.zh-CN.md", "CHANGELOG.md", "LICENSE", "monitor", "skills"}) {
 		t.Fatal("incorrect platform file lists")
 	}
 }
