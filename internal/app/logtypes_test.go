@@ -25,6 +25,7 @@ func TestMissingTypeSourceAndNearest(t *testing.T) {
 	e.WriteFile(filepath.Join(mods, "Coder", "Assemblies", "LogRefs.dll"), string(b))
 	e.WriteMod(filepath.Join(mods, "Typo"), testkit.Mod{PackageID: "tester.typo", Name: "Typo", Author: "Tester", Files: map[string]string{
 		"Patches/Stats.xml": "<Patch>\n  <Operation Class=\"PatchOperationAdd\">\n    <xpath>Defs/StatDef[defName=\"Beauty\"]/parts</xpath>\n    <value>\n      <li Class=\"LogRefs.Holdr\"/>\n    </value>\n  </Operation>\n</Patch>\n",
+		"Patches/Ops.xml":   "<Patch>\n  <Operation Class=\"PatchOperationConditionl\">\n    <xpath>Defs/ThingDef[defName=\"A\"]</xpath>\n  </Operation>\n  <Operation Class=\"Verse.PatchOperationAddd\">\n    <xpath>Defs/ThingDef[defName=\"B\"]</xpath>\n  </Operation>\n</Patch>\n",
 		"Defs/Things.xml":   "<Defs>\n  <ThingDef>\n    <defName>Typo_Stand</defName>\n    <thingClass>LogRefs.Inner.Holder</thingClass>\n  </ThingDef>\n</Defs>\n",
 	}})
 	e.WriteMod(filepath.Join(mods, "User"), testkit.Mod{PackageID: "tester.user", Name: "User", Author: "Tester", Files: map[string]string{
@@ -39,7 +40,9 @@ func TestMissingTypeSourceAndNearest(t *testing.T) {
 	rep, err := e.App.AnalyzeLogText("RimWorld 1.6.4633 rev1261\n" +
 		"Exception loading def from file Stats_Basics_General.xml: System.ArgumentException: Could not find type named LogRefs.Holdr\n" +
 		"Could not find a type named LogRefs.Inner.Holder\n" +
-		"Could not find a type named LogRefs.Holder\n")
+		"Could not find a type named LogRefs.Holder\n" +
+		"Could not find type named PatchOperationConditionl from node <Operation Class=\"PatchOperationConditionl\"><xpath>Defs/ThingDef[defName=\"A\"]</xpath></Operation>\n" +
+		"Could not find type named Verse.PatchOperationAddd from node <Operation Class=\"Verse.PatchOperationAddd\"><xpath>Defs/ThingDef[defName=\"B\"]</xpath></Operation>\n")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,6 +55,12 @@ func TestMissingTypeSourceAndNearest(t *testing.T) {
 			[]string{"names class LogRefs.Holdr at Patches/Stats.xml:5, which no installed mod defines", "did you mean: LogRefs.Holder (#", "LogRefs.dll)"}},
 		{"LogRefs.Inner.Holder", map[string]string{"tester.typo": "source"},
 			[]string{"names class LogRefs.Inner.Holder at Defs/Things.xml:4", "did you mean: LogRefs.Holder ("}},
+		// A patch operation's own Class: the game's "from node" wording, bare or with a namespace
+		// (VM round 2026-11-05: no source, and filed under "other").
+		{"PatchOperationConditionl", map[string]string{"tester.typo": "source"},
+			[]string{"names class PatchOperationConditionl at Patches/Ops.xml:2"}},
+		{"Verse.PatchOperationAddd", map[string]string{"tester.typo": "source"},
+			[]string{"names class Verse.PatchOperationAddd at Patches/Ops.xml:5"}},
 		{"named LogRefs.Holder", map[string]string{"tester.coder": "mentioned"},
 			[]string{"provides type LogRefs.Holder and is enabled"}},
 	} {
@@ -71,6 +80,11 @@ func TestMissingTypeSourceAndNearest(t *testing.T) {
 		}
 		if c.sub == "named LogRefs.Holder" && strings.Contains(text, "did you mean") {
 			t.Errorf("%s: a defined type got a suggestion\n%s", c.sub, text)
+		}
+	}
+	for _, lc := range rep.Clusters {
+		if strings.Contains(lc.Key, "PatchOperation") && lc.Class != "xml-load" {
+			t.Errorf("%s: class %q, want xml-load", lc.Key, lc.Class)
 		}
 	}
 }

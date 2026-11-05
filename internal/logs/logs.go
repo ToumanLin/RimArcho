@@ -553,7 +553,7 @@ func (e *Entry) Top() *Frame {
 	return nil
 }
 
-var xmlRe = regexp.MustCompile(`XML error|XmlException|Exception parsing|Could not find parent node|parent node named|Duplicate def|Could not find a type named|Exception loading def from file|Exception reading .*\.xml|XML parse|failed to load|Could not find class|Exception loading .* from|is not a valid .*Def|DefOf field .* not found|Config error in`)
+var xmlRe = regexp.MustCompile(`XML error|XmlException|Exception parsing|Could not find parent node|parent node named|Duplicate def|Could not find (?:a )?type named|Exception loading def from file|Exception reading .*\.xml|XML parse|failed to load|Could not find class|Exception loading .* from|is not a valid .*Def|DefOf field .* not found|Config error in`)
 
 // GameError reports a message without a stack in the game's own error wording ("Tried to add pawn
 // X to lord with lord jobNs.LordJob_Y but …") that names a type outside the game's namespaces.

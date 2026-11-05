@@ -235,7 +235,7 @@ export function page(cls, lead, ...right) {
     if (r.matches("button, input, select")) {
       if (r.matches("button.btn") && !r.classList.contains("primary")) r.classList.add("quiet");
       acts.push(r);
-    } else head.append(r);
+    } else { r.dataset.headNote = ""; head.append(r); }
   }
   if (acts.length) {
     const box = el("div", "page-acts");
@@ -977,7 +977,15 @@ function logPage(name, title, ...right) {
       head.append(box);
     }
     box.innerHTML = "";
-    for (const r of right) if (r && r.matches("button, input, select")) { if (r.matches("button.btn") && !r.classList.contains("primary")) r.classList.add("quiet"); box.append(r); }
+    // Notes (not controls) are redrawn too: they follow the log's state and the interface
+    // language (VM round 2026-11-05: "its errors are in needs attention" kept the old language).
+    const head = box.parentElement;
+    for (const n of head.querySelectorAll(":scope > [data-head-note]")) n.remove();
+    for (const r of right) {
+      if (!r) continue;
+      if (r.matches("button, input, select")) { if (r.matches("button.btn") && !r.classList.contains("primary")) r.classList.add("quiet"); box.append(r); }
+      else { r.dataset.headNote = ""; head.insertBefore(r, box); }
+    }
   }
   ui.renderWhere();
   return w;

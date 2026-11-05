@@ -721,7 +721,9 @@ var (
 	parentRe      = regexp.MustCompile(`Could not find parent node named "([^"]+)"`)
 	thinkKeyRe    = regexp.MustCompile(`^Config error in (\S+): Two ThinkNodes have the same unique save key`)
 	ctxNameRe     = regexp.MustCompile(`Context: <\w+[^>]*\bName="([^"]+)"`)
-	missingTypeRe = regexp.MustCompile(`Could not find (?:a )?type (?:named )?([A-Za-z_][\w.+]*\.[\w+]+)|expected class '([^']+)'`)
+	// A bare name counts only before " from node": the game's wording for a Class="…" it cannot
+	// resolve (VM round 2026-11-05: Class="PatchOperationConditionl" in a patch).
+	missingTypeRe = regexp.MustCompile(`Could not find (?:a )?type (?:named )?(?:([A-Za-z_][\w.+]*\.[\w+]+)|([A-Za-z_]\w*) from node)|expected class '([^']+)'`)
 	blockRe       = regexp.MustCompile(`^\[(.+?)\] Verse\.PatchOperation`)
 	modFolderRe   = regexp.MustCompile(`(?i)[\\/](?:294100|Mods)[\\/]([^\\/]+)[\\/](.+)$`)
 	wanterRe      = regexp.MustCompile(`found to give to ([\w.]+Def) ([^\s(]+)`)
@@ -932,7 +934,7 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 		if skipProviders {
 			break
 		}
-		t := m[1] + m[2]
+		t := m[1] + m[2] + m[3]
 		ids := cx.types(t)
 		if len(ids) == 0 && !slices.Contains(lc.missingTypes, t) {
 			lc.missingTypes = append(lc.missingTypes, t)

@@ -4,6 +4,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 1.0.1 (unreleased)
 
+- Game log: a misspelled class of a patch operation (`<Operation Class="PatchOperationConditionl">`, also with a namespace) now names the Mod whose patch has it, and the error is an XML load error, shown by default. Before, `Could not find type named … from node …` was filed as other (hidden) with no Mod identified.
+- Game log page: after switching the interface language in place, the note beside the title ("its errors are in needs attention") also changes language; it also follows the log's state when the page redraws.
 - Can it load: a Mod unsubscribed or deleted while it was still in the list now says what the save loses without it (`loading without it loses 5 colonists of race Ratkin …`). Before, it said nothing in the save needed it.
 - Mod settings: an empty stored value (`<PinnedMods />`) is read only and shows as empty. It can be an empty list as well as empty text, and `archo mod-settings set` wrote text into XML Extensions' list, which then failed to load in the game.
 - Background tasks in Chinese: the RimArcho update check's result "new version available" is translated.
