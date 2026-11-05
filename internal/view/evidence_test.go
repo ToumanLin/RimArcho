@@ -10,7 +10,7 @@ import (
 )
 
 // G13 in part: every item sits in one of the four sections by its group, and the items of
-// Will cause errors say where their claim comes from (06 §2.4).
+// Will cause errors say where their claim comes from (16 §2.4).
 func TestNeedsSectionsAndEvidence(t *testing.T) {
 	t.Parallel()
 	_, _, n := shellEnv(t)
@@ -58,7 +58,7 @@ func TestNeedsSectionsAndEvidence(t *testing.T) {
 	}
 }
 
-// One mod's definitions with a missing parent are one item (06 §5's merge rule): the
+// One mod's definitions with a missing parent are one item (16 §5's merge rule): the
 // title counts them, the parts list each, and the count goes up by one.
 func TestNeedsMergePerMod(t *testing.T) {
 	t.Parallel()

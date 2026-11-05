@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Import and export of the mod list (04 §9): the page previews a list before anything
+// Import and export of the mod list (07 §7): the page previews a list before anything
 // changes, and applies it as one undoable step; export writes a file or copies text.
 // The file dialogs and the clipboard are the window's (Wails); the development harness
 // has none; local-path editing belongs to the desktop window.
@@ -30,7 +30,7 @@ type native interface {
 type exchange struct {
 	native native
 	imp    *view.Import
-	// follow: once applied, the list follows the collection imported (04 §9.6)
+	// follow: once applied, the list follows the collection imported (07 §7.6)
 	follow bool
 	seq    uint64
 	envID  string // game that owns the checked new-list preview
@@ -55,7 +55,7 @@ type Exchange struct {
 	Formats []view.ExportFormat `json:"formats"`
 }
 
-// ExchangeInfo supplies file and clipboard capabilities for the sub-pages (06 §2.17).
+// ExchangeInfo supplies file and clipboard capabilities for the sub-pages (16 §2.17).
 func (s *API) ExchangeInfo() *Exchange {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -151,7 +151,7 @@ func (s *API) ImportPreview(kind, src string) (*view.ImportPreview, error) {
 		return nil, err
 	}
 	s.x.imp = imp
-	s.x.follow = imp.Collection != nil // ticked by default (06 §2.17)
+	s.x.follow = imp.Collection != nil // ticked by default (16 §2.17)
 	return p, nil
 }
 

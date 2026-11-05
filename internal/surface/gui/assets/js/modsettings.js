@@ -1,8 +1,8 @@
-// Mod library › Mod settings (06 §2.9 "Mod settings"): the current list's Mods that have
+// Mod library › Mod settings (16 §2.9 "Mod settings"): the current list's Mods that have
 // settings, one row per settings file or HugsLib pack (its window's title, how many values
 // it stores, its size), and on the right what the cursor's file stores. On/off, numbers, text
 // and HugsLib choices change there while no game runs; the rest in the game. The table
-// follows 06 §3.9; the gap between the cards drags (§3.1).
+// follows 16 §3.9; the gap between the cards drags (16 §3.1).
 import { pathContent } from "./fields.js";
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { beginPageRead, page, area, act } from "./screens.js";
@@ -12,12 +12,12 @@ import { wireSeparator } from "./separator.js";
 
 // page: the table's read; rows: its rows as sorted; at: the cursor's file (its key), kept
 // across reads and sorts; detail: the values on the right (for detail.key); seq: the newest
-// values read (an older reply is dropped, 06 §3.1 rule 9).
+// values read (an older reply is dropped, 16 §3.1 rule 9).
 const X = { cols: null, sort: "name", dir: 1, page: null, rows: [], at: "", detail: null, seq: 0 };
 let tableCard = null, detailCard = null, rowEls = [], timer = 0, wanted = "";
 
 // focusMod puts the cursor on a Mod's first file when the page opens next (a detail's
-// settings row, 06 §4.1).
+// settings row, 16 §4.1).
 export function focusMod(instance) { wanted = instance || ""; }
 
 const table = createTable({ key: "ui.gui.modsettings.columns", columns: modSettingsColumns, state: X,
@@ -268,7 +268,7 @@ function resetButton(d, v) {
   return b;
 }
 
-// change writes one value (06 §2.9): the reply's file replaces the values, and the row's
+// change writes one value (16 §2.9): the reply's file replaces the values, and the row's
 // count follows; a refusal reads the file again.
 async function change(d, v, value, reset = false) {
   const r = X.rows.find((x) => x.key === d.key);
@@ -301,7 +301,7 @@ async function openFolder() {
   try { await api.OpenModSettingsFolder(); } catch (e) { say("fail", errText(e)); }
 }
 
-// key: the page's keys (06 §3.3): arrows move the table's cursor; in the values card they
+// key: the page's keys (16 §3.3): arrows move the table's cursor; in the values card they
 // scroll it (the browser's own scrolling). true when taken.
 export function key(e) {
   const k = e.key;

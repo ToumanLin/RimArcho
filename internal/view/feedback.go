@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
-// Settings > Feedback (06 §2.14): a GitHub issue written in RimArcho, sent through the feedback
+// Settings > Feedback (16 §2.14): a GitHub issue written in RimArcho, sent through the feedback
 // relay (no GitHub account needed) or opened in the browser. RimArcho, the game and the
 // system always go with it; the enabled mods, the paths and the game log's errors only when
 // the player ticks them, and the page shows the whole text first.
@@ -244,7 +244,7 @@ func feedbackSendError(err error) error {
 	return errors.New(Tf("the feedback relay could not file it (%s); open GitHub instead", re.Code))
 }
 
-// CommunityLink is one of RimArcho's public pages (the settings page's head, 06 §2.14).
+// CommunityLink is one of RimArcho's public pages (the settings page's head, 16 §2.14).
 type CommunityLink struct {
 	Label string `json:"label"`
 	URL   string `json:"url"`

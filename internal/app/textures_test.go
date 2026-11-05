@@ -276,7 +276,7 @@ func TestTexturesStaleAndFailures(t *testing.T) {
 	}
 }
 
-// The commands: status, a dry run, the run, clean (05 §4.2). First the refusals: Core, and a
+// The commands: status, a dry run, the run, clean (13 §4.2). First the refusals: Core, and a
 // run while the game runs (a dry run is still allowed).
 func TestTexturesCLI(t *testing.T) {
 	t.Parallel()
@@ -327,7 +327,7 @@ func realDir(p string) string {
 	return p
 }
 
-// Uninstall deletes the DDS RimArcho wrote and nothing else of the mod (01 §4.1).
+// Uninstall deletes the DDS RimArcho wrote and nothing else of the mod (02 §2).
 func TestTexturesUninstall(t *testing.T) {
 	t.Parallel()
 	e, _, dir := texSetup(t)

@@ -1,6 +1,6 @@
 package order
 
-// Sort acceptance S1–S5 (04 §10) at the algorithm level; the CLI path is covered by the
+// Sort acceptance S1–S5 (07 §8) at the algorithm level; the CLI path is covered by the
 // golden and app tests.
 
 import (
@@ -100,7 +100,7 @@ func TestS2CycleAndS3Ignore(t *testing.T) {
 }
 
 // A cycle gives up its weakest constraint, not whatever the current order happens to break
-// (04 §5.2): a dependency outranks a loadAfter even when the list has it the wrong way round.
+// (08 §1.2): a dependency outranks a loadAfter even when the list has it the wrong way round.
 func TestCycleBreaksWeakestEdge(t *testing.T) {
 	nodes := []Node{
 		node("ludeon.rimworld", scan.Decl{}),
@@ -141,7 +141,7 @@ type posCommunity map[string]Tier
 func (p posCommunity) Rules(string) ([]string, []string) { return nil, nil }
 func (p posCommunity) Position(pkg string) Tier          { return p[pkg] }
 
-// loadTop / loadBottom (04 §5.5): a top mod goes up with what it needs, a bottom mod goes
+// loadTop / loadBottom (08 §1.5): a top mod goes up with what it needs, a bottom mod goes
 // down with what needs it; official content stays first; a user rule wins; the community
 // one can be ignored.
 func TestTiers(t *testing.T) {
@@ -204,7 +204,7 @@ func TestTiers(t *testing.T) {
 	}
 }
 
-// Enabling without a position (04 §2.1): after what it needs, else before what needs it,
+// Enabling without a position (07 §2.1): after what it needs, else before what needs it,
 // else the end.
 func TestPlace(t *testing.T) {
 	cur := []Node{

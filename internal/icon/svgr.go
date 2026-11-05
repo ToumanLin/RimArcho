@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-// A small SVG renderer for the icon artwork (06 §8.6). It covers what the portrait uses:
+// A small SVG renderer for the icon artwork (16 §8.6). It covers what the portrait uses:
 // groups whose fill and stroke settings are inherited; transforms (matrix, translate, scale,
 // rotate, skewX, skewY); paths (absolute and relative m, l, h, v, c, s, q, z), rect, circle,
 // ellipse, line, polyline, polygon; nonzero and evenodd fills; strokes (round joins and

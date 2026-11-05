@@ -59,9 +59,9 @@ func loadLog(c *Ctx, a *Args) (*app.LogReport, *app.LoadoutState, error) {
 	return r, st, err
 }
 
-// analysedAs says when a log was attributed against its own game version (03 §6.4), when
+// analysedAs says when a log was attributed against its own game version (06 §4), when
 // its game folder is no environment's (attributed against this one anyway), when the
-// analysis was still running (MCP waits 10 s, 05 §5.1) and when mods were not analysed.
+// analysis was still running (MCP waits 10 s, 14 §1) and when mods were not analysed.
 func analysedAs(c *Ctx, root *render.Node, r *app.LogReport) {
 	if st := c.Loadout(); st != nil {
 		if g := c.App.UnregisteredLogGame(st, r.Path); g != "" {
@@ -170,7 +170,7 @@ func logCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			continue
 		}
 		if lc.ConsequenceOf != "" && !a.Bool("all") {
-			folded++ // listed under the failed def file's cluster (03 §6.3)
+			folded++ // listed under the failed def file's cluster (06 §3)
 			continue
 		}
 		shown++
@@ -321,7 +321,7 @@ func clusterDoc(c *Ctx, ix *app.Index, r *app.LogReport, lc *app.LogCluster) *re
 	return d
 }
 
-// logSince lists the clusters new or grown after a cursor (03 §6.6, MCP analyze_log since).
+// logSince lists the clusters new or grown after a cursor (06 §6, MCP analyze_log since).
 func logSince(c *Ctx, a *Args, st *app.LoadoutState, r *app.LogReport, cur app.LogCursor, since string) (*render.Doc, error) {
 	s, err := c.App.Since(r, cur)
 	if err != nil {

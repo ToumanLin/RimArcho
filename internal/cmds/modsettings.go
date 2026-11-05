@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
-// Mod settings (06 §2.9 "Mod settings", 05 §4): the current list's Mods that have settings,
+// Mod settings (16 §2.9 "Mod settings", 13 §4): the current list's Mods that have settings,
 // and what one Mod's settings files store.
 func init() {
 	register(&Command{Name: "mod-settings", Args: "[<ref>]", Summary: "Mod settings: the current list's Mods that have settings, or what one Mod's files store (change values with mod-settings set)",
@@ -18,7 +18,7 @@ func init() {
 		Flags: []Flag{{Name: "all", Help: "every Mod or value, not only the first ones"}}})
 }
 
-// Changing simple values (06 §2.9 "Mod settings", 01 §4): only with the game closed, after
+// Changing simple values (16 §2.9 "Mod settings", 02 §1): only with the game closed, after
 // backing the file up.
 func init() {
 	register(&Command{Name: "mod-settings set", Args: "<ref> [<name>=<value>…]",

@@ -10,7 +10,7 @@ import (
 )
 
 // A job's end can arrive while the player does something else, so the status line names the
-// job (06 §11 A12): a failed pack build says it was the pack build and which pack, while the
+// job (16 §11 A12): a failed pack build says it was the pack build and which pack, while the
 // task record, which shows the job beside it, keeps the bare reason. Texture cleanup, which
 // has no event of its own, says how it ended through the task record.
 func TestBackgroundEndsNameTheirJob(t *testing.T) {

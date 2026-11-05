@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Maintenance kinds serialize independently, and keep successes and failures (06 §2.16).
+// Maintenance kinds serialize independently, and keep successes and failures (16 §2.16).
 func TestSelfTasksQueueResultsAndConcurrency(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "tasks.json")

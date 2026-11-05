@@ -141,14 +141,14 @@ func TestVerbsAndUndo(t *testing.T) {
 		}
 		b = api.Board()
 		got := names(b.Cols[view.Active]) + " | " + names(b.Cols[view.Staging])
-		// Undo restores the list; staging is the player's separate list (04 §6).
+		// Undo restores the list; staging is the player's separate list (08 §2).
 		if strings.Split(got, " | ")[0] != strings.Split(want, " | ")[0] {
 			t.Fatalf("undo: %s, want %s", got, want)
 		}
 	}
 }
 
-// 06 §6: sort, write and launch act on one click (no confirmation); sort offers undo, and
+// 16 §6: sort, write and launch act on one click (no confirmation); sort offers undo, and
 // a refusal comes back with the commands that resolve it, writing nothing.
 func TestRunAtOnce(t *testing.T) {
 	t.Parallel()
@@ -221,7 +221,7 @@ func previewAndInspect(t *testing.T, _ *testkit.Env, api *API) {
 	}
 }
 
-// The scan runs in the background and says when it is done (an event, 06 §8.4).
+// The scan runs in the background and says when it is done (an event, 16 §8.4).
 func TestScanEvent(t *testing.T) {
 	t.Parallel()
 	e, api, events := fixture(t)
@@ -365,7 +365,7 @@ func TestPackUnfinishedRows(t *testing.T) {
 	}
 }
 
-// G14 (06 §2.6): with an error-level problem the build page disables create and says why,
+// G14 (16 §2.6): with an error-level problem the build page disables create and says why,
 // pointing to Can it run; see the list first writes nothing; once fixed, create is enabled with the sizes.
 func TestBuildPageG14(t *testing.T) {
 	t.Parallel()
@@ -396,7 +396,7 @@ func TestBuildPageG14(t *testing.T) {
 	if !p.Ok || p.Why != "" || p.Before == "" || p.After == "" || p.Mods != 2 || p.Steps[0].Level == view.LevelBad {
 		t.Fatalf("fixed: %+v", p)
 	}
-	// Textures (08 §5.2): a step of the build with the choices; without todds, create says
+	// Textures (10 §2): a step of the build with the choices; without todds, create says
 	// to install it there; with an encoder the step says what it converts.
 	if p.Steps[2].Kind != "textures" || p.Tex != 0 || len(p.TexChoices) != 8 {
 		t.Fatalf("textures step: %+v", p.Steps[2])
@@ -457,7 +457,7 @@ type fakeEncoder struct{}
 
 func (fakeEncoder) Encode(context.Context, []string, int, bool) error { return nil }
 
-// Another version in the way of a pack copy (08 §5.3): the launch comes back with the moves
+// Another version in the way of a pack copy (10 §3): the launch comes back with the moves
 // for one confirmation; with move it goes on.
 func TestPackLaunchMovesConfirm(t *testing.T) {
 	t.Parallel()

@@ -1,4 +1,4 @@
-// Can it run in the GUI (06 §2.4, §5; 06 §10 G29): the two columns, an item's buttons, the
+// Can it run in the GUI (16 §2.4, §5; 16 §10 G29): the two columns, an item's buttons, the
 // confirmation asked in the item and the done lines an action leaves.
 import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';

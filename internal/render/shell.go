@@ -7,9 +7,9 @@ import (
 )
 
 // ShellSafe writes the instance references of the archo commands in s without "#"
-// ("fix: archo enable #nyh3" → "fix: archo enable nyh3"), 05 §3.1 rule 11. A word that
+// ("fix: archo enable #nyh3" → "fix: archo enable nyh3"), 13 §3.1 rule 11. A word that
 // starts with "#" is a comment in PowerShell and bash, so a pasted command would run
-// without its argument. The bare ID prefix is accepted wherever a reference is (05 §2)
+// without its argument. The bare ID prefix is accepted wherever a reference is (13 §2)
 // and needs no quotes in cmd, PowerShell or bash. A "#" inside a word (L#7c2e,
 // decl:#iqmu:…), inside double quotes, and every reference outside a command keep theirs.
 //

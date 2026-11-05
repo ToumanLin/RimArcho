@@ -17,7 +17,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// Printed commands survive a paste into a shell (05 §3.1 rule 11). Every archo command
+// Printed commands survive a paste into a shell (13 §3.1 rule 11). Every archo command
 // the problem fixture prints (fix:, next:, "… N more (…)", error hints) is checked three
 // ways: no word starts with "#"; PowerShell's own parser, where "#" starts a comment,
 // reads the same words; and the command runs with its references as printed.
@@ -123,7 +123,7 @@ func TestPrintedCommandsSurviveShells(t *testing.T) {
 }
 
 // A player who types `archo enable #nyh3` in PowerShell or bash runs `archo enable`: the
-// usage error says why when the missing argument is a mod reference (05 §3.3).
+// usage error says why when the missing argument is a mod reference (13 §3.3).
 func TestMissingRefNamesTheComment(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)

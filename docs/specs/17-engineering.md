@@ -1,0 +1,331 @@
+# 17 · Technology and engineering
+
+> Status: technology choices are settled and in use; 18 holds the performance targets and measured baselines referenced by all specifications; §6 records game behavior confirmed through decompilation.
+> Basis: 00, 00a; 02 §1 (write allowlist); 16 §8–§10 (GUI and TUI technology).
+
+## 1. Technology
+
+| Purpose | Choice | Reason / notes |
+| --- | --- | --- |
+| Language | Go 1.27.2, `CGO_ENABLED=0` | Single exe, controlled memory use, simple concurrency; no C toolchain, direct cross-compilation |
+| TUI | Bubble Tea v1.3.10 + Lip Gloss (v1.1.1 pseudo-version) + termenv | Rendering lists of over 500 rows and Chinese character widths verified (18); no Bubbles |
+| GUI | Wails v3.0.0-beta.28 + WebView2; plain HTML / CSS / native JS (ES modules), embedded in the exe with `go:embed` | No framework, npm or build step; no `wails3` binding generation; only `go build` needed (16 §8) |
+| Storage | SQLite, pure Go modernc.org/sqlite v1.60.1; WAL + `synchronous=NORMAL`, default cache; schema from `internal/store/schema.sql` (04 §4) | No cgo; multiple processes (archo.exe, RimArcho.exe, child processes) share one database |
+| XML reading | Standard library `encoding/xml` streaming parser | Def layer extracts fields without building a DOM |
+| XPath simulation | antchfx/xpath v1.3.9 + custom compact node store `internal/xdoc` (implements `xpath.NodeNavigator`) | No measured difference from .NET XPath 1.0 (18). antchfx/xmlquery v1.5.2 is used only in `spikes/` |
+| .NET metadata | saferwall/pe v1.6.5 reads tables and heaps + custom CustomAttribute blob decoder (about 450 lines, `internal/dotnet`) | No need to develop an ECMA-335 reader |
+| MCP | Official Go SDK modelcontextprotocol/go-sdk v1.8.0, stdio only | Supports tool annotations |
+| KeyValues | Custom `internal/vdf` | Reads `libraryfolders.vdf` and `appworkshop_*.acf` |
+| Hash | xxh3-128 (zeebo/xxh3 v1.1.0) | Fast |
+| Pack files (2026-10-24) | `.archopack` format 2: standard library `archive/tar` + klauspost/compress v1.20.3 `zstd` (`SpeedBetterCompression`, 8 MB window, single-thread encoding; decoding uses `WithDecoderLowmem`, one thread, 64 MB window limit), copy digests SHA-256 (standard library); standard library reads format 1 ZIP | Rationale and measurements in 10 §1 |
+| Game menu backgrounds (2026-10-24) | `internal/menubg`: klauspost/compress v1.20.3 (1.7 ZIP zstd method 93) + custom Unity SerializedFile / ResourceManager / Texture2D range reads (no ZIP in 1.6) + woozymasta/bcn v0.7.0 (BC1 / BC3 / BC7, MIT); standard library for RGBA32 | Pure Go, no external runtime tools; decode and resize by row; retain official preview if extraction fails. Resource selection, support boundaries and cache rules: [16 §2.14](16-interface/2.14-settings.md#214-settings) |
+| Character width | mattn/go-runewidth v0.0.31 (`EastAsianWidth` disabled) | Chinese alignment; see §7.2 |
+| System interfaces | golang.org/x/sys | Path resolution, process table, recycle bin, hidden child-process windows |
+| Git (subscriptions, 11 §1) | go-git v5 (github.com/go-git/go-git/v5, pure Go) | Players need not install Git; `CGO_ENABLED=0` unchanged. Only anonymous HTTPS / local fetch, shallow clone, ls-remote and checkout. System `git` rejected: most players do not have it; discovery and output parsing vary by version. Tests create bare repositories in temporary directories with go-git, without networking |
+| Decompilation | ilspycmd (external, optional, not distributed) | Called on demand (05 §5.4). Search `ARCHO_ILSPYCMD` → PATH → `~/.dotnet/tools`; never install automatically; if missing, suggest `dotnet tool install --global ilspycmd` |
+
+Do not introduce Web frameworks, frontend frameworks or build tools, ORMs, or cgo SQLite (thresholds in 18 §1). Archo model invocation: 15 §3.
+
+## 2. Code structure
+
+```
+cmd/archo/            Entry: no arguments opens TUI; arguments use CLI; `mcp` uses MCP; `gui` opens a window
+internal/
+  env/                Environments, path detection, Version.txt, Player.log location, read-only ModsConfig parsing, data directory
+  source/             Source types, junction / symbolic link / 8.3 short-path resolution, child directory enumeration, rebinding, recycle bin
+  scan/               Tolerant About.xml parsing, PublishedFileId, LoadFolders, ACF, git HEAD, origin.json, layered fingerprints, similarity
+  identity/           Reconciliation R1–R7, Lineage membership, change events, identity questions (pure logic)
+  store/              SQLite access, schema and upgrades, gc
+  ids/                Internal IDs and short references
+  vdf/                Valve KeyValues
+  textenc/            Mod XML encoding normalization (including UTF-16)
+  content/            Effective content (LoadFolders, version directories, conditions)
+  modsearch/          Search Mod files in the game's loading scope (`files search` / `search_files`, 05 §5.5)
+  xdoc/               Compact XML node store and NodeNavigator for Patch simulation
+  analyze/            Def facts, Patch simulation, Def / Patch findings
+  dotnet/             .NET metadata reading
+  harmony/            Read Harmony facts from assemblies
+  logs/               Player.log parsing and clustering
+  finding/            Finding model
+  loadout/            Plan lists, ModsConfig.xml reading and writing (backup, atomic replacement)
+  order/              Constraint graph and sorting
+  rules/              Community rule data
+  bbcode/             Workshop description BBCode parsing
+  app/                Operations behind commands: environments, scan pipeline, reference resolution, plans, analysis, logs, packs, launch, running-game detection
+  l10ndata/            Embedded feature JSON translations under locale/<language>/; add a locale directory to bundle another language (16 §1)
+  view/               Surface-independent view models; language selection and lookup shared by TUI and GUI (16 §1)
+  cmds/               Single command table: argument parsing, execution, outline text (13 §1)
+  render/             Outline text rendering (13 §3)
+  surface/cli|mcp|tui|gui/   Surfaces
+  deps/               External dependency discovery and versions (todds, SteamCMD, §2.1)
+  feedback/           Feedback: issue body, prefilled links, relay submission (16 §2.14)
+  selfupdate/         RimArcho updates: release information, version comparison, download and verification, extraction, replacement and rollback (§5.1)
+  icon/, winres/      Icon rendering (portrait.svg) and Windows resource objects
+  buildinfo/          Release version (-ldflags -X)
+  procmem/            Process memory readings
+  testkit/            Synthetic test environments
+scripts/release.ps1   Release script; scripts/winres/ writes .syso; scripts/monitoricon/ holds Archo Monitor icons
+feedback-relay/       Feedback relay (Cloudflare Worker, JavaScript, 16 §2.14): worker.mjs, worker.test.mjs, wrangler.toml; deployment in README.md; excluded from releases, deployed by repository owner
+monitor/              Archo Monitor (in-game helper Mod, C#, 06 §7): src/ source, About/ and LoadFolders.xml, build.ps1; outputs monitor/out/ArchoMonitor/ (not committed)
+spikes/               Technology experiments and measurement programs (same module, included by `go vet ./...`; excluded from releases)
+testdata/             Synthetic Mod samples (mods/), golden files (golden/), .NET fixtures (dotnet/)
+```
+
+- CLI and MCP depend only on `cmds`; TUI and GUI depend on `view` and `app`. Business packages never depend on surfaces.
+- Business rules belong only in `app` or `view`. A surface-layer condition such as "if this is a Workshop Mod …" is a defect (16 §1).
+- Heavy work runs in short-lived child processes. TUI, GUI and commands needing content facts launch scanning (`archo scan`) and analysis (`archo analyze --env <name>`) as children, passing `RIMARCHO_HOME`. Progress lines (`progress: …`) go to stderr; the UI routes them to its status bar. Tests inject an in-process runner.
+
+### 2.1 External dependencies (`internal/deps`, 2026-10-24)
+
+RimArcho uses two programs not compiled into the exe (bundled fonts and WezTerm removed on 2026-10-30, 16 §9.2). Only `deps` discovers them. Other features (texture optimization, game downloads, Mod sources, settings, uninstall) ask it instead of searching themselves.
+
+| Name | Purpose | Search order | Version | RimArcho-owned directory |
+| --- | --- | --- | --- | --- |
+| `todds` | DDS encoder (10 §2) | `textures.todds` → own copy → `PATH` | Run `--version`; anything other than 0.4.1 is unusable | `%LOCALAPPDATA%\RimArcho\todds` |
+| `steamcmd` | Download game versions (11 §3) and Mods | `steamcmd.path` (search same directory if file absent) → own copy → `PATH` | Do not run it (it self-updates); leave version empty | `%LOCALAPPDATA%\RimArcho\steamcmd` |
+
+Interface (kept small for other features):
+
+```go
+f := app.Deps()                          // *deps.Finder; reads current settings
+path, version, ok := f.Locate(deps.SteamCMD) // ok: found and usable
+info := f.Status(deps.Todds)             // Path, Version, Source (config/own/path), OK, Own, Err, ConfigKey, Dir, Installable
+all := f.All()                           // todds, then steamcmd
+app.InstallDep(name, progress)           // Download to own directory (call only after player consent); returns executable path
+app.RemoveDep(name)                      // Delete only own copy; see 02 §1
+```
+
+- Discovery does not use networking, download or modify files. Cache version probes by path, size and modification time so refreshing settings does not run todds each time.
+- Installation does not change settings: if the player specified another copy, it remains selected after installation (the settings explanation shows the source).
+- `app.CheckToolUpdates` checks only the currently used managed SteamCMD and todds: Valve's Windows SteamCMD package manifest and todds' latest stable GitHub release. It downloads no executables. Results appear in settings rows and `archo deps`; scheduling: 16 §2.16. Read SteamCMD's version from the package manifest; manual updates run its own update process, never overwrite an installed tool with the bootstrap ZIP. Install only the todds version supported by the caller; merely notify about incompatible newer releases.
+- Check processes before updating or removing; refuse while a same-named tool is in use. In-app use and replacement of SteamCMD and todds share locks. Refuse replacement if Windows process inspection fails; do not infer whether a tool is busy from a single failed write.
+- CLI: `archo deps` (status, versions, paths, sources), `archo deps install <name>`, `archo deps remove <name>`. Settings buttons run the same commands; downloads enter background tasks (16 §2.16).
+- Tests: `internal/deps` uses temporary directories and fake `LookPath` / `Version` to check discovery order, version caching and `Own`; `internal/app/deps_test.go` checks that `RemoveDep` refuses copies it does not own.
+
+### 2.2 Network: proxy and GitHub mirror (`internal/netcfg`, 2026-11-04)
+
+Some of RimArcho's hosts are often unreachable in mainland China: `raw.githubusercontent.com` (community data), `api.github.com` and `github.com` releases (self-update, todds), and at times `steamcommunity.com` and `api.steampowered.com`. Players there usually run a proxy tool (Clash, v2rayN) in system-proxy mode, which sets the Windows per-user proxy. WebView2 follows that proxy, but Go ignores it, so the window's pages loaded while RimArcho's own downloads failed.
+
+`netcfg.Install` (called once in `cli.Run`, so in `archo.exe`, `RimArcho.exe` and their child processes) replaces `http.DefaultTransport` with a wrapper. Every client without a transport of its own goes through it; test clients (`testkit`, `App.HTTP`) keep their own. `app.OpenWith` and `config set network.*` pass the settings to `netcfg.Configure`, so a change applies at once in the running process.
+
+| Setting | Values | Behavior |
+| --- | --- | --- |
+| `network.proxy` | `system` (default), `off`, or a proxy URL (`http://`, `https://`, `socks5://`; a bare `host:port` is HTTP) | `system`: `HTTPS_PROXY` / `HTTP_PROXY` / `NO_PROXY` first, then the Windows proxy (`HKCU\…\Internet Settings`: `ProxyEnable`, `ProxyServer` including per-scheme `http=…;https=…;socks=…`, `ProxyOverride` with `*` wildcards and `<local>`), read at most every 5 seconds. PAC scripts (`AutoConfigURL`) are not read. Loopback never goes through a proxy. |
+| `network.github_mirror` | empty (default) or a prefix (`https://gh-proxy.org/`) or a template with `{url}` | GET and HEAD to `github.com`, `api.github.com`, `codeload.github.com`, `raw.githubusercontent.com`, `objects.githubusercontent.com`, `release-assets.githubusercontent.com`, `gist.githubusercontent.com` go to the mirror first. A mirror that fails to connect, gives no headers within 15 seconds, or answers ≥ 400 is followed by the direct request. `Authorization` and `Cookie` headers are not sent to the mirror. |
+
+- A failed request to a non-loopback host adds what to set: the proxy, and for GitHub hosts the mirror. The error still unwraps to its cause and keeps `Timeout()`.
+- A mirror sees and serves the files it relays. todds' final release zip is pinned by SHA-256 (`textures.ToddsZipSHA256`), so a mirror cannot swap it. Self-update checks the zip against the release's checksum file, but both come through the mirror, so the player trusts the mirror for updates; the settings description says to use a trusted one. Community data is parsed and rejected when malformed (08 §2).
+- Not covered: SteamCMD (its own networking), the login windows (WebView2, system proxy), and the feedback relay's host. RimCrow's hosts-file overrides and automatic mirror catalogs are not adopted: the proxy setting covers most players, and mirror lists need upkeep.
+- Tests: `internal/netcfg` (mirror first, fallback on 502 and on a closed port, POST and other hosts untouched, system-proxy parsing and bypass, error hint) dial only loopback; `TestNetworkSettings` checks `config set` validation and the settings rows.
+
+## 3. Data locations
+
+| Platform | Directory |
+| --- | --- |
+| Windows | `%APPDATA%\RimArcho\` |
+| macOS | `~/Library/Application Support/RimArcho/` |
+| Linux | `$XDG_DATA_HOME/rimarcho/`, otherwise `~/.local/share/rimarcho/` |
+
+The `RIMARCHO_HOME` environment variable overrides this table (used by tests and child processes).
+
+| Content | Description |
+| --- | --- |
+| `config.toml` | Reads only `tombstone_days` (default 90); writes defaults on first launch. Other settings live in the database meta table (`cfg:<key>`, 13 §4.2) |
+| `archo.db` (and WAL) | All facts, identities, plans, history, findings, log attribution cache, and the save full-read cache (`save_cache`, 12 §1.7; schema 31: the facts as gzip JSON plus summary columns for lists) |
+| `cache/` | `previews/` (thumbnails), `workshop/<Workshop ID>.json` (Workshop descriptions), `workshop-img/` (description images), community data (`communityRules.json`, `steamDB.json` compressed into `steamDB.index.json`, `replacements.json.gz`); `loadcost-v1.json` (per-Mod list loading measurements, keyed by Mod directory, stamped by the loading-directory list fingerprint; 2026-10-24). `cache clear` clears supported categories; rebuild on demand |
+| `source/` | Default managed Source library; `folder set source` / `folder move source` persist another root. Mod projects: `mods/<lowercase filesystem-safe packageId>/<DLL stem> <first 6 hash hex>/`; a prefix collision extends the suffix without moving existing code. Game projects: `game/<build>/Assembly-CSharp/`. Type-only files live in the same DLL folder under `.types/<type-key>/`. Identity, publication and retention: 05 §5.4. Library-relative records survive relocation; contents are never exported or attached |
+| `source-library.lock` | Coordinates source readers/decompilers with relocation and cleanup across processes; artifact locks live in the library's `.locks/` |
+| `logs/` | `gui.log`, `pack-build.log` (older versions also leave `wezterm-start.log`) |
+| `backups/` | Database backups `archo-YYYYMMDD-HHMMSS.db` (local time); save backups `saves/YYYYMMDD-HHMMSS/` (12 §4.4, unimplemented, same time format as database backups) |
+| `packs/` | Packs (10) |
+| `webview2/` | WebView2 user data (not in `%APPDATA%\RimArcho.exe`) |
+| `wezterm/`, `wezterm.lua` | Portable WezTerm downloaded by older versions and generated configuration; unused and unwritten since 2026-10-30, not automatically deleted (16 §9.2) |
+| `rimcrow-*` | Temporary RimCrow database copies during `import rimcrow`; deleted afterward |
+
+- The data directory must not contain, or be contained by, game directories, user data directories or any source root. Check on `env add`, `env set`, `folder add` and `scan`. Exception: the "own saves" directory `<data directory>/userdata/<environment name>` (03 §3.1).
+- Writes outside the data directory are limited to the allowlist in 02 §1.
+- The game's ModsConfig.xml backup is `ModsConfig.xml.rimarcho.bak` in the same directory (07 §4.1).
+
+## 4. Tests
+
+| Layer | Method |
+| --- | --- |
+| Unit | `_test.go` in each package: About.xml (BOM, tag case, `authors`, derived packageId), semantic file classification, similarity, incremental hashing, ACF, VDF, IDs, detection, Player.log, ModsConfig, etc. |
+| Identity | `internal/app/accept_test.go` builds A1–A11 from 04 §5 with `internal/testkit`: fake clock, fixed-seed IDs, `mklink /J` (symbolic links on macOS / Linux), handwritten Mod templates |
+| Output | Golden tests (`internal/cmds/golden_test.go`, `m4_golden_test.go`): `basics`, `lifecycle`, `rebind`, `loadout`, `problems`, `harmonylog`; snapshots in `testdata/golden/*.txt`; stable across runs |
+| CLI = MCP | `internal/surface/mcp/mcp_test.go`: `TestToolsAndAnnotations`, `TestCLIParity`, `TestRefsRoundTrip`, `TestAmbiguousPackage`, `TestTruncation`, `TestWriteTools`, `TestEnvParameter`, `TestStillComputing` (13 §6) |
+| Analysis | B and C series from 03; Harmony fixtures in `testdata/dotnet`: fake 0Harmony, fake Assembly-CSharp and C# source for four Mods, build script and compiled DLLs (4–5 KB each, committed; tests need no .NET SDK) |
+| Plans and sorting | `internal/order/order_test.go` (S1–S5), `app/loadout_test.go`, `loadout.TestWriteFileBackupAtomic` |
+| TUI | teatest interaction snapshots (`TestListEnableMoveSortSaveUndo`, `TestSmallTerminalAndCJK`, `TestProblemsView`, `TestChangesViewAndMouse`, `TestProblemsViewLogs`, `TestT6Thumbnail`, `TestT7Wrapping`, `TestFullSections`, etc.); manual usability test T4 (16 §11) |
+| GUI | `gui.TestSameViewModels`, `gui.TestVerbsAndUndo`; debug in a browser using `spikes/guidev` (listens only on 127.0.0.1, excluded from releases) |
+| Feedback relay | `node --test "feedback-relay/*.test.mjs"`: fake GitHub, Map as KV, counters as rate-limit bindings; no real GitHub or Cloudflare. Covers issue creation, JWT signing, token reuse, three limits, refusals, excluding IP and contact details from issues, private key format. Client uses `httptest` as relay: `feedback.TestSend`, `gui.TestFeedbackSend`, `tui.TestFeedbackSendTUI`; point `RIMARCHO_FEEDBACK_RELAY` to it. Clear `feedback.Relay` too when testing "no relay"; tests never contact the real relay. One real submission belongs in VM testing |
+| Scale | Opt-in with `RIMARCHO_SCALE_TESTS=1` (about a minute each, so not in the default run): `tui.TestT1KeyLatency1354` (16 §11 T1, 1,354 synthetic Mods, slowest key ≤ 50 ms; run it alone, as other packages' CPU load breaks the threshold) and `vmstate.TestScaleFixture` (the 4,000-Mod VM fixture) |
+| Concurrency | `app/concurrent_test.go`: two connections to one data directory; external changes update `ChangeKey`, edits from a stale view do not overwrite them (G8) |
+| Real corpus | Optional tests run only with environment variables: `RIMARCHO_REAL_HOME` (data directory) + `RIMARCHO_EXE` (archo for children) for TUI memory; `RIMARCHO_IDLE_SECONDS` changes idle duration; `RIMARCHO_NO_BROWSE` skips browsing; `RIMARCHO_LOG_VERSION` specifies log replay major/minor version; `RIMARCHO_REAL_COPY` (data directory **copy**) for T1; `RIMARCHO_WORKSHOP_CACHE` replays real Workshop descriptions. Measurement programs in `spikes/` (`tuimem`, `tuistart`, `mcplat`, `mcpcheck`, `analyzereal`, `logreal`, `logfirst`, etc.) |
+
+Test speed: `testkit.New` copies a schema-only database built once per test process instead of creating the schema for each fixture, and replaces the SteamCMD retry backoff (5 s / 15 s) with no wait. Run the suite with `go test -count=1 ./...`: on Windows, recording the test cache's file accesses makes an uncached run about 40% slower (2026-11-03, 32 threads: 4.5 → 3.2 minutes).
+
+`l10ndata.TestSourceLanguage` scans tracked source files and falls back to a repository walk when Git is unavailable. Han characters and fullwidth punctuation fail the test outside the centralized, documented exceptions in `internal/l10ndata/source_language_test.go`.
+
+**Archo Monitor** (06 §7, 09 §6): in-game behavior requires game testing. Game-independent tests live in `monitor/test` (`dotnet run -c Release -p:GameVersion=1.7`): message splitting, fingerprints, stack-frame parsing, JSON writing, deduplication and count lines, rotation. RimArcho-side reading, pairing, evidence and installation: L5–L14 in 05 §6, M1–M8 in 09 §8. Package the `Languages` directory with the mod and verify that settings labels and tooltips follow English and Simplified Chinese game language, retaining the info-message setting (06 §7).
+
+In the test VM, `scripts/vm/round.ps1` automates a whole game round (new colony, play, save, load, return to main menu, exit) and checks phase order, save name, and whether the game uses RimArcho's bundled Monitor. Test-only Archo Drive controls the game (`scripts/vm/drive`, excluded from releases), without screenshots; see `scripts/vm/README.md`. Like `release.ps1`, `vm.ps1 build` builds Monitor from `monitor/`. Before a round, run `archo monitor install`, then place the driver: any content change replaces the entire development Monitor folder, removing the driver too.
+
+Manual checklist (repeat on 1.6 and 1.7; use a test plan and save, not regular playthroughs):
+
+1. Build: `pwsh monitor/build.ps1 -RimWorldDir <game directory>`, then set `RIMARCHO_MONITOR=<repository>\monitor\out\ArchoMonitor` and run `archo monitor install`. Expect `installed`, `registered src:monitor`, `plan:<name>: added after Harmony`.
+2. Prepare known XML errors: in a local test Mod's `Defs/`, place a `ThingDef` missing `label` (`Config error in <defName>`) and a list item referencing a nonexistent Def (`<costList><NoSuchThing>1</NoSuchThing></costList>`, missing cross-reference). Enable this Mod.
+3. `archo launch` (or launch in the UI). Confirm `Mods/_Archo_monitor_ArchoMonitor-<version>` is a link and `toumanlin.archomonitor` immediately follows `brrainz.harmony` in ModsConfig.xml.
+4. After the game reaches the main menu: `ArchoMonitor.log` exists in the save data directory; its first line is a session line (`version`, `game`, empty `skipped`). Player.log contains `[Archo Monitor] <version> session <id>: <path>`.
+5. Two errors in `ArchoMonitor.log`: Config error has the test Mod's XML in `relatedFiles`, the Mod in `relatedModIds`, and `inferredType` of `DefConfigError`; the cross-reference error has `inferredType` of `CrossRefError` and `xref:NoSuchThing:…` in `refs`.
+6. While the game runs, view "this run" in "can it run": both errors appear, with evidence "log · ArchoMonitor.log · Defs/…"; the same item in `archo log --follow --once` is followed by the test Mod (source).
+7. Exit the game: last line of `ArchoMonitor.log` is `kind:"exit"`. Launch again: the previous file becomes `ArchoMonitor-prev.log`; evidence in "errors from the last run" still names the file.
+8. Play once with a pack on 1.6 (`archo pack build`, `archo pack launch`): log goes to `<pack>/userdata/ArchoMonitor.log`; the marker in Player.log points there.
+9. Overhead: compare load time with Monitor enabled and disabled in a large plan (hundreds of Mods), using a stopwatch or Player.log timestamps (`gui.log` does not cover this). Difference should be within a few seconds; many repeats of one in-game error should not cause stutter.
+10. Enable "record info-level messages" in Mod settings, restart, and check INFO entries in `ArchoMonitor.log`; disable it and check their absence.
+
+**Test safety rules:**
+
+1. Automated tests use only synthetic environments and temporary data directories (`RIMARCHO_HOME` points to a temporary directory). All write-operation tests (save, copy, links, recycle bin, packs) run only on synthetic environments.
+2. With real data, **game, Workshop, `Mods/`, ModsConfig.xml and RimCrow databases are read-only**. Record and compare ModsConfig.xml md5 before and after measurements; use marker files to check mtime if needed.
+3. Real measurements needing RimArcho database writes use a data directory **copy** (`RIMARCHO_REAL_COPY`), never `%APPDATA%\RimArcho`. Lesson: an interrupted TUI memory measurement skipped restoration and pointed `log.selected` / `log.seen` in the real `archo.db` at the real Player.log; later this happened again when viewing the real "can it run" page through test tools. These were RimArcho's own settings and were cleared afterward, but "restore after measurement" is unreliable.
+4. Measurement scripts must leave no files in user directories; record files third-party programs write themselves.
+5. VM game saves sync to the player's real Steam Cloud. Therefore rounds run by `round.ps1` do not autosave and delete their own saves before exit. Place the test driver only in the Monitor directory written by `archo monitor`, never a guessed default. When rehearsing guest scripts on the host, point `USERPROFILE`, `APPDATA` and `LOCALAPPDATA` to temporary directories. Lesson: one rehearsal guessed a default and placed the driver in the host's real Monitor folder (deleted immediately, never loaded by the game).
+
+## 5. Releases
+
+- Primary platform: Windows amd64. Link the same source twice (16 §8.1):
+  - `archo.exe`: console application, CLI, `archo mcp`, `archo tui`, `archo gui`.
+  - `RimArcho.exe`: `-H windowsgui`; double-click opens the GUI without a console window; `buildinfo.GUI=1`. Scan and analysis children use `CREATE_NO_WINDOW`.
+  - Both executables share a data directory and database and can run together.
+- `scripts/release.ps1 -Version X.Y.Z[-rc1] [-SkipTests]`:
+  1. Validate the version format (semantic versioning), then test: `go test -count=1 ./internal/... ./cmd/... ./scripts/... ./spikes/hugslogs ./spikes/corpuslabel` (product code, build helpers and maintained corpus tools); after scan or TUI speed changes, also set `RIMARCHO_SCALE_TESTS=1` (see Scale below);
+  2. `CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X buildinfo.Version/Commit/Date"`, marking dirty commits with `-dirty`;
+  3. Before each build, `go run ./scripts/winres` writes `cmd/archo/rsrc_windows_amd64.syso` (icon group ID 3, one PNG each at 16/20/24/32/40/48/64/256; version information: `FileVersion` / `ProductVersion` = release version, `ProductName` RimArcho, `FileDescription` respectively "RimArcho command line" and "RimArcho"); delete afterward; do not commit `.syso`;
+  4. Build Archo Monitor (`monitor/build.ps1`, version rules in 09 §6), place in `monitor/ArchoMonitor/`;
+  5. Package `dist/archo-<version>-windows-amd64.zip`: both executables, README.md, CHANGELOG.md, LICENSE, `monitor/ArchoMonitor/` (no `fonts/` since 2026-10-30);
+  6. Write `dist/archo-<version>-windows-amd64.zip.sha256` (sha256sum format: `<64 lowercase hexadecimal digits>  <zip name>`, 2026-10-31). Upload both ZIP and checksum to GitHub Releases; self-update refuses installation without the checksum (§5.1).
+  The script writes only `dist/`; it never pushes or publishes.
+- The repository is public; do not commit binaries. `internal/icon` generates icons from `portrait.svg` at runtime or release time (16 §8.6).
+- **Building Archo Monitor** (`monitor/`, 09 §6):
+  - SDK-style csproj, `dotnet build`; requires .NET SDK 8+ (`net10.0` requires SDK 10). Compile the same source twice: `net472` (for `1.5/`, `1.6/`, Mono + Harmony 2.x) and `net10.0` (for `1.7/`, Waylith + Harmony 3.x). Handle differences with constants (`RW_UNITY`, `RW_WAYLITH`) and reflection (06 §7.5).
+  - Do not commit game assemblies. Default references use NuGet `Krafs.Rimworld.Ref` (`1.5.4409` for 1.5, `1.6.4871` for 1.6, `1.7.4984-unstable` for 1.7). Setting `RimWorldDir=<game directory>` references local game assemblies instead (`RimWorldWin64_Data/Managed`, or game root for 1.7) to build against the local version. Harmony uses `Lib.Harmony` (2.3.x for net472, 3.0.x for net10.0), `ExcludeAssets=runtime`: exclude assemblies from output; use Harmony Mod's at runtime.
+  - `build.ps1 [-Version <version>] [-RimWorldDir <directory>]`: build for 1.5, 1.6 and 1.7, assemble `monitor/out/ArchoMonitor/` (write version to About.xml `modVersion`; source in 09 §6). `go run ./scripts/monitoricon` generates `About/Preview.png` and `About/ModIcon.png` (same source as application icon; do not commit PNGs).
+  - During development, `RIMARCHO_MONITOR=<repository>/monitor/out/ArchoMonitor` selects this build for local RimArcho (09 §6).
+- The feedback relay (`feedback-relay/`) is excluded from releases. The repository owner deploys it to Cloudflare following its README, then sets `Relay` in `internal/feedback/relay.go` (deployed and set on 2026-10-31). Versions with an empty address offer only "open GitHub".
+- Publish through GitHub Releases, tag `v<version>`; mark prereleases (`-rc1`, etc.) as prereleases on GitHub. Self-update: §5.1 (files change only after player confirmation, never unattended). Executables are unsigned (explained in README).
+- No installer: extract and run. Uninstall uses RimArcho's `archo uninstall` / settings › uninstall RimArcho (02 §2); after closing, a temporary cmd script deletes the ZIP's files. If an installer is adopted later, its uninstaller becomes the last step and also handles updates (§5.1).
+- Record text output format (13 §5) and MCP tool changes in CHANGELOG.
+- Before release, run the entire [release VM tests](../release-vm-tests.md) table in the VM (real data, `scripts/vm/`); fix findings or record TODOs before tagging.
+- macOS and Linux: `GOOS=linux` and `GOOS=darwin` compile, without runtime testing; official support in 1.x (00 §5).
+
+### 5.1 RimArcho self-update (2026-10-31)
+
+Checks are automatic; installation needs player confirmation (02 §1). Code: `internal/selfupdate` (independent of other packages), `internal/app/selfupdate.go`; UI: 16 §2.3, §2.14, §2.16, §9.1; CLI `archo update [--check]` (13 §4).
+
+- **Check** (`app.CheckSelfUpdate`): automatic maintenance category `self` (16 §2.16.1 A15), settings "check for updates", TUI "update RimArcho", and `archo update [--check]` (`App.RunAutomaticNow`, recorded like automatic checks). `selfupdate.Client.Latest` reads GitHub Releases (`api.github.com/repos/ToumanLin/RimArcho`; metadata ≤ 1 MB, 15 seconds; `RIMARCHO_UPDATE_API` substitutes a test release service for VM tests without publishing to the production repository). **The running version determines the channel**: stable requests `/releases/latest` (GitHub excludes drafts and prereleases); prereleases (such as `1.0.0-rc1`) request `/releases?per_page=30` and select the highest non-draft version, including prereleases, so rc users also receive stable releases. Compare semantic versions, `rc2 < rc10` (`selfupdate.Compare`). Development builds (non-semantic versions such as `dev`) neither check nor install. Store results in meta `self-update` (version, notes, release page, two assets) and `automatic:self` (`latest` ensures one notification per version). Recalculate update availability against the running version each time (`App.SelfUpdatePending`); old records no longer count after installation. Retain last results offline.
+- **Assets**: `archo-<version>-windows-amd64.zip` and `<zip>.sha256` (§5 step 6). If either is absent, only notify and direct the player to the release page.
+- **Install** (`app.InstallSelfUpdate`):
+  1. Create `.archo-update/` in the application folder (on write failure, report an error and link the release page). Open its `lock` exclusively (Windows non-shared handle owned by the process). Refuse a second installation in that folder ("another RimArcho is already installing the update"); startup cleanup also skips it.
+  2. Download into `download/`: checksum first (≤ 64 KB), ZIP into `<zip>.part`, computing SHA-256 while writing. Rename to ZIP only if its byte count matches the release asset size and its hash matches the checksum. On interruption, size/hash mismatch or stop, delete `.part` and change nothing. Reuse a downloaded ZIP with a correct hash. Limit 200 MB.
+  3. Extract into `new-<version>/` (`selfupdate.Extract`): allow only `selfupdate.Files` at ZIP root (`archo.exe`, `RimArcho.exe`, `README.md`, `CHANGELOG.md`, `LICENSE`, `monitor/`). Reject absolute paths, drive letters, `..`, symbolic links, files over 200 MB and totals over 500 MB; require both executables. Treat `\` and `/` as separators (Windows PowerShell 5 Compress-Archive writes `\`).
+  4. Wait for other RimArcho processes in the application folder (GUI, TUI, `archo mcp`, their scan children) to exit (16 §2.16.1 W09): the new version may upgrade the database, making continued use by old versions unsafe. Allow stopping while waiting: change no files, retain the download for next time.
+  5. Replace (`selfupdate.Apply`): rename each old entry into `old-<old version>-<time>/`, then rename the new one into place. Windows permits renaming running executables, not deleting them, so move old files aside. All files remain on the same volume in the application folder; only renames occur. On any failure, reverse completed steps in reverse order. Leave entries absent from the ZIP untouched.
+  6. Verify: run the new `archo.exe version` with an empty temporary data directory (`selfupdate.VersionOf`, up to 20 seconds, not interrupted by stop). Require the new version; otherwise roll back (`Swap.Rollback`) and report "the new program could not start; restored RimArcho <old version>". From step 5 onward, window closing or TUI exit waits for completion or rollback (`app.WaitSelfSwap`, 16 §2.16.1 W04).
+  7. The surface restarts: GUI launches the new `RimArcho.exe` with the same arguments (`RIMARCHO_UPDATED_FROM=<old process pid>`), records task results, then closes. TUI exits, closes the database, runs the new `archo.exe` in the same terminal and waits (`cli.restartTUI`). CLI only replaces files and asks the player to reopen.
+- **Cleanup**: on GUI and TUI startup, without blocking the first screen, `App.CleanSelfUpdate` waits up to 10 seconds for `RIMARCHO_UPDATED_FROM` to exit, then deletes `old-*`, `new-*` and `download/` in `.archo-update/`. Keep files still in use (the old TUI process waiting for the new one) until next time. Uninstall deletes all `.archo-update/` (02 §2).
+- **Untouched**: data directory, `%LOCALAPPDATA%\RimArcho`, game and Mods. First opening the new version upgrades the database if its schema changed (04 §4); old versions refuse newer databases (`unsupported schema version`). Back up the database yourself before reverting (settings › database › back up).
+- **Tests**: `internal/selfupdate` uses `httptest` for release reading and channels, version comparison, checksum format, download interruption, hash/size mismatch, ZIP paths, replacement and rollback (Nth rename failure), renaming running executables on Windows, and `VersionOf`. `internal/app/selfupdate_test.go` uses fake GitHub for checks, waiting for other RimArcho processes, verification failure, interrupted download, rollback when the new program cannot start, stopping while waiting, and single installation. Actual executable replacement is tried only on self-built copies on the host; old-to-new upgrades are tested in the VM (release VM test table).
+
+## 6. Game behavior notes (facts confirmed by decompilation)
+
+Basis: ilspycmd decompilation of 1.7.4982 `Assembly-CSharp.dll`, covering `Verse.ModsConfig`, `ModLister`, `ModMetaData`, `ModMetaDataInternal`, `ModContentPack`, `LoadedModManager`, `PatchOperation*`, `DirectXmlLoader`. Items marked "measured" were verified in a real environment.
+
+**Mod registration and ModsConfig.xml**
+
+1. `ModLister.RebuildModList` calls `TryAddMod` in order: official `Data/` → `Mods/` → **subscribed** Workshop entries. Within `Mods/`, registration follows folder-name order, so `!` folders come first (pack links use `!ArchoPack_`, 09 §3).
+2. The game enumerates only **subscribed** Workshop entries; folders left after unsubscribing are not loaded (measured: several exist locally). RimArcho considers an entry subscribed if it appears in ACF `WorkshopItemsInstalled` or `WorkshopItemDetails` (04 §1.2).
+3. **`_steam` rule**: if packageId duplicates an existing entry from another source and the new entry is a Workshop copy, set `appendPackageIdSteamPostfix`, making its ID `<pkg>_steam`; save that suffixed ID. Duplicates from the same source produce an error and are ignored. Reading: match full ID, then folder name; if still unmatched and suffixed `_steam`, strip it and retry. If one unsuffixed ID is enabled twice, disable the later entry. (In-game verification pending: coexistence of local and Workshop copies with the same package ID.)
+4. If `ModsConfig.version` major/minor differs from the game, **reset the whole enabled list** (measured: player's 1.6 list with 1.7 game). RimArcho therefore always writes the current game version (07 §4.1).
+5. Derived packageId (when absent in About.xml, `ModMetaDataInternal.TryParsePackageId`): `ConvertToASCII(author + first 3 characters of description hash) + "." + ConvertToASCII(name)`; default `author` is `Anonymous`; description hash uses `GenText.StableStringHash` (UTF-16, wrapping int32 overflow). Official content without packageId uses `ludeon.rimworld` for Core, `ludeon.rimworld.<folder>` otherwise (04 §1.5).
+6. Official DLC About.xml has no `<name>`; display name comes from the ExpansionDef label, the folder name (for example, "Royalty").
+7. Log Mod prefix `[Name]` uses About.xml's name, not RimArcho's alias.
+8. Player.log: `<user data>/Logs/Player.log` in 1.7+, user data root in earlier versions (03 §3.3).
+
+**Def and Patch (behavior XPath simulation must honor, 05 §5.2)**
+
+9. Ignore comments and whitespace while parsing XML (`IgnoreComments` / `IgnoreWhitespace`).
+10. Merge all Mods' Defs first, then execute Patches in load order. Thus "defined by a later Mod" does not cause a miss; `target-later` means "created by a later Patch".
+11. Resolve ParentName inheritance after Patches (Mods use AttributeAdd to add `Name` to Core Defs).
+12. A Def with `MayRequire` / `MayRequireAnyOf` is skipped if the relevant Mod is not enabled.
+13. Only `li` in a `PatchOperationSequence` list honors `MayRequire`; it has no effect on top-level Operation.
+14. `PatchOperationFindMod` matches Mod **display names** (DLC: item 6). Initial simulation missed this and produced 2 false positives.
+15. Tree operations on a selected attribute node throw an exception; count that operation as failed.
+16. Failure descriptions in logs are the operation's `ToString()`, such as `Verse.PatchOperationAdd(xpath)`, `...Sequence(count=N, lastFailedOperation=...)`; compare by "file path + description", one entry per failed top-level operation.
+17. Treat LoadFolders `IfDLCActive` / `IfDLCNotActive` as `IfModActive` / `IfModNotActive`, stripping `_steam` from package IDs (05 §1).
+
+**Other**
+
+18. Steam verification or updates overwrite Workshop files, so RimArcho never writes marker files there. Create a locked version before modifying a Mod (07 §5).
+19. Game argument `-savedatafolder` gives packs their own save and configuration directories (10 §3); whether Player.log follows awaits measurement.
+20. **Save class names** (1.6.4633 `Verse.GenTypes`, `Scribe_Deep`): a save writes `Class="…"` when an `IExposable` object's runtime type differs from the declared one, using `GetTypeNameWithoutIgnoredNamespaces`: a generic type as `Type.ToString()` (`Verse.Pair`2[Verse.Thing,System.Int32]`), a type in an ignored namespace (`RimWorld`, `Verse`, `LudeonTK`, `Verse.AI`, `Verse.AI.Group`, `Verse.Sound`, `Verse.Grammar`, `RimWorld.Planet`, `RimWorld.BaseGen`, `RimWorld.QuestGen`, `RimWorld.SketchGen`, `System`; `store.SaveNamespaces`) by its simple name, a nested one by its own name only, and any other by its full name with `+` for nesting. Loading (`GetTypeInAnyAssembly`) tries, in order: the simple name among all types of the global or an ignored namespace (case-sensitive); the name as given (case-insensitive) in `Assembly-CSharp`, then each loaded Mod assembly, then `Type.GetType` (the calling assembly and mscorlib); each ignored namespace prefixed; a generic built from its parts. No other game DLL is searched, `Assembly-CSharp-firstpass` included. Used by 05 §5.3 and 12 §4.6.
+
+## 7. Engineering notes
+
+### 7.1 Dependency pinning
+
+- **Wails pinned to v3.0.0-beta.28** (v3 is still beta). Verify upgrades separately, including minimized memory targets (§7.3). This reads Wails private fields by name; layout changes cause a harmless no-op, but memory savings cease.
+- **charmbracelet/x/ansi**: v0.11.9 is incompatible with bubbletea v1.3.10 cellbuf; do not use it. Originally pinned v0.10.1; Wails raised it through minimal version selection to v0.11.4 and lipgloss to a v1.1.1 pseudo-version. `clipperhouse/displaywidth` must become v0.11.0 to compile with uax29 v2.7.0; all TUI tests pass.
+- **saferwall/pe**: returns raw coded indexes; decode tag bits yourself. Heaps map into the file; copy before `Close`. Treat all Harmony enums as int32 (they are all int32).
+- **MCP SDK**: tool argument structures require direct fields; embedded structures are not flattened (14 §3).
+
+- **go-git**: fetching local paths (`file://`) uses an in-process implementation when `git-upload-pack` is absent; tests need no system Git. It does not support recursive submodule updates or LFS (11 §1 item 10).
+- **SteamCMD location**: subscriptions request paths only through `App.FindTool(name) (path, ok)` (11 §1 item 2), supplied by dependency management in settings; tests replace it with a fake.
+
+### 7.2 Terminal and Windows pitfalls
+
+- **East Asian ambiguous width**: `–`, `…`, `·` occupy 1 cell in Windows Terminal. If locale or `RUNEWIDTH_EASTASIAN` enables runewidth's `EastAsianWidth`, alignment breaks; disable it. Nerd Font private-use code points also have ambiguous width; count them as 1 cell.
+- With **piped input**, bubbletea decodes UTF-8 byte by byte, so end-to-end tests inject Chinese keystrokes using `p.Send`; real-console Chinese input requires manual validation.
+- **GUI**: `display:flex` on popup containers overrides `hidden`, creating an invisible click-blocking overlay; start stylesheets with `[hidden]{display:none !important}`. Wails runtime works under `script-src 'self'`, without `unsafe-eval`. Full service method names are `github.com/ToumanLin/RimArcho/internal/surface/gui.API.<method>`, assembled with `Proxy` in `api.js`. On Windows, Wails intercepts WebView2 resources without opening ports (measured: no TCP connections or listeners).
+
+### 7.3 Memory measures
+
+- **TUI process** (`tui.TuneProcess`, first line of `tui.Run`): `debug.SetMemoryLimit(40 MiB)` soft limit, GOGC 50, sole TUI connection `PRAGMA cache_size=-256` (256 KiB page cache). All scans run in children, never in the main process.
+- **On-demand loading**: `store.Mods` omits `decl_blob`; `Mod.Decl()` reads it on demand; sorting and analysis batch-load through `Store.LoadDecls`.
+- **Caching**: `app.Loadout()` and `app.Problems()` cache by `Store.ChangeKey()` (`PRAGMA data_version` + `total_changes()`) + environment ID + ModsConfig.xml size/mtime. Concurrent executables detect each other's changes through `ChangeKey`. `app.Index()` and link checks cache by `Store.IndexKey()`; the index also includes environment ID. `store.Open` installs the shared `archo_index_gen` counter table and persistent triggers, advancing generation only on environment, source, lineage, instance, snapshot, lineage_data and lineage_tag changes. List edits do not invalidate other connections' indexes. `OpenSession` installs no triggers and writes nothing. Shared indexes (`ReadIndex`) retain their source generation, avoiding marking stale data current after a concurrent commit. Link checks read all environments once, caching only IDs, source labels, relative paths, real paths and status; shared Instances are not loaded twice.
+- **Lazy log parsing**: `App.LazyLog` makes TUI startup status read only the stored attribution report (`App.LogCacheOnly`); opening findings parses new logs. `status` and `mod` (MCP `status`, `get_mod`) never parse logs.
+- **Scanning**: one goroutine per source, up to NumCPU workers per source. IDs are assigned deterministically during reconciliation, independent of concurrency. Incremental scans load only hashed semantic-file rows. If a folder is unchanged and not rehashed, release its manifest after reading. If only external state (such as ACF manifest) changes, copy file rows from the old snapshot to the new one with SQL.
+- Tried without benefit: `PRAGMA shrink_memory`, closing idle connections. Retain idle `FreeOSMemory` (timing: 16 §2.16.1 M01; about 5 MB less early in idle).
+- **GUI process** (`gui/memory.go`): `debug.SetMemoryLimit(256 MiB)`, `PRAGMA cache_size=-256` per connection. Soft limit leaves room for concurrent read allocations. With 5183 real inventory rows and reused WAL readers, resident heap is about 100 MiB; 128 MiB still causes frequent GC during page rebuilds. The former 32 MiB also kept resident heap near the limit during refresh: one list edit triggered tens to hundreds of GCs, 2–3 times slower. Go does not reclaim memory itself while the window idles, so debounce `FreeOSMemory` under 16 §2.16.1 M01 after `Board`, `Library`, `Needs`, log/texture reads, scans and page departure. Retain `Library`, invalidated by database ChangeKey, to avoid rebuilding on return, until its reader expires (below). Leaving needs attention / logs drops main App log reports and findings; independent log sessions keep their own change-aware cache. Leaving home drops each plan's findings. Leaving textures cancels unfinished statistics. Pages call `Leave` in `openScreen` / `closeScreen`. In the older baseline, `Library` was about 0.9 MB, index about 2 MB; explicit release plus soft limit yielded about 22 MB idle. This is not a memory retest after new read sessions.
+- **Loaded state and slow reads**: `s.board.St`, `s.lib.St` and main App cache share the index, copying only enabled lists and workspaces. Logs use an independent App / SQLite connection and mutex, preserving pending cross-version analysis. Texture reads also use an independent connection, but capture targets with only names, references and directories from main App, without reloading the full index. Hold the shared API lock only while capturing inputs and publishing results. Texture statistics use at most 4 workers, each retaining per-Mod summaries. Cache PNG headers in `cache/textures/` by path, size and mtime; page summaries in `summaries-v1.json`, reused by texture metadata fingerprint, options and DDS records, at most one atomic write per page. Still enumerate directories and check sizes/mtime to detect unscanned external changes; conversion and restoration always revalidate files.
+- **Page reader expiry** (16 §2.16.1 M07, 2026-11-01): each page reader keeps its own connection plus index, registry, list state and problems, about 5–12 MB per reader at 6,574 copies before indexes, registries and game links were shared (heap profile: index copies about 40 MB, registries 20 MB, link checks and problem sets 16 MB each across readers). The Mod library, library copy details, list management, Mod details, cold-index, texture and uninstall readers close after 5 unused minutes; the library reader also drops `Library`. The editor/sidebar reader and the log reader stay: `s.board` and saved needs are their objects. Never close a reader whose objects are published. Index Mods do not depend on the reader that built them: their lazy `decl_blob` reads use the declaration connection (shared read-only caches below).
+- **Shared read-only caches** (`app/shared.go`, 2026-11-01): sessions share list registries by a 128-bit fingerprint of their candidates and game-link instances by database path and shared index generation (`i<token>.<n>`; a connection's own fallback key is not shared). Both are never changed after construction; `Registry.Given` is capacity-clipped, so appending copies. Entries are weak pointers: they live only while a session uses them. A moved managed directory, which the index generation does not count, calls `forgetLinks`.
+- **Shared index contents** (`App.ReadIndex`, 2026-11-02): a page session takes a warm index as its own `Index` (environment copy, session for foreign-list lookups) over the source's Mods, maps, lineages and sources, instead of copying about 8 MB per session at 6,574 copies. Nothing changes them after `readIndex` (checked with a type-aware scan of every field write; only constructors and the store's scans write); `readIndex` clips the slices so an append copies. The one lazily filled field is the declaration: `Mod.lazy` and `Mod.store` are atomic, and `ReadIndex` binds the Mods to the declaration connection, one `OpenSession` per opened data directory, shared by its read sessions and closed by the App that opened it (`declReads`). Snapshot rows never change `decl_blob`, so any connection reads the same declaration. Declarations loaded by any session stay with the shared Mods until the index generation changes, as they did in the long-lived editor session before. An App not from `Open` has no declaration connection; a reader then loads its own index. Copying a `store.Mod` by value is a `go vet` error (copylocks).
+- **Page DOM cache** (`JS/screens.js:openScreen`): only warm pages (`WARM`, Can it run) keep their last drawing; other pages show their skeleton on return, including during a game switch. Mod library and Search files still keep their own element references.
+- **Launch-page memory refresh** (16 §2.16.1 G19): `HomeMemory` reads on the launch page's log reader with the current list (`OpenPlan = 0`, as `Home`), so the 30-second refresh hits the cached list state. It used a new read session that rebuilt the whole index and list every time: 30 MB allocated and about 95 ms per call at 6,574 copies, which kept the idle window's Go memory rising (18 §2).
+- **Slow reads on other pages**: launch and can it run reuse the independent log session; sidebar and list editor share one read session; mod library and list management keep their own connections/caches. An independent reader coalesces cold-index queries; page sessions share its index contents (§7.3, shared read-only caches) but own their list state, problems and caches. Pin a short-lived WAL read view during page construction to avoid repeated state rebuilding under consecutive list commits; release before publication. Launch reads list state directly without constructing all editor library rows. Main App stays in cache-only mode; visiting these pages does not enable synchronous log parsing for later requests. Changes, technical details, settings, environments, pack list/details/build preview, game detection and uninstall preview use short-lived independent connections, closed after constructing views; mutations remain serialized by main App. Environment pages read configuration only, not Mod indexes. Background discovery captures small inputs (official/background Mod names, directories) from existing indexes, accesses files outside the lock, then validates the environment on publication. Do not simply remove locks on one App or retain a second full-library cache for a small settings page.
+- **Package-name validation** avoids regex: `^[\p{L}\p{N}][\p{L}\p{N} ._\-]{0,63}$` copies two Unicode classes 63 times, retaining about 1.4 MB.
+- **WebView2 switches** (`gui.BrowserArgs`, through `application.WindowsOptions.AdditionalBrowserArgs`; `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` is ineffective under Wails): always `--enable-features=NetworkServiceInProcess2 --renderer-process-limit=1`, merging network service into the browser and removing a roughly 7 MB process (page is offline, 16 §8.2; only one page, so renderer cap changes nothing except preventing extras). With GPU enabled, idle savings about 6 MB without visible differences. `ui.gpu off` (16 §2.14) adds `--disable-gpu --disable-gpu-compositing --in-process-gpu`: removes GPU process, saving another about 15 MB idle, 20 MB in Mod inventory; CPU draws the page.
+- **Minimization and background** (`gui/winmem_policy.go`, `gui/winmem_windows.go`, 16 §2.16.1 M08): call `ICoreWebView2_19::put_MemoryUsageTargetLevel(LOW)` on minimize, after the window has been inactive for 1 minute (another window, such as the game, has the focus), and after the active window has had no input for 2 minutes (`js/activity.js` reports pointer, wheel and key input through `PageInput`, at most every 30 seconds); `NORMAL` on input, when the window is active and not minimized, on restore and on focus. Low keeps a visible window drawing: on the host a visible inactive window under low still showed its page, and opening Mod library drew in full (page process 102 → 15 MB idle, 83 MB after opening the library). Restore counts as active because Windows activates a window while it is still minimized and Wails reports no `WindowActive` for that; wrongly assuming active only keeps normal memory. A quick switch away and back changes nothing; no-op if runtime lacks the interface (before 1.0.2210). Wails beta.28 does not expose it; its internal `ICoreWebView2_19` binding lists only its own two methods after IUnknown, which would call `get_Settings`. Call the actual vtable slot directly instead (IUnknown 3 + ICoreWebView2 58 + _2…_18 total 58 + 1 = 120). Read the WebView2 pointer by field names from Wails private fields (`WebviewWindow.impl.chromium.webview`). Saves about 45 MB (WebView2 129 → 81 MB). `TrySuspend` also requires implementing a COM callback; not done.
+
+### 7.4 Analysis implementation
+
+- Packages: `internal/xdoc` (arena XML store and NodeNavigator), `internal/content` (effective content), `internal/analyze` (Def facts, Patch simulation, findings), `internal/finding`, `app/analysis.go` and `app/problems.go` (inputs, storage, freshness, declaration layer).
+- **Arena**: 44-byte node structures, allocated in blocks of 64K (first grows like a slice to keep small documents small); int32 links; names interned in a `Names` table shared by merged and Patch documents; text in 1 MiB append-only pages, separate allocations above 64 KiB. Lesson: an initially growing text buffer left every old backing array alive through strings referenced by index keys, retaining about 226 MB.
+- **Parsing pipeline**: up to 8 workers turn files into events with `encoding/xml`, retaining at most twice the worker count in files; build documents sequentially in load order.
+- **defName/@Name index fast path is mandatory** (otherwise the 30-second target is unreachable); invalidation rules: `spikes/xpathcompat/index.go`.
+- **Child process**: `debug.SetMemoryLimit(300 MiB)`.
+- **Freshness**: `AnalysisKey` hashes analyzer version, game major/minor, each included Instance's ID, snapshot hash and position. User/community rules do not enter the key (they affect only the dynamically computed declaration layer). Included Instances = enabled list + all live, loadable, disabled Instances (the latter build only Def facts as `target-inactive` providers).
+- **Storage**: analysis slots, content sets and reference cleanup: 05 §3 (`store.SaveAnalysis`, `store.PruneFacts`); log attribution reports and file reference indexes: 06 §5.
+- **Per-plan analysis caching** (schema v12): cache by fingerprint of enabled set, retain multiple results; switching plans does not evict others (05 §3).
+
+### 7.5 Other
+
+- GUI performs scheduled database maintenance in an independent session after the first screen. Retention, collection and scheduling: 04 §4.1–§4.2. Synthetic regressions cover identity evidence, history degradation, insufficient disk, busy, cancellation, background tasks and running-game protection. Manual compaction uses the same flow.
+
+- When several locations resolve to one real directory, choose primary by "already an Instance location → not a link → source reconciliation order → source order"; record others as aliases. Do not follow links inside Mod directories; exclude `.git`, `.svn`, `.rimarcho` from fingerprints (03 §4.3, 04 §1.4).
+- Never insert external Workshop description content as HTML; serve images only from local cache through `/img/` (16 §8.3).
+- `ARCHO_MEMSTATS=1` prints process memory before exit (measurement).
+- `app.ChildAnalyze` refuses child launch inside a Go test binary; otherwise tests recursively relaunch themselves (this happened).
+- File search (05 §5.5) does not invoke `rg.exe`: pure Go. Literal search first uses ASCII-case-folded `bytes.Index` on whole files, calculating line numbers only on hits; regex uses RE2 with literal-prefix prefiltering. About 5–6 thousand files and 150 ms per search, within 500 ms budget, so no trigram or defName index (snapshot invalidation maintenance outweighs benefit). Def-definition and Patch relationships have separate analysis indexes (`get_def`). Directory and file reads use `modsearch.FS`, allowing a cached walker later.
+- UI screenshots use Win32 `PrintWindow`, without bringing the player's window forward or capturing other windows.

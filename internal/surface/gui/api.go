@@ -24,7 +24,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// API is the service the page calls (06 §1, §3): every method returns view models from
+// API is the service the page calls (16 §1, §3): every method returns view models from
 // internal/view, or runs a view verb. No business rule lives here.
 //
 // The app is not safe for concurrent use and Wails calls methods concurrently, so each
@@ -66,7 +66,7 @@ type API struct {
 	// building is the pack this window's build child is making ("" none).
 	building  string
 	buildRead buildPageReader
-	live      view.LiveTracker // the running game's log (03 §6.6)
+	live      view.LiveTracker // the running game's log (06 §6)
 	logPath   string           // the log page's Player.log and its clusters' first lines
 	logLinks  map[string]string
 	x         exchange // import and export (exchange.go)
@@ -91,7 +91,7 @@ type API struct {
 	quit            func()        // closes the window (nil in the harness and in tests)
 	windowTheme     func(bool)    // synchronises the native frame with the resolved page scheme
 	memTarget       *memoryTarget // WebView2's memory target (winmem_policy.go); nil off Windows and in tests
-	// tasks is the Background tasks record and its lanes (tasks.go, 06 §2.16)
+	// tasks is the Background tasks record and its lanes (tasks.go, 16 §2.16)
 	tasks        *app.Tasks
 	taskEv       taskEvents
 	creditID     string
@@ -155,7 +155,7 @@ func (s *API) Ready() {
 	defer perftrace.Span("Ready")()
 	s.startAutomatic()
 	s.startMaintenance()
-	s.prepareBackgrounds(false) // menu extraction starts after the first draw (06 §3.1)
+	s.prepareBackgrounds(false) // menu extraction starts after the first draw (16 §3.1)
 	s.monitorOnce.Do(s.checkMonitor)
 	ms := time.Since(processStart).Milliseconds()
 	dir := filepath.Join(s.a.Home, "logs")
@@ -170,7 +170,7 @@ func (s *API) Ready() {
 	fmt.Fprintf(f, "%s ready %d ms (%s)\n", time.Now().Format(time.RFC3339), ms, buildinfo.String())
 }
 
-// checkMonitor installs or updates Archo Monitor in a child process once per window (08 §9)
+// checkMonitor installs or updates Archo Monitor in a child process once per window (09 §6)
 // and, when that changed something, refreshes the page the way a scan does.
 func (s *API) checkMonitor() {
 	home, env, exe := s.a.Home, s.a.EnvName, s.Exe
@@ -201,7 +201,7 @@ type Start struct {
 	ExtraText map[string]string `json:"extraText,omitempty"`
 	Commands  []view.Command    `json:"commands"`
 	Version   string            `json:"version"`
-	// Ops is the op table both pages' menus, hint lines and keys come from (06 §8.5).
+	// Ops is the op table both pages' menus, hint lines and keys come from (16 §8.5).
 	Ops []view.Op `json:"ops"`
 }
 
@@ -219,8 +219,8 @@ func (s *API) Init() *Start {
 type Board struct {
 	Problems *view.ListProblems `json:"problems,omitempty"`
 	*view.Board
-	Status map[string]int `json:"status"` // row icons (06 §7)
-	// Reasons are the items behind each row icon, for its hover / pinned popover (06 §4.2).
+	Status map[string]int `json:"status"` // row icons (16 §7)
+	// Reasons are the items behind each row icon, for its hover / pinned popover (16 §4.2).
 	Reasons   map[string][]view.Reason `json:"reasons,omitempty"`
 	Needs     int                      `json:"needs"` // the top bar's number
 	Stamp     string                   `json:"stamp"` // the database state: the page reloads when it changes
@@ -231,7 +231,7 @@ type Board struct {
 	Never     bool                     `json:"neverScanned"`
 }
 
-// Board builds the columns (06 §2.5) and the counts from the workspace.
+// Board builds the columns (16 §2.5) and the counts from the workspace.
 func (s *API) Board() *Board {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -287,7 +287,7 @@ type PackList struct {
 	Building   string               `json:"building,omitempty"` // the build this window started
 }
 
-// Packs lists the current environment's packs (08 §5).
+// Packs lists the current environment's packs (10).
 func (s *API) Packs() (*PackList, error) {
 	r, err := s.detachedReader()
 	if err != nil {
@@ -345,7 +345,7 @@ func (s *API) PackDryRun(name string, tex int) []string {
 	return out
 }
 
-// Pack is one pack's page (06 §2.7).
+// Pack is one pack's page (16 §2.7).
 func (s *API) Pack(name string) (*view.PackPage, error) {
 	r, err := s.detachedReader()
 	if err != nil {
@@ -505,7 +505,7 @@ func (s *API) PackRemoveUnfinished(name string) (string, error) {
 }
 
 // PackLaunch plays a pack. move: the player agreed to move the folders in the way into the
-// lock library first (Outcome.Moves, 08 §5.3).
+// lock library first (Outcome.Moves, 10 §3).
 func (s *API) PackLaunch(name string, move bool) (*view.Outcome, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -535,7 +535,7 @@ func (s *API) Directories() ([]app.ManagedDirectory, error) {
 	return dirs, err
 }
 
-// Settings is the settings page (06 §2.14).
+// Settings is the settings page (16 §2.14).
 func (s *API) Settings() []view.SettingGroup {
 	r, err := s.detachedReader()
 	if err != nil {
@@ -603,7 +603,7 @@ func (s *API) ApplySetting(argv []string, value string) ([]string, error) {
 	return lines, nil
 }
 
-// History is the history area (06 §2.5): unsaved steps around now, then the versions.
+// History is the history area (16 §2.5): unsaved steps around now, then the versions.
 func (s *API) History() ([]view.HistItem, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -635,7 +635,7 @@ func (s *API) HistoryGo(steps, version int) (*view.Result, error) {
 	return &view.Result{Text: view.Tf("%d changes", len(r.Changes))}, nil
 }
 
-// Live reports the running game and the errors its log gained (06 §2.1); the page asks
+// Live reports the running game and the errors its log gained (16 §2.1); the page asks
 // every two seconds.
 func (s *API) Live() (*view.Live, error) {
 	defer perftrace.Span("Live")()
@@ -653,8 +653,8 @@ func (s *API) Stamp() string {
 	return s.a.Store.ChangeKey()
 }
 
-// Filter returns the indexes of a column's rows that match the query (06 §3.7), and how
-// many rows match in each column (for "other lists: …", 06 §3.7).
+// Filter returns the indexes of a column's rows that match the query (16 §3.7), and how
+// many rows match in each column (for "other lists: …", 16 §3.7).
 func (s *API) Filter(col int, query string) (*Filtered, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -692,13 +692,13 @@ func (s *API) Filter(col int, query string) (*Filtered, error) {
 type Filtered struct {
 	Rows   []int  `json:"rows"`
 	Counts [3]int `json:"counts"`
-	// Complete is the grey text after the query that tab accepts (06 §3.7).
+	// Complete is the grey text after the query that tab accepts (16 §3.7).
 	Complete string `json:"complete,omitempty"`
 }
 
 // ---- the detail ----
 
-// Detail is one mod's detail (06 §4.1), in the order the page shows it.
+// Detail is one mod's detail (16 §4.1), in the order the page shows it.
 type Detail struct {
 	ID         string      `json:"id"`
 	Name       string      `json:"name"`
@@ -708,7 +708,7 @@ type Detail struct {
 	Status     int         `json:"status"`
 	StatusText string      `json:"statusText"`
 	Facts      []view.Fact `json:"facts"`
-	// Fields is the detail's one field list (06 §4.1): Archo ID, package, location, Workshop,
+	// Fields is the detail's one field list (16 §4.1): Archo ID, package, location, Workshop,
 	// tags, languages, dependencies, conflicts.
 	Fields      []view.Field   `json:"fields"`
 	Deps        []view.Dep     `json:"deps"`
@@ -726,7 +726,7 @@ type Detail struct {
 }
 
 // Detail returns the detail of an instance; fetch allows the network for the Workshop
-// page (the page asks again after the cursor rested, 06 §4.3 item 3), refresh ignores the
+// page (the page asks again after the cursor rested, 16 §4.3 item 3), refresh ignores the
 // cache.
 func (s *API) Detail(id string, staged, fetch, refresh bool) (*Detail, error) {
 	defer perftrace.Span("Detail")()
@@ -791,7 +791,7 @@ func (s *API) Detail(id string, staged, fetch, refresh bool) (*Detail, error) {
 	return d, nil
 }
 
-// Sections are the full detail's sub-sections (06 §4.2), #refs replaced by names.
+// Sections are the full detail's sub-sections (16 §4.2), #refs replaced by names.
 func (s *API) Sections(id string) ([]view.Section, error) {
 	r, err := s.detachedReader()
 	if err != nil {
@@ -818,7 +818,7 @@ func (s *API) boardState() *app.LoadoutState {
 	return st
 }
 
-// ---- verbs (06 §3.5) ----
+// ---- verbs (16 §3.5) ----
 
 func (s *API) object(ids, refs []string) view.Object {
 	st := s.boardState()
@@ -883,7 +883,7 @@ func (s *API) Place(col int, ids []string, at int) (*view.Result, error) {
 	return s.after(view.Place(s.a, view.Column(col), s.object(ids, nil), at))
 }
 
-// PosOptions are the position input's choices (06 §3.6).
+// PosOptions are the position input's choices (16 §3.6).
 func (s *API) PosOptions(ids []string, text string, before bool) ([]view.PosOpt, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -946,14 +946,14 @@ func (s *API) Swap(id string) (string, error) {
 	return s.text(view.Swap(s.a, st, id))
 }
 
-// Preview is the dry run of sort, save or launch (the palette's preview…; 06 §6).
+// Preview is the dry run of sort, save or launch (the palette's preview…; 16 §6).
 func (s *API) Preview(what string) (*view.Preview, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return view.DryRun(s.a, what)
 }
 
-// Run does sort, save or launch at once (S, w, L; 06 §6). A refusal comes back in
+// Run does sort, save or launch at once (S, w, L; 16 §6). A refusal comes back in
 // Outcome.Refused with the commands that resolve it. A launch with required mods missing
 // asks first (Outcome.Confirm, VM run B8); RunAnyway goes on.
 func (s *API) Run(what string) (*view.Outcome, error) {
@@ -982,7 +982,7 @@ func (s *API) run(what string, ask bool) (*view.Outcome, error) {
 }
 
 // RunMoving is Run after the player agreed to move the folders in the way into the lock
-// library (Outcome.Moves, 08 §3).
+// library (Outcome.Moves, 09 §3).
 func (s *API) RunMoving(what string) (*view.Outcome, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -995,7 +995,7 @@ func (s *API) RunMoving(what string) (*view.Outcome, error) {
 	return view.RunMoving(s.a, what), nil
 }
 
-// ---- tags (06 §3.8) ----
+// ---- tags (16 §3.8) ----
 
 // TagCandidates for the mods.
 func (s *API) TagCandidates(ids []string) ([]view.TagCand, error) {
@@ -1031,7 +1031,7 @@ func (s *API) SetTag(ids []string, tag string, remove bool) (string, error) {
 	return s.text(view.Tf("tags of %s: %s", o.What, msg), err)
 }
 
-// ---- Can it run (06 §5) ----
+// ---- Can it run (16 §5) ----
 
 // Needs builds the screen. Opening it includes the newest log (parsing it if needed) and
 // starts the files' check when it is stale, as the TUI does.
@@ -1092,7 +1092,7 @@ func (s *API) Needs() *view.Needs {
 
 // ReadNewLog reads Player.log once when it is newer than the last launch and the last log
 // read (app.NewLog): the game exited, or ran without RimArcho. Then Can it run's badge counts
-// that run without a visit (06 §2.1; the sidebar's "analyse this run's log" line asked for one until
+// that run without a visit (16 §2.1; the sidebar's "analyse this run's log" line asked for one until
 // 2026-10-30). Like opening Can it run it parses the log, records it as read and lets the
 // memory go again soon; it starts no analysis. It reports whether it read one.
 func (s *API) ReadNewLog() bool {
@@ -1211,7 +1211,7 @@ func (s *API) IdentityWhy(qid int64) (*view.IdentityPanel, error) {
 	return view.IdentityQuestionPanel(s.a, qid)
 }
 
-// Inspect runs a read-only command an action names (view, 06 §5) and returns its text
+// Inspect runs a read-only command an action names (view, 16 §5) and returns its text
 // with names for #refs.
 func (s *API) Inspect(argv []string) ([]string, error) {
 	s.mu.Lock()
@@ -1247,7 +1247,7 @@ func (s *API) Inspect(argv []string) ([]string, error) {
 	return out, nil
 }
 
-// ---- changes (06 §2.9) ----
+// ---- changes (16 §2.9) ----
 
 // Changes is the Updates page: the current plan's mods since it was last played, or the whole
 // library; of (an instance ID) narrows it to that mod's Lineage, every change by day.
@@ -1294,7 +1294,7 @@ func (s *API) OpenChangeNotes(ws string) (string, error) {
 
 // ---- environments, logs, scans ----
 
-// EnvRemoval is the dry run of removing an environment (06 §2.14): the confirmation's
+// EnvRemoval is the dry run of removing an environment (16 §2.14): the confirmation's
 // title and lines. Nothing changes.
 type EnvRemoval struct {
 	Title string   `json:"title"`
@@ -1417,7 +1417,7 @@ func (s *API) LogCluster(path, id string) ([]string, error) {
 	return out, nil
 }
 
-// LogPattern is the pattern card of a cluster (06 §2.10): community background shown apart
+// LogPattern is the pattern card of a cluster (16 §2.10): community background shown apart
 // from the evidence; nil when the cluster matches no pattern.
 func (s *API) LogPattern(path, id string) *view.PatternCard {
 	s.logRead.mu.Lock()
@@ -1560,7 +1560,7 @@ func (s *API) startAnalyzeOf(list string) bool {
 
 // ---- palette and the rest ----
 
-// Palette ranks commands, mods and the other environments for a query (06 §3.5).
+// Palette ranks commands, mods and the other environments for a query (16 §3.5).
 func (s *API) Palette(query string) []view.PalEntry {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -1634,7 +1634,7 @@ func (s *API) SaveRefNums(prefix, text string) error {
 	return os.Rename(p+".tmp", p)
 }
 
-// Setting reads a GUI setting (column widths, 06 §7).
+// Setting reads a GUI setting (column widths, 16 §7).
 func (s *API) Setting(key string) string {
 	defer perftrace.Span("Setting")()
 	s.mu.Lock()

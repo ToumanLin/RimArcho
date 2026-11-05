@@ -1,4 +1,4 @@
-// Package logs parses RimWorld's Player.log (03 §6.1): it splits the file into entries
+// Package logs parses RimWorld's Player.log (06 §1): it splits the file into entries
 // (a message line plus its stack, Harmony patch lines and continuation lines), resolves
 // "[Ref X] Duplicate stacktrace" back to the original stack, normalises messages into
 // cluster keys and classifies each cluster. Attribution to mods happens in internal/app.
@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-// Classes (03 §6.1).
+// Classes (06 §1).
 const (
 	ClassXMLLoad     = "xml-load"
 	ClassPatchFailed = "patch-failed"
@@ -213,7 +213,7 @@ func Parse(r io.Reader) (*File, error) {
 	return f, sc.Err()
 }
 
-// Parser reads a log line by line (Parse, and the live follower of a running game: 03 §6.6).
+// Parser reads a log line by line (Parse, and the live follower of a running game: 06 §6).
 // Entries are appended to F.Entries; the last one may still grow until Open reports false.
 type Parser struct {
 	phase        *Phase
@@ -530,7 +530,7 @@ func resolveRefs(f *File) {
 	}
 }
 
-// Classify returns the class of an entry (03 §6.1).
+// Classify returns the class of an entry (06 §1).
 func Classify(e *Entry) string {
 	m := e.Message
 	switch {

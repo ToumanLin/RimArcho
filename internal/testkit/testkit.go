@@ -1,5 +1,5 @@
 // Package testkit builds synthetic RimWorld environments in a temporary directory for the
-// identity acceptance tests (02 §8) and the CLI golden tests. Everything it writes lives
+// identity acceptance tests (04 §5) and the CLI golden tests. Everything it writes lives
 // under t.TempDir(); it never touches a real game or workshop folder.
 package testkit
 
@@ -133,7 +133,7 @@ func (e *Env) Open() {
 	a.Rand = rand.NewChaCha8([32]byte{'r', 'i', 'm', 'a', 'r', 'c', 'h', 'o'})
 	a.Loc = time.UTC
 	a.Detect = env.DetectOptions{SteamRoots: []string{e.Steam}, ManualRoots: []string{}, Home: e.Root, GOOS: "windows", SkipRegistry: true}
-	// The lock library (04 §7) stays inside the fixture.
+	// The lock library (07 §5) stays inside the fixture.
 	a.LockBase = filepath.Join(e.Root, "LocalAppData")
 	// Uninstall stays inside the fixture: kept saves and packs go to <root>/Documents, no
 	// other RimArcho is found, and the clean-up script is never started.
@@ -141,7 +141,7 @@ func (e *Env) Open() {
 	a.UninstallLog = filepath.Join(e.Root, "uninstall.log")
 	a.ArchoProbe = func() []int { return nil }
 	a.AfterExitFunc = func(app.AfterExit) error { return nil }
-	// No bundled Archo Monitor unless a test brings one (08 §9).
+	// No bundled Archo Monitor unless a test brings one (09 §6).
 	a.MonitorBundle = app.MonitorNone
 	// The DDS encoder is only what a test brings (Texture optimisation), never one on PATH.
 	a.ToddsNoPath = true
@@ -288,7 +288,7 @@ func (e *Env) CopyTree(src, dst string) {
 }
 
 // stamp gives a mod folder the fake clock's time, so what reads folder times (Mod library's
-// update date, 06 §2.9) is reproducible.
+// update date, 16 §2.9) is reproducible.
 func (e *Env) stamp(dir string) {
 	os.Chtimes(dir, e.now, e.now)
 }
@@ -462,7 +462,7 @@ func (e *Env) ReadModsConfig() string {
 const nl = string(rune(10))
 
 // OtherGame makes a second RimWorld install named name under the fixture root, outside any
-// Steam library (one environment is one game folder, 02 §0), and returns its folder.
+// Steam library (one environment is one game folder, 03 §2), and returns its folder.
 func (e *Env) OtherGame(name, version string) string {
 	e.T.Helper()
 	g := filepath.Join(e.Root, name)

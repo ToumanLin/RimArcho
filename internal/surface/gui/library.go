@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Mod library > All (06 §2.9). The library is built once per database state; each filter
+// Mod library > All (16 §2.9). The library is built once per database state; each filter
 // click only filters it again.
 
 // inventoryKey includes invocation options as well as database changes (opening a
@@ -152,10 +152,10 @@ func (s *API) LibraryDo(kind string, refs []string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.board, s.needs, s.lib = nil, nil, nil
-	// the actions on folders and through Steam are background tasks (06 §2.16): queued
+	// the actions on folders and through Steam are background tasks (16 §2.16): queued
 	// here, one item at a time, one failure does not stop the rest
 	t, err := view.LibDo(s.a, kind, refs)
-	// Steam out of reach (not running, no DLL): the Workshop pages instead, said so (06 §2.9)
+	// Steam out of reach (not running, no DLL): the Workshop pages instead, said so (16 §2.9)
 	var pages *view.OpenPages
 	if errors.As(err, &pages) {
 		for _, u := range pages.URLs {
@@ -191,7 +191,7 @@ func (s *API) OpenFolder(id string) error {
 	return openDir(dir)
 }
 
-// OpenWorkshop opens an instance's Workshop page (ctrl+w, 06 §3.5); without a Workshop ID
+// OpenWorkshop opens an instance's Workshop page (ctrl+w, 16 §3.5); without a Workshop ID
 // it says so.
 func (s *API) OpenWorkshop(id string) (string, error) {
 	s.mu.Lock()
@@ -246,7 +246,7 @@ var openDir = func(dir string) error {
 	return exec.Command("xdg-open", dir).Start()
 }
 
-// ModCopies is the full detail's Mod library part (06 §4.2): the Lineage row of the mod with
+// ModCopies is the full detail's Mod library part (16 §4.2): the Lineage row of the mod with
 // the instance id (or the copy ref), every copy with its state, place, size, version, note,
 // plans and ops, and the op table they refer to.
 type ModCopies struct {

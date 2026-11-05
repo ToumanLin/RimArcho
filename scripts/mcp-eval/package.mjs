@@ -20,7 +20,7 @@ function source(p) {
 }
 
 // The case log as the VM's player would have it: the sandbox game folder becomes the guest game C:\Eval\RimWorld,
-// in the Mono path lines too. archo reads `Mono path[0]` to tell whose game wrote a log (03 §6.4); without it, or
+// in the Mono path lines too. archo reads `Mono path[0]` to tell whose game wrote a log (06 §4); without it, or
 // with a host path, the log has no known owner, so archo before 1.0.1 skipped the attribution analysis (review
 // 2026-11-04 §2.4). The sandbox's command line and save-folder lines would give the host layout away: dropped.
 export function vmLog(text) {

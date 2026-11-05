@@ -12,7 +12,7 @@ All ordinary list edits record staging and persistently remove staged entries th
 
 Old history restores entries only, preserving unrelated staged entries and removing hidden staged entries enabled in current or target entries; the reverse step saves a complete snapshot. It does not infer positions or anchors absent from old history.
 
-Specification updates: [04 §1.2, §2.1–2.2](../specs/04-plans-and-sorting.md) require entries and staging to enter the undo stack together, give stage drop and staging-only edits of disabled entries their own steps, and define old-history compatibility; [06 §2.5](../specs/06-ui/2.5-plans-and-packs.md) updates the GUI contract.
+Specification updates: [07 §1.2, §2.1–2.2](../specs/07-plans.md) require entries and staging to enter the undo stack together, give stage drop and staging-only edits of disabled entries their own steps, and define old-history compatibility; [16 §2.5](../specs/16-interface/2.5-plans-and-packs.md) updates the GUI contract.
 
 ## Commits
 

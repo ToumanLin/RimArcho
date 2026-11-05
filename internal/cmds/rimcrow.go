@@ -73,7 +73,7 @@ func importRimCrowCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	list("conflicts", rep.Conflicts)
 	list("not-mapped", rep.Unmapped)
 	list("rules-skipped", rep.RulesSkipped)
-	// 02 §4.2: mods RimCrow switched off by renaming About.xml.
+	// 04 §1.2: mods RimCrow switched off by renaming About.xml.
 	if len(rep.AboutDisabled) > 0 || rep.CrowDisabled > 0 {
 		var kinds []string
 		for k, n := range rep.DisabledKinds {

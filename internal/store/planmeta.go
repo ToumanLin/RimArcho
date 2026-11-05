@@ -19,7 +19,7 @@ type CollectionItem struct {
 	Sub        bool   `json:"sub,omitempty"` // a nested collection
 }
 
-// PlanCollection is a Workshop collection a plan follows (04 §9.6).
+// PlanCollection is a Workshop collection a plan follows (07 §7.6).
 type PlanCollection struct {
 	PlanID     int64
 	WorkshopID string

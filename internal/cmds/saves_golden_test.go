@@ -77,7 +77,7 @@ func packSave(e *testkit.Env) string {
 var saveRefRe = regexp.MustCompile(`sv:[0-9a-f]{6}`)
 
 // saveRefs names each save reference after its save, so the golden text does not depend on
-// the temporary folder (a reference hashes the real path, 05 §2). It learns new references
+// the temporary folder (a reference hashes the real path, 13 §2). It learns new references
 // as files are renamed and copied.
 type saveRefs struct {
 	e     *testkit.Env
@@ -157,7 +157,7 @@ func runSavesGolden(t *testing.T, name string, e *testkit.Env, steps []step) {
 		}
 		sb.WriteString("\n")
 		if n := strings.Count(strings.TrimRight(out, "\n"), "\n") + 1; n > 40 && !slices.Contains(args, "--all") {
-			t.Errorf("archo %s: %d lines (05 §3.1: at most 40)", strings.Join(args, " "), n)
+			t.Errorf("archo %s: %d lines (13 §3.1: at most 40)", strings.Join(args, " "), n)
 		}
 	}
 	got := sb.String()
@@ -177,7 +177,7 @@ func runSavesGolden(t *testing.T, name string, e *testkit.Env, steps []step) {
 	}
 }
 
-// archo saves (05 §4.2, 10 §4): the list and its filters, one save against its list, the
+// archo saves (13 §4.2, 12 §4): the list and its filters, one save against its list, the
 // fix with and without launching, rename and copy, backup and recycle with and without
 // --yes, a pack's save, and an ambiguous reference.
 func TestGoldenSaves(t *testing.T) {

@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// The player's load-order rules in the plan editor (06 §2.5, 04 §6.1). Rules are global:
+// The player's load-order rules in the plan editor (16 §2.5, 08 §2.1). Rules are global:
 // every list and every game share them; the editor only lists, adds, changes and removes.
 
 // RuleMod is a mod a rule names: its lineage reference for the commands, the copy the

@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// The v3 interaction model (06 §3): T17–T20.
+// The v3 interaction model (16 §3): T17–T20.
 
 // v3Fixture: the fixture plus P001 … P125 enabled after it, and Late (loads after P050),
 // not enabled. P001 has a long description.
@@ -115,7 +115,7 @@ func TestT17ArrowsOnlyNavigate(t *testing.T) {
 	}
 }
 
-// T18: the tasks of 06 §11, each in no more keys than the v3 column, with the right result.
+// T18: the tasks of 16 §11, each in no more keys than the v3 column, with the right result.
 func TestT18TaskSteps(t *testing.T) {
 	t.Parallel()
 	e, m := v3Fixture(t)
@@ -137,7 +137,7 @@ func TestT18TaskSteps(t *testing.T) {
 	pos := func(name string) int { return m.st.Position(m.st.Ix.ByID[idOf(t, m, name)].ID) }
 
 	// 1. Enable a mod by name at the right place, focus in Enabled: / name enter 1 space
-	// (the bar filters both lists, 06 §2.5).
+	// (the bar filters both lists, 16 §2.5).
 	press(m, "2")
 	n = 0
 	key("/")
@@ -181,7 +181,7 @@ func TestT18TaskSteps(t *testing.T) {
 		t.Fatalf("after space: %s", got)
 	}
 	// 4. Read the current mod's description to the end: 4 PgDn PgDn (PgDn pages the list
-	// cursor, and the detail once it has the focus, 06 §3.3).
+	// cursor, and the detail once it has the focus, 16 §3.3).
 	press(m, "home")
 	for m.current().name != "P001" {
 		press(m, "down")
@@ -240,7 +240,7 @@ func idOf(t *testing.T, m *model, name string) string {
 	return ""
 }
 
-// tagsDefault is the i-th pinned tag (06 §3.8).
+// tagsDefault is the i-th pinned tag (16 §3.8).
 func (m *model) tagsDefault(i int) string {
 	m.tagKey()
 	defer func() { m.tags = nil }()
@@ -327,7 +327,7 @@ func TestT20EscBack(t *testing.T) {
 	}
 }
 
-// The position input (06 §3.6): a number, a name with tab for before, enter alone is the
+// The position input (16 §3.6): a number, a name with tab for before, enter alone is the
 // suggested place; from Disabled it enables there, one undo step.
 func TestPositionInput(t *testing.T) {
 	t.Parallel()
@@ -401,7 +401,7 @@ func TestPositionInput(t *testing.T) {
 	}
 }
 
-// 06 §3.7: while searching, the status line counts the other lists' matches; tab takes
+// 16 §3.7: while searching, the status line counts the other lists' matches; tab takes
 // the search to the next list with matches.
 func TestSearchOtherLists(t *testing.T) {
 	t.Parallel()
@@ -410,7 +410,7 @@ func TestSearchOtherLists(t *testing.T) {
 	press(m, "2")
 	press(m, "/")
 	typeIn(m, "beta")
-	// the bar's search filters both lists at once (06 §2.5): Beta shows in Disabled
+	// the bar's search filters both lists at once (16 §2.5): Beta shows in Disabled
 	press(m, "enter")
 	press(m, "1")
 	if m.focus != cInactive || m.bar.typing || m.current() == nil || m.current().name != "Beta" || len(m.cols[cActive].view) != 0 {

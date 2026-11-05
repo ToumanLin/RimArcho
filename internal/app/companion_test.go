@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// monitorLine is one ArchoMonitor.log line (03 §6.7.3), JSON-encoded so paths stay valid.
+// monitorLine is one ArchoMonitor.log line (06 §7.3), JSON-encoded so paths stay valid.
 func monitorLine(t *testing.T, kind, level, msg, details string, count, total int, id string, ctx map[string]any) string {
 	t.Helper()
 	m := map[string]any{"timestamp": "2026-10-21 14:05:03.120", "level": level, "message": msg, "details": details, "count": count,
@@ -159,7 +159,7 @@ func TestLogAnalysisWithMonitor(t *testing.T) {
 	if !tick.OnlyCompanion || tick.Count != 1234 || tick.First.Top() == nil {
 		t.Fatalf("monitor-only: only %v count %d", tick.OnlyCompanion, tick.Count)
 	}
-	// The problem carries the file for the chip in Can it run (06 §2.4).
+	// The problem carries the file for the chip in Can it run (16 §2.4).
 	if out := e.MustRun("log", "--file", pl, "--cluster", "E1"); !strings.Contains(out, "ArchoMonitor.log") {
 		t.Fatalf("archo log:\n%s", out)
 	}
@@ -292,7 +292,7 @@ func TestLiveLogMonitorFirst(t *testing.T) {
 // A line Player.log has as noise is in Player.log: the monitor's entry for it (with a stack)
 // is not an error of its own, as in the full analysis (VM run 2026-10-28 listed "Translation
 // data … 9 errors" under ArchoMonitor.log while the game ran). Since the translation count is
-// known noise (03 §6.1) both copies are one informational noise cluster.
+// known noise (06 §1) both copies are one informational noise cluster.
 func TestLiveLogMonitorNoise(t *testing.T) {
 	t.Parallel()
 	e := setup(t, false)

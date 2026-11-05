@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// The three list columns (06 §2.5, 06 §1): not enabled | enabled | staging.
+// The three list columns (16 §2.5, 16 §1): not enabled | enabled | staging.
 
 // Column is a list column.
 type Column int
@@ -22,7 +22,7 @@ const (
 	Staging
 )
 
-// Row status, worst first wins (06 §7: one status icon at most).
+// Row status, worst first wins (16 §7: one status icon at most).
 const (
 	StatusNone = iota
 	StatusUnloadable
@@ -45,7 +45,7 @@ type Item struct {
 	ID          string            `json:"id"`
 	Ref         string            `json:"ref"`
 	Name        string            `json:"name"` // the alias when there is one
-	Kind        string            `json:"kind"` // official, workshop, local, copy, git (06 §3.7 type:)
+	Kind        string            `json:"kind"` // official, workshop, local, copy, git (16 §3.7 type:)
 	SteamCMD    bool              `json:"steamcmd,omitempty"`
 	Pos         int               `json:"pos,omitempty"`     // 1-based load position (enabled column)
 	Unsaved     bool              `json:"unsaved,omitempty"` // changed since the last save
@@ -63,7 +63,7 @@ type Item struct {
 	Location    string            `json:"-"` // the registered source root, including for linked mods
 
 	Lower string `json:"-"` // sort key
-	// search fields (06 §3.7), lower case
+	// search fields (16 §3.7), lower case
 	names, author, text string
 }
 
@@ -232,7 +232,7 @@ func RowStatus(it *Item, status map[string]int) int {
 	return s
 }
 
-// SourceKind is the type: value of a mod's source (06 §3.7).
+// SourceKind is the type: value of a mod's source (16 §3.7).
 func SourceKind(m *store.Mod) string {
 	switch {
 	case m.Kind == source.Official:

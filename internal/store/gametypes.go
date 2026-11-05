@@ -7,7 +7,7 @@ import (
 
 // The game's own managed assemblies (Assembly-CSharp.dll …) are indexed per environment at
 // each scan, keyed by the environment's game major.minor, so lookups for Store.MM never mix
-// 1.6 and 1.7 types (03 §5.3). Unlike Mod facts they have no fact set: an environment has
+// 1.6 and 1.7 types (05 §5.3). Unlike Mod facts they have no fact set: an environment has
 // one game folder, and a row is replaced when its file changes.
 
 // GameMainAssembly is the game's own code; it defines every Verse and RimWorld type.
@@ -116,7 +116,7 @@ func typeNamespace(full string) (ns, name string) {
 // a type full name in a game of version Store.MM; empty when none does or no game of that
 // version has been scanned (GameTypesIndexed). Nested types are found when printed with
 // dots too, as in TypeOwners. Unlike TypeOwners the match ignores case, as the game's own
-// type lookup does (07 §7).
+// type lookup does (17 §6).
 func (s *Store) GameTypeOwners(name string) ([]string, error) {
 	var out []string
 	err := nestedForms(name, func(names ...string) (bool, error) {
@@ -128,13 +128,13 @@ func (s *Store) GameTypeOwners(name string) ([]string, error) {
 }
 
 // SaveNamespaces are the namespaces whose types a save names without the namespace
-// (Verse.GenTypes.IgnoredNamespaceNames, 1.6.4633; 07 §7). "" is the global namespace,
+// (Verse.GenTypes.IgnoredNamespaceNames, 1.6.4633; 17 §6). "" is the global namespace,
 // which the game searches by simple name too.
 var SaveNamespaces = []string{"RimWorld", "Verse", "LudeonTK", "Verse.AI", "Verse.AI.Group", "Verse.Sound",
 	"Verse.Grammar", "RimWorld.Planet", "RimWorld.BaseGen", "RimWorld.QuestGen", "RimWorld.SketchGen", "System"}
 
 // GameClassOwners resolves a save's Class="…" value against the game's own assemblies of
-// version Store.MM in the game's order (GenTypes.GetTypeInAnyAssembly, 07 §7): the simple
+// version Store.MM in the game's order (GenTypes.GetTypeInAnyAssembly, 17 §6): the simple
 // name of a type in one of SaveNamespaces or the global namespace (how the game writes those,
 // nested types by their own name), else the full name (GameTypeOwners), else the name
 // prefixed by each of SaveNamespaces. A generic value resolves by its definition

@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Mod library › Mod settings (06 §2.9 "Mod settings"): the current list's Mods that have
+// Mod library › Mod settings (16 §2.9 "Mod settings"): the current list's Mods that have
 // settings and what one file stores. Reads use their own session over the persisted list
 // (WorkspaceSnapshot), as Mod library's do, off the window's own session; a change uses the
 // window's session.
@@ -51,7 +51,7 @@ type ModSettingChange struct {
 }
 
 // SetModSetting changes one value of a Mod's settings file or HugsLib pack (class: its key)
-// to value, or resets it (06 §2.9): only while no game runs, after backing the file up. old
+// to value, or resets it (16 §2.9): only while no game runs, after backing the file up. old
 // is the stored text the page showed ("" not stored); a file changed since is refused.
 func (s *API) SetModSetting(instance, class, name, value, old string, reset bool) (*ModSettingChange, error) {
 	s.mu.Lock()

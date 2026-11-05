@@ -1,4 +1,4 @@
-// Shared card gaps and the sidebar edge (06 §3.1, 06 §7.3).
+// Shared card gaps and the sidebar edge (16 §3.1, 16 §7.3).
 // Pages own their geometry and saved format so existing GUI settings keep working.
 import { api, T } from "./state.js";
 

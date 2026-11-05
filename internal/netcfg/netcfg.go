@@ -1,4 +1,4 @@
-// Package netcfg routes RimArcho's own HTTP requests (07 §2.2): through a proxy (the
+// Package netcfg routes RimArcho's own HTTP requests (17 §2.2): through a proxy (the
 // environment's or the Windows system proxy by default) and, for GitHub, through a mirror
 // first. Install wraps http.DefaultTransport once per process, so every client without a
 // transport of its own follows the settings; Configure changes them at any time.

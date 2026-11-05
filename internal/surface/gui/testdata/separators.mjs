@@ -35,7 +35,7 @@ async function setup(saved = new Map()) {
   return { make, api, saved, writes, listeners };
 }
 
-// 06 §3.1: focusable gaps move by 40px, clamp, reset, and save per page.
+// 16 §3.1: focusable gaps move by 40px, clamp, reset, and save per page.
 test("both orientations expose their range; keyboard, reset and restore round trip independently", async () => {
   const h = await setup();
   for (const [key, axis, before, after, orientation] of [

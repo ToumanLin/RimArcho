@@ -204,7 +204,7 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 	}
 	var jobs []job
 	// The reference index names the XML files that can mention each name; only those are
-	// read (03 §6.5). Without it every effective Defs/Patches file is read.
+	// read (06 §5). Without it every effective Defs/Patches file is read.
 	x, _ := cx.a.RefIndex(cx.st)
 	if x != nil {
 		read := map[int]bool{}
@@ -418,7 +418,7 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 		}
 		if q.class {
 			// Nothing installed defines the class: a typo or a wrong namespace in this XML, or
-			// a framework that is not installed (03 §6.2).
+			// a framework that is not installed (06 §2).
 			q.lc.add(h.inst, role, fmt.Sprintf("names class %s %s, which no installed mod defines", name, where))
 			continue
 		}

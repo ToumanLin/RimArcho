@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/surface/mcp"
 )
 
-// --open-plan names the list a command acts on without making it current (04 §1.3).
+// --open-plan names the list a command acts on without making it current (07 §1.3).
 func TestOpenPlanFlag(t *testing.T) {
 	for _, c := range []struct {
 		argv       []string
@@ -49,7 +49,7 @@ func TestHereCompatibility(t *testing.T) {
 	}
 }
 
-// archo mcp [--tools core|all] (05 §5.1): core by default; a bad flag or value is a usage
+// archo mcp [--tools core|all] (14 §1): core by default; a bad flag or value is a usage
 // error before the data folder is opened.
 func TestMCPToolsFlag(t *testing.T) {
 	for argv, want := range map[string]mcp.Group{"mcp": mcp.Core, "mcp --tools core": mcp.Core, "mcp --tools all": mcp.All, "mcp --tools=all": mcp.All} {

@@ -23,7 +23,7 @@ type CommandResult struct {
 	Running  bool   `json:"running"`
 	Output   string `json:"output"`
 	Code     int    `json:"code"`
-	// Uninstall: `uninstall --yes` started the protected run (06 §2.14); the page takes over.
+	// Uninstall: `uninstall --yes` started the protected run (16 §2.14); the page takes over.
 	Uninstall bool `json:"uninstall,omitempty"`
 }
 type commandWorker struct {

@@ -1,6 +1,6 @@
 // The list's problems inside the editor: the top bar's "N problems" button opens a panel
 // with every item of Can it run, worst first, each with its fix, so the list can be put right
-// without leaving it (06 §4.2). The panel follows S.board.problems: a list edit, a sort or
+// without leaving it (16 §4.2). The panel follows S.board.problems: a list edit, a sort or
 // the background check (the list-problems event) redraw it in place.
 import { S, el, T, Tf, say, errText, keyCaps } from "./state.js";
 import { api } from "./api.js";
@@ -17,7 +17,7 @@ box.id = "problems-popup"; box.tabIndex = -1;
 box.setAttribute("role", "dialog"); box.setAttribute("aria-labelledby", "problems-popup-title");
 let anchor = null, back = null; // back: where the focus was, it returns there
 const opened = new Set(); // sections shown in full
-// view.Section* (06 §2.4); the last one is SectionElsewhere: the editor still lists those items
+// view.Section* (16 §2.4); the last one is SectionElsewhere: the editor still lists those items
 const SECTIONS = ["breaks the game", "worth knowing", "for you to confirm", "errors from the last run", "hidden mods"];
 const FOLD_AT = 4; // a long section shows this many, then "show all"
 

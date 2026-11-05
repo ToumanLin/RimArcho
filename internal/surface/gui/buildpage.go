@@ -22,7 +22,7 @@ type buildPageReader struct {
 }
 
 // BuildPage starts a private reader and returns its ticket before measuring folders
-// (06 §2.6, 06 §3.1). Only the latest request may publish a result.
+// (16 §2.6, 16 §3.1). Only the latest request may publish a result.
 func (s *API) BuildPage(tex int) (uint64, error) {
 	r, err := s.detachedReader()
 	if err != nil {
@@ -50,7 +50,7 @@ func (s *API) BuildPage(tex int) (uint64, error) {
 	return id, nil
 }
 
-// BuildPageResult returns nil while measuring; superseded tickets are invalid (06 §3.1).
+// BuildPageResult returns nil while measuring; superseded tickets are invalid (16 §3.1).
 func (s *API) BuildPageResult(id uint64) (*view.BuildPage, error) {
 	b := &s.buildRead
 	b.mu.Lock()

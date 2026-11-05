@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The log corpus in Can it run (06 §2.4, §5): an undeclared prerequisite with the dependencies,
+// The log corpus in Can it run (16 §2.4, §5): an undeclared prerequisite with the dependencies,
 // a known-bad pair with the conflicts, a mod's own known error as a dimmed note, each with
 // the community logs chip and its measured share; weak order preferences folded, dimmed and not
 // counted; the launch hint is the first LaunchChecks code with a counted item.
@@ -82,7 +82,7 @@ func TestCorpusNeeds(t *testing.T) {
 		t.Errorf("count %d, want 0: %+v", n.Count, n.Items)
 	}
 	for _, it := range []*view.Need{dep, pair, own, weak} {
-		// worth knowing (06 §2.4): nothing sorts here, so the weak preferences are a hint too
+		// worth knowing (16 §2.4): nothing sorts here, so the weak preferences are a hint too
 		if it.Section != view.SectionHint || it.Into != "" {
 			t.Errorf("not in Things to watch: %+v", it)
 		}
@@ -102,7 +102,7 @@ func TestCorpusNeeds(t *testing.T) {
 	}
 }
 
-// The pattern card of a log cluster (06 §2.10): community background  in the player's
+// The pattern card of a log cluster (16 §2.10): community background  in the player's
 // words; the CLI's English pattern section is left out of the text the interfaces show.
 func TestPatternCard(t *testing.T) {
 	t.Parallel()

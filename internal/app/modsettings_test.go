@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// 08 §3: a Mod played from its Workshop folder and then from a SteamCMD copy (an _Archo_
+// 09 §3: a Mod played from its Workshop folder and then from a SteamCMD copy (an _Archo_
 // link) keeps its settings; going back never replaces the Workshop file.
 func TestSettingsFollowDeployedCopy(t *testing.T) {
 	t.Parallel()
@@ -53,7 +53,7 @@ func TestSettingsFollowDeployedCopy(t *testing.T) {
 	}
 }
 
-// 08 §5.3 step 4: a pack's links read their own names; the first play copies each Mod's
+// 10 §3 step 4: a pack's links read their own names; the first play copies each Mod's
 // settings to them, and HugsLib's; later plays keep the pack's own.
 func TestPackSettingsFollowTheMod(t *testing.T) {
 	t.Parallel()
@@ -109,7 +109,7 @@ func TestPackSettingsFollowTheMod(t *testing.T) {
 	}
 }
 
-// 03 §6.7.1, 08 §3: a folder only Archo Monitor saw (a copy since deleted) still leads to the
+// 06 §7.1, 09 §3: a folder only Archo Monitor saw (a copy since deleted) still leads to the
 // Mod's settings, also after its log has rotated away.
 func TestSettingsFromMonitorRecord(t *testing.T) {
 	t.Parallel()
@@ -142,7 +142,7 @@ func TestSettingsFromMonitorRecord(t *testing.T) {
 	}
 }
 
-// 06 §2.9 "Mod settings", 05 §4: the current list's Mods with settings (a file, or a window
+// 16 §2.9 "Mod settings", 13 §4: the current list's Mods with settings (a file, or a window
 // Archo Monitor saw), one Mod's stored values, and the same in archo mod.
 func TestModSettingsCommand(t *testing.T) {
 	t.Parallel()
@@ -177,7 +177,7 @@ func TestModSettingsCommand(t *testing.T) {
 	}
 }
 
-// 03 §6.7.1, 06 §2.9: a settings window Archo Monitor saw shows in archo mod-settings, read
+// 06 §7.1, 16 §2.9: a settings window Archo Monitor saw shows in archo mod-settings, read
 // from where the last read of the live log stopped; it stays after its log is gone, and a
 // window alone puts its Mod in the list.
 func TestModSettingsWindow(t *testing.T) {
@@ -215,7 +215,7 @@ func TestModSettingsWindow(t *testing.T) {
 	}
 }
 
-// 06 §2.9: HugsLib's settings packs. Without Archo Monitor's HugsLib record a pack is a
+// 16 §2.9: HugsLib's settings packs. Without Archo Monitor's HugsLib record a pack is a
 // Mod's only under its package id and shows what the file stores; the record maps a pack
 // under another name and adds titles and defaults, and stays after its log is gone.
 func TestModSettingsHugsLib(t *testing.T) {
@@ -257,7 +257,7 @@ func TestModSettingsHugsLib(t *testing.T) {
 	}
 }
 
-// 06 §2.9, 01 §4: archo mod-settings set changes stored simple values after a backup; a dry
+// 16 §2.9, 02 §1: archo mod-settings set changes stored simple values after a backup; a dry
 // run writes nothing; a Mod with several files names one; a running game refuses.
 func TestModSettingsSet(t *testing.T) {
 	t.Parallel()

@@ -12,15 +12,15 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Saves (06 §2.11, 10 §4). The page reads on its own session (savesState.read), whose App
-// keeps the save heads cached by path, size and time (10 §1.7 L0), so coming back costs a
+// Saves (16 §2.11, 12 §4). The page reads on its own session (savesState.read), whose App
+// keeps the save heads cached by path, size and time (12 §1.7 L0), so coming back costs a
 // stat per save. Listing a cold library reads every head, which can take longer than a
-// call may (06 §8.4): SavesRead returns at once and the listing arrives as a "saves" event.
+// call may (16 §8.4): SavesRead returns at once and the listing arrives as a "saves" event.
 // Selecting a save checks it against its list (SaveDetail, milliseconds). Actions run on
 // the window's session: fixes edit the save's list (one undo step), file actions change
 // the save's folder (rename, copy) or copy and recycle after the player confirmed.
 //
-// The full read (10 §1.7 L1): after a listing that has saves not read yet, the background
+// The full read (12 §1.7 L1): after a listing that has saves not read yet, the background
 // task "saves" runs `archo saves index` in a child process, the selected save first, and
 // the page hears of what it read through "saves-read" events (relisted at most once a
 // second, so rows get their day and colonies regroup by world). The selected save never
@@ -54,7 +54,7 @@ type savesState struct {
 	runner func(ctx context.Context, first []string, progress func(string)) error
 }
 
-// Throttles of the "saves-read" event (06 §2.16.1 G20): news at most every half second
+// Throttles of the "saves-read" event (16 §2.16.1 G20): news at most every half second
 // (the selected save's own read at once), the listing at most once a second.
 const (
 	savesNewsEvery = 500 * time.Millisecond
@@ -172,7 +172,7 @@ func (s *API) findSave(ref string) (*app.Save, error) {
 	return sv, err
 }
 
-// SaveDetail is the selected save against its list (10 §4.3): the middle and right cards.
+// SaveDetail is the selected save against its list (12 §4.3): the middle and right cards.
 func (s *API) SaveDetail(ref string) (*view.SaveDetail, error) {
 	sv, err := s.findSave(ref)
 	if err != nil {
@@ -207,9 +207,9 @@ type SaveFixReply struct {
 	Page        string   `json:"page"`
 }
 
-// SaveFix applies a save's Mod fixes to its list as one undoable edit (10 §4.4): mods
+// SaveFix applies a save's Mod fixes to its list as one undoable edit (12 §4.4): mods
 // names the Mods to enable or subscribe (none: all of them), disableAdded and order the
-// other two fixes. The list opens in the editor first (not current, 04 §1.3), so the
+// other two fixes. The list opens in the editor first (not current, 07 §1.3), so the
 // status line's undo undoes this edit.
 func (s *API) SaveFix(ref string, mods []string, disableAdded, order bool) (*SaveFixReply, error) {
 	sv, err := s.findSave(ref)
@@ -251,7 +251,7 @@ func (s *API) SaveNameProblem(ref, name string) string {
 	return view.SaveNameProblem(sv, name)
 }
 
-// SaveRename renames a save in its folder, keeping a RimSaves prefix (10 §4.4); refused
+// SaveRename renames a save in its folder, keeping a RimSaves prefix (12 §4.4); refused
 // while a game runs.
 func (s *API) SaveRename(ref, name string) (*SaveFileReply, error) {
 	sv, err := s.findSave(ref)
@@ -271,7 +271,7 @@ func (s *API) SaveRename(ref, name string) (*SaveFileReply, error) {
 	return &SaveFileReply{Text: view.Tf("renamed %s to %s", sv.Name, shown), Ref: app.SaveRef(to)}, nil
 }
 
-// SaveCopy copies a save next to itself as "<name> (copy)" (10 §4.4).
+// SaveCopy copies a save next to itself as "<name> (copy)" (12 §4.4).
 func (s *API) SaveCopy(ref string) (*SaveFileReply, error) {
 	sv, err := s.findSave(ref)
 	if err != nil {
@@ -309,8 +309,8 @@ func (s *API) savesOf(refs []string) ([]*app.Save, error) {
 	return out, nil
 }
 
-// SaveBackup copies saves to <data>/backups/saves/<time>/ (10 §4.4). Without yes it only
-// lists the files and their sizes for the page's confirmation (06 §6).
+// SaveBackup copies saves to <data>/backups/saves/<time>/ (12 §4.4). Without yes it only
+// lists the files and their sizes for the page's confirmation (16 §6).
 func (s *API) SaveBackup(refs []string, yes bool) (*SaveFilesReply, error) {
 	saves, err := s.savesOf(refs)
 	if err != nil {
@@ -328,7 +328,7 @@ func (s *API) SaveBackup(refs []string, yes bool) (*SaveFilesReply, error) {
 	return &SaveFilesReply{Text: view.SaveFilesText(r, true), Failed: len(r.Errs) > 0}, nil
 }
 
-// SaveTrash moves saves to the recycle bin (08 §7, 10 §4.4), refused while a game runs.
+// SaveTrash moves saves to the recycle bin (02 §3, 12 §4.4), refused while a game runs.
 // Without yes it only lists the files and their sizes.
 func (s *API) SaveTrash(refs []string, yes bool) (*SaveFilesReply, error) {
 	saves, err := s.savesOf(refs)
@@ -348,8 +348,8 @@ func (s *API) SaveTrash(refs []string, yes bool) (*SaveFilesReply, error) {
 }
 
 // SaveNewList makes a new list from the save's Mods, as All lists' "from a save" does
-// (04 §9, 10 §4.4): named after the colony, opened in the editor, not made current. With
-// analyze it also starts the analysis of the new list (background task, 06 §2.16) and
+// (07 §7, 12 §4.4): named after the colony, opened in the editor, not made current. With
+// analyze it also starts the analysis of the new list (background task, 16 §2.16) and
 // the page does not move.
 func (s *API) SaveNewList(ref string, analyze bool) (*PlanDone, error) {
 	sv, err := s.findSave(ref)
@@ -368,7 +368,7 @@ func (s *API) SaveNewList(ref string, analyze bool) (*PlanDone, error) {
 	}
 	d, err := s.planDone(p.ID, t, err)
 	// Analysing the new list indexes the save's Mods, so Can it load? can check what they
-	// own (10 §4.6); the page stays and checks the save again when it is done.
+	// own (12 §4.6); the page stays and checks the save again when it is done.
 	if err == nil && analyze {
 		if s.startAnalyzeOf(p.Name) {
 			d.Text += "  " + view.Tf("analysing %s…", p.Name)
@@ -400,9 +400,9 @@ func saveErr(err error) error {
 	return errors.New(view.Humanize(nil, err.Error()))
 }
 
-// leaveSaves forgets the listing and the facts when the player leaves the page (07 §8.3);
+// leaveSaves forgets the listing and the facts when the player leaves the page (17 §7.3);
 // the reader and its head cache stay until it is idle (readerIdle). A background read
-// goes on (it is a task, 06 §2.16); a selected save waiting to be read is dropped.
+// goes on (it is a task, 16 §2.16); a selected save waiting to be read is dropped.
 func (s *API) leaveSaves() {
 	s.saves.mu.Lock()
 	s.saves.list, s.saves.facts, s.saves.failed, s.saves.next = nil, nil, nil, nil

@@ -11,11 +11,11 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/savefile"
 )
 
-// The playthrough of saves show (10 §4.3 "Play facts", 06 §2.11 "Right"), from the full
-// read (10 §1.7 L1): a short summary by default, the colonists, events and research with
+// The playthrough of saves show (12 §4.3 "Play facts", 16 §2.11 "Right"), from the full
+// read (12 §1.7 L1): a short summary by default, the colonists, events and research with
 // --play. Changes are against the colony's previous save when its full read is cached.
 
-// Rows --play shows before "… N more" (05 §3.1 rule 5: the whole call stays within 40 lines).
+// Rows --play shows before "… N more" (13 §3.1 rule 5: the whole call stays within 40 lines).
 const (
 	playColonists = 10
 	playEvents    = 6

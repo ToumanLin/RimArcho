@@ -1,5 +1,5 @@
-// Package savefile reads RimWorld saves (.rws) without writing them (10 §1). ReadHead is
-// the cheap tier (10 §1.7 L0): the <meta> block at the start and the last bytes of the file.
+// Package savefile reads RimWorld saves (.rws) without writing them (12 §1). ReadHead is
+// the cheap tier (12 §1.7 L0): the <meta> block at the start and the last bytes of the file.
 package savefile
 
 import (
@@ -16,7 +16,7 @@ import (
 // ErrNoMeta: the file has no <meta><modIds>, so it is not a usable save.
 var ErrNoMeta = errors.New("no <meta><modIds> in the save")
 
-// Head is what a save says about itself before the game data (10 §1.3), plus whether the
+// Head is what a save says about itself before the game data (12 §1.3), plus whether the
 // file ends like a finished save.
 type Head struct {
 	GameVersion string   `json:"gameVersion"`
@@ -24,7 +24,7 @@ type Head struct {
 	ModNames    []string `json:"modNames"` // one per ModIDs entry when the save has them
 	SteamIDs    []string `json:"steamIds"` // Workshop IDs per ModIDs entry; "0" or "" for none
 	// Complete: the last non-space bytes are </savegame>. A file cut off while the game
-	// wrote it (often during a crash) is not complete (10 §4.3).
+	// wrote it (often during a crash) is not complete (12 §4.3).
 	Complete bool `json:"complete"`
 }
 

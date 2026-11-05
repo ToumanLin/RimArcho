@@ -111,7 +111,7 @@ func TestTestRunPlanConfigVisibilityAndReport(t *testing.T) {
 	e.WriteFile(filepath.Join(e.UserData, "Config", "KeyPrefs.xml"), "<KeyPrefs/>")
 	e.WriteFile(filepath.Join(e.UserData, "Config", "ModSettings.xml"), "<Settings>keep</Settings>")
 	// Linked is seen through another tool's link now; its settings were saved under its
-	// RimArcho link name (08 §3).
+	// RimArcho link name (09 §3).
 	e.WriteFile(filepath.Join(e.UserData, "Config", "Mod__Archo_extra_Linked_LinkedMod.xml"), "<linked/>")
 	e.WriteFile(filepath.Join(e.UserData, "Config", "Knowledge.xml"), "player knowledge")
 	e.WriteFile(filepath.Join(e.UserData, "Config", "skip.txt"), "not config")
@@ -154,7 +154,7 @@ func TestTestRunPlanConfigVisibilityAndReport(t *testing.T) {
 	if r.Status != "menu" || r.Plan != "plan:tested" || r.Requested != 7 || r.LoadSeconds <= 0 || r.TotalSeconds <= r.LoadSeconds || r.Attribution != "tested-plan" {
 		t.Fatalf("report %+v", r)
 	}
-	// The SteamCMD and extra Mods are linked for the run only (08 §12).
+	// The SteamCMD and extra Mods are linked for the run only (09 §7).
 	if len(r.Missing) != 0 || len(r.Linked) != 2 || !slices.Equal(linkedDuringRun, r.Linked) {
 		t.Fatalf("missing %+v, linked %v, links during the run %v", r.Missing, r.Linked, linkedDuringRun)
 	}
@@ -365,7 +365,7 @@ func linkNames(t *testing.T, mods string) []string {
 }
 
 // A Mod that would sit next to another copy of its packageId in Mods/ is not linked; a
-// link an interrupted run left is removed by the next run (08 §12).
+// link an interrupted run left is removed by the next run (09 §7).
 func TestTestRunLinksBlockedAndLeftover(t *testing.T) {
 	t.Parallel()
 	e := testRunEnv(t)
@@ -415,7 +415,7 @@ func TestTestRunLinksBlockedAndLeftover(t *testing.T) {
 }
 
 // The flow the MCP Instructions recommend: pin_mod, edit the copy, then test_run tests the
-// copy, not the Workshop original, and leaves Mods/ as it was (08 §12).
+// copy, not the Workshop original, and leaves Mods/ as it was (09 §7).
 func TestTestRunSeesPinnedCopy(t *testing.T) {
 	t.Parallel()
 	e, _ := pinFixture(t)

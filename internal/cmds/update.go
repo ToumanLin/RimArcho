@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	register(&Command{Name: "update", Summary: "check GitHub for a newer RimArcho and install it; the data folder is not touched (07 §5.1)",
+	register(&Command{Name: "update", Summary: "check GitHub for a newer RimArcho and install it; the data folder is not touched (17 §5.1)",
 		Flags: []Flag{{Name: "check", Help: "only check and show what installing would do; nothing is downloaded"}}, MaxArgs: 0, Run: updateCmd})
 }
 

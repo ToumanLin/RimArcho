@@ -10,9 +10,9 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// gameTypeFiles are the game's managed assemblies whose type names are indexed (03 §5.3).
+// gameTypeFiles are the game's managed assemblies whose type names are indexed (05 §5.3).
 // A save's Class="…" names a Verse.IExposable type, which only Assembly-CSharp and the Mods'
-// assemblies can define, and the game looks it up only there and in mscorlib (07 §7). The
+// assemblies can define, and the game looks it up only there and in mscorlib (17 §6). The
 // Unity, Steamworks, audio and zip libraries beside them reference no game type.
 var gameTypeFiles = []string{store.GameMainAssembly, "Assembly-CSharp-firstpass.dll"}
 

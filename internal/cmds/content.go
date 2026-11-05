@@ -44,7 +44,7 @@ func analysed(c *Ctx) (*app.LoadoutState, *app.AnalysisState, error) {
 }
 
 // notAnalysed answers --mod for a mod outside the current list. Patches and Harmony are
-// analysed only for the list (03 §5), so a count of 0 would say the mod has none.
+// analysed only for the list (05 §5), so a count of 0 would say the mod has none.
 func notAnalysed(what string) *render.Doc {
 	d, root := render.New(what + ": not analysed (not in the current list)")
 	root.Add("patches and Harmony are analysed only for the mods in the current list; add it to see them")
@@ -147,7 +147,7 @@ func defCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			}
 			sec.Add(line)
 		}
-		// The definition exists, but the game may not have loaded its file (03 §6.3).
+		// The definition exists, but the game may not have loaded its file (06 §3).
 		if eff := active[len(active)-1].f; !byName {
 			if id := c.App.DefFileFailed(st, path.Base(eff.File)); id != "" {
 				root.KV("log", fmt.Sprintf("not loaded: the newest log says %s failed to load (%s); archo log --cluster %s", path.Base(eff.File), id, strings.TrimPrefix(id, "log:")))
@@ -473,7 +473,7 @@ func whyCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		onto(ma, db)
 		onto(mb, da)
-		// Methods both mods patch with Harmony (05 §4.2: shared patches).
+		// Methods both mods patch with Harmony (13 §4.2: shared patches).
 		ha, _ := c.App.Store.HarmonyPatches(store.HarmonyFilter{Instance: ma.ID})
 		hb, _ := c.App.Store.HarmonyPatches(store.HarmonyFilter{Instance: mb.ID})
 		kinds := map[string][2][]string{}

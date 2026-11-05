@@ -9,9 +9,9 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
-// Saves (05 §4.2, 10 §4): list colonies and their saves, show one save against its list
+// Saves (13 §4.2, 12 §4): list colonies and their saves, show one save against its list
 // and its playthrough, fix its list, rename, copy, back up and recycle, read saves in full.
-// Lists use the cached full read (10 §1.7 L1) and never read; a save not read in full yet
+// Lists use the cached full read (12 §1.7 L1) and never read; a save not read in full yet
 // is "meta only". saves show reads its one save in full inline.
 
 func init() {
@@ -34,7 +34,7 @@ func init() {
 	register(&Command{Name: "saves trash", Args: "<save…>", Summary: "move saves to the recycle bin (confirm with --yes; refused while the game runs)", MinArgs: 1, MaxArgs: -1, Flags: yes, Run: savesTrash})
 }
 
-// metaOnly marks a save without the full read: no in-game day or play facts (10 §1.7).
+// metaOnly marks a save without the full read: no in-game day or play facts (12 §1.7).
 const metaOnly = "meta only"
 
 // dayText is saves list's day column: the in-game day from the cached full read, else
@@ -51,8 +51,8 @@ func dayText(s *app.Save) string {
 
 // ---- references ----
 
-// findSaves resolves save references (05 §2). A reference that several saves match is the
-// candidate list with exit code 3 (05 §3.3): the doc to return instead.
+// findSaves resolves save references (13 §2). A reference that several saves match is the
+// candidate list with exit code 3 (13 §3.3): the doc to return instead.
 func findSaves(c *Ctx, refs []string) ([]*app.Save, *render.Doc, error) {
 	l, err := c.App.ListSaves()
 	if err != nil {
@@ -117,7 +117,7 @@ func saveListText(s *app.Save) string {
 	return "no list"
 }
 
-// matchText says how a save matched its list (10 §4.2).
+// matchText says how a save matched its list (12 §4.2).
 func matchText(s *app.Save) string {
 	switch s.Match {
 	case app.MatchPack:
@@ -135,8 +135,8 @@ func fixLine(f app.SaveFix) string {
 	return strings.TrimSuffix(f.Label, "…") + " (archo " + f.Command + ")"
 }
 
-// consequence is what an issue means for loading the save (10 §4.3). With the full read a
-// missing Mod's row says what it owns in the save (10 §4.6); without it, only that what
+// consequence is what an issue means for loading the save (12 §4.3). With the full read a
+// missing Mod's row says what it owns in the save (12 §4.6); without it, only that what
 // the Mod added is lost.
 func consequence(is app.SaveIssue) string {
 	owns := func(lost string) string {
@@ -282,7 +282,7 @@ func inEnv(s *app.Save, name string) bool {
 	return false
 }
 
-// listSaveBudget is the default number of lines for colonies and saves (05 §3.1 rule 5),
+// listSaveBudget is the default number of lines for colonies and saves (13 §3.1 rule 5),
 // and listColonySaves the saves shown per colony when every colony is listed.
 const (
 	listSaveBudget  = 34
@@ -487,8 +487,8 @@ func savesShow(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil || amb != nil {
 		return amb, err
 	}
-	// The full read first (10 §1.7: inline for the one save), so the load check and the
-	// colony see it: a save read now may join its world's colony (10 §4.1).
+	// The full read first (12 §1.7: inline for the one save), so the load check and the
+	// colony see it: a save read now may join its world's colony (12 §4.1).
 	had := s.Summary != nil
 	facts, ferr := c.App.SaveFacts(s, true)
 	if facts != nil && !had {
@@ -547,7 +547,7 @@ func savesShow(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		addPlay(root, s, facts, prev, play, limit)
 	}
-	// The rest shares the call's 40 lines (05 §3.1 rule 5): the load check's items first,
+	// The rest shares the call's 40 lines (13 §3.1 rule 5): the load check's items first,
 	// then the Mod rows, keeping room for the quick fix, a few Mod rows and next:.
 	budget := 0
 	if !all {
@@ -650,7 +650,7 @@ func savesShow(c *Ctx, a *Args) (*render.Doc, error) {
 	return d, nil
 }
 
-// showLines is saves show's line budget without --all (05 §3.1 rule 5).
+// showLines is saves show's line budget without --all (13 §3.1 rule 5).
 const showLines = 40
 
 // nodeLines counts the lines a node renders; docLines a whole document's, next: included.
@@ -673,7 +673,7 @@ func docLines(d *render.Doc) int {
 	return c
 }
 
-// addSaveMods is the save's Mod list against the list (10 §4.3 "Mod list"): with full the
+// addSaveMods is the save's Mod list against the list (12 §4.3 "Mod list"): with full the
 // whole list in save order, else only the differences.
 func addSaveMods(root *render.Node, ix *app.Index, chk *app.SaveCheck, full bool, limit int, s *app.Save) {
 	counts := map[string]int{}

@@ -11,7 +11,7 @@ import (
 
 // While the game writes Player.log, that log is this run: the problems take the last run
 // from Player-prev.log, also when the player had selected Player.log, and go back to
-// Player.log when the game exits (03 §6.4; VM run 2026-10-28 listed one run twice).
+// Player.log when the game exits (06 §4; VM run 2026-10-28 listed one run twice).
 func TestProblemLogSkipsTheRunningGamesLog(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)

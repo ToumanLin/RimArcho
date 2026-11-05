@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// 06 §3.1 rule 6: everything the mouse can do, the keyboard can do. Every op a row can
+// 16 §3.1 rule 6: everything the mouse can do, the keyboard can do. Every op a row can
 // have is in the table with a key or a menu group (the menu key and shift+F10 open the
 // menu), and every menu group's ops come in the menu's order.
 func TestOpsReachable(t *testing.T) {
@@ -56,7 +56,7 @@ func TestOpsReachable(t *testing.T) {
 			}
 		}
 	}
-	// Form pages expose their verbs and cancellation to keyboard users (06 §2.17).
+	// Form pages expose their verbs and cancellation to keyboard users (16 §2.17).
 	for page, required := range map[string][]string{PagePlans: {"n", "i", "e", "F2", "Delete", "esc"}, "plan-import": {"tab", "enter", "esc"}, "plan-export": {"↑↓", "ctrl+s", "ctrl+c", "esc"}} {
 		keys := map[string]bool{}
 		for _, row := range KeyHelp(page, false) {
@@ -130,7 +130,7 @@ func TestKeyHelpText(t *testing.T) {
 	}
 }
 
-// The launch page's numbered columns are focus keys (06 §2.3, 06 §3.5).
+// The launch page's numbered columns are focus keys (16 §2.3, 16 §3.5).
 func TestHomeFocusKeyHelp(t *testing.T) {
 	t.Parallel()
 	if !slices.ContainsFunc(KeyHelp("home", false), func(r KeyRow) bool { return r.Keys == "1–3" }) {

@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// add a subscription (06 §2.9, §9.1): Mod library's paste box as a page of its own (+ on updates, the
+// add a subscription (16 §2.9, §9.1): Mod library's paste box as a page of its own (+ on updates, the
 // palette, a paste on updates). What is typed or pasted is recognised the way the window
 // recognises it (subscribe.Detect); under it a card asks only the one decision that source
 // needs (↑↓), shows the --dry-run text, and enter queues subscribe as a background task (06
@@ -422,7 +422,7 @@ func (m *model) checkSources(keys []string) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-// allSources: the sources K checks — every one that has mods, but local (06 §2.9).
+// allSources: the sources K checks — every one that has mods, but local (16 §2.9).
 func (c *chState) allSources() []string {
 	var keys []string
 	if c.subscriptions != nil {
@@ -518,7 +518,7 @@ func (m *model) removeSubscription(ref, name string) tea.Cmd {
 	}, func(m *model) tea.Cmd { return m.submitLane(view.OpSubRemove, []string{ref}, []string{name}) })
 }
 
-// previewPanel opens a confirmation whose dry run is made in the background (06 §6, §3.1
+// previewPanel opens a confirmation whose dry run is made in the background (16 §6, §3.1
 // rule 9): "dry run…" at once, the text when it is in, enter runs do once it allows.
 func (m *model) previewPanel(title string, dry func(a *app.App) ([]string, bool), do func(m *model) tea.Cmd) tea.Cmd {
 	pn := &panel{title: title, lines: []string{T("dry run…")}}

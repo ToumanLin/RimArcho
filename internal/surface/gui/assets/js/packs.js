@@ -1,5 +1,5 @@
 import { choiceControl } from "./choices.js";
-// pack (06 §2.6, §2.7, 08 §5): the packs (the sidebar's pack), each pack's own page
+// pack (16 §2.6, §2.7, 10): the packs (the sidebar's pack), each pack's own page
 // (its sub-entries), and Create a pack, the plan's sub-page: on the left the name and the
 // things building does, on the right the summary and create, disabled with the reason when
 // something stops the build (G14); the builds cut short below. A pack's list alone is
@@ -154,7 +154,7 @@ async function launch() {
 
 // launchPack plays a pack (here and on Start): when Mods/ holds another version of one of its
 // mods that can move into the lock library, one confirmation lists the moves, then it goes
-// on (08 §5.3).
+// on (10 §3).
 export async function launchPack(name) {
   let o;
   try { o = await api.PackLaunch(name, false); } catch (e) { return say("fail", errText(e)); }
@@ -218,7 +218,7 @@ function progressBox(p, label) {
 }
 
 // buildCard is a build: running (here or in another window) or cut short (delete what it
-// copied — RimArcho's own unfinished copy, 08 §5.2 — or build it again).
+// copied — RimArcho's own unfinished copy, 10 §2 — or build it again).
 function buildCard(u) {
   const card = el("section", "card build" + (u.running ? "" : " unfinished"));
   card.dataset.build = u.name;
@@ -375,7 +375,7 @@ async function measureBuild(tex) {
   read.finish();
 }
 
-// 06 §3.1: polling never holds navigation; late replies belong to their old ticket.
+// 16 §3.1: polling never holds navigation; late replies belong to their old ticket.
 async function readBuild(tex, current) {
   const id = await api.BuildPage(tex);
   while (current()) {
@@ -387,7 +387,7 @@ async function readBuild(tex, current) {
   return null;
 }
 
-// 06 §2.6, 06 §7.1: keep the form alive and replace only facts being measured.
+// 16 §2.6, 16 §7.1: keep the form alive and replace only facts being measured.
 function syncMeasure() {
   const select = $("#pk-tex");
   if (select) select.value = String(B.tex);
@@ -605,7 +605,7 @@ async function startBuild(name) {
   redraw();
 }
 
-// The preview stays beneath the summary; leaving or changing inputs discards late replies (06 §2.6).
+// The preview stays beneath the summary; leaving or changing inputs discards late replies (16 §2.6).
 function syncDryRun() {
   const out = $("#pk-dry-output"), button = $(".bd-dry");
   if (!out) return;

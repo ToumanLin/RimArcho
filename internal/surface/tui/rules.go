@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Load-order rules (06 §2.5, §9.1, 04 §6.1): the editor's rules card as a screen of its own, on the
+// Load-order rules (16 §2.5, §9.1, 08 §2.1): the editor's rules card as a screen of its own, on the
 // same view.BuildRules / SaveRule / RemoveRule / RestoreRule. The window folds it into the
 // editor's left column; the terminal's third column is too narrow for its sentences. Rules
 // are global; the screen shows the ones with a mod enabled in the open list (only the current list,
@@ -316,7 +316,7 @@ func (m *model) rulePick() {
 }
 
 // ruleSave adds or changes the rule; the editor reloads (the order problems, the row icons
-// and Can it run's number follow), and nothing is sorted (06 §2.5).
+// and Can it run's number follow), and nothing is sorted (16 §2.5).
 func (m *model) ruleSave() tea.Cmd {
 	r := &m.rules
 	f := r.form

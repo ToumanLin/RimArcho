@@ -116,7 +116,7 @@ func (s *API) cancelLoadCost(close bool) {
 	}
 }
 
-// The list management page and its export sub-page (06 §2.17). Every verb is a view call
+// The list management page and its export sub-page (16 §2.17). Every verb is a view call
 // over the same app functions the CLI's plan versions / follow / sync use.
 
 // PlanManage is the page with the list sel picked (0: the current one). No network.

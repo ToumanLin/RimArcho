@@ -7,7 +7,7 @@ import (
 )
 
 // VolumeFS names the file system of the volume holding dir ("NTFS", "exFAT", "FAT32" …;
-// "" when it cannot be read). Directory junctions need NTFS or ReFS (08 §3).
+// "" when it cannot be read). Directory junctions need NTFS or ReFS (09 §3).
 func VolumeFS(dir string) string {
 	abs, err := filepath.Abs(dir)
 	if err != nil {

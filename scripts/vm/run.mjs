@@ -545,7 +545,7 @@ async function scenario4() {
   const stageHistory = async (b,a,disable) => {
     const step=async redo=>{if(c){await press(redo?'Control+KeyR':'KeyU');await settled();}else await act(redo?'Redo':'Undo');};
     await step(false);const u=await snapshot('stage-undone');
-    check('stage undo restores entries and staging payload',JSON.stringify(payload(u))===JSON.stringify(payload(b)),{finding:'Staging/history payload mismatch (spec 04 §2.2)'});
+    check('stage undo restores entries and staging payload',JSON.stringify(payload(u))===JSON.stringify(payload(b)),{finding:'Staging/history payload mismatch (spec 07 §2.2)'});
     await step(true);const r=await snapshot('stage-redone');
     check('stage redo restores entries and staging payload',JSON.stringify(payload(r))===JSON.stringify(payload(a)));
     await step(false);await snapshot('stage-undone-again');

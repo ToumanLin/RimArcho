@@ -7,7 +7,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 )
 
-// ownedConsequence says what loading a save without a Mod loses (10 §4.6), from what the
+// ownedConsequence says what loading a save without a Mod loses (12 §4.6), from what the
 // Mod owns in it; without the full read (nil) it is lost, the generic sentence.
 func ownedConsequence(o *app.SaveOwned, lost string) string {
 	if o == nil {
@@ -25,7 +25,7 @@ func ownedConsequence(o *app.SaveOwned, lost string) string {
 			}
 		}
 	}
-	// the quick-fix bar offers the analysis that checks them (06 §2.11)
+	// the quick-fix bar offers the analysis that checks them (16 §2.11)
 	if o.DefsUnchecked {
 		b.WriteString(T("; Defs of the save's list not analysed yet"))
 	}

@@ -16,14 +16,14 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Locked is a locked version RimArcho created (04 §7.1): a copy in the local (or an extra) source with
+// Locked is a locked version RimArcho created (07 §5.1): a copy in the local (or an extra) source with
 // .rimarcho/origin.json whose origin instance (the upstream) is still installed and not
 // hidden. RimCrow-style locks (a hidden workshop copy) are Hidden with HiddenPinned.
 type Locked struct {
 	Copy     *store.Mod
 	Upstream *store.Mod
 	Origin   scan.Origin
-	// Updated: the upstream's current snapshot differs from origin_snapshot (04 §7.3).
+	// Updated: the upstream's current snapshot differs from origin_snapshot (07 §5.3).
 	Updated bool
 }
 
@@ -83,7 +83,7 @@ func (st *LoadoutState) lockFor(m *store.Mod) (*Locked, error) {
 	return nil, &Ambiguous{Ref: st.Ix.Ref(m.ID), Mods: mods}
 }
 
-// PinResult is the outcome of Pin and PinUpdate (04 §7.2, §7.4).
+// PinResult is the outcome of Pin and PinUpdate (07 §5.2, §5.4).
 type PinResult struct {
 	From *store.Mod  // the instance copied
 	Copy *CopyResult // the files copied (counted only on a dry run)
@@ -104,13 +104,13 @@ type PinResult struct {
 	Blocked string
 	// Moved: update only, the old copy was in Mods/ and moves to the lock library first.
 	Moved *MoveResult
-	// Reason: why the player (or an agent) made it, kept in the copy's note (06 §2.9).
+	// Reason: why the player (or an agent) made it, kept in the copy's note (16 §2.9).
 	Reason string
 }
 
-// Pin creates a locked version (04 §7.2): copy into the lock library with an origin
+// Pin creates a locked version (07 §5.2): copy into the lock library with an origin
 // marker, rescan, and swap the copy in for the original in the current plan when the
-// original is enabled. The game sees the copy only through an _Archo_ link (08 §3).
+// original is enabled. The game sees the copy only through an _Archo_ link (09 §3).
 func (a *App) Pin(ref, name string, git, dryRun bool) (*PinResult, error) {
 	return a.PinFor(ref, name, git, dryRun, "")
 }
@@ -132,7 +132,7 @@ func (a *App) PinFor(ref, name string, git, dryRun bool, reason string) (*PinRes
 	return res, a.makeLock(st, res, name, git)
 }
 
-// PinUpdate remakes a locked version from the upstream's current content (04 §7.4): a
+// PinUpdate remakes a locked version from the upstream's current content (07 §5.4): a
 // fresh copy under a new folder name replaces the old copy (or the upstream) in the
 // current plan; the old copy stays in the library. An old copy still in Mods/ (made before
 // the library) is moved into the library first. ref may name the copy or the upstream.
@@ -236,7 +236,7 @@ func (a *App) makeLock(st *LoadoutState, res *PinResult, name string, git bool) 
 	}
 	res.CopyMod = ix.ModAt(res.Copy.Dir)
 	if res.CopyMod != nil {
-		// The copy's note starts from this (06 §2.9): made when, for which plan, why.
+		// The copy's note starts from this (16 §2.9): made when, for which plan, why.
 		made := &store.Made{Kind: "pin", At: a.Now().UTC(), Reason: res.Reason}
 		if res.Old != nil {
 			made.Kind = "pin-update"

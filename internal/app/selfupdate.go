@@ -1,6 +1,6 @@
 package app
 
-// RimArcho updating itself (07 §5.1): the "self" automatic check reads GitHub Releases;
+// RimArcho updating itself (17 §5.1): the "self" automatic check reads GitHub Releases;
 // installing waits for the player's confirmation, downloads and verifies the release zip,
 // waits until no other RimArcho runs from the program folder, swaps the files and checks
 // the new program before the surface restarts it. The data folder is never touched.
@@ -24,7 +24,7 @@ import (
 
 // UpdateDirName is the folder inside the program folder that holds the download, the
 // unpacked new files and the old files moved aside; on the program's volume so the swap
-// is renames only (07 §5.1, 01 §4).
+// is renames only (17 §5.1, 02 §1).
 const UpdateDirName = ".archo-update"
 
 // UpdatedFromEnv carries the pid of the process that installed an update to the program it
@@ -71,7 +71,7 @@ func selfPrerelease(v string) bool {
 	return pre != ""
 }
 
-// UpdateAPIEnv replaces GitHub's API root (a test release server in the VM, 07 §5.1).
+// UpdateAPIEnv replaces GitHub's API root (a test release server in the VM, 17 §5.1).
 const UpdateAPIEnv = "RIMARCHO_UPDATE_API"
 
 func (a *App) selfClient() *selfupdate.Client {
@@ -163,7 +163,7 @@ func (a *App) OtherArchoIn(dir string) []*GameRun {
 // ErrUpdateBusy: another RimArcho is installing the update from the same program folder.
 var ErrUpdateBusy = errors.New("another RimArcho is already installing the update")
 
-// InstallSelfUpdate installs the pending release after the player confirmed it (01 §4).
+// InstallSelfUpdate installs the pending release after the player confirmed it (02 §1).
 // The download and unpacking happen first; the files are swapped only once no other
 // RimArcho runs from the program folder (it waits, reporting them, until ctx ends). The
 // new archo must then report the new version, or the old files are put back. The caller

@@ -9,7 +9,7 @@ import (
 )
 
 // Environment preparation owns a separate session and never holds the page mutex
-// during disk reads, linking or scanning (06 §3.1, 06 §8.4).
+// during disk reads, linking or scanning (16 §3.1, 16 §8.4).
 type environmentWorker struct {
 	mu      sync.Mutex
 	gate    sync.Mutex
@@ -41,7 +41,7 @@ func (s *API) UseEnv(request uint64, name string) bool {
 	return s.queueEnvironment(request, name, "", 0, "", nil)
 }
 
-// HomeApply applies the selected game/list in the background (06 §2.3).
+// HomeApply applies the selected game/list in the background (16 §2.3).
 func (s *API) HomeApply(request uint64, kind, name string, plan int64, pack string) bool {
 	return s.queueEnvironment(request, name, kind, plan, pack, nil)
 }
@@ -118,7 +118,7 @@ func (s *API) queueEnvironment(request uint64, name, kind string, plan int64, pa
 			return
 		}
 		// Registration deliberately skips the board: it would import/load thousands
-		// of mods before GuideScan even starts (06 §8.4).
+		// of mods before GuideScan even starts (16 §8.4).
 		var reader *API
 		if kind != "add" {
 			reader = &API{a: r, busy: map[string]bool{}}
@@ -184,7 +184,7 @@ func (s *API) queueEnvironment(request uint64, name, kind string, plan int64, pa
 }
 
 // Workspace reads the board/sidebar/history without blocking a GUI method or sharing
-// the page mutex during index loads (06 §8.4). Results use the same event contract.
+// the page mutex during index loads (16 §8.4). Results use the same event contract.
 func (s *API) Workspace(request uint64) bool {
 	w := &s.environment
 	w.mu.Lock()

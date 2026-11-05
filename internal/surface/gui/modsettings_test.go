@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Mod library › Mod settings (06 §2.9 "Mod settings"): one row per settings file of the
+// Mod library › Mod settings (16 §2.9 "Mod settings"): one row per settings file of the
 // current list, and what a file stores, by instance and class (the page never passes a path).
 func TestModSettingsPage(t *testing.T) {
 	t.Parallel()
@@ -73,7 +73,7 @@ func TestModSettingsPage(t *testing.T) {
 	if _, err := api.ModSettingsFile("nope", r.Class); err == nil {
 		t.Fatal("an unknown instance is an error")
 	}
-	// the Mod's detail has a settings row whose button opens the page at it (06 §4.1)
+	// the Mod's detail has a settings row whose button opens the page at it (16 §4.1)
 	det, err := api.Detail(r.Instance, false, false, false)
 	if err != nil {
 		t.Fatal(err)

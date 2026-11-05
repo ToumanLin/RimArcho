@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/known"
 )
 
-// Can it run's sections and evidence (06 §2.4): the items are shown in sections, and each says
+// Can it run's sections and evidence (16 §2.4): the items are shown in sections, and each says
 // where its claim comes from.
 
 // Sections, in screen order. The GUI's left column holds the first three (what checking
@@ -41,8 +41,8 @@ func SectionOf(group int) int {
 }
 
 // Evidence kinds: the mod's own declaration, RimArcho's analysis, the game's log, the
-// community's data (04 §6), a rule the player added, or what shared logs showed (the log
-// corpus, 03 §4.3: the source carries the measured share).
+// community's data (08 §2), a rule the player added, or what shared logs showed (the log
+// corpus, 05 §4.3: the source carries the measured share).
 const (
 	EvDeclared  = "declared"
 	EvInferred  = "inferred"
@@ -220,13 +220,13 @@ func atoi(s string) int {
 
 var (
 	logIDRe = regexp.MustCompile(`^log:(\S+) x\d+:`)
-	// a file the companion log tied to the error (03 §6.7.4): "log file (ArchoMonitor.log): Defs/X.xml"
+	// a file the companion log tied to the error (06 §7.4): "log file (ArchoMonitor.log): Defs/X.xml"
 	companionFileRe = regexp.MustCompile(`log file \(([^)]+\.log)\): (\S+)`)
 )
 
 // companionChips are the files the companion log names in evidence texts, as
 // "file Defs/X.xml  ArchoMonitor.log": the mod's file labelled as one, then the log that
-// named it; two spaces part facts (06 §7.3, the GUI shows them as a gap).
+// named it; two spaces part facts (16 §7.3, the GUI shows them as a gap).
 func companionChips(texts []string) []string {
 	var out []string
 	for _, t := range texts {
@@ -245,7 +245,7 @@ func companionChips(texts []string) []string {
 }
 
 // logEvidence: the clusters of a mod's errors in the last log and when it was written; a
-// file from the companion log when it names one (03 §6.7.4).
+// file from the companion log when it names one (06 §7.4).
 func logEvidence(ps []*app.Problem, when string) *Evidence {
 	var ids, texts []string
 	for _, p := range ps {

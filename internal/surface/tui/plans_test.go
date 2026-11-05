@@ -38,7 +38,7 @@ func typeText(m *model, s string) {
 	m.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)})
 }
 
-// 06 §9.1, T21/T22: P manages the plans with the view verbs; the palette goes to another
+// 16 §9.1, T21/T22: P manages the plans with the view verbs; the palette goes to another
 // plan; the editor and the top bar show the current one.
 func TestPlansInTUI(t *testing.T) {
 	t.Parallel()

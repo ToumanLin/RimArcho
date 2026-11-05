@@ -1,4 +1,4 @@
-// Package store is RimArcho's SQLite fact store (02 §7), using modernc.org/sqlite in WAL mode
+// Package store is RimArcho's SQLite fact store (04 §4), using modernc.org/sqlite in WAL mode
 // with synchronous=NORMAL and a WAL size limit.
 package store
 
@@ -19,7 +19,7 @@ import (
 const SchemaVersion = 31
 
 // FirstReleaseSchema is the schema of the first public release (1.0.0). Databases from
-// development builds before it are not upgraded (02 §7).
+// development builds before it are not upgraded (04 §4).
 const FirstReleaseSchema = 29
 
 //go:embed schema.sql
@@ -35,7 +35,7 @@ var upgrades = []func(tx *sql.Tx, report func(done, total int64)) error{
 // ErrPreRelease: the database was created by a development build before 1.0.0.
 var ErrPreRelease = errors.New("store: database from a pre-1.0 development build")
 
-// Shared is the environment ID of what every environment shares (02 §0): the mod folders
+// Shared is the environment ID of what every environment shares (03 §2): the mod folders
 // and their instances, the lineages, the player's data on lineages and the user rules.
 const Shared = ""
 
@@ -56,7 +56,7 @@ func Open(path string) (*Store, error) {
 }
 
 // UpgradeProgress is what OpenUpgrading reports while it upgrades an existing database
-// from schema From to To (02 §7): Done of Total rows of the slow steps (v28), both 0 while
+// from schema From to To (04 §4): Done of Total rows of the slow steps (v28), both 0 while
 // the count is not known.
 type UpgradeProgress struct {
 	From, To    int
@@ -97,7 +97,7 @@ func open(path string, initialise bool, progress func(UpgradeProgress)) (*Store,
 	}
 	// Per-connection settings go in the DSN so every connection the pool opens gets them.
 	// journal_size_limit: after a large write the WAL file is cut back to 16 MB when it is
-	// next reset, instead of keeping its largest size while any connection is open (02 §7).
+	// next reset, instead of keeping its largest size while any connection is open (04 §4).
 	dsn := "file:" + filepath.ToSlash(path) + "?_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(1)&_pragma=journal_size_limit(16777216)"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {

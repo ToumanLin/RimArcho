@@ -1,4 +1,4 @@
-// Package menubg reads RimWorld menu art without writing to the game (06 §2.14).
+// Package menubg reads RimWorld menu art without writing to the game (16 §2.14).
 package menubg
 
 import (
@@ -66,7 +66,7 @@ func ReadDDS(r io.Reader) (*DDS, error) {
 }
 
 // Rows decodes four source rows at a time. The callback must not retain the reused
-// pixels. This bounds the full-resolution storage to 4×width pixels (06 §2.14).
+// pixels. This bounds the full-resolution storage to 4×width pixels (16 §2.14).
 func (d *DDS) Rows(ctx context.Context, visit func(y int, rows *image.NRGBA) error) error {
 	if d.blockSize == 0 {
 		rows := image.NewNRGBA(image.Rect(0, 0, d.Width, 4))
@@ -106,7 +106,7 @@ func (d *DDS) Rows(ctx context.Context, visit func(y int, rows *image.NRGBA) err
 }
 
 // Scaled produces the two cached images in one streaming decode, using the same box
-// filter and alpha-on-black rule as other backgrounds (06 §2.14).
+// filter and alpha-on-black rule as other backgrounds (16 §2.14).
 func (d *DDS) Scaled(ctx context.Context, widths ...int) ([]*image.RGBA, error) {
 	scalers := make([]*boxScaler, len(widths))
 	for i, w := range widths {

@@ -20,17 +20,17 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Saves (10 §4): the folders games and packs save to, each save's head (10 §1.7 L0), the
-// colony it belongs to (§4.1) and the list it matches (§4.2). Nothing here writes a save.
+// Saves (12 §4): the folders games and packs save to, each save's head (12 §1.7 L0), the
+// colony it belongs to (12 §4.1) and the list it matches (12 §4.2). Nothing here writes a save.
 
-// How a save matched its list (10 §4.2).
+// How a save matched its list (12 §4.2).
 const (
 	MatchPack   = "pack"      // rule 1: the save is in a pack's folder
 	MatchLaunch = "launch"    // rule 2: saved after a launch of that list
 	MatchMods   = "same-mods" // rule 3: same Mods as a version of the list
 )
 
-// WritingWindow: a save modified this recently may still be written (10 §1.7).
+// WritingWindow: a save modified this recently may still be written (12 §1.7).
 const WritingWindow = 5 * time.Second
 
 // SaveFolder is one Saves folder: a game's user data folder (shared by every environment
@@ -43,7 +43,7 @@ type SaveFolder struct {
 
 // Save is one .rws file as read now.
 type Save struct {
-	Ref     string `json:"ref"`  // sv:<6 hex>, sha1 of the real path (05 §2)
+	Ref     string `json:"ref"`  // sv:<6 hex>, sha1 of the real path (13 §2)
 	Path    string `json:"path"` // full path
 	File    string `json:"file"` // base name
 	Name    string `json:"name"` // shown: RimSaves folder and .rws removed
@@ -57,11 +57,11 @@ type Save struct {
 	// Writing: modified within WritingWindow, or changed while its head was read.
 	Writing bool
 	Colony  *Colony
-	// Summary is the full read's summary (10 §1.7 L1) when the cache has a valid one;
+	// Summary is the full read's summary (12 §1.7 L1) when the cache has a valid one;
 	// nil: read from the head only ("meta only"). SaveFacts gives the whole read.
 	Summary *SaveSummary
 
-	// The list it matches (10 §4.2): a plan, a pack, or neither.
+	// The list it matches (12 §4.2): a plan, a pack, or neither.
 	Env   *env.Environment
 	Plan  *store.Plan
 	Pack  string
@@ -79,7 +79,7 @@ func (s *Save) ListName() string {
 	return ""
 }
 
-// Colony is the group of saves of one game (10 §4.1).
+// Colony is the group of saves of one game (12 §4.1).
 type Colony struct {
 	Key   string  `json:"key"`
 	Name  string  `json:"name"`
@@ -92,7 +92,7 @@ type Colony struct {
 // Latest is the colony's newest save: the colony's facts come from it.
 func (c *Colony) Latest() *Save { return c.Saves[0] }
 
-// Orphan: the latest save matches no list (10 §4.1).
+// Orphan: the latest save matches no list (12 §4.1).
 func (c *Colony) Orphan() bool { return c.Latest().Match == "" }
 
 // SaveList is every save RimArcho can see.
@@ -112,7 +112,7 @@ func (l *SaveList) Saves() []*Save {
 }
 
 // SaveFolders lists the Saves folders of every environment (deduplicated by real path:
-// environments may share the game's default user data, 02 §2.4) and every pack.
+// environments may share the game's default user data, 03 §3.4) and every pack.
 func (a *App) SaveFolders() ([]*SaveFolder, error) {
 	envs, err := a.Store.Envs()
 	if err != nil {
@@ -201,7 +201,7 @@ func (a *App) ListSaves() (*SaveList, error) {
 	return l, nil
 }
 
-// FindSave resolves a save reference (05 §2): sv:<hex>, a full path, a file name, or
+// FindSave resolves a save reference (13 §2): sv:<hex>, a full path, a file name, or
 // <colony>/<save>. Several matches are an error that lists them.
 func (a *App) FindSave(ref string) (*Save, *SaveList, error) {
 	l, err := a.ListSaves()
@@ -236,7 +236,7 @@ func (l *SaveList) Find(ref string) (*Save, error) {
 	return nil, &AmbiguousSave{Ref: ref, Saves: hits}
 }
 
-// AmbiguousSave: a save reference matches several saves (05 §3.3), in listing order.
+// AmbiguousSave: a save reference matches several saves (13 §3.3), in listing order.
 type AmbiguousSave struct {
 	Ref   string
 	Saves []*Save
@@ -251,13 +251,13 @@ func (e *AmbiguousSave) Error() string {
 }
 
 // SaveRef is a save's reference: the first 3 bytes of sha1 of its real path, which stays
-// the same while the file stays where it is (05 §2).
+// the same while the file stays where it is (13 §2).
 func SaveRef(path string) string {
 	sum := sha1.Sum([]byte(env.PathKey(realOrAbs(path))))
 	return "sv:" + hex.EncodeToString(sum[:3])
 }
 
-// rimSavesSep separates RimSaves' folder from the save's name: <folder>#§#<save>.rws (10 §4.1).
+// rimSavesSep separates RimSaves' folder from the save's name: <folder>#§#<save>.rws (12 §4.1).
 const rimSavesSep = "#§#"
 
 // SplitSaveName splits a file name into a RimSaves folder ("" for none) and the name shown.
@@ -275,7 +275,7 @@ var (
 	trailingNumRe = regexp.MustCompile(`[\s_\-.]*\d+$`)
 )
 
-// colonyBaseName is a manual save's name with trailing numbers removed (10 §4.1 rule 3).
+// colonyBaseName is a manual save's name with trailing numbers removed (12 §4.1 rule 3).
 func colonyBaseName(name string) string {
 	base := strings.TrimSpace(trailingNumRe.ReplaceAllString(name, ""))
 	if base == "" {
@@ -354,10 +354,10 @@ func (a *App) readHeads(saves []*Save) {
 	wg.Wait()
 }
 
-// ---- grouping (10 §4.1) ----
+// ---- grouping (12 §4.1) ----
 
-// groupColonies groups saves (10 §4.1): a RimSaves folder first; else the world identity
-// of the full read (10 §1.7 L1), named after the player faction, else the world; else the
+// groupColonies groups saves (12 §4.1): a RimSaves folder first; else the world identity
+// of the full read (12 §1.7 L1), named after the player faction, else the world; else the
 // file name without trailing numbers, where a save not read in full yet joins the world
 // colony whose saves have that name. Autosaves without a full read carry no colony in
 // their name, so each joins the colony in the same folder whose save has the same Mods
@@ -454,7 +454,7 @@ func absDur(d time.Duration) time.Duration {
 	return d
 }
 
-// ---- matching (10 §4.2) ----
+// ---- matching (12 §4.2) ----
 
 type saveMatcher struct {
 	a       *App
@@ -517,7 +517,7 @@ func (a *App) newSaveMatcher() (*saveMatcher, error) {
 }
 
 // modsFingerprint compares Mod lists the way the game does: packageIds without case and
-// without the Workshop copy's _steam suffix (04 §4.1), in order.
+// without the Workshop copy's _steam suffix (07 §4.1), in order.
 func modsFingerprint(tokens []string) string {
 	norm := make([]string, 0, len(tokens))
 	for _, t := range tokens {

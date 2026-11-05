@@ -7,8 +7,8 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/patterns"
 )
 
-// PatternCard is what the error pattern library (03 §6.8) says about one log cluster, for
-// the game log page's detail (06 §2.10): what this kind of error usually is, its common
+// PatternCard is what the error pattern library (06 §8) says about one log cluster, for
+// the game log page's detail (16 §2.10): what this kind of error usually is, its common
 // causes, a next step and the kinds of fix. It is community background from shared logs,
 // not a conclusion about the player's list: the attribution above it stays RimArcho's own.
 // Only clusters that match a pattern get one (fallback rules say nothing and get none).

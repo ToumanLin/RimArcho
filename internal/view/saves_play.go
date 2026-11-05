@@ -9,8 +9,8 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/savefile"
 )
 
-// The Saves page's right card (06 §2.11 "Right"; 10 §4.3 Play facts, §4.5): the
-// playthrough at the selected save from its full read (10 §1.7 L1), the change since the
+// The Saves page's right card (16 §2.11 "Right"; 12 §4.3 Play facts, §4.5): the
+// playthrough at the selected save from its full read (12 §1.7 L1), the change since the
 // colony's previous read save, and the colony over time. Only what the facts hold is
 // shown: the biome is not read, so the card has none.
 
@@ -56,7 +56,7 @@ type SaveEvent struct {
 	Death bool   `json:"death,omitempty"`
 }
 
-// SaveTimeline is the colony over in-game days (10 §4.5). The lines are the selected
+// SaveTimeline is the colony over in-game days (12 §4.5). The lines are the selected
 // save's own history (the game's Wealth_Total and FreeColonists records), spread evenly
 // from day 0 to its day (Upto) and thinned to at most TimelineValues each; the points are
 // the colony's read saves at their day, on the wealth line when it reaches their day.
@@ -80,7 +80,7 @@ type SaveTimepoint struct {
 	Auto   bool `json:"auto,omitempty"`
 }
 
-// Limits that keep the right card within the page's size budget (06 §10, §11 A18).
+// Limits that keep the right card within the page's size budget (16 §10, §11 A18).
 const (
 	TimelineValues = 120 // values per line
 	PlayColonists  = 40  // colonists listed
@@ -207,7 +207,7 @@ func playStats(f, prev *savefile.Facts) []SaveStat {
 }
 
 // researchPoints is the research done: the points of every project, finished or not
-// (whether a project is finished needs its cost from the Defs, 10 §1.7 L2).
+// (whether a project is finished needs its cost from the Defs, 12 §1.7 L2).
 func researchPoints(f *savefile.Facts) float64 {
 	t := 0.0
 	for _, v := range f.Research.Progress {

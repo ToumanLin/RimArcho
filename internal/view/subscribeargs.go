@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 )
 
-// SubscribeRequest is what the add a subscription card decided (06 §2.9): the source and its one
+// SubscribeRequest is what the add a subscription card decided (16 §2.9): the source and its one
 // choice. The window sends it as JSON; the TUI builds it from its card.
 type SubscribeRequest struct {
 	Kind     string `json:"kind"`
@@ -52,7 +52,7 @@ func SubscribeArgv(r SubscribeRequest) ([]string, error) {
 }
 
 // WorkshopUpdatePreview is the confirmation of update for a Workshop item the Steam client
-// keeps (06 §2.9): installed → latest, and that Steam downloads it. Refused while a game
+// keeps (16 §2.9): installed → latest, and that Steam downloads it. Refused while a game
 // runs, like the update itself.
 func WorkshopUpdatePreview(a *app.App, ref string) (*Preview, error) {
 	if err := a.UpdateWorkshopClient(ref, true); err != nil {
@@ -75,7 +75,7 @@ func WorkshopUpdatePreview(a *app.App, ref string) (*Preview, error) {
 	return &Preview{What: OpSubUpdate, Title: T("update subscription"), Apply: true, Lines: lines}, nil
 }
 
-// SourceCheckResult checks one source of updates (check, 06 §2.9) and words the result as
+// SourceCheckResult checks one source of updates (check, 16 §2.9) and words the result as
 // the page does: "everything is up to date" or "N updates available", never "check complete"; a failure keeps its reason.
 func SourceCheckResult(a *app.App, kind string, pageReader ...func(string) (*subscribe.PageInfo, error)) (string, error) {
 	if err := a.CheckSubscriptionSource(kind, pageReader...); err != nil {

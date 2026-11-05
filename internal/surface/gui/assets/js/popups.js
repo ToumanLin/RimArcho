@@ -1,5 +1,5 @@
 import { closeChoiceMenu } from "./choices.js";
-// Popups (06 §3.1 rule 5): the command palette, the tag bar, the position input, a
+// Popups (16 §3.1 rule 5): the command palette, the tag bar, the position input, a
 // confirmation, a text or choice panel, help. Each has a title, shows in the position
 // line, closes with esc, and never nests: opening one closes the other.
 import { pathContent, copyablePath } from "./fields.js";
@@ -113,7 +113,7 @@ function linkOpener(p, id) {
   p.onclose = () => { if (was == null) o.removeAttribute("aria-controls"); else o.setAttribute("aria-controls", was); prev?.(); };
 }
 
-// optionList: a list of options moved with the arrows (both pairs, 06 §3.3).
+// optionList: a list of options moved with the arrows (both pairs, 16 §3.3).
 function optionList(pop, p, opts, render, pick, input) {
   const list = el("div", "opts");
   list.id = "popup-options";
@@ -180,7 +180,7 @@ function inputLine(pop, prompt, placeholder) {
   return inp;
 }
 
-// ---- the command palette (06 §3.5) ----
+// ---- the command palette (16 §3.5) ----
 export function palette() {
   if (S.popup?.kind === "palette") { close(); return; }
   hideMenu();
@@ -190,7 +190,7 @@ export function palette() {
   });
 }
 
-// ---- the tag bar (06 §3.8): pinned tags first, then by use; ✓ all have it, ~ some ----
+// ---- the tag bar (16 §3.8): pinned tags first, then by use; ✓ all have it, ~ some ----
 export async function tags(items, after) {
   const ids = items.filter((x) => x.id).map((x) => x.id);
   if (!ids.length) return;
@@ -247,7 +247,7 @@ export async function tags(items, after) {
   });
 }
 
-// ---- the position input (06 §3.6) ----
+// ---- the position input (16 §3.6) ----
 export function position(obj, from, done = null) {
   open("position", T("move to"), (pop, p) => {
     pop.append(el("div", "ttl", Tf("move %s to", obj.what)));
@@ -267,7 +267,7 @@ export function position(obj, from, done = null) {
   });
 }
 
-// ---- a confirmation, for what u cannot undo (06 §6); text() shows lines with none ----
+// ---- a confirmation, for what u cannot undo (16 §6); text() shows lines with none ----
 // previewOk: the items of list (refs or ids, in the order the preview was asked for) that
 // can go ahead; a preview leaves out the ones that cannot now (p.ok unset: all of them).
 export function previewOk(p, list) {
@@ -465,7 +465,7 @@ export function ask(title, placeholder, done, value = null) {
   });
 }
 
-// help: the keys of the page it is asked on (06 §3.1 rule 4, view.KeyHelp): the plan
+// help: the keys of the page it is asked on (16 §3.1 rule 4, view.KeyHelp): the plan
 // editor and Mod library share one table, then each page's own.
 export async function help(page = "plan") {
   let rows = [];
@@ -478,7 +478,7 @@ export async function help(page = "plan") {
   });
 }
 
-// ---- the context menu (06 §8.5): the same actions as the hint line ----
+// ---- the context menu (16 §8.5): the same actions as the hint line ----
 // An item {label, key, run, cls, checked?, disabled?, current?}; {sep: true} draws a hairline between groups. The keyboard
 // works it as the mouse does: ↑↓ (or tab) move, enter runs, esc closes; it opens with the
 // first item focused when the menu key or shift+F10 opened it (keys = true).
@@ -563,7 +563,7 @@ export function hideMenu(restore = false) {
   else if (focus.back.isConnected) focus.back.focus({ preventScroll: true, focusVisible: focus.visible });
 }
 
-// A player-requested temporary decision panel (06 §3.1 rule 7).
+// A player-requested temporary decision panel (16 §3.1 rule 7).
 export async function problem(ref, run, actionWrite) {
   open("problem", T("see the problem and fixes"), (box) => {
     box.append(el("div", "ttl", T("checking the problem…")));

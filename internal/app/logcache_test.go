@@ -22,7 +22,7 @@ func logProblems(l []*app.Problem) int {
 	return n
 }
 
-// 03 §6.4: a log whose plan changed since its launch, or written by another game version,
+// 06 §4: a log whose plan changed since its launch, or written by another game version,
 // is stale: its problems are kept apart (ProblemSet.Stale), not counted, and do not escalate.
 func TestStaleLog(t *testing.T) {
 	t.Parallel()

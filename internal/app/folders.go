@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Mod folders (02 §0): the folders every environment shares — the Workshop folder (found
+// Mod folders (03 §2): the folders every environment shares — the Workshop folder (found
 // from Steam), SteamCMD folders, other folders, and RimArcho's own Archo Monitor folder and
 // lock library. Their instances, and everything the player says about them, are the same
 // whichever game is played. They are managed in one place: `archo folder`, the settings
@@ -91,7 +91,7 @@ func (a *App) overlapping(root string, skip func(*source.Source) bool) (*source.
 }
 
 // FolderAdd adds a shared mod folder. There is one Workshop folder: naming another one
-// moves it (re-bound as in 02 §3.2). A folder already known is left as it is.
+// moves it (re-bound as in 03 §4.2). A folder already known is left as it is.
 func (a *App) FolderAdd(kind source.Kind, root string) (SourceChange, error) {
 	if !SharedKind(kind) {
 		return SourceChange{}, fmt.Errorf("a mod folder is workshop, steamcmd or extra, not %s (a game's Data/ and Mods/ come with its environment)", kind)
@@ -231,7 +231,7 @@ func (a *App) sharedSource(label, root string) (*source.Source, error) {
 
 // SharedUnread reports whether a shared mod folder has never been read (no instance was
 // ever recorded from it): adding a game then scans the shared folders too, otherwise only
-// the game's own Data/ and Mods/ (02 §0 item 8).
+// the game's own Data/ and Mods/ (03 §2 item 8).
 func (a *App) SharedUnread() bool {
 	fs, err := a.Folders()
 	if err != nil {
@@ -250,7 +250,7 @@ func (a *App) SharedUnread() bool {
 }
 
 // adoptGameWorkshop registers the Workshop folder a SteamCMD game keeps inside its own
-// folder (steamapps\workshop\content\294100) as a shared SteamCMD folder (02 §0). It is
+// folder (steamapps\workshop\content\294100) as a shared SteamCMD folder (03 §2). It is
 // never the Workshop folder: that one is the Steam client's, and a game's own folder must
 // not move it. Nothing happens when the folder is missing, is the Steam client's, or is
 // known already, retired included: a folder the player removed stays removed — except when

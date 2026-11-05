@@ -20,7 +20,7 @@ import (
 )
 
 // ParentPart identifies content that cannot inherit its missing template. The claim
-// describes the patched document, unlike the cached Def facts (03 §5.1).
+// describes the patched document, unlike the cached Def facts (05 §5.1).
 type ParentPart struct{ Type, Name, Parent string }
 
 var parentClaim = regexp.MustCompile(`^(\S+) (.*?) inherits ParentName="([^"]+)"`)
@@ -295,7 +295,7 @@ func (a *App) FindParentHelp(ctx context.Context, ps *ProblemSet, p *Problem) (*
 		}
 	}
 	// A fresh analysis indexed every installed mod's Names; search only the mods whose
-	// facts may differ from what they would load once enabled (03 §4.3).
+	// facts may differ from what they would load once enabled (05 §4.3).
 	var keys map[string]string
 	if ps.Analysis != nil && ps.Analysis.Fresh {
 		prevMM := a.Store.MM

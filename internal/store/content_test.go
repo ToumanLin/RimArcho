@@ -70,7 +70,7 @@ func TestContentKindsScopedSnapshots(t *testing.T) {
 	}
 }
 
-// The flags stay with a snapshot after 02 §7.1 drops its file rows.
+// The flags stay with a snapshot after 04 §4.1 drops its file rows.
 func TestContentKindsOutliveFileRows(t *testing.T) {
 	t.Parallel()
 	s, err := Open(filepath.Join(t.TempDir(), "archo.db"))

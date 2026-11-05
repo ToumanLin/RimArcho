@@ -267,7 +267,7 @@ func TestFactSetsEmptyAssemblyViewReplacesOld(t *testing.T) {
 	}
 }
 
-// 02 §7.2 step 2: maintenance (automatic or the Compact button) runs the same fact
+// 04 §4.2 step 2: maintenance (automatic or the Compact button) runs the same fact
 // cleanup as a saved analysis, so an expired slot for another game version goes even
 // when nothing is analysed again.
 func TestMaintainPrunesFacts(t *testing.T) {
@@ -317,7 +317,7 @@ func TestMaintainPrunesFacts(t *testing.T) {
 	}
 }
 
-// 03 §3: Def lookups by name come back by instance ID, then file order, whatever order the
+// 05 §3: Def lookups by name come back by instance ID, then file order, whatever order the
 // facts were written in, so a rebuilt or migrated cache names the same first provider.
 func TestDefsNamedOrderIndependentOfWrites(t *testing.T) {
 	e := testkit.New(t)

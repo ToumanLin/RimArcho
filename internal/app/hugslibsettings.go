@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// HugsLib settings packs (06 §2.9 "Mod settings", 03 §6.7.1). HugsLib keeps the settings of
+// HugsLib settings packs (16 §2.9 "Mod settings", 06 §7.1). HugsLib keeps the settings of
 // the Mods built on it in <user data>/HugsLib/ModSettings.xml: one element per settings pack,
 // one child per stored value, as text. Like the game, it stores only values that differ from
 // the default. A pack is named by its Mod's settings identifier: the Mod's package id unless

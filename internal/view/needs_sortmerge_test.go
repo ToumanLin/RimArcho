@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// One mod out of order, a cycle, a weak preference and an old log (06 §5): the order item
+// One mod out of order, a cycle, a weak preference and an old log (16 §5): the order item
 // is the host, the cycle and the weak preference are its lines, and nothing else merges.
 // Items made after the problem loop once took the last problem's code (the cycle's), so
 // the order item merged into itself and vanished from the page.

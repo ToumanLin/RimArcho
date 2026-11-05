@@ -1,6 +1,6 @@
 # Save format: the fields of a full read (L1), 2026-11-04
 
-Status: **from source, unverified on real saves.** Every path below was read from the game's `ExposeData` methods; none has been checked against a real `.rws` yet (no real saves were read on the host). A VM measurement against real saves is pending; until then treat each path as the expected shape, not a measured one. Implementation: `internal/savefile` (`Scan`, `Facts`, `ParserVersion`); tier definition: 10 §1.7 L1.
+Status: **from source, unverified on real saves.** Every path below was read from the game's `ExposeData` methods; none has been checked against a real `.rws` yet (no real saves were read on the host). A VM measurement against real saves is pending; until then treat each path as the expected shape, not a measured one. Implementation: `internal/savefile` (`Scan`, `Facts`, `ParserVersion`); tier definition: 12 §1.7 L1.
 
 Source: RimWorld 1.6.4871 rev590, `RimWorldWin64_Data/Managed/Assembly-CSharp.dll`, decompiled with `ilspycmd` 10.1 (`-p`, references the `Managed` folder) into a scratch directory outside the repository and deleted afterwards. `archo source` was not used: it skips the game's own assembly (see 2026-11-01_decompile-storage.md).
 
@@ -10,7 +10,7 @@ These rules explain the shape of every path below.
 
 | Rule | Source | Consequence for reading |
 | --- | --- | --- |
-| The file is `<savegame>` with `<meta>` (10 §1.3) then `<game>` | `GameDataSaveLoader.SaveGame` (`SafeSaver.Save(…, "savegame", …)`, `Scribe_Deep.Look(ref target, "game")`) | Absolute paths start `savegame/game/` |
+| The file is `<savegame>` with `<meta>` (12 §1.3) then `<game>` | `GameDataSaveLoader.SaveGame` (`SafeSaver.Save(…, "savegame", …)`, `Scribe_Deep.Look(ref target, "game")`) | Absolute paths start `savegame/game/` |
 | A value equal to its default is **not written** | `Scribe_Values.Look` (`!forceSave && value.Equals(defaultValue)` → return) | A missing element means the default: `greatestPopulation` 3, `Faction.loadID` 0, `Ideo.id` 0, `Quest.id` 0, `Map.uniqueID` −1, `WorldObject.ID` −1, `healthState` Mobile, `guestStatus` Guest |
 | A null def is not written either | `Scribe_Defs.Look` (writes `"null"` with default `"null"`) | `<def>null</def>` does not occur; the scanner still ignores it |
 | A null deep object is `<label IsNull="True" />` | `Scribe_Deep.Look` | Animals have `<story IsNull="True" />` |
@@ -49,7 +49,7 @@ All under `savegame/game/` unless they start with `…/` (relative to the elemen
 | animal | `…/training` present and not `IsNull` | `PawnComponentsUtility.AddAndRemoveDynamicComponents` (training when intelligence ≤ Animal, has a faction, not a mechanoid) | `Animals`; other living player pawns count as `Mechs` |
 | `Pawn.Dead` | `…/healthTracker/healthState` = `Dead` | `Pawn_HealthTracker.ExposeData` | Default Mobile is omitted |
 | `Pawn.Slave`, `Prisoners` | `…/guest/guestStatus` (`Slave`, `Prisoner`), `…/guest/hostFaction` | `Pawn_GuestTracker.ExposeData` | A prisoner keeps its own faction; `hostFaction` is the player's |
-| `Defs` | any `<def>` | `Scribe_Defs.Look(ref def, "def")` in `Thing`, `Hediff`, `Gene`, `Tale`, `Letter`, `WorldObject`, `ScenPart`, … | Counts every occurrence (10 §1.4). See "Not extracted" for Defs written under other names |
+| `Defs` | any `<def>` | `Scribe_Defs.Look(ref def, "def")` in `Thing`, `Hediff`, `Gene`, `Tale`, `Letter`, `WorldObject`, `ScenPart`, … | Counts every occurrence (12 §1.4). See "Not extracted" for Defs written under other names |
 | `Classes` | any `Class="…"` | `Scribe_Deep.Look` | |
 | `Refs` | see below | | |
 
@@ -74,11 +74,11 @@ All under `savegame/game/` unless they start with `…/` (relative to the elemen
 ## Not extracted (open questions for the VM measurement)
 
 1. **Biome.** A map's biome comes from its tile in the world grid (`world/grid`, compressed per-tile arrays such as `tileBiomeDeflate`, indexed by def short hash). Decoding needs the grid layout and the short-hash table, so it is skipped. A cheaper source may exist on real saves; check.
-2. **Defs not written as `<def>`.** Terrain (`topGridDeflate` and friends) and compressed things are short hashes, so floors and rocks of a Mod never appear in `Defs`. Pawn fields also hold Defs under their own names: `kindDef`, `stuff`, `childhood`/`adulthood` (backstories), `hairDef`, `beardDef`, `bodyType`, `headType`, `xenotype`, research keys. Which to add is the open question of 10 §1.4.
-3. **Colony identity.** Whether world name + seed + persistent random value + player faction name is enough (10 §4.1) needs real saves: a world regenerated with the same seed shares the seed but not `persistentRandomValue`.
+2. **Defs not written as `<def>`.** Terrain (`topGridDeflate` and friends) and compressed things are short hashes, so floors and rocks of a Mod never appear in `Defs`. Pawn fields also hold Defs under their own names: `kindDef`, `stuff`, `childhood`/`adulthood` (backstories), `hairDef`, `beardDef`, `bodyType`, `headType`, `xenotype`, research keys. Which to add is the open question of 12 §1.4.
+3. **Colony identity.** Whether world name + seed + persistent random value + player faction name is enough (12 §4.1) needs real saves: a world regenerated with the same seed shares the seed but not `persistentRandomValue`.
 4. **Player faction of Mod scenarios.** A scenario with no `playerFaction` part, or a Mod that replaces `ScenPart_PlayerFaction`, falls back to the `Player` name heuristic.
 5. **Colonist semantics.** `Colonists` is "humanlike, player faction": it includes slaves (flagged), babies and the dead, and excludes colonists whose faction changed (kidnapped). The game's `IsColonist` adds slave and quest-lodger rules; compare counts on real saves with the game's colonist bar.
-6. **Element density and timing.** The synthetic benchmark save has about 0.9 million elements in 27 MB. Real saves may be denser; measure time and peak memory on the 202 saves of 07 §6.
+6. **Element density and timing.** The synthetic benchmark save has about 0.9 million elements in 27 MB. Real saves may be denser; measure time and peak memory on the 202 saves of 18.
 7. **Older saves.** A 1.5 save loaded and resaved in 1.6 has 1.6 shapes; an unconverted 1.5 save may lack newer elements (`BackCompatibility` fills them on load). Facts then hold the defaults.
 
 ## Performance

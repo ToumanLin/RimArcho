@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The Saves page's full read (06 §2.11 "Loading", 10 §1.7 L1); saves.go says how it fits.
+// The Saves page's full read (16 §2.11 "Loading", 12 §1.7 L1); saves.go says how it fits.
 
 // factsKey names a save's file as it is now: its facts are valid for this key only.
 func factsKey(sv *app.Save) string {
@@ -78,7 +78,7 @@ func (s *API) factsOf(r *app.App, sv *app.Save) (*savefile.Facts, error) {
 	return r.SaveFacts(&cp, false)
 }
 
-// readSelected reads the selected save on its own session, off the call path (06 §8.4):
+// readSelected reads the selected save on its own session, off the call path (16 §8.4):
 // one at a time, a newer selection replacing one that waits. The background run may read
 // the same save; the second read only rewrites the same cache row.
 func (s *API) readSelected(sv *app.Save) {
@@ -141,7 +141,7 @@ func (s *API) readSelectedLoop(sv *app.Save) {
 }
 
 // startSavesIndex starts the background read of the saves in l that are not read yet,
-// first the one named by first (06 §2.11, 10 §1.7): one run at a time, task kind "saves".
+// first the one named by first (16 §2.11, 12 §1.7): one run at a time, task kind "saves".
 func (s *API) startSavesIndex(l *app.SaveList, first string) {
 	n := 0
 	for _, sv := range l.Saves() {
@@ -178,7 +178,7 @@ func (s *API) startSavesIndex(l *app.SaveList, first string) {
 				return
 			}
 			read = done
-			// "n/m" makes the status line a progress bar (06 §11 A11)
+			// "n/m" makes the status line a progress bar (16 §11 A11)
 			text := view.Tf("reading the saves %d/%d  %s", done, total, name)
 			s.tasks.Update(task, func(t *app.Task) { t.Phase, t.Done, t.Total = text, done, total })
 			s.savesNews([]string{ref}, text, false)
@@ -194,7 +194,7 @@ func (s *API) startSavesIndex(l *app.SaveList, first string) {
 		st.stop = nil
 		closed := st.closed
 		st.mu.Unlock()
-		if closed { // Close marks it stopped with the window (06 §2.16)
+		if closed { // Close marks it stopped with the window (16 §2.16)
 			return
 		}
 		ev := &SavesReadEvent{Done: true}
@@ -346,7 +346,7 @@ func (s *API) relistSaves() *view.SavesPage {
 	return view.SavesRows(l)
 }
 
-// closeSaves stops the full read with the window (06 §2.16): the child process is ended
+// closeSaves stops the full read with the window (16 §2.16): the child process is ended
 // (each save it read is already stored), a selected save being read finishes, and nothing
 // more is sent. Close calls it before it marks the tasks stopped and releases the readers.
 func (s *API) closeSaves() {

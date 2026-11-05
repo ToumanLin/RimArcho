@@ -35,7 +35,7 @@ func (a *App) SubscriptionSourceCheck(kind string) SourceCheck {
 }
 
 func (a *App) subscriptionCheckKey(kind string) string {
-	// Subscription folders are shared by every game (02 §0), so automatic
+	// Subscription folders are shared by every game (03 §2), so automatic
 	// results must survive switching games too. Workshop-client state stays scoped.
 	if kind == LibSteamCMD || kind == LibGit || kind == LibPage {
 		return "subscriptions:check:shared:" + kind

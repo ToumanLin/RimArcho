@@ -1,4 +1,4 @@
-// Shared search/CLI panel (06 §3.5); closing preserves draft and the last output.
+// Shared search/CLI panel (16 §3.5); closing preserves draft and the last output.
 import { fieldError } from "./feedbacksemantics.js";
 import { S, el, api, T, errText } from "./state.js";
 import { copy } from "./fields.js";
@@ -47,7 +47,7 @@ export function buildCommandPanel(pop, p, { close, pick, reload, uninstall }) {
     error = "";
     try {
       const r = await api.RunCLI(input.value);
-      // uninstall --yes: the progress page takes over (06 §2.14).
+      // uninstall --yes: the progress page takes over (16 §2.14).
       if (r.uninstall) { draft = ""; close(); await uninstall?.(); return; }
       result = r; draft = input.value; historyAt = -1; paintResult(); afterRun = reload; poll();
     }

@@ -40,7 +40,7 @@ func TestRender(t *testing.T) {
 	}
 }
 
-// docs/assets/rimarcho.svg is generated from the artwork (06 §8.6):
+// docs/assets/rimarcho.svg is generated from the artwork (16 §8.6):
 // go test ./internal/icon -update
 func TestSVGFile(t *testing.T) {
 	path := filepath.Join("..", "..", "docs", "assets", "rimarcho.svg")

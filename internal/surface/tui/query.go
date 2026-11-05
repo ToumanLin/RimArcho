@@ -2,7 +2,7 @@ package tui
 
 import "github.com/ToumanLin/RimArcho/internal/view"
 
-// Column search (06 §3.7): the syntax and the matching are view.Query (06 §1).
+// Column search (16 §3.7): the syntax and the matching are view.Query (16 §1).
 
 // matcher builds the column predicate. The second result is the fallback for a single
 // free word that matched nothing: its letters in order in the name.
@@ -31,7 +31,7 @@ func (m *model) matcher(q string) (func(*item) bool, func(*item) bool) {
 func (m *model) refilterCol(k colKind, keepID string) {
 	c := &m.cols[k]
 	if k != cStaging {
-		// Not enabled and Enabled follow the filter bar (06 §2.5); Staging keeps its own search
+		// Not enabled and Enabled follow the filter bar (16 §2.5); Staging keeps its own search
 		c.view = c.view[:0]
 		if r := m.barResult(); r != nil && m.bar.active() {
 			c.view = append(c.view, r.Rows[k]...)

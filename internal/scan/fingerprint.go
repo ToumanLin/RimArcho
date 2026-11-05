@@ -17,7 +17,7 @@ import (
 // Hash is an xxh3-128 digest, big-endian (hi, lo).
 type Hash = [16]byte
 
-// File is one entry of the structure manifest (02 §4.4). Semantic files carry a content hash.
+// File is one entry of the structure manifest (04 §1.4). Semantic files carry a content hash.
 type File struct {
 	Rel     string // forward slashes, original case
 	Size    int64
@@ -184,7 +184,7 @@ func SemanticOnly(dir string) (SemanticSet, error) {
 	return fp.Semantic, err
 }
 
-// Similarity of two semantic sets (02 §4.4, revised after M1): the larger of
+// Similarity of two semantic sets (04 §1.4, revised after M1): the larger of
 //   - J(paths): Jaccard over relative paths only — "moved and updated" keeps its structure;
 //   - J(hashes): Jaccard over content hashes regardless of path (as multisets, so several
 //     identical files count once each) — "restructured" moves files into e.g. 1.6/.

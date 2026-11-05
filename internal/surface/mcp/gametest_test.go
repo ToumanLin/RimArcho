@@ -78,7 +78,7 @@ func TestTestRunToolReport(t *testing.T) {
 
 // TestTestRunToolProgress: a client that asks for progress gets a notification every
 // ProgressEvery while the game runs, naming the step, and none after the result; this is
-// what keeps Pi from cancelling a test run after its 60 s request timeout (05 §5.1).
+// what keeps Pi from cancelling a test run after its 60 s request timeout (14 §1).
 func TestTestRunToolProgress(t *testing.T) {
 	e := testkit.New(t)
 	e.AddEnv(false)

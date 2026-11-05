@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
-// A pack's textures (08 §5.2): after the copy, each mod's PNGs are converted to DDS in the
+// A pack's textures (10 §2): after the copy, each mod's PNGs are converted to DDS in the
 // pack and the PNGs deleted — preconvert at full size, resize when scaled. The copy is the pack's
 // own, so the game version is known and nothing needs recording: what could not be
 // converted keeps its PNG.

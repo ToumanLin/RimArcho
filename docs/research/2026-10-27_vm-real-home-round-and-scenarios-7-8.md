@@ -51,7 +51,7 @@ VM real home (build from `3e8dae8`, CLI, snapshot restored afterward):
 
 - default list (6 entries): seven formats round-tripped identically; no Workshop Mods, so workshop format behaved as above.
 - Temporary `rt-big` built with CLI (Workshop Mods plus completed dependencies, 42 entries; intended to take 470, but truncated `archo list` output yielded only 30): eight exports plus eight imports took 2.1 s.
-  - Seven formats: no entries lost, order preserved; every reimport added one Archo Monitor entry (position 2). This is "new lists add Monitor by default" (04 §1.5), not a bug.
+  - Seven formats: no entries lost, order preserved; every reimport added one Archo Monitor entry (position 2). This is "new lists add Monitor by default" (07 §1.5), not a bug.
   - workshop format: lost Core, Royalty, and Biotech (format records Workshop entries only), and likewise added Monitor. The result is a list without Core. The format is inherently lossy, but whether imports should automatically restore Core/owned DLC needs a decision.
 
 Also checked the steamDB index used for missing editor rows in the VM: neither guest nor host had downloaded steamDB, so lookup falls straight back to packageId. For players who have downloaded it, the index is parsed once per process; a simulated 45,000 entries (4.4 MB) parsed in about 13 ms.

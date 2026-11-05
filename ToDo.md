@@ -1,6 +1,6 @@
 # ToDo
 
-Things to research, not yet decided. Once decided, put them in the specifications (implementation plans in 01 §5); research goes in docs/research/.
+Things to research, not yet decided. Once decided, put them in the specifications (implementation plans in 01 §4); research goes in docs/research/.
 
 ## review docs, delete unnecessary 
 
@@ -77,7 +77,7 @@ Auto translate mod details? Need to think about it.
 
 Join multiple saves of a colony into a timeline: in-game days, real play time, population, wealth, and deaths.
 
-Include research progress (the undecided item in 10 §1.4) and DLC in content not yet played.
+Include research progress (the undecided item in 12 §1.4) and DLC in content not yet played.
 
 Optionally count occurrences instead of only recording that something appeared. This costs little and can show how deeply the content was played.
 

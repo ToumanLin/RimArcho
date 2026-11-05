@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The TUI's pages and keys the window has too (06 §9.1): Search files, H, F, 4 on a narrow
+// The TUI's pages and keys the window has too (16 §9.1): Search files, H, F, 4 on a narrow
 // screen, and the window's names.
 
 func screen(m *model) string { return ansi.Strip(m.View()) }
@@ -93,7 +93,7 @@ func TestFileSearchPage(t *testing.T) {
 			t.Fatalf("esc ×3: %d", m.tab)
 		}
 	})
-	// Leaving Search files cancels its search (06 §3.1 rule 9).
+	// Leaving Search files cancels its search (16 §3.1 rule 9).
 	t.Run("leave stops", func(t *testing.T) {
 		m := direct(t, e, 160, 40)
 		m.openSearch()
@@ -127,7 +127,7 @@ func TestFileSearchPage(t *testing.T) {
 }
 
 // H lists every step and version, and enter goes there; A checks the files; 4 on a screen
-// with no detail column opens the full-screen detail (06 §2.5, §3.5).
+// with no detail column opens the full-screen detail (16 §2.5, §3.5).
 func TestEditorKeysOfTheWindow(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)
@@ -166,7 +166,7 @@ func TestEditorKeysOfTheWindow(t *testing.T) {
 	}
 }
 
-// The window's names on the TUI's pages (06 §2.1, §2.9).
+// The window's names on the TUI's pages (16 §2.1, §2.9).
 func TestWindowNames(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)
@@ -212,7 +212,7 @@ func TestWindowNames(t *testing.T) {
 	}
 }
 
-// Load-order rules (06 §9.1): r opens it with the form for the cursor's mod; the other mod comes from
+// Load-order rules (16 §9.1): r opens it with the form for the cursor's mod; the other mod comes from
 // the candidates; the rule is listed under only the current list; Del removes it, u puts it back with
 // its number; enter changes it; letters in the form are the form's.
 func TestRulesScreen(t *testing.T) {
@@ -292,7 +292,7 @@ func TestRulesScreen(t *testing.T) {
 }
 
 // F on Can it run enables the installed requirement and sorts; the check Can it run then starts
-// by itself says so in the head and leaves the status line's undo hint alone (06 §2.4).
+// by itself says so in the head and leaves the status line's undo hint alone (16 §2.4).
 func TestAutoFixKeepsTheUndoHint(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)
@@ -331,7 +331,7 @@ func TestAutoFixKeepsTheUndoHint(t *testing.T) {
 	}
 }
 
-// Start (06 §2.3, §9.1): shift+1 and the editor's L open it; it shows the current list and
+// Start (16 §2.3, §9.1): shift+1 and the editor's L open it; it shows the current list and
 // ▶ launch game, and only L there launches.
 func TestStartPage(t *testing.T) {
 	t.Parallel()
@@ -356,7 +356,7 @@ func TestStartPage(t *testing.T) {
 	}
 }
 
-// Lists are opened, not switched to (04 §1.3): P opens another list, the top bar says which
+// Lists are opened, not switched to (07 §1.3): P opens another list, the top bar says which
 // one launches, make current or the editor's L makes it current.
 func TestOpenListIsNotCurrent(t *testing.T) {
 	t.Parallel()
@@ -397,7 +397,7 @@ func TestOpenListIsNotCurrent(t *testing.T) {
 	}
 }
 
-// T (06 §3.5): in staging everything goes back; elsewhere every enabled mod is staged.
+// T (16 §3.5): in staging everything goes back; elsewhere every enabled mod is staged.
 func TestStageAllKey(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)

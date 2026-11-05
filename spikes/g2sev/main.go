@@ -1,4 +1,4 @@
-// Spike: measure the sorter's report changes (04 §4.4) on the log corpus, sort only (no
+// Spike: measure the sorter's report changes (07 §4.4) on the log corpus, sort only (no
 // analysis). Uses a research environment made with `corpusrun setup`; for each 1.6 log the
 // mod list becomes ModsConfig.xml, then SortInput + order.Sort, and the load-order findings
 // are counted the old way (every violation a warning) and the new way (by strength, DLC moves,

@@ -45,7 +45,7 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	}
 
 	if len(argv) >= 1 && argv[0] == "steam-worker" {
-		// The short-lived Steam client call (06 §2.9, 08 §10); no data directory.
+		// The short-lived Steam client call (16 §2.9, 11 §2); no data directory.
 		return steamWorker(argv[1:], stdout)
 	}
 	if len(argv) == 1 && (argv[0] == "--version" || argv[0] == "-v") {
@@ -60,7 +60,7 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "error:", err)
 		return cmds.ExitUsage
 	}
-	// `archo mcp [--tools core|all]` (05 §5.1); `archo mcp --help` runs as a command. A bad
+	// `archo mcp [--tools core|all]` (14 §1); `archo mcp --help` runs as a command. A bad
 	// flag fails before the data folder is opened.
 	serveMCP := len(rest) > 0 && rest[0] == "mcp" && !(len(rest) > 1 && (rest[len(rest)-1] == "--help" || rest[len(rest)-1] == "-h"))
 	var group mcp.Group
@@ -70,10 +70,10 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 			return cmds.ExitUsage
 		}
 	}
-	// A database upgrade runs inside app.Open; show it (02 §7): RimArcho.exe has no console,
+	// A database upgrade runs inside app.Open; show it (04 §4): RimArcho.exe has no console,
 	// so it gets a small window; the TUI's line follows ui.lang.
 	home := env.AppHome()
-	netcfg.Install() // proxy and GitHub mirror for every request of this process (07 §2.2)
+	netcfg.Install() // proxy and GitHub mirror for every request of this process (17 §2.2)
 	tuiMode := buildinfo.GUI != "1" && (len(rest) == 0 || len(rest) == 1 && rest[0] == "tui")
 	up := &upgradeReport{window: buildinfo.GUI == "1", lang: buildinfo.GUI == "1" || tuiMode, dbPath: filepath.Join(home, "archo.db"), stderr: stderr}
 	ap, err := app.OpenWith(home, app.OpenOptions{Upgrade: up.progress})
@@ -87,11 +87,11 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	ap.EnvName, ap.PlanName = envName, openPlan
 	interactive := len(rest) == 0 || len(rest) == 1 && (rest[0] == "gui" || rest[0] == "tui")
 	if interactive {
-		// What an update left in the program folder (07 §5.1); never delays the first paint.
+		// What an update left in the program folder (17 §5.1); never delays the first paint.
 		go ap.CleanSelfUpdate()
 	}
 	if (len(rest) == 0 && buildinfo.GUI == "1") || (len(rest) == 1 && rest[0] == "gui") {
-		// RimArcho.exe (a double click) or `archo gui` (06 §8.1).
+		// RimArcho.exe (a double click) or `archo gui` (16 §8.1).
 		if err := runGUI(ap, len(rest) == 1); err != nil {
 			fmt.Fprintln(stderr, "error:", err)
 			return cmds.ExitError
@@ -116,7 +116,7 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	cmds.Progress = func(line string) { fmt.Fprintln(stderr, line) }
 	cmds.Stream = func(line string) { fmt.Fprintln(stdout, line) }
 	if serveMCP {
-		// MCP over stdio (05 §5): stdout carries only protocol messages.
+		// MCP over stdio (14): stdout carries only protocol messages.
 		if err := mcp.Run(context.Background(), ap, group); err != nil {
 			fmt.Fprintln(stderr, "error:", err)
 			return cmds.ExitError
@@ -141,7 +141,7 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 }
 
 // restartTUI runs the updated archo in this terminal with the same arguments and returns
-// its exit code (07 §5.1). Windows cannot replace a running process, so this one waits; the
+// its exit code (17 §5.1). Windows cannot replace a running process, so this one waits; the
 // new one leaves the old program file for the next start to remove.
 func restartTUI(exe string, argv []string, stderr io.Writer) int {
 	c := exec.Command(exe, argv...)
@@ -205,7 +205,7 @@ func globalFlags(argv []string) (envName string, rest []string, err error) {
 }
 
 // openPlanFlag removes --open-plan <name> / --open-plan=<name>: the command acts on that
-// list without making it current (04 §1.3; the GUI's analysis and pack build children).
+// list without making it current (07 §1.3; the GUI's analysis and pack build children).
 func openPlanFlag(argv []string) (plan string, rest []string, err error) {
 	for i := 0; i < len(argv); i++ {
 		a := argv[i]
@@ -247,7 +247,7 @@ func steamWorker(argv []string, stdout io.Writer) int {
 	return steamworks.Worker(argv[0], ids, stdout)
 }
 
-// mcpGroup reads `archo mcp [--tools core|all]` (05 §5.1); a bad flag or value is a usage error.
+// mcpGroup reads `archo mcp [--tools core|all]` (14 §1); a bad flag or value is a usage error.
 func mcpGroup(rest []string) (mcp.Group, error) {
 	v, err := cmds.MCPTools(rest)
 	if err != nil {

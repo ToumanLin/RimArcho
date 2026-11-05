@@ -10,7 +10,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// P2, P3 (06 §2.14): caches are measured and cleared; a backup is a database that opens; launch
+// P2, P3 (16 §2.14): caches are measured and cleared; a backup is a database that opens; launch
 // arguments reach the game's command line.
 func TestSettingsCommands(t *testing.T) {
 	t.Parallel()

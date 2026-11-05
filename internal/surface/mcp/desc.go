@@ -1,6 +1,6 @@
 package mcp
 
-// What a client sees when it connects (05 §5.3): short Instructions and one short
+// What a client sees when it connects (14 §3): short Instructions and one short
 // description per tool, enough to pick the right tool. The full references, the diagnosis
 // workflow and the error-kind checklist are guide topics (internal/cmds/guide*.go), read
 // when needed. TestInitialContextBudget keeps this small.

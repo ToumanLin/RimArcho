@@ -27,10 +27,10 @@ func TestStyleRules(t *testing.T) {
 }
 
 func styleProblems(source string) []string {
-	// The Swiss-grid home design has its own sizes, rules and radii (06 §2.3, 06 §7.3).
+	// The Swiss-grid home design has its own sizes, rules and radii (16 §2.3, 16 §7.3).
 	// Only these three checks are exempt inside the explicit home section; side strips
 	// and token definitions still obey the shared rules. Keep offsets for diagnostics.
-	const homeStart = "/* home: special case, 06 §7.3 */"
+	const homeStart = "/* home: special case, 16 §7.3 */"
 	const homeEnd = "/* end home */"
 	start, end := strings.Index(source, homeStart), strings.Index(source, homeEnd)
 	var problems []string
@@ -214,10 +214,10 @@ func TestStyleRulesDetection(t *testing.T) {
 	}
 }
 
-// The exception must stop at its closing marker and must not bypass other rules (06 §7.3).
+// The exception must stop at its closing marker and must not bypass other rules (16 §7.3).
 func TestStyleRulesHomeException(t *testing.T) {
 	t.Parallel()
-	const start = "/* home: special case, 06 §7.3 */"
+	const start = "/* home: special case, 16 §7.3 */"
 	const end = "/* end home */"
 	const sizes = ".hm-example { font-size: 17px; font: 700 clamp(48px, 7.6vw, 124px)/1 sans-serif; border-top: 2px solid var(--fg); border-radius: 4px; }"
 	for _, tc := range []struct {

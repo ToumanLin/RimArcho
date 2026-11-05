@@ -2,7 +2,7 @@ package source
 
 import "strings"
 
-// Rebinding thresholds (02 §3.2).
+// Rebinding thresholds (03 §4.2).
 const (
 	RebindSamples    = 20
 	RebindSimilarity = 0.9

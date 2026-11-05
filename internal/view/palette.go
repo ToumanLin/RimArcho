@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// The command palette (06 §3.5): commands (by their Chinese name or English alias), mods and
+// The command palette (16 §3.5): commands (by their Chinese name or English alias), mods and
 // the other environments. Ranking: prefix > substring > subsequence > description; ties go
 // to commands, then mods, then environments, then the shorter name.
 

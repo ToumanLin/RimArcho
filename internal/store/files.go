@@ -3,11 +3,11 @@ package store
 import "sort"
 
 // InstanceFiles returns the current files of the live instances an environment sees (the
-// shared mod folders and its own Data/ and Mods/, 02 §0) whose relative path matches a LIKE
+// shared mod folders and its own Data/ and Mods/, 03 §2) whose relative path matches a LIKE
 // pattern (ASCII case-insensitive), as instance ID → paths in path order. Log attribution
-// uses it to find the installed mod that ships a missing texture or assembly (03 §6.2). A
+// uses it to find the installed mod that ships a missing texture or assembly (06 §2). A
 // pattern for .dll files reads only manifest rows; any other also unpacks the current
-// snapshots' blocks (02 §7).
+// snapshots' blocks (04 §4).
 func (s *Store) InstanceFiles(envID, like string) (map[string][]string, error) {
 	rows, err := s.DB.Query(`SELECT i.id, f.rel_path FROM instance i
 		JOIN snapshot_file f ON f.snapshot_id = i.current_snapshot_id

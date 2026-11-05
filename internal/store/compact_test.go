@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// 03 §6.5: reports are stored gzipped and read back unchanged; a report that cannot be
+// 06 §5: reports are stored gzipped and read back unchanged; a report that cannot be
 // decompressed counts as no cache, so the log is parsed again.
 func TestLogCacheCompressed(t *testing.T) {
 	s, err := Open(filepath.Join(t.TempDir(), "archo.db"))
@@ -70,7 +70,7 @@ func bigWrite(t *testing.T, s *Store, n int) {
 	}
 }
 
-// 02 §7: after a large write the WAL file is truncated instead of keeping its size while
+// 04 §4: after a large write the WAL file is truncated instead of keeping its size while
 // connections stay open; with another connection reading, TruncateWAL does not wait and
 // journal_size_limit cuts the file back on the next reset.
 func TestTruncateWAL(t *testing.T) {
@@ -116,9 +116,9 @@ func TestTruncateWAL(t *testing.T) {
 	}
 }
 
-// 03 §3: Def lookups by name start from the name index and then find each set's version
+// 05 §3: Def lookups by name start from the name index and then find each set's version
 // view. With a plain JOIN, the ORDER BY made SQLite walk the version's whole content_state
-// and probe the name index once per row (07 §6.2).
+// and probe the name index once per row (18 §2).
 func TestDefsNamedPlanStartsFromName(t *testing.T) {
 	s, err := Open(filepath.Join(t.TempDir(), "archo.db"))
 	if err != nil {
@@ -147,7 +147,7 @@ func TestDefsNamedPlanStartsFromName(t *testing.T) {
 	}
 }
 
-// 03 §3: every fact query still finds an index after v25 dropped the single-column ones.
+// 05 §3: every fact query still finds an index after v25 dropped the single-column ones.
 func TestFactQueriesUseIndexes(t *testing.T) {
 	s, err := Open(filepath.Join(t.TempDir(), "archo.db"))
 	if err != nil {

@@ -1,6 +1,6 @@
 # Error pattern library v0: draft MCP integration
 
-> Status: integrated into the product (G11, `internal/patterns`, `archo pattern`, `analyze_log pattern=`, and the MCP `Instructions` checklist; see 03 §6.5). The following is the pre-integration draft, retained as a record. Basis: `docs/research/00-log-corpus-design.md` §3 G5, §9; data: `spikes/patterns/patterns-v0.json`; figures: `spikes/patterns/RESULT.txt`.
+> Status: integrated into the product (G11, `internal/patterns`, `archo pattern`, `analyze_log pattern=`, and the MCP `Instructions` checklist; see 06 §5). The following is the pre-integration draft, retained as a record. Basis: `docs/research/00-log-corpus-design.md` §3 G5, §9; data: `spikes/patterns/patterns-v0.json`; figures: `spikes/patterns/RESULT.txt`.
 
 ## 1. What the data tells us
 

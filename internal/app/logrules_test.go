@@ -170,7 +170,7 @@ func TestLogRulesFromCorpus(t *testing.T) {
 
 // A save names a def of a mod left out of the list, and another mod patched the code that
 // read it: the left-out mod is the reason, the patcher only a candidate after it
-// (03 §6.3; VM run 2026-10-28, missing hair blamed on a Pawn.ExposeData patch).
+// (06 §3; VM run 2026-10-28, missing hair blamed on a Pawn.ExposeData patch).
 func TestLogSaveRefPrefersLeftOutProvider(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
@@ -206,9 +206,9 @@ func TestLogSaveRefPrefersLeftOutProvider(t *testing.T) {
 	t.Fatal("no Lib_Gun cluster")
 }
 
-// A disabled mod in a shared folder (here the Workshop; no environment ID since v14, 02 §0)
+// A disabled mod in a shared folder (here the Workshop; no environment ID since v14, 03 §2)
 // that ships the missing texture or assembly is named as the provider, like one in Mods/
-// (03 §6.2).
+// (06 §2).
 func TestLogProvidersInSharedFolders(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)

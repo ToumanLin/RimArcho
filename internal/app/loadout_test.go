@@ -1,6 +1,6 @@
 package app_test
 
-// M2 Loadout tests (04 §1.1–§4, §8). Every ModsConfig.xml written here lives in a temp dir.
+// M2 Loadout tests (07 §1.1–§4, §6). Every ModsConfig.xml written here lives in a temp dir.
 
 import (
 	"os"
@@ -77,7 +77,7 @@ func TestLoadoutImportHealAndEdits(t *testing.T) {
 	if out := e.MustRun("status"); !strings.Contains(out, "loadout: 4 active (1 missing entries), same as v1 (import)") {
 		t.Fatal(out)
 	}
-	// First use (04 §1.4): the first plan is ModsConfig.xml, imported as v1.
+	// First use (07 §1.4): the first plan is ModsConfig.xml, imported as v1.
 	p, err := e.App.CurrentPlan()
 	if err != nil {
 		t.Fatal(err)
@@ -163,7 +163,7 @@ func TestSaveSteamSuffixVersionAndBackup(t *testing.T) {
 	if !strings.Contains(out, "ModsConfig.xml was saved for 1.5; the game (1.6) resets it on start") {
 		t.Fatal(out)
 	}
-	// The mismatch no longer blocks a launch: launching writes the file for 1.6 (08 §2).
+	// The mismatch no longer blocks a launch: launching writes the file for 1.6 (09 §2).
 	if out, _ := e.Run("launch", "--dry-run"); strings.Contains(out, "saved for") {
 		t.Fatalf("launch blocked by the version mismatch:\n%s", out)
 	}
@@ -263,11 +263,11 @@ func TestHistoryCheckoutUndoSource(t *testing.T) {
 		t.Fatal(out)
 	}
 	if _, code := e.Run("loadout", "tag", "v2", "base"); code == 0 {
-		t.Fatal("loadout tag is gone: named lists are plans (04 §1.1)")
+		t.Fatal("loadout tag is gone: named lists are plans (07 §1.1)")
 	}
 }
 
-// V16 (04 §2.1): enable without a position puts a mod at the latest place its constraints
+// V16 (07 §2.1): enable without a position puts a mod at the latest place its constraints
 // allow — a library before the enabled mod that needs it, anything else at the end.
 func TestEnablePlacesByConstraints(t *testing.T) {
 	t.Parallel()
@@ -293,7 +293,7 @@ func TestEnablePlacesByConstraints(t *testing.T) {
 	}
 }
 
-// S13 through the CLI (04 §5.5): a community loadBottom and a user top rule move mods to the
+// S13 through the CLI (08 §1.5): a community loadBottom and a user top rule move mods to the
 // ends, `sort` explains them under "ends", and the community one can be ignored.
 func TestSortTopBottom(t *testing.T) {
 	t.Parallel()
@@ -455,7 +455,7 @@ func TestLaunchPlans(t *testing.T) {
 	}
 	e.MustRun("env", "set", "main", "--launch", "direct")
 	e.MustRun("enable", refOf(t, e, "B", ""))
-	// Edits since the last write do not block: the launch writes them (08 §2 "what was removed").
+	// Edits since the last write do not block: the launch writes them (09 §2 "what was removed").
 	if out, code := e.Run("launch", "--force"); code == 0 {
 		t.Fatalf("launch --force must be gone:\n%s", out)
 	}

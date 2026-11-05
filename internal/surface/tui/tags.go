@@ -9,8 +9,8 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The tag bar (06 §3.8): # opens one line of candidates for the selected mods (or the one
-// under the cursor; 06 §3.5). ←→ choose, enter applies, esc closes. Left of the first candidate is
+// The tag bar (16 §3.8): # opens one line of candidates for the selected mods (or the one
+// under the cursor; 16 §3.5). ←→ choose, enter applies, esc closes. Left of the first candidate is
 // "✎ type…", where typing makes a new tag. A tag every mod has shows as [✓tag] (enter
 // removes it), one only some have as [~tag] (enter gives it to all). The pinned tags
 // (config tags.pinned) come first, then the tags in use, most used first.
@@ -60,7 +60,7 @@ func (m *model) tagBarKey(k tea.KeyMsg) tea.Cmd {
 	case tea.KeyEsc:
 		m.tags = nil
 		return nil
-	case tea.KeyLeft, tea.KeyUp: // 06 §3.3: in a popup both pairs of arrows choose
+	case tea.KeyLeft, tea.KeyUp: // 16 §3.3: in a popup both pairs of arrows choose
 		tb.sel = max(tb.sel-1, -1)
 		return nil
 	case tea.KeyRight, tea.KeyDown:

@@ -338,7 +338,7 @@ try {
       }
     });
   }
-  // The launch page's numbers are focus keys; applying a row must keep the column (06 §2.3).
+  // The launch page's numbers are focus keys; applying a row must keep the column (16 §2.3).
   await test("home 1/2/3 focus columns, arrows apply within their scope, Enter launches", async () => {
     const original = { ...ui }, live = S.live;
     const rows = [
@@ -398,7 +398,7 @@ try {
       S.live = { running: true }; home.liveChanged(); press("3"); press("Enter");
       assert(focused(3) && launched.length === 1 && opened.length === 1, "disabled 03 launched or opened the list");
       const hints = home.hintList();
-      assert(hints.map((h) => h.key).join(" ") === "1–3 ↑↓ ←→ enter L shift+1–8 ?", "startup hint keys differ from 06 §2.3");
+      assert(hints.map((h) => h.key).join(" ") === "1–3 ↑↓ ←→ enter L shift+1–8 ?", "startup hint keys differ from 16 §2.3");
     } finally {
       Object.assign(ui, original); delete ui.run; S.live = live;
       handlers.set("Home", () => ({ rows: [], featured: -1 })); handlers.delete("HomeApply");
@@ -512,7 +512,7 @@ try {
     assert(selected === "1.6" && !S.busy.env && !button.disabled, "newest result did not win");
     button.remove();
   });
-  // Attribute guards must survive translated text, icons and redraws (06 §2.3, 06 §3.1).
+  // Attribute guards must survive translated text, icons and redraws (16 §2.3, 16 §3.1).
   await test("Chinese environment actions disable by code, navigation stays live, and state restores", async () => {
     const start = S.start, lang = document.documentElement.lang, live = S.live;
     const host = document.createElement("section"), menu = document.createElement("div"), popup = document.createElement("div");

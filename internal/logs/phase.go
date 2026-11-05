@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Phase is an observed Monitor boundary (03 §6.7.3), never inferred from an error.
+// Phase is an observed Monitor boundary (06 §7.3), never inferred from an error.
 // Index preserves repeated save/play/menu transitions within one run.
 type Phase struct {
 	Name  string

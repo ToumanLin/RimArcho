@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
-// Another version in the way (08 §3, §5.3): RimArcho must link a copy into Mods/ (a pack's,
+// Another version in the way (09 §3, 10 §3): RimArcho must link a copy into Mods/ (a pack's,
 // or a plan's _Archo_ deploy), and Mods/ already holds a plain folder with the same
 // packageId and other content. Two of them would make the game report an error, so instead
 // of refusing outright RimArcho offers to move that folder into the lock library (the

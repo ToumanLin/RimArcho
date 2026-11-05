@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Mod settings from the command palette (06 §2.9 "Mod settings"): the current list's Mods
+// Mod settings from the command palette (16 §2.9 "Mod settings"): the current list's Mods
 // that have settings as a panel, with up to settingsShown values of each file. The panel
 // only reads: values change on the GUI page, with archo mod-settings set, or in the game.
 

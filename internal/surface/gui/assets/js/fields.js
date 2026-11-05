@@ -1,4 +1,4 @@
-// The detail's one field list (06 §4.1, §2.9): the plan editor's detail and a copy's
+// The detail's one field list (16 §4.1, §2.9): the plan editor's detail and a copy's
 // detail on Mod library draw view.Field rows with it. Address and identifier rows have a copy icon;
 // a row's own action opens the location, the page, or the tag bar.
 import { el, esc, api, T, errText, say } from "./state.js";

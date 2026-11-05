@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// realRoot is the save data root the fixtures were written under (sanitized, 03 §6.7.3).
+// realRoot is the save data root the fixtures were written under (sanitized, 06 §7.3).
 const realRoot = `C:\Users\p\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios`
 
 // realRun puts the 1.7 run of 2026-10-21 (Archo Monitor 0.9.0-dev: 12 patch errors, one
@@ -50,7 +50,7 @@ func realRun(t *testing.T) (*testkit.Env, string, string) {
 	return e, player, monitor
 }
 
-// 06 §2.10: the log page shows the run's ArchoMonitor.log as its own section and lists it
+// 16 §2.10: the log page shows the run's ArchoMonitor.log as its own section and lists it
 // in the file picker under its Player.log.
 func TestLogPageMonitor(t *testing.T) {
 	e, player, monitor := realRun(t)
@@ -125,7 +125,7 @@ func TestLogPageMonitor(t *testing.T) {
 	}
 }
 
-// 06 §2.10: while the game runs, the section comes from the live tracker's companion log.
+// 16 §2.10: while the game runs, the section comes from the live tracker's companion log.
 func TestLiveMonitor(t *testing.T) {
 	t.Parallel()
 	e, player, _ := realRun(t)

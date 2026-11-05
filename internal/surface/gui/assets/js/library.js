@@ -1,4 +1,4 @@
-// Mod library > All (06 §2.9): what is on this machine. The same layout as the plan editor:
+// Mod library > All (16 §2.9): what is on this machine. The same layout as the plan editor:
 // the filter bar on top of a table, the details in a column on the right. The table is like
 // a file manager's details view: one row per Lineage (opening to its copies), columns the
 // player sorts (click a header, again reverses), moves (drag a header), sizes (drag its
@@ -46,7 +46,7 @@ export function initLibrary(u) {
   // A scan, or another process (the CLI, an agent), changes what is there.
   on("scan", () => { if (S.screen === "library") load(); });
   addEventListener("focus", () => { if (S.screen === "library") load(); });
-  // a background task on the copies ended (06 §2.16): what is there changed
+  // a background task on the copies ended (16 §2.16): what is there changed
   document.addEventListener("task-ended", (e) => {
     if (S.screen !== "library") return;
     const ref = e.detail?.ref;
@@ -63,7 +63,7 @@ export async function open() {
   await load(true, undefined, read);
 }
 
-// openSearch shows the page searching for q (a background task's mod, 06 §2.16).
+// openSearch shows the page searching for q (a background task's mod, 16 §2.16).
 export async function openSearch(q) {
   const b = bar();
   b.filters = [];
@@ -172,13 +172,13 @@ function build() {
   rows.append(th, sizer);
   main.append(head, rows);
   // the left column, as the editor's Not enabled: the filter bar on top, then the details (the
-  // editor's detail card) filling the rest (06 §2.9)
+  // editor's detail card) filling the rest (16 §2.9)
   const detail = el("section", "area detail lib-detail");
   const dhead = el("div", "head");
   const scroll = el("div", "scroll");
   scroll.tabIndex = -1;
   detail.append(dhead, scroll);
-  // the filter bar and the details are two cards, one above the other (06 §2.9)
+  // the filter bar and the details are two cards, one above the other (16 §2.9)
   const side = el("div", "fcol lib-side");
   side.append(bar().el, detail);
   dhead.addEventListener("click", () => { if (L.bar.fills()) L.bar.toggle(false); });
@@ -190,7 +190,7 @@ function build() {
   w.append(root, selbar);
   sc.append(w);
   els = { root, main, head, rows, th, sizer, side, detail, dhead, scroll, bar: selbar, lead: w.querySelector(".lead") };
-  // 1 the filter, 2 the table, 3 the details (06 §3.5); the numbers sit in their headings
+  // 1 the filter, 2 the table, 3 the details (16 §3.5); the numbers sit in their headings
   const fb = L.bar.el;
   // the bar is kept across visits: mark it once
   const row = fb.querySelector(".fbar-row");
@@ -349,7 +349,7 @@ function rowEl(x, k) {
   return r;
 }
 
-// nameCell: only the name (06 §2.9): a Lineage's, or under an open Lineage the copy's folder.
+// nameCell: only the name (16 §2.9): a Lineage's, or under an open Lineage the copy's folder.
 function nameCell(x) {
   const left = el("span", "c name");
   left.append(el("span", "m"));
@@ -375,7 +375,7 @@ function nameCell(x) {
 const isOpen = (r) => L.open.has(r.id) || r.insts.length < r.copies;
 
 // toggle opens or closes a Lineage. The cursor never rests on a Lineage's own row: closing
-// the one it is in moves it on to the next row (06 §2.9).
+// the one it is in moves it on to the next row (16 §2.9).
 function toggle(r) {
   const x = L.flat[L.cur];
   const inside = x && x.r === r;
@@ -505,7 +505,7 @@ function setFull(v) {
 let detailSeq = 0, frame = null;
 // drawDetail: the cursor's copy in the details, laid out as the editor's (detail.js
 // detailFrame): its note, picture and name, where it comes from, Mod library's field list, its
-// actions, the description and history (06 §2.9). A Workshop page not read yet is fetched
+// actions, the description and history (16 §2.9). A Workshop page not read yet is fetched
 // straight away.
 async function drawDetail() {
   if (!els) return;
@@ -610,7 +610,7 @@ function drawBar() {
   bar.append(x);
 }
 
-// menuAt: the row menu (06 §8.5), the same groups as the editor's.
+// menuAt: the row menu (16 §8.5), the same groups as the editor's.
 function menuAt(x, y, keys = false) {
   const by = opsOf(selected());
   ops.openMenu(x, y, [...by.keys()], (c) => run(c, by.get(c)), keys, { name: L.flat[L.cur]?.r.name, opener: els.rows });
@@ -672,7 +672,7 @@ async function run(code, copies) {
   pop.confirm(p.title, p.lines, o.label, p.apply ? () => done(api.LibraryDo(code, pop.previewOk(p, refs))) : null);
 }
 
-// ---- keys (06 §3.5): the plan editor's table; the arrows only move ----
+// ---- keys (16 §3.5): the plan editor's table; the arrows only move ----
 
 export function key(e) {
   if (pageLoading()) return;
@@ -711,7 +711,7 @@ export function key(e) {
     if (x.t === "inst" && !x.lone && L.open.has(x.r.id)) return toggle(x.r);
     return;
   }
-  // enter: the full detail, the same page the editor opens (06 §4.2); in a narrow window
+  // enter: the full detail, the same page the editor opens (16 §4.2); in a narrow window
   // the details still lie over the table first (→)
   if (k === "Enter") {
     done();
@@ -735,7 +735,7 @@ export function key(e) {
     return;
   }
   if (ctrl && k.toLowerCase() === "a") { done(); return selectAll(); }
-  // ctrl+o / ctrl+w: the cursor's copy's folder and Workshop page (06 §3.5); the Wails
+  // ctrl+o / ctrl+w: the cursor's copy's folder and Workshop page (16 §3.5); the Wails
   // window does not take them, preventDefault keeps them from the browser
   if (ctrl && !e.shiftKey && !e.altKey && ["o", "w", "s"].includes(k.toLowerCase())) { done(); return byKey("ctrl+" + k.toLowerCase()); }
   if (k === "/" || (ctrl && k.toLowerCase() === "f")) { done(); return L.bar.focus(); }
@@ -758,7 +758,7 @@ export function stepCopy(d) {
   return i ? i.id || i.ref : "";
 }
 
-// where: the position line on this page (06 §3.2): the cursor's row of the rows shown.
+// where: the position line on this page (16 §3.2): the cursor's row of the rows shown.
 export function where() {
   if (!L.page) return "";
   let s = `${T("Mod library")}    ${L.flat.length ? L.cur + 1 : 0} / ${L.flat.length}`;
@@ -767,7 +767,7 @@ export function where() {
   return s;
 }
 
-// hintList: the hint line for the page (06 §2.2): what the object can do now, as the editor.
+// hintList: the hint line for the page (16 §2.2): what the object can do now, as the editor.
 export function hintList() {
   const list = [];
   const x = L.flat[L.cur];

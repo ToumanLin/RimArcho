@@ -1,4 +1,4 @@
-# Builds Archo Monitor (docs/specs 07 §5, 08 §9): the same source for 1.5 and 1.6 (net472,
+# Builds Archo Monitor (docs/specs 17 §5, 09 §6): the same source for 1.5 and 1.6 (net472,
 # Mono, Harmony 2.x) and 1.7 (net10.0, .NET 10, Harmony 3.x), then assembles the mod folder:
 #
 #   monitor/out/ArchoMonitor/
@@ -28,7 +28,7 @@ $repo = Split-Path -Parent $here
 if (-not $Out) { $Out = Join-Path $here "out\ArchoMonitor" }
 if (!$Version) { $Version = (Get-Content -LiteralPath (Join-Path $here 'VERSION') -Raw).Trim() }
 if ($Version -notmatch '^\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)?$') { throw "Version must look like 1.2.3 or 1.2.3-dev" }
-if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { throw "dotnet not found; install the .NET SDK 10 (07 §5)" }
+if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { throw "dotnet not found; install the .NET SDK 10 (17 §5)" }
 
 $localMM = ""
 if ($RimWorldDir) {

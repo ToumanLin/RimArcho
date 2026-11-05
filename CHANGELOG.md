@@ -69,7 +69,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 - Mod library › Mod settings: a new page with the current list's Mods that have settings, one row per settings file with its settings window's title (when Archo Monitor saw it), how many values it stores and its size. The values of the file under the cursor show beside the table: on/off, numbers and text, with lists, dictionaries and nested values counted, and the file's path. Read only: change values in the game. `ctrl+o` opens the Config folder. A Mod's details say how many values its settings store, and open goes to the page at that Mod. In the terminal (TUI), the command panel's Mod settings shows the same as text.
 - `archo mod-settings` lists the current list's Mods that have settings (their settings window's title when Archo Monitor saw it, the file, or "defaults" when there is none yet); `archo mod-settings <ref>` shows what one Mod's settings files store: on/off values, numbers and text, with lists, dictionaries and nested values counted. Only values that differ from the Mod's defaults are in a file. `archo mod <ref>` shows the same for that Mod. MCP: the read-only core tool `get_mod_settings`. Read only: change values in the game.
 - MCP: `archo mcp` now serves 27 core tools by default: diagnosis (`status`, `analyze_log`, `list_problems`, `get_mod`, `get_mod_settings`, `get_def`, `get_patches`, `get_harmony`, `search_files`, `read_source` and the rest), plan edits, `save_loadout`, `launch_game`, `test_run`, `pin_mod` / `unpin_mod`, plans and their history, `manage_rules`, `ignore_problem`, `scan` and `list_library`. `archo mcp --tools all` serves all 41 tools, adding the player's management tools: `manage_subscriptions`, `manage_packs`, `manage_library`, `exchange_list`, `manage_textures`, `estimate_memory`, `maintenance`, `resolve_identity`, `manage_hidden`, `check_links`, `repair_links`, `mute_version_warnings`, `set_player_data` and `preview_uninstall`. To keep using those tools, add `--tools all` to the agent's `archo mcp` command. The full list cost an agent about 11k tokens on every turn (29% of its tokens in an evaluation), and the management tools were never called there. The core `tools/list` is 27 KB instead of 43 KB. The server instructions name what `--tools all` adds, and `archo guide` lists those tools on a separate line. Any other `--tools` value is a usage error (exit 2).
-- MCP: the aliases `copy_local` (use `pin_mod`) and `add_rule` (use `manage_rules`) are removed, with their guide topics. Both were renamed in 0.9.0 and kept as aliases through the 1.0.0 release, the minor version 05 §6 requires. The CLI command `archo copy-local` stays.
+- MCP: the aliases `copy_local` (use `pin_mod`) and `add_rule` (use `manage_rules`) are removed, with their guide topics. Both were renamed in 0.9.0 and kept as aliases through the 1.0.0 release, the minor version 13 §5 requires. The CLI command `archo copy-local` stays.
 - `archo test run` / MCP `test_run` compare error clusters with the previous run of the same plan and map mode: JSON adds `baseline` (`new`, `present`, `gone` counts), `delta` on each cluster and a `gone` list; the text marks new clusters and lists the gone ones. A fixed error is now visible even when unrelated errors remain. The exit code and MCP `isError` are unchanged: any error cluster still fails.
 - Log attribution names the Mod whose assembly defines a type in "static constructor of T" (and other type evidence) in a freshly scanned environment: `test_run` brings the tested plan's analysis up to date after the game exits (JSON `analysis_error` if that fails), and `archo log` / MCP `analyze_log` do the same for the environment's own logs and pasted text. Before, they used only a stored analysis, so a Harmony patch failing in a Mod's static constructor, or a texture path named only in a Mod's code, came back with no Mod. While the MCP wait (10 s) runs out, `analyze_log` says `analysis: still computing`.
 - MCP: long tool calls send a progress notification every 10 seconds when the client asks for progress; for `test_run` it names the current step, such as waiting for the game to load. Clients that restart their request timeout on progress, such as Pi, no longer give up on `test_run` after 60 seconds. Giving up cancelled the call, which closed the game before it could report.
@@ -484,7 +484,7 @@ and were not released on their own.
   it" because the old version's link is still in Mods/; the next launch replaces that
   link.
 
-The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, with a
+The new design's 1.0 work (01 §4.1). 1.0.0 follows once 01 §4.2 is verified, with a
 `1.0.0-rc1` first.
 
 - Downloading a game version no longer fails when SteamCMD drops its connection and
@@ -659,7 +659,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   the whole cycle in its current order. A dependency the list had the wrong way round is now
   put right. `archo sort` marks the constraints it gives up `[broken]`; the suggested ignore
   is the weakest of them.
-- Sorting honours loadTop / loadBottom (04 §5.5): from the community rules (RocketMan,
+- Sorting honours loadTop / loadBottom (08 §1.5): from the community rules (RocketMan,
   RimThreaded, Performance Optimizer and others load last; XML Extensions first), from new
   user rules `archo rule add top|bottom <mod>`, and from RimCrow's user rules on import. A
   top mod takes what it needs up with it, a bottom mod takes what needs it down. They are
@@ -693,7 +693,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - `ctrl+\` turns reference numbers on and off: every control, text block, image and chart
   gets a thin red frame numbered at its top-left (`lib12`: the page, then the number), so a
   change can be asked for as "change lib12". The frames take no clicks.
-- Lists are shared by every game (04 §1.7). Switching games no longer hides the lists made
+- Lists are shared by every game (07 §1.7). Switching games no longer hides the lists made
   in another one; each game keeps its own current list. A list's Core, DLC and game-folder
   `Mods/` entries are read as the open game's own copy by packageId. Removing a game keeps
   the lists. The database moves to schema v19: lists with the same name in two games get the
@@ -714,14 +714,14 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - The plan editor and mod library filter bars now include Location, with one value per
   registered source folder. Multiple locations, exclusions and quoted paths in search are
   supported; CLI/MCP library queries accept `location:<source folder path>` too.
-- Opening a list no longer switches the list you play (04 §1.3). A list opened from the
+- Opening a list no longer switches the list you play (07 §1.3). A list opened from the
   sidebar, the palette or list management is only shown and edited; the current list — the
   one the launch page shows and launches — changes when you make another current, write it
   to the game or launch it from its editor. New lists open without becoming current. The
   editor says which list launches and offers "make current". lists opens the current list,
   which comes first in the sidebar and in list management (manage moves last), and reordered
   entries slide to their new place. `--open-plan <name>` runs one command on another list.
-- List management is simpler (06 §2.17). The sidebar entry is now "all lists" (and the mod
+- List management is simpler (16 §2.17). The sidebar entry is now "all lists" (and the mod
   library's first entry "all mods"). One "new / import" button opens one form that starts
   empty; importing has a short guide, a file button that reads the file at once (no typed
   path) and drag-and-drop, and its one main button says "preview" until the content is read,
@@ -740,18 +740,18 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   RimArcho wrote (v16), a plan's game versions and followed collections (v17), the link
   ledger (v18). Each environment's workspace, undo stack, versions and
   staging become its first plan, `default`; each `loadout tag` name becomes a plan of its own
-  with one `import` version (04 §1.4).
-- `launch --force` is removed: launching always writes the plan first (08 §2).
-- Severities follow the log corpus (03 §4.3.1): `official.order` error → warning,
+  with one `import` version (07 §1.4).
+- `launch --force` is removed: launching always writes the plan first (09 §2).
+- Severities follow the log corpus (05 §4.3.1): `official.order` error → warning,
   `order.cycle` warning → info, `version.unsupported` reversed (stopping at the previous minor
   version → warning, older only → info), `harmony.multi-transpiler` warning → info (warning when
   a current log's stack passes through the method); `order.violated` is info for weak and
-  harmless constraints (04 §5.3). Analyzer version 7: stored analyses are rebuilt once.
-- `loadout tag` is removed: a named list is a plan (05 §4.3).
-- `archo save` means "write to the game without launching" (04 §4.1).
+  harmless constraints (08 §1.3). Analyzer version 7: stored analyses are rebuilt once.
+- `loadout tag` is removed: a named list is a plan (13 §4.3).
+- `archo save` means "write to the game without launching" (07 §4.1).
 - `save` and `launch` refuse while ModsConfig.xml holds an outside change that was not loaded
-  (04 §4.1, §4.3).
-- Locked copies made by `pin` live in the lock library, not in `Mods/` (04 §7).
+  (07 §4.1, §4.3).
+- Locked copies made by `pin` live in the lock library, not in `Mods/` (07 §5).
 - Light packs are gone: a pack always carries its mods' files. Sharing a list with each mod's
   version is the RimArcho list export format (Packs, below); `pack export --light` is now
   `pack export --list`, and `pack build --light` and the build page's full / light choice are
@@ -759,7 +759,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - One environment is one game folder: `env add` refuses a game folder another environment
   uses, and the Workshop, SteamCMD and other folders are no longer an environment's (below).
 
-### Environments and shared mod folders (02 §0)
+### Environments and shared mod folders (03 §2)
 - An environment is one game folder: its `Data` and `Mods`, version, launch, arguments,
   saves and plans. Saves are `--saves shared` (the game's default folder) or `--saves own`
   (`<data>/userdata/<env>`, started with `-savedatafolder`).
@@ -796,7 +796,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - A game outside a Steam library launches `direct` by default even when a Workshop folder is
   given (`env add --workshop`); only a game inside a Steam library defaults to `steam`.
 
-### Downloading a game version (08 §11)
+### Downloading a game version (11 §3)
 - `archo env branches` lists RimWorld's Steam branches from SteamCMD (anonymous
   `app_info_print`); `archo env download <branch> --to <dir>` downloads one
   with SteamCMD and adds it as an environment. The guide's download a version does the same with a
@@ -816,7 +816,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - SteamCMD is downloaded from Valve into `%LOCALAPPDATA%\RimArcho\steamcmd` only after the
   player saw its size (`--install-steamcmd` in the CLI).
 
-### Archo Monitor (03 §6.7, 04 §1.5, 08 §9)
+### Archo Monitor (06 §7, 07 §1.5, 09 §6)
 - RimArcho ships its own in-game companion mod, Archo Monitor (`toumanlin.archomonitor`,
   1.5 / 1.6 / 1.7). It writes `ArchoMonitor.log` in the save data folder: the XML file and def
   being loaded at an error, the mods on the stack and their Harmony patches, and errors after
@@ -835,14 +835,14 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   mods by name and files), details on click, a link to the matching Player.log cluster, and
   the session's version, game and start–end as its header. It follows the live tracker while
   the game runs. The file picker lists ArchoMonitor.log under its Player.log. A plan without
-  the monitor gets one line with add Archo Monitor (one undoable step) (06 §2.10).
+  the monitor gets one line with add Archo Monitor (one undoable step) (16 §2.10).
 - Log lines on that page take RimWorld's own debug-log colours (error #ff6666, warning
   #ffeb04, message white; darkened for the light theme with the hue kept), and mods' Unity
   rich text (`<color>`, `<b>`, `<i>`) is shown as styled text, parsed in Go; other tags stay
   plain text. The first visit to the page no longer stays blank when the log reads quickly.
 - The release zip has `monitor/ArchoMonitor/`; building it needs the .NET SDK 10.
 
-### Plans (04 §1)
+### Plans (07 §1)
 - `plan list|new <name> [--from current|v<n>|<file>]|use|rename|remove --yes`;
   `loadout import <file> --new [<name>]`. The last plan cannot be removed; names ignore case.
 - Workspace, undo, versions (numbered per plan) and staging belong to a plan; `status`,
@@ -854,14 +854,14 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   right-click, `P` or the palette. The status bar says "in the game now:: <list> v<n>". The TUI
   has the same switcher on `P` and names the plan in its top bar.
 
-### Outside changes (04 §4.3)
+### Outside changes (07 §4.3)
 - A change made to ModsConfig.xml outside RimArcho goes to the plan that last wrote the file,
   in whichever environment shares the folder: loaded as an `external` version when that plan
   is untouched since, else recorded and marked. With no record it goes to the current plan.
 - `archo loadout ignore-external` clears the mark; the version stays. The mark shows in
   `status`, `loadout log`, can it run (with "see the difference"), the sidebar and the plan page.
 
-### Launching (08 §1, §2, §4)
+### Launching (09 §1, §2, §4)
 - `archo launch` writes the plan to the game (links, ModsConfig.xml, a `launch` version unless
   the list equals the newest one) and then starts it; Steam or the game exe is found before
   anything is written.
@@ -876,9 +876,9 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   status line says what happened (sort: undo / u). A refusal names its reason and lists the
   commands that resolve it. Loading a history version or an outside change is one undoable
   step, with no confirmation. The palette's preview the sort / preview save / preview the launch show the dry runs
-  (06 §6).
+  (16 §6).
 
-### Locked versions (04 §7)
+### Locked versions (07 §5)
 - `archo pin <instance> [--name] [--git] [--dry-run]` (`copy-local` is an alias) copies the
   mod into the lock library (`lock.dir`, default `%LOCALAPPDATA%\RimArcho\locked`, one folder
   per environment, scanned as source `src:locked`) and swaps it into the current plan. The game
@@ -891,7 +891,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   `Mods/` into the library — a rename on the same volume, else copy, verify, recycle.
 - `unpin` on a RimArcho copy swaps the upstream back into the current plan.
 
-### Logs (03 §3, §6.4)
+### Logs (05 §3, 06 §4)
 - A log belongs to the newest launch before it was written (else the plan that last wrote
   ModsConfig.xml; else "source unknown"). It is stale for another game version, another
   plan, environment or pack, or a list changed since that launch; the header says why.
@@ -901,22 +901,22 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   the last launch and the log last seen.
 - `archo log` (MCP `analyze_log`) prints a cursor; `--since <cursor>` (MCP `since`) lists only
   the clusters that are new (`new`) or whose count grew (`+N`) since then, ArchoMonitor.log
-  included, for an agent polling a running game (03 §6.6). When the game restarted, the cursor
+  included, for an agent polling a running game (06 §6). When the game restarted, the cursor
   is called stale and the old run is Player-prev.log (`--prev --since`).
-- The first query on a new log is fast again (07 §6): on corpus logs 1.1–14 s → 128–330 ms,
+- The first query on a new log is fast again (18): on corpus logs 1.1–14 s → 128–330 ms,
   where it was 568 ms on the reference log. Looking defs up by `Name` has an index (schema v15);
   the files mentioning each def name are indexed once per enabled set (`cache/refindex/`, built
   after an analysis), so cross-reference referrers no longer read every mod file; repeated log
   entries are classified once. Referrer evidence is listed by file.
 
-### Search (06 §3.7)
+### Search (16 §3.7)
 - `tag:` matches the start of any word in a tag: `tag:facial` finds Facial Hair and Facial
   Animation, `tag:animation` finds Facial Animation.
 - From the second letter, grey ghost text completes field names (`au` → `author:`) and
   values after `tag:`, `type:` and `has:`; Tab (or → in the GUI) takes it, otherwise Tab
   still jumps to the next list with matches.
 
-### MCP (05 §1.2, §5.2)
+### MCP (13 §1.2, 14 §2)
 - New tools: `manage_packs`, `ignore_problem`, `resolve_identity`, `scan`, `exchange_list`,
   `manage_rules` (`add_rule` stays as an alias), `manage_hidden`, `maintenance`, `pin_mod`
   (`copy_local` stays as an alias), `unpin_mod`; `status` gains `show` pages (envs,
@@ -935,9 +935,9 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - Instructions and descriptions speak of the current plan, writing to the game and locked
   versions.
 
-### Uninstall (01 §4.1)
+### Uninstall (02 §2)
 - `archo uninstall` shows what RimArcho put on the machine and what happens to each piece;
-  `--yes` runs it. Every row of the write list (01 §4) has an uninstall step or a stated
+  `--yes` runs it. Every row of the write list (02 §1) has an uninstall step or a stated
   reason; a test keeps the two in step.
 - RimArcho's `_Archo_` / `!ArchoPack_` links leave every game's `Mods/` (never their targets;
   a same-named folder that is not a link stays and is listed). Each ModsConfig.xml RimArcho
@@ -957,7 +957,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   report and close RimArcho; TUI palette uninstall RimArcho asks for the word `uninstall`; MCP
   `preview_uninstall` is the dry run only.
 
-### mod library (06 §2.9)
+### mod library (16 §2.9)
 - `archo library` lists every mod on this machine, one line per Lineage (copies, size,
   the most important state, the plans using it), with `--search`, `--include` /
   `--exclude key:value` (tag, source, version, state, used), `--sort name|size|changed|played`,
@@ -992,7 +992,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   day RimArcho first saw them and, beside a Workshop copy, how often it updated since. Edit it in the window (click), the TUI (`n` in mod library), the CLI
   (`archo note <ref> <text> --copy`, `--clear`) or MCP (`set_player_data` `copy_note`);
   `pin --reason`, `library move-to-locked --reason` and the MCP `reason` record why.
-- unsubscribe and resubscribe go through the running Steam client, as RimCrow does (08 §10): a
+- unsubscribe and resubscribe go through the running Steam client, as RimCrow does (11 §2): a
   short-lived `archo steam-worker` process, started in `%LOCALAPPDATA%\RimArcho\steam` with
   the game's `steam_api64.dll` copied in and `steam_appid.txt`, calls the Steamworks flat API
   (no cgo) and exits. Unsubscribing makes Steam delete the folder, so it shows the dry run
@@ -1014,7 +1014,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - `ctrl+o` opens the cursor's mod's folder and `ctrl+w` its Workshop page, in the plan editor
   and mod library, in both interfaces; without a Workshop ID the status line says so.
 
-### One interface for the plan editor and mod library (06 §2.5, §2.9, §3, §8.5)
+### One interface for the plan editor and mod library (16 §2.5, §2.9, §3, §8.5)
 - One filter bar on both pages: a search box (the grey completion and `tag:` word matching
   as before, now with `version:`), the filters in force as removable chips, and filters (`\`).
   Open, it shows one line per group (tags, source, version with the current game marked, content and has
@@ -1030,7 +1030,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - mod library loses its filter column: the bar is over the table, and a copy's details are a
   permanent right-hand column (the editor's detail card) that follows the cursor; `enter`
   lays them over the page, `enter` or `esc` closes them, `→` on a copy focuses them.
-- One key table on both pages (06 §3.5), in both interfaces: `PgUp` / `PgDn` move the cursor
+- One key table on both pages (16 §3.5), in both interfaces: `PgUp` / `PgDn` move the cursor
   (they scroll only the focused details), `ctrl+a` selects everything shown, `enter` opens /
   closes the details, `esc` backs out (details → selection → search and filters), `space`
   takes effect / stops (enable / disable in the editor; add to the current list / remove from the current list / switch to this copy in
@@ -1045,7 +1045,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   version, update the locked version, unlock, back up locked version), disk (restore, resubscribe, then unsubscribe / delete in red),
   each with its key, only what applies. The editor's menu now has the version and disk
   ops too.
-- New rule (06 §3.1 rule 6): everything the mouse can do, the keyboard can do. The menu key
+- New rule (16 §3.1 rule 6): everything the mouse can do, the keyboard can do. The menu key
   and `shift+F10` open the row's menu at the cursor (↑↓, enter, esc); `H` lists the history,
   `C` a mod's changes, `<` `>` `=` set the editor's column widths, `s` in mod library is the
   headers' menu (sort, move, size, show columns). A test checks every op has a key or the
@@ -1053,7 +1053,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - mod library's page data is 0.77 MB instead of 1.47 MB on a 1,284-mod library: each copy
   carries op codes, the labels come once, and folder paths and Workshop URLs stay in Go.
 
-### changes (06 §2.9, §2.3)
+### changes (16 §2.9, §2.3)
 - One row per mod: its changes in the time range merged into "name · what it means", with a
   tier pill (affects launch / worth a look / content only), sorted by tier then name. The sentence comes only from
   what the scans recorded: supported versions added or dropped (the game's own version
@@ -1077,8 +1077,8 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   Player.log by itself when the page loads or the window regains focus, and is hidden when there
   was never a run.
 
-### The window (06 §2)
-- One full detail page (06 §4.2): `enter` in the plan editor and in mod library › all opens the
+### The window (16 §2)
+- One full detail page (16 §4.2): `enter` in the plan editor and in mod library › all opens the
   same page. The mod on the left (picture, name, author, state, tags, description); its
   copies (state, size, version, folder, note, and the selected copy's actions), where each is
   used with the current plan's `space`, the fields and the history on the right; technical information under
@@ -1113,7 +1113,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   rest under ⋯; ← → jump between sections. The view model carries `Section`, `Title`,
   `Why` and `Evidence` for both interfaces. A mod's missing inherited definitions, and its
   patches that miss the same disabled target, are now one item each (the count drops).
-- Motion (06 §7.1): three duration tokens (120 / 180 / 260 ms); pages fade in with a 4px
+- Motion (16 §7.1): three duration tokens (120 / 180 / 260 ms); pages fade in with a 4px
   rise; the sidebar's highlight slides; list edits slide the visible rows to their new
   place and flash the changed ones; badges and counts bump; the status line slides in;
   lazily loaded parts shimmer. Only opacity and transform move, and nothing does under
@@ -1132,11 +1132,11 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   writing game files); the last run and scan are two lines. No page actions on home. The plan editor has three columns,
   Disabled | Enabled | details, with Staging and history as folds under details (drag to a folded Staging still
   stages; `3` opens it); two splitters, old four-column widths carried over.
-- start is laid out like the game's main menu over a background image (06 §2.3): the plans and
+- start is laid out like the game's main menu over a background image (16 §2.3): the plans and
   packs down the left (kind first, then the name; the applied one raised with edit ↵, the
   others with apply ↵ on the cursor), the last run and scan under them, ▶ launch the game in the
   bottom right with the problem as a tab under it. `↑` `↓`, `enter` (apply / edit), `L`.
-- settings › launch page background (06 §2.14): the game's art (RimWorld's planet by default, the DLC
+- settings › launch page background (16 §2.14): the game's art (RimWorld's planet by default, the DLC
   covers), the images of every mod with "background" in its name (their
   `VBE.BackgroundImageDef`s: Vanilla Backgrounds Expanded, Shella Backgrounds, …), your own
   PNG / JPG, or plain; dimming, blur, focus, and rotation among starred images, with a small
@@ -1148,9 +1148,9 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   selection and scroll, the details stay open; it no longer reloads to the home page.
 - The plan editor: sort (`S`) is in the Enabled column's header, import / export (`i`) in the
   toolbar. Rows no longer show tags, in any column or interface (they are in the detail and
-  `tag:` search, 06 §3.8). The detail is one field list — Archo ID, package ID, location [open the location],
+  `tag:` search, 16 §3.8). The detail is one field list — Archo ID, package ID, location [open the location],
   workshop [opens the page], tag [edit], languages, dependency, conflicts with — shared with mod library; clicking Archo ID,
-  package ID, location or the Workshop ID copies it and says copied (06 §4.1); the list has no
+  package ID, location or the Workshop ID copies it and says copied (16 §4.1); the list has no
   background and long values wrap. The TUI detail draws the same list.
 - The TUI's can it run has the GUI's four sections, each heading with its count (and which run
   the run errors are from), and every item's evidence chip on the line under it: an icon
@@ -1182,15 +1182,15 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   log pages' columns. The draggable gaps keep a 10 px grab area that reaches over the cards'
   edges.
 - New icon artwork: the portrait with the accent rim light (1024×1024). 48 px and up show it
-  whole; 40 px and below show the head (hair and face) instead of the face alone (06 §8.6).
+  whole; 40 px and below show the head (hair and face) instead of the face alone (16 §8.6).
   The icon renderer now draws groups with inherited fill and stroke, transforms, clip paths,
   radial and bounding-box gradients, evenodd fills and Gaussian blur, and skips what is only
   defined (defs, clip paths, gradients, filters).
-- The bow from the portrait is RimArcho's mark (06 §7): in front of Archo's name on the log
+- The bow from the portrait is RimArcho's mark (16 §7): in front of Archo's name on the log
   page's Archo log analysis card and the ask Archo analyze button. Brand colours: a `#4f46e5`
   rim in the light theme; a `#a5b4fc` rim and a grey outline in the dark theme.
 
-### Memory (07 §8.3)
+### Memory (17 §7.3)
 - settings › interface has GPU acceleration (`config set ui.gpu on|off`, default on). Off draws the window in
   software and saves about 20–35 MB; it takes effect the next time RimArcho opens.
 - The window's Go process returns freed memory to the system 2 seconds after heavy work, and
@@ -1207,8 +1207,8 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
 - Measured on the same data copy, GPU on: idle 202 → 138 MB, plan editor 204 → 138,
   mod library 175 → 151, minimised 171 → 105. GPU off: 182 → 123, 185 → 123, 155 → 132, 150 → 88.
 
-### Packs (06 §2.6, §2.7, 08 §5.3, §7)
-- The recycle bin has one entry that checks the allow-list (08 §7) for every caller: a mod
+### Packs (16 §2.6, §2.7, 10 §3, 02 §3)
+- The recycle bin has one entry that checks the allow-list (02 §3) for every caller: a mod
   folder inside a source folder (not the folder itself), a pack directly in the pack folder,
   saves (a game's `Saves/`, own save folders, save backups) and a game downloaded with
   SteamCMD. A link, or any other path, is refused whoever asks (`trash`, `pack remove`,
@@ -1234,7 +1234,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   in `Mods/`. Such pairs already there are `pkg.duplicate-mods` errors in can it run › breaks the game,
   whoever made them; the fix only ever changes RimArcho's own links or the plan, never the
   player's folders. Pack links that duplicate a copy raise `pack.links-left` to an error.
-- Another version in the way (08 §3, §5.3): when a pack or a plan's locked copy needs one
+- Another version in the way (09 §3, 10 §3): when a pack or a plan's locked copy needs one
   version and `Mods/` holds a plain folder with another, RimArcho offers to move that folder
   into the lock library and go on, with one confirmation listing what moves where and what is
   linked instead. Plans that used the folder keep it (it comes back through a link). The
@@ -1247,11 +1247,11 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   `pack.links-left`: in can it run › for you to confirm with remove the links, in the tab under launch the game, in
   `archo problems` and MCP `list_problems`. `archo pack unlink [--dry-run]` / MCP
   `manage_packs action=unlink` remove only the links; refused while a game runs.
-- `.archopack` format 2 (08 §5.1, §5.4): tar + zstd with `pack.json` first, a SHA-256 digest
+- `.archopack` format 2 (10 §1, §4): tar + zstd with `pack.json` first, a SHA-256 digest
   per copy and a whitelist that never lets game files in. Import verifies every copy.
   `archo pack check <name|file>` (MCP `manage_packs action=check`) verifies a pack's copies,
   or an archive without extracting it.
-- A pack is compared with the game it is imported into or launched on (08 §5.5): game build,
+- A pack is compared with the game it is imported into or launched on (10 §5): game build,
   DLC and mods. The import result says whether every copy matched and lists the differences;
   launching refuses only on errors.
 - The RimArcho list (`loadout export --format archo`, `.archolist.json`) shares a list with
@@ -1259,7 +1259,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   content and marks mods installed in another version. A pack's page exports its list (`E`).
 - Packs remember the list they were made from.
 
-### texture optimisation (08 §5.2)
+### texture optimisation (10 §2)
 - Database schema v15 → v16: the DDS RimArcho wrote, per file and per mod.
 - `archo textures status|optimize|clean|tool`: converts a mod's PNG textures to DDS next to
   them with todds 0.4.1 (BC1 when opaque, BC7 otherwise, with mipmaps); the PNGs stay. Every
@@ -1281,7 +1281,7 @@ The new design's 1.0 work (01 §5.1). 1.0.0 follows once 01 §5.2 is verified, w
   slim 80–25%, with the PNGs converted, the size after and the peak while converting; `D` steps
   through it; without todds the step says so and build points to settings › texture optimisation); TUI palette panel; MCP `manage_textures`.
 
-### Log corpus (03 §4.3, §4.3.1, §5.3, §6.3, §6.8; 04 §5; 08 §2)
+### Log corpus (05 §4.3, §4.3.1, §5.3, 06 §3, §8; 08 §1; 09 §2)
 The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
 - **Severities from the corpus** (G8): each code graded by how often its mods are error
   sources in the same log against chance; see Breaking. `official.order`'s first suggestion is
@@ -1306,7 +1306,7 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
   references, field errors with their Context, XML Extensions blocks, absolute file paths,
   texture providers, missing assemblies loaded reflection-only, save-load holders. The cluster
   view shows the full message, its extra lines and the messages around it (`nearby`). The
-  referrer search keeps using the reference index (03 §6.5).
+  referrer search keeps using the reference index (06 §5).
 - **Error patterns** (G5/G11, `internal/patterns`): `[pattern:g:<id>]` on cluster lines, a
   `pattern:` section in the cluster view (community background: usual causes, route, fixes,
   repeat-upload evidence), `archo pattern` and MCP `analyze_log pattern=`; MCP Instructions end
@@ -1316,7 +1316,7 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
 - **Data from 40,326 logs** (corpus expansion): `internal/patterns` now has 3,947 mod-specific
   errors seen in at least 25 logs (was 1,034 from at least 10) and `internal/known` 95 prerequisites and 486 combinations (was 38 and 180),
   same thresholds. Severities (G8) and constraint strength (G2) keep their 6,734-log measurements.
-- **In the pages** (06 §2.3, §2.4, §2.5, §2.10, §4.2; TUI the same):
+- **In the pages** (16 §2.3, §2.4, §2.5, §2.10, §4.2; TUI the same):
   - start: the tab under launch the game names the most likely trouble (the first `LaunchChecks` code
     with an item in can it run) and its one-line reason with the corpus numbers; it opens
     can it run and never blocks. The TUI's `L` says it on the status line (“worth a look: …”).
@@ -1332,7 +1332,7 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
   - Mod detail › technical information › Harmony (`archo harmony --mod`): patches from `Harmony.Patch`
     calls are marked, and every unresolved call is listed with its reason.
 
-### Background tasks (06 §2.16)
+### Background tasks (16 §2.16)
 - mod library's file and Steam actions are queued once confirmed: two queues (files, Steam), one
   failure does not stop the rest, and each item's result is kept (`<data>/tasks.json`).
   Scans, checks, pack builds, texture work, game downloads and the long actions of the
@@ -1342,11 +1342,11 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
 - The TUI queues its subscription actions (subscribe, check, update, remove) into the same
   queues and `tasks.json`; the status line says when one is queued and how it ended. Its
   other mod library file actions still run in the foreground.
-- The window stays usable during long work (06 §3.1 rule 9): adding a large game, switching
+- The window stays usable during long work (16 §3.1 rule 9): adding a large game, switching
   games, the first scan, folder sizes, and the settings page's downloads and database actions
   run in the background, and a page opens before its data is read; stale results are dropped.
 
-### Interface rules (06 §3.1, §3.9, §7.3)
+### Interface rules (16 §3.1, §3.9, §7.3)
 - Popups are only for warnings: new list, import, the build checklist and loading an older
   version happen in the page. A filter bar folds away when it loses focus.
 - Packs, a pack's mods and the texture list are data tables. The gaps between cards can be
@@ -1359,7 +1359,7 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
 - Back and forward between pages (rule 11): the mouse side buttons, `alt+←` / `alt+→` and
   BrowserBack / BrowserForward share one session history of the last 50 pages; back first
   closes a menu or popup. Deleted lists, other games' pages and finished guides are skipped.
-  The TUI keeps its own page switching (06 §8.5).
+  The TUI keeps its own page switching (16 §8.5).
 - start is a grid: the current list or pack as the title, then 01 game → 02 list / pack → 03
   launch. Choosing applies it, choosing again opens it; a switch shows its progress on the
   launch block instead of a popup. The launch tab's problems can be folded away until they
@@ -1369,7 +1369,7 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
 - settings › interface: an accent colour (`ui.accent`, the 15 Radix Colors scales or default), applied at
   once in light and dark. The native title bar and the launch backdrop follow the theme.
 
-### Lists (04 §1.6, §9.6; 06 §2.17)
+### Lists (07 §1.6, §7.6; 16 §2.17)
 - list management (the sidebar's lists › manage, `shift+5`): the lists on the left; on the right a list's
   game versions, the Steam collections it follows and sharing, with an export sub-page
   (`e` in the editor opens it too). New lists are created in the page, and unfinished drafts
@@ -1390,7 +1390,7 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
 - Sorting puts the installed base game back when it is missing; the Disabled area lists Core and
   the DLCs first.
 
-### Subscriptions (02 §3.4, 06 §2.9)
+### Subscriptions (11 §1, 16 §2.9)
 - Mods from a Git repository (`archo subscribe git <url> [--branch|--tag|--commit]`), from a
   download page such as LoversLab (`subscribe page <url> [--git] [--from zip|folder]`: the
   page's Git repository if it has one, else the files the player downloaded; never downloaded
@@ -1412,7 +1412,7 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
   `+` and paste, queued as background tasks. A page update or a page without a single Git
   repository points to the window or `--from`.
 
-### Accounts (07 §3.1)
+### Accounts (11 §4)
 - settings › accounts: one status line each for SteamCMD and LoversLab (log in, log in again, log out).
   SteamCMD's login runs in SteamCMD's own console and is verified, and RimWorld ownership is
   checked. LoversLab signs in in a separate WebView2 window (its own process, a throwaway
@@ -1420,7 +1420,7 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
   downloads that need a login work. Passwords are never asked for or stored. Uninstall
   forgets the accounts first.
 
-### Searching files (03 §5.5, 05 §4)
+### Searching files (05 §5.5, 13 §4)
 - `archo files search <pattern>` / MCP `search_files` search only what the game loads: the
   enabled copies in load order, the version or LoadFolders branch for this game version, and
   the content folders (Defs, Patches, About; Languages, Textures, Sounds, Assemblies when
@@ -1428,13 +1428,13 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
   paged. `--def` classifies hits (def, abstract, child, patch, patch value, translation,
   reference). Literal text or `--regex`; no index.
 
-### Game test runs (08 §12)
+### Game test runs (09 §7)
 - `archo test run [<plan>] [--map] [--timeout]` / MCP `test_run`: starts the game on isolated
   data with default settings, waits for the main menu (or a quick test map), stops it and
   reports the startup errors by mod (`report.json`, the last 10 runs kept). Missing mods and
   broken links stop it before the game starts.
 
-### Game links (08 §3)
+### Game links (09 §3)
 - `archo links check [--all]` / MCP `check_links` find RimArcho's `_Archo_` / `!ArchoPack_`
   links in every known game's `Mods/` that are dangling, point at the wrong mod, cannot be
   checked, or whose name a real folder holds (`mods.link-dangling`, `mods.link-foreign`,
@@ -1450,14 +1450,14 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
   v18). An interrupted operation shows as `mods.link-recovery` and finishes through links
   repair. Links to a known mod count as RimArcho's own, old IDs too.
 
-### Managed directories (06 §2.14)
+### Managed directories (16 §2.14)
 - settings › RimArcho managed directories lists the game folders, Workshop, SteamCMD, other mod folders, the
   lock library, packs, Archo Monitor and the SteamCMD program. Each can be relocated (you moved
   it) or moved by RimArcho (a verified copy across drives, the old folder to the recycle bin).
   Mods keep their identity, tags and lists, and links follow. Every start checks them and asks
   where a missing one went; can it run and the launch check only warn.
 
-### External tools (07 §2.1)
+### External tools (17 §2.1)
 - `archo deps`, `deps install <todds|steamcmd|wezterm>`, `deps remove <name>`: one place that
   finds the bundled font, todds, SteamCMD and WezTerm. settings › external tools installs and updates them
   as background tasks (`wezterm.path`, `steamcmd.path`). Only RimArcho's own copy is removed,
@@ -1502,7 +1502,7 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
 Specs: `docs/specs/` (rewritten 2026-10-21; the old `10-1.0\u5b9e\u73b0.md` (Unicode escapes) was folded into them). Section
 numbers below are the current ones.
 
-### Hidden and pinned mods (08 §6, 04 §7)
+### Hidden and pinned mods (09 §5, 07 §5)
 - Folders another manager hid by renaming About.xml are classified: **pinned** (a loadable copy
   of the lineage is what the game uses; a warning once the workshop copy changed since, with
   `archo mod <copy> --diff <workshop>`), **left over** (unsubscribed) or **hidden** on their own.
@@ -1510,14 +1510,14 @@ numbers below are the current ones.
   version (`archo unpin`), move to the recycle bin (`archo trash`). Trash never deletes
   permanently and only takes hidden or unsubscribed workshop/SteamCMD folders.
 
-### Live game log (03 §6.6)
+### Live game log (06 §6)
 - `archo log --follow [--once] [--json]` follows Player.log while the game runs: only new bytes
   are read, clusters instead of text are kept, attribution is the full-log engine's.
 - RimCrow's companion log (`RimCrow_Realtime.log`) adds timestamps, levels and related mods.
 - The window says "game running since … · n errors" and puts this run's errors first in
   needs attention; `archo status` shows a running game.
 
-### Lists from other tools (04 §9)
+### Lists from other tools (07 §7)
 - `loadout import` reads RimSort (XML, JSON, clipboard, Rentry), RimWorld's `.rml`, RimCrow's
   ModList.xml, JSON and share codes (also pasted as the argument), and workshop-ID lists.
 - `loadout export --format rimsort|rml|rimcrow`.
@@ -1532,12 +1532,12 @@ numbers below are the current ones.
   file, never over a file without asking) or copies a share code. The TUI has both in the
   palette and `e` for export.
 
-### Community data (04 §6.3)
+### Community data (08 §2.3)
 - `archo data update` / `archo data status`: RimSort's rules and Workshop database, Use This
   Instead's replacements. All-or-nothing; the only command that fetches them.
 - Missing mods get direct Workshop links; enabled mods with a maintained replacement are listed.
 
-### Packs (08 §5)
+### Packs (10)
 - `archo pack build|list|launch|export|import|remove`: compile the current list into a pack
   (checked, sorted for the pack only, each mod copied without other game versions' folders),
   play it with its own list and saves through links in `Mods/`, share it as a zip or a list.
@@ -1552,13 +1552,13 @@ numbers below are the current ones.
   list` shows it too, `archo pack stop` and `pack remove --unfinished` handle it, and `archo
   pack build` prints progress lines. Sizes show in GB from 1 GB up.
 
-### Settings (06 §2.14)
+### Settings (16 §2.14)
 - A settings screen (gear in the top bar): environment folders, launch method and arguments,
   language, Workshop descriptions, community data sources, database backup and compaction,
   and each cache with its size and a clear button.
 - `archo db status|backup|vacuum`, `archo cache status|clear <kind>`, `env set --launch-args`.
 
-### History (04 §3)
+### History (07 §3)
 - `archo history`, `archo undo <n>`, `archo redo <n>`. The window shows the history in the empty
   staging list: redo steps, now, undo steps in plain words, then the saved versions.
 
@@ -1603,7 +1603,7 @@ numbers below are the current ones.
   In staging `T` puts everything back, as in the TUI. Both are in the palette of both
   interfaces.
 - The Enabled list's position column is as wide as its longest number.
-- About.xml, LoadFolders.xml and Defs saved as UTF-16 are read (02 §4.3).
+- About.xml, LoadFolders.xml and Defs saved as UTF-16 are read (04 §1.3).
 
 ## 0.7.0 — the window (development milestone, in 1.0.0)
 
@@ -1617,7 +1617,7 @@ numbers below are the current ones.
   release script writes the resource object with `go run ./scripts/winres`; no resource compiler is
   needed. The window, its title bar and the page header use the same icon.
 
-### Link deployment (09 §8)
+### Link deployment (15 §8)
 - Mods in SteamCMD and extra folders can be enabled. `save` links each one into `Mods/` as
   `_Archo_<source>_<folder>` before it writes ModsConfig.xml, and removes the link once the mod is
   disabled. `save --dry-run` and the save preview list the links. Windows uses junctions.
@@ -1631,7 +1631,7 @@ numbers below are the current ones.
 - The window and the TUI share one layer, `internal/view`: the columns, the search syntax, the
   details, needs attention with its actions, the changes, tags, the verbs and the position input, the
   palette and the interface text. Neither interface builds these itself.
-- The window follows the TUI's v3 rules (06 §13) and adds the mouse: click and modifier clicks,
+- The window follows the TUI's v3 rules (16 §13) and adds the mouse: click and modifier clicks,
   double-click, drag and drop between and within the lists, a context menu, resizable columns.
 - Workshop descriptions are built from parsed BBCode blocks and never inserted as HTML; images
   come only from RimArcho's cache. The page loads nothing remote and the window opens no port.

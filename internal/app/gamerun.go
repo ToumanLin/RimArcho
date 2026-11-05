@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/env"
 )
 
-// GameRun is a running game of an environment (08 §4).
+// GameRun is a running game of an environment (09 §4).
 type GameRun struct {
 	PID     int
 	Exe     string
@@ -96,7 +96,7 @@ func underDir(p, dir string) bool {
 	return strings.HasPrefix(p, dir)
 }
 
-// RunningGame is a game running in any registered environment (08 §1, §4).
+// RunningGame is a game running in any registered environment (09 §1, §4).
 type RunningGame struct {
 	Env  *env.Environment
 	Run  *GameRun
@@ -125,7 +125,7 @@ func (g *RunningGame) Describe(loc *time.Location) string {
 	return s + ")"
 }
 
-// GameRunningError refuses a launch while a game runs: only one game runs at a time (08 §1).
+// GameRunningError refuses a launch while a game runs: only one game runs at a time (09 §1).
 type GameRunningError struct {
 	Game *RunningGame
 	Loc  *time.Location
@@ -138,7 +138,7 @@ func (e *GameRunningError) Error() string {
 func (e *GameRunningError) Unwrap() error { return ErrLaunchBlocked }
 
 // RunningGame finds a running game in any registered environment, the current one first: a
-// process whose executable is under an environment's game folder (08 §4). nil when none.
+// process whose executable is under an environment's game folder (09 §4). nil when none.
 func (a *App) RunningGame() (*RunningGame, error) {
 	envs, err := a.Store.Envs()
 	if err != nil {
@@ -161,7 +161,7 @@ func (a *App) RunningGame() (*RunningGame, error) {
 	return nil, nil
 }
 
-// checkNoGame refuses while any environment's game runs (08 §1).
+// checkNoGame refuses while any environment's game runs (09 §1).
 func (a *App) checkNoGame() error {
 	g, err := a.RunningGame()
 	if err != nil {
@@ -173,12 +173,12 @@ func (a *App) checkNoGame() error {
 	return nil
 }
 
-// RunWhat is what a game run plays: one of the environment's plans or a pack (08 §5.3).
+// RunWhat is what a game run plays: one of the environment's plans or a pack (10 §3).
 type RunWhat struct {
 	Pack     string // "" for the environment's list
 	UserData string // the run's data folder: its ModsConfig.xml, and on 1.7 its Logs/
 	Guess    bool   // read from the launch records: the command line was not available
-	// Plan names the plan played, from the launch records (08 §4) or, for a game started
+	// Plan names the plan played, from the launch records (09 §4) or, for a game started
 	// elsewhere, the plan last written to the game; "" when neither says.
 	Plan string
 	// PlanWritten: Plan comes from the write record, not from a launch.

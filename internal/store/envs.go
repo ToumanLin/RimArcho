@@ -92,7 +92,7 @@ func (s *Store) CurrentEnv() (*env.Environment, error) {
 func (s *Store) SetCurrentEnv(id string) error { return s.SetMeta(metaCurrentEnv, id) }
 
 // Sources lists the sources an environment sees: its own (official, local) and the shared
-// mod folders (02 §0), by kind, then label.
+// mod folders (03 §2), by kind, then label.
 func (s *Store) Sources(envID string) ([]*source.Source, error) {
 	return s.sources(`environment_id IN ('', ?)`, envID)
 }
@@ -138,7 +138,7 @@ func (s *Store) UpdateSource(src *source.Source) error {
 }
 
 // SourceSemantics returns, for every instance of a source with a snapshot, its relative path
-// (lower-cased) and semantic set — the "old" side of source re-binding (02 §3.2).
+// (lower-cased) and semantic set — the "old" side of source re-binding (03 §4.2).
 func (s *Store) SourceSemantics(sourceID string) (map[string]map[string][16]byte, error) {
 	rows, err := s.DB.Query(`SELECT lower(i.rel_path), lower(f.rel_path), f.hash FROM instance i
 		JOIN snapshot_file f ON f.snapshot_id = i.current_snapshot_id
@@ -181,7 +181,7 @@ func (s *Store) SourceSemantics(sourceID string) (map[string]map[string][16]byte
 
 // DeleteEnv removes an environment and everything RimArcho stored for it: its own sources
 // (Data/, Mods/) and their instances, its plans, launches, analyses and ignores. The shared
-// mod folders, their instances and the player's data on lineages stay (02 §0); a lineage
+// mod folders, their instances and the player's data on lineages stay (03 §2); a lineage
 // left without instances goes. Only RimArcho's own database is touched; no game or mod file is.
 func (s *Store) DeleteEnv(envID string) error {
 	return s.inTx(func(tx *sql.Tx) error {
@@ -209,7 +209,7 @@ func (s *Store) DeleteEnv(envID string) error {
 			`DELETE FROM source WHERE environment_id=?`,
 			// The ModsConfig.xml write record belongs to the user data folder, which other
 			// environments may share; it stays.
-			// Lists are shared by every game and stay (04 §1.1); keepLists already named
+			// Lists are shared by every game and stay (07 §1.1); keepLists already named
 			// this game's own mods in them by packageId.
 			`DELETE FROM launch WHERE environment_id=?`,
 			`DELETE FROM game_assembly WHERE environment_id=?`, // and its game_type rows

@@ -34,7 +34,7 @@ func (s subSide) scrub(text string) string {
 	return s.e.Scrub(strings.ReplaceAll(text, s.g.Bare, "$GIT"))
 }
 
-// 02 §3.4, 05 §1.2: manage_subscriptions runs every action through MCP on one fixture and
+// 11 §1, 13 §1.2: manage_subscriptions runs every action through MCP on one fixture and
 // the matching archo subscribe command on an identical one. The texts must be the same
 // (I1), and the MCP transcript is compared with testdata/golden/mcp_subscriptions.txt.
 func TestManageSubscriptions(t *testing.T) {
@@ -133,7 +133,7 @@ func TestManageSubscriptions(t *testing.T) {
 	}
 }
 
-// The argv of each add form: the source recognised from url as the paste box does (06 §2.9),
+// The argv of each add form: the source recognised from url as the paste box does (16 §2.9),
 // or the kind given.
 func TestManageSubscriptionsArgv(t *testing.T) {
 	t.Parallel()

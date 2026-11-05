@@ -120,8 +120,8 @@ func TestCheckSaveOwnershipRemovedWhileListed(t *testing.T) {
 	}
 }
 
-// What a Mod owns in a save (10 §4.6) and the rows of Can it load? that need the full read
-// (10 §4.3): the same save while Kurin is enabled, disabled and removed; a class no Mod
+// What a Mod owns in a save (12 §4.6) and the rows of Can it load? that need the full read
+// (12 §4.3): the same save while Kurin is enabled, disabled and removed; a class no Mod
 // defines; malformed XML (SV14).
 func TestCheckSaveOwnership(t *testing.T) {
 	t.Parallel()
@@ -197,7 +197,7 @@ func TestCheckSaveOwnership(t *testing.T) {
 		t.Fatalf("disabled fixes %+v", f)
 	}
 
-	// Kurin removed from disk: its tombstone keeps the facts of its last copy (02 §5.5), so
+	// Kurin removed from disk: its tombstone keeps the facts of its last copy (04 §2.5), so
 	// what it owns is still known, not inferred.
 	e.Remove(filepath.Join(e.Workshop, "3000000005"))
 	e.Unsubscribe("3000000005")
@@ -290,7 +290,7 @@ func TestCheckSaveOwnershipUnchecked(t *testing.T) {
 
 // A Mod the list has and the save does not stored nothing in it: the checks need only the
 // facts of the save's own Mods, so one enabled after the analysis leaves them checked
-// (10 §4.6).
+// (12 §4.6).
 func TestCheckSaveOwnershipCover(t *testing.T) {
 	t.Parallel()
 	e := ownersFixture(t)

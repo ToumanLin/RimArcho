@@ -1,9 +1,9 @@
 import { choiceControl } from "./choices.js";
-// The plan editor's Load-order rules (06 §2.5, 04 §6.1): a fold above history in the left column. Rules
+// The plan editor's Load-order rules (16 §2.5, 08 §2.1): a fold above history in the left column. Rules
 // are global (every list and game shares them); the fold shows those with a mod enabled in
 // the current list (only the current list, the default) or all of them, and its bar counts what it
 // shows. Each row has edit and delete; the form adds or changes one in place (no popup,
-// 06 §3.1 rule 7). r opens the form for the mod at the cursor. Removing is at once, with
+// 16 §3.1 rule 7). r opens the form for the mod at the cursor. Removing is at once, with
 // undo in the status line (u right after, too); rules are not list edits, so they are not in
 // the list's undo stack.
 import { $, el, api, T, errText, say, keyCaps } from "./state.js";

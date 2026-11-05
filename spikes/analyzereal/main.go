@@ -1,6 +1,6 @@
 // Spike: run the M3 Def+Patch analysis against a real data directory without persisting
 // anything, report time and memory, and replay Player.log patch failures against the
-// simulation (03 §7 acceptance, as spikes/xpathcompat did in M0). Read-only.
+// simulation (05 §6 acceptance, as spikes/xpathcompat did in M0). Read-only.
 //
 //	go run ./spikes/analyzereal -home %APPDATA%\RimArcho -version 1.6
 package main

@@ -8,7 +8,7 @@ import (
 )
 
 // Fingerprint checks the mod's texture paths, sizes and mtimes without opening PNGs
-// (08 §5.2). Additions, deletions and overwrites invalidate page summaries, even before
+// (10 §2). Additions, deletions and overwrites invalidate page summaries, even before
 // the next library scan. Conversion always collects and validates the individual files.
 func Fingerprint(ctx context.Context, root string) ([32]byte, error) {
 	set, err := collect(ctx, root, AllFolders(root), func(string, os.FileInfo) (PNGHeader, bool) { return PNGHeader{}, false })

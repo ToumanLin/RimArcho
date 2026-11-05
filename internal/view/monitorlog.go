@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/logs"
 )
 
-// The game log page's companion section (06 §2.10, 03 §6.7.4): what Archo Monitor (or
+// The game log page's companion section (16 §2.10, 06 §7.4): what Archo Monitor (or
 // RimCrow Companion) wrote during the run of the selected Player.log, one row per entry.
 
 // MonitorEntry is one entry of the companion log.
@@ -237,7 +237,7 @@ func LiveMonitor(a *app.App, st *app.LoadoutState, t *LiveTracker, path string, 
 	return MonitorOf(a, st, c, links, true)
 }
 
-// MonitorAdd is the page's "add it" action (the default insertion, 04 §1.5).
+// MonitorAdd is the page's "add it" action (the default insertion, 07 §1.5).
 func MonitorAdd(a *app.App) (string, error) {
 	if _, err := a.AddMonitor(); err != nil {
 		return "", err

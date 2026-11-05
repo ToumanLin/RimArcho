@@ -17,7 +17,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Subscribing and unsubscribing through the Steam client (06 §2.9, 08 §10). The call runs in
+// Subscribing and unsubscribing through the Steam client (16 §2.9, 11 §2). The call runs in
 // `archo steam-worker` started in %LOCALAPPDATA%\RimArcho\steam, which holds a copy of the
 // game's steam_api64.dll and steam_appid.txt; RimArcho never writes into the game folder.
 
@@ -44,7 +44,7 @@ type WorkshopItem struct {
 	State      uint32
 	Installed  bool // local fallback: the folder exists now, not a Steam account state
 	// unsubscribe: the plans that use it. The player's word goes: it still goes, and they
-	// show it as missing (06 §2.9).
+	// show it as missing (16 §2.9).
 	UsedBy []string
 	Links  *LinkLifecyclePlan
 }

@@ -20,7 +20,7 @@ ToDo "Auto Update": publish RimArcho on the RimWorld Workshop, upload updates wi
 | Check (`CheckSelfUpdate`) | `selfupdate.Client.Latest`: GitHub Releases, 15 s, ≤ 1 MB | `GetPublishedFileDetails` POST, no key (`SteamAPI`, `postWorkshopDetails`, already used for Mod pages): item `time_updated`, `tags` |
 | Download (`Client.Download`) | checksum file, then zip into `<zip>.part`, SHA-256 while writing, size check, 200 MB limit | anonymous SteamCMD into a private base folder, then copy zip and checksum into `.archo-update/download/` and run the same checksum and size check on the local file |
 | Extract | `selfupdate.Extract`: `Files` whitelist, no `..` or symlinks, 200 MB per entry, 500 MB total, both programs present | unchanged |
-| Wait, `Apply`, `VersionOf`, rollback, restart, cleanup | 07 §5.1 steps 4–7 | unchanged |
+| Wait, `Apply`, `VersionOf`, rollback, restart, cleanup | 17 §5.1 steps 4–7 | unchanged |
 
 Code touchpoints: a source choice in `internal/app/selfupdate.go`; in `internal/selfupdate` split `Download` into "fetch" and "verify a local zip against a checksum"; a Workshop branch next to `selfClient()`.
 
@@ -32,7 +32,7 @@ Code touchpoints: a source choice in `internal/app/selfupdate.go`; in `internal/
 | --- | --- |
 | **Version in a tag** (`SetItemTags`, e.g. `v1.0.2`), read from `tags` | **Recommended.** Cheap (one POST), no SteamCMD start, and the existing `Newer(running, version)` and the "one notification per version" record keep working. **[I]** Workshop tags are free-form through the API; not tried for app 294100 (test 1). |
 | Compare only `time_updated` | Fails the first time: a running GitHub-installed build has no stored Workshop time, so the same version would be offered again. Also changes on description edits. Fallback only ("a newer upload exists", no number). |
-| Run SteamCMD as the check, read the version from the zip name | Needs SteamCMD and a download before the player confirmed anything; 07 §5.1 says a check never downloads. Rejected. |
+| Run SteamCMD as the check, read the version from the zip name | Needs SteamCMD and a download before the player confirmed anything; 17 §5.1 says a check never downloads. Rejected. |
 | Keep reading the version from GitHub, only download from the Workshop | Contradicts the ToDo and makes the Workshop lag a dependency. Rejected. |
 
 Metadata failure (offline, item missing, `result` not 1) makes the check fall back to GitHub and say so. Prerelease channel: **[I]** the Workshop has no channels, so prerelease builds (`-rc1`) keep checking GitHub; the item carries stable releases only.
@@ -46,7 +46,7 @@ Metadata failure (offline, item missing, `result` not 1) makes the check fall ba
 3. **Reuse `runWorkshopBatches`** with one id. Do not call `downloadWorkshopGroup`: it registers sources, writes `source.json`, scans and manages links, none of which apply.
 4. **Confirm.** **[C]** SteamCMD exits 0 even when an item failed; trust only `Success. Downloaded item <id>` plus the presence of the zip and its `.sha256`.
 5. **Clean up the whole base folder after a successful swap.** **[I]** If the content is deleted but `appworkshop_294100.acf` stays, SteamCMD may log "has no changes" and download nothing (parallel-downloads §3.4); keep both or neither. Neither is simpler: each release is a new zip anyway.
-6. **SteamCMD missing.** Today `downloadWorkshopGroup` stops with "install SteamCMD in Settings". For the updater: offer to install RimArcho's managed SteamCMD as part of the confirmed install (an extra download and write, so it belongs in the confirmation text, 01 §4), or fall back to GitHub.
+6. **SteamCMD missing.** Today `downloadWorkshopGroup` stops with "install SteamCMD in Settings". For the updater: offer to install RimArcho's managed SteamCMD as part of the confirmed install (an extra download and write, so it belongs in the confirmation text, 02 §1), or fall back to GitHub.
 7. **Progress.** **[C]** The Workshop runner has no byte callback (parallel-downloads §2.1), so `SelfUpdateStep{Phase: "download"}` is indeterminate unless the staging folder's size is polled.
 
 **[C]** Measured cost (four small items, one Windows machine): SteamCMD start, anonymous connect and quit with no download about 6.7 s; first start with its own update about 9.2 s; a no-change rerun about 4.7 s. Throughput on one large download was not measured, so a download time for the zip is unknown.
@@ -57,7 +57,7 @@ Metadata failure (offline, item missing, `result` not 1) makes the check fall ba
 
 ### 1.5 Source choice and what the item contains
 
-- Settings › update source: automatic (Workshop, GitHub when the check or SteamCMD cannot work) / Workshop / GitHub. Installing still waits for the player (07 §5.1, 01 §4).
+- Settings › update source: automatic (Workshop, GitHub when the check or SteamCMD cannot work) / Workshop / GitHub. Installing still waits for the player (17 §5.1, 02 §1).
 - Item contents: the Archo Monitor Mod folder (`monitor/out/ArchoMonitor/`, about 440 KB) plus the release assets:
 
 ```
@@ -67,9 +67,9 @@ archo-<version>-windows-amd64.zip
 archo-<version>-windows-amd64.zip.sha256
 ```
 
-  The zip and checksum are exactly the release assets (`ZipName`), so `selfupdate.Files` and the 200 MB limits apply unchanged; the game ignores the zip at the folder root. `SetItemContent` replaces the folder, so only the current version is in the item. Nobody subscribes for Monitor alone, so the 32 MB zip in every subscriber's download is not a cost. Linux and macOS zips would add to every pull; a separate item per platform is the way out when they become official (07 §5).
+  The zip and checksum are exactly the release assets (`ZipName`), so `selfupdate.Files` and the 200 MB limits apply unchanged; the game ignores the zip at the folder root. `SetItemContent` replaces the folder, so only the current version is in the item. Nobody subscribes for Monitor alone, so the 32 MB zip in every subscriber's download is not a cost. Linux and macOS zips would add to every pull; a separate item per platform is the way out when they become official (17 §5).
 - **Versions.** The item's version tag is the launcher version. Monitor keeps its own `monitor/VERSION` (`modVersion` in About.xml), which often does not change between launcher releases.
-- **Monitor identity.** Today only Instances under the Monitor source count as Monitor (08 §9). A subscribed copy plus the `_Archo_monitor_` link would be two Mods with packageId `toumanlin.archomonitor` in the game. Count every Instance with that packageId as Monitor, keep "highest `modVersion` wins", and on a tie prefer the Workshop copy: it needs no link, so it also works when `Mods/` is on exFAT (08 §9 "FAT and exFAT").
+- **Monitor identity.** Today only Instances under the Monitor source count as Monitor (09 §6). A subscribed copy plus the `_Archo_monitor_` link would be two Mods with packageId `toumanlin.archomonitor` in the game. Count every Instance with that packageId as Monitor, keep "highest `modVersion` wins", and on a tie prefer the Workshop copy: it needs no link, so it also works when `Mods/` is on exFAT (09 §6 "FAT and exFAT").
 - 1.0.0 and 1.0.1 installs only know GitHub and keep updating from there until a version with the Workshop source is installed.
 
 ### 1.6 First start from the Workshop folder
@@ -80,7 +80,7 @@ The Workshop page says: subscribe, open the item folder, extract the zip, run `R
 2. Offer a default install folder (for example `%LOCALAPPDATA%\Programs\RimArcho`) with a way to pick another; say how much space it needs and warn when the drive is nearly full. This joins the first-run question about where RimArcho's managed folders go (default on C: Local, warn when C: is full) and the offer to import RimSort and RimCrow databases.
 3. Copy the release files (`selfupdate.Files`) there, start the copy and exit; the copy removes what was extracted into the Workshop folder and keeps the item's own files (About, Monitor, zip, checksum), so the Mod and the next update are untouched.
 4. Declining keeps running from the Workshop folder for this session only, with a warning that the next item update can break it. Self-update refuses there.
-5. Uninstall (01 §4.1) works on the installed copy; the item stays until the player unsubscribes.
+5. Uninstall (02 §2) works on the installed copy; the item stays until the player unsubscribes.
 
 ## 2. Uploading (maintainer side)
 
@@ -92,7 +92,7 @@ The Workshop page says: subscribe, open the item folder, extract the zip, run `R
 
 **[C]** Refusals to handle: `k_EResultAccessDenied` (no RimWorld license), `k_EResultInsufficientPrivilege` (community ban), `k_EResultBanned`, `k_EResultServiceReadOnly` (recent password or email change, usually 5 days). Limited accounts cannot upload. The preview must be under 1 MB, tags cannot contain `,`, and `SetItemContent` takes an absolute, unzipped folder. go-steamworks has no `ISteamUGC`; RimSort has no uploader.
 
-**Where it goes:** `scripts/release.ps1` must not publish (07 §5). A separate step, for example `archo workshop publish <folder> --item <id> --note <text>`, uploads the assembled item folder after the GitHub release, with the item id in `About/PublishedFileId.txt`. The Workshop therefore trails the GitHub release by that step.
+**Where it goes:** `scripts/release.ps1` must not publish (17 §5). A separate step, for example `archo workshop publish <folder> --item <id> --note <text>`, uploads the assembled item folder after the GitHub release, with the item id in `About/PublishedFileId.txt`. The Workshop therefore trails the GitHub release by that step.
 
 ## 3. Risks
 
@@ -121,4 +121,4 @@ The Workshop page says: subscribe, open the item folder, extract the zip, run `R
 - RimWorld wiki, distribution and folder structure: https://rimworldwiki.com/wiki/Modding_Tutorials/Distribution, https://rimworldwiki.com/wiki/Modding_Tutorials/Mod_Folder_Structure
 - Steam Subscriber Agreement §6.B and online conduct: https://store.steampowered.com/subscriber_agreement/english/, https://store.steampowered.com/online_conduct/
 - Generic uploaders running under a game's app id: https://github.com/EliteMasterEric/SteamWorkshopUploader, https://github.com/nozwock/steam-workshop-uploader
-- RimArcho: `internal/app/subscribeworkshop.go`, `internal/app/subscribeworkshoprun.go`, `internal/app/gamedl.go` (`SteamCMDAccount`, `SteamCMDSignsOutSteam`), `internal/app/selfupdate.go`, `internal/selfupdate/` (`download.go`, `extract.go`), `internal/app/workshopdetails.go`, `internal/steamworks/`; 07 §5.1; [2026-10-24 login sessions research](2026-10-24_login-sessions-loverslab-steamcmd.md), [2026-10-26 SteamCMD parallel downloads](2026-10-26_steamcmd-parallel-downloads.md)
+- RimArcho: `internal/app/subscribeworkshop.go`, `internal/app/subscribeworkshoprun.go`, `internal/app/gamedl.go` (`SteamCMDAccount`, `SteamCMDSignsOutSteam`), `internal/app/selfupdate.go`, `internal/selfupdate/` (`download.go`, `extract.go`), `internal/app/workshopdetails.go`, `internal/steamworks/`; 17 §5.1; [2026-10-24 login sessions research](2026-10-24_login-sessions-loverslab-steamcmd.md), [2026-10-26 SteamCMD parallel downloads](2026-10-26_steamcmd-parallel-downloads.md)

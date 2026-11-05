@@ -9,7 +9,7 @@ import (
 )
 
 // Entries the list has but nothing installed matches (an imported list) are one item with
-// one action for all of them, and a mod needing one of them adds no item of its own (06 §5).
+// one action for all of them, and a mod needing one of them adds no item of its own (16 §5).
 func TestMissingEntriesAreOneItem(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)

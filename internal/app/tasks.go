@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// Background tasks (06 §2.16): what RimArcho does after a click that takes a while, kept
+// Background tasks (16 §2.16): what RimArcho does after a click that takes a while, kept
 // as one record per task so the window can say what runs, what waits and what each item
 // came to. Two lanes run here, one task at a time, one item at a time: "files" (Mod library's
 // actions on folders) and "steam" (unsubscribe and resubscribe through the Steam client). The third
@@ -266,7 +266,7 @@ func (ts *Tasks) Begin(kind, obj string, stop func() error) string {
 }
 
 // EnqueueSelf schedules work in the RimArcho lane: one of each kind at a time,
-// different kinds concurrently (06 §2.16). run reports progress through Update.
+// different kinds concurrently (16 §2.16). run reports progress through Update.
 func (ts *Tasks) EnqueueSelf(request Task, run func(string) (string, error)) Task {
 	ts.mu.Lock()
 	if ts.selfRuns == nil {

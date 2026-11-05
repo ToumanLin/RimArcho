@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Batches and block moves for the TUI's pick sessions (06 §3.4): the edits of one session
+// Batches and block moves for the TUI's pick sessions (16 §3.4): the edits of one session
 // apply at once, as previews, and become one undo step when the session ends; a cancelled
 // session puts the list and the staging list back as they were.
 
@@ -107,13 +107,13 @@ func (a *App) MoveBlock(ids []string, at int) (*EditResult, error) {
 
 // SuggestAt is the 1-based position where instances that are not enabled best go in the
 // list: right after the last enabled mod they must load after, unless that breaks a "load
-// before"; at the end when nothing constrains them (06 §3.4).
+// before"; at the end when nothing constrains them (16 §3.4).
 func (a *App) SuggestAt(ids []string) (int, error) {
 	st, err := a.Loadout()
 	if err != nil {
 		return 0, err
 	}
-	// Enabled ones are taken out first (06 §3.6: m suggests a place for them too); the
+	// Enabled ones are taken out first (16 §3.6: m suggests a place for them too); the
 	// position counts in the list without them, as MoveBlock and Enable expect.
 	moving := map[string]bool{}
 	for _, id := range ids {

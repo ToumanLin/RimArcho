@@ -9,7 +9,7 @@ import (
 )
 
 // The import result says whether the files were checked and what differs from this
-// game; info items stay on the pack's page (06 §2.7, 08 §5.5).
+// game; info items stay on the pack's page (16 §2.7, 10 §5).
 func TestPackImportTextShowsCheck(t *testing.T) {
 	t.Parallel()
 	check := &app.PackCheck{PackGame: "1.6.4633 rev1261", Game: "1.6.4871 rev590", Items: []app.PackCheckItem{

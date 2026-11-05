@@ -1,9 +1,9 @@
 import { fieldError, progress } from "./feedbacksemantics.js";
 import { editablePath, copyablePath, pathContent } from "./fields.js";
-// The first-run guide (06 §2.15): three steps, each with a way back.
+// The first-run guide (16 §2.15): three steps, each with a way back.
 //   1. find the game: existing games — what detection finds (tick several), or a folder
 //      chosen in the native dialog; or download a version — a branch, a folder and an optional
-//      account override, downloaded by SteamCMD in its own window (08 §11);
+//      account override, downloaded by SteamCMD in its own window (11 §3);
 //   2. read the mods: a scan per environment in a child process, with its progress (a game
 //      added once the shared mod folders were read: only its own Data/ and Mods/);
 //   3. where to start: the game's own list, a list from RimSort / RimCrow (previewed, then
@@ -30,7 +30,7 @@ const G = { step: 0, way: 0, games: [], picked: new Set(), added: [], scan: null
 const D = { info: null, loading: false, branch: "", dir: "", dirTyped: false, account: "", run: null };
 const C = { id: "", row: null, submitting: false };
 
-// The guide follows the same durable task as the background page (06 §2.15, 06 §2.16).
+// The guide follows the same durable task as the background page (16 §2.15, 16 §2.16).
 async function updateSteamCMD() {
   if (!C.id) return;
   const id = C.id;
@@ -196,7 +196,7 @@ async function added(names) {
   await scanAll();
 }
 
-// ---- 1b. download a version (SteamCMD, 08 §11) ----
+// ---- 1b. download a version (SteamCMD, 11 §3) ----
 
 async function loadDownload() {
   D.loading = true;

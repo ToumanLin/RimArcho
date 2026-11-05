@@ -16,7 +16,7 @@ Speed is not the decision criterion for this goal. Initial four-item active-clie
 
 ## 2. Scope, current state, and prior research
 
-Read [workspace rules](../../../AGENTS.md), [architecture](../00a-architecture.md), [02 §3.4](../specs/02-environments-identity-and-scanning.md#34-subscriptions-git-download-pages-steamcmd-2026-10-24), [login session research](2026-10-24_login-sessions-loverslab-steamcmd.md), [parallel download research](2026-10-26_steamcmd-parallel-downloads.md). Do not repeat its process parallelism, shared-library races, or 25-item batching findings. Work on `codex/steamcmd-batch` is outside this report's implementation scope; proposals should build on its batch executor.
+Read [workspace rules](../../../AGENTS.md), [architecture](../00a-architecture.md), [11 §1](../specs/11-downloads-and-accounts.md#1-subscriptions-git-download-pages-steamcmd-2026-10-24), [login session research](2026-10-24_login-sessions-loverslab-steamcmd.md), [parallel download research](2026-10-26_steamcmd-parallel-downloads.md). Do not repeat its process parallelism, shared-library races, or 25-item batching findings. Work on `codex/steamcmd-batch` is outside this report's implementation scope; proposals should build on its batch executor.
 
 The workspace initially contained two untracked reports: parallel downloads and page-load time/optimization; both retained. The user clarified that other tasks' changes in `.claude/worktrees/` are outside this task.
 
@@ -264,10 +264,10 @@ After adoption, workshop Instance is authoritative, client alone updates; no CMD
 
 Spec changes for review:
 
-- **02 §3.4, 08 §10/§11**: separate subscription/readiness, all-ID credit, account binding, subscribe failures, cross-exit recovery. Optional pre-seed falls back to client, no no-redownload promise.
-- **01 §4 write list, 07 storage/lifecycle**: durable pending work, independent staging, same-volume publish, client-exit boundary, recycling/crash recovery; default needs no ACF write permission.
+- **11 §1, 11 §2/§3**: separate subscription/readiness, all-ID credit, account binding, subscribe failures, cross-exit recovery. Optional pre-seed falls back to client, no no-redownload promise.
+- **02 §1 write list, 07 storage/lifecycle**: durable pending work, independent staging, same-volume publish, client-exit boundary, recycling/crash recovery; default needs no ACF write permission.
 - **06 inventory/subscriptions/tasks, 05 CLI/MCP**: distinguish "subscribed", "waiting for Steam", "downloading/validating", "launch-ready"; nonblocking background tasks with explicit waits for new unavailable Mods.
-- **04 plans, 08 §3 links/launch**: no automatic source switch by Workshop ID; scan/deploy only fully ready content, no running directory/link swaps. Explain conflict between strict single copy and immediate reads during client processing.
+- **04 plans, 09 §3 links/launch**: no automatic source switch by Workshop ID; scan/deploy only fully ready content, no running directory/link swaps. Explain conflict between strict single copy and immediate reads during client processing.
 
 Acceptance: all failed downloads still subscribe every ID; exit/crash across confirmation window; partial batches/rate backoff; Steam absent, original-account recovery/account switching; temporarily unreadable ACF; empty-ACF pre-seed retransmission/replacement; launch readiness/no running-plan source swaps; staging recycling after completion; refuse auto-recycling CMD still referenced by plans. Failure never unsubscribes, restores whole ACF, or deletes used sources.
 

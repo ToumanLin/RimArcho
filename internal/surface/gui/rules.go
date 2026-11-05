@@ -7,7 +7,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The plan editor's Load-order rules (06 §2.5, 04 §6.1): the player's load-order rules. They are
+// The plan editor's Load-order rules (16 §2.5, 08 §2.1): the player's load-order rules. They are
 // global; a change reaches the sort and the problems through the database's change key.
 
 // RuleSpec is a rule as the editor's form sends it: A and B are references (L#…, #…).

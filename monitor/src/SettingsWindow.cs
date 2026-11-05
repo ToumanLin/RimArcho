@@ -10,7 +10,7 @@ using Verse;
 namespace ArchoMonitor
 {
     // SettingsControl is one thing a settings window draws: a label, or a control with its
-    // current value and, for a slider, its range (03 §6.7.1).
+    // current value and, for a slider, its range (06 §7.1).
     internal struct SettingsControl
     {
         internal string Kind;  // label, checkbox, radio, slider, text, number, button
@@ -21,7 +21,7 @@ namespace ArchoMonitor
 
     // SettingsWindow records what a Mod's settings window draws in the first frame of each
     // opening: its labels and each control's kind, current value and range. RimArcho shows them
-    // beside the file's values (06 §2.9). The control patches go in when a settings window first
+    // beside the file's values (16 §2.9). The control patches go in when a settings window first
     // opens; until then nothing is patched, and after it each one only checks a flag. Only what
     // the game draws through Widgets is seen; what a Mod draws by hand is missed.
     internal static class SettingsWindow

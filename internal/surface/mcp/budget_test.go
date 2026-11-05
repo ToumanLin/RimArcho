@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// 05 §5.3: what a client reads when it connects stays short; the detail is in guide topics.
+// 14 §3: what a client reads when it connects stays short; the detail is in guide topics.
 // The character limits apply to the default (core) tools; the tools/list size to all of them.
 // Raise a limit only on purpose, after making the new text as short as the rest.
 const (

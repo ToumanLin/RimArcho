@@ -1,6 +1,6 @@
 package app_test
 
-// A plan's game versions (04 §1.6, P1, P2, P4).
+// A plan's game versions (07 §1.6, P1, P2, P4).
 
 import (
 	"os"
@@ -149,9 +149,9 @@ func TestParseAndFormatVersions(t *testing.T) {
 	}
 }
 
-// The workshop export (04 §9.3): Markdown links in load order, the rest named in a
+// The workshop export (07 §7.3): Markdown links in load order, the rest named in a
 // comment; it reads back as the installed mods with those workshop IDs, after the current
-// plan's Core (04 §9.1).
+// plan's Core (07 §7.1).
 func TestExportWorkshopLinks(t *testing.T) {
 	t.Parallel()
 	e := loadoutEnv(t)

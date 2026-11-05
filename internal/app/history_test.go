@@ -7,7 +7,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 )
 
-// V2 (06 §2.5): three edits; going back two steps from the history, then forward one.
+// V2 (16 §2.5): three edits; going back two steps from the history, then forward one.
 func TestHistorySteps(t *testing.T) {
 	t.Parallel()
 	e := loadoutEnv(t)

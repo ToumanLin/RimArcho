@@ -6,7 +6,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// 06 §4.2: the full detail's copies part is the mod's Lineage row as Mod library builds it,
+// 16 §4.2: the full detail's copies part is the mod's Lineage row as Mod library builds it,
 // found by the instance id or a copy ref, with the op table its codes refer to.
 func modCopies(t *testing.T, _ *testkit.Env, api *API) {
 	var alpha string

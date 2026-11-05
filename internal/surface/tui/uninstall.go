@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// uninstall RimArcho from the command palette (06 §2.14, §9.1): the plan as a panel, enter asks
+// uninstall RimArcho from the command palette (16 §2.14, §9.1): the plan as a panel, enter asks
 // for the word "uninstall" (with flags for other answers), then the report; any key quits.
 
 // uninstallText is a plan or report as panel text.

@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Settings follow the Mod (08 §3). The game names a Mod's settings file after the folder it
+// Settings follow the Mod (09 §3). The game names a Mod's settings file after the folder it
 // sees the Mod under: Config/Mod_<folder>_<Mod class>.xml. A Mod that moves from its
 // Workshop folder to an _Archo_ link, a pack link or another copy would read a new file and
 // start with its defaults, so before the game starts RimArcho copies the settings saved
@@ -61,7 +61,7 @@ type settingsMod struct {
 
 // settingsFolders lists, per package (lower case, without "_steam"), every folder name the
 // game sees or saw an installed copy under: Workshop and Mods/ folders, other tools' links,
-// another game's Mods/ folder and RimArcho's deployment names (08 §3). Copies no longer
+// another game's Mods/ folder and RimArcho's deployment names (09 §3). Copies no longer
 // live still count: their files stay in Config.
 func settingsFolders(ix *Index, aliases map[string][]store.Alias) map[string][]string {
 	kinds := map[string]source.Kind{}
@@ -140,7 +140,7 @@ func (a *App) listSettings(st *LoadoutState, seen map[string]string, cfg string)
 // settingsJob is what carryModSettings does. read lists the Config folders settings come
 // from, the first with a file for a Mod class winning. A file in have counts as present and
 // is never overwritten; copies go to write (have for launches; a test run's own Config,
-// refreshed from have each run, 08 §12). known is every folder name the library has, so a
+// refreshed from have each run, 09 §7). known is every folder name the library has, so a
 // file is told apart from one of a longer folder name.
 type settingsJob struct {
 	read  []string
@@ -319,7 +319,7 @@ func copySettingsFile(job settingsJob, c SettingsCarry, check func(path string) 
 }
 
 // copyHugsLib gives a pack HugsLib's settings (<user data>/HugsLib/, named by Mod rather
-// than folder) while the pack has none of its own (08 §5.3 step 4).
+// than folder) while the pack has none of its own (10 §3 step 4).
 func copyHugsLib(from, to string) ([]string, error) {
 	dst := filepath.Join(to, "HugsLib")
 	if _, err := os.Lstat(dst); err == nil || !errors.Is(err, os.ErrNotExist) {

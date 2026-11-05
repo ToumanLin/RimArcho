@@ -15,7 +15,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
-// A pack build in progress (08 §5.2). The copy takes minutes, so the window runs it as an
+// A pack build in progress (10 §2). The copy takes minutes, so the window runs it as an
 // `archo pack build` child process: it goes on when the window closes, and its state is a
 // file in the folder it assembles the pack in, which any process can read.
 
@@ -305,7 +305,7 @@ func PackBuildArgs(t *textures.Options) []string {
 // ChildPackBuildExe runs `<exe> pack build <name> [extra flags]` with the same data
 // directory. Its output goes to logPath (not a pipe: the build goes on when this process
 // ends); the progress is in the build folder (ReadBuildProgress). It returns when the
-// child ends. plan is the list a session opened ("" the current one, 04 §1.3).
+// child ends. plan is the list a session opened ("" the current one, 07 §1.3).
 func ChildPackBuildExe(exe, home, envName, plan, name, logPath string, extra ...string) error {
 	args := append([]string{"pack", "build", name}, extra...)
 	if envName != "" {

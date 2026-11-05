@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/logs"
 )
 
-// Mod library › Mod settings (06 §2.9 "Mod settings"): the current list's Mods that have
+// Mod library › Mod settings (16 §2.9 "Mod settings"): the current list's Mods that have
 // settings, one row per settings file or HugsLib settings pack, and what one stores. Simple
 // values change here while no game runs (app.EditModSettings); the rest in the game.
 
@@ -95,7 +95,7 @@ type ModSettingsDetail struct {
 	Values   []SettingRow `json:"values"`
 	Notes    []string     `json:"notes"`
 	// Window is what the game's settings window drew when the player last opened it (Archo
-	// Monitor, 03 §6.7.1); nil when never seen.
+	// Monitor, 06 §7.1); nil when never seen.
 	Window *SettingsWindowView `json:"window,omitempty"`
 }
 

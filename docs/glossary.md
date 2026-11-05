@@ -2,7 +2,7 @@
 
 This glossary keeps recurring terms consistent across RimArcho documentation; quote the existing English UI text when describing a control or page. Chinese is allowed here as an exception, alongside language files and `README.zh-CN.md`. Entries are sorted by Chinese pinyin within each section; the UI column is filled only when its wording or capitalization differs from the documentation term.
 
-The domain/UI distinction follows [02 §1](specs/02-environments-identity-and-scanning.md#1-terms) and [06 §7.2](specs/06-ui/7-visual-design.md#72-interface-wording). Interface translations live in feature JSON files under [internal/l10ndata/locale/](../internal/l10ndata/locale/), selected by locale directory name. [internal/view/text.go](../internal/view/text.go) owns lookup and the English `enText` overrides, which take precedence over English lookup keys.
+The domain/UI distinction follows [03 §1](specs/03-environments-and-sources.md#1-terms) and [16 §7.2](specs/16-interface/7-visual-design.md#72-interface-wording). Interface translations live in feature JSON files under [internal/l10ndata/locale/](../internal/l10ndata/locale/), selected by locale directory name. [internal/view/text.go](../internal/view/text.go) owns lookup and the English `enText` overrides, which take precedence over English lookup keys.
 
 ## Environments and scanning
 
@@ -65,7 +65,7 @@ The domain/UI distinction follows [02 §1](specs/02-environments-identity-and-sc
 | 规则来源 | rule source |  |  |
 | 环路 | cycle |  | A cycle in the load-order constraint graph. |
 | 回到旧版 | checkout | go back to this version | Keep checkout as the command and storage operation name. |
-| 交接 | handoff |  | 04 §2; SteamCMD credit replacement |
+| 交接 | handoff |  | 07 §2; SteamCMD credit replacement |
 | 交接锁 | handoff lock |  | Coordinates replacement and launch. |
 | 加载顺序 | load order |  |  |
 | 解除锁定 | unpin | unlock | Keep unpin as the command name. |
@@ -89,15 +89,15 @@ The domain/UI distinction follows [02 §1](specs/02-environments-identity-and-sc
 | 未保存 | unsaved |  |  |
 | 未启用 | disabled | Disabled | The editor area uses Disabled; status text may say not enabled. |
 | 写入游戏 | write to the game | save | Write the plan projection to ModsConfig.xml. |
-| 写入者 | writer |  | 04 §4.3; plan/version that last wrote ModsConfig.xml |
+| 写入者 | writer |  | 07 §4.3; plan/version that last wrote ModsConfig.xml |
 | 依赖 | dependency |  |  |
 | 硬约束 | hard constraint |  |  |
 | 已启用 | enabled | Enabled | Preserve capitalization when quoting the editor area. |
 | 用户规则 | user rule |  | Rules attached to lineages and shared across environments. |
 | 载入外部修改 | load outside changes | use the outside change | Adopt edits made outside RimArcho to ModsConfig.xml. |
 | 暂存 | staging | Staging | The editor's temporary holding area. |
-| 置底 | bottom tier |  | 04 §5.5; sorting tier |
-| 置顶 | top tier |  | 04 §5.5; sorting tier |
+| 置底 | bottom tier |  | 08 §1.5; sorting tier |
+| 置顶 | top tier |  | 08 §1.5; sorting tier |
 | 重做 | redo |  |  |
 | 自动排序 | automatic sorting |  |  |
 
@@ -201,15 +201,15 @@ The domain/UI distinction follows [02 §1](specs/02-environments-identity-and-sc
 | 独立存档 | own saves |  | An environment or pack uses its own user data directory. |
 | 峰值内存 | peak memory |  |  |
 | 符号链接 | symbolic link |  |  |
-| 功能型 Mod | functional Mod |  | 10 §3.3; Mods without playable content |
+| 功能型 Mod | functional Mod |  | 12 §3.3; Mods without playable content |
 | 共用默认存档 | shared default saves |  | Use the game's default user data directory. |
 | 回收站 | recycle bin |  |  |
 | 精简贴图 | texture slimming |  | DDS conversion with reduced dimensions. |
 | 链接部署 | link deployment |  | Expose a Mod through a managed link in the game's Mods directory. |
-| 没碰过的内容 | unused content |  | 10 §3; distinct from sidebar not played yet |
+| 没碰过的内容 | unused content |  | 12 §3; distinct from sidebar not played yet |
 | 目录联接 | directory junction |  | A Windows directory junction, distinct from a symbolic link. |
 | 内存校准 | memory calibration |  |  |
-| 内容目录 | content catalog |  | 10 §2; categories of Mod content |
+| 内容目录 | content catalog |  | 12 §2; categories of Mod content |
 | 启动 | launch |  |  |
 | 启动参数 | launch arguments |  |  |
 | 启动记录 | launch record |  | A persisted Launch, distinct from a scanned log run. |
@@ -223,7 +223,7 @@ The domain/UI distinction follows [02 §1](specs/02-environments-identity-and-sc
 | 显存 | video memory |  |  |
 | 隐藏的 Mod | hidden mod |  | A Mod hidden from the game, not necessarily unsubscribed. |
 | 用户数据目录 | user data directory |  | Contains Config/ModsConfig.xml and saves. |
-| 游玩回顾 | playthrough review |  | 10 §3–4; future page |
+| 游玩回顾 | playthrough review |  | 12 §3–4; future page |
 | 预转换 | pre-conversion | pre-convert (full size) | DDS conversion that preserves texture dimensions. |
 | 载入预算 | loading budget |  | Startup RAM estimate; not a peak guarantee. |
 | 占用统计 | resource-usage statistics |  | Plan resource estimates; distinguish from disk-directory size alone |

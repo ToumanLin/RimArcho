@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// Mod library (06 §2.9): the list, filters, one lineage, removing from every plan, and moving a
+// Mod library (16 §2.9): the list, filters, one lineage, removing from every plan, and moving a
 // spare copy out of Mods/ into the lock library.
 func TestGoldenLibrary(t *testing.T) {
 	t.Parallel()

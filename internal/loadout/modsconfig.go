@@ -22,7 +22,7 @@ type ModsConfig struct {
 	Known   []string
 }
 
-// Hash fingerprints file contents for external-modification detection (04 §4.3).
+// Hash fingerprints file contents for external-modification detection (07 §4.3).
 func Hash(b []byte) []byte {
 	h := xxh3.Hash128(b).Bytes()
 	return h[:]
@@ -200,7 +200,7 @@ func escape(s string) string {
 	return b.String()
 }
 
-// BackupSuffix is appended to ModsConfig.xml for the single backup (04 §4.1 rule 8).
+// BackupSuffix is appended to ModsConfig.xml for the single backup (07 §4.1 rule 8).
 const BackupSuffix = ".rimarcho.bak"
 
 // WriteFile backs up the current file (if any) and atomically replaces it: write to a

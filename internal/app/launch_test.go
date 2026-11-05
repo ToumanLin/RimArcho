@@ -13,7 +13,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Launching writes the list (08 §2): no "unsaved changes" block, a version with source
+// Launching writes the list (09 §2): no "unsaved changes" block, a version with source
 // launch (none when nothing changed since the newest version), the launch recorded.
 func TestLaunchWritesTheList(t *testing.T) {
 	t.Parallel()
@@ -88,7 +88,7 @@ func TestLaunchRefusesBeforeWriting(t *testing.T) {
 	}
 }
 
-// One game at a time (08 §1, §4): a game running in any registered environment blocks
+// One game at a time (09 §1, §4): a game running in any registered environment blocks
 // launch and pack launch, and the refusal names the environment and what it plays. Saving
 // is still allowed and says the game reads it on its next start.
 func TestOneGameAtATime(t *testing.T) {

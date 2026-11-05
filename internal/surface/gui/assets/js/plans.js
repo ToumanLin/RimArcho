@@ -1,4 +1,4 @@
-// Plans in the window (04 §1.3, 06 §2.1, §2.5): each plan is a sidebar entry whose page is
+// Plans in the window (07 §1.3, 16 §2.1, §2.5): each plan is a sidebar entry whose page is
 // its editor. Opening one only shows it: the current list (the one launched) changes when
 // the player makes another current, writes it to the game or launches it from its editor.
 // New (empty, a copy, a version, an import) opens management; delete asks for confirmation.
@@ -48,7 +48,7 @@ function forget() {
 }
 
 // done: after a dialog's verb the window shows the plan's page, or what after opens (the
-// list management page stays where it is, 06 §2.17).
+// list management page stays where it is, 16 §2.17).
 async function done(p, after) {
   let d;
   try { d = await p; } catch (e) { say("fail", errText(e)); return null; }
@@ -83,7 +83,7 @@ function nameField(box, value, self) {
   return { inp, check, bad: () => why.textContent !== "" };
 }
 
-// New lists live in the management page's right column (06 §2.17).
+// New lists live in the management page's right column (16 §2.17).
 export function newPlan(from = "") { pop.close(); return ui.newList(from); }
 
 // renamePlan: the rename dialog; the history stays.

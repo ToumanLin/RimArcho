@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// Moving a locked copy to another volume (04 §7): copy everything (.git and the origin
+// Moving a locked copy to another volume (07 §5): copy everything (.git and the origin
 // marker included), check it, then send the original to the recycle bin.
 func TestCopyMove(t *testing.T) {
 	t.Parallel()

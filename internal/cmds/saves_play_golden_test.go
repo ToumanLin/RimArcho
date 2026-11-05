@@ -169,7 +169,7 @@ func playFixture(t *testing.T) *testkit.Env {
 	return e
 }
 
-// archo saves with the full read (05 §4.2, 10 §1.7): lists before and after archo saves
+// archo saves with the full read (13 §4.2, 12 §1.7): lists before and after archo saves
 // index, one save read inline (its colony regrouped by world), the playthrough and its
 // change since the colony's previous save, --play and --all, a malformed save, a save being
 // written, a new save that is meta only, and saves index: first run, second run, --only,

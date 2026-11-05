@@ -1,9 +1,9 @@
 import { fieldError, fieldStatusError, progress } from "./feedbacksemantics.js";
 import { choiceControl } from "./choices.js";
-// Manage lists (06 §2.17): the sidebar's list › Manage lists. On the left every list of the game, on the
-// right the picked one: its game versions (04 §1.6), the Steam Workshop collections it
-// follows (04 §9.6) and how to share it (export, pack). The export is a sub-page of its own
-// (Library / Lists / <list> / export). Editing what a list holds stays in the editor (§2.5).
+// Manage lists (16 §2.17): the sidebar's list › Manage lists. On the left every list of the game, on the
+// right the picked one: its game versions (07 §1.6), the Steam Workshop collections it
+// follows (07 §7.6) and how to share it (export, pack). The export is a sub-page of its own
+// (Library / Lists / <list> / export). Editing what a list holds stays in the editor (16 §2.5).
 // Data: API.PlanManage (view.BuildPlanManage), API.PlanExport (view.BuildPlanExport).
 import { pathContent, copyablePath, editablePath } from "./fields.js";
 import { S, $, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
@@ -73,7 +73,7 @@ function draw(focus = "") {
   const d = M.data;
   const sc = S.screen === "plans" ? $("#screen") : openScreen("plans");
   const top = sc.scrollTop;
-  // the rows slide when their order changes (the current list first, 06 §2.17); where they
+  // the rows slide when their order changes (the current list first, 16 §2.17); where they
   // were is kept from the last drawing, as making a list current reads the page afresh
   const was = M.places && M.places.seq === S.screenSeq ? M.places.at : null;
   sc.innerHTML = "";
@@ -610,7 +610,7 @@ function inlineImport(draft, active, updateButtons) {
   return box;
 }
 
-// Leaving the page: transient reads stop; a draft the player never named goes (06 §2.17).
+// Leaving the page: transient reads stop; a draft the player never named goes (16 §2.17).
 export function abandon() {
   M.importSeq++; if (M.draft) M.draft.importing = false; C.seq++; C.slot = null; M.form = null; M.renaming = 0;
   if (M.creating && !named(M.draft)) { M.creating = false; S.listCreating = false; M.draft = null; }
@@ -709,7 +709,7 @@ function showCost(p, id) {
   s.append(details);
 }
 
-// ---- game version (04 §1.6): one small button per version, the allowed ones raised ----
+// ---- game version (07 §1.6): one small button per version, the allowed ones raised ----
 
 function versions(p) {
   const s = section(T("game versions"));
@@ -753,7 +753,7 @@ async function setVersions(p, vs) {
   });
 }
 
-// ---- follows Steam collections (04 §9.6) ----
+// ---- follows Steam collections (07 §7.6) ----
 
 function follows(p) {
   const s = section(T("follows Steam collections"), p.follows.length ? String(p.follows.length) : "");
@@ -881,7 +881,7 @@ function share(p) {
   return s;
 }
 
-// buildOf opens Create a pack (§2.6) for the list: it is opened first (the current list
+// buildOf opens Create a pack (16 §2.6) for the list: it is opened first (the current list
 // stays), and esc comes back here.
 async function buildOf(p) {
   if (!(await plans.openPlan(p.id))) return;

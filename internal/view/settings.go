@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
-// The settings page (06 §2.14): every item is a value and the command that changes it, so the
+// The settings page (16 §2.14): every item is a value and the command that changes it, so the
 // interfaces only show and run commands; nothing here has logic of its own.
 
 // SettingItem is one row of the settings page.
@@ -37,11 +37,11 @@ type SettingItem struct {
 	Note         string   `json:"note,omitempty"`
 	Hover        string   `json:"hover,omitempty"`
 	ValueNote    string   `json:"valueNote,omitempty"`
-	// URL: the value is a web page; the interfaces open it in the browser (Community, 06 §2.14).
+	// URL: the value is a web page; the interfaces open it in the browser (Community, 16 §2.14).
 	URL     string          `json:"url,omitempty"`
 	Links   []CommunityLink `json:"links,omitempty"`
 	Actions []SettingAction `json:"actions,omitempty"`
-	// Details fold under the row (06 §3.1 rule 7): RimArcho's release notes.
+	// Details fold under the row (16 §3.1 rule 7): RimArcho's release notes.
 	Details *SettingDetails `json:"details,omitempty"`
 }
 
@@ -62,7 +62,7 @@ type SettingAction struct {
 	Pending string   `json:"pending,omitempty"`
 }
 
-// SettingTask identifies commands that queue after confirmation (06 §2.14, 06 §2.16).
+// SettingTask identifies commands that queue after confirmation (16 §2.14, 16 §2.16).
 func SettingTask(argv []string) string {
 	if len(argv) > 0 && argv[0] == "update" {
 		if len(argv) == 1 {
@@ -136,7 +136,7 @@ type EnvRow struct {
 }
 
 // EnvPage is the environment page: the environments, and the current one's game folder,
-// version, launch and saves (what belongs to one game, 02 §0; the mod folders every game
+// version, launch and saves (what belongs to one game, 03 §2; the mod folders every game
 // shares are on the settings page).
 type EnvPage struct {
 	Envs   []EnvRow       `json:"envs"`
@@ -186,7 +186,7 @@ func EnvGroups(a *app.App, st *app.LoadoutState) []SettingGroup {
 	}}}
 }
 
-// FolderGroup is the settings page's "Mod folders" (02 §0): the folders every environment
+// FolderGroup is the settings page's "Mod folders" (03 §2): the folders every environment
 // shares. The Workshop folder can be moved; SteamCMD and other folders added and removed;
 // RimArcho's own folders (Archo Monitor, the lock library) are shown.
 func FolderGroup(a *app.App) SettingGroup {
@@ -244,7 +244,7 @@ func FolderGroup(a *app.App) SettingGroup {
 	return g
 }
 
-// SettingsPage is the settings page's groups (06 §2.14): About, Interface, Accounts, update,
+// SettingsPage is the settings page's groups (16 §2.14): About, Interface, Accounts, update,
 // Folders, game log, network, external tools, community data, Storage and, last, uninstall. The GUI and
 // the TUI show them in this order. Game launch and save options are on the environment page.
 func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
@@ -354,7 +354,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	return out
 }
 
-// NetworkGroup: the proxy and the GitHub mirror for RimArcho's own downloads (07 §2.2).
+// NetworkGroup: the proxy and the GitHub mirror for RimArcho's own downloads (17 §2.2).
 // The window's Workshop pages follow the Windows system proxy on their own.
 func NetworkGroup(a *app.App) SettingGroup {
 	proxy := cmds.Setting(a, "network.proxy")

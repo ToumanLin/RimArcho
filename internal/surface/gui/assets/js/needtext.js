@@ -41,7 +41,7 @@ export function needParts(it, activated) {
 export function needEvidence(ev) {
   const line = el("div", "ev-line");
   line.append(el("span", "ev-chip " + ev.kind, ev.label));
-  // two spaces part facts in the source (06 §7.3): each is its own span, a gap apart
+  // two spaces part facts in the source (16 §7.3): each is its own span, a gap apart
   if (ev.source) for (const part of ev.source.split(/ {2,}/)) if (part) line.append(el("span", "src", part));
   return line;
 }

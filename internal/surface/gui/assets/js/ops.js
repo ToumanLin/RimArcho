@@ -1,4 +1,4 @@
-// The ops both pages share (06 §3.5, §8.5): the op table (view.OpTable: code, label, key,
+// The ops both pages share (16 §3.5, §8.5): the op table (view.OpTable: code, label, key,
 // menu group) and the row menu built from a row's codes. The plan editor and Mod library > All
 // list the same groups in the same order, each item with its key on the right, only the
 // ops that apply, unsubscribe / delete last in red.
@@ -56,5 +56,5 @@ export function keyed(codes, k) {
   return "";
 }
 
-// menuKey: the menu key or shift+F10 (06 §3.1 rule 6).
+// menuKey: the menu key or shift+F10 (16 §3.1 rule 6).
 export const menuKey = (e) => e.key === "ContextMenu" || (e.key === "F10" && e.shiftKey);

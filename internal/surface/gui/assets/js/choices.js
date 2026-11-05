@@ -1,4 +1,4 @@
-// Shared single-value controls (06 §3.10). A button keeps native disabled/fieldset,
+// Shared single-value controls (16 §3.10). A button keeps native disabled/fieldset,
 // focus and change behavior; only the open menu owns document listeners and DOM.
 import { icon } from "./icons.js";
 

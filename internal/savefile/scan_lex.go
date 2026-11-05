@@ -9,7 +9,7 @@ import (
 )
 
 // The scanner is a byte-level XML tokenizer: encoding/xml's Decoder.Token allocates per
-// token and is several times too slow for a 27 MB save (10 §1.7). It reads a sliding
+// token and is several times too slow for a 27 MB save (12 §1.7). It reads a sliding
 // buffer, keeps only the element stack and the text of the element opened last (up to a
 // cap), and reports the first syntax error the way the game's XmlDocument load would fail.
 // It is not a validating parser: it checks tag structure, attribute syntax, entities in

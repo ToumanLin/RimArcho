@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Plan is one named, ordered enabled list (04 §1): it owns a workspace, an undo stack,
+// Plan is one named, ordered enabled list (07 §1): it owns a workspace, an undo stack,
 // versions and a staging list. Lists are shared by every game (2026-10-25); names are
 // unique across them.
 type Plan struct {
@@ -19,16 +19,16 @@ type Plan struct {
 	Created time.Time
 	Updated time.Time // the workspace's last change
 	// CreatedGame is the environment's game version when the plan was made; Versions are
-	// the game versions the player chose for it, empty for the default (04 §1.6).
+	// the game versions the player chose for it, empty for the default (07 §1.6).
 	CreatedGame string
 	Versions    []string
 }
 
 // DefaultPlanName names an environment's first plan: the one imported from ModsConfig.xml
-// on first use, or the environment's data before plans existed (04 §1.4).
+// on first use, or the environment's data before plans existed (07 §1.4).
 const DefaultPlanName = "default"
 
-// StageKey is the meta key of a plan's staging list (04 §2.2).
+// StageKey is the meta key of a plan's staging list (07 §2.2).
 func StageKey(planID int64) string { return fmt.Sprintf("stage:%d", planID) }
 
 const planCols = `id, environment_id, name, created_at, updated_at, created_game, versions`
@@ -95,7 +95,7 @@ func (s *Store) PlanByName(name string) (*Plan, error) {
 }
 
 // CreatePlan stores a new, empty plan (no workspace, no versions). Its created_game is the
-// environment's game version now (04 §1.6).
+// environment's game version now (07 §1.6).
 func (s *Store) CreatePlan(envID, name string, at time.Time) (*Plan, error) {
 	res, err := s.DB.Exec(`INSERT INTO plan(environment_id, name, created_at, updated_at, created_game)
 		VALUES(?,?,?,?, coalesce((SELECT game_version FROM environment WHERE id=?), ''))`, envID, name, at.Unix(), at.Unix(), envID)
@@ -160,7 +160,7 @@ func (s *Store) SetCurrentPlan(envID string, planID int64) error {
 }
 
 // metaPlansEnabled holds the enable history: list IDs, the most recently enabled first,
-// in any game (lists are shared, 04 §1.7). The sidebar orders lists by it (06 §2.1).
+// in any game (lists are shared, 07 §1.7). The sidebar orders lists by it (16 §2.1).
 const metaPlansEnabled = "plans-enabled"
 
 // PlansEnabled is the enable history, the most recently enabled list first. Lists never
@@ -186,7 +186,7 @@ func joinIDs(ids []int64) string {
 // CurrentPlan returns the environment's current plan — any list, lists being shared by
 // every game; when the stored one is gone it falls back to the first plan (and records
 // that). nil when the game has never had a current list: its first use imports its
-// ModsConfig.xml (04 §1.4).
+// ModsConfig.xml (07 §1.4).
 func (s *Store) CurrentPlan(envID string) (*Plan, error) {
 	id := s.CurrentPlanID(envID)
 	if id == 0 {

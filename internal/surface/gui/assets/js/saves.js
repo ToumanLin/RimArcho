@@ -1,10 +1,10 @@
-// Library › Saves (06 §2.11, 10 §4). Three cards numbered 1–3, the gaps drag (06 §3.1 rule
+// Library › Saves (16 §2.11, 12 §4). Three cards numbered 1–3, the gaps drag (16 §3.1 rule
 // 10): left the colonies, each opening to its saves as a tree, under the search's own card
 // (`/`); middle the selected save: where it belongs, Can it load? with its quick fix and its
 // rows by group (the file, the game, the Mod list), and the whole Mod list; right the
-// playthrough, whose facts come with the full read of the save (10 §1.7 L1): skeletons
+// playthrough, whose facts come with the full read of the save (12 §1.7 L1): skeletons
 // until it is read. The listing reads every save's head, which can
-// take a while on a cold library, so it arrives as a "saves" event (06 §8.4); the full read
+// take a while on a cold library, so it arrives as a "saves" event (16 §8.4); the full read
 // runs as a background task and its news arrives as "saves-read" events.
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { on } from "./api.js";
@@ -28,7 +28,7 @@ const X = { page: null, sel: "", open: new Set(), q: "", detail: null, ask: null
   listSeq: 0, detailSeq: 0, busy: false };
 let leftCard = null, midCard = null, rightCard = null, tree = null, input = null, timer = 0, mods = null;
 const waiting = new Map(); // listing request → its resolve
-const ROW = 24; // a Mod list row's height: the list mounts only the rows in view (06 §11 A18)
+const ROW = 24; // a Mod list row's height: the list mounts only the rows in view (16 §11 A18)
 
 on("saves", (ev) => {
   const w = waiting.get(ev?.request);
@@ -40,7 +40,7 @@ on("saves-read", (ev) => news(ev || {}));
 // a list made from a save to analyse it: the save is checked again with what it indexed
 on("analyze", (ev) => { if (ev?.done && S.screen === "saves" && X.detail && !X.detail.loading) showDetail(0); });
 
-// news is the full read's progress (06 §2.11 "Loading"): the status line while the page
+// news is the full read's progress (16 §2.11 "Loading"): the status line while the page
 // is open (never over a failure or a message with its undo), rows with their day and
 // colonies regrouped, and the selected save's play facts once it is read.
 function news(ev) {
@@ -211,7 +211,7 @@ function focusTree() {
   tree.querySelector(".sv-save.on")?.scrollIntoView({ block: "nearest" });
 }
 
-// ---- left: colonies and their saves (06 §2.11) ----
+// ---- left: colonies and their saves (16 §2.11) ----
 
 const lc = (s) => String(s || "").toLowerCase();
 function saveMatch(c, s) { return !X.q || lc(c.name).includes(X.q) || lc(s.name).includes(X.q); }
@@ -277,7 +277,7 @@ function drawLeft() {
 }
 
 // clickColony opens a colony and selects its latest save; clicking the open current
-// colony folds it (06 §2.11).
+// colony folds it (16 §2.11).
 function clickColony(key) {
   const c = X.page.colonies.find((x) => x.key === key);
   if (!c) return;
@@ -428,7 +428,7 @@ function drawMid(keep) {
 
 const GROUPS = [["file", "the file"], ["game", "game changes"], ["mods", "Mod list changes"]];
 
-// loadSection is Can it load? (10 §4.3): the quick-fix bar, then only what needs
+// loadSection is Can it load? (12 §4.3): the quick-fix bar, then only what needs
 // attention, under the file, the game and the Mod list.
 function loadSection(d) {
   const s = el("div", "sv-sect");
@@ -483,7 +483,7 @@ function issueRow(d, is) {
   return row;
 }
 
-// detailsBox is View's list (06 §2.11): each Mod with its packageId, then what loading
+// detailsBox is View's list (16 §2.11): each Mod with its packageId, then what loading
 // without them loses, by kind.
 function detailsBox(x) {
   const box = el("div", "sv-details");
@@ -513,7 +513,7 @@ function fixButton(d, f, primary) {
   return b;
 }
 
-// modSection is the save's Mods in load order (10 §4.3 Mod list), all of them: the rows
+// modSection is the save's Mods in load order (12 §4.3 Mod list), all of them: the rows
 // come and go as the card scrolls (modRows).
 function modSection(d) {
   const s = el("div", "sv-sect");
@@ -527,7 +527,7 @@ function modSection(d) {
 }
 
 // modRows keeps the Mod list's rows in view mounted, plus a few on each side: a save of a
-// thousand Mods stays within the page's size limits (06 §11 A18).
+// thousand Mods stays within the page's size limits (16 §11 A18).
 function modRows(scroll, list, all) {
   const shown = new Map();
   let frame = 0;
@@ -561,7 +561,7 @@ function modRows(scroll, list, all) {
   return { draw, destroy() { cancelAnimationFrame(frame); ro.disconnect(); scroll.removeEventListener("scroll", later); } };
 }
 
-// drawRight is the playthrough (10 §4.3 Play facts, §4.5; the draft's right column):
+// drawRight is the playthrough (12 §4.3 Play facts, §4.5; the draft's right column):
 // the colony, its day and date, storyteller, difficulty and play time; the numbers at this
 // save with their change since the colony's previous read save, the colonists; the
 // newest letters; the colony over time. Skeletons while the save is read.
@@ -687,7 +687,7 @@ function kilo(v) {
   return (Math.round(v / 1e5) / 10) + "M";
 }
 
-// chart is the colony over in-game days (10 §4.5): this save's wealth (line and area) and
+// chart is the colony over in-game days (12 §4.5): this save's wealth (line and area) and
 // colonists (dashed) from its own history, a mark per death letter, and a point per read
 // save of the colony; a point opens its save. The tree reaches every save by keys, so the
 // points are for the mouse; the chart reads as one image.
@@ -726,7 +726,7 @@ function chart(tl) {
   return svg;
 }
 
-// ---- actions (10 §4.4) ----
+// ---- actions (12 §4.4) ----
 
 async function runFix(d, f) {
   switch (f.action) {
@@ -759,7 +759,7 @@ async function fix(d, mods, disableAdded, order, thenLaunch) {
   if (S.screen === "saves") showDetail(0);
   const ids = r.workshopIds || [];
   // without downloads it launches now; with them the list becomes current once they are
-  // queued, and the player launches when they are in (06 §2.11)
+  // queued, and the player launches when they are in (16 §2.11)
   const after = async () => {
     if (!thenLaunch) return;
     if (!ids.length) { if (await plans.usePlan(r.plan)) await ui.run("launch"); return; }
@@ -798,7 +798,7 @@ async function copySave() {
   await reread(r.ref);
 }
 
-// askFiles shows the inline confirmation of Back up or Recycle (06 §6): the files and
+// askFiles shows the inline confirmation of Back up or Recycle (16 §6): the files and
 // sizes first; only the confirm button acts.
 async function askFiles(kind) {
   const d = X.detail;
@@ -854,7 +854,7 @@ function startRename() {
   inp?.select();
 }
 
-// renameField is the inline rename (06 §2.17): duplicates are checked while typing; enter
+// renameField is the inline rename (16 §2.17): duplicates are checked while typing; enter
 // or leaving saves, esc cancels.
 function renameField(d) {
   const box = el("div", "sv-rename");
@@ -896,13 +896,13 @@ function renameField(d) {
 }
 
 // liveChanged follows the game: a running game locks rename and recycle; when it exits
-// the saves are read again (10 §1.7).
+// the saves are read again (12 §1.7).
 export function liveChanged(running) {
   if (S.screen !== "saves" || !X.page) return;
   if (!running) reread(); else showDetail(0);
 }
 
-// key: the page's keys (06 §2.11). true when taken.
+// key: the page's keys (16 §2.11). true when taken.
 export function key(e) {
   const k = e.key;
   if (e.ctrlKey || e.metaKey || e.altKey) return false;

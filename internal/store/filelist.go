@@ -13,7 +13,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/scan"
 )
 
-// A snapshot's file manifest is split in two (02 §7, schema v28): snapshot_file keeps the
+// A snapshot's file manifest is split in two (04 §4, schema v28): snapshot_file keeps the
 // rows that have readers by row (semantic files with their hashes, and every .dll, which log
 // attribution looks up by name), and snapshot_list holds the rest (textures, sounds,
 // Languages and so on) as one zstd block per snapshot: paths sorted, front-coded, with their
@@ -62,7 +62,7 @@ var listCodec struct {
 }
 
 // codec makes the zstd encoder and decoder on first use, with one worker each and small
-// windows: blocks are a few KB, and page processes should not keep large buffers (06 §10).
+// windows: blocks are a few KB, and page processes should not keep large buffers (16 §10).
 func codec() (*zstd.Encoder, *zstd.Decoder, error) {
 	c := &listCodec
 	c.once.Do(func() {

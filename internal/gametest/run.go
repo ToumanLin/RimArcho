@@ -1,4 +1,4 @@
-// Package gametest runs RimWorld with isolated data and captures startup logs (08 §12).
+// Package gametest runs RimWorld with isolated data and captures startup logs (09 §7).
 package gametest
 
 import (

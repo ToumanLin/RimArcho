@@ -1,4 +1,4 @@
-// Spike (TUI v2 V0, 06 §9.4): Preview.png thumbnails over the iTerm2 inline-image
+// Spike (TUI v2 V0, 16 §9.4): Preview.png thumbnails over the iTerm2 inline-image
 // protocol (OSC 1337) beside a bubbletea list, in WezTerm.
 //
 // How it cooperates with bubbletea's renderer (v1.3 standard renderer):
@@ -42,7 +42,7 @@ const (
 	rectRow, rectCol = 3, 56 // 1-based screen position of the thumbnail rect
 	rectW, rectH     = 18, 9 // cells
 	dwell            = 150 * time.Millisecond
-	thumbPx          = 360 // cached width (06 §9.4)
+	thumbPx          = 360 // cached width (16 §9.4)
 )
 
 type mod struct {

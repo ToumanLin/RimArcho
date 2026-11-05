@@ -1,4 +1,4 @@
-// Append-only result tree for Search files (06 §2.9).
+// Append-only result tree for Search files (16 §2.9).
 import { el, T } from "./state.js";
 import { button, hintsChanged } from "./screens.js";
 import { virtualRows } from "./virtualrows.js";

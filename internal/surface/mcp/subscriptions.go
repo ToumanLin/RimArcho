@@ -6,11 +6,11 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 )
 
-// updates (02 §3.4, 06 §2.9): subscriptions RimArcho installs and updates itself — Git
+// updates (11 §1, 16 §2.9): subscriptions RimArcho installs and updates itself — Git
 // repositories, download pages, Workshop items downloaded with SteamCMD — as one tool over
-// archo subscribe (05 §1.2). update replaces installed files and remove moves folders to
+// archo subscribe (13 §1.2). update replaces installed files and remove moves folders to
 // the recycle bin, so it is marked destructive; add, check and update reach Git hosts, web
-// pages and Steam, so it is open-world. The LoversLab session stays the player's (05 §1.2):
+// pages and Steam, so it is open-world. The LoversLab session stays the player's (13 §1.2):
 // page subscriptions are read publicly, and files come from a zip or folder (from).
 func subscriptionTools() []tool {
 	return []tool{

@@ -1,4 +1,4 @@
-// Motion (06 §7.1): short, and only opacity and transform, so WebView2 composites it
+// Motion (16 §7.1): short, and only opacity and transform, so WebView2 composites it
 // without layout or paint work; nothing moves under prefers-reduced-motion. The CSS side
 // (the tokens --t-press, --t-enter, --t-layout and the keyframes) is in style.css.
 import { S, $$, key, ROW_H } from "./state.js";

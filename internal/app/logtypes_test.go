@@ -11,7 +11,7 @@ import (
 
 // A missing type nothing installed defines: the mod whose XML names it is the source (a
 // patch's Class="…" value, a def's <thingClass>), and the nearest types of the analysed
-// assemblies are offered (03 §6.2, MCP review round 2 P5). A type an enabled mod does define
+// assemblies are offered (06 §2, MCP review round 2 P5). A type an enabled mod does define
 // is a version question, not a typo: the XML naming it is not searched.
 func TestMissingTypeSourceAndNearest(t *testing.T) {
 	t.Parallel()
@@ -93,7 +93,7 @@ func TestMissingTypeSourceAndNearest(t *testing.T) {
 // order is the one the game keeps, so the later copy's types are missing in game (MCP eval
 // h2). A static finding names both, the log's missing type names the earlier mod as source,
 // and the mod page lists its assemblies with the same-name mark. Identical copies (a shared
-// library) are no finding (03 §4.3 asm.duplicate-name).
+// library) are no finding (05 §4.3 asm.duplicate-name).
 func TestSameNameAssemblies(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)

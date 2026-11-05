@@ -23,7 +23,7 @@ ToDo numbers came from a read-only measurement of a 10-day real database (443 MB
 1. **`def_fact` no longer has `instance_id`.** v26 (`store.schemaV26`) gives facts integer `set_id`, with Instance in `fact_set(id, instance_id, kind, content_key)`. ToDo's "19.8 MB instance_id duplicated in two indexes" predates v26. Instance text left across facts/snapshots/analysis/events totals about **0.85 MB** (§3).
 2. **No code reads nonsemantic-file mtime.** ToDo says72% of rows serve incremental mtime comparison. Actually only semantic hashes reuse: `scan.ComputeSkip` compares size+mtime only if `IsSemantic(rel)` and prior hash (`internal/scan/fingerprint.go:115-117`); `Store.CurrentFiles` only `hash IS NOT NULL`. Nonsemantic texture/audio/Languages mtime only written/copied; real readers query paths (§5.1).
 3. **`Store.InstanceFiles` queries environment-private Mods only.** `i.environment_id=?` (`internal/store/files.go:9`), but since v14 (2026-10-22) shared-folder Workshop/SteamCMD Instances have empty `environment_id`. Function written10-21 before v14, unchanged/untested. Log attribution "who supplies this texture/DLL" (`logrefs.go:410`, `logrefs.go:517`, `logcallers.go:294`) misses Workshop Mods. Apparent v14 regression, outside scope/unfixed. Benchmarks use intended `environment_id IN ('', ?)` (more results/slower).
-4. **07 §6.2's190 distinct Name queries5.589ms no longer holds**, §7.2.
+4. **18 §2's190 distinct Name queries5.589ms no longer holds**, §7.2.
 
 ## 2. Method
 
@@ -33,7 +33,7 @@ Measurement `TestIntKeyResearch` across `internal/store/intkey_research_test.go`
 
 | Item | ToDo real DB | Synthetic DB |
 | --- | ---: | ---: |
-| Instance | 1354 (07 §6 real: 6 official, 74 local, 1274 Workshop) | 1354, same distribution, 482 enabled |
+| Instance | 1354 (18 real: 6 official, 74 local, 1274 Workshop) | 1354, same distribution, 482 enabled |
 | `snapshot_file` rows | 980,000 | 973,764 (4,864 snapshots: 1354 current+history) |
 | `rel_path` total/mean | 59.6 MB / about 61 B | 56.9 MB /58.4 B, 271,102 distinct paths |
 | Nonsemantic share | 72% | 71.7% (697,889 rows) |
@@ -44,7 +44,7 @@ Measurement `TestIntKeyResearch` across `internal/store/intkey_research_test.go`
 
 Paths model real Mods, e.g. `1.6/Defs/ThingDefs_Buildings/XYZ_Buildings_Kamelvan.xml`, `Textures/Things/Building/Furniture/XYZ_Torix/XYZ_Torix_north.png`, `Languages/ChineseSimplified (Simplified Chinese)/DefInjected/ThingDef/…`.45% have version folders, 40% of those `1.7/`, with separate1.7 sets; others share across versions (~82% shared, assumption without real proportion). Historical snapshots change5% semantic files, remove1%, add0.5%.
 
-**Synthetic first `ContentKinds`236–294ms, real 246ms (07 §6.2)**, suggesting similar manifest shape.
+**Synthetic first `ContentKinds`236–294ms, real 246ms (18 §2)**, suggesting similar manifest shape.
 
 ### 2.2 Prototype structures
 
@@ -87,7 +87,7 @@ Integer keys/identity rules (review `internal/store/mutate.go`, `migrate14.go`, 
 - **same answer** retains old candidate/tombstone row/text ID, removes new Instance; rewrites the `instance_id` in `snapshot`, `change_event`, `instance_alias` to the candidate, plan (`workspace`, `workspace_undo`, `loadout_version`)/launch fingerprints via `rewriteInstanceLists` (`identityrefs.go`). The new Instance's `fact_set`/`content_state` are not rewritten, left for `PruneFacts` to delete and rebuilt on the next analysis (AnalysisKey includes Instance ID/snapshot hash). Integer UPDATE changes column, no simplification.
 - **v14 merge, `MergeLinkedInstances`** likewise rewrite text IDs, retain earliest live copy, delete merged copy's facts entirely.
 - **Lineage split/merge** changes only `instance.lineage_id`, not Instance ID, unrelated to surrogate.
-- **External references text**: plan JSON, `id_alias`, `log_cache` reports, pack manifests, `#a3f9` short refs (05 §2). Integer adds internal second identity requiring synchronization on every rewrite path.
+- **External references text**: plan JSON, `id_alias`, `log_cache` reports, pack manifests, `#a3f9` short refs (13 §2). Integer adds internal second identity requiring synchronization on every rewrite path.
 - **Migration renumbering** safe for internal-only integers, as `fact_set.id` already renumbered by v26. Integer caches (`ContentKinds` key `(snapshot_id, scan_id)`) live one process only.
 
 Only per-Mod path tables (§4) require integer Instance keys: a 26-byte text ID prefix in `mod_path` costs about 7 MB across 270,000 paths. Section 4 does not recommend that design.
@@ -116,11 +116,11 @@ MB. Global unique text index `sqlite_autoindex_path_1` alone18.9 MB, duplicating
 | `InstanceFiles("%x.dll")` ×20 (log DLL lookup) | 1,435–1,812 | 4,599–4,759 | 4,950–8,050 | 1,500–1,728 |
 | Write 30 snapshot manifests | 20–32 | 75–86 | 197–214 | 26–39 |
 
-Thus **do not ship manifest path tables alone**: first inventory adds0.1–0.5s, farther from 06 §10's200ms. Combine §5 derived columns/blocks; then only semantic/DLL rows remain11 MB, table savings few MB (§8).
+Thus **do not ship manifest path tables alone**: first inventory adds0.1–0.5s, farther from 16 §10's200ms. Combine §5 derived columns/blocks; then only semantic/DLL rows remain11 MB, table savings few MB (§8).
 
 ### 4.2 Choosing granularity
 
-- **Per snapshot** is existing `snapshot_file`, duplicated paths each snapshot: 970,000 rows, 270,000 distinct (historical snapshots mostly match). Does not save manifests; pointing `def_fact.file` to snapshot-file rows ties fact lifetime to manifests, whose old manifests are pruned by 02 §7.1 while another game version's `content_state` may still reference the old set. **Rejected**, no separate prototype. Nonsemantic block/snapshot (§5) is compressed version of this granularity, adopted.
+- **Per snapshot** is existing `snapshot_file`, duplicated paths each snapshot: 970,000 rows, 270,000 distinct (historical snapshots mostly match). Does not save manifests; pointing `def_fact.file` to snapshot-file rows ties fact lifetime to manifests, whose old manifests are pruned by 04 §4.1 while another game version's `content_state` may still reference the old set. **Rejected**, no separate prototype. Nonsemantic block/snapshot (§5) is compressed version of this granularity, adopted.
 - **Per Mod** smallest but needs integer Instance (§3); same/v14/link merges move snapshots with original path IDs, requiring renumbering. `CachedDefs` (all disabled cached Defs each analysis)494–613→1,039–1,114ms, `DefsOf` slower due per-row `(inst,id)` lookup. **Rejected**.
 - **Global** needs no identity-merge rewrite, paths once across Mods/snapshots; per-path write lookup makes manifests2–4× slower, maintenance scans all references (§4.3).
 - **Per fact-set file list** (`setfiles`, additional option): content-keyed immutable sets own facts; list/facts share lifetime: **no cleanup, merge renumbering, write lookup**. Read once/set, cache by immutable `set_id`.
@@ -142,10 +142,10 @@ Global saves another4.5 MB (1.8%) at cost of global table/maintenance step/write
 
 Recommended approach needs no separate rule:
 
-- File list lives in `fact_set` row, deleted by `PruneFacts` with set (03 §3: immediately when no version references). After update, delete old set when all version views move on.
-- Nonsemantic blocks follow snapshot manifests, 02 §7.1 retention (current, unanswered questions, before/after last3 updates per Instance), deleted in `Store.Maintain` step 1.
+- File list lives in `fact_set` row, deleted by `PruneFacts` with set (05 §3: immediately when no version references). After update, delete old set when all version views move on.
+- Nonsemantic blocks follow snapshot manifests, 04 §4.1 retention (current, unanswered questions, before/after last3 updates per Instance), deleted in `Store.Maintain` step 1.
 
-If global chosen, clean after `Store.Maintain` (02 §7.2) steps1/2 in same transaction: `DELETE FROM path WHERE id NOT IN (SELECT path_id FROM snapshot_file UNION ALL SELECT file_id FROM def_fact … )`. Even no deletions scans refs: uncompressed0.83–0.92s, with blocks0.42–0.68s. Not during save/scan; table grows between maintenance.
+If global chosen, clean after `Store.Maintain` (04 §4.2) steps1/2 in same transaction: `DELETE FROM path WHERE id NOT IN (SELECT path_id FROM snapshot_file UNION ALL SELECT file_id FROM def_fact … )`. Even no deletions scans refs: uncompressed0.83–0.92s, with blocks0.42–0.68s. Not during save/scan; table grows between maintenance.
 
 ## 5. Question3: nonsemantic files in compressed snapshot blocks
 
@@ -186,7 +186,7 @@ If global chosen, clean after `Store.Maintain` (02 §7.2) steps1/2 in same trans
 | `CurrentFiles`(incremental scan) | 95–137 | 79–91 | 75–122 |
 | Write 30 snapshot manifests | 20–32 | 14.0–14.5 | 16.9–22.7 |
 
-**Recommend blocks+derived columns, exclude DLL/mtime, dedup optional.** Main page gain derived columns: first inventory content-kind~260ms→few ms (real 246, 07 §6.2). Independent of blocks, can ship first: snapshot `kinds`/`langs`, compute on write/backfill migration. Only texture-provider logs slower+40–50ms, once/log then cached. DLL lookup occurs per missing assembly; putting DLLs in blocks would decode>20,000 for 20 queries. Remaining rows fewer, DLL queries~3× faster.
+**Recommend blocks+derived columns, exclude DLL/mtime, dedup optional.** Main page gain derived columns: first inventory content-kind~260ms→few ms (real 246, 18 §2). Independent of blocks, can ship first: snapshot `kinds`/`langs`, compute on write/backfill migration. Only texture-provider logs slower+40–50ms, once/log then cached. DLL lookup occurs per missing assembly; putting DLLs in blocks would decode>20,000 for 20 queries. Remaining rows fewer, DLL queries~3× faster.
 
 ## 6. Question4: name-only disabled-Mod Defs
 
@@ -276,7 +276,7 @@ CROSS JOIN: SEARCH f USING INDEX def_fact_named (name=?)
             SEARCH c USING INDEX content_state_def (def_set_id=? AND game_mm=?)
 ```
 
-To avoid sorting, SQLite traverses all 1,354 version `content_state` rows then probes Name index each. `CROSS JOIN` (already used by `TypeOwners`) preserves results: 190 Name **153–185→4.7–6.5ms**, 100 defName **84–93→2.1–2.7ms**.10-29 sharing report 5.6ms predates B1 fix `6c67849` adding ORDER BY instance_id.190 missing-parent log clusters alone consume1/3 first-log 500ms budget (07 §6 first MCP `list_problems`/`analyze_log` after new log). Independent of integers, fix separately.
+To avoid sorting, SQLite traverses all 1,354 version `content_state` rows then probes Name index each. `CROSS JOIN` (already used by `TypeOwners`) preserves results: 190 Name **153–185→4.7–6.5ms**, 100 defName **84–93→2.1–2.7ms**.10-29 sharing report 5.6ms predates B1 fix `6c67849` adding ORDER BY instance_id.190 missing-parent log clusters alone consume1/3 first-log 500ms budget (18 first MCP `list_problems`/`analyze_log` after new log). Independent of integers, fix separately.
 
 ### 7.3 Against06 §10/07 §6 thresholds
 
@@ -287,13 +287,13 @@ Recommended `combo-setfiles` effects, §7.1 figures:
 | First inventory content-kind+PNG | Page≤200ms | 257–325 | 2.8–3.8 | Faster; current component alone exceeds budget |
 | Detail language, one snapshot | Interaction≤50ms | 0.12–0.21 | 0.01 | Unchanged |
 | Changes two-snapshot files | Page≤200ms | 0.35–0.56 | 0.30–0.37 | Unchanged |
-| First log texture+20 DLL+190 Name | ≤500ms (07 §6) | 1,700–2,200 | 770–1,000 | Faster but over; DLL/Name dominate (§7.2), independent. Synthetic DLL lookup covers all 1354 environment Mods, more than current source (§1 item 3) |
-| Analysis all-disabled cached Defs | No separate threshold (indexed7.8s, 07 §6) | 494–724 | 702–925 | Prototype per-row string split; production direct indexes closer to baseline, worst+0.2–0.4s |
-| Incremental semantic-row read | ≤3s (07 §6) | 95–137 | 75–122 | Unchanged |
+| First log texture+20 DLL+190 Name | ≤500ms (18) | 1,700–2,200 | 770–1,000 | Faster but over; DLL/Name dominate (§7.2), independent. Synthetic DLL lookup covers all 1354 environment Mods, more than current source (§1 item 3) |
+| Analysis all-disabled cached Defs | No separate threshold (indexed7.8s, 18) | 494–724 | 702–925 | Prototype per-row string split; production direct indexes closer to baseline, worst+0.2–0.4s |
+| Incremental semantic-row read | ≤3s (18) | 95–137 | 75–122 | Unchanged |
 | Write 30 manifests | — | 20–32 | 16.9–22.7 | Same/slightly faster |
 | Save 30 Def sets | — | 54–112 | 71.8–89.2 | Within noise |
 
-Memory: prototype adds no resident cache. Derived columns allow removing `ContentKinds` process cache; set-list cache needs cap/IndexKey invalidation (06 §10 avoid long-term memory).
+Memory: prototype adds no resident cache. Derived columns allow removing `ContentKinds` process cache; set-list cache needs cap/IndexKey invalidation (16 §10 avoid long-term memory).
 
 ### 7.4 Migration duration
 
@@ -308,7 +308,7 @@ Memory: prototype adds no resident cache. Derived columns allow removing `Conten
 | **`combo-setfiles` (recommended)** | **8.4–11.3s** | 256.4 MB | 162.7 MB | 1.6–1.9s |
 | `combo-ik-mod` | 8.8–9.2s | 255.4 MB | 146.6 MB | 1.2–1.3s |
 
-Time scales with affected rows, not total size; ToDo real same rows implies~10s. v26 synthetic 760,000 rows 4.33s (07 §6), VM54 MB real first-open+upgrade1.7s. Longer step needs startup progress ("upgrading database…"), not frozen-looking window. File grows first (~256 MB before maintenance, WAL extra), later reclaimed; space rule02 §7.2 twice DB+64 MiB. `D:\RimArcho-test\dbint` peak~500 MB (baseline+converting copy+WAL).
+Time scales with affected rows, not total size; ToDo real same rows implies~10s. v26 synthetic 760,000 rows 4.33s (18), VM54 MB real first-open+upgrade1.7s. Longer step needs startup progress ("upgrading database…"), not frozen-looking window. File grows first (~256 MB before maintenance, WAL extra), later reclaimed; space rule02 §7.2 twice DB+64 MiB. `D:\RimArcho-test\dbint` peak~500 MB (baseline+converting copy+WAL).
 
 Migration constraint: `Store.Open` `foreign_keys(1)` cannot turn off in transaction. Parent `fact_set` **must not be dropped/rebuilt**, cascading all facts; `ALTER TABLE ADD COLUMN` only. Children `def_fact`/etc can create/copy/drop/rename. Prototype disabled FKs; production must respect constraint. Recommendation only adds fact_set column.
 
@@ -323,12 +323,12 @@ Migration constraint: `Store.Open` `foreign_keys(1)` cannot turn off in transact
 | `combo-global` (global paths too) | 148.12 MB | −39.7% |
 
 1. Snapshot `kinds` (DLL, Defs/Patches XML,`Languages`, texture PNG four bits), `langs` (existing Languages directory rules), computed at write/backfilled migration. `ContentKinds`/`SnapshotsWithPNG*`/Languages read them.
-2. Nonsemantic non-DLL `snapshot_file` rows to sorted `rel_path`/prefix/size/zstd per-snapshot block, no mtime. New `snapshot_list(snapshot_id INTEGER PRIMARY KEY, n, data)`, optional hash-dedup `file_blob`. Update `InstanceFiles` texture branch, `SnapshotFiles`, persist copy/rewrite, 02 §7.1 cleanup, gc, remove env.
+2. Nonsemantic non-DLL `snapshot_file` rows to sorted `rel_path`/prefix/size/zstd per-snapshot block, no mtime. New `snapshot_list(snapshot_id INTEGER PRIMARY KEY, n, data)`, optional hash-dedup `file_blob`. Update `InstanceFiles` texture branch, `SnapshotFiles`, persist copy/rewrite, 04 §4.1 cleanup, gc, remove env.
 3. Add `fact_set`.`files` JSON/newline list; replace `file TEXT` in `def_fact`/`type_fact`/`harmony_fact`/`harmony_id`/`assembly_fact` with indexes. Build list/set on save, read once/set.
 4. No Instance integers/name-only/global paths.
 5. Independent first fixes: `Store.DefsNamed` `CROSS JOIN` (§7.2), InstanceFiles `environment_id IN ('', ?)` (§1 item 3, tests needed).
 
-## 9. Proposed implementation plan for 01 §5
+## 9. Proposed implementation plan for 01 §4
 
 (2026-10-31: added01 §5.1 step 24 per §10. Step 1, derived columns, was completed first as schema v27; blocks+set lists together deferred to v28 after §12 VM measurement, no dedup.)
 
@@ -336,14 +336,14 @@ Add step to §5.1 implementation table (number at that time):
 
 | # | Step | Dependencies | Spec |
 | --- | --- | --- | --- |
-| 24 | **archo.db size (schema v27)**: snapshot `kinds`/`langs` computed scan/backfill; content/PNG/language read them; nonsemantic non-DLL rows to per-snapshot zstd `snapshot_list` (prefix paths+sizes, no mtime), keep semantic/DLL rows; `fact_set`.`files`, indexed fact `file`; one transaction/progress/no VACUUM/no fact_set rebuild. No Instance integers/name-only. Synthetic245→153 MB, first inventory content260→3ms (research2026-10-30_archo-db-integer-keys) | — | 02 §4.3,§7,§7.1,§7.2; 03 §2,§3; 07 §6 |
+| 24 | **archo.db size (schema v27)**: snapshot `kinds`/`langs` computed scan/backfill; content/PNG/language read them; nonsemantic non-DLL rows to per-snapshot zstd `snapshot_list` (prefix paths+sizes, no mtime), keep semantic/DLL rows; `fact_set`.`files`, indexed fact `file`; one transaction/progress/no VACUUM/no fact_set rebuild. No Instance integers/name-only. Synthetic245→153 MB, first inventory content260→3ms (research2026-10-30_archo-db-integer-keys) | — | 04 §1.3,§4,§4.1,§4.2; 05 §2,§3; 18 |
 
 Implement in order, independently mergeable:
 
 1. **Derived columns** (independent, largest gain): two `snapshot` columns, `insertSnapshot` computes, migration backfills all; `ContentKinds`/`SnapshotsWithPNG`/`SnapshotsWithPNGFor`/`Languages` read; remove process cache. Keep content/texture/language tests, add equivalence for `About.xml.disabled`-only/versioned Languages/any-location DLL.
-2. **Blocks**: `snapshot_list` (`file_blob` if dedup), `insertFiles` splits rows/block, `insertSnapshot` copies previous block, mtime refresh semantic only, `InstanceFiles` texture decodes current blocks, `SnapshotFiles` merges, 02 §7.1/`gc`/`DeleteEnv` delete blocks,`Maintain --dry-run` counts blocks. Tests byte-identical `modchanges`, SnapshotFiles migration equivalence, protected manifests intact after maintenance.
+2. **Blocks**: `snapshot_list` (`file_blob` if dedup), `insertFiles` splits rows/block, `insertSnapshot` copies previous block, mtime refresh semantic only, `InstanceFiles` texture decodes current blocks, `SnapshotFiles` merges, 04 §4.1/`gc`/`DeleteEnv` delete blocks,`Maintain --dry-run` counts blocks. Tests byte-identical `modchanges`, SnapshotFiles migration equivalence, protected manifests intact after maintenance.
 3. **Set lists**: `saveContent`/`saveHarmony` list/set; `DefsOf`/`DefsNamed`/`CachedDefs`/`HarmonyPatches`/`Assemblies`/`TypeOwners` restore indexed paths, bounded immutable `set_id` cache. Rebuild child tables like v26 preserving rowid order. Reuse `TestMigrateV26*` equivalence plus `TestDefsNamedOrderIndependentOfWrites`.
-4. **Specs/baselines**: 02 §4.3/§7 schema and `snapshot_file.mtime` incremental-only description updated; 02 §7.1 blocks follow manifests; 03 §3 set lists; 07 §6.2 synthetic benchmarks;`docs/release-vm-tests.md` row for real-VM upgrade time/size/first inventory.
+4. **Specs/baselines**: 04 §1.3/§4 schema and `snapshot_file.mtime` incremental-only description updated; 04 §4.1 blocks follow manifests; 05 §3 set lists; 18 §2 synthetic benchmarks;`docs/release-vm-tests.md` row for real-VM upgrade time/size/first inventory.
 5. **Benchmark**: retain `TestIntKeyResearch` reference, replace `combo-setfiles` with production or separate opt-in production-only benchmark.
 
 ## 10. User decisions (2026-10-31)
@@ -352,7 +352,7 @@ Questions/answers at the time:
 
 1. Recommended or global path table? **Recommended**: set lists+snapshot blocks, no global paths/Instance integers/name-only.
 2. Dedup blocks? **No.**
-3. Derived columns separately first? **Yes**, done schema v27 (`8b38732`, synthetic 07 §6.2).
+3. Derived columns separately first? **Yes**, done schema v27 (`8b38732`, synthetic 18 §2).
 4. Fix `DefsNamed` plan/`InstanceFiles` scope now? **These two first**, before derived columns; separate branches already fixed/merged dev/1.0.
 5. Measure real VM before deciding schema? **Yes**, before table changes (§12).
 
@@ -399,4 +399,4 @@ Untested: host443 MB with hundreds enabled/DLL facts (rules prohibit copying to 
 
 ## 13. Production implementation (2026-10-31, schema v28)
 
-§10 design implemented via §9 steps2/3 (branch `claude/db-v28-6b0a03`), specs02 §7,§7.1–§7.2, 03 §3, synthetic 07 §6.2 (`TestV28Formal`: same synthetic v27 245.5→v28 156.2 MB, matches corrected~156 MB, production migration4.7s). Block selection (no hash/non-`.dll`) and list creation match prototype; reads differ: once/set, restore/cache in Go, not per-row SQL `json_extract`. Prototype Def checksums differ from v26 (`DIFF`) in harness, also on v27 baseline: prototype issue. Production equivalence `TestMigrateV28`/`TestFileListsMatchRows`. Harness `ikPlanLibrary` never finishes at `RIMARCHO_INTKEY_SCALE=0.02` (too few candidates); use0.05.
+§10 design implemented via §9 steps2/3 (branch `claude/db-v28-6b0a03`), specs02 §7,§7.1–§7.2, 05 §3, synthetic 18 §2 (`TestV28Formal`: same synthetic v27 245.5→v28 156.2 MB, matches corrected~156 MB, production migration4.7s). Block selection (no hash/non-`.dll`) and list creation match prototype; reads differ: once/set, restore/cache in Go, not per-row SQL `json_extract`. Prototype Def checksums differ from v26 (`DIFF`) in harness, also on v27 baseline: prototype issue. Production equivalence `TestMigrateV28`/`TestFileListsMatchRows`. Harness `ikPlanLibrary` never finishes at `RIMARCHO_INTKEY_SCALE=0.02` (too few candidates); use0.05.

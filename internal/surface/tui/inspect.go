@@ -13,7 +13,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Inspect (06 §4): a full-screen panel showing any reference with the same text as the CLI
+// Inspect (16 §4): a full-screen panel showing any reference with the same text as the CLI
 // command. enter follows the reference on the selected line, backspace goes back, and a
 // mod has sub-tabs (tab / shift+tab): summary, Defs, Patches, problems, rules, history.
 
@@ -74,7 +74,7 @@ func (m *model) fillInspect(v *inspectView) {
 	}
 	out, _ := cmds.Execute(m.app, argv)
 	v.lines = strings.Split(strings.TrimRight(out, "\n"), "\n")
-	// A log cluster: the pattern card replaces the CLI's English pattern section (06 §2.10).
+	// A log cluster: the pattern card replaces the CLI's English pattern section (16 §2.10).
 	if c := view.PatternCardArgv(m.app, m.st, argv); c != nil {
 		v.lines = append(append(view.WithoutPatternBlock(v.lines), ""), c.Lines()...)
 	}
@@ -84,7 +84,7 @@ func (m *model) fillInspect(v *inspectView) {
 var refRe = regexp.MustCompile(`(?:^|[\s(,\[])((?:L?#[a-z0-9]{4,})|(?:def:[A-Za-z0-9_.]+[/@][^\s,)]+)|(?:p:[0-9a-f]{6})|(?:log:E[0-9]+))`)
 
 // lineRef returns the first followable reference in a line and the command that shows it.
-// Printed commands write instance references without "#" (05 §3.1 rule 11), so a word of
+// Printed commands write instance references without "#" (13 §3.1 rule 11), so a word of
 // an archo command is followed too when ix knows it as one mod.
 func lineRef(line string, ix *app.Index) []string {
 	at, argv := len(line), []string(nil)
@@ -146,7 +146,7 @@ func (m *model) inspectKey(s string) tea.Cmd {
 		}
 	case "esc", "q":
 		// The whole stack at once, so esc gets back to the list in a few presses
-		// (06 §11 T20); backspace goes back one page.
+		// (16 §11 T20); backspace goes back one page.
 		m.insp, m.inspHist = nil, nil
 	case "down", "j":
 		move(1)

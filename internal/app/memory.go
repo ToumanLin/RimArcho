@@ -44,7 +44,7 @@ func (a *App) measuredMemory() machine.Memory {
 	return machine.Measure()
 }
 
-// RAMBudget uses current available physical RAM (06 §2.3).
+// RAMBudget uses current available physical RAM (16 §2.3).
 // It is not the commit limit and cannot prove that a launch will crash.
 func RAMBudget(m machine.Memory) int64 { return m.AvailableRAM }
 func AssessMemory(m machine.Memory, r *LoadCost) MemoryAssessment {

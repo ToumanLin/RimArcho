@@ -37,7 +37,7 @@ func progress() func(string) { return Progress }
 type progressKey struct{}
 
 // WithProgress returns a context whose commands also send their progress lines to f.
-// The MCP server uses it to put the current step into its progress notifications (05 §5.1).
+// The MCP server uses it to put the current step into its progress notifications (14 §1).
 func WithProgress(ctx context.Context, f func(string)) context.Context {
 	return context.WithValue(ctx, progressKey{}, f)
 }
@@ -170,7 +170,7 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		return problemShowCmd(c, &detail)
 	}
 	if !a.Bool("no-analyze") {
-		// The newest log is attributed against its own version (03 §6.4, §7.3).
+		// The newest log is attributed against its own version (06 §4, 05 §6.3).
 		if st, err := c.App.Loadout(); err == nil {
 			if p := c.App.ProblemLog(st); p != "" {
 				c.App.EnsureLogFileAnalysis(st, p, progress())
@@ -201,7 +201,7 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	var sel []*app.Problem
 	hidden := map[string]int{}
 	var versions, skips []*app.Problem
-	byLog := map[*app.LogRun][]*app.Problem{} // log problems are grouped under their log (03 §6.3)
+	byLog := map[*app.LogRun][]*app.Problem{} // log problems are grouped under their log (06 §3)
 	for _, p := range list {
 		if subj != "" && !contains(p.Subjects, subj) {
 			continue
@@ -224,7 +224,7 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			continue
 		}
 		if !full && p.Code == "harmony.skip-prefix" && p.Severity == finding.Info {
-			skips = append(skips, p) // folded too (03 §4.5)
+			skips = append(skips, p) // folded too (05 §4.5)
 			continue
 		}
 		if p.Log != nil {
@@ -469,7 +469,7 @@ func contains(l []string, s string) bool {
 // infoFoldLimit: above this many info rows, --all lists info by code (P12).
 var infoFoldLimit = 30
 
-// addModProblems adds the "content:" and "problems:" lines of `archo mod` (05 §3.4). It
+// addModProblems adds the "content:" and "problems:" lines of `archo mod` (13 §3.4). It
 // uses the stored analysis as is (no rebuild).
 func addModProblems(c *Ctx, ix *app.Index, m *store.Mod, root *render.Node) error {
 	st, err := c.App.Loadout()
@@ -530,7 +530,7 @@ func addModProblems(c *Ctx, ix *app.Index, m *store.Mod, root *render.Node) erro
 		}
 	}
 	// Each assembly with its size and types; the game keeps the first copy of a name in load
-	// order, so a name another enabled mod also ships is marked (03 §4.3).
+	// order, so a name another enabled mod also ships is marked (05 §4.3).
 	for _, a := range asms {
 		line := a.File
 		if fi, err := os.Stat(filepath.Join(ix.ModDir(m), filepath.FromSlash(a.File))); err == nil {
@@ -578,7 +578,7 @@ func skipSummary(ps []*app.Problem) string {
 	return fmt.Sprintf("%s harmony.skip-prefix  %d bool prefixes from %d mods can skip methods other mods also patch; none is in a log stack  (archo problems --code harmony.skip-prefix)", ps[0].Severity, len(ps), len(mods))
 }
 
-// versionSummary folds version.unsupported into one row per game version (03 §4.5).
+// versionSummary folds version.unsupported into one row per game version (05 §4.5).
 func versionSummary(ps []*app.Problem, mm string) string {
 	sev := finding.Info
 	warn := 0
@@ -590,14 +590,14 @@ func versionSummary(ps []*app.Problem, mm string) string {
 	}
 	line := fmt.Sprintf("%s version.unsupported  %d enabled mods do not list %s", sev, len(ps), mm)
 	if prev := app.PrevMinor(mm); prev != "" {
-		// Stopping at the previous version is the warning; older ones are info (03 §4.3).
+		// Stopping at the previous version is the warning; older ones are info (05 §4.3).
 		line += fmt.Sprintf(" (%d list %s, %d older only)", warn, prev, len(ps)-warn)
 	}
 	return line + "  (archo problems --code version.unsupported)"
 }
 
 // logRunText describes a log: file, game version, time, the run it belongs to and whether
-// it is stale, with the reasons (03 §6.4).
+// it is stale, with the reasons (06 §4).
 func logRunText(c *Ctx, r *app.LogRun) string {
 	s := r.Label
 	if v := strings.Fields(r.Version); len(v) > 0 {

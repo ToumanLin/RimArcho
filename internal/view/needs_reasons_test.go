@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Every row icon comes with what it is (06 §4.2): the badge's popover lists the items
+// Every row icon comes with what it is (16 §4.2): the badge's popover lists the items
 // behind it, worst first, and the first one has the icon's status.
 func TestRowIconsHaveReasons(t *testing.T) {
 	t.Parallel()

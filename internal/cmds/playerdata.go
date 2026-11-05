@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Player data on lineages (04 §8.1, 05 §4.2): every instance of a lineage shares it.
+// Player data on lineages (07 §6.1, 13 §4.2): every instance of a lineage shares it.
 
 func init() {
 	register(&Command{Name: "alias", Args: "<ref> [<name>]", Summary: "set the name RimArcho shows for a mod (all its copies)", MinArgs: 1, MaxArgs: 2, Run: aliasCmd,
@@ -42,7 +42,7 @@ func noteCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	return setText(c, a, "note", c.App.Store.SetNote)
 }
 
-// copyNoteCmd sets one copy's own note (06 §2.9); the mod's note stays as it is.
+// copyNoteCmd sets one copy's own note (16 §2.9); the mod's note stays as it is.
 func copyNoteCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	v := ""
 	switch {

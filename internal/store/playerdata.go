@@ -5,14 +5,14 @@ import (
 	"strings"
 )
 
-// PlayerData is what the player attached to a lineage (04 §8.1).
+// PlayerData is what the player attached to a lineage (07 §6.1).
 type PlayerData struct {
 	Alias, Note string
 	Tags        []string
 }
 
 // PlayerDataAll returns every lineage's player data. It is global, like the lineages
-// (02 §0); envID is kept for the callers.
+// (03 §2); envID is kept for the callers.
 func (s *Store) PlayerDataAll(envID string) (map[string]*PlayerData, error) {
 	out := map[string]*PlayerData{}
 	get := func(lin string) *PlayerData {

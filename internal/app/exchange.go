@@ -23,7 +23,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Loadout exchange (05 §4.2): a text list of packageIds, a ModsConfig.xml, or the mod list
+// Loadout exchange (13 §4.2): a text list of packageIds, a ModsConfig.xml, or the mod list
 // stored in a save file's <meta>.
 
 // Export formats.
@@ -31,7 +31,7 @@ const (
 	FormatText       = "text"
 	FormatModsConfig = "modsconfig"
 	FormatSave       = "save"
-	// FormatArcho is a RimArcho list (04 §9.3): a pack.json without files, so each mod
+	// FormatArcho is a RimArcho list (07 §7.3): a pack.json without files, so each mod
 	// carries its lineage, workshop ID and content hash and an import sees which match.
 	FormatArcho = "archo"
 )
@@ -103,7 +103,7 @@ func (a *App) exportList(st *LoadoutState, format string) ([]byte, error) {
 	case FormatRML:
 		return RML(game, tokens, ws, names), nil
 	case FormatRimCrow:
-		// The share code's list name is the plan's (04 §9.4).
+		// The share code's list name is the plan's (07 §7.4).
 		code, err := ShareCode(st.Plan.Name, game, tokens, ws, names)
 		return []byte(code + "\n"), err
 	case FormatRimCrowXML:
@@ -147,7 +147,7 @@ func (a *App) exportList(st *LoadoutState, format string) ([]byte, error) {
 }
 
 // workshopLinks writes the list as Workshop links in load order, then names what is not in
-// the Workshop (official content, local mods, missing entries) in a comment (04 §9.3).
+// the Workshop (official content, local mods, missing entries) in a comment (07 §7.3).
 func (a *App) workshopLinks(st *LoadoutState) []byte {
 	var links, other []string
 	for _, e := range st.List {
@@ -185,19 +185,19 @@ type ImportedList struct {
 	Lineages     map[string]string // packageId → source lineage (RimArcho lists)
 	Workshop     map[string]string
 	WorkshopOnly []string
-	// Unresolved are WorkshopOnly IDs no installed mod has (import notes them, 04 §9).
+	// Unresolved are WorkshopOnly IDs no installed mod has (import notes them, 07 §7).
 	Unresolved []string
 	// Hashes maps packageIds to content hashes (RimArcho lists): an import uses the copy
 	// with that content when there is one, and the preview tells the others apart.
 	Hashes map[string]string
-	// Versions are the game versions a RimArcho list was meant for (04 §1.6).
+	// Versions are the game versions a RimArcho list was meant for (07 §1.6).
 	Versions []string
 }
 
 // Hash is the content hash a RimArcho list gives pkg ("" for none).
 func (l *ImportedList) Hash(pkg string) string { return l.Hashes[strings.ToLower(pkg)] }
 
-// ReadLoadoutFile reads a list file in any supported format (04 §9), or a RimCrow share
+// ReadLoadoutFile reads a list file in any supported format (07 §7), or a RimCrow share
 // code given instead of a path.
 func ReadLoadoutFile(path string) (*ImportedList, error) {
 	if _, err := os.Stat(path); err != nil && shareCodeRe.MatchString(strings.TrimSpace(path)) {
@@ -348,7 +348,7 @@ func ImportedEntries(st *LoadoutState, il *ImportedList) (list loadout.List, unr
 func KeptOfficial(st *LoadoutState, il *ImportedList) int { return len(keptOfficial(st, il)) }
 
 // keptOfficial is the official content an import that names none keeps (a Workshop
-// collection or a list of workshop links cannot name Core and the DLCs, 04 §9.1): what
+// collection or a list of workshop links cannot name Core and the DLCs, 07 §7.1): what
 // the current plan has enabled, else the installed Core. Workshop IDs never stand for
 // official content, so the list's packageIds tell.
 func keptOfficial(st *LoadoutState, il *ImportedList) loadout.List {

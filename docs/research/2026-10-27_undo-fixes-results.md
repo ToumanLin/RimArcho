@@ -15,7 +15,7 @@ the requested no-op behavior. Equality is checked after resolving the saved list
 for the current game. The stored workspace, origin, conflict, staging and both
 history stacks stay unchanged. CLI/GUI/TUI report no changes; GUI receives an
 explicit undo flag, and version-row tooltips no longer promise undo unconditionally.
-The clarified contract is in spec 04 §3.2 and the editor-specific feedback in 06 §2.5.
+The clarified contract is in spec 07 §3.2 and the editor-specific feedback in 16 §2.5.
 
 ## Bug B: cross-game sort and undo
 
@@ -28,7 +28,7 @@ Snapshots now use `Workspace.Entries`, including the reverse state recorded duri
 undo/redo and the initial state of a batch. Restoring writes the stored payload
 exactly; returned lists and history differences resolve it for the current game.
 The existing transactional entries/staging history implementation remains in use.
-Spec 04 §2.1 states the binding-preservation rule.
+Spec 07 §2.1 states the binding-preservation rule.
 
 Sorting uses the active game's Core in its edited output; undo must restore the
 previously stored binding. The reported drift normally has no visible effect on

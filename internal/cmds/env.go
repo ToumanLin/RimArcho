@@ -168,7 +168,7 @@ func envRemove(c *Ctx, a *Args) (*render.Doc, error) {
 	return d, nil
 }
 
-// envRemovalLines says what removing an environment forgets and what stays (06 §2.14).
+// envRemovalLines says what removing an environment forgets and what stays (16 §2.14).
 func envRemovalLines(n *render.Node, r *app.EnvRemoval) {
 	n.KV("forgets", fmt.Sprintf("%d launch records, %d mods read from its Data/ and Mods/, its history; plans are shared by every game and stay", r.Launches, r.Mods))
 	n.KV("keeps", "game files, mods and saves; the shared mod folders and what you noted on mods")
@@ -320,7 +320,7 @@ func envRebind(c *Ctx, a *Args) (*render.Doc, error) {
 	return d, nil
 }
 
-// ---- a game version downloaded with SteamCMD (08 §11) ----
+// ---- a game version downloaded with SteamCMD (11 §3) ----
 
 var steamcmdFlag = Flag{Name: "install-steamcmd", Help: "download SteamCMD from Valve first when it is not installed"}
 

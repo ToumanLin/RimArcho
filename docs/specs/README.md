@@ -1,32 +1,49 @@
-# RimArcho Specifications
+# RimArcho specifications
 
-For top-level design and decision records, see [00-Top-level design](../00-top-level-design.md); for architecture, see [00a-Architecture](../00a-architecture.md). Before changing an area, read its specification, then check the code it links to.
+For what RimArcho is and the decisions behind it, see [00 · Top-level design](../00-top-level-design.md); for the architecture, see [00a · Architecture](../00a-architecture.md). Before changing an area, read its specification, then check the code it links to.
 
-| File | Contents |
+| Spec | Contents |
 | --- | --- |
-| [01-Scope and status](01-scope-and-status.md) | Version scope, exclusions, file write list (safety boundary), pending work and validation |
-| [02-Environments, identity and scanning](02-environments-identity-and-scanning.md) | Environments, sources, scanning, reconciliation, Lineage, change events, storage |
-| [03-Facts and analysis](03-facts-and-analysis.md) | Effective content, Def / Patch / Harmony analysis, finding catalog, log attribution |
-| [04-Plans and sorting](04-plans-and-sorting.md) | Plans, editing, history, writing to the game, sorting, rules, locked versions, import and export |
-| [05-Semantic interface and MCP](05-semantic-interface-and-mcp.md) | Tool layer, references, text formats, CLI, MCP |
-| [06-ui/](06-ui/README.md) | Sidebar and pages, interaction rules, details, visual design, GUI and TUI technology (split by section) |
-| [07-Technology and engineering](07-technology-and-engineering.md) | Technology, code structure, tests, releases, performance targets and measured baselines, game behavior notes |
-| [08-Launch and packs](08-launch-and-packs.md) | Launch model, link deployment, game process detection, packs, hidden Mods, recycle bin |
-| [09-Archo](09-Archo.md) | Built-in AI assistant (1.1) |
-| [10-Unplayed and worth playing](10-unplayed-and-worth-playing.md) | Save reading, untouched content, save management (1.1); worth playing (long term) |
+| **Scope** | |
+| [01 · Scope and status](01-scope-and-status.md) | Version scope, capabilities, exclusions, work still open |
+| [02 · File writes and uninstall](02-file-writes-and-uninstall.md) | Every file RimArcho writes (the safety boundary), uninstall, the recycle bin |
+| **What is installed** | |
+| [03 · Environments and sources](03-environments-and-sources.md) | Terms, environments (one game directory each), Mod sources, links and aliases |
+| [04 · Scanning and identity](04-scanning-and-identity.md) | Scanning, reconciliation, Lineage, change events, storage |
+| [05 · Facts and findings](05-facts-and-findings.md) | Effective content, fact types, the finding catalog, Def / Patch / Harmony analysis |
+| [06 · Game log](06-game-log.md) | Log parsing, attribution, which launch owns a log, live tracking, Archo Monitor logs, error patterns |
+| **What is played** | |
+| [07 · Plans](07-plans.md) | The plan model, editing, history, writing to the game, locked versions, player data, list exchange |
+| [08 · Sorting and rules](08-sorting-and-rules.md) | Automatic sorting, user rules, community data |
+| [09 · Launch](09-launch.md) | Launching a plan, link deployment, running-game detection, hidden Mods, Archo Monitor, test runs |
+| [10 · Packs](10-packs.md) | Building, launching, importing and exporting packs |
+| [11 · Downloads, subscriptions and accounts](11-downloads-and-accounts.md) | Git and download-page subscriptions, SteamCMD, Steam client calls, game downloads, account sessions |
+| [12 · Saves, unplayed and worth playing](12-saves-unplayed-and-worth-playing.md) | Save reading and management, untouched content (1.1), worth playing (long term) |
+| **Interfaces** | |
+| [13 · Commands and CLI](13-commands-and-cli.md) | The tool layer, references, text format, CLI commands |
+| [14 · MCP](14-mcp.md) | `archo mcp`: transport, tool table, instructions and guide |
+| [15 · Archo](15-archo.md) | The built-in AI assistant (1.1) |
+| [16 · Interface](16-interface/README.md) | GUI and TUI: pages, interaction rules, details, visual design, GUI and TUI technology (a directory) |
+| **Engineering** | |
+| [17 · Technology and engineering](17-engineering.md) | Technology, code structure, data locations, tests, releases, game behavior notes |
+| [18 · Performance](18-performance.md) | Performance targets and measured baselines |
 
-Log corpus research is a separate track; see [research/](../research/). Interface mockups are in [design/](../design/).
+Research notes are in [research/](../research/); interface drafts are in [design/](../design/).
 
 ## References
 
-Use `NN §x.y` references between specifications and in code comments (for example, `06 §2.9`). Section numbers belong to the whole specification, not the file: when a specification is split into a directory, section numbers and references stay unchanged. Find the file in that directory's README table. When changing section numbers, update references in code comments and other specifications too.
+Use `NN §x.y` references between specifications and in code comments (for example, `16 §2.9`); `NN` alone names a whole specification. Section numbers belong to the whole specification, not the file: when a specification is split into a directory, its section numbers and references stay unchanged; find the file in that directory's README table. When changing section numbers, update references in code comments and other specifications too.
+
+`node scripts/docs-refs/refs.cjs check` lists references and links that point nowhere. Code or documents from a branch cut before the November 2026 renumbering still use the old numbers: `node scripts/docs-refs/refs.cjs remap scripts/docs-refs/map-2026-11.json <files>` rewrites them.
 
 ## Maintenance
 
 - Write documentation in English; Chinese belongs only in language files, `docs/glossary.md`, `README.zh-CN.md`, and `ToDo.md`; a name quoted verbatim (an account, a Mod, a path) may appear inside an inline `code` span.
 - **Write each fact in one place.** Elsewhere, reference `NN §x.y` instead of copying it. Copies will eventually diverge.
 - **Update the specification with behavior changes, in the same commit.** Changes to responsibilities, interfaces, storage formats, state transitions, file writes, failure handling, or compatibility rules must update the section that owns them. Refactoring that changes none of these needs no specification update.
-- **Describe the current state.** Describe implemented behavior as it is; label unfinished work "not implemented", "draft", or "undecided", or put it in 01 §5. Ideas without a decision belong in research/ or design/, not specifications. Decision rationale belongs in 00 §6; specifications record only the conclusions.
+- **Describe the current state.** Describe implemented behavior as it is; label unfinished work "not implemented", "draft", or "undecided", or put it in 01 §4. Do not record when something was decided or changed, what it used to be called, or how it was before: that history lives in git and `CHANGELOG.md`. Ideas without a decision belong in research/ or design/, not specifications. Decision rationale belongs in 00 §6; specifications record only the conclusions.
+- **Use the glossary's terms.** Documentation, the CLI and MCP say plan, environment and Instance; quote the interface's own words ("list", "game") only when describing a control or page (`docs/glossary.md`).
 - **Point to code; do not repeat it.** Name files, types, and functions (for example, `view.Nav`), and describe meanings and constraints their signatures cannot express. Omit implementation details that change often.
-- **Split files that grow too long.** If a file exceeds about 500 lines or covers unrelated areas, split it into a directory with the same name: put status, basis, and a file table in `README.md`; split other files by section, with filenames starting with their first section number (for example, `2.9-inventory-and-logs.md`). Keep section numbers unchanged. Start each file with a line naming its parent specification.
+- **Keep measurements in 18.** Other specifications state targets and reference 18 for measured values; they do not narrate earlier timings.
+- **Split files that grow too long.** If a file exceeds about 40 KB or covers unrelated areas, split it into a directory with the same name: put status, basis, and a file table in `README.md`; split other files by section, with filenames starting with their first section number (for example, `2.9-mod-library-and-game-logs.md`). Keep section numbers unchanged. Start each file with a line naming its parent specification.
 - **Acceptance follows the specification.** The "Acceptance" section at the end of each specification describes how to check that area. State which checks ran and which did not when submitting changes.

@@ -1,4 +1,4 @@
-// Icons (06 §7): sources and row states, drawn as small SVGs in currentColor.
+// Icons (16 §7): sources and row states, drawn as small SVGs in currentColor.
 const svg = (body, cls = "") => `<svg class="i ${cls}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
 
 export const icon = {
@@ -16,13 +16,13 @@ export const icon = {
   unloadable: svg('<circle cx="8" cy="8" r="5.6" stroke-dasharray="2.2 2"/>', "dim"),
   rescan: svg('<path d="M13.2 8a5.2 5.2 0 1 1-1.6-3.8"/><path d="M13.4 2.6v2.8h-2.8"/>'),
   ok: svg('<path d="M3.2 8.4l3 3 6.6-6.8"/>', "ok"),
-  // the sidebar (06 §2.1)
+  // the sidebar (16 §2.1)
   sidebar: svg('<rect x="2" y="2.8" width="12" height="10.4" rx="2"/><path d="M6.2 2.8v10.4"/>'),
   home: svg('<path d="M2.6 7.4L8 2.8l5.4 4.6"/><path d="M4.2 6.2v6.8h7.6V6.2"/>'),
   needs: svg('<circle cx="8" cy="8" r="5.8"/><path d="M5.6 8.2l1.7 1.7 3.2-3.4"/>'),
   plan: svg('<path d="M5.5 4h8M5.5 8h8M5.5 12h8"/><circle cx="2.8" cy="4" r=".6"/><circle cx="2.8" cy="8" r=".6"/><circle cx="2.8" cy="12" r=".6"/>'),
   packs: svg('<path d="M2.4 5L8 2.4 13.6 5v6L8 13.6 2.4 11z"/><path d="M2.4 5L8 7.6 13.6 5M8 7.6v6"/>'),
-  // Saves (06 §2.11): a save file
+  // Saves (16 §2.11): a save file
   saves: svg('<path d="M3 2.6h7.8l2.6 2.6v8.2H2.6V3z"/><path d="M5.2 2.6v3.2h5V2.6M5 13.4V9.2h6v4.2"/>'),
   search: svg('<circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2l3.2 3.2"/>'),
   env: svg('<rect x="2" y="2.8" width="12" height="8.4" rx="1.6"/><path d="M5.6 13.6h4.8M8 11.2v2.4"/>'),
@@ -34,7 +34,7 @@ export const icon = {
   // Background tasks: stacked bars, the work in a queue
   tasks: svg('<path d="M3 4.5h10M3 8h10M3 11.5h6"/>'),
   chev: svg('<path d="M6 4l4 4-4 4"/>'),
-  // the list management page (06 §2.17)
+  // the list management page (16 §2.17)
   import: svg('<path d="M8 2.4v7.2M5.2 6.8L8 9.6l2.8-2.8"/><path d="M2.8 10.4v2.2h10.4v-2.2"/>'),
   export: svg('<path d="M8 9.6V2.4M5.2 5.2L8 2.4l2.8 2.8"/><path d="M2.8 10.4v2.2h10.4v-2.2"/>'),
   more: svg('<circle cx="3.6" cy="8" r=".9"/><circle cx="8" cy="8" r=".9"/><circle cx="12.4" cy="8" r=".9"/>', "fill"),
@@ -49,7 +49,7 @@ export function statusIcon(s) {
   return ["", icon.unloadable, icon.warn, icon.log, icon.err][s] || "";
 }
 
-// bowMark is RimArcho's mark, the bow from the portrait (06 §7), drawn simply enough for
+// bowMark is RimArcho's mark, the bow from the portrait (16 §7), drawn simply enough for
 // 16–24 px: three wings and the knot, with the accent rim to the lower left as on the
 // portrait. size picks the drawing: 24 keeps one lighter facet per wing, 16 is flat. The
 // colours are --bow-* (the dark theme has a lighter rim and a grey outline).

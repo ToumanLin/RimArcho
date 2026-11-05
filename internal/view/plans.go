@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Plans in the interfaces (04 §1.3, 06 §2.1, §2.3, §2.5): the rows the sidebar, the home
+// Plans in the interfaces (07 §1.3, 16 §2.1, §2.3, §2.5): the rows the sidebar, the home
 // page and the TUI's plan chooser show, and the managing verbs both interfaces call —
 // new, switch, rename, delete. Switching writes no game file; the game holds what the
 // write record says (InGame).
@@ -39,29 +39,29 @@ type PlanRow struct {
 	Page string `json:"page"`
 	Name string `json:"name"`
 	// Current: the environment's current list, the one launched; Open: the one this window
-	// shows and edits (the current one unless another was opened, 04 §1.3).
+	// shows and edits (the current one unless another was opened, 07 §1.3).
 	Current  bool `json:"current,omitempty"`
 	Open     bool `json:"open,omitempty"`
 	Entries  int  `json:"entries"`
 	Versions int  `json:"versions"`
 	// Played is "played Oct 20" or "never played".
 	Played string `json:"played"`
-	// Conflict: an external version was not loaded (04 §4.3); ConflictText says so.
+	// Conflict: an external version was not loaded (07 §4.3); ConflictText says so.
 	Conflict     bool   `json:"conflict,omitempty"`
 	ConflictText string `json:"conflictText,omitempty"`
 	// InGame: this plan is what the game's ModsConfig.xml holds now (the write record).
 	InGame   bool      `json:"inGame,omitempty"`
 	PlayedAt time.Time `json:"-"`
 	// UsedAt is the list's last use: its last change or launch, whichever is later. The
-	// sidebar shows the most recently used lists (06 §2.1).
+	// sidebar shows the most recently used lists (16 §2.1).
 	UsedAt time.Time `json:"-"`
 	// Enabled is the list's place in the enable history (1: the most recently enabled; 0:
-	// never). The sidebar orders lists by it (06 §2.1).
+	// never). The sidebar orders lists by it (16 §2.1).
 	Enabled int `json:"-"`
 }
 
 // PlanRows lists the current environment's plans: the current one first, then the others
-// in creation order (06 §2.1, §2.17).
+// in creation order (16 §2.1, §2.17).
 func PlanRows(a *app.App) ([]PlanRow, error) {
 	ps, err := a.Plans()
 	if err != nil {
@@ -89,7 +89,7 @@ func PlanRows(a *app.App) ([]PlanRow, error) {
 }
 
 // InGameState is what the game's ModsConfig.xml holds, by the write record of the
-// environment's user data folder (04 §1.3, §4.3).
+// environment's user data folder (07 §1.3, §4.3).
 type InGameState struct {
 	PlanID  int64  `json:"planId"`
 	Plan    string `json:"plan"`
@@ -132,7 +132,7 @@ func InGame(a *app.App) *InGameState {
 
 // PlanProblems is the number of "Will cause errors" items of a plan that is not the current
 // one, and whether its analysis is known. It reads stored results only (PlanCheckOf,
-// 03 §3): a plan whose enabled set has no stored run is "not checked yet". A variable so
+// 05 §3): a plan whose enabled set has no stored run is "not checked yet". A variable so
 // tests can replace it.
 var PlanProblems = func(a *app.App, planID int64) (count int, checked bool) {
 	p, err := a.Store.PlanByID(planID)
@@ -146,7 +146,7 @@ var PlanProblems = func(a *app.App, planID int64) (count int, checked bool) {
 	return c.Count, true
 }
 
-// ---- managing (04 §1.3) ----
+// ---- managing (07 §1.3) ----
 
 // PlanFrom is where a new plan's list comes from: "" empty, "current", "v<n>".
 type PlanFrom struct {
@@ -233,7 +233,7 @@ func NewPlan(a *app.App, name, from string) (*store.Plan, string, error) {
 	return switchToNew(a, r)
 }
 
-// ImportAsPlan makes a previewed import a new plan (04 §9.1) and switches to it.
+// ImportAsPlan makes a previewed import a new plan (07 §7.1) and switches to it.
 func ImportAsPlan(a *app.App, imp *Import, name string) (*store.Plan, string, error) {
 	if imp == nil {
 		return nil, "", errors.New(T("nothing to import"))
@@ -245,7 +245,7 @@ func ImportAsPlan(a *app.App, imp *Import, name string) (*store.Plan, string, er
 	return switchToNew(a, r)
 }
 
-// switchToNew opens the new plan; the current one (what launches) stays (04 §1.3).
+// switchToNew opens the new plan; the current one (what launches) stays (07 §1.3).
 func switchToNew(a *app.App, r *app.NewPlanResult) (*store.Plan, string, error) {
 	if _, err := a.OpenPlanID(r.Plan.ID); err != nil {
 		return r.Plan, "", err
@@ -261,7 +261,7 @@ func switchToNew(a *app.App, r *app.NewPlanResult) (*store.Plan, string, error) 
 }
 
 // UsePlan makes a plan current: the one launched, and the one edited. It writes no game
-// file (04 §1.3).
+// file (07 §1.3).
 func UsePlan(a *app.App, id int64) (*store.Plan, string, error) {
 	p, err := planByID(a, id)
 	if err != nil {
@@ -274,7 +274,7 @@ func UsePlan(a *app.App, id int64) (*store.Plan, string, error) {
 }
 
 // OpenPlan shows and edits a plan without making it current: launching still plays the
-// current one (04 §1.3, 06 §2.5). Going somewhere says nothing, so there is no text.
+// current one (07 §1.3, 16 §2.5). Going somewhere says nothing, so there is no text.
 func OpenPlan(a *app.App, id int64) (*store.Plan, error) {
 	p, err := a.OpenPlanID(id)
 	if err != nil {

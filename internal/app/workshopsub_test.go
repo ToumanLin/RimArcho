@@ -45,7 +45,7 @@ func steamDLL(e *testkit.Env) {
 	e.WriteFile(filepath.Join(e.Game, "RimWorldWin64_Data", "Plugins", "x86_64", "steam_api64.dll"), "not really a DLL")
 }
 
-// 06 §2.9: unsubscribe and resubscribe go through the Steam client, in a worker run in a runtime
+// 16 §2.9: unsubscribe and resubscribe go through the Steam client, in a worker run in a runtime
 // folder outside the game; unsubscribing is refused while the game runs, and only names the
 // plans that use the mod; without Steam the error carries the Workshop pages.
 func TestWorkshopSubscribe(t *testing.T) {

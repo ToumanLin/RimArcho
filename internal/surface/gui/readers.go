@@ -264,7 +264,7 @@ func (s *API) Close() {
 	s.environment.seq++
 	s.environment.mu.Unlock()
 	s.environment.wg.Wait()
-	s.tasks.Close() // what still runs or waits is stopped with the window (06 §2.16)
+	s.tasks.Close() // what still runs or waits is stopped with the window (16 §2.16)
 	s.mu.Lock()
 	if s.texCancel != nil {
 		s.texCancel()

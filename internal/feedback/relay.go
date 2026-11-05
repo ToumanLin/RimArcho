@@ -14,7 +14,7 @@ import (
 	"unicode/utf16"
 )
 
-// Relay is the feedback relay's address (feedback-relay/README.md, 06 §2.14 Feedback): a
+// Relay is the feedback relay's address (feedback-relay/README.md, 16 §2.14 Feedback): a
 // Cloudflare Worker that files a report as an issue, so a player without a GitHub account
 // can send one. Empty: Feedback offers only the GitHub link.
 var Relay = "https://rimarcho-feedback.toumanlin.workers.dev/report"

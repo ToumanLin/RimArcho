@@ -13,7 +13,7 @@ import (
 )
 
 // RimArcho.exe has no console: an open failure shows a message box in the player's language,
-// with its own text for a pre-1.0 database; a console program only writes stderr (02 §7).
+// with its own text for a pre-1.0 database; a console program only writes stderr (04 §4).
 func TestOpenFailureMessageBox(t *testing.T) {
 	old := showOpenError
 	defer func() { showOpenError = old; view.SetLang("en") }()

@@ -1,4 +1,4 @@
-// Spike: the first query on a new Player.log (07 §6, target ≤ 500 ms). Copies a log to a
+// Spike: the first query on a new Player.log (18, target ≤ 500 ms). Copies a log to a
 // temporary file several times (each copy is a log the cache has never seen) and times
 // App.AnalyzeLog on each, after one warm-up that brings the analysis for the log's own game
 // version up to date. Use a data directory COPY: the reports are stored in its log_cache.

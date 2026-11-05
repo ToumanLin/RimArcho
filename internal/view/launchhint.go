@@ -2,8 +2,8 @@ package view
 
 import "github.com/ToumanLin/RimArcho/internal/app"
 
-// LaunchHint is the most likely trouble of a launch (06 §2.3): the first code of
-// app.LaunchChecks (most predictive first, 03 §4.3.1) that has a counted item in Can it run, in
+// LaunchHint is the most likely trouble of a launch (16 §2.3): the first code of
+// app.LaunchChecks (most predictive first, 05 §4.3.1) that has a counted item in Can it run, in
 // that item's words, with the check's one-line reason from the log corpus. It never blocks
 // a launch; it says where to look. Only items Can it run shows are used, so following the hint
 // always lands on something the player can act on.

@@ -1,6 +1,6 @@
 package app_test
 
-// Acceptance tests A1–A11 of 02 §8, plus residue, identity questions, lineage editing and gc.
+// Acceptance tests A1–A11 of 04 §5, plus residue, identity questions, lineage editing and gc.
 
 import (
 	"encoding/json"
@@ -604,7 +604,7 @@ func TestTombstoneGC(t *testing.T) {
 	}
 }
 
-// 02 §4.4 (revised): files moved into a version folder with unchanged content still count
+// 04 §1.4 (revised): files moved into a version folder with unchanged content still count
 // as the same mod (J(hash)); a content-only edit keeps J(path) = 1.
 func TestSimilarityRestructureAndContentOnly(t *testing.T) {
 	t.Parallel()
@@ -635,7 +635,7 @@ func TestSimilarityRestructureAndContentOnly(t *testing.T) {
 	wantKinds(t, eventsOf(t, e, sid), map[string]int{identity.EvMoved: 1, identity.EvUpdated: 1})
 }
 
-// 02 §4.2: RimCrow disables a workshop mod by renaming About.xml and deploys a copy through
+// 04 §1.2: RimCrow disables a workshop mod by renaming About.xml and deploys a copy through
 // a junction outside every source. The disabled folder is an unloadable Instance, and the
 // deployed copy joins its lineage.
 func TestAboutDisabled(t *testing.T) {
@@ -688,7 +688,7 @@ func TestEnvRemoveAndSourceRemove(t *testing.T) {
 	if out := e.MustRun("env", "list"); !strings.Contains(out, "environments: 0") {
 		t.Fatal(out)
 	}
-	// The game's own rows go; the shared mod folders and their mods stay (02 §0).
+	// The game's own rows go; the shared mod folders and their mods stay (03 §2).
 	var n, shared int
 	e.App.Store.DB.QueryRow(`SELECT (SELECT count(*) FROM instance WHERE environment_id<>'') + (SELECT count(*) FROM source WHERE environment_id<>'')
 		+ (SELECT count(*) FROM snapshot_file WHERE snapshot_id IN (SELECT n.id FROM snapshot n LEFT JOIN instance i ON i.id=n.instance_id WHERE i.id IS NULL))`).Scan(&n)

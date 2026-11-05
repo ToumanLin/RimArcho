@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Verbs (06 §3.5): each acts at once on the object, the selection or else the cursor's
+// Verbs (16 §3.5): each acts at once on the object, the selection or else the cursor's
 // row, and is one undo step. None opens a mode; m opens the position input, a popup.
 
 // objIDs: the instances of the rows (missing entries have none).
@@ -24,7 +24,7 @@ func objIDs(its []*item) []string {
 
 func (m *model) positions(ids []string) []int { return view.Positions(m.st, ids) }
 
-// object: the shared verb object of the selection (06 §3.5).
+// object: the shared verb object of the selection (16 §3.5).
 func object(sel []*item) view.Object {
 	return view.Object{IDs: objIDs(sel), Refs: refsOf(sel), What: named(sel)}
 }
@@ -68,7 +68,7 @@ func (m *model) applied(err error) bool {
 	return true
 }
 
-// stageKey: t stages the object; in Staging it puts it back where it was (06 §3.5).
+// stageKey: t stages the object; in Staging it puts it back where it was (16 §3.5).
 func (m *model) stageKey() tea.Cmd {
 	sel := m.selection()
 	ids := objIDs(sel)
@@ -95,7 +95,7 @@ func (m *model) moveBy(d int) tea.Cmd {
 	}
 	keep := m.cols[cActive].curID()
 	if m.bar.active() {
-		// the bar shows some rows: past the next shown row (06 §3.5, view.StepAt)
+		// the bar shows some rows: past the next shown row (16 §3.5, view.StepAt)
 		c := &m.cols[cActive]
 		var shown []int
 		for _, vi := range c.view {
@@ -129,7 +129,7 @@ func (m *model) moveTo(ids []string, what string, at int) tea.Cmd {
 	return m.requestDetail()
 }
 
-// ---- the position input (06 §3.6) ----
+// ---- the position input (16 §3.6) ----
 
 type posOpt struct {
 	label string // "after  Harmony"
@@ -184,7 +184,7 @@ func (m *model) posOptions() {
 	p.sel = 0
 }
 
-// posKey: typing filters; ↑↓ ←→ choose (06 §3.3: the arrows move among the options);
+// posKey: typing filters; ↑↓ ←→ choose (16 §3.3: the arrows move among the options);
 // tab switches after / before; enter moves; esc closes.
 func (m *model) posKey(k tea.KeyMsg) tea.Cmd {
 	p := m.pos

@@ -1,6 +1,6 @@
-// Package mcp is the MCP surface (05 §5): `archo mcp` over stdio. Every tool translates
+// Package mcp is the MCP surface (14): `archo mcp` over stdio. Every tool translates
 // its arguments into the argv of one CLI command and returns that command's text, so the
-// output is byte-identical to the CLI (05 §1.1, I1).
+// output is byte-identical to the CLI (13 §1.1, I1).
 package mcp
 
 import (
@@ -23,12 +23,12 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 )
 
-// AnalyzeWait is how long a tool call waits for an out-of-date analysis (05 §5.1).
+// AnalyzeWait is how long a tool call waits for an out-of-date analysis (14 §1).
 var AnalyzeWait = 10 * time.Second
 
 func ptr[T any](v T) *T { return &v }
 
-// Group is a set of tools `archo mcp --tools` serves (05 §5.1): Core by default, All for
+// Group is a set of tools `archo mcp --tools` serves (14 §1): Core by default, All for
 // every tool. Each tool's group is part of its row in the tool table.
 type Group string
 
@@ -124,7 +124,7 @@ func (s *Server) run(ctx context.Context, req *sdk.CallToolRequest, env string, 
 	return &sdk.CallToolResult{Content: []sdk.Content{&sdk.TextContent{Text: out}}, IsError: code == cmds.ExitError || code == cmds.ExitUsage}, nil, nil
 }
 
-// ProgressEvery is how often a running tool call sends a progress notification (05 §5.1).
+// ProgressEvery is how often a running tool call sends a progress notification (14 §1).
 var ProgressEvery = 10 * time.Second
 
 // heartbeat sends a progress notification every ProgressEvery until stop is called, when
@@ -164,10 +164,10 @@ func heartbeat(ctx context.Context, req *sdk.CallToolRequest) (context.Context, 
 	return ctx, func() { close(done); <-finished }
 }
 
-// New builds the server with the tools of group g (05 §5.2): Core, or All for every tool.
+// New builds the server with the tools of group g (14 §2): Core, or All for every tool.
 func New(a *app.App, g Group) *Server {
 	s := &Server{app: a}
-	// 05 §5.1: a first call that needs the analysis returns what is ready after 10 s.
+	// 14 §1: a first call that needs the analysis returns what is ready after 10 s.
 	if a.AnalyzeWait == 0 {
 		a.AnalyzeWait = AnalyzeWait
 	}
@@ -258,7 +258,7 @@ func argv(words ...string) *builder { return &builder{a: append([]string{}, word
 
 // ---- tool arguments ----
 
-// GuideIn is the guide tool: a workflow or a tool name (05 §5.3). The guide is the same in
+// GuideIn is the guide tool: a workflow or a tool name (14 §3). The guide is the same in
 // every environment, so it takes no env.
 type GuideIn struct {
 	Topic string `json:"topic,omitempty" jsonschema:"diagnose, errors, plans, words, or a tool name; empty lists the topics"`
@@ -282,7 +282,7 @@ type RefIn struct {
 	Ref string `json:"ref" jsonschema:"a mod reference: #<id>, L#<lineage>, pkg:<packageId>, ws:<workshopId> or src:<label>"`
 }
 
-// ModSettingsSetIn is set_mod_settings: archo mod-settings set (06 §2.9 "Mod settings").
+// ModSettingsSetIn is set_mod_settings: archo mod-settings set (16 §2.9 "Mod settings").
 type ModSettingsSetIn struct {
 	Env    string            `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Ref    string            `json:"ref" jsonschema:"the mod: #<id>, L#<lineage>, pkg:<packageId>, ws:<workshopId>"`
@@ -309,7 +309,7 @@ func ModSettingsSetArgv(in ModSettingsSetIn) []string {
 	return b.str("file", in.File).flag("dry-run", in.DryRun).a
 }
 
-// ModSettingsIn is get_mod_settings: archo mod-settings (06 §2.9 "Mod settings").
+// ModSettingsIn is get_mod_settings: archo mod-settings (16 §2.9 "Mod settings").
 type ModSettingsIn struct {
 	Env string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Ref string `json:"ref,omitempty" jsonschema:"a mod reference (#<id>, L#<lineage>, pkg:<packageId>, ws:<workshopId>): its stored values; empty lists the current list's Mods that have settings"`
@@ -469,7 +469,7 @@ type DescribeIn struct {
 
 type PlayerIn struct {
 	Env    string   `json:"env,omitempty" jsonschema:"environment name (default: current)"`
-	Action string   `json:"action" jsonschema:"tag_add, tag_remove, alias, note (the mod's), copy_note (one copy's own, 06 §2.9)"`
+	Action string   `json:"action" jsonschema:"tag_add, tag_remove, alias, note (the mod's), copy_note (one copy's own, 16 §2.9)"`
 	Refs   []string `json:"refs" jsonschema:"the mods (tag actions: one or more; alias and note: exactly one)"`
 	Tags   []string `json:"tags,omitempty" jsonschema:"tag_add / tag_remove: the tags"`
 	Text   string   `json:"text,omitempty" jsonschema:"alias / note / copy_note: the text; empty clears it"`
@@ -522,7 +522,7 @@ type UninstallIn struct {
 	All           bool   `json:"all,omitempty" jsonschema:"no truncation"`
 }
 
-// UninstallArgv maps preview_uninstall: always the dry run, never --yes (05 §5.2).
+// UninstallArgv maps preview_uninstall: always the dry run, never --yes (14 §2).
 func UninstallArgv(in UninstallIn) []string {
 	return argv("uninstall", "--dry-run").flag("keep-locked", in.KeepLocked).str("locked-to", in.LockedTo).flag("remove-packs", in.RemovePacks).
 		str("packs-to", in.PacksTo).flag("remove-saves", in.RemoveSaves).str("saves-to", in.SavesTo).flag("remove-games", in.RemoveGames).
@@ -646,7 +646,7 @@ func ArgvFor(name string, args []byte) ([]string, error) {
 	return nil, fmt.Errorf("unknown tool %q", name)
 }
 
-// ProblemsArgv maps list_problems: warning and above by default (03 §4.5).
+// ProblemsArgv maps list_problems: warning and above by default (05 §4.5).
 func ProblemsArgv(in ProblemsIn) []string {
 	if in.Ref != "" {
 		return gv(argv("problems").str("ref", in.Ref).flag("all", in.All), in.GameVersion)
@@ -659,7 +659,7 @@ func ProblemsArgv(in ProblemsIn) []string {
 		flag("all", in.All).flag("detail", in.Detail).flag("ignored", in.Ignored).flag("include-muted", in.IncludeMuted), in.GameVersion)
 }
 
-// SourceArgv maps read_source: a search gets a 10 s decompile budget by default (05 §5.1).
+// SourceArgv maps read_source: a search gets a 10 s decompile budget by default (14 §1).
 func SourceArgv(in SourceIn) []string {
 	if in.Search != "" {
 		b := argv("source", "search", in.Search)
@@ -671,7 +671,7 @@ func SourceArgv(in SourceIn) []string {
 		case in.Scope == "active":
 			b.flag("active", true).flag("yes", true)
 		default:
-			b.flag("implicated", true) // 03 §5.4
+			b.flag("implicated", true) // 05 §5.4
 		}
 		budget := in.Budget
 		if budget == 0 {

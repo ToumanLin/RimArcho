@@ -193,7 +193,7 @@ func TestC4PatchTargetInactive(t *testing.T) {
 	}
 }
 
-// Ignoring a problem hides it until its mod changes (03 §4.2).
+// Ignoring a problem hides it until its mod changes (05 §4.2).
 func TestIgnoreExpiresWhenModChanges(t *testing.T) {
 	t.Parallel()
 	e := setup(t, false)

@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/savefile"
 )
 
-// Can it load? (10 §4.3): a save compared with the list it matched, as that list is now.
+// Can it load? (12 §4.3): a save compared with the list it matched, as that list is now.
 // Only what needs attention becomes an issue; each issue names its fixes and the archo
 // command performing each, so the CLI, MCP and the page offer the same actions.
 
@@ -19,8 +19,8 @@ const (
 	LevelError   = "error"
 )
 
-// Issue kinds (10 §4.3). Malformed and class-missing need the full read (10 §1.7 L1);
-// the last load's errors (03 §6.7) and dangling references are not implemented.
+// Issue kinds (12 §4.3). Malformed and class-missing need the full read (12 §1.7 L1);
+// the last load's errors (06 §7) and dangling references are not implemented.
 const (
 	IssueUnreadable   = "unreadable"    // no <meta> or not XML at the start
 	IssueCutOff       = "cut-off"       // no </savegame> at the end
@@ -34,7 +34,7 @@ const (
 	IssueReordered    = "reordered"     // same Mods, another order
 )
 
-// Fix actions (10 §4.4).
+// Fix actions (12 §4.4).
 const (
 	FixSubscribe    = "subscribe"     // subscribe to a Workshop Mod (and enable it when the list lacks it)
 	FixEnable       = "enable"        // enable an installed Mod in save order
@@ -72,7 +72,7 @@ type SaveIssue struct {
 	Level string    `json:"level"`
 	Mods  []SaveMod `json:"mods,omitempty"`
 	Text  string    `json:"text,omitempty"` // e.g. the versions of a game-version issue
-	// Owns is what the row's Mod owns in the save (10 §4.6), from the full read: on
+	// Owns is what the row's Mod owns in the save (12 §4.6), from the full read: on
 	// not-installed and disabled rows (nil without the full read, or when neither Defs nor
 	// classes could be checked), and the classes of a class-missing row.
 	Owns  *SaveOwned `json:"owns,omitempty"`
@@ -91,11 +91,11 @@ type SaveCheck struct {
 	Quick *SaveFix // the quick-fix bar's one action
 	Game  string   // the game version of the save's environment
 	// GoneOwns is what the not-installed Mods own together, what nothing installed
-	// provides counted once (10 §4.6); nil without the full read or such Mods.
+	// provides counted once (12 §4.6); nil without the full read or such Mods.
 	GoneOwns *SaveOwned
 }
 
-// Verdict texts (10 §4.3).
+// Verdict texts (12 §4.3).
 func (c *SaveCheck) Verdict() string {
 	switch c.Level {
 	case "writing":
@@ -108,9 +108,9 @@ func (c *SaveCheck) Verdict() string {
 	return "loads with the list"
 }
 
-// CheckSave compares a save with its list (10 §4.3). It reads the list's environment and
-// plan; nothing is written. With the save's full read cached (10 §1.7 L1; never read here)
-// it adds the malformed and class-missing rows and what each missing Mod owns (10 §4.6),
+// CheckSave compares a save with its list (12 §4.3). It reads the list's environment and
+// plan; nothing is written. With the save's full read cached (12 §1.7 L1; never read here)
+// it adds the malformed and class-missing rows and what each missing Mod owns (12 §4.6),
 // which makes a Mod owning pawns, factions or classes an error.
 func (a *App) CheckSave(s *Save) (*SaveCheck, error) {
 	c := &SaveCheck{Save: s}

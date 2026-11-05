@@ -15,7 +15,7 @@ import (
 
 // Mod is an Instance joined with its source and current snapshot, for queries and output.
 type Mod struct {
-	// Player data of the lineage (04 §8.1), filled by the app's index.
+	// Player data of the lineage (07 §6.1), filled by the app's index.
 	Alias, Note string
 	Tags        []string
 
@@ -52,7 +52,7 @@ type Mod struct {
 	TotalSize         int64
 	SemanticCount     int
 
-	// An index's Mods can be shared by several sessions of one process (07 §8.3), so the
+	// An index's Mods can be shared by several sessions of one process (17 §7.3), so the
 	// lazily loaded declaration and the connection it is read from are atomic. Nothing
 	// else in a Mod changes once its index is built.
 	lazy  atomic.Pointer[string] // declaration loaded on demand
@@ -97,7 +97,7 @@ func (m *Mod) WorkshopID() string {
 // DisplayName falls back to the folder name when About.xml has no <name>.
 func (m *Mod) DisplayName() string {
 	if m.Alias != "" {
-		return m.Alias // the player's name for it comes first (04 §8.1)
+		return m.Alias // the player's name for it comes first (07 §6.1)
 	}
 	if m.Name != "" {
 		return m.Name
@@ -156,7 +156,7 @@ var (
 )
 
 // Mods returns every Instance an environment sees (live and tombstones): those of the shared
-// mod folders and those of its own Data/ and Mods/ (02 §0). Declarations are
+// mod folders and those of its own Data/ and Mods/ (03 §2). Declarations are
 // loaded on demand by Mod.Decl (see LoadDecls for a batch).
 func (s *Store) Mods(envID string) ([]*Mod, error) { return s.mods(envID, modColsLite) }
 
@@ -270,7 +270,7 @@ func (s *Store) Mod(id string) (*Mod, error) {
 	return m, err
 }
 
-// Alias is an extra location of an Instance (02 §3.3).
+// Alias is an extra location of an Instance (03 §4.3).
 type Alias struct {
 	SourceID, SourceLabel, Rel, RealPath string
 }

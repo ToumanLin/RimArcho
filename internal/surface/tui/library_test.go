@@ -22,7 +22,7 @@ func libAt(t *testing.T, m *model, name string) {
 	t.Fatalf("no row %q", name)
 }
 
-// 06 §2.9, §9.1: Mod library is the window's page in text: the filter bar (the editor's),
+// 16 §2.9, §9.1: Mod library is the window's page in text: the filter bar (the editor's),
 // the Lineage rows, the cursor's copy on the right; esc backs out a level at a time.
 func TestLibraryList(t *testing.T) {
 	t.Parallel()
@@ -82,7 +82,7 @@ func TestLibraryList(t *testing.T) {
 	}
 }
 
-// 06 §2.9: n writes a copy's own note; an empty line clears it.
+// 16 §2.9: n writes a copy's own note; an empty line clears it.
 func TestLibraryCopyNote(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)
@@ -158,7 +158,7 @@ func TestLibraryPlanOps(t *testing.T) {
 	}
 }
 
-// 06 §3.1 rule 6: every op of the table has a runner on both pages (no unknown code).
+// 16 §3.1 rule 6: every op of the table has a runner on both pages (no unknown code).
 func TestEveryOpRuns(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)

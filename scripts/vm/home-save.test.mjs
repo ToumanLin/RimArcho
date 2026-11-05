@@ -1,4 +1,4 @@
-// Start (06 §2.3): edits not yet written to the game get save in the launch block's corner, a
+// Start (16 §2.3): edits not yet written to the game get save in the launch block's corner, a
 // button of its own (w); nothing when there is nothing to save or the game runs.
 import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';

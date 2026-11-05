@@ -7,7 +7,7 @@ import (
 )
 
 // LastListLaunch returns when the environment's own list was last launched: the newest
-// launch that did not play a pack (zero if never). The home page sorts by it (06 §2.3).
+// launch that did not play a pack (zero if never). The home page sorts by it (16 §2.3).
 func (s *Store) LastListLaunch(envID string) time.Time {
 	var t sql.NullInt64
 	s.DB.QueryRow(`SELECT max(started_at) FROM launch WHERE environment_id=? AND method NOT LIKE 'pack:%'`, envID).Scan(&t)
@@ -18,8 +18,8 @@ func (s *Store) LastListLaunch(envID string) time.Time {
 }
 
 // LaunchRecordBefore returns the newest launch of any of the environments that started at
-// or before t (nil if none). Logs map to it by their modification time (03 §6.4), and a
-// running game by its start (08 §4).
+// or before t (nil if none). Logs map to it by their modification time (06 §4), and a
+// running game by its start (09 §4).
 func (s *Store) LaunchRecordBefore(envIDs []string, t time.Time) (*LaunchRecord, error) {
 	if len(envIDs) == 0 {
 		return nil, nil

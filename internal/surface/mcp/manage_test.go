@@ -23,7 +23,7 @@ var freeRe = regexp.MustCompile(`(space: )[0-9.]+ [KMGT]?B`)
 
 var update = flag.Bool("update", false, "rewrite golden files")
 
-// manageEnv is the fixture for the tools of 05 §1.2: a lineage with two copies, a mod that
+// manageEnv is the fixture for the tools of 13 §1.2: a lineage with two copies, a mod that
 // comes back under a new package id (an identity question), a hidden subscribed mod, a
 // hidden unsubscribed one, a Workshop collection server and a RimCrow database.
 func manageEnv(t *testing.T) *testkit.Env {
@@ -193,7 +193,7 @@ func manageSteps(e *testkit.Env) []func() manageStep {
 		s("manage_packs", map[string]any{"action": "check", "name": "first"}, "pack", "check", "first"),
 		s("manage_packs", map[string]any{"action": "launch", "name": "first", "dry_run": true}, "pack", "launch", "first", "--dry-run"),
 		s("manage_packs", map[string]any{"action": "launch", "name": "first"}, "pack", "launch", "first"),
-		// 08 §5.3: the pack's links stay in Mods/ after the game; a launch from Steam would load them.
+		// 10 §3: the pack's links stay in Mods/ after the game; a launch from Steam would load them.
 		s("list_problems", map[string]any{"code": "pack"}, "problems", "--code", "pack", "--min-severity", "warning"),
 		s("manage_packs", map[string]any{"action": "unlink", "dry_run": true}, "pack", "unlink", "--dry-run"),
 		s("manage_packs", map[string]any{"action": "unlink"}, "pack", "unlink"),
@@ -235,7 +235,7 @@ func manageSteps(e *testkit.Env) []func() manageStep {
 		s("launch_game", map[string]any{"dry_run": true}, "launch", "--dry-run"),
 		s("launch_game", nil, "launch"),
 		s("plan_history", nil, "loadout", "log"),
-		// 06 §2.9: the library, moving a spare copy into the lock library, removing from plans.
+		// 16 §2.9: the library, moving a spare copy into the lock library, removing from plans.
 		s("list_library", map[string]any{"include": []string{"used:none"}}, "library", "--include", "used:none"),
 		func() manageStep {
 			a := pick("A", "local")
@@ -268,7 +268,7 @@ func manageSteps(e *testkit.Env) []func() manageStep {
 	}
 }
 
-// TestGoldenManageTools runs every new tool of 05 §1.2 through MCP on one fixture and the
+// TestGoldenManageTools runs every new tool of 13 §1.2 through MCP on one fixture and the
 // matching CLI command on an identical one: the texts must be the same (I1), and the MCP
 // transcript is compared with testdata/golden/mcp_manage.txt.
 func TestGoldenManageTools(t *testing.T) {

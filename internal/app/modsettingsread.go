@@ -16,7 +16,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Reading Mod settings (06 §2.9 "Mod settings", 05 §4): which Mods of the current list have
+// Reading Mod settings (16 §2.9 "Mod settings", 13 §4): which Mods of the current list have
 // settings, and what a settings file stores. Only flat values (on/off, numbers, text) are
 // shown as values; lists, dictionaries and nested objects are summarised and stay the game's
 // to change. A file stores only values that differ from the Mod's defaults, so a value missing
@@ -430,7 +430,7 @@ func (r *settingsReader) packsOf(pkg string) []ModSettingsFile {
 // StoredSettingsOf is how many values m's settings store, and whether it has any: its
 // Config files under the folder the game sees it under (st's registry) and the HugsLib pack
 // under its package id. No Archo Monitor record is read, so a detail can ask on every cursor
-// move (06 §4.1).
+// move (16 §4.1).
 func StoredSettingsOf(st *LoadoutState, m *store.Mod) (n int, ok bool) {
 	paths := settingsFilesOf(st, m)
 	for _, p := range paths {

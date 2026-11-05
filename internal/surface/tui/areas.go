@@ -8,9 +8,9 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// Focus areas and the position line (06 §3.2): 1 Disabled, 2 Enabled, 3 Staging,
+// Focus areas and the position line (16 §3.2): 1 Disabled, 2 Enabled, 3 Staging,
 // 4 the detail. Number keys jump to an area, ←→ go to the neighbouring one. The arrows only
-// ever navigate (06 §3.1 rule 1).
+// ever navigate (16 §3.1 rule 1).
 
 // area is the focused area, 1–4.
 func (m *model) area() int {
@@ -23,7 +23,7 @@ func (m *model) area() int {
 // hasDetailArea: the detail is a column on this screen (not below 110 cells).
 func (m *model) hasDetailArea() bool { return m.layout().detailW > 0 }
 
-// setFocus focuses a list; another list than before drops the selection (06 §3.4).
+// setFocus focuses a list; another list than before drops the selection (16 §3.4).
 func (m *model) setFocus(k colKind) {
 	if k != m.focus {
 		m.clearSel()
@@ -41,7 +41,7 @@ func (m *model) goArea(a int) tea.Cmd {
 		return m.requestDetail()
 	case a == 4:
 		if !m.hasDetailArea() {
-			// no detail column: 4 opens the full-screen detail, as enter does (06 §2.5)
+			// no detail column: 4 opens the full-screen detail, as enter does (16 §2.5)
 			return m.listKey("enter")
 		}
 		m.detailFocus = true
@@ -50,7 +50,7 @@ func (m *model) goArea(a int) tea.Cmd {
 }
 
 // areaStep: ←→ move to the neighbouring area, without wrapping. ← from the detail goes
-// back to the list whose mod it shows (06 §3.2, a ruling in 06 §3.3).
+// back to the list whose mod it shows (16 §3.2, a ruling in 16 §3.3).
 func (m *model) areaStep(d int) tea.Cmd {
 	if m.detailFocus {
 		if d < 0 {
@@ -66,7 +66,7 @@ func (m *model) areaStep(d int) tea.Cmd {
 }
 
 // scrollDetail: PgUp PgDn and the wheel scroll the detail from any area, without moving
-// the focus (06 §3.3). With no detail column they page the list instead.
+// the focus (16 §3.3). With no detail column they page the list instead.
 func (m *model) scrollDetail(d int) tea.Cmd {
 	if !m.hasDetailArea() {
 		return m.moveCursor(d)
@@ -91,7 +91,7 @@ func (m *model) detailPage() int { return max(m.rowsShown()-2, 1) }
 
 // ---- the position line ----
 
-// position says where the player is (06 §3.2): the focused area and the place in it, what
+// position says where the player is (16 §3.2): the focused area and the place in it, what
 // is selected, and the popup that is open.
 func (m *model) position() string {
 	var p string
@@ -154,7 +154,7 @@ func (m *model) position() string {
 	return p
 }
 
-// popupName is the open popup (06 §3.1 rule 5) or input, "" when there is none.
+// popupName is the open popup (16 §3.1 rule 5) or input, "" when there is none.
 func (m *model) popupName() string {
 	switch {
 	case m.menu != nil:

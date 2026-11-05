@@ -9,13 +9,13 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// ListFingerprint is the identity of an enabled list in order (08 §1): what a launch
+// ListFingerprint is the identity of an enabled list in order (09 §1): what a launch
 // record keeps, and what a log's launch is compared with to tell whether the plan changed
-// since (03 §6.4). Missing entries count by their token.
+// since (06 §4). Missing entries count by their token.
 func ListFingerprint(l loadout.List) string { return fingerprintOf(entryKeys(l)) }
 
 // SetFingerprint is the identity of the enabled set, order left out: the slot of an
-// analysis run (03 §3). Plans with the same enabled mods share a slot.
+// analysis run (05 §3). Plans with the same enabled mods share a slot.
 func SetFingerprint(l loadout.List) string {
 	keys := entryKeys(l)
 	slices.Sort(keys)

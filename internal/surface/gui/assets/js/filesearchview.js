@@ -1,4 +1,4 @@
-// Bounded text preview and actions for Search files (06 §2.9).
+// Bounded text preview and actions for Search files (16 §2.9).
 import { el, api, T, Tf, errText, say } from "./state.js";
 import { button, hintsChanged } from "./screens.js";
 import { copyablePath } from "./fields.js";

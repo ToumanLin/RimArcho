@@ -9,7 +9,7 @@ import (
 
 func ptr(s string) *string { return &s }
 
-// 06 §2.9: a change touches only the value's bytes; reset removes its line; what RimArcho
+// 16 §2.9: a change touches only the value's bytes; reset removes its line; what RimArcho
 // does not understand is refused and stays.
 func TestEditConfigBytes(t *testing.T) {
 	t.Parallel()

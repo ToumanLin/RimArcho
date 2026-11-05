@@ -17,7 +17,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// AnalyzeMemoryLimit is the soft heap cap of the `archo analyze` child (07 §6.2 target:
+// AnalyzeMemoryLimit is the soft heap cap of the `archo analyze` child (18 §2 target:
 // peak ≤ 400 MB). M3 measurement: 310 MB peak working set on 482 active mods.
 const AnalyzeMemoryLimit = 300 << 20
 
@@ -44,7 +44,7 @@ func (ix *Index) ModIsLink(m *store.Mod) bool {
 // analysisMods: the enabled list in order, plus every other live instance the list could
 // load: registered, or deployable through a link on save (SteamCMD and extra folders).
 // Inactive ones are definers for no-match reasons and the missing-parent provider index
-// (03 §4.3). pos is 1-based; 0 = inactive.
+// (05 §4.3). pos is 1-based; 0 = inactive.
 func analysisMods(st *LoadoutState) ([]*store.Mod, map[string]int) {
 	pos := map[string]int{}
 	for i, e := range st.List {
@@ -113,7 +113,7 @@ type AnalyzeReport struct {
 }
 
 // Analyze runs the Def and Patch layers in this process and stores the result. It is what
-// the `archo analyze` child does (03 §3); other callers go through EnsureAnalysis.
+// the `archo analyze` child does (05 §3); other callers go through EnsureAnalysis.
 func (a *App) Analyze(progress func(string)) (*AnalyzeReport, error) {
 	st, err := a.Loadout()
 	if err != nil {
@@ -134,8 +134,8 @@ func (a *App) Analyze(progress func(string)) (*AnalyzeReport, error) {
 	if err != nil {
 		return nil, err
 	}
-	a.Store.TruncateWAL() // a first analysis writes ~100 MB through the WAL (02 §7)
-	// The log attribution's reference index for this set (03 §6.5), so the first query on a
+	a.Store.TruncateWAL() // a first analysis writes ~100 MB through the WAL (04 §4)
+	// The log attribution's reference index for this set (06 §5), so the first query on a
 	// new log does not read every mod file.
 	if progress != nil {
 		progress("indexing def references")
@@ -150,7 +150,7 @@ type AnalysisState struct {
 	Fresh bool
 }
 
-// Analysis returns the stored run of st's slot — its enabled set (03 §3) — and whether it
+// Analysis returns the stored run of st's slot — its enabled set (05 §3) — and whether it
 // is current. Each plan's newest run is kept, so switching plans back and forth reuses it.
 // A slot not analysed yet (the list just gained or lost a mod) shows the environment's
 // newest run as stale, as before slots existed, until the analysis catches up.
@@ -189,7 +189,7 @@ func ChildAnalyze(home, envName, plan, mm string, progress func(string)) error {
 }
 
 // ChildAnalyzeExe is ChildAnalyze with an explicit archo executable. plan is the list a
-// session opened ("" the current one, 04 §1.3).
+// session opened ("" the current one, 07 §1.3).
 func ChildAnalyzeExe(exe, home, envName, plan, mm string, progress func(string)) error {
 	args := []string{"analyze"}
 	if envName != "" {
@@ -243,7 +243,7 @@ type pendingAnalysis struct {
 	done chan error
 }
 
-// EnsureAnalysis brings the stored analysis up to date (03 §3: on demand), using the
+// EnsureAnalysis brings the stored analysis up to date (05 §3: on demand), using the
 // configured runner — by default the `archo analyze` child process.
 func (a *App) EnsureAnalysis(progress func(string)) (*AnalysisState, error) {
 	st, err := a.Loadout()

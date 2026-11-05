@@ -11,7 +11,7 @@ import (
 )
 
 // The last run read a save that names a def of a mod left out of the list: the item names
-// that mod, says it is not in the list, and does not call the source unconfirmed (06 §5;
+// that mod, says it is not in the list, and does not call the source unconfirmed (16 §5;
 // VM run 2026-10-28, where a patcher of Pawn.ExposeData was named instead).
 func TestLastRunNamesLeftOutMod(t *testing.T) {
 	t.Parallel()

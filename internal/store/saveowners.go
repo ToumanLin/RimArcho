@@ -2,7 +2,7 @@ package store
 
 import "strings"
 
-// Batch lookups for what a Mod owns in a save (10 §4.6): a save names thousands of Defs and
+// Batch lookups for what a Mod owns in a save (12 §4.6): a save names thousands of Defs and
 // hundreds of classes, so these take many names per query instead of one each (DefsNamed,
 // TypeOwners). Like those, they read the version view of Store.MM: every instance with
 // facts for that game version, in any environment.
@@ -76,7 +76,7 @@ func (s *Store) TypeDefiners(names []string) (map[string][]string, error) {
 }
 
 // NestedTypeDefiners finds nested types by their own name: a save writes a type of one of
-// SaveNamespaces by its Name, which for a nested type is the inner name only (07 §7 item
+// SaveNamespaces by its Name, which for a nested type is the inner name only (17 §6 item
 // 20), and type_fact has no simple-name column. It returns, for each of names, the
 // instances defining a nested type "<ns>.Outer+…+<name>" whose outermost namespace is one
 // of SaveNamespaces or the global one. One pass over Store.MM's nested type facts per call
@@ -119,7 +119,7 @@ func (s *Store) NestedTypeDefiners(names []string) (map[string][]string, error) 
 // FactView says which facts of Store.MM an instance has.
 type FactView struct {
 	Defs bool // a Def view: analysed (enabled or not) for this game version
-	DLLs bool // a DLL view: analysed while enabled, or unchanged since (03 §3)
+	DLLs bool // a DLL view: analysed while enabled, or unchanged since (05 §3)
 }
 
 // FactViews returns the views of Store.MM the instances have; an instance without any is
@@ -148,7 +148,7 @@ func (s *Store) FactViews(instances []string) (map[string]FactView, error) {
 
 // PackageFactViews returns, by lowercase packageId, the views of Store.MM that any
 // instance of that packageId has, in any environment and including tombstones (whose facts
-// last until the version view is cleaned up, 03 §3): what is known of a Mod that is not
+// last until the version view is cleaned up, 05 §3): what is known of a Mod that is not
 // installed here. Packages without any are absent.
 func (s *Store) PackageFactViews(pkgs []string) (map[string]FactView, error) {
 	out := map[string]FactView{}

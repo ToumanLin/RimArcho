@@ -1,5 +1,5 @@
 // Package selfupdate checks GitHub Releases for a newer RimArcho, downloads and verifies the
-// release zip, and swaps the program files in place (07 §5.1).
+// release zip, and swaps the program files in place (17 §5.1).
 package selfupdate
 
 import (

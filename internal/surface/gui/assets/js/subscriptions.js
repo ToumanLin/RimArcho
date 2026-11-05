@@ -1,4 +1,4 @@
-// Mod library › updates (06 §2.9): one list and a detail. The list is what waits for the player
+// Mod library › updates (16 §2.9): one list and a detail. The list is what waits for the player
 // to update (Git, download pages, SteamCMD, Workshop items Steam has not downloaded), then
 // installed copies removed from the Workshop, then what already changed (one row per mod; earlier
 // days). A scope bar above it picks the current list or every mod; one line under it sums
@@ -509,7 +509,7 @@ async function openSource(r) {
   try { say("ok", await api.OpenSubscriptionSource(r.ref)); } catch (e) { say("fail", errText(e)); }
 }
 
-// lock: a copy in the lock library, the dry run first (as on Mod library, 06 §6).
+// lock: a copy in the lock library, the dry run first (as on Mod library, 16 §6).
 async function lock(ref) {
   let p;
   try { p = await api.LibraryPreview("pin", [ref]); } catch (e) { return say("fail", errText(e)); }

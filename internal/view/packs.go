@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
-// The packs screen (08 §5, 08 §5.3): like choosing a version in a game launcher — the packs,
+// The packs screen (10, 10 §3): like choosing a version in a game launcher — the packs,
 // when each was last played, and a button to play it; building one from the current list.
 
 // PackRow is one pack on the screen.

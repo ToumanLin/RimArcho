@@ -164,7 +164,7 @@ func harmonyCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			ps.Truncate(limit, "archo harmony --mod "+ix.Ref(m.ID)+" --all")
 		}
 		if manual {
-			// G9 (03 §5.3): the targets of Harmony.Patch calls read from IL, and why the
+			// G9 (05 §5.3): the targets of Harmony.Patch calls read from IL, and why the
 			// others could not be resolved.
 			found := 0
 			var open []*store.HarmonyRow

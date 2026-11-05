@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Enabling a list moves it to the front of the enable history, once (06 §2.1).
+// Enabling a list moves it to the front of the enable history, once (16 §2.1).
 func TestPlansEnabledHistory(t *testing.T) {
 	s, err := store.Open(filepath.Join(t.TempDir(), "archo.db"))
 	if err != nil {

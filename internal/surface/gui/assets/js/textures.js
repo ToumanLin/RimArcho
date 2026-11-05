@@ -1,5 +1,5 @@
 import { choiceControl } from "./choices.js";
-// Library > Texture optimisation (08 §5.2, 06 §2.13): the current plan's (or every mod's) PNG textures, what
+// Library > Texture optimisation (10 §2, 16 §2.13): the current plan's (or every mod's) PNG textures, what
 // RimArcho converted and what went stale, what converting at a scale would take and save,
 // then the run in the background ("textures" events), stop, and take everything back. The
 // encoder (todds) is downloaded only after the player saw where from and how big.
@@ -87,7 +87,7 @@ function select(f, values, labels, value, onchange) {
   return s;
 }
 
-// Pending values use the shared shimmer, with text for screen readers (06 §7.1).
+// Pending values use the shared shimmer, with text for screen readers (16 §7.1).
 function pending(lines = 1) {
   const s = el("span", "skel tex-pending");
   s.setAttribute("role", "img");
@@ -97,7 +97,7 @@ function pending(lines = 1) {
 }
 
 // count reads every PNG of the scope (count the textures): rows fill in as mods finish; a later
-// count, a stop or leaving the page drops this one (06 §3.1).
+// count, a stop or leaving the page drops this one (16 §3.1).
 async function count() {
   if (S.screen !== "textures" || X.loading) return;
   const read = X.countRead = beginPageRead("textures", { keep: true, label: "reading textures…", retry: open });
@@ -111,7 +111,7 @@ async function count() {
   try {
     let p = await api.Textures(at.scope, at.scale);
     if (!current()) return;
-    // Both the request and the page visit must still match after every await (06 §3.1).
+    // Both the request and the page visit must still match after every await (16 §3.1).
     while (current() && p) {
       const changed = JSON.stringify(X.page) !== JSON.stringify(p);
       X.page = p; X.at = at; X.old = false;
@@ -208,7 +208,7 @@ function draw(measurements = false) {
   if (previous) textureRows(rows, previous.querySelector('[data-tex="rows"]'));
   else w.append(slot(textureRows(rows), "rows"));
   if (previous) {
-    // Keep live choice controls in place while estimates arrive (06 §3.1).
+    // Keep live choice controls in place while estimates arrive (16 §3.1).
     previous.setAttribute("aria-busy", String(busy));
     for (const next of w.querySelectorAll("[data-tex]")) updateMeasurement(previous.querySelector(`[data-tex="${next.dataset.tex}"]`), next);
     return;
@@ -232,7 +232,7 @@ function textureRows(p, old = null) {
   t.hidden = !(p.rows || []).length;
   const head = el("div", "lib-th");
   textureTable.draw(t, head, { count: (p.rows || []).length });
-  // Keep the pointer capture target during updates (06 §3.9).
+  // Keep the pointer capture target during updates (16 §3.9).
   if (old && old.children[0].dataset.columns === head.dataset.columns) textureTable.adopt(t, old.children[0]);
   else if (old) old.children[0].replaceWith(head);
   else t.append(head);
@@ -260,7 +260,7 @@ function textureRows(p, old = null) {
     }
     nodes.push(tr);
   }
-  // Reuse untouched cells and their shimmer; sorting moves only existing rows (06 §2.13).
+  // Reuse untouched cells and their shimmer; sorting moves only existing rows (16 §2.13).
   nodes.forEach((row, i) => { textureTable.row(row, i, "texture-row-" + encodeURIComponent(row.dataset.ref)); if (t.children[i + 1] !== row) t.insertBefore(row, t.children[i + 1] || null); });
   while (t.children.length > nodes.length + 1) t.lastChild.remove();
   return t;
@@ -269,7 +269,7 @@ export function key(e) { return textureTable.key(e); }
 
 function slot(node, key) { node.dataset.tex = key; return node; }
 
-// Preserve unchanged placeholders so their shimmer can finish (06 §7.1).
+// Preserve unchanged placeholders so their shimmer can finish (16 §7.1).
 function updateMeasurement(old, next) {
   if (!old.isEqualNode(next)) { next.scrollLeft = old.scrollLeft; old.replaceWith(next); }
 }

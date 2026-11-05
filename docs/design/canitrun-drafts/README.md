@@ -1,6 +1,6 @@
 # Can it run page drafts
 
-Three candidates for "playing / can it run" (06 §2.4, §5), plus a "now" page drawn from current specifications for comparison. Colors, sidebar and items follow current GUI (`style.css` variables). Example data only (`ITEMS` in `shared.js`); buttons only show hints, never read/write files.
+Three candidates for "playing / can it run" (16 §2.4, §5), plus a "now" page drawn from current specifications for comparison. Colors, sidebar and items follow current GUI (`style.css` variables). Example data only (`ITEMS` in `shared.js`); buttons only show hints, never read/write files.
 
 ## Current problems
 
@@ -45,9 +45,9 @@ A was chosen; `a.html` polished as below (now/B/C unchanged):
 
 Specification/code changes needed:
 
-- 06 §2.4 layout and §5 one-click actions column (all actions visible, choice buttons, `1` `2` `3`).
+- 16 §2.4 layout and §5 one-click actions column (all actions visible, choice buttons, `1` `2` `3`).
 - §5 corpus hint color/position.
-- 03 §4.3.1 weak-order/cycle display.
+- 05 §4.3.1 weak-order/cycle display.
 - TUI 80 columns cannot fit two: same order in one column, three left sections then logs.
 
 ## First-draft recommendation (since changed to A)

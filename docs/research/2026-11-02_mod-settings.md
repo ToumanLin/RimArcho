@@ -106,7 +106,7 @@ No migration of `Mod_<old folder>_<handle>.xml` to `Mod_<new folder>_<handle>.xm
 - Pack copying excludes sibling `HugsLib/` and other custom directories. Settings are independent afterward; later environment edits are not synchronized.
 - Tests (`internal/app/gametest.go:179`) refresh top-level Config XML on every run, excluding ModsConfig.xml, Knowledge.xml, Prefs.xml and KeyPrefs.xml. They render a fresh ModsConfig.xml, remove old preferences/Knowledge, and retain caches. They do not translate filenames, copy HugsLib or create deployment links. Matching registrations can use copied files; not-yet-visible deployable Mods are reported missing. Isolated files absent from the source are not comprehensively swept, so reused userdata can retain stale Mod settings.
 
-The brief's references have moved: tests are **08 §12**, first-play copy is **08 §5.3**, and the file-write boundary is **01 §4**, not §3. Also qualify 08 §5.3's promise to copy “Mod settings”: code copies bytes but does not preserve filename identity for new pack registrations. Code behavior is reported here; specs are unchanged.
+The brief's references have moved: tests are **09 §7**, first-play copy is **10 §3**, and the file-write boundary is **02 §1**, not §3. Also qualify 10 §3's promise to copy “Mod settings”: code copies bytes but does not preserve filename identity for new pack registrations. Code behavior is reported here; specs are unchanged.
 
 ## 3. Settings beyond the standard per-Mod file
 
@@ -193,14 +193,14 @@ No third-party backup-Mod capability is claimed: an authoritative external sourc
 | `internal/env/detect.go:216`, `:249`; `internal/env/env.go:123` | Default userdata discovery and Config/ModsConfig.xml path composition; custom/own/shared roots recorded on the environment. |
 | `internal/env/modsconfig.go:19` | Read-only parsed view. Its “M1 never writes” comment is historical; app/loadout writes exist. |
 | `internal/loadout/modsconfig.go:34`, `:115`, `:204`, `:208` | Parse/render enabled list, preserve unowned XML, single .rimarcho.bak, temporary-file/flush/rename. This is for ModsConfig.xml, not general Mod settings. |
-| `internal/app/loadout.go:1003`, `:1033`; `internal/app/launch.go:133` | Save/launch projection, links and userdata override. Ordinary save may run while game runs (08 §2); do not reuse that permission for settings edits. |
+| `internal/app/loadout.go:1003`, `:1033`; `internal/app/launch.go:133` | Save/launch projection, links and userdata override. Ordinary save may run while game runs (09 §2); do not reuse that permission for settings edits. |
 | `internal/app/deploy.go:26`, `:98`; `envlinks.go:21`; `internal/source/link_windows.go:68` | Normal/cross-environment names and physical junction creation; no settings translation. |
 | `internal/app/pack.go:748`, `:930` | Pack registration names and first-play top-level XML copying. |
 | `internal/app/gametest.go:179`; `internal/gametest/settings.go:16`, `:22`, `:48`; `paths.go:62`; `run.go:106` | Test copies, preference reset/error classification, path checks and menu-marker handling. |
 | `internal/gametest/settings_test.go:14`, `:22`, `:48` | Synthetic tests prove old preferences removed while synthetic ModSettings.xml/cache survive; classify preference failures. They do not prove settings survive folder-name changes or framework directories are copied. |
-| `docs/specs/01-scope-and-status.md` 01 §4, rows at `:93`, `:108` and test-data row | Write allowlist permits environment ModsConfig.xml/backup, pack first-play copies and managed test data. It does not authorize general player Mod-settings writes/deletions. A product feature needs an explicit addition. |
-| 02 §2.4; 04 §4.1–4.3; 08 §1–4, §5.3, §12 | Shared userdata, list serialization/attribution, deployment, process checks, packs/tests. Settings contents have no equivalent ownership/history/profile contract. |
-| 05 §1 / §4 / §5; 06 §4.2, §2.9, §2.14, §9 | Shared operation layer and possible UI homes. `config set` edits RimArcho settings, not Mod settings. No general Mod-settings API/view/edit command found. |
+| `docs/specs/01-scope-and-status.md` 02 §1, rows at `:93`, `:108` and test-data row | Write allowlist permits environment ModsConfig.xml/backup, pack first-play copies and managed test data. It does not authorize general player Mod-settings writes/deletions. A product feature needs an explicit addition. |
+| 03 §3.4; 07 §4.1–4.3; 09 §1–4, 10 §3, 09 §7 | Shared userdata, list serialization/attribution, deployment, process checks, packs/tests. Settings contents have no equivalent ownership/history/profile contract. |
+| 13 §1 / §4 / 14; 16 §4.2, §2.9, §2.14, §9 | Shared operation layer and possible UI homes. `config set` edits RimArcho settings, not Mod settings. No general Mod-settings API/view/edit command found. |
 
 Production searches covered `internal/` and `docs/specs/`, distinguishing testkit fixtures from application code. No test suite was run: only documentation changed, and actual game/data execution is excluded by the brief.
 
@@ -240,8 +240,8 @@ These are **candidate stale identities**. Three of the four numeric candidates h
 
 RimArcho plays no tricks and keeps the player's load low. The player sees Mods and their settings; filenames, variants, frameworks and schemas stay out of the interface. This replaces the earlier phased proposal (inventory, transfer, safe editing, profiles and seven owner questions). Four parts:
 
-1. **Settings follow the Mod.** RimArcho fixes F1 and F2 without asking. Before launch, if the file the game will read for a deployed Mod is missing and the same Mod has a settings file under a name it was used with before, RimArcho copies that file to the new name. The original stays; an existing file is never overwritten; of several earlier files, the newest wins. A pack's first play copies settings under the names its links use and copies `HugsLib/`; test runs do the same for the names they deploy. Monitor's record (2) says which names a Mod was used with. Until then RimArcho derives them from its own deployment names (08 §3) and the Workshop folder.
-2. **Archo Monitor reports what the game knows** (03 §6.7). It already runs in the game; it adds two records to the companion log:
+1. **Settings follow the Mod.** RimArcho fixes F1 and F2 without asking. Before launch, if the file the game will read for a deployed Mod is missing and the same Mod has a settings file under a name it was used with before, RimArcho copies that file to the new name. The original stays; an existing file is never overwritten; of several earlier files, the newest wins. A pack's first play copies settings under the names its links use and copies `HugsLib/`; test runs do the same for the names they deploy. Monitor's record (2) says which names a Mod was used with. Until then RimArcho derives them from its own deployment names (09 §3) and the Workshop folder.
+2. **Archo Monitor reports what the game knows** (06 §7). It already runs in the game; it adds two records to the companion log:
    - On reaching the main menu: for each loaded Mod with a settings window, its packageId, the folder name the game uses, the settings file it reads and writes (as `LoadedModManager` builds the name) and the window's title.
    - When the player opens a Mod's settings window: what the window draws, once per opening. That means headings and labels, and each control's kind (checkbox, slider, number or text field, choice), current value and range. HugsLib settings carry their own title, description, value and default, so Monitor reads them without a window.
    - Limits: only windows the player has opened; controls a Mod draws by hand appear as their text only. Monitor runs no Mod code beyond what the game runs anyway.

@@ -65,7 +65,7 @@ $guestLib = Fill @'
 $ErrorActionPreference = 'Continue'
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 $archo = '__ARCHO__'
-# The installed Archo Monitor folders (08 §9). Only the directory `archo monitor` names:
+# The installed Archo Monitor folders (09 §6). Only the directory `archo monitor` names:
 # never a guessed default, since the driver must not land in some other install.
 function MonitorDir {
   $m = & $archo monitor 2>&1 | Out-String
@@ -174,7 +174,7 @@ Expand-Archive -Force "$run\drive.zip" "$run\drive"
 if (Games) { 'FAIL start: a game is already running in the guest'; return }
 $stale = @(RemoveDriver)
 if ('__KEEPMON__' -ne '1') {
-  # What the RimArcho window does when it opens (08 §9): install or update the bundled
+  # What the RimArcho window does when it opens (09 §6): install or update the bundled
   # Monitor, so the round runs the Monitor this build ships. The driver goes in after this,
   # because a development Monitor folder whose files differ is replaced.
   $inst = @((& $archo monitor install 2>&1 | Out-String).Trim() -split "`r?`n" | Where-Object { $_ -match '^\s*(monitor|bundled):' } | ForEach-Object { ($_.Trim() -replace '^monitor:\s*', '') })

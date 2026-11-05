@@ -15,7 +15,7 @@ import (
 )
 
 // keyLatency sends navigation and filter keys to a model and returns the time of each
-// key's Update plus the View that follows it (what the player waits for, 06 §11 T1).
+// key's Update plus the View that follows it (what the player waits for, 16 §11 T1).
 func keyLatency(t *testing.T, m *model) map[string][]time.Duration {
 	t.Helper()
 	out := map[string][]time.Duration{}
@@ -85,7 +85,7 @@ func report(t *testing.T, lat map[string][]time.Duration) time.Duration {
 	return worst
 }
 
-// 06 §11 T1 on a synthetic environment of 1354 mods (485 enabled, CJK names among them).
+// 16 §11 T1 on a synthetic environment of 1354 mods (485 enabled, CJK names among them).
 func TestT1KeyLatency1354(t *testing.T) {
 	if os.Getenv("RIMARCHO_SCALE_TESTS") == "" {
 		t.Skip("set RIMARCHO_SCALE_TESTS=1: builds and scans 1354 mods (about a minute)")
@@ -140,7 +140,7 @@ func TestT1KeyLatencyReal(t *testing.T) {
 	if worst := report(t, keyLatency(t, m)); worst > 50*time.Millisecond {
 		t.Fatalf("slowest key %v > 50 ms", worst)
 	}
-	// search (06 §3.7): the first content term loads the content kinds once
+	// search (16 §3.7): the first content term loads the content kinds once
 	for _, q := range []string{"type:assembly", "type:xml-only has:problem", "harmony", "author:oskar -tag:ui", "id:2009463077", "hrmny"} {
 		c := &m.cols[cInactive]
 		c.filter = q

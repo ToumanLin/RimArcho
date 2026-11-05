@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// Weak order preferences and cycles merge into the item that sorts (06 §5); without one
+// Weak order preferences and cycles merge into the item that sorts (16 §5); without one
 // they are hints of their own.
 func TestNeedsSortAlso(t *testing.T) {
 	t.Parallel()
@@ -48,7 +48,7 @@ func TestNeedsSortAlso(t *testing.T) {
 }
 
 // The last run's error groups and the left column's items about the same mod point at
-// each other (06 §5).
+// each other (16 §5).
 func TestNeedsRelated(t *testing.T) {
 	t.Parallel()
 	items := []Need{
@@ -75,7 +75,7 @@ func TestNeedsRelated(t *testing.T) {
 	}
 }
 
-// What other pages handle is counted into one line each (06 §2.4); the current game's
+// What other pages handle is counted into one line each (16 §2.4); the current game's
 // links come first.
 func TestNeedsElsewhereAndLinks(t *testing.T) {
 	t.Parallel()

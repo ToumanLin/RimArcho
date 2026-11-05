@@ -23,7 +23,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
-// Texture optimisation (08 §5.2, docs/research/dds-texture-optimization.md): the DDS of a mod's PNGs, written next to
+// Texture optimisation (10 §2, docs/research/dds-texture-optimization.md): the DDS of a mod's PNGs, written next to
 // them. The game (1.6 and 1.7) loads a .dds in place of the .png of the same name: no PNG to
 // decode at start, and opaque textures take half the video memory (BC1, where the game makes
 // BC7 or DXT5 of a PNG). The PNGs stay; RimArcho records every file it writes and only ever
@@ -92,7 +92,7 @@ func (a *App) toddsURL() string {
 }
 
 // OfferTodds says where todds comes from and how big it is, so the player can be asked
-// first (01 §4: RimArcho only goes online when the player asks).
+// first (02 §1: RimArcho only goes online when the player asks).
 func (a *App) OfferTodds() *ToddsOffer {
 	return &ToddsOffer{URL: a.toddsURL(), Dir: a.ToddsDir(), Bytes: textures.ToddsZipSize, Version: textures.ToddsVersion, Home: textures.ToddsHome}
 }
@@ -104,7 +104,7 @@ func (a *App) InstallTodds() (string, error) {
 	return a.InstallToddsProgress(nil)
 }
 
-// InstallToddsProgress reports the download to the task record (06 §2.16).
+// InstallToddsProgress reports the download to the task record (16 §2.16).
 func (a *App) InstallToddsProgress(progress func(done, total int64)) (string, error) {
 	unlock := accounts.Lock(a.ToddsDir())
 	defer unlock()
@@ -433,7 +433,7 @@ func (a *App) TextureSummaryTargets(ctx context.Context, targets []TextureTarget
 	return a.TextureSummaryProgress(ctx, targets, o, nil)
 }
 
-// TextureSummaryProgress publishes each measured mod so pages can fill rows as they finish (06 §2.13).
+// TextureSummaryProgress publishes each measured mod so pages can fill rows as they finish (16 §2.13).
 func (a *App) TextureSummaryProgress(ctx context.Context, targets []TextureTarget, o textures.Options, progress func(*TextureMod)) (*TextureReport, error) {
 	return a.textureSummaries(ctx, targets, o, progress, textureSummaryWorkers)
 }
@@ -848,7 +848,7 @@ func (a *App) CleanTextures(refs []string, scope string, dryRun bool) (*TextureC
 	return c, a.Store.DeleteTextureFiles(forget)
 }
 
-// uninstallTextures is uninstall's textures step (01 §4.1): one item per mod folder with
+// uninstallTextures is uninstall's textures step (02 §2): one item per mod folder with
 // DDS RimArcho wrote; only those files go, the folder and the PNGs stay.
 func (a *App) uninstallTextures() ([]*UninstallItem, error) {
 	rows, err := a.Store.TextureFilesOf(nil)

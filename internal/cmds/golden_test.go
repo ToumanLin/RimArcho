@@ -28,7 +28,7 @@ var searchMSRe = regexp.MustCompile(`(files search [^\n]*, )[0-9]+ ms\)`)
 
 var msRe = regexp.MustCompile(`(active mods, )[0-9.]+(?:ms|s|µs)`)
 
-// cursorRe matches log cursors (03 §6.6): a checksum of the fixture log, whose paths vary.
+// cursorRe matches log cursors (06 §6): a checksum of the fixture log, whose paths vary.
 var cursorRe = regexp.MustCompile(`log1\.[0-9a-z]+\.[0-9a-f]{8}(?:\.[0-9a-z]+\.[0-9a-f]{8})?`)
 
 type step func(e *testkit.Env) []string
@@ -328,7 +328,7 @@ func TestGoldenLoadout(t *testing.T) {
 	})
 }
 
-// Several plans per environment (04 §1, 05 §4.3): each has its own list, undo stack,
+// Several plans per environment (07 §1, 13 §4.3): each has its own list, undo stack,
 // versions and staging; switching writes no game file.
 func TestGoldenPlans(t *testing.T) {
 	t.Parallel()
@@ -404,7 +404,7 @@ func TestGoldenProblems(t *testing.T) {
 	runGolden(t, "problems", e, []step{
 		cmd("status"),
 		cmd("problems"),
-		cmd("launch", "--dry-run"), // 08 §2: the problems that most often cause errors, not blocking
+		cmd("launch", "--dry-run"), // 09 §2: the problems that most often cause errors, not blocking
 		cmd("problems", "--code", "patch", "--detail"),
 		firstRef("dep.missing"),
 		cmd("def", "ThingDef/Shared_Gun"),

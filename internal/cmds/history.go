@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
-// The history (06 §2.5): unsaved edits around "now", then the saved versions.
+// The history (16 §2.5): unsaved edits around "now", then the saved versions.
 func init() {
 	register(&Command{Name: "history", Summary: "the workspace's unsaved edits (undo/redo) and the saved versions", MaxArgs: 0, Run: historyCmd,
 		Flags: []Flag{{Name: "all", Help: "every version (default: the newest 10)"}}})

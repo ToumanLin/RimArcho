@@ -1,4 +1,4 @@
-// Shared filter inputs and completion for Search files (06 §2.9).
+// Shared filter inputs and completion for Search files (16 §2.9).
 import { el, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { button } from "./screens.js";
 import { createBar } from "./filterbar.js";

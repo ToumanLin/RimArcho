@@ -181,7 +181,7 @@ func TestLibraryDo(t *testing.T) {
 	}
 }
 
-// 06 §3.7 in the library: typed key:value words filter, tag: matches tag words, and the
+// 16 §3.7 in the library: typed key:value words filter, tag: matches tag words, and the
 // box completes the library's keys and values.
 func TestLibrarySearchBox(t *testing.T) {
 	t.Parallel()
@@ -226,7 +226,7 @@ func TestLibrarySearchBox(t *testing.T) {
 	}
 }
 
-// 06 §4.1, §2.9: one field list, the editor's fields with the library's in between.
+// 16 §4.1, §2.9: one field list, the editor's fields with the library's in between.
 func TestLibFields(t *testing.T) {
 	t.Parallel()
 	e := libEnv(t)
@@ -266,7 +266,7 @@ func TestLibFields(t *testing.T) {
 	}
 }
 
-// 06 §2.9: unsubscribe is a confirmed action through the Steam client; when Steam is out of reach
+// 16 §2.9: unsubscribe is a confirmed action through the Steam client; when Steam is out of reach
 // LibDo answers OpenPages (the window opens the page and says so).
 func TestLibSteam(t *testing.T) {
 	t.Parallel()
@@ -302,7 +302,7 @@ func TestLibSteam(t *testing.T) {
 	}
 }
 
-// 06 §2.9: the rows carry op codes only; the labels go once, in the page's op table, and
+// 16 §2.9: the rows carry op codes only; the labels go once, in the page's op table, and
 // the copies' paths and Workshop URLs stay on the Go side.
 func TestLibraryPayload(t *testing.T) {
 	view.SetLang("zh")

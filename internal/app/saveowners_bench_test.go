@@ -11,10 +11,10 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// BenchmarkSavesListFullRead times `archo saves list` over 100 synthetic saves (10 §4.3,
-// 06 §10): read from the head only, then with every save read in full, so CheckSave
+// BenchmarkSavesListFullRead times `archo saves list` over 100 synthetic saves (12 §4.3,
+// 16 §10): read from the head only, then with every save read in full, so CheckSave
 // attributes classes in every save and Defs in the half missing a Mod. Each save names
-// 1,400 Defs (1,300 of Core's, like a real 1.6 save's 1,382, 07 §6) and 25 classes. "cold"
+// 1,400 Defs (1,300 of Core's, like a real 1.6 save's 1,382, 18) and 25 classes. "cold"
 // opens the data directory again for each run, as the CLI does; "warm" reuses it, as the
 // GUI does.
 func BenchmarkSavesListFullRead(b *testing.B) {

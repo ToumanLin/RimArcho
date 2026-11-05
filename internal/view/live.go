@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/logs"
 )
 
-// GroupThisRun holds the errors of the running game (06 §2.1); interfaces show it first.
+// GroupThisRun holds the errors of the running game (16 §2.1); interfaces show it first.
 const GroupThisRun = 6
 
 // Live is the running game as the interfaces show it.
@@ -23,9 +23,9 @@ type Live struct {
 	Pack  string `json:"pack,omitempty"`
 	Guess bool   `json:"guess,omitempty"`
 	// Blocked is set while another environment's game runs: launching is refused until it
-	// exits (08 §1), so the interfaces disable launch and say why.
+	// exits (09 §1), so the interfaces disable launch and say why.
 	Blocked string `json:"blocked,omitempty"`
-	// NewLog is the "analyse this run's log" hint (08 §2 "after the game exits"): set while no game runs
+	// NewLog is the "analyse this run's log" hint (09 §2 "after the game exits"): set while no game runs
 	// and Player.log is newer than the last launch and the last log the player looked at.
 	// The TUI shows it in its status line; the GUI reads that log at once (API.ReadNewLog).
 	NewLog string `json:"newLog,omitempty"`
@@ -49,7 +49,7 @@ type LiveTracker struct {
 
 // Update checks the game and reads what its log gained.
 func (t *LiveTracker) Update(a *app.App, st *app.LoadoutState) (*Live, error) {
-	// One look at the process table for every environment, the current one first (08 §4).
+	// One look at the process table for every environment, the current one first (09 §4).
 	g, err := a.RunningGame()
 	if err != nil {
 		return nil, err
@@ -69,7 +69,7 @@ func (t *LiveTracker) Update(a *app.App, st *app.LoadoutState) (*Live, error) {
 		return newLog(a, st, &Live{}), nil
 	}
 	if t.lv == nil || t.pid != run.PID {
-		// a pack run writes its own log on 1.7 (08 §5.3): follow the one this run writes
+		// a pack run writes its own log on 1.7 (10 §3): follow the one this run writes
 		t.what = a.WhatRuns(st.Ix.Env, run)
 		path := a.RunLog(st, t.what)
 		if path == "" {
@@ -100,7 +100,7 @@ func LiveNeeds(st *app.LoadoutState, cs []*app.LiveCluster) []Need {
 			msg = msg[:87] + "…"
 		}
 		// The section heading already says "this run", and the text gives the count: the
-		// item names only the mod (06 §5).
+		// item names only the mod (16 §5).
 		var ids []string
 		text := fmt.Sprintf("%d× %s", c.Count, msg)
 		for _, at := range c.Report.Attr {
@@ -143,7 +143,7 @@ func LiveNeeds(st *app.LoadoutState, cs []*app.LiveCluster) []Need {
 
 // LiveText is the running game's line, "game running since 14:05", naming the pack when a
 // pack is played ("" when the game is not running). The GUI's sidebar foot and the TUI's
-// status line show it with this run's errors as an amber number beside it (06 §2.1, §9.1).
+// status line show it with this run's errors as an amber number beside it (16 §2.1, §9.1).
 func LiveText(l *Live) string {
 	if l == nil || !l.Running {
 		return ""

@@ -2,7 +2,7 @@ package mcp
 
 import "fmt"
 
-// The tools for player actions that already had a CLI command but no tool (05 §1.2):
+// The tools for player actions that already had a CLI command but no tool (13 §1.2):
 // packs, ignoring problems, identity answers, scan, list exchange, user rules, hidden mods
 // and maintenance. Each one still maps to exactly one CLI argv.
 
@@ -51,7 +51,7 @@ func unknown(tool, action string) []string {
 
 // StatusArgv maps status: the overview, or one read-only page of RimArcho's own setup
 // (environments, shared mod folders, settings, community data, database, caches). Changing them is left to the
-// player (05 §1.2).
+// player (13 §1.2).
 func StatusArgv(in StatusIn) []string {
 	switch in.Show {
 	case "", "overview":

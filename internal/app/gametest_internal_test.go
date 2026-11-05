@@ -15,7 +15,7 @@ import (
 )
 
 // A test run loads and reaches the menu, a map run also starts a new game; neither loads
-// a save or plays (08 §12).
+// a save or plays (09 §7).
 func TestTestRunReaches(t *testing.T) {
 	t.Parallel()
 	at := func(names ...string) []logs.PhaseCount {

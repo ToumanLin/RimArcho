@@ -1,4 +1,4 @@
-// The window's shell (06 §2.1, §2.2): the sidebar grouped by the player's questions, the
+// The window's shell (16 §2.1, §2.2): the sidebar grouped by the player's questions, the
 // top bar (collapse, breadcrumb, environment chip, the page's actions) and, at the
 // sidebar's foot, the environment and the running game. What it lists comes from
 // view.Nav and view.NavPath through API.Shell.
@@ -12,7 +12,7 @@ import { initWindowChrome, placeWindowControls } from "./window-chrome.js";
 
 let ui = null;
 
-// Where the navigation sits (06 §2.1): at the side (the sidebar, groups Playing / Library) or at the
+// Where the navigation sits (16 §2.1): at the side (the sidebar, groups Playing / Library) or at the
 // top (the same entries as one strip over the page: the groups are separators, an entry's
 // sub-entries a dropdown). The toggle heads the sidebar, or ends the strip; ctrl+b. The
 // choice is kept in ui.gui.nav ("top", or empty for the side).
@@ -64,7 +64,7 @@ export function navigated() { pop.hideMenu(); }
 
 // navKey: the keyboard in the navigation itself. Tab reaches its buttons; ← → (↑ ↓ at the
 // side) move between them, enter opens one, and ↓ on a top entry with sub-entries opens
-// its dropdown (06 §2.1, rule 6 of §3.1).
+// its dropdown (16 §2.1, rule 6 of 16 §3.1).
 function navKey(e) {
   const b = e.target.closest("button");
   if (!b) return;
@@ -123,7 +123,7 @@ function navItem(id) {
 }
 
 // The sidebar's width: dragged on its right edge, kept in the settings (ui.gui.side),
-// double-click resets it (06 §2.1).
+// double-click resets it (16 §2.1).
 const SIDE_MIN = 168, SIDE_MAX = 360, SIDE_KEY = "ui.gui.side";
 
 function setSideWidth(px) {
@@ -165,14 +165,14 @@ export function shellFailed(next) {
 // current is the sidebar ID of what is shown: a page, the open plan (the editor and its
 // full detail), or one pack.
 export function current() {
-  // Create a pack is the current plan's sub-page (06 §2.1)
-  // the full detail belongs to the list it was opened from (06 §4.2)
+  // Create a pack is the current plan's sub-page (16 §2.1)
+  // the full detail belongs to the list it was opened from (16 §4.2)
   if (S.screen === "full" && S.fullFrom === "library") return "library";
   if (!S.screen || S.screen === "full" || S.screen === "build") return (S.shell && S.shell.plan && S.shell.plan.page) || "plan";
   if (S.screen === "packs" && S.packFocus) return "pack:" + S.packFocus;
-  // a list's export: under Manage lists, or under the list when the editor opened it (06 §2.17)
+  // a list's export: under Manage lists, or under the list when the editor opened it (16 §2.17)
   if (S.screen === "plan-export" && S.planExport) return S.planExport.from === "editor" ? "plan:" + S.planExport.id : "plans";
-  if (S.screen === "plan-import") return "plans"; // 06 §2.17
+  if (S.screen === "plan-import") return "plans"; // 16 §2.17
   // uninstall RimArcho is under settings
   if (S.screen === "uninstall" || S.screen === "uninstall-progress" || S.screen === "feedback") return "settings";
   // adding an environment belongs to the environment page
@@ -187,7 +187,7 @@ export function sync() {
   syncPageAccessibility();
 }
 
-// inGameMark: which plan the game's ModsConfig.xml holds (04 §1.3) is a small mark on that
+// inGameMark: which plan the game's ModsConfig.xml holds (07 §1.3) is a small mark on that
 // plan's sub-entry (the home card says it in words), only when there are several plans to
 // tell apart; its tooltip says "the game now uses: <list> v<n>". null when there is nothing to mark.
 function inGameMark(isInGame) {
@@ -201,7 +201,7 @@ function inGameMark(isInGame) {
 const ICONS = { home: "home", needs: "needs", plan: "plan", packs: "packs", saves: "saves", textures: "textures", env: "env", library: "library", log: "log" };
 
 // The entry whose sub-entries were open when the sidebar was last drawn: a redraw starts
-// from it, so the sub-entries open and close with a transition (06 §7.1).
+// from it, so the sub-entries open and close with a transition (16 §7.1).
 let openWas = "";
 // Until the first page is shown the sidebar takes its state without moving (startup draws
 // it before the home page is open).
@@ -232,7 +232,7 @@ function renderSide() {
         // a pack left out of the capped sub-entries still keeps pack open
         const kidOn = kids.some((k) => k.id === cur) || (it.id === "packs" && String(cur).startsWith("pack:"));
         const on = it.id === cur || kidOn;
-        // only the open entry shows its sub-entries (06 §2.1)
+        // only the open entry shows its sub-entries (16 §2.1)
         if (on && kids.length) openNow = it.id;
         const b = el("button", "nav-item" + (on ? " on" : "") + (kids.length ? " parent" : ""));
         b.dataset.id = it.id;
@@ -252,13 +252,13 @@ function renderSide() {
           c.onclick = (e) => { if (layout === "top") { e.stopPropagation(); kidMenu(b, false); } };
           b.append(c);
         }
-        // Only Can it run carries a number (06 §2.1): the board's count between two Shell
+        // Only Can it run carries a number (16 §2.1): the board's count between two Shell
         // calls, plus this run's errors
         const badge = it.id === "needs" && S.board ? S.board.needs + liveCount() : it.badge;
         let n = null;
         if (badge) b.append(n = el("span", "badge-n num", String(badge)));
         bump("nav:" + it.id, n, badge || 0);
-        // list opens its first sub-entry, the current list (06 §2.1)
+        // list opens its first sub-entry, the current list (16 §2.1)
         b.onclick = () => ui.go(it.id === "plan" ? (kids.find((k) => k.current) || kids.find((k) => k.id !== "plans") || { id: "plans" }).id : it.id);
         nav.append(b);
         if (kids.length) nav.append(kidList(it, kids, cur, hls.get(it.id)));
@@ -313,7 +313,7 @@ function kidList(it, kids, cur, hl) {
     kb.title = k.label;
     const g = inGameMark(k.inGame);
     if (g) kb.append(g);
-    // a plan's "an outside version has not been loaded" (04 §4.3)
+    // a plan's "an outside version has not been loaded" (07 §4.3)
     if (k.mark) { const m = el("span", "mark"); m.title = k.mark; kb.append(m); kb.title = k.label + T("; ") + k.mark; }
     kb.onclick = () => ui.go(k.id);
     if (it.id === "plan" && !k.add) {
@@ -326,7 +326,7 @@ function kidList(it, kids, cur, hl) {
   return wrap;
 }
 
-// crumbs: the breadcrumb of what is shown; every level opens its page (06 §2.2).
+// crumbs: the breadcrumb of what is shown; every level opens its page (16 §2.2).
 export function crumbs() {
   const sh = S.shell;
   const cur = current();
@@ -419,7 +419,7 @@ function renderCrumbs() {
   namePage();
 }
 
-// setActs puts the page's actions at the right end of its description line (06 §2.2): the
+// setActs puts the page's actions at the right end of its description line (16 §2.2): the
 // page's own .page-head, or the plan editor's #planhead. The top bar has no buttons.
 let actsKey = "";
 export function setActs(key, ...nodes) {

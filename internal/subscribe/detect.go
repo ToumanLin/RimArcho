@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Detect says what a pasted text is, the way the add a subscription paste box recognises it (06 §2.9):
+// Detect says what a pasted text is, the way the add a subscription paste box recognises it (16 §2.9):
 // "git", "loverslab", "page", "workshop", "bad", or "" for nothing. Repositories are
 // recognised on known Git hosts (owner/name, nothing more) or by a .git ending; any other
 // https page is a download page that is read first. The window's copy is detect in

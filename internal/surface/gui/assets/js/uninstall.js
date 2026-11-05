@@ -1,4 +1,4 @@
-// settings › uninstall RimArcho (06 §2.14): the dry run of every step (view.UninstallPage), the player's
+// settings › uninstall RimArcho (16 §2.14): the dry run of every step (view.UninstallPage), the player's
 // answers inline on the steps that have them (a checkbox, and where kept things go), one
 // confirmation dialog, a dedicated progress page, then the same rows as the report.
 // Plan/report controls keep their native keyboard behavior.

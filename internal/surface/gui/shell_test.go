@@ -111,7 +111,7 @@ func TestGuide(t *testing.T) {
 	}
 }
 
-// Plans in the window (06 §2.1, §2.5): each plan is a sidebar entry with its breadcrumb;
+// Plans in the window (16 §2.1, §2.5): each plan is a sidebar entry with its breadcrumb;
 // opening one switches the board; new, import-as-plan, rename and delete go through view.
 func TestPlansInWindow(t *testing.T) {
 	t.Parallel()
@@ -182,7 +182,7 @@ func TestPlansInWindow(t *testing.T) {
 }
 
 // A game added after the shared folders were read is scanned alone: the guide counts its
-// Data/ and Mods/ (02 §0 item 8).
+// Data/ and Mods/ (03 §2 item 8).
 func TestScanLineGameOnly(t *testing.T) {
 	view.SetLang("en")
 	out := "scan:3  env:1.5  1s  [game only]\n  sources:\n    src:official  1 mod\n    src:local     2 mods (1 about-disabled)\n  instances: 900 live, 0 tombstones\n"
@@ -194,7 +194,7 @@ func TestScanLineGameOnly(t *testing.T) {
 	}
 }
 
-// Opening a list from the sidebar only shows it (04 §1.3, 06 §2.5): the current list — the
+// Opening a list from the sidebar only shows it (07 §1.3, 16 §2.5): the current list — the
 // one the launch page shows and launches — stays until the player makes another current
 // or writes the open one to the game.
 func TestOpenListKeepsCurrent(t *testing.T) {

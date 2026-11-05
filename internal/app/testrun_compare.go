@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
-// TestRunBaseline compares error clusters with an earlier run of the same plan (08 §12).
+// TestRunBaseline compares error clusters with an earlier run of the same plan (09 §7).
 type TestRunBaseline struct {
 	RunDir  string `json:"run_dir"`
 	Status  string `json:"status"`
@@ -24,7 +24,7 @@ type TestRunBaseline struct {
 }
 
 // TestRunPlayerLog compares a test run with the player's problem log, the log
-// `archo log` reads by default (08 §12).
+// `archo log` reads by default (09 §7).
 type TestRunPlayerLog struct {
 	Path    string `json:"path"`
 	Present int    `json:"present"` // this run's clusters already in the player's log
@@ -40,7 +40,7 @@ type TestRunPlayerLog struct {
 const testRunListLimit = 30
 
 // comparePlayerLog marks each cluster present or absent in the player's log and lists the
-// player's clusters that are gone, with their attribution (08 §12). The player's log is
+// player's clusters that are gone, with their attribution (09 §7). The player's log is
 // attributed as `archo log` attributes it (AnalyzeLog, cached).
 func (a *App) comparePlayerLog(st *LoadoutState, r *TestRunReport) {
 	cur, prev := a.LogPaths(st)
@@ -102,7 +102,7 @@ func (a *App) comparePlayerLog(st *LoadoutState, r *TestRunReport) {
 			continue
 		}
 		pl.Fixed++
-		// A consequence of a failed def file is listed through its cause (03 §6.3).
+		// A consequence of a failed def file is listed through its cause (06 §3).
 		if len(r.Fixed) < testRunListLimit && lc.ConsequenceOf == "" {
 			r.Fixed = append(r.Fixed, c)
 		}
@@ -110,7 +110,7 @@ func (a *App) comparePlayerLog(st *LoadoutState, r *TestRunReport) {
 }
 
 // testRunReaches reports whether a test run could show a cluster with these observed
-// phases (03 §6.7.3): every run loads and reaches the main menu, a map run also starts a
+// phases (06 §7.3): every run loads and reaches the main menu, a map run also starts a
 // new game, and none loads a save or plays. Unobserved phases count as reached.
 func testRunReaches(phases []logs.PhaseCount, mapRun bool) bool {
 	if len(phases) == 0 {

@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// A missing type that nothing installed defines (03 §6.2, "Missing types"): the XML naming it
+// A missing type that nothing installed defines (06 §2, "Missing types"): the XML naming it
 // is the likely source (a typo or a wrong namespace), so the enabled mods' Defs and Patches
 // are searched for it (refQuery.class), and the nearest type names of the analysed and game
 // assemblies are offered.
@@ -151,7 +151,7 @@ func indexFrom(b, sep []byte, off int) int {
 
 // shadowing finds why an enabled mod's type can still be missing: another enabled mod, earlier
 // in load order, ships a DLL with the same file name that lacks the type. The game keeps the
-// first copy of an assembly name (03 §4.3 asm.duplicate-name), so that mod is the source.
+// first copy of an assembly name (05 §4.3 asm.duplicate-name), so that mod is the source.
 // It returns the shadowing instance and the evidence for both mods ("" when none).
 func (cx *attrCtx) shadowing(t, provider string) (string, string, string) {
 	owners, err := cx.a.Store.TypeOwners(t)

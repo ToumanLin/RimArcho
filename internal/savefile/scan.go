@@ -6,7 +6,7 @@ import (
 )
 
 // ParserVersion is the version of Scan's output. Bump it whenever Facts changes meaning
-// (a field added, removed or computed differently): caches of Facts key on it (10 §1.7).
+// (a field added, removed or computed differently): caches of Facts key on it (12 §1.7).
 const ParserVersion = 1
 
 // Limits on the lists Facts keeps; counts beyond them are still exact.
@@ -16,10 +16,10 @@ const (
 )
 
 // KeptSeries names the history recorders whose whole series Facts keeps (the timeline of
-// 10 §4.5); other recorders keep only their count and last value.
+// 12 §4.5); other recorders keep only their count and last value.
 var KeptSeries = []string{"Wealth_Total", "FreeColonists"}
 
-// Scan reads a whole save in one streaming pass (10 §1.7 L1) and returns what it found.
+// Scan reads a whole save in one streaming pass (12 §1.7 L1) and returns what it found.
 // Memory stays bounded by the save's distinct content (defs, IDs, pawns), not its size:
 // large text such as compressed map grids is skipped without being buffered.
 //
@@ -34,7 +34,7 @@ func Scan(r io.Reader) (*Facts, error) {
 }
 
 // Facts is everything one full read of a save yields. It depends only on the file, so it
-// is cached as JSON (10 §1.7). Element paths and their sources are listed in
+// is cached as JSON (12 §1.7). Element paths and their sources are listed in
 // docs/research/2026-11-04_save-format-fields.md. Unless noted, a field the save does
 // not contain is left at its zero value; Scan applies the game's own defaults where
 // Scribe omits values equal to them.
@@ -46,7 +46,7 @@ type Facts struct {
 	// its root element closes); reading stopped there. Nil means well formed.
 	Malformed *Malformed `json:"malformed,omitempty"`
 
-	// Colony identity (10 §4.1).
+	// Colony identity (12 §4.1).
 	World    World     `json:"world"`
 	Player   Faction   `json:"player"`             // the player's faction; Def "" when not found
 	Factions []Faction `json:"factions,omitempty"` // every faction, in save order
@@ -72,8 +72,8 @@ type Facts struct {
 	Research Research   `json:"research"`
 	History  []Recorder `json:"history,omitempty"` // the game's history recorders (wealth, colonists, mood…)
 
-	// References for the checks of 10 §4.3 and §4.6.
-	Defs    map[string]int `json:"defs,omitempty"`    // text of every <def> element → occurrences (10 §1.4)
+	// References for the checks of 12 §4.3 and §4.6.
+	Defs    map[string]int `json:"defs,omitempty"`    // text of every <def> element → occurrences (12 §1.4)
 	Classes map[string]int `json:"classes,omitempty"` // every Class="…" attribute value → occurrences
 	Refs    Refs           `json:"refs"`
 
@@ -168,7 +168,7 @@ type Stats struct {
 }
 
 // Research is game/researchManager. Whether a project is finished needs its cost from the
-// Def (progress ≥ cost), so that is left to the reader of these facts (10 §1.7 L2).
+// Def (progress ≥ cost), so that is left to the reader of these facts (12 §1.7 L2).
 type Research struct {
 	Current  string             `json:"current,omitempty"`  // currentProj
 	Progress map[string]float64 `json:"progress,omitempty"` // project defName → research points

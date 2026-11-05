@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// The detail's one field list (06 §4.1, §2.9): the plan editor's detail and a copy's
+// The detail's one field list (16 §4.1, §2.9): the plan editor's detail and a copy's
 // detail on Mod library show the same list, one row per field. In the window a value copies
 // itself when clicked ("copied"); Act is the row's own button.
 
@@ -42,7 +42,7 @@ const (
 	ActURL    = "url"    // open the page
 	ActSteam  = "steam"  // Steam client page
 	ActTags   = "tags"   // edit (the tag bar)
-	// ActSettings opens Mod library › Mod settings at Target's files (06 §2.9)
+	// ActSettings opens Mod library › Mod settings at Target's files (16 §2.9)
 	ActSettings = "settings"
 )
 
@@ -76,7 +76,7 @@ func workshopField(id string) Field {
 }
 
 // ModFields: Archo ID, package, location [open], Workshop [open], tags [edit], alias and
-// note when set, languages, dependencies, conflicts (06 §4.1).
+// note when set, languages, dependencies, conflicts (16 §4.1).
 func ModFields(a *app.App, st *app.LoadoutState, mod *store.Mod, d *DetailData) []Field {
 	fs := headFields(st, mod)
 	if a != nil {

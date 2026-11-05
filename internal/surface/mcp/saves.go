@@ -1,6 +1,6 @@
 package mcp
 
-// Saves (10 §1.6, §4; 05 §5.2): two read-only tools for agents diagnosing a save that will
+// Saves (12 §1.6, §4; 14 §2): two read-only tools for agents diagnosing a save that will
 // not load or asking about a playthrough, and the save actions for the player. Each call
 // maps to one archo saves argv, so the text is the CLI's (I1).
 
@@ -58,7 +58,7 @@ type ManageSavesIn struct {
 }
 
 // ManageSavesArgv maps manage_saves to saves fix / rename / copy / backup / trash. Backup
-// and trash only preview unless confirm=true (--yes) and dry_run is not set (10 §4.4).
+// and trash only preview unless confirm=true (--yes) and dry_run is not set (12 §4.4).
 func ManageSavesArgv(in ManageSavesIn) []string {
 	switch in.Action {
 	case "fix":

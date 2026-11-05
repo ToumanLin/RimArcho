@@ -117,7 +117,7 @@ code, .mono { font: 12px var(--code); }
 .sub-h { display: flex; align-items: baseline; gap: 8px; padding: 12px 14px 4px; color: var(--muted); font-size: 11px; font-weight: 500; letter-spacing: .04em; }
 .sub-h .r { margin-left: auto; letter-spacing: 0; font-size: 12px; }
 
-/* source marks (06 §7 icon table: source icons are faint) */
+/* source marks (16 §7 icon table: source icons are faint) */
 .src { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; white-space: nowrap; }
 .src svg.i { color: var(--faint); }
 

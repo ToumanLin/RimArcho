@@ -1,6 +1,6 @@
-// Background tasks (06 §2.16): what RimArcho does in the background, what waits and what each item
+// Background tasks (16 §2.16): what RimArcho does in the background, what waits and what each item
 // came to. Like Mod library: the filter bar and the tasks down the left; on the right the task's
-// summary, then a table of every item it touched (06 §3.9: the headers sort, move, size and
+// summary, then a table of every item it touched (16 §3.9: the headers sort, move, size and
 // pick columns). Not a popup: the work goes on while the player is on other pages, and the
 // sidebar's foot line and ctrl+j bring them back here. "tasks" events say the record
 // changed; a lane task that ended also brings its result for the status line.
@@ -47,7 +47,7 @@ let els = null;
 
 export function initTasks(u) { ui = u; }
 
-// ---- the sidebar's foot line (06 §2.1): always there, where it is; it says more while
+// ---- the sidebar's foot line (16 §2.1): always there, where it is; it says more while
 // something runs, waits or failed ----
 export function foot(p) {
   const b = $("#tasks-line");
@@ -70,7 +70,7 @@ export function foot(p) {
   b.title = T("background tasks") + T("; ") + "ctrl+j";
 }
 
-// relang: the language changed (06 §2.14). The foot line is drawn again even though no task
+// relang: the language changed (16 §2.14). The foot line is drawn again even though no task
 // changed, and the page, if open, is built again so its fixed labels follow.
 export async function relang() {
   const b = $("#tasks-line");
@@ -261,7 +261,7 @@ function mark() {
   ui.renderWhere();
 }
 
-// ---- the gaps (06 §2.16): left | right, and the summary over the items ----
+// ---- the gaps (16 §2.16): left | right, and the summary over the items ----
 function wireGaps(root, split, right, hsplit) {
   const setSide = (v) => { if (v) root.style.setProperty("--tk-side", v + "px"); else root.style.removeProperty("--tk-side"); };
   const setTop = (v) => { if (v) right.style.setProperty("--tk-top", v + "px"); else right.style.removeProperty("--tk-top"); };
@@ -355,7 +355,7 @@ function rects() {
   for (const e of els.rows.querySelectorAll(".tk-row")) m.set(e.dataset.id, e.getBoundingClientRect().top);
   return m;
 }
-// a task that changed groups slides to its new place (FLIP, transform only; 06 §7.1)
+// a task that changed groups slides to its new place (FLIP, transform only; 16 §7.1)
 function slide(before) {
   for (const e of els.rows.querySelectorAll(".tk-row")) {
     const y = before.get(e.dataset.id);
@@ -441,7 +441,7 @@ function drawSum() {
   box.append(facts);
 }
 
-// ---- the items table (06 §3.9) ----
+// ---- the items table (16 §3.9) ----
 function itemRows() {
   const r = current();
   const list = [...((r && r.items) || [])];
@@ -611,7 +611,7 @@ async function run(act, rows, ref = "") {
   load();
 }
 
-// ---- keys (06 §2.16): the page's own; the rest are the shell's ----
+// ---- keys (16 §2.16): the page's own; the rest are the shell's ----
 export function key(e) {
   const k = e.key, ctrl = e.ctrlKey || e.metaKey;
   if (!X.page || !els) return;

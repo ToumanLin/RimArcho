@@ -9,7 +9,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// escPage is one state of one of the TUI's pages besides the editor (06 §9.1), set up from
+// escPage is one state of one of the TUI's pages besides the editor (16 §9.1), set up from
 // the editor as a player gets there.
 type escPage struct {
 	name  string
@@ -82,7 +82,7 @@ var escPages = []escPage{
 	{"Lists, help", tabList, func(m *model) { press(m, "?") }},
 }
 
-// atBase: the page shown has nothing over it, nothing selected and no open filter (06 §11
+// atBase: the page shown has nothing over it, nothing selected and no open filter (16 §11
 // T20). Filters applied with the bar closed are the page's own state (a further esc clears
 // them). esc on a page with nothing over it goes back to the editor (the TUI has no
 // sidebar), which is the editor's base.

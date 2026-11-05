@@ -1,4 +1,4 @@
-// 06 §3.1 / G24: exercise every card gap in guidev with disposable game data.
+// 16 §3.1 / G24: exercise every card gap in guidev with disposable game data.
 // CGO_ENABLED=0 go build -o tmp/gap-check/archo.exe ./cmd/archo
 // CGO_ENABLED=0 go build -o tmp/gap-check/guidev.exe ./spikes/guidev
 // npm install --prefix tmp/gap-check --no-package-lock playwright-core@1.58.2
@@ -72,7 +72,7 @@ cli('scan');
       const rect = await handle.boundingBox(), dragBefore = await value(handle);
       const space = +(await handle.getAttribute('aria-valuemax')) - dragBefore;
       const dragDelta = selector.includes('fbar-gap') && space < 80 ? -63 : space >= 23 ? 23 : -23;
-      // Start in the extended hit area, three pixels over the card edge (06 §7.3).
+      // Start in the extended hit area, three pixels over the card edge (16 §7.3).
       const x = rect.x + rect.width / 2 + (vertical && selector !== '#side-split' ? 4 : 0), y = rect.y + rect.height / 2;
       await page.mouse.move(x, y); await page.mouse.down();
       await page.mouse.move(x + (vertical ? dragDelta : 0), y + (vertical ? 0 : reverse ? -dragDelta : dragDelta), { steps: 4 });

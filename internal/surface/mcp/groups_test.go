@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// coreTools is the default `archo mcp` set (05 §5.2): what agents use to diagnose, edit,
+// coreTools is the default `archo mcp` set (14 §2): what agents use to diagnose, edit,
 // save, launch and test.
 var coreTools = []string{"guide", "status", "find_mods", "get_mod", "get_mod_settings", "get_description", "get_def", "get_patches",
 	"get_harmony", "explain_relation", "list_problems", "list_changes", "analyze_log", "search_files", "read_source",
@@ -88,7 +88,7 @@ func TestParseGroup(t *testing.T) {
 	}
 }
 
-// The aliases copy_local and add_rule are gone (05 §6): no group serves them.
+// The aliases copy_local and add_rule are gone (13 §5): no group serves them.
 func TestRemovedAliases(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)

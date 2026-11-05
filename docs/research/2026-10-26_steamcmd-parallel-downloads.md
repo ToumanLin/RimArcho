@@ -21,7 +21,7 @@ Three rounds with four small public Mods: four fully isolated processes took med
 
 ## 2. Current implementation: batch additions, per-item updates
 
-Code snapshot: RimArcho `dev/0.9.0`, HEAD `81017d85f73f504ed59d4701c94ccd907363d8f6`. Read [workspace rules](../../../AGENTS.md), [architecture](../00a-architecture.md), [session research](2026-10-24_login-sessions-loverslab-steamcmd.md), [subscription spec §3.4](../specs/02-environments-identity-and-scanning.md#34-subscriptions-git-download-pages-steamcmd-2026-10-24). Earlier recommendations do not replace source: account actions/locks already exist.
+Code snapshot: RimArcho `dev/0.9.0`, HEAD `81017d85f73f504ed59d4701c94ccd907363d8f6`. Read [workspace rules](../../../AGENTS.md), [architecture](../00a-architecture.md), [session research](2026-10-24_login-sessions-loverslab-steamcmd.md), [subscription spec §3.4](../specs/11-downloads-and-accounts.md#1-subscriptions-git-download-pages-steamcmd-2026-10-24). Earlier recommendations do not replace source: account actions/locks already exist.
 
 ### 2.1 Entry points, processes, result parsing
 
@@ -202,7 +202,7 @@ Pool adds cache copies/publication state: define storage first. Retain worker AC
 
 Alternative worker roots registered separately avoid copies but alter source UX/reassignment, not a spec-free shortcut.
 
-Future locations: planning/results/publication `subscribeworkshop.go`; startup `gamedl.go`/worker runner; retain `accounts/lock.go` instance locks/add source locks; `deps/deps.go` defines worker/account relation; `accounts.go`/uninstall maintain new directories. Sync directories/settings/state with [01 write inventory](../specs/01-scope-and-status.md), 02 §3.4, 08 §11, settings specs. No passwords/tokens/ssfn in business parameters/reports.
+Future locations: planning/results/publication `subscribeworkshop.go`; startup `gamedl.go`/worker runner; retain `accounts/lock.go` instance locks/add source locks; `deps/deps.go` defines worker/account relation; `accounts.go`/uninstall maintain new directories. Sync directories/settings/state with [01 write inventory](../specs/01-scope-and-status.md), 11 §1, 11 §3, settings specs. No passwords/tokens/ssfn in business parameters/reports.
 
 ### 6.3 Other gains and fallback
 

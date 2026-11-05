@@ -17,7 +17,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Details (06 §4): who the mod is, its problems, the facts a player uses (package id,
+// Details (16 §4): who the mod is, its problems, the facts a player uses (package id,
 // version, Workshop page, tags, alias, note, dependencies), the description, and the
 // technical information folded behind i.
 
@@ -27,7 +27,7 @@ type detailData = view.DetailData
 type detailDataMsg struct{ d *detailData }
 type fetchTick struct{ id string }
 
-// fetchDwell: the Workshop page is fetched once the cursor rests this long (06 §4.3 item 3).
+// fetchDwell: the Workshop page is fetched once the cursor rests this long (16 §4.3 item 3).
 const fetchDwell = 400 * time.Millisecond
 
 // loadData reads the declaration, About.xml and the cached Workshop text (no network).
@@ -136,7 +136,7 @@ func (m *model) detailLayout(o detailOpts) []dline {
 		}
 		add("")
 	}
-	// the field list (06 §4.1), the GUI's one
+	// the field list (16 §4.1), the GUI's one
 	for _, l := range fieldLines(view.ModFields(m.app, m.st, mod, d), w) {
 		add(l)
 	}
@@ -151,7 +151,7 @@ func (m *model) detailLayout(o detailOpts) []dline {
 		for _, l := range wrap(view.HistoryLine(d.Events), w-2) {
 			add("  " + sSecond.Render(fit(l, w-2)))
 		}
-		// the whole history of its Lineage is on the Updates page (06 §2.9)
+		// the whole history of its Lineage is on the Updates page (16 §2.9)
 		for _, l := range wrap(T("see all in change history")+", C", w-2) {
 			add("  " + sDimS.Render(l))
 		}
@@ -206,8 +206,8 @@ func clip(s string, w int) string {
 	return sText.Render("") + s + strings.Repeat(" ", max(w-lipgloss.Width(s), 0))
 }
 
-// depLines: the declared dependencies with their state (06 §4.1).
-// descLines: the description heading and text (06 §4.3 item 2).
+// depLines: the declared dependencies with their state (16 §4.1).
+// descLines: the description heading and text (16 §4.3 item 2).
 func (m *model) descLines(d *detailData, o detailOpts, w int) []dline {
 	var out []dline
 	head := func(title, note string) {
@@ -250,7 +250,7 @@ func (m *model) descLines(d *detailData, o detailOpts, w int) []dline {
 	return out
 }
 
-// renderBlocks lays out BBCode blocks at width w (06 §4.3 item 5).
+// renderBlocks lays out BBCode blocks at width w (16 §4.3 item 5).
 func (m *model) renderBlocks(bs []bbcode.Block, w int, o detailOpts) []dline {
 	var out []dline
 	add := func(s string) { out = append(out, dline{text: s}) }
@@ -362,7 +362,7 @@ func wrapSpans(spans []bbcode.Span, w int, base lipgloss.Style) []string {
 			}
 		}
 		flush()
-		// A link's domain follows its text, faint (06 §9.3), unless the text already shows it.
+		// A link's domain follows its text, faint (16 §9.3), unless the text already shows it.
 		if sp.Link != "" && (i+1 == len(spans) || spans[i+1].Link != sp.Link) {
 			if u, err := url.Parse(sp.Link); err == nil && u.Host != "" && !strings.Contains(sp.Text, u.Host) {
 				domain := "(" + u.Host + ")"
@@ -522,7 +522,7 @@ var openURL = func(u string) error {
 	return exec.Command("xdg-open", u).Start()
 }
 
-// ---- full-screen detail (06 §4.2) ----
+// ---- full-screen detail (16 §4.2) ----
 
 func (m *model) fullKey(s string) tea.Cmd {
 	if cmd, ok := m.versionDetailKey(s); ok {
@@ -531,7 +531,7 @@ func (m *model) fullKey(s string) tea.Cmd {
 	page := max(m.h-6, 1)
 	switch s {
 	case "esc", "q", "backspace", "enter":
-		m.full = false // the cursor is on the last mod shown (enter opens and closes, 06 §3.5)
+		m.full = false // the cursor is on the last mod shown (enter opens and closes, 16 §3.5)
 		return m.requestDetail()
 	case "down", "j":
 		m.fullOff++
@@ -648,7 +648,7 @@ func (m *model) syncFullSec() {
 	}
 }
 
-// detailKey: the keys of area 4, the compact detail (06 §3.3): ↑↓ scroll it, ← and esc
+// detailKey: the keys of area 4, the compact detail (16 §3.3): ↑↓ scroll it, ← and esc
 // go back to the list whose mod it shows. Verbs and the other keys work as in that list
 // (they act on the mod shown, or on the list's selection) and keep the focus here.
 func (m *model) detailKey(s string) (tea.Cmd, bool) {

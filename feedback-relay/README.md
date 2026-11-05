@@ -1,6 +1,6 @@
 # Feedback relay (Cloudflare Worker)
 
-"send" in Settings › Feedback passes the report to this Worker, which opens a public issue in [ToumanLin/RimArcho](https://github.com/ToumanLin/RimArcho) using a GitHub App with write access only to Issues. Players need no GitHub account. The GitHub App private key lives only in a Worker secret, never in RimArcho. Specification: 06 §2.14; code structure: 07 §2.
+"send" in Settings › Feedback passes the report to this Worker, which opens a public issue in [ToumanLin/RimArcho](https://github.com/ToumanLin/RimArcho) using a GitHub App with write access only to Issues. Players need no GitHub account. The GitHub App private key lives only in a Worker secret, never in RimArcho. Specification: 16 §2.14; code structure: 17 §2.
 
 Until RimArcho has a relay URL, the feedback page offers only "open GitHub".
 

@@ -10,7 +10,7 @@ import (
 )
 
 // asmDuplicates: two or more enabled mods ship an assembly with the same file name in their
-// effective folders (03 §4.3, asm.duplicate-name). RimWorld loads each mod's DLLs in load
+// effective folders (05 §4.3, asm.duplicate-name). RimWorld loads each mod's DLLs in load
 // order with Assembly.LoadFrom, and a later DLL whose name is already loaded is not loaded
 // again: the first copy in load order is the one every mod gets (MCP eval h2, real 1.6: a
 // stale OutfitStandsPlus.dll in a patch mod listed first hid four types of Outfit Stands

@@ -1,5 +1,5 @@
 // Package winres writes a Windows resource object (.syso) the Go linker picks up: the icon
-// group and the version information of an executable (06 §8.6). It replaces a resource
+// group and the version information of an executable (16 §8.6). It replaces a resource
 // compiler so the release needs no extra tool.
 package winres
 

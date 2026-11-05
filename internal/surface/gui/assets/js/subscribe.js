@@ -1,4 +1,4 @@
-// Mod library › add a subscription (06 §2.9): one paste box. What is pasted is recognised (a Git repository,
+// Mod library › add a subscription (16 §2.9): one paste box. What is pasted is recognised (a Git repository,
 // a LoversLab file page, another web page, Workshop links or IDs); the card below asks only
 // the one decision that source needs and shows the --dry-run text before subscribe. Also the
 // file choice a download-page update needs (pageUpdate, in the updates detail).

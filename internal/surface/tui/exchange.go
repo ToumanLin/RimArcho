@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Import and export of the mod list (04 §9), the TUI's short form of the window's popup:
+// Import and export of the mod list (07 §7), the TUI's short form of the window's popup:
 // import reads a path, share code or link, shows what it would do and offers replace or
 // add; export picks a format, then a file.
 

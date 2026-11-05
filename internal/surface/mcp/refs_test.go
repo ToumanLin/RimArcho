@@ -9,7 +9,7 @@ import (
 
 // Agents pass packageIds without pkg: (MCP review 2026-11-04 §2.3). Every tool that takes a
 // mod reference accepts them in any case, and a reference matching nothing points to
-// find_mods on MCP and to archo find on the CLI (05 §2, §3.3).
+// find_mods on MCP and to archo find on the CLI (13 §2, §3.3).
 func TestBarePackageIDTools(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)

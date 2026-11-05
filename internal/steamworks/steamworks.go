@@ -1,5 +1,5 @@
 // Package steamworks subscribes to and unsubscribes from Workshop items, and reads their
-// state, through the Steam client (06 §2.9, 08 §10). The calls run in a bounded worker
+// state, through the Steam client (16 §2.9, 11 §2). The calls run in a bounded worker
 // process (`archo steam-worker <action> <ids>`) started in a runtime folder that holds
 // steam_api64.dll (copied from the game install) and steam_appid.txt. Steam sees RimWorld
 // as running while a download is watched; DownloadItem explicitly drives it. A crash

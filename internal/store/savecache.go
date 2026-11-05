@@ -2,7 +2,7 @@ package store
 
 import "database/sql"
 
-// The full read of a save (10 §1.7 L1) depends only on the file, so it is kept by path
+// The full read of a save (12 §1.7 L1) depends only on the file, so it is kept by path
 // and valid while the size, modification time and parser version are unchanged. Lists
 // read only the summary columns; the facts (gzip JSON) are read for one save at a time.
 // Path is the caller's key for the file (app uses env.PathKey).
@@ -20,7 +20,7 @@ type SaveCache struct {
 // SaveSummaryRow is the part of the full read that lists and grouping need.
 type SaveSummaryRow struct {
 	Ticks     int64
-	Identity  string // world identity, "" when the save holds none (10 §4.1)
+	Identity  string // world identity, "" when the save holds none (12 §4.1)
 	World     string // world name
 	Faction   string // the player faction's name
 	Malformed bool

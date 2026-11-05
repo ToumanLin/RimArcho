@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/logs"
 )
 
-// Consequences of a Def file that failed to load (03 §6.3). "Exception loading def from file
+// Consequences of a Def file that failed to load (06 §3). "Exception loading def from file
 // F" means every def F defines is missing from the game, so each later "Could not resolve
 // cross-reference … named X" for one of them, and the config checks that then read a null
 // stat ("defines the stat base  more than once", the stat's name empty), are the same fault.

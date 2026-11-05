@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The ops of a row, the same on the editor and Mod library (06 §3.5, §8.5, view.OpTable): each
+// The ops of a row, the same on the editor and Mod library (16 §3.5, §8.5, view.OpTable): each
 // op code has one runner here, so a key, the row menu and Mod library's detail all run the same.
 
 // library is the library as of the board's build (the editor's rows ask it for their copy's
@@ -80,7 +80,7 @@ func (m *model) runEditorOp(code string) tea.Cmd {
 }
 
 // libOp runs an op of the version and disk groups (and the plan ops of Mod library) on copies:
-// one that changes files shows its dry run first and runs on enter (06 §6).
+// one that changes files shows its dry run first and runs on enter (16 §6).
 func (m *model) libOp(code string, refs []string, what string) tea.Cmd {
 	o := view.OpOf(code)
 	if o.Code == "" {
@@ -108,7 +108,7 @@ func (m *model) libOp(code string, refs []string, what string) tea.Cmd {
 
 // libDo runs a library action and says what it did; Steam out of reach opens the pages.
 // The subscription actions (check for updates, update, remove subscription) are background tasks, as in the window
-// (06 §2.16).
+// (16 §2.16).
 func (m *model) libDo(code string, refs []string) tea.Cmd {
 	if code == view.OpSubCheck || code == view.OpSubUpdate || code == view.OpSubRemove {
 		var names []string
@@ -146,7 +146,7 @@ func (m *model) libDo(code string, refs []string) tea.Cmd {
 }
 
 // delKey is Del: unsubscribe, remove the subscription or delete, whichever the row has
-// (06 §3.5, §2.9).
+// (16 §3.5, §2.9).
 func (m *model) delKey(ops []string, run func(code string) tea.Cmd) tea.Cmd {
 	for _, c := range ops {
 		if c == view.OpUnsub || c == view.OpDelete || c == view.OpSubRemove {
@@ -157,7 +157,7 @@ func (m *model) delKey(ops []string, run func(code string) tea.Cmd) tea.Cmd {
 	return nil
 }
 
-// noteKey is n in the editor: the mod's own note (the Lineage's, 06 §4.1).
+// noteKey is n in the editor: the mod's own note (the Lineage's, 16 §4.1).
 func (m *model) noteKey() tea.Cmd {
 	it := m.current()
 	if it == nil || it.id == "" || m.st == nil {
@@ -195,7 +195,7 @@ func (m *model) selectAll() tea.Cmd {
 
 // ---- pages ----
 
-// navKeys: shift+1…8 are the sidebar's entries (06 §3.5); a terminal sends them as the
+// navKeys: shift+1…8 are the sidebar's entries (16 §3.5); a terminal sends them as the
 // characters of the US layout.
 var navKeys = map[string]int{"!": 1, "@": 2, "#": 3, "$": 4, "%": 5, "^": 6, "&": 7, "*": 8}
 

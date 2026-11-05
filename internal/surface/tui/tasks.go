@@ -37,7 +37,7 @@ func (m *model) queueSourceDecompile(envName string) tea.Cmd {
 	})
 }
 
-// Background tasks (06 §2.16) in the terminal: the subscription actions (add a subscription, check for updates, update,
+// Background tasks (16 §2.16) in the terminal: the subscription actions (add a subscription, check for updates, update,
 // remove subscription) queue into app.Tasks — the record and lanes the window uses, <data>/tasks.json —
 // and run on their own database session, so the screen never waits for Git, a web page,
 // Steam or a folder move. The status line says when a task is queued and how it ended; the
@@ -56,7 +56,7 @@ type taskRunner struct {
 	ended   chan app.Task
 	pending int  // tasks queued here that have not ended (screen goroutine only)
 	waiting bool // a waitTask command is out (screen goroutine only)
-	// scanning: a scan runs; the files lane waits for it (06 §2.16).
+	// scanning: a scan runs; the files lane waits for it (16 §2.16).
 	scanning atomic.Bool
 	// runSub runs an archo command on a session (cmds.Execute; tests point Git URLs at a
 	// local repository).
@@ -73,7 +73,7 @@ func (m *model) snapshot() *app.App {
 	return snap
 }
 
-// bg runs read on its own session off the screen goroutine (06 §3.1 rule 9) and hands the
+// bg runs read on its own session off the screen goroutine (16 §3.1 rule 9) and hands the
 // result back as a message.
 func (m *model) bg(read func(a *app.App) func(m *model) tea.Cmd) tea.Cmd {
 	snap := m.snapshot()
@@ -259,7 +259,7 @@ func (m *model) closeTasks() {
 	}
 }
 
-// showTasks is Background tasks as text (06 §9.1): the record the window and this TUI share, by
+// showTasks is Background tasks as text (16 §9.1): the record the window and this TUI share, by
 // group, a task a line with how it ended. Stopping and retrying stay in the window.
 func (m *model) showTasks() {
 	p := view.BuildTasks(m.taskList().List(), time.Now())

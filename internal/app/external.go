@@ -13,9 +13,9 @@ import (
 )
 
 // attributeExternal handles a ModsConfig.xml whose hash is neither the one RimArcho last
-// saw nor the one it last wrote (04 §4.3). The change belongs to the plan that last wrote
+// saw nor the one it last wrote (07 §4.3). The change belongs to the plan that last wrote
 // the file — possibly another plan of this environment, or a plan of another environment
-// sharing the user data folder — with entries resolved by the game that wrote it (§4.2).
+// sharing the user data folder — with entries resolved by the game that wrote it (07 §4.2).
 // Without a usable record it belongs to the current plan. A file that only differs in
 // format from the version the file is known to hold is no change.
 //
@@ -127,7 +127,7 @@ func (a *App) writerPlan(st *LoadoutState, mcs *store.ModsConfigState) (*store.P
 }
 
 // ExternalConflict is a plan's external ModsConfig.xml version that was not loaded because
-// the plan had changed since it was written (04 §4.3: "an outside version has not been loaded").
+// the plan had changed since it was written (07 §4.3: "an outside version has not been loaded").
 type ExternalConflict struct {
 	Plan    *store.Plan
 	Env     *env.Environment // the plan's environment
@@ -234,7 +234,7 @@ func conflictError(st *LoadoutState, c *ExternalConflict) error {
 		ErrExternalConflict, c.Name(st.Ix.Env), how)
 }
 
-// IgnoreExternal clears the current plan's "unloaded external version" mark (04 §4.3,
+// IgnoreExternal clears the current plan's "unloaded external version" mark (07 §4.3,
 // `loadout ignore-external`); the version stays in the history. It returns the version
 // that was ignored, 0 when there was none.
 func (a *App) IgnoreExternal() (int, *LoadoutState, error) {
@@ -256,7 +256,7 @@ func (a *App) IgnoreExternal() (int, *LoadoutState, error) {
 	return n, st, a.Store.SetWorkspace(st.WS)
 }
 
-// DismissConflict is IgnoreExternal for the UI's "ignore it" (06 §2.5).
+// DismissConflict is IgnoreExternal for the UI's "ignore it" (16 §2.5).
 func (a *App) DismissConflict() error {
 	_, _, err := a.IgnoreExternal()
 	return err

@@ -15,7 +15,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Index is an environment's instances with reference helpers (05 §2).
+// Index is an environment's instances with reference helpers (13 §2).
 type Index struct {
 	store     *store.Store // lazy foreign-list lookups follow the owning session on adoption
 	Env       *env.Environment
@@ -29,7 +29,7 @@ type Index struct {
 }
 
 // OwnCopy is this game's own Mods/ copy of a packageId (not a RimArcho link), or nil. A list
-// naming another game's Mods/ copy uses it instead (02 §0 item 14, 04 §1.7).
+// naming another game's Mods/ copy uses it instead (03 §2 item 14, 07 §1.7).
 func (ix *Index) OwnCopy(pkg string) *store.Mod { return ix.own[strings.ToLower(pkg)] }
 
 // Elsewhere is m when it is another game's Mods/ copy that this game has no copy of its
@@ -173,7 +173,7 @@ func (ix *Index) Source(id string) *source.Source {
 
 // RefError is a reference that matched nothing. Find, when set, is what to search for
 // instead: Error names the CLI command (search with archo find <Find>) and MCPError the
-// MCP tool (search with find_mods query=<Find>), 05 §3.3.
+// MCP tool (search with find_mods query=<Find>), 13 §3.3.
 type RefError struct{ Ref, Hint, Find string }
 
 func (e *RefError) Error() string { return e.text("archo find " + quoteWords(e.Find)) }
@@ -203,7 +203,7 @@ func quoteWords(s string) string {
 }
 
 // PackageRef returns the lower-case packageId a reference names: pkg:<packageId> or a bare
-// packageId (BarePackageID), 05 §2.
+// packageId (BarePackageID), 13 §2.
 func PackageRef(ref string) (string, bool) {
 	r := strings.TrimSpace(ref)
 	if p, ok := strings.CutPrefix(strings.ToLower(r), "pkg:"); ok {
@@ -215,7 +215,7 @@ func PackageRef(ref string) (string, bool) {
 	return "", false
 }
 
-// BarePackageID reports whether a word is a packageId written without pkg: (05 §2): two or
+// BarePackageID reports whether a word is a packageId written without pkg: (13 §2): two or
 // more dot-separated parts of ASCII letters, digits, "_" and "-", with at least one letter.
 // No other reference has that shape: instance and lineage IDs have no dot, the prefixed
 // forms have ":" or "#", Def references "/" or "@", paths "/" or "\", names a space, and a
@@ -378,7 +378,7 @@ func (a *App) IdentityQuestion(qid int64) (*store.Question, error) {
 	return q, nil
 }
 
-// ResolveQuestion answers an identity question: same | copy | unrelated (02 §5.4).
+// ResolveQuestion answers an identity question: same | copy | unrelated (04 §2.4).
 func (a *App) ResolveQuestion(qid int64, answer string) (*store.Question, error) {
 	q, err := a.IdentityQuestion(qid)
 	if err != nil {
@@ -435,7 +435,7 @@ func (a *App) MergeLineages(ix *Index, into, from string) error {
 	return a.Store.MergeLineages(ix.Env.ID, into, from)
 }
 
-// GC removes expired tombstones (02 §5.5).
+// GC removes expired tombstones (04 §2.5).
 func (a *App) GC(dryRun bool) (*store.GCResult, time.Time, error) {
 	e, err := a.Env()
 	if err != nil {

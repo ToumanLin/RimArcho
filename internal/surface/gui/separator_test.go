@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// Every adjustable card gap uses the keyboard and persistence implementation (06 §3.1).
+// Every adjustable card gap uses the keyboard and persistence implementation (16 §3.1).
 func TestSeparators(t *testing.T) {
 	t.Parallel()
 	for _, name := range []string{"main", "filterbar", "library", "screens", "tasks", "planmanage", "shell"} {

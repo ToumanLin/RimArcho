@@ -1,5 +1,5 @@
 import { closeChoiceMenu } from "./choices.js";
-// Session page navigation (06 §3.1 rule 11). Page reads report completion here;
+// Session page navigation (16 §3.1 rule 11). Page reads report completion here;
 // refreshes and stale replies never add another visit. No browser History API is used.
 import { S, $, api } from "./state.js";
 import { openEditor } from "./lists.js";
@@ -30,10 +30,10 @@ let openingPlan = Promise.resolve(), requestedPlan = null;
 export function initNavigation(u) { ui = u; }
 
 // go opens a sidebar page; "plan" is the open plan's editor, "plan:<id>" a plan (opened
-// only: the current list, the one launched, stays; 04 §1.3), "plan:new" the new-list form,
+// only: the current list, the one launched, stays; 07 §1.3), "plan:new" the new-list form,
 // "pack:<name>" a pack on the packs page.
 export async function go(id, entry = null) {
-  if (uninst.locked()) return; // an uninstall runs, or has run (06 §2.14)
+  if (uninst.locked()) return; // an uninstall runs, or has run (16 §2.14)
   pageEntering();
   shell.navigated();
   if (entry) {

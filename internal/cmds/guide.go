@@ -1,6 +1,6 @@
 package cmds
 
-// `archo guide` and the MCP tool guide (05 §5.3): the detail behind the short MCP
+// `archo guide` and the MCP tool guide (14 §3): the detail behind the short MCP
 // Instructions and tool descriptions, read when an agent needs it (progressive disclosure).
 // Topics are the workflows below and every MCP tool by name (guide_tools.go).
 
@@ -16,7 +16,7 @@ func init() {
 		MaxArgs: 1, Run: guideCmd})
 }
 
-// AllOnlyTools are the MCP tools only `archo mcp --tools all` serves (05 §5.2): the
+// AllOnlyTools are the MCP tools only `archo mcp --tools all` serves (14 §2): the
 // player's management tools. The topic list marks them the same way on every surface (I1);
 // TestToolGroups (internal/surface/mcp) keeps this in step with the MCP tool table.
 var AllOnlyTools = map[string]bool{
@@ -115,4 +115,4 @@ const guidePlans = `Plans: every editing tool acts on the current plan. edit_loa
 Inventory: list_library lists every mod on this machine with its copies, sizes, states and the plans using it; manage_library moves a spare Mods/ copy into the lock library or takes mods out of every plan. manage_subscriptions adds, checks, updates and removes the subscriptions RimArcho keeps itself (Git repositories, download pages, Workshop items downloaded with SteamCMD). manage_textures converts mods' PNG textures to DDS next to them (lighter loading and video memory; the PNGs stay) and takes them back.
 Editing mod files: pin_mod first creates a locked version (a copy the current plan uses instead; never edit Workshop files in place — Steam overwrites them), then edit the copy; test_run tests the copy before anything is saved.`
 
-const guideWords = `Talking to the player: the interface calls a plan a list, an environment a game, the library the mod library, save_loadout "save", pin_mod "lock this version", swap "switch version" and a pack a pack (06 §7.2); use those words with the player, and the tool names only in calls.`
+const guideWords = `Talking to the player: the interface calls a plan a list, an environment a game, the library the mod library, save_loadout "save", pin_mod "lock this version", swap "switch version" and a pack a pack (16 §7.2); use those words with the player, and the tool names only in calls.`

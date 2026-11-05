@@ -6,7 +6,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// 06 §3.7: from the second letter the search shows the rest of a field name; Tab takes it.
+// 16 §3.7: from the second letter the search shows the rest of a field name; Tab takes it.
 func TestSearchCompletes(t *testing.T) {
 	t.Parallel()
 	e, _ := v3Fixture(t)

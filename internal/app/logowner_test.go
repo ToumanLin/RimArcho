@@ -32,7 +32,7 @@ func writeLogAt(t *testing.T, e *testkit.Env, path, text string, at time.Time) {
 }
 
 // No foreign log may enter even a stale group, hit a cached report, mark itself seen,
-// prompt a new log, or start the other version's Def/Patch analysis (03 §6.4).
+// prompt a new log, or start the other version's Def/Patch analysis (06 §4).
 func TestForeignLogExcludedBeforeAnalysis(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
@@ -226,7 +226,7 @@ func TestOwnLogBeforeGameUpgrade(t *testing.T) {
 // before it moved; MCP eval 2026-11-04) is attributed against this environment, its only
 // candidate: `archo log` analyses first and says so. Before any analysis, a failing type
 // with no owner reads "assemblies not analysed yet", never "no enabled mod defines it".
-// The same log owned by another registered environment is still refused (03 §6.4).
+// The same log owned by another registered environment is still refused (06 §4).
 func TestUnknownGameLogAttributedHere(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)

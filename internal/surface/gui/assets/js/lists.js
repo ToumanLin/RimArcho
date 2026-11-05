@@ -1,4 +1,4 @@
-// The three lists (06 §2.5): virtual rows, the cursor, selection, search, dragging. The
+// The three lists (16 §2.5): virtual rows, the cursor, selection, search, dragging. The
 // board has three columns: Not enabled | Enabled | details, with Staging and history folded under details.
 import { factText, S, $, $$, el, esc, col, cur, key, api, T, Tf, AREAS, ROW_H } from "./state.js";
 import { icon, sourceIcon, statusIcon } from "./icons.js";
@@ -11,7 +11,7 @@ const rowID = (k, it) => `editor-${k}-${encodeURIComponent(key(it))}`;
 const rowsEl = (k) => $(`.area[data-area="${k}"] .rows`);
 
 // The editor lives under the page overlay; old virtual rows must stay inert until its
-// new object is ready, including after a failed read (06 §8.2).
+// new object is ready, including after a failed read (16 §8.2).
 export async function openEditor(load, replace = false, ready = () => {}) {
   const read = beginPageRead(null, { replace, retry: () => openEditor(load, replace, ready) });
   const board = $("#board");
@@ -48,7 +48,7 @@ export function setItems(k, items) {
   return keep ? key(keep) : "";
 }
 
-// The filter bar over Not enabled and Enabled (06 §2.5): one search and one set of filters for both
+// The filter bar over Not enabled and Enabled (16 §2.5): one search and one set of filters for both
 // lists; S.bar is the bar (filterbar.js), S.barData its last answer (view.BarFilter).
 // Both lists ask at once: one call per bar state; only the latest call's answer counts.
 let barCall = null, barSig = "";
@@ -83,7 +83,7 @@ export async function refilter(k, keepKey) {
     const r = await api.Filter(k, c.query);
     if (!current()) return;
     c.view = r.rows || [];
-    c.others = null; // no "other lists" line: tab no longer jumps lists (06 §3.7)
+    c.others = null; // no "other lists" line: tab no longer jumps lists (16 §3.7)
     c.complete = r.complete || "";
   }
   c.cursor = Math.max(0, Math.min(c.cursor, c.view.length - 1));
@@ -278,7 +278,7 @@ export function renderRows(k) {
 export let onHistory = () => {};
 export function setOnHistory(fn) { onHistory = fn; }
 
-// renderHistory: the history's fold under details and staging (06 §2.5): its bar says how
+// renderHistory: the history's fold under details and staging (16 §2.5): its bar says how
 // many steps; open, it lists them, then the saved versions.
 export function renderHistory() {
   const area = $(".histarea");
@@ -294,7 +294,7 @@ export function renderHistory() {
   if (fold.hist) body.append(historyPanel());
 }
 
-// historyPanel: unsaved steps around "now", then the saved versions (06 §2.5).
+// historyPanel: unsaved steps around "now", then the saved versions (16 §2.5).
 function historyPanel() {
   const p = el("div", "hist");
   let versions = false;
@@ -392,7 +392,7 @@ export function wireLists(ui) {
     const input = $(`.area[data-area="${k}"] .search input`);
     if (!input) continue; // Not enabled and Enabled share the filter bar
     input.placeholder = T("search: words, tag:, author:, type:, has:, -not");
-    // the grey completion after the query (06 §3.7): the typed text, invisible, then the rest
+    // the grey completion after the query (16 §3.7): the typed text, invisible, then the rest
     const ghost = el("span", "ghost");
     ghost.append(el("span", "typed"), el("span", "sfx"));
     input.after(ghost);
@@ -403,8 +403,8 @@ export function wireLists(ui) {
   }
 }
 
-// Dragging is another way to run a verb (06 §8.5): it acts on drop and u undoes it. It runs
-// on mouse events, not HTML drag and drop: under WebView2 composition hosting (06 §8.2) the
+// Dragging is another way to run a verb (16 §8.5): it acts on drop and u undoes it. It runs
+// on mouse events, not HTML drag and drop: under WebView2 composition hosting (16 §8.2) the
 // window has no OLE drop target, so a native drag starts but nothing can receive the drop.
 let press = null; // the pressed row, until the mouse moves far enough to drag it
 let drag = null; // { ui, from, items, to: area under the pointer or -1, at, x, y }
@@ -495,7 +495,7 @@ function wireDragWindow() {
     setTimeout(() => window.removeEventListener("click", swallowClick, true), 0);
     if (d.to >= 0) d.ui.drop(d.from, d.to, d.items, d.at);
   });
-  // esc cancels a drag (06 §8.5), and so does leaving the window
+  // esc cancels a drag (16 §8.5), and so does leaving the window
   window.addEventListener("keydown", (e) => {
     if (!drag || e.key !== "Escape") return;
     e.preventDefault();

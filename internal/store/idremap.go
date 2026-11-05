@@ -349,7 +349,7 @@ func sortedKeys(m map[string]string) []string {
 	return out
 }
 
-// IDAliases maps merged-away IDs to the IDs kept (02 §0.1), for IDs written to disk
+// IDAliases maps merged-away IDs to the IDs kept (03 §2.1), for IDs written to disk
 // before the merge: pack.json entries and .rimarcho/origin.json.
 func (s *Store) IDAliases() (map[string]string, error) {
 	rows, err := s.DB.Query(`SELECT old_id, new_id FROM id_alias`)

@@ -17,7 +17,7 @@ func settingQueued(t app.Task) string {
 }
 
 // queueSettingTaskLocked captures the target at submission. Slow work uses its own
-// connection and never holds the GUI lock (06 §3.1 rule 9, 06 §2.16).
+// connection and never holds the GUI lock (16 §3.1 rule 9, 16 §2.16).
 func (s *API) queueSettingTaskLocked(kind string, argv []string, env string, resume ...app.Task) app.Task {
 	snapshot := &app.App{Store: s.a.Store}
 	snapshot.ReadOptions(s.a)

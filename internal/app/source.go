@@ -23,7 +23,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// On-demand decompilation with ilspycmd (03 §5.4). Generated projects live in the
+// On-demand decompilation with ilspycmd (05 §5.4). Generated projects live in the
 // managed Source library; identities and uses survive removed output.
 
 // Decompiler turns dll into C# under outDir (a whole project, or one type when typ != "").

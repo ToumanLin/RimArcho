@@ -1,4 +1,4 @@
-// Settings > Feedback (06 §2.14): a GitHub issue written here, sent through the feedback relay
+// Settings > Feedback (16 §2.14): a GitHub issue written here, sent through the feedback relay
 // (send, no GitHub account needed; offered only when RimArcho has one) or opened in the
 // browser with the title and body filled in (view.FeedbackAttachments, ComposeFeedback,
 // SendFeedback). RimArcho, the game and the system always go with it; the enabled mods, the
@@ -8,7 +8,7 @@ import { copy } from "./fields.js";
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { page, button, area, beginPageRead } from "./screens.js";
 
-// The draft stays for the session: leaving the page does not lose what was typed (06 §3.1).
+// The draft stays for the session: leaving the page does not lose what was typed (16 §3.1).
 // sent: the issue send opened last, shown until the next draft. open: the preview's
 // attachments unfolded by the player (by key), kept while typing.
 const F = { title: "", text: "", contact: "", opts: { mods: false, paths: false, log: false }, at: null, res: null, sent: null, sending: false, open: new Set() };
@@ -105,7 +105,7 @@ function partRow(p) {
   c.disabled = !!(p.fixed || p.none);
   box.append(c, el("span", "name", p.label));
   const note = el("div", "sub setting-note");
-  // the basic facts side by side, spaced like other facts (06 §7.3 rule 5)
+  // the basic facts side by side, spaced like other facts (16 §7.3 rule 5)
   if (p.fixed) { note.classList.add("word-facts"); for (const f of F.at?.basic || []) note.append(el("span", "", f)); }
   else note.textContent = p.note || "";
   left.append(box, note);

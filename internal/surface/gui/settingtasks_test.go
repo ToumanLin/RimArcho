@@ -75,7 +75,7 @@ func waitSettingEnd(t *testing.T, events <-chan string, id string) {
 }
 
 // The guide returns while downloading, progress appears in the record, and settings
-// can still be read. SteamCMD and todds share the same queue entry points (06 §2.16).
+// can still be read. SteamCMD and todds share the same queue entry points (16 §2.16).
 func TestToolDownloadsAreTasks(t *testing.T) {
 	t.Parallel()
 	e, api, events := fixture(t)

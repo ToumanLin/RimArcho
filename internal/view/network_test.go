@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 06 §2.14, 07 §2.2: Settings › network holds the proxy and the GitHub mirror; config set
+// 16 §2.14, 17 §2.2: Settings › network holds the proxy and the GitHub mirror; config set
 // checks them and the process's requests follow at once.
 func TestNetworkSettings(t *testing.T) {
 	e := testkit.New(t)

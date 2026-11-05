@@ -123,7 +123,7 @@ func TestSaveDetail(t *testing.T) {
 	}
 
 	// Mods missing and reordered: one row each, with its consequence and its own fix; the
-	// bar offers no Fix and launch (06 §2.11)
+	// bar offers no Fix and launch (16 §2.11)
 	current = true
 	d = detail("Tundra 2", false)
 	current = false

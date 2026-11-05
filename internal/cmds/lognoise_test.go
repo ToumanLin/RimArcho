@@ -12,7 +12,7 @@ import (
 // The solid-colour material made in code and the translation error count are known noise:
 // hidden informational clusters, named in the hidden line, with an honest note and no
 // uiIconColor route. A def's texture-less material with no mod identified is labelled
-// "common kind, no source found" (MCP transcript review 2026-11-04, P2; 03 §6.1, §6.8).
+// "common kind, no source found" (MCP transcript review 2026-11-04, P2; 06 §1, §8).
 func TestLogKnownNoiseAndCommon(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)

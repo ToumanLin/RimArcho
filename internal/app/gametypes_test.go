@@ -21,7 +21,7 @@ func copyFixtureDLL(t *testing.T, e *testkit.Env, name, dst string) {
 }
 
 // A scan indexes the game's own assemblies for its version, rereads them only when they
-// change, and keeps 1.6 and 1.7 games apart (03 §5.3).
+// change, and keeps 1.6 and 1.7 games apart (05 §5.3).
 func TestScanIndexesGameTypes(t *testing.T) {
 	e := testkit.New(t)
 	managed := filepath.Join(e.Game, "RimWorldWin64_Data", "Managed")

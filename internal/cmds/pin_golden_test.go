@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// Locked versions (04 §7): pin into the lock library, the upstream update warning,
+// Locked versions (07 §5): pin into the lock library, the upstream update warning,
 // pin --update, the _Archo_ link on save, unpin.
 func TestGoldenPin(t *testing.T) {
 	t.Parallel()

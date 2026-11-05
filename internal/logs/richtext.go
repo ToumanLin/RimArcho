@@ -5,7 +5,7 @@ import (
 	"unicode/utf8"
 )
 
-// Unity rich text in log messages (06 §2.10): mods colour their messages with <color>, <b>
+// Unity rich text in log messages (16 §2.10): mods colour their messages with <color>, <b>
 // and <i>, as RimWorld's debug log shows them. RichSpans parses a message into styled
 // spans; nothing in the text ever becomes markup for an interface.
 

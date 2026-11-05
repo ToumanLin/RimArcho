@@ -30,7 +30,7 @@ type workshopAnswer struct {
 	err error
 }
 
-// workshopDetails reads the details of many items, workshopBatch per request (02 §3.4).
+// workshopDetails reads the details of many items, workshopBatch per request (11 §1).
 // A request that fails is sent once more after a pause, and so are the items Steam
 // answered with a passing error (busy, timed out, rate limited). Every ID gets an answer.
 func (a *App) workshopDetails(ctx context.Context, ids []string) map[string]workshopAnswer {

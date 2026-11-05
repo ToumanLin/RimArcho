@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 06 §3.1 rule 6: everything the mouse can do, the keyboard can do. Every op the editor's
+// 16 §3.1 rule 6: everything the mouse can do, the keyboard can do. Every op the editor's
 // and Mod library's rows can have has a key or the row menu (the menu key, shift+F10), and the
 // page runs it: as one of the editor's verbs (main.js rowOp), one of Mod library's own cases
 // (library.js run), or through LibDo.
@@ -33,7 +33,7 @@ func TestOpsRunnable(t *testing.T) {
 		}
 		q := `"` + o.Code + `"`
 		ed := strings.Contains(verbs[1], q) || strings.Contains(verbs[1], o.Code+":") || view.LibDoes(o.Code)
-		// the list ops are the editor's only: Mod library's menu has library ops (06 §8.5)
+		// the list ops are the editor's only: Mod library's menu has library ops (16 §8.5)
 		lb := strings.Contains(lib, "case "+q) || view.LibDoes(o.Code) || o.Code == view.OpEnableAt || o.Code == view.OpMoveTo
 		if !ed {
 			t.Errorf("%s: the editor does not run it", o.Code)
@@ -43,7 +43,7 @@ func TestOpsRunnable(t *testing.T) {
 		}
 	}
 	// the keys the table names are the ones the pages read
-	// Data table headers share mouse and keyboard behavior (06 §3.9).
+	// Data table headers share mouse and keyboard behavior (16 §3.9).
 	for _, name := range []string{"library", "tasks", "packs", "textures"} {
 		source := read("assets/js/" + name + ".js")
 		for _, marker := range []string{`from "./datatable.js"`, `.key(e)`} {
@@ -62,7 +62,7 @@ func TestOpsRunnable(t *testing.T) {
 	}
 }
 
-// Player-invoked forms are pages; irreversible list deletion still confirms (06 §3.1, 06 §6).
+// Player-invoked forms are pages; irreversible list deletion still confirms (16 §3.1, 16 §6).
 func TestFormRoutesRunnable(t *testing.T) {
 	t.Parallel()
 	read := func(p string) string {

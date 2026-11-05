@@ -63,7 +63,7 @@ func TestToolsAndAnnotations(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[string]string{ // name → expected annotation: ro, write, destructive
-		"guide":  "ro", // 05 §5.3: the detail behind the short descriptions
+		"guide":  "ro", // 14 §3: the detail behind the short descriptions
 		"status": "ro", "find_mods": "ro", "get_mod": "ro", "get_mod_settings": "ro", "get_def": "ro", "get_patches": "ro", "get_harmony": "ro",
 		"explain_relation": "ro", "list_problems": "ro", "list_changes": "ro", "analyze_log": "ro", "search_files": "ro",
 		"read_source": "ro", "edit_loadout": "write", "save_loadout": "destructive",
@@ -71,22 +71,22 @@ func TestToolsAndAnnotations(t *testing.T) {
 		"test_run":        "write",
 		"estimate_memory": "ro",
 		"check_links":     "ro", "repair_links": "destructive",
-		// 05 §1.2: the player actions that only had CLI commands.
+		// 13 §1.2: the player actions that only had CLI commands.
 		"manage_rules": "write", "ignore_problem": "write", "scan": "write", "exchange_list": "write",
 		"mute_version_warnings": "write",
 		"manage_packs":          "destructive", "resolve_identity": "destructive", "manage_hidden": "destructive", "maintenance": "destructive",
 		"pin_mod": "write", "unpin_mod": "write",
 		// 0.9: launching, plans and their history.
 		"launch_game": "destructive", "manage_plans": "destructive", "plan_history": "ro",
-		// 06 §2.9: Mod library.
+		// 16 §2.9: Mod library.
 		"list_library": "ro", "manage_library": "destructive",
-		// 02 §3.4: subscriptions RimArcho installs and updates (Git, download pages, SteamCMD).
+		// 11 §1: subscriptions RimArcho installs and updates (Git, download pages, SteamCMD).
 		"manage_subscriptions": "destructive",
-		// Uninstall: only its dry run (05 §5.2).
+		// Uninstall: only its dry run (14 §2).
 		"preview_uninstall": "ro",
-		// Texture optimisation (08 §5.2).
+		// Texture optimisation (10 §2).
 		"manage_textures": "destructive",
-		// Saves (10 §1.6, §4.4): a fix subscribes through Steam, so it is open-world.
+		// Saves (12 §1.6, §4.4): a fix subscribes through Steam, so it is open-world.
 		"list_saves": "ro", "get_save": "ro", "manage_saves": "destructive",
 	}
 	openWorld := map[string]bool{"get_description": true, "exchange_list": true, "maintenance": true, "manage_subscriptions": true, "manage_saves": true}
@@ -109,7 +109,7 @@ func TestToolsAndAnnotations(t *testing.T) {
 		case a.OpenWorldHint == nil || *a.OpenWorldHint != openWorld[tl.Name]:
 			t.Errorf("%s: openWorldHint %v, want %v", tl.Name, a.OpenWorldHint, openWorld[tl.Name])
 		}
-		// 05 §5.3: every tool's guide topic gives an example call with output.
+		// 14 §3: every tool's guide topic gives an example call with output.
 		if text, ok := cmds.Guide(tl.Name); tl.Name != "guide" && (!ok || !strings.Contains(text, "Example: "+tl.Name+" {")) {
 			t.Errorf("%s: no guide topic with an example call", tl.Name)
 		}
@@ -129,7 +129,7 @@ func TestToolsAndAnnotations(t *testing.T) {
 	if text, _ := cmds.Guide("errors"); !strings.Contains(text, "Save loading") || !strings.Contains(text, "pattern=<id>") {
 		t.Error("guide topic errors is not the pattern checklist")
 	}
-	// Every destructive tool is named in the instructions' list; "unsaved" is gone (04 §3).
+	// Every destructive tool is named in the instructions' list; "unsaved" is gone (07 §3).
 	for n, kind := range want {
 		if kind == "destructive" && !strings.Contains(r.Instructions, n+",") && !strings.Contains(r.Instructions, n+")") {
 			t.Errorf("instructions do not list destructive tool %s", n)
@@ -191,7 +191,7 @@ func TestCLIParity(t *testing.T) {
 		{"edit_loadout", map[string]any{"action": "sort", "dry_run": true}, []string{"sort", "--dry-run"}},
 		{"edit_loadout", map[string]any{"action": "ignore_external"}, []string{"loadout", "ignore-external"}},
 		{"get_description", map[string]any{"ref": modA, "offline": true}, []string{"describe", modA, "--offline"}},
-		// The read-only pages folded into status, and the read-only actions of the 05 §1.2
+		// The read-only pages folded into status, and the read-only actions of the 13 §1.2
 		// tools (their write actions: TestGoldenManageTools).
 		{"status", map[string]any{"show": "envs"}, []string{"env", "list"}},
 		{"status", map[string]any{"show": "folders"}, []string{"folder", "list"}},
@@ -216,7 +216,7 @@ func TestCLIParity(t *testing.T) {
 		{"plan_history", map[string]any{"action": "steps", "all": true}, []string{"history", "--all"}},
 		{"manage_plans", nil, []string{"plan", "list"}},
 		{"launch_game", map[string]any{"dry_run": true}, []string{"launch", "--dry-run"}},
-		// 06 §2.9: the library (its write actions: TestGoldenManageTools).
+		// 16 §2.9: the library (its write actions: TestGoldenManageTools).
 		{"list_library", nil, []string{"library"}},
 		{"list_library", map[string]any{"search": "mod", "include": []string{"source:local", "used:none"}, "exclude": []string{"tag:x"}, "sort": "size"},
 			[]string{"library", "--search", "mod", "--include", "source:local", "--include", "used:none", "--exclude", "tag:x", "--sort", "size"}},
@@ -400,7 +400,7 @@ func TestWriteTools(t *testing.T) {
 	}
 }
 
-// 05 §5.1: a tool can name another environment.
+// 14 §1: a tool can name another environment.
 func TestEnvParameter(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
@@ -422,7 +422,7 @@ func TestEnvParameter(t *testing.T) {
 	}
 }
 
-// 05 §5.1: when the analysis takes longer than the wait, the call returns the declaration
+// 14 §1: when the analysis takes longer than the wait, the call returns the declaration
 // problems with a note, and a later call gets the finished analysis.
 func TestStillComputing(t *testing.T) {
 	t.Parallel()

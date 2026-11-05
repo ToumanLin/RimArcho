@@ -7,7 +7,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 )
 
-// The rows of Can it load? that come from the full read (10 §4.3, §4.6).
+// The rows of Can it load? that come from the full read (12 §4.3, §4.6).
 func TestSaveIssueViewOwnership(t *testing.T) {
 	t.Setenv("ARCHO_LANG", "")
 	before := Lang()

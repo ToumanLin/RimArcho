@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/savefile"
 )
 
-// The playthrough's words (10 §4.3 Play facts): the date as the game writes it, real play
+// The playthrough's words (12 §4.3 Play facts): the date as the game writes it, real play
 // time, where a colonist is, the change line and the read line.
 func TestSavePlayText(t *testing.T) {
 	t.Parallel()

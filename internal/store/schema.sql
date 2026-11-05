@@ -1,5 +1,5 @@
 -- The archo.db schema at version SchemaVersion (store.go), created in one transaction for a new
--- database. A schema change edits this file and adds an upgrade step in store.go (02 §7).
+-- database. A schema change edits this file and adds an upgrade step in store.go (04 §4).
 -- Index-generation triggers are installed separately on each open (indexkey.go).
 
 CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -194,7 +194,7 @@ CREATE INDEX type_fact_lookup ON type_fact(type_name,set_id);
 CREATE INDEX harmony_fact_set ON harmony_fact(set_id);
 CREATE INDEX harmony_id_set ON harmony_id(set_id);
 CREATE INDEX harmony_id_lookup ON harmony_id(id,set_id);
--- The game's own managed assemblies per environment and the type names they define (03 §5.3).
+-- The game's own managed assemblies per environment and the type names they define (05 §5.3).
 CREATE TABLE game_assembly(
  id INTEGER PRIMARY KEY, environment_id TEXT NOT NULL, file TEXT NOT NULL, game_mm TEXT NOT NULL,
  path TEXT NOT NULL, size INTEGER NOT NULL, mtime INTEGER NOT NULL, reader INTEGER NOT NULL,
@@ -205,7 +205,7 @@ CREATE TABLE game_type(
 CREATE INDEX game_type_assembly ON game_type(assembly_id);
 CREATE INDEX game_type_lookup ON game_type(type_name,assembly_id);
 CREATE INDEX game_type_named ON game_type(name,assembly_id);
--- The full read of each save (10 §1.7 L1): the facts as gzip JSON, plus the summary lists need.
+-- The full read of each save (12 §1.7 L1): the facts as gzip JSON, plus the summary lists need.
 CREATE TABLE save_cache(
  path TEXT PRIMARY KEY, size INTEGER NOT NULL, mtime INTEGER NOT NULL, parser INTEGER NOT NULL,
  ticks INTEGER NOT NULL DEFAULT 0, identity TEXT NOT NULL DEFAULT '', world TEXT NOT NULL DEFAULT '',

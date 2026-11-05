@@ -2,7 +2,7 @@ package loadout
 
 import "sort"
 
-// Change kinds of a Loadout diff (04 §3).
+// Change kinds of a Loadout diff (07 §3).
 const (
 	Added    = "added"
 	Removed  = "removed"

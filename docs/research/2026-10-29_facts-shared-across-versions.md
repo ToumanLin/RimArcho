@@ -1,6 +1,6 @@
 # Cross-version analysis-fact sharing and cleanup measurements
 
-2026-10-29. Synthetic data only; branch `codex/fact-share`, ran `git merge dev/0.9.0`, incorporating `aa5da8e` with v25. No VM, player game, Mods, or host RimArcho data directory used; no push. Specification contract: [03 §1–3](../specs/03-facts-and-analysis.md). This report records measurements and tradeoffs.
+2026-10-29. Synthetic data only; branch `codex/fact-share`, ran `git merge dev/0.9.0`, incorporating `aa5da8e` with v25. No VM, player game, Mods, or host RimArcho data directory used; no push. Specification contract: [05 §1–3](../specs/05-facts-and-findings.md). This report records measurements and tradeoffs.
 
 ## Results
 
@@ -122,11 +122,11 @@ Specifications, architecture references, CHANGELOG, and VM checklist accompany c
 
 ## Conflicts between code and original documentation
 
-Original 03 §2 stated `analyze.Version=4` and a version on every fact; actual code was version 8, and fact rows had no separate snapshot/analyzer fields, only old content keys and run records. Changed to references to `analyze.Version` and set associations.
+Original 05 §2 stated `analyze.Version=4` and a version on every fact; actual code was version 8, and fact rows had no separate snapshot/analyzer fields, only old content keys and run records. Changed to references to `analyze.Version` and set associations.
 
-Original 03 §3 stated both "only the latest run per `(environment, mm)`" and "multiple slots by enabled set". Actual code uses set-based slots; the multiple-slot contract now governs. Old-plan removal previously cleaned only the current mm; this explicitly cleans across all mm of that environment.
+Original 05 §3 stated both "only the latest run per `(environment, mm)`" and "multiple slots by enabled set". Actual code uses set-based slots; the multiple-slot contract now governs. Old-plan removal previously cleaned only the current mm; this explicitly cleans across all mm of that environment.
 
-Original 07 §8.4 / 00a descriptions of facts physically partitioned by version now reference content sets and version views. Historical measurement tables remain; historical index-improvement figures were not rewritten as current structure.
+Original 17 §7.4 / 00a descriptions of facts physically partitioned by version now reference content sets and version views. Historical measurement tables remain; historical index-improvement figures were not rewritten as current structure.
 
 ## Evidence chain
 

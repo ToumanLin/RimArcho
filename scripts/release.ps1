@@ -1,7 +1,7 @@
 # Builds a release: archo.exe and RimArcho.exe (pure Go, no cgo, no runtime to install; the same
-# program, RimArcho.exe linked as a Windows GUI so a double click opens the window, 06 §8.1)
+# program, RimArcho.exe linked as a Windows GUI so a double click opens the window, 16 §8.1)
 # with the version stamped in through -ldflags, plus README, CHANGELOG and LICENSE.
-# Archo Monitor, the in-game companion mod (08 §9), is
+# Archo Monitor, the in-game companion mod (09 §6), is
 # built by monitor/build.ps1 (needs the .NET SDK 10; game references come from NuGet) and
 # shipped under monitor/ArchoMonitor/.
 #
@@ -48,7 +48,7 @@ New-Item -ItemType Directory -Force $out | Out-Null
 $pkg = "github.com/ToumanLin/RimArcho/internal/buildinfo"
 $ldflags = "-s -w -X $pkg.Version=$Version -X $pkg.Commit=$commit -X $pkg.Date=$date"
 $exe = if ($GOOS -eq "windows") { "archo.exe" } else { "archo" }
-# Windows resources (06 §8.6): the keystone icon and the version information, written as a
+# Windows resources (16 §8.6): the keystone icon and the version information, written as a
 # .syso next to main.go before each build (the two exes differ in their description) and
 # removed afterwards; the .syso is never committed.
 $syso = "cmd/archo/rsrc_windows_$GOARCH.syso"
@@ -78,7 +78,7 @@ try {
 
 Copy-Item README.md, CHANGELOG.md, LICENSE $out
 
-# Archo Monitor (08 §9): built for 1.5, 1.6 and 1.7 with monitor/VERSION and shipped as
+# Archo Monitor (09 §6): built for 1.5, 1.6 and 1.7 with monitor/VERSION and shipped as
 # monitor/ArchoMonitor/, where RimArcho finds it next to the exe.
 Write-Host "building Archo Monitor"
 & (Join-Path $PSScriptRoot "..\monitor\build.ps1") -Out (Join-Path $out "monitor\ArchoMonitor")
@@ -88,7 +88,7 @@ $zip = "$out.zip"
 if (Test-Path $zip) { Remove-Item -Force $zip }
 Compress-Archive -Path (Join-Path $out "*") -DestinationPath $zip
 
-# The checksum RimArcho's own update verifies the download against (07 §5.1): upload it to
+# The checksum RimArcho's own update verifies the download against (17 §5.1): upload it to
 # the GitHub release next to the zip, as <zip>.sha256 in sha256sum format.
 $zipName = Split-Path -Leaf $zip
 $sum = "$zip.sha256"

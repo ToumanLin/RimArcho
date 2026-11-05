@@ -48,7 +48,7 @@ func TestLibraryForMatchesFullLineage(t *testing.T) {
 	}
 }
 
-// Read sessions share an index's Mods (07 §8.3); their lazy declarations keep loading
+// Read sessions share an index's Mods (17 §7.3); their lazy declarations keep loading
 // after the session the index came from closes, and after adoption.
 func TestReadIndexSharesModsBeyondItsSource(t *testing.T) {
 	t.Parallel()

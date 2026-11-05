@@ -28,7 +28,7 @@ Recommended priorities: (1) make add subscription lightweight and reuse subscrip
 | Plans | 1 default; 2 Test; 3 default (1.6); 4 Multiplayer Modpack 1.6 (Stable); 5 The Progression Modpack [UPDATED 1.7]. Shared globally; both environments see all 5 |
 | Other | 4 plan_collection; 2 log_cache; texture_file is 0; real packs directory has no packs |
 
-Read the [top-level design](../00-top-level-design.md), [architecture](../00a-architecture.md), [engineering spec](../specs/07-technology-and-engineering.md), and [UI spec](../specs/06-ui/README.md) first, then enumerated actual routes and calls. The GUI is Wails v3 + native ES modules; thin API → `internal/view` → `internal/app` → SQLite/disk. Direct calls here bypass the Wails bridge, so Go duration is not called screen load time.
+Read the [top-level design](../00-top-level-design.md), [architecture](../00a-architecture.md), [engineering spec](../specs/17-engineering.md), and [UI spec](../specs/16-interface/README.md) first, then enumerated actual routes and calls. The GUI is Wails v3 + native ES modules; thin API → `internal/view` → `internal/app` → SQLite/disk. Direct calls here bypass the Wails bridge, so Go duration is not called screen load time.
 
 ### 2.2 Definitions of Cold, First Entry, and Warm
 

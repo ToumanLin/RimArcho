@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-// BenchmarkScan27MB scans a generated save shaped like a long 1.6 colony (10 §1.7 L1
+// BenchmarkScan27MB scans a generated save shaped like a long 1.6 colony (12 §1.7 L1
 // target: at most 0.3 s per 27 MB, flat memory). The file is written to
 // $SAVEFILE_BENCH_DIR (default: a temporary directory) and removed afterwards.
 func BenchmarkScan27MB(b *testing.B) {

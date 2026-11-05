@@ -19,7 +19,7 @@ func TestParse(t *testing.T) {
 
 // The object is an AMD64 COFF with one .rsrc section whose root directory lists the icon,
 // icon group and version types, and one relocation per resource. (Windows itself reading
-// the result was checked by linking it into RimArcho.exe, 06 §11.)
+// the result was checked by linking it into RimArcho.exe, 16 §11.)
 func TestSyso(t *testing.T) {
 	icons := []Icon{{16, []byte("png16")}, {256, []byte("png256")}}
 	b, err := Syso(icons, Version{Version: "1.2.3", Filename: "archo.exe", Product: "RimArcho"})

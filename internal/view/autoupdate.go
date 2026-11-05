@@ -37,7 +37,7 @@ func selfNotice(before, after app.AutomaticStatus) string {
 	return Tf("RimArcho %s can be updated; see Settings", after.Latest)
 }
 
-// AboutGroup keeps RimArcho's version and checks together (06 §2.14).
+// AboutGroup keeps RimArcho's version and checks together (16 §2.14).
 func AboutGroup(a *app.App) SettingGroup {
 	return SettingGroup{Title: T("about"), Items: []SettingItem{
 		SelfUpdateItem(a),

@@ -1,11 +1,11 @@
-/* RimArcho GUI (06 §7). The look follows magpie (github.com/yetone/magpie): one quiet
+/* RimArcho GUI (16 §7). The look follows magpie (github.com/yetone/magpie): one quiet
    surface, content on cards with a hairline border and 12px corners, a centred view
    switch whose open view is a raised thumb, icon buttons, small text buttons.
    The colour tokens and several component rules are taken from magpie's app.css:
    Copyright (c) 2026 yetone, MIT License (https://github.com/yetone/magpie/blob/main/LICENSE). */
 :root {
-  --hairline: 1px; /* 06 §7.3: one physical pixel at 100% and 150% scaling. */
-  /* the gap between side-by-side and stacked cards, the same everywhere (06 §7) */
+  --hairline: 1px; /* 16 §7.3: one physical pixel at 100% and 150% scaling. */
+  /* the gap between side-by-side and stacked cards, the same everywhere (16 §7) */
   --card-gap: 4px;
   --r-lg: 12px;
   --r-sm: 6px;
@@ -38,7 +38,7 @@
   --red: #d64545;
   --red-soft: #fbe9e9;
   --amber: #b45309;
-  /* the bow mark (06 §7): fixed brand colours, not the chosen accent */
+  /* the bow mark (16 §7): fixed brand colours, not the chosen accent */
   --bow-rim: #4f46e5; --bow-body: #17181a; --bow-facet: #4a4644; --bow-halo: transparent;
   --amber-soft: #fbf0df;
   --log: #c2561d;
@@ -46,7 +46,7 @@
   --shadow: 0 16px 44px rgba(20, 22, 30, .16), 0 2px 8px rgba(20, 22, 30, .06), 0 0 0 var(--hairline) rgba(20, 22, 30, .1);
   --ease: cubic-bezier(.2, .8, .2, 1);
   --ease-in: cubic-bezier(.4, 0, 1, 1);
-  /* motion (06 §7.1): press, enter, exit, and layout changes */
+  /* motion (16 §7.1): press, enter, exit, and layout changes */
   --t-press: 120ms;
   --t-enter: 200ms;
   --t-exit: 150ms;
@@ -79,7 +79,7 @@
 [hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 13px/1.4 var(--font); -webkit-font-smoothing: antialiased; }
 body { font-variant-numeric: tabular-nums; user-select: text; overflow: hidden; cursor: default; }
-/* Text is selectable everywhere (06 §3.1 rule 13); only the controls are not: buttons,
+/* Text is selectable everywhere (16 §3.1 rule 13); only the controls are not: buttons,
    navigation, area heads and dividers, and the multi-select list rows, whose press selects
    the row, shift / ctrl extend it and a drag moves the mods. */
 button, select, kbd, svg, #side, #crumbs, .envchip, #hints, .area .head, .hbar, .split, .lib-th,
@@ -91,7 +91,7 @@ button, select, kbd, svg, #side, #crumbs, .envchip, #hints, .area .head, .hbar, 
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: default; }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 input { font: inherit; color: var(--fg); background: transparent; border: 0; outline: 0; width: 100%; }
-/* Key labels are key caps, so a key never reads as a word of the label beside it (06 §7.3 rule 13). */
+/* Key labels are key caps, so a key never reads as a word of the label beside it (16 §7.3 rule 13). */
 kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 6px; font: 500 12px/16px var(--code); color: var(--muted);
   text-align: center; white-space: nowrap; border: var(--hairline) solid var(--line); border-radius: var(--r-sm); background: var(--card-2); box-shadow: 0 1px 0 var(--line); }
 .keys { display: inline-flex; gap: 3px; } .keys kbd { margin-left: 0; }
@@ -101,14 +101,14 @@ kbd { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 6px; 
 .ok { color: var(--green); } .warn { color: var(--amber); } .err { color: var(--red); } .log { color: var(--log); }
 svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 
-/* ---- the shell (06 §2.1, §2.2): the sidebar, then the top bar, the page and the bottom line ---- */
-/* --side-w: the width the player dragged the sidebar to (06 §2.1); unset = the default */
+/* ---- the shell (16 §2.1, §2.2): the sidebar, then the top bar, the page and the bottom line ---- */
+/* --side-w: the width the player dragged the sidebar to (16 §2.1); unset = the default */
 #app { display: grid; grid-template-columns: var(--side-w, 212px) minmax(0, 1fr); height: 100%; }
 #side { grid-column: 1; grid-row: 1; view-transition-name: nav; }
 #main { view-transition-name: page; }
 #main { grid-column: 2; grid-row: 1; display: grid; grid-template-rows: 50px minmax(0, 1fr) 30px; min-width: 0; min-height: 0; }
 #body { position: relative; display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; min-width: 0; }
-/* the plan editor's description line, like every page's (06 §2.5): the lead, its actions */
+/* the plan editor's description line, like every page's (16 §2.5): the lead, its actions */
 #planhead { grid-row: 1; padding: 0 12px 10px; min-height: 28px; }
 #planhead[hidden] { display: none; }
 #body > #board { grid-row: 2; }
@@ -139,7 +139,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .window-controls .window-control { flex: none; width: 36px; height: 32px; border-radius: inherit; border-left: var(--hairline) solid var(--line); }
 .window-controls .window-control:last-child:hover { color: var(--bg); background: var(--red); }
 .window-maximize { --wails-non-client-region: maximize; }
-/* the bow, RimArcho's mark (06 §7) */
+/* the bow, RimArcho's mark (16 §7) */
 .bow { display: block; width: 100%; height: 100%; overflow: visible; }
 .bow .bow-halo { stroke: var(--bow-halo); }
 .bow .bow-rim { fill: var(--bow-rim); }
@@ -148,7 +148,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 /* the small bow in front of Archo's name */
 .archo-mark { display: inline-flex; width: 14px; height: 14px; margin-right: 5px; vertical-align: -2px; flex: none; }
 .btn .archo-mark { margin-right: 4px; }
-/* a group's title: small, muted, apart from the entries above it (06 §2.1) */
+/* a group's title: small, muted, apart from the entries above it (16 §2.1) */
 #nav .grp { padding: 14px 8px 4px; color: var(--muted); font-size: 12px; font-weight: 500; letter-spacing: .04em; }
 #nav > .grp:first-of-type { padding-top: 2px; }
 #nav > :not(.nav-thumb) { position: relative; z-index: 1; }
@@ -168,7 +168,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .nav-item .cnt, .nav-kid .cnt { margin-left: auto; color: var(--muted); font-size: 12px; font-weight: 400; font-variant-numeric: tabular-nums; }
 .nav-item .badge-n { margin: 0 -4px 0 auto; font-size: 12px; font-weight: 500; line-height: 17px; min-width: 17px; padding: 0 5px; border-radius: 999px; text-align: center; color: var(--amber); background: var(--amber-soft); }
 /* The open entry's sub-entries hang off a thin guide line, 16px in. Opening and closing
-   grows the row from 0fr to 1fr and fades it (06 §7.1); a closed list is out of the tab order. */
+   grows the row from 0fr to 1fr and fades it (16 §7.1); a closed list is out of the tab order. */
 .kids-wrap { display: grid; grid-template-rows: 0fr; opacity: 0; margin-top: -1px; transition: grid-template-rows var(--t-layout) var(--ease), opacity var(--t-exit) var(--ease-in); }
 .kids-wrap.open { grid-template-rows: 1fr; opacity: 1; transition: grid-template-rows var(--t-layout) var(--ease), opacity var(--t-enter) var(--ease); }
 .kids { min-height: 0; overflow: hidden; visibility: hidden; transition: visibility 0s linear var(--t-layout); }
@@ -181,7 +181,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .kid-hl { position: absolute; left: 0; top: 0; z-index: 0; border-radius: var(--r-sm); background: color-mix(in srgb, var(--fg) 6.5%, transparent); opacity: 0; pointer-events: none; transition: transform var(--t-layout) var(--ease), opacity var(--t-press); will-change: transform; }
 .side-foot .nav-item.on { background: var(--card); box-shadow: var(--seg-edge); }
 .side-foot { flex: none; padding: 8px 10px 10px; border-top: var(--hairline) solid var(--line-2); display: flex; flex-direction: column; gap: 6px; }
-/* the navigation at the top (06 §2.1): the same entries as one strip over the page. The
+/* the navigation at the top (16 §2.1): the same entries as one strip over the page. The
    toggle ends it on the left; the groups are thin separators; an entry's sub-entries are a
    dropdown from its chevron (↓ on the keyboard); settings at the right
    end. The raised highlight and the badge stay; a narrow window scrolls the strip. */
@@ -228,7 +228,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 /* the chip beside the page's name: the environment (and the plan on Can it run) */
 .envchip { height: 20px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: var(--r-sm); background: var(--pill); color: var(--fg-2); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; transition: background var(--t-press), color var(--t-press); }
 .envchip:hover, .envchip.on { background: var(--pill-hover); color: var(--fg); }
-/* a page's actions: quiet icon + text, no border (06 §2.2) */
+/* a page's actions: quiet icon + text, no border (16 §2.2) */
 .page-acts .btn.quiet { border-color: transparent; background: none; box-shadow: none; color: var(--fg-2); font-size: 13px; padding: 0 6px; }
 .page-acts .btn.quiet:hover { background: var(--pill); color: var(--fg); }
 .page-acts .btn.quiet kbd { display: none; }
@@ -277,7 +277,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .area .head .acts .btn:hover { border-color: var(--muted); color: var(--fg); }
 .area .head .acts .btn.hot { color: var(--accent-11, var(--accent)); border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 
-/* ---- the board: three columns (06 §2.5): Not enabled | Enabled | details, with Staging and history folded
+/* ---- the board: three columns (16 §2.5): Not enabled | Enabled | details, with Staging and history folded
    under details in the third column ---- */
 #board { display: grid; min-height: 0; padding: 0 12px 6px; grid-template-columns: var(--c0, 38fr) var(--card-gap) var(--c1, 31fr) var(--card-gap) var(--c2, 31fr); }
 #board > .fcol { grid-column: 1; } #board > [data-split="0"] { grid-column: 2; }
@@ -299,7 +299,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .histarea .hbar { width: 100%; text-align: left; }
 .histbody { flex: 1; min-height: 0; overflow-y: auto; padding: 0 10px 6px; }
 .histbody .hist { margin-top: 4px; }
-/* Load-order rules (rules.js, 06 §2.5): the player's rules, each a sentence with its note; edit / delete
+/* Load-order rules (rules.js, 16 §2.5): the player's rules, each a sentence with its note; edit / delete
    show on hover or focus; the form adds or changes a rule in place */
 .rulesarea .hbar { width: 100%; text-align: left; }
 .rulesbody { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 10px 8px; }
@@ -335,7 +335,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .area.focus { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
 .area .head { display: flex; align-items: baseline; gap: 8px; padding: 9px 12px 6px; color: var(--faint); white-space: nowrap; overflow: hidden; border-bottom: var(--hairline) solid var(--line-2); }
 .area .head .n { color: var(--faint); font-size: 12px; font-weight: 600; }
-/* a page's numbered areas (06 §3.5): the number before the heading, as the editor's; 1–9 focus the area */
+/* a page's numbered areas (16 §3.5): the number before the heading, as the editor's; 1–9 focus the area */
 .anum { color: var(--faint); font-size: 12px; font-weight: 600; margin-right: 7px; font-variant-numeric: tabular-nums; letter-spacing: 0; text-transform: none; }
 .fbar-row > .anum { align-self: center; margin: 0 -2px 0 10px; }
 .col-head { flex: none; padding: 9px 12px 6px; font-size: 12px; color: var(--muted); border-bottom: var(--hairline) solid var(--line-2); }
@@ -349,7 +349,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .search.on { display: block; }
 .search input { height: 26px; padding: 0 9px; border-radius: var(--r-sm); background: var(--pill); }
 .search input:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
-/* the grey completion after the query (06 §3.7): drawn over the input, same box and font */
+/* the grey completion after the query (16 §3.7): drawn over the input, same box and font */
 .search { position: relative; }
 .search .ghost { position: absolute; left: 10px; right: 10px; top: 6px; height: 26px; padding: 0 9px; display: flex; align-items: center; overflow: hidden; white-space: pre; pointer-events: none; font: inherit; }
 .search .ghost .typed { color: transparent; }
@@ -361,11 +361,11 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .split::after { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: var(--hairline); transform: translateX(-50%); border-radius: var(--r-sm); background: transparent; transition: background var(--t-press); }
 .split:hover::after, .split.drag::after { background: var(--accent); }
 
-/* rows (06 §2.5): position, source, name, status */
+/* rows (16 §2.5): position, source, name, status */
 .rows { flex: 1; overflow-y: auto; position: relative; outline: 0; }
 .row { position: absolute; left: 6px; right: 6px; height: var(--row-h); display: flex; align-items: center; gap: 7px; padding: 0 8px 0 6px; white-space: nowrap; border-radius: var(--r-sm); }
 .row:hover { background: var(--pill); }
-/* no bar on the left of a selected row (06 §7 rule 4): the selection is the row's tint */
+/* no bar on the left of a selected row (16 §7 rule 4): the selection is the row's tint */
 .row .m { width: 2px; align-self: stretch; margin: 6px 0; flex: none; }
 .row .p { width: var(--pw, 3ch); text-align: right; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; flex: none; }
 .row .k { color: var(--faint); display: flex; }
@@ -391,7 +391,7 @@ body.row-dragging, body.row-dragging * { cursor: grabbing !important; user-selec
 .hist .h.redo { color: var(--faint); }
 .drop-tip { position: fixed; pointer-events: none; background: var(--pop-bg); box-shadow: var(--shadow); color: var(--fg); padding: 3px 9px; border-radius: var(--r-sm); font-size: 12px; z-index: 30; }
 
-/* detail (06 §4) */
+/* detail (16 §4) */
 .detail .scroll { flex: 1; overflow-y: auto; outline: 0; }
 :is(#detail, .lib-desc, .mod-detail) { padding: 10px 18px 40px 16px; user-select: text; }
 :is(#detail, .lib-desc, .mod-detail) .thumb { display: block; max-width: min(100%, 480px); max-height: 260px; border-radius: var(--r-sm); margin: 4px 0 12px; border: var(--hairline) solid var(--line-2); }
@@ -400,7 +400,7 @@ body.row-dragging, body.row-dragging * { cursor: grabbing !important; user-selec
 :is(#detail, .lib-desc, .mod-detail) .facts { color: var(--faint); margin-top: 4px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 12px; }
 :is(#detail, .lib-desc, .mod-detail) .state { margin: 12px 0; display: flex; gap: 8px; align-items: flex-start; }
 :is(#detail, .lib-desc, .mod-detail) .state button { color: var(--accent-11, var(--accent)); }
-/* the detail's one field list (fields.js, 06 §4.1): addresses and identifiers copy from their trailing icon */
+/* the detail's one field list (fields.js, 16 §4.1): addresses and identifiers copy from their trailing icon */
 .fields { margin: 8px 0 14px; font-size: 13px; }
 .frow { position: relative; display: flex; gap: 12px; align-items: baseline; padding: 2px 0; }
 .frow .k { width: 64px; flex: none; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -439,13 +439,13 @@ body.row-dragging, body.row-dragging * { cursor: grabbing !important; user-selec
 
 /* ---- pages (the sidebar's entries): a head, then cards; centred within 1200px like magpie's ---- */
 #screen { position: absolute; inset: 0; background: var(--bg); overflow-y: auto; z-index: 10; }
-/* focus lands on the page or a confirmation itself only to keep it in the dialog or page (06 §11 A1, A6); no ring */
+/* focus lands on the page or a confirmation itself only to keep it in the dialog or page (16 §11 A1, A6); no ring */
 #board:focus, #screen:focus, .pop:focus { outline: none; }
 .page { padding: 0 max(20px, calc(50% - 600px)) 24px; display: flex; flex-direction: column; gap: var(--card-gap); }
 /* a new page fades in and rises 4px; a redraw of the page shown does not */
 .page.enter { animation: view-in var(--t-enter) var(--ease); }
 .page.fill { height: 100%; min-height: 0; padding-bottom: 8px; }
-/* page width by shape (06 §7.3 rule 12): list-and-detail pages fill the window like the
+/* page width by shape (16 §7.3 rule 12): list-and-detail pages fill the window like the
    editor and the library; one-column pages share one reading width */
 .page:is(.logs, .pm-page, .packs, .subs-page, .needs, .modsettings, .saves) { padding-left: 12px; padding-right: 12px; }
 .page:is(.env, .textures, .settings, .feedback) { padding-left: max(20px, calc(50% - 480px)); padding-right: max(20px, calc(50% - 480px)); }
@@ -463,9 +463,9 @@ body.row-dragging, body.row-dragging * { cursor: grabbing !important; user-selec
 .chip.cur { color: var(--accent-11, var(--accent)); background: var(--accent-soft); margin: 0; }
 @media (prefers-reduced-motion: reduce) { .page.enter, .seg > .thumb { animation: none; transition: none; } }
 .page-head { display: flex; gap: 6px 12px; align-items: center; flex-wrap: wrap; color: var(--muted); min-height: 28px; }
-/* the page's actions at the right end of its description line (06 §2.2) */
+/* the page's actions at the right end of its description line (16 §2.2) */
 .page-head .page-acts { margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
-/* one line under the breadcrumb that says what the page is for (06 §2.2) */
+/* one line under the breadcrumb that says what the page is for (16 §2.2) */
 .page-head .lead { margin: 0; color: var(--muted); font-size: 13px; }
 .subbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .label { font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
@@ -502,7 +502,7 @@ body.row-dragging, body.row-dragging * { cursor: grabbing !important; user-selec
 body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 @media (max-width: 900px) { .cols.three, .cols.two, .cols.logcols { grid-template-columns: 1fr; } .logsplit { display: none; } .page.fill { height: auto; } .cols .col .scroll { max-height: 60vh; } }
 
-/* Can it run (06 §2.4): two columns that scroll on their own, each a stack of sections; a
+/* Can it run (16 §2.4): two columns that scroll on their own, each a stack of sections; a
    section is a card of items, its heading stays at the top of its column */
 .cols.needcols { grid-template-columns: minmax(320px, var(--needs-left, 55fr)) var(--card-gap) minmax(300px, 45fr); gap: 0; }
 .needcol { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
@@ -538,7 +538,7 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 .need { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 12px 16px; }
 .need + .need { border-top: var(--hairline) solid var(--line-2); }
 .need:hover { background: var(--card-2); }
-/* The cursor uses a quiet tint and an accent title (06 §2.4). */
+/* The cursor uses a quiet tint and an accent title (16 §2.4). */
 .need.cur { background: color-mix(in srgb, var(--fg) 6%, transparent); }
 .need.cur .title { color: var(--accent-11, var(--accent)); }
 .need .top { display: flex; gap: 10px; align-items: flex-start; }
@@ -549,7 +549,7 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 .need.dimmed { padding-top: 9px; padding-bottom: 9px; }
 .need.dimmed .why { color: var(--muted); }
 /* what belongs to the item, then its buttons with the evidence on their right: all lined
-   up with the title (06 §2.4) */
+   up with the title (16 §2.4) */
 .need .need-x { display: flex; flex-direction: column; gap: 4px; padding-left: 26px; min-width: 0; }
 .need .need-x .link-groups { margin-top: 0; }
 .need-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding-left: 26px; min-width: 0; }
@@ -571,7 +571,7 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 .need-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: 26px; padding: 8px 10px; border-radius: var(--r-sm); background: var(--amber-soft); color: var(--fg); }
 .need-confirm .t { flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; }
 .need-confirm .btn { height: 28px; padding: 0 12px; }
-/* an item an action resolved: one quiet line where it was (06 §5) */
+/* an item an action resolved: one quiet line where it was (16 §5) */
 .need.done { flex-direction: row; align-items: center; gap: 10px; padding-top: 8px; padding-bottom: 8px; color: var(--muted); }
 .need.done .need-ic { align-self: center; margin-top: 0; color: var(--green); }
 .need.done .body { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -579,12 +579,12 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 .need.flash { animation: need-flash 1.6s var(--ease); }
 @keyframes need-flash { 0%, 35% { background: var(--accent-soft); } 100% { background: transparent; } }
 .need .ev-line .src { overflow-wrap: anywhere; min-width: 0; }
-.ev-line .src + .src { margin-left: 4px; } /* 8px gap + 4px: the 12px between facts (06 §7.3) */
+.ev-line .src + .src { margin-left: 4px; } /* 8px gap + 4px: the 12px between facts (16 §7.3) */
 .ev-chip { flex: none; line-height: 16px; padding: 0 6px; border-radius: var(--r-sm); background: var(--pill); color: var(--fg-2); font-size: 12px; }
 .ev-chip.log { color: var(--log); }
 .ev-chip.community { color: var(--accent-11, var(--accent)); }
 .ev-chip.corpus { color: var(--muted); background: var(--pill); }
-/* the pattern card under a log cluster's evidence (06 §2.10): community background */
+/* the pattern card under a log cluster's evidence (16 §2.10): community background */
 .pcard { padding: 8px 10px; display: flex; flex-direction: column; gap: 7px; font-size: 13px; color: var(--fg-2); }
 /* the severity: a word in its colour, then what it does to the game */
 .pcard .psev { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
@@ -630,7 +630,7 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 .lrow .mods { margin-left: auto; color: var(--accent-11, var(--accent)); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .lrow .text { margin-top: 3px; color: var(--fg-2); font-size: 12px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 .detail-card .scroll { padding: 12px 14px; }
-/* game log's file picker and the companion section (06 §2.10) */
+/* game log's file picker and the companion section (16 §2.10) */
 .btn.picker { display: inline-flex; align-items: center; gap: 8px; }
 .btn.picker .chev { color: var(--faint); font-size: 12px; }
 #menu button.sub { padding-left: 22px; color: var(--muted); }
@@ -650,7 +650,7 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 .mrow .log-disclosure .fold-chev { margin: 0; color: var(--muted); }
 .mrow button.log-disclosure:hover { background: var(--pill); color: var(--fg); }
 .mrow button.log-disclosure:hover .fold-chev { color: inherit; }
-/* a log line's level colour and a mod's own <color> (--c dark, --l light; 06 §7) */
+/* a log line's level colour and a mod's own <color> (--c dark, --l light; 16 §7) */
 .lrow .text.lv-error { color: var(--log-error); }
 .lrow .text.lv-warning { color: var(--log-warning); }
 .lrow .text.lv-info { color: var(--log-info); }
@@ -673,7 +673,7 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 pre.lines { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.55 var(--code); color: var(--fg-2); margin: 0; user-select: text; }
 pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: var(--hairline) solid var(--line-2); }
 
-/* settings (06 §2.14) and packs (08 §5): rows on a card */
+/* settings (16 §2.14) and packs (10): rows on a card */
 .settings .set, .packs .pack { display: flex; gap: 16px; align-items: center; min-height: 48px; padding: 8px 14px; }
 .settings .set + .set, .packs .pack + .pack { border-top: var(--hairline) solid var(--line-2); }
 .settings .set .l, .packs .pack .l { flex: 0 0 38%; min-width: 0; }
@@ -686,7 +686,7 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .field { height: 26px; flex: 1; min-width: 0; background: var(--card-2); color: var(--fg); border: var(--hairline) solid var(--line-2); border-radius: var(--r-sm); padding: 0 9px; }
 .field:focus { border-color: var(--accent); }
 
-/* packs (06 §2.7): the list's rows open a pack's page; a pack's page lists its mods */
+/* packs (16 §2.7): the list's rows open a pack's page; a pack's page lists its mods */
 .packs .pack.link { cursor: default; }
 .packs .pack.link:hover { background: var(--card-2); }
 .packs .pack.link.cur { background: var(--accent-soft); }
@@ -708,7 +708,7 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .prog .ptext { margin-top: 5px; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prog .ptext.bad { color: var(--red); white-space: pre-wrap; }
 
-/* Create a pack (06 §2.6): the name, the kind and the four steps on the left; the summary
+/* Create a pack (16 §2.6): the name, the kind and the four steps on the left; the summary
    and create on the right; the builds cut short below */
 .bd-cols { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
 .bd-left { flex: 999 1 440px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
@@ -758,7 +758,7 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 @media (prefers-reduced-motion: reduce) { .bd-step.cur .n::after { animation: none; } }
 .settings select { height: 26px; background: var(--card-2); color: var(--fg); border: var(--hairline) solid var(--line-2); border-radius: var(--r-sm); padding: 0 6px; font: inherit; }
 .settings .set .r > .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-/* Notes wrap inside their column: a long path never runs under the controls (06 §7.3 rule 11). */
+/* Notes wrap inside their column: a long path never runs under the controls (16 §7.3 rule 11). */
 .settings .set .l .setting-note.word-facts { display: flex; flex-wrap: wrap; gap: 0 12px; white-space: normal; overflow: visible; }
 .settings .set .l .setting-note.word-facts > span { min-width: 0; overflow-wrap: anywhere; }
 .settings .set .r > * { flex-shrink: 0; }
@@ -766,13 +766,13 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .settings .set .r > .field { min-width: 140px; }
 .settings .set .r { flex-wrap: wrap; row-gap: 6px; }
 .settings .group-note { padding: 8px 14px; font-size: 12px; color: var(--muted); border-bottom: var(--hairline) solid var(--line-2); }
-/* RimArcho's release notes, folded under its row (07 §5.1) */
+/* RimArcho's release notes, folded under its row (17 §5.1) */
 .settings .setting-details { padding: 0 14px 10px; font-size: 12px; }
 .settings .setting-details > summary { cursor: pointer; color: var(--muted); width: max-content; }
 .settings .setting-details > pre { margin: 6px 0; max-height: 320px; overflow: auto; white-space: pre-wrap; font: inherit; }
 .settings .setting-details > a { color: var(--muted); }
 
-/* ---- motion (06 §7.1): opacity and transform only ---- */
+/* ---- motion (16 §7.1): opacity and transform only ---- */
 /* a changed row flashes accent-soft: an overlay that fades, not an animated background */
 .row.flash { isolation: isolate; }
 .row.flash::after { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--accent-soft); pointer-events: none; animation: flash 400ms var(--ease) forwards; }
@@ -793,7 +793,7 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
   .row.flash::after { display: none; }
 }
 
-/* ---- the bottom line: where you are, what happened, what you can do (06 §6) ---- */
+/* ---- the bottom line: where you are, what happened, what you can do (16 §6) ---- */
 #bottom { display: flex; align-items: center; gap: 12px; padding: 0 16px; white-space: nowrap; overflow: hidden; font-size: 12px; color: var(--muted); }
 .where { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: none; max-width: 45%; }
 .where:not(:empty) + #status:not(:empty) { padding-left: 12px; }
@@ -807,7 +807,7 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 #hints kbd, #hints .keys { margin: 0 4px 0 0; } #hints kbd { color: var(--fg-2); }
 #hints .sep { color: var(--faint); margin: 0 6px; }
 
-/* ---- popups (06 §3.1 rule 5) and the context menu: magpie's popovers ---- */
+/* ---- popups (16 §3.1 rule 5) and the context menu: magpie's popovers ---- */
 .env-progress { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 24px; background: rgba(0, 0, 0, .22); cursor: progress; outline: none; }
 .env-progress-card { width: min(380px, 100%); padding: 24px; border: var(--hairline) solid var(--line-2); border-radius: var(--r-lg); background: var(--card); box-shadow: var(--shadow); }
 .env-progress-card .title { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
@@ -877,8 +877,8 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 svg.i.fill { fill: currentColor; }
 .packs .pack.hl { background: var(--accent-soft); }
 
-/* home: special case, 06 §7.3 */
-/* ---- Start (06 §2.3): like the game's main menu — the plans and packs down the left over a
+/* home: special case, 16 §7.3 */
+/* ---- Start (16 §2.3): like the game's main menu — the plans and packs down the left over a
    background image, the last run and scan under them, ▶ launch game in the bottom right with the
    applied list's problem tucked under it like a tab ---- */
 #main { position: relative; }
@@ -905,7 +905,7 @@ svg.i.fill { fill: currentColor; }
 #app.photo #board { visibility: hidden; }
 :root[data-scheme="dark"] #app.photo #crumbs .crumb.last { text-shadow: 0 1px 8px rgba(0, 0, 0, .5); }
 
-/* Start (06 §2.3) on a 12-column grid: the headline carries the page; under a rule the three
+/* Start (16 §2.3) on a 12-column grid: the headline carries the page; under a rule the three
    steps read left to right; ▶ launch game is the one block of colour. */
 .page.home { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: auto minmax(0, 1fr) auto auto;
   gap: 12px 24px; padding: 8px 48px 36px; overflow-y: auto; font-variant-numeric: normal; }
@@ -938,8 +938,8 @@ svg.i.fill { fill: currentColor; }
 .hm-s1 { grid-column: 1 / 4; } .hm-s2 { grid-column: 4 / 9; } .hm-s3 { grid-column: 9 / 13; }
 .hm-step h3 { display: flex; gap: 12px; margin: 0 0 14px; font-size: 12px; font-weight: 600; letter-spacing: .1em; color: var(--muted); }
 .hm-step h3 b { color: var(--fg); }
-.hm-step:focus-within h3 b { color: var(--accent-11, var(--accent)); } /* The number is the focus key (06 §7.3). */
-/* Startup hints use 16px gaps (06 §2.3); the shared renderer supplies the separators. */
+.hm-step:focus-within h3 b { color: var(--accent-11, var(--accent)); } /* The number is the focus key (16 §7.3). */
+/* Startup hints use 16px gaps (16 §2.3); the shared renderer supplies the separators. */
 #app:has(.page.home) #hints .sep { display: inline-block; width: 0; overflow: hidden; margin: 0 8px; }
 #app:has(.page.home) #hints kbd { color: var(--fg); }
 /* A column holds about six rows and scrolls past them; the padding keeps the square on its
@@ -957,7 +957,7 @@ svg.i.fill { fill: currentColor; }
 #app.photo .hm-pick.on, #app.photo .hm-pick:hover { color: var(--fg); }
 .hm-pick:hover { color: var(--fg); }
 .hm-pick.on { color: var(--fg); font-weight: 600; }
-/* Column focus is shown only by its number (06 §2.3); other controls keep their focus rings. */
+/* Column focus is shown only by its number (16 §2.3); other controls keep their focus rings. */
 .hm-step:focus, .hm-pick:focus-visible, .hm-go:focus { outline: none; }
 .hm-pick .nm { line-height: 40px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hm-pick small { font-size: 12px; font-weight: 400; color: var(--muted); white-space: nowrap; }
@@ -980,7 +980,7 @@ svg.i.fill { fill: currentColor; }
 .hm-go:disabled { cursor: default; }
 .hm-go.running { background: var(--fg); color: var(--bg); }
 :root[data-scheme="dark"] #app.photo .hm-go.running { color: #14142a; }
-/* switching (06 §2.3): ▶ says what is loading, a bar sweeps along its foot; the new pick
+/* switching (16 §2.3): ▶ says what is loading, a bar sweeps along its foot; the new pick
    comes in when the page is read again */
 .hm-go.switching { cursor: progress; filter: saturate(.85); }
 .hm-go.switching .title { font-size: 17px; line-height: 1.15; animation: hm-fade var(--t-enter) var(--ease) both; }
@@ -1048,7 +1048,7 @@ svg.i.fill { fill: currentColor; }
 }
 /* end home */
 
-/* ---- settings › Start page background (06 §2.14): the launch page in small, the controls beside it, the
+/* ---- settings › Start page background (16 §2.14): the launch page in small, the controls beside it, the
    images by group below ---- */
 .bg-card { padding: 18px 20px; display: flex; flex-direction: column; }
 .bg-head { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 28px; }
@@ -1104,7 +1104,7 @@ svg.i.fill { fill: currentColor; }
 .bg-note { margin-top: 12px; font-size: 12px; color: var(--muted); }
 @media (max-width: 760px) { .bg-head { grid-template-columns: minmax(0, 1fr); } }
 
-/* ---- the first-run guide (06 §2.15) ---- */
+/* ---- the first-run guide (16 §2.15) ---- */
 .steps { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .steps .st { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 10px 0 4px; border-radius: 999px; color: var(--muted); }
 .steps .st:not(:disabled):hover { background: var(--pill); color: var(--fg); }
@@ -1221,7 +1221,7 @@ details.xc-sec > summary { cursor: pointer; }
 .chip.mark { color: var(--amber); background: var(--amber-soft); }
 .page-acts .chip.mark { margin: 0; white-space: nowrap; flex: none; cursor: pointer; border: 0; display: inline-flex; align-items: center; gap: 6px; }
 .page-acts .chip.mark .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); }
-/* the editor shows a list that is not the current one (04 §1.3) */
+/* the editor shows a list that is not the current one (07 §1.3) */
 .page-acts .play-note { display: inline-flex; align-items: center; gap: 8px; flex: none; white-space: nowrap; color: var(--muted); font-size: 12px; }
 .page-acts .play-note .lnk { color: var(--accent-11, var(--accent)); font-size: 12px; padding: 0; background: none; border: 0; cursor: pointer; }
 .page-acts .play-note .lnk:hover { text-decoration: underline; }
@@ -1239,7 +1239,7 @@ details.xc-sec > summary { cursor: pointer; }
 .xc-way .xc-input { width: 100%; }
 .plan-pop .in .pr { flex: none; }
 
-/* ---- Mod library (06 §2.9): the filters, one row per Lineage, and size · state · used-in on
+/* ---- Mod library (16 §2.9): the filters, one row per Lineage, and size · state · used-in on
    the right of every row; a copy's details take the right column's place ---- */
 /* the list scrolls inside its card at every width, so only the rows in view are drawn */
 .page.fill.library { height: 100%; }
@@ -1340,7 +1340,7 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .lib-bar .btn.quiet { margin-left: auto; border-color: transparent; background: none; box-shadow: none; }
 @media (prefers-reduced-motion: reduce) { .lib-bar, .fbar-panel { animation: none; } .lib-row .chev svg { transition: none; } }
 
-/* ---- the filter bar (06 §2.5, §2.9): the plan editor and Mod library share it ---- */
+/* ---- the filter bar (16 §2.5, §2.9): the plan editor and Mod library share it ---- */
 .fbar { position: relative; flex: none; z-index: 6; }
 .fbar-row { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 6px; border-bottom: var(--hairline) solid var(--line-2); }
 .fbar-search { flex: 1; min-width: 90px; position: relative; }
@@ -1373,7 +1373,7 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .fbar-v.ex .l { text-decoration: line-through; color: var(--faint); }
 .fbar-v.cur .l { color: var(--fg); font-weight: 600; }
 .fbar-v .curv { font-size: 12px; line-height: 15px; padding: 0 4px; border-radius: var(--r-sm); background: var(--accent-soft); color: var(--accent-11, var(--accent)); }
-/* open, the bar grows down its column (06 §2.5, §2.9): the groups stacked, each group's
+/* open, the bar grows down its column (16 §2.5, §2.9): the groups stacked, each group's
    values wrapping; what was under it (Not enabled's rows, Mod library's details) shrinks to its
    title bar at the bottom, a click on which (or \, esc) closes the bar again */
 /* the bar is a card of its own over the column's other card (Not enabled, the details); the
@@ -1399,13 +1399,13 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .fcol:has(> .fbar.open.fill) > .area > :not(.head) { display: none; }
 .fcol:has(> .fbar.open.fill) > .area > .head { border-bottom: 0; cursor: pointer; }
 
-/* the row menu (06 §8.5): groups split by a hairline, keys on the right, unsubscribe / delete in red */
+/* the row menu (16 §8.5): groups split by a hairline, keys on the right, unsubscribe / delete in red */
 #menu hr { border: 0; border-top: var(--hairline) solid var(--line-2); margin: 3px 4px; }
 #menu button.danger { color: var(--red); }
 #menu button.danger:hover, #menu button.danger:focus { background: var(--red-soft); }
 #menu button:focus { outline: 0; background: var(--pill); }
 
-/* settings › uninstall RimArcho (06 §2.14): one row per step, the answer inline, the items folded */
+/* settings › uninstall RimArcho (16 §2.14): one row per step, the answer inline, the items folded */
 .uninstall .un-step + .un-step { border-top: var(--hairline) solid var(--line-2); }
 .uninstall .un-step .set { border-top: 0; }
 .uninstall .un-toggle { display: flex; gap: 6px; align-items: center; cursor: pointer; white-space: nowrap; }
@@ -1427,7 +1427,7 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .page .btn.primary.danger-go:disabled { opacity: .45; cursor: default; }
 .uninstall .set .sub { white-space: normal; }
 
-/* Settings > Feedback (06 §2.14): what the player writes, the attachments, the whole text */
+/* Settings > Feedback (16 §2.14): what the player writes, the attachments, the whole text */
 .fb-form { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; }
 .fb-field { display: flex; flex-direction: column; gap: 6px; font-weight: 500; }
 .fb-field .field { flex: none; width: 100%; font-weight: 400; }
@@ -1449,16 +1449,16 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 /* "public on GitHub" beside preview: a note, not part of the uppercase heading */
 .fb-public { margin-left: 12px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--faint); }
 
-/* Library > Texture optimisation (08 §5.2): settings rows, the run's foot, the mods table */
+/* Library > Texture optimisation (10 §2): settings rows, the run's foot, the mods table */
 .textures .set .sub { white-space: normal; }
-/* 06 §2.13: offscreen texture cells need no layout/paint during background estimates. */
+/* 16 §2.13: offscreen texture cells need no layout/paint during background estimates. */
 .tex-rows .data-row { content-visibility: auto; contain-intrinsic-size: auto 30px; }
 .textures .set .sub.warn, .tex-rows .warn { color: var(--amber); }
 .tex-foot { display: flex; gap: 10px; align-items: center; justify-content: flex-end; margin: 14px 0 18px; }
 .tex-foot .prog { flex: 1; }
 .tex-foot .tex-note { flex: 1; min-width: 0; font-size: 12px; }
 .tex-foot .tex-note:empty { visibility: hidden; }
-/* Data tables share the library's header grid and gestures (06 §3.9). */
+/* Data tables share the library's header grid and gestures (16 §3.9). */
 .data-table { overflow: auto; max-height: 65vh; outline: none; }
 .data-table:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .data-table .lib-th { padding: 0 12px; }
@@ -1475,7 +1475,7 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 .packpv .packtex { display: flex; gap: 8px; align-items: center; margin: 0 0 10px; }
 .packpv .packtex select { height: 26px; background: var(--card-2); color: var(--fg); border: var(--hairline) solid var(--line-2); border-radius: var(--r-sm); padding: 0 6px; font: inherit; }
 
-/* ---- the full detail (06 §4.2): one page for the editor and Mod library. The mod on the left,
+/* ---- the full detail (16 §4.2): one page for the editor and Mod library. The mod on the left,
    wide; its copies, where they are used, the fields and the history on the right; the
    technical information under both, full width. Each part is a numbered card (1–6). ---- */
 .page.mod-page { padding-left: max(20px, calc(50% - 720px)); padding-right: max(20px, calc(50% - 720px)); }
@@ -1524,9 +1524,9 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 .fd-desc .desc s { color: var(--faint); }
 .fd-desc .desc .link { color: var(--accent-11, var(--accent)); cursor: pointer; }
 
-/* ---- Background tasks (06 §2.16): the filter bar and the tasks on the left; the task's summary over
+/* ---- Background tasks (16 §2.16): the filter bar and the tasks on the left; the task's summary over
    a table of every item it touched on the right. The selection is a tint, never a bar on
-   the left (06 §7 rule 4). ---- */
+   the left (16 §7 rule 4). ---- */
 .page.fill.tasks { height: 100%; padding-left: 12px; padding-right: 12px; }
 .tk { flex: 1; min-height: 0; display: grid; grid-template-columns: var(--tk-side, clamp(270px, 25%, 380px)) var(--card-gap) minmax(0, 1fr); }
 .tk-side { min-height: 0; }
@@ -1609,7 +1609,7 @@ summary.fb-p-head { cursor: pointer; width: max-content; max-width: 100%; }
 .hsplit::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: var(--hairline); transform: translateY(-50%); border-radius: var(--r-sm); background: transparent; transition: background var(--t-press); }
 .hsplit:hover::after, .hsplit.drag::after { background: var(--accent); }
 body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: none; }
-/* the sidebar's line for background work (06 §2.1): a ring that fills, the count, the percent */
+/* the sidebar's line for background work (16 §2.1): a ring that fills, the count, the percent */
 .tasks-line .ring { width: 14px; height: 14px; transform: rotate(-90deg); }
 .tasks-line .ring circle { fill: none; stroke: var(--line); stroke-width: 2; }
 .tasks-line .ring circle.v { stroke: var(--accent); stroke-linecap: round; transition: stroke-dasharray var(--t-layout) var(--ease); }
@@ -1624,7 +1624,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 }
 @media (prefers-reduced-motion: reduce) { .mini i, .tasks-line .ring circle.v { transition: none; } }
 
-/* ---- Manage lists (06 §2.17): the lists on the left, the picked one on the right ---- */
+/* ---- Manage lists (16 §2.17): the lists on the left, the picked one on the right ---- */
 .pm { display: grid; grid-template-columns: minmax(270px, 320px) minmax(0, 1fr); gap: var(--card-gap); align-items: start; }
 .pm-list { position: sticky; top: 0; max-height: calc(100vh - 140px); display: flex; flex-direction: column; }
 .pm-list .scroll { overflow-y: auto; padding: 6px 0; }
@@ -1714,7 +1714,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .xc-check { display: flex; align-items: center; gap: 8px; margin: 8px 0 2px; font-size: 13px; flex-wrap: wrap; }
 .xc-check input { accent-color: var(--accent); }
 
-/* New-list and import forms stay in the page (06 §2.17). */
+/* New-list and import forms stay in the page (16 §2.17). */
 .pm-new form { display: flex; flex-direction: column; gap: 8px; }
 .card.pm-new { overflow: visible; }
 .pm-new .pm-head { margin-bottom: 16px; }
@@ -1741,7 +1741,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .pm-new label.xc-sec { display: grid; gap: 8px; }
 .pm-new .xc-check .xc-input { flex: 1; min-width: 140px; }
 .pm-new .xc-check input[type=radio], .pm-import input[type=radio], .pm-import input[type=checkbox] { flex: none; width: auto; }
-/* The title renames in place (double-click, F2, rename); make current sits beside it (06 §2.17). */
+/* The title renames in place (double-click, F2, rename); make current sits beside it (16 §2.17). */
 .pm-head h2.pm-title { cursor: text; border-radius: var(--r-sm); padding: 1px 4px; margin-left: -4px; }
 .pm-head h2.pm-title:hover { background: var(--pill); }
 .pm-rename { display: grid; gap: 4px; min-width: 0; flex: 1; max-width: 360px; }
@@ -1761,7 +1761,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .pm-import .xc-check .xc-note { flex-basis: 100%; padding-left: 22px; }
 .pm-import .xc-preview[hidden] { display: none; }
 
-/* Adjustable card gaps: 06 §3.1, 06 §7.3. Kept together for every page. */
+/* Adjustable card gaps: 16 §3.1, 16 §7.3. Kept together for every page. */
 .separator { outline: none; touch-action: none; }
 .separator.split::after { width: var(--hairline); margin-left: 0; }
 .separator.hsplit::after, .separator.fbar-gap::after { height: var(--hairline); margin-top: 0; }
@@ -1783,12 +1783,12 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 }
 @media (max-width: 900px) { .logside > .hsplit { display: none; } }
 
-/* Text groups (06 §7.3): facts and key hints use space between elements. */
+/* Text groups (16 §7.3): facts and key hints use space between elements. */
 .word-facts.word-facts, #detail .word-facts { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 12px; }
 #hints:has(.hint-group) { display: flex; align-items: center; gap: 16px; }
 .hint-group { white-space: nowrap; }
 
-/* Paths and feedback stay within their columns at narrow widths (06 §7.3 rule 11). */
+/* Paths and feedback stay within their columns at narrow widths (16 §7.3 rule 11). */
 .settings .set { flex-wrap: wrap; }
 .settings .set .l { flex: 1 1 240px; }
 .settings .set .r { flex: 1 1 320px; }
@@ -1840,7 +1840,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
   .link-tag { justify-self: end; }
 }
 
-/* ---- Mod library › updates (06 §2.9): the scope bar and the list on the left, the detail ---- */
+/* ---- Mod library › updates (16 §2.9): the scope bar and the list on the left, the detail ---- */
 .page.fill.subs-page { display: flex; flex-direction: column; }
 .subs { flex: 1; min-height: 0; display: grid; grid-template-columns: var(--subs-side, clamp(320px, 34%, 460px)) var(--card-gap) minmax(0, 1fr); }
 .subs-split { align-self: stretch; margin: 0; }
@@ -1913,7 +1913,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .subs-detail pre.lines.files { padding: 6px 0; border-top: 0; max-height: 360px; overflow: auto; }
 .page .btn.link { border-color: transparent; background: none; box-shadow: none; }
 
-/* ---- Library › Saves (06 §2.11): colonies and their saves, the selected save, the playthrough ---- */
+/* ---- Library › Saves (16 §2.11): colonies and their saves, the selected save, the playthrough ---- */
 .page.fill.saves { display: flex; flex-direction: column; }
 .sv { flex: 1; min-height: 0; display: grid; grid-template-columns: var(--sv-left, 248px) var(--card-gap) minmax(0, 11fr) var(--card-gap) var(--sv-right, minmax(260px, 9fr)); }
 .sv > .card, .sv-leftcol > .card.sv-left { min-height: 0; min-width: 0; display: flex; flex-direction: column; }
@@ -2010,7 +2010,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .sv-mods .tagx.bad { color: var(--red); background: var(--red-soft); }
 .sv-note { margin: 10px 0 0; font-size: 12px; }
 .sv-folder { margin: 6px auto 0; max-width: 560px; font: 12px var(--code); }
-/* the right card (06 §2.11 "Right"): numbers at this save, colonists, letters, the colony over time */
+/* the right card (16 §2.11 "Right"): numbers at this save, colonists, letters, the colony over time */
 .sv-note.warn { color: var(--amber); }
 .sv-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
 .sv-stat { padding: 8px 10px; border-radius: var(--r-lg); background: var(--card-2); border: var(--hairline) solid var(--line-2); min-width: 0; }
@@ -2052,7 +2052,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 @media (max-width: 1180px) { .sv { grid-template-columns: var(--sv-left, 220px) var(--card-gap) minmax(0, 1fr) var(--card-gap) var(--sv-right, minmax(240px, 1fr)); } }
 @media (max-width: 900px) { .sv { display: flex; flex-direction: column; gap: var(--card-gap); } .sv-split { display: none; } .page.fill.saves { height: auto; } .sv > .card { max-height: 70vh; } .sv-leftcol > .sv-left { height: 360px; flex: none; } }
 
-/* ---- Mod library › Mod settings (06 §2.9): the settings files on the left, the values ---- */
+/* ---- Mod library › Mod settings (16 §2.9): the settings files on the left, the values ---- */
 .page.fill.modsettings { display: flex; flex-direction: column; }
 .ms { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(320px, var(--ms-side, 55%)) var(--card-gap) minmax(0, 1fr); }
 .ms-split { align-self: stretch; margin: 0; }
@@ -2094,7 +2094,7 @@ select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-s
 .page .btn.link:hover { background: var(--accent-soft); }
 @media (max-width: 900px) { .subs { grid-template-columns: minmax(0, 1fr); gap: var(--card-gap); } .subs-split { display: none; } .page.fill.subs-page { height: auto; } .subs-list > .scroll { max-height: 60vh; } }
 
-/* ---- Mod library › add a subscription (06 §2.9): one paste box, what it recognised, the source cards ---- */
+/* ---- Mod library › add a subscription (16 §2.9): one paste box, what it recognised, the source cards ---- */
 .subscribe-page { height: 100%; overflow-y: auto; }
 .subscribe-add { max-width: 760px; margin: 0 auto; padding: 8px 0 24px; display: flex; flex-direction: column; gap: 12px; }
 .subscribe-omni { display: flex; align-items: center; height: 44px; padding: 0 14px; border: var(--hairline) solid var(--line); border-radius: var(--r-lg); background: var(--card); transition: border-color var(--t-press), box-shadow var(--t-press); }
@@ -2186,7 +2186,7 @@ select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-s
 
 .fbar-more { color: var(--muted); }
 
-/* The row badge's popover (06 §4.2): what the warning or error is; a click pins it. */
+/* The row badge's popover (16 §4.2): what the warning or error is; a click pins it. */
 .badge-pop { position: fixed; z-index: 26; max-width: 360px; padding: 8px 10px; background: var(--pop-bg); border: var(--hairline) solid var(--line-2); border-radius: var(--r-sm); box-shadow: var(--shadow); color: var(--fg); font-size: 12px; line-height: 1.45; user-select: text; cursor: text; display: grid; gap: 6px; animation: fade var(--t-press) ease-out; }
 .badge-pop .bp-item { display: flex; gap: 7px; align-items: flex-start; }
 .badge-pop .bp-ic { display: flex; flex: none; margin-top: 1px; }
@@ -2246,7 +2246,7 @@ select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-s
 .identity-answer-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .identity-comparison .btns { flex-wrap: wrap; justify-content: space-between; }
 
-/* Search files (06 §2.9): cards 1 query and 2 results on the left (38%), 3 the file view. While
+/* Search files (16 §2.9): cards 1 query and 2 results on the left (38%), 3 the file view. While
    the filter panel is open the gap under the query card drags its height (38% of the column). */
 .page.filesearch { padding: 0; display: grid; grid-template-columns: minmax(260px,var(--fs-side,38%)) var(--card-gap) minmax(0,1fr); gap: 0; height: 100%; min-height: 0; overflow: hidden; }
 .filesearch .fs-left { display: flex; flex-direction: column; gap: 0; min-width: 0; min-height: 0; }
@@ -2341,7 +2341,7 @@ select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-s
  .filesearch .fs-code { height: 480px; flex: none; }
  .filesearch .fs-view-actions { margin-left: 0; }
 }
-/* ---- shared choice controls (06 §3.10, §7): off/on and single-value menus ---- */
+/* ---- shared choice controls (16 §3.10, §7): off/on and single-value menus ---- */
 .choice-control { display: inline-flex; align-items: center; flex: 0 1 auto; min-width: 0; max-width: 100%; height: 30px; border: var(--hairline) solid var(--line-2); border-radius: var(--r-lg); background: var(--pill); color: var(--fg); font: inherit; font-weight: 400; user-select: none; transition: background var(--t-press), border-color var(--t-press); }
 .choice-control:hover:not(:disabled) { background: var(--pill-hover); }
 .choice-control:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -2367,7 +2367,7 @@ select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-s
 .settings .set .r > .choice-control { flex-shrink: 1; }
 .pm-field > .choice-control { width: 100%; }
 
-/* Uninstall owns the page until its report (06 §2.14). */
+/* Uninstall owns the page until its report (16 §2.14). */
 .uninstall-exclusive :is(#nav, #nav-settings, #tasks-line) { pointer-events: none; opacity: .45; }
 .uninstall-exclusive #crumbs, .uninstall-exclusive #env, .uninstall-exclusive #hints { pointer-events: none; }
 .uninstall-exclusive #hints { visibility: hidden; }
@@ -2394,7 +2394,7 @@ select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-s
 .un-summary p { margin: 8px 0 0; overflow-wrap: anywhere; }
 .pop.un-confirm .btns .danger-go { background: var(--red); border-color: var(--red); color: #fff; }
 
-/* Address rows keep their full payload behind a single-line display (06 §3.1). */
+/* Address rows keep their full payload behind a single-line display (16 §3.1). */
 .settings .set .r > .setting-value { flex: 1 1 240px; min-width: 0; }
 .settings .set .r > .setting-value:has(.path-copy), .settings .set .r > .setting-value.path-copy { min-width: min(100%, 240px); }
 .settings .setting-value > .path-copy { flex: 1; }
@@ -2415,7 +2415,7 @@ select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-s
   .settings .set .l, .settings .set .r { flex-basis: 100%; }
 }
 
-/* RAM comparison and launch risk (06 §2.3–2.4). */
+/* RAM comparison and launch risk (16 §2.3–2.4). */
 .hm-go.memory-warning { background: var(--amber-soft); color: var(--amber); }
 .hm-go.memory-severe { background: var(--red-soft); color: var(--red); }
 .need.memory-capacity .why { white-space: pre-line; }

@@ -30,7 +30,7 @@ func sourcesOf(t *testing.T, e *testkit.Env) map[string]*source.Source {
 	return out
 }
 
-// 02 §0: a second game shares the Workshop folder: the same instances, lineages and player
+// 03 §2: a second game shares the Workshop folder: the same instances, lineages and player
 // data in both environments; Data/ and Mods/ are each game's own; plans are shared by every game.
 func TestEnvModelSharedWorkshop(t *testing.T) {
 	t.Parallel()
@@ -115,7 +115,7 @@ func TestEnvModelSharedWorkshop(t *testing.T) {
 	}
 }
 
-// 02 §0 item 5: own saves live in <data>/userdata/<env> and the game starts with
+// 03 §2 item 5: own saves live in <data>/userdata/<env> and the game starts with
 // -savedatafolder; shared saves are the game's default folder.
 func TestEnvModelSaves(t *testing.T) {
 	t.Parallel()
@@ -140,7 +140,7 @@ func TestEnvModelSaves(t *testing.T) {
 	}
 }
 
-// 02 §0 items 3, 12: shared mod folders are added and removed in one place; a second
+// 03 §2 items 3, 12: shared mod folders are added and removed in one place; a second
 // Workshop folder replaces the first (re-bound); RimArcho's own folders stay; folders
 // must not contain each other.
 func TestFolderCommands(t *testing.T) {
@@ -189,7 +189,7 @@ func TestFolderCommands(t *testing.T) {
 	}
 }
 
-// 02 §0: a SteamCMD game keeps its own Workshop folder inside the game folder. It becomes a
+// 03 §2: a SteamCMD game keeps its own Workshop folder inside the game folder. It becomes a
 // shared SteamCMD folder on env add (and, for an environment added earlier, on a scan); it
 // never moves the Steam client's Workshop folder, and a removed one stays removed.
 func TestGameWorkshopIsSteamCMD(t *testing.T) {
@@ -266,7 +266,7 @@ func TestGameWorkshopIsSteamCMD(t *testing.T) {
 	}
 }
 
-// 06 §2.14: removing an environment is refused while its game runs; removing the current
+// 16 §2.14: removing an environment is refused while its game runs; removing the current
 // one makes another current, and removing the last leaves none (the guide).
 func TestEnvRemoveCurrent(t *testing.T) {
 	t.Parallel()

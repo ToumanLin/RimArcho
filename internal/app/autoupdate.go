@@ -1,6 +1,6 @@
 package app
 
-// Automatic maintenance runs only while an interactive surface is open (06 §2.16).
+// Automatic maintenance runs only while an interactive surface is open (16 §2.16).
 
 import (
 	"context"
@@ -21,7 +21,7 @@ type AutomaticStatus struct {
 	Completed time.Time `json:"completed"`
 	Pending   int       `json:"pending"`
 	State     string    `json:"state"`
-	// Latest is the newest RimArcho release the "self" check found (07 §5.1): a notice is
+	// Latest is the newest RimArcho release the "self" check found (17 §5.1): a notice is
 	// due again when it changes even though Pending stays 1.
 	Latest string `json:"latest,omitempty"`
 }

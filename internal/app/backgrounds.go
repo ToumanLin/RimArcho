@@ -24,8 +24,8 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
-// Launch page backgrounds (06 §2.3, §2.14). The images come from three places:
-//   - the game: menu art streamed from ZIP/Unity by internal/menubg, with Preview.png fallback (06 §2.14);
+// Launch page backgrounds (16 §2.3, §2.14). The images come from three places:
+//   - the game: menu art streamed from ZIP/Unity by internal/menubg, with Preview.png fallback (16 §2.14);
 //   - mods whose name has "background" in it: the images their VBE.BackgroundImageDefs
 //     name (Vanilla Backgrounds Expanded, Shella Backgrounds, ...), or, with no such Def,
 //     the large landscape images under Textures/;
@@ -57,7 +57,7 @@ const BgDefault = "game:ludeon.rimworld"
 const bgMinWidth = 1280
 
 // Backgrounds lists official preview fallbacks and background mods. Menu art
-// replaces successful official entries in the GUI worker (06 §2.14).
+// replaces successful official entries in the GUI worker (16 §2.14).
 func (a *App) Backgrounds(ix *Index) []Background {
 	return CollectBackgrounds(a.BackgroundTargets(ix))
 }
@@ -245,7 +245,7 @@ func imageSize(path string) (int, int) {
 var bgMu sync.Mutex
 
 // releaseSoon gives the decoded pixels back to Windows once the decoding stops for a
-// moment (a page of thumbnails is many decodes in a row; one release after them, 06 §10).
+// moment (a page of thumbnails is many decodes in a row; one release after them, 16 §10).
 var (
 	releaseMu    sync.Mutex
 	releaseTimer *time.Timer

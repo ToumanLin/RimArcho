@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
-// 07 §6.2: opt-in, real-data benchmark; only the disposable data directory is written.
+// 18 §2: opt-in, real-data benchmark; only the disposable data directory is written.
 // RIMARCHO_TEXTURE_PERF_HOME=<tmp data dir> go test ./internal/app -run ^$ -bench BenchmarkTextureSummary -benchtime=1x -count=3
 func BenchmarkTextureSummary(b *testing.B) {
 	home := os.Getenv("RIMARCHO_TEXTURE_PERF_HOME")

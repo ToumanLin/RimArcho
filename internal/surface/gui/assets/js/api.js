@@ -1,12 +1,12 @@
-// The Go service (internal/surface/gui.API) through the Wails runtime (06 §8.2): no
+// The Go service (internal/surface/gui.API) through the Wails runtime (16 §8.2): no
 // generated bindings, no build step.
 import { call as perfCall } from "./perf.js";
 import { Call, Events } from "/wails/runtime.js";
 
 const SVC = "github.com/ToumanLin/RimArcho/internal/surface/gui.API.";
 
-// Environment jobs acknowledge immediately and deliver their result by event (06 §8.4).
-let request = Date.now() * 1000; // remains newer when the WebView reloads (06 §3.1)
+// Environment jobs acknowledge immediately and deliver their result by event (16 §8.4).
+let request = Date.now() * 1000; // remains newer when the WebView reloads (16 §3.1)
 const pending = new Map();
 let actionGuard = () => "";
 export function setEnvironmentGuard(fn) { actionGuard = fn; }
@@ -18,7 +18,7 @@ const writesGame = new Set([
   "PlanSync", "PlanFollow", "PlanFollowMode", "PlanUnfollow", "PlanVersionsSet", "SetModNote", "SetTag",
   "LibraryDo", "LibrarySetNote", "Subscribe", "SubscriptionFrom", "CheckSubscriptionSource", "WorkshopUpdate", "Scan", "Analyze", "RemoveEnv", "ApplySetting", "AddMonitor",
   "PackLaunch", "PackBuild", "PackRemove", "PackRemoveUnfinished", "TexturesRun", "TexturesClean", "CreditAnswer", "CompleteDependencies", "ReplaceRecommended",
-  // Saves (06 §2.11): fixes edit the save's list, the file actions change its folder
+  // Saves (16 §2.11): fixes edit the save's list, the file actions change its folder
   "SaveFix", "SaveNewList", "SaveRename", "SaveCopy", "SaveTrash",
 ]);
 on("environment", (result) => {

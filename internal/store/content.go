@@ -6,12 +6,12 @@ import (
 	"strings"
 )
 
-// Content kinds of snapshots (06 §3.7 type:assembly|xml|language), kept in snapshot.kinds.
+// Content kinds of snapshots (16 §3.7 type:assembly|xml|language), kept in snapshot.kinds.
 const (
 	HasDLL       = 1 << iota // a .dll anywhere
 	HasDefsPatch             // XML under Defs/ or Patches/ (at any load-folder depth)
 	HasLanguages             // something under Languages/
-	HasPNG                   // a .png under a folder whose name ends in "textures" (convertible textures, 08 §5.2)
+	HasPNG                   // a .png under a folder whose name ends in "textures" (convertible textures, 10 §2)
 
 	contentKinds = HasDLL | HasDefsPatch | HasLanguages
 )

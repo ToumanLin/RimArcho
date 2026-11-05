@@ -58,7 +58,7 @@ func (s *Store) CachedDefs(instanceID, key string) ([]analyze.DefFact, bool) {
 	return fs, err == nil
 }
 
-// defFields: file_ix indexes the set's file list (03 §3); scanDefs turns it into the path.
+// defFields: file_ix indexes the set's file list (05 §3); scanDefs turns it into the path.
 const defFields = `f.set_id, f.def_type, f.def_name, f.name, f.parent, f.abstract, f.file_ix, f.line, f.may_require, f.may_require_any`
 const defCols = `c.instance_id, ` + defFields
 const defView = ` FROM def_fact f JOIN content_state c ON c.def_set_id=f.set_id `
@@ -66,7 +66,7 @@ const defView = ` FROM def_fact f JOIN content_state c ON c.def_set_id=f.set_id 
 // defByName is defView for lookups by name: CROSS JOIN keeps the name index as the outer
 // loop. With a plain JOIN, ORDER BY c.instance_id makes SQLite walk every content_state row
 // of the version and probe the name index once per row: tens of times slower, more with
-// more mods (07 §6.2).
+// more mods (18 §2).
 const defByName = ` FROM def_fact f CROSS JOIN content_state c ON c.def_set_id=f.set_id `
 
 // The DefsNamed queries, by defName and by Name attribute.
@@ -125,7 +125,7 @@ func (s *Store) DefsOf(instanceID string) ([]analyze.DefFact, error) {
 // DefsNamed returns the Def facts with a defName (or, with byName, a Name attribute), by
 // instance ID and then file order. The order must not follow the table layout: rebuilt or
 // migrated facts get new rowids, and the first provider of a missing parent (and so a log
-// problem's ID) would change with them (03 §3).
+// problem's ID) would change with them (05 §3).
 func (s *Store) DefsNamed(name string, byName bool) ([]analyze.DefFact, error) {
 	q := defsByDefNameQ
 	if byName {
@@ -170,7 +170,7 @@ func (s *Store) ContentFolders(instanceID string) []string {
 // Analysis is one stored analysis run.
 type Analysis struct {
 	ID       int64
-	SetKey   string // the enabled set's fingerprint: the run's slot (03 §3)
+	SetKey   string // the enabled set's fingerprint: the run's slot (05 §3)
 	RunKey   string
 	MM       string
 	Version  int
@@ -180,7 +180,7 @@ type Analysis struct {
 }
 
 // SaveAnalysis persists a run: content states and rebuilt Def facts, the Patch facts and
-// findings. The run fills the slot (environment, mm, setKey) (03 §3): the slot's older run
+// findings. The run fills the slot (environment, mm, setKey) (05 §3): the slot's older run
 // is deleted, and so is every run of the environment whose set key is not in keep
 // (the enabled sets the environment's plans have now), so slots do not pile up as plans
 // are edited.
@@ -385,7 +385,7 @@ func (s *Store) PatchCounts(analysisID int64) (map[string][2]int, error) {
 	return out, rows.Err()
 }
 
-// Ignore is a problem the player chose to ignore (03 §4.2).
+// Ignore is a problem the player chose to ignore (05 §4.2).
 type Ignore struct {
 	ID         int64
 	LineageID  string
@@ -496,7 +496,7 @@ func saveHarmony(tx *sql.Tx, asms []*analyze.AssemblyFacts, sets map[string]int6
 		}
 		for _, p := range a.Patches {
 			// dynamic holds two bits: 1 the target is chosen at run time, 2 the patch was
-			// found at a Harmony.Patch call in code (G9, 03 §5.3).
+			// found at a Harmony.Patch call in code (G9, 05 §5.3).
 			if _, err := insH.Exec(set, file, p.PatchType, p.PatchMethod, p.Kind, p.Target(), p.TargetType, p.TargetMethod, p.Args, b(p.Skips), b(p.Dynamic)|2*b(p.Manual)); err != nil {
 				return err
 			}
@@ -732,7 +732,7 @@ func (s *Store) DecompileRecords(instance string) ([]*DecompileRecord, error) {
 // TypesUnder returns the distinct type names of Store.MM's analysed assemblies in the root
 // namespace root ("VanillaFurnitureEC" → "VanillaFurnitureEC.…"), each with the instances
 // defining it, at most limit names: the candidates a misspelled class is compared with
-// (03 §6.2, "did you mean").
+// (06 §2, "did you mean").
 func (s *Store) TypesUnder(root string, limit int) (map[string][]string, error) {
 	rows, err := s.DB.Query(`SELECT DISTINCT f.type_name, c.instance_id FROM type_fact f CROSS JOIN content_state c ON c.dll_set_id=f.set_id
  WHERE f.type_name >= ? AND f.type_name < ? AND instr(f.type_name,'<')=0 AND c.game_mm=? LIMIT ?`, root+".", root+"/", s.MM, limit)
@@ -772,7 +772,7 @@ func (s *Store) GameTypesUnder(root string, limit int) ([]string, error) {
 
 // DefsInFile returns the non-abstract Def facts of Store.MM that come from a file named base
 // (any folder, case-insensitive), for the instances in only: what is lost when the game
-// reports "Exception loading def from file <base>" (03 §6.3, consequences).
+// reports "Exception loading def from file <base>" (06 §3, consequences).
 func (s *Store) DefsInFile(base string, only map[string]bool) ([]analyze.DefFact, error) {
 	rows, err := s.DB.Query(`SELECT c.instance_id, s.id, s.files FROM fact_set s JOIN content_state c ON c.def_set_id=s.id
  WHERE c.game_mm=? AND s.files LIKE ?`, s.MM, `%`+base+`"%`)

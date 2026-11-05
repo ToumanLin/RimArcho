@@ -95,7 +95,7 @@ func TestNewListImportUsesOnlyItsPreview(t *testing.T) {
 }
 
 // Management targets the selected list; preview and cancelled/failed creation do not
-// switch the editor. Versions/saves and copied version constraints survive (06 §2.17).
+// switch the editor. Versions/saves and copied version constraints survive (16 §2.17).
 func TestPlanForms(t *testing.T) {
 	t.Parallel()
 	e, api, _ := fixture(t)
@@ -168,7 +168,7 @@ func TestPlanForms(t *testing.T) {
 }
 
 // Checkout is an immediate undoable edit through the same API used by enter and the
-// history's action; it never writes ModsConfig.xml (06 §2.5, 06 §6).
+// history's action; it never writes ModsConfig.xml (16 §2.5, 16 §6).
 func TestHistoryCheckoutUndo(t *testing.T) {
 	t.Parallel()
 	e, api, _ := fixture(t)

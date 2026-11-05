@@ -23,7 +23,7 @@ const (
 	ToddsVersion = "0.4.1"
 	ToddsZipURL  = "https://github.com/todds-encoder/todds/releases/download/0.4.1/todds_Windows_0.4.1.zip"
 	ToddsZipSize = 3846213 // bytes, as the release lists it
-	// The release is final, so its bytes are pinned: a GitHub mirror (07 §2.2) cannot swap them.
+	// The release is final, so its bytes are pinned: a GitHub mirror (17 §2.2) cannot swap them.
 	ToddsZipSHA256 = "5ecec319eb49fc87b1a83a62bd0dbbfe8660967e68f0026393d42d3c54d870b8"
 	ToddsHome      = "https://github.com/todds-encoder/todds"
 )

@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 )
 
-// Save actions (10 §4.4). Fixing a save edits its list (one undoable step); rename and copy
+// Save actions (12 §4.4). Fixing a save edits its list (one undoable step); rename and copy
 // change files in the save's folder when the player asks; backup copies into the data
 // directory and recycling moves to the recycle bin, both only after confirmation (yes).
 
@@ -53,7 +53,7 @@ func (r *SaveFixResult) WorkshopIDs() []string {
 	return ids
 }
 
-// FixSave applies a save's Mod fixes to the list it matched as one undoable edit (10 §4.4):
+// FixSave applies a save's Mod fixes to the list it matched as one undoable edit (12 §4.4):
 // missing Mods go in at their place in the save's order. Nothing is written to the game
 // until save or launch. A dry run reports the same without editing.
 func (a *App) FixSave(s *Save, opt SaveFixOptions, dryRun bool) (*SaveFixResult, error) {
@@ -231,7 +231,7 @@ func (a *App) refuseWhileRunning() error {
 	return nil
 }
 
-// RenameSave renames a save in its folder, keeping a RimSaves folder prefix (10 §4.4). It
+// RenameSave renames a save in its folder, keeping a RimSaves folder prefix (12 §4.4). It
 // refuses an existing name, a name with path characters, and while a game runs.
 func (a *App) RenameSave(s *Save, name string) (string, error) {
 	name = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(name), ".rws"))
@@ -264,7 +264,7 @@ func (a *App) RenameSave(s *Save, name string) (string, error) {
 }
 
 // CopySave copies a save next to itself as "<name> (copy)", never overwriting, and keeps
-// its modification time so it sorts beside the original (10 §4.4).
+// its modification time so it sorts beside the original (12 §4.4).
 func (a *App) CopySave(s *Save) (string, error) {
 	if s.Writing {
 		return "", fmt.Errorf("%s is being written; try again when the game has saved", s.Name)
@@ -320,7 +320,7 @@ type SaveFilesResult struct {
 	Errs  []string // per save, when some failed
 }
 
-// BackupSaves copies saves to <data>/backups/saves/<time>/ (07 §3, 10 §4.4). Without yes it
+// BackupSaves copies saves to <data>/backups/saves/<time>/ (17 §3, 12 §4.4). Without yes it
 // only previews the files and their size.
 func (a *App) BackupSaves(saves []*Save, yes bool) (*SaveFilesResult, error) {
 	r := &SaveFilesResult{Saves: saves, Dir: filepath.Join(a.Home, "backups", "saves", a.Now().In(a.Loc).Format("20060102-150405"))}
@@ -345,7 +345,7 @@ func (a *App) BackupSaves(saves []*Save, yes bool) (*SaveFilesResult, error) {
 	return r, nil
 }
 
-// TrashSaves moves saves to the recycle bin (08 §7, 10 §4.4), refusing while a game runs.
+// TrashSaves moves saves to the recycle bin (02 §3, 12 §4.4), refusing while a game runs.
 // Without yes it only previews the files and their size.
 func (a *App) TrashSaves(saves []*Save, yes bool) (*SaveFilesResult, error) {
 	r := &SaveFilesResult{Saves: saves}

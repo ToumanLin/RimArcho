@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The four columns (06 §2.5): not enabled | enabled | staging | detail.
+// The four columns (16 §2.5): not enabled | enabled | staging | detail.
 
 type colKind int
 
@@ -26,7 +26,7 @@ func (k colKind) title() string {
 	return [...]string{T("Disabled"), T("Enabled"), T("Staging")}[k]
 }
 
-// Row status, worst first wins (06 §7: one status icon at most; view.Status*).
+// Row status, worst first wins (16 §7: one status icon at most; view.Status*).
 const (
 	statusNone       = view.StatusNone
 	statusUnloadable = view.StatusUnloadable
@@ -36,7 +36,7 @@ const (
 	statusErr        = view.StatusErr
 )
 
-// item is one row: the shared view.Item (06 §1) and the TUI's copies of its fields.
+// item is one row: the shared view.Item (16 §1) and the TUI's copies of its fields.
 type item struct {
 	v               view.Item
 	id, ref         string
@@ -102,7 +102,7 @@ type layout struct {
 	tabs             bool
 }
 
-// layout places the columns for the terminal width (06 §2.5): staging hides below 140
+// layout places the columns for the terminal width (16 §2.5): staging hides below 140
 // (focusing it shows it in the first slot), the detail column below 110 (enter opens it
 // full screen), and below 80 one column at a time with [ ] to switch.
 func (m *model) layout() layout {
@@ -126,7 +126,7 @@ func (m *model) layout() layout {
 		out[len(out)-1] += rest - used
 		return out
 	}
-	// Stored widths (06 §2.5) replace the defaults; the detail column takes the rest.
+	// Stored widths (16 §2.5) replace the defaults; the detail column takes the rest.
 	withDetail := func(kinds []colKind, defaults []int) {
 		gaps := len(kinds) * colGap
 		ws := m.fitWidths(kinds, defaults, w-gaps-minDetailW)
@@ -187,7 +187,7 @@ func (m *model) reload() {
 		}
 		return
 	}
-	// a list only open here: the top bar says which one launches (04 §1.3)
+	// a list only open here: the top bar says which one launches (07 §1.3)
 	m.launches, m.launchesID = "", 0
 	if m.app.OpenPlan != 0 && st.Plan != nil {
 		if p, _ := m.app.Store.CurrentPlan(st.Ix.Env.ID); p != nil && p.ID != st.Plan.ID {
@@ -269,7 +269,7 @@ func (m *model) columnLines(n int) []string {
 // drawColumn returns n lines of exactly s.w cells: the title, then the rows.
 func (m *model) drawColumn(s slot, n int, tabs bool) []string {
 	c := &m.cols[s.kind]
-	focused := m.focus == s.kind && !m.detailFocus // area 4 has the focus: no list is bright (06 §3.2)
+	focused := m.focus == s.kind && !m.detailFocus // area 4 has the focus: no list is bright (16 §3.2)
 	out := make([]string, 0, n)
 	if tabs {
 		out = append(out, m.tabStrip(s.w))
@@ -339,18 +339,18 @@ func (m *model) columnTitle(c *column, focused bool, w int) string {
 		t = fmt.Sprintf("%s %d/%d", c.kind.title(), len(c.view), len(c.items))
 	}
 	if c.kind != cStaging && m.bar.active() {
-		t = fmt.Sprintf("%s %d / %d", c.kind.title(), len(c.view), len(c.items)) // the bar filters both lists (06 §2.5)
+		t = fmt.Sprintf("%s %d / %d", c.kind.title(), len(c.view), len(c.items)) // the bar filters both lists (16 §2.5)
 	}
 	st := sDimS
 	if focused {
 		st = sAccent
 	}
-	num := fmt.Sprintf("%d ", int(c.kind)+1) // the area's number key (06 §3.2)
+	num := fmt.Sprintf("%d ", int(c.kind)+1) // the area's number key (16 §3.2)
 	title := sDimS.Render(num) + st.Render(fit(t, min(width.StringWidth(t), w-2)))
 	used := 2 + min(width.StringWidth(t), w-2)
 	if c.filter != "" || (focused && m.editing) {
 		f := "  " + ic.search + " " + c.filter
-		// while typing: the grey completion tab takes (06 §3.7), else the cursor mark
+		// while typing: the grey completion tab takes (16 §3.7), else the cursor mark
 		tail := ""
 		if focused && m.editing {
 			if tail = m.searchGhost(); tail == "" {
@@ -394,13 +394,13 @@ func (m *model) tabStrip(w int) string {
 }
 
 // drawRow: mark, position (enabled column), source icon, name, unsaved dot, status icon at
-// the right edge (06 §2.5). Exactly w cells.
+// the right edge (16 §2.5). Exactly w cells.
 func (m *model) drawRow(c *column, vi int, focused bool, w int) string {
 	return m.drawRowLines(c, vi, focused, w, false)[0]
 }
 
 // drawRowLines draws a row; with wrap a long name continues on more lines, under the name
-// (the position, icons and status are on the first line only, 06 §2.5).
+// (the position, icons and status are on the first line only, 16 §2.5).
 func (m *model) drawRowLines(c *column, vi int, focused bool, w int, wrapName bool) []string {
 	it := &c.items[c.view[vi]]
 	isCur := vi == c.cursor
@@ -468,7 +468,7 @@ func (m *model) drawRowLines(c *column, vi int, focused bool, w int, wrapName bo
 		b.WriteString(bg(sAccent).Render(dot))
 	}
 	used += nw + width.StringWidth(dot)
-	// No tags after the name (06 §3.8): they are in the detail and in search.
+	// No tags after the name (16 §3.8): they are in the detail and in search.
 	b.WriteString(pad(w - used - statusW))
 	b.WriteString(pad(1) + bg(statusStyle(st)).Render(statusGlyph(st)))
 	lines := []string{b.String()}
@@ -536,7 +536,7 @@ func fit(s string, w int) string {
 // wrap breaks s into lines of at most w cells, the same way as the description (wrapSpans):
 // at spaces, between CJK characters, never inside a rune or before closing punctuation,
 // and a word longer than the line after a path separator when it has one. A line's
-// leading spaces are kept on every line it wraps into (06 §4.1, T7).
+// leading spaces are kept on every line it wraps into (16 §4.1, T7).
 func wrap(s string, w int) []string {
 	if w < 1 {
 		return nil

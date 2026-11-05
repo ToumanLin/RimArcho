@@ -13,12 +13,12 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/logs"
 )
 
-// Archo Monitor's settings records (03 §6.7.1) name, for one run, the folder each Mod class
+// Archo Monitor's settings records (06 §7.1) name, for one run, the folder each Mod class
 // was seen under and the settings file it read, and what each settings window the player
 // opened drew, and HugsLib's settings packs. ArchoMonitor.log keeps only two runs, so RimArcho keeps what it has read per
 // save-data root in meta "mod-settings:<root>": a folder name used long ago still leads to
-// its settings (08 §3), and a window's labels and HugsLib's titles and defaults stay after
-// their run is gone (06 §2.9).
+// its settings (09 §3), and a window's labels and HugsLib's titles and defaults stay after
+// their run is gone (16 §2.9).
 
 // seenSessionsMax bounds the session ids remembered as read; seenWindowsMax the windows kept
 // (the newest).

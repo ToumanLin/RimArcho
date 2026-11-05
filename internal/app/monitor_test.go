@@ -40,7 +40,7 @@ func monitorDir(e *testkit.Env) string {
 	return filepath.Join(e.Root, "LocalAppData", "RimArcho", "monitor")
 }
 
-// 08 §9, 04 §1.5 (M1, M2, M4): the bundled monitor is copied, registered as src:monitor,
+// 09 §6, 07 §1.5 (M1, M2, M4): the bundled monitor is copied, registered as src:monitor,
 // and added right after Harmony to every plan once, as one undoable edit; then it is a
 // normal mod.
 func TestMonitorInstallAndDefault(t *testing.T) {
@@ -168,7 +168,7 @@ func TestMonitorUpdate(t *testing.T) {
 	}
 }
 
-// 04 §1.5: monitor.default off adds nothing; plans are not marked, so turning it on later
+// 07 §1.5: monitor.default off adds nothing; plans are not marked, so turning it on later
 // still adds it.
 func TestMonitorDefaultOff(t *testing.T) {
 	t.Parallel()
@@ -257,7 +257,7 @@ func TestMonitorNotBundled(t *testing.T) {
 	}
 }
 
-// 08 §9: RIMARCHO_MONITOR points RimArcho at a locally built monitor.
+// 09 §6: RIMARCHO_MONITOR points RimArcho at a locally built monitor.
 func TestMonitorDevPath(t *testing.T) {
 	e := loadoutEnv(t)
 	scanNow(t, e)
@@ -290,7 +290,7 @@ func TestMonitorInPack(t *testing.T) {
 	}
 }
 
-// 06 §2.10: the log page's "add Archo Monitor" puts it back after Harmony in the current
+// 16 §2.10: the log page's "add Archo Monitor" puts it back after Harmony in the current
 // plan, also after the player removed it; one step that undo takes back.
 func TestAddMonitor(t *testing.T) {
 	t.Parallel()
@@ -318,7 +318,7 @@ func TestAddMonitor(t *testing.T) {
 	}
 }
 
-// 04 §1.5, §5.1: with monitor.default on, every sort puts Archo Monitor back after Harmony,
+// 07 §1.5, 08 §1.1: with monitor.default on, every sort puts Archo Monitor back after Harmony,
 // also after the player took it out; off, a sort leaves it out; a list without Harmony
 // says why it was not added.
 func TestSortAddsMonitor(t *testing.T) {
@@ -365,7 +365,7 @@ func TestSortAddsMonitor(t *testing.T) {
 // M9 (VM 2026-10-28): the game was launched before the monitor check finished (the first
 // scan took 27 s), and the check then put the newer Archo Monitor into the plan while the
 // game ran. A monitor version swap is not a list change: the run's log is still counted
-// (03 §6.4). The old copy's _Archo_ link, left in Mods/ until the next save removes it, does
+// (06 §4). The old copy's _Archo_ link, left in Mods/ until the next save removes it, does
 // not make the plan's new copy look unloadable; the next launch links the new one.
 func TestMonitorUpdateAfterLaunch(t *testing.T) {
 	t.Parallel()

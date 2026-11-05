@@ -1,4 +1,4 @@
-// Progress and field errors for agents (06 §11 A11, A12): attributes on what is already shown,
+// Progress and field errors for agents (16 §11 A11, A12): attributes on what is already shown,
 // never a second, hidden copy of the text.
 let feedbackID = 0;
 const newID = (prefix) => `${prefix}-${++feedbackID}`;

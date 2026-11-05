@@ -62,7 +62,7 @@ func archoLinks(t *testing.T, e *testkit.Env) map[string]string {
 	return out
 }
 
-// 04 §7.2: pin copies into the lock library (registered as src:locked), swaps the copy in
+// 07 §5.2: pin copies into the lock library (registered as src:locked), swaps the copy in
 // for the enabled original as one undoable edit, and the game gets it only through an
 // _Archo_ link on save. A dry run writes nothing; a mod that is not enabled leaves the plan.
 func TestPinLibrary(t *testing.T) {
@@ -132,7 +132,7 @@ func TestPinLibrary(t *testing.T) {
 	}
 }
 
-// 04 §7.3, §7.4: the upstream's snapshot differing from origin_snapshot raises mod.pinned to
+// 07 §5.3, §5.4: the upstream's snapshot differing from origin_snapshot raises mod.pinned to
 // a warning; pin --update makes a new library folder and swaps it in; both copies coexist
 // and save links only the one the plan uses.
 func TestPinUpdate(t *testing.T) {
@@ -180,7 +180,7 @@ func TestPinUpdate(t *testing.T) {
 	}
 }
 
-// 04 §7: a copy RimArcho made in Mods/ before the library existed moves into the library on
+// 07 §5: a copy RimArcho made in Mods/ before the library existed moves into the library on
 // pin --move-to-library (and on the first pin --update); nothing else leaves Mods/.
 func TestPinLegacyMove(t *testing.T) {
 	t.Parallel()
@@ -234,7 +234,7 @@ func TestPinLegacyMove(t *testing.T) {
 	}
 }
 
-// 04 §7.5: unpinning a library copy swaps the upstream back; the copy stays.
+// 07 §5.5: unpinning a library copy swaps the upstream back; the copy stays.
 func TestUnpinLocked(t *testing.T) {
 	t.Parallel()
 	e, _ := pinFixture(t)
@@ -261,7 +261,7 @@ func TestUnpinLocked(t *testing.T) {
 	}
 }
 
-// 08 §3: on a Mods/ volume without junctions (FAT, exFAT) save refuses with the existing
+// 09 §3: on a Mods/ volume without junctions (FAT, exFAT) save refuses with the existing
 // reason and writes nothing; there is no copy fallback.
 func TestPinNoJunctions(t *testing.T) {
 	e, _ := pinFixture(t)

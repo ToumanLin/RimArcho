@@ -53,7 +53,7 @@ func recordsXML(def string, v []float32) string {
 	return "<li><def>" + def + "</def><records>" + base64.StdEncoding.EncodeToString(b) + "</records></li>"
 }
 
-// playBody is the part of a synthetic save the right card reads (10 §1.7 L1): storyteller,
+// playBody is the part of a synthetic save the right card reads (12 §1.7 L1): storyteller,
 // play time, raids, the history series, letters, research and pawns of the player
 // faction (Faction_1, the testkit's PlayerColony).
 func playBody(wealth, people []float32, alive, dead []string, animals int, letters [][3]string) string {
@@ -119,7 +119,7 @@ func savesTask(api *API) *app.Task {
 	return nil
 }
 
-// The Saves page's full read (06 §2.11 "Loading", "Right"; 10 §1.7, §4.5): the listing
+// The Saves page's full read (16 §2.11 "Loading", "Right"; 12 §1.7, §4.5): the listing
 // starts the background task, its news relists the page (days, colonies by world), the
 // selected save's right card fills in, and a save selected while the run is busy elsewhere
 // is read on its own without waiting.

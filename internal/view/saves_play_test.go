@@ -31,7 +31,7 @@ func series(n int, f func(i int) float32) []float32 {
 	return v
 }
 
-// The right card from the full read (06 §2.11 "Right", 10 §4.5): only what the facts
+// The right card from the full read (16 §2.11 "Right", 12 §4.5): only what the facts
 // hold, the change since the colony's previous read save, and lists kept short.
 func TestSavePlayOf(t *testing.T) {
 	t.Parallel()

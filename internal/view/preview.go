@@ -24,7 +24,7 @@ func launchHintNow(a *app.App) *LaunchHint {
 	return BuildNeeds(a, st, ps).Launch
 }
 
-// Whole-list actions (06 §6): sort, save and launch act on one key or click and say what
+// Whole-list actions (16 §6): sort, save and launch act on one key or click and say what
 // they did (sort: u undoes it). The preview is the CLI's dry run (read-only), reached from
 // the palette (preview the sort / preview saving / preview the launch) or `archo … --dry-run`; it never asks to go on.
 
@@ -54,14 +54,14 @@ type Outcome struct {
 	Undo    bool     `json:"undo,omitempty"`    // u takes it back (sort)
 	Refused []string `json:"refused,omitempty"` // refused: why, then the commands that resolve it
 	// Moves: refused because Mods/ holds another version that can move into the lock
-	// library (08 §3): what moving them does, for the one confirmation; RunMoving goes on.
+	// library (09 §3): what moving them does, for the one confirmation; RunMoving goes on.
 	Moves []string `json:"moves,omitempty"`
 	// Confirm: nothing was done; a launch with required mods missing asks first (RunAsking):
 	// what will go wrong, then the missing ones.
 	Confirm []string `json:"confirm,omitempty"`
 }
 
-// Run carries out sort, save or launch at once (06 §6). A refusal (a game is running, an
+// Run carries out sort, save or launch at once (16 §6). A refusal (a game is running, an
 // outside change not loaded, no user data folder …) is an Outcome with Refused set, not an
 // error: the interface shows it and asks nothing.
 func Run(a *app.App, what string) *Outcome { return run(a, what, false) }
@@ -194,7 +194,7 @@ func apply(a *app.App, what string, move bool) (string, error) {
 		if _, err := a.LaunchWith(false, move); err != nil {
 			return "", err
 		}
-		// The most likely trouble goes with it (06 §2.3, never blocking): the TUI has no
+		// The most likely trouble goes with it (16 §2.3, never blocking): the TUI has no
 		// launch page, so its status line is where the player reads it.
 		if h := launchHintNow(a); h != nil {
 			return T("the game is starting") + "  " + Tf("watch for: %s", h.Text), nil
@@ -243,7 +243,7 @@ func Swap(a *app.App, st *app.LoadoutState, id string) (string, error) {
 }
 
 // LaunchPack plays a pack as an Outcome: a refusal because of folders that can move into the
-// lock library carries the moves (08 §5.3).
+// lock library carries the moves (10 §3).
 func LaunchPack(a *app.App, name string, move bool) *Outcome {
 	o := &Outcome{What: "pack"}
 	r, err := a.LaunchPackWith(name, false, move)
@@ -286,7 +286,7 @@ func sortChangeText(r *app.SortResult) string {
 		}
 	}
 	if len(added) > 0 {
-		// what the sort put in (Core, Archo Monitor: 04 §5.1) by name
+		// what the sort put in (Core, Archo Monitor: 08 §1.1) by name
 		return Tf("sorted: added %s, %d moved", strings.Join(added, T(", ")), moved)
 	}
 	strong := 0
@@ -296,7 +296,7 @@ func sortChangeText(r *app.SortResult) string {
 		}
 	}
 	if strong > 0 {
-		// Strong ones first (04 §5.3): they are what the sort mattered for.
+		// Strong ones first (08 §1.3): they are what the sort mattered for.
 		return Tf("sorted: %d moved, strong requirements put right: %d", len(r.Changes), strong)
 	}
 	return Tf("sorted: %d moved, only weaker preferences were out of order", len(r.Changes))

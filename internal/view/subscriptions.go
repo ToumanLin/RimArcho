@@ -26,7 +26,7 @@ type SourceFailureGroup struct {
 	Items []string `json:"items"`
 }
 
-// PendingUpdate is one row of waiting for you to update (06 §2.9) and its detail.
+// PendingUpdate is one row of waiting for you to update (16 §2.9) and its detail.
 type PendingUpdate struct {
 	ID        string   `json:"id"`
 	Ref       string   `json:"ref"`

@@ -16,10 +16,10 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Package modchanges builds the change history (06 §2.9) for every surface: the GUI and the
+// Package modchanges builds the change history (16 §2.9) for every surface: the GUI and the
 // TUI word it through view.T, the CLI and MCP in English.
 //
-// Changes (06 §2.9): one row per mod, merging its change events in the time range, with a
+// Changes (16 §2.9): one row per mod, merging its change events in the time range, with a
 // sentence built only from what the scans recorded (the declarations and file lists of the
 // two snapshots, the Workshop time, locked versions). The default is the current plan's
 // mods since that plan was last played; older changes follow by day.
@@ -57,7 +57,7 @@ func TierText(tx Text, t int) string {
 	return tx.T("content only")
 }
 
-// Row actions (06 §2.9), each with its key on the page.
+// Row actions (16 §2.9), each with its key on the page.
 const (
 	ActWorkshop = "workshop" // open page: the Workshop change notes (ctrl+w)
 	ActDeps     = "deps"     // see dependencies: Can it run (D)
@@ -938,7 +938,7 @@ func Files(a *app.App, tx Text, before, after int64) []string {
 	return out
 }
 
-// Home is the home page's line about the current plan (06 §2.3).
+// Home is the home page's line about the current plan (16 §2.3).
 type Home struct {
 	Title  string `json:"title"` // "the current plan since you last played"
 	Text   string `json:"text"`  // "5 mods updated, 1 needs attention" / "nothing changed"

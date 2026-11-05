@@ -1,4 +1,4 @@
-// Package finding is the problem (Finding) model of 03 §4: code, severity, subjects,
+// Package finding is the problem (Finding) model of 05 §4: code, severity, subjects,
 // claim, evidence, confidence and suggestions. Instance references are stored as
 // "@{<instance id>}" tokens and turned into short refs when rendered.
 package finding
@@ -22,7 +22,7 @@ const (
 	Possible = "possible"
 )
 
-// Evidence source types (03 §4.1).
+// Evidence source types (05 §4.1).
 const (
 	Declared  = "declared"
 	Inferred  = "inferred"

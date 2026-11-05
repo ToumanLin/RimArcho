@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// 04 §1.1 (2026-10-25): lists are shared by every game. Lists made in one game show in
+// 07 §1.1 (2026-10-25): lists are shared by every game. Lists made in one game show in
 // another; their Core entry is read as that game's Core; each game keeps its own current
 // list; removing a game keeps the lists.
 func TestPlansSharedAcrossGames(t *testing.T) {
@@ -88,7 +88,7 @@ func TestPlansSharedAcrossGames(t *testing.T) {
 	}
 }
 
-// 04 §1.7, 06 §2.9: every game's own Mods/ is in the mod library, and a list enables such
+// 07 §1.7, 16 §2.9: every game's own Mods/ is in the mod library, and a list enables such
 // a mod in any game: saving links it into this game's Mods/ as _Archo_env_<ID>. A mod this
 // game has in its own Mods/ is used instead of another game's copy.
 func TestOtherGamesModsUsableAnywhere(t *testing.T) {

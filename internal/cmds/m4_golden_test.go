@@ -27,7 +27,7 @@ func TestGoldenHarmonyLog(t *testing.T) {
 		cmd("log", "--cluster", "E4"),
 		cmd("log", "--select"),
 		cmd("problems", "--code", "log"),
-		// 03 §6.3: logs are grouped under one row each; a change to the Loadout after the
+		// 06 §3: logs are grouped under one row each; a change to the Loadout after the
 		// log makes it stale: folded by default and left out of the counts.
 		cmd("problems"),
 		cmd("status"),

@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Following Steam Workshop collections (04 §9.6): link, unlink, check and catch up.
+// Following Steam Workshop collections (07 §7.6): link, unlink, check and catch up.
 
 func init() {
 	register(&Command{Name: "plan follow", Args: "<name> <collection link|ID>", Summary: "make a plan follow a Steam Workshop collection: RimArcho tells you when it changes (uses the network)",

@@ -6,7 +6,7 @@ using Verse;
 
 namespace ArchoMonitor
 {
-    // SettingsFile is one Mod class's settings file as the game names it (03 §6.7.1).
+    // SettingsFile is one Mod class's settings file as the game names it (06 §7.1).
     internal struct SettingsFile
     {
         internal string PackageId; // lower case, player-facing
@@ -19,7 +19,7 @@ namespace ArchoMonitor
 
     // SettingsRecord writes, once per session when the main menu first opens, which settings
     // file each Mod reads and writes and its settings window's title. RimArcho uses it to keep a
-    // Mod's settings when its folder name changes (08 §3) and to list Mods with settings. It
+    // Mod's settings when its folder name changes (09 §3) and to list Mods with settings. It
     // calls only what the game calls itself: SettingsCategory (the options list) and the file
     // name the game builds for GetSettings.
     internal static class SettingsRecord

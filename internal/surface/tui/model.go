@@ -26,7 +26,7 @@ type Options struct {
 	// ScanOnStart scans before showing the list if the environment was never scanned.
 	ScanOnStart bool
 	// Analyze brings the Def/Patch analysis up to date; nil means the `archo analyze`
-	// child process (03 §3), so the merged document never lives in the TUI process.
+	// child process (05 §3), so the merged document never lives in the TUI process.
 	Analyze AnalyzeRunner
 	// OpenURL opens the Workshop page (o); nil means the default browser.
 	OpenURL func(string) error
@@ -39,16 +39,16 @@ type Options struct {
 func ChildScan(envName string) (string, error) { return app.ChildScan(env.AppHome(), envName) }
 
 // Screens. The main screen is the four columns; the others are opened from it and esc
-// returns (06 §2.2).
+// returns (16 §2.2).
 const (
 	tabList = iota
 	tabProblems
 	tabChanges
-	tabLibrary   // Mod library (06 §2.9), from the palette
-	tabSubscribe // Mod library › add a subscription (06 §2.9): + on updates
-	tabSearch    // Mod library › Search files (06 §2.9)
-	tabRules     // Load-order rules (06 §2.5): r in the editor
-	tabHome      // Start (06 §2.3): shift+1, and the editor's L
+	tabLibrary   // Mod library (16 §2.9), from the palette
+	tabSubscribe // Mod library › add a subscription (16 §2.9): + on updates
+	tabSearch    // Mod library › Search files (16 §2.9)
+	tabRules     // Load-order rules (16 §2.5): r in the editor
+	tabHome      // Start (16 §2.3): shift+1, and the editor's L
 )
 
 // panel is a secondary screen: command output to read, or a chooser.
@@ -61,11 +61,11 @@ type panel struct {
 	onPick  func(m *model, value string) tea.Cmd
 	// onPickAt: enter on choice i, for choices whose labels may repeat (H's steps)
 	onPickAt func(m *model, i int) tea.Cmd
-	// onDelete: d / delete on a choice (the environment chooser's remove game, 06 §2.14)
+	// onDelete: d / delete on a choice (the environment chooser's remove game, 16 §2.14)
 	onDelete func(m *model, value string) tea.Cmd
-	// onEnter: enter runs it (a confirmation: the dry run is the text, 06 §6)
+	// onEnter: enter runs it (a confirmation: the dry run is the text, 16 §6)
 	onEnter func(m *model) tea.Cmd
-	// keys: a text panel's own keys (Feedback's m / p / l, 06 §2.14); the panel stays open
+	// keys: a text panel's own keys (Feedback's m / p / l, 16 §2.14); the panel stays open
 	keys map[string]func(m *model) tea.Cmd
 }
 
@@ -77,7 +77,7 @@ type prompt struct {
 	submit func(m *model, text string) tea.Cmd
 }
 
-// Status line kinds (06 §6).
+// Status line kinds (16 §6).
 const (
 	sayNone = iota
 	sayOK
@@ -121,7 +121,7 @@ type model struct {
 	newLog    bool
 	analyzing bool
 	// analyzeQuiet: the check Can it run starts by itself; its head says it runs, and the
-	// status line keeps what the player just did (the undo hint, 06 §2.4)
+	// status line keeps what the player just did (the undo hint, 16 §2.4)
 	analyzeQuiet bool
 	analyzeWait  func() tea.Msg
 
@@ -132,53 +132,53 @@ type model struct {
 	rules rulesState // Load-order rules
 	home  homeState  // Start
 	// launches: the current list when the editor has another one open ("": the editor's
-	// list is the current one); the top bar says it (04 §1.3)
+	// list is the current one); the top bar says it (07 §1.3)
 	launches   string
 	launchesID int64
-	tasks      taskRunner // the subscription actions' background tasks (06 §2.16)
+	tasks      taskRunner // the subscription actions' background tasks (16 §2.16)
 
-	bar      barState  // the editor's filter bar over Not enabled and Enabled (06 §2.5)
+	bar      barState  // the editor's filter bar over Not enabled and Enabled (16 §2.5)
 	board    *boardRef // the board the columns were built from (the bar filters it)
 	boardSeq int
 	barCache *view.BarFilter
 	barKey   string
 	libCache *app.Library // the library as of board build libAt (the rows' ops)
-	menu     *rowMenu     // the row menu is open (06 §8.5)
+	menu     *rowMenu     // the row menu is open (16 §8.5)
 	libAt    int
 
 	liveTr view.LiveTracker
-	live   *view.Live // the running game (06 §2.1); nil until the first poll
+	live   *view.Live // the running game (16 §2.1); nil until the first poll
 
-	hist    []view.HistItem // the history area, shown in empty staging (06 §2.5)
+	hist    []view.HistItem // the history area, shown in empty staging (16 §2.5)
 	histCur int
 	histOff int
 
 	panel   *panel
 	prompt  *prompt
-	cmdl    *cmdLine // the command line, `:` (06 §9.4); kept while closed
+	cmdl    *cmdLine // the command line, `:` (16 §9.4); kept while closed
 	cmdOn   bool     // the command line is open
 	cmdBusy string   // the command line's command that runs, "" none
-	tags    *tagBar  // the tag bar is open (06 §3.8)
+	tags    *tagBar  // the tag bar is open (16 §3.8)
 	status  string
 	sayKind int
 
 	content view.ContentCache // content kinds for type: (loaded on first use)
 
 	dd          *detailData // the current mod's details beyond the row
-	fsecs       *fullSecs   // the full-screen detail's sub-sections (06 §4.2)
-	pal         *palette    // the command palette (06 §3.5), nil when closed
-	sel         selRange    // the shift range of the selection (06 §3.4)
-	pos         *posInput   // the position input, m (06 §3.6)
-	placed      []string    // the mods space just enabled: an m right after it moves them (06 §3.5)
-	prefs       colPrefs    // column widths and wrapping (06 §2.5)
+	fsecs       *fullSecs   // the full-screen detail's sub-sections (16 §4.2)
+	pal         *palette    // the command palette (16 §3.5), nil when closed
+	sel         selRange    // the shift range of the selection (16 §3.4)
+	pos         *posInput   // the position input, m (16 §3.6)
+	placed      []string    // the mods space just enabled: an m right after it moves them (16 §3.5)
+	prefs       colPrefs    // column widths and wrapping (16 §2.5)
 	prefsEnv    string
 	resizing    *resizeDrag // a column gap being dragged
 	rowMap      [3][]int    // per list column: body line → view index (-1: title or empty), as last drawn
-	armed       *armed      // a destructive key pressed once (06 §6)
+	armed       *armed      // a destructive key pressed once (16 §6)
 	full        bool        // the full-screen detail
 	fullOff     int
 	fullSec     int    // the full-screen sub-section tab / shift+tab went to (0: the summary)
-	detailFocus bool   // focus area 4, the compact detail: ↑↓ scroll it (06 §3.2)
+	detailFocus bool   // focus area 4, the compact detail: ↑↓ scroll it (16 §3.2)
 	detailOff   int    // its scroll (PgUp PgDn and the wheel scroll it from any area)
 	detailOffID string // the mod it was scrolled for
 	lastLines   []dline
@@ -187,7 +187,7 @@ type model struct {
 	quitting bool
 
 	// selfRun is RimArcho's own update while it installs; restartExe the new program Run
-	// starts once the screen has closed (07 §5.1).
+	// starts once the screen has closed (17 §5.1).
 	selfRun    *selfUpdate
 	restartExe string
 }
@@ -204,12 +204,12 @@ func New(o Options) tea.Model {
 	return &model{opts: o, app: o.App, w: 120, h: 30, focus: cActive, marked: map[string]bool{}}
 }
 
-// MemoryLimit is the Go heap soft cap of the TUI process (06 §3.5 T5: idle ≤ 80 MB with
+// MemoryLimit is the Go heap soft cap of the TUI process (16 §3.5 T5: idle ≤ 80 MB with
 // ≥ 15 MB headroom). The GC works harder near the cap instead of growing the heap.
 const MemoryLimit = 40 << 20
 
 // TuneProcess applies the TUI process's memory settings (M3 measurements in
-// 07 §8.3): a soft heap cap, GOGC 50, and a 256 KiB SQLite page cache on the
+// 17 §7.3): a soft heap cap, GOGC 50, and a 256 KiB SQLite page cache on the
 // single connection (the default 2 MB stays resident in modernc's allocator).
 func TuneProcess(a *app.App) {
 	debug.SetMemoryLimit(MemoryLimit)
@@ -269,7 +269,7 @@ func Run(o Options) error {
 }
 
 // Restart is Run's answer after RimArcho updated itself: the caller closes the database
-// and starts Exe in this terminal with the same arguments (07 §5.1).
+// and starts Exe in this terminal with the same arguments (17 §5.1).
 type Restart struct{ Exe string }
 
 func (r *Restart) Error() string { return "restart " + r.Exe }
@@ -325,13 +325,13 @@ type boardRef struct {
 	seq int
 }
 
-// resizeDrag: a mouse drag on the gap right of a list column (06 §2.5).
+// resizeDrag: a mouse drag on the gap right of a list column (16 §2.5).
 type resizeDrag struct {
 	kind   colKind
 	x0, w0 int
 }
 
-// armed is a destructive action waiting for its second press (06 §6).
+// armed is a destructive action waiting for its second press (16 §6).
 type armed struct {
 	key string
 	run func(m *model) tea.Cmd
@@ -345,7 +345,7 @@ func (m *model) arm(key, warning string, run func(m *model) tea.Cmd) tea.Cmd {
 	return nil
 }
 
-// say sets the status line (06 §6); it is cleared by the next key.
+// say sets the status line (16 §6); it is cleared by the next key.
 func (m *model) say(kind int, text string) { m.sayKind, m.status = kind, text }
 
 // act runs a command; success shows okText, failure the command's error in plain words.

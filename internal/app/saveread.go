@@ -22,7 +22,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// The full read of a save (10 §1.7 L1): savefile.Scan over the whole file, cached in
+// The full read of a save (12 §1.7 L1): savefile.Scan over the whole file, cached in
 // save_cache by path, size, modification time and parser version. Lists carry only the
 // summary (Save.Summary); the facts are loaded for one save at a time (SaveFacts). The GUI
 // reads in the `archo saves index` child process; the CLI reads one save inline.
@@ -31,7 +31,7 @@ import (
 type SaveSummary struct {
 	Ticks     int64  `json:"ticks"`
 	Day       int    `json:"day"`               // whole in-game days since the start
-	Identity  string `json:"-"`                 // world identity (10 §4.1); "" when the save holds none
+	Identity  string `json:"-"`                 // world identity (12 §4.1); "" when the save holds none
 	World     string `json:"world,omitempty"`   // world name
 	Faction   string `json:"faction,omitempty"` // the player faction's name
 	Malformed bool   `json:"malformed,omitempty"`
@@ -153,7 +153,7 @@ type SaveIndexResult struct {
 }
 
 // IndexSaves reads the saves without a valid cache row in the order given, 2–4 at a
-// time, storing each as soon as it is read, so a stopped run keeps what it read (10 §1.7).
+// time, storing each as soon as it is read, so a stopped run keeps what it read (12 §1.7).
 func (a *App) IndexSaves(saves []*Save, progress func(SaveIndexProgress)) (*SaveIndexResult, error) {
 	start := time.Now()
 	r := &SaveIndexResult{}
@@ -293,7 +293,7 @@ func (a *App) RunSavesIndex(exe string, first []string, progress func(string)) e
 }
 
 // RunSavesIndexContext is RunSavesIndex that ends the child process when ctx is done
-// (the GUI's stop and window close, 06 §2.16): each save it read is already stored. A
+// (the GUI's stop and window close, 16 §2.16): each save it read is already stored. A
 // configured in-process runner (tests) is not interrupted.
 func (a *App) RunSavesIndexContext(ctx context.Context, exe string, first []string, progress func(string)) error {
 	if a.SavesIndexRunner != nil {

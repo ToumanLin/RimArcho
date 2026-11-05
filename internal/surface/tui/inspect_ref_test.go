@@ -7,7 +7,7 @@ import (
 )
 
 // enter follows the first reference in a line; a printed command writes instance references
-// without "#" (05 §3.1 rule 11), and those are followed when the index knows them.
+// without "#" (13 §3.1 rule 11), and those are followed when the index knows them.
 func TestLineRefBareCommandReference(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)

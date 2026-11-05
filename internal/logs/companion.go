@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// Companion logs (03 §6.7): one JSON object per line, written by an in-game companion mod —
+// Companion logs (06 §7): one JSON object per line, written by an in-game companion mod —
 // Archo Monitor's ArchoMonitor.log, or RimCrow Companion's RimCrow_Realtime.log (and its old
 // name RMM_Realtime.log). Archo Monitor's format is a superset of RimCrow's, so one reader
 // handles both.
@@ -70,7 +70,7 @@ type Companion struct {
 	Game      string // the game version the session line names
 	Started   time.Time
 	Ended     time.Time      // the exit line's time: the game closed normally
-	Full      bool           // the monitor stopped adding entries (32 MiB, 03 §6.7.3)
+	Full      bool           // the monitor stopped adding entries (32 MiB, 06 §7.3)
 	Settings  []SettingsFile // the settings record written at the main menu
 	BadLines  int
 	Entries   []*CompanionEntry
@@ -301,7 +301,7 @@ func (c *Companion) Lookup(message string) *CompanionEntry {
 	return c.byMatch[Normalize(strings.TrimSpace(message))]
 }
 
-// Poll reads what the file gained since the last call (live tracking, 03 §6.6). A file that
+// Poll reads what the file gained since the last call (live tracking, 06 §6). A file that
 // got shorter started over (the game restarted): everything is forgotten.
 func (c *Companion) Poll(maxRead int64) ([]*CompanionEntry, error) {
 	fi, err := os.Stat(c.Path)
@@ -345,7 +345,7 @@ func FirstSession(path string) string {
 }
 
 // SettingsFile is one Mod class's settings file as Archo Monitor recorded it when the main
-// menu first opened (03 §6.7.1): the folder the game saw the Mod under and the file it reads.
+// menu first opened (06 §7.1): the folder the game saw the Mod under and the file it reads.
 type SettingsFile struct {
 	PackageID string `json:"packageId"`
 	Folder    string `json:"folder"`
@@ -355,7 +355,7 @@ type SettingsFile struct {
 	Stored    bool   `json:"stored"` // the Mod reads its settings through the game
 }
 
-// SettingsControl is one thing a settings window drew (03 §6.7.1): a label, or a control
+// SettingsControl is one thing a settings window drew (06 §7.1): a label, or a control
 // with its value and, for a slider, its range.
 type SettingsControl struct {
 	Kind  string `json:"kind"` // label, checkbox, radio, slider, text, number, button
@@ -374,7 +374,7 @@ type SettingsWindow struct {
 }
 
 // HugsLibPack is one HugsLib settings pack as Archo Monitor recorded it once start-up work
-// was done (03 §6.7.1): its identifier (its element in HugsLib/ModSettings.xml), the Mod it
+// was done (06 §7.1): its identifier (its element in HugsLib/ModSettings.xml), the Mod it
 // belongs to and its settings.
 type HugsLibPack struct {
 	ID        string           `json:"id"`
@@ -519,7 +519,7 @@ func appendNew(l []string, xs ...string) []string {
 	return l
 }
 
-// HintClass maps a companion's inferredType to a cluster class (03 §6.7.4): only used when
+// HintClass maps a companion's inferredType to a cluster class (06 §7.4): only used when
 // RimArcho's own class is other or exception and the entry is a warning or an error.
 func HintClass(inferred, message string) string {
 	switch inferred {
@@ -539,7 +539,7 @@ func HintClass(inferred, message string) string {
 }
 
 // Hint gives an entry's class hint ("" for none): the companion's class for a message
-// RimArcho classed other or exception (03 §6.7.4).
+// RimArcho classed other or exception (06 §7.4).
 type Hint func(message string) string
 
 // HintFrom is the hint of a companion log.
@@ -579,7 +579,7 @@ func ClustersHint(f *File, hint Hint) []*Cluster {
 	by := map[string]*Cluster{}
 	var out []*Cluster
 	// The regular expressions cost tens of µs an entry on long messages and logs repeat the
-	// same entry thousands of times: classify each distinct entry once (07 §6).
+	// same entry thousands of times: classify each distinct entry once (18).
 	type kind struct {
 		interesting          bool
 		key, template, class string
@@ -654,7 +654,7 @@ func entrySig(sb *strings.Builder, e *Entry) {
 }
 
 // EntryOf parses a companion entry's message and details as a log entry (an entry that is
-// only in the companion log, 03 §6.7.4).
+// only in the companion log, 06 §7.4).
 func EntryOf(e *CompanionEntry) *Entry {
 	text := e.Message
 	if d := strings.TrimSpace(e.Details); d != "" {

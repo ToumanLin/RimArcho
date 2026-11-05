@@ -220,7 +220,7 @@ var rules = []*Rule{
 		Fixes:   []string{"enable-dependency", "update", "ignore"}, Workflow: "no"},
 	// Since 2026-11-04 the solid-colour material made in code (Material 'SolidColorMat-…') is
 	// logs.ClassNoise, informational, so a corpus run from then on leaves it out of this rule's
-	// counts; the v0 counts (2,696 logs) still include it (03 §6.1, §6.8).
+	// counts; the v0 counts (2,696 logs) still include it (06 §1, §8).
 	{ID: "asset.maintex", Class: logs.ClassMaterial, Match: `_MainTex`, Stage: "load",
 		Summary: "a material without a texture (often an icon)",
 		Causes:  []string{"a buildable def with uiIconColor but no icon path"},

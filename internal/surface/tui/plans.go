@@ -6,7 +6,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Plans in the TUI (04 §1.3, 06 §9.1), as in the window: P (or the palette's "plans"), the
+// Plans in the TUI (07 §1.3, 16 §9.1), as in the window: P (or the palette's "plans"), the
 // palette's list entries and tab in the editor open a list without making it current;
 // the top bar then says which list launches. P's make current, saving it or launching it makes
 // it current. P also makes a new list, renames or deletes the open one. Every verb is the
@@ -142,7 +142,7 @@ func (m *model) newPlan() tea.Cmd {
 	return nil
 }
 
-// importAsPlan is the import preview's third way (04 §9.1).
+// importAsPlan is the import preview's third way (07 §7.1).
 func (m *model) importAsPlan(imp *view.Import, p *view.ImportPreview) tea.Cmd {
 	base := p.Name
 	if base == "" {
@@ -173,7 +173,7 @@ func (m *model) renamePlan(r view.PlanRow) tea.Cmd {
 	return nil
 }
 
-// deletePlan asks first: it cannot be undone (06 §6); the last plan cannot go.
+// deletePlan asks first: it cannot be undone (16 §6); the last plan cannot go.
 func (m *model) deletePlan(r view.PlanRow) tea.Cmd {
 	warn, err := view.RemovePlanWarn(m.app, r.ID)
 	if err != nil {

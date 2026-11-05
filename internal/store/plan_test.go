@@ -56,7 +56,7 @@ func TestPlanStore(t *testing.T) {
 }
 
 // A database from a development build before 1.0.0 is refused, not upgraded, and left as it
-// was; a current one opens again (02 §7).
+// was; a current one opens again (04 §4).
 func TestPreReleaseDatabaseRefused(t *testing.T) {
 	t.Parallel()
 	path := filepath.Join(t.TempDir(), "archo.db")

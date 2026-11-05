@@ -1,4 +1,4 @@
-// Command winres writes cmd/archo's Windows resources (06 §8.6): the keystone icon group
+// Command winres writes cmd/archo's Windows resources (16 §8.6): the keystone icon group
 // and the version information. The release script runs it before each of the two builds.
 //
 //	go run ./scripts/winres -version 0.7.0 -exe RimArcho.exe -desc RimArcho

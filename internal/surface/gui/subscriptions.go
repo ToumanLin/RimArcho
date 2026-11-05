@@ -87,7 +87,7 @@ func (s *API) WorkshopUpdate(ref string) (string, error) {
 	return settingQueued(s.queueSettingTaskLocked(view.TaskWorkshopUpdate, []string{"workshop-update", ref}, "")), nil
 }
 
-// OpenSubscriptionSource opens what open the source page shows for a pending update (06 §2.9): the
+// OpenSubscriptionSource opens what open the source page shows for a pending update (16 §2.9): the
 // Workshop change notes, the compare view of two commits on GitHub / GitLab, or the
 // repository or download page. The page passes only the reference.
 func (s *API) OpenSubscriptionSource(ref string) (string, error) {

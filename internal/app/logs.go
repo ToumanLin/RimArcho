@@ -22,7 +22,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Attribution roles (03 §6.3).
+// Attribution roles (06 §3).
 const (
 	RoleSource     = "source"
 	RolePatcher    = "patcher"
@@ -52,21 +52,21 @@ type LogCluster struct {
 	// <message>"), the context agents otherwise grep the raw log for (G7 traces).
 	Near    []string
 	Finding *finding.Finding
-	// From the companion log (03 §6.7.4): its file name, the first occurrence's time and
+	// From the companion log (06 §7.4): its file name, the first occurrence's time and
 	// level; OnlyCompanion when Player.log does not have the entry at all.
 	Companion     string    `json:",omitempty"`
 	At            time.Time `json:",omitzero"`
 	Level         string    `json:",omitempty"`
 	OnlyCompanion bool      `json:",omitempty"`
 	// ConsequenceOf: the ID of the cluster whose failed def file this one follows from;
-	// Consequences and ConsequentLines count them on that cluster (03 §6.3).
+	// Consequences and ConsequentLines count them on that cluster (06 §3).
 	ConsequenceOf                 string `json:",omitempty"`
 	Consequences, ConsequentLines int    `json:",omitempty"`
 	// providerOff: a missing reference whose def an installed mod defines but is not
-	// enabled. That mod is the reason, not a patcher on the stack (03 §6.3).
+	// enabled. That mod is the reason, not a patcher on the stack (06 §3).
 	providerOff bool
 	// missingTypes: types the log reports missing that no installed mod defines; the XML
-	// naming them is searched for (refQuery.class, 03 §6.2).
+	// naming them is searched for (refQuery.class, 06 §2).
 	missingTypes []string
 }
 
@@ -80,22 +80,22 @@ type LogReport struct {
 	Lines     int
 	Version   string
 	// AnalysedAs is the major.minor the log was attributed against when it differs from
-	// the environment's (EnvMM): the log's own version (03 §6.4).
+	// the environment's (EnvMM): the log's own version (06 §4).
 	AnalysedAs, EnvMM string
 	Clusters          []*LogCluster
 	// Unanalysed counts the enabled mods (Core and DLC aside) whose content and assemblies
 	// had not been analysed for the attributed version: their types and Harmony IDs could
-	// not name them (03 §6.2).
+	// not name them (06 §2).
 	Unanalysed int `json:",omitempty"`
-	// Companion is the companion log read with it (03 §6.7.4); CompanionBad its bad lines.
+	// Companion is the companion log read with it (06 §7.4); CompanionBad its bad lines.
 	Companion    string `json:",omitempty"`
 	CompanionBad int    `json:",omitempty"`
 	// Cursor marks how much of the log and its companion this report covers: get_log
-	// since=<cursor> lists what is new after it (03 §6.6). Empty for pasted text.
+	// since=<cursor> lists what is new after it (06 §6). Empty for pasted text.
 	Cursor string `json:",omitempty"`
 }
 
-// LogPaths returns usable current and previous logs (03 §6.4). Check both locations,
+// LogPaths returns usable current and previous logs (06 §4). Check both locations,
 // preferring this game's layout, independently: a foreign Player.log must not hide an
 // owned Player-prev.log. --game-version changes analysis, never game ownership.
 func (a *App) LogPaths(st *LoadoutState) (cur, prev string) {
@@ -127,7 +127,7 @@ type logCacheEntry struct {
 
 // DropLogCaches forgets the parsed log report and the problem set built with it; the next
 // read takes the stored report from the database again (the GUI calls it when the player
-// leaves Can it run or Game log, 07 §8.3).
+// leaves Can it run or Game log, 17 §7.3).
 func (a *App) DropLogCaches() {
 	a.logCache = nil
 	a.prCache, a.prKey = nil, ""
@@ -146,7 +146,7 @@ var ErrLogNotCached = errors.New("log not analysed yet")
 // 11: texture and assembly providers in the shared mod folders (Store.InstanceFiles); 12: known
 // noise (logs.ClassNoise) and its note; "assemblies not analysed yet" instead of "no enabled mod
 // defines it" (Unanalysed); 13: a missing type's XML referrer, nearest types, a same-name DLL that
-// loads first; consequences of a def file that failed to load (03 §6.2, §6.3); stack-less
+// loads first; consequences of a def file that failed to load (06 §2, §3); stack-less
 // "Tried to" errors, the game-error class and the lord rule.
 const logCacheVersion = 13
 
@@ -291,7 +291,7 @@ func (a *App) AnalyzeLogText(text string) (*LogReport, error) {
 func LogMM(version string) string { return env.MajorMinor(version) }
 
 // logState switches attribution to the log's own game version when it differs from the
-// environment's and no --game-version was given (03 §6.4). restore undoes it.
+// environment's and no --game-version was given (06 §4). restore undoes it.
 func (a *App) logState(st *LoadoutState, rep *LogReport) (*LoadoutState, func(), error) {
 	mm := LogMM(rep.Version)
 	if a.GameVersion != "" || mm == "" || mm == st.GameMM() {
@@ -373,7 +373,7 @@ type attrCtx struct {
 }
 
 // notAnalysed qualifies a "nothing defines it" detail: when some enabled mods were never
-// analysed, their types are unknown, so the absence says nothing about them (03 §6.2).
+// analysed, their types are unknown, so the absence says nothing about them (06 §2).
 func (cx *attrCtx) notAnalysed() string {
 	if cx.unanalysed == 0 {
 		return ""
@@ -492,7 +492,7 @@ func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails [
 	}
 	cx.consequences(rep)
 	for _, lc := range rep.Clusters {
-		// Source searches cover the cluster's candidates, not every enabled mod (03 §5.4).
+		// Source searches cover the cluster's candidates, not every enabled mod (05 §5.4).
 		if rep.HasPhases {
 			lc.Phases = logs.CompletePhaseCounts(lc.Phases, lc.Count)
 			if lc.Phase == nil {
@@ -521,7 +521,7 @@ const inPlaceholder = "<in>"
 
 // ImplicatedMods are the mods the newest log and the current problems point at: the
 // candidates of the problem log's error clusters, else the subjects of Harmony warnings.
-// MCP source searches default to them (03 §5.4).
+// MCP source searches default to them (05 §5.4).
 func (a *App) ImplicatedMods(st *LoadoutState) []string {
 	seen := map[string]bool{}
 	var out []string
@@ -586,7 +586,7 @@ func (lc *LogCluster) add(inst, role, ev string) {
 // whyProviderOff explains a likely cluster led by a mod left out of the list.
 const whyProviderOff = "a mod that defines it is installed but not enabled"
 
-// order sorts the candidates by role (03 §6.3). A save or def that names a def of a mod
+// order sorts the candidates by role (06 §3). A save or def that names a def of a mod
 // left out of the list: that mod comes before whoever only patched the code that read it
 // (VM run 2026-10-28: Vanilla Expanded Framework's Pawn.ExposeData patch was blamed for
 // missing hair).
@@ -1238,7 +1238,7 @@ func uniqStr(l []string) []string {
 	return out
 }
 
-// SelectedLog is the log whose clusters `problems` includes ("" if none) (06 §2).
+// SelectedLog is the log whose clusters `problems` includes ("" if none) (16 §2).
 func (a *App) SelectedLog(st *LoadoutState) string {
 	return a.Store.Meta("log.selected:" + st.Ix.Env.ID)
 }
@@ -1258,7 +1258,7 @@ func (a *App) SelectLog(st *LoadoutState, path string) error {
 }
 
 // NewLog reports whether the current Player.log is newer than the last launch and the
-// last log the player looked at (06 §5).
+// last log the player looked at (16 §5).
 func (a *App) NewLog(st *LoadoutState) (string, bool) {
 	cur, _ := a.LogPaths(st)
 	if cur == "" {
@@ -1280,7 +1280,7 @@ func (a *App) NewLog(st *LoadoutState) (string, bool) {
 }
 
 // LiveLog is the log the current environment's running game writes ("" when none runs):
-// this run, which is not a last run until the game exits (03 §6.4).
+// this run, which is not a last run until the game exits (06 §4).
 func (a *App) LiveLog(st *LoadoutState) string {
 	if st == nil || st.Ix == nil || st.Ix.Env == nil {
 		return ""
@@ -1295,7 +1295,7 @@ func (a *App) LiveLog(st *LoadoutState) string {
 // sameLog: two log paths name one file ("" names none).
 func sameLog(a, b string) bool { return a != "" && b != "" && env.PathKey(a) == env.PathKey(b) }
 
-// ProblemLog is the log whose clusters join the problems (03 §6.4): the
+// ProblemLog is the log whose clusters join the problems (06 §4): the
 // selected one, or the current Player.log when that is newer. While the game writes
 // Player.log, the last run is the one it moved to Player-prev.log: the run in progress is
 // listed as this run, not again as the last (VM run 2026-10-28).
@@ -1357,7 +1357,7 @@ type hotMethod struct {
 }
 
 // LogRun is a log whose clusters join the problems, the run it belongs to, and whether it
-// still describes the analysed plan (03 §6.4). A stale log's problems are listed apart and
+// still describes the analysed plan (06 §4). A stale log's problems are listed apart and
 // not counted.
 type LogRun struct {
 	Phases      map[string][]logs.PhaseCount `json:",omitempty"` // finding key → observed counts
@@ -1367,7 +1367,7 @@ type LogRun struct {
 	MM, EnvMM   string // the log's and the environment's major.minor
 	// Source is the launch (or, without one, the ModsConfig.xml write) the log maps to.
 	Source *RunSource
-	// The stale reasons (03 §6.4 new rule):
+	// The stale reasons (06 §4 new rule):
 	OtherGame bool   // written by another game version
 	OtherRun  bool   // its run is not the analysed plan: another plan, environment or a pack
 	OtherEnv  string // the other environment's name, when that is the reason
@@ -1460,7 +1460,7 @@ func (a *App) logFindings(st *LoadoutState) ([]*finding.Finding, map[string]hotM
 }
 
 // escalateSkips raises harmony.skip-prefix and harmony.multi-transpiler to warning when their
-// method is in a log cluster (03 §4.5): a bool prefix or two transpilers on one method are
+// method is in a log cluster (05 §4.5): a bool prefix or two transpilers on one method are
 // ordinary until a stack trace passes through it.
 func escalateSkips(fs []*finding.Finding, hot map[string]hotMethod) []*finding.Finding {
 	if len(hot) == 0 {

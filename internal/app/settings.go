@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// What the settings page (06 §2.14) shows and changes besides environments and config keys:
+// What the settings page (16 §2.14) shows and changes besides environments and config keys:
 // the database, the caches and the launch arguments.
 
 // DBStatus is the size of the database files.
@@ -133,7 +133,7 @@ func (a *App) ClearCache(kind string) (Cache, error) {
 	return Cache{}, fmt.Errorf("unknown cache %q (%s)", kind, strings.Join(kinds, ", "))
 }
 
-// LaunchArgs are the extra arguments the game is started with (06 §2.14), per environment.
+// LaunchArgs are the extra arguments the game is started with (16 §2.14), per environment.
 func (a *App) LaunchArgs(envID string) string { return a.Store.Meta("env:" + envID + ":launch_args") }
 
 // SetLaunchArgs stores them ("" removes them).

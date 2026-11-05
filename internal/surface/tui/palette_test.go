@@ -32,7 +32,7 @@ func typeIn(m *model, s string) {
 	m.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)})
 }
 
-// 06 §3.5: ctrl+k; commands by Chinese name or English alias; mods jump; esc closes.
+// 16 §3.5: ctrl+k; commands by Chinese name or English alias; mods jump; esc closes.
 func TestPalette(t *testing.T) {
 	e, _ := fixture(t)
 	m := direct(t, e, 140, 40)

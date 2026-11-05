@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// SaveSpec describes a synthetic save (10 §1.3): only <meta> and a token game block.
+// SaveSpec describes a synthetic save (12 §1.3): only <meta> and a token game block.
 type SaveSpec struct {
 	Game     string   // gameVersion; "" is the fixture's 1.6.4633 rev1261
 	Mods     []string // packageIds in load order
@@ -17,7 +17,7 @@ type SaveSpec struct {
 	CutOff   bool     // the file stops inside <game>, as after a crash
 	ModTime  time.Time
 
-	// The full read (10 §1.7 L1). Unset fields keep the token game block as it is.
+	// The full read (12 §1.7 L1). Unset fields keep the token game block as it is.
 	Ticks   int64  // ticksGame; 0 writes 60000 (day 1)
 	World   string // world name; "" writes Synthetic
 	Seed    string // world seed; with it, persistentRandomValue PRV is written too

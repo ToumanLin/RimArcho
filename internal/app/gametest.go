@@ -22,7 +22,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
-// TestRunOptions selects a plan to run without writing the player's files (08 §12).
+// TestRunOptions selects a plan to run without writing the player's files (09 §7).
 type TestRunOptions struct {
 	Env, Plan       string
 	Map             bool
@@ -46,10 +46,10 @@ type TestRunCluster struct {
 	Delta      string   `json:"delta,omitempty"`  // against the previous run: new / present
 	Before     string   `json:"before,omitempty"` // in the player's log: present / absent
 	// Note: "common kind, no source found: …" for a cluster no mod is named for whose kind is in more
-	// than 5% of public logs (patterns.CommonUnattributed, 03 §6.8).
+	// than 5% of public logs (patterns.CommonUnattributed, 06 §8).
 	Note string `json:"note,omitempty"`
 	// Consequences: clusters that follow from this one's failed def file, folded into it and
-	// not listed (03 §6.3); they still count in counts and clusters_total.
+	// not listed (06 §3); they still count in counts and clusters_total.
 	Consequences int `json:"consequences,omitempty"`
 }
 
@@ -99,7 +99,7 @@ func (r *TestRunReport) Success() bool {
 }
 
 // TestRun starts the executable directly, including for a Steam-launch environment.
-// The current plan and the player's config, saves and logs are left alone (08 §12).
+// The current plan and the player's config, saves and logs are left alone (09 §7).
 func (a *App) TestRun(ctx context.Context, o TestRunOptions) (_ *TestRunReport, err error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -202,7 +202,7 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (_ *TestRunReport, 
 		Requested: len(st.List), Missing: missing, Linked: linkNames(add), RunDir: runDir, LogPath: raw.LogPath,
 		Args: raw.Args, Attribution: "tested-plan", Counts: map[string]int{}, Clusters: []TestRunCluster{},
 	}
-	// Attribution reads assembly types and Harmony IDs from the analysis (03 §6.2); a
+	// Attribution reads assembly types and Harmony IDs from the analysis (06 §2); a
 	// test run is often the first command in a fresh environment. After the game exits,
 	// so the measured load is not slowed by it.
 	if err := a.ensureTestAnalysis(ctx, st, o.Progress); err != nil {
@@ -252,7 +252,7 @@ func (a *App) prepareTestConfig(st *LoadoutState, data string, protected []strin
 				return err
 			}
 		}
-		// Settings follow the Mod (08 §3): what a launch would copy, written here only.
+		// Settings follow the Mod (09 §3): what a launch would copy, written here only.
 		job := a.listSettings(st, testRunSeen(st), filepath.Join(root, "Config"))
 		job.write = cfg
 		for _, c := range carryModSettings(job, func(path string) error { return testRunPath(data, path, protected) }) {
@@ -322,7 +322,7 @@ func testRunMissing(st *LoadoutState, blocked map[string]string) []TestRunMissin
 
 // testRunSeen maps each listed Mod a test run's game sees to the folder it sees it under.
 // It is the Mod's folder in Data/, Mods/ or the Workshop, or the name of a link in Mods/
-// to it (including the links a test run makes, 08 §12).
+// to it (including the links a test run makes, 09 §7).
 func testRunSeen(st *LoadoutState) map[string]string {
 	parents, linked := map[string]bool{}, map[string]string{}
 	roots := []string{filepath.Join(st.Ix.Env.GameRoot, "Data"), filepath.Join(st.Ix.Env.GameRoot, "Mods")}
@@ -440,7 +440,7 @@ func testRunMods(st *LoadoutState, lc *LogCluster) []string {
 }
 
 // ensureTestAnalysis brings the tested plan's Def/Patch/Harmony analysis up to date,
-// waiting without the MCP bound (05 §5.1): the test run's report depends on it.
+// waiting without the MCP bound (14 §1): the test run's report depends on it.
 func (a *App) ensureTestAnalysis(ctx context.Context, st *LoadoutState, progress func(string)) error {
 	if p := a.analyzing; p != nil { // a background analysis from an earlier call
 		select {

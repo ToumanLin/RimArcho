@@ -14,7 +14,7 @@ import (
 )
 
 // The record file is shared by every window open on the same data folder (the GUI, the
-// TUI, a second GUI; 06 §2.16). Each window runs and answers for the tasks it started
+// TUI, a second GUI; 16 §2.16). Each window runs and answers for the tasks it started
 // (Task.Owner); another window's tasks come from the file: the ended ones are shown, the
 // unfinished ones are not (their window has them in memory and writes them when they
 // end). A write reads the file back first, keeps the other windows' records and drops

@@ -42,7 +42,7 @@ Evidence: `a-inventory.txt`, `a-prepare.txt`, `a-baseline.txt`, `a-{problems,def
 
 Expected: first new-CLI open upgrades to schema 26, compresses old reports, removes old indexes, creates fact sets, preserves query content/order.
 
-First `db status` open took **1,708 ms**, exit 0. After CLI closed, database 64,237,568 bytes. Command printed `database 75.7 MB` while running; not the main-file size after closing connections. v26 does not auto-VACUUM (03 §3), so main file temporarily grew 6,148,096 bytes, leaving 5,657 free pages, later reclaimed by automatic maintenance (§5). Test-table "database smaller after upgrade" cannot mean immediate physical shrink on migration-transaction completion.
+First `db status` open took **1,708 ms**, exit 0. After CLI closed, database 64,237,568 bytes. Command printed `database 75.7 MB` while running; not the main-file size after closing connections. v26 does not auto-VACUUM (05 §3), so main file temporarily grew 6,148,096 bytes, leaving 5,657 free pages, later reclaimed by automatic maintenance (§5). Test-table "database smaller after upgrade" cannot mean immediate physical shrink on migration-transaction completion.
 
 `fact_set` exists; `def_fact_name`, `type_fact_name`, `type_fact_instance`, `harmony_fact_instance`, `harmony_fact_target` absent. Final Name index is v26 `def_fact_named`; intermediate v25 `def_fact_mm_named` is superseded by v26 and need not remain. gzip compresses original report to **7.97%** (about 92.0% reduction).
 

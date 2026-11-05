@@ -36,7 +36,7 @@ func codeModEnv(t *testing.T) *testkit.Env {
 }
 
 // A static constructor failure names the mod whose assembly defines the type, even when
-// the test run is the first command after a scan (03 §6.2, 08 §12).
+// the test run is the first command after a scan (06 §2, 09 §7).
 func TestTestRunAttributesTypeToItsAssembly(t *testing.T) {
 	t.Parallel()
 	e := codeModEnv(t)

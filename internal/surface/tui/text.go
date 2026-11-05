@@ -2,7 +2,7 @@ package tui
 
 import "github.com/ToumanLin/RimArcho/internal/view"
 
-// The interface text lives in internal/view (06 §1); the TUI adds its own help text.
+// The interface text lives in internal/view (16 §1); the TUI adds its own help text.
 
 // T translates an interface string.
 func T(s string) string { return view.T(s) }

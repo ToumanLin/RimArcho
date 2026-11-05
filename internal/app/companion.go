@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/logs"
 )
 
-// Companion logs (03 §6.7.4): which one belongs to a Player.log, and what its entries add to
+// Companion logs (06 §7.4): which one belongs to a Player.log, and what its entries add to
 // a cluster's attribution.
 
 // logDataRoot is the save data root a Player.log belongs to: 1.7 writes it under Logs/.
@@ -158,7 +158,7 @@ func uniqueCompanion(path, root, candidate, candidateSession string) string {
 	return candidate
 }
 
-// companionKey fingerprints the companion log for the log cache (03 §6.5).
+// companionKey fingerprints the companion log for the log cache (06 §5).
 func companionKey(path string) string {
 	if path == "" {
 		return "-"
@@ -171,7 +171,7 @@ func companionKey(path string) string {
 }
 
 // companionOnly appends the companion's warnings and errors Player.log does not have (the
-// game stopped writing it, 03 §6.7.4) to lf; it returns them.
+// game stopped writing it, 06 §7.4) to lf; it returns them.
 func companionOnly(lf *logs.File, comp *logs.Companion) map[*logs.Entry]bool {
 	if comp == nil {
 		return nil
@@ -193,7 +193,7 @@ func companionOnly(lf *logs.File, comp *logs.Companion) map[*logs.Entry]bool {
 	return out
 }
 
-// companion adds what the companion log knows about a cluster (03 §6.7.4): time, level and
+// companion adds what the companion log knows about a cluster (06 §7.4): time, level and
 // count; files in enabled mods as source evidence; related mods by how they were found.
 // It never removes or weakens RimArcho's own conclusions.
 func (cx *attrCtx) companion(lc *LogCluster) {

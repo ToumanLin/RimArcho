@@ -36,7 +36,7 @@ func environmentResult(t *testing.T, events <-chan string, request uint64) *Envi
 }
 
 // An in-flight switch may finish preparing links, but cannot publish its destination
-// after the player picked another game (06 §3.1).
+// after the player picked another game (16 §3.1).
 func TestEnvironmentLatePreparationCannotSelectOldGame(t *testing.T) {
 	t.Parallel()
 	e, api, events := fixture(t)

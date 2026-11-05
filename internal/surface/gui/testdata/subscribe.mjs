@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { Element, loadModules, deferred, event, flush } from "./dom.mjs";
 
-// add a subscription (06 §2.9): the paste box recognises the source, asks one decision, shows the dry
+// add a subscription (16 §2.9): the paste box recognises the source, asks one decision, shows the dry
 // run and only then subscribes; a download-page update needs the player's files.
 async function setup(data = null) {
   const calls = [], confirmations = [], messages = [];

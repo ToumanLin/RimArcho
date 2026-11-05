@@ -1,4 +1,4 @@
-// Package harmony extracts the Harmony layer of a mod assembly (03 §2, §5.3): declared
+// Package harmony extracts the Harmony layer of a mod assembly (05 §2, §5.3): declared
 // HarmonyPatch targets with their patch kind, bool prefixes that may skip the original,
 // manual Harmony.Patch calls, Harmony ID candidates from the #US heap, and the TypeDef
 // index used to attribute stack frames.
@@ -63,7 +63,7 @@ type Assembly struct {
 	Unresolved     map[string]int
 }
 
-// DefaultSkip are library assemblies whose Harmony facts are not the mod's own (03 §5.3).
+// DefaultSkip are library assemblies whose Harmony facts are not the mod's own (05 §5.3).
 // Their TypeDefs are still indexed (frames inside them are attributed as "library").
 var DefaultSkip = []string{"0harmony.dll", "harmony.dll", "harmonylib.dll", "hugslib.dll", "0multiplayerapi.dll", "0prepatcherapi.dll",
 	"mono.cecil*.dll", "system.*.dll", "microsoft.*.dll", "newtonsoft.json.dll", "unityengine*.dll", "assembly-csharp*.dll"}

@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Mod library (06 §2.9): every mod on this machine, one line per Lineage; --lineage shows each
+// Mod library (16 §2.9): every mod on this machine, one line per Lineage; --lineage shows each
 // copy. The GUI page, the TUI list and MCP list_library filter the same app.Library.
 func init() {
 	flags := []Flag{
@@ -29,7 +29,7 @@ func init() {
 		MinArgs: 1, MaxArgs: 1, Flags: []Flag{{Name: "reason", Value: "<text>", Help: "why: kept in the copy's note"}, {Name: "dry-run", Help: "show what would move"}}, Run: libraryMoveCmd})
 }
 
-// libStateText is a state in the fixed English of the text output (05 §3).
+// libStateText is a state in the fixed English of the text output (13 §3).
 func libStateText(s, mm string) string {
 	switch s {
 	case app.LibUnloadable:
@@ -296,7 +296,7 @@ func copyNoteText(c *Ctx, i *app.LibInstance) string {
 	return ""
 }
 
-// libNext is what each state's action is as a command (06 §2.9's table).
+// libNext is what each state's action is as a command (16 §2.9's table).
 func libNext(ix *app.Index, i *app.LibInstance) []string {
 	if i.Mod == nil {
 		return nil

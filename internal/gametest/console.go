@@ -15,7 +15,7 @@ var (
 	versionRev     = regexp.MustCompile(`^(\d+\.\d+\.\d+) rev(\d+)$`)
 )
 
-// consoleLog streams Waylith console output in the file format (08 §12).
+// consoleLog streams Waylith console output in the file format (09 §7).
 type consoleLog struct {
 	w       io.Writer
 	date    string

@@ -1,7 +1,7 @@
 // Spike: a development harness for the GUI page (08). It serves the embedded page on
 // 127.0.0.1 with a stand-in for /wails/runtime.js that calls the same gui.API over HTTP,
 // so the page can be driven in a browser during development. Never part of a release: the
-// product opens no port (01 §4).
+// product opens no port (02 §1).
 //
 //	go run ./spikes/guidev -home <copy of the data dir> -addr 127.0.0.1:8765
 package main
@@ -74,7 +74,7 @@ func main() {
 	assets := flag.String("assets", "", "serve the page's files from this folder (edits show on reload)")
 	steam := flag.String("steam-api", "", "local Steam fixture server URL (collection at /collection, titles at /api)")
 	fake := flag.String("fakegame", "", "while this file exists the current environment's game counts as running (started at its time)")
-	selfVersion := flag.String("version", "", "act as this release for RimArcho's own update (07 §5.1); RIMARCHO_UPDATE_API names a test release server")
+	selfVersion := flag.String("version", "", "act as this release for RimArcho's own update (17 §5.1); RIMARCHO_UPDATE_API names a test release server")
 	selfProgram := flag.String("program", "", "with -version: the program folder an install replaces (a test folder, never a real install)")
 	flag.Parse()
 	if !strings.HasPrefix(*addr, "127.0.0.1:") {
@@ -105,7 +105,7 @@ func main() {
 	}
 	a.Launcher = func(string, []string, string) error { return fmt.Errorf("launching is off in the dev harness") }
 	if *fake != "" {
-		// the sidebar's running game (06 §2.1, G17) without starting RimWorld
+		// the sidebar's running game (16 §2.1, G17) without starting RimWorld
 		a.GameProbe = func(string) *app.GameRun {
 			fi, err := os.Stat(*fake)
 			if err != nil {

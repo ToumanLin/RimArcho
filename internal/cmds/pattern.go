@@ -1,7 +1,7 @@
 package cmds
 
 // The error pattern library in the log outputs (archo log, MCP analyze_log) and the
-// pattern:<id> entity (archo pattern). docs/research/01-pattern-library-integration-draft.md, 03 §6.8.
+// pattern:<id> entity (archo pattern). docs/research/01-pattern-library-integration-draft.md, 06 §8.
 
 import (
 	"fmt"

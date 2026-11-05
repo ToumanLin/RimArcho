@@ -16,7 +16,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// RimCrow import (04 §8.2, U11). RimCrow (D:\…\RimModManager) keeps player data in
+// RimCrow import (07 §6.2, U11). RimCrow (D:\…\RimModManager) keeps player data in
 // <home>/data/mod_manager.db (peewee, keyed by packageId) and user rules in
 // <home>/data/rules/user_rules.json. Both are read from copies; the originals are never
 // opened for writing.
@@ -43,7 +43,7 @@ type RimCrowReport struct {
 
 	NotMapped map[string]int // RimCrow fields with no RimArcho equivalent
 
-	// About-disabled (02 §4.2): RimCrow renames About.xml to About.xml.disabled.
+	// About-disabled (04 §1.2): RimCrow renames About.xml to About.xml.disabled.
 	CrowDisabled  int            // modasset rows with disabled=1
 	AboutDisabled []string       // RimArcho instances marked unloadable: about-disabled
 	DisabledKinds map[string]int // by source kind
@@ -407,7 +407,7 @@ func (a *App) ImportRimCrow(opt RimCrowOptions) (*RimCrowReport, error) {
 			sort.Strings(ks)
 			for _, k := range ks {
 				if pos := map[string]string{"loadTop": order.RuleTop, "loadBottom": order.RuleBottom}[k]; pos != "" {
-					// {"value": true, "comment": "..."} → top / bottom (04 §5.5)
+					// {"value": true, "comment": "..."} → top / bottom (08 §1.5)
 					var f struct {
 						Value json.RawMessage `json:"value"`
 					}

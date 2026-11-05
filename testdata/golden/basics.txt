@@ -107,7 +107,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     links repair                              preview or confirm link repair and unfinished-operation recovery
     mod-settings set <ref> [<name>=<value>…]  change a Mod's simple settings values (on/off, numbers, one line of text, a HugsLib choice) with the game closed; backs the file up first
     monitor                                   Archo Monitor, the in-game companion: versions, source, place in the plan
-    monitor install                           install or update the bundled Archo Monitor and add it to plans by default (08 §9)
+    monitor install                           install or update the bundled Archo Monitor and add it to plans by default (09 §6)
     pack build <name>                         compile the workspace into a pack: checked, sorted, each mod copied without the version folders this game does not load
     pack list                                 the packs: mods, size, game version, last played
     pack launch <name>                        play a pack: link its mods into Mods/, its own list and saves, start the game
@@ -151,7 +151,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     textures optimize [<mod>...]              write the DDS of mods' PNG textures next to them (the game loads them instead; the PNGs stay)
     textures clean [<mod>...]                 delete the DDS RimArcho wrote (only those; the game goes back to the PNGs)
     textures tool                             the DDS encoder (todds): where it is, or --install to download it
-    update                                    check GitHub for a newer RimArcho and install it; the data folder is not touched (07 §5.1)
+    update                                    check GitHub for a newer RimArcho and install it; the data folder is not touched (17 §5.1)
     workshop unsubscribe <ref…>               unsubscribe in Steam: Steam deletes the Workshop folder (refused while the game runs; plans that use it show it missing)
     workshop subscribe <ref…>                 subscribe again in Steam to an unsubscribed leftover
     workshop resubscribe <ref…>               resubscribe and wait for Steam to download mods; local edits are lost (refused while the game runs)

@@ -1,4 +1,4 @@
-// Package rules holds community ordering data (04 §6.3). M2 reads a local RimSort-format
+// Package rules holds community ordering data (08 §2.3). M2 reads a local RimSort-format
 // communityRules.json if one is present; downloading (`archo data update`) comes later.
 package rules
 
@@ -17,7 +17,7 @@ type Community struct {
 	Timestamp int64
 	after     map[string][]string
 	before    map[string][]string
-	position  map[string]order.Tier // loadTop / loadBottom (04 §5.5)
+	position  map[string]order.Tier // loadTop / loadBottom (08 §1.5)
 }
 
 // Position implements order.Positions.

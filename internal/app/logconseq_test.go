@@ -42,7 +42,7 @@ func conseqEnv(t *testing.T) *testkit.Env {
 }
 
 // A def file that failed to load: the clusters that follow from its missing defs are its
-// consequences, folded under it in the list, in test runs and in get_def (03 §6.3, MCP
+// consequences, folded under it in the list, in test runs and in get_def (06 §3, MCP
 // review round 2 P21); the patch naming the missing class is the root's source (P5).
 func TestFailedDefFileConsequences(t *testing.T) {
 	t.Parallel()

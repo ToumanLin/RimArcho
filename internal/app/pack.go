@@ -29,7 +29,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
-// Packs (08 §5): a plan compiled into a fixed product. Every mod is pinned to the
+// Packs (10): a plan compiled into a fixed product. Every mod is pinned to the
 // instance and content it had, copied without the version folders this game does not load,
 // and played from its own data folder through links in Mods/, so the environment's list and
 // saves stay as they were.
@@ -44,16 +44,16 @@ type Pack struct {
 	Created time.Time `json:"created"`
 	Game    string    `json:"game"` // the game version it was built for
 	Env     string    `json:"env"`
-	// Light: the list only, no files — a RimArcho list (04 §9.3) or a pack's exported list.
+	// Light: the list only, no files — a RimArcho list (07 §7.3) or a pack's exported list.
 	Light bool `json:"light,omitempty"`
 	// PlanID is the plan the pack was created from, in the database that created it (the
-	// list management page shows a plan's newest pack, 06 §2.17).
+	// list management page shows a plan's newest pack, 16 §2.17).
 	PlanID int64 `json:"plan_id,omitempty"`
-	// Versions are the game versions the list is meant for (a RimArcho list, 04 §1.6, §9.3).
+	// Versions are the game versions the list is meant for (a RimArcho list, 07 §1.6, §7.3).
 	Versions []string    `json:"versions,omitempty"`
 	Entries  []PackEntry `json:"entries"`
 	Trimmed  int64       `json:"trimmed_bytes,omitempty"`
-	// Textures: the copies' PNGs were converted to DDS and deleted (08 §5.2).
+	// Textures: the copies' PNGs were converted to DDS and deleted (10 §2).
 	Textures *PackTextures `json:"textures,omitempty"`
 }
 
@@ -88,7 +88,7 @@ type PackEntry struct {
 	Lineage         string   `json:"lineage,omitempty"`
 	Instance        string   `json:"instance,omitempty"`
 	WorkshopID      string   `json:"workshop_id,omitempty"`
-	Hash            string   `json:"hash,omitempty"`   // semantic snapshot hash (02 §4)
+	Hash            string   `json:"hash,omitempty"`   // semantic snapshot hash (04 §1)
 	Folder          string   `json:"folder,omitempty"` // under mods/ (carried entries)
 	Bytes           int64    `json:"bytes,omitempty"`
 	Trimmed         int64    `json:"trimmed_bytes,omitempty"`
@@ -156,7 +156,7 @@ func (a *App) ReadPack(name string) (*Pack, error) {
 	return &p, nil
 }
 
-// aliasPack follows IDs merged by migration or an identity answer (02 §5.4): the
+// aliasPack follows IDs merged by migration or an identity answer (04 §2.4): the
 // file on disk is not rewritten.
 func (a *App) aliasPack(p *Pack) {
 	al, err := a.Store.IDAliases()
@@ -218,9 +218,9 @@ var ErrNoSpace = errors.New("not enough free space for the pack")
 // SpaceMargin is kept free on the packs drive beyond the copy itself.
 const SpaceMargin = 256 << 20
 
-// BuildPack compiles the workspace into a pack (08 §5.2): nothing must be left to fix,
+// BuildPack compiles the workspace into a pack (10 §2): nothing must be left to fix,
 // the list is sorted (for the pack only), and each mod is copied without the version
-// folders this game does not load. (Sharing the list alone is an export: 04 §9.3.)
+// folders this game does not load. (Sharing the list alone is an export: 07 §7.3.)
 func (a *App) BuildPack(name string, dryRun bool) (*PackBuild, error) {
 	return a.BuildPackWith(name, BuildOptions{DryRun: dryRun})
 }
@@ -649,7 +649,7 @@ func dirSizeWithLinks(dir string) int64 {
 
 // ---- list ----
 
-// PacksOf lists the packs of an environment (08 §5): built in it, or — for a pack from
+// PacksOf lists the packs of an environment (10): built in it, or — for a pack from
 // another machine whose environment does not exist here — built for its game version.
 // others counts the packs that belong to other environments.
 func (a *App) PacksOf(e *env.Environment) (mine []*PackInfo, others int, err error) {
@@ -740,8 +740,8 @@ type PackLaunch struct {
 	Copied     []string        // settings files copied from the environment on the first run
 	InMods     []string        // mods whose copy already in Mods/ (the same content) stands in for the pack's
 	Moved      []DuplicateMove // folders moved into the lock library first (or, in a dry run, to move)
-	// Settings: Mod settings copied to the file names the pack's links give them (08 §3,
-	// §5.3 step 4); in a dry run, the ones that would be.
+	// Settings: Mod settings copied to the file names the pack's links give them (09 §3,
+	// 10 §3 step 4); in a dry run, the ones that would be.
 	Settings []SettingsCarry
 }
 
@@ -749,7 +749,7 @@ func packLink(name string) bool {
 	return strings.HasPrefix(strings.ToLower(name), strings.ToLower(source.PackLinkPrefix))
 }
 
-// packSettings is where a pack launch takes Mod settings from (08 §5.3 step 4): the pack's
+// packSettings is where a pack launch takes Mod settings from (10 §3 step 4): the pack's
 // own Config first, then the environment's, under every folder name the environment knows
 // the package by or Archo Monitor saw it under in either; each Mod gets the name the game
 // sees it under in this run.
@@ -780,14 +780,14 @@ func packLinkName(pack, folder string) string {
 	return source.PackLinkPrefix + unsafeFolder.ReplaceAllString(pack, "_") + "_" + folder
 }
 
-// LaunchPack plays a pack (08 §5.3): its mods are linked into Mods/, its list is written to
+// LaunchPack plays a pack (10 §3): its mods are linked into Mods/, its list is written to
 // its own data folder, and the game starts with -savedatafolder pointing there.
 func (a *App) LaunchPack(name string, dryRun bool) (*PackLaunch, error) {
 	return a.LaunchPackWith(name, dryRun, false)
 }
 
 // LaunchPackWith is LaunchPack that, with move, first moves plain Mods/ folders holding
-// another version of a pack copy into the lock library (08 §5.3; --move-duplicates).
+// another version of a pack copy into the lock library (10 §3; --move-duplicates).
 func (a *App) LaunchPackWith(name string, dryRun, move bool) (*PackLaunch, error) {
 	unlock, err := a.waitLaunch()
 	if err != nil {
@@ -798,7 +798,7 @@ func (a *App) LaunchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 }
 
 func (a *App) launchPackWith(name string, dryRun, move bool) (*PackLaunch, error) {
-	if err := a.checkNoGame(); err != nil { // one game at a time (08 §1)
+	if err := a.checkNoGame(); err != nil { // one game at a time (09 §1)
 		return nil, err
 	}
 	p, err := a.ReadPack(name)
@@ -827,7 +827,7 @@ func (a *App) launchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 	dir := a.packPath(name)
 	r := &PackLaunch{Pack: p, Check: check, UserData: filepath.Join(dir, "userdata"), DryRun: dryRun}
 	r.ModsConfig = env.ModsConfigPath(r.UserData)
-	// What Mods/ holds besides this pack (08 §5.3 step 2): a second folder with a pack copy's
+	// What Mods/ holds besides this pack (10 §3 step 2): a second folder with a pack copy's
 	// packageId makes the game report an error and ignore one of them, so a pack copy is
 	// never linked next to one. A copy of the player's (a folder, or another tool's link)
 	// with the same content stands in for the pack's; with other content the launch is
@@ -974,7 +974,7 @@ func (a *App) launchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 			}
 		}
 	}
-	// Settings follow the Mod (§5.3 step 4): HugsLib's while the pack has none, and each
+	// Settings follow the Mod (10 §3 step 4): HugsLib's while the pack has none, and each
 	// Mod's under the name its link gives it.
 	if e.UserDataRoot != "" {
 		hl, err := copyHugsLib(e.UserDataRoot, r.UserData)
@@ -1013,7 +1013,7 @@ func (a *App) launchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 	}
 	b, _ := json.Marshal(packState{LastPlayed: a.Now().UTC()})
 	os.WriteFile(filepath.Join(dir, "state.json"), b, 0o644)
-	// A pack's launch has no plan; its fingerprint is the pack's list (08 §1).
+	// A pack's launch has no plan; its fingerprint is the pack's list (09 §1).
 	return r, a.Store.AddLaunchRecord(&store.LaunchRecord{EnvID: e.ID, Started: a.Now().UTC(), Method: "pack:" + name,
 		Command: r.Plan.Command(), Fingerprint: TokenFingerprint(r.Tokens)})
 }
@@ -1021,7 +1021,7 @@ func (a *App) launchPackWith(name string, dryRun, move bool) (*PackLaunch, error
 // ---- export, import, remove ----
 
 // ExportPack writes a pack to a file (.archopack, without its saves), or
-// with listOnly its list as a RimArcho list (.archolist.json, 04 §9.3).
+// with listOnly its list as a RimArcho list (.archolist.json, 07 §7.3).
 func (a *App) ExportPack(name, file string, listOnly bool) (int64, error) {
 	p, err := a.ReadPack(name)
 	if err != nil {
@@ -1056,7 +1056,7 @@ func (a *App) ExportPack(name, file string, listOnly bool) (int64, error) {
 }
 
 // PackMatch compares a RimArcho list (a pack.json without files) with the installed mods
-// (08 §5.4), or says where a pack was unpacked.
+// (10 §4), or says where a pack was unpacked.
 type PackMatch struct {
 	Pack            *Pack
 	Same, Different []PackEntry // installed with the same content / another version
@@ -1081,7 +1081,7 @@ func IsPackZip(file string) bool {
 
 // ImportPack reads a pack file. A pack (.archopack) is unpacked into the packs folder; a
 // RimArcho list (.archolist.json, or a pack.json) is compared with the installed mods and,
-// with asPlan, loaded into the workspace (loadout import reads it too, 04 §9.2).
+// with asPlan, loaded into the workspace (loadout import reads it too, 07 §7.2).
 func (a *App) ImportPack(file string, asPlan bool) (*PackMatch, error) {
 	if IsPackZip(file) {
 		return a.importPackArchive(file)

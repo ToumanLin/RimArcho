@@ -37,7 +37,7 @@ func mustPlans(t *testing.T, a *app.App) []view.PlanRow {
 	return rows
 }
 
-// 04 §1.3 through the view verbs both interfaces call: new (empty, a copy, a version, an
+// 07 §1.3 through the view verbs both interfaces call: new (empty, a copy, a version, an
 // import) switches to the new plan; rename keeps the history; the last plan cannot go.
 func TestPlanVerbs(t *testing.T) {
 	t.Parallel()
@@ -61,7 +61,7 @@ func TestPlanVerbs(t *testing.T) {
 	if err != nil || !strings.Contains(text, "new list Copy: 2 mods") {
 		t.Fatalf("new: %v %q", err, text)
 	}
-	// The new plan is open; the current one (launched) stays (04 §1.3).
+	// The new plan is open; the current one (launched) stays (07 §1.3).
 	if cur, _ := a.CurrentPlan(); cur.ID != p.ID {
 		t.Fatalf("the new plan is not open: %+v", cur)
 	}
@@ -131,7 +131,7 @@ func TestPlanVerbs(t *testing.T) {
 	}
 
 	// An import read and previewed becomes a plan of its own; it names no official
-	// content, so it keeps the current plan's Core (04 §9.1).
+	// content, so it keeps the current plan's Core (07 §7.1).
 	imp, err := view.ReadImport(a, view.ImportText, "tester.b\nbrrainz.harmony\nsomeone.missing")
 	if err != nil {
 		t.Fatal(err)
@@ -191,7 +191,7 @@ func TestInGameAndMarks(t *testing.T) {
 	}
 	nav := view.Nav(0, rows, nil)
 	kids := nav[1].Items[0].Kids
-	// all lists first, then the current list (list opens it), then the open one (06 §2.1)
+	// all lists first, then the current list (list opens it), then the open one (16 §2.1)
 	if len(kids) != 3 || kids[0].ID != view.PagePlans || kids[2].Mark == "" || !kids[2].Open || !kids[1].Current {
 		t.Fatalf("plan kids %+v", kids)
 	}
@@ -258,7 +258,7 @@ func TestHomePerPlan(t *testing.T) {
 
 // The sidebar keeps all lists first and shows NavLists lists at most: the current one,
 // then the others by when they were last enabled, then the never enabled ones by last
-// use. The list open in the editor keeps its place (06 §2.1).
+// use. The list open in the editor keeps its place (16 §2.1).
 func TestNavRecentLists(t *testing.T) {
 	t.Parallel()
 	now := time.Now()

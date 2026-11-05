@@ -38,7 +38,7 @@ func logGameRoot(path string) string {
 }
 
 // CheckLogOwner excludes another game's log before analysis, attribution, cache reads
-// or marking it seen (03 §6.4). A startup game path is stronger evidence than a launch
+// or marking it seen (06 §4). A startup game path is stronger evidence than a launch
 // matched by time (the player may have launched from Steam since). Version alone is
 // insufficient: this game directory may have been upgraded since writing the log.
 // Unknown ownership retains the existing source-unknown/stale handling.
@@ -100,7 +100,7 @@ func (a *App) envWithGame(root string) *env.Environment {
 // UnregisteredLogGame is the game folder a log's startup header names when it is neither
 // this environment's nor any other registered environment's ("" otherwise): a log someone
 // sent, a corpus log, or this game before its folder moved. Such a log is attributed
-// against this environment, its only candidate, and the output says so (03 §6.4).
+// against this environment, its only candidate, and the output says so (06 §4).
 func (a *App) UnregisteredLogGame(st *LoadoutState, path string) string {
 	if path == "" {
 		return ""
@@ -127,11 +127,11 @@ func (a *App) EnsureLogFileAnalysis(st *LoadoutState, path string, progress func
 // EnsureAttributionAnalysis is what `archo log` (and MCP analyze_log) runs before
 // attributing a log: EnsureLogFileAnalysis, and for logs of this environment's version the
 // environment's analysis too. Assembly types and Harmony IDs come only from the analysis
-// (03 §6.2); without it "static constructor of T" names no mod (MCP eval c3, 2026-11-02).
+// (06 §2); without it "static constructor of T" names no mod (MCP eval c3, 2026-11-02).
 // path "" is pasted text of version textVersion. A log of unknown owner (no record says who
 // wrote it, or its game folder is no environment's) is attributed against this environment,
 // its only candidate, so it gets this environment's analysis too, but never an analysis of
-// another game version. Another environment's log is refused (03 §6.4; MCP eval 2026-11-04).
+// another game version. Another environment's log is refused (06 §4; MCP eval 2026-11-04).
 func (a *App) EnsureAttributionAnalysis(st *LoadoutState, path, textVersion string, progress func(string)) error {
 	version := textVersion
 	if path != "" {

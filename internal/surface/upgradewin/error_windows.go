@@ -4,7 +4,7 @@ import "golang.org/x/sys/windows"
 
 // ShowError shows a modal error message box and returns when the player closes it. It is
 // for failures before the GUI window exists, which RimArcho.exe (no console) could
-// otherwise report only on stderr (02 §7).
+// otherwise report only on stderr (04 §4).
 func ShowError(title, text string) {
 	t, err := windows.UTF16PtrFromString(text)
 	if err != nil {

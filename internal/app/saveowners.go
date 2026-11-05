@@ -11,13 +11,13 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// What a Mod owns in a save (10 §4.6): the save's objects that need a Mod because nothing
-// else the list loads provides them. Def references go to the Mods defining them (10 §1.5),
+// What a Mod owns in a save (12 §4.6): the save's objects that need a Mod because nothing
+// else the list loads provides them. Def references go to the Mods defining them (12 §1.5),
 // Class="…" values to the Mods whose assemblies define the type (store.TypeDefiners) unless
 // the game does (store.GameClassOwners), the player's pawns by their race Def and factions
 // by their FactionDef.
 //
-// Which facts exist (03 §3): Def facts for every loadable installed Mod, once an analysis of
+// Which facts exist (05 §3): Def facts for every loadable installed Mod, once an analysis of
 // this game version has run; type facts only for Mods enabled when an analysis ran (a
 // disabled Mod keeps them while its content is unchanged); nothing for a Mod that is not
 // installed. So what a Mod that is not installed owns is inferred by elimination: the
@@ -37,7 +37,7 @@ type SaveOwned struct {
 	// NoFacts: nothing is known of the Mod itself (never installed, or not analysed).
 	NoFacts bool `json:"noFacts,omitempty"`
 	// What could not be checked because the save's Mods or the game are not indexed for
-	// this game version (03 §3, §5.3): Defs (and so pawns and factions), or classes.
+	// this game version (05 §3, §5.3): Defs (and so pawns and factions), or classes.
 	DefsUnchecked    bool `json:"defsUnchecked,omitempty"`
 	ClassesUnchecked bool `json:"classesUnchecked,omitempty"`
 }
@@ -61,7 +61,7 @@ type OwnedDefs struct {
 }
 
 // OwnedDefNames bounds OwnedDefs.Names: a missing Mod can own thousands of Defs, and the
-// interfaces show the most used ones (06 §10).
+// interfaces show the most used ones (16 §10).
 const OwnedDefNames = 100
 
 func (d *OwnedDefs) note(name string, uses int) {
@@ -432,8 +432,8 @@ func (o *saveOwnership) missingRows() []SaveIssue {
 	return out
 }
 
-// ownerMemoLimit bounds the memo (06 §10): far above one library's distinct Defs and
-// classes (a real 1.6 save names about 1,400 Defs, 07 §6).
+// ownerMemoLimit bounds the memo (16 §10): far above one library's distinct Defs and
+// classes (a real 1.6 save names about 1,400 Defs, 18).
 const ownerMemoLimit = 200_000
 
 // ownerMemo returns the lookup memo for the database as it is now, locked; the caller
@@ -450,7 +450,7 @@ func (a *App) ownerMemo() *saveOwnerMemo {
 	return m
 }
 
-// attributeSave attributes a save's content to its Mods (10 §4.6). Only the Mods with a
+// attributeSave attributes a save's content to its Mods (12 §4.6). Only the Mods with a
 // row (q.issues) get what they own; classes nothing explains come back as missing.
 func (a *App) attributeSave(q ownerQuery) (*saveOwnership, error) {
 	m := a.ownerMemo()
@@ -512,7 +512,7 @@ func (a *App) attributeSave(q ownerQuery) (*saveOwnership, error) {
 		return m.pkgView[normPkg(q.mods[i].PackageID)]
 	}
 	// owner picks, among the definers of something lost, the Mod with a row latest in the
-	// save's order (10 §1.5); -1 when none has one.
+	// save's order (12 §1.5); -1 when none has one.
 	pkgOf := func(inst string) string {
 		if q.names != nil {
 			if p, _ := q.names(inst); p != "" {
@@ -574,7 +574,7 @@ func (a *App) attributeSave(q ownerQuery) (*saveOwnership, error) {
 		}
 		// lost: nothing the list loads defines it. Returns the Mod with a row owning it, -1
 		// for nobody installed (the pool), -2 for an installed Mod without a row (not
-		// counted: 10 §1.5).
+		// counted: 12 §1.5).
 		lost := func(name string) (int, []string, bool) {
 			ds := m.defs[name]
 			var insts, types []string
@@ -928,7 +928,7 @@ func classParts(c string) []string {
 }
 
 // loadClasses resolves the parts of the classes not in the memo: the game first (when its
-// types are indexed), then Mod assemblies by every form the game tries (07 §7 item 20).
+// types are indexed), then Mod assemblies by every form the game tries (17 §6 item 20).
 func (m *saveOwnerMemo) loadClasses(s *store.Store, classes []string, gameOK bool) error {
 	var parts []string
 	seen := map[string]bool{}

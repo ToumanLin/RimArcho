@@ -24,7 +24,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// selfRelease is a fake GitHub (07 §5.1): one release 0.9.1 with its zip and checksum.
+// selfRelease is a fake GitHub (17 §5.1): one release 0.9.1 with its zip and checksum.
 type selfRelease struct {
 	srv     *httptest.Server
 	zip     []byte

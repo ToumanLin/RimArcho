@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The window's shell (06 §2.1–§2.3, §2.15): the sidebar, the home page and the first-run
+// The window's shell (16 §2.1–§2.3, §2.15): the sidebar, the home page and the first-run
 // guide. Every method only calls view.
 
 // Shell is the sidebar and the breadcrumb of every page in it.
@@ -26,7 +26,7 @@ type Shell struct {
 	Envs   int                     `json:"envs"`
 	// Plans are the environment's plans, the current one (launched) first; Plan is the open
 	// one (the editor's); Current the current one when another is open; InGame what the
-	// game's ModsConfig.xml holds (04 §1.3).
+	// game's ModsConfig.xml holds (07 §1.3).
 	Plans   []view.PlanRow    `json:"plans"`
 	Plan    *view.PlanRow     `json:"plan,omitempty"`
 	Current *view.PlanRow     `json:"current,omitempty"`
@@ -128,7 +128,7 @@ func (s *API) shellLocked(n *view.Needs) *Shell {
 	return out
 }
 
-// Home is the home page (06 §2.3).
+// Home is the home page (16 §2.3).
 func (s *API) Home() *view.Home {
 	defer perftrace.Span("Home")()
 	s.logRead.mu.Lock()
@@ -145,7 +145,7 @@ func (s *API) Home() *view.Home {
 		return &view.Home{Featured: -1, Error: err.Error()}
 	}
 	// The launch page is about the current list, the one launched, whichever list the
-	// editor has open (04 §1.3); the reader takes the window's options again next time.
+	// editor has open (07 §1.3); the reader takes the window's options again next time.
 	r.OpenPlan, r.PlanName = 0, ""
 	st, err := r.Loadout()
 	if err != nil {
@@ -186,7 +186,7 @@ func (s *API) Home() *view.Home {
 	return h
 }
 
-// ---- plans (04 §1.3, 06 §2.5) ----
+// ---- plans (07 §1.3, 16 §2.5) ----
 
 // PlanFroms are the new-plan dialog's starting lists.
 func (s *API) PlanFroms() ([]view.PlanFrom, error) {
@@ -274,7 +274,7 @@ func (s *API) UsePlan(id int64) (*PlanDone, error) {
 	return s.planDone(id, t, err)
 }
 
-// OpenPlan shows a plan in the editor without making it current (06 §2.5): the sidebar's
+// OpenPlan shows a plan in the editor without making it current (16 §2.5): the sidebar's
 // lists are places to go, not a choice of what to play.
 func (s *API) OpenPlan(id int64) (*PlanDone, error) {
 	s.mu.Lock()
@@ -306,7 +306,7 @@ func (s *API) RemovePlan(id int64) (*PlanDone, error) {
 	return s.planDone(0, t, err)
 }
 
-// ---- the first-run guide (06 §2.15) ----
+// ---- the first-run guide (16 §2.15) ----
 
 // GuideFind lists the RimWorld installs detection finds.
 func (s *API) GuideFind() []view.GameFound {
@@ -326,7 +326,7 @@ func (s *API) GuideGame(path string) (*view.GameFound, error) {
 }
 
 // GuideScan scans the environments one after another in child processes and returns at
-// once; "guide" events carry which one is being read and the end (06 §8.4).
+// once; "guide" events carry which one is being read and the end (16 §8.4).
 func (s *API) GuideScan(names []string) bool {
 	s.mu.Lock()
 	if s.busy["scan"] || len(names) == 0 {
@@ -353,7 +353,7 @@ func (s *API) GuideScan(names []string) bool {
 			out, err := "", setupErr
 			if err == nil {
 				// The first link preparation can scan too: it belongs here, never in
-				// GuideAdd or the GUI call (06 §8.4).
+				// GuideAdd or the GUI call (16 §8.4).
 				s.environment.gate.Lock()
 				_, err = r.PrepareEnv(n)
 				s.environment.gate.Unlock()
@@ -439,7 +439,7 @@ func (s *API) PackImport(path string) (string, error) {
 	return view.PackImportText(m), nil
 }
 
-// ---- the guide's "download a version" (08 §11) ----
+// ---- the guide's "download a version" (11 §3) ----
 
 // DownloadInfo is what the download step shows: SteamCMD (or the offer to download it from
 // Valve, with its size), RimWorld's branches, and a folder for the game.
@@ -490,7 +490,7 @@ func gamesFolder(a *app.App) string {
 	return filepath.Join(os.Getenv("HOME"), "Games")
 }
 
-// GuideInstallSteamCMD queues the confirmed download and returns its task ID (06 §2.15).
+// GuideInstallSteamCMD queues the confirmed download and returns its task ID (16 §2.15).
 func (s *API) GuideInstallSteamCMD() (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -539,7 +539,7 @@ func (s *API) GuideDownload(branch, dir, account, name string) (bool, error) {
 			err = s.a.Store.SetCurrentEnv(r.Env.ID)
 			s.a.EnvName = r.Env.Name
 		}
-		// GuideScan owns link preparation and the first scan (06 §8.4).
+		// GuideScan owns link preparation and the first scan (16 §8.4).
 		s.busy["download"], s.board, s.needs = false, nil, nil
 		s.mu.Unlock()
 		if err != nil {

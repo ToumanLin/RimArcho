@@ -1,6 +1,6 @@
-// The pages over the board (the sidebar's entries, 06 §2.1): Can it run (06 §2.4, §5), the
-// game log (§2.10), Mod library › Updates (§2.9), the full detail (§4.2), packs, the environment
-// and settings. The pages are side by side: esc does not go from one to another (06 §3.1);
+// The pages over the board (the sidebar's entries, 16 §2.1): Can it run (16 §2.4, §5), the
+// game log (16 §2.10), Mod library › Updates (16 §2.9), the full detail (16 §4.2), packs, the environment
+// and settings. The pages are side by side: esc does not go from one to another (16 §3.1);
 // esc leaves only the full detail, back to the plan. A page's actions sit in the top bar.
 import { fieldError, fieldStatusError } from "./feedbacksemantics.js";
 import { choiceControl } from "./choices.js";
@@ -35,7 +35,7 @@ export function initScreens(u) {
     if (ev?.notice) say(ev.kind === "session" ? "warn" : "ok", ev.notice);
     if (S.screen === "settings") refreshSettingTasks(true);
     if (S.screen === "changes" && ev?.kind === "mods") changes();
-    // a new RimArcho puts its line on the launch page (06 §2.3); found rarely, so redraw
+    // a new RimArcho puts its line on the launch page (16 §2.3); found rarely, so redraw
     if (S.screen === "home" && ev?.kind === "self" && ev?.notice) ui.reload();
   });
   on("tasks", (ev) => {
@@ -49,7 +49,7 @@ export function initScreens(u) {
 let fresh = false;
 const pageCache = new Map();
 
-// left tells Go the player left a page, which forgets what only that page used (07 §8.3).
+// left tells Go the player left a page, which forgets what only that page used (17 §7.3).
 function left(next) {
   if (S.screen && S.screen !== next) {
     settlePageRead();
@@ -84,8 +84,8 @@ export function openScreen(name) {
   if (fresh) onArea = 0;
   const previous = $("#screen");
   // Only warm pages come back from their last drawing, so only they keep it: any other
-  // page held here stays in memory with its listeners and data (07 §8.3). The others
-  // show their skeleton first (06 §3.1), including while a game switch runs.
+  // page held here stays in memory with its listeners and data (17 §7.3). The others
+  // show their skeleton first (16 §3.1), including while a game switch runs.
   if (fresh && S.screen && previous.children.length && !pageLoading()) {
     if (WARM.has(S.screen)) pageCache.set(S.screen, { nodes: [...previous.childNodes], top: previous.scrollTop });
     else pageCache.delete(S.screen);
@@ -97,7 +97,7 @@ export function openScreen(name) {
   sc.hidden = false;
   sc.removeAttribute("aria-busy");
   sc.replaceChildren();
-  // While the game switches, or when coming back to a page kept warm (06 §2.4: Can it run,
+  // While the game switches, or when coming back to a page kept warm (16 §2.4: Can it run,
   // the editor's other half) for the same game and list, the last drawing shows at once
   // and the page reads again behind it.
   const sameContext = WARM.has(name) && pageContexts.get(name) === JSON.stringify([S.board?.env, S.shell?.plan?.id]);
@@ -155,7 +155,7 @@ export function beginPageRead(name, { replace = false, keep = false, label = "lo
   pageContexts.set(name, context);
   const current = () => S.envSeq === gameRequest && S.screen === name && S.screenSeq === epoch && S.board?.env === env && S.shell?.plan?.id === plan && pageReads.get(name) === n;
   const editor = name === null, board = editor && $("#board");
-  // Old object controls cannot remain usable across a game/list switch (06 §8.2).
+  // Old object controls cannot remain usable across a game/list switch (16 §8.2).
   const objectPage = editor || name === "library";
   const hasContent = sc.children.length || (editor && same && sc.hidden && S.board);
   // Coming back to the editor of the same list: its columns are still in #board, so show
@@ -182,7 +182,7 @@ export function beginPageRead(name, { replace = false, keep = false, label = "lo
   if (editor && sc.hidden && !warmEditor && !same) say("busy", T(label));
   return {
     current,
-    // A workspace reply can itself change the current game/list (06 §8.2).
+    // A workspace reply can itself change the current game/list (16 §8.2).
     commit(apply) {
       if (!current()) return false;
       apply();
@@ -220,7 +220,7 @@ function dropBackdrop() {
 }
 
 // page builds a page: one muted sentence that says what the page is for (the breadcrumb
-// names it, 06 §2.2), then the body. The buttons and fields among right are the page's
+// names it, 16 §2.2), then the body. The buttons and fields among right are the page's
 // actions: they sit at the right end of that line, quiet unless primary; anything else
 // joins the lead. The top bar has no buttons.
 export function page(cls, lead, ...right) {
@@ -246,7 +246,7 @@ export function page(cls, lead, ...right) {
   return w;
 }
 
-// ---- numbered areas (06 §3.5): on every page 1–9 focus its areas, as 1–4 do in the editor;
+// ---- numbered areas (16 §3.5): on every page 1–9 focus its areas, as 1–4 do in the editor;
 // each area's heading shows its number ("1 breaks the game") ----
 let areas = [];
 let onArea = 0; // the area last picked on this page: a redraw keeps its mark
@@ -281,7 +281,7 @@ export function areaKey(e) {
 }
 
 // archoMark is the small bow in front of Archo's name where the portrait would be too small
-// to read (06 §7).
+// to read (16 §7).
 export function archoMark() {
   const m = el("span", "archo-mark");
   m.innerHTML = bowMark(16);
@@ -296,7 +296,7 @@ export function button(label, keyName, run, cls = "", envWrite = "") {
   return b;
 }
 
-// act is a page action with an icon (the top bar's quiet buttons, 06 §2.2).
+// act is a page action with an icon (the top bar's quiet buttons, 16 §2.2).
 export function act(label, ic, run, keyName, envWrite = "") {
   const b = button(label, keyName, run, "", envWrite);
   const i = el("span", "ic");
@@ -340,7 +340,7 @@ function moveIn(curIdx, n, k) {
   return null;
 }
 
-// ---- Can it run (06 §2.4, §5): two columns ----
+// ---- Can it run (16 §2.4, §5): two columns ----
 // Left (before you start): breaks the game, worth knowing, for you to confirm, what checking the mods' files and the
 // shared logs found. Right (when you last played): the run's errors, this run first while the game
 // runs. Each item is a card: a bold line, a plain sentence, what belongs to it (link rows,
@@ -359,7 +359,7 @@ const COL_SECS = [[0, 1, 2], [3]]; // view.Section*: the left column's, then the
 const N = { data: null, cols: [[], []], cur: [0, 0], at: ["", ""], col: 0, open: new Set(), els: [[], []],
   hintsShut: false, done: [], batch: 0, before: null, ready: false, result: null, ask: null, others: false, env: "" };
 
-// archo is the hook for the Archo panel (06 §2.13, 1.1): when set, an item can be handed
+// archo is the hook for the Archo panel (16 §2.13, 1.1): when set, an item can be handed
 // to it ("Archo is watching"). Nothing sets it yet.
 export const archo = { ask: null };
 
@@ -367,7 +367,7 @@ export function liveChanged() {
   if (S.screen === "needs" && N.data && !pageLoading()) { orderNeeds(); drawNeeds(); }
 }
 
-// liveCount: this run's counted errors (the sidebar's badge adds them, 06 §2.1).
+// liveCount: this run's counted errors (the sidebar's badge adds them, 16 §2.1).
 export function liveCount() {
   return ((S.live && S.live.items) || []).filter((it) => it.counted).length;
 }
@@ -400,7 +400,7 @@ export async function needs(keepCursor) {
   let data;
   try { data = await api.Needs(); } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
-  // done lines belong to this visit and this game (06 §5)
+  // done lines belong to this visit and this game (16 §5)
   const env = (S.board && S.board.env) || "";
   if (!keepCursor || env !== N.env) { N.done = []; N.ask = null; N.before = null; N.ready = false; N.result = null; N.others = false; }
   N.env = env;
@@ -546,7 +546,7 @@ function drawNeeds() {
   }
   if (!N.cols[0].length) lbox.append(el("section", "card empty-state", "✓ " + T("nothing here")));
   if (!N.cols[1].length) rbox.append(el("div", "need-empty", T("no errors in the last run")));
-  // what other pages handle: one line each (06 §2.4)
+  // what other pages handle: one line each (16 §2.4)
   for (const e of d.elsewhere || []) {
     const b = el("button", "need-away", "→ " + e.text);
     b.onclick = () => e.page === "library" ? document.dispatchEvent(new CustomEvent("library-search", { detail: e.query || "" })) : ui.go(e.page);
@@ -555,7 +555,7 @@ function drawNeeds() {
   w.append(grid);
   sc.append(w);
   sc.querySelectorAll(".needcol > .scroll").forEach((s, i) => { s.scrollTop = keep[i] || 0; });
-  // 1–9: the sections in the order shown, the left column's first (06 §3.5)
+  // 1–9: the sections in the order shown, the left column's first (16 §3.5)
   resetAreas();
   sc.querySelectorAll(".need-sec").forEach((sec) => area(sec, sec.querySelector("h2"), () => {
     const ci = +sec.dataset.col, i = N.cols[ci].findIndex((x) => x.section === +sec.dataset.section);
@@ -576,7 +576,7 @@ function needSection(si, rows, ci, shut, live) {
   const h = el("h2", "label", T(title));
   const n = rows.filter((x) => !x.done && x.counted).length;
   if (si === 1) {
-    // worth knowing folds and opens by its heading (06 §2.4)
+    // worth knowing folds and opens by its heading (16 §2.4)
     const all = (N.data.items || []).filter((x) => x.section === 1 && !x.into).length;
     const toggle = el("button", "need-fold");
     toggle.tabIndex = -1;
@@ -624,7 +624,7 @@ function needSection(si, rows, ci, shut, live) {
 
 // autoFix: one click for what needs no question: the required mods that are installed
 // but not enabled are enabled and the list sorted again (one undo step). The button counts
-// the items it resolves (06 §5).
+// the items it resolves (16 §5).
 function autoFix() {
   const items = (N.data.items || []).filter((it) => it.counted && !it.into);
   const enable = items.filter((it) => it.target && (it.actions || []).some((a) => a.kind === "enable")).length;
@@ -700,7 +700,7 @@ function needCard(it, ci, i) {
       continue;
     }
     if (a.kind === "choose-disable") {
-      // a choice: each option is a button, none the main one (06 §5)
+      // a choice: each option is a button, none the main one (16 §5)
       a.options.forEach((o, oi) => {
         const b = button(o.label, oi ? "" : a.key, () => { setCur(ci, i); if (N.ask) { N.ask = null; } snapshot(); doAction(a, oi); }, "option", actionWrite(a));
         btns.append(b);
@@ -741,7 +741,7 @@ function setCur(ci, i) {
   markNeeds();
 }
 
-// jumpTo: the item an other column's link names; it lights up for a moment (06 §5).
+// jumpTo: the item an other column's link names; it lights up for a moment (16 §5).
 function jumpTo(id) {
   for (const ci of [0, 1]) {
     const i = N.cols[ci].findIndex((x) => x.id === id);
@@ -753,7 +753,7 @@ function jumpTo(id) {
   }
 }
 
-// doneLine: an item the last actions resolved (06 §5): ✓, what the status line said, its
+// doneLine: an item the last actions resolved (16 §5): ✓, what the status line said, its
 // title; the latest that u can undo has undo.
 function doneLine(d, ci, i) {
   const row = el("div", "need done");
@@ -768,7 +768,7 @@ function doneLine(d, ci, i) {
   return row;
 }
 
-// confirmRow: the question an action asks before it runs, in place of the buttons (06 §5).
+// confirmRow: the question an action asks before it runs, in place of the buttons (16 §5).
 function confirmRow(it, a) {
   const box = el("div", "need-confirm");
   box.append(el("span", "t", a.kind === "repair-links" ? T("apply the repair shown above?") : (a.warn || a.label)));
@@ -787,7 +787,7 @@ function confirmYes() {
 }
 
 // linkBlock: the current game's broken links; the other games' fold into one line (the
-// repair still covers them all, 06 §2.4).
+// repair still covers them all, 16 §2.4).
 function linkBlock(it) {
   const gs = it.linkGroups, cur = gs.filter((g) => g.current);
   if (!cur.length || cur.length === gs.length) return linkRows(gs);
@@ -803,7 +803,7 @@ function linkBlock(it) {
 }
 
 // needSplit: the gap between the columns drags the left one's width, kept in
-// ui.gui.needs.left; double-click goes back to the default (06 §3.1 rule 10).
+// ui.gui.needs.left; double-click goes back to the default (16 §3.1 rule 10).
 const NEEDS_LEFT = "ui.gui.needs.left";
 let needsLeft = 0;
 function needSplit(grid, left, split) {
@@ -817,9 +817,9 @@ function needSplit(grid, left, split) {
   });
 }
 
-// Read-only needs actions stay available during a game switch (06 §3.1).
+// Read-only needs actions stay available during a game switch (16 §3.1).
 const actionWrite = (a) => ["open-url", "problem", "view", "game-log", "list", "version-list", "manage-lists", "fold"].includes(a.kind) ? "" : a.kind;
-// The pinned badge popover in the editor offers the same actions (06 §4.2).
+// The pinned badge popover in the editor offers the same actions (16 §4.2).
 setNeedRunner((it, a) => runAction(it, a), actionWrite);
 setVersionRunner((it, a) => runAction(it, a));
 // The editor's problems panel (problems.js) runs them too.
@@ -828,7 +828,7 @@ export const needActionWrite = actionWrite;
 
 // runAction runs an item's action. here: from Can it run itself, where a confirmation is
 // asked in the item, a choice is its buttons, and what the action resolves stays as done
-// lines (06 §5); the editor's panel and popover ask in a dialog.
+// lines (16 §5); the editor's panel and popover ask in a dialog.
 async function runAction(it, act, here = false) {
   switch (act.kind) {
     case "sort": case "save":
@@ -872,13 +872,13 @@ async function runAction(it, act, here = false) {
       if (here) return focusButtons(it, ".btn.option");
       return pop.choose(act.title, act.options.map((o) => o.label), (i) => doAction(act, i));
     case "subscribe":
-      // a background task (06 §2.16): the mods take their place in the list once downloaded
+      // a background task (16 §2.16): the mods take their place in the list once downloaded
       return pop.choose(act.label, getChoices(), async (i) => {
         try { say("ok", await api.Subscribe({ kind: "workshop", url: act.refs.join(" "), steamcmd: i === 1, batch: true })); } catch (e) { say("fail", errText(e)); }
       });
   }
   if (act.confirm) {
-    // Not undone with u: ask first (06 §6); on this page in the item itself
+    // Not undone with u: ask first (16 §6); on this page in the item itself
     if (here && S.screen === "needs") {
       N.ask = { id: it.id, act };
       drawNeeds();
@@ -957,7 +957,7 @@ export function analyzeEvent(ev) {
   if (S.screen === "needs" && ev.done) needs(true);
 }
 
-// ---- game log (06 §2.10) and Mod library › Updates (§2.9) ----
+// ---- game log (16 §2.10) and Mod library › Updates (16 §2.9) ----
 // tab: 0 the Player.log clusters, 1 the companion log's entries (mcur, open: their cursor
 // and the entries whose details are open).
 const L = { env: null, path: "", page: null, loading: false, pending: "", error: "", cur: 0, target: "", targetLine: "", detail: new Map(), seq: 0, els: [], tab: 0, tabPick: null, mcur: 0, open: new Set(), want: "", list: null, views: [], view: null, viewPath: "" };
@@ -1145,7 +1145,7 @@ function drawGameLog() {
   dscroll.tabIndex = -1;
   det.append(dscroll);
   // Archo log analysis: what the shared logs say about the picked error, its own card under the
-  // log text (06 §2.10); hidden while nothing matches
+  // log text (16 §2.10); hidden while nothing matches
   const ana = el("section", "card col ana-card");
   ana.hidden = true;
   ana.append(el("div", "col-head", ""), el("div", "scroll"));
@@ -1198,7 +1198,7 @@ function logText(r) {
 }
 
 // filePicker: the log shown, and a menu of the logs — each Player.log with the companion
-// log of its run under it (03 §6.7.4); picking a companion shows its section.
+// log of its run under it (06 §7.4); picking a companion shows its section.
 function filePicker(files) {
   const shown = (L.tab === 1 && files.find((f) => f.of === L.path)) || files.find((f) => f.path === L.path) || files[0];
   const b = el("button", "btn quiet picker");
@@ -1431,7 +1431,7 @@ function setAna(card) {
   if (card) sc.append(patternCard(card));
 }
 
-// patternCard (06 §2.10): what the shared logs say this kind of error usually is. It is
+// patternCard (16 §2.10): what the shared logs say this kind of error usually is. It is
 // marked as community background, apart from the evidence above: never a conclusion about
 // this list.
 function patternCard(c) {
@@ -1458,7 +1458,7 @@ function patternCard(c) {
   return d;
 }
 
-// ---- Mod library › updates and add a subscription (06 §2.9): subscriptions.js ----
+// ---- Mod library › updates and add a subscription (16 §2.9): subscriptions.js ----
 export { changes, changesHints, changesFiltered, changesPlan, openAdd, addHints } from "./subscriptions.js";
 
 export function rescanButton(label) {
@@ -1506,10 +1506,10 @@ export function logsKey(e) {
   return changesKey(e);
 }
 
-// ---- the full detail (06 §4.2): one page for the editor and Mod library (fulldetail.js) ----
+// ---- the full detail (16 §4.2): one page for the editor and Mod library (fulldetail.js) ----
 export { full, fullKey, fullSection } from "./fulldetail.js";
 
-// ---- settings (06 §2.14) ----
+// ---- settings (16 §2.14) ----
 // Every row is a value and the command that changes it (view.SettingsPage); the page runs
 // only those commands (API.ApplySetting).
 
@@ -1537,7 +1537,7 @@ export async function settings() {
   if (taskVersion !== settingTaskRead) refreshSettingTasks(true);
 }
 
-// Task events update the affected values without replacing edits or focus (06 §2.14).
+// Task events update the affected values without replacing edits or focus (16 §2.14).
 let settingTaskRead = 0;
 let settingValueRead = 0;
 async function refreshSettingTasks(values = false) {
@@ -1727,7 +1727,7 @@ function renderGroups(w, groups, again) {
         right.append(inp);
         right.append(ok);
       } else if (it.url) {
-        // Community: a web page, opened in the browser (06 §2.14)
+        // Community: a web page, opened in the browser (16 §2.14)
         const value = document.createElement("span"); value.textContent = it.value || it.url;
         const b = button("↗", "", () => api.OpenURL(it.url).catch(e => say("fail", errText(e))), "link");
         b.title = T("open the web page"); b.setAttribute("aria-label", T("open the web page"));
@@ -1748,7 +1748,7 @@ function renderGroups(w, groups, again) {
   }
 }
 
-// settingDetails folds text under its row (06 §3.1 rule 7): RimArcho's release notes.
+// settingDetails folds text under its row (16 §3.1 rule 7): RimArcho's release notes.
 function settingDetails(d) {
   const box = el("details", "setting-details");
   box.dataset.details = JSON.stringify(d);
@@ -1881,7 +1881,7 @@ export async function pickFolder(start, then) {
 }
 
 // ---- the environment (the pill on the left of the top bar) ----
-// Everything here belongs to one game folder (02 §0): which one is in use, the folder, its
+// Everything here belongs to one game folder (03 §2): which one is in use, the folder, its
 // version, how it is started and its saves. The mod folders every game shares are on the
 // settings page.
 
@@ -1921,7 +1921,7 @@ export async function environment() {
 }
 
 // removeEnv: the dry run says what RimArcho forgets and what stays, one confirmation removes
-// it (06 §2.14). Another environment takes over when it was in use; with none left, the
+// it (16 §2.14). Another environment takes over when it was in use; with none left, the
 // guide opens.
 export async function removeEnv(name) {
   let p;

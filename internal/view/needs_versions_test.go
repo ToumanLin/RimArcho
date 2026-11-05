@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// P3 (04 §1.6): the game now is not among the versions the list allows: one counted item in
+// P3 (07 §1.6): the game now is not among the versions the list allows: one counted item in
 // for you to confirm; "add 1.6" allows it and the item goes. Launching is not stopped by it.
 func TestGameNotAllowedNeed(t *testing.T) {
 	t.Parallel()

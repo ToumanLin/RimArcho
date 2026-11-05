@@ -8,7 +8,7 @@ import (
 
 // Launching with a required mod not installed or not enabled (VM run B8): the game does not
 // load the mods that need it and may reset its mod list to the base game, so the window
-// asks once. The CLI and the TUI do not ask (08 §2: the pre-launch hint never blocks).
+// asks once. The CLI and the TUI do not ask (09 §2: the pre-launch hint never blocks).
 
 // RunAsking is Run, except that a launch with required mods missing comes back with
 // Outcome.Confirm instead of starting the game; Run then launches anyway.

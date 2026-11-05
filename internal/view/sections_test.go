@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 06 §4.2: patches and Harmony are analysed only for the current list (03 §5). A mod outside
+// 16 §4.2: patches and Harmony are analysed only for the current list (05 §5). A mod outside
 // it says so, without a count, instead of "0" over a patch file and a DLL it does have.
 func TestSectionsOutsideList(t *testing.T) {
 	t.Parallel()

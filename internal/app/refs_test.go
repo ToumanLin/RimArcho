@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// A bare packageId is pkg:<packageId> (05 §2); no other reference form has its shape.
+// A bare packageId is pkg:<packageId> (13 §2); no other reference form has its shape.
 func TestBarePackageID(t *testing.T) {
 	t.Parallel()
 	for s, want := range map[string]bool{

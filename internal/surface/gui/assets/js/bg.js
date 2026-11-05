@@ -1,4 +1,4 @@
-// settings › Start page background (06 §2.14): a small launch page that shows the choice as it will look,
+// settings › Start page background (16 §2.14): a small launch page that shows the choice as it will look,
 // the dimming, blur, focus and rotation beside it, and the images by group below — the
 // game's, each background mod's, the player's own. Every change is saved at once
 // (API.SetBackground). The grid is reached with tab: arrows pick, enter uses, * stars
@@ -25,7 +25,7 @@ export async function bgSection(current = () => true) {
 }
 
 // Replace only the image choices after background extraction. Keep the live slider
-// values, focus and scroll while the player edits settings (06 §2.14, 06 §3.1).
+// values, focus and scroll while the player edits settings (16 §2.14, 16 §3.1).
 export async function refreshBackgrounds() {
   const section = box;
   if (!section?.isConnected || !P) return;

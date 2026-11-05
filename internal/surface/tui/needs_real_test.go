@@ -14,11 +14,11 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 )
 
-// What must never appear on the Can it run screen (06 §5): problem codes, #refs and the other
+// What must never appear on the Can it run screen (16 §5): problem codes, #refs and the other
 // reference forms of the CLI.
 var leakRe = regexp.MustCompile(`\b(?:dep|order|official|incompat|pkg|patch|version|log|harmony|def|mod|entry)\.[a-z][a-z-]+\b|#[a-z0-9]{4,5}\b|L#[a-z0-9]+|@\{|\bpkg:|\bp:[0-9a-f]{6}\b|\blog:E?\d|\bscan:\d|\bq:\d|\br:\d`)
 
-// T8 (06 §11) on a copy of a real data directory: every item of Can it run reads as one
+// T8 (16 §11) on a copy of a real data directory: every item of Can it run reads as one
 // sentence in plain words, has keys, and each key does something (opens a view or a
 // preview, or acts and says so); no code or #ref is on the screen. The data directory is
 // copied again into a temp dir first, so the keys' edits land nowhere that is kept.
@@ -88,7 +88,7 @@ func TestT8NeedsReal(t *testing.T) {
 	}
 	SetLang("en")
 	m.loadProblems()
-	// One key fixes every order violation: they are one item, counted once (06 §5).
+	// One key fixes every order violation: they are one item, counted once (16 §5).
 	folds := 0
 	for i, it := range m.prob.items {
 		if strings.Contains(it.text, "should load after") {
@@ -139,7 +139,7 @@ func TestT8NeedsReal(t *testing.T) {
 			}
 			wasOpen := m.prob.open[text]
 			m.needsKey(key)
-			if a := m.armed; a != nil { // a destructive key: the second press (06 §6)
+			if a := m.armed; a != nil { // a destructive key: the second press (16 §6)
 				if !strings.Contains(m.status, "again") {
 					t.Errorf("%q: armed without saying so: %q", text, m.status)
 				}

@@ -4,7 +4,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// Selection (06 §3.4): the selected instances of the focused list, m.marked. It is a
+// Selection (16 §3.4): the selected instances of the focused list, m.marked. It is a
 // selection only, not a mode: plain ↑↓ move the cursor and keep it, shift+↑↓ extend it as
 // a range from where the range started, ctrl+space adds or removes the cursor's row, esc
 // clears it, and going to another list clears it. Verbs act on it (or on the cursor's row

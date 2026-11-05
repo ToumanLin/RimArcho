@@ -7,7 +7,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
-// Locked versions (04 §7.2, §7.4): pin copies a mod into Mods/ and uses the copy in the
+// Locked versions (07 §5.2, §5.4): pin copies a mod into Mods/ and uses the copy in the
 // current plan; copy-local is the old name, kept as an alias.
 func init() {
 	flags := []Flag{{Name: "name", Value: "<folder>", Help: "default <folder>_local"}, {Name: "git", Help: "make the copy a git repository with a baseline commit"},

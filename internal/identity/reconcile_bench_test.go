@@ -10,7 +10,7 @@ import (
 	"github.com/zeebo/xxh3"
 )
 
-// Synthetic 1354-mod input, for before/after scan matching costs (06 §10).
+// Synthetic 1354-mod input, for before/after scan matching costs (16 §10).
 func BenchmarkReconcile1354(b *testing.B) {
 	for _, replacement := range []bool{false, true} {
 		b.Run(fmt.Sprintf("replacement=%v", replacement), func(b *testing.B) {

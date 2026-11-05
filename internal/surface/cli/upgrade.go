@@ -16,7 +16,7 @@ import (
 // upgradeShowAfter: an upgrade that ends sooner shows nothing.
 const upgradeShowAfter = 300 * time.Millisecond
 
-// upgradeReport shows a database upgrade while app.Open runs it (02 §7): after
+// upgradeReport shows a database upgrade while app.Open runs it (04 §4): after
 // upgradeShowAfter, a small native window for RimArcho.exe (no console; window), else lines
 // on stderr (CLI, MCP, and the TUI before it takes the terminal). lang: the text follows
 // ui.lang (GUI, TUI); otherwise it is English, like the CLI.

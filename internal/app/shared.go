@@ -11,7 +11,7 @@ import (
 	"github.com/zeebo/xxh3"
 )
 
-// Read-only results that every session of this process may share (07 §8.3). The window
+// Read-only results that every session of this process may share (17 §7.3). The window
 // keeps several read sessions on one database; each built its own list registry and
 // game-link instances from the same data, about 4 and 5.5 MB per session for 6,574 Mod
 // copies. These caches hold weak pointers: an entry lives only while a session uses it,

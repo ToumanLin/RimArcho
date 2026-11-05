@@ -14,7 +14,7 @@ import (
 
 // A test run links the plan's Mods the game cannot see (pinned copies, SteamCMD and extra
 // folders) into Mods/ for the run only, and removes those links when the game has exited
-// (08 §12). The links are recorded before they are made, so the next test run removes
+// (09 §7). The links are recorded before they are made, so the next test run removes
 // what an interrupted one left.
 
 const testLinksFile = "links.json"
@@ -58,7 +58,7 @@ func (a *App) testRunLinks(st *LoadoutState) (string, []LinkChange, map[string]s
 		if _, err := os.Lstat(filepath.Join(mods, name)); err == nil {
 			blocked[m.ID] = "Mods/" + name + " exists and is not this copy; save the plan to replace it"
 		} else if other := inMods[strings.ToLower(m.PackageID)]; other != "" {
-			// The game loads only one copy of a packageId from Mods/ (08 §3).
+			// The game loads only one copy of a packageId from Mods/ (09 §3).
 			blocked[m.ID] = "Mods/" + other + " has the same packageId; the game would load only one"
 		} else {
 			add = append(add, LinkChange{Op: "add", Name: name, Target: m.RealPath, Mod: m.ID})

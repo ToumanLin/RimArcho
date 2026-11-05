@@ -23,7 +23,7 @@ type Dependency struct {
 }
 
 // Decl is the normalised declaration of a mod: About.xml, PublishedFileId.txt and
-// LoadFolders.xml (02 §4.3). It is stored as snapshot.decl_blob for the analysis layer.
+// LoadFolders.xml (04 §1.3). It is stored as snapshot.decl_blob for the analysis layer.
 type Decl struct {
 	PackageIDRaw      string   `json:"package_id_raw,omitempty"`
 	PackageID         string   `json:"package_id,omitempty"` // lower case
@@ -139,7 +139,7 @@ func ReadDecl(dir string, official bool) Decl {
 	if _, err := os.Stat(aboutPath); err != nil {
 		if p := findCI(dir, "About", "About.xml.disabled"); p != "" {
 			if _, err := os.Stat(p); err == nil {
-				aboutPath = p // RimCrow-disabled: the declaration is still valid (02 §4.2)
+				aboutPath = p // RimCrow-disabled: the declaration is still valid (04 §1.2)
 			}
 		}
 	}

@@ -1,4 +1,4 @@
-// Import and export of the mod list (04 §9): to and from RimSort, RimCrow, RimWorld's
+// Import and export of the mod list (07 §7): to and from RimSort, RimCrow, RimWorld's
 // own .rml, share codes, Rentry and Workshop collections. An import is previewed first —
 // what is installed, what is missing and where to get it, what the enabled list becomes —
 // and applied as one undo step; nothing here writes ModsConfig.xml (that stays save).
@@ -12,7 +12,7 @@ import { copyablePath, editablePath } from "./fields.js";
 let ui = null;
 export function initExchange(u) {
   ui = u;
-  // File drops anywhere in the window enter the same import flow (06 §2.17).
+  // File drops anywhere in the window enter the same import flow (16 §2.17).
   document.addEventListener("dragover", e => { if (e.dataTransfer?.types.includes("Files")) e.preventDefault(); });
   document.addEventListener("drop", async e => {
     if (e.defaultPrevented) return;
@@ -29,7 +29,7 @@ let pasted = "";
 let session = null;
 let previewSeq = 0;
 
-// Import is a sub-page, including when entered from the first-run guide (06 §2.17).
+// Import is a sub-page, including when entered from the first-run guide (16 §2.17).
 export async function importFrom(kind, src) {
   await exchange();
   if (S.screen === "plan-import") return preview(kind, src);
@@ -144,7 +144,7 @@ async function preview(kind, src, fileName) {
 
   showImportSummary(body, p, !!(p.sourcePath || fileName));
 
-  // A destination is selected first; only the final import button changes data (06 §2.17).
+  // A destination is selected first; only the final import button changes data (16 §2.17).
   const ways = el("fieldset", "xc-sec");
   ways.append(el("legend", "xc-sec-t", T("import destination")));
   let destination = "new", busy = false;
@@ -200,7 +200,7 @@ async function preview(kind, src, fileName) {
     } catch (e) { if (current()) { say("fail", errText(e)); busy = false; checkName(); } }
   }
   checkName();
-  // a Steam Workshop collection: the list can follow it (04 §9.6); ticked by default
+  // a Steam Workshop collection: the list can follow it (07 §7.6); ticked by default
   if (p.collection) {
     const lb = el("label", "xc-check");
     const cb = el("input");
@@ -219,7 +219,7 @@ async function preview(kind, src, fileName) {
 }
 
 // Shared by the standalone destination flow and the new-list form's inline source.
-// sourceIsPath: the source is a file the player picked, so it copies on a click (06 §3.1 rule 12).
+// sourceIsPath: the source is a file the player picked, so it copies on a click (16 §3.1 rule 12).
 export function showImportSummary(body, p, sourceIsPath = !!p.sourcePath) {
   const top = el("div", "xc-sum");
   top.append(el("div", "xc-big", p.summary));
@@ -278,7 +278,7 @@ export function showImportContents(body, p) {
 export const workshopIDs = rows => [...new Set(rows.map(r => /[?&]id=(\d+)/.exec(r.url || "")?.[1]).filter(Boolean))];
 
 // getAll asks how to get the Workshop items ids (Steam or SteamCMD), then gets them all as one
-// background task (06 §2.16); btn stays disabled once it started. The import page's "subscribe
+// background task (16 §2.16); btn stays disabled once it started. The import page's "subscribe
 // all" and a followed collection's mods that are not installed share it.
 export function getAll(ids, btn) {
   pop.choose(Tf("get %d mods", ids.length), getChoices(), async (i) => {
@@ -289,7 +289,7 @@ export function getAll(ids, btn) {
 }
 
 // subscribeAll gets every missing mod that has a Workshop page in one go (a background task,
-// 06 §2.16); once downloaded they take their place in the list by themselves.
+// 16 §2.16); once downloaded they take their place in the list by themselves.
 function subscribeAll(sec, rows) {
   const ids = workshopIDs(rows);
   const bar = el("div", "xc-subscribe");

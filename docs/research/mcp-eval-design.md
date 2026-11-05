@@ -145,12 +145,12 @@ Observations (one run per cell, so only leads):
 
 Two causes, both needed for a working `test_run` in the eval:
 
-1. **Archo (fixed, branch `claude/test-run-progress`).** Pi 1.4 asks for progress on every MCP call and restarts its 60 s timer on each progress notification. `archo mcp` now sends one every 10 s while a call runs, with the current step (05 §5.1). Checked in the VM with Pi's own MCP client (`guest/probe-testrun.mjs`, no model): the call stayed open for 600 s with 60 notifications and returned the report.
+1. **Archo (fixed, branch `claude/test-run-progress`).** Pi 1.4 asks for progress on every MCP call and restarts its 60 s timer on each progress notification. `archo mcp` now sends one every 10 s while a call runs, with the current step (14 §1). Checked in the VM with Pi's own MCP client (`guest/probe-testrun.mjs`, no model): the call stayed open for 600 s with 60 notifications and returned the report.
 2. **Harness (fixed).** The game hung in session 0 (defect 6). `run-case.ps1 -Archo <exe>` now pushes the evaluated build and starts Pi with `-interactive` in `NewPlayer(Chinese)`'s desktop (snapshot Staged3).
 
 End to end with both fixes (c3 staged, Pi's MCP client, no model): `test_run` returned `menu` after 93 s (load 84 s, peak 4.3 GB, 9 progress notifications) with the injected fault as an `exception` cluster: `Error in static constructor of SmartFirefight.Startup … Undefined target method`.
 
-Pilot with both fixes, c3 group A (one run, `results/c3-A-1`): 508 s, 35 turns, 54 tool calls (bash 49, `status` 1, `test_run` 2), 1.33 M tokens; culprit yes, fix yes (rebuilt DLL, log clean). After copying its rebuilt DLL into the Mod, the agent verified with `test_run` (menu, 89 s) and `test_run map=true` (map, 85 s); both returned full reports. Both reports set `isError`, because the base noise errors stay (expected; 08 §12 counts every error cluster), so the agent still grepped the run's Player.log to see that its own error was gone.
+Pilot with both fixes, c3 group A (one run, `results/c3-A-1`): 508 s, 35 turns, 54 tool calls (bash 49, `status` 1, `test_run` 2), 1.33 M tokens; culprit yes, fix yes (rebuilt DLL, log clean). After copying its rebuilt DLL into the Mod, the agent verified with `test_run` (menu, 89 s) and `test_run map=true` (map, 85 s); both returned full reports. Both reports set `isError`, because the base noise errors stay (expected; 09 §7 counts every error cluster), so the agent still grepped the run's Player.log to see that its own error was gone.
 
 MCP lead from that report: the cluster lists no Mod (`mods: []`, `possible`) although `SmartFirefight.Startup` is a type in Smart Firefight's own assembly; the missing `Designator_ExtinguishFires` texture is also unattributed. Attributing a type named in the message to the Mod whose assembly defines it would name the culprit directly.
 

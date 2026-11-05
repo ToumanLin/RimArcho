@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// runSelfCheck is settings' "check for updates" (07 §5.1): recorded like the automatic check.
+// runSelfCheck is settings' "check for updates" (17 §5.1): recorded like the automatic check.
 func (s *API) runSelfCheck(a *app.App) (string, error) {
 	ran, err := a.RunAutomaticNow(s.branchCtx, "self")
 	if !ran && err == nil {

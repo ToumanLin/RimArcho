@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// VolumeFS names the temp folder's file system on Windows (08 §9 checks Mods/ with it).
+// VolumeFS names the temp folder's file system on Windows (09 §6 checks Mods/ with it).
 func TestVolumeFS(t *testing.T) {
 	fs := VolumeFS(t.TempDir())
 	if runtime.GOOS == "windows" && fs == "" {

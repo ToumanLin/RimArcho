@@ -1,6 +1,6 @@
 # Save page drafts
 
-Three candidates for the save page under Play review (06 §2.11, 10 §4; ToDo "Save analysis"). Colors, sidebar and controls follow the current GUI (`style.css` tokens). Example data only (`COLONIES` in `shared.js`); buttons only show a toast and never read or write files.
+Three candidates for the save page under Play review (16 §2.11, 12 §4; ToDo "Save analysis"). Colors, sidebar and controls follow the current GUI (`style.css` tokens). Example data only (`COLONIES` in `shared.js`); buttons only show a toast and never read or write files.
 
 ## The problem
 
@@ -62,7 +62,7 @@ B is the best for stepping through many saves, but its narrow right column fight
 
 ## Specifications
 
-Written on 2026-11-04 from revised B: page layout 06 §2.11 (Saves moved to the Library group, 06 §2.1); read tiers, cache and background reading 10 §1.7; grouping, matching, can it load, actions, timeline and attribution 10 §4; commands, `sv:` references and MCP tools 05 §2, §4.2, §5.2; cache location 07 §3; decision 00 D18.
+Written on 2026-11-04 from revised B: page layout 16 §2.11 (Saves moved to the Library group, 16 §2.1); read tiers, cache and background reading 12 §1.7; grouping, matching, can it load, actions, timeline and attribution 12 §4; commands, `sv:` references and MCP tools 13 §2, §4.2, 14 §2; cache location 17 §3; decision 00 D18.
 
 ## Open
 

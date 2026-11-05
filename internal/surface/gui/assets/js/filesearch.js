@@ -1,4 +1,4 @@
-// Mod library › Search files (06 §2.9). Query completion and filters are shared with the library.
+// Mod library › Search files (16 §2.9). Query completion and filters are shared with the library.
 import { S, $, el, api, T, errText, say } from "./state.js";
 import { beginPageRead, page, area, hintsChanged } from "./screens.js";
 import { copy } from "./fields.js";
@@ -82,13 +82,13 @@ export async function open() {
   $("#screen").replaceChildren(root);
   query.buildQuery();
   results.buildResults();
-  // Cards 1 query, 2 results, 3 file (06 §3.1): the digit keys focus them.
+  // Cards 1 query, 2 results, 3 file (16 §3.1): the digit keys focus them.
   area(queryCard, queryCard.querySelector(".fs-field"), focusInput);
   area(resultsCard, resultsCard.querySelector(".fs-result-head"), focusResults);
   area(viewerCard, null, viewer.focus);
   viewer.draw();
   // The gap under the query card drags while the filter panel is open; closed, the card
-  // follows its three fields (06 §3.1 rule 10). Default 38% of the column.
+  // follows its three fields (16 §3.1 rule 10). Default 38% of the column.
   let queryH = null;
   const placeQuery = () => {
     const open = !!query.modsBar?.open;

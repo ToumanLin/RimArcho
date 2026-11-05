@@ -70,7 +70,7 @@ func Cached(ctx context.Context, game, cache, lang string) ([]Item, error) {
 }
 
 // Prepare fills shared pairs from one installation. Use PrepareFrom when other
-// registered installations can supply missing art (06 §2.14).
+// registered installations can supply missing art (16 §2.14).
 func Prepare(ctx context.Context, game, cache, lang string) ([]Item, error) {
 	return PrepareFrom(ctx, game, cache, lang, nil)
 }

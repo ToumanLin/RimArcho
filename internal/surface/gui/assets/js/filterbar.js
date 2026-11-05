@@ -1,4 +1,4 @@
-// The filter bar (06 §2.5, §2.9): one component for the plan editor and Mod library > All.
+// The filter bar (16 §2.5, §2.9): one component for the plan editor and Mod library > All.
 // One row: the query (grey completion, Tab takes it) and a "filter" toggle (also `\`).
 // Clicked conditions edit the same query. Open, it shows lists, tags, source and content:
 // the values most used first with their counts, then a button to expand the rest. A left
@@ -348,7 +348,7 @@ export function createBar(opts) {
     }
   };
   // the open bar folds the moment the focus leaves it: a click elsewhere, tab, a key that
-  // moves the focus (06 §3.1 rule 8); what it filters stays in force on its one line
+  // moves the focus (16 §3.1 rule 8); what it filters stays in force on its one line
   const left = (t) =>
     b.open &&
     root.isConnected &&

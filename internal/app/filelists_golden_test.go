@@ -17,7 +17,7 @@ import (
 
 var updateFileLists = flag.Bool("update-filelists", false, "rewrite testdata/store/filelists-scenario.txt")
 
-// 02 §7 (v28): everything read from snapshot file lists is the same as when every file was a
+// 04 §4 (v28): everything read from snapshot file lists is the same as when every file was a
 // row. The golden file was written by this test on the v27 code (dev/1.0 57a7643, before the
 // blocks); v28 must reproduce it byte for byte: the change history and its file diffs, each
 // snapshot's file list, the log lookups of textures and DLLs, and what maintenance prunes.

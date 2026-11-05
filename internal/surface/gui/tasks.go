@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Background tasks (06 §2.16): Mod library's file and Steam actions run in app.Tasks' lanes, one item
+// Background tasks (16 §2.16): Mod library's file and Steam actions run in app.Tasks' lanes, one item
 // at a time, each item through the same single-item action as before (view.LibDo); the
 // window's own jobs (scan, analysis, packs, textures, downloads) report into the same
 // record. "tasks" events say the record changed (at most every 500 ms); a task of a lane
@@ -39,7 +39,7 @@ func (s *API) startTasks() {
 		if lane != app.LaneFiles {
 			return true
 		}
-		// a scan reads the folders the files lane moves: one waits for the other (06 §2.16)
+		// a scan reads the folders the files lane moves: one waits for the other (16 §2.16)
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		return !s.busy["scan"]
@@ -93,7 +93,7 @@ func (s *API) taskItem(kind, ref string) error {
 	st, _ := a.Loadout()
 	_, err = view.LibDo(a, kind, []string{ref})
 	s.invalidateInventory()
-	// Steam out of reach: the Workshop page instead, as the action did before (06 §2.9)
+	// Steam out of reach: the Workshop page instead, as the action did before (16 §2.9)
 	var pages *view.OpenPages
 	if errors.As(err, &pages) {
 		for _, u := range pages.URLs {
@@ -326,7 +326,7 @@ func (s *API) beginSelf(kind, obj string, stop func() error) string {
 }
 
 // failedText is a job's failure for the status line. It can arrive while the player does something
-// else, so it names the job as a task row does (06 §11 A12); the task record keeps the bare reason.
+// else, so it names the job as a task row does (16 §11 A12); the task record keeps the bare reason.
 func failedText(kind, obj, reason string) string {
 	return view.TaskStatus(view.TaskRow{Title: view.TaskTitle(kind), Obj: obj, Line: reason})
 }
@@ -445,7 +445,7 @@ func (s *API) batchSteam(kind string, refs []string, b app.BatchCalls) {
 			return
 		}
 		if pages := view.SteamPages(kind, err); pages != nil {
-			// Steam out of reach: the Workshop pages instead, as before (06 §2.9); once
+			// Steam out of reach: the Workshop pages instead, as before (16 §2.9); once
 			if !opened {
 				for _, u := range pages.URLs {
 					s.open(u)

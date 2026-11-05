@@ -1,6 +1,6 @@
 package app_test
 
-// Several plans per environment (04 §1, V9, X5): each plan has its own list, undo stack,
+// Several plans per environment (07 §1, V9, X5): each plan has its own list, undo stack,
 // versions and staging list; switching, creating and removing write no game file.
 
 import (

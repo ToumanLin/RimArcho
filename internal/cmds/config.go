@@ -23,17 +23,17 @@ var configKeys = map[string][]string{
 	"ui.theme":         {"auto", "light", "dark"},
 	"ui.icons":         {"compat", "nerd"}, // nerd: the player's terminal already uses a Nerd Font
 	"ui.mouse":         {"on", "off"},
-	// 06 §4.3: whether descriptions and their images may be fetched from the Steam Workshop
+	// 16 §4.3: whether descriptions and their images may be fetched from the Steam Workshop
 	"workshop.fetch":  {"on", "off"},
 	"workshop.images": {"on", "off"},
-	// 04 §1.5: add Archo Monitor to new plans (and to each plan once on upgrade)
+	// 07 §1.5: add Archo Monitor to new plans (and to each plan once on upgrade)
 	"monitor.default": {"on", "off"},
-	// 06 §2.14: off starts the window's WebView2 without GPU acceleration (less memory,
+	// 16 §2.14: off starts the window's WebView2 without GPU acceleration (less memory,
 	// software drawing); read when the window opens
 	"ui.gpu": {"on", "off"},
 }
 
-// freeKeys are settings with free values: their default and a check (06 §3.8, §12.4).
+// freeKeys are settings with free values: their default and a check (16 §3.8, §12.4).
 var freeKeys = map[string]struct {
 	def   string
 	check func(string) error
@@ -49,14 +49,14 @@ var freeKeys = map[string]struct {
 	}},
 	// the tags offered first by the tag bar, comma separated; the preset is the default
 	"tags.pinned": {DefaultPinnedTags, func(string) error { return nil }},
-	// the lock library (04 §7): "" is %LOCALAPPDATA%\RimArcho\locked
+	// the lock library (07 §5): "" is %LOCALAPPDATA%\RimArcho\locked
 	"lock.dir": {"", func(v string) error {
 		if !filepath.IsAbs(v) {
 			return fmt.Errorf("lock.dir must be an absolute folder path")
 		}
 		return nil
 	}},
-	// the Archo Monitor folder (08 §9): "" is %LOCALAPPDATA%\RimArcho\monitor
+	// the Archo Monitor folder (09 §6): "" is %LOCALAPPDATA%\RimArcho\monitor
 	"monitor.dir": {"", func(v string) error {
 		if !filepath.IsAbs(v) {
 			return fmt.Errorf("monitor.dir must be an absolute folder path")
@@ -69,7 +69,7 @@ var freeKeys = map[string]struct {
 		}
 		return nil
 	}},
-	// 07 §2.2: RimArcho's own requests. system: HTTPS_PROXY / HTTP_PROXY, then the Windows
+	// 17 §2.2: RimArcho's own requests. system: HTTPS_PROXY / HTTP_PROXY, then the Windows
 	// system proxy; off; or a proxy URL.
 	"network.proxy": {"system", netcfg.CheckProxy},
 	// a GitHub mirror tried before GitHub itself; "" is direct
@@ -82,7 +82,7 @@ var freeKeys = map[string]struct {
 	}},
 }
 
-// DefaultPinnedTags is the preset of common tags (06 §3.8).
+// DefaultPinnedTags is the preset of common tags (16 §3.8).
 var DefaultPinnedTags = l10ndata.DefaultPinnedTags
 
 // Setting returns a setting of the app, or its default.

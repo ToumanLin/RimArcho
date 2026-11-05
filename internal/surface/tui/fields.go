@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// fieldLines draws the detail's one field list (06 §4.1), the GUI's fields.js in text: a
+// fieldLines draws the detail's one field list (16 §4.1), the GUI's fields.js in text: a
 // label column, then the value; a row's button becomes the key that does it.
 func fieldLines(fs []view.Field, w int) []string {
 	lw := 0

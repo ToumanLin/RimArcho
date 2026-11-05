@@ -18,7 +18,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// SourceDir is the managed, local-only library (03 §5.4, 07 §3).
+// SourceDir is the managed, local-only library (05 §5.4, 17 §3).
 func (a *App) SourceDir() string {
 	if p := a.Store.Meta("cfg:source.dir"); p != "" {
 		return p

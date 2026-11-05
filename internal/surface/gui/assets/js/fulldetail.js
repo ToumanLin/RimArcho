@@ -1,4 +1,4 @@
-// The full detail (06 §4.2): one page for a mod, opened by enter from the plan editor and
+// The full detail (16 §4.2): one page for a mod, opened by enter from the plan editor and
 // from Mod library > All. It puts together what the two lists know about it:
 //   1 the mod: picture, name, author, its state, its tags, the description;
 //   2 its copies (copies): each copy's state, place, size, version and note, and the selected
@@ -72,7 +72,7 @@ export async function full(from, id) {
   }
   draw(false);
   read.finish();
-  // the Workshop description once the cursor rested on the mod (06 §4.3 item 3)
+  // the Workshop description once the cursor rested on the mod (16 §4.3 item 3)
   if (d && d.state === "not cached") {
     setTimeout(async () => {
       if (n !== F.seq || !read.current()) return;
@@ -236,7 +236,7 @@ function copyCard(x) {
   return b;
 }
 
-// runOp runs an op on the selected copy, as Mod library does (06 §3.5): the plan's ops at once
+// runOp runs an op on the selected copy, as Mod library does (16 §3.5): the plan's ops at once
 // (u undoes), the ones that change files after their dry run.
 async function runOp(code) {
   const c = theCopy();

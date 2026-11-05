@@ -20,7 +20,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// The reference index (03 §6.5): which effective Defs/ and Patches/ files of an enabled
+// The reference index (06 §5): which effective Defs/ and Patches/ files of an enabled
 // set mention which names, the way a def is referenced. A "Could not resolve
 // cross-reference" cluster asks which enabled mods want the missing def; without the index
 // that meant listing and reading every file of every enabled mod for every new log (5,750
@@ -41,7 +41,7 @@ const refIndexKeep = 8
 // text between a '>' and the next '<' (<thingDef>X</thingDef>, <li>X</li>) and a tag name up
 // to the next '>' (<X>1</X> in ThingDefCountClass lists such as costList), with the offset
 // of the '>' or '<' it starts at; and a Class="…" attribute value in a tag (<li
-// Class="NS.T"/>), the class a missing-type error names (03 §6.2).
+// Class="NS.T"/>), the class a missing-type error names (06 §2).
 func refTokens(b []byte, fn func(tok []byte, at int)) {
 	prev := 0 // just after the previous '<'
 	for {

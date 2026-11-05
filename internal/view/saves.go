@@ -11,13 +11,13 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 )
 
-// Saves (06 §2.11, 10 §4): the left card's colonies and their saves, and the selected
+// Saves (16 §2.11, 12 §4): the left card's colonies and their saves, and the selected
 // save's middle card (where it belongs, can it load, its Mod list) and right card (the
-// playthrough). The left card and the middle card come from the save head (10 §1.7 L0)
+// playthrough). The left card and the middle card come from the save head (12 §1.7 L0)
 // and the list it matched; the right card comes from the full read (L1, SavePlayOf) and is
 // left empty until the save is read, never made up.
 
-// PageSaves is the Saves page under Library (06 §2.1).
+// PageSaves is the Saves page under Library (16 §2.1).
 const PageSaves = "saves"
 
 // SavesPage is the left card.
@@ -117,7 +117,7 @@ type SaveDetail struct {
 	Bytes  int64  `json:"bytes"`
 	Saved  string `json:"saved"` // the date and time the file was written
 
-	// Where it belongs (10 §4.3): the game it was made in and the environment it runs in,
+	// Where it belongs (12 §4.3): the game it was made in and the environment it runs in,
 	// the list or pack it matched and how.
 	Game     string `json:"game"`               // the save's game version
 	Env      string `json:"env,omitempty"`      // the environment chip: "steam  1.6"
@@ -126,7 +126,7 @@ type SaveDetail struct {
 	ListID   int64  `json:"listId,omitempty"` // the plan to make current or open
 	Match    string `json:"match,omitempty"`  // how it matched, as a sentence
 
-	// Can it load? (10 §4.3): the verdict, the quick-fix bar's one action and the rows
+	// Can it load? (12 §4.3): the verdict, the quick-fix bar's one action and the rows
 	// that need attention. Level: "" loads, warning, error, or writing (no verdict).
 	Verdict string          `json:"verdict"`
 	Level   string          `json:"level"`
@@ -177,7 +177,7 @@ type SaveIssueView struct {
 	Details *SaveIssueDetails `json:"details,omitempty"`
 }
 
-// Issue groups (06 §2.11), in the order they show.
+// Issue groups (16 §2.11), in the order they show.
 const (
 	SaveGroupFile = "file"
 	SaveGroupGame = "game"
@@ -295,7 +295,7 @@ func SaveDetailOf(c *app.SaveCheck, running, current bool) *SaveDetail {
 // action: SaveNewList with analyze).
 const SaveFixAnalyse = "new-list-analyse"
 
-// unchecked says what Can it load? could not check (10 §4.6): "defs" when the save's Mods
+// unchecked says what Can it load? could not check (12 §4.6): "defs" when the save's Mods
 // are not analysed for the game version, "classes" when their assemblies (or the game's)
 // are not indexed, "" when everything was checked or nothing needed it.
 func unchecked(c *app.SaveCheck) string {
@@ -318,7 +318,7 @@ func unchecked(c *app.SaveCheck) string {
 	return out
 }
 
-// verdictText is the quick-fix bar's sentence (10 §4.3), with what could not be checked.
+// verdictText is the quick-fix bar's sentence (12 §4.3), with what could not be checked.
 func verdictText(c *app.SaveCheck, gap string) string {
 	v := verdictOf(c)
 	switch gap {
@@ -382,7 +382,7 @@ func fixView(f app.SaveFix, s *app.Save) SaveFixView {
 	return v
 }
 
-// issueViews makes Can it load?'s rows (10 §4.3, 06 §2.11): the Mods that are not
+// issueViews makes Can it load?'s rows (12 §4.3, 16 §2.11): the Mods that are not
 // installed as one row with what they lose together, the others one row each (rows of
 // installed Mods not in the list fold past ModRowsShown), by group: the file, the game,
 // the Mod list.
@@ -556,7 +556,7 @@ func lowerFirst(s string) string {
 	return string(unicode.ToLower(r)) + s[n:]
 }
 
-// issueView is one Can it load? row: its sentence and consequence by kind (10 §4.3).
+// issueView is one Can it load? row: its sentence and consequence by kind (12 §4.3).
 func issueView(is app.SaveIssue, s *app.Save) SaveIssueView {
 	v := SaveIssueView{Kind: is.Kind, Level: is.Level, Group: SaveGroupMods, Fixes: []SaveFixView{}}
 	switch is.Kind {
@@ -676,7 +676,7 @@ func SaveFixText(r *app.SaveFixResult) string {
 	return Tf("%s fixed from %s: ", r.Plan, r.Save.Name) + strings.Join(parts, T(", "))
 }
 
-// SaveFilesPreview is the inline confirmation of Back up or Recycle (06 §6): the files and
+// SaveFilesPreview is the inline confirmation of Back up or Recycle (16 §6): the files and
 // their sizes, then where they go.
 type SaveFilesPreview struct {
 	Title  string   `json:"title"`
@@ -732,7 +732,7 @@ func SaveFilesText(r *app.SaveFilesResult, backup bool) string {
 }
 
 // SaveNameProblem is what is wrong with a new name for s ("" none): empty, path characters,
-// or a save of that name in the folder. Checked while the player types (06 §2.17).
+// or a save of that name in the folder. Checked while the player types (16 §2.17).
 func SaveNameProblem(s *app.Save, name string) string {
 	name = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(name), ".rws"))
 	switch {
@@ -768,8 +768,8 @@ func argQuote(s string) string {
 }
 
 // ModRowsShown is how many rows of installed Mods not in the list Can it load? shows before
-// it folds the rest into one row with one fix (06 §3.1 rule 8): a save of a thousand such
-// Mods stays one screen and within the page's size limits (06 §11 A18). The Mods that are
+// it folds the rest into one row with one fix (16 §3.1 rule 8): a save of a thousand such
+// Mods stays one screen and within the page's size limits (16 §11 A18). The Mods that are
 // not installed are one row already (goneView).
 const ModRowsShown = 4
 

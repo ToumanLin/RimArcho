@@ -7,7 +7,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 )
 
-// RimArcho's own update (07 §5.1): a row in settings › about, a line on the launch
+// RimArcho's own update (17 §5.1): a row in settings › about, a line on the launch
 // page and a quiet notice when a new version is found.
 
 const (
@@ -15,7 +15,7 @@ const (
 	TaskSelfCheck  = "self-check"
 )
 
-// SelfUpdateLine is the launch page's line (06 §2.3): nil when nothing is to install.
+// SelfUpdateLine is the launch page's line (16 §2.3): nil when nothing is to install.
 type SelfUpdateLine struct {
 	Title string `json:"title"` // "RimArcho"
 	Text  string `json:"text"`  // "0.9.1 can be updated"
@@ -29,7 +29,7 @@ func SelfUpdateHome(a *app.App) *SelfUpdateLine {
 	return &SelfUpdateLine{Title: "RimArcho", Text: Tf("%s can be updated", r.Version)}
 }
 
-// SelfUpdateItem is the first row of the About group (06 §2.14): the running
+// SelfUpdateItem is the first row of the About group (16 §2.14): the running
 // version, what the last check found, its notes folded under the row, and the buttons.
 func SelfUpdateItem(a *app.App) SettingItem {
 	cur := a.SelfVersionNow()

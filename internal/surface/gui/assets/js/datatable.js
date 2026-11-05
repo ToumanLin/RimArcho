@@ -1,4 +1,4 @@
-// Shared headers and saved columns for data tables (06 §3.9).
+// Shared headers and saved columns for data tables (16 §3.9).
 import { el, api, T, Tf } from "./state.js";
 import * as pop from "./popups.js";
 
@@ -69,7 +69,7 @@ export function createTable({ key, columns, state = { cols: null, sort: "name", 
     for (const c of cols()) if (!def(c.key).fixed) acts.push({ label: T(def(c.key).title), key: c.shown ? "✓" : "", checked: c.shown, run: () => { c.shown = !c.shown; changed(); } });
     acts.push({ sep: true }, { label: T("reset the columns"), run: () => { state.cols = mergeColumns(defs(), ""); changed(); } });
     if (x == null) { const b = (head.querySelector(".th.on") || head).getBoundingClientRect(); x = b.left; y = b.bottom; }
-    // the header opens it; esc goes back to the rows, where the keys work (06 §3.9)
+    // the header opens it; esc goes back to the rows, where the keys work (16 §3.9)
     pop.menu(x, y, acts, keys, { name: T(d.title), opener: head.querySelector(`[data-k="${k}"]`) || root, back: focusTable });
   }
   function draw(box, th, options = {}) {
@@ -113,7 +113,7 @@ export function createTable({ key, columns, state = { cols: null, sort: "name", 
         const c = cols().find((col) => col.key === d.key);
         const resizing = e.target === rz, x0 = e.clientX, w0 = c.w;
         let moving = false, target, after;
-        // Keep resize clicks targeted at the edge so its double click can restore width (06 §3.9).
+        // Keep resize clicks targeted at the edge so its double click can restore width (16 §3.9).
         (resizing ? rz : cell).setPointerCapture(e.pointerId);
         if (resizing) document.body.classList.add("col-resizing");
         const clear = () => {

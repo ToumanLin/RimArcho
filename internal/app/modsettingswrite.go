@@ -15,7 +15,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Changing Mod settings (06 §2.9 "Mod settings", 01 §4). RimArcho changes only simple values
+// Changing Mod settings (16 §2.9 "Mod settings", 02 §1). RimArcho changes only simple values
 // (on/off, whole numbers, numbers, one line of text, a HugsLib choice) of a Mod's settings
 // file or HugsLib pack, only while no game runs. It first copies the file to
 // <file>.rimarcho.bak (one copy) and writes a temporary file that it renames over the file;

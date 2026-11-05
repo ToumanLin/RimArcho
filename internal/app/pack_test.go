@@ -85,7 +85,7 @@ func TestPackBuildAndLaunch(t *testing.T) {
 
 	e.MustRun("pack", "launch", "first")
 	// Versions is in Mods/ as it was built (the same content): its copy there stands in, so
-	// Mods/ never holds it twice (08 §5.3).
+	// Mods/ never holds it twice (10 §3).
 	links, _ := filepath.Glob(filepath.Join(mods, "!ArchoPack_first_*"))
 	if len(links) != len(p.Entries)-2 {
 		t.Fatalf("K4: %d links for %d carried mods, one of them already in Mods/", len(links), len(p.Entries)-1)

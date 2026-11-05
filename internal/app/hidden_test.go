@@ -124,7 +124,7 @@ func TestHiddenAlone(t *testing.T) {
 	e.Remove(filepath.Join(ws, "About", "About.xml"))
 	e.MustRun("unhide", ref)
 	e.MustRun("enable", refOf(t, e, "Alone", ""))
-	// H6 (06 §2.9 delete): a copy in Mods/ may go to the recycle bin; one a plan uses too (the
+	// H6 (16 §2.9 delete): a copy in Mods/ may go to the recycle bin; one a plan uses too (the
 	// player's word goes): the plan is named, and keeps the entry as missing.
 	mine := refOf(t, e, "Mine", "")
 	if out, code := e.Run("trash", mine, "--dry-run"); code != 0 || !strings.Contains(out, "Mods") || strings.Contains(out, "warning") {

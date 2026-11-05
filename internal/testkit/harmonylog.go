@@ -67,7 +67,7 @@ func (e *Env) HarmonyLogFixture() string {
 	os.Chtimes(e.ModsConfig, e.Now().Add(-time.Hour), e.Now().Add(-time.Hour))
 	e.AddEnv(false)
 	e.MustRun("scan")
-	// RimArcho launched the plan before the session that wrote the log (03 §6.4).
+	// RimArcho launched the plan before the session that wrote the log (06 §4).
 	e.RecordLaunch(e.Now().Add(-30 * time.Minute))
 	log := FixtureLog(filepath.Join(mods, "Compat", "Patches", "Compat.xml"))
 	p := filepath.Join(e.UserData, "Player.log")
@@ -77,7 +77,7 @@ func (e *Env) HarmonyLogFixture() string {
 }
 
 // RecordLaunch records a launch of the current plan at at, as Launch does once the game
-// started: the plan, its list fingerprint and its newest version (08 §1). Nothing starts.
+// started: the plan, its list fingerprint and its newest version (09 §1). Nothing starts.
 func (e *Env) RecordLaunch(at time.Time) {
 	e.T.Helper()
 	st, err := e.App.Loadout()

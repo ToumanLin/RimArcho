@@ -8,7 +8,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// gameProcesses lists the running RimWorld processes (08 §4): executable name starting with
+// gameProcesses lists the running RimWorld processes (09 §4): executable name starting with
 // "rimworld", with full path, start time and, when readable, -savedatafolder.
 func gameProcesses() []*GameRun {
 	return listProcesses(func(name string) bool { return strings.HasPrefix(name, "rimworld") }, true)

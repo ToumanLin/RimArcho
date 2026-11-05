@@ -17,13 +17,13 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/perftrace"
 )
 
-// The window's shell (06 §2.1–§2.3, §2.15): the sidebar, the home page and the first-run
+// The window's shell (16 §2.1–§2.3, §2.15): the sidebar, the home page and the first-run
 // guide's data. The plans are the environment's (plans.go).
 
 // ---- counts ----
 
 // BreakCount is the number of items in Can it run's "Will cause errors" group: the list's own
-// problems, missing dependencies and conflicts (06 §2.4). The home page's state counts it.
+// problems, missing dependencies and conflicts (16 §2.4). The home page's state counts it.
 func BreakCount(n *Needs) int {
 	c := 0
 	for _, it := range n.Items {
@@ -69,7 +69,7 @@ func EnvChip(name, gameVersion string) string {
 	return name
 }
 
-// ---- the sidebar (06 §2.1) ----
+// ---- the sidebar (16 §2.1) ----
 
 // Sidebar page IDs. "plan" is the current plan's editor; a plan's own page is
 // PlanPage(id) and a pack's is "pack:<name>".
@@ -83,12 +83,12 @@ const (
 	PageChanges  = "changes"
 	PageLog      = "log"
 	PageSettings = "settings"
-	PageTextures = "textures" // Texture optimisation (08 §5.2), under Library
-	// PageSubscribe: Mod library › add a subscription (06 §2.9)
+	PageTextures = "textures" // Texture optimisation (10 §2), under Library
+	// PageSubscribe: Mod library › add a subscription (16 §2.9)
 	PageSubscribe = "subscribe"
-	// PageSearch: Mod library › Search files (06 §2.9)
+	// PageSearch: Mod library › Search files (16 §2.9)
 	PageSearch = "search"
-	// PageModSettings: Mod library › Mod settings (06 §2.9 "Mod settings")
+	// PageModSettings: Mod library › Mod settings (16 §2.9 "Mod settings")
 	PageModSettings = "mod-settings"
 )
 
@@ -96,10 +96,10 @@ const (
 type NavItem struct {
 	ID    string    `json:"id"`
 	Label string    `json:"label"`
-	Badge int       `json:"badge,omitempty"` // Can it run: the actionable items (06 §5)
+	Badge int       `json:"badge,omitempty"` // Can it run: the actionable items (16 §5)
 	Key   string    `json:"key,omitempty"`   // shift+1–8
 	Kids  []NavItem `json:"kids,omitempty"`
-	// Mark is a plan's "an outside version has not been loaded" (04 §4.3); Current the current plan (the one
+	// Mark is a plan's "an outside version has not been loaded" (07 §4.3); Current the current plan (the one
 	// launched, listed first); Open the plan being edited; InGame the plan the game's
 	// ModsConfig.xml holds (a small mark when there are several).
 	Mark    string `json:"mark,omitempty"`
@@ -115,7 +115,7 @@ const NavLists = 4
 
 // navPlans picks the sidebar's lists: the current one first, then the others in the order
 // they were last enabled, then the never enabled ones by last use; NavLists at most.
-// Opening a list in the editor does not move it (06 §2.1).
+// Opening a list in the editor does not move it (16 §2.1).
 func navPlans(plans []PlanRow) []PlanRow {
 	rank := func(p PlanRow) int {
 		switch {
@@ -155,7 +155,7 @@ type NavGroup struct {
 func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	// all lists comes first, where every list is and new lists are made; then at most
 	// NavLists lists: the current one, then the others by when they were last enabled.
-	// list itself opens the current list (06 §2.1, §2.17).
+	// list itself opens the current list (16 §2.1, §2.17).
 	// When some are left out, all lists says how many there are.
 	all := T("all lists")
 	if len(plans) > NavLists {
@@ -177,7 +177,7 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	for _, p := range shown {
 		packKids = append(packKids, NavItem{ID: "pack:" + p.Name, Label: p.Name})
 	}
-	// Two groups (06 §2.1): what you play now, and what you have.
+	// Two groups (16 §2.1): what you play now, and what you have.
 	playing := []NavItem{
 		{ID: PageHome, Label: T("start")},
 		{ID: PageNeeds, Label: T("can it run"), Badge: needs},
@@ -186,12 +186,12 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	library := []NavItem{
 		{ID: PagePlan, Label: T("lists"), Kids: planKids},
 		{ID: PagePacks, Label: T("packs"), Kids: packKids},
-		// Saves (06 §2.11), after the packs since 2026-11-04. Its own name: the plain
+		// Saves (16 §2.11), after the packs since 2026-11-04. Its own name: the plain
 		// "saves" key is translated for settings rows; the sidebar's name is longer.
 		{ID: PageSaves, Label: extraName("@nav.saves", "saves")},
-		// Below the packs (2026-10-28). The entry opens All, its first sub-entry (06 §2.9).
+		// Below the packs (2026-10-28). The entry opens All, its first sub-entry (16 §2.9).
 		{ID: PageLibrary, Label: T("mod library"), Kids: []NavItem{{ID: PageLibrary, Label: T("all mods")}, {ID: PageChanges, Label: T("updates")}, {ID: PageSubscribe, Label: T("add a subscription")}, {ID: PageSearch, Label: T("search files")}, {ID: PageModSettings, Label: T("mod settings")}}},
-		// what the game loads faster (08 §5.2)
+		// what the game loads faster (10 §2)
 		{ID: PageTextures, Label: T("texture optimisation")},
 		{ID: PageEnv, Label: T("game")},
 	}
@@ -200,7 +200,7 @@ func Nav(needs int, plans []PlanRow, packs []PackRow) []NavGroup {
 	for g := range groups {
 		for i := range groups[g].Items {
 			if groups[g].Items[i].ID == PageSaves {
-				continue // no shift key: shift+1–8 stay the eight pages the TUI also has (06 §3.5)
+				continue // no shift key: shift+1–8 stay the eight pages the TUI also has (16 §3.5)
 			}
 			n++
 			groups[g].Items[i].Key = fmt.Sprintf("shift+%d", n)
@@ -220,7 +220,7 @@ func extraName(key, en string) string {
 }
 
 // NavPath is where a page sits in the sidebar: the group, the entry and the sub-entry's
-// labels, for the breadcrumb (06 §2.2), with the page each one opens.
+// labels, for the breadcrumb (16 §2.2), with the page each one opens.
 func NavPath(groups []NavGroup, id string) []Crumb {
 	if id == PageSettings {
 		return []Crumb{{Label: T("settings"), ID: PageSettings}}
@@ -250,7 +250,7 @@ type Crumb struct {
 	ID    string `json:"id"`
 }
 
-// ---- the home page (06 §2.3) ----
+// ---- the home page (16 §2.3) ----
 
 // Home row kinds.
 const (
@@ -271,7 +271,7 @@ type HomeRow struct {
 	State       string        `json:"state"` // "2 problems break the game", "ready to play", "not checked yet"
 	Level       string        `json:"level"` // LevelBad, HomeOK, or "" for not checked
 	// Facts: "312 mods"; Mode how its mods change: a plan follows Workshop updates, a pack
-	// keeps its versions (08 §5). Unsaved: the current plan's entries not written to the
+	// keeps its versions (10). Unsaved: the current plan's entries not written to the
 	// game yet (the launch step says so).
 	Facts   string `json:"facts"`
 	Mode    string `json:"mode,omitempty"`
@@ -285,7 +285,7 @@ type HomeRow struct {
 	Current bool   `json:"current,omitempty"`
 	Mark    string `json:"mark,omitempty"`
 	InGame  bool   `json:"inGame,omitempty"`
-	// Links: the current plan's row when a pack's links are left in Mods/ (08 §5.3), the
+	// Links: the current plan's row when a pack's links are left in Mods/ (10 §3), the
 	// sentence of its Can it run item; the launch button's tab shows it.
 	Links string `json:"links,omitempty"`
 	// EnvName is its environment, Versions the game versions it runs on ("1.7"; a pack's
@@ -307,7 +307,7 @@ type Home struct {
 	LastRun       string `json:"lastRun,omitempty"`
 	LastRunDay    string `json:"lastRunDay,omitempty"`
 	LastRunErrors int    `json:"lastRunErrors"`
-	// Changes is the current plan's changes since it was last played (06 §2.3): one
+	// Changes is the current plan's changes since it was last played (16 §2.3): one
 	// sentence that opens Updates with that scope and time.
 	Changes *modchanges.Home `json:"changes,omitempty"`
 	// Featured is the row of what is applied now (PickFeatured): the large card with
@@ -316,13 +316,13 @@ type Home struct {
 	// Launch is the current plan's most likely trouble (Needs.Launch): the tab under the
 	// launch button says it with its reason and opens Can it run. It never blocks.
 	Launch *LaunchHint `json:"launch,omitempty"`
-	// Update is the line about a new RimArcho at the top right (07 §5.1); nil when there is none.
+	// Update is the line about a new RimArcho at the top right (17 §5.1); nil when there is none.
 	Update *SelfUpdateLine `json:"update,omitempty"`
 }
 
 // BuildHome builds the home page: one row per plan of the environment and one per pack.
 // The current plan's state counts its needs; another plan's comes from PlanProblems.
-// Rows go by the last time they were played (launch records, 08 §2); never played ones
+// Rows go by the last time they were played (launch records, 09 §2); never played ones
 // follow by name.
 func BuildHome(a *app.App, b *Board, n *Needs, plans []PlanRow, packs []PackRow) *Home {
 	if b == nil || b.St == nil {
@@ -348,7 +348,7 @@ func BuildHomeFromState(a *app.App, st *app.LoadoutState, n *Needs, plans []Plan
 		r := HomeRow{Kind: RowPlan, Name: p.Name, Env: chip, Played: p.Played, at: p.PlayedAt, Plan: p.ID, Page: p.Page,
 			Current: p.Current, Mark: p.ConflictText, InGame: p.InGame, Facts: Tf("%d mods", p.Entries), Mode: T("follows Workshop updates"),
 			EnvName: name, GameVersion: version, Versions: ver, Mods: p.Entries}
-		// a list says the game versions it allows (04 §1.6, 06 §2.3)
+		// a list says the game versions it allows (07 §1.6, 16 §2.3)
 		if sp, err := a.Store.PlanByID(p.ID); err == nil && sp != nil {
 			if vs := app.FormatVersions(a.PlanAllowedVersions(st, sp)); vs != "" {
 				r.Versions = vs
@@ -393,12 +393,12 @@ func packHomeRow(p PackRow, chip, envName, gameVersion string) HomeRow {
 		r.Facts = Tf("%d mods", p.Mods)
 	}
 	r.Mode = T("versions locked  own saves")
-	// A pack is checked when it is built (08 §5.2): error-level problems refuse it.
+	// A pack is checked when it is built (10 §2): error-level problems refuse it.
 	r.State, r.Level = T("checked when created"), HomeOK
 	return r
 }
 
-// AddOtherEnvs puts the other environments' plans and packs on the home page (06 §2.3):
+// AddOtherEnvs puts the other environments' plans and packs on the home page (16 §2.3):
 // it lists what you play everywhere, not only in the current environment. Lists are
 // shared by every game, so each game lists all of them. Their state comes from
 // PlanProblems like any plan that is not current; nothing is loaded or scanned.
@@ -486,7 +486,7 @@ func SortHome(rows []HomeRow) {
 	})
 }
 
-// ---- the first-run guide (06 §2.15) ----
+// ---- the first-run guide (16 §2.15) ----
 
 // GameFound is a RimWorld install the guide offers as an environment.
 type GameFound struct {
@@ -500,7 +500,7 @@ type GameFound struct {
 	Env string `json:"env,omitempty"`
 }
 
-// FindGames lists the installs detection finds (02 §2.2), each with a free name; the
+// FindGames lists the installs detection finds (03 §3.2), each with a free name; the
 // ones an environment already uses say which.
 func FindGames(a *app.App) []GameFound {
 	envs, _ := a.Store.Envs()
@@ -576,7 +576,7 @@ func AddGames(a *app.App, games []GameFound) ([]string, error) {
 	return out, err
 }
 
-// CreateGames registers installs without scanning or selecting them (06 §8.4).
+// CreateGames registers installs without scanning or selecting them (16 §8.4).
 func CreateGames(a *app.App, games []GameFound) ([]string, error) {
 	var out []string
 	for _, g := range games {
@@ -592,7 +592,7 @@ func CreateGames(a *app.App, games []GameFound) ([]string, error) {
 	return out, nil
 }
 
-// PackImportText says what unpacking a pack did (pack import, 08 §5.4).
+// PackImportText says what unpacking a pack did (pack import, 10 §4).
 func PackImportText(m *app.PackMatch) string {
 	if m == nil || m.Pack == nil {
 		return ""
@@ -603,7 +603,7 @@ func PackImportText(m *app.PackMatch) string {
 	} else {
 		parts = append(parts, T("files not checked (a pack from an older RimArcho)"))
 	}
-	// what differs from this game (08 §5.5); info stays on the pack's page
+	// what differs from this game (10 §5); info stays on the pack's page
 	if c := PackCheckOf(m.Check); c != nil {
 		for _, it := range c.Items {
 			if it.Level == finding.Warning || it.Level == finding.Error {

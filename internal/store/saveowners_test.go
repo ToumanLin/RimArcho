@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-// The batch lookups of save attribution (10 §4.6) start from the name index, then join the
-// version view, as DefsNamed does (03 §3).
+// The batch lookups of save attribution (12 §4.6) start from the name index, then join the
+// version view, as DefsNamed does (05 §3).
 func TestSaveOwnerLookupsStartFromName(t *testing.T) {
 	s, err := Open(filepath.Join(t.TempDir(), "archo.db"))
 	if err != nil {

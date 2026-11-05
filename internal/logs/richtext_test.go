@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// 06 §2.10: Unity rich text in log messages becomes spans; nothing else is markup.
+// 16 §2.10: Unity rich text in log messages becomes spans; nothing else is markup.
 func TestRichSpans(t *testing.T) {
 	cases := []struct {
 		in   string

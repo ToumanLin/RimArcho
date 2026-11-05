@@ -1,4 +1,4 @@
-// G5 (06 §11): from any state of any page, esc brings the page back to its base state in at
+// G5 (16 §11): from any state of any page, esc brings the page back to its base state in at
 // most 3 presses: the same page, nothing selected, no popup, menu or overlay, no open
 // filter (filters applied with the bar closed are the page's own state; a further esc
 // clears them). Run in the dev harness's page (guidev serves this file at /dev/esccheck.js):

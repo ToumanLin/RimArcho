@@ -22,7 +22,7 @@ func TestHintOnlySectionHeading(t *testing.T) {
 
 // worth knowing keeps its name though it holds only hints; what merged into another item and what
 // another page handles are not items of their own; the other page is a faint last line
-// (06 §2.4).
+// (16 §2.4).
 func TestNeedsMergedAndElsewhere(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)

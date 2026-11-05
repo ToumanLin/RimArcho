@@ -15,12 +15,12 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Plans (04 §1): named lists shared by every game; each game has one current list — the
+// Plans (07 §1): named lists shared by every game; each game has one current list — the
 // one it is launched with — and every editing, history and staging command acts on it, or
 // on the list a session opened instead (OpenPlan, --open-plan). Switching writes no game
 // file.
 
-// PlanInfo is a plan with what `plan list` shows (05 §4.3).
+// PlanInfo is a plan with what `plan list` shows (13 §4.3).
 type PlanInfo struct {
 	*store.Plan
 	Current    bool // the environment's current plan: the one launched
@@ -29,12 +29,12 @@ type PlanInfo struct {
 	Versions   int
 	LastPlayed time.Time // zero: never launched
 	// Enabled is the list's place in the enable history: 1 for the most recently enabled,
-	// 0 when never enabled (06 §2.1).
+	// 0 when never enabled (16 §2.1).
 	Enabled int
 }
 
 // CurrentPlan returns the environment's current plan, creating the first one from
-// ModsConfig.xml on first use (04 §1.4).
+// ModsConfig.xml on first use (07 §1.4).
 func (a *App) CurrentPlan() (*store.Plan, error) {
 	st, err := a.Loadout()
 	if err != nil {
@@ -81,7 +81,7 @@ func (a *App) enableRanks() map[int64]int {
 
 // PlansIn lists every plan with another game's current one marked, without loading that
 // game: each list's length comes from its workspace (the home page lists every game, and
-// lists are shared by all of them, 06 §2.3).
+// lists are shared by all of them, 16 §2.3).
 func (a *App) PlansIn(envID string) ([]*PlanInfo, error) {
 	ps, err := a.Store.Plans()
 	if err != nil {
@@ -166,14 +166,14 @@ type NewPlanResult struct {
 	// installed mod has (they are not in the list).
 	Imported   *ImportedList
 	Unresolved []string
-	// Monitor says what the Archo Monitor default did to the new plan (04 §1.5): "" or
+	// Monitor says what the Archo Monitor default did to the new plan (07 §1.5): "" or
 	// "added after Harmony", one undoable edit after v1.
 	Monitor string
 }
 
 var versionArgRe = regexp.MustCompile(`^[vV]?\d+$`)
 
-// NewPlan creates a plan in the current environment (04 §1.3) from an empty list (from ""),
+// NewPlan creates a plan in the current environment (07 §1.3) from an empty list (from ""),
 // the current plan ("current"), one of its versions ("v<n>"), or a list file. Its first
 // version has source import and a note saying where it came from. The current plan stays.
 func (a *App) NewPlan(name, from string) (*NewPlanResult, error) {
@@ -245,7 +245,7 @@ func (a *App) NewPlan(name, from string) (*NewPlanResult, error) {
 	return &NewPlanResult{Plan: p, List: list, Version: v, State: st, Imported: il, Unresolved: unresolved, Monitor: mon}, nil
 }
 
-// ImportLoadoutAsPlan imports a list file (or share code) as a new plan (04 §9.1 "import
+// ImportLoadoutAsPlan imports a list file (or share code) as a new plan (07 §7.1 "import
 // as a new plan"); name "" takes the list's own name, else the file name. The current plan
 // stays.
 func (a *App) ImportLoadoutAsPlan(path, name string) (*NewPlanResult, error) {
@@ -274,7 +274,7 @@ func (a *App) ImportLoadoutAsPlan(path, name string) (*NewPlanResult, error) {
 }
 
 // NewPlanFromImport creates a plan from a list an interface already read and previewed
-// (a file, pasted text, a share code, a Workshop collection; 04 §9.1 "import as a new
+// (a file, pasted text, a share code, a Workshop collection; 07 §7.1 "import as a new
 // plan"). source is its v1's note. The current plan stays.
 func (a *App) NewPlanFromImport(name string, il *ImportedList, source string) (*NewPlanResult, error) {
 	unlock, err := a.lockLaunch()
@@ -345,7 +345,7 @@ func (a *App) createPlan(envID, name string, list loadout.List, v *store.Version
 }
 
 // UsePlan makes a plan current: the one launched, and the one this session edits. It
-// writes no game file (04 §1.3).
+// writes no game file (07 §1.3).
 func (a *App) UsePlan(name string) (*store.Plan, error) {
 	st, err := a.Loadout()
 	if err != nil {
@@ -364,7 +364,7 @@ func (a *App) UsePlan(name string) (*store.Plan, error) {
 
 // OpenPlanID makes this session show and edit a plan without making it current: the game
 // keeps being launched with the current one until the player chooses this one, writes it
-// to the game or launches it (04 §1.3). Opening the current plan clears the override.
+// to the game or launches it (07 §1.3). Opening the current plan clears the override.
 func (a *App) OpenPlanID(id int64) (*store.Plan, error) {
 	e, err := a.Env()
 	if err != nil {

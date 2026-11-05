@@ -7,7 +7,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 06 §2.14: the settings page has the game log group with the monitor.default switch.
+// 16 §2.14: the settings page has the game log group with the monitor.default switch.
 func TestSettingsMonitor(t *testing.T) {
 	t.Parallel()
 	e, _, _ := shellEnv(t)

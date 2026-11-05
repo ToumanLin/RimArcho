@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
-// Community data (04 §6.3).
+// Community data (08 §2.3).
 func init() {
 	keys := make([]string, 0, len(app.Datasets))
 	for _, d := range app.Datasets {

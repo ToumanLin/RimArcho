@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// updates (06 §2.9, §9.1): three simple lists. 1 the sources (enter checks one, K every
+// updates (16 §2.9, §9.1): three simple lists. 1 the sources (enter checks one, K every
 // one with mods); 2 the updates waiting for the player (u updates one, U every one shown —
 // the dry run first, then a background task, refused while a game runs; Del removes the
 // subscription; p locks this version first; ctrl+w opens the source page); 3 the change
@@ -95,7 +95,7 @@ func (c *chState) build() {
 				}
 			}
 		}
-		add("2 "+T("waiting for you to update"), chHead) // the window's names (06 §2.9)
+		add("2 "+T("waiting for you to update"), chHead) // the window's names (16 §2.9)
 		for i := range c.subscriptions.Pending {
 			r := &c.subscriptions.Pending[i]
 			c.rows = append(c.rows, chRow{text: "  " + r.Name + "  " + r.Source + "  " + r.Installed + " → " + r.Available + "  " + strings.Join(r.UsedIn, ", "), kind: chPending, pend: r, key: "pend:" + r.ID})
@@ -499,7 +499,7 @@ func (c *chState) shownPending() []view.PendingUpdate {
 }
 
 // changesPairs: the hint line of updates — what the cursor's row can do, then the page's
-// own keys (06 §2.9 keys).
+// own keys (16 §2.9 keys).
 func (m *model) changesPairs() [][2]string {
 	c := &m.chg
 	var r *chRow

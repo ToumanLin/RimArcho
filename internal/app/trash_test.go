@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
-// H8: the recycle bin's entry refuses any path outside the allow-list of 08 §7, whoever
+// H8: the recycle bin's entry refuses any path outside the allow-list of 02 §3, whoever
 // calls it; paths on the list reach the recycle bin.
 func TestTrashAllowList(t *testing.T) {
 	t.Parallel()

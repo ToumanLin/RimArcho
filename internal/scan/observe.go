@@ -1,5 +1,5 @@
 // Package scan enumerates source roots and records one observation per mod folder:
-// location, declarations, external state and layered content fingerprint (02 §4).
+// location, declarations, external state and layered content fingerprint (04 §1).
 package scan
 
 import (
@@ -22,11 +22,11 @@ type Origin struct {
 	WorkshopID   string `json:"workshop_id,omitempty"`
 	SnapshotHash string `json:"origin_snapshot,omitempty"`
 	CopiedAt     string `json:"copied_at,omitempty"`
-	// Textures: a pack's copy whose PNGs were converted to DDS ("dds", "dds 50%"; 08 §5.2).
+	// Textures: a pack's copy whose PNGs were converted to DDS ("dds", "dds 50%"; 10 §2).
 	Textures string `json:"textures,omitempty"`
 }
 
-// UnloadableAboutDisabled marks a folder with only About/About.xml.disabled (02 §4.2).
+// UnloadableAboutDisabled marks a folder with only About/About.xml.disabled (04 §1.2).
 const UnloadableAboutDisabled = "about-disabled"
 
 // OriginFile is the marker's path relative to a mod folder.
@@ -48,7 +48,7 @@ func (l Location) Key() string { return LocKey(l.SourceID, l.Rel) }
 // LocKey builds a location key.
 func LocKey(sourceID, rel string) string { return sourceID + "\x00" + strings.ToLower(rel) }
 
-// Observation is everything one scan learned about one mod folder (02 §4.3).
+// Observation is everything one scan learned about one mod folder (04 §1.3).
 type Observation struct {
 	Loc        Location
 	Aliases    []Location // other locations resolving to the same real directory

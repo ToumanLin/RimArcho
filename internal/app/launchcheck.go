@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/finding"
 )
 
-// LaunchCheck is one row of the pre-launch list (08 §2): a problem code whose mods were error
+// LaunchCheck is one row of the pre-launch list (09 §2): a problem code whose mods were error
 // sources in the game's log much more often than chance in the log corpus (decisions-corpus
 // §3, G4/G8). The list never blocks a launch; it says what is likely to go wrong and what to do.
 //
@@ -130,7 +130,7 @@ func count(n int, one, many string) string {
 }
 
 // StrengthPrefix starts the evidence line that gives an order.violated finding its
-// constraint strength (04 §5.3): "constraint strength: strong|weak|harmless".
+// constraint strength (08 §1.3): "constraint strength: strong|weak|harmless".
 const StrengthPrefix = "constraint strength: "
 
 // Strength is the constraint strength an order.violated problem carries ("" for other codes).

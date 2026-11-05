@@ -215,7 +215,7 @@ func TestEnableMoveSortSaveUndo(t *testing.T) {
 	tm := start(t, e, scans, 160, 40)
 	waitFor(t, tm, "Enabled 3")
 	// Enabled is focused; h goes to "Disabled", where a filter finds Beta. space enables it
-	// where the order wants it: the end, nothing constrains it (06 §3.5).
+	// where the order wants it: the end, nothing constrains it (16 §3.5).
 	keys(tm, "h", "/", "Beta", "enter", "space")
 	waitFor(t, tm, "placed at position 4, m changes it")
 	if got := activeNames(t, e); got != "Core, Alpha, Harmony, Beta" {
@@ -231,7 +231,7 @@ func TestEnableMoveSortSaveUndo(t *testing.T) {
 	if got := activeNames(t, e); got != "Core, Alpha, Harmony, Beta" {
 		t.Fatalf("after undo: %s", got)
 	}
-	// S, w and L act at once and say what they did (06 §6); sort offers u.
+	// S, w and L act at once and say what they did (16 §6); sort offers u.
 	keys(tm, "S")
 	waitFor(t, tm, "sorted: 1 moved, strong requirements put right: 1, u undoes")
 	if got := activeNames(t, e); got != "Core, Harmony, Alpha, Beta" {
@@ -242,7 +242,7 @@ func TestEnableMoveSortSaveUndo(t *testing.T) {
 	if !strings.Contains(e.ReadModsConfig(), "<li>tester.b</li>") {
 		t.Fatal("save did not write the list")
 	}
-	keys(tm, "L") // Start first (06 §2.5), then L there launches
+	keys(tm, "L") // Start first (16 §2.5), then L there launches
 	waitFor(t, tm, T("launch the game"))
 	keys(tm, "L")
 	waitFor(t, tm, "the game is starting")
@@ -277,7 +277,7 @@ func TestRescanRunsOutOfProcessAndCommandLine(t *testing.T) {
 	}
 }
 
-// 06 §11 T2 and T3: 160, 130, 100 and 78 columns degrade as §5.1 says, every line fits,
+// 16 §11 T2 and T3: 160, 130, 100 and 78 columns degrade as 16 §2.5 says, every line fits,
 // CJK names are cut on whole characters, and every list operation still works.
 func TestBreakpointsAndCJK(t *testing.T) {
 	e, _ := fixture(t)
@@ -388,7 +388,7 @@ func TestBreakpointsAndCJK(t *testing.T) {
 	}
 }
 
-// 06 §11 T9: 20 mods into staging (picked with v, one t), then T: all back in place.
+// 16 §11 T9: 20 mods into staging (picked with v, one t), then T: all back in place.
 func TestStagingT9(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
@@ -406,7 +406,7 @@ func TestStagingT9(t *testing.T) {
 	press(m, "home")
 	press(m, "down") // M01
 	for i := 0; i < 26; i++ {
-		if i%4 != 3 { // picks 20 of 26; ctrl+↓ moves the cursor alone (06 §3.4)
+		if i%4 != 3 { // picks 20 of 26; ctrl+↓ moves the cursor alone (16 §3.4)
 			press(m, "v")
 		}
 		press(m, "ctrl+down")
@@ -428,7 +428,7 @@ func TestStagingT9(t *testing.T) {
 	}
 }
 
-// 06 §3.4: a click moves the cursor (and focus), ctrl+click picks one more, shift+click
+// 16 §3.4: a click moves the cursor (and focus), ctrl+click picks one more, shift+click
 // picks a range; there is no drag-to-move; the wheel scrolls.
 func TestMouseClicks(t *testing.T) {
 	t.Parallel()
@@ -471,7 +471,7 @@ func TestMouseClicks(t *testing.T) {
 	if names := pickedNames(m); names != "N2 N4 N5" || m.current().name != "Beta" {
 		t.Fatalf("plain click: %q on %s", names, m.current().name)
 	}
-	// A click in another list moves the focus there and drops the selection (06 §3.4).
+	// A click in another list moves the focus there and drops the selection (16 §3.4).
 	click(xOf(cActive), 5, false, false)
 	if len(m.marked) != 0 || m.focus != cActive || m.current().name != "Alpha" {
 		t.Fatalf("click in Enabled: selected %d, %+v", len(m.marked), m.current())
@@ -479,7 +479,7 @@ func TestMouseClicks(t *testing.T) {
 	if got := activeNames(t, e); got != "Core, Alpha, Harmony" {
 		t.Fatalf("a click changed the list: %s", got)
 	}
-	// The wheel scrolls the detail wherever it is; the cursor and the focus stay (06 §3.3).
+	// The wheel scrolls the detail wherever it is; the cursor and the focus stay (16 §3.3).
 	m.update(tea.MouseMsg{X: xOf(cActive), Y: 6, Button: tea.MouseButtonWheelDown, Action: tea.MouseActionPress})
 	if m.cols[cActive].cursor != 1 || m.focus != cActive || m.detailFocus || m.detailOff != 3 {
 		t.Fatalf("wheel: cursor %d, focus %d/%v, detail scrolled %d", m.cols[cActive].cursor, m.focus, m.detailFocus, m.detailOff)
@@ -515,7 +515,7 @@ func TestEnvSwitchAndInspect(t *testing.T) {
 	}
 }
 
-// 06 §2.14: E, then d on an environment: the dry run, enter removes it; the other one is
+// 16 §2.14: E, then d on an environment: the dry run, enter removes it; the other one is
 // then in use.
 func TestEnvRemoveFromChooser(t *testing.T) {
 	t.Parallel()
@@ -560,7 +560,7 @@ func TestChineseUI(t *testing.T) {
 			t.Fatalf("line wider than the terminal (%d): %q", w, l)
 		}
 	}
-	// Command output stays English (05 §1.1).
+	// Command output stays English (13 §1.1).
 	if out, _ := cmds.Execute(e.App, []string{"status"}); !strings.Contains(out, "lineages:") {
 		t.Fatalf("status output changed: %s", out)
 	}
@@ -584,7 +584,7 @@ func findNeed(m *model, sub string) int {
 	return -1
 }
 
-// 06 §5: a cycle of order requirements is one item in "this list"; enter shows the
+// 16 §5: a cycle of order requirements is one item in "this list"; enter shows the
 // requirements and the automatic resolution in words; a dependency that is installed but
 // not enabled is one item in "missing dependencies" that space enables.
 func TestNeedsView(t *testing.T) {
@@ -668,7 +668,7 @@ func countedNeeds(m *model) int {
 	return n
 }
 
-// 06 §2.9: changes are a sentence on the status line after a scan and the c view, in
+// 16 §2.9: changes are a sentence on the status line after a scan and the c view, in
 // words; an outside change of ModsConfig.xml is an item of Can it run with load / ignore.
 func TestChangesView(t *testing.T) {
 	t.Parallel()
@@ -712,7 +712,7 @@ func TestChangesView(t *testing.T) {
 	}
 }
 
-// 06 §2.4, §7.3: the current log's errors are one item per mod under "last run"; a stale
+// 16 §2.4, §7.3: the current log's errors are one item per mod under "last run"; a stale
 // log is one dim row that is not counted.
 func TestNeedsLogs(t *testing.T) {
 	t.Parallel()
@@ -756,7 +756,7 @@ func TestNeedsLogs(t *testing.T) {
 	}
 }
 
-// 06 §7: every icon of both sets is one cell wide for RimArcho's width function.
+// 16 §7: every icon of both sets is one cell wide for RimArcho's width function.
 func TestIconWidths(t *testing.T) {
 	t.Parallel()
 	for name, set := range map[string]icons{"nerd": nerdIcons, "compat": compatIcons} {
@@ -799,7 +799,7 @@ func TestWrap(t *testing.T) {
 	}
 }
 
-// 06 §3.7 on the fixture: every field, negation, AND, the per-column query, the fallback.
+// 16 §3.7 on the fixture: every field, negation, AND, the per-column query, the fallback.
 func TestColumnSearch(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)
@@ -819,7 +819,7 @@ func TestColumnSearch(t *testing.T) {
 		return strings.Join(out, ",")
 	}
 	all := func(q string) string {
-		m.bar.search = q // the filter bar filters Not enabled and Enabled together (06 §2.5)
+		m.bar.search = q // the filter bar filters Not enabled and Enabled together (16 §2.5)
 		m.barChanged()
 		return names(cActive) + " | " + names(cInactive)
 	}
@@ -875,7 +875,7 @@ func TestColumnSearch(t *testing.T) {
 	}
 }
 
-// 06 §6: L loads an outside change of ModsConfig.xml into the list at once; it is one
+// 16 §6: L loads an outside change of ModsConfig.xml into the list at once; it is one
 // step, so u brings the player's list back.
 func TestLoadExternalAtOnce(t *testing.T) {
 	t.Parallel()

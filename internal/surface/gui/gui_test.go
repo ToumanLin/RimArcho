@@ -13,7 +13,7 @@ import (
 
 var textRe = regexp.MustCompile(`\bTf?\("((?:[^"\\]|\\.)*)"`)
 
-// Every string the page translates has a Chinese entry (06 §7; the page has no table of
+// Every string the page translates has a Chinese entry (16 §7; the page has no table of
 // its own: it gets view.Table and view.ExtraText).
 func TestPageTextTranslated(t *testing.T) {
 	view.SetLang("zh")
@@ -52,7 +52,7 @@ func compactStrings(s []string) []string {
 }
 
 // ui.gpu off adds the software-drawing switches; both keep the network service in the
-// browser process and one renderer (07 §8.3).
+// browser process and one renderer (17 §7.3).
 func TestBrowserArgs(t *testing.T) {
 	t.Parallel()
 	on, off := strings.Join(BrowserArgs(true), " "), strings.Join(BrowserArgs(false), " ")

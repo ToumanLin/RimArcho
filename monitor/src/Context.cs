@@ -4,7 +4,7 @@ using System.Text;
 
 namespace ArchoMonitor
 {
-    // Context is what one entry knows besides its text (03 §6.7.3): the mods and how each was
+    // Context is what one entry knows besides its text (06 §7.3): the mods and how each was
     // found, files, references and the inferred type.
     internal sealed class Context
     {
@@ -61,7 +61,7 @@ namespace ArchoMonitor
     internal static class Normalize
     {
         // Fingerprint: hex addresses → <HEX>, digit runs → <NUM>, whitespace runs → one space,
-        // lower case (03 §6.7.3). Hand-written: it runs once per distinct message.
+        // lower case (06 §7.3). Hand-written: it runs once per distinct message.
         internal static string Fingerprint(string m)
         {
             if (string.IsNullOrEmpty(m))

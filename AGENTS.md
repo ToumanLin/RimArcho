@@ -16,9 +16,9 @@ RimArcho: a RimWorld launcher and Mod manager written in Go. `RimArcho.exe` is t
 
 ## Performance
 
-Pages must load quickly and use little memory. Requirements and thresholds: 06 §10; measured baselines: 07 §6.
+Pages must load quickly and use little memory. Requirements and thresholds: 16 §10; measured baselines: 18.
 
 ## Tests
 
 - `go test -count=1 ./...` (`-count=1` skips the test cache, whose file-access recording is slow on Windows), `node --test "scripts/vm/*.test.mjs" "feedback-relay/*.test.mjs"`.
-- Automated tests use only synthetic data (`internal/testkit`). Touch real games, Mods and `%APPDATA%\RimArcho` only inside the VM ([scripts/vm/README.md](scripts/vm/README.md); safety rules: 07 §4).
+- Automated tests use only synthetic data (`internal/testkit`). Touch real games, Mods and `%APPDATA%\RimArcho` only inside the VM ([scripts/vm/README.md](scripts/vm/README.md); safety rules: 17 §4).
