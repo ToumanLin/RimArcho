@@ -109,7 +109,7 @@ Every object has stable references that can appear in any output and can be pass
 
 ### 3.2 Detail Levels
 
-- The default output is a summary. `--all` removes truncation; for findings, it also removes collapsing and shows categories hidden by default. `--detail` expands the original evidence, such as XML or log snippets.
+- The default output is a summary. `--all` removes truncation; for findings, it also removes collapsing and shows categories hidden by default, except that more than 30 info findings are listed by code (03 §4.5). `--detail` expands the original evidence, such as XML or log snippets.
 - `problems --ref` and problems show open the same focused details; MCP `list_problems ref=` returns identical text. Providers of missing parent templates are looked up on demand (03 §4.3), with a bounded, cancellable wait. Show the impact, enable commands, and subscription candidates first, omitting an empty `fixes:` section. For unresolved templates, show `providers:` to indicate an incomplete lookup or that no installed provider defines them. Then list the affected content with its file:line; use a separate evidence section only for other notes. Group unignored items from the same Mod, but check ignored items individually. Limit the sections by default; `--ref … --all` expands repair and ignore commands. See 03 §4.3 for provider and log conditions. Inactive targets and known errors also lead with their impact and available actions. Details omit the identity, file, Workshop, and history lists from the Mod card; mod remains the complete card.
 - The default finding display, including collapsing, hiding, and stale-log counts, follows 03 §4.5. When findings are hidden by default, the line `hidden: N def.override, M patch.contested` explains them.
 

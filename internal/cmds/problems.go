@@ -262,6 +262,36 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if len(skips) > 0 {
 		folds = append(folds, fold{sevRank(skips[0].Severity), skipSummary(skips)})
 	}
+	// --all with many info rows: one row per code (MCP review round 2 P12: 20–25 KB results
+	// of 137 info rows that no agent used). --code or --severity info lists them.
+	if a.Bool("all") && code == "" && sev == "" {
+		var info []*app.Problem
+		for _, p := range sel {
+			if p.Severity == finding.Info {
+				info = append(info, p)
+			}
+		}
+		if len(info) > infoFoldLimit {
+			byCode := map[string]int{}
+			var codes []string
+			keep := sel[:0:0]
+			for _, p := range sel {
+				if p.Severity != finding.Info {
+					keep = append(keep, p)
+					continue
+				}
+				if byCode[p.Code] == 0 {
+					codes = append(codes, p.Code)
+				}
+				byCode[p.Code]++
+			}
+			sel = keep
+			sort.Strings(codes)
+			for _, k := range codes {
+				folds = append(folds, fold{sevRank(finding.Info), fmt.Sprintf("info %s  %d problems  (archo problems --code %s; MCP: list_problems code=%s)", k, byCode[k], k, k)})
+			}
+		}
+	}
 	sort.SliceStable(folds, func(i, j int) bool { return folds[i].rank < folds[j].rank })
 	flush := func(rank int) {
 		for len(folds) > 0 && folds[0].rank <= rank {
@@ -422,6 +452,9 @@ func contains(l []string, s string) bool {
 	}
 	return false
 }
+
+// infoFoldLimit: above this many info rows, --all lists info by code (P12).
+var infoFoldLimit = 30
 
 // addModProblems adds the "content:" and "problems:" lines of `archo mod` (05 §3.4). It
 // uses the stored analysis as is (no rebuild).
