@@ -191,7 +191,7 @@ func TestSavesFullReadPage(t *testing.T) {
 		t.Fatalf("detail play %+v reading %v note %q", pl, d.Reading, d.PlayNote)
 	}
 	if pl.Day != "day 3" || pl.Date == "" || pl.Storyteller != "Cassandra Classic" || pl.Difficulty != "strive to survive" ||
-		pl.Played != "3.4 h" || pl.Since != "Landing" {
+		pl.Played != "3h 25m" || pl.Since != "Landing" {
 		t.Fatalf("play head %+v", pl)
 	}
 	stats := map[string]string{}

@@ -17,7 +17,7 @@ import (
 // SavePlay is the playthrough at one save.
 type SavePlay struct {
 	Day         string `json:"day"`            // "day 214"
-	Date        string `json:"date,omitempty"` // "Aprimay 5, 5502"
+	Date        string `json:"date,omitempty"` // "5th of Aprimay, 5502", as the game writes it
 	Storyteller string `json:"storyteller,omitempty"`
 	Difficulty  string `json:"difficulty,omitempty"`
 	Played      string `json:"played,omitempty"` // real play time
@@ -115,7 +115,7 @@ func SavePlayOf(s *app.Save, f *savefile.Facts, prevSave *app.Save, prev *savefi
 		Stats: []SaveStat{}, Colonists: []SaveColonist{}, Events: []SaveEvent{}}
 	if f.TicksGame > 0 || f.GameStartAbsTick > 0 {
 		y, q, d := f.Date()
-		p.Date = Tf("%[2]s %[1]d, %[3]d", d, quadrumName(q), y)
+		p.Date = Tf("%[1]d%[2]s of %[3]s, %[4]d", d, ordinal(d), quadrumName(q), y)
 	}
 	if prev != nil && prevSave != nil {
 		p.Since = prevSave.Name
@@ -229,17 +229,35 @@ func numText(v float64, compact bool) string {
 	return strconv.FormatFloat(math.Round(v/100_000)/10, 'f', -1, 64) + "M"
 }
 
-// playedText is real play time: "38 min", "3.5 h", "52 h".
+// playedText is real play time as saves show writes it: "3h 25m", "25m", "under a
+// minute".
 func playedText(sec float64) string {
+	m := int(sec / 60)
 	switch {
 	case sec <= 0:
 		return ""
-	case sec < 3600:
-		return Tf("%d min", max(1, int(math.Round(sec/60))))
-	case sec < 36000:
-		return Tf("%s h", strconv.FormatFloat(math.Round(sec/360)/10, 'f', -1, 64))
+	case m < 1:
+		return T("under a minute")
+	case m < 60:
+		return Tf("%dm", m)
 	}
-	return Tf("%s h", strconv.Itoa(int(math.Round(sec/3600))))
+	return Tf("%dh %02dm", m/60, m%60)
+}
+
+// ordinal is the English suffix of a day of the quadrum ("st", "nd", "rd", "th").
+func ordinal(n int) string {
+	if n%100 >= 11 && n%100 <= 13 {
+		return "th"
+	}
+	switch n % 10 {
+	case 1:
+		return "st"
+	case 2:
+		return "nd"
+	case 3:
+		return "rd"
+	}
+	return "th"
 }
 
 // The vanilla storytellers' and difficulties' names as the game shows them; a Mod's are

@@ -62,8 +62,8 @@ func TestSavePlayOf(t *testing.T) {
 	}
 
 	p := view.SavePlayOf(sel, f, prevSave, prev)
-	if p.Day != "day 40" || p.Date != "Decembary 1, 5500" || p.Storyteller != "Kiiro_Storyteller" || p.Difficulty != "losing is fun  commitment mode" ||
-		p.Played != "25 min" || p.Since != "Save 3" || p.Note == "" {
+	if p.Day != "day 40" || p.Date != "1st of Decembary, 5500" || p.Storyteller != "Kiiro_Storyteller" || p.Difficulty != "losing is fun  commitment mode" ||
+		p.Played != "25m" || p.Since != "Save 3" || p.Note == "" {
 		t.Fatalf("head %+v", p)
 	}
 	var stats []string
