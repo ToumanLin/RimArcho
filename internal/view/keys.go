@@ -212,10 +212,10 @@ func KeyHelp(page string, tui bool) []KeyRow {
 	}
 	if page == PageSaves && !tui { // Saves (06 §2.11); the TUI has the saves commands
 		out = append(out,
-			r("/", "search colonies, saves and Mods; esc clears it"),
+			r("/", "search colonies and saves; esc clears it"),
 			r("↑↓", "the previous / next save in the tree"),
 			r("← →", "fold / unfold the colony"),
-			r("enter", "the quick fix: fix and launch, launch, recycle or make a list"),
+			r("enter", "the quick fix: launch, recycle or make a list (and analyse it when the save's Mods are not)"),
 			r("F2", "rename the save"),
 		)
 	}

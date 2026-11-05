@@ -1,8 +1,9 @@
-// Library › Saves (06 §2.11, 10 §4). Three cards, the gaps drag (06 §3.1 rule 10):
-// left the colonies, each opening to its saves as a tree (search on top, `/`); middle the
-// selected save: where it belongs, Can it load? with its quick fix and one row per problem,
-// and its Mod list; right the playthrough, whose facts come with the full read of the save
-// (10 §1.7 L1): skeletons until it is read. The listing reads every save's head, which can
+// Library › Saves (06 §2.11, 10 §4). Three cards numbered 1–3, the gaps drag (06 §3.1 rule
+// 10): left the colonies, each opening to its saves as a tree, under the search's own card
+// (`/`); middle the selected save: where it belongs, Can it load? with its quick fix and its
+// rows by group (the file, the game, the Mod list), and the whole Mod list; right the
+// playthrough, whose facts come with the full read of the save (10 §1.7 L1): skeletons
+// until it is read. The listing reads every save's head, which can
 // take a while on a cold library, so it arrives as a "saves" event (06 §8.4); the full read
 // runs as a background task and its news arrives as "saves-read" events.
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
@@ -20,16 +21,14 @@ let ui = null;
 export function initSaves(u) { ui = u; }
 
 // page: the listing; sel: the selected save's ref; open: the colonies shown open; q: the
-// search, hits: the colonies whose Mods match it (from Go); detail: the middle and right
-// cards' data (for detail.ref); ask: the inline confirmation shown (backup or recycle);
-// renaming: the rename field is open; shown: how many of the Mod list's rows show (0: the
-// first MODS; Show all adds STEP at a time, so a save of a thousand Mods stays within the
-// page's size limits, 06 §11 A18).
-const X = { page: null, sel: "", open: new Set(), q: "", hits: new Set(), detail: null, ask: null, renaming: false, shown: 0,
-  listSeq: 0, detailSeq: 0, searchSeq: 0, busy: false };
-let leftCard = null, midCard = null, rightCard = null, tree = null, input = null, timer = 0, searchTimer = 0;
+// search (colony and save names); detail: the middle and right cards' data (for
+// detail.ref); ask: the inline confirmation shown (backup or recycle); renaming: the rename
+// field is open; viewing: the rows whose details View opened (by kind).
+const X = { page: null, sel: "", open: new Set(), q: "", detail: null, ask: null, renaming: false, viewing: new Set(),
+  listSeq: 0, detailSeq: 0, busy: false };
+let leftCard = null, midCard = null, rightCard = null, tree = null, input = null, timer = 0, mods = null;
 const waiting = new Map(); // listing request → its resolve
-const MODS = 24, STEP = 200;
+const ROW = 24; // a Mod list row's height: the list mounts only the rows in view (06 §11 A18)
 
 on("saves", (ev) => {
   const w = waiting.get(ev?.request);
@@ -38,6 +37,8 @@ on("saves", (ev) => {
   w(ev);
 });
 on("saves-read", (ev) => news(ev || {}));
+// a list made from a save to analyse it: the save is checked again with what it indexed
+on("analyze", (ev) => { if (ev?.done && S.screen === "saves" && X.detail && !X.detail.loading) showDetail(0); });
 
 // news is the full read's progress (06 §2.11 "Loading"): the status line while the page
 // is open (never over a failure or a message with its undo), rows with their day and
@@ -149,13 +150,13 @@ function build() {
     return;
   }
   const grid = el("div", "sv");
-  leftCard = el("section", "card sv-left");
-  const search = el("label", "sv-search");
-  const si = el("span", "ic"); si.innerHTML = icon.search || "";
+  // the search is a card of its own above the tree, unnumbered: `/` reaches it
+  const leftCol = el("div", "sv-leftcol");
+  const search = el("label", "card sv-find");
   input = el("input", "sv-q");
   input.type = "search";
-  input.placeholder = T("search colonies, saves, Mods");
-  input.setAttribute("aria-label", T("search colonies, saves, Mods"));
+  input.placeholder = T("search colonies and saves");
+  input.setAttribute("aria-label", T("search colonies and saves"));
   input.value = X.q;
   input.autocomplete = "off"; input.spellcheck = false;
   input.oninput = () => setQuery(input.value);
@@ -164,29 +165,33 @@ function build() {
     else if (e.key === "ArrowDown" || e.key === "Enter") { e.preventDefault(); e.stopPropagation(); focusTree(); }
     else e.stopPropagation(); // typing is not a page key
   };
-  search.append(si, input, el("kbd", "", "/"));
+  search.append(input, el("kbd", "", "/"));
+  leftCard = el("section", "card sv-left");
+  const treeHead = el("div", "sv-cardhead");
+  treeHead.append(el("span", "", T("colonies")));
   tree = el("div", "sv-tree");
   tree.setAttribute("role", "tree");
   tree.setAttribute("aria-label", T("colonies and their saves"));
   tree.tabIndex = 0;
-  leftCard.append(search, tree);
+  leftCard.append(treeHead, tree);
+  leftCol.append(search, leftCard);
   const gap1 = el("div", "split sv-split");
   midCard = el("section", "card sv-mid");
   const gap2 = el("div", "split sv-split");
   rightCard = el("section", "card sv-right");
-  grid.append(leftCard, gap1, midCard, gap2, rightCard);
+  grid.append(leftCol, gap1, midCard, gap2, rightCard);
   w.append(grid);
   sc.append(w);
   const setVar = (name) => (v) => { if (v) grid.style.setProperty(name, v + "px"); else grid.style.removeProperty(name); };
   const leftRange = () => [200, Math.max(200, Math.min(480, grid.clientWidth - 640))];
   wireSeparator(gap1, { key: "ui.gui.saves.left", range: leftRange,
-    get: () => leftCard.getBoundingClientRect().width, set: setVar("--sv-left"), reset: () => setVar("--sv-left")(0),
+    get: () => leftCol.getBoundingClientRect().width, set: setVar("--sv-left"), reset: () => setVar("--sv-left")(0),
     restore: (v) => setVar("--sv-left")(+v ? Math.max(leftRange()[0], Math.min(leftRange()[1], +v)) : 0) });
-  const rightRange = () => [260, Math.max(260, grid.clientWidth - leftCard.getBoundingClientRect().width - 380)];
+  const rightRange = () => [260, Math.max(260, grid.clientWidth - leftCol.getBoundingClientRect().width - 380)];
   wireSeparator(gap2, { key: "ui.gui.saves.right", direction: -1, range: rightRange,
     get: () => rightCard.getBoundingClientRect().width, set: setVar("--sv-right"), reset: () => setVar("--sv-right")(0),
     restore: (v) => setVar("--sv-right")(+v ? Math.max(rightRange()[0], Math.min(rightRange()[1], +v)) : 0) });
-  area(leftCard, null, () => focusTree());
+  area(leftCard, treeHead, () => focusTree());
   area(midCard, null, () => midCard.querySelector(".sv-body")?.focus({ preventScroll: true }));
   area(rightCard, null, () => rightCard.querySelector(".sv-body")?.focus({ preventScroll: true }));
   tree.onclick = (e) => {
@@ -209,24 +214,12 @@ function focusTree() {
 // ---- left: colonies and their saves (06 §2.11) ----
 
 const lc = (s) => String(s || "").toLowerCase();
-function saveMatch(c, s) { return !X.q || lc(c.name).includes(X.q) || X.hits.has(c.key) || lc(s.name).includes(X.q); }
-function colonyMatch(c) { return !X.q || lc(c.name).includes(X.q) || X.hits.has(c.key) || c.saves.some((s) => lc(s.name).includes(X.q)); }
+function saveMatch(c, s) { return !X.q || lc(c.name).includes(X.q) || lc(s.name).includes(X.q); }
+function colonyMatch(c) { return !X.q || lc(c.name).includes(X.q) || c.saves.some((s) => lc(s.name).includes(X.q)); }
 
 function setQuery(v) {
   X.q = lc(v.trim());
-  X.hits = new Set();
   drawLeft();
-  clearTimeout(searchTimer);
-  if (!X.q) return;
-  const n = ++X.searchSeq;
-  // Mods in a colony's saves are matched in Go, where the heads are (a short rest first)
-  searchTimer = setTimeout(async () => {
-    let keys = [];
-    try { keys = await api.SavesSearch(X.q); } catch { return; }
-    if (n !== X.searchSeq || S.screen !== "saves") return;
-    X.hits = new Set(keys || []);
-    drawLeft();
-  }, 120);
 }
 
 // mark highlights the search in a name.
@@ -300,7 +293,7 @@ function pick(ref) {
   if (c) X.open.add(c.key);
   if (ref === X.sel) { drawLeft(); return; }
   X.sel = ref;
-  X.ask = null; X.renaming = false; X.shown = 0;
+  X.ask = null; X.renaming = false; X.viewing = new Set();
   drawLeft();
   showDetail(60);
 }
@@ -323,13 +316,13 @@ function showDetail(delay) {
   if (!ref) { X.detail = null; drawDetail(); return; }
   if (X.detail?.ref !== ref) {
     const r = rowOf(ref);
-    X.detail = { ref, name: r?.name || "", colony: colonyOf(ref)?.name || "", loading: true, issues: [], mods: [], listOnly: [] };
+    X.detail = { ref, name: r?.name || "", colony: colonyOf(ref)?.name || "", loading: true, issues: [], mods: [] };
     drawDetail();
   }
   const n = ++X.detailSeq;
   timer = setTimeout(async () => {
     let d;
-    try { d = await api.SaveDetail(ref); } catch (e) { d = { ref, name: rowOf(ref)?.name || "", error: errText(e), issues: [], mods: [], listOnly: [] }; }
+    try { d = await api.SaveDetail(ref); } catch (e) { d = { ref, name: rowOf(ref)?.name || "", error: errText(e), issues: [], mods: [] }; }
     if (n !== X.detailSeq || S.screen !== "saves" || X.sel !== ref) return;
     X.detail = d;
     drawDetail(true);
@@ -348,12 +341,20 @@ function body() {
   return b;
 }
 
+// anum is a card's number (1–3, the keys that focus it), as other pages put it before a
+// heading (screens.js area).
+function anum(card) {
+  return el("span", "anum", card?.dataset.area || "");
+}
+
 function drawMid(keep) {
   if (!midCard) return;
   const d = X.detail;
   const top = keep ? midCard.querySelector(".sv-body")?.scrollTop || 0 : 0;
   const focused = midCard.contains(document.activeElement) && !X.renaming ? document.activeElement : null;
   const focusKey = focused?.dataset?.key;
+  mods?.destroy();
+  mods = null;
   midCard.replaceChildren();
   if (!d) { midCard.append(el("div", "empty-state", T("select a save"))); return; }
   const b = body();
@@ -361,6 +362,7 @@ function drawMid(keep) {
   // header: the name and the save's actions, then game, list and location
   const head = el("div", "sv-head");
   const row1 = el("div", "sv-row1");
+  row1.append(anum(midCard));
   if (X.renaming && !d.loading && !d.error) row1.append(renameField(d));
   else {
     const h = el("h2", "sv-name", d.name);
@@ -369,8 +371,8 @@ function drawMid(keep) {
   }
   const acts = el("div", "sv-acts");
   const locked = d.locked || (d.loading ? T("reading…") : "");
-  const add = (label, key, run, k, off = "") => {
-    const b = button(label, k, run, "small", key);
+  const add = (label, key, run, k, off = "", env = "") => {
+    const b = button(label, k, run, "small", env);
     b.dataset.key = key;
     if (off) { b.disabled = true; b.title = off; } else if (k) b.title = k;
     acts.append(b);
@@ -380,6 +382,7 @@ function drawMid(keep) {
   add(T("rename"), "rename", () => startRename(), "F2", locked || noFile);
   add(T("copy"), "copy", () => copySave(), "", noFile);
   add(T("back up"), "backup", () => askFiles("backup"), "", noFile);
+  if (d.newList) add(T("make a list"), "new-list", () => newList(d, false), "", "", "new-plan").title = d.newList.command;
   const rec = add(T("recycle…"), "recycle", () => askFiles("recycle"), "", locked || noFile);
   rec.classList.add("danger");
   row1.append(acts);
@@ -396,6 +399,10 @@ function drawMid(keep) {
     } else fact(T("list"), el("span", "warn", T("no list or pack matches")));
     const loc = el("dd", "sv-loc");
     pathContent(loc, d.path, [d.path]);
+    const open = button(T("open location"), "", () => api.OpenSaveFolder(d.ref).catch((e) => say("fail", errText(e))), "link sv-open");
+    open.dataset.key = "open-folder";
+    open.title = d.folder;
+    loc.append(open);
     kv.append(el("dt", "", T("location")), loc);
     head.append(kv);
   }
@@ -413,11 +420,16 @@ function drawMid(keep) {
     if (d.mods?.length) b.append(modSection(d));
   }
   midCard.append(b);
+  if (d.mods?.length && !d.error) mods = modRows(b, b.querySelector(".sv-mods"), d.mods);
   b.scrollTop = top;
+  mods?.draw();
   if (focusKey) midCard.querySelector(`[data-key="${CSS.escape(focusKey)}"]`)?.focus({ preventScroll: true });
 }
 
-// loadSection is Can it load? (10 §4.3): the quick-fix bar, then only what needs attention.
+const GROUPS = [["file", "the file"], ["game", "game changes"], ["mods", "Mod list changes"]];
+
+// loadSection is Can it load? (10 §4.3): the quick-fix bar, then only what needs
+// attention, under the file, the game and the Mod list.
 function loadSection(d) {
   const s = el("div", "sv-sect");
   const h = el("h3", "", T("can it load?"));
@@ -435,29 +447,65 @@ function loadSection(d) {
     bar.append(q);
   }
   s.append(bar);
-  if (d.issues?.length) {
+  for (const [g, title] of GROUPS) {
+    const rows = (d.issues || []).filter((is) => (is.group || "mods") === g);
+    if (!rows.length) continue;
+    s.append(el("h4", "sv-group", T(title)));
     const list = el("div", "sv-issues");
-    for (const is of d.issues) {
-      const row = el("div", "sv-iss " + (is.level || ""));
-      row.setAttribute("role", "group");
-      row.setAttribute("aria-label", is.head);
-      const sign = el("span", "sign " + (is.sign === "−" ? "m" : is.sign === "+" ? "p" : "o"), is.sign || (is.level === "error" ? "✗" : is.level === "warning" ? "!" : "i"));
-      sign.setAttribute("aria-hidden", "true");
-      const head = el("span", "h", is.head);
-      if (is.mods?.length > 1) head.title = is.mods.join("\n");
-      const fixes = el("span", "f");
-      for (const f of is.fixes || []) fixes.append(fixButton(d, f, false));
-      row.append(sign, head, fixes, el("span", "c", is.consequence));
-      list.append(row);
-    }
+    for (const is of rows) list.append(issueRow(d, is));
     s.append(list);
   }
   return s;
 }
 
+function issueRow(d, is) {
+  const row = el("div", "sv-iss " + (is.level || ""));
+  row.setAttribute("role", "group");
+  row.setAttribute("aria-label", is.head);
+  const sign = el("span", "sign " + (is.sign === "−" ? "m" : is.sign === "+" ? "p" : "o"), is.sign || (is.level === "error" ? "✗" : is.level === "warning" ? "!" : "i"));
+  sign.setAttribute("aria-hidden", "true");
+  const head = el("span", "h", is.head);
+  if (is.title) head.title = is.title;
+  const fixes = el("span", "f");
+  for (const f of is.fixes || []) fixes.append(fixButton(d, f, false));
+  const open = X.viewing.has(is.kind);
+  if (is.details) {
+    const v = button(open ? T("hide") : T("view"), "", () => {
+      if (X.viewing.has(is.kind)) X.viewing.delete(is.kind); else X.viewing.add(is.kind);
+      drawMid(true);
+    }, "small sv-fix");
+    v.dataset.key = "view-" + is.kind;
+    v.setAttribute("aria-expanded", String(open));
+    fixes.append(v);
+  }
+  row.append(sign, head, fixes, el("span", "c", is.consequence));
+  if (open && is.details) row.append(detailsBox(is.details));
+  return row;
+}
+
+// detailsBox is View's list (06 §2.11): each Mod with its packageId, then what loading
+// without them loses, by kind.
+function detailsBox(x) {
+  const box = el("div", "sv-details");
+  const ul = el("ul", "sv-dmods");
+  for (const m of x.mods || []) {
+    const li = el("li", "");
+    li.append(el("span", "n", m.name), el("code", "", m.packageId));
+    if (m.note) li.append(el("span", "muted", m.note));
+    ul.append(li);
+  }
+  box.append(ul);
+  for (const l of x.lost || []) {
+    const p = el("p", "sv-lost");
+    p.append(el("b", "", l.kind), " " + l.names.join(T(", ")) + (l.more ? " " + Tf("and %d more", l.more) : ""));
+    box.append(p);
+  }
+  return box;
+}
+
 function fixButton(d, f, primary) {
   const env = { fix: "save-fix", subscribe: "save-fix", enable: "save-fix", mods: "save-fix", "disable-added": "save-fix", order: "save-fix", launch: "launch",
-    recycle: "recycle", "new-list": "new-plan" }[f.action] || "";
+    recycle: "recycle", "new-list": "new-plan", "new-list-analyse": "new-plan" }[f.action] || "";
   const b = button(f.label, "", () => runFix(d, f), primary ? "primary small" : "small sv-fix", env);
   b.dataset.key = "fix-" + f.action + "-" + (f.target || "");
   b.title = f.command;
@@ -465,49 +513,52 @@ function fixButton(d, f, primary) {
   return b;
 }
 
-// modSection is the save's Mods in load order (10 §4.3 Mod list).
+// modSection is the save's Mods in load order (10 §4.3 Mod list), all of them: the rows
+// come and go as the card scrolls (modRows).
 function modSection(d) {
   const s = el("div", "sv-sect");
-  const h = el("h3", "", T("mod list"));
-  const facts = [Tf("%d in load order", d.mods.length)];
-  if (d.missing) facts.push(Tf("%d not installed", d.missing));
-  if (d.moved) facts.push(Tf("%d in another order", d.moved));
-  const r = el("span", "r", facts.join(T(", ")));
-  h.append(r);
-  s.append(h);
-  const shown = d.mods.slice(0, Math.max(MODS, X.shown));
-  const ol = el("ol", "sv-mods");
-  ol.setAttribute("aria-label", T("mod list"));
-  shown.forEach((m, i) => {
-    const li = el("li", (m.missing ? "gone" : "") + (m.off ? " off" : ""));
-    li.append(el("i", "", String(i + 1)), el("span", "n", m.name));
-    li.title = m.packageId;
-    if (m.missing) li.append(el("span", "tagx bad", T("not installed")));
-    else if (m.off) li.append(el("span", "tagx", T("not in the list")));
-    if (m.moved) { const mv = el("b", "mv", "↕"); mv.title = T("in another order in the list"); mv.setAttribute("aria-label", T("in another order in the list")); li.append(mv); }
-    ol.append(li);
-  });
-  s.append(ol);
-  const more = el("div", "sv-more");
-  if (d.mods.length > MODS) {
-    const left = d.mods.length - shown.length;
-    const label = !left ? T("show fewer") : left <= STEP ? Tf("show all %d", d.mods.length) : Tf("show %d more (%d left)", STEP, left);
-    const all = button(label, "", () => { X.shown = left ? shown.length + STEP : 0; drawMid(true); }, "link");
-    all.dataset.key = "show-all";
-    more.append(all);
-  }
-  if (d.newList) {
-    const nl = button(d.newList.label, "", () => runFix(d, d.newList), "link", "new-plan");
-    nl.dataset.key = "new-list";
-    nl.title = d.newList.command;
-    more.append(nl);
-  }
-  if (d.listOnly?.length) {
-    const names = d.listOnly.slice(0, 3).join(T(", ")) + (d.listOnly.length > 3 ? " " + Tf("and %d more", d.listOnly.length - 3) : "");
-    more.append(el("span", "muted", Tf("in the list, not in the save: %s", names)));
-  }
-  if (more.childNodes.length) s.append(more);
+  s.append(el("h3", "", T("mod list")));
+  const list = el("div", "sv-mods");
+  list.setAttribute("role", "list");
+  list.setAttribute("aria-label", T("mod list"));
+  list.style.height = d.mods.length * ROW + "px";
+  s.append(list);
   return s;
+}
+
+// modRows keeps the Mod list's rows in view mounted, plus a few on each side: a save of a
+// thousand Mods stays within the page's size limits (06 §11 A18).
+function modRows(scroll, list, all) {
+  const shown = new Map();
+  let frame = 0;
+  const row = (i) => {
+    const m = all[i];
+    const r = el("div", "r" + (m.missing ? " gone" : "") + (m.off ? " off" : ""));
+    r.setAttribute("role", "listitem");
+    r.setAttribute("aria-setsize", String(all.length));
+    r.setAttribute("aria-posinset", String(i + 1));
+    r.style.top = i * ROW + "px";
+    r.append(el("i", "", String(i + 1)), el("span", "n", m.name));
+    r.title = m.packageId;
+    if (m.missing) r.append(el("span", "tagx bad", T("not installed")));
+    else if (m.off) r.append(el("span", "tagx", T("not in the list")));
+    if (m.moved) { const mv = el("b", "mv", "↕"); mv.title = T("in another order in the list"); mv.setAttribute("aria-label", T("in another order in the list")); r.append(mv); }
+    return r;
+  };
+  const draw = () => {
+    frame = 0;
+    if (!list.isConnected) return;
+    const at = list.getBoundingClientRect().top - scroll.getBoundingClientRect().top + scroll.scrollTop;
+    const from = Math.max(0, Math.floor((scroll.scrollTop - at) / ROW) - 8);
+    const to = Math.min(all.length, Math.ceil((scroll.scrollTop + scroll.clientHeight - at) / ROW) + 8);
+    for (const [i, r] of shown) if (i < from || i >= to) { r.remove(); shown.delete(i); }
+    for (let i = from; i < to; i++) if (!shown.has(i)) { const r = row(i); shown.set(i, r); list.append(r); }
+  };
+  const later = () => { if (!frame) frame = requestAnimationFrame(draw); };
+  scroll.addEventListener("scroll", later, { passive: true });
+  const ro = new ResizeObserver(later);
+  ro.observe(scroll);
+  return { draw, destroy() { cancelAnimationFrame(frame); ro.disconnect(); scroll.removeEventListener("scroll", later); } };
 }
 
 // drawRight is the playthrough (10 §4.3 Play facts, §4.5; the draft's right column):
@@ -526,7 +577,7 @@ function drawRight(keep) {
   b.setAttribute("aria-label", T("the playthrough"));
   const head = el("div", "sv-head");
   const row = el("div", "sv-row1");
-  row.append(el("h2", "sv-name", d.colony || ""));
+  row.append(anum(rightCard), el("h2", "sv-name", d.colony || ""));
   if (p) row.append(el("span", "muted", [p.day, p.date].filter(Boolean).join("  ")));
   head.append(row);
   if (p) {
@@ -681,7 +732,8 @@ async function runFix(d, f) {
   switch (f.action) {
     case "recycle": return askFiles("recycle");
     case "open-save": return pick(f.target);
-    case "new-list": return newList(d);
+    case "new-list": return newList(d, false);
+    case "new-list-analyse": return newList(d, true);
     case "launch": return launch(d);
     case "fix": return fix(d, [], false, false, true);
     case "enable": case "subscribe": return fix(d, [f.target], false, false, false);
@@ -727,10 +779,12 @@ async function launch(d) {
   if (await plans.usePlan(d.listId)) await ui.run("launch");
 }
 
-async function newList(d) {
+// newList makes a list from the save and opens it; with analyse it starts the list's
+// analysis instead and stays, and the save is checked again when it is done.
+async function newList(d, analyse) {
   let r;
-  try { r = await api.SaveNewList(d.ref); } catch (e) { say("fail", errText(e)); return; }
-  say("ok", r.text);
+  try { r = await api.SaveNewList(d.ref, analyse); } catch (e) { say("fail", errText(e)); return; }
+  say(analyse ? "busy" : "ok", r.text);
   await ui?.reload?.();
   if (r.page) ui.go(r.page);
 }

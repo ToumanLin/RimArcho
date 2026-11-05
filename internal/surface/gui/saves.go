@@ -157,14 +157,6 @@ func (s *API) listSaves(request uint64) (*SavesEvent, *app.SaveList) {
 	return ev, l
 }
 
-// SavesSearch is the colonies whose saves hold a Mod matching q (06 §2.11): the page
-// matches colony and save names itself.
-func (s *API) SavesSearch(q string) []string {
-	s.saves.mu.Lock()
-	defer s.saves.mu.Unlock()
-	return view.SavesMatching(s.saves.list, q)
-}
-
 // findSave is a save of the last listing.
 func (s *API) findSave(ref string) (*app.Save, error) {
 	s.saves.mu.Lock()
@@ -199,7 +191,8 @@ func (s *API) SaveDetail(ref string) (*view.SaveDetail, error) {
 		return nil, err
 	}
 	g, _ := r.RunningGame()
-	d := view.SaveDetailOf(c, g != nil)
+	current := sv.Plan != nil && sv.Env != nil && r.Store.CurrentPlanID(sv.Env.ID) == sv.Plan.ID
+	d := view.SaveDetailOf(c, g != nil, current)
 	s.savePlay(r, sv, d)
 	return d, nil
 }
@@ -355,8 +348,10 @@ func (s *API) SaveTrash(refs []string, yes bool) (*SaveFilesReply, error) {
 }
 
 // SaveNewList makes a new list from the save's Mods, as All lists' "from a save" does
-// (04 §9, 10 §4.4): named after the colony, opened in the editor, not made current.
-func (s *API) SaveNewList(ref string) (*PlanDone, error) {
+// (04 §9, 10 §4.4): named after the colony, opened in the editor, not made current. With
+// analyze it also starts the analysis of the new list (background task, 06 §2.16) and
+// the page does not move.
+func (s *API) SaveNewList(ref string, analyze bool) (*PlanDone, error) {
 	sv, err := s.findSave(ref)
 	if err != nil {
 		return nil, err
@@ -371,7 +366,18 @@ func (s *API) SaveNewList(ref string) (*PlanDone, error) {
 	if p == nil {
 		return s.planDone(0, t, err)
 	}
-	return s.planDone(p.ID, t, err)
+	d, err := s.planDone(p.ID, t, err)
+	// Analysing the new list indexes the save's Mods, so Can it load? can check what they
+	// own (10 §4.6); the page stays and checks the save again when it is done.
+	if err == nil && analyze {
+		if s.startAnalyzeOf(p.Name) {
+			d.Text += "  " + view.Tf("analysing %s…", p.Name)
+		} else {
+			d.Text += "  " + view.T("an analysis is already running; analyse the new list once it is done")
+		}
+		d.Page = ""
+	}
+	return d, err
 }
 
 // OpenSaveFolder shows the save's folder with its file selected where the system can.

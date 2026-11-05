@@ -46,9 +46,6 @@ func TestSavesPage(t *testing.T) {
 	if p.Saves != 2 || len(p.Colonies) != 1 || p.Colonies[0].Name != "Colony" {
 		t.Fatalf("listing %+v", p)
 	}
-	if got := api.SavesSearch("gone mod"); !slices.Equal(got, []string{p.Colonies[0].Key}) {
-		t.Fatalf("search %v", got)
-	}
 
 	issues := func(ref string) []string {
 		t.Helper()
@@ -65,7 +62,7 @@ func TestSavesPage(t *testing.T) {
 	if got := issues("Colony"); len(got) != 0 {
 		t.Fatalf("Colony issues %q", got)
 	}
-	want := []string{"Beta is installed but not in the list", "Gone Mod is not installed"}
+	want := []string{"Beta", "Gone Mod"}
 	if got := issues("Colony 2"); !slices.Equal(got, want) {
 		t.Fatalf("Colony 2 issues %q, want %q", got, want)
 	}
@@ -139,10 +136,30 @@ func TestSavesPage(t *testing.T) {
 
 	// a new list from a save is named after the colony and opens in the editor
 	read()
-	nl, err := api.SaveNewList("Colony 1")
+	nl, err := api.SaveNewList("Colony 1", false)
 	if err != nil || !strings.HasPrefix(nl.Page, "plan:") {
 		t.Fatalf("new list %+v %v", nl, err)
 	}
+	// to analyse it: the new list's analysis runs in the background and the page stays
+	ran := make(chan struct{}, 1)
+	inner := e.App.AnalyzeRunner
+	e.App.AnalyzeRunner = func(env string, p func(string)) error {
+		defer func() { ran <- struct{}{} }()
+		if inner == nil {
+			return nil
+		}
+		return inner(env, p)
+	}
+	nl, err = api.SaveNewList("Colony 1", true)
+	if err != nil || nl.Page != "" || !strings.Contains(nl.Text, "analysing Colony (2)…") {
+		t.Fatalf("new list to analyse %+v %v", nl, err)
+	}
+	select {
+	case <-ran:
+	case <-time.After(30 * time.Second):
+		t.Fatal("the new list was not analysed")
+	}
+	api.needsJobs.Wait()
 
 	// leaving the page drops the listing
 	api.leaveSaves()

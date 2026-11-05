@@ -159,7 +159,8 @@ func TestCheckSaveOwnership(t *testing.T) {
 		Colonists: []app.OwnedRace{{Race: "Kurin_Race", Alive: 2, Dead: 1}},
 		Factions:  []string{"Kurin Clan"},
 		Classes:   []string{"ModA.CompBroken"},
-		Defs:      []app.OwnedDefs{{Type: "ThingDef", Defs: 2, Uses: 3}, {Type: "HediffDef", Defs: 1, Uses: 1}},
+		Defs: []app.OwnedDefs{{Type: "ThingDef", Defs: 2, Uses: 3, Names: []string{"KurinTea", "Corpse_Kurin_Race"}},
+			{Type: "HediffDef", Defs: 1, Uses: 1, Names: []string{"KurinTail"}}},
 	}
 	if got := c.Issues[0].Owns; !reflect.DeepEqual(got, want) {
 		t.Fatalf("disabled Kurin owns %+v\nwant %+v", got, want)
@@ -226,10 +227,15 @@ func TestCheckSaveOwnership(t *testing.T) {
 	}
 	for _, is := range c.Issues {
 		o := is.Owns
-		if o == nil || !o.Inferred || o.Among != 1 || !reflect.DeepEqual(o.Colonists, []app.OwnedRace{{Race: "Zorr_Race", Alive: 1}}) ||
-			!slices.Equal(o.Classes, []string{"ZorrWorld"}) || !reflect.DeepEqual(o.Defs, []app.OwnedDefs{{Defs: 1, Uses: 1}}) {
+		if o == nil || !o.Inferred || o.Among != 1 || !o.NoFacts || !reflect.DeepEqual(o.Colonists, []app.OwnedRace{{Race: "Zorr_Race", Alive: 1}}) ||
+			!slices.Equal(o.Classes, []string{"ZorrWorld"}) || !reflect.DeepEqual(o.Defs, []app.OwnedDefs{{Defs: 1, Uses: 1, Names: []string{"ZorrHat"}}}) {
 			t.Fatalf("%s owns %+v", is.Mods[0].PackageID, o)
 		}
+	}
+	// Together the two own what nothing installed provides once, not once each.
+	if o := c.GoneOwns; o == nil || !o.Inferred || o.Among != 0 || !reflect.DeepEqual(o.Colonists, []app.OwnedRace{{Race: "Zorr_Race", Alive: 1}}) ||
+		!slices.Equal(o.Classes, []string{"ZorrWorld"}) || !reflect.DeepEqual(o.Defs, []app.OwnedDefs{{Defs: 1, Uses: 1, Names: []string{"ZorrHat"}}}) {
+		t.Fatalf("the two together own %+v", c.GoneOwns)
 	}
 	if out, _ := e.Run("saves", "show", "Zorr"); !strings.Contains(out, "loses 1 colonist of race Zorr_Race, 1 class (ZorrWorld), 1 Def use "+
 		"(inferred: nothing installed provides them; they may belong to the other 1 Mod without facts instead)") {
@@ -254,5 +260,31 @@ func TestCheckSaveOwnershipUnchecked(t *testing.T) {
 	c := checkNamed(t, e, "Lone")
 	if got := issueKinds(c); !slices.Equal(got, []string{"warning not-installed tester.zorr"}) || c.Issues[0].Owns != nil {
 		t.Fatalf("unchecked: %q owns %+v", got, c.Issues[0].Owns)
+	}
+}
+
+// A Mod the list has and the save does not stored nothing in it: the checks need only the
+// facts of the save's own Mods, so one enabled after the analysis leaves them checked
+// (10 §4.6).
+func TestCheckSaveOwnershipCover(t *testing.T) {
+	t.Parallel()
+	e := ownersFixture(t)
+	spec := testkit.SaveSpec{Mods: []string{"ludeon.rimworld", "tester.alpha", "tester.kurin", "tester.gone"}, Faction: "New Arrivals", Body: kurinBody}
+	writeOwnersSave(t, e, "Foxes.rws", spec)
+	e.AddWorkshop("3000000009", testkit.Sample("tester.late", "Late"))
+	e.MustRun("scan")
+	e.MustRun("enable", "pkg:tester.late")
+	if err := e.App.RunSavesIndex("", nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	c := checkNamed(t, e, "Foxes")
+	if got, want := issueKinds(c), []string{"warning not-installed tester.gone", "info added tester.late"}; !slices.Equal(got, want) {
+		t.Fatalf("issues %q, want %q", got, want)
+	}
+	if o := c.Issues[0].Owns; o == nil || o.DefsUnchecked || o.ClassesUnchecked || !o.NoFacts {
+		t.Fatalf("the save's Mods are analysed: %+v", o)
+	}
+	if c.GoneOwns == nil || c.GoneOwns.DefsUnchecked || c.GoneOwns.ClassesUnchecked {
+		t.Fatalf("together: %+v", c.GoneOwns)
 	}
 }

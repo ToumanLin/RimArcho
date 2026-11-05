@@ -25,11 +25,12 @@ func ownedConsequence(o *app.SaveOwned, lost string) string {
 			}
 		}
 	}
+	// the quick-fix bar offers the analysis that checks them (06 §2.11)
 	if o.DefsUnchecked {
-		b.WriteString(T("; Defs, pawns and factions not checked: the list is not analysed for this game version"))
+		b.WriteString(T("; Defs of the save's list not analysed yet"))
 	}
 	if o.ClassesUnchecked {
-		b.WriteString(T("; classes not checked: the assemblies of the list or the game are not indexed"))
+		b.WriteString(T("; assemblies of the save's list not analysed yet"))
 	}
 	return b.String()
 }
@@ -55,6 +56,8 @@ func ownedParts(o *app.SaveOwned) []string {
 		switch {
 		case i >= 3:
 			rest += d.Uses
+		case d.Type == "" && len(out) == 0:
+			out = append(out, Tf("%d Def uses", d.Uses))
 		case d.Type == "":
 			out = append(out, Tf("%d other Def uses", d.Uses))
 		default:

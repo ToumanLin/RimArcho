@@ -3,6 +3,7 @@ package view
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -102,31 +103,6 @@ func SaveDay(s *app.Save) (int, bool) {
 	return s.Summary.Day, true
 }
 
-// SavesMatching lists the colonies whose saves hold a Mod whose packageId or name contains
-// q (lower case): the left card's search matches Mods too (06 §2.11).
-func SavesMatching(l *app.SaveList, q string) []string {
-	q = strings.ToLower(strings.TrimSpace(q))
-	out := []string{}
-	if q == "" || l == nil {
-		return out
-	}
-	for _, c := range l.Colonies {
-	saves:
-		for _, s := range c.Saves {
-			if s.Head == nil {
-				continue
-			}
-			for i, id := range s.Head.ModIDs {
-				if strings.Contains(id, q) || strings.Contains(strings.ToLower(s.Head.Name(i)), q) {
-					out = append(out, c.Key)
-					break saves
-				}
-			}
-		}
-	}
-	return out
-}
-
 // SaveDetail is the selected save: the middle and right cards.
 type SaveDetail struct {
 	Ref    string `json:"ref"`
@@ -158,12 +134,10 @@ type SaveDetail struct {
 	Quick   *SaveFixView    `json:"quick,omitempty"`
 	Issues  []SaveIssueView `json:"issues"`
 
-	// Mod list: the save's Mods in load order, then the list's Mods it lacks.
-	Mods     []SaveModView `json:"mods"`
-	Missing  int           `json:"missing"`
-	Moved    int           `json:"moved"`
-	ListOnly []string      `json:"listOnly"`
-	NewList  *SaveFixView  `json:"newList,omitempty"` // Make a list from this save
+	// Mod list: the save's Mods in load order. NewList is the header's Make a list from
+	// this save.
+	Mods    []SaveModView `json:"mods"`
+	NewList *SaveFixView  `json:"newList,omitempty"`
 
 	// Locked says why Rename and Recycle are off now (a game runs, the file is written).
 	Locked string `json:"locked,omitempty"`
@@ -186,15 +160,49 @@ type SaveFixView struct {
 }
 
 // SaveIssueView is one row of Can it load?: what is wrong or changed, its consequence, and
-// its own fixes. Sign marks Mod rows: − missing, + added, ↕ reordered.
+// its own fixes. Sign marks Mod rows: − missing, + added, ↕ reordered. Group is the heading
+// it goes under: "file", "game" or "mods" (the Mod list).
 type SaveIssueView struct {
 	Kind        string        `json:"kind"`
 	Level       string        `json:"level"`
+	Group       string        `json:"group"`
 	Sign        string        `json:"sign,omitempty"`
 	Head        string        `json:"head"`
+	Title       string        `json:"title,omitempty"` // the heading's hover text
 	Consequence string        `json:"consequence"`
-	Mods        []string      `json:"mods,omitempty"` // names, for the row's hover text
+	Mods        []string      `json:"mods,omitempty"` // names
 	Fixes       []SaveFixView `json:"fixes"`
+	// Details is what View opens under the row: the Mods with their packageIds and what
+	// loading without them loses, by name.
+	Details *SaveIssueDetails `json:"details,omitempty"`
+}
+
+// Issue groups (06 §2.11), in the order they show.
+const (
+	SaveGroupFile = "file"
+	SaveGroupGame = "game"
+	SaveGroupMods = "mods"
+)
+
+// SaveIssueDetails lists a row's Mods and what is lost without them.
+type SaveIssueDetails struct {
+	Mods []SaveDetailMod  `json:"mods"`
+	Lost []SaveDetailLost `json:"lost,omitempty"`
+}
+
+// SaveDetailMod is one Mod of a row: its name, packageId and where to get it.
+type SaveDetailMod struct {
+	Name      string `json:"name"`
+	PackageID string `json:"packageId"`
+	Note      string `json:"note,omitempty"` // "Workshop 123" or that it has no known page
+}
+
+// SaveDetailLost is one kind of what is lost: "ThingDef", "classes"; Names the most used
+// first, More how many are not named.
+type SaveDetailLost struct {
+	Kind  string   `json:"kind"`
+	Names []string `json:"names"`
+	More  int      `json:"more,omitempty"`
 }
 
 // SaveModView is one Mod of the save's list.
@@ -208,11 +216,12 @@ type SaveModView struct {
 	Moved   bool `json:"moved,omitempty"`
 }
 
-// SaveDetailOf makes the middle and right cards from a load check; running: a game runs.
-func SaveDetailOf(c *app.SaveCheck, running bool) *SaveDetail {
+// SaveDetailOf makes the middle and right cards from a load check; running: a game runs;
+// current: the save's list is its environment's current list.
+func SaveDetailOf(c *app.SaveCheck, running, current bool) *SaveDetail {
 	s := c.Save
 	d := &SaveDetail{Ref: s.Ref, Name: s.Name, File: s.File, Path: s.Path, Folder: filepath.Dir(s.Path), Prefix: s.Prefix,
-		Auto: s.Auto, Size: SizeText(s.Size), Bytes: s.Size, Issues: []SaveIssueView{}, Mods: []SaveModView{}, ListOnly: []string{}}
+		Auto: s.Auto, Size: SizeText(s.Size), Bytes: s.Size, Issues: []SaveIssueView{}, Mods: []SaveModView{}}
 	if s.Colony != nil {
 		d.Colony = colonyName(s.Colony)
 	}
@@ -239,47 +248,89 @@ func SaveDetailOf(c *app.SaveCheck, running bool) *SaveDetail {
 		d.Locked = T("the game is writing this file: rename and recycle wait until it has saved")
 	}
 
-	d.Level, d.Verdict = c.Level, verdictText(c)
+	gap := unchecked(c)
+	d.Level, d.Verdict = c.Level, verdictText(c, gap)
 	switch {
+	case d.ListKind == "list" && current:
+		d.Against = Tf("against the current list %s", d.List)
 	case d.ListKind == "list":
-		d.Against = Tf("against %s as it is now", d.List)
+		d.Against = Tf("against list %s", d.List)
 	case d.ListKind == "pack":
 		d.Against = Tf("against pack %s", d.List)
 	default:
 		d.Against = T("against the installed Mods")
 	}
-	if c.Quick != nil {
-		q := fixView(*c.Quick, s)
-		d.Quick = &q
-	}
-	for _, is := range c.Issues {
-		d.Issues = append(d.Issues, issueView(is, s))
-	}
-	d.Issues = foldModRows(d.Issues, c.Issues, s)
-	for _, m := range c.Mods {
-		v := SaveModView{Name: m.Name, PackageID: m.PackageID, Missing: m.Instance == "", Moved: m.Moved}
-		v.Off = !v.Missing && !m.InList && d.ListKind != ""
-		if v.Missing {
-			d.Missing++
-		}
-		if v.Moved {
-			d.Moved++
-		}
-		d.Mods = append(d.Mods, v)
-	}
-	for _, m := range c.ListOnly {
-		d.ListOnly = append(d.ListOnly, m.Name)
-	}
+	var newList *SaveFixView
 	if s.Head != nil && s.Colony != nil {
 		nl := fixView(app.SaveFix{Action: app.FixNewList, Label: "Make a list from this save",
 			Command: "loadout import " + argQuote(s.Path) + " --new " + argQuote(s.Colony.Name), Target: s.Ref}, s)
-		d.NewList = &nl
+		newList, d.NewList = &nl, &nl
+	}
+	// The bar's one action: Recycle for a file that cannot load; while what the Mods own
+	// could not be checked, a list made from the save and analysed (it indexes the save's
+	// Mods); else Launch or Make a list. Fix and launch is not offered: each row has its fix.
+	switch q := c.Quick; {
+	case q != nil && q.Action == app.FixRecycle:
+		v := fixView(*q, s)
+		d.Quick = &v
+	case gap != "" && newList != nil:
+		v := *newList
+		v.Action, v.Label = SaveFixAnalyse, T("make a list from this save to analyse its assemblies")
+		v.Command += " && archo analyze --open-plan " + argQuote(s.Colony.Name)
+		d.Quick = &v
+	case q != nil && q.Action != app.FixAll:
+		v := fixView(*q, s)
+		d.Quick = &v
+	}
+	d.Issues = issueViews(c, s)
+	for _, m := range c.Mods {
+		v := SaveModView{Name: m.Name, PackageID: m.PackageID, Missing: m.Instance == "", Moved: m.Moved}
+		v.Off = !v.Missing && !m.InList && d.ListKind != ""
+		d.Mods = append(d.Mods, v)
 	}
 	return d
 }
 
-// verdictText is the quick-fix bar's sentence (10 §4.3).
-func verdictText(c *app.SaveCheck) string {
+// SaveFixAnalyse is the bar's Make a list from this save, then analyse it (the page's own
+// action: SaveNewList with analyze).
+const SaveFixAnalyse = "new-list-analyse"
+
+// unchecked says what Can it load? could not check (10 §4.6): "defs" when the save's Mods
+// are not analysed for the game version, "classes" when their assemblies (or the game's)
+// are not indexed, "" when everything was checked or nothing needed it.
+func unchecked(c *app.SaveCheck) string {
+	out := ""
+	note := func(o *app.SaveOwned) {
+		switch {
+		case o == nil:
+		case o.DefsUnchecked:
+			out = "defs"
+		case o.ClassesUnchecked && out == "":
+			out = "classes"
+		}
+	}
+	for _, is := range c.Issues {
+		if is.Kind == app.IssueNotInstalled || is.Kind == app.IssueDisabled {
+			note(is.Owns)
+		}
+	}
+	note(c.GoneOwns)
+	return out
+}
+
+// verdictText is the quick-fix bar's sentence (10 §4.3), with what could not be checked.
+func verdictText(c *app.SaveCheck, gap string) string {
+	v := verdictOf(c)
+	switch gap {
+	case "defs":
+		return Tf("%s; %s", v, T("Defs and assemblies not analysed yet"))
+	case "classes":
+		return Tf("%s; %s", v, T("assemblies not analysed yet"))
+	}
+	return v
+}
+
+func verdictOf(c *app.SaveCheck) string {
 	s := c.Save
 	switch c.Level {
 	case "writing":
@@ -290,7 +341,7 @@ func verdictText(c *app.SaveCheck) string {
 		}
 		return T("will not load cleanly")
 	case app.LevelWarning:
-		return T("loads, but content will be lost")
+		return T("content will be lost")
 	}
 	switch {
 	case s.Plan != nil:
@@ -321,10 +372,180 @@ func fixView(f app.SaveFix, s *app.Save) SaveFixView {
 	case app.FixOpenSave:
 		name := strings.TrimPrefix(f.Label, "Open ")
 		v.Label = Tf("open %s", name)
+	case app.FixEnable: // the row says which Mod and which list
+		v.Label = T("enable")
+	case app.FixDisableAdded:
+		v.Label = T("disable")
 	default:
 		v.Label = T(lowerFirst(f.Label))
 	}
 	return v
+}
+
+// issueViews makes Can it load?'s rows (10 §4.3, 06 §2.11): the Mods that are not
+// installed as one row with what they lose together, the others one row each (rows of
+// installed Mods not in the list fold past ModRowsShown), by group: the file, the game,
+// the Mod list.
+func issueViews(c *app.SaveCheck, s *app.Save) []SaveIssueView {
+	var views []SaveIssueView
+	var src, gone []app.SaveIssue
+	goneAt := -1
+	for _, is := range c.Issues {
+		if is.Kind == app.IssueNotInstalled {
+			if goneAt < 0 {
+				goneAt = len(views)
+				views, src = append(views, SaveIssueView{}), append(src, app.SaveIssue{Kind: is.Kind})
+			}
+			gone = append(gone, is)
+			src[goneAt].Mods = append(src[goneAt].Mods, is.Mods...)
+			continue
+		}
+		views, src = append(views, issueView(is, s)), append(src, is)
+	}
+	if goneAt >= 0 {
+		views[goneAt] = goneView(gone, c.GoneOwns, s)
+	}
+	views = foldModRows(views, src, s)
+	sort.SliceStable(views, func(i, j int) bool { return groupRank(views[i].Group) < groupRank(views[j].Group) })
+	return views
+}
+
+func groupRank(g string) int {
+	switch g {
+	case SaveGroupFile:
+		return 0
+	case SaveGroupGame:
+		return 1
+	}
+	return 2
+}
+
+// goneView is the one row of the Mods that are not installed: their names, what loading
+// without them loses (owns: theirs together, from the full read), one fix subscribing the
+// ones with a Workshop page, and View's details.
+func goneView(issues []app.SaveIssue, owns *app.SaveOwned, s *app.Save) SaveIssueView {
+	v := SaveIssueView{Kind: app.IssueNotInstalled, Group: SaveGroupMods, Sign: "−", Fixes: []SaveFixView{}}
+	var mods []app.SaveMod
+	var subs []SaveFixView
+	var pkgs []string
+	noFacts := 0
+	for _, is := range issues {
+		if levelRank(is.Level) > levelRank(v.Level) {
+			v.Level = is.Level
+		}
+		mods = append(mods, is.Mods...)
+		if is.Owns != nil && is.Owns.NoFacts {
+			noFacts++
+		}
+		for _, f := range is.Fixes {
+			if f.Action == app.FixSubscribe {
+				subs = append(subs, fixView(f, s))
+				pkgs = append(pkgs, f.Target)
+			}
+		}
+	}
+	for _, m := range mods {
+		v.Mods = append(v.Mods, m.Name)
+	}
+	v.Head = namesText(v.Mods, 6)
+	if owns == nil && len(issues) == 1 {
+		owns = issues[0].Owns
+	}
+	v.Consequence = goneConsequence(owns, len(mods), noFacts)
+	switch {
+	case len(subs) == 1:
+		v.Fixes = subs
+	case len(subs) > 1:
+		f := SaveFixView{Action: "mods", Label: T("subscribe and enable these"), Target: strings.Join(pkgs, " "),
+			Command: "archo saves fix " + s.Ref + " --mod " + strings.Join(pkgs, " --mod ")}
+		if len(subs) < len(mods) {
+			f.Label = Tf("subscribe and enable %d of them", len(subs))
+		}
+		if len(f.Command) > 200 {
+			f.Command = f.Command[:200] + "…"
+		}
+		v.Fixes = []SaveFixView{f}
+	}
+	v.Details = lostDetails(mods, owns)
+	return v
+}
+
+// goneConsequence says what loading without n Mods that are not installed loses; noFacts
+// of them are unknown to the database, so what they own is inferred.
+func goneConsequence(o *app.SaveOwned, n, noFacts int) string {
+	one := n == 1
+	if o == nil {
+		if one {
+			return T("what it stored in the save is removed when the save loads")
+		}
+		return T("what they stored in the save is removed when the save loads")
+	}
+	var b strings.Builder
+	switch {
+	case o.Empty() && one:
+		b.WriteString(T("nothing in the save is known to need it; what else it stored is removed when the save loads"))
+	case o.Empty():
+		b.WriteString(T("nothing in the save is known to need them; what else they stored is removed when the save loads"))
+	case one:
+		b.WriteString(Tf("loading without it loses %s", strings.Join(ownedParts(o), T(", "))))
+	default:
+		b.WriteString(Tf("loading without them loses %s", strings.Join(ownedParts(o), T(", "))))
+	}
+	switch {
+	case noFacts == n && one:
+		b.WriteString(T("; the database has no data on this Mod"))
+	case noFacts == n:
+		b.WriteString(Tf("; the database has no data on these %d Mods", n))
+	case noFacts > 0:
+		b.WriteString(Tf("; the database has no data on %d of them", noFacts))
+	case o.Inferred:
+		b.WriteString(T("; inferred: nothing installed provides them"))
+	}
+	if o.Among > 0 {
+		b.WriteString(Tf("; they may belong to the other %s without facts instead", Plural(o.Among, "Mod")))
+	}
+	if o.DefsUnchecked {
+		b.WriteString(T("; Defs of the save's list not analysed yet"))
+	}
+	return b.String()
+}
+
+// lostDetails is View's list: each Mod with its packageId and Workshop page, then what is
+// lost without them by kind, most used first.
+func lostDetails(mods []app.SaveMod, o *app.SaveOwned) *SaveIssueDetails {
+	d := &SaveIssueDetails{Mods: []SaveDetailMod{}}
+	for _, m := range mods {
+		note := T("no known Workshop page")
+		if m.SteamID != "" {
+			note = Tf("Workshop %s", m.SteamID)
+		}
+		d.Mods = append(d.Mods, SaveDetailMod{Name: m.Name, PackageID: m.PackageID, Note: note})
+	}
+	if o == nil {
+		return d
+	}
+	if len(o.Colonists) > 0 {
+		var races []string
+		for _, r := range o.Colonists {
+			races = append(races, Tf("%s (%d)", r.Race, r.Alive+r.Dead))
+		}
+		d.Lost = append(d.Lost, SaveDetailLost{Kind: T("colonists by race"), Names: races})
+	}
+	if len(o.Factions) > 0 {
+		d.Lost = append(d.Lost, SaveDetailLost{Kind: T("factions"), Names: o.Factions})
+	}
+	if n := len(o.Classes); n > 0 {
+		shown := o.Classes[:min(n, app.OwnedDefNames)]
+		d.Lost = append(d.Lost, SaveDetailLost{Kind: T("classes"), Names: shown, More: n - len(shown)})
+	}
+	for _, x := range o.Defs {
+		kind := x.Type
+		if kind == "" {
+			kind = T("Defs of an unknown type")
+		}
+		d.Lost = append(d.Lost, SaveDetailLost{Kind: kind, Names: append([]string{}, x.Names...), More: x.Defs - len(x.Names)})
+	}
+	return d
 }
 
 func lowerFirst(s string) string {
@@ -337,7 +558,13 @@ func lowerFirst(s string) string {
 
 // issueView is one Can it load? row: its sentence and consequence by kind (10 §4.3).
 func issueView(is app.SaveIssue, s *app.Save) SaveIssueView {
-	v := SaveIssueView{Kind: is.Kind, Level: is.Level, Fixes: []SaveFixView{}}
+	v := SaveIssueView{Kind: is.Kind, Level: is.Level, Group: SaveGroupMods, Fixes: []SaveFixView{}}
+	switch is.Kind {
+	case app.IssueUnreadable, app.IssueCutOff, app.IssueMalformed:
+		v.Group = SaveGroupFile
+	case app.IssueGameVersion:
+		v.Group = SaveGroupGame
+	}
 	for _, f := range is.Fixes {
 		v.Fixes = append(v.Fixes, fixView(f, s))
 	}
@@ -385,40 +612,30 @@ func issueView(is app.SaveIssue, s *app.Save) SaveIssueView {
 		v.Head = T("no list matches this save")
 		v.Consequence = T("no launch of a list came before it, and no version of a list has the same Mods")
 	case app.IssueGameVersion:
-		v.Head = Tf("made in another game version (%s)", is.Text)
+		v.Head = Tf("the game version changed since this save (%s)", is.Text)
 		v.Consequence = T("the game converts it when it loads; Mods made only for the old version may be missing")
-	case app.IssueNotInstalled:
-		v.Sign = "−"
-		v.Head = Tf("%s is not installed", name)
-		v.Consequence = ownedConsequence(is.Owns, T("what it stored in the save is removed when the save loads"))
-		if len(is.Mods) > 0 && is.Mods[0].SteamID == "" {
-			v.Consequence += T("; it has no known Workshop page, so look for it yourself")
-		}
+	case app.IssueNotInstalled: // issueViews makes one row of these (goneView)
+		return goneView([]app.SaveIssue{is}, is.Owns, s)
 	case app.IssueDisabled:
 		v.Sign = "−"
+		v.Head = name
+		v.Title = T("installed but not in the list")
 		if s.Pack != "" {
-			v.Head = Tf("%s is not in the pack", name)
-		} else {
-			v.Head = Tf("%s is installed but not in the list", name)
+			v.Title = T("not in the pack")
 		}
 		v.Consequence = ownedConsequence(is.Owns, T("what it stored in the save is removed when the save loads without it"))
 	case app.IssueAdded:
 		v.Sign = "+"
-		if len(names) <= 2 {
-			v.Head = Tf("%s added since this save", strings.Join(names, T(", ")))
-		} else {
-			v.Head = Tf("%d Mods in the list are not in this save", len(names))
-		}
+		v.Head = namesText(names, 8)
+		v.Title = T("in the list, not in this save")
 		v.Consequence = T("usually safe: a new Mod starts fresh in an existing save")
-		if len(names) > 2 {
-			v.Consequence = Tf("%s and %d more; ", strings.Join(names[:2], T(", ")), len(names)-2) + v.Consequence
-		}
 	case app.IssueReordered:
 		v.Sign = "↕"
 		v.Head = Tf("%d Mods in another order", len(names))
 		if len(names) == 1 {
 			v.Head = Tf("%s is in another order", name)
 		}
+		v.Title = namesText(names, 12)
 		v.Consequence = T("usually safe: the same Mods load, only the order their patches apply in differs")
 	default:
 		v.Head = is.Kind
@@ -550,91 +767,73 @@ func argQuote(s string) string {
 	return `"` + strings.ReplaceAll(s, `"`, `\"`) + `"`
 }
 
-// ModRowsShown is how many rows of one Mod kind (not installed, not in the list) Can it load?
-// shows before it folds the rest into one row with one fix (06 §3.1 rule 8): a save of a
-// thousand missing Mods stays one screen and within the page's size limits (06 §11 A18).
+// ModRowsShown is how many rows of installed Mods not in the list Can it load? shows before
+// it folds the rest into one row with one fix (06 §3.1 rule 8): a save of a thousand such
+// Mods stays one screen and within the page's size limits (06 §11 A18). The Mods that are
+// not installed are one row already (goneView).
 const ModRowsShown = 4
 
-// foldModRows folds each kind's rows past ModRowsShown into one row: its names, the shared
-// consequence and one fix for all of them (enable or subscribe them; else the rows' own).
+// foldModRows folds the disabled rows past ModRowsShown into one row: their names, the
+// shared consequence and one fix enabling all of them (else the rows' own).
 func foldModRows(views []SaveIssueView, issues []app.SaveIssue, s *app.Save) []SaveIssueView {
-	count := map[string]int{}
+	count := 0
 	for _, v := range views {
-		if v.Kind == app.IssueNotInstalled || v.Kind == app.IssueDisabled {
-			count[v.Kind]++
+		if v.Kind == app.IssueDisabled {
+			count++
 		}
 	}
-	type fold struct {
-		at    int // where the folded row goes
-		names []string
-		pkgs  []string
-		fix   *SaveFixView
-		level string
+	if count <= ModRowsShown+1 {
+		return views
 	}
-	folds := map[string]*fold{}
-	seen := map[string]int{}
 	var out []SaveIssueView
+	var names, pkgs []string
+	var fix *SaveFixView
+	at, seen, level := -1, 0, ""
 	for i, v := range views {
-		n := count[v.Kind]
-		if n <= ModRowsShown+1 || (v.Kind != app.IssueNotInstalled && v.Kind != app.IssueDisabled) {
+		if v.Kind != app.IssueDisabled {
 			out = append(out, v)
 			continue
 		}
-		seen[v.Kind]++
-		if seen[v.Kind] <= ModRowsShown {
+		if seen++; seen <= ModRowsShown {
 			out = append(out, v)
 			continue
 		}
-		f := folds[v.Kind]
-		if f == nil {
-			f = &fold{at: len(out), level: v.Level}
-			folds[v.Kind] = f
+		if at < 0 {
+			at, level = len(out), v.Level
 			out = append(out, SaveIssueView{}) // filled below
 		}
-		if levelRank(v.Level) > levelRank(f.level) {
-			f.level = v.Level
+		if levelRank(v.Level) > levelRank(level) {
+			level = v.Level
 		}
-		f.names = append(f.names, v.Mods...)
+		names = append(names, v.Mods...)
 		for _, m := range issues[i].Mods {
-			f.pkgs = append(f.pkgs, m.PackageID)
+			pkgs = append(pkgs, m.PackageID)
 		}
 		for _, fx := range v.Fixes {
-			switch fx.Action {
-			case app.FixEnable, app.FixSubscribe:
-				if f.fix == nil || f.fix.Action != "mods" {
-					f.fix = &SaveFixView{Action: "mods", Label: T("enable or subscribe to these")}
-				}
-			default:
-				if f.fix == nil {
-					fx := fx
-					f.fix = &fx
-				}
+			switch {
+			case fx.Action == app.FixEnable:
+				fix = &SaveFixView{Action: "mods", Label: T("enable these")}
+			case fix == nil:
+				fx := fx
+				fix = &fx
 			}
 		}
 	}
-	for kind, f := range folds {
-		v := SaveIssueView{Kind: kind, Level: f.level, Sign: "−", Mods: f.names, Fixes: []SaveFixView{}}
-		if kind == app.IssueNotInstalled {
-			v.Head = Tf("%d more Mods are not installed", len(f.names))
-			v.Consequence = T("what they stored in the save is removed when the save loads")
-		} else {
-			v.Head = Tf("%d more Mods are installed but not in the list", len(f.names))
-			v.Consequence = T("what they stored in the save is removed when the save loads without them")
-		}
-		v.Consequence = namesText(f.names, 12) + ": " + v.Consequence
-		if f.fix != nil {
-			fx := *f.fix
-			if fx.Action == "mods" {
-				fx.Target = strings.Join(f.pkgs, " ")
-				fx.Command = "archo saves fix " + s.Ref + " --mod " + strings.Join(f.pkgs, " --mod ")
-				if len(fx.Command) > 200 {
-					fx.Command = fx.Command[:200] + "…"
-				}
+	v := SaveIssueView{Kind: app.IssueDisabled, Level: level, Group: SaveGroupMods, Sign: "−", Mods: names, Fixes: []SaveFixView{},
+		Head: Tf("%d more Mods are installed but not in the list", len(names)), Title: namesText(names, 40),
+		Consequence: namesText(names, 12) + ": " + T("what they stored in the save is removed when the save loads without them")}
+	if fix != nil {
+		fx := *fix
+		if fx.Action == "mods" {
+			fx.Target = strings.Join(pkgs, " ")
+			fx.Command = "archo saves fix " + s.Ref + " --mod " + strings.Join(pkgs, " --mod ")
+			if len(fx.Command) > 200 {
+				fx.Command = fx.Command[:200] + "…"
 			}
-			v.Fixes = append(v.Fixes, fx)
 		}
-		out[f.at] = v
+		v.Fixes = append(v.Fixes, fx)
 	}
+	out[at] = v
 	return out
 }
 

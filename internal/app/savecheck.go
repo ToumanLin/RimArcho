@@ -90,6 +90,9 @@ type SaveCheck struct {
 	Level string
 	Quick *SaveFix // the quick-fix bar's one action
 	Game  string   // the game version of the save's environment
+	// GoneOwns is what the not-installed Mods own together, what nothing installed
+	// provides counted once (10 §4.6); nil without the full read or such Mods.
+	GoneOwns *SaveOwned
 }
 
 // Verdict texts (10 §4.3).
@@ -254,9 +257,13 @@ func (a *App) CheckSave(s *Save) (*SaveCheck, error) {
 		}
 	}
 	fixable := 0
+	var gone []int
 	for _, i := range rows {
 		m := c.Mods[i]
 		installed := m.Instance != ""
+		if !installed {
+			gone = append(gone, i)
+		}
 		is := SaveIssue{Kind: IssueDisabled, Level: LevelWarning, Mods: []SaveMod{m}}
 		if o := owns.of(i); o != nil {
 			is.Owns = o
@@ -285,6 +292,7 @@ func (a *App) CheckSave(s *Save) (*SaveCheck, error) {
 		}
 		c.add(is)
 	}
+	c.GoneOwns = owns.group(gone)
 	for _, is := range owns.missingRows() {
 		c.add(is)
 	}

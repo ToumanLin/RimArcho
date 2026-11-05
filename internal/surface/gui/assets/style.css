@@ -1916,14 +1916,18 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 /* ---- Library › Saves (06 §2.11): colonies and their saves, the selected save, the playthrough ---- */
 .page.fill.saves { display: flex; flex-direction: column; }
 .sv { flex: 1; min-height: 0; display: grid; grid-template-columns: var(--sv-left, 248px) var(--card-gap) minmax(0, 11fr) var(--card-gap) var(--sv-right, minmax(260px, 9fr)); }
-.sv > .card { min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+.sv > .card, .sv-leftcol > .card.sv-left { min-height: 0; min-width: 0; display: flex; flex-direction: column; }
+.sv-leftcol { min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: var(--card-gap); }
+.sv-leftcol > .sv-left { flex: 1; }
 .sv-split { align-self: stretch; margin: 0; }
-.sv-search { flex: none; height: 38px; display: flex; align-items: center; gap: 6px; padding: 0 12px; border-bottom: var(--hairline) solid var(--line-2); color: var(--muted); }
-.sv-search .ic { display: inline-flex; }
+/* the search's own card: focused, its border lights up in place, the card's size and corners */
+.sv-find { height: 38px; display: flex; align-items: center; gap: 6px; padding: 0 10px 0 12px; color: var(--muted); cursor: text; transition: border-color var(--t-press); }
+.sv-find:focus-within { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); color: var(--fg-2); }
 .sv-q { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: none; font: inherit; color: var(--fg); }
+.sv-q:focus-visible { outline: none; }
 .sv-q::-webkit-search-cancel-button { display: none; }
-.sv-search kbd { margin: 0; }
-.sv-search:focus-within { color: var(--fg-2); }
+.sv-find kbd { margin: 0; }
+.sv-cardhead { flex: none; display: flex; align-items: baseline; padding: 9px 12px 7px; border-bottom: var(--hairline) solid var(--line-2); font-size: 12px; font-weight: 600; color: var(--muted); }
 .sv-tree { flex: 1; min-height: 0; overflow-y: auto; padding: 4px; outline: none; }
 .sv-tree:focus-visible { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
 .sv-col { width: 100%; height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 8px 0 4px; border-radius: var(--r-sm); font-weight: 600; color: var(--fg); text-align: left; user-select: none; }
@@ -1946,6 +1950,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .sv-row1 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 26px; }
 .sv-row1 .muted { font-size: 12px; }
 .sv-name { margin: 0; font-size: 15px; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.sv-row1 > .anum { margin-right: -2px; }
 .sv-acts { margin-left: auto; display: flex; gap: 2px; flex-wrap: wrap; }
 .sv-rename { flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .sv-rename .xc-input { flex: none; height: 26px; font-size: 15px; font-weight: 600; }
@@ -1954,7 +1959,8 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .sv-kv { display: grid; grid-template-columns: minmax(64px, max-content) minmax(0, 1fr); gap: 4px 12px; margin: 10px 0 0; font-size: 13px; }
 .sv-kv dt { color: var(--muted); }
 .sv-kv dd { margin: 0; color: var(--fg-2); min-width: 0; overflow-wrap: anywhere; }
-.sv-kv dd.sv-loc { font: 12px var(--code); }
+.sv-kv dd.sv-loc { font: 12px var(--code); display: flex; align-items: center; flex-wrap: wrap; gap: 2px 8px; }
+.sv-kv dd.sv-loc .btn.link.sv-open { font: 12px var(--font); padding: 0 4px; height: 20px; }
 .sv-match { font-size: 12px; }
 .sv-sect { padding: 14px 16px; }
 .sv-sect + .sv-sect { border-top: var(--hairline) solid var(--line-2); }
@@ -1965,7 +1971,8 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .sv-fixbar.ok { background: var(--green-soft); }
 .sv-fixbar.busy { background: var(--pill); }
 .sv-fixbar .t { flex: 1 1 200px; font-weight: 600; }
-.sv-issues { margin-top: 6px; }
+.sv-group { margin: 14px 0 0; font-size: 12px; font-weight: 600; color: var(--muted); }
+.sv-issues { margin-top: 2px; }
 .sv-iss { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 2px 8px; align-items: baseline; padding: 9px 0; border-top: var(--hairline) solid var(--line-2); }
 .sv-iss:first-child { border-top: 0; }
 .sv-iss .h { font-weight: 600; overflow-wrap: anywhere; }
@@ -1976,6 +1983,13 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .sv-iss .sign.m, .sv-iss.error .sign.o { color: var(--red); }
 .sv-iss.warning .sign.o { color: var(--amber); }
 .sv-iss .sign.p { color: var(--green); }
+.sv-details { grid-column: 2 / -1; margin-top: 6px; padding: 8px 10px; border-radius: var(--r-lg); background: var(--card-2); border: var(--hairline) solid var(--line-2); font-size: 12px; color: var(--fg-2); }
+.sv-dmods { margin: 0; padding: 0; list-style: none; }
+.sv-dmods li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; padding: 1px 0; }
+.sv-dmods li .n { font-weight: 600; color: var(--fg); }
+.sv-dmods code { font: 12px var(--code); }
+.sv-lost { margin: 6px 0 0; overflow-wrap: anywhere; }
+.sv-lost b { font-weight: 600; color: var(--fg); }
 .page .btn.sv-fix { border: var(--hairline) solid var(--line); background: var(--card); }
 .page .btn.sv-fix:hover { background: var(--pill); }
 .sv-ask { margin: 10px 16px 0; padding: 10px 12px; border-radius: var(--r-lg); background: var(--amber-soft); }
@@ -1984,17 +1998,16 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .sv-ask .files { margin: 0 0 6px; padding-left: 18px; font: 12px var(--code); color: var(--fg-2); }
 .sv-ask .muted { margin: 0 0 8px; font-size: 12px; overflow-wrap: anywhere; }
 .sv-ask .btns { display: flex; gap: 6px; }
-.sv-mods { margin: 0; padding: 0; list-style: none; font-size: 13px; columns: 2 220px; column-gap: 20px; }
-.sv-mods li { display: flex; gap: 8px; align-items: baseline; padding: 2px 0; break-inside: avoid; color: var(--fg-2); }
-.sv-mods li i { font-style: normal; font-size: 12px; color: var(--faint); width: 22px; text-align: right; flex: none; font-variant-numeric: tabular-nums; }
-.sv-mods li .n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sv-mods li.gone .n { color: var(--red); }
-.sv-mods li.off .n { color: var(--amber); }
-.sv-mods li .mv { font-weight: 400; color: var(--muted); font-size: 12px; }
+/* every Mod of the save; only the rows in view are mounted (saves.js modRows) */
+.sv-mods { position: relative; font-size: 13px; }
+.sv-mods .r { position: absolute; left: 0; right: 0; height: 24px; display: flex; gap: 8px; align-items: center; color: var(--fg-2); }
+.sv-mods .r i { font-style: normal; font-size: 12px; color: var(--faint); width: 30px; text-align: right; flex: none; font-variant-numeric: tabular-nums; }
+.sv-mods .r .n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sv-mods .r.gone .n { color: var(--red); }
+.sv-mods .r.off .n { color: var(--amber); }
+.sv-mods .r .mv { font-weight: 400; color: var(--muted); font-size: 12px; }
 .sv-mods .tagx { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: var(--r-sm); font-size: 12px; background: var(--pill); color: var(--muted); white-space: nowrap; }
 .sv-mods .tagx.bad { color: var(--red); background: var(--red-soft); }
-.sv-more { margin-top: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 12px; }
-.sv-more .btn.link { padding: 0 4px; margin-left: -4px; }
 .sv-note { margin: 10px 0 0; font-size: 12px; }
 .sv-folder { margin: 6px auto 0; max-width: 560px; font: 12px var(--code); }
 /* the right card (06 §2.11 "Right"): numbers at this save, colonists, letters, the colony over time */
@@ -2037,7 +2050,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .sv-legend .p::before { height: 1px; background: repeating-linear-gradient(90deg, var(--muted) 0 3px, transparent 3px 6px); }
 .sv-legend .x::before { width: 1px; height: 10px; background: var(--red); opacity: .6; }
 @media (max-width: 1180px) { .sv { grid-template-columns: var(--sv-left, 220px) var(--card-gap) minmax(0, 1fr) var(--card-gap) var(--sv-right, minmax(240px, 1fr)); } }
-@media (max-width: 900px) { .sv { display: flex; flex-direction: column; gap: var(--card-gap); } .sv-split { display: none; } .page.fill.saves { height: auto; } .sv > .card { max-height: 70vh; } .sv-left { height: 360px; } }
+@media (max-width: 900px) { .sv { display: flex; flex-direction: column; gap: var(--card-gap); } .sv-split { display: none; } .page.fill.saves { height: auto; } .sv > .card { max-height: 70vh; } .sv-leftcol > .sv-left { height: 360px; flex: none; } }
 
 /* ---- Mod library › Mod settings (06 §2.9): the settings files on the left, the values ---- */
 .page.fill.modsettings { display: flex; flex-direction: column; }

@@ -1492,7 +1492,10 @@ func (s *API) Analyze() bool {
 	return s.startAnalyze()
 }
 
-func (s *API) startAnalyze() bool {
+func (s *API) startAnalyze() bool { return s.startAnalyzeOf("") }
+
+// startAnalyzeOf analyses a list by name ("" the open one); s.mu is held.
+func (s *API) startAnalyzeOf(list string) bool {
 	if s.needsClosed || s.busy["analyze"] {
 		return false
 	}
@@ -1504,6 +1507,9 @@ func (s *API) startAnalyze() bool {
 	obj := env
 	if s.board != nil && s.board.St != nil && s.board.St.Plan != nil {
 		obj = s.board.St.Plan.Name
+	}
+	if list != "" {
+		plan, obj = list, list
 	}
 	task := s.beginSelf(view.TaskAnalyze, obj, nil)
 	s.needsJobs.Add(1)

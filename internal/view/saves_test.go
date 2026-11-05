@@ -75,16 +75,6 @@ func TestSavesRows(t *testing.T) {
 	if !p.Colonies[1].Saves[0].Auto {
 		t.Fatal("the autosave is not marked")
 	}
-	// search matches Mods in a colony's saves, by packageId or name, without case
-	if got := view.SavesMatching(l, "GONE mod"); !slices.Equal(got, []string{p.Colonies[1].Key}) {
-		t.Fatalf("search by Mod name: %v", got)
-	}
-	if got := view.SavesMatching(l, "old.m3"); !slices.Equal(got, []string{p.Colonies[3].Key}) {
-		t.Fatalf("search by packageId: %v", got)
-	}
-	if got := view.SavesMatching(l, ""); len(got) != 0 {
-		t.Fatalf("empty search: %v", got)
-	}
 
 	empty := view.SavesRows(&app.SaveList{})
 	if empty.Saves != 0 || empty.Empty == "" || empty.Lead != "" {
@@ -95,6 +85,7 @@ func TestSavesRows(t *testing.T) {
 func TestSaveDetail(t *testing.T) {
 	t.Parallel()
 	e := savesEnv(t)
+	current := false
 	detail := func(name string, running bool) *view.SaveDetail {
 		t.Helper()
 		s, _, err := e.App.FindSave(name)
@@ -105,12 +96,12 @@ func TestSaveDetail(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		return view.SaveDetailOf(c, running)
+		return view.SaveDetailOf(c, running, current)
 	}
 	rows := func(d *view.SaveDetail) []string {
 		var out []string
 		for _, is := range d.Issues {
-			r := is.Level + " " + is.Sign + " " + is.Head
+			r := is.Group + " " + is.Level + " " + is.Sign + " " + is.Head
 			for _, f := range is.Fixes {
 				r += " [" + f.Label + "]"
 			}
@@ -131,32 +122,42 @@ func TestSaveDetail(t *testing.T) {
 		t.Fatal("play facts from the head: the right card is the caller's (gui savePlay)")
 	}
 
-	// Mods missing and reordered: one row each, with its consequence and its own fix
+	// Mods missing and reordered: one row each, with its consequence and its own fix; the
+	// bar offers no Fix and launch (06 §2.11)
+	current = true
 	d = detail("Tundra 2", false)
+	current = false
 	want := []string{
-		"warning − Gamma is installed but not in the list [enable in the list]",
-		"warning − Gone Mod is not installed [subscribe and enable]",
-		"info ↕ Beta is in another order [use the save's order]",
+		"mods warning − Gamma [enable]",
+		"mods warning − Gone Mod [subscribe and enable]",
+		"mods info ↕ Beta is in another order [use the save's order]",
 	}
 	if !slices.Equal(rows(d), want) {
 		t.Fatalf("issues %q\nwant %q", rows(d), want)
 	}
-	if d.Verdict != "loads, but content will be lost" || d.Quick.Label != "fix and launch" || d.Quick.Command != "archo saves fix "+d.Ref+" --launch" {
+	if d.Verdict != "content will be lost" || d.Quick != nil {
 		t.Fatalf("verdict %q quick %+v", d.Verdict, d.Quick)
 	}
-	if d.Match != "saved after a launch of this list" || d.Against != "against default as it is now" {
+	if d.Match != "saved after a launch of this list" || d.Against != "against the current list default" {
 		t.Fatalf("match %q against %q", d.Match, d.Against)
+	}
+	if d.Issues[0].Title != "installed but not in the list" || d.Issues[1].Details == nil || len(d.Issues[1].Details.Mods) != 1 ||
+		d.Issues[1].Details.Mods[0] != (view.SaveDetailMod{Name: "Gone Mod", PackageID: "tester.gone", Note: "Workshop 99"}) {
+		t.Fatalf("hover text and details: %+v", d.Issues[:2])
 	}
 	for _, is := range d.Issues {
 		if is.Consequence == "" {
 			t.Fatalf("no consequence: %+v", is)
 		}
 	}
-	if d.Missing != 1 || d.Moved != 1 || len(d.Mods) != 5 || !d.Mods[4].Missing || !d.Mods[3].Off || !d.Mods[1].Moved {
+	if len(d.Mods) != 5 || !d.Mods[4].Missing || !d.Mods[3].Off || !d.Mods[1].Moved {
 		t.Fatalf("Mod list: %+v", d.Mods)
 	}
 	if d.NewList == nil || d.NewList.Label != "make a list from this save" {
 		t.Fatalf("make a list: %+v", d.NewList)
+	}
+	if d := detail("Tundra 2", false); d.Against != "against list default" {
+		t.Fatalf("against a list that is not current: %q", d.Against)
 	}
 
 	// cut off: Recycle first, and the colony's previous readable save
@@ -164,26 +165,25 @@ func TestSaveDetail(t *testing.T) {
 	if d.Level != app.LevelError || d.Verdict != "this save cannot be loaded" || d.Quick.Action != app.FixRecycle || d.Quick.Label != "recycle…" {
 		t.Fatalf("cut off: %+v %v", d, rows(d))
 	}
-	if r := rows(d)[0]; r != "error  the file is cut off [recycle…]" {
+	if r := rows(d)[0]; r != "file error  the file is cut off [recycle…]" {
 		t.Fatalf("cut-off row %q", r)
 	}
 
-	// no list, another game version, seven Mods not installed: four rows and one folded row
+	// no list, another game version, seven Mods not installed: the game's row first, then
+	// one row for the seven
 	d = detail("Sandy", false)
 	got := rows(d)
-	if d.ListKind != "" || d.Quick.Action != app.FixNewList || !strings.Contains(got[0], "made in another game version (1.5.4104 rev435 → 1.6.4633 rev1261)") {
-		t.Fatalf("no list: %+v %q", d, got)
+	want = []string{
+		"game warning  the game version changed since this save (1.5.4104 rev435 → 1.6.4633 rev1261)",
+		"mods warning − Old 0, Old 1, Old 2, Old 3, Old 4, Old 5 and 1 more",
+		"mods info  no list matches this save [make a list from this save]",
 	}
-	var folded *view.SaveIssueView
-	n := 0
-	for i, is := range d.Issues {
-		if is.Kind == app.IssueNotInstalled {
-			n++
-			folded = &d.Issues[i]
-		}
+	if d.ListKind != "" || d.Quick.Action != app.FixNewList || !slices.Equal(got, want) {
+		t.Fatalf("no list: %+v\n%q\nwant %q", d, got, want)
 	}
-	if n != view.ModRowsShown+1 || folded.Head != "3 more Mods are not installed" || len(folded.Mods) != 3 || !strings.HasPrefix(folded.Consequence, "Old 4, Old 5, Old 6: ") {
-		t.Fatalf("folded rows: %d, %+v", n, folded)
+	if g := d.Issues[1]; len(g.Mods) != 7 || len(g.Details.Mods) != 7 || g.Details.Mods[0].Note != "no known Workshop page" ||
+		g.Consequence != "what they stored in the save is removed when the save loads" {
+		t.Fatalf("the Mods not installed: %+v", g)
 	}
 
 	// a running game locks rename and recycle, with the reason
@@ -192,7 +192,7 @@ func TestSaveDetail(t *testing.T) {
 	}
 }
 
-// Seven Mods to enable or subscribe fold into one row whose one fix names all of them.
+// Seven Mods to subscribe are one row whose one fix names all of them.
 func TestSaveDetailFoldsFixes(t *testing.T) {
 	t.Parallel()
 	e := savesEnv(t)
@@ -211,15 +211,16 @@ func TestSaveDetailFoldsFixes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := view.SaveDetailOf(c, false)
-	var last view.SaveIssueView
+	d := view.SaveDetailOf(c, false, false)
+	var gone []view.SaveIssueView
 	for _, is := range d.Issues {
 		if is.Kind == app.IssueNotInstalled {
-			last = is
+			gone = append(gone, is)
 		}
 	}
-	if len(last.Fixes) != 1 || last.Fixes[0].Action != "mods" || last.Fixes[0].Target != "more.m4 more.m5 more.m6" {
-		t.Fatalf("folded fix: %+v", last)
+	if len(gone) != 1 || len(gone[0].Fixes) != 1 || gone[0].Fixes[0].Action != "mods" || gone[0].Fixes[0].Label != "subscribe and enable these" ||
+		gone[0].Fixes[0].Target != "more.m0 more.m1 more.m2 more.m3 more.m4 more.m5 more.m6" {
+		t.Fatalf("one row, one fix: %+v", gone)
 	}
 }
 
