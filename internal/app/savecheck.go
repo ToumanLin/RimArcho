@@ -1,9 +1,11 @@
 package app
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/savefile"
 )
 
 // Can it load? (10 §4.3): a save compared with the list it matched, as that list is now.
@@ -17,11 +19,13 @@ const (
 	LevelError   = "error"
 )
 
-// Issue kinds (10 §4.3). Kinds needing the full read (classes, references, last load) are
-// added with it.
+// Issue kinds (10 §4.3). Malformed and class-missing need the full read (10 §1.7 L1);
+// the last load's errors (03 §6.7) and dangling references are not implemented.
 const (
 	IssueUnreadable   = "unreadable"    // no <meta> or not XML at the start
 	IssueCutOff       = "cut-off"       // no </savegame> at the end
+	IssueMalformed    = "malformed"     // L1: the XML is not well formed (Text: where reading stopped)
+	IssueClassMissing = "class-missing" // L1: Class="…" values no loaded Mod nor the game defines (Owns.Classes)
 	IssueNoList       = "no-list"       // matches no list or pack
 	IssueGameVersion  = "game-version"  // made for another major.minor than the game
 	IssueNotInstalled = "not-installed" // a Mod in the save is not installed (in the list or not)
@@ -68,7 +72,11 @@ type SaveIssue struct {
 	Level string    `json:"level"`
 	Mods  []SaveMod `json:"mods,omitempty"`
 	Text  string    `json:"text,omitempty"` // e.g. the versions of a game-version issue
-	Fixes []SaveFix `json:"fixes,omitempty"`
+	// Owns is what the row's Mod owns in the save (10 §4.6), from the full read: on
+	// not-installed and disabled rows (nil without the full read, or when neither Defs nor
+	// classes could be checked), and the classes of a class-missing row.
+	Owns  *SaveOwned `json:"owns,omitempty"`
+	Fixes []SaveFix  `json:"fixes,omitempty"`
 }
 
 // SaveCheck is a save against its list.
@@ -98,7 +106,9 @@ func (c *SaveCheck) Verdict() string {
 }
 
 // CheckSave compares a save with its list (10 §4.3). It reads the list's environment and
-// plan; nothing is written.
+// plan; nothing is written. With the save's full read cached (10 §1.7 L1; never read here)
+// it adds the malformed and class-missing rows and what each missing Mod owns (10 §4.6),
+// which makes a Mod owning pawns, factions or classes an error.
 func (a *App) CheckSave(s *Save) (*SaveCheck, error) {
 	c := &SaveCheck{Save: s}
 	if s.Env != nil {
@@ -114,23 +124,43 @@ func (a *App) CheckSave(s *Save) (*SaveCheck, error) {
 		c.Quick = &recycle
 		return c, nil
 	}
-	if !s.Head.Complete {
+	unloadable := func() []SaveFix {
 		fixes := []SaveFix{recycle}
 		if p := s.previousReadable(); p != nil {
 			fixes = append(fixes, SaveFix{Action: FixOpenSave, Label: "Open " + p.Name, Command: "saves show " + p.Ref, Target: p.Ref})
 		}
-		c.add(SaveIssue{Kind: IssueCutOff, Level: LevelError, Fixes: fixes})
+		return fixes
+	}
+	if !s.Head.Complete {
+		c.add(SaveIssue{Kind: IssueCutOff, Level: LevelError, Fixes: unloadable()})
 		c.Quick = &recycle
+	}
+	facts, err := a.SaveFacts(s, false)
+	if err != nil {
+		return nil, err
+	}
+	// A file that only ends early has the cut-off row already.
+	if facts != nil && facts.Malformed != nil && !(facts.Malformed.EOF && !s.Head.Complete) {
+		c.add(SaveIssue{Kind: IssueMalformed, Level: LevelError, Text: malformedText(facts.Malformed), Fixes: unloadable()})
+		if c.Quick == nil {
+			c.Quick = &recycle
+		}
 	}
 
 	// The list as it is now, and what this game would load for each packageId.
 	var list []SaveMod
 	hasList := false
 	var resolve func(string) string
-	err := a.inSaveList(s, func() error {
-		st, err := a.Loadout()
-		if err == nil {
+	var st *LoadoutState
+	mm := ""              // the game version whose facts the list's analysis reads
+	var packInst []string // the installed copies a pack's Mods come from
+	err = a.inSaveList(s, func() error {
+		var err error
+		if st, err = a.Loadout(); err == nil {
+			mm = a.Store.MM
 			resolve = func(pkg string) string { return st.Reg.Resolve(pkg).Instance }
+		} else {
+			st = nil
 		}
 		switch {
 		case s.Pack != "":
@@ -143,6 +173,11 @@ func (a *App) CheckSave(s *Save) (*SaveCheck, error) {
 			for _, e := range p.Entries {
 				list = append(list, SaveMod{PackageID: strings.ToLower(e.PackageID), Name: e.Name, SteamID: e.WorkshopID, InList: true})
 				inPack[normPkg(e.PackageID)] = true
+				inst := e.Instance
+				if inst == "" && st != nil {
+					inst = st.Reg.Resolve(e.PackageID).Instance
+				}
+				packInst = append(packInst, inst)
 			}
 			// A pack carries its Mods: what it has is what loads.
 			resolve = func(pkg string) string {
@@ -202,15 +237,33 @@ func (a *App) CheckSave(s *Save) (*SaveCheck, error) {
 		c.add(SaveIssue{Kind: IssueNoList, Level: LevelInfo, Fixes: []SaveFix{newList}})
 	}
 	editable := s.Plan != nil
-	fixable := 0
-	for _, m := range c.Mods {
-		// A Mod the list has only as a missing entry (a fix added it, its download is not
-		// scanned yet) is as absent from the game as one the list lacks.
-		installed := m.Instance != ""
-		if installed && (m.InList || !hasList) {
+	// The Mods with a row of their own. A Mod the list has only as a missing entry (a fix
+	// added it, its download is not scanned yet) is as absent from the game as one the list
+	// lacks.
+	var rows []int
+	for i, m := range c.Mods {
+		if m.Instance != "" && (m.InList || !hasList) {
 			continue
 		}
+		rows = append(rows, i)
+	}
+	var owns *saveOwnership
+	if facts != nil && st != nil {
+		if owns, err = a.saveOwnership(s, st, mm, facts, c.Mods, rows, packInst); err != nil {
+			return nil, err
+		}
+	}
+	fixable := 0
+	for _, i := range rows {
+		m := c.Mods[i]
+		installed := m.Instance != ""
 		is := SaveIssue{Kind: IssueDisabled, Level: LevelWarning, Mods: []SaveMod{m}}
+		if o := owns.of(i); o != nil {
+			is.Owns = o
+			if o.Severe() {
+				is.Level = LevelError
+			}
+		}
 		if !installed {
 			is.Kind = IssueNotInstalled
 		}
@@ -230,6 +283,9 @@ func (a *App) CheckSave(s *Save) (*SaveCheck, error) {
 				is.Fixes = []SaveFix{newList}
 			}
 		}
+		c.add(is)
+	}
+	for _, is := range owns.missingRows() {
 		c.add(is)
 	}
 	if editable && len(c.ListOnly) > 0 {
@@ -288,7 +344,16 @@ func levelRank(l string) int {
 	return 0
 }
 
-// previousReadable is the newest older save of the same colony that is complete.
+// malformedText says where reading stopped.
+func malformedText(m *savefile.Malformed) string {
+	if m.EOF {
+		return fmt.Sprintf("the file ends at line %d before the save does", m.Line)
+	}
+	return fmt.Sprintf("line %d (byte %d): %s", m.Line, m.Offset, m.Msg)
+}
+
+// previousReadable is the newest older save of the same colony that is complete and, when
+// read in full, well formed.
 func (s *Save) previousReadable() *Save {
 	if s.Colony == nil {
 		return nil
@@ -299,7 +364,7 @@ func (s *Save) previousReadable() *Save {
 			after = true
 			continue
 		}
-		if after && o.Head != nil && o.Head.Complete && !o.Writing {
+		if after && o.Head != nil && o.Head.Complete && !o.Writing && (o.Summary == nil || !o.Summary.Malformed) {
 			return o
 		}
 	}

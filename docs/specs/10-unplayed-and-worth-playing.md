@@ -1,6 +1,6 @@
 # 10 · Unplayed and worth playing
 
-> Status: question two, "what haven't I played?", is a design specification for 1.1; §5 is for 1.2; §6 is a long-term direction. Implemented: reading the Mod list at the start of a save (§1.3), the save head (§1.7 L0), grouping and matching (§4.1, §4.2), the head-only rows of can it load (§4.3), the actions (§4.4) and the save commands and tools (§1.6). Everything else is unimplemented. The Saves page, its read tiers and its tools were decided on 2026-11-04 (§1.6, §1.7, §4; 06 §2.11).
+> Status: question two, "what haven't I played?", is a design specification for 1.1; §5 is for 1.2; §6 is a long-term direction. Implemented: reading the Mod list at the start of a save (§1.3), the save head (§1.7 L0), the full read's core (§1.7 L1), grouping and matching (§4.1, §4.2), can it load except the last load's errors (§4.3), what a Mod owns in a save (§4.6), the actions (§4.4) and the save commands and tools (§1.6). Everything else is unimplemented. The Saves page, its read tiers and its tools were decided on 2026-11-04 (§1.6, §1.7, §4; 06 §2.11).
 > Basis: 00 (§2, §4), 00a, 03, 04, 06, 08, 09.
 
 Question two asks: **which installed Mods and content have gone unused across multiple playthroughs?** Read all saves without modifying them and map the Defs they reference back to their providing Mods. This analysis is deterministic and needs no AI; Archo participates only in interpreting results and making suggestions (09 §4).
@@ -61,7 +61,7 @@ Save reading has read-only tools in the tool layer (05 §1.2, §4.2, §5.2): `sa
 
 ### 1.7 Read tiers, cache and background reading
 
-A save is read at three costs; each tier is computed and cached separately. L0 is implemented (`savefile.ReadHead`, cached in memory per App by path, size and mtime; `app.ListSaves`). L1 is implemented in the core (`internal/app/saveread.go`): the cache, `archo saves index`, `Save.Summary` on every listed save with a valid cache row, `App.SaveFacts` for one save, and grouping by world (§4.1); the CLI, MCP and page do not show L1 facts yet.
+A save is read at three costs; each tier is computed and cached separately. L0 is implemented (`savefile.ReadHead`, cached in memory per App by path, size and mtime; `app.ListSaves`). L1 is implemented in the core (`internal/app/saveread.go`): the cache, `archo saves index`, `Save.Summary` on every listed save with a valid cache row, `App.SaveFacts` for one save, and grouping by world (§4.1). Can it load uses the cached facts for its malformed and class rows and for what a missing Mod owns (§4.3, §4.6); the CLI, MCP and page do not show play facts yet.
 
 | Tier | What | Cost | Used for |
 | --- | --- | --- | --- |
@@ -183,15 +183,15 @@ Approximate matching for rule 3 (an enabled set differing by one or two entries)
 
 **Where it belongs**: game version and environment, the matched list or pack with the rule that matched it, and the location (folder and file).
 
-**Can it load?** compares the save with the matched list as it is now and lists only what needs attention. Passed checks are not listed. `app.CheckSave` implements the rows that need only the head (cut off, Mods, order, game version, no list); the rows needing the full read (malformed XML, classes, last load) are not implemented.
+**Can it load?** compares the save with the matched list as it is now and lists only what needs attention. Passed checks are not listed. `app.CheckSave` implements every row but the last load's: the rows needing only the head (cut off, Mods, order, game version, no list) always, and those needing the full read (malformed XML, classes, what a Mod owns) when the save's L1 facts are cached (§1.7; `CheckSave` never reads a save in full). Without them its rows and levels are those of the head alone.
 
 | Item | Level | Consequence shown | Fix |
 | --- | --- | --- | --- |
 | Cut off: no `</savegame>` (L0) and not being written | Error | Can never load | Recycle; open the previous readable save |
-| Malformed XML (L1) | Error | Where reading stopped | Recycle; open the previous readable save |
-| A Mod in the save is not installed, whether the list lacks it or has it only as a missing entry (as after a fix, until Steam's download is scanned) | Error when it owns pawns, factions, world components or classes in the save; otherwise warning | What it owns (§4.6), broken references, missing classes | Subscribe and enable (needs `<modSteamIds>`; only Subscribe when the list has it already), else Make a list from this save |
+| Malformed XML (L1). A file that only ends early is the cut-off row, not this one | Error | Where reading stopped (line and byte) | Recycle; open the previous readable save (complete and, when read, well formed) |
+| A Mod in the save is not installed, whether the list lacks it or has it only as a missing entry (as after a fix, until Steam's download is scanned) | Error when it owns pawns, factions or classes in the save (L1, §4.6); otherwise, and without the full read, warning | What it owns (§4.6), its classes among them; broken references are not implemented | Subscribe and enable (needs `<modSteamIds>`; only Subscribe when the list has it already), else Make a list from this save |
 | A Mod in the save is installed but not enabled | As above | As above | Enable in the list, positioned in save order |
-| `Class="…"` with no type in installed assemblies or the game | Error | The type, and its Mod when known | The fix of that Mod's row |
+| `Class="…"` with no type in the list's loaded Mods or the game (L1), and no Mod with a row of its own explaining it: a class whose Mod has a row is counted in that row (§4.6) | Error | The types, and the installed Mod defining them when one does (one row per such Mod, one for types no installed Mod defines) | None: such a Mod is not in the save's Mods |
 | The last load of this save had errors (a game log phase whose save name matches, 03 §6.7) | Error | Count and first message | Open the game log at that load |
 | A Mod in the list is not in the save | Information | Usually safe: it starts fresh in an existing save | Disable to match |
 | Same Mods in a different order | Information | Usually safe; patch order differs | Use the save's order |
@@ -199,7 +199,8 @@ Approximate matching for rule 3 (an enabled set differing by one or two entries)
 
 - Compare packageIds case-insensitively. For Workshop entries written as `<package ID>_steam`, strip the suffix before comparing (04 §4.1).
 - The verdict takes the highest level present: **loads with the list**, **loads, but content will be lost** (warnings) or **will not load cleanly** (errors). The quick-fix bar has at most one primary action: **Fix and launch** applies every Mod fix as one reversible plan edit, starts any subscriptions, previews, then launches (08 §2); for a cut-off save it is Recycle; for a save matching no list it is Make a list from this save.
-- `saves show` prints each item with its consequence and the command that performs the fix (`fix: <label> (archo <command>)`), then the quick fix. Until §4.6, the consequence of a missing Mod is generic: what it added to the save is lost on load.
+- `saves show` prints each item with its consequence and the command that performs the fix (`fix: <label> (archo <command>)`), then the quick fix. With the full read, a missing Mod's consequence says what loading without it loses (§4.6), marked inferred where it is; without it, the consequence is generic: what it added to the save is lost on load.
+- `saves fix --launch` does not launch a malformed save, as for a cut-off one.
 
 **Mod list**: the save's Mods in load order, named from `<modNames>`; not-installed entries and reordered entries marked; the list's Mods missing from the save named after it.
 
@@ -230,7 +231,16 @@ From the L1 facts of a colony's saves (and the game's own history records inside
 
 ### 4.6 What a Mod owns in a save
 
-To state the consequence of a missing Mod, attribute the save's objects to Mods: Def references by §1.5; `Class="…"` values by the type index of Mod assemblies (`store.TypeOwners`) plus the game's own assemblies (`store.GameClassOwners`, 03 §5.3; resolution order 07 §7 item 20); pawns by their race Def, factions by their Def, world and game components by their class. Report counts per kind ("3 colonists of the Kurin race, 1 faction, 2 hediffs"). The same attribution answers whether a Mod can be removed mid-playthrough (`saves list --mod`).
+Implemented for can it load (`internal/app/saveowners.go`, 2026-11-04; synthetic tests only, unverified on real saves). To state the consequence of a missing Mod, attribute the save's L1 facts (§1.7) to the Mods with a row of their own (not installed, or installed but not in the list). A Mod **owns** what the save needs and nothing the list loads provides: an object that a Mod the list loads, or the game, also provides is not lost.
+
+- **Defs**: each `<def>` value by Def facts (03 §2; batched, `store.DefDefiners`), as in §1.5: non-abstract definitions; of several defining Mods with rows, the last in the save's order. A Def the game generates from another at startup has no Def file and resolves by the Def it is made from: prefixes `Corpse_`, `Meat_`, `Blueprint_`, `Blueprint_Install_`, `Frame_`, `Techprint_`, `Psytrainer_`, `Neurotrainer_`, `Make_`, `Administer_`, suffixes `_Rough`, `_RoughHewn`, `_Smooth` (`DefGenerator`, 1.6). Counted per Def type with the number of `<def>` elements naming them, about one per object ("3 things, 1 hediff").
+- **Pawns** (the player's humanlike pawns, alive and dead) by their race Def; **factions** by their FactionDef, named by the faction's name. The facts count animals, mechanoids and prisoners without their races, so those are not attributed.
+- **Classes**: each `Class="…"` value; a generic one by its definition and each argument. The game's own types by `store.GameClassOwners` (03 §5.3); `System.` and `UnityEngine.` types count as present (not indexed; the runtime has them). Mod types by `store.TypeDefiners` in every form the game tries (07 §7 item 20): the value, and the value prefixed by each of `store.SaveNamespaces`; a simple name found nowhere is looked up as a nested type's inner name (`store.NestedTypeDefiners`). World and game components are among the classes: the facts do not say where a `Class` appeared, so they are not reported apart (not implemented; needs a scanner field).
+- **Which facts exist** (03 §3), and so what is certain: Def facts for every loadable installed Mod once an analysis of the game version has run; type facts only for Mods enabled when an analysis ran (a disabled Mod keeps them while its content is unchanged); a Mod removed from disk keeps its facts while its tombstone lasts (02 §5.5; inferred from the code and seen in synthetic tests: scan and analysis keep a tombstone's version view). Facts of any copy of the packageId count, in any environment of that game version (`store.PackageFactViews`). A Mod without facts of a kind (never installed, or disabled without type facts) is given, **inferred**, what nothing installed provides of that kind: the Defs no installed Mod defines and the classes no installed assembly nor the game defines. When several Mods lack facts, each is given all of it and says it may belong to the others. A Def no installed Mod defines may also be one a Mod update removed (§1.5), so a Mod whose inferred share is only Defs stays a warning.
+- **Unchecked**: when a Mod the list loads has no Def view, the Defs, pawns and factions are not checked; when one has no DLL view, or the game's types are not indexed (`GameTypesIndexed`), a class found nowhere is not concluded on (no class-missing row, nothing inferred), since it may be in the unindexed assembly. The row says what was not checked; with neither checked it is as without the full read.
+- Counts per kind ("3 colonists of race Kurin_Race (1 dead), 1 faction (Kurin Clan), 1 class (ModA.CompBroken), 3 things, 1 hediff") are `app.SaveOwned` on the row's `SaveIssue.Owns` (JSON `owns`); the text is `consequence()` in `internal/cmds/saves.go` (CLI and MCP) and `issueView()` in `internal/view/saves.go` (the page).
+- Speed: `saves list` checks every save, so lookups are batched and kept per App while the database is unchanged (`saveOwnerMemo`); Defs are looked up only for saves with a Mod row. Measured in 07 §6.
+- Not implemented: whether a Mod can be removed mid-playthrough (`saves list --mod`), which the same attribution answers.
 
 ## 5. Playthrough themes and content conflicts (1.2)
 
@@ -276,5 +286,5 @@ Two pages under "worth playing" in the sidebar: play goals and shared packs (06 
 | SV11 | Open Saves with no L1 cache | Left card, middle header and Mod list appear from L0 at once; the background task reads the selected save first | Unimplemented |
 | SV12 | A save written during a crash (no `</savegame>`) | Cut off, error, Recycle offered; a file still being written gets no verdict | Partial: cut off passes (synthetic: `TestCheckSave`); a file being written is untested |
 | SV13 | RimSaves name `Ashfall#§#Landing.rws` | Grouped under colony `Ashfall`, shown as `Landing` | Pass (synthetic: `TestSavesListGroupAndMatch`) |
-| SV14 | A save whose Mod with pawns is not installed | Error naming what is lost; Fix subscribes and enables it as one reversible edit | Unimplemented |
+| SV14 | A save whose Mod with pawns is not installed | Error naming what is lost; Fix subscribes and enables it as one reversible edit | Pass (synthetic: `TestCheckSaveOwnership`, a removed and two never-installed Mods; the fix as SV10); a real save untested (release VM row) |
 | SV15 | `get_save` on MCP | Same text as `saves show`; each fix names its command or tool call | Pass (synthetic: `TestSaveToolsCLIParity`, golden `saves`) |

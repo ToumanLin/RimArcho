@@ -379,6 +379,27 @@ func issueView(is app.SaveIssue, s *app.Save) SaveIssueView {
 	case app.IssueCutOff:
 		v.Head = T("the file is cut off")
 		v.Consequence = T("it ends before </savegame>, usually because the game stopped while writing it; it can never load")
+	case app.IssueMalformed:
+		v.Head = T("the file is malformed")
+		v.Consequence = T("its XML breaks off, so the game cannot load it") + "  (" + is.Text + ")"
+	case app.IssueClassMissing:
+		var classes []string
+		if is.Owns != nil {
+			classes = is.Owns.Classes
+		}
+		if len(classes) == 1 {
+			v.Head = Tf("type %s is missing", classes[0])
+		} else {
+			v.Head = Tf("%d types are missing", len(classes))
+		}
+		if name != "" {
+			v.Consequence = Tf("the game drops these objects with errors: only %s defines them, and the list does not load it", name)
+		} else {
+			v.Consequence = T("the game drops these objects with errors: no installed Mod nor the game defines them (inferred: a Mod update removed them, or their Mod is gone)")
+		}
+		if len(classes) > 1 {
+			v.Consequence += "  (" + is.Text + ")"
+		}
 	case app.IssueNoList:
 		v.Head = T("no list matches this save")
 		v.Consequence = T("no launch of a list came before it, and no version of a list has the same Mods")
@@ -388,7 +409,7 @@ func issueView(is app.SaveIssue, s *app.Save) SaveIssueView {
 	case app.IssueNotInstalled:
 		v.Sign = "−"
 		v.Head = Tf("%s is not installed", name)
-		v.Consequence = T("what it stored in the save is removed when the save loads")
+		v.Consequence = ownedConsequence(is.Owns, T("what it stored in the save is removed when the save loads"))
 		if len(is.Mods) > 0 && is.Mods[0].SteamID == "" {
 			v.Consequence += T("; it has no known Workshop page, so look for it yourself")
 		}
@@ -399,7 +420,7 @@ func issueView(is app.SaveIssue, s *app.Save) SaveIssueView {
 		} else {
 			v.Head = Tf("%s is installed but not in the list", name)
 		}
-		v.Consequence = T("what it stored in the save is removed when the save loads without it")
+		v.Consequence = ownedConsequence(is.Owns, T("what it stored in the save is removed when the save loads without it"))
 	case app.IssueAdded:
 		v.Sign = "+"
 		if len(names) <= 2 {

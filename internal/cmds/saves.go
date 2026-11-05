@@ -121,22 +121,57 @@ func fixLine(f app.SaveFix) string {
 	return strings.TrimSuffix(f.Label, "…") + " (archo " + f.Command + ")"
 }
 
-// consequence is what an issue means for loading the save (10 §4.3). Without the full read
-// RimArcho cannot say what a missing Mod owns in the save (10 §4.6).
-func consequence(kind string) string {
-	switch kind {
+// consequence is what an issue means for loading the save (10 §4.3). With the full read a
+// missing Mod's row says what it owns in the save (10 §4.6); without it, only that what
+// the Mod added is lost.
+func consequence(is app.SaveIssue) string {
+	owns := func(lost string) string {
+		o := is.Owns
+		if o == nil {
+			return lost
+		}
+		var b strings.Builder
+		if o.Empty() {
+			b.WriteString("nothing in the save is known to need it; what else it stored is lost on load")
+		} else {
+			b.WriteString("loading without it loses " + strings.Join(o.Parts(), ", "))
+			if o.Inferred {
+				b.WriteString(" (inferred: nothing installed provides them")
+				if o.Among > 0 {
+					fmt.Fprintf(&b, "; they may belong to the other %s instead", render.Plural(o.Among, "Mod")+" without facts")
+				}
+				b.WriteString(")")
+			}
+		}
+		if o.DefsUnchecked {
+			b.WriteString("; Defs, pawns and factions not checked: the list is not analysed for this game version (archo problems)")
+		}
+		if o.ClassesUnchecked {
+			b.WriteString("; classes not checked: the list's or the game's assemblies are not indexed (archo scan, archo problems)")
+		}
+		return b.String()
+	}
+	switch is.Kind {
 	case app.IssueUnreadable:
 		return "cannot be read as a save"
 	case app.IssueCutOff:
 		return "can never load: the file stops before its end (written during a crash?)"
+	case app.IssueMalformed:
+		return "can never load: its XML breaks off where reading stopped (written during a crash, or edited by hand?)"
+	case app.IssueClassMissing:
+		if len(is.Mods) > 0 {
+			m := is.Mods[0]
+			return "the game drops these objects with errors: only " + m.Name + " (pkg:" + m.PackageID + ") defines them, and the list does not load it"
+		}
+		return "the game drops these objects with errors: no installed Mod nor the game defines them (inferred: a Mod update removed them, or their Mod is gone)"
 	case app.IssueNoList:
 		return "nothing to compare its Mods with"
 	case app.IssueGameVersion:
 		return "the game converts it on load"
 	case app.IssueNotInstalled:
-		return "what the Mod added to the save is lost on load"
+		return owns("what the Mod added to the save is lost on load")
 	case app.IssueDisabled:
-		return "installed but not in the list: what it added to the save is lost on load"
+		return "installed but not in the list: " + owns("what it added to the save is lost on load")
 	case app.IssueAdded:
 		return "usually safe: they start fresh in an existing save"
 	case app.IssueReordered:
@@ -483,7 +518,7 @@ func savesShow(c *Ctx, a *Args) (*render.Doc, error) {
 				}
 				n.Truncate(min(limit, 10), "archo saves show "+s.Ref+" --all")
 			}
-			n.KV("consequence", consequence(is.Kind))
+			n.KV("consequence", consequence(is))
 			for _, f := range is.Fixes {
 				n.KV("fix", fixLine(f))
 			}
@@ -679,7 +714,7 @@ func savesFix(c *Ctx, a *Args) (*render.Doc, error) {
 	broken := ""
 	var waiting []app.SaveMod
 	for _, is := range after.Issues {
-		if is.Kind == app.IssueCutOff || is.Kind == app.IssueUnreadable {
+		if is.Kind == app.IssueCutOff || is.Kind == app.IssueUnreadable || is.Kind == app.IssueMalformed {
 			broken = is.Kind
 		}
 	}
