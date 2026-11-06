@@ -1,6 +1,6 @@
 ---
 name: rimworld-probe
-description: Check how RimWorld mods actually behave in the real game. Build a small probe mod from a ready skeleton, run it on a quicktest map in an isolated sandbox, and read [Probe] log lines and a screenshot. Use when a mod bug or conflict needs in-game confirmation, static reading of code and logs cannot settle a cause, or a fix must be shown to work. Windows, RimWorld 1.6 and earlier (Unity builds).
+description: Check how RimWorld mods actually behave in the real game. Build a small probe mod from a ready skeleton, run it on a quicktest map in an isolated sandbox, and read [Probe] log lines and a screenshot. Use when a mod bug or conflict needs in-game confirmation, static reading of code and logs cannot settle a cause, or a fix must be shown to work. Windows, RimWorld 1.6 (Unity) and 1.7 (Waylith).
 ---
 
 # RimWorld probe
@@ -13,22 +13,22 @@ A probe is a tiny test mod. It loads with the mods under test, sets up a situati
 | --- | --- |
 | `template/src/Scenario.cs` | The only file you edit. The default is a smoke test. |
 | `template/src/ProbeRunner.cs` | Lifecycle, logging, screenshot, exit and helpers. Do not edit. |
-| `template/Probe.csproj`, `template/About/About.xml` | Builds against the local game's own assemblies, offline. Change the packageId with `new --id`. |
+| `template/Probe.csproj`, `template/About/About.xml`, `template/LoadFolders.xml` | Builds against the local game's own assemblies, offline, into `1.6/` or `1.7/`. Change the packageId with `new --id`. |
 | `scripts/probe.mjs` | `new`, `build`, `run`, `clean`. Usage is in its header. |
 
 ## Workflow
 
-1. **Locate** the game folder (has `RimWorldWin64.exe` and `Version.txt`), the Harmony mod folder (packageId `brrainz.harmony`) and each mod under test (folder with `About/About.xml`; read its packageId and `modDependencies`).
+1. **Locate** the game folder (has `Version.txt`; `RimWorldWin64.exe` in 1.6, `RimWorld.exe` and `Waylith.dll` in 1.7), the Harmony mod folder (packageId `brrainz.harmony`) and each mod under test (folder with `About/About.xml`; read its packageId and `modDependencies`).
 2. **Create** the probe outside the game and mod folders: `node scripts/probe.mjs new <work>/probe`.
 3. **Smoke test first.** Build and run the unchanged probe with only Harmony. Expect `[Probe] RESULT smoke ok ...`. If this fails, fix the environment before writing any scenario.
-4. **Write the scenario** in `Scenario.cs` (see the next section), then `build`.
+4. **Write the scenario** in `Scenario.cs` (see the next section), then `build`. `build` reads the game version and builds for it; to test both versions, build once against each game.
 5. **Run each configuration** with its own `--name`:
    `node scripts/probe.mjs run --game <game> --work <work> --name <cfg> --mods "brrainz.harmony=<dir>,<pkg>=<dir>,probe.scenario=<work>/probe"`.
    `--mods` is the load order of the non-official mods; official content comes first.
-6. **Read the output**: the `[Probe]` lines print to the console and go to `<work>/runs/<name>/probe-lines.txt`. The full log is `Player.log` next to it; the screenshot is `userdata/probe.png`. Look at the screenshot when the claim is visual.
+6. **Read the output**: the `[Probe]` lines print to the console and go to `<work>/runs/<name>/probe-lines.txt`. The full log is `Player.log` next to it, and the screenshot `probe.png`. Look at the screenshot when the claim is visual.
 7. **Clean up**: `node scripts/probe.mjs clean --work <work>` removes the sandbox junctions safely and keeps the run logs.
 
-A run takes 1 to 3 minutes. Run commands in the background if your tool has a short timeout.
+A run takes 1 to 3 minutes; the first 1.7 run in a work folder takes longer while the game builds its shader and texture caches in the sandbox user data. Run commands in the background if your tool has a short timeout.
 
 ## Writing the scenario
 
@@ -59,7 +59,7 @@ Do not reference the assemblies of the mods under test. Reach their types by nam
 
 The game and every mod are .NET assemblies; their source is one decompile away. Decompile once into the work folder and search the text, instead of guessing names:
 
-- Whole assembly (1.6: about 30 s and 45 MB; do it once): `ilspycmd -p -o <work>/decomp/game <game>/RimWorldWin64_Data/Managed/Assembly-CSharp.dll`; the same for each mod DLL under test (`<mod>/<version>/Assemblies/*.dll`).
+- Whole assembly (1.6: about 30 s and 45 MB; do it once): `ilspycmd -p -o <work>/decomp/game <game>/RimWorldWin64_Data/Managed/Assembly-CSharp.dll` (1.7: `<game>/Assembly-CSharp.dll`); the same for each mod DLL under test (`<mod>/<version>/Assemblies/*.dll`).
 - One type: `ilspycmd -t <Namespace.Type> <dll>`. All type names: `ilspycmd -l c <dll>`.
 
 Three ways in:
@@ -85,11 +85,12 @@ Mods change these paths. `Patches(method)` shows who patched a method you call o
 
 - Never edit files of the game, the mods under test or Steam. Copy a mod into the work folder before changing it, and pass the copy in `--mods`.
 - Keep the work folder outside the game and mod folders. The sandbox uses junctions: delete it only with `clean`, never with a recursive delete, which could follow a junction into the real game.
-- The sandbox does not use the player's saves or config. If `run` warns that the real `Prefs.xml` changed, report it and leave the file alone.
+- The sandbox does not use the player's saves or config, and it leaves out `steam_appid.txt` so the game never attaches to a running Steam client. Attached, it scanned every subscribed Workshop mod, and 1.6 changed the player's real `Prefs.xml` at startup (Steam Cloud covers that folder). The log then has a `SteamAPI.Init() failed` warning; that is expected. If `run` warns that the real `Prefs.xml` changed, report it and leave the file alone.
 - Close the probe's game before starting another run; the runner waits for its own game only.
 
 ## Limits
 
-- RimWorld 1.7 (Waylith, .NET 10) is not supported: different assemblies, and the log path is fixed.
+- 1.7 runs on Waylith (.NET 10): the probe builds for net10.0 against `UnityStubs.dll`, and the game log is its console output (`-NoFileLog`), because its file log always goes to the player's folder. Code under `#if RW_WAYLITH` / `#if RW_UNITY` builds for one version only.
+- 1.6 and 1.7 differ in game code too. Check a method exists in both decompiles before relying on it in a scenario meant for both.
 - The game runs windowed at 1280x720 with sound off; the screenshot is the game window.
 - `-quicktest` builds a small colony with a random world each run. Results that depend on the world need several runs or a scenario that sets the condition itself.

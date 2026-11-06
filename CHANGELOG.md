@@ -20,6 +20,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 - Background tasks in Chinese: the RimArcho update check's result "new version available" is translated.
 - `archo problems`: when two copies of a Mod are installed and neither is in the list, the finding no longer suggests `archo swap`, which failed with "not enabled", and no longer says both copies are ignored because another copy wins.
 - RimArcho's own update and uninstall now know `README.zh-CN.md` and `skills/` (agent skills, such as `rimworld-probe` for checking Mod behaviour in the game). Release zips carry them from 1.0.2 on. RimArcho 1.0.0 refuses a zip with files it does not know, so a 1.0.0 install should update to 1.0.1 before 1.0.2 is out; after that, download 1.0.2 by hand.
+- `rimworld-probe` skill: probes also build and run on RimWorld 1.7, and the game it starts no longer attaches to a running Steam client.
 
 - Switching the interface language now also changes "Background tasks" at the foot of the sidebar, and the search hints of the filter bars (list editor, Mod library, Background tasks, file search). Before, they kept the old language until RimArcho restarted.
 
