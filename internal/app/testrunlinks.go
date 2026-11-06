@@ -14,7 +14,7 @@ import (
 
 // A test run links the plan's Mods the game cannot see (pinned copies, SteamCMD and extra
 // folders) into Mods/ for the run only, and removes those links when the game has exited
-// (09 §7). The links are recorded before they are made, so the next test run removes
+// (20 §2). The links are recorded before they are made, so the next test run removes
 // what an interrupted one left.
 
 const testLinksFile = "links.json"

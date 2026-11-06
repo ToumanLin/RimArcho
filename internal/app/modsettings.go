@@ -140,7 +140,7 @@ func (a *App) listSettings(st *LoadoutState, seen map[string]string, cfg string)
 // settingsJob is what carryModSettings does. read lists the Config folders settings come
 // from, the first with a file for a Mod class winning. A file in have counts as present and
 // is never overwritten; copies go to write (have for launches; a test run's own Config,
-// refreshed from have each run, 09 §7). known is every folder name the library has, so a
+// refreshed from have each run, 20 §2). known is every folder name the library has, so a
 // file is told apart from one of a longer folder name.
 type settingsJob struct {
 	read  []string

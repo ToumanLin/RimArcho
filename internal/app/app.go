@@ -102,7 +102,7 @@ type App struct {
 	// GameProbe finds the running game of a game folder; nil means the process table
 	// (tests replace it).
 	GameProbe func(gameRoot string) *GameRun
-	// TestGameStart replaces cmd.Start for isolated test runs (09 §7).
+	// TestGameStart replaces cmd.Start for isolated test runs (20 §2).
 	TestGameStart func(*exec.Cmd) error
 	// TrashFunc moves a folder to the recycle bin; nil means source.Trash (tests replace it).
 	TrashFunc func(path string) error

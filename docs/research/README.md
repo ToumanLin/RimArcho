@@ -48,7 +48,7 @@ Investigations, measurements and open questions; once a report's conclusions are
 
 | Document | What it is | Status |
 | --- | --- | --- |
-| [2026-10-24_game-test-runs-rimdevtools.md](2026-10-24_game-test-runs-rimdevtools.md) | How RimDevTools tests a game, and test-run measurements on 1.6 and 1.7 | Implemented (09 §7); open: §2.1 log locations are not yet in 10 §3 (pack logs on 1.7) or 17 §6 |
+| [2026-10-24_game-test-runs-rimdevtools.md](2026-10-24_game-test-runs-rimdevtools.md) | How RimDevTools tests a game, and test-run measurements on 1.6 and 1.7 | Implemented (20 §2); open: §2.1 log locations are not yet in 10 §3 (pack logs on 1.7) or 17 §6 |
 | [2026-11-01_decompile-storage.md](2026-11-01_decompile-storage.md) | Where decompiled code lives: the Source library and Mod projects | A and B in 05 §5.4; open: C, Mod projects (ToDo) |
 | [2026-11-02_gui-accessibility.md](2026-11-02_gui-accessibility.md) | Screenshot-free GUI acceptance for agents: criteria, baseline, fix rounds | Criteria in 16 §11 (A1–A18); open: failing criteria (01 §4), proposed rule and open decisions |
 | [2026-11-04_save-format-fields.md](2026-11-04_save-format-fields.md) | Element paths of a save's full read (L1), from the game's `ExposeData` | Implemented (12 §1.7); open: not yet checked against real saves |

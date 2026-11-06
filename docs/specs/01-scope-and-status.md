@@ -73,7 +73,7 @@ Listed by who can do what; status refers to the current code.
 ### 4.1 Open work
 
 - **1.1**: extracting the Defs a save references and mapping them back to the Mods that provide them (12 §1.4, §1.5); the content catalog (12 §2, draft); unused content and its page (12 §3, 16 §2.11); the last load's errors in can it load (12 §4.3); built-in Archo (15). Later versions: §1.
-- **Defects not yet fixed**: those found in the 1.0.1 VM round are listed under "Open items" in research 2026-11-05_release-1.0.1-vm-round. One needs a decision: a test run compares with the newest Player.log even when that log came from an unrelated, older list (09 §7); either compare only with a log of the same plan, or say how old the log is.
+- **Defects not yet fixed**: those found in the 1.0.1 VM round are listed under "Open items" in research 2026-11-05_release-1.0.1-vm-round. One needs a decision: a test run compares with the newest Player.log even when that log came from an unrelated, older list (20 §2); either compare only with a log of the same plan, or say how old the log is.
 - Work not yet decided is tracked in `ToDo.md` and docs/research/, not here.
 
 ### 4.2 Implemented, not yet validated

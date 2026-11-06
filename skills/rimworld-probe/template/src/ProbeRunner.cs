@@ -247,12 +247,23 @@ namespace RimProbe
         static ProbeStartup()
         {
             ErrorCapture.Start();   // later than most load errors; those stay in Player.log
+            // A runner that writes no Prefs.xml (archo test run --probe) starts the game with runInBackground off:
+            // keep the probe running when its window loses focus.
+            if (GenCommandLine.CommandLineArgPassed("probequit"))
+            {
+                try { Application.runInBackground = true; }
+                catch (Exception e) { ProbeScenario.Log("could not set runInBackground: " + e.Message); }
+            }
             try
             {
                 ProbeScenario.Log($"startup scenario={ProbeScenario.Instance.GetType().Name} order={ProbeScenario.LoadOrder()}");
                 ProbeScenario.Instance.OnStartup();
             }
-            catch (Exception e) { ProbeScenario.Log("EXCEPTION in OnStartup " + e); }
+            catch (Exception e)
+            {
+                ProbeScenario.Log("EXCEPTION in OnStartup " + e);   // an EXCEPTION line is the probe's last line
+                ProbeMapComponent.Quit();
+            }
         }
     }
 
@@ -356,7 +367,7 @@ namespace RimProbe
             Quit();
         }
 
-        static void Quit()
+        internal static void Quit()
         {
             if (GenCommandLine.CommandLineArgPassed("probequit")) Application.Quit();
         }

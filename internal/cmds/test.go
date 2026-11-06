@@ -17,14 +17,24 @@ func init() {
 		Flags: []Flag{
 			{Name: "env", Value: "<name>", Help: "test another environment"},
 			{Name: "map", Help: "load a quick test map instead of the main menu"},
+			{Name: "probe", Value: "<folder>", Help: "add this probe mod and run a test map until its [Probe] RESULT line"},
+			{Name: "probe-after", Value: "<packageId>", Help: "load the probe right after this mod (default: last)"},
+			{Name: "probe-before", Value: "<packageId>", Help: "load the probe right before this mod"},
 			{Name: "timeout", Value: "<duration>", Help: "maximum run time (default 10m)"},
-			{Name: "settle", Value: "<duration>", Help: "wait after the menu marker (default 5s)"},
+			{Name: "settle", Value: "<duration>", Help: "wait after the menu marker (default 5s), or for a probe to quit (default 15s)"},
 			{Name: "json", Help: "print the report as JSON"},
 		}, Run: testRunCmd})
 }
 
 func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
-	o := app.TestRunOptions{Env: args.Str("env"), Map: args.Bool("map"), Progress: c.progressCtx()}
+	o := app.TestRunOptions{Env: args.Str("env"), Map: args.Bool("map"), Progress: c.progressCtx(),
+		Probe: args.Str("probe"), ProbeAfter: args.Str("probe-after"), ProbeBefore: args.Str("probe-before")}
+	if o.Probe == "" && (o.ProbeAfter != "" || o.ProbeBefore != "") {
+		return nil, &UsageError{Msg: "--probe-after and --probe-before need --probe <folder>"}
+	}
+	if o.ProbeAfter != "" && o.ProbeBefore != "" {
+		return nil, &UsageError{Msg: "give --probe-after or --probe-before, not both"}
+	}
 	if len(args.Pos) > 0 {
 		o.Plan = args.Pos[0]
 	}
@@ -68,6 +78,9 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 		for _, name := range r.Linked {
 			linked.Add("Mods/" + name)
 		}
+	}
+	if p := r.Probe; p != nil {
+		testProbe(root, p)
 	}
 	missing := root.Section(fmt.Sprintf("missing: %d", len(r.Missing)))
 	for _, m := range r.Missing {
@@ -145,6 +158,37 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 	root.KV("attribution", r.Attribution)
 	root.KV("run dir", r.RunDir)
 	return d, nil
+}
+
+// testProbe prints a probe run's result and lines (20 §3).
+func testProbe(root *render.Node, p *app.TestRunProbe) {
+	n := root.Addf("probe: %s, load order position %d (%s)", p.PackageID, p.Position, p.Folder)
+	n.KV("outcome", p.Outcome)
+	switch p.Outcome {
+	case "result":
+		n.KV("result", p.Result)
+	case "exception":
+		n.KV("exception", p.Exception)
+	default:
+		n.KV("result", "no [Probe] RESULT line: see the log, or raise --timeout")
+	}
+	if len(p.MissingDeps) > 0 {
+		n.KV("missing dependencies", strings.Join(p.MissingDeps, ", "))
+	}
+	if p.Screenshot != "" {
+		n.KV("screenshot", p.Screenshot)
+	}
+	title := fmt.Sprintf("[Probe] lines: %d", p.LinesTotal)
+	if p.LinesTotal > len(p.Lines) {
+		title += fmt.Sprintf(", first %d and last %d shown", min(10, len(p.Lines)), max(0, len(p.Lines)-10))
+	}
+	lines := n.Add(title)
+	for i, l := range p.Lines {
+		if i == 10 && p.LinesTotal > len(p.Lines) {
+			lines.Add("…")
+		}
+		lines.Add(l)
+	}
 }
 
 func testClusterMods(n *render.Node, cluster app.TestRunCluster) {
