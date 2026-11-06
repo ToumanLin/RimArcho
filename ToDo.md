@@ -2,45 +2,7 @@
 
 Things to research, not yet decided. Once decided, put them in the specifications (implementation plans in 01 §4); research goes in docs/research/.
 
-## review docs, delete unnecessary 
-
-## Mod library管理标签
-- Mod library左栏, 支持以Tag分组展示, 提供便捷批量增加删除Tag的方式
-
-## RimArcho安装与更新（创意工坊发布）
-原"RimArcho安装"和 Deferred 里的"Auto Update"合并为一个项目。调研：[research/2026-11-05_workshop-distribution.md](docs/research/2026-11-05_workshop-distribution.md)。
-
-**分发**：创意工坊条目名为 RimArcho，内容 = Archo Monitor 的 Mod 文件夹（About、LoadFolders、1.5/1.6/1.7）+ 发布 zip + `.sha256`。没有人只为 Monitor 订阅，条目就是 RimArcho 本身。
-
-**玩家步骤**：Steam 订阅 → 打开条目文件夹 → 解压 zip → 双击 `RimArcho.exe`。
-
-**首次启动**
-- 检测自己是否运行在创意工坊文件夹里（`steamapps/workshop/content/294100/<id>/`）。如果是，给出默认安装地址（可另选），把自己搬过去，再从新位置重启。Steam 更新或取消订阅时会改写、删除这个文件夹，所以程序不能留在那里。
-- 搬走后清理在条目文件夹里解压出来的文件，只留条目原本的内容。
-- 询问 RimArcho 管理的目录是否用默认值（C 盘 Local）；C 盘空间不足时提示。
-- 提供从 RimSort、RimCrow 导入数据库（自动找到它们在玩家电脑上的数据库位置）；设置里也有同样的入口。
-
-**Monitor**
-- 订阅得到的副本就是 Monitor。RimArcho 要把任何来源中 packageId 为 `toumanlin.archomonitor` 的副本都认作 Monitor，否则它和 `_Archo_monitor_` 链接会被报成重复 Mod。
-- 版本相同时优先用订阅的副本：不需要建链接，`Mods/` 在 exFAT 上也能用。
-- Monitor 版本（`monitor/VERSION`）与启动器版本相互独立。
-
-**更新**
-- 已订阅的玩家：Steam 会自动把新 zip 下到条目文件夹，RimArcho 直接从那里读取并校验，不需要 SteamCMD。
-- 未订阅的（GOG、GitHub 安装）：用匿名 SteamCMD 拉取条目，绝不用玩家的账号。必须传 `SteamCMDAccount("anonymous")`，传空会取设置里的账号，和桌面 Steam 同号时会把 Steam 登出。下到专用目录（不是 Mod 用的 `steamcmd-mods`），复用 `runWorkshopBatches`，以 `Success. Downloaded item` 加文件存在为准（SteamCMD 失败也返回 0），换完后整个目录删掉。
-- 检查更新：一次 `GetPublishedFileDetails` 读 tag，不启动 SteamCMD。现有 Mod 更新检查只比时间戳（`time_updated` 对比 ACF 时间/下载时间），没有版本号，也不比远端哈希，自更新不能照搬。
-- 版本号放在条目 tag 里（已定：自由格式的 `v1.0.2` 和不公开条目都可接受，待测试验证；不行就改读标题），zip 名必须与之一致。
-- GitHub 保留，用于首次下载、预发布版和兜底。预发布版只走 GitHub，条目只放稳定版。
-- 建议同时加 ed25519 签名：维护者账号一旦被盗，`.sha256` 防不住。
-
-**上传**（维护者）：`archo workshop publish`，经 steam-worker 调 ISteamUGC 上传，不启动游戏；不放进 `release.ps1`。
-
-**进展**
-- 2026-11-05：完成调研。发布 zip 从 1.0.2 起带 `README.zh-CN.md` 和 `skills/`（代码已写，未提交）。
-- 2026-11-05：更新方式已定，写入规格 17 §5.1（标注"未实现"）：匿名 SteamCMD 拉取、版本号写 tag、预发布走 GitHub、条目带有效的 Mod 部分。约 30 MB 的 zip 预计下载很快，待测试 3 记录实际耗时。
-- 创意工坊部分尚未实现。
-- 下一步：先做上传工具，传一个不公开的测试条目，在 VM 里实测调研文档第 4 节的问题（tag 能否放版本、不公开条目能否匿名下载、订阅后 Monitor 是否正常加载且不报重复）。
-- 调研文档已按"Monitor 即条目"改好：条目内容和 Monitor 识别见 §1.5，首次启动搬家见 §1.6，订阅者直接从条目文件夹取更新见 §1.3。
+## 无法打开数据库的报错是中文的
 
 ## MCP test&improve
 Baed on benchmark exam on real mod list and error log from corpus research
@@ -56,11 +18,14 @@ manage decompiled mod instance
 
 ## New Mod Project
 Allow player to initialize a new mod project with `about.xml`
-I suggest a new side bar group: developing
+I suggest a new side bar group: developing, or debugging, not sure
+因为开发mod和处理mod冲突处理bug从工具角度来看没有不同, 都要反编译/编译
 developing
 /decompile
 /new mod project
 Developing would possibly need new tools such as Bash, ilspyCMD, .Net SDK, 
+所以这也要考虑, 假设一般玩家用不到这些工具, 那么这整个group都是没法用的
+如果要给一般玩家用, 需要让玩家下载这些工具
 
 ## Translation
 Auto translate mod details? Need to think about it.
@@ -72,6 +37,8 @@ Auto translate mod details? Need to think about it.
 - §2 内容目录：Def 类型 → 内容类别的映射（现为草案）
 - §3 未使用的内容（1.1 核心答案）：三组分类、解读、功能型 Mod 的处理，Unplayed 分组下的 Play review 页面
 - §4.3 "上次加载的报错"
+
+Can-it-run 中, 将`上次运行时的报错`分为三块, `上次启动时的报错` `上次载入$存档$时的报错` `上次游玩$存档时的报错`
 
 ### Playthrough review (data for the third question)
 

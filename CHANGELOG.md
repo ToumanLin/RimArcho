@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 1.0.1 (unreleased)
 
+- The error box `RimArcho.exe` shows when it cannot open its database is in the Windows display language. Before, it used the interface language saved in that database, so on an English Windows with RimArcho set to Chinese it put a Chinese sentence around an English error.
 - Dependencies: a Mod that requires another is satisfied by the Mod standing in for it. A dependency's `alternativePackageIds` in About.xml count, as they do in the game, and so does a continued version that Use This Instead (community data) names as the original's replacement. Sort orders the requiring Mod after the stand-in and no longer offers to download the original; Can it run, the launch question and `archo problems` no longer report the dependency missing; the Mod's details show the stand-in "(in place of …)". Example from a player: a translation requiring a Mod made for 1.3/1.4, with a 1.7 continuation under another packageId enabled. Before, the only way to sort quietly was to enable the outdated original, which then failed its version check.
 - Replacing a Mod with its recommended replacement (after Sort, or `mod.replaced` in Can it run) is offered also when another Mod requires the original; before, it said "X requires Y, so it stays".
 - The first scan after updating reads each Mod's dependencies again, so `alternativePackageIds` take effect for Mods that did not change.

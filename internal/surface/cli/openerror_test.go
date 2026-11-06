@@ -12,9 +12,11 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// RimArcho.exe has no console: an open failure shows a message box in the player's language,
-// with its own text for a pre-1.0 database; a console program only writes stderr (04 §4).
+// RimArcho.exe has no console: an open failure shows a message box in the Windows display
+// language (not ui.lang, which is in the database that failed), with its own text for a
+// pre-1.0 database; a console program only writes stderr (04 §4).
 func TestOpenFailureMessageBox(t *testing.T) {
+	t.Setenv("ARCHO_LANG", "")
 	old := showOpenError
 	defer func() { showOpenError = old; view.SetLang("en") }()
 	var title, text string
@@ -58,8 +60,11 @@ func TestOpenFailureMessageBox(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.Close()
-	(&upgradeReport{window: true, dbPath: db}).openFailed(openErr)
-	if strings.Contains(text, "Move or rename") || !strings.Contains(text, db) {
-		t.Fatalf("zh: %q", text)
+	view.SetLang("auto")
+	want := view.Tf("RimArcho could not open its database:\n%s", other.Error())
+	view.SetLang("en")
+	(&upgradeReport{window: true, dbPath: db}).openFailed(other)
+	if text != want {
+		t.Fatalf("ui.lang zh: got %q, want the Windows language %q", text, want)
 	}
 }
