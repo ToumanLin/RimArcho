@@ -73,6 +73,10 @@ Do not reference the assemblies of the mods under test. Reach their types by nam
 - The sandbox does not use the player's saves or config. If `run` warns that the real `Prefs.xml` changed, report it and leave the file alone.
 - Close the probe's game before starting another run; the runner waits for its own game only.
 
+## Line contract
+
+A probe logs messages that start with `[Probe] `, ends with exactly one `[Probe] RESULT …` or `[Probe] EXCEPTION …` line, and quits the game after it when `-probequit` is on the command line. `ProbeRunner.cs` keeps this contract; keep it too if you write a probe by other means. Any runner that follows it can run the probe: `scripts/probe.mjs run`, or RimArcho's `archo test run --probe <probe folder>` (MCP `test_run` with `probe`), which also attributes the run's errors to mods and supports 1.7 once the probe is built for it.
+
 ## Limits
 
 - RimWorld 1.7 (Waylith, .NET 10) is not supported: different assemblies, and the log path is fixed.

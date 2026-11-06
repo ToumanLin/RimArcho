@@ -47,6 +47,7 @@ func TestCatalogAndArgvFor(t *testing.T) {
 		{"status", ``, []string{"status"}},
 		{"test_run", ``, []string{"test", "run", "--json"}},
 		{"test_run", `{"plan":"small","map":true,"timeout_seconds":30}`, []string{"test", "run", "small", "--map", "--timeout", "30s", "--json"}},
+		{"test_run", `{"probe":"D:\\work\\probe","probe_after":"brrainz.harmony"}`, []string{"test", "run", "--probe", `D:\work\probe`, "--probe-after", "brrainz.harmony", "--json"}},
 	}
 	for _, c := range cases {
 		got, err := mcp.ArgvFor(c.tool, []byte(c.args))
