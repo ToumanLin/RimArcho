@@ -80,7 +80,7 @@ func (a *App) comparePlayerLog(st *LoadoutState, r *TestRunReport) {
 			}
 		}
 	}
-	reached := r.Status == "menu" || r.Status == "map"
+	reached := r.reached()
 	r.playerClusters = map[string]TestRunCluster{}
 	for _, lc := range rep.Clusters {
 		// Preference errors are not compared: test runs use their own preferences.
@@ -97,7 +97,8 @@ func (a *App) comparePlayerLog(st *LoadoutState, r *TestRunReport) {
 		if current[lc.Key] {
 			continue
 		}
-		if !reached || !testRunReaches(lc.Phases, r.Status == "map") {
+		// A probe run starts a new game like a map run; its minutes of play do not count (09 §7.1).
+		if !reached || !testRunReaches(lc.Phases, r.Status == "map" || r.Status == "probe") {
 			pl.Unreached++
 			continue
 		}
@@ -228,9 +229,12 @@ func previousTestRun(r *TestRunReport) (*TestRunBaseline, []*logs.Cluster, []Tes
 			Status   string           `json:"status"`
 			Args     []string         `json:"args"`
 			Clusters []TestRunCluster `json:"clusters"`
+			Probe    *TestRunProbe    `json:"probe"`
 		}
+		// A probe run compares only with runs of the same probe (09 §7.1).
 		if json.Unmarshal(b, &report) != nil || report.Plan != r.Plan || report.Status == "links-blocked" ||
-			slices.Contains(report.Args, "quicktest") != slices.Contains(r.Args, "quicktest") {
+			slices.Contains(report.Args, "quicktest") != slices.Contains(r.Args, "quicktest") ||
+			probePackage(report.Probe) != probePackage(r.Probe) {
 			continue
 		}
 		f, err := os.Open(filepath.Join(dir, "Player.log"))

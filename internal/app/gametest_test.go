@@ -80,6 +80,11 @@ func TestAppGameHelper(t *testing.T) {
 		}
 	} else if mode == "exit" {
 		os.Exit(7)
+	} else if mode == "probe" { // a probe saves its screenshot, logs its RESULT and quits (09 §7.1)
+		if err := os.WriteFile(filepath.Join(os.Getenv("ARCHO_TEST_DATA"), "probe.png"), []byte("png"), 0o644); err != nil {
+			os.Exit(96)
+		}
+		os.Exit(0)
 	}
 	time.Sleep(30 * time.Second)
 }

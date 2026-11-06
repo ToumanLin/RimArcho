@@ -24,10 +24,13 @@ import (
 
 // TestRunOptions selects a plan to run without writing the player's files (09 §7).
 type TestRunOptions struct {
-	Env, Plan       string
-	Map             bool
-	Timeout, Settle time.Duration
-	Progress        func(string)
+	Env, Plan string
+	Map       bool
+	// Probe: a probe Mod folder to add to the tested list (map mode implied, 09 §7.1);
+	// ProbeAfter or ProbeBefore name the packageId it goes next to (default: last).
+	Probe, ProbeAfter, ProbeBefore string
+	Timeout, Settle                time.Duration
+	Progress                       func(string)
 }
 
 type TestRunMissing struct {
@@ -80,14 +83,16 @@ type TestRunReport struct {
 	Fixed         []TestRunCluster  `json:"fixed,omitempty"`
 	Baseline      *TestRunBaseline  `json:"baseline,omitempty"`
 	Gone          []TestRunCluster  `json:"gone,omitempty"`
+	Probe         *TestRunProbe     `json:"probe,omitempty"` // a probe run's lines and result (09 §7.1)
 	clusterKeys   []string
 	// playerClusters: the player's log's error clusters by key, attributed (comparePlayerLog)
 	playerClusters map[string]TestRunCluster
 }
 
-// Success is the CLI/MCP outcome: the target was reached without error clusters.
+// Success is the CLI/MCP outcome: the target was reached without error clusters. A probe
+// run's target is its RESULT line (09 §7.1).
 func (r *TestRunReport) Success() bool {
-	if r.Status != "menu" && r.Status != "map" {
+	if !r.reached() || (r.Status == "probe" && (r.Probe == nil || r.Probe.Outcome != "result")) {
 		return false
 	}
 	for class, n := range r.Counts {
@@ -96,6 +101,11 @@ func (r *TestRunReport) Success() bool {
 		}
 	}
 	return true
+}
+
+// reached: the run got to its target: the menu, a quiet map, or a probe's last line.
+func (r *TestRunReport) reached() bool {
+	return r.Status == "menu" || r.Status == "map" || r.Status == "probe"
 }
 
 // TestRun starts the executable directly, including for a Steam-launch environment.
@@ -158,14 +168,28 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (_ *TestRunReport, 
 	if err := a.removeTestLinks(base); err != nil {
 		return nil, err
 	}
+	// After the old links are gone, so a probe linked by an interrupted run is linked anew.
+	probe, err := a.checkProbe(st, o)
+	if err != nil {
+		return nil, err
+	}
 	mods, add, blocked := a.testRunLinks(st)
+	if probe != nil && probe.link != nil {
+		mods = modsDir(st.Ix)
+		add = append(add, *probe.link)
+	}
 	unlink, err := a.addTestLinks(base, mods, add)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { err = errors.Join(err, unlink()) }() // a no-op once removed below
-	if err := a.prepareTestConfig(st, data, protected); err != nil {
+	if err := a.prepareTestConfig(st, data, protected, probe); err != nil {
 		return nil, err
+	}
+	if probe != nil {
+		if err := clearProbeShot(data); err != nil {
+			return nil, err
+		}
 	}
 	missing := testRunMissing(st, blocked)
 	if err := os.MkdirAll(runs, 0o755); err != nil {
@@ -189,7 +213,7 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (_ *TestRunReport, 
 	}
 	raw, runErr := gametest.Run(ctx, gametest.Options{
 		GameRoot: e.GameRoot, GameVersion: e.GameVersion, DataDir: data, RunDir: runDir,
-		Map: o.Map, Timeout: o.Timeout, Settle: o.Settle, Start: a.TestGameStart,
+		Map: o.Map, Probe: probe != nil, Timeout: o.Timeout, Settle: o.Settle, Start: a.TestGameStart,
 	})
 	// The game has exited (gametest.Run reaps it): take the links away before anything else.
 	unlinkErr := unlink()
@@ -201,6 +225,11 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (_ *TestRunReport, 
 		LoadSeconds: raw.LoadSeconds, TotalSeconds: raw.TotalSeconds, PeakMemoryMB: raw.PeakMemoryMB,
 		Requested: len(st.List), Missing: missing, Linked: linkNames(add), RunDir: runDir, LogPath: raw.LogPath,
 		Args: raw.Args, Attribution: "tested-plan", Counts: map[string]int{}, Clusters: []TestRunCluster{},
+	}
+	var probeErr error
+	if probe != nil {
+		r.Probe = probe.report
+		probeErr = finishProbe(r.Probe, raw.LogPath, data, runDir)
 	}
 	// Attribution reads assembly types and Harmony IDs from the analysis (06 §2); a
 	// test run is often the first command in a fresh environment. After the game exits,
@@ -222,10 +251,10 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (_ *TestRunReport, 
 		saveErr = os.WriteFile(filepath.Join(runDir, "report.json"), append(b, '\n'), 0o644)
 	}
 	pruneErr := pruneTestRuns(runs, runDir)
-	return r, errors.Join(runErr, unlinkErr, analysisErr, saveErr, pruneErr)
+	return r, errors.Join(runErr, unlinkErr, probeErr, analysisErr, saveErr, pruneErr)
 }
 
-func (a *App) prepareTestConfig(st *LoadoutState, data string, protected []string) error {
+func (a *App) prepareTestConfig(st *LoadoutState, data string, protected []string, probe *probeSetup) error {
 	cfg := filepath.Join(data, "Config")
 	if err := os.MkdirAll(cfg, 0o755); err != nil {
 		return err
@@ -267,12 +296,7 @@ func (a *App) prepareTestConfig(st *LoadoutState, data string, protected []strin
 			known = append(known, m.PackageID)
 		}
 	}
-	tokens := st.Reg.Tokens(st.List, func(id string) string {
-		if m := st.Ix.ByID[id]; m != nil {
-			return m.PackageID
-		}
-		return ""
-	})
+	tokens := probe.probeTokens(testRunTokens(st))
 	b, err := loadout.Render(nil, st.Ix.Env.GameVersion, tokens, known)
 	if err != nil {
 		return err
@@ -396,6 +420,10 @@ func (a *App) testRunLog(st *LoadoutState, r *TestRunReport) error {
 		settings := gametest.SettingsError(lc.First)
 		if settings {
 			class = gametest.ClassSettings
+		}
+		// A probe's own messages are in probe.lines; as mod reports they would only repeat them (09 §7.1).
+		if r.Probe != nil && logs.Informational(class) && strings.HasPrefix(lc.First.Message, "[Probe] ") {
+			continue
 		}
 		r.Counts[class]++
 		if logs.Informational(class) {

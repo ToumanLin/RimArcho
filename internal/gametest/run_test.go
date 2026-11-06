@@ -208,6 +208,70 @@ func TestRunMap(t *testing.T) {
 	}
 }
 
+func TestRunProbe(t *testing.T) {
+	for _, tc := range []struct {
+		mode    string
+		waylith bool
+		status  string
+		quit    bool // the game ends by itself (0, or 7 for the helper's early exit)
+	}{
+		{"probe-quit", false, "probe", true},
+		{"probe-quit", true, "probe", true},
+		{"probe-stay", false, "probe", false},
+		{"probe-exception", true, "probe", false},
+		{"exit", false, "exited", true},
+	} {
+		t.Run(fmt.Sprint(tc.mode, tc.waylith), func(t *testing.T) {
+			t.Parallel()
+			o := testOptions(t, tc.mode, tc.waylith)
+			o.Probe = true
+			o.Settle = 400 * time.Millisecond
+			r, err := Run(context.Background(), o)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assertResult(t, o, r, tc.status)
+			if !strings.Contains(strings.Join(r.Args, " "), "quicktest "+ProbeQuit) {
+				t.Fatalf("args %q", r.Args)
+			}
+			if tc.quit != (*r.ExitCode == 0 || *r.ExitCode == 7) {
+				t.Fatalf("exit code %d, quit %v", *r.ExitCode, tc.quit)
+			}
+			if tc.status == "probe" && (r.LoadSeconds < 0.5 || r.TotalSeconds < r.LoadSeconds) {
+				t.Fatalf("timing %+v", r)
+			}
+			if !tc.quit && r.TotalSeconds-r.LoadSeconds < 0.3 {
+				t.Fatalf("did not wait for the probe to quit: %+v", r)
+			}
+		})
+	}
+	o := testOptions(t, "idle", false)
+	o.ExtraArgs = []string{"-probequit"}
+	if _, err := Run(context.Background(), o); err == nil || !strings.Contains(err.Error(), "managed option") {
+		t.Fatalf("managed -probequit accepted: %v", err)
+	}
+}
+
+func TestProbeLine(t *testing.T) {
+	for _, tc := range []struct{ line, text, end string }{
+		{"[Probe] RESULT smoke ok errors=[setup:0]\r", "RESULT smoke ok errors=[setup:0]", "result"},
+		{"[Probe] RESULT", "RESULT", "result"},
+		{"2026-11-05 03:36:12.000  INFO [Probe] EXCEPTION in Setup System.Exception: x", "EXCEPTION in Setup System.Exception: x", "exception"},
+		{"2026-11-05 03:36:12.000  INFO [Probe] RESULTS later", "RESULTS later", ""},
+		{"[Probe] t=250 a:Wait", "t=250 a:Wait", ""},
+	} {
+		text, ok := ProbeLine(tc.line)
+		if !ok || text != tc.text || ProbeEnd(text) != tc.end {
+			t.Errorf("%q: %q %v %q", tc.line, text, ok, ProbeEnd(text))
+		}
+	}
+	for _, line := range []string{"Error: [Probe] RESULT inside", " [Probe] RESULT", "2026-11-05 03:36:12.000  INFO Mod [Probe] RESULT x"} {
+		if _, ok := ProbeLine(line); ok {
+			t.Errorf("%q read as a probe line", line)
+		}
+	}
+}
+
 func TestRunCancel(t *testing.T) {
 	t.Parallel()
 	o := testOptions(t, "idle", true)
@@ -271,6 +335,27 @@ func TestGameHelper(t *testing.T) {
 		fmt.Fprintf(log, "03:36:12  INFO %s\r\n", mapMarker)
 		time.Sleep(700 * time.Millisecond)
 		fmt.Fprint(log, "03:36:13  INFO Map still loading\r\n")
+	case "probe-quit", "probe-stay", "probe-exception":
+		// Unity writes the message alone; the 1.7 console writes time and level first.
+		line := func(s string) {
+			if os.Getenv("RIMARCHO_HELPER_WAYLITH") == "true" {
+				fmt.Fprintf(log, "03:36:14  INFO %s\r\n", s)
+			} else {
+				fmt.Fprintf(log, "%s\r\n", s)
+			}
+		}
+		fmt.Fprintf(log, "03:36:12  INFO %s\r\n", mapMarker)
+		line("[Probe] startup scenario=Scenario")
+		time.Sleep(700 * time.Millisecond)
+		line("[Probe] RESULTS are not the end")
+		if mode == "probe-exception" {
+			line("[Probe] EXCEPTION in Setup System.Exception: boom")
+		} else {
+			line("[Probe] RESULT smoke ok")
+		}
+		if mode == "probe-quit" {
+			os.Exit(0)
+		}
 	}
 	time.Sleep(30 * time.Second)
 }

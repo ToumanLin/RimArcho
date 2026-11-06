@@ -88,6 +88,10 @@ Mods change these paths. `Patches(method)` shows who patched a method you call o
 - The sandbox does not use the player's saves or config, and it leaves out `steam_appid.txt` so the game never attaches to a running Steam client. Attached, it scanned every subscribed Workshop mod, and 1.6 changed the player's real `Prefs.xml` at startup (Steam Cloud covers that folder). The log then has a `SteamAPI.Init() failed` warning; that is expected. If `run` warns that the real `Prefs.xml` changed, report it and leave the file alone.
 - Close the probe's game before starting another run; the runner waits for its own game only.
 
+## Line contract
+
+A probe logs messages that start with `[Probe] `, ends with exactly one `[Probe] RESULT …` or `[Probe] EXCEPTION …` line, and quits the game after it when `-probequit` is on the command line. `ProbeRunner.cs` keeps this contract; keep it too if you write a probe by other means. Any runner that follows it can run the probe: `scripts/probe.mjs run`, or RimArcho's `archo test run --probe <probe folder>` (MCP `test_run` with `probe`), which also attributes the run's errors to mods. Build the probe against the game the runner starts (`build` picks 1.6 or 1.7).
+
 ## Limits
 
 - 1.7 runs on Waylith (.NET 10): the probe builds for net10.0 against `UnityStubs.dll`, and the game log is its console output (`-NoFileLog`), because its file log always goes to the player's folder. Code under `#if RW_WAYLITH` / `#if RW_UNITY` builds for one version only.
