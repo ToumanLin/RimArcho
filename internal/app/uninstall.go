@@ -170,6 +170,9 @@ func joinInts(n []int) string {
 // LocalDir is %LOCALAPPDATA%\RimArcho: the default lock library, Monitor, SteamCMD and the
 // Steam runtime folder live here.
 func (a *App) LocalDir() string {
+	if p := a.storeMeta("cfg:local.dir"); p != "" {
+		return p
+	}
 	base := a.LockBase
 	if base == "" {
 		base = os.Getenv("LOCALAPPDATA")
@@ -1092,4 +1095,12 @@ func RunAfterExit(x AfterExit) []string {
 		removeIfEmpty(d)
 	}
 	return left
+}
+
+// storeMeta reads a meta value, or "" before the database is open.
+func (a *App) storeMeta(key string) string {
+	if a.Store == nil {
+		return ""
+	}
+	return a.Store.Meta(key)
 }

@@ -15,7 +15,7 @@ For what RimArcho is and the decisions behind it, see [00 · Top-level design](.
 | **What is played** | |
 | [07 · Plans](07-plans.md) | The plan model, editing, history, writing to the game, locked versions, player data, list exchange |
 | [08 · Sorting and rules](08-sorting-and-rules.md) | Automatic sorting, user rules, community data |
-| [09 · Launch](09-launch.md) | Launching a plan, link deployment, running-game detection, hidden Mods, test runs |
+| [09 · Launch](09-launch.md) | Launching a plan, link deployment, running-game detection, hidden Mods |
 | [10 · Packs](10-packs.md) | Building, launching, importing and exporting packs |
 | [11 · Downloads, subscriptions and accounts](11-downloads-and-accounts.md) | Git and download-page subscriptions, SteamCMD, Steam client calls, game downloads, account sessions |
 | [12 · Saves, unplayed and worth playing](12-saves-unplayed-and-worth-playing.md) | Save reading and management, untouched content (1.1), worth playing (long term) |
@@ -29,6 +29,7 @@ For what RimArcho is and the decisions behind it, see [00 · Top-level design](.
 | [18 · Performance](18-performance.md) | Performance targets and measured baselines |
 | **In the game** | |
 | [19 · Archo Monitor](19-archo-monitor.md) | The bundled in-game helper Mod: what it records, its companion log format, installation and updates, building and tests |
+| [20 · Game test runs](20-game-test-runs.md) | Test runs of a plan with isolated data, probe runs, and the `rimworld-probe` agent skill's sandbox |
 
 Research notes are in [research/](../research/); interface drafts are in [design/](../design/).
 
@@ -36,7 +37,7 @@ Research notes are in [research/](../research/); interface drafts are in [design
 
 Use `NN §x.y` references between specifications and in code comments (for example, `16 §2.9`); `NN` alone names a whole specification. Section numbers belong to the whole specification, not the file: when a specification is split into a directory, its section numbers and references stay unchanged; find the file in that directory's README table. When changing section numbers, update references in code comments and other specifications too.
 
-`node scripts/docs-refs/refs.cjs check` lists references and links that point nowhere. Code or documents from a branch cut before the November 2026 renumbering still use the old numbers: `node scripts/docs-refs/refs.cjs remap scripts/docs-refs/map-2026-11.json <files>` rewrites them; `map-2026-11-monitor.json` does the same for the later move of Archo Monitor into 19 (run it second).
+`node scripts/docs-refs/refs.cjs check` lists references and links that point nowhere. Code or documents from a branch cut before the November 2026 renumbering still use the old numbers: `node scripts/docs-refs/refs.cjs remap scripts/docs-refs/map-2026-11.json <files>` rewrites them; `map-2026-11-monitor.json` does the same for the later move of Archo Monitor into 19 (run it second), and `map-2026-11-testing.json` for the move of test runs into 20 (run it third).
 
 ## Maintenance
 

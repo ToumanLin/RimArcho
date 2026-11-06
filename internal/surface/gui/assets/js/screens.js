@@ -1766,6 +1766,9 @@ function settingDetails(d) {
 
 function renderSettingActions(right, actions, run, item) {
   for (const a of actions || []) {
+    if (a.argv[0] === "import-managers") {
+      right.append(button(a.label, "", () => ui.importManagers())); continue;
+    }
     // uninstall RimArcho and Feedback are their own pages; every other action is a command
     if (a.argv[0] === "uninstall" || a.argv[0] === "feedback") {
       const b = button(a.label, "", () => ui.go(a.argv[0]));

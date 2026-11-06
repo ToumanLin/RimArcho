@@ -40,6 +40,7 @@ pwsh scripts/vm/round.ps1 -Launch gui        # press the launch button in the Ri
 pwsh scripts/vm/round.ps1 -Play 300 -Coverage 0.3 -Difficulty Rough
 pwsh scripts/vm/round.ps1 -Script round.txt  # any steps (below)
 pwsh scripts/vm/round.ps1 -KeepMonitor       # run the Monitor installed in the guest, not the bundled one
+pwsh scripts/vm/round.ps1 -ExtraMonitor "<folder>"  # also put the driver in another Monitor copy, e.g. a subscribed Workshop item the plan uses
 pwsh scripts/vm/round.ps1 -Cleanup           # remove a driver an interrupted round left behind
 ```
 

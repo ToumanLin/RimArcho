@@ -152,7 +152,7 @@ func (r *taskRunner) item(kind, ref string) error {
 // batch runs remove subscription as one task: every folder checked, moved, then one scan (the window's
 // batchRemoveSubscriptions).
 func (r *taskRunner) batch(kind string, refs []string, b app.BatchCalls) bool {
-	if kind != view.OpSubRemove {
+	if kind != view.OpSubRemove && kind != view.OpSubUpdate {
 		return false
 	}
 	a, err := r.session()
@@ -163,7 +163,14 @@ func (r *taskRunner) batch(kind string, refs []string, b app.BatchCalls) bool {
 		return true
 	}
 	defer a.Close()
-	if op, err := a.RemoveSubscriptionsWith(refs, app.RemoveSubscriptionOptions{Workers: 4}, b); op == nil && err != nil {
+	var op *app.SubscribeOp
+	if kind == view.OpSubUpdate {
+		// one operation: SteamCMD downloads the task's items in one run (11 §1)
+		op, err = a.UpdateSubscriptionsWith(refs, false, b)
+	} else {
+		op, err = a.RemoveSubscriptionsWith(refs, app.RemoveSubscriptionOptions{Workers: 4}, b)
+	}
+	if op == nil && err != nil {
 		for i := range refs {
 			b.Done(i, err)
 		}

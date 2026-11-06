@@ -104,7 +104,7 @@ func (a *App) prepareEnvLinks(e *env.Environment) error {
 			fallback[m.PackageID] = append(fallback[m.PackageID], m)
 		}
 	}
-	if ms := monitorInstances(ix); len(ms) > 0 && !packages[MonitorPackage] {
+	if ms := monitorInstances(ix); len(ms) > 0 && !packages[MonitorPackage] && deployable(ix, aliases, ms[0].Mod) {
 		fallback[MonitorPackage] = []*store.Mod{ms[0].Mod}
 	}
 	for _, ms := range fallback {

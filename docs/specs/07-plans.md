@@ -62,11 +62,11 @@ The GUI gathers these actions on all lists (16 §2.17). Commands: `archo plan li
 Archo Monitor is RimArcho's bundled in-game helper Mod (19; installation and updates: 19 §6). **On by default** means RimArcho adds it to plans; after that it is an ordinary Mod.
 
 - **Setting**: `monitor.default` (`on` / `off`, default `on`): `archo config set monitor.default off`, or the settings "game log" group (16 §2.14). It controls only automatic addition, not updates (19 §6).
-- **Plans affected**: new plans (from any origin: empty, copy of the current plan, history, imported list or save), and every existing plan in the environment when RimArcho first installs Monitor. When to check: "When to check" in 19 §6; new plans right after creation.
+- **Plans affected**: new plans (from any origin: empty, copy of the current plan, history, imported list or save), and every existing plan in the environment when Monitor first becomes available. When to check: "Check timing" in 19 §6; new plans right after creation.
 - **Once per plan**: processed plans are recorded in meta `monitor.added:<plan ID>` (added, or already present). The player may then disable, move or stage it as usual; RimArcho adds it again only when sorting (next item).
-- **Sorting adds it too**: if the setting is on and Monitor is installed but not in the plan, every sort (`archo sort`, the editor, can it run) places its latest version after Harmony in the same undo step, even if the player removed it; turn the setting off to avoid this. If that is impossible (no Harmony in the plan, or `Mods/` cannot hold links), the sort runs normally and gives the reason (`SortResult.MonitorSkipped`, a GUI notice and `archo sort`). Test: `TestSortAddsMonitor`.
+- **Sorting adds it too**: if the setting is on and Monitor is installed but not in the plan, every sort (`archo sort`, the editor, can it run) places the selected copy (19 §6) after Harmony in the same undo step, even if the player removed it; turn the setting off to avoid this. If that is impossible (no Harmony in the plan, or the selected copy needs a link and `Mods/` cannot hold links), the sort runs normally and gives the reason (`SortResult.MonitorSkipped`, a GUI notice and `archo sort`). Test: `TestSortAddsMonitor`.
 - **Position**: right after Harmony (`brrainz.harmony`). Monitor's About.xml declares `loadAfter brrainz.harmony` and `loadBefore Ludeon.RimWorld`; sorting (08 §1) keeps it after Harmony and before Core, so it observes the loading of Core and every Mod.
-- **Neither add nor mark processed** (retry at the next check) if the setting is `off`, Harmony (required) is absent, `Mods/` cannot hold links (FAT, exFAT, 19 §6), or Monitor is not installed.
+- **Neither add nor mark processed** (retry at the next check) if the setting is `off`, Harmony (required) is absent, the selected copy needs a link that `Mods/` cannot hold (FAT, exFAT, 19 §6), or Monitor is not installed.
 - **One reversible edit**, named `add Archo Monitor after Harmony (default; archo config set monitor.default off)`. For a plan that is not current, the edit goes into that plan's own undo stack; `archo undo` there reverses it. The result (CLI output, UI notices) lists the plans affected. Tests: `TestMonitorInstallAndDefault`, `TestMonitorDefaultOff`.
 
 ### 1.6 Allowed game versions
@@ -374,7 +374,19 @@ Storage: `lineage_data` (environment, Lineage, alias, note), `lineage_tag` (envi
 7. Running it again gives the same result: identical values are skipped, and rules are deduplicated by kind + Lineage. RimCrow's log tables are not imported.
 8. `--dry-run` only reports and writes nothing. By default 6 details per category; `--all` shows all.
 
+The GUI's shared manager-import flow (16 §2.15) discovers sources read-only with `app.DiscoverManagerImports`:
+
+- RimSort: `%LOCALAPPDATA%\RimSort` (Windows `platformdirs`, `appauthor=False`), with `%APPDATA%\RimSort` as a compatibility candidate; `modlists/`, `dbs/userRules.json`, and `settings.json`'s legacy `config_folder` or each `instances` entry's `config_folder` for ModsConfig.xml. Portable/development candidates also check the program folder and its `data/` child.
+- RimCrow: `<install>/data/mod_manager.db`; also a directly selected/recent data folder's `mod_manager.db`. Saved lists come from `<install>/backups/`, its `today`, `earlier`, `other` children, and up to 16 profile directories under `backups/profile/`.
+- Install candidates: running RimCrow/RimModManager/RimSort executable directories; named folders in Program Files, Local AppData/Programs, Local AppData, Downloads, Desktop, Games and beside RimArcho's parent folder; named Start-menu shortcuts and recent-folder shortcuts. Windows shortcut resolution is read-only, hidden and limited to four seconds and 200 shortcuts per root. No registry registration is assumed. Each list folder contributes at most its first 100 entries. Duplicate source paths are suppressed; inaccessible or absent locations are skipped.
+
+Choosing a candidate does not import it. Lists use §7; RimCrow data uses the existing dry-run report and import above. Original databases, WAL files, settings and rules remain unchanged. The manual file picker remains available when discovery finds nothing.
+
 Measured on real data: 18 §3.
+
+### 6.3 RimSort user rules
+
+`app.ImportRimSortRules` reads `dbs/userRules.json` (at most 4 MB) without modifying it. Its `rules` map imports loadAfter/loadBefore/incompatibleWith and true loadTop/loadBottom values as after/before/incompatible/top/bottom user rules. A packageId must resolve to one live Lineage; missing or ambiguous packages are skipped and reported. Existing kind + Lineage rules are deduplicated, including repeats in the input; unsupported fields are counted. Preview and confirmation follow 16 §2.15; applying rules does not sort a plan or write ModsConfig.xml. RimSort's application settings and community databases are discovery inputs, not settings to apply to RimArcho.
 
 ## 7. List exchange
 

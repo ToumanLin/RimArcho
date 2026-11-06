@@ -267,7 +267,7 @@ func CopyOps(lib *app.Library, l *app.LibLineage, i *app.LibInstance, page strin
 		ks = append(ks, OpUnhide)
 	}
 	// Texture optimisation: a copy with PNG textures (not RimArcho's own mod)
-	if page != LibraryPage && live && i.PNG && i.Path != "" && i.Source != app.LibMonitor && !has(app.LibHidden) && !has(app.LibResidue) {
+	if page != LibraryPage && live && i.PNG && i.Path != "" && !app.IsMonitor(m) && !has(app.LibHidden) && !has(app.LibResidue) {
 		ks = append(ks, OpTextures)
 	}
 	if i.Textures != nil && i.Textures.Files > 0 {

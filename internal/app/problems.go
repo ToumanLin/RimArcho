@@ -534,7 +534,7 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 				f.Suggestions = append(f.Suggestions, "archo disable "+inst(m.ID))
 			}
 			add(f)
-		} else if ins := installed[p]; len(ins) > 1 && !onlyLocks(ins, lockedCopy) {
+		} else if ins := installed[p]; p != MonitorPackage && len(ins) > 1 && !onlyLocks(ins, lockedCopy) {
 			subj := ins[0]
 			if len(as) == 1 {
 				subj = as[0]

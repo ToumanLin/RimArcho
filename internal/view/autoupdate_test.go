@@ -32,9 +32,11 @@ func TestAutomaticSettingsOnlyControlsAndHumanIntervals(t *testing.T) {
 			}
 			e.MustRun("config", "set", "updates.interval", preset.value)
 			g := view.AutomaticGroup(e.App)
-			// Version and the automatic field have moved into About; intervals remain here.
-			if len(g.Items) != 1 || g.Items[0].Label != view.T("check interval") || strings.Contains(g.Note, "LoversLab") {
+			if len(g.Items) != 2 || g.Items[0].Label != view.T("update source") || g.Items[1].Label != view.T("check interval") || strings.Contains(g.Note, "LoversLab") {
 				t.Fatal(g)
+			}
+			if !reflect.DeepEqual(g.Items[0].Choices, []string{"auto", "github"}) || g.Items[0].Value != "auto" || g.Items[0].Note != "" {
+				t.Fatal(g.Items[0])
 			}
 			want := view.Tf("While RimArcho is open: check mods, community data and RimArcho %s, tools %s.", intervals[0], intervals[1]) + " " + view.T("Mod, tool and RimArcho updates wait for your click.")
 			if g.Note != want {
@@ -88,7 +90,7 @@ func TestAutomaticDatesBelongToTheirSubjects(t *testing.T) {
 		for _, g := range view.SettingsPage(e.App, nil) {
 			switch g.Title {
 			case view.T("updates"):
-				if strings.Contains(g.Note, date) || len(g.Items) != 1 {
+				if strings.Contains(g.Note, date) || len(g.Items) != 2 {
 					t.Fatal(g)
 				}
 			case view.T("external tools"), view.T("community data"):

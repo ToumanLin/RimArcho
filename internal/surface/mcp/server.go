@@ -472,8 +472,8 @@ type PlayerIn struct {
 	Action string   `json:"action" jsonschema:"tag_add, tag_remove, alias, note (the mod's), copy_note (one copy's own, 16 §2.9); on every mod: tag_rename, tag_merge, tag_delete, tag_note"`
 	Refs   []string `json:"refs,omitempty" jsonschema:"the mods (tag_add / tag_remove: one or more; alias and note: exactly one)"`
 	Tags   []string `json:"tags,omitempty" jsonschema:"the tags (tag_rename, tag_note: one)"`
-	Text   string   `json:"text,omitempty" jsonschema:"alias / note / copy_note / tag_note: the text, empty clears it; tag_rename: the new name; tag_merge: the target"`
-	DryRun bool     `json:"dry_run,omitempty" jsonschema:"tag_rename, tag_merge, tag_delete: preview only"`
+	Text   string   `json:"text,omitempty" jsonschema:"alias / note / copy_note / tag_note: the text, empty clears it; tag_rename: new name; tag_merge: target"`
+	DryRun bool     `json:"dry_run,omitempty" jsonschema:"preview a tag edit"`
 }
 
 type SaveIn struct {

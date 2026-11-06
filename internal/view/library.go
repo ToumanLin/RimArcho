@@ -654,7 +654,7 @@ func CopyNoteAuto(i *app.LibInstance) string {
 			from = T("unsubscribed; Steam left the folder")
 		}
 		if from != "" {
-			if !i.Created.IsZero() && i.Source != app.LibMonitor {
+			if !i.Created.IsZero() && i.Source != app.LibMonitor && !app.IsMonitor(i.Mod) {
 				from += Tf(", first seen on %s", ShortDate(i.Created))
 			}
 			parts = append(parts, from)
@@ -733,6 +733,11 @@ func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 		p.Apply = code == 0 && !strings.Contains(out, "convert: 0 PNGs") && !strings.Contains(out, "would delete 0 DDS")
 		return p, nil
 	}
+	if kind == OpSubUpdate && len(refs) > 1 {
+		if p := subUpdatePreview(a, st, refs); p != nil {
+			return p, nil
+		}
+	}
 	var ok []int
 	for k, ref := range refs {
 		if kind == LibPinUpdate {
@@ -802,6 +807,45 @@ func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 		p.Lines = append(p.Lines, Tf("%d of %d cannot be done now and are left out", len(refs)-len(ok), len(refs)))
 	}
 	return p, nil
+}
+
+// subUpdatePreview is update all's dry run as one command for every copy (each in turn
+// re-checked the running game and read the subscriptions again: seconds for many copies).
+// nil when it fails: the caller then runs one per copy to say which cannot go.
+func subUpdatePreview(a *app.App, st *app.LoadoutState, refs []string) *Preview {
+	p := &Preview{What: OpSubUpdate, Title: libActionLabel(OpSubUpdate), Apply: true}
+	var run []string
+	var names []string
+	for _, ref := range refs {
+		m, err := st.Ix.ResolveOne(ref)
+		if err != nil {
+			return nil
+		}
+		if r := a.SubscriptionOf(m); r != nil && r.Kind == "page" {
+			p.Lines = append(p.Lines, m.DisplayName()+": "+T("page items skipped; choose downloaded files to update them"))
+			continue
+		}
+		run, names = append(run, ref), append(names, m.DisplayName())
+	}
+	if len(run) == 0 {
+		return p
+	}
+	out, code := cmds.Execute(a, append(libArgv(OpSubUpdate, run), "--dry-run"))
+	if code != 0 {
+		return nil
+	}
+	for _, l := range strings.Split(strings.TrimRight(out, "\n"), "\n") {
+		if strings.HasPrefix(l, "next:") {
+			break
+		}
+		l = Humanize(st, l)
+		// "#ref Name" became "Name Name"
+		for _, n := range names {
+			l = strings.ReplaceAll(l, n+" "+n, n)
+		}
+		p.Lines = append(p.Lines, l)
+	}
+	return p
 }
 
 // previewFailure is a copy's dry run that failed, as one line with its name; a folder that

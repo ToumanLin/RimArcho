@@ -32,6 +32,7 @@ param(
     [switch]$NoBuild,
     [switch]$NoShot,                  # no guest screenshot when the round fails
     [switch]$KeepMonitor,             # run the installed Archo Monitor; no `archo monitor install` first
+    [string[]]$ExtraMonitor = @(),    # more Monitor folders for the driver, e.g. a subscribed Workshop copy
     [switch]$Cleanup
 )
 $ErrorActionPreference = 'Stop'
@@ -57,7 +58,7 @@ function Guest([string]$name, [string]$body, [switch]$Interactive) {
     @($out) | ForEach-Object { $_.TrimStart([char]0xFEFF) }
 }
 function Fill([string]$s) {
-    $s.Replace('__RUN__', $guestRun).Replace('__WORK__', $work).Replace('__NAME__', $runName).Replace('__ARCHO__', $archo)
+    $s.Replace('__EXTRA__', ($ExtraMonitor -join '|')).Replace('__RUN__', $guestRun).Replace('__WORK__', $work).Replace('__NAME__', $runName).Replace('__ARCHO__', $archo)
 }
 
 # Shared by the guest scripts (Windows PowerShell 5.1 as Player).
@@ -76,7 +77,7 @@ function MonitorDir {
 function MonitorFolders {
   $dir = MonitorDir
   if (-not $dir) { return @() }
-  @(Get-ChildItem -LiteralPath $dir -Directory -Filter 'ArchoMonitor-*' -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch '\.archo-' })
+  @(Get-ChildItem -LiteralPath $dir -Directory -Filter 'ArchoMonitor-*' -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch '\.archo-' }) + @('__EXTRA__'.Split('|') | Where-Object { $_ } | ForEach-Object { Get-Item -LiteralPath $_ })
 }
 function DriverFiles {
   foreach ($f in MonitorFolders) {

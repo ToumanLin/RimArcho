@@ -10,6 +10,14 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 - CLI: `archo tag rename <tag> <new>`, `tag merge <tags…> --into <tag>`, `tag delete <tags…>` (each with `--dry-run`) and `tag note <tag> [<text>] [--clear]` change a tag on every Mod; `tag list` shows pinned tags and notes, and says `1 mod` instead of `1 mods`.
 - MCP: `set_player_data` has the actions `tag_rename`, `tag_merge`, `tag_delete` and `tag_note`, with `dry_run`; `refs` is now optional.
 - The database moves to schema 32 (tag notes) when a 1.0.x database is opened.
+- Archo Monitor is recognized by packageId from every Mod source, including RimArcho's Workshop item. The highest Monitor modVersion wins; on a tie, the Workshop copy wins and the next save or launch removes the bundled copy's link. Plans keep one active Monitor, and Can it run, CLI and MCP no longer report installed Monitor copies as duplicate Mods. Workshop Monitor also works when `Mods/` is on FAT or exFAT. Monitor keeps its own version, independent of the launcher.
+- Maintainers: `archo workshop publish` assembles and validates the RimArcho Workshop item, then creates or updates it through the signed-in Steam client without starting RimWorld. Supports a local-only dry run, stable version tag, item ID persistence, change note, visibility and upload progress. Release scripts never publish.
+- RimArcho can check for stable updates on the Steam Workshop and use a subscribed release zip or anonymous SteamCMD, with GitHub fallback for the same version. Settings has one update source choice: automatic (Workshop first) or GitHub; prereleases use GitHub. `archo update --check` names the source and any check fallback. When the Web API cannot see the item, a subscribed copy still gives the version. The Workshop source stays disabled until its item is configured.
+- Steam Workshop distribution: started from the subscribed item folder, the GUI offers "install RimArcho" to a folder of its own, then restarts there and removes only the extracted release files (the item keeps its own files, LICENSE included). Declining keeps a session warning; self-update refuses installation in Workshop folders, and TUI/CLI startup warns on stderr.
+- First-run setup asks where to keep managed downloads and tools, with a low-space warning. The `local.dir` setting chooses their root before it holds content; existing folder overrides remain effective.
+- The guide and Settings can discover RimSort lists and user rules and RimCrow databases and saved lists. Imports show a preview before confirmation; RimCrow player data and RimSort rules preserve existing values and leave the source files unchanged.
+- Probe runs: `archo test run --probe <folder>` and MCP `test_run` with `probe` add a probe Mod (a small test Mod that logs `[Probe]` lines and ends with one `[Probe] RESULT` or `[Probe] EXCEPTION` line) to the tested list, run a quick test map with `-probequit` and stop at that line instead of waiting for a quiet log. The probe is linked into `Mods/` for the run only and loads last, or next to a Mod with `--probe-after` / `--probe-before` (`probe_after`, `probe_before`). The report adds `probe`: the outcome, the RESULT text, the `[Probe]` lines, the screenshot the probe saved (moved into the run folder) and the probe's dependencies the list lacks; error clusters, attribution and both comparisons are as before, and a probe run compares only with earlier runs of the same probe. Success needs the RESULT line and no error clusters. Works for 1.7 too, with a probe built for .NET 10. The `rimworld-probe` skill's template keeps running when its window is in the background and ends at an exception in `OnStartup`; its `SKILL.md` describes the line contract.
+- Updates page: Update all with many Mods opens its confirmation at once. Before, it built a preview for each Mod in turn, about 10 seconds for a long list. Confirming now queues one task for the Git and SteamCMD Mods, downloaded by SteamCMD in shared batches, and one for Steam client Mods, which Steam gets in one request. Before, every Mod was its own task and its own SteamCMD run. The TUI's update all (`U`) does the same.
 - The first-run guide no longer shows `✗ no environment configured` (in English) on the status line before a game is added.
 - Can it run: after Sort, or after choosing which Mod of an incompatible pair to disable, the cards under errors from the last run no longer each turn into a ✓ row with its own undo.
 - Add subscription: the preview reads in the interface language (it was English in Chinese).
@@ -25,6 +33,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 - Background tasks in Chinese: the RimArcho update check's result "new version available" is translated.
 - `archo problems`: when two copies of a Mod are installed and neither is in the list, the finding no longer suggests `archo swap`, which failed with "not enabled", and no longer says both copies are ignored because another copy wins.
 - RimArcho's own update and uninstall now know `README.zh-CN.md` and `skills/` (agent skills, such as `rimworld-probe` for checking Mod behaviour in the game). Release zips carry them from 1.0.2 on. RimArcho 1.0.0 refuses a zip with files it does not know, so a 1.0.0 install should update to 1.0.1 before 1.0.2 is out; after that, download 1.0.2 by hand.
+- `rimworld-probe` skill: probes also build and run on RimWorld 1.7, and the game it starts no longer attaches to a running Steam client.
 
 - Switching the interface language now also changes "Background tasks" at the foot of the sidebar, and the search hints of the filter bars (list editor, Mod library, Background tasks, file search). Before, they kept the old language until RimArcho restarted.
 
@@ -1439,7 +1448,7 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
   paged. `--def` classifies hits (def, abstract, child, patch, patch value, translation,
   reference). Literal text or `--regex`; no index.
 
-### Game test runs (09 §7)
+### Game test runs (20 §2)
 - `archo test run [<plan>] [--map] [--timeout]` / MCP `test_run`: starts the game on isolated
   data with default settings, waits for the main menu (or a quick test map), stops it and
   reports the startup errors by mod (`report.json`, the last 10 runs kept). Missing mods and

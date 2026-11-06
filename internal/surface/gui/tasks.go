@@ -347,7 +347,7 @@ const steamChunk = 50
 // unsubscribe and resubscribe check every item and hand Steam 50 at a time. The rest (lock, move into the lock library…)
 // need a scan after each item to know the new copy, and go one by one.
 func (s *API) taskBatch(kind string, refs []string, b app.BatchCalls) bool {
-	if kind == view.OpSubRemove || kind == view.OpSubRemoveFast {
+	if kind == view.OpSubRemove || kind == view.OpSubRemoveFast || kind == view.OpSubUpdate {
 		s.filesMu.RLock()
 		defer s.filesMu.RUnlock()
 	}
@@ -358,6 +358,8 @@ func (s *API) taskBatch(kind string, refs []string, b app.BatchCalls) bool {
 		s.batchSteam(kind, refs, b)
 	case view.OpSubRemove, view.OpSubRemoveFast:
 		s.batchRemoveSubscriptions(kind, refs, b)
+	case view.OpSubUpdate:
+		s.batchUpdateSubscriptions(refs, b)
 	default:
 		return false
 	}
@@ -471,6 +473,35 @@ func (s *API) batchSteam(kind string, refs []string, b app.BatchCalls) {
 			}
 		}
 	}
+}
+
+// batchUpdateSubscriptions updates a task's subscriptions in one operation, so SteamCMD
+// downloads them in one run per content root instead of one run per item (11 §1).
+func (s *API) batchUpdateSubscriptions(refs []string, b app.BatchCalls) {
+	a, err := s.detachedReader()
+	if err != nil {
+		for i := range refs {
+			b.Done(i, err)
+		}
+		return
+	}
+	defer a.Close()
+	a.WorkspaceSnapshot()
+	st, _ := a.Loadout()
+	done := b.Done
+	b.Done = func(i int, err error) {
+		if err != nil {
+			err = errors.New(view.Humanize(st, err.Error()))
+		}
+		done(i, err)
+	}
+	op, err := a.UpdateSubscriptionsWith(refs, false, b)
+	if op == nil && err != nil {
+		for i := range refs {
+			b.Done(i, err)
+		}
+	}
+	s.invalidateInventory()
 }
 
 func (s *API) batchRemoveSubscriptions(kind string, refs []string, b app.BatchCalls) {

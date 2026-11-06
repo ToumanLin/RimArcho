@@ -21,6 +21,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/buildinfo"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
 	"github.com/ToumanLin/RimArcho/internal/surface/gui"
 	"github.com/ToumanLin/RimArcho/internal/surface/mcp"
@@ -60,6 +61,16 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, "error:", err)
 		return cmds.ExitUsage
 	}
+	// Maintainer dry runs assemble local release files without creating a player home.
+	if cmds.WorkshopPublishOffline(rest) {
+		out, code := cmds.ExecuteContext(context.Background(), &app.App{}, rest)
+		if code == cmds.ExitOK {
+			io.WriteString(stdout, out)
+		} else {
+			io.WriteString(stderr, out)
+		}
+		return code
+	}
 	// `archo mcp [--tools core|all]` (14 §1); `archo mcp --help` runs as a command. A bad
 	// flag fails before the data folder is opened.
 	serveMCP := len(rest) > 0 && rest[0] == "mcp" && !(len(rest) > 1 && (rest[len(rest)-1] == "--help" || rest[len(rest)-1] == "-h"))
@@ -98,6 +109,11 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 		}
 		return cmds.ExitOK
 	}
+	if program, err := ap.SelfProgramDir(); err == nil {
+		if _, ok := selfupdate.InWorkshopFolder(program); ok {
+			fmt.Fprintln(stderr, "warning: Steam can replace this Workshop folder; open RimArcho.exe to move RimArcho")
+		}
+	}
 	if len(rest) == 0 || (len(rest) == 1 && rest[0] == "tui") {
 		// No command, or `archo tui`: run the TUI in the current terminal.
 		// Scans run as a child process of this executable.
@@ -125,7 +141,7 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	}
 	ctx := context.Background()
 	// Ctrl+C stops a test run, or an update waiting for the other RimArcho to close.
-	if len(rest) >= 2 && rest[0] == "test" && rest[1] == "run" || rest[0] == "update" {
+	if len(rest) >= 2 && rest[0] == "test" && rest[1] == "run" || rest[0] == "update" || len(rest) >= 2 && rest[0] == "workshop" && rest[1] == "publish" {
 		var stop context.CancelFunc
 		ctx, stop = signal.NotifyContext(ctx, os.Interrupt)
 		defer stop()
@@ -228,9 +244,21 @@ func openPlanFlag(argv []string) (plan string, rest []string, err error) {
 }
 
 // steamWorker runs `archo steam-worker <action> <id>…`, started by app.Workshop in the
-// Steam runtime folder. It is not a listed command: players and agents use
-// `archo workshop subscribe|unsubscribe|state`.
+// Steam runtime folder. Maintainer uploads instead pass `publish <request.json>`.
+// It is not a listed command; the public commands live under `archo workshop`.
 func steamWorker(argv []string, stdout io.Writer) int {
+	if len(argv) > 0 && argv[0] == steamworks.Publish {
+		if len(argv) != 2 {
+			fmt.Fprintln(stdout, steamworks.ErrorLine("usage: archo steam-worker publish <request.json>"))
+			return cmds.ExitUsage
+		}
+		r, err := steamworks.ReadPublishRequest(argv[1])
+		if err != nil {
+			fmt.Fprintln(stdout, steamworks.ErrorLine(err.Error()))
+			return cmds.ExitUsage
+		}
+		return steamworks.PublishWorker(r, stdout)
+	}
 	if len(argv) < 2 {
 		fmt.Fprintln(stdout, steamworks.ErrorLine("usage: archo steam-worker subscribe|unsubscribe|state|download|watch <workshop id>…"))
 		return cmds.ExitUsage

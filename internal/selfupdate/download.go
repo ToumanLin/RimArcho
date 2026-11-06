@@ -91,16 +91,12 @@ func (c *Client) Download(ctx context.Context, r *Release, dir string, progress 
 		return "", err
 	}
 	if info, err := os.Lstat(zipPath); err == nil && info.Mode().IsRegular() && info.Size() <= maxDownload {
-		hash, size, err := hashFile(ctx, zipPath)
-		if err != nil {
-			return "", err
-		}
-		if hash == want && (r.Zip.Size <= 0 || size == r.Zip.Size) {
+		if err := VerifyLocal(ctx, zipPath, r.Zip.Name, b, r.Zip.Size); err == nil {
 			if err := removeIfExists(part); err != nil {
 				return "", err
 			}
 			if progress != nil {
-				progress(size, max(r.Zip.Size, 0))
+				progress(info.Size(), max(r.Zip.Size, 0))
 			}
 			return zipPath, nil
 		}
@@ -143,13 +139,104 @@ func (c *Client) Download(ctx context.Context, r *Release, dir string, progress 
 	if err := errors.Join(copyErr, closeErr); err != nil {
 		return "", err
 	}
-	if r.Zip.Size > 0 && done != r.Zip.Size {
-		return "", fmt.Errorf("zip size mismatch: got %d, want %d", done, r.Zip.Size)
-	}
-	if hex.EncodeToString(h.Sum(nil)) != want {
-		return "", fmt.Errorf("zip verification: %w", ErrChecksum)
+	if err := verifyDigest(want, hex.EncodeToString(h.Sum(nil)), done, r.Zip.Size); err != nil {
+		return "", err
 	}
 	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	if err := os.Rename(part, zipPath); err != nil {
+		return "", err
+	}
+	return zipPath, nil
+}
+
+// VerifyLocal checks an archive against its sidecar. A positive size is the GitHub
+// asset size; Workshop files use zero, with the checksum as their authority.
+func VerifyLocal(ctx context.Context, zipPath, name string, checksum []byte, size int64) error {
+	want, err := ParseSum(checksum, name)
+	if err != nil {
+		return err
+	}
+	info, err := os.Lstat(zipPath)
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() || info.Size() > maxDownload {
+		return errors.New("release zip must be a regular file of at most 200 mb")
+	}
+	hash, got, err := hashFile(ctx, zipPath)
+	if err != nil {
+		return err
+	}
+	return verifyDigest(want, hash, got, size)
+}
+
+func verifyDigest(want, hash string, got, size int64) error {
+	if size > 0 && got != size {
+		return fmt.Errorf("zip size mismatch: got %d, want %d", got, size)
+	}
+	if hash != want {
+		return fmt.Errorf("zip verification: %w", ErrChecksum)
+	}
+	return nil
+}
+
+// CopyLocal stages the exact checked Workshop archive and checksum, leaving the
+// subscribed item untouched. No unverified archive is published in download/.
+func CopyLocal(ctx context.Context, r *Release, source, dir string) (result string, err error) {
+	if r == nil || !safeAssetName(r.Zip.Name) || r.Sum.Name != r.Zip.Name+".sha256" {
+		return "", errors.New("release has invalid asset names")
+	}
+	sum, err := os.Open(filepath.Join(source, r.Sum.Name))
+	if err != nil {
+		return "", err
+	}
+	b, readErr := readLimited(sum, 64<<10)
+	if err := errors.Join(readErr, sum.Close()); err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", err
+	}
+	zipPath := filepath.Join(dir, r.Zip.Name)
+	part := zipPath + ".part"
+	defer func() {
+		if err != nil {
+			err = errors.Join(err, removeIfExists(part), removeIfExists(zipPath), removeIfExists(filepath.Join(dir, r.Sum.Name)))
+		}
+	}()
+	srcPath := filepath.Join(source, r.Zip.Name)
+	info, err := os.Lstat(srcPath)
+	if err != nil {
+		return "", err
+	}
+	if !info.Mode().IsRegular() || info.Size() > maxDownload {
+		return "", errors.New("release zip must be a regular file of at most 200 mb")
+	}
+	src, err := os.Open(srcPath)
+	if err != nil {
+		return "", err
+	}
+	defer src.Close()
+	if err := removeIfExists(part); err != nil {
+		return "", err
+	}
+	dst, err := os.OpenFile(part, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return "", err
+	}
+	_, copyErr := copyDownload(ctx, dst, src, 0, nil)
+	if err := errors.Join(copyErr, dst.Close()); err != nil {
+		return "", err
+	}
+	if err := VerifyLocal(ctx, part, r.Zip.Name, b, 0); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(filepath.Join(dir, r.Sum.Name), b, 0o600); err != nil {
+		return "", err
+	}
+	if err := removeIfExists(zipPath); err != nil {
 		return "", err
 	}
 	if err := os.Rename(part, zipPath); err != nil {

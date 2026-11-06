@@ -34,11 +34,15 @@ type TestRunIn struct {
 	Env            string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Plan           string `json:"plan,omitempty" jsonschema:"plan name or plan:name (default: the environment's current plan)"`
 	Map            bool   `json:"map,omitempty" jsonschema:"load a quick test map instead of the main menu"`
+	Probe          string `json:"probe,omitempty" jsonschema:"probe mod folder: run a test map until its [Probe] RESULT line"`
+	ProbeAfter     string `json:"probe_after,omitempty" jsonschema:"packageId the probe follows (default: last)"`
+	ProbeBefore    string `json:"probe_before,omitempty" jsonschema:"packageId the probe precedes"`
 	TimeoutSeconds int    `json:"timeout_seconds,omitempty" jsonschema:"maximum run time in seconds (default 600)"`
 }
 
 func TestRunArgv(in TestRunIn) []string {
-	b := argv("test", "run").pos(in.Plan).flag("map", in.Map)
+	b := argv("test", "run").pos(in.Plan).flag("map", in.Map).
+		str("probe", in.Probe).str("probe-after", in.ProbeAfter).str("probe-before", in.ProbeBefore)
 	if in.TimeoutSeconds != 0 {
 		b.str("timeout", fmt.Sprintf("%ds", in.TimeoutSeconds))
 	}

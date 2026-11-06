@@ -51,7 +51,7 @@ const descSave = `Save the current plan to the game (ModsConfig.xml and RimArcho
 
 const descLaunch = `Save the current plan like save_loadout, then start the game. Refused while any game runs. Starts a program and changes the game's list: call with dry_run=true first, show the player and ask.`
 
-const descTestRun = `Start the game with a plan in isolated test data, wait for the main menu (map=true: a test map), capture startup errors, stop it, return a JSON report. Compares with the player's log (before, fixed) and the previous run (delta, gone). Takes minutes. Pinned copies are linked into Mods/ for the run only.`
+const descTestRun = `Start the game with a plan in isolated test data, wait for the main menu (map=true: a test map; probe: a probe mod's RESULT), capture errors, stop it, report JSON. Compares with the player's log (before, fixed) and the previous run (delta, gone). Takes minutes. Pinned copies are linked into Mods/ for the run only.`
 
 const descPlans = `The environment's plans (named mod lists): list, new, use (switch; writes no game file), rename, remove, import, versions, follow / unfollow / sync a Workshop collection. remove deletes a plan with its whole history: ask the player first, naming the plan.`
 
@@ -61,7 +61,7 @@ const descPin = `Lock a version of a mod: copy it into RimArcho's lock library a
 
 const descUnpin = `Unlock a locked version: the current plan uses the upstream (usually Workshop) copy again; the locked copy stays. dry_run=true previews.`
 
-const descPlayer = `The player's own data on mods, in RimArcho's database: tags, alias and note (shared by every copy of a mod), copy_note (one copy's own note). tag_rename, tag_merge, tag_delete and tag_note change a tag on every mod (dry_run first; ask before a merge or delete). Nothing reaches the game.`
+const descPlayer = `The player's own data on mods, in RimArcho's database: tags, alias and note (shared by every copy of a mod), copy_note (one copy's own note). tag_rename/merge/delete/note change a tag on every mod (dry_run first; ask before merge or delete). Nothing reaches the game.`
 
 const descRules = `User load-order rules: add (after, before, incompatible, attach, top, bottom, or ignore a wrong About.xml / community constraint — how an order.cycle is broken), list, remove. Rules guide sort and the order problems; they do not reorder by themselves.`
 

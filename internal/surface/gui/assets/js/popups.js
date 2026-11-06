@@ -81,7 +81,7 @@ export function open(kind, title, build) {
 }
 
 export function close() {
-  if (!S.popup) return;
+  if (!S.popup || S.popup.canClose?.() === false) return;
   const p = S.popup;
   for (const [n, inert] of p.background || []) n.inert = inert;
   p.onclose?.();

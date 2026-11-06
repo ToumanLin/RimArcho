@@ -50,12 +50,13 @@ type Description struct {
 }
 
 type workshopCache struct {
-	ID          string `json:"id"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	TimeUpdated int64  `json:"time_updated"`
-	Fetched     int64  `json:"fetched"`
-	Result      int    `json:"result"`
+	Tags        []string `json:"tags,omitempty"`
+	ID          string   `json:"id"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	TimeUpdated int64    `json:"time_updated"`
+	Fetched     int64    `json:"fetched"`
+	Result      int      `json:"result"`
 }
 
 func (a *App) httpClient() *http.Client {
