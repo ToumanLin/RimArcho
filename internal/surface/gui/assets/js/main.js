@@ -22,6 +22,7 @@ import * as shell from "./shell.js";
 import * as homePage from "./home.js";
 import * as fullPage from "./fulldetail.js";
 import * as guide from "./guide.js";
+import * as firstRun from "./firstrun.js";
 import * as plans from "./plans.js";
 import * as library from "./library.js";
 import { updateFromForm } from "./subscribe.js";
@@ -1214,6 +1215,8 @@ const ui = {
   duplicateList: (id) => planManage.duplicate(id),
   selectedList: () => planManage.selected(),
   resumeGuide: () => guide.resume(),
+  prepareManagedFolders: firstRun.managedFolders,
+  importManagers: () => exchange(true),
   manageLists: (id = 0) => { planManage.select(id); return go("plans"); },
   edited: (call, undoable = true) => edited(call, undoable),
   ruleTarget: () => actionContext().sel[0],
@@ -1335,6 +1338,7 @@ async function start() {
     try { if (S.board && (await api.Stamp()) !== S.board.stamp) await reload(); } catch { /* keep the page */ }
     checkCredit();
   });
+  if (!(await firstRun.workshopStart())) return;
   if (await uninst.restore()) { shell.settle(); return; }
   // The start page needs only Workspace's shell and board. The editor behind it gets its
   // filter answer (the bar's first one reads every mod's content) and its rows afterwards,

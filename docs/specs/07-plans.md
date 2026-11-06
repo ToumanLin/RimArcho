@@ -372,7 +372,19 @@ Storage: `lineage_data` (environment, Lineage, alias, note), `lineage_tag` (envi
 7. Running it again gives the same result: identical values are skipped, and rules are deduplicated by kind + Lineage. RimCrow's log tables are not imported.
 8. `--dry-run` only reports and writes nothing. By default 6 details per category; `--all` shows all.
 
+The GUI's shared manager-import flow (16 §2.15) discovers sources read-only with `app.DiscoverManagerImports`:
+
+- RimSort: `%LOCALAPPDATA%\RimSort` (Windows `platformdirs`, `appauthor=False`), with `%APPDATA%\RimSort` as a compatibility candidate; `modlists/`, `dbs/userRules.json`, and `settings.json`'s legacy `config_folder` or each `instances` entry's `config_folder` for ModsConfig.xml. Portable/development candidates also check the program folder and its `data/` child.
+- RimCrow: `<install>/data/mod_manager.db`; also a directly selected/recent data folder's `mod_manager.db`. Saved lists come from `<install>/backups/`, its `today`, `earlier`, `other` children, and up to 16 profile directories under `backups/profile/`.
+- Install candidates: running RimCrow/RimModManager/RimSort executable directories; named folders in Program Files, Local AppData/Programs, Local AppData, Downloads, Desktop, Games and beside RimArcho's parent folder; named Start-menu shortcuts and recent-folder shortcuts. Windows shortcut resolution is read-only, hidden and limited to four seconds and 200 shortcuts per root. No registry registration is assumed. Each list folder contributes at most its first 100 entries. Duplicate source paths are suppressed; inaccessible or absent locations are skipped.
+
+Choosing a candidate does not import it. Lists use §7; RimCrow data uses the existing dry-run report and import above. Original databases, WAL files, settings and rules remain unchanged. The manual file picker remains available when discovery finds nothing.
+
 Measured on real data: 18 §3.
+
+### 6.3 RimSort user rules
+
+`app.ImportRimSortRules` reads `dbs/userRules.json` (at most 4 MB) without modifying it. Its `rules` map imports loadAfter/loadBefore/incompatibleWith and true loadTop/loadBottom values as after/before/incompatible/top/bottom user rules. A packageId must resolve to one live Lineage; missing or ambiguous packages are skipped and reported. Existing kind + Lineage rules are deduplicated, including repeats in the input; unsupported fields are counted. Preview and confirmation follow 16 §2.15; applying rules does not sort a plan or write ModsConfig.xml. RimSort's application settings and community databases are discovery inputs, not settings to apply to RimArcho.
 
 ## 7. List exchange
 

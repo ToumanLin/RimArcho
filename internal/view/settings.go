@@ -278,6 +278,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 			folders.Items = append(folders.Items, item)
 		}
 	}
+	folders.Items = append(folders.Items, SettingItem{Key: "import.managers", Label: T("import from RimSort or RimCrow"), Actions: []SettingAction{{Label: T("import…"), Argv: []string{"import-managers"}}}})
 	out = append(out, folders)
 
 	mon := SettingItem{Label: T("add Archo Monitor to lists"), Value: cmds.Setting(a, "monitor.default"), Edit: "choice", Choices: []string{"on", "off"},

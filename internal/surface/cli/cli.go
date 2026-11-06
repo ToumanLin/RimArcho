@@ -21,6 +21,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/buildinfo"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
 	"github.com/ToumanLin/RimArcho/internal/surface/gui"
 	"github.com/ToumanLin/RimArcho/internal/surface/mcp"
@@ -97,6 +98,11 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 			return cmds.ExitError
 		}
 		return cmds.ExitOK
+	}
+	if program, err := ap.SelfProgramDir(); err == nil {
+		if _, ok := selfupdate.InWorkshopFolder(program); ok {
+			fmt.Fprintln(stderr, "warning: Steam can replace this Workshop folder; open RimArcho.exe to move RimArcho")
+		}
 	}
 	if len(rest) == 0 || (len(rest) == 1 && rest[0] == "tui") {
 		// No command, or `archo tui`: run the TUI in the current terminal.

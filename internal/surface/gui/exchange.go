@@ -28,8 +28,9 @@ type native interface {
 // exchange is the API's import/export state: the list read for import, kept between its
 // preview and its apply.
 type exchange struct {
-	native native
-	imp    *view.Import
+	manager *managerPreview
+	native  native
+	imp     *view.Import
 	// follow: once applied, the list follows the collection imported (07 §7.6)
 	follow bool
 	seq    uint64

@@ -185,6 +185,10 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 						fmt.Fprintf(&b, "    : archo %s\n", strings.Join(it.MoveArgv, " "))
 					}
 					for _, a := range it.Actions {
+						if a.Argv[0] == "import-managers" {
+							fmt.Fprintf(&b, "    %s  : archo gui\n", a.Label)
+							continue
+						}
 						if a.Argv[0] == "feedback" { // a panel, not a command (16 §2.14)
 							fmt.Fprintf(&b, "    %s  ctrl+k %s\n", a.Label, T("feedback"))
 							continue
