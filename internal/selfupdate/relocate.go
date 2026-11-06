@@ -137,6 +137,10 @@ func CleanWorkshopRelease(dir string) error {
 	}
 	var errs []error
 	for _, name := range Files {
+		// The item's Monitor folder carries the same LICENSE; extracting overwrote it.
+		if name == "LICENSE" {
+			continue
+		}
 		errs = append(errs, os.RemoveAll(filepath.Join(dir, name)))
 	}
 	return errors.Join(errs...)

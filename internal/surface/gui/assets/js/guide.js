@@ -59,8 +59,9 @@ export async function start(from = "first") {
   G.picked.clear();
   if (D.run && D.run.end) D.run = null;
   G.way = D.run ? 1 : 0;
-  if (from === "first") await ui.prepareManagedFolders?.();
   await find();
+  // Over the guide page, so the "no game yet" read failure stays quiet (main.js reload).
+  if (from === "first" && S.screen === "guide") await ui.prepareManagedFolders?.();
 }
 
 async function find() {

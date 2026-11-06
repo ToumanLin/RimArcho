@@ -116,6 +116,21 @@ The Workshop page says: subscribe, open the item folder, extract the zip, run `R
 7. `hcontent_file` from the Web API against the ACF `manifest`, only if the tag route fails.
 8. Defender and SmartScreen on a zip from the Workshop path (Steam downloads carry no Mark-of-the-Web, so SmartScreen likely stays quiet).
 
+## 5. VM results (2026-11-06)
+
+Test item `3834567511`, unlisted, published from the Player-Test VM with the maintainer's account; builds 0.99.1 to 0.99.3. Answers to §4:
+
+1. **Tag**: `SetItemTags` accepts `v0.99.1`; the item page shows it. The anonymous `GetPublishedFileDetails` does not: it answers `result 9` for the unlisted item, for minutes after upload, while the community page loads. **The real item must be public**, or only subscribers see the version (RimArcho then reads it from the subscribed folder's zip name).
+2. **Visibility**: anonymous SteamCMD downloads the unlisted item. Private and public were not tried.
+3. **Speed**: anonymous SteamCMD, 33 MB item: 10.3 s cold, 4.7 s rerun (both `Success. Downloaded item`). Upload 9 s; an update 7 s; Steam replaced a subscriber's folder about 90 s after the update, removing the old zip.
+4. Not tried.
+5. **Subscribed**: Monitor 0.11.0 from the item loaded in 1.6 with every hook through a full round (new colony, save, load, quit); RimArcho chose it over its own copy on the tie, reported no duplicate and made no link; after unsubscribing (Steam deleted the folder about 4 minutes later), plans fell back to the bundled copy. The move out of the item folder worked, but its cleanup also deleted the item's `LICENSE` (the release zip carries one too), and Steam's next item update did not restore it: cleanup now keeps `LICENSE`.
+6. **Worker**: create and update through the flat API worked; this account needed no legal agreement. Refusal results were not triggered.
+7. Not needed.
+8. Defender raised nothing on the extracted files; SmartScreen not observed (the GUI was started by script).
+
+Also found: `archo subscribe workshop <id>` refuses an unlisted item as "removed from the Workshop", because the anonymous Web API answers 9 for it; the Mod update check would likewise call such an item gone. A public RimArcho item avoids both; other people's unlisted Mods keep this behaviour.
+
 ## Sources
 
 - Steamworks Workshop implementation, SteamCMD section: https://partner.steamgames.com/doc/features/workshop/implementation

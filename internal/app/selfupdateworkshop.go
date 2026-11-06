@@ -31,23 +31,40 @@ func (a *App) workshopSelfRelease(ctx context.Context) (*selfupdate.Release, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
+	v, title, notes := "", "", ""
 	details, err := a.postWorkshopDetails(ctx, []string{id})
-	if err != nil {
+	switch d := details[id]; {
+	case err != nil:
+	case d == nil || d.Result != 1:
+		err = errors.New("Workshop update item is unavailable")
+	default:
+		v, title, notes = selfupdate.WorkshopVersion(d.Tags), d.Title, d.Description
+		if v == "" {
+			err = errors.New("Workshop update item has no stable version tag")
+		}
+	}
+	// The anonymous Web API answers 9 for an unlisted item; a subscriber's folder still
+	// names the version it holds.
+	local := ""
+	if v == "" {
+		for _, root := range env.WorkshopFolders(a.Detect) {
+			if v = selfupdate.SubscribedVersion(filepath.Join(root, id), runtime.GOOS, runtime.GOARCH); v != "" {
+				local, err = filepath.Join(root, id), nil
+				break
+			}
+		}
+	}
+	if v == "" {
 		return nil, err
 	}
-	d := details[id]
-	if d == nil || d.Result != 1 {
-		return nil, errors.New("Workshop update item is unavailable")
-	}
-	v := selfupdate.WorkshopVersion(d.Tags)
-	if v == "" {
-		return nil, errors.New("Workshop update item has no stable version tag")
-	}
-	r := &selfupdate.Release{Version: v, Tag: "v" + v, Name: d.Title, Notes: d.Description,
+	r := &selfupdate.Release{Version: v, Tag: "v" + v, Name: title, Notes: notes,
 		Page: workshopURL(id), WorkshopItem: id}
 	if runtime.GOOS == "windows" && runtime.GOARCH == "amd64" {
 		r.Zip.Name = selfupdate.ZipName(v, "windows", "amd64")
 		r.Sum.Name = r.Zip.Name + ".sha256"
+		if st, err := os.Stat(filepath.Join(local, r.Zip.Name)); local != "" && err == nil {
+			r.Zip.Size = st.Size() // shown only; the checksum verifies the copy
+		}
 	}
 	return r, nil
 }

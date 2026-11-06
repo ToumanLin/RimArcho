@@ -37,7 +37,7 @@ test("declining relocation keeps one warning line and copies nothing", async () 
 
 test("failed relocation stays in the dialog for retry", async () => {
   const h = await setup(true); h.fail(); const done = h.module.workshopStart(); await flush();
-  assert.equal(h.moves(),0); await h.button("move and restart").onclick();
-  assert.match(h.popup().textContent,/copy failed/); assert.equal(h.button("move and restart").disabled,false);
+  assert.equal(h.moves(),0); await h.button("install and restart").onclick();
+  assert.match(h.popup().textContent,/copy failed/); assert.equal(h.button("install and restart").disabled,false);
   h.button("use here this time").onclick(); assert.equal(await done,true);
 });

@@ -59,3 +59,23 @@ func TestCopyLocal(t *testing.T) {
 		t.Fatal("changed subscribed files", err)
 	}
 }
+
+func TestSubscribedVersion(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{
+		"archo-0.99.1-windows-amd64.zip", "archo-0.99.1-windows-amd64.zip.sha256",
+		"archo-0.99.3-windows-amd64.zip", // no checksum: ignored
+		"archo-1.0.0-rc1-windows-amd64.zip", "archo-1.0.0-rc1-windows-amd64.zip.sha256",
+		"archo-0.99.2-linux-amd64.zip", "archo-0.99.2-linux-amd64.zip.sha256",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), nil, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := SubscribedVersion(dir, "windows", "amd64"); got != "0.99.1" {
+		t.Fatalf("got %q", got)
+	}
+	if got := SubscribedVersion(filepath.Join(dir, "missing"), "windows", "amd64"); got != "" {
+		t.Fatalf("missing folder: %q", got)
+	}
+}

@@ -464,10 +464,15 @@ func (a *App) monitorPlan(ix *Index, p *store.Plan, newest MonitorInstance) (Mon
 			return c, nil
 		}
 		op := fmt.Sprintf("update Archo Monitor %s → %s", old, newest.Version)
+		c.Change = fmt.Sprintf("updated %s → %s", old, newest.Version)
+		if old == newest.Version {
+			// Same version from another source, such as the subscribed Workshop copy.
+			op = fmt.Sprintf("use the %s copy of Archo Monitor %s", newest.Mod.Kind, old)
+			c.Change = fmt.Sprintf("now uses the %s copy", newest.Mod.Kind)
+		}
 		if err := a.editPlan(p, ws, list, after, op); err != nil {
 			return c, err
 		}
-		c.Change = fmt.Sprintf("updated %s → %s", old, newest.Version)
 		return c, nil
 	}
 	if a.Store.Meta(monitorAddedKey(p.ID)) != "" {

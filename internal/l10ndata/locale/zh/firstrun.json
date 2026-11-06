@@ -1,10 +1,10 @@
 {
-  "move RimArcho": "迁移 RimArcho",
-  "Copy RimArcho here, restart, and remove the extracted release files from the Workshop folder; Steam's item files stay.": "将 RimArcho 复制到这里并重启，随后清理工坊目录中解压出的发行文件；保留工坊物品本身的文件。",
+  "install RimArcho": "安装 RimArcho",
+  "Steam rewrites this Workshop folder when the item updates, so RimArcho needs a folder of its own. The files extracted here are removed after the move.": "Steam 更新条目时会改写这个创意工坊文件夹，RimArcho 需要装到单独的文件夹。搬过去后会删掉在这里解压出的文件。",
   "free: %s": "可用空间：%s",
   "Less than 10 GB is free on this drive.": "此磁盘的可用空间不足 10 GB。",
   "The RimArcho already in this folder will be replaced.": "此目录中已有的 RimArcho 将被替换。",
-  "move and restart": "迁移并重启",
+  "install and restart": "安装并重启",
   "use here this time": "本次在这里运行",
   "Steam can replace or delete this folder; self-update is unavailable this session.": "Steam 可能替换或删除此目录；本次运行无法自更新。",
   "managed folders": "托管目录",

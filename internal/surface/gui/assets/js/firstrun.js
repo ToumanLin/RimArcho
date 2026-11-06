@@ -60,8 +60,8 @@ export async function workshopStart() {
   try { await api.FinishWorkshopRelocation(); } catch (e) { say("warn", errText(e)); }
   const info = await api.WorkshopFolder("");
   if (!info.workshop) return true;
-  const moved = await folderDialog("move RimArcho", "Copy RimArcho here, restart, and remove the extracted release files from the Workshop folder; Steam's item files stay.", info,
-    path => api.WorkshopFolder(path), path => api.RelocateWorkshop(path), "move and restart", "use here this time");
+  const moved = await folderDialog("install RimArcho", "Steam rewrites this Workshop folder when the item updates, so RimArcho needs a folder of its own. The files extracted here are removed after the move.", info,
+    path => api.WorkshopFolder(path), path => api.RelocateWorkshop(path), "install and restart", "use here this time");
   if (moved) return false;
   const warning = el("div", "muted", T("Steam can replace or delete this folder; self-update is unavailable this session."));
   warning.id = "workshop-warning";
