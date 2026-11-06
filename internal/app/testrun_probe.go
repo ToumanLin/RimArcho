@@ -16,7 +16,7 @@ import (
 )
 
 // A probe run adds a probe Mod to the tested list and runs a test map until its last
-// "[Probe]" line (09 §7.1). Any folder that follows the line contract works.
+// "[Probe]" line (20 §3). Any folder that follows the line contract works.
 
 // TestRunProbe is the probe part of a test run's report.
 type TestRunProbe struct {
@@ -70,7 +70,7 @@ func tokenIndex(tokens []string, pkg string) int {
 }
 
 // checkProbe validates the probe folder and its position before the run links or writes
-// anything (09 §7.1).
+// anything (20 §3).
 func (a *App) checkProbe(st *LoadoutState, o TestRunOptions) (*probeSetup, error) {
 	if o.Probe == "" {
 		if o.ProbeAfter != "" || o.ProbeBefore != "" {

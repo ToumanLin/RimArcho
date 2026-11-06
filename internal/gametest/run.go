@@ -1,4 +1,4 @@
-// Package gametest runs RimWorld with isolated data and captures startup logs (09 §7).
+// Package gametest runs RimWorld with isolated data and captures startup logs (20 §2).
 package gametest
 
 import (
@@ -27,7 +27,7 @@ type Options struct {
 	RunDir string
 	Map    bool
 	// Probe: run a test map (Map is implied) with -probequit until the probe's RESULT or
-	// EXCEPTION line, then wait up to Settle for the game to quit by itself (09 §7.1).
+	// EXCEPTION line, then wait up to Settle for the game to quit by itself (20 §3).
 	Probe bool
 	// Zero durations use defaults of 10m, 5s (15s in a probe run) and 15s. Negative values are rejected.
 	Timeout, Settle, MapQuiet time.Duration
@@ -305,7 +305,7 @@ type logTail struct {
 	lastWrite time.Time
 	marker    bool
 	pending   string
-	// probe: look for the probe's last line (09 §7.1) in whole lines; line holds the
+	// probe: look for the probe's last line (20 §3) in whole lines; line holds the
 	// unfinished one, probeEnd is "result" or "exception" once it is found.
 	probe    bool
 	line     []byte

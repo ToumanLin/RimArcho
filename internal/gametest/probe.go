@@ -6,7 +6,7 @@ import (
 )
 
 // A probe is a test Mod that logs "[Probe] …" messages and ends with one "[Probe] RESULT …"
-// or "[Probe] EXCEPTION …" line, then quits the game when -probequit is given (09 §7.1).
+// or "[Probe] EXCEPTION …" line, then quits the game when -probequit is given (20 §3).
 
 // ProbeQuit is the command-line switch that tells a probe to quit the game after its last line.
 const ProbeQuit = "-probequit"

@@ -80,7 +80,7 @@ func TestAppGameHelper(t *testing.T) {
 		}
 	} else if mode == "exit" {
 		os.Exit(7)
-	} else if mode == "probe" { // a probe saves its screenshot, logs its RESULT and quits (09 §7.1)
+	} else if mode == "probe" { // a probe saves its screenshot, logs its RESULT and quits (20 §3)
 		if err := os.WriteFile(filepath.Join(os.Getenv("ARCHO_TEST_DATA"), "probe.png"), []byte("png"), 0o644); err != nil {
 			os.Exit(96)
 		}
@@ -159,7 +159,7 @@ func TestTestRunPlanConfigVisibilityAndReport(t *testing.T) {
 	if r.Status != "menu" || r.Plan != "plan:tested" || r.Requested != 7 || r.LoadSeconds <= 0 || r.TotalSeconds <= r.LoadSeconds || r.Attribution != "tested-plan" {
 		t.Fatalf("report %+v", r)
 	}
-	// The SteamCMD and extra Mods are linked for the run only (09 §7).
+	// The SteamCMD and extra Mods are linked for the run only (20 §2).
 	if len(r.Missing) != 0 || len(r.Linked) != 2 || !slices.Equal(linkedDuringRun, r.Linked) {
 		t.Fatalf("missing %+v, linked %v, links during the run %v", r.Missing, r.Linked, linkedDuringRun)
 	}
@@ -370,7 +370,7 @@ func linkNames(t *testing.T, mods string) []string {
 }
 
 // A Mod that would sit next to another copy of its packageId in Mods/ is not linked; a
-// link an interrupted run left is removed by the next run (09 §7).
+// link an interrupted run left is removed by the next run (20 §2).
 func TestTestRunLinksBlockedAndLeftover(t *testing.T) {
 	t.Parallel()
 	e := testRunEnv(t)
@@ -420,7 +420,7 @@ func TestTestRunLinksBlockedAndLeftover(t *testing.T) {
 }
 
 // The flow the MCP Instructions recommend: pin_mod, edit the copy, then test_run tests the
-// copy, not the Workshop original, and leaves Mods/ as it was (09 §7).
+// copy, not the Workshop original, and leaves Mods/ as it was (20 §2).
 func TestTestRunSeesPinnedCopy(t *testing.T) {
 	t.Parallel()
 	e, _ := pinFixture(t)

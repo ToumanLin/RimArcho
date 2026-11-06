@@ -160,7 +160,7 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 	return d, nil
 }
 
-// testProbe prints a probe run's result and lines (09 §7.1).
+// testProbe prints a probe run's result and lines (20 §3).
 func testProbe(root *render.Node, p *app.TestRunProbe) {
 	n := root.Addf("probe: %s, load order position %d (%s)", p.PackageID, p.Position, p.Folder)
 	n.KV("outcome", p.Outcome)

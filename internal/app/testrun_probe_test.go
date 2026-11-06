@@ -18,7 +18,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// probeEnv: a plan with two local Mods and a probe folder outside the game (09 §7.1).
+// probeEnv: a plan with two local Mods and a probe folder outside the game (20 §3).
 func probeEnv(t *testing.T) (*testkit.Env, string) {
 	t.Helper()
 	e := testRunEnv(t)
@@ -177,7 +177,7 @@ func TestTestRunProbeOutcomes(t *testing.T) {
 	}
 }
 
-// Every probe check fails before anything is linked or started (09 §7.1).
+// Every probe check fails before anything is linked or started (20 §3).
 func TestTestRunProbeChecks(t *testing.T) {
 	t.Parallel()
 	e, probe := probeEnv(t)

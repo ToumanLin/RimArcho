@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
-// TestRunBaseline compares error clusters with an earlier run of the same plan (09 §7).
+// TestRunBaseline compares error clusters with an earlier run of the same plan (20 §2).
 type TestRunBaseline struct {
 	RunDir  string `json:"run_dir"`
 	Status  string `json:"status"`
@@ -24,7 +24,7 @@ type TestRunBaseline struct {
 }
 
 // TestRunPlayerLog compares a test run with the player's problem log, the log
-// `archo log` reads by default (09 §7).
+// `archo log` reads by default (20 §2).
 type TestRunPlayerLog struct {
 	Path    string `json:"path"`
 	Present int    `json:"present"` // this run's clusters already in the player's log
@@ -40,7 +40,7 @@ type TestRunPlayerLog struct {
 const testRunListLimit = 30
 
 // comparePlayerLog marks each cluster present or absent in the player's log and lists the
-// player's clusters that are gone, with their attribution (09 §7). The player's log is
+// player's clusters that are gone, with their attribution (20 §2). The player's log is
 // attributed as `archo log` attributes it (AnalyzeLog, cached).
 func (a *App) comparePlayerLog(st *LoadoutState, r *TestRunReport) {
 	cur, prev := a.LogPaths(st)
@@ -97,7 +97,7 @@ func (a *App) comparePlayerLog(st *LoadoutState, r *TestRunReport) {
 		if current[lc.Key] {
 			continue
 		}
-		// A probe run starts a new game like a map run; its minutes of play do not count (09 §7.1).
+		// A probe run starts a new game like a map run; its minutes of play do not count (20 §3).
 		if !reached || !testRunReaches(lc.Phases, r.Status == "map" || r.Status == "probe") {
 			pl.Unreached++
 			continue
@@ -231,7 +231,7 @@ func previousTestRun(r *TestRunReport) (*TestRunBaseline, []*logs.Cluster, []Tes
 			Clusters []TestRunCluster `json:"clusters"`
 			Probe    *TestRunProbe    `json:"probe"`
 		}
-		// A probe run compares only with runs of the same probe (09 §7.1).
+		// A probe run compares only with runs of the same probe (20 §3).
 		if json.Unmarshal(b, &report) != nil || report.Plan != r.Plan || report.Status == "links-blocked" ||
 			slices.Contains(report.Args, "quicktest") != slices.Contains(r.Args, "quicktest") ||
 			probePackage(report.Probe) != probePackage(r.Probe) {

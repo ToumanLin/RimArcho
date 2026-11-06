@@ -1436,7 +1436,7 @@ The research on 6,734 public 1.6 logs (docs/research/), merged from `master`.
   paged. `--def` classifies hits (def, abstract, child, patch, patch value, translation,
   reference). Literal text or `--regex`; no index.
 
-### Game test runs (09 §7)
+### Game test runs (20 §2)
 - `archo test run [<plan>] [--map] [--timeout]` / MCP `test_run`: starts the game on isolated
   data with default settings, waits for the main menu (or a quick test map), stops it and
   reports the startup errors by mod (`report.json`, the last 10 runs kept). Missing mods and

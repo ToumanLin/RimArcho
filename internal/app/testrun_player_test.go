@@ -36,7 +36,7 @@ func testRunWith(t *testing.T, e *testkit.Env, mode, text string) *app.TestRunRe
 
 // The first run of a plan has no previous run, but it is compared with the player's log:
 // the fault that is gone is listed as fixed with its attribution, and the noise that
-// stays is marked as already there (09 §7).
+// stays is marked as already there (20 §2).
 func TestTestRunComparesWithPlayerLog(t *testing.T) {
 	t.Parallel()
 	e := codeModEnv(t)
@@ -86,7 +86,7 @@ func TestTestRunComparesWithPlayerLog(t *testing.T) {
 	}
 }
 
-// gone keeps the attribution the earlier run's report listed (09 §7).
+// gone keeps the attribution the earlier run's report listed (20 §2).
 func TestTestRunGoneKeepsAttribution(t *testing.T) {
 	t.Parallel()
 	e := codeModEnv(t)

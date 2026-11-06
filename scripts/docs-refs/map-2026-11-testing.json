@@ -1,0 +1,10 @@
+{
+ "note": "Game testing split of 2026-11: section 7 of 09 (test runs) became 20 section 2, and 7.1 (probe runs) became 20 section 3. Run `node scripts/docs-refs/refs.cjs remap scripts/docs-refs/map-2026-11-testing.json <files>` on code and docs from branches cut before it, after the older maps.",
+ "map": {
+  "09": [
+   ["", "09", ""],
+   ["7", "20", "2"],
+   ["7.1", "20", "3"]
+  ]
+ }
+}

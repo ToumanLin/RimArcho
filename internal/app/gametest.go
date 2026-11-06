@@ -22,11 +22,11 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
-// TestRunOptions selects a plan to run without writing the player's files (09 §7).
+// TestRunOptions selects a plan to run without writing the player's files (20 §2).
 type TestRunOptions struct {
 	Env, Plan string
 	Map       bool
-	// Probe: a probe Mod folder to add to the tested list (map mode implied, 09 §7.1);
+	// Probe: a probe Mod folder to add to the tested list (map mode implied, 20 §3);
 	// ProbeAfter or ProbeBefore name the packageId it goes next to (default: last).
 	Probe, ProbeAfter, ProbeBefore string
 	Timeout, Settle                time.Duration
@@ -83,14 +83,14 @@ type TestRunReport struct {
 	Fixed         []TestRunCluster  `json:"fixed,omitempty"`
 	Baseline      *TestRunBaseline  `json:"baseline,omitempty"`
 	Gone          []TestRunCluster  `json:"gone,omitempty"`
-	Probe         *TestRunProbe     `json:"probe,omitempty"` // a probe run's lines and result (09 §7.1)
+	Probe         *TestRunProbe     `json:"probe,omitempty"` // a probe run's lines and result (20 §3)
 	clusterKeys   []string
 	// playerClusters: the player's log's error clusters by key, attributed (comparePlayerLog)
 	playerClusters map[string]TestRunCluster
 }
 
 // Success is the CLI/MCP outcome: the target was reached without error clusters. A probe
-// run's target is its RESULT line (09 §7.1).
+// run's target is its RESULT line (20 §3).
 func (r *TestRunReport) Success() bool {
 	if !r.reached() || (r.Status == "probe" && (r.Probe == nil || r.Probe.Outcome != "result")) {
 		return false
@@ -109,7 +109,7 @@ func (r *TestRunReport) reached() bool {
 }
 
 // TestRun starts the executable directly, including for a Steam-launch environment.
-// The current plan and the player's config, saves and logs are left alone (09 §7).
+// The current plan and the player's config, saves and logs are left alone (20 §2).
 func (a *App) TestRun(ctx context.Context, o TestRunOptions) (_ *TestRunReport, err error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -346,7 +346,7 @@ func testRunMissing(st *LoadoutState, blocked map[string]string) []TestRunMissin
 
 // testRunSeen maps each listed Mod a test run's game sees to the folder it sees it under.
 // It is the Mod's folder in Data/, Mods/ or the Workshop, or the name of a link in Mods/
-// to it (including the links a test run makes, 09 §7).
+// to it (including the links a test run makes, 20 §2).
 func testRunSeen(st *LoadoutState) map[string]string {
 	parents, linked := map[string]bool{}, map[string]string{}
 	roots := []string{filepath.Join(st.Ix.Env.GameRoot, "Data"), filepath.Join(st.Ix.Env.GameRoot, "Mods")}
@@ -421,7 +421,7 @@ func (a *App) testRunLog(st *LoadoutState, r *TestRunReport) error {
 		if settings {
 			class = gametest.ClassSettings
 		}
-		// A probe's own messages are in probe.lines; as mod reports they would only repeat them (09 §7.1).
+		// A probe's own messages are in probe.lines; as mod reports they would only repeat them (20 §3).
 		if r.Probe != nil && logs.Informational(class) && strings.HasPrefix(lc.First.Message, "[Probe] ") {
 			continue
 		}
