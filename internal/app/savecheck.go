@@ -32,6 +32,7 @@ const (
 	IssueDisabled     = "disabled"      // installed but not in the list
 	IssueAdded        = "added"         // in the list, not in the save
 	IssueReordered    = "reordered"     // same Mods, another order
+	IssueLastLoad     = "last-load"     // the game's log has errors from loading this save (Load)
 )
 
 // Fix actions (12 §4.4).
@@ -45,6 +46,7 @@ const (
 	FixRecycle      = "recycle"       // move the file to the recycle bin
 	FixOpenSave     = "open-save"     // look at another save of the colony
 	FixNewList      = "new-list"      // make a list from the save's Mods
+	FixOpenLog      = "open-log"      // open the game log at the save's last load
 )
 
 // SaveMod is one Mod of a save or of its list.
@@ -56,6 +58,9 @@ type SaveMod struct {
 	InList    bool   `json:"inList"`
 	InSave    bool   `json:"inSave"`
 	Moved     bool   `json:"moved,omitempty"` // in both, out of the save's order
+	// Library is the installed copy the Mod library shows for it ("" none): what this
+	// environment resolves the packageId to, also for a pack's save.
+	Library string `json:"library,omitempty"`
 }
 
 // SaveFix is one way to resolve an issue.
@@ -75,8 +80,10 @@ type SaveIssue struct {
 	// Owns is what the row's Mod owns in the save (12 §4.6), from the full read: on
 	// not-installed and disabled rows (nil without the full read, or when neither Defs nor
 	// classes could be checked), and the classes of a class-missing row.
-	Owns  *SaveOwned `json:"owns,omitempty"`
-	Fixes []SaveFix  `json:"fixes,omitempty"`
+	Owns *SaveOwned `json:"owns,omitempty"`
+	// Load is the last load's errors on a last-load row (12 §4.3).
+	Load  *SaveLoad `json:"load,omitempty"`
+	Fixes []SaveFix `json:"fixes,omitempty"`
 }
 
 // SaveCheck is a save against its list.
@@ -93,6 +100,11 @@ type SaveCheck struct {
 	// GoneOwns is what the not-installed Mods own together, what nothing installed
 	// provides counted once (12 §4.6); nil without the full read or such Mods.
 	GoneOwns *SaveOwned
+	// Since is the colony's previous save with a readable head, which Changes is against
+	// (12 §4.3 Mod list); nil for the colony's first save. Changes are the Mods added since
+	// it (InSave) and removed (not InSave), in each save's load order; order is ignored.
+	Since   *Save
+	Changes []SaveMod
 }
 
 // Verdict texts (12 §4.3).
@@ -230,7 +242,29 @@ func (a *App) CheckSave(s *Save) (*SaveCheck, error) {
 		}
 	}
 	markMoved(c.Mods, list)
+	library := func(pkg string) string {
+		if st == nil || st.Reg == nil {
+			return ""
+		}
+		return st.Reg.Resolve(pkg).Instance
+	}
+	for i := range c.Mods {
+		c.Mods[i].Library = library(c.Mods[i].PackageID)
+	}
+	name := func(inst string) string {
+		if st == nil || st.Ix == nil || st.Ix.ByID[inst] == nil {
+			return ""
+		}
+		return st.Ix.ByID[inst].Name
+	}
+	c.Since, c.Changes = s.modChanges(c.Mods, library, name)
 
+	// The last load of this save had errors (12 §4.3): from the stored report of the
+	// environment's logs, never parsing one here.
+	if l := a.lastLoadOf(s, st); l != nil && l.Kinds > 0 {
+		c.add(SaveIssue{Kind: IssueLastLoad, Level: LevelError, Load: l, Text: l.text(),
+			Fixes: []SaveFix{{Action: FixOpenLog, Label: "Open the game log", Command: "log --file " + cmdQuote(l.Log), Target: l.Log}}})
+	}
 	if mm, gm := env.MajorMinor(s.Head.GameVersion), env.MajorMinor(c.Game); mm != "" && gm != "" && mm != gm {
 		c.add(SaveIssue{Kind: IssueGameVersion, Level: LevelWarning, Text: s.Head.GameVersion + " → " + c.Game})
 	}
@@ -358,6 +392,58 @@ func malformedText(m *savefile.Malformed) string {
 		return fmt.Sprintf("the file ends at line %d before the save does", m.Line)
 	}
 	return fmt.Sprintf("line %d (byte %d): %s", m.Line, m.Offset, m.Msg)
+}
+
+// previousHead is the next older save of the same colony whose head was read, or nil.
+func (s *Save) previousHead() *Save {
+	if s.Colony == nil {
+		return nil
+	}
+	after := false
+	for _, o := range s.Colony.Saves {
+		if o == s {
+			after = true
+			continue
+		}
+		if after && o.Head != nil {
+			return o
+		}
+	}
+	return nil
+}
+
+// modChanges compares the save's Mods with the colony's previous save (12 §4.3 Mod list):
+// the Mods added since it, then those removed, by packageId; order is ignored.
+func (s *Save) modChanges(mods []SaveMod, library, name func(string) string) (*Save, []SaveMod) {
+	p := s.previousHead()
+	if p == nil {
+		return nil, nil
+	}
+	before := map[string]bool{}
+	for _, id := range p.Head.ModIDs {
+		before[normPkg(id)] = true
+	}
+	now := map[string]bool{}
+	changes := []SaveMod{}
+	for _, m := range mods {
+		now[normPkg(m.PackageID)] = true
+		if !before[normPkg(m.PackageID)] {
+			changes = append(changes, m)
+		}
+	}
+	for i, id := range p.Head.ModIDs {
+		if !now[normPkg(id)] {
+			m := SaveMod{PackageID: id, Name: p.Head.Name(i), SteamID: p.Head.SteamID(i), Library: library(id)}
+			if m.Name == id && name != nil {
+				// a save without <modNames>: the installed copy's name
+				if n := name(m.Library); n != "" {
+					m.Name = n
+				}
+			}
+			changes = append(changes, m)
+		}
+	}
+	return p, changes
 }
 
 // previousReadable is the newest older save of the same colony that is complete and, when

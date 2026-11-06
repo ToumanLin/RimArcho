@@ -238,6 +238,27 @@ func listTitle(what string) string {
 	return T("launch")
 }
 
+// lastSaveLine is the save the last run loaded and whether it loads with this list (16
+// §2.4): "your last save  Landing: content will be lost (2 Mods are not installed…)  archo
+// saves show sv:…"; "" none.
+func lastSaveLine(v *view.LastSaveView) string {
+	if v == nil {
+		return ""
+	}
+	l := T("your last save") + "  " + v.Name + T(": ") + v.Verdict
+	if len(v.Lines) > 0 {
+		l += " (" + strings.Join(v.Lines, "; ")
+		if v.More > 0 {
+			l += "; " + Tf("and %d more", v.More)
+		}
+		l += ")"
+	}
+	if v.Command != "" {
+		l += "  archo " + v.Command
+	}
+	return l
+}
+
 // ---- the screen ----
 
 // needLines draws Can it run: a count line, then the groups with their items; the selected
@@ -269,7 +290,11 @@ func (m *model) needLines(n int) []string {
 	case p.stale:
 		head += "   " + T("the files changed since the last check")
 	}
-	out := []string{"  " + sText.Render(fit(head, w-2)), ""}
+	out := []string{"  " + sText.Render(fit(head, w-2))}
+	if l := lastSaveLine(p.lastSave); l != "" {
+		out = append(out, "  "+sSecond.Render(fit(l, w-2)))
+	}
+	out = append(out, "")
 	if len(items) == 0 {
 		out = append(out, "  "+sOK.Render(markOK)+" "+sSecond.Render(fit(T("nothing needs your attention"), w-4)))
 		if away := m.elsewhereLines(w); len(away) > 0 {

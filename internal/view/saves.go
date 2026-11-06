@@ -134,10 +134,15 @@ type SaveDetail struct {
 	Quick   *SaveFixView    `json:"quick,omitempty"`
 	Issues  []SaveIssueView `json:"issues"`
 
-	// Mod list: the save's Mods in load order. NewList is the header's Make a list from
-	// this save.
-	Mods    []SaveModView `json:"mods"`
-	NewList *SaveFixView  `json:"newList,omitempty"`
+	// Mod list (12 §4.3): the save's Mods in load order, and what changed since the
+	// colony's previous save (Since, its ref SinceRef; "" for the colony's first save):
+	// the Mods added (Added) and removed, order ignored. NewList is the header's Make a
+	// list from this save.
+	Mods     []SaveModView `json:"mods"`
+	Since    string        `json:"since,omitempty"`
+	SinceRef string        `json:"sinceRef,omitempty"`
+	Changes  []SaveModView `json:"changes"`
+	NewList  *SaveFixView  `json:"newList,omitempty"`
 
 	// Locked says why Rename and Recycle are off now (a game runs, the file is written).
 	Locked string `json:"locked,omitempty"`
@@ -157,6 +162,7 @@ type SaveFixView struct {
 	Label   string `json:"label"`
 	Command string `json:"command"`
 	Target  string `json:"target,omitempty"`
+	Cluster string `json:"cluster,omitempty"` // open-log: the cluster to select
 }
 
 // SaveIssueView is one row of Can it load?: what is wrong or changed, its consequence, and
@@ -180,6 +186,7 @@ type SaveIssueView struct {
 // Issue groups (16 §2.11), in the order they show.
 const (
 	SaveGroupFile = "file"
+	SaveGroupLoad = "load" // the last load's errors in the game's log
 	SaveGroupGame = "game"
 	SaveGroupMods = "mods"
 )
@@ -214,6 +221,10 @@ type SaveModView struct {
 	Missing bool `json:"missing,omitempty"`
 	Off     bool `json:"off,omitempty"`
 	Moved   bool `json:"moved,omitempty"`
+	// Added: a change since the previous save that the save has (else it was removed).
+	Added bool `json:"added,omitempty"`
+	// Library is the installed copy the name links to in the Mod library ("" no link).
+	Library string `json:"library,omitempty"`
 }
 
 // SaveDetailOf makes the middle and right cards from a load check; running: a game runs;
@@ -221,7 +232,7 @@ type SaveModView struct {
 func SaveDetailOf(c *app.SaveCheck, running, current bool) *SaveDetail {
 	s := c.Save
 	d := &SaveDetail{Ref: s.Ref, Name: s.Name, File: s.File, Path: s.Path, Folder: filepath.Dir(s.Path), Prefix: s.Prefix,
-		Auto: s.Auto, Size: SizeText(s.Size), Bytes: s.Size, Issues: []SaveIssueView{}, Mods: []SaveModView{}}
+		Auto: s.Auto, Size: SizeText(s.Size), Bytes: s.Size, Issues: []SaveIssueView{}, Mods: []SaveModView{}, Changes: []SaveModView{}}
 	if s.Colony != nil {
 		d.Colony = colonyName(s.Colony)
 	}
@@ -284,9 +295,15 @@ func SaveDetailOf(c *app.SaveCheck, running, current bool) *SaveDetail {
 	}
 	d.Issues = issueViews(c, s)
 	for _, m := range c.Mods {
-		v := SaveModView{Name: m.Name, PackageID: m.PackageID, Missing: m.Instance == "", Moved: m.Moved}
+		v := SaveModView{Name: m.Name, PackageID: m.PackageID, Missing: m.Instance == "", Moved: m.Moved, Library: m.Library}
 		v.Off = !v.Missing && !m.InList && d.ListKind != ""
 		d.Mods = append(d.Mods, v)
+	}
+	if c.Since != nil {
+		d.Since, d.SinceRef = c.Since.Name, c.Since.Ref
+		for _, m := range c.Changes {
+			d.Changes = append(d.Changes, SaveModView{Name: m.Name, PackageID: m.PackageID, Added: m.InSave, Missing: m.InSave && m.Instance == "", Library: m.Library})
+		}
 	}
 	return d
 }
@@ -414,6 +431,8 @@ func groupRank(g string) int {
 	switch g {
 	case SaveGroupFile:
 		return 0
+	case SaveGroupLoad:
+		return 1
 	case SaveGroupGame:
 		return 1
 	}
@@ -556,6 +575,41 @@ func lowerFirst(s string) string {
 	return string(unicode.ToLower(r)) + s[n:]
 }
 
+// lastLoadText is the last-load row (12 §4.3): how many errors loading the save logged,
+// and the first one.
+func lastLoadText(l *app.SaveLoad) (head, consequence string) {
+	if l == nil {
+		return "", ""
+	}
+	head = Tf("the last load logged %d errors", l.Errors)
+	if l.Errors == 1 {
+		head = T("the last load logged 1 error")
+	}
+	if !l.At.IsZero() {
+		head += "  " + ShortDate(l.At) + " " + l.At.Local().Format("15:04")
+	}
+	consequence = T("it may load with missing or broken content")
+	if l.First != "" {
+		consequence += "; " + Tf("first: %s", firstLine(l.First))
+	}
+	if l.Kinds > 1 {
+		consequence += "  " + Tf("(%d kinds)", l.Kinds)
+	}
+	return head, consequence
+}
+
+// firstLine is a log message's first line, cut to 160 characters.
+func firstLine(m string) string {
+	if i := strings.IndexByte(m, '\n'); i >= 0 {
+		m = m[:i]
+	}
+	m = strings.TrimSpace(m)
+	if r := []rune(m); len(r) > 160 {
+		m = string(r[:159]) + "…"
+	}
+	return m
+}
+
 // issueView is one Can it load? row: its sentence and consequence by kind (12 §4.3).
 func issueView(is app.SaveIssue, s *app.Save) SaveIssueView {
 	v := SaveIssueView{Kind: is.Kind, Level: is.Level, Group: SaveGroupMods, Fixes: []SaveFixView{}}
@@ -564,9 +618,15 @@ func issueView(is app.SaveIssue, s *app.Save) SaveIssueView {
 		v.Group = SaveGroupFile
 	case app.IssueGameVersion:
 		v.Group = SaveGroupGame
+	case app.IssueLastLoad:
+		v.Group = SaveGroupLoad
 	}
 	for _, f := range is.Fixes {
-		v.Fixes = append(v.Fixes, fixView(f, s))
+		fv := fixView(f, s)
+		if f.Action == app.FixOpenLog && is.Load != nil {
+			fv.Cluster = is.Load.Cluster
+		}
+		v.Fixes = append(v.Fixes, fv)
 	}
 	var names []string
 	for _, m := range is.Mods {
@@ -611,6 +671,8 @@ func issueView(is app.SaveIssue, s *app.Save) SaveIssueView {
 	case app.IssueNoList:
 		v.Head = T("no list matches this save")
 		v.Consequence = T("no launch of a list came before it, and no version of a list has the same Mods")
+	case app.IssueLastLoad:
+		v.Head, v.Consequence = lastLoadText(is.Load)
 	case app.IssueGameVersion:
 		v.Head = Tf("the game version changed since this save (%s)", is.Text)
 		v.Consequence = T("the game converts it when it loads; Mods made only for the old version may be missing")

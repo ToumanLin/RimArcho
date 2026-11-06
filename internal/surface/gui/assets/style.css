@@ -2059,6 +2059,28 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .sv-mods .r .mv { font-weight: 400; color: var(--muted); font-size: 12px; }
 .sv-mods .tagx { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: var(--r-sm); font-size: 12px; background: var(--pill); color: var(--muted); white-space: nowrap; }
 .sv-mods .tagx.bad { color: var(--red); background: var(--red-soft); }
+.need-save .need-save-row { padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.need-save .need-save-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; min-width: 0; }
+.need-save .need-save-head b { overflow-wrap: anywhere; }
+.need-save .need-save-dot { width: 14px; text-align: center; font-weight: 700; flex: none; }
+.need-save .ok .need-save-dot { color: var(--green); }
+.need-save .warn .need-save-dot, .need-save .warn .need-save-verdict { color: var(--amber); }
+.need-save .err .need-save-dot, .need-save .err .need-save-verdict { color: var(--red); }
+.need-save .need-save-verdict { color: var(--fg-2); }
+.need-save .need-save-lines { margin: 0; padding-left: 22px; font-size: 12px; color: var(--fg-2); display: flex; flex-direction: column; gap: 2px; }
+.need-save .need-save-open { margin-left: 22px; }
+.sv-mods .r .sg { font-weight: 600; font-size: 13px; width: 16px; text-align: center; }
+.sv-mods .r.add .sg, .sv-mods .r.add .n { color: var(--green); }
+.sv-mods .r.del .sg, .sv-mods .r.del .n { color: var(--red); }
+.sv-mods .r .n.lk { border: 0; background: none; padding: 0 2px; margin: 0 -2px; height: 20px; font: inherit; text-align: left; cursor: pointer; border-radius: var(--r-sm); }
+.sv-mods .r .n.lk:hover { text-decoration: underline; }
+.sv-mods .r .n.lk:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
+.sv-mcount { margin: -4px 0 8px; display: flex; gap: 12px; font-size: 12px; }
+.sv-mcount .add { color: var(--green); }
+.sv-mcount .del { color: var(--red); }
+.sv-none { margin: 0; font-size: 12px; color: var(--muted); }
+.sv-sect .sv-fold { margin: 6px 0 0 18px; }
+.sv-sect h3 .r .btn.link { height: 18px; padding: 0 4px; font-size: 12px; }
 .sv-note { margin: 10px 0 0; font-size: 12px; }
 .sv-folder { margin: 6px auto 0; max-width: 560px; font: 12px var(--code); }
 /* the right card (16 §2.11 "Right"): numbers at this save, colonists, letters, the colony over time */
