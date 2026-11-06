@@ -226,6 +226,11 @@ type Parser struct {
 	xname  string
 	xinner []string
 	xended bool
+	// HugsLib's log upload starts with its own header ("Log uploaded on …", the Mod list, the
+	// Harmony patches) and puts the game's log after "Log file contents:"; every log of the
+	// corpus has one, 2,061 lines at the median.
+	hugsHeader bool
+	start      int // the line before the game's log: 0, or the end of HugsLib's header
 }
 
 var xmlExtStartRe = regexp.MustCompile(`^(?:\S+\|0x[0-9A-Fa-f]+\|)?\[(.+) - Start of stack trace\]\s*$`)
@@ -286,7 +291,23 @@ func (p *Parser) Line(l string) {
 	if len(l) > 4096 {
 		l = l[:4096]
 	}
-	if !f.Waylith && n < 50 && strings.HasPrefix(l, "=== Waylith log ===") {
+	if n == 1 && strings.HasPrefix(l, "Log uploaded on ") {
+		p.hugsHeader = true
+		return
+	}
+	if p.hugsHeader {
+		// An upload cut short may lack "Log file contents:"; the game's first lines end it too.
+		if strings.HasPrefix(l, "Log file contents:") {
+			p.hugsHeader, p.start = false, n
+			return
+		}
+		if !strings.HasPrefix(l, "=== Waylith log ===") && !versionRe.MatchString(l) {
+			return
+		}
+		p.hugsHeader, p.start = false, n-1
+	}
+	head := n-p.start < 50 // the game's version and format are in its first lines
+	if !f.Waylith && head && strings.HasPrefix(l, "=== Waylith log ===") {
 		p.finish()
 		f.Waylith, p.cur = true, nil
 		return
@@ -309,7 +330,7 @@ func (p *Parser) Line(l string) {
 	if p.marker(l, "", n) {
 		return
 	}
-	if f.Version == "" && n < 50 {
+	if f.Version == "" && head {
 		if m := versionRe.FindStringSubmatch(l); m != nil {
 			f.Version = m[1]
 		}

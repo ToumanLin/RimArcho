@@ -147,8 +147,9 @@ var ErrLogNotCached = errors.New("log not analysed yet")
 // noise (logs.ClassNoise) and its note; "assemblies not analysed yet" instead of "no enabled mod
 // defines it" (Unanalysed); 13: a missing type's XML referrer, nearest types, a same-name DLL that
 // loads first; consequences of a def file that failed to load (06 §2, §3); stack-less
-// "Tried to" errors, the game-error class and the lord rule.
-const logCacheVersion = 13
+// "Tried to" errors, the game-error class and the lord rule; 14: Unity-format stack frames,
+// HugsLib upload headers skipped (06 §1).
+const logCacheVersion = 14
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a

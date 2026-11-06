@@ -38,6 +38,45 @@ func TestParsePastedStack(t *testing.T) {
 	}
 }
 
+// A log uploaded by HugsLib: its header (Mod list, Harmony patches, some with "Error" in a
+// method name) is not part of the game's log, and the game's version and the 1.7 format are
+// found after it, however long it is.
+func TestParseHugsLibUpload(t *testing.T) {
+	header := "Log uploaded on Thursday, October 22, 2026, 12:03:55 PM\n" +
+		"Loaded mods:\n" +
+		"Harmony(brrainz.harmony)[v:2.4.1.0]: 0Harmony(2.4.1), HarmonyMod(2.4.1)\n" +
+		"Active Harmony patches:\n" +
+		strings.Repeat("Log.Error: PRE: ModA.Patches.Log_Error_Patch.Prefix\n", 80) +
+		"Harmony versions present: 2.4.1.0: net.pardeike.rimworld.lib.harmony\n" +
+		"Platform information: (hidden, use publishing options to include)\n" +
+		"\n"
+	for _, c := range []struct {
+		name, log, version string
+		waylith            bool
+		entries            int
+	}{
+		{"1.6", header + "Log file contents:\nMono path[0] = 'C:/RimWorld/RimWorldWin64_Data/Managed'\nRimWorld 1.6.4633 rev1261\n" +
+			"Could not find a type named ModA.Thing\n", "1.6.4633 rev1261", false, 3},
+		{"1.7", header + "Log file contents:\n=== Waylith log ===\nVersion:   1.7.4985.1269\n\n" +
+			"2026-10-22 11:30:11.692  WARN [Verse] Could not find a type named ModA.Thing\n", "1.7.4985 rev1269", true, 1},
+		{"cut short", header + "RimWorld 1.6.4633 rev1261\nCould not find a type named ModA.Thing\n", "1.6.4633 rev1261", false, 2},
+	} {
+		f, err := Parse(strings.NewReader(c.log))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if f.Version != c.version || f.Waylith != c.waylith || len(f.Entries) != c.entries {
+			for _, e := range f.Entries {
+				t.Logf("%s: entry %d %q", c.name, e.Line, e.Message)
+			}
+			t.Errorf("%s: version %q waylith %v entries %d, want %q %v %d", c.name, f.Version, f.Waylith, len(f.Entries), c.version, c.waylith, c.entries)
+		}
+		if cs := Clusters(f); len(cs) != 1 || !strings.Contains(cs[0].Template, "ModA.Thing") && !strings.Contains(cs[0].Template, "Could not find a type") {
+			t.Errorf("%s: clusters %+v", c.name, cs)
+		}
+	}
+}
+
 // Unity's "Type:Method (args)" stacks in a 1.6 log: the stack Unity adds to every message when
 // full stack traces are on (logger frames dropped, the rest caller frames), Unity's own exception
 // stack after "[Ref X] Duplicate stacktrace" (exception frames), and a mod message with a stack
