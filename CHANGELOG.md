@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 1.0.1 (unreleased)
 
+- RimArcho can check for stable updates on the Steam Workshop and use a subscribed release zip or anonymous SteamCMD, with GitHub fallback for the same version. Settings has one update source choice: automatic, Workshop or GitHub; prereleases use GitHub. `archo update --check` names the source and any check fallback. The Workshop source stays disabled until its item is configured.
 - Updates page: Update all with many Mods opens its confirmation at once. Before, it built a preview for each Mod in turn, about 10 seconds for a long list. Confirming now queues one task for the Git and SteamCMD Mods, downloaded by SteamCMD in shared batches, and one for Steam client Mods, which Steam gets in one request. Before, every Mod was its own task and its own SteamCMD run. The TUI's update all (`U`) does the same.
 - The first-run guide no longer shows `✗ no environment configured` (in English) on the status line before a game is added.
 - Can it run: after Sort, or after choosing which Mod of an incompatible pair to disable, the cards under errors from the last run no longer each turn into a ✓ row with its own undo.

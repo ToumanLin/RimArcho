@@ -56,8 +56,12 @@ func SelfUpdateItem(a *app.App) SettingItem {
 		it.Actions = []SettingAction{check}
 		return it
 	}
+	size := SizeText(r.Zip.Size)
+	if r.Zip.Size <= 0 {
+		size = T("size unknown")
+	}
 	install := SettingAction{Label: T("install update"), Argv: []string{"update"}, Task: TaskSelfUpdate, Pending: TaskPending(TaskSelfUpdate),
-		Confirm: Tf("Download RimArcho %s (%s), check it against its SHA-256 and replace the program files, then restart RimArcho. Your data is not changed.", r.Version, SizeText(r.Zip.Size))}
+		Confirm: Tf("Download RimArcho %s (%s), check it against its SHA-256 and replace the program files, then restart RimArcho. Your data is not changed.", r.Version, size)}
 	if program, err := a.SelfProgramDir(); err == nil {
 		if n := len(a.OtherArchoIn(program)); n > 0 {
 			install.Confirm += " " + Tf("%d other RimArcho are open: the files are replaced once they close.", n)
