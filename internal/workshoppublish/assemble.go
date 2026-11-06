@@ -4,7 +4,6 @@ package workshoppublish
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/xml"
 	"errors"
 	"fmt"
 	"io"
@@ -36,7 +35,7 @@ type Item struct {
 
 // Assemble copies a built Monitor and the matching release assets from a repository
 // root. Each run uses a fresh folder, so a previous release cannot leave extra files.
-// The source About.xml is untouched; only the staged Mod name becomes RimArcho.
+// About.xml stays Monitor's; the item title RimArcho is set by the worker.
 func Assemble(root, version string, id uint64) (*Item, error) {
 	if err := ValidateVersion(version); err != nil {
 		return nil, err
@@ -116,9 +115,6 @@ func Assemble(root, version string, id uint64) (*Item, error) {
 		}
 	}()
 	if err := copyTree(monitor, folder); err != nil {
-		return nil, err
-	}
-	if err := setName(filepath.Join(folder, "About", "About.xml")); err != nil {
 		return nil, err
 	}
 	if id != 0 {
@@ -241,52 +237,4 @@ func copyTree(src, dst string) error {
 		}
 		return copyRegular(path, to, nil)
 	})
-}
-
-// Token streaming preserves every other metadata field and handles XML escaping.
-func setName(path string) error {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	d := xml.NewDecoder(strings.NewReader(strings.TrimPrefix(string(b), "\uFEFF")))
-	var out strings.Builder
-	e := xml.NewEncoder(&out)
-	found := false
-	depth := 0
-	for {
-		t, err := d.Token()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return fmt.Errorf("%s: %w", path, err)
-		}
-		if start, ok := t.(xml.StartElement); ok && depth == 1 && strings.EqualFold(start.Name.Local, "name") {
-			if err := d.Skip(); err != nil {
-				return err
-			}
-			if err := e.EncodeElement("RimArcho", start); err != nil {
-				return err
-			}
-			found = true
-			continue
-		}
-		switch t.(type) {
-		case xml.StartElement:
-			depth++
-		case xml.EndElement:
-			depth--
-		}
-		if err := e.EncodeToken(t); err != nil {
-			return err
-		}
-	}
-	if !found {
-		return fmt.Errorf("%s has no name element", path)
-	}
-	if err := e.Flush(); err != nil {
-		return err
-	}
-	return os.WriteFile(path, []byte(out.String()), 0o644)
 }

@@ -57,19 +57,13 @@ func TestAssemble(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	b, err := os.ReadFile(filepath.Join(item.Folder, "About", "About.xml"))
+	staged, err := os.ReadFile(filepath.Join(item.Folder, "About", "About.xml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(b), "<name>RimArcho</name>") || !strings.Contains(string(b), "<packageId>test.monitor</packageId>") || !strings.Contains(string(b), "A &amp; B") {
-		t.Fatalf("metadata: %s", b)
-	}
-	if !strings.Contains(string(b), "<extra><name>Keep</name></extra>") {
-		t.Fatal("changed nested metadata name")
-	}
-	b, err = os.ReadFile(filepath.Join(root, "monitor", "About", "About.xml"))
-	if err != nil || strings.Contains(string(b), "<name>RimArcho</name>") {
-		t.Fatal("source metadata changed", err)
+	src, err := os.ReadFile(filepath.Join(root, "dist", "archo-1.2.3-windows-amd64", "monitor", "ArchoMonitor", "About", "About.xml"))
+	if err != nil || string(staged) != string(src) {
+		t.Fatalf("About.xml must be copied unchanged: %s, %v", staged, err)
 	}
 	write(t, filepath.Join(item.Folder, "stale.zip"), []byte("old"))
 	next, err := workshoppublish.Assemble(root, "1.2.3", 0)
@@ -92,7 +86,6 @@ func TestAssembleValidation(t *testing.T) {
 		{"checksum filename", "dist/archo-1.2.3-windows-amd64.zip.sha256", strings.Repeat("a", 64) + "  archo-9.9.9-windows-amd64.zip", "no valid sha256"},
 		{"hash mismatch", "dist/archo-1.2.3-windows-amd64.zip", "changed", "does not match"},
 		{"preview limit", "dist/archo-1.2.3-windows-amd64/monitor/ArchoMonitor/About/Preview.png", strings.Repeat("x", 1<<20), "smaller than 1 MB"},
-		{"bad metadata", "dist/archo-1.2.3-windows-amd64/monitor/ArchoMonitor/About/About.xml", "<ModMetaData>", "XML"},
 		{"bad ID", "monitor/About/PublishedFileId.txt", "not an id", "positive decimal"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
