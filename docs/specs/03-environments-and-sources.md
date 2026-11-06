@@ -139,7 +139,7 @@ Packs do not share: each uses its own `-savedatafolder` (10 §3).
 | `local` | `<game_root>/Mods` | Environment | The player's local Mods |
 | `workshop` | `.../workshop/content/294100` | Shared | The subdirectory name is the Workshop ID. At most one active Workshop directory |
 | `steamcmd` | Chosen by the player, or the `<game_root>/steamapps/workshop/content/294100` of a game downloaded with SteamCMD (§2 item 3) | Shared | Same structure as workshop; the game does not read it directly; enabled Mods are deployed through `_Archo_` links (09 §3) |
-| `extra` | Chosen by the player | Shared | Other directories, enabled like steamcmd. RimArcho's Archo Monitor directory (`src:monitor`, 09 §6) and the lock library (`src:locked`, 07 §5.1) are also extra |
+| `extra` | Chosen by the player | Shared | Other directories, enabled like steamcmd. RimArcho's Archo Monitor directory (`src:monitor`, 19 §6) and the lock library (`src:locked`, 07 §5.1) are also extra |
 
 - **Mod folders** (shared sources, with an empty `source.environment_id`) are managed in one place: `archo folder list|add|remove` and Settings "mod folders" (16 §2.14); MCP reads them with `status show=folders`. `folder add workshop <directory>` when a Workshop directory exists changes its path, rebinding by §4.2. Mod folders must not contain one another or any game's `Data` or `Mods`. The Monitor directory and the lock library belong to RimArcho and cannot be removed.
 - Each source has a **label** for `src:<label>` references. Shared labels are globally unique (deployment link names include them, 09 §3); environment-owned sources have only official and local (plus renamed retired labels). The default label is the kind; further sources of the same kind get `steamcmd2`, `steamcmd3` and so on.

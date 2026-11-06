@@ -1,4 +1,4 @@
-# Builds Archo Monitor (docs/specs 17 §5, 09 §6): the same source for 1.5 and 1.6 (net472,
+# Builds Archo Monitor (docs/specs 17 §5, 19 §6): the same source for 1.5 and 1.6 (net472,
 # Mono, Harmony 2.x) and 1.7 (net10.0, .NET 10, Harmony 3.x), then assembles the mod folder:
 #
 #   monitor/out/ArchoMonitor/

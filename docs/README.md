@@ -4,7 +4,7 @@
 | --- | --- | --- |
 | [00-top-level-design.md](00-top-level-design.md) | What RimArcho is, who it serves, the three questions it answers, principles, roadmap and the decision record (§6) | Changes only with a product decision |
 | [00a-architecture.md](00a-architecture.md) | Domain model, module layers, technical principles, why Mod identity works the way it does | Changes with the architecture |
-| [specs/](specs/README.md) | The specifications `01`–`18`: how each area behaves now. Code comments cite them as `NN §x.y` | Updated in the same commit as the behavior |
+| [specs/](specs/README.md) | The specifications `01`–`19`: how each area behaves now. Code comments cite them as `NN §x.y` | Updated in the same commit as the behavior |
 | [glossary.md](glossary.md) | Chinese and English terms, and where the interface's words differ from the documentation's | Add a row when a term is introduced |
 | [release-vm-tests.md](release-vm-tests.md) | Checks to run in the VM before a release, one row per new or changed feature | A row per change; tested rows leave the table |
 | [research/](research/README.md) | Investigations and open questions; conclusions move into the specifications and the report is removed once it has landed | One file per question |

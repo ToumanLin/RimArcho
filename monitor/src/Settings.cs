@@ -6,7 +6,7 @@ using Verse;
 
 namespace ArchoMonitor
 {
-    // SettingsFile is one Mod class's settings file as the game names it (06 §7.1).
+    // SettingsFile is one Mod class's settings file as the game names it (19 §2).
     internal struct SettingsFile
     {
         internal string PackageId; // lower case, player-facing

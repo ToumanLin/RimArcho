@@ -40,7 +40,7 @@ func monitorDir(e *testkit.Env) string {
 	return filepath.Join(e.Root, "LocalAppData", "RimArcho", "monitor")
 }
 
-// 09 §6, 07 §1.5 (M1, M2, M4): the bundled monitor is copied, registered as src:monitor,
+// 19 §6, 07 §1.5 (M1, M2, M4): the bundled monitor is copied, registered as src:monitor,
 // and added right after Harmony to every plan once, as one undoable edit; then it is a
 // normal mod.
 func TestMonitorInstallAndDefault(t *testing.T) {
@@ -257,7 +257,7 @@ func TestMonitorNotBundled(t *testing.T) {
 	}
 }
 
-// 09 §6: RIMARCHO_MONITOR points RimArcho at a locally built monitor.
+// 19 §6: RIMARCHO_MONITOR points RimArcho at a locally built monitor.
 func TestMonitorDevPath(t *testing.T) {
 	e := loadoutEnv(t)
 	scanNow(t, e)

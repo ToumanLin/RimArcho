@@ -7,8 +7,8 @@ using Verse;
 
 namespace ArchoMonitor
 {
-    // Hooks installs the Harmony patches (06 §7.1). Every target is looked up by reflection;
-    // a missing one is skipped and named in the session line (06 §7.5).
+    // Hooks installs the Harmony patches (19 §2). Every target is looked up by reflection;
+    // a missing one is skipped and named in the session line (19 §5).
     internal static class Hooks
     {
         internal static void Install(bool messages)
@@ -80,7 +80,7 @@ namespace ArchoMonitor
         }
     }
 
-    // EngineLog: the engine's log callback, and on Unity the stack trace levels (06 §7.1).
+    // EngineLog: the engine's log callback, and on Unity the stack trace levels (19 §2).
     internal static class EngineLog
     {
         internal static void Install()

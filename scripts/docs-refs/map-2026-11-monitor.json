@@ -1,0 +1,20 @@
+{
+ "note": "Archo Monitor split of 2026-11: 06 §7.1–7.3 and §7.5, 09 §6 moved into 19; 06 §7.4 became 06 §7. Run `node scripts/docs-refs/refs.cjs remap scripts/docs-refs/map-2026-11-monitor.json <files>` on code and docs from branches cut before it (after map-2026-11.json if they predate that too).",
+ "map": {
+  "06": [
+   ["", "06", ""],
+   ["7.1", "19", "2"],
+   ["7.2", "19", "3"],
+   ["7.3", "19", "4"],
+   ["7.4", "06", "7"],
+   ["7.5", "19", "5"]
+  ],
+  "09": [
+   ["", "09", ""],
+   ["6", "19", "6"]
+  ],
+  "17": [
+   ["", "17", ""]
+  ]
+ }
+}

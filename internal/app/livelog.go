@@ -33,7 +33,7 @@ type LiveCluster struct {
 	At                   time.Time // the companion log's timestamp, else when RimArcho saw it
 	Level                string    // the companion log's level, if any
 	// OnlyCompanion: the entry is in the companion log only (the game had stopped writing
-	// Player.log, 06 §7.4).
+	// Player.log, 06 §7).
 	OnlyCompanion bool
 	withComp      bool   // attributed with its companion entry
 	redo          bool   // attribute again: Player.log showed a companion-only entry after all
@@ -78,7 +78,7 @@ type LiveLog struct {
 }
 
 // liveCompanionWait is how long a companion entry waits for Player.log to show it before it
-// becomes a cluster of its own (06 §7.4).
+// becomes a cluster of its own (06 §7).
 const liveCompanionWait = 5 * time.Second
 
 type liveKey struct {
@@ -100,7 +100,7 @@ func (a *App) FollowLog(path, companion string) *LiveLog {
 	return lv
 }
 
-// FollowRun follows a run using the same pairing rules as full analysis (06 §7.4).
+// FollowRun follows a run using the same pairing rules as full analysis (06 §7).
 // dataRoot may name a pack's save folder; empty uses the Player.log's data root.
 func (a *App) FollowRun(path, dataRoot string) *LiveLog {
 	if dataRoot == "" {
@@ -384,7 +384,7 @@ func (lv *LiveLog) trim() {
 
 // companionOnly turns companion entries Player.log has not shown within
 // liveCompanionWait (or at all, once the game exited) into clusters of their own: the game
-// stops writing Player.log after its message limit, the monitor does not (06 §7.4).
+// stops writing Player.log after its message limit, the monitor does not (06 §7).
 func (lv *LiveLog) companionOnly(all bool) []*LiveCluster {
 	if lv.comp == nil {
 		return nil
@@ -443,7 +443,7 @@ func firstLineKey(m string) string {
 // finish attributes new clusters with the full-log engine and applies the companion log.
 func (lv *LiveLog) finish(a *App, fresh []*LiveCluster) error {
 	// A cluster attributed before its companion line was read is attributed again once the
-	// line is there (the files and mods it names are evidence, 06 §7.4).
+	// line is there (the files and mods it names are evidence, 06 §7).
 	// So is a companion-only cluster Player.log joined.
 	todo := fresh
 	for _, c := range lv.order {
@@ -487,7 +487,7 @@ func (lv *LiveLog) finish(a *App, fresh []*LiveCluster) error {
 			}
 		}
 	}
-	// Times, levels and counts from the companion log (06 §7.4).
+	// Times, levels and counts from the companion log (06 §7).
 	for _, c := range lv.order {
 		if len(c.samples) == 0 {
 			continue

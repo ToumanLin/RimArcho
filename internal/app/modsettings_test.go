@@ -109,7 +109,7 @@ func TestPackSettingsFollowTheMod(t *testing.T) {
 	}
 }
 
-// 06 §7.1, 09 §3: a folder only Archo Monitor saw (a copy since deleted) still leads to the
+// 19 §2, 09 §3: a folder only Archo Monitor saw (a copy since deleted) still leads to the
 // Mod's settings, also after its log has rotated away.
 func TestSettingsFromMonitorRecord(t *testing.T) {
 	t.Parallel()
@@ -177,7 +177,7 @@ func TestModSettingsCommand(t *testing.T) {
 	}
 }
 
-// 06 §7.1, 16 §2.9: a settings window Archo Monitor saw shows in archo mod-settings, read
+// 19 §2, 16 §2.9: a settings window Archo Monitor saw shows in archo mod-settings, read
 // from where the last read of the live log stopped; it stays after its log is gone, and a
 // window alone puts its Mod in the list.
 func TestModSettingsWindow(t *testing.T) {

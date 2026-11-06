@@ -1,6 +1,6 @@
 # RimArcho architecture
 
-> Status: in force; describes the organization implemented in 1.0. The top-level design (00) covers what to build and for whom; this document covers how the system is organized. Algorithms and rules are in the specifications 01–18 ([specs/](specs/README.md)).
+> Status: in force; describes the organization implemented in 1.0. The top-level design (00) covers what to build and for whom; this document covers how the system is organized. Algorithms and rules are in the specifications 01–19 ([specs/](specs/README.md)).
 > Principle: use RimCrow only as a source of requirements and edge cases; do not reuse its interface, navigation or module structure.
 
 ## 1. Domain model

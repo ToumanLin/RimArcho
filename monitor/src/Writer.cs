@@ -13,7 +13,7 @@ namespace ArchoMonitor
         internal static readonly string[] Names = { "INFO", "WARNING", "ERROR" };
     }
 
-    // One distinct log entry (06 §7.3): the first line carries the details; later lines carry
+    // One distinct log entry (19 §4): the first line carries the details; later lines carry
     // the occurrences since the previous line (count) and the running total.
     internal sealed class Entry
     {
@@ -92,7 +92,7 @@ namespace ArchoMonitor
             }
         }
 
-        // Seen is the hot path (06 §7.2): one lookup of the exact text; a hit only counts.
+        // Seen is the hot path (19 §3): one lookup of the exact text; a hit only counts.
         internal static bool Seen(int level, string text)
         {
             lock (sync)
@@ -179,7 +179,7 @@ namespace ArchoMonitor
         }
 
         // FlushDirty writes the counts gained since the last line of each entry; a full file
-        // keeps them for the exit (06 §7.3).
+        // keeps them for the exit (19 §4).
         static void FlushDirty(bool closing)
         {
             if (full && !closing)
@@ -268,7 +268,7 @@ namespace ArchoMonitor
             }
         }
 
-        // WriteSettings writes the settings record (06 §7.1): one line, kind settings, with
+        // WriteSettings writes the settings record (19 §2): one line, kind settings, with
         // context.settings listing each Mod class's settings file.
         internal static void WriteSettings(IList<SettingsFile> files)
         {
@@ -290,7 +290,7 @@ namespace ArchoMonitor
             }
         }
 
-        // WriteSettingsWindow writes what a settings window drew when it opened (06 §7.1): one
+        // WriteSettingsWindow writes what a settings window drew when it opened (19 §2): one
         // line, kind settings-window, with context.window naming the Mod's settings file and the
         // controls in drawing order.
         internal static void WriteSettingsWindow(SettingsFile f, IList<SettingsControl> controls)
@@ -318,7 +318,7 @@ namespace ArchoMonitor
             }
         }
 
-        // WriteHugsLib writes the HugsLib record (06 §7.1): one line, kind hugslib, with
+        // WriteHugsLib writes the HugsLib record (19 §2): one line, kind hugslib, with
         // context.hugslib listing each settings pack and its settings.
         internal static void WriteHugsLib(IList<HugsLibPack> packs)
         {

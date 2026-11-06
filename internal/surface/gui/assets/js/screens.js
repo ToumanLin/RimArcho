@@ -1198,7 +1198,7 @@ function logText(r) {
 }
 
 // filePicker: the log shown, and a menu of the logs — each Player.log with the companion
-// log of its run under it (06 §7.4); picking a companion shows its section.
+// log of its run under it (06 §7); picking a companion shows its section.
 function filePicker(files) {
   const shown = (L.tab === 1 && files.find((f) => f.of === L.path)) || files.find((f) => f.path === L.path) || files[0];
   const b = el("button", "btn quiet picker");

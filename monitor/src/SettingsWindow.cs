@@ -10,7 +10,7 @@ using Verse;
 namespace ArchoMonitor
 {
     // SettingsControl is one thing a settings window draws: a label, or a control with its
-    // current value and, for a slider, its range (06 §7.1).
+    // current value and, for a slider, its range (19 §2).
     internal struct SettingsControl
     {
         internal string Kind;  // label, checkbox, radio, slider, text, number, button

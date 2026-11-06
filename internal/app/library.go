@@ -45,7 +45,7 @@ const (
 	LibLocked   = "locked" // the lock library (07 §5)
 	LibSteamCMD = "steamcmd"
 	LibExtra    = "extra"
-	LibMonitor  = "monitor" // Archo Monitor's folder (09 §6)
+	LibMonitor  = "monitor" // Archo Monitor's folder (19 §6)
 	LibGit      = "git"
 	LibPage     = "page"
 )

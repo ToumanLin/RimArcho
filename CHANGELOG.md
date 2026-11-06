@@ -820,7 +820,7 @@ The new design's 1.0 work (01 §4.1). 1.0.0 follows once 01 §4.2 is verified, w
 - SteamCMD is downloaded from Valve into `%LOCALAPPDATA%\RimArcho\steamcmd` only after the
   player saw its size (`--install-steamcmd` in the CLI).
 
-### Archo Monitor (06 §7, 07 §1.5, 09 §6)
+### Archo Monitor (19, 07 §1.5)
 - RimArcho ships its own in-game companion mod, Archo Monitor (`toumanlin.archomonitor`,
   1.5 / 1.6 / 1.7). It writes `ArchoMonitor.log` in the save data folder: the XML file and def
   being loaded at an error, the mods on the stack and their Harmony patches, and errors after

@@ -6,7 +6,7 @@ using Verse;
 
 namespace ArchoMonitor
 {
-    // Capture receives every log call (06 §7.1). The hot path is Writer.Seen: one lookup of
+    // Capture receives every log call (19 §2). The hot path is Writer.Seen: one lookup of
     // the exact text. Only a message seen for the first time is analysed.
     public static class Capture
     {
@@ -143,7 +143,7 @@ namespace ArchoMonitor
             return sb.ToString().TrimEnd('\n');
         }
 
-        // Infer is the entry's inferredType (06 §7.1); the first rule that matches wins.
+        // Infer is the entry's inferredType (19 §2); the first rule that matches wins.
         internal static string Infer(Context c)
         {
             string m = c.Message ?? "";
@@ -191,7 +191,7 @@ namespace ArchoMonitor
         }
     }
 
-    // Enrich adds what the XML tracker knows (06 §7.1): the first rule with a result wins for
+    // Enrich adds what the XML tracker knows (19 §2): the first rule with a result wins for
     // files; the flags for inferredType are always set.
     internal static class Enrich
     {

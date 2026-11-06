@@ -110,7 +110,7 @@ func (a *App) comparePlayerLog(st *LoadoutState, r *TestRunReport) {
 }
 
 // testRunReaches reports whether a test run could show a cluster with these observed
-// phases (06 §7.3): every run loads and reaches the main menu, a map run also starts a
+// phases (19 §4): every run loads and reaches the main menu, a map run also starts a
 // new game, and none loads a save or plays. Unobserved phases count as reached.
 func testRunReaches(phases []logs.PhaseCount, mapRun bool) bool {
 	if len(phases) == 0 {

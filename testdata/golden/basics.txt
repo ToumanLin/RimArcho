@@ -107,7 +107,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     links repair                              preview or confirm link repair and unfinished-operation recovery
     mod-settings set <ref> [<name>=<value>…]  change a Mod's simple settings values (on/off, numbers, one line of text, a HugsLib choice) with the game closed; backs the file up first
     monitor                                   Archo Monitor, the in-game companion: versions, source, place in the plan
-    monitor install                           install or update the bundled Archo Monitor and add it to plans by default (09 §6)
+    monitor install                           install or update the bundled Archo Monitor and add it to plans by default (19 §6)
     pack build <name>                         compile the workspace into a pack: checked, sorted, each mod copied without the version folders this game does not load
     pack list                                 the packs: mods, size, game version, last played
     pack launch <name>                        play a pack: link its mods into Mods/, its own list and saves, start the game

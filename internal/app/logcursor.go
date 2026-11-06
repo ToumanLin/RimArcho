@@ -212,7 +212,7 @@ func prefixOf(path string, size int64, sum uint32) (*logs.File, bool, error) {
 
 // clusterCounts is each cluster's count as the full analysis computes it, without the
 // attribution: Player.log's entries plus the companion-only ones, clustered with the
-// companion's class hints, the count raised to the companion's (06 §7.4).
+// companion's class hints, the count raised to the companion's (06 §7).
 func clusterCounts(lf *logs.File, comp *logs.Companion) map[string]int {
 	companionOnly(lf, comp)
 	out := map[string]int{}
