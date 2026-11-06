@@ -2423,3 +2423,9 @@ select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-s
 .memory-confirm .memory-values strong { display: block; margin-top: 8px; font-size: 15px; }
 .memory-confirm .memory-cancel:focus, .memory-confirm .go:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 @media (max-width: 480px) { .memory-confirm .memory-values { grid-template-columns: 1fr; } }
+
+#workshop-warning { padding: 4px 20px; color: var(--amber); font-size: 12px; }
+.pop .typed { display: flex; align-items: center; gap: 8px; margin: 12px 0; }
+.xc-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+
+.folder-space { display: flex; flex-wrap: wrap; gap: 12px; }

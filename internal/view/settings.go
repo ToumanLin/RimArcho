@@ -329,6 +329,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 			{Label: T("compact"), Argv: []string{"db", "vacuum"}},
 			{Label: T("remove old tombstones"), Argv: []string{"gc"}, Confirm: T("mods gone for longer than the tombstone time are forgotten")},
 		}},
+		{Key: "import.managers", Label: T("import from RimSort or RimCrow"), Actions: []SettingAction{{Label: T("import…"), Argv: []string{"import-managers"}}}},
 	}}
 	for _, c := range a.Caches() {
 		storage.Items = append(storage.Items, SettingItem{Label: T(c.Desc), Value: Tf("%s  %d items", SizeText(c.Bytes), c.Files),

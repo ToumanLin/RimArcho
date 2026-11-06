@@ -35,7 +35,7 @@ export async function importFrom(kind, src) {
   if (S.screen === "plan-import") return preview(kind, src);
 }
 
-export async function exchange() {
+export async function exchange(managers = false) {
   const from = S.screen === "plan-import" ? session?.from : S.screen || "plan";
   const target = from === "plans" ? ui.selectedList() : S.shell?.plan?.id || 0;
   const read = beginPageRead("plan-import", { replace: true });
@@ -49,6 +49,7 @@ export async function exchange() {
   const result = el("section", "card pad xc-preview"); result.hidden = true;
   w.append(body, result); sc.append(w);
   importSource(body);
+  if (managers) discoverManagers(body);
   body.append(el("div", "xc-hint", T("or drop a file here")));
   read.finish(); ui.renderWhere(); ui.renderHints();
 }
@@ -61,6 +62,63 @@ export function cancel() {
 }
 export function key(e) { if (e.key === "Escape") { e.preventDefault(); cancel(); } }
 export const hintList = () => [{ key: "tab", label: T("import destination") }, { key: "enter", label: T("import") }, { key: "esc", label: T("cancel") }];
+
+// The guide and Settings share this flow, including manual file selection.
+async function discoverManagers(body) {
+  const active = session;
+  const found = el("section", "xc-sec");
+  found.append(el("div", "xc-sec-t", T("import from RimSort or RimCrow")));
+  const candidates = el("div"), status = el("div", "muted", T("looking for RimSort and RimCrow…"));
+  found.append(status, candidates);
+  const pick = button(T("choose a file…"), "", async () => {
+    try {
+      const path = await api.PickManagerImport();
+      if (path && session === active && S.screen === "plan-import") {
+        const kind = await api.ManagerFileKind(path);
+        if (session === active && S.screen === "plan-import") select({ kind, path });
+      }
+    } catch (e) { say("fail", T(errText(e))); }
+  });
+  found.append(pick); body.prepend(found);
+  // One picker includes databases and lists; keep the shared paste input below.
+  const regular = body.querySelector(".xc-selected-file")?.parentElement;
+  if (regular) regular.hidden = true;
+  async function select(candidate) {
+    if (candidate.kind === "list") return preview("file", candidate.path);
+    const result = $("#screen .xc-preview"), seq = ++previewSeq;
+    result.hidden = false; result.textContent = T("reading the data…");
+    try {
+      const data = await api.PreviewManagerImport(candidate.kind, candidate.path);
+      if (session !== active || S.screen !== "plan-import" || seq !== previewSeq) return;
+      result.textContent = "";
+      result.append(copyablePath(el("div", "xc-note", candidate.path), candidate.path), el("pre", "", data.text));
+      result.append(el("div", "xc-note", T("Existing values stay; importing player data cannot be undone.")));
+      const apply = button(T("import"), "enter", async () => {
+        apply.disabled = true;
+        try {
+          const text = await api.ApplyManagerImport(data.request);
+          if (session !== active || S.screen !== "plan-import") return;
+          result.textContent = "";
+          result.append(el("pre", "", text));
+          await ui.reload();
+          say("ok", T("import complete"));
+        } catch (e) { say("fail", T(errText(e))); apply.disabled = false; }
+      }, "primary");
+      result.append(apply);
+    } catch (e) { if (session === active && seq === previewSeq) result.textContent = T(errText(e)); }
+  }
+  try {
+    const rows = await api.DiscoverManagerImports();
+    if (session !== active || S.screen !== "plan-import") return;
+    status.textContent = rows?.length ? "" : T("No RimSort or RimCrow data found.");
+    for (const row of rows || []) {
+      const line = el("div", "xc-row");
+      const kind = { list: "list", rimcrow: "player data", "rimsort-rules": "user rules" }[row.kind];
+      line.append(button(row.manager, "", () => select(row)), el("span", "muted", T(kind)), copyablePath(el("span", "muted", row.path), row.path));
+      candidates.append(line);
+    }
+  } catch (e) { if (session === active) status.textContent = T(errText(e)); }
+}
 
 // ---- import, step 1: where the list comes from ----
 

@@ -186,6 +186,14 @@ var ErrUpdateBusy = errors.New("another RimArcho is already installing the updat
 // new archo must then report the new version, or the old files are put back. The caller
 // restarts the program; the data folder is not touched.
 func (a *App) InstallSelfUpdate(ctx context.Context, step func(SelfUpdateStep)) (*SelfUpdateResult, error) {
+	programDir, programErr := a.SelfProgramDir()
+	if programErr != nil {
+		return nil, programErr
+	}
+	if _, ok := selfupdate.InWorkshopFolder(programDir); ok {
+		return nil, errors.New("RimArcho cannot update in a Steam Workshop folder; open RimArcho.exe to move it first")
+	}
+
 	if step == nil {
 		step = func(SelfUpdateStep) {}
 	}

@@ -16,6 +16,7 @@ var frontendNodeSuites = []string{
 	"testdata/detail-follow.mjs",
 	"testdata/editorfilter.mjs",
 	"testdata/guide.mjs",
+	"testdata/firstrun.mjs",
 	"testdata/packs.mjs",
 	"testdata/paths.mjs",
 	"testdata/planmanage.mjs",
