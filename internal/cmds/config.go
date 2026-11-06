@@ -16,7 +16,7 @@ import (
 // configKeys are the user settings stored in the database (meta "cfg:<key>"), with their
 // allowed values; the first is the default.
 var configKeys = map[string][]string{
-	"updates.source":   {"auto", "workshop", "github"},
+	"updates.source":   {"auto", "github"},
 	"updates.auto":     {"on", "off"},
 	"updates.interval": {"normal", "frequent", "relaxed"},
 	"ui.accent":        {"default", "indigo", "blue", "cyan", "teal", "green", "grass", "orange", "amber", "red", "crimson", "pink", "plum", "purple", "violet", "iris"},
@@ -122,7 +122,7 @@ func SettingKeys() []string {
 
 func init() {
 	register(&Command{Name: "config get", Args: "[<key>]", Summary: "show settings", MaxArgs: 1, Run: configGetCmd})
-	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (updates.source: auto|workshop|github; updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris; ui.icons: compat|nerd; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; network.proxy: system|off|a proxy URL; network.github_mirror: empty or a mirror prefix such as https://gh-proxy.org/)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
+	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (updates.source: auto|github; updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris; ui.icons: compat|nerd; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; network.proxy: system|off|a proxy URL; network.github_mirror: empty or a mirror prefix such as https://gh-proxy.org/)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
 }
 
 // ConfigValue returns a setting, or its default.

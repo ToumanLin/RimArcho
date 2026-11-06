@@ -284,7 +284,7 @@ func TestSelfUpdateWorkshopInstall(t *testing.T) {
 			f.use(e.App)
 			e.App.SteamAPI = f.srv.URL + "/workshop"
 			e.MustRun("config", "set", "steamcmd.account", "desktop-player")
-			e.MustRun("config", "set", "updates.source", "workshop")
+			e.MustRun("config", "set", "updates.source", "auto")
 			if mode == "no matching release" {
 				f.tags = []string{"v0.9.2"}
 			}

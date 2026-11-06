@@ -35,7 +35,7 @@ func TestAutomaticSettingsOnlyControlsAndHumanIntervals(t *testing.T) {
 			if len(g.Items) != 2 || g.Items[0].Label != view.T("update source") || g.Items[1].Label != view.T("check interval") || strings.Contains(g.Note, "LoversLab") {
 				t.Fatal(g)
 			}
-			if !reflect.DeepEqual(g.Items[0].Choices, []string{"auto", "workshop", "github"}) || g.Items[0].Value != "auto" || g.Items[0].Note != "" {
+			if !reflect.DeepEqual(g.Items[0].Choices, []string{"auto", "github"}) || g.Items[0].Value != "auto" || g.Items[0].Note != "" {
 				t.Fatal(g.Items[0])
 			}
 			want := view.Tf("While RimArcho is open: check mods, community data and RimArcho %s, tools %s.", intervals[0], intervals[1]) + " " + view.T("Mod, tool and RimArcho updates wait for your click.")

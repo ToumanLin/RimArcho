@@ -56,7 +56,7 @@ func AutomaticGroup(a *app.App) SettingGroup {
 	g := SettingGroup{Title: T("updates"), Note: note + " " + T("Mod, tool and RimArcho updates wait for your click.")}
 	// Version and automatic checks live in AboutGroup.
 	g.Items = []SettingItem{
-		{Label: T("update source"), Value: cmds.Setting(a, "updates.source"), Edit: "choice", Choices: cmds.SettingChoices("updates.source"), ChoiceLabels: []string{T("automatic"), "Workshop", "GitHub"}, Argv: []string{"config", "set", "updates.source", "{}"}},
+		{Label: T("update source"), Value: cmds.Setting(a, "updates.source"), Edit: "choice", Choices: cmds.SettingChoices("updates.source"), ChoiceLabels: []string{T("automatic"), "GitHub"}, Argv: []string{"config", "set", "updates.source", "{}"}},
 		{Label: T("check interval"), Value: cmds.Setting(a, "updates.interval"), Edit: "choice", Choices: []string{"normal", "frequent", "relaxed"}, ChoiceLabels: []string{T("standard intervals"), T("half the interval"), T("twice the interval")}, Argv: []string{"config", "set", "updates.interval", "{}"}},
 	}
 	return g
