@@ -159,6 +159,59 @@ func TestParseUnityStacks(t *testing.T) {
 	}
 }
 
+// An XML Extensions block in a 1.7 log becomes "[Mod] <first failure>" with its file, as in 1.6:
+// a patch failure, one cluster per failure, the caller stack kept as caller frames.
+func TestParseWaylithXMLExtensions(t *testing.T) {
+	block := func(ts, def string) string {
+		return ts + " ERROR [Verse] [Progression: Arsenal - Start of stack trace]\n" +
+			`Verse.PatchOperationReplace(xpath="Defs/ResearchProjectDef[defName="` + def + `"]/label"): Failed to find a node with the given xpath` + "\n" +
+			"Verse.PatchOperationSequence: Error in the operation at position=2\n" +
+			"[End of stack trace]\n" +
+			`Source file: D:\Mods\Arsenal\Patches\` + def + ".xml\n" +
+			"\n" +
+			"    at XmlExtensions.ErrorManager.PrintErrors(String source, ModContentPack mod) [0x6A]\n" +
+			"    at .Verse.PatchOperation.Apply_Patch2(PatchOperation this, XmlDocument xml) [0xFFFFFFFF]\n"
+	}
+	text := "=== Waylith log ===\nVersion:   1.7.4985.1269\n\n" +
+		block("2026-10-22 11:31:14.428", "VWE_TrenchWarfare") +
+		"2026-10-22 11:31:14.430  INFO [Verse] Loaded 12 patches\n" +
+		block("2026-10-22 11:31:14.431", "VWE_Artillery") +
+		"2026-10-22 11:31:14.432 ERROR [Verse] [Cut - Start of stack trace]\n" +
+		`Verse.PatchOperationAdd(xpath="Defs/ThingDef"): Failed to find a node with the given xpath` + "\n" +
+		"    at XmlExtensions.ErrorManager.PrintErrors(String source, ModContentPack mod) [0x6A]\n"
+	f, err := Parse(strings.NewReader(text))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []*Entry
+	for _, e := range f.Entries {
+		if e.Level == "ERROR" {
+			got = append(got, e)
+		}
+	}
+	if len(got) != 3 {
+		t.Fatalf("error entries %d, want 3", len(got))
+	}
+	e := got[0]
+	if !strings.HasPrefix(e.Message, `[Progression: Arsenal] Verse.PatchOperationReplace(xpath="Defs/ResearchProjectDef[defName="VWE_TrenchWarfare"]`) ||
+		len(e.Extra) != 2 || e.Extra[0] != "Verse.PatchOperationSequence: Error in the operation at position=2" || e.Extra[1] != `file: D:\Mods\Arsenal\Patches\VWE_TrenchWarfare.xml` {
+		t.Fatalf("block %q extra %q", e.Message, e.Extra)
+	}
+	if len(e.Frames) != 2 || !e.Frames[0].Caller || Classify(e) != ClassPatchFailed {
+		t.Fatalf("frames %+v class %s", e.Frames, Classify(e))
+	}
+	if cut := got[2]; !strings.HasPrefix(cut.Message, "[Cut] Verse.PatchOperationAdd(") || len(cut.Frames) != 1 {
+		t.Fatalf("block without its end line: %q frames %d", cut.Message, len(cut.Frames))
+	}
+	cs := Clusters(f)
+	if len(cs) != 3 {
+		for _, c := range cs {
+			t.Logf("cluster %s %q", c.Class, c.Template)
+		}
+		t.Fatalf("clusters %d, want one per failure (3)", len(cs))
+	}
+}
+
 // A 1.7 (Waylith) log: levels, logger frames removed from the caller stack, the exception stack
 // kept apart from the caller stack, the .NET 10 Harmony line form, INFO lines not clustered.
 func TestParseWaylith(t *testing.T) {
@@ -232,6 +285,12 @@ func TestClassifyCorpusLines(t *testing.T) {
 		{"Object with load ID Thing_Human3262543 is referenced (xml node name: li) but is not deep-saved. This will cause errors during loading.", ClassSave, true},
 		{"Failed to find Verse.TerrainDef named AncientHeavyBridge. There are 636 defs of this type loaded.", ClassXrefMissing, true},
 		{"Verse.PatchOperationSequence: Error in the operation at position=5", ClassPatchFailed, true},
+		// XML Extensions blocks: a mod's own operation class, an "Error" ending, an xpath cut by a
+		// line break, brackets in the mod's name.
+		{`[1trickPwnyta's Anomaly Patch] AnomalyPatch.PatchOperationRemoveIf(xpath="/Defs/BackstoryDef[defName="UnknownAdulthood"]/bodyTypeGlobal"): Failed to find a node with the given xpath`, ClassPatchFailed, true},
+		{`[JustFloorTiles] Verse.PatchOperationAttributeAdd(xpath=Defs/TerrainDef[defName="WoodPlankFloor"], attribute=Name, value=WoodPlankBase): Error`, ClassPatchFailed, true},
+		{`[Combat Extended] Verse.PatchOperationAdd(xpath="Defs/thingDef[defName="Gun_A" or`, ClassPatchFailed, true},
+		{`[[FSF] Vanilla Bionics Expansion] Verse.PatchOperationReplace(xpath="Defs/HediffDef"): Failed to find a node with the given xpath`, ClassPatchFailed, true},
 		{`[SafePatcher]The xPath: "Defs/ThingDef[defName="VFES_Gun_HMGComplex"]" not found`, ClassModReport, true},
 		{"<color=#66ffb5>[MeleeAnim]</color> ancot.milirarace 'Milira Race' has 5 missing weapon tweak data.", ClassModReport, true},
 		{"TradingControl :: 23.3.24.18192  - 02 - LandingZoneCanBeUsed not found, skipping.", ClassModReport, true},

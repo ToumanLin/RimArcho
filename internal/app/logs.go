@@ -148,8 +148,9 @@ var ErrLogNotCached = errors.New("log not analysed yet")
 // defines it" (Unanalysed); 13: a missing type's XML referrer, nearest types, a same-name DLL that
 // loads first; consequences of a def file that failed to load (06 §2, §3); stack-less
 // "Tried to" errors, the game-error class and the lord rule; 14: Unity-format stack frames,
-// HugsLib upload headers skipped (06 §1).
-const logCacheVersion = 14
+// HugsLib upload headers skipped (06 §1); 15: XML Extensions blocks in 1.7 logs, any
+// "[Mod] Ns.PatchOperation…(" block line a patch failure.
+const logCacheVersion = 15
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a

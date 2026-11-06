@@ -313,6 +313,9 @@ func (p *Parser) Line(l string) {
 		return
 	}
 	if f.Waylith {
+		if p.xname != "" && p.waylithXMLBlock(l) {
+			return
+		}
 		// INFO phase markers must be seen before the usual level filtering.
 		if m := waylithLineRe.FindStringSubmatch(l); m != nil && p.marker(m[2], l, n) {
 			return
@@ -324,6 +327,9 @@ func (p *Parser) Line(l string) {
 		p.cur = next
 		if next != nil && next.Line == n {
 			next.Phase = p.phase
+			if m := xmlExtStartRe.FindStringSubmatch(next.Message); m != nil {
+				p.xname = m[1]
+			}
 		}
 		return
 	}
@@ -377,6 +383,31 @@ func (p *Parser) Line(l string) {
 	p.finish()
 	p.cur = &Entry{Line: n, Message: l, Phase: p.phase}
 	f.Entries = append(f.Entries, p.cur)
+}
+
+// waylithXMLBlock takes a line of an XML Extensions block in a 1.7 log: the message is
+// "[Mod - Start of stack trace]", the failure lines, "[End of stack trace]" and "Source file:"
+// follow without a timestamp, then the caller stack. It closes the block and returns false at the
+// first line that is not part of it.
+func (p *Parser) waylithXMLBlock(l string) bool {
+	t := strings.TrimSpace(l)
+	switch {
+	case waylithLineRe.MatchString(l), strings.HasPrefix(t, "at "): // a block without its end line
+	case !p.xended && t == "[End of stack trace]":
+		p.xended = true
+		return true
+	case !p.xended:
+		if t != "" {
+			p.xinner = append(p.xinner, t)
+		}
+		return true
+	case strings.HasPrefix(l, "Source file: "):
+		p.closeBlock()
+		p.cur.Extra = append(p.cur.Extra, "file: "+strings.TrimPrefix(l, "Source file: "))
+		return true
+	}
+	p.closeBlock()
+	return false
 }
 
 func (p *Parser) marker(msg, line string, n int) bool {
@@ -561,8 +592,11 @@ func Classify(e *Entry) string {
 		strings.HasPrefix(m, "Verse.PatchOperation") && strings.Contains(m, "): Failed"):
 		return ClassPatchFailed
 	case strings.HasPrefix(m, "Verse.PatchOperationSequence: Error in the operation"),
-		// An XML Extensions block: "[Mod] Verse.PatchOperationAdd(xpath=…): Failed …".
-		strings.Contains(m, "] Verse.PatchOperation") && (strings.Contains(m, "): Failed") || strings.Contains(m, ": Error in")):
+		// An XML Extensions block: "[Mod] Verse.PatchOperationAdd(xpath=…): Failed …". Every
+		// operation in a block failed, whatever its class or ending ("): Error", an xpath that
+		// goes on to the next line, AnomalyPatch.PatchOperationRemoveIf).
+		strings.Contains(m, "] Verse.PatchOperation") && (strings.Contains(m, "): Failed") || strings.Contains(m, ": Error in")),
+		strings.HasPrefix(m, "[") && strings.Contains(m, "PatchOperation") && xmlExtOpRe.MatchString(m):
 		return ClassPatchFailed
 	case strings.Contains(m, "Could not resolve cross-reference") || strings.HasPrefix(m, "Could not load reference to") ||
 		defNamedRe.MatchString(m):
@@ -596,6 +630,9 @@ func Classify(e *Entry) string {
 var (
 	// DefDatabase.GetNamed: "Failed to find Verse.TerrainDef named X. There are N defs of this type loaded."
 	defNamedRe = regexp.MustCompile(`^Failed to find [\w.]+Def named `)
+	// "[Mod] Ns.PatchOperationX(": a failed operation of an XML Extensions block; the mod's name
+	// may hold brackets ("[[FSF] Vanilla Bionics Expansion] …").
+	xmlExtOpRe = regexp.MustCompile(`^\[.+\] (?:[\w.]+\.)?PatchOperation\w*\(`)
 	textureRe  = regexp.MustCompile(`^(?:Could not load Texture2D at |Failed to find any textures at |Could not load (?:Texture|Material|Shader|AudioClip|SoundDef)\b)`)
 	saveRe     = regexp.MustCompile(`^Could not resolve reference to object with loadID|is referenced \(xml node name: .*\) but is not deep-saved|^Error in PostExposeData|^Could not find think node with key|^Exception loading .* from save|^Could not load .* from save|^Could not get load ID\. `)
 	// A mod reporting on itself: "[Mod] …", "<color=…>[Mod]</color> …", "Mod :: …", "MOD: …".
