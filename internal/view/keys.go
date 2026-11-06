@@ -50,6 +50,12 @@ func KeyHelp(page string, tui bool) []KeyRow {
 				r("C", "this mod's changes"),
 				r("R", "rescan"),
 			)
+			if !tui { // the Tags view is the window's (16 §2.9)
+				out = append(out,
+					r("v", "every mod / group by tag"),
+					r("F2 / n / M / Del", "on a tag's group row: rename, note, merge, delete the tag"),
+				)
+			}
 		} else {
 			out = append(out,
 				r("space", "enable / disable; in staging, put back in the list"),

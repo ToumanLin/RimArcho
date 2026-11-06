@@ -344,10 +344,12 @@ Recycling Mod folders: 09 §5, 02 §3.
 | Data | Owner | Description | Command |
 | --- | --- | --- | --- |
 | Alias | Lineage | Display name in all interfaces; `find` and search match it. Log attribution still matches the About.xml name, because the game prints `[Name]`, not the alias | `archo alias <ref> [<name>] [--clear]` |
-| Tags | Lineage | Several, case-insensitive; RimCrow groups import as tags | `archo tag add\|remove <ref> <tags…> [--mod <ref>]…`, `archo tag list`; filter `list --filter tag:<tag>` |
+| Tags | Lineage | Several, case-insensitive; RimCrow groups import as tags. A tag itself can be renamed, merged into another, deleted and given a note, on every Mod at once (the GUI's Tag manager, 16 §2.9) | `archo tag add\|remove <ref> <tags…> [--mod <ref>]…`, `archo tag list`, `archo tag rename\|merge\|delete\|note`; filter `list --filter tag:<tag>` |
 | Note | Lineage | Plain text | `archo note <ref> [<text>] [--clear]` |
 
-Storage: `lineage_data` (environment, Lineage, alias, note), `lineage_tag` (environment, Lineage, tag). The data belongs to the Lineage and is shared by original and locked versions and by all plans.
+Storage: `lineage_data` (environment, Lineage, alias, note), `lineage_tag` (environment, Lineage, tag), `tag_note` (tag, note; case-insensitive). The data belongs to the Lineage and is shared by original and locked versions and by all plans. Tags and their notes are global, like the Lineages, so a rename, merge or delete applies in every game.
+
+**Whole-tag edits** (`cmds.RenameTag`, `MergeTags`, `DeleteTags`, `SetTagNote`; each one store transaction): a merge gives every Mod carrying one of the source tags the target tag (new or existing; an existing target keeps its spelling) and removes the sources; their notes are appended to the target's. A rename is a merge into a new name and may change only the case; a name another tag already has is refused, because that is a merge. A delete removes the tags and their notes and touches nothing else. `tags.pinned` (16 §3.8) follows: a renamed or merged tag takes the source's pinned place unless the target is pinned already, a deleted tag leaves the list, and an unchanged list is not written, so the preset stays a preset. Removing the last pinned tag stores `,` (none pinned), since an empty value would bring the preset back. These edits are player data, outside the undo history (16 §3.8). Test: `TestTagEdits`.
 
 ### 6.2 One-time RimCrow import
 

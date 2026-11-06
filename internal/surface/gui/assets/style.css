@@ -1296,8 +1296,9 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .lib-row.lone .c.name { padding-left: 21px; }
 .lib-row .t { flex: 0 1 auto; min-width: 2em; overflow: hidden; text-overflow: ellipsis; }
 .lib-row.lin .t { font-weight: 500; }
-.lib-row.inst:not(.lone) .c.name { padding-left: 22px; }
-.lib-row .tree { color: var(--faint); font-size: 12px; flex: none; }
+/* a copy's name lines up with the Mod names, its └ where the chevron is */
+.lib-row.inst:not(.lone) .c.name { padding-left: 0; }
+.lib-row .tree { color: var(--faint); font-size: 12px; flex: none; width: 14px; text-align: center; }
 .lib-row .kind { color: var(--fg-2); }
 .lib-row .here { color: var(--accent-11, var(--accent)); font-size: 12px; flex: none; }
 .lib-row .c.unloadable, .lib-row .c.missing { color: var(--red); }
@@ -1339,6 +1340,52 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .lib-bar > .accent { font-weight: 600; margin-right: 4px; font-size: 12px; }
 .lib-bar .btn.quiet { margin-left: auto; border-color: transparent; background: none; box-shadow: none; }
 @media (prefers-reduced-motion: reduce) { .lib-bar, .fbar-panel { animation: none; } .lib-row .chev svg { transition: none; } }
+
+/* ---- the Tags view (16 §2.9): a header row per tag, its rows under it; the Tag manager ---- */
+.lib-head .lib-fold { display: flex; gap: 2px; margin-left: auto; }
+.lib-head .lib-fold button { display: flex; align-items: center; justify-content: center; width: 24px; height: 22px; padding: 0; border-radius: var(--r-sm); color: var(--muted); }
+.lib-head .lib-fold button:hover { background: var(--pill); color: var(--fg-2); }
+.lib-head .lib-view { margin-left: 8px; padding: 2px; border-radius: var(--r-sm); }
+.lib-head .lib-view button { height: 22px; padding: 0 10px; font-size: 12px; }
+.lib-head .lib-view button.on { background: var(--seg-thumb); box-shadow: var(--seg-edge); }
+.lib-head .lib-view + kbd { margin-left: 4px; }
+.lib-row.grp { background: var(--card-2); }
+.lib-row.grp:hover { background: var(--pill); }
+.lib-row.grp.cur { background: color-mix(in srgb, var(--fg) 7%, var(--card-2)); }
+.lib-row.grp .c.name { grid-column: 1 / -1; min-width: 0; }
+.lib-row.grp .t { font-weight: 600; flex: none; max-width: 40%; }
+.lib-row.grp .gn { flex: none; font-size: 12px; color: var(--muted); }
+.lib-row.grp .gnote { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 12px; color: var(--muted); font-style: italic; }
+.lib-row.grp.none .t { color: var(--muted); font-weight: 500; }
+/* a mod's chevron stands under its tag's name; a copy's name lines up with the mods', its └ in the chevron's place (Mods view: .lib-row.inst above) */
+.lib-row.in.lin .c.name { padding-left: 21px; }
+.lib-row.in.lone .c.name { padding-left: 42px; }
+.lib-row.in.inst:not(.lone) .c.name { padding-left: 21px; }
+/* the Tag manager: a copy's details (.mod-detail), its parts for a tag */
+.tag-detail .tm-titlerow { display: flex; align-items: baseline; gap: 12px; }
+.tag-detail .tm-name { flex: 1; min-width: 0; cursor: text; overflow-wrap: anywhere; }
+.tag-detail .tm-titlerow .fact { flex: none; color: var(--accent-11, var(--accent)); font-size: 12px; padding: 0 2px; }
+.tag-detail .tm-titlerow .fact:hover { text-decoration: underline; }
+.tag-detail .tm-title { flex: 1; min-width: 0; height: 26px; margin: -2px -6px -1px; padding: 0 6px; border: 0; border-radius: var(--r-sm); background: var(--pill); color: var(--fg); font: 600 15px var(--font); outline: none; box-shadow: 0 0 0 2px var(--accent); }
+.tag-detail .facts { gap: 12px; }
+.tag-detail .fields .chip { margin: 0 4px 2px 0; white-space: nowrap; }
+.tag-detail .lib-acts { margin: 12px 0 4px; }
+.tag-detail .tm-hint { margin: 8px 0; color: var(--muted); }
+.tag-detail .sub .cnt { margin-left: 8px; color: var(--faint); font-weight: 400; letter-spacing: 0; }
+.tm-cloud { display: flex; flex-wrap: wrap; gap: 4px; }
+/* its own chip: the details' .chip rule is scoped through #detail and would beat these */
+.tm-chip { display: inline-flex; align-items: baseline; gap: 6px; max-width: 100%; padding: 0 8px; border: 0; border-radius: 999px; background: var(--pill); color: var(--fg-2); font: inherit; font-size: 12px; line-height: 21px; cursor: pointer; }
+.tm-chip > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tm-chip:hover { background: color-mix(in srgb, var(--fg) 10%, var(--pill)); }
+.tm-chip .n { color: var(--faint); font-variant-numeric: tabular-nums; }
+.tm-chip.cur { background: var(--accent-soft); color: var(--accent-11, var(--accent)); }
+.tm-chip.cur .n { color: inherit; opacity: .7; }
+.tm-chip.picked { background: color-mix(in srgb, var(--accent) 30%, transparent); color: var(--fg); box-shadow: inset 0 0 0 var(--hairline) var(--accent); }
+.tm-chip.picked .n { color: inherit; opacity: .7; }
+.tag-detail .tm-picked { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; padding: 6px 8px; border-radius: var(--r-sm); background: var(--accent-soft); }
+.tag-detail .tm-picked .cnt { margin-right: auto; font-size: 12px; font-weight: 600; color: var(--accent-11, var(--accent)); }
+.tag-detail .tm-picked .btn { height: 24px; font-size: 12px; }
+.tag-detail .tm-idle { margin: 10px 0 0; font-size: 12px; color: var(--faint); }
 
 /* ---- the filter bar (16 §2.5, §2.9): the plan editor and Mod library share it ---- */
 .fbar { position: relative; flex: none; z-index: 6; }

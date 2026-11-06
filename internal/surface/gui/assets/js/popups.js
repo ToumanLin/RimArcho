@@ -267,6 +267,27 @@ export function position(obj, from, done = null) {
   });
 }
 
+// ---- the tag a tag is merged into (16 §2.9): one of tags ({tag, n}), found by typing, or a new name ----
+export function tagTarget(title, tags, pick) {
+  open("tag-target", title, (pop, p) => {
+    pop.append(el("div", "ttl", title));
+    const inp = inputLine(pop, "❯", T("find a tag, or type a new name"));
+    optionList(pop, p, [], (d, o) => {
+      d.append(el("span", "", o.label));
+      if (o.note) d.append(el("span", "d", o.note));
+    }, (o) => { close(); pick(o.tag); }, inp);
+    const fill = () => {
+      const q = inp.value.trim(), ql = q.toLowerCase();
+      const opts = tags.filter((t) => !ql || t.tag.toLowerCase().includes(ql)).map((t) => ({ tag: t.tag, label: t.tag, note: Tf("%d mods", t.n) }));
+      if (q && !tags.some((t) => t.tag.toLowerCase() === ql)) opts.push({ tag: q, label: Tf("new tag %s", q), note: "" });
+      p.sel = 0;
+      p.redraw(opts);
+    };
+    inp.addEventListener("input", fill);
+    fill();
+  });
+}
+
 // ---- a confirmation, for what u cannot undo (16 §6); text() shows lines with none ----
 // previewOk: the items of list (refs or ids, in the order the preview was asked for) that
 // can go ahead; a preview leaves out the ones that cannot now (p.ok unset: all of them).

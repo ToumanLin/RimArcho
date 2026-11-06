@@ -268,7 +268,7 @@ Commands and output call a plan `loadout` or `plan`. The editing commands below 
 | | `rule edit <r:n> <kind> <A> [<B>] \| ignore <constraint> [--note]` | Replace a rule and keep its `r:n` reference (08 §2.1). |
 | | `rule list` / `rule remove <r:n>` | |
 | Player data | `alias <reference> [<name>] [--clear]` / `note <reference> [<text>] [--clear]` | Set the display name or notes on the Lineage. |
-| | `tag add\|remove <reference> <tags…> [--mod <reference>]…` / `tag list` | Manage tags. Repeating `--mod` applies the change to several Mods at once. |
+| | `tag add\|remove <reference> <tags…> [--mod <reference>]…` / `tag list` / `tag rename <tag> <new> [--dry-run]` / `tag merge <tags…> --into <tag> [--dry-run]` / `tag delete <tags…> [--dry-run]` / `tag note <tag> [<text>] [--clear]` | Manage tags. Repeating `--mod` applies the change to several Mods at once. `list` shows each tag's Mod count, pinned, and note. `rename`, `merge`, `delete` and `note` act on the tag itself, on every Mod (07 §6.1); a rename to a name another tag already has is refused, naming the `merge` command to use instead. |
 | | `import rimcrow --db <path> [--rules <path>] [--dry-run] [--include-disabled-rules] [--all]` | Import RimCrow aliases, notes, groups (as tags) and user rules once. It can be run again (07 §6). |
 | Identity | `identity [list] [--all]` / `identity why <q:n>` / `identity resolve <q:n> same\|copy\|unrelated` | With no subcommand, list identity questions. Listing, inspecting, and answering all include a trimmed comparison (04 §2.4). |
 | | `lineage split <reference>` / `lineage merge <reference> <reference>` / `gc [--dry-run]` | Split or merge Lineages, or collect expired tombstones and unused snapshots (04 §2.5). |

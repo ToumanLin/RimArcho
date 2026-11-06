@@ -1031,6 +1031,80 @@ func (s *API) SetTag(ids []string, tag string, remove bool) (string, error) {
 	return s.text(view.Tf("tags of %s: %s", o.What, msg), err)
 }
 
+// ---- whole tags: Mod library's Tag manager (16 §2.9) ----
+
+// TagList is every tag: pinned first, then by how many mods carry it.
+func (s *API) TagList() ([]cmds.TagInfo, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return cmds.TagList(s.a)
+}
+
+// TagPreview says what merging from into into (or deleting from, into "") would change.
+func (s *API) TagPreview(from []string, into string) (cmds.TagEdit, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if into == "" {
+		return cmds.DeleteTags(s.a, from, true)
+	}
+	return cmds.MergeTags(s.a, from, into, true)
+}
+
+// RenameTag renames a tag on every mod.
+func (s *API) RenameTag(from, to string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, err := cmds.RenameTag(s.a, from, to, false)
+	return s.tagDone(view.Tf("renamed tag %s to %s on %d mods", from, strings.TrimSpace(to), e.Lineages), err)
+}
+
+// MergeTags makes the tags from into on every mod.
+func (s *API) MergeTags(from []string, into string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, err := cmds.MergeTags(s.a, from, into, false)
+	return s.tagDone(view.Tf("merged %s into %s", strings.Join(e.From, ", "), e.Into), err)
+}
+
+// DeleteTags removes the tags from every mod.
+func (s *API) DeleteTags(tags []string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, err := cmds.DeleteTags(s.a, tags, false)
+	return s.tagDone(view.Tf("removed %s from %d mods", strings.Join(e.From, ", "), e.Lineages), err)
+}
+
+// SetTagNote sets (or with "" clears) a tag's note.
+func (s *API) SetTagNote(tag, note string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t, err := cmds.SetTagNote(s.a, tag, note)
+	if strings.TrimSpace(note) == "" {
+		return s.tagDone(view.Tf("note of %s cleared", t), err)
+	}
+	return s.tagDone(view.Tf("note of %s saved", t), err)
+}
+
+// PinTag pins a tag in the tag bar and the groups, or unpins it (config tags.pinned).
+func (s *API) PinTag(tag string, on bool) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	err := cmds.SetTagPinned(s.a, tag, on)
+	if on {
+		return s.tagDone(view.Tf("%s is kept on top", tag), err)
+	}
+	return s.tagDone(view.Tf("%s is no longer on top", tag), err)
+}
+
+// tagDone ends a whole-tag edit: tags are player data, outside the list's undo (16 §3.8).
+func (s *API) tagDone(t string, err error) (string, error) {
+	s.board = nil
+	if err != nil {
+		return "", err
+	}
+	return t, nil
+}
+
 // ---- Can it run (16 §5) ----
 
 // Needs builds the screen. Opening it includes the newest log (parsing it if needed) and

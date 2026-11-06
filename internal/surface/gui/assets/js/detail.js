@@ -236,7 +236,8 @@ function description(d) {
 
 // noteEl: the copy's own note (16 §2.9). The player's text, else what RimArcho wrote (grey),
 // else a place to write one; a click (or n) edits it, enter saves, shift+enter breaks the
-// line, esc leaves it as it was. o.saved() after a save, o.leave() when the editing ends.
+// line, esc leaves it as it was. o.saved() after a save, o.leave() when the editing ends;
+// o.save(text) saves another note (a tag's) in place of the copy's, o.placeholder its hint.
 export function noteEl(i, o = {}) {
   const box = el("div", "lib-note" + (i.note ? "" : i.auto ? " auto" : " empty"));
   const show = () => {
@@ -246,7 +247,7 @@ export function noteEl(i, o = {}) {
     if (!i.note && i.auto) box.append(el("div", "by", T("by RimArcho, click to edit")));
   };
   show();
-  if (!i.id) return box;
+  if (!i.id && !o.save) return box;
   box.title = T("click to edit") + T("; ") + "n";
   box.onclick = () => {
     if (box.classList.contains("editing")) return;
@@ -255,7 +256,7 @@ export function noteEl(i, o = {}) {
     const start = i.note || i.auto || "";
     const ta = el("textarea", "lib-note-in");
     ta.value = start;
-    ta.placeholder = T("a note on this copy…");
+    ta.placeholder = o.placeholder || T("a note on this copy…");
     ta.rows = Math.min(6, Math.max(2, start.split("\n").length + 1));
     box.append(ta, el("div", "by", T("enter saves, esc cancels")));
     ta.focus();
@@ -267,7 +268,7 @@ export function noteEl(i, o = {}) {
       done = true;
       const text = ta.value.trim();
       if (text === start.trim()) { show(); leave(); return; }
-      try { say("ok", await api.LibrarySetNote(i.ref, text)); i.note = text; } catch (e) { say("fail", errText(e)); }
+      try { say("ok", await (o.save ? o.save(text) : api.LibrarySetNote(i.ref, text))); i.note = text; } catch (e) { say("fail", errText(e)); }
       show();
       leave();
       if (o.saved) await o.saved(text);

@@ -370,7 +370,7 @@ gc: removed 0 tombstones (tombstones older than 90 days, before 2026-07-03)
 database maintenance: would remove 6 old file records and compact the database
 
 > maintenance {"action":"vacuum"}
-database compacted: freed 44.3 KB (now 480.0 KB)
+database compacted: freed 44.3 KB (now 492.0 KB)
 
 > edit_loadout {"action":"disable","refs":["#hnyg"]}
 workspace: 2 active, 1 change unsaved (plan:default, env:main)
@@ -575,6 +575,26 @@ next:
 copy note set for #iqmu A
   note: kept for the 1.5 save
   copy: this instance only (src:locked A Local); the mod's note is archo note iqmu
+
+> set_player_data {"action":"tag_add","refs":["#iqmu"],"tags":["visual","looks"]}
+tagged #iqmu A: visual, looks
+
+> set_player_data {"action":"tag_merge","dry_run":true,"tags":["visual"],"text":"looks"}
+dry run, tag merged: visual → looks
+  mods: 1 mod changes to looks (1 already had it)
+  undo: tag changes are not in the undo history
+
+> set_player_data {"action":"tag_rename","tags":["looks"],"text":"visuals"}
+tag renamed: looks → visuals
+  mods: 1 mod changes to visuals
+
+> set_player_data {"action":"tag_note","tags":["visuals"],"text":"textures"}
+note set for tag visuals
+  note: textures
+
+> set_player_data {"action":"tag_delete","tags":["visual","visuals"]}
+tag deleted: visual, visuals
+  mods: 1 mod loses the tag; its files and lists are not touched
 
 > list_library {"lineage":"L#l4xt","sort":"-size"}
 L#l4xt A  [2 copies, 1.3 KB]

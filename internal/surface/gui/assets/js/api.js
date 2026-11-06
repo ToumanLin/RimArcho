@@ -16,6 +16,7 @@ const writesGame = new Set([
   "MoveBy", "MoveShown", "Place", "Swap", "Undo", "Redo", "HistoryGo", "RunOp", "DoAction",
   "CreatePlan", "ImportApplyTo", "UsePlan", "OpenPlan", "NewPlan", "RenamePlan", "RemovePlan", "ImportApply", "ImportAsPlan", "ImportAsPlanPreview", "ImportFollow",
   "PlanSync", "PlanFollow", "PlanFollowMode", "PlanUnfollow", "PlanVersionsSet", "SetModNote", "SetTag",
+  "RenameTag", "MergeTags", "DeleteTags", "SetTagNote", "PinTag",
   "LibraryDo", "LibrarySetNote", "Subscribe", "SubscriptionFrom", "CheckSubscriptionSource", "WorkshopUpdate", "Scan", "Analyze", "RemoveEnv", "ApplySetting", "AddMonitor",
   "PackLaunch", "PackBuild", "PackRemove", "PackRemoveUnfinished", "TexturesRun", "TexturesClean", "CreditAnswer", "CompleteDependencies", "ReplaceRecommended",
   // Saves (16 §2.11): fixes edit the save's list, the file actions change its folder

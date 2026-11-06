@@ -51,7 +51,7 @@ Annotations follow the MCP specification; the external harness decides whether t
 | `pin_mod` | pin (ref, name, git, update, `move_to_library`, reason, and `dry_run`); reason is stored in the copy's origin and shown in its copy notes (16 §2.9). | false | false |
 | `unpin_mod` | unpin (ref and `dry_run`) | false | false |
 | `set_mod_settings` | mod-settings set (ref; set as `name=value` pairs in name order; each reset; file; `dry_run`) | false | false |
-| `set_player_data` | The action is `tag_add` or `tag_remove` (refs and tags), alias or note (text; an empty string clears it), or `copy_note` (the note on one copy, `note <reference> <text> --copy`; an empty string clears it, 16 §2.9). | false | false |
+| `set_player_data` | The action is `tag_add` or `tag_remove` (refs and tags), alias or note (text; an empty string clears it), or `copy_note` (the note on one copy, `note <reference> <text> --copy`; an empty string clears it, 16 §2.9). On a tag itself, without refs: `tag_rename` (tags: the one tag, text: the new name), `tag_merge` (tags, text: the target), `tag_delete` (tags) and `tag_note` (tags: the one tag, text; an empty string clears it). `dry_run` previews rename, merge and delete (`tag rename\|merge\|delete\|note`, 13 §4.2). | false | false |
 | `manage_rules` | `rule add/list/remove` (action, kind, a, b, target, note, and rule) | false | false |
 | `ignore_problem` | `problems ignore` or unignore (undo) | false | false |
 | `mute_version_warnings` | `problems mute-version` or `unmute-version` (refs, `game_version`, and undo); see 05 §4.2 for the scope. | false | false |
@@ -129,7 +129,7 @@ The following table gives the highlights of the tool guides. `internal/cmds/guid
 | `save_loadout` | Save without launching, for players who start RimWorld another way. Ask the player and show the `dry_run=true` preview first. Refused while an outside change to ModsConfig.xml is not loaded or ignored (07 §4.3); while the game runs it still saves. |
 | `pin_mod` | Copy a Workshop Mod before editing it because Steam overwrites Workshop files. Do not copy links outside the folder or the upstream `.git`, and never overwrite an existing folder. |
 | `get_description` | Learn what a Mod does before recommending it. Fetch Workshop text on demand and cache it until the item updates. The player can disable network access with `workshop.fetch`. |
-| `set_player_data` | Set tags (used by `list --filter tag:<t>` and TUI `tag:` search), aliases, and notes on the Lineage, shared by all copies. `copy_note` belongs to one copy and says why it is kept. It does not touch the game. |
+| `set_player_data` | Set tags (used by `list --filter tag:<t>` and TUI `tag:` search), aliases, and notes on the Lineage, shared by all copies. `copy_note` belongs to one copy and says why it is kept. `tag_rename`, `tag_merge`, `tag_delete` and `tag_note` change a tag on every Mod (dry run first; ask before merging or deleting). It does not touch the game. |
 | `manage_subscriptions` | Use it to install a Mod from Git, a download page, or SteamCMD, or to check subscription updates. Check before update; preview add, update, and remove with `dry_run` first. The player downloads page files and supplies `from`; the agent does not log in to LoversLab. Use `manage_library` for client Workshop items. Pin the old version before updating if it should be retained. |
 | `manage_rules` | Ignore wrong-direction About.xml or community constraints to break `order.cycle`. Rules affect sorting and order findings but do not themselves reorder the plan. |
 

@@ -74,6 +74,7 @@ CREATE TABLE lineage_data(
 CREATE TABLE lineage_tag(
   environment_id TEXT NOT NULL, lineage_id TEXT NOT NULL, tag TEXT NOT NULL COLLATE NOCASE,
   PRIMARY KEY(environment_id, lineage_id, tag));
+CREATE TABLE tag_note(tag TEXT PRIMARY KEY COLLATE NOCASE, note TEXT NOT NULL);
 CREATE TABLE log_cache(
   path TEXT PRIMARY KEY, size INTEGER NOT NULL, mtime INTEGER NOT NULL, version TEXT NOT NULL DEFAULT '',
   input_key TEXT NOT NULL, report BLOB NOT NULL);

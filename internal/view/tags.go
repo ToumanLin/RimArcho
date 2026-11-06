@@ -57,12 +57,4 @@ func TagCandidates(a *app.App, envID string, selected [][]string) []TagCand {
 }
 
 // PinnedTags: config tags.pinned, split on ASCII and fullwidth commas.
-func PinnedTags(a *app.App) []string {
-	var out []string
-	for _, t := range strings.FieldsFunc(cmds.Setting(a, "tags.pinned"), func(r rune) bool { return r == ',' || r == '\uff0c' }) {
-		if t = strings.TrimSpace(t); t != "" {
-			out = append(out, t)
-		}
-	}
-	return out
-}
+func PinnedTags(a *app.App) []string { return cmds.PinnedTagList(a) }

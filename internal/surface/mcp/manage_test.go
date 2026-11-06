@@ -262,6 +262,22 @@ func manageSteps(e *testkit.Env) []func() manageStep {
 			return manageStep{"set_player_data", map[string]any{"action": "copy_note", "refs": []string{a}, "text": "kept for the 1.5 save"}, []string{"note", a, "kept for the 1.5 save", "--copy"}}
 		},
 		func() manageStep {
+			a := pick("A", "locked")
+			return manageStep{"set_player_data", map[string]any{"action": "tag_add", "refs": []string{a}, "tags": []string{"visual", "looks"}}, []string{"tag", "add", a, "visual", "looks"}}
+		},
+		func() manageStep {
+			return manageStep{"set_player_data", map[string]any{"action": "tag_merge", "tags": []string{"visual"}, "text": "looks", "dry_run": true}, []string{"tag", "merge", "visual", "--into", "looks", "--dry-run"}}
+		},
+		func() manageStep {
+			return manageStep{"set_player_data", map[string]any{"action": "tag_rename", "tags": []string{"looks"}, "text": "visuals"}, []string{"tag", "rename", "looks", "visuals"}}
+		},
+		func() manageStep {
+			return manageStep{"set_player_data", map[string]any{"action": "tag_note", "tags": []string{"visuals"}, "text": "textures"}, []string{"tag", "note", "visuals", "textures"}}
+		},
+		func() manageStep {
+			return manageStep{"set_player_data", map[string]any{"action": "tag_delete", "tags": []string{"visual", "visuals"}}, []string{"tag", "delete", "visual", "visuals"}}
+		},
+		func() manageStep {
 			l := lineage("A", "workshop")
 			return manageStep{"list_library", map[string]any{"lineage": l, "sort": "-size"}, []string{"library", "--lineage", l, "--sort", "-size"}}
 		},

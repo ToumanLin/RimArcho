@@ -185,8 +185,8 @@ Content types such as `type:assembly` come from the current snapshot's `snapshot
 
 ### 3.8 Tags
 
-- Mod tags appear in the detail fields (§4.1), next to edit. They never appear in list rows, where they would displace long names and be unreadable across more than a thousand rows. Find tagged Mods with tag: search (§3.7) or the Mod library's tag filters (§2.9).
-- Tags belong to the Mod's Lineage (07 §6). The corresponding interfaces are CLI `tag add|remove <ref> <tag…> --mod <ref>…` and MCP `set_player_data`.
+- Mod tags appear in the detail fields (§4.1), next to edit. They never appear in list rows, where they would displace long names and be unreadable across more than a thousand rows. Find tagged Mods with tag: search (§3.7), the Mod library's tag filters, or its Tags view, which groups the rows under a header row per tag (§2.9).
+- Tags belong to the Mod's Lineage (07 §6). The corresponding interfaces are CLI `tag add|remove <ref> <tag…> --mod <ref>…` and MCP `set_player_data`. Renaming, merging, deleting a tag and its note are on the Mod library's Tag manager (§2.9), CLI `tag rename|merge|delete|note` and the same MCP tool.
 - Tags are player data rather than list edits, so they do not enter the undo stack. u does not undo them, and the GUI status line offers no undo link for a tag change.
 
 `g` opens a candidate row below the hints or details, rather than an input box:

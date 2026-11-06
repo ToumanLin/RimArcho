@@ -4,6 +4,12 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 1.0.1 (unreleased)
 
+- Mod library: a Mods | Tags switch (`v`) above the table. The Tags view lists the Mods under a header row per tag (pinned tags first, untagged Mods under No tag at the end); a Mod with several tags appears under each. Headers open and close with ← →.
+- Mod library: on a tag's header the details become a Tag manager, laid out like a Mod's details: rename the tag (F2), give it a note shown in its header (`n`), merge it into another tag or a new name (`M`), delete it (`Del`), or keep it on top of the tag list. Tags spelled almost the same are offered as a merge, and every tag is listed below as a chip that jumps to its group; ctrl+click several chips to merge or delete them together. Merge and delete ask first; tag changes cannot be undone with `u`.
+- Mod library: collapse all and expand all buttons in the table heading (every Mod's copies, or in the Tags view every tag group). An expanded Mod's copies now line up with the Mod names instead of one step further in.
+- CLI: `archo tag rename <tag> <new>`, `tag merge <tags…> --into <tag>`, `tag delete <tags…>` (each with `--dry-run`) and `tag note <tag> [<text>] [--clear]` change a tag on every Mod; `tag list` shows pinned tags and notes, and says `1 mod` instead of `1 mods`.
+- MCP: `set_player_data` has the actions `tag_rename`, `tag_merge`, `tag_delete` and `tag_note`, with `dry_run`; `refs` is now optional.
+- The database moves to schema 32 (tag notes) when a 1.0.x database is opened.
 - The first-run guide no longer shows `✗ no environment configured` (in English) on the status line before a game is added.
 - Can it run: after Sort, or after choosing which Mod of an incompatible pair to disable, the cards under errors from the last run no longer each turn into a ✓ row with its own undo.
 - Add subscription: the preview reads in the interface language (it was English in Chinese).

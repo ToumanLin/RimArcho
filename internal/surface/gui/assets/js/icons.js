@@ -34,6 +34,9 @@ export const icon = {
   // Background tasks: stacked bars, the work in a queue
   tasks: svg('<path d="M3 4.5h10M3 8h10M3 11.5h6"/>'),
   chev: svg('<path d="M6 4l4 4-4 4"/>'),
+  // collapse all / expand all (Mod library's table heading): chevrons closing in, opening out
+  fold: svg('<path d="M5 2.5l3 3 3-3M5 13.5l3-3 3 3"/>'),
+  unfold: svg('<path d="M5 5.5l3-3 3 3M5 10.5l3 3 3-3"/>'),
   // the list management page (16 §2.17)
   import: svg('<path d="M8 2.4v7.2M5.2 6.8L8 9.6l2.8-2.8"/><path d="M2.8 10.4v2.2h10.4v-2.2"/>'),
   export: svg('<path d="M8 9.6V2.4M5.2 5.2L8 2.4l2.8 2.8"/><path d="M2.8 10.4v2.2h10.4v-2.2"/>'),

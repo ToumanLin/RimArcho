@@ -469,10 +469,11 @@ type DescribeIn struct {
 
 type PlayerIn struct {
 	Env    string   `json:"env,omitempty" jsonschema:"environment name (default: current)"`
-	Action string   `json:"action" jsonschema:"tag_add, tag_remove, alias, note (the mod's), copy_note (one copy's own, 16 §2.9)"`
-	Refs   []string `json:"refs" jsonschema:"the mods (tag actions: one or more; alias and note: exactly one)"`
-	Tags   []string `json:"tags,omitempty" jsonschema:"tag_add / tag_remove: the tags"`
-	Text   string   `json:"text,omitempty" jsonschema:"alias / note / copy_note: the text; empty clears it"`
+	Action string   `json:"action" jsonschema:"tag_add, tag_remove, alias, note (the mod's), copy_note (one copy's own, 16 §2.9); on every mod: tag_rename, tag_merge, tag_delete, tag_note"`
+	Refs   []string `json:"refs,omitempty" jsonschema:"the mods (tag_add / tag_remove: one or more; alias and note: exactly one)"`
+	Tags   []string `json:"tags,omitempty" jsonschema:"the tags (tag_rename, tag_note: one)"`
+	Text   string   `json:"text,omitempty" jsonschema:"alias / note / copy_note / tag_note: the text, empty clears it; tag_rename: the new name; tag_merge: the target"`
+	DryRun bool     `json:"dry_run,omitempty" jsonschema:"tag_rename, tag_merge, tag_delete: preview only"`
 }
 
 type SaveIn struct {
@@ -754,6 +755,18 @@ func PlayerArgv(in PlayerIn) []string {
 			return []string{"note", first, "--copy", "--clear"}
 		}
 		return []string{"note", first, in.Text, "--copy"}
+	case "tag_rename":
+		return argv(append([]string{"tag", "rename"}, append(in.Tags, in.Text)...)...).flag("dry-run", in.DryRun).a
+	case "tag_merge":
+		return argv(append([]string{"tag", "merge"}, in.Tags...)...).str("into", in.Text).flag("dry-run", in.DryRun).a
+	case "tag_delete":
+		return argv(append([]string{"tag", "delete"}, in.Tags...)...).flag("dry-run", in.DryRun).a
+	case "tag_note":
+		b := argv(append([]string{"tag", "note"}, in.Tags...)...)
+		if in.Text == "" {
+			return b.flag("clear", true).a
+		}
+		return b.pos(in.Text).a
 	}
 	return []string{"set_player_data: unknown action " + fmt.Sprintf("%q", in.Action)}
 }
