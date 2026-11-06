@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"encoding/json"
+	"reflect"
 	"slices"
 	"sort"
 	"strings"
@@ -31,6 +32,17 @@ func (s *Store) FinishScan(scanID int64, finished time.Time, stats any) error {
 	b, _ := json.Marshal(stats)
 	_, err := s.DB.Exec(`UPDATE scan SET finished_at=?, stats=? WHERE id=?`, finished.Unix(), string(b), scanID)
 	return err
+}
+
+// declReparsed: unchanged files whose dependencies now read differently, because the parser
+// learned a field (alternativePackageIds). The stored declaration is brought up to date in
+// place; a new snapshot would record an update the mod never had. The same files give the
+// same declaration, so this happens once after an upgrade.
+func declReparsed(prev, now scan.Decl) bool {
+	if now.ParseError != "" || prev.ParseError != "" || now.PackageID != prev.PackageID {
+		return false
+	}
+	return !reflect.DeepEqual(prev.Dependencies, now.Dependencies) || !reflect.DeepEqual(prev.DependenciesByVersion, now.DependenciesByVersion)
 }
 
 // insertSnapshot writes a snapshot and its manifest; returns the snapshot ID. A released
@@ -158,6 +170,12 @@ func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identi
 			}
 		default:
 			snapID = a.Prev.ID
+			if declReparsed(a.Prev.Decl, ob.Decl) {
+				blob, _ := json.Marshal(ob.Decl)
+				if _, err = tx.Exec(`UPDATE snapshot SET decl_blob=? WHERE id=?`, string(blob), snapID); err != nil {
+					return err
+				}
+			}
 			if ob.FP.Hashed > 0 && ob.FP.Files != nil {
 				// Same content, newer mtimes: refresh the cache so the next scan can skip hashing.
 				if _, err = deleteFiles(tx, `=?`, snapID); err != nil {

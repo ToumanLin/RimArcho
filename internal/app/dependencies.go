@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/loadout"
+	"github.com/ToumanLin/RimArcho/internal/scan"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
@@ -25,6 +26,64 @@ type dependencyIndex struct {
 	activeByPkg map[string][]*store.Mod
 	installed   map[string][]*store.Mod
 	loadable    map[string][]*store.Mod
+	activeByWS  map[string][]*store.Mod // built on first need
+	// replacement: Use This Instead's replacement for a package (08 §2.3); nil: none known.
+	replacement func(workshopID, pkg string) *Replacement
+}
+
+// newDependencyIndex indexes the enabled mods (by packageId, as the game matches them).
+func (a *App) newDependencyIndex(st *LoadoutState, activeByPkg map[string][]*store.Mod) *dependencyIndex {
+	return &dependencyIndex{st: st, activeByPkg: activeByPkg, installed: installedDependencies(st), replacement: a.ReplacementFor}
+}
+
+// How an enabled mod stands in for a required package that is not enabled itself.
+const (
+	// StandInAlternative: the requiring mod lists it in alternativePackageIds; the game
+	// counts the dependency as met.
+	StandInAlternative = "alternative"
+	// StandInReplacement: Use This Instead names it as the package's replacement. The game
+	// still warns in its mod list, but loads both, and the replacement is what the player
+	// meant to use (08 §1.1).
+	StandInReplacement = "replacement"
+)
+
+// standIns returns the enabled mods that satisfy dep although no mod with its packageId is
+// enabled, and how (StandIn*). Alternatives come first, as the game reads them.
+func (ix *dependencyIndex) standIns(dep scanDep) ([]*store.Mod, string) {
+	for _, alt := range dep.alts {
+		if ms := ix.activeByPkg[dependencyPackage(alt)]; len(ms) > 0 {
+			return ms, StandInAlternative
+		}
+	}
+	if ix.replacement == nil {
+		return nil, ""
+	}
+	r := ix.replacement(workshopID(dep.url), dependencyPackage(dep.pkg))
+	if r == nil {
+		return nil, ""
+	}
+	if p := dependencyPackage(r.NewPackageID); p != "" {
+		if ms := ix.activeByPkg[p]; len(ms) > 0 {
+			return ms, StandInReplacement
+		}
+	}
+	if r.NewWorkshopID == "" {
+		return nil, ""
+	}
+	if ix.activeByWS == nil {
+		ix.activeByWS = map[string][]*store.Mod{}
+		for _, ms := range ix.activeByPkg {
+			for _, m := range ms {
+				if w := m.WorkshopID(); w != "" {
+					ix.activeByWS[w] = append(ix.activeByWS[w], m)
+				}
+			}
+		}
+	}
+	if ms := ix.activeByWS[r.NewWorkshopID]; len(ms) > 0 {
+		return ms, StandInReplacement
+	}
+	return nil, ""
 }
 
 func dependencyPackage(p string) string {
@@ -60,8 +119,30 @@ func (ix *dependencyIndex) candidates(p string) []*store.Mod {
 	return out
 }
 
+// DependencyStandIn is the enabled mod that meets dep in place of its package, and how
+// (StandIn*); nil when the package itself is enabled or nothing stands in (16 §4.1).
+func (a *App) DependencyStandIn(st *LoadoutState, dep scan.Dependency) (*store.Mod, string) {
+	activeByPkg := map[string][]*store.Mod{}
+	for _, e := range st.List {
+		if m := st.Ix.ByID[e.Instance]; m != nil {
+			p := dependencyPackage(m.PackageID)
+			activeByPkg[p] = append(activeByPkg[p], m)
+		}
+	}
+	d := toDeps([]scan.Dependency{dep})[0]
+	if len(activeByPkg[dependencyPackage(d.pkg)]) > 0 {
+		return nil, ""
+	}
+	ms, how := a.newDependencyIndex(st, activeByPkg).standIns(d)
+	if len(ms) == 0 {
+		return nil, ""
+	}
+	return ms[0], how
+}
+
 // missing uses only modDependencies and the current version, never loadAfter or
-// community observations. A duplicate declaration can supply a missing name or URL.
+// community observations. A duplicate declaration can supply a missing name or URL. An
+// enabled stand-in (alternative or replacement, standIns) meets the dependency.
 func (ix *dependencyIndex) missing(m *store.Mod) []scanDep {
 	d := m.Decl()
 	deps := append(toDeps(d.Dependencies), toDeps(d.DependenciesByVersion["v"+ix.st.GameMM()])...)
@@ -70,6 +151,9 @@ func (ix *dependencyIndex) missing(m *store.Mod) []scanDep {
 	for _, dep := range deps {
 		dep.pkg = dependencyPackage(dep.pkg)
 		if dep.pkg == "" || len(ix.activeByPkg[dep.pkg]) > 0 {
+			continue
+		}
+		if ms, _ := ix.standIns(dep); len(ms) > 0 {
 			continue
 		}
 		if i, ok := seen[dep.pkg]; ok {
@@ -104,7 +188,7 @@ func (a *App) dependencyWorkshop(dep scanDep) (id, name string) {
 // MissingDependencies reads cached declarations in bulk; it never scans files or
 // invokes the full problem/analysis pipeline. Missing list entries do not satisfy deps.
 func (a *App) MissingDependencies(st *LoadoutState) ([]MissingDependency, error) {
-	ix := dependencyIndex{st: st, activeByPkg: map[string][]*store.Mod{}, installed: installedDependencies(st)}
+	activeByPkg := map[string][]*store.Mod{}
 	var active []*store.Mod
 	seen := map[string]bool{}
 	for _, e := range st.List {
@@ -112,9 +196,10 @@ func (a *App) MissingDependencies(st *LoadoutState) ([]MissingDependency, error)
 			seen[m.ID] = true
 			active = append(active, m)
 			p := dependencyPackage(m.PackageID)
-			ix.activeByPkg[p] = append(ix.activeByPkg[p], m)
+			activeByPkg[p] = append(activeByPkg[p], m)
 		}
 	}
+	ix := a.newDependencyIndex(st, activeByPkg)
 	if err := a.Store.LoadDecls(active); err != nil {
 		return nil, err
 	}

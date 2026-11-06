@@ -126,7 +126,7 @@ func tailFields(a *app.App, st *app.LoadoutState, mod *store.Mod, d *DetailData)
 			fs = append(fs, Field{Kind: FieldLanguages, Label: T("languages"), Value: strings.Join(ls, "  "), List: ls})
 		}
 	}
-	if deps := Deps(st, d); len(deps) > 0 {
+	if deps := Deps(a, st, d); len(deps) > 0 {
 		fs = append(fs, Field{Kind: FieldDeps, Label: T("requires"), Value: depNames(deps), Items: deps})
 	}
 	if cs := Conflicts(st, d); len(cs) > 0 {

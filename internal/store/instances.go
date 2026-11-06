@@ -110,7 +110,7 @@ func (m *Mod) Decl() scan.Decl {
 	blob := m.declBlob()
 	if s := m.store.Load(); blob == "" && s != nil && m.SnapID != 0 {
 		if s.DB.QueryRow(`SELECT decl_blob FROM snapshot WHERE id=?`, m.SnapID).Scan(&blob) == nil && blob != "" {
-			m.lazy.Store(&blob) // snapshot rows never change their declaration
+			m.lazy.Store(&blob) // a scan rewrites one only after a parser upgrade, and the index reloads then
 		}
 	}
 	var d scan.Decl

@@ -66,6 +66,9 @@ func depLine(x view.Dep, conflict bool) string {
 		if conflict {
 			return sErrS.Render(ic.err) + " " + sText.Render(x.Name)
 		}
+		if x.For != "" {
+			return sOK.Render(markOK) + " " + sText.Render(x.Name) + sDimS.Render(Tf(" (in place of %s)", x.For))
+		}
 		return sOK.Render(markOK) + " " + sText.Render(x.Name)
 	case view.DepDisabled:
 		return sWarnS.Render(ic.warn) + " " + sText.Render(x.Name) + sDimS.Render(T(" (not enabled)"))

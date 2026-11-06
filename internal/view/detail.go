@@ -147,15 +147,17 @@ const (
 	DepMissing  = "missing"  // not installed
 )
 
-// Dep is one declared dependency with its state.
+// Dep is one declared dependency with its state. For is set when another enabled mod meets
+// the dependency in its place (Name): the declared name.
 type Dep struct {
 	Name  string `json:"name"`
 	State string `json:"state"`
+	For   string `json:"for,omitempty"`
 }
 
 // Deps: the declared dependencies (plus the current version's), each once, with their
-// state (16 §4.1).
-func Deps(st *app.LoadoutState, d *DetailData) []Dep {
+// state (16 §4.1). A dependency met by an alternative or a replacement shows that mod, enabled.
+func Deps(a *app.App, st *app.LoadoutState, d *DetailData) []Dep {
 	if d == nil || st == nil {
 		return nil
 	}
@@ -189,13 +191,22 @@ func Deps(st *app.LoadoutState, d *DetailData) []Dep {
 				enabled, name = true, mod.DisplayName()
 			}
 		}
+		var standIn *store.Mod
+		if !enabled && a != nil {
+			standIn, _ = a.DependencyStandIn(st, x)
+		}
 		switch {
 		case enabled:
-			out = append(out, Dep{name, DepEnabled})
+			out = append(out, Dep{Name: name, State: DepEnabled})
+		case standIn != nil:
+			if len(inst) > 0 {
+				name = inst[0].DisplayName()
+			}
+			out = append(out, Dep{Name: standIn.DisplayName(), State: DepEnabled, For: name})
 		case len(inst) > 0:
-			out = append(out, Dep{inst[0].DisplayName(), DepDisabled})
+			out = append(out, Dep{Name: inst[0].DisplayName(), State: DepDisabled})
 		default:
-			out = append(out, Dep{name, DepMissing})
+			out = append(out, Dep{Name: name, State: DepMissing})
 		}
 	}
 	return out

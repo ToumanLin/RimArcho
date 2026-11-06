@@ -867,6 +867,7 @@ func (a *App) SortInput(st *LoadoutState, l loadout.List) (order.Input, error) {
 		d := m.Decl()
 		in.Nodes = append(in.Nodes, order.Node{Instance: m.ID, PackageID: m.PackageID, Lineage: m.LineageID, Decl: &d})
 	}
+	in.Replacements = a.sortReplacements(st, in.Nodes, enabled)
 	rules, err := a.Store.Rules(st.Ix.Env.ID)
 	if err != nil {
 		return in, err
@@ -875,6 +876,43 @@ func (a *App) SortInput(st *LoadoutState, l loadout.List) (order.Input, error) {
 		in.Rules = append(in.Rules, order.Rule{ID: r.ID, Kind: r.Kind, A: r.A, B: r.B, Target: r.Target})
 	}
 	return in, nil
+}
+
+// sortReplacements: for each required package no list entry has, the enabled mods Use This
+// Instead names as its replacement (order.Input.Replacements, 08 §1.1).
+func (a *App) sortReplacements(st *LoadoutState, nodes []order.Node, enabled []*store.Mod) map[string][]string {
+	inList := map[string]bool{}
+	for _, nd := range nodes {
+		inList[dependencyPackage(nd.PackageID)] = true
+	}
+	activeByPkg := map[string][]*store.Mod{}
+	for _, m := range enabled {
+		p := dependencyPackage(m.PackageID)
+		activeByPkg[p] = append(activeByPkg[p], m)
+	}
+	ix := a.newDependencyIndex(st, activeByPkg)
+	var out map[string][]string
+	for _, nd := range nodes {
+		if nd.Decl == nil {
+			continue
+		}
+		for _, dep := range append(toDeps(nd.Decl.Dependencies), toDeps(nd.Decl.DependenciesByVersion["v"+st.GameMM()])...) {
+			p := dependencyPackage(dep.pkg)
+			if p == "" || inList[p] || out[p] != nil {
+				continue
+			}
+			dep.alts = nil // the sort reads alternatives from the declaration itself
+			if ms, how := ix.standIns(dep); how == StandInReplacement {
+				if out == nil {
+					out = map[string][]string{}
+				}
+				for _, m := range ms {
+					out[p] = append(out[p], m.PackageID)
+				}
+			}
+		}
+	}
+	return out
 }
 
 // Sort orders the workspace (08 §1); dryRun only computes.

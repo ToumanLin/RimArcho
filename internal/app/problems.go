@@ -399,8 +399,8 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 	for _, l := range locked {
 		lockedCopy[l.Copy.ID] = l.Upstream.ID
 	}
-	installed := installedDependencies(st)
-	depsIndex := dependencyIndex{st: st, activeByPkg: activeByPkg, installed: installed}
+	depsIndex := a.newDependencyIndex(st, activeByPkg)
+	installed := depsIndex.installed
 
 	for _, m := range active {
 		d := m.Decl()
@@ -777,12 +777,16 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 	return out, nil
 }
 
-type scanDep struct{ pkg, name, url string }
+// scanDep is one declared dependency; alts are its alternativePackageIds.
+type scanDep struct {
+	pkg, name, url string
+	alts           []string
+}
 
 func toDeps(l []scan.Dependency) []scanDep {
 	out := make([]scanDep, 0, len(l))
 	for _, d := range l {
-		out = append(out, scanDep{d.PackageID, d.DisplayName, d.SteamWorkshopURL})
+		out = append(out, scanDep{pkg: d.PackageID, name: d.DisplayName, url: d.SteamWorkshopURL, alts: d.Alternatives})
 	}
 	return out
 }

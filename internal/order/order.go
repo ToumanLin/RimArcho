@@ -103,6 +103,9 @@ type Input struct {
 	GameMM    string // "1.6": selects *ByVersion entries
 	Rules     []Rule
 	Community Community
+	// Replacements: for a required package no node has, the packageIds of nodes that replace
+	// it (Use This Instead, 08 §1.1). The dependency then orders after those.
+	Replacements map[string][]string
 }
 
 // Constraint kinds.
@@ -426,12 +429,10 @@ func Sort(in Input) Result {
 		if d == nil {
 			continue
 		}
-		deps := map[string]bool{}
-		for _, x := range d.Dependencies {
-			deps[strings.ToLower(x.PackageID)] = true
-		}
-		for _, x := range d.DependenciesByVersion["v"+in.GameMM] {
-			deps[strings.ToLower(x.PackageID)] = true
+		deps := map[string][]string{} // required package → its alternativePackageIds
+		for _, x := range append(slices.Clone(d.Dependencies), d.DependenciesByVersion["v"+in.GameMM]...) {
+			p := strings.ToLower(x.PackageID)
+			deps[p] = append(deps[p], pkgsOf(x.Alternatives)...)
 		}
 		depList := make([]string, 0, len(deps))
 		for p := range deps {
@@ -439,8 +440,24 @@ func Sort(in Input) Result {
 		}
 		sort.Strings(depList)
 		for _, p := range depList {
-			for _, j := range byPkg[p] {
-				add(j, i, Constraint{Kind: KindDependency, Owner: i, Field: "modDependencies", Target: p, Ref: DeclRef(nd.Lineage, "dependency", p)})
+			// The package itself; when no node has it, the first alternative some node has
+			// (the game's ModDependency.IsSatisfied), then its replacements. The reference
+			// stays the declared package, so one ignore rule covers every stand-in.
+			targets, target := byPkg[p], p
+			for _, alt := range deps[p] {
+				if len(targets) > 0 {
+					break
+				}
+				targets, target = byPkg[alt], alt
+			}
+			for _, r := range in.Replacements[p] {
+				if len(targets) > 0 {
+					break
+				}
+				targets, target = byPkg[r], r
+			}
+			for _, j := range targets {
+				add(j, i, Constraint{Kind: KindDependency, Owner: i, Field: "modDependencies", Target: target, Ref: DeclRef(nd.Lineage, "dependency", p)})
 			}
 		}
 		for _, f := range []struct {

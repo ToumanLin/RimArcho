@@ -14,12 +14,15 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/textenc"
 )
 
-// Dependency is one <modDependencies> entry.
+// Dependency is one <modDependencies> entry. Alternatives (<alternativePackageIds>) also
+// satisfy it: the game's ModDependency.IsSatisfied accepts any of them when PackageID is not
+// enabled (08 §1.1).
 type Dependency struct {
-	PackageID        string `json:"package_id"`
-	DisplayName      string `json:"display_name,omitempty"`
-	SteamWorkshopURL string `json:"steam_workshop_url,omitempty"`
-	DownloadURL      string `json:"download_url,omitempty"`
+	PackageID        string   `json:"package_id"`
+	DisplayName      string   `json:"display_name,omitempty"`
+	SteamWorkshopURL string   `json:"steam_workshop_url,omitempty"`
+	DownloadURL      string   `json:"download_url,omitempty"`
+	Alternatives     []string `json:"alternative_package_ids,omitempty"`
 }
 
 // Decl is the normalised declaration of a mod: About.xml, PublishedFileId.txt and
@@ -221,6 +224,7 @@ func deps(n *node) []Dependency {
 			DisplayName:      li.str("displayname"),
 			SteamWorkshopURL: li.str("steamworkshopurl"),
 			DownloadURL:      li.str("downloadurl"),
+			Alternatives:     li.list("alternativepackageids"),
 		}
 		if dep.PackageID == "" && len(li.children) == 0 {
 			dep.PackageID = strings.TrimSpace(li.text.String())

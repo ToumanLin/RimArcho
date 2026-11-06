@@ -128,7 +128,7 @@ export function fieldList(fields, acts = {}) {
       for (const x of f.items) {
         const line = el("span", "dep " + x.state);
         const ic = { enabled: f.kind === "conflicts" ? icon.err : icon.ok, disabled: icon.warn, missing: f.kind === "conflicts" ? icon.ok : icon.err }[x.state] || "";
-        const note = x.state === "disabled" ? T(" (not enabled)") : x.state === "missing" ? T(" (not installed)") : "";
+        const note = x.state === "disabled" ? T(" (not enabled)") : x.state === "missing" ? T(" (not installed)") : x.for ? T(" (in place of %s)").replace("%s", x.for) : "";
         line.innerHTML = ic + `<span class="n">${esc(x.name)}</span>` + (note ? `<span class="dim">${esc(note)}</span>` : "");
         v.append(line);
       }

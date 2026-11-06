@@ -772,7 +772,7 @@ func (s *API) Detail(id string, staged, fetch, refresh bool) (*Detail, error) {
 
 	data := view.LoadDetail(r, st.Ix, mod, fetch, refresh) // off the lock: may use the network
 	d := &Detail{ID: id, Name: mod.DisplayName(), Authors: strings.TrimSpace(mod.Authors), Kind: view.SourceKind(mod), Pos: pos,
-		Header: view.HeaderFacts(mod, pos, staged), Facts: view.Facts(mod, data), Deps: view.Deps(st, data), Fields: view.ModFields(r, st, mod, data),
+		Header: view.HeaderFacts(mod, pos, staged), Facts: view.Facts(mod, data), Deps: view.Deps(r, st, data), Fields: view.ModFields(r, st, mod, data),
 		Show: data.Desc.Show, Note: view.DescNote(data), State: data.Desc.WorkshopState,
 		About: data.About, Workshop: data.Workshop, History: view.HistoryLine(data.Events), CanSeparate: st.Ix.CanSeparate(mod)}
 	d.Version = data.Version

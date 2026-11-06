@@ -160,7 +160,7 @@ func (a *App) ParentHelp(ps *ProblemSet, p *Problem) (*ParentHelp, error) {
 		}
 		old, exists := candidates[pkg]
 		if !exists || old.url == "" && url != "" {
-			candidates[pkg] = scanDep{pkg, name, url}
+			candidates[pkg] = scanDep{pkg: pkg, name: name, url: url}
 			basis[pkg] = why
 		}
 	}

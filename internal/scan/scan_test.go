@@ -186,3 +186,21 @@ func TestACF(t *testing.T) {
 		t.Fatal("unknown item present")
 	}
 }
+
+// alternativePackageIds (game 1.5+) are kept with each dependency, here and by version.
+func TestReadDeclAlternatives(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "About"), 0o755)
+	os.WriteFile(filepath.Join(dir, "About", "About.xml"), []byte(`<ModMetaData><packageId>t.tr</packageId><name>Tr</name>
+<modDependencies><li><packageId>x.old</packageId><displayName>Old</displayName>
+ <alternativePackageIds><li> X.New </li><li>y.fork</li></alternativePackageIds></li></modDependencies>
+<modDependenciesByVersion><v1.6><li><packageId>x.old</packageId><AlternativePackageIds><li>x.new</li></AlternativePackageIds></li></v1.6></modDependenciesByVersion>
+</ModMetaData>`), 0o644)
+	d := ReadDecl(dir, false)
+	if len(d.Dependencies) != 1 || !slices.Equal(d.Dependencies[0].Alternatives, []string{"X.New", "y.fork"}) {
+		t.Fatalf("deps = %+v", d.Dependencies)
+	}
+	if v := d.DependenciesByVersion["v1.6"]; len(v) != 1 || !slices.Equal(v[0].Alternatives, []string{"x.new"}) {
+		t.Fatalf("by version = %+v", d.DependenciesByVersion)
+	}
+}

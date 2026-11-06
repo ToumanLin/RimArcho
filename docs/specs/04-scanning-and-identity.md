@@ -50,7 +50,7 @@ Recorded for each Mod directory:
 | Category | Contents |
 | --- | --- |
 | Location | `source_id`, relative path, real path, link flag, alias locations |
-| Declarations | `About.xml`: `packageId`, name, author/authors, `modVersion`, `supportedVersions`, description, `modDependencies` and `modDependenciesByVersion`, `loadBefore`, `loadAfter`, `forceLoadBefore`, `forceLoadAfter`, `incompatibleWith`, `loadBeforeByVersion`, `loadAfterByVersion`, `incompatibleWithByVersion`, `descriptionsByVersion`; `About/PublishedFileId.txt` (BOM and whitespace stripped); the original `LoadFolders.xml` |
+| Declarations | `About.xml`: `packageId`, name, author/authors, `modVersion`, `supportedVersions`, description, `modDependencies` and `modDependenciesByVersion` (each entry with its `alternativePackageIds`), `loadBefore`, `loadAfter`, `forceLoadBefore`, `forceLoadAfter`, `incompatibleWith`, `loadBeforeByVersion`, `loadAfterByVersion`, `incompatibleWithByVersion`, `descriptionsByVersion`; `About/PublishedFileId.txt` (BOM and whitespace stripped); the original `LoadFolders.xml` |
 | Workshop ID | Workshop-type sources (workshop, steamcmd): the directory name; others: `PublishedFileId.txt` |
 | External state | Workshop-type sources: ACF manifest ID, timeupdated, size, subscription status; with `.git`: the `HEAD` commit (read `HEAD`, then the ref file or `packed-refs`) |
 | Content fingerprint | See §1.4 |
@@ -63,6 +63,8 @@ Recorded for each Mod directory:
 - Split authors like the game's `ModMetaData.Authors`: on ` and `, `&` and `,`, trimming whitespace.
 - A dependency `li` may contain a `packageId` child or plain text.
 - A malformed `About.xml` still creates an Instance; the error is recorded in the declaration and the scan goes on.
+
+A scan reads `About.xml` again even when the content is unchanged. If the dependencies then read differently (only possible after the parser learned a field, such as `alternativePackageIds` in 1.0.1), the current snapshot's stored declaration is rewritten in place; no new snapshot or update event is recorded (`store.declReparsed`).
 
 `packageId` is always stored twice: the original `package_id_raw` and the lowercase `package_id`. A missing `packageId` is derived by §1.5.
 

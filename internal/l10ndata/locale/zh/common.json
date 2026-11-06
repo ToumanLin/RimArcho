@@ -1,6 +1,7 @@
 {
   " (%d list %s, %d older only)": "（其中 %d 个支持 %s，%d 个只支持更早的版本）",
   " (%s)": "（%s）",
+  " (in place of %s)": "（代替 %s）",
   " (not enabled)": "（未启用）",
   " (not installed)": "（未安装）",
   "%d added": "新增 %d",

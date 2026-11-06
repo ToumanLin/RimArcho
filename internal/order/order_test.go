@@ -336,3 +336,38 @@ func TestS5FiveHundred(t *testing.T) {
 	}
 	t.Logf("500 mods, %d edges, %d cycles: %v", len(r.Edges), len(r.Cycles), el)
 }
+
+// A dependency whose package is absent orders after its first present alternative, else
+// after its replacements; the ignore reference stays the declared package (08 §1.1).
+func TestDependencyStandIns(t *testing.T) {
+	alt := node("t.alt", scan.Decl{Dependencies: []scan.Dependency{{PackageID: "x.old", Alternatives: []string{"X.Gone", "X.New"}}}})
+	repl := node("t.repl", scan.Decl{Dependencies: []scan.Dependency{{PackageID: "x.old"}}})
+	in := Input{Nodes: []Node{node("ludeon.rimworld", scan.Decl{}), alt, repl, node("x.new", scan.Decl{}), node("y.fork", scan.Decl{})},
+		GameMM: "1.6", Replacements: map[string][]string{"x.old": {"y.fork"}}}
+	r := Sort(in)
+	if got := pkgs(in, r); !slices.Equal(got, []string{"ludeon.rimworld", "x.new", "t.alt", "y.fork", "t.repl"}) {
+		t.Fatal(got)
+	}
+	var deps []string
+	for _, e := range r.Edges {
+		if e.C.Kind == KindDependency {
+			deps = append(deps, in.Nodes[e.To].PackageID+">"+e.C.Target+" "+e.C.Ref)
+		}
+	}
+	if want := []string{"t.alt>x.new decl:L-t.alt:dependency:x.old", "t.repl>y.fork decl:L-t.repl:dependency:x.old"}; !slices.Equal(deps, want) {
+		t.Fatal(deps)
+	}
+	// One ignore rule on the declared package drops the stand-in edge.
+	in.Rules = []Rule{{Kind: RuleIgnore, Target: "decl:L-t.repl:dependency:x.old"}}
+	if r = Sort(in); r.Ignored != 1 {
+		t.Fatal(r.Ignored)
+	}
+	// With the package itself present, neither alternative nor replacement is used.
+	in.Rules = nil
+	in.Nodes = append(in.Nodes, node("x.old", scan.Decl{}))
+	for _, e := range Sort(in).Edges {
+		if e.C.Kind == KindDependency && e.C.Target != "x.old" {
+			t.Fatal("stand-in next to the package", e.C.Target)
+		}
+	}
+}
