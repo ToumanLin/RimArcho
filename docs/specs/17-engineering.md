@@ -139,6 +139,7 @@ The `RIMARCHO_HOME` environment variable overrides this table (used by tests and
 | `backups/` | Database backups `archo-YYYYMMDD-HHMMSS.db` (local time); save backups `saves/YYYYMMDD-HHMMSS/` (12 §4.4, same time format) |
 | `packs/` | Packs (10) |
 | `webview2/` | WebView2 user data (not in `%APPDATA%\RimArcho.exe`) |
+| `refnums/` | `<prefix>.txt` per page, written while GUI reference numbers are on (16 §3.5); only for looking numbers up, never read back |
 | `wezterm/`, `wezterm.lua` | A portable WezTerm and its configuration, left by development builds before 1.0; RimArcho neither uses, writes nor deletes them (16 §9.2) |
 | `rimcrow-*` | Temporary RimCrow database copies during `import rimcrow`; deleted afterward |
 

@@ -110,3 +110,15 @@ test("bottom cards reverse arrow direction so the gap follows the pressed arrow"
   s.handle.dispatch("keydown", { key: "ArrowUp" }); assert.equal(s.size(), 340);
   s.handle.dispatch("keydown", { key: "ArrowDown" }); assert.equal(s.size(), 300);
 });
+
+// Reference numbers (refnums.js) redraw on every DOM write, and a redraw wakes the
+// separators' observer: a refresh that writes unchanged values would loop at frame rate.
+test("a refresh that changes nothing writes nothing", async () => {
+  const h = await setup(), s = h.make("ui.gui.plans.side"); await s.ready; await flush();
+  const written = [], setAttribute = s.handle.setAttribute.bind(s.handle);
+  s.handle.setAttribute = (k, v) => { written.push(k); setAttribute(k, v); };
+  s.refresh(); s.refresh();
+  assert.deepEqual(written, []);
+  s.handle.dispatch("keydown", { key: "ArrowRight" });
+  assert.deepEqual(written, ["aria-valuenow"]);
+});

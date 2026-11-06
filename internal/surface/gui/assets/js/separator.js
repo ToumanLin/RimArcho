@@ -12,13 +12,16 @@ export function wireSeparator(handle, opts) {
     const value = reset ? "" : opts.serialize ? opts.serialize() : String(Math.round(opts.get()));
     return api.SetSetting(key(), value).catch(() => {});
   };
+  // Writes only what changed: the same value written again is still a mutation, and the
+  // reference-number layer (refnums.js) redraws on every mutation, which wakes this again.
+  const put = (name, value) => { if (handle.getAttribute(name) !== value) handle.setAttribute(name, value); };
   function refresh() {
-    const [min, max] = range();
-    handle.tabIndex = enabled() ? 0 : -1;
-    handle.setAttribute("aria-disabled", String(!enabled()));
-    handle.setAttribute("aria-valuemin", String(Math.round(min)));
-    handle.setAttribute("aria-valuemax", String(Math.round(max)));
-    handle.setAttribute("aria-valuenow", String(Math.round(Math.max(min, Math.min(max, opts.get())))));
+    const [min, max] = range(), on = enabled();
+    if (handle.getAttribute("tabindex") !== (on ? "0" : "-1")) handle.tabIndex = on ? 0 : -1;
+    put("aria-disabled", String(!on));
+    put("aria-valuemin", String(Math.round(min)));
+    put("aria-valuemax", String(Math.round(max)));
+    put("aria-valuenow", String(Math.round(Math.max(min, Math.min(max, opts.get())))));
   }
   function set(value) {
     const [min, max] = range();
