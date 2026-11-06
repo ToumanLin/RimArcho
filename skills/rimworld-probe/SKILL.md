@@ -55,6 +55,21 @@ Helpers on the base class: `Log`, `Patches(method)` (Harmony owners on a method)
 
 Do not reference the assemblies of the mods under test. Reach their types by name with `CompNamed`, `Call`, `Get`, `Set`, `AccessTools.TypeByName`. The probe then builds with the game alone and runs in every configuration.
 
+## Finding the code to call
+
+The game and every mod are .NET assemblies; their source is one decompile away. Decompile once into the work folder and search the text, instead of guessing names:
+
+- Whole assembly (1.6: about 30 s and 45 MB; do it once): `ilspycmd -p -o <work>/decomp/game <game>/RimWorldWin64_Data/Managed/Assembly-CSharp.dll`; the same for each mod DLL under test (`<mod>/<version>/Assemblies/*.dll`).
+- One type: `ilspycmd -t <Namespace.Type> <dll>`. All type names: `ilspycmd -l c <dll>`.
+
+Three ways in:
+
+1. **From what the player sees.** Find the visible text of the button, menu entry or dialog in the English language files: `<game>/Data/<Core or DLC>/Languages/English/Keyed/*.xml` (other languages are `.tar`), or `<mod>/Languages/English/Keyed/` for a mod. Its key appears in the code as `"Key".Translate()`. That leads to the gizmo (`Command_Action.action`, `Command_Toggle.toggleAction`), the float-menu option (`FloatMenuOption` action) or the dialog button, and so to the method the player's click really calls. Call that method, or the gizmo's own action.
+2. **From what a pawn does.** `Observe` can log `pawn.CurJobDef.defName`. The job comes from a `JobGiver_*` (needs, duties, the think tree in `Data/*/Defs/ThinkTreeDefs`) or a `WorkGiver_*` (work types, `Data/*/Defs/WorkGiverDefs`). Search for `JobDefOf.<Name>` and the giver's class; its `TryGiveJob`, `HasJobOnThing` and `JobOnThing` hold the checks the AI makes.
+3. **From a decision that went the wrong way.** Read down the decision function the AI or UI uses. Every `return false` / `return null` on the way is a precondition; call the same checks in the scenario and log each result. Stop at the first one that differs from what you expect.
+
+Mods change these paths. `Patches(method)` shows who patched a method you call or read; read those patch bodies in the mod's decompiled source. Defs are best read at runtime (`DefDatabase<ThingDef>.GetNamed(...)` and its fields), because XML patches from other mods are already applied there.
+
 ## Method
 
 - **Act through the same entry points as the player and the AI.** Call the method the UI button or the dialog calls, not an internal shortcut. Change the state the AI reacts to (a need level, a designation, a setting), then let ticks run and watch what the AI decides. Setting the outcome directly proves nothing.
