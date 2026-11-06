@@ -37,15 +37,21 @@ public class Scenario : ProbeScenario
 {
     public override void OnStartup() { }                      // game start, in load order: record patch state
     public override void Setup(Map map) { }                   // map ready: build the situation
-    public override string Observe(Map map, int tick) { }     // one state line; logged when it changes; null ends
-    public override bool Done(Map map, int tick) { }          // true ends early
+    public override void OnFrame(Map map, int frame) { }      // every frame, also while paused: UI work
+    public override string Observe(Map map, int tick) { }     // while time runs: one state line, logged when it changes
+    public override bool Done(Map map, int tick) { }          // true ends the run
     public override string Finish(Map map, int tick) { }      // the RESULT summary
+    public override TimeSpeed Speed => TimeSpeed.Paused;      // for UI-only checks; default runs Ultrafast
     public override int MaxTicks => 30000;                    // 2500 ticks = 1 game hour
-    public override int ObserveEvery => 1;
+    public override int MaxFrames => 36000;                   // about 60 frames per second
 }
 ```
 
-Helpers on the base class: `Log`, `Patches(method)` (Harmony owners on a method), `Colonists(map, n)` (spawned colonists, generates more if needed), `SpawnBuilding(map, defName, stuff)`, `ClearSpot`, `CompNamed(thing, typeName)` (a comp from another mod without referencing it), `Call` / `Get` / `Set` (private members by name), `LoadOrder()`, and `ScreenshotTarget` (what the final screenshot selects and centers on).
+The run ends when `Done` returns true, a hook calls `EndNow()`, or `MaxTicks` / `MaxFrames` is reached. `Observe` runs only while the clock runs; a paused scenario works in `OnFrame`, one small action per frame (open a window this frame, switch its tab the next, read it the one after), because windows draw between frames.
+
+**Steps and errors.** Call `Step("name")` before each part of the scenario. Every error and exception the game logs from then on counts against that step, and the RESULT line ends with `errors=[setup:0 open-card:2 ...]`, with the first lines of each listed above it. `ErrorCount(step)` and `Errors(step)` read them inside the scenario. Steps before your first call are `startup` (from the probe's load), `setup` and `run`. Errors logged before the probe loads, such as XML load errors, are only in `Player.log`.
+
+Helpers on the base class: `Log`, `Patches(method)` (Harmony owners on a method), `Colonists(map, n)` (spawned colonists, generates more if needed), `SpawnBuilding(map, defName, stuff)`, `ClearSpot`, `CompNamed(thing, typeName)` (a comp from another mod without referencing it), `Call` / `Get` / `Set` (private members by name), `LoadOrder()`, and `ScreenshotTarget` (what the final screenshot selects and centers on). A window still open at the end shows in the screenshot.
 
 Do not reference the assemblies of the mods under test. Reach their types by name with `CompNamed`, `Call`, `Get`, `Set`, `AccessTools.TypeByName`. The probe then builds with the game alone and runs in every configuration.
 
@@ -53,6 +59,7 @@ Do not reference the assemblies of the mods under test. Reach their types by nam
 
 - **Act through the same entry points as the player and the AI.** Call the method the UI button or the dialog calls, not an internal shortcut. Change the state the AI reacts to (a need level, a designation, a setting), then let ticks run and watch what the AI decides. Setting the outcome directly proves nothing.
 - **One variable per configuration, and a control.** For a suspected conflict: the mod alone, both mods in each load order, and a control that keeps the suspected mechanism and drops the other mod.
+- **Name steps.** A failure in one step should not be read as a failure of the whole scenario. With `Step` the result says where each error came from.
 - **Log decisions, not only outcomes.** When the expected thing does not happen, call the game's own decision functions for the same subject (the checks the AI or the UI runs before it acts) and log each result. A `false` in that list is the cause; do not guess.
 - **Check preconditions before blaming a mod.** A quicktest map is random: the scenario, the ideoligion and its precepts, traits, relations, terrain, season. Any of these can block what you test. Log the relevant ones in `Setup`. If one blocks the test, remove it (for example leave a DLC off with `--no-dlc`) and say so in the report.
 - **Let time run.** Read state after the AI has had ticks to act, not in the first frame. For "does X keep happening", keep observing for a while after it first happens.

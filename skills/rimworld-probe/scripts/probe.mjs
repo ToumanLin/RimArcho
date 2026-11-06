@@ -111,6 +111,7 @@ ${li(known)}
   <pauseOnError>False</pauseOnError>
   <automaticPauseMode>Never</automaticPauseMode>
   <devMode>True</devMode>
+  <adaptiveTrainingEnabled>False</adaptiveTrainingEnabled>
   <langFolderName>English</langFolderName>
   <resetModsConfigOnCrash>False</resetModsConfigOnCrash>
   <volumeMaster>0</volumeMaster>

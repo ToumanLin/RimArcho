@@ -17,10 +17,14 @@ namespace RimProbe
 
         public override void Setup(Map map)
         {
+            Step("spawn-wall");   // errors from here on count against this step
             marker = SpawnBuilding(map, "Wall", "WoodLog");
             ScreenshotTarget = marker;
             Log($"setup colonists={map.mapPawns.FreeColonistsSpawnedCount} map={map.Size} wall at {marker.Position}");
+            Step("watch");
         }
+
+        // For UI checks, also override OnFrame (called every frame, even paused) and Speed => TimeSpeed.Paused.
 
         public override int MaxTicks => 2500;
         public override int ObserveEvery => 250;
