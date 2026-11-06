@@ -855,6 +855,10 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .version-panel .version-name { justify-self: start; text-align: left; color: var(--accent); }
 .version-panel .version-name:hover { text-decoration: underline; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px 12px; }
+/* the tag bar: many tags scroll inside the popup instead of running past the window */
+.pop .chips { max-height: 50vh; overflow-y: auto; align-content: flex-start; }
+.pop .tag-new { padding: 0 16px 12px; color: var(--muted); font-size: 12px; }
+.pop .chips[hidden] + .tag-new { padding-top: 10px; }
 .chips .c { height: 25px; display: inline-flex; align-items: center; padding: 0 10px; border-radius: 999px; border: var(--hairline) solid var(--line-2); color: var(--fg-2); background: var(--card); }
 .chips .c:hover { border-color: var(--accent); color: var(--accent-11, var(--accent)); background: var(--accent-soft); }
 .chips .c.on { border-color: var(--accent); color: var(--accent-11, var(--accent)); background: var(--accent-soft); }

@@ -153,6 +153,11 @@ func TestT13TagBar(t *testing.T) {
 	if m.tags == nil || m.tags.sel != 0 {
 		t.Fatalf("# did not open the tag bar on the first candidate: %+v", m.tags)
 	}
+	// the selection's own tags come first: Alpha's "half" leads as [~half], then the pinned ones
+	if c := m.tags.cands; len(c) < 3 || c[0].tag != "half" || c[0].have != 1 || c[2].tag != "美化" {
+		t.Fatalf("candidates not own-first: %+v", c)
+	}
+	press(m, "right")
 	press(m, "right")
 	if bar := ansi.Strip(m.View()); !strings.Contains(bar, "✎ 输入…") && !strings.Contains(bar, "✎ type…") {
 		t.Fatalf("no input in the bar:\n%s", bar)
@@ -174,8 +179,10 @@ func TestT13TagBar(t *testing.T) {
 	if len(m.marked) != 2 {
 		t.Fatal("tagging dropped the selection")
 	}
-	press(m, "g")
-	press(m, "right")
+	press(m, "g") // [✓美化] is on both now, so it leads the bar and starts selected
+	if c := m.tags.cands; len(c) == 0 || c[0].tag != "美化" {
+		t.Fatalf("the tag both have is not first: %+v", c)
+	}
 	if s := ansi.Strip(m.View()); !strings.Contains(s, "[✓美化]") {
 		t.Fatalf("no the checked Visuals tag:\n%s", s)
 	}
