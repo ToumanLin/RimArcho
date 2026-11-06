@@ -486,3 +486,40 @@ func TestNormalizeLordPawn(t *testing.T) {
 		t.Errorf("keys differ or keep the name:\n%s\n%s", a, b)
 	}
 }
+
+// One bug in a pawn comp throws for every colonist and world pawn: one cluster, not one per name
+// (the SSR Body repro had 20). A ThingID keeps its defName.
+func TestNormalizeTickPawn(t *testing.T) {
+	cases := []struct{ a, b, want string }{
+		{"Exception ticking Hubbard (at (121, 0, 135)): System.InvalidOperationException: Collection was modified; enumeration operation may not execute.",
+			"Exception ticking 'Big' Jim (at (116, 0, 138)): System.InvalidOperationException: Collection was modified; enumeration operation may not execute.",
+			"Exception ticking <pawn> (at (#, #, #)): System.InvalidOperationException: Collection was modified; enumeration operation may not execute."},
+		{"Exception ticking Nik. Suppressing further errors. Exception: System.ArgumentOutOfRangeException: Index was out of range.",
+			"Exception ticking Teej (at (122, 0, 122)). Suppressing further errors. Exception: System.ArgumentOutOfRangeException: Index was out of range.",
+			""},
+		{"Exception ticking world pawn Martin. Suppressing further errors. System.InvalidOperationException: Collection was modified",
+			"Exception ticking world pawn Irobarmar. Suppressing further errors. System.InvalidOperationException: Collection was modified",
+			"Exception ticking world pawn <pawn>. Suppressing further errors. System.InvalidOperationException: Collection was modified"},
+		{"Exception ticking hediff (Flu Torso ticksSinceCreation=40) for pawn Ann. Removing hediff... Exception: System.NullReferenceException",
+			"Exception ticking hediff (Flu Torso ticksSinceCreation=90) for pawn Big Red. Removing hediff... Exception: System.NullReferenceException",
+			"Exception ticking hediff (Flu Torso ticksSinceCreation=#) for pawn <pawn>. Removing hediff... Exception: System.NullReferenceException"},
+	}
+	for _, c := range cases {
+		a, b := Normalize(c.a), Normalize(c.b)
+		if a != b && c.want != "" || c.want != "" && a != c.want || !strings.Contains(a, "<pawn>") {
+			t.Errorf("\n%s\n%s", a, b)
+		}
+	}
+	for _, m := range []string{
+		"Exception ticking Wall12345 (at (3, 0, 4)): System.NullReferenceException",
+		"Exception ticking UnnamedDef-7. Suppressing further errors. Exception: System.NullReferenceException",
+		"Exception ticking Pawn7: System.NullReferenceException",
+	} {
+		if n := Normalize(m); strings.Contains(n, "<pawn>") {
+			t.Errorf("ThingID replaced: %s", n)
+		}
+	}
+	if Normalize("Exception ticking Wall12 (at (3, 0, 4)): x") == Normalize("Exception ticking Door12 (at (3, 0, 4)): x") {
+		t.Error("ThingIDs of different defs merged")
+	}
+}

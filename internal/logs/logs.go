@@ -755,7 +755,25 @@ var (
 	normNum      = regexp.MustCompile(`\d+`)
 	normLordPawn = regexp.MustCompile(`^(Tried to add pawn ).+?( to lord with lord job)`)
 	normPath     = regexp.MustCompile(`[A-Za-z]:[\\/][^\s"'<>]*`)
+	// TickList and WorldPawns name the thing that threw: a humanlike pawn by its name, any other
+	// thing by its ThingID (defName and ID number). Group 2 is the name.
+	normTickThing   = regexp.MustCompile(`^(Exception ticking (?:world pawn )?)(.+?)( \(at \([-\d, ]+\)\))?(: |\. Suppressing further errors\.)`)
+	normThingID     = regexp.MustCompile(`^\w+?-?\d+$`)
+	normHediffOwner = regexp.MustCompile(`^(Exception ticking hediff .+? for pawn ).+?(\. Removing hediff)`)
 )
+
+// normTickName replaces a pawn's name in a tick error with <pawn>, so one bug hitting every
+// colonist is one cluster. A ThingID stays: its defName says what kind of thing threw.
+func normTickName(m string) string {
+	if strings.HasPrefix(m, "Exception ticking hediff ") {
+		return normHediffOwner.ReplaceAllString(m, "${1}<pawn>${2}")
+	}
+	loc := normTickThing.FindStringSubmatchIndex(m)
+	if loc == nil || normThingID.MatchString(m[loc[4]:loc[5]]) {
+		return m
+	}
+	return m[:loc[4]] + "<pawn>" + m[loc[5]:]
+}
 
 // Normalize turns a message into its cluster key part: numbers, addresses, IDs and paths
 // become placeholders.
@@ -766,6 +784,9 @@ func Normalize(m string) string {
 	m = normPath.ReplaceAllString(m, "<path>")
 	// Lord.AddPawn repeats every tick for each pawn: one cluster, not one per pawn name.
 	m = normLordPawn.ReplaceAllString(m, "${1}<pawn>${2}")
+	if strings.HasPrefix(m, "Exception ticking ") {
+		m = normTickName(m)
+	}
 	m = normHex.ReplaceAllString(m, "<hex>")
 	m = normNum.ReplaceAllString(m, "#")
 	return m

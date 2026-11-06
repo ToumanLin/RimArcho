@@ -56,7 +56,7 @@ A `material` cluster for a def's own material (`Material '<def material>' … _M
 
 **Clustering** follows these rules:
 
-- Normalize the first 300 message characters: replace paths with `<path>`, addresses and long hexadecimal IDs with `<hex>`, and numbers with `#`.
+- Normalize the first 300 message characters: replace paths with `<path>`, addresses and long hexadecimal IDs with `<hex>`, and numbers with `#`. Replace the pawn name in "Tried to add pawn … to lord", and in "Exception ticking …" errors (also "world pawn …" and a hediff's "for pawn …"), with `<pawn>`: one bug in a pawn comp throws for every pawn. A ThingID there (a defName followed by its number, such as `Wall12345`) stays, because it names the kind of thing.
 - The key combines the category, normalized message, continuations for `patch-failed` (to distinguish files), and the location frame's `Type.Method`. Merge entries with the same key into `log:E<n>`, numbered by first appearance. Record the count and the first 5 line numbers.
 - A **template** combines the category with a further-normalized message. Replace color tags, `defName=…`, quoted contents, names after `named / loadID / Type / field / at / for def / key`, the `Def` in "found to give to X", parenthesized type names, and `packageId` with placeholders. Templates count kinds of problems: each missing texture has its own cluster but the same template. Cluster keys keep these names because attribution needs them.
 
