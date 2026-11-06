@@ -136,7 +136,7 @@ func (s *API) runSettingTask(a *app.App, id, kind string, argv []string) (string
 		}
 		return view.SourceCheckResult(a, argv[1])
 	case view.TaskWorkshopUpdate:
-		return view.T("Steam will download this Workshop update"), a.UpdateWorkshopClient(argv[1], false)
+		return view.T("Steam will download this Workshop update"), a.UpdateWorkshopClients(argv[1:], false)
 	case view.TaskSubscribe, view.TaskSubscriptionFrom:
 		return s.runSubscriptionTask(a, id, kind, argv)
 	case view.TaskSelfCheck:

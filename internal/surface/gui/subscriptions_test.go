@@ -43,10 +43,10 @@ func TestSubscriptionSourceTaskAndRunningGuard(t *testing.T) {
 		t.Fatalf("task o: %q", got)
 	}
 	e.App.GameProbe = func(string) *app.GameRun { return &app.GameRun{PID: 42} }
-	if _, err := api.WorkshopUpdatePreview("ws:1001"); err == nil || !strings.Contains(err.Error(), "running") {
+	if _, err := api.SubscriptionUpdatePreview([]string{"ws:1001"}); err == nil || !strings.Contains(err.Error(), "running") {
 		t.Fatalf("running preview: %v", err)
 	}
-	if _, err := api.WorkshopUpdate("ws:1001"); err == nil || !strings.Contains(err.Error(), "running") {
+	if _, err := api.WorkshopUpdate([]string{"ws:1001"}); err == nil || !strings.Contains(err.Error(), "running") {
 		t.Fatalf("running apply: %v", err)
 	}
 }

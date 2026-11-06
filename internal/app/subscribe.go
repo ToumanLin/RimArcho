@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
@@ -367,7 +368,15 @@ func (a *App) CheckSubscriptions(refs []string, pageReader ...func(string) (*sub
 	return op, errors.Join(failures...)
 }
 
-func (a *App) UpdateSubscriptions(refs []string, dryRun bool) (result *SubscribeOp, updateErr error) {
+func (a *App) UpdateSubscriptions(refs []string, dryRun bool) (*SubscribeOp, error) {
+	return a.UpdateSubscriptionsWith(refs, dryRun, BatchCalls{})
+}
+
+// UpdateSubscriptionsWith is UpdateSubscriptions reporting on each reference through calls,
+// by its index in refs (a background task's items). SteamCMD items between Git items are
+// downloaded in one SteamCMD run per content root (11 §1), so a task of many items is one
+// batch, not one run per item.
+func (a *App) UpdateSubscriptionsWith(refs []string, dryRun bool, calls BatchCalls) (result *SubscribeOp, updateErr error) {
 	if !dryRun {
 		defer a.recordModUpdatesPending()
 	}
@@ -378,7 +387,27 @@ func (a *App) UpdateSubscriptions(refs []string, dryRun bool) (result *Subscribe
 	if err := a.refuseSubscriptionGameRunning(); err != nil {
 		return nil, err
 	}
+	slots, err := a.subscriptionSlots(refs, ss)
+	if err != nil {
+		return nil, err
+	}
+	start := func(j int) {
+		if calls.Start != nil {
+			for _, i := range slots[j] {
+				calls.Start(i)
+			}
+		}
+	}
+	done := func(j int, err error) {
+		if calls.Done != nil {
+			for _, i := range slots[j] {
+				calls.Done(i, err)
+			}
+		}
+	}
+	stopped := func() bool { return calls.Stopped != nil && calls.Stopped() }
 	op := &SubscribeOp{Action: "update", DryRun: dryRun}
+	var gitDry []int
 	for _, s := range ss {
 		it := subscriptionItem(s)
 		if s.Record.Kind != "git" && s.Record.Kind != "steamcmd" {
@@ -390,10 +419,7 @@ func (a *App) UpdateSubscriptions(refs []string, dryRun bool) (result *Subscribe
 			continue
 		}
 		if dryRun && s.Record.Kind == "git" {
-			it.To, err = subscribe.RemoteCommit(context.Background(), s.Record.GitURL(), s.Record.RefType, s.Record.Ref)
-			if err != nil {
-				return op, err
-			}
+			gitDry = append(gitDry, len(op.Items))
 		}
 		if s.Record.Kind == "steamcmd" {
 			it.Result = "would download Workshop " + s.Record.WorkshopID + " with SteamCMD"
@@ -401,7 +427,23 @@ func (a *App) UpdateSubscriptions(refs []string, dryRun bool) (result *Subscribe
 		op.Items = append(op.Items, it)
 	}
 	if dryRun {
-		return op, nil
+		// The remote commits are network round trips: asked side by side, so a preview of
+		// many Git subscriptions does not wait for each in turn.
+		errs := make([]error, len(op.Items))
+		var wg sync.WaitGroup
+		sem := make(chan struct{}, 8)
+		for _, j := range gitDry {
+			wg.Add(1)
+			go func(j int) {
+				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
+				r := op.Items[j].Record
+				op.Items[j].To, errs[j] = subscribe.RemoteCommit(context.Background(), r.GitURL(), r.RefType, r.Ref)
+			}(j)
+		}
+		wg.Wait()
+		return op, errors.Join(errs...)
 	}
 	// Git failures still prevent later work. Skipped download-page subscriptions
 	// do not split SteamCMD groups; only Git updates are ordering barriers.
@@ -413,6 +455,9 @@ func (a *App) UpdateSubscriptions(refs []string, dryRun bool) (result *Subscribe
 		}
 	}()
 	for i := 0; i < len(ss); {
+		if stopped() {
+			break
+		}
 		s := ss[i]
 		if s.Record.Kind == "steamcmd" {
 			end := i + 1
@@ -421,6 +466,11 @@ func (a *App) UpdateSubscriptions(refs []string, dryRun bool) (result *Subscribe
 			}
 			account, accountErr := a.SteamCMDAccount("")
 			if accountErr != nil {
+				for j := i; j < end; j++ {
+					if ss[j].Record.Kind == "steamcmd" {
+						done(j, accountErr)
+					}
+				}
 				return op, errors.Join(append(failures, accountErr)...)
 			}
 			type groupKey struct{ root, account string }
@@ -449,6 +499,12 @@ func (a *App) UpdateSubscriptions(refs []string, dryRun bool) (result *Subscribe
 				g.indices = append(g.indices, j)
 			}
 			for _, g := range groups {
+				if stopped() {
+					break
+				}
+				for _, j := range g.indices {
+					start(j)
+				}
 				download, err := a.downloadWorkshopGroup(g.ids, g.key.root, g.key.account, false, false)
 				if err != nil {
 					failures = append(failures, err)
@@ -457,8 +513,10 @@ func (a *App) UpdateSubscriptions(refs []string, dryRun bool) (result *Subscribe
 					if download == nil {
 						op.Items[j].To = ""
 						op.Items[j].Result = "failed: " + err.Error()
+						done(j, err)
 						continue
 					}
+					var itemErr error = fmt.Errorf("SteamCMD did not report Workshop %s", ss[j].Record.WorkshopID)
 					for _, item := range download.Items {
 						if item.Record.WorkshopID == ss[j].Record.WorkshopID {
 							op.Items[j].To, op.Items[j].Result = item.To, item.Result
@@ -466,8 +524,13 @@ func (a *App) UpdateSubscriptions(refs []string, dryRun bool) (result *Subscribe
 							delete(a.subscriptionCache, ss[j].Folder)
 							delete(a.subscriptionCache, realOrAbs(ss[j].Folder))
 							changed = changed || item.To != ""
+							itemErr = nil
+							if why, failed := strings.CutPrefix(item.Result, "failed: "); failed {
+								itemErr = errors.New(why)
+							}
 						}
 					}
+					done(j, itemErr)
 				}
 			}
 			i = end
@@ -477,8 +540,10 @@ func (a *App) UpdateSubscriptions(refs []string, dryRun bool) (result *Subscribe
 			i++
 			continue
 		}
+		start(i)
 		commit, err := subscribe.Update(context.Background(), s.Folder, s.Record)
 		if err != nil {
+			done(i, err)
 			return op, errors.Join(append(failures, err)...)
 		}
 		changed = true
@@ -486,12 +551,44 @@ func (a *App) UpdateSubscriptions(refs []string, dryRun bool) (result *Subscribe
 		r.Installed, r.Latest, r.InstalledAt, r.CheckedAt, r.CheckError = commit, commit, a.Now(), a.Now(), ""
 		op.Items[i].To, op.Items[i].Result = commit, "updated"
 		if err := subscribe.Write(s.Folder, r); err != nil {
+			done(i, err)
 			return op, errors.Join(append(failures, err)...)
 		}
 		delete(a.subscriptionCache, s.Folder)
+		done(i, nil)
 		i++
 	}
 	return op, errors.Join(failures...)
+}
+
+// subscriptionSlots maps each selected subscription to the indices in refs that name it
+// (two references to one copy report together). Without refs, each is its own slot.
+func (a *App) subscriptionSlots(refs []string, ss []Subscription) ([][]int, error) {
+	slots := make([][]int, len(ss))
+	if len(refs) == 0 {
+		for j := range ss {
+			slots[j] = []int{j}
+		}
+		return slots, nil
+	}
+	ix, err := a.Index()
+	if err != nil {
+		return nil, err
+	}
+	at := make(map[string]int, len(ss))
+	for j, s := range ss {
+		at[s.Mod.ID] = j
+	}
+	for i, ref := range refs {
+		m, err := ix.ResolveOne(ref)
+		if err != nil {
+			return nil, err
+		}
+		if j, ok := at[m.ID]; ok {
+			slots[j] = append(slots[j], i)
+		}
+	}
+	return slots, nil
 }
 
 func (a *App) RemoveSubscriptions(refs []string, dryRun bool) (*SubscribeOp, error) {

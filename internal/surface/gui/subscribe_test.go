@@ -244,3 +244,83 @@ func TestWorkshopSubscriptionTaskMessage(t *testing.T) {
 		t.Fatalf("Steam result: %+v", task)
 	}
 }
+
+// Update all on several SteamCMD subscriptions is one task and one SteamCMD run, not a task
+// and a run per item; its preview is one call (16 §2.9).
+func TestSubscriptionUpdateAllIsOneBatch(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	ids := []string{"8101", "8102", "8103"}
+	for _, id := range ids {
+		e.WriteMod(filepath.Join(e.SteamCMD, id), testkit.Sample("batch.mod"+id, "Batch "+id))
+	}
+	e.AddEnv(true)
+	e.MustRun("scan")
+	api := NewAPI(e.App, func(string, any) {})
+	t.Cleanup(api.Close)
+	ss, err := e.App.Subscriptions()
+	if err != nil || len(ss) != len(ids) {
+		t.Fatalf("subscriptions: %+v %v", ss, err)
+	}
+	var refs []string
+	for _, s := range ss {
+		refs = append(refs, s.Ref)
+	}
+	e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, "steamcmd.exe"), true }
+	var mu sync.Mutex
+	var runs [][]string
+	e.App.SteamCMDRun = func(exe string, args []string) (string, error) {
+		b, err := os.ReadFile(filepath.Join(filepath.Dir(exe), args[len(args)-1]))
+		if err != nil {
+			t.Error(err)
+			return "", err
+		}
+		var got, out []string
+		for _, line := range strings.Split(string(b), "\n") {
+			if f := strings.Fields(line); len(f) == 3 && f[0] == "workshop_download_item" {
+				got = append(got, f[2])
+				e.WriteFile(filepath.Join(args[1], "steamapps", "workshop", "content", "294100", f[2], "updated.xml"), "<Defs/>")
+				out = append(out, "Success. Downloaded item "+f[2])
+			}
+		}
+		mu.Lock()
+		runs = append(runs, got)
+		mu.Unlock()
+		return strings.Join(out, "\n"), nil
+	}
+	p, err := api.SubscriptionUpdatePreview(refs)
+	if err != nil || !p.Apply {
+		t.Fatalf("preview: %+v %v", p, err)
+	}
+	for _, id := range ids {
+		if !strings.Contains(strings.Join(p.Lines, "\n"), id) {
+			t.Fatalf("preview misses %s: %q", id, p.Lines)
+		}
+	}
+	if _, err := api.LibraryDo(view.OpSubUpdate, refs); err != nil {
+		t.Fatal(err)
+	}
+	task := endedTask(t, api, view.OpSubUpdate)
+	if task.State != app.TaskDone {
+		t.Fatalf("update: %+v", task)
+	}
+	n := 0
+	for _, task := range api.tasks.List() {
+		if task.Kind == view.OpSubUpdate {
+			n++
+			if len(task.Items) != len(ids) {
+				t.Fatalf("task items: %+v", task.Items)
+			}
+			for _, it := range task.Items {
+				if it.State != app.ItemOK {
+					t.Fatalf("item: %+v", it)
+				}
+			}
+		}
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if n != 1 || len(runs) != 1 || len(runs[0]) != len(ids) {
+		t.Fatalf("tasks %d, SteamCMD runs %v", n, runs)
+	}
+}

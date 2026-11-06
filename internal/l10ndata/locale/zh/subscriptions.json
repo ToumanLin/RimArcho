@@ -36,6 +36,7 @@
   "Steam downloads this update; RimArcho asks it to.": "这次更新由 Steam 下载，RimArcho 只是请它下载",
   "Steam login failed": "Steam 登录失败",
   "Steam will download this Workshop update": "Steam 客户端将下载此工坊更新，完成后按 R 重新扫描",
+  "Steam will download these %d Workshop updates": "Steam 客户端将下载这 %d 个工坊更新，完成后按 R 重新扫描",
   "SteamCMD exited before confirming the download": "SteamCMD 异常退出，下载未确认",
   "Subscribe with Steam; without the Steam client, download with SteamCMD.": "用 Steam 订阅；没有 Steam 客户端时用 SteamCMD 下载",
   "The public page could not be read; use the LoversLab session or downloaded files.": "读不了公开页面；用 LoversLab 登录下载，或选下载好的文件",

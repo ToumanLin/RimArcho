@@ -403,9 +403,30 @@ func TestUpdateWorkshopGroups(t *testing.T) {
 	if _, err := e.App.UpdateSubscriptions(refs, true); err != nil || len(calls) != 0 {
 		t.Fatalf("dry run: %v", err)
 	}
-	op, err := e.App.UpdateSubscriptions(refs, false)
+	// A background task reports on each of its items (16 §2.16) while the downloads stay grouped.
+	started, ended := map[int]bool{}, map[int]error{}
+	op, err := e.App.UpdateSubscriptionsWith(refs, false, app.BatchCalls{
+		Start: func(i int) { started[i] = true },
+		Done: func(i int, err error) {
+			if !started[i] {
+				t.Errorf("item %d ended before it started", i)
+			}
+			if _, twice := ended[i]; twice {
+				t.Errorf("item %d ended twice", i)
+			}
+			ended[i] = err
+		},
+	})
 	if err == nil || !strings.Contains(err.Error(), "8002") {
 		t.Fatalf("partial failure: %v", err)
+	}
+	if len(ended) != len(refs) {
+		t.Fatalf("reported %d of %d items", len(ended), len(refs))
+	}
+	for i, err := range ended {
+		if (i == 2) != (err != nil) {
+			t.Fatalf("item %d reported %v", i, err)
+		}
 	}
 	if len(calls) != 4 || len(calls[0]) != 25 || len(calls[1]) != 2 || len(calls[2]) != 25 || len(calls[3]) != 2 || bases[0] != bases[1] || bases[2] != bases[3] || bases[0] == bases[2] {
 		t.Fatalf("groups: %v, bases %v", calls, bases)

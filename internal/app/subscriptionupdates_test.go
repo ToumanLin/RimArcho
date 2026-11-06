@@ -76,6 +76,35 @@ func TestWorkshopSourceCheckKeepsKnownUpdateOnFailure(t *testing.T) {
 	}
 }
 
+// Update all asks Steam once for every Workshop copy, not once per copy, and names the
+// copies Steam refused.
+func TestUpdateWorkshopClientsOneCall(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	for _, id := range []string{"1001", "1002", "1003"} {
+		e.AddWorkshop(id, testkit.Sample("tester.workshop"+id, "Workshop "+id))
+	}
+	e.AddEnv(false)
+	e.MustRun("scan")
+	e.WriteFile(filepath.Join(e.Game, "steam_api64.dll"), "fixture DLL")
+	var calls []string
+	e.App.SteamWorker = func(_ string, argv []string) (string, error) {
+		calls = append(calls, strings.Join(argv, " "))
+		return "ITEM 1001 ok 8\nITEM 1002 failed:download 0\nITEM 1003 ok 8\nDONE download 3\n", nil
+	}
+	refs := []string{"ws:1001", "ws:1002", "ws:1003", "ws:1001"}
+	if err := e.App.UpdateWorkshopClients(refs, true); err != nil || len(calls) != 0 {
+		t.Fatalf("dry run: %v %v", err, calls)
+	}
+	err := e.App.UpdateWorkshopClients(refs, false)
+	if len(calls) != 1 || calls[0] != "download 1001 1002 1003" {
+		t.Fatalf("Steam calls: %q", calls)
+	}
+	if err == nil || !strings.Contains(err.Error(), "Workshop 1002") || strings.Contains(err.Error(), "Workshop 1001") {
+		t.Fatalf("refused item: %v", err)
+	}
+}
+
 // A big library is checked 100 items per request. A failed request and an item Steam
 // was too busy for are asked once more; items gone from the Workshop are listed but do
 // not fail the check (the host had 5182 mods and two-minute checks that always failed).

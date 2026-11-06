@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 
@@ -460,45 +461,34 @@ func (m *model) updatePending(rows []view.PendingUpdate) tea.Cmd {
 	if len(items) > 1 {
 		title = T("update all")
 	}
-	return m.previewPanel(title, func(a *app.App) ([]string, bool) {
-		var lines []string
-		apply := true
-		st, _ := a.Loadout()
-		for _, r := range items {
-			var p *view.Preview
-			var err error
-			if r.Kind == app.LibWorkshop {
-				p, err = view.WorkshopUpdatePreview(a, r.Ref)
-			} else {
-				p, err = view.LibPreview(a, view.OpSubUpdate, []string{r.Ref})
-			}
-			if len(items) > 1 {
-				lines = append(lines, r.Name)
-			}
-			if err != nil {
-				lines = append(lines, view.Humanize(st, err.Error()))
-				apply = false
-				continue
-			}
-			lines = append(lines, p.Lines...)
-			apply = apply && p.Apply
+	var refs, names, ws, wsNames []string
+	for _, r := range items {
+		if r.Kind == app.LibWorkshop {
+			ws, wsNames = append(ws, r.Ref), append(wsNames, r.Name)
+		} else {
+			refs, names = append(refs, r.Ref), append(names, r.Name)
 		}
+	}
+	all := append(slices.Clone(refs), ws...)
+	return m.previewPanel(title, func(a *app.App) ([]string, bool) {
+		// one session, one dry run (16 §2.9), however many updates are listed
+		p, err := view.SubscriptionUpdatePreview(a, all)
+		if err != nil {
+			st, _ := a.Loadout()
+			return []string{view.Humanize(st, err.Error())}, false
+		}
+		lines := p.Lines
 		if pages > 0 {
 			lines = append(lines, Tf("%d download pages need a file first; they are not updated now", pages))
 		}
-		return lines, apply
+		return lines, p.Apply
 	}, func(m *model) tea.Cmd {
-		var refs, names []string
 		var cmds []tea.Cmd
-		for _, r := range items {
-			if r.Kind == app.LibWorkshop {
-				ref := r.Ref
-				cmds = append(cmds, m.queueSelf(view.TaskWorkshopUpdate, r.Name, []string{"workshop-update", ref}, func(a *app.App, _ string) (string, error) {
-					return view.T("Steam will download this Workshop update"), a.UpdateWorkshopClient(ref, false)
-				}))
-				continue
-			}
-			refs, names = append(refs, r.Ref), append(names, r.Name)
+		if len(ws) > 0 {
+			// Steam gets every Workshop copy in one call
+			cmds = append(cmds, m.queueSelf(view.TaskWorkshopUpdate, view.TaskObj(wsNames), append([]string{"workshop-update"}, ws...), func(a *app.App, _ string) (string, error) {
+				return view.T("Steam will download this Workshop update"), a.UpdateWorkshopClients(ws, false)
+			}))
 		}
 		cmds = append(cmds, m.submitLane(view.OpSubUpdate, refs, names))
 		return tea.Batch(cmds...)

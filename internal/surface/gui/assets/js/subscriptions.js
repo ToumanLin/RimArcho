@@ -494,14 +494,20 @@ async function updateRows(items) {
     if (pages.length) { pick("p:" + pages[0].ref); say("fail", T("choose the new files first")); }
     return;
   }
-  const previews = [];
-  try { for (const r of items) previews.push(r.kind === "workshop" ? await api.WorkshopUpdatePreview(r.ref) : await api.LibraryPreview("subscription-update", [r.ref])); }
+  // One preview call and at most two tasks, however many rows: Steam gets every Workshop
+  // copy in one call, and the rest is one task that SteamCMD downloads in one batch.
+  let p;
+  try { p = await api.SubscriptionUpdatePreview(items.map((r) => r.ref)); }
   catch (e) { return say("fail", errText(e)); }
-  const lines = previews.flatMap((p, i) => [items[i].name, ...(p.lines || [])]);
+  const lines = [...(p.lines || [])];
   if (pages.length) lines.push(Tf("%d download pages need a file first; they are not updated now", pages.length));
-  pop.confirm(T("update subscription"), lines, T("update subscription"), previews.every((p) => p.apply) ? async () => {
-    try { for (const r of items) say("ok", r.kind === "workshop" ? await api.WorkshopUpdate(r.ref) : await api.LibraryDo("subscription-update", [r.ref])); }
-    catch (e) { say("fail", errText(e)); }
+  const ws = items.filter((r) => r.kind === "workshop").map((r) => r.ref);
+  const rest = items.filter((r) => r.kind !== "workshop").map((r) => r.ref);
+  pop.confirm(T("update subscription"), lines, T("update subscription"), p.apply ? async () => {
+    try {
+      if (rest.length) say("ok", await api.LibraryDo("subscription-update", rest));
+      if (ws.length) say("ok", await api.WorkshopUpdate(ws));
+    } catch (e) { say("fail", errText(e)); }
   } : null);
 }
 

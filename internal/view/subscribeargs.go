@@ -7,6 +7,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/modchanges"
+	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 )
 
@@ -54,25 +55,70 @@ func SubscribeArgv(r SubscribeRequest) ([]string, error) {
 // WorkshopUpdatePreview is the confirmation of update for a Workshop item the Steam client
 // keeps (16 §2.9): installed → latest, and that Steam downloads it. Refused while a game
 // runs, like the update itself.
-func WorkshopUpdatePreview(a *app.App, ref string) (*Preview, error) {
-	if err := a.UpdateWorkshopClient(ref, true); err != nil {
+func WorkshopUpdatePreview(a *app.App, refs ...string) (*Preview, error) {
+	if err := a.UpdateWorkshopClients(refs, true); err != nil {
 		return nil, err
 	}
 	ix, err := a.Index()
 	if err != nil {
 		return nil, err
 	}
-	m, err := ix.ResolveOne(ref)
+	latestOf := a.SubscriptionSourceCheck("workshop").Latest
+	var lines []string
+	for _, ref := range refs {
+		m, err := ix.ResolveOne(ref)
+		if err != nil {
+			return nil, err
+		}
+		lines = append(lines, m.DisplayName())
+		if latest := latestOf[m.ID]; latest > 0 {
+			lines = append(lines, a.FormatTime(time.Unix(m.ACFTimeUpdated, 0))+" → "+a.FormatTime(time.Unix(latest, 0)))
+		}
+	}
+	if len(refs) == 1 {
+		lines = append(lines, T("Steam will download this Workshop update"))
+	} else {
+		lines = append(lines, Tf("Steam will download these %d Workshop updates", len(refs)))
+	}
+	return &Preview{What: OpSubUpdate, Title: T("update subscription"), Apply: true, Lines: lines}, nil
+}
+
+// SubscriptionUpdatePreview is the one confirmation of update / update all (16 §2.9) on
+// one session: Workshop client copies as WorkshopUpdatePreview, the rest as one dry run
+// (LibPreview). Download-page copies say they need a file first.
+func SubscriptionUpdatePreview(a *app.App, refs []string) (*Preview, error) {
+	ix, err := a.Index()
 	if err != nil {
 		return nil, err
 	}
-	latest := a.SubscriptionSourceCheck("workshop").Latest[m.ID]
-	lines := []string{m.DisplayName()}
-	if latest > 0 {
-		lines = append(lines, a.FormatTime(time.Unix(m.ACFTimeUpdated, 0))+" → "+a.FormatTime(time.Unix(latest, 0)))
+	var ws, rest []string
+	for _, ref := range refs {
+		m, err := ix.ResolveOne(ref)
+		if err != nil {
+			return nil, err
+		}
+		if m.Kind == source.Workshop {
+			ws = append(ws, ref)
+		} else {
+			rest = append(rest, ref)
+		}
 	}
-	lines = append(lines, T("Steam will download this Workshop update"))
-	return &Preview{What: OpSubUpdate, Title: T("update subscription"), Apply: true, Lines: lines}, nil
+	p := &Preview{What: OpSubUpdate, Title: T("update subscription"), Apply: true}
+	if len(rest) > 0 {
+		lp, err := LibPreview(a, OpSubUpdate, rest)
+		if err != nil {
+			return nil, err
+		}
+		p.Lines, p.Apply = lp.Lines, lp.Apply
+	}
+	if len(ws) > 0 {
+		wp, err := WorkshopUpdatePreview(a, ws...)
+		if err != nil {
+			return nil, err
+		}
+		p.Lines = append(p.Lines, wp.Lines...)
+	}
+	return p, nil
 }
 
 // SourceCheckResult checks one source of updates (check, 16 §2.9) and words the result as
