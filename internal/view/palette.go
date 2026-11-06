@@ -3,11 +3,13 @@ package view
 import (
 	"sort"
 	"strings"
+	"unicode"
 )
 
 // The command palette (16 §3.5): commands (by their Chinese name or English alias), mods and
-// the other environments. Ranking: prefix > substring > subsequence > description; ties go
-// to commands, then mods, then environments, then the shorter name.
+// the other environments. Ranking: prefix > substring > word starts > subsequence > word
+// starts with typos > description; ties go to commands, then mods, then environments, then
+// the shorter name.
 
 // Command is one palette command; each interface maps the ID to what it does.
 type Command struct {
@@ -89,32 +91,177 @@ type PalEntry struct {
 	Score int    `json:"-"`
 }
 
-// PalScore ranks one candidate for q (lower case): 4 prefix or suffix, 3 substring, 2
-// subsequence, 1 description, 0 no match. A suffix counts as a prefix: a Chinese name ends
-// in its head noun, the sort query matches both automatic sorting and load-order rules.
+// PalScore ranks one candidate for q (lower case): 6 prefix or suffix, 5 substring, 4 word
+// starts, 3 subsequence, 2 word starts with typos, 1 description, 0 no match. A suffix
+// counts as a prefix: a Chinese name ends in its head noun, the sort query matches both
+// automatic sorting and load-order rules. Word starts: every word of q begins a different
+// word of the name, in any order, so "ad cu" finds Add Cube and "lib hug" finds HugsLib.
 func PalScore(q string, e PalEntry) int {
 	if q == "" {
 		return 1
 	}
+	qw := palWords(q)
 	best := 0
 	for _, f := range []string{e.Name, e.Alias} {
-		f = strings.ToLower(f)
-		if f == "" {
+		if f == "" || best == 6 {
 			continue
 		}
+		lf := strings.ToLower(f)
+		if strings.HasPrefix(lf, q) || strings.HasSuffix(lf, q) {
+			best = 6
+			continue
+		}
+		if strings.Contains(lf, q) {
+			best = max(best, 5)
+			continue
+		}
+		if best >= 4 {
+			continue
+		}
+		fw := palWords(f)
 		switch {
-		case strings.HasPrefix(f, q), strings.HasSuffix(f, q):
-			best = max(best, 4)
-		case strings.Contains(f, q):
+		case wordStarts(qw, fw, false):
+			best = 4
+		case Subsequence(q, lf):
 			best = max(best, 3)
-		case Subsequence(q, f):
-			best = max(best, 2)
+		case best < 2 && wordStarts(qw, fw, true):
+			best = 2
 		}
 	}
-	if best == 0 && strings.Contains(strings.ToLower(e.Desc), q) {
+	if best == 0 && (strings.Contains(strings.ToLower(e.Desc), q) || wordStarts(qw, palWords(e.Desc), false)) {
 		best = 1
 	}
 	return best
+}
+
+// palWords splits s into lower-case words at spaces, punctuation and lower-to-upper case
+// changes: "HugsLib" is hugs and lib.
+func palWords(s string) [][]rune {
+	buf := make([]rune, 0, len(s)) // one backing array; the words are slices of it
+	var out [][]rune
+	start := 0
+	cut := func() {
+		if len(buf) > start {
+			out = append(out, buf[start:len(buf):len(buf)])
+		}
+		start = len(buf)
+	}
+	prevLower := false
+	for _, r := range s {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+			cut()
+			prevLower = false
+			continue
+		}
+		if unicode.IsUpper(r) && prevLower {
+			cut()
+		}
+		prevLower = unicode.IsLower(r)
+		buf = append(buf, unicode.ToLower(r))
+	}
+	cut()
+	return out
+}
+
+// palTypos is how many typos a query word may hold: none below 4 letters, then one, and
+// two from 8 letters on.
+func palTypos(n int) int {
+	switch {
+	case n < 4:
+		return 0
+	case n < 8:
+		return 1
+	}
+	return 2
+}
+
+// wordStarts reports whether each query word begins a different name word. With typos, a
+// query word may be palTypos edits (a swap of neighbours is one edit) away from the
+// start of its name word.
+func wordStarts(qw, fw [][]rune, typos bool) bool {
+	if len(qw) == 0 || len(qw) > len(fw) {
+		return false
+	}
+	if typos {
+		some := false
+		for _, w := range qw {
+			some = some || palTypos(len(w)) > 0
+		}
+		if !some {
+			return false // the same as without typos, which already failed
+		}
+	}
+	used := make([]bool, len(fw))
+	var assign func(i int) bool
+	assign = func(i int) bool {
+		if i == len(qw) {
+			return true
+		}
+		for j, f := range fw {
+			if used[j] {
+				continue
+			}
+			var ok bool
+			if typos {
+				ok = prefixDist(qw[i], f, palTypos(len(qw[i])))
+			} else {
+				ok = len(f) >= len(qw[i]) && string(f[:len(qw[i])]) == string(qw[i])
+			}
+			if ok {
+				used[j] = true
+				if assign(i + 1) {
+					return true
+				}
+				used[j] = false
+			}
+		}
+		return false
+	}
+	return assign(0)
+}
+
+// prefixDist reports whether a is at most k edits (insert, delete, change, or swap two
+// neighbours) away from some prefix of b.
+func prefixDist(a, b []rune, k int) bool {
+	if len(b) > len(a)+k {
+		b = b[:len(a)+k]
+	}
+	m := len(b)
+	var stack [3 * 24]int
+	rows := stack[:]
+	if 3*(m+1) > len(rows) {
+		rows = make([]int, 3*(m+1))
+	}
+	prev2, prev, cur := rows[:m+1], rows[m+1:2*(m+1)], rows[2*(m+1):3*(m+1)]
+	for j := range prev {
+		prev[j] = j
+	}
+	for i := 1; i <= len(a); i++ {
+		cur[0] = i
+		rowMin := cur[0]
+		for j := 1; j <= m; j++ {
+			cost := 1
+			if a[i-1] == b[j-1] {
+				cost = 0
+			}
+			d := min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost)
+			if i > 1 && j > 1 && a[i-1] == b[j-2] && a[i-2] == b[j-1] {
+				d = min(d, prev2[j-2]+1)
+			}
+			cur[j] = d
+			rowMin = min(rowMin, d)
+		}
+		if rowMin > k {
+			return false
+		}
+		prev2, prev, cur = prev, cur, prev2
+	}
+	for _, d := range prev {
+		if d <= k {
+			return true
+		}
+	}
+	return false
 }
 
 // PlanEntries are the palette's "go to plan X" entries: every plan but the open one.
