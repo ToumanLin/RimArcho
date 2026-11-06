@@ -23,7 +23,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Archo Monitor (09 §6, 07 §1.5): RimArcho's in-game companion mod. It ships with RimArcho,
+// Archo Monitor (19 §6, 07 §1.5): RimArcho's in-game companion mod. It ships with RimArcho,
 // is copied into a RimArcho-managed folder, registered as an extra source (src:monitor),
 // reaches the game only through an _Archo_ link, and is added to plans right after Harmony.
 
@@ -47,7 +47,7 @@ type MonitorBundled struct {
 	Dir, Version string
 }
 
-// MonitorDir is where installed monitor versions live (09 §6): config monitor.dir, else
+// MonitorDir is where installed monitor versions live (19 §6): config monitor.dir, else
 // %LOCALAPPDATA%\RimArcho\monitor, outside the data directory like the lock library.
 func (a *App) MonitorDir() string {
 	if v := a.Store.Meta("cfg:monitor.dir"); v != "" {
@@ -59,7 +59,7 @@ func (a *App) MonitorDir() string {
 // MonitorDefault reports whether the monitor is added to plans by default (07 §1.5).
 func (a *App) MonitorDefault() bool { return a.Store.Meta("cfg:monitor.default") != "off" }
 
-// FindMonitor finds the bundled monitor (09 §6): RIMARCHO_MONITOR, monitor/ArchoMonitor next
+// FindMonitor finds the bundled monitor (19 §6): RIMARCHO_MONITOR, monitor/ArchoMonitor next
 // to the executable, or, in a development build, monitor/out/ArchoMonitor above the
 // executable or the working directory. tried lists the places looked at.
 func (a *App) FindMonitor() (b *MonitorBundled, tried []string) {
@@ -200,7 +200,7 @@ func CompareVersions(a, b string) int {
 	return strings.Compare(pa, pb)
 }
 
-// MonitorStatus is what `archo monitor` and `archo status` show (09 §6).
+// MonitorStatus is what `archo monitor` and `archo status` show (19 §6).
 type MonitorStatus struct {
 	Bundled   *MonitorBundled
 	Tried     []string
@@ -260,7 +260,7 @@ type MonitorPlanChange struct {
 	Reason string // why it was skipped
 }
 
-// MonitorResult is what one check did (09 §6 "when to check").
+// MonitorResult is what one check did (19 §6 "when to check").
 type MonitorResult struct {
 	DryRun     bool
 	Bundled    *MonitorBundled
@@ -277,7 +277,7 @@ type MonitorResult struct {
 }
 
 // EnsureMonitor installs or updates the bundled monitor for the current environment and
-// applies the default to its plans (09 §6, 07 §1.5). Without a bundled monitor it does
+// applies the default to its plans (19 §6, 07 §1.5). Without a bundled monitor it does
 // nothing to disk and only adds already installed monitors to plans.
 func (a *App) EnsureMonitor(dryRun bool) (*MonitorResult, error) {
 	r := &MonitorResult{DryRun: dryRun}
@@ -406,7 +406,7 @@ func (a *App) installMonitor(r *MonitorResult, b *MonitorBundled, dryRun bool) (
 			os.Rename(old, r.Target)
 			return false, err
 		}
-		os.RemoveAll(old) // RimArcho's own product (09 §6)
+		os.RemoveAll(old) // RimArcho's own product (19 §6)
 		return true, nil
 	}
 	return true, os.Rename(tmp, r.Target)
@@ -499,7 +499,7 @@ func (a *App) monitorSlot(ix *Index, list loadout.List) (at int, why string) {
 		return -1, "no Harmony in the plan; Archo Monitor needs it"
 	}
 	if fs := a.modsVolumeFS(ix); noLinks(fs) {
-		return -1, fmt.Sprintf("Mods/ is on %s, which cannot hold the link Archo Monitor needs (09 §6)", fs)
+		return -1, fmt.Sprintf("Mods/ is on %s, which cannot hold the link Archo Monitor needs (19 §6)", fs)
 	}
 	return at, ""
 }

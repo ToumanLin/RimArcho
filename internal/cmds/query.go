@@ -84,7 +84,7 @@ func scanCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			root.Addf("%s: %s -> %s: %s", l.Code, l.Path, l.Target, l.ShortReason())
 		}
 	}
-	// Archo Monitor (09 §6): install or update the bundled monitor, apply the default.
+	// Archo Monitor (19 §6): install or update the bundled monitor, apply the default.
 	if m, err := c.App.EnsureMonitor(false); err != nil {
 		root.KV("monitor", "error: "+err.Error())
 	} else {
@@ -852,7 +852,7 @@ func loadoutStatus(c *Ctx, root *render.Node, d *render.Doc) {
 	}
 	root.KV("plan", plan)
 	root.KV("loadout", line)
-	// Archo Monitor (09 §6): shown once it is bundled or installed.
+	// Archo Monitor (19 §6): shown once it is bundled or installed.
 	if s, err := c.App.MonitorState(); err == nil && (s.Bundled != nil || s.Source != nil || s.InPlan != nil) {
 		root.KV("monitor", MonitorPlanLine(c, s))
 	}

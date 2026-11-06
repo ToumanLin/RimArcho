@@ -2,7 +2,7 @@
 # program, RimArcho.exe linked as a Windows GUI so a double click opens the window, 16 §8.1)
 # with the version stamped in through -ldflags, plus README, CHANGELOG and LICENSE, and from
 # 1.0.2 on README.zh-CN.md and skills/.
-# Archo Monitor, the in-game companion mod (09 §6), is
+# Archo Monitor, the in-game companion mod (19 §6), is
 # built by monitor/build.ps1 (needs the .NET SDK 10; game references come from NuGet) and
 # shipped under monitor/ArchoMonitor/.
 #
@@ -95,7 +95,7 @@ if ([version]($Version -replace '[-+].*$', '') -ge [version]"1.0.2") {
     Write-Host "README.zh-CN.md and skills/ are packed from 1.0.2 on (older updaters reject them)"
 }
 
-# Archo Monitor (09 §6): built for 1.5, 1.6 and 1.7 with monitor/VERSION and shipped as
+# Archo Monitor (19 §6): built for 1.5, 1.6 and 1.7 with monitor/VERSION and shipped as
 # monitor/ArchoMonitor/, where RimArcho finds it next to the exe.
 Write-Host "building Archo Monitor"
 & (Join-Path $PSScriptRoot "..\monitor\build.ps1") -Out (Join-Path $out "monitor\ArchoMonitor")

@@ -52,7 +52,7 @@ type LogCluster struct {
 	// <message>"), the context agents otherwise grep the raw log for (G7 traces).
 	Near    []string
 	Finding *finding.Finding
-	// From the companion log (06 §7.4): its file name, the first occurrence's time and
+	// From the companion log (06 §7): its file name, the first occurrence's time and
 	// level; OnlyCompanion when Player.log does not have the entry at all.
 	Companion     string    `json:",omitempty"`
 	At            time.Time `json:",omitzero"`
@@ -87,7 +87,7 @@ type LogReport struct {
 	// had not been analysed for the attributed version: their types and Harmony IDs could
 	// not name them (06 §2).
 	Unanalysed int `json:",omitempty"`
-	// Companion is the companion log read with it (06 §7.4); CompanionBad its bad lines.
+	// Companion is the companion log read with it (06 §7); CompanionBad its bad lines.
 	Companion    string `json:",omitempty"`
 	CompanionBad int    `json:",omitempty"`
 	// Cursor marks how much of the log and its companion this report covers: get_log

@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/logs"
 )
 
-// The game log page's companion section (16 §2.10, 06 §7.4): what Archo Monitor (or
+// The game log page's companion section (16 §2.10, 06 §7): what Archo Monitor (or
 // RimCrow Companion) wrote during the run of the selected Player.log, one row per entry.
 
 // MonitorEntry is one entry of the companion log.

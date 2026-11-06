@@ -95,7 +95,7 @@ type ModSettingsDetail struct {
 	Values   []SettingRow `json:"values"`
 	Notes    []string     `json:"notes"`
 	// Window is what the game's settings window drew when the player last opened it (Archo
-	// Monitor, 06 §7.1); nil when never seen.
+	// Monitor, 19 §2); nil when never seen.
 	Window *SettingsWindowView `json:"window,omitempty"`
 }
 

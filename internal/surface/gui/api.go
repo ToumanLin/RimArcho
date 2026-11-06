@@ -170,7 +170,7 @@ func (s *API) Ready() {
 	fmt.Fprintf(f, "%s ready %d ms (%s)\n", time.Now().Format(time.RFC3339), ms, buildinfo.String())
 }
 
-// checkMonitor installs or updates Archo Monitor in a child process once per window (09 §6)
+// checkMonitor installs or updates Archo Monitor in a child process once per window (19 §6)
 // and, when that changed something, refreshes the page the way a scan does.
 func (s *API) checkMonitor() {
 	home, env, exe := s.a.Home, s.a.EnvName, s.Exe

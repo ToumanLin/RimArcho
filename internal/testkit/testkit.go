@@ -141,7 +141,7 @@ func (e *Env) Open() {
 	a.UninstallLog = filepath.Join(e.Root, "uninstall.log")
 	a.ArchoProbe = func() []int { return nil }
 	a.AfterExitFunc = func(app.AfterExit) error { return nil }
-	// No bundled Archo Monitor unless a test brings one (09 §6).
+	// No bundled Archo Monitor unless a test brings one (19 §6).
 	a.MonitorBundle = app.MonitorNone
 	// The DDS encoder is only what a test brings (Texture optimisation), never one on PATH.
 	a.ToddsNoPath = true

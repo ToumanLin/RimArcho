@@ -56,7 +56,7 @@ var freeKeys = map[string]struct {
 		}
 		return nil
 	}},
-	// the Archo Monitor folder (09 §6): "" is %LOCALAPPDATA%\RimArcho\monitor
+	// the Archo Monitor folder (19 §6): "" is %LOCALAPPDATA%\RimArcho\monitor
 	"monitor.dir": {"", func(v string) error {
 		if !filepath.IsAbs(v) {
 			return fmt.Errorf("monitor.dir must be an absolute folder path")

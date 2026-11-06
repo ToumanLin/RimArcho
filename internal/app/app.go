@@ -120,7 +120,7 @@ type App struct {
 	// LockBase replaces %LOCALAPPDATA% when finding the default lock library and monitor
 	// folder (tests).
 	LockBase string
-	// MonitorBundle is the bundled Archo Monitor folder (09 §6): "" searches the usual
+	// MonitorBundle is the bundled Archo Monitor folder (19 §6): "" searches the usual
 	// places, MonitorNone turns it off (tests).
 	MonitorBundle string
 	// VolumeFS names the file system of a folder's volume; nil means source.VolumeFS

@@ -104,7 +104,7 @@ func deployCandidate(m *store.Mod) loadout.Candidate {
 // disk now (the game sees them until the next save removes the link). A link on disk whose
 // packageId the workspace already holds through another instance is left out: the save that
 // writes the list removes it, so it never competes with the list's copy (an Archo Monitor
-// update while the old version's link is still in Mods/, 09 §6).
+// update while the old version's link is still in Mods/, 19 §6).
 func (a *App) deploySet(ix *Index, aliases map[string][]store.Alias) (map[string]bool, error) {
 	var ws *store.Workspace
 	plan, err := a.planFor(ix.Env.ID)
@@ -276,7 +276,7 @@ func applyLinks(mods string, plan []LinkChange) error {
 			}
 			if err := CreateLink(p, c.Target); err != nil {
 				if strings.Contains(strings.ToLower(c.Name), strings.ToLower(monitorFolder)) {
-					// 09 §6: the monitor never falls back to a copy.
+					// 19 §6: the monitor never falls back to a copy.
 					return fmt.Errorf("Archo Monitor reaches the game only through a link, and %s cannot hold one: %v (the Mods/ volume must support junctions, e.g. NTFS; FAT and exFAT cannot). Disable it in this plan: archo disable pkg:%s", mods, err, MonitorPackage)
 				}
 				return fmt.Errorf("cannot link %s into %s: %v (the Mods/ volume must support junctions, e.g. NTFS)", c.Target, mods, err)

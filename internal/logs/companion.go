@@ -70,7 +70,7 @@ type Companion struct {
 	Game      string // the game version the session line names
 	Started   time.Time
 	Ended     time.Time      // the exit line's time: the game closed normally
-	Full      bool           // the monitor stopped adding entries (32 MiB, 06 §7.3)
+	Full      bool           // the monitor stopped adding entries (32 MiB, 19 §4)
 	Settings  []SettingsFile // the settings record written at the main menu
 	BadLines  int
 	Entries   []*CompanionEntry
@@ -345,7 +345,7 @@ func FirstSession(path string) string {
 }
 
 // SettingsFile is one Mod class's settings file as Archo Monitor recorded it when the main
-// menu first opened (06 §7.1): the folder the game saw the Mod under and the file it reads.
+// menu first opened (19 §2): the folder the game saw the Mod under and the file it reads.
 type SettingsFile struct {
 	PackageID string `json:"packageId"`
 	Folder    string `json:"folder"`
@@ -355,7 +355,7 @@ type SettingsFile struct {
 	Stored    bool   `json:"stored"` // the Mod reads its settings through the game
 }
 
-// SettingsControl is one thing a settings window drew (06 §7.1): a label, or a control
+// SettingsControl is one thing a settings window drew (19 §2): a label, or a control
 // with its value and, for a slider, its range.
 type SettingsControl struct {
 	Kind  string `json:"kind"` // label, checkbox, radio, slider, text, number, button
@@ -374,7 +374,7 @@ type SettingsWindow struct {
 }
 
 // HugsLibPack is one HugsLib settings pack as Archo Monitor recorded it once start-up work
-// was done (06 §7.1): its identifier (its element in HugsLib/ModSettings.xml), the Mod it
+// was done (19 §2): its identifier (its element in HugsLib/ModSettings.xml), the Mod it
 // belongs to and its settings.
 type HugsLibPack struct {
 	ID        string           `json:"id"`
@@ -519,7 +519,7 @@ func appendNew(l []string, xs ...string) []string {
 	return l
 }
 
-// HintClass maps a companion's inferredType to a cluster class (06 §7.4): only used when
+// HintClass maps a companion's inferredType to a cluster class (06 §7): only used when
 // RimArcho's own class is other or exception and the entry is a warning or an error.
 func HintClass(inferred, message string) string {
 	switch inferred {
@@ -539,7 +539,7 @@ func HintClass(inferred, message string) string {
 }
 
 // Hint gives an entry's class hint ("" for none): the companion's class for a message
-// RimArcho classed other or exception (06 §7.4).
+// RimArcho classed other or exception (06 §7).
 type Hint func(message string) string
 
 // HintFrom is the hint of a companion log.
@@ -654,7 +654,7 @@ func entrySig(sb *strings.Builder, e *Entry) {
 }
 
 // EntryOf parses a companion entry's message and details as a log entry (an entry that is
-// only in the companion log, 06 §7.4).
+// only in the companion log, 06 §7).
 func EntryOf(e *CompanionEntry) *Entry {
 	text := e.Message
 	if d := strings.TrimSpace(e.Details); d != "" {

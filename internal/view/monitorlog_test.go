@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// realRoot is the save data root the fixtures were written under (sanitized, 06 §7.3).
+// realRoot is the save data root the fixtures were written under (sanitized, 19 §4).
 const realRoot = `C:\Users\p\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios`
 
 // realRun puts the 1.7 run of 2026-10-21 (Archo Monitor 0.9.0-dev: 12 patch errors, one

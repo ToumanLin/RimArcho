@@ -65,7 +65,7 @@ type LogPage struct {
 }
 
 // LogFiles lists the environment's current and previous Player.log, each followed by its
-// companion log when it has one (06 §7.4).
+// companion log when it has one (06 §7).
 func LogFiles(a *app.App, st *app.LoadoutState) []LogFile {
 	var out []LogFile
 	cur, prev := a.LogPaths(st)

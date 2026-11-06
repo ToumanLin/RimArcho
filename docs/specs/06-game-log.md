@@ -1,9 +1,9 @@
 # 06 · Game log
 
-> Status: implemented: parsing of `Unity` (1.6 and earlier) and `Waylith` (1.7) logs, attribution, log ownership and staleness, the attribution cache, live tracking and the since cursor, Archo Monitor and its companion log, and the error pattern library. A few checks in §9 still need the VM or real 1.6 and 1.7 games.
-> Basis: 00, 00a, 03, 05, 07, 09, 10 §3
+> Status: implemented: parsing of `Unity` (1.6 and earlier) and `Waylith` (1.7) logs, attribution, log ownership and staleness, the attribution cache, live tracking and the since cursor, companion logs (Archo Monitor, RimCrow), and the error pattern library. A few checks in §9 still need the VM or real 1.6 and 1.7 games.
+> Basis: 00, 00a, 03, 05, 07, 09, 10 §3, 19
 
-This document describes how RimArcho reads RimWorld's `Player.log`: parsing and clustering (§1), attributing clusters to Mods with the facts of 05 (§2–3), deciding which game, launch and plan a log belongs to (§4), caching (§5), live tracking while the game runs (§6), Archo Monitor's companion log (§7), and the error pattern library (§8). Each cluster becomes a log-layer finding (05 §4.3).
+This document describes how RimArcho reads RimWorld's `Player.log`: parsing and clustering (§1), attributing clusters to Mods with the facts of 05 (§2–3), deciding which game, launch and plan a log belongs to (§4), caching (§5), live tracking while the game runs (§6), companion logs such as Archo Monitor's (§7; the Monitor itself is in 19), and the error pattern library (§8). Each cluster becomes a log-layer finding (05 §4.3).
 
 ## 1. Parsing
 
@@ -50,7 +50,7 @@ The `mod-report`, `other` and `noise` categories are informational and do not ap
 
 A `material` cluster for a def's own material (`Material '<def material>' … _MainTex`, or `ResolveIcon` in the stack) is not known noise.
 
-**Category is not runtime phase**. Names such as `save-load` describe message content only. Determine phases only from explicit Archo Monitor markers (§7.3–4), never from a category, stack, or vanilla text such as "Loading game…". `logs.Entry.Phase` is the latest marker before the entry. `logs.Cluster.Phase` keeps the phase of the first occurrence, and `Phases` counts occurrences in each phase separately. Cluster keys and numbers do not change with the phase. Logs without markers stay unphased.
+**Category is not runtime phase**. Names such as `save-load` describe message content only. Determine phases only from explicit Archo Monitor markers (§7; their format: 19 §4), never from a category, stack, or vanilla text such as "Loading game…". `logs.Entry.Phase` is the latest marker before the entry. `logs.Cluster.Phase` keeps the phase of the first occurrence, and `Phases` counts occurrences in each phase separately. Cluster keys and numbers do not change with the phase. Logs without markers stay unphased.
 
 **Clustering** follows these rules:
 
@@ -121,7 +121,7 @@ Use the following evidence, strongest first:
 - Match each log by its write time to the **latest launch record** whose start time is no later than the log's mtime. Include other environments sharing userdata. For logs under 1.7 `Logs/`, exclude pack launches because packs write their own logs. Launch records contain the environment, plan or pack, time, and list fingerprint (09 §2). A log is stale if any of the following applies:
   1. Its major.minor version differs from the analyzed version.
   2. The matched launch is not for the analyzed plan (another plan or pack in this environment; foreign logs were already excluded).
-  3. The launch list fingerprint differs from the current enabled list because the plan was edited after launch. Replacing only the Archo Monitor version in the same position (09 §6) does not count as an edit: retrieve the list at the recorded launch or write version, verify its fingerprint, then compare each Monitor as the same item (`App.monitorSwapOnly`).
+  3. The launch list fingerprint differs from the current enabled list because the plan was edited after launch. Replacing only the Archo Monitor version in the same position (19 §6) does not count as an edit: retrieve the list at the recorded launch or write version, verify its fingerprint, then compare each Monitor as the same item (`App.monitorSwapOnly`).
 
   Without a matching launch record (for a Steam or external launch), use the latest ModsConfig write record before the log time, which identifies the writer plan (07 §4.3). If no record matches, the source is unknown, and the heading says so. Such a log is **counted** as the last run when nothing says it is another game's (no header path, or this environment's): the heading reads `source unknown (no launch and no ModsConfig.xml write by RimArcho before it; counted as the last run)`. Otherwise a player who starts the game from Steam before RimArcho has written the list would see `0 error` over a log with errors (MCP review round 2 P25). A log whose header names a game folder no environment has (`UnknownGame`) stays stale. The ModsConfig.xml mtime is not used.
 - Exclude stale findings from problems, status, and interface counts and from skip-prefix escalation. Collapse them to a title by default. The `--code`, `--subject`, and `--all` filters show individual entries; `problems show` still works and names the log.
@@ -148,7 +148,7 @@ See 09 §4 for game detection. While the game runs:
 
 - **Incremental read** (`app.LiveLog`): remember the `Player.log` path and read offset. Check each second and read up to 8 MiB, leaving the remainder for the next read. A smaller file means a new file (a game restart): reset the offset and clear the old clusters. Split new content into lines and keep an incomplete last line until the next read.
 - Preserve parser state across batches. An entry ends at the next noncontinuation line or at game exit (`logs.Parser`).
-- Preserve phase markers across batches too (§7.4). If an old cluster repeats in another phase, update that phase's count and the this-run entry without requiring a new cluster. The first marker assigns preceding entries to loading. Without any markers, keep the flat entries.
+- Preserve phase markers across batches too (§7). If an old cluster repeats in another phase, update that phase's count and the this-run entry without requiring a new cluster. The first marker assigns preceding entries to loading. Without any markers, keep the flat entries.
 - **Memory**: keep clusters, not the raw log. Keep the first 3 sample entries and the count per cluster. Above 2000 clusters, discard the oldest informational clusters. Memoize the category by message, location frame, and continuations, so repeated messages are classified once; clear the table at 10000 entries.
 - Fully attribute the first sample of each new cluster (§2). Show the result in the this-run part of errors from the last run on Can it run, in first-appearance order (16 §2.4). Update counts without dialogs. Show the game-running status and this run's error count on the GUI Launch page and the TUI status line.
 - On exit, stop tracking and perform a full analysis, as with `archo log`. Replace the this-run section with the result.
@@ -159,86 +159,15 @@ See 09 §4 for game detection. While the game runs:
 
 **The since cursor** supports agent polling (MCP `analyze_log` since, CLI `archo log --since`):
 
-- The cluster lists include `cursor: log1.<size>.<checksum>[.<companion-size>.<checksum>]`: the number of bytes read from `Player.log` and its paired companion (§7.4), in base 36, plus their CRC-32C checksums. The cursor stores no state on disk. The CLI and MCP results are identical.
+- The cluster lists include `cursor: log1.<size>.<checksum>[.<companion-size>.<checksum>]`: the number of bytes read from `Player.log` and its paired companion (§7), in base 36, plus their CRC-32C checksums. The cursor stores no state on disk. The CLI and MCP results are identical.
 - With since, analyze the current log normally, using the cache if possible. Recluster the first size bytes without attribution to obtain the counts at the cursor. Show only new clusters (new) and clusters with increased counts (`+N`), with the added and total counts in the heading and a new cursor. Also read the companion prefix, so companion-only entries after the game stops writing `Player.log` and increased companion counts are included. A changed companion session means nothing was known about it at the cursor.
 - **Expiry**: if the prefix is shorter or its checksum differs, the game has restarted and written a new log. State that the cursor expired and list all current clusters. If the current `Player.log` does not match but the `Player-prev.log` prefix does, explain that the cursor's run is now `Player-prev.log` and suggest `archo log --prev --since <cursor>` (MCP `prev=true`). If the previous log itself does not match, explain that a newer run replaced it after another restart.
 - The last line at the cursor may have been half-written. Count the entry as new when it is completed, preferring an extra report to an omission.
 - This polls full analysis, not `LiveLog`: analyze the file size at each call. See §5 for first-query speed.
 
-## 7. Archo Monitor and companion logs
+## 7. Companion logs
 
-RimArcho bundles the in-game helper Archo Monitor, adds it to plans by default (07 §1.5), and installs it with releases (09 §6).
-
-Only the game knows what `Player.log` cannot say: which file or `Def` was loading when an error occurred, which Mod owns an assembly or Harmony patch in the stack, and how many errors occurred after the logging limit. Archo Monitor (`packageId` `toumanlin.archomonitor`) records these in-game as JSON lines in a companion log. Its behavior follows RimCrow Companion 0.3.12; the decompiled code was read only to understand behavior and format, and the implementation was written independently. No code was borrowed from the projects it credits: BetterModSort (Apache-2.0), LogAfterDefError (MIT), BetterLog (MPL-2.0), or Mod Error Checker (no public license). About.xml credits them all.
-
-Archo Monitor settings use RimWorld Keyed translations and follow the game language. Package the `Languages` directory with the Mod; build and test requirements are in 17 §4–§5.
-
-### 7.1 What is captured
-
-| Hook | Action |
-| --- | --- |
-| `Prefix` on `Verse.Log.Error(string)`, `Verse.Log.Warning(string)` | Record every error and warning. The `Prefix` runs before the `StopLoggingAtMessageCount` check, so errors are counted even after the game stops writing `Player.log`. |
-| `Prefix` on `Verse.Log.Message(string)` | Off by default because informational entries are the most numerous and this is a hot path. Turning on "Record info messages (Log.Message)" in the Mod settings attaches it on the next startup. |
-| `Application.logMessageReceivedThreaded` | Capture `Exception`, Error, and Assert messages outside `Verse.Log`, with no `Verse.Log` frame in the stack. |
-| `Prefix` + finalizer on `DirectXmlLoader.DefFromNode`, `DirectXmlToObjectNew.DefFromNodeNew` (`1.6`+) | Keep a thread-local stack of the loading `LoadableXmlAsset` and `Def` node. Also map `defName`, or `Name` if absent, to the file, owning Mod, and `ParentName`. |
-| `Prefix` + finalizer on `LoadedModManager.ApplyPatches` | Mark XML patching. On the first entry, collect all enabled `Mods`' operations: map XPath `defName` and `Name` values to the Mod and operation type, including `Sequence`, `FindMod`, and `Conditional` children. |
-| `Postfix` on `DirectXmlToObject.ValidateListNode` | Map a referenced `Def` name to the loading `Def`, file, and list field from the stack above, without another XML traversal. Use this for missing cross-references. |
-| `Postfix` on `Verse.UIRoot_Entry.Init()` | Menu initialization is complete and `MainMenuDrawer.Init` has already run. Enter menu, recording it again when returning to the menu from the game. |
-| The same postfix, first time per session (Monitor ≥ 0.10.0, `SettingsRecord`) | Write the **settings record**: for each running Mod class (`LoadedModManager.ModHandles`) with a settings window (`SettingsCategory()` not empty) or settings read through `GetSettings` (`Mod.modSettings` set), its packageId, `Content.FolderName`, simple class name, the file name `LoadedModManager.GetSettingsFilename` builds (falling back to `GenText.SanitizeFilename`), the window title, and whether settings were read. Monitor calls only what the game calls itself: `SettingsCategory` when listing Mod options, and the file name `GetSettings` uses. RimArcho uses it for 09 §3. |
-| The same postfix, first time per session, once the queued start-up work is done (`LongEventHandler.ExecuteWhenFinished`; Monitor ≥ 0.11.0, `HugsLibRecord`) | When HugsLib is loaded, write the **HugsLib record**: each settings pack (`HugsLibController.SettingsManager.ModSettingsPacks`) with its identifier (`ModId`, its element in `HugsLib/ModSettings.xml`), dialog entry (`EntryName`), and owning Mod's packageId and folder (the child Mod whose `SettingsIdentifier` is the pack's, from `HugsLibController.Instance.childMods`; for HugsLib's own pack `HugsLib`, `OwnContentPack`; empty when not found); and per setting (at most 300, `full` false beyond) its name, title, description, value and default (`ToString()` of `Value` / `DefaultValue`), the value type's simple name, `hidden` (`NeverVisible`) and, for an enum type, `choices` (`Enum.GetNames`, at most 50). Everything is found by reflection, and only property getters run (never `StringValue`, whose getter can reset a value). Texts are cut at 300 characters. Without HugsLib nothing is written. |
-| `Prefix` + finalizer on `RimWorld.Dialog_ModSettings.DoWindowContents(Rect)` (Monitor ≥ 0.11.0, `SettingsWindow`) | Write a **settings window record** for the first frame of each opening of a Mod's settings window (a new dialog instance): the Mod's settings file as above and what the window drew, in order, at most 300 entries (`full` false beyond): headings (`label`), and each control's kind (`checkbox`, `radio`, `slider`, `text`, `number`, `button`), label, current value and a slider's `min` / `max`. The first opening patches `Widgets.Label(Rect, string\|TaggedString)`, `CheckboxLabeled`, `Checkbox`, `RadioButtonLabeled`, `ButtonText`, `TextField`, `TextArea`, `HorizontalSlider` (both forms) and `IntEntry` with prefixes and postfixes that record only while that frame draws and otherwise just check a flag (no finalizer on these hot paths). A control drawn inside another (a checkbox's label) is not recorded again; a field drawn right after a heading takes it as its label (Listing_Standard's labeled sliders and entries). Rich-text tags are removed, texts are cut at 200 characters, and the dialog's own title is dropped. What a Mod draws by hand or in its own dialog (HugsLib: see the HugsLib record) is not seen. |
-| `Prefix` on `Verse.SavedGameLoaderNow.LoadGameFromSaveFileNow(string)` | Begin loading a save and enter save. Keep the filename without its directory. |
-| `Prefix` on `RimWorld.Planet.WorldGenerator.GenerateWorld`, `Verse.Game.InitNewGame()` | Begin world generation or new-colony initialization and enter new. Record consecutive entries into the same phase only once. |
-| `Postfix` on `Verse.Game.FinalizeInit()` | New-colony or save initialization is complete. Enter play. |
-
-- **Stack → Mod**: map the frame's declaring-type assembly to the Mod loading that assembly, cached by assembly. For Harmony patches on the frame's method, use the patch method's assembly, falling back to matching the owner against `packageId`, cached by method. Exclude base assemblies (mscorlib, `System`, netstandard, `Microsoft`, `Mono`, `MonoMod`, `Unity`, `UnityEngine`, `Assembly-CSharp`, `Assembly-CSharp-firstpass`, `0Harmony`, `HarmonyLib`, `Waylith`, `Brutal`, `ICSharpCode`, `Newtonsoft`, `NAudio`, `NVorbis`, `ISharpZipLib`, `com.rlabrecque.steamworks.net`, and Monitor itself). Include base `Mods` (Harmony, HugsLib, XML Extensions, Prepatcher, Performance Optimizer, RocketMan, and Mod Error Checker) only if no other Mod is found. Stop at the first non-base Mod frame. For textual stacks supplied in messages or `Unity` callbacks, parse `Type.Method` line by line and use the same mapping.
-- **Extra context**: use the first rule that yields a result. For `Config error in X:` or `Exception in ConfigErrors() of X:`, collect X's file, the parent chain's files (up to 10 levels), and patch operations on those `Defs`. For `Could not resolve cross-reference … named X`, collect the referencing `Def`, file, and field, plus patches adding X to those `Defs`. For `… loadID X`, record only `loadID:X`. While loading a `Def`, collect the current file, `Def`, and Mod. Also map message packageIds such as `[a.b]` and `assembly name: X` to `Mods`.
-- **`inferredType`** uses the first match: `DefConfigError` (the Config error above), `CrossRefError` (cross-reference or loadID), `PatchError` (during XML patching or a `Patch operation` message), `XMLSyntaxError` (while loading a `Def`; the RimCrow name means an error during XML loading), `AssemblyConflict` (`MissingMethodException`, `TypeLoadException`, `ReflectionTypeLoadException`, `MissingFieldException`), `TickException` (`Exception ticking`), `DrawException` (`Exception drawing`), `NullReference`, `OutOfMemory`, or `MissingTexture` (`Failed to find any texture`, `Could not load Texture2D`, `Could not load UnityEngine.Texture2D`). Otherwise, it is empty. A Monitor failure writes `ObserverFailure` without affecting the game.
-- **Stack levels**: in 1.5 and `1.6` (`Unity`), Monitor raises Error and `Exception` stack levels below `ScriptOnly` to `ScriptOnly`, leaving `Full` unchanged. It does not change them if other diagnostic `Mods` (Visual Exceptions or Mod Error Checker) are loaded. In 1.7, `Waylith` has no such setting and already writes full stacks.
-- **Unchanged messages**: RimCrow adds a `[Mod name, …] ` prefix. Monitor preserves the `Player.log` message exactly so that RimArcho can match it.
-
-### 7.2 Overhead
-
-- **Per log entry (hot path)**: look up the level and original message in a hash table once. A hit only increments the count. A miss normalizes the message and analyzes its stack and context once per distinct message.
-- **Loading**: each `Def` requires one stack push and pop and one dictionary write. Each `Def` list item requires one dictionary write, without constructing a node path. Collect patches in one pass. The tables are capped at 300,000 `Defs` and 500,000 references; recording stops when they are full.
-- **File writes**: use a 64 KiB buffer. Flush the first occurrence of an `ERROR` immediately because the game may crash next. A background timer writes other first occurrences and count changes at most once per second. Flush on `Application.quitting` and `AppDomain.ProcessExit`.
-- **Phase changes**: handle them only when a hook fires, without polling or work per frame. Under the same Writer lock, call `FlushDirty`, then write and flush the phase boundary. Do not add stacks, reflection, or file writes to the per-error hot path.
-
-### 7.3 Files
-
-- **Location**: write `ArchoMonitor.log` under the save-data root (`GenFilePaths.SaveDataFolderPath`, which follows `-savedatafolder`, so packs use `<pack>/userdata/`). If unavailable, use the command-line `-savedatafolder`, then `Application.persistentDataPath`. On startup, rename the existing log to `ArchoMonitor-prev.log`, replacing the previous file, and create a new current log.
-- Use UTF-8 without a BOM, with one JSON object per line ending in `\n`. Truncate message content above 4 KiB and details above 16 KiB, adding … . At 32 MiB, write `kind:"full"` and stop writing new entries. Phase changes and exit still write the remaining counts and boundaries.
-- **Deduplication**: the fingerprint combines the level, inferred type, and normalized lowercase message (hex addresses → `<hex>`, numbers → `<num>`, and whitespace collapsed to one space). The exact-message hot table is capped at 8000 entries, and the fingerprint table at 4000. When full, flush pending counts before clearing them. Later occurrences of the same messages are then treated as first occurrences again.
-
-**Format (schema 1)** is a superset of the RimCrow format, so one reader handles both.
-
-| Field | RimCrow Companion | Archo Monitor |
-| --- | --- | --- |
-| `timestamp` | `yyyy-MM-dd HH:mm:ss.fff`, the local time when this line was written | Same |
-| `level` | `ERROR`, `WARNING`, `INFO` | Same |
-| `message` | The text before the stack, prefixed with [names] if `Mods` were found | The original text before the stack |
-| `details` | The stack text on every line | The stack appears only on the entry's first line; later count lines use an empty string to avoid repeating it. An `ERROR` or `WARNING` without its own stack gets the stack of the code calling `Verse.Log`, excluding Monitor and logging frames. |
-| `count` | Occurrences represented by this line: 1 at first, then the increase since the previous line for the same entry | Same |
-| `context.relatedModIds` | The lowercase, player-visible `packageId` | Same |
-| `context.relatedFiles` | A mixture of Mod-relative and absolute paths, `patch:<Def>:<operation>`, `xref:<name>:<node-path>`, `def:<name>`, `loadID:<ID>`, and `<root:<node>>` | Only absolute file paths; other references go in `context.refs` |
-| `context.inferredType` | The names above, except `PatchError` | The names above |
-| `source` | — | `"archo-monitor"` |
-| `schema` | — | `1` |
-| `id` | — | The entry's 8-hex fingerprint, identical on every line for that entry |
-| `total` | — | The cumulative count through this line |
-| `kind` | — | Present only on special lines: session (first), exit (last on normal exit), full, phase, settings, settings-window, and hugslib |
-| `context.phase` | — | The phase on a phase row: menu, save, new, or play; loading applies before the first phase row |
-| `context.save` | — | The save filename on a save phase row, if available, without its directory |
-| `context.settings` | — | On the settings row (message `[Archo Monitor] settings <n>`): `[{packageId, folder, class, file, title, stored}]`, one element per Mod class (§7.1) |
-| `context.roles` | — | `{"<packageId>": "xml" \| "def" \| "patch" \| "stack" \| "text"}` records how the Mod was found: file owner, definer in the `Def` chain, patcher, stack or patch owner, or message mention. |
-| `context.refs` | — | `patch:<Def>:<operation-type>@<packageId>`, `xref:<name>:<Def>/<field>`, `def:<name>`, `loadID:<ID>` |
-| `context.def` | — | The `Def` loading when the error occurred |
-
-**Session line**. The first line has level `INFO`, message `[Archo Monitor] session <id>`, and kind session. Its context contains session (12 random hexadecimal digits), version (the Monitor version), game (`VersionControl.CurrentVersionStringWithRev`), `dataRoot`, and `playerLog` (`Application.consoleLogPath`, empty if unavailable). Monitor also writes `[Archo Monitor] <version> session <id>: <full-ArchoMonitor.log-path>` to `Player.log` through `Log.Message`. This lets RimArcho pair the files: a `1.6` pack's `Player.log` stays in `Unity`'s fixed location while the companion is in the pack's data root, so the explicit path avoids guessing. **Exit line**. Its kind is exit, and `context.entries` is the number of distinct entries.
-
-**Phase line**. Its level is `INFO`, kind is phase, message is `[Archo Monitor] phase <phase>`, and `context.phase` is one of the values above. The other envelope fields follow schema 1. Flush pending count rows before the change, so that each count row belongs to one phase; total remains cumulative for the whole run. Write the same phase message to `Player.log` through `Log.Message`, regardless of the informational logging setting. Read boundaries independently in each file's order. Phase messages themselves never form error clusters.
-
-### 7.4 How RimArcho reads them
+Archo Monitor (19) and RimCrow Companion write a companion log in the game's save-data root; its format is in 19 §4. This section describes how RimArcho reads it.
 
 **Selection** is read-only; do not rename or delete the files.
 
@@ -271,20 +200,6 @@ Archo Monitor settings use RimWorld Keyed translations and follow the game langu
 - **Phases and display**: when phase information exists, deduplicate companion entries separately at each phase boundary and keep their first-appearance order in the file. The same id can appear again after another save load to show the boundary. Global attribution still merges by id. See 16 §2.4 and §2.10 for Can it run grouping and log-page separators, and 13 §4 for the CLI and MCP. Logs without phase markers (from an older Monitor, RimCrow, or no Monitor) keep the count and display rules without phases.
 - **Cache** (§5): add the paired companion's path, size, and mtime to the key.
 - Skip and count invalid lines (live `BadLines`, or the full-analysis heading). Each companion entry table and interface phase-entry table is capped at 20000 entries. Once full, update only existing entries.
-
-### 7.5 Version differences
-
-| | 1.5, `1.6` | 1.7 |
-| --- | --- | --- |
-| Runtime | `Mono`, with assemblies compiled for net472 | .NET 10 (`Waylith`), with assemblies compiled for net10.0 |
-| Harmony | 2.x bundled with the Harmony Mod | 3.x |
-| `Application` | `UnityEngine` | `UnityStubs`: has `logMessageReceivedThreaded`, quitting, and `consoleLogPath`, but no `SetStackTraceLogType` |
-| `DefFromNodeNew` | Present in `1.6`, absent in 1.5; find it by reflection and skip the hook if absent | Present |
-| Phase hooks (§7.1) | All exist in the reference assemblies. `GenerateWorld` lacks `LandmarkDensity` in 1.5 and has it in `1.6`; find it by name through reflection. | All exist; `GenerateWorld` has the same parameters as in `1.6`. |
-
-`LoadFolders.xml` selects directories by game version: `1.5/` and `1.6/` contain the net472 assemblies, and `1.7/` contains net10.0 assemblies. Find hook targets through reflection. Skip missing targets and list them in the session line's `context.skipped`.
-
-The phase hook signatures are checked for each version against the Krafs reference assemblies selected by `monitor/ArchoMonitor.csproj`. These references contain only method signatures. The actual timing of menu entry, world generation, save loading, and playable state must be tested in full game rounds in both `1.6` and 1.7 (the pre-release VM checklist).
 
 ## 8. Error pattern library
 
@@ -335,6 +250,6 @@ The pattern library comes from the public HugsLib log corpus (`docs/research/00-
 | L11 | Read bad lines, an incomplete last line, and a RimCrow message with a `[name] ` prefix. | Count bad lines, leave the last line for the next read, and strip the prefix to match the cluster (`logs.TestCompanionMonitor`, `logs.TestCompanionRimCrow`). | Pass |
 | L12 | Run a pack with `-savedatafolder=<pack>/userdata`. | Read `<pack>/userdata/ArchoMonitor.log`, not the environment's companion (`TestCompanionFor`, `TestLiveLogMonitor`). | Pass |
 | L13 | Write one entry across lines with counts 1, 5, and 3 and total 9. | The cluster count is 9, with the timestamp from the first line (`logs.TestCompanionMonitor`, `TestLogAnalysisWithMonitor`). | Pass |
-| L14 | Enable Monitor and create a known XML error in real `1.6` and 1.7 games. | `ArchoMonitor.log` contains the entry and file, and Can it run shows file evidence. | Pending (manual checklist 17 §4) |
+| L14 | Enable Monitor and create a known XML error in real `1.6` and 1.7 games. | `ArchoMonitor.log` contains the entry and file, and Can it run shows file evidence. | Pending (manual checklist 19 §7) |
 | L15 | During live tracking, the companion entry arrives first, and the Player.log entry ends or appears after 5 seconds. | Keep one cluster with Player.log as evidence and count later occurrences of the same error in it (`TestLiveLogMonitorFirst`). If the Player.log line is noise and the companion entry has a stack, it is no error cluster in live tracking either: an excluded status line stays excluded, and known noise such as `Translation data … errors` is one informational `noise` cluster (`TestLiveLogMonitorNoise`). | Pass |
 | L16 | The companion has a settings row; a folder only it names (a copy since deleted) holds a Mod's settings; the log later rotates away. | The row is not an entry; save copies the settings to the Mod's current folder name, also after the log is gone (`logs.TestMonitorSettingsRecord`, `TestSettingsFromMonitorRecord`; Monitor `monitor/test` writes and parses the row). In real 1.6 and 1.7 games each Mod with a settings window appears with the file its settings are in. | Synthetic pass; real games pending (release VM tests) |

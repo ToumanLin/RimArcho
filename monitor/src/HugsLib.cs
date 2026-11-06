@@ -7,7 +7,7 @@ using Verse;
 namespace ArchoMonitor
 {
     // HugsLibPack is one HugsLib settings pack: its identifier, the Mod it belongs to and its
-    // settings (06 §7.1).
+    // settings (19 §2).
     internal struct HugsLibPack
     {
         internal string Id;        // the pack's identifier: its element in HugsLib/ModSettings.xml

@@ -6,14 +6,14 @@ using Verse;
 
 namespace ArchoMonitor
 {
-    // Archo Monitor (RimArcho docs/specs 06 §7): writes what Player.log cannot say — the file
+    // Archo Monitor (RimArcho docs/specs 19): writes what Player.log cannot say — the file
     // and def being loaded, the mods on the stack, and errors after the game stops logging — to
     // <save data root>/ArchoMonitor.log, one JSON object per line.
 
     public class MonitorSettings : ModSettings
     {
         // Info messages are the most frequent; Log.Message is hooked only when this is on, from
-        // the next start (06 §7.1).
+        // the next start (19 §2).
         public bool recordMessages;
 
         public override void ExposeData()
@@ -80,7 +80,7 @@ namespace ArchoMonitor
                 string session = Guid.NewGuid().ToString("N").Substring(0, 12);
                 Writer.WriteSession(session, root, settings != null && settings.recordMessages);
                 Writer.Ready = true;
-                // The marker that pairs Player.log with this file (06 §7.3).
+                // The marker that pairs Player.log with this file (19 §4).
                 Log.Message("[Archo Monitor] " + Version + " session " + session + ": " + Writer.Path);
             }
             catch (Exception e)

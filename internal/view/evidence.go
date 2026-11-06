@@ -220,7 +220,7 @@ func atoi(s string) int {
 
 var (
 	logIDRe = regexp.MustCompile(`^log:(\S+) x\d+:`)
-	// a file the companion log tied to the error (06 §7.4): "log file (ArchoMonitor.log): Defs/X.xml"
+	// a file the companion log tied to the error (06 §7): "log file (ArchoMonitor.log): Defs/X.xml"
 	companionFileRe = regexp.MustCompile(`log file \(([^)]+\.log)\): (\S+)`)
 )
 
@@ -245,7 +245,7 @@ func companionChips(texts []string) []string {
 }
 
 // logEvidence: the clusters of a mod's errors in the last log and when it was written; a
-// file from the companion log when it names one (06 §7.4).
+// file from the companion log when it names one (06 §7).
 func logEvidence(ps []*app.Problem, when string) *Evidence {
 	var ids, texts []string
 	for _, p := range ps {

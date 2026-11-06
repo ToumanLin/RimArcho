@@ -59,14 +59,14 @@ The GUI gathers these actions on all lists (16 §2.17). Commands: `archo plan li
 
 ### 1.5 Archo Monitor added by default
 
-Archo Monitor is RimArcho's bundled in-game helper Mod (06 §7; installation and updates: 09 §6). **On by default** means RimArcho adds it to plans; after that it is an ordinary Mod.
+Archo Monitor is RimArcho's bundled in-game helper Mod (19; installation and updates: 19 §6). **On by default** means RimArcho adds it to plans; after that it is an ordinary Mod.
 
-- **Setting**: `monitor.default` (`on` / `off`, default `on`): `archo config set monitor.default off`, or the settings "game log" group (16 §2.14). It controls only automatic addition, not updates (09 §6).
-- **Plans affected**: new plans (from any origin: empty, copy of the current plan, history, imported list or save), and every existing plan in the environment when RimArcho first installs Monitor. When to check: "When to check" in 09 §6; new plans right after creation.
+- **Setting**: `monitor.default` (`on` / `off`, default `on`): `archo config set monitor.default off`, or the settings "game log" group (16 §2.14). It controls only automatic addition, not updates (19 §6).
+- **Plans affected**: new plans (from any origin: empty, copy of the current plan, history, imported list or save), and every existing plan in the environment when RimArcho first installs Monitor. When to check: "When to check" in 19 §6; new plans right after creation.
 - **Once per plan**: processed plans are recorded in meta `monitor.added:<plan ID>` (added, or already present). The player may then disable, move or stage it as usual; RimArcho adds it again only when sorting (next item).
 - **Sorting adds it too**: if the setting is on and Monitor is installed but not in the plan, every sort (`archo sort`, the editor, can it run) places its latest version after Harmony in the same undo step, even if the player removed it; turn the setting off to avoid this. If that is impossible (no Harmony in the plan, or `Mods/` cannot hold links), the sort runs normally and gives the reason (`SortResult.MonitorSkipped`, a GUI notice and `archo sort`). Test: `TestSortAddsMonitor`.
 - **Position**: right after Harmony (`brrainz.harmony`). Monitor's About.xml declares `loadAfter brrainz.harmony` and `loadBefore Ludeon.RimWorld`; sorting (08 §1) keeps it after Harmony and before Core, so it observes the loading of Core and every Mod.
-- **Neither add nor mark processed** (retry at the next check) if the setting is `off`, Harmony (required) is absent, `Mods/` cannot hold links (FAT, exFAT, 09 §6), or Monitor is not installed.
+- **Neither add nor mark processed** (retry at the next check) if the setting is `off`, Harmony (required) is absent, `Mods/` cannot hold links (FAT, exFAT, 19 §6), or Monitor is not installed.
 - **One reversible edit**, named `add Archo Monitor after Harmony (default; archo config set monitor.default off)`. For a plan that is not current, the edit goes into that plan's own undo stack; `archo undo` there reverses it. The result (CLI output, UI notices) lists the plans affected. Tests: `TestMonitorInstallAndDefault`, `TestMonitorDefaultOff`.
 
 ### 1.6 Allowed game versions

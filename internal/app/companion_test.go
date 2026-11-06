@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// monitorLine is one ArchoMonitor.log line (06 §7.3), JSON-encoded so paths stay valid.
+// monitorLine is one ArchoMonitor.log line (19 §4), JSON-encoded so paths stay valid.
 func monitorLine(t *testing.T, kind, level, msg, details string, count, total int, id string, ctx map[string]any) string {
 	t.Helper()
 	m := map[string]any{"timestamp": "2026-10-21 14:05:03.120", "level": level, "message": msg, "details": details, "count": count,

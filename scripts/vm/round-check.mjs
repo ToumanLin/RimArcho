@@ -112,7 +112,7 @@ export function check(dir) {
   if (quits && done) pass(!!exit && mon.indexOf(exit) === mon.length - 1, 'monitor: exit line last', exit ? 'lines after the exit line' : 'no exit line');
   if (exit) note(`monitor exit: ${exit.context?.entries} entries`);
 
-  // Player.log carries the same phase lines (06 §7.3).
+  // Player.log carries the same phase lines (19 §4).
   const pl = (read('player-phases.txt') || '').split(/\r?\n/).map(l => /\[Archo Monitor\] phase (\w+)/.exec(l)?.[1]).filter(Boolean);
   const plSame = pl.length === want.length && pl.every((p, i) => p === want[i].phase);
   pass(plSame, 'player.log: the same phase lines', `Player.log has ${pl.join(' > ') || '(none)'}`);

@@ -21,7 +21,7 @@ const settingsWindowLine = `{"timestamp":"2026-11-03 10:05:00.000","level":"INFO
 const hugsLibLine = `{"timestamp":"2026-11-03 10:01:01.000","level":"INFO","message":"[Archo Monitor] hugslib 1","details":"","count":1,"context":{"hugslib":[{"id":"APack","packageId":"a.mod","folder":"A","title":"A options","full":true,"settings":[{"name":"raids","title":"Raids","value":"True","default":"False","type":"Boolean"},{"name":"seen","value":"3","default":"0","type":"Int32","hidden":true}]}]},"source":"archo-monitor","schema":1,"kind":"hugslib"}
 `
 
-// 06 §7.1: the settings records are read, not taken for entries. ReadMonitorRecords has no
+// 19 §2: the settings records are read, not taken for entries. ReadMonitorRecords has no
 // settings record before the main menu, and reads a live log again only past its last read.
 func TestMonitorSettingsRecord(t *testing.T) {
 	c := NewCompanion("x")

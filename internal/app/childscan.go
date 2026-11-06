@@ -16,7 +16,7 @@ func ChildScan(home, envName string, flags ...string) (string, error) {
 	return ChildScanExe(exe, home, envName, flags...)
 }
 
-// ChildMonitor runs `<this executable> monitor install` in a separate process (09 §6): the
+// ChildMonitor runs `<this executable> monitor install` in a separate process (19 §6): the
 // install may scan, and scans never run in an interface process.
 func ChildMonitor(home, envName string) (string, error) {
 	exe, err := os.Executable()
