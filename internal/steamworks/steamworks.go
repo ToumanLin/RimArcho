@@ -12,6 +12,9 @@
 //	STATE <id> <state>               state: the item's EItemState flags
 //	PROGRESS <id> <downloaded> <total> <state>  watch: bytes and current flags
 //	DONE <action> <n>
+//
+// Maintainer uploads use `steam-worker publish <request.json>` and the separate
+// request and output protocol documented in publish.go (17 §5.1).
 package steamworks
 
 import (

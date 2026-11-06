@@ -156,6 +156,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     workshop subscribe <ref…>                 subscribe again in Steam to an unsubscribed leftover
     workshop resubscribe <ref…>               resubscribe and wait for Steam to download mods; local edits are lost (refused while the game runs)
     workshop state <ref…>                     ask Steam for item state; without Steam, show local folders with account state unknown
+    workshop publish                          maintainer only: assemble and publish RimArcho from the repository root through the signed-in Steam client
   references: #<id> instance, L#<id> lineage, pkg:<packageId> or the bare packageId, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>, pattern:<id> error pattern
   global flags: --env <name> (use another environment for this command)
 
