@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
@@ -35,6 +36,106 @@ func monitorBundle(t *testing.T, e *testkit.Env, version string) string {
 }
 
 const monName = "Archo Monitor"
+
+// 19 §6: Workshop wins version ties, including on exFAT; an update from any source
+// leaves one Monitor in the plan and removes an obsolete managed link on save.
+func TestMonitorWorkshopSelection(t *testing.T) {
+	t.Parallel()
+	for _, tc := range []struct {
+		name, bundled, fs string
+		wantWorkshop      bool
+	}{
+		{"tie", "0.9.0", "NTFS", true},
+		{"tie on exFAT", "0.9.0", "exFAT", true},
+		{"higher source version", "0.10.0", "NTFS", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := loadoutEnv(t)
+			scanNow(t, e)
+			e.MustRun("disable", "pkg:gone.mod")
+			e.App.MonitorBundle = monitorBundle(t, e, tc.bundled)
+			e.MustRun("monitor", "install")
+			e.MustRun("save")
+			link := filepath.Join(e.Game, "Mods", "_Archo_monitor_ArchoMonitor-"+tc.bundled)
+			workshop := e.AddWorkshop("9999", testkit.Mod{PackageID: app.MonitorPackage, Name: monName})
+			about, err := os.ReadFile(filepath.Join(monitorBundle(t, e, "0.9.0"), "About", "About.xml"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			e.WriteFile(filepath.Join(workshop, "About", "About.xml"), string(about))
+			scanNow(t, e)
+			st, err := e.App.Loadout()
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Reproduce an imported list that enabled both the local and _steam tokens.
+			ws := *st.WS
+			ws.Entries = append(st.List.Clone(), loadout.Entry{Instance: refID(t, e, monName, source.Workshop)}).Encode()
+			if err := e.App.Store.SetWorkspace(&ws); err != nil {
+				t.Fatal(err)
+			}
+			e.App.VolumeFS = func(string) string { return tc.fs }
+			e.MustRun("monitor", "install")
+			ms, err := e.App.MonitorState()
+			if err != nil || ms.InPlan == nil {
+				t.Fatalf("Monitor state: %+v, %v", ms, err)
+			}
+			if (ms.InPlan.Kind == source.Workshop) != tc.wantWorkshop || ms.Newest.Mod.ID != ms.InPlan.ID {
+				t.Fatalf("wrong Monitor selected: %+v", ms)
+			}
+			if got := active(t, e); strings.Count(strings.Join(got, ","), monName) != 1 {
+				t.Fatalf("Monitor not collapsed to one entry: %v", got)
+			}
+			if out := e.MustRun("problems", "--all"); strings.Contains(out, "pkg.duplicate-") {
+				t.Fatalf("Monitor reported as duplicate:\n%s", out)
+			}
+			e.MustRun("save")
+			if source.IsLink(link) == tc.wantWorkshop {
+				t.Fatalf("managed link present=%v, Workshop selected=%v", source.IsLink(link), tc.wantWorkshop)
+			}
+			cfg := e.ReadModsConfig()
+			if strings.Count(cfg, "<li>"+app.MonitorPackage) != 1 || strings.Contains(cfg, app.MonitorPackage+"_steam") {
+				t.Fatalf("Monitor active more than once or using a stale token:\n%s", cfg)
+			}
+			if out := e.MustRun("status"); !strings.Contains(out, "ArchoMonitor "+tc.bundled+" in the plan") {
+				t.Fatalf("status did not use modVersion:\n%s", out)
+			}
+		})
+	}
+}
+
+// A subscribed Monitor works without a bundled copy or Monitor source, including
+// default insertion, sorting and explicit addition on exFAT.
+func TestMonitorWorkshopOnlyExFAT(t *testing.T) {
+	t.Parallel()
+	e := loadoutEnv(t)
+	e.App.VolumeFS = func(string) string { return "exFAT" }
+	dir := e.AddWorkshop("9999", testkit.Mod{PackageID: app.MonitorPackage, Name: monName})
+	about, err := os.ReadFile(filepath.Join(monitorBundle(t, e, "0.9.0"), "About", "About.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.WriteFile(filepath.Join(dir, "About", "About.xml"), string(about))
+	e.MustRun("scan")
+	e.MustRun("disable", "pkg:gone.mod")
+	if !contains(active(t, e), monName) {
+		t.Fatal("Workshop-only Monitor was not added by default")
+	}
+	e.MustRun("disable", "pkg:"+app.MonitorPackage)
+	e.MustRun("sort")
+	if !contains(active(t, e), monName) {
+		t.Fatal("sort did not add Workshop-only Monitor")
+	}
+	e.MustRun("disable", "pkg:"+app.MonitorPackage)
+	if _, err := e.App.AddMonitor(); err != nil {
+		t.Fatal(err)
+	}
+	e.MustRun("save")
+	links, err := filepath.Glob(filepath.Join(e.Game, "Mods", "_Archo_*"))
+	if err != nil || len(links) != 0 {
+		t.Fatalf("Workshop-only Monitor needed links: %v, %v", links, err)
+	}
+}
 
 func monitorDir(e *testkit.Env) string {
 	return filepath.Join(e.Root, "LocalAppData", "RimArcho", "monitor")
@@ -201,7 +302,7 @@ func TestMonitorExFAT(t *testing.T) {
 	defer func() { app.CreateLink = saved }()
 	e.MustRun("enable", "pkg:"+app.MonitorPackage, "--after", "pkg:brrainz.harmony")
 	out, code := e.Run("save")
-	if code == 0 || !strings.Contains(out, "Archo Monitor reaches the game only through a link") || !strings.Contains(out, "archo disable pkg:toumanlin.archomonitor") {
+	if code == 0 || !strings.Contains(out, "this Archo Monitor copy needs a link") || !strings.Contains(out, "archo disable pkg:toumanlin.archomonitor") {
 		t.Fatalf("save on exFAT: exit %d\n%s", code, out)
 	}
 	e.MustRun("disable", "pkg:"+app.MonitorPackage)

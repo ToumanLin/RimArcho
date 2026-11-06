@@ -654,7 +654,7 @@ func CopyNoteAuto(i *app.LibInstance) string {
 			from = T("unsubscribed; Steam left the folder")
 		}
 		if from != "" {
-			if !i.Created.IsZero() && i.Source != app.LibMonitor {
+			if !i.Created.IsZero() && i.Source != app.LibMonitor && !app.IsMonitor(i.Mod) {
 				from += Tf(", first seen on %s", ShortDate(i.Created))
 			}
 			parts = append(parts, from)

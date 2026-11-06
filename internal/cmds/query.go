@@ -853,7 +853,7 @@ func loadoutStatus(c *Ctx, root *render.Node, d *render.Doc) {
 	root.KV("plan", plan)
 	root.KV("loadout", line)
 	// Archo Monitor (19 §6): shown once it is bundled or installed.
-	if s, err := c.App.MonitorState(); err == nil && (s.Bundled != nil || s.Source != nil || s.InPlan != nil) {
+	if s, err := c.App.MonitorState(); err == nil && (s.Bundled != nil || s.Source != nil || s.Newest != nil || s.InPlan != nil) {
 		root.KV("monitor", MonitorPlanLine(c, s))
 	}
 	if run, _ := c.App.GameRunning(); run != nil {

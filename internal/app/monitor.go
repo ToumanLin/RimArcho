@@ -23,9 +23,8 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Archo Monitor (19 §6, 07 §1.5): RimArcho's in-game companion mod. It ships with RimArcho,
-// is copied into a RimArcho-managed folder, registered as an extra source (src:monitor),
-// reaches the game only through an _Archo_ link, and is added to plans right after Harmony.
+// Archo Monitor (19 §6, 07 §1.5): RimArcho's in-game companion mod, supplied by any
+// source. The bundled copy is installed as src:monitor; plans add Monitor after Harmony.
 
 const (
 	// MonitorPackage is Archo Monitor's packageId.
@@ -125,21 +124,22 @@ type MonitorInstance struct {
 	Version string
 }
 
-// monitorInstances are the environment's live monitor instances, newest first: those of
-// its monitor source with Archo Monitor's packageId.
+// monitorInstances are the environment's usable Monitor instances, newest first.
+// Workshop wins a version tie because it needs no Mods/ link (19 §6).
 func monitorInstances(ix *Index) []MonitorInstance {
-	src := monitorSourceOf(ix)
-	if src == nil {
-		return nil
-	}
 	var out []MonitorInstance
 	for _, m := range ix.Mods {
-		if m.SourceID != src.ID || m.Status != identity.Live || strings.TrimSuffix(strings.ToLower(m.PackageID), "_steam") != MonitorPackage {
+		if !IsMonitor(m) || m.Status != identity.Live || m.Residue || m.Unloadable != "" {
 			continue
 		}
-		out = append(out, MonitorInstance{Mod: m, Version: strings.TrimPrefix(m.Rel, monitorFolder)})
+		out = append(out, MonitorInstance{Mod: m, Version: strings.TrimSpace(m.Decl().ModVersion)})
 	}
-	sort.SliceStable(out, func(i, j int) bool { return CompareVersions(out[i].Version, out[j].Version) > 0 })
+	sort.SliceStable(out, func(i, j int) bool {
+		if cmp := CompareVersions(out[i].Version, out[j].Version); cmp != 0 {
+			return cmp > 0
+		}
+		return out[i].Mod.Kind == source.Workshop && out[j].Mod.Kind != source.Workshop
+	})
 	return out
 }
 
@@ -442,21 +442,27 @@ func (a *App) monitorPlan(ix *Index, p *store.Plan, newest MonitorInstance) (Mon
 		return c, err
 	}
 	list := loadout.Decode(ws.Entries)
-	for i, e := range list {
+	after := make(loadout.List, 0, len(list))
+	old, found := "", false
+	for _, e := range list {
 		m := ix.ByID[e.Instance]
-		if !IsMonitor(m) {
+		if !IsMonitor(m) && packageBase(strings.ToLower(e.Missing)) != MonitorPackage {
+			after = append(after, e)
 			continue
 		}
+		if !found {
+			if m != nil {
+				old = strings.TrimSpace(m.Decl().ModVersion)
+			}
+			after = append(after, loadout.Entry{Instance: newest.Mod.ID})
+			found = true
+		}
+	}
+	if found {
 		a.Store.SetMeta(monitorAddedKey(p.ID), "1")
-		if m.ID == newest.Mod.ID || m.SourceID != newest.Mod.SourceID {
+		if after.Equal(list) {
 			return c, nil
 		}
-		old := strings.TrimPrefix(m.Rel, monitorFolder)
-		if CompareVersions(old, newest.Version) >= 0 {
-			return c, nil
-		}
-		after := list.Clone()
-		after[i] = loadout.Entry{Instance: newest.Mod.ID}
 		op := fmt.Sprintf("update Archo Monitor %s → %s", old, newest.Version)
 		if err := a.editPlan(p, ws, list, after, op); err != nil {
 			return c, err
@@ -471,12 +477,12 @@ func (a *App) monitorPlan(ix *Index, p *store.Plan, newest MonitorInstance) (Mon
 		c.Reason = "monitor.default is off"
 		return c, nil
 	}
-	at, why := a.monitorSlot(ix, list)
+	at, why := a.monitorSlot(ix, list, newest.Mod)
 	if why != "" {
 		c.Reason = why
 		return c, nil
 	}
-	after := insert(list.Clone(), at, loadout.Entry{Instance: newest.Mod.ID})
+	after = insert(list.Clone(), at, loadout.Entry{Instance: newest.Mod.ID})
 	if err := a.editPlan(p, ws, list, after, MonitorAddOp); err != nil {
 		return c, err
 	}
@@ -487,7 +493,7 @@ func (a *App) monitorPlan(ix *Index, p *store.Plan, newest MonitorInstance) (Mon
 
 // monitorSlot is where the monitor goes in a list: right after Harmony. why says why it
 // cannot go in (no Harmony, Mods/ cannot hold links).
-func (a *App) monitorSlot(ix *Index, list loadout.List) (at int, why string) {
+func (a *App) monitorSlot(ix *Index, list loadout.List, monitor *store.Mod) (at int, why string) {
 	at = -1
 	for i, e := range list {
 		if m := ix.ByID[e.Instance]; m != nil && strings.TrimSuffix(strings.ToLower(m.PackageID), "_steam") == harmonyPkg {
@@ -498,8 +504,10 @@ func (a *App) monitorSlot(ix *Index, list loadout.List) (at int, why string) {
 	if at < 0 {
 		return -1, "no Harmony in the plan; Archo Monitor needs it"
 	}
-	if fs := a.modsVolumeFS(ix); noLinks(fs) {
-		return -1, fmt.Sprintf("Mods/ is on %s, which cannot hold the link Archo Monitor needs (19 §6)", fs)
+	if !gameVisible(monitor.Kind) {
+		if fs := a.modsVolumeFS(ix); noLinks(fs) {
+			return -1, fmt.Sprintf("Mods/ is on %s, which cannot hold the link Archo Monitor needs (19 §6)", fs)
+		}
 	}
 	return at, ""
 }
@@ -524,7 +532,7 @@ func (a *App) AddMonitor() (*store.Mod, error) {
 		if len(ms) == 0 {
 			return nil, nil, errors.New("Archo Monitor is not installed (archo monitor install)")
 		}
-		at, why := a.monitorSlot(st.Ix, l)
+		at, why := a.monitorSlot(st.Ix, l, ms[0].Mod)
 		if why != "" {
 			return nil, nil, errors.New(why)
 		}

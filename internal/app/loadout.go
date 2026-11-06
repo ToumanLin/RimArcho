@@ -816,7 +816,7 @@ func (a *App) sortMonitor(st *LoadoutState, l loadout.List) (loadout.List, strin
 	if len(ms) == 0 {
 		return l, ""
 	}
-	at, why := a.monitorSlot(st.Ix, l)
+	at, why := a.monitorSlot(st.Ix, l, ms[0].Mod)
 	switch {
 	case why == "":
 		return insert(l.Clone(), at, loadout.Entry{Instance: ms[0].Mod.ID}), ""

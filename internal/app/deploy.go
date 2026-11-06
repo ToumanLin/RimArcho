@@ -10,6 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
+	"github.com/ToumanLin/RimArcho/internal/scan"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
@@ -275,9 +276,9 @@ func applyLinks(mods string, plan []LinkChange) error {
 				return fmt.Errorf("cannot link %s: %v", c.Name, err)
 			}
 			if err := CreateLink(p, c.Target); err != nil {
-				if strings.Contains(strings.ToLower(c.Name), strings.ToLower(monitorFolder)) {
+				if d := scan.ReadDecl(c.Target, false); strings.EqualFold(d.PackageID, MonitorPackage) {
 					// 19 §6: the monitor never falls back to a copy.
-					return fmt.Errorf("Archo Monitor reaches the game only through a link, and %s cannot hold one: %v (the Mods/ volume must support junctions, e.g. NTFS; FAT and exFAT cannot). Disable it in this plan: archo disable pkg:%s", mods, err, MonitorPackage)
+					return fmt.Errorf("this Archo Monitor copy needs a link, and %s cannot hold one: %v (the Mods/ volume must support junctions, e.g. NTFS; FAT and exFAT cannot). Disable it in this plan: archo disable pkg:%s", mods, err, MonitorPackage)
 				}
 				return fmt.Errorf("cannot link %s into %s: %v (the Mods/ volume must support junctions, e.g. NTFS)", c.Target, mods, err)
 			}

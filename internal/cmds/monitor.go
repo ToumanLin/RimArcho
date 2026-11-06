@@ -57,7 +57,7 @@ func MonitorPlanLine(c *Ctx, s *app.MonitorStatus) string {
 		if s.AfterHarmony {
 			where = "after Harmony"
 		}
-		v := strings.TrimPrefix(s.InPlan.Rel, "ArchoMonitor-")
+		v := strings.TrimSpace(s.InPlan.Decl().ModVersion)
 		return fmt.Sprintf("ArchoMonitor %s in the plan (%s)", v, where)
 	case s.Newest != nil:
 		ref := s.Newest.Mod.ID
