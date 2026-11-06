@@ -145,6 +145,7 @@ export function fieldList(fields, acts = {}) {
     }
     r.append(v);
     const actions = [...(f.act ? [{ act: f.act, label: f.actLabel }] : []), ...(f.actions || [])];
+    const bar = actions.length > 1 ? el("span", "facts-acts") : r;
     for (const a of actions) {
       const b = el("button", "fact", a.label);
       if (a.act === "tags") b.dataset.envWrite = a.act;
@@ -156,8 +157,9 @@ export function fieldList(fields, acts = {}) {
         if (a.act === "settings") return document.dispatchEvent(new CustomEvent("open-mod-settings", { detail: f.target }));
         if (acts[a.act]) return acts[a.act](f);
       };
-      r.append(b);
+      bar.append(b);
     }
+    if (bar !== r) r.append(bar);
     box.append(r);
   }
   return box;

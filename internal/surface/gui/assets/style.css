@@ -2451,7 +2451,9 @@ select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-s
 .url-editor .field { width: 100%; }
 .url-editor .err:not(:empty) { margin-top: 8px; }
 .frow:has(.path-copy) { flex-wrap: wrap; }
-.frow:has(.path-copy) .v { flex-basis: 200px; }
+.frow:has(.path-copy) .v { flex-basis: 120px; }
+.frow .path-copy { min-width: min(100%, 120px); }
+.frow .facts-acts { flex: none; display: flex; gap: 8px; align-items: baseline; white-space: nowrap; }
 .settings .set .r > .btn { flex: none; }
 .setting-release-link { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .pm-file, .xc-selected-file { min-width: 0; max-width: 100%; }
