@@ -39,10 +39,9 @@ export function build(caseDir, runDir, layerDir) {
     const dest = path.join(g, 'Mods', m.pkg);
     const layer = layerDir && fs.existsSync(path.join(layerDir, m.pkg)) ? path.join(layerDir, m.pkg) : null;
     const gone = del.filter(f => f.toLowerCase().startsWith(m.pkg.toLowerCase() + '/')).map(f => f.slice(m.pkg.length + 1));
-    if (ov || layer || gone.length) {
-      copyDir(m.path, dest); if (ov) copyDir(path.resolve(caseDir, ov.files), dest); if (layer) copyDir(layer, dest);
-      for (const f of gone) fs.rmSync(path.join(dest, f), {force: true});
-    }
+    const layers = [ov && path.resolve(caseDir, ov.files), layer].filter(Boolean);
+    const drop = [...gone, ...(ov?.omit || [])];   // overlay `omit`: files of the pristine Mod the case leaves out
+    if (layers.length || drop.length) mergeMod(m.path, dest, layers, drop);
     else fs.symlinkSync(m.path, dest, 'junction');
   }
   if (layerDir && fs.existsSync(path.join(layerDir, 'ModsConfig.xml'))) {   // the submission changed the active list
@@ -54,24 +53,66 @@ export function build(caseDir, runDir, layerDir) {
   let x = fs.readFileSync(path.join(USERCFG, 'ModsConfig.xml'), 'utf8');
   x = x.replace(/<activeMods>[\s\S]*?<\/activeMods>/, '<activeMods>\n' + active.map(p => `    <li>${p.toLowerCase()}</li>`).join('\n') + '\n  </activeMods>');
   fs.writeFileSync(path.join(cfg, 'ModsConfig.xml'), x);
-  fs.copyFileSync(path.join(USERCFG, 'Prefs.xml'), path.join(cfg, 'Prefs.xml'));
-  return {game: g, userdata: path.join(runDir, 'userdata'), log: path.join(runDir, 'Player.log'), active};
+  let prefs = fs.readFileSync(path.join(USERCFG, 'Prefs.xml'), 'utf8');
+  // runtime cases (case.json `runtime: {ticks}`): a quicktest map; the first autosave marks `ticks` game ticks played
+  const ticks = c.runtime?.ticks || 0;
+  if (ticks) prefs = prefs.replace(/<autosaveIntervalDays>[^<]*<\/autosaveIntervalDays>/, `<autosaveIntervalDays>${ticks / 60000}</autosaveIntervalDays>`);
+  fs.writeFileSync(path.join(cfg, 'Prefs.xml'), prefs);
+  return {game: g, userdata: path.join(runDir, 'userdata'), log: path.join(runDir, 'Player.log'), active, ticks};
 }
 
-function copyDir(src, dst) { fs.cpSync(src, dst, {recursive: true, force: true, dereference: true}); }
+// A Mod with changed files: real folders only on the way to a changed (or left out) path, junctions for the rest,
+// so a large Mod (textures) is never copied. Layers are applied in order; `drop` lists paths inside the Mod to leave out.
+function mergeMod(src, dest, layers, drop) {
+  const norm = p => p.replaceAll('\\', '/');
+  const changed = new Map();   // relative path (lower case) -> {rel, file}; the last layer wins
+  for (const l of layers) for (const f of fs.readdirSync(l, {recursive: true}))
+    if (fs.statSync(path.join(l, f)).isFile()) changed.set(norm(f).toLowerCase(), {rel: norm(f), file: path.join(l, f)});
+  const gone = new Set(drop.map(p => norm(p).toLowerCase()));
+  const touched = [...changed.keys(), ...gone];
+  (function walk(s, d, rel) {
+    fs.mkdirSync(d, {recursive: true});
+    for (const n of fs.readdirSync(s)) {
+      const r = (rel ? rel + '/' : '') + n.toLowerCase(); const sp = path.join(s, n), dp = path.join(d, n);
+      if (gone.has(r) || changed.has(r)) continue;
+      if (!fs.statSync(sp).isDirectory()) fs.copyFileSync(sp, dp);
+      else if (touched.some(t => t.startsWith(r + '/'))) walk(sp, dp, r);
+      else fs.symlinkSync(sp, dp, 'junction');
+    }
+  })(src, dest, '');
+  for (const [k, {rel, file}] of changed) {
+    if (gone.has(k)) continue;   // a deletion wins over the layers, as a submission's delete.json removes an overlay file
+    // folders the Mod already has keep its spelling (Windows paths ignore case); new ones take the layer's
+    let d = dest;
+    for (const seg of rel.split('/').slice(0, -1)) {
+      const hit = fs.existsSync(d) ? fs.readdirSync(d).find(n => n.toLowerCase() === seg.toLowerCase()) : null;
+      d = path.join(d, hit || seg);
+    }
+    fs.mkdirSync(d, {recursive: true}); fs.copyFileSync(file, path.join(d, path.basename(rel)));
+  }
+}
 
-export async function run(env, seconds = 150) {
+export async function run(env, seconds = env.ticks ? 600 : 150) {
   const exe = path.join(env.game, 'RimWorldWin64.exe');
-  const child = spawn(exe, [`-savedatafolder=${env.userdata}`, '-logFile', env.log], {cwd: env.game, stdio: 'ignore', detached: false, env: {...process.env, HARMONY_LOG_FILE: path.join(path.dirname(env.log), 'harmony.log.txt')}});
-  let lastSize = -1, stable = 0; const t0 = Date.now();
+  const args = [`-savedatafolder=${env.userdata}`, '-logFile', env.log, ...(env.ticks ? ['-quicktest'] : [])];
+  const saves = path.join(env.userdata, 'Saves'); if (env.ticks) fs.rmSync(saves, {recursive: true, force: true});
+  const child = spawn(exe, args, {cwd: env.game, stdio: 'ignore', detached: false, env: {...process.env, HARMONY_LOG_FILE: path.join(path.dirname(env.log), 'harmony.log.txt')}});
+  let lastSize = -1, stable = 0; const t0 = Date.now(); env.reached = false;
   while (Date.now() - t0 < seconds * 1000) {
     await new Promise(r => setTimeout(r, 5000));
+    if (env.ticks) {   // the first autosave comes `ticks` game ticks after the map started; done once its file stops growing
+      const f = path.join(saves, 'Autosave-1.rws'); const sz = fs.existsSync(f) ? fs.statSync(f).size : 0;
+      stable = sz === lastSize && sz > 0 ? stable + 1 : 0; lastSize = sz;
+      if (stable >= 1) { env.reached = true; break; }
+      continue;
+    }
     const sz = fs.existsSync(env.log) ? fs.statSync(env.log).size : 0;
     stable = sz === lastSize && sz > 0 ? stable + 1 : 0; lastSize = sz;
     if (stable >= 8 && sz > 8000 && Date.now() - t0 > 60000) break;   // 40 s of silence once past the Mod loading output: at the main menu
   }
   try { execFileSync('taskkill', ['/PID', String(child.pid), '/T', '/F']); } catch {}
-  return fs.existsSync(env.log);
+  await new Promise(r => setTimeout(r, 1500));
+  return fs.existsSync(env.log) && (!env.ticks || env.reached);
 }
 
 if (process.argv[1].endsWith('sandbox.mjs')) {

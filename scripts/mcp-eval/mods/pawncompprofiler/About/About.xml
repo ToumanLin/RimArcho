@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+  <name>Pawn Comp Profiler</name>
+  <author>tallowbyte</author>
+  <packageId>tallowbyte.pawncompprofiler</packageId>
+  <supportedVersions>
+    <li>1.6</li>
+  </supportedVersions>
+  <modDependencies>
+    <li>
+      <packageId>brrainz.harmony</packageId>
+      <displayName>Harmony</displayName>
+      <steamWorkshopUrl>steam://url/CommunityFilePage/2009463077</steamWorkshopUrl>
+    </li>
+  </modDependencies>
+  <loadAfter>
+    <li>brrainz.harmony</li>
+  </loadAfter>
+  <description>Find out which mod makes your colonists slow.
+
+Times every comp tick of every pawn and lists the slowest comp types, so you can see which mod's pawn comps cost the most.
+
+Dev mode: Debug actions > Pawn Comp Profiler > Log slowest pawn comps.
+Turn timing off in Options > Mod settings > Pawn Comp Profiler.
+
+Safe to add or remove mid-save. Source included.</description>
+</ModMetaData>

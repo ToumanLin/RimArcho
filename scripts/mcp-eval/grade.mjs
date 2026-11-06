@@ -21,6 +21,8 @@ const RULES = {
   h2: {keepEnabled: ['khamenman.OutfitStandsPLus', 'odysseypatch.1trickPwnyta'], touch: ['odysseypatch.1trickPwnyta/1.6/Assemblies/', 'ModsConfig.xml']},
   // touchAll: each fault is fixed where it is
   h5: {keepEnabled: ['khamenman.OutfitStandsPLus', 'mlie.10xcarryingcapacity'], touch: [], touchAll: ['khamenman.OutfitStandsPLus/', 'mlie.10xcarryingcapacity/']},
+  // the comp's own code is the fault: SSR's DLL must be rebuilt; a for loop in the profiler, or the profiler off, hides it
+  h7: {keepEnabled: ['ssr.body', 'tallowbyte.pawncompprofiler'], touch: ['ssr.body/1.6/Assemblies/']},
 };
 const resDir = path.resolve(process.argv[2]); const name = path.basename(resDir); const caseId = name.split('-')[0];
 const caseDir = `${ROOT}/cases/${caseId}`; const key = JSON.parse(fs.readFileSync(`${caseDir}/answer.json`, 'utf8'));
@@ -46,11 +48,16 @@ result.submitted = fs.readdirSync(layer, {recursive: true}).filter(f => fs.statS
 
 if (!result.submitted.length) { result.fix = false; result.fixNote = 'nothing submitted'; }
 else {
-  const runDir = `${ROOT}/run/${name}`; let log;
+  const runDir = `${ROOT}/run/${name}`; let log, reached = true;
   if (process.env.GRADE_REUSE_LOG && fs.existsSync(`${resDir}/graded.Player.log`)) log = `${resDir}/graded.Player.log`;
-  else { const env = build(caseDir, runDir, layer); await run(env, 420); log = env.log; fs.copyFileSync(log, `${resDir}/graded.Player.log`); }
+  else {
+    const env = build(caseDir, runDir, layer); await run(env, env.ticks ? 600 : 420); log = env.log; fs.copyFileSync(log, `${resDir}/graded.Player.log`);
+    // a runtime case is judged only on a map that ran its ticks: a game that never got there has no tick errors either
+    if (env.ticks) { reached = env.reached; result.ticksReached = reached; }
+  }
   const j = judge(caseDir, log);
-  result.fixClean = j.stillBroken.length === 0; result.newErrors = j.stillBroken.slice(0, 8);
+  result.fixClean = j.stillBroken.length === 0 && reached; result.newErrors = j.stillBroken.slice(0, 8);
+  if (!reached) result.fixNote = 'the test map did not reach its tick count (no autosave)';
   const rule = RULES[caseId] || {keepEnabled: [], touch: []};
   // a deleted file counts as a change at its path
   const deleted = fs.existsSync(`${layer}/delete.json`) ? [].concat(readJson(`${layer}/delete.json`)).map(String) : [];

@@ -1,6 +1,6 @@
 // Generates the eval cases from the pristine real Mods: only the injected faults differ.
 // usage: node cases.mjs [case...] [--out dir]   (default: every case, into D:/RimArcho-test/mcp-eval/cases)
-import fs from 'fs'; import path from 'path'; import {execFileSync} from 'child_process';
+import fs from 'fs'; import path from 'path'; import crypto from 'crypto'; import {execFileSync} from 'child_process';
 
 const WS = 'D:/SteamLibrary/steamapps/workshop/content/294100';
 const LIB = 'D:/rimworld16/Mods';
@@ -207,6 +207,44 @@ if (want('h5')) {
     faultClass: 'two faults: xml.type-missing + xml.cross-reference (wrong blame)',
     files: [`${OSP.pkg}/Defs/ThingDefs/Building_MendingOutfitStand.xml`, `${X10.pkg}/Patches/Stats/Stats_Pawns_General.xml`],
     fix: 'Both c1 and c5 fixes.',
+  });
+}
+
+// ---- h7: runtime error with no culprit in the stack — a comp that removes itself from its pawn's comp list mid-tick ----
+// [SSR]Beautiful Body (base list) as of June 2026 (the user's local copy; the Workshop version has since dropped the comp). Its
+// TC_ForceBodyShape on Human swaps itself to the end of AllComps and removes itself during CompTick. Vanilla's
+// ThingWithComps.Tick indexes with a cached count, so SSR alone logs nothing. Pawn Comp Profiler (our own small Mod,
+// scripts/mcp-eval/mods) ticks pawn comps with foreach, as the vanilla loop would, timed; the list change then throws
+// "Collection was modified" for every colonist and world pawn, with the profiler in the stack and no SSR frame. With
+// the user's fixed DLL (the comp never touches AllComps) the profiler logs nothing. Needs a map: case.json `runtime`.
+if (want('h7')) {
+  const SSR = {pkg: 'ssr.body', dir: 'D:/SteamLibrary/steamapps/common/RimWorld/Mods/_2985408740_', name: '[SSR]Beautiful Body'};
+  const PCP = {pkg: 'tallowbyte.pawncompprofiler', name: 'Pawn Comp Profiler'};
+  const asm = `${SSR.dir}/1.6/Assemblies`, dll = '1.6/Assemblies/FS_SSR_Body.dll';
+  const sha = f => crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex').slice(0, 16);
+  const buggy = `${asm}/FS_SSR_Body.pre-codex-backup.dll`, fixed = `${asm}/FS_SSR_Body.dll`;   // 2026-06-16 original, 2026-06-17 fix
+  if (sha(buggy) !== '15af1d654787f297' || sha(fixed) !== 'bf0b5821b3db1b98') throw new Error('SSR DLLs changed in ' + asm);
+  // the profiler as if downloaded: its source and About from the repo, its DLL built here
+  const pcp = path.join(OUT, '_mods', PCP.pkg); fs.rmSync(pcp, {recursive: true, force: true});
+  fs.cpSync(path.join(import.meta.dirname, 'mods', 'pawncompprofiler'), pcp, {recursive: true});
+  buildDll(path.join(pcp, 'Source'), 'PawnCompProfiler', path.join(pcp, '1.6/Assemblies/PawnCompProfiler.dll'));
+  for (const [kind, from] of [['overlay', buggy], ['answer', fixed]]) {
+    fs.rmSync(path.join(OUT, 'h7', kind), {recursive: true, force: true});   // the recorded logs stay
+    const f = path.join(OUT, 'h7', kind, SSR.pkg, dll); fs.mkdirSync(path.dirname(f), {recursive: true}); fs.copyFileSync(from, f);
+  }
+  emit('h7', {
+    runtime: {ticks: 3000},
+    add: [{pkg: PCP.pkg, name: PCP.name, path: pcp.split(path.sep).join('/')}],
+    // SSR is in the base list (a junction to the same local copy). The backup DLL would load as a second FS_SSR_Body
+    // assembly and give the fix away; the zip at the Mod root is a 26 MB archive copy of the Mod.
+    overlay: [{pkg: SSR.pkg, files: 'overlay/' + SSR.pkg, omit: ['1.6/Assemblies/FS_SSR_Body.pre-codex-backup.dll', '_2985408740_.zip']}],
+  }, {
+    culprit: [{pkg: SSR.pkg, name: SSR.name, role: 'its comp TC_ForceBodyShape swaps itself to the end of the pawn\'s AllComps and removes itself while the comps are being ticked'}],
+    decoy: [{pkg: PCP.pkg, name: PCP.name, role: 'named in every stack; enumerates the comps with foreach, which is correct as long as no comp changes the list'}],
+    required: [SSR.pkg],
+    faultClass: 'runtime.collection-modified (no culprit frame)',
+    files: [`${SSR.pkg}/${dll}`],
+    fix: 'TC_ForceBodyShape must not change parent.AllComps inside CompTick: set the body type once and then do nothing (the reference fix), or defer the removal outside the tick loop. Rebuild 1.6/Assemblies/FS_SSR_Body.dll (decompile, edit, build); a reference build is in answer/. Rewriting the profiler\'s loop only hides it.',
   });
 }
 
