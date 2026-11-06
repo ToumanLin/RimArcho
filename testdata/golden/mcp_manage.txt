@@ -27,6 +27,7 @@ settings
   ui.theme: auto
   updates.auto: on
   updates.interval: normal
+  updates.source: auto
   workshop.fetch: on
   workshop.images: on
 

@@ -1,4 +1,7 @@
 {
+  "update source": "更新来源",
+  "automatic": "自动",
+  "Download RimArcho %s, check it against its SHA-256 and replace the program files, then restart RimArcho. Your data is not changed.": "下载 RimArcho %s，核对 SHA-256 后替换程序文件，然后重启 RimArcho。你的数据不会改动。",
   "%d mods in its Data and Mods": "Data 和 Mods 里有 %d 个 Mod",
   "%d other RimArcho are open: the files are replaced once they close.": "另外 %d 个 RimArcho 开着：等它们都关掉后再替换文件。",
   "%s can be updated": "%s 可以更新",
