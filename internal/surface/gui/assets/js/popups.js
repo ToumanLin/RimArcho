@@ -190,7 +190,8 @@ export function palette() {
   });
 }
 
-// ---- the tag bar (16 §3.8): pinned tags first, then by use; ✓ all have it, ~ some ----
+// ---- the tag bar (16 §3.8): the selection's tags first, then pinned, then by use; ✓ all
+// have it, ~ some. Typing narrows the chips as the filter bar's tags: suggestions do. ----
 export async function tags(items, after) {
   const ids = items.filter((x) => x.id).map((x) => x.id);
   if (!ids.length) return;
@@ -200,23 +201,27 @@ export async function tags(items, after) {
     pop.append(el("div", "ttl", Tf("tags of %s", items.length === 1 ? items[0].name : Tf("%d mods", items.length))));
     const inp = inputLine(pop, "✎", T("type a new tag, or pick one"));
     const chips = el("div", "chips");
+    const fresh = el("div", "tag-new");
     const title = pop.querySelector(".ttl"); title.id = "tag-title";
     chips.id = "tag-options"; chips.setAttribute("role", "listbox"); chips.setAttribute("aria-labelledby", title.id);
     inp.setAttribute("role", "combobox"); inp.setAttribute("aria-controls", chips.id);
-    inp.setAttribute("aria-labelledby", title.id); inp.setAttribute("aria-expanded", String(cands.length > 0));
+    inp.setAttribute("aria-labelledby", title.id);
     inp.setAttribute("aria-autocomplete", "list");
     linkOpener(p, chips.id);
     p.restoreFocus = () => { if (p.opener?.isConnected) p.opener.focus({ preventScroll: true, focusVisible: p.openerFocusVisible }); };
-    pop.append(chips);
+    pop.append(chips, fresh);
     p.sel = -1;
+    let shown = cands;
+    const typed = () => inp.value.trim();
+    const exact = () => { const q = typed().toLowerCase(); return q ? cands.find((c) => c.tag.toLowerCase() === q) : null; };
     const draw = () => {
       chips.innerHTML = "";
-      cands.forEach((c, i) => {
+      shown.forEach((c, i) => {
         const all = c.have === ids.length, some = c.have > 0 && !all;
         const b = el("button", "c" + (i === p.sel ? " on" : ""));
         b.id = "tag-option-" + i; b.setAttribute("role", "option");
         b.setAttribute("aria-selected", String(i === p.sel)); b.setAttribute("aria-checked", some ? "mixed" : String(all));
-        b.setAttribute("aria-posinset", String(i + 1)); b.setAttribute("aria-setsize", String(cands.length));
+        b.setAttribute("aria-posinset", String(i + 1)); b.setAttribute("aria-setsize", String(shown.length));
         if (all || some) { const mark = el("span", "h", all ? "✓" : "~"); mark.setAttribute("aria-hidden", "true"); b.append(mark); }
         b.append(c.tag);
         b.dataset.envWrite = "tags";
@@ -224,7 +229,22 @@ export async function tags(items, after) {
         b.onclick = () => apply(c.tag, all);
         chips.append(b);
       });
-      if (p.sel >= 0) inp.setAttribute("aria-activedescendant", "tag-option-" + p.sel); else inp.removeAttribute("aria-activedescendant");
+      chips.hidden = !shown.length;
+      inp.setAttribute("aria-expanded", String(shown.length > 0));
+      // A typed name that is no tag yet: enter makes it.
+      const q = typed();
+      fresh.hidden = !q || !!exact();
+      fresh.textContent = fresh.hidden ? "" : Tf("new tag %s", q);
+      if (p.sel >= 0) {
+        inp.setAttribute("aria-activedescendant", "tag-option-" + p.sel);
+        chips.children[p.sel]?.scrollIntoView({ block: "nearest" });
+      } else inp.removeAttribute("aria-activedescendant");
+    };
+    const filter = () => {
+      const q = typed().toLowerCase();
+      shown = q ? cands.filter((c) => c.tag.toLowerCase().includes(q)) : cands;
+      p.sel = -1;
+      draw();
     };
     const apply = async (tag, remove) => {
       close();
@@ -232,12 +252,14 @@ export async function tags(items, after) {
       ui.reload();
       if (after) after();
     };
+    inp.addEventListener("input", filter);
     p.keys = (e) => {
-      if (["ArrowRight", "ArrowDown"].includes(e.key)) { p.sel = Math.min(p.sel + 1, cands.length - 1); draw(); e.preventDefault(); return true; }
+      if (["ArrowRight", "ArrowDown"].includes(e.key)) { p.sel = Math.min(p.sel + 1, shown.length - 1); draw(); e.preventDefault(); return true; }
       if (["ArrowLeft", "ArrowUp"].includes(e.key)) { p.sel = Math.max(p.sel - 1, -1); draw(); if (p.sel < 0) inp.focus(); e.preventDefault(); return true; }
       if (e.key === "Enter") {
         e.preventDefault();
-        if (p.sel >= 0) { const c = cands[p.sel]; apply(c.tag, c.have === ids.length); } else if (inp.value.trim()) apply(inp.value.trim(), false);
+        if (p.sel >= 0) { const c = shown[p.sel]; apply(c.tag, c.have === ids.length); }
+        else if (typed()) apply(exact()?.tag || typed(), false); // an existing tag keeps its spelling
         return true;
       }
       if (p.sel >= 0 && e.key.length === 1) { p.sel = -1; draw(); inp.focus(); }

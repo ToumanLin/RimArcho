@@ -9,8 +9,9 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 )
 
-// Tag candidates (16 §3.8): the pinned tags (config tags.pinned) first, then the tags in
-// use, most used first; each says how many of the selected mods have it.
+// Tag candidates (16 §3.8): the tags the selected mods have come first (all of them, then
+// some), then the rest; within each, the pinned tags (config tags.pinned), then the tags in
+// use, most used first. Each says how many of the selected mods have it.
 
 // TagCand is one candidate tag.
 type TagCand struct {
@@ -53,6 +54,16 @@ func TagCandidates(a *app.App, envID string, selected [][]string) []TagCand {
 	for _, t := range used {
 		add(t.Tag, t.N)
 	}
+	rank := func(c TagCand) int {
+		switch {
+		case c.Have > 0 && c.Have == len(selected):
+			return 0
+		case c.Have > 0:
+			return 1
+		}
+		return 2
+	}
+	sort.SliceStable(out, func(i, j int) bool { return rank(out[i]) < rank(out[j]) })
 	return out
 }
 

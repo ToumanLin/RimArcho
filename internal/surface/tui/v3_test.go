@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/ToumanLin/RimArcho/internal/testkit"
+	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
 // The v3 interaction model (16 §3): T17–T20.
@@ -241,11 +242,7 @@ func idOf(t *testing.T, m *model, name string) string {
 }
 
 // tagsDefault is the i-th pinned tag (16 §3.8).
-func (m *model) tagsDefault(i int) string {
-	m.tagKey()
-	defer func() { m.tags = nil }()
-	return m.tags.cands[i].tag
-}
+func (m *model) tagsDefault(i int) string { return view.PinnedTags(m.app)[i] }
 
 // T19: every state, popups and the full screen included, shows the focused area and the
 // place in it on the position line, and the open popup's name.
