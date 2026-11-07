@@ -117,6 +117,9 @@ func Assemble(root, version string, id uint64) (*Item, error) {
 	if err := copyTree(monitor, folder); err != nil {
 		return nil, err
 	}
+	if err := copyDocs(root, folder); err != nil {
+		return nil, err
+	}
 	if id != 0 {
 		if err := WriteID(filepath.Join(folder, "About", "PublishedFileId.txt"), id); err != nil {
 			return nil, err
@@ -137,6 +140,35 @@ func Assemble(root, version string, id uint64) (*Item, error) {
 	}
 	ok = true
 	return &Item{Folder: folder, Preview: preview, ZipName: name, IDFile: idFile, ID: id}, nil
+}
+
+// Docs are the reading files the item carries beside the zip. The zip stays the GitHub
+// release byte for byte: updaters before 1.0.5 reject top-level entries they do not know,
+// and no updater accepts UserGuide/. RimWorld ignores these files, since LoadFolders.xml
+// loads only the Mod folders.
+var Docs = []string{"README.md", "README.zh-CN.md", "UserGuide/user-guide.md", "UserGuide/user-guide.zh-CN.md"}
+
+// copyDocs copies Docs and the agent skills (skills/) from the repository root, keeping
+// their paths so the READMEs' and guides' links between them still work.
+func copyDocs(root, folder string) error {
+	for _, p := range Docs {
+		to := filepath.Join(folder, filepath.FromSlash(p))
+		if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
+			return err
+		}
+		if err := copyRegular(filepath.Join(root, filepath.FromSlash(p)), to, nil); err != nil {
+			return err
+		}
+	}
+	// A skill template built locally leaves bin/ and obj/; never publish build output.
+	to := filepath.Join(folder, "skills")
+	if err := copyTreeSkipping(filepath.Join(root, "skills"), to, map[string]bool{"bin": true, "obj": true, "node_modules": true}); err != nil {
+		return err
+	}
+	if found, _ := filepath.Glob(filepath.Join(to, "*", "SKILL.md")); len(found) == 0 {
+		return errors.New("skills/ has no <skill>/SKILL.md")
+	}
+	return nil
 }
 
 // ReadID treats an absent or empty file as a new item, and rejects malformed IDs.
@@ -219,10 +251,16 @@ func copyRegular(src, dst string, hash io.Writer) error {
 	return errors.Join(err, out.Close())
 }
 
-func copyTree(src, dst string) error {
+func copyTree(src, dst string) error { return copyTreeSkipping(src, dst, nil) }
+
+// copyTreeSkipping copies regular files, leaving out directories with a skipped name.
+func copyTreeSkipping(src, dst string, skip map[string]bool) error {
 	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
+		}
+		if d.IsDir() && path != src && skip[d.Name()] {
+			return filepath.SkipDir
 		}
 		rel, err := filepath.Rel(src, path)
 		if err != nil {

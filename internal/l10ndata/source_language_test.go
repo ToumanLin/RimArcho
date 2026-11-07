@@ -109,7 +109,7 @@ var sourceLanguageDirectories = map[string]string{
 }
 
 // chineseCopyMarker in a file name marks a Chinese copy of a document (README.zh-CN.md,
-// docs/user-guide.zh-CN.md); such files are exempt without being listed.
+// UserGuide/user-guide.zh-CN.md); such files are exempt without being listed.
 const chineseCopyMarker = "zh-CN"
 
 func sourceLanguageExempt(path string) bool {

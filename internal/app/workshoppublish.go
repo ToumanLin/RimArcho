@@ -53,6 +53,10 @@ func (a *App) WorkshopPublish(ctx context.Context, request steamworks.PublishReq
 					progress(fmt.Sprintf("progress: created ws:%d", id))
 				}
 			}
+		case strings.HasPrefix(line, "TRANSLATED "):
+			if f := strings.Fields(line); progress != nil && len(f) == 3 {
+				progress("progress: set the " + f[2] + " title and description")
+			}
 		case strings.HasPrefix(line, "LEGAL "):
 			if progress != nil {
 				progress(strings.TrimPrefix(line, "LEGAL "))

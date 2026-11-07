@@ -4,23 +4,32 @@
 
 如果你觉得好用, 不妨点个赞, 点个收藏, 去github给我点个star, 非常感谢!
 
-![启动页](assets/release-post/zh/01-home.png)
+### 怎么用
 
-![性能](assets/release-post/zh/divider-01-performance.png)
+订阅后, Steam会把 `archo-版本号-windows-amd64.zip` 下载到 `Steam目录\steamapps\workshop\content\294100\3835688284\`; 也可以从 GitHub Releases 下载.
+
+1. 新用户: 找个目录解压, 双击 RimArcho.exe
+2. 老用户: 用新的 RimArcho.exe 和 archo.exe 替换旧的
+
+exe没有代码签名, 首次运行时Windows可能提示"Windows 已保护你的电脑": 选"更多信息", 再选"仍要运行".
+
+![启动页](../docs/assets/release-post/zh/01-home.png)
+
+![性能](../docs/assets/release-post/zh/divider-01-performance.png)
 
 RimArcho专门优化了性能: 
 在拥有6574份Mod, 列表启用601个mod的情况下, 空闲占用~100MB, 访问所有页面后峰值占用<250MB; TUI模式下占用~47MB; 空闲CPU占用仅为单核的~0.2-1.1%
 完全可以一边开着一边打游戏
 
-![能不能跑](assets/release-post/zh/divider-02-preflight.png)
+![能不能跑](../docs/assets/release-post/zh/divider-02-preflight.png)
 
 ### 启动前体检
 
-我收集了4.8万份玩家报错日志, 下载了5143个Mod, 用这些数据反复迭代排序算法和冲突检测.
+我收集了40,326份玩家报错日志, 下载了5143个Mod, 用这些数据反复迭代排序算法和冲突检测.
 
 基于这些数据, RimArcho迭代出了属于自己的高效排序算法; 并且会提示哪些mod在一起可能出错, 并建议停用其中一个.
 
-![能不能跑](assets/release-post/zh/02-can-it-run.png)
+![能不能跑](../docs/assets/release-post/zh/02-can-it-run.png)
 
 RimArcho能静态检查Mod程序集(dll)中的冲突, 这一步无法覆盖运行时冲突, 但是也能提前发现很多问题.
 
@@ -28,35 +37,35 @@ RimAcho能分析游戏存档使用的Mod, 并对比当前列表, 告诉你上一
 
 RimArcho会估测Mod列表需要占用的内存/显存. 电脑带不动提前警告你, 不用再等20分钟加载再崩溃.
 
-RimArcho能分析游玩中产生的日志, 并总结告诉你哪里出了问题, 不用费心在万行日志中迷失自我; 根据4.8万份日志, 给每类报错标注严重程度. 满屏红字黄字大部分可放心忽略, 真正需要处理的会挑出来.
+RimArcho能分析游玩中产生的日志, 并总结告诉你哪里出了问题, 不用费心在万行日志中迷失自我; 根据40,326份日志, 给每类报错标注严重程度. 满屏红字黄字大部分可放心忽略, 真正需要处理的会挑出来.
 
-![游戏日志](assets/release-post/zh/04-game-log.png)
+![游戏日志](../docs/assets/release-post/zh/04-game-log.png)
 
-![列表和游戏](assets/release-post/zh/divider-03-lists.png)
+![列表和游戏](../docs/assets/release-post/zh/divider-03-lists.png)
 
 ### 换个游玩风格
 
 支持多个列表, 多个游戏实例共用一套Mod下载. RimArcho通过软链接的方式管理Mod, 让一份Mod可以在不同游戏实例中使用.
 
-![游戏](assets/release-post/zh/07-games.png)
+![游戏](../docs/assets/release-post/zh/07-games.png)
 
 列表管理支持订阅(follow)steam合集, 合集更新时候列表跟着更新; 也能从RimSort, RimCrow中导入. 列表历史记录每一次的改动, 随时可以回滚.
 
-![跟着 Steam 合集](assets/release-post/zh/06-list-follow.png)
+![跟着 Steam 合集](../docs/assets/release-post/zh/06-list-follow.png)
 
 RimArcho提供的锁定版本功能, 允许玩家将当前使用的Mod复制为锁定版本, 避免steam自动更新覆盖.
 
-![Mod库存管理](assets/release-post/zh/divider-04-library.png)
+![Mod库存管理](../docs/assets/release-post/zh/divider-04-library.png)
 
 ### 轻松简单
 
 RimArcho展示Mod更新的内容, 玩家再也不必看着"正在更新RimWorld:steam工坊"发呆并疑惑是哪个Mod被更新了
 
-![更新](assets/release-post/zh/08-updates.png)
+![更新](../docs/assets/release-post/zh/08-updates.png)
 
 详情页直接显示Steam工坊介绍, 而不是Modder各个都懒得写的About.xml
 
-![Mod 详情](assets/release-post/zh/09-details.png)
+![Mod 详情](../docs/assets/release-post/zh/09-details.png)
 
 支持从GitHub, LoversLab, Steam工坊链接直接添加Mod下载, 并且在这些mod有更新的时候自动更新
 
@@ -64,9 +73,9 @@ RimArcho展示Mod更新的内容, 玩家再也不必看着"正在更新RimWorld:
 
 贴图优化使用todds, 允许将Mod中的png转换成dds, 降低游戏内存占用
 
-![贴图优化](assets/release-post/zh/11-textures.png)
+![贴图优化](../docs/assets/release-post/zh/11-textures.png)
 
-![存档管理](assets/release-post/zh/divider-05-saves.png)
+![存档管理](../docs/assets/release-post/zh/divider-05-saves.png)
 
 ### 用不着启动游戏
 
@@ -74,9 +83,9 @@ RimArcho展示Mod更新的内容, 玩家再也不必看着"正在更新RimWorld:
 
 RimArcho能分析这个存档使用了哪些mod, 去掉某个mod存档是否会丢失内容, 是否能正常启动
 
-![游戏存档](assets/release-post/zh/12-saves.png)
+![游戏存档](../docs/assets/release-post/zh/12-saves.png)
 
-![AI与MCP](assets/release-post/zh/divider-06-ai.png)
+![AI与MCP](../docs/assets/release-post/zh/divider-06-ai.png)
 
 RimArcho迭代了MCP服务, 未来也会内置AI Agent.
 

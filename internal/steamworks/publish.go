@@ -22,7 +22,22 @@ type PublishRequest struct {
 	Note        string  `json:"note"`
 	Visibility  *uint32 `json:"visibility,omitempty"`
 	IDFile      string  `json:"id_file"` // source About/PublishedFileId.txt; saved immediately after CreateItem
+	// Translations set the title and description for other Steam languages, each in
+	// its own update after the main one (Steam's update handle holds one language).
+	Translations []PublishTranslation `json:"translations,omitempty"`
 }
+
+// PublishTranslation is one Steam language's title and description.
+type PublishTranslation struct {
+	Language    string `json:"language"` // a Steam API language code, such as schinese
+	Description string `json:"description"`
+}
+
+// DescriptionMax is Steam's description limit in bytes (k_cchPublishedDocumentDescriptionMax).
+const DescriptionMax = 8000
+
+// PublishLanguages are the Steam API language codes a translation may use.
+var PublishLanguages = map[string]bool{"schinese": true, "tchinese": true, "japanese": true, "koreana": true, "russian": true, "german": true, "french": true, "spanish": true, "brazilian": true, "polish": true}
 
 // ReadPublishRequest validates local inputs before loading or calling Steam.
 func ReadPublishRequest(path string) (PublishRequest, error) {
@@ -48,9 +63,23 @@ func ReadPublishRequest(path string) (PublishRequest, error) {
 	if r.Title == "" || r.Version == "" || strings.ContainsAny(r.Version, ",\r\n") {
 		return r, errors.New("publish title and version are required; version must be one tag")
 	}
-	for _, s := range []string{r.Content, r.Preview, r.Version, r.Title, r.Description, r.Note, r.IDFile} {
+	texts := []string{r.Content, r.Preview, r.Version, r.Title, r.Description, r.Note, r.IDFile}
+	descriptions := []string{r.Description}
+	for _, t := range r.Translations {
+		if !PublishLanguages[t.Language] || t.Description == "" {
+			return r, fmt.Errorf("invalid Workshop translation %q", t.Language)
+		}
+		texts = append(texts, t.Description)
+		descriptions = append(descriptions, t.Description)
+	}
+	for _, s := range texts {
 		if strings.ContainsRune(s, 0) {
 			return r, errors.New("publish request contains a NUL character")
+		}
+	}
+	for _, s := range descriptions {
+		if len(s) > DescriptionMax {
+			return r, fmt.Errorf("Workshop description exceeds %d bytes", DescriptionMax)
 		}
 	}
 	if r.Visibility != nil && *r.Visibility > 3 {

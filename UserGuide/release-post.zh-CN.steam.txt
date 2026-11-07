@@ -4,6 +4,14 @@
 
 如果你觉得好用, 不妨点个赞, 点个收藏, 去github给我点个star, 非常感谢!
 
+[h3]怎么用[/h3]
+订阅后, Steam会把 archo-版本号-windows-amd64.zip 下载到 Steam目录\steamapps\workshop\content\294100\3835688284\; 也可以从 GitHub Releases 下载.
+[olist]
+[*]新用户: 找个目录解压, 双击 RimArcho.exe
+[*]老用户: 用新的 RimArcho.exe 和 archo.exe 替换旧的
+[/olist]
+exe没有代码签名, 首次运行时Windows可能提示"Windows 已保护你的电脑": 选"更多信息", 再选"仍要运行".
+
 [img]https://fastly.jsdelivr.net/gh/ToumanLin/RimArcho@ce31c187bde020132530e37faf2106c4ff63c60f/steam/zh/p01-01-home.png[/img]
 
 [img]https://fastly.jsdelivr.net/gh/ToumanLin/RimArcho@ce31c187bde020132530e37faf2106c4ff63c60f/steam/zh/p02-divider-01-performance.png[/img]
@@ -13,7 +21,7 @@ RimArcho专门优化了性能:
 
 [img]https://fastly.jsdelivr.net/gh/ToumanLin/RimArcho@ce31c187bde020132530e37faf2106c4ff63c60f/steam/zh/p03-divider-02-preflight.png[/img]
 [h3]启动前体检[/h3]
-我收集了4.8万份玩家报错日志, 下载了5143个Mod, 用这些数据反复迭代排序算法和冲突检测.
+我收集了40,326份玩家报错日志, 下载了5143个Mod, 用这些数据反复迭代排序算法和冲突检测.
 
 基于这些数据, RimArcho迭代出了属于自己的高效排序算法; 并且会提示哪些mod在一起可能出错, 并建议停用其中一个.
 
@@ -25,7 +33,7 @@ RimAcho能分析游戏存档使用的Mod, 并对比当前列表, 告诉你上一
 
 RimArcho会估测Mod列表需要占用的内存/显存. 电脑带不动提前警告你, 不用再等20分钟加载再崩溃.
 
-RimArcho能分析游玩中产生的日志, 并总结告诉你哪里出了问题, 不用费心在万行日志中迷失自我; 根据4.8万份日志, 给每类报错标注严重程度. 满屏红字黄字大部分可放心忽略, 真正需要处理的会挑出来.
+RimArcho能分析游玩中产生的日志, 并总结告诉你哪里出了问题, 不用费心在万行日志中迷失自我; 根据40,326份日志, 给每类报错标注严重程度. 满屏红字黄字大部分可放心忽略, 真正需要处理的会挑出来.
 
 [img]https://fastly.jsdelivr.net/gh/ToumanLin/RimArcho@ce31c187bde020132530e37faf2106c4ff63c60f/steam/zh/p05-04-game-log.png[/img]
 

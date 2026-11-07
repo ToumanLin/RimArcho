@@ -3,6 +3,7 @@ package cmds
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/buildinfo"
@@ -18,6 +19,9 @@ var workshopPublishCommand = &Command{
 		{Name: "item", Value: "<id>", Help: "Workshop item ID (default: Monitor's PublishedFileId.txt; absent creates an item)"},
 		{Name: "note", Value: "<text>", Help: "Workshop change note"},
 		{Name: "visibility", Value: "public|unlisted|private|friends", Help: "set visibility (default: leave Steam's current/default value)"},
+		{Name: "description", Value: "<file>", Help: "set the description from a Steam BBCode file, at most 8000 bytes (default: leave it)"},
+		{Name: "description-zh", Value: "<file>", Help: "set the Simplified Chinese description from a Steam BBCode file"},
+		{Name: "preview", Value: "<file>", Help: "preview image (PNG, JPG or GIF, under 1 MB) instead of Monitor's About/Preview.png"},
 		{Name: "dry-run", Help: "assemble and validate locally without contacting Steam"},
 	},
 	Run: workshopPublishCmd,
@@ -72,7 +76,69 @@ func publishOptions(a *Args) (steamworks.PublishRequest, error) {
 	if strings.ContainsRune(r.Note, 0) || len(r.Note) > 8000 {
 		return r, &UsageError{Msg: "--note must be at most 8000 bytes and contain no NUL characters"}
 	}
+	var err error
+	if r.Description, err = descriptionFile(a, "description"); err != nil {
+		return r, err
+	}
+	if zh, err := descriptionFile(a, "description-zh"); err != nil {
+		return r, err
+	} else if zh != "" {
+		r.Translations = []steamworks.PublishTranslation{{Language: "schinese", Description: zh}}
+	}
+	if a.Bool("preview") {
+		if r.Preview, err = previewFile(a.Str("preview")); err != nil {
+			return r, err
+		}
+	}
 	return r, nil
+}
+
+// descriptionFile reads a description flag's file; an absent flag leaves Steam's text.
+func descriptionFile(a *Args, flag string) (string, error) {
+	if !a.Bool(flag) {
+		return "", nil
+	}
+	path := a.Str(flag)
+	if path == "" {
+		return "", &UsageError{Msg: "--" + flag + " needs a file"}
+	}
+	fi, err := os.Stat(path)
+	if err != nil || !fi.Mode().IsRegular() {
+		return "", &UsageError{Msg: "--" + flag + ": " + path + " is not a readable file"}
+	}
+	if fi.Size() > steamworks.DescriptionMax {
+		return "", &UsageError{Msg: fmt.Sprintf("--%s: %s is %d bytes; Steam allows at most %d", flag, path, fi.Size(), steamworks.DescriptionMax)}
+	}
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	text := strings.TrimSpace(strings.TrimPrefix(string(b), "\uFEFF"))
+	if text == "" || strings.ContainsRune(text, 0) {
+		return "", &UsageError{Msg: "--" + flag + ": " + path + " is empty or contains NUL characters"}
+	}
+	return text, nil
+}
+
+// previewFile checks what Steam accepts as a preview: an image under 1 MB.
+func previewFile(path string) (string, error) {
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".png", ".jpg", ".jpeg", ".gif":
+	default:
+		return "", &UsageError{Msg: "--preview must be a PNG, JPG or GIF file"}
+	}
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	fi, err := os.Stat(abs)
+	if err != nil || !fi.Mode().IsRegular() {
+		return "", &UsageError{Msg: "--preview: " + path + " is not a readable file"}
+	}
+	if fi.Size() >= 1<<20 {
+		return "", &UsageError{Msg: "--preview: Workshop preview must be smaller than 1 MB"}
+	}
+	return abs, nil
 }
 
 func workshopPublishCmd(c *Ctx, a *Args) (*render.Doc, error) {
@@ -92,7 +158,10 @@ func workshopPublishCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		return nil, err
 	}
 	r.ID = item.ID
-	r.Content, r.Preview, r.IDFile = item.Folder, item.Preview, item.IDFile
+	r.Content, r.IDFile = item.Folder, item.IDFile
+	if r.Preview == "" {
+		r.Preview = item.Preview
+	}
 	if !a.Bool("dry-run") {
 		id, legal, err := c.App.WorkshopPublish(c.Context, r, Progress)
 		if err != nil {
@@ -127,6 +196,12 @@ func workshopPublishCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	if r.Preview != "" {
 		n.KV("preview", r.Preview)
+	}
+	if r.Description != "" {
+		n.KV("description", fmt.Sprintf("%d bytes (replaces the current one)", len(r.Description)))
+	}
+	for _, t := range r.Translations {
+		n.KV("description "+t.Language, fmt.Sprintf("%d bytes, set in a second update", len(t.Description)))
 	}
 	return d, nil
 }

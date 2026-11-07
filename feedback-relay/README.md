@@ -48,7 +48,7 @@ Requires a Cloudflare account (the free plan suffices), Node.js (LTS) and reposi
 
 6. (Optional) Create a `feedback` label under Issues → Labels. This is optional: if GitHub rejects the label, the Worker retries issue creation without it.
 
-7. **Send one real report in the VM** (a row in [pre-release VM tests](../docs/release-vm-tests.md) covers this):
+7. **Send one real report in the VM** (a row in [pre-release VM tests](../UserGuide/release-vm-tests.md) covers this):
    1. Set `RIMARCHO_FEEDBACK_RELAY=https://rimarcho-feedback.<your-subdomain>.workers.dev/report` before starting RimArcho.
    2. Settings › Feedback: enter "relay test" as the title, any contact details, and click "send".
    3. After "sent as #N" appears, check GitHub:

@@ -2,7 +2,7 @@
 
 English | [&#31616;&#20307;&#20013;&#25991;](user-guide.zh-CN.md)
 
-This guide is for players. It walks through every part of RimArcho 1.0.5: what each page is for, what its controls do, and how to get common jobs done. For how things work inside, see the [specifications](specs/README.md); for one-paragraph selling points, see [highlights](highlights.md).
+This guide is for players. It walks through every part of RimArcho 1.0.5: what each page is for, what its controls do, and how to get common jobs done. For how things work inside, see the [specifications](../docs/specs/README.md).
 
 ## Contents
 

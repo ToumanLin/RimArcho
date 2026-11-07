@@ -95,7 +95,7 @@ Listed by who can do what; status refers to the current code.
 | Real community data download | `archo data update` against the real sources (about 50 MB) | Player |
 | DDS textures | Optimized textures and slimmed packs look right in the game, in 1.6 and 1.7 (10 §2; research dds-texture-optimization §6) | Player enters game |
 | GUI accessibility | Narrator; the A13 branches that need real files, the network or a launch; A17 on the remaining pages (16 §11) | Player or agent |
-| Release VM test rows | The rows still in [release VM tests](../release-vm-tests.md), among them every row's 1.7 part, real-mouse checks, the LoversLab session, in-game settings windows (Archo Monitor and HugsLib records) and the feedback relay's real send (research 2026-11-05_release-1.0.1-vm-round, "Not covered") | VM, or player where credentials are needed |
+| Release VM test rows | The rows still in [release VM tests](../../UserGuide/release-vm-tests.md), among them every row's 1.7 part, real-mouse checks, the LoversLab session, in-game settings windows (Archo Monitor and HugsLib records) and the feedback relay's real send (research 2026-11-05_release-1.0.1-vm-round, "Not covered") | VM, or player where credentials are needed |
 
 ### 4.3 Limits of implemented features
 

@@ -6,8 +6,8 @@ import (
 	"strings"
 )
 
-// WorkshopItem is set after the maintainer publishes the RimArcho item.
-const WorkshopItem = ""
+// WorkshopItem is the RimArcho item on the Steam Workshop (17 §5.1), created 2026-11-07.
+const WorkshopItem = "3835688284"
 
 // WorkshopVersion selects the highest stable v<semver> tag, ignoring Mod tags.
 func WorkshopVersion(tags []string) string {

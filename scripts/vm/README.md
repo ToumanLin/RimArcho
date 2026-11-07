@@ -44,7 +44,7 @@ pwsh scripts/vm/round.ps1 -ExtraMonitor "<folder>"  # also put the driver in ano
 pwsh scripts/vm/round.ps1 -Cleanup           # remove a driver an interrupted round left behind
 ```
 
-This is the "actually enter the game" round of [pre-release VM tests](../../docs/release-vm-tests.md). **Archo Drive** (`drive/`, test only, never shipped) plays it inside the game. It calls what the game's buttons call:
+This is the "actually enter the game" round of [pre-release VM tests](../../UserGuide/release-vm-tests.md). **Archo Drive** (`drive/`, test only, never shipped) plays it inside the game. It calls what the game's buttons call:
 
 - each page's Next (`CanDoNext`, then `DoNext`) after "New colony";
 - the save and load dialogs' file action;

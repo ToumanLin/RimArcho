@@ -38,7 +38,7 @@ Investigations, measurements and open questions; once a report's conclusions are
 
 | Document | What it is | Status |
 | --- | --- | --- |
-| [2026-10-27_vm-automation-test-plan.md](2026-10-27_vm-automation-test-plan.md) | VM automation plan: player-action map, scenario contract, budgets, scenarios | In use: §3, §5–§7 cited by [release-vm-tests.md](../release-vm-tests.md) and `scripts/vm/phase1a.md`; §2 is a 2026-10-27 snapshot |
+| [2026-10-27_vm-automation-test-plan.md](2026-10-27_vm-automation-test-plan.md) | VM automation plan: player-action map, scenario contract, budgets, scenarios | In use: §3, §5–§7 cited by [release-vm-tests.md](../../UserGuide/release-vm-tests.md) and `scripts/vm/phase1a.md`; §2 is a 2026-10-27 snapshot |
 | [2026-11-05_release-1.0.1-vm-round.md](2026-11-05_release-1.0.1-vm-round.md) | Pre-release VM round for 1.0.1: sessions, bugs found and fixed | Latest release round; cited by release-vm-tests.md |
 | [2026-10-27_vm-scenarios-5-6-9.md](2026-10-27_vm-scenarios-5-6-9.md) | VM scenarios 5, 6, 9 on real data (subscribe, unsubscribe and recycle, save and launch) | Method cited by release-vm-tests.md; open: B6, B7, B10, B12–B15 (§7) |
 | [2026-10-27_vm-real-home-round-and-scenarios-7-8.md](2026-10-27_vm-real-home-round-and-scenarios-7-8.md) | Real-home random-player rounds, export/reimport, post-sort repair | Open: §5 item 3 (save says "no changes" while links are pending) |

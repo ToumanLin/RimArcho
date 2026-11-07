@@ -26,6 +26,14 @@ func fixture(t *testing.T) string {
 		"dist/archo-1.2.3-windows-amd64/monitor/ArchoMonitor/Languages/English/Keyed/Settings.xml": "<LanguageData/>",
 		"dist/archo-1.2.3-windows-amd64.zip":                                                       "synthetic zip payload",
 		"dist/archo-1.2.3-windows-amd64.zip.sha256":                                                fmt.Sprintf("%x  archo-1.2.3-windows-amd64.zip\n", sha256.Sum256([]byte("synthetic zip payload"))),
+		"README.md":                         "# synthetic readme",
+		"README.zh-CN.md":                   "# synthetic readme zh",
+		"UserGuide/user-guide.md":           "# synthetic guide",
+		"UserGuide/user-guide.zh-CN.md":     "# synthetic guide zh",
+		"skills/probe/SKILL.md":             "synthetic skill",
+		"skills/probe/template/a.cs":        "class A {}",
+		"skills/probe/template/bin/out.dll": "local build output",
+		"skills/probe/template/obj/x.json":  "local build output",
 	}
 	for name, text := range files {
 		write(t, filepath.Join(root, filepath.FromSlash(name)), []byte(text))
@@ -52,9 +60,15 @@ func TestAssemble(t *testing.T) {
 	if !filepath.IsAbs(item.Folder) || item.ID != 81234 || item.Preview == "" {
 		t.Fatalf("item: %+v", item)
 	}
-	for _, p := range []string{"About/PublishedFileId.txt", "About/Preview.png", "LoadFolders.xml", "1.5/Assemblies/ArchoMonitor.dll", "1.6/Assemblies/ArchoMonitor.dll", "1.7/Assemblies/ArchoMonitor.dll", "Languages/English/Keyed/Settings.xml", item.ZipName, item.ZipName + ".sha256"} {
+	for _, p := range []string{"About/PublishedFileId.txt", "About/Preview.png", "LoadFolders.xml", "1.5/Assemblies/ArchoMonitor.dll", "1.6/Assemblies/ArchoMonitor.dll", "1.7/Assemblies/ArchoMonitor.dll", "Languages/English/Keyed/Settings.xml", item.ZipName, item.ZipName + ".sha256",
+		"README.md", "README.zh-CN.md", "UserGuide/user-guide.md", "UserGuide/user-guide.zh-CN.md", "skills/probe/SKILL.md", "skills/probe/template/a.cs"} {
 		if _, err := os.Stat(filepath.Join(item.Folder, filepath.FromSlash(p))); err != nil {
 			t.Fatal(err)
+		}
+	}
+	for _, p := range []string{"skills/probe/template/bin", "skills/probe/template/obj"} {
+		if _, err := os.Stat(filepath.Join(item.Folder, filepath.FromSlash(p))); !os.IsNotExist(err) {
+			t.Fatalf("build output %s published", p)
 		}
 	}
 	staged, err := os.ReadFile(filepath.Join(item.Folder, "About", "About.xml"))
@@ -128,5 +142,20 @@ func TestAssembleStandaloneBuildWithoutPreviewOrID(t *testing.T) {
 	}
 	if item.ID != 0 || item.Preview != "" {
 		t.Fatalf("item: %+v", item)
+	}
+}
+
+func TestAssembleNeedsDocsAndSkills(t *testing.T) {
+	for _, missing := range []string{"README.zh-CN.md", "UserGuide/user-guide.md", "skills/probe/SKILL.md"} {
+		root := fixture(t)
+		if err := os.Remove(filepath.Join(root, filepath.FromSlash(missing))); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := workshoppublish.Assemble(root, "1.2.3", 0); err == nil {
+			t.Errorf("assembled without %s", missing)
+		}
+		if folders, _ := filepath.Glob(filepath.Join(root, "dist", "workshop-*")); len(folders) != 0 {
+			t.Fatal("failed assembly left a partial staging folder")
+		}
 	}
 }

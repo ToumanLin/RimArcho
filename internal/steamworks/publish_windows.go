@@ -38,7 +38,11 @@ func publishWorker(r PublishRequest, w io.Writer) error {
 	}
 	defer f.shutdown.Call()
 	procs := map[string]*syscall.Proc{}
-	for _, name := range []string{"CreateItem", "StartItemUpdate", "SetItemContent", "SetItemPreview", "SetItemTags", "SetItemTitle", "SetItemDescription", "SetItemVisibility", "SubmitItemUpdate", "GetItemUpdateProgress"} {
+	names := []string{"CreateItem", "StartItemUpdate", "SetItemContent", "SetItemPreview", "SetItemTags", "SetItemTitle", "SetItemDescription", "SetItemVisibility", "SubmitItemUpdate", "GetItemUpdateProgress"}
+	if len(r.Translations) > 0 {
+		names = append(names, "SetItemUpdateLanguage")
+	}
+	for _, name := range names {
 		p, err := f.dll.FindProc("SteamAPI_ISteamUGC_" + name)
 		if err != nil {
 			return fmt.Errorf("steam_api64.dll has no SteamAPI_ISteamUGC_%s (too old?)", name)
@@ -89,9 +93,16 @@ func publishWorker(r PublishRequest, w io.Writer) error {
 			}
 		}
 	}
-	h, _, _ := procs["StartItemUpdate"].Call(f.ugc, AppID, uintptr(r.ID))
-	if h == 0 || h == ^uintptr(0) {
-		return errors.New("Steam could not start the Workshop item update; check item ownership")
+	start := func() (uintptr, error) {
+		h, _, _ := procs["StartItemUpdate"].Call(f.ugc, AppID, uintptr(r.ID))
+		if h == 0 || h == ^uintptr(0) {
+			return 0, errors.New("Steam could not start the Workshop item update; check item ownership")
+		}
+		return h, nil
+	}
+	h, err := start()
+	if err != nil {
+		return err
 	}
 	set := func(name string, value uintptr) error {
 		ok, _, _ := procs[name].Call(f.ugc, h, value)
@@ -99,6 +110,21 @@ func publishWorker(r PublishRequest, w io.Writer) error {
 			return fmt.Errorf("Steam rejected %s; check the item's inputs and ownership", name)
 		}
 		return nil
+	}
+	submit := func(note string) ([]byte, error) {
+		call, _, _ := procs["SubmitItemUpdate"].Call(f.ugc, h, cstr(note))
+		var last string
+		sample := func() {
+			var got, total uint64
+			status, _, _ := procs["GetItemUpdateProgress"].Call(f.ugc, h, uintptr(unsafe.Pointer(&got)), uintptr(unsafe.Pointer(&total)))
+			line := fmt.Sprintf("UPLOAD %d %d %d", uint32(status), got, total)
+			if line != last {
+				fmt.Fprintln(w, line)
+				last = line
+			}
+		}
+		// SubmitItemUpdateResult_t: EResult at 0, bool at 4, PublishedFileId_t at 8; sizeof 16.
+		return f.waitUpload(uint64(call), 3404, 16, 30*time.Minute, sample)
 	}
 	for _, x := range []struct{ name, value string }{
 		{"SetItemContent", r.Content}, {"SetItemTitle", r.Title},
@@ -126,19 +152,7 @@ func publishWorker(r PublishRequest, w io.Writer) error {
 			return err
 		}
 	}
-	call, _, _ := procs["SubmitItemUpdate"].Call(f.ugc, h, cstr(r.Note))
-	var last string
-	sample := func() {
-		var got, total uint64
-		status, _, _ := procs["GetItemUpdateProgress"].Call(f.ugc, h, uintptr(unsafe.Pointer(&got)), uintptr(unsafe.Pointer(&total)))
-		line := fmt.Sprintf("UPLOAD %d %d %d", uint32(status), got, total)
-		if line != last {
-			fmt.Fprintln(w, line)
-			last = line
-		}
-	}
-	// SubmitItemUpdateResult_t: EResult at 0, bool at 4, PublishedFileId_t at 8; sizeof 16.
-	b, err := f.waitUpload(uint64(call), 3404, 16, 30*time.Minute, sample)
+	b, err := submit(r.Note)
 	if err != nil {
 		return err
 	}
@@ -146,6 +160,24 @@ func publishWorker(r PublishRequest, w io.Writer) error {
 	fmt.Fprintf(w, "PUBLISHED %d %d\n", r.ID, boolNumber(legal))
 	if legal {
 		legalMessage(w, r.ID)
+	}
+	// An update handle holds one language, so each translation is its own update.
+	// Its empty note keeps the change history to the main update's note.
+	for _, t := range r.Translations {
+		if h, err = start(); err != nil {
+			return err
+		}
+		for _, x := range []struct{ name, value string }{
+			{"SetItemUpdateLanguage", t.Language}, {"SetItemTitle", r.Title}, {"SetItemDescription", t.Description},
+		} {
+			if err := set(x.name, cstr(x.value)); err != nil {
+				return fmt.Errorf("%s translation: %w", t.Language, err)
+			}
+		}
+		if _, err := submit(""); err != nil {
+			return fmt.Errorf("%s translation: %w", t.Language, err)
+		}
+		fmt.Fprintf(w, "TRANSLATED %d %s\n", r.ID, t.Language)
 	}
 	fmt.Fprintln(w, DoneLine(Publish, 1))
 	return nil
