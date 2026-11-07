@@ -90,7 +90,7 @@ type SaveIssue struct {
 type SaveCheck struct {
 	Save     *Save
 	Mods     []SaveMod   // the save's Mods in load order
-	ListOnly []SaveMod   // the list's Mods the save does not have
+	ListOnly []SaveMod   // the list's Mods the save does not have, in the list's order
 	Issues   []SaveIssue // most severe first
 	// Level is the verdict: "" loads with the list, warning: content will be lost, error:
 	// will not load cleanly, "writing": the file is still being written (no verdict).
@@ -100,11 +100,6 @@ type SaveCheck struct {
 	// GoneOwns is what the not-installed Mods own together, what nothing installed
 	// provides counted once (12 §4.6); nil without the full read or such Mods.
 	GoneOwns *SaveOwned
-	// Since is the colony's previous save with a readable head, which Changes is against
-	// (12 §4.3 Mod list); nil for the colony's first save. Changes are the Mods added since
-	// it (InSave) and removed (not InSave), in each save's load order; order is ignored.
-	Since   *Save
-	Changes []SaveMod
 }
 
 // Verdict texts (12 §4.3).
@@ -251,13 +246,9 @@ func (a *App) CheckSave(s *Save) (*SaveCheck, error) {
 	for i := range c.Mods {
 		c.Mods[i].Library = library(c.Mods[i].PackageID)
 	}
-	name := func(inst string) string {
-		if st == nil || st.Ix == nil || st.Ix.ByID[inst] == nil {
-			return ""
-		}
-		return st.Ix.ByID[inst].Name
+	for i := range c.ListOnly {
+		c.ListOnly[i].Library = library(c.ListOnly[i].PackageID)
 	}
-	c.Since, c.Changes = s.modChanges(c.Mods, library, name)
 
 	// The last load of this save had errors or warnings (12 §4.3): from the stored report of the
 	// environment's logs, never parsing one here.
@@ -396,58 +387,6 @@ func malformedText(m *savefile.Malformed) string {
 		return fmt.Sprintf("the file ends at line %d before the save does", m.Line)
 	}
 	return fmt.Sprintf("line %d (byte %d): %s", m.Line, m.Offset, m.Msg)
-}
-
-// previousHead is the next older save of the same colony whose head was read, or nil.
-func (s *Save) previousHead() *Save {
-	if s.Colony == nil {
-		return nil
-	}
-	after := false
-	for _, o := range s.Colony.Saves {
-		if o == s {
-			after = true
-			continue
-		}
-		if after && o.Head != nil {
-			return o
-		}
-	}
-	return nil
-}
-
-// modChanges compares the save's Mods with the colony's previous save (12 §4.3 Mod list):
-// the Mods added since it, then those removed, by packageId; order is ignored.
-func (s *Save) modChanges(mods []SaveMod, library, name func(string) string) (*Save, []SaveMod) {
-	p := s.previousHead()
-	if p == nil {
-		return nil, nil
-	}
-	before := map[string]bool{}
-	for _, id := range p.Head.ModIDs {
-		before[normPkg(id)] = true
-	}
-	now := map[string]bool{}
-	changes := []SaveMod{}
-	for _, m := range mods {
-		now[normPkg(m.PackageID)] = true
-		if !before[normPkg(m.PackageID)] {
-			changes = append(changes, m)
-		}
-	}
-	for i, id := range p.Head.ModIDs {
-		if !now[normPkg(id)] {
-			m := SaveMod{PackageID: id, Name: p.Head.Name(i), SteamID: p.Head.SteamID(i), Library: library(id)}
-			if m.Name == id && name != nil {
-				// a save without <modNames>: the installed copy's name
-				if n := name(m.Library); n != "" {
-					m.Name = n
-				}
-			}
-			changes = append(changes, m)
-		}
-	}
-	return p, changes
 }
 
 // previousReadable is the newest older save of the same colony that is complete and, when

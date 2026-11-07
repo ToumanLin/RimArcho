@@ -150,8 +150,14 @@ func TestSaveDetail(t *testing.T) {
 			t.Fatalf("no consequence: %+v", is)
 		}
 	}
-	if len(d.Mods) != 5 || !d.Mods[4].Missing || !d.Mods[3].Off || !d.Mods[1].Moved {
+	if len(d.Mods) != 5 || !d.Mods[4].Missing || d.Mods[3].Change != view.SaveModRemoved || d.Mods[2].Change != "" || !d.Mods[1].Moved {
 		t.Fatalf("Mod list: %+v", d.Mods)
+	}
+	// Mod changes against the list (16 §2.11): the save's Gamma and Gone Mod are not in it;
+	// the installed one links to the Mod library.
+	if len(d.Changes) != 2 || d.Changes[0].Name != "Gamma" || d.Changes[0].Change != view.SaveModRemoved || d.Changes[0].Library == "" ||
+		d.Changes[1].Name != "Gone Mod" || !d.Changes[1].Missing || d.Changes[1].Library != "" {
+		t.Fatalf("Mod changes: %+v", d.Changes)
 	}
 	if d.NewList == nil || d.NewList.Label != "make a list from this save" {
 		t.Fatalf("make a list: %+v", d.NewList)
@@ -184,6 +190,9 @@ func TestSaveDetail(t *testing.T) {
 	if g := d.Issues[1]; len(g.Mods) != 7 || len(g.Details.Mods) != 7 || g.Details.Mods[0].Note != "no known Workshop page" ||
 		g.Consequence != "what they stored in the save is removed when the save loads" {
 		t.Fatalf("the Mods not installed: %+v", g)
+	}
+	if len(d.Changes) != 0 || d.Mods[1].Change != "" {
+		t.Fatalf("no list, no changes: %+v", d.Changes)
 	}
 
 	// a running game locks rename and recycle, with the reason

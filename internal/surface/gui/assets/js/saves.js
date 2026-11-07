@@ -517,59 +517,66 @@ function fixButton(d, f, primary) {
   return b;
 }
 
-// The Mod list (12 §4.3, 16 §2.11) shows only what changed since the colony's previous
-// save: Mods added (green +) and removed (red −), order ignored. A colony's first save
-// shows its whole list folded. Past MOD_FOLD rows the rest fold behind Show all; the
-// choice stays while the same save is selected.
+// The Mod list (12 §4.3, 16 §2.11) shows only how the list the save is checked against
+// differs from the save: the list's Mods the save lacks (green +) and the save's Mods the
+// list lacks (red −), order ignored. Past MOD_FOLD changes the rest fold behind Show all;
+// Show the full list unfolds the save's whole list in load order with the changes marked,
+// then the added Mods. A save with no list or pack has no changes: its list is folded
+// whole. The choice stays while the same save is selected.
 const MOD_FOLD = 12;
-let modOpen = ""; // the ref of the save whose Mod list is unfolded
+let modOpen = { ref: "", mode: "" }; // mode: "changes" (all of them) or "full"
 
-function modItems(d) { return d.since ? d.changes || [] : d.mods || []; }
+function modMode(d) { return modOpen.ref === d.ref ? modOpen.mode : ""; }
+function modItems(d, mode) {
+  if (mode === "full" || !d.listKind) return [...(d.mods || []), ...(d.changes || []).filter((m) => m.change === "added")];
+  return d.changes || [];
+}
 function modShown(d) {
-  const all = modItems(d);
-  return modOpen === d.ref ? all : all.slice(0, d.since ? MOD_FOLD : 0);
+  const mode = modMode(d), all = modItems(d, mode);
+  if (mode) return all;
+  return d.listKind ? all.slice(0, MOD_FOLD) : [];
 }
 
 // modSection is the heading, what the changes are against, the rows (mounted as the card
-// scrolls, modRows) and the fold.
+// scrolls, modRows) and the folds.
 function modSection(d) {
   const s = el("div", "sv-sect");
-  const all = modItems(d), shown = modShown(d);
-  const h = el("h3", "", d.since ? T("mod changes") : T("mod list"));
-  if (d.since) {
-    const added = all.filter((m) => m.added).length;
-    const since = el("span", "r");
-    since.append(T("since") + " ");
-    const prev = button(d.since, "", () => pick(d.sinceRef), "link sv-since");
-    prev.dataset.key = "since";
-    prev.title = T("open the previous save");
-    since.append(prev);
-    h.append(since);
-    s.append(h);
-    if (!all.length) { s.append(el("p", "sv-none", T("the same Mods as the previous save"))); return s; }
-    const counts = el("p", "sv-mcount");
-    if (added) counts.append(el("span", "add", Tf("%d added", added)));
-    if (all.length - added) counts.append(el("span", "del", Tf("%d removed", all.length - added)));
-    s.append(counts);
-  } else {
-    h.append(el("span", "r", Tf("first save of this colony: %d Mods", all.length)));
-    s.append(h);
+  const mode = modMode(d), shown = modShown(d);
+  const changes = d.changes || [], mods = d.mods || [];
+  const h = el("h3", "", d.listKind ? T("mod changes") : T("mod list"));
+  h.append(el("span", "r", d.listKind ? d.against : Tf("this save's %d Mods", mods.length)));
+  s.append(h);
+  if (d.listKind) {
+    const added = changes.filter((m) => m.change === "added").length;
+    if (!changes.length) s.append(el("p", "sv-none", T("the list has the same Mods as this save")));
+    else {
+      const counts = el("p", "sv-mcount");
+      if (added) counts.append(el("span", "add", Tf("%d added", added)));
+      if (changes.length - added) counts.append(el("span", "del", Tf("%d removed", changes.length - added)));
+      s.append(counts);
+    }
   }
-  const list = el("div", "sv-mods");
+  const list = el("div", "sv-mods" + (mode === "full" || !d.listKind ? " full" : ""));
   list.setAttribute("role", "list");
-  list.setAttribute("aria-label", d.since ? T("mod changes") : T("mod list"));
+  list.setAttribute("aria-label", mode === "full" || !d.listKind ? T("mod list") : T("mod changes"));
   list.style.height = shown.length * ROW + "px";
   s.append(list);
-  if (all.length > shown.length || (modOpen === d.ref && all.length > (d.since ? MOD_FOLD : 0))) {
-    const open = modOpen === d.ref;
-    const more = button(open ? T("show fewer") : Tf("show all %d", all.length), "", () => {
-      modOpen = open ? "" : d.ref;
-      drawMid(true);
-    }, "link sv-fold");
-    more.dataset.key = "mod-fold";
-    more.setAttribute("aria-expanded", String(open));
-    s.append(more);
+  const folds = el("p", "sv-folds");
+  const fold = (label, to, key, open) => {
+    const b = button(label, "", () => { modOpen = { ref: d.ref, mode: to }; drawMid(true); }, "link sv-fold");
+    b.dataset.key = key;
+    b.setAttribute("aria-expanded", String(open));
+    folds.append(b);
+  };
+  if (d.listKind && changes.length > MOD_FOLD && mode !== "full") {
+    if (mode === "changes") fold(T("show fewer"), "", "mod-fold", true);
+    else fold(Tf("show all %d changes", changes.length), "changes", "mod-fold", false);
   }
+  if (mods.length) {
+    if (mode === "full") fold(d.listKind ? T("show only the changes") : T("show fewer"), "", "mod-full", true);
+    else fold(Tf("show the full list (%d Mods)", mods.length), "full", "mod-full", false);
+  }
+  if (folds.childElementCount) s.append(folds);
   return s;
 }
 
@@ -577,17 +584,22 @@ function modSection(d) {
 // thousand Mods stays within the page's size limits (16 §11 A18).
 function modRows(scroll, list, all) {
   const shown = new Map();
+  const full = list.classList.contains("full"); // order marks only in the full list
   let frame = 0;
   const row = (i) => {
     const m = all[i];
-    const change = X.detail?.since ? (m.added ? " add" : " del") : "";
-    const r = el("div", "r" + change + (m.missing ? " gone" : "") + (m.off ? " off" : ""));
+    const add = m.change === "added";
+    const r = el("div", "r" + (m.change ? (add ? " add" : " del") : "") + (m.missing ? " gone" : ""));
     r.setAttribute("role", "listitem");
     r.setAttribute("aria-setsize", String(all.length));
     r.setAttribute("aria-posinset", String(i + 1));
     r.style.top = i * ROW + "px";
-    const sign = X.detail?.since ? el("i", "sg", m.added ? "+" : "−") : el("i", "", String(i + 1));
-    if (X.detail?.since) sign.setAttribute("aria-label", m.added ? T("added") : T("removed"));
+    // a change has its sign; in the full list the others have their place in the save
+    const sign = m.change ? el("i", "sg", add ? "+" : "−") : el("i", "", String(i + 1));
+    if (m.change) {
+      sign.title = add ? T("in the list, not in this save") : T("in this save, not in the list");
+      sign.setAttribute("aria-label", sign.title);
+    }
     r.append(sign);
     if (m.library) {
       const n = el("button", "n lk", m.name);
@@ -601,8 +613,7 @@ function modRows(scroll, list, all) {
       r.append(n);
     }
     if (m.missing) r.append(el("span", "tagx bad", T("not installed")));
-    else if (m.off) r.append(el("span", "tagx", T("not in the list")));
-    if (m.moved) { const mv = el("b", "mv", "↕"); mv.title = T("in another order in the list"); mv.setAttribute("aria-label", T("in another order in the list")); r.append(mv); }
+    if (m.moved && full) { const mv = el("b", "mv", "↕"); mv.title = T("in another order in the list"); mv.setAttribute("aria-label", T("in another order in the list")); r.append(mv); }
     return r;
   };
   const draw = () => {

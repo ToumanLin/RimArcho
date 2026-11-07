@@ -347,43 +347,41 @@ func TestSavesFullRead(t *testing.T) {
 	}
 }
 
-// The Mod list's changes since the colony's previous save (12 §4.3 Mod list): added and
-// removed by packageId, case and order ignored; a colony's first save has none.
-func TestSaveModChanges(t *testing.T) {
+// The Mod list against the save's list (12 §4.3 Mod list): the save's Mods the list lacks
+// (not InList) and the list's Mods the save lacks (ListOnly), each with the installed copy
+// it links to in the Mod library.
+func TestSaveListDifferences(t *testing.T) {
 	t.Parallel()
 	e := savesFixture(t)
-	changes := func(name string) (string, []string) {
+	diff := func(name string) []string {
 		t.Helper()
 		c := checkNamed(t, e, name)
-		since := ""
-		if c.Since != nil {
-			since = c.Since.Name
-		}
 		var out []string
-		for _, m := range c.Changes {
-			sign := "-"
-			if m.InSave {
-				sign = "+"
-			}
+		mark := func(sign string, m app.SaveMod) {
 			if m.Library != "" {
 				sign += "L"
 			}
 			out = append(out, sign+" "+m.PackageID)
 		}
-		return since, out
+		for _, m := range c.ListOnly {
+			mark("+", m)
+		}
+		for _, m := range c.Mods {
+			if !m.InList {
+				mark("-", m)
+			}
+		}
+		return out
 	}
-	if since, ch := changes("Tundra"); since != "" || len(ch) != 0 {
-		t.Fatalf("first save: since %q changes %q", since, ch)
+	if ch := diff("Tundra"); len(ch) != 0 {
+		t.Fatalf("same Mods as the list: %q", ch)
 	}
-	if since, ch := changes("Tundra 2"); since != "Tundra" || !slices.Equal(ch, []string{"+L tester.gamma", "+ tester.gone"}) {
-		t.Fatalf("Tundra 2: since %q changes %q", since, ch)
+	if ch := diff("Tundra 2"); !slices.Equal(ch, []string{"-L tester.gamma", "- tester.gone"}) {
+		t.Fatalf("Tundra 2: %q", ch)
 	}
-	if since, ch := changes("Autosave-1"); since != "Tundra 2" || len(ch) != 0 {
-		t.Fatalf("autosave: since %q changes %q", since, ch)
-	}
-	// Removed: the previous save had a Mod this one lacks; installed ones link.
+	// The list has a Mod the save lacks; installed, it links.
 	e.WriteSave("Tundra 3.rws", testkit.SaveSpec{Mods: []string{"ludeon.rimworld", "tester.beta"}, ModTime: e.Now().Add(-5 * time.Minute)})
-	if since, ch := changes("Tundra 3"); since != "Autosave-1" || !slices.Equal(ch, []string{"-L tester.alpha", "-L tester.gamma", "- tester.gone"}) {
-		t.Fatalf("Tundra 3: since %q changes %q", since, ch)
+	if ch := diff("Tundra 3"); !slices.Equal(ch, []string{"+L tester.alpha"}) {
+		t.Fatalf("Tundra 3: %q", ch)
 	}
 }

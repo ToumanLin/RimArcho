@@ -134,15 +134,14 @@ type SaveDetail struct {
 	Quick   *SaveFixView    `json:"quick,omitempty"`
 	Issues  []SaveIssueView `json:"issues"`
 
-	// Mod list (12 §4.3): the save's Mods in load order, and what changed since the
-	// colony's previous save (Since, its ref SinceRef; "" for the colony's first save):
-	// the Mods added (Added) and removed, order ignored. NewList is the header's Make a
-	// list from this save.
-	Mods     []SaveModView `json:"mods"`
-	Since    string        `json:"since,omitempty"`
-	SinceRef string        `json:"sinceRef,omitempty"`
-	Changes  []SaveModView `json:"changes"`
-	NewList  *SaveFixView  `json:"newList,omitempty"`
+	// Mod list (12 §4.3, 16 §2.11): the save's Mods in load order, and how the list it is
+	// checked against differs from it, order ignored: the list's Mods the save lacks
+	// (added, in the list's order), then the save's Mods the list lacks (removed, in load
+	// order). Without a list or pack (ListKind "") there are no changes. NewList is the
+	// header's Make a list from this save.
+	Mods    []SaveModView `json:"mods"`
+	Changes []SaveModView `json:"changes"`
+	NewList *SaveFixView  `json:"newList,omitempty"`
 
 	// Locked says why Rename and Recycle are off now (a game runs, the file is written).
 	Locked string `json:"locked,omitempty"`
@@ -216,13 +215,12 @@ type SaveDetailLost struct {
 type SaveModView struct {
 	Name      string `json:"name"`
 	PackageID string `json:"packageId"`
-	// Missing: not installed; Off: installed but not in the matched list; Moved: out of the
-	// save's order in the list.
+	// Missing: not installed; Moved: out of the save's order in the list.
 	Missing bool `json:"missing,omitempty"`
-	Off     bool `json:"off,omitempty"`
 	Moved   bool `json:"moved,omitempty"`
-	// Added: a change since the previous save that the save has (else it was removed).
-	Added bool `json:"added,omitempty"`
+	// Change against the list: SaveModAdded (in the list, not in the save), SaveModRemoved
+	// (in the save, not in the list) or "".
+	Change string `json:"change,omitempty"`
 	// Library is the installed copy the name links to in the Mod library ("" no link).
 	Library string `json:"library,omitempty"`
 }
@@ -294,19 +292,30 @@ func SaveDetailOf(c *app.SaveCheck, running, current bool) *SaveDetail {
 		d.Quick = &v
 	}
 	d.Issues = issueViews(c, s)
+	var removed []SaveModView
 	for _, m := range c.Mods {
 		v := SaveModView{Name: m.Name, PackageID: m.PackageID, Missing: m.Instance == "", Moved: m.Moved, Library: m.Library}
-		v.Off = !v.Missing && !m.InList && d.ListKind != ""
+		if !m.InList && d.ListKind != "" {
+			v.Change = SaveModRemoved
+			removed = append(removed, v)
+		}
 		d.Mods = append(d.Mods, v)
 	}
-	if c.Since != nil {
-		d.Since, d.SinceRef = c.Since.Name, c.Since.Ref
-		for _, m := range c.Changes {
-			d.Changes = append(d.Changes, SaveModView{Name: m.Name, PackageID: m.PackageID, Added: m.InSave, Missing: m.InSave && m.Instance == "", Library: m.Library})
+	if d.ListKind != "" {
+		for _, m := range c.ListOnly { // a pack carries its Mods: none is missing
+			d.Changes = append(d.Changes, SaveModView{Name: m.Name, PackageID: m.PackageID, Missing: m.Instance == "" && d.ListKind == "list",
+				Library: m.Library, Change: SaveModAdded})
 		}
+		d.Changes = append(d.Changes, removed...)
 	}
 	return d
 }
+
+// SaveModView.Change values.
+const (
+	SaveModAdded   = "added"
+	SaveModRemoved = "removed"
+)
 
 // SaveFixAnalyse is the bar's Make a list from this save, then analyse it (the page's own
 // action: SaveNewList with analyze).
