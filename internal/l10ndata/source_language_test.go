@@ -17,9 +17,6 @@ import (
 // Every permanent exception has a specific purpose; test data exceptions name individual files.
 var sourceLanguageFiles = map[string]string{
 	"docs/glossary.md":                                       "The bilingual terminology reference.",
-	"README.zh-CN.md":                                        "The Chinese README.",
-	"docs/user-guide.zh-CN.md":                               "The Chinese player user guide.",
-	"docs/highlights.zh-CN.md":                               "The Chinese release highlights for players.",
 	"ToDo.md":                                                "The maintainer's working list; notes are written in whichever language is quicker.",
 	"monitor/About/About.xml":                                "RimWorld does not localize About.xml descriptions; keep the bilingual description.",
 	"internal/app/filelists_golden_test.go":                  "Exercises Chinese interface output, legacy Chinese data, or CJK names and paths.",
@@ -111,7 +108,14 @@ var sourceLanguageDirectories = map[string]string{
 	"monitor/Languages/":        "RimWorld Keyed language resources.",
 }
 
+// chineseCopyMarker in a file name marks a Chinese copy of a document (README.zh-CN.md,
+// docs/user-guide.zh-CN.md); such files are exempt without being listed.
+const chineseCopyMarker = "zh-CN"
+
 func sourceLanguageExempt(path string) bool {
+	if strings.Contains(filepath.Base(path), chineseCopyMarker) {
+		return true
+	}
 	if _, ok := sourceLanguageFiles[path]; ok {
 		return true
 	}
@@ -288,6 +292,14 @@ func TestSourceLanguageScanner(t *testing.T) {
 	}
 	if !sourceLanguageExempt("ToDo.md") {
 		t.Fatal("the working list may contain Chinese")
+	}
+	for _, path := range []string{"README.zh-CN.md", "docs/new-page.zh-CN.md", "docs/release-vm-tests.zh-CN.md"} {
+		if !sourceLanguageExempt(path) {
+			t.Fatalf("%s: a zh-CN file name must be exempt", path)
+		}
+	}
+	if sourceLanguageExempt("docs/zh-CN/page.md") || sourceLanguageExempt("docs/release-vm-tests.md") {
+		t.Fatal("only the file name, not a directory, grants the exemption")
 	}
 	if sourceLanguageExempt("internal/view/future.go") || sourceLanguageExempt("internal/view/new_test.go") {
 		t.Fatal("test and code directories must not be exempt")

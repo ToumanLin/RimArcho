@@ -2,6 +2,12 @@
 
 Things to research, not yet decided. Once decided, put them in the specifications (implementation plans in 01 §4); research goes in docs/research/.
 
+## 开始使用
+1. `托管目录`不要放弹窗, 应该作为界面的一部分
+    `暂不设置` 是什么选择... 不能不设置,
+2. 界面要整齐, 顶上的步骤和下面的div都没对齐, 不如把Archo放到和展示步骤同一行
+3. Archo动态可以上下切割, 不应该左右切割, 不能给玩家理解为Archo是展示在格子里面的
+
 ## Mod library
 Mod详情, 标签`编辑`的弹窗
 1. 如果标签太多, 底部会被外窗口clip掉, 应该限制y高度, 增加滚动条
@@ -40,13 +46,13 @@ Auto translate mod details? Need to think about it. 因为需要OCR.
 中栏技术信息底部的完整Mod列表更改为只展示变化(绿色增加红色删除, 不考虑加载顺序改变), 并且在太长的时候折叠, 允许展开, 对数据库中有的mod增加超链接到Mod库对应mod
 - §1.4–1.5：从存档提取引用的 Def，映射回提供它的 Mod
 - §2 内容目录：Def 类型 → 内容类别的映射（现为草案）
-在中栏中
+
+## §4.3 "上次加载的报错"
+`Can-it-run` 中, 将`上次运行时的报错`分为三块, `上次启动时的报错` `上次载入$存档$时的报错` `上次游玩$存档时的报错
+`Can-it-run` 中, 在`开始之前`以上次加载的存档展示`能不能载入`
+
 ### 1.1 剩余（10）
 - §3 未使用的内容（1.1 核心答案）：三组分类、解读、功能型 Mod 的处理，Unplayed 分组下的 Play review 页面
-- §4.3 "上次加载的报错"
-
-Can-it-run 中, 将`上次运行时的报错`分为三块, `上次启动时的报错` `上次载入$存档$时的报错` `上次游玩$存档时的报错`
-
 ### Playthrough review (data for the third question)
 
 这个估计还得琢磨琢磨, 目前不满意

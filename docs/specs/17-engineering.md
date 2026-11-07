@@ -167,7 +167,7 @@ The `RIMARCHO_HOME` environment variable overrides this table (used by tests and
 
 Test speed: `testkit.New` copies a schema-only database built once per test process instead of creating the schema for each fixture, and replaces the SteamCMD retry backoff (5 s / 15 s) with no wait. Run the suite with `go test -count=1 ./...`: on Windows, recording the test cache's file accesses makes an uncached run about 40% slower (32 threads: 4.5 minutes, against 3.2 with `-count=1`).
 
-`l10ndata.TestSourceLanguage` scans tracked source files and falls back to a repository walk when Git is unavailable. Han characters and fullwidth punctuation fail the test outside the centralized, documented exceptions in `internal/l10ndata/source_language_test.go`.
+`l10ndata.TestSourceLanguage` scans tracked source files and falls back to a repository walk when Git is unavailable. Han characters and fullwidth punctuation fail the test outside the centralized, documented exceptions in `internal/l10ndata/source_language_test.go`; a file whose name contains `zh-CN` is exempt without being listed.
 
 **Archo Monitor**: its own tests, the manual in-game checklist and its build are in 19 §7.
 
