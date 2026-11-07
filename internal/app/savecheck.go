@@ -19,8 +19,8 @@ const (
 	LevelError   = "error"
 )
 
-// Issue kinds (12 §4.3). Malformed and class-missing need the full read (12 §1.7 L1);
-// the last load's errors (06 §7) and dangling references are not implemented.
+// Issue kinds (12 §4.3). Malformed and class-missing need the full read (12 §1.7 L1).
+// Dangling references are not implemented.
 const (
 	IssueUnreadable   = "unreadable"    // no <meta> or not XML at the start
 	IssueCutOff       = "cut-off"       // no </savegame> at the end
@@ -32,7 +32,7 @@ const (
 	IssueDisabled     = "disabled"      // installed but not in the list
 	IssueAdded        = "added"         // in the list, not in the save
 	IssueReordered    = "reordered"     // same Mods, another order
-	IssueLastLoad     = "last-load"     // the game's log has errors from loading this save (Load)
+	IssueLastLoad     = "last-load"     // the game's log has errors or warnings from loading this save (Load)
 )
 
 // Fix actions (12 §4.4).
@@ -259,10 +259,14 @@ func (a *App) CheckSave(s *Save) (*SaveCheck, error) {
 	}
 	c.Since, c.Changes = s.modChanges(c.Mods, library, name)
 
-	// The last load of this save had errors (12 §4.3): from the stored report of the
+	// The last load of this save had errors or warnings (12 §4.3): from the stored report of the
 	// environment's logs, never parsing one here.
-	if l := a.lastLoadOf(s, st); l != nil && l.Kinds > 0 {
-		c.add(SaveIssue{Kind: IssueLastLoad, Level: LevelError, Load: l, Text: l.text(),
+	if l := a.lastLoadOf(s, st); l != nil && (l.Errors > 0 || l.Warnings > 0) {
+		level := LevelWarning
+		if l.Errors > 0 {
+			level = LevelError
+		}
+		c.add(SaveIssue{Kind: IssueLastLoad, Level: level, Load: l, Text: l.text(),
 			Fixes: []SaveFix{{Action: FixOpenLog, Label: "Open the game log", Command: "log --file " + cmdQuote(l.Log), Target: l.Log}}})
 	}
 	if mm, gm := env.MajorMinor(s.Head.GameVersion), env.MajorMinor(c.Game); mm != "" && gm != "" && mm != gm {

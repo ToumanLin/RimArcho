@@ -575,15 +575,29 @@ func lowerFirst(s string) string {
 	return string(unicode.ToLower(r)) + s[n:]
 }
 
-// lastLoadText is the last-load row (12 §4.3): how many errors loading the save logged,
-// and the first one.
+// lastLoadText is the last-load row (12 §4.3): errors and warnings logged while loading,
+// and the first message of the most severe class.
 func lastLoadText(l *app.SaveLoad) (head, consequence string) {
 	if l == nil {
 		return "", ""
 	}
-	head = Tf("the last load logged %d errors", l.Errors)
-	if l.Errors == 1 {
+	switch {
+	case l.Errors == 1 && l.Warnings == 1:
+		head = T("the last load logged 1 error and 1 warning")
+	case l.Errors == 1 && l.Warnings > 1:
+		head = Tf("the last load logged 1 error and %d warnings", l.Warnings)
+	case l.Errors > 1 && l.Warnings == 1:
+		head = Tf("the last load logged %d errors and 1 warning", l.Errors)
+	case l.Errors > 1 && l.Warnings > 1:
+		head = Tf("the last load logged %d errors and %d warnings", l.Errors, l.Warnings)
+	case l.Errors == 1:
 		head = T("the last load logged 1 error")
+	case l.Errors > 1:
+		head = Tf("the last load logged %d errors", l.Errors)
+	case l.Warnings == 1:
+		head = T("the last load logged 1 warning")
+	default:
+		head = Tf("the last load logged %d warnings", l.Warnings)
 	}
 	if !l.At.IsZero() {
 		head += "  " + ShortDate(l.At) + " " + l.At.Local().Format("15:04")
@@ -592,7 +606,9 @@ func lastLoadText(l *app.SaveLoad) (head, consequence string) {
 	if l.First != "" {
 		consequence += "; " + Tf("first: %s", firstLine(l.First))
 	}
-	if l.Kinds > 1 {
+	if l.Kinds == 1 {
+		consequence += "  " + T("(1 kind)")
+	} else if l.Kinds > 1 {
 		consequence += "  " + Tf("(%d kinds)", l.Kinds)
 	}
 	return head, consequence

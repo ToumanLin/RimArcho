@@ -9,26 +9,36 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/finding"
 	"github.com/ToumanLin/RimArcho/internal/logs"
+	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
 // What the game's log says about loading a save (12 §4.3 "the last load", 06 §7): Archo
-// Monitor marks the phase "save" with the save's file name (19 §4), so the errors counted
-// in that phase are the errors of loading that save.
+// Monitor marks the phase "save" with the save's file name (19 §4), so the errors and
+// warnings counted in that phase belong to loading that save.
 
-// SaveLoad is a run's load of one save: the log, when, and its errors while loading.
+// SaveLoad is a run's load of one save: the log, when, and its errors and warnings.
 type SaveLoad struct {
-	Log     string    `json:"log"`
-	At      time.Time `json:"at,omitzero"`
-	Errors  int       `json:"errors"`  // occurrences while loading
-	Kinds   int       `json:"kinds"`   // their clusters
-	First   string    `json:"first"`   // the first cluster's message
-	Cluster string    `json:"cluster"` // its ID (E1 …), for the log page
+	Log      string    `json:"log"`
+	At       time.Time `json:"at,omitzero"`
+	Errors   int       `json:"errors"`   // occurrences while loading
+	Warnings int       `json:"warnings"` // occurrences while loading
+	Kinds    int       `json:"kinds"`    // their clusters
+	First    string    `json:"first"`    // the first cluster's message
+	Cluster  string    `json:"cluster"`  // its ID (E1 …), for the log page
 }
 
-// text is the row's line for the CLI and MCP: the count, the log and when.
+// text is the row's line for the CLI and MCP: the counts, the log and when.
 func (l *SaveLoad) text() string {
-	t := fmt.Sprintf("%d errors while loading it (%s", l.Errors, filepath.Base(l.Log))
+	var counts []string
+	if l.Errors > 0 {
+		counts = append(counts, render.Plural(l.Errors, "error"))
+	}
+	if l.Warnings > 0 {
+		counts = append(counts, render.Plural(l.Warnings, "warning"))
+	}
+	t := fmt.Sprintf("%s while loading it (%s; %s", strings.Join(counts, " and "), render.Plural(l.Kinds, "kind"), filepath.Base(l.Log))
 	if !l.At.IsZero() {
 		t += " " + l.At.Local().Format("2006-01-02 15:04")
 	}
@@ -182,6 +192,7 @@ func (a *App) logLoads(path string) map[string]*SaveLoad {
 	}
 	l := &SaveLoad{Log: path}
 	firstBegan := false
+	firstSeverity := ""
 	for _, p := range rep.Phases {
 		if p != nil && p.Name == "save" {
 			l.At = p.At
@@ -189,7 +200,8 @@ func (a *App) logLoads(path string) map[string]*SaveLoad {
 		}
 	}
 	for _, c := range rep.Clusters {
-		if logs.Informational(c.Class) {
+		severity := logSeverity[c.Class]
+		if severity != finding.Error && severity != finding.Warning {
 			continue
 		}
 		n := 0
@@ -201,17 +213,22 @@ func (a *App) logLoads(path string) map[string]*SaveLoad {
 		if n == 0 {
 			continue
 		}
-		// The first error of the load: the first cluster that began while loading (clusters
-		// are in order of first occurrence), else the first that occurred then at all.
+		// Prefer errors to warnings, then clusters that began while loading; clusters
+		// within each group are in order of first occurrence.
 		began := logs.PhaseName(c.Phase) == "save"
-		if l.Kinds == 0 || began && !firstBegan {
+		if l.Kinds == 0 || severity == finding.Error && firstSeverity != finding.Error || severity == firstSeverity && began && !firstBegan {
 			l.Cluster, l.First, firstBegan = c.ID, "", began
+			firstSeverity = severity
 			if c.First != nil {
 				l.First = c.First.Message
 			}
 		}
 		l.Kinds++
-		l.Errors += n
+		if severity == finding.Error {
+			l.Errors += n
+		} else {
+			l.Warnings += n
+		}
 	}
 	m.loads[SaveKey(names[0])] = l
 	return m.loads
