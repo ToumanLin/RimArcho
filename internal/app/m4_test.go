@@ -160,7 +160,7 @@ func ref(t *testing.T, e *testkit.Env, name string) string {
 	return ""
 }
 
-// 03 §4.5/§7.2: skip-prefix is info until the newest log's stack passes through
+// 05 §4.5, 06 §2: skip-prefix is info until the newest log's stack passes through
 // the method; the newest Player.log joins the problems without --select.
 func TestSkipPrefixEscalation(t *testing.T) {
 	t.Parallel()
@@ -198,7 +198,7 @@ func TestSkipPrefixEscalation(t *testing.T) {
 	}
 }
 
-// 03 §6.4: a log from another game version is attributed against that version.
+// 06 §4: a log from another game version is attributed against that version.
 func TestLogOwnVersion(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
@@ -214,7 +214,7 @@ func TestLogOwnVersion(t *testing.T) {
 	}
 }
 
-// 03 §5.4: searching every enabled mod prints an estimate and needs --yes;
+// 05 §5.4: searching every enabled mod prints an estimate and needs --yes;
 // --implicated covers the newest log's candidates.
 func TestSourceSearchScope(t *testing.T) {
 	t.Parallel()

@@ -1,7 +1,8 @@
-// Mod library › add a subscription (06 §2.9): one paste box. What is pasted is recognised (a Git repository,
+// Mod library › add a subscription (16 §2.9): one paste box. What is pasted is recognised (a Git repository,
 // a LoversLab file page, another web page, Workshop links or IDs); the card below asks only
 // the one decision that source needs and shows the --dry-run text before subscribe. Also the
 // file choice a download-page update needs (pageUpdate, in the updates detail).
+import { linkError } from "./feedbacksemantics.js";
 import { pathContent, editablePath } from "./fields.js";
 import { el, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import * as pop from "./popups.js";
@@ -128,10 +129,14 @@ export function addForm(ctx = {}) {
   const field = el("input");
   field.type = "text"; field.spellcheck = false;
   field.placeholder = T("paste a GitHub repository, a LoversLab file page, a Workshop link or ID");
+  field.setAttribute("aria-label", T("add a subscription")); // the page title; the placeholder says what to paste
   box.append(field);
   const result = el("div", "subscribe-result");
   const below = el("div", "subscribe-below");
   root.append(box, result, below);
+  // the paste box is described by what refuses it: "not recognised", or a dry run that cannot go
+  const refusal = () => linkError(field, result.querySelector(".subscribe-bad, [data-field-error]"));
+  new MutationObserver(refusal).observe(result, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-field-error"] });
   let seq = 0, timer = 0, shown = "";
 
   const account = (key) => ((ctx.data?.sources || []).find(s => s.key === key) || {}).account || "";
@@ -197,16 +202,17 @@ export function addForm(ctx = {}) {
     foot.append(cancel, sub);
     // refresh: the dry run of the current choice; a reply for an older choice is dropped.
     const refresh = async () => {
-      ready = ""; sub.disabled = true; preview.replaceChildren(); preview.hidden = true;
+      ready = ""; sub.disabled = true; delete preview.dataset.fieldError; preview.replaceChildren(); preview.hidden = true;
       sub.hidden = own;
       const req = args();
       if (!req || own) return;
       const key = JSON.stringify(req);
       let p;
-      try { p = await api.SubscribePreview(req); } catch (e) { if (live()) { preview.hidden = false; preview.textContent = errText(e); } return; }
+      try { p = await api.SubscribePreview(req); } catch (e) { if (live() && key === JSON.stringify(args())) { preview.hidden = false; preview.dataset.fieldError = "true"; preview.textContent = errText(e); } return; }
       if (!live() || key !== JSON.stringify(args())) return;
       preview.hidden = false;
       pathContent(preview, (p.lines || []).join("\n"), [req.from].filter(Boolean));
+      if (!p.apply) preview.dataset.fieldError = "true";
       ready = p.apply ? key : "";
       sub.disabled = !ready;
     };

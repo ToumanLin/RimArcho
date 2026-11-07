@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The running game (06 §2.1): every two seconds view.LiveTracker checks the game and reads
+// The running game (16 §2.1): every two seconds view.LiveTracker checks the game and reads
 // what its log gained. While it runs the status line says so (statusLine), and its errors
 // lead their section of Can it run.
 

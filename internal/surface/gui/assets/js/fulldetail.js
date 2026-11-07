@@ -1,4 +1,4 @@
-// The full detail (06 §4.2): one page for a mod, opened by enter from the plan editor and
+// The full detail (16 §4.2): one page for a mod, opened by enter from the plan editor and
 // from Mod library > All. It puts together what the two lists know about it:
 //   1 the mod: picture, name, author, its state, its tags, the description;
 //   2 its copies (copies): each copy's state, place, size, version and note, and the selected
@@ -72,7 +72,7 @@ export async function full(from, id) {
   }
   draw(false);
   read.finish();
-  // the Workshop description once the cursor rested on the mod (06 §4.3 item 3)
+  // the Workshop description once the cursor rested on the mod (16 §4.3 item 3)
   if (d && d.state === "not cached") {
     setTimeout(async () => {
       if (n !== F.seq || !read.current()) return;
@@ -208,9 +208,13 @@ function draw(loading) {
 function copyCard(x) {
   const on = x.ref === F.copy;
   const b = el("div", "fd-copy" + (on ? " on" : ""));
+  b.setAttribute("role", "group");
+  b.setAttribute("aria-current", String(on));
   b.tabIndex = -1;
   const top = el("div", "top");
   top.append(el("span", "lbl", x.label));
+  top.firstChild.id = "full-copy-" + encodeURIComponent(x.ref);
+  b.setAttribute("aria-labelledby", top.firstChild.id);
   if (x.state) top.append(el("span", "chip st " + (x.code || ""), x.state));
   if (x.inPlan) top.append(el("span", "chip cur", T("in the current list")));
   b.append(top);
@@ -232,7 +236,7 @@ function copyCard(x) {
   return b;
 }
 
-// runOp runs an op on the selected copy, as Mod library does (06 §3.5): the plan's ops at once
+// runOp runs an op on the selected copy, as Mod library does (16 §3.5): the plan's ops at once
 // (u undoes), the ones that change files after their dry run.
 async function runOp(code) {
   const c = theCopy();
@@ -320,7 +324,6 @@ export async function fullKey(e) {
     }
     return;
   }
-  if (k === "Tab" && (F.secs || []).length) { e.preventDefault(); const n = F.secs.length; F.tab = (F.tab + (e.shiftKey ? n - 1 : 1)) % n; return draw(false); }
   if (k === "[" || k === "]") {
     e.preventDefault();
     const cs = copies();
@@ -332,7 +335,7 @@ export async function fullKey(e) {
   if (ops.menuKey(e) && c) {
     e.preventDefault();
     const b = (document.querySelector("#screen .fd-copy.on") || sc).getBoundingClientRect();
-    return ops.openMenu(b.left + 24, b.top + 24, c.ops || [], runOp, true);
+    return ops.openMenu(b.left + 24, b.top + 24, c.ops || [], runOp, true, { name: F.row?.name || F.d?.name, opener: sc });
   }
   if (ctrl && c && ["o", "w", "s"].includes(k.toLowerCase())) { e.preventDefault(); return runOp({ o: "folder", w: "workshop", s: "steam" }[k.toLowerCase()]); }
   if (!ctrl && !e.altKey && c) {

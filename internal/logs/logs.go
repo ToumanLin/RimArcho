@@ -1,4 +1,4 @@
-// Package logs parses RimWorld's Player.log (03 §6.1): it splits the file into entries
+// Package logs parses RimWorld's Player.log (06 §1): it splits the file into entries
 // (a message line plus its stack, Harmony patch lines and continuation lines), resolves
 // "[Ref X] Duplicate stacktrace" back to the original stack, normalises messages into
 // cluster keys and classifies each cluster. Attribution to mods happens in internal/app.
@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-// Classes (03 §6.1).
+// Classes (06 §1).
 const (
 	ClassXMLLoad     = "xml-load"
 	ClassPatchFailed = "patch-failed"
@@ -26,17 +26,56 @@ const (
 	ClassMaterial    = "material"
 	ClassTexture     = "texture-missing"
 	ClassSave        = "save-load"
-	ClassModReport   = "mod-report"
-	ClassOther       = "other"
+	// ClassGameError: a 1.6 Log.Error line without a stack in the game's own wording ("Tried to
+	// …") that names a type outside the game (GameError).
+	ClassGameError = "game-error"
+	ClassModReport = "mod-report"
+	ClassOther     = "other"
+	// ClassNoise: a known engine line that reads like a problem but that no def, file or mod
+	// setting causes (KnownNoise).
+	ClassNoise = "noise"
 )
 
 // Classes lists the classes from most to least severe, for display.
 var Classes = []string{ClassException, ClassHarmony, ClassXMLLoad, ClassPatchFailed, ClassXrefMissing,
-	ClassMaterial, ClassTexture, ClassSave, ClassModReport, ClassOther}
+	ClassMaterial, ClassTexture, ClassSave, ClassGameError, ClassModReport, ClassOther, ClassNoise}
 
 // Informational reports classes that are context rather than problems: a mod reporting on itself
-// ("[Mod] … not found, skipping") and unclassified lines.
-func Informational(class string) bool { return class == ClassModReport || class == ClassOther }
+// ("[Mod] … not found, skipping"), unclassified lines and known noise.
+func Informational(class string) bool {
+	return class == ClassModReport || class == ClassOther || class == ClassNoise
+}
+
+// Noise is a known engine line that reads like a problem but has no cause an agent can find in
+// a def, a file or the list (MCP transcript review 2026-11-04 §2.2: agents chased both in most
+// runs). Such lines are clustered as ClassNoise, informational.
+type Noise struct {
+	ID     string // short id
+	Prefix string // the message starts with it (cheap test before re)
+	Label  string // a few words for a list line
+	Note   string // what it is, honestly; shown in a cluster's detail and next to nearby lines
+	re     *regexp.Regexp
+}
+
+// knownNoise: the message, not the stack, decides (a companion log's copy carries a stack).
+var knownNoise = []*Noise{
+	{ID: "solid-color-material", Prefix: "Material 'SolidColorMat-", Label: "material made in code",
+		Note: "known noise: a material made in code (SolidColorMaterials, named SolidColorMat-<shader>-<colour>) had its main texture read or set, and its shader has no _MainTex; no def or file causes it, so searching defs or files (uiIconColor, the shader name) finds nothing. Harmless unless something visibly renders wrong",
+		re:   regexp.MustCompile(`^Material 'SolidColorMat-[^']*' with Shader '[^']*' doesn't have a texture property`)},
+	{ID: "translation-count", Prefix: "Translation data for language ", Label: "translation error count",
+		Note: "informational: the game's count of problems in the active language's translation files (the game's and every mod's Languages folder: duplicate keys, injections for defs or fields that are not loaded); they affect only text, never loading, and do not cause the other errors in this log. The count names no mod; the game lists the entries when a translation report is generated, as the message says",
+		re:   regexp.MustCompile(`^Translation data for language .* has \d+ errors`)},
+}
+
+// KnownNoise returns the known-noise kind of a message, nil if none.
+func KnownNoise(message string) *Noise {
+	for _, n := range knownNoise {
+		if strings.HasPrefix(message, n.Prefix) && n.re.MatchString(message) {
+			return n
+		}
+	}
+	return nil
+}
 
 // Frame is one stack frame.
 type Frame struct {
@@ -44,7 +83,7 @@ type Frame struct {
 	Type    string // declaring type, compiler-generated parts removed; '+' kept for nesting
 	Method  string
 	Patched bool // a Harmony replacement (wrapper dynamic-method …_PatchN)
-	Caller  bool // Waylith: a frame of the stack that logged the message, not of an exception
+	Caller  bool // a frame of the stack that logged the message, not of an exception (Waylith, Unity's full stack traces)
 	Harmony []Patch
 }
 
@@ -63,6 +102,9 @@ type Entry struct {
 	Ref     string // "[Ref X]" this entry defines or points to
 	Dup     bool   // "Duplicate stacktrace, see ref for original"
 	Level   string // Waylith: INFO, WARN, ERROR …; "" for Unity logs, which carry no level
+	// unityCaller: a Unity "Type:Method (args)" stack began with StackTraceUtility:ExtractStackTrace,
+	// so its frames are the logging call's stack, not the exception's.
+	unityCaller bool
 }
 
 // File is a parsed log.
@@ -80,11 +122,15 @@ var (
 	wrapperRe = regexp.MustCompile(`^\s*(?:at )?\(wrapper ([\w-]+)\) (.+?)(?:\s*\(.*)?$`)
 	patchRe   = regexp.MustCompile(`^\s*- (PREFIX|POSTFIX|TRANSPILER|FINALIZER|ILMANIPULATOR) ([^:]+): (?:\S+ )?([^\s:(]+):([\w<>.` + "`" + `]+)\(`)
 	// A frame without "at " (inner exception stacks): Ns.Type.Method(args) or Ns.Type..ctor(args)
-	bareFrameRe   = regexp.MustCompile(`^([A-Za-z_][\w+<>` + "`" + `]*(?:\.[\w+<>` + "`" + `]+)*\.\.?[\w<>` + "`" + `]+) ?\([^()]*\)\s*$`)
-	refRe         = regexp.MustCompile(`^\[Ref ([0-9A-Fa-f]+)\]( Duplicate stacktrace)?`)
-	patchNumRe    = regexp.MustCompile(`_Patch\d+$`)
-	genericArgsRe = regexp.MustCompile(`\[[^\[\]]*\]`)
-	versionRe     = regexp.MustCompile(`RimWorld (\d+\.\d+\.\d+ rev\d+)`)
+	bareFrameRe = regexp.MustCompile(`^([A-Za-z_][\w+<>` + "`" + `]*(?:\.[\w+<>` + "`" + `]+)*\.\.?[\w<>` + "`" + `]+) ?\([^()]*\)\s*$`)
+	// Unity's own stack format: "Ns.Type/Nested:Method (args)", "List`1<Verse.Thing>:Add(Thing)",
+	// "MonoMod.Utils.DynamicMethodDefinition:Verse.Root.Update_Patch1 (Verse.Root)"; some end ":0".
+	unityFrameRe   = regexp.MustCompile(`^([A-Za-z_][\w.` + "`" + `/+<>-]*(?:, [\w.` + "`" + `/+<>-]+)*):([\w.<>` + "`" + `|$-]+(?:, [\w.` + "`" + `/+<>-]+)*) ?\([^()]*\)(?::\d+)?\s*$`)
+	unityGenericRe = regexp.MustCompile(`([\w` + "`" + `])<[^<>]*>`)
+	refRe          = regexp.MustCompile(`^\[Ref ([0-9A-Fa-f]+)\]( Duplicate stacktrace)?`)
+	patchNumRe     = regexp.MustCompile(`_Patch\d+$`)
+	genericArgsRe  = regexp.MustCompile(`\[[^\[\]]*\]`)
+	versionRe      = regexp.MustCompile(`RimWorld (\d+\.\d+\.\d+ rev\d+)`)
 
 	waylithLineRe  = regexp.MustCompile(`^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\.\d+ +([A-Z]+) (?:\[[^\]]*\] )?(.*)$`)
 	waylithVerRe   = regexp.MustCompile(`^Version:\s+(\d+\.\d+\.\d+)\.(\d+)`)
@@ -92,10 +138,45 @@ var (
 	waylithPatchRe = regexp.MustCompile(`^\s*- (PREFIX|POSTFIX|TRANSPILER|FINALIZER|ILMANIPULATOR) ([^:]+): \S+ <- (.*)$`)
 )
 
-// loggerFrame reports a Waylith caller frame of the logging system itself.
+// loggerFrame reports a caller frame of the logging system itself.
 func loggerFrame(t string) bool {
 	t = strings.TrimPrefix(t, ".")
-	return strings.HasPrefix(t, "Brutal.Logging.") || t == "Verse.Log"
+	switch t {
+	case "Verse.Log", "UnityEngine.StackTraceUtility", "UnityEngine.DebugLogHandler", "UnityEngine.Logger", "UnityEngine.Debug":
+		return true
+	}
+	return strings.HasPrefix(t, "Brutal.Logging.")
+}
+
+// unityCallerFrame reports whether the next Unity-format frame of e belongs to the logging call:
+// after StackTraceUtility:ExtractStackTrace, or under a message that is not an exception. Unity's
+// own exception stacks ("ArgumentOutOfRangeException: …", "[Ref X] Duplicate stacktrace", frames)
+// stay exception frames.
+func unityCallerFrame(e *Entry) bool {
+	return e.unityCaller || e.Ref == "" && !hasExceptionStack(e) && !strings.Contains(e.Message, "Exception")
+}
+
+// unityMember turns Unity's "Type:Method" into the Mono form splitMember reads:
+// "Verse.Root/<>c:<Start>b__10_1" → "Verse.Root+<>c.<Start>b__10_1"; generic arguments go;
+// a Harmony replacement "MonoMod.Utils.DynamicMethodDefinition:Verse.Root.Update_Patch1" keeps
+// only the patched method's name.
+func unityMember(s string) string {
+	typ, method, _ := strings.Cut(s, ":")
+	if i := strings.IndexByte(method, '<'); i > 0 {
+		method = method[:i] // Do<System.Type>
+	}
+	if strings.HasSuffix(typ, "DynamicMethodDefinition") && strings.Contains(method, ".") {
+		return method
+	}
+	typ = strings.ReplaceAll(typ, "/", "+")
+	for {
+		t := unityGenericRe.ReplaceAllString(typ, "$1")
+		if t == typ {
+			break
+		}
+		typ = t
+	}
+	return typ + "." + strings.TrimPrefix(method, ".") // .ctor
 }
 
 func isContinuation(l string) bool {
@@ -115,7 +196,7 @@ func isContinuation(l string) bool {
 		strings.HasPrefix(l, "<0x") && strings.Contains(l, "> <unknown method>"):
 		return true
 	}
-	return bareFrameRe.MatchString(l)
+	return bareFrameRe.MatchString(l) || unityFrameRe.MatchString(l)
 }
 
 // Parse reads a Player.log. Very long lines (XML dumps) are cut at 4 KiB.
@@ -132,7 +213,7 @@ func Parse(r io.Reader) (*File, error) {
 	return f, sc.Err()
 }
 
-// Parser reads a log line by line (Parse, and the live follower of a running game: 03 §6.6).
+// Parser reads a log line by line (Parse, and the live follower of a running game: 06 §6).
 // Entries are appended to F.Entries; the last one may still grow until Open reports false.
 type Parser struct {
 	phase        *Phase
@@ -145,6 +226,11 @@ type Parser struct {
 	xname  string
 	xinner []string
 	xended bool
+	// HugsLib's log upload starts with its own header ("Log uploaded on …", the Mod list, the
+	// Harmony patches) and puts the game's log after "Log file contents:"; every log of the
+	// corpus has one, 2,061 lines at the median.
+	hugsHeader bool
+	start      int // the line before the game's log: 0, or the end of HugsLib's header
 }
 
 var xmlExtStartRe = regexp.MustCompile(`^(?:\S+\|0x[0-9A-Fa-f]+\|)?\[(.+) - Start of stack trace\]\s*$`)
@@ -205,12 +291,31 @@ func (p *Parser) Line(l string) {
 	if len(l) > 4096 {
 		l = l[:4096]
 	}
-	if !f.Waylith && n < 50 && strings.HasPrefix(l, "=== Waylith log ===") {
+	if n == 1 && strings.HasPrefix(l, "Log uploaded on ") {
+		p.hugsHeader = true
+		return
+	}
+	if p.hugsHeader {
+		// An upload cut short may lack "Log file contents:"; the game's first lines end it too.
+		if strings.HasPrefix(l, "Log file contents:") {
+			p.hugsHeader, p.start = false, n
+			return
+		}
+		if !strings.HasPrefix(l, "=== Waylith log ===") && !versionRe.MatchString(l) {
+			return
+		}
+		p.hugsHeader, p.start = false, n-1
+	}
+	head := n-p.start < 50 // the game's version and format are in its first lines
+	if !f.Waylith && head && strings.HasPrefix(l, "=== Waylith log ===") {
 		p.finish()
 		f.Waylith, p.cur = true, nil
 		return
 	}
 	if f.Waylith {
+		if p.xname != "" && p.waylithXMLBlock(l) {
+			return
+		}
 		// INFO phase markers must be seen before the usual level filtering.
 		if m := waylithLineRe.FindStringSubmatch(l); m != nil && p.marker(m[2], l, n) {
 			return
@@ -222,13 +327,16 @@ func (p *Parser) Line(l string) {
 		p.cur = next
 		if next != nil && next.Line == n {
 			next.Phase = p.phase
+			if m := xmlExtStartRe.FindStringSubmatch(next.Message); m != nil {
+				p.xname = m[1]
+			}
 		}
 		return
 	}
 	if p.marker(l, "", n) {
 		return
 	}
-	if f.Version == "" && n < 50 {
+	if f.Version == "" && head {
 		if m := versionRe.FindStringSubmatch(l); m != nil {
 			f.Version = m[1]
 		}
@@ -275,6 +383,31 @@ func (p *Parser) Line(l string) {
 	p.finish()
 	p.cur = &Entry{Line: n, Message: l, Phase: p.phase}
 	f.Entries = append(f.Entries, p.cur)
+}
+
+// waylithXMLBlock takes a line of an XML Extensions block in a 1.7 log: the message is
+// "[Mod - Start of stack trace]", the failure lines, "[End of stack trace]" and "Source file:"
+// follow without a timestamp, then the caller stack. It closes the block and returns false at the
+// first line that is not part of it.
+func (p *Parser) waylithXMLBlock(l string) bool {
+	t := strings.TrimSpace(l)
+	switch {
+	case waylithLineRe.MatchString(l), strings.HasPrefix(t, "at "): // a block without its end line
+	case !p.xended && t == "[End of stack trace]":
+		p.xended = true
+		return true
+	case !p.xended:
+		if t != "" {
+			p.xinner = append(p.xinner, t)
+		}
+		return true
+	case strings.HasPrefix(l, "Source file: "):
+		p.closeBlock()
+		p.cur.Extra = append(p.cur.Extra, "file: "+strings.TrimPrefix(l, "Source file: "))
+		return true
+	}
+	p.closeBlock()
+	return false
 }
 
 func (p *Parser) marker(msg, line string, n int) bool {
@@ -348,8 +481,24 @@ func addLine(e *Entry, l string) {
 		}
 		return
 	}
+	if m := unityFrameRe.FindStringSubmatch(l); m != nil {
+		s := unityMember(m[1] + ":" + m[2])
+		fr := Frame{Text: strings.TrimSpace(l), Patched: patchNumRe.MatchString(s), Caller: unityCallerFrame(e)}
+		fr.Type, fr.Method = splitMember(dedupePatched(s))
+		if loggerFrame(fr.Type) {
+			// StackTraceUtility:ExtractStackTrace heads the stack Unity adds to every message when
+			// the player turns full stack traces on.
+			e.unityCaller = e.unityCaller || fr.Type == "UnityEngine.StackTraceUtility"
+			return
+		}
+		e.Frames = append(e.Frames, fr)
+		return
+	}
 	if m := wrapperRe.FindStringSubmatch(l); m != nil {
 		fr := Frame{Text: strings.TrimSpace(l)}
+		if strings.Contains(m[2], ":") { // Unity's format, inside a Unity stack
+			m[2], fr.Caller = unityMember(m[2]), unityCallerFrame(e)
+		}
 		if m[1] == "dynamic-method" {
 			fr.Type, fr.Method = splitMember(dedupePatched(m[2]))
 			fr.Patched = true
@@ -433,16 +582,21 @@ func resolveRefs(f *File) {
 	}
 }
 
-// Classify returns the class of an entry (03 §6.1).
+// Classify returns the class of an entry (06 §1).
 func Classify(e *Entry) string {
 	m := e.Message
 	switch {
+	case KnownNoise(m) != nil:
+		return ClassNoise
 	case strings.Contains(m, "] Patch operation ") || strings.HasPrefix(m, "Patch operation ") ||
 		strings.HasPrefix(m, "Verse.PatchOperation") && strings.Contains(m, "): Failed"):
 		return ClassPatchFailed
 	case strings.HasPrefix(m, "Verse.PatchOperationSequence: Error in the operation"),
-		// An XML Extensions block: "[Mod] Verse.PatchOperationAdd(xpath=…): Failed …".
-		strings.Contains(m, "] Verse.PatchOperation") && (strings.Contains(m, "): Failed") || strings.Contains(m, ": Error in")):
+		// An XML Extensions block: "[Mod] Verse.PatchOperationAdd(xpath=…): Failed …". Every
+		// operation in a block failed, whatever its class or ending ("): Error", an xpath that
+		// goes on to the next line, AnomalyPatch.PatchOperationRemoveIf).
+		strings.Contains(m, "] Verse.PatchOperation") && (strings.Contains(m, "): Failed") || strings.Contains(m, ": Error in")),
+		strings.HasPrefix(m, "[") && strings.Contains(m, "PatchOperation") && xmlExtOpRe.MatchString(m):
 		return ClassPatchFailed
 	case strings.Contains(m, "Could not resolve cross-reference") || strings.HasPrefix(m, "Could not load reference to") ||
 		defNamedRe.MatchString(m):
@@ -464,6 +618,9 @@ func Classify(e *Entry) string {
 	if hasExceptionStack(e) || strings.Contains(m, "Exception") {
 		return ClassException
 	}
+	if GameError(e) {
+		return ClassGameError
+	}
 	if modReportRe.MatchString(m) && !levelWordRe.MatchString(m) {
 		return ClassModReport
 	}
@@ -473,6 +630,9 @@ func Classify(e *Entry) string {
 var (
 	// DefDatabase.GetNamed: "Failed to find Verse.TerrainDef named X. There are N defs of this type loaded."
 	defNamedRe = regexp.MustCompile(`^Failed to find [\w.]+Def named `)
+	// "[Mod] Ns.PatchOperationX(": a failed operation of an XML Extensions block; the mod's name
+	// may hold brackets ("[[FSF] Vanilla Bionics Expansion] …").
+	xmlExtOpRe = regexp.MustCompile(`^\[.+\] (?:[\w.]+\.)?PatchOperation\w*\(`)
 	textureRe  = regexp.MustCompile(`^(?:Could not load Texture2D at |Failed to find any textures at |Could not load (?:Texture|Material|Shader|AudioClip|SoundDef)\b)`)
 	saveRe     = regexp.MustCompile(`^Could not resolve reference to object with loadID|is referenced \(xml node name: .*\) but is not deep-saved|^Error in PostExposeData|^Could not find think node with key|^Exception loading .* from save|^Could not load .* from save|^Could not get load ID\. `)
 	// A mod reporting on itself: "[Mod] …", "<color=…>[Mod]</color> …", "Mod :: …", "MOD: …".
@@ -482,7 +642,7 @@ var (
 	// Engine and framework status lines that read like errors but are not. One ^ before all
 	// the branches (here and above): with a ^ in each branch Go retries the pattern at every
 	// offset of a long message.
-	noiseRe = regexp.MustCompile(`^(?:Shader '[^']*': fallback shader '[^']*' not found|Translation data for language .* has \d+ errors|\[XML Extensions\] \d+ total patch operations run|Curl error \d+: Callback aborted|Mod .* is missing supported versions list in About\.xml)`)
+	noiseRe = regexp.MustCompile(`^(?:Shader '[^']*': fallback shader '[^']*' not found|\[XML Extensions\] \d+ total patch operations run|Curl error \d+: Callback aborted|Mod .* is missing supported versions list in About\.xml)`)
 )
 
 // hasExceptionStack reports frames other than a Waylith caller stack.
@@ -509,7 +669,45 @@ func (e *Entry) Top() *Frame {
 	return nil
 }
 
-var xmlRe = regexp.MustCompile(`XML error|XmlException|Exception parsing|Could not find parent node|parent node named|Duplicate def|Could not find a type named|Exception loading def from file|Exception reading .*\.xml|XML parse|failed to load|Could not find class|Exception loading .* from|is not a valid .*Def|DefOf field .* not found|Config error in`)
+var xmlRe = regexp.MustCompile(`XML error|XmlException|Exception parsing|Could not find parent node|parent node named|Duplicate def|Could not find (?:a )?type named|Exception loading def from file|Exception reading .*\.xml|XML parse|failed to load|Could not find class|Exception loading .* from|is not a valid .*Def|DefOf field .* not found|Config error in`)
+
+// GameError reports a message without a stack in the game's own error wording ("Tried to add pawn
+// X to lord with lord jobNs.LordJob_Y but …") that names a type outside the game's namespaces.
+// 1.6 writes Log.Error without a stack, and these lines hold none of the problem words of
+// interesting; the corpus has 124,268 such lines naming mod types (2026-11-05).
+func GameError(e *Entry) bool {
+	if hasExceptionStack(e) || !strings.HasPrefix(e.Message, "Tried to ") {
+		return false
+	}
+	for _, t := range typeTokRe.FindAllString(e.Message, -1) {
+		if strings.Contains(t, ".") && !GameNamespace(t) && !GameNamespace(Unglue(t)) {
+			return true
+		}
+	}
+	return false
+}
+
+// typeTokRe matches a dotted name in a message: Ns.Type, Ns.Type.Method.
+var typeTokRe = regexp.MustCompile(`\b[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+\b`)
+
+// Unglue drops a lower-case word that the game glued to a type name: "lord jobNs.LordJob_X"
+// prints "jobNs.LordJob_X". It returns t when there is nothing to drop. Callers try t first:
+// some namespaces start in lower case ("aRandomKiwi.RimThemes").
+func Unglue(t string) string {
+	dot := strings.IndexByte(t, '.')
+	if dot < 0 {
+		dot = len(t)
+	}
+	for i := 1; i < dot; i++ {
+		if t[i] >= 'A' && t[i] <= 'Z' {
+			if t[i-1] >= 'a' && t[i-1] <= 'z' && t[0] >= 'a' && t[0] <= 'z' {
+				return t[i:]
+			}
+			return t
+		}
+	}
+	return t
+}
 
 func hasFrame(e *Entry, method string) bool {
 	for _, fr := range e.Frames {
@@ -537,7 +735,10 @@ func interesting(e *Entry) (bool, string) {
 		return false, ""
 	}
 	c := Classify(e)
-	if hasExceptionStack(e) || !Informational(c) {
+	if hasExceptionStack(e) || !Informational(c) || c == ClassNoise {
+		return true, c
+	}
+	if strings.HasPrefix(e.Message, "Tried to ") {
 		return true, c
 	}
 	l := strings.ToLower(e.Message)
@@ -550,10 +751,29 @@ func interesting(e *Entry) (bool, string) {
 }
 
 var (
-	normHex  = regexp.MustCompile(`0x[0-9A-Fa-f]+|\b[0-9a-f]{16,}\b`)
-	normNum  = regexp.MustCompile(`\d+`)
-	normPath = regexp.MustCompile(`[A-Za-z]:[\\/][^\s"'<>]*`)
+	normHex      = regexp.MustCompile(`0x[0-9A-Fa-f]+|\b[0-9a-f]{16,}\b`)
+	normNum      = regexp.MustCompile(`\d+`)
+	normLordPawn = regexp.MustCompile(`^(Tried to add pawn ).+?( to lord with lord job)`)
+	normPath     = regexp.MustCompile(`[A-Za-z]:[\\/][^\s"'<>]*`)
+	// TickList and WorldPawns name the thing that threw: a humanlike pawn by its name, any other
+	// thing by its ThingID (defName and ID number). Group 2 is the name.
+	normTickThing   = regexp.MustCompile(`^(Exception ticking (?:world pawn )?)(.+?)( \(at \([-\d, ]+\)\))?(: |\. Suppressing further errors\.)`)
+	normThingID     = regexp.MustCompile(`^\w+?-?\d+$`)
+	normHediffOwner = regexp.MustCompile(`^(Exception ticking hediff .+? for pawn ).+?(\. Removing hediff)`)
 )
+
+// normTickName replaces a pawn's name in a tick error with <pawn>, so one bug hitting every
+// colonist is one cluster. A ThingID stays: its defName says what kind of thing threw.
+func normTickName(m string) string {
+	if strings.HasPrefix(m, "Exception ticking hediff ") {
+		return normHediffOwner.ReplaceAllString(m, "${1}<pawn>${2}")
+	}
+	loc := normTickThing.FindStringSubmatchIndex(m)
+	if loc == nil || normThingID.MatchString(m[loc[4]:loc[5]]) {
+		return m
+	}
+	return m[:loc[4]] + "<pawn>" + m[loc[5]:]
+}
 
 // Normalize turns a message into its cluster key part: numbers, addresses, IDs and paths
 // become placeholders.
@@ -562,6 +782,11 @@ func Normalize(m string) string {
 		m = m[:300]
 	}
 	m = normPath.ReplaceAllString(m, "<path>")
+	// Lord.AddPawn repeats every tick for each pawn: one cluster, not one per pawn name.
+	m = normLordPawn.ReplaceAllString(m, "${1}<pawn>${2}")
+	if strings.HasPrefix(m, "Exception ticking ") {
+		m = normTickName(m)
+	}
 	m = normHex.ReplaceAllString(m, "<hex>")
 	m = normNum.ReplaceAllString(m, "#")
 	return m

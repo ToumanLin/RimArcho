@@ -1,6 +1,6 @@
 package app
 
-// RimArcho updating itself (07 §5.1): the "self" automatic check reads GitHub Releases;
+// RimArcho updating itself (17 §5.1): the "self" check reads Workshop or GitHub;
 // installing waits for the player's confirmation, downloads and verifies the release zip,
 // waits until no other RimArcho runs from the program folder, swaps the files and checks
 // the new program before the surface restarts it. The data folder is never touched.
@@ -24,7 +24,7 @@ import (
 
 // UpdateDirName is the folder inside the program folder that holds the download, the
 // unpacked new files and the old files moved aside; on the program's volume so the swap
-// is renames only (07 §5.1, 01 §4).
+// is renames only (17 §5.1, 02 §1).
 const UpdateDirName = ".archo-update"
 
 // UpdatedFromEnv carries the pid of the process that installed an update to the program it
@@ -33,9 +33,11 @@ const UpdatedFromEnv = "RIMARCHO_UPDATED_FROM"
 
 // SelfUpdate is meta "self-update": the newest release the last check found.
 type SelfUpdate struct {
-	Checked time.Time           `json:"checked"`
-	Release *selfupdate.Release `json:"release,omitempty"`
-	State   string              `json:"state"`
+	Source   string              `json:"source,omitempty"`
+	Fallback string              `json:"fallback,omitempty"`
+	Checked  time.Time           `json:"checked"`
+	Release  *selfupdate.Release `json:"release,omitempty"`
+	State    string              `json:"state"`
 }
 
 // SelfVersionNow is the running version ("dev" for a plain go build).
@@ -71,7 +73,7 @@ func selfPrerelease(v string) bool {
 	return pre != ""
 }
 
-// UpdateAPIEnv replaces GitHub's API root (a test release server in the VM, 07 §5.1).
+// UpdateAPIEnv replaces GitHub's API root (a test release server in the VM, 17 §5.1).
 const UpdateAPIEnv = "RIMARCHO_UPDATE_API"
 
 func (a *App) selfClient() *selfupdate.Client {
@@ -86,7 +88,7 @@ func (a *App) selfClient() *selfupdate.Client {
 	return c
 }
 
-// CheckSelfUpdate asks GitHub for the newest release and records it; it never downloads.
+// CheckSelfUpdate asks the selected source and records it; it never downloads.
 // It is the automatic "self" check and `archo update --check`.
 func (a *App) CheckSelfUpdate(ctx context.Context) (int, string, error) {
 	cur := a.SelfVersionNow()
@@ -94,15 +96,30 @@ func (a *App) CheckSelfUpdate(ctx context.Context) (int, string, error) {
 		return 0, "development build", nil
 	}
 	s := a.SelfUpdateInfo()
-	r, err := a.selfClient().Latest(ctx, selfPrerelease(cur))
+	var r *selfupdate.Release
+	var err error
+	source, fallback := "GitHub", ""
+	if a.Store.Meta("cfg:updates.source") != "github" && !selfPrerelease(cur) && updateWorkshopItem() != "" {
+		r, err = a.workshopSelfRelease(ctx)
+		if err == nil {
+			source = "Workshop"
+		} else {
+			fallback = err.Error()
+		}
+	}
+	if r == nil {
+		r, err = a.selfClient().Latest(ctx, selfPrerelease(cur))
+	}
 	s.Checked = a.Now().UTC()
 	switch {
 	case errors.Is(err, selfupdate.ErrNoRelease):
 		s.Release, s.State, err = nil, "no release published yet", nil
+		s.Source, s.Fallback = source, fallback
 	case err != nil:
 		s.State = "check unavailable offline" // the last known release stays
 	default:
 		s.Release, s.State = r, "up to date"
+		s.Source, s.Fallback = source, fallback
 		if selfupdate.Newer(cur, r.Version) {
 			s.State = "new version available"
 		}
@@ -163,12 +180,20 @@ func (a *App) OtherArchoIn(dir string) []*GameRun {
 // ErrUpdateBusy: another RimArcho is installing the update from the same program folder.
 var ErrUpdateBusy = errors.New("another RimArcho is already installing the update")
 
-// InstallSelfUpdate installs the pending release after the player confirmed it (01 §4).
+// InstallSelfUpdate installs the pending release after the player confirmed it (02 §1).
 // The download and unpacking happen first; the files are swapped only once no other
 // RimArcho runs from the program folder (it waits, reporting them, until ctx ends). The
 // new archo must then report the new version, or the old files are put back. The caller
 // restarts the program; the data folder is not touched.
 func (a *App) InstallSelfUpdate(ctx context.Context, step func(SelfUpdateStep)) (*SelfUpdateResult, error) {
+	programDir, programErr := a.SelfProgramDir()
+	if programErr != nil {
+		return nil, programErr
+	}
+	if _, ok := selfupdate.InWorkshopFolder(programDir); ok {
+		return nil, errors.New("RimArcho cannot update in a Steam Workshop folder; open RimArcho.exe to move it first")
+	}
+
 	if step == nil {
 		step = func(SelfUpdateStep) {}
 	}
@@ -197,10 +222,7 @@ func (a *App) InstallSelfUpdate(ctx context.Context, step func(SelfUpdateStep)) 
 	}
 	defer release()
 
-	step(SelfUpdateStep{Phase: "download", Total: r.Zip.Size})
-	zip, err := a.selfClient().Download(ctx, r, filepath.Join(dir, "download"), func(done, total int64) {
-		step(SelfUpdateStep{Phase: "download", Done: done, Total: total})
-	})
+	zip, err := a.downloadSelfUpdate(ctx, r, filepath.Join(dir, "download"), step)
 	if err != nil {
 		if errors.Is(err, selfupdate.ErrChecksum) {
 			return nil, fmt.Errorf("the downloaded RimArcho %s does not match its checksum; nothing was changed", r.Version)
@@ -265,6 +287,7 @@ func (a *App) InstallSelfUpdate(ctx context.Context, step func(SelfUpdateStep)) 
 		b, _ := json.Marshal(s)
 		_ = a.Store.SetMeta("automatic:self", string(b))
 	}
+	a.cleanSelfWorkshop()
 	return &SelfUpdateResult{From: cur, To: r.Version, Program: program}, nil
 }
 
@@ -286,6 +309,7 @@ func WaitSelfSwap(limit time.Duration) {
 // stays for the next start. With UpdatedFromEnv set it first waits up to ten seconds for
 // that process, which held the old files, to exit.
 func (a *App) CleanSelfUpdate() {
+	a.cleanSelfWorkshop()
 	program, err := a.SelfProgramDir()
 	if err != nil {
 		return

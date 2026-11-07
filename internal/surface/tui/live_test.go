@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 06 §9.1: while the game runs the status line says so and its errors lead their section; when it
+// 16 §9.1: while the game runs the status line says so and its errors lead their section; when it
 // exits both go.
 func TestLiveGame(t *testing.T) {
 	t.Parallel()
@@ -44,7 +44,7 @@ func TestLiveGame(t *testing.T) {
 	if line := ansi.Strip(m.statusLine()); !strings.HasPrefix(line, "✓ done") || !strings.Contains(line, Tf("game running since %s", since)) {
 		t.Fatalf("status line with a message %q", line)
 	}
-	// this run leads its section, errors from the last run (06 §2.4)
+	// this run leads its section, errors from the last run (16 §2.4)
 	first := -1
 	for i, it := range m.prob.items {
 		if it.section == view.SectionRun {
@@ -72,10 +72,39 @@ func TestLiveGame(t *testing.T) {
 	}
 }
 
-// 06 §2.5: empty staging shows the history; enter on a step or version goes there
+// 16 §2.5: empty staging shows the history; enter on a step or version goes there
 // immediately, and u restores the previous list.
 func TestHistoryArea(t *testing.T) {
 	e, _ := fixture(t)
+	// On the fresh fixture the list is the saved version: going there changes nothing.
+	t.Run("identical checkout is a no-op", func(t *testing.T) {
+		m := direct(t, e, 160, 40)
+		before := *m.st.WS
+		depth := e.App.Store.StepCount(m.st.Plan.ID, "undo")
+		for i, h := range m.hist {
+			if h.Kind == "version" {
+				m.histCur = i
+				break
+			}
+		}
+		if m.hist[m.histCur].Kind != "version" {
+			t.Fatal("no saved version")
+		}
+		if strings.Contains(m.histLabel(), T("u undoes")) {
+			t.Fatal("unconditional undo hint")
+		}
+		m.histGo()
+		if m.status != T("no changes") {
+			t.Fatalf("no-op feedback: %s", m.status)
+		}
+		after, err := e.App.Store.Workspace(m.st.Plan.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if *after != before || e.App.Store.StepCount(m.st.Plan.ID, "undo") != depth {
+			t.Fatal("identical checkout mutated workspace/history")
+		}
+	})
 	m := direct(t, e, 160, 40)
 	e.MustRun("disable", "pkg:tester.a")
 	m.reload()
@@ -109,7 +138,7 @@ func TestHistoryArea(t *testing.T) {
 	m.reload()
 	before := m.st.List.Encode()
 	steps := e.App.Store.StepCount(m.st.Plan.ID, "undo")
-	// A saved version: one enter loads it (one step, u brings the list back; 06 §6).
+	// A saved version: one enter loads it (one step, u brings the list back; 16 §6).
 	press(m, "end")
 	h := m.hist[m.histCur]
 	if h.Kind != "version" {
@@ -150,7 +179,7 @@ func TestHistoryArea(t *testing.T) {
 	}
 }
 
-// 08 §1: while another environment's game runs, the top bar shows why launching is off
+// 09 §1: while another environment's game runs, the top bar shows why launching is off
 // instead of the L key.
 func TestTopBarLaunchBlocked(t *testing.T) {
 	t.Parallel()
@@ -183,35 +212,5 @@ func TestStatusLineAfterGame(t *testing.T) {
 	press(m, "@")
 	if m.tab != tabProblems {
 		t.Fatalf("shift+2 went to %d", m.tab)
-	}
-}
-
-func TestHistoryIdenticalCheckoutIsNoOp(t *testing.T) {
-	e, _ := fixture(t)
-	m := direct(t, e, 160, 40)
-	before := *m.st.WS
-	depth := e.App.Store.StepCount(m.st.Plan.ID, "undo")
-	for i, h := range m.hist {
-		if h.Kind == "version" {
-			m.histCur = i
-			break
-		}
-	}
-	if m.hist[m.histCur].Kind != "version" {
-		t.Fatal("no saved version")
-	}
-	if strings.Contains(m.histLabel(), T("u undoes")) {
-		t.Fatal("unconditional undo hint")
-	}
-	m.histGo()
-	if m.status != T("no changes") {
-		t.Fatalf("no-op feedback: %s", m.status)
-	}
-	after, err := e.App.Store.Workspace(m.st.Plan.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if *after != before || e.App.Store.StepCount(m.st.Plan.ID, "undo") != depth {
-		t.Fatal("identical checkout mutated workspace/history")
 	}
 }

@@ -7,8 +7,8 @@ import (
 	"sync/atomic"
 )
 
-// Package view holds the shared interface models and text (06 §1).
-// Interface keys are English; CLI output stays English (05 §1.1).
+// Package view holds the shared interface models and text (16 §1).
+// Interface keys are English; CLI output stays English (13 §1.1).
 var selectedLocale atomic.Pointer[localeTable]
 
 // Lang returns the selected locale directory name, or en for English.
@@ -66,7 +66,7 @@ func T(s string) string {
 
 // enText is English the interface says differently from the text it is given: app and
 // modchanges write these in the CLI's words (plan, build), which the CLI keeps for agents;
-// the interface uses the player's (06 §7.2).
+// the interface uses the player's (16 §7.2).
 var enText = map[string]string{
 	"RimArcho's link for this plan":          "RimArcho's link for this list",
 	"a plan needs a name":                    "a list needs a name",

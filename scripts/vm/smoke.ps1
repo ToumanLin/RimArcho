@@ -9,11 +9,13 @@
 # Needs: the VM running, 'vm.ps1 prep' and 'vm.ps1 forward' done once, Player signed in
 # on the guest screen (for the window part). See README.md.
 param(
+    [string]$VMX = 'D:\VMs\Player-Test\Win11-Player-Test.vmx',   # which test VM (Player-Test, Eval-2, Eval-3)
     [switch]$NoBuild,
     [string]$Shot = ''
 )
 $ErrorActionPreference = 'Stop'
-$vm = Join-Path $PSScriptRoot 'vm.ps1'
+$vmScript = Join-Path $PSScriptRoot 'vm.ps1'
+$vm = { & $vmScript @args -VMX $VMX }
 $transfer = 'D:\VMs\Transfer\rimarcho'
 $script:fails = 0
 function Report([bool]$ok, [string]$name, [string]$why = '') {
@@ -28,7 +30,7 @@ function Step([string]$name, [scriptblock]$do) {
 }
 
 # The VM and its Tools; nothing else works without them.
-$tools = try { (& 'D:\VMs\Setup\Invoke-VMRun.ps1' -VMX 'D:\VMs\Player-Test\Win11-Player-Test.vmx' -Command checkToolsState) 2>$null | Select-Object -Last 1 } catch { 'error' }
+$tools = try { (& 'D:\VMs\Setup\Invoke-VMRun.ps1' -VMX $VMX -Command checkToolsState) 2>$null | Select-Object -Last 1 } catch { 'error' }
 Report ($tools -eq 'running') 'vm: tools running' "tools: $tools"
 if ($tools -ne 'running') { exit $script:fails }
 

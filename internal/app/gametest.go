@@ -18,28 +18,42 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/logs"
+	"github.com/ToumanLin/RimArcho/internal/patterns"
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
-// TestRunOptions selects a plan to run without writing the player's files (08 §12).
+// TestRunOptions selects a plan to run without writing the player's files (20 §2).
 type TestRunOptions struct {
-	Env, Plan       string
-	Map             bool
-	Timeout, Settle time.Duration
-	Progress        func(string)
+	Env, Plan string
+	Map       bool
+	// Probe: a probe Mod folder to add to the tested list (map mode implied, 20 §3);
+	// ProbeAfter or ProbeBefore name the packageId it goes next to (default: last).
+	Probe, ProbeAfter, ProbeBefore string
+	Timeout, Settle                time.Duration
+	Progress                       func(string)
 }
 
 type TestRunMissing struct {
 	PackageID string `json:"package_id"`
 	Name      string `json:"name"`
+	Reason    string `json:"reason,omitempty"` // why it could not be linked for the run
 }
 
 type TestRunCluster struct {
+	key        string
 	Class      string   `json:"class"`
 	Message    string   `json:"message"`
 	Count      int      `json:"count"`
 	Mods       []string `json:"mods"`
 	Confidence string   `json:"confidence"`
+	Delta      string   `json:"delta,omitempty"`  // against the previous run: new / present
+	Before     string   `json:"before,omitempty"` // in the player's log: present / absent
+	// Note: "common kind, no source found: …" for a cluster no mod is named for whose kind is in more
+	// than 5% of public logs (patterns.CommonUnattributed, 06 §8).
+	Note string `json:"note,omitempty"`
+	// Consequences: clusters that follow from this one's failed def file, folded into it and
+	// not listed (06 §3); they still count in counts and clusters_total.
+	Consequences int `json:"consequences,omitempty"`
 }
 
 type TestRunReport struct {
@@ -53,18 +67,32 @@ type TestRunReport struct {
 	PeakMemoryMB  int64            `json:"peak_memory_mb"`
 	Requested     int              `json:"requested"`
 	Missing       []TestRunMissing `json:"missing"`
+	Linked        []string         `json:"linked,omitempty"` // Mods/ links made for this run and removed after it
 	RunDir        string           `json:"run_dir"`
 	LogPath       string           `json:"log_path"`
-	Args          []string         `json:"args"`
+	Args          []string         `json:"args,omitempty"` // saved in report.json (map mode of a baseline); not in --json output
 	Attribution   string           `json:"attribution"`
-	Counts        map[string]int   `json:"counts"` // clusters per class, before the limit
+	AnalysisError string           `json:"analysis_error,omitempty"` // attributed without a fresh analysis
+	Counts        map[string]int   `json:"counts"`                   // clusters per class, before the limit
 	Clusters      []TestRunCluster `json:"clusters"`
-	ClustersTotal int              `json:"clusters_total"`
+	// Info: the informational clusters (mod reports, other, known noise), one line each with
+	// before, so an agent need not reread the log for them (MCP review round 2 P24).
+	Info          []TestRunCluster  `json:"info,omitempty"`
+	ClustersTotal int               `json:"clusters_total"`
+	PlayerLog     *TestRunPlayerLog `json:"player_log,omitempty"`
+	Fixed         []TestRunCluster  `json:"fixed,omitempty"`
+	Baseline      *TestRunBaseline  `json:"baseline,omitempty"`
+	Gone          []TestRunCluster  `json:"gone,omitempty"`
+	Probe         *TestRunProbe     `json:"probe,omitempty"` // a probe run's lines and result (20 §3)
+	clusterKeys   []string
+	// playerClusters: the player's log's error clusters by key, attributed (comparePlayerLog)
+	playerClusters map[string]TestRunCluster
 }
 
-// Success is the CLI/MCP outcome: the target was reached without error clusters.
+// Success is the CLI/MCP outcome: the target was reached without error clusters. A probe
+// run's target is its RESULT line (20 §3).
 func (r *TestRunReport) Success() bool {
-	if r.Status != "menu" && r.Status != "map" {
+	if !r.reached() || (r.Status == "probe" && (r.Probe == nil || r.Probe.Outcome != "result")) {
 		return false
 	}
 	for class, n := range r.Counts {
@@ -75,9 +103,14 @@ func (r *TestRunReport) Success() bool {
 	return true
 }
 
+// reached: the run got to its target: the menu, a quiet map, or a probe's last line.
+func (r *TestRunReport) reached() bool {
+	return r.Status == "menu" || r.Status == "map" || r.Status == "probe"
+}
+
 // TestRun starts the executable directly, including for a Steam-launch environment.
-// The current plan and the player's config, saves and logs are left alone (08 §12).
-func (a *App) TestRun(ctx context.Context, o TestRunOptions) (*TestRunReport, error) {
+// The current plan and the player's config, saves and logs are left alone (20 §2).
+func (a *App) TestRun(ctx context.Context, o TestRunOptions) (_ *TestRunReport, err error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -128,10 +161,37 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (*TestRunReport, er
 	if o.Progress != nil {
 		o.Progress("preparing test data for " + PlanRef(st.Plan))
 	}
-	if err := a.prepareTestConfig(st, data, protected); err != nil {
+	if err := os.MkdirAll(base, 0o755); err != nil {
 		return nil, err
 	}
-	missing := testRunMissing(st)
+	// Links an interrupted run left, then this run's: the plan's Mods the game cannot see.
+	if err := a.removeTestLinks(base); err != nil {
+		return nil, err
+	}
+	// After the old links are gone, so a probe linked by an interrupted run is linked anew.
+	probe, err := a.checkProbe(st, o)
+	if err != nil {
+		return nil, err
+	}
+	mods, add, blocked := a.testRunLinks(st)
+	if probe != nil && probe.link != nil {
+		mods = modsDir(st.Ix)
+		add = append(add, *probe.link)
+	}
+	unlink, err := a.addTestLinks(base, mods, add)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { err = errors.Join(err, unlink()) }() // a no-op once removed below
+	if err := a.prepareTestConfig(st, data, protected, probe); err != nil {
+		return nil, err
+	}
+	if probe != nil {
+		if err := clearProbeShot(data); err != nil {
+			return nil, err
+		}
+	}
+	missing := testRunMissing(st, blocked)
 	if err := os.MkdirAll(runs, 0o755); err != nil {
 		return nil, err
 	}
@@ -153,30 +213,48 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (*TestRunReport, er
 	}
 	raw, runErr := gametest.Run(ctx, gametest.Options{
 		GameRoot: e.GameRoot, GameVersion: e.GameVersion, DataDir: data, RunDir: runDir,
-		Map: o.Map, Timeout: o.Timeout, Settle: o.Settle, Start: a.TestGameStart,
+		Map: o.Map, Probe: probe != nil, Timeout: o.Timeout, Settle: o.Settle, Start: a.TestGameStart,
 	})
+	// The game has exited (gametest.Run reaps it): take the links away before anything else.
+	unlinkErr := unlink()
 	if raw == nil {
-		return nil, runErr
+		return nil, errors.Join(runErr, unlinkErr)
 	}
 	r := &TestRunReport{
 		Env: e.Name, Plan: PlanRef(st.Plan), GameVersion: e.GameVersion, Status: raw.Status,
 		LoadSeconds: raw.LoadSeconds, TotalSeconds: raw.TotalSeconds, PeakMemoryMB: raw.PeakMemoryMB,
-		Requested: len(st.List), Missing: missing, RunDir: runDir, LogPath: raw.LogPath,
+		Requested: len(st.List), Missing: missing, Linked: linkNames(add), RunDir: runDir, LogPath: raw.LogPath,
 		Args: raw.Args, Attribution: "tested-plan", Counts: map[string]int{}, Clusters: []TestRunCluster{},
+	}
+	var probeErr error
+	if probe != nil {
+		r.Probe = probe.report
+		probeErr = finishProbe(r.Probe, raw.LogPath, data, runDir)
+	}
+	// Attribution reads assembly types and Harmony IDs from the analysis (06 §2); a
+	// test run is often the first command in a fresh environment. After the game exits,
+	// so the measured load is not slowed by it.
+	if err := a.ensureTestAnalysis(ctx, st, o.Progress); err != nil {
+		r.AnalysisError = err.Error()
 	}
 	if o.Progress != nil {
 		o.Progress("analysing test log")
 	}
 	analysisErr := a.testRunLog(st, r)
+	if o.Progress != nil {
+		o.Progress("comparing with the player's log")
+	}
+	a.comparePlayerLog(st, r)
+	compareTestRun(r)
 	b, saveErr := json.MarshalIndent(r, "", "  ")
 	if saveErr == nil {
 		saveErr = os.WriteFile(filepath.Join(runDir, "report.json"), append(b, '\n'), 0o644)
 	}
 	pruneErr := pruneTestRuns(runs, runDir)
-	return r, errors.Join(runErr, analysisErr, saveErr, pruneErr)
+	return r, errors.Join(runErr, unlinkErr, probeErr, analysisErr, saveErr, pruneErr)
 }
 
-func (a *App) prepareTestConfig(st *LoadoutState, data string, protected []string) error {
+func (a *App) prepareTestConfig(st *LoadoutState, data string, protected []string, probe *probeSetup) error {
 	cfg := filepath.Join(data, "Config")
 	if err := os.MkdirAll(cfg, 0o755); err != nil {
 		return err
@@ -203,6 +281,14 @@ func (a *App) prepareTestConfig(st *LoadoutState, data string, protected []strin
 				return err
 			}
 		}
+		// Settings follow the Mod (09 §3): what a launch would copy, written here only.
+		job := a.listSettings(st, testRunSeen(st), filepath.Join(root, "Config"))
+		job.write = cfg
+		for _, c := range carryModSettings(job, func(path string) error { return testRunPath(data, path, protected) }) {
+			if c.Err != "" {
+				return fmt.Errorf("test run: copying %s's settings: %s", c.Mod, c.Err)
+			}
+		}
 	}
 	var known []string
 	for _, m := range st.Ix.Mods {
@@ -210,12 +296,7 @@ func (a *App) prepareTestConfig(st *LoadoutState, data string, protected []strin
 			known = append(known, m.PackageID)
 		}
 	}
-	tokens := st.Reg.Tokens(st.List, func(id string) string {
-		if m := st.Ix.ByID[id]; m != nil {
-			return m.PackageID
-		}
-		return ""
-	})
+	tokens := probe.probeTokens(testRunTokens(st))
 	b, err := loadout.Render(nil, st.Ix.Env.GameVersion, tokens, known)
 	if err != nil {
 		return err
@@ -227,8 +308,47 @@ func (a *App) prepareTestConfig(st *LoadoutState, data string, protected []strin
 	return os.WriteFile(path, b, 0o644)
 }
 
-func testRunMissing(st *LoadoutState) []TestRunMissing {
-	parents, linked := map[string]bool{}, map[string]bool{}
+// shortMessage is a message's first line cut to 100 characters, for the lists whose entries
+// only identify a cluster (info, fixed, gone; MCP review round 2 P9).
+func shortMessage(msg string) string {
+	s := firstLine(msg)
+	if r := []rune(s); len(r) > 100 {
+		s = string(r[:97]) + "..."
+	}
+	return s
+}
+
+func linkNames(cs []LinkChange) []string {
+	var out []string
+	for _, c := range cs {
+		out = append(out, c.Name)
+	}
+	slices.Sort(out)
+	return out
+}
+
+// testRunMissing lists the plan's Mods this run's game cannot see, after its links are made.
+func testRunMissing(st *LoadoutState, blocked map[string]string) []TestRunMissing {
+	seen := testRunSeen(st)
+	missing := []TestRunMissing{}
+	for _, entry := range st.List {
+		m := st.Ix.ByID[entry.Instance]
+		if m == nil {
+			missing = append(missing, TestRunMissing{PackageID: entry.Missing, Name: entry.Missing})
+			continue
+		}
+		if m.Kind != source.Official && seen[m.ID] == "" {
+			missing = append(missing, TestRunMissing{PackageID: m.PackageID, Name: m.DisplayName(), Reason: blocked[m.ID]})
+		}
+	}
+	return missing
+}
+
+// testRunSeen maps each listed Mod a test run's game sees to the folder it sees it under.
+// It is the Mod's folder in Data/, Mods/ or the Workshop, or the name of a link in Mods/
+// to it (including the links a test run makes, 20 §2).
+func testRunSeen(st *LoadoutState) map[string]string {
+	parents, linked := map[string]bool{}, map[string]string{}
 	roots := []string{filepath.Join(st.Ix.Env.GameRoot, "Data"), filepath.Join(st.Ix.Env.GameRoot, "Mods")}
 	for _, s := range st.Ix.Sources {
 		if s.Kind == source.Workshop && s.Status != source.StatusRetired {
@@ -249,26 +369,27 @@ func testRunMissing(st *LoadoutState) []TestRunMissing {
 		}
 		if info, err := os.Stat(path); err == nil && info.IsDir() {
 			if real, err := source.RealPath(path); err == nil {
-				linked[env.PathKey(real)] = true
+				linked[env.PathKey(real)] = f.Name()
 			}
 		}
 	}
-	missing := []TestRunMissing{}
+	seen := map[string]string{}
 	for _, entry := range st.List {
 		m := st.Ix.ByID[entry.Instance]
-		if m == nil {
-			missing = append(missing, TestRunMissing{PackageID: entry.Missing, Name: entry.Missing})
-			continue
-		}
-		if m.Kind == source.Official {
+		if m == nil || m.Kind == source.Official {
 			continue
 		}
 		real, err := source.RealPath(st.Ix.ModDir(m))
-		if err != nil || !parents[env.PathKey(filepath.Dir(real))] && !linked[env.PathKey(real)] {
-			missing = append(missing, TestRunMissing{PackageID: m.PackageID, Name: m.DisplayName()})
+		if err != nil {
+			continue
+		}
+		if parents[env.PathKey(filepath.Dir(real))] {
+			seen[m.ID] = filepath.Base(real)
+		} else if name := linked[env.PathKey(real)]; name != "" {
+			seen[m.ID] = name
 		}
 	}
-	return missing
+	return seen
 }
 
 func (a *App) testRunLog(st *LoadoutState, r *TestRunReport) error {
@@ -300,12 +421,20 @@ func (a *App) testRunLog(st *LoadoutState, r *TestRunReport) error {
 		if settings {
 			class = gametest.ClassSettings
 		}
+		// A probe's own messages are in probe.lines; as mod reports they would only repeat them (20 §3).
+		if r.Probe != nil && logs.Informational(class) && strings.HasPrefix(lc.First.Message, "[Probe] ") {
+			continue
+		}
 		r.Counts[class]++
 		if logs.Informational(class) {
+			if len(r.Info) < testRunListLimit {
+				r.Info = append(r.Info, TestRunCluster{key: lc.Key, Class: class, Message: shortMessage(lc.First.Message), Count: lc.Count})
+			}
 			continue
 		}
 		r.ClustersTotal++
-		if len(r.Clusters) == 30 {
+		r.clusterKeys = append(r.clusterKeys, lc.Key)
+		if len(r.Clusters) == 30 || lc.ConsequenceOf != "" {
 			continue
 		}
 		mods := []string{}
@@ -313,16 +442,61 @@ func (a *App) testRunLog(st *LoadoutState, r *TestRunReport) error {
 		if settings {
 			confidence = finding.Certain
 		} else {
-			for _, at := range lc.Attr {
-				if m := st.Ix.ByID[at.Instance]; m != nil && !slices.Contains(mods, m.DisplayName()) {
-					mods = append(mods, m.DisplayName())
-				}
-			}
+			mods = testRunMods(st, lc)
 		}
-		message, _, _ := strings.Cut(lc.First.Message, "\n")
-		r.Clusters = append(r.Clusters, TestRunCluster{Class: class, Message: strings.TrimSuffix(message, "\r"), Count: lc.Count, Mods: mods, Confidence: confidence})
+		note := ""
+		if !settings {
+			note = patterns.Load().CommonUnattributed(class, lc.Template, len(lc.Attr) > 0)
+		}
+		if slices.Contains(lc.Details, ownArtNote) {
+			note = ownArtNote
+		}
+		r.Clusters = append(r.Clusters, TestRunCluster{key: lc.Key, Class: class, Message: firstLine(lc.First.Message), Count: lc.Count, Mods: mods, Confidence: confidence, Note: note, Consequences: lc.Consequences})
 	}
 	return nil
+}
+
+// testRunMods names a cluster's candidate mods in attribution order.
+func testRunMods(st *LoadoutState, lc *LogCluster) []string {
+	mods := []string{}
+	for _, at := range lc.Attr {
+		if m := st.Ix.ByID[at.Instance]; m != nil && !slices.Contains(mods, m.DisplayName()) {
+			mods = append(mods, m.DisplayName())
+		}
+	}
+	return mods
+}
+
+// ensureTestAnalysis brings the tested plan's Def/Patch/Harmony analysis up to date,
+// waiting without the MCP bound (14 §1): the test run's report depends on it.
+func (a *App) ensureTestAnalysis(ctx context.Context, st *LoadoutState, progress func(string)) error {
+	if p := a.analyzing; p != nil { // a background analysis from an earlier call
+		select {
+		case <-p.done:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		a.analyzing = nil
+	}
+	if s, err := a.analysisOf(st, false); err == nil && s.Fresh {
+		return nil
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if progress != nil {
+		progress("analysing the plan's mods for attribution")
+	}
+	open, name := a.OpenPlan, a.PlanName
+	a.OpenPlan, a.PlanName = st.Plan.ID, ""
+	defer func() { a.OpenPlan, a.PlanName = open, name }()
+	if a.AnalyzeRunner != nil {
+		return a.AnalyzeRunner(st.Ix.Env.Name, progress)
+	}
+	if a.AnalyzeExe != "" {
+		return ChildAnalyzeExe(a.AnalyzeExe, a.Home, st.Ix.Env.Name, st.Plan.Name, "", progress)
+	}
+	return ChildAnalyze(a.Home, st.Ix.Env.Name, st.Plan.Name, "", progress)
 }
 
 func testRunPath(root, path string, protected []string) error {

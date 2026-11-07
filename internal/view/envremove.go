@@ -2,7 +2,7 @@ package view
 
 import "github.com/ToumanLin/RimArcho/internal/app"
 
-// Removing an environment (06 §2.14): the dry run says what goes and what stays, then one
+// Removing an environment (16 §2.14): the dry run says what goes and what stays, then one
 // confirmation removes it.
 
 // EnvRemovalTitle is the confirmation's title.

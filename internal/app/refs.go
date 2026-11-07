@@ -15,7 +15,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Index is an environment's instances with reference helpers (05 §2).
+// Index is an environment's instances with reference helpers (13 §2).
 type Index struct {
 	store     *store.Store // lazy foreign-list lookups follow the owning session on adoption
 	Env       *env.Environment
@@ -29,7 +29,7 @@ type Index struct {
 }
 
 // OwnCopy is this game's own Mods/ copy of a packageId (not a RimArcho link), or nil. A list
-// naming another game's Mods/ copy uses it instead (02 §0 item 14, 04 §1.7).
+// naming another game's Mods/ copy uses it instead (03 §2 item 14, 07 §1.7).
 func (ix *Index) OwnCopy(pkg string) *store.Mod { return ix.own[strings.ToLower(pkg)] }
 
 // Elsewhere is m when it is another game's Mods/ copy that this game has no copy of its
@@ -171,22 +171,112 @@ func (ix *Index) Source(id string) *source.Source {
 	return nil
 }
 
-// RefError is a reference that matched nothing.
-type RefError struct{ Ref, Hint string }
+// RefError is a reference that matched nothing. Find, when set, is what to search for
+// instead: Error names the CLI command (search with archo find <Find>) and MCPError the
+// MCP tool (search with find_mods query=<Find>), 13 §3.3.
+type RefError struct{ Ref, Hint, Find string }
 
-func (e *RefError) Error() string {
-	if e.Hint != "" {
-		return fmt.Sprintf("%s matches nothing (%s)", e.Ref, e.Hint)
+func (e *RefError) Error() string { return e.text("archo find " + quoteWords(e.Find)) }
+
+// MCPError is Error as an MCP tool call shows it: the search names find_mods.
+func (e *RefError) MCPError() string { return e.text("find_mods query=" + quoteWords(e.Find)) }
+
+func (e *RefError) text(search string) string {
+	hint := e.Hint
+	if e.Find != "" {
+		if hint != "" {
+			hint += "; "
+		}
+		hint += "search with " + search
+	}
+	if hint != "" {
+		return fmt.Sprintf("%s matches nothing (%s)", e.Ref, hint)
 	}
 	return e.Ref + " matches nothing"
 }
 
-// Resolve maps a reference to instances: #id, L#lineage, pkg:, ws:, or a bare ID prefix.
-// pkg:, ws: and L# may return several instances; callers list them instead of choosing (05 I3).
+func quoteWords(s string) string {
+	if strings.ContainsAny(s, " \t") {
+		return `"` + s + `"`
+	}
+	return s
+}
+
+// PackageRef returns the lower-case packageId a reference names: pkg:<packageId> or a bare
+// packageId (BarePackageID), 13 §2.
+func PackageRef(ref string) (string, bool) {
+	r := strings.TrimSpace(ref)
+	if p, ok := strings.CutPrefix(strings.ToLower(r), "pkg:"); ok {
+		return p, true
+	}
+	if BarePackageID(r) {
+		return strings.ToLower(r), true
+	}
+	return "", false
+}
+
+// BarePackageID reports whether a word is a packageId written without pkg: (13 §2): two or
+// more dot-separated parts of ASCII letters, digits, "_" and "-", with at least one letter.
+// No other reference has that shape: instance and lineage IDs have no dot, the prefixed
+// forms have ":" or "#", Def references "/" or "@", paths "/" or "\", names a space, and a
+// game version such as 1.6 has no letter.
+func BarePackageID(s string) bool {
+	parts := strings.Split(s, ".")
+	if len(parts) < 2 {
+		return false
+	}
+	letter := false
+	for _, part := range parts {
+		if part == "" {
+			return false
+		}
+		for _, c := range part {
+			switch {
+			case c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z':
+				letter = true
+			case c >= '0' && c <= '9' || c == '_' || c == '-':
+			default:
+				return false
+			}
+		}
+	}
+	return letter
+}
+
+// packageSearch is the word to search for when a packageId matches nothing: its longest
+// part, usually the mod's name (khamenman.outfitstandsplus → outfitstandsplus), which
+// find also matches in names, folders and other packageIds.
+func packageSearch(pkg string) string {
+	best := ""
+	for _, part := range strings.Split(pkg, ".") {
+		if len(part) > len(best) {
+			best = part
+		}
+	}
+	return best
+}
+
+// Resolve maps a reference to instances: #id, L#lineage, pkg:<packageId> or a bare
+// packageId, ws:, or a bare ID prefix. A packageId, ws: and L# may return several
+// instances; callers list them instead of choosing (05 I3).
 func (ix *Index) Resolve(ref string) ([]*store.Mod, error) {
 	r := strings.TrimSpace(ref)
 	lower := strings.ToLower(r)
 	var out []*store.Mod
+	if p, ok := PackageRef(r); ok {
+		if p == "" {
+			return nil, &RefError{Ref: ref, Hint: "pkg: needs a packageId", Find: "<words>"}
+		}
+		for _, m := range ix.Mods {
+			if m.PackageID == p {
+				out = append(out, m)
+			}
+		}
+		if len(out) == 0 {
+			return nil, &RefError{Ref: ref, Hint: "no mod has packageId " + p, Find: packageSearch(p)}
+		}
+		return out, nil
+	}
 	switch {
 	case strings.HasPrefix(lower, "l#"):
 		p := lower[2:]
@@ -200,13 +290,6 @@ func (ix *Index) Resolve(ref string) ([]*store.Mod, error) {
 		for _, l := range lids {
 			out = append(out, ix.ByLineage[l]...)
 		}
-	case strings.HasPrefix(lower, "pkg:"):
-		p := lower[4:]
-		for _, m := range ix.Mods {
-			if m.PackageID == p {
-				out = append(out, m)
-			}
-		}
 	case strings.HasPrefix(lower, "ws:"):
 		p := r[3:]
 		for _, m := range ix.Mods {
@@ -214,17 +297,23 @@ func (ix *Index) Resolve(ref string) ([]*store.Mod, error) {
 				out = append(out, m)
 			}
 		}
+		if len(out) == 0 && p != "" {
+			return nil, &RefError{Ref: ref, Hint: "no mod has Workshop ID " + p, Find: p}
+		}
 	default:
 		p := strings.TrimPrefix(lower, "#")
 		if !ids.Valid(p) {
-			return nil, &RefError{Ref: ref, Hint: "not a reference (#id, L#id, pkg:<packageId>, ws:<workshopId>); search with archo find " + ref}
+			return nil, &RefError{Ref: ref, Hint: "not a reference (#id, L#id, pkg:<packageId> or a bare packageId, ws:<workshopId>)", Find: r}
 		}
 		for _, id := range ix.inst.Lookup(p) {
 			out = append(out, ix.ByID[id])
 		}
+		if len(out) == 0 && !strings.HasPrefix(r, "#") {
+			return nil, &RefError{Ref: ref, Find: r} // a bare word may be a name: archo mod Alpha
+		}
 	}
 	if len(out) == 0 {
-		return nil, &RefError{Ref: ref, Hint: "archo find <words>"}
+		return nil, &RefError{Ref: ref, Find: "<words>"}
 	}
 	return out, nil
 }
@@ -289,7 +378,7 @@ func (a *App) IdentityQuestion(qid int64) (*store.Question, error) {
 	return q, nil
 }
 
-// ResolveQuestion answers an identity question: same | copy | unrelated (02 §5.4).
+// ResolveQuestion answers an identity question: same | copy | unrelated (04 §2.4).
 func (a *App) ResolveQuestion(qid int64, answer string) (*store.Question, error) {
 	q, err := a.IdentityQuestion(qid)
 	if err != nil {
@@ -346,7 +435,7 @@ func (a *App) MergeLineages(ix *Index, into, from string) error {
 	return a.Store.MergeLineages(ix.Env.ID, into, from)
 }
 
-// GC removes expired tombstones (02 §5.5).
+// GC removes expired tombstones (04 §2.5).
 func (a *App) GC(dryRun bool) (*store.GCResult, time.Time, error) {
 	e, err := a.Env()
 	if err != nil {

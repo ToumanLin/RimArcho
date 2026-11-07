@@ -44,7 +44,7 @@ func droppedNeed(a *app.App, st *app.LoadoutState) *Need {
 		Evidence: evidence(EvInferred, Tf("v%d → v%d", from, to)),
 		Actions: []Action{
 			viewAction(T("see the difference"), "loadout", "diff", fmt.Sprintf("v%d", from), fmt.Sprintf("v%d", to)),
-			// One step: u takes it back (06 §6), so no confirmation.
+			// One step: u takes it back (16 §6), so no confirmation.
 			{Kind: ActLoadExternal, Key: "L", Label: Tf("put back v%d", from), Version: from, Undo: true, Done: Tf("the list is v%d again", from)},
 			{Kind: ActKeepOutside, Key: "I", Label: T("keep the change"), Done: Tf("v%d is kept", to)},
 		}}

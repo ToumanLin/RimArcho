@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The history area (06 §2.5): where the staging list is when staging is empty, the
+// The history area (16 §2.5): where the staging list is when staging is empty, the
 // unsaved steps around "now" (redo dimmed above, undo below), then the saved versions. The
 // rows are view.HistoryItems; enter on a step or version goes there at once
 // (u / ctrl+r move back).
@@ -121,7 +121,7 @@ func (m *model) histLabel() string {
 }
 
 // chooseHistory is H: every step and version as a chooser, the window's history picker
-// (06 §2.5); enter goes there, as enter in the history area does. It works whatever the
+// (16 §2.5); enter goes there, as enter in the history area does. It works whatever the
 // staging area holds.
 func (m *model) chooseHistory() tea.Cmd {
 	if m.st == nil {
@@ -165,7 +165,7 @@ func (m *model) histGoTo(h view.HistItem) tea.Cmd {
 	case "now":
 		return nil
 	case "version":
-		// One step: the list it replaces stays in the history, u brings it back (06 §6).
+		// One step: the list it replaces stays in the history, u brings it back (16 §6).
 		r, _, err := m.app.Checkout(fmt.Sprintf("v%d", h.Version))
 		m.reload()
 		if err != nil {

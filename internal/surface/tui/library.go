@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Mod library > All (06 §2.9, §9.1), laid out as the window's page: the filter bar on top (the
+// Mod library > All (16 §2.9, §9.1), laid out as the window's page: the filter bar on top (the
 // editor's, view.BuildLibrary's groups), the table of Lineages that open to their copies
 // (→ ←), and the detail of the cursor's copy on the right when the terminal is wide enough
 // (enter shows it full screen). Every op of a copy is a key or in the row menu (view.CopyOps,
@@ -236,7 +236,7 @@ func (m *model) openLibraryInstance(id string) tea.Cmd {
 
 // ---- running ops ----
 
-// runLibOp runs an op on the targets that have it (06 §2.9).
+// runLibOp runs an op on the targets that have it (16 §2.9).
 func (m *model) runLibOp(code string) tea.Cmd {
 	var ts []*view.LibInstRow
 	for _, i := range m.targets() {
@@ -548,7 +548,7 @@ func (m *model) libraryKey(s string) tea.Cmd {
 		return nil
 	case `\`:
 		return m.toggleBar()
-	// the page's areas (06 §3.5): 1 the filter, 2 the table, 3 the details
+	// the page's areas (16 §3.5): 1 the filter, 2 the table, 3 the details
 	case "1":
 		if !l.bar.open {
 			return m.toggleBar()
@@ -727,7 +727,7 @@ func (m *model) libraryLines(n int) []string {
 }
 
 // libRowLine: a Lineage (its copies' count, open or not) or a copy (└ its folder); then
-// the default columns: size, state, source, used in (06 §2.9).
+// the default columns: size, state, source, used in (16 §2.9).
 func (m *model) libRowLine(i, w, right int) string {
 	l := &m.libr
 	x := l.flat[i]
@@ -774,7 +774,7 @@ func (m *model) libRowLine(i, w, right int) string {
 	return rowBackground(st, sel, i == l.cursor && !l.detail).Render(line)
 }
 
-// libDetailLines: the cursor's copy (06 §2.9): its note (RimArcho's grey first version
+// libDetailLines: the cursor's copy (16 §2.9): its note (RimArcho's grey first version
 // when the player wrote none), what it can do with its keys, its states, its fields.
 func (m *model) libDetailLines(w, n int) []string {
 	l := &m.libr
@@ -838,7 +838,7 @@ func (m *model) libDetailLines(w, n int) []string {
 
 var _ = fmt.Sprint
 
-// libPairs: the hint line of Mod library: what the cursor's copy can do now (06 §2.2).
+// libPairs: the hint line of Mod library: what the cursor's copy can do now (16 §2.2).
 func (m *model) libPairs() [][2]string {
 	l := &m.libr
 	pairs := [][2]string{}

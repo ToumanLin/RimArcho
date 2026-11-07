@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 )
 
-// Exchange with other mod managers (04 §9): a list read from a file, pasted text (any
+// Exchange with other mod managers (07 §7): a list read from a file, pasted text (any
 // list, a share code, a Rentry link) or a Steam Workshop collection is previewed first —
 // what is installed, what is missing and where to get it, what the enabled list would
 // become — and then put into the workspace as one undoable step. Nothing writes
@@ -33,7 +33,7 @@ type Import struct {
 	Source     string            // the file, "share code", the link
 	Titles     map[string]string // workshop ID → title (collections)
 	// Collection is the Workshop collection read (nil for other sources): applying the
-	// import can make the list follow it (04 §9.1, §9.6).
+	// import can make the list follow it (07 §7.1, §7.6).
 	Collection *app.Collection
 }
 
@@ -172,7 +172,7 @@ type ImportPreview struct {
 	Merge      ImportEffect `json:"merge"`
 	Summary    string       `json:"summary"`
 	Allowed    string       `json:"allowed"`
-	// Collection: the list is a Steam Workshop collection the list can follow (04 §9.6).
+	// Collection: the list is a Steam Workshop collection the list can follow (07 §7.6).
 	Collection bool `json:"collection,omitempty"`
 }
 
@@ -182,7 +182,7 @@ func PreviewImport(a *app.App, imp *Import) (*ImportPreview, error) {
 	return PreviewImportFor(a, imp, 0)
 }
 
-// PreviewImportFor compares with the explicit management selection without switching it (06 §2.17).
+// PreviewImportFor compares with the explicit management selection without switching it (16 §2.17).
 func PreviewImportFor(a *app.App, imp *Import, id int64) (*ImportPreview, error) {
 	st, err := a.Loadout()
 	if err != nil {
@@ -207,7 +207,7 @@ func PreviewImportFor(a *app.App, imp *Import, id int64) (*ImportPreview, error)
 		p.GameNote = Tf("the list is for RimWorld %s, this game runs %s", majorMinor(il.Game), mm)
 	}
 	list, unresolved := app.ImportedEntries(st, il)
-	// The suggested versions use the imported content and its declared versions (06 §2.17).
+	// The suggested versions use the imported content and its declared versions (16 §2.17).
 	suggested := *st
 	suggested.List = list
 	plan := *st.Plan
@@ -221,7 +221,7 @@ func PreviewImportFor(a *app.App, imp *Import, id int64) (*ImportPreview, error)
 	if versions, e := a.PlanVersionsOf(&suggested, &plan); e == nil {
 		p.Allowed = app.FormatVersions(versions.Allowed)
 	}
-	// Core and the DLCs kept from the current plan are not the list's (04 §9.1): they count
+	// Core and the DLCs kept from the current plan are not the list's (07 §7.1): they count
 	// in what the list would become, not in what it holds.
 	kept := app.KeptOfficial(st, il)
 	p.Total = len(list) - kept + len(unresolved)

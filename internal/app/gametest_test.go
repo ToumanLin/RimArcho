@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"runtime"
 	"slices"
 	"strings"
@@ -81,6 +80,11 @@ func TestAppGameHelper(t *testing.T) {
 		}
 	} else if mode == "exit" {
 		os.Exit(7)
+	} else if mode == "probe" { // a probe saves its screenshot, logs its RESULT and quits (20 §3)
+		if err := os.WriteFile(filepath.Join(os.Getenv("ARCHO_TEST_DATA"), "probe.png"), []byte("png"), 0o644); err != nil {
+			os.Exit(96)
+		}
+		os.Exit(0)
 	}
 	time.Sleep(30 * time.Second)
 }
@@ -111,6 +115,9 @@ func TestTestRunPlanConfigVisibilityAndReport(t *testing.T) {
 	e.WriteFile(filepath.Join(e.UserData, "Config", "Prefs.xml"), string(prefs))
 	e.WriteFile(filepath.Join(e.UserData, "Config", "KeyPrefs.xml"), "<KeyPrefs/>")
 	e.WriteFile(filepath.Join(e.UserData, "Config", "ModSettings.xml"), "<Settings>keep</Settings>")
+	// Linked is seen through another tool's link now; its settings were saved under its
+	// RimArcho link name (09 §3).
+	e.WriteFile(filepath.Join(e.UserData, "Config", "Mod__Archo_extra_Linked_LinkedMod.xml"), "<linked/>")
 	e.WriteFile(filepath.Join(e.UserData, "Config", "Knowledge.xml"), "player knowledge")
 	e.WriteFile(filepath.Join(e.UserData, "Config", "skip.txt"), "not config")
 	e.WriteFile(filepath.Join(e.UserData, "Logs", "Player.log"), "player log")
@@ -131,7 +138,9 @@ func TestTestRunPlanConfigVisibilityAndReport(t *testing.T) {
 	// Attribution must find OnlyTest even though it is disabled in the current plan.
 	e.App.TestGameStart = fakeTestGame(t, "menu", "[OnlyTest] Exception: test failure\n  at OnlyTest.Mod.Start()\n")
 	start := e.App.TestGameStart
+	var linkedDuringRun []string
 	e.App.TestGameStart = func(cmd *exec.Cmd) error {
+		linkedDuringRun = linkNames(t, filepath.Join(e.Game, "Mods"))
 		for _, name := range []string{"Prefs.xml", "KeyPrefs.xml"} {
 			if _, err := os.Lstat(filepath.Join(data, "Config", name)); !os.IsNotExist(err) {
 				t.Errorf("player preferences reached test launch: %s: %v", name, err)
@@ -150,9 +159,15 @@ func TestTestRunPlanConfigVisibilityAndReport(t *testing.T) {
 	if r.Status != "menu" || r.Plan != "plan:tested" || r.Requested != 7 || r.LoadSeconds <= 0 || r.TotalSeconds <= r.LoadSeconds || r.Attribution != "tested-plan" {
 		t.Fatalf("report %+v", r)
 	}
-	wantMissing := []app.TestRunMissing{{PackageID: "test.cmd", Name: "CmdOnly"}, {PackageID: "test.extra", Name: "ExtraOnly"}}
-	if !reflect.DeepEqual(r.Missing, wantMissing) {
-		t.Fatalf("missing %+v, want %+v", r.Missing, wantMissing)
+	// The SteamCMD and extra Mods are linked for the run only (20 §2).
+	if len(r.Missing) != 0 || len(r.Linked) != 2 || !slices.Equal(linkedDuringRun, r.Linked) {
+		t.Fatalf("missing %+v, linked %v, links during the run %v", r.Missing, r.Linked, linkedDuringRun)
+	}
+	if left := linkNames(t, filepath.Join(e.Game, "Mods")); len(left) != 0 {
+		t.Fatalf("links left after the run: %v", left)
+	}
+	if _, err := os.Stat(filepath.Join(base, "links.json")); !os.IsNotExist(err) {
+		t.Fatalf("link record left: %v", err)
 	}
 	if r.ClustersTotal != 1 || r.Counts[logs.ClassException] != 1 || len(r.Clusters) != 1 ||
 		!slices.Contains(r.Clusters[0].Mods, "OnlyTest") || r.Clusters[0].Confidence == "" || r.Success() {
@@ -166,12 +181,13 @@ func TestTestRunPlanConfigVisibilityAndReport(t *testing.T) {
 		t.Fatalf("test config %+v", config)
 	}
 	for path, want := range map[string]string{
-		filepath.Join(e.UserData, "Config", "Prefs.xml"):     string(prefs),
-		filepath.Join(e.UserData, "Config", "KeyPrefs.xml"):  "<KeyPrefs/>",
-		filepath.Join(data, "Config", "ModSettings.xml"):     "<Settings>keep</Settings>",
-		filepath.Join(data, "ShaderCache", "keep"):           "cached",
-		filepath.Join(e.UserData, "Config", "Knowledge.xml"): "player knowledge",
-		filepath.Join(e.UserData, "Logs", "Player.log"):      "player log",
+		filepath.Join(e.UserData, "Config", "Prefs.xml"):                string(prefs),
+		filepath.Join(e.UserData, "Config", "KeyPrefs.xml"):             "<KeyPrefs/>",
+		filepath.Join(data, "Config", "ModSettings.xml"):                "<Settings>keep</Settings>",
+		filepath.Join(data, "Config", "Mod_ExistingLink_LinkedMod.xml"): "<linked/>",
+		filepath.Join(data, "ShaderCache", "keep"):                      "cached",
+		filepath.Join(e.UserData, "Config", "Knowledge.xml"):            "player knowledge",
+		filepath.Join(e.UserData, "Logs", "Player.log"):                 "player log",
 	} {
 		b, err := os.ReadFile(path)
 		if err != nil || string(b) != want {
@@ -181,6 +197,9 @@ func TestTestRunPlanConfigVisibilityAndReport(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(data, "Config", "skip.txt")); !os.IsNotExist(err) {
 		t.Fatal("copied non-XML settings")
 	}
+	if _, err := os.Stat(filepath.Join(e.UserData, "Config", "Mod_ExistingLink_LinkedMod.xml")); !os.IsNotExist(err) {
+		t.Fatal("a test run wrote the player's Config")
+	}
 	if len(progress) < 3 || len(e.Launched) != 0 || e.ReadModsConfig() != before {
 		t.Fatalf("progress %v; ordinary launches %v; player config changed", progress, e.Launched)
 	}
@@ -189,8 +208,8 @@ func TestTestRunPlanConfigVisibilityAndReport(t *testing.T) {
 		t.Fatalf("current plan/environment changed: %+v, %v", after, err)
 	}
 	b, err := os.ReadFile(filepath.Join(r.RunDir, "report.json"))
-	var saved app.TestRunReport
-	if err != nil || json.Unmarshal(b, &saved) != nil || !reflect.DeepEqual(&saved, r) {
+	wantJSON, marshalErr := json.MarshalIndent(r, "", "  ")
+	if err != nil || marshalErr != nil || string(b) != string(append(wantJSON, '\n')) {
 		t.Fatalf("saved report %s: %v", b, err)
 	}
 	dirs, err := os.ReadDir(filepath.Join(base, "runs"))
@@ -308,7 +327,9 @@ func TestTestRunSettingsReport(t *testing.T) {
 	}
 	e.App.TestGameStart = fakeTestGame(t, "menu", "XML error: unknown field in type PrefsData\n")
 	out, code = e.Run("test", "run", "--timeout", "5s", "--settle", "1ms")
-	if code != 1 || !strings.Contains(out, "settings x1:") || !strings.Contains(out, "source: game preferences") || strings.Contains(out, "mods:") {
+	// The only mods line is the gone ThingDef error's, attributed in the earlier report.
+	if code != 1 || !strings.Contains(out, "settings x1:") || !strings.Contains(out, "source: game preferences") ||
+		strings.Count(out, "mods:") != 1 || !strings.Contains(out, "mods: SettingsOwner (likely)") {
 		t.Fatalf("settings text report: exit %d: %s", code, out)
 	}
 }
@@ -330,5 +351,108 @@ func TestTestRunCancelSavesReport(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(r.RunDir, "report.json")); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func linkNames(t *testing.T, mods string) []string {
+	t.Helper()
+	ents, err := os.ReadDir(mods)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []string
+	for _, d := range ents {
+		if strings.HasPrefix(d.Name(), app.DeployPrefix) {
+			out = append(out, d.Name())
+		}
+	}
+	return out
+}
+
+// A Mod that would sit next to another copy of its packageId in Mods/ is not linked; a
+// link an interrupted run left is removed by the next run (20 §2).
+func TestTestRunLinksBlockedAndLeftover(t *testing.T) {
+	t.Parallel()
+	e := testRunEnv(t)
+	extra := filepath.Join(e.Root, "extra")
+	e.WriteMod(filepath.Join(extra, "Pinned"), testkit.Sample("test.pinned", "Pinned"))
+	e.WriteMod(filepath.Join(extra, "Clash"), testkit.Sample("test.clash", "Clash"))
+	e.WriteMod(filepath.Join(extra, "Old"), testkit.Sample("test.old", "Old"))
+	e.MustRun("folder", "add", "extra", extra)
+	e.MustRun("scan")
+	e.MustRun("enable", "pkg:test.pinned")
+	e.MustRun("enable", "pkg:test.clash")
+	e.WriteMod(filepath.Join(e.Game, "Mods", "ClashCopy"), testkit.Sample("test.clash", "Clash copy"))
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := filepath.Join(e.Home, "tests", st.Ix.Env.ID)
+	mods := filepath.Join(e.Game, "Mods")
+	leftover := filepath.Join(mods, app.DeployPrefix+"left")
+	e.Junction(leftover, filepath.Join(extra, "Old"))
+	keep := filepath.Join(mods, app.DeployPrefix+"retargeted")
+	e.Junction(keep, filepath.Join(extra, "Old"))
+	rec, _ := json.Marshal(map[string]any{"mods": mods, "links": []map[string]string{
+		{"Op": "add", "Name": filepath.Base(leftover), "Target": filepath.Join(extra, "Old")},
+		{"Op": "add", "Name": filepath.Base(keep), "Target": filepath.Join(extra, "Pinned")}, // no longer what was recorded
+	}})
+	e.WriteFile(filepath.Join(base, "links.json"), string(rec))
+	r, err := e.App.TestRun(context.Background(), app.TestRunOptions{Timeout: 5 * time.Second, Settle: time.Millisecond})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Linked) != 1 || !strings.Contains(r.Linked[0], "Pinned") {
+		t.Fatalf("linked %v", r.Linked)
+	}
+	if len(r.Missing) != 1 || r.Missing[0].PackageID != "test.clash" || !strings.Contains(r.Missing[0].Reason, "ClashCopy") {
+		t.Fatalf("missing %+v", r.Missing)
+	}
+	if _, err := os.Lstat(leftover); !os.IsNotExist(err) {
+		t.Fatalf("leftover link kept: %v", err)
+	}
+	if _, err := os.Lstat(keep); err != nil {
+		t.Fatalf("removed a link that no longer matches the record: %v", err)
+	}
+	if left := linkNames(t, mods); !slices.Equal(left, []string{filepath.Base(keep)}) {
+		t.Fatalf("links after the run: %v", left)
+	}
+}
+
+// The flow the MCP Instructions recommend: pin_mod, edit the copy, then test_run tests the
+// copy, not the Workshop original, and leaves Mods/ as it was (20 §2).
+func TestTestRunSeesPinnedCopy(t *testing.T) {
+	t.Parallel()
+	e, _ := pinFixture(t)
+	e.App.GameProbe = func(string) *app.GameRun { return nil }
+	e.MustRun("pin", refOf(t, e, "Lockable", ""))
+	before := e.ReadModsConfig()
+	var during map[string]string
+	start := fakeTestGame(t, "menu", "")
+	e.App.TestGameStart = func(cmd *exec.Cmd) error {
+		during = archoLinks(t, e)
+		return start(cmd)
+	}
+	r, err := e.App.TestRun(context.Background(), app.TestRunOptions{Timeout: 5 * time.Second, Settle: time.Millisecond})
+	if err != nil {
+		t.Fatal(err)
+	}
+	lib := strings.ToLower(mustReal(t, library(e)))
+	if len(r.Missing) != 0 || len(r.Linked) != 1 || len(during) != 1 || !strings.HasPrefix(strings.ToLower(during[r.Linked[0]]), lib) {
+		t.Fatalf("missing %+v, linked %v, links during the run %v", r.Missing, r.Linked, during)
+	}
+	if left := archoLinks(t, e); len(left) != 0 {
+		t.Fatalf("links left after the run: %v", left)
+	}
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	config, err := loadout.ReadModsConfig(filepath.Join(e.Home, "tests", st.Ix.Env.ID, "userdata", "Config", "ModsConfig.xml"))
+	if err != nil || !slices.Contains(config.Active, "tester.lock") {
+		t.Fatalf("test config %+v, %v", config, err)
+	}
+	if e.ReadModsConfig() != before {
+		t.Fatal("a test run wrote the player's ModsConfig.xml")
 	}
 }

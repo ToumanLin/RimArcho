@@ -7,7 +7,7 @@ using Verse;
 
 namespace ArchoMonitor
 {
-    // Mods maps code to the mod that loaded it (03 §6.7.1): assemblies, Harmony patch owners,
+    // Mods maps code to the mod that loaded it (19 §2): assemblies, Harmony patch owners,
     // and type names read from stack text. Every lookup is cached; nothing here runs on the hot
     // path (only for a message seen for the first time).
     internal static class Mods

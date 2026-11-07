@@ -28,7 +28,7 @@ func TestData(t *testing.T) {
 	if !last.Fallback || last.Match != "." {
 		t.Errorf("last rule %s should be the catch-all fallback", last.ID)
 	}
-	// Privacy (00 §8): mod patterns only from enough logs and players, never paths.
+	// Privacy (docs/research/00-log-corpus-design.md §8): mod patterns only from enough logs and players, never paths.
 	for _, p := range d.Mod {
 		if p.Logs < 10 || p.Sessions < 5 {
 			t.Errorf("%s: %d logs, %d sessions", p.ID, p.Logs, p.Sessions)
@@ -122,6 +122,53 @@ func TestLines(t *testing.T) {
 	for n, want := range map[int]string{0: "0", 999: "999", 6734: "6,734", 610910: "610,910", 1234567: "1,234,567"} {
 		if got := patterns.Thousands(n); got != want {
 			t.Errorf("Thousands(%d) = %s", n, got)
+		}
+	}
+}
+
+// A cluster no mod is named for, of a kind in more than 5% of the public logs, is labelled
+// "common kind, no source found" (MCP transcript review 2026-11-04, P2); rare kinds, fallback rules and
+// attributed clusters are not.
+func TestCommonUnattributed(t *testing.T) {
+	d, err := patterns.Parse([]byte(`{"version":"t","game":"1.6","logs":1000,"clusters":100,
+"generic":[
+{"id":"g:common","match":"^Common","logs":51,"sessions":40,"clusters":10},
+{"id":"g:edge","match":"^Edge","logs":50,"sessions":40,"clusters":10},
+{"id":"g:rare","match":"^Rare","logs":10,"sessions":8,"clusters":10},
+{"id":"g:fallback","match":".","fallback":true,"logs":900,"sessions":700,"clusters":70}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		tpl        string
+		attributed bool
+		want       string
+	}{
+		{"exception|Common thing", false, "common kind, no source found: this kind is in 5.1% of public 1.6 logs (pattern:g:common)"},
+		{"exception|Common thing", true, ""},
+		{"exception|Edge thing", false, ""}, // exactly 5% is not more than 5%
+		{"exception|Rare thing", false, ""},
+		{"exception|Anything else", false, ""},
+	} {
+		if got := d.CommonUnattributed("exception", c.tpl, c.attributed); got != c.want {
+			t.Errorf("%s (attributed %v): %q, want %q", c.tpl, c.attributed, got, c.want)
+		}
+	}
+	// The shipped library: a texture-less material of a def is common (2,696 of 40,326 logs);
+	// the solid-colour material made in code is known noise and matches no pattern.
+	lib := patterns.Load()
+	for _, msg := range []string{
+		"Material 'MyMod_Icon' with Shader 'Custom/Solid Color' doesn't have a texture property '_MainTex'",
+		"Material 'SolidColorMat-Custom/Solid Color-RGBA(0.000, 0.000, 0.000, 0.000)' with Shader 'Custom/Solid Color' doesn't have a texture property '_MainTex'",
+	} {
+		_, tpl, class := logs.ClusterKey(&logs.Entry{Message: msg})
+		got := lib.CommonUnattributed(class, tpl, false)
+		if class == logs.ClassNoise {
+			if g := lib.Generic(class, tpl); got != "" || g != nil && !g.Fallback {
+				t.Errorf("known noise %q: %q", tpl, got)
+			}
+		} else if !strings.HasPrefix(got, patterns.CommonLabel+": ") || !strings.Contains(got, "g:asset.maintex") {
+			t.Errorf("def material %q: %q", tpl, got)
 		}
 	}
 }

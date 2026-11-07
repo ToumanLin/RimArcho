@@ -1,4 +1,4 @@
-// Package env models RimWorld environments (game install + user data) and detects them (02 §2).
+// Package env models RimWorld environments (game install + user data) and detects them (03 §3).
 package env
 
 import (
@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// Environment is one game install plus one user data directory (02 §2.1).
+// Environment is one game install plus one user data directory (03 §3.1).
 type Environment struct {
 	ID           string
 	Name         string
@@ -106,6 +106,18 @@ func ReadGameVersion(gameRoot string) string {
 	return strings.TrimSpace(s)
 }
 
+// ManagedDir is the folder holding the game's own managed assemblies: the first of
+// <game_root>/RimWorldWin64_Data/Managed and the game folder itself (1.7) that contains
+// Assembly-CSharp.dll, or "" when neither does (05 §5.3, §5.4).
+func ManagedDir(gameRoot string) string {
+	for _, d := range []string{filepath.Join(gameRoot, "RimWorldWin64_Data", "Managed"), gameRoot} {
+		if _, err := os.Stat(filepath.Join(d, "Assembly-CSharp.dll")); err == nil {
+			return d
+		}
+	}
+	return ""
+}
+
 var executables = []string{"RimWorldWin64.exe", "RimWorld.exe", "RimWorldWin.exe", "RimWorldLinux", "RimWorldMac.app"}
 
 // LooksLikeGameRoot reports whether dir contains a RimWorld executable or Data/Core.
@@ -124,7 +136,7 @@ func ModsConfigPath(userDataRoot string) string {
 	return filepath.Join(userDataRoot, "Config", "ModsConfig.xml")
 }
 
-// PlayerLog locates Player.log per 02 §2.3: 1.7+ uses Logs/, older versions the root;
+// PlayerLog locates Player.log per 03 §3.3: 1.7+ uses Logs/, older versions the root;
 // with an unknown version both are checked and the newest wins. Returns "" if none exists.
 func PlayerLog(userDataRoot, gameVersion string) string {
 	newer := filepath.Join(userDataRoot, "Logs", "Player.log")
@@ -161,7 +173,7 @@ func VersionLess(a, b string) bool {
 	return len(pa) < len(pb)
 }
 
-// AppHome is RimArcho's own data directory (07 §3). RIMARCHO_HOME overrides it, which the
+// AppHome is RimArcho's own data directory (17 §3). RIMARCHO_HOME overrides it, which the
 // tests use to stay inside a temporary directory.
 func AppHome() string {
 	if h := os.Getenv("RIMARCHO_HOME"); h != "" {

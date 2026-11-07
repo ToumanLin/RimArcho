@@ -12,12 +12,23 @@ export function openVersionList(act, run, show) {
       pane = p;
       panel = box;
       box.classList.add("version-panel");
+      box.id = "version-panel"; box.setAttribute("role", "dialog");
+      box.setAttribute("aria-labelledby", "version-panel-title");
+      if (p.opener) {
+        p.opener.setAttribute("aria-controls", box.id); p.opener.setAttribute("aria-haspopup", "dialog");
+        p.opener.setAttribute("aria-expanded", "true");
+      }
+      p.onclose = () => p.opener?.setAttribute("aria-expanded", "false");
+      p.restoreFocus = () => {
+        const opener = p.opener?.isConnected ? p.opener : document.querySelector('#screen[role="main"], #board:not([inert])');
+        opener?.focus({ preventScroll: true, focusVisible: opener === p.opener && p.openerFocusVisible });
+      };
       const head = el("div", "version-head");
-      title = el("h2", "", act.title);
+      title = el("h2", "", act.title); title.id = "version-panel-title";
       all = el("button", "btn small");
       all.hidden = true;
       head.append(title, all);
-      body = el("div", "body", T("loading…"));
+      body = el("div", "body", T("loading…")); body.setAttribute("role", "list"); body.setAttribute("aria-labelledby", title.id);
       const foot = el("div", "btns"), close = el("button", "", T("close"));
       close.append(keyCaps("esc"));
       close.onclick = pop.close;
@@ -69,6 +80,8 @@ export function openVersionList(act, run, show) {
         for (const entry of group.rows) {
           const row = el("div", "version-row"), name = el("button", "version-name", entry.name);
           name.onclick = () => { if (active()) { pop.close(); show(entry.id); } };
+          name.id = "version-entry-" + entry.id;
+          row.setAttribute("role", "listitem"); row.setAttribute("aria-labelledby", name.id);
           row.append(name, el("span", "muted", entry.supported), button(entry.action));
           body.append(row);
         }

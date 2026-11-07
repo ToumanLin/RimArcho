@@ -23,7 +23,7 @@ func pngBytes(w, h int) string {
 	return b.String()
 }
 
-// 06 §9.4: Preview.png (any case) scaled to 360 px wide, cached by snapshot hash.
+// 16 §4.4: Preview.png (any case) scaled to 360 px wide, cached by snapshot hash.
 func TestPreview(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)

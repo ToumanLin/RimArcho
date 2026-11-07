@@ -38,7 +38,7 @@ type MaintenanceResult struct {
 	Vacuumed, Skipped bool
 }
 
-// Maintain owns the ordered maintenance pipeline (02 §7). It always uses a private
+// Maintain owns the ordered maintenance pipeline (04 §4). It always uses a private
 // connection: page connections, their busy timeouts and their caches are untouched.
 func (s *Store) Maintain(ctx context.Context, o MaintenanceOptions) (r MaintenanceResult, err error) {
 	w, err := OpenSession(s.Path)
@@ -109,7 +109,7 @@ func (s *Store) Maintain(ctx context.Context, o MaintenanceOptions) (r Maintenan
 	if err != nil {
 		return r, err
 	}
-	// A manifest is its rows and its block (02 §7); Files counts the files either lists.
+	// A manifest is its rows and its block (04 §4); Files counts the files either lists.
 	const obsolete = `snapshot_id NOT IN (SELECT id FROM maintenance_keep)`
 	var listedFiles int64
 	if err = c.QueryRowContext(ctx, `SELECT coalesce(sum(n),0) FROM snapshot_list WHERE `+obsolete).Scan(&listedFiles); err != nil {
@@ -133,7 +133,7 @@ func (s *Store) Maintain(ctx context.Context, o MaintenanceOptions) (r Maintenan
 		return r, err
 	}
 	r.Files += listedFiles
-	// 2. Version views no game needs and the fact sets nothing references (03 §3).
+	// 2. Version views no game needs and the fact sets nothing references (05 §3).
 	if err = pruneFactsOn(ctx, c, o.Now); err != nil {
 		return r, err
 	}

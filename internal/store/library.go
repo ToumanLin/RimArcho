@@ -8,7 +8,7 @@ import (
 )
 
 // LastChanged maps each instance of an environment to the start of the newest scan that
-// recorded a change for it (Mod library's "last changed" sort, 06 §2.9). Optional IDs restrict the lookup.
+// recorded a change for it (Mod library's "last changed" sort, 16 §2.9). Optional IDs restrict the lookup.
 func (s *Store) LastChanged(envID string, instances ...string) (map[string]time.Time, error) {
 	where, args := libraryInstances(envID, instances)
 	rows, err := s.DB.Query(`SELECT c.instance_id, max(s.started_at) FROM change_event c JOIN scan s ON s.id=c.scan_id
@@ -29,17 +29,17 @@ func (s *Store) LastChanged(envID string, instances ...string) (map[string]time.
 	return out, rows.Err()
 }
 
-// RelocateInstance points an instance at a new folder (a move RimArcho made itself, 06 §2.9):
+// RelocateInstance points an instance at a new folder (a move RimArcho made itself, 16 §2.9):
 // the next scan finds it there by source and path (R1), so its ID, lineage, history and
 // every plan's reference stay the same.
 func (s *Store) RelocateInstance(id, sourceID, rel, realPath string) error {
-	// It belongs where its new source does (a copy moved into the lock library is shared, 02 §0).
+	// It belongs where its new source does (a copy moved into the lock library is shared, 03 §2).
 	_, err := s.DB.Exec(`UPDATE instance SET source_id=?, rel_path=?, real_path=?,
 		environment_id=coalesce((SELECT environment_id FROM source WHERE id=?), environment_id) WHERE id=?`, sourceID, rel, realPath, sourceID, id)
 	return err
 }
 
-// Made is what RimArcho recorded when it made a copy (06 §2.9): how ("pin", "pin-update",
+// Made is what RimArcho recorded when it made a copy (16 §2.9): how ("pin", "pin-update",
 // "move"), when, for which plans, and why when it was told.
 type Made struct {
 	Kind   string    `json:"kind"`

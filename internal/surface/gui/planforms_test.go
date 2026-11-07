@@ -95,7 +95,7 @@ func TestNewListImportUsesOnlyItsPreview(t *testing.T) {
 }
 
 // Management targets the selected list; preview and cancelled/failed creation do not
-// switch the editor. Versions/saves and copied version constraints survive (06 §2.17).
+// switch the editor. Versions/saves and copied version constraints survive (16 §2.17).
 func TestPlanForms(t *testing.T) {
 	t.Parallel()
 	e, api, _ := fixture(t)
@@ -168,10 +168,31 @@ func TestPlanForms(t *testing.T) {
 }
 
 // Checkout is an immediate undoable edit through the same API used by enter and the
-// history's action; it never writes ModsConfig.xml (06 §2.5, 06 §6).
+// history's action; it never writes ModsConfig.xml (16 §2.5, 16 §6).
 func TestHistoryCheckoutUndo(t *testing.T) {
 	t.Parallel()
 	e, api, _ := fixture(t)
+	// Checking out the current version is a no-op: no undo step, no workspace change.
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ws := *st.WS
+	depth := e.App.Store.StepCount(st.Plan.ID, "undo")
+	r, err := api.HistoryGo(0, st.Latest.N)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Undo || r.Text != view.T("no changes") {
+		t.Fatalf("no-op feedback: %+v", r)
+	}
+	unchanged, err := e.App.Store.Workspace(st.Plan.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if *unchanged != ws || e.App.Store.StepCount(st.Plan.ID, "undo") != depth {
+		t.Fatal("identical checkout mutated workspace/history")
+	}
 	e.MustRun("save")
 	if _, err := api.ImportPreview(view.ImportText, "tester.b"); err != nil {
 		t.Fatal(err)
@@ -242,30 +263,5 @@ func TestImportCollectionForm(t *testing.T) {
 	managed, err := api.PlanManage(view.PlanOfPage(d.Page))
 	if err != nil || len(managed.Sel.Follows) != 1 {
 		t.Fatalf("default follow: %+v %v", managed, err)
-	}
-}
-
-func TestHistoryIdenticalCheckoutIsNoOp(t *testing.T) {
-	t.Parallel()
-	e, api, _ := fixture(t)
-	st, err := e.App.Loadout()
-	if err != nil {
-		t.Fatal(err)
-	}
-	before := *st.WS
-	depth := e.App.Store.StepCount(st.Plan.ID, "undo")
-	r, err := api.HistoryGo(0, st.Latest.N)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if r.Undo || r.Text != view.T("no changes") {
-		t.Fatalf("no-op feedback: %+v", r)
-	}
-	after, err := e.App.Store.Workspace(st.Plan.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if *after != before || e.App.Store.StepCount(st.Plan.ID, "undo") != depth {
-		t.Fatal("identical checkout mutated workspace/history")
 	}
 }

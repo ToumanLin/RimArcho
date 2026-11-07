@@ -23,7 +23,7 @@ func stageDataFile(dst string, b []byte) (stagedDataFile, error) {
 }
 
 // All files are staged first. Keep the previous set until publication and the
-// generation record succeed; restore it on errors (04 §6.3). This is rollback,
+// generation record succeed; restore it on errors (08 §2.3). This is rollback,
 // not a transaction across process crashes or power loss.
 func replaceDataFiles(files []stagedDataFile, rename func(string, string) error, commit func() error) error {
 	if len(files) == 0 {

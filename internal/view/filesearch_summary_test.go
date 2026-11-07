@@ -11,7 +11,7 @@ import (
 )
 
 func TestFileSearchSummaryStates(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	run := view.NewFileSearchRun()
 	if summary := run.Update(0).Summary; summary != "searching…" {
 		t.Fatalf("undiscovered scope: %q", summary)

@@ -1,19 +1,5 @@
 package store
 
-// The append-only operation rows survive scans and environment removal. A completed
-// row is ownership evidence; unfinished rows are recovery work, never startup writes.
-const schemaV18 = `
-CREATE TABLE managed_link(
- id INTEGER PRIMARY KEY, operation_id TEXT NOT NULL, phase TEXT NOT NULL,
- mods_path TEXT NOT NULL, name TEXT NOT NULL, kind TEXT NOT NULL,
- instance_id TEXT NOT NULL DEFAULT '', pack_id TEXT NOT NULL DEFAULT '',
- target TEXT NOT NULL, next_path TEXT NOT NULL, next_target TEXT NOT NULL,
- from_path TEXT NOT NULL DEFAULT '', to_path TEXT NOT NULL DEFAULT '', directory_id TEXT NOT NULL DEFAULT '',
- UNIQUE(operation_id, mods_path, name));
-CREATE INDEX managed_link_phase ON managed_link(phase);
-CREATE INDEX managed_link_path ON managed_link(mods_path, name, id);
-`
-
 type ManagedLink struct {
 	ID         int64  `json:"id"`
 	Operation  string `json:"operation"`

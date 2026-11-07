@@ -9,14 +9,14 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// feedbackState keeps the attachments read last, so typing only composes (06 §2.14 Feedback).
+// feedbackState keeps the attachments read last, so typing only composes (16 §2.14 Feedback).
 type feedbackState struct {
 	mu sync.Mutex
 	at *view.FeedbackAttach
 }
 
 // FeedbackAttach reads what can go with a report under the ticked options (Settings > Feedback,
-// 06 §2.14). It shares the game log's reader: the Game log section is that page's error groups.
+// 16 §2.14). It shares the game log's reader: the Game log section is that page's error groups.
 func (s *API) FeedbackAttach(o view.FeedbackOptions) (*view.FeedbackAttach, error) {
 	s.logRead.mu.Lock()
 	defer s.logRead.mu.Unlock()

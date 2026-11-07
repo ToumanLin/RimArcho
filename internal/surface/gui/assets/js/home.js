@@ -1,4 +1,4 @@
-// Start (06 §2.3), on a Swiss grid: what is applied is one large headline that fits its
+// Start (16 §2.3), on a Swiss grid: what is applied is one large headline that fits its
 // width (its mods and last play below), the last game and the changes since it was last
 // played in the top right, and under a rule three steps read left to right — 01 the game,
 // 02 that game's lists and packs, 03 ▶ launch game with the applied list's problem under it
@@ -8,7 +8,8 @@
 // no game file. Picking the applied row again opens it. The problem can be hidden; it
 // comes back when the row, its game, its mods or its problem change.
 // Data: API.Home (view.BuildHome, view.AddOtherEnvs, view.PickFeatured) and
-// API.HomeBackground (the image, its dimming, blur and focus; 06 §2.14).
+// API.HomeBackground (the image, its dimming, blur and focus; 16 §2.14).
+import { progress } from "./feedbacksemantics.js";
 import { S, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { openScreen, page, changesPlan, beginPageRead } from "./screens.js";
 import { launchPack } from "./packs.js";
@@ -98,7 +99,7 @@ function games() {
 }
 const gameOf = (r) => games().find((g) => g.name === r.envName) || { name: r.envName, version: "" };
 
-// Numbered columns are focus keys (06 §2.3, 06 §3.5): ↑↓ in 01 changes games;
+// Numbered columns are focus keys (16 §2.3, 16 §3.5): ↑↓ in 01 changes games;
 // elsewhere it applies lists and packs. Enter on 03 launches, elsewhere it opens the row.
 function focusedStep() { return document.activeElement?.closest(".hm-step")?.dataset.step; }
 
@@ -152,14 +153,14 @@ function canSave(f) {
   return !!(f && f.kind === "plan" && f.current && f.unsaved > 0 && !running() && !S.busy.env && !(launching > Date.now()));
 }
 
-// save writes the current list to the game without launching it (the editor's w; 04 §1).
+// save writes the current list to the game without launching it (the editor's w; 07 §1).
 async function save() {
   if (S.busy.env) return say("busy", Tf("switching to %s…", S.busy.env));
   await ui.run("save");
   if (S.screen === "home") home({ keep: true });
 }
 
-// focusLaunch is the editor's launch game (06 §2.5): the current plan becomes the applied row
+// focusLaunch is the editor's launch game (16 §2.5): the current plan becomes the applied row
 // (it usually is; a pack applied here gives way) and the focus goes to ▶ launch game, so L or
 // enter starts the game.
 export async function focusLaunch() {
@@ -173,6 +174,17 @@ export async function focusLaunch() {
 }
 
 // liveChanged redraws the launch button when the game starts or stops.
+// applyItem applies a game's list or pack as clicking its row does (the Saves page's Switch
+// and launch, 16 §2.11); t: {kind, envName, plan, name}. True once it is the applied one.
+export async function applyItem(t) {
+  const r = rows().find((x) => key(x) === key(t));
+  if (!r) { say("fail", Tf("%s is not on the Launch page", t.name || t.envName)); return false; }
+  const f = applied();
+  if (!f || key(f) !== key(r)) await apply(r);
+  const now = applied();
+  return !!now && key(now) === key(r);
+}
+
 export function liveChanged() { if (S.screen === "home" && data) { launching = 0; draw(); } }
 
 function draw() {
@@ -197,7 +209,7 @@ function draw() {
   const env = f ? f.envName : games()[0].name;
   const rowMoved = !f || shown.row !== key(f), gameMoved = shown.game !== env;
   // the floor goes first so everything paints over it: over a picture it gives the three
-  // steps a flat ground (06 §2.3)
+  // steps a flat ground (16 §2.3)
   w.append(el("div", "hm-floor"), activity(), hero(f, rowMoved));
   w.append(el("div", "hm-rule" + (shown.drawn ? "" : " in")));
   w.append(gameStep(env), rowStep(f, env, gameMoved), launchStep(f));
@@ -212,7 +224,7 @@ function draw() {
 }
 
 // setBackdrop puts the image behind the top bar and the page (#main's first child), or
-// takes it away: off the launch page nothing holds the decoded picture (06 §10).
+// takes it away: off the launch page nothing holds the decoded picture (16 §10).
 export function setBackdrop(b) {
   const app = document.querySelector("#app");
   let d = document.querySelector("#backdrop");
@@ -269,7 +281,7 @@ function hero(f, moved) {
   return box;
 }
 
-// fitHeadline sets the headline as large as its width allows (06 §2.3): one line, from the
+// fitHeadline sets the headline as large as its width allows (16 §2.3): one line, from the
 // largest size down to 64px; still too long, two lines, from 64px down to 48px. Only a
 // name longer than that ends in an ellipsis (the whole name is on hover).
 function fitHeadline() {
@@ -295,7 +307,7 @@ function fitHeadline() {
 function step(n, cls, title) {
   const s = el("section", "hm-step " + cls);
   s.dataset.step = String(Number(n));
-  s.tabIndex = -1; // Disabled launch controls leave their column reachable (06 §2.3).
+  s.tabIndex = -1; // Disabled launch controls leave their column reachable (16 §2.3).
   const h = el("h3");
   h.append(el("b", "num", n), title);
   s.append(h);
@@ -311,6 +323,7 @@ function gameStep(env) {
   list.append(el("span", "hm-mark"));
   for (const g of shownFirst(games(), (g) => g.name === env)) {
     const b = el("button", "hm-pick" + (g.name === env ? " on" : ""));
+    b.setAttribute("aria-pressed", String(g.name === env));
     b.dataset.game = g.name;
     b.dataset.id = "game|" + g.name;
     b.title = g.version;
@@ -331,12 +344,13 @@ function rowStep(f, env, moved) {
   shownFirst(rowsOf(env), (r) => f && key(r) === key(f)).forEach((r, i) => {
     const on = f && key(r) === key(f);
     const b = el("button", "hm-pick" + (on ? " on" : ""));
+    b.setAttribute("aria-pressed", String(!!on));
     b.dataset.key = key(r);
     b.dataset.id = "row|" + key(r);
     b.style.setProperty("--d", i);
     const nm = el("span", "nm", r.name);
     // Only the applied row is marked, and 03 says what is wrong; another row's state is
-    // on hover (06 §2.3).
+    // on hover (16 §2.3).
     if (on && r.level === "bad") nm.append(el("span", "flag bad", "▲"));
     else if (on && r.level !== "ok") nm.append(el("span", "flag", "○"));
     // the count alone for a list; a pack says it is one
@@ -371,7 +385,8 @@ function launchStep(f) {
   bottom.append(el("span", "sub num", sub));
   if (!live) bottom.append(el("span", "arrow", "→"));
   b.append(top, bottom);
-  // one game at a time (08 §4)
+  if (starting) b.setAttribute("aria-busy", "true");
+  // one game at a time (09 §4)
   b.disabled = live || !f;
   if (live) b.title = T("a game is already running");
   else if (f && f.unsaved) b.title = T("different from the last saved list; launching or saving saves these changes to the game");
@@ -395,7 +410,7 @@ function launchStep(f) {
 // problemOf: what is wrong with the applied row; null when all is well. The current plan's
 // most likely trouble of a launch (view.LaunchHint: the most predictive problem in the
 // shared logs, with its reason), else problems that break the game, else a pack's links
-// left in Mods/ (08 §5.3), else an outside version not loaded. It never blocks the launch.
+// left in Mods/ (10 §3), else an outside version not loaded. It never blocks the launch.
 function problemOf(r) {
   const h = r.current && data.launch;
   if (h) return { what: h.text, why: h.why, bad: true, go: true, id: h.code + ":" + h.count };
@@ -464,7 +479,7 @@ function pickGame(env) {
   if (r) apply(r);
 }
 
-// apply: apply (06 §2.3) — the row becomes the applied one. The page stays as it is: the
+// apply: apply (16 §2.3) — the row becomes the applied one. The page stays as it is: the
 // squares move to the pick at once, and ▶ shows the switch (another game: "switching to
 // main…", which can take a while; another row: "applying X…") until the new page is read,
 // then the new pick comes in on it.
@@ -500,13 +515,13 @@ function showSwitch(r) {
   const root = document.querySelector(".page.home");
   if (!root) return;
   const gameMoved = !applied() || applied().envName !== r.envName;
-  root.querySelectorAll(".hm-s1 .hm-pick").forEach((b) => b.classList.toggle("on", b.dataset.game === r.envName));
-  if (!gameMoved) root.querySelectorAll(".hm-s2 .hm-pick").forEach((b) => b.classList.toggle("on", b.dataset.key === key(r)));
+  root.querySelectorAll(".hm-s1 .hm-pick").forEach((b) => { const on = b.dataset.game === r.envName; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
+  if (!gameMoved) root.querySelectorAll(".hm-s2 .hm-pick").forEach((b) => { const on = b.dataset.key === key(r); b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
   else root.querySelectorAll(".hm-s2 .hm-pick").forEach((b) => b.classList.add("leaving"));
   placeMarks(false);
   const b = root.querySelector(".hm-go");
   if (!b) return;
-  // Keep 03 focused while its launch control is disabled (06 §2.3).
+  // Keep 03 focused while its launch control is disabled (16 §2.3).
   if (document.activeElement === b) b.closest(".hm-step").focus();
   b.className = "hm-go switching";
   b.disabled = true;
@@ -514,14 +529,13 @@ function showSwitch(r) {
   top.append(el("span", "title", gameMoved ? Tf("switching to %s…", r.envName) : Tf("applying %s…", r.name)));
   bottom.append(el("span", "sub num", gameMoved ? T("loading the game, please wait…") : ""));
   const bar = el("span", "bar");
-  bar.setAttribute("role", "progressbar");
-  bar.setAttribute("aria-label", top.textContent);
+  progress(bar, top);
   b.replaceChildren(top, bottom, bar);
   b.setAttribute("aria-busy", "true");
 }
 
 // activity: the last game (only once there was one) and the current plan's changes since
-// it was last played, each a line that is a link (06 §2.3).
+// it was last played, each a line that is a link (16 §2.3).
 function activity() {
   const box = el("div", "hm-act");
   const live = S.live && S.live.running;
@@ -537,7 +551,7 @@ function activity() {
     const go = c.noScan ? () => ui.cmd("rescan") : () => { changesPlan(); ui.go("changes"); };
     box.append(actLine(c.title, c.text, go));
   }
-  // a new RimArcho (07 §5.1): opens its row in settings, where it is installed
+  // a new RimArcho (17 §5.1): opens its row in settings, where it is installed
   if (data.update) box.append(actLine(data.update.title, data.update.text, goSelfUpdate));
   return box;
 }
@@ -589,7 +603,7 @@ async function refreshHomeMemory(expected) {
   if (current()) memoryTimer = setTimeout(() => refreshHomeMemory(expected), 30000);
 }
 
-// Launch the applied row after checking its current RAM comparison (08 §2, §5.3).
+// Launch the applied row after checking its current RAM comparison (09 §2, 10 §3).
 async function launch(r) {
   if (S.busy.env) return say("busy", Tf("switching to %s…", S.busy.env));
   if (launchPending || running() || launching > Date.now()) return;

@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>saves · A Colony page</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  #page { display: grid; grid-template-columns: 264px minmax(0, 1fr); gap: 16px; overflow: hidden; padding-bottom: 12px; }
+  #cols, #detail { min-height: 0; overflow-y: auto; }
+  #cols h2.label { margin: 12px 4px 6px; }
+  .col-card { width: 100%; display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; padding: 10px 12px; border-radius: 10px; }
+  .col-card + .col-card { margin-top: 2px; }
+  .col-card:hover { background: var(--pill); }
+  .col-card.on { background: var(--card); box-shadow: 0 0 0 var(--hairline) var(--line), 0 1px 3px rgba(0,0,0,.06); }
+  .col-card .n { font-weight: 600; display: flex; align-items: center; gap: 7px; }
+  .col-card .m { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
+  .col-card .s { grid-column: 1 / -1; font-size: 12px; color: var(--fg-2); display: flex; gap: 6px; align-items: baseline; }
+  .col-card .s.warn { color: var(--amber); } .col-card .s.broken { color: var(--red); }
+  .col-card .spark { align-self: center; }
+  #detail { padding-right: 4px; }
+  .dhead { display: flex; align-items: flex-start; gap: 12px; margin: 2px 0 12px; }
+  .dhead h1 { margin: 0 0 6px; font-size: 20px; font-weight: 600; }
+  .dhead .acts { margin-left: auto; display: flex; gap: 6px; }
+  .tl-card { padding: 12px 16px 10px; margin-bottom: 12px; }
+  .tl-card h3 { margin: 0; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .viewing { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 8px; border-top: var(--hairline) solid var(--line-2); margin-top: 4px; font-size: 12.5px; color: var(--fg-2); }
+  .viewing b { color: var(--fg); }
+  .viewing .acts { margin-left: auto; display: flex; gap: 2px; }
+  .stepper { display: inline-flex; gap: 2px; }
+  .stepper .btn { padding: 0 6px; }
+  .all-saves { margin-top: 8px; width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .all-saves td { padding: 5px 8px; border-top: var(--hairline) solid var(--line-2); white-space: nowrap; }
+  .all-saves td.say { white-space: normal; color: var(--muted); font-size: 12px; }
+  .all-saves tr { cursor: default; }
+  .all-saves tr:hover td { background: var(--card-2); }
+  .all-saves tr.on td { background: var(--sel); }
+  .cleanup { margin-top: 8px; font-size: 12px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+  .grid2 { display: grid; grid-template-columns: minmax(0, 11fr) minmax(0, 9fr); gap: 12px; align-items: start; }
+  .grid2 > .card, .full { margin-bottom: 12px; }
+  @media (max-width: 1100px) { .grid2 { grid-template-columns: 1fr; } }
+  @media (max-width: 760px) { #page { display: block; } #cols { margin-bottom: 16px; } }
+</style>
+</head>
+<body>
+<div class="review" id="review"></div>
+<div id="app">
+  <aside id="side"><div class="side-head">RimArcho</div><nav id="nav"></nav></aside>
+  <main id="main">
+    <div id="top"></div><div class="page-head" id="head"></div><div id="page"><div id="cols"></div><div id="detail"></div></div>
+    <div id="bottom"><span id="status"></span><span id="hints"></span></div>
+  </main>
+</div>
+<div id="toast"></div>
+<script src="shared.js"></script>
+<script>
+// A: the colony is the only list. Saves are not a second list but points on the colony's timeline;
+// the page always shows one save (the latest unless you pick another), so the deepest level is one click away.
+let cur = COLONIES[0], sel = latest(cur).id, showAll = false;
+shell("a", '<span class="crumb">Library</span><span class="muted">/</span><span class="crumb">Saves</span>',
+  [["↑↓", "colony"], ["←→", "save"], ["enter", "launch"], ["l", "all saves"]]);
+$("#head").innerHTML = `<p class="lead"><b>4 colonies</b> · 13 saves · 1 needs attention before you load it</p>
+  <div class="page-acts"><button class="btn line small" data-toast="would rescan all saves">Rescan</button></div>`;
+
+function drawCols() {
+  const card = (c) => { const s = latest(c);
+    return `<button class="col-card ${c === cur ? "on" : ""}" data-c="${c.id}"><span class="n"><span class="dot ${s.st}"></span>${esc(c.name)}</span>${sparkSVG(c)}
+      <span class="m">${esc(c.ver.slice(0, 3))} · ${esc(c.list || "no list")} · day ${s.day} · ${c.saves.length} save${c.saves.length > 1 ? "s" : ""}</span>
+      <span class="s ${s.st}">${s.st === "ok" ? "Ready to continue" : esc(s.say)}</span></button>`; };
+  $("#cols").innerHTML = `<h2 class="label">Colonies <span class="n">by last played</span></h2>${COLONIES.filter((c) => !c.orphan).map(card).join("")}
+    <h2 class="label">Matches no list <span class="n">old or foreign saves</span></h2>${COLONIES.filter((c) => c.orphan).map(card).join("")}`;
+}
+function drawDetail() {
+  const c = cur, s = findSave(sel), L = latest(c), isLatest = s === L;
+  const others = c.saves.filter((x) => x.trunc).length;
+  const prevNext = `<span class="stepper"><button class="btn small" id="older" title="older save (←)">‹</button><button class="btn small" id="newer" title="newer save (→)">›</button></span>`;
+  let diff = "";
+  if (!isLatest) {
+    const dd = L.day - s.day, extra = [];
+    if (s.col !== L.col) extra.push(`${s.col > L.col ? "+" : ""}${s.col - L.col} colonist${Math.abs(s.col - L.col) > 1 ? "s" : ""}`);
+    if (s.mods !== L.mods) extra.push(`${s.mods - L.mods} Mods`);
+    diff = `<div class="diffnote">${ic("hint")}<span>Older save, <b>${dd} days</b> before the latest${extra.length ? ": " + extra.join(" · ") : ""}. Everything below is about this save.</span><button class="btn small" id="toLatest">Back to latest</button></div>`;
+  }
+  $("#detail").innerHTML = `
+    <div class="dhead"><div><h1>${esc(c.name)}</h1>${colonyChips(c)}</div>
+      <div class="acts">${c.list ? `<button class="btn primary" data-toast="would launch ${esc(c.list)}">${ic("play")} Launch ${esc(c.list)}</button>` : ""}</div></div>
+    <div class="card tl-card">
+      <h3>${c.saves.length} saves over ${L.day} in-game days <span class="muted" style="font-weight:400">· ${c.playH} h played</span>
+        <span style="margin-left:auto"></span><button class="btn small" id="toggleAll">${showAll ? "Hide list" : "List all saves"} <kbd>l</kbd></button></h3>
+      ${timelineSVG(c, sel, Math.max(360, $("#detail").clientWidth - 40), 116)}
+      <div class="viewing">${stIcon(s.st)}<span>Viewing <b>${esc(shownName(s))}</b></span>${isLatest ? '<span class="tagx latest">latest</span>' : ""}${s.auto ? '<span class="tagx">autosave</span>' : ""}
+        <span class="muted">day ${s.day} · saved ${esc(s.saved)} · ${esc(s.size)}${s.file.includes("#§#") ? ` · RimSaves folder “${esc(c.prefix)}”` : ""}</span>${prevNext}
+        <span class="acts">${saveActs(s)}</span></div>
+      ${showAll ? `<table class="all-saves">${c.saves.map((x) => `<tr data-save="${x.id}" class="${x.id === sel ? "on" : ""}"><td>${stIcon(x.st)}</td><td>${esc(shownName(x))} ${x.auto ? '<span class="tagx">auto</span>' : ""}</td>
+        <td>day ${x.day}</td><td class="muted">${esc(x.saved)}</td><td class="muted">${esc(x.size)}</td><td class="say">${esc(x.say)}</td></tr>`).join("")}</table>
+        ${others ? `<div class="cleanup">${ic("hint")} Cleanup: ${others} autosave is cut off and can never load. <button class="btn link" data-toast="would ask, then recycle Autosave-3">Recycle it…</button></div>` : ""}` : ""}
+    </div>
+    ${diff}
+    <div class="grid2">
+      <div class="card"><div class="sect"><h3>Can it load? <span class="r">vs ${esc(c.list || "no list")}, now</span></h3>${verdictHTML(s)}</div><div class="sect">${checksHTML(s)}</div></div>
+      <div class="card"><div class="sect"><h3>The colony at day ${s.day}</h3>${playHTML(s)}</div></div>
+    </div>
+    <div class="card full"><div class="sect"><h3>What the save uses <span class="r">by Mod · can it be removed mid-playthrough?</span></h3>${usesHTML(c)}</div></div>`;
+  $("#older").onclick = () => step(1); $("#newer").onclick = () => step(-1);
+  $("#toLatest")?.addEventListener("click", () => { sel = L.id; drawDetail(); });
+  $("#toggleAll").onclick = () => { showAll = !showAll; drawDetail(); };
+  $$("[data-save]", $("#detail")).forEach((n) => n.onclick = () => { sel = n.dataset.save; drawDetail(); });
+}
+function step(d) { const i = cur.saves.findIndex((x) => x.id === sel), j = Math.max(0, Math.min(cur.saves.length - 1, i + d)); sel = cur.saves[j].id; drawDetail(); }
+function pick(c) { cur = c; sel = latest(c).id; drawCols(); drawDetail(); }
+$("#cols").onclick = (e) => { const b = e.target.closest("[data-c]"); if (b) pick(COLONIES.find((c) => c.id === b.dataset.c)); };
+addEventListener("keydown", (e) => {
+  const i = COLONIES.indexOf(cur);
+  if (e.key === "ArrowDown") pick(COLONIES[Math.min(COLONIES.length - 1, i + 1)]);
+  else if (e.key === "ArrowUp") pick(COLONIES[Math.max(0, i - 1)]);
+  else if (e.key === "ArrowLeft") step(1); else if (e.key === "ArrowRight") step(-1);
+  else if (e.key === "l") { showAll = !showAll; drawDetail(); } else return;
+  e.preventDefault();
+});
+$("#status").textContent = "Colony = its saves grouped; colony facts come from the latest save and appear once.";
+drawCols(); drawDetail();
+</script>
+</body>
+</html>

@@ -9,9 +9,34 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
+	"github.com/ToumanLin/RimArcho/internal/logs"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
+
+// A test run loads and reaches the menu, a map run also starts a new game; neither loads
+// a save or plays (20 §2).
+func TestTestRunReaches(t *testing.T) {
+	t.Parallel()
+	at := func(names ...string) []logs.PhaseCount {
+		var cs []logs.PhaseCount
+		for _, n := range names {
+			cs = logs.AddPhaseCount(cs, &logs.Phase{Name: n}, 1)
+		}
+		return cs
+	}
+	for _, c := range []struct {
+		phases   []logs.PhaseCount
+		map_, ok bool
+	}{
+		{nil, false, true}, {at("loading"), false, true}, {at("menu"), false, true}, {at("unknown"), false, true},
+		{at("new"), false, false}, {at("new"), true, true}, {at("save", "play"), true, false}, {at("play", "loading"), false, true},
+	} {
+		if got := testRunReaches(c.phases, c.map_); got != c.ok {
+			t.Errorf("%v map=%v: %v, want %v", c.phases, c.map_, got, c.ok)
+		}
+	}
+}
 
 func TestTestRunMissingFolders(t *testing.T) {
 	t.Parallel()
@@ -51,7 +76,7 @@ func TestTestRunMissingFolders(t *testing.T) {
 		{PackageID: "mod6", Name: "mod6"}, {PackageID: "mod7", Name: "mod7"},
 		{PackageID: "not.installed", Name: "not.installed"},
 	}
-	if got := testRunMissing(st); !reflect.DeepEqual(got, want) {
+	if got := testRunMissing(st, nil); !reflect.DeepEqual(got, want) {
 		t.Fatalf("missing %+v, want %+v", got, want)
 	}
 }

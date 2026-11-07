@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
 )
 
-// Subscribing through the Steam client (06 §2.9, 08 §10).
+// Subscribing through the Steam client (16 §2.9, 11 §2).
 func init() {
 	dry := []Flag{{Name: "dry-run", Help: "show what would happen"}}
 	register(&Command{Name: "workshop unsubscribe", Args: "<ref…>", Summary: "unsubscribe in Steam: Steam deletes the Workshop folder (refused while the game runs; plans that use it show it missing)",

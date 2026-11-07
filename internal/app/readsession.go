@@ -35,6 +35,7 @@ func (b *App) ReadOptions(a *App) {
 	b.EnvName, b.GameVersion = a.EnvName, a.GameVersion
 	b.OpenPlan, b.PlanName = a.OpenPlan, a.PlanName
 	b.AnalyzeRunner, b.AnalyzeExe, b.AnalyzeWait = a.AnalyzeRunner, a.AnalyzeExe, a.AnalyzeWait
+	b.SavesIndexRunner = a.SavesIndexRunner
 	b.LazyLog, b.LogCacheOnly = a.LazyLog, a.LogCacheOnly
 	b.GameProbe, b.LockBase, b.MonitorBundle = a.GameProbe, a.LockBase, a.MonitorBundle
 	b.HTTP, b.SteamAPI = a.HTTP, a.SteamAPI
@@ -53,7 +54,7 @@ func (b *App) ReadOptions(a *App) {
 }
 
 // AdoptReadState transfers a finished worker's index/workspace to the GUI session,
-// avoiding a second large load while holding its page mutex (06 §8.4).
+// avoiding a second large load while holding its page mutex (16 §8.4).
 // Both sessions must use the same database and environment and be idle.
 func (a *App) AdoptReadState(r *App) {
 	rekey := func(stamp, key string) string {
@@ -92,7 +93,7 @@ func (a *App) AdoptReadSnapshot(r *App) {
 // its own Index (environment, session for foreign-list lookups) over the same Mods, maps,
 // lineages and sources: they are not changed once built, and their lazy declarations are
 // read through the process's long-lived declaration connection, so a source session that
-// closes later does not leave them reading a closed connection (07 §8.3). Without that
+// closes later does not leave them reading a closed connection (17 §7.3). Without that
 // connection the reader loads its own index when it needs one. List edits on a's
 // connection do not invalidate the shared index.
 func (b *App) ReadIndex(a *App) {

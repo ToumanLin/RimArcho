@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Screen structure (06 §2.2): top bar, blank, body, blank, status line, hint line.
+// Screen structure (16 §2.2): top bar, blank, body, blank, status line, hint line.
 
 func (m *model) View() string {
 	if m.quitting {
@@ -65,7 +65,7 @@ func (m *model) View() string {
 	lines[h-2] = m.statusLine()
 	lines[h-1] = m.hintLine()
 	if m.cmdOn {
-		// the command line over the last lines: candidates, explanation, input (06 §9.4)
+		// the command line over the last lines: candidates, explanation, input (16 §9.4)
 		cl := m.cmdLines()
 		for i, l := range cl {
 			if r := h - len(cl) + i; r >= 1 {
@@ -85,7 +85,7 @@ func (m *model) View() string {
 }
 
 // topBar: brand · environment pill · needs attention · unsaved, and on the right the
-// position line (06 §3.2) and launch. Secondary screens show a breadcrumb that is the
+// position line (16 §3.2) and launch. Secondary screens show a breadcrumb that is the
 // position line.
 func (m *model) topBar() string {
 	left := sBold.Render("RimArcho")
@@ -108,7 +108,7 @@ func (m *model) topBar() string {
 	pill := " " + envText + " "
 	add("  ", 2)
 	add(sPill.Render(pill), width.StringWidth(pill))
-	// the plan being edited (06 §9.1) and its "an outside version has not been loaded" (04 §4.3)
+	// the plan being edited (16 §9.1) and its "an outside version has not been loaded" (07 §4.3)
 	if m.st != nil && m.st.Plan != nil {
 		t := T("list") + " " + m.st.Plan.Name
 		add("  "+sText.Render(t), 2+width.StringWidth(t))
@@ -125,7 +125,7 @@ func (m *model) topBar() string {
 		t := Tf("can it run %d", n)
 		add("  "+sWarnS.Render(t), 2+width.StringWidth(t))
 	}
-	// (the running game is on the status line, 06 §9.1)
+	// (the running game is on the status line, 16 §9.1)
 	if m.unsaved > 0 {
 		t := Tf("%d unsaved", m.unsaved)
 		add("  "+sAccent.Render(ic.unsaved+" "+t), 2+2+width.StringWidth(t))
@@ -134,7 +134,7 @@ func (m *model) topBar() string {
 	launchW := width.StringWidth(launch) + 2 // "L "
 	key := sText.Render("L") + " "
 	if m.live != nil && m.live.Blocked != "" {
-		// another environment's game runs: launching is refused until it exits (08 §1)
+		// another environment's game runs: launching is refused until it exits (09 §1)
 		launch, key = m.live.Blocked, ""
 		launchW = width.StringWidth(launch)
 	}
@@ -168,7 +168,7 @@ func (m *model) renderPos(p string) string {
 }
 
 // statusLine: the sentence (statusText) and, on its right, the running game while there is
-// something to say (06 §9.1; the sidebar's foot in the GUI): "● game running since 14:05"
+// something to say (16 §9.1; the sidebar's foot in the GUI): "● game running since 14:05"
 // with this run's errors in amber, or after the game "● analyse this run's log".
 func (m *model) statusLine() string {
 	if m.tags != nil {
@@ -196,14 +196,14 @@ func (m *model) liveStatus() (string, int) {
 		}
 		return s, w
 	case l != nil && l.NewLog != "":
-		// 08 §2 "after the game exits": a new Player.log; Can it run (shift+2) analyses it
+		// 09 §2 "after the game exits": a new Player.log; Can it run (shift+2) analyses it
 		return sAccent.Render("● "+l.NewLog) + sDimS.Render("  shift+2"), 2 + width.StringWidth(l.NewLog) + 9
 	}
 	return "", 0
 }
 
 // statusText is the status line's sentence in w cells: ✓ done (green), ✗ failed (red), …
-// in progress (06 §6).
+// in progress (16 §6).
 func (m *model) statusText(w int) string {
 	text, kind := m.status, m.sayKind
 	if m.editing && text == "" {
@@ -241,7 +241,7 @@ func (m *model) statusText(w int) string {
 	return ms.Render(mark) + " " + sText.Render(fit(text, w-2))
 }
 
-// hintLine: "key label · key label", only what the object can do now, at most 7 (06 §6,
+// hintLine: "key label · key label", only what the object can do now, at most 7 (16 §6,
 // §13.2 rule 4); ? lists everything.
 func (m *model) hintLine() string {
 	var pairs [][2]string
@@ -294,7 +294,7 @@ func (m *model) hintLine() string {
 	case m.tab == tabLibrary:
 		pairs = m.libPairs()
 	case m.selCount() > 0:
-		// 06 §3.4: what the selection can do, and that another list drops it.
+		// 16 §3.4: what the selection can do, and that another list drops it.
 		prefix = Tf("selected %d", m.selCount())
 		pairs = append(m.verbPairs(), [2]string{"esc", T("clear the selection")}, [2]string{"←→", T("another area clears it")})
 	case m.histActive():
@@ -341,12 +341,12 @@ func (m *model) hintLine() string {
 	return b.String()
 }
 
-// verbPairs: the verbs the focused list's object can use now (06 §3.5).
+// verbPairs: the verbs the focused list's object can use now (16 §3.5).
 func (m *model) verbPairs() [][2]string {
 	if m.col().cur() == nil {
 		return nil
 	}
-	// ctrl+o / ctrl+w: the cursor's mod's folder and Workshop page (06 §3.5)
+	// ctrl+o / ctrl+w: the cursor's mod's folder and Workshop page (16 §3.5)
 	one := [2]string{"ctrl+o ctrl+w", T("folder / Workshop page")}
 	switch m.focus {
 	case cInactive:
@@ -400,7 +400,7 @@ func window(lines []string, off, n int) []string {
 	return lines[off:end]
 }
 
-// descMax is how many description lines the detail column shows (06 §4.1): all of them
+// descMax is how many description lines the detail column shows (16 §4.1): all of them
 // once it is focused or scrolled.
 func (m *model) descMax() int {
 	if m.detailFocus || m.detailOff > 0 {
@@ -410,7 +410,7 @@ func (m *model) descMax() int {
 }
 
 // detailLines draws the detail column (w wide, n lines). Its first line is "4 details", or the
-// mod's name once scrolled; in the accent colour when area 4 has the focus (06 §3.2).
+// mod's name once scrolled; in the accent colour when area 4 has the focus (16 §3.2).
 func (m *model) detailLines(w, n int) []string {
 	m.syncDetailOff()
 	lines := m.detailLayout(detailOpts{width: w, descMax: m.descMax(), techText: m.detail})

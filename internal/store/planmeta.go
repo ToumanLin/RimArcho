@@ -6,23 +6,6 @@ import (
 	"time"
 )
 
-// schemaV17: what the list management page keeps per plan (04 §1.6, §9.6, 06 §2.17).
-// created_game is the game version of the environment when the plan was made (existing
-// plans take the environment's version now); versions are the game versions the player
-// chose ("" = the default, worked out from the mods). plan_collection is a Steam Workshop
-// collection a plan follows: its snapshot (the items when it was linked or caught up with,
-// what changes are measured against) and the items seen at the last check.
-const schemaV17 = `
-ALTER TABLE plan ADD COLUMN created_game TEXT NOT NULL DEFAULT '';
-ALTER TABLE plan ADD COLUMN versions TEXT NOT NULL DEFAULT '';
-UPDATE plan SET created_game = coalesce((SELECT game_version FROM environment WHERE environment.id = plan.environment_id), '');
-CREATE TABLE plan_collection(
-  plan_id INTEGER NOT NULL, workshop_id TEXT NOT NULL, title TEXT NOT NULL DEFAULT '',
-  mode TEXT NOT NULL DEFAULT 'add', linked_at INTEGER NOT NULL DEFAULT 0, checked_at INTEGER NOT NULL DEFAULT 0,
-  snapshot TEXT NOT NULL DEFAULT '[]', seen TEXT NOT NULL DEFAULT '[]',
-  PRIMARY KEY(plan_id, workshop_id));
-`
-
 // SetPlanVersions stores the game versions a player chose for a plan ("" = the default).
 func (s *Store) SetPlanVersions(id int64, versions []string) error {
 	_, err := s.DB.Exec(`UPDATE plan SET versions=? WHERE id=?`, strings.Join(versions, " "), id)
@@ -36,7 +19,7 @@ type CollectionItem struct {
 	Sub        bool   `json:"sub,omitempty"` // a nested collection
 }
 
-// PlanCollection is a Workshop collection a plan follows (04 §9.6).
+// PlanCollection is a Workshop collection a plan follows (07 §7.6).
 type PlanCollection struct {
 	PlanID     int64
 	WorkshopID string

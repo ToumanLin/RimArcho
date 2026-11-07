@@ -7,8 +7,8 @@ const info = (description = "old", refreshing = true, error = "") => ({
   branches: [{ name: "public", description }, { name: "version-1.5", version: "1.5", description }],
 });
 
-async function setup() {
-  const screen = new Element("div"), S = { screen: "guide" };
+async function setup({ folder = { done: true }, space = (path) => ({ path, free: 50e9 }) } = {}) {
+  const screen = new Element("div"), S = { screen: "guide" }, chosen = [];
   let now = 0, calls = 0, response = info(), switchWay, pathEditor;
   const timers = [], delays = [];
   const el = (tag, cls, text) => new Element(tag, cls, text);
@@ -16,6 +16,7 @@ async function setup() {
     "./fields.js": { copyablePath: (n) => n, editablePath: (n) => n, pathContent: (n) => n },
     "./state.js": { S, $: () => screen, el, api: {
       GuideFind: async () => [], GuideDownloadInfo: async () => { calls++; return await response; },
+      ManagedFolder: async () => folder, FolderSpace: async (path) => space(path), ChooseManagedFolder: async (path) => { chosen.push(path); },
     }, T: s => s, Tf: s => s, errText: String, say() {} },
     "./screens.js": {
       page: () => el("div"),
@@ -28,9 +29,10 @@ async function setup() {
     "./api.js": { on() {} },
   }, { Date: { now: () => now }, setTimeout: (fn, ms) => { timers.push({fn,ms}); delays.push(ms); } });
   guide.initGuide({ renderWhere() {} });
-  await guide.start(); switchWay(1); await flush();
+  await guide.start();
+  if (folder.done) { switchWay(1); await flush(); }
   return {
-    screen, S, timers, delays, guide,
+    screen, S, timers, delays, guide, chosen, choosePath: (value) => pathEditor.done(value),
     calls: () => calls, now: () => now, respond: value => { response = value; },
     switchWay: n => switchWay(n),
     changeDirectory(value) { screen.querySelectorAll("button").find(b => b.textContent === "change…").onclick(); pathEditor.done(value); },
@@ -91,4 +93,31 @@ test("a response arriving after navigation cannot redraw the page", async () => 
   const before = h.screen.textContent;
   reply.resolve(info("late", false)); await flush();
   assert.equal(h.screen.textContent, before); assert.equal(h.timers.length, 0);
+});
+
+test("a first run without a managed folder starts on that step, which has no way to skip it", async () => {
+  const button = (h, label) => h.screen.querySelectorAll("button").find(b => b.textContent === label);
+  const h = await setup({ folder: { path: "C:\RimArcho", free: 50e9, done: false }, space: (path) => ({ path, free: 2e9, low: true }) });
+  assert.equal(h.screen.querySelectorAll(".st").length, 4);
+  assert.match(h.screen.querySelector(".st.cur").textContent, /managed folders/);
+  assert.ok(h.screen.textContent.includes("C:\RimArcho"));
+  assert.equal(button(h, "not now"), undefined);
+  assert.equal(button(h, "back"), undefined);
+  // another folder: its free space and the low-space warning; nothing is saved yet
+  button(h, "change…").onclick(); h.choosePath("E:\Archo"); await flush();
+  assert.ok(h.screen.textContent.includes("E:\Archo"));
+  assert.match(h.screen.textContent, /Less than 10 GB/);
+  assert.deepEqual(h.chosen, []);
+  // confirming saves it and moves on to finding the game; the step stays, done
+  button(h, "use this folder").onclick(); await flush();
+  assert.deepEqual(h.chosen, ["E:\Archo"]);
+  assert.match(h.screen.querySelector(".st.cur").textContent, /find the game/);
+  assert.match(h.screen.querySelector(".st.done").textContent, /managed folders/);
+  assert.ok(button(h, "back"), "the folder step can be revisited");
+});
+
+test("a managed folder already chosen, or adding another game, has no folder step", async () => {
+  const h = await setup();
+  assert.equal(h.screen.querySelectorAll(".st").length, 3);
+  assert.match(h.screen.querySelector(".st.cur").textContent, /find the game/);
 });

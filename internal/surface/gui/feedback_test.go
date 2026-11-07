@@ -16,7 +16,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Settings > Feedback (06 §2.14): only the basics unless ticked; ticked parts are the list, the
+// Settings > Feedback (16 §2.14): only the basics unless ticked; ticked parts are the list, the
 // paths without the user's home, and the game log's error groups; the link stays openable.
 func TestFeedbackAttachments(t *testing.T) {
 	t.Parallel()
@@ -82,7 +82,7 @@ func TestFeedbackAttachments(t *testing.T) {
 	}
 }
 
-// send (06 §2.14): offered only with a relay; the report carries the title (or the first line
+// send (16 §2.14): offered only with a relay; the report carries the title (or the first line
 // of what happened), the ticked attachments and the contact; the relay's refusal is said in
 // the player's words. The relay is httptest, standing in for feedback-relay/.
 func TestFeedbackSend(t *testing.T) {

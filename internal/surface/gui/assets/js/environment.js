@@ -1,4 +1,4 @@
-// Only actions that conflict with the destination wait; navigation stays live (06 §2.3).
+// Only actions that conflict with the destination wait; navigation stays live (16 §2.3).
 import { S, Tf, say } from "./state.js";
 import { setEnvironmentGuard } from "./api.js";
 
@@ -35,7 +35,7 @@ export async function withEnvironmentSwitch(name, action) {
   // Invalidate reads already in flight, even if the destination has the same name.
   S.screenSeq++;
   if (!observer) {
-    // Repainted actions wait too; inspect added subtrees and marked controls during the switch (06 §3.1).
+    // Repainted actions wait too; inspect added subtrees and marked controls during the switch (16 §3.1).
     observer = new MutationObserver((records) => {
       for (const record of records) {
         if (record.type === "attributes") {

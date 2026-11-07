@@ -16,12 +16,19 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// connect serves e.App over in-memory transports and returns a client session.
+// connect serves e.App with every tool (--tools all) over in-memory transports and
+// returns a client session.
 func connect(t *testing.T, e *testkit.Env) *sdk.ClientSession {
+	t.Helper()
+	return connectGroup(t, e, mcp.All)
+}
+
+// connectGroup is connect for one tool group.
+func connectGroup(t *testing.T, e *testkit.Env, g mcp.Group) *sdk.ClientSession {
 	t.Helper()
 	ctx := context.Background()
 	ct, st := sdk.NewInMemoryTransports()
-	srv := mcp.New(e.App)
+	srv := mcp.New(e.App, g)
 	if _, err := srv.SDK().Connect(ctx, st, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -48,6 +55,7 @@ func call(t *testing.T, cs *sdk.ClientSession, name string, args map[string]any)
 }
 
 func TestToolsAndAnnotations(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	cs := connect(t, e)
 	res, err := cs.ListTools(context.Background(), nil)
@@ -55,31 +63,33 @@ func TestToolsAndAnnotations(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[string]string{ // name → expected annotation: ro, write, destructive
-		"guide":  "ro", // 05 §5.3: the detail behind the short descriptions
-		"status": "ro", "find_mods": "ro", "get_mod": "ro", "get_def": "ro", "get_patches": "ro", "get_harmony": "ro",
+		"guide":  "ro", // 14 §3: the detail behind the short descriptions
+		"status": "ro", "find_mods": "ro", "get_mod": "ro", "get_mod_settings": "ro", "get_def": "ro", "get_patches": "ro", "get_harmony": "ro",
 		"explain_relation": "ro", "list_problems": "ro", "list_changes": "ro", "analyze_log": "ro", "search_files": "ro",
-		"read_source": "ro", "edit_loadout": "write", "copy_local": "write", "save_loadout": "destructive", "add_rule": "write",
-		"get_description": "ro", "set_player_data": "write",
+		"read_source": "ro", "edit_loadout": "write", "save_loadout": "destructive",
+		"get_description": "ro", "set_player_data": "write", "set_mod_settings": "write",
 		"test_run":        "write",
 		"estimate_memory": "ro",
 		"check_links":     "ro", "repair_links": "destructive",
-		// 05 §1.2: the player actions that only had CLI commands.
+		// 13 §1.2: the player actions that only had CLI commands.
 		"manage_rules": "write", "ignore_problem": "write", "scan": "write", "exchange_list": "write",
 		"mute_version_warnings": "write",
 		"manage_packs":          "destructive", "resolve_identity": "destructive", "manage_hidden": "destructive", "maintenance": "destructive",
 		"pin_mod": "write", "unpin_mod": "write",
 		// 0.9: launching, plans and their history.
 		"launch_game": "destructive", "manage_plans": "destructive", "plan_history": "ro",
-		// 06 §2.9: Mod library.
+		// 16 §2.9: Mod library.
 		"list_library": "ro", "manage_library": "destructive",
-		// 02 §3.4: subscriptions RimArcho installs and updates (Git, download pages, SteamCMD).
+		// 11 §1: subscriptions RimArcho installs and updates (Git, download pages, SteamCMD).
 		"manage_subscriptions": "destructive",
-		// Uninstall: only its dry run (05 §5.2).
+		// Uninstall: only its dry run (14 §2).
 		"preview_uninstall": "ro",
-		// Texture optimisation (08 §5.2).
+		// Texture optimisation (10 §2).
 		"manage_textures": "destructive",
+		// Saves (12 §1.6, §4.4): a fix subscribes through Steam, so it is open-world.
+		"list_saves": "ro", "get_save": "ro", "manage_saves": "destructive",
 	}
-	openWorld := map[string]bool{"get_description": true, "exchange_list": true, "maintenance": true, "manage_subscriptions": true}
+	openWorld := map[string]bool{"get_description": true, "exchange_list": true, "maintenance": true, "manage_subscriptions": true, "manage_saves": true}
 	seen := map[string]bool{}
 	for _, tl := range res.Tools {
 		seen[tl.Name] = true
@@ -99,7 +109,7 @@ func TestToolsAndAnnotations(t *testing.T) {
 		case a.OpenWorldHint == nil || *a.OpenWorldHint != openWorld[tl.Name]:
 			t.Errorf("%s: openWorldHint %v, want %v", tl.Name, a.OpenWorldHint, openWorld[tl.Name])
 		}
-		// 05 §5.3: every tool's guide topic gives an example call with output.
+		// 14 §3: every tool's guide topic gives an example call with output.
 		if text, ok := cmds.Guide(tl.Name); tl.Name != "guide" && (!ok || !strings.Contains(text, "Example: "+tl.Name+" {")) {
 			t.Errorf("%s: no guide topic with an example call", tl.Name)
 		}
@@ -119,7 +129,7 @@ func TestToolsAndAnnotations(t *testing.T) {
 	if text, _ := cmds.Guide("errors"); !strings.Contains(text, "Save loading") || !strings.Contains(text, "pattern=<id>") {
 		t.Error("guide topic errors is not the pattern checklist")
 	}
-	// Every destructive tool is named in the instructions' list; "unsaved" is gone (04 §3).
+	// Every destructive tool is named in the instructions' list; "unsaved" is gone (07 §3).
 	for n, kind := range want {
 		if kind == "destructive" && !strings.Contains(r.Instructions, n+",") && !strings.Contains(r.Instructions, n+")") {
 			t.Errorf("instructions do not list destructive tool %s", n)
@@ -135,6 +145,7 @@ func TestToolsAndAnnotations(t *testing.T) {
 // I1: the same command through the CLI and through MCP gives identical text. I5: default
 // output is at most 40 lines.
 func TestCLIParity(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	e.MustRun("analyze")
@@ -153,6 +164,8 @@ func TestCLIParity(t *testing.T) {
 		{"find_mods", map[string]any{"query": "mod"}, []string{"find", "mod"}},
 		{"find_mods", map[string]any{"active": true}, []string{"list", "--active"}},
 		{"get_mod", map[string]any{"ref": modA}, []string{"mod", modA}},
+		{"get_mod_settings", map[string]any{}, []string{"mod-settings"}},
+		{"get_mod_settings", map[string]any{"ref": modA, "all": true}, []string{"mod-settings", modA, "--all"}},
 		{"get_def", map[string]any{"def": "ThingDef/Lib_Gun"}, []string{"def", "ThingDef/Lib_Gun"}},
 		{"get_patches", map[string]any{"failed": true}, []string{"patches", "--failed"}},
 		{"get_harmony", map[string]any{"target": "Verse.Pawn.Tick"}, []string{"harmony", "--target", "Verse.Pawn.Tick"}},
@@ -178,7 +191,7 @@ func TestCLIParity(t *testing.T) {
 		{"edit_loadout", map[string]any{"action": "sort", "dry_run": true}, []string{"sort", "--dry-run"}},
 		{"edit_loadout", map[string]any{"action": "ignore_external"}, []string{"loadout", "ignore-external"}},
 		{"get_description", map[string]any{"ref": modA, "offline": true}, []string{"describe", modA, "--offline"}},
-		// The read-only pages folded into status, and the read-only actions of the 05 §1.2
+		// The read-only pages folded into status, and the read-only actions of the 13 §1.2
 		// tools (their write actions: TestGoldenManageTools).
 		{"status", map[string]any{"show": "envs"}, []string{"env", "list"}},
 		{"status", map[string]any{"show": "folders"}, []string{"folder", "list"}},
@@ -195,7 +208,6 @@ func TestCLIParity(t *testing.T) {
 		{"ignore_problem", map[string]any{"ref": "p:000000"}, []string{"problems", "ignore", "p:000000"}},
 		{"pin_mod", map[string]any{"ref": modA, "dry_run": true}, []string{"pin", modA, "--dry-run"}},
 		{"pin_mod", map[string]any{"ref": modA, "update": true}, []string{"pin", modA, "--update"}},
-		{"copy_local", map[string]any{"ref": modA, "name": "x/y"}, []string{"copy-local", modA, "--name", "x/y"}},
 		{"unpin_mod", map[string]any{"ref": modA, "dry_run": true}, []string{"unpin", modA, "--dry-run"}},
 		// 0.9: the read-only side of plans and history (write actions: TestGoldenManageTools).
 		{"plan_history", nil, []string{"loadout", "log"}},
@@ -204,7 +216,7 @@ func TestCLIParity(t *testing.T) {
 		{"plan_history", map[string]any{"action": "steps", "all": true}, []string{"history", "--all"}},
 		{"manage_plans", nil, []string{"plan", "list"}},
 		{"launch_game", map[string]any{"dry_run": true}, []string{"launch", "--dry-run"}},
-		// 06 §2.9: the library (its write actions: TestGoldenManageTools).
+		// 16 §2.9: the library (its write actions: TestGoldenManageTools).
 		{"list_library", nil, []string{"library"}},
 		{"list_library", map[string]any{"search": "mod", "include": []string{"source:local", "used:none"}, "exclude": []string{"tag:x"}, "sort": "size"},
 			[]string{"library", "--search", "mod", "--include", "source:local", "--include", "used:none", "--exclude", "tag:x", "--sort", "size"}},
@@ -239,6 +251,7 @@ func TestCLIParity(t *testing.T) {
 
 // I2: references printed by one tool are accepted by the others.
 func TestRefsRoundTrip(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	cs := connect(t, e)
@@ -285,6 +298,7 @@ func TestRefsRoundTrip(t *testing.T) {
 
 // I3: a packageId with several instances lists the candidates instead of picking one.
 func TestAmbiguousPackage(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	e.WriteMod(filepath.Join(e.Game, "Mods", "ModA_copy"), testkit.Mod{PackageID: "tester.moda", Name: "Mod A (local copy)", Author: "Tester"})
@@ -303,6 +317,7 @@ func TestAmbiguousPackage(t *testing.T) {
 
 // I5: a long list is cut at 40 lines with the command that shows everything.
 func TestTruncation(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	var active []string
 	for i := 0; i < 60; i++ {
@@ -351,6 +366,7 @@ func ref(t *testing.T, e *testkit.Env, name string) string {
 
 // Write tools only ever run against synthetic environments: enable, save, rule, undo.
 func TestWriteTools(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	cs := connect(t, e)
@@ -367,8 +383,8 @@ func TestWriteTools(t *testing.T) {
 	if out, isErr := call(t, cs, "save_loadout", nil); isErr || !strings.Contains(e.ReadModsConfig(), "tester.lib") {
 		t.Fatalf("save:\n%s", out)
 	}
-	if out, isErr := call(t, cs, "add_rule", map[string]any{"kind": "after", "a": "pkg:tester.modc", "b": "pkg:tester.modb"}); isErr || !strings.Contains(out, "r:1") {
-		t.Fatalf("add_rule:\n%s", out)
+	if out, isErr := call(t, cs, "manage_rules", map[string]any{"kind": "after", "a": "pkg:tester.modc", "b": "pkg:tester.modb"}); isErr || !strings.Contains(out, "r:1") {
+		t.Fatalf("manage_rules:\n%s", out)
 	}
 	for _, tool := range []string{"edit_loadout", "manage_rules", "exchange_list", "manage_packs", "resolve_identity", "manage_hidden", "maintenance", "manage_plans", "plan_history"} {
 		args := map[string]any{"action": "bogus"}
@@ -384,8 +400,9 @@ func TestWriteTools(t *testing.T) {
 	}
 }
 
-// 05 §5.1: a tool can name another environment.
+// 14 §1: a tool can name another environment.
 func TestEnvParameter(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	e.MustRun("env", "add", "other", "--game", e.OtherGame("Other", "1.6.4633 rev1261"), "--user-data", e.UserData)
@@ -405,9 +422,10 @@ func TestEnvParameter(t *testing.T) {
 	}
 }
 
-// 05 §5.1: when the analysis takes longer than the wait, the call returns the declaration
+// 14 §1: when the analysis takes longer than the wait, the call returns the declaration
 // problems with a note, and a later call gets the finished analysis.
 func TestStillComputing(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	inner := e.App.AnalyzeRunner
@@ -420,27 +438,14 @@ func TestStillComputing(t *testing.T) {
 		t.Fatalf("first call:\n%s", out)
 	}
 	close(release)
-	time.Sleep(500 * time.Millisecond)
-	if out, _ := call(t, cs, "list_problems", map[string]any{"code": "harmony"}); !strings.Contains(out, "analysis: a:1") || !strings.Contains(out, "harmony.multi-transpiler") {
-		t.Fatalf("second call:\n%s", out)
-	}
-}
-
-// pin_mod swaps the copy into the current plan; unpin_mod swaps the upstream back (04 §7).
-func TestPinUnpinTools(t *testing.T) {
-	e := testkit.New(t)
-	e.AddWorkshop("5100", testkit.Sample("tester.lock", "Lockable"))
-	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.lock")
-	e.AddEnv(false)
-	e.MustRun("scan")
-	cs := connect(t, e)
-	up := ref(t, e, "Lockable")
-	out, isErr := call(t, cs, "pin_mod", map[string]any{"ref": up})
-	if isErr || !strings.Contains(out, "replaces "+up+" in the current plan") {
-		t.Fatalf("pin_mod:\n%s", out)
-	}
-	out, isErr = call(t, cs, "unpin_mod", map[string]any{"ref": up})
-	if isErr || !strings.Contains(out, "the current plan uses "+up) {
-		t.Fatalf("unpin_mod:\n%s", out)
+	// A later call gets the finished analysis once the background run is done.
+	for deadline := time.Now().Add(20 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+		out, _ := call(t, cs, "list_problems", map[string]any{"code": "harmony"})
+		if strings.Contains(out, "analysis: a:1") && strings.Contains(out, "harmony.multi-transpiler") {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("second call:\n%s", out)
+		}
 	}
 }

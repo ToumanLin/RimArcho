@@ -15,7 +15,7 @@ import (
 // LockLabel is the source label of the lock library (src:locked).
 const LockLabel = "locked"
 
-// LockDir is the lock library root (04 §7): config lock.dir, else
+// LockDir is the lock library root (07 §5): config lock.dir, else
 // %LOCALAPPDATA%\RimArcho\locked. It lives outside the data directory, so the rule that the
 // data directory and source roots never contain each other still holds.
 func (a *App) LockDir() string {
@@ -26,7 +26,7 @@ func (a *App) LockDir() string {
 }
 
 // lockRoot is the lock library's folder. The library is shared by every environment
-// (02 §0 item 9): a copy is the same mod record whichever game plays it, and each plan links
+// (03 §2 item 9): a copy is the same mod record whichever game plays it, and each plan links
 // the copy it uses. e is kept for the callers.
 func (a *App) lockRoot(e *env.Environment) string { return a.LockDir() }
 
@@ -38,7 +38,7 @@ func (a *App) IsLockSource(s *source.Source) bool {
 
 // lockSource returns the lock library source, creating the folder and registering it as a
 // shared extra source (src:locked) when create is set. The game never looks there: copies
-// reach it only through _Archo_ links (08 §3).
+// reach it only through _Archo_ links (09 §3).
 func (a *App) lockSource(ix *Index, create bool) (*source.Source, error) {
 	root := a.LockDir()
 	if create {
@@ -70,7 +70,7 @@ func (a *App) lockSource(ix *Index, create bool) (*source.Source, error) {
 	return a.sharedSource(LockLabel, root)
 }
 
-// MoveResult is a locked copy moved from Mods/ into the lock library (04 §7).
+// MoveResult is a locked copy moved from Mods/ into the lock library (07 §5).
 type MoveResult struct {
 	Mod    *store.Mod // the copy before the move
 	From   string
@@ -111,7 +111,7 @@ func (a *App) MoveToLibrary(ref string, dryRun bool) (*MoveResult, error) {
 }
 
 // moveToLibrary moves a folder of Mods/ into the lock library and points its instance at
-// the new place, so the instance (and every plan's entry) stays the same (06 §2.9, 04 §7.4).
+// the new place, so the instance (and every plan's entry) stays the same (16 §2.9, 07 §5.4).
 func (a *App) moveToLibrary(st *LoadoutState, m *store.Mod, dryRun bool) (result *MoveResult, moveErr error) {
 	if !m.Kind.GameMods() {
 		return nil, fmt.Errorf("%s is not in Mods/; RimArcho moves nothing else into the lock library", st.Ix.Ref(m.ID))
@@ -201,7 +201,7 @@ func (a *App) moveToLibrary(st *LoadoutState, m *store.Mod, dryRun bool) (result
 }
 
 // copyMove copies a folder to another volume, checks every file arrived, then moves the
-// original to the recycle bin (RimArcho never deletes; 08 §7).
+// original to the recycle bin (RimArcho never deletes; 02 §3).
 func (a *App) copyMove(from, to string) error {
 	if err := copyChecked(from, to); err != nil {
 		return err

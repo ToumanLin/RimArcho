@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Column search (06 §3.7): words, field:value terms, - negation, "quoted words"; all
+// Column search (16 §3.7): words, field:value terms, - negation, "quoted words"; all
 // terms must hold.
 
 type term struct {
@@ -91,7 +91,7 @@ func (q Query) NeedsContent() bool {
 }
 
 // MatchFacts are what matching needs beyond the row: content kinds by instance (Contents) and
-// the row status (06 §3.7 has:problem).
+// the row status (16 §3.7 has:problem).
 type MatchFacts struct {
 	Content map[string]int
 	Status  map[string]int
@@ -272,7 +272,7 @@ func (c *ContentCache) Get(a *app.App, st *app.LoadoutState) (map[string]int, er
 }
 
 // TagMatch: v names tag when, ignoring case, it starts at the beginning of one of the tag's
-// words (06 §3.7): "facial" finds "Facial Hair" and "Facial Animation", "animation" and
+// words (16 §3.7): "facial" finds "Facial Hair" and "Facial Animation", "animation" and
 // "anim" find "Facial Animation", "facial hair" finds "Facial Hair"; "air" does not.
 // The rule is app.TagMatch, so Mod library's tag: filter (app.Library) matches the same way.
 func TagMatch(tag, v string) bool { return app.TagMatch(tag, v) }
@@ -282,14 +282,14 @@ func isTagSep(c byte) bool { return app.IsTagSep(c) }
 // queryFieldOrder is the order completion offers fields in when several share a prefix.
 var queryFieldOrder = []string{"lists", "name", "author", "tag", "id", "type", "has", "version", "location"}
 
-// queryValues are the fixed values of type: and has: (06 §3.7), in the order offered.
+// queryValues are the fixed values of type: and has: (16 §3.7), in the order offered.
 var queryValues = map[string][]string{
 	"type": {"workshop", "local", "official", "copy", "git", "steamcmd", "assembly", "xml", "language"},
 	"has":  {"problem", "error", "tag", "note", "alias"},
 }
 
 // CompleteQuery is the grey text to show after the search box's last word, which tab
-// accepts (06 §3.7), from the second letter on: "au" → "thor:", "-ta" → "g:", "type:wo" → "rkshop", "tag:fac" →
+// accepts (16 §3.7), from the second letter on: "au" → "thor:", "-ta" → "g:", "type:wo" → "rkshop", "tag:fac" →
 // "ial" (from the tags in use, up to the end of the word). "" when nothing fits or the
 // last word is inside quotes.
 func CompleteQuery(q string, tags []string) string { return CompleteQueryWith(q, tags, nil) }

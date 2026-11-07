@@ -6,28 +6,6 @@ import (
 	"time"
 )
 
-const schemaV20 = `
-CREATE TABLE credit_batch(
- id INTEGER PRIMARY KEY, created_at INTEGER NOT NULL,
- state TEXT NOT NULL DEFAULT 'counting' CHECK(state IN ('counting','prompt','replacing','done','dismissed')),
- sessions INTEGER NOT NULL DEFAULT 0);
-CREATE TABLE credit_item(
- batch_id INTEGER NOT NULL REFERENCES credit_batch(id), workshop_id TEXT NOT NULL,
- instance_id TEXT NOT NULL, name TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'pending',
- target_id TEXT NOT NULL DEFAULT '', attempts INTEGER NOT NULL DEFAULT 0,
- next_attempt INTEGER NOT NULL DEFAULT 0, result TEXT NOT NULL DEFAULT '',
- PRIMARY KEY(batch_id, workshop_id));
-CREATE TABLE credit_session(
- batch_id INTEGER NOT NULL REFERENCES credit_batch(id), launch_id INTEGER NOT NULL,
- environment_id TEXT NOT NULL, started_at INTEGER NOT NULL,
- PRIMARY KEY(batch_id, environment_id, launch_id, started_at));
-CREATE TABLE credit_deployment(
- batch_id INTEGER NOT NULL, workshop_id TEXT NOT NULL, environment_id TEXT NOT NULL,
- plan_id INTEGER NOT NULL, done INTEGER NOT NULL DEFAULT 0,
- PRIMARY KEY(batch_id, workshop_id, environment_id),
- FOREIGN KEY(batch_id, workshop_id) REFERENCES credit_item(batch_id, workshop_id));
-`
-
 // CreditBatch is one explicit bulk SteamCMD download, independent of task history.
 type CreditBatch struct {
 	ID       int64  `json:"id"`

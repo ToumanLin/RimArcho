@@ -10,7 +10,7 @@ async function setup() {
   const $ = (s) => s === "#screen" ? screen : screen.querySelector(s);
   const deps = {
     "./state.js": { S, $, el, api, T: (s) => s, Tf: (s, ...args) => { let i = 0; return s.replace(/%[sd]/g, () => args[i++]); }, errText: (e) => e.message, say() {} },
-    "./popups.js": { menu: (...args) => menus.push(args), text() { throw Error("preview must stay inline"); } },
+    "./popups.js": { menuOpener: n => n, menu: (...args) => menus.push(args), text() { throw Error("preview must stay inline"); } },
     "./motion.js": { shimmer: () => el("span", "skel") },
     "./screens.js": {
       page: (cls) => el("div", cls), area() {},
@@ -144,4 +144,40 @@ test("packs and pack mods render the shared table; dry run toggles inline and re
   packs.packsKey(event("V")); h.S.screen = "home"; h.S.screenSeq++;
   previews[3].resolve(["abandoned"]); await flush();
   assert.ok(!h.screen.textContent.includes("abandoned"));
+});
+
+
+test("table positions and cells follow visible columns after moving and hiding", async () => {
+  const h = await setup(), box = h.el("section"), head = h.el("div");
+  const t = h.createTable({ key: "test", columns: h.packColumns, redraw() {} });
+  box.append(head);
+  t.draw(box, head, { role: "treegrid", labelledby: "visible-heading", count: 1354, multiselectable: true });
+  const row = h.el("div");
+  const paint = () => {
+    row.replaceChildren(...t.visible().map((c) => h.el("span", "", c.key)));
+    t.row(row, 699);
+  };
+  paint();
+  assert.equal(box.getAttribute("aria-rowcount"), "1355");
+  assert.equal(box.getAttribute("aria-colcount"), "5");
+  assert.equal(box.getAttribute("aria-labelledby"), "visible-heading");
+  assert.equal(head.getAttribute("role"), "row");
+  assert.equal(head.getAttribute("aria-rowindex"), "1");
+  assert.equal(row.getAttribute("aria-rowindex"), "701");
+  t.move("name", "size", true);
+  t.state.cols.find((c) => c.key === "mods").shown = false;
+  t.draw(box, head, { count: 32 });
+  paint();
+  assert.equal(box.getAttribute("aria-rowcount"), "33");
+  assert.equal(box.getAttribute("aria-colcount"), "4");
+  head.children.forEach((header, i) => {
+    assert.equal(header.getAttribute("aria-colindex"), String(i + 1));
+    assert.equal(row.children[i].textContent, header.dataset.k);
+    assert.equal(row.children[i].getAttribute("role"), "gridcell");
+    assert.equal(row.children[i].getAttribute("aria-colindex"), String(i + 1));
+    if (header.querySelector(".arrow")) assert.equal(header.querySelector(".arrow").getAttribute("aria-hidden"), "true");
+  });
+  t.draw(box, head, { role: "table" });
+  paint();
+  assert.equal(row.children[0].getAttribute("role"), "cell");
 });

@@ -13,6 +13,9 @@ import (
 )
 
 // Files lists the top-level entries replaced for the current operating system.
+// An older RimArcho rejects a zip with entries missing from its own list, so a new entry
+// goes here one release before release.ps1 starts packing it (README.zh-CN.md and skills
+// were added in 1.0.5 and are packed from 1.0.6).
 var Files = releaseFiles(runtime.GOOS)
 
 func releaseFiles(goos string) []string {
@@ -20,7 +23,7 @@ func releaseFiles(goos string) []string {
 	if goos == "windows" {
 		programs = []string{"archo.exe", "RimArcho.exe"}
 	}
-	return append(programs, "README.md", "CHANGELOG.md", "LICENSE", "monitor")
+	return append(programs, "README.md", "README.zh-CN.md", "CHANGELOG.md", "LICENSE", "monitor", "skills")
 }
 
 // Extract validates and unpacks a release into a new directory, removing it on failure.

@@ -1,6 +1,6 @@
 package tui
 
-// Measurement against a real installation (07 §6.2, 06 §3.5 T5), skipped unless
+// Measurement against a real installation (18 §2, 16 §3.5 T5), skipped unless
 // RIMARCHO_REAL_HOME (data dir) and RIMARCHO_EXE (archo binary for the child scan) are set.
 // Only navigation and search keys are sent; the launcher fails the test if called.
 

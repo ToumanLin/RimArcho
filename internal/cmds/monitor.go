@@ -8,11 +8,11 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
-// Archo Monitor (08 §9): where the bundled monitor is, which versions are installed, and
+// Archo Monitor (19 §6): where the bundled monitor is, which versions are installed, and
 // whether the current plan has it; `install` copies, registers and applies the default.
 func init() {
 	register(&Command{Name: "monitor", Summary: "Archo Monitor, the in-game companion: versions, source, place in the plan", MaxArgs: 0, Run: monitorCmd})
-	register(&Command{Name: "monitor install", Summary: "install or update the bundled Archo Monitor and add it to plans by default (08 §9)", MaxArgs: 0,
+	register(&Command{Name: "monitor install", Summary: "install or update the bundled Archo Monitor and add it to plans by default (19 §6)", MaxArgs: 0,
 		Flags: []Flag{{Name: "dry-run", Help: "show what would be copied and registered"}}, Run: monitorInstallCmd})
 }
 
@@ -57,7 +57,7 @@ func MonitorPlanLine(c *Ctx, s *app.MonitorStatus) string {
 		if s.AfterHarmony {
 			where = "after Harmony"
 		}
-		v := strings.TrimPrefix(s.InPlan.Rel, "ArchoMonitor-")
+		v := strings.TrimSpace(s.InPlan.Decl().ModVersion)
 		return fmt.Sprintf("ArchoMonitor %s in the plan (%s)", v, where)
 	case s.Newest != nil:
 		ref := s.Newest.Mod.ID
@@ -88,7 +88,7 @@ func monitorInstallCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	return d, nil
 }
 
-// MonitorLines describe a check (08 §9); all includes the plans left alone and why.
+// MonitorLines describe a check (19 §6); all includes the plans left alone and why.
 func MonitorLines(r *app.MonitorResult, all bool) []string {
 	var out []string
 	if r.Bundled != nil {

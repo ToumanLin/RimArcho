@@ -294,7 +294,7 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	addSortNotices(root, r.SortNotices)
 	addChanges(c, root, st, r.Changes, render.DefaultLimit, "archo loadout diff --all")
 	if moved > 0 {
-		// Why: what the order broke, strong constraints first (04 §5.3): breaking a strong one
+		// Why: what the order broke, strong constraints first (08 §1.3): breaking a strong one
 		// came with more errors in shared logs, a weak or harmless one did not.
 		why := root.Section("why (order constraints the list broke; strong ones go with more errors)")
 		seen := map[string]bool{}
@@ -309,7 +309,7 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		why.Truncate(12, "")
 	}
 	if len(r.Result.Anchors) > 0 {
-		// loadTop / loadBottom (04 §5.5): preferences that only break ties.
+		// loadTop / loadBottom (08 §1.5): preferences that only break ties.
 		ends := root.Section("ends (loadTop / loadBottom: preferred, never over a constraint)")
 		for _, an := range r.Result.Anchors {
 			nd := r.Input.Nodes[an.Node]
@@ -377,7 +377,7 @@ func sortCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 	}
 	if len(r.Result.Dropped) > 0 {
-		// Constraints that cannot be satisfied are left out with the reason (04 §5.1).
+		// Constraints that cannot be satisfied are left out with the reason (08 §1.1).
 		nu := root.Section("not used")
 		seen := map[string]bool{}
 		for _, dr := range r.Result.Dropped {
@@ -426,7 +426,37 @@ func saveCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	return d, nil
 }
 
-// writeBody is what save and launch write (08 §2, one preview for both dry runs): the file,
+// settingsKV lists the Mod settings copied to the file names the Mods' folders now give
+// them (09 §3). Nothing is shown when nothing moved.
+func settingsKV(root *render.Node, cs []app.SettingsCarry, dryRun bool) {
+	if len(cs) == 0 {
+		return
+	}
+	failed := 0
+	for _, c := range cs {
+		if c.Err != "" {
+			failed++
+		}
+	}
+	head := fmt.Sprintf("copied %s to the names their folders now give them; the old files stay", render.Plural(len(cs)-failed, "settings file"))
+	if dryRun {
+		head = fmt.Sprintf("would copy %s to the names their folders now give them", render.Plural(len(cs), "settings file"))
+	}
+	if failed > 0 {
+		head += fmt.Sprintf("; %d could not be copied", failed)
+	}
+	n := root.KV("Mod settings", head)
+	for _, c := range cs {
+		line := c.Mod + ": " + c.From + " → " + c.To
+		if c.Err != "" {
+			line += " (not copied: " + c.Err + ")"
+		}
+		n.Add(line)
+	}
+	n.Truncate(10, "")
+}
+
+// writeBody is what save and launch write (09 §2, one preview for both dry runs): the file,
 // its version rewrite, the entries, the Mods/ links and the changes since the newest version.
 func writeBody(c *Ctx, root *render.Node, r *app.SaveResult) {
 	movedKV(root, r.Moved, r.DryRun)
@@ -454,7 +484,7 @@ func writeBody(c *Ctx, root *render.Node, r *app.SaveResult) {
 		root.KV("source", fmt.Sprintf("undo (restores v%d)", r.Restores))
 	}
 	if len(r.Links) > 0 {
-		ln := root.KV("links", fmt.Sprintf("%d in Mods/ (08 §3: SteamCMD and extra mods are linked, never copied)", len(r.Links)))
+		ln := root.KV("links", fmt.Sprintf("%d in Mods/ (09 §3: SteamCMD and extra mods are linked, never copied)", len(r.Links)))
 		for _, l := range r.Links {
 			what := "+ " + l.Name + " → " + l.Target
 			if l.Op == "remove" {
@@ -463,6 +493,7 @@ func writeBody(c *Ctx, root *render.Node, r *app.SaveResult) {
 			ln.Add(what)
 		}
 	}
+	settingsKV(root, r.Settings, r.DryRun)
 	base := "workspace"
 	if r.State.Latest != nil {
 		base = fmt.Sprintf("v%d", r.State.Latest.N)
@@ -587,7 +618,7 @@ func loadoutIgnoreExternal(c *Ctx, a *Args) (*render.Doc, error) {
 }
 
 // addConflicts lists the environment's plans with an unloaded external ModsConfig.xml
-// version and the three ways out (04 §4.3).
+// version and the three ways out (07 §4.3).
 func addConflicts(c *Ctx, root *render.Node, st *app.LoadoutState) {
 	cs, err := c.App.Conflicts(st)
 	if err != nil {

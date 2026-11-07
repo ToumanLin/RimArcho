@@ -13,11 +13,11 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/logs"
 )
 
-// The live log over MCP (03 §6.6): get_log / `archo log` return a cursor; called again with
+// The live log over MCP (06 §6): get_log / `archo log` return a cursor; called again with
 // since=<cursor> they list only the clusters that are new or whose count grew after it.
 //
 // The cursor holds no state on disk: it is how many bytes of the log (and of its companion
-// log, 03 §6.7) the report covered and a checksum of those bytes. A later call checks that
+// log, 06 §7) the report covered and a checksum of those bytes. A later call checks that
 // the log still starts with the same bytes — the game appends to Player.log while it runs and
 // starts a new one when it restarts (the old one becomes Player-prev.log) — and clusters that
 // prefix again, without attribution, to know each cluster's count at the cursor.
@@ -212,7 +212,7 @@ func prefixOf(path string, size int64, sum uint32) (*logs.File, bool, error) {
 
 // clusterCounts is each cluster's count as the full analysis computes it, without the
 // attribution: Player.log's entries plus the companion-only ones, clustered with the
-// companion's class hints, the count raised to the companion's (03 §6.7.4).
+// companion's class hints, the count raised to the companion's (06 §7).
 func clusterCounts(lf *logs.File, comp *logs.Companion) map[string]int {
 	companionOnly(lf, comp)
 	out := map[string]int{}

@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"encoding/json"
+	"reflect"
 	"slices"
 	"sort"
 	"strings"
@@ -31,6 +32,17 @@ func (s *Store) FinishScan(scanID int64, finished time.Time, stats any) error {
 	b, _ := json.Marshal(stats)
 	_, err := s.DB.Exec(`UPDATE scan SET finished_at=?, stats=? WHERE id=?`, finished.Unix(), string(b), scanID)
 	return err
+}
+
+// declReparsed: unchanged files whose dependencies now read differently, because the parser
+// learned a field (alternativePackageIds). The stored declaration is brought up to date in
+// place; a new snapshot would record an update the mod never had. The same files give the
+// same declaration, so this happens once after an upgrade.
+func declReparsed(prev, now scan.Decl) bool {
+	if now.ParseError != "" || prev.ParseError != "" || now.PackageID != prev.PackageID {
+		return false
+	}
+	return !reflect.DeepEqual(prev.Dependencies, now.Dependencies) || !reflect.DeepEqual(prev.DependenciesByVersion, now.DependenciesByVersion)
 }
 
 // insertSnapshot writes a snapshot and its manifest; returns the snapshot ID. A released
@@ -92,7 +104,7 @@ func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identi
 	}()
 	ts := now.Unix()
 	// An instance belongs where its source does: a shared mod folder's to every environment
-	// (environment_id ''), Data/ and Mods/ to the environment (02 §0).
+	// (environment_id ''), Data/ and Mods/ to the environment (03 §2).
 	srcEnv := map[string]string{}
 	if err = eachRow(tx, `SELECT id, environment_id FROM source`, func(r *sql.Rows) error {
 		var id, e string
@@ -158,6 +170,12 @@ func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identi
 			}
 		default:
 			snapID = a.Prev.ID
+			if declReparsed(a.Prev.Decl, ob.Decl) {
+				blob, _ := json.Marshal(ob.Decl)
+				if _, err = tx.Exec(`UPDATE snapshot SET decl_blob=? WHERE id=?`, string(blob), snapID); err != nil {
+					return err
+				}
+			}
 			if ob.FP.Hashed > 0 && ob.FP.Files != nil {
 				// Same content, newer mtimes: refresh the cache so the next scan can skip hashing.
 				if _, err = deleteFiles(tx, `=?`, snapID); err != nil {
@@ -220,9 +238,9 @@ func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identi
 	return tx.Commit()
 }
 
-// recomputePrimaries sets each lineage's primary instance (02 §6): a live instance before a
+// recomputePrimaries sets each lineage's primary instance (04 §3): a live instance before a
 // tombstone, then a workshop-like source, then the earliest first_seen. Empty lineages are
-// deleted. Lineages are shared by every environment (02 §0), so this runs over all of them;
+// deleted. Lineages are shared by every environment (03 §2), so this runs over all of them;
 // envID is kept for the callers.
 func recomputePrimaries(tx *sql.Tx, envID string) error { return recomputeAllPrimaries(tx) }
 

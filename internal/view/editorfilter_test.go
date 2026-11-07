@@ -6,6 +6,7 @@ import (
 )
 
 func TestTypedBarConditions(t *testing.T) {
+	t.Parallel()
 	b := barBoard()
 	for _, query := range []string{"source:local source:workshop", "tags:美化 source:workshop", "-source:local version:1.6", "source:"} {
 		words, filters := splitBoardQuery(query)

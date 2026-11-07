@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
-// Hidden mods (08 §6): folders another manager hid by renaming About.xml.
+// Hidden mods (09 §5): folders another manager hid by renaming About.xml.
 func init() {
 	dry := []Flag{{Name: "dry-run", Help: "show what would change"}}
 	register(&Command{Name: "unhide", Args: "<ref>", Summary: "rename About.xml.disabled back to About.xml so the game sees the mod again", MinArgs: 1, MaxArgs: 1, Flags: dry,
@@ -64,7 +64,7 @@ func usedByWarning(plans []string) string {
 	return "used by " + strings.Join(plans, ", ") + "; it still goes, and they show it as missing"
 }
 
-// unpinCopyDoc reports unpinning a locked version RimArcho made (04 §7.5): no files change.
+// unpinCopyDoc reports unpinning a locked version RimArcho made (07 §5.5): no files change.
 func unpinCopyDoc(c *Ctx, a *Args, op *app.FileOp) (*render.Doc, error) {
 	ix, err := c.App.Index()
 	if err != nil {

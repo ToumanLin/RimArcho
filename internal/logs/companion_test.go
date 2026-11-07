@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// 03 §6.7 (L11, L13): Archo Monitor's lines merge by id (counts add up, the highest total
+// 06 §7 (L11, L13): Archo Monitor's lines merge by id (counts add up, the highest total
 // wins), the session line is read, bad lines are counted, a half-written last line waits.
 func TestCompanionMonitor(t *testing.T) {
 	path := filepath.Join("..", "..", "testdata", "companion", "ArchoMonitor.log")

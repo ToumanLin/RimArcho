@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/identity"
@@ -35,7 +36,7 @@ func (a *App) SubscriptionSourceCheck(kind string) SourceCheck {
 }
 
 func (a *App) subscriptionCheckKey(kind string) string {
-	// Subscription folders are shared by every game (02 §0), so automatic
+	// Subscription folders are shared by every game (03 §2), so automatic
 	// results must survive switching games too. Workshop-client state stays scoped.
 	if kind == LibSteamCMD || kind == LibGit || kind == LibPage {
 		return "subscriptions:check:shared:" + kind
@@ -144,6 +145,12 @@ func (a *App) CheckSubscriptionSource(kind string, pageReader ...func(string) (*
 
 // UpdateWorkshopClient asks the running client to download; Steam owns completion.
 func (a *App) UpdateWorkshopClient(ref string, dryRun bool) error {
+	return a.UpdateWorkshopClients([]string{ref}, dryRun)
+}
+
+// UpdateWorkshopClients asks the running client to download every copy in one Steam call
+// (update all, 16 §2.9); Steam owns completion. The error names the items Steam refused.
+func (a *App) UpdateWorkshopClients(refs []string, dryRun bool) error {
 	if err := a.refuseSubscriptionGameRunning(); err != nil {
 		return err
 	}
@@ -151,22 +158,45 @@ func (a *App) UpdateWorkshopClient(ref string, dryRun bool) error {
 	if err != nil {
 		return err
 	}
-	m, err := ix.ResolveOne(ref)
-	if err != nil {
-		return err
+	var ids []string
+	names := map[uint64]string{}
+	for _, ref := range refs {
+		m, err := ix.ResolveOne(ref)
+		if err != nil {
+			return err
+		}
+		if m.Kind != source.Workshop {
+			return fmt.Errorf("%s is not a Workshop client mod", ref)
+		}
+		id, err := strconv.ParseUint(m.WorkshopID(), 10, 64)
+		if err != nil {
+			return fmt.Errorf("%s has no Workshop ID", ref)
+		}
+		if _, seen := names[id]; !seen {
+			ids = append(ids, m.WorkshopID())
+		}
+		names[id] = m.DisplayName()
 	}
-	if m.Kind != source.Workshop {
-		return fmt.Errorf("%s is not a Workshop client mod", ref)
-	}
-	if dryRun {
+	if dryRun || len(ids) == 0 {
 		return nil
 	}
-	r, err := a.runSteam(steamworks.Download, []string{m.WorkshopID()})
+	r, err := a.runSteam(steamworks.Download, ids)
 	if err != nil {
 		return err
 	}
-	if len(r.Items) != 1 || r.Items[0].Result != "ok" {
-		return fmt.Errorf("Steam did not accept download of %s", strconv.Quote(m.DisplayName()))
+	ok := map[uint64]bool{}
+	for _, it := range r.Items {
+		ok[it.ID] = ok[it.ID] || it.Result == "ok"
+	}
+	var refused []string
+	for _, id := range ids {
+		n, _ := strconv.ParseUint(id, 10, 64)
+		if !ok[n] {
+			refused = append(refused, strconv.Quote(names[n]))
+		}
+	}
+	if len(refused) > 0 {
+		return fmt.Errorf("Steam did not accept download of %s", strings.Join(refused, ", "))
 	}
 	return nil
 }

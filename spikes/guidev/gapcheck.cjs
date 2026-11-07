@@ -1,11 +1,11 @@
-// 06 §3.1 / G24: exercise every card gap in guidev with disposable game data.
+// 16 §3.1 / G24: exercise every card gap in guidev with disposable game data.
 // CGO_ENABLED=0 go build -o tmp/gap-check/archo.exe ./cmd/archo
 // CGO_ENABLED=0 go build -o tmp/gap-check/guidev.exe ./spikes/guidev
 // npm install --prefix tmp/gap-check --no-package-lock playwright-core@1.58.2
 // node spikes/guidev/gapcheck.cjs
 const fs = require('fs'), path = require('path'), { spawn, execFileSync } = require('child_process');
-const { chromium } = require(path.resolve('tmp/gap-check/node_modules/playwright-core'));
-const root = path.resolve('tmp/gap-check'), fixture = path.join(root, 'fixture');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || path.resolve('tmp/gap-check/node_modules/playwright-core'));
+const root = path.resolve(process.env.RIMARCHO_CHECK_ROOT || 'tmp/gap-check'), fixture = path.join(root, 'fixture');
 const game = path.join(fixture, 'Game'), data = path.join(fixture, 'UserData'), home = path.join(fixture, 'Home');
 const write = (file, value) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, value); };
 const assert = (ok, message) => { if (!ok) throw new Error(message); };
@@ -72,7 +72,7 @@ cli('scan');
       const rect = await handle.boundingBox(), dragBefore = await value(handle);
       const space = +(await handle.getAttribute('aria-valuemax')) - dragBefore;
       const dragDelta = selector.includes('fbar-gap') && space < 80 ? -63 : space >= 23 ? 23 : -23;
-      // Start in the extended hit area, three pixels over the card edge (06 §7.3).
+      // Start in the extended hit area, three pixels over the card edge (16 §7.3).
       const x = rect.x + rect.width / 2 + (vertical && selector !== '#side-split' ? 4 : 0), y = rect.y + rect.height / 2;
       await page.mouse.move(x, y); await page.mouse.down();
       await page.mouse.move(x + (vertical ? dragDelta : 0), y + (vertical ? 0 : reverse ? -dragDelta : dragDelta), { steps: 4 });
@@ -103,12 +103,15 @@ cli('scan');
     }
     await filter('#board .fbar', 'ui.gui.filter.split:plan', editor);
     const expandStack = () => page.evaluate(async () => {
+      const { S } = await import('/js/state.js');
+      S.history = [{ kind: 'undo', text: 'Fixture edit' }, { kind: 'now', text: 'now' }];
+      (await import('/js/lists.js')).renderHistory();
       (await import('/js/lists.js')).setStagingOpen(true);
       const history = document.querySelector('#board .histarea');
       if (!history.classList.contains('open')) history.querySelector('.hbar').click();
     });
     await expandStack(); await settle();
-    for (const [i, name] of [[0, 'stage'], [1, 'history']]) await check(`#board .stack-split:nth-of-type(${i ? 2 : 1})`, 'ui.gui.plan.' + name, async () => { await reloadEditor(); await expandStack(); }, true);
+    for (const [target, name] of [['[data-area="2"]', 'stage'], ['.histarea', 'history']]) await check(`#board .stack-split:has(+ ${target})`, 'ui.gui.plan.' + name, async () => { await reloadEditor(); await expandStack(); }, true);
     await open('library'); await check('.lib-split', 'ui.gui.library.side', () => open('library'));
     await filter('.lib .fbar', 'ui.gui.filter.split:library', () => open('library'));
     await open('tasks');

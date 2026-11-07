@@ -7,10 +7,11 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/modchanges"
+	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 )
 
-// SubscribeRequest is what the add a subscription card decided (06 §2.9): the source and its one
+// SubscribeRequest is what the add a subscription card decided (16 §2.9): the source and its one
 // choice. The window sends it as JSON; the TUI builds it from its card.
 type SubscribeRequest struct {
 	Kind     string `json:"kind"`
@@ -52,30 +53,75 @@ func SubscribeArgv(r SubscribeRequest) ([]string, error) {
 }
 
 // WorkshopUpdatePreview is the confirmation of update for a Workshop item the Steam client
-// keeps (06 §2.9): installed → latest, and that Steam downloads it. Refused while a game
+// keeps (16 §2.9): installed → latest, and that Steam downloads it. Refused while a game
 // runs, like the update itself.
-func WorkshopUpdatePreview(a *app.App, ref string) (*Preview, error) {
-	if err := a.UpdateWorkshopClient(ref, true); err != nil {
+func WorkshopUpdatePreview(a *app.App, refs ...string) (*Preview, error) {
+	if err := a.UpdateWorkshopClients(refs, true); err != nil {
 		return nil, err
 	}
 	ix, err := a.Index()
 	if err != nil {
 		return nil, err
 	}
-	m, err := ix.ResolveOne(ref)
-	if err != nil {
-		return nil, err
+	latestOf := a.SubscriptionSourceCheck("workshop").Latest
+	var lines []string
+	for _, ref := range refs {
+		m, err := ix.ResolveOne(ref)
+		if err != nil {
+			return nil, err
+		}
+		lines = append(lines, m.DisplayName())
+		if latest := latestOf[m.ID]; latest > 0 {
+			lines = append(lines, a.FormatTime(time.Unix(m.ACFTimeUpdated, 0))+" → "+a.FormatTime(time.Unix(latest, 0)))
+		}
 	}
-	latest := a.SubscriptionSourceCheck("workshop").Latest[m.ID]
-	lines := []string{m.DisplayName()}
-	if latest > 0 {
-		lines = append(lines, a.FormatTime(time.Unix(m.ACFTimeUpdated, 0))+" → "+a.FormatTime(time.Unix(latest, 0)))
+	if len(refs) == 1 {
+		lines = append(lines, T("Steam will download this Workshop update"))
+	} else {
+		lines = append(lines, Tf("Steam will download these %d Workshop updates", len(refs)))
 	}
-	lines = append(lines, T("Steam will download this Workshop update"))
 	return &Preview{What: OpSubUpdate, Title: T("update subscription"), Apply: true, Lines: lines}, nil
 }
 
-// SourceCheckResult checks one source of updates (check, 06 §2.9) and words the result as
+// SubscriptionUpdatePreview is the one confirmation of update / update all (16 §2.9) on
+// one session: Workshop client copies as WorkshopUpdatePreview, the rest as one dry run
+// (LibPreview). Download-page copies say they need a file first.
+func SubscriptionUpdatePreview(a *app.App, refs []string) (*Preview, error) {
+	ix, err := a.Index()
+	if err != nil {
+		return nil, err
+	}
+	var ws, rest []string
+	for _, ref := range refs {
+		m, err := ix.ResolveOne(ref)
+		if err != nil {
+			return nil, err
+		}
+		if m.Kind == source.Workshop {
+			ws = append(ws, ref)
+		} else {
+			rest = append(rest, ref)
+		}
+	}
+	p := &Preview{What: OpSubUpdate, Title: T("update subscription"), Apply: true}
+	if len(rest) > 0 {
+		lp, err := LibPreview(a, OpSubUpdate, rest)
+		if err != nil {
+			return nil, err
+		}
+		p.Lines, p.Apply = lp.Lines, lp.Apply
+	}
+	if len(ws) > 0 {
+		wp, err := WorkshopUpdatePreview(a, ws...)
+		if err != nil {
+			return nil, err
+		}
+		p.Lines = append(p.Lines, wp.Lines...)
+	}
+	return p, nil
+}
+
+// SourceCheckResult checks one source of updates (check, 16 §2.9) and words the result as
 // the page does: "everything is up to date" or "N updates available", never "check complete"; a failure keeps its reason.
 func SourceCheckResult(a *app.App, kind string, pageReader ...func(string) (*subscribe.PageInfo, error)) (string, error) {
 	if err := a.CheckSubscriptionSource(kind, pageReader...); err != nil {

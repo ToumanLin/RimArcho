@@ -224,7 +224,7 @@ func nameCands(prior []string, word string) []cmdCand {
 }
 
 // argCands: the flags of c (a word starting with -) or the values of the positional
-// argument the word is, from the placeholder in c's usage (06 §9.4).
+// argument the word is, from the placeholder in c's usage (16 §9.4).
 func (m *model) argCands(c *cmds.Command, rest []string, word string) []cmdCand {
 	if strings.HasPrefix(word, "-") {
 		var out []cmdCand
@@ -377,7 +377,7 @@ func isModToken(tok string) bool {
 }
 
 // modCands: the mods of the current game whose name, package id or reference matches the
-// word, inserted as a reference without # (05 §3.1 rule 11). An empty word starts with the
+// word, inserted as a reference without # (13 §3.1 rule 11). An empty word starts with the
 // mod under the cursor and, for a repeating argument, the selection.
 func (m *model) modCands(word string, many bool) []cmdCand {
 	lw := strings.ToLower(strings.TrimPrefix(word, "#"))

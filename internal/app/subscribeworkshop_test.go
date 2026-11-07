@@ -233,6 +233,7 @@ func workshopScriptIDs(t *testing.T, exe string, args []string) []string {
 }
 
 func TestWorkshopBatchesPartialSuccess(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, "steamcmd.exe"), true }
 	var ids, scripts []string
@@ -299,6 +300,7 @@ func TestWorkshopBatchesPartialSuccess(t *testing.T) {
 }
 
 func TestWorkshopRetryClassification(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name, output, reason string
 		calls                int
@@ -344,6 +346,7 @@ func TestWorkshopRetryClassification(t *testing.T) {
 }
 
 func TestWorkshopRetryOnlyFailedIDs(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, "steamcmd.exe"), true }
 	e.App.SteamCMDWait = func(time.Duration) {}
@@ -376,6 +379,7 @@ func TestWorkshopRetryOnlyFailedIDs(t *testing.T) {
 }
 
 func TestWorkshopScriptCleanupOnStartFailure(t *testing.T) {
+	t.Parallel()
 	for _, account := range []string{"anonymous", "player"} {
 		t.Run(account, func(t *testing.T) {
 			e := setup(t, false)
@@ -410,6 +414,7 @@ func TestWorkshopScriptCleanupOnStartFailure(t *testing.T) {
 }
 
 func TestWorkshopSuccessWithProcessError(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, "steamcmd.exe"), true }
 	e.App.SteamCMDRun = func(exe string, args []string) (string, error) {

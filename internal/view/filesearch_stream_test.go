@@ -15,6 +15,7 @@ import (
 )
 
 func TestFileSearchKinds(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		text  string
 		kinds modsearch.Kind
@@ -35,6 +36,7 @@ func TestFileSearchKinds(t *testing.T) {
 }
 
 func TestFileSearchCopiesDefaultsAndDeltas(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("4000000001", testkit.Sample("sample.same", "Same"))
 	e.WriteMod(filepath.Join(e.Game, "Mods", "Same"), testkit.Sample("sample.same", "Same"))
@@ -133,6 +135,7 @@ func TestFileSearchCopiesDefaultsAndDeltas(t *testing.T) {
 }
 
 func TestFileSearchCapAndRead(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	dir := e.AddWorkshop("4000000001", testkit.Sample("sample.cap", "Cap"))
 	path := filepath.Join(dir, "Defs", "Many.xml")
@@ -183,6 +186,7 @@ func TestFileSearchCapAndRead(t *testing.T) {
 }
 
 func TestFileSearchCoreAndStop(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddEnv(false)
 	e.MustRun("scan")
@@ -235,6 +239,7 @@ func TestFileSearchCoreAndStop(t *testing.T) {
 }
 
 func TestFileSearchStreamsBeforeDecompilingAndRetainsOrder(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("4000000001", testkit.Mod{PackageID: "sample.alpha", Name: "Alpha", Files: map[string]string{"Defs/a.xml": "<x>needle</x>", "Assemblies/A.dll": "synthetic assembly"}})
 	e.AddWorkshop("4000000002", testkit.Mod{PackageID: "sample.beta", Name: "Beta", Files: map[string]string{"Defs/b.xml": "<x>needle</x>"}})
@@ -280,6 +285,7 @@ func TestFileSearchStreamsBeforeDecompilingAndRetainsOrder(t *testing.T) {
 }
 
 func TestFileSearchCachedSourceAppearsBeforeMissingProject(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("4000000001", testkit.Mod{PackageID: "sample.missing", Name: "Alpha missing", Files: map[string]string{"Assemblies/A.dll": "missing code"}})
 	e.AddWorkshop("4000000002", testkit.Mod{PackageID: "sample.cached", Name: "Zulu cached", Files: map[string]string{"Assemblies/Z.dll": "cached code"}})
@@ -332,6 +338,7 @@ func TestFileSearchCachedSourceAppearsBeforeMissingProject(t *testing.T) {
 }
 
 func TestFileSearchLinkedEscape(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	dir := e.AddWorkshop("4000000001", testkit.Sample("sample.link", "Link"))
 	e.AddEnv(false)

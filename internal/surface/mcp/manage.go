@@ -2,30 +2,31 @@ package mcp
 
 import "fmt"
 
-// The tools for player actions that already had a CLI command but no tool (05 §1.2):
+// The tools for player actions that already had a CLI command but no tool (13 §1.2):
 // packs, ignoring problems, identity answers, scan, list exchange, user rules, hidden mods
 // and maintenance. Each one still maps to exactly one CLI argv.
 
 // openWorld names the tools that may reach the network: the Workshop page (describe), a
 // Workshop collection (exchange_list), the community data download (maintenance) and the
-// subscription sources (manage_subscriptions: Git hosts, download pages, Steam).
-var openWorld = map[string]bool{"get_description": true, "exchange_list": true, "maintenance": true, "manage_subscriptions": true}
+// subscription sources (manage_subscriptions: Git hosts, download pages, Steam) and a
+// save fix's Workshop subscriptions (manage_saves: the Steam Web API and Steam).
+var openWorld = map[string]bool{"get_description": true, "exchange_list": true, "maintenance": true, "manage_subscriptions": true, "manage_saves": true}
 
 func manageTools() []tool {
 	return []tool{
-		reg("check_links", true, false, descCheckLinks, func(in LinksCheckIn) []string { return argv("links", "check").flag("all", in.All).flag("json", true).a }),
-		reg("repair_links", false, true, descRepairLinks, LinksRepairArgv),
+		reg("check_links", true, false, descCheckLinks, func(in LinksCheckIn) []string { return argv("links", "check").flag("all", in.All).flag("json", true).a }).allOnly(),
+		reg("repair_links", false, true, descRepairLinks, LinksRepairArgv).allOnly(),
 		reg("test_run", false, false, descTestRun, TestRunArgv),
-		reg("estimate_memory", true, false, descMemory, MemoryArgv),
+		reg("estimate_memory", true, false, descMemory, MemoryArgv).allOnly(),
 		reg("manage_rules", false, false, descRules, func(in RuleIn) []string { return RulesArgv(in) }),
 		reg("ignore_problem", false, false, descIgnore, func(in IgnoreIn) []string { return IgnoreArgv(in) }),
-		reg("mute_version_warnings", false, false, descVersionMute, VersionMuteArgv),
+		reg("mute_version_warnings", false, false, descVersionMute, VersionMuteArgv).allOnly(),
 		reg("scan", false, false, descScan, func(in ScanIn) []string { return argv("scan").flag("full", in.Full).a }),
-		reg("exchange_list", false, false, descExchange, func(in ExchangeIn) []string { return ExchangeArgv(in) }),
-		reg("manage_packs", false, true, descPacks, func(in PackIn) []string { return PackArgv(in) }),
-		reg("resolve_identity", false, true, descIdentity, func(in IdentityIn) []string { return IdentityArgv(in) }),
-		reg("manage_hidden", false, true, descHidden, func(in HiddenIn) []string { return HiddenArgv(in) }),
-		reg("maintenance", false, true, descMaintenance, func(in MaintenanceIn) []string { return MaintenanceArgv(in) }),
+		reg("exchange_list", false, false, descExchange, func(in ExchangeIn) []string { return ExchangeArgv(in) }).allOnly(),
+		reg("manage_packs", false, true, descPacks, func(in PackIn) []string { return PackArgv(in) }).allOnly(),
+		reg("resolve_identity", false, true, descIdentity, func(in IdentityIn) []string { return IdentityArgv(in) }).allOnly(),
+		reg("manage_hidden", false, true, descHidden, func(in HiddenIn) []string { return HiddenArgv(in) }).allOnly(),
+		reg("maintenance", false, true, descMaintenance, func(in MaintenanceIn) []string { return MaintenanceArgv(in) }).allOnly(),
 	}
 }
 
@@ -33,11 +34,15 @@ type TestRunIn struct {
 	Env            string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Plan           string `json:"plan,omitempty" jsonschema:"plan name or plan:name (default: the environment's current plan)"`
 	Map            bool   `json:"map,omitempty" jsonschema:"load a quick test map instead of the main menu"`
+	Probe          string `json:"probe,omitempty" jsonschema:"probe mod folder: run a test map until its [Probe] RESULT line"`
+	ProbeAfter     string `json:"probe_after,omitempty" jsonschema:"packageId the probe follows (default: last)"`
+	ProbeBefore    string `json:"probe_before,omitempty" jsonschema:"packageId the probe precedes"`
 	TimeoutSeconds int    `json:"timeout_seconds,omitempty" jsonschema:"maximum run time in seconds (default 600)"`
 }
 
 func TestRunArgv(in TestRunIn) []string {
-	b := argv("test", "run").pos(in.Plan).flag("map", in.Map)
+	b := argv("test", "run").pos(in.Plan).flag("map", in.Map).
+		str("probe", in.Probe).str("probe-after", in.ProbeAfter).str("probe-before", in.ProbeBefore)
 	if in.TimeoutSeconds != 0 {
 		b.str("timeout", fmt.Sprintf("%ds", in.TimeoutSeconds))
 	}
@@ -50,7 +55,7 @@ func unknown(tool, action string) []string {
 
 // StatusArgv maps status: the overview, or one read-only page of RimArcho's own setup
 // (environments, shared mod folders, settings, community data, database, caches). Changing them is left to the
-// player (05 §1.2).
+// player (13 §1.2).
 func StatusArgv(in StatusIn) []string {
 	switch in.Show {
 	case "", "overview":
@@ -71,7 +76,7 @@ func StatusArgv(in StatusIn) []string {
 	return []string{"status: unknown show " + fmt.Sprintf("%q", in.Show)}
 }
 
-// RulesArgv maps manage_rules (and its old name add_rule): add by default.
+// RulesArgv maps manage_rules: add by default.
 func RulesArgv(in RuleIn) []string {
 	switch in.Action {
 	case "", "add":

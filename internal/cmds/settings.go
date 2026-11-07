@@ -8,9 +8,9 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
-// The database and the caches (06 §2.14): what the settings page shows, as commands.
+// The database and the caches (16 §2.14): what the settings page shows, as commands.
 func init() {
-	// where packs are kept (08 §5); "" is <data>/packs
+	// where packs are kept (10); "" is <data>/packs
 	freeKeys["pack.dir"] = struct {
 		def   string
 		check func(string) error

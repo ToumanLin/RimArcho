@@ -33,7 +33,7 @@ func waitBuildPage(t *testing.T, api *API, id uint64) (*view.BuildPage, error) {
 	return nil, fmt.Errorf("build page %d did not finish", id)
 }
 
-// 06 §3.1: a slow old reader cannot block input or replace the latest texture choice.
+// 16 §3.1: a slow old reader cannot block input or replace the latest texture choice.
 func TestBuildPageLatestMeasurementWins(t *testing.T) {
 	t.Parallel()
 	e, api, _ := fixture(t)

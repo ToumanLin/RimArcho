@@ -24,7 +24,7 @@ func ValidWorkshopID(id string) bool {
 }
 
 // FileEvidence distinguishes shared paths from shared content. Payload counts exclude
-// About/, routing metadata, empty files and repeated hashes (02 §5.1).
+// About/, routing metadata, empty files and repeated hashes (04 §2.1).
 type FileEvidence struct {
 	Paths, Contents, Changed          int
 	PayloadA, PayloadB, PayloadCommon int

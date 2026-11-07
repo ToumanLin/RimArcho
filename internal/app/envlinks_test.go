@@ -35,6 +35,18 @@ func TestEnvUseLinksLocalAndMonitorBeforeImport(t *testing.T) {
 	e, g2 := envLinksFixture(t)
 	before := e.ReadModsConfig()
 	main := active(t, e)
+	// No switch into a game that is running; the refused switch changes nothing checked below.
+	probe := e.App.GameProbe
+	e.App.GameProbe = func(root string) *app.GameRun {
+		if root == g2 {
+			return &app.GameRun{PID: 42}
+		}
+		return nil
+	}
+	if _, err := e.App.EnvUse("other"); err == nil || !strings.Contains(err.Error(), "running") {
+		t.Fatalf("switch to running game: %v", err)
+	}
+	e.App.GameProbe = probe
 	e.MustRun("env", "use", "other")
 	if got := active(t, e); !slices.Equal(got, main) {
 		t.Fatalf("switch lost installed mods: %v; want %v", got, main)
@@ -121,20 +133,6 @@ func TestEnvUseRollsBackFailedLinks(t *testing.T) {
 	}
 	if !source.HasAbout(filepath.Join(e.Game, "Mods", "B")) {
 		t.Fatal("rollback touched source files")
-	}
-}
-
-func TestEnvUseDoesNotLinkIntoRunningGame(t *testing.T) {
-	t.Parallel()
-	e, g2 := envLinksFixture(t)
-	e.App.GameProbe = func(root string) *app.GameRun {
-		if root == g2 {
-			return &app.GameRun{PID: 42}
-		}
-		return nil
-	}
-	if _, err := e.App.EnvUse("other"); err == nil || !strings.Contains(err.Error(), "running") {
-		t.Fatalf("switch to running game: %v", err)
 	}
 }
 

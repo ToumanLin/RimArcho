@@ -15,7 +15,7 @@ import (
 )
 
 func TestArrivalGroupNamesTheChange(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	for _, tc := range []struct {
 		name                     string
 		local, workshop, removed int
@@ -83,7 +83,7 @@ func TestArrivalGroupNamesTheChange(t *testing.T) {
 }
 
 func TestRemovedWorkshopSectionUsesInstalledCopiesAndSavedChecks(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("1001", testkit.Sample("test.removed", "Same name"))
 	e.AddWorkshop("1002", testkit.Sample("test.network", "Network failure"))

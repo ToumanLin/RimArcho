@@ -1,4 +1,4 @@
-// Package order sorts a Loadout under hard constraints (04 §5): official order, dependencies,
+// Package order sorts a Loadout under hard constraints (08 §1): official order, dependencies,
 // About.xml load rules, community rules and user rules, keeping the current relative order
 // wherever the constraints allow. Constraint cycles are reported, never broken silently.
 package order
@@ -35,14 +35,14 @@ type Node struct {
 	Decl      *scan.Decl
 }
 
-// Rule kinds (04 §6.1).
+// Rule kinds (08 §2.1).
 const (
 	RuleAfter        = "after"
 	RuleBefore       = "before"
 	RuleIncompatible = "incompatible"
 	RuleAttach       = "attach"
 	RuleIgnore       = "ignore"
-	RuleTop          = "top"    // A loads as early as its constraints allow (04 §5.5)
+	RuleTop          = "top"    // A loads as early as its constraints allow (08 §1.5)
 	RuleBottom       = "bottom" // A loads as late as its constraints allow
 )
 
@@ -54,17 +54,17 @@ type Rule struct {
 	Target string
 }
 
-// Community supplies community ordering rules by packageId (04 §6.3).
+// Community supplies community ordering rules by packageId (08 §2.3).
 type Community interface {
 	Rules(pkg string) (loadAfter, loadBefore []string)
 }
 
-// Positions is implemented by a Community that also has loadTop / loadBottom (04 §5.5).
+// Positions is implemented by a Community that also has loadTop / loadBottom (08 §1.5).
 type Positions interface {
 	Position(pkg string) Tier
 }
 
-// Tier is a preferred end of the list (04 §5.5). It only breaks ties between mods the
+// Tier is a preferred end of the list (08 §1.5). It only breaks ties between mods the
 // constraints leave free: it never overrides a constraint.
 type Tier int
 
@@ -103,6 +103,9 @@ type Input struct {
 	GameMM    string // "1.6": selects *ByVersion entries
 	Rules     []Rule
 	Community Community
+	// Replacements: for a required package no node has, the packageIds of nodes that replace
+	// it (Use This Instead, 08 §1.1). The dependency then orders after those.
+	Replacements map[string][]string
 }
 
 // Constraint kinds.
@@ -141,7 +144,7 @@ type Cycle struct {
 	Suggest int   // index into Edges of the edge suggested for an ignore rule; -1: none
 }
 
-// kindRank orders constraint kinds by how readily a cycle gives them up (04 §5.2): community
+// kindRank orders constraint kinds by how readily a cycle gives them up (08 §1.2): community
 // rules, loadAfter, the other About.xml load rules, dependencies, the official order, user
 // rules.
 func kindRank(k string) int {
@@ -285,8 +288,8 @@ type Result struct {
 	Cycles  []Cycle
 	Edges   []Edge
 	Ignored int       // edges removed by ignore rules
-	Dropped []Dropped // constraints not used because they cannot be satisfied (04 §5.1)
-	Anchors []Anchor  // loadTop / loadBottom requests (04 §5.5)
+	Dropped []Dropped // constraints not used because they cannot be satisfied (08 §1.1)
+	Anchors []Anchor  // loadTop / loadBottom requests (08 §1.5)
 }
 
 // Reasons a constraint is dropped.
@@ -338,7 +341,7 @@ func withVersion(base []string, byV map[string][]string, mm string) []string {
 	return out
 }
 
-// Sort computes the new order (04 §5.2).
+// Sort computes the new order (08 §1.2).
 func Sort(in Input) Result {
 	n := len(in.Nodes)
 	byPkg := map[string][]int{}
@@ -426,12 +429,10 @@ func Sort(in Input) Result {
 		if d == nil {
 			continue
 		}
-		deps := map[string]bool{}
-		for _, x := range d.Dependencies {
-			deps[strings.ToLower(x.PackageID)] = true
-		}
-		for _, x := range d.DependenciesByVersion["v"+in.GameMM] {
-			deps[strings.ToLower(x.PackageID)] = true
+		deps := map[string][]string{} // required package → its alternativePackageIds
+		for _, x := range append(slices.Clone(d.Dependencies), d.DependenciesByVersion["v"+in.GameMM]...) {
+			p := strings.ToLower(x.PackageID)
+			deps[p] = append(deps[p], pkgsOf(x.Alternatives)...)
 		}
 		depList := make([]string, 0, len(deps))
 		for p := range deps {
@@ -439,8 +440,24 @@ func Sort(in Input) Result {
 		}
 		sort.Strings(depList)
 		for _, p := range depList {
-			for _, j := range byPkg[p] {
-				add(j, i, Constraint{Kind: KindDependency, Owner: i, Field: "modDependencies", Target: p, Ref: DeclRef(nd.Lineage, "dependency", p)})
+			// The package itself; when no node has it, the first alternative some node has
+			// (the game's ModDependency.IsSatisfied), then its replacements. The reference
+			// stays the declared package, so one ignore rule covers every stand-in.
+			targets, target := byPkg[p], p
+			for _, alt := range deps[p] {
+				if len(targets) > 0 {
+					break
+				}
+				targets, target = byPkg[alt], alt
+			}
+			for _, r := range in.Replacements[p] {
+				if len(targets) > 0 {
+					break
+				}
+				targets, target = byPkg[r], r
+			}
+			for _, j := range targets {
+				add(j, i, Constraint{Kind: KindDependency, Owner: i, Field: "modDependencies", Target: target, Ref: DeclRef(nd.Lineage, "dependency", p)})
 			}
 		}
 		for _, f := range []struct {
@@ -559,7 +576,7 @@ func Sort(in Input) Result {
 	}
 	sort.Slice(res.Cycles, func(a, b int) bool { return slices.Min(res.Cycles[a].Members) < slices.Min(res.Cycles[b].Members) })
 
-	// loadTop / loadBottom (04 §5.5): a top mod pulls what it needs to the top, a bottom mod
+	// loadTop / loadBottom (08 §1.5): a top mod pulls what it needs to the top, a bottom mod
 	// pulls what needs it to the bottom. A component's tier breaks ties in the Kahn pick.
 	tier := tiers(in, &res, byLin, ignore, n)
 	ctier := make([]Tier, nComp)
@@ -635,7 +652,7 @@ func Sort(in Input) Result {
 	return res
 }
 
-// Place finds where newly enabled mods go (04 §2.1): in.Nodes[:n] is the current list,
+// Place finds where newly enabled mods go (07 §2.1): in.Nodes[:n] is the current list,
 // in order, and in.Nodes[n:] the new mods in the order given. The current list keeps its
 // order; each new mod goes right after the last enabled mod it must load after (never
 // ahead of the official content); with only mods that must load after it (a library, a

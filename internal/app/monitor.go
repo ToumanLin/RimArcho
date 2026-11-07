@@ -23,9 +23,8 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Archo Monitor (08 §9, 04 §1.5): RimArcho's in-game companion mod. It ships with RimArcho,
-// is copied into a RimArcho-managed folder, registered as an extra source (src:monitor),
-// reaches the game only through an _Archo_ link, and is added to plans right after Harmony.
+// Archo Monitor (19 §6, 07 §1.5): RimArcho's in-game companion mod, supplied by any
+// source. The bundled copy is installed as src:monitor; plans add Monitor after Harmony.
 
 const (
 	// MonitorPackage is Archo Monitor's packageId.
@@ -36,7 +35,7 @@ const (
 	MonitorNone   = "none"
 	monitorFolder = "ArchoMonitor-"
 	harmonyPkg    = "brrainz.harmony"
-	// MonitorAddOp names the default insertion in the plan's undo stack (04 §1.5).
+	// MonitorAddOp names the default insertion in the plan's undo stack (07 §1.5).
 	MonitorAddOp = "add Archo Monitor after Harmony (default; archo config set monitor.default off)"
 )
 
@@ -47,7 +46,7 @@ type MonitorBundled struct {
 	Dir, Version string
 }
 
-// MonitorDir is where installed monitor versions live (08 §9): config monitor.dir, else
+// MonitorDir is where installed monitor versions live (19 §6): config monitor.dir, else
 // %LOCALAPPDATA%\RimArcho\monitor, outside the data directory like the lock library.
 func (a *App) MonitorDir() string {
 	if v := a.Store.Meta("cfg:monitor.dir"); v != "" {
@@ -56,10 +55,10 @@ func (a *App) MonitorDir() string {
 	return filepath.Join(a.LocalDir(), "monitor")
 }
 
-// MonitorDefault reports whether the monitor is added to plans by default (04 §1.5).
+// MonitorDefault reports whether the monitor is added to plans by default (07 §1.5).
 func (a *App) MonitorDefault() bool { return a.Store.Meta("cfg:monitor.default") != "off" }
 
-// FindMonitor finds the bundled monitor (08 §9): RIMARCHO_MONITOR, monitor/ArchoMonitor next
+// FindMonitor finds the bundled monitor (19 §6): RIMARCHO_MONITOR, monitor/ArchoMonitor next
 // to the executable, or, in a development build, monitor/out/ArchoMonitor above the
 // executable or the working directory. tried lists the places looked at.
 func (a *App) FindMonitor() (b *MonitorBundled, tried []string) {
@@ -125,21 +124,22 @@ type MonitorInstance struct {
 	Version string
 }
 
-// monitorInstances are the environment's live monitor instances, newest first: those of
-// its monitor source with Archo Monitor's packageId.
+// monitorInstances are the environment's usable Monitor instances, newest first.
+// Workshop wins a version tie because it needs no Mods/ link (19 §6).
 func monitorInstances(ix *Index) []MonitorInstance {
-	src := monitorSourceOf(ix)
-	if src == nil {
-		return nil
-	}
 	var out []MonitorInstance
 	for _, m := range ix.Mods {
-		if m.SourceID != src.ID || m.Status != identity.Live || strings.TrimSuffix(strings.ToLower(m.PackageID), "_steam") != MonitorPackage {
+		if !IsMonitor(m) || m.Status != identity.Live || m.Residue || m.Unloadable != "" {
 			continue
 		}
-		out = append(out, MonitorInstance{Mod: m, Version: strings.TrimPrefix(m.Rel, monitorFolder)})
+		out = append(out, MonitorInstance{Mod: m, Version: strings.TrimSpace(m.Decl().ModVersion)})
 	}
-	sort.SliceStable(out, func(i, j int) bool { return CompareVersions(out[i].Version, out[j].Version) > 0 })
+	sort.SliceStable(out, func(i, j int) bool {
+		if cmp := CompareVersions(out[i].Version, out[j].Version); cmp != 0 {
+			return cmp > 0
+		}
+		return out[i].Mod.Kind == source.Workshop && out[j].Mod.Kind != source.Workshop
+	})
 	return out
 }
 
@@ -200,7 +200,7 @@ func CompareVersions(a, b string) int {
 	return strings.Compare(pa, pb)
 }
 
-// MonitorStatus is what `archo monitor` and `archo status` show (08 §9).
+// MonitorStatus is what `archo monitor` and `archo status` show (19 §6).
 type MonitorStatus struct {
 	Bundled   *MonitorBundled
 	Tried     []string
@@ -260,7 +260,7 @@ type MonitorPlanChange struct {
 	Reason string // why it was skipped
 }
 
-// MonitorResult is what one check did (08 §9 "when to check").
+// MonitorResult is what one check did (19 §6 "when to check").
 type MonitorResult struct {
 	DryRun     bool
 	Bundled    *MonitorBundled
@@ -277,7 +277,7 @@ type MonitorResult struct {
 }
 
 // EnsureMonitor installs or updates the bundled monitor for the current environment and
-// applies the default to its plans (08 §9, 04 §1.5). Without a bundled monitor it does
+// applies the default to its plans (19 §6, 07 §1.5). Without a bundled monitor it does
 // nothing to disk and only adds already installed monitors to plans.
 func (a *App) EnsureMonitor(dryRun bool) (*MonitorResult, error) {
 	r := &MonitorResult{DryRun: dryRun}
@@ -406,13 +406,13 @@ func (a *App) installMonitor(r *MonitorResult, b *MonitorBundled, dryRun bool) (
 			os.Rename(old, r.Target)
 			return false, err
 		}
-		os.RemoveAll(old) // RimArcho's own product (08 §9)
+		os.RemoveAll(old) // RimArcho's own product (19 §6)
 		return true, nil
 	}
 	return true, os.Rename(tmp, r.Target)
 }
 
-// registerMonitorSource adds src:monitor, a shared extra source (02 §0 item 10).
+// registerMonitorSource adds src:monitor, a shared extra source (03 §2 item 10).
 func (a *App) registerMonitorSource(ix *Index, dir string) error {
 	if err := a.checkRoots(dir); err != nil {
 		return err
@@ -429,7 +429,7 @@ func (a *App) registerMonitorSource(ix *Index, dir string) error {
 func monitorAddedKey(planID int64) string { return fmt.Sprintf("monitor.added:%d", planID) }
 
 // monitorPlan updates a plan's older monitor to the newest, or adds the monitor right after
-// Harmony once (04 §1.5). Each change is one undoable edit of that plan.
+// Harmony once (07 §1.5). Each change is one undoable edit of that plan.
 func (a *App) monitorPlan(ix *Index, p *store.Plan, newest MonitorInstance) (MonitorPlanChange, error) {
 	c := MonitorPlanChange{Plan: p.Name}
 	unlock, err := a.lockLaunch()
@@ -442,26 +442,37 @@ func (a *App) monitorPlan(ix *Index, p *store.Plan, newest MonitorInstance) (Mon
 		return c, err
 	}
 	list := loadout.Decode(ws.Entries)
-	for i, e := range list {
+	after := make(loadout.List, 0, len(list))
+	old, found := "", false
+	for _, e := range list {
 		m := ix.ByID[e.Instance]
-		if !IsMonitor(m) {
+		if !IsMonitor(m) && packageBase(strings.ToLower(e.Missing)) != MonitorPackage {
+			after = append(after, e)
 			continue
 		}
+		if !found {
+			if m != nil {
+				old = strings.TrimSpace(m.Decl().ModVersion)
+			}
+			after = append(after, loadout.Entry{Instance: newest.Mod.ID})
+			found = true
+		}
+	}
+	if found {
 		a.Store.SetMeta(monitorAddedKey(p.ID), "1")
-		if m.ID == newest.Mod.ID || m.SourceID != newest.Mod.SourceID {
+		if after.Equal(list) {
 			return c, nil
 		}
-		old := strings.TrimPrefix(m.Rel, monitorFolder)
-		if CompareVersions(old, newest.Version) >= 0 {
-			return c, nil
-		}
-		after := list.Clone()
-		after[i] = loadout.Entry{Instance: newest.Mod.ID}
 		op := fmt.Sprintf("update Archo Monitor %s → %s", old, newest.Version)
+		c.Change = fmt.Sprintf("updated %s → %s", old, newest.Version)
+		if old == newest.Version {
+			// Same version from another source, such as the subscribed Workshop copy.
+			op = fmt.Sprintf("use the %s copy of Archo Monitor %s", newest.Mod.Kind, old)
+			c.Change = fmt.Sprintf("now uses the %s copy", newest.Mod.Kind)
+		}
 		if err := a.editPlan(p, ws, list, after, op); err != nil {
 			return c, err
 		}
-		c.Change = fmt.Sprintf("updated %s → %s", old, newest.Version)
 		return c, nil
 	}
 	if a.Store.Meta(monitorAddedKey(p.ID)) != "" {
@@ -471,12 +482,12 @@ func (a *App) monitorPlan(ix *Index, p *store.Plan, newest MonitorInstance) (Mon
 		c.Reason = "monitor.default is off"
 		return c, nil
 	}
-	at, why := a.monitorSlot(ix, list)
+	at, why := a.monitorSlot(ix, list, newest.Mod)
 	if why != "" {
 		c.Reason = why
 		return c, nil
 	}
-	after := insert(list.Clone(), at, loadout.Entry{Instance: newest.Mod.ID})
+	after = insert(list.Clone(), at, loadout.Entry{Instance: newest.Mod.ID})
 	if err := a.editPlan(p, ws, list, after, MonitorAddOp); err != nil {
 		return c, err
 	}
@@ -487,7 +498,7 @@ func (a *App) monitorPlan(ix *Index, p *store.Plan, newest MonitorInstance) (Mon
 
 // monitorSlot is where the monitor goes in a list: right after Harmony. why says why it
 // cannot go in (no Harmony, Mods/ cannot hold links).
-func (a *App) monitorSlot(ix *Index, list loadout.List) (at int, why string) {
+func (a *App) monitorSlot(ix *Index, list loadout.List, monitor *store.Mod) (at int, why string) {
 	at = -1
 	for i, e := range list {
 		if m := ix.ByID[e.Instance]; m != nil && strings.TrimSuffix(strings.ToLower(m.PackageID), "_steam") == harmonyPkg {
@@ -498,8 +509,10 @@ func (a *App) monitorSlot(ix *Index, list loadout.List) (at int, why string) {
 	if at < 0 {
 		return -1, "no Harmony in the plan; Archo Monitor needs it"
 	}
-	if fs := a.modsVolumeFS(ix); noLinks(fs) {
-		return -1, fmt.Sprintf("Mods/ is on %s, which cannot hold the link Archo Monitor needs (08 §9)", fs)
+	if !gameVisible(monitor.Kind) {
+		if fs := a.modsVolumeFS(ix); noLinks(fs) {
+			return -1, fmt.Sprintf("Mods/ is on %s, which cannot hold the link Archo Monitor needs (19 §6)", fs)
+		}
 	}
 	return at, ""
 }
@@ -508,7 +521,7 @@ func (a *App) monitorSlot(ix *Index, list loadout.List) (at int, why string) {
 const MonitorAddUserOp = "add Archo Monitor after Harmony"
 
 // AddMonitor puts the newest installed Archo Monitor right after Harmony in the current
-// plan, as one undoable edit: the default insertion (04 §1.5) on the player's request, also
+// plan, as one undoable edit: the default insertion (07 §1.5) on the player's request, also
 // after they removed it. It returns the instance added.
 func (a *App) AddMonitor() (*store.Mod, error) {
 	var added *store.Mod
@@ -524,7 +537,7 @@ func (a *App) AddMonitor() (*store.Mod, error) {
 		if len(ms) == 0 {
 			return nil, nil, errors.New("Archo Monitor is not installed (archo monitor install)")
 		}
-		at, why := a.monitorSlot(st.Ix, l)
+		at, why := a.monitorSlot(st.Ix, l, ms[0].Mod)
 		if why != "" {
 			return nil, nil, errors.New(why)
 		}
@@ -564,7 +577,7 @@ func (a *App) editPlan(p *store.Plan, ws *store.Workspace, before, after loadout
 	return a.Store.EditWorkspace(ws, before.Encode(), op, nil)
 }
 
-// MonitorForNewPlan applies the default to a plan just created (04 §1.5): no install, no
+// MonitorForNewPlan applies the default to a plan just created (07 §1.5): no install, no
 // scan; only an installed monitor is added.
 func (a *App) MonitorForNewPlan(p *store.Plan) (string, error) {
 	ix, err := a.Index()
@@ -592,7 +605,7 @@ func (a *App) modsVolumeFS(ix *Index) string {
 	return f(dir)
 }
 
-// noLinks reports file systems without directory junctions (08 §3).
+// noLinks reports file systems without directory junctions (09 §3).
 func noLinks(fs string) bool {
 	switch strings.ToUpper(fs) {
 	case "FAT", "FAT12", "FAT16", "FAT32", "EXFAT":

@@ -36,8 +36,9 @@ func runLine(t *testing.T, m *model, line string) {
 
 func lineText(m *model) string { return string(m.cmdl.text) }
 
-// 06 §9.4: quotes keep spaces in one argument, backslashes stay (Windows paths), # is text.
+// 16 §9.4: quotes keep spaces in one argument, backslashes stay (Windows paths), # is text.
 func TestCmdLineWords(t *testing.T) {
+	t.Parallel()
 	for _, c := range []struct {
 		in   string
 		want []string
@@ -63,7 +64,7 @@ func TestCmdLineWords(t *testing.T) {
 	}
 }
 
-// 06 §9.4: tab completes command names, flags, mods, list names and setting values; several
+// 16 §9.4: tab completes command names, flags, mods, list names and setting values; several
 // candidates open the list, tab cycles, enter takes one without running, esc puts the word back.
 func TestCmdLineComplete(t *testing.T) {
 	t.Parallel()
@@ -156,7 +157,7 @@ func TestCmdLineComplete(t *testing.T) {
 	}
 }
 
-// 06 §9.4: a usage error does not run and keeps the line with the error; a line runs in the
+// 16 §9.4: a usage error does not run and keeps the line with the error; a line runs in the
 // background, one at a time; one line of output goes to the status line, more to a panel;
 // quotes make one argument.
 func TestCmdLineRun(t *testing.T) {
@@ -231,7 +232,7 @@ func TestCmdLineRun(t *testing.T) {
 	}
 }
 
-// 06 §9.4: ↑↓ go through the commands that ran, newest first, back to the typed line; the
+// 16 §9.4: ↑↓ go through the commands that ran, newest first, back to the typed line; the
 // history survives a restart and keeps one copy of each line.
 func TestCmdLineHistory(t *testing.T) {
 	t.Parallel()

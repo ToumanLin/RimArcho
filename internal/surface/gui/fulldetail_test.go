@@ -1,12 +1,14 @@
 package gui
 
-import "testing"
+import (
+	"testing"
 
-// 06 §4.2: the full detail's copies part is the mod's Lineage row as Mod library builds it,
+	"github.com/ToumanLin/RimArcho/internal/testkit"
+)
+
+// 16 §4.2: the full detail's copies part is the mod's Lineage row as Mod library builds it,
 // found by the instance id or a copy ref, with the op table its codes refer to.
-func TestModCopies(t *testing.T) {
-	t.Parallel()
-	_, api, _ := fixture(t)
+func modCopies(t *testing.T, _ *testkit.Env, api *API) {
 	var alpha string
 	for _, c := range api.Board().Cols {
 		for _, it := range c {

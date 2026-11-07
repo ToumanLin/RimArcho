@@ -5,14 +5,14 @@ import (
 	"strings"
 )
 
-// PlayerData is what the player attached to a lineage (04 §8.1).
+// PlayerData is what the player attached to a lineage (07 §6.1).
 type PlayerData struct {
 	Alias, Note string
 	Tags        []string
 }
 
 // PlayerDataAll returns every lineage's player data. It is global, like the lineages
-// (02 §0); envID is kept for the callers.
+// (03 §2); envID is kept for the callers.
 func (s *Store) PlayerDataAll(envID string) (map[string]*PlayerData, error) {
 	out := map[string]*PlayerData{}
 	get := func(lin string) *PlayerData {
@@ -108,3 +108,131 @@ func (s *Store) TagCounts(envID string) ([][2]string, error) {
 }
 
 var _ = sql.ErrNoRows
+
+// Tag notes and whole-tag edits (16 §2.9, Tag manager). Tags are global, like the
+// lineages; a tag's note is kept in tag_note, case-insensitive as lineage_tag is.
+
+func upgradeTagNotes(tx *sql.Tx, _ func(done, total int64)) error {
+	_, err := tx.Exec(`CREATE TABLE tag_note(tag TEXT PRIMARY KEY COLLATE NOCASE, note TEXT NOT NULL)`)
+	return err
+}
+
+// TagNotes returns every tag's note, by lower-cased tag.
+func (s *Store) TagNotes() (map[string]string, error) {
+	rows, err := s.DB.Query(`SELECT tag, note FROM tag_note`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var t, n string
+		if err := rows.Scan(&t, &n); err != nil {
+			return nil, err
+		}
+		out[strings.ToLower(t)] = n
+	}
+	return out, rows.Err()
+}
+
+// SetTagNote sets (or with "" clears) a tag's note.
+func (s *Store) SetTagNote(tag, note string) error {
+	tag, note = strings.TrimSpace(tag), strings.TrimSpace(note)
+	if note == "" {
+		_, err := s.DB.Exec(`DELETE FROM tag_note WHERE tag=?`, tag)
+		return err
+	}
+	_, err := s.DB.Exec(`INSERT INTO tag_note(tag, note) VALUES(?,?)
+		ON CONFLICT(tag) DO UPDATE SET tag=excluded.tag, note=excluded.note`, tag, note)
+	return err
+}
+
+// TagLineages returns, for every lineage carrying one of the tags, which of them it
+// carries (as stored).
+func (s *Store) TagLineages(tags []string) (map[string][]string, error) {
+	out := map[string][]string{}
+	for _, t := range tags {
+		rows, err := s.DB.Query(`SELECT lineage_id, tag FROM lineage_tag WHERE tag=?`, strings.TrimSpace(t))
+		if err != nil {
+			return nil, err
+		}
+		for rows.Next() {
+			var lin, tag string
+			if err := rows.Scan(&lin, &tag); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			out[lin] = append(out[lin], tag)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
+// MergeTags replaces the tags from with into on every lineage, in one transaction: a
+// lineage carrying any of from carries into afterwards. into may differ from a source only
+// in case (a rename). The notes of from are joined onto into's. It returns how many
+// lineages carried one of from.
+func (s *Store) MergeTags(from []string, into string) (int, error) {
+	return s.retag(from, strings.TrimSpace(into))
+}
+
+// DeleteTags removes the tags from every lineage, with their notes. It returns how many
+// lineages carried one of them.
+func (s *Store) DeleteTags(tags []string) (int, error) { return s.retag(tags, "") }
+
+func (s *Store) retag(from []string, into string) (int, error) {
+	lins, err := s.TagLineages(from)
+	if err != nil {
+		return 0, err
+	}
+	notes, err := s.TagNotes()
+	if err != nil {
+		return 0, err
+	}
+	var joined []string
+	seen := map[string]bool{}
+	addNote := func(t string) {
+		if n := notes[strings.ToLower(strings.TrimSpace(t))]; n != "" && !seen[n] {
+			seen[n] = true
+			joined = append(joined, n)
+		}
+	}
+	if into != "" {
+		addNote(into)
+	}
+	tx, err := s.DB.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	for _, t := range from {
+		t = strings.TrimSpace(t)
+		addNote(t)
+		if _, err := tx.Exec(`DELETE FROM lineage_tag WHERE tag=?`, t); err != nil {
+			return 0, err
+		}
+		if _, err := tx.Exec(`DELETE FROM tag_note WHERE tag=?`, t); err != nil {
+			return 0, err
+		}
+	}
+	if into != "" {
+		for lin := range lins {
+			if _, err := tx.Exec(`INSERT OR IGNORE INTO lineage_tag(environment_id, lineage_id, tag) VALUES(?,?,?)`, Shared, lin, into); err != nil {
+				return 0, err
+			}
+		}
+		if _, err := tx.Exec(`DELETE FROM tag_note WHERE tag=?`, into); err != nil {
+			return 0, err
+		}
+		if len(joined) > 0 {
+			if _, err := tx.Exec(`INSERT INTO tag_note(tag, note) VALUES(?,?)`, into, strings.Join(joined, "\n")); err != nil {
+				return 0, err
+			}
+		}
+	}
+	return len(lins), tx.Commit()
+}

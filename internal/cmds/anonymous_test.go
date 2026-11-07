@@ -15,6 +15,7 @@ type anonymousProc struct{}
 func (anonymousProc) Wait() error { return nil }
 
 func TestAnonymousConfigAndCLI(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	for _, value := range []string{"player", "anonymous", ""} {
 		e.MustRun("config", "set", "steamcmd.account", value)

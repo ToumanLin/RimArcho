@@ -19,19 +19,19 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 )
 
-// Mod library (06 §2.9): every mod on this machine for the environment, one Lineage with each
+// Mod library (16 §2.9): every mod on this machine for the environment, one Lineage with each
 // of its Instances, where it lives, how big it is, which plans and packs use it and what is
 // wrong with it. The interfaces (CLI `library`, MCP list_library, the GUI page, the TUI
 // list) all filter the same Library with the same LibQuery.
 
-// Library states, most important first: a row shows the first one it has (06 §2.9).
+// Library states, most important first: a row shows the first one it has (16 §2.9).
 const (
 	LibUnloadable   = "unloadable" // no readable About.xml (mod.unloadable)
 	LibMissing      = "missing"    // subscribed in the Workshop ACF, no folder on disk
 	LibIgnored      = "ignored"    // another copy with the same packageId wins (pkg.duplicate-installed)
 	LibResidue      = "residue"    // a Workshop folder that is no longer subscribed
-	LibHidden       = "hidden"     // About.xml renamed to About.xml.disabled by another manager (08 §6)
-	LibUpdated      = "updated"    // a locked version whose upstream changed (04 §7.3)
+	LibHidden       = "hidden"     // About.xml renamed to About.xml.disabled by another manager (09 §5)
+	LibUpdated      = "updated"    // a locked version whose upstream changed (07 §5.3)
 	LibSourceUpdate = "source-update"
 )
 
@@ -42,10 +42,10 @@ var LibStates = []string{LibUnloadable, LibMissing, LibIgnored, LibResidue, LibH
 const (
 	LibWorkshop = "workshop"
 	LibLocal    = "local"  // the game's Mods/
-	LibLocked   = "locked" // the lock library (04 §7)
+	LibLocked   = "locked" // the lock library (07 §5)
 	LibSteamCMD = "steamcmd"
 	LibExtra    = "extra"
-	LibMonitor  = "monitor" // Archo Monitor's folder (08 §9)
+	LibMonitor  = "monitor" // Archo Monitor's folder (19 §6)
 	LibGit      = "git"
 	LibPage     = "page"
 )
@@ -56,7 +56,7 @@ var LibSources = []string{LibWorkshop, LibLocal, LibLocked, LibSteamCMD, LibGit,
 // Library filter keys (LibQuery Include / Exclude are "key:value").
 var LibKeys = []string{"lists", "tag", "source", "location", "version", "state", "used", "updated", "content", "has", "name", "author", "id"}
 
-// LibAges are the updated: values (06 §2.9): within a week, a month, half a year, and
+// LibAges are the updated: values (16 §2.9): within a week, a month, half a year, and
 // older. They nest: a copy updated three days ago is in week, month and half-year.
 var LibAges = []string{"week", "month", "half-year", "older"}
 
@@ -110,8 +110,8 @@ type LibInstance struct {
 	UsedIn   []LibUse
 	Lists    []string // enabled-list names, shared with Library.Lists.ByInstance
 	InPlan   bool     // the current plan uses it
-	Staged   bool     // in the current plan's staging (06 §2.5)
-	// Played: the newest launch whose list held it (launch records, 08 §1).
+	Staged   bool     // in the current plan's staging (16 §2.5)
+	// Played: the newest launch whose list held it (launch records, 09 §1).
 	Played  time.Time
 	Changed time.Time // the newest scan that recorded a change
 	Locked  *Locked   // a locked version RimArcho made, with its upstream
@@ -448,7 +448,7 @@ func (a *App) buildLibrary(st *LoadoutState, only string, search, snapshot bool)
 		}
 		add(m, i)
 	}
-	// Subscribed Workshop items with no folder (06 §2.9: "missing Workshop items"). A tombstone of the item
+	// Subscribed Workshop items with no folder (16 §2.9: "missing Workshop items"). A tombstone of the item
 	// keeps its name and lineage.
 	for _, s := range ix.Sources {
 		if search || s.Kind != source.Workshop || s.Status == source.StatusRetired {
@@ -562,7 +562,7 @@ func sortUses(us []LibUse) {
 	})
 }
 
-// libEnv is an environment whose plans count: every one (02 §0 item 11). here maps an
+// libEnv is an environment whose plans count: every one (03 §2 item 11). here maps an
 // instance of its plans to the current environment's ("" none): a shared folder's instance
 // is the same in every environment; another environment's own Data/ and Mods/ are not this
 // game's, except for an environment made before migration v14 on the same game folder,
@@ -757,7 +757,7 @@ func (a *App) libPlayed(st *LoadoutState) (map[string]time.Time, error) {
 }
 
 // TagMatch: v names tag when, ignoring case, it starts at the beginning of one of the tag's
-// words (06 §3.7): "facial" finds "Facial Hair" and "Facial Animation", "anim" finds
+// words (16 §3.7): "facial" finds "Facial Hair" and "Facial Animation", "anim" finds
 // "Facial Animation"; "air" does not. The plan's search (view.TagMatch) and the library's
 // tag: filter share it.
 func TagMatch(tag, v string) bool {
@@ -777,7 +777,7 @@ func TagMatch(tag, v string) bool {
 // IsTagSep separates the words of a tag.
 func IsTagSep(c byte) bool { return c == ' ' || c == '-' || c == '_' || c == '/' || c == '.' }
 
-// ---- filtering (06 §2.9) ----
+// ---- filtering (16 §2.9) ----
 
 // LibQuery selects and orders the library: search words (all must match: names, package
 // id, authors, alias, tags, note, Workshop ID, folder), filters "key:value" (one key's
@@ -789,7 +789,7 @@ type LibQuery struct {
 	Sort             string
 }
 
-// LibSorts are the sort orders, by column (06 §2.9); a leading "-" reverses one. Each has
+// LibSorts are the sort orders, by column (16 §2.9); a leading "-" reverses one. Each has
 // its natural direction: names, sources, authors and tags A to Z; sizes biggest first;
 // dates and versions newest first; states most important first; used-in most used first.
 var LibSorts = []string{"name", "size", "changed", "played", "state", "source", "used", "updated", "version", "author", "tags"}
@@ -1426,7 +1426,7 @@ func (a *App) libSourceKinds(ix *Index) map[string]string {
 			srcKind[s.ID] = LibWorkshop
 		case s.Kind == source.SteamCMD:
 			srcKind[s.ID] = LibSteamCMD
-		case s.Kind == source.Local, s.Kind == source.Elsewhere: // every game's Mods/ (04 §1.7)
+		case s.Kind == source.Local, s.Kind == source.Elsewhere: // every game's Mods/ (07 §1.7)
 			srcKind[s.ID] = LibLocal
 		case a.IsLockSource(s):
 			srcKind[s.ID] = LibLocked

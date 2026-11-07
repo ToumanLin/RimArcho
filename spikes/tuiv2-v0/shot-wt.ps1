@@ -1,5 +1,5 @@
 # Screenshot of `archo tui` in a new Windows Terminal window (the player's terminal with
-# its default Cascadia Mono: compatibility mode, 06 §9.3). Only that window is closed again.
+# its default Cascadia Mono: compatibility mode, 16 §9.3). Only that window is closed again.
 #   pwsh -File shot-wt.ps1 -DataHome <copy> -Name v1v2-wt-compat [-Cols 160 -Rows 46]
 param([Parameter(Mandatory)] [string]$DataHome, [Parameter(Mandatory)] [string]$Name, [int]$Cols = 160, [int]$Rows = 46, [string]$Lang = "zh")
 $root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)

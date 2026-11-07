@@ -1,4 +1,4 @@
-// Package analyze builds the Def and Patch layers (03 §2, §5.1, §5.2): Def facts from each
+// Package analyze builds the Def and Patch layers (05 §2, §5.1, §5.2): Def facts from each
 // mod's effective Defs, and a load-order simulation of every PatchOperation against the
 // merged Defs document. It runs in the `archo analyze` child process; it knows nothing of
 // the store — the caller supplies the mods and persists the Output.
@@ -19,8 +19,8 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/xdoc"
 )
 
-// Version of the analyzers; facts written by another version are rebuilt (03 §2).
-const Version = 8 // 6: manual Harmony.Patch targets, HugsLib.dll in its own mod; 7: harmony.multi-transpiler is info; 8: a parent named by a mod-defined patch operation is not missing
+// Version of the analyzers; facts written by another version are rebuilt (05 §2).
+const Version = 10 // 6: manual Harmony.Patch targets, HugsLib.dll in its own mod; 7: harmony.multi-transpiler is info; 8: a parent named by a mod-defined patch operation is not missing; 9: asm.duplicate-name; 10: compiler-added types are not lost types
 
 // Mod is one installed instance.
 type Mod struct {
@@ -35,7 +35,7 @@ type Mod struct {
 	Pos      int // 1-based load position; 0 = inactive
 }
 
-// DefFact is one top-level Def (03 §2).
+// DefFact is one top-level Def (05 §2).
 type DefFact struct {
 	Instance string `json:"-"`
 	Type     string `json:"t"`
@@ -353,6 +353,7 @@ func Run(in Input) (*Output, error) {
 		}
 	}
 	out.Findings = append(out.Findings, harmonyFindings(active, out.Assemblies)...)
+	out.Findings = append(out.Findings, asmDuplicates(active, out.Assemblies)...)
 	out.Stats.HarmonyMs = time.Since(t2).Milliseconds()
 	out.Stats.TotalMs = time.Since(t0).Milliseconds()
 	in.progress("done: %d failed operations, %d findings, %v", out.Stats.Failed, len(out.Findings), time.Since(t0).Round(time.Millisecond))

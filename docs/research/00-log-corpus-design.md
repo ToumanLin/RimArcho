@@ -8,14 +8,14 @@
 RimArcho's judgments have so far been validated on only one real environment (the author's 485 Mods; see decisions-m2/m3):
 
 - Whether sorting constraints are reasonable and cycles common;
-- Whether finding catalog (03 §4.3) severities are appropriate;
-- How many real errors log attribution (03 §6) covers.
+- Whether finding catalog (05 §4.3) severities are appropriate;
+- How many real errors log attribution (06) covers.
 
 One environment is too small a sample. HugsLib's "share logs" feature has accumulated extensive real-player data, each containing both **load order** and **run results**, filling exactly this gap.
 
 Meanwhile, the agent diagnostic workflow (Diagnosis workflow in MCP `Instructions`, and the hotspot checklist attached to `analyze_log`) is handwritten from the old inspector skill's experience. It covers only a few error kinds (XML patches, cross-references, materials, `Pawn.Tick`). No data currently supports the distribution of real errors, common causes per kind, or effective fixes. The corpus can make this data-driven.
 
-This is **offline research**, not a product feature: RimArcho itself collects no data online, consistent with "only `data update` accesses the network" (04 §6.3).
+This is **offline research**, not a product feature: RimArcho itself collects no data online, consistent with "only `data update` accesses the network" (08 §2.3).
 
 ## 2. Data source: what a HugsLib log contains
 
@@ -47,7 +47,7 @@ In priority order. Each goal states the question, the part of RimArcho to improv
 ### G1 Log attribution: coverage and regression corpus (primary)
 
 - **Questions**: how many real errors can be attributed to specific Mods? Which kinds fail attribution? Are new error formats unrecognized?
-- **Improve**: parsing, classification, and attribution evidence in 03 §6.
+- **Improve**: parsing, classification, and attribution evidence in 06.
 - **Metrics**:
   - Error-cluster classification coverage (fraction other than `other`);
   - Attribution rate (fraction with at least one `source` role);
@@ -60,20 +60,20 @@ In priority order. Each goal states the question, the part of RimArcho to improv
   - How often do players' actual orders violate declared constraints (loadBefore/After, dependencies)? Do violations coincide with errors?
   - How many Mods would RimArcho's sorter move on real lists? Are results stable?
   - Which Mod pairs often co-occur with `patch-failed` errors? Can these yield candidate community rules or inferred constraints?
-- **Improve**: the sorter in 04 §5, plus `inferred` constraints and tiers discussed previously.
+- **Improve**: the sorter in 08 §1, plus `inferred` constraints and tiers discussed previously.
 - **Metrics**: violation rate, number of moves, count of constraint pairs co-occurring with errors.
 
 ### G3 Static Harmony analysis recall (secondary)
 
 - **Questions**: how many runtime-active Harmony patches does static scanning find? Are misses concentrated in manual `Harmony.Patch` (`harmony.manual`)?
-- **Improve**: `HarmonyPatch` facts in 03 §2 and 1.x "IL scan for manual Patch targets" in 01 §1.
+- **Improve**: `HarmonyPatch` facts in 05 §2 and 1.x "IL scan for manual Patch targets" in 01 §1.
 - **Metrics**: recall by method and Mod.
 - **Prerequisite**: corresponding-version DLLs locally (§5 L2).
 
 ### G4 Finding catalog severity calibration (secondary)
 
 - **Questions**: when static findings (`def.override`, `harmony.skip-prefix`, `patch.no-match`, etc.) appear, how often do corresponding errors actually occur in logs?
-- **Improve**: severity in 03 §4.3 and `confidence` values.
+- **Improve**: severity in 05 §4.3 and `confidence` values.
 - **Metrics**: fraction with a corresponding log error for each finding code.
 - **Prerequisite**: corresponding Mod files locally (§5 L2).
 
@@ -83,7 +83,7 @@ In priority order. Each goal states the question, the part of RimArcho to improv
   - What common patterns occur in real errors? What fraction is each? How much does the existing workflow cover?
   - What usually causes each pattern? Which diagnostic route applies (which MCP tools first)?
   - Which fixes work: disabling a Mod, reordering, adding dependencies, updating Mods, repairing patches in a local copy?
-- **Improve**: MCP `Instructions` diagnostic workflow, `analyze_log` checklist (03 §6.3), `suggestions` content.
+- **Improve**: MCP `Instructions` diagnostic workflow, `analyze_log` checklist (06 §3), `suggestions` content.
 - **Metrics**:
   - Pattern coverage: fraction of error clusters matching a known pattern (weighted by occurrence and by log separately);
   - Whether each pattern's "known fixes" have evidence (`Resolution` in §5 L1);
@@ -95,10 +95,10 @@ In priority order. Each goal states the question, the part of RimArcho to improv
 ### Non-goals
 
 - No model training or "automatic diagnostic AI". Patterns are data and clues for agents; reasoning remains with the agent in the harness (D6). RimArcho has no built-in LLM.
-- Pattern matching is not a conclusion. Matches are one piece of evidence, with source type `community` or `inferred`, still following 03 §4.2: "do not treat occurrence location as cause".
+- Pattern matching is not a conclusion. Matches are one piece of evidence, with source type `community` or `inferred`, still following 05 §4.2: "do not treat occurrence location as cause".
 - No public database or republication of logs.
 - No telemetry or automatic uploads in RimArcho.
-- No causal claims. All conclusions describe "correlation", consistent with 03 §4.2.
+- No causal claims. All conclusions describe "correlation", consistent with 05 §4.2.
 
 ## 4. Research questions and required data
 
@@ -140,7 +140,7 @@ Parse each log into a record:
 | `LogRecord` | gist ID, upload time, full and major/minor game version, HugsLib version, Harmony version, truncation flag, total lines, Mod-list hash |
 | `ModEntry` | Position, name, packageId, Mod version, assembly list (names, versions) |
 | `HarmonyEntry` | Target method, patch kind, patch source (Harmony ID / Mod) |
-| `ErrorCluster` | Normalized key (same as 03 §6.1), category, count, first line number, one sanitized sample, type frames in stack, Harmony patch lines in stack |
+| `ErrorCluster` | Normalized key (same as 06 §1), category, count, first line number, one sanitized sample, type frames in stack, Harmony patch lines in stack |
 | `StackShape` | For G5: exception type, innermost game method (e.g. `Verse.Pawn.Tick`), assembly owning innermost Mod frame, fingerprint of the frame sequence with Mod parts removed. Groups similar errors from different Mods into one generic pattern |
 | `Attribution` | RimArcho attribution for each cluster, evidence used, attribution engine version |
 | `Session` | Consecutive uploads by one player (§6.2). Record `ListDiff` between neighbors: added, removed, moved Mods, and version changes |
@@ -256,7 +256,7 @@ The pattern library is the most direct product output of this research. Integrat
 | New referenceable entity `pattern:<id>` | As with other references, inspect further in Inspect, CLI, MCP: matching rules, diagnostic route, fixes and evidence counts |
 | MCP `Instructions` | Rewrite workflow categories and checklists from actual pattern distribution, covering common patterns first |
 | `suggestions` | Turn fixes into executable commands, e.g. `archo disable #a3f9`, `archo rule add after …` |
-| Data distribution | As with community sorting rules, obtain through `archo data update`, recording dataset version (04 §6.3) |
+| Data distribution | As with community sorting rules, obtain through `archo data update`, recording dataset version (08 §2.3) |
 
 ## 10. Phases and open questions
 
@@ -267,7 +267,7 @@ The pattern library is the most direct product output of this research. Integrat
 | P0 feasibility | Validate §7 route A; fetch about 50 logs, record actual formats of three sections; roughly inspect repeat-upload share | `spikes/hugslogs/RESULT.txt`: bulk acquisition feasibility, format notes, whether enough `Session` records exist |
 | P1 corpus and G1/G2/G5 discovery | Fetch, parse, deduplicate, ingest locally; run existing attribution and sorter; cluster initial generic patterns by `StackShape`; extract `Resolution` from `Session`; finish labeled subset | G1/G2 metrics; initial pattern library and coverage; conclusions and improvements in `decisions-*.md` |
 | P2 local Mod library and G3/G4/G5 evaluation | packageId frequency; download frequent Mods; implement virtual environment; compare static analysis with runtime; build agent evaluation dataset | G3/G4 metrics; agent evaluation baseline |
-| P3 product integration | Integrate `analyze_log`, `pattern:` references, MCP `Instructions` per §9; compare before/after using evaluation dataset | New spec sections (03 §6, 05) |
+| P3 product integration | Integrate `analyze_log`, `pattern:` references, MCP `Instructions` per §9; compare before/after using evaluation dataset | New spec sections (06, 05) |
 
 At each phase end, record conclusions in `docs/decisions-*.md`, then decide whether to proceed.
 

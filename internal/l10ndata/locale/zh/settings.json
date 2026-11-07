@@ -1,4 +1,11 @@
 {
+  "Archo animation": "Archo 动画",
+  "Archo's figure while pages load and in the first-run guide; still uses no GPU": "页面加载和首次使用引导中的 Archo 形象；静态模式不使用 GPU",
+  "still": "静态",
+  "animated": "动态",
+  "update source": "更新来源",
+  "automatic": "自动",
+  "Download RimArcho %s, check it against its SHA-256 and replace the program files, then restart RimArcho. Your data is not changed.": "下载 RimArcho %s，核对 SHA-256 后替换程序文件，然后重启 RimArcho。你的数据不会改动。",
   "%d mods in its Data and Mods": "Data 和 Mods 里有 %d 个 Mod",
   "%d other RimArcho are open: the files are replaced once they close.": "另外 %d 个 RimArcho 开着：等它们都关掉后再替换文件。",
   "%s can be updated": "%s 可以更新",
@@ -38,6 +45,8 @@
   "The database upgrade did not finish.": "数据库升级没有完成。",
   "The database was upgraded in %.1f s.": "数据库升级完成，用时 %.1f 秒。",
   "The full text was too long for the link; RimArcho copied it. Paste it here.": "全文太长，放不进链接，RimArcho 已经复制好了，请粘贴在这里。",
+  "RimArcho could not open its database:\n%s": "RimArcho 无法打开它的数据库：\n%s",
+  "This database was made by a RimArcho development build from before 1.0, and this version cannot open it:\n%s\n\nMove or rename the file, then start RimArcho again to begin with a new database.": "这个数据库是 1.0 之前的 RimArcho 开发版建立的，当前版本无法打开：\n%s\n\n请移走或重命名这个文件，然后重新启动 RimArcho，就会建立新的数据库。",
   "Upgrading the RimArcho database (schema %d → %d)…": "正在升级 RimArcho 数据库（结构 %d → %d）…",
   "Upgrading the RimArcho database…": "正在升级 RimArcho 数据库…",
   "XML load error": "XML 加载错误",
@@ -242,5 +251,14 @@
   "what happened, and what you expected; steps to make it happen again help": "发生了什么，你希望怎样；能重现的话写下步骤",
   "write a title or what happened first": "先写标题或说明",
   "… %d more error groups": "…还有 %d 组报错",
-  "… %d more lines": "…还有 %d 行"
+  "… %d more lines": "…还有 %d 行",
+  "network": "网络",
+  "proxy": "代理",
+  "direct": "直连",
+  "through %s": "经由 %s",
+  "now: %s": "当前：%s",
+  "none: GitHub directly": "无：直连 GitHub",
+  "GitHub mirror": "GitHub 镜像",
+  "system follows the Windows proxy (Clash, v2rayN in system proxy mode); off goes direct; or a proxy such as http://127.0.0.1:7890 or socks5://127.0.0.1:7891": "system 跟随 Windows 代理（Clash、v2rayN 的系统代理模式）；off 直连；也可填代理地址，如 http://127.0.0.1:7890 或 socks5://127.0.0.1:7891",
+  "tried before GitHub for community data, updates and todds, e.g. https://gh-proxy.org/; empty goes to GitHub directly. Use one you trust: updates come through it": "社区数据、更新和 todds 先走镜像再走 GitHub，例如 https://gh-proxy.org/；留空则直连 GitHub。请使用可信的镜像：软件更新也经由它下载"
 }

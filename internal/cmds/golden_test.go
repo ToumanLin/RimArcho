@@ -28,7 +28,7 @@ var searchMSRe = regexp.MustCompile(`(files search [^\n]*, )[0-9]+ ms\)`)
 
 var msRe = regexp.MustCompile(`(active mods, )[0-9.]+(?:ms|s|µs)`)
 
-// cursorRe matches log cursors (03 §6.6): a checksum of the fixture log, whose paths vary.
+// cursorRe matches log cursors (06 §6): a checksum of the fixture log, whose paths vary.
 var cursorRe = regexp.MustCompile(`log1\.[0-9a-z]+\.[0-9a-f]{8}(?:\.[0-9a-z]+\.[0-9a-f]{8})?`)
 
 type step func(e *testkit.Env) []string
@@ -147,6 +147,7 @@ func populate(e *testkit.Env) {
 }
 
 func TestGoldenBasics(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	populate(e)
 	runGolden(t, "basics", e, []step{
@@ -168,6 +169,8 @@ func TestGoldenBasics(t *testing.T) {
 		cmd("mod", "pkg:tester.alpha"),
 		cmd("mod", "pkg:nope"),
 		cmd("mod", "Alpha"),
+		cmd("mod", "Tester.Alpha"),
+		cmd("mod", "khamenman.outfitstandsplus"),
 		cmd("changes"),
 		cmd("scan"),
 		cmd("changes"),
@@ -178,6 +181,7 @@ func TestGoldenBasics(t *testing.T) {
 }
 
 func TestGoldenLifecycle(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	populate(e)
 	e.AddEnv(true)
@@ -236,6 +240,7 @@ func TestGoldenLifecycle(t *testing.T) {
 }
 
 func TestGoldenRebind(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	populate(e)
 	e.AddEnv(false)
@@ -265,6 +270,7 @@ func TestGoldenRebind(t *testing.T) {
 }
 
 func TestGoldenLoadout(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	populate(e)
 	// X and Y declare loadAfter each other (S2); "Versioned" depends on Harmony.
@@ -322,9 +328,10 @@ func TestGoldenLoadout(t *testing.T) {
 	})
 }
 
-// Several plans per environment (04 §1, 05 §4.3): each has its own list, undo stack,
+// Several plans per environment (07 §1, 13 §4.3): each has its own list, undo stack,
 // versions and staging; switching writes no game file.
 func TestGoldenPlans(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	populate(e)
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "brrainz.harmony", "tester.alpha", "gone.mod")
@@ -377,6 +384,7 @@ func TestGoldenPlans(t *testing.T) {
 }
 
 func TestGoldenProblems(t *testing.T) {
+	t.Parallel()
 	e := problemsFixture(t)
 	firstRef := func(code string) step {
 		return func(e *testkit.Env) []string {
@@ -396,7 +404,7 @@ func TestGoldenProblems(t *testing.T) {
 	runGolden(t, "problems", e, []step{
 		cmd("status"),
 		cmd("problems"),
-		cmd("launch", "--dry-run"), // 08 §2: the problems that most often cause errors, not blocking
+		cmd("launch", "--dry-run"), // 09 §2: the problems that most often cause errors, not blocking
 		cmd("problems", "--code", "patch", "--detail"),
 		firstRef("dep.missing"),
 		cmd("def", "ThingDef/Shared_Gun"),
@@ -454,6 +462,7 @@ func problemsFixture(t *testing.T) *testkit.Env {
 }
 
 func TestGoldenMemory(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddEnv(false)
 	e.AddWorkshop("3101", testkit.Sample("tester.memory", "Memory fixture"))

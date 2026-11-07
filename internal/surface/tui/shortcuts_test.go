@@ -24,7 +24,7 @@ func cursorOn(t *testing.T, m *model, name string) {
 	t.Fatalf("no %s in the lists", name)
 }
 
-// 06 §3.5: ctrl+o opens the cursor's mod's folder, ctrl+w its Workshop page (the status
+// 16 §3.5: ctrl+o opens the cursor's mod's folder, ctrl+w its Workshop page (the status
 // line says when it has no Workshop ID), C the Updates page narrowed to its Lineage; the
 // same in Mod library.
 func TestShortcutsFolderWorkshopChanges(t *testing.T) {

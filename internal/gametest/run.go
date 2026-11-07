@@ -1,7 +1,8 @@
-// Package gametest runs RimWorld with isolated data and captures startup logs (08 §12).
+// Package gametest runs RimWorld with isolated data and captures startup logs (20 §2).
 package gametest
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -25,7 +26,10 @@ type Options struct {
 	// These three files are replaced on each run.
 	RunDir string
 	Map    bool
-	// Zero durations use defaults of 10m, 5s and 15s. Negative values are rejected.
+	// Probe: run a test map (Map is implied) with -probequit until the probe's RESULT or
+	// EXCEPTION line, then wait up to Settle for the game to quit by itself (20 §3).
+	Probe bool
+	// Zero durations use defaults of 10m, 5s (15s in a probe run) and 15s. Negative values are rejected.
 	Timeout, Settle, MapQuiet time.Duration
 	// ExtraArgs cannot override the managed data, log or quicktest arguments.
 	ExtraArgs []string
@@ -36,9 +40,9 @@ type Options struct {
 
 type Result struct {
 	Links        []*source.LinkInfo `json:"links,omitempty"`
-	Status       string             // menu, map, timeout, exited, start-failed or links-blocked
+	Status       string             // menu, map, probe, timeout, exited, start-failed or links-blocked
 	ExitCode     *int
-	LoadSeconds  float64 // launch to menu marker or confirmed map quiet period
+	LoadSeconds  float64 // launch to menu marker, confirmed map quiet period or the probe's last line
 	TotalSeconds float64
 	PeakMemoryMB int64
 	LogPath      string
@@ -47,7 +51,7 @@ type Result struct {
 	Waylith      bool
 }
 
-// Run waits for the menu or a quiet test map, then kills and reaps the process.
+// Run waits for the menu, a quiet test map or a probe's last line, then kills and reaps the process.
 // Timeout and early exit return a result with no error; cancellation returns ctx.Err().
 // Invalid options and setup failures return no result. Start failures return both.
 func Run(ctx context.Context, o Options) (result *Result, runErr error) {
@@ -57,7 +61,7 @@ func Run(ctx context.Context, o Options) (result *Result, runErr error) {
 	for _, arg := range o.ExtraArgs {
 		key, _, _ := strings.Cut(strings.ToLower(strings.TrimLeft(arg, "-/")), "=")
 		switch key {
-		case "savedatafolder", "logfile", "nofilelog", "quicktest":
+		case "savedatafolder", "logfile", "nofilelog", "quicktest", "probequit":
 			return nil, fmt.Errorf("gametest: extra argument %q overrides a managed option", arg)
 		}
 	}
@@ -86,8 +90,14 @@ func Run(ctx context.Context, o Options) (result *Result, runErr error) {
 	if o.Timeout == 0 {
 		o.Timeout = 10 * time.Minute
 	}
+	if o.Probe {
+		o.Map = true
+	}
 	if o.Settle == 0 {
 		o.Settle = 5 * time.Second
+		if o.Probe {
+			o.Settle = 15 * time.Second
+		}
 	}
 	if o.MapQuiet == 0 {
 		o.MapQuiet = 15 * time.Second
@@ -132,6 +142,9 @@ func Run(ctx context.Context, o Options) (result *Result, runErr error) {
 	}
 	if o.Map {
 		args = append(args, "quicktest")
+	}
+	if o.Probe {
+		args = append(args, ProbeQuit)
 	}
 	args = append(args, o.ExtraArgs...)
 	cmd := exec.Command(exe, args...)
@@ -205,25 +218,58 @@ func Run(ctx context.Context, o Options) (result *Result, runErr error) {
 	defer deadline.Stop()
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
-	var menuAt time.Time
-	var tail logTail
+	var menuAt, probeAt time.Time
+	tail := logTail{probe: o.Probe}
+	// probeEnded reads the log on and marks the run "probe" once the probe's last line is in it.
+	probeEnded := func(now time.Time) (bool, error) {
+		if !probeAt.IsZero() {
+			return true, nil
+		}
+		if err := tail.read(logPath, now); err != nil {
+			return false, err
+		}
+		if tail.probeEnd == "" {
+			return false, nil
+		}
+		probeAt = now
+		result.Status = "probe"
+		result.LoadSeconds = now.Sub(launch).Seconds()
+		return true, nil
+	}
 	for {
 		select {
 		case <-ctx.Done():
 			return result, errors.Join(ctx.Err(), stop())
 		case err := <-done:
-			result.Status = "exited"
 			var exitErr *exec.ExitError
 			if errors.As(err, &exitErr) {
 				err = nil
 			}
-			return result, errors.Join(ctx.Err(), finish(err))
+			err = finish(err) // flushes the 1.7 console log before the last read
+			result.Status = "exited"
+			if o.Probe {
+				// A probe quits right after its last line, often before the next sample.
+				ended, readErr := probeEnded(o.Now())
+				if ended {
+					result.Status = "probe"
+				}
+				err = errors.Join(err, readErr)
+			}
+			return result, errors.Join(ctx.Err(), err)
 		case <-deadline.C:
 			return result, errors.Join(ctx.Err(), stop())
 		case <-ticker.C:
 			sample()
 			now := o.Now()
-			if o.Map {
+			if o.Probe {
+				ended, err := probeEnded(now)
+				if err != nil {
+					return result, errors.Join(err, stop())
+				}
+				if ended && now.Sub(probeAt) >= o.Settle {
+					return result, errors.Join(ctx.Err(), stop())
+				}
+			} else if o.Map {
 				if err := tail.read(logPath, now); err != nil {
 					return result, errors.Join(err, stop())
 				}
@@ -259,6 +305,37 @@ type logTail struct {
 	lastWrite time.Time
 	marker    bool
 	pending   string
+	// probe: look for the probe's last line (20 §3) in whole lines; line holds the
+	// unfinished one, probeEnd is "result" or "exception" once it is found.
+	probe    bool
+	line     []byte
+	probeEnd string
+}
+
+// maxProbeLine bounds the unfinished line kept between reads; a longer line is dropped.
+const maxProbeLine = 64 << 10
+
+func (t *logTail) probeLines(chunk []byte) {
+	if t.probeEnd != "" {
+		return
+	}
+	t.line = append(t.line, chunk...)
+	for {
+		i := bytes.IndexByte(t.line, '\n')
+		if i < 0 {
+			break
+		}
+		if text, ok := ProbeLine(string(t.line[:i])); ok {
+			if end := ProbeEnd(text); end != "" {
+				t.probeEnd, t.line = end, nil
+				return
+			}
+		}
+		t.line = t.line[i+1:]
+	}
+	if len(t.line) > maxProbeLine {
+		t.line = nil
+	}
 }
 
 func (t *logTail) read(path string, now time.Time) error {
@@ -275,7 +352,7 @@ func (t *logTail) read(path string, now time.Time) error {
 		return err
 	}
 	if st.Size() < t.offset {
-		t.offset, t.pending, t.marker = 0, "", false
+		t.offset, t.pending, t.marker, t.line = 0, "", false, nil
 	}
 	if _, err := f.Seek(t.offset, io.SeekStart); err != nil {
 		return err
@@ -289,6 +366,9 @@ func (t *logTail) read(path string, now time.Time) error {
 			text := t.pending + string(buf[:n])
 			t.marker = t.marker || strings.Contains(text, mapMarker)
 			t.pending = text[max(0, len(text)-len(mapMarker)+1):]
+			if t.probe {
+				t.probeLines(buf[:n])
+			}
 		}
 		if err == io.EOF {
 			return nil

@@ -10,7 +10,7 @@ import (
 )
 
 // K12: a pack's links left in Mods/ while the pack is not played are a problem of the plan
-// with one fix that removes only the links (08 §5.3).
+// with one fix that removes only the links (10 §3).
 func TestPackLinksLeft(t *testing.T) {
 	t.Parallel()
 	e := packEnv(t)

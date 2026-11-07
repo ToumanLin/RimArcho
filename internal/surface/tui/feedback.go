@@ -31,7 +31,7 @@ var copyText = func(s string) error {
 	return c.Run()
 }
 
-// feedbackPanel is Settings > Feedback in the terminal (06 §2.14, §9): the same attachments as the
+// feedbackPanel is Settings > Feedback in the terminal (16 §2.14, §9): the same attachments as the
 // window, m / p / l tick them, the whole text below. s sends it through the feedback relay
 // (asked for the title, what happened and a contact on the input line; only when RimArcho
 // has a relay); enter opens GitHub with it filled in (the title and text are written there).

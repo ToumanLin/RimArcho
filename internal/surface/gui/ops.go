@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The plan editor's filter bar, the ops both pages share and the help per page (06 §2.5,
+// The plan editor's filter bar, the ops both pages share and the help per page (16 §2.5,
 // §2.9, §3.5, §8.5).
 
 // BarFilter is the editor's filter bar over Not enabled and Enabled: the rows that match, and the
@@ -115,7 +115,7 @@ func (s *API) OpPreview(code string, ids []string) (*view.Preview, error) {
 	return s.LibraryPreview(code, refs)
 }
 
-// Keys is the help of a page (`?`, 06 §3.5).
+// Keys is the help of a page (`?`, 16 §3.5).
 func (s *API) Keys(page string) []view.KeyRow { return view.KeyHelp(page, false) }
 
 // ModNote is a mod's own note (n).

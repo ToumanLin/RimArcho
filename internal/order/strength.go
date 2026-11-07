@@ -9,7 +9,7 @@ import (
 	"sync"
 )
 
-// Strength says how much breaking a constraint matters (04 §5.3). It comes from the log
+// Strength says how much breaking a constraint matters (08 §1.3). It comes from the log
 // corpus (docs/research/decisions-corpus.md §2): for every constraint that some shared log breaks,
 // how often either mod is an error source when the constraint is broken, against logs with
 // both mods that keep it (same pair, same list-size band). Kinds at 1.3 or more are strong.
@@ -150,7 +150,7 @@ type BrokenEdge struct {
 	Assessment
 }
 
-// Broken lists what the current order breaks and a sort puts right, strongest first (04 §5.3):
+// Broken lists what the current order breaks and a sort puts right, strongest first (08 §1.3):
 // the edges whose source comes after their target, left out when both ends are in one cycle
 // (the cycle reports those). Official content first is strong.
 func Broken(in Input, r Result) []BrokenEdge {

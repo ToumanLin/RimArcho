@@ -1,4 +1,4 @@
-// Can it run in the GUI (06 §2.4, §5; 06 §10 G29): the two columns, an item's buttons, the
+// Can it run in the GUI (16 §2.4, §5; 16 §10 G29): the two columns, an item's buttons, the
 // confirmation asked in the item and the done lines an action leaves.
 import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
@@ -154,4 +154,16 @@ test('a sort, which says nothing back, takes the status line as it is when the s
   assert.deepEqual(plain(c.N.done.map((d) => [d.id, d.text, d.undo])), [['b', 'sorted, 2 moved', true]]);
   assert.equal(c.N.before, null);
   assert.equal(c.N.ready, false);
+});
+
+test('a sort that makes the last run stale leaves no done lines on its cards', () => {
+  // VM round 2026-11-05: Sort put "sorted, …" with undo on all 13 last-run cards.
+  const c = layoutContext();
+  c.N.data = { items: [{ id: 'b', kind: 'order.violated', group: 0, section: 0, title: '7 mods are out of order' },
+    { id: 'log1', group: 3, section: 3, title: 'Furniture — 12 errors' }, { id: 'log2', group: 3, section: 3, title: 'Other — 1 error' }] };
+  c.orderNeeds();
+  c.snapshot();
+  c.actionDone();
+  c.settleDone({ items: [] });
+  assert.deepEqual(plain(c.N.done.map((d) => d.id)), ['b']);
 });

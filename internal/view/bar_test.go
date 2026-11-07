@@ -28,7 +28,7 @@ func barBoard() *Board {
 }
 
 // The bar filters Not enabled and Enabled together; values of one group are "or", groups "and",
-// a leading "-" leaves out (06 §2.5).
+// a leading "-" leaves out (16 §2.5).
 func TestFilterBoard(t *testing.T) {
 	t.Parallel()
 	b := barBoard()
@@ -123,7 +123,7 @@ func TestFilterBoardLocations(t *testing.T) {
 	t.Fatal("no location group")
 }
 
-// J / K while the bar filters: the rows trade places with the shown rows (06 §3.5).
+// J / K while the bar filters: the rows trade places with the shown rows (16 §3.5).
 func TestStepAt(t *testing.T) {
 	t.Parallel()
 	// 10 enabled mods; the bar shows 2, 5, 8, 9

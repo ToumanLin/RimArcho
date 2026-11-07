@@ -41,7 +41,7 @@ func plainLines(ls []dline) string {
 	return strings.Join(out, "\n")
 }
 
-// 06 §4.1: the default detail shows package id, version, Workshop id, tags, alias, note,
+// 16 §4.1: the default detail shows package id, version, Workshop id, tags, alias, note,
 // dependencies with their state, and the description; technical information is folded.
 func TestDetailContent(t *testing.T) {
 	e, _ := fixture(t)
@@ -135,7 +135,7 @@ func TestDetailContent(t *testing.T) {
 	}
 }
 
-// T13 (06 §11): # → enter gives the picked mods the second candidate; the same again
+// T13 (16 §11): # → enter gives the picked mods the second candidate; the same again
 // removes it ([✓]); a tag only some have shows as [~] and enter gives it to all; # ←
 // then typing makes a new tag. The list rows show tags faintly.
 func TestT13TagBar(t *testing.T) {
@@ -153,6 +153,11 @@ func TestT13TagBar(t *testing.T) {
 	if m.tags == nil || m.tags.sel != 0 {
 		t.Fatalf("# did not open the tag bar on the first candidate: %+v", m.tags)
 	}
+	// the selection's own tags come first: Alpha's "half" leads as [~half], then the pinned ones
+	if c := m.tags.cands; len(c) < 3 || c[0].tag != "half" || c[0].have != 1 || c[2].tag != "美化" {
+		t.Fatalf("candidates not own-first: %+v", c)
+	}
+	press(m, "right")
 	press(m, "right")
 	if bar := ansi.Strip(m.View()); !strings.Contains(bar, "✎ 输入…") && !strings.Contains(bar, "✎ type…") {
 		t.Fatalf("no input in the bar:\n%s", bar)
@@ -174,8 +179,10 @@ func TestT13TagBar(t *testing.T) {
 	if len(m.marked) != 2 {
 		t.Fatal("tagging dropped the selection")
 	}
-	press(m, "g")
-	press(m, "right")
+	press(m, "g") // [✓美化] is on both now, so it leads the bar and starts selected
+	if c := m.tags.cands; len(c) == 0 || c[0].tag != "美化" {
+		t.Fatalf("the tag both have is not first: %+v", c)
+	}
 	if s := ansi.Strip(m.View()); !strings.Contains(s, "[✓美化]") {
 		t.Fatalf("no the checked Visuals tag:\n%s", s)
 	}
@@ -217,7 +224,7 @@ func TestT13TagBar(t *testing.T) {
 		t.Fatalf("esc removed the tag: %q", got)
 	}
 	c := &m.cols[cActive]
-	// 06 §3.8: rows carry no tags; they are in the detail and in search.
+	// 16 §3.8: rows carry no tags; they are in the detail and in search.
 	if row := ansi.Strip(m.drawRow(c, 0, true, 60)); strings.Contains(row, "official-stuff") {
 		t.Fatalf("a row shows its tag: %q", row)
 	}
@@ -262,7 +269,7 @@ func TestWrapKinsoku(t *testing.T) {
 	}
 }
 
-// 06 §4.2: the full-screen detail has Def, patches, Harmony, rules and the full history
+// 16 §4.2: the full-screen detail has Def, patches, Harmony, rules and the full history
 // as sub-sections, 1–5 jump to them; the column shows a one-line history.
 func TestFullSections(t *testing.T) {
 	t.Parallel()
@@ -288,7 +295,7 @@ func TestFullSections(t *testing.T) {
 			t.Fatalf("full detail lacks %q:\n%s", want, all)
 		}
 	}
-	// text names mods; only the Archo ID field shows the #ref (06 §4.1)
+	// text names mods; only the Archo ID field shows the #ref (16 §4.1)
 	all = regexp.MustCompile(`(?m)^\s*Archo ID .*$`).ReplaceAllString(all, "")
 	if strings.Contains(all, "#") && regexp.MustCompile(`#[a-z0-9]{4}\b`).MatchString(all) {
 		t.Fatalf("a #ref is shown:\n%s", all)
@@ -307,7 +314,7 @@ func TestFullSections(t *testing.T) {
 	}
 }
 
-// T7 (06 §11): a long description, a long path and mixed Chinese and English all wrap
+// T7 (16 §11): a long description, a long path and mixed Chinese and English all wrap
 // within the column at every width and in the full screen; only the column's
 // "enter shows all" may cut the text.
 func TestT7Wrapping(t *testing.T) {
@@ -349,6 +356,7 @@ func TestT7Wrapping(t *testing.T) {
 }
 
 func TestDetailTextOnly(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 160, 40)
 	press(m, "home")

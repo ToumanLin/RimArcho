@@ -2,21 +2,25 @@ package cmds
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/render"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Player data on lineages (04 §8.1, 05 §4.2): every instance of a lineage shares it.
+// Player data on lineages (07 §6.1, 13 §4.2): every instance of a lineage shares it.
 
 func init() {
 	register(&Command{Name: "alias", Args: "<ref> [<name>]", Summary: "set the name RimArcho shows for a mod (all its copies)", MinArgs: 1, MaxArgs: 2, Run: aliasCmd,
 		Flags: []Flag{{Name: "clear"}}})
 	register(&Command{Name: "note", Args: "<ref> [<text>]", Summary: "attach a plain-text note to a mod (all its copies), or with --copy to this copy only", MinArgs: 1, MaxArgs: 2, Run: noteCmd,
 		Flags: []Flag{{Name: "clear"}, {Name: "copy", Help: "this copy's own note (Mod library), not the mod's"}}})
-	register(&Command{Name: "tag", Args: "add|remove <ref> <tag…> | list", Summary: "tags for filtering (list --filter tag:<tag>)", MinArgs: 1, MaxArgs: -1, Run: tagCmd,
-		Flags: []Flag{{Name: "mod", Value: "<ref>", Multi: true, Help: "more mods to tag (add/remove)"}}})
+	register(&Command{Name: "tag", Args: "add|remove <ref> <tag…> | list | rename <tag> <new> | merge <tag…> --into <tag> | delete <tag…> | note <tag> [<text>]", Summary: "tags for filtering (list --filter tag:<tag>); rename, merge, delete and note apply to the tag on every mod", MinArgs: 1, MaxArgs: -1, Run: tagCmd,
+		Flags: []Flag{{Name: "mod", Value: "<ref>", Multi: true, Help: "more mods to tag (add/remove)"},
+			{Name: "into", Value: "<tag>", Help: "merge: the tag the others become (new or existing)"},
+			{Name: "dry-run", Help: "rename, merge, delete: show what would change"},
+			{Name: "clear", Help: "note: clear the tag's note"}}})
 }
 
 func playerTarget(c *Ctx, ref string) (*store.Mod, string, error) {
@@ -42,7 +46,7 @@ func noteCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	return setText(c, a, "note", c.App.Store.SetNote)
 }
 
-// copyNoteCmd sets one copy's own note (06 §2.9); the mod's note stays as it is.
+// copyNoteCmd sets one copy's own note (16 §2.9); the mod's note stays as it is.
 func copyNoteCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	v := ""
 	switch {
@@ -109,14 +113,29 @@ func tagCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	switch a.Pos[0] {
 	case "list":
-		ts, err := c.App.Store.TagCounts(ix.Env.ID)
+		all, err := TagList(c.App)
 		if err != nil {
 			return nil, err
 		}
+		var ts []TagInfo
+		for _, t := range all {
+			if t.N > 0 {
+				ts = append(ts, t)
+			}
+		}
+		slices.SortStableFunc(ts, func(x, y TagInfo) int { return strings.Compare(strings.ToLower(x.Tag), strings.ToLower(y.Tag)) })
 		d, root := render.New(fmt.Sprintf("tags: %d", len(ts)))
 		var rows [][]string
 		for _, t := range ts {
-			rows = append(rows, []string{t[0], t[1] + " mods"})
+			r := []string{t.Tag, render.Plural(t.N, "mod")}
+			var more []string
+			if t.Pinned {
+				more = append(more, "pinned")
+			}
+			if t.Note != "" {
+				more = append(more, "note: "+strings.ReplaceAll(t.Note, "\n", " / "))
+			}
+			rows = append(rows, append(r, strings.Join(more, "  ")))
 		}
 		root.AddColumns(rows)
 		if len(ts) == 0 {
@@ -124,8 +143,55 @@ func tagCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		root.Truncate(boolLimit(a, render.DefaultLimit), "")
 		if len(ts) > 0 {
-			d.AddNext("archo list --filter tag:" + ts[0][0])
+			d.AddNext("archo list --filter tag:" + quoteArg(ts[0].Tag))
 		}
+		return d, nil
+	case "rename":
+		if len(a.Pos) != 3 {
+			return nil, &UsageError{Msg: "tag rename <tag> <new name> [--dry-run]"}
+		}
+		e, err := RenameTag(c.App, a.Pos[1], a.Pos[2], a.Bool("dry-run"))
+		if err != nil {
+			return nil, err
+		}
+		return tagEditDoc(e, a.Bool("dry-run"), "renamed", fmt.Sprintf("%s → %s", e.From[0], e.Into)), nil
+	case "merge":
+		if len(a.Pos) < 2 || a.Str("into") == "" {
+			return nil, &UsageError{Msg: "tag merge <tag…> --into <tag> [--dry-run]"}
+		}
+		e, err := MergeTags(c.App, a.Pos[1:], a.Str("into"), a.Bool("dry-run"))
+		if err != nil {
+			return nil, err
+		}
+		return tagEditDoc(e, a.Bool("dry-run"), "merged", fmt.Sprintf("%s → %s", strings.Join(e.From, ", "), e.Into)), nil
+	case "delete":
+		if len(a.Pos) < 2 {
+			return nil, &UsageError{Msg: "tag delete <tag…> [--dry-run]"}
+		}
+		e, err := DeleteTags(c.App, a.Pos[1:], a.Bool("dry-run"))
+		if err != nil {
+			return nil, err
+		}
+		return tagEditDoc(e, a.Bool("dry-run"), "deleted", strings.Join(e.From, ", ")), nil
+	case "note":
+		v := ""
+		switch {
+		case len(a.Pos) == 2 && a.Bool("clear"):
+		case len(a.Pos) == 3:
+			v = a.Pos[2]
+		default:
+			return nil, &UsageError{Msg: "tag note <tag> <text> | tag note <tag> --clear"}
+		}
+		t, err := SetTagNote(c.App, a.Pos[1], v)
+		if err != nil {
+			return nil, err
+		}
+		if strings.TrimSpace(v) == "" {
+			d, _ := render.New("note cleared for tag " + t)
+			return d, nil
+		}
+		d, root := render.New("note set for tag " + t)
+		root.KV("note", strings.TrimSpace(v))
 		return d, nil
 	case "add", "remove":
 		if len(a.Pos) < 3 {
@@ -185,5 +251,30 @@ func tagCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		return d, nil
 	}
-	return nil, &UsageError{Msg: "tag add|remove <ref> <tag…> | tag list"}
+	return nil, &UsageError{Msg: "tag add|remove <ref> <tag…> | list | rename <tag> <new> | merge <tag…> --into <tag> | delete <tag…> | note <tag> [<text>]"}
+}
+
+// tagEditDoc reports a rename, merge or delete (or with dryRun what it would do).
+func tagEditDoc(e TagEdit, dryRun bool, verb, what string) *render.Doc {
+	head := fmt.Sprintf("tag %s: %s", verb, what)
+	if dryRun {
+		head = fmt.Sprintf("dry run, tag %s: %s", verb, what)
+	}
+	d, root := render.New(head)
+	mods, change, lose := render.Plural(e.Lineages, "mod"), "change", "lose the tag; their"
+	if e.Lineages == 1 {
+		change, lose = "changes", "loses the tag; its"
+	}
+	switch {
+	case e.Into == "":
+		root.KV("mods", fmt.Sprintf("%s %s files and lists are not touched", mods, lose))
+	case e.Both > 0:
+		root.KV("mods", fmt.Sprintf("%s %s to %s (%d already had it)", mods, change, e.Into, e.Both))
+	default:
+		root.KV("mods", fmt.Sprintf("%s %s to %s", mods, change, e.Into))
+	}
+	if dryRun {
+		root.KV("undo", "tag changes are not in the undo history")
+	}
+	return d
 }

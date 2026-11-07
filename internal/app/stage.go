@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Staging (06 §2.5, 04 §2.2): one list per plan, kept by RimArcho and never written to the
+// Staging (16 §2.5, 07 §2.2): one list per plan, kept by RimArcho and never written to the
 // game. A mod staged from the Loadout remembers where it was, so it can be put back:
 // its 1-based position then and the instance just before it (the anchor).
 //

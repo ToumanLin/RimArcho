@@ -24,7 +24,7 @@ func TestSaveDataArg(t *testing.T) {
 	}
 }
 
-// A running game is the environment's list or a pack (08 §5.3): by its -savedatafolder,
+// A running game is the environment's list or a pack (10 §3): by its -savedatafolder,
 // else by the launch records.
 func TestWhatRuns(t *testing.T) {
 	t.Parallel()

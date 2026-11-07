@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Background tasks (06 §2.16): Mod library's file and Steam actions run in app.Tasks' lanes, one item
+// Background tasks (16 §2.16): Mod library's file and Steam actions run in app.Tasks' lanes, one item
 // at a time, each item through the same single-item action as before (view.LibDo); the
 // window's own jobs (scan, analysis, packs, textures, downloads) report into the same
 // record. "tasks" events say the record changed (at most every 500 ms); a task of a lane
@@ -39,7 +39,7 @@ func (s *API) startTasks() {
 		if lane != app.LaneFiles {
 			return true
 		}
-		// a scan reads the folders the files lane moves: one waits for the other (06 §2.16)
+		// a scan reads the folders the files lane moves: one waits for the other (16 §2.16)
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		return !s.busy["scan"]
@@ -47,7 +47,7 @@ func (s *API) startTasks() {
 	ts.Changed = s.tasksChanged
 	ts.Ended = func(t app.Task) {
 		s.subRevision.Add(1)
-		if t.Lane == app.LaneSelf && !view.IsSettingTask(t.Kind) && t.Kind != view.TaskAccount && t.Kind != view.TaskSiteDownload && t.Kind != view.TaskCreditReplace {
+		if t.Lane == app.LaneSelf && !view.IsSettingTask(t.Kind) && t.Kind != view.TaskAccount && t.Kind != view.TaskSiteDownload && t.Kind != view.TaskCreditReplace && t.Kind != view.TaskTexClean {
 			return // its own event says how it ended
 		}
 		r := view.BuildTasks([]app.Task{t}, time.Now()).Rows[0]
@@ -93,7 +93,7 @@ func (s *API) taskItem(kind, ref string) error {
 	st, _ := a.Loadout()
 	_, err = view.LibDo(a, kind, []string{ref})
 	s.invalidateInventory()
-	// Steam out of reach: the Workshop page instead, as the action did before (06 §2.9)
+	// Steam out of reach: the Workshop page instead, as the action did before (16 §2.9)
 	var pages *view.OpenPages
 	if errors.As(err, &pages) {
 		for _, u := range pages.URLs {
@@ -325,6 +325,12 @@ func (s *API) beginSelf(kind, obj string, stop func() error) string {
 	return s.tasks.Begin(kind, obj, stop)
 }
 
+// failedText is a job's failure for the status line. It can arrive while the player does something
+// else, so it names the job as a task row does (16 §11 A12); the task record keeps the bare reason.
+func failedText(kind, obj, reason string) string {
+	return view.TaskStatus(view.TaskRow{Title: view.TaskTitle(kind), Obj: obj, Line: reason})
+}
+
 // endSelf ends it: done, or failed with the reason.
 func (s *API) endSelf(id string, err error, text string) {
 	if err != nil {
@@ -341,7 +347,7 @@ const steamChunk = 50
 // unsubscribe and resubscribe check every item and hand Steam 50 at a time. The rest (lock, move into the lock library…)
 // need a scan after each item to know the new copy, and go one by one.
 func (s *API) taskBatch(kind string, refs []string, b app.BatchCalls) bool {
-	if kind == view.OpSubRemove || kind == view.OpSubRemoveFast {
+	if kind == view.OpSubRemove || kind == view.OpSubRemoveFast || kind == view.OpSubUpdate {
 		s.filesMu.RLock()
 		defer s.filesMu.RUnlock()
 	}
@@ -352,6 +358,8 @@ func (s *API) taskBatch(kind string, refs []string, b app.BatchCalls) bool {
 		s.batchSteam(kind, refs, b)
 	case view.OpSubRemove, view.OpSubRemoveFast:
 		s.batchRemoveSubscriptions(kind, refs, b)
+	case view.OpSubUpdate:
+		s.batchUpdateSubscriptions(refs, b)
 	default:
 		return false
 	}
@@ -439,7 +447,7 @@ func (s *API) batchSteam(kind string, refs []string, b app.BatchCalls) {
 			return
 		}
 		if pages := view.SteamPages(kind, err); pages != nil {
-			// Steam out of reach: the Workshop pages instead, as before (06 §2.9); once
+			// Steam out of reach: the Workshop pages instead, as before (16 §2.9); once
 			if !opened {
 				for _, u := range pages.URLs {
 					s.open(u)
@@ -465,6 +473,35 @@ func (s *API) batchSteam(kind string, refs []string, b app.BatchCalls) {
 			}
 		}
 	}
+}
+
+// batchUpdateSubscriptions updates a task's subscriptions in one operation, so SteamCMD
+// downloads them in one run per content root instead of one run per item (11 §1).
+func (s *API) batchUpdateSubscriptions(refs []string, b app.BatchCalls) {
+	a, err := s.detachedReader()
+	if err != nil {
+		for i := range refs {
+			b.Done(i, err)
+		}
+		return
+	}
+	defer a.Close()
+	a.WorkspaceSnapshot()
+	st, _ := a.Loadout()
+	done := b.Done
+	b.Done = func(i int, err error) {
+		if err != nil {
+			err = errors.New(view.Humanize(st, err.Error()))
+		}
+		done(i, err)
+	}
+	op, err := a.UpdateSubscriptionsWith(refs, false, b)
+	if op == nil && err != nil {
+		for i := range refs {
+			b.Done(i, err)
+		}
+	}
+	s.invalidateInventory()
 }
 
 func (s *API) batchRemoveSubscriptions(kind string, refs []string, b app.BatchCalls) {

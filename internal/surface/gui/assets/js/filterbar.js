@@ -1,4 +1,4 @@
-// The filter bar (06 §2.5, §2.9): one component for the plan editor and Mod library > All.
+// The filter bar (16 §2.5, §2.9): one component for the plan editor and Mod library > All.
 // One row: the query (grey completion, Tab takes it) and a "filter" toggle (also `\`).
 // Clicked conditions edit the same query. Open, it shows lists, tags, source and content:
 // the values most used first with their counts, then a button to expand the rest. A left
@@ -27,7 +27,9 @@ export function createBar(opts) {
   const box = el("div", "fbar-search");
   const inp = el("input");
   inp.spellcheck = false;
-  inp.placeholder = opts.placeholder || T("search");
+  // placeholder: a string, or a function so it follows a language change
+  const placeholder = () => (typeof opts.placeholder === "function" ? opts.placeholder() : opts.placeholder) || T("search");
+  inp.placeholder = placeholder();
   const ghost = el("span", "fbar-ghost");
   ghost.append(el("span", "typed"), el("span", "sfx"));
   ghost.setAttribute("aria-hidden", "true");
@@ -38,7 +40,6 @@ export function createBar(opts) {
   box.append(popup);
   inp.setAttribute("role", "combobox");
   inp.setAttribute("aria-autocomplete", "both");
-  inp.setAttribute("aria-controls", listID);
   const clear = el("button", "fbar-clear", "×");
   clear.title = T("clear");
   clear.onclick = () => {
@@ -84,6 +85,7 @@ export function createBar(opts) {
     );
     choice = Math.min(choice, Math.max(0, candidates.length - 1));
     const visible = suggestOpen && !composing && document.activeElement === inp;
+    if (visible) inp.setAttribute("aria-controls", listID); else inp.removeAttribute("aria-controls");
     popup.hidden = !visible;
     inp.setAttribute("aria-expanded", String(visible));
     popup.replaceChildren();
@@ -139,7 +141,7 @@ export function createBar(opts) {
       ghost.lastChild.textContent = sfx;
       ghost.style.transform = `translateX(${-inp.scrollLeft}px)`;
     }
-    inp.placeholder = !ghost.hidden ? "" : opts.placeholder || T("search");
+    inp.placeholder = !ghost.hidden ? "" : placeholder();
     clear.hidden = !inp.value;
   }
   b.showGhost = showGhost;
@@ -346,7 +348,7 @@ export function createBar(opts) {
     }
   };
   // the open bar folds the moment the focus leaves it: a click elsewhere, tab, a key that
-  // moves the focus (06 §3.1 rule 8); what it filters stays in force on its one line
+  // moves the focus (16 §3.1 rule 8); what it filters stays in force on its one line
   const left = (t) =>
     b.open &&
     root.isConnected &&

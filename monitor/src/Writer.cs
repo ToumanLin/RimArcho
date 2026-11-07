@@ -13,7 +13,7 @@ namespace ArchoMonitor
         internal static readonly string[] Names = { "INFO", "WARNING", "ERROR" };
     }
 
-    // One distinct log entry (03 §6.7.3): the first line carries the details; later lines carry
+    // One distinct log entry (19 §4): the first line carries the details; later lines carry
     // the occurrences since the previous line (count) and the running total.
     internal sealed class Entry
     {
@@ -92,7 +92,7 @@ namespace ArchoMonitor
             }
         }
 
-        // Seen is the hot path (03 §6.7.2): one lookup of the exact text; a hit only counts.
+        // Seen is the hot path (19 §3): one lookup of the exact text; a hit only counts.
         internal static bool Seen(int level, string text)
         {
             lock (sync)
@@ -179,7 +179,7 @@ namespace ArchoMonitor
         }
 
         // FlushDirty writes the counts gained since the last line of each entry; a full file
-        // keeps them for the exit (03 §6.7.3).
+        // keeps them for the exit (19 §4).
         static void FlushDirty(bool closing)
         {
             if (full && !closing)
@@ -268,6 +268,90 @@ namespace ArchoMonitor
             }
         }
 
+        // WriteSettings writes the settings record (19 §2): one line, kind settings, with
+        // context.settings listing each Mod class's settings file.
+        internal static void WriteSettings(IList<SettingsFile> files)
+        {
+            var j = new Json().Head(DateTime.Now, "INFO", "[Archo Monitor] settings " + files.Count);
+            j.Str("details", "").Num("count", 1);
+            j.Raw("context").Open().Raw("settings").Arr();
+            foreach (var f in files)
+            {
+                j.Next().Open().Str("packageId", f.PackageId).Str("folder", f.Folder).Str("class", f.Class)
+                    .Str("file", f.File).Str("title", f.Title).Bool("stored", f.Stored).Close();
+            }
+            j.EndArr().Close().Kind("settings");
+            lock (sync)
+            {
+                if (closed || w == null) return;
+                FlushDirty(true);
+                WriteLine(j.End(), force: true);
+                Flush();
+            }
+        }
+
+        // WriteSettingsWindow writes what a settings window drew when it opened (19 §2): one
+        // line, kind settings-window, with context.window naming the Mod's settings file and the
+        // controls in drawing order.
+        internal static void WriteSettingsWindow(SettingsFile f, IList<SettingsControl> controls)
+        {
+            var j = new Json().Head(DateTime.Now, "INFO", "[Archo Monitor] settings window " + f.Title);
+            j.Str("details", "").Num("count", 1);
+            j.Raw("context").Open().Raw("window").Open().Str("packageId", f.PackageId).Str("folder", f.Folder).Str("class", f.Class)
+                .Str("file", f.File).Str("title", f.Title).Bool("full", controls.Count < SettingsWindow.MaxControls);
+            j.Raw("controls").Arr();
+            foreach (var c in controls)
+            {
+                j.Next().Open().Str("kind", c.Kind);
+                if (!string.IsNullOrEmpty(c.Label)) j.Str("label", c.Label);
+                if (!string.IsNullOrEmpty(c.Value)) j.Str("value", c.Value);
+                if (!string.IsNullOrEmpty(c.Min)) j.Str("min", c.Min).Str("max", c.Max);
+                j.Close();
+            }
+            j.EndArr().Close().Close().Kind("settings-window");
+            lock (sync)
+            {
+                if (closed || w == null) return;
+                FlushDirty(true);
+                WriteLine(j.End(), force: true);
+                Flush();
+            }
+        }
+
+        // WriteHugsLib writes the HugsLib record (19 §2): one line, kind hugslib, with
+        // context.hugslib listing each settings pack and its settings.
+        internal static void WriteHugsLib(IList<HugsLibPack> packs)
+        {
+            var j = new Json().Head(DateTime.Now, "INFO", "[Archo Monitor] hugslib " + packs.Count);
+            j.Str("details", "").Num("count", 1);
+            j.Raw("context").Open().Raw("hugslib").Arr();
+            foreach (var p in packs)
+            {
+                j.Next().Open().Str("id", p.Id).Str("packageId", p.PackageId).Str("folder", p.Folder).Str("title", p.Title)
+                    .Bool("full", p.Handles.Count < HugsLibRecord.MaxHandles);
+                j.Raw("settings").Arr();
+                foreach (var h in p.Handles)
+                {
+                    j.Next().Open().Str("name", h.Name);
+                    if (!string.IsNullOrEmpty(h.Title)) j.Str("title", h.Title);
+                    if (!string.IsNullOrEmpty(h.Description)) j.Str("description", h.Description);
+                    j.Str("value", h.Value).Str("default", h.Default).Str("type", h.Type);
+                    if (h.Hidden) j.Bool("hidden", true);
+                    if (h.Choices != null) j.List("choices", h.Choices);
+                    j.Close();
+                }
+                j.EndArr().Close();
+            }
+            j.EndArr().Close().Kind("hugslib");
+            lock (sync)
+            {
+                if (closed || w == null) return;
+                FlushDirty(true);
+                WriteLine(j.End(), force: true);
+                Flush();
+            }
+        }
+
         // Close writes the remaining counts and the exit line (Application.quitting, ProcessExit).
         internal static void Close()
         {
@@ -347,6 +431,27 @@ namespace ArchoMonitor
         {
             sb.Append('}');
             first = false;
+            return this;
+        }
+
+        // Arr opens an array after Raw(key); Next separates its elements.
+        internal Json Arr()
+        {
+            sb.Append('[');
+            first = true;
+            return this;
+        }
+
+        internal Json EndArr()
+        {
+            sb.Append(']');
+            first = false;
+            return this;
+        }
+
+        internal Json Next()
+        {
+            Comma();
             return this;
         }
 

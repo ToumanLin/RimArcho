@@ -207,6 +207,43 @@ func (d *Data) Share(p *Pattern) float64 {
 	return 100 * float64(p.NClusters) / float64(d.Clusters)
 }
 
+// CommonShare: a kind of error seen in more than this share of the public logs is common
+// enough that, with nothing linking it to a mod, it is more likely background than the fault
+// a player or agent is looking for (MCP transcript review 2026-11-04, P2).
+const CommonShare = 0.05
+
+// LogShare is the share of the public logs that have the pattern, in percent.
+func (d *Data) LogShare(p *Pattern) float64 {
+	if d.Logs == 0 || p == nil {
+		return 0
+	}
+	return 100 * float64(p.Logs) / float64(d.Logs)
+}
+
+// Common reports a pattern seen in more than CommonShare of the public logs.
+func (d *Data) Common(p *Pattern) bool {
+	return p != nil && d.Logs > 0 && float64(p.Logs) > CommonShare*float64(d.Logs)
+}
+
+// CommonUnattributed is the label of a cluster that no attribution names a mod for and whose
+// generic (non-fallback) pattern is common: "common kind, no source found: this kind is in
+// 6.7% of public 1.6 logs". "" otherwise. Fallback patterns only name the class and say nothing.
+func (d *Data) CommonUnattributed(class, template string, attributed bool) string {
+	if attributed {
+		return ""
+	}
+	g := d.MatchCluster(class, template, nil).Generic
+	if !d.Common(g) {
+		return ""
+	}
+	return fmt.Sprintf("%s: this kind is in %.1f%% of public %s logs (%s)", CommonLabel, d.LogShare(g), d.Game, g.Ref())
+}
+
+// CommonLabel marks a common kind of error with no mod identified. It says what is known,
+// not that the cluster is background: in MCP eval round 2 the old "common, unattributed"
+// also marked the root cause of h1 and h5 and was read as "ignore" (P23).
+const CommonLabel = "common kind, no source found"
+
 // Seen says how often the pattern occurs: "22,998 of 40,326 public 1.6 logs".
 func (d *Data) Seen(p *Pattern) string {
 	return fmt.Sprintf("%s of %s public %s logs", Thousands(p.Logs), Thousands(d.Logs), d.Game)

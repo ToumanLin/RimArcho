@@ -27,10 +27,10 @@ func TestStyleRules(t *testing.T) {
 }
 
 func styleProblems(source string) []string {
-	// The Swiss-grid home design has its own sizes, rules and radii (06 §2.3, 06 §7.3).
+	// The Swiss-grid home design has its own sizes, rules and radii (16 §2.3, 16 §7.3).
 	// Only these three checks are exempt inside the explicit home section; side strips
 	// and token definitions still obey the shared rules. Keep offsets for diagnostics.
-	const homeStart = "/* home: special case, 06 §7.3 */"
+	const homeStart = "/* home: special case, 16 §7.3 */"
 	const homeEnd = "/* end home */"
 	start, end := strings.Index(source, homeStart), strings.Index(source, homeEnd)
 	var problems []string
@@ -214,10 +214,10 @@ func TestStyleRulesDetection(t *testing.T) {
 	}
 }
 
-// The exception must stop at its closing marker and must not bypass other rules (06 §7.3).
+// The exception must stop at its closing marker and must not bypass other rules (16 §7.3).
 func TestStyleRulesHomeException(t *testing.T) {
 	t.Parallel()
-	const start = "/* home: special case, 06 §7.3 */"
+	const start = "/* home: special case, 16 §7.3 */"
 	const end = "/* end home */"
 	const sizes = ".hm-example { font-size: 17px; font: 700 clamp(48px, 7.6vw, 124px)/1 sans-serif; border-top: 2px solid var(--fg); border-radius: 4px; }"
 	for _, tc := range []struct {
@@ -239,6 +239,49 @@ func TestStyleRulesHomeException(t *testing.T) {
 		}
 		if strings.Contains(tc.css, ".a {") && len(got) > 0 && !strings.Contains(got[0], ":4: font-size: 7px") {
 			t.Errorf("wrong source location after home exception: %v", got)
+		}
+	}
+}
+
+// An endless CSS animation makes WebView2 draw a frame on every refresh, about 5% of a
+// core at 60 Hz even for a 9-pixel dot (18, 2026-11-06). Endless animations are allowed
+// only on elements that exist while work runs; anything shown at rest stops after a few
+// iterations (the running-game dot blinks three times).
+var endlessWhileWorking = map[string]string{
+	".icon.spin svg":                      "spinner of a running operation",
+	".btn .ic.spin svg":                   "spinner of a running operation",
+	".bd-step.cur .n::after":              "pack build step in progress",
+	".skel .bar::after":                   "page skeleton while it loads",
+	".env-progress-bar > span":            "game environment work in progress",
+	".hm-go.switching::before":            "launch block while a list or game is applied",
+	".hm-go .bar::after":                  "launch block while a list or game is applied",
+	".prog .bar.busy i::after":            "task progress without a value",
+	".page-acts .chip.prob.updating .dot": "problems refresh or analysis running (needsWorkLocked)",
+}
+
+var cssRule = regexp.MustCompile(`([^{}]+)\{([^{}]*)\}`)
+
+func TestEndlessAnimationsOnlyWhileWorking(t *testing.T) {
+	t.Parallel()
+	b, err := fs.ReadFile(assets, "assets/style.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := cssComments.ReplaceAllString(string(b), "")
+	seen := map[string]bool{}
+	for _, m := range cssRule.FindAllStringSubmatch(src, -1) {
+		if !regexp.MustCompile(`animation(-iteration-count)?\s*:[^;]*\binfinite\b`).MatchString(m[2]) {
+			continue
+		}
+		sel := strings.Join(strings.Fields(m[1]), " ")
+		if _, ok := endlessWhileWorking[sel]; !ok {
+			t.Errorf("%s: endless animation on an element that may be shown at rest; stop it after a few iterations or list it in endlessWhileWorking with the work it shows", sel)
+		}
+		seen[sel] = true
+	}
+	for sel := range endlessWhileWorking {
+		if !seen[sel] {
+			t.Errorf("%s: listed in endlessWhileWorking but has no endless animation", sel)
 		}
 	}
 }

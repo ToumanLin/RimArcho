@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// PlanSources supplies the four starting points without changing the current list (06 §2.17).
+// PlanSources supplies the four starting points without changing the current list (16 §2.17).
 type PlanSources struct {
 	Copy     string          `json:"copy"`
 	Count    int             `json:"count"`
@@ -67,7 +67,7 @@ func (s *API) PlanSources(id int64) (*PlanSources, error) {
 }
 
 // withPlan opens an explicit management target while the API lock is held; the current
-// list (what launches) does not change. Failed edits reopen the previous list (06 §2.17).
+// list (what launches) does not change. Failed edits reopen the previous list (16 §2.17).
 func (s *API) withPlan(id int64, keep bool, run func() error) (err error) {
 	previous, err := s.a.CurrentPlan()
 	if err != nil {
@@ -89,7 +89,7 @@ func (s *API) withPlan(id int64, keep bool, run func() error) (err error) {
 	return run()
 }
 
-// CreatePlan copies the selected list, version or save and opens the resulting list (06 §2.17).
+// CreatePlan copies the selected list, version or save and opens the resulting list (16 §2.17).
 func (s *API) CreatePlan(source int64, name, from string) (done *PlanDone, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -104,7 +104,7 @@ func (s *API) CreatePlan(source int64, name, from string) (done *PlanDone, err e
 	return
 }
 
-// ImportPreviewFor compares with the selected list and restores the editor's list (06 §2.17).
+// ImportPreviewFor compares with the selected list and restores the editor's list (16 §2.17).
 type PlanImportPreview struct {
 	*view.ImportPreview
 	Request uint64 `json:"request"`
@@ -174,7 +174,7 @@ func (s *API) ImportAsPlanPreview(name string, request uint64, follow bool) (*Pl
 	return s.importAsPlan(name)
 }
 
-// ImportApplyTo edits the selected destination in one undoable step (06 §2.17).
+// ImportApplyTo edits the selected destination in one undoable step (16 §2.17).
 func (s *API) ImportApplyTo(id int64, merge bool) (text string, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

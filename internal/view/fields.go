@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// The detail's one field list (06 §4.1, §2.9): the plan editor's detail and a copy's
+// The detail's one field list (16 §4.1, §2.9): the plan editor's detail and a copy's
 // detail on Mod library show the same list, one row per field. In the window a value copies
 // itself when clicked ("copied"); Act is the row's own button.
 
@@ -33,6 +33,7 @@ const (
 	FieldLanguages = "languages"
 	FieldDeps      = "deps"
 	FieldConflicts = "conflicts"
+	FieldSettings  = "settings" // the Mod's settings files; the act opens Mod library › Mod settings
 )
 
 // Field acts: what the row's button does.
@@ -41,6 +42,8 @@ const (
 	ActURL    = "url"    // open the page
 	ActSteam  = "steam"  // Steam client page
 	ActTags   = "tags"   // edit (the tag bar)
+	// ActSettings opens Mod library › Mod settings at Target's files (16 §2.9)
+	ActSettings = "settings"
 )
 
 // Field is one row of the field list.
@@ -55,7 +58,8 @@ type Field struct {
 	Act     string        `json:"act,omitempty"`
 	ActAt   string        `json:"actLabel,omitempty"`
 	URL     string        `json:"url,omitempty"`
-	Extra   string        `json:"extra,omitempty"` // the alias's original name
+	Extra   string        `json:"extra,omitempty"`  // the alias's original name
+	Target  string        `json:"target,omitempty"` // the instance ActSettings opens
 	Actions []FieldAction `json:"actions,omitempty"`
 }
 
@@ -72,7 +76,7 @@ func workshopField(id string) Field {
 }
 
 // ModFields: Archo ID, package, location [open], Workshop [open], tags [edit], alias and
-// note when set, languages, dependencies, conflicts (06 §4.1).
+// note when set, languages, dependencies, conflicts (16 §4.1).
 func ModFields(a *app.App, st *app.LoadoutState, mod *store.Mod, d *DetailData) []Field {
 	fs := headFields(st, mod)
 	if a != nil {
@@ -108,15 +112,21 @@ func headFields(st *app.LoadoutState, mod *store.Mod) []Field {
 	return fs
 }
 
-// tailFields: languages, dependencies, conflicts.
+// tailFields: settings files, languages, dependencies, conflicts.
 func tailFields(a *app.App, st *app.LoadoutState, mod *store.Mod, d *DetailData) []Field {
 	var fs []Field
+	if st != nil {
+		if n, ok := app.StoredSettingsOf(st, mod); ok {
+			fs = append(fs, Field{Kind: FieldSettings, Label: T("mod settings"), Value: Tf("%d stored values", n),
+				Act: ActSettings, ActAt: T("open"), Target: mod.ID})
+		}
+	}
 	if a != nil && mod.SnapID != 0 {
 		if ls, err := a.Store.Languages(mod.SnapID); err == nil && len(ls) > 0 {
 			fs = append(fs, Field{Kind: FieldLanguages, Label: T("languages"), Value: strings.Join(ls, "  "), List: ls})
 		}
 	}
-	if deps := Deps(st, d); len(deps) > 0 {
+	if deps := Deps(a, st, d); len(deps) > 0 {
 		fs = append(fs, Field{Kind: FieldDeps, Label: T("requires"), Value: depNames(deps), Items: deps})
 	}
 	if cs := Conflicts(st, d); len(cs) > 0 {

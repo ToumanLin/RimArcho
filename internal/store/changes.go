@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// What the change history (06 §2.9) reads of stored snapshots: the declaration and Workshop
+// What the change history (16 §2.9) reads of stored snapshots: the declaration and Workshop
 // time of the two ends of a mod's changes, and their file lists.
 
 // SnapInfo is a stored snapshot's declaration and size.
@@ -61,7 +61,7 @@ type SnapFile struct {
 }
 
 // SnapshotFiles lists a snapshot's files keyed by lower-cased path (nil, nil when the
-// snapshot has none stored): its manifest rows and its block (02 §7), taken in path order as
+// snapshot has none stored): its manifest rows and its block (04 §4), taken in path order as
 // the rows alone were before v28, so paths that differ only in case resolve the same way.
 func (s *Store) SnapshotFiles(id int64) (map[string]SnapFile, error) {
 	rows, err := s.DB.Query(`SELECT rel_path, size, hash FROM snapshot_file WHERE snapshot_id=?`, id)

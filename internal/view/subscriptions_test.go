@@ -168,7 +168,7 @@ func TestSubscriptionsThreeSections(t *testing.T) {
 }
 
 func TestSubscriptionSourceStates(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e := testkit.New(t)
 	e.App.SteamCMDNoPath = true
 	e.WriteFile(filepath.Join(e.App.LocalDir(), "steamcmd", "steamcmd.exe"), "fixture executable")
@@ -256,7 +256,7 @@ func TestWorkshopFailureReasonsAndGrouping(t *testing.T) {
 	}
 }
 
-// open the source page (06 §2.9): two commits on GitHub / GitLab open their compare view; otherwise the
+// open the source page (16 §2.9): two commits on GitHub / GitLab open their compare view; otherwise the
 // repository or the download page.
 func TestSubscriptionSourceURL(t *testing.T) {
 	t.Parallel()

@@ -30,7 +30,7 @@ func items(refs ...string) []TaskItem {
 	return out
 }
 
-// One failure does not stop the task; every item keeps its result (06 §2.16).
+// One failure does not stop the task; every item keeps its result (16 §2.16).
 func TestTasksItemsGoOnAfterAFailure(t *testing.T) {
 	t.Parallel()
 	ts := OpenTasks(filepath.Join(t.TempDir(), "tasks.json"))

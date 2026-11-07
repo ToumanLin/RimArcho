@@ -1,4 +1,4 @@
-// Package loadout models the ordered mod list (04 §1.1–§3): entries, the game's registry of
+// Package loadout models the ordered mod list (07 §1.1–§3): entries, the game's registry of
 // loadable instances with its packageId tokens (`_steam`), resolution of ModsConfig.xml
 // entries, and diffs between lists.
 package loadout
@@ -13,7 +13,7 @@ import (
 )
 
 // Entry is one position of a Loadout: an Instance, or an entry that matched nothing
-// (kept, never silently dropped — 04 §4.2).
+// (kept, never silently dropped — 07 §4.2).
 type Entry struct {
 	Instance   string `json:"i,omitempty"`
 	Missing    string `json:"m,omitempty"`    // the token as found in ModsConfig.xml
@@ -85,7 +85,7 @@ type Candidate struct {
 	Lineage   string
 }
 
-// Registry mirrors ModLister.RebuildModList + TryAddMod (07 §7 item 5): official, then
+// Registry mirrors ModLister.RebuildModList + TryAddMod (17 §6 item 5): official, then
 // Mods/, then workshop, each in folder order. A workshop copy of a packageId already taken
 // by a non-workshop copy is registered as <pkg>_steam; any other duplicate is rejected.
 type Registry struct {
@@ -158,6 +158,14 @@ func (r *Registry) Known(id string) bool { _, ok := r.byID[id]; return ok }
 // Token is the ModsConfig.xml identifier of a registered instance ("" if not registered).
 func (r *Registry) Token(id string) string { return r.token[id] }
 
+// Folder is the folder name the game sees a candidate under ("" if it is none).
+func (r *Registry) Folder(id string) string {
+	if c := r.byID[id]; c != nil {
+		return c.Folder
+	}
+	return ""
+}
+
 // SamePackage returns the other candidates declaring id's packageId.
 func (r *Registry) SamePackage(id string) []*Candidate {
 	c := r.byID[id]
@@ -180,7 +188,7 @@ type Resolution struct {
 	Via      string // "id", "folder", "steam-suffix", "missing", "duplicate"
 }
 
-// Resolve maps one token per 04 §4.2: full id, then folder name, then id without _steam.
+// Resolve maps one token per 07 §4.2: full id, then folder name, then id without _steam.
 func (r *Registry) Resolve(token string) Resolution {
 	t := strings.ToLower(strings.TrimSpace(token))
 	if c := r.byToken[t]; c != nil {

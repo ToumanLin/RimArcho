@@ -2,9 +2,9 @@ package view
 
 import "github.com/ToumanLin/RimArcho/internal/app"
 
-// The key table (06 §3.5): the plan editor and Mod library > All share one, the page's own keys
+// The key table (16 §3.5): the plan editor and Mod library > All share one, the page's own keys
 // come after it, and `?` lists the keys of the page it is pressed on, the same for the GUI
-// and the TUI but for the few each writes in §8.5 and §9.1.
+// and the TUI but for the few each writes in 16 §8.5 and §9.1.
 
 // KeyRow is one line of the help: the keys and what they do.
 type KeyRow struct {
@@ -50,6 +50,12 @@ func KeyHelp(page string, tui bool) []KeyRow {
 				r("C", "this mod's changes"),
 				r("R", "rescan"),
 			)
+			if !tui { // the Tags view is the window's (16 §2.9)
+				out = append(out,
+					r("v", "every mod / group by tag"),
+					r("F2 / n / M / Del", "on a tag's group row: rename, note, merge, delete the tag"),
+				)
+			}
 		} else {
 			out = append(out,
 				r("space", "enable / disable; in staging, put back in the list"),
@@ -82,7 +88,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			}
 		}
 	}
-	// Management and its forms use native tab focus; esc closes the form (06 §2.17).
+	// Management and its forms use native tab focus; esc closes the form (16 §2.17).
 	if page == PagePlans {
 		out = append(out, r("↑↓", "pick a list"), r("enter", "edit"), r("n", "new / import"), r("i", "import"), r("F2", "rename"), r("D", "duplicate"), r("Delete", "delete…"), r("e", "export"), r("B", "create a pack"), r("esc", "close"), r("tab", "the next field or button"))
 	}
@@ -94,9 +100,9 @@ func KeyHelp(page string, tui bool) []KeyRow {
 	}
 	if page == ChangesPage {
 		if !tui {
-			out = append(out, r("+", "add a subscription"), r("K", "check for updates"), r("U", "update all"), r("u", "update"), r("1 / 2", "list / details"), r("tab / shift+tab", "the next field or button"))
+			out = append(out, r("+", "add a subscription"), r("K", "check for updates"), r("U", "update all"), r("u", "update"), r("1 / 2", "list / details"))
 		} else {
-			// 06 §9.1: the subscription actions, each a background task (06 §2.16)
+			// 16 §9.1: the subscription actions, each a background task (16 §2.16)
 			out = append(out,
 				r("+ / paste", "add a subscription"),
 				r("K", "check every source for updates (enter on a source: that one)"),
@@ -130,9 +136,11 @@ func KeyHelp(page string, tui bool) []KeyRow {
 		)
 	}
 	if page == PackPages {
+		out = append(out, r("↑↓ / enter", "the packs: move, open one"))
+		if tui {
+			out = append(out, r("tab / shift+tab", "the next / previous pack"))
+		}
 		out = append(out,
-			r("↑↓ / enter", "the packs: move, open one"),
-			r("tab / shift+tab", "the next / previous pack"),
 			r("L", "play the pack"),
 			r("e", "export the pack to a file"),
 			r("E", "export only its list, each mod with its version"),
@@ -167,7 +175,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("menu / shift+F10 / right click", "the row's menu: everything it can do"),
 		)
 	}
-	if page == RulesPage { // the TUI's Load-order rules screen (06 §9.1); the window's card has buttons
+	if page == RulesPage { // the TUI's Load-order rules screen (16 §9.1); the window's card has buttons
 		out = append(out,
 			r("↑↓ / PgUp PgDn / Home End", "move the cursor"),
 			r("a", "only the current list / all load-order rules"),
@@ -180,7 +188,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("esc", "close the form; back to the editor"),
 		)
 	}
-	if page == PageSearch { // Search files (06 §2.9)
+	if page == PageSearch { // Search files (16 §2.9)
 		out = append(out,
 			r("/  ctrl+f", "search"),
 			r("alt+c / alt+r", "case, regex"),
@@ -196,28 +204,46 @@ func KeyHelp(page string, tui bool) []KeyRow {
 			r("← →", "collapse / expand"),
 			r("ctrl+o", "open the folder"),
 		)
-		if !tui { // the terminal selects text itself (06 §3.1 rule 12)
+		if !tui { // the terminal selects text itself (16 §3.1 rule 12)
 			out = append(out, r("ctrl+c", "copy the path"))
 		}
 		out = append(out, r("esc", "stop the search; in the box: leave it"))
 	}
-	if !tui && (page == LibraryPage || page == "packs" || page == "textures") {
+	if page == PageModSettings && !tui { // Mod settings (16 §2.9); the TUI's is a panel
+		out = append(out,
+			r("↑↓ / j k / PgUp PgDn / Home End", "move the cursor; the values show the cursor's file"),
+			r("1 / 2", "focus the table / the values"),
+			r("ctrl+o", "open the Config folder"),
+		)
+	}
+	if page == PageSaves && !tui { // Saves (16 §2.11); the TUI has the saves commands
+		out = append(out,
+			r("/", "search colonies and saves; esc clears it"),
+			r("↑↓", "the previous / next save in the tree"),
+			r("← →", "fold / unfold the colony"),
+			r("enter", "the quick fix: launch, recycle or make a list (and analyse it when the save's Mods are not)"),
+			r("F2", "rename the save"),
+		)
+	}
+	if !tui && (page == LibraryPage || page == "packs" || page == "textures" || page == PageModSettings) {
 		out = append(out, r("s / < > =", "the headers: sort and columns; < > = changes or resets the sorted column's width"))
 	}
 	if page == "home" && !tui {
-		// The launch page has three numbered columns (06 §2.3).
+		// The launch page has three numbered columns (16 §2.3).
 		out = append(out, r("1–3", "focus the page's areas (the numbers in their headings)"),
 			r("w", "save the current list's edits to the game without launching (while there are any)"))
 	} else if page == "home" {
-		// The terminal's is one column: the current list and its launch key (06 §9.1).
+		// The terminal's is one column: the current list and its launch key (16 §9.1).
 		out = append(out, r("L / enter", "launch the game"),
 			r("w", "save the current list's edits to the game without launching (while there are any)"),
 			r("P", "lists"), r("esc", "back"))
 	} else if page != EditorPage && page != RulesPage { // Load-order rules is one list
 		out = append(out, r("1–9", "focus the page's areas (the numbers in their headings)"))
 	}
+	// The GUI's tab moves the focus on every page (it reaches the address copy buttons); the
+	// terminal's goes to the next sub-page (16 §3.5).
 	tabText := "next / previous page under the same sidebar entry"
-	if page == ChangesPage && !tui {
+	if !tui {
 		tabText = "the next field or button"
 	}
 	if page != RulesPage { // its tab is the form's (above)
@@ -239,7 +265,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 }
 
 // OpKeyed reports whether op code has a key of its own or is reachable from the row menu
-// (every op is: the menu lists the row's ops, 06 §3.1 rule 6).
+// (every op is: the menu lists the row's ops, 16 §3.1 rule 6).
 func OpKeyed(code string) bool {
 	o := OpOf(code)
 	return o.Code != "" && (o.Key != "" || o.Group > 0)

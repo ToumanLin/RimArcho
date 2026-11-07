@@ -1,6 +1,6 @@
 package app_test
 
-// Following a Steam Workshop collection (04 §9.6, C1–C4).
+// Following a Steam Workshop collection (07 §7.6, C1–C4).
 
 import (
 	"net/http"

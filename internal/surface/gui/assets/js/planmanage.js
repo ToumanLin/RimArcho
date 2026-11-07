@@ -1,8 +1,9 @@
+import { fieldError, fieldStatusError, progress } from "./feedbacksemantics.js";
 import { choiceControl } from "./choices.js";
-// Manage lists (06 §2.17): the sidebar's list › Manage lists. On the left every list of the game, on the
-// right the picked one: its game versions (04 §1.6), the Steam Workshop collections it
-// follows (04 §9.6) and how to share it (export, pack). The export is a sub-page of its own
-// (Library / Lists / <list> / export). Editing what a list holds stays in the editor (§2.5).
+// Manage lists (16 §2.17): the sidebar's list › Manage lists. On the left every list of the game, on the
+// right the picked one: its game versions (07 §1.6), the Steam Workshop collections it
+// follows (07 §7.6) and how to share it (export, pack). The export is a sub-page of its own
+// (Library / Lists / <list> / export). Editing what a list holds stays in the editor (16 §2.5).
 // Data: API.PlanManage (view.BuildPlanManage), API.PlanExport (view.BuildPlanExport).
 import { pathContent, copyablePath, editablePath } from "./fields.js";
 import { S, $, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
@@ -72,7 +73,7 @@ function draw(focus = "") {
   const d = M.data;
   const sc = S.screen === "plans" ? $("#screen") : openScreen("plans");
   const top = sc.scrollTop;
-  // the rows slide when their order changes (the current list first, 06 §2.17); where they
+  // the rows slide when their order changes (the current list first, 16 §2.17); where they
   // were is kept from the last drawing, as making a list current reads the page afresh
   const was = M.places && M.places.seq === S.screenSeq ? M.places.at : null;
   sc.innerHTML = "";
@@ -200,7 +201,7 @@ function renameField(p) {
   const inp = el("input", "xc-input pm-title-input");
   inp.value = p.name; inp.spellcheck = false;
   inp.setAttribute("aria-label", T("rename the list"));
-  const why = el("div", "plan-why"); why.setAttribute("role", "alert");
+  const why = el("div", "plan-why"); why.setAttribute("role", "alert"); fieldError(inp, why);
   let seq = 0, done = false;
   const check = async () => {
     const n = ++seq;
@@ -372,7 +373,7 @@ function newForm() {
   const label = el("label", "pm-field", T("new list name"));
   const name = el("input", "xc-input pm-name"); name.value = draft.name; name.spellcheck = false;
   label.append(name);
-  const why = el("div", "plan-why", draft.error || ""); why.setAttribute("role", "alert");
+  const why = el("div", "plan-why", draft.error || ""); why.setAttribute("role", "alert"); fieldError(name, why);
   // One main button: in an import it reads the content first (preview), then it creates.
   const main = button(T("create and edit"), "enter", () => go(), "primary", "create-plan");
   const active = () => M.draft === draft && M.form === form && M.creating && S.screen === "plans" && draft.env === game();
@@ -528,13 +529,19 @@ function inlineImport(draft, active, updateButtons) {
   text.placeholder = T("a share code (RC-…), a Steam Workshop collection link, a Rentry link, or a list copied from RimSort or RimCrow");
   text.setAttribute("aria-label", T("paste"));
   box.append(text);
-  const status = el("div", "pm-note", draft.importing ? T("reading the list…") : ""); status.setAttribute("role", "status");
-  const error = el("div", "plan-why", imp.error || ""); error.setAttribute("role", "alert");
+  const status = el("div", "pm-note", draft.importing ? T("reading the list…") : ""); status.setAttribute("role", draft.importing ? "progressbar" : "status");
+  const reading = value => {
+    status.textContent = value;
+    if (value) progress(status, status);
+    else { status.setAttribute("role", "status"); status.removeAttribute("aria-labelledby"); }
+  };
+  reading(status.textContent);
+  const error = el("div", "plan-why", imp.error || ""); error.setAttribute("role", "alert"); fieldError(text, error); fieldError(pickBtn, error);
   const preview = el("div", "pm-inline-preview");
   box.append(status, error, preview);
   function invalidate() {
     M.importSeq++; draft.importing = false; imp.preview = null; imp.error = "";
-    preview.replaceChildren(); status.textContent = ""; error.textContent = ""; updateButtons();
+    preview.replaceChildren(); reading(""); error.textContent = ""; updateButtons();
   }
   text.oninput = () => { imp.text = text.value; if (text.value && imp.path) { imp.path = ""; showFile(); } invalidate(); };
   async function read(kind, value, fileName) {
@@ -542,13 +549,13 @@ function inlineImport(draft, active, updateButtons) {
     const n = ++M.importSeq, env = S.envSeq;
     const current = () => active() && n === M.importSeq && env === S.envSeq;
     imp.preview = null; imp.error = ""; draft.importing = true;
-    preview.replaceChildren(); error.textContent = ""; status.textContent = T("reading the list…"); updateButtons();
+    preview.replaceChildren(); error.textContent = ""; reading(T("reading the list…")); updateButtons();
     try {
       const p = await api.ImportPreviewFor(selected(), kind, value);
       if (!current()) return;
       if (fileName) p.source = fileName;
       imp.preview = p; imp.kind = kind; imp.value = value; draft.importing = false;
-      status.textContent = ""; renderPreview(); updateButtons();
+      reading(""); renderPreview(); updateButtons();
       // the list's own title names the new list, unless the player named it
       const base = p.name || (fileName || (kind === "file" ? value : "")).replace(/^.*[\\/]/, "").replace(/\.[^.]*$/, "");
       if (base && !draft.nameTouched) {
@@ -557,7 +564,7 @@ function inlineImport(draft, active, updateButtons) {
       }
     } catch (e) {
       if (!current()) return;
-      draft.importing = false; imp.error = errText(e); error.textContent = imp.error; status.textContent = ""; updateButtons();
+      draft.importing = false; imp.error = errText(e); error.textContent = imp.error; reading(""); updateButtons();
     }
   }
   async function readFile(f) {
@@ -603,7 +610,7 @@ function inlineImport(draft, active, updateButtons) {
   return box;
 }
 
-// Leaving the page: transient reads stop; a draft the player never named goes (06 §2.17).
+// Leaving the page: transient reads stop; a draft the player never named goes (16 §2.17).
 export function abandon() {
   M.importSeq++; if (M.draft) M.draft.importing = false; C.seq++; C.slot = null; M.form = null; M.renaming = 0;
   if (M.creating && !named(M.draft)) { M.creating = false; S.listCreating = false; M.draft = null; }
@@ -631,7 +638,7 @@ function costSection(p) {
   if (C.page && !C.page.loading) showCost(C.page, p.id);
   else {
     const pending = el("div", "skel");
-    pending.setAttribute("aria-label", T("Loaded memory (estimate)"));
+    progress(pending, s.querySelector(".pm-sub"));
     pending.setAttribute("aria-busy", "true");
     pending.append(el("span", "bar"), el("span", "bar"));
     C.progress = el("div", "muted pm-note", C.page?.progress || "");
@@ -702,7 +709,7 @@ function showCost(p, id) {
   s.append(details);
 }
 
-// ---- game version (04 §1.6): one small button per version, the allowed ones raised ----
+// ---- game version (07 §1.6): one small button per version, the allowed ones raised ----
 
 function versions(p) {
   const s = section(T("game versions"));
@@ -711,6 +718,7 @@ function versions(p) {
   const on = p.versions.filter((c) => c.on).map((c) => c.v);
   for (const c of p.versions) {
     const b = el("button", "v" + (c.on ? " on" : ""), c.v);
+    b.setAttribute("aria-pressed", String(!!c.on));
     if (c.game) b.append(el("span", "cur"));
     b.dataset.envWrite = "plan-versions";
     b.title = c.tip;
@@ -745,7 +753,7 @@ async function setVersions(p, vs) {
   });
 }
 
-// ---- follows Steam collections (04 §9.6) ----
+// ---- follows Steam collections (07 §7.6) ----
 
 function follows(p) {
   const s = section(T("follows Steam collections"), p.follows.length ? String(p.follows.length) : "");
@@ -763,7 +771,7 @@ function follows(p) {
     go.disabled = true;
     say("busy", T("reading the collection…"));
     let t;
-    try { t = await api.PlanFollow(p.id, link, "add"); } catch (e) { go.disabled = false; return say("fail", errText(e)); }
+    try { t = await api.PlanFollow(p.id, link, "add"); } catch (e) { go.disabled = false; say("fail", errText(e)); fieldStatusError(inp, $("#status")); return; }
     await open();
     say("ok", t);
   };
@@ -873,7 +881,7 @@ function share(p) {
   return s;
 }
 
-// buildOf opens Create a pack (§2.6) for the list: it is opened first (the current list
+// buildOf opens Create a pack (16 §2.6) for the list: it is opened first (the current list
 // stays), and esc comes back here.
 async function buildOf(p) {
   if (!(await plans.openPlan(p.id))) return;
@@ -968,6 +976,7 @@ function drawExport() {
   const list = el("div", "fmts");
   d.formats.forEach((f, i) => {
     const b = el("button", "fmt" + (f.id === d.format ? " on" : ""));
+    b.setAttribute("aria-pressed", String(f.id === d.format));
     b.append(el("span", "rd"));
     const nm = el("span", "nm", f.name);
     if (i === 0) nm.append(el("small", "", T("recommended")));
@@ -1005,7 +1014,7 @@ function drawExport() {
 async function choose(id) {
   if (id === X.format) return;
   X.format = id;
-  document.querySelectorAll("#screen .fmt").forEach((b, i) => b.classList.toggle("on", X.data.formats[i].id === id));
+  document.querySelectorAll("#screen .fmt").forEach((b, i) => { const on = X.data.formats[i].id === id; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
   api.SetSetting(FORMAT_KEY, id).catch(() => {});
   let d;
   try { d = await api.PlanExport(X.id, id); } catch (e) { return say("fail", errText(e)); }

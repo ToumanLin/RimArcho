@@ -8,9 +8,9 @@ import (
 	"time"
 )
 
-// ModsConfigState is the write record of one user data folder's ModsConfig.xml (04 §4.3):
+// ModsConfigState is the write record of one user data folder's ModsConfig.xml (07 §4.3):
 // what RimArcho last wrote and last saw there, and who wrote it. Several environments can
-// share a folder (02 §2.4), so the record belongs to the folder, not to an environment.
+// share a folder (03 §3.4), so the record belongs to the folder, not to an environment.
 type ModsConfigState struct {
 	Written   []byte
 	Seen      []byte
@@ -97,7 +97,7 @@ func (s *Store) SetModsConfigState(envID string, st *ModsConfigState) error {
 	return s.SetModsConfigStateAt(s.envUserData(envID), st)
 }
 
-// LaunchRecord is one game launch (08 §1): a plan's (PlanID set) or a pack's (method
+// LaunchRecord is one game launch (09 §1): a plan's (PlanID set) or a pack's (method
 // "pack:<name>", no plan).
 type LaunchRecord struct {
 	ID          int64
@@ -125,7 +125,7 @@ func (s *Store) AddLaunchRecord(r *LaunchRecord) error {
 	return err
 }
 
-// AddLaunch records a game launch (08 §2); a launch that is not a pack's is attributed to
+// AddLaunch records a game launch (09 §2); a launch that is not a pack's is attributed to
 // the environment's current plan.
 //
 // Deprecated: use AddLaunchRecord with the plan, fingerprint and version.

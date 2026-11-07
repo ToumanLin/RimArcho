@@ -1,5 +1,5 @@
 // Package upgradewin shows a small native window while the database upgrades,
-// before the GUI window opens (02 §7, 06 §8.1).
+// before the GUI window opens (04 §4, 16 §8.1).
 package upgradewin
 
 import (

@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
-// Savings refer to the PNGs the pending conversion replaces (06 §2.13, 06 §3.9).
+// Savings refer to the PNGs the pending conversion replaces (16 §2.13, 16 §3.9).
 func TestTextureTableSortValues(t *testing.T) {
 	t.Parallel()
 	m := &app.TextureMod{Mod: &store.Mod{Name: "Alpha"}, Ref: "alpha", PNG: 10, PNGBytes: 9000,

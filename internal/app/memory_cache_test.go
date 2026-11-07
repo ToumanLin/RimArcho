@@ -13,6 +13,7 @@ import (
 )
 
 func TestMemoryEstimateCacheTracksPlanAndScan(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddEnv(false)
 	modDir := e.AddWorkshop("3101", testkit.Sample("tester.memory", "Memory"))

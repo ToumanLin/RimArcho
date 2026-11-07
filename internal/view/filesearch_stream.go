@@ -15,7 +15,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// These bounds keep retained results small relative to the 80 MB Go target (06 §10).
+// These bounds keep retained results small relative to the 80 MB Go target (16 §10).
 const FileSearchLineCap = 5000
 const FileSearchReadCap = 2 << 20
 const FileSearchViewCap = 1 << 20

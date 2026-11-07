@@ -17,7 +17,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The launch page's background (06 §2.3, §2.14): which image, how dark, how blurred and
+// The launch page's background (16 §2.3, §2.14): which image, how dark, how blurred and
 // where its focus is, kept as one GUI setting. The images are app.Backgrounds plus the
 // files the player picked; the page loads them from /bg, which serves only those.
 
@@ -90,7 +90,7 @@ func bgURL(b app.Background, thumb bool) string {
 	if thumb {
 		w = "thumb"
 	}
-	// A different game version can use the same package key (06 §2.14).
+	// A different game version can use the same package key (16 §2.14).
 	return "/bg?w=" + w + "&k=" + url.QueryEscape(b.Key) + "&v=" + bgRevision(b.Src)
 }
 

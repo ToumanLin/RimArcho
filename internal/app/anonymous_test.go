@@ -28,7 +28,8 @@ func TestSteamCMDAnonymousAndAccountPrecedence(t *testing.T) {
 			}
 			f := &fakeSteamCMD{lines: []string{"Connecting anonymously to Steam Public...OK", "ERROR! Failed to install app '294100' (No subscription)"}}
 			f.install(t, e)
-			_, err := e.App.FetchGame(app.DownloadSpec{Dir: filepath.Join(e.Root, "Game"), Account: tc.override}, nil)
+			dir := filepath.Join(e.Root, "Game")
+			_, err := e.App.FetchGame(app.DownloadSpec{Dir: dir, Account: tc.override}, nil)
 			if tc.want != "anonymous" && (len(f.args) < 4 || f.args[3] != tc.want) {
 				t.Fatalf("args %v, error %v", f.args, err)
 			}
@@ -39,6 +40,9 @@ func TestSteamCMDAnonymousAndAccountPrecedence(t *testing.T) {
 			if tc.want == "anonymous" {
 				if de.Kind != "anonymous-license" || !strings.Contains(de.Why(), "game folder") || len(f.args) != 0 {
 					t.Fatalf("%+v", de)
+				}
+				if _, err := os.Stat(dir); !os.IsNotExist(err) {
+					t.Fatal("anonymous request created game folder")
 				}
 			} else if de.Kind != "ownership" {
 				t.Fatalf("%+v", de)
@@ -55,22 +59,6 @@ func TestSteamCMDBadSavedAccountNeverStarts(t *testing.T) {
 	e.App.Store.SetMeta("cfg:steamcmd.account", "bad +quit")
 	if _, err := e.App.FetchGame(app.DownloadSpec{Dir: filepath.Join(e.Root, "Game")}, nil); err == nil || f.args != nil {
 		t.Fatalf("args %v, err %v", f.args, err)
-	}
-}
-
-func TestAnonymousGameDownloadDoesNotStartOrCreateFolder(t *testing.T) {
-	t.Parallel()
-	e := testkit.New(t)
-	f := &fakeSteamCMD{lines: okRun, game: true}
-	f.install(t, e)
-	dir := filepath.Join(e.Root, "Game")
-	_, err := e.App.FetchGame(app.DownloadSpec{Dir: dir}, nil)
-	var de *app.DownloadError
-	if !errors.As(err, &de) || de.Kind != "anonymous-license" || len(f.args) != 0 {
-		t.Fatal(err, f.args)
-	}
-	if _, err := os.Stat(dir); !os.IsNotExist(err) {
-		t.Fatal("anonymous request created game folder")
 	}
 }
 

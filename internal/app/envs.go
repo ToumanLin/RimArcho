@@ -13,11 +13,11 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// An environment is one game folder (02 §0): its Data/ and Mods/, version, launch, saves and
+// An environment is one game folder (03 §2): its Data/ and Mods/, version, launch, saves and
 // plans. The mod folders every game shares (Workshop, SteamCMD, extra, monitor, lock
 // library) are managed apart, with FolderAdd / FolderRemove (folders.go).
 
-// Saves values (02 §0 item 5).
+// Saves values (03 §2 item 5).
 const (
 	SavesShared = "shared" // the game's default user data folder
 	SavesOwn    = "own"    // <data>/userdata/<env>, started with -savedatafolder
@@ -105,7 +105,7 @@ func (a *App) checkRoots(roots ...string) error {
 	return nil
 }
 
-// OwnSavesRoot is where environments with their own saves keep them (02 §0 item 5).
+// OwnSavesRoot is where environments with their own saves keep them (03 §2 item 5).
 func (a *App) OwnSavesRoot() string { return filepath.Join(a.Home, "userdata") }
 
 // ownSaves is an environment's own saves folder.
@@ -331,7 +331,7 @@ func (a *App) foldersFromSpec(e *env.Environment, spec EnvSpec, adding, moved bo
 }
 
 // EnvSet changes an environment's game folder, saves and launch. Data/ and Mods/ are
-// re-bound when a sample of the new folder matches their known instances (02 §3.2);
+// re-bound when a sample of the new folder matches their known instances (03 §4.2);
 // otherwise the change waits for `env rebind`. The older --workshop / --steamcmd / --extra /
 // --remove-source flags change the shared folders.
 func (a *App) EnvSet(name string, spec EnvSpec) (*env.Environment, []SourceChange, error) {
@@ -441,7 +441,7 @@ func (a *App) EnvSet(name string, spec EnvSpec) (*env.Environment, []SourceChang
 	return e, changes, nil
 }
 
-// EnvRemoval is what removing an environment forgets (06 §2.14), for the dry run and the
+// EnvRemoval is what removing an environment forgets (16 §2.14), for the dry run and the
 // result. Only RimArcho's records go: game files, mods and saves stay, and so do the shared
 // mod folders with their mods, what the player noted on them, and the lists (shared by every game).
 type EnvRemoval struct {
@@ -575,7 +575,7 @@ func (a *App) EnvUse(name string) (*env.Environment, error) {
 	return e, a.Store.SetCurrentEnv(e.ID)
 }
 
-// PrepareEnv prepares links and scans without selecting the game (06 §3.1).
+// PrepareEnv prepares links and scans without selecting the game (16 §3.1).
 // GUI workers select it only after checking that their request is still current.
 func (a *App) PrepareEnv(name string) (*env.Environment, error) {
 	e, err := a.Store.EnvByName(name)

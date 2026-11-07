@@ -7,6 +7,7 @@ test('editor resizes coalesce redraws outside ResizeObserver delivery',()=>{
   const observers=[],frames=[],draws=[];
   const node={addEventListener(){},closest(){return this;}};
   const context=createContext({
+    window:{addEventListener(){}},
     $:selector=>selector.endsWith('.search input')?null:node,el:()=>node,wireBadges(){},draws,
     ResizeObserver:class {constructor(fn){observers.push(fn);}observe(){}},
     requestAnimationFrame:fn=>{frames.push(fn);return frames.length;}

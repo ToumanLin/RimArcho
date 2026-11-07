@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 06 §8.5: the row menu, from the menu key, shift+F10 or a right click: the op table's
+// 16 §8.5: the row menu, from the menu key, shift+F10 or a right click: the op table's
 // groups in order with separators, keys on the right, only what applies, unsubscribe last; ↑↓ and
 // enter run an item.
 func TestRowMenu(t *testing.T) {

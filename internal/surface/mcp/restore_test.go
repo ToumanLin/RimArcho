@@ -8,7 +8,7 @@ import (
 )
 
 // edit_loadout restore with no refs still restores every staged mod: the CLI needs --all
-// for that (05 §3.3), the tool's arguments stay as they were.
+// for that (13 §3.3), the tool's arguments stay as they were.
 func TestRestoreArgv(t *testing.T) {
 	t.Parallel()
 	if got := mcp.EditArgv(mcp.EditIn{Action: "restore"}); !slices.Equal(got, []string{"stage", "restore", "--all"}) {

@@ -9,12 +9,12 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// One mod out of order, a cycle, a weak preference and an old log (06 §5): the order item
+// One mod out of order, a cycle, a weak preference and an old log (16 §5): the order item
 // is the host, the cycle and the weak preference are its lines, and nothing else merges.
 // Items made after the problem loop once took the last problem's code (the cycle's), so
 // the order item merged into itself and vanished from the page.
 func TestNeedsSortMergeEndToEnd(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("2009463077", testkit.Mod{PackageID: "brrainz.harmony", Name: "Harmony"})
 	gamma := testkit.Sample("tester.gamma", "Gamma")

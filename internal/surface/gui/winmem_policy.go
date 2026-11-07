@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-// WebView2's memory target follows where the window is and whether it is used (07 §8.3,
-// 06 §2.16.1 M08): low while minimised, once the window has stayed in the background for
+// WebView2's memory target follows where the window is and whether it is used (17 §7.3,
+// 16 §2.16.1 M08): low while minimised, once the window has stayed in the background for
 // backgroundLow (as while the player is in the game), and once the active window has had
 // no input for idleLow. Back to normal at once on input, activation or restore. Low makes
 // WebView2 trim its caches, collect and drop painted tiles; a visible window keeps drawing

@@ -64,9 +64,26 @@ static class Tests
         Check(Writer.Seen(Level.Error, text), "same entry in save phase");
         Check(Writer.WritePhase("play"), "play phase flushes save counts");
         Check(Writer.Seen(Level.Error, text), "same entry while playing");
+        Writer.WriteSettings(new System.Collections.Generic.List<SettingsFile> {
+            new SettingsFile { PackageId = "a.mod", Folder = "!ArchoPack_x_1", Class = "AMod", File = "Mod__ArchoPack_x_1_AMod.xml", Title = "A \"quoted\"", Stored = true },
+            new SettingsFile { PackageId = "b.mod", Folder = "2", Class = "BMod", File = "Mod_2_BMod.xml", Title = "", Stored = true },
+        });
+        Writer.WriteSettingsWindow(new SettingsFile { PackageId = "a.mod", Folder = "A", Class = "AMod", File = "Mod_A_AMod.xml", Title = "A" },
+            new System.Collections.Generic.List<SettingsControl> {
+                new SettingsControl { Kind = "label", Label = "General" },
+                new SettingsControl { Kind = "checkbox", Label = "Raids", Value = "False" },
+                new SettingsControl { Kind = "slider", Label = "Scale", Value = "0.75", Min = "0", Max = "2" },
+            });
+        Writer.WriteHugsLib(new System.Collections.Generic.List<HugsLibPack> {
+            new HugsLibPack { Id = "APack", PackageId = "a.mod", Folder = "A", Title = "A mod", Handles = new System.Collections.Generic.List<HugsLibHandle> {
+                new HugsLibHandle { Name = "raids", Title = "Raids", Description = "More raids", Value = "True", Default = "False", Type = "Boolean" },
+                new HugsLibHandle { Name = "seen", Value = "3", Default = "0", Type = "Int32", Hidden = true },
+                new HugsLibHandle { Name = "mode", Title = "Mode", Value = "Hard", Default = "Normal", Type = "Mode", Choices = new[] { "Easy", "Normal", "Hard" } },
+            } },
+        });
         Writer.Close();
         var lines = File.ReadAllLines(Path.Combine(dir, "ArchoMonitor.log"));
-        Check(lines.Length == 7, "7 lines, got " + lines.Length);
+        Check(lines.Length == 10, "10 lines, got " + lines.Length);
         var first = JsonDocument.Parse(lines[0]).RootElement;
         Check(first.GetProperty("message").GetString() == c.Message, "message round trip");
         Check(first.GetProperty("count").GetInt32() == 1 && first.GetProperty("total").GetInt32() == 1, "first count");
@@ -89,7 +106,29 @@ static class Tests
         Check(JsonDocument.Parse(lines[4]).RootElement.GetProperty("context").GetProperty("phase").GetString() == "play", "play boundary");
         var playCount = JsonDocument.Parse(lines[5]).RootElement;
         Check(playCount.GetProperty("count").GetInt32() == 1 && playCount.GetProperty("total").GetInt32() == 6, "play count");
-        var exit = JsonDocument.Parse(lines[6]).RootElement;
+        var settings = JsonDocument.Parse(lines[6]).RootElement;
+        Check(settings.GetProperty("kind").GetString() == "settings" && settings.GetProperty("source").GetString() == "archo-monitor", "settings line: " + lines[6]);
+        var files = settings.GetProperty("context").GetProperty("settings");
+        Check(files.GetArrayLength() == 2, "two settings files");
+        Check(files[0].GetProperty("folder").GetString() == "!ArchoPack_x_1" && files[0].GetProperty("file").GetString() == "Mod__ArchoPack_x_1_AMod.xml", "settings file");
+        Check(files[0].GetProperty("title").GetString() == "A \"quoted\"" && files[0].GetProperty("stored").GetBoolean(), "settings title");
+        Check(files[1].GetProperty("class").GetString() == "BMod" && files[1].GetProperty("title").GetString() == "", "settings without a window");
+        var window = JsonDocument.Parse(lines[7]).RootElement;
+        Check(window.GetProperty("kind").GetString() == "settings-window", "window line: " + lines[7]);
+        var win = window.GetProperty("context").GetProperty("window");
+        var controls = win.GetProperty("controls");
+        Check(win.GetProperty("class").GetString() == "AMod" && win.GetProperty("full").GetBoolean() && controls.GetArrayLength() == 3, "window record");
+        Check(!controls[0].TryGetProperty("value", out _) && controls[0].GetProperty("label").GetString() == "General", "a label has no value");
+        Check(controls[2].GetProperty("kind").GetString() == "slider" && controls[2].GetProperty("value").GetString() == "0.75" && controls[2].GetProperty("max").GetString() == "2", "slider range");
+        var hugs = JsonDocument.Parse(lines[8]).RootElement;
+        Check(hugs.GetProperty("kind").GetString() == "hugslib", "hugslib line: " + lines[8]);
+        var pack = hugs.GetProperty("context").GetProperty("hugslib")[0];
+        var handles = pack.GetProperty("settings");
+        Check(pack.GetProperty("id").GetString() == "APack" && pack.GetProperty("packageId").GetString() == "a.mod" && pack.GetProperty("full").GetBoolean() && handles.GetArrayLength() == 3, "hugslib pack");
+        Check(handles[0].GetProperty("title").GetString() == "Raids" && handles[0].GetProperty("default").GetString() == "False" && !handles[0].TryGetProperty("hidden", out _), "hugslib setting");
+        Check(!handles[1].TryGetProperty("title", out _) && handles[1].GetProperty("hidden").GetBoolean() && handles[1].GetProperty("type").GetString() == "Int32", "hidden hugslib setting");
+        Check(!handles[0].TryGetProperty("choices", out _) && handles[2].GetProperty("choices").GetArrayLength() == 3 && handles[2].GetProperty("choices")[2].GetString() == "Hard", "enum choices");
+        var exit = JsonDocument.Parse(lines[9]).RootElement;
         Check(exit.GetProperty("kind").GetString() == "exit", "exit line");
         Directory.Delete(dir, true);
 

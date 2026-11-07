@@ -25,7 +25,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/vdf"
 )
 
-// Downloading a game version with SteamCMD (01 §3, 08 §11). Anonymous by default; an
+// Downloading a game version with SteamCMD (01 §3, 11 §3). Anonymous by default; an
 // optional account name comes from settings or the download form. Passwords and Steam
 // Guard codes are entered only in SteamCMD's own console. Progress comes from its log.
 
@@ -95,7 +95,7 @@ func (a *App) InstallSteamCMD() (string, error) {
 	return a.InstallSteamCMDProgress(nil)
 }
 
-// InstallSteamCMDProgress also reports bytes received to the guide and task (06 §2.15).
+// InstallSteamCMDProgress also reports bytes received to the guide and task (16 §2.15).
 func (a *App) InstallSteamCMDProgress(progress func(done, total int64)) (string, error) {
 	return a.installSteamCMDProgress(a.SteamCMDDir(), progress)
 }

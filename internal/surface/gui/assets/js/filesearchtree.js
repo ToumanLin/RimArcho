@@ -1,4 +1,4 @@
-// Append-only result tree for Search files (06 §2.9).
+// Append-only result tree for Search files (16 §2.9).
 import { el, T } from "./state.js";
 import { button, hintsChanged } from "./screens.js";
 import { virtualRows } from "./virtualrows.js";
@@ -139,6 +139,7 @@ export function createResults(X, resultsCard, viewer, query, { key, stop, run })
   function renderTreeRow(i) {
     const row = X.rows[i],
       node = el(row.type === "mod" ? "div" : "button", "fs-tree-row fs-" + row.type);
+    node.id = "search-row-" + encodeURIComponent(JSON.stringify([row.type, row.mod.id, row.file?.path, row.line]));
     node.setAttribute("role", "treeitem");
     node.setAttribute("aria-level", String(row.type === "mod" ? 1 : row.type === "file" ? 2 : 3));
     if (row.type === "mod") {

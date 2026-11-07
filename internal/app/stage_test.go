@@ -54,7 +54,7 @@ func stagedNames(t *testing.T, e *testkit.Env) string {
 	return strings.Join(out, " ")
 }
 
-// 06 §11 T9: 20 mods into staging, then all back: every mod returns to its position.
+// 16 §11 T9: 20 mods into staging, then all back: every mod returns to its position.
 func TestStageRestoreAllKeepsPositions(t *testing.T) {
 	t.Parallel()
 	e := stageEnv(t)

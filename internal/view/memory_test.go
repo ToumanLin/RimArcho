@@ -45,6 +45,7 @@ func TestMemoryNeedSeverityAndUnknown(t *testing.T) {
 }
 
 func TestRefreshMemoryPreservesSectionOrder(t *testing.T) {
+	t.Parallel()
 	e, b, _ := shellEnv(t)
 	e.App.MemoryProbe = func() machine.Memory { return machine.Memory{} }
 	old := &view.Needs{Items: []view.Need{

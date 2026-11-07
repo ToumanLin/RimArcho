@@ -13,6 +13,7 @@ import (
 // I9: launch_game refuses while a game runs and names the environment; save_loadout still
 // writes and says the game reads the list on its next start.
 func TestLaunchGameRefusesWhileRunning(t *testing.T) {
+	t.Parallel()
 	e := manageEnv(t)
 	cs := connect(t, e)
 	running := map[string]*app.GameRun{}
@@ -45,6 +46,7 @@ func TestLaunchGameRefusesWhileRunning(t *testing.T) {
 // I10: plan use writes no game file; the last plan cannot be removed. (CLI and MCP give
 // the same text for every plan action: TestGoldenManageTools.)
 func TestManagePlans(t *testing.T) {
+	t.Parallel()
 	e := manageEnv(t)
 	cs := connect(t, e)
 	if out, isErr := call(t, cs, "manage_plans", map[string]any{"action": "remove", "name": "default"}); !isErr {

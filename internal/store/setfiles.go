@@ -8,7 +8,7 @@ import (
 )
 
 // Fact rows name their file by an index into their set's file list, fact_set.files: a JSON
-// array of paths relative to the mod, in the order the set's rows first use them (03 §3,
+// array of paths relative to the mod, in the order the set's rows first use them (05 §3,
 // schema v28). A set is written once and never changes, so its list lives and dies with it.
 
 // fileIndex builds a set's file list while its rows are written.

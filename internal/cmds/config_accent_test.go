@@ -8,6 +8,7 @@ import (
 )
 
 func TestAccentSetting(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	values := cmds.SettingChoices("ui.accent")
 	if len(values) < 9 || values[0] != "default" || cmds.Setting(e.App, "ui.accent") != "default" {

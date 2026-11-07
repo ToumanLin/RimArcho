@@ -20,7 +20,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// The reference index (03 §6.5): which effective Defs/ and Patches/ files of an enabled
+// The reference index (06 §5): which effective Defs/ and Patches/ files of an enabled
 // set mention which names, the way a def is referenced. A "Could not resolve
 // cross-reference" cluster asks which enabled mods want the missing def; without the index
 // that meant listing and reading every file of every enabled mod for every new log (5,750
@@ -32,7 +32,7 @@ import (
 const maxRefName = 200
 
 // refIndexVersion invalidates stored indexes when the tokens or the format change.
-const refIndexVersion = 1
+const refIndexVersion = 2 // 2: Class="…" attribute values
 
 // refIndexKeep is how many indexes (enabled sets) stay on disk.
 const refIndexKeep = 8
@@ -40,7 +40,8 @@ const refIndexKeep = 8
 // refTokens calls fn with every piece of text that could be a def reference, in order: the
 // text between a '>' and the next '<' (<thingDef>X</thingDef>, <li>X</li>) and a tag name up
 // to the next '>' (<X>1</X> in ThingDefCountClass lists such as costList), with the offset
-// of the '>' or '<' it starts at.
+// of the '>' or '<' it starts at; and a Class="…" attribute value in a tag (<li
+// Class="NS.T"/>), the class a missing-type error names (06 §2).
 func refTokens(b []byte, fn func(tok []byte, at int)) {
 	prev := 0 // just after the previous '<'
 	for {
@@ -53,9 +54,34 @@ func refTokens(b []byte, fn func(tok []byte, at int)) {
 			fn(b[prev+j+1:k], prev+j)
 		}
 		if m := bytes.IndexByte(b[k+1:], '>'); m > 0 && m <= maxRefName {
-			fn(b[k+1:k+1+m], k)
+			tag := b[k+1 : k+1+m]
+			fn(tag, k)
+			if v := classAttr(tag); v != nil {
+				fn(v, k)
+			}
 		}
 		prev = k + 1
+	}
+}
+
+var classAttrTag = []byte(`Class="`)
+
+// classAttr is the value of a tag's Class="…" attribute (nil without one).
+func classAttr(tag []byte) []byte {
+	for off := 0; ; {
+		i := bytes.Index(tag[off:], classAttrTag)
+		if i < 0 {
+			return nil
+		}
+		i += off
+		v := i + len(classAttrTag)
+		if i > 0 && xmlSpace(tag[i-1]) {
+			if e := bytes.IndexByte(tag[v:], '"'); e > 0 {
+				return tag[v : v+e]
+			}
+			return nil
+		}
+		off = v
 	}
 }
 
@@ -332,3 +358,5 @@ func readRefIndex(path, key string) (*refIndex, error) {
 	}
 	return x, nil
 }
+
+func xmlSpace(c byte) bool { return c == ' ' || c == '\t' || c == '\r' || c == '\n' }

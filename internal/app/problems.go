@@ -20,7 +20,7 @@ type Problem struct {
 	Ref           string // p:<hex>
 	Ignored       bool
 	VersionMuted  bool    // global package + game minor preference; survives updates
-	IgnoreExpired bool    // ignored once, but the subject changed since (03 §4.2)
+	IgnoreExpired bool    // ignored once, but the subject changed since (05 §4.2)
 	Log           *LogRun // the log of a log.* problem
 }
 
@@ -48,13 +48,13 @@ func ProblemRef(f *finding.Finding, lineage string) string {
 
 // Problems collects the declaration layer (computed now) and the stored Def/Patch layers.
 // With ensure, a stale or missing analysis is rebuilt first. A pack's links left in Mods/
-// (08 §5.3) are looked at every time: they change on disk, outside what the cache knows.
+// (10 §3) are looked at every time: they change on disk, outside what the cache knows.
 func (a *App) Problems(ensure bool, progress func(string)) (*ProblemSet, error) {
 	ps, err := a.problems(ensure, progress)
 	if err != nil || ps.State == nil {
 		return ps, err
 	}
-	// What Mods/ holds now (08 §3, §5.3): a pack's links left there, and two folders of one
+	// What Mods/ holds now (09 §3, 10 §3): a pack's links left there, and two folders of one
 	// packageId, which the game reports as an error.
 	ix := ps.State.Ix
 	dups := ModsDuplicates(a.ModsCopies(ix))
@@ -153,8 +153,8 @@ type planProblems struct {
 
 // PlanProblems is plan p's problem set from stored results only, never computing an
 // analysis or parsing a log: the declaration layer (computed, cheap), the stored run of
-// p's analysis slot (03 §3) and the log's stored report judged against p (03 §6.4). The
-// home page counts every plan's problems with it (06 §2.3). The result is kept until the
+// p's analysis slot (05 §3) and the log's stored report judged against p (06 §4). The
+// home page counts every plan's problems with it (16 §2.3). The result is kept until the
 // database, ModsConfig.xml or the log changes.
 func (a *App) PlanProblems(p *store.Plan) (*ProblemSet, error) {
 	cur, err := a.Loadout()
@@ -349,7 +349,7 @@ func (a *App) IgnoreProblem(ref string, undo bool) (*Problem, error) {
 	return nil, &RefError{Ref: ref, Hint: "archo problems lists the current problems with their p: refs"}
 }
 
-// DeclFindings computes the declaration layer (03 §4.3) for the workspace.
+// DeclFindings computes the declaration layer (05 §4.3) for the workspace.
 func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 	mm := st.GameMM()
 	var out []*finding.Finding
@@ -399,12 +399,12 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 	for _, l := range locked {
 		lockedCopy[l.Copy.ID] = l.Upstream.ID
 	}
-	installed := installedDependencies(st)
-	depsIndex := dependencyIndex{st: st, activeByPkg: activeByPkg, installed: installed}
+	depsIndex := a.newDependencyIndex(st, activeByPkg)
+	installed := depsIndex.installed
 
 	for _, m := range active {
 		d := m.Decl()
-		// Use This Instead (04 §6.3): the community knows a maintained replacement for this game version.
+		// Use This Instead (08 §2.3): the community knows a maintained replacement for this game version.
 		if r := a.replacementFor(st, m); r != nil {
 			f := &finding.Finding{Code: "mod.replaced", Severity: finding.Warning, Key: r.NewWorkshopID, Subjects: []string{inst(m.ID)},
 				Claim:    fmt.Sprintf("%s has a replacement for %s: %s by %s", inst(m.ID), mm, r.NewName, r.NewAuthor),
@@ -495,7 +495,7 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 				}
 			}
 			if !ok {
-				// Measured on 6,734 logs of 1.6 (decisions-corpus §2, G8; 03 §4.5): a mod that
+				// Measured on 6,734 logs of 1.6 (decisions-corpus §2, G8; 05 §4.5): a mod that
 				// stops at the previous minor version is an error source 2.6× as often as chance
 				// (its code was built for the previous game): warning. A mod for older versions
 				// that players still run is 0.3× chance (the ones that broke were dropped long
@@ -534,13 +534,19 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 				f.Suggestions = append(f.Suggestions, "archo disable "+inst(m.ID))
 			}
 			add(f)
-		} else if ins := installed[p]; len(ins) > 1 && !onlyLocks(ins, lockedCopy) {
+		} else if ins := installed[p]; p != MonitorPackage && len(ins) > 1 && !onlyLocks(ins, lockedCopy) {
 			subj := ins[0]
 			if len(as) == 1 {
 				subj = as[0]
 			}
 			f := &finding.Finding{Code: "pkg.duplicate-installed", Severity: finding.Info, Key: p, Subjects: []string{inst(subj.ID)},
 				Claim: fmt.Sprintf("%d copies of pkg:%s are installed", len(ins), p)}
+			anyLoadable := false
+			for _, m := range ins {
+				if st.Reg.Loadable(m.ID) {
+					anyLoadable = true
+				}
+			}
 			for _, m := range ins {
 				if m != subj {
 					f.Subjects = append(f.Subjects, inst(m.ID))
@@ -548,17 +554,21 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 				note := "installed"
 				if activePos[m.ID] > 0 {
 					note = fmt.Sprintf("enabled at %d", activePos[m.ID])
-				} else if !st.Reg.Loadable(m.ID) {
+				} else if !st.Reg.Loadable(m.ID) && anyLoadable {
 					note = "ignored by the game (another copy wins)"
 				}
 				f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Inferred, Ref: inst(m.ID), Text: fmt.Sprintf("src:%s %s", m.SourceLabel, note)})
 			}
-			f.Suggestions = []string{"archo swap " + inst(subj.ID)}
+			// swap needs an enabled copy (host round 2026-11-05: `archo swap` on a copy that is not
+			// in the list fails with "not enabled").
+			if len(as) == 1 {
+				f.Suggestions = []string{"archo swap " + inst(subj.ID)}
+			}
 			add(f)
 		}
 	}
 	// About.xml renamed away (about-disabled) on installed mods that are not enabled: pinned
-	// by a copy, unsubscribed, or hidden on their own (08 §6).
+	// by a copy, unsubscribed, or hidden on their own (09 §5).
 	for _, h := range st.Hidden() {
 		m := h.Mod
 		if activePos[m.ID] != 0 {
@@ -585,7 +595,7 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 				Suggestions: []string{"archo unhide " + inst(m.ID), "archo trash " + inst(m.ID)}})
 		}
 	}
-	// Locked versions RimArcho made (04 §7): the upstream stays visible; the copy is what
+	// Locked versions RimArcho made (07 §5): the upstream stays visible; the copy is what
 	// the plan uses. Reported while the upstream itself is not enabled.
 	for _, l := range locked {
 		up, cp := l.Upstream, l.Copy
@@ -672,7 +682,7 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 		case order.KindUser:
 			src = finding.User
 		}
-		// Severity by constraint strength (04 §5.3): dependencies, loadBefore, forced orders
+		// Severity by constraint strength (08 §1.3): dependencies, loadBefore, forced orders
 		// and user rules are warnings; loadAfter and community preferences, and rules the
 		// log corpus saw broken without effect, are information.
 		sev := finding.Warning
@@ -733,7 +743,7 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 			refs = append(refs, nodeTok(mi))
 		}
 		// Info (G8): mods on a cycle were error sources no more often than chance (6.8% vs
-		// 6.1% in 804 logs). Sorting gives up the weakest constraints (04 §5.2).
+		// 6.1% in 804 logs). Sorting gives up the weakest constraints (08 §1.2).
 		f := &finding.Finding{Code: "order.cycle", Severity: finding.Info, Key: strings.Join(refs, " "), Subjects: refs,
 			Claim: fmt.Sprintf("load-order constraints form a cycle among %s (sorting gives up the weakest)", strings.Join(refs, " "))}
 		for i, e := range cy.Edges {
@@ -767,12 +777,16 @@ func (a *App) DeclFindings(st *LoadoutState) ([]*finding.Finding, error) {
 	return out, nil
 }
 
-type scanDep struct{ pkg, name, url string }
+// scanDep is one declared dependency; alts are its alternativePackageIds.
+type scanDep struct {
+	pkg, name, url string
+	alts           []string
+}
 
 func toDeps(l []scan.Dependency) []scanDep {
 	out := make([]scanDep, 0, len(l))
 	for _, d := range l {
-		out = append(out, scanDep{d.PackageID, d.DisplayName, d.SteamWorkshopURL})
+		out = append(out, scanDep{pkg: d.PackageID, name: d.DisplayName, url: d.SteamWorkshopURL, alts: d.Alternatives})
 	}
 	return out
 }
@@ -832,11 +846,11 @@ func PrevMinor(mm string) string {
 	return fmt.Sprintf("%d.%d", a, b-1)
 }
 
-// NoisyCodes are hidden from default problem lists (03 §4.5); they show with
+// NoisyCodes are hidden from default problem lists (05 §4.5); they show with
 // --all, an explicit --code or --subject, severity info, and in def / patches output.
 var NoisyCodes = map[string]bool{"def.override": true, "patch.contested": true}
 
-// onlyLocks reports whether ins is one instance plus locked copies of it (04 §7): those are
+// onlyLocks reports whether ins is one instance plus locked copies of it (07 §5): those are
 // reported as mod.pinned, not as duplicates.
 func onlyLocks(ins []*store.Mod, lockedCopy map[string]string) bool {
 	var rest []*store.Mod

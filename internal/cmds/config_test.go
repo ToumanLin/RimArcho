@@ -8,8 +8,9 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// Settings with free values (06 §3.8, §12.4): a default, a check, and set/get.
+// Settings with free values (16 §3.8, §2.14): a default, a check, and set/get.
 func TestFreeSettings(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	if v := cmds.Setting(e.App, "tags.pinned"); !strings.HasPrefix(v, "框架,美化,") {
 		t.Fatalf("tags.pinned default: %q", v)
@@ -24,6 +25,7 @@ func TestFreeSettings(t *testing.T) {
 }
 
 func TestEnumeratedSettingDefaults(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	for _, tc := range []struct{ key, stored, want string }{
 		{"ui.icons", "", "compat"},
@@ -32,6 +34,8 @@ func TestEnumeratedSettingDefaults(t *testing.T) {
 		{"ui.icons", "nerd", "nerd"},
 		{"ui.theme", "obsolete", "auto"},
 		{"ui.theme", "light", "light"},
+		{"ui.archo.motion", "obsolete", "live"},
+		{"ui.archo.motion", "still", "still"},
 	} {
 		if err := e.App.Store.SetMeta("cfg:"+tc.key, tc.stored); err != nil {
 			t.Fatal(err)

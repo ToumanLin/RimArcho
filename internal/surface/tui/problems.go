@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Loading Can it run (06 §5; the items and the screen are in needs.go), the analysis in a child
+// Loading Can it run (16 §5; the items and the screen are in needs.go), the analysis in a child
 // process (A) and the choice of log (l).
 
 type probState struct {
@@ -23,14 +23,16 @@ type probState struct {
 	loaded        bool
 	countsKey     string
 	// status is each mod's row icon and need the top bar's number: the counted items of
-	// Can it run (06 §7, §4.2, §7).
+	// Can it run (16 §7, §4.2, §7).
 	status map[string]int
 	need   int
 	open   map[string]bool // folded items shown open (enter), by text
-	base   []view.Need     // the analysis' items; the running game's lead them (06 §2.1)
+	base   []view.Need     // the analysis' items; the running game's lead them (16 §2.1)
 	// lastRun says which run the last-run section is from ("the list · Sep 29 19:41")
 	lastRun string
-	// elsewhere is what this page leaves to another page (view.Needs.Elsewhere, 06 §2.4)
+	// lastSave is Before you start's last-save line (view.Needs.LastSave); nil none.
+	lastSave *view.LastSaveView
+	// elsewhere is what this page leaves to another page (view.Needs.Elsewhere, 16 §2.4)
 	elsewhere []view.Elsewhere
 }
 
@@ -59,7 +61,7 @@ func (m *model) ensureProblems() tea.Cmd {
 }
 
 // loadProblems reads the problems (declaration layer now, Def/Patch layers as stored) and
-// builds the items of Can it run from them (06 §5).
+// builds the items of Can it run from them (16 §5).
 func (m *model) loadProblems() {
 	ps, err := m.app.Problems(false, nil)
 	p := &m.prob
@@ -70,7 +72,7 @@ func (m *model) loadProblems() {
 		m.say(sayFail, err.Error())
 		return
 	}
-	// The newest log was parsed into this list (03 §6.4): it has been seen.
+	// The newest log was parsed into this list (06 §4): it has been seen.
 	if m.newLog && m.st != nil {
 		if cur, _ := m.app.LogPaths(m.st); cur != "" && !m.app.LazyLog && m.app.ProblemLog(m.st) == cur {
 			m.app.SelectLog(m.st, cur)
@@ -80,6 +82,7 @@ func (m *model) loadProblems() {
 	vn := view.BuildNeeds(m.app, m.st, ps)
 	p.never, p.stale = vn.Never, vn.Stale
 	p.base, p.status, p.need, p.lastRun, p.elsewhere = vn.Items, vn.Status, vn.Count, vn.LastRun, vn.Elsewhere
+	p.lastSave = vn.LastSave
 	m.composeNeeds()
 }
 
@@ -94,9 +97,9 @@ func (m *model) composeNeeds() {
 	p.cursor = min(p.cursor, max(len(p.items)-1, 0))
 }
 
-// needCount is the top bar's "Can it run N" number (06 §2.2): problems, identity
+// needCount is the top bar's "Can it run N" number (16 §2.2): problems, identity
 // questions, an external change of the list, a list saved for another game version, and
-// the running game's errors, so it equals the counted items of the screen (06 §2.4).
+// the running game's errors, so it equals the counted items of the screen (16 §2.4).
 func (m *model) needCount() int {
 	m.problemCounts()
 	n := m.prob.need
@@ -173,7 +176,7 @@ func (m *model) analyzeMsg(msg tea.Msg) tea.Cmd {
 }
 
 // chooseLog picks Player.log or Player-prev.log; its clusters join the Problems view as
-// log.* problems (06 §2, §7.3).
+// log.* problems (16 §2, §7.3).
 func (m *model) chooseLog() tea.Cmd {
 	if m.st == nil {
 		return nil

@@ -7,7 +7,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 )
 
-// The history area (06 §2.5): where the workspace is, where u takes it, and the saved
+// The history area (16 §2.5): where the workspace is, where u takes it, and the saved
 // versions to go back to. The interfaces show it where the staging list is when staging is
 // empty.
 
@@ -86,5 +86,5 @@ func StepText(st *app.LoadoutState, s app.HistoryStep) string {
 	return Tf("%s, %d changes", op, len(s.Changes))
 }
 
-// stepWords are the edit names (app's op codes) the interface says in other words (06 §7.2).
+// stepWords are the edit names (app's op codes) the interface says in other words (16 §7.2).
 var stepWords = map[string]string{"checkout": "back to an older version", "swap": "switch version", "restore": "put back"}

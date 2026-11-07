@@ -1,4 +1,4 @@
-// Package cmds is the single command set behind every surface (05 §1.1): argument parsing,
+// Package cmds is the single command set behind every surface (13 §1.1): argument parsing,
 // execution against internal/app, and outline text output. CLI (and later MCP and the TUI
 // command line) only translate their input into Execute calls.
 package cmds
@@ -23,7 +23,7 @@ type Flag struct {
 	Help  string
 }
 
-// Command is one entry of the command table (05 §4.2).
+// Command is one entry of the command table (13 §4.2).
 type Command struct {
 	Name    string // words, e.g. "env list"
 	Args    string // positional usage, e.g. "<ref>"
@@ -60,6 +60,8 @@ type Ctx struct {
 	st     *app.LoadoutState
 	stErr  error
 	stDone bool
+	// logPending: the log was attributed while the analysis was still computing.
+	logPending bool
 }
 
 // Loadout returns the workspace, loaded once per command (nil if unavailable).
@@ -96,9 +98,9 @@ var registry []*Command
 
 func register(c *Command) { registry = append(registry, c) }
 
-// order is the documented command order (05 §4.2); registration order depends on file names.
+// order is the documented command order (13 §4.2); registration order depends on file names.
 var commandOrder = []string{"env list", "env detect", "env add", "env set", "env use", "env rebind", "env remove", "scan", "status", "list", "find",
-	"mod", "describe", "def", "patches", "harmony", "why", "log", "problems", "problems show", "problems ignore", "problems unignore", "files search", "source", "source search", "analyze", "changes", "library", "library remove-from-plans", "library move-to-locked", "enable", "disable", "move", "swap", "sort", "undo", "redo", "save", "loadout log", "loadout diff",
+	"mod", "mod-settings", "describe", "def", "patches", "harmony", "why", "log", "problems", "problems show", "problems ignore", "problems unignore", "files search", "source", "source search", "analyze", "changes", "library", "library remove-from-plans", "library move-to-locked", "enable", "disable", "move", "swap", "sort", "undo", "redo", "save", "loadout log", "loadout diff",
 	"loadout checkout", "loadout ignore-external", "loadout complete-dependencies", "loadout replace-recommended", "loadout use-installed", "loadout export", "loadout import", "plan list", "plan new", "plan use", "plan rename", "plan remove", "plan cost", "stage list", "stage add", "stage drop", "stage restore", "pin", "copy-local", "import rimcrow", "alias", "note", "tag", "rule add", "rule edit", "rule list", "rule remove", "launch", "test run", "identity", "identity list", "identity why", "identity resolve", "lineage split", "lineage merge", "gc", "config get", "config set", "guide", "mcp", "gui", "version", "uninstall"}
 
 // Commands returns the command table in documented order.
@@ -151,7 +153,7 @@ func Find(words []string) (*Command, []string) { return lookup(words) }
 
 // Check parses a command line without running it and returns the usage error Execute
 // would print, without the "error: " prefix; nil when the line would run (the TUI command
-// line checks a line before it runs it, 06 §9.4). Errors a command finds while running
+// line checks a line before it runs it, 16 §9.4). Errors a command finds while running
 // are not checked.
 func Check(argv []string) error {
 	if len(argv) == 0 || argv[0] == "help" || argv[0] == "--help" || argv[0] == "-h" {
@@ -242,12 +244,12 @@ func parse(c *Command, rest []string) (*Args, error) {
 }
 
 // commentHint explains a mod reference the shell dropped: a player who types
-// `archo enable #nyh3` in PowerShell or bash runs `archo enable` (05 §3.3). It never
+// `archo enable #nyh3` in PowerShell or bash runs `archo enable` (13 §3.3). It never
 // writes "archo … #ref", which ShellSafe would rewrite.
 const commentHint = "in PowerShell and bash a word starting with # is a comment: write a mod reference as nyh3, not #nyh3"
 
 // refsOrAll is for commands that can act on every item: with no mod named they need --all,
-// so a shell that ate `#nyh3` cannot turn `stage restore #nyh3` into "restore all" (05 §3.3).
+// so a shell that ate `#nyh3` cannot turn `stage restore #nyh3` into "restore all" (13 §3.3).
 func refsOrAll(a *Args) error {
 	switch {
 	case len(a.Pos) > 0 && a.Bool("all"):
@@ -325,10 +327,25 @@ func ExecuteContext(ctx context.Context, ap *app.App, argv []string) (string, in
 			return render.ShellSafe("error: " + ue.Error() + "\n"), ExitUsage
 		}
 		// Errors suggest commands too ("x is not enabled (archo enable #x)").
-		return render.ShellSafe("error: " + err.Error() + "\n"), ExitError
+		msg := err.Error()
+		var re *app.RefError
+		if IsMCP(ctx) && errors.As(err, &re) && re.Find != "" {
+			msg = strings.Replace(msg, re.Error(), re.MCPError(), 1)
+		}
+		return render.ShellSafe("error: " + msg + "\n"), ExitError
 	}
 	return doc.String(), cctx.ExitCode
 }
+
+type mcpKey struct{}
+
+// ForMCP marks a command as an MCP tool call. The text stays the CLI's, except that a
+// reference matching nothing suggests the find_mods tool instead of archo find (13 §3.3):
+// agents never ran the CLI to recover (MCP review 2026-11-04 §2.3).
+func ForMCP(ctx context.Context) context.Context { return context.WithValue(ctx, mcpKey{}, true) }
+
+// IsMCP reports whether ctx is an MCP tool call (ForMCP).
+func IsMCP(ctx context.Context) bool { v, _ := ctx.Value(mcpKey{}).(bool); return v }
 
 // Help lists every command.
 func Help() *render.Doc {
@@ -342,14 +359,14 @@ func Help() *render.Doc {
 		rows = append(rows, []string{u, c.Summary})
 	}
 	root.Section("commands").AddColumns(rows)
-	root.KV("references", "#<id> instance, L#<id> lineage, pkg:<packageId>, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>, pattern:<id> error pattern")
+	root.KV("references", "#<id> instance, L#<id> lineage, pkg:<packageId> or the bare packageId, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>, pattern:<id> error pattern")
 	root.KV("global flags", "--env <name> (use another environment for this command)")
 	return d
 }
 
 var gameVersionRe = regexp.MustCompile(`^\d+\.\d+$`)
 
-// gameVersionFlag is accepted by the analysis commands (03 §3).
+// gameVersionFlag is accepted by the analysis commands (05 §3).
 var gameVersionFlag = Flag{Name: "game-version", Value: "<X.Y>", Help: "analyse for another game version than the environment's"}
 
 // CommandHelp is `archo <command> --help`: the usage line, the summary and each flag.

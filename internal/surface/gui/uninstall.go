@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// settings › uninstall RimArcho (06 §2.14): the dry run for the player's answers, then the run with
+// settings › uninstall RimArcho (16 §2.14): the dry run for the player's answers, then the run with
 // "uninstall" events and the report.
 
 // UninstallPlan is the plan for these answers (nothing changes).
@@ -166,7 +166,7 @@ func (s *API) uninstallSession() (*app.App, error) {
 }
 
 // The guard owns no App lock: even a slow filesystem operation must not stall a
-// native close request. The status also survives WebView reloads (06 §2.14).
+// native close request. The status also survives WebView reloads (16 §2.14).
 type uninstallState struct {
 	mu            sync.Mutex
 	status        UninstallStatus

@@ -13,6 +13,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     list                                      list mods
     find <words…>                             search by name, package id, author, workshop id, folder
     mod <ref>                                 mod details
+    mod-settings [<ref>]                      Mod settings: the current list's Mods that have settings, or what one Mod's files store (change values with mod-settings set)
     describe <ref>                            a mod's description: About.xml and the Workshop page (fetched on demand, cached)
     def [<Type/defName>]                      who defines and patches a Def; or the Defs of a mod
     patches                                   Patch operations and their simulated outcome
@@ -63,7 +64,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     import rimcrow                            one-time import of RimCrow's aliases, notes, groups (as tags) and user rules; repeatable
     alias <ref> [<name>]                      set the name RimArcho shows for a mod (all its copies)
     note <ref> [<text>]                       attach a plain-text note to a mod (all its copies), or with --copy to this copy only
-    tag add|remove <ref> <tag…> | list        tags for filtering (list --filter tag:<tag>)
+    tag add|remove <ref> <tag…> | list | rename <tag> <new> | merge <tag…> --into <tag> | delete <tag…> | note <tag> [<text>]  tags for filtering (list --filter tag:<tag>); rename, merge, delete and note apply to the tag on every mod
     rule add after|before|incompatible|attach <A> <B> | top|bottom <A> | ignore <constraint>  add a user rule
     rule edit <r:n> after|before|incompatible|attach <A> <B> | top|bottom <A> | ignore <constraint>  replace a user rule; r:<n> stays
     rule list                                 list user rules
@@ -78,7 +79,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     lineage merge <ref> <ref>                 merge the second lineage into the first
     gc                                        remove expired tombstones and superseded snapshots
     config get [<key>]                        show settings
-    config set <key> <value>                  change a setting (updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris; ui.icons: compat|nerd; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program)
+    config set <key> <value>                  change a setting (local.dir: unused managed-folder root; updates.source: auto|github; updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris; ui.icons: compat|nerd; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; ui.archo.motion: off|still|live; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; network.proxy: system|off|a proxy URL; network.github_mirror: empty or a mirror prefix such as https://gh-proxy.org/)
     guide [<topic>]                           the agent guide behind the MCP tools: a workflow (diagnose, errors, plans, words) or one tool's full reference
     mcp                                       serve the MCP tools over stdio (for Claude Code, Codex and other agents)
     gui                                       open the desktop window (RimArcho.exe does this on a double click)
@@ -104,8 +105,9 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     history                                   the workspace's unsaved edits (undo/redo) and the saved versions
     links check                               check RimArcho links without changing files
     links repair                              preview or confirm link repair and unfinished-operation recovery
+    mod-settings set <ref> [<name>=<value>…]  change a Mod's simple settings values (on/off, numbers, one line of text, a HugsLib choice) with the game closed; backs the file up first
     monitor                                   Archo Monitor, the in-game companion: versions, source, place in the plan
-    monitor install                           install or update the bundled Archo Monitor and add it to plans by default (08 §9)
+    monitor install                           install or update the bundled Archo Monitor and add it to plans by default (19 §6)
     pack build <name>                         compile the workspace into a pack: checked, sorted, each mod copied without the version folders this game does not load
     pack list                                 the packs: mods, size, game version, last played
     pack launch <name>                        play a pack: link its mods into Mods/, its own list and saves, start the game
@@ -122,6 +124,15 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     plan sync <name> [<collection>]           catch a plan up with a collection it follows (one undoable edit; uses the network)
     problems mute-version <mod>…              ignore version warnings for these packages in every list and game; survives updates
     problems unmute-version <mod>…            restore version warnings for these packages
+    saves list                                colonies and their saves, newest first, each with its list and whether it loads with it
+    saves show <save>                         one save: where it belongs, can it load (each issue with its fix), how its Mods differ from the list, the playthrough
+    saves fix <save>                          the save's Mod fixes as one undoable edit of its list, then Workshop subscriptions; --launch starts it
+    saves index [<save…>]                     read new and changed saves in full into the cache, the named ones first (the Saves page runs it as a child process)
+    saves rename <save> <name>                rename a save in its folder (keeps a RimSaves folder; refused while the game runs or when the name exists)
+    saves rename-colony <colony|save> [<name>]  name a colony in RimArcho (without a name: back to its saves' name; save files and the game keep theirs)
+    saves copy <save>                         copy a save beside itself as <name> (copy), never overwriting
+    saves backup <save…>                      copy saves into RimArcho's backups folder (confirm with --yes)
+    saves trash <save…>                       move saves to the recycle bin (confirm with --yes; refused while the game runs)
     db status                                 the database: path, size, backups
     db backup                                 write a consistent copy of the database to <data>/backups
     db vacuum                                 clean old file lists and compact the database
@@ -141,12 +152,13 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     textures optimize [<mod>...]              write the DDS of mods' PNG textures next to them (the game loads them instead; the PNGs stay)
     textures clean [<mod>...]                 delete the DDS RimArcho wrote (only those; the game goes back to the PNGs)
     textures tool                             the DDS encoder (todds): where it is, or --install to download it
-    update                                    check GitHub for a newer RimArcho and install it; the data folder is not touched (07 §5.1)
+    update                                    check Workshop or GitHub for a newer RimArcho and install it; the data folder is not touched (17 §5.1)
     workshop unsubscribe <ref…>               unsubscribe in Steam: Steam deletes the Workshop folder (refused while the game runs; plans that use it show it missing)
     workshop subscribe <ref…>                 subscribe again in Steam to an unsubscribed leftover
     workshop resubscribe <ref…>               resubscribe and wait for Steam to download mods; local edits are lost (refused while the game runs)
     workshop state <ref…>                     ask Steam for item state; without Steam, show local folders with account state unknown
-  references: #<id> instance, L#<id> lineage, pkg:<packageId>, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>, pattern:<id> error pattern
+    workshop publish                          maintainer only: assemble and publish RimArcho from the repository root through the signed-in Steam client
+  references: #<id> instance, L#<id> lineage, pkg:<packageId> or the bare packageId, ws:<workshopId>, q:<n> question, src:<label> source, scan:<n>, pattern:<id> error pattern
   global flags: --env <name> (use another environment for this command)
 
 $ archo status
@@ -309,11 +321,24 @@ next:
 [exit 3]
 
 $ archo mod pkg:nope
-error: pkg:nope matches nothing (archo find <words>)
+error: pkg:nope matches nothing (no mod has packageId nope; search with archo find nope)
 [exit 1]
 
 $ archo mod Alpha
-error: Alpha matches nothing (archo find <words>)
+error: Alpha matches nothing (search with archo find Alpha)
+[exit 1]
+
+$ archo mod Tester.Alpha
+Tester.Alpha matches 2 instances; pick one
+  #nyh3  Alpha       [workshop ws:3000000002]
+  #lqj2  Alpha Fork  [local Twin]
+next:
+  archo mod nyh3
+  archo mod lqj2
+[exit 3]
+
+$ archo mod khamenman.outfitstandsplus
+error: khamenman.outfitstandsplus matches nothing (no mod has packageId khamenman.outfitstandsplus; search with archo find outfitstandsplus)
 [exit 1]
 
 $ archo changes

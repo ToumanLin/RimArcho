@@ -13,8 +13,8 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// The list management page (06 §2.17): every list of the game, and for the one picked its
-// game versions (04 §1.6), the Steam collections it follows (04 §9.6) and how to share it.
+// The list management page (16 §2.17): every list of the game, and for the one picked its
+// game versions (07 §1.6), the Steam collections it follows (07 §7.6) and how to share it.
 // Reading the page never uses the network; CheckPlanFollows does, when the page asks.
 
 // PagePlans is the sidebar's list › Manage lists.

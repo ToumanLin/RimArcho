@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Texture optimisation (08 §5.2, 06 §2.13): its page, and the runs of Mod library's optimise textures. A run takes
+// Texture optimisation (10 §2, 16 §2.13): its page, and the runs of Mod library's optimise textures. A run takes
 // minutes, so it is an `archo textures optimize` child, like a scan: the window keeps
 // working, and "textures" events carry its progress (TextureEvent) and its end.
 
@@ -44,7 +44,7 @@ type textureMeasurement struct {
 
 // TexturesInfo is the page without reading a texture: the encoder and the scope's mods.
 // The page opens with it and changing a choice asks only this; Textures reads the textures
-// when the player asks (06 §2.13).
+// when the player asks (16 §2.13).
 func (s *API) TexturesInfo(scope string, scale int) (*TexturePage, error) {
 	if scope != app.TexAll {
 		scope = app.TexPlan
@@ -69,7 +69,7 @@ func (s *API) TexturesInfo(scope string, scale int) (*TexturePage, error) {
 	return out, nil
 }
 
-// Textures returns choices immediately; disk reads run in the background (06 §3.1).
+// Textures returns choices immediately; disk reads run in the background (16 §3.1).
 func (s *API) Textures(scope string, scale int) (*TexturePage, error) {
 	if scope != app.TexAll {
 		scope = app.TexPlan
@@ -88,7 +88,7 @@ func (s *API) Textures(scope string, scale int) (*TexturePage, error) {
 	return s.textureSnapshot(), nil
 }
 
-// TextureMeasure polls only the current request; previous options have no result (06 §3.1).
+// TextureMeasure polls only the current request; previous options have no result (16 §3.1).
 func (s *API) TextureMeasure(request uint64) *TexturePage {
 	s.texMeasure.mu.Lock()
 	defer s.texMeasure.mu.Unlock()
@@ -113,7 +113,7 @@ func (s *API) textureSnapshot() *TexturePage {
 	return out
 }
 
-// publishTextureMeasure also guards the final write after a cancelled disk read (06 §3.1).
+// publishTextureMeasure also guards the final write after a cancelled disk read (16 §3.1).
 func (s *API) publishTextureMeasure(ctx context.Context, request uint64, update func(*textureMeasurement)) {
 	m := &s.texMeasure
 	m.mu.Lock()
@@ -211,7 +211,7 @@ func (s *API) TexturesRun(scope string, scale int, refs []string) (string, error
 		obj = view.T("every installed mod")
 	}
 	task := s.beginSelf(view.TaskTextures, obj, func() error { _, err := s.TexturesStop(); return err })
-	go s.watchTextures(task, args, run)
+	go s.watchTextures(task, obj, args, run)
 	return view.T("converting textures") + "  " + view.T("it goes on in the background"), nil
 }
 
@@ -221,7 +221,7 @@ var (
 	texFailedRe  = regexp.MustCompile(`^failed: (\d+) `)
 )
 
-func (s *API) watchTextures(task string, args []string, run func([]string, func(string)) ([]string, error)) {
+func (s *API) watchTextures(task, obj string, args []string, run func([]string, func(string)) ([]string, error)) {
 	lines, err := run(args, func(l string) {
 		p, ok := cmds.ParseTextureProgress(l)
 		if !ok {
@@ -239,7 +239,7 @@ func (s *API) watchTextures(task string, args []string, run func([]string, func(
 	})
 	ev := TextureEvent{Done: true, Ok: err == nil, Frac: 1}
 	if err != nil {
-		ev.Error = view.Humanize(nil, err.Error())
+		ev.Error = failedText(view.TaskTextures, obj, view.Humanize(nil, err.Error()))
 	} else {
 		ev.Text = textureDoneText(lines)
 	}

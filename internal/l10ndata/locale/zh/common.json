@@ -1,6 +1,7 @@
 {
   " (%d list %s, %d older only)": "（其中 %d 个支持 %s，%d 个只支持更早的版本）",
   " (%s)": "（%s）",
+  " (in place of %s)": "（代替 %s）",
   " (not enabled)": "（未启用）",
   " (not installed)": "（未安装）",
   "%d added": "新增 %d",
@@ -118,6 +119,7 @@
   "Defs": "Def",
   "Disabled": "未启用",
   "Enabled": "已启用",
+  "game-error": "游戏报错",
   "GPU acceleration": "GPU 加速",
   "LoadFolders.xml changed": "LoadFolders.xml 改了",
   "Mods/ is on a FAT or exFAT drive, which cannot hold the link it needs": "Mods/ 在 FAT 或 exFAT 盘上，放不了它需要的链接",
@@ -465,6 +467,7 @@
   "no scan yet (R scans)": "尚未扫描（R 扫描）",
   "no such folder": "文件夹不存在",
   "no suggested command for this problem": "此问题没有建议命令",
+  "noise": "已知噪声",
   "none": "无",
   "none, # adds": "无，按 # 添加",
   "not a workshop mod": "不是创意工坊 Mod",

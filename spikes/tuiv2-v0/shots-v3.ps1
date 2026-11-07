@@ -1,4 +1,4 @@
-# The V3 screenshots (06 §11): detail column with the thumbnail, the full-screen detail
+# The V3 screenshots (16 §11): detail column with the thumbnail, the full-screen detail
 # with its bigger thumbnail and sub-sections, and wrapping of mixed Chinese and English.
 # Always on a data directory copy. Needs the display on: Windows does not draw windows
 # while the screen is off, and every capture then comes out blank (checked below).

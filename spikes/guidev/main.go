@@ -1,7 +1,7 @@
 // Spike: a development harness for the GUI page (08). It serves the embedded page on
 // 127.0.0.1 with a stand-in for /wails/runtime.js that calls the same gui.API over HTTP,
 // so the page can be driven in a browser during development. Never part of a release: the
-// product opens no port (01 §4).
+// product opens no port (02 §1).
 //
 //	go run ./spikes/guidev -home <copy of the data dir> -addr 127.0.0.1:8765
 package main
@@ -16,8 +16,10 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
@@ -46,8 +48,21 @@ export const Events = { On: (n, f) => { (subs[n] = subs[n] || []).push(f); } };
 //go:embed esccheck.js
 var escCheck string
 
-//go:embed pagecheck.html pagecheck.js pagecheck-runtime.js
+//go:embed pagecheck.html pagecheck.js pagecheck-runtime.js feedbackcheck.js
 var pageCheck embed.FS
+
+// callDelay holds GUIDEV_DELAY, such as "Init=1500,GuideFind=3000": API methods answered late
+// by that many milliseconds, so loading screens can be seen and timed.
+var callDelay = func() map[string]time.Duration {
+	out := map[string]time.Duration{}
+	for _, part := range strings.Split(os.Getenv("GUIDEV_DELAY"), ",") {
+		name, ms, ok := strings.Cut(strings.TrimSpace(part), "=")
+		if n, err := strconv.Atoi(ms); ok && err == nil {
+			out[name] = time.Duration(n) * time.Millisecond
+		}
+	}
+	return out
+}()
 
 type hub struct {
 	mu   sync.Mutex
@@ -74,7 +89,7 @@ func main() {
 	assets := flag.String("assets", "", "serve the page's files from this folder (edits show on reload)")
 	steam := flag.String("steam-api", "", "local Steam fixture server URL (collection at /collection, titles at /api)")
 	fake := flag.String("fakegame", "", "while this file exists the current environment's game counts as running (started at its time)")
-	selfVersion := flag.String("version", "", "act as this release for RimArcho's own update (07 §5.1); RIMARCHO_UPDATE_API names a test release server")
+	selfVersion := flag.String("version", "", "act as this release for RimArcho's own update (17 §5.1); RIMARCHO_UPDATE_API names a test release server")
 	selfProgram := flag.String("program", "", "with -version: the program folder an install replaces (a test folder, never a real install)")
 	flag.Parse()
 	if !strings.HasPrefix(*addr, "127.0.0.1:") {
@@ -105,7 +120,7 @@ func main() {
 	}
 	a.Launcher = func(string, []string, string) error { return fmt.Errorf("launching is off in the dev harness") }
 	if *fake != "" {
-		// the sidebar's running game (06 §2.1, G17) without starting RimWorld
+		// the sidebar's running game (16 §2.1, G17) without starting RimWorld
 		a.GameProbe = func(string) *app.GameRun {
 			fi, err := os.Stat(*fake)
 			if err != nil {
@@ -124,7 +139,7 @@ func main() {
 	}
 	mux := http.NewServeMux()
 	mux.Handle("/dev/pagecheck", http.RedirectHandler("/dev/pagecheck.html", http.StatusTemporaryRedirect))
-	for _, name := range []string{"pagecheck.html", "pagecheck.js", "pagecheck-runtime.js"} {
+	for _, name := range []string{"pagecheck.html", "pagecheck.js", "pagecheck-runtime.js", "feedbackcheck.js"} {
 		mux.HandleFunc("/dev/"+name, func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Cache-Control", "no-store")
 			if *assets != "" {
@@ -156,6 +171,9 @@ func main() {
 			A []json.RawMessage `json:"a"`
 		}
 		json.NewDecoder(r.Body).Decode(&req)
+		if d := callDelay[req.M]; d > 0 {
+			time.Sleep(d) // GUIDEV_DELAY: a slow read on demand, to see the waits (16 §7.1)
+		}
 		res, err := call(api, req.M, req.A)
 		out := map[string]any{"result": res}
 		if err != nil {

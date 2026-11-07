@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
-// Plan management (05 §4.3, 04 §1.3). Every other editing and history command acts on the
+// Plan management (13 §4.3, 07 §1.3). Every other editing and history command acts on the
 // environment's current plan.
 
 func init() {
@@ -131,7 +131,7 @@ func planRemove(c *Ctx, a *Args) (*render.Doc, error) {
 	return d, nil
 }
 
-// planVersions shows a plan's game versions (04 §1.6), or sets them: versions such as
+// planVersions shows a plan's game versions (07 §1.6), or sets them: versions such as
 // "1.6 1.7" or "1.5-1.7", or "default" to follow the mods again.
 func planVersions(c *Ctx, a *Args) (*render.Doc, error) {
 	name := ""

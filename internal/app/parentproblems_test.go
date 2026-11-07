@@ -43,6 +43,7 @@ func parentFixture(t *testing.T) (*testkit.Env, *app.ProblemSet, *app.Problem, s
 }
 
 func TestParentFixLookupAndFocusedCLI(t *testing.T) {
+	t.Parallel()
 	e, ps, p, provider := parentFixture(t)
 	// Cached lookup must work even when Defs are unavailable; no XML scan is allowed.
 	if err := os.Remove(filepath.Join(provider, "Defs", "Base.xml")); err != nil {
@@ -121,9 +122,11 @@ func TestParentQuietLogAndGroupedIgnore(t *testing.T) {
 	run.Pending = true
 	check(false)
 	run.Pending = false
-	run.Unknown = true
+	run.Unknown = true // this game, no record: counted (P25)
+	check(true)
+	run.UnknownGame = "D:/elsewhere"
 	check(false)
-	run.Unknown = false
+	run.Unknown, run.UnknownGame = false, ""
 	run.Changed = true
 	check(false)
 	run.Changed = false
@@ -192,6 +195,7 @@ func TestParentQuietLogAndGroupedIgnore(t *testing.T) {
 }
 
 func TestParentProviderCacheAndConditionalEligibility(t *testing.T) {
+	t.Parallel()
 	e, ps, p, _ := parentFixture(t)
 	provider, err := ps.State.Ix.ResolveOne("pkg:test.provider")
 	if err != nil {
@@ -216,6 +220,7 @@ func TestParentProviderCacheAndConditionalEligibility(t *testing.T) {
 }
 
 func TestParentMayRequireSelfAndFolderSwitch(t *testing.T) {
+	t.Parallel()
 	for _, folderSwitch := range []bool{false, true} {
 		t.Run(fmt.Sprint(folderSwitch), func(t *testing.T) {
 			e := testkit.New(t)
@@ -387,6 +392,7 @@ func BenchmarkNeverAnalysedParentProviders400(b *testing.B) {
 }
 
 func TestParentSubscribeIsPrimaryWithoutProvider(t *testing.T) {
+	t.Parallel()
 	e, ps, p, provider := parentFixture(t)
 	if err := os.Remove(filepath.Join(provider, "Defs", "Base.xml")); err != nil {
 		t.Fatal(err)
@@ -502,6 +508,7 @@ func TestParentSearchTrustsFreshIndex(t *testing.T) {
 // indexes it like a Workshop mod: the provider comes from the index, and the panel's
 // file search has nothing left to read.
 func TestParentProviderInSteamCMDFolder(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("1001", testkit.Mod{PackageID: "test.child", Name: "Child", Files: map[string]string{
 		"Defs/Child.xml": `<Defs><HediffDef ParentName="Base"><defName>Illness</defName></HediffDef></Defs>`}})

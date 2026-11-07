@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"github.com/ToumanLin/RimArcho/internal/netcfg"
 	"io"
 	"net/http"
 	"os"
@@ -27,14 +28,14 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
-// Config is config.toml (07 §3). Only keys used by M1 are read.
+// Config is config.toml (17 §3). Only keys used by M1 are read.
 type Config struct {
-	TombstoneDays int // 02 §5.5, default 90
+	TombstoneDays int // 04 §2.5, default 90
 }
 
 // DefaultConfig is written on first start.
 const DefaultConfig = `# RimArcho configuration
-# Days a vanished mod is kept as a tombstone before "archo gc" may remove it (02 §5.5).
+# Days a vanished mod is kept as a tombstone before "archo gc" may remove it (04 §2.5).
 tombstone_days = 90
 `
 
@@ -61,7 +62,7 @@ type App struct {
 	// EnvName overrides the current environment for one invocation (--env).
 	EnvName string
 	// OpenPlan is the list this session shows and edits in place of the environment's
-	// current one (04 §1.3): the GUI opens a list from the sidebar without choosing it to
+	// current one (07 §1.3): the GUI opens a list from the sidebar without choosing it to
 	// play. 0, or a plan of another environment, is the current one. PlanName (--open-plan)
 	// names it for one invocation; OpenPlan wins.
 	OpenPlan int64
@@ -71,10 +72,13 @@ type App struct {
 	// Launcher starts the game; nil means ExecLauncher.
 	Launcher Launcher
 	// AnalyzeRunner brings the Def/Patch analysis up to date; nil means the `archo analyze`
-	// child process (03 §3). Tests run it in-process.
+	// child process (05 §3). Tests run it in-process.
 	AnalyzeRunner func(envName string, progress func(string)) error
 	// AnalyzeExe is the archo executable the default runner starts; "" is this one.
 	AnalyzeExe string
+	// SavesIndexRunner reads saves into the full-read cache (12 §1.7), the given saves
+	// first; nil means the `archo saves index` child process. Tests run it in-process.
+	SavesIndexRunner func(first []string, progress func(string)) error
 	// FreeSpace tells the free space of a folder's drive for a pack build (tests); nil
 	// means DiskFree.
 	FreeSpace func(dir string) int64
@@ -82,47 +86,47 @@ type App struct {
 	Decompile Decompiler
 	// GameVersion ("X.Y") overrides the environment's game version for analysis commands.
 	GameVersion string
-	// AnalyzeWait bounds how long a command waits for an out-of-date analysis (05 §5.1:
+	// AnalyzeWait bounds how long a command waits for an out-of-date analysis (14 §1:
 	// MCP returns the finished part after 10 s and the analysis continues in the
 	// background). 0 waits until it is done (CLI).
 	AnalyzeWait time.Duration
 	// LazyLog keeps the newest Player.log out of Problems until the player opens the
-	// Problems view (the TUI; 03 §6.4: parse lazily to keep idle memory down).
+	// Problems view (the TUI; 06 §4: parse lazily to keep idle memory down).
 	// An explicitly selected log is always included.
 	LazyLog bool
 	// LogCacheOnly makes Problems use a stored log report only, never parse the log
 	// (status and mod: commands that are not about the log).
 	LogCacheOnly bool
-	// HTTP and SteamAPI reach the Steam Workshop for descriptions (06 §4.3); nil and ""
+	// HTTP and SteamAPI reach the Steam Workshop for descriptions (16 §4.3); nil and ""
 	// mean a 15-second client and the public endpoint. Tests replace both.
 	// GameProbe finds the running game of a game folder; nil means the process table
 	// (tests replace it).
 	GameProbe func(gameRoot string) *GameRun
-	// TestGameStart replaces cmd.Start for isolated test runs (08 §12).
+	// TestGameStart replaces cmd.Start for isolated test runs (20 §2).
 	TestGameStart func(*exec.Cmd) error
 	// TrashFunc moves a folder to the recycle bin; nil means source.Trash (tests replace it).
 	TrashFunc func(path string) error
 	// SameVolume says whether a folder can be renamed from one path to another (MoveDirectory);
 	// nil compares the volume names (tests replace it to copy on one drive).
 	SameVolume func(from, to string) bool
-	// trashAllow replaces the recycle bin's allow-list check (08 §7) in tests of a bare App
+	// trashAllow replaces the recycle bin's allow-list check (02 §3) in tests of a bare App
 	// with no store; nil means trashAllowed.
 	trashAllow func(path string) error
 	// SteamWorker runs `archo steam-worker <args>` in the Steam runtime folder and returns
-	// its output; nil starts this executable (tests fake Steam with it, 06 §2.9).
+	// its output; nil starts this executable (tests fake Steam with it, 16 §2.9).
 	SteamWorker func(dir string, args []string) (string, error)
 	// SteamWorkerStream replaces the live, cancellable download worker in tests.
 	SteamWorkerStream func(ctx context.Context, dir string, args []string, line func(string)) error
 	// LockBase replaces %LOCALAPPDATA% when finding the default lock library and monitor
 	// folder (tests).
 	LockBase string
-	// MonitorBundle is the bundled Archo Monitor folder (08 §9): "" searches the usual
+	// MonitorBundle is the bundled Archo Monitor folder (19 §6): "" searches the usual
 	// places, MonitorNone turns it off (tests).
 	MonitorBundle string
 	// VolumeFS names the file system of a folder's volume; nil means source.VolumeFS
 	// (tests act out exFAT with it).
 	VolumeFS func(dir string) string
-	// SteamCMDStart and SteamCMDRun replace starting SteamCMD (tests fake it, 08 §11);
+	// SteamCMDStart and SteamCMDRun replace starting SteamCMD (tests fake it, 11 §3);
 	// SteamCMDZip replaces Valve's download URL, SteamCMDPoll how often its log is read,
 	// SteamCMDNoPath leaves PATH out when looking for it.
 	SteamCMDStart func(exe string, args []string, console bool) (SteamCMDProc, error)
@@ -147,7 +151,7 @@ type App struct {
 	ToddsNoPath    bool
 	depFinder      *deps.Finder
 	depFake        bool
-	// SteamCollectionAPI reads Workshop collections (04 §9.5); "" is the public endpoint.
+	// SteamCollectionAPI reads Workshop collections (07 §7.5); "" is the public endpoint.
 	SteamCollectionAPI string
 	// Uninstall (uninstall.go): UninstallExe is the program to remove ("" this one; a
 	// development build is never removed), UninstallKeepBase replaces Documents as the
@@ -160,7 +164,7 @@ type App struct {
 	AfterExitFunc     func(AfterExit) error
 	// Uninstalled is set once an uninstall has run: every command is refused after it.
 	Uninstalled bool
-	// Self-update (selfupdate.go, 07 §5.1), all for tests: SelfUpdateAPI replaces GitHub's
+	// Self-update (selfupdate.go, 17 §5.1), all for tests: SelfUpdateAPI replaces GitHub's
 	// API root, SelfVersion the running version, SelfProgram the program folder,
 	// SelfVersionOf asking the new program its version, SelfOthers listing the other
 	// RimArcho processes in a folder, SelfWaitPoll how often that is asked while waiting.
@@ -173,7 +177,7 @@ type App struct {
 
 	analyzing *pendingAnalysis
 
-	dataIdx *dataIndex // community data indexes (04 §6.3), loaded on first use
+	dataIdx *dataIndex // community data indexes (08 §2.3), loaded on first use
 
 	ixCache  *Index
 	decl     *declReads     // shared with read sessions (shared.go)
@@ -185,6 +189,9 @@ type App struct {
 	pngSnapsKey        string
 	stCache            *LoadoutState
 	stKey              string
+	saveHeads          saveHeadCache           // save heads by path, size and mtime (saves.go)
+	saveOwners         saveOwnerMemo           // Def and class lookups of save attribution (saveowners.go)
+	saveLoads          map[string]*storedLoads // the logs' loads of saves, by log path (saveload.go)
 	modsCopies         map[string]*modsCopiesCache
 	linkRepairPreviews map[string]*LinkRepairPlan
 	linkRepairSerial   uint64
@@ -201,7 +208,7 @@ func Open(home string) (*App, error) { return OpenWith(home, OpenOptions{}) }
 
 // OpenOptions are the optional parts of opening the data directory.
 type OpenOptions struct {
-	// Upgrade receives the progress of a database upgrade while Open runs one (02 §7);
+	// Upgrade receives the progress of a database upgrade while Open runs one (04 §4);
 	// the surfaces show it (cli.upgradeReport).
 	Upgrade func(store.UpgradeProgress)
 }
@@ -227,6 +234,7 @@ func OpenWith(home string, o OpenOptions) (*App, error) {
 		return nil, err
 	}
 	a := &App{Home: home, Store: st, Config: cfg, Now: time.Now, Rand: rand.Reader, Loc: time.Local}
+	a.ApplyNetwork()
 	a.decl, a.ownDecl = &declReads{path: st.Path}, true
 	if st.Meta("source-library:legacy-cleared") == "" {
 		if err := os.RemoveAll(filepath.Join(home, "cache", "source")); err != nil {
@@ -345,4 +353,9 @@ func (a *App) FormatDate(t time.Time) string {
 		return "-"
 	}
 	return t.In(a.Loc).Format("2006-01-02")
+}
+
+// ApplyNetwork hands the network settings to the process's requests (17 §2.2).
+func (a *App) ApplyNetwork() {
+	netcfg.Configure(netcfg.Settings{Proxy: a.Store.Meta("cfg:network.proxy"), Mirror: a.Store.Meta("cfg:network.github_mirror")})
 }

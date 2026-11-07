@@ -9,12 +9,12 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// RunSource is what wrote a log or plays a running game (03 §6.4, 08 §4): the newest launch
+// RunSource is what wrote a log or plays a running game (06 §4, 09 §4): the newest launch
 // record that started no later than the moment, else the ModsConfig.xml write record
 // before it (a game started from Steam plays what was last written), else unknown.
 type RunSource struct {
 	Launch  *store.LaunchRecord // the launch it maps to (nil: none)
-	ByWrite bool                // no launch: attributed through the write record (04 §4.3)
+	ByWrite bool                // no launch: attributed through the write record (07 §4.3)
 	At      time.Time           // the launch's start or the write's time
 	EnvID   string              // the launch's environment ("" when attributed by the write)
 	PlanID  int64               // the plan played or written (0: a pack, or unknown)
@@ -28,7 +28,7 @@ type RunSource struct {
 }
 
 // sharedEnvs are the environments whose game writes into e's user data folder: e and
-// every environment sharing that folder (02 §2.4).
+// every environment sharing that folder (03 §3.4).
 func (a *App) sharedEnvs(e *env.Environment) []string {
 	ids := []string{e.ID}
 	if e.UserDataRoot == "" {
@@ -49,7 +49,7 @@ func (a *App) sharedEnvs(e *env.Environment) []string {
 
 // sourceAt says which launch or write of e's user data folder a moment t belongs to.
 // plansOnly leaves pack launches out: on 1.7 a pack's game writes its own Logs/, never the
-// environment's (08 §5.3). reg reads a written version's list for its fingerprint (nil:
+// environment's (10 §3). reg reads a written version's list for its fingerprint (nil:
 // not needed).
 func (a *App) sourceAt(e *env.Environment, reg *loadout.Registry, t time.Time, plansOnly bool) *RunSource {
 	src := &RunSource{}
@@ -114,7 +114,7 @@ func (a *App) logSource(st *LoadoutState, path string, mod time.Time) *RunSource
 	return src
 }
 
-// judge sets r's attribution and staleness against st's plan (03 §6.4 new rule): the log
+// judge sets r's attribution and staleness against st's plan (06 §4 new rule): the log
 // is stale when it was written by another game version, when its run is not st's plan
 // (another plan, another environment or a pack), when the plan's enabled list changed
 // since that run, or when no launch or write matches it.
@@ -125,6 +125,7 @@ func (a *App) judge(st *LoadoutState, r *LogRun) {
 	switch {
 	case src.Unknown:
 		r.Unknown = true
+		r.UnknownGame = a.UnregisteredLogGame(st, r.Path)
 	case src.Pack != "":
 		r.OtherRun = true
 	case src.EnvID != "" && src.EnvID != st.Ix.Env.ID:
@@ -145,8 +146,8 @@ func (a *App) judge(st *LoadoutState, r *LogRun) {
 }
 
 // monitorSwapOnly reports whether the plan's list differs from the played one only in which
-// Archo Monitor version sits at the same place (08 §9 "update"): the monitor update does not
-// change what the run's errors describe, so the log stays counted (03 §6.4). The played
+// Archo Monitor version sits at the same place (19 §6 "update"): the monitor update does not
+// change what the run's errors describe, so the log stays counted (06 §4). The played
 // list is the version the launch or write names, checked against its fingerprint.
 func (a *App) monitorSwapOnly(st *LoadoutState, src *RunSource) bool {
 	if src.PlanID == 0 || src.VersionN <= 0 {

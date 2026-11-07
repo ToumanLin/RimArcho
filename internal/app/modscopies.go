@@ -19,7 +19,7 @@ import (
 // Two folders in Mods/ with one packageId make the game log "Tried loading mod with the same
 // packageId multiple times" and ignore all but the first (Verse.ModLister.TryAddMod, 1.6 and
 // 1.7). Only a Workshop copy may share a packageId with a Mods/ copy (it becomes <pkg>_steam).
-// RimArcho never makes such a pair (08 §3, §5.3) and reports any it finds (CodeModsDuplicate).
+// RimArcho never makes such a pair (09 §3, 10 §3) and reports any it finds (CodeModsDuplicate).
 
 // CodeModsDuplicate is the finding for two copies of one packageId in Mods/.
 const CodeModsDuplicate = "pkg.duplicate-mods"
@@ -27,8 +27,8 @@ const CodeModsDuplicate = "pkg.duplicate-mods"
 // Who put a folder in Mods/.
 const (
 	CopyPlayer = ""      // a folder, or a link another tool made (RimCrow's _Link_…)
-	CopyDeploy = "archo" // RimArcho's _Archo_ link (08 §3)
-	CopyPack   = "pack"  // RimArcho's !ArchoPack_ link (08 §5.3)
+	CopyDeploy = "archo" // RimArcho's _Archo_ link (09 §3)
+	CopyPack   = "pack"  // RimArcho's !ArchoPack_ link (10 §3)
 )
 
 // ModsCopy is one entry of Mods/ that holds a mod.
@@ -178,7 +178,7 @@ func (d ModsDuplicate) Names() string {
 }
 
 // duplicateFindings are the Mods/ duplicates the pack links finding does not cover: each a
-// pkg.duplicate-mods error (06 §2.4 Will cause errors).
+// pkg.duplicate-mods error (16 §2.4 Will cause errors).
 func (a *App) duplicateFindings(st *LoadoutState, dups []ModsDuplicate) []*finding.Finding {
 	var out []*finding.Finding
 	copies := a.ModsCopies(st.Ix)

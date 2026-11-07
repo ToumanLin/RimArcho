@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<savegame>
+	<meta><gameVersion>1.6.4633 rev1261</gameVersion><modIds><li>ludeon.rimworld</li></modIds></meta>
+	<game>
+		<scenario><playerFaction><def>PlayerFaction</def><factionDef>PlayerTribe</factionDef></playerFaction></scenario>
+		<tickManager><ticksGame>150000</ticksGame></tickManager>
+		<world>
+			<info><name>Ashfall</name><seedString>ash</seedString></info>
+			<factionManager><allFactions><li><def>PlayerTribe</def><name>Ash Walkers</name><loadID>2</loadID></li></allFactions></factionManager>
+		</world>
+	</game>
+</savegame>

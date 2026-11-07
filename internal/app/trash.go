@@ -5,15 +5,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 )
 
-// ErrNotInTrashList: a path outside the recycle bin's allow-list (08 §7).
+// ErrNotInTrashList: a path outside the recycle bin's allow-list (02 §3).
 var ErrNotInTrashList = errors.New("not something RimArcho moves to the recycle bin")
 
-// ToTrash is the one way into the recycle bin (08 §7). Whoever calls it, the path must be
+// ToTrash is the one way into the recycle bin (02 §3). Whoever calls it, the path must be
 // on the allow-list; the caller's own rules (enabled, used by a plan, subscribed) come first.
 func (a *App) ToTrash(path string) error {
 	check := a.trashAllow
@@ -49,7 +50,7 @@ func (a *App) trash(path string) error {
 	return trash(path)
 }
 
-// trashAllowed checks a path against the allow-list of 08 §7 (01 §4):
+// trashAllowed checks a path against the allow-list of 02 §3 (02 §1):
 //   - a mod folder: inside a source folder (workshop, SteamCMD, Mods/, the lock library or
 //     another mod folder), not the source folder itself;
 //   - a pack: a folder directly in the pack folder;
@@ -105,6 +106,11 @@ func (a *App) trashAllowed(path string) error {
 	if bk := filepath.Join(a.Home, "backups", "saves"); inside(bk) || samePath(p, bk) {
 		return nil
 	}
+	// A save in a pack's own folder: <packs>/<pack>/userdata/Saves/<file> (12 §4.4).
+	if dir := filepath.Dir(p); strings.EqualFold(filepath.Base(dir), "Saves") && strings.EqualFold(filepath.Base(filepath.Dir(dir)), "userdata") &&
+		samePath(filepath.Dir(filepath.Dir(filepath.Dir(dir))), realOrAbs(a.PacksDir())) {
+		return nil
+	}
 	envs, err := a.Store.Envs()
 	if err != nil {
 		return err
@@ -115,6 +121,8 @@ func (a *App) trashAllowed(path string) error {
 			return nil
 		case e.UserDataRoot != "" && inside(filepath.Join(e.UserDataRoot, "Saves")):
 			return nil
+		case e.UserDataRoot == "" && a.DefaultUserData() != "" && inside(filepath.Join(a.DefaultUserData(), "Saves")):
+			return nil // the game's default user data folder
 		case downloadedGame(e.GameRoot) && samePath(p, e.GameRoot):
 			return nil
 		}

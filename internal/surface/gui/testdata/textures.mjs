@@ -32,7 +32,7 @@ async function setup() {
   const deps = {
     "./state.js": { S, $, el, api, T: (s) => s, Tf: (s, ...args) => { let i = 0; return s.replace(/%[sd]/g, () => args[i++]); }, errText: (e) => e.message, say: (...args) => messages.push(args) },
     "./screens.js": { beginPageRead, pageLoading: () => false, page: (cls) => el("div", cls), button: (label, _, run, cls) => Object.assign(el("button", cls, label), { onclick: run }) },
-    "./popups.js": { confirm: () => {} },
+    "./popups.js": { menuOpener: n => n, confirm: () => {} },
   };
   const document = { activeElement: null, body: new Element("body") };
   const tex = await loadModules("./textures.js", deps, { document, setTimeout: (f) => timers.push(f) });

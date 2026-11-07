@@ -58,6 +58,7 @@ const rml = `<?xml version="1.0" encoding="utf-8"?>
 // X-GUI1: the formats are detected (file, pasted JSON, share code, RimSort clipboard), and
 // the preview lists what is installed and what is missing with its Workshop link.
 func TestImportPreview(t *testing.T) {
+	t.Parallel()
 	e := exchangeEnv(t)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "list.rml")
@@ -123,6 +124,7 @@ func TestImportPreview(t *testing.T) {
 
 // X-GUI2: applying is one undoable step, replace or add, and never writes ModsConfig.xml.
 func TestImportApplyIsOneStep(t *testing.T) {
+	t.Parallel()
 	e := exchangeEnv(t)
 	before, _ := os.ReadFile(e.ModsConfig)
 	imp, err := view.ReadImport(e.App, view.ImportText, rml)
@@ -213,6 +215,7 @@ func TestImportLinks(t *testing.T) {
 // X-GUI4: export writes every format readable back, never over a file without asking and
 // never to the game's ModsConfig.xml.
 func TestExport(t *testing.T) {
+	t.Parallel()
 	e := exchangeEnv(t)
 	dir := t.TempDir()
 	for _, f := range view.ExportFormats(e.App) {

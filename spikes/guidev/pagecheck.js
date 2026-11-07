@@ -24,7 +24,11 @@ import { withEnvironmentSwitch } from "/js/environment.js";
 const output = document.querySelector("#results"), results = [];
 const assert = (ok, message) => { if (!ok) throw new Error(message); };
 const settle = async () => { for (let i = 0; i < 5; i++) await new Promise(requestAnimationFrame); };
-const key = (name) => screens.logsKey(new KeyboardEvent("keydown", { key: name, cancelable: true }));
+const key = (name) => {
+  const target = document.querySelector("#screen");
+  target.addEventListener("keydown", screens.logsKey, { once: true });
+  target.dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true }));
+};
 const deferred = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; };
 const visibleSelection = () => {
   const row = document.querySelector(".lrow.cur"), scroll = row?.closest(".scroll");
@@ -133,7 +137,8 @@ try {
       document.querySelector('[data-setting-action="deps install ' + name + '"]').click(); await settle();
       assert(installs === before && !popup.hidden, "download began without confirmation");
       const text = popup.textContent;
-      assert(text.includes("https://fixture.invalid/" + name + ".zip") && text.includes("C:/fixture/" + name), "missing URL or directory");
+      const addresses = [...popup.querySelectorAll("[title]")].map(n => n.title).join("\n");
+      assert(addresses.includes("https://fixture.invalid/" + name + ".zip") && addresses.includes("C:/fixture/" + name), "missing URL or directory");
       assert(text.includes(bytes > 0 ? Tf("size: %s bytes", bytes) : T("size unknown")), "missing size");
       popup.querySelector(".btns .go").click(); await settle();
       assert(installs === before + 1, "confirmed installation did not run");
@@ -161,7 +166,7 @@ try {
     const target = document.querySelector("#screen .link-row .link-path:nth-child(3)");
     assert(target.dataset.path === groups[0].rows[0].target && target.title.includes(groups[0].rows[0].target), "full target lost");
     assert(target.scrollWidth <= target.clientWidth + 1, "long path overflows row");
-    document.querySelector("#screen .need .acts button").click(); await settle();
+    await screens.runNeedAction({}, { kind: "repair-links", label: "Repair", confirm: "Confirm", linkGroups: preview }); await settle();
     assert(document.querySelectorAll("#popup .link-game").length === 2, "preview lost game groups");
     assert([...document.querySelectorAll("#popup .link-tag")].every(n => n.textContent === "will delete"), "preview action tag is wrong");
     assert(document.querySelector("#popup .link-row .link-path:nth-child(3)").dataset.path === groups[0].rows[0].target, "preview lost full path");
@@ -274,7 +279,7 @@ try {
         const d = deferred(); handlers.set(method, () => d.promise);
         const pending = open(); await Promise.resolve();
         assert(S.screen === screen, method + " waited before navigation");
-        assert(document.querySelector('#screen [role="status"]') || document.querySelector('#screen[aria-busy="true"]'), method + " has no feedback");
+        assert(document.querySelector('#screen [role="progressbar"]') || document.querySelector('#screen[aria-busy="true"]'), method + " has no feedback");
         screens.openScreen("other");
         if (fail) d.reject(new Error("late " + method)); else d.resolve(payload);
         await pending;
@@ -333,7 +338,7 @@ try {
       }
     });
   }
-  // The launch page's numbers are focus keys; applying a row must keep the column (06 §2.3).
+  // The launch page's numbers are focus keys; applying a row must keep the column (16 §2.3).
   await test("home 1/2/3 focus columns, arrows apply within their scope, Enter launches", async () => {
     const original = { ...ui }, live = S.live;
     const rows = [
@@ -393,7 +398,7 @@ try {
       S.live = { running: true }; home.liveChanged(); press("3"); press("Enter");
       assert(focused(3) && launched.length === 1 && opened.length === 1, "disabled 03 launched or opened the list");
       const hints = home.hintList();
-      assert(hints.map((h) => h.key).join(" ") === "1–3 ↑↓ ←→ enter L shift+1–8 ?", "startup hint keys differ from 06 §2.3");
+      assert(hints.map((h) => h.key).join(" ") === "1–3 ↑↓ ←→ enter L shift+1–8 ?", "startup hint keys differ from 16 §2.3");
     } finally {
       Object.assign(ui, original); delete ui.run; S.live = live;
       handlers.set("Home", () => ({ rows: [], featured: -1 })); handlers.delete("HomeApply");
@@ -507,7 +512,7 @@ try {
     assert(selected === "1.6" && !S.busy.env && !button.disabled, "newest result did not win");
     button.remove();
   });
-  // Attribute guards must survive translated text, icons and redraws (06 §2.3, 06 §3.1).
+  // Attribute guards must survive translated text, icons and redraws (16 §2.3, 16 §3.1).
   await test("Chinese environment actions disable by code, navigation stays live, and state restores", async () => {
     const start = S.start, lang = document.documentElement.lang, live = S.live;
     const host = document.createElement("section"), menu = document.createElement("div"), popup = document.createElement("div");
@@ -630,7 +635,7 @@ try {
     const old = deferred(), fresh = deferred();
     handlers.set("TexturesInfo", () => old.promise);
     const p1 = textures.open(); await Promise.resolve();
-    assert(S.screen === "textures" && document.querySelector('#screen [role="status"]')?.getAttribute("aria-label") === "loading…", "textures did not show loading immediately");
+    assert(S.screen === "textures" && document.querySelector('#screen [role="progressbar"]')?.getAttribute("aria-label") === "loading…", "textures did not show loading immediately");
     screens.closeScreen(); handlers.set("TexturesInfo", () => fresh.promise);
     const p2 = textures.open(); await Promise.resolve();
     old.resolve({}); await p1;
@@ -641,7 +646,7 @@ try {
   await test("log opens immediately and ignores late replies", async () => {
     const d = deferred(); handlers.set("LogPage", () => d.promise);
     const pending = screens.gameLog("", true);
-    assert(S.screen === "log" && document.querySelector('#screen [role="status"]')?.getAttribute("aria-label") === "reading the log…", "log did not show loading immediately");
+    assert(S.screen === "log" && document.querySelector('#screen [role="progressbar"]')?.getAttribute("aria-label") === "reading the log…", "log did not show loading immediately");
     screens.openScreen("other"); d.resolve({ path: "old" }); await pending;
     assert(S.screen === "other", "late log reply reopened log");
   });
@@ -866,7 +871,7 @@ try {
   });
   await test("direct import and task entry points record completion, expired guide sessions cannot reopen", async () => {
     await nav.go("home"); await nav.go("plan-import");
-    const field = document.querySelector("#screen input:not([type=file])"); field.value = "unsaved input";
+    const field = document.querySelector("#screen textarea"); field.value = "unsaved input";
     await tasks.toggle(); assert(S.screen === "tasks", "tasks did not open");
     await nav.travel(-1); assert(S.screen === "plan-import" && !S.popup, "import was not restored as normal navigation");
     await nav.travel(-1); assert(S.screen === "home", "import return missing");
@@ -950,6 +955,7 @@ try {
     assert(S.screen === before && writes === 0, "history escaped uninstall lock");
   });
   for (const method of writeMethods) handlers.delete(method);
+  await (await import("./feedbackcheck.js")).checkFeedback({ handlers, test, assert, deferred });
   output.dataset.result = "pass";
   const preview = document.createElement("button");
   preview.textContent = "Preview environment switching animation";

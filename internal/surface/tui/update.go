@@ -12,7 +12,7 @@ import (
 )
 
 // idleAfter is how long the TUI waits without input before returning freed memory to the
-// OS, so the resident size stays near the live heap while idle (06 §3.5 T5).
+// OS, so the resident size stays near the live heap while idle (16 §3.5 T5).
 const idleAfter = 2 * time.Second
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -37,7 +37,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	defer m.fsLeft() // leaving Search files stops its search (06 §3.1 rule 9)
+	defer m.fsLeft() // leaving Search files stops its search (16 §3.1 rule 9)
 	if m.uninstallRun != nil {
 		switch msg := msg.(type) {
 		case uninstallStepMsg, uninstallDoneMsg:
@@ -155,7 +155,7 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// scanSummary: "scan complete · 12 changes" (06 §2.9); the CLI line keeps the scan id.
+// scanSummary: "scan complete · 12 changes" (16 §2.9); the CLI line keeps the scan id.
 func (m *model) scanSummary(out string) string {
 	if m.changes > 0 {
 		return T("scan complete") + "  " + view.ChangeSummary(m.lastEvents) + "  " + T("c shows them")
@@ -178,7 +178,7 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 	if m.prompt == nil && !m.editing && m.pos == nil {
 		m.status, m.sayKind = "", sayNone // the status line lasts until the next key
 	}
-	placed := m.placed // "m changes it" holds for the next key only (06 §3.5)
+	placed := m.placed // "m changes it" holds for the next key only (16 §3.5)
 	m.placed = nil
 	if a := m.armed; a != nil {
 		m.armed = nil
@@ -217,7 +217,7 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 	case m.rulesTyping():
 		return m.rulesKey(k) // the rule's form
 	case m.tab == tabChanges && k.Paste:
-		return m.openAdd(string(k.Runes)) // a pasted address goes to add a subscription (06 §2.9 ctrl+v)
+		return m.openAdd(string(k.Runes)) // a pasted address goes to add a subscription (16 §2.9 ctrl+v)
 	case (m.tab == tabList || m.tab == tabLibrary) && m.curBar().typing:
 		return m.barTypeKey(k)
 	case (m.tab == tabList || m.tab == tabLibrary) && m.curBar().open:
@@ -291,7 +291,7 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 	return m.listKey(s)
 }
 
-// listKey: the keys of the list areas (06 §3.3, §13.6). The arrows only navigate.
+// listKey: the keys of the list areas (16 §3.3). The arrows only navigate.
 func (m *model) listKey(s string) tea.Cmd {
 	c := m.col()
 	switch s {
@@ -310,7 +310,7 @@ func (m *model) listKey(s string) tea.Cmd {
 	case "end":
 		return m.moveCursor(len(c.view))
 	case "pgup":
-		return m.moveCursor(-m.detailPage()) // the list's cursor, a page (06 §3.3)
+		return m.moveCursor(-m.detailPage()) // the list's cursor, a page (16 §3.3)
 	case "pgdown":
 		return m.moveCursor(m.detailPage())
 	case "ctrl+a":
@@ -342,7 +342,7 @@ func (m *model) listKey(s string) tea.Cmd {
 	case `\`:
 		return m.toggleBar()
 	case "esc":
-		// back one level (06 §3.1): the selection, then the search and the filters
+		// back one level (16 §3.1): the selection, then the search and the filters
 		switch {
 		case m.selCount() > 0:
 			m.clearSel()
@@ -370,7 +370,7 @@ func (m *model) listKey(s string) tea.Cmd {
 		return m.stageKey()
 	case "T":
 		// in staging: everything back in place; elsewhere: every enabled mod into staging,
-		// as in the window (06 §3.5)
+		// as in the window (16 §3.5)
 		if m.focus != cStaging {
 			m.verb(view.StageAll(m.app))
 			m.clearSel()
@@ -403,7 +403,7 @@ func (m *model) listKey(s string) tea.Cmd {
 	case "w":
 		return m.listAction(view.ListSave)
 	case "A":
-		return m.startAnalyze() // check the files again (06 §3.5)
+		return m.startAnalyze() // check the files again (16 §3.5)
 	case "H":
 		return m.chooseHistory()
 	case "u", "ctrl+z":
@@ -413,7 +413,7 @@ func (m *model) listKey(s string) tea.Cmd {
 		m.act(T("redid the change"), "redo")
 		return m.requestDetail()
 	case "L":
-		return m.goLaunch() // Start first, as in the window (06 §2.5)
+		return m.goLaunch() // Start first, as in the window (16 §2.5)
 	case "x":
 		if it := c.cur(); it != nil && it.id != "" {
 			m.act(Tf("switched the version of %s", it.name), "swap", it.ref)
@@ -446,7 +446,7 @@ func (m *model) listKey(s string) tea.Cmd {
 		}
 		return nil
 	case "r":
-		// Load-order rules with the form for this mod (06 §2.5): the window's rules card
+		// Load-order rules with the form for this mod (16 §2.5): the window's rules card
 		it := c.cur()
 		if it == nil || it.id == "" {
 			m.say(sayInfo, T("choose a mod in the lists first"))
@@ -457,7 +457,7 @@ func (m *model) listKey(s string) tea.Cmd {
 	return nil
 }
 
-// filterKey: typing the search of the focused list (06 §3.7). The status line counts the
+// filterKey: typing the search of the focused list (16 §3.7). The status line counts the
 // matches in the other lists; tab takes the search to the next list that has any.
 func (m *model) filterKey(k tea.KeyMsg) tea.Cmd {
 	c := m.col()
@@ -469,7 +469,7 @@ func (m *model) filterKey(k tea.KeyMsg) tea.Cmd {
 	case tea.KeyEsc:
 		m.editing, c.filter = false, ""
 	case tea.KeyTab:
-		// tab takes the grey completion when there is one (06 §3.7), else goes to the
+		// tab takes the grey completion when there is one (16 §3.7), else goes to the
 		// next list with matches
 		g := m.searchGhost()
 		if g == "" {
@@ -628,7 +628,7 @@ func (m *model) panelKey(s string) tea.Cmd {
 	}
 	switch s {
 	case ":":
-		m.panel = nil // one command after another (06 §9.4)
+		m.panel = nil // one command after another (16 §9.4)
 		return m.openCmdLine()
 	case "down", "j":
 		p.off = min(p.off+1, max(len(p.lines)-page, 0))
@@ -679,7 +679,7 @@ func (m *model) chooseEnv() tea.Cmd {
 	return nil
 }
 
-// removeEnv shows the dry run of removing an environment; enter removes it (06 §2.14).
+// removeEnv shows the dry run of removing an environment; enter removes it (16 §2.14).
 func (m *model) removeEnv(name string) {
 	r, err := m.app.EnvRemovePreview(name)
 	if err != nil {
@@ -702,7 +702,7 @@ func (m *model) removeEnv(name string) {
 		}}
 }
 
-// ---- mouse (06 §3.3, §13.5) ----
+// ---- mouse (16 §3.3, §8.5) ----
 
 // hit returns the column slot and view index under a point (index -1: the title row or
 // below the last row; ok false: not over a list column).
@@ -761,7 +761,7 @@ func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
 		}
 		return tea.Batch(cmds...)
 	}
-	// The wheel scrolls the detail wherever the pointer is; the focus stays (06 §3.3).
+	// The wheel scrolls the detail wherever the pointer is; the focus stays (16 §3.3).
 	if wheel != 0 {
 		return m.scrollDetail(wheel)
 	}
@@ -772,7 +772,7 @@ func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
 		}
 		return nil
 	}
-	// Dragging the gap after a list column sets its width (06 §2.5).
+	// Dragging the gap after a list column sets its width (16 §2.5).
 	if r := m.resizing; r != nil {
 		switch e.Action {
 		case tea.MouseActionMotion:
@@ -792,7 +792,7 @@ func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
 	}
 	k, i, ok := m.hit(e.X, e.Y)
 	if e.Action == tea.MouseActionPress && e.Button == tea.MouseButtonRight && ok && i >= 0 {
-		// a right click: the row's menu at the pointer (06 §8.5); a selected row keeps the selection
+		// a right click: the row's menu at the pointer (16 §8.5); a selected row keeps the selection
 		c := &m.cols[k]
 		if k != m.focus || !m.marked[c.items[c.view[i]].id] {
 			m.setFocus(k)
@@ -805,7 +805,7 @@ func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
 		return nil
 	}
 	// Click: the cursor; shift+click: a range from the cursor; ctrl+click: add or remove
-	// one row. Another list drops the selection (06 §3.4). Moving is done with verbs.
+	// one row. Another list drops the selection (16 §3.4). Moving is done with verbs.
 	m.setFocus(k)
 	c := &m.cols[k]
 	if i < 0 {

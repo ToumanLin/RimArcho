@@ -286,7 +286,7 @@ Historical single/few observations are not current P95: bulk audit starts `887b6
 
 For every budget, record host/guest CPU, RAM, disk, GPU, build hash, content scale, and cold/warm category. Time from actual input receipt; record first-feedback, confirm-ready, API-ack, data-ready, task-terminal, and stable-snapshot separately. Run at least 5 rounds and retain all samples; report meaningful quantiles only after 20 or more. Separate performance failures from functional failures; old single runs are not P95.
 
-Original detailed records: [bulk timing audit](2026-10-27_batch-operation-timing-audit.md), [page-load research](2026-10-26_page-load-time-and-optimization.md), [needs cache results](2026-10-27_needs-cache-and-list-problems-api-results.md).
+Original detailed records: [bulk timing audit](2026-10-27_batch-operation-timing-audit.md), [page-load research](2026-10-26_page-load-time-and-optimization.md); the needs cache contract is 16 §8.7.
 
 ## 7. Ten Concrete Phase 1 Scenarios
 

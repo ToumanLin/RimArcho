@@ -18,12 +18,12 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Can it run (06 §5): what the player can act on, grouped by where the problem is, each item one
+// Can it run (16 §5): what the player can act on, grouped by where the problem is, each item one
 // sentence in plain words with the actions that fix it. No problem codes and no #refs appear
 // here: they stay in the technical information, the CLI and MCP. The top bar's number is
-// the number of counted items (06 §2.2).
+// the number of counted items (16 §2.2).
 
-// Groups, in screen order (06 §2.4).
+// Groups, in screen order (16 §2.4).
 const (
 	GroupList = iota
 	GroupDeps
@@ -61,15 +61,15 @@ const (
 	ActUnpin           = "unpin"            // Refs[0]: restore the workshop copy (confirm first)
 	ActTrash           = "trash"            // Refs[0]: folder to the recycle bin (confirm first)
 	ActIgnore          = "ignore"           // Problem: keep as it is (ignore the problem)
-	ActUnlinkPacks     = "unlink-packs"     // remove the packs' links from Mods/ (08 §5.3)
+	ActUnlinkPacks     = "unlink-packs"     // remove the packs' links from Mods/ (10 §3)
 	ActRepairLinks     = "repair-links"
 	ActSwap            = "swap"           // Refs[0] → Refs[1] in the plan (one undoable step)
 	ActSubscribe       = "subscribe"      // Refs: Workshop IDs to subscribe to (a background task)
 	ActMoveLocked      = "move-to-locked" // Refs[0]: a Mods/ folder into the lock library (confirm first)
 	ActTextures        = "textures"       // Refs: convert their textures to DDS again (confirm first)
 	ActTexClean        = "textures-clean" // Refs: delete the DDS RimArcho wrote (confirm first)
-	ActAddVersion      = "add-version"    // Refs[0]: the list's name, Refs[1]: a game version to allow (04 §1.6)
-	ActManageLists     = "manage-lists"   // the list management page (06 §2.17); Argv: the CLI's view of it
+	ActAddVersion      = "add-version"    // Refs[0]: the list's name, Refs[1]: a game version to allow (07 §1.6)
+	ActManageLists     = "manage-lists"   // the list management page (16 §2.17); Argv: the CLI's view of it
 )
 
 // Option is one choice of a choose-disable action.
@@ -84,10 +84,10 @@ type Action struct {
 	ID    string `json:"id,omitempty"`
 	After string `json:"after,omitempty"`
 	Kind  string `json:"kind"`
-	Key   string `json:"key"` // the TUI's key for it (06 §5)
+	Key   string `json:"key"` // the TUI's key for it (16 §5)
 	Label string `json:"label"`
 	// Done is what the status line says afterwards; Confirm, when set, is asked first
-	// (06 §6: actions u cannot undo).
+	// (16 §6: actions u cannot undo).
 	Done    string   `json:"done,omitempty"`
 	Confirm string   `json:"confirm,omitempty"` // the TUI's "press again" line
 	Warn    string   `json:"warn,omitempty"`    // what a confirmation dialog says
@@ -121,7 +121,7 @@ type Need struct {
 	Target       string     `json:"target,omitempty"`
 	RequiredBy   []ModOwner `json:"requiredBy,omitempty"`
 	Group        int        `json:"group"`
-	Section      int        `json:"section"` // the section it is shown in (SectionOf, 06 §2.4)
+	Section      int        `json:"section"` // the section it is shown in (SectionOf, 16 §2.4)
 	Phase        string     `json:"phase,omitempty"`
 	PhaseHeading string     `json:"phaseHeading,omitempty"`
 	Text         string     `json:"text"` // one sentence (the TUI's line)
@@ -138,7 +138,7 @@ type Need struct {
 
 	Content *NeedContent `json:"content,omitempty"`
 
-	// A folded item stands for several findings one action resolves (06 §5): its parts
+	// A folded item stands for several findings one action resolves (16 §5): its parts
 	// are shown on demand; every mod in Mods gets the row icon.
 	Parts []string `json:"parts,omitempty"`
 	Fold  bool     `json:"fold,omitempty"`
@@ -147,18 +147,18 @@ type Need struct {
 
 	// Kind is the kind of problem it stands for (a problem code, or "" for the page's own
 	// items). The GUI keeps a resolved item in place only when no item of the same kind
-	// took its place (06 §5: done items).
+	// took its place (16 §5: done items).
 	Kind string `json:"kind,omitempty"`
-	// Also: lines about what merged into this item (weak order preferences, cycles: 06 §5).
+	// Also: lines about what merged into this item (weak order preferences, cycles: 16 §5).
 	Also []string `json:"also,omitempty"`
 	// Into: the item this one is shown inside on Can it run (its ID); the editor's panel and
 	// the CLI still list it on its own.
 	Into string `json:"into,omitempty"`
-	// Related: items of the other column about the same mod (06 §5: the columns point at
+	// Related: items of the other column about the same mod (16 §5: the columns point at
 	// each other).
 	Related []Related `json:"related,omitempty"`
 
-	rank int    // order within the group (06 §5's order)
+	rank int    // order within the group (16 §5's order)
 	code string // the problem code it stands for (LaunchHint)
 
 	linkProblems []*app.Problem // original subjects and targets, retained through folding for name links
@@ -177,22 +177,82 @@ type Needs struct {
 	Error       string                `json:"error,omitempty"`
 	Items       []Need                `json:"items"`
 	Status      map[string]int        `json:"status"` // each mod's row icon
-	// Reasons say why a row has its icon: the items behind it, worst first (06 §4.2: the
+	// Reasons say why a row has its icon: the items behind it, worst first (16 §4.2: the
 	// badge's hover / pinned popover).
 	Reasons map[string][]Reason `json:"reasons,omitempty"`
 	Count   int                 `json:"count"` // the top bar's number
 	Never   bool                `json:"never"` // the mods' files were never checked
 	Stale   bool                `json:"stale"` // the files changed since the last check
 	// Launch is the most likely trouble of a launch (app.LaunchChecks among the counted
-	// items), for the launch page's tab and the TUI's launch line (06 §2.3); nil when none.
+	// items), for the launch page's tab and the TUI's launch line (16 §2.3); nil when none.
 	Launch *LaunchHint `json:"launch,omitempty"`
 	// LastRun says which run wrote the last-run log: "the list · Sep 29 19:41" or
-	// "pack X · …" (08 §5.3: a pack's errors are not the list's).
+	// "pack X · …" (10 §3: a pack's errors are not the list's).
 	LastRun    string `json:"lastRun,omitempty"`
 	LastRunDay string `json:"lastRunDay,omitempty"` // its day: "Oct 21"
 	// Elsewhere: what is not on Can it run but handled on another page (SectionElsewhere),
-	// one line each at the bottom of the page (06 §2.4).
+	// one line each at the bottom of the page (16 §2.4).
 	Elsewhere []Elsewhere `json:"elsewhere,omitempty"`
+	// LastSave is Before you start's first card: whether the save the last run loaded
+	// loads with this list (16 §2.4); nil when no run names a save.
+	LastSave *LastSaveView `json:"lastSave,omitempty"`
+}
+
+// LastSaveView is the save the last run loaded, checked against the list as it is now
+// (app.LastLoadedSave, 12 §4.3): its verdict and the rows that need attention.
+type LastSaveView struct {
+	Ref     string   `json:"ref"`
+	Name    string   `json:"name"`
+	Colony  string   `json:"colony,omitempty"`
+	Loaded  string   `json:"loaded,omitempty"` // when it was loaded: "Oct 28 18:13"
+	Level   string   `json:"level"`            // "" loads, warning, error, writing
+	Verdict string   `json:"verdict"`
+	Lines   []string `json:"lines,omitempty"` // the warning and error rows' headings, LastSaveLines at most
+	More    int      `json:"more,omitempty"`  // rows not in Lines
+	Command string   `json:"command"`         // the archo command that shows the whole check
+	// Gone: the run named a save that is no longer in the Saves folder.
+	Gone bool `json:"gone,omitempty"`
+}
+
+// LastSaveLines is how many rows the last save's card names.
+const LastSaveLines = 3
+
+// lastSaveView checks the save the newest run loaded against st's list (nil: none named,
+// or it could not be checked).
+func lastSaveView(a *app.App, st *app.LoadoutState, runs []*app.LogRun) *LastSaveView {
+	c, run, err := a.LastLoadedSave(st, runs)
+	if err != nil || run == nil {
+		return nil
+	}
+	v := &LastSaveView{}
+	at := run.ModTime
+	for _, p := range run.Marks {
+		if p != nil && p.Name == "save" && !p.At.IsZero() {
+			at = p.At
+		}
+	}
+	if !at.IsZero() {
+		v.Loaded = ShortDate(at) + " " + at.In(a.Loc).Format("15:04")
+	}
+	if c == nil {
+		v.Name, v.Gone = shownSave(run.LastSave()), true
+		v.Verdict = T("not in the Saves folder any more")
+		return v
+	}
+	d := SaveDetailOf(c, false, true)
+	v.Ref, v.Name, v.Colony, v.Level, v.Verdict = d.Ref, d.Name, d.Colony, d.Level, d.Verdict
+	v.Command = "saves show " + d.Ref
+	for _, is := range d.Issues {
+		if is.Level != app.LevelError && is.Level != app.LevelWarning {
+			continue
+		}
+		if len(v.Lines) == LastSaveLines {
+			v.More++
+			continue
+		}
+		v.Lines = append(v.Lines, is.Head)
+	}
+	return v
 }
 
 // Related points at an item of the other column: its ID and a line naming it.
@@ -211,7 +271,7 @@ type Elsewhere struct {
 }
 
 // Reason is one item behind a row's status icon: its status, its one-line text and the
-// same actions Can it run offers for it (the pinned popover's buttons, 06 §4.2).
+// same actions Can it run offers for it (the pinned popover's buttons, 16 §4.2).
 type Reason struct {
 	Content  *NeedContent `json:"content,omitempty"`
 	Evidence *Evidence    `json:"evidence,omitempty"`
@@ -224,7 +284,7 @@ type Reason struct {
 }
 
 // BuildNeeds turns the problem set and the environment's open questions into items, and
-// counts them (06 §7, §4.2, §7).
+// counts them (16 §7, §4.2, §7).
 func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 	n := &Needs{Status: map[string]int{}, Reasons: map[string][]Reason{}}
 	n.Never = ps.Analysis == nil || ps.Analysis.Run == nil
@@ -248,7 +308,7 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 		}
 		n.Items[i].Kind = n.Items[i].code
 		if ev := n.Items[i].Evidence; ev != nil && ev.Kind == EvCorpus {
-			// what shared logs taught: a hint, not counted; on Can it run it is worth knowing (06 §5)
+			// what shared logs taught: a hint, not counted; on Can it run it is worth knowing (16 §5)
 			n.Items[i].Status = StatusHint
 			n.Items[i].Counted = false
 			if n.Items[i].Section == SectionBreak {
@@ -282,6 +342,7 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 		}
 		break
 	}
+	n.LastSave = lastSaveView(a, st, ps.Logs)
 	indexNeeds(n)
 	return n
 }
@@ -291,13 +352,13 @@ func indexNeeds(n *Needs) {
 	n.Reasons = map[string][]Reason{}
 	n.Count = 0
 	n.Launch = launchHint(n.Items)
-	// Count actionable problems; also retain uncounted corpus hints on rows (06 §5).
+	// Count actionable problems; also retain uncounted corpus hints on rows (16 §5).
 	for _, it := range n.Items {
 		if !it.Counted && it.Status != StatusHint {
 			continue
 		}
 		// Hidden mods are housekeeping, not something that stops the game: they are listed
-		// on the page but not counted in the sidebar's number (06 §2.1).
+		// on the page but not counted in the sidebar's number (16 §2.1).
 		if it.Counted && it.Group != GroupHidden {
 			n.Count++
 		}
@@ -362,10 +423,10 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 	}
 	var versions []*app.Problem
 	var order []Need                    // order.violated: folded into one item when there are several
-	var weak []Need                     // order.violated of weak or harmless constraints: one dimmed item (04 §5.3)
+	var weak []Need                     // order.violated of weak or harmless constraints: one dimmed item (08 §1.3)
 	logs := map[string][]*app.Problem{} // current log problems by subject mod ("" unattributed)
 	// A mod's patches that miss the same inactive target, and its definitions whose parent
-	// is missing, are one item each: one action covers them all (06 §5's merge rule).
+	// is missing, are one item each: one action covers them all (16 §5's merge rule).
 	type merged struct {
 		n    Need
 		x, y string
@@ -415,14 +476,14 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			versions = append(versions, p)
 			continue
 		}
-		// A cycle is info (the corpus saw no effect, 03 §4.3), but only the player can resolve
+		// A cycle is info (the corpus saw no effect, 05 §4.3), but only the player can resolve
 		// it: listed with its actions, dimmed and not counted. So are weak order preferences
 		// (folded) and a mod's own known error (a note): the player sees them, they are not
 		// what stops the game.
 		if p.Severity != finding.Error && p.Severity != finding.Warning &&
 			p.Code != "order.cycle" && p.Code != "order.violated" && p.Code != "mod.known-error" &&
 			p.Code != "dep.observed-missing" && p.Code != "combo.known-bad" {
-			continue // info: technical information only (06 §5)
+			continue // info: technical information only (16 §5)
 		}
 		cur = p.Code
 		linkProblem = p
@@ -454,7 +515,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 				Why: T("a strong requirement (a dependency or loadBefore): breaking it goes with more errors in shared logs; sorting puts it right"), Evidence: ev})
 			order[len(order)-1].linkProblems = []*app.Problem{p}
 		case "mod.known-error":
-			// The mod's own problem (03 §4.3): whatever else is enabled, shared logs show it.
+			// The mod's own problem (05 §4.3): whatever else is enabled, shared logs show it.
 			add(Need{rank: 9, Group: GroupConflict, Text: Tf("%s has a known error: this is the mod's own problem", nm(x)),
 				Actions: []Action{problemAction(p.Ref)}, Mods: ids, Status: StatusWarn, Dim: true,
 				Title: Tf("%s has a known error: this is the mod's own problem", nm(x)), Why: T("not your list's: shared logs show it whatever else is enabled; an update may fix it"), Evidence: ev})
@@ -469,7 +530,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			pkg := strings.TrimPrefix(x, "pkg:")
 			look := Action{Kind: ActOpenURL, Key: "o", Label: T("look for it in the Workshop"), URL: WorkshopSearch(pkg), Done: T("opened the Workshop page")}
 			for _, sg := range p.Suggestions {
-				if u, ok := strings.CutPrefix(sg, "subscribe: "); ok { // steamDB knows the item (04 §6.3)
+				if u, ok := strings.CutPrefix(sg, "subscribe: "); ok { // steamDB knows the item (08 §2.3)
 					look.Label, look.URL = T("open it in the Workshop"), u
 				}
 			}
@@ -595,7 +656,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			}
 		default:
 			// Harmony warnings without log evidence, overlapping Defs and patches whose target
-			// is simply absent stay in the technical information (06 §5).
+			// is simply absent stay in the technical information (16 §5).
 		}
 	}
 	// what is added from here on says its own code: cur is the last problem's
@@ -687,7 +748,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 		add(n)
 	}
 	if len(weak) > 0 {
-		// Weak and harmless constraints (04 §5.3): breaking them went with no more errors in
+		// Weak and harmless constraints (08 §1.3): breaking them went with no more errors in
 		// shared logs. One dimmed, uncounted item; sorting still puts them right.
 		f := Need{rank: 8, Group: GroupList, Status: StatusWarn, Dim: true, Fold: true, code: "order.violated",
 			Text:     Tf("%d weaker order preferences are not met", len(weak)),
@@ -757,7 +818,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			Actions: []Action{{Kind: ActSave, Key: "w", Label: T("save")}}, Counted: true, Status: StatusWarn,
 			Title: Tf("the list was saved for %s", v), Why: T("the game resets it when it starts; saving once fixes that"), Evidence: evidence(EvInferred, Tf("ModsConfig.xml says %s", v))})
 	}
-	// Last run: the current log's errors, one item per mod (06 §2.4).
+	// Last run: the current log's errors, one item per mod (16 §2.4).
 	logWhen := ""
 	for _, r := range ps.Logs {
 		if !r.Stale() && !r.ModTime.IsZero() {
@@ -806,7 +867,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 		add(Need{Group: GroupConfirm, Text: T("ModsConfig.xml was changed outside RimArcho"), Counted: true, Status: StatusWarn,
 			Why: T("this list was changed after it too: use the outside change, or keep yours"), Evidence: evidence(EvInferred, T("ModsConfig.xml differs from what RimArcho wrote")), Actions: []Action{
 				viewAction(T("see the difference"), "loadout", "diff", fmt.Sprintf("v%d", v), "workspace"),
-				// One step: u brings the list back (06 §6), so no confirmation.
+				// One step: u brings the list back (16 §6), so no confirmation.
 				{Kind: ActLoadExternal, Key: "L", Label: T("use the outside change"), Version: v, Undo: true,
 					Done: T("the outside change is in use")},
 				{Kind: ActDismissConflict, Key: "I", Label: T("ignore it"), Done: T("the outside change is ignored (it stays in the history)")},
@@ -815,7 +876,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 	if n := droppedNeed(a, st); n != nil {
 		add(*n)
 	}
-	// The game now is not among the versions the list allows (04 §1.6): something to
+	// The game now is not among the versions the list allows (07 §1.6): something to
 	// confirm, not a block; version.unsupported still checks each mod against the game.
 	if pv, err := a.PlanVersionsOf(st, st.Plan); err == nil && pv.Game != "" && len(pv.Allowed) > 0 && !slices.Contains(pv.Allowed, pv.Game) {
 		name, allowed := st.Plan.Name, app.FormatVersions(pv.Allowed)
@@ -829,7 +890,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 				{Kind: ActManageLists, Key: "M", Label: T("go to list management"), Argv: []string{"plan", "versions", name}},
 			}})
 	}
-	// Other plans of the environment with an unloaded outside change (04 §4.3): resolved
+	// Other plans of the environment with an unloaded outside change (07 §4.3): resolved
 	// after switching to them.
 	if cs, err := a.Conflicts(st); err == nil {
 		for _, c := range cs {
@@ -848,7 +909,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 	return out
 }
 
-// packLinksNeed: a pack's links left in Mods/ (08 §5.3). Launching from RimArcho removes
+// packLinksNeed: a pack's links left in Mods/ (10 §3). Launching from RimArcho removes
 // them anyway, so it is something to decide, not something that breaks the game: in
 // for you to confirm, with one action that removes only the links (no confirmation: launching the
 // pack makes them again).
@@ -890,7 +951,7 @@ func packLinksNeed(p *app.Problem) Need {
 	return n
 }
 
-// modsDuplicateNeed: two folders of one packageId in Mods/ (08 §3). The one action never
+// modsDuplicateNeed: two folders of one packageId in Mods/ (09 §3). The one action never
 // moves a folder RimArcho did not make: it uses the copy in Mods/ instead of RimArcho's link,
 // or takes the linked mod out of the plan; with only the player's folders it says what to do.
 func modsDuplicateNeed(st *app.LoadoutState, p *app.Problem, ids []string) Need {
@@ -938,7 +999,7 @@ func modsDuplicateNeed(st *app.LoadoutState, p *app.Problem, ids []string) Need 
 		n.Actions = []Action{{Kind: ActList, Key: "enter", Label: T("see which"), Title: Tf("Mods/ holds %s twice", pkg), Lines: where}}
 	}
 	if move != nil {
-		// move into the lock library first: the plain folder leaves Mods/, plans keep it (08 §3)
+		// move into the lock library first: the plain folder leaves Mods/, plans keep it (09 §3)
 		n.Why = T("move the plain folder into the lock library: it leaves Mods/, and lists that use it keep it and get it through a link")
 		n.Actions = append([]Action{*move}, n.Actions...)
 	}
@@ -949,7 +1010,7 @@ func questionNeed(st *app.LoadoutState, q *store.Question) Need {
 	nm := func(id string) string { return TokName(st, finding.Inst(id)) }
 	x, y := nm(q.InstanceID), nm(q.CandidateID)
 	answer := func(key, label, ans, will, done, hint string) Action {
-		// Merging or splitting lineages is not undone with u: confirm first (06 §6). The
+		// Merging or splitting lineages is not undone with u: confirm first (16 §6). The
 		// confirmation says what will happen; the status line says what did.
 		return Action{Kind: ActAnswer, Key: key, Label: label, QID: q.ID, Answer: ans, Done: done, Confirm: Tf("press %s again: %s", key, will), Warn: will + "\n" + hint + "\n" + T("this answer cannot be undone with u"), Title: hint}
 	}

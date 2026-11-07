@@ -9,7 +9,6 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/identity"
-	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
@@ -31,7 +30,7 @@ func sourcesOf(t *testing.T, e *testkit.Env) map[string]*source.Source {
 	return out
 }
 
-// 02 §0: a second game shares the Workshop folder: the same instances, lineages and player
+// 03 §2: a second game shares the Workshop folder: the same instances, lineages and player
 // data in both environments; Data/ and Mods/ are each game's own; plans are shared by every game.
 func TestEnvModelSharedWorkshop(t *testing.T) {
 	t.Parallel()
@@ -116,7 +115,7 @@ func TestEnvModelSharedWorkshop(t *testing.T) {
 	}
 }
 
-// 02 §0 item 5: own saves live in <data>/userdata/<env> and the game starts with
+// 03 §2 item 5: own saves live in <data>/userdata/<env> and the game starts with
 // -savedatafolder; shared saves are the game's default folder.
 func TestEnvModelSaves(t *testing.T) {
 	t.Parallel()
@@ -141,7 +140,7 @@ func TestEnvModelSaves(t *testing.T) {
 	}
 }
 
-// 02 §0 items 3, 12: shared mod folders are added and removed in one place; a second
+// 03 §2 items 3, 12: shared mod folders are added and removed in one place; a second
 // Workshop folder replaces the first (re-bound); RimArcho's own folders stay; folders
 // must not contain each other.
 func TestFolderCommands(t *testing.T) {
@@ -190,210 +189,7 @@ func TestFolderCommands(t *testing.T) {
 	}
 }
 
-// 02 §0.1: a database from before the shared folders, with a second environment that had
-// its own copy of the Workshop folder: after the migration every plan keeps its list and
-// order, the undo stack works, a pack made before still launches and is counted as using
-// the mod, and a locked copy (whose origin.json names IDs merged away) is matched by R5.
-func TestMigrateV14App(t *testing.T) {
-	t.Parallel()
-	e, _ := pinFixture(t)
-	e.MustRun("env", "set", "main", "--launch", "direct")
-	up := refID(t, e, "Lockable", source.Workshop)
-	e.MustRun("pack", "build", "before")
-	e.MustRun("pin", refOf(t, e, "Lockable", ""))
-	cp := lockedAt(t, e, "5100_local")
-	stBefore, _ := e.App.Loadout()
-	planBefore := folders(t, e, stBefore.List)
-
-	twin := downgradeWithTwin(t, e)
-	e.Open() // migration v14
-
-	ix, _ := e.App.Index()
-	if ix.ByID[up] != nil {
-		t.Fatal("the merged-away Workshop instance is still there")
-	}
-	newUp := twin[up]
-	w := ix.ByID[newUp]
-	c := ix.ByID[cp]
-	if w == nil || c == nil || c.LineageID != w.LineageID {
-		t.Fatalf("the locked copy and its upstream share the lineage kept: up %+v copy %+v", w, c)
-	}
-	st, _ := e.App.Loadout()
-	if got := folders(t, e, st.List); !slices.Equal(got, planBefore) {
-		t.Fatalf("main's plan changed:\n%v\n%v", planBefore, got)
-	}
-	// Undo: the pin's swap is undone onto the instance kept.
-	e.MustRun("undo")
-	if st, _ := e.App.Loadout(); st.List.Index(newUp) < 0 || st.List.Index(cp) >= 0 {
-		t.Fatal("undo after the migration must bring the upstream back")
-	}
-	e.MustRun("redo")
-
-	// The pack names the old ID: it launches, and counts as using the mod kept.
-	e.MustRun("pack", "launch", "before", "--dry-run")
-	lib, err := e.App.Library()
-	if err != nil {
-		t.Fatal(err)
-	}
-	l, err := lib.Lineage("L#" + w.LineageID[:6])
-	if err != nil {
-		t.Fatal(err)
-	}
-	found := false
-	for _, u := range l.UsedIn() {
-		found = found || (u.Kind == "pack" && u.Name == "before")
-	}
-	if !found {
-		t.Fatalf("the old pack's use: %+v", l.UsedIn())
-	}
-
-	// A scan: nothing changes; a second copy of the locked folder is a confirmed copy in the
-	// lineage kept (R5 through id_alias).
-	sid := scanNow(t, e)
-	if evs := eventsOf(t, e, sid); len(evs) != 0 {
-		t.Fatalf("the first scan after the migration changed something: %v", evs)
-	}
-	lockDir := filepath.Join(e.Root, "LocalAppData", "RimArcho", "locked")
-	legacy := filepath.Join(lockDir, "main")
-	e.CopyTree(filepath.Join(legacy, "5100_local"), filepath.Join(legacy, "5100_again"))
-	sid = scanNow(t, e)
-	ix, _ = e.App.Index()
-	m := ix.ModAt(filepath.Join(legacy, "5100_again"))
-	if m == nil || m.LineageID != w.LineageID || m.LineageBasis != identity.BasisConfirmed {
-		t.Fatalf("R5 after the migration: %+v (events %v)", m, eventsOf(t, e, sid))
-	}
-	// The older per-environment folder still counts as the lock library.
-	if s := sourcesOf(t, e)["locked-main"]; s == nil || !e.App.IsLockSource(s) {
-		t.Fatalf("legacy lock folder: %+v", sourcesOf(t, e))
-	}
-}
-
-func folders(t *testing.T, e *testkit.Env, l loadout.List) []string {
-	t.Helper()
-	ix, _ := e.App.Index()
-	var out []string
-	for _, x := range l {
-		if m := ix.ByID[x.Instance]; m != nil {
-			out = append(out, string(m.Kind)+"/"+m.Rel)
-		} else {
-			out = append(out, "?"+x.Key())
-		}
-	}
-	return out
-}
-
-// downgradeWithTwin turns e's database into what schema v13 would have held with a second
-// environment "two" that had its own copy of every shared folder (except the lock library):
-// "two"'s instances are older, so they are the ones kept. The lock library goes back to
-// <lock.dir>/main. It returns the map from main's shared instances to their twins.
-func downgradeWithTwin(t *testing.T, e *testkit.Env) map[string]string {
-	t.Helper()
-	db := e.App.Store.DB
-	exec := func(q string, args ...any) {
-		t.Helper()
-		if _, err := db.Exec(q, args...); err != nil {
-			t.Fatalf("%s: %v", q, err)
-		}
-	}
-	envID := ""
-	db.QueryRow(`SELECT id FROM environment WHERE name='main'`).Scan(&envID)
-	g2 := secondGame(e, "Game15")
-	two := e.App.NewID()
-	exec(`INSERT INTO environment(id, name, game_root, user_data_root, game_version, launch, created_at) VALUES(?, 'two', ?, ?, '1.6', 'direct', 1)`, two, g2, e.UserData)
-	exec(`INSERT INTO source(id, environment_id, kind, label, root, status) VALUES(?, ?, 'official', 'official', ?, 'ok'), (?, ?, 'local', 'local', ?, 'ok')`,
-		e.App.NewID(), two, filepath.Join(g2, "Data"), e.App.NewID(), two, filepath.Join(g2, "Mods"))
-
-	// The lock library as it was: <lock.dir>/main, a source of main.
-	lockDir := filepath.Join(e.Root, "LocalAppData", "RimArcho", "locked")
-	legacy := filepath.Join(lockDir, "main")
-	ents, _ := os.ReadDir(lockDir)
-	e.MkdirAll(legacy)
-	for _, d := range ents {
-		e.Move(filepath.Join(lockDir, d.Name()), filepath.Join(legacy, d.Name()))
-	}
-	exec(`UPDATE source SET root=? WHERE label='locked'`, legacy)
-	exec(`UPDATE instance SET real_path=replace(real_path, ?, ?) WHERE source_id IN (SELECT id FROM source WHERE label='locked')`, lockDir, legacy)
-
-	type row struct{ id, kind, label, root string }
-	var shared []row
-	rows, _ := db.Query(`SELECT id, kind, label, root FROM source WHERE environment_id=''`)
-	for rows.Next() {
-		var r row
-		rows.Scan(&r.id, &r.kind, &r.label, &r.root)
-		shared = append(shared, r)
-	}
-	rows.Close()
-	twin := map[string]string{}
-	twinLin := map[string]string{}
-	for _, s := range shared {
-		if s.label == app.LockLabel {
-			continue
-		}
-		ts := e.App.NewID()
-		exec(`INSERT INTO source(id, environment_id, kind, label, root, status) VALUES(?, ?, ?, ?, ?, 'ok')`, ts, two, s.kind, s.label, s.root)
-		type inst struct {
-			id, lin, rel, real, status string
-			snap                       int64
-			first                      int64
-		}
-		var is []inst
-		rows, _ := db.Query(`SELECT id, lineage_id, rel_path, real_path, status, coalesce(current_snapshot_id, 0), first_seen FROM instance WHERE source_id=?`, s.id)
-		for rows.Next() {
-			var x inst
-			rows.Scan(&x.id, &x.lin, &x.rel, &x.real, &x.status, &x.snap, &x.first)
-			is = append(is, x)
-		}
-		rows.Close()
-		for _, x := range is {
-			if twinLin[x.lin] == "" {
-				twinLin[x.lin] = e.App.NewID()
-				exec(`INSERT INTO lineage(id, environment_id, primary_instance_id, created_at) SELECT ?, ?, '', created_at-10 FROM lineage WHERE id=?`, twinLin[x.lin], two, x.lin)
-			}
-			n := e.App.NewID()
-			twin[x.id] = n
-			res, err := db.Exec(`INSERT INTO snapshot(instance_id, scan_id, snapshot_hash, package_id, package_id_raw, name, authors, workshop_id_declared,
-				supported_versions, decl_blob, acf_manifest, acf_time_updated, acf_size, git_head, origin, file_count, total_size, semantic_count, kinds, langs)
-				SELECT ?, scan_id, snapshot_hash, package_id, package_id_raw, name, authors, workshop_id_declared, supported_versions, decl_blob,
-				acf_manifest, acf_time_updated, acf_size, git_head, origin, file_count, total_size, semantic_count, kinds, langs FROM snapshot WHERE id=?`, n, x.snap)
-			if err != nil {
-				t.Fatal(err)
-			}
-			sid, _ := res.LastInsertId()
-			exec(`INSERT INTO snapshot_file(snapshot_id, rel_path, size, mtime, hash) SELECT ?, rel_path, size, mtime, hash FROM snapshot_file WHERE snapshot_id=?`, sid, x.snap)
-			exec(`INSERT INTO instance(id, environment_id, lineage_id, source_id, rel_path, real_path, status, current_snapshot_id, first_seen, last_seen)
-				VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, n, two, twinLin[x.lin], ts, x.rel, x.real, x.status, sid, x.first-10, x.first)
-		}
-	}
-	exec(`UPDATE source SET environment_id=? WHERE environment_id=''`, envID)
-	exec(`UPDATE instance SET environment_id=? WHERE environment_id=''`, envID)
-	exec(`UPDATE lineage SET environment_id=? WHERE environment_id=''`, envID)
-	exec(`UPDATE lineage_data SET environment_id=?`, envID)
-	exec(`UPDATE lineage_tag SET environment_id=?`, envID)
-	exec(`UPDATE user_rule SET environment_id=?`, envID)
-	exec(`INSERT INTO plan(environment_id, name, created_at, updated_at) VALUES(?, 'default', 1, 1)`, two)
-	exec(`DROP TABLE id_alias`)
-	exec(`DROP TABLE texture_file`) // v16
-	exec(`DROP TABLE texture_mod`)
-	exec(`DROP TABLE plan_collection`)             // v17
-	exec(`ALTER TABLE snapshot DROP COLUMN kinds`) // v27
-	exec(`ALTER TABLE snapshot DROP COLUMN langs`)
-	exec(`DROP TABLE version_mute`)                           // v23
-	exec(`ALTER TABLE identity_question DROP COLUMN summary`) // v22
-	exec(`ALTER TABLE workspace_undo DROP COLUMN staging`)    // v21
-	exec(`DROP TABLE credit_deployment`)                      // v20
-	exec(`DROP TABLE credit_session`)
-	exec(`DROP TABLE credit_item`)
-	exec(`DROP TABLE credit_batch`)
-	exec(`DROP TABLE managed_link`)                             // v18
-	exec(`ALTER TABLE modsconfig_state DROP COLUMN writer_env`) // v19
-	exec(`ALTER TABLE plan DROP COLUMN created_game`)
-	exec(`ALTER TABLE plan DROP COLUMN versions`)
-	e.DowngradeFacts()
-	exec(`UPDATE meta SET value='13' WHERE key='schema_version'`)
-	return twin
-}
-
-// 02 §0: a SteamCMD game keeps its own Workshop folder inside the game folder. It becomes a
+// 03 §2: a SteamCMD game keeps its own Workshop folder inside the game folder. It becomes a
 // shared SteamCMD folder on env add (and, for an environment added earlier, on a scan); it
 // never moves the Steam client's Workshop folder, and a removed one stays removed.
 func TestGameWorkshopIsSteamCMD(t *testing.T) {
@@ -470,7 +266,7 @@ func TestGameWorkshopIsSteamCMD(t *testing.T) {
 	}
 }
 
-// 06 §2.14: removing an environment is refused while its game runs; removing the current
+// 16 §2.14: removing an environment is refused while its game runs; removing the current
 // one makes another current, and removing the last leaves none (the guide).
 func TestEnvRemoveCurrent(t *testing.T) {
 	t.Parallel()

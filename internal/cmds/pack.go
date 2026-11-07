@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
-// Packs (08 §5).
+// Packs (10).
 func init() {
 	dry := Flag{Name: "dry-run", Help: "show what would happen"}
 	register(&Command{Name: "pack build", Args: "<name>", Summary: "compile the workspace into a pack: checked, sorted, each mod copied without the version folders this game does not load", MinArgs: 1, MaxArgs: 1, Run: packBuildCmd,
@@ -240,6 +240,7 @@ func packLaunchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if len(r.Copied) > 0 {
 		root.KV("settings", "copied from the environment: "+strings.Join(r.Copied, ", "))
 	}
+	settingsKV(root, r.Settings, r.DryRun)
 	root.KV("command", r.Plan.Command())
 	return d, nil
 }

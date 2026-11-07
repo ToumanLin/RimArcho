@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -15,17 +14,6 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
-
-func TestDependencySettingsRenderer(t *testing.T) {
-	t.Parallel()
-	node, err := exec.LookPath("node")
-	if err != nil {
-		t.Skip("node is needed for the dependency settings tests")
-	}
-	if out, err := exec.Command(node, "--experimental-vm-modules", "--test", "testdata/deps.mjs").CombinedOutput(); err != nil {
-		t.Fatalf("dependency settings: %v\n%s", err, out)
-	}
-}
 
 func TestDependencySettingTasksInstallRemoveAndRetry(t *testing.T) {
 	t.Parallel()

@@ -1,8 +1,12 @@
 package cmds
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -30,6 +34,30 @@ func init() {
 
 func progress() func(string) { return Progress }
 
+type progressKey struct{}
+
+// WithProgress returns a context whose commands also send their progress lines to f.
+// The MCP server uses it to put the current step into its progress notifications (14 §1).
+func WithProgress(ctx context.Context, f func(string)) context.Context {
+	return context.WithValue(ctx, progressKey{}, f)
+}
+
+// progressCtx is progress() plus the receiver WithProgress attached to the command's context.
+func (c *Ctx) progressCtx() func(string) {
+	var f func(string)
+	if c.Context != nil {
+		f, _ = c.Context.Value(progressKey{}).(func(string))
+	}
+	g := Progress
+	switch {
+	case f == nil:
+		return g
+	case g == nil:
+		return f
+	}
+	return func(line string) { g(line); f(line) }
+}
+
 func analyzeCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	app.SetAnalyzeLimits()
 	r, err := c.App.Analyze(func(s string) {
@@ -50,6 +78,23 @@ func analyzeCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	d.AddNext("archo problems")
 	return d, nil
+}
+
+// problemsExpandCmd is the "… N more (…)" command of a truncated list. It keeps the filters:
+// `--code X` must not point at a bare --all, which folds X back into one row (VM round
+// 2026-11-05).
+func problemsExpandCmd(code, subject, sev string) string {
+	cmd := "archo problems"
+	if code != "" {
+		cmd += " --code " + code
+	}
+	if subject != "" {
+		cmd += " --subject " + subject
+	}
+	if sev != "" {
+		cmd += " --severity " + sev
+	}
+	return cmd + " --all"
 }
 
 // expand renders "@{id}" tokens as refs; the first mention of the subject gets its name.
@@ -125,7 +170,7 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		return problemShowCmd(c, &detail)
 	}
 	if !a.Bool("no-analyze") {
-		// The newest log is attributed against its own version (03 §6.4, §7.3).
+		// The newest log is attributed against its own version (06 §3, §4).
 		if st, err := c.App.Loadout(); err == nil {
 			if p := c.App.ProblemLog(st); p != "" {
 				c.App.EnsureLogFileAnalysis(st, p, progress())
@@ -156,7 +201,7 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	var sel []*app.Problem
 	hidden := map[string]int{}
 	var versions, skips []*app.Problem
-	byLog := map[*app.LogRun][]*app.Problem{} // log problems are grouped under their log (03 §6.3)
+	byLog := map[*app.LogRun][]*app.Problem{} // log problems are grouped under their log (06 §3)
 	for _, p := range list {
 		if subj != "" && !contains(p.Subjects, subj) {
 			continue
@@ -179,7 +224,7 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			continue
 		}
 		if !full && p.Code == "harmony.skip-prefix" && p.Severity == finding.Info {
-			skips = append(skips, p) // folded too (03 §4.5)
+			skips = append(skips, p) // folded too (05 §4.5)
 			continue
 		}
 		if p.Log != nil {
@@ -234,6 +279,36 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if len(skips) > 0 {
 		folds = append(folds, fold{sevRank(skips[0].Severity), skipSummary(skips)})
 	}
+	// --all with many info rows: one row per code (MCP review round 2 P12: 20–25 KB results
+	// of 137 info rows that no agent used). --code or --severity info lists them.
+	if a.Bool("all") && code == "" && sev == "" {
+		var info []*app.Problem
+		for _, p := range sel {
+			if p.Severity == finding.Info {
+				info = append(info, p)
+			}
+		}
+		if len(info) > infoFoldLimit {
+			byCode := map[string]int{}
+			var codes []string
+			keep := sel[:0:0]
+			for _, p := range sel {
+				if p.Severity != finding.Info {
+					keep = append(keep, p)
+					continue
+				}
+				if byCode[p.Code] == 0 {
+					codes = append(codes, p.Code)
+				}
+				byCode[p.Code]++
+			}
+			sel = keep
+			sort.Strings(codes)
+			for _, k := range codes {
+				folds = append(folds, fold{sevRank(finding.Info), fmt.Sprintf("info %s  %d problems  (archo problems --code %s --all; MCP: list_problems code=%s all=true)", k, byCode[k], k, k)})
+			}
+		}
+	}
 	sort.SliceStable(folds, func(i, j int) bool { return folds[i].rank < folds[j].rank })
 	flush := func(rank int) {
 		for len(folds) > 0 && folds[0].rank <= rank {
@@ -249,11 +324,7 @@ func problemsCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 	}
 	flush(99)
-	expandCmd := "archo problems --all"
-	if a.Str("subject") != "" {
-		expandCmd = "archo problems --subject " + a.Str("subject") + " --all"
-	}
-	lst.Truncate(limit, expandCmd)
+	lst.Truncate(limit, problemsExpandCmd(code, a.Str("subject"), sev))
 	if len(hidden) > 0 {
 		var hs []string
 		for _, k := range []string{"def.override", "patch.contested"} {
@@ -395,7 +466,10 @@ func contains(l []string, s string) bool {
 	return false
 }
 
-// addModProblems adds the "content:" and "problems:" lines of `archo mod` (05 §3.4). It
+// infoFoldLimit: above this many info rows, --all lists info by code (P12).
+var infoFoldLimit = 30
+
+// addModProblems adds the "content:" and "problems:" lines of `archo mod` (13 §3.4). It
 // uses the stored analysis as is (no rebuild).
 func addModProblems(c *Ctx, ix *app.Index, m *store.Mod, root *render.Node) error {
 	st, err := c.App.Loadout()
@@ -406,6 +480,8 @@ func addModProblems(c *Ctx, ix *app.Index, m *store.Mod, root *render.Node) erro
 	if err != nil {
 		return err
 	}
+	var asmList *render.Node
+	var asms []*store.AssemblyRow
 	if s.Run != nil {
 		defs := c.App.Store.DefCount(m.ID)
 		ops, failed := c.App.Store.PatchCount(s.Run.ID, m.ID)
@@ -413,7 +489,7 @@ func addModProblems(c *Ctx, ix *app.Index, m *store.Mod, root *render.Node) erro
 		if failed > 0 {
 			line += fmt.Sprintf(" (%d failed)", failed)
 		}
-		if asms, _ := c.App.Store.Assemblies(m.ID); len(asms) > 0 {
+		if asms, _ = c.App.Store.Assemblies(m.ID); len(asms) > 0 {
 			hp, manual := 0, false
 			for _, a := range asms {
 				hp += a.Patches
@@ -428,6 +504,9 @@ func addModProblems(c *Ctx, ix *app.Index, m *store.Mod, root *render.Node) erro
 			line += "  [analysis stale]"
 		}
 		root.KV("content", line)
+		if len(asms) > 0 {
+			asmList = root.Section("assemblies")
+		}
 	}
 	c.App.LogCacheOnly = true // a mod page does not parse the log (stored report only)
 	ps, err := c.App.Problems(false, nil)
@@ -437,10 +516,34 @@ func addModProblems(c *Ctx, ix *app.Index, m *store.Mod, root *render.Node) erro
 	}
 	tok := finding.Inst(m.ID)
 	var mine []*app.Problem
+	sameName := map[string][]string{} // DLL file name (lower) → the other mods shipping one (asm.duplicate-name)
 	for _, p := range ps.List {
 		if contains(p.Subjects, tok) {
 			mine = append(mine, p)
+			if p.Code == "asm.duplicate-name" {
+				for _, s := range p.Subjects {
+					if s != tok {
+						sameName[p.Key] = append(sameName[p.Key], ix.Ref(finding.InstID(s)))
+					}
+				}
+			}
 		}
+	}
+	// Each assembly with its size and types; the game keeps the first copy of a name in load
+	// order, so a name another enabled mod also ships is marked (05 §4.3).
+	for _, a := range asms {
+		line := a.File
+		if fi, err := os.Stat(filepath.Join(ix.ModDir(m), filepath.FromSlash(a.File))); err == nil {
+			line += fmt.Sprintf("  %d B", fi.Size())
+		}
+		line += ", " + render.Plural(a.Types, "type")
+		if a.Skipped {
+			line += ", library"
+		}
+		if others := sameName[strings.ToLower(path.Base(a.File))]; len(others) > 0 {
+			line += "  same name as " + strings.Join(others, ", ")
+		}
+		asmList.Add(line)
 	}
 	if len(mine) == 0 {
 		return nil
@@ -475,7 +578,7 @@ func skipSummary(ps []*app.Problem) string {
 	return fmt.Sprintf("%s harmony.skip-prefix  %d bool prefixes from %d mods can skip methods other mods also patch; none is in a log stack  (archo problems --code harmony.skip-prefix)", ps[0].Severity, len(ps), len(mods))
 }
 
-// versionSummary folds version.unsupported into one row per game version (03 §4.5).
+// versionSummary folds version.unsupported into one row per game version (05 §4.5).
 func versionSummary(ps []*app.Problem, mm string) string {
 	sev := finding.Info
 	warn := 0
@@ -487,14 +590,14 @@ func versionSummary(ps []*app.Problem, mm string) string {
 	}
 	line := fmt.Sprintf("%s version.unsupported  %d enabled mods do not list %s", sev, len(ps), mm)
 	if prev := app.PrevMinor(mm); prev != "" {
-		// Stopping at the previous version is the warning; older ones are info (03 §4.3).
+		// Stopping at the previous version is the warning; older ones are info (05 §4.3).
 		line += fmt.Sprintf(" (%d list %s, %d older only)", warn, prev, len(ps)-warn)
 	}
 	return line + "  (archo problems --code version.unsupported)"
 }
 
 // logRunText describes a log: file, game version, time, the run it belongs to and whether
-// it is stale, with the reasons (03 §6.4).
+// it is stale, with the reasons (06 §4).
 func logRunText(c *Ctx, r *app.LogRun) string {
 	s := r.Label
 	if v := strings.Fields(r.Version); len(v) > 0 {
@@ -523,7 +626,12 @@ func logRunText(c *Ctx, r *app.LogRun) string {
 	}
 	switch {
 	case src == nil:
+	case r.Unknown && r.UnknownGame != "":
+		why = append(why, "source unknown: its game path "+r.UnknownGame+" is not this environment's game")
 	case r.Unknown:
+		if !r.Stale() {
+			return s + ", source unknown (no launch and no ModsConfig.xml write by RimArcho before it; counted as the last run)"
+		}
 		why = append(why, "source unknown: no launch and no ModsConfig.xml write by RimArcho before it")
 	case r.OtherRun && r.OtherEnv != "":
 		why = append(why, fmt.Sprintf("from %s in environment %s", run(), r.OtherEnv))
@@ -568,9 +676,15 @@ func logRunLine(c *Ctx, r *app.LogRun, ps []*app.Problem, folded bool) string {
 		line += ", not counted"
 	}
 	if folded {
-		line += "  (" + logExpandCmd(r) + ")"
+		line += "  (" + logFoldedHint(r) + ")"
 	}
 	return line
+}
+
+// logFoldedHint names how to list a folded log's problems from the CLI and from MCP: the
+// output is the same for both, and agents otherwise guessed the MCP form (eval 2026-11-04).
+func logFoldedHint(r *app.LogRun) string {
+	return logExpandCmd(r) + "; MCP: list_problems code=log"
 }
 
 func logExpandCmd(r *app.LogRun) string {

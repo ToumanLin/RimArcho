@@ -327,6 +327,7 @@ func TestSubscribedDirectoryMove(t *testing.T) {
 }
 
 func TestUpdateWorkshopGroups(t *testing.T) {
+	t.Parallel()
 	e := setup(t, true)
 	roots := []string{
 		filepath.Join(e.Root, "batch library A", "steamapps", "workshop", "content", "294100"),
@@ -402,9 +403,30 @@ func TestUpdateWorkshopGroups(t *testing.T) {
 	if _, err := e.App.UpdateSubscriptions(refs, true); err != nil || len(calls) != 0 {
 		t.Fatalf("dry run: %v", err)
 	}
-	op, err := e.App.UpdateSubscriptions(refs, false)
+	// A background task reports on each of its items (16 §2.16) while the downloads stay grouped.
+	started, ended := map[int]bool{}, map[int]error{}
+	op, err := e.App.UpdateSubscriptionsWith(refs, false, app.BatchCalls{
+		Start: func(i int) { started[i] = true },
+		Done: func(i int, err error) {
+			if !started[i] {
+				t.Errorf("item %d ended before it started", i)
+			}
+			if _, twice := ended[i]; twice {
+				t.Errorf("item %d ended twice", i)
+			}
+			ended[i] = err
+		},
+	})
 	if err == nil || !strings.Contains(err.Error(), "8002") {
 		t.Fatalf("partial failure: %v", err)
+	}
+	if len(ended) != len(refs) {
+		t.Fatalf("reported %d of %d items", len(ended), len(refs))
+	}
+	for i, err := range ended {
+		if (i == 2) != (err != nil) {
+			t.Fatalf("item %d reported %v", i, err)
+		}
 	}
 	if len(calls) != 4 || len(calls[0]) != 25 || len(calls[1]) != 2 || len(calls[2]) != 25 || len(calls[3]) != 2 || bases[0] != bases[1] || bases[2] != bases[3] || bases[0] == bases[2] {
 		t.Fatalf("groups: %v, bases %v", calls, bases)
@@ -510,6 +532,7 @@ func TestUpdateWorkshopGitOrdering(t *testing.T) {
 }
 
 func TestUpdateWorkshopGroupsAcrossSkippedPages(t *testing.T) {
+	t.Parallel()
 	e := setup(t, true)
 	e.WriteMod(filepath.Join(e.SteamCMD, "8100"), testkit.Sample("group.first", "A Workshop"))
 	e.WriteMod(filepath.Join(e.SteamCMD, "8200"), testkit.Sample("group.last", "C Workshop"))
@@ -544,6 +567,7 @@ func TestUpdateWorkshopGroupsAcrossSkippedPages(t *testing.T) {
 }
 
 func TestUpdateWorkshopJunctionCacheAndRetiredSource(t *testing.T) {
+	t.Parallel()
 	for _, retired := range []bool{false, true} {
 		t.Run(fmt.Sprint(retired), func(t *testing.T) {
 			e := setup(t, false)

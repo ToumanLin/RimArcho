@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,7 +16,7 @@ import (
 // upgradeShowAfter: an upgrade that ends sooner shows nothing.
 const upgradeShowAfter = 300 * time.Millisecond
 
-// upgradeReport shows a database upgrade while app.Open runs it (02 §7): after
+// upgradeReport shows a database upgrade while app.Open runs it (04 §4): after
 // upgradeShowAfter, a small native window for RimArcho.exe (no console; window), else lines
 // on stderr (CLI, MCP, and the TUI before it takes the terminal). lang: the text follows
 // ui.lang (GUI, TUI); otherwise it is English, like the CLI.
@@ -120,4 +121,27 @@ func (u *upgradeReport) finish(ok bool) {
 		}
 		fmt.Fprintln(u.stderr, msg)
 	}
+}
+
+// showOpenError is upgradewin.ShowError; tests replace it.
+var showOpenError = upgradewin.ShowError
+
+// openFailed reports an app.Open error in a message box when the program has no console
+// (RimArcho.exe): otherwise the window would never appear and nothing would say why. The
+// error is still written to stderr by the caller.
+//
+// The box follows the Windows display language, not ui.lang: the error text it carries comes
+// from SQLite and Windows, and the setting lives in the database that failed to open. With
+// ui.lang read from the database, an English Windows showed a Chinese sentence around an
+// English error.
+func (u *upgradeReport) openFailed(err error) {
+	if !u.window {
+		return
+	}
+	view.SetLang("auto")
+	text := view.Tf("RimArcho could not open its database:\n%s", err.Error())
+	if errors.Is(err, store.ErrPreRelease) {
+		text = view.Tf("This database was made by a RimArcho development build from before 1.0, and this version cannot open it:\n%s\n\nMove or rename the file, then start RimArcho again to begin with a new database.", u.dbPath)
+	}
+	showOpenError("RimArcho", text)
 }

@@ -44,7 +44,7 @@ func TestInventoryCacheSurvivesNavigationAndSeesExternalWrites(t *testing.T) {
 func TestLogAnalysisDoesNotBlockOtherPagesOrRestartBetweenPolls(t *testing.T) {
 	t.Parallel()
 	e, api, _ := fixture(t)
-	// Only this game's old logs may request another version's analysis (03 §6.4).
+	// Only this game's old logs may request another version's analysis (06 §4).
 	e.RecordLaunch(e.Now().Add(-time.Minute))
 	e.WriteFile(filepath.Join(e.UserData, "Player.log"), "RimWorld 1.5.4104 rev435\nNullReferenceException: fixture\n  at Fixture.Tick ()\n")
 	started, release := make(chan struct{}, 4), make(chan struct{})

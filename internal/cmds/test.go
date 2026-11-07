@@ -3,6 +3,7 @@ package cmds
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -16,14 +17,24 @@ func init() {
 		Flags: []Flag{
 			{Name: "env", Value: "<name>", Help: "test another environment"},
 			{Name: "map", Help: "load a quick test map instead of the main menu"},
+			{Name: "probe", Value: "<folder>", Help: "add this probe mod and run a test map until its [Probe] RESULT line"},
+			{Name: "probe-after", Value: "<packageId>", Help: "load the probe right after this mod (default: last)"},
+			{Name: "probe-before", Value: "<packageId>", Help: "load the probe right before this mod"},
 			{Name: "timeout", Value: "<duration>", Help: "maximum run time (default 10m)"},
-			{Name: "settle", Value: "<duration>", Help: "wait after the menu marker (default 5s)"},
+			{Name: "settle", Value: "<duration>", Help: "wait after the menu marker (default 5s), or for a probe to quit (default 15s)"},
 			{Name: "json", Help: "print the report as JSON"},
 		}, Run: testRunCmd})
 }
 
 func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
-	o := app.TestRunOptions{Env: args.Str("env"), Map: args.Bool("map"), Progress: progress()}
+	o := app.TestRunOptions{Env: args.Str("env"), Map: args.Bool("map"), Progress: c.progressCtx(),
+		Probe: args.Str("probe"), ProbeAfter: args.Str("probe-after"), ProbeBefore: args.Str("probe-before")}
+	if o.Probe == "" && (o.ProbeAfter != "" || o.ProbeBefore != "") {
+		return nil, &UsageError{Msg: "--probe-after and --probe-before need --probe <folder>"}
+	}
+	if o.ProbeAfter != "" && o.ProbeBefore != "" {
+		return nil, &UsageError{Msg: "give --probe-after or --probe-before, not both"}
+	}
 	if len(args.Pos) > 0 {
 		o.Plan = args.Pos[0]
 	}
@@ -47,7 +58,10 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 		c.ExitCode = ExitError
 	}
 	if args.Bool("json") {
-		b, err := json.MarshalIndent(r, "", "  ")
+		// The launch arguments are for report.json (a later run's baseline), not for readers.
+		out := *r
+		out.Args = nil
+		b, err := json.MarshalIndent(&out, "", "  ")
 		return &render.Doc{Raw: string(b) + "\n"}, err
 	}
 	d, root := render.New("test run: " + r.Plan + "  env:" + r.Env)
@@ -59,27 +73,138 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 	root.KV("load", fmt.Sprintf("%.1fs (total %.1fs)", r.LoadSeconds, r.TotalSeconds))
 	root.KV("peak memory", fmt.Sprintf("%d MB", r.PeakMemoryMB))
 	root.KV("requested", fmt.Sprint(r.Requested))
+	if len(r.Linked) > 0 {
+		linked := root.Section(fmt.Sprintf("linked for this run (removed after it): %d", len(r.Linked)))
+		for _, name := range r.Linked {
+			linked.Add("Mods/" + name)
+		}
+	}
+	if p := r.Probe; p != nil {
+		testProbe(root, p)
+	}
 	missing := root.Section(fmt.Sprintf("missing: %d", len(r.Missing)))
 	for _, m := range r.Missing {
-		missing.Add(m.PackageID + "  " + m.Name)
+		n := missing.Add(m.PackageID + "  " + m.Name)
+		if m.Reason != "" {
+			n.KV("not linked", m.Reason)
+		}
 	}
 	clusters := root.Section(fmt.Sprintf("error clusters: %d", r.ClustersTotal))
 	for _, cluster := range r.Clusters {
-		n := clusters.Addf("%s x%d: %s", cluster.Class, cluster.Count, cluster.Message)
-		if cluster.Class == gametest.ClassSettings {
-			n.KV("source", "game preferences")
-			continue
+		prefix := ""
+		if cluster.Delta == "new" {
+			prefix = "new "
 		}
-		mods := "no mod identified"
-		if len(cluster.Mods) > 0 {
-			mods = strings.Join(cluster.Mods, ", ")
+		n := clusters.Addf("%s%s x%d: %s", prefix, cluster.Class, cluster.Count, cluster.Message)
+		switch cluster.Before {
+		case "present":
+			n.KV("before", "in the player's log")
+		case "absent":
+			n.KV("before", "not in the player's log")
 		}
-		n.KV("mods", mods+" ("+cluster.Confidence+")")
+		testClusterMods(n, cluster)
+		if cluster.Note != "" {
+			n.KV("note", cluster.Note)
+		}
 	}
-	if more := r.ClustersTotal - len(r.Clusters); more > 0 {
+	folded := 0
+	for _, cluster := range r.Clusters {
+		folded += cluster.Consequences
+	}
+	if more := r.ClustersTotal - len(r.Clusters) - folded; more > 0 {
 		clusters.Addf("… %d more (full log: %s)", more, r.LogPath)
+	}
+	if len(r.Info) > 0 {
+		info := root.Section(fmt.Sprintf("informational: %d", len(r.Info)))
+		for _, cluster := range r.Info {
+			line := fmt.Sprintf("%s x%d: %s", cluster.Class, cluster.Count, cluster.Message)
+			switch cluster.Before {
+			case "present":
+				line += "  (in the player's log)"
+			case "absent":
+				line += "  (not in the player's log)"
+			}
+			info.Add(line)
+		}
+	}
+	if p := r.PlayerLog; p == nil {
+		root.Add("compared with the player's log: none found")
+	} else if p.Error != "" {
+		root.Addf("compared with the player's log %s: %s", p.Path, p.Error)
+	} else {
+		line := fmt.Sprintf("compared with the player's log %s: %d present, %d absent, %d fixed", p.Path, p.Present, p.Absent, p.Fixed)
+		if p.Unreached > 0 {
+			line += fmt.Sprintf(", %d not reached by this run", p.Unreached)
+		}
+		root.Add(line)
+		fixed := root.Section(fmt.Sprintf("fixed: %d", p.Fixed))
+		for _, cluster := range r.Fixed {
+			n := fixed.Addf("%s x%d: %s", cluster.Class, cluster.Count, cluster.Message)
+			testClusterMods(n, cluster)
+			if cluster.Note != "" {
+				n.KV("note", cluster.Note)
+			}
+		}
+	}
+	if b := r.Baseline; b != nil {
+		root.Addf("compared with run %s (%s): %d new, %d present, %d gone", filepath.Base(b.RunDir), b.Status, b.New, b.Present, b.Gone)
+		gone := root.Section(fmt.Sprintf("gone: %d", b.Gone))
+		for _, cluster := range r.Gone {
+			testClusterMods(gone.Addf("%s x%d: %s", cluster.Class, cluster.Count, cluster.Message), cluster)
+		}
+	} else {
+		root.Add("compared with: no earlier run of this plan")
 	}
 	root.KV("attribution", r.Attribution)
 	root.KV("run dir", r.RunDir)
 	return d, nil
+}
+
+// testProbe prints a probe run's result and lines (20 §3).
+func testProbe(root *render.Node, p *app.TestRunProbe) {
+	n := root.Addf("probe: %s, load order position %d (%s)", p.PackageID, p.Position, p.Folder)
+	n.KV("outcome", p.Outcome)
+	switch p.Outcome {
+	case "result":
+		n.KV("result", p.Result)
+	case "exception":
+		n.KV("exception", p.Exception)
+	default:
+		n.KV("result", "no [Probe] RESULT line: see the log, or raise --timeout")
+	}
+	if len(p.MissingDeps) > 0 {
+		n.KV("missing dependencies", strings.Join(p.MissingDeps, ", "))
+	}
+	if p.Screenshot != "" {
+		n.KV("screenshot", p.Screenshot)
+	}
+	title := fmt.Sprintf("[Probe] lines: %d", p.LinesTotal)
+	if p.LinesTotal > len(p.Lines) {
+		title += fmt.Sprintf(", first %d and last %d shown", min(10, len(p.Lines)), max(0, len(p.Lines)-10))
+	}
+	lines := n.Add(title)
+	for i, l := range p.Lines {
+		if i == 10 && p.LinesTotal > len(p.Lines) {
+			lines.Add("…")
+		}
+		lines.Add(l)
+	}
+}
+
+func testClusterMods(n *render.Node, cluster app.TestRunCluster) {
+	if cluster.Consequences > 0 {
+		n.KV("consequences", render.Plural(cluster.Consequences, "cluster")+" that follow from this def file failing to load, not listed")
+	}
+	if cluster.Class == gametest.ClassSettings {
+		n.KV("source", "game preferences")
+		return
+	}
+	if cluster.Confidence == "" && len(cluster.Mods) == 0 {
+		return // a gone cluster of an earlier report that did not list it
+	}
+	mods := "no mod identified"
+	if len(cluster.Mods) > 0 {
+		mods = strings.Join(cluster.Mods, ", ")
+	}
+	n.KV("mods", mods+" ("+cluster.Confidence+")")
 }

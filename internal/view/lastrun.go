@@ -18,6 +18,7 @@ var logKindWords = map[string]string{
 	"xml-load":        "content loading errors",
 	"patch-failed":    "failed patches",
 	"save-load":       "save data errors",
+	"game-error":      "game errors naming mod code",
 	"exception":       "exceptions",
 	"harmony-stack":   "errors in patched methods",
 }

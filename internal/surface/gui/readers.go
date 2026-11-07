@@ -228,6 +228,7 @@ func (s *API) Close() {
 	}
 	s.mu.Unlock()
 	s.needsJobs.Wait()
+	s.closeSaves() // the saves' full read: before the tasks are marked stopped and the readers go
 	// RimArcho's own update: a swap of the program files that has begun ends whole (W04).
 	app.WaitSelfSwap(30 * time.Second)
 	creditDone := make(chan struct{})
@@ -263,7 +264,7 @@ func (s *API) Close() {
 	s.environment.seq++
 	s.environment.mu.Unlock()
 	s.environment.wg.Wait()
-	s.tasks.Close() // what still runs or waits is stopped with the window (06 §2.16)
+	s.tasks.Close() // what still runs or waits is stopped with the window (16 §2.16)
 	s.mu.Lock()
 	if s.texCancel != nil {
 		s.texCancel()
@@ -274,7 +275,7 @@ func (s *API) Close() {
 	s.libGate.Lock()
 	//lint:ignore SA2001 barrier, nothing to guard
 	s.libGate.Unlock()
-	for _, w := range []*logReader{&s.libRead, &s.plansRead, &s.workspaceReader, &s.indexRead, &s.detailRead} {
+	for _, w := range []*logReader{&s.libRead, &s.plansRead, &s.workspaceReader, &s.indexRead, &s.detailRead, &s.saves.read} {
 		w.mu.Lock()
 		w.release() // also stops an idle expiry
 		w.mu.Unlock()

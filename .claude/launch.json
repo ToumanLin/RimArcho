@@ -6,6 +6,12 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8765", "--bind", "127.0.0.1", "--directory", "docs/design/canitrun-drafts"],
       "port": 8765
+    },
+    {
+      "name": "saves-drafts",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8766", "--bind", "127.0.0.1", "--directory", "docs/design/saves-drafts"],
+      "port": 8766
     }
   ]
 }

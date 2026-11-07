@@ -1,8 +1,9 @@
+import { fieldError, progress } from "./feedbacksemantics.js";
 import { editablePath, copyablePath, pathContent } from "./fields.js";
-// The first-run guide (06 §2.15): three steps, each with a way back.
+// The first-run guide (16 §2.15): three steps, each with a way back.
 //   1. find the game: existing games — what detection finds (tick several), or a folder
 //      chosen in the native dialog; or download a version — a branch, a folder and an optional
-//      account override, downloaded by SteamCMD in its own window (08 §11);
+//      account override, downloaded by SteamCMD in its own window (11 §3);
 //   2. read the mods: a scan per environment in a child process, with its progress (a game
 //      added once the shared mod folders were read: only its own Data/ and Mods/);
 //   3. where to start: the game's own list, a list from RimSort / RimCrow (previewed, then
@@ -13,6 +14,7 @@ import { page, button, seg, chooseLocalPath, beginPageRead } from "./screens.js"
 import { exchange, importFrom } from "./exchange.js";
 import { withEnvironmentSwitch } from "./environment.js";
 import { on } from "./api.js";
+import { archoFigure, archoMode, bootDone } from "./archo.js";
 
 let ui = null;
 export function initGuide(u) {
@@ -24,12 +26,14 @@ let session = 0, activeSession = null;
 export const historySession = () => activeSession;
 
 const STEPS = ["find the game", "read the mods", "where to start"];
-const G = { step: 0, way: 0, games: [], picked: new Set(), added: [], scan: null, typed: "", error: "" };
+// G.folder: the managed folder (FirstRunFolder) while the first run still has to choose it;
+// it is then step -1, before "find the game" (16 §2.15).
+const G = { folder: null, folderBusy: false, step: 0, way: 0, games: [], picked: new Set(), added: [], scan: null, typed: "", error: "", errorFrom: null };
 // The download way: SteamCMD's info (DownloadInfo), the choices, and a run's progress.
 const D = { info: null, loading: false, branch: "", dir: "", dirTyped: false, account: "", run: null };
 const C = { id: "", row: null, submitting: false };
 
-// The guide follows the same durable task as the background page (06 §2.15, 06 §2.16).
+// The guide follows the same durable task as the background page (16 §2.15, 16 §2.16).
 async function updateSteamCMD() {
   if (!C.id) return;
   const id = C.id;
@@ -58,14 +62,22 @@ export async function start(from = "first") {
   G.picked.clear();
   if (D.run && D.run.end) D.run = null;
   G.way = D.run ? 1 : 0;
-  await find();
+  G.folder = null;
+  await find(from === "first");
+  bootDone();
 }
 
-async function find() {
+// find reads the games detection finds and, on a first run, whether the managed folder is
+// still to be chosen: then the guide starts there.
+async function find(first = false) {
   const read = beginPageRead("guide", { replace: true });
-  let games;
-  try { games = (await api.GuideFind()) || []; } catch (e) { read.fail(e); return; }
+  let games, folder = null;
+  try {
+    [games, folder] = await Promise.all([api.GuideFind(), first ? api.ManagedFolder() : null]);
+    games ||= [];
+  } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
+  if (folder && !folder.done) { G.folder = folder; G.step = -1; }
   G.games = games;
   G.games.forEach((g, i) => { if (!g.env) G.picked.add(i); });
   draw();
@@ -81,24 +93,56 @@ function draw() {
   if (S.screen !== "guide") return;
   const sc = $("#screen");
   sc.innerHTML = "";
-  const lead = S.guideFrom === "env" ? T("find the install, read its mods once, and it is ready") : T("find the game, read the mods once, then pick where your first list comes from");
-  const w = page("guide", lead);
+  const lead = S.guideFrom === "env" ? T("find the install, read its mods once, and it is ready")
+    : G.folder ? T("choose RimArcho's folder, find the game, read the mods once, then pick where your first list comes from")
+    : T("find the game, read the mods once, then pick where your first list comes from");
+  const w = page("guide");
   sc.append(w);
-  // the steps: where you are, where you can go back to
+  // the steps: where you are, where you can go back to; the managed folder is step -1
   const bar = el("div", "steps");
-  STEPS.forEach((s, i) => {
-    if (i) bar.append(el("span", "line" + (i <= G.step ? " on" : "")));
+  const steps = G.folder ? ["managed folders", ...STEPS] : STEPS, first = G.folder ? -1 : 0;
+  steps.forEach((s, k) => {
+    const i = first + k;
+    if (k) bar.append(el("span", "line" + (i <= G.step ? " on" : "")));
     const b = el("button", "st" + (i === G.step ? " cur" : i < G.step ? " done" : ""));
-    b.append(el("span", "n", i < G.step ? "✓" : String(i + 1)), el("span", "t", T(s)));
+    b.append(el("span", "n", i < G.step ? "✓" : String(k + 1)), el("span", "t", T(s)));
     b.disabled = i >= G.step || (i === 1 && !G.added.length);
     b.onclick = () => go(i);
     bar.append(b);
   });
-  w.append(bar);
+  // the lead and the steps on the left, Archo on the right: one row, as tall as she is
+  const top = el("div", "guide-top"), left = el("div", "guide-lead"), head = el("div", "page-head");
+  head.append(el("p", "lead word-facts", lead));
+  left.append(head, bar);
+  top.append(left);
+  // Archo on the steps' row, behind the card (16 §2.15): one slot kept across redraws, so
+  // the live figure keeps moving while progress redraws the card
+  if (archoMode() !== "off") {
+    if (!figure || figure.ended || figure.session !== activeSession) {
+      figure?.end();
+      figure = archoFigure(el("div", "guide-archo"), guideExpression());
+      figure.session = activeSession;
+    } else figure.set(guideExpression());
+    top.append(figure.slot);
+  }
   const card = el("section", "card guide-card");
-  w.append(card);
-  [step1, step2, step3][G.step](card);
+  w.append(top, card);
+  [folderStep, step1, step2, step3][G.step + 1](card);
   ui.renderWhere();
+}
+
+// Archo's face follows the guide: a wink to start, thinking while something runs, a salute
+// when a scan or a download is done, surprise at an error.
+let figure = null;
+function guideExpression() {
+  if (G.error) return "surprised";
+  if (G.step === -1) return "wink";
+  if (G.step === 0) {
+    if (D.run) return !D.run.end ? "think" : D.run.ok ? "salute" : "surprised";
+    return G.way === 1 ? "ponder" : G.folder ? "smile" : "wink";
+  }
+  if (G.step === 1) return !G.scan || !G.scan.done ? "think" : G.scan.ok ? "salute" : "surprised";
+  return "smile";
 }
 
 function go(i) {
@@ -110,10 +154,47 @@ function go(i) {
 function footer(card, ...btns) {
   const f = el("div", "guide-foot");
   if (G.error) f.append(el("span", "err grow", G.error)); else f.append(el("span", "grow"));
-  if (G.step > 0) f.append(button(T("back"), "", () => go(G.step - 1)));
+  if (G.step > (G.folder ? -1 : 0)) f.append(button(T("back"), "", () => go(G.step - 1)));
   for (const b of btns) if (b) f.append(b);
   card.append(f);
 }
+
+// ---- 0. the managed folder (first run only) ----
+// Where SteamCMD, downloaded Mods and tools go. The default is filled in; the player keeps
+// it or picks another folder, and confirming it is the way on (17 §3).
+
+function folderStep(card) {
+  const info = G.folder;
+  card.append(el("div", "guide-q", T("Where should RimArcho keep SteamCMD, downloaded Mods and tools?")));
+  const choose = () => chooseLocalPath(info.path, async (path) => {
+    G.folderBusy = true; draw();
+    try { G.folder = { ...(await api.FolderSpace(path)), path }; G.error = ""; }
+    catch (e) { G.error = errText(e); }
+    finally { G.folderBusy = false; draw(); }
+  });
+  const row = el("div", "typed folder-row");
+  row.append(editablePath(copyablePath(el("span", "", info.path), info.path), choose), button(T("change…"), "", choose));
+  card.append(row);
+  const space = el("div", "folder-space muted");
+  space.append(el("span", "", Tf("free: %s", freeText(info.free))));
+  if (info.low) space.append(el("span", "warn", T("Less than 10 GB is free on this drive.")));
+  card.append(space);
+  if (info.error) card.append(el("div", "dl-note err", info.error));
+  const use = button(T("use this folder"), "", async () => {
+    G.folderBusy = true; draw();
+    try {
+      await api.ChooseManagedFolder(info.path);
+      G.folder = { ...info, done: true };
+      G.error = "";
+      G.step = 0;
+    } catch (e) { G.error = errText(e); }
+    finally { G.folderBusy = false; draw(); }
+  }, "primary");
+  use.disabled = G.folderBusy || !!info.error;
+  footer(card, use);
+}
+
+const freeText = (n) => n < 0 ? T("free space unknown") : sizeText(n);
 
 // ---- 1. find the game ----
 
@@ -195,7 +276,7 @@ async function added(names) {
   await scanAll();
 }
 
-// ---- 1b. download a version (SteamCMD, 08 §11) ----
+// ---- 1b. download a version (SteamCMD, 11 §3) ----
 
 async function loadDownload() {
   D.loading = true;
@@ -251,7 +332,7 @@ function download(card) {
     const bar = el("div", "bar" + (row?.pct > 0 ? "" : " busy"));
     const fill = el("i");
     fill.style.width = (row?.pct || 0) + "%";
-    bar.append(fill); prog.append(bar); card.append(prog);
+    bar.append(fill); progress(bar, card.querySelector(".dl-state"), row?.count || row?.pct > 0 ? row.pct : undefined); prog.append(bar); card.append(prog);
     return footer(card);
   }
   if (D.run) return downloading(card, D.run);
@@ -259,6 +340,7 @@ function download(card) {
     card.append(el("div", "dl-note", T("asking Steam which versions RimWorld has… (SteamCMD may update itself first)")));
     const prog = el("div", "prog");
     const b = el("div", "bar busy");
+    progress(b, card.querySelector(".dl-note"));
     b.append(el("i"));
     prog.append(b);
     card.append(prog);
@@ -340,6 +422,7 @@ function downloading(card, r) {
   const fill = el("i");
   fill.style.width = (r.end && r.ok ? 100 : Math.round(r.percent || 0)) + "%";
   bar.append(fill);
+  progress(bar, head, r.end && r.ok ? 100 : r.total > 0 ? r.percent : undefined);
   prog.append(bar);
   card.append(prog);
   if (r.error) card.append(el("div", "dl-note err", r.error));
@@ -350,7 +433,7 @@ function downloading(card, r) {
 
 // downloadEvent is a "download" event: SteamCMD's progress, then the end.
 export function downloadEvent(ev) {
-  if (!D.run) return;
+  if (!D.run || D.run.end) return;
   if (ev.end) {
     Object.assign(D.run, { end: true, ok: ev.ok, error: ev.error || "", env: ev.env || "" });
     draw();
@@ -385,7 +468,7 @@ async function scanAll() {
 
 // guideEvent is a "guide" event: an environment started, ended, or all are done.
 export function guideEvent(ev) {
-  if (!G.scan) return;
+  if (!G.scan || G.scan.done) return;
   if (ev.done) {
     G.scan.done = true;
     S.busy.scan = false;
@@ -415,6 +498,7 @@ function step2(card) {
   const fill = el("i");
   fill.style.width = (s.rows.length ? Math.round(100 * doneN / s.rows.length) : 100) + "%";
   bar.append(fill);
+  progress(bar, card.querySelector(".guide-q"), s.rows.length ? doneN : undefined, s.rows.length);
   prog.append(bar);
   card.append(prog);
   const again = s.done && !s.ok ? button(T("scan again"), "", () => scanAll()) : null;
@@ -431,34 +515,44 @@ function step3(card) {
   const n = S.board && S.board.cols ? (S.board.cols[1] || []).length : 0;
   ways.append(way(T("the game's current list"), Tf("ModsConfig.xml enables %d mods; that becomes your first list", n),
     button(T("use this list"), "", () => finish(T("use the game's list as it is")), "primary")));
-  const imp = button(T("import a list…"), "", () => { ui.afterImport = () => finish(""); exchange(0); });
-  ways.append(way(T("move over from RimSort or RimCrow"), T("a list file, a share code or pasted text; you see what changes before it is applied"), imp));
+  const imp = button(T("import…"), "", () => { ui.afterImport = () => finish(""); ui.importManagers(); });
+  ways.append(way(T("move over from RimSort or RimCrow"), T("lists and player data, previewed before anything is imported"), imp));
   const src = el("input", "field");
   src.placeholder = T("a Steam Workshop collection link");
   src.type = "url"; src.spellcheck = false;
   const open = button(T("open"), "", async () => {
     const v = src.value.trim();
     if (!v) return src.focus();
-    if (!/^https?:\/\//i.test(v)) { G.error = T("enter a complete HTTP or HTTPS URL"); return draw(); }
+    if (!/^https?:\/\//i.test(v)) { G.error = T("enter a complete HTTP or HTTPS URL"); G.errorFrom = ["url", G.error]; return draw(); }
     ui.afterImport = () => finish(""); return importFrom("text", v);
   });
   src.onkeydown = (e) => { if (e.key === "Enter") { e.stopPropagation(); open.click(); } };
   const row = el("div", "typed");
-  row.append(button(T("choose a pack…"), "", async () => {
+  const pick = button(T("choose a pack…"), "", async () => {
     const session = activeSession;
     try {
       const path = await api.PickPackFile();
       if (path && S.screen === "guide" && activeSession === session) await finish(await api.PackImport(path));
-    } catch (e) { if (S.screen === "guide" && activeSession === session) { G.error = errText(e); draw(); } }
-  }), src, open);
-  ways.append(way(T("open a pack or a Steam collection"), T("choose a pack (.archopack), or paste a Steam Workshop collection link"), row));
+    } catch (e) { if (S.screen === "guide" && activeSession === session) { G.error = errText(e); G.errorFrom = ["pack", G.error]; draw(); } }
+  });
+  // the link field above, the pack button on the buttons' line with the other two ways
+  row.append(src, open);
+  ways.append(way(T("open a pack or a Steam collection"), T("choose a pack (.archopack), or paste a Steam Workshop collection link"), pick, row));
   card.append(ways);
   footer(card, button(T("skip"), "", () => finish("")));
+  const error = card.querySelector(".guide-foot .err");
+  // the footer's error belongs to the field that caused it, while it is still that error
+  const from = (k) => () => G.errorFrom?.[0] === k && G.errorFrom[1] === G.error;
+  if (error) { fieldError(src, error, from("url")); fieldError(pick, error, from("pack")); }
 }
 
-function way(title, text, action) {
+// way is one choice: its title, what it does, then its button at the bottom, level with the
+// other choices' buttons (extra goes between the text and the button)
+function way(title, text, action, extra) {
   const d = el("div", "way");
-  d.append(el("div", "t", title), el("div", "muted", text), action);
+  d.append(el("div", "t", title), el("div", "muted", text));
+  if (extra) d.append(extra);
+  d.append(action);
   return d;
 }
 

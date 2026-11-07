@@ -7,7 +7,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 )
 
-// RimArcho's own update (07 §5.1): a row in settings › about, a line on the launch
+// RimArcho's own update (17 §5.1): a row in settings › about, a line on the launch
 // page and a quiet notice when a new version is found.
 
 const (
@@ -15,7 +15,7 @@ const (
 	TaskSelfCheck  = "self-check"
 )
 
-// SelfUpdateLine is the launch page's line (06 §2.3): nil when nothing is to install.
+// SelfUpdateLine is the launch page's line (16 §2.3): nil when nothing is to install.
 type SelfUpdateLine struct {
 	Title string `json:"title"` // "RimArcho"
 	Text  string `json:"text"`  // "0.9.1 can be updated"
@@ -29,11 +29,11 @@ func SelfUpdateHome(a *app.App) *SelfUpdateLine {
 	return &SelfUpdateLine{Title: "RimArcho", Text: Tf("%s can be updated", r.Version)}
 }
 
-// SelfUpdateItem is the first row of the About group (06 §2.14): the running
+// SelfUpdateItem is the first row of the About group (16 §2.14): the running
 // version, what the last check found, its notes folded under the row, and the buttons.
 func SelfUpdateItem(a *app.App) SettingItem {
 	cur := a.SelfVersionNow()
-	it := SettingItem{Label: "RimArcho", Value: cur}
+	it := SettingItem{Key: "archo.version", Label: "RimArcho", Value: cur}
 	if _, ok := selfupdate.Compare(cur, cur); !ok {
 		it.ValueNote = T("a development build is not updated")
 		return it
@@ -56,8 +56,11 @@ func SelfUpdateItem(a *app.App) SettingItem {
 		it.Actions = []SettingAction{check}
 		return it
 	}
-	install := SettingAction{Label: T("install update"), Argv: []string{"update"}, Task: TaskSelfUpdate, Pending: TaskPending(TaskSelfUpdate),
-		Confirm: Tf("Download RimArcho %s (%s), check it against its SHA-256 and replace the program files, then restart RimArcho. Your data is not changed.", r.Version, SizeText(r.Zip.Size))}
+	confirm := Tf("Download RimArcho %s, check it against its SHA-256 and replace the program files, then restart RimArcho. Your data is not changed.", r.Version)
+	if r.Zip.Size > 0 {
+		confirm = Tf("Download RimArcho %s (%s), check it against its SHA-256 and replace the program files, then restart RimArcho. Your data is not changed.", r.Version, SizeText(r.Zip.Size))
+	}
+	install := SettingAction{Label: T("install update"), Argv: []string{"update"}, Task: TaskSelfUpdate, Pending: TaskPending(TaskSelfUpdate), Confirm: confirm}
 	if program, err := a.SelfProgramDir(); err == nil {
 		if n := len(a.OtherArchoIn(program)); n > 0 {
 			install.Confirm += " " + Tf("%d other RimArcho are open: the files are replaced once they close.", n)

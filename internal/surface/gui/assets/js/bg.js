@@ -1,4 +1,4 @@
-// settings › Start page background (06 §2.14): a small launch page that shows the choice as it will look,
+// settings › Start page background (16 §2.14): a small launch page that shows the choice as it will look,
 // the dimming, blur, focus and rotation beside it, and the images by group below — the
 // game's, each background mod's, the player's own. Every change is saved at once
 // (API.SetBackground). The grid is reached with tab: arrows pick, enter uses, * stars
@@ -25,7 +25,7 @@ export async function bgSection(current = () => true) {
 }
 
 // Replace only the image choices after background extraction. Keep the live slider
-// values, focus and scroll while the player edits settings (06 §2.14, 06 §3.1).
+// values, focus and scroll while the player edits settings (16 §2.14, 16 §3.1).
 export async function refreshBackgrounds() {
   const section = box;
   if (!section?.isConnected || !P) return;
@@ -93,6 +93,7 @@ function controls() {
   const seg = el("div", "bg-seg");
   for (const [v, l] of [["left", T("left")], ["center", T("center")], ["right", T("right")]]) {
     const b = el("button", v === B().focus ? "on" : "", l);
+    b.setAttribute("aria-pressed", String(v === B().focus));
     b.onclick = () => save({ focus: v });
     seg.append(b);
   }
@@ -138,6 +139,7 @@ function tabs() {
   const t = el("div", "bg-tabs");
   P.groups.forEach((g, i) => {
     const b = el("button", "bg-tab" + (i === tab ? " on" : ""));
+    b.setAttribute("aria-pressed", String(i === tab));
     b.append(el("span", "", g.name), el("em", "num", g.files ? (g.items.length ? String(g.items.length) : "+") : String(g.items.length)));
     b.onclick = () => { tab = i; kb = 0; draw(); };
     t.append(b);

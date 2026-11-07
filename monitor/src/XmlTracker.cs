@@ -8,7 +8,7 @@ using Verse;
 
 namespace ArchoMonitor
 {
-    // XmlTracker follows the XML load (03 §6.7.1): the file and def being loaded on each thread,
+    // XmlTracker follows the XML load (19 §2): the file and def being loaded on each thread,
     // which file defines each def, which defs list which names, and which patch operations
     // target which defs. Load-time cost: a push, a pop and a dictionary write per def.
     public static class XmlTracker

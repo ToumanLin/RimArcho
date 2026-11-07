@@ -24,6 +24,7 @@ func b8Env(t *testing.T) *testkit.Env {
 }
 
 func TestLaunchAsksWhenRequiredModsAreMissing(t *testing.T) {
+	t.Parallel()
 	e := b8Env(t)
 	e.MustRun("disable", "pkg:brrainz.harmony")
 	file := e.ReadModsConfig()
@@ -47,6 +48,7 @@ func TestLaunchAsksWhenRequiredModsAreMissing(t *testing.T) {
 }
 
 func TestOutsideChangeThatDropsModsIsSaid(t *testing.T) {
+	t.Parallel()
 	e := b8Env(t)
 	card := func() *view.Need {
 		t.Helper()

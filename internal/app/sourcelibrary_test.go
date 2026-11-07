@@ -70,6 +70,7 @@ func TestSourceLibraryConcurrentRequestsSharePublication(t *testing.T) {
 }
 
 func TestSourceLibraryGameBuildReuseAcrossEnvironments(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddEnv(false)
 	e.WriteFile(filepath.Join(e.Game, "RimWorldWin64_Data", "Managed", "Assembly-CSharp.dll"), "synthetic game assembly")
@@ -200,6 +201,7 @@ func TestSourceLibrarySharedIdentityAndTypes(t *testing.T) {
 }
 
 func TestSourceLibraryRelocation(t *testing.T) {
+	t.Parallel()
 	for _, cross := range []bool{false, true} {
 		t.Run(map[bool]string{false: "rename", true: "cross-volume"}[cross], func(t *testing.T) {
 			e := testkit.New(t)

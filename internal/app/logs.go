@@ -22,7 +22,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Attribution roles (03 §6.3).
+// Attribution roles (06 §3).
 const (
 	RoleSource     = "source"
 	RolePatcher    = "patcher"
@@ -52,15 +52,22 @@ type LogCluster struct {
 	// <message>"), the context agents otherwise grep the raw log for (G7 traces).
 	Near    []string
 	Finding *finding.Finding
-	// From the companion log (03 §6.7.4): its file name, the first occurrence's time and
+	// From the companion log (06 §7): its file name, the first occurrence's time and
 	// level; OnlyCompanion when Player.log does not have the entry at all.
 	Companion     string    `json:",omitempty"`
 	At            time.Time `json:",omitzero"`
 	Level         string    `json:",omitempty"`
 	OnlyCompanion bool      `json:",omitempty"`
+	// ConsequenceOf: the ID of the cluster whose failed def file this one follows from;
+	// Consequences and ConsequentLines count them on that cluster (06 §3).
+	ConsequenceOf                 string `json:",omitempty"`
+	Consequences, ConsequentLines int    `json:",omitempty"`
 	// providerOff: a missing reference whose def an installed mod defines but is not
-	// enabled. That mod is the reason, not a patcher on the stack (03 §6.3).
+	// enabled. That mod is the reason, not a patcher on the stack (06 §3).
 	providerOff bool
+	// missingTypes: types the log reports missing that no installed mod defines; the XML
+	// naming them is searched for (refQuery.class, 06 §2).
+	missingTypes []string
 }
 
 // LogReport is an analysed log.
@@ -73,18 +80,22 @@ type LogReport struct {
 	Lines     int
 	Version   string
 	// AnalysedAs is the major.minor the log was attributed against when it differs from
-	// the environment's (EnvMM): the log's own version (03 §6.4).
+	// the environment's (EnvMM): the log's own version (06 §4).
 	AnalysedAs, EnvMM string
 	Clusters          []*LogCluster
-	// Companion is the companion log read with it (03 §6.7.4); CompanionBad its bad lines.
+	// Unanalysed counts the enabled mods (Core and DLC aside) whose content and assemblies
+	// had not been analysed for the attributed version: their types and Harmony IDs could
+	// not name them (06 §2).
+	Unanalysed int `json:",omitempty"`
+	// Companion is the companion log read with it (06 §7); CompanionBad its bad lines.
 	Companion    string `json:",omitempty"`
 	CompanionBad int    `json:",omitempty"`
 	// Cursor marks how much of the log and its companion this report covers: get_log
-	// since=<cursor> lists what is new after it (03 §6.6). Empty for pasted text.
+	// since=<cursor> lists what is new after it (06 §6). Empty for pasted text.
 	Cursor string `json:",omitempty"`
 }
 
-// LogPaths returns usable current and previous logs (03 §6.4). Check both locations,
+// LogPaths returns usable current and previous logs (06 §4). Check both locations,
 // preferring this game's layout, independently: a foreign Player.log must not hide an
 // owned Player-prev.log. --game-version changes analysis, never game ownership.
 func (a *App) LogPaths(st *LoadoutState) (cur, prev string) {
@@ -116,7 +127,7 @@ type logCacheEntry struct {
 
 // DropLogCaches forgets the parsed log report and the problem set built with it; the next
 // read takes the stored report from the database again (the GUI calls it when the player
-// leaves Can it run or Game log, 07 §8.3).
+// leaves Can it run or Game log, 17 §7.3).
 func (a *App) DropLogCaches() {
 	a.logCache = nil
 	a.prCache, a.prKey = nil, ""
@@ -132,8 +143,15 @@ var ErrLogNotCached = errors.New("log not analysed yet")
 // 7: both the companion log (dev, 4) and the G1/G7 attribution rules (master, 6); 8: no
 // nearby messages for entries only the companion log has; 9: observed phase boundaries
 // and counts from both logs; 10: a left-out provider of a missing def before patchers;
-// 11: texture and assembly providers in the shared mod folders (Store.InstanceFiles).
-const logCacheVersion = 11
+// 11: texture and assembly providers in the shared mod folders (Store.InstanceFiles); 12: known
+// noise (logs.ClassNoise) and its note; "assemblies not analysed yet" instead of "no enabled mod
+// defines it" (Unanalysed); 13: a missing type's XML referrer, nearest types, a same-name DLL that
+// loads first; consequences of a def file that failed to load (06 §2, §3); stack-less
+// "Tried to" errors, the game-error class and the lord rule; 14: Unity-format stack frames,
+// HugsLib upload headers skipped (06 §1); 15: XML Extensions blocks in 1.7 logs, any
+// "[Mod] Ns.PatchOperation…(" block line a patch failure; 16: a pawn's name in "Exception
+// ticking …" errors normalised, one cluster for all pawns.
+const logCacheVersion = 16
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a
@@ -276,7 +294,7 @@ func (a *App) AnalyzeLogText(text string) (*LogReport, error) {
 func LogMM(version string) string { return env.MajorMinor(version) }
 
 // logState switches attribution to the log's own game version when it differs from the
-// environment's and no --game-version was given (03 §6.4). restore undoes it.
+// environment's and no --game-version was given (06 §4). restore undoes it.
 func (a *App) logState(st *LoadoutState, rep *LogReport) (*LoadoutState, func(), error) {
 	mm := LogMM(rep.Version)
 	if a.GameVersion != "" || mm == "" || mm == st.GameMM() {
@@ -350,6 +368,48 @@ type attrCtx struct {
 	libMemo  map[string]string   // type → the one DLL file name its owners ship it in
 	asmMemo  map[string][]string // assembly base name (lower) → enabled mods loading it
 	lf       *logs.File          // the whole log (neighbouring lines)
+	// unanalysed: enabled non-official mods without analysed content (LogReport.Unanalysed).
+	unanalysed int
+
+	// dllMemo: DLL file name (lower) → the enabled mods' copies (shadowing).
+	dllMemo map[string][]*store.AssemblyRow
+}
+
+// notAnalysed qualifies a "nothing defines it" detail: when some enabled mods were never
+// analysed, their types are unknown, so the absence says nothing about them (06 §2).
+func (cx *attrCtx) notAnalysed() string {
+	if cx.unanalysed == 0 {
+		return ""
+	}
+	return "assemblies not analysed yet (" + EnabledMods(cx.unanalysed) + ")"
+}
+
+// EnabledMods is "1 enabled mod" or "N enabled mods".
+func EnabledMods(n int) string {
+	if n == 1 {
+		return "1 enabled mod"
+	}
+	return fmt.Sprintf("%d enabled mods", n)
+}
+
+// unanalysedMods counts the enabled mods, Core and DLC aside, that have no analysed
+// content for the version attributed against.
+func (a *App) unanalysedMods(st *LoadoutState) int {
+	keys, err := a.Store.ContentKeys()
+	if err != nil {
+		return 0
+	}
+	n := 0
+	for _, e := range st.List {
+		m := st.Ix.ByID[e.Instance]
+		if m == nil || strings.HasPrefix(strings.ToLower(m.PackageID), "ludeon.rimworld") {
+			continue
+		}
+		if keys[m.ID] == "" {
+			n++
+		}
+	}
+	return n
 }
 
 type dirOwner struct {
@@ -411,6 +471,9 @@ func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails [
 			}
 		}
 	}
+	a.Store.MM = st.GameMM()
+	cx.unanalysed = a.unanalysedMods(st)
+	rep.Unanalysed = cx.unanalysed
 	// Map the multi-line patch-failure records (file + description) onto entries by line.
 	failAt := map[string]analyze.LogFailure{}
 	for _, f := range fails {
@@ -430,8 +493,9 @@ func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails [
 		cx.referrers(qs)
 		cx.textureProviders(qs)
 	}
+	cx.consequences(rep)
 	for _, lc := range rep.Clusters {
-		// Source searches cover the cluster's candidates, not every enabled mod (03 §5.4).
+		// Source searches cover the cluster's candidates, not every enabled mod (05 §5.4).
 		if rep.HasPhases {
 			lc.Phases = logs.CompletePhaseCounts(lc.Phases, lc.Count)
 			if lc.Phase == nil {
@@ -460,7 +524,7 @@ const inPlaceholder = "<in>"
 
 // ImplicatedMods are the mods the newest log and the current problems point at: the
 // candidates of the problem log's error clusters, else the subjects of Harmony warnings.
-// MCP source searches default to them (03 §5.4).
+// MCP source searches default to them (05 §5.4).
 func (a *App) ImplicatedMods(st *LoadoutState) []string {
 	seen := map[string]bool{}
 	var out []string
@@ -525,7 +589,7 @@ func (lc *LogCluster) add(inst, role, ev string) {
 // whyProviderOff explains a likely cluster led by a mod left out of the list.
 const whyProviderOff = "a mod that defines it is installed but not enabled"
 
-// order sorts the candidates by role (03 §6.3). A save or def that names a def of a mod
+// order sorts the candidates by role (06 §3). A save or def that names a def of a mod
 // left out of the list: that mod comes before whoever only patched the code that read it
 // (VM run 2026-10-28: Vanilla Expanded Framework's Pawn.ExposeData patch was blamed for
 // missing hair).
@@ -552,6 +616,17 @@ func (lc *LogCluster) next(cmds ...string) {
 			lc.Next = append(lc.Next, c)
 		}
 	}
+}
+
+// typeOrDeclaring is types, falling back to the declaring type of a Type.Method name.
+func (cx *attrCtx) typeOrDeclaring(t string) []string {
+	ids := cx.types(t)
+	if len(ids) == 0 {
+		if i := strings.LastIndexByte(t, '.'); i > 0 {
+			ids = cx.types(t[:i])
+		}
+	}
+	return ids
 }
 
 func (cx *attrCtx) types(t string) []string {
@@ -640,20 +715,24 @@ func (cx *attrCtx) dirOwner(path string) (string, string) {
 }
 
 var (
-	bracketRe     = regexp.MustCompile(`^(?:<color=[^>]*>)?\[([^\]]{2,80})\](?:</color>)?`)
-	xmlExtRe      = regexp.MustCompile(`^Verse\.PatchOperation\w*\(xpath="(.*)"\): Failed`)
-	winPathRe     = regexp.MustCompile(`[A-Za-z]:[\\/][^"'<>|\r\n]*?\.(?:xml|dll|png|txt)`)
-	xrefRe        = regexp.MustCompile(`No ([\w.]+) named (\S+) found to give to (\S+)|cross-reference to ([\w.]+) named (\S+)|reference to ([\w.]+) named (\S+)`)
-	forDefRe      = regexp.MustCompile(` for def '([^']+)'`)
-	ctxDefNameRe  = regexp.MustCompile(`(?:Context|Full node): [\s\S]*?<defName>([^<\s]+)</defName>`)
-	parentRe      = regexp.MustCompile(`Could not find parent node named "([^"]+)"`)
-	thinkKeyRe    = regexp.MustCompile(`^Config error in (\S+): Two ThinkNodes have the same unique save key`)
-	ctxNameRe     = regexp.MustCompile(`Context: <\w+[^>]*\bName="([^"]+)"`)
-	missingTypeRe = regexp.MustCompile(`Could not find (?:a )?type (?:named )?([A-Za-z_][\w.+]*\.[\w+]+)|expected class '([^']+)'`)
+	bracketRe    = regexp.MustCompile(`^(?:<color=[^>]*>)?\[([^\]]{2,80})\](?:</color>)?`)
+	xmlExtRe     = regexp.MustCompile(`^Verse\.PatchOperation\w*\(xpath="(.*)"\): Failed`)
+	winPathRe    = regexp.MustCompile(`[A-Za-z]:[\\/][^"'<>|\r\n]*?\.(?:xml|dll|png|txt)`)
+	xrefRe       = regexp.MustCompile(`No ([\w.]+) named (\S+) found to give to (\S+)|cross-reference to ([\w.]+) named (\S+)|reference to ([\w.]+) named (\S+)`)
+	forDefRe     = regexp.MustCompile(` for def '([^']+)'`)
+	ctxDefNameRe = regexp.MustCompile(`(?:Context|Full node): [\s\S]*?<defName>([^<\s]+)</defName>`)
+	parentRe     = regexp.MustCompile(`Could not find parent node named "([^"]+)"`)
+	thinkKeyRe   = regexp.MustCompile(`^Config error in (\S+): Two ThinkNodes have the same unique save key`)
+	ctxNameRe    = regexp.MustCompile(`Context: <\w+[^>]*\bName="([^"]+)"`)
+	// A bare name counts only before " from node": the game's wording for a Class="…" it cannot
+	// resolve (VM round 2026-11-05: Class="PatchOperationConditionl" in a patch).
+	missingTypeRe = regexp.MustCompile(`Could not find (?:a )?type (?:named )?(?:([A-Za-z_][\w.+]*\.[\w+]+)|([A-Za-z_]\w*) from node)|expected class '([^']+)'`)
 	blockRe       = regexp.MustCompile(`^\[(.+?)\] Verse\.PatchOperation`)
 	modFolderRe   = regexp.MustCompile(`(?i)[\\/](?:294100|Mods)[\\/]([^\\/]+)[\\/](.+)$`)
 	wanterRe      = regexp.MustCompile(`found to give to ([\w.]+Def) ([^\s(]+)`)
-	typeTokRe     = regexp.MustCompile(`\b([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+)\b`)
+	// "Tried to add pawn X to lord with lord jobA but this pawn is already a member of lord with lord jobB."
+	lordAddRe = regexp.MustCompile(`^Tried to add pawn .* to lord with lord job ?\S+ but this pawn is already a member of lord`)
+	typeTokRe = regexp.MustCompile(`\b([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+)\b`)
 	// DefDatabase.GetNamed: "Failed to find Verse.ThingDef named X. There are N defs of this type loaded."
 	getNamedRe = regexp.MustCompile(`^Failed to find ([\w.]+Def) named ([^\s.]+(?:\.[^\s.]+)*)\. There are`)
 	texPathRe  = regexp.MustCompile(`^Could not load Texture2D at '([^']+)'|^Failed to find any textures at (\S+) while constructing`)
@@ -832,6 +911,10 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 		} else if m := ctxNameRe.FindStringSubmatch(texts); m != nil {
 			cx.definedBy(lc, m[1], true, "is the abstract def the XML error is in")
 		}
+	case logs.ClassNoise:
+		if n := logs.KnownNoise(e.Message); n != nil {
+			lc.Details = append(lc.Details, n.Note)
+		}
 	case logs.ClassMaterial:
 		if m := shaderRe.FindStringSubmatch(e.Message); m != nil {
 			// The shader lives in a mod's asset bundle (compressed) or in the game: its name is not
@@ -854,11 +937,22 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 		if skipProviders {
 			break
 		}
-		t := m[1] + m[2]
-		for _, id := range cx.types(t) {
+		t := m[1] + m[2] + m[3]
+		ids := cx.types(t)
+		if len(ids) == 0 && !slices.Contains(lc.missingTypes, t) {
+			lc.missingTypes = append(lc.missingTypes, t)
+			if near := cx.nearTypes(t); len(near) > 0 {
+				lc.Details = append(lc.Details, "did you mean: "+strings.Join(near, ", "))
+			}
+		}
+		for _, id := range ids {
 			if cx.st.Position(id) == 0 {
 				lc.add(id, RoleDependency, "provides type "+t+" but is not enabled")
 				lc.next("archo enable " + ix.Ref(id))
+			} else if sh, why, prov := cx.shadowing(t, id); sh != "" {
+				lc.add(sh, RoleSource, why)
+				lc.add(id, RoleMentioned, prov)
+				lc.next("archo mod " + ix.Ref(sh))
 			} else {
 				lc.add(id, RoleMentioned, "provides type "+t+" and is enabled (a version mismatch?)")
 			}
@@ -878,7 +972,11 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 				lc.add(id, RolePatcher, fmt.Sprintf("log harmony:%s#%s %q (%s)", target, p.Kind, "- "+strings.ToUpper(p.Kind)+" "+p.Owner, via))
 			}
 			if len(ids) == 0 {
-				lc.Details = append(lc.Details, fmt.Sprintf("harmony owner %q on %s: no installed mod matches", p.Owner, target))
+				d := fmt.Sprintf("harmony owner %q on %s: no installed mod matches", p.Owner, target)
+				if na := cx.notAnalysed(); na != "" {
+					d += " (" + na + ")"
+				}
+				lc.Details = append(lc.Details, d)
 			}
 			lc.next("archo harmony --target " + strings.ReplaceAll(target, "+", "."))
 		}
@@ -913,16 +1011,21 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 		if logs.GameNamespace(t) || !strings.Contains(t, ".") {
 			continue
 		}
-		role := RoleMentioned
-		if strings.Contains(e.Message, "instantiating a mod of type "+t) || strings.Contains(e.Message, "static constructor of "+t) {
-			role = RoleSource
-		}
-		ids := cx.types(t)
-		if len(ids) == 0 {
-			// Type.Method: try the declaring type.
-			if i := strings.LastIndexByte(t, '.'); i > 0 {
-				ids = cx.types(t[:i])
+		ids := cx.typeOrDeclaring(t)
+		if u := logs.Unglue(t); len(ids) == 0 && u != t {
+			// "lord jobNs.LordJob_X": the game glued a word to the name.
+			if logs.GameNamespace(u) {
+				continue
 			}
+			t, ids = u, cx.typeOrDeclaring(u)
+		}
+		role := RoleMentioned
+		if strings.Contains(e.Message, "instantiating a mod of type "+t) || strings.Contains(e.Message, "static constructor of "+t) ||
+			// Lord.AddPawn: the code adding the pawn is the lord's own (its LordJob or LordToil).
+			// The other lord, the one the pawn is already in, did nothing wrong (Progression:
+			// Education's class lord in 9 corpus logs, against five different other lords).
+			lordAddRe.MatchString(e.Message) && (strings.Contains(e.Message, "to lord with lord job"+t+" ") || strings.Contains(e.Message, "to lord with lord job "+t+" ")) {
+			role = RoleSource
 		}
 		for _, id := range ids {
 			lc.add(id, role, "log message names type "+t)
@@ -1087,8 +1190,8 @@ func lastToken(desc string) string {
 var logSeverity = map[string]string{
 	logs.ClassException: finding.Error, logs.ClassHarmony: finding.Error, logs.ClassXMLLoad: finding.Error,
 	logs.ClassPatchFailed: finding.Warning, logs.ClassXrefMissing: finding.Warning, logs.ClassMaterial: finding.Warning,
-	logs.ClassTexture: finding.Warning, logs.ClassSave: finding.Warning,
-	logs.ClassModReport: finding.Info, logs.ClassOther: finding.Info,
+	logs.ClassTexture: finding.Warning, logs.ClassSave: finding.Warning, logs.ClassGameError: finding.Warning,
+	logs.ClassModReport: finding.Info, logs.ClassOther: finding.Info, logs.ClassNoise: finding.Info,
 }
 
 // findingKey keeps a log problem's ref (and an ignore of it) stable across logs and
@@ -1138,7 +1241,7 @@ func uniqStr(l []string) []string {
 	return out
 }
 
-// SelectedLog is the log whose clusters `problems` includes ("" if none) (06 §2).
+// SelectedLog is the log whose clusters `problems` includes ("" if none) (16 §2).
 func (a *App) SelectedLog(st *LoadoutState) string {
 	return a.Store.Meta("log.selected:" + st.Ix.Env.ID)
 }
@@ -1158,7 +1261,7 @@ func (a *App) SelectLog(st *LoadoutState, path string) error {
 }
 
 // NewLog reports whether the current Player.log is newer than the last launch and the
-// last log the player looked at (06 §5).
+// last log the player looked at (16 §5).
 func (a *App) NewLog(st *LoadoutState) (string, bool) {
 	cur, _ := a.LogPaths(st)
 	if cur == "" {
@@ -1180,7 +1283,7 @@ func (a *App) NewLog(st *LoadoutState) (string, bool) {
 }
 
 // LiveLog is the log the current environment's running game writes ("" when none runs):
-// this run, which is not a last run until the game exits (03 §6.4).
+// this run, which is not a last run until the game exits (06 §4).
 func (a *App) LiveLog(st *LoadoutState) string {
 	if st == nil || st.Ix == nil || st.Ix.Env == nil {
 		return ""
@@ -1195,7 +1298,7 @@ func (a *App) LiveLog(st *LoadoutState) string {
 // sameLog: two log paths name one file ("" names none).
 func sameLog(a, b string) bool { return a != "" && b != "" && env.PathKey(a) == env.PathKey(b) }
 
-// ProblemLog is the log whose clusters join the problems (03 §6.4): the
+// ProblemLog is the log whose clusters join the problems (06 §4): the
 // selected one, or the current Player.log when that is newer. While the game writes
 // Player.log, the last run is the one it moved to Player-prev.log: the run in progress is
 // listed as this run, not again as the last (VM run 2026-10-28).
@@ -1257,29 +1360,40 @@ type hotMethod struct {
 }
 
 // LogRun is a log whose clusters join the problems, the run it belongs to, and whether it
-// still describes the analysed plan (03 §6.4). A stale log's problems are listed apart and
+// still describes the analysed plan (06 §4). A stale log's problems are listed apart and
 // not counted.
 type LogRun struct {
-	Phases      map[string][]logs.PhaseCount `json:",omitempty"` // finding key → observed counts
+	Phases map[string][]logs.PhaseCount `json:",omitempty"` // finding key → observed counts
+	// Marks are the run's phase boundaries in order (06 §7), nil without markers.
+	Marks       []*logs.Phase `json:"-"`
 	Path, Label string
 	Version     string
 	ModTime     time.Time
 	MM, EnvMM   string // the log's and the environment's major.minor
 	// Source is the launch (or, without one, the ModsConfig.xml write) the log maps to.
 	Source *RunSource
-	// The stale reasons (03 §6.4 new rule):
+	// The stale reasons (06 §4 new rule):
 	OtherGame bool   // written by another game version
 	OtherRun  bool   // its run is not the analysed plan: another plan, environment or a pack
 	OtherEnv  string // the other environment's name, when that is the reason
 	Changed   bool   // the plan's enabled list changed since that run
 	Unknown   bool   // no launch or write record matches: the source is unknown
+	// UnknownGame: with Unknown, the game folder the log's header names when no
+	// environment has it (UnregisteredLogGame).
+	UnknownGame string `json:",omitempty"`
 	// Pending: a cache-only problem list (status, mod) found no stored report; the log's
 	// problems are not in the list until a log or problems command analyses it.
 	Pending bool
 }
 
-// Stale reports whether the log's problems describe another run or an earlier state.
-func (r *LogRun) Stale() bool { return r.OtherGame || r.OtherRun || r.Changed || r.Unknown }
+// Stale reports whether the log's problems describe another run or an earlier state. A log
+// of this game whose run no record matches (a Steam launch before RimArcho ever wrote the
+// list) is not stale: it is the only evidence there is, and leaving it out made status and
+// list_problems say "0 error" over a log with errors (MCP review round 2 P25). A log whose
+// header names a game folder no environment has stays stale.
+func (r *LogRun) Stale() bool {
+	return r.OtherGame || r.OtherRun || r.Changed || r.Unknown && r.UnknownGame != ""
+}
 
 func (a *App) logRun(st *LoadoutState, path, version string, mod time.Time) *LogRun {
 	r := &LogRun{Path: path, Label: filepath.Base(path), Version: version, ModTime: mod, MM: LogMM(version), EnvMM: st.GameMM()}
@@ -1324,6 +1438,7 @@ func (a *App) logFindings(st *LoadoutState) ([]*finding.Finding, map[string]hotM
 	run := a.logRun(st, path, rep.Version, rep.ModTime)
 	if rep.HasPhases {
 		run.Phases = map[string][]logs.PhaseCount{}
+		run.Marks = rep.Phases
 	}
 	var out []*finding.Finding
 	hot := map[string]hotMethod{}
@@ -1351,7 +1466,7 @@ func (a *App) logFindings(st *LoadoutState) ([]*finding.Finding, map[string]hotM
 }
 
 // escalateSkips raises harmony.skip-prefix and harmony.multi-transpiler to warning when their
-// method is in a log cluster (03 §4.5): a bool prefix or two transpilers on one method are
+// method is in a log cluster (05 §4.5): a bool prefix or two transpilers on one method are
 // ordinary until a stack trace passes through it.
 func escalateSkips(fs []*finding.Finding, hot map[string]hotMethod) []*finding.Finding {
 	if len(hot) == 0 {

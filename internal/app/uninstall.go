@@ -1,6 +1,6 @@
 package app
 
-// Uninstall (01 §4's uninstall column, 05 §4.2 `archo uninstall`, 06 §2.14): undo every row of
+// Uninstall (02 §1's uninstall column, 13 §4.2 `archo uninstall`, 16 §2.14): undo every row of
 // the write list. The plan is computed first and shown as a dry run; Uninstall carries it
 // out. What holds the player's things (lock library copies, packs, saves, downloaded games)
 // is a choice; RimArcho's own folders are deleted; the data folders and the program go last,
@@ -25,7 +25,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// The steps, in the order they run. 01 §4's uninstall column names them.
+// The steps, in the order they run. 02 §1's uninstall column names them.
 const (
 	UnAccounts   = "accounts"   // forget sessions before removing tools or data
 	UnLinks      = "links"      // _Archo_ and !ArchoPack_ links in each game's Mods/
@@ -50,7 +50,7 @@ const (
 	DoUnlink  = "unlink"     // the link is deleted, never its target
 	DoClean   = "clean"      // ModsConfig.xml keeps the list without the mods that go away
 	DoRestore = "restore"    // ModsConfig.xml.rimarcho.bak goes back
-	DoTrash   = "trash"      // to the recycle bin; refused when there is none (08 §7)
+	DoTrash   = "trash"      // to the recycle bin; refused when there is none (02 §3)
 	DoMove    = "move"       // to Item.To (renamed, or copied, checked and the original trashed)
 	DoKeep    = "keep"       // stays where it is
 	DoDelete  = "delete"     // RimArcho's own: deleted
@@ -170,6 +170,9 @@ func joinInts(n []int) string {
 // LocalDir is %LOCALAPPDATA%\RimArcho: the default lock library, Monitor, SteamCMD and the
 // Steam runtime folder live here.
 func (a *App) LocalDir() string {
+	if p := a.storeMeta("cfg:local.dir"); p != "" {
+		return p
+	}
 	base := a.LockBase
 	if base == "" {
 		base = os.Getenv("LOCALAPPDATA")
@@ -192,11 +195,11 @@ func (a *App) KeepBase() string {
 func (a *App) DefaultSavesTo() string { return filepath.Join(a.KeepBase(), "RimArcho saves") }
 func (a *App) DefaultPacksTo() string { return filepath.Join(a.KeepBase(), "RimArcho packs") }
 
-// releaseFiles are what the release zip puts next to the program (07 §5); only these are
+// releaseFiles are what the release zip puts next to the program (17 §5); only these are
 // deleted from the program folder, and the folder only when nothing else is left in it.
 // Releases before this one shipped fonts/, so uninstall still removes it if present;
-// .archo-update is what RimArcho's own update leaves there (07 §5.1).
-var releaseFiles = []string{"archo.exe", "RimArcho.exe", "README.md", "CHANGELOG.md", "LICENSE", "fonts", "monitor", UpdateDirName}
+// .archo-update is what RimArcho's own update leaves there (17 §5.1).
+var releaseFiles = []string{"archo.exe", "RimArcho.exe", "README.md", "README.zh-CN.md", "CHANGELOG.md", "LICENSE", "fonts", "monitor", "skills", UpdateDirName}
 
 // downloadedGame reports whether a game folder was downloaded with SteamCMD: force_install_dir
 // leaves steamapps/appmanifest_294100.acf inside it (a Steam library keeps the manifest beside
@@ -982,10 +985,24 @@ func restoreModsConfig(path string) error {
 
 func removeBackup(path string) error {
 	os.Remove(path + ".rimarcho.tmp")
+	removeSettingsBackups(filepath.Dir(path))
 	if err := os.Remove(path + loadout.BackupSuffix); err != nil && !os.IsNotExist(err) {
 		return err
 	}
 	return nil
+}
+
+// removeSettingsBackups removes the backups RimArcho made before changing Mod settings
+// (16 §2.9) in a user data folder's Config folder (configDir): Config/Mod_*.xml.rimarcho.bak
+// and HugsLib's. The changed values stay: they are the player's.
+func removeSettingsBackups(configDir string) {
+	ents, _ := os.ReadDir(configDir)
+	for _, e := range ents {
+		if n := e.Name(); strings.HasPrefix(n, "Mod_") && strings.HasSuffix(n, ".xml"+loadout.BackupSuffix) && e.Type().IsRegular() {
+			os.Remove(filepath.Join(configDir, n))
+		}
+	}
+	os.Remove(filepath.Join(filepath.Dir(configDir), HugsLibSettingsFile+loadout.BackupSuffix))
 }
 
 // replaceFile writes a temporary file beside path and renames it over (no backup: the
@@ -1078,4 +1095,12 @@ func RunAfterExit(x AfterExit) []string {
 		removeIfEmpty(d)
 	}
 	return left
+}
+
+// storeMeta reads a meta value, or "" before the database is open.
+func (a *App) storeMeta(key string) string {
+	if a.Store == nil {
+		return ""
+	}
+	return a.Store.Meta(key)
 }

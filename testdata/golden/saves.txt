@@ -1,0 +1,338 @@
+$ archo saves list
+saves: 5 saves in 3 colonies
+  Broken  1 save, latest 2026-10-01 09:50
+    sv:<Broken.rws>  Broken      2026-10-01 09:50  meta only  plan:default (launch)     will not load cleanly
+  Tundra  3 saves, latest 2026-10-01 09:40
+    sv:<Autosave-1.rws>  Autosave-1  2026-10-01 09:40  meta only  plan:default (launch)     loads, but content will be lost
+    sv:<Tundra 2.rws>  Tundra 2    2026-10-01 09:30  meta only  plan:default (launch)     loads, but content will be lost
+    sv:<Tundra.rws>  Tundra      2026-10-01 08:00  meta only  plan:default (same-mods)  loads with the list
+  Ashfall  1 save, latest 2026-10-01 07:00
+    sv:<Ashfall#§#Landing.rws>  Landing     2026-10-01 07:00  meta only  plan:default (same-mods)  loads with the list
+  note: 5 saves are meta only: only the head is read, so no in-game day yet; archo saves index reads them in full
+next:
+  archo saves show sv:<Broken.rws>
+
+$ archo saves list --attention
+saves: 3 saves in 2 colonies (attention)
+  Broken  1 save, latest 2026-10-01 09:50
+    sv:<Broken.rws>  Broken      2026-10-01 09:50  meta only  plan:default (launch)  will not load cleanly
+  Tundra  3 saves, latest 2026-10-01 09:40
+    sv:<Autosave-1.rws>  Autosave-1  2026-10-01 09:40  meta only  plan:default (launch)  loads, but content will be lost
+    sv:<Tundra 2.rws>  Tundra 2    2026-10-01 09:30  meta only  plan:default (launch)  loads, but content will be lost
+  note: 3 saves are meta only: only the head is read, so no in-game day yet; archo saves index reads them in full
+next:
+  archo saves show sv:<Broken.rws>
+
+$ archo saves list --mod tester.gone
+saves: 2 saves in 1 colony (mod tester.gone)
+  Tundra  3 saves, latest 2026-10-01 09:40
+    sv:<Autosave-1.rws>  Autosave-1  2026-10-01 09:40  meta only  plan:default (launch)  loads, but content will be lost
+    sv:<Tundra 2.rws>  Tundra 2    2026-10-01 09:30  meta only  plan:default (launch)  loads, but content will be lost
+  note: 2 saves are meta only: only the head is read, so no in-game day yet; archo saves index reads them in full
+next:
+  archo saves show sv:<Autosave-1.rws>
+
+$ archo saves list --mod #z3bw
+saves: 2 saves in 1 colony (mod #z3bw)
+  Tundra  3 saves, latest 2026-10-01 09:40
+    sv:<Autosave-1.rws>  Autosave-1  2026-10-01 09:40  meta only  plan:default (launch)  loads, but content will be lost
+    sv:<Tundra 2.rws>  Tundra 2    2026-10-01 09:30  meta only  plan:default (launch)  loads, but content will be lost
+  note: 2 saves are meta only: only the head is read, so no in-game day yet; archo saves index reads them in full
+next:
+  archo saves show sv:<Autosave-1.rws>
+
+$ archo saves list --colony ashfall
+saves: 1 save in 1 colony (colony ashfall)
+  Ashfall  1 save, latest 2026-10-01 07:00
+    sv:<Ashfall#§#Landing.rws>  Landing  2026-10-01 07:00  meta only  plan:default (same-mods)  loads with the list
+  note: 1 save is meta only: only the head is read, so no in-game day yet; archo saves index reads them in full
+next:
+  archo saves show sv:<Ashfall#§#Landing.rws>
+
+$ archo saves list --colony Nope
+error: no colony named Nope (archo saves list)
+[exit 1]
+
+$ archo saves list --mod nothing.here
+saves: 0 saves in 0 colonies (mod nothing.here)
+
+$ archo saves show Tundra 2
+sv:<Tundra 2.rws> Tundra 2  [loads, but content will be lost]
+  colony: Tundra (3 saves, latest Autosave-1 sv:<Autosave-1.rws>)
+  game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
+  list: plan:default (saved after a launch of it)
+  file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Tundra 2.rws
+  saved: 2026-10-01 09:30, 573 B
+  read: in full
+  play: day 1 (2nd of Aprimay, 5500)
+    colonists: unknown: no player faction found in the save
+    since Tundra sv:<Tundra.rws>: not compared: that save is not read in full yet (archo saves index)
+  can it load: 3 items
+    warning disabled  #z3bw Gamma
+      consequence: installed but not in the list: what it added to the save is lost on load
+      fix: Enable in the list (archo saves fix sv:<Tundra 2.rws> --mod tester.gamma)
+    warning not-installed  pkg:tester.gone Gone Mod (ws:99)
+      consequence: what the Mod added to the save is lost on load
+      fix: Subscribe and enable (archo saves fix sv:<Tundra 2.rws> --mod tester.gone)
+    info reordered  #hnyg Beta
+      consequence: usually safe; patches apply in another order
+      fix: Use the save's order (archo saves fix sv:<Tundra 2.rws> --order)
+  quick fix: Fix and launch (archo saves fix sv:<Tundra 2.rws> --launch)
+  mods: 5 Mods in the save; 1 not installed, 1 not in the list, 1 moved
+    2.  #hnyg Beta                        moved
+    4.  #z3bw Gamma                       not in the list
+    5.  pkg:tester.gone Gone Mod (ws:99)  not installed
+    (the whole list: archo saves show sv:<Tundra 2.rws> --mods)
+next:
+  archo saves fix sv:<Tundra 2.rws> --launch --dry-run
+
+$ archo saves show Tundra 2.rws --mods
+sv:<Tundra 2.rws> Tundra 2  [loads, but content will be lost]
+  colony: Tundra (3 saves, latest Autosave-1 sv:<Autosave-1.rws>)
+  game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
+  list: plan:default (saved after a launch of it)
+  file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Tundra 2.rws
+  saved: 2026-10-01 09:30, 573 B
+  read: in full
+  play: day 1 (2nd of Aprimay, 5500)
+    colonists: unknown: no player faction found in the save
+    since Tundra sv:<Tundra.rws>: not compared: that save is not read in full yet (archo saves index)
+  can it load: 3 items
+    warning disabled  #z3bw Gamma
+      consequence: installed but not in the list: what it added to the save is lost on load
+      fix: Enable in the list (archo saves fix sv:<Tundra 2.rws> --mod tester.gamma)
+    warning not-installed  pkg:tester.gone Gone Mod (ws:99)
+      consequence: what the Mod added to the save is lost on load
+      fix: Subscribe and enable (archo saves fix sv:<Tundra 2.rws> --mod tester.gone)
+    info reordered  #hnyg Beta
+      consequence: usually safe; patches apply in another order
+      fix: Use the save's order (archo saves fix sv:<Tundra 2.rws> --order)
+  quick fix: Fix and launch (archo saves fix sv:<Tundra 2.rws> --launch)
+  mods: 5 Mods in the save; 1 not installed, 1 not in the list, 1 moved
+    1.  #nyh3 Core
+    2.  #hnyg Beta                        moved
+    3.  #6olp Alpha
+    4.  #z3bw Gamma                       not in the list
+    5.  pkg:tester.gone Gone Mod (ws:99)  not installed
+next:
+  archo saves fix sv:<Tundra 2.rws> --launch --dry-run
+
+$ archo saves show Broken
+sv:<Broken.rws> Broken  [will not load cleanly]
+  colony: Broken (1 save)
+  game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
+  list: plan:default (saved after a launch of it)
+  file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Broken.rws
+  saved: 2026-10-01 09:50, 425 B
+  read: stopped at line 11, byte 425: the file ends inside a tag (the facts below are from before that point)
+  play: day 1 (2nd of Aprimay, 5500)
+    colonists: unknown: no player faction found in the save
+  can it load: 1 item
+    error cut-off
+      consequence: can never load: the file stops before its end (written during a crash?)
+      fix: Recycle (archo saves trash sv:<Broken.rws>)
+  quick fix: Recycle (archo saves trash sv:<Broken.rws>)
+  mods: 3 Mods in the save, the same as the list
+    (the whole list: archo saves show sv:<Broken.rws> --mods)
+next:
+  archo saves trash sv:<Broken.rws>
+
+$ archo saves show Ashfall/Landing
+sv:<Ashfall#§#Landing.rws> Landing  [loads with the list]
+  colony: Ashfall (1 save)
+  game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
+  list: plan:default (same Mods as one of its versions)
+  file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Ashfall#§#Landing.rws
+  saved: 2026-10-01 07:00, 487 B
+  read: in full
+  play: day 1 (2nd of Aprimay, 5500)
+    colonists: unknown: no player faction found in the save
+  can it load: yes, with the list as it is now
+  quick fix: Launch (archo saves fix sv:<Ashfall#§#Landing.rws> --launch)
+  mods: 3 Mods in the save, the same as the list
+    (the whole list: archo saves show sv:<Ashfall#§#Landing.rws> --mods)
+next:
+  archo saves fix sv:<Ashfall#§#Landing.rws> --launch --dry-run
+
+$ archo saves show Nope
+error: no such save: Nope (archo saves list)
+[exit 1]
+
+$ archo saves fix Tundra 2 --dry-run --launch
+dry run, nothing changed: would fix plan:default for sv:<Tundra 2.rws> Tundra 2
+  would enable:
+    #z3bw Gamma
+  would add (missing until downloaded):
+    pkg:tester.gone Gone Mod (ws:99)
+  subscriptions:
+    ws:99 Gone Mod
+    note: Would subscribe through Steam; use SteamCMD only if Steam is unavailable.
+  launch: would wait: the new subscriptions download first
+next:
+  archo saves fix sv:<Tundra 2.rws> --launch
+
+$ archo saves fix Tundra 2 --mod tester.gamma
+fixed plan:default for sv:<Tundra 2.rws> Tundra 2
+  enabled:
+    #z3bw Gamma
+  history: one undoable step (archo undo)
+next:
+  archo saves fix sv:<Tundra 2.rws> --launch --dry-run
+
+$ archo saves show Tundra 2
+sv:<Tundra 2.rws> Tundra 2  [loads, but content will be lost]
+  colony: Tundra (3 saves, latest Autosave-1 sv:<Autosave-1.rws>)
+  game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
+  list: plan:default (saved after a launch of it)
+  file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Tundra 2.rws
+  saved: 2026-10-01 09:30, 573 B
+  read: in full
+  play: day 1 (2nd of Aprimay, 5500)
+    colonists: unknown: no player faction found in the save
+    since Tundra sv:<Tundra.rws>: not compared: that save is not read in full yet (archo saves index)
+  can it load: 2 items
+    warning not-installed  pkg:tester.gone Gone Mod (ws:99)
+      consequence: what the Mod added to the save is lost on load
+      fix: Subscribe and enable (archo saves fix sv:<Tundra 2.rws> --mod tester.gone)
+    info reordered  #hnyg Beta
+      consequence: usually safe; patches apply in another order
+      fix: Use the save's order (archo saves fix sv:<Tundra 2.rws> --order)
+  quick fix: Fix and launch (archo saves fix sv:<Tundra 2.rws> --launch)
+  mods: 5 Mods in the save; 1 not installed, 1 moved
+    2.  #hnyg Beta                        moved
+    5.  pkg:tester.gone Gone Mod (ws:99)  not installed
+    (the whole list: archo saves show sv:<Tundra 2.rws> --mods)
+next:
+  archo saves fix sv:<Tundra 2.rws> --launch --dry-run
+
+$ archo undo
+workspace: 3 active, saved (plan:default, env:main)
+  undid: fix from save Tundra 2
+  removed  #z3bw  Gamma  was 3
+
+$ archo saves fix Tundra 2 --mod tester.nothing
+error: tester.nothing: no Mod of Tundra 2 to enable (archo saves show sv:<Tundra 2.rws>)
+[exit 1]
+
+$ archo saves fix Tundra 2 --launch
+fixed plan:default for sv:<Tundra 2.rws> Tundra 2
+  enabled:
+    #z3bw Gamma
+  added (missing until downloaded):
+    pkg:tester.gone Gone Mod (ws:99)
+  history: one undoable step (archo undo)
+  subscriptions:
+    ws:99 Gone Mod  ok
+    note: Steam downloads it; it appears after the next scan.
+  launch: not started: 1 Mod of the save is not installed yet; scan when Steam has downloaded it, then fix again with --launch
+    pkg:tester.gone Gone Mod (ws:99)
+next:
+  archo scan
+  archo saves fix sv:<Tundra 2.rws> --launch
+
+$ archo saves fix Tundra --launch
+sv:<Tundra.rws> Tundra: nothing to fix in plan:default
+  launch: started RimWorld via direct with plan:default
+  command: $ROOT/Steam/steamapps/common/RimWorld/RimWorldWin64.exe "-savedatafolder=$ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios"
+
+$ archo saves fix Broken
+sv:<Broken.rws> Broken: nothing to fix in plan:default
+  note: the file itself cannot load (cut-off); no list fix changes that (archo saves show sv:<Broken.rws>)
+
+$ archo saves rename Ashfall/Landing First day
+renamed sv:<Ashfall#§#Landing.rws> Landing → sv:<Ashfall#§#First day.rws> First day
+  file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Ashfall#§#First day.rws
+next:
+  archo saves show sv:<Ashfall#§#First day.rws>
+
+$ archo saves rename Tundra Tundra 2
+error: a save named Tundra 2 already exists
+[exit 1]
+
+$ archo saves copy Tundra
+copied sv:<Tundra.rws> Tundra → sv:<Tundra (copy).rws> Tundra (copy)
+  file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Tundra (copy).rws
+next:
+  archo saves show sv:<Tundra (copy).rws>
+
+$ archo saves backup Tundra Broken
+backup preview, nothing written: 2 saves, 912 B
+  sv:<Tundra.rws>  Tundra/Tundra  487 B  $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Tundra.rws
+  sv:<Broken.rws>  Broken/Broken  425 B  $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Broken.rws
+  confirm: ask the player, then run it again with --yes
+  to: $ROOT/ArchoHome/backups/saves/20261001-100000
+next:
+  archo saves backup sv:<Tundra.rws> sv:<Broken.rws> --yes
+
+$ archo saves backup Tundra Broken --yes
+backed up 2 saves, 912 B
+  sv:<Tundra.rws>  Tundra/Tundra  487 B  $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Tundra.rws
+  sv:<Broken.rws>  Broken/Broken  425 B  $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Broken.rws
+  to: $ROOT/ArchoHome/backups/saves/20261001-100000
+
+$ archo saves trash Broken
+recycle preview, nothing moved: 1 save, 425 B
+  sv:<Broken.rws>  Broken/Broken  425 B  $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Broken.rws
+  confirm: ask the player, then run it again with --yes
+next:
+  archo saves trash sv:<Broken.rws> --yes
+
+$ archo saves trash Broken --yes
+moved to the recycle bin: 1 save, 425 B
+  sv:<Broken.rws>  Broken/Broken  425 B  $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Broken.rws
+
+$ archo saves show Tundra
+Tundra matches 2 saves; pick one
+  sv:<pack:Tundra.rws>  Tundra/Tundra  $ROOT/ArchoHome/packs/P1/userdata/Saves/Tundra.rws
+  sv:<Tundra.rws>  Tundra/Tundra  $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Tundra.rws
+next:
+  archo saves show sv:<pack:Tundra.rws>
+  archo saves show sv:<Tundra.rws>
+[exit 3]
+
+$ archo saves list --colony Tundra
+saves: 4 saves in 2 colonies (colony Tundra)
+  Tundra  1 save, latest 2026-10-01 09:55
+    sv:<pack:Tundra.rws>  Tundra      2026-10-01 09:55  meta only  pack P1                   loads, but content will be lost
+  Tundra  3 saves, latest 2026-10-01 09:40
+    sv:<Autosave-1.rws>  Autosave-1  2026-10-01 09:40  meta only  plan:default (launch)     loads, but content will be lost
+    sv:<Tundra 2.rws>  Tundra 2    2026-10-01 09:30  day 1      plan:default (launch)     loads, but content will be lost
+    sv:<Tundra.rws>  Tundra      2026-10-01 08:00  meta only  plan:default (same-mods)  loads with the list
+  note: 3 saves are meta only: only the head is read, so no in-game day yet; archo saves index reads them in full
+next:
+  archo saves show sv:<pack:Tundra.rws>
+
+$ archo saves fix sv:<pack:Tundra.rws>
+error: Tundra is a save of pack P1; a pack's list does not change (loadout import $ROOT/ArchoHome/packs/P1/userdata/Saves/Tundra.rws --new makes a list from it)
+[exit 1]
+
+$ archo saves list
+saves: 1 save in 1 colony (env:old)
+  Outpost  1 save, latest 2026-10-01 06:00  [matches no list]
+    sv:<Outpost.rws>  Outpost  2026-10-01 06:00  meta only  no list  loads, but content will be lost
+  note: 1 save is meta only: only the head is read, so no in-game day yet; archo saves index reads them in full
+next:
+  archo saves show sv:<Outpost.rws>
+
+$ archo saves show Outpost
+sv:<Outpost.rws> Outpost  [loads, but content will be lost]
+  colony: Outpost (1 save)
+  game: 1.6.4633 rev1261, env:old runs 1.5.4409 rev1118
+  list: none (matches no list or pack)
+  file: $ROOT/ArchoHome/userdata/old/Saves/Outpost.rws
+  saved: 2026-10-01 06:00, 385 B
+  read: in full
+  play: day 1 (2nd of Aprimay, 5500)
+    colonists: unknown: no player faction found in the save
+  can it load: 2 items
+    warning game-version  1.6.4633 rev1261 → 1.5.4409 rev1118
+      consequence: the game converts it on load
+    info no-list
+      consequence: nothing to compare its Mods with
+      fix: Make a list from this save (archo loadout import $ROOT/ArchoHome/userdata/old/Saves/Outpost.rws --new Outpost)
+  quick fix: Make a list from this save (archo loadout import $ROOT/ArchoHome/userdata/old/Saves/Outpost.rws --new Outpost)
+  mods: 1 Mod in the save
+    (the whole list: archo saves show sv:<Outpost.rws> --mods)
+next:
+  archo loadout import $ROOT/ArchoHome/userdata/old/Saves/Outpost.rws --new Outpost
+

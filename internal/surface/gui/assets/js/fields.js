@@ -1,5 +1,5 @@
-// The detail's one field list (06 §4.1, §2.9): the plan editor's detail and a copy's
-// detail on Mod library draw view.Field rows with it. Address rows have a copy icon;
+// The detail's one field list (16 §4.1, §2.9): the plan editor's detail and a copy's
+// detail on Mod library draw view.Field rows with it. Address and identifier rows have a copy icon;
 // a row's own action opens the location, the page, or the tag bar.
 import { el, esc, api, T, errText, say } from "./state.js";
 import { icon } from "./icons.js";
@@ -8,7 +8,7 @@ import * as rt from "/wails/runtime.js";
 
 const Clipboard = rt.Clipboard || { SetText: () => Promise.reject(new Error("no clipboard")) };
 
-// Address fields get a copy button; identifiers retain their existing copy action.
+// Addresses and identifiers show their value with a trailing copy icon.
 const copyable = new Set(["id", "package", "path", "workshop", "subscription-url", "subscription-repo"]);
 
 // Address text stays selectable; only its trailing icon copies the full value.
@@ -16,7 +16,6 @@ export function copyablePath(node, path) {
   if (!path) return node;
   const display = node.querySelector(".address-text")?.dataset.address ?? (node.textContent || path);
   node.replaceChildren(addressLabel(display));
-  node.classList.remove("copy");
   node.classList.add("path-copy");
   node.dataset.path = path;
   node.removeAttribute("tabindex");
@@ -77,6 +76,18 @@ export function pathContent(node, text, paths = []) {
     span.textContent = value;
     node.append(copyablePath(span, path));
   };
+  // A web address ends before trailing punctuation and an unmatched ")": the one that closes
+  // a Markdown link ([text](https://…/CHANGELOG.md)) or a sentence's parenthesis (VM round
+  // 2026-11-05: the release notes' copy button copied ".../CHANGELOG.md)", a 404).
+  const urlEnd = url => {
+    if (!/^https?:\/\//i.test(url)) return url;
+    for (;;) {
+      const last = url.slice(-1);
+      if (".,;:!?".includes(last)) { url = url.slice(0, -1); continue; }
+      if (last === ")" && (url.match(/\(/g) || []).length < (url.match(/\)/g) || []).length) { url = url.slice(0, -1); continue; }
+      return url;
+    }
+  };
   const plain = value => {
     // Legacy command/task text has no metadata. Rooted paths and web addresses
     // need a clear boundary; shortcuts do not qualify.
@@ -87,7 +98,8 @@ export function pathContent(node, text, paths = []) {
       for (const m of part.matchAll(rooted)) {
         const start = m.index + m[1].length;
         if (start > at) node.append(part.slice(at, start));
-        append(m[2]); at = start + m[2].length;
+        const hit = urlEnd(m[2]);
+        append(hit); at = start + hit.length;
       }
       if (part.slice(at)) node.append(part.slice(at));
     }
@@ -116,7 +128,7 @@ export function fieldList(fields, acts = {}) {
       for (const x of f.items) {
         const line = el("span", "dep " + x.state);
         const ic = { enabled: f.kind === "conflicts" ? icon.err : icon.ok, disabled: icon.warn, missing: f.kind === "conflicts" ? icon.ok : icon.err }[x.state] || "";
-        const note = x.state === "disabled" ? T(" (not enabled)") : x.state === "missing" ? T(" (not installed)") : "";
+        const note = x.state === "disabled" ? T(" (not enabled)") : x.state === "missing" ? T(" (not installed)") : x.for ? T(" (in place of %s)").replace("%s", x.for) : "";
         line.innerHTML = ic + `<span class="n">${esc(x.name)}</span>` + (note ? `<span class="dim">${esc(note)}</span>` : "");
         v.append(line);
       }
@@ -126,26 +138,14 @@ export function fieldList(fields, acts = {}) {
         v.append(el("span", "chip", t));
       }
     } else {
-      const t = el("span", copyable.has(f.kind) && f.value ? "copy" : "", f.value || "—");
-      if (f.value && copyable.has(f.kind)) {
-        if (["path", "subscription-url", "subscription-repo"].includes(f.kind)) copyablePath(t, f.value);
-        else {
-          t.tabIndex = 0; t.setAttribute("role", "button"); t.title = T("click to copy");
-          t.onclick = () => {
-            const selection = globalThis.getSelection?.();
-            if (!selection || selection.isCollapsed || !t.contains(selection.anchorNode)) copy(f.value, t);
-          };
-          t.onkeydown = e => {
-            if (e.key !== "Enter" && e.key !== " ") return;
-            e.preventDefault(); e.stopPropagation(); if (!e.repeat) copy(f.value, t);
-          };
-        }
-      }
+      const t = el("span", "", f.value || "—");
+      if (f.value && copyable.has(f.kind)) copyablePath(t, f.value);
       v.append(t);
       if (f.extra) v.append(el("span", "dim", `  (${f.extra})`));
     }
     r.append(v);
     const actions = [...(f.act ? [{ act: f.act, label: f.actLabel }] : []), ...(f.actions || [])];
+    const bar = actions.length > 1 ? el("span", "facts-acts") : r;
     for (const a of actions) {
       const b = el("button", "fact", a.label);
       if (a.act === "tags") b.dataset.envWrite = a.act;
@@ -153,10 +153,13 @@ export function fieldList(fields, acts = {}) {
       b.onclick = () => {
         if (a.act === "url") return api.OpenURL(f.url).then(() => say("ok", T("opened the page")), (e) => say("fail", errText(e)));
         if (a.act === "steam") return api.OpenSteamWorkshop("ws:" + f.value).then((t) => say("ok", t), (e) => say("fail", errText(e)));
+        // Mod library › Mod settings at this Mod's files (main.js opens it)
+        if (a.act === "settings") return document.dispatchEvent(new CustomEvent("open-mod-settings", { detail: f.target }));
         if (acts[a.act]) return acts[a.act](f);
       };
-      r.append(b);
+      bar.append(b);
     }
+    if (bar !== r) r.append(bar);
     box.append(r);
   }
   return box;

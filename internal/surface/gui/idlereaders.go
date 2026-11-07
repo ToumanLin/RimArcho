@@ -2,7 +2,7 @@ package gui
 
 import "time"
 
-// Page readers close when unused (06 §2.16.1 M07, 07 §8.3). Each keeps its own SQLite
+// Page readers close when unused (16 §2.16.1 M07, 17 §7.3). Each keeps its own SQLite
 // connection and a detached copy of the Mod index, list state and problems: about 5-12 MB
 // per reader for a library of 6,574 copies. A reader unused for readerIdle closes, drops
 // what only it built, and the window returns the memory (M01); the next visit reads again

@@ -1,4 +1,4 @@
-# V3 memory gate (06 §11 T5): archo's working set in WezTerm after browsing with thumbnails.
+# V3 memory gate (16 §11 T5): archo's working set in WezTerm after browsing with thumbnails.
 # Always on a data directory copy (-DataHome is required). The cursor rests on -Mods mods in
 # turn, long enough for each thumbnail to be drawn, opens one full-screen detail, then the
 # TUI idles while the working set is sampled every 5 s.
@@ -32,7 +32,7 @@ while (((Get-Date) - $t0).TotalSeconds -lt $IdleSeconds) {
   Sample ("idle {0,3}s" -f [int]((Get-Date) - $t0).TotalSeconds)
 }
 $w = Get-Process wezterm-gui -ErrorAction SilentlyContinue | Select-Object -First 1
-if ($w) { "wezterm-gui working set {0:N1} MB (recorded separately, 06 §10)" -f ($w.WorkingSet64 / 1MB) }
+if ($w) { "wezterm-gui working set {0:N1} MB (recorded separately, 16 §10)" -f ($w.WorkingSet64 / 1MB) }
 Send "q"; Start-Sleep -Milliseconds 800
 Get-Process archo, wezterm-gui -ErrorAction SilentlyContinue | Stop-Process -Force
 $n = @(Get-ChildItem (Join-Path $DataHome "cache\previews") -Filter *.png -ErrorAction SilentlyContinue).Count

@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// update RimArcho from the command palette or `:update` (07 §5.1, 06 §9.1): a panel with the
+// update RimArcho from the command palette or `:update` (17 §5.1, 16 §9.1): a panel with the
 // version, what the last check found and the release notes; enter checks, or installs
 // once a newer version is known. The install runs off the screen goroutine; the status
 // line says its phase (it waits while another RimArcho is open); then the TUI quits and

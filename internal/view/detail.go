@@ -16,9 +16,9 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Details (06 §4): who the mod is, its problems, the facts a player uses (package id,
+// Details (16 §4): who the mod is, its problems, the facts a player uses (package id,
 // version, Workshop page, tags, alias, note, dependencies), the description, its history,
-// and the full detail's sub-sections (06 §4.2). Each interface lays these out itself.
+// and the full detail's sub-sections (16 §4.2). Each interface lays these out itself.
 
 // DetailData is what the detail shows for one mod beyond its row, loaded off the input path.
 type DetailData struct {
@@ -33,7 +33,7 @@ type DetailData struct {
 }
 
 // LoadDetail reads the declaration, About.xml and the cached Workshop text; fetch allows
-// the network (06 §4.3 item 3), refresh ignores the cache.
+// the network (16 §4.3 item 3), refresh ignores the cache.
 func LoadDetail(a *app.App, ix *app.Index, mod *store.Mod, fetch, refresh bool) *DetailData {
 	d := &DetailData{ID: mod.ID, Decl: mod.Decl()}
 	if st, err := a.Loadout(); err == nil {
@@ -66,7 +66,7 @@ func HeaderFacts(mod *store.Mod, pos int, staged bool) []string {
 }
 
 // UnloadableWhy says why the game cannot load a mod; a pinned workshop copy names the copy
-// the game uses instead (08 §6).
+// the game uses instead (09 §5).
 func UnloadableWhy(st *app.LoadoutState, mod *store.Mod) string {
 	switch {
 	case mod.Unloadable != "" && st != nil:
@@ -101,7 +101,7 @@ type Fact struct {
 	List  []string `json:"list,omitempty"`  // tags
 }
 
-// Facts: package, version, Workshop id, tags, alias, note (06 §4.1).
+// Facts: package, version, Workshop id, tags, alias, note (16 §4.1).
 func Facts(mod *store.Mod, d *DetailData) []Fact {
 	fs := []Fact{{Kind: FactPackage, Label: T("package"), Value: mod.PackageID}}
 	if d != nil && d.Decl.ModVersion != "" {
@@ -147,15 +147,17 @@ const (
 	DepMissing  = "missing"  // not installed
 )
 
-// Dep is one declared dependency with its state.
+// Dep is one declared dependency with its state. For is set when another enabled mod meets
+// the dependency in its place (Name): the declared name.
 type Dep struct {
 	Name  string `json:"name"`
 	State string `json:"state"`
+	For   string `json:"for,omitempty"`
 }
 
 // Deps: the declared dependencies (plus the current version's), each once, with their
-// state (06 §4.1).
-func Deps(st *app.LoadoutState, d *DetailData) []Dep {
+// state (16 §4.1). A dependency met by an alternative or a replacement shows that mod, enabled.
+func Deps(a *app.App, st *app.LoadoutState, d *DetailData) []Dep {
 	if d == nil || st == nil {
 		return nil
 	}
@@ -189,13 +191,22 @@ func Deps(st *app.LoadoutState, d *DetailData) []Dep {
 				enabled, name = true, mod.DisplayName()
 			}
 		}
+		var standIn *store.Mod
+		if !enabled && a != nil {
+			standIn, _ = a.DependencyStandIn(st, x)
+		}
 		switch {
 		case enabled:
-			out = append(out, Dep{name, DepEnabled})
+			out = append(out, Dep{Name: name, State: DepEnabled})
+		case standIn != nil:
+			if len(inst) > 0 {
+				name = inst[0].DisplayName()
+			}
+			out = append(out, Dep{Name: standIn.DisplayName(), State: DepEnabled, For: name})
 		case len(inst) > 0:
-			out = append(out, Dep{inst[0].DisplayName(), DepDisabled})
+			out = append(out, Dep{Name: inst[0].DisplayName(), State: DepDisabled})
 		default:
-			out = append(out, Dep{name, DepMissing})
+			out = append(out, Dep{Name: name, State: DepMissing})
 		}
 	}
 	return out
@@ -247,7 +258,7 @@ func EventText(kind string) string {
 	return kind
 }
 
-// HistoryLine: the one-line history, the three newest events (06 §4.1).
+// HistoryLine: the one-line history, the three newest events (16 §4.1).
 func HistoryLine(evs []*store.Event) string {
 	var parts []string
 	for i := len(evs) - 1; i >= 0 && len(parts) < 3; i-- {
@@ -256,7 +267,7 @@ func HistoryLine(evs []*store.Event) string {
 	return strings.Join(parts, "  ")
 }
 
-// ---- the full detail's sub-sections (06 §4.2) ----
+// ---- the full detail's sub-sections (16 §4.2) ----
 
 // PathText keeps the displayed relative name separate from the full copy target.
 type PathText struct {

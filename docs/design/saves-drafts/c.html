@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>saves · C One list</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  #page { position: relative; }
+  .bar { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; flex-wrap: wrap; }
+  .search { height: 28px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border-radius: 7px; background: var(--card); border: var(--hairline) solid var(--line); color: var(--muted); width: 220px; font-size: 12.5px; }
+  .grp-card { margin-bottom: 12px; }
+  .ghead { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; padding: 12px 16px; border-bottom: var(--hairline) solid var(--line-2); background: var(--card-2); }
+  .ghead h2 { margin: 0; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  .ghead .sum { font-size: 12px; color: var(--muted); }
+  .ghead .acts { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+  .ghead .chips { flex-basis: 100%; }
+  .t { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .t th { text-align: left; font-weight: 500; font-size: 11.5px; color: var(--muted); padding: 6px 8px; border-bottom: var(--hairline) solid var(--line-2); white-space: nowrap; }
+  .t td { padding: 7px 8px; border-top: var(--hairline) solid var(--line-2); white-space: nowrap; vertical-align: baseline; }
+  .t tr:first-child td { border-top: 0; }
+  .t td:first-child, .t th:first-child { padding-left: 16px; width: 22px; }
+  .t td.num, .t th.num { text-align: right; }
+  .t td.say { white-space: normal; color: var(--fg-2); min-width: 220px; }
+  .t td.say.warn { color: var(--amber); } .t td.say.broken { color: var(--red); }
+  .t tbody tr:hover td { background: var(--card-2); }
+  .t tbody tr.on td { background: var(--sel); }
+  .t .nm { font-weight: 500; }
+  .mdiff { display: inline-flex; gap: 4px; }
+  .mdiff span { font: 11.5px var(--code); padding: 0 5px; border-radius: 4px; background: var(--pill); }
+  .mdiff .m { color: var(--red); background: var(--red-soft); } .mdiff .p { color: var(--green); background: var(--green-soft); }
+  .more-row td { color: var(--muted); font-size: 12px; }
+  .more-row button { color: var(--accent); }
+  /* the drawer: full analysis of one save, over the right side of the page */
+  #drawer { position: fixed; top: 40px; right: 0; bottom: 30px; width: min(520px, 92vw); background: var(--card); box-shadow: var(--shadow); z-index: 20; display: flex; flex-direction: column;
+    transform: translateX(105%); transition: transform var(--t-enter) var(--ease); }
+  #drawer.open { transform: none; }
+  #drawer .dh { padding: 14px 16px 10px; border-bottom: var(--hairline) solid var(--line-2); }
+  #drawer .dh .row1 { display: flex; align-items: center; gap: 8px; }
+  #drawer .dh h2 { margin: 0; font-size: 15px; }
+  #drawer .dh .x { margin-left: auto; }
+  #drawer .dh .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  #drawer .dh .acts { margin-top: 8px; display: flex; gap: 2px; margin-left: -8px; }
+  #drawer .body { overflow-y: auto; flex: 1; }
+  @media (max-width: 1100px) { .t .opt { display: none; } }
+</style>
+</head>
+<body>
+<div class="review" id="review"></div>
+<div id="app">
+  <aside id="side"><div class="side-head">RimArcho</div><nav id="nav"></nav></aside>
+  <main id="main">
+    <div id="top"></div><div class="page-head" id="head"></div><div id="page"></div>
+    <div id="bottom"><span id="status"></span><span id="hints"></span></div>
+  </main>
+</div>
+<aside id="drawer"></aside>
+<div id="toast"></div>
+<script src="shared.js"></script>
+<script>
+// C: there is only one list, the saves. Colonies are its group headings, carrying the shared facts once.
+// The question players open this page with ("can I load it? what breaks?") is answered in the row itself,
+// so the deep analysis becomes optional reading in a drawer rather than a level you must reach.
+let filter = "all", hideAuto = false, open = new Set(), sel = null;
+shell("c", '<span class="crumb">Library</span><span class="muted">/</span><span class="crumb">Saves</span>',
+  [["↑↓", "save"], ["enter", "details"], ["esc", "close"], ["a", "autosaves"], ["!", "needs attention"]]);
+$("#head").innerHTML = `<p class="lead"><b>13 saves</b> in 4 colonies · 1 needs attention before you load it</p>
+  <div class="page-acts"><button class="btn line small" data-toast="would rescan all saves">Rescan</button></div>`;
+
+const SHOWN = 3; // rows per colony before "N older saves"
+function mdiff(s) {
+  const d = s.diff, g = d.gone.length === 1 && /^\d+ Mods$/.test(d.gone[0]) ? +d.gone[0].split(" ")[0] : d.gone.length, a = d.added.length > 2 ? 16 : d.added.length;
+  if (!g && !a) return '<span class="muted">same</span>';
+  return `<span class="mdiff">${g ? `<span class="m">−${g}</span>` : ""}${a ? `<span class="p">+${a}</span>` : ""}</span>`;
+}
+function rows() { return $$("tbody tr[data-save]"); }
+function draw() {
+  const groups = COLONIES.map((c) => {
+    let ss = c.saves.filter((s) => (!hideAuto || !s.auto || s === latest(c)) && (filter === "all" || s.st !== "ok"));
+    if (!ss.length) return "";
+    const more = open.has(c.id) ? 0 : Math.max(0, ss.length - SHOWN), vis = more ? ss.slice(0, SHOWN) : ss;
+    return `<div class="card grp-card"><div class="ghead"><h2><span class="dot ${latest(c).st}"></span>${esc(c.name)}</h2>
+        <span class="sum">${c.saves.length} saves · day ${latest(c).day} · ${c.playH} h played</span>${sparkSVG(c, 80, 20)}
+        <span class="acts">${c.list ? `<button class="btn primary small" data-toast="would launch ${esc(c.list)}">${ic("play")} Launch ${esc(c.list)}</button>` : `<button class="btn line small" data-toast="would create a list from this save">Make a list from this save</button>`}</span>
+        ${colonyChips(c)}</div>
+      <table class="t"><thead><tr><th></th><th>Save</th><th>In-game</th><th class="opt">Saved</th><th class="num">Colonists</th><th class="num">Wealth</th><th class="opt">Mods vs list</th><th>Can it load?</th></tr></thead><tbody>
+      ${vis.map((s) => `<tr data-save="${s.id}" class="${s.id === sel ? "on" : ""}"><td>${stIcon(s.st)}</td><td><span class="nm">${esc(shownName(s))}</span> ${s === latest(c) ? '<span class="tagx latest">latest</span>' : ""}${s.auto ? '<span class="tagx">auto</span>' : ""}</td>
+        <td>day ${s.day}</td><td class="opt muted">${esc(s.saved)}</td><td class="num">${s.trunc ? "—" : s.col}</td><td class="num">${s.trunc ? "—" : kw(s.wealth)}</td><td class="opt">${mdiff(s)}</td>
+        <td class="say ${s.st === "ok" ? "" : s.st}">${esc(s.say)}</td></tr>`).join("")}
+      ${more ? `<tr class="more-row"><td></td><td colspan="7"><button data-more="${c.id}">${more} older save${more > 1 ? "s" : ""}</button>${c.saves.some((s) => s.trunc) && !vis.some((s) => s.trunc) ? ' · <span class="err">1 is cut off and can be recycled</span>' : ""}</td></tr>` : ""}
+      </tbody></table></div>`;
+  }).join("");
+  $("#page").innerHTML = `<div class="bar"><div class="seg"><button data-f="all" class="${filter === "all" ? "on" : ""}">All</button><button data-f="attn" class="${filter === "attn" ? "on" : ""}">Needs attention</button></div>
+      <button class="btn small ${hideAuto ? "" : ""}" id="autoBtn">${hideAuto ? "Show" : "Hide"} older autosaves <kbd>a</kbd></button>
+      <span class="search">${ic("search")} Search colonies, saves, Mods</span></div>${groups || '<div class="empty">Nothing needs attention.</div>'}`;
+  $$("[data-f]").forEach((b) => b.onclick = () => { filter = b.dataset.f; draw(); });
+  $("#autoBtn").onclick = () => { hideAuto = !hideAuto; draw(); };
+  $$("[data-more]").forEach((b) => b.onclick = () => { open.add(b.dataset.more); draw(); });
+  rows().forEach((r) => r.onclick = () => openDrawer(r.dataset.save));
+}
+function openDrawer(id) {
+  sel = id; const s = findSave(id), c = s.c, L = latest(c);
+  $("#drawer").innerHTML = `<div class="dh"><div class="row1">${stIcon(s.st)}<h2>${esc(shownName(s))}</h2>${s === L ? '<span class="tagx latest">latest</span>' : ""}
+      <button class="btn small x" id="close" title="esc">${ic("x")}</button></div>
+      <div class="meta">${esc(c.name)} · ${esc(s.file)} · saved ${esc(s.saved)} · ${esc(s.size)}</div><div class="acts">${saveActs(s)}</div></div>
+    <div class="body"><div class="sect">${verdictHTML(s)}</div><div class="sect"><h3>Checks</h3>${checksHTML(s)}</div>
+      <div class="sect"><h3>What the save uses <span class="r">remove mid-playthrough?</span></h3>${usesHTML(c)}</div>
+      <div class="sect"><h3>The colony at day ${s.day} <span class="r">${s === L ? "" : `${L.day - s.day} days before the latest`}</span></h3>${playHTML(s)}</div>
+      <div class="sect"><h3>Over time</h3>${timelineSVG(c, id, 480, 100)}</div></div>`;
+  $("#drawer").classList.add("open");
+  $("#close").onclick = closeDrawer;
+  $$("#drawer .timeline [data-save]").forEach((n) => n.onclick = () => openDrawer(n.dataset.save));
+  draw();
+}
+function closeDrawer() { $("#drawer").classList.remove("open"); sel = null; draw(); }
+addEventListener("keydown", (e) => {
+  if (e.key === "Escape") return closeDrawer();
+  if (e.key === "a") { hideAuto = !hideAuto; return draw(); }
+  if (e.key === "!") { filter = filter === "all" ? "attn" : "all"; return draw(); }
+  const ids = rows().map((r) => r.dataset.save), i = ids.indexOf(sel);
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") { const j = Math.max(0, Math.min(ids.length - 1, i + (e.key === "ArrowDown" ? 1 : -1))); sel = ids[j]; $("#drawer").classList.contains("open") ? openDrawer(sel) : draw(); e.preventDefault(); }
+  else if (e.key === "Enter" && sel) openDrawer(sel);
+});
+$("#status").textContent = "One list of saves; colony headings carry the shared facts. Each row already says whether it loads.";
+draw();
+</script>
+</body>
+</html>

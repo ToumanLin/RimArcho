@@ -1,5 +1,5 @@
 // Command monitoricon writes Archo Monitor's About/ModIcon.png and About/Preview.png from
-// RimArcho's icon (06 §8.6), so no PNG is kept in the repository. monitor/build.ps1 runs it.
+// RimArcho's icon (16 §8.6), so no PNG is kept in the repository. monitor/build.ps1 runs it.
 //
 //	go run ./scripts/monitoricon -o monitor/out/ArchoMonitor/About
 package main

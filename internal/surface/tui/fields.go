@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// fieldLines draws the detail's one field list (06 §4.1), the GUI's fields.js in text: a
+// fieldLines draws the detail's one field list (16 §4.1), the GUI's fields.js in text: a
 // label column, then the value; a row's button becomes the key that does it.
 func fieldLines(fs []view.Field, w int) []string {
 	lw := 0
@@ -65,6 +65,9 @@ func depLine(x view.Dep, conflict bool) string {
 	case view.DepEnabled:
 		if conflict {
 			return sErrS.Render(ic.err) + " " + sText.Render(x.Name)
+		}
+		if x.For != "" {
+			return sOK.Render(markOK) + " " + sText.Render(x.Name) + sDimS.Render(Tf(" (in place of %s)", x.For))
 		}
 		return sOK.Render(markOK) + " " + sText.Render(x.Name)
 	case view.DepDisabled:

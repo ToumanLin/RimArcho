@@ -36,6 +36,7 @@
   "Steam downloads this update; RimArcho asks it to.": "这次更新由 Steam 下载，RimArcho 只是请它下载",
   "Steam login failed": "Steam 登录失败",
   "Steam will download this Workshop update": "Steam 客户端将下载此工坊更新，完成后按 R 重新扫描",
+  "Steam will download these %d Workshop updates": "Steam 客户端将下载这 %d 个工坊更新，完成后按 R 重新扫描",
   "SteamCMD exited before confirming the download": "SteamCMD 异常退出，下载未确认",
   "Subscribe with Steam; without the Steam client, download with SteamCMD.": "用 Steam 订阅；没有 Steam 客户端时用 SteamCMD 下载",
   "The public page could not be read; use the LoversLab session or downloaded files.": "读不了公开页面；用 LoversLab 登录下载，或选下载好的文件",
@@ -129,6 +130,7 @@
   "lock this version first": "锁定现在这个版本",
   "never updates": "以后不更新",
   "new version available: %s": "有新版本：%s",
+  "new version available": "有新版本",
   "no account needed": "不需要账户",
   "no files on this page": "这个页面没有文件",
   "no known updates; check a source above": "没有已知更新，可在来源里检查更新",
@@ -244,5 +246,14 @@
   "removed from the mod folder": "已从 Mod 目录移除",
   "%s; the current list uses it": "%s；当前列表仍在使用它",
   "list / details": "列表 / 详情",
-  "show every mod": "显示全部 Mod"
+  "show every mod": "显示全部 Mod",
+  "dry run, nothing changed": "试运行，没有改动",
+  "affected link": "受影响的链接",
+  "%s subscriptions": "%s 个订阅",
+  "git": "Git",
+  "page": "页面",
+  "Steam downloads it; it appears after the next scan.": "由 Steam 下载；下次扫描后出现。",
+  "Git submodules are not downloaded.": "不下载 Git 子模块。",
+  "Git LFS content is not downloaded; LFS files remain pointers.": "不下载 Git LFS 内容；LFS 文件仍是指针。",
+  "Would subscribe through Steam; use SteamCMD only if Steam is unavailable.": "将通过 Steam 订阅；只在 Steam 不可用时用 SteamCMD。"
 }

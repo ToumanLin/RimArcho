@@ -1,4 +1,4 @@
-// Package identity reconciles scan observations against known Instances (02 §5): rules
+// Package identity reconciles scan observations against known Instances (04 §2): rules
 // R1–R7, lineage membership, change events and identity questions. It is pure logic; the
 // caller loads the known state and persists the result.
 package identity
@@ -18,7 +18,7 @@ const (
 	Tombstone = "tombstone"
 )
 
-// Lineage membership basis (02 §5.1, §6).
+// Lineage membership basis (04 §2.1, §3).
 const (
 	BasisRoot      = ""          // founded the lineage
 	BasisInferred  = "inferred"  // R4: similar content + same declaration
@@ -26,14 +26,14 @@ const (
 	BasisManual    = "manual"    // lineage split/merge
 )
 
-// Thresholds (02 §5.1).
+// Thresholds (04 §2.1).
 const (
 	MoveSimilarity     = 0.85 // R3
 	CopySimilarity     = 0.6  // R4
 	QuestionSimilarity = 0.6  // R6
 )
 
-// Event kinds (02 §5.3).
+// Event kinds (04 §2.3).
 const (
 	EvDiscovered       = "discovered"
 	EvUpdated          = "updated"
@@ -83,7 +83,7 @@ type Input struct {
 	// instances are neither matched nor tombstoned.
 	Skip map[string]bool
 	// Present lists skipped sources that were left out of this scan, not lost: the shared mod
-	// folders during a scan of one game's own Data/ and Mods/ (02 §0 item 8). Their live
+	// folders during a scan of one game's own Data/ and Mods/ (03 §2 item 8). Their live
 	// instances are still there, so they count as originals for R4.
 	Present map[string]bool
 	// Lineages that exist (to validate origin markers).
@@ -140,7 +140,7 @@ type reconciler struct {
 	present []*Assignment
 }
 
-// Reconcile applies 02 §5.1. R1, R2, R5 and R3 match against the known state rule by rule;
+// Reconcile applies 04 §2.1. R1, R2, R5 and R3 match against the known state rule by rule;
 // the remaining observations then go through R4, R6 and R7 one at a time, so an Instance
 // created earlier in the same scan can be the original of a later copy (first scan of a
 // workshop item and its Mods/ copy, or Steam + SteamCMD).
@@ -384,7 +384,7 @@ func (r *reconciler) event(a *Assignment, kind, detail string, before int64) {
 	r.res.Events = append(r.res.Events, &Event{InstanceID: a.InstanceID, Kind: kind, Detail: detail, Before: before, After: a})
 }
 
-// fieldEvents emits the per-field change events of 02 §5.3.
+// fieldEvents emits the per-field change events of 04 §2.3.
 func (r *reconciler) fieldEvents(a *Assignment, old, cur *scan.Decl, before int64) {
 	if old.PackageID != cur.PackageID {
 		r.event(a, EvPackageIDChanged, fmt.Sprintf("pkg:%s → pkg:%s", old.PackageID, cur.PackageID), before)

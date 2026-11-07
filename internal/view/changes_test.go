@@ -15,6 +15,7 @@ import (
 )
 
 func TestChangesAfterMaintenance(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("1001", testkit.Sample("tester.alpha", "Alpha"))
 	e.AddEnv(false)
@@ -58,11 +59,11 @@ func TestChangesAfterMaintenance(t *testing.T) {
 	}
 }
 
-// 06 §2.9: one row per mod since the plan was last played, tiered by what the change means
+// 16 §2.9: one row per mod since the plan was last played, tiered by what the change means
 // and worded from the recorded data only; the whole library adds the other mods and new
 // ones; older changes go by day; one mod's Lineage lists every change.
 func TestChangesPage(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e := testkit.New(t)
 	mod := func(pkg, name string, f func(*testkit.Mod)) testkit.Mod {
 		m := testkit.Sample(pkg, name)

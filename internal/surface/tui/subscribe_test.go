@@ -70,9 +70,9 @@ func tasksOnRecord(t *testing.T, e *testkit.Env) []app.Task {
 	return list
 }
 
-// 06 §2.9, §9.1: add a subscription recognises a pasted address as the window does, asks the one
+// 16 §2.9, §9.1: add a subscription recognises a pasted address as the window does, asks the one
 // decision that source needs, shows the dry run, and enter queues subscribe as a background task
-// (06 §2.16) that installs the mod.
+// (16 §2.16) that installs the mod.
 func TestAddSubscriptionPage(t *testing.T) {
 	e, g := subscriptionEnv(t)
 	const url = "https://github.com/Example/colony"
@@ -157,7 +157,7 @@ func TestAddSubscriptionPage(t *testing.T) {
 	}
 }
 
-// 06 §2.9: on updates, K checks every source with mods, u updates a waiting one (its dry
+// 16 §2.9: on updates, K checks every source with mods, u updates a waiting one (its dry
 // run first; refused while a game runs), Del removes a subscription — each a background task.
 func TestSubscriptionsPageActions(t *testing.T) {
 	e, g := subscriptionEnv(t)

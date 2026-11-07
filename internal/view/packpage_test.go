@@ -57,3 +57,36 @@ func TestBuildPackPageCheck(t *testing.T) {
 		t.Fatalf("translated blocked page: %+v", pg)
 	}
 }
+
+func TestPackPageEntryIdentitySurvivesReordering(t *testing.T) {
+	view.SetLang("en")
+	e := testkit.New(t)
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld")
+	e.AddEnv(false)
+	p := app.Pack{Format: 2, Name: "identity", Game: "1.6.4633 rev1261", Entries: []app.PackEntry{
+		{PackageID: "fixture.a", Name: "Same Mod", Folder: "folder one", Bytes: 100},
+		{PackageID: "fixture.b", Name: "Same Mod", Folder: "folder two", Bytes: 200},
+	}}
+	read := func() *view.PackPage {
+		t.Helper()
+		data, err := json.Marshal(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		e.WriteFile(filepath.Join(e.App.PacksDir(), p.Name, "pack.json"), string(data))
+		page, err := view.BuildPackPage(e.App, p.Name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return page
+	}
+	before := read()
+	if before.Mods[0].Key == "" || before.Mods[0].Key == before.Mods[1].Key {
+		t.Fatalf("duplicate display names need distinct record identities: %+v", before.Mods)
+	}
+	p.Entries[0], p.Entries[1] = p.Entries[1], p.Entries[0]
+	after := read()
+	if before.Mods[0].Key != after.Mods[1].Key || before.Mods[1].Key != after.Mods[0].Key {
+		t.Fatalf("entry identity changed with load order: before=%+v after=%+v", before.Mods, after.Mods)
+	}
+}

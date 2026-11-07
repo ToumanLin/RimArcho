@@ -1,4 +1,5 @@
-// Shared search/CLI panel (06 §3.5); closing preserves draft and the last output.
+// Shared search/CLI panel (16 §3.5); closing preserves draft and the last output.
+import { fieldError } from "./feedbacksemantics.js";
 import { S, el, api, T, errText } from "./state.js";
 import { copy } from "./fields.js";
 let draft = "", result = null, paint = null, polling = false, afterRun = null;
@@ -20,25 +21,33 @@ export function buildCommandPanel(pop, p, { close, pick, reload, uninstall }) {
   pop.classList.add("command-panel");
   const head = el("div", "command-head"), output = el("pre", "command-output"), list = el("div", "opts"), row = el("div", "in"), input = el("input"), foot = el("div", "command-foot");
   const copyButton = el("button", "btn", T("copy")), dismiss = el("button", "btn", "×");
-  head.append(el("span", "", T("command palette")), copyButton, dismiss);
+  const title = el("span", "", T("command palette")); title.id = "command-panel-title";
+  head.append(title, copyButton, dismiss);
+  list.id = "command-results"; list.setAttribute("role", "listbox"); list.setAttribute("aria-labelledby", title.id);
+  input.setAttribute("role", "combobox"); input.setAttribute("aria-controls", list.id);
+  input.setAttribute("aria-autocomplete", "list"); input.setAttribute("aria-expanded", "false");
   dismiss.setAttribute("aria-label", T("close")); dismiss.onclick = close;
   output.tabIndex = 0; input.spellcheck = false; input.value = draft;
   input.placeholder = T("a command, a mod, a game"); input.setAttribute("aria-label", input.placeholder);
   foot.setAttribute("role", "status"); row.append(el("span", "pr", "❯"), input);
   pop.append(head, output, list, row, foot);
   let options = [], selected = 0, sequence = 0, historyAt = -1, historyDraft = "", completion = null, error = "";
+  fieldError(input, foot, () => !!error || !!(result && !result.running && result.code));
   const paintResult = () => {
     if (!live()) return;
     output.hidden = !result?.output; output.textContent = result?.output || ""; copyButton.hidden = !result?.output;
     foot.classList.toggle("err", !!error || !!(result && !result.running && result.code));
-    foot.textContent = error || (result?.running ? T("running…") : result ? `exit ${result.code}` : "Tab " + T("complete") + "  ↑↓ " + T("history") + "  Ctrl+N/P  Enter  Esc");
+    const text = error || (result?.running ? T("running…") : result ? `exit ${result.code}` : "Tab " + T("complete") + "  ↑↓ " + T("history") + "  Ctrl+N/P  Enter  Esc");
+    foot.setAttribute("role", foot.classList.contains("err") ? "alert" : "status");
+    foot.setAttribute("aria-busy", String(!!result?.running));
+    if (text !== foot.textContent) foot.textContent = text;
   };
   copyButton.onclick = () => copy(result?.output || "", copyButton);
   const run = async () => {
     error = "";
     try {
       const r = await api.RunCLI(input.value);
-      // uninstall --yes: the progress page takes over (06 §2.14).
+      // uninstall --yes: the progress page takes over (16 §2.14).
       if (r.uninstall) { draft = ""; close(); await uninstall?.(); return; }
       result = r; draft = input.value; historyAt = -1; paintResult(); afterRun = reload; poll();
     }
@@ -62,10 +71,21 @@ export function buildCommandPanel(pop, p, { close, pick, reload, uninstall }) {
     list.replaceChildren();
     options.forEach((o, i) => {
       const item = el("button", "opt" + (i === selected ? " on" : "")); item.type = "button";
-      item.append(el("span", "", o.name)); if (o.desc) item.append(el("span", "d", o.desc));
+      item.id = "command-result-" + i;
+      item.setAttribute("role", "option"); item.setAttribute("aria-selected", String(i === selected));
+      item.setAttribute("aria-posinset", String(i + 1)); item.setAttribute("aria-setsize", String(options.length));
+      item.append(el("span", "", o.name));
+      if (o.desc) {
+        const desc = el("span", "d", o.desc);
+        if (o.desc === o.name) desc.setAttribute("aria-hidden", "true");
+        item.append(desc);
+      }
       item.onclick = () => choose(o); item.onmousemove = () => { if (selected !== i) { selected = i; draw(); } }; list.append(item);
     });
-    list.children[selected]?.scrollIntoView({ block: "nearest" });
+    const active = list.children[selected];
+    input.setAttribute("aria-expanded", String(options.length > 0));
+    if (active) input.setAttribute("aria-activedescendant", active.id); else input.removeAttribute("aria-activedescendant");
+    active?.scrollIntoView({ block: "nearest" });
   };
   const refresh = async () => {
     const n = ++sequence, text = input.value;

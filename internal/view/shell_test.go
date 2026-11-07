@@ -36,6 +36,7 @@ func shellEnv(t *testing.T) (*testkit.Env, *view.Board, *view.Needs) {
 }
 
 func TestNavAndPath(t *testing.T) {
+	t.Parallel()
 	e, _, n := shellEnv(t)
 	plans, err := view.PlanRows(e.App)
 	if err != nil || len(plans) != 1 {
@@ -43,7 +44,7 @@ func TestNavAndPath(t *testing.T) {
 	}
 	g := view.Nav(n.Count, plans, []view.PackRow{{Name: "Main"}})
 	if len(g) != 2 || g[0].Title != "playing" || g[1].Title != "library" {
-		t.Fatalf("two groups, Playing and Library (06 §2.1): %+v", g)
+		t.Fatalf("two groups, Playing and Library (16 §2.1): %+v", g)
 	}
 	var ids, keys []string
 	for _, gr := range g {
@@ -51,16 +52,17 @@ func TestNavAndPath(t *testing.T) {
 			ids, keys = append(ids, it.ID), append(keys, it.Key)
 		}
 	}
-	if strings.Join(ids, ",") != "home,needs,log,plan,packs,library,textures,env" {
+	if strings.Join(ids, ",") != "home,needs,log,plan,packs,saves,library,textures,env" {
 		t.Fatalf("order %v", ids)
 	}
-	if keys[0] != "shift+1" || keys[7] != "shift+8" {
+	// Saves has no shift key: shift+1–8 stay the eight entries the TUI also has (16 §3.5)
+	if keys[0] != "shift+1" || keys[5] != "" || keys[6] != "shift+6" || keys[8] != "shift+8" {
 		t.Fatalf("keys %v", keys)
 	}
 	if g[0].Items[1].Badge != n.Count || n.Count == 0 {
 		t.Fatalf("badge %d, needs %d", g[0].Items[1].Badge, n.Count)
 	}
-	// only Can it run carries a number (06 §2.1)
+	// only Can it run carries a number (16 §2.1)
 	for _, gr := range g {
 		for _, it := range gr.Items {
 			if it.ID != view.PageNeeds && it.Badge != 0 {
@@ -94,6 +96,7 @@ func TestNavAndPath(t *testing.T) {
 }
 
 func TestBuildHome(t *testing.T) {
+	t.Parallel()
 	e, b, n := shellEnv(t)
 	if view.BreakCount(n) != 1 {
 		t.Fatalf("break count %d: %+v", view.BreakCount(n), n.Items)
@@ -123,7 +126,7 @@ func TestBuildHome(t *testing.T) {
 	if plan.Kind != view.RowPlan || plan.Env != "main  1.6" || !strings.HasPrefix(plan.Played, "played ") {
 		t.Fatalf("plan row %+v", plan)
 	}
-	// the meta line: how many mods, and how they change (06 §2.3)
+	// the meta line: how many mods, and how they change (16 §2.3)
 	if !strings.HasSuffix(plan.Facts, " mods") && !strings.Contains(plan.Facts, " mods  ") || plan.Mode != "follows Workshop updates" {
 		t.Fatalf("plan meta %q / %q", plan.Facts, plan.Mode)
 	}
@@ -175,7 +178,7 @@ func TestBuildHome(t *testing.T) {
 }
 
 func TestFindAndAddGames(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e := testkit.New(t)
 	gs := view.FindGames(e.App)
 	if len(gs) != 1 || gs[0].Name != "1.6" || gs[0].Launch != "steam" || gs[0].Workshop == "" || gs[0].Env != "" || gs[0].Version == "" {

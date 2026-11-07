@@ -22,7 +22,7 @@ const (
 	ResultUnknown = "unknown" // mod-defined operation class: not simulated
 )
 
-// No-match reasons (03 §4.4), plus node-absent: the def exists but the path inside it does not.
+// No-match reasons (05 §4.4), plus node-absent: the def exists but the path inside it does not.
 const (
 	ReasonTargetInactive   = "target-inactive"
 	ReasonTargetMissing    = "target-missing"
@@ -35,7 +35,7 @@ const (
 	ReasonRuntimeException = "exception"
 )
 
-// PatchFact is one top-level PatchOperation and its simulated outcome (03 §2).
+// PatchFact is one top-level PatchOperation and its simulated outcome (05 §2).
 type PatchFact struct {
 	Instance string   `json:"-"`
 	Seq      int      `json:"seq"`
@@ -159,7 +159,7 @@ func (s *sim) facts(tops []*topOp, k *knowledge) []*PatchFact {
 	return out
 }
 
-// reasons classifies a failed operation (03 §4.4).
+// reasons classifies a failed operation (05 §4.4).
 func (s *sim) reasons(t *topOp, leaf *Op, k *knowledge, tops []*topOp) ([]string, string) {
 	var rs, details []string
 	add := func(r, d string) {

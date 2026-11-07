@@ -12,6 +12,7 @@ import (
 )
 
 func TestFileSearchReplacementWaitsForCancelledWorker(t *testing.T) {
+	t.Parallel()
 	e, s, _ := fixture(t)
 	e.WriteFile(filepath.Join(e.Game, "RimWorldWin64_Data", "Managed", "Assembly-CSharp.dll"), "synthetic game code")
 	started := make(chan int32, 2)

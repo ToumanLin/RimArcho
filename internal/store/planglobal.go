@@ -7,65 +7,6 @@ import (
 	"strings"
 )
 
-// schemaV19: lists are shared by every game (04 §1.1, 2026-10-25). plan.environment_id
-// stays as the game the list was made in; names become unique across games, so the Go
-// step renames clashes. ModsConfig.xml write records name the game that wrote the file,
-// which used to be the writer plan's game.
-const schemaV19 = `
-ALTER TABLE modsconfig_state ADD COLUMN writer_env TEXT NOT NULL DEFAULT '';
-UPDATE modsconfig_state SET writer_env = coalesce((SELECT p.environment_id FROM plan p WHERE p.id = modsconfig_state.writer_plan), '');
-`
-
-// migrateV19 gives clashing plan names a game suffix ("default (1.6)") — the oldest plan
-// keeps the plain name — and points every game that has lists at one of its own.
-func migrateV19(tx *sql.Tx) error {
-	type row struct {
-		id         int64
-		name, game string
-	}
-	rows, err := tx.Query(`SELECT p.id, p.name, coalesce(e.name, '') FROM plan p LEFT JOIN environment e ON e.id = p.environment_id ORDER BY p.id`)
-	if err != nil {
-		return err
-	}
-	var ps []row
-	for rows.Next() {
-		var r row
-		if err := rows.Scan(&r.id, &r.name, &r.game); err != nil {
-			rows.Close()
-			return err
-		}
-		ps = append(ps, r)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return err
-	}
-	taken := map[string]bool{}
-	for _, p := range ps {
-		taken[strings.ToLower(p.name)] = true
-	}
-	seen := map[string]bool{}
-	for _, p := range ps {
-		k := strings.ToLower(p.name)
-		if !seen[k] {
-			seen[k] = true
-			continue
-		}
-		base := p.name
-		if p.game != "" {
-			base = fmt.Sprintf("%s (%s)", p.name, p.game)
-		}
-		n := UniquePlanName(base, func(s string) bool { return taken[strings.ToLower(s)] })
-		taken[strings.ToLower(n)], seen[strings.ToLower(n)] = true, true
-		if _, err := tx.Exec(`UPDATE plan SET name=? WHERE id=?`, n, p.id); err != nil {
-			return err
-		}
-	}
-	_, err = tx.Exec(`UPDATE environment SET current_plan = coalesce((SELECT min(p.id) FROM plan p WHERE p.environment_id = environment.id), 0)
-		WHERE current_plan NOT IN (SELECT id FROM plan)`)
-	return err
-}
-
 // UniquePlanName is base, or base followed by " 2", " 3"… when taken.
 func UniquePlanName(base string, taken func(string) bool) string {
 	if !taken(base) {
@@ -80,7 +21,7 @@ func UniquePlanName(base string, taken func(string) bool) string {
 
 // keepLists rewrites the entries naming envID's own instances (its Data/ and Mods/) as
 // their packageIds in every list, version and undo step, before that game is removed: the
-// lists stay, and the game that reads them next finds its own copy (04 §1.1).
+// lists stay, and the game that reads them next finds its own copy (07 §1.1).
 func keepLists(tx *sql.Tx, envID string) error {
 	rows, err := tx.Query(`SELECT i.id, lower(coalesce(n.package_id, '')) FROM instance i LEFT JOIN snapshot n ON n.id = i.current_snapshot_id
 		WHERE i.environment_id = ?`, envID)
@@ -150,7 +91,7 @@ func keepLists(tx *sql.Tx, envID string) error {
 
 // ElsewhereMods lists the other games' own Mods/ instances, leaving out links
 // RimArcho made there (_Archo_*). Tombstones keep a plan's deleted copy missing
-// instead of healing its packageId to another installed copy (06 §2.9, 04 §1.7).
+// instead of healing its packageId to another installed copy (16 §2.9, 07 §1.7).
 func (s *Store) ElsewhereMods(envID string) ([]*Mod, error) {
 	rows, err := s.DB.Query(`SELECT `+modColsLite+modFrom+` WHERE i.environment_id NOT IN ('', ?) AND s.kind = 'local'
 		AND substr(lower(i.rel_path), 1, 7) <> '_archo_' ORDER BY i.id`, envID)

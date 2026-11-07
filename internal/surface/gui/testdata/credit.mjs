@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { loadModules, deferred, flush } from "./dom.mjs";
 
-// The Steam credit question (02 §3.4): asked only when the backend has a due batch and no
+// The Steam credit question (11 §1): asked only when the backend has a due batch and no
 // other popup is open; concurrent checks share one; the answer goes back with the batch ids.
 async function setup(prompt) {
   const calls = [], chosen = [], messages = [];

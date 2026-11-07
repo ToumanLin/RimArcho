@@ -17,7 +17,7 @@ import (
 // Every permanent exception has a specific purpose; test data exceptions name individual files.
 var sourceLanguageFiles = map[string]string{
 	"docs/glossary.md":                                       "The bilingual terminology reference.",
-	"README.zh-CN.md":                                        "The Chinese README.",
+	"ToDo.md":                                                "The maintainer's working list; notes are written in whichever language is quicker.",
 	"monitor/About/About.xml":                                "RimWorld does not localize About.xml descriptions; keep the bilingual description.",
 	"internal/app/filelists_golden_test.go":                  "Exercises Chinese interface output, legacy Chinese data, or CJK names and paths.",
 	"internal/app/packname_test.go":                          "Exercises Chinese interface output, legacy Chinese data, or CJK names and paths.",
@@ -33,7 +33,7 @@ var sourceLanguageFiles = map[string]string{
 	"internal/store/content_test.go":                         "Exercises Chinese interface output, legacy Chinese data, or CJK names and paths.",
 	"internal/store/derived_scan_test.go":                    "Exercises Chinese interface output, legacy Chinese data, or CJK names and paths.",
 	"internal/store/intkey_research_test.go":                 "Exercises Chinese interface output, legacy Chinese data, or CJK names and paths.",
-	"internal/store/migrate28_test.go":                       "Exercises Chinese interface output, legacy Chinese data, or CJK names and paths.",
+	"internal/store/filelist_test.go":                        "Exercises Chinese interface output, legacy Chinese data, or CJK names and paths.",
 	"internal/surface/gui/credit_test.go":                    "Exercises Chinese interface output, legacy Chinese data, or CJK names and paths.",
 	"internal/surface/gui/exchange_test.go":                  "Exercises Chinese interface output, legacy Chinese data, or CJK names and paths.",
 	"internal/surface/gui/linkhealth_test.go":                "Exercises Chinese interface output, legacy Chinese data, or CJK names and paths.",
@@ -59,6 +59,7 @@ var sourceLanguageFiles = map[string]string{
 	"internal/view/accounts_test.go":                         "Asserts Chinese interface text or searches Chinese tags and mod names.",
 	"internal/view/analyzeprogress_test.go":                  "Asserts Chinese interface text or searches Chinese tags and mod names.",
 	"internal/view/autoupdate_test.go":                       "Asserts Chinese interface text or searches Chinese tags and mod names.",
+	"internal/view/cliline_test.go":                          "Asserts Chinese interface text or searches Chinese tags and mod names.",
 	"internal/view/bar_test.go":                              "Asserts Chinese interface text or searches Chinese tags and mod names.",
 	"internal/view/companion_internal_test.go":               "Asserts Chinese interface text or searches Chinese tags and mod names.",
 	"internal/view/copycaption_test.go":                      "Asserts Chinese interface text or searches Chinese tags and mod names.",
@@ -75,6 +76,7 @@ var sourceLanguageFiles = map[string]string{
 	"internal/view/needlinks_test.go":                        "Asserts Chinese interface text or searches Chinese tags and mod names.",
 	"internal/view/ops_test.go":                              "Asserts Chinese interface text or searches Chinese tags and mod names.",
 	"internal/view/packpage_test.go":                         "Asserts Chinese interface text or searches Chinese tags and mod names.",
+	"internal/view/saves_play_test.go":                       "Asserts Chinese interface text or searches Chinese tags and mod names.",
 	"internal/view/steamtext_test.go":                        "Asserts Chinese interface text or searches Chinese tags and mod names.",
 	"internal/view/subscription_test.go":                     "Asserts Chinese interface text or searches Chinese tags and mod names.",
 	"internal/view/subscriptions_test.go":                    "Asserts Chinese interface text or searches Chinese tags and mod names.",
@@ -106,7 +108,14 @@ var sourceLanguageDirectories = map[string]string{
 	"monitor/Languages/":        "RimWorld Keyed language resources.",
 }
 
+// chineseCopyMarker in a file name marks a Chinese copy of a document (README.zh-CN.md,
+// UserGuide/user-guide.zh-CN.md); such files are exempt without being listed.
+const chineseCopyMarker = "zh-CN"
+
 func sourceLanguageExempt(path string) bool {
+	if strings.Contains(filepath.Base(path), chineseCopyMarker) {
+		return true
+	}
 	if _, ok := sourceLanguageFiles[path]; ok {
 		return true
 	}
@@ -124,12 +133,59 @@ func sourceLanguageRune(r rune) bool {
 		r >= 0xff3b && r <= 0xff40 || r >= 0xff5b && r <= 0xff65
 }
 
-func sourceLanguageLines(data []byte) []int {
+// stripCodeSpans drops Markdown inline code spans. A name quoted verbatim (a Windows account, a
+// Mod folder, a path) keeps its own language; the prose around it is still checked.
+func stripCodeSpans(line string) string {
+	var out strings.Builder
+	for i := 0; i < len(line); {
+		if line[i] != '`' {
+			out.WriteByte(line[i])
+			i++
+			continue
+		}
+		n := 0
+		for i+n < len(line) && line[i+n] == '`' {
+			n++
+		}
+		end := closingBackticks(line, i+n, n)
+		if end < 0 { // An unclosed run is plain text, as in CommonMark.
+			out.WriteString(line[i : i+n])
+			i += n
+			continue
+		}
+		i = end + n
+	}
+	return out.String()
+}
+
+// closingBackticks finds the next run of exactly n backticks at or after from.
+func closingBackticks(line string, from, n int) int {
+	for i := from; i < len(line); {
+		if line[i] != '`' {
+			i++
+			continue
+		}
+		run := 0
+		for i+run < len(line) && line[i+run] == '`' {
+			run++
+		}
+		if run == n {
+			return i
+		}
+		i += run
+	}
+	return -1
+}
+
+func sourceLanguageLines(data []byte, markdown bool) []int {
 	if bytes.IndexByte(data, 0) >= 0 || !utf8.Valid(data) {
 		return nil
 	}
 	var lines []int
 	for index, line := range strings.Split(string(data), "\n") {
+		if markdown {
+			line = stripCodeSpans(line)
+		}
 		for _, r := range line {
 			if sourceLanguageRune(r) {
 				lines = append(lines, index+1)
@@ -191,8 +247,9 @@ func TestSourceLanguage(t *testing.T) {
 			t.Error(err)
 			continue
 		}
-		for _, line := range sourceLanguageLines(data) {
-			t.Errorf("%s:%d: CJK text belongs in language resources or documented test data", path, line)
+		markdown := strings.EqualFold(filepath.Ext(path), ".md")
+		for _, line := range sourceLanguageLines(data, markdown) {
+			t.Errorf("%s:%d: CJK text belongs in language resources or documented test data (Markdown may quote a name in `code`)", path, line)
 		}
 	}
 }
@@ -200,13 +257,49 @@ func TestSourceLanguage(t *testing.T) {
 func TestSourceLanguageScanner(t *testing.T) {
 	for _, r := range []rune{0x4e00, 0x3400, 0x20000, 0x3002, 0xff0c} {
 		input := []byte(fmt.Sprintf("English\n%c\n", r))
-		lines := sourceLanguageLines(input)
-		if len(lines) != 1 || lines[0] != 2 {
-			t.Fatalf("U+%04X: lines %v", r, lines)
+		for _, markdown := range []bool{false, true} {
+			lines := sourceLanguageLines(input, markdown)
+			if len(lines) != 1 || lines[0] != 2 {
+				t.Fatalf("U+%04X markdown=%v: lines %v", r, markdown, lines)
+			}
 		}
 	}
-	if lines := sourceLanguageLines([]byte("English\nASCII !?,.\n")); len(lines) != 0 {
+	if lines := sourceLanguageLines([]byte("English\nASCII !?,.\n"), false); len(lines) != 0 {
 		t.Fatal(lines)
+	}
+	// Code points keep this file free of the text it tests.
+	name, other := string([]rune{0x65b0, 0x73a9, 0x5bb6}), string([]rune{0x8001, 0x73a9, 0x5bb6})
+	for _, c := range []struct {
+		text string
+		want []int
+	}{
+		{"account `" + name + "` signed in", nil},
+		{"two `" + name + "` and `" + other + "` spans", nil},
+		{"double ``a ` " + name + "`` span", nil},
+		{"prose " + name + " outside `" + name + "` a span", []int{1}},
+		{"unclosed `" + name + " span", []int{1}},
+		{"``" + name + "` wrong run length", []int{1}},
+		{"English\n```\n" + name + "\n```\n", []int{3}}, // Fenced blocks stay checked.
+	} {
+		if got := sourceLanguageLines([]byte(c.text), true); fmt.Sprint(got) != fmt.Sprint(c.want) {
+			t.Errorf("markdown %q: lines %v, want %v", c.text, got, c.want)
+		}
+		if c.want == nil {
+			if got := sourceLanguageLines([]byte(c.text), false); len(got) != 1 {
+				t.Errorf("code file %q: code spans must not be exempt, got %v", c.text, got)
+			}
+		}
+	}
+	if !sourceLanguageExempt("ToDo.md") {
+		t.Fatal("the working list may contain Chinese")
+	}
+	for _, path := range []string{"README.zh-CN.md", "docs/new-page.zh-CN.md", "docs/release-vm-tests.zh-CN.md"} {
+		if !sourceLanguageExempt(path) {
+			t.Fatalf("%s: a zh-CN file name must be exempt", path)
+		}
+	}
+	if sourceLanguageExempt("docs/zh-CN/page.md") || sourceLanguageExempt("docs/release-vm-tests.md") {
+		t.Fatal("only the file name, not a directory, grants the exemption")
 	}
 	if sourceLanguageExempt("internal/view/future.go") || sourceLanguageExempt("internal/view/new_test.go") {
 		t.Fatal("test and code directories must not be exempt")

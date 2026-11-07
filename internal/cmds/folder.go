@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
-// Mod folders (02 §0): the folders every environment shares. MCP reads them with
+// Mod folders (03 §2): the folders every environment shares. MCP reads them with
 // status show=folders; changing them is left to the player, like environments.
 
 func init() {

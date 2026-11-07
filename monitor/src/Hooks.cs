@@ -7,8 +7,8 @@ using Verse;
 
 namespace ArchoMonitor
 {
-    // Hooks installs the Harmony patches (03 §6.7.1). Every target is looked up by reflection;
-    // a missing one is skipped and named in the session line (03 §6.7.5).
+    // Hooks installs the Harmony patches (19 §2). Every target is looked up by reflection;
+    // a missing one is skipped and named in the session line (19 §5).
     internal static class Hooks
     {
         internal static void Install(bool messages)
@@ -38,6 +38,7 @@ namespace ArchoMonitor
             PhasePatch(h, "RimWorld.Planet.WorldGenerator", "GenerateWorld", prefix: "New", args: null, anyArgs: true);
             PhasePatch(h, "Verse.Game", "InitNewGame", prefix: "New");
             PhasePatch(h, "Verse.Game", "FinalizeInit", postfix: "Play");
+            SettingsWindow.Install(h);
         }
 
         static void PhasePatch(Harmony h, string type, string method, string prefix = null, string postfix = null, Type[] args = null, bool anyArgs = false)
@@ -79,7 +80,7 @@ namespace ArchoMonitor
         }
     }
 
-    // EngineLog: the engine's log callback, and on Unity the stack trace levels (03 §6.7.1).
+    // EngineLog: the engine's log callback, and on Unity the stack trace levels (19 §2).
     internal static class EngineLog
     {
         internal static void Install()

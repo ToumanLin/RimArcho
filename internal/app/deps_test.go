@@ -142,6 +142,12 @@ func TestInstallDepSteamCMDOwnDirectoryAndRemove(t *testing.T) {
 	if _, err := os.Stat(want); err != nil {
 		t.Fatal("own copy removed when external selected", err)
 	}
+	if b, err := os.ReadFile(external); err != nil || string(b) != "external program" {
+		t.Fatalf("refused removal changed the external copy: %s %v", b, err)
+	}
+	if v := e.App.Store.Meta("cfg:steamcmd.path"); v != external {
+		t.Fatalf("refused removal cleared the setting: %q", v)
+	}
 	e.MustRun("config", "set", "steamcmd.path", "")
 	if err := e.App.RemoveDep(deps.SteamCMD); err != nil {
 		t.Fatal(err)
@@ -157,26 +163,23 @@ func TestInstallDepSteamCMDOwnDirectoryAndRemove(t *testing.T) {
 	}
 }
 
+// The SteamCMD case is in TestInstallDepSteamCMDOwnDirectoryAndRemove.
 func TestRemoveDepRefusesExternalCopies(t *testing.T) {
 	t.Parallel()
-	for _, name := range []string{deps.Todds, deps.SteamCMD} {
-		t.Run(name, func(t *testing.T) {
-			e := testkit.New(t)
-			e.App.SteamCMDNoPath = true
-			i := e.App.Deps().Status(name)
-			external := filepath.Join(e.Root, "external", name+".exe")
-			e.WriteFile(external, "external")
-			e.MustRun("config", "set", i.ConfigKey, external)
-			if err := e.App.RemoveDep(name); err == nil {
-				t.Fatal("removed configured copy")
-			}
-			if b, err := os.ReadFile(external); err != nil || string(b) != "external" {
-				t.Fatalf("external copy changed: %s %v", b, err)
-			}
-			if e.App.Store.Meta("cfg:"+i.ConfigKey) != external {
-				t.Fatal("setting cleared")
-			}
-		})
+	e := testkit.New(t)
+	e.App.SteamCMDNoPath = true
+	i := e.App.Deps().Status(deps.Todds)
+	external := filepath.Join(e.Root, "external", deps.Todds+".exe")
+	e.WriteFile(external, "external")
+	e.MustRun("config", "set", i.ConfigKey, external)
+	if err := e.App.RemoveDep(deps.Todds); err == nil {
+		t.Fatal("removed configured copy")
+	}
+	if b, err := os.ReadFile(external); err != nil || string(b) != "external" {
+		t.Fatalf("external copy changed: %s %v", b, err)
+	}
+	if e.App.Store.Meta("cfg:"+i.ConfigKey) != external {
+		t.Fatal("setting cleared")
 	}
 }
 

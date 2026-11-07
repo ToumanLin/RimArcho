@@ -16,7 +16,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/textenc"
 )
 
-// Mod list formats of other tools (04 §9): RimSort (ModsConfig XML, JSON, clipboard text,
+// Mod list formats of other tools (07 §7): RimSort (ModsConfig XML, JSON, clipboard text,
 // Rentry), RimWorld's own saved list (.rml, which RimCrow also writes), RimCrow's
 // ModList.xml, JSON and share code, and lists of workshop IDs. Detected by content.
 
@@ -27,7 +27,7 @@ const (
 	FormatRimCrow = "rimcrow" // share code
 	// FormatRimCrowXML is RimCrow's ModList.xml.
 	FormatRimCrowXML = "rimcrow-xml"
-	// FormatWorkshop is a list of Workshop links in Markdown (04 §9.3): for someone who
+	// FormatWorkshop is a list of Workshop links in Markdown (07 §7.3): for someone who
 	// subscribes by hand; it reads back as a list of workshop IDs.
 	FormatWorkshop = "workshop"
 )

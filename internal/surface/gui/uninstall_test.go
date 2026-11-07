@@ -12,6 +12,7 @@ import (
 )
 
 func TestUninstallPreviewCachesOnlySizes(t *testing.T) {
+	t.Parallel()
 	e, s, _ := fixture(t)
 	file := filepath.Join(e.Home, "size-test")
 	e.WriteFile(file, strings.Repeat("x", 1<<20))
@@ -96,6 +97,7 @@ func samePhysicalPath(a, b string) bool {
 }
 
 func TestUninstallPreviewRechecksForeignLinks(t *testing.T) {
+	t.Parallel()
 	e, s, _ := fixture(t)
 	pack := filepath.Join(e.Home, "packs", "P")
 	e.WriteFile(filepath.Join(pack, "pack.json"), `{"format":1,"name":"P","entries":[]}`)
@@ -120,6 +122,7 @@ func TestUninstallPreviewRechecksForeignLinks(t *testing.T) {
 }
 
 func TestUninstallRunBlockedReleasesLocks(t *testing.T) {
+	t.Parallel()
 	e, s, _ := fixture(t)
 	e.App.ArchoProbe = func() []int { return []int{77} }
 	if err := s.UninstallRun(view.UninstallChoice{}); err == nil {

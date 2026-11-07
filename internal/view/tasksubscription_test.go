@@ -63,6 +63,7 @@ func TestSubscriptionTaskTextAndActions(t *testing.T) {
 }
 
 func TestSubscriptionProgressUsesByteWeights(t *testing.T) {
+	t.Parallel()
 	task := app.Task{Kind: TaskSubscribe, Lane: app.LaneSelf, State: app.TaskRunning}
 	task.SetWorkshopProgress([]app.TaskItem{{Ref: "ws:1", State: app.ItemOK, Size: 100}, {Ref: "ws:2", Name: "Big Mod", State: app.ItemRun, Size: 300}})
 	r := BuildTasks([]app.Task{task}, time.Now()).Rows[0]

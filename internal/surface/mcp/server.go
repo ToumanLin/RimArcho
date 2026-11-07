@@ -1,6 +1,6 @@
-// Package mcp is the MCP surface (05 §5): `archo mcp` over stdio. Every tool translates
+// Package mcp is the MCP surface (14): `archo mcp` over stdio. Every tool translates
 // its arguments into the argv of one CLI command and returns that command's text, so the
-// output is byte-identical to the CLI (05 §1.1, I1).
+// output is byte-identical to the CLI (13 §1.1, I1).
 package mcp
 
 import (
@@ -9,9 +9,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -21,21 +23,45 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 )
 
-// AnalyzeWait is how long a tool call waits for an out-of-date analysis (05 §5.1).
+// AnalyzeWait is how long a tool call waits for an out-of-date analysis (14 §1).
 var AnalyzeWait = 10 * time.Second
 
 func ptr[T any](v T) *T { return &v }
 
+// Group is a set of tools `archo mcp --tools` serves (14 §1): Core by default, All for
+// every tool. Each tool's group is part of its row in the tool table.
+type Group string
+
+const (
+	Core Group = "core" // the agent's tools: diagnosis, plan edits, saving, launching, testing
+	All  Group = "all"  // Core plus the player's management tools
+)
+
+// ParseGroup reads a --tools value; "" is Core.
+func ParseGroup(s string) (Group, error) {
+	switch Group(s) {
+	case "", Core:
+		return Core, nil
+	case All:
+		return All, nil
+	}
+	return "", fmt.Errorf("unknown --tools value %q: use core or all", s)
+}
+
 // tool is one MCP tool: annotations, description and the argv builder.
 type tool struct {
 	name        string
+	group       Group // Core, or All for a tool only `--tools all` serves
 	readOnly    bool
 	destructive bool
 	desc        string
-	add         func(s *sdk.Server, run func(context.Context, string, []string) (*sdk.CallToolResult, any, error), t *sdk.Tool)
+	add         func(s *sdk.Server, run runFunc, t *sdk.Tool)
 	in          reflect.Type                       // the argument struct
 	argvOf      func(raw []byte) ([]string, error) // JSON arguments → argv, as a tool call does
 }
+
+// runFunc runs one tool call's argv (Server.run).
+type runFunc func(context.Context, *sdk.CallToolRequest, string, []string) (*sdk.CallToolResult, any, error)
 
 // Server serialises tool calls on one App (it is not safe for concurrent use).
 type Server struct {
@@ -57,7 +83,7 @@ func (s *Server) executeContext(ctx context.Context, env string, argv []string) 
 		s.app.EnvName = env
 		defer func() { s.app.EnvName = prev }()
 	}
-	out, code := cmds.ExecuteContext(ctx, s.app, argv)
+	out, code := cmds.ExecuteContext(cmds.ForMCP(ctx), s.app, argv)
 	if len(argv) >= 2 && argv[0] == "config" && argv[1] == "get" && s.app.Store.Meta("cfg:steamcmd.account") != "" {
 		lines := strings.Split(out, "\n")
 		for i, line := range lines {
@@ -87,8 +113,10 @@ func ClipOutput(out string) string {
 	return out[:cut] + fmt.Sprintf("\n… output clipped at %d KB of %d KB (%d more lines): narrow the call (mod=, target=, pattern, cluster) instead of all=true\n", cut>>10, len(out)>>10, rest)
 }
 
-func (s *Server) run(ctx context.Context, env string, argv []string) (*sdk.CallToolResult, any, error) {
+func (s *Server) run(ctx context.Context, req *sdk.CallToolRequest, env string, argv []string) (*sdk.CallToolResult, any, error) {
+	ctx, stop := heartbeat(ctx, req)
 	out, code := s.executeContext(ctx, env, argv)
+	stop()
 	// Test reports already limit clusters; clipping their JSON would corrupt it.
 	if len(argv) < 2 || (argv[0] != "test" || argv[1] != "run") && argv[0] != "links" {
 		out = ClipOutput(out)
@@ -96,15 +124,58 @@ func (s *Server) run(ctx context.Context, env string, argv []string) (*sdk.CallT
 	return &sdk.CallToolResult{Content: []sdk.Content{&sdk.TextContent{Text: out}}, IsError: code == cmds.ExitError || code == cmds.ExitUsage}, nil, nil
 }
 
-// New builds the server with every tool of 05 §5.2.
-func New(a *app.App) *Server {
+// ProgressEvery is how often a running tool call sends a progress notification (14 §1).
+var ProgressEvery = 10 * time.Second
+
+// heartbeat sends a progress notification every ProgressEvery until stop is called, when
+// the client asked for progress. Clients that restart their request timeout on progress
+// (Pi does, after 60 s) then wait for a test run instead of cancelling it, which stops
+// the game. The message is the command's latest progress line, with the elapsed time.
+func heartbeat(ctx context.Context, req *sdk.CallToolRequest) (context.Context, func()) {
+	if req == nil || req.Session == nil || req.Params == nil || req.Params.GetProgressToken() == nil {
+		return ctx, func() {}
+	}
+	token := req.Params.GetProgressToken()
+	var step atomic.Pointer[string]
+	ctx = cmds.WithProgress(ctx, func(line string) { step.Store(&line) })
+	done, finished := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(finished)
+		start := time.Now()
+		tick := time.NewTicker(ProgressEvery)
+		defer tick.Stop()
+		for n := 1; ; n++ {
+			select {
+			case <-done:
+				return
+			case <-ctx.Done():
+				return
+			case <-tick.C:
+			}
+			msg := "running"
+			if p := step.Load(); p != nil {
+				msg = strings.TrimPrefix(*p, "progress: ")
+			}
+			msg = fmt.Sprintf("%s (%ds)", msg, int(time.Since(start).Seconds()))
+			req.Session.NotifyProgress(ctx, &sdk.ProgressNotificationParams{ProgressToken: token, Progress: float64(n), Message: msg})
+		}
+	}()
+	// Waiting for the goroutine keeps every notification before the result.
+	return ctx, func() { close(done); <-finished }
+}
+
+// New builds the server with the tools of group g (14 §2): Core, or All for every tool.
+func New(a *app.App, g Group) *Server {
 	s := &Server{app: a}
-	// 05 §5.1: a first call that needs the analysis returns what is ready after 10 s.
+	// 14 §1: a first call that needs the analysis returns what is ready after 10 s.
 	if a.AnalyzeWait == 0 {
 		a.AnalyzeWait = AnalyzeWait
 	}
 	s.srv = sdk.NewServer(&sdk.Implementation{Name: "rimarcho", Version: buildinfo.Version}, &sdk.ServerOptions{Instructions: Instructions})
 	for _, t := range Tools() {
+		if t.group == All && g != All {
+			continue
+		}
 		// Only the tools in openWorld may reach the network; everything else stays local.
 		ann := &sdk.ToolAnnotations{ReadOnlyHint: t.readOnly, OpenWorldHint: ptr(openWorld[t.name])}
 		if !t.readOnly {
@@ -118,14 +189,14 @@ func New(a *app.App) *Server {
 // SDK returns the underlying SDK server (for in-memory tests).
 func (s *Server) SDK() *sdk.Server { return s.srv }
 
-// Run serves stdio until the client disconnects.
-func Run(ctx context.Context, a *app.App) error {
-	return New(a).srv.Run(ctx, &sdk.StdioTransport{})
+// Run serves group g's tools over stdio until the client disconnects.
+func Run(ctx context.Context, a *app.App, g Group) error {
+	return New(a, g).srv.Run(ctx, &sdk.StdioTransport{})
 }
 
 // reg builds a tool whose arguments of type In map to argv.
 func reg[In any](name string, readOnly, destructive bool, desc string, argv func(In) []string) tool {
-	return tool{name: name, readOnly: readOnly, destructive: destructive, desc: desc,
+	return tool{name: name, group: Core, readOnly: readOnly, destructive: destructive, desc: desc,
 		in: reflect.TypeOf((*In)(nil)).Elem(),
 		argvOf: func(raw []byte) ([]string, error) {
 			var in In
@@ -138,12 +209,15 @@ func reg[In any](name string, readOnly, destructive bool, desc string, argv func
 			}
 			return argv(in), nil
 		},
-		add: func(s *sdk.Server, run func(context.Context, string, []string) (*sdk.CallToolResult, any, error), t *sdk.Tool) {
-			sdk.AddTool(s, t, func(ctx context.Context, _ *sdk.CallToolRequest, in In) (*sdk.CallToolResult, any, error) {
-				return run(ctx, envOf(in), argv(in))
+		add: func(s *sdk.Server, run runFunc, t *sdk.Tool) {
+			sdk.AddTool(s, t, func(ctx context.Context, req *sdk.CallToolRequest, in In) (*sdk.CallToolResult, any, error) {
+				return run(ctx, req, envOf(in), argv(in))
 			})
 		}}
 }
+
+// allOnly moves a tool to All: only `archo mcp --tools all` serves it.
+func (t tool) allOnly() tool { t.group = All; return t }
 
 // envOf is a call's env argument; "" (the current environment) when the tool has none.
 func envOf(in any) string {
@@ -184,7 +258,7 @@ func argv(words ...string) *builder { return &builder{a: append([]string{}, word
 
 // ---- tool arguments ----
 
-// GuideIn is the guide tool: a workflow or a tool name (05 §5.3). The guide is the same in
+// GuideIn is the guide tool: a workflow or a tool name (14 §3). The guide is the same in
 // every environment, so it takes no env.
 type GuideIn struct {
 	Topic string `json:"topic,omitempty" jsonschema:"diagnose, errors, plans, words, or a tool name; empty lists the topics"`
@@ -208,6 +282,40 @@ type RefIn struct {
 	Ref string `json:"ref" jsonschema:"a mod reference: #<id>, L#<lineage>, pkg:<packageId>, ws:<workshopId> or src:<label>"`
 }
 
+// ModSettingsSetIn is set_mod_settings: archo mod-settings set (16 §2.9 "Mod settings").
+type ModSettingsSetIn struct {
+	Env    string            `json:"env,omitempty" jsonschema:"environment name (default: current)"`
+	Ref    string            `json:"ref" jsonschema:"the mod: #<id>, L#<lineage>, pkg:<packageId>, ws:<workshopId>"`
+	File   string            `json:"file,omitempty" jsonschema:"which settings when the Mod has several: its Mod class or hugslib:<pack>, as get_mod_settings names them"`
+	Set    map[string]string `json:"set,omitempty" jsonschema:"setting name (or HugsLib title) → new value: on/off, a number, one line of text, a HugsLib choice"`
+	Reset  []string          `json:"reset,omitempty" jsonschema:"settings whose stored value is removed: the Mod uses its default"`
+	DryRun bool              `json:"dry_run,omitempty" jsonschema:"check and show the change without writing"`
+}
+
+// ModSettingsSetArgv maps set_mod_settings to its command (set pairs in name order).
+func ModSettingsSetArgv(in ModSettingsSetIn) []string {
+	b := argv("mod-settings", "set", in.Ref)
+	names := make([]string, 0, len(in.Set))
+	for k := range in.Set {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+	for _, k := range names {
+		b.a = append(b.a, k+"="+in.Set[k])
+	}
+	for _, r := range in.Reset {
+		b.str("reset", r)
+	}
+	return b.str("file", in.File).flag("dry-run", in.DryRun).a
+}
+
+// ModSettingsIn is get_mod_settings: archo mod-settings (16 §2.9 "Mod settings").
+type ModSettingsIn struct {
+	Env string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
+	Ref string `json:"ref,omitempty" jsonschema:"a mod reference (#<id>, L#<lineage>, pkg:<packageId>, ws:<workshopId>): its stored values; empty lists the current list's Mods that have settings"`
+	All bool   `json:"all,omitempty" jsonschema:"no truncation"`
+}
+
 type DefIn struct {
 	Env         string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Def         string `json:"def,omitempty" jsonschema:"Type/defName (ThingDef/Gun_Revolver), Type@Name for abstract parents, def:… or a bare defName"`
@@ -219,7 +327,7 @@ type DefIn struct {
 type PatchesIn struct {
 	Env         string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
 	Mod         string `json:"mod,omitempty" jsonschema:"only this mod's operations (#id, pkg:…)"`
-	Target      string `json:"target,omitempty" jsonschema:"Type/defName of a touched def, or part of an XPath"`
+	Target      string `json:"target,omitempty" jsonschema:"Type/defName of a touched def; a bare defName also finds operations nested in FindMod/Sequence; or part of an XPath"`
 	Failed      bool   `json:"failed,omitempty" jsonschema:"only operations that matched nothing (patch.no-match), with reasons"`
 	All         bool   `json:"all,omitempty"`
 	GameVersion string `json:"game_version,omitempty" jsonschema:"analyse for another game major.minor than the environment's, e.g. 1.6"`
@@ -361,17 +469,11 @@ type DescribeIn struct {
 
 type PlayerIn struct {
 	Env    string   `json:"env,omitempty" jsonschema:"environment name (default: current)"`
-	Action string   `json:"action" jsonschema:"tag_add, tag_remove, alias, note (the mod's), copy_note (one copy's own, 06 §2.9)"`
-	Refs   []string `json:"refs" jsonschema:"the mods (tag actions: one or more; alias and note: exactly one)"`
-	Tags   []string `json:"tags,omitempty" jsonschema:"tag_add / tag_remove: the tags"`
-	Text   string   `json:"text,omitempty" jsonschema:"alias / note / copy_note: the text; empty clears it"`
-}
-
-type CopyIn struct {
-	Env  string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
-	Ref  string `json:"ref" jsonschema:"the mod to copy (#id, pkg:…)"`
-	Name string `json:"name,omitempty" jsonschema:"folder name under Mods/ (default <folder>_local)"`
-	Git  bool   `json:"git,omitempty" jsonschema:"make the copy a git repository with a baseline commit, so edits can be diffed"`
+	Action string   `json:"action" jsonschema:"tag_add, tag_remove, alias, note (the mod's), copy_note (one copy's own, 16 §2.9); on every mod: tag_rename, tag_merge, tag_delete, tag_note"`
+	Refs   []string `json:"refs,omitempty" jsonschema:"the mods (tag_add / tag_remove: one or more; alias and note: exactly one)"`
+	Tags   []string `json:"tags,omitempty" jsonschema:"the tags (tag_rename, tag_note: one)"`
+	Text   string   `json:"text,omitempty" jsonschema:"alias / note / copy_note / tag_note: the text, empty clears it; tag_rename: new name; tag_merge: target"`
+	DryRun bool     `json:"dry_run,omitempty" jsonschema:"preview a tag edit"`
 }
 
 type SaveIn struct {
@@ -421,7 +523,7 @@ type UninstallIn struct {
 	All           bool   `json:"all,omitempty" jsonschema:"no truncation"`
 }
 
-// UninstallArgv maps preview_uninstall: always the dry run, never --yes (05 §5.2).
+// UninstallArgv maps preview_uninstall: always the dry run, never --yes (14 §2).
 func UninstallArgv(in UninstallIn) []string {
 	return argv("uninstall", "--dry-run").flag("keep-locked", in.KeepLocked).str("locked-to", in.LockedTo).flag("remove-packs", in.RemovePacks).
 		str("packs-to", in.PacksTo).flag("remove-saves", in.RemoveSaves).str("saves-to", in.SavesTo).flag("remove-games", in.RemoveGames).
@@ -441,6 +543,9 @@ func toolList() []tool {
 			return argv("list").flag("active", in.Active).str("filter", in.Filter).flag("all", in.All).a
 		}),
 		reg("get_mod", true, false, descMod, func(in RefIn) []string { return []string{"mod", in.Ref} }),
+		reg("get_mod_settings", true, false, descModSettings, func(in ModSettingsIn) []string {
+			return argv("mod-settings").pos(in.Ref).flag("all", in.All).a
+		}),
 		reg("get_description", true, false, descDescribe, func(in DescribeIn) []string {
 			return argv("describe", in.Ref).str("source", in.Source).flag("refresh", in.Refresh).flag("offline", in.Offline).a
 		}),
@@ -474,29 +579,26 @@ func toolList() []tool {
 		reg("save_loadout", false, true, descSave, func(in SaveIn) []string {
 			return argv("save").flag("dry-run", in.DryRun).flag("move-duplicates", in.MoveDuplicates).a
 		}),
-		reg("copy_local", false, false, descCopy, func(in CopyIn) []string {
-			return argv("copy-local", in.Ref).str("name", in.Name).flag("git", in.Git).a
-		}),
-		reg("set_player_data", false, false, descPlayer, func(in PlayerIn) []string { return PlayerArgv(in) }),
-		// add_rule is the old name of manage_rules, kept as an alias (05 §6).
-		reg("add_rule", false, false, descRuleAlias, func(in RuleIn) []string { return RulesArgv(in) }),
+		reg("set_player_data", false, false, descPlayer, func(in PlayerIn) []string { return PlayerArgv(in) }).allOnly(),
+		reg("set_mod_settings", false, false, descModSettingsSet, func(in ModSettingsSetIn) []string { return ModSettingsSetArgv(in) }).allOnly(),
 		reg("pin_mod", false, false, descPin, func(in PinIn) []string {
 			return argv("pin", in.Ref).str("name", in.Name).flag("git", in.Git).flag("update", in.Update).flag("move-to-library", in.MoveToLibrary).str("reason", in.Reason).flag("dry-run", in.DryRun).a
 		}),
-		reg("preview_uninstall", true, false, descUninstall, UninstallArgv),
+		reg("preview_uninstall", true, false, descUninstall, UninstallArgv).allOnly(),
 		reg("unpin_mod", false, false, descUnpin, func(in UnpinIn) []string { return argv("unpin", in.Ref).flag("dry-run", in.DryRun).a }),
 	}
 }
 
-// Tools returns the tool table.
+// Tools returns the whole tool table, every group.
 func Tools() []tool {
-	return append(append(append(append(append(toolList(), manageTools()...), planTools()...), libraryTools()...), subscriptionTools()...), textureTools()...)
+	return append(append(append(append(append(append(toolList(), manageTools()...), planTools()...), libraryTools()...), saveTools()...), subscriptionTools()...), textureTools()...)
 }
 
 // ToolDoc describes one tool as a client sees it (name, description, parameters): for
 // harnesses that drive the tools without an MCP client (spikes/agenteval).
 type ToolDoc struct {
 	Name, Description string
+	Group             Group
 	ReadOnly          bool
 	Params            []ParamDoc
 }
@@ -507,11 +609,11 @@ type ParamDoc struct {
 	Required         bool
 }
 
-// Catalog lists every tool with its parameters (the env parameter is left out).
+// Catalog lists every tool (both groups) with its parameters (the env parameter is left out).
 func Catalog() []ToolDoc {
 	var out []ToolDoc
 	for _, t := range Tools() {
-		d := ToolDoc{Name: t.name, Description: t.desc, ReadOnly: t.readOnly}
+		d := ToolDoc{Name: t.name, Description: t.desc, Group: t.group, ReadOnly: t.readOnly}
 		for i := 0; i < t.in.NumField(); i++ {
 			f := t.in.Field(i)
 			name, opts, _ := strings.Cut(f.Tag.Get("json"), ",")
@@ -534,7 +636,7 @@ func Catalog() []ToolDoc {
 	return out
 }
 
-// ArgvFor maps a tool call (name and JSON arguments) to the CLI argv the server would run.
+// ArgvFor maps a tool call to any tool (both groups) (name and JSON arguments) to the CLI argv the server would run.
 // Unknown argument names are an error.
 func ArgvFor(name string, args []byte) ([]string, error) {
 	for _, t := range Tools() {
@@ -545,7 +647,7 @@ func ArgvFor(name string, args []byte) ([]string, error) {
 	return nil, fmt.Errorf("unknown tool %q", name)
 }
 
-// ProblemsArgv maps list_problems: warning and above by default (03 §4.5).
+// ProblemsArgv maps list_problems: warning and above by default (05 §4.5).
 func ProblemsArgv(in ProblemsIn) []string {
 	if in.Ref != "" {
 		return gv(argv("problems").str("ref", in.Ref).flag("all", in.All), in.GameVersion)
@@ -558,7 +660,7 @@ func ProblemsArgv(in ProblemsIn) []string {
 		flag("all", in.All).flag("detail", in.Detail).flag("ignored", in.Ignored).flag("include-muted", in.IncludeMuted), in.GameVersion)
 }
 
-// SourceArgv maps read_source: a search gets a 10 s decompile budget by default (05 §5.1).
+// SourceArgv maps read_source: a search gets a 10 s decompile budget by default (14 §1).
 func SourceArgv(in SourceIn) []string {
 	if in.Search != "" {
 		b := argv("source", "search", in.Search)
@@ -570,7 +672,7 @@ func SourceArgv(in SourceIn) []string {
 		case in.Scope == "active":
 			b.flag("active", true).flag("yes", true)
 		default:
-			b.flag("implicated", true) // 03 §5.4
+			b.flag("implicated", true) // 05 §5.4
 		}
 		budget := in.Budget
 		if budget == 0 {
@@ -653,6 +755,18 @@ func PlayerArgv(in PlayerIn) []string {
 			return []string{"note", first, "--copy", "--clear"}
 		}
 		return []string{"note", first, in.Text, "--copy"}
+	case "tag_rename":
+		return argv(append([]string{"tag", "rename"}, append(in.Tags, in.Text)...)...).flag("dry-run", in.DryRun).a
+	case "tag_merge":
+		return argv(append([]string{"tag", "merge"}, in.Tags...)...).str("into", in.Text).flag("dry-run", in.DryRun).a
+	case "tag_delete":
+		return argv(append([]string{"tag", "delete"}, in.Tags...)...).flag("dry-run", in.DryRun).a
+	case "tag_note":
+		b := argv(append([]string{"tag", "note"}, in.Tags...)...)
+		if in.Text == "" {
+			return b.flag("clear", true).a
+		}
+		return b.pos(in.Text).a
 	}
 	return []string{"set_player_data: unknown action " + fmt.Sprintf("%q", in.Action)}
 }

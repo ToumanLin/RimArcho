@@ -172,28 +172,33 @@ func TestReplacementMustMatchRecommendedWorkshop(t *testing.T) {
 	}
 }
 
-// A replacement with another packageId is not offered while an enabled mod requires the
-// original: completing dependencies would enable the original again next to it.
-func TestReplacementKeptWhenRequired(t *testing.T) {
+// A replacement with another packageId is offered while an enabled mod requires the
+// original: the replacement meets that requirement in its place (08 §1.1), so replacing
+// leaves nothing missing and the sort puts the requiring mod after the replacement.
+func TestReplacementOfferedWhenRequired(t *testing.T) {
 	t.Parallel()
 	e := setup(t, false)
 	e.WriteMod(filepath.Join(e.Game, "Mods", "Old"), testkit.Sample("tester.old", "Old"))
 	e.WriteMod(filepath.Join(e.Game, "Mods", "New"), testkit.Sample("tester.new", "New"))
 	e.WriteMod(filepath.Join(e.Game, "Mods", "User"), testkit.Mod{PackageID: "tester.user", Name: "User", Deps: []string{"tester.old"}})
-	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.old", "tester.user")
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.user", "tester.old")
 	e.WriteFile(filepath.Join(e.Home, "cache", "replacements.json.gz"), `{"rules":[{"oldPackageId":"tester.old","newPackageId":"tester.new"}]}`)
 	scanNow(t, e)
 	r, err := e.App.Sort(false)
 	if err != nil || len(r.Replacements) != 1 {
 		t.Fatal(r, err)
 	}
-	if s := r.Replacements[0]; s.CanReplace || !s.Installed || s.BlockedReason != "User requires Old, so it stays" {
+	s := r.Replacements[0]
+	if !s.CanReplace || !s.Installed || s.BlockedReason != "" {
 		t.Fatalf("%+v", s)
 	}
-	// Without the requirement it is offered.
-	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.old")
-	scanNow(t, e)
-	if r, err = e.App.Sort(false); err != nil || len(r.Replacements) != 1 || !r.Replacements[0].CanReplace {
+	if _, err := e.App.ReplaceRecommended([]string{s.Original.Ref}); err != nil {
+		t.Fatal(err)
+	}
+	if r, err = e.App.Sort(false); err != nil || len(r.MissingDependencies) != 0 || len(r.Replacements) != 0 {
 		t.Fatal(r, err)
+	}
+	if got := names(t, e); got != "Core New User" {
+		t.Fatal(got)
 	}
 }

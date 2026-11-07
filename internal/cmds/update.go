@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	register(&Command{Name: "update", Summary: "check GitHub for a newer RimArcho and install it; the data folder is not touched (07 §5.1)",
+	register(&Command{Name: "update", Summary: "check Workshop or GitHub for a newer RimArcho and install it; the data folder is not touched (17 §5.1)",
 		Flags: []Flag{{Name: "check", Help: "only check and show what installing would do; nothing is downloaded"}}, MaxArgs: 0, Run: updateCmd})
 }
 
@@ -44,7 +44,7 @@ func updateCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		return d, nil
 	}
 	if Progress != nil {
-		Progress(fmt.Sprintf("progress: downloading RimArcho %s (%s)", r.Version, render.Size(r.Zip.Size)))
+		Progress(fmt.Sprintf("progress: downloading RimArcho %s (%s)", r.Version, updateSize(r)))
 	}
 	waited := false
 	res, err := c.App.InstallSelfUpdate(ctx, func(s app.SelfUpdateStep) {
@@ -64,6 +64,12 @@ func updateCmd(c *Ctx, a *Args) (*render.Doc, error) {
 }
 
 func updateFacts(c *Ctx, root *render.Node, info app.SelfUpdate, r *selfupdate.Release) {
+	if info.Source != "" {
+		root.KV("source", info.Source)
+	}
+	if info.Fallback != "" {
+		root.KV("fallback", info.Fallback)
+	}
 	if r == nil {
 		if info.State == "development build" {
 			root.KV("update", "a development build is not updated")
@@ -96,7 +102,7 @@ func updateFacts(c *Ctx, root *render.Node, info app.SelfUpdate, r *selfupdate.R
 		return
 	}
 	root.KV("update", "available")
-	root.KV("download", fmt.Sprintf("%s, %s, checked against %s", r.Zip.Name, render.Size(r.Zip.Size), r.Sum.Name))
+	root.KV("download", fmt.Sprintf("%s, %s, checked against %s", r.Zip.Name, updateSize(r), r.Sum.Name))
 	if program, err := c.App.SelfProgramDir(); err == nil {
 		root.KV("replaces", strings.Join(selfupdate.Files, ", ")+" in "+program)
 		root.KV("keeps", "the data folder "+c.App.Home)
@@ -114,7 +120,14 @@ func updateFacts(c *Ctx, root *render.Node, info app.SelfUpdate, r *selfupdate.R
 	}
 }
 
-// othersText: "2 other RimArcho (RimArcho.exe 1234, archo.exe 5678)".
+func updateSize(r *selfupdate.Release) string {
+	if r.Zip.Size <= 0 {
+		return "size unknown"
+	}
+	return render.Size(r.Zip.Size)
+}
+
+// othersText names the processes an install is waiting for.
 func othersText(others []*app.GameRun) string {
 	var names []string
 	for _, o := range others {

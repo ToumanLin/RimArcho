@@ -1,6 +1,6 @@
 package order
 
-// Sort acceptance S1–S5 (04 §10) at the algorithm level; the CLI path is covered by the
+// Sort acceptance S1–S5 (07 §8) at the algorithm level; the CLI path is covered by the
 // golden and app tests.
 
 import (
@@ -100,7 +100,7 @@ func TestS2CycleAndS3Ignore(t *testing.T) {
 }
 
 // A cycle gives up its weakest constraint, not whatever the current order happens to break
-// (04 §5.2): a dependency outranks a loadAfter even when the list has it the wrong way round.
+// (08 §1.2): a dependency outranks a loadAfter even when the list has it the wrong way round.
 func TestCycleBreaksWeakestEdge(t *testing.T) {
 	nodes := []Node{
 		node("ludeon.rimworld", scan.Decl{}),
@@ -141,7 +141,7 @@ type posCommunity map[string]Tier
 func (p posCommunity) Rules(string) ([]string, []string) { return nil, nil }
 func (p posCommunity) Position(pkg string) Tier          { return p[pkg] }
 
-// loadTop / loadBottom (04 §5.5): a top mod goes up with what it needs, a bottom mod goes
+// loadTop / loadBottom (08 §1.5): a top mod goes up with what it needs, a bottom mod goes
 // down with what needs it; official content stays first; a user rule wins; the community
 // one can be ignored.
 func TestTiers(t *testing.T) {
@@ -204,7 +204,7 @@ func TestTiers(t *testing.T) {
 	}
 }
 
-// Enabling without a position (04 §2.1): after what it needs, else before what needs it,
+// Enabling without a position (07 §2.1): after what it needs, else before what needs it,
 // else the end.
 func TestPlace(t *testing.T) {
 	cur := []Node{
@@ -335,4 +335,39 @@ func TestS5FiveHundred(t *testing.T) {
 		}
 	}
 	t.Logf("500 mods, %d edges, %d cycles: %v", len(r.Edges), len(r.Cycles), el)
+}
+
+// A dependency whose package is absent orders after its first present alternative, else
+// after its replacements; the ignore reference stays the declared package (08 §1.1).
+func TestDependencyStandIns(t *testing.T) {
+	alt := node("t.alt", scan.Decl{Dependencies: []scan.Dependency{{PackageID: "x.old", Alternatives: []string{"X.Gone", "X.New"}}}})
+	repl := node("t.repl", scan.Decl{Dependencies: []scan.Dependency{{PackageID: "x.old"}}})
+	in := Input{Nodes: []Node{node("ludeon.rimworld", scan.Decl{}), alt, repl, node("x.new", scan.Decl{}), node("y.fork", scan.Decl{})},
+		GameMM: "1.6", Replacements: map[string][]string{"x.old": {"y.fork"}}}
+	r := Sort(in)
+	if got := pkgs(in, r); !slices.Equal(got, []string{"ludeon.rimworld", "x.new", "t.alt", "y.fork", "t.repl"}) {
+		t.Fatal(got)
+	}
+	var deps []string
+	for _, e := range r.Edges {
+		if e.C.Kind == KindDependency {
+			deps = append(deps, in.Nodes[e.To].PackageID+">"+e.C.Target+" "+e.C.Ref)
+		}
+	}
+	if want := []string{"t.alt>x.new decl:L-t.alt:dependency:x.old", "t.repl>y.fork decl:L-t.repl:dependency:x.old"}; !slices.Equal(deps, want) {
+		t.Fatal(deps)
+	}
+	// One ignore rule on the declared package drops the stand-in edge.
+	in.Rules = []Rule{{Kind: RuleIgnore, Target: "decl:L-t.repl:dependency:x.old"}}
+	if r = Sort(in); r.Ignored != 1 {
+		t.Fatal(r.Ignored)
+	}
+	// With the package itself present, neither alternative nor replacement is used.
+	in.Rules = nil
+	in.Nodes = append(in.Nodes, node("x.old", scan.Decl{}))
+	for _, e := range Sort(in).Edges {
+		if e.C.Kind == KindDependency && e.C.Target != "x.old" {
+			t.Fatal("stand-in next to the package", e.C.Target)
+		}
+	}
 }

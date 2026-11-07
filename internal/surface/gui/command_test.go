@@ -22,6 +22,7 @@ func waitCommand(t *testing.T, s *API) CommandResult {
 	return CommandResult{}
 }
 func TestCommandRawOutputHistoryAndGuard(t *testing.T) {
+	t.Parallel()
 	e, s, _ := fixture(t)
 	s.emit = nil
 	for _, line := range []string{"log --follow", "plan new", "no-such-command", "list --env"} {
@@ -61,6 +62,7 @@ func TestCommandRawOutputHistoryAndGuard(t *testing.T) {
 	}
 }
 func TestCommandDoesNotHoldPageLock(t *testing.T) {
+	t.Parallel()
 	_, s, _ := fixture(t)
 	s.emit = nil
 	entered, release := make(chan struct{}), make(chan struct{})
@@ -94,6 +96,7 @@ func TestCommandDoesNotHoldPageLock(t *testing.T) {
 	}
 }
 func TestCommandSharedCompletions(t *testing.T) {
+	t.Parallel()
 	_, s, _ := fixture(t)
 	s.emit = nil
 	for _, tc := range []struct{ line, want string }{{"sort --dr", "--dry-run"}, {"config set ui.icons ", "compat"}, {"why harm", "Harmony"}} {

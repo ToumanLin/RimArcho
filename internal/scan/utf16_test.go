@@ -8,7 +8,7 @@ import (
 	"unicode/utf16"
 )
 
-// 02 §4.3: an About.xml saved as UTF-16 (with a BOM) is read like UTF-8.
+// 04 §1.3: an About.xml saved as UTF-16 (with a BOM) is read like UTF-8.
 func TestReadDeclUTF16(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, "About"), 0o755); err != nil {

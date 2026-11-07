@@ -78,7 +78,7 @@ func TestLibraryStates(t *testing.T) {
 	if n, ok := lock.Bytes(); !ok || n <= 0 {
 		t.Errorf("sizes come from the scan: %d %v", n, ok)
 	}
-	// "does not support the game" and "in no plan" are not states (06 §2.9)
+	// "does not support the game" and "in no plan" are not states (16 §2.9)
 	want := map[string]string{"Idle": "", "Oldie": "", "Gone": app.LibResidue, "Workshop item 5300": app.LibMissing}
 	for name, s := range want {
 		if got := libLineage(t, lib, name).State(); got != s {
@@ -218,7 +218,7 @@ func TestLibraryLocations(t *testing.T) {
 	}
 }
 
-// 06 §2.9: removing from every plan is one undo step in each plan that had it.
+// 16 §2.9: removing from every plan is one undo step in each plan that had it.
 func TestLibraryRemoveFromPlans(t *testing.T) {
 	t.Parallel()
 	e := libFixture(t)
@@ -249,7 +249,7 @@ func TestLibraryRemoveFromPlans(t *testing.T) {
 	}
 }
 
-// 06 §2.9, 01 §4: a spare copy in Mods/ moves into the lock library as the same instance.
+// 16 §2.9, 02 §1: a spare copy in Mods/ moves into the lock library as the same instance.
 func TestLibraryMoveToLocked(t *testing.T) {
 	t.Parallel()
 	e := libFixture(t)
@@ -303,7 +303,7 @@ func TestLibraryMoveToLocked(t *testing.T) {
 	}
 }
 
-// 06 §2.9: trash names the plans that still use the folder.
+// 16 §2.9: trash names the plans that still use the folder.
 func TestLibraryTrashNamesPlans(t *testing.T) {
 	t.Parallel()
 	e := libFixture(t)

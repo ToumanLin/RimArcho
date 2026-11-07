@@ -1,4 +1,4 @@
-// Package feedback writes a GitHub issue from RimArcho (06 §2.14 Feedback): the body, and either
+// Package feedback writes a GitHub issue from RimArcho (16 §2.14 Feedback): the body, and either
 // a prefilled issues/new link the system browser opens (the player submits it on GitHub), or
 // a report sent to the feedback relay (relay.go), which files it without a GitHub account.
 // RimArcho holds no token either way.
@@ -11,7 +11,7 @@ import (
 	"unicode/utf8"
 )
 
-// The project's public pages, shown on the settings page (06 §2.14).
+// The project's public pages, shown on the settings page (16 §2.14).
 const (
 	Repo = "https://github.com/ToumanLin/RimArcho"
 	// Discord is the community server's invite.

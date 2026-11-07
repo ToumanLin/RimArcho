@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/logs"
 )
 
-// Log text in RimWorld's own debug-log colours (06 §2.10, §7): a line's level colours it
+// Log text in RimWorld's own debug-log colours (16 §2.10, §7): a line's level colours it
 // as the game's log window does (Verse.LogMessage.Color), and a mod's <color>, <b> and <i>
 // (Unity rich text) style parts of it. Both interfaces use the same spans: the GUI as CSS
 // colours, the TUI mapped to its terminal colours.

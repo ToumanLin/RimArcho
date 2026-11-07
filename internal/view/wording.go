@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// The Chinese replacements live under @retired in the language resources (06 §7.2).
+// The Chinese replacements live under @retired in the language resources (16 §7.2).
 // retiredEn are the English words the interface no longer uses: list, game, a newer
 // version, switch version, locked, go back to a version, and the
 // light / full pack (a pack is always full; its list alone is a RimArcho list).
@@ -25,7 +25,7 @@ var wordingExempt = map[string]bool{
 
 // WordingTextProblems checks text from surface-specific literals as well as tables.
 func WordingTextProblems(where, text string) []string {
-	// The approved search-files design uses these separators (06 §2.9).
+	// The approved search-files design uses these separators (16 §2.9).
 	switch text {
 	case "searching %d of %d mods · %d matches so far", "%d matches in %d files of %d mods · %s s",
 		"UTF-8 · XML", "UTF-8 · C#":
@@ -37,7 +37,7 @@ func WordingTextProblems(where, text string) []string {
 		}
 	}
 	if strings.ContainsRune(text, '\u00b7') {
-		return []string{fmt.Sprintf("%s: %q uses a middle dot (06 §7.3)", where, text)}
+		return []string{fmt.Sprintf("%s: %q uses a middle dot (16 §7.3)", where, text)}
 	}
 	return nil
 }

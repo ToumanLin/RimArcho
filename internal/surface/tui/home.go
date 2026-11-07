@@ -7,11 +7,11 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Start (06 §2.3, §9.1) in the terminal, kept simple: the current list (the one launched),
+// Start (16 §2.3, §9.1) in the terminal, kept simple: the current list (the one launched),
 // its game and version, how it stands, the last run, the most likely trouble, and ▶ launch game.
 // The data is the window's view.Home for the current list; the rows of the other lists,
 // packs and games, the changes line and the picture are the window's only. The editor's L
-// comes here first, and L or enter here launches (06 §2.5).
+// comes here first, and L or enter here launches (16 §2.5).
 
 type homeState struct {
 	data    *view.Home
@@ -28,7 +28,7 @@ func (m *model) openHome() tea.Cmd {
 	h.loading = true
 	seq := m.home.seq
 	return m.bg(func(a *app.App) func(m *model) tea.Cmd {
-		// the page is about the current list, whichever list the editor has open (04 §1.3)
+		// the page is about the current list, whichever list the editor has open (07 §1.3)
 		a.OpenPlan, a.PlanName = 0, ""
 		data, err := homeOf(a)
 		return func(m *model) tea.Cmd {
@@ -66,7 +66,7 @@ func homeOf(a *app.App) (*view.Home, error) {
 }
 
 // goLaunch is the editor's L (and the palette's launch game): the list in the editor becomes
-// the current one, then Start opens with ▶ launch game under the cursor (06 §2.5).
+// the current one, then Start opens with ▶ launch game under the cursor (16 §2.5).
 func (m *model) goLaunch() tea.Cmd {
 	if m.launches != "" && m.st != nil && m.st.Plan != nil {
 		if _, _, err := view.UsePlan(m.app, m.st.Plan.ID); err != nil {

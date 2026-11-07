@@ -20,7 +20,7 @@ func sharedFixture(t *testing.T) *testkit.Env {
 	return e
 }
 
-// Sessions of one process share a registry built from identical candidates (07 §8.3).
+// Sessions of one process share a registry built from identical candidates (17 §7.3).
 func TestSharedRegistryAcrossSessions(t *testing.T) {
 	e := sharedFixture(t)
 	st, err := e.App.Loadout()

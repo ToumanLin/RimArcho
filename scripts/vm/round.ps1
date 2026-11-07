@@ -1,7 +1,7 @@
 # One real game round in the Player-Test VM, with no screenshots and no clicks: launch from
 # RimArcho, main menu, a new colony, play, save, load that save, play, main menu, delete the
 # save (the guest's saves sync to the player's Steam Cloud), quit to the desktop
-# (docs/release-vm-tests.md, "launch the actual game"). Archo Drive (scripts/vm/drive) plays it
+# (UserGuide/release-vm-tests.md, "launch the actual game"). Archo Drive (scripts/vm/drive) plays it
 # inside the game; this script places it, launches, waits, collects the evidence and checks
 # the driver's steps and Archo Monitor's phases. Prints PASS / FAIL / NOTE lines; exit code =
 # number of failures. See README.md, "Game rounds".
@@ -20,6 +20,7 @@
 # 'vm.ps1 forward'. Evidence goes to D:\RimArcho-test\rounds\<run> (a few KB).
 [CmdletBinding()]
 param(
+    [string]$VMX = 'D:\VMs\Player-Test\Win11-Player-Test.vmx',   # which test VM (Player-Test, Eval-2, Eval-3)
     [ValidateSet('cli', 'gui')][string]$Launch = 'cli',
     [int]$Play = 120,                 # seconds of play before the save; half that after the load
     [string]$Difficulty = 'Peaceful',
@@ -31,11 +32,13 @@ param(
     [switch]$NoBuild,
     [switch]$NoShot,                  # no guest screenshot when the round fails
     [switch]$KeepMonitor,             # run the installed Archo Monitor; no `archo monitor install` first
+    [string[]]$ExtraMonitor = @(),    # more Monitor folders for the driver, e.g. a subscribed Workshop copy
     [switch]$Cleanup
 )
 $ErrorActionPreference = 'Stop'
 if ($PSVersionTable.PSVersion.Major -lt 7) { throw 'Run this with PowerShell 7 (pwsh)' }
-$vm = Join-Path $PSScriptRoot 'vm.ps1'
+$vmScript = Join-Path $PSScriptRoot 'vm.ps1'
+$vm = { & $vmScript @args -VMX $VMX }
 $work = 'C:\Users\Public\Documents\VM-Test'
 $archo = "$work\RimArcho\archo.exe"
 $transfer = 'D:\RimArcho-test\transfer\round'
@@ -51,10 +54,11 @@ function Say([string]$line) {
 function Guest([string]$name, [string]$body, [switch]$Interactive) {
     $file = Join-Path $transfer "$runName-$name.ps1"
     Set-Content -Encoding UTF8 -LiteralPath $file -Value ($guestLib + "`r`n" + $body)
-    @(& $vm exec $file -Interactive:$Interactive 2>$null) | ForEach-Object { $_.TrimStart([char]0xFEFF) }
+    $out = if ($Interactive) { & $vmScript exec $file -Interactive -VMX $VMX 2>$null } else { & $vmScript exec $file -VMX $VMX 2>$null }
+    @($out) | ForEach-Object { $_.TrimStart([char]0xFEFF) }
 }
 function Fill([string]$s) {
-    $s.Replace('__RUN__', $guestRun).Replace('__WORK__', $work).Replace('__NAME__', $runName).Replace('__ARCHO__', $archo)
+    $s.Replace('__EXTRA__', ($ExtraMonitor -join '|')).Replace('__RUN__', $guestRun).Replace('__WORK__', $work).Replace('__NAME__', $runName).Replace('__ARCHO__', $archo)
 }
 
 # Shared by the guest scripts (Windows PowerShell 5.1 as Player).
@@ -62,7 +66,7 @@ $guestLib = Fill @'
 $ErrorActionPreference = 'Continue'
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 $archo = '__ARCHO__'
-# The installed Archo Monitor folders (08 §9). Only the directory `archo monitor` names:
+# The installed Archo Monitor folders (19 §6). Only the directory `archo monitor` names:
 # never a guessed default, since the driver must not land in some other install.
 function MonitorDir {
   $m = & $archo monitor 2>&1 | Out-String
@@ -73,7 +77,7 @@ function MonitorDir {
 function MonitorFolders {
   $dir = MonitorDir
   if (-not $dir) { return @() }
-  @(Get-ChildItem -LiteralPath $dir -Directory -Filter 'ArchoMonitor-*' -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch '\.archo-' })
+  @(Get-ChildItem -LiteralPath $dir -Directory -Filter 'ArchoMonitor-*' -ErrorAction SilentlyContinue | Where-Object { $_.Name -notmatch '\.archo-' }) + @('__EXTRA__'.Split('|') | Where-Object { $_ } | ForEach-Object { Get-Item -LiteralPath $_ })
 }
 function DriverFiles {
   foreach ($f in MonitorFolders) {
@@ -112,7 +116,7 @@ if ($left) { "FAIL cleanup: could not remove $($left -join ', ') (is the game st
 }
 
 # The VM and its Tools.
-$tools = try { (& 'D:\VMs\Setup\Invoke-VMRun.ps1' -VMX 'D:\VMs\Player-Test\Win11-Player-Test.vmx' -Command checkToolsState) 2>$null | Select-Object -Last 1 } catch { 'error' }
+$tools = try { (& 'D:\VMs\Setup\Invoke-VMRun.ps1' -VMX $VMX -Command checkToolsState) 2>$null | Select-Object -Last 1 } catch { 'error' }
 if ($tools -ne 'running') { Say "FAIL vm: tools running (tools: $tools)"; exit $script:fails }
 
 # The driver, for both engines.
@@ -171,7 +175,7 @@ Expand-Archive -Force "$run\drive.zip" "$run\drive"
 if (Games) { 'FAIL start: a game is already running in the guest'; return }
 $stale = @(RemoveDriver)
 if ('__KEEPMON__' -ne '1') {
-  # What the RimArcho window does when it opens (08 §9): install or update the bundled
+  # What the RimArcho window does when it opens (19 §6): install or update the bundled
   # Monitor, so the round runs the Monitor this build ships. The driver goes in after this,
   # because a development Monitor folder whose files differ is replaced.
   $inst = @((& $archo monitor install 2>&1 | Out-String).Trim() -split "`r?`n" | Where-Object { $_ -match '^\s*(monitor|bundled):' } | ForEach-Object { ($_.Trim() -replace '^monitor:\s*', '') })
@@ -296,7 +300,7 @@ $player = if ($start -and $start.playerLog) { $start.playerLog } else { '' }
 if (-not $player -and $mon) { try { $player = ($mon[0] | ConvertFrom-Json).context.playerLog } catch { } }
 if (-not $player) { $player = Join-Path $data 'Player.log' }
 @((ReadShared $player) -split "`r?`n" | Where-Object { $_.Contains('[Archo Monitor]') }) | Set-Content -Encoding UTF8 "$run\player-phases.txt"
-# What RimArcho makes of the run: the checks in docs/release-vm-tests.md read these.
+# What RimArcho makes of the run: the checks in UserGuide/release-vm-tests.md read these.
 & $archo problems 2>&1 | Out-File -Encoding UTF8 "$run\problems.txt"
 & $archo log 2>&1 | Out-File -Encoding UTF8 "$run\log.txt"
 Remove-Item -Recurse -Force "$run\drive", "$run\drive.zip" -ErrorAction SilentlyContinue

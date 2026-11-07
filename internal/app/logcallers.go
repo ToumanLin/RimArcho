@@ -5,6 +5,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -151,7 +152,11 @@ func (cx *attrCtx) callerRules(lc *LogCluster) {
 			lc.next(fmt.Sprintf("archo source %s --type %s", cx.st.Ix.Ref(id), outerType(t)))
 		}
 		if len(ids) == 0 {
-			lc.Details = append(lc.Details, fmt.Sprintf("failing type %s: no enabled mod's analysed assemblies define it (search_files / find_mods for its namespace)", t))
+			if na := cx.notAnalysed(); na != "" {
+				lc.Details = append(lc.Details, fmt.Sprintf("failing type %s: owner unknown, %s", t, na))
+			} else {
+				lc.Details = append(lc.Details, fmt.Sprintf("failing type %s: no enabled mod's analysed assemblies define it (search_files / find_mods for its namespace)", t))
+			}
 		}
 	}
 	// Mod frames outside a dispatch frame are callers.
@@ -318,7 +323,7 @@ func (cx *attrCtx) assemblyRules(lc *LogCluster) (skipProviders bool) {
 
 // nearMessages are up to 4 log messages before and 3 after e (other entries, clipped).
 func nearMessages(lf *logs.File, e *logs.Entry) []string {
-	// An entry only the companion log has (03 §6.7.4) has no place in Player.log: nothing is
+	// An entry only the companion log has (06 §7) has no place in Player.log: nothing is
 	// near it, and such entries are near nothing.
 	if lf == nil || e == nil || e.Line <= 0 {
 		return nil
@@ -342,13 +347,35 @@ func nearMessages(lf *logs.File, e *logs.Entry) []string {
 		if len(m) > 200 {
 			m = m[:197] + "..."
 		}
+		if n := logs.KnownNoise(x.Message); n != nil {
+			m += "  (known noise: " + n.Label + ")"
+		}
 		out = append(out, fmt.Sprintf("%s:%d %s", mark, x.Line, m))
 	}
-	for i := max(0, idx-4); i < idx; i++ {
+	// A transpiler's IL listing says nothing about the error (MCP review P13): skip it and
+	// look further, within the same 30 lines.
+	var before []int
+	for i := idx - 1; i >= 0 && len(before) < 4; i-- {
+		x := lf.Entries[i]
+		if x.Line > 0 && x.Line < e.Line-30 {
+			break
+		}
+		if !logs.ILDump(x.Message) {
+			before = append(before, i)
+		}
+	}
+	for _, i := range slices.Backward(before) {
 		add(lf.Entries[i], "before")
 	}
-	for i := idx + 1; i < len(lf.Entries) && i <= idx+3; i++ {
-		add(lf.Entries[i], "after")
+	for i, n := idx+1, 0; i < len(lf.Entries) && n < 3; i++ {
+		x := lf.Entries[i]
+		if x.Line > e.Line+30 {
+			break
+		}
+		if !logs.ILDump(x.Message) {
+			add(lf.Entries[i], "after")
+			n++
+		}
 	}
 	return out
 }

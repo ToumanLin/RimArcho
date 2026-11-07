@@ -1,4 +1,4 @@
-// RimArcho's feedback relay (06 §2.14 Feedback; deploying it: README.md). A Cloudflare Worker
+// RimArcho's feedback relay (16 §2.14 Feedback; deploying it: README.md). A Cloudflare Worker
 // that files a report sent from RimArcho's Settings > Feedback as an issue in the public
 // repository, so a player without a GitHub account can report. The GitHub App's key lives
 // only here, as a Worker secret; RimArcho carries nothing but this Worker's address.

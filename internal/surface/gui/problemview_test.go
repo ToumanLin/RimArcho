@@ -11,6 +11,7 @@ import (
 )
 
 func TestFocusedProblemAPIAndEnable(t *testing.T) {
+	t.Parallel()
 	e, s, _ := fixture(t)
 	e.WriteFile(filepath.Join(e.Workshop, "1001", "Defs", "Missing.xml"), `<Defs><HediffDef ParentName="BaseIllness"><defName>Illness</defName></HediffDef></Defs>`)
 	e.MustRun("scan")
@@ -80,6 +81,7 @@ func TestFocusedProblemAPIAndEnable(t *testing.T) {
 }
 
 func TestProblemProviderCancellation(t *testing.T) {
+	t.Parallel()
 	_, s, _ := fixture(t)
 	old := s.BeginProblemProviders()
 	current := s.BeginProblemProviders()

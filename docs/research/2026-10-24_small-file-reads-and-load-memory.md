@@ -40,7 +40,7 @@ Windows 11, Ryzen 9 7950X (32 threads), D: Nextorage NVMe SSD, Go 1.27.2, Defend
 | `dirSize`: largest Mod (5.1 GB) | 4.6 ms | 2.6 ms |
 | Scan `ComputeSkip`, 16 workers, full hash | 1,118 | 1,019 |
 | Scan `ComputeSkip`, 16 workers, unchanged | 768 | 686; allocations 586 → 246 MB |
-| Texture-page summary concurrency | 4 | `min(8, Workers)` (07 §6.2 measured 4 → 8:584 → 352 ms) |
+| Texture-page summary concurrency | 4 | `min(8, Workers)` (18 §2 measured 4 → 8:584 → 352 ms) |
 | Scan concurrency per source | `NumCPU` (32) | `fsscan.Workers` (SSD 16, HDD 2) |
 
 ## 4. List load cost

@@ -7,7 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// 06 §3.5: one key table for the editor and Mod library; ? lists the page's keys; shift+1…7
+// 16 §3.5: one key table for the editor and Mod library; ? lists the page's keys; shift+1…7
 // (the characters of the US layout) go to pages; tab / shift+tab go to the next page under
 // the same sidebar entry.
 func TestKeyTable(t *testing.T) {

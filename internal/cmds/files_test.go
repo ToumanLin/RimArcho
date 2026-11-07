@@ -36,6 +36,7 @@ func searchFixture(t *testing.T) *testkit.Env {
 }
 
 func TestFilesSearchFlags(t *testing.T) {
+	t.Parallel()
 	e := searchFixture(t)
 	out := e.MustRun("files", "search", "Target")
 	for _, text := range []string{"active list, 1.6, defs,patches,about", "official Core", "load: 1.6, /", "1.6/Defs/A.xml", "(+2 more in this file)", "in ThingDef/Holder"} {
@@ -84,6 +85,7 @@ func TestFilesSearchFlags(t *testing.T) {
 }
 
 func TestFilesSearchCopySelection(t *testing.T) {
+	t.Parallel()
 	e := searchFixture(t)
 	st, err := e.App.Loadout()
 	if err != nil {
@@ -117,6 +119,7 @@ func TestFilesSearchCopySelection(t *testing.T) {
 }
 
 func TestFilesSearchPagingModesAndSummary(t *testing.T) {
+	t.Parallel()
 	e := searchFixture(t)
 	out := e.MustRun("files", "search", "Target", "--def", "--limit", "1", "--per-file", "1")
 	for _, text := range []string{"summary:", "defined:", "Core (ThingDef/Target)", "Search A (ThingDef/Target)", "(last wins)", "children:", "Search B (ThingDef/Child)", "patched by: 1 operations in 1 mods", "--def --limit 1 --per-file 1 --page 2 Target"} {
@@ -154,6 +157,7 @@ func TestFilesSearchPagingModesAndSummary(t *testing.T) {
 }
 
 func TestFilesSearchInvalidFlags(t *testing.T) {
+	t.Parallel()
 	e := searchFixture(t)
 	for _, flags := range [][]string{{"--mode", "bad"}, {"--game", "bad"}, {"--kind", "bad"}, {"--limit", "-1"}, {"--page", "0"}, {"--page", "x"}, {"--per-file", "-1"}, {"--regex"}, {"--page", "9223372036854775807", "--limit", "40"}, {"--game-version", "bad"}} {
 		out, code := e.Run(append([]string{"files", "search", "["}, flags...)...)

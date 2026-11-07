@@ -1,11 +1,12 @@
 import { choiceControl } from "./choices.js";
-// pack (06 §2.6, §2.7, 08 §5): the packs (the sidebar's pack), each pack's own page
+// pack (16 §2.6, §2.7, 10): the packs (the sidebar's pack), each pack's own page
 // (its sub-entries), and Create a pack, the plan's sub-page: on the left the name and the
 // things building does, on the right the summary and create, disabled with the reason when
 // something stops the build (G14); the builds cut short below. A pack's list alone is
 // exported from its page as a RimArcho list (E).
 // Data: API.Packs (view.PackRows, view.UnfinishedRows), API.Pack (view.BuildPackPage),
 // API.BuildPage (view.BuildPageOf), API.PackDryRun (archo pack build --dry-run).
+import { fieldError, progress } from "./feedbacksemantics.js";
 import { copyablePath, pathContent } from "./fields.js";
 import { factText, S, $, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { shimmer } from "./motion.js";
@@ -37,13 +38,14 @@ function drawPackRows() {
   packCard.innerHTML = "";
   const head = el("div", "lib-th");
   packCard.append(head);
-  packTable.draw(packCard, head);
+  packTable.draw(packCard, head, { count: L.rows.length });
   L.els = [];
   L.rows.forEach((r, i) => {
     const row = el("div", "data-row link" + (i === L.cur ? " cur" : ""));
     row.setAttribute("role", "row");
     for (const c of packTable.visible()) row.append(el("span", "cell" + (c.key === "name" ? " n" : "") + (packTable.column(c.key).num ? " num" : ""), String(r[c.key] ?? "—")));
     row.onclick = () => ui.go("pack:" + r.name);
+    packTable.row(row, i, "pack-row-" + encodeURIComponent(r.name));
     L.els.push(row); packCard.append(row);
   });
 }
@@ -52,11 +54,12 @@ function drawModRows() {
   modCard.innerHTML = "";
   const head = el("div", "lib-th");
   modCard.append(head);
-  modTable.draw(modCard, head);
-  for (const m of modTable.sorted(P.mods)) {
+  modTable.draw(modCard, head, { labelledby: "pack-mods-heading", count: P.mods.length });
+  for (const [i, m] of modTable.sorted(P.mods).entries()) {
     const row = el("div", "data-row");
     row.setAttribute("role", "row");
     for (const c of modTable.visible()) row.append(el("span", "cell" + (c.key === "name" ? " n" : "") + (modTable.column(c.key).num ? " num" : ""), String(m[c.key] || "—")));
+    modTable.row(row, i, "pack-mod-row-" + encodeURIComponent(JSON.stringify([P.name, m.key])));
     modCard.append(row);
   }
 }
@@ -131,7 +134,9 @@ export async function pack(name) {
     w.querySelector(".page-head").after(note);
   }
   const sec = el("section", "sec");
-  sec.append(el("h2", "label", T("the mods, in load order")));
+  const heading = el("h2", "label", T("the mods, in load order"));
+  heading.id = "pack-mods-heading";
+  sec.append(heading);
   const card = modCard = el("div", "card data-table pack-mods");
   card.tabIndex = 0;
   card.setAttribute("role", "table");
@@ -149,7 +154,7 @@ async function launch() {
 
 // launchPack plays a pack (here and on Start): when Mods/ holds another version of one of its
 // mods that can move into the lock library, one confirmation lists the moves, then it goes
-// on (08 §5.3).
+// on (10 §3).
 export async function launchPack(name) {
   let o;
   try { o = await api.PackLaunch(name, false); } catch (e) { return say("fail", errText(e)); }
@@ -200,18 +205,20 @@ async function removePack() {
 
 // ---- builds running or cut short ----
 
-function progressBox(p) {
+function progressBox(p, label) {
   const w = el("div", "prog");
   const bar = el("div", "bar" + (p.error ? " bad" : ""));
   const fill = el("i");
   fill.style.width = Math.round((p.frac || 0) * 100) + "%";
   bar.append(fill);
-  w.append(bar, el("div", "ptext word-facts" + (p.error ? " bad" : ""), p.error || p.text || ""));
+  const text = el("div", "ptext word-facts" + (p.error ? " bad" : ""), p.error || p.text || "");
+  w.append(bar, text);
+  progress(bar, label || text, Number.isFinite(p.frac) ? p.frac : undefined, 1);
   return w;
 }
 
 // buildCard is a build: running (here or in another window) or cut short (delete what it
-// copied — RimArcho's own unfinished copy, 08 §5.2 — or build it again).
+// copied — RimArcho's own unfinished copy, 10 §2 — or build it again).
 function buildCard(u) {
   const card = el("section", "card build" + (u.running ? "" : " unfinished"));
   card.dataset.build = u.name;
@@ -235,7 +242,7 @@ function buildCard(u) {
   card.append(head);
   if (u.running) {
     const body = el("div", "progwrap");
-    body.append(progressBox(u.progress || { frac: 0, text: "" }));
+    body.append(progressBox(u.progress || { text: "" }, left.querySelector(".name")));
     card.append(body);
   }
   return card;
@@ -258,9 +265,11 @@ function redraw() {
 
 // packEvent is a "pack" event: the progress of the build this window started, and its end
 // (a finished build opens its page).
+let buildEnded = "";
 export function packEvent(ev) {
   S.packBuild = ev.done ? null : ev;
   if (ev.done) {
+    buildEnded = ev.name;
     say(ev.ok ? "ok" : "fail", ev.ok ? ev.text : ev.error);
     ui.reload();
     if (ev.ok && S.screen === "build") return ui.go("pack:" + ev.name);
@@ -271,7 +280,7 @@ export function packEvent(ev) {
   const card = document.querySelector(`.card.build[data-build="${CSS.escape(ev.name)}"]`);
   if (!card) return list();
   const body = card.querySelector(".progwrap");
-  if (body) { body.innerHTML = ""; body.append(progressBox(ev)); }
+  if (body) { body.innerHTML = ""; body.append(progressBox(ev, card.querySelector(".name"))); }
   factText(card.querySelector(".sub"), T("creating"), ev.text);
 }
 
@@ -366,7 +375,7 @@ async function measureBuild(tex) {
   read.finish();
 }
 
-// 06 §3.1: polling never holds navigation; late replies belong to their old ticket.
+// 16 §3.1: polling never holds navigation; late replies belong to their old ticket.
 async function readBuild(tex, current) {
   const id = await api.BuildPage(tex);
   while (current()) {
@@ -378,7 +387,7 @@ async function readBuild(tex, current) {
   return null;
 }
 
-// 06 §2.6, 06 §7.1: keep the form alive and replace only facts being measured.
+// 16 §2.6, 16 §7.1: keep the form alive and replace only facts being measured.
 function syncMeasure() {
   const select = $("#pk-tex");
   if (select) select.value = String(B.tex);
@@ -389,8 +398,9 @@ function syncMeasure() {
     step.classList.remove("bad", "warn");
     const text = step.querySelector(".x");
     text.replaceChildren(B.error ? el("span", "err", B.error) : shimmer(T("checking the list…"), key === "textures" ? 3 : 1));
-    // a failed count keeps count the textures, to try again
-    step.querySelectorAll(B.loading ? "ul, button" : "ul").forEach((n) => n.remove());
+    // a failed count keeps count the textures, to try again; the step's own buttons go while
+    // counting, never the textures choice in its body (it keeps its value and focus)
+    step.querySelectorAll(B.loading ? "ul, :scope > button" : "ul").forEach((n) => n.remove());
   }
   const size = $("#pk-size");
   if (size) size.replaceChildren(B.error ? el("span", "err", B.error) : shimmer(T("checking the list…"), 1));
@@ -416,6 +426,7 @@ function drawBuild() {
   const w = page("build", "",
     button(T("cancel"), "esc", () => ui.go("plan")));
   const cols = el("div", "bd-cols");
+  const why = el("div", "bd-why");
   const left = el("div", "bd-left");
 
   // the name
@@ -442,7 +453,8 @@ function drawBuild() {
     if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); if (B.dry !== null) closeDryRun(); else name.blur(); }
   };
   nameRow.append(el("span", "k", T("name")), name);
-  bc.append(nameRow, el("div", "bd-err", ""));
+  const nameError = el("div", "bd-err", ""); fieldError(name, nameError);
+  bc.append(nameRow, nameError);
   basics.append(bc);
 
   // the four things building does; while it builds, where it is
@@ -488,7 +500,7 @@ function drawBuild() {
     // this window's build: where it is, and stop (what it copied is removed)
     const pw = el("div", "progwrap bd-prog");
     const name = S.packBuild.name;
-    pw.append(progressBox(S.packBuild), button(T("stop"), "", async () => {
+    pw.append(progressBox(S.packBuild, why), button(T("stop"), "", async () => {
       try { say("ok", await api.PackStop(name)); } catch (e) { say("fail", errText(e)); }
     }));
     sc2.append(pw);
@@ -520,7 +532,6 @@ function drawBuild() {
   go1.dataset.envWrite = "pack-build";
   go1.append(T("create pack"), keyCaps("B"));
   go1.onclick = () => go();
-  const why = el("div", "bd-why");
   const dry = button(T("see the list first, write nothing"), "V", () => dryRun());
   dry.classList.add("bd-dry");
   dry.setAttribute("aria-expanded", String(B.dry !== null));
@@ -586,11 +597,15 @@ function go() {
 }
 
 async function startBuild(name) {
-  try { say("ok", await api.PackBuild(name, B.tex || 0)); } catch (e) { return say("fail", errText(e)); }
+  buildEnded = "";
+  let text;
+  try { text = await api.PackBuild(name, B.tex || 0); } catch (e) { return say("fail", errText(e)); }
+  // a build that failed at once keeps its failure on the line; the reply came after it
+  if (buildEnded !== name) say("ok", text);
   redraw();
 }
 
-// The preview stays beneath the summary; leaving or changing inputs discards late replies (06 §2.6).
+// The preview stays beneath the summary; leaving or changing inputs discards late replies (16 §2.6).
 function syncDryRun() {
   const out = $("#pk-dry-output"), button = $(".bd-dry");
   if (!out) return;
@@ -655,8 +670,7 @@ export function hintList() {
       { key: "esc", label: T("back to the list") }, ...tail];
   }
   if (S.packFocus) {
-    return [{ key: "L", label: T("play") }, { key: "e", label: T("export") }, { key: "E", label: T("export the list") }, { key: "Del", label: T("move to the recycle bin") },
-      { key: "tab", label: T("next pack") }, ...tail];
+    return [{ key: "L", label: T("play") }, { key: "e", label: T("export") }, { key: "E", label: T("export the list") }, { key: "Del", label: T("move to the recycle bin") }, ...tail];
   }
-  return [{ key: "↑↓", label: T("move") }, { key: "enter", label: T("open") }, { key: "B", label: T("create a pack") }, { key: "tab", label: T("first pack") }, ...tail];
+  return [{ key: "↑↓", label: T("move") }, { key: "enter", label: T("open") }, { key: "B", label: T("create a pack") }, ...tail];
 }

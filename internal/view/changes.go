@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/modchanges"
 )
 
-// Changes (06 §2.9): the page is built by modchanges (shared with the CLI and MCP); the
+// Changes (16 §2.9): the page is built by modchanges (shared with the CLI and MCP); the
 // interfaces word it in their language.
 
 // ChangeText is the interfaces' wording of the page.
@@ -49,7 +49,7 @@ func ChangeNotesURL(id string) string {
 	return "https://steamcommunity.com/sharedfiles/filedetails/changelog/" + id
 }
 
-// ChangeHome is the home page's line about the current plan (06 §2.3).
+// ChangeHome is the home page's line about the current plan (16 §2.3).
 func ChangeHome(a *app.App, st *app.LoadoutState) *modchanges.Home {
 	return modchanges.BuildHome(a, st, changeText(a))
 }

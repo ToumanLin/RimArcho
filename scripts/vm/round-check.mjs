@@ -34,7 +34,7 @@ export function steps(script) {
   return out;
 }
 
-// expectedPhases: what Archo Monitor writes for the script (03 §6.6). Loading ends at the
+// expectedPhases: what Archo Monitor writes for the script (06 §6). Loading ends at the
 // main menu; a new colony is "new" then "play"; loading a save is "save" then "play"; the
 // main menu is "menu". The Monitor never repeats a phase, so neither does this.
 export function expectedPhases(script) {
@@ -112,7 +112,7 @@ export function check(dir) {
   if (quits && done) pass(!!exit && mon.indexOf(exit) === mon.length - 1, 'monitor: exit line last', exit ? 'lines after the exit line' : 'no exit line');
   if (exit) note(`monitor exit: ${exit.context?.entries} entries`);
 
-  // Player.log carries the same phase lines (03 §6.7.3).
+  // Player.log carries the same phase lines (19 §4).
   const pl = (read('player-phases.txt') || '').split(/\r?\n/).map(l => /\[Archo Monitor\] phase (\w+)/.exec(l)?.[1]).filter(Boolean);
   const plSame = pl.length === want.length && pl.every((p, i) => p === want[i].phase);
   pass(plSame, 'player.log: the same phase lines', `Player.log has ${pl.join(' > ') || '(none)'}`);

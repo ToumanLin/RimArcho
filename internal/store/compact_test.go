@@ -2,7 +2,6 @@ package store
 
 import (
 	"bytes"
-	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,87 +10,7 @@ import (
 	"time"
 )
 
-// v24DB builds a schema v24 database. noNamed drops def_fact_mm_named, as on databases that
-// took the texture branch's v15 (2026-10-22) and never ran the logs branch's v15.
-func v24DB(t *testing.T, path string, noNamed bool, rows ...string) {
-	t.Helper()
-	db, err := sql.Open("sqlite", "file:"+filepath.ToSlash(path))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-	steps := []string{schemaV1, schemaV2, schemaV3, schemaV4, schemaV5, schemaV6, schemaV7, schemaV8, schemaV9, schemaV10, schemaV11, schemaV12,
-		schemaV13, schemaV14, schemaV15, schemaV16, schemaV17, schemaV18, schemaV19, schemaV20, schemaV21, schemaV22, schemaV23, schemaV24}
-	if _, err := db.Exec(strings.Join(steps, "")); err != nil {
-		t.Fatal(err)
-	}
-	if noNamed {
-		if _, err := db.Exec(`DROP INDEX def_fact_mm_named`); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if _, err := db.Exec(`INSERT INTO meta(key, value) VALUES('schema_version', '24')`); err != nil {
-		t.Fatal(err)
-	}
-	for _, q := range rows {
-		if _, err := db.Exec(q); err != nil {
-			t.Fatalf("%s: %v", q, err)
-		}
-	}
-}
-
-func indexes(t *testing.T, s *Store) map[string]bool {
-	t.Helper()
-	rows, err := s.DB.Query(`SELECT name FROM sqlite_master WHERE type='index'`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer rows.Close()
-	out := map[string]bool{}
-	for rows.Next() {
-		var n string
-		rows.Scan(&n)
-		out[n] = true
-	}
-	return out
-}
-
-// 02 §7, 03 §3 (v25): the unused fact indexes go, def_fact_mm_named comes back where a
-// version clash left it out, and stored log reports are compressed and still readable.
-func TestMigrateV25(t *testing.T) {
-	for _, noNamed := range []bool{false, true} {
-		path := filepath.Join(t.TempDir(), "archo.db")
-		report := `{"Path":"C:\\Logs\\Player.log","Clusters":[` + strings.Repeat(`{"First":"Exception in Verse.Foo"},`, 2000) + `{}]}`
-		v24DB(t, path, noNamed, fmt.Sprintf(`INSERT INTO log_cache(path, size, mtime, version, input_key, report) VALUES('C:\Logs\Player.log', 10, 20, '1.6', 'k', CAST('%s' AS BLOB))`, report))
-		s, err := Open(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		ix := indexes(t, s)
-		for _, gone := range []string{"def_fact_name", "type_fact_name", "type_fact_instance", "harmony_fact_instance", "harmony_fact_target", "def_fact_instance", "def_fact_mm", "def_fact_mm_name", "def_fact_mm_named"} {
-			if ix[gone] {
-				t.Errorf("noNamed=%v: index %s kept", noNamed, gone)
-			}
-		}
-		for _, kept := range []string{"def_fact_named", "def_fact_lookup", "def_fact_set", "content_state_def", "content_state_dll", "type_fact_lookup", "type_fact_set", "harmony_fact_set", "harmony_id_lookup"} {
-			if !ix[kept] {
-				t.Errorf("noNamed=%v: index %s missing", noNamed, kept)
-			}
-		}
-		var raw []byte
-		s.DB.QueryRow(`SELECT report FROM log_cache`).Scan(&raw)
-		if !isGzip(raw) || len(raw) >= len(report)/5 {
-			t.Errorf("noNamed=%v: stored report not compressed: %d of %d bytes", noNamed, len(raw), len(report))
-		}
-		c, err := s.LogCache(`C:\Logs\Player.log`)
-		if err != nil || c == nil || string(c.Report) != report || c.Size != 10 || c.Version != "1.6" {
-			t.Errorf("noNamed=%v: cached report after migration: %v %+v", noNamed, err, c)
-		}
-		s.Close()
-	}
-}
-
-// 03 §6.5: reports are stored gzipped and read back unchanged; a report that cannot be
+// 06 §5: reports are stored gzipped and read back unchanged; a report that cannot be
 // decompressed counts as no cache, so the log is parsed again.
 func TestLogCacheCompressed(t *testing.T) {
 	s, err := Open(filepath.Join(t.TempDir(), "archo.db"))
@@ -151,7 +70,7 @@ func bigWrite(t *testing.T, s *Store, n int) {
 	}
 }
 
-// 02 §7: after a large write the WAL file is truncated instead of keeping its size while
+// 04 §4: after a large write the WAL file is truncated instead of keeping its size while
 // connections stay open; with another connection reading, TruncateWAL does not wait and
 // journal_size_limit cuts the file back on the next reset.
 func TestTruncateWAL(t *testing.T) {
@@ -197,9 +116,9 @@ func TestTruncateWAL(t *testing.T) {
 	}
 }
 
-// 03 §3: Def lookups by name start from the name index and then find each set's version
+// 05 §3: Def lookups by name start from the name index and then find each set's version
 // view. With a plain JOIN, the ORDER BY made SQLite walk the version's whole content_state
-// and probe the name index once per row (07 §6.2).
+// and probe the name index once per row (18 §2).
 func TestDefsNamedPlanStartsFromName(t *testing.T) {
 	s, err := Open(filepath.Join(t.TempDir(), "archo.db"))
 	if err != nil {
@@ -228,7 +147,7 @@ func TestDefsNamedPlanStartsFromName(t *testing.T) {
 	}
 }
 
-// 03 §3: every fact query still finds an index after v25 dropped the single-column ones.
+// 05 §3: every fact query still finds an index after v25 dropped the single-column ones.
 func TestFactQueriesUseIndexes(t *testing.T) {
 	s, err := Open(filepath.Join(t.TempDir(), "archo.db"))
 	if err != nil {

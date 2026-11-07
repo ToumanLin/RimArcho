@@ -121,7 +121,7 @@ func TestExportImportRoundTrip(t *testing.T) {
 // A list that names no official content (workshop links, a collection, workshop IDs)
 // keeps the Core and DLCs the current plan has enabled, when it replaces the plan and as a
 // new plan; an installed DLC the plan does not enable stays out. A list that names Core is
-// taken as it is (04 §9.1).
+// taken as it is (07 §7.1).
 func TestImportWithoutOfficialKeepsCoreAndDLC(t *testing.T) {
 	t.Parallel()
 	e := loadoutEnv(t)
@@ -148,7 +148,7 @@ func TestImportWithoutOfficialKeepsCoreAndDLC(t *testing.T) {
 	}
 }
 
-// A RimArcho list names each mod's content (04 §9.3): an import takes the installed copy
+// A RimArcho list names each mod's content (07 §7.3): an import takes the installed copy
 // with that content where the packageId alone would pick another, and says which mods it
 // only has in another version.
 func TestArchoListPrefersSameContent(t *testing.T) {

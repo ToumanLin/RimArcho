@@ -34,7 +34,7 @@ func AssemblyKey(m *Mod, folders []string, skip []string) string {
 	return fmt.Sprintf("%x|dll%x|a%d", m.SnapHash, sha256.Sum256(data), Version)
 }
 
-// harmonyLayer reads every effective DLL of the active mods (03 §5.3). It is independent
+// harmonyLayer reads every effective DLL of the active mods (05 §5.3). It is independent
 // of the Def/Patch layers: a failure only affects its own facts.
 func harmonyLayer(active []*Mod, folders map[string][]string, skip []string, workers int) []*AssemblyFacts {
 	type job struct {
@@ -181,7 +181,7 @@ func harmonyFindings(active []*Mod, asms []*AssemblyFacts) []*Finding {
 					tev = append(tev, ev(h))
 				}
 			}
-			// Info (03 §4.3.1): after the manual targets of G9, the subjects of this finding are
+			// Info (05 §4.3.1): after the manual targets of G9, the subjects of this finding are
 			// error sources 2.3x as often as chance, less than harmony.shared-target (2.6x, info),
 			// and the rewritten method is in an error's stack no more often than a shared target
 			// (0.5% / 0.6%). It is raised to warning when a current log's stack passes through it.

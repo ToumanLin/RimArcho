@@ -55,7 +55,7 @@ test("a shell read that failed never replaces the sidebar's lists", async () => 
   const S={shell:null};
   const shell=await loadModules("./shell.js", {
     "./state.js":{S,factText:()=>{},$:()=>null,el:tag=>new Element(tag),api:{},T:s=>s,Tf:s=>s},
-    "./icons.js":{icon:{}},"./screens.js":{liveCount:()=>0,seg:()=>{},setSeg:()=>{}},
+    "./icons.js":{icon:{}},"./screens.js":{liveCount:()=>0,seg:()=>{},setSeg:()=>{},syncPageAccessibility:()=>{}},
     "./motion.js":{bump:()=>{},slideNav:()=>{},places:()=>{},slideFrom:()=>{}},
     "./popups.js":{},"./separator.js":{wireSeparator:()=>{}},
   });

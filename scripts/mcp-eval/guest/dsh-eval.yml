@@ -1,0 +1,61 @@
+# dsh patch layer for the eval (group B): `dsh --profile headless --patch dsh-eval.yml --json "<task>"`.
+# Same model and reasoning effort as Pi (magpie gateway, apikeyfan/deepseek-flash, thinking high), Archo as an MCP server,
+# and no web tools (Pi has none). Environment:
+#   EVAL_GATEWAY_URL  the gateway's OpenAI endpoint (guest: http://192.168.86.1:3425/v1)
+#   MAGPIE_GATEWAY_KEY  read from the environment or $DSH_HOME/.env
+#   EVAL_ARCHO  archo.exe; EVAL_ARCHO_HOME  optional RIMARCHO_HOME for archo (host tests only; never the real one)
+# The runner also sets DSH_PERMISSION_MODE=danger-full-access (no approval prompts; Pi has none either) and
+# DSH_TELEMETRY_MODE=DISABLED.
+- id: llm-pi-ai
+  name: "@deepseek-ai/dsh-llm-pi-ai"
+  config:
+    providers:
+      magpie:
+        displayName: Magpie
+        apiKeyEnv: MAGPIE_GATEWAY_KEY
+        api: openai-completions
+        baseURL: !!js process.env.EVAL_GATEWAY_URL
+        models:
+          - id: apikeyfan/deepseek-flash
+            name: DeepSeek V4.1 Flash · APIKEY.FAN
+            contextWindow: 1000000
+            maxTokens: 384000
+            input: [text, image]
+            reasoningEfforts:
+              low: low
+              high: high
+              max: max
+- id: agent-default-model
+  name: "@deepseek-ai/dsh-agent-default-model"
+  config:
+    provider: magpie
+    model: apikeyfan/deepseek-flash
+    reasoningEffort: high
+# Pi has no web search or fetch
+- id: tool-web
+  disabled: true
+- id: web
+  disabled: true
+- id: web-search-deepseek
+  disabled: true
+- id: web-deepseek-api
+  disabled: true
+- id: web-fetch-http
+  disabled: true
+# the session title is an extra model call outside the agent's own usage
+- id: session-title
+  disabled: true
+- id: session-title-llm
+  disabled: true
+# test_run starts the game and takes 1 to 3 minutes: the 60 s default would cut it off
+- insert:
+    - id: mcp-archo
+      name: "@deepseek-ai/dsh-mcp-client"
+      config:
+        serverName: archo
+        transport: stdio
+        command: !!js process.env.EVAL_ARCHO
+        args: [mcp]
+        env: !!js "process.env.EVAL_ARCHO_HOME ? { RIMARCHO_HOME: process.env.EVAL_ARCHO_HOME } : {}"
+        toolCallTimeoutMs: 900000
+        failOnStartupError: true

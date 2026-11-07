@@ -8,10 +8,10 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Every row icon comes with what it is (06 §4.2): the badge's popover lists the items
+// Every row icon comes with what it is (16 §4.2): the badge's popover lists the items
 // behind it, worst first, and the first one has the icon's status.
 func TestRowIconsHaveReasons(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("2009463077", testkit.Mod{PackageID: "brrainz.harmony", Name: "Harmony"})
 	dir := e.AddWorkshop("1002", testkit.Sample("tester.h", "Hidden One"))

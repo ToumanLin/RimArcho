@@ -1,14 +1,12 @@
 package app_test
 
 import (
-	"fmt"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
-	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
@@ -38,19 +36,9 @@ func versionProblemCounts(t *testing.T, e *testkit.Env) (active, muted int) {
 	return active, len(ps.Muted)
 }
 
-func TestVersionMuteMigrationAndStorage(t *testing.T) {
+func TestVersionMuteStorage(t *testing.T) {
+	t.Parallel()
 	e := versionMuteEnv(t)
-	e.DowngradeFacts()
-	if _, err := e.App.Store.DB.Exec(`ALTER TABLE snapshot DROP COLUMN kinds; ALTER TABLE snapshot DROP COLUMN langs; DROP TABLE version_mute; UPDATE meta SET value='22' WHERE key='schema_version'`); err != nil {
-		t.Fatal(err)
-	}
-	if err := e.App.Store.SetMeta("keeper", "preserved"); err != nil {
-		t.Fatal(err)
-	}
-	e.Open()
-	if e.App.Store.Meta("schema_version") != fmt.Sprint(store.SchemaVersion) || e.App.Store.Meta("keeper") != "preserved" {
-		t.Fatal("migration lost state")
-	}
 	if err := e.App.Store.SetVersionMutes([]string{" TESTER.A_Steam ", "tester.a"}, "1.7", true); err != nil {
 		t.Fatal(err)
 	}
@@ -71,6 +59,7 @@ func TestVersionMuteMigrationAndStorage(t *testing.T) {
 }
 
 func TestVersionMuteAcrossPlansGamesUpdatesAndCopies(t *testing.T) {
+	t.Parallel()
 	e := versionMuteEnv(t)
 	e.MustRun("problems", "mute-version", "pkg:tester.a")
 	e.MustRun("plan", "new", "other", "--from", "current")
@@ -126,6 +115,7 @@ func TestVersionMuteAcrossPlansGamesUpdatesAndCopies(t *testing.T) {
 }
 
 func TestVersionMuteCountsAndAtomicValidation(t *testing.T) {
+	t.Parallel()
 	e := versionMuteEnv(t)
 	st, err := e.App.Loadout()
 	if err != nil {

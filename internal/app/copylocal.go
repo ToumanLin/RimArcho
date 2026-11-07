@@ -15,7 +15,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// CopyResult describes a finished copy-local (04 §7.2).
+// CopyResult describes a finished copy-local (07 §5.2).
 type CopyResult struct {
 	Dir      string // the new folder under the local source
 	Files    int
@@ -28,7 +28,7 @@ type CopyResult struct {
 	onFile func(bytes int64) error
 	// dry: count what would be copied, write nothing.
 	dry bool
-	// keepAll: copy .git and .rimarcho too (moving a locked copy, 04 §7).
+	// keepAll: copy .git and .rimarcho too (moving a locked copy, 07 §5).
 	keepAll bool
 	// generated: files RimArcho wrote into the mod (lower-cased paths relative to it; the
 	// DDS of Texture optimisation), not part of the mod, so a copy leaves them out.
@@ -59,7 +59,7 @@ func (ix *Index) LocalSource() *source.Source {
 }
 
 // copyLocal copies an instance into the folder root (the lock library) with an origin
-// marker (04 §7.2). It never overwrites an existing folder (a taken name gets a numeric
+// marker (07 §5.2). It never overwrites an existing folder (a taken name gets a numeric
 // suffix), never copies .git and never follows links that leave the mod folder. The copy
 // is assembled next to its final place and renamed, so a failure leaves nothing behind.
 // dry checks the name and counts the files without writing.

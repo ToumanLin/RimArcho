@@ -2,7 +2,7 @@ package mcp
 
 import "strings"
 
-// The 0.9 tools for plans (05 §1.2): starting the game with the current plan, managing the
+// The 0.9 tools for plans (13 §1.2): starting the game with the current plan, managing the
 // environment's plans, and reading a plan's history. Each one still maps to exactly one CLI
 // argv. Going back to a version is edit_loadout action=checkout (an undoable edit).
 
@@ -11,7 +11,7 @@ func planTools() []tool {
 		reg("launch_game", false, true, descLaunch, func(in LaunchIn) []string {
 			return argv("launch").flag("dry-run", in.DryRun).flag("move-duplicates", in.MoveDuplicates).a
 		}),
-		// Removing a plan deletes its history and cannot be undone (04 §1.3), so the whole
+		// Removing a plan deletes its history and cannot be undone (07 §1.3), so the whole
 		// tool is marked destructive, like resolve_identity.
 		reg("manage_plans", false, true, descPlans, func(in PlansIn) []string { return PlansArgv(in) }),
 		reg("plan_history", true, false, descHistory, func(in HistoryIn) []string { return HistoryArgv(in) }),
@@ -78,9 +78,9 @@ type PlansIn struct {
 	Name    string `json:"name,omitempty" jsonschema:"the plan (new, use, rename, remove); import: the new plan's name (default: the list's own name or the file name)"`
 	NewName string `json:"new_name,omitempty" jsonschema:"rename: the new name"`
 	From    string `json:"from,omitempty" jsonschema:"new: current, v<n> (a version of the current plan) or a list file (default: an empty list); import: the list file or RimCrow share code"`
-	// Versions sets a plan's game versions (04 §1.6).
+	// Versions sets a plan's game versions (07 §1.6).
 	Versions string `json:"versions,omitempty" jsonschema:"versions: the game versions to set, e.g. 1.5-1.7 or 1.6 1.7, or default (needs name; leave empty to show them)"`
-	// Following a Steam Workshop collection (04 §9.6).
+	// Following a Steam Workshop collection (07 §7.6).
 	Collection string `json:"collection,omitempty" jsonschema:"follow, unfollow, sync: the Steam Workshop collection link or ID (sync: optional when the plan follows one)"`
 	Mode       string `json:"mode,omitempty" jsonschema:"follow: add (default: catching up enables the new mods) or follow (also disables the mods the collection dropped)"`
 	Check      bool   `json:"check,omitempty" jsonschema:"sync: only read the collections and list what changed"`

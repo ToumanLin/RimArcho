@@ -26,7 +26,7 @@
     </header>
     <div id="body">
       <div id="planhead" class="page-head" hidden><p class="lead"></p><div class="page-acts"></div></div>
-      <main id="board">
+      <main id="board" tabindex="-1">
         <div class="fcol stack editor-left" data-col="detail">
           <div class="barhost"></div>
           <section class="area detail" data-area="3"><div class="head"></div><div class="scroll" tabindex="-1"><div id="detail"></div></div></section>
@@ -38,12 +38,14 @@
         <div class="split" data-split="1"></div>
         <div class="stack editor-right">
           <section class="area list" data-area="0"><div class="head"></div><div class="rows" tabindex="-1"></div></section>
-          <section class="area list fold" data-area="2"><div class="head"></div><div class="search"><input spellcheck="false"></div><div class="rows" tabindex="-1"></div></section>
+          <section class="area list fold" data-area="2"><div class="head" role="button" tabindex="-1"></div><div class="search"><input spellcheck="false"></div><div class="rows" tabindex="-1"></div></section>
         </div>
       </main>
-      <div id="screen" aria-busy="true"></div>
+      <div id="screen" aria-busy="true" tabindex="-1"></div>
+      <div id="boot" aria-hidden="true"><div class="archo-slot"></div><p class="boot-tip"></p></div>
+      <script src="/js/boot.js"></script>
     </div>
-    <footer id="bottom"><span id="where" class="where"></span><span id="status"></span><span class="grow"></span><span id="hints"></span></footer>
+    <footer id="bottom"><span id="where" class="where"></span><span id="status" role="status" aria-live="polite" aria-atomic="true"></span><span class="grow"></span><span id="hints"></span></footer>
   </div>
   <div id="popup" hidden></div>
   <div id="menu" hidden></div>

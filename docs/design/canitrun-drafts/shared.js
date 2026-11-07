@@ -168,13 +168,13 @@ document.addEventListener("click", (e) => {
 }, true);
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeMenu(); });
 
-// linkRows: the grouped broken links (06 §2.4), one game per group.
+// linkRows: the grouped broken links (16 §2.4), one game per group.
 function linkRows(groups) {
   return `<div class="links">${groups.map(([g, path, rows]) => `<div><div class="game"><b>${esc(g)}</b>${esc(path)}</div>
     ${rows.map(([f, to, why]) => `<div class="link-row"><span>${esc(f)}</span><span class="muted">→</span><span class="p" title="${esc(to)}">${esc(to)}</span><span class="muted">${esc(why)}</span><span class="tag ${why.includes("unconfirmed") ? "keep" : ""}">${why.includes("unconfirmed") ? "keep" : "will delete"}</span></div>`).join("")}</div>`).join("")}</div>`;
 }
 
-// needHTML: one item as the page draws it today (06 §2.4): icon, bold title, a plain why,
+// needHTML: one item as the page draws it today (16 §2.4): icon, bold title, a plain why,
 // the evidence line under the cursor, one main button on the right and the rest in ⋯.
 // opts.links: the link groups to show; opts.open: expanded merged items.
 function needHTML(it, i, opts = {}) {

@@ -3,7 +3,6 @@ package app_test
 import (
 	"errors"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -167,26 +166,6 @@ func TestV7ConflictOnEditedWriter(t *testing.T) {
 	if !strings.Contains(e.ReadModsConfig(), "tester.b") {
 		t.Fatal("save after ignore did not write")
 	}
-}
-
-// Loading the unloaded external version (checkout) clears the mark and unblocks saving.
-func TestIgnoreExternalCheckoutClears(t *testing.T) {
-	t.Parallel()
-	e := loadoutEnv(t)
-	scanNow(t, e)
-	e.MustRun("save")
-	e.MustRun("enable", refOf(t, e, "B", ""))
-	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "brrainz.harmony")
-	st, err := e.App.Loadout()
-	if err != nil || st.WS.Conflict == 0 {
-		t.Fatalf("no conflict: %v", err)
-	}
-	n := st.WS.Conflict
-	e.MustRun("loadout", "checkout", "v"+strconv.Itoa(n))
-	if st, _ := e.App.Loadout(); st.WS.Conflict != 0 || joined(active(t, e)) != "Core, Harmony" {
-		t.Fatal("checkout did not load and clear")
-	}
-	e.MustRun("save")
 }
 
 // V8: two environments share a user data folder. The second game takes the list that

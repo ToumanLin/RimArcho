@@ -7,13 +7,13 @@ import (
 	"strings"
 )
 
-// The filter bar of the plan editor (06 §2.5, §3.7): one search box and one set of filters
+// The filter bar of the plan editor (16 §2.5, §3.7): one search box and one set of filters
 // for Not enabled and Enabled together. The bar's groups and values are the same JSON as Mod library's
 // (LibGroup, LibChoice, LibCond), so both pages draw them with one component.
 //
 // A filter is "group:value" ("-group:value" leaves out). Within a group the values are
-// "or", between groups "and", as in Mod library (06 §2.9). The search box is the column search
-// of §3.7 and may hold tag: type: has: version: words of its own.
+// "or", between groups "and", as in Mod library (16 §2.9). The search box is the column search
+// of 16 §3.7 and may hold tag: type: has: version: words of its own.
 
 // BarKeys are the editor bar's groups in the order shown.
 var BarKeys = []string{"lists", "tag", "source", "location", "version", "content", "has"}
@@ -285,7 +285,7 @@ func barValueText(k, v string) string {
 	return v
 }
 
-// ---- moves while the bar filters (06 §3.5) ----
+// ---- moves while the bar filters (16 §3.5) ----
 
 // StepAt is where J / K put the mods while the list shows only some rows: past the next
 // shown row (d rows for alt+J / alt+K), so the moving rows trade places with the rows the

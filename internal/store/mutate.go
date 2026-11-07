@@ -20,7 +20,7 @@ func (s *Store) inTx(fn func(tx *sql.Tx) error) error {
 	return tx.Commit()
 }
 
-// ResolveSame merges the question's new Instance into the candidate (02 §5.4 "same"): the
+// ResolveSame merges the question's new Instance into the candidate (04 §2.4 "same"): the
 // candidate takes over the location, snapshots and events, and comes back to life.
 func (s *Store) ResolveSame(q *Question, now time.Time) error {
 	return s.inTx(func(tx *sql.Tx) error {
@@ -182,7 +182,7 @@ type GCResult struct {
 	Files     int64
 }
 
-// GC removes tombstones that died before cutoff (02 §5.5) unless an open question refers to
+// GC removes tombstones that died before cutoff (04 §2.5) unless an open question refers to
 // them, and drops superseded snapshots no event refers to. dryRun only counts.
 func (s *Store) GC(envID string, cutoff time.Time, dryRun bool) (*GCResult, error) {
 	r := &GCResult{}

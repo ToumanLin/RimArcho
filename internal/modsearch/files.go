@@ -203,7 +203,7 @@ func acceptFile(kind Kind, path string) bool {
 	}
 }
 
-// AllVersions includes entries from every tag, independent of their conditions (03 §1).
+// AllVersions includes entries from every tag, independent of their conditions (05 §1).
 func everyLoadFolder(s string) []string {
 	dec := xml.NewDecoder(bytes.NewReader(textenc.UTF8([]byte(s))))
 	dec.Strict = false

@@ -4,12 +4,10 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
 func TestStartupDirectoryPromptCanSkipAndRelocate(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e, _ := fixture(t)
 	moved := filepath.Join(e.Root, "relocated-workshop")
 	if err := os.Rename(e.Workshop, moved); err != nil {

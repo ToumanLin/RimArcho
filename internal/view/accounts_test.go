@@ -66,8 +66,8 @@ func TestCompactAccountRows(t *testing.T) {
 }
 
 func TestAccountSubscriptionsAndTaskResultsEnglishHaveNoCJK(t *testing.T) {
+	t.Parallel()
 	e, _, _ := shellEnv(t)
-	view.SetLang("en")
 	e.App.SteamCMDNoPath = true
 	e.WriteFile(filepath.Join(e.App.LocalDir(), "steamcmd", "steamcmd.exe"), "offline")
 	st, err := e.App.Loadout()

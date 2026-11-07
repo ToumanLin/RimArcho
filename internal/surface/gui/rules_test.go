@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The editor's Load-order rules (06 §2.5): list, add, change (r:<n> stays), remove and restore.
+// The editor's Load-order rules (16 §2.5): list, add, change (r:<n> stays), remove and restore.
 func TestRulesFold(t *testing.T) {
 	view.SetLang("en")
 	e, s, _ := fixture(t)
@@ -110,8 +110,7 @@ func TestRulesIgnoreRow(t *testing.T) {
 }
 
 // The second mod's candidates: by name, one per mod, never the rule's own mod.
-func TestRuleCandidates(t *testing.T) {
-	_, s, _ := fixture(t)
+func ruleCandidates(t *testing.T, _ *testkit.Env, s *API) {
 	c, err := s.RuleCandidates("a", "pkg:tester.a")
 	if err != nil {
 		t.Fatal(err)
@@ -131,6 +130,7 @@ func TestRuleCandidates(t *testing.T) {
 
 // archo rule edit keeps r:<n>.
 func TestRuleEditCommand(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("2009463077", testkit.Mod{PackageID: "brrainz.harmony", Name: "Harmony"})
 	e.AddWorkshop("1001", testkit.Sample("tester.a", "Alpha"))
@@ -149,7 +149,7 @@ func TestRuleEditCommand(t *testing.T) {
 	}
 }
 
-// Search files (06 §2.9): results by mod and file, pages, and a superseded search is dropped.
+// Search files (16 §2.9): results by mod and file, pages, and a superseded search is dropped.
 func TestFileSearchAPI(t *testing.T) {
 	view.SetLang("en")
 	_, s, _ := fixture(t)

@@ -1,4 +1,4 @@
-// Package content resolves a mod's effective content (03 §1): the load folders the game
+// Package content resolves a mod's effective content (05 §1): the load folders the game
 // uses for the environment's version and the current Loadout, and the XML assets in them.
 // Semantics follow ModContentPack.InitLoadFolders and DirectXmlLoader.XmlAssetsInModFolder
 // (the M0 xpathcompat spike).
@@ -28,7 +28,7 @@ type Active func(pkg string) bool
 type Resolved struct {
 	Folders []string // absolute, highest priority first
 	// Conds is the outcome of every conditional LoadFolders entry, e.g.
-	// "IfModActive=a.b:1;IfModNotActive=c.d:0". It is part of the cache key (03 §1).
+	// "IfModActive=a.b:1;IfModNotActive=c.d:0". It is part of the cache key (05 §1).
 	Conds string
 	// Tag is the LoadFolders version tag used ("" without LoadFolders.xml).
 	Tag string
@@ -65,7 +65,7 @@ func Resolve(root, loadFoldersXML, mm string, active Active) Resolved {
 	return ResolveFS(root, loadFoldersXML, mm, active, os.ReadDir)
 }
 
-// ResolveFS is Resolve with directory access supplied by the caller (03 §1).
+// ResolveFS is Resolve with directory access supplied by the caller (05 §1).
 func ResolveFS(root, loadFoldersXML, mm string, active Active, readDir func(string) ([]fs.DirEntry, error)) Resolved {
 	if active == nil {
 		active = func(string) bool { return false }
@@ -132,7 +132,7 @@ func ResolveFS(root, loadFoldersXML, mm string, active Active, readDir func(stri
 }
 
 // pickTag: the exact version, else the highest tag not above it, else "default", else the
-// lowest (03 §1).
+// lowest (05 §1).
 func pickTag(lf map[string][]lfEntry, mm string) string {
 	if _, ok := lf[mm]; ok {
 		return mm

@@ -1,4 +1,4 @@
-// The row's status badge says what it is (06 §4.2): hovering it shows the items behind the
+// The row's status badge says what it is (16 §4.2): hovering it shows the items behind the
 // icon (S.board.reasons, worst first); a click pins the popover so its text can be read and
 // selected; a second click on the badge, esc, a click elsewhere or scrolling the list closes
 // it. The same information is in the details (enter), so the keyboard reaches it there.

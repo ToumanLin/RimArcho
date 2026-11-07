@@ -15,7 +15,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Mod library > All (06 §2.9) for both interfaces: the filter groups, one row per Lineage with
+// Mod library > All (16 §2.9) for both interfaces: the filter groups, one row per Lineage with
 // its Instances, the right column's size · state · used-in, and each Instance's actions as
 // data. The filtering itself is app.Library's, shared with `archo library`.
 
@@ -30,14 +30,14 @@ type LibPage struct {
 	Conds  []LibCond   `json:"conds"` // what is in force, in the order given
 	Sort   string      `json:"sort"`
 	Sorts  []LibChoice `json:"sorts"`
-	// Columns are the table's columns in their default order (06 §2.9); the window keeps
+	// Columns are the table's columns in their default order (16 §2.9); the window keeps
 	// the player's order, widths and hidden ones (ui.gui.library.columns).
 	Columns []LibColumn `json:"columns"`
 	Search  string      `json:"search"`
 	// Ops is the op table (labels, keys, menu groups) the rows' codes refer to.
 	Ops []Op `json:"opTable"`
 	// Complete is the grey text after the search box's last word that tab (or →) takes
-	// (06 §3.7): a key ("so" → "urce:") or a value ("state:un" → "used").
+	// (16 §3.7): a key ("so" → "urce:") or a value ("state:un" → "used").
 	Complete string `json:"complete,omitempty"`
 }
 
@@ -64,7 +64,7 @@ type LibCond struct {
 	Exclude bool   `json:"exclude,omitempty"`
 }
 
-// LibCells are a row's table cells (06 §2.9): name size state library source used in, and from the
+// LibCells are a row's table cells (16 §2.9): name size state library source used in, and from the
 // header's menu update date supported versions author a tag last played. State is only one worth acting on.
 type LibCells struct {
 	Name    string `json:"name"`
@@ -121,7 +121,7 @@ type LibInstRow struct {
 	Auto   string `json:"auto,omitempty"`
 	InPlan bool   `json:"inPlan,omitempty"`
 	// Path and URL stay on the Go side (the TUI, the field list); the page asks for a
-	// copy's fields when it shows it and opens folders and pages by instance (06 §2.9).
+	// copy's fields when it shows it and opens folders and pages by instance (16 §2.9).
 	Path string `json:"-"`
 	URL  string `json:"-"`
 	// Page is the Workshop page of a subscribed item RimArcho never saw (no instance to
@@ -166,7 +166,7 @@ const (
 
 func libActionLabel(k string) string { return opLabel(k) }
 
-// rowState is the state a row shows: the most important one (06 §2.9).
+// rowState is the state a row shows: the most important one (16 §2.9).
 func rowState(states []string) string {
 	if len(states) == 0 {
 		return ""
@@ -253,7 +253,7 @@ func libValueText(key, v, mm string) string {
 	return v
 }
 
-// LibSetNote sets a copy's own note from the page (06 §2.9); "" clears it.
+// LibSetNote sets a copy's own note from the page (16 §2.9); "" clears it.
 func LibSetNote(a *app.App, ref, text string) (string, error) {
 	m, err := a.SetCopyNote(ref, text)
 	if err != nil {
@@ -271,7 +271,7 @@ func LibColumnTitle(k string) string {
 		"updated": T("update date"), "version": T("supported versions"), "author": T("author"), "tags": T("tags"), "played": T("last played")}[k]
 }
 
-// libStamp is a locked copy's creation time (06 §2.9).
+// libStamp is a locked copy's creation time (16 §2.9).
 func libStamp(t time.Time) string { return t.Local().Format("2006/01/02 15:04") }
 
 func libLabel(i *app.LibInstance) string {
@@ -510,7 +510,7 @@ func libraryGroups(lib *app.Library, res *app.LibResult) []LibGroup {
 				c.Cur = true
 			}
 			if f.Key == "version" && v.Value == lib.GameMM {
-				// the game's own version first, marked (06 §2.9)
+				// the game's own version first, marked (16 §2.9)
 				c.Cur = true
 				g.Values = append([]LibChoice{c}, g.Values...)
 				continue
@@ -611,7 +611,7 @@ func lineageAuthor(l *app.LibLineage) string {
 	return ""
 }
 
-// CopyNoteAuto is RimArcho's first version of a copy's note (06 §2.9): "locked version created on Oct
+// CopyNoteAuto is RimArcho's first version of a copy's note (16 §2.9): "locked version created on Oct
 // 21 for list Test; two newer versions since; reason: …" ("" when it knows nothing). The
 // player's note replaces it; editing starts from it.
 func CopyNoteAuto(i *app.LibInstance) string {
@@ -654,7 +654,7 @@ func CopyNoteAuto(i *app.LibInstance) string {
 			from = T("unsubscribed; Steam left the folder")
 		}
 		if from != "" {
-			if !i.Created.IsZero() && i.Source != app.LibMonitor {
+			if !i.Created.IsZero() && i.Source != app.LibMonitor && !app.IsMonitor(i.Mod) {
 				from += Tf(", first seen on %s", ShortDate(i.Created))
 			}
 			parts = append(parts, from)
@@ -711,7 +711,7 @@ func libArgv(kind string, refs []string) []string {
 	return nil
 }
 
-// LibPreview is the dry run of a file-changing action for each copy (06 §6: preview, then
+// LibPreview is the dry run of a file-changing action for each copy (16 §6: preview, then
 // confirm). Each copy's dry run is the CLI's text with names for #refs.
 func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 	if !libConfirm[kind] || len(refs) == 0 {
@@ -732,6 +732,11 @@ func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 		}
 		p.Apply = code == 0 && !strings.Contains(out, "convert: 0 PNGs") && !strings.Contains(out, "would delete 0 DDS")
 		return p, nil
+	}
+	if kind == OpSubUpdate && len(refs) > 1 {
+		if p := subUpdatePreview(a, st, refs); p != nil {
+			return p, nil
+		}
 	}
 	var ok []int
 	for k, ref := range refs {
@@ -804,6 +809,45 @@ func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 	return p, nil
 }
 
+// subUpdatePreview is update all's dry run as one command for every copy (each in turn
+// re-checked the running game and read the subscriptions again: seconds for many copies).
+// nil when it fails: the caller then runs one per copy to say which cannot go.
+func subUpdatePreview(a *app.App, st *app.LoadoutState, refs []string) *Preview {
+	p := &Preview{What: OpSubUpdate, Title: libActionLabel(OpSubUpdate), Apply: true}
+	var run []string
+	var names []string
+	for _, ref := range refs {
+		m, err := st.Ix.ResolveOne(ref)
+		if err != nil {
+			return nil
+		}
+		if r := a.SubscriptionOf(m); r != nil && r.Kind == "page" {
+			p.Lines = append(p.Lines, m.DisplayName()+": "+T("page items skipped; choose downloaded files to update them"))
+			continue
+		}
+		run, names = append(run, ref), append(names, m.DisplayName())
+	}
+	if len(run) == 0 {
+		return p
+	}
+	out, code := cmds.Execute(a, append(libArgv(OpSubUpdate, run), "--dry-run"))
+	if code != 0 {
+		return nil
+	}
+	for _, l := range strings.Split(strings.TrimRight(out, "\n"), "\n") {
+		if strings.HasPrefix(l, "next:") {
+			break
+		}
+		l = Humanize(st, l)
+		// "#ref Name" became "Name Name"
+		for _, n := range names {
+			l = strings.ReplaceAll(l, n+" "+n, n)
+		}
+		p.Lines = append(p.Lines, l)
+	}
+	return p
+}
+
 // previewFailure is a copy's dry run that failed, as one line with its name; a folder that
 // is not there any more says so instead of the system's message.
 func previewFailure(st *app.LoadoutState, ref, out string) string {
@@ -825,7 +869,7 @@ func previewFailure(st *app.LoadoutState, ref, out string) string {
 }
 
 // usedWarning: deleting or unsubscribing a copy the lists use only warns; the player's word
-// goes, and the lists show it as missing (06 §2.9). "" when no list uses it.
+// goes, and the lists show it as missing (16 §2.9). "" when no list uses it.
 func usedWarning(a *app.App, st *app.LoadoutState, kind, ref string) string {
 	if kind != LibDelete && kind != LibUnsub && kind != OpSubRemove {
 		return ""
@@ -954,7 +998,7 @@ func LibDo(a *app.App, kind string, refs []string) (string, error) {
 	return Tf("%s: %s", libActionLabel(kind), what), nil
 }
 
-// LibPlan runs a plan op of Mod library on copies (06 §2.9): space adds and enables, or takes
+// LibPlan runs a plan op of Mod library on copies (16 §2.9): space adds and enables, or takes
 // out of the current plan, or puts back from staging; t stages; x uses this copy (the plan
 // had another) or swaps for another. Each is the editor's verb, one undo step.
 func LibPlan(a *app.App, kind string, refs []string) (*Result, error) {
@@ -1000,7 +1044,7 @@ func libCopyName(st *app.LoadoutState, m *store.Mod) string {
 	return Tf("%s (%s)", m.DisplayName(), SourceText(m))
 }
 
-// libSteam unsubscribes or subscribes again through the Steam client (06 §2.9); when Steam
+// libSteam unsubscribes or subscribes again through the Steam client (16 §2.9); when Steam
 // is out of reach the answer is OpenPages.
 func libSteam(a *app.App, kind string, refs []string, what string) (string, error) {
 	action := SteamAction(kind)
@@ -1016,7 +1060,7 @@ func libSteam(a *app.App, kind string, refs []string, what string) (string, erro
 	return Tf("unsubscribed from %s, Steam deletes the folder", what), nil
 }
 
-// SteamPages is the answer when Steam is out of reach (06 §2.9): the Workshop pages to open
+// SteamPages is the answer when Steam is out of reach (16 §2.9): the Workshop pages to open
 // and what to say; nil for any other error.
 func SteamPages(kind string, err error) *OpenPages {
 	var u *app.SteamUnavailable
@@ -1048,7 +1092,7 @@ func idsOfRefs(st *app.LoadoutState, refs []string) []string {
 	return out
 }
 
-// SetModNote sets a mod's own note (`n` in the editor, 06 §3.5; the note on the Lineage,
+// SetModNote sets a mod's own note (`n` in the editor, 16 §3.5; the note on the Lineage,
 // `archo note <ref>`); "" clears it.
 func SetModNote(a *app.App, ref, text string) (string, error) {
 	st, err := a.Loadout()
@@ -1079,7 +1123,7 @@ func LibDoes(kind string) bool {
 }
 
 // LibCopy is one copy's row (its note and ops, as Mod library shows them), found by instance
-// id or ref: the plan editor's details draw it like Mod library's (06 §2.9, §4.1). nil when
+// id or ref: the plan editor's details draw it like Mod library's (16 §2.9, §4.1). nil when
 // the library does not have it.
 func LibCopy(lib *app.Library, ref string) *LibInstRow {
 	for _, l := range lib.Lineages {

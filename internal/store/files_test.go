@@ -8,8 +8,8 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// Log attribution looks for the installed mod that ships a missing texture or DLL (03 §6.2).
-// Since v14 the shared folders' instances have an empty environment_id (02 §0), so the lookup must
+// Log attribution looks for the installed mod that ships a missing texture or DLL (06 §2).
+// Since v14 the shared folders' instances have an empty environment_id (03 §2), so the lookup must
 // cover them as well as the environment's own Mods/; another game's Mods/ stays out.
 func TestInstanceFilesSharedFolders(t *testing.T) {
 	t.Parallel()

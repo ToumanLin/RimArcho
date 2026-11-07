@@ -30,7 +30,7 @@ type workshopAnswer struct {
 	err error
 }
 
-// workshopDetails reads the details of many items, workshopBatch per request (02 §3.4).
+// workshopDetails reads the details of many items, workshopBatch per request (11 §1).
 // A request that fails is sent once more after a pause, and so are the items Steam
 // answered with a passing error (busy, timed out, rate limited). Every ID gets an answer.
 func (a *App) workshopDetails(ctx context.Context, ids []string) map[string]workshopAnswer {
@@ -143,6 +143,9 @@ func (a *App) postWorkshopDetails(ctx context.Context, ids []string) (map[string
 				Title       string `json:"title"`
 				Description string `json:"description"`
 				TimeUpdated int64  `json:"time_updated"`
+				Tags        []struct {
+					Tag string `json:"tag"`
+				} `json:"tags"`
 			} `json:"publishedfiledetails"`
 		} `json:"response"`
 	}
@@ -154,6 +157,9 @@ func (a *App) postWorkshopDetails(ctx context.Context, ids []string) (map[string
 	now := a.Now().Unix()
 	for _, x := range r.Response.Details {
 		out[x.ID] = &workshopCache{ID: x.ID, Title: x.Title, Description: x.Description, TimeUpdated: x.TimeUpdated, Fetched: now, Result: x.Result}
+		for _, tag := range x.Tags {
+			out[x.ID].Tags = append(out[x.ID].Tags, tag.Tag)
+		}
 	}
 	return out, nil
 }

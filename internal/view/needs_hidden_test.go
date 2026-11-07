@@ -8,9 +8,9 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Hidden mods are listed on Can it run but not counted in the sidebar's number (06 §2.1).
+// Hidden mods are listed on Can it run but not counted in the sidebar's number (16 §2.1).
 func TestHiddenModsNotCounted(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("2009463077", testkit.Mod{PackageID: "brrainz.harmony", Name: "Harmony"})
 	dir := e.AddWorkshop("1002", testkit.Sample("tester.h", "Hidden One"))
@@ -44,7 +44,7 @@ func TestHiddenModsNotCounted(t *testing.T) {
 	if n.Count != other {
 		t.Fatalf("count %d, want %d (the %d hidden-mod items are not counted)", n.Count, other, hidden)
 	}
-	// Not on Can it run (06 §2.4): Mod library handles them, one line points there.
+	// Not on Can it run (16 §2.4): Mod library handles them, one line points there.
 	for _, it := range n.Items {
 		if it.Group == view.GroupHidden && it.Section != view.SectionElsewhere {
 			t.Errorf("hidden-mod item on the page: %+v", it)

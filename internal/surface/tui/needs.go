@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Can it run (06 §5). The items, their wording and their actions are view.BuildNeeds (06 §1);
+// Can it run (16 §5). The items, their wording and their actions are view.BuildNeeds (16 §1);
 // here each action gets its key and the screen is drawn.
 
 type needKey struct {
@@ -23,7 +23,7 @@ type needKey struct {
 type need struct {
 	phaseHeading string
 	group        int
-	section      int            // the section it is shown in (view.SectionOf, 06 §2.4)
+	section      int            // the section it is shown in (view.SectionOf, 16 §2.4)
 	evidence     *view.Evidence // where the claim comes from: the chip under the item
 	text         string
 	keys         []needKey
@@ -39,7 +39,7 @@ type need struct {
 func (m *model) toNeeds(items []view.Need) []need {
 	out := make([]need, 0, len(items))
 	for _, it := range items {
-		// shown inside another item, or handled on another page (06 §2.4)
+		// shown inside another item, or handled on another page (16 §2.4)
 		if it.Into != "" || it.Section == view.SectionElsewhere {
 			continue
 		}
@@ -54,7 +54,7 @@ func (m *model) toNeeds(items []view.Need) []need {
 	return out
 }
 
-// evIcon is the evidence chip's icon (06 §7, §9.3).
+// evIcon is the evidence chip's icon (16 §7, §9.3).
 func evIcon(kind string) string {
 	switch kind {
 	case view.EvDeclared:
@@ -85,7 +85,7 @@ func chipText(e *view.Evidence) string {
 	return s
 }
 
-// actionKey binds a shared action to its key (06 §5).
+// actionKey binds a shared action to its key (16 §5).
 func (m *model) actionKey(a view.Action, text string) needKey {
 	k := needKey{key: a.Key, label: a.Label}
 	switch a.Kind {
@@ -146,7 +146,7 @@ func (m *model) actionKey(a view.Action, text string) needKey {
 	default:
 		k.run = func(m *model) tea.Cmd {
 			if a.Confirm != "" {
-				// Not undone with u: press twice (06 §6).
+				// Not undone with u: press twice (16 §6).
 				return m.arm(a.Key, a.Confirm, func(m *model) tea.Cmd { m.doAction(a, 0); return nil })
 			}
 			m.doAction(a, 0)
@@ -191,7 +191,7 @@ func (m *model) open(u string) tea.Cmd {
 	return nil
 }
 
-// listAction is S, w and L (06 §6): it acts at once and says what it did; sort adds "u
+// listAction is S, w and L (16 §6): it acts at once and says what it did; sort adds "u
 // undoes". A refusal says why and opens a panel with the commands that resolve it.
 func (m *model) listAction(what string) tea.Cmd {
 	if what == view.ListLaunch {
@@ -238,6 +238,27 @@ func listTitle(what string) string {
 	return T("launch")
 }
 
+// lastSaveLine is the save the last run loaded and whether it loads with this list (16
+// §2.4): "your last save  Landing: content will be lost (2 Mods are not installed…)  archo
+// saves show sv:…"; "" none.
+func lastSaveLine(v *view.LastSaveView) string {
+	if v == nil {
+		return ""
+	}
+	l := T("your last save") + "  " + v.Name + T(": ") + v.Verdict
+	if len(v.Lines) > 0 {
+		l += " (" + strings.Join(v.Lines, "; ")
+		if v.More > 0 {
+			l += "; " + Tf("and %d more", v.More)
+		}
+		l += ")"
+	}
+	if v.Command != "" {
+		l += "  archo " + v.Command
+	}
+	return l
+}
+
 // ---- the screen ----
 
 // needLines draws Can it run: a count line, then the groups with their items; the selected
@@ -269,7 +290,11 @@ func (m *model) needLines(n int) []string {
 	case p.stale:
 		head += "   " + T("the files changed since the last check")
 	}
-	out := []string{"  " + sText.Render(fit(head, w-2)), ""}
+	out := []string{"  " + sText.Render(fit(head, w-2))}
+	if l := lastSaveLine(p.lastSave); l != "" {
+		out = append(out, "  "+sSecond.Render(fit(l, w-2)))
+	}
+	out = append(out, "")
 	if len(items) == 0 {
 		out = append(out, "  "+sOK.Render(markOK)+" "+sSecond.Render(fit(T("nothing needs your attention"), w-4)))
 		if away := m.elsewhereLines(w); len(away) > 0 {
@@ -361,7 +386,7 @@ func (m *model) needLines(n int) []string {
 			}
 		}
 	}
-	// what this page leaves to another: faint lines at the end (06 §2.4)
+	// what this page leaves to another: faint lines at the end (16 §2.4)
 	if away := m.elsewhereLines(w); len(away) > 0 {
 		rows = append(rows, row{"", -1})
 		for _, l := range away {
@@ -393,7 +418,7 @@ func (m *model) needLines(n int) []string {
 }
 
 // sectionHead is a section's heading: its title, its count and, for the run errors, which
-// run they are from (06 §2.4).
+// run they are from (16 §2.4).
 func (m *model) sectionHead(sec, w int) string {
 	n := 0
 	hintsOnly := true
@@ -411,11 +436,11 @@ func (m *model) sectionHead(sec, w int) string {
 	live := sec == view.SectionRun && m.live != nil && m.live.Running
 	switch {
 	case live:
-		title = T("errors this run") // the window's title while the game runs (06 §2.4)
+		title = T("errors this run") // the window's title while the game runs (16 §2.4)
 	case hintsOnly && sec != view.SectionHint:
 		title = T("suggestions") // only hints: not a red Will cause errors
 	}
-	// its number among the sections shown: 1–4 jump to it (06 §3.5)
+	// its number among the sections shown: 1–4 jump to it (16 §3.5)
 	num := itoa(m.sectionNumber(sec)) + " "
 	head := sDimS.Render(num) + sDimS.Render(title)
 	switch {
@@ -514,7 +539,7 @@ func (m *model) sectionStep(d int) {
 	}
 }
 
-// autoFix is F, fix automatically (06 §2.4, §5): the required mods that are installed get enabled and
+// autoFix is F, fix automatically (16 §2.4, §5): the required mods that are installed get enabled and
 // the list is sorted again, one undo step.
 func (m *model) autoFix() tea.Cmd {
 	if view.AutoFixCount(m.prob.base) == 0 {
@@ -563,7 +588,7 @@ func (m *model) needsKey(s string) tea.Cmd {
 		return m.startAnalyze()
 	case "F":
 		return m.autoFix()
-	case "c": // updates, from any page (06 §3.5)
+	case "c": // updates, from any page (16 §3.5)
 		return m.openChangesOf("", "")
 	case "l":
 		return m.chooseLog()

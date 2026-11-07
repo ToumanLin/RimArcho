@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// G13 in the TUI (06 §2.4): Can it run shows the four sections in order with their counts,
+// G13 in the TUI (16 §2.4): Can it run shows the four sections in order with their counts,
 // every item with its evidence chip, and the top bar's number equals the counted items,
 // the running game's errors included.
 func TestG13NeedsSectionsTUI(t *testing.T) {
@@ -48,6 +48,7 @@ func TestG13NeedsSectionsTUI(t *testing.T) {
 }
 
 func TestNeedsPhaseHeadingsAreNotCursorItems(t *testing.T) {
+	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 160, 40)
 	press(m, "@")
@@ -155,7 +156,7 @@ func TestNeedsSectionsLive(t *testing.T) {
 	}
 }
 
-// 06 §3.5: Mod library's areas are numbered, 1 the filter, 2 the table, 3 the details.
+// 16 §3.5: Mod library's areas are numbered, 1 the filter, 2 the table, 3 the details.
 func TestLibraryAreaKeys(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)

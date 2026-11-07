@@ -21,7 +21,7 @@ const (
 )
 
 // windowIcon is the PNG Wails turns into the window's icon when the exe has no icon group 3
-// (a development build; release builds carry it, 06 §8.6): nil when the exe has one, else
+// (a development build; release builds carry it, 16 §8.6): nil when the exe has one, else
 // the icon drawn at the system's large-icon size (32 px at 100 %), the only size Wails
 // uses. Drawing at 256 px cost 43 MB of start-up heap for a 32 px result.
 func windowIcon() []byte {

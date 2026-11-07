@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// A plan's game versions (04 §1.6): the game versions the list is meant to be played on.
+// A plan's game versions (07 §1.6): the game versions the list is meant to be played on.
 // The default is worked out each time from the list: the versions every mod lists, plus the
 // game the plan was made on, as one run from the lowest to the highest. A player's choice
 // is stored and stays until they go back to the default.
@@ -305,7 +305,7 @@ func (a *App) PlanAllowedVersions(st *LoadoutState, p *store.Plan) []string {
 	return nil
 }
 
-// adoptVersions stores versions read from a RimArcho list for a new plan (04 §1.6, §9.3).
+// adoptVersions stores versions read from a RimArcho list for a new plan (07 §1.6, §7.3).
 func (a *App) adoptVersions(p *store.Plan, vs []string) {
 	if len(vs) == 0 {
 		return

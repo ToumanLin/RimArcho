@@ -15,7 +15,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
-// 06 §2.13 / 08 §5.2: cache summaries, not conversion jobs. Validate texture metadata
+// 16 §2.13 / 10 §2: cache summaries, not conversion jobs. Validate texture metadata
 // even without a scan: folder mtimes alone miss an overwrite of an existing PNG.
 type textureSummaryEntry struct {
 	Fingerprint [32]byte
@@ -56,7 +56,7 @@ func (a *App) textureSummaries(ctx context.Context, targets []TextureTarget, o t
 	jobs := make(chan int)
 	results := make(chan result)
 	if workers <= 0 && len(targets) > 0 {
-		// SSDs benefit through eight workers (07 §6.2); HDDs use two.
+		// SSDs benefit through eight workers (18 §2); HDDs use two.
 		workers = min(8, fsscan.Workers(targets[0].Dir))
 	}
 	workers = max(1, min(workers, runtime.GOMAXPROCS(0), len(targets)))
@@ -126,7 +126,7 @@ func (a *App) textureSummaries(ctx context.Context, targets []TextureTarget, o t
 		}
 	}()
 	go func() { wg.Wait(); close(results) }()
-	// Apply callbacks serially; request cancellation still guards every publication (06 §3.1).
+	// Apply callbacks serially; request cancellation still guards every publication (16 §3.1).
 	changed := false
 	var readErr error
 	updates := map[string]textureSummaryEntry{}

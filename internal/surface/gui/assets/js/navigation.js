@@ -1,5 +1,5 @@
 import { closeChoiceMenu } from "./choices.js";
-// Session page navigation (06 §3.1 rule 11). Page reads report completion here;
+// Session page navigation (16 §3.1 rule 11). Page reads report completion here;
 // refreshes and stale replies never add another visit. No browser History API is used.
 import { S, $, api } from "./state.js";
 import { openEditor } from "./lists.js";
@@ -19,6 +19,8 @@ import * as planManage from "./planmanage.js";
 import * as tex from "./textures.js";
 import * as tasksPage from "./tasks.js";
 import * as fileSearch from "./filesearch.js";
+import * as modSettings from "./modsettings.js";
+import * as savesPage from "./saves.js";
 
 let ui;
 // The displayed shell can still name the previous plan while OpenPlan is in flight:
@@ -28,10 +30,10 @@ let openingPlan = Promise.resolve(), requestedPlan = null;
 export function initNavigation(u) { ui = u; }
 
 // go opens a sidebar page; "plan" is the open plan's editor, "plan:<id>" a plan (opened
-// only: the current list, the one launched, stays; 04 §1.3), "plan:new" the new-list form,
+// only: the current list, the one launched, stays; 07 §1.3), "plan:new" the new-list form,
 // "pack:<name>" a pack on the packs page.
 export async function go(id, entry = null) {
-  if (uninst.locked()) return; // an uninstall runs, or has run (06 §2.14)
+  if (uninst.locked()) return; // an uninstall runs, or has run (16 §2.14)
   pageEntering();
   shell.navigated();
   if (entry) {
@@ -42,18 +44,21 @@ export async function go(id, entry = null) {
     planManage.restoreHistory({ creating: false, selected: planManage.selected() });
   }
   if (id === "plan:new") return plans.newPlan();
+  // "save:<ref>": Saves with that save selected
+  let save = "";
+  if (id.startsWith("save:")) { save = id.slice(5); id = "saves"; }
   const plan = id.startsWith("plan:") ? +id.slice(5) : null;
   if (plan !== null) id = "plan";
   S.packFocus = id.startsWith("pack:") ? id.slice(5) : null;
   if (id !== "plans") planManage.abandon();
   if (id !== "build") S.buildFrom = null;
   if (id !== "plan-export") S.planExport = null;
-  await openPage(id, plan, entry);
+  await openPage(id, plan, entry, save);
   // a page already shown is redrawn in place: its sub-entry and breadcrumb follow too
   ui.renderWhere();
 }
 
-export async function openPage(id, plan = null, entry = null) {
+export async function openPage(id, plan = null, entry = null, save = "") {
   if (S.packFocus) return packsPage.pack(S.packFocus);
   switch (id) {
     case "plan":
@@ -89,6 +94,8 @@ export async function openPage(id, plan = null, entry = null) {
     case "textures": return tex.open();
     case "tasks": return tasksPage.open();
     case "search": return fileSearch.open();
+    case "mod-settings": return modSettings.open();
+    case "saves": return savesPage.open(save);
     case "guide": return entry ? guide.resume() : guide.start(S.board && S.board.envs && S.board.envs.length ? "env" : "first");
   }
 }

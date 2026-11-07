@@ -14,6 +14,7 @@ import (
 )
 
 func TestSourceLibrarySettingTaskStopRetryAndHistory(t *testing.T) {
+	t.Parallel()
 	e, api, events := fixture(t)
 	e.WriteFile(filepath.Join(e.Workshop, "1001", "Assemblies", "Alpha.dll"), "synthetic assembly")
 	e.MustRun("scan")

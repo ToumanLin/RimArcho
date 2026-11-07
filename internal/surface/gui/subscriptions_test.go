@@ -43,10 +43,10 @@ func TestSubscriptionSourceTaskAndRunningGuard(t *testing.T) {
 		t.Fatalf("task o: %q", got)
 	}
 	e.App.GameProbe = func(string) *app.GameRun { return &app.GameRun{PID: 42} }
-	if _, err := api.WorkshopUpdatePreview("ws:1001"); err == nil || !strings.Contains(err.Error(), "running") {
+	if _, err := api.SubscriptionUpdatePreview([]string{"ws:1001"}); err == nil || !strings.Contains(err.Error(), "running") {
 		t.Fatalf("running preview: %v", err)
 	}
-	if _, err := api.WorkshopUpdate("ws:1001"); err == nil || !strings.Contains(err.Error(), "running") {
+	if _, err := api.WorkshopUpdate([]string{"ws:1001"}); err == nil || !strings.Contains(err.Error(), "running") {
 		t.Fatalf("running apply: %v", err)
 	}
 }
@@ -72,7 +72,7 @@ func TestSubscriptionInventoryReuseAndInvalidation(t *testing.T) {
 	}
 	read(false, "")
 	first := api.subRead.lib
-	// Its own session and connection; the index's Mods may be shared (07 §8.3), its Index not.
+	// Its own session and connection; the index's Mods may be shared (17 §7.3), its Index not.
 	if api.subRead.a == e.App || api.subRead.a.Store.DB == e.App.Store.DB || first.St.Ix == ix || first.St.Ix.Env == ix.Env {
 		t.Fatal("subscription reader shares mutable application/index state")
 	}
@@ -241,6 +241,7 @@ func TestSubscriptionReadDoesNotBlockEditsAndRechecksAfterOvertake(t *testing.T)
 }
 
 func TestSubscriptionReaderSeesSourceRecordChanges(t *testing.T) {
+	// Not parallel: testkit.NewGitRepo uses t.Setenv.
 	e, api, _ := fixture(t)
 	g := testkit.NewGitRepo(t, "")
 	op, err := e.App.SubscribeGit(g.Bare, "branch", "main", false)

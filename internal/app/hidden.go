@@ -14,7 +14,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Kinds of hidden mods (08 §6): folders another manager hid by renaming About.xml.
+// Kinds of hidden mods (09 §5): folders another manager hid by renaming About.xml.
 const (
 	HiddenPinned  = "pinned"  // a loadable copy of the same lineage is what the game uses
 	HiddenResidue = "residue" // an unsubscribed workshop folder
@@ -78,7 +78,7 @@ func (st *LoadoutState) pinCopy(m *store.Mod) *store.Mod {
 	return best
 }
 
-// FileOp is a change RimArcho makes to a mod folder at the player's request (08 §6).
+// FileOp is a change RimArcho makes to a mod folder at the player's request (09 §5).
 type FileOp struct {
 	Op     string // "rename", "trash", "unpin"
 	Path   string
@@ -91,7 +91,7 @@ type FileOp struct {
 	Locked *Locked
 	InPlan bool
 	// Op "trash": the plans that use the copy (every environment of this game). The
-	// player's word goes: it still goes, and they show it as missing (06 §2.9).
+	// player's word goes: it still goes, and they show it as missing (16 §2.9).
 	UsedBy []string
 	Links  *LinkLifecyclePlan
 }
@@ -116,7 +116,7 @@ func aboutDisabledPath(m *store.Mod) (string, error) {
 }
 
 // Unhide renames About.xml.disabled back to About.xml so the game sees the folder again
-// (08 §6), then rescans.
+// (09 §5), then rescans.
 func (a *App) Unhide(ref string, dryRun bool) (*FileOp, error) {
 	st, err := a.Loadout()
 	if err != nil {
@@ -159,7 +159,7 @@ func (a *App) unhide(st *LoadoutState, m *store.Mod, dryRun bool) (*FileOp, erro
 }
 
 // Unpin restores the hidden workshop copy of a pinned mod and switches the workspace to
-// it; the pinning copy stays where it is (08 §6). ref may name either copy.
+// it; the pinning copy stays where it is (09 §5). ref may name either copy.
 func (a *App) Unpin(ref string, dryRun bool) (*FileOp, error) {
 	st, err := a.Loadout()
 	if err != nil {
@@ -178,7 +178,7 @@ func (a *App) Unpin(ref string, dryRun bool) (*FileOp, error) {
 	}
 	if h == nil {
 		// A locked version RimArcho made: the upstream was never hidden, so unpinning only
-		// swaps it back into the current plan (04 §7.5). The copy stays on disk.
+		// swaps it back into the current plan (07 §5.5). The copy stays on disk.
 		l, err := st.lockFor(m)
 		if err != nil {
 			return nil, err
@@ -206,7 +206,7 @@ func (a *App) Unpin(ref string, dryRun bool) (*FileOp, error) {
 var ErrNotTrashable = errors.New("not trashable")
 
 // Trash moves a copy of the player's own, or a hidden or unsubscribed workshop folder, to the recycle bin
-// (08 §6, §2.4), then rescans.
+// (09 §5, 02 §3), then rescans.
 func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 	st, err := a.Loadout()
 	if err != nil {
@@ -229,7 +229,7 @@ func (a *App) Trash(ref string, dryRun bool) (*FileOp, error) {
 		return nil, fmt.Errorf("%w: %s is a link, not a folder; RimArcho does not move it", ErrNotTrashable, st.Ix.ModDir(m))
 	}
 	// The plans that use it (the current one when it is enabled, any environment of this
-	// game) only hear about it: they keep the entry and show it missing (06 §2.9).
+	// game) only hear about it: they keep the entry and show it missing (16 §2.9).
 	ps, err := a.usedBy(st, m.ID)
 	if err != nil {
 		return nil, err

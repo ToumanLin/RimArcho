@@ -1,0 +1,66 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Probe mod. References come from the local game, so the build works offline:
+      dotnet build -c Release -p:GameVersion=<1.6|1.7> -p:RimWorldDir=<game folder> -p:HarmonyDir=<Harmony mod folder>
+    1.6 and earlier (Unity): net472 against the game's own mscorlib in RimWorldWin64_Data/Managed.
+    1.7 (Waylith, .NET 10): net10.0 against the assemblies in the game folder, Harmony 3.
+    The DLL goes to <GameVersion>/Assemblies; LoadFolders.xml picks the folder for the running game.
+    scripts/probe.mjs build detects the version and passes all three.
+  -->
+  <PropertyGroup>
+    <GameVersion Condition="'$(GameVersion)' == ''">1.6</GameVersion>
+    <AssemblyName>Probe</AssemblyName>
+    <RootNamespace>RimProbe</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Optimize>true</Optimize>
+    <DebugType>none</DebugType>
+    <OutputPath>$(GameVersion)\Assemblies\</OutputPath>
+    <BaseIntermediateOutputPath>obj\$(GameVersion)\</BaseIntermediateOutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(GameVersion)' == '1.7'">
+    <TargetFramework>net10.0</TargetFramework>
+    <DefineConstants>$(DefineConstants);RW_WAYLITH</DefineConstants>
+    <Managed>$(RimWorldDir)</Managed>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(GameVersion)' != '1.7'">
+    <TargetFramework>net472</TargetFramework>
+    <DefineConstants>$(DefineConstants);RW_UNITY</DefineConstants>
+    <Managed>$(RimWorldDir)\RimWorldWin64_Data\Managed</Managed>
+    <!-- Use the game's own mscorlib instead of a .NET Framework reference pack. -->
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <NoStdLib>true</NoStdLib>
+    <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="src\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(GameVersion)' != '1.7'">
+    <Reference Include="$(Managed)\mscorlib.dll" Private="false" />
+    <Reference Include="$(Managed)\System.dll" Private="false" />
+    <Reference Include="$(Managed)\System.Core.dll" Private="false" />
+    <Reference Include="$(Managed)\netstandard.dll" Private="false" />
+    <Reference Include="$(Managed)\UnityEngine.CoreModule.dll" Private="false" />
+    <Reference Include="$(Managed)\UnityEngine.IMGUIModule.dll" Private="false" />
+    <Reference Include="$(Managed)\UnityEngine.ScreenCaptureModule.dll" Private="false" />
+    <Reference Include="$(Managed)\UnityEngine.TextRenderingModule.dll" Private="false" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(GameVersion)' == '1.7'">
+    <!-- UnityEngine types come from Waylith's compatibility assemblies. -->
+    <Reference Include="$(Managed)\UnityStubs.dll" Private="false" />
+    <Reference Include="$(Managed)\Waylith.UnityCompat.dll" Private="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="$(Managed)\Assembly-CSharp.dll" Private="false" />
+    <Reference Include="$(HarmonyDir)\$(GameVersion)\Assemblies\0Harmony.dll" Condition="Exists('$(HarmonyDir)\$(GameVersion)\Assemblies\0Harmony.dll')" Private="false" />
+    <Reference Include="$(HarmonyDir)\Current\Assemblies\0Harmony.dll" Condition="!Exists('$(HarmonyDir)\$(GameVersion)\Assemblies\0Harmony.dll') And Exists('$(HarmonyDir)\Current\Assemblies\0Harmony.dll')" Private="false" />
+  </ItemGroup>
+</Project>

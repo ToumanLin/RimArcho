@@ -2,12 +2,6 @@ package store
 
 import "strings"
 
-const schemaV23 = `
-CREATE TABLE IF NOT EXISTS version_mute(
-  package_id TEXT NOT NULL, game_mm TEXT NOT NULL,
-  PRIMARY KEY(package_id, game_mm));
-`
-
 // VersionMuteKey follows package identity across updates and independently scanned copies.
 func VersionMuteKey(pkg string) string {
 	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(pkg)), "_steam")

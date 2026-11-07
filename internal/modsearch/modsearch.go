@@ -1,4 +1,4 @@
-// Package modsearch searches mod content in game load order (03 §1).
+// Package modsearch searches mod content in game load order (05 §1).
 package modsearch
 
 import (

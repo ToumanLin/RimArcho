@@ -21,7 +21,7 @@ type DetectOptions struct {
 	SkipRegistry bool
 }
 
-// Detected is a suggestion only; nothing is written until the player confirms (02 §2.2).
+// Detected is a suggestion only; nothing is written until the player confirms (03 §3.2).
 type Detected struct {
 	GameRoot     string
 	UserDataRoot string
@@ -32,7 +32,7 @@ type Detected struct {
 	Tried        []string // locations that were checked, in order
 }
 
-// Detect runs the 02 §2.2 search order; each step stops at the first hit.
+// Detect runs the 03 §3.2 search order; each step stops at the first hit.
 func Detect(o DetectOptions) Detected {
 	if o.GOOS == "" {
 		o.GOOS = runtime.GOOS
@@ -83,7 +83,7 @@ func Detect(o DetectOptions) Detected {
 
 // DetectAll is Detect without stopping at the first hit: every RimWorld install in the
 // Steam libraries and the usual folders, in the same order (the first-run guide lets the
-// player pick several, 06 §2.15). Each carries the shared user data folder.
+// player pick several, 16 §2.15). Each carries the shared user data folder.
 func DetectAll(o DetectOptions) []Detected {
 	first := Detect(o) // fills in the defaults' user data folder
 	if o.GOOS == "" {
@@ -288,7 +288,7 @@ func DefaultUserDataFor(o DetectOptions) string {
 }
 
 // WorkshopFolders lists the RimWorld Workshop content folders found in the Steam libraries
-// (02 §0 item 3): the one in the library that holds the game first.
+// (03 §2 item 3): the one in the library that holds the game first.
 func WorkshopFolders(o DetectOptions) []string {
 	if o.GOOS == "" {
 		o.GOOS = runtime.GOOS

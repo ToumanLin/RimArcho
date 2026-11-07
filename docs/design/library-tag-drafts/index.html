@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Library Tag Groups</title>
+<style>
+/* Tokens copied from internal/surface/gui/assets/style.css so the draft reads like the app. */
+:root {
+  --hairline: 1px; --r-lg: 12px; --r-sm: 6px; --row-h: 28px;
+  --bg: #f4f4f6; --card: #ffffff; --card-2: #f9f9fb; --pill: #f1f1f4; --pill-hover: #e9e9ee;
+  --seg-thumb: var(--card); --seg-edge: 0 1px 2px rgba(0,0,0,.14), 0 0 0 var(--hairline) rgba(0,0,0,.08);
+  --ctl-fg: #63636b; --line: #e3e3e8; --line-2: #ececf0; --fg: #1c1c21; --fg-2: #4b4b53; --muted: #85858d; --faint: #b9b9c2;
+  --accent: #4f46e5; --accent-soft: #eeedfd; --accent-fg: #fff; --sel: #ecebfb;
+  --green: #189a58; --green-soft: #e4f6ec; --red: #d64545; --red-soft: #fbe9e9; --amber: #b45309; --amber-soft: #fbf0df;
+  --pop-bg: rgba(255,255,255,.96);
+  --shadow: 0 16px 44px rgba(20,22,30,.16), 0 2px 8px rgba(20,22,30,.06), 0 0 0 var(--hairline) rgba(20,22,30,.1);
+  --font: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  --code: "Cascadia Mono", Consolas, monospace;
+  --note-bg: #fffbea; --note-line: #f1e3a6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1a1a1e; --card: #232327; --card-2: #1f1f23; --pill: #2d2d33; --pill-hover: #36363d;
+    --seg-thumb: rgba(255,255,255,.15); --seg-edge: inset 0 var(--hairline) 0 rgba(255,255,255,.08), 0 1px 2px rgba(0,0,0,.3);
+    --line: #333339; --line-2: #2c2c32; --fg: #ededf1; --fg-2: #b9b9c1; --muted: #8b8b94; --faint: #56565f; --ctl-fg: #a1a1aa;
+    --accent: #a5b4fc; --accent-soft: #2b2c47; --accent-fg: #14142a; --sel: #33345a;
+    --green: #6fd99b; --green-soft: #1e3a2b; --red: #f28b82; --red-soft: #45272a; --amber: #f2b544; --amber-soft: #3f3220;
+    --pop-bg: rgba(38,38,43,.97); --shadow: 0 16px 44px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.3), 0 0 0 var(--hairline) rgba(255,255,255,.1);
+    --note-bg: #2c2a1f; --note-line: #4a4428;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1a1a1e; --card: #232327; --card-2: #1f1f23; --pill: #2d2d33; --pill-hover: #36363d;
+  --seg-thumb: rgba(255,255,255,.15); --seg-edge: inset 0 var(--hairline) 0 rgba(255,255,255,.08), 0 1px 2px rgba(0,0,0,.3);
+  --line: #333339; --line-2: #2c2c32; --fg: #ededf1; --fg-2: #b9b9c1; --muted: #8b8b94; --faint: #56565f; --ctl-fg: #a1a1aa;
+  --accent: #a5b4fc; --accent-soft: #2b2c47; --accent-fg: #14142a; --sel: #33345a;
+  --green: #6fd99b; --green-soft: #1e3a2b; --red: #f28b82; --red-soft: #45272a; --amber: #f2b544; --amber-soft: #3f3220;
+  --pop-bg: rgba(38,38,43,.97); --shadow: 0 16px 44px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.3), 0 0 0 var(--hairline) rgba(255,255,255,.1);
+  --note-bg: #2c2a1f; --note-line: #4a4428;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--fg); font: 13px/1.45 var(--font); }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+input, textarea { font: inherit; color: var(--fg); }
+kbd { font: 11px var(--code); color: var(--muted); padding: 0 4px; border-radius: 4px; background: var(--pill); }
+
+/* ---------- draft chrome ---------- */
+.draft-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 16px 6px; max-width: 1360px; margin: 0 auto; }
+.draft-top h1 { font-size: 15px; margin: 0; font-weight: 600; }
+.draft-top .faint { color: var(--muted); font-size: 12px; }
+.draft-top .sp { flex: 1; }
+.chip-btn { height: 26px; padding: 0 10px; border-radius: var(--r-sm); background: var(--pill); color: var(--ctl-fg); font-size: 12px; }
+.chip-btn:hover { background: var(--pill-hover); color: var(--fg); }
+
+/* ---------- the page ---------- */
+.page { max-width: 1360px; margin: 0 auto; padding: 6px 16px 16px; }
+.lib { display: grid; grid-template-columns: clamp(280px, 28%, 420px) 1fr; gap: 4px; height: 680px; }
+.card { background: var(--card); border-radius: var(--r-lg); box-shadow: 0 0 0 var(--hairline) var(--line-2); min-width: 0; min-height: 0; }
+.side { display: flex; flex-direction: column; gap: 4px; min-height: 0; }
+.head { display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px 0 14px; font-size: 12px; color: var(--muted); white-space: nowrap; flex: none; }
+.anum { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 4px; background: var(--pill); font-size: 11px; color: var(--muted); }
+.head .t { color: var(--fg-2); font-weight: 600; }
+.head .sp { flex: 1; }
+
+.fbar { padding-bottom: 10px; }
+.fbar .search { margin: 0 10px; display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: var(--r-sm); background: var(--pill); color: var(--muted); }
+.fbar .search span { flex: 1; }
+
+.detail { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.dscroll { flex: 1; overflow: auto; padding: 4px 14px 16px; }
+
+/* ---------- table ---------- */
+.main { display: flex; flex-direction: column; overflow: hidden; }
+.seg { position: relative; display: inline-flex; gap: 2px; padding: 3px; border-radius: 8px; background: color-mix(in srgb, var(--fg) 5%, transparent); }
+.seg button { height: 22px; padding: 0 10px; border-radius: 5px; font-size: 12px; color: var(--ctl-fg); display: inline-flex; align-items: center; gap: 6px; }
+.seg button:hover:not(.on) { color: var(--fg-2); }
+.seg button.on { background: var(--seg-thumb); box-shadow: var(--seg-edge); color: var(--fg); }
+.cols { --cols: minmax(220px, 1fr) 76px 150px 110px 90px; }
+.th { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: var(--cols); gap: 10px; height: 28px; align-items: center; padding: 0 12px 0 6px; background: var(--card); border-top: var(--hairline) solid var(--line-2); border-bottom: var(--hairline) solid var(--line-2); font-size: 12px; color: var(--muted); }
+.th .name { padding-left: 29px; }
+.th .on { color: var(--fg-2); font-weight: 600; }
+.th .r { text-align: right; }
+.rows { flex: 1; overflow: auto; outline: none; }
+.row { display: grid; grid-template-columns: var(--cols); gap: 10px; height: var(--row-h); align-items: center; padding: 0 12px 0 6px; white-space: nowrap; cursor: default; user-select: none; }
+.row > * { overflow: hidden; text-overflow: ellipsis; }
+.row:hover { background: color-mix(in srgb, var(--fg) 3%, transparent); }
+.row.sel { background: var(--sel); }
+.row.cur { background: color-mix(in srgb, var(--accent) 16%, var(--card)); }
+.row .nm { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.row .nm .tx { overflow: hidden; text-overflow: ellipsis; }
+.row .tw { width: 16px; flex: none; text-align: center; color: var(--muted); font-size: 10px; }
+.row .r { text-align: right; color: var(--fg-2); font-variant-numeric: tabular-nums; }
+.row .m { color: var(--muted); }
+.row.copy .nm { padding-left: 22px; color: var(--fg-2); }
+.row.copy .lead { color: var(--faint); font-family: var(--code); }
+.row.grp .nm { padding-left: 0; }
+.row.grp.in .nm { padding-left: 0; }
+.row.mod.in .nm { padding-left: 22px; }
+.row.copy.in .nm { padding-left: 44px; }
+.st-warn { color: var(--amber); }
+
+/* group header rows */
+.row.grp { height: 32px; background: var(--card-2); border-top: var(--hairline) solid var(--line-2); font-size: 12px; }
+.row.grp:first-child { border-top: 0; }
+.row.grp:hover { background: color-mix(in srgb, var(--fg) 5%, var(--card-2)); }
+.row.grp.cur { background: color-mix(in srgb, var(--accent) 16%, var(--card)); }
+.row.grp .gname { font-weight: 600; color: var(--fg); font-size: 13px; }
+.row.grp .gcount { color: var(--muted); margin-left: 4px; }
+.row.grp .gnote { color: var(--muted); margin-left: 10px; overflow: hidden; text-overflow: ellipsis; font-style: italic; }
+.pin { color: var(--muted); font-size: 11px; }
+.row.grp.none .gname { color: var(--muted); font-weight: 500; }
+.dup { font-size: 11px; color: var(--muted); padding: 0 6px; border-radius: 4px; background: var(--pill); }
+
+.hints { flex: none; height: 28px; display: flex; align-items: center; gap: 14px; padding: 0 14px; border-top: var(--hairline) solid var(--line-2); font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; }
+
+/* ---------- details: mod ---------- */
+.fields { display: grid; grid-template-columns: 92px 1fr; gap: 6px 10px; font-size: 12px; margin-top: 8px; }
+.fields .k { color: var(--muted); }
+.mname { font-size: 18px; font-weight: 600; margin: 6px 0 2px; }
+.tagchips { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.tagchip { font-size: 12px; padding: 0 7px; height: 20px; display: inline-flex; align-items: center; border-radius: 10px; background: var(--accent-soft); color: var(--accent); }
+.edit { font-size: 12px; color: var(--accent); }
+
+/* ---------- details: tag manager ---------- */
+.tm-sec { padding: 10px 0 12px; border-bottom: var(--hairline) solid var(--line-2); }
+.tm-sec:last-child { border-bottom: 0; }
+.tm-cap { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; display: flex; gap: 8px; align-items: center; }
+.tm-cap .sp { flex: 1; }
+.tm-name { display: flex; align-items: center; gap: 8px; }
+.tm-name input { flex: 1; min-width: 0; font-size: 18px; font-weight: 600; border: 0; border-radius: var(--r-sm); padding: 2px 6px; margin-left: -6px; background: transparent; outline: none; }
+.tm-name input:hover { background: var(--pill); }
+.tm-name input:focus { background: var(--pill); box-shadow: 0 0 0 2px var(--accent); }
+.tm-meta { color: var(--muted); font-size: 12px; margin: 2px 0 10px; }
+.tm-meta b { color: var(--fg-2); font-weight: 600; }
+.note { width: 100%; min-height: 56px; resize: vertical; border: var(--hairline) solid var(--note-line); background: var(--note-bg); border-radius: var(--r-sm); padding: 6px 8px; font-size: 12px; outline: none; }
+.note:focus { box-shadow: 0 0 0 2px var(--accent); border-color: transparent; }
+.acts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.btn { height: 26px; padding: 0 10px; border-radius: var(--r-sm); background: var(--pill); color: var(--fg-2); font-size: 12px; display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover { background: var(--pill-hover); color: var(--fg); }
+.btn.primary { background: var(--accent); color: var(--accent-fg); }
+.btn.danger { color: var(--red); }
+.btn.danger.solid { background: var(--red); color: #fff; }
+.btn kbd { background: transparent; padding: 0; color: inherit; opacity: .6; }
+.inline { margin-top: 10px; padding: 10px; border-radius: var(--r-sm); background: var(--card-2); box-shadow: 0 0 0 var(--hairline) var(--line); font-size: 12px; }
+.inline.warn { background: var(--red-soft); box-shadow: none; }
+.inline p { margin: 0 0 8px; }
+.pick { display: flex; flex-direction: column; gap: 1px; max-height: 150px; overflow: auto; margin: 6px 0 8px; }
+.pick button { display: flex; justify-content: space-between; height: 26px; align-items: center; padding: 0 8px; border-radius: 5px; text-align: left; }
+.pick button:hover { background: var(--pill); }
+.pick button.on { background: var(--sel); color: var(--fg); }
+.pick .n { color: var(--muted); font-variant-numeric: tabular-nums; }
+.pick-in { width: 100%; height: 26px; border: 0; border-radius: 5px; padding: 0 8px; background: var(--card); box-shadow: 0 0 0 var(--hairline) var(--line); outline: none; }
+.pick-in:focus { box-shadow: 0 0 0 2px var(--accent); }
+.preview { color: var(--fg-2); }
+.preview b { color: var(--fg); }
+.suggest { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--r-sm); background: var(--amber-soft); font-size: 12px; color: var(--fg-2); }
+.suggest .sp { flex: 1; }
+.suggest button { color: var(--amber); font-weight: 600; font-size: 12px; }
+
+.tl { display: flex; flex-direction: column; }
+.tl .r { display: grid; grid-template-columns: 18px 1fr 44px; gap: 6px; align-items: center; height: 28px; padding: 0 6px; border-radius: 5px; cursor: default; }
+.tl .r:hover { background: color-mix(in srgb, var(--fg) 3%, transparent); }
+.tl .r.on { background: var(--sel); }
+.tl .r .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tl .r .nm small { color: var(--muted); margin-left: 6px; font-style: italic; }
+.tl .r .n { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tl input[type=checkbox] { margin: 0; accent-color: var(--accent); }
+.tl .zero .nm { color: var(--muted); }
+.multibar { position: sticky; bottom: 0; display: flex; align-items: center; gap: 6px; margin: 8px -14px -16px; padding: 8px 14px; background: var(--card); border-top: var(--hairline) solid var(--line-2); font-size: 12px; }
+.multibar .sp { flex: 1; }
+
+.status { margin-top: 8px; font-size: 12px; color: var(--green); min-height: 18px; }
+
+/* ---------- notes under the draft ---------- */
+.notes { max-width: 1360px; margin: 0 auto; padding: 0 16px 40px; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
+.notes .card { padding: 14px 16px; }
+.notes h2 { font-size: 13px; margin: 0 0 8px; }
+.notes ol, .notes ul { margin: 0; padding-left: 18px; color: var(--fg-2); font-size: 12.5px; }
+.notes li { margin: 4px 0; }
+.notes code { font: 12px var(--code); background: var(--pill); padding: 0 4px; border-radius: 4px; }
+
+@media (max-width: 900px) {
+  .lib { grid-template-columns: 1fr; height: auto; }
+  .main { height: 520px; }
+  .detail { min-height: 520px; }
+  .cols { --cols: minmax(160px, 1fr) 64px; }
+  .th > :nth-child(n+3), .row > :nth-child(n+3) { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="draft-top">
+  <h1>Mod library · Tag groups</h1>
+  <span class="faint">Draft · synthetic data · click group headers, Mods and the controls; ↑ ↓ ← → work in the table</span>
+  <span class="sp"></span>
+  <button class="chip-btn" id="theme">Toggle dark</button>
+</div>
+
+<div class="page">
+  <div class="lib">
+    <div class="side">
+      <section class="card fbar">
+        <div class="head"><span class="anum">1</span><span class="t">Filter</span></div>
+        <div class="search">⌕ <span>Search name, author, tag:…</span><kbd>/</kbd></div>
+      </section>
+      <section class="card detail">
+        <div class="head" id="dhead"></div>
+        <div class="dscroll" id="dscroll"></div>
+      </section>
+    </div>
+    <section class="card main cols">
+      <div class="head" id="mhead"></div>
+      <div class="rows" id="rows" tabindex="0"></div>
+      <div class="hints" id="hints"></div>
+    </section>
+  </div>
+</div>
+
+<div class="notes">
+  <section class="card">
+    <h2>What changes</h2>
+    <ol>
+      <li><b>View switch</b> at the right of the table heading: <i>Mods</i> | <i>Tags</i>. Saved in <code>ui.gui.library.view</code>. Filters, sorting, columns and selection carry over between views.</li>
+      <li><b>Tags view</b> adds a group header row per tag: name, Mod count, total size and the first line of the tag note. Mods inside a group sort by the current column; their copies expand as today (<code>└ SteamCMD</code>, <code>└ Workshop</code>).</li>
+      <li>A Mod with several tags appears <b>in each of its groups</b>; a small <span class="dup">+2</span> marks that it also sits elsewhere. Mods without tags gather in <b>No tag</b> at the end.</li>
+      <li>Group order follows the tag bar (16 §3.8): pinned tags first, then by Mod count. Groups that the filter empties disappear.</li>
+      <li><b>Cursor on a group header, or no Mod selected</b>: the left details become the <b>Tag manager</b>. Cursor on a Mod or copy: the usual Mod and copy details.</li>
+    </ol>
+  </section>
+  <section class="card">
+    <h2>Tag manager</h2>
+    <ul>
+      <li><b>Rename</b>: the tag name is an editable title. Renaming to an existing tag turns into a merge preview.</li>
+      <li><b>Note</b>: one note per tag, shown in the group header and in tag candidates.</li>
+      <li><b>Merge into…</b>: pick a target (or type a new name); the preview counts Mods that already have both. Several tags can be checked in the list and merged at once.</li>
+      <li><b>Delete</b>: inline confirmation naming the Mod count. Only removes the tag from Mods; files and lists are untouched.</li>
+      <li><b>Similar tags</b> hint: names equal apart from case, spaces or plural (<i>visuals</i>, <i>Visual</i>, <i>visual effects</i>?) get a one-click merge suggestion.</li>
+      <li>Tag changes stay player data, outside plan undo (16 §3.8), so delete and merge always confirm.</li>
+    </ul>
+  </section>
+  <section class="card">
+    <h2>Open questions</h2>
+    <ul>
+      <li>Tags are stored per game environment today. Should rename / merge / delete / note apply to the current environment only (proposed), or to all?</li>
+      <li>Pinned tags with no Mods: listed greyed in the manager (proposed) or hidden?</li>
+      <li>Key for the view switch: proposed <kbd>v</kbd> (free on this page). TUI: same grouping later, or GUI only for now?</li>
+      <li>CLI / MCP: <code>archo tag rename|merge|delete|note</code> and a <code>manage_tags</code> MCP action — in the same change, or after?</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+// ---------- synthetic data ----------
+const TAGS = {
+  framework: { pinned: true, note: "Libraries other Mods need. Keep near the top of every list." },
+  visuals: { pinned: true, note: "" },
+  apparel: { pinned: true, note: "" },
+  races: { pinned: true, note: "Xenotypes and alien races; check balance before adding." },
+  weapons: { pinned: true, note: "" },
+  QoL: { pinned: true, note: "Small fixes I always want on." },
+  testing: { pinned: true, note: "" },
+  "to delete": { pinned: true, note: "Unused for 3+ months; review then delete." },
+  Visual: { pinned: false, note: "" },
+  "visual effects": { pinned: false, note: "" },
+  performance: { pinned: true, note: "" },
+};
+const C = (label, size, src, used, st) => ({ label, size, src, used, st });
+const MODS = [
+  { name: "Harmony", size: 1.2, src: "Workshop", used: "4 lists", tags: ["framework"], copies: [] },
+  { name: "Vanilla Expanded Framework", size: 85, src: "Workshop / SteamCMD", used: "3 lists", tags: ["framework"], copies: [C("Workshop", 43, "Workshop", "Main colony"), C("SteamCMD", 42, "SteamCMD", "Test")] },
+  { name: "HugsLib", size: 3.1, src: "Workshop", used: "2 lists", tags: ["framework"], copies: [] },
+  { name: "XML Extensions", size: 2.4, src: "Workshop", used: "2 lists", tags: ["framework", "testing"], copies: [] },
+  { name: "Humanoid Alien Races", size: 6.8, src: "Workshop / Lock library", used: "2 lists", tags: ["framework", "races"], copies: [C("Workshop", 3.4, "Workshop", "Main colony", "Upstream updated"), C("Locked version 2026/10/21 14:27", 3.4, "Locked version", "Test")] },
+  { name: "Vanilla Textures Expanded", size: 410, src: "Workshop", used: "1 list", tags: ["visuals"], copies: [] },
+  { name: "Dubs Paint Shop", size: 12, src: "Workshop", used: "1 list", tags: ["visuals", "QoL"], copies: [] },
+  { name: "[NL] Facial Animation", size: 220, src: "Workshop", used: "1 list", tags: ["visuals", "Visual"], copies: [] },
+  { name: "Vanilla Hair Expanded", size: 96, src: "Workshop", used: "2 lists", tags: ["Visual"], copies: [] },
+  { name: "Glowing Effects", size: 7.5, src: "Local", used: "—", tags: ["visual effects"], copies: [] },
+  { name: "Vanilla Apparel Expanded", size: 140, src: "Workshop", used: "2 lists", tags: ["apparel"], copies: [] },
+  { name: "Rimsenal Core", size: 64, src: "Workshop", used: "1 list", tags: ["apparel", "weapons"], copies: [] },
+  { name: "Vanilla Weapons Expanded", size: 120, src: "Workshop", used: "1 list", tags: ["weapons"], copies: [] },
+  { name: "Combat Extended", size: 380, src: "Workshop", used: "—", tags: ["weapons", "to delete"], copies: [] },
+  { name: "Erin's Japanese Clothing", size: 33, src: "Workshop", used: "1 list", tags: ["apparel"], copies: [] },
+  { name: "Kurin HAR Edition", size: 150, src: "Workshop / Local", used: "1 list", tags: ["races"], copies: [C("Workshop", 75, "Workshop", "Main colony"), C("Local", 75, "Local", "—", "Game ignores this copy")] },
+  { name: "Ratkin Species", size: 88, src: "Workshop", used: "1 list", tags: ["races"], copies: [] },
+  { name: "RimHUD", size: 2.2, src: "Workshop", used: "4 lists", tags: ["QoL"], copies: [] },
+  { name: "Allow Tool", size: 1.9, src: "Workshop", used: "4 lists", tags: ["QoL"], copies: [] },
+  { name: "Replace Stuff", size: 0.9, src: "Workshop", used: "3 lists", tags: ["QoL"], copies: [] },
+  { name: "Performance Optimizer", size: 1.1, src: "Workshop", used: "4 lists", tags: ["performance"], copies: [] },
+  { name: "Dubs Performance Analyzer", size: 4.0, src: "Workshop", used: "—", tags: ["performance", "testing"], copies: [] },
+  { name: "Old Medieval Overhaul", size: 520, src: "Workshop", used: "—", tags: ["to delete"], copies: [] },
+  { name: "Real Ruins", size: 140, src: "Workshop", used: "1 list", tags: [], copies: [] },
+  { name: "Save Our Ship 2", size: 230, src: "Workshop", used: "—", tags: [], copies: [] },
+  { name: "Character Editor", size: 3.0, src: "Workshop", used: "2 lists", tags: [], copies: [] },
+];
+
+// ---------- state ----------
+const S = { view: "tags", cur: 0, open: new Set(["Vanilla Expanded Framework|framework"]), closed: new Set(), tag: null, mode: null, mergeTarget: null, mergeQ: "", checked: new Set(), status: "" };
+const $ = (s) => document.querySelector(s);
+const el = (tag, cls, txt) => { const n = document.createElement(tag); if (cls) n.className = cls; if (txt != null) n.textContent = txt; return n; };
+const fmt = (mb) => mb >= 1000 ? (mb / 1000).toFixed(1) + " GB" : (mb >= 10 ? Math.round(mb) : mb.toFixed(1)) + " MB";
+const usage = () => { const m = new Map(Object.keys(TAGS).map(t => [t, 0])); MODS.forEach(x => x.tags.forEach(t => m.set(t, (m.get(t) || 0) + 1))); return m; };
+const tagOrder = () => { const u = usage(); return Object.keys(TAGS).sort((a, b) => (TAGS[b].pinned - TAGS[a].pinned) || (u.get(b) - u.get(a)) || a.localeCompare(b)); };
+
+function flat() {
+  const out = [];
+  const pushMod = (m, grp) => {
+    const key = m.name + "|" + (grp || "");
+    out.push({ t: "mod", m, grp, key });
+    if (m.copies.length && S.open.has(key)) m.copies.forEach((c, i) => out.push({ t: "copy", m, c, grp, last: i === m.copies.length - 1 }));
+  };
+  if (S.view === "mods") { [...MODS].sort((a, b) => a.name.localeCompare(b.name)).forEach(m => pushMod(m)); return out; }
+  const u = usage();
+  for (const t of tagOrder()) {
+    if (!u.get(t)) continue;
+    out.push({ t: "grp", tag: t });
+    if (S.closed.has(t)) continue;
+    MODS.filter(m => m.tags.includes(t)).sort((a, b) => a.name.localeCompare(b.name)).forEach(m => pushMod(m, t));
+  }
+  const none = MODS.filter(m => !m.tags.length);
+  if (none.length) { out.push({ t: "grp", tag: null }); if (!S.closed.has("")) none.forEach(m => pushMod(m, "")); }
+  return out;
+}
+let F = [];
+
+// ---------- table ----------
+function drawHead() {
+  const h = $("#mhead"); h.innerHTML = "";
+  const total = MODS.reduce((s, m) => s + m.size, 0);
+  h.append(el("span", "anum", "2"), el("span", "t", "2,200 mods"), el("span", "", fmt(total * 18)));
+  if (S.view === "tags") h.append(el("span", "", "· " + [...usage().values()].filter(Boolean).length + " tags"));
+  h.append(el("span", "sp"));
+  const seg = el("div", "seg"); seg.setAttribute("role", "tablist");
+  for (const [k, lbl] of [["mods", "Mods"], ["tags", "Tags"]]) {
+    const b = el("button", S.view === k ? "on" : "", lbl); b.setAttribute("role", "tab");
+    b.onclick = () => setView(k); seg.append(b);
+  }
+  const k = el("kbd", "", "v"); k.style.marginLeft = "6px";
+  h.append(seg, k);
+}
+function drawRows() {
+  F = flat();
+  if (S.cur >= F.length) S.cur = F.length - 1;
+  const box = $("#rows"); box.innerHTML = "";
+  const th = el("div", "th");
+  th.append(el("span", "name on", "Name ▴"), el("span", "r", "Size"), el("span", "", "State"), el("span", "", "Source"), el("span", "", "Used in"));
+  box.append(th);
+  const u = usage();
+  F.forEach((x, i) => {
+    let r;
+    if (x.t === "grp") {
+      const closed = S.closed.has(x.tag ?? "");
+      r = el("div", "row grp" + (x.tag == null ? " none" : ""));
+      const nm = el("span", "nm");
+      nm.append(el("span", "tw", closed ? "▸" : "▾"));
+      const mods = x.tag == null ? MODS.filter(m => !m.tags.length) : MODS.filter(m => m.tags.includes(x.tag));
+      nm.append(el("span", "gname", x.tag ?? "No tag"));
+      nm.append(el("span", "gcount", mods.length + (mods.length === 1 ? " mod" : " mods")));
+      if (x.tag && TAGS[x.tag].pinned) nm.append(el("span", "pin", "· pinned"));
+      if (x.tag && TAGS[x.tag].note) nm.append(el("span", "gnote", TAGS[x.tag].note));
+      r.append(nm, el("span", "r", fmt(mods.reduce((s, m) => s + m.size, 0))), el("span"), el("span"), el("span"));
+      r.ondblclick = () => toggleGroup(x.tag);
+      nm.firstChild.onclick = (e) => { e.stopPropagation(); toggleGroup(x.tag); };
+    } else if (x.t === "mod") {
+      const m = x.m, inG = S.view === "tags";
+      r = el("div", "row mod" + (inG ? " in" : ""));
+      const nm = el("span", "nm");
+      const tw = el("span", "tw", m.copies.length ? (S.open.has(x.key) ? "▾" : "▸") : "");
+      tw.onclick = (e) => { e.stopPropagation(); toggleMod(x.key); };
+      nm.append(tw, el("span", "tx", m.name));
+      if (inG && m.tags.length > 1) { const d = el("span", "dup", "+" + (m.tags.length - 1)); d.title = "Also in: " + m.tags.filter(t => t !== x.grp).join(", "); nm.append(d); }
+      const st = m.copies.find(c => c.st);
+      r.append(nm, el("span", "r", fmt(m.size)), el("span", st ? "st-warn" : "m", st ? st.st : ""), el("span", "m", m.src), el("span", "m", m.used));
+    } else {
+      r = el("div", "row copy" + (S.view === "tags" ? " in" : ""));
+      const nm = el("span", "nm"); nm.append(el("span", "lead", x.last ? "└" : "├"), el("span", "tx", x.c.label));
+      r.append(nm, el("span", "r", fmt(x.c.size)), el("span", x.c.st ? "st-warn" : "m", x.c.st || ""), el("span", "m", x.c.src), el("span", "m", x.c.used));
+    }
+    if (i === S.cur) r.classList.add("cur");
+    r.onclick = () => { S.cur = i; S.mode = null; S.status = ""; draw(); };
+    box.append(r);
+  });
+  const cur = box.querySelectorAll(".row")[S.cur];
+  if (cur) { const top = cur.offsetTop - 28, bot = cur.offsetTop + cur.offsetHeight; if (top < box.scrollTop) box.scrollTop = top; else if (bot > box.scrollTop + box.clientHeight) box.scrollTop = bot - box.clientHeight; }
+}
+function drawHints() {
+  const h = $("#hints"), x = F[S.cur];
+  const items = S.view === "tags" && x && x.t === "grp"
+    ? [["← →", "collapse / expand"], ["F2", "rename"], ["n", "note"], ["M", "merge into…"], ["Del", "delete tag"], ["v", "Mods view"]]
+    : [["↑ ↓", "move"], ["← →", "copies"], ["g", "tags"], ["enter", "full details"], ["v", S.view === "tags" ? "Mods view" : "Tags view"]];
+  h.innerHTML = items.map(([k, t]) => `<span><kbd>${k}</kbd> ${t}</span>`).join("");
+}
+
+// ---------- details ----------
+function draw() { drawHead(); drawRows(); drawHints(); drawDetail(); }
+function drawDetail() {
+  const x = F[S.cur];
+  const tagMode = S.view === "tags" && (!x || x.t === "grp");
+  if (tagMode) { S.tag = x && x.tag != null ? x.tag : null; return drawTagManager(); }
+  drawMod(x);
+}
+function drawMod(x) {
+  const h = $("#dhead"), d = $("#dscroll");
+  h.innerHTML = ""; d.innerHTML = "";
+  h.append(el("span", "anum", "3"), el("span", "t", "Details"), el("span", "", x.t === "copy" ? x.c.label : ""), el("span", "sp"), el("span", "", "View full details ↵"));
+  const m = x.m;
+  d.append(el("div", "mname", m.name));
+  const f = el("div", "fields");
+  const tags = el("div", "tagchips");
+  m.tags.forEach(t => tags.append(el("span", "tagchip", t)));
+  if (!m.tags.length) tags.append(el("span", "", "—"));
+  tags.append(el("button", "edit", "edit"));
+  const rows = [["Tags", tags], ["Source", m.src], ["Size", fmt(x.t === "copy" ? x.c.size : m.size)], ["Used in", x.t === "copy" ? x.c.used : m.used], ["Author", "—"], ["Supported", "1.5, 1.6"]];
+  for (const [k, v] of rows) { f.append(el("span", "k", k)); const c = el("span"); typeof v === "string" ? c.textContent = v : c.append(v); f.append(c); }
+  d.append(f);
+  const p = el("p", "", "The rest of the details are unchanged from today (copy note, actions, image, description, history).");
+  p.style.cssText = "color:var(--muted);font-size:12px;margin-top:16px";
+  d.append(p);
+}
+
+function similar(t) {
+  const norm = (s) => s.toLowerCase().replace(/[\s_-]+/g, "").replace(/s$/, "");
+  const n = norm(t);
+  return Object.keys(TAGS).filter(o => o !== t && usage().get(o) && (norm(o) === n || norm(o).startsWith(n) || n.startsWith(norm(o))));
+}
+
+function drawTagManager() {
+  const h = $("#dhead"), d = $("#dscroll"), u = usage();
+  h.innerHTML = ""; d.innerHTML = "";
+  const used = [...u.entries()].filter(([, n]) => n);
+  h.append(el("span", "anum", "3"), el("span", "t", "Tags"), el("span", "", used.length + " tags · " + MODS.filter(m => m.tags.length).length + " tagged mods"));
+
+  // selected tag
+  if (S.tag) {
+    const t = S.tag, info = TAGS[t], mods = MODS.filter(m => m.tags.includes(t));
+    const sec = el("div", "tm-sec");
+    const nm = el("div", "tm-name");
+    const inp = el("input"); inp.value = t; inp.title = "Click to rename · enter saves · esc cancels";
+    inp.onkeydown = (e) => {
+      if (e.key === "Escape") { inp.value = t; inp.blur(); }
+      if (e.key === "Enter") { const v = inp.value.trim(); if (!v || v === t) return inp.blur(); if (TAGS[v]) { S.mode = "merge"; S.mergeTarget = v; draw(); } else rename(t, v); }
+    };
+    nm.append(inp);
+    const pin = el("button", "btn", info.pinned ? "★ Pinned" : "☆ Pin");
+    pin.title = "Pinned tags come first in the tag bar and in groups (tags.pinned)";
+    pin.onclick = () => { info.pinned = !info.pinned; draw(); };
+    nm.append(pin);
+    sec.append(nm);
+    const meta = el("div", "tm-meta");
+    meta.innerHTML = `<b>${mods.length}</b> mods · ${fmt(mods.reduce((s, m) => s + m.size, 0))} · used in ${mods.filter(m => m.used !== "—").length} of them`;
+    sec.append(meta);
+
+    const cap = el("div", "tm-cap", "Note"); sec.append(cap);
+    const note = el("textarea", "note"); note.placeholder = "What is this tag for? Shown in the group header and the tag bar.";
+    note.value = info.note; note.oninput = () => { info.note = note.value; drawRows(); };
+    sec.append(note);
+
+    const acts = el("div", "acts");
+    const bMerge = el("button", "btn"); bMerge.innerHTML = "Merge into… <kbd>M</kbd>"; bMerge.onclick = () => { S.mode = S.mode === "merge" ? null : "merge"; S.mergeTarget = null; S.mergeQ = ""; drawDetail(); };
+    const bDel = el("button", "btn danger"); bDel.innerHTML = "Delete tag <kbd>Del</kbd>"; bDel.onclick = () => { S.mode = S.mode === "delete" ? null : "delete"; drawDetail(); };
+    const bShow = el("button", "btn", "Filter to this tag"); bShow.title = "Puts tags:\"" + t + "\" into the filter";
+    acts.append(bMerge, bDel, bShow);
+    sec.append(acts);
+
+    if (S.mode === "merge") sec.append(mergeBox([t]));
+    if (S.mode === "delete") sec.append(deleteBox([t]));
+
+    const sim = similar(t);
+    if (sim.length && S.mode !== "merge") {
+      const s = el("div", "suggest"); s.style.marginTop = "10px";
+      s.append(el("span", "", "Looks similar: " + sim.join(", ")), el("span", "sp"));
+      const b = el("button", "", "Merge here…"); b.onclick = () => { S.mode = "merge"; S.mergeTarget = t; S.mergeSources = sim; drawDetail(); };
+      s.append(b); sec.append(s);
+    }
+    const st = el("div", "status", S.status); sec.append(st);
+    d.append(sec);
+  } else {
+    const sec = el("div", "tm-sec");
+    const p = el("div", "tm-meta"); p.innerHTML = "Select a group header to rename, note, merge or delete its tag, or check several tags below.";
+    sec.append(p);
+    const st = el("div", "status", S.status); sec.append(st);
+    d.append(sec);
+  }
+
+  // all tags
+  const all = el("div", "tm-sec");
+  const cap = el("div", "tm-cap"); cap.append(el("span", "", "All tags"), el("span", "sp"), el("span", "", "mods"));
+  all.append(cap);
+  const list = el("div", "tl");
+  for (const t of tagOrder()) {
+    const n = u.get(t);
+    const r = el("div", "r" + (t === S.tag ? " on" : "") + (n ? "" : " zero"));
+    const cb = el("input"); cb.type = "checkbox"; cb.checked = S.checked.has(t);
+    cb.onclick = (e) => { e.stopPropagation(); cb.checked ? S.checked.add(t) : S.checked.delete(t); S.mode = null; drawDetail(); };
+    const nm = el("span", "nm", t);
+    if (TAGS[t].note) nm.append(el("small", "", TAGS[t].note));
+    if (!n) nm.append(el("small", "", "pinned, unused"));
+    r.append(cb, nm, el("span", "n", n || "—"));
+    r.onclick = () => { const i = F.findIndex(x => x.t === "grp" && x.tag === t); if (i >= 0) { S.cur = i; S.mode = null; S.status = ""; draw(); } };
+    list.append(r);
+  }
+  all.append(list);
+  d.append(all);
+
+  if (S.checked.size) {
+    const bar = el("div", "multibar");
+    bar.append(el("span", "", S.checked.size + " checked"), el("span", "sp"));
+    const m = el("button", "btn", "Merge…"); m.onclick = () => { S.mode = "multimerge"; drawDetail(); };
+    const del = el("button", "btn danger", "Delete…"); del.onclick = () => { S.mode = "multidelete"; drawDetail(); };
+    const c = el("button", "btn", "Clear"); c.onclick = () => { S.checked.clear(); S.mode = null; drawDetail(); };
+    bar.append(m, del, c);
+    d.append(bar);
+    if (S.mode === "multimerge") bar.before(mergeBox([...S.checked]));
+    if (S.mode === "multidelete") bar.before(deleteBox([...S.checked]));
+  }
+}
+
+function mergeBox(sources) {
+  if (S.mergeSources && S.mode === "merge") sources = S.mergeSources;
+  const box = el("div", "inline");
+  const lbl = sources.length === 1 ? `Merge <b>${sources[0]}</b> into:` : `Merge <b>${sources.join(", ")}</b> into:`;
+  box.append(Object.assign(el("p"), { innerHTML: lbl }));
+  const q = el("input", "pick-in"); q.placeholder = "Find a tag, or type a new name"; q.value = S.mergeQ;
+  box.append(q);
+  const pick = el("div", "pick");
+  const u = usage();
+  const fill = () => {
+    pick.innerHTML = "";
+    const v = q.value.trim().toLowerCase();
+    const cands = tagOrder().filter(t => !sources.includes(t) && (!v || t.toLowerCase().includes(v)));
+    if (sources.length > 1) sources.forEach(s => { if (!v || s.toLowerCase().includes(v)) cands.unshift(s); });
+    for (const t of cands) {
+      const b = el("button", t === S.mergeTarget ? "on" : "");
+      b.append(el("span", "", t + (sources.includes(t) ? "  (keep this one)" : "")), el("span", "n", u.get(t) || "—"));
+      b.onclick = () => { S.mergeTarget = t; S.mergeQ = q.value; fill(); prev(); };
+      pick.append(b);
+    }
+    if (v && !TAGS[q.value.trim()]) {
+      const b = el("button", S.mergeTarget === q.value.trim() ? "on" : "");
+      b.append(el("span", "", "+ new tag \"" + q.value.trim() + "\""), el("span", "n", ""));
+      b.onclick = () => { S.mergeTarget = q.value.trim(); S.mergeQ = q.value; fill(); prev(); };
+      pick.append(b);
+    }
+  };
+  q.oninput = () => { S.mergeQ = q.value; fill(); };
+  box.append(pick);
+  const pv = el("p", "preview");
+  const prev = () => {
+    const tgt = S.mergeTarget;
+    if (!tgt) { pv.textContent = "Pick a target to see what changes."; go.disabled = true; go.style.opacity = .5; return; }
+    const from = sources.filter(s => s !== tgt);
+    const set = new Set(MODS.filter(m => m.tags.some(t => from.includes(t) || t === tgt)));
+    const both = MODS.filter(m => m.tags.includes(tgt) && m.tags.some(t => from.includes(t))).length;
+    pv.innerHTML = `<b>${from.join(", ")}</b> → <b>${tgt}</b>: ${set.size} mods will have <b>${tgt}</b>` + (both ? ` (${both} already had both)` : "") + `. ${from.join(", ")} ${from.length > 1 ? "are" : "is"} removed. Notes are joined.`;
+    go.disabled = false; go.style.opacity = 1;
+  };
+  box.append(pv);
+  const acts = el("div", "acts");
+  const go = el("button", "btn primary", "Merge"); go.onclick = () => merge(sources, S.mergeTarget);
+  const cancel = el("button", "btn", "Cancel"); cancel.onclick = () => { S.mode = null; S.mergeSources = null; drawDetail(); };
+  acts.append(go, cancel); box.append(acts);
+  fill(); prev();
+  return box;
+}
+function deleteBox(tags) {
+  const box = el("div", "inline warn");
+  const n = MODS.filter(m => m.tags.some(t => tags.includes(t))).length;
+  box.append(Object.assign(el("p"), { innerHTML: `Remove <b>${tags.join(", ")}</b> from ${n} mods? Mod files and lists are not touched. Tag changes cannot be undone with <kbd>u</kbd>.` }));
+  const acts = el("div", "acts");
+  const go = el("button", "btn danger solid", "Delete " + (tags.length > 1 ? tags.length + " tags" : "tag"));
+  go.onclick = () => del(tags);
+  const c = el("button", "btn", "Cancel"); c.onclick = () => { S.mode = null; drawDetail(); };
+  acts.append(go, c); box.append(acts);
+  setTimeout(() => go.focus(), 0);
+  return box;
+}
+
+// ---------- actions (draft-only, in memory) ----------
+function rename(a, b) {
+  TAGS[b] = TAGS[a]; delete TAGS[a];
+  MODS.forEach(m => m.tags = m.tags.map(t => t === a ? b : t));
+  S.status = `Renamed ${a} → ${b} on ${MODS.filter(m => m.tags.includes(b)).length} mods.`;
+  S.mode = null; F = flat(); S.cur = Math.max(0, flat().findIndex(x => x.t === "grp" && x.tag === b)); draw();
+}
+function merge(sources, tgt) {
+  if (!tgt) return;
+  const from = sources.filter(s => s !== tgt);
+  if (!TAGS[tgt]) TAGS[tgt] = { pinned: false, note: "" };
+  const notes = [TAGS[tgt].note, ...from.map(f => TAGS[f].note)].filter(Boolean);
+  TAGS[tgt].note = [...new Set(notes)].join(" ");
+  MODS.forEach(m => { if (m.tags.some(t => from.includes(t))) { m.tags = m.tags.filter(t => !from.includes(t)); if (!m.tags.includes(tgt)) m.tags.push(tgt); } });
+  from.forEach(f => delete TAGS[f]);
+  S.status = `Merged ${from.join(", ")} into ${tgt}.`;
+  S.mode = null; S.mergeSources = null; S.checked.clear();
+  S.cur = Math.max(0, flat().findIndex(x => x.t === "grp" && x.tag === tgt)); draw();
+}
+function del(tags) {
+  const n = MODS.filter(m => m.tags.some(t => tags.includes(t))).length;
+  MODS.forEach(m => m.tags = m.tags.filter(t => !tags.includes(t)));
+  tags.forEach(t => { if (!TAGS[t].pinned) delete TAGS[t]; });
+  S.status = `Removed ${tags.join(", ")} from ${n} mods.`;
+  S.mode = null; S.checked.clear(); draw();
+}
+function setView(v) {
+  const x = F[S.cur]; S.view = v; S.mode = null; S.status = "";
+  const nf = flat();
+  const name = x && x.m && x.m.name;
+  S.cur = name ? Math.max(0, nf.findIndex(y => y.t === "mod" && y.m.name === name)) : 0;
+  draw();
+}
+function toggleGroup(tag) { const k = tag ?? ""; S.closed.has(k) ? S.closed.delete(k) : S.closed.add(k); draw(); }
+function toggleMod(key) { S.open.has(key) ? S.open.delete(key) : S.open.add(key); draw(); }
+
+$("#rows").addEventListener("keydown", (e) => {
+  const x = F[S.cur];
+  if (e.key === "ArrowDown") { S.cur = Math.min(F.length - 1, S.cur + 1); S.mode = null; S.status = ""; }
+  else if (e.key === "ArrowUp") { S.cur = Math.max(0, S.cur - 1); S.mode = null; S.status = ""; }
+  else if (e.key === "ArrowLeft" && x) {
+    if (x.t === "grp") { if (!S.closed.has(x.tag ?? "")) toggleGroup(x.tag); return e.preventDefault(); }
+    if (x.t === "mod" && S.open.has(x.key)) return toggleMod(x.key), e.preventDefault();
+    for (let i = S.cur - 1; i >= 0; i--) if (F[i].t === (x.t === "copy" ? "mod" : "grp")) { S.cur = i; break; }
+  }
+  else if (e.key === "ArrowRight" && x) {
+    if (x.t === "grp" && S.closed.has(x.tag ?? "")) return toggleGroup(x.tag), e.preventDefault();
+    if (x.t === "mod" && x.m.copies.length && !S.open.has(x.key)) return toggleMod(x.key), e.preventDefault();
+  }
+  else if (e.key === "v") return setView(S.view === "tags" ? "mods" : "tags");
+  else if (x && x.t === "grp" && x.tag && (e.key === "Delete")) { S.mode = "delete"; drawDetail(); return e.preventDefault(); }
+  else if (x && x.t === "grp" && x.tag && (e.key === "M")) { S.mode = "merge"; S.mergeTarget = null; drawDetail(); return e.preventDefault(); }
+  else if (x && x.t === "grp" && x.tag && (e.key === "F2")) { $(".tm-name input").focus(); $(".tm-name input").select(); return e.preventDefault(); }
+  else if (x && x.t === "grp" && x.tag && (e.key === "n")) { $(".note").focus(); return e.preventDefault(); }
+  else return;
+  e.preventDefault(); draw();
+});
+$("#theme").onclick = () => {
+  const r = document.documentElement, dark = r.dataset.theme ? r.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  r.dataset.theme = dark ? "light" : "dark";
+};
+draw();
+$("#rows").focus();
+</script>
+</body>
+</html>

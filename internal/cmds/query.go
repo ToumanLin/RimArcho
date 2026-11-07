@@ -84,7 +84,7 @@ func scanCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			root.Addf("%s: %s -> %s: %s", l.Code, l.Path, l.Target, l.ShortReason())
 		}
 	}
-	// Archo Monitor (08 §9): install or update the bundled monitor, apply the default.
+	// Archo Monitor (19 §6): install or update the bundled monitor, apply the default.
 	if m, err := c.App.EnsureMonitor(false); err != nil {
 		root.KV("monitor", "error: "+err.Error())
 	} else {
@@ -233,7 +233,7 @@ func statusCmd(c *Ctx, a *Args) (*render.Doc, error) {
 						lp = append(lp, p)
 					}
 				}
-				text += ": " + shortCounts(lp) + ", not counted (archo problems --code log --all)"
+				text += ": " + shortCounts(lp) + ", not counted (" + logFoldedHint(r) + ")"
 			}
 			root.KV("log", text)
 		}
@@ -599,6 +599,12 @@ func modDoc(c *Ctx, ix *app.Index, m *store.Mod) (*render.Doc, error) {
 			}
 		}
 	}
+	// Its settings as the game reads them now (16 §2.9 "Mod settings").
+	if m.Status == identity.Live && m.Kind != source.Official {
+		if sm, err := c.App.ModSettingsOf(m); err == nil && len(sm.Files) > 0 {
+			settingsFiles(root.Section("settings"), sm, 10, "archo mod-settings "+ref)
+		}
+	}
 	if decl.ParseError != "" {
 		root.KV("warning", "About.xml: "+decl.ParseError)
 	}
@@ -608,7 +614,7 @@ func modDoc(c *Ctx, ix *app.Index, m *store.Mod) (*render.Doc, error) {
 	return d, nil
 }
 
-// changesCmd is the change history (06 §2.9) in text: one row per mod, by tier, for the
+// changesCmd is the change history (16 §2.9) in text: one row per mod, by tier, for the
 // current plan since it was last played (--library: every mod; --since: from then; a ref:
 // that mod's Lineage, every change by day).
 func changesCmd(c *Ctx, a *Args) (*render.Doc, error) {
@@ -815,7 +821,7 @@ func activeList(c *Ctx, a *Args) (*render.Doc, error) {
 	return d, nil
 }
 
-// loadoutStatus adds the workspace lines to status (04 §4.1, §2.3).
+// loadoutStatus adds the workspace lines to status (07 §4.1, §2.3).
 func loadoutStatus(c *Ctx, root *render.Node, d *render.Doc) {
 	st := c.Loadout()
 	if st == nil {
@@ -846,13 +852,13 @@ func loadoutStatus(c *Ctx, root *render.Node, d *render.Doc) {
 	}
 	root.KV("plan", plan)
 	root.KV("loadout", line)
-	// Archo Monitor (08 §9): shown once it is bundled or installed.
-	if s, err := c.App.MonitorState(); err == nil && (s.Bundled != nil || s.Source != nil || s.InPlan != nil) {
+	// Archo Monitor (19 §6): shown once it is bundled or installed.
+	if s, err := c.App.MonitorState(); err == nil && (s.Bundled != nil || s.Source != nil || s.Newest != nil || s.InPlan != nil) {
 		root.KV("monitor", MonitorPlanLine(c, s))
 	}
 	if run, _ := c.App.GameRunning(); run != nil {
 		w := c.App.WhatRuns(st.Ix.Env, run)
-		what := w.PlanText() // the plan, from the launch records (08 §4)
+		what := w.PlanText() // the plan, from the launch records (09 §4)
 		if what == "its list" {
 			what = "the list"
 		}

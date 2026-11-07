@@ -58,7 +58,7 @@ func main() {
 	w := bufio.NewWriter(os.Stdout)
 	fmt.Fprintf(w, "TERM_PROGRAM=%s  (each row: name |g|ggg| — bars must line up in one column)\n\n", os.Getenv("TERM_PROGRAM"))
 	section(w, "Nerd Font (Font Awesome 4 range)", nerd)
-	section(w, "06 §7 compat column as specified", old)
+	section(w, "16 §7 compat column as specified", old)
 	section(w, "Proposed compat column", proposed)
 	fmt.Fprintln(w, "CJK check: |中文|Ab|  ⇒ the bar after 中文 must be 4 cells after the first bar")
 	w.Flush()

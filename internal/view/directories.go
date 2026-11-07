@@ -40,7 +40,7 @@ func DirectoryGroup(a *app.App) SettingGroup {
 	g := SettingGroup{Title: T("managed directories")}
 	dirs, err := a.ManagedDirectories()
 	if err != nil {
-		g.Items = append(g.Items, SettingItem{Label: T("directory check failed"), Note: err.Error()})
+		g.Items = append(g.Items, SettingItem{Key: "directory.error", Label: T("directory check failed"), Note: err.Error()})
 		return g
 	}
 	// One note for the whole group; a row only says what is different about it.

@@ -10,7 +10,7 @@ import (
 
 // The launch page asks for its memory comparison every 30 seconds. An unchanged refresh
 // reuses the launch page's reader instead of rebuilding the index and list on a new
-// connection (07 §8.3).
+// connection (17 §7.3).
 func TestHomeMemoryReusesLaunchReader(t *testing.T) {
 	e, api, _ := fixture(t)
 	api.Board()
@@ -66,6 +66,7 @@ func TestHomeMemoryReusesLaunchReader(t *testing.T) {
 }
 
 func TestIdlePageReadersClose(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	api.Board()
 	if _, err := api.Library("", nil, ""); err != nil {

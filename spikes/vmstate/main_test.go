@@ -100,6 +100,9 @@ func TestSnapshotLegacyHistoryReadOnly(t *testing.T) {
 }
 
 func TestScaleFixture(t *testing.T) {
+	if os.Getenv("RIMARCHO_SCALE_TESTS") == "" {
+		t.Skip("set RIMARCHO_SCALE_TESTS=1: builds and scans a 4000-Mod fixture (about a minute)")
+	}
 	root := filepath.Join(t.TempDir(), "scale")
 	fixtureSized(root, true)
 	db, err := sql.Open("sqlite", "file:"+filepath.ToSlash(filepath.Join(root, "home", "archo.db"))+"?mode=ro")

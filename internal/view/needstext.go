@@ -3,7 +3,7 @@ package view
 import "regexp"
 
 // Can it run's card text (needs.go, evidence.go): the sections, the evidence chips, each
-// item's bold line and its explanation (06 §2.4, §5).
+// item's bold line and its explanation (16 §2.4, §5).
 func init() {
 	interfaceFormats = append(interfaceFormats,
 		interfaceFormat{"no usable installed copy for missing package %s", regexp.MustCompile(`^no usable installed copy for missing package (.+)$`)},

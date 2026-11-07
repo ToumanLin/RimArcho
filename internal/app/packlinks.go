@@ -11,11 +11,11 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
-// CodePackLinks is the finding for a pack's links left in Mods/ (08 §5.3).
+// CodePackLinks is the finding for a pack's links left in Mods/ (10 §3).
 const CodePackLinks = "pack.links-left"
 
 // PackLinksLeft is what a pack left in the environment's Mods/ while that pack is not being
-// played (08 §5.3): a game started from Steam, not from RimArcho, loads the pack's copies
+// played (10 §3): a game started from Steam, not from RimArcho, loads the pack's copies
 // (the "!" sorts first) instead of the plan's mods.
 type PackLinksLeft struct {
 	Mods  string       // the Mods/ folder
@@ -151,7 +151,7 @@ func (r *PackLinksLeft) Finding() *finding.Finding {
 	return f
 }
 
-// UnlinkPacks removes the !ArchoPack_ links from the current environment's Mods/ (08 §5.3):
+// UnlinkPacks removes the !ArchoPack_ links from the current environment's Mods/ (10 §3):
 // only the links, never what they point at. Refused while a game runs; launching a pack
 // makes them again.
 func (a *App) UnlinkPacks(dryRun bool) (*PackLinksLeft, error) {

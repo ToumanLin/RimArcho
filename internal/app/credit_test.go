@@ -229,6 +229,16 @@ func TestCreditActualLaunchHook(t *testing.T) {
 	if bs[0].ID != batch || bs[0].Sessions != 1 {
 		t.Fatal(bs)
 	}
+	// Failing to count the session does not fail a launch that started.
+	e.MustRun("enable", items[0].InstanceID)
+	if _, err := e.App.Store.DB.Exec(`CREATE TRIGGER reject_credit_session BEFORE INSERT ON credit_session BEGIN SELECT RAISE(FAIL,'test count failure'); END`); err != nil {
+		t.Fatal(err)
+	}
+	started := false
+	e.App.Launcher = func(string, []string, string) error { started = true; return nil }
+	if _, err := e.App.LaunchWith(false, false); err != nil || !started {
+		t.Fatalf("successful launch reported failure: started=%t err=%v", started, err)
+	}
 }
 
 func TestCreditReplacementResumeAndFailures(t *testing.T) {
@@ -924,21 +934,6 @@ func TestCreditReadinessWaitKeepsAttempts(t *testing.T) {
 			}
 			e.Advance(5 * time.Second)
 		}
-	}
-}
-
-func TestCreditLaunchCountFailureIsNonfatal(t *testing.T) {
-	t.Parallel()
-	e, _, items := creditEnv(t, "8100")
-	e.MustRun("env", "set", "main", "--launch", "direct")
-	e.MustRun("enable", items[0].InstanceID)
-	if _, err := e.App.Store.DB.Exec(`CREATE TRIGGER reject_credit_session BEFORE INSERT ON credit_session BEGIN SELECT RAISE(FAIL,'test count failure'); END`); err != nil {
-		t.Fatal(err)
-	}
-	started := false
-	e.App.Launcher = func(string, []string, string) error { started = true; return nil }
-	if _, err := e.App.LaunchWith(false, false); err != nil || !started {
-		t.Fatalf("successful launch reported failure: started=%t err=%v", started, err)
 	}
 }
 

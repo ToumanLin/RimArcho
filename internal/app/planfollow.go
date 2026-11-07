@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Following a Steam Workshop collection (04 §9.6): a plan remembers a collection and a
+// Following a Steam Workshop collection (07 §7.6): a plan remembers a collection and a
 // snapshot of its items. Changes are measured against the snapshot, not against the plan,
 // so a collection mod the player disabled is not offered again. RimArcho reads the
 // collection only when asked (the list management page, at most every CheckEvery, or
@@ -173,7 +173,7 @@ func (a *App) FollowCollection(planName, ref, mode string) (*Followed, error) {
 }
 
 // FollowReadCollection links a collection already read (an import that ticked "follow
-// this collection", 04 §9.1) to a plan, without reading it again.
+// this collection", 07 §7.1) to a plan, without reading it again.
 func (a *App) FollowReadCollection(p *store.Plan, col *Collection, mode string) (*Followed, error) {
 	st, err := a.Loadout()
 	if err != nil {
@@ -283,7 +283,7 @@ type SyncResult struct {
 	DryRun       bool
 }
 
-// SyncCollection catches a plan up with a followed collection (04 §9.6): it reads the
+// SyncCollection catches a plan up with a followed collection (07 §7.6): it reads the
 // collection when the last check is older than CheckEvery, enables the new installed
 // mods where the sort constraints suggest, and in follow mode disables the mods the
 // collection dropped; one undoable edit of that plan, named "sync collection <title>".

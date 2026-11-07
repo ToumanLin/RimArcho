@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"path"
 	"strings"
 	"time"
 
@@ -57,7 +58,7 @@ func (s *Store) CachedDefs(instanceID, key string) ([]analyze.DefFact, bool) {
 	return fs, err == nil
 }
 
-// defFields: file_ix indexes the set's file list (03 §3); scanDefs turns it into the path.
+// defFields: file_ix indexes the set's file list (05 §3); scanDefs turns it into the path.
 const defFields = `f.set_id, f.def_type, f.def_name, f.name, f.parent, f.abstract, f.file_ix, f.line, f.may_require, f.may_require_any`
 const defCols = `c.instance_id, ` + defFields
 const defView = ` FROM def_fact f JOIN content_state c ON c.def_set_id=f.set_id `
@@ -65,7 +66,7 @@ const defView = ` FROM def_fact f JOIN content_state c ON c.def_set_id=f.set_id 
 // defByName is defView for lookups by name: CROSS JOIN keeps the name index as the outer
 // loop. With a plain JOIN, ORDER BY c.instance_id makes SQLite walk every content_state row
 // of the version and probe the name index once per row: tens of times slower, more with
-// more mods (07 §6.2).
+// more mods (18 §2).
 const defByName = ` FROM def_fact f CROSS JOIN content_state c ON c.def_set_id=f.set_id `
 
 // The DefsNamed queries, by defName and by Name attribute.
@@ -124,7 +125,7 @@ func (s *Store) DefsOf(instanceID string) ([]analyze.DefFact, error) {
 // DefsNamed returns the Def facts with a defName (or, with byName, a Name attribute), by
 // instance ID and then file order. The order must not follow the table layout: rebuilt or
 // migrated facts get new rowids, and the first provider of a missing parent (and so a log
-// problem's ID) would change with them (03 §3).
+// problem's ID) would change with them (05 §3).
 func (s *Store) DefsNamed(name string, byName bool) ([]analyze.DefFact, error) {
 	q := defsByDefNameQ
 	if byName {
@@ -169,7 +170,7 @@ func (s *Store) ContentFolders(instanceID string) []string {
 // Analysis is one stored analysis run.
 type Analysis struct {
 	ID       int64
-	SetKey   string // the enabled set's fingerprint: the run's slot (03 §3)
+	SetKey   string // the enabled set's fingerprint: the run's slot (05 §3)
 	RunKey   string
 	MM       string
 	Version  int
@@ -179,7 +180,7 @@ type Analysis struct {
 }
 
 // SaveAnalysis persists a run: content states and rebuilt Def facts, the Patch facts and
-// findings. The run fills the slot (environment, mm, setKey) (03 §3): the slot's older run
+// findings. The run fills the slot (environment, mm, setKey) (05 §3): the slot's older run
 // is deleted, and so is every run of the environment whose set key is not in keep
 // (the enabled sets the environment's plans have now), so slots do not pile up as plans
 // are edited.
@@ -309,6 +310,15 @@ type PatchFilter struct {
 	FailedOnly bool
 	Target     string // "ThingDef/Gun_A": facts whose touched defs or XPath mention it
 	XPathPart  string // substring of the XPath
+	// DefName widens XPathPart: also facts whose touched defs (Targets) include a def of
+	// that name, and failed facts whose innermost XPath has XPathPart. A FindMod or
+	// Sequence has no XPath of its own; its nested operations are found this way (P26).
+	DefName string
+}
+
+// likeEscape escapes LIKE wildcards for ESCAPE '\'.
+func likeEscape(s string) string {
+	return strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(s)
 }
 
 // PatchFacts returns the Patch facts of a run, in load order of their files.
@@ -322,17 +332,21 @@ func (s *Store) PatchFacts(analysisID int64, f PatchFilter) ([]*analyze.PatchFac
 	if f.FailedOnly {
 		q += ` AND result='failed'`
 	}
-	if f.XPathPart != "" {
+	if f.XPathPart != "" && f.DefName != "" {
+		q += ` AND (instr(xpath, ?) > 0 OR instr(leaf, ?) > 0 OR ' ' || targets || ' ' LIKE ? ESCAPE '\')`
+		args = append(args, f.XPathPart, f.XPathPart, "%/"+likeEscape(f.DefName)+" %")
+	} else if f.XPathPart != "" {
 		q += ` AND instr(xpath, ?) > 0`
 		args = append(args, f.XPathPart)
 	}
 	if f.Target != "" {
-		q += ` AND (' ' || targets || ' ' LIKE ? OR instr(leaf, ?) > 0)`
+		// "_" in a def name is a LIKE wildcard: Lib_Gun must not match LibXGun.
+		q += ` AND (' ' || targets || ' ' LIKE ? ESCAPE '\' OR instr(leaf, ?) > 0)`
 		name := f.Target
 		if i := strings.IndexAny(name, "/@"); i >= 0 {
 			name = name[i+1:]
 		}
-		args = append(args, "% "+f.Target+" %", `"`+name+`"`)
+		args = append(args, "% "+likeEscape(f.Target)+" %", `"`+name+`"`)
 	}
 	rows, err := s.DB.Query(q+` ORDER BY rowid`, args...)
 	if err != nil {
@@ -371,7 +385,7 @@ func (s *Store) PatchCounts(analysisID int64) (map[string][2]int, error) {
 	return out, rows.Err()
 }
 
-// Ignore is a problem the player chose to ignore (03 §4.2).
+// Ignore is a problem the player chose to ignore (05 §4.2).
 type Ignore struct {
 	ID         int64
 	LineageID  string
@@ -482,7 +496,7 @@ func saveHarmony(tx *sql.Tx, asms []*analyze.AssemblyFacts, sets map[string]int6
 		}
 		for _, p := range a.Patches {
 			// dynamic holds two bits: 1 the target is chosen at run time, 2 the patch was
-			// found at a Harmony.Patch call in code (G9, 03 §5.3).
+			// found at a Harmony.Patch call in code (G9, 05 §5.3).
 			if _, err := insH.Exec(set, file, p.PatchType, p.PatchMethod, p.Kind, p.Target(), p.TargetType, p.TargetMethod, p.Args, b(p.Skips), b(p.Dynamic)|2*b(p.Manual)); err != nil {
 				return err
 			}
@@ -597,24 +611,39 @@ func (s *Store) Assemblies(instanceID string) ([]*AssemblyRow, error) {
 // TypeOwners returns the (instance, file) pairs defining a type full name. Nested types are
 // stored with '+'; stack frames may print either.
 func (s *Store) TypeOwners(name string) ([][2]string, error) {
-	alt := strings.ReplaceAll(name, ".", "+")
-	out, err := s.typeOwners(`f.type_name IN (?, ?)`, name, alt)
-	if err != nil {
-		return nil, err
+	var out [][2]string
+	err := nestedForms(name, func(names ...string) (bool, error) {
+		var err error
+		out, err = s.typeOwners(`f.type_name IN (`+placeholders(len(names))+`)`, anys(names)...)
+		return len(out) > 0, err
+	})
+	return out, err
+}
+
+// nestedForms calls look with the stored forms of a type name until one finds something:
+// the name as given together with every '.' turned into '+', then (a nested type printed
+// with dots) the last dots turned into '+' one at a time: "A.B.Outer.Inner" →
+// "A.B.Outer+Inner", then "A.B+Outer+Inner".
+func nestedForms(name string, look func(names ...string) (bool, error)) error {
+	if ok, err := look(name, strings.ReplaceAll(name, ".", "+")); ok || err != nil {
+		return err
 	}
-	if len(out) == 0 && strings.Contains(name, ".") {
-		// Nested types: try replacing the last dot(s) with '+' one at a time.
-		parts := strings.Split(name, ".")
-		for k := len(parts) - 1; k > 1 && len(out) == 0; k-- {
-			cand := strings.Join(parts[:k], ".") + "+" + strings.Join(parts[k:], "+")
-			r, err := s.TypeOwners0(cand)
-			if err != nil {
-				return nil, err
-			}
-			out = r
+	parts := strings.Split(name, ".")
+	for k := len(parts) - 1; k > 1; k-- {
+		cand := strings.Join(parts[:k], ".") + "+" + strings.Join(parts[k:], "+")
+		if ok, err := look(cand); ok || err != nil {
+			return err
 		}
 	}
-	return out, nil
+	return nil
+}
+
+func anys(ss []string) []any {
+	out := make([]any, len(ss))
+	for i, s := range ss {
+		out[i] = s
+	}
+	return out
 }
 
 // TypeOwners0 is TypeOwners for an exact stored name.
@@ -698,4 +727,103 @@ func (s *Store) DecompileRecords(instance string) ([]*DecompileRecord, error) {
 		out = append(out, &r)
 	}
 	return out, rows.Err()
+}
+
+// TypesUnder returns the distinct type names of Store.MM's analysed assemblies in the root
+// namespace root ("VanillaFurnitureEC" → "VanillaFurnitureEC.…"), each with the instances
+// defining it, at most limit names: the candidates a misspelled class is compared with
+// (06 §2, "did you mean").
+func (s *Store) TypesUnder(root string, limit int) (map[string][]string, error) {
+	rows, err := s.DB.Query(`SELECT DISTINCT f.type_name, c.instance_id FROM type_fact f CROSS JOIN content_state c ON c.dll_set_id=f.set_id
+ WHERE f.type_name >= ? AND f.type_name < ? AND instr(f.type_name,'<')=0 AND c.game_mm=? LIMIT ?`, root+".", root+"/", s.MM, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string][]string{}
+	for rows.Next() {
+		var name, inst string
+		if err := rows.Scan(&name, &inst); err != nil {
+			return nil, err
+		}
+		out[name] = append(out[name], inst)
+	}
+	return out, rows.Err()
+}
+
+// GameTypesUnder is TypesUnder for the game's own assemblies (any environment of Store.MM).
+func (s *Store) GameTypesUnder(root string, limit int) ([]string, error) {
+	rows, err := s.DB.Query(`SELECT DISTINCT g.type_name FROM game_type g JOIN game_assembly a ON a.id=g.assembly_id
+ WHERE g.type_name >= ? AND g.type_name < ? AND a.game_mm=? LIMIT ?`, root+".", root+"/", s.MM, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		out = append(out, name)
+	}
+	return out, rows.Err()
+}
+
+// DefsInFile returns the non-abstract Def facts of Store.MM that come from a file named base
+// (any folder, case-insensitive), for the instances in only: what is lost when the game
+// reports "Exception loading def from file <base>" (06 §3, consequences).
+func (s *Store) DefsInFile(base string, only map[string]bool) ([]analyze.DefFact, error) {
+	rows, err := s.DB.Query(`SELECT c.instance_id, s.id, s.files FROM fact_set s JOIN content_state c ON c.def_set_id=s.id
+ WHERE c.game_mm=? AND s.files LIKE ?`, s.MM, `%`+base+`"%`)
+	if err != nil {
+		return nil, err
+	}
+	type hit struct {
+		inst string
+		set  int64
+		ixs  []any
+	}
+	var hits []hit
+	for rows.Next() {
+		var inst, files string
+		var set int64
+		if err := rows.Scan(&inst, &set, &files); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		if !only[inst] {
+			continue
+		}
+		var list []string
+		if json.Unmarshal([]byte(files), &list) != nil {
+			continue
+		}
+		h := hit{inst: inst, set: set}
+		for i, f := range list {
+			if strings.EqualFold(path.Base(f), base) {
+				h.ixs = append(h.ixs, i)
+			}
+		}
+		if len(h.ixs) > 0 {
+			hits = append(hits, h)
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	var out []analyze.DefFact
+	for _, h := range hits {
+		r, err := s.DB.Query(`SELECT `+defCols+defView+` WHERE c.instance_id=? AND c.game_mm=? AND f.set_id=? AND f.abstract=0 AND f.def_name<>'' AND f.file_ix IN (`+placeholders(len(h.ixs))+`) ORDER BY f.rowid`,
+			append([]any{h.inst, s.MM, h.set}, h.ixs...)...)
+		if err != nil {
+			return nil, err
+		}
+		ds, err := s.scanDefs(r)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, ds...)
+	}
+	return out, nil
 }

@@ -14,16 +14,19 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/textenc"
 )
 
-// Dependency is one <modDependencies> entry.
+// Dependency is one <modDependencies> entry. Alternatives (<alternativePackageIds>) also
+// satisfy it: the game's ModDependency.IsSatisfied accepts any of them when PackageID is not
+// enabled (08 §1.1).
 type Dependency struct {
-	PackageID        string `json:"package_id"`
-	DisplayName      string `json:"display_name,omitempty"`
-	SteamWorkshopURL string `json:"steam_workshop_url,omitempty"`
-	DownloadURL      string `json:"download_url,omitempty"`
+	PackageID        string   `json:"package_id"`
+	DisplayName      string   `json:"display_name,omitempty"`
+	SteamWorkshopURL string   `json:"steam_workshop_url,omitempty"`
+	DownloadURL      string   `json:"download_url,omitempty"`
+	Alternatives     []string `json:"alternative_package_ids,omitempty"`
 }
 
 // Decl is the normalised declaration of a mod: About.xml, PublishedFileId.txt and
-// LoadFolders.xml (02 §4.3). It is stored as snapshot.decl_blob for the analysis layer.
+// LoadFolders.xml (04 §1.3). It is stored as snapshot.decl_blob for the analysis layer.
 type Decl struct {
 	PackageIDRaw      string   `json:"package_id_raw,omitempty"`
 	PackageID         string   `json:"package_id,omitempty"` // lower case
@@ -139,7 +142,7 @@ func ReadDecl(dir string, official bool) Decl {
 	if _, err := os.Stat(aboutPath); err != nil {
 		if p := findCI(dir, "About", "About.xml.disabled"); p != "" {
 			if _, err := os.Stat(p); err == nil {
-				aboutPath = p // RimCrow-disabled: the declaration is still valid (02 §4.2)
+				aboutPath = p // RimCrow-disabled: the declaration is still valid (04 §1.2)
 			}
 		}
 	}
@@ -221,6 +224,7 @@ func deps(n *node) []Dependency {
 			DisplayName:      li.str("displayname"),
 			SteamWorkshopURL: li.str("steamworkshopurl"),
 			DownloadURL:      li.str("downloadurl"),
+			Alternatives:     li.list("alternativepackageids"),
 		}
 		if dep.PackageID == "" && len(li.children) == 0 {
 			dep.PackageID = strings.TrimSpace(li.text.String())

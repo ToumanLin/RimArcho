@@ -1,10 +1,12 @@
 package gui
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +16,7 @@ import (
 )
 
 func TestNeedsCacheKeyInputs(t *testing.T) {
+	t.Parallel()
 	e, s, _ := fixture(t)
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -78,6 +81,7 @@ func TestNeedsCacheKeyInputs(t *testing.T) {
 }
 
 func TestNeedsEditSharesIncrementalSnapshotAndUndo(t *testing.T) {
+	t.Parallel()
 	e, s, _ := fixture(t)
 	// This test inspects the synchronous result; no background publication may race it.
 	s.needsClosed = true
@@ -100,8 +104,11 @@ func TestNeedsEditSharesIncrementalSnapshotAndUndo(t *testing.T) {
 		t.Fatal(err)
 	}
 	c, _ := s.cachedNeedsLocked()
-	if !c.n.Updating {
-		t.Fatal("stale content must be marked updating")
+	if c.eager {
+		t.Fatal("an edit's incremental snapshot counted as checked")
+	}
+	if c.n.Updating {
+		t.Fatal("updating without background work (it is closed here)")
 	}
 	for _, it := range c.n.Items {
 		if it.Target != "" && it.Target == "brrainz.harmony" {
@@ -126,8 +133,8 @@ func TestNeedsEditSharesIncrementalSnapshotAndUndo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Problems == nil || !result.Problems.Updating {
-		t.Fatal("edit omitted problem summary")
+	if result.Problems == nil || result.Problems.Updating {
+		t.Fatal("edit omitted problem summary, or said updating with no background work")
 	}
 	c, _ = s.cachedNeedsLocked()
 	if result.Problems.Revision != c.n.Revision || result.Problems.Count != c.n.Count {
@@ -135,32 +142,8 @@ func TestNeedsEditSharesIncrementalSnapshotAndUndo(t *testing.T) {
 	}
 }
 
-func TestNeedsCacheBoundedAndWorkspaceReused(t *testing.T) {
-	_, s, events := fixture(t)
-	s.Board()
-	if !s.Workspace(1) {
-		t.Fatal("workspace rejected")
-	}
-	r := environmentResult(t, events, 1)
-	if !s.Workspace(2) {
-		t.Fatal("workspace rejected")
-	}
-	next := environmentResult(t, events, 2)
-	if r.Board.Problems.Revision != next.Board.Problems.Revision || r.Shell.Env != next.Shell.Env {
-		t.Fatal("cached workspace differs")
-	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for i := 0; i < 12; i++ {
-		s.a.GameVersion = fmt.Sprintf("1.%d", i)
-		s.needsLocked()
-	}
-	if len(s.needsCache) > 8 {
-		t.Fatal("unbounded needs cache")
-	}
-}
-
 func TestNeedsIncrementalKeepsContentThroughEnableUndo(t *testing.T) {
+	t.Parallel()
 	e, s, _ := fixture(t)
 	s.needsClosed = true
 	_ = s.needsLocked()
@@ -206,6 +189,7 @@ func TestNeedsIncrementalKeepsContentThroughEnableUndo(t *testing.T) {
 }
 
 func TestNeedsBackgroundCannotPublishAnOlderEdit(t *testing.T) {
+	t.Parallel()
 	e, s, _ := fixture(t)
 	e.App.AnalyzeRunner = func(string, func(string)) error { return errors.New("fixture: analysis intentionally unavailable") }
 	s.emit = func(string, any) {}
@@ -231,6 +215,7 @@ func TestNeedsBackgroundCannotPublishAnOlderEdit(t *testing.T) {
 }
 
 func TestNeedsDetachedLinkActionsUseReceivingSession(t *testing.T) {
+	t.Parallel()
 	e, s, _ := fixture(t)
 	s.needsClosed = true
 	// Consume a different token in the main session before the reader starts at 1.
@@ -260,6 +245,7 @@ func TestNeedsDetachedLinkActionsUseReceivingSession(t *testing.T) {
 }
 
 func TestWorkspaceAdoptsOneNeedsSnapshotAndRefreshesAfterEdit(t *testing.T) {
+	t.Parallel()
 	_, s, events := fixture(t)
 	s.needsClosed = true
 	read := func(request uint64) *EnvironmentResult {
@@ -287,7 +273,7 @@ func TestWorkspaceAdoptsOneNeedsSnapshotAndRefreshesAfterEdit(t *testing.T) {
 	s.mu.Lock()
 	reused := s.workspace == cached
 	s.mu.Unlock()
-	if !reused || warm.Board.Problems.Sequence != first.Board.Problems.Sequence {
+	if !reused || warm.Board.Problems.Sequence != first.Board.Problems.Sequence || warm.Shell.Env != first.Shell.Env {
 		t.Fatal("unchanged needs key rebuilt workspace")
 	}
 	a, err := s.a.Loadout()
@@ -308,5 +294,68 @@ func TestWorkspaceAdoptsOneNeedsSnapshotAndRefreshesAfterEdit(t *testing.T) {
 	}
 	if next.Board.Problems.Count != edit.Problems.Count || next.Board.Problems.Sequence <= first.Board.Problems.Sequence {
 		t.Fatal("workspace lost edit problems or sequence")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := 0; i < 12; i++ {
+		s.a.GameVersion = fmt.Sprintf("1.%d", i)
+		s.needsLocked()
+	}
+	if len(s.needsCache) > 8 {
+		t.Fatal("unbounded needs cache")
+	}
+}
+
+// `updating` means background work will replace the findings (16 §8.7). The first paint's
+// cache-only read of a never-analysed list starts none, so it is not updating; once the
+// editor asks, the refresh and the analysis say updating and the last answer does not.
+func TestProblemsUpdatingOnlyWhileWorkRuns(t *testing.T) {
+	t.Parallel()
+	_, s, events := fixture(t)
+	if !s.Workspace(1) {
+		t.Fatal("workspace rejected")
+	}
+	r := environmentResult(t, events, 1)
+	s.mu.Lock()
+	c, _ := s.cachedNeedsLocked()
+	never, work := c.n.Never, s.needsWorkLocked()
+	s.mu.Unlock()
+	if !never || work {
+		t.Fatalf("fixture: never=%v work=%v", never, work)
+	}
+	if r.Board.Problems.Updating {
+		t.Fatal("first paint says updating with no background work")
+	}
+	s.ListProblems()
+	var sawUpdating bool
+	timeout := time.After(30 * time.Second)
+	for {
+		select {
+		case ev := <-events:
+			name, body, _ := strings.Cut(ev, " ")
+			if name != "list-problems" {
+				continue
+			}
+			var p view.ListProblems
+			if err := json.Unmarshal([]byte(body), &p); err != nil {
+				t.Fatal(err)
+			}
+			if p.Updating {
+				sawUpdating = true
+				continue
+			}
+			s.mu.Lock()
+			c, _ := s.cachedNeedsLocked()
+			done := !c.n.Never && !s.needsWorkLocked()
+			s.mu.Unlock()
+			if done {
+				if !sawUpdating {
+					t.Fatal("the refresh and analysis never said updating")
+				}
+				return
+			}
+		case <-timeout:
+			t.Fatal("updating never ended")
+		}
 	}
 }

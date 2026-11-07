@@ -32,7 +32,7 @@ func writeLogAt(t *testing.T, e *testkit.Env, path, text string, at time.Time) {
 }
 
 // No foreign log may enter even a stale group, hit a cached report, mark itself seen,
-// prompt a new log, or start the other version's Def/Patch analysis (03 §6.4).
+// prompt a new log, or start the other version's Def/Patch analysis (06 §4).
 func TestForeignLogExcludedBeforeAnalysis(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
@@ -170,6 +170,9 @@ func TestLogOwnerEvidence(t *testing.T) {
 	if err := e.App.EnsureLogFileAnalysis(st, p, nil); err != nil || calls != 0 {
 		t.Fatalf("unknown owner triggered version analysis: %d, %v", calls, err)
 	}
+	if err := e.App.EnsureAttributionAnalysis(st, p, "", nil); err != nil || calls != 0 {
+		t.Fatalf("unknown owner of another version triggered an analysis before attribution: %d, %v", calls, err)
+	}
 	r := e.App.LogRunOf(st, p)
 	if !r.Unknown || !r.Stale() {
 		t.Fatalf("unknown log must remain uncounted: %+v", r)
@@ -216,5 +219,82 @@ func TestOwnLogBeforeGameUpgrade(t *testing.T) {
 	out := e.MustRun("log")
 	if !strings.Contains(out, "analysed: as 1.6 (log version); environment is 1.7") || len(runs) != 1 || runs[0] != "1.6" {
 		t.Fatalf("old own log did not use 1.6 analysis: runs %v\n%s", runs, out)
+	}
+}
+
+// A log whose game folder no environment has (copied from another machine, or this game
+// before it moved; MCP eval 2026-11-04) is attributed against this environment, its only
+// candidate: `archo log` analyses first and says so. Before any analysis, a failing type
+// with no owner reads "assemblies not analysed yet", never "no enabled mod defines it".
+// The same log owned by another registered environment is still refused (06 §4).
+func TestUnknownGameLogAttributedHere(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	b, err := os.ReadFile(filepath.Join(testkit.DotnetBin(), "ModA.dll"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.WriteMod(filepath.Join(e.Game, "Mods", "Failer"), testkit.Mod{PackageID: "tester.failer", Name: "Failer", Author: "Tester",
+		Files: map[string]string{"Assemblies/ModA.dll": string(b)}})
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.failer")
+	e.AddEnv(false)
+	e.MustRun("scan")
+	elsewhere := filepath.Join(e.Root, "OtherPC", "RimWorld")
+	body := "RimWorld 1.6.4633 rev1261\n" +
+		"Error in static constructor of ModA.Boot: System.TypeInitializationException: The type initializer for 'ModA.Boot' threw an exception. ---> HarmonyLib.HarmonyException: Patching exception\n" +
+		"  at HarmonyLib.PatchClassProcessor.Patch () [0x00000] in <abc>:0\n"
+	p := filepath.Join(e.UserData, "Player.log")
+	writeLogAt(t, e, p, "Mono path[0] = '"+filepath.ToSlash(filepath.Join(elsewhere, "RimWorldWin64_Data", "Managed"))+"'\n"+body, e.Now())
+
+	// Not analysed yet: the detail names the analysis state, not a fact about mods.
+	rep, err := e.App.AnalyzeLogText(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var details string
+	for _, lc := range rep.Clusters {
+		details += strings.Join(lc.Details, "\n")
+	}
+	if rep.Unanalysed != 1 || !strings.Contains(details, "failing type ModA.Boot: owner unknown, assemblies not analysed yet (1 enabled mod)") ||
+		strings.Contains(details, "no enabled mod's analysed assemblies define it") {
+		t.Fatalf("not-analysed wording (%d unanalysed):\n%s", rep.Unanalysed, details)
+	}
+
+	// Unknown game folder: analysed and attributed against env:main, and said so.
+	runs := 0
+	inner := e.App.AnalyzeRunner
+	e.App.AnalyzeRunner = func(name string, progress func(string)) error { runs++; return inner(name, progress) }
+	out := e.MustRun("log")
+	want := "game: log game path " + elsewhere + " is not this environment's game; attributed against env:main"
+	if runs != 1 || !strings.Contains(out, want) || strings.Contains(out, "not analysed yet") {
+		t.Fatalf("unknown game folder: %d analyses\n%s", runs, out)
+	}
+	cl := e.MustRun("log", "--cluster", "E1")
+	if !strings.Contains(cl, "Failer") || !strings.Contains(cl, "source") || strings.Contains(cl, "(no mod identified)") {
+		t.Fatalf("failing type not attributed after the analysis:\n%s", cl)
+	}
+	// Still not counted (no launch or write maps it to this plan), and the folded row
+	// says why and how to list it from MCP too.
+	probs := e.MustRun("problems")
+	if !strings.Contains(probs, "stale log (source unknown: its game path "+elsewhere+" is not this environment's game)") ||
+		!strings.Contains(probs, "not counted  (archo problems --code log --all; MCP: list_problems code=log)") {
+		t.Fatal(probs)
+	}
+
+	// The same folder registered as another environment's game: refused, no analysis.
+	e.WriteFile(filepath.Join(elsewhere, "RimWorldWin64.exe"), "")
+	e.WriteFile(filepath.Join(elsewhere, "Version.txt"), "1.6.4633 rev1261\n")
+	e.MustRun("env", "add", "other", "--game", elsewhere, "--user-data", e.UserData)
+	e.MustRun("env", "use", "main")
+	st, err := e.App.Loadout()
+	if err != nil {
+		t.Fatal(err)
+	}
+	runs = 0
+	if err := e.App.EnsureAttributionAnalysis(st, p, "", nil); err == nil || !strings.Contains(err.Error(), "environment other") || runs != 0 {
+		t.Fatalf("another environment's log: %v, %d analyses", err, runs)
+	}
+	if out, code := e.Run("log"); code == 0 || strings.Contains(out, "attributed against") {
+		t.Fatalf("another environment's log attributed here:\n%s", out)
 	}
 }

@@ -55,7 +55,7 @@ func TestOfficialContentFirstOnlyInInactiveColumn(t *testing.T) {
 }
 
 func TestSortPreviewCanAddCoreWithoutMovingAnything(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e := testkit.New(t)
 	e.WriteModsConfig("1.6.4633 rev1261")
 	e.AddEnv(false)

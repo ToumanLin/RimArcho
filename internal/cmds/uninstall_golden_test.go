@@ -11,9 +11,10 @@ import (
 
 var sizeRe = regexp.MustCompile(`\b\d+(\.\d+)? (B|KB|MB|GB)\b`)
 
-// archo uninstall (01 §4, 05 §4.2): the dry run with the defaults and with every other
+// archo uninstall (02 §1, 13 §4.2): the dry run with the defaults and with every other
 // answer, the refusals, the run, and every command refused after it.
 func TestGoldenUninstall(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddWorkshop("2009463077", testkit.Mod{PackageID: "brrainz.harmony", Name: "Harmony", Files: map[string]string{"Assemblies/0Harmony.dll": "MZ"}})
 	e.AddWorkshop("1001", testkit.Sample("tester.a", "A"))

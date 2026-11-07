@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/env"
 )
 
-// How Can it run lays its items out (06 §2.4, §5): what merges into the sort item, what the
+// How Can it run lays its items out (16 §2.4, §5): what merges into the sort item, what the
 // two columns say about each other, and what other pages handle.
 
 // mergeIntoSort: weak order preferences and order cycles are what sorting settles anyway.
@@ -114,7 +114,7 @@ func elsewhere(items []Need) []Elsewhere {
 	return out
 }
 
-// currentLinksFirst puts the current game's link group first (06 §2.4: the others fold
+// currentLinksFirst puts the current game's link group first (16 §2.4: the others fold
 // into one line); the repair still covers every game.
 func currentLinksFirst(items []Need, gameRoot string) {
 	key := env.PathKey(realViewPath(gameRoot))
@@ -132,7 +132,7 @@ func currentLinksFirst(items []Need, gameRoot string) {
 	}
 }
 
-// NeedsLead is Can it run's lead sentence (06 §2.4): the open list's verdict from the
+// NeedsLead is Can it run's lead sentence (16 §2.4): the open list's verdict from the
 // counted items before the start (sections 1–3) and of the runs (the last section), and
 // whether the files were never checked or only suggestions are left. GUI screens.js
 // needsLead writes the same.
@@ -154,7 +154,7 @@ func NeedsLead(plan string, before, runs int, never, suggestions bool) string {
 }
 
 // AutoFixCount is how many items fix automatically (F) resolves: required mods that are installed but
-// not enabled (CompleteDependencies enables them), and the sort it runs after (06 §5).
+// not enabled (CompleteDependencies enables them), and the sort it runs after (16 §5).
 // 0: there is nothing it can fix, and the action is not offered.
 func AutoFixCount(items []Need) int {
 	enable, sorts := 0, 0

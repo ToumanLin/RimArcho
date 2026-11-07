@@ -2,7 +2,7 @@ package tui
 
 import "encoding/json"
 
-// Column widths and name wrapping (06 §2.5): < > change the focused list column by 2
+// Column widths and name wrapping (16 §2.5): < > change the focused list column by 2
 // cells, = resets them, a mouse drag on the gap after a column sets its width; z wraps
 // long names in the focused column. Both are kept per environment (meta "ui.columns:<id>").
 

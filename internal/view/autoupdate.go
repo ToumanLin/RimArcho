@@ -37,14 +37,14 @@ func selfNotice(before, after app.AutomaticStatus) string {
 	return Tf("RimArcho %s can be updated; see Settings", after.Latest)
 }
 
-// AboutGroup keeps RimArcho's version and checks together (06 §2.14).
+// AboutGroup keeps RimArcho's version and checks together (16 §2.14).
 func AboutGroup(a *app.App) SettingGroup {
 	return SettingGroup{Title: T("about"), Items: []SettingItem{
 		SelfUpdateItem(a),
 		{Label: T("automatically check for updates"), Value: cmds.Setting(a, "updates.auto"), Edit: "choice", Choices: []string{"on", "off"}, ChoiceLabels: []string{T("on"), T("off")}, Argv: []string{"config", "set", "updates.auto", "{}"},
 			Note: T("Checks RimArcho, mods, external tools and community data while RimArcho is open.")},
 		{Label: T("feedback"), Actions: []SettingAction{{Label: T("bugs and suggestions…"), Argv: []string{"feedback"}}}},
-		{Label: T("community"), Links: CommunityLinks()},
+		{Key: "community", Label: T("community"), Links: CommunityLinks()},
 	}}
 }
 
@@ -54,8 +54,9 @@ func AutomaticGroup(a *app.App) SettingGroup {
 		note += " " + Tf("Check the LoversLab login %s.", checkInterval(a.AutomaticInterval("session")))
 	}
 	g := SettingGroup{Title: T("updates"), Note: note + " " + T("Mod, tool and RimArcho updates wait for your click.")}
-	// Version and automatic checks live in AboutGroup; only intervals stay here.
+	// Version and automatic checks live in AboutGroup.
 	g.Items = []SettingItem{
+		{Label: T("update source"), Value: cmds.Setting(a, "updates.source"), Edit: "choice", Choices: cmds.SettingChoices("updates.source"), ChoiceLabels: []string{T("automatic"), "GitHub"}, Argv: []string{"config", "set", "updates.source", "{}"}},
 		{Label: T("check interval"), Value: cmds.Setting(a, "updates.interval"), Edit: "choice", Choices: []string{"normal", "frequent", "relaxed"}, ChoiceLabels: []string{T("standard intervals"), T("half the interval"), T("twice the interval")}, Argv: []string{"config", "set", "updates.interval", "{}"}},
 	}
 	return g

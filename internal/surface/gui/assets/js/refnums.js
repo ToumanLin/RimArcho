@@ -10,9 +10,10 @@
 // a control also by what it does (data-cmd, data-env-write, …) or its label without digits;
 // alike text blocks and repeated rows by their position. ctrl+shift+\ numbers the page afresh.
 //
-// Each time the numbers are drawn they are also written to refnums/<prefix>.txt in the data
-// directory (API.SaveRefNums): a line per number with its place and its text, the ones not
-// on screen now included, so a number can be looked up in the code without the window.
+// The numbers drawn are also written to refnums/<prefix>.txt in the data directory
+// (API.SaveRefNums) once the page is still, at the latest MAXWAIT after a change: a line per
+// number with its place and its text, the ones not on screen now included, so a number can
+// be looked up in the code without the window.
 // window.refnum("lib12") gives the element back (for the dev harness's console).
 import { S, api } from "./state.js";
 
@@ -20,7 +21,7 @@ const PREFIX = {
   home: "hom", library: "lib", changes: "chg", subscribe: "sub", log: "log", needs: "run",
   plans: "lst", "plan-import": "imp", "plan-export": "exp", packs: "pak", build: "bld",
   textures: "tex", env: "env", settings: "set", tasks: "tsk", full: "ful", guide: "gui",
-  uninstall: "del", feedback: "fbk",
+  uninstall: "del", feedback: "fbk", "mod-settings": "mst", saves: "sav",
 };
 const EDITOR = "edt"; // the plan editor (S.screen is null)
 const SETTING = "ui.gui.refnums";
@@ -32,7 +33,8 @@ const TEXT = "p, h1, h2, h3, h4, h5, h6, li, dt, dd, th, td, pre, blockquote, fi
 // what an element does, when it says so: stable across its label's changes
 const IDENT = ["data-cmd", "data-env-write", "data-id", "data-key", "data-step", "data-game", "data-area", "name", "aria-label"];
 
-let layer = null, observer = null, queued = false, ids = new Map(), saveTimer = 0, saved = "";
+const QUIET = 400, MAXWAIT = 1500; // save once the page is still, or this long after a change
+let layer = null, observer = null, queued = false, ids = new Map(), saveTimer = 0, saveDue = 0, savePrefix = "", saved = "";
 // book: prefix → { next, seen: signature → [number, where, text] }
 let book = null, bookDirty = false;
 window.refnum = (id) => ids.get(id);
@@ -47,10 +49,13 @@ async function on() {
   layer = document.createElement("div");
   layer.className = "refnums";
   document.body.append(layer);
+  // An attribute written again with the same value changes nothing on screen.
+  const changed = (r) => !layer.contains(r.target) &&
+    (r.type !== "attributes" || r.oldValue !== r.target.getAttribute(r.attributeName));
   observer = new MutationObserver((records) => {
-    if (records.some((r) => !layer.contains(r.target))) queue();
+    if (records.some(changed)) queue();
   });
-  observer.observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+  observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeOldValue: true, characterData: true });
   addEventListener("scroll", queue, true);
   addEventListener("resize", queue);
   draw();
@@ -173,6 +178,7 @@ function signatures(els) {
 
 function draw() {
   const prefix = S.screen ? PREFIX[S.screen] || S.screen.slice(0, 3) : EDITOR;
+  if (savePrefix && savePrefix !== prefix) save(savePrefix); // the page left, as it was shown
   const page = book[prefix] || (book[prefix] = { next: 1, seen: {} });
   const clips = new Map();
   const frag = document.createDocumentFragment();
@@ -195,11 +201,17 @@ function draw() {
     frag.append(f);
   });
   layer.replaceChildren(frag);
+  // A page that keeps changing (progress, animations) must not put the save off for good.
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(save, 400, prefix);
+  const now = performance.now();
+  if (!saveDue) saveDue = now + MAXWAIT;
+  savePrefix = prefix;
+  saveTimer = setTimeout(save, Math.max(0, Math.min(QUIET, saveDue - now)), prefix);
 }
 
 function save(prefix) {
+  clearTimeout(saveTimer);
+  saveDue = 0; savePrefix = "";
   if (!layer) return;
   const page = book[prefix];
   const entries = Object.entries(page.seen);

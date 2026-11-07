@@ -69,25 +69,31 @@ func (s *API) CheckSubscriptionSource(kind string) (string, error) {
 	return settingQueued(s.queueSettingTaskLocked(view.TaskSourceCheck, []string{"source-check", kind}, "")), nil
 }
 
-func (s *API) WorkshopUpdatePreview(ref string) (*view.Preview, error) {
+// SubscriptionUpdatePreview is the one confirmation of update / update all (16 §2.9),
+// built on one session however many copies are listed.
+func (s *API) SubscriptionUpdatePreview(refs []string) (*view.Preview, error) {
 	a, err := s.detachedReader()
 	if err != nil {
 		return nil, err
 	}
 	defer a.Close()
-	return view.WorkshopUpdatePreview(a, ref)
+	return view.SubscriptionUpdatePreview(a, refs)
 }
 
-func (s *API) WorkshopUpdate(ref string) (string, error) {
+// WorkshopUpdate queues one task that asks Steam to download every listed Workshop copy.
+func (s *API) WorkshopUpdate(refs []string) (string, error) {
+	if len(refs) == 0 {
+		return "", errors.New(view.T("nothing selected"))
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if err := s.a.UpdateWorkshopClient(ref, true); err != nil {
+	if err := s.a.UpdateWorkshopClients(refs, true); err != nil {
 		return "", err
 	}
-	return settingQueued(s.queueSettingTaskLocked(view.TaskWorkshopUpdate, []string{"workshop-update", ref}, "")), nil
+	return settingQueued(s.queueSettingTaskLocked(view.TaskWorkshopUpdate, append([]string{"workshop-update"}, refs...), "")), nil
 }
 
-// OpenSubscriptionSource opens what open the source page shows for a pending update (06 §2.9): the
+// OpenSubscriptionSource opens what open the source page shows for a pending update (16 §2.9): the
 // Workshop change notes, the compare view of two commits on GitHub / GitLab, or the
 // repository or download page. The page passes only the reference.
 func (s *API) OpenSubscriptionSource(ref string) (string, error) {

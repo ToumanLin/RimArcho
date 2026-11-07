@@ -19,6 +19,7 @@ type preflightTransport func(*http.Request) (*http.Response, error)
 func (f preflightTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 func TestSubscribeWorkshopPreflightBothRoutesAndCredit(t *testing.T) {
+	t.Parallel()
 	for _, steamcmd := range []bool{true, false} {
 		t.Run(fmt.Sprint(steamcmd), func(t *testing.T) {
 			e := setup(t, false)
@@ -74,6 +75,7 @@ func TestSubscribeWorkshopPreflightBothRoutesAndCredit(t *testing.T) {
 }
 
 func TestSteamSubscribeCancellationKeepsCompletedCalls(t *testing.T) {
+	t.Parallel()
 	e := setup(t, false)
 	steamDLL(e)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -112,21 +114,5 @@ func TestSteamSubscribeCancellationKeepsCompletedCalls(t *testing.T) {
 		if it.State != want {
 			t.Fatalf("item %d = %+v, want %s", i, it, want)
 		}
-	}
-}
-
-func TestSubscribeWorkshopPreflightFailureStillDownloads(t *testing.T) {
-	e := setup(t, false)
-	e.App.HTTP = &http.Client{Transport: preflightTransport(func(*http.Request) (*http.Response, error) { return nil, fmt.Errorf("offline") })}
-	e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, "steamcmd.exe"), true }
-	called := false
-	e.App.SteamCMDRun = func(_ string, args []string) (string, error) {
-		called = true
-		e.WriteMod(filepath.Join(args[1], "steamapps", "workshop", "content", "294100", "8100"), testkit.Sample("fallback.mod", "Fallback"))
-		return "Success. Downloaded item 8100", nil
-	}
-	op, err := e.App.SubscribeWorkshop([]string{"8100"}, true, false)
-	if err != nil || !called || op.Items[0].Permanent || op.Items[0].Result != "downloaded with SteamCMD" {
-		t.Fatalf("op=%+v err=%v", op, err)
 	}
 }

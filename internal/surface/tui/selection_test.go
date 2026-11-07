@@ -90,7 +90,7 @@ func TestSelectionRows(t *testing.T) {
 	golden.RequireEqual(t, []byte(snapshot.String()))
 }
 
-// The position input's caret is independent of row selection (06 §3.6).
+// The position input's caret is independent of row selection (16 §3.6).
 func TestPositionInputCaret(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)

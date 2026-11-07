@@ -11,20 +11,20 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 )
 
-// 01 §4.1: every row of the write list (01 §4) says what uninstall does with it — a step in
-// backticks, or "none:" and why not — every step it names exists, and every step is in §4.
+// 02 §2: every row of the write list (02 §1) says what uninstall does with it — a step in
+// backticks, or "none:" and why not — every step it names exists, and every step is in 02 §1.
 func TestUninstallCoversWriteList(t *testing.T) {
 	t.Parallel()
 	_, file, _, _ := runtime.Caller(0)
-	b, err := os.ReadFile(filepath.Join(filepath.Dir(file), "..", "..", "docs", "specs", "01-scope-and-status.md"))
+	b, err := os.ReadFile(filepath.Join(filepath.Dir(file), "..", "..", "docs", "specs", "02-file-writes-and-uninstall.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	doc := strings.ReplaceAll(string(b), "\r\n", "\n")
-	start := strings.Index(doc, "## 4. File Write List (Safety Boundary)")
-	end := strings.Index(doc, "## 5.")
+	start := strings.Index(doc, "\n## 1. ")
+	end := strings.Index(doc, "\n## 2. ")
 	if start < 0 || end < start {
-		t.Fatal("01 §4 not found")
+		t.Fatal("02 §1 not found")
 	}
 	sec := doc[start:end]
 	known := map[string]bool{}
@@ -71,7 +71,7 @@ func TestUninstallCoversWriteList(t *testing.T) {
 	}
 	for _, k := range app.UninstallSteps {
 		if !strings.Contains(sec, "`"+k+"`") {
-			t.Errorf("step %s is not in 01 §4", k)
+			t.Errorf("step %s is not in 02 §1", k)
 		}
 	}
 }

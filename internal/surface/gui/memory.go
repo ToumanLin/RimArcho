@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/perftrace"
 )
 
-// The window process's memory (07 §8.3). Go does not collect on its own while the window
+// The window process's memory (17 §7.3). Go does not collect on its own while the window
 // sits idle, so what a page built stays resident after the page is gone; the window returns
 // it a moment after heavy work. Change-keyed inventory/log caches survive navigation
 // so revisiting a page does not repeat the same database queries or log analysis.
@@ -63,6 +63,9 @@ func (s *API) Leave(page string) {
 	}
 	if page == "search" {
 		s.stopFileSearch()
+	}
+	if page == "saves" { // view.PageSaves
+		s.leaveSaves()
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()

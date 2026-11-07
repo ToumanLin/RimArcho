@@ -1,4 +1,4 @@
-// The three lists (06 §2.5): virtual rows, the cursor, selection, search, dragging. The
+// The three lists (16 §2.5): virtual rows, the cursor, selection, search, dragging. The
 // board has three columns: Not enabled | Enabled | details, with Staging and history folded under details.
 import { factText, S, $, $$, el, esc, col, cur, key, api, T, Tf, AREAS, ROW_H } from "./state.js";
 import { icon, sourceIcon, statusIcon } from "./icons.js";
@@ -7,10 +7,11 @@ import { listGeometry, rowAt } from "./listgeometry.js";
 import { bump } from "./motion.js";
 import { beginPageRead, pageLoading } from "./screens.js";
 
+const rowID = (k, it) => `editor-${k}-${encodeURIComponent(key(it))}`;
 const rowsEl = (k) => $(`.area[data-area="${k}"] .rows`);
 
 // The editor lives under the page overlay; old virtual rows must stay inert until its
-// new object is ready, including after a failed read (06 §8.2).
+// new object is ready, including after a failed read (16 §8.2).
 export async function openEditor(load, replace = false, ready = () => {}) {
   const read = beginPageRead(null, { replace, retry: () => openEditor(load, replace, ready) });
   const board = $("#board");
@@ -47,7 +48,7 @@ export function setItems(k, items) {
   return keep ? key(keep) : "";
 }
 
-// The filter bar over Not enabled and Enabled (06 §2.5): one search and one set of filters for both
+// The filter bar over Not enabled and Enabled (16 §2.5): one search and one set of filters for both
 // lists; S.bar is the bar (filterbar.js), S.barData its last answer (view.BarFilter).
 // Both lists ask at once: one call per bar state; only the latest call's answer counts.
 let barCall = null, barSig = "";
@@ -82,7 +83,7 @@ export async function refilter(k, keepKey) {
     const r = await api.Filter(k, c.query);
     if (!current()) return;
     c.view = r.rows || [];
-    c.others = null; // no "other lists" line: tab no longer jumps lists (06 §3.7)
+    c.others = null; // no "other lists" line: tab no longer jumps lists (16 §3.7)
     c.complete = r.complete || "";
   }
   c.cursor = Math.max(0, Math.min(c.cursor, c.view.length - 1));
@@ -140,7 +141,9 @@ function toggleHistory() { fold.hist = !fold.hist; keepFolds(); applyFolds(); re
 
 function applyFolds() {
   $('.area[data-area="2"]').classList.toggle("open", stagingOpen());
+  $('.area[data-area="2"] .head').setAttribute("aria-expanded", String(stagingOpen()));
   $(".histarea").classList.toggle("open", fold.hist);
+  $(".histarea .hbar").setAttribute("aria-expanded", String(fold.hist));
   $(".histarea").hidden = !(S.history && S.history.length > 1);
 }
 
@@ -162,8 +165,22 @@ export function renderHeads() {
     const c = S.cols[k];
     const filtered = k < 2 ? barOn() : !!c.query.trim();
     const n = filtered ? Tf("%d / %d", c.view.length, c.items.length) : `${c.items.length}`;
-    h.innerHTML = `<span class="n">${k + 1}</span><span class="t">${esc(T(AREAS[k]))}</span><span class="num">${n}</span>` +
+    const markup = `<span class="n">${k + 1}</span><span class="t">${esc(T(AREAS[k]))}</span><span class="num">${n}</span>` +
       (c.query && !c.searching ? `<span class="q">${esc(c.query)}</span>` : "") + (k === 1 ? listActions() : "") + (k === 2 ? chev() : "");
+    // Retain the collection's visible label while only cursor/focus changes.
+    if (h.listMarkup !== markup) {
+      h.innerHTML = markup;
+      h.listMarkup = markup;
+      $(".t", h).id = `editor-heading-${k}`;
+    }
+    const box = rowsEl(k);
+    if (box.getAttribute("role") !== "listbox") {
+      box.setAttribute("role", "listbox");
+      box.setAttribute("aria-labelledby", `editor-heading-${k}`);
+      box.setAttribute("aria-multiselectable", "true");
+    }
+    if (!S.screen && !S.popup && S.focus === k &&
+        (document.activeElement === document.body || document.activeElement.matches("#board .rows, #board .detail .scroll"))) box.focus({ preventScroll: true });
     bump("head:" + k, $(".num", h), n);
     const s = $(".search", a);
     if (!s) continue;
@@ -196,6 +213,7 @@ export function renderRows(k) {
   if (!pad || !pad.classList.contains("pad")) {
     box.innerHTML = "";
     pad = el("div", "pad");
+    pad.setAttribute("aria-hidden", "true");
     box.appendChild(pad);
     pools[k].clear();
   }
@@ -215,15 +233,21 @@ export function renderRows(k) {
   for (let i = first; i < last; i++) {
     const it = c.items[c.view[i]];
     let d = pool.get(i);
-    const sig = rowSig(k, i, it) + `:${layout.tops[i]}:${layout.heights[i]}:${layout.heads[i]}`;
+    const sig = rowSig(k, i, it) + `:${layout.tops[i]}:${layout.heights[i]}:${layout.heads[i]}:${c.view.length}`;
     if (d && d.dataset.sig === sig) continue;
     if (!d) { d = el("div", "row"); box.appendChild(d); pool.set(i, d); }
+    d.id = rowID(k, it);
+    d.setAttribute("role", "option");
+    // Preserve the hover title without announcing the name again as a description.
+    d.setAttribute("aria-description", [it.missing || it.gone ? T(it.canUse ? "installed copy available" : "not installed") : k === 1 && it.copyCount > 1 ? it.copyLabel : "", it.unsaved ? T("unsaved") : ""].filter(Boolean).join("; "));
+    d.setAttribute("aria-setsize", String(c.view.length));
+    d.setAttribute("aria-posinset", String(i + 1));
+    d.setAttribute("aria-selected", String(c.sel.has(key(it))));
     d.dataset.sig = sig;
     d.dataset.i = i;
     d.style.transform = ""; // a slide (motion.js) belongs to the mod the row showed before
     d.style.top = layout.tops[i] + "px";
     d.style.height = layout.heights[i] + "px";
-    d.draggable = !!it.id || k === 1;
     const st = S.board && S.board.status ? rowStatus(it) : 0;
     d.className = "row" + (i === c.cursor ? " cur" : "") + (c.sel.has(key(it)) ? " sel" : "") + (it.dim || it.missing ? " dimmed" : "");
     d.innerHTML = `<span class="m"></span>` + (k === 1 ? `<span class="p">${it.pos || ""}</span>` : "") +
@@ -236,15 +260,25 @@ export function renderRows(k) {
       $(".t",d).textContent="└ " + it.copyLabel;
       if (layout.heads[i]) { d.classList.add("copy-group-start"); d.prepend(el("span","editor-copy-head",it.name)); }
     }
+    $(".t", d).id = d.id + "-name";
+    // A grouped copy shows only "└ <copy>"; its name carries the Mod, as the group head does.
+    if (d.classList.contains("copy-item")) { d.removeAttribute("aria-labelledby"); d.setAttribute("aria-label", it.name + ", " + it.copyLabel); }
+    else { d.removeAttribute("aria-label"); d.setAttribute("aria-labelledby", d.id + "-name"); }
+    // The visible note on the name's line (not installed, which copy) describes the row.
+    d.removeAttribute("aria-describedby");
     d.title = it.name + (it.missing ? "  " + it.ref.replace(/^pkg:/, "") + "  " + T(it.canUse ? "installed copy available" : "not installed") : it.gone ? "  " + T("not installed") : it.copyCount > 1 && it.copyLabel ? "  " + it.copyLabel : "");
   }
+  const active = pool.get(c.cursor);
+  if (active) {
+    if (box.getAttribute("aria-activedescendant") !== active.id) box.setAttribute("aria-activedescendant", active.id);
+  } else box.removeAttribute("aria-activedescendant");
 }
 
 // onHistory runs when a history row is clicked (main.js sets it).
 export let onHistory = () => {};
 export function setOnHistory(fn) { onHistory = fn; }
 
-// renderHistory: the history's fold under details and staging (06 §2.5): its bar says how
+// renderHistory: the history's fold under details and staging (16 §2.5): its bar says how
 // many steps; open, it lists them, then the saved versions.
 export function renderHistory() {
   const area = $(".histarea");
@@ -260,7 +294,7 @@ export function renderHistory() {
   if (fold.hist) body.append(historyPanel());
 }
 
-// historyPanel: unsaved steps around "now", then the saved versions (06 §2.5).
+// historyPanel: unsaved steps around "now", then the saved versions (16 §2.5).
 function historyPanel() {
   const p = el("div", "hist");
   let versions = false;
@@ -325,6 +359,7 @@ export function wireLists(ui) {
     renderRows(2);
   });
   $(".histarea .hbar").addEventListener("click", () => toggleHistory());
+  wireDragWindow();
   for (const k of [0, 1, 2]) {
     const box = rowsEl(k);
     box.addEventListener("scroll", () => renderRows(k), { passive: true });
@@ -337,6 +372,7 @@ export function wireLists(ui) {
       const r = e.target.closest(".row");
       if (!r || e.button !== 0) return;
       ui.click(k, +r.dataset.i, e);
+      box.focus({ preventScroll: true });
     });
     box.addEventListener("dblclick", (e) => {
       const r = e.target.closest(".row");
@@ -356,7 +392,7 @@ export function wireLists(ui) {
     const input = $(`.area[data-area="${k}"] .search input`);
     if (!input) continue; // Not enabled and Enabled share the filter bar
     input.placeholder = T("search: words, tag:, author:, type:, has:, -not");
-    // the grey completion after the query (06 §3.7): the typed text, invisible, then the rest
+    // the grey completion after the query (16 §3.7): the typed text, invisible, then the rest
     const ghost = el("span", "ghost");
     ghost.append(el("span", "typed"), el("span", "sfx"));
     input.after(ghost);
@@ -367,46 +403,116 @@ export function wireLists(ui) {
   }
 }
 
-// Dragging is another way to run a verb (06 §8.5): it acts on drop and u undoes it.
-let drag = null;
+// Dragging is another way to run a verb (16 §8.5): it acts on drop and u undoes it. It runs
+// on mouse events, not HTML drag and drop: under WebView2 composition hosting (16 §8.2) the
+// window has no OLE drop target, so a native drag starts but nothing can receive the drop.
+let press = null; // the pressed row, until the mouse moves far enough to drag it
+let drag = null; // { ui, from, items, to: area under the pointer or -1, at, x, y }
 const tip = el("div", "drop-tip");
+const dragFrom = 5; // px of movement that turn a press into a drag
+const scrollEdge = 28; // px from a list's top or bottom that scroll it during a drag
 
+// Capture: the press's click redraws the row, which can detach the element under the pointer.
 function wireDrag(ui, k, box) {
-  box.addEventListener("dragstart", (e) => {
+  box.addEventListener("mousedown", (e) => {
     const r = e.target.closest(".row");
-    if (!r) return;
-    const c = S.cols[k];
-    const it = c.items[c.view[+r.dataset.i]];
-    if (!c.sel.has(key(it)) || S.focus !== k) ui.click(k, +r.dataset.i, { shiftKey: false, ctrlKey: false });
-    const its = ui.selectionItems();
-    drag = { from: k, items: its };
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", its.map((x) => x.name).join("\n"));
-  });
-  box.addEventListener("dragend", () => { drag = null; clearDrop(); });
-  const area = box.closest(".area");
-  area.addEventListener("dragover", (e) => {
-    if (!drag) return;
-    e.preventDefault();
-    clearDrop();
-    area.classList.add("drop-target");
-    const t = dropTarget(k, box, e);
-    if (t.row) t.row.classList.add(t.before ? "drop-before" : "drop-after");
+    if (r && e.button === 0) press = { ui, k, i: +r.dataset.i, x: e.clientX, y: e.clientY };
+  }, true);
+}
+
+function startDrag() {
+  const { ui, k, i } = press;
+  press = null;
+  const c = S.cols[k];
+  const it = c.items[c.view[i]];
+  if (!it || (!it.id && k !== 1)) return; // a missing Mod moves only within Enabled
+  // Dragging a row outside the selection drags that row alone; a plain click keeps the
+  // selection (16 §3.1), so clear it first or the old selection would move instead.
+  if (!c.sel.has(key(it)) || S.focus !== k) {
+    c.sel.clear();
+    ui.click(k, i, { shiftKey: false, ctrlKey: false });
+  }
+  drag = { ui, from: k, items: ui.selectionItems(), to: -1, at: 0, x: 0, y: 0 };
+  document.body.classList.add("row-dragging");
+}
+
+// overDrop marks where a drop at the pointer would go; a list's edge scrolls it.
+function overDrop() {
+  clearDrop();
+  const { x, y } = drag;
+  const area = document.elementFromPoint(x, y)?.closest("#board .area[data-area]");
+  const k = area ? +area.dataset.area : -1;
+  drag.to = k >= 0 && k <= 2 ? k : -1;
+  if (drag.to < 0) return;
+  const box = rowsEl(k);
+  area.classList.add("drop-target");
+  const t = dropTarget(k, box, { clientY: y });
+  drag.at = t.at;
+  if (t.row) t.row.classList.add(t.before ? "drop-before" : "drop-after");
+  if (t.label) {
     tip.textContent = t.label;
-    tip.style.left = e.clientX + 14 + "px";
-    tip.style.top = e.clientY + 10 + "px";
+    tip.style.left = x + 14 + "px";
+    tip.style.top = y + 10 + "px";
     if (!tip.isConnected) document.body.appendChild(tip);
-  });
-  area.addEventListener("dragleave", (e) => { if (!area.contains(e.relatedTarget)) clearDrop(); });
-  area.addEventListener("drop", (e) => {
+  }
+  const b = box.getBoundingClientRect();
+  const step = y < b.top + scrollEdge ? -1 : y > b.bottom - scrollEdge && y < b.bottom ? 1 : 0;
+  if (step && !drag.scrolling) {
+    drag.scrolling = true;
+    requestAnimationFrame(() => {
+      if (!drag) return;
+      drag.scrolling = false;
+      const before = box.scrollTop;
+      box.scrollTop += step * ROW_H / 2;
+      if (box.scrollTop !== before) { renderRows(k); overDrop(); }
+    });
+  }
+}
+
+function endDrag() {
+  drag = null;
+  press = null;
+  document.body.classList.remove("row-dragging");
+  clearDrop();
+}
+
+// wireDragWindow follows a press or drag anywhere in the window (wireLists calls it once).
+function wireDragWindow() {
+  window.addEventListener("mousemove", (e) => {
+    if (press && !drag) {
+      if (!(e.buttons & 1)) { press = null; return; }
+      if (Math.abs(e.clientX - press.x) < dragFrom && Math.abs(e.clientY - press.y) < dragFrom) return;
+      startDrag();
+    }
     if (!drag) return;
     e.preventDefault();
-    const t = dropTarget(k, box, e);
-    const d = drag;
-    drag = null;
-    clearDrop();
-    ui.drop(d.from, k, d.items, t.at);
+    drag.x = e.clientX;
+    drag.y = e.clientY;
+    overDrop();
   });
+  window.addEventListener("mouseup", (e) => {
+    press = null;
+    if (!drag || e.button !== 0) return;
+    const d = drag;
+    endDrag();
+    // the click that may follow this mouseup ends the drag, not a click on what is under it
+    window.addEventListener("click", swallowClick, true);
+    setTimeout(() => window.removeEventListener("click", swallowClick, true), 0);
+    if (d.to >= 0) d.ui.drop(d.from, d.to, d.items, d.at);
+  });
+  // esc cancels a drag (16 §8.5), and so does leaving the window
+  window.addEventListener("keydown", (e) => {
+    if (!drag || e.key !== "Escape") return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    endDrag();
+  }, true);
+  window.addEventListener("blur", () => { if (drag || press) endDrag(); });
+}
+function swallowClick(e) {
+  e.stopPropagation();
+  e.preventDefault();
+  window.removeEventListener("click", swallowClick, true);
 }
 
 function clearDrop() {

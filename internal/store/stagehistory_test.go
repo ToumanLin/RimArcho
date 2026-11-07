@@ -2,49 +2,10 @@ package store
 
 import (
 	"database/sql"
-	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
 )
-
-func TestMigrateV20StageHistory(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "archo.db")
-	s, err := Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := s.DB.Exec(`INSERT INTO environment(id,name,game_root,user_data_root,created_at) VALUES('e','e','g','u',0)`); err != nil {
-		t.Fatal(err)
-	}
-	p, err := s.CreatePlan("e", "test", fixed)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := s.PushStep(p.ID, "undo", `[]`, "legacy"); err != nil {
-		t.Fatal(err)
-	}
-	downgradeFacts(t, s)
-	if _, err := s.DB.Exec(`ALTER TABLE snapshot DROP COLUMN kinds; ALTER TABLE snapshot DROP COLUMN langs; ALTER TABLE identity_question DROP COLUMN summary; ALTER TABLE workspace_undo DROP COLUMN staging; UPDATE meta SET value='20' WHERE key='schema_version'`); err != nil {
-		t.Fatal(err)
-	}
-	s.Close()
-	s, err = Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer s.Close()
-	steps, err := s.Steps(p.ID, "undo")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(steps) != 1 || steps[0].Staging != nil || steps[0].Entries != "[]" {
-		t.Fatalf("migration lost legacy step: %+v", steps)
-	}
-	if s.Meta("schema_version") != fmt.Sprint(SchemaVersion) {
-		t.Fatal("migration not completed")
-	}
-}
 
 func TestStageHistoryRemapItemsAndAnchors(t *testing.T) {
 	s, err := Open(filepath.Join(t.TempDir(), "archo.db"))

@@ -9,6 +9,7 @@ import (
 )
 
 func TestPageReadersRetainIndexAcrossEditorCommits(t *testing.T) {
+	t.Parallel()
 	e, api, events := fixture(t)
 	b := api.Board()
 	id := b.Cols[view.Active][1].ID
@@ -72,6 +73,7 @@ func TestPageReadersRetainIndexAcrossEditorCommits(t *testing.T) {
 }
 
 func TestWorkspaceInvalidatedIndexLoadsOutsidePageMutex(t *testing.T) {
+	t.Parallel()
 	e, api, events := fixture(t)
 	board := api.Board()
 	api.Workspace(1)
@@ -90,7 +92,7 @@ func TestWorkspaceInvalidatedIndexLoadsOutsidePageMutex(t *testing.T) {
 	go func() { api.Init(); close(done) }()
 	select {
 	case <-done:
-	case <-time.After(time.Second):
+	case <-time.After(10 * time.Second): // the blocker is held until released; this only bounds a hang
 		release()
 		t.Fatal("invalidated workspace loaded the index while holding the page mutex")
 	}

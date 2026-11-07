@@ -18,6 +18,13 @@ type LogCache struct {
 	Report   []byte // JSON
 }
 
+// LogCacheStamp is the size and mtime the stored report of a log path was made from,
+// without reading the report (ok false: none stored).
+func (s *Store) LogCacheStamp(path string) (size, mtime int64, ok bool) {
+	err := s.DB.QueryRow(`SELECT size, mtime FROM log_cache WHERE path=?`, path).Scan(&size, &mtime)
+	return size, mtime, err == nil
+}
+
 // LogCache returns the stored report of a log path (nil if none).
 func (s *Store) LogCache(path string) (*LogCache, error) {
 	c := &LogCache{Path: path}

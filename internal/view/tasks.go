@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 )
 
-// Background tasks (06 §2.16): the record of app.Tasks as the page shows it. The rows go by group
+// Background tasks (16 §2.16): the record of app.Tasks as the page shows it. The rows go by group
 // (running, waiting, today, yesterday, earlier); a row carries its summary, its actions
 // (with their keys) and its items, so the page draws without asking again.
 
@@ -21,6 +21,7 @@ const (
 	TaskAccount          = "account-operation"
 	TaskSiteDownload     = "site-download"
 	TaskAnalyze          = "analyze"
+	TaskSaves            = "saves" // the Saves page's full read of the saves (16 §2.11, 12 §1.7)
 	TaskPack             = "pack"
 	TaskTextures         = OpTextures
 	TaskTexClean         = OpTexClean
@@ -115,7 +116,7 @@ func TaskStatus(r TaskRow) string {
 	return r.Title + "  " + Tf("%s: %s", r.Obj, r.Line)
 }
 
-// TaskStep is a step of a pack build (06 §2.6).
+// TaskStep is a step of a pack build (16 §2.6).
 type TaskStep struct {
 	Label string `json:"label"`
 	State string `json:"state"` // ok, run, wait, fail
@@ -173,6 +174,8 @@ func TaskTitle(kind string) string {
 		return T("scan the mods")
 	case TaskAnalyze:
 		return T("check whether it runs")
+	case TaskSaves:
+		return T("read the saves")
 	case TaskPack:
 		return T("create a pack")
 	case TaskDownload:
@@ -283,7 +286,7 @@ func DurText(d time.Duration) string {
 	return Tf("%d min %d s", s/60, s%60)
 }
 
-// packSteps are the build's steps as its page names them (06 §2.6); packStep maps
+// packSteps are the build's steps as its page names them (16 §2.6); packStep maps
 // PackProgress.Step to them (the copy leaves out what is not used and locks the versions
 // in one go).
 var packSteps = []string{"check whether it runs", "copy, leaving out what is not used", "textures", "put it in place"}
@@ -529,6 +532,8 @@ func taskTarget(t *app.Task) string {
 		return PageChanges
 	case TaskAnalyze:
 		return PageNeeds
+	case TaskSaves:
+		return PageSaves
 	case TaskPack:
 		if t.State == app.TaskDone && t.Target != "" {
 			return "pack:" + t.Target
@@ -557,13 +562,16 @@ func TaskTargetName(target string) string {
 		return T("game")
 	case target == PageSettings:
 		return T("settings")
+	case target == PageSaves:
+		return T("saves")
 	}
 	return T("mod library")
 }
 
 // TaskCanStop says which self tasks stop part way (a pack build, a texture run).
 func TaskCanStop(kind string) bool {
-	return kind == TaskSourceDecompile || kind == TaskSourceClean || kind == TaskCreditReplace || kind == TaskPack || kind == TaskTextures || kind == TaskTexClean
+	return kind == TaskSourceDecompile || kind == TaskSourceClean || kind == TaskCreditReplace || kind == TaskPack || kind == TaskTextures || kind == TaskTexClean ||
+		kind == TaskSaves
 }
 
 // handedOver counts the items a new task took over.

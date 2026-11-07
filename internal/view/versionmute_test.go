@@ -13,7 +13,7 @@ import (
 )
 
 func TestVersionReasonsAndMuteActions(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e := testkit.New(t)
 	e.WriteFile(filepath.Join(e.Game, "Version.txt"), "1.7.5000 rev1")
 	e.AddWorkshop("1001", testkit.Mod{PackageID: "tester.a", Name: "Alpha", Supported: []string{"1.6"}})
@@ -163,7 +163,7 @@ func TestVersionReasonChinese(t *testing.T) {
 }
 
 func TestVersionPanelGroupsAndActions(t *testing.T) {
-	view.SetLang("en")
+	t.Parallel()
 	e := testkit.New(t)
 	e.WriteFile(filepath.Join(e.Game, "Version.txt"), "1.7.5000 rev1")
 	packages := []string{"ludeon.rimworld"}

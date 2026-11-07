@@ -8,12 +8,12 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
-// describe (06 §4.3): the mod's description from About.xml and the Steam Workshop page.
+// describe (16 §4.3): the mod's description from About.xml and the Steam Workshop page.
 
 func init() {
 	register(&Command{Name: "describe", Args: "<ref>", Summary: "a mod's description: About.xml and the Workshop page (fetched on demand, cached)", MinArgs: 1, MaxArgs: 1,
 		Flags: []Flag{
-			{Name: "source", Value: "auto|about|workshop|both", Help: "which text to show (auto: 06 §4.3)"},
+			{Name: "source", Value: "auto|about|workshop|both", Help: "which text to show (auto: 16 §4.3)"},
 			{Name: "refresh", Help: "fetch the Workshop page again"},
 			{Name: "offline", Help: "use the cache only"},
 		}, Run: describeCmd})

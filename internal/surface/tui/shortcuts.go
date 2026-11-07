@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The editor's and Mod library's shortcuts for one mod (06 §3.5): ctrl+o its folder, ctrl+w its
+// The editor's and Mod library's shortcuts for one mod (16 §3.5): ctrl+o its folder, ctrl+w its
 // Workshop page, C the Updates page narrowed to its Lineage.
 
 // openFolderOf shows an instance's folder in the file manager.

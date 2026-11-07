@@ -133,13 +133,13 @@ Video memory estimate (RimCrow's formula): BC1 = width×height×0.5, BC7 = width
 
 **Shadowing rule (§2.3).** Collect PNGs across all effective load folders of the Mod, not just the `Textures/` root. If any PNG at a relative path is skipped or fails conversion, delete all lower-priority DDS files we generated at that path.
 
-**Scan fingerprint.** The structural manifest now includes all files (02 §4.4); new DDS changes the snapshot hash and makes the Mod look "updated". Exclude manifest-tracked DDS from the structural layer. Authors' own DDS still counts.
+**Scan fingerprint.** The structural manifest now includes all files (04 §1.4); new DDS changes the snapshot hash and makes the Mod look "updated". Exclude manifest-tracked DDS from the structural layer. Authors' own DDS still counts.
 
 **Will Workshop updates delete our DDS?** Unknown; test it (§6). Stale checks cover either outcome.
 
 ### 5.2 Pack slimming (copies in the pack, delete PNG)
 
-Add a step between "clean" and "measure" in 08 §5.2, operating on copies in `.archo-tmp`:
+Add a step between "clean" and "measure" in 10 §2, operating on copies in `.archo-tmp`:
 
 1. Run todds on PNGs under effective load folders in the copy (same arguments, optional scaling).
 2. Delete successfully converted PNGs; keep failed PNGs and roll back lower-priority DDS at the same path per §2.3.

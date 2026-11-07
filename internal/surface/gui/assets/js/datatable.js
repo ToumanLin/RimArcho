@@ -1,4 +1,4 @@
-// Shared headers and saved columns for data tables (06 §3.9).
+// Shared headers and saved columns for data tables (16 §3.9).
 import { el, api, T, Tf } from "./state.js";
 import * as pop from "./popups.js";
 
@@ -66,13 +66,22 @@ export function createTable({ key, columns, state = { cols: null, sort: "name", 
       { label: Tf("widen %s", T(d.title)), key: ">", run: () => size(k, 24) },
       { label: Tf("narrow %s", T(d.title)), key: "<", run: () => size(k, -24) },
       { label: Tf("reset width: %s", T(d.title)), key: "=", run: () => size(k, 0) }, { sep: true });
-    for (const c of cols()) if (!def(c.key).fixed) acts.push({ label: T(def(c.key).title), key: c.shown ? "✓" : "", run: () => { c.shown = !c.shown; changed(); } });
+    for (const c of cols()) if (!def(c.key).fixed) acts.push({ label: T(def(c.key).title), key: c.shown ? "✓" : "", checked: c.shown, run: () => { c.shown = !c.shown; changed(); } });
     acts.push({ sep: true }, { label: T("reset the columns"), run: () => { state.cols = mergeColumns(defs(), ""); changed(); } });
     if (x == null) { const b = (head.querySelector(".th.on") || head).getBoundingClientRect(); x = b.left; y = b.bottom; }
-    pop.menu(x, y, acts, keys);
+    // the header opens it; esc goes back to the rows, where the keys work (16 §3.9)
+    pop.menu(x, y, acts, keys, { name: T(d.title), opener: head.querySelector(`[data-k="${k}"]`) || root, back: focusTable });
   }
-  function draw(box, th) {
+  function draw(box, th, options = {}) {
     root = box; head = th;
+    root.setAttribute("role", options.role || root.getAttribute("role") || "table");
+    // A table is named by its own visible heading; a page's only table needs none (the main region is named).
+    if (options.labelledby) root.setAttribute("aria-labelledby", options.labelledby);
+    if (options.multiselectable) root.setAttribute("aria-multiselectable", "true");
+    if (options.count != null) count(options.count);
+    root.setAttribute("aria-colcount", String(visible().length));
+    head.setAttribute("role", "row");
+    head.setAttribute("aria-rowindex", "1");
     layout();
     head.innerHTML = "";
     head.title = T("drag to move, right click: columns");
@@ -81,10 +90,18 @@ export function createTable({ key, columns, state = { cols: null, sort: "name", 
       const d = def(c.key), active = state.sort === c.key;
       const cell = el("div", "th " + (d.cls || "") + (active ? " on" : "") + (d.num ? " r" : ""));
       cell.dataset.k = c.key;
+      cell.id = key + "-column-" + c.key;
       cell.setAttribute("role", "columnheader");
+      cell.tabIndex = -1;
+      pop.menuOpener(cell);
+      cell.setAttribute("aria-colindex", String(visible().indexOf(c) + 1));
       cell.setAttribute("aria-sort", active ? (state.dir * d.dir > 0 ? "ascending" : "descending") : "none");
       cell.append(el("span", "lbl", T(d.title)));
-      if (active) cell.append(el("span", "arrow", state.dir * d.dir > 0 ? "▲" : "▼"));
+      if (active) {
+        const arrow = el("span", "arrow", state.dir * d.dir > 0 ? "▲" : "▼");
+        arrow.setAttribute("aria-hidden", "true");
+        cell.append(arrow);
+      }
       const rz = el("span", "rz");
       rz.ondblclick = (e) => { e.preventDefault(); e.stopPropagation(); size(c.key, 0); };
       cell.append(rz);
@@ -96,7 +113,7 @@ export function createTable({ key, columns, state = { cols: null, sort: "name", 
         const c = cols().find((col) => col.key === d.key);
         const resizing = e.target === rz, x0 = e.clientX, w0 = c.w;
         let moving = false, target, after;
-        // Keep resize clicks targeted at the edge so its double click can restore width (06 §3.9).
+        // Keep resize clicks targeted at the edge so its double click can restore width (16 §3.9).
         (resizing ? rz : cell).setPointerCapture(e.pointerId);
         if (resizing) document.body.classList.add("col-resizing");
         const clear = () => {
@@ -123,8 +140,21 @@ export function createTable({ key, columns, state = { cols: null, sort: "name", 
     }
     head.oncontextmenu = (e) => { e.preventDefault(); focusTable(); menu(e.clientX, e.clientY); };
   }
+  function count(n) { root.setAttribute("aria-rowcount", String(n + 1)); }
+  function row(node, index, identity) {
+    if (identity != null) node.id = identity;
+    node.setAttribute("role", "row");
+    node.setAttribute("aria-rowindex", String(index + 2));
+    const grid = ["grid", "treegrid"].includes(root.getAttribute("role"));
+    [...node.children].forEach((cell, i) => {
+      cell.setAttribute("role", grid ? "gridcell" : "cell");
+      cell.setAttribute("aria-colindex", String(i + 1));
+      if (cell.title === cell.textContent) cell.setAttribute("aria-description", "");
+    });
+    return node;
+  }
   return {
-    state, visible, draw, menu, size, move, sortBy, column: def,
+    state, visible, draw, row, count, menu, size, move, sortBy, column: def,
     adopt(box, th) { root = box; head = th; layout(); },
     async load() {
       if (!reading) reading = api.Setting(key).catch(() => "").then((saved) => { state.cols = mergeColumns(defs(), saved); });

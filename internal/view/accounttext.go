@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/l10ndata"
 )
 
@@ -79,6 +80,34 @@ func Text(s string) string {
 	}
 	if i := strings.LastIndex(s, " 0x"); i >= 0 {
 		return T(s[:i]) + s[i:]
+	}
+	return s
+}
+
+// cliKVRe is a `label: value` line of the CLI's output (render KV), and cliCountRe its
+// subscription head ("workshop: 1 subscriptions").
+var (
+	cliKVRe    = regexp.MustCompile(`^(folder|result|note|version|warning|affected link|state): (.*)$`)
+	cliCountRe = regexp.MustCompile(`^(workshop|git|page|update|remove|check): (\d+) subscriptions$`)
+)
+
+// CLILine is one line of CLI output for a page that shows it (a dry-run preview): a line
+// with its own translation as it is, else its parts translated, so the page reads in the
+// interface language (VM round 2026-11-05: Add subscription's preview was English in the
+// Chinese interface).
+func CLILine(st *app.LoadoutState, s string) string {
+	s = strings.TrimSpace(s)
+	if h := Humanize(st, s); h != s {
+		return h
+	}
+	if rest, ok := strings.CutPrefix(s, "dry run, nothing changed: "); ok {
+		return T("dry run, nothing changed") + T(": ") + CLILine(st, rest)
+	}
+	if m := cliCountRe.FindStringSubmatch(s); m != nil {
+		return T(m[1]) + T(": ") + Tf("%s subscriptions", m[2])
+	}
+	if m := cliKVRe.FindStringSubmatch(s); m != nil {
+		return T(m[1]) + T(": ") + Humanize(st, m[2])
 	}
 	return s
 }

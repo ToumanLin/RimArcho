@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// Severities recalibrated on the log corpus (03 §4.3, decisions-corpus §2 G8): official.order is
+// Severities recalibrated on the log corpus (05 §4.3, decisions-corpus §2 G8): official.order is
 // a warning, order.cycle info; version.unsupported is a warning when the mod stops at the
 // previous minor version and info when it lists only older ones.
 func TestCorpusSeverities(t *testing.T) {

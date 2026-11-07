@@ -10,11 +10,11 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// The filter bar (06 §2.5, §2.9): one search line and the filters in force as chips, over
+// The filter bar (16 §2.5, §2.9): one search line and the filters in force as chips, over
 // Not enabled and Enabled together in the editor (view.FilterBoard) and over the table in Mod library
 // (view.BuildLibrary). `\` opens the groups, one line each: ↑↓ a group, ←→ a value, enter
 // or space keeps it, x or - leaves it out, typing finds a value of the group ("more…"),
-// esc closes. The search line takes the words of §3.7; tab takes the grey completion.
+// esc closes. The search line takes the words of 16 §3.7; tab takes the grey completion.
 
 // barState is a page's bar.
 type barState struct {
@@ -341,7 +341,7 @@ func (m *model) barView(w int) []string {
 		used += cells
 	}
 	if m.tab == tabLibrary {
-		add(sDimS.Render("1 "), 2) // Mod library's first area (06 §3.5)
+		add(sDimS.Render("1 "), 2) // Mod library's first area (16 §3.5)
 	}
 	add(sDimS.Render(ic.search+" "), 2)
 	switch {

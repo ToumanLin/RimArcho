@@ -7,10 +7,10 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// withElsewhere adds the other games' own Mods/ folders to an index (04 §1.7, 06 §2.9):
+// withElsewhere adds the other games' own Mods/ folders to an index (07 §1.7, 16 §2.9):
 // the mod library is the whole machine's, and a list can enable those mods in any game —
 // saving links them into this game's Mods/ as _Archo_env_<ID>, as switching games does
-// (02 §0 item 14). Their copies carry kind Elsewhere, so nothing takes them for this
+// (03 §2 item 14). Their copies carry kind Elsewhere, so nothing takes them for this
 // game's Mods/. A mod this game already sees at the same folder (an earlier link, read as
 // this game's own) is not added twice.
 func (a *App) withElsewhere(e *env.Environment, mods []*store.Mod, srcs []*source.Source) ([]*store.Mod, []*source.Source, error) {

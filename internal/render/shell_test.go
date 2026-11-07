@@ -2,7 +2,7 @@ package render
 
 import "testing"
 
-// Commands lose the "#" of instance references; everything else keeps it (05 §3.1 rule 11).
+// Commands lose the "#" of instance references; everything else keeps it (13 §3.1 rule 11).
 func TestShellSafe(t *testing.T) {
 	t.Parallel()
 	for _, c := range []struct{ in, want string }{

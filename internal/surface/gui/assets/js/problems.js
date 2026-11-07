@@ -1,6 +1,6 @@
 // The list's problems inside the editor: the top bar's "N problems" button opens a panel
 // with every item of Can it run, worst first, each with its fix, so the list can be put right
-// without leaving it (06 §4.2). The panel follows S.board.problems: a list edit, a sort or
+// without leaving it (16 §4.2). The panel follows S.board.problems: a list edit, a sort or
 // the background check (the list-problems event) redraw it in place.
 import { S, el, T, Tf, say, errText, keyCaps } from "./state.js";
 import { api } from "./api.js";
@@ -13,10 +13,11 @@ let ui = null;
 export function initProblems(u) { ui = u; listen(); }
 
 const box = el("div", "prob-pop");
-box.setAttribute("role", "dialog");
-let anchor = null;
+box.id = "problems-popup"; box.tabIndex = -1;
+box.setAttribute("role", "dialog"); box.setAttribute("aria-labelledby", "problems-popup-title");
+let anchor = null, back = null; // back: where the focus was, it returns there
 const opened = new Set(); // sections shown in full
-// view.Section* (06 §2.4); the last one is SectionElsewhere: the editor still lists those items
+// view.Section* (16 §2.4); the last one is SectionElsewhere: the editor still lists those items
 const SECTIONS = ["breaks the game", "worth knowing", "for you to confirm", "errors from the last run", "hidden mods"];
 const FOLD_AT = 4; // a long section shows this many, then "show all"
 
@@ -36,22 +37,30 @@ export function chip() {
   const b = el("button", "chip prob " + (n ? (p.severity === "error" ? "err" : "warn") : "hint") + (p.updating ? " updating" : "") + (isOpen() ? " on" : ""));
   b.append(el("span", "dot"), el("span", "t", n ? Tf("%d problems", n) : T("suggestions")), keyCaps("p"));
   b.title = T(n ? "what is wrong with this list, and the fixes" : "suggestions") + T("; ") + "p";
-  b.onclick = (e) => { e.stopPropagation(); toggle(b); };
+  b.setAttribute("aria-haspopup", "dialog"); b.setAttribute("aria-expanded", String(isOpen())); if (isOpen()) b.setAttribute("aria-controls", box.id);
+  b.onclick = (e) => { e.stopPropagation(); toggle(b, e.detail === 0); };
   return b;
 }
 
-export function toggle(at) {
+export function toggle(at, keys = true) {
   if (isOpen()) return close();
   anchor = at || document.querySelector(".chip.prob");
   if (!anchor) return say("", T("nothing to fix in this list"));
+  back = document.activeElement;
   draw();
-  anchor.classList.add("on");
+  anchor.classList.add("on"); anchor.setAttribute("aria-expanded", "true"); anchor.setAttribute("aria-controls", box.id);
+  if (keys) box.focus({ preventScroll: true, focusVisible: false });
 }
 
-export function close() {
+// close: esc (restore), or the focus inside the panel, puts the focus back where it was before
+// it opened (the button for a click; the page for p, as the popups do).
+export function close(restore = false) {
+  restore ||= box.contains(document.activeElement);
   box.remove();
-  if (anchor) anchor.classList.remove("on");
-  anchor = null;
+  if (anchor) { anchor.classList.remove("on"); anchor.setAttribute("aria-expanded", "false"); anchor.removeAttribute("aria-controls"); }
+  const to = back?.isConnected && back !== document.body ? back : document.querySelector('#screen[role="main"], #board:not([inert])');
+  if (restore && to?.isConnected) to.focus({ preventScroll: true, focusVisible: false });
+  anchor = null; back = null;
 }
 
 // refresh: the board changed; the open panel follows it, anchored to the new button.
@@ -73,7 +82,8 @@ function draw() {
   const p = S.board.problems;
   const head = el("div", "pp-head");
   const lead = el("div", "pp-lead");
-  lead.append(el("b", "", problemCount(its) ? Tf("%d problems in this list", problemCount(its)) : T("suggestions")));
+  const title = el("b", "", problemCount(its) ? Tf("%d problems in this list", problemCount(its)) : T("suggestions"));
+  title.id = "problems-popup-title"; lead.append(title);
   if (p.updating) lead.append(el("span", "muted", T("updating…")));
   head.append(lead);
   const acts = el("div", "pp-acts");
@@ -91,7 +101,7 @@ function draw() {
   head.append(acts);
   box.append(head);
 
-  const list = el("div", "pp-list");
+  const list = el("div", "pp-list"); list.setAttribute("role", "list"); list.setAttribute("aria-labelledby", title.id);
   SECTIONS.forEach((title, si) => {
     const sec = its.filter((it) => it.section === si).sort((a, b) => b.status - a.status);
     if (!sec.length) return;
@@ -115,6 +125,7 @@ function draw() {
 
 function card(it) {
   const row = el("div", "pp-item" + (it.dim ? " muted" : ""));
+  row.setAttribute("role", "listitem");
   const ic = el("span", "pp-ic s" + it.status);
   ic.innerHTML = statusIcon(it.status);
   const body = el("div", "pp-body");
@@ -138,11 +149,12 @@ function card(it) {
     for (const a of shown) right.append(actButton(it, a, answers ? "btn small" : "btn small primary"));
     if (!answers && acts.length > 1) {
       const more = el("button", "btn small more", "⋯");
+      pop.menuOpener(more);
       more.title = acts.slice(1).map((x) => x.label).join(T("; "));
       more.onclick = (e) => {
         e.stopPropagation();
         const r = more.getBoundingClientRect();
-        pop.menu(r.left, r.bottom + 4, acts.slice(1).map((x) => ({ label: x.label, envWrite: needActionWrite(x), run: () => runNeedAction(it, x) })));
+        pop.menu(r.left, r.bottom + 4, acts.slice(1).map((x) => ({ label: x.label, envWrite: needActionWrite(x), run: () => runNeedAction(it, x) })), e.detail === 0, { name: t.textContent, opener: more });
       };
       right.append(more);
     }
@@ -196,7 +208,7 @@ function listen() {
     if (e.key !== "Escape" || !isOpen() || S.popup || !document.querySelector("#menu")?.hidden) return;
     e.preventDefault();
     e.stopPropagation();
-    close();
+    close(true);
   }, true);
   addEventListener("resize", () => place());
 }

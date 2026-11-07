@@ -1,9 +1,9 @@
 import { choiceControl } from "./choices.js";
-// The plan editor's Load-order rules (06 §2.5, 04 §6.1): a fold above history in the left column. Rules
+// The plan editor's Load-order rules (16 §2.5, 08 §2.1): a fold above history in the left column. Rules
 // are global (every list and game shares them); the fold shows those with a mod enabled in
 // the current list (only the current list, the default) or all of them, and its bar counts what it
 // shows. Each row has edit and delete; the form adds or changes one in place (no popup,
-// 06 §3.1 rule 7). r opens the form for the mod at the cursor. Removing is at once, with
+// 16 §3.1 rule 7). r opens the form for the mod at the cursor. Removing is at once, with
 // undo in the status line (u right after, too); rules are not list edits, so they are not in
 // the list's undo stack.
 import { $, el, api, T, errText, say, keyCaps } from "./state.js";
@@ -111,6 +111,7 @@ function draw() {
   const rows = shown();
   const n = rows.length;
   const bar = $(".hbar", a);
+  bar.setAttribute("aria-expanded", String(R.open));
   bar.replaceChildren(el("span", "t", T("load-order rules")));
   if (n) bar.append(el("span", "num", String(n)));
   const chev = el("span", "fold-chev"); chev.innerHTML = icon.chev; bar.append(chev);
@@ -152,7 +153,11 @@ function modName(m) {
 function row(r) {
   const d = el("div", "rule");
   d.dataset.id = r.id;
+  d.id = "rule-row-" + encodeURIComponent(r.id);
+  d.setAttribute("role", "group");
   const t = el("div", "rule-t");
+  t.id = d.id + "-text";
+  d.setAttribute("aria-labelledby", t.id);
   for (const p of r.parts) t.append(p.mod === 1 ? modName(r.a) : p.mod === 2 ? modName(r.b) : p.text);
   d.append(t);
   if (r.note) d.append(el("div", "rule-n", r.note));

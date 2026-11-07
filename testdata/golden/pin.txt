@@ -79,7 +79,7 @@ save: dry run, nothing written
   path: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Config/ModsConfig.xml
   version: 1.6.4633 rev1261
   entries: 2
-  links: 1 in Mods/ (08 §3: SteamCMD and extra mods are linked, never copied)
+  links: 1 in Mods/ (09 §3: SteamCMD and extra mods are linked, never copied)
     + _Archo_locked_5100_local2 → $ROOT/LocalAppData/RimArcho/locked/5100_local2
   changes: 1 since v1
     replaced  #z3bw  Lockable  replaces #6olp at 2

@@ -12,7 +12,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// U10 / 04 §7.2, and the inspector's test_copy_local_creates_clean_independent_git_baseline.
+// U10 / 07 §5.2, and the inspector's test_copy_local_creates_clean_independent_git_baseline.
 func TestCopyLocal(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
@@ -32,7 +32,7 @@ func TestCopyLocal(t *testing.T) {
 	out := e.MustRun("copy-local", orig, "--git")
 	dst := filepath.Join(e.Root, "LocalAppData", "RimArcho", "locked", "123456_local")
 	// copy-local is now an alias of pin: the enabled original is swapped for the copy in
-	// the current plan (04 §7.2 step 6); the game's files are not touched.
+	// the current plan (07 §5.2 step 6); the game's files are not touched.
 	for _, want := range []string{"locked: copied to", "git: repository with a baseline commit", "skipped: 1 links", "Textures/External", "replaces " + orig + " in the current plan"} {
 		if !strings.Contains(e.Scrub(out), want) {
 			t.Fatalf("missing %q:\n%s", want, out)
@@ -108,7 +108,7 @@ func rimcrowDB(t *testing.T, path string, stmts ...string) {
 	}
 }
 
-// U11 / 04 §8.2: path first, packageId second, ambiguous and missing reported, conflicts
+// U11 / 07 §6.2: path first, packageId second, ambiguous and missing reported, conflicts
 // kept, rules mapped, idempotent, and the RimCrow files are never written.
 func TestImportRimCrow(t *testing.T) {
 	t.Parallel()
@@ -189,7 +189,7 @@ func TestImportRimCrow(t *testing.T) {
 	}
 }
 
-// 05 §4.2: loadout export / import round-trips through a text list and a ModsConfig.xml,
+// 13 §4.2: loadout export / import round-trips through a text list and a ModsConfig.xml,
 // and reads a save's mod list; import is one undoable step and never writes the game file.
 func TestLoadoutExchange(t *testing.T) {
 	t.Parallel()
@@ -245,7 +245,7 @@ func TestLoadoutExchange(t *testing.T) {
 	}
 }
 
-// 03 §3: the environment's analysis and one for the log's game version coexist;
+// 05 §3: the environment's analysis and one for the log's game version coexist;
 // alternating problems and log does not re-run either.
 func TestAnalysisPerGameVersion(t *testing.T) {
 	t.Parallel()

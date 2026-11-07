@@ -2,6 +2,8 @@ package cmds
 
 import (
 	"fmt"
+	"path"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -41,6 +43,14 @@ func analysed(c *Ctx) (*app.LoadoutState, *app.AnalysisState, error) {
 	return st, s, nil
 }
 
+// notAnalysed answers --mod for a mod outside the current list. Patches and Harmony are
+// analysed only for the list (05 §5), so a count of 0 would say the mod has none.
+func notAnalysed(what string) *render.Doc {
+	d, root := render.New(what + ": not analysed (not in the current list)")
+	root.Add("patches and Harmony are analysed only for the mods in the current list; add it to see them")
+	return d
+}
+
 func modLabel(ix *app.Index, id string) string {
 	m := ix.ByID[id]
 	if m == nil {
@@ -50,6 +60,9 @@ func modLabel(ix *app.Index, id string) string {
 }
 
 // parseDefRef accepts "def:ThingDef/Gun_A", "ThingDef/Gun_A", "ThingDef@BaseGun" or "Gun_A".
+// defNameRe matches a bare def name, as opposed to an XPath fragment.
+var defNameRe = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
+
 func parseDefRef(s string) (typ, name string, byName bool) {
 	s = strings.TrimPrefix(s, "def:")
 	if i := strings.IndexByte(s, '@'); i >= 0 {
@@ -134,6 +147,12 @@ func defCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			}
 			sec.Add(line)
 		}
+		// The definition exists, but the game may not have loaded its file (06 §3).
+		if eff := active[len(active)-1].f; !byName {
+			if id := c.App.DefFileFailed(st, path.Base(eff.File)); id != "" {
+				root.KV("log", fmt.Sprintf("not loaded: the newest log says %s failed to load (%s); archo log --cluster %s", path.Base(eff.File), id, strings.TrimPrefix(id, "log:")))
+			}
+		}
 	}
 	if len(inactive) > 0 {
 		sec := root.Section("also-in (not enabled)")
@@ -145,7 +164,7 @@ func defCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	target := typ + sep + name
 	pf := store.PatchFilter{Target: target}
 	if typ == "" {
-		pf = store.PatchFilter{XPathPart: `"` + name + `"`}
+		pf = store.PatchFilter{XPathPart: `"` + name + `"`, DefName: name}
 	}
 	pfs, err := c.App.Store.PatchFacts(s.Run.ID, pf)
 	if err != nil {
@@ -238,6 +257,9 @@ func patchesCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			return nil, err
 		}
 		f.Instance = m.ID
+		if st.Position(m.ID) == 0 {
+			return notAnalysed("patches"), nil
+		}
 	}
 	if t := a.Str("target"); t != "" {
 		if typ, name, byName := parseDefRef(t); typ != "" && !strings.ContainsAny(name, "/[") {
@@ -248,6 +270,11 @@ func patchesCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			f.Target = typ + sep + name
 		} else {
 			f.XPathPart = strings.TrimPrefix(t, "def:")
+			if defNameRe.MatchString(f.XPathPart) {
+				// A bare name also finds operations nested in FindMod or Sequence, which
+				// have no XPath of their own, by the defs they touched (P26).
+				f.DefName = f.XPathPart
+			}
 		}
 	}
 	pfs, err := c.App.Store.PatchFacts(s.Run.ID, f)
@@ -287,6 +314,9 @@ func patchesCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	d, root := render.New(head)
 	if !s.Fresh {
 		root.KV("analysis", "stale (archo analyze)")
+	}
+	if f.DefName != "" {
+		root.KV("target", fmt.Sprintf("operations whose XPath contains %s or that touched a def named %s, nested ones included; <Type>/%s matches that def only", f.DefName, f.DefName, f.DefName))
 	}
 	lst := root.Section("list")
 	if len(pfs) == 0 {
@@ -443,7 +473,7 @@ func whyCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		onto(ma, db)
 		onto(mb, da)
-		// Methods both mods patch with Harmony (05 §4.2: shared patches).
+		// Methods both mods patch with Harmony (13 §4.2: shared patches).
 		ha, _ := c.App.Store.HarmonyPatches(store.HarmonyFilter{Instance: ma.ID})
 		hb, _ := c.App.Store.HarmonyPatches(store.HarmonyFilter{Instance: mb.ID})
 		kinds := map[string][2][]string{}

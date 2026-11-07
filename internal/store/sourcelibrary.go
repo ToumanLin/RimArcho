@@ -5,18 +5,6 @@ import (
 	"time"
 )
 
-// Old cache output is discarded by app.Open. Keep its attempt history, without
-// claiming that any of those deleted projects exists in the library.
-const schemaV29 = `
-CREATE TABLE source_library(
-  dll_hash TEXT NOT NULL, game_build TEXT NOT NULL DEFAULT '', folder TEXT NOT NULL UNIQUE,
-  kind TEXT NOT NULL, package_id TEXT NOT NULL DEFAULT '', dll_name TEXT NOT NULL,
-  ilspy_version TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL, bytes INTEGER NOT NULL DEFAULT 0,
-  PRIMARY KEY(dll_hash, game_build));
-ALTER TABLE source_cache RENAME TO source_use;
-ALTER TABLE source_use ADD COLUMN mode TEXT NOT NULL DEFAULT 'project';
-`
-
 // SourceArtifact identifies generated code. Folder is relative to the managed root.
 // GameBuild distinguishes game releases even when their assembly bytes are equal.
 type SourceArtifact struct {

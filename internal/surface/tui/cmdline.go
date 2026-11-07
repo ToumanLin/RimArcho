@@ -15,7 +15,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 )
 
-// The command line (06 §9.4): `:` opens an input on the last line that runs one archo
+// The command line (16 §9.4): `:` opens an input on the last line that runs one archo
 // command as the CLI would — the same command table and the same text (cmds.Execute) — in
 // the background on its own database session. tab completes the word under the cursor,
 // ↑↓ go through the history, a usage error keeps the line open with the error above it.
@@ -29,7 +29,7 @@ const (
 var sCursor = lipgloss.NewStyle().Reverse(true)
 
 // cmdLine is the command line's state. It outlives closing: an unsent line comes back
-// when `:` opens again (06 §3.1 rule 8).
+// when `:` opens again (16 §3.1 rule 8).
 type cmdLine struct {
 	text []rune
 	cur  int // cursor, a rune index into text
@@ -83,7 +83,7 @@ func (m *model) openCmdLine() tea.Cmd {
 	return nil
 }
 
-// cmdKey: every key while the command line is open (06 §9.4).
+// cmdKey: every key while the command line is open (16 §9.4).
 func (m *model) cmdKey(k tea.KeyMsg) tea.Cmd {
 	l := m.cmdl
 	s := k.String()
@@ -288,7 +288,7 @@ func (m *model) cmdCands() ([]cmdCand, int, int) {
 	return out, from, to
 }
 
-// cmdSubmit is enter: check the line, then run it in the background (06 §9.4).
+// cmdSubmit is enter: check the line, then run it in the background (16 §9.4).
 func (m *model) cmdSubmit() tea.Cmd {
 	l := m.cmdl
 	argv := cmdArgv(l.text)
@@ -339,13 +339,13 @@ func (m *model) cmdSubmit() tea.Cmd {
 		return m.queueSourceDecompile(envName)
 	case len(argv) == 1 && argv[0] == "scan" && (envName == "" || envName == m.envName):
 		m.remember(line)
-		return m.startScan() // never scan inside the TUI process (06 §8.2)
+		return m.startScan() // never scan inside the TUI process (16 §8.2)
 	case len(argv) == 1 && argv[0] == "analyze" && (envName == "" || envName == m.envName):
 		m.remember(line)
-		return m.startAnalyze() // the analysis child (03 §3)
+		return m.startAnalyze() // the analysis child (05 §3)
 	case len(argv) == 1 && argv[0] == "update":
 		m.remember(line)
-		return m.selfUpdatePanel() // installs, then restarts this TUI (07 §5.1)
+		return m.selfUpdatePanel() // installs, then restarts this TUI (17 §5.1)
 	}
 	m.cmdBusy = line // the status line says so while it runs (statusText)
 	snap := m.snapshot()
@@ -398,7 +398,7 @@ func gameVersionArg(argv []string) string {
 }
 
 // cmdDone: one line of output goes to the status line, more open a panel; a usage error
-// the command found itself brings the line back with the error (06 §9.4).
+// the command found itself brings the line back with the error (16 §9.4).
 func (m *model) cmdDone(d cmdDoneMsg) tea.Cmd {
 	m.cmdBusy = ""
 	if d.uninstalled {
@@ -438,7 +438,7 @@ func (m *model) cmdDone(d cmdDoneMsg) tea.Cmd {
 	return m.requestDetail()
 }
 
-// cmdAfter: what a command changed that the screen keeps itself (06 §9.4).
+// cmdAfter: what a command changed that the screen keeps itself (16 §9.4).
 func (m *model) cmdAfter(d cmdDoneMsg) {
 	if d.code != cmds.ExitOK || len(d.argv) < 2 {
 		return

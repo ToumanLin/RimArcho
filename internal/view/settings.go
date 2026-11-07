@@ -7,14 +7,16 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/deps"
+	"github.com/ToumanLin/RimArcho/internal/netcfg"
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
-// The settings page (06 §2.14): every item is a value and the command that changes it, so the
+// The settings page (16 §2.14): every item is a value and the command that changes it, so the
 // interfaces only show and run commands; nothing here has logic of its own.
 
 // SettingItem is one row of the settings page.
 type SettingItem struct {
+	Key   string `json:"key,omitempty"` // stable identity for rows without a setting command
 	Label string `json:"label"`
 	Value string `json:"value"`
 	// Path markers identify filesystem text independently of editing/status text.
@@ -35,11 +37,11 @@ type SettingItem struct {
 	Note         string   `json:"note,omitempty"`
 	Hover        string   `json:"hover,omitempty"`
 	ValueNote    string   `json:"valueNote,omitempty"`
-	// URL: the value is a web page; the interfaces open it in the browser (Community, 06 §2.14).
+	// URL: the value is a web page; the interfaces open it in the browser (Community, 16 §2.14).
 	URL     string          `json:"url,omitempty"`
 	Links   []CommunityLink `json:"links,omitempty"`
 	Actions []SettingAction `json:"actions,omitempty"`
-	// Details fold under the row (06 §3.1 rule 7): RimArcho's release notes.
+	// Details fold under the row (16 §3.1 rule 7): RimArcho's release notes.
 	Details *SettingDetails `json:"details,omitempty"`
 }
 
@@ -60,7 +62,7 @@ type SettingAction struct {
 	Pending string   `json:"pending,omitempty"`
 }
 
-// SettingTask identifies commands that queue after confirmation (06 §2.14, 06 §2.16).
+// SettingTask identifies commands that queue after confirmation (16 §2.14, 16 §2.16).
 func SettingTask(argv []string) string {
 	if len(argv) > 0 && argv[0] == "update" {
 		if len(argv) == 1 {
@@ -134,7 +136,7 @@ type EnvRow struct {
 }
 
 // EnvPage is the environment page: the environments, and the current one's game folder,
-// version, launch and saves (what belongs to one game, 02 §0; the mod folders every game
+// version, launch and saves (what belongs to one game, 03 §2; the mod folders every game
 // shares are on the settings page).
 type EnvPage struct {
 	Envs   []EnvRow       `json:"envs"`
@@ -175,7 +177,7 @@ func EnvGroups(a *app.App, st *app.LoadoutState) []SettingGroup {
 	return []SettingGroup{{Title: T("this game"), Items: []SettingItem{
 		{Label: T("game folder"), Value: e.GameRoot, ValuePath: true, Edit: "path", Argv: []string{"env", "set", e.Name, "--game", "{}"},
 			Note: T("RimArcho checks that the mods are still the same before it moves them over")},
-		{Label: T("game version"), Value: version},
+		{Key: "game.version", Label: T("game version"), Value: version},
 		{Label: T("start the game through"), Value: e.Launch, Edit: "choice", Choices: []string{"steam", "direct"},
 			ChoiceLabels: []string{"Steam", T("the game's own exe")}, Argv: []string{"env", "set", e.Name, "--launch", "{}"}},
 		saves,
@@ -184,7 +186,7 @@ func EnvGroups(a *app.App, st *app.LoadoutState) []SettingGroup {
 	}}}
 }
 
-// FolderGroup is the settings page's "Mod folders" (02 §0): the folders every environment
+// FolderGroup is the settings page's "Mod folders" (03 §2): the folders every environment
 // shares. The Workshop folder can be moved; SteamCMD and other folders added and removed;
 // RimArcho's own folders (Archo Monitor, the lock library) are shown.
 func FolderGroup(a *app.App) SettingGroup {
@@ -242,8 +244,8 @@ func FolderGroup(a *app.App) SettingGroup {
 	return g
 }
 
-// SettingsPage is the settings page's groups (06 §2.14): About, Interface, Accounts, update,
-// Folders, game log, external tools, community data, Storage and, last, uninstall. The GUI and
+// SettingsPage is the settings page's groups (16 §2.14): About, Interface, Accounts, update,
+// Folders, game log, network, external tools, community data, Storage and, last, uninstall. The GUI and
 // the TUI show them in this order. Game launch and save options are on the environment page.
 func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	gpuNote := ""
@@ -266,6 +268,10 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		onOff(T("Workshop descriptions"), "workshop.fetch"),
 		onOff(T("images in descriptions"), "workshop.images"),
 		gpu,
+		{Label: T("Archo animation"), Value: cmds.Setting(a, "ui.archo.motion"), Edit: "segments",
+			Choices: []string{"off", "still", "live"}, ChoiceLabels: []string{T("off"), T("still"), T("animated")},
+			Hover: T("Archo's figure while pages load and in the first-run guide; still uses no GPU"),
+			Argv:  []string{"config", "set", "ui.archo.motion", "{}"}},
 	}}, AccountGroup(a), AutomaticGroup(a)}
 
 	// RimArcho's folders, each with relocation controls, then adding a mod folder.
@@ -281,15 +287,17 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 	mon := SettingItem{Label: T("add Archo Monitor to lists"), Value: cmds.Setting(a, "monitor.default"), Edit: "choice", Choices: []string{"on", "off"},
 		ChoiceLabels: []string{T("on"), T("off")}, Argv: []string{"config", "set", "monitor.default", "{}"}, Hover: T("new lists, and every sort")}
 	if s, err := a.MonitorState(); err == nil {
-		v := T("not installed")
-		if len(s.Installed) > 0 {
+		v, path := T("not installed"), s.Dir
+		if s.Newest != nil {
+			v, path = s.Newest.Version, s.Newest.Mod.RealPath
+		} else if len(s.Installed) > 0 {
 			v = s.Installed[0]
 		}
-		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon, {Label: T("Archo Monitor installed"), Value: v, Note: s.Dir, NotePaths: []string{s.Dir}}}})
+		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon, {Key: "monitor.installed", Label: T("Archo Monitor installed"), Value: v, Note: path, NotePaths: []string{path}}}})
 	} else {
 		out = append(out, SettingGroup{Title: T("game log"), Items: []SettingItem{mon}})
 	}
-	out = append(out, DependencyGroup(a))
+	out = append(out, NetworkGroup(a), DependencyGroup(a))
 
 	data := SettingGroup{Title: T("community data")}
 	status := a.DataStatus()
@@ -325,6 +333,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 			{Label: T("compact"), Argv: []string{"db", "vacuum"}},
 			{Label: T("remove old tombstones"), Argv: []string{"gc"}, Confirm: T("mods gone for longer than the tombstone time are forgotten")},
 		}},
+		{Key: "import.managers", Label: T("import from RimSort or RimCrow"), Actions: []SettingAction{{Label: T("import…"), Argv: []string{"import-managers"}}}},
 	}}
 	for _, c := range a.Caches() {
 		storage.Items = append(storage.Items, SettingItem{Label: T(c.Desc), Value: Tf("%s  %d items", SizeText(c.Bytes), c.Files),
@@ -350,6 +359,29 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		}
 	}
 	return out
+}
+
+// NetworkGroup: the proxy and the GitHub mirror for RimArcho's own downloads (17 §2.2).
+// The window's Workshop pages follow the Windows system proxy on their own.
+func NetworkGroup(a *app.App) SettingGroup {
+	proxy := cmds.Setting(a, "network.proxy")
+	via := netcfg.Describe("https://github.com/")
+	now := T("direct")
+	if via != "direct" {
+		now = Tf("through %s", via)
+	}
+	mirror := cmds.Setting(a, "network.github_mirror")
+	mv := mirror
+	if mv == "" {
+		mv = T("none: GitHub directly")
+	}
+	return SettingGroup{Title: T("network"), Items: []SettingItem{
+		{Label: T("proxy"), Value: proxy, Edit: "text", Argv: []string{"config", "set", "network.proxy", "{}"},
+			ValueNote: Tf("now: %s", now),
+			Note:      T("system follows the Windows proxy (Clash, v2rayN in system proxy mode); off goes direct; or a proxy such as http://127.0.0.1:7890 or socks5://127.0.0.1:7891")},
+		{Label: T("GitHub mirror"), Value: mv, EditValue: &mirror, Edit: "text", Argv: []string{"config", "set", "network.github_mirror", "{}"},
+			Note: T("tried before GitHub for community data, updates and todds, e.g. https://gh-proxy.org/; empty goes to GitHub directly. Use one you trust: updates come through it")},
+	}}
 }
 
 // SettingCommand checks that argv is one of the settings page's commands (the interfaces

@@ -10,21 +10,22 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
+	"github.com/ToumanLin/RimArcho/internal/scan"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// CreateLink makes a Mods/ link (08 §3); tests replace it to act out a volume without
+// CreateLink makes a Mods/ link (09 §3); tests replace it to act out a volume without
 // junctions (FAT, exFAT).
 var CreateLink = source.CreateLink
 
-// DeployPrefix marks the Mods/ links RimArcho manages (08 §3). It only ever creates or
+// DeployPrefix marks the Mods/ links RimArcho manages (09 §3). It only ever creates or
 // removes entries with this prefix.
 const DeployPrefix = "_Archo_"
 
 // DeployName is the Mods/ link name of a deployed instance.
 func DeployName(m *store.Mod) string {
-	if m.Kind == source.Elsewhere { // another game's Mods/ (04 §1.7), named as on switching games
+	if m.Kind == source.Elsewhere { // another game's Mods/ (07 §1.7), named as on switching games
 		return envLinkPrefix + m.ID
 	}
 	r := strings.NewReplacer("/", "_", `\`, "_", ":", "_")
@@ -40,7 +41,7 @@ func gameVisible(k source.Kind) bool {
 }
 
 // deployable reports whether m lives where the game does not look (SteamCMD, an extra
-// folder or another game's Mods/) and could be linked into Mods/ (08 §3). An instance the game already sees
+// folder or another game's Mods/) and could be linked into Mods/ (09 §3). An instance the game already sees
 // through someone else's link is not deployable: it is an ordinary candidate.
 func deployable(ix *Index, aliases map[string][]store.Alias, m *store.Mod) bool {
 	if m.Status != identity.Live || m.Residue || m.Unloadable != "" || (m.Kind != source.SteamCMD && m.Kind != source.Extra && m.Kind != source.Elsewhere) {
@@ -104,7 +105,7 @@ func deployCandidate(m *store.Mod) loadout.Candidate {
 // disk now (the game sees them until the next save removes the link). A link on disk whose
 // packageId the workspace already holds through another instance is left out: the save that
 // writes the list removes it, so it never competes with the list's copy (an Archo Monitor
-// update while the old version's link is still in Mods/, 08 §9).
+// update while the old version's link is still in Mods/, 19 §6).
 func (a *App) deploySet(ix *Index, aliases map[string][]store.Alias) (map[string]bool, error) {
 	var ws *store.Workspace
 	plan, err := a.planFor(ix.Env.ID)
@@ -162,7 +163,7 @@ func modsDir(ix *Index) string {
 	return ""
 }
 
-// LinkChange is one Mods/ link a save creates or removes (08 §3).
+// LinkChange is one Mods/ link a save creates or removes (09 §3).
 type LinkChange struct {
 	Op     string // "add" or "remove"
 	Name   string // link name in Mods/
@@ -194,7 +195,7 @@ func planLinks(st *LoadoutState, copies []ModsCopy) (string, []LinkChange, []Dup
 	for _, d := range ents {
 		name := d.Name()
 		if packLink(name) && source.IsLink(filepath.Join(mods, name)) {
-			// A pack's link (08 §5.3): saving the normal list ends the pack's run.
+			// A pack's link (10 §3): saving the normal list ends the pack's run.
 			tgt, _ := source.RealPath(filepath.Join(mods, name))
 			out = append(out, LinkChange{Op: "remove", Name: name, Target: tgt})
 			continue
@@ -231,7 +232,7 @@ func planLinks(st *LoadoutState, copies []ModsCopy) (string, []LinkChange, []Dup
 		out = append(out, c)
 	}
 	// A link next to another copy of the same packageId in Mods/ makes the game report an
-	// error and ignore one of them (08 §3): refuse instead of making the pair.
+	// error and ignore one of them (09 §3): refuse instead of making the pair.
 	if dups := deployDuplicates(st, want, copies); len(dups) > 0 {
 		return "", nil, dups, nil
 	}
@@ -275,9 +276,9 @@ func applyLinks(mods string, plan []LinkChange) error {
 				return fmt.Errorf("cannot link %s: %v", c.Name, err)
 			}
 			if err := CreateLink(p, c.Target); err != nil {
-				if strings.Contains(strings.ToLower(c.Name), strings.ToLower(monitorFolder)) {
-					// 08 §9: the monitor never falls back to a copy.
-					return fmt.Errorf("Archo Monitor reaches the game only through a link, and %s cannot hold one: %v (the Mods/ volume must support junctions, e.g. NTFS; FAT and exFAT cannot). Disable it in this plan: archo disable pkg:%s", mods, err, MonitorPackage)
+				if d := scan.ReadDecl(c.Target, false); strings.EqualFold(d.PackageID, MonitorPackage) {
+					// 19 §6: the monitor never falls back to a copy.
+					return fmt.Errorf("this Archo Monitor copy needs a link, and %s cannot hold one: %v (the Mods/ volume must support junctions, e.g. NTFS; FAT and exFAT cannot). Disable it in this plan: archo disable pkg:%s", mods, err, MonitorPackage)
 				}
 				return fmt.Errorf("cannot link %s into %s: %v (the Mods/ volume must support junctions, e.g. NTFS)", c.Target, mods, err)
 			}

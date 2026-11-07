@@ -19,7 +19,7 @@ type backgroundResult struct {
 	done  bool
 }
 
-// Protected by API.mu. This is incidental background work, outside Tasks (06 §3.1).
+// Protected by API.mu. This is incidental background work, outside Tasks (16 §3.1).
 type backgroundReader struct {
 	ctx     context.Context
 	cancel  context.CancelFunc

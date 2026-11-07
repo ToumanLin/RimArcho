@@ -11,7 +11,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// After a game, the window reads the new Player.log by itself (06 §2.1): Can it run's badge
+// After a game, the window reads the new Player.log by itself (16 §2.1): Can it run's badge
 // counts the run without a visit, the log is recorded as read, and a second call reads
 // nothing. Until 2026-10-30 the sidebar said "analyse this run's log" and waited for a click.
 func TestReadNewLogCountsTheRun(t *testing.T) {

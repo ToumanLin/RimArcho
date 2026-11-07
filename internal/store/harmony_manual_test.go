@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/harmony"
 )
 
-// A patch found at a Harmony.Patch call keeps that in the stored facts (03 §5.3, G9): with
+// A patch found at a Harmony.Patch call keeps that in the stored facts (05 §5.3, G9): with
 // its target resolved it is a manual patch, without it is dynamic too and says why.
 func TestHarmonyManualFlag(t *testing.T) {
 	s, err := Open(filepath.Join(t.TempDir(), "rimarcho.db"))

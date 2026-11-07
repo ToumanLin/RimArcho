@@ -51,7 +51,7 @@ func toggleResponds(t *testing.T, api *API, id string) {
 		if err != nil {
 			t.Fatal(err)
 		}
-	case <-time.After(time.Second):
+	case <-time.After(10 * time.Second): // the slow read is held until released; this only bounds a hang
 		t.Fatal("editor waits for a slow read")
 	}
 }

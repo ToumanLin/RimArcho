@@ -1,6 +1,6 @@
 package mcp
 
-// Mod library (06 §2.9, 05 §1.2): the read-only inventory and its two actions that had no tool.
+// Mod library (16 §2.9, 13 §1.2): the read-only inventory and its two actions that had no tool.
 // Each call maps to one CLI argv, so the text is the CLI's (I1).
 
 func libraryTools() []tool {
@@ -8,7 +8,7 @@ func libraryTools() []tool {
 		reg("list_library", true, false, descLibrary, func(in LibraryIn) []string { return LibraryArgv(in) }),
 		// Moving a folder out of Mods/ changes the game's folder (a recycle-bin copy on another
 		// volume), so the tool is marked destructive.
-		reg("manage_library", false, true, descManageLibrary, func(in ManageLibraryIn) []string { return ManageLibraryArgv(in) }),
+		reg("manage_library", false, true, descManageLibrary, func(in ManageLibraryIn) []string { return ManageLibraryArgv(in) }).allOnly(),
 	}
 }
 

@@ -3,7 +3,9 @@
 package gui
 
 import (
+	"crypto/sha256"
 	"embed"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"os"
@@ -17,6 +19,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/events"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/buildinfo"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/icon"
 	"github.com/ToumanLin/RimArcho/internal/perftrace"
@@ -52,7 +55,7 @@ func Run(o Options) error {
 	debug.FreeOSMemory() // the drawing's buffers
 	w := application.New(application.Options{
 		Name:       "RimArcho",
-		Icon:       ico, // used when the exe has no icon resource (development builds, 06 §8.6)
+		Icon:       ico, // used when the exe has no icon resource (development builds, 16 §8.6)
 		Services:   []application.Service{application.NewService(api)},
 		Assets:     application.AssetOptions{Handler: page},
 		ShouldQuit: api.allowClose,
@@ -74,7 +77,7 @@ func Run(o Options) error {
 		Frameless:                  runtime.GOOS == "windows",
 		BackgroundColour:           frame.background,
 		Windows:                    frame.options,
-		DefaultContextMenuDisabled: true, // the page draws its own (06 §8.5)
+		DefaultContextMenuDisabled: true, // the page draws its own (16 §8.5)
 	})
 	win.RegisterHook(events.Common.WindowClosing, api.guardWindowClose)
 	api.uninstall.shutdownBlock = uninstallShutdownBlock(win)
@@ -86,17 +89,17 @@ func Run(o Options) error {
 	return w.Run()
 }
 
-// BrowserArgs are WebView2's command-line switches (07 §8.3). Always: the network service
-// runs inside the browser process (the page loads nothing from the network, 06 §8.2) and
+// BrowserArgs are WebView2's command-line switches (17 §7.3). Always: the network service
+// runs inside the browser process (the page loads nothing from the network, 16 §8.2) and
 // there is one renderer, which saves a process of about 7 MB. Without GPU acceleration
-// (ui.gpu off, 06 §2.14) the GPU process goes too and the page is drawn in software.
+// (ui.gpu off, 16 §2.14) the GPU process goes too and the page is drawn in software.
 // WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS has no effect under Wails, so they go here.
 func BrowserArgs(gpu bool) []string {
 	args := []string{"--enable-features=NetworkServiceInProcess2", "--renderer-process-limit=1"}
 	if !gpu {
 		args = append(args, "--disable-gpu", "--disable-gpu-compositing", "--in-process-gpu")
 	}
-	// Testing only (07 §4): RIMARCHO_DEVTOOLS_PORT opens WebView2's DevTools protocol on
+	// Testing only (17 §4): RIMARCHO_DEVTOOLS_PORT opens WebView2's DevTools protocol on
 	// 127.0.0.1 so a test script can drive the real window, for example in the test VM.
 	// Unset for players, so nothing listens.
 	if port := os.Getenv("RIMARCHO_DEVTOOLS_PORT"); port != "" {
@@ -114,7 +117,7 @@ func NewAPI(a *app.App, emit func(name string, data any)) *API {
 }
 
 // PageHandler serves the page, the thumbnails (/preview/<id>) and the description images
-// (/img?u=<url>) from the local caches; nothing remote is loaded by the page (06 §8.2).
+// (/img?u=<url>) from the local caches; nothing remote is loaded by the page (16 §8.2).
 func PageHandler(api *API) (http.Handler, error) {
 	files, err := fs.Sub(assets, "assets")
 	if err != nil {
@@ -123,18 +126,28 @@ func PageHandler(api *API) (http.Handler, error) {
 	return handler(api, files), nil
 }
 
+// previewOf makes a thumbnail; a test replaces it to hold one open.
+var previewOf = (*app.App).PreviewOf
+
 func handler(api *API, files fs.FS) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/preview/", func(w http.ResponseWriter, r *http.Request) {
 		id := strings.TrimPrefix(r.URL.Path, "/preview/")
 		api.mu.Lock()
 		st := api.boardState()
-		var path string
-		var err error = app.ErrNoPreview
+		var target *app.PreviewTarget
 		if st != nil && st.Ix.ByID[id] != nil {
-			path, _, _, err = api.a.Preview(st.Ix, st.Ix.ByID[id])
+			t := api.a.PreviewTargetOf(st.Ix, st.Ix.ByID[id])
+			target = &t
 		}
 		api.mu.Unlock()
+		// Making a thumbnail decodes the full picture (tens of milliseconds for a large
+		// one); page calls do not wait for it (16 §8.4).
+		var path string
+		var err error = app.ErrNoPreview
+		if target != nil {
+			path, _, _, err = previewOf(api.a, *target)
+		}
 		serveFile(w, r, path, err)
 	})
 	mux.HandleFunc("/img", func(w http.ResponseWriter, r *http.Request) {
@@ -154,8 +167,19 @@ func handler(api *API, files fs.FS) http.Handler {
 		})
 	}
 	files2 := application.BundledAssetFileServer(files)
+	archoETag := fmt.Sprintf(`"%x"`, sha256.Sum256([]byte(buildinfo.String())))
 	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'")
+		if strings.HasPrefix(r.URL.Path, "/archo/") {
+			// Unhashed paths must revalidate across upgrades. ServeContent in Wails'
+			// file server handles If-None-Match (including lists and weak tags).
+			// Wails strips conditional headers on Windows to avoid a WebView2 304
+			// hang, so native windows currently receive the full response.
+			w.Header().Set("Cache-Control", "no-cache")
+			if info, err := fs.Stat(files, strings.TrimPrefix(r.URL.Path, "/")); err == nil && info.Mode().IsRegular() {
+				w.Header().Set("ETag", archoETag)
+			}
+		}
 		files2.ServeHTTP(w, r)
 	}))
 	return mux

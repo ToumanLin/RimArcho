@@ -9,7 +9,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// escPage is one state of one of the TUI's pages besides the editor (06 §9.1), set up from
+// escPage is one state of one of the TUI's pages besides the editor (16 §9.1), set up from
 // the editor as a player gets there.
 type escPage struct {
 	name  string
@@ -82,7 +82,7 @@ var escPages = []escPage{
 	{"Lists, help", tabList, func(m *model) { press(m, "?") }},
 }
 
-// atBase: the page shown has nothing over it, nothing selected and no open filter (06 §11
+// atBase: the page shown has nothing over it, nothing selected and no open filter (16 §11
 // T20). Filters applied with the bar closed are the page's own state (a further esc clears
 // them). esc on a page with nothing over it goes back to the editor (the TUI has no
 // sidebar), which is the editor's base.
@@ -95,6 +95,7 @@ func atBase(m *model, page int) bool {
 }
 
 // T20 on the pages besides the editor (G5's TUI half): esc reaches the base in at most 3.
+// The states really are built: each named overlay is there before esc.
 func TestT20EscBackPages(t *testing.T) {
 	t.Parallel()
 	e, _ := v3Fixture(t)
@@ -106,6 +107,13 @@ func TestT20EscBackPages(t *testing.T) {
 			s.setup(m)
 			if m.app.Uninstalled {
 				t.Fatal("uninstalled")
+			}
+			built := m.tab == s.page && (s.page != tabList || m.popupName() != "")
+			if strings.Contains(s.name, ", ") && atBase(m, s.page) {
+				built = false
+			}
+			if !built {
+				t.Errorf("not built (tab %d, popup %q)", m.tab, m.popupName())
 			}
 			for i := 0; ; i++ {
 				if atBase(m, s.page) {
@@ -120,24 +128,5 @@ func TestT20EscBackPages(t *testing.T) {
 				press(m, "esc")
 			}
 		})
-	}
-}
-
-// The states really are built: each named overlay is there before esc.
-func TestT20PagesBuilt(t *testing.T) {
-	t.Parallel()
-	e, _ := v3Fixture(t)
-	e.WriteFile(filepath.Join(e.UserData, "Player.log"), "RimWorld 1.6.4633 rev1261\n")
-	e.WriteFile(filepath.Join(e.Root, "LocalAppData", "RimArcho", "steamcmd", "steamcmd.exe"), "MZ")
-	for _, s := range escPages {
-		m := direct(t, e, 160, 40)
-		s.setup(m)
-		built := m.tab == s.page && (s.page != tabList || m.popupName() != "")
-		if strings.Contains(s.name, ", ") && atBase(m, s.page) {
-			built = false
-		}
-		if !built {
-			t.Errorf("%s: not built (tab %d, popup %q)", s.name, m.tab, m.popupName())
-		}
 	}
 }

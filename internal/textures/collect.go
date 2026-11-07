@@ -47,7 +47,7 @@ type Other struct {
 	Prio  int
 	Ext   string // ".dds", ".jpg", ".jpeg", ".psd", ".png" (not a PNG inside)
 	Size  int64
-	MTime int64 // unix nanoseconds; page cache fingerprint (08 §5.2)
+	MTime int64 // unix nanoseconds; page cache fingerprint (10 §2)
 }
 
 // Set is every texture file of a mod's load folders.

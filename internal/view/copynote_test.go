@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 06 §2.9: every copy gets RimArcho's first note, not only the locked versions it made.
+// 16 §2.9: every copy gets RimArcho's first note, not only the locked versions it made.
 func TestCopyNoteAutoEveryCopy(t *testing.T) {
 	view.SetLang("zh")
 	defer view.SetLang("en")

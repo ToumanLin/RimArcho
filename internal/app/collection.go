@@ -16,7 +16,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Steam Workshop collections (04 §9.5): read the items through the public, keyless API and
+// Steam Workshop collections (07 §7.5): read the items through the public, keyless API and
 // compare them with what is installed. The network is used only when the player asks.
 
 // SteamCollectionAPI is the public endpoint; tests point App.SteamCollectionAPI elsewhere.

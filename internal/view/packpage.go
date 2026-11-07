@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/source"
 )
 
-// ---- Create a pack (06 §2.6) ----
+// ---- Create a pack (16 §2.6) ----
 
 // BuildStep is one of the four things building does, as the page says it.
 type BuildStep struct {
@@ -32,7 +32,7 @@ type TexChoice struct {
 }
 
 // PackTextureChoices are the values a pack's textures can take: off, preconvert (DDS at full
-// size), resize at a percent of the size (08 §5.2).
+// size), resize at a percent of the size (10 §2).
 func PackTextureChoices() []TexChoice {
 	out := []TexChoice{{0, T("off: copy the PNGs")}, {100, T("pre-convert (full size)")}}
 	for _, p := range []int{80, 75, 60, 50, 40, 25} {
@@ -62,7 +62,7 @@ type BuildPage struct {
 	Tex        int         `json:"tex"`
 	TexChoices []TexChoice `json:"texChoices,omitempty"`
 	// ToolOK: the DDS encoder is ready, whatever Tex is, so the page can let the player
-	// pick another choice and create the pack without measuring it first (06 §2.6).
+	// pick another choice and create the pack without measuring it first (16 §2.6).
 	ToolOK bool `json:"toolOk"`
 }
 
@@ -207,7 +207,7 @@ func BuildPageOf(pl *app.PackPlan, plan, envChip, packsDir string, tex int) *Bui
 	return p
 }
 
-// textureStep is the textures step (08 §5.2): the choice, and what it costs and
+// textureStep is the textures step (10 §2): the choice, and what it costs and
 // saves (the PNGs converted, the pack's size after, the most the drive needs meanwhile).
 func textureStep(r *app.PackBuild, tex int) BuildStep {
 	s := BuildStep{Key: "textures", Title: T("textures"), Kind: "textures"}
@@ -245,10 +245,11 @@ func textureStep(r *app.PackBuild, tex int) BuildStep {
 	return s
 }
 
-// ---- one pack (06 §2.7) ----
+// ---- one pack (16 §2.7) ----
 
 // PackPageEntry is one mod of a pack's page.
 type PackPageEntry struct {
+	Key   string `json:"key"` // package and pack folder, independent of load order
 	Name  string `json:"name"`
 	Order int    `json:"order"`
 	Bytes int64  `json:"bytes"`
@@ -316,7 +317,7 @@ func BuildPackPage(a *app.App, name string) (*PackPage, error) {
 		pg.Facts = append(pg.Facts, Tf("played %s", ShortDate(p.LastPlayed)))
 	}
 	for i, e := range p.Entries {
-		r := PackPageEntry{Name: e.Name, Order: i + 1, Bytes: e.Bytes}
+		r := PackPageEntry{Key: strconv.Quote(e.PackageID) + "/" + strconv.Quote(e.Folder), Name: e.Name, Order: i + 1, Bytes: e.Bytes}
 		switch {
 		case e.Official:
 			r.Note = T("from the game")

@@ -1,7 +1,7 @@
 package cmds
 
 // The error pattern library in the log outputs (archo log, MCP analyze_log) and the
-// pattern:<id> entity (archo pattern). docs/research/01-pattern-library-integration-draft.md, 03 §6.8.
+// pattern:<id> entity (archo pattern). docs/research/01-pattern-library-integration-draft.md, 06 §8.
 
 import (
 	"fmt"
@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/logs"
 	"github.com/ToumanLin/RimArcho/internal/patterns"
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
@@ -41,6 +42,15 @@ func patternTag(ix *app.Index, lc *app.LogCluster) string {
 		return "  [" + m.Generic.Ref() + "]"
 	}
 	return ""
+}
+
+// commonUnattributed labels a cluster with no candidate mod whose kind of error is in more than
+// 5% of the public logs (patterns.CommonShare), "" otherwise.
+func commonUnattributed(lc *app.LogCluster) string {
+	if logs.Informational(lc.Class) {
+		return ""
+	}
+	return patterns.Load().CommonUnattributed(lc.Class, lc.Template, len(lc.Attr) > 0)
 }
 
 // addClusterPatterns adds what the library knows about a cluster to its detail: the generic

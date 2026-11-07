@@ -16,7 +16,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// The Mod library actions that are not already somewhere else (06 §2.9): taking mods out of
+// The Mod library actions that are not already somewhere else (16 §2.9): taking mods out of
 // every plan, and moving a spare copy out of Mods/ into the lock library.
 
 // PlanRemoval is one plan a removal changed: one undo step in that plan.
@@ -87,7 +87,7 @@ func (a *App) RemoveFromPlans(refs []string) ([]PlanRemoval, error) {
 }
 
 // editOther changes a plan that is not the current one, with an undo step in its own
-// history (the step is undone once the plan is current, 04 §3).
+// history (the step is undone once the plan is current, 07 §3).
 func (a *App) editOther(p *store.Plan, op string, f func(loadout.List) (loadout.List, int)) (int, error) {
 	unlock, err := a.lockLaunch()
 	if err != nil {
@@ -108,7 +108,7 @@ func (a *App) editOther(p *store.Plan, op string, f func(loadout.List) (loadout.
 }
 
 // MoveToLocked moves a spare copy of a lineage out of the game's Mods/ into the lock
-// library (06 §2.9, 01 §4): a copy made by hand or left by another manager, beside another
+// library (16 §2.9, 02 §1): a copy made by hand or left by another manager, beside another
 // copy of the same mod. Same volume: renamed; another volume: copied, every file checked,
 // then the original goes to the recycle bin. Its instance stays the same (ID, lineage,
 // history), so every plan keeps it. Incoming installations and an entry needed by
@@ -118,7 +118,7 @@ func (a *App) MoveToLocked(ref string, dryRun bool) (*MoveResult, error) {
 	return a.MoveToLockedFor(ref, dryRun, "")
 }
 
-// MoveToLockedFor is MoveToLocked with the reason, kept in the copy's note (06 §2.9).
+// MoveToLockedFor is MoveToLocked with the reason, kept in the copy's note (16 §2.9).
 func (a *App) MoveToLockedFor(ref string, dryRun bool, reason string) (*MoveResult, error) {
 	st, err := a.Loadout()
 	if err != nil {
@@ -141,7 +141,7 @@ func (a *App) MoveToLockedFor(ref string, dryRun bool, reason string) (*MoveResu
 		}
 	}
 	// The only copy of its mod moves too when it shares a packageId with another entry of
-	// Mods/ (08 §3): there the game would report an error, and in the lock library plans
+	// Mods/ (09 §3): there the game would report an error, and in the lock library plans
 	// still choose it.
 	if !other && m.Origin == "" && !a.inModsDuplicate(st, m.ID) {
 		return nil, fmt.Errorf("%s is the only copy of its mod; RimArcho moves only spare copies out of Mods/", st.Ix.Ref(m.ID))
@@ -169,7 +169,7 @@ func (a *App) MoveToLockedFor(ref string, dryRun bool, reason string) (*MoveResu
 	return r, err
 }
 
-// SetCopyNote sets one copy's own note (06 §2.9); "" clears it. The lineage's note (note,
+// SetCopyNote sets one copy's own note (16 §2.9); "" clears it. The lineage's note (note,
 // has:note) is about the mod and all its copies; this one is about this copy only.
 func (a *App) SetCopyNote(ref, text string) (*store.Mod, error) {
 	ix, err := a.Index()
@@ -199,7 +199,7 @@ func upstreamOf(ix *Index, m *store.Mod) *store.Mod {
 
 // writeOrigin gives a moved spare copy the lock library's marker: its upstream (the
 // lineage's Workshop copy, else itself) and its own content as the snapshot, so "a newer version is out"
-// means the upstream's content differs from the copy's (04 §7.3).
+// means the upstream's content differs from the copy's (07 §5.3).
 func (a *App) writeOrigin(ix *Index, m *store.Mod, dir string) error {
 	o := scan.Origin{InstanceID: m.ID, LineageID: m.LineageID, WorkshopID: m.DeclaredWorkshop, SnapshotHash: hex.EncodeToString(m.SnapHash),
 		CopiedAt: a.Now().UTC().Format("2006-01-02T15:04:05Z")}

@@ -1,6 +1,6 @@
 # Error pattern library v0: draft MCP integration
 
-> Status: integrated into the product (G11, `internal/patterns`, `archo pattern`, `analyze_log pattern=`, and the MCP `Instructions` checklist; see 03 §6.5). The following is the pre-integration draft, retained as a record. Basis: `docs/research/00-log-corpus-design.md` §3 G5, §9; data: `spikes/patterns/patterns-v0.json`; figures: `spikes/patterns/RESULT.txt`.
+> Status: integrated into the product (G11, `internal/patterns`, `archo pattern`, `analyze_log pattern=`, and the MCP `Instructions` checklist; see 06 §5). The following is the pre-integration draft, retained as a record. Basis: `docs/research/00-log-corpus-design.md` §3 G5, §9; data: `spikes/patterns/patterns-v0.json`; figures: `spikes/patterns/RESULT.txt`.
 
 ## 1. What the data tells us
 
@@ -52,4 +52,4 @@ As with community sorting rules: `archo data update` downloads `patterns-v<n>.js
 
 - `parsed.jsonl` omits Mod entries with `[v:…]` / `[ov:…]` (about 5%, but present in every log; HugsLib itself uses `[ov:]`). Fix this and regenerate the library before using Mod versions and "disappeared after an update" evidence.
 - Fallback patterns such as bare `NullReferenceException` need `StackShape` (innermost game method, and assembly owning the innermost Mod frame); v0 only has message templates.
-- Compare agent conclusions before and after integration using the evaluation dataset (00 §6.5), then decide the final `Instructions` wording.
+- Compare agent conclusions before and after integration using the evaluation dataset (`00-log-corpus-design.md` §6.5), then decide the final `Instructions` wording.

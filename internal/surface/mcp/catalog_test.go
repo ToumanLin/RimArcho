@@ -10,6 +10,7 @@ import (
 )
 
 func TestCatalogAndArgvFor(t *testing.T) {
+	t.Parallel()
 	cat := mcp.Catalog()
 	if len(cat) != len(mcp.Tools()) {
 		t.Fatalf("catalog has %d tools, server %d", len(cat), len(mcp.Tools()))
@@ -46,6 +47,7 @@ func TestCatalogAndArgvFor(t *testing.T) {
 		{"status", ``, []string{"status"}},
 		{"test_run", ``, []string{"test", "run", "--json"}},
 		{"test_run", `{"plan":"small","map":true,"timeout_seconds":30}`, []string{"test", "run", "small", "--map", "--timeout", "30s", "--json"}},
+		{"test_run", `{"probe":"D:\\work\\probe","probe_after":"brrainz.harmony"}`, []string{"test", "run", "--probe", `D:\work\probe`, "--probe-after", "brrainz.harmony", "--json"}},
 	}
 	for _, c := range cases {
 		got, err := mcp.ArgvFor(c.tool, []byte(c.args))
@@ -62,6 +64,7 @@ func TestCatalogAndArgvFor(t *testing.T) {
 }
 
 func TestClipOutput(t *testing.T) {
+	t.Parallel()
 	short := "a\nb\n"
 	if mcp.ClipOutput(short) != short {
 		t.Error("short output changed")
@@ -74,6 +77,7 @@ func TestClipOutput(t *testing.T) {
 }
 
 func TestFilesSchemaAndArgv(t *testing.T) {
+	t.Parallel()
 	var search *mcp.ToolDoc
 	for _, tool := range mcp.Catalog() {
 		if tool.Name == "search_files" {

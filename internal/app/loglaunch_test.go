@@ -27,7 +27,7 @@ func launches(t *testing.T, e *testkit.Env) []*store.LaunchRecord {
 }
 
 // J11: a plan's launch records the plan, the list's fingerprint and the version played; a
-// pack's launch has no plan and the pack list's fingerprint (08 §1).
+// pack's launch has no plan and the pack list's fingerprint (09 §1).
 func TestLaunchRecordCarriesPlan(t *testing.T) {
 	t.Parallel()
 	e := packEnv(t)
@@ -82,7 +82,7 @@ func newPlan(t *testing.T, e *testkit.Env, name string) {
 	}
 }
 
-// 03 §6.4 new rule: a log maps to the newest launch that started no later than it was
+// 06 §4 new rule: a log maps to the newest launch that started no later than it was
 // written, and is stale when that launch is another plan's (B9), a pack's or another
 // environment's, or when the plan changed since (B10, current again once changed back).
 func TestLogBelongsToLaunch(t *testing.T) {
@@ -160,22 +160,27 @@ func TestLogBelongsToLaunch(t *testing.T) {
 }
 
 // B11 and "unknown source": without a launch record the log belongs to the plan last written to
-// the game before it; with neither it is of unknown source, stale, and the header says so.
+// the game before it; with neither it is of unknown source, the header says so, and it is
+// counted as the last run (MCP review round 2 P25: "0 error" over a log with errors).
 func TestLogWriteRecordAndUnknown(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()
 	e.App.Store.DB.Exec(`DELETE FROM launch`)
 	r := logRun(t, e)
-	if !r.Unknown || !r.Stale() {
+	if !r.Unknown || r.Stale() {
 		t.Fatalf("no launch, no write: %+v", r)
 	}
 	out := e.MustRun("problems")
-	if !strings.Contains(out, "stale log (source unknown: no launch and no ModsConfig.xml write by RimArcho before it)") {
+	if !strings.Contains(out, "source unknown (no launch and no ModsConfig.xml write by RimArcho before it; counted as the last run)") || strings.Contains(out, "not counted") {
 		t.Fatal(out)
 	}
-	if strings.Contains(e.MustRun("status"), "current") {
-		t.Fatal("status counts an unknown log")
+	if strings.Contains(e.MustRun("status"), "0 error") {
+		t.Fatal("status does not count the log")
+	}
+	r.UnknownGame = "D:/elsewhere"
+	if !r.Stale() {
+		t.Fatal("a log of an unregistered game folder is counted")
 	}
 
 	// Written to the game (archo save) before the session that wrote the log; started from
@@ -201,7 +206,7 @@ func TestLogWriteRecordAndUnknown(t *testing.T) {
 	}
 }
 
-// C11: each plan's analysis is kept (03 §3), so switching between two plans with different
+// C11: each plan's analysis is kept (05 §3), so switching between two plans with different
 // enabled sets and back does not run the analysis again; the per-plan rows read stored
 // results only.
 func TestAnalysisPerPlan(t *testing.T) {
@@ -253,7 +258,7 @@ func TestAnalysisPerPlan(t *testing.T) {
 	}
 }
 
-// 08 §1, §4: the refusal and archo status name the plan running, from the launch records;
+// 09 §1, §4: the refusal and archo status name the plan running, from the launch records;
 // a game started elsewhere plays the plan last written to the game.
 func TestRunningGameNamesThePlan(t *testing.T) {
 	t.Parallel()
@@ -282,7 +287,7 @@ func TestRunningGameNamesThePlan(t *testing.T) {
 }
 
 // J13: after the game exits, a Player.log newer than the last launch and the last log the
-// player looked at shows "analyse this run's log" (08 §2), until the log is looked at.
+// player looked at shows "analyse this run's log" (09 §2), until the log is looked at.
 func TestNewLogHint(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)

@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    Archo Monitor, RimArcho's in-game companion mod (docs/specs 03 §6.7, 08 §9).
+    Archo Monitor, RimArcho's in-game companion mod (docs/specs 19).
 
     dotnet build -p:GameVersion=1.6                 references Krafs.Rimworld.Ref from NuGet
     dotnet build -p:GameVersion=1.7 -p:RimWorldDir=D:\…\RimWorld   references the local game

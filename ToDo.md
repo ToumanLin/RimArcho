@@ -1,18 +1,9 @@
 # ToDo
 
-Things to research, not yet decided. Once decided, put them in the specifications (implementation plans in 01 §5); research goes in docs/research/.
+Things to research, not yet decided. Once decided, put them in the specifications (implementation plans in 01 §4); research goes in docs/research/.
 
-## GUI
-
-### Search files
-
-The search interface confuses players. Consider a default 32:68 split: a search/filter card at the upper left, matching Mod instances and their file tree below it, and detailed file contents on the right.
-
-Search options need review. The default scope is the current list, but players cannot choose another list or filter by Mod source, tag, or version to exclude other copies' files. Reuse the Mod library's filter approach. Searching decompiled code targets a Mod, but it is unclear which instance is searched when the Mod has multiple copies.
-
-Search results also need review: addresses are relative and players cannot directly open the corresponding file or folder. Design around what players want to do with their results.
-
-2026-11-01: mockup for review at https://claude.ai/artifact/Xh4rTagnS8p6UnqHysR2tx (Def / Text / C# code views). Waiting for the owner's feedback before the spec (06 §2.9) changes.
+## MCP test&improve
+Baed on benchmark exam on real mod list and error log from corpus research
 
 ## Decompilation
 
@@ -20,52 +11,38 @@ Decompilation serves two purposes: investigating Mod conflicts and creating Mods
 
 2026-11-01: decided in [research/2026-11-01_decompile-storage.md](docs/research/2026-11-01_decompile-storage.md): a durable source library including the game's own code; being implemented. Mod projects are deferred (New Mod Project below).
 
-## Research displaying, editing, and managing Mod configuration
-
-Mod configuration determines how a Mod's content is played. In the game it has an interface; outside the game it is plain XML.
-
-## Accessibility
-
-Accessibility is intended to let AI agents operate without screenshots. Define acceptance criteria for it.
+### Decompilation management
+manage decompiled mod instance
 
 ## New Mod Project
-Allow player to initialize a new mod project
+Allow player to initialize a new mod project with `about.xml`
+I suggest a new side bar group: developing, or debugging, not sure
+因为开发mod和处理mod冲突处理bug从工具角度来看没有不同, 都要反编译/编译
+developing
+/decompile
+/new mod project
+Developing would possibly need new tools such as Bash, ilspyCMD, .Net SDK, 
+所以这也要考虑, 假设一般玩家用不到这些工具, 那么这整个group都是没法用的
+如果要给一般玩家用, 需要让玩家下载这些工具
+
+## Translation
+Auto translate mod details? Need to think about it. 因为需要OCR. 
 
 ## Save analysis
 
-### Save management
+- §1.4–1.5：从存档提取引用的 Def，映射回提供它的 Mod
+- §2 内容目录：Def 类型 → 内容类别的映射（现为草案）
 
-Preview the colony name, in-game date, storyteller and difficulty, play time, colonist count, save size, and Mod list.
-
-Group saves by colony using RimSaves' folder logic. RimSaves stores the folder name in the filename as folder#§#save-name.rws. Recognize that prefix so its users' saves are not grouped incorrectly.
-
-Support renaming and copying saves, and offer cleanup suggestions.
-
-### Mods used by a save
-
-Explain the effect of the save's Mod list. List objects belonging to Mod X, for example 3 colonists of its race, 12 buildings, 1 faction, and 1 WorldComponent.
-
-Close the gap in 10 §3.3: after extracting Class, functional Mods with Comp or Component classes leave traces in saves, so their usage can be determined at least partially.
-
-Answer the common community question of whether a Mod can be removed mid-playthrough. Compare the current Mod list with the save's Mod list.
-
-### Detect save corruption
-
-At the file level, detect truncation (no </savegame>, often saved during a crash), empty files, and malformed XML. Do not report a save as corrupt while the game is writing it; check running-game detection in 08 §4 first.
-
-At the reference level, collect defined and referenced loadIDs statically and find references to nonexistent objects. This can reveal Could not resolve reference before loading.
-
-At the source level, Class="..." pointing to a type absent from installed assemblies will fail on load and is the most severe case. An unresolved Def source (already recorded in 10 §1.5) should become a risk warning.
-
-Connect the checks to logs: Monitor already records context.save, so attach save-load errors from the last attempt to the save card, showing static checks alongside actual loading evidence.
-
-Undecided: whether to generate a repaired copy by removing invalid references and objects belonging to missing Mods.
+### 1.1 剩余（10）
+- §3 未使用的内容（1.1 核心答案）：三组分类、解读、功能型 Mod 的处理，Unplayed 分组下的 Play review 页面
 
 ### Playthrough review (data for the third question)
 
+这个估计还得琢磨琢磨, 目前不满意
+
 Join multiple saves of a colony into a timeline: in-game days, real play time, population, wealth, and deaths.
 
-Include research progress (the undecided item in 10 §1.4) and DLC in content not yet played.
+Include research progress (the undecided item in 12 §1.4) and DLC in content not yet played.
 
 Optionally count occurrences instead of only recording that something appeared. This costs little and can show how deeply the content was played.
 
@@ -74,6 +51,15 @@ Optionally count occurrences instead of only recording that something appeared. 
 Archo should be a Mod development agent that can take action, not just translate or tag. Tentatively use a modified Pi agent; the approach needs research.
 
 # Deferred
+
+## mod更新的语义理解
+当前只展示什么文件改了, 未来
+1. 从steam拉changelog, 如果mod本身有changelog, 自动读取, 有的mod会做in-game changelog, 需要研究怎么放
+2. 通过AI接口summary更新内容
+
+## Research displaying, editing, and managing Mod configuration
+
+Not now: profiles, exports, cleanup.
 
 ## TUI
 
@@ -84,3 +70,5 @@ Maybe add a UI loading animation--low priority for now
 
 ## 1.6 memory on a real graphics card is inferred
 Calibrated in the VM up to 7.5 GiB texture payload (2026-11-01). Most of the VM's texture RAM is the driver's copy, which the VMware adapter (no dedicated VRAM) commits as process memory; the model now counts it as VRAM and adds back only what does not fit in 90% of the card (research: unity16-texture-memory-breakdown). The 720 list: 36–52 GiB resident without dedicated VRAM, 15–30 GiB with a 24 GiB card. Deferred (2026-11-01): the estimate is good enough for now, so no real-hardware run is planned. If false warnings are ever reported, run 1.6 once on a PC with a discrete GPU and compare Task Manager's "Commit size" and "Dedicated GPU memory" with the estimate (vanilla: about 0.9 GiB commit, 0.66 GiB dedicated).
+
+你可用agent-bridge parallel派发任务给codex 用 gpt-6.1-sol effort high, 可当worker或者sub agent, 让它做代码研究和修改代码, 然后你review, 如果你让codex修改前端, 请务必检查她的前端实现的用户体验(不必要和功能重复的选项, 重复性文字等), 简单直接的任务在这里做

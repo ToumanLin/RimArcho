@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Workspace is the list of a plan being edited (04 §1.2).
+// Workspace is the list of a plan being edited (07 §1.2).
 type Workspace struct {
 	PlanID  int64
 	Entries string // loadout.List encoded
@@ -16,7 +16,7 @@ type Workspace struct {
 	OriginVersion int
 	OriginKind    string
 	// Conflict is an external version that was not loaded because the workspace had
-	// unsaved edits (04 §4.3); 0 when none.
+	// unsaved edits (07 §4.3); 0 when none.
 	Conflict int
 	Updated  time.Time
 }
@@ -172,7 +172,7 @@ func (s *Store) ClearSteps(planID int64, stack string) error {
 	return err
 }
 
-// Version is a saved version v<n> of a plan (04 §3); numbers count per plan.
+// Version is a saved version v<n> of a plan (07 §3); numbers count per plan.
 type Version struct {
 	N           int
 	Created     time.Time
@@ -248,7 +248,7 @@ func (s *Store) VersionCount(planID int64) int {
 	return n
 }
 
-// UserRule is a stored user rule (04 §6.1); A and B are lineage IDs.
+// UserRule is a stored user rule (08 §2.1); A and B are lineage IDs.
 type UserRule struct {
 	ID      int64
 	Kind    string
@@ -272,7 +272,7 @@ func (s *Store) AddRule(envID string, r *UserRule) (int64, error) {
 	return r.ID, s.SetMeta("rule_seq", fmt.Sprint(r.ID))
 }
 
-// Rules lists the user rules. They are global (02 §0 item 6): envID is kept for the callers.
+// Rules lists the user rules. They are global (03 §2 item 6): envID is kept for the callers.
 func (s *Store) Rules(envID string) ([]*UserRule, error) {
 	rows, err := s.DB.Query(`SELECT id, kind, a_lineage, b_lineage, target, note, created_at FROM user_rule ORDER BY id`)
 	if err != nil {

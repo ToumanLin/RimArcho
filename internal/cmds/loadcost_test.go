@@ -14,6 +14,7 @@ import (
 )
 
 func TestPlanCostModsAndJSON(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddEnv(false)
 	e.AddWorkshop("3101", testkit.Sample("tester.cost.a", "Alpha"))

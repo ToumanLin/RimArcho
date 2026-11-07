@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// Load-order findings by constraint strength (04 §5.3), and the DLC-after-mods move.
+// Load-order findings by constraint strength (08 §1.3), and the DLC-after-mods move.
 func TestOrderSeverityAndDLCMove(t *testing.T) {
 	t.Parallel()
 	e := setup(t, false)

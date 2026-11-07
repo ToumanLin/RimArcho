@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// Two windows on one data folder (06 §2.16): each keeps the other's records when it
+// Two windows on one data folder (16 §2.16): each keeps the other's records when it
 // writes, and sees what the other ended.
 func TestTasksTwoWindowsKeepEachOthersRecords(t *testing.T) {
 	t.Parallel()

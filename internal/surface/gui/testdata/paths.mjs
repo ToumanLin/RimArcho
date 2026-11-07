@@ -34,6 +34,13 @@ test("fallback recognises rooted paths and complete URLs without treating keys o
     assert.equal(h.pathContent(h.el("div"), path).querySelector(".path-copy").dataset.path, path);
   }
   assert.equal(h.pathContent(h.el("div"), "backup written to C:\\data\\archo.db").querySelector(".path-copy").dataset.path, "C:\\data\\archo.db");
+  // A Markdown link's ")" and a sentence's full stop are not part of the address; a balanced
+  // pair inside it is (VM round 2026-11-05: release notes copied ".../CHANGELOG.md)").
+  for (const [text, url] of [["[notes](https://github.com/a/b/blob/v1/CHANGELOG.md)", "https://github.com/a/b/blob/v1/CHANGELOG.md"],
+    ["see https://example.invalid/x.", "https://example.invalid/x"],
+    ["https://en.wikipedia.org/wiki/A_(b)", "https://en.wikipedia.org/wiki/A_(b)"]]) {
+    assert.equal(h.pathContent(h.el("div"), text).querySelector(".path-copy").dataset.path, url, text);
+  }
   for (const text of ["ctrl+/", "↑↓ / enter", "1.6 / 1.7", "ludeon.rimworld", "Mods/", "from github.com/a/b", "moving mods"]) {
     assert.equal(h.pathContent(h.el("div"), text).querySelector(".path-copy"), null, text);
   }
@@ -67,6 +74,28 @@ test("address text has no copy action; its button copies the full payload and re
   for (const fn of h.timers.values()) fn();
   assert.equal(button.dataset.copied, undefined); assert.equal(button.title, "copy");
   h.noNative(); await h.copy(path, button); assert.deepEqual(h.browser, [path]);
+});
+
+test("detail identifiers copy only from their trailing icon, like addresses", async () => {
+  const h = await setup();
+  const box = h.fieldList([
+    { kind: "id", label: "Archo ID", value: "#4k2p" },
+    { kind: "package", label: "package ID", value: "ceteam.combatextended" },
+    { kind: "workshop", label: "Workshop", value: "2890901044" },
+    { kind: "alias", label: "alias", value: "CE" },
+  ]);
+  const [id, pkg, ws, alias] = box.querySelectorAll(".frow");
+  for (const [row, value] of [[id, "#4k2p"], [pkg, "ceteam.combatextended"], [ws, "2890901044"]]) {
+    const node = row.querySelector(".path-copy");
+    assert.equal(node.dataset.path, value);
+    assert.equal(node.attributes.role, undefined);
+    node.dispatchEvent(event("", { type: "click" }));
+    node.dispatchEvent(event("Enter", { type: "keydown" }));
+    await flush(); assert.deepEqual(h.copied, []);
+    node.querySelector(".address-copy").dispatchEvent(event("", { type: "click" }));
+    await flush(); assert.deepEqual(h.copied, [value]); h.copied.length = 0;
+  }
+  assert.equal(alias.querySelector(".address-copy"), null);
 });
 
 test("decorating an existing address twice leaves one copy button and retains its display label", async () => {

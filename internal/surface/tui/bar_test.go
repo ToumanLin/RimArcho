@@ -18,7 +18,7 @@ func viewNames(m *model, k colKind) []string {
 	return out
 }
 
-// 06 §2.5: `\` opens the bar's groups; ↑↓ a group, typing finds a value, enter keeps it, x
+// 16 §2.5: `\` opens the bar's groups; ↑↓ a group, typing finds a value, enter keeps it, x
 // leaves it out, esc closes; the filter holds for Not enabled and Enabled together.
 func TestBarGroups(t *testing.T) {
 	t.Parallel()
@@ -91,7 +91,7 @@ func TestListsBarKeyboard(t *testing.T) {
 	}
 }
 
-// 06 §3.5: J / K while the bar filters move past the next shown row; space and m keep the
+// 16 §3.5: J / K while the bar filters move past the next shown row; space and m keep the
 // full order's places.
 func TestBarMoves(t *testing.T) {
 	t.Parallel()

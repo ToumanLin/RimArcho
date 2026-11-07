@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// No two copies of one packageId in Mods/ (08 §3, §5.3): the game logs "Tried loading mod
+// No two copies of one packageId in Mods/ (09 §3, 10 §3): the game logs "Tried loading mod
 // with the same packageId multiple times" and ignores one.
 
 // dupEnv is the player's 2026-10-21 game: a RimCrow-style local copy Mods/_2888837973_
@@ -103,7 +103,7 @@ func TestPackLinksDuplicateReported(t *testing.T) {
 	}
 }
 
-// _Archo_ links (08 §3): writing a plan never links a mod next to another copy of its
+// _Archo_ links (09 §3): writing a plan never links a mod next to another copy of its
 // packageId in Mods/; a pair that is already there is reported with a fix that does not move
 // the player's folder; a pack drops a plan's link that would duplicate its own copy.
 func TestDeployNoDuplicates(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
-// Texture optimisation (08 §5.2, 06 §2.13): the page that converts the current plan's (or every mod's)
+// Texture optimisation (10 §2, 16 §2.13): the page that converts the current plan's (or every mod's)
 // PNG textures to DDS next to them, and takes them back; Mod library does the same per copy
 // (OpTextures, OpTexClean), packs on their own copies (PackPreview's textures step).
 
@@ -27,7 +27,7 @@ func TextureScaleLabel(s int) string {
 type TexturePage struct {
 	Loading bool `json:"loading,omitempty"`
 	// Measured: the textures were read (Scope, Scale say with what). The page opens with
-	// only the encoder and the mods; the player starts the read (06 §2.13).
+	// only the encoder and the mods; the player starts the read (16 §2.13).
 	Measured bool     `json:"measured,omitempty"`
 	Scope    string   `json:"scope"` // app.TexPlan or app.TexAll
 	Scale    int      `json:"scale"`
@@ -74,7 +74,7 @@ type TextureRow struct {
 	Own           int    `json:"own,omitempty"` // DDS of the mod's own
 }
 
-// TexturePageLoading offers choices before any disk measurements finish (06 §3.1).
+// TexturePageLoading offers choices before any disk measurements finish (16 §3.1).
 func TexturePageLoading(scope string, scale int) *TexturePage {
 	p := &TexturePage{Scope: scope, Scale: textures.Options{Scale: scale}.Normal().Scale, Scales: TextureScales, Loading: true}
 	for _, s := range TextureScales {
@@ -83,7 +83,7 @@ func TexturePageLoading(scope string, scale int) *TexturePage {
 	return p
 }
 
-// TextureRowOf formats one completed measurement (06 §2.13).
+// TextureRowOf formats one completed measurement (16 §2.13).
 func TextureRowOf(m *app.TextureMod) TextureRow {
 	row := TextureRow{Ref: m.Ref, Name: m.Mod.DisplayName(), PNG: Tf("%d  %s", m.PNG, SizeText(m.PNGBytes)), PNGCount: m.PNG, PNGBytes: m.PNGBytes, CurrentSize: SizeText(m.PNGBytes), Stale: m.Stale + m.Orphans, Own: m.Foreign}
 	if m.Plan != nil {
@@ -116,7 +116,7 @@ func TexturePageContext(ctx context.Context, a *app.App, scope string, scale int
 }
 
 // TexturePageInfo is the page before any texture is read: the encoder and how many mods
-// the scope holds. Reading the textures is the player's call (06 §2.13).
+// the scope holds. Reading the textures is the player's call (16 §2.13).
 func TexturePageInfo(a *app.App, scope string, scale int, tool *app.TextureTool, mods int) *TexturePage {
 	p := TexturePageLoading(scope, scale)
 	p.Loading, p.Mods = false, mods

@@ -1,6 +1,6 @@
 # Feedback relay (Cloudflare Worker)
 
-"send" in Settings › Feedback passes the report to this Worker, which opens a public issue in [ToumanLin/RimArcho](https://github.com/ToumanLin/RimArcho) using a GitHub App with write access only to Issues. Players need no GitHub account. The GitHub App private key lives only in a Worker secret, never in RimArcho. Specification: 06 §2.14; code structure: 07 §2.
+"send" in Settings › Feedback passes the report to this Worker, which opens a public issue in [ToumanLin/RimArcho](https://github.com/ToumanLin/RimArcho) using a GitHub App with write access only to Issues. Players need no GitHub account. The GitHub App private key lives only in a Worker secret, never in RimArcho. Specification: 16 §2.14; code structure: 17 §2.
 
 Until RimArcho has a relay URL, the feedback page offers only "open GitHub".
 
@@ -48,7 +48,7 @@ Requires a Cloudflare account (the free plan suffices), Node.js (LTS) and reposi
 
 6. (Optional) Create a `feedback` label under Issues → Labels. This is optional: if GitHub rejects the label, the Worker retries issue creation without it.
 
-7. **Send one real report in the VM** (a row in [pre-release VM tests](../docs/release-vm-tests.md) covers this):
+7. **Send one real report in the VM** (a row in [pre-release VM tests](../UserGuide/release-vm-tests.md) covers this):
    1. Set `RIMARCHO_FEEDBACK_RELAY=https://rimarcho-feedback.<your-subdomain>.workers.dev/report` before starting RimArcho.
    2. Settings › Feedback: enter "relay test" as the title, any contact details, and click "send".
    3. After "sent as #N" appears, check GitHub:

@@ -29,7 +29,7 @@ func isLinkInfo(fi os.FileInfo) bool {
 }
 
 // RealPath resolves junctions, symbolic links and 8.3 short names to the final path, using
-// GetFinalPathNameByHandle on a directory handle (02 §3.3).
+// GetFinalPathNameByHandle on a directory handle (03 §4.3).
 func RealPath(p string) (string, error) {
 	abs, err := filepath.Abs(p)
 	if err != nil {
@@ -65,7 +65,7 @@ func RealPath(p string) (string, error) {
 	}
 }
 
-// CreateLink makes link a directory junction pointing at target (08 §3). A junction needs no
+// CreateLink makes link a directory junction pointing at target (09 §3). A junction needs no
 // privileges; volumes without reparse points (FAT, exFAT) fail with an error.
 func CreateLink(link, target string) error {
 	abs, err := filepath.Abs(target)

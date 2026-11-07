@@ -16,6 +16,7 @@ import (
 )
 
 func TestRemovalIOKeepsPagesAndEditorAvailable(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	e.WriteMod(filepath.Join(e.SteamCMD, "7001"), testkit.Sample("tester.remove", "Remove me"))
 	e.MustRun("folder", "add", "steamcmd", e.SteamCMD)
@@ -55,7 +56,7 @@ func TestRemovalIOKeepsPagesAndEditorAvailable(t *testing.T) {
 		if result.Error != "" || result.Board == nil {
 			t.Fatalf("workspace: %+v", result)
 		}
-	case <-time.After(time.Second):
+	case <-time.After(10 * time.Second): // the blocker is held until released; this only bounds a hang
 		t.Fatal("Workspace waits for recycler")
 	}
 	for name, read := range map[string]func() error{
@@ -81,7 +82,7 @@ func TestRemovalIOKeepsPagesAndEditorAvailable(t *testing.T) {
 			if err != nil {
 				t.Fatalf("%s: %v", name, err)
 			}
-		case <-time.After(time.Second):
+		case <-time.After(10 * time.Second): // the blocker is held until released; this only bounds a hang
 			t.Fatalf("%s waits for recycler", name)
 		}
 	}
@@ -93,6 +94,7 @@ func TestRemovalIOKeepsPagesAndEditorAvailable(t *testing.T) {
 }
 
 func TestColdPagesReadDuringWALWriter(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	api.Board() // persist initial workspace, then open a different writer
 	w, err := e.App.ReadSession()
@@ -115,12 +117,13 @@ func TestColdPagesReadDuringWALWriter(t *testing.T) {
 		if err != "" {
 			t.Fatal(err)
 		}
-	case <-time.After(time.Second):
+	case <-time.After(10 * time.Second): // the blocker is held until released; this only bounds a hang
 		t.Fatal("cold readers wait for WAL writer")
 	}
 }
 
 func TestReadFailuresAreExplicit(t *testing.T) {
+	t.Parallel()
 	e, api, _ := fixture(t)
 	if _, err := e.App.Store.DB.Exec(`DROP TABLE environment`); err != nil {
 		t.Fatal(err)
@@ -134,6 +137,7 @@ func TestReadFailuresAreExplicit(t *testing.T) {
 }
 
 func TestAccountReservationDoesNotHoldMutex(t *testing.T) {
+	t.Parallel()
 	_, api, _ := fixture(t)
 	release, err := api.beginAccount()
 	if err != nil {
@@ -150,6 +154,7 @@ func TestAccountReservationDoesNotHoldMutex(t *testing.T) {
 }
 
 func TestGUIFileBatchUsesAppLifecycle(t *testing.T) {
+	t.Parallel()
 	for _, unhide := range []bool{false, true} {
 		name, kind := "trash", view.LibDelete
 		if unhide {

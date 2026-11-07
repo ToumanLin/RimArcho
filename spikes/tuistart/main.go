@@ -1,4 +1,4 @@
-// Spike: cold start to an interactive list (07 §6.2): open the data directory, build the
+// Spike: cold start to an interactive list (18 §2): open the data directory, build the
 // TUI model, run Init (workspace load + rows) and render the first frame, then exit.
 // Time the whole process from outside (process start included):
 //
@@ -35,7 +35,7 @@ func main() {
 	frame := mm.View()
 	rows := strings.Count(frame, "\n")
 	fmt.Printf("first frame after %d ms in-process (%d lines, list shown: %v)\n", time.Since(t0).Milliseconds(), rows, strings.Contains(frame, "Core"))
-	// T1 (06 §3.5): time each keypress (Update + View) over the whole list: scrolling, paging
+	// T1 (16 §3.5): time each keypress (Update + View) over the whole list: scrolling, paging
 	// and typing a search.
 	var ds []time.Duration
 	press := func(k tea.KeyMsg) {

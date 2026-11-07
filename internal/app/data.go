@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-// Community data (04 §6.3): RimSort's sorting rules and Steam Workshop database and
+// Community data (08 §2.3): RimSort's sorting rules and Steam Workshop database and
 // the "Use This Instead" replacements. Downloaded manually or by automatic maintenance; stored in
 // <home>/cache with a sidecar recording where and when each came from.
 
@@ -86,7 +86,7 @@ type DataUpdate struct {
 }
 
 // UpdateData downloads the datasets (only those named in keys, or all), validates every
-// one, and replaces the stored files only when all succeeded (04 §6.3 D2).
+// one, and replaces the stored files only when all succeeded (08 §2.3 D2).
 func (a *App) UpdateData(keys []string, dryRun bool) ([]*DataUpdate, error) {
 	return a.UpdateDataProgress(keys, dryRun, nil)
 }

@@ -11,9 +11,10 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
-// 08 §2: before a launch, the problems of app.LaunchChecks are listed, one row per code; several
+// 09 §2: before a launch, the problems of app.LaunchChecks are listed, one row per code; several
 // problems of a code are summed up, with their shared fix. Nothing of it blocks the launch.
 func TestLaunchChecksGrouped(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.WriteMod(filepath.Join(e.Game, "Mods", "Lib"), testkit.Sample("tester.lib", "Lib"))
 	for _, n := range []string{"Alpha", "Beta"} {
@@ -39,7 +40,7 @@ func TestLaunchChecksGrouped(t *testing.T) {
 		"before you play: 2 problems that often cause errors",
 		"error dep.inactive  2 dependencies of 2 mods are installed but not enabled: " + ref(e, "Alpha") + " Alpha, " + ref(e, "Beta") + " Beta",
 		"why: a mod without its dependency fails in parts",
-		"fix: archo enable " + strings.TrimPrefix(lib, "#"), // commands write refs without "#" (05 §3.1 rule 11)
+		"fix: archo enable " + strings.TrimPrefix(lib, "#"), // commands write refs without "#" (13 §3.1 rule 11)
 		"checks: declarations only",
 	} {
 		if !strings.Contains(out, want) {
@@ -66,6 +67,7 @@ func TestLaunchChecksGrouped(t *testing.T) {
 // A managed directory moved while RimArcho was away is listed before a launch, with how to
 // locate it; it never blocks the launch.
 func TestLaunchChecksDirectories(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld")
 	e.WriteFile(filepath.Join(e.Steam, "steam.exe"), "")

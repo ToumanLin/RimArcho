@@ -23,7 +23,7 @@ type expansion struct {
 }
 
 // Item uses the old official package key so saved choices and stars keep working
-// when a Preview.png is replaced by the actual menu background (06 §2.14).
+// when a Preview.png is replaced by the actual menu background (16 §2.14).
 type Item struct {
 	Key, Label, Full, Thumb string
 }
@@ -97,7 +97,7 @@ func expansions(game, lang string) ([]expansion, error) {
 }
 
 // Both unpacked translations and RimWorld 1.7's language tar files are read in
-// place. Translation XML is small; no language archive is extracted (06 §2.14).
+// place. Translation XML is small; no language archive is extracted (16 §2.14).
 func chineseLabels(game string) map[string]string {
 	labels := map[string]string{}
 	data, _ := os.ReadDir(filepath.Join(game, "Data"))

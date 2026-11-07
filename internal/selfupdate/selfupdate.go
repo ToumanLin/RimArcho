@@ -1,5 +1,5 @@
 // Package selfupdate checks GitHub Releases for a newer RimArcho, downloads and verifies the
-// release zip, and swaps the program files in place (07 §5.1).
+// release zip, and swaps the program files in place (17 §5.1).
 package selfupdate
 
 import (
@@ -23,23 +23,24 @@ type Asset struct {
 }
 
 type Release struct {
-	Version    string    `json:"version"`
-	Tag        string    `json:"tag"`
-	Name       string    `json:"name"`
-	Notes      string    `json:"notes"`
-	Page       string    `json:"page"`
-	Published  time.Time `json:"published"`
-	Prerelease bool      `json:"prerelease"`
-	Zip        Asset     `json:"zip"`
-	Sum        Asset     `json:"sum"`
+	WorkshopItem string    `json:"workshop_item,omitempty"`
+	Version      string    `json:"version"`
+	Tag          string    `json:"tag"`
+	Name         string    `json:"name"`
+	Notes        string    `json:"notes"`
+	Page         string    `json:"page"`
+	Published    time.Time `json:"published"`
+	Prerelease   bool      `json:"prerelease"`
+	Zip          Asset     `json:"zip"`
+	Sum          Asset     `json:"sum"`
 }
 
 // Installable reports missing platform assets or checksum files.
 func (r *Release) Installable() error {
-	if r == nil || r.Zip.Name == "" || r.Zip.URL == "" {
+	if r == nil || r.Zip.Name == "" || (r.Zip.URL == "" && r.WorkshopItem == "") {
 		return errors.New("release has no zip for this platform")
 	}
-	if r.Sum.Name == "" || r.Sum.URL == "" {
+	if r.Sum.Name == "" || (r.Sum.URL == "" && r.WorkshopItem == "") {
 		return errors.New("release has no checksum file")
 	}
 	return nil
@@ -117,6 +118,41 @@ func (c *Client) Latest(ctx context.Context, prerelease bool) (*Release, error) 
 			return nil, ErrNoRelease
 		}
 	}
+	return c.release(selected), nil
+}
+
+// Version looks up the exact checked version when a Workshop download fails.
+func (c *Client) Version(ctx context.Context, version string) (*Release, error) {
+	if _, ok := Compare(version, version); !ok {
+		return nil, errors.New("invalid release version")
+	}
+	api := c.API
+	if api == "" {
+		api = DefaultAPI
+	}
+	resp, err := c.get(ctx, c.metadataClient(), strings.TrimRight(api, "/")+"/releases/tags/v"+version)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("release %s lookup: HTTP %d", version, resp.StatusCode)
+	}
+	b, err := readLimited(resp.Body, 1<<20)
+	if err != nil {
+		return nil, err
+	}
+	var selected githubRelease
+	if err := json.Unmarshal(b, &selected); err != nil {
+		return nil, err
+	}
+	if selected.Draft || selected.Prerelease || strings.TrimPrefix(selected.Tag, "v") != version {
+		return nil, fmt.Errorf("GitHub has no stable release %s", version)
+	}
+	return c.release(selected), nil
+}
+
+func (c *Client) release(selected githubRelease) *Release {
 	goos, goarch := c.GOOS, c.GOARCH
 	if goos == "" {
 		goos = runtime.GOOS
@@ -142,7 +178,7 @@ func (c *Client) Latest(ctx context.Context, prerelease bool) (*Release, error) 
 	if r.Zip.Name == "" {
 		r.Sum = Asset{}
 	}
-	return r, nil
+	return r
 }
 
 // ZipName returns the release archive name for a platform.

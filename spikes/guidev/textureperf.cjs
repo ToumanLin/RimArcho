@@ -1,4 +1,4 @@
-// 06 §2.13, 07 §6.2: real 450-Mod texture page measurements (no conversion).
+// 16 §2.13, 18 §2: real 450-Mod texture page measurements (no conversion).
 // npm install --prefix tmp/tex-perf --no-package-lock playwright-core@1.58.2
 // node spikes/guidev/textureperf.cjs <guidev.exe> <home> <output.json>
 const fs = require('fs'), path = require('path'), { spawn } = require('child_process');

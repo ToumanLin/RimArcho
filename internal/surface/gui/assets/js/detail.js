@@ -1,6 +1,6 @@
-// The detail (06 §4): who the mod is, its state, one field list (fields.js), the
+// The detail (16 §4): who the mod is, its state, one field list (fields.js), the
 // description, the history. The description is built from Go's BBCode blocks with
-// elements and textContent only: outside text is never inserted as HTML (06 §8.2).
+// elements and textContent only: outside text is never inserted as HTML (16 §8.2).
 import { factText, S, $, el, esc, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { icon, sourceIcon, statusIcon } from "./icons.js";
 import { fieldList } from "./fields.js";
@@ -28,7 +28,7 @@ export function followDetail(it, staged) {
 }
 
 
-// showDetail draws the plan editor's details of a row (06 §4.1): at once what the row knows
+// showDetail draws the plan editor's details of a row (16 §4.1): at once what the row knows
 // (its copies, name, picture), then the detail and the copy's note and actions as Go
 // answers. A Workshop page not read yet is fetched straight away.
 export async function showDetail(it, staged) {
@@ -81,7 +81,7 @@ export async function showDetail(it, staged) {
 let editorFrame = null;
 
 // editorCopies: the row's copies in the editor's lists, the one shown marked; the one the
-// current list uses says so, the others offer to take its place (06 §4.1).
+// current list uses says so, the others offer to take its place (16 §4.1).
 function editorCopies(it) {
   if (!it.lineage) return [];
   const copies = S.cols.flatMap((c) => c.items).filter((x) => x.id && x.lineage === it.lineage);
@@ -212,7 +212,7 @@ export function detailFrame(box, sc, o = {}) {
   return f;
 }
 
-// description: the About.xml text and the Workshop page's (06 §4.3 item 2).
+// description: the About.xml text and the Workshop page's (16 §4.3 item 2).
 function description(d) {
   const desc = el("div", "desc");
   const head = (title, note) => {
@@ -234,9 +234,10 @@ function description(d) {
   return desc;
 }
 
-// noteEl: the copy's own note (06 §2.9). The player's text, else what RimArcho wrote (grey),
+// noteEl: the copy's own note (16 §2.9). The player's text, else what RimArcho wrote (grey),
 // else a place to write one; a click (or n) edits it, enter saves, shift+enter breaks the
-// line, esc leaves it as it was. o.saved() after a save, o.leave() when the editing ends.
+// line, esc leaves it as it was. o.saved() after a save, o.leave() when the editing ends;
+// o.save(text) saves another note (a tag's) in place of the copy's, o.placeholder its hint.
 export function noteEl(i, o = {}) {
   const box = el("div", "lib-note" + (i.note ? "" : i.auto ? " auto" : " empty"));
   const show = () => {
@@ -246,7 +247,7 @@ export function noteEl(i, o = {}) {
     if (!i.note && i.auto) box.append(el("div", "by", T("by RimArcho, click to edit")));
   };
   show();
-  if (!i.id) return box;
+  if (!i.id && !o.save) return box;
   box.title = T("click to edit") + T("; ") + "n";
   box.onclick = () => {
     if (box.classList.contains("editing")) return;
@@ -255,7 +256,7 @@ export function noteEl(i, o = {}) {
     const start = i.note || i.auto || "";
     const ta = el("textarea", "lib-note-in");
     ta.value = start;
-    ta.placeholder = T("a note on this copy…");
+    ta.placeholder = o.placeholder || T("a note on this copy…");
     ta.rows = Math.min(6, Math.max(2, start.split("\n").length + 1));
     box.append(ta, el("div", "by", T("enter saves, esc cancels")));
     ta.focus();
@@ -267,7 +268,7 @@ export function noteEl(i, o = {}) {
       done = true;
       const text = ta.value.trim();
       if (text === start.trim()) { show(); leave(); return; }
-      try { say("ok", await api.LibrarySetNote(i.ref, text)); i.note = text; } catch (e) { say("fail", errText(e)); }
+      try { say("ok", await (o.save ? o.save(text) : api.LibrarySetNote(i.ref, text))); i.note = text; } catch (e) { say("fail", errText(e)); }
       show();
       leave();
       if (o.saved) await o.saved(text);
@@ -282,7 +283,7 @@ export function noteEl(i, o = {}) {
   return box;
 }
 
-// renderDetail draws a detail into box (scrolled by sc). Mod library (06 §2.9) draws its
+// renderDetail draws a detail into box (scrolled by sc). Mod library (16 §2.9) draws its
 // copies' details with it; opts.page leaves out what acts on the plan's selection (the tag
 // editor, the full detail).
 export function renderDetail(d, box, sc, keepScroll, opts = {}) {
@@ -295,7 +296,7 @@ export function renderDetail(d, box, sc, keepScroll, opts = {}) {
   box.append(img, el("h1", "", d.name));
   if (d.authors) box.append(el("div", "who", d.authors));
   if (d.version) box.append(versionNotice(d.version));
-  // a copy's details on Mod library draw their own note, actions and field list (06 §2.9)
+  // a copy's details on Mod library draw their own note, actions and field list (16 §2.9)
   if (!opts.page) {
     const facts = el("div", "facts");
     facts.innerHTML = sourceIcon(d.kind);
@@ -332,13 +333,13 @@ export function renderDetail(d, box, sc, keepScroll, opts = {}) {
       };
       box.append(b);
     }
-    // the field list (06 §4.1): a click on a value copies it
+    // the field list (16 §4.1): a click on a value copies it
     box.append(fieldList(d.fields, {
       tags: () => document.dispatchEvent(new CustomEvent("verb", { detail: "tags" })),
       folder: () => api.OpenFolder(d.id).catch((e) => say("fail", errText(e))),
     }));
   }
-  // description (06 §4.3 item 2)
+  // description (16 §4.3 item 2)
   const desc = el("div", "desc");
   const head = (title, note) => {
     const h = el("div", "sub word-facts", title);
@@ -358,7 +359,7 @@ export function renderDetail(d, box, sc, keepScroll, opts = {}) {
   }
   box.append(desc);
   if (d.history && !opts.noHistory) {
-    // the three newest here; the whole history of its Lineage on Updates (06 §2.9)
+    // the three newest here; the whole history of its Lineage on Updates (16 §2.9)
     const all = el("div", "sub link", T("see all in change history"));
     all.onclick = () => document.dispatchEvent(new CustomEvent("changes-of", { detail: { id: d.id, name: d.name } }));
     box.append(el("div", "sub", T("history")), el("div", "history word-facts", d.history), all);
@@ -433,7 +434,7 @@ function host(u) {
   try { return new URL(u).host; } catch { return u; }
 }
 
-// scrollDetail moves the detail by a page or a line (PgUp / PgDn anywhere, 06 §3.3).
+// scrollDetail moves the detail by a page or a line (PgUp / PgDn anywhere, 16 §3.3).
 export function scrollDetail(dy, page) {
   const sc = $(".detail .scroll");
   sc.scrollTop += page ? dy * sc.clientHeight * 0.9 : dy * 40;

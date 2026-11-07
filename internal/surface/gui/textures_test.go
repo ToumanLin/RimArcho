@@ -2,7 +2,6 @@ package gui
 
 import (
 	"context"
-	"os/exec"
 	"reflect"
 	"strings"
 	"testing"
@@ -12,17 +11,6 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
-
-func TestTexturePageRequests(t *testing.T) {
-	t.Parallel()
-	node, err := exec.LookPath("node")
-	if err != nil {
-		t.Skip("node is needed for the texture page regression tests")
-	}
-	if out, err := exec.Command(node, "--experimental-vm-modules", "--test", "testdata/textures.mjs").CombinedOutput(); err != nil {
-		t.Fatalf("texture page: %v\n%s", err, out)
-	}
-}
 
 func waitTextureMeasure(t *testing.T, api *API, request uint64) *TexturePage {
 	t.Helper()
@@ -104,6 +92,7 @@ func TestTextureMeasureReturnsBeforeDiskAndRejectsLateResults(t *testing.T) {
 // pages answer, a second run is refused), its progress and its end as "textures" events, in
 // the interface's words.
 func TestTexturesBackground(t *testing.T) {
+	t.Parallel()
 	e, api, events := fixture(t)
 	e.App.GameProbe = func(string) *app.GameRun { return nil }
 	p, err := api.Textures("plan", 50)

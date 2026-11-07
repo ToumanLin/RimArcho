@@ -10,7 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Texture optimisation from the command palette (08 §5.2, 06 §2.14): the current plan's textures as a
+// Texture optimisation from the command palette (10 §2, 16 §2.14): the current plan's textures as a
 // panel, with the commands that convert and take them back (run them on the : line). One
 // copy at a time is Mod library's optimise textures (the shared op table).
 

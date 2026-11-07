@@ -12,7 +12,7 @@ import (
 // ForeignAnalysisRetention is the idle lifetime of slots for a non-current version.
 const ForeignAnalysisRetention = 30 * 24 * time.Hour
 
-// PruneFacts removes unused version views and their unreferenced fact sets (03 §3).
+// PruneFacts removes unused version views and their unreferenced fact sets (05 §3).
 func (s *Store) PruneFacts(now time.Time) error {
 	return s.inTx(func(tx *sql.Tx) error { return pruneFacts(tx, now) })
 }

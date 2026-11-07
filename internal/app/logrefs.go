@@ -7,6 +7,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -37,6 +38,9 @@ type refQuery struct {
 	// LayoutRoomDef). A file without it cannot hold the failing node: the same <F>V</F> in a
 	// GeneDef file is another def type (G6: selectionWeight in GeneDefs for a LayoutRoomDef).
 	ctx string
+	// class: a type name the log reports missing and nothing installed defines; matched as
+	// element text (<thingClass>NS.T</thingClass>) and as a Class="NS.T" attribute.
+	class bool
 }
 
 // ctxRootRe is the first element of a field error's Context.
@@ -45,6 +49,9 @@ var ctxRootRe = regexp.MustCompile(`Context: <([A-Za-z_][\w.]*)`)
 // referrerQuery is the lookup a cluster needs, if any.
 func referrerQuery(lc *LogCluster) *refQuery {
 	msg := lc.First.Message
+	if len(lc.missingTypes) > 0 {
+		return &refQuery{lc: lc, names: lc.missingTypes, class: true}
+	}
 	switch lc.Class {
 	case logs.ClassXrefMissing:
 		typ, name, ok := xrefName(msg)
@@ -165,6 +172,8 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 	text := map[string][]int{}  // element text → queries
 	elem := map[string][]int{}  // element name → queries (defs only)
 	lit := map[string][]int{}   // assembly string literal → queries
+	var paths []int             // texture queries: a literal can also be the start of the path
+	class := map[string][]int{} // Class="…" attribute value → queries
 	field := map[string][]int{} // element name + "\x00" + text → queries
 	for i, q := range qs {
 		for _, n := range q.names {
@@ -173,12 +182,18 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 				continue
 			}
 			text[n] = append(text[n], i)
+			if q.class {
+				class[n] = append(class[n], i)
+			}
 			if q.def != "" {
 				elem[n] = append(elem[n], i)
 			}
 			if q.dll {
 				lit[n] = append(lit[n], i)
 			}
+		}
+		if q.dll && !q.code && q.def == "" && q.field == "" && !q.class {
+			paths = append(paths, i)
 		}
 	}
 	type job struct {
@@ -189,7 +204,7 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 	}
 	var jobs []job
 	// The reference index names the XML files that can mention each name; only those are
-	// read (03 §6.5). Without it every effective Defs/Patches file is read.
+	// read (06 §5). Without it every effective Defs/Patches file is read.
 	x, _ := cx.a.RefIndex(cx.st)
 	if x != nil {
 		read := map[int]bool{}
@@ -258,6 +273,21 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 						for _, q := range lit[s] {
 							first[q] = hit{q, j.m.ID, j.rel, 0, s}
 						}
+						// Code that builds the path: "OdysseyPatch/OutfitStands/OutfitStand_" + defName
+						// (MCP eval h2). Only a literal shaped like a path prefix counts.
+						if len(paths) > 0 && pathPrefix(s) {
+							for _, q := range paths {
+								if _, ok := first[q]; ok {
+									continue
+								}
+								for _, n := range qs[q].names {
+									if strings.HasPrefix(n, s) && n != s {
+										first[q] = hit{q, j.m.ID, j.rel, 0, s}
+										break
+									}
+								}
+							}
+						}
 					}
 				} else {
 					b, err := os.ReadFile(j.path)
@@ -281,6 +311,15 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 							}
 						}
 					})
+					if len(class) > 0 {
+						classAttrs(b, func(v []byte, off int) {
+							for _, q := range class[string(v)] {
+								if _, ok := first[q]; !ok {
+									first[q] = hit{q, j.m.ID, j.rel, bytes.Count(b[:off], []byte{'\n'}) + 1, string(v)}
+								}
+							}
+						})
+					}
 				}
 				if len(first) > 0 {
 					mu.Lock()
@@ -377,6 +416,16 @@ func (cx *attrCtx) referrers(qs []*refQuery) {
 			q.lc.add(h.inst, role, fmt.Sprintf("has <%s>%s</%s> %s", q.field, name, q.field, where))
 			continue
 		}
+		if q.class {
+			// Nothing installed defines the class: a typo or a wrong namespace in this XML, or
+			// a framework that is not installed (06 §2).
+			q.lc.add(h.inst, role, fmt.Sprintf("names class %s %s, which no installed mod defines", name, where))
+			continue
+		}
+		if h.line == 0 && !slices.Contains(q.names, name) {
+			q.lc.add(h.inst, role, fmt.Sprintf("builds the path from %q + … %s", name, where))
+			continue
+		}
 		q.lc.add(h.inst, role, fmt.Sprintf("references %s %s", name, where))
 	}
 	for i, q := range qs {
@@ -400,7 +449,7 @@ func (cx *attrCtx) rank(lc *LogCluster) {
 func (cx *attrCtx) textureProviders(qs []*refQuery) {
 	var need []*refQuery
 	for _, q := range qs {
-		if q.def == "" && q.field == "" && !hasSource(q.lc) {
+		if q.def == "" && q.field == "" && !q.class && (!hasSource(q.lc) || codeSource(q.lc)) {
 			need = append(need, q)
 		}
 	}
@@ -441,6 +490,12 @@ func (cx *attrCtx) textureProviders(qs []*refQuery) {
 			}
 		}
 		sort.Strings(ids)
+		if len(ids) == 0 && codeSource(q.lc) {
+			// The mod's own code asks for art nobody ships (MCP eval h2: the Odyssey Patch's
+			// outfit stand textures, in the log before and after the fix): a defect of that mod
+			// that only affects drawing. Adding the files elsewhere hides it but fixes nothing.
+			q.lc.Details = append(q.lc.Details, ownArtNote)
+		}
 		for _, inst := range ids {
 			if cx.st.Ix.ByID[inst] == nil || cx.official(inst) {
 				continue
@@ -454,6 +509,35 @@ func (cx *attrCtx) textureProviders(qs []*refQuery) {
 		}
 		cx.rank(q.lc)
 	}
+}
+
+// ownArtNote marks a missing texture that only its source mod's code asks for.
+const ownArtNote = "own art missing: the source mod's code asks for this texture and no installed mod ships it; a defect of that mod, rendering only (adding the file elsewhere hides it, it fixes nothing that loads)"
+
+// codeSource: the cluster's first candidate is a source by a string literal in its code.
+func codeSource(lc *LogCluster) bool {
+	if len(lc.Attr) == 0 || lc.Attr[0].Role != RoleSource {
+		return false
+	}
+	for _, ev := range lc.Attr[0].Evidence {
+		if strings.Contains(ev, " string literal)") {
+			return true
+		}
+	}
+	return false
+}
+
+// pathPrefix: a literal that can start a texture path built in code — it has a '/', ends in
+// '/', '_' or '-' and is at least 8 characters long.
+func pathPrefix(s string) bool {
+	if len(s) < 8 || !strings.Contains(s, "/") {
+		return false
+	}
+	switch s[len(s)-1] {
+	case '/', '_', '-':
+		return true
+	}
+	return false
 }
 
 // roUse is how a mod's code uses the ReflectionOnly APIs.
@@ -572,7 +656,9 @@ func (cx *attrCtx) saveLoad(lc *LogCluster) {
 				found = true
 			}
 		}
-		if !found {
+		if na := cx.notAnalysed(); !found && na != "" {
+			lc.Details = append(lc.Details, "the holder "+t+": owner unknown, "+na)
+		} else if !found {
 			lc.Details = append(lc.Details, "the holder "+t+" is in no enabled mod's code")
 		}
 	case strings.HasPrefix(msg, "Could not find think node with key"):

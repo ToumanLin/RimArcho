@@ -15,6 +15,7 @@ import (
 )
 
 func TestMaintenanceRetentionAndHistory(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	s := e.App.Store
 	ids := testkit.MaintenanceHistory(t, s, "history", 10, 4, 20)
@@ -153,6 +154,7 @@ func TestMaintenanceBusySpaceAndCancellation(t *testing.T) {
 }
 
 func TestMaintenanceGameRefusalAndReclaimsSpace(t *testing.T) {
+	t.Parallel()
 	e := testkit.New(t)
 	e.AddEnv(false)
 	e.App.GameProbe = func(string) *app.GameRun { return &app.GameRun{PID: 123} }

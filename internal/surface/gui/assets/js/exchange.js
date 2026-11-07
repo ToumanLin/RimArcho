@@ -1,7 +1,8 @@
-// Import and export of the mod list (04 §9): to and from RimSort, RimCrow, RimWorld's
+// Import and export of the mod list (07 §7): to and from RimSort, RimCrow, RimWorld's
 // own .rml, share codes, Rentry and Workshop collections. An import is previewed first —
 // what is installed, what is missing and where to get it, what the enabled list becomes —
 // and applied as one undo step; nothing here writes ModsConfig.xml (that stays save).
+import { fieldError } from "./feedbacksemantics.js";
 import { factText, S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { page, button, beginPageRead } from "./screens.js";
 import * as pop from "./popups.js";
@@ -11,7 +12,7 @@ import { copyablePath, editablePath } from "./fields.js";
 let ui = null;
 export function initExchange(u) {
   ui = u;
-  // File drops anywhere in the window enter the same import flow (06 §2.17).
+  // File drops anywhere in the window enter the same import flow (16 §2.17).
   document.addEventListener("dragover", e => { if (e.dataTransfer?.types.includes("Files")) e.preventDefault(); });
   document.addEventListener("drop", async e => {
     if (e.defaultPrevented) return;
@@ -28,13 +29,13 @@ let pasted = "";
 let session = null;
 let previewSeq = 0;
 
-// Import is a sub-page, including when entered from the first-run guide (06 §2.17).
+// Import is a sub-page, including when entered from the first-run guide (16 §2.17).
 export async function importFrom(kind, src) {
   await exchange();
   if (S.screen === "plan-import") return preview(kind, src);
 }
 
-export async function exchange() {
+export async function exchange(managers = false) {
   const from = S.screen === "plan-import" ? session?.from : S.screen || "plan";
   const target = from === "plans" ? ui.selectedList() : S.shell?.plan?.id || 0;
   const read = beginPageRead("plan-import", { replace: true });
@@ -48,6 +49,7 @@ export async function exchange() {
   const result = el("section", "card pad xc-preview"); result.hidden = true;
   w.append(body, result); sc.append(w);
   importSource(body);
+  if (managers) discoverManagers(body);
   body.append(el("div", "xc-hint", T("or drop a file here")));
   read.finish(); ui.renderWhere(); ui.renderHints();
 }
@@ -61,9 +63,67 @@ export function cancel() {
 export function key(e) { if (e.key === "Escape") { e.preventDefault(); cancel(); } }
 export const hintList = () => [{ key: "tab", label: T("import destination") }, { key: "enter", label: T("import") }, { key: "esc", label: T("cancel") }];
 
+// The guide and Settings share this flow, including manual file selection.
+async function discoverManagers(body) {
+  const active = session;
+  const found = el("section", "xc-sec");
+  found.append(el("div", "xc-sec-t", T("import from RimSort or RimCrow")));
+  const candidates = el("div"), status = el("div", "muted", T("looking for RimSort and RimCrow…"));
+  found.append(status, candidates);
+  const pick = button(T("choose a file…"), "", async () => {
+    try {
+      const path = await api.PickManagerImport();
+      if (path && session === active && S.screen === "plan-import") {
+        const kind = await api.ManagerFileKind(path);
+        if (session === active && S.screen === "plan-import") select({ kind, path });
+      }
+    } catch (e) { say("fail", T(errText(e))); }
+  });
+  found.append(pick); body.prepend(found);
+  // One picker includes databases and lists; keep the shared paste input below.
+  const regular = body.querySelector(".xc-selected-file")?.parentElement;
+  if (regular) regular.hidden = true;
+  async function select(candidate) {
+    if (candidate.kind === "list") return preview("file", candidate.path);
+    const result = $("#screen .xc-preview"), seq = ++previewSeq;
+    result.hidden = false; result.textContent = T("reading the data…");
+    try {
+      const data = await api.PreviewManagerImport(candidate.kind, candidate.path);
+      if (session !== active || S.screen !== "plan-import" || seq !== previewSeq) return;
+      result.textContent = "";
+      result.append(copyablePath(el("div", "xc-note", candidate.path), candidate.path), el("pre", "", data.text));
+      result.append(el("div", "xc-note", T("Existing values stay; importing player data cannot be undone.")));
+      const apply = button(T("import"), "enter", async () => {
+        apply.disabled = true;
+        try {
+          const text = await api.ApplyManagerImport(data.request);
+          if (session !== active || S.screen !== "plan-import") return;
+          result.textContent = "";
+          result.append(el("pre", "", text));
+          await ui.reload();
+          say("ok", T("import complete"));
+        } catch (e) { say("fail", T(errText(e))); apply.disabled = false; }
+      }, "primary");
+      result.append(apply);
+    } catch (e) { if (session === active && seq === previewSeq) result.textContent = T(errText(e)); }
+  }
+  try {
+    const rows = await api.DiscoverManagerImports();
+    if (session !== active || S.screen !== "plan-import") return;
+    status.textContent = rows?.length ? "" : T("No RimSort or RimCrow data found.");
+    for (const row of rows || []) {
+      const line = el("div", "xc-row");
+      const kind = { list: "list", rimcrow: "player data", "rimsort-rules": "user rules" }[row.kind];
+      line.append(button(row.manager, "", () => select(row)), el("span", "muted", T(kind)), copyablePath(el("span", "muted", row.path), row.path));
+      candidates.append(line);
+    }
+  } catch (e) { if (session === active) status.textContent = T(errText(e)); }
+}
+
 // ---- import, step 1: where the list comes from ----
 
 function importSource(body) {
+  const result = $("#screen .xc-preview");
   body.append(el("div", "xc-note", T("RimArcho, RimSort, RimCrow and RimWorld lists, share codes, packageIds or workshop links. Nothing changes before you confirm.")));
 
   // A selected file is read-only; choosing another file starts another preview.
@@ -72,6 +132,7 @@ function importSource(body) {
   const path = el("span", "xc-selected-file");
   {
     const pick = el("button", "btn primary", T("choose a file…"));
+    fieldError(pick, result, () => result.dataset.fieldError === "file");
     pick.onclick = async () => {
       let f = "";
       try { f = await api.PickImportFile(); } catch (e) { return say("fail", errText(e)); }
@@ -93,6 +154,7 @@ function importSource(body) {
   ta.spellcheck = false;
   ta.placeholder = T("a list from RimSort or RimCrow, a share code (RC-…), a Rentry link, or a Steam Workshop collection link");
   ta.value = pasted;
+  fieldError(ta, result, () => result.dataset.fieldError === "text");
   ta.oninput = () => { pasted = ta.value; };
   const btns = el("div", "xc-row end");
   const clip = el("button", "btn", T("paste from the clipboard"));
@@ -127,11 +189,12 @@ async function preview(kind, src, fileName) {
   const active = session, seq = ++previewSeq;
   const current = () => S.screen === "plan-import" && session === active && S.screenSeq === active.epoch && seq === previewSeq;
   if (!body) return;
+  delete body.dataset.fieldError;
   say("busy", kind === "text" && /^\s*\S+\s*$/.test(src) && /steamcommunity|rentry|^\s*\d{6,}\s*$/.test(src) ? T("reading the link…") : T("reading the list…"));
   let p;
   body.hidden = false; body.textContent = T("reading the list…");
   try { p = await api.ImportPreviewFor(active.target, kind, src); }
-  catch (e) { if (current()) { body.textContent = errText(e); say("fail", errText(e)); } return; }
+  catch (e) { if (current()) { body.dataset.fieldError = fileName || kind === "file" ? "file" : "text"; body.textContent = errText(e); say("fail", errText(e)); } return; }
   if (!current()) return;
   say("", "");
   if (fileName) p.source = fileName;
@@ -139,7 +202,7 @@ async function preview(kind, src, fileName) {
 
   showImportSummary(body, p, !!(p.sourcePath || fileName));
 
-  // A destination is selected first; only the final import button changes data (06 §2.17).
+  // A destination is selected first; only the final import button changes data (16 §2.17).
   const ways = el("fieldset", "xc-sec");
   ways.append(el("legend", "xc-sec-t", T("import destination")));
   let destination = "new", busy = false;
@@ -148,7 +211,7 @@ async function preview(kind, src, fileName) {
   const free = await api.CheckPlanName(base, "", 0).catch(() => ({ free: base }));
   if (!current()) return;
   name.value = free.free;
-  const why = el("div", "plan-why");
+  const why = el("div", "plan-why"); fieldError(name, why);
   const submit = button(T("import"), "enter", perform, "primary", "import-apply");
   submit.title = T("does not write game files");
   const options = [["new", T("import as a new list"), Tf("%d mods; the current list stays as it is", p.total)],
@@ -195,7 +258,7 @@ async function preview(kind, src, fileName) {
     } catch (e) { if (current()) { say("fail", errText(e)); busy = false; checkName(); } }
   }
   checkName();
-  // a Steam Workshop collection: the list can follow it (04 §9.6); ticked by default
+  // a Steam Workshop collection: the list can follow it (07 §7.6); ticked by default
   if (p.collection) {
     const lb = el("label", "xc-check");
     const cb = el("input");
@@ -214,7 +277,7 @@ async function preview(kind, src, fileName) {
 }
 
 // Shared by the standalone destination flow and the new-list form's inline source.
-// sourceIsPath: the source is a file the player picked, so it copies on a click (06 §3.1 rule 12).
+// sourceIsPath: the source is a file the player picked, so it copies on a click (16 §3.1 rule 12).
 export function showImportSummary(body, p, sourceIsPath = !!p.sourcePath) {
   const top = el("div", "xc-sum");
   top.append(el("div", "xc-big", p.summary));
@@ -273,7 +336,7 @@ export function showImportContents(body, p) {
 export const workshopIDs = rows => [...new Set(rows.map(r => /[?&]id=(\d+)/.exec(r.url || "")?.[1]).filter(Boolean))];
 
 // getAll asks how to get the Workshop items ids (Steam or SteamCMD), then gets them all as one
-// background task (06 §2.16); btn stays disabled once it started. The import page's "subscribe
+// background task (16 §2.16); btn stays disabled once it started. The import page's "subscribe
 // all" and a followed collection's mods that are not installed share it.
 export function getAll(ids, btn) {
   pop.choose(Tf("get %d mods", ids.length), getChoices(), async (i) => {
@@ -284,7 +347,7 @@ export function getAll(ids, btn) {
 }
 
 // subscribeAll gets every missing mod that has a Workshop page in one go (a background task,
-// 06 §2.16); once downloaded they take their place in the list by themselves.
+// 16 §2.16); once downloaded they take their place in the list by themselves.
 function subscribeAll(sec, rows) {
   const ids = workshopIDs(rows);
   const bar = el("div", "xc-subscribe");

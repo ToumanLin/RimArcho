@@ -1,4 +1,4 @@
-// Mod library › updates (06 §2.9): one list and a detail. The list is what waits for the player
+// Mod library › updates (16 §2.9): one list and a detail. The list is what waits for the player
 // to update (Git, download pages, SteamCMD, Workshop items Steam has not downloaded), then
 // installed copies removed from the Workshop, then what already changed (one row per mod; earlier
 // days). A scope bar above it picks the current list or every mod; one line under it sums
@@ -295,6 +295,10 @@ function sourcesDetail(card) {
     const l = el("div", "l");
     const n = el("div", "n");
     n.append(ic(SRC_ICON[s.key] || "local"), el("b", "", s.name), el("span", "muted", Tf("%d mods", s.count)));
+    const label = n.querySelector("b");
+    label.id = "update-source-" + encodeURIComponent(s.key);
+    r.setAttribute("role", "group");
+    r.setAttribute("aria-labelledby", label.id);
     l.append(n, el("div", "muted word-facts", (s.checked ? [s.checked, s.result] : [s.result || T("not checked yet")]).filter(Boolean).join("  ")));
     if (s.account && ["steamcmd", "page"].includes(s.key)) {
       const a = el("div", "word-facts acct");
@@ -490,14 +494,20 @@ async function updateRows(items) {
     if (pages.length) { pick("p:" + pages[0].ref); say("fail", T("choose the new files first")); }
     return;
   }
-  const previews = [];
-  try { for (const r of items) previews.push(r.kind === "workshop" ? await api.WorkshopUpdatePreview(r.ref) : await api.LibraryPreview("subscription-update", [r.ref])); }
+  // One preview call and at most two tasks, however many rows: Steam gets every Workshop
+  // copy in one call, and the rest is one task that SteamCMD downloads in one batch.
+  let p;
+  try { p = await api.SubscriptionUpdatePreview(items.map((r) => r.ref)); }
   catch (e) { return say("fail", errText(e)); }
-  const lines = previews.flatMap((p, i) => [items[i].name, ...(p.lines || [])]);
+  const lines = [...(p.lines || [])];
   if (pages.length) lines.push(Tf("%d download pages need a file first; they are not updated now", pages.length));
-  pop.confirm(T("update subscription"), lines, T("update subscription"), previews.every((p) => p.apply) ? async () => {
-    try { for (const r of items) say("ok", r.kind === "workshop" ? await api.WorkshopUpdate(r.ref) : await api.LibraryDo("subscription-update", [r.ref])); }
-    catch (e) { say("fail", errText(e)); }
+  const ws = items.filter((r) => r.kind === "workshop").map((r) => r.ref);
+  const rest = items.filter((r) => r.kind !== "workshop").map((r) => r.ref);
+  pop.confirm(T("update subscription"), lines, T("update subscription"), p.apply ? async () => {
+    try {
+      if (rest.length) say("ok", await api.LibraryDo("subscription-update", rest));
+      if (ws.length) say("ok", await api.WorkshopUpdate(ws));
+    } catch (e) { say("fail", errText(e)); }
   } : null);
 }
 
@@ -505,7 +515,7 @@ async function openSource(r) {
   try { say("ok", await api.OpenSubscriptionSource(r.ref)); } catch (e) { say("fail", errText(e)); }
 }
 
-// lock: a copy in the lock library, the dry run first (as on Mod library, 06 §6).
+// lock: a copy in the lock library, the dry run first (as on Mod library, 16 §6).
 async function lock(ref) {
   let p;
   try { p = await api.LibraryPreview("pin", [ref]); } catch (e) { return say("fail", errText(e)); }

@@ -58,11 +58,11 @@ type ScanReport struct {
 type ScanOptions struct {
 	Full bool // ignore cached hashes and read every semantic file again
 	// GameOnly reads only the environment's own Data/ and Mods/, not the shared mod folders
-	// (a game just added, 02 §0 item 8).
+	// (a game just added, 03 §2 item 8).
 	GameOnly bool
 }
 
-// Scan runs 02 §4.1 for the current environment: the shared mod folders and the game's own
+// Scan runs 04 §1.1 for the current environment: the shared mod folders and the game's own
 // Data/ and Mods/, each read once. full ignores cached hashes.
 func (a *App) Scan(full bool) (*ScanReport, error) { return a.ScanWith(ScanOptions{Full: full}) }
 
@@ -184,7 +184,7 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 	if err != nil {
 		return nil, err
 	}
-	// Origin markers written before migration v14 name IDs merged away (02 §0.1).
+	// Origin markers written before migration v14 name IDs merged away (03 §2.1).
 	if aliases, err := a.Store.IDAliases(); err != nil {
 		return nil, err
 	} else if len(aliases) > 0 {
@@ -220,6 +220,9 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 	if v := env.ReadGameVersion(e.GameRoot); v != "" && v != e.GameVersion {
 		e.GameVersion = v
 		a.Store.UpdateEnv(e)
+	}
+	if err := a.indexGameTypes(e); err != nil {
+		return nil, err
 	}
 
 	st := ScanStats{Events: map[string]int{}, Questions: len(res.Questions)}
@@ -261,10 +264,10 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 		return nil, err
 	}
 	if st.Snapshots > 0 {
-		a.Store.TruncateWAL() // new snapshots wrote their file lists through the WAL (02 §7)
+		a.Store.TruncateWAL() // new snapshots wrote their file lists through the WAL (04 §4)
 	}
 	rep := &ScanReport{Env: e, ScanID: scanID, Full: full, GameOnly: o.GameOnly, Stats: st}
-	// 04 §4.3: every scan compares ModsConfig.xml with what RimArcho last wrote.
+	// 07 §4.3: every scan compares ModsConfig.xml with what RimArcho last wrote.
 	if ls, err := a.Loadout(); err == nil {
 		rep.Notices = ls.Notices
 	} else {

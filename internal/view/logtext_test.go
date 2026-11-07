@@ -9,7 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// 06 §2.10, §7: log lines take the game's log colours; a mod's <color> is kept, adjusted
+// 16 §2.10, §7: log lines take the game's log colours; a mod's <color> is kept, adjusted
 // only for contrast; tags that are not rich text stay text.
 func TestLogText(t *testing.T) {
 	t.Parallel()

@@ -1,4 +1,4 @@
-// Numeric values travel alongside formatted cells so sorting is language independent (06 §3.9).
+// Numeric values travel alongside formatted cells so sorting is language independent (16 §3.9).
 const text = (key) => (a, b) => (a[key] || "").localeCompare(b[key] || "", undefined, { numeric: true });
 const number = (key) => (a, b) => (a[key] || 0) - (b[key] || 0);
 const name = { key: "name", title: "name", w: 220, fixed: true, dir: 1, cmp: text("name") };
@@ -22,4 +22,12 @@ export const textureColumns = [
   { key: "currentSize", title: "current size", w: 120, dir: -1, num: true, cmp: number("pngBytes") },
   { key: "estimate", title: "estimated size", w: 120, dir: -1, num: true, cmp: number("savedBytes") },
   { key: "state", title: "progress / state", w: 230, dir: 1, cmp: (a, b) => textureRank(a) - textureRank(b) || (b.stale || 0) - (a.stale || 0) || (b.convert || 0) - (a.convert || 0) },
+];
+// Mod library › Mod settings (16 §2.9): one row per settings file.
+export const modSettingsColumns = [
+  { ...name, title: "mod", w: 160 },
+  { key: "title", title: "settings window", w: 160, dir: 1, cmp: text("title") },
+  { key: "values", title: "stored values", w: 84, dir: -1, num: true, cmp: number("count") },
+  { key: "size", title: "size", w: 64, dir: -1, num: true, cmp: number("bytes") },
+  { key: "file", title: "file", w: 260, shown: false, dir: 1, cmp: text("file") },
 ];

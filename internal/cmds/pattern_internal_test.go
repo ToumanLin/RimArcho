@@ -14,6 +14,7 @@ import (
 // A mod-specific pattern is shown only when the cluster's own attribution names that mod as
 // source; the generic kind is shown either way (01-pattern-library-integration-draft.md §3).
 func TestClusterPatterns(t *testing.T) {
+	t.Parallel()
 	p := patterns.Load().Get("m:krkr.rocketman:e84d5a3b")
 	if p == nil {
 		t.Fatal("fixture pattern missing")
