@@ -8,11 +8,8 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
-	"image"
-	"image/draw"
 	_ "image/gif" // first frame (16 §4.3 item 6)
 	_ "image/jpeg"
-	"image/png"
 	"io"
 	"net/http"
 	"net/url"
@@ -253,12 +250,8 @@ func (a *App) DescImage(rawURL string) (path string, w, h int, err error) {
 	}
 	sum := sha1.Sum([]byte(u.String()))
 	path = filepath.Join(a.cacheDir("workshop-img"), hex.EncodeToString(sum[:10])+".png")
-	if f, err := os.Open(path); err == nil {
-		cfg, err := png.DecodeConfig(f)
-		f.Close()
-		if err == nil {
-			return path, cfg.Width, cfg.Height, nil
-		}
+	if w, h, ok := cachedPNG(path); ok {
+		return path, w, h, nil
 	}
 	if !a.WorkshopImages() {
 		return "", 0, 0, errors.New("image downloads are off (workshop.images)")
@@ -276,58 +269,28 @@ func (a *App) DescImage(rawURL string) (path string, w, h int, err error) {
 	if resp.StatusCode != 200 {
 		return "", 0, 0, fmt.Errorf("download failed: %s", resp.Status)
 	}
-	img, _, err := image.Decode(io.LimitReader(resp.Body, 16<<20))
+	// Download whole, then wait for a decode slot: a slow server holds no slot.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, descImageMaxBytes+1))
 	if err != nil {
-		return "", 0, 0, fmt.Errorf("cannot decode the image: %v", err)
+		return "", 0, 0, fmt.Errorf("download failed: %v", shortErr(err))
 	}
-	b := img.Bounds()
-	if b.Dx() < 1 || b.Dy() < 1 || b.Dx()*b.Dy() > 40e6 {
+	if len(body) > descImageMaxBytes {
+		return "", 0, 0, errors.New("image larger than 16 MB")
+	}
+	w, h, err = makeCachedPNG(path, DescImageMaxWidth, func() (io.ReadSeeker, func(), error) {
+		return bytes.NewReader(body), func() {}, nil
+	})
+	var bad decodeError
+	switch {
+	case errors.Is(err, errImageSize):
 		return "", 0, 0, errors.New("image size out of range")
-	}
-	tw := min(b.Dx(), DescImageMaxWidth)
-	th := max(b.Dy()*tw/b.Dx(), 1)
-	out := ScaleBox(img, tw, th)
-	var buf bytes.Buffer
-	if err := (&png.Encoder{CompressionLevel: png.BestSpeed}).Encode(&buf, out); err != nil {
+	case errors.As(err, &bad):
+		return "", 0, 0, fmt.Errorf("cannot decode the image: %v", bad.error)
+	case err != nil:
 		return "", 0, 0, err
 	}
-	os.MkdirAll(filepath.Dir(path), 0o755)
-	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
-		return "", 0, 0, err
-	}
-	return path, tw, th, nil
+	return path, w, h, nil
 }
 
-// ScaleBox scales with a box filter (averaging the source pixels under each target pixel).
-func ScaleBox(src image.Image, w, h int) *image.RGBA {
-	b := src.Bounds()
-	rgba, ok := src.(*image.RGBA)
-	if !ok {
-		rgba = image.NewRGBA(b)
-		draw.Draw(rgba, b, src, b.Min, draw.Src)
-	}
-	dst := image.NewRGBA(image.Rect(0, 0, w, h))
-	for y := 0; y < h; y++ {
-		y0, y1 := y*b.Dy()/h, (y+1)*b.Dy()/h
-		if y1 <= y0 {
-			y1 = y0 + 1
-		}
-		for x := 0; x < w; x++ {
-			x0, x1 := x*b.Dx()/w, (x+1)*b.Dx()/w
-			if x1 <= x0 {
-				x1 = x0 + 1
-			}
-			var r, g, bl, al, n uint32
-			for yy := y0; yy < y1; yy++ {
-				i := rgba.PixOffset(b.Min.X+x0, b.Min.Y+yy)
-				for xx := x0; xx < x1; xx++ {
-					r, g, bl, al, n = r+uint32(rgba.Pix[i]), g+uint32(rgba.Pix[i+1]), bl+uint32(rgba.Pix[i+2]), al+uint32(rgba.Pix[i+3]), n+1
-					i += 4
-				}
-			}
-			j := dst.PixOffset(x, y)
-			dst.Pix[j], dst.Pix[j+1], dst.Pix[j+2], dst.Pix[j+3] = uint8(r/n), uint8(g/n), uint8(bl/n), uint8(al/n)
-		}
-	}
-	return dst
-}
+// descImageMaxBytes is the most a description image may download.
+const descImageMaxBytes = 16 << 20

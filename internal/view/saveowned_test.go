@@ -77,3 +77,45 @@ func TestSaveIssueViewOwnership(t *testing.T) {
 		}
 	}
 }
+
+func TestLastLoadText(t *testing.T) {
+	t.Setenv("ARCHO_LANG", "")
+	before := Lang()
+	t.Cleanup(func() { SetLang(before) })
+	for _, tc := range []struct {
+		errors, warnings int
+		want             string
+	}{
+		{1, 0, "the last load logged 1 error"},
+		{3, 0, "the last load logged 3 errors"},
+		{0, 1, "the last load logged 1 warning"},
+		{0, 3, "the last load logged 3 warnings"},
+		{1, 1, "the last load logged 1 error and 1 warning"},
+		{1, 3, "the last load logged 1 error and 3 warnings"},
+		{3, 1, "the last load logged 3 errors and 1 warning"},
+		{69, 224, "the last load logged 69 errors and 224 warnings"},
+	} {
+		t.Run(tc.want, func(t *testing.T) {
+			load := &app.SaveLoad{Errors: tc.errors, Warnings: tc.warnings, Kinds: 2, First: "synthetic first message\nstack trace"}
+			SetLang("en")
+			head, consequence := lastLoadText(load)
+			if head != tc.want || consequence != "it may load with missing or broken content; first: synthetic first message  (2 kinds)" {
+				t.Fatalf("English: %q / %q", head, consequence)
+			}
+			SetLang("zh")
+			head, consequence = lastLoadText(load)
+			for _, en := range []string{"the last load", "error", "warning", "it may load", "first:", "kinds"} {
+				if strings.Contains(head+consequence, en) {
+					t.Errorf("untranslated %q in %q / %q", en, head, consequence)
+				}
+			}
+		})
+	}
+	for _, lang := range []string{"en", "zh"} {
+		SetLang(lang)
+		_, consequence := lastLoadText(&app.SaveLoad{Errors: 1, Kinds: 1})
+		if !strings.HasSuffix(consequence, T("(1 kind)")) || lang == "zh" && strings.Contains(consequence, "kind") {
+			t.Fatalf("%s single kind: %q", lang, consequence)
+		}
+	}
+}

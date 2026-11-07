@@ -465,5 +465,12 @@
   "while starting a new colony": "开始新殖民地时",
   "will delete": "将删除",
   "worth knowing": "可以留意",
-  "your rule": "你的规则"
+  "your rule": "你的规则",
+  "errors when the game last started": "上次启动时的报错",
+  "errors when the last save was loaded": "上次载入存档时的报错",
+  "errors when %s was last loaded": "上次载入 %s 时的报错",
+  "errors when %s and %d more saves were last loaded": "上次载入 %s 及另外 %d 个存档时的报错",
+  "errors when %s was last played": "上次游玩 %s 时的报错",
+  "errors when the game was last played": "上次游玩时的报错",
+  "errors whose phase was not recorded": "未记录阶段的报错"
 }

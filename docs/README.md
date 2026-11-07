@@ -2,6 +2,8 @@
 
 | Where | What it is | Kept how |
 | --- | --- | --- |
+| [user-guide.md](user-guide.md) ([Chinese](user-guide.zh-CN.md)) | For players: every page and feature, how to use it, recipes | Updated when a feature players see changes; the Chinese copy in the same commit |
+| [highlights.md](highlights.md) ([Chinese](highlights.zh-CN.md)) | Release copy: tagline, blurbs, selling points with their conditions | Checked before each release; only implemented features; the Chinese copy in the same commit |
 | [00-top-level-design.md](00-top-level-design.md) | What RimArcho is, who it serves, the three questions it answers, principles, roadmap and the decision record (§6) | Changes only with a product decision |
 | [00a-architecture.md](00a-architecture.md) | Domain model, module layers, technical principles, why Mod identity works the way it does | Changes with the architecture |
 | [specs/](specs/README.md) | The specifications `01`–`19`: how each area behaves now. Code comments cite them as `NN §x.y` | Updated in the same commit as the behavior |

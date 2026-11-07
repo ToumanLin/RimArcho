@@ -126,18 +126,28 @@ func PageHandler(api *API) (http.Handler, error) {
 	return handler(api, files), nil
 }
 
+// previewOf makes a thumbnail; a test replaces it to hold one open.
+var previewOf = (*app.App).PreviewOf
+
 func handler(api *API, files fs.FS) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/preview/", func(w http.ResponseWriter, r *http.Request) {
 		id := strings.TrimPrefix(r.URL.Path, "/preview/")
 		api.mu.Lock()
 		st := api.boardState()
-		var path string
-		var err error = app.ErrNoPreview
+		var target *app.PreviewTarget
 		if st != nil && st.Ix.ByID[id] != nil {
-			path, _, _, err = api.a.Preview(st.Ix, st.Ix.ByID[id])
+			t := api.a.PreviewTargetOf(st.Ix, st.Ix.ByID[id])
+			target = &t
 		}
 		api.mu.Unlock()
+		// Making a thumbnail decodes the full picture (tens of milliseconds for a large
+		// one); page calls do not wait for it (16 §8.4).
+		var path string
+		var err error = app.ErrNoPreview
+		if target != nil {
+			path, _, _, err = previewOf(api.a, *target)
+		}
 		serveFile(w, r, path, err)
 	})
 	mux.HandleFunc("/img", func(w http.ResponseWriter, r *http.Request) {

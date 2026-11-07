@@ -190,6 +190,13 @@ func consequence(is app.SaveIssue) string {
 		return "usually safe: they start fresh in an existing save"
 	case app.IssueReordered:
 		return "usually safe; patches apply in another order"
+	case app.IssueLastLoad:
+		t := "it may load with missing or broken content"
+		if l := is.Load; l != nil && l.First != "" {
+			first, _, _ := strings.Cut(l.First, "\n")
+			t += "; first: log:" + l.Cluster + " " + strings.TrimSpace(first)
+		}
+		return t
 	}
 	return ""
 }

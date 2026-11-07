@@ -73,7 +73,7 @@ func (s *API) saveNeedsLocked(ps *app.ProblemSet, n *view.Needs, eager bool) *ne
 	n.Environment = ps.State.Ix.Env.ID
 	n.Plan = ps.State.Plan.ID
 	n.ListVersion = list
-	n.Updating = n.Stale || n.Never || !eager
+	n.Updating = s.needsWorkLocked()
 	dirs, _ := s.a.ManagedDirectories()
 	db, _ := json.Marshal(dirs)
 	c := &needsSnapshot{directories: string(db), scope: scope, key: key, index: index, list: list, ps: ps, base: ps, n: n, eager: eager}
@@ -101,6 +101,18 @@ func (s *API) saveNeedsLocked(ps *app.ProblemSet, n *view.Needs, eager bool) *ne
 	return c
 }
 
+// needsWorkLocked reports whether background work will replace the shown findings: a
+// refresh of the list's problems or a content analysis. Only then is `updating` true
+// (16 §8.7): a cache-only read, a stale or a never-run analysis alone is not work.
+func (s *API) needsWorkLocked() bool { return s.needsRefreshing || s.busy["analyze"] }
+
+// problemsNowLocked is the summary of n with `updating` as of now.
+func (s *API) problemsNowLocked(n *view.Needs) *view.ListProblems {
+	p := view.ProblemsOf(n)
+	p.Updating = s.needsWorkLocked()
+	return p
+}
+
 // ListProblems supplies editor cards and per-mod counts without a second calculation.
 func (s *API) ListProblems() *view.ListProblems {
 	return view.ProblemsOf(s.Needs())
@@ -111,7 +123,7 @@ func (s *API) editProblemsLocked() *view.ListProblems {
 	previous := s.needsCache[scope]
 	if previous != nil && previous.index == index {
 		if previous.list == list {
-			return view.ProblemsOf(s.needsLocked())
+			return s.problemsNowLocked(s.needsLocked())
 		}
 		base := previous.base
 		if base == nil {
@@ -123,14 +135,14 @@ func (s *API) editProblemsLocked() *view.ListProblems {
 			c := s.saveNeedsLocked(ps, n, false)
 			c.base = base
 			s.refreshNeedsLocked(c)
-			return view.ProblemsOf(n)
+			return s.problemsNowLocked(n)
 		}
 	}
 	n := s.needsLocked()
 	if c := s.needsCache[scope]; c != nil {
 		s.refreshNeedsLocked(c)
 	}
-	return view.ProblemsOf(n)
+	return s.problemsNowLocked(n)
 }
 
 // refreshNeedsLocked coalesces work on an independent session. Publication compares the
@@ -178,10 +190,10 @@ func (s *API) refreshNeedsLocked(c *needsSnapshot) {
 		var event *view.ListProblems
 		if n != nil {
 			s.saveNeedsLocked(ps, n, true)
-			event = view.ProblemsOf(n)
 			if s.needsWanted && (n.Stale || n.Never) && !s.busy["analyze"] {
 				s.startAnalyze()
 			}
+			event = s.problemsNowLocked(n)
 		} else {
 			copy := *c.n
 			copy.Updating = false

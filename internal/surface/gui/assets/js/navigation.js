@@ -44,18 +44,21 @@ export async function go(id, entry = null) {
     planManage.restoreHistory({ creating: false, selected: planManage.selected() });
   }
   if (id === "plan:new") return plans.newPlan();
+  // "save:<ref>": Saves with that save selected
+  let save = "";
+  if (id.startsWith("save:")) { save = id.slice(5); id = "saves"; }
   const plan = id.startsWith("plan:") ? +id.slice(5) : null;
   if (plan !== null) id = "plan";
   S.packFocus = id.startsWith("pack:") ? id.slice(5) : null;
   if (id !== "plans") planManage.abandon();
   if (id !== "build") S.buildFrom = null;
   if (id !== "plan-export") S.planExport = null;
-  await openPage(id, plan, entry);
+  await openPage(id, plan, entry, save);
   // a page already shown is redrawn in place: its sub-entry and breadcrumb follow too
   ui.renderWhere();
 }
 
-export async function openPage(id, plan = null, entry = null) {
+export async function openPage(id, plan = null, entry = null, save = "") {
   if (S.packFocus) return packsPage.pack(S.packFocus);
   switch (id) {
     case "plan":
@@ -92,7 +95,7 @@ export async function openPage(id, plan = null, entry = null) {
     case "tasks": return tasksPage.open();
     case "search": return fileSearch.open();
     case "mod-settings": return modSettings.open();
-    case "saves": return savesPage.open();
+    case "saves": return savesPage.open(save);
     case "guide": return entry ? guide.resume() : guide.start(S.board && S.board.envs && S.board.envs.length ? "env" : "first");
   }
 }

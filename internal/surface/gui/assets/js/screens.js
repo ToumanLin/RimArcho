@@ -551,15 +551,17 @@ function drawNeeds() {
   const grid = el("div", "cols needcols");
   grid.append(left, split, right);
   needSplit(grid, left, split);
+  if (d.lastSave) lbox.append(lastSaveCard(d.lastSave));
   for (const [ci, box] of [[0, lbox], [1, rbox]]) {
     for (const si of COL_SECS[ci]) {
       const rows = N.cols[ci].filter((x) => x.section === si);
       const shut = si === 1 && N.hintsShut && (d.items || []).some((x) => x.section === 1 && !x.into);
       if (!rows.length && !shut) continue;
+      if (si === 3) { for (const b of runBlocks(rows)) box.append(needSection(si, b.rows, ci, false, live, b.title)); continue; }
       box.append(needSection(si, rows, ci, shut, live));
     }
   }
-  if (!N.cols[0].length) lbox.append(el("section", "card empty-state", "✓ " + T("nothing here")));
+  if (!N.cols[0].length && !d.lastSave) lbox.append(el("section", "card empty-state", "✓ " + T("nothing here")));
   if (!N.cols[1].length) rbox.append(el("div", "need-empty", T("no errors in the last run")));
   // what other pages handle: one line each (16 §2.4)
   for (const e of d.elsewhere || []) {
@@ -573,7 +575,10 @@ function drawNeeds() {
   // 1–9: the sections in the order shown, the left column's first (16 §3.5)
   resetAreas();
   sc.querySelectorAll(".need-sec").forEach((sec) => area(sec, sec.querySelector("h2"), () => {
-    const ci = +sec.dataset.col, i = N.cols[ci].findIndex((x) => x.section === +sec.dataset.section);
+    // a block of the run's errors focuses its own first item
+    const ci = +sec.dataset.col, first = sec.dataset.first;
+    let i = first ? N.cols[ci].findIndex((x) => x === sec.firstItem) : -1;
+    if (i < 0) i = N.cols[ci].findIndex((x) => x.section === +sec.dataset.section);
     if (i >= 0) { N.col = ci; setCur(ci, i); }
   }));
   markNeeds(false);
@@ -581,14 +586,68 @@ function drawNeeds() {
   ui.renderHints();
 }
 
+// lastSaveCard is Before you start's first card (16 §2.4): whether the save the last run
+// loaded loads with this list, the rows that need attention, and a way to the save on
+// Saves, where each row has its fix.
+function lastSaveCard(v) {
+  const sec = el("section", "sec need-save");
+  const h = el("h2", "label word-facts", T("your last save"));
+  if (v.loaded) h.append(el("span", "muted", Tf("loaded %s", v.loaded)));
+  sec.append(h);
+  const card = el("div", "card need-list");
+  const lvl = v.gone ? "warn" : v.level === "error" ? "err" : v.level === "warning" ? "warn" : v.level === "writing" ? "" : "ok";
+  const row = el("div", "need-save-row " + lvl);
+  const head = el("div", "need-save-head");
+  head.append(el("span", "need-save-dot", lvl === "err" ? "✕" : lvl === "warn" ? "!" : lvl === "ok" ? "✓" : "…"));
+  const t = el("b", "", v.name);
+  if (v.colony && v.colony !== v.name) t.title = v.colony;
+  head.append(t, el("span", "need-save-verdict", v.verdict));
+  row.append(head);
+  if (v.lines?.length) {
+    const ul = el("ul", "need-save-lines");
+    for (const l of v.lines) ul.append(el("li", "", l));
+    if (v.more) ul.append(el("li", "muted", Tf("and %d more", v.more)));
+    row.append(ul);
+  }
+  if (v.ref) {
+    const b = button(T("open in saves"), "", () => ui.go("save:" + v.ref), "small need-save-open");
+    b.title = v.command ? "archo " + v.command : "";
+    row.append(b);
+  }
+  card.append(row);
+  sec.append(card);
+  return sec;
+}
+
+// runBlocks splits the run's errors into cards (16 §2.4): this run's while the game runs
+// (one card, its phases as quiet headings inside), then the last run's: with phase marks
+// one card per block (starting the game, loading the save, playing it), each headed by the
+// block the view names (phaseHeading); without marks one card.
+function runBlocks(rows) {
+  const out = [];
+  let cur = null;
+  for (const it of rows) {
+    const key = it.group === 6 ? "live" : (it.phaseHeading || "last");
+    if (!cur || cur.key !== key) {
+      cur = { key, title: key === "live" || key === "last" ? "" : it.phaseHeading, rows: [] };
+      out.push(cur);
+    }
+    cur.rows.push(it);
+  }
+  return out;
+}
+
 // needSection: a section's heading and its card. The run's errors say which run; while the
-// game runs this run's come first, then a quiet line and the last run's.
-function needSection(si, rows, ci, shut, live) {
+// game runs this run's come first, then the last run's blocks (runBlocks). heading: a
+// block's own heading, already translated.
+function needSection(si, rows, ci, shut, live, heading = "") {
   const sec = el("section", "sec need-sec " + SECTION_CLS[si]);
   sec.dataset.col = String(ci);
   sec.dataset.section = String(si);
-  const title = si === 3 && live ? "errors this run" : SECTIONS[si];
-  const h = el("h2", "label", T(title));
+  if (heading && rows.length) { sec.dataset.first = "1"; sec.firstItem = rows[0]; }
+  const lastRun = si === 3 && !rows.some((x) => x.group === 6);
+  const title = si === 3 && !lastRun ? "errors this run" : SECTIONS[si];
+  const h = el("h2", "label", heading || T(title));
   const n = rows.filter((x) => !x.done && x.counted).length;
   if (si === 1) {
     // worth knowing folds and opens by its heading (16 §2.4)
@@ -606,10 +665,10 @@ function needSection(si, rows, ci, shut, live) {
     const c = el("span", "n num", String(n));
     h.classList.add("word-facts");
     h.append(c);
-    bump("needs:" + si, c, n);
+    bump("needs:" + si + (heading ? ":" + heading : ""), c, n);
   }
   if (si === 3) {
-    if (live) {
+    if (!lastRun) {
       const run = el("span", "muted need-live");
       run.append(el("span", "dot"), document.createTextNode(S.live.pack ? Tf("pack %s", S.live.pack) : T("game running")));
       h.append(run);
@@ -625,8 +684,7 @@ function needSection(si, rows, ci, shut, live) {
       // while the game runs, the last run's items follow this run's: say which run they are
       // from, or the same phase headings repeat over the same errors (view.GroupThisRun 6,
       // GroupLastRun 3)
-      if (it.group === 3 && group === 6) card.append(el("div", "need-phase need-run word-facts", T("last run") + (N.data.lastRun ? "  " + N.data.lastRun : "")));
-      if (it.phaseHeading && (it.phaseHeading !== phase || it.group !== group)) card.append(el("div", "need-phase", it.phaseHeading));
+      if (it.phaseHeading && it.group === 6 && (it.phaseHeading !== phase || it.group !== group)) card.append(el("div", "need-phase", it.phaseHeading));
       phase = it.phaseHeading || ""; group = it.group;
     }
     const row = needCard(it, ci, i);
@@ -860,12 +918,7 @@ async function runAction(it, act, here = false) {
     case "problem":
       return pop.problem(act.problem, (fix) => runAction(it, fix), actionWrite);
     case "game-log":
-      syncLogEnvironment();
-      L.target = act.cluster || "";
-      L.targetLine = act.line || "";
-      L.tab = 0;
-      L.tabPick = 0;
-      return gameLog(act.logPath || "", true);
+      return openGameLog(act.logPath, act.cluster, act.line);
     case "view":
       if (act.argv?.[0] === "plan" && act.argv?.[1] === "cost") return refreshMemoryEstimate();
       if (act.argv?.[0] === "identity" && act.argv?.[1] === "why") {
@@ -1027,6 +1080,17 @@ function syncLogEnvironment() {
 
 export async function logEnvironmentChanged() {
   if (syncLogEnvironment() && S.screen === "log") await gameLog("", true);
+}
+
+// openGameLog opens the game log page on a log file at one of its clusters (Can it run's
+// and Saves' "open the game log").
+export function openGameLog(path, cluster, line) {
+  syncLogEnvironment();
+  L.target = cluster || "";
+  L.targetLine = line || "";
+  L.tab = 0;
+  L.tabPick = 0;
+  return gameLog(path || "", true);
 }
 
 // gameLog shows the page immediately; late responses cannot reopen it after navigation.

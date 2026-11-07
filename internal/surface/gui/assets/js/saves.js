@@ -8,7 +8,7 @@
 // runs as a background task and its news arrives as "saves-read" events.
 import { S, $, el, api, T, Tf, errText, say } from "./state.js";
 import { on } from "./api.js";
-import { beginPageRead, page, area, act, button, hintsChanged } from "./screens.js";
+import { beginPageRead, page, area, act, button, hintsChanged, openGameLog } from "./screens.js";
 import { wireSeparator } from "./separator.js";
 import { pathContent } from "./fields.js";
 import { icon } from "./icons.js";
@@ -16,6 +16,7 @@ import { shimmer } from "./motion.js";
 import * as pop from "./popups.js";
 import { getChoices } from "./credit.js";
 import * as plans from "./plans.js";
+import { openLibraryInstance } from "./librarylink.js";
 
 let ui = null;
 export function initSaves(u) { ui = u; }
@@ -95,8 +96,10 @@ function readList() {
   });
 }
 
-export async function open() {
-  const read = beginPageRead("saves", { retry: open, label: "reading the saves…" });
+// open shows the page; select names a save to select (Can it run's last save).
+export async function open(select = "") {
+  if (select && select !== X.sel) { X.sel = select; X.detail = null; X.ask = null; X.renaming = false; }
+  const read = beginPageRead("saves", { retry: () => open(select), label: "reading the saves…" });
   let p;
   try { p = await readList(); } catch (e) { read.fail(e); return; }
   if (!p || !read.current()) return;
@@ -417,16 +420,17 @@ function drawMid(keep) {
   }
   if (!d.error) {
     b.append(loadSection(d));
-    if (d.mods?.length) b.append(modSection(d));
+    if (d.mods?.length || d.changes?.length) b.append(modSection(d));
   }
   midCard.append(b);
-  if (d.mods?.length && !d.error) mods = modRows(b, b.querySelector(".sv-mods"), d.mods);
+  const list = b.querySelector(".sv-mods");
+  if (list && !d.error) mods = modRows(b, list, modShown(d));
   b.scrollTop = top;
   mods?.draw();
   if (focusKey) midCard.querySelector(`[data-key="${CSS.escape(focusKey)}"]`)?.focus({ preventScroll: true });
 }
 
-const GROUPS = [["file", "the file"], ["game", "game changes"], ["mods", "Mod list changes"]];
+const GROUPS = [["file", "the file"], ["load", "the last load"], ["game", "game changes"], ["mods", "Mod list changes"]];
 
 // loadSection is Can it load? (12 §4.3): the quick-fix bar, then only what needs
 // attention, under the file, the game and the Mod list.
@@ -513,16 +517,59 @@ function fixButton(d, f, primary) {
   return b;
 }
 
-// modSection is the save's Mods in load order (12 §4.3 Mod list), all of them: the rows
-// come and go as the card scrolls (modRows).
+// The Mod list (12 §4.3, 16 §2.11) shows only what changed since the colony's previous
+// save: Mods added (green +) and removed (red −), order ignored. A colony's first save
+// shows its whole list folded. Past MOD_FOLD rows the rest fold behind Show all; the
+// choice stays while the same save is selected.
+const MOD_FOLD = 12;
+let modOpen = ""; // the ref of the save whose Mod list is unfolded
+
+function modItems(d) { return d.since ? d.changes || [] : d.mods || []; }
+function modShown(d) {
+  const all = modItems(d);
+  return modOpen === d.ref ? all : all.slice(0, d.since ? MOD_FOLD : 0);
+}
+
+// modSection is the heading, what the changes are against, the rows (mounted as the card
+// scrolls, modRows) and the fold.
 function modSection(d) {
   const s = el("div", "sv-sect");
-  s.append(el("h3", "", T("mod list")));
+  const all = modItems(d), shown = modShown(d);
+  const h = el("h3", "", d.since ? T("mod changes") : T("mod list"));
+  if (d.since) {
+    const added = all.filter((m) => m.added).length;
+    const since = el("span", "r");
+    since.append(T("since") + " ");
+    const prev = button(d.since, "", () => pick(d.sinceRef), "link sv-since");
+    prev.dataset.key = "since";
+    prev.title = T("open the previous save");
+    since.append(prev);
+    h.append(since);
+    s.append(h);
+    if (!all.length) { s.append(el("p", "sv-none", T("the same Mods as the previous save"))); return s; }
+    const counts = el("p", "sv-mcount");
+    if (added) counts.append(el("span", "add", Tf("%d added", added)));
+    if (all.length - added) counts.append(el("span", "del", Tf("%d removed", all.length - added)));
+    s.append(counts);
+  } else {
+    h.append(el("span", "r", Tf("first save of this colony: %d Mods", all.length)));
+    s.append(h);
+  }
   const list = el("div", "sv-mods");
   list.setAttribute("role", "list");
-  list.setAttribute("aria-label", T("mod list"));
-  list.style.height = d.mods.length * ROW + "px";
+  list.setAttribute("aria-label", d.since ? T("mod changes") : T("mod list"));
+  list.style.height = shown.length * ROW + "px";
   s.append(list);
+  if (all.length > shown.length || (modOpen === d.ref && all.length > (d.since ? MOD_FOLD : 0))) {
+    const open = modOpen === d.ref;
+    const more = button(open ? T("show fewer") : Tf("show all %d", all.length), "", () => {
+      modOpen = open ? "" : d.ref;
+      drawMid(true);
+    }, "link sv-fold");
+    more.dataset.key = "mod-fold";
+    more.setAttribute("aria-expanded", String(open));
+    s.append(more);
+  }
   return s;
 }
 
@@ -533,13 +580,26 @@ function modRows(scroll, list, all) {
   let frame = 0;
   const row = (i) => {
     const m = all[i];
-    const r = el("div", "r" + (m.missing ? " gone" : "") + (m.off ? " off" : ""));
+    const change = X.detail?.since ? (m.added ? " add" : " del") : "";
+    const r = el("div", "r" + change + (m.missing ? " gone" : "") + (m.off ? " off" : ""));
     r.setAttribute("role", "listitem");
     r.setAttribute("aria-setsize", String(all.length));
     r.setAttribute("aria-posinset", String(i + 1));
     r.style.top = i * ROW + "px";
-    r.append(el("i", "", String(i + 1)), el("span", "n", m.name));
-    r.title = m.packageId;
+    const sign = X.detail?.since ? el("i", "sg", m.added ? "+" : "−") : el("i", "", String(i + 1));
+    if (X.detail?.since) sign.setAttribute("aria-label", m.added ? T("added") : T("removed"));
+    r.append(sign);
+    if (m.library) {
+      const n = el("button", "n lk", m.name);
+      n.type = "button";
+      n.title = m.packageId + "  " + T("show in the mod library");
+      n.onclick = () => openLibraryInstance(m.library);
+      r.append(n);
+    } else {
+      const n = el("span", "n", m.name);
+      n.title = m.packageId;
+      r.append(n);
+    }
     if (m.missing) r.append(el("span", "tagx bad", T("not installed")));
     else if (m.off) r.append(el("span", "tagx", T("not in the list")));
     if (m.moved) { const mv = el("b", "mv", "↕"); mv.title = T("in another order in the list"); mv.setAttribute("aria-label", T("in another order in the list")); r.append(mv); }
@@ -732,6 +792,7 @@ async function runFix(d, f) {
   switch (f.action) {
     case "recycle": return askFiles("recycle");
     case "open-save": return pick(f.target);
+    case "open-log": return openGameLog(f.target, f.cluster);
     case "new-list": return newList(d, false);
     case "new-list-analyse": return newList(d, true);
     case "launch": return launch(d);

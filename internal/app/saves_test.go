@@ -346,3 +346,44 @@ func TestSavesFullRead(t *testing.T) {
 		t.Fatalf("pruned %d %v", n, err)
 	}
 }
+
+// The Mod list's changes since the colony's previous save (12 §4.3 Mod list): added and
+// removed by packageId, case and order ignored; a colony's first save has none.
+func TestSaveModChanges(t *testing.T) {
+	t.Parallel()
+	e := savesFixture(t)
+	changes := func(name string) (string, []string) {
+		t.Helper()
+		c := checkNamed(t, e, name)
+		since := ""
+		if c.Since != nil {
+			since = c.Since.Name
+		}
+		var out []string
+		for _, m := range c.Changes {
+			sign := "-"
+			if m.InSave {
+				sign = "+"
+			}
+			if m.Library != "" {
+				sign += "L"
+			}
+			out = append(out, sign+" "+m.PackageID)
+		}
+		return since, out
+	}
+	if since, ch := changes("Tundra"); since != "" || len(ch) != 0 {
+		t.Fatalf("first save: since %q changes %q", since, ch)
+	}
+	if since, ch := changes("Tundra 2"); since != "Tundra" || !slices.Equal(ch, []string{"+L tester.gamma", "+ tester.gone"}) {
+		t.Fatalf("Tundra 2: since %q changes %q", since, ch)
+	}
+	if since, ch := changes("Autosave-1"); since != "Tundra 2" || len(ch) != 0 {
+		t.Fatalf("autosave: since %q changes %q", since, ch)
+	}
+	// Removed: the previous save had a Mod this one lacks; installed ones link.
+	e.WriteSave("Tundra 3.rws", testkit.SaveSpec{Mods: []string{"ludeon.rimworld", "tester.beta"}, ModTime: e.Now().Add(-5 * time.Minute)})
+	if since, ch := changes("Tundra 3"); since != "Autosave-1" || !slices.Equal(ch, []string{"-L tester.alpha", "-L tester.gamma", "- tester.gone"}) {
+		t.Fatalf("Tundra 3: since %q changes %q", since, ch)
+	}
+}

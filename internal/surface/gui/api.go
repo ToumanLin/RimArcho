@@ -273,7 +273,7 @@ func (s *API) boardLocked() *Board {
 		out.Error = n.Error
 		return out
 	}
-	out.Problems = view.ProblemsOf(n)
+	out.Problems = s.problemsNowLocked(n)
 	out.Status, out.Reasons, out.Needs = n.Status, n.Reasons, n.Count
 	return out
 }
@@ -1121,8 +1121,10 @@ func (s *API) Needs() *view.Needs {
 			if c.eager && n.Error == "" && (n.Stale || n.Never) && !s.busy["analyze"] {
 				s.startAnalyze()
 			}
+			out := *n
+			out.Updating = s.needsWorkLocked()
 			s.mu.Unlock()
-			return n
+			return &out
 		}
 		n := *c.n
 		dirs, _ := s.a.ManagedDirectories()
@@ -1130,8 +1132,8 @@ func (s *API) Needs() *view.Needs {
 		if string(db) != c.directories {
 			n = *view.RefreshDirectories(s.a, &n)
 		}
-		n.Updating = true
 		s.refreshNeedsLocked(c)
+		n.Updating = s.needsWorkLocked()
 		st, _ := s.a.Loadout()
 		n = *view.RefreshMemory(s.a, st, &n)
 		s.mu.Unlock()
@@ -1161,6 +1163,7 @@ func (s *API) Needs() *view.Needs {
 		if (n.Stale || n.Never) && !s.busy["analyze"] {
 			s.startAnalyze()
 		}
+		n.Updating = s.needsWorkLocked()
 	}
 	return n
 }
@@ -1587,6 +1590,11 @@ func (s *API) startAnalyzeOf(list string) bool {
 		plan, obj = list, list
 	}
 	task := s.beginSelf(view.TaskAnalyze, obj, nil)
+	// the open list's findings will change: its problems button says so while this runs
+	if c, _ := s.cachedNeedsLocked(); c != nil && c.scope == scope {
+		ev := s.problemsNowLocked(c.n)
+		go s.send("list-problems", ev)
+	}
 	s.needsJobs.Add(1)
 	go func() {
 		defer s.needsJobs.Done()

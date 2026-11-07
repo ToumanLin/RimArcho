@@ -25,7 +25,9 @@ func fixture(t *testing.T) (*testkit.Env, *API, chan string) {
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.a")
 	e.AddEnv(false)
 	e.MustRun("scan")
-	events := make(chan string, 16)
+	// Many tests never read events; a background analysis must still finish (its last
+	// send would block, and Close waits for it), so the buffer holds a whole run's events.
+	events := make(chan string, 256)
 	api := NewAPI(e.App, func(name string, data any) {
 		b, _ := json.Marshal(data)
 		events <- name + " " + string(b)
