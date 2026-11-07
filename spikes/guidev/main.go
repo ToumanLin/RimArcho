@@ -16,8 +16,10 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
@@ -48,6 +50,19 @@ var escCheck string
 
 //go:embed pagecheck.html pagecheck.js pagecheck-runtime.js feedbackcheck.js
 var pageCheck embed.FS
+
+// callDelay holds GUIDEV_DELAY, such as "Init=1500,GuideFind=3000": API methods answered late
+// by that many milliseconds, so loading screens can be seen and timed.
+var callDelay = func() map[string]time.Duration {
+	out := map[string]time.Duration{}
+	for _, part := range strings.Split(os.Getenv("GUIDEV_DELAY"), ",") {
+		name, ms, ok := strings.Cut(strings.TrimSpace(part), "=")
+		if n, err := strconv.Atoi(ms); ok && err == nil {
+			out[name] = time.Duration(n) * time.Millisecond
+		}
+	}
+	return out
+}()
 
 type hub struct {
 	mu   sync.Mutex
@@ -156,6 +171,9 @@ func main() {
 			A []json.RawMessage `json:"a"`
 		}
 		json.NewDecoder(r.Body).Decode(&req)
+		if d := callDelay[req.M]; d > 0 {
+			time.Sleep(d) // GUIDEV_DELAY: a slow read on demand, to see the waits (16 §7.1)
+		}
 		res, err := call(api, req.M, req.A)
 		out := map[string]any{"result": res}
 		if err != nil {

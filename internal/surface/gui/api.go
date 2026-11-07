@@ -194,13 +194,14 @@ func (s *API) checkMonitor() {
 
 // Start is what the page needs once: the language, its text table, the commands.
 type Start struct {
-	Lang      string            `json:"lang"`
-	Accent    string            `json:"accent"`
-	Theme     string            `json:"theme"`
-	Text      map[string]string `json:"text"`
-	ExtraText map[string]string `json:"extraText,omitempty"`
-	Commands  []view.Command    `json:"commands"`
-	Version   string            `json:"version"`
+	Lang        string            `json:"lang"`
+	Accent      string            `json:"accent"`
+	Theme       string            `json:"theme"`
+	ArchoMotion string            `json:"archoMotion"`
+	Text        map[string]string `json:"text"`
+	ExtraText   map[string]string `json:"extraText,omitempty"`
+	Commands    []view.Command    `json:"commands"`
+	Version     string            `json:"version"`
 	// Ops is the op table both pages' menus, hint lines and keys come from (16 §8.5).
 	Ops []view.Op `json:"ops"`
 }
@@ -210,7 +211,7 @@ func (s *API) Init() *Start {
 	defer perftrace.Span("Init")()
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return &Start{Lang: view.Lang(), Accent: cmds.Setting(s.a, "ui.accent"), Theme: cmds.Setting(s.a, "ui.theme"), Text: view.Table(), ExtraText: view.ExtraText(), Commands: view.Commands, Version: buildinfo.String(), Ops: view.OpTable()}
+	return &Start{Lang: view.Lang(), Accent: cmds.Setting(s.a, "ui.accent"), Theme: cmds.Setting(s.a, "ui.theme"), ArchoMotion: cmds.Setting(s.a, "ui.archo.motion"), Text: view.Table(), ExtraText: view.ExtraText(), Commands: view.Commands, Version: buildinfo.String(), Ops: view.OpTable()}
 }
 
 // ---- the board ----

@@ -20,14 +20,6 @@ async function setup(workshop = false) {
     writes: () => writes, moves: () => moves, choose: path => picked(path), fail: () => { fail = true; } };
 }
 
-test("managed-folder choice only saves after confirmation and refreshes free space", async () => {
-  const h = await setup(); const done = h.module.managedFolders(); await flush();
-  assert.equal(h.writes(),0); assert.match(h.popup().textContent,/Less than 10 GB/);
-  h.button("change…").onclick(); await h.choose("Y:/RimArcho");
-  assert.match(h.popup().textContent,/Y:\/RimArcho/); assert.doesNotMatch(h.popup().textContent,/Less than 10 GB/);
-  assert.equal(h.writes(),0); await h.button("use this folder").onclick(); await done; assert.equal(h.writes(),1);
-});
-
 test("declining relocation keeps one warning line and copies nothing", async () => {
   const h = await setup(true); const done = h.module.workshopStart(); await flush();
   assert.match(h.popup().textContent,/already in this folder will be replaced/);

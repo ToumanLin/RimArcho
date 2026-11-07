@@ -45,6 +45,7 @@ import * as fileSearch from "./filesearch.js";
 import * as modSettings from "./modsettings.js";
 import * as savesPage from "./saves.js";
 import { initRules, refreshRules, startRule, showRules } from "./rules.js";
+import { setMode as setArchoMode, bootLive, bootDone } from "./archo.js";
 
 // ---- loading ----
 
@@ -145,6 +146,7 @@ async function reaccent() {
   S.start.theme = s.theme;
   archoTheme.apply(s.theme);
   applyAccent(s.accent);
+  setArchoMode(s.archoMotion); // settings › Archo animation (16 §2.14)
 }
 
 // ---- drawing ----
@@ -1215,7 +1217,6 @@ const ui = {
   duplicateList: (id) => planManage.duplicate(id),
   selectedList: () => planManage.selected(),
   resumeGuide: () => guide.resume(),
-  prepareManagedFolders: firstRun.managedFolders,
   importManagers: () => exchange(true),
   manageLists: (id = 0) => { planManage.select(id); return go("plans"); },
   edited: (call, undoable = true) => edited(call, undoable),
@@ -1225,6 +1226,8 @@ const ui = {
 
 async function start() {
   const s = await api.Init();
+  setArchoMode(s.archoMotion);
+  bootLive(); // the start-up screen's figure and tip, from 0.21 s (16 §7.1)
   archoTheme.apply(s.theme);
   applyAccent(s.accent);
   S.start = s;
@@ -1339,7 +1342,7 @@ async function start() {
     checkCredit();
   });
   if (!(await firstRun.workshopStart())) return;
-  if (await uninst.restore()) { shell.settle(); return; }
+  if (await uninst.restore()) { bootDone(); shell.settle(); return; }
   // The start page needs only Workspace's shell and board. The editor behind it gets its
   // filter answer (the bar's first one reads every mod's content) and its rows afterwards,
   // so the first page does not wait for them.
@@ -1358,6 +1361,7 @@ async function start() {
   const first = !S.shell || !S.shell.envs;
   if (first) await guide.start("first");
   else await go("home");
+  bootDone();
   shell.settle();
   requestAnimationFrame(() => api.Ready().catch(() => {}));
   pollLive();
@@ -1413,4 +1417,4 @@ async function readNewLog() {
   else if (S.screen === "home") homePage.home({ keep: true });
 }
 
-start().catch((e) => say("fail", errText(e)));
+start().catch((e) => { bootDone(); say("fail", errText(e)); });

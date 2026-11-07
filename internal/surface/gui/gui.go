@@ -3,7 +3,9 @@
 package gui
 
 import (
+	"crypto/sha256"
 	"embed"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"os"
@@ -17,6 +19,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/events"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/buildinfo"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/icon"
 	"github.com/ToumanLin/RimArcho/internal/perftrace"
@@ -154,8 +157,19 @@ func handler(api *API, files fs.FS) http.Handler {
 		})
 	}
 	files2 := application.BundledAssetFileServer(files)
+	archoETag := fmt.Sprintf(`"%x"`, sha256.Sum256([]byte(buildinfo.String())))
 	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'")
+		if strings.HasPrefix(r.URL.Path, "/archo/") {
+			// Unhashed paths must revalidate across upgrades. ServeContent in Wails'
+			// file server handles If-None-Match (including lists and weak tags).
+			// Wails strips conditional headers on Windows to avoid a WebView2 304
+			// hang, so native windows currently receive the full response.
+			w.Header().Set("Cache-Control", "no-cache")
+			if info, err := fs.Stat(files, strings.TrimPrefix(r.URL.Path, "/")); err == nil && info.Mode().IsRegular() {
+				w.Header().Set("ETag", archoETag)
+			}
+		}
 		files2.ServeHTTP(w, r)
 	}))
 	return mux

@@ -34,6 +34,8 @@ func TestEnumeratedSettingDefaults(t *testing.T) {
 		{"ui.icons", "nerd", "nerd"},
 		{"ui.theme", "obsolete", "auto"},
 		{"ui.theme", "light", "light"},
+		{"ui.archo.motion", "obsolete", "live"},
+		{"ui.archo.motion", "still", "still"},
 	} {
 		if err := e.App.Store.SetMeta("cfg:"+tc.key, tc.stored); err != nil {
 			t.Fatal(err)

@@ -2,6 +2,7 @@ import { el, $, api, T, Tf, errText, say } from "./state.js";
 import { button, chooseLocalPath } from "./screens.js";
 import { editablePath, copyablePath } from "./fields.js";
 import * as pop from "./popups.js";
+import { bootDone } from "./archo.js";
 
 const bytes = n => n < 0 ? T("free space unknown") : n >= 1073741824 ? (n / 1073741824).toFixed(1) + " GB" : (n / 1048576).toFixed(1) + " MB";
 
@@ -60,6 +61,7 @@ export async function workshopStart() {
   try { await api.FinishWorkshopRelocation(); } catch (e) { say("warn", errText(e)); }
   const info = await api.WorkshopFolder("");
   if (!info.workshop) return true;
+  bootDone(); // the dialog needs the window
   const moved = await folderDialog("install RimArcho", "Steam rewrites this Workshop folder when the item updates, so RimArcho needs a folder of its own. The files extracted here are removed after the move.", info,
     path => api.WorkshopFolder(path), path => api.RelocateWorkshop(path), "install and restart", "use here this time");
   if (moved) return false;
@@ -67,11 +69,4 @@ export async function workshopStart() {
   warning.id = "workshop-warning";
   $("#top").after(warning);
   return true;
-}
-
-export async function managedFolders() {
-  const info = await api.ManagedFolder();
-  if (info.done) return;
-  await folderDialog("managed folders", "Where should RimArcho keep SteamCMD, downloaded Mods and tools?", info,
-    path => api.FolderSpace(path), path => api.ChooseManagedFolder(path), "use this folder", "not now");
 }
