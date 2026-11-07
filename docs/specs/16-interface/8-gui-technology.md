@@ -118,7 +118,7 @@ The main `ListProblems` JSON fields are:
 | `listVersion` | The fingerprint of the list content used for this result. |
 | `revision` | The cache input fingerprint; identical inputs are reused. Do not compare it lexicographically. |
 | `sequence` | An increasing publication number within the API session; for the same environment and list, accept only a sequence at least as large as the displayed one. |
-| `updating`, `error?` | While background work completes, retain the previous content findings with `updating=true`. On failure, retain the findings and return the error text. |
+| `updating`, `error?` | While background work completes, retain the previous content findings with `updating=true`. The work is a refresh of the list's problems or a content analysis (`API.needsWorkLocked`); starting an analysis publishes `list-problems` with `updating=true`. A cache-only read (first paint, the log not yet parsed), or a stale or never-run analysis with no analysis running, is not updating. On failure, retain the findings and return the error text. |
 | `count`, `severity` | The shared needs count and maximum severity, `error` / `warning` / `info`; hidden maintenance and muted information items follow needs counting rules. |
 | `mods` | An Instance-ID index whose values contain `count`, `severity`, `summary`, and `problemIds`. An absent Mod has no displayable finding. |
 | `items` | The full list-level `Need` array, with each finding sent once and looked up through `problemIds`. |

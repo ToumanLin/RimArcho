@@ -1,10 +1,12 @@
 package gui
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -102,8 +104,11 @@ func TestNeedsEditSharesIncrementalSnapshotAndUndo(t *testing.T) {
 		t.Fatal(err)
 	}
 	c, _ := s.cachedNeedsLocked()
-	if !c.n.Updating {
-		t.Fatal("stale content must be marked updating")
+	if c.eager {
+		t.Fatal("an edit's incremental snapshot counted as checked")
+	}
+	if c.n.Updating {
+		t.Fatal("updating without background work (it is closed here)")
 	}
 	for _, it := range c.n.Items {
 		if it.Target != "" && it.Target == "brrainz.harmony" {
@@ -128,8 +133,8 @@ func TestNeedsEditSharesIncrementalSnapshotAndUndo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Problems == nil || !result.Problems.Updating {
-		t.Fatal("edit omitted problem summary")
+	if result.Problems == nil || result.Problems.Updating {
+		t.Fatal("edit omitted problem summary, or said updating with no background work")
 	}
 	c, _ = s.cachedNeedsLocked()
 	if result.Problems.Revision != c.n.Revision || result.Problems.Count != c.n.Count {
@@ -298,5 +303,59 @@ func TestWorkspaceAdoptsOneNeedsSnapshotAndRefreshesAfterEdit(t *testing.T) {
 	}
 	if len(s.needsCache) > 8 {
 		t.Fatal("unbounded needs cache")
+	}
+}
+
+// `updating` means background work will replace the findings (16 §8.7). The first paint's
+// cache-only read of a never-analysed list starts none, so it is not updating; once the
+// editor asks, the refresh and the analysis say updating and the last answer does not.
+func TestProblemsUpdatingOnlyWhileWorkRuns(t *testing.T) {
+	t.Parallel()
+	_, s, events := fixture(t)
+	if !s.Workspace(1) {
+		t.Fatal("workspace rejected")
+	}
+	r := environmentResult(t, events, 1)
+	s.mu.Lock()
+	c, _ := s.cachedNeedsLocked()
+	never, work := c.n.Never, s.needsWorkLocked()
+	s.mu.Unlock()
+	if !never || work {
+		t.Fatalf("fixture: never=%v work=%v", never, work)
+	}
+	if r.Board.Problems.Updating {
+		t.Fatal("first paint says updating with no background work")
+	}
+	s.ListProblems()
+	var sawUpdating bool
+	timeout := time.After(30 * time.Second)
+	for {
+		select {
+		case ev := <-events:
+			name, body, _ := strings.Cut(ev, " ")
+			if name != "list-problems" {
+				continue
+			}
+			var p view.ListProblems
+			if err := json.Unmarshal([]byte(body), &p); err != nil {
+				t.Fatal(err)
+			}
+			if p.Updating {
+				sawUpdating = true
+				continue
+			}
+			s.mu.Lock()
+			c, _ := s.cachedNeedsLocked()
+			done := !c.n.Never && !s.needsWorkLocked()
+			s.mu.Unlock()
+			if done {
+				if !sawUpdating {
+					t.Fatal("the refresh and analysis never said updating")
+				}
+				return
+			}
+		case <-timeout:
+			t.Fatal("updating never ended")
+		}
 	}
 }

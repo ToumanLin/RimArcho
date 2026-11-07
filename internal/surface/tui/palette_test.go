@@ -15,10 +15,11 @@ func TestPalScore(t *testing.T) {
 		item palItem
 		want int
 	}{
-		{"so", it("自动排序", "sort", ""), 4},                    // the English alias, prefix
-		{"排序", it("自动排序", "sort", ""), 4},                    // the Chinese name's head noun, suffix
-		{"动排", it("自动排序", "sort", ""), 3},                    // substring
-		{"srt", it("自动排序", "sort", ""), 2},                   // subsequence
+		{"so", it("自动排序", "sort", ""), 6},                    // the English alias, prefix
+		{"排序", it("自动排序", "sort", ""), 6},                    // the Chinese name's head noun, suffix
+		{"动排", it("自动排序", "sort", ""), 5},                    // substring
+		{"srt", it("自动排序", "sort", ""), 3},                   // subsequence
+		{"sotr", it("自动排序", "sort", ""), 2},                  // a typo
 		{"brrainz", it("Harmony", "", "brrainz.harmony"), 1}, // description only
 		{"xyz", it("Harmony", "", "brrainz.harmony"), 0},
 	} {

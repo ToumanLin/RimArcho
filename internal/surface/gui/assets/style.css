@@ -997,7 +997,9 @@ svg.i.fill { fill: currentColor; }
 .hm-go.arrived .bottom { animation-delay: .06s; }
 .hm-go.arrived::before { content: ""; position: absolute; inset: 0; background: var(--accent-fg); opacity: 0; animation: hm-flash 400ms var(--ease); pointer-events: none; }
 .hm-pick.leaving { animation: hm-leave var(--t-exit) var(--ease-in) forwards; }
-.hm-go .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--green); margin-right: 10px; animation: hm-blink 1.4s infinite; }
+/* the running dot blinks three times when the game starts, then holds: an endless blink
+   redraws the window every frame for the whole run (about 5% of a core, 16 §10) */
+.hm-go .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--green); margin-right: 10px; animation: hm-blink 1.4s 3; }
 /* save in the block's lower left, where "N unsaved" was: a button of its own beside ▶ (not
    inside it), drawn like the block's L key so the block stays the page's one colour */
 .hm-launch { position: relative; }
