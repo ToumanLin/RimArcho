@@ -698,7 +698,7 @@ One failed item does not stop a batch, stopping keeps what is done, and retry sk
 | Section | Settings |
 | --- | --- |
 | **about** | Version and **release notes**; **check for updates** / **install update**; **automatically check for updates** (RimArcho, Mods, tools, community data; checks only, never installs); **bugs and suggestions…**; Discord and GitHub |
-| **interface** | Language (follow system, English, 简体中文; changes in place); **day/night theme**; **accent colour**; Workshop descriptions and their images on or off; GPU acceleration (off uses about 20–35 MB less memory; next start); the **start** page background: game art, background Mods or your own images, with dimming, blur, focus point, stars and rotation |
+| **interface** | Language (follow system, English, `简体中文`; changes in place); **day/night theme**; **accent colour**; **Archo animation** (off, still or animated; Archo keeps you company on the start-up screen, in loading cards and in the first-run guide); Workshop descriptions and their images on or off; GPU acceleration (off uses about 20–35 MB less memory; next start); the **start** page background: game art, background Mods or your own images, with dimming, blur, focus point, stars and rotation |
 | **accounts** | SteamCMD and LoversLab sign-in (section 11) |
 | **updates** | **update source**: automatic (Steam Workshop first, then GitHub) or GitHub; **check interval** |
 | **folders** | Every game, Workshop, SteamCMD and extra Mod folder, the lock library, source library, packs, Monitor and downloads: **locate**, **move to…**, add or remove sources (removing keeps the files); clean up or pre-decompile the source library |

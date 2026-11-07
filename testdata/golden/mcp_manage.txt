@@ -20,6 +20,7 @@ settings
   network.proxy: system
   tags.pinned: 框架,美化,服装,种族,武器,建筑,家具,QoL,平衡,剧情,性能,语言包,测试中,待删除
   ui.accent: default
+  ui.archo.motion: live
   ui.gpu: on
   ui.icons: compat
   ui.lang: auto

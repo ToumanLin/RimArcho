@@ -1,4 +1,8 @@
 {
+  "Archo animation": "Archo 动画",
+  "Archo's figure while pages load and in the first-run guide; still uses no GPU": "页面加载和首次使用引导中的 Archo 形象；静态模式不使用 GPU",
+  "still": "静态",
+  "animated": "动态",
   "update source": "更新来源",
   "automatic": "自动",
   "Download RimArcho %s, check it against its SHA-256 and replace the program files, then restart RimArcho. Your data is not changed.": "下载 RimArcho %s，核对 SHA-256 后替换程序文件，然后重启 RimArcho。你的数据不会改动。",

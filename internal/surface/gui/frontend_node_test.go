@@ -9,6 +9,7 @@ import (
 // One node process runs them all; node --test still isolates each file.
 var frontendNodeSuites = []string{
 	"testdata/accent.mjs",
+	"testdata/archo.mjs",
 	"testdata/command-panel.mjs",
 	"testdata/credit.mjs",
 	"testdata/datatables.mjs",

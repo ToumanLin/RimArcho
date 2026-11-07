@@ -10,6 +10,7 @@ import { factText, S, $, el, api, T, Tf, errText, say, cur, slideThumb, keyCaps 
 import { icon, bowMark } from "./icons.js";
 import { statusIcon } from "./icons.js";
 import { bump, shimmer } from "./motion.js";
+import { archoMode, archoWait, tipLine } from "./archo.js";
 import * as pop from "./popups.js";
 import { bgSection } from "./bg.js";
 import { appearanceControl } from "./appearance.js";
@@ -132,7 +133,23 @@ const pageContexts = new Map();
 export function notePageContext(name) { pageContexts.set(name, JSON.stringify([S.board?.env, S.shell?.plan?.id])); }
 let activeRead = null;
 export const pendingPageRead = () => activeRead?.done;
-function settlePageRead() { activeRead?.resolve(); activeRead = null; }
+function settlePageRead() { activeRead?.resolve(); activeRead = null; endLoadingFigure(); }
+// The loading card's Archo and tip (16 §7.1): nothing for 0.21 s, then the figure on the left
+// and a usage tip on the right; both end with the read.
+let loadingFigure = null;
+function endLoadingFigure() { loadingFigure?.(); loadingFigure = null; }
+function loadingCard(label, name) {
+  const card = el("section", "card pad page-loading");
+  if (archoMode() === "off") { card.append(shimmer(label, 6)); return card; }
+  card.classList.add("with-archo");
+  const slot = el("div"), side = el("div", "loading-side"), tip = el("p", "loading-tip");
+  side.append(tip, shimmer(label, 3));
+  card.append(slot, side);
+  // the first-run guide's waits tell what helps a new player
+  const figure = archoWait(slot), stop = tipLine(tip, name === "guide" ? "first" : "any", 210);
+  loadingFigure = () => { figure.end(); stop(); };
+  return card;
+}
 export const pageLoading = () => !!$("#screen .page-loading, #screen .page-read-error");
 // Every page starts navigation before I/O and owns a ticket for its reply. Refreshes
 // keep the visible content; a new page/subview shows a placeholder immediately.
@@ -171,9 +188,7 @@ export function beginPageRead(name, { replace = false, keep = false, label = "lo
     sc.hidden = false;
     sc.innerHTML = "";
     const w = page(name || "plan", "");
-    const card = el("section", "card pad page-loading");
-    card.append(shimmer(T(label), 6));
-    w.append(card); sc.append(w);
+    w.append(loadingCard(T(label), name)); sc.append(w);
   }
   sc.setAttribute("aria-busy", "true");
   syncPageAccessibility();

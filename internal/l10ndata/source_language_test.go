@@ -18,6 +18,8 @@ import (
 var sourceLanguageFiles = map[string]string{
 	"docs/glossary.md":                                       "The bilingual terminology reference.",
 	"README.zh-CN.md":                                        "The Chinese README.",
+	"docs/user-guide.zh-CN.md":                               "The Chinese player user guide.",
+	"docs/highlights.zh-CN.md":                               "The Chinese release highlights for players.",
 	"ToDo.md":                                                "The maintainer's working list; notes are written in whichever language is quicker.",
 	"monitor/About/About.xml":                                "RimWorld does not localize About.xml descriptions; keep the bilingual description.",
 	"internal/app/filelists_golden_test.go":                  "Exercises Chinese interface output, legacy Chinese data, or CJK names and paths.",

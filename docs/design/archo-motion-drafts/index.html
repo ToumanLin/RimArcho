@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Archo motion drafts</title>
+<script src="/app/js/theme.js"></script>
+<link rel="stylesheet" href="/app/style.css">
+<style>
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; flex-direction: column; background: var(--bg); color: var(--fg); font-size: 13px; }
+
+  /* review bar: outside the product canvas */
+  .rv { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; padding: 8px 14px; background: var(--card-2, var(--card)); border-bottom: var(--hairline) solid var(--line); font-size: 12px; color: var(--muted); }
+  .rv .dx-grp { display: flex; gap: 4px; align-items: center; }
+  .rv .dx-grp > span { margin-right: 4px; }
+  .rv button { height: 24px; padding: 0 9px; border-radius: var(--r-sm); color: var(--ctl-fg); font-size: 12px; }
+  .rv button:hover { background: var(--pill); color: var(--fg); }
+  .rv button.on { background: var(--accent-soft); color: var(--accent-11, var(--accent)); }
+  .rv .perf { margin-left: auto; font: 12px/1.4 "Cascadia Mono", ui-monospace, monospace; color: var(--fg-2); white-space: pre; }
+  .timeline { display: flex; gap: 16px; padding: 6px 14px; font-size: 12px; color: var(--muted); border-bottom: var(--hairline) solid var(--line-2); }
+  .timeline b { color: var(--fg-2); font-weight: 500; }
+  .timeline .now { color: var(--accent-11, var(--accent)); }
+
+  /* a still copy of the product shell */
+  .shell { flex: 1; min-height: 0; display: grid; grid-template-columns: 200px minmax(0, 1fr); }
+  .side { display: flex; flex-direction: column; gap: 2px; padding: 12px 8px; border-right: var(--hairline) solid var(--line-2); }
+  .side .dx-grp { padding: 10px 8px 4px; font-size: 12px; color: var(--faint); }
+  .side .nav-item.on { background: var(--pill); color: var(--fg); }
+  .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .dx-top { height: 40px; display: flex; align-items: center; padding: 0 20px; font-size: 15px; color: var(--fg); }
+  .scr { flex: 1; overflow-y: auto; padding: 0 20px 24px; display: flex; flex-direction: column; gap: var(--card-gap); }
+  .dx-bottom { height: 28px; display: flex; align-items: center; gap: 12px; padding: 0 14px; font-size: 12px; color: var(--muted); border-top: var(--hairline) solid var(--line-2); }
+
+  /* ---- the proposal: Archo in a loading card ---- */
+  .archo-slot { position: relative; width: var(--archo-size); height: var(--archo-size); flex: none; opacity: 0; transform: translateY(4px);
+    transition: opacity var(--t-enter) var(--ease), transform var(--t-enter) var(--ease); pointer-events: none; }
+  .archo-slot.on { opacity: 1; transform: none; }
+  .archo-slot > img, .archo-slot > canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; }
+  .archo-slot > canvas { opacity: 0; transition: opacity var(--t-layout) var(--ease); }
+  .archo-slot.live > canvas { opacity: 1; }
+  .archo-slot.live > img { opacity: 0; transition: opacity var(--t-layout) var(--ease) 80ms; }
+  @media (prefers-reduced-motion: reduce) { .archo-slot { transform: none; } }
+
+  .loading-a { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 28px 14px 8px; }
+  .loading-a .skel { align-self: stretch; }
+    .loading-b { display: flex; gap: 16px; align-items: center; padding: 14px 18px; }
+  .loading-b .skel { flex: 1; padding: 0; }
+
+  .page-real .dx-row { display: flex; gap: 12px; padding: 7px 14px; border-top: var(--hairline) solid var(--line-2); }
+  .page-real .dx-row:first-child { border-top: 0; }
+  .page-real .dx-row .dx-n { color: var(--faint); width: 30px; text-align: right; font-variant-numeric: tabular-nums; }
+  .page-err { padding: 16px 18px; color: var(--red); }
+
+  .task { display: flex; gap: 16px; align-items: center; padding: 14px 18px; }
+  .task .dx-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .task .dx-t { font-weight: 600; }
+  .task .dx-m { font-size: 12px; color: var(--muted); }
+  .prog .bar { height: 6px; border-radius: var(--r-sm); background: var(--pill); overflow: hidden; }
+  .prog .bar i { display: block; height: 100%; background: var(--accent); border-radius: var(--r-sm); transition: width var(--t-layout) var(--ease); }
+  .prog .bar.bad i { background: var(--red); }
+
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: var(--card-gap); }
+  .gcard { display: flex; gap: 12px; padding: 12px 14px; }
+  .gcard img { width: 84px; height: 84px; flex: none; }
+  .gcard img:not([src]) { visibility: hidden; }
+  .gcard .dx-t { font-weight: 600; margin-bottom: 2px; }
+  .gcard .dx-m { font-size: 12px; color: var(--muted); }
+  .gcard .dx-k { margin-top: 6px; font-size: 12px; color: var(--fg-2); }
+  .dx-note { font-size: 12px; color: var(--muted); padding: 2px 4px; }
+</style>
+</head>
+<body>
+<div class="rv">
+  <div class="dx-grp" id="g-scene"><span>scene</span></div>
+  <div class="dx-grp" id="g-mode"><span>Archo</span></div>
+  <div class="dx-grp" id="g-size"><span>size</span></div>
+  <div class="dx-grp" id="g-layout"><span>placement</span></div>
+  <div class="dx-grp" id="g-misc"></div>
+  <div class="perf" id="perf"></div>
+</div>
+<div class="timeline" id="timeline"></div>
+<div class="shell">
+  <aside class="side" id="side"></aside>
+  <div class="main">
+    <div class="dx-top" id="crumb"></div>
+    <div class="scr" id="scr"></div>
+    <div class="dx-bottom"><span id="status"></span></div>
+  </div>
+</div>
+<script type="module" src="drafts.js"></script>
+</body>
+</html>

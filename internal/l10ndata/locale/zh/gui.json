@@ -98,6 +98,8 @@
   "fields": "字段",
   "find the game": "找到游戏",
   "find the game, read the mods once, then pick where your first list comes from": "找到游戏，读一遍 Mod，再选第一个列表从哪里来",
+  "choose RimArcho's folder, find the game, read the mods once, then pick where your first list comes from": "选好托管目录，找到游戏，读一遍 Mod，再选第一个列表从哪里来",
+  "lists and player data, previewed before anything is imported": "列表和玩家数据，导入前先预览",
   "find the install, read its mods once, and it is ready": "找到这份安装，读一遍它的 Mod，就可以用了",
   "fix %d": "修复 %d 个",
   "fix %d and get %d": "修复 %d 个并获取 %d 个",

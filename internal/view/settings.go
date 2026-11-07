@@ -268,6 +268,10 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 		onOff(T("Workshop descriptions"), "workshop.fetch"),
 		onOff(T("images in descriptions"), "workshop.images"),
 		gpu,
+		{Label: T("Archo animation"), Value: cmds.Setting(a, "ui.archo.motion"), Edit: "segments",
+			Choices: []string{"off", "still", "live"}, ChoiceLabels: []string{T("off"), T("still"), T("animated")},
+			Hover: T("Archo's figure while pages load and in the first-run guide; still uses no GPU"),
+			Argv:  []string{"config", "set", "ui.archo.motion", "{}"}},
 	}}, AccountGroup(a), AutomaticGroup(a)}
 
 	// RimArcho's folders, each with relocation controls, then adding a mod folder.
