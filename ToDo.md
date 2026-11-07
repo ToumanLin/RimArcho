@@ -2,7 +2,11 @@
 
 Things to research, not yet decided. Once decided, put them in the specifications (implementation plans in 01 §4); research goes in docs/research/.
 
-## 无法打开数据库的报错是中文的
+## Mod library
+Mod详情, 标签`编辑`的弹窗
+1. 如果标签太多, 底部会被外窗口clip掉, 应该限制y高度, 增加滚动条
+2. 输入和筛选栏表现一致, 基于输入增加/减少下方展示的tag
+3. 下方显示的tag中, 应该顶置当前mod所拥有的tag
 
 ## MCP test&improve
 Baed on benchmark exam on real mod list and error log from corpus research
@@ -28,13 +32,16 @@ Developing would possibly need new tools such as Bash, ilspyCMD, .Net SDK,
 如果要给一般玩家用, 需要让玩家下载这些工具
 
 ## Translation
-Auto translate mod details? Need to think about it.
+Auto translate mod details? Need to think about it. 因为需要OCR. 
 
 ## Save analysis
 
-### 1.1 剩余（10）
+### `游戏存档`中栏技术信息
+中栏技术信息底部的完整Mod列表更改为只展示变化(绿色增加红色删除, 不考虑加载顺序改变), 并且在太长的时候折叠, 允许展开, 对数据库中有的mod增加超链接到Mod库对应mod
 - §1.4–1.5：从存档提取引用的 Def，映射回提供它的 Mod
 - §2 内容目录：Def 类型 → 内容类别的映射（现为草案）
+在中栏中
+### 1.1 剩余（10）
 - §3 未使用的内容（1.1 核心答案）：三组分类、解读、功能型 Mod 的处理，Unplayed 分组下的 Play review 页面
 - §4.3 "上次加载的报错"
 
