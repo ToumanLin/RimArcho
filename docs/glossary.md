@@ -1,6 +1,6 @@
 # Glossary
 
-This glossary keeps recurring terms consistent across RimArcho documentation; quote the existing English UI text when describing a control or page. Chinese is allowed here as an exception, alongside language files and `README.zh-CN.md`. Entries are sorted by Chinese pinyin within each section; the UI column is filled only when its wording or capitalization differs from the documentation term.
+This glossary keeps recurring terms consistent across RimArcho documentation; quote the existing English UI text when describing a control or page. Chinese is allowed here as an exception, alongside language files, `README.zh-CN.md` and the Chinese player documents (`docs/user-guide.zh-CN.md`, `docs/highlights.zh-CN.md`). Entries are sorted by Chinese pinyin within each section; the UI column is filled only when its wording or capitalization differs from the documentation term.
 
 The domain/UI distinction follows [03 §1](specs/03-environments-and-sources.md#1-terms) and [16 §7.2](specs/16-interface/7-visual-design.md#72-interface-wording). Interface translations live in feature JSON files under [internal/l10ndata/locale/](../internal/l10ndata/locale/), selected by locale directory name. [internal/view/text.go](../internal/view/text.go) owns lookup and the English `enText` overrides, which take precedence over English lookup keys.
 
