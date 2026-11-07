@@ -33,8 +33,10 @@ type SavesPage struct {
 
 // SaveColonyRow is one colony: its name and its saves, newest first.
 type SaveColonyRow struct {
-	Key   string    `json:"key"`
-	Name  string    `json:"name"`
+	Key  string `json:"key"`
+	Name string `json:"name"`
+	// Game is the name its saves give it when the player renamed it (12 §4.1).
+	Game  string    `json:"game,omitempty"`
 	Saves []SaveRow `json:"saves"`
 }
 
@@ -56,7 +58,7 @@ func SavesRows(l *app.SaveList) *SavesPage {
 		p.Folders = append(p.Folders, f.Dir)
 	}
 	for _, c := range l.Colonies {
-		row := SaveColonyRow{Key: c.Key, Name: colonyName(c), Saves: []SaveRow{}}
+		row := SaveColonyRow{Key: c.Key, Name: colonyName(c), Game: c.GameName, Saves: []SaveRow{}}
 		for _, s := range c.Saves {
 			r := SaveRow{Ref: s.Ref, Name: s.Name, When: saveWhen(s), Auto: s.Auto}
 			if d, ok := SaveDay(s); ok {
@@ -112,10 +114,14 @@ type SaveDetail struct {
 	Folder string `json:"folder"`
 	Prefix string `json:"prefix,omitempty"` // the RimSaves folder its file name keeps
 	Colony string `json:"colony"`
-	Auto   bool   `json:"auto,omitempty"`
-	Size   string `json:"size"`
-	Bytes  int64  `json:"bytes"`
-	Saved  string `json:"saved"` // the date and time the file was written
+	// ColonyKey names the colony to rename (API.ColonyRename); ColonyGame is the name its
+	// saves give it when the player renamed it (12 §4.1).
+	ColonyKey  string `json:"colonyKey,omitempty"`
+	ColonyGame string `json:"colonyGame,omitempty"`
+	Auto       bool   `json:"auto,omitempty"`
+	Size       string `json:"size"`
+	Bytes      int64  `json:"bytes"`
+	Saved      string `json:"saved"` // the date and time the file was written
 
 	// Where it belongs (12 §4.3): the game it was made in and the environment it runs in,
 	// the list or pack it matched and how.
@@ -125,6 +131,14 @@ type SaveDetail struct {
 	List     string `json:"list,omitempty"`
 	ListID   int64  `json:"listId,omitempty"` // the plan to make current or open
 	Match    string `json:"match,omitempty"`  // how it matched, as a sentence
+
+	// AgainstKind is what Can it load? and the Mod changes check the save against: "list",
+	// "pack" or "" (no list: the installed Mods). The Saves page checks against what the
+	// Launch page applied (16 §2.11), which may not be the save's own list.
+	AgainstKind string `json:"againstKind,omitempty"`
+	// Switch is the save's own game and list or pack when they are not the applied ones:
+	// how it loads with them and Switch and launch (16 §2.11); nil otherwise.
+	Switch *SaveSwitchView `json:"switch,omitempty"`
 
 	// Can it load? (12 §4.3): the verdict, the quick-fix bar's one action and the rows
 	// that need attention. Level: "" loads, warning, error, or writing (no verdict).
@@ -152,6 +166,19 @@ type SaveDetail struct {
 	Play     *SavePlay `json:"play,omitempty"`
 	Reading  bool      `json:"reading,omitempty"`
 	PlayNote string    `json:"playNote,omitempty"`
+}
+
+// SaveSwitchView is the bar's line for the save's own game and list or pack: whether it
+// loads with them (Level as SaveDetail.Level) and what Switch and launch applies (Kind
+// RowPlan with Plan, or RowPack with Pack, in Env) before opening the Launch page.
+type SaveSwitchView struct {
+	Text  string `json:"text"`
+	Level string `json:"level"`
+	Label string `json:"label"`
+	Env   string `json:"env"`
+	Kind  string `json:"kind"`
+	Plan  int64  `json:"plan,omitempty"`
+	Pack  string `json:"pack,omitempty"`
 }
 
 // SaveFixView is one fix as a button: the core's action and target, the label translated,
@@ -228,11 +255,22 @@ type SaveModView struct {
 // SaveDetailOf makes the middle and right cards from a load check; running: a game runs;
 // current: the save's list is its environment's current list.
 func SaveDetailOf(c *app.SaveCheck, running, current bool) *SaveDetail {
-	s := c.Save
+	return SaveDetailAgainst(c, running, current, nil, nil)
+}
+
+// SaveDetailAgainst is SaveDetailOf for a check against what the Launch page applied
+// (16 §2.11): c checks a copy of own (app.SaveAgainstCurrent) whose header facts come from
+// own; ownCheck, when not nil, checks own against its own game and list or pack, which are
+// not the applied ones, and becomes the Switch line. own nil: c.Save is the save itself.
+func SaveDetailAgainst(c *app.SaveCheck, running, current bool, own *app.Save, ownCheck *app.SaveCheck) *SaveDetail {
+	s := c.Save // what it is checked against
+	if own == nil {
+		own = s
+	}
 	d := &SaveDetail{Ref: s.Ref, Name: s.Name, File: s.File, Path: s.Path, Folder: filepath.Dir(s.Path), Prefix: s.Prefix,
 		Auto: s.Auto, Size: SizeText(s.Size), Bytes: s.Size, Issues: []SaveIssueView{}, Mods: []SaveModView{}, Changes: []SaveModView{}}
 	if s.Colony != nil {
-		d.Colony = colonyName(s.Colony)
+		d.Colony, d.ColonyKey, d.ColonyGame = colonyName(s.Colony), s.Colony.Key, s.Colony.GameName
 	}
 	if !s.ModTime.IsZero() {
 		d.Saved = LongDate(s.ModTime) + " " + s.ModTime.Local().Format("15:04")
@@ -240,16 +278,22 @@ func SaveDetailOf(c *app.SaveCheck, running, current bool) *SaveDetail {
 	if s.Head != nil {
 		d.Game = s.Head.GameVersion
 	}
-	if s.Env != nil {
-		d.Env = EnvChip(s.Env.Name, s.Env.GameVersion)
+	if own.Env != nil {
+		d.Env = EnvChip(own.Env.Name, own.Env.GameVersion)
 	}
 	switch {
-	case s.Plan != nil:
-		d.ListKind, d.List, d.ListID = "list", s.Plan.Name, s.Plan.ID
-	case s.Pack != "":
-		d.ListKind, d.List = "pack", s.Pack
+	case own.Plan != nil:
+		d.ListKind, d.List, d.ListID = "list", own.Plan.Name, own.Plan.ID
+	case own.Pack != "":
+		d.ListKind, d.List = "pack", own.Pack
 	}
-	d.Match = matchText(s.Match)
+	d.Match = matchText(own.Match)
+	switch {
+	case s.Plan != nil:
+		d.AgainstKind = "list"
+	case s.Pack != "":
+		d.AgainstKind = "pack"
+	}
 	switch {
 	case running:
 		d.Locked = T("the game is running: rename and recycle wait until it is closed")
@@ -260,12 +304,14 @@ func SaveDetailOf(c *app.SaveCheck, running, current bool) *SaveDetail {
 	gap := unchecked(c)
 	d.Level, d.Verdict = c.Level, verdictText(c, gap)
 	switch {
-	case d.ListKind == "list" && current:
-		d.Against = Tf("against the current list %s", d.List)
-	case d.ListKind == "list":
-		d.Against = Tf("against list %s", d.List)
-	case d.ListKind == "pack":
-		d.Against = Tf("against pack %s", d.List)
+	case ownCheck != nil && s.Env != nil:
+		d.Against = Tf("with the current %s and %s", s.Env.Name, listOf(s))
+	case s.Plan != nil && current:
+		d.Against = Tf("against the current list %s", s.Plan.Name)
+	case s.Plan != nil:
+		d.Against = Tf("against list %s", s.Plan.Name)
+	case s.Pack != "":
+		d.Against = Tf("against pack %s", s.Pack)
 	default:
 		d.Against = T("against the installed Mods")
 	}
@@ -277,7 +323,10 @@ func SaveDetailOf(c *app.SaveCheck, running, current bool) *SaveDetail {
 	}
 	// The bar's one action: Recycle for a file that cannot load; while what the Mods own
 	// could not be checked, a list made from the save and analysed (it indexes the save's
-	// Mods); else Launch or Make a list. Fix and launch is not offered: each row has its fix.
+	// Mods); a save matching no list, Make a list; a save checked against its own list that
+	// loads, Launch, which opens the Launch page (the game starts only there). Fix and
+	// launch is not offered: each row has its fix. Checked against another list, the
+	// Switch line has the action.
 	switch q := c.Quick; {
 	case q != nil && q.Action == app.FixRecycle:
 		v := fixView(*q, s)
@@ -287,23 +336,42 @@ func SaveDetailOf(c *app.SaveCheck, running, current bool) *SaveDetail {
 		v.Action, v.Label = SaveFixAnalyse, T("make a list from this save to analyse its assemblies")
 		v.Command += " && archo analyze --open-plan " + argQuote(s.Colony.Name)
 		d.Quick = &v
-	case q != nil && q.Action != app.FixAll:
-		v := fixView(*q, s)
-		d.Quick = &v
+	case ownCheck != nil:
+	case own.Plan == nil && own.Pack == "":
+		d.Quick = newList
+	case c.Level == "" && d.AgainstKind != "":
+		d.Quick = &SaveFixView{Action: SaveGoLaunch, Label: T("launch"), Command: T("open the Launch page")}
+	}
+	if ownCheck != nil && own.Env != nil && ownCheck.Level != "writing" && (d.Quick == nil || d.Quick.Action != app.FixRecycle) {
+		w := &SaveSwitchView{Level: ownCheck.Level, Label: T("switch and launch"), Env: own.Env.Name, Kind: RowPlan, Pack: own.Pack}
+		if own.Pack != "" {
+			w.Kind = RowPack
+		} else {
+			w.Plan = own.Plan.ID
+		}
+		verdict := T("loads as it is")
+		switch ownCheck.Level {
+		case app.LevelError:
+			verdict = T("will not load cleanly")
+		case app.LevelWarning:
+			verdict = T("content will be lost")
+		}
+		w.Text = Tf("with %s and %s: %s", own.Env.Name, listOf(own), verdict)
+		d.Switch = w
 	}
 	d.Issues = issueViews(c, s)
 	var removed []SaveModView
 	for _, m := range c.Mods {
 		v := SaveModView{Name: m.Name, PackageID: m.PackageID, Missing: m.Instance == "", Moved: m.Moved, Library: m.Library}
-		if !m.InList && d.ListKind != "" {
+		if !m.InList && d.AgainstKind != "" {
 			v.Change = SaveModRemoved
 			removed = append(removed, v)
 		}
 		d.Mods = append(d.Mods, v)
 	}
-	if d.ListKind != "" {
+	if d.AgainstKind != "" {
 		for _, m := range c.ListOnly { // a pack carries its Mods: none is missing
-			d.Changes = append(d.Changes, SaveModView{Name: m.Name, PackageID: m.PackageID, Missing: m.Instance == "" && d.ListKind == "list",
+			d.Changes = append(d.Changes, SaveModView{Name: m.Name, PackageID: m.PackageID, Missing: m.Instance == "" && d.AgainstKind == "list",
 				Library: m.Library, Change: SaveModAdded})
 		}
 		d.Changes = append(d.Changes, removed...)
@@ -320,6 +388,20 @@ const (
 // SaveFixAnalyse is the bar's Make a list from this save, then analyse it (the page's own
 // action: SaveNewList with analyze).
 const SaveFixAnalyse = "new-list-analyse"
+
+// SaveGoLaunch is the bar's Launch: it opens the Launch page, where the game starts.
+const SaveGoLaunch = "go-launch"
+
+// listOf names a save's list or pack: "list X", "pack X" or "no list".
+func listOf(s *app.Save) string {
+	switch {
+	case s.Plan != nil:
+		return Tf("list %s", s.Plan.Name)
+	case s.Pack != "":
+		return Tf("pack %s", s.Pack)
+	}
+	return T("no list")
+}
 
 // unchecked says what Can it load? could not check (12 §4.6): "defs" when the save's Mods
 // are not analysed for the game version, "classes" when their assemblies (or the game's)

@@ -269,6 +269,10 @@ func (a *App) CheckSave(s *Save) (*SaveCheck, error) {
 		c.add(SaveIssue{Kind: IssueNoList, Level: LevelInfo, Fixes: []SaveFix{newList}})
 	}
 	editable := s.Plan != nil
+	fixRef := s.Ref // what saves fix names: the save, and the current list when checked against it
+	if s.Current {
+		fixRef += " --current"
+	}
 	// The Mods with a row of their own. A Mod the list has only as a missing entry (a fix
 	// added it, its download is not scanned yet) is as absent from the game as one the list
 	// lacks.
@@ -306,14 +310,14 @@ func (a *App) CheckSave(s *Save) (*SaveCheck, error) {
 		if editable {
 			switch {
 			case installed:
-				is.Fixes = []SaveFix{{Action: FixEnable, Label: "Enable in the list", Command: "saves fix " + s.Ref + " --mod " + m.PackageID, Target: m.PackageID}}
+				is.Fixes = []SaveFix{{Action: FixEnable, Label: "Enable in the list", Command: "saves fix " + fixRef + " --mod " + m.PackageID, Target: m.PackageID}}
 				fixable++
 			case m.SteamID != "":
 				label := "Subscribe and enable"
 				if m.InList {
 					label = "Subscribe"
 				}
-				is.Fixes = []SaveFix{{Action: FixSubscribe, Label: label, Command: "saves fix " + s.Ref + " --mod " + m.PackageID, Target: m.PackageID}}
+				is.Fixes = []SaveFix{{Action: FixSubscribe, Label: label, Command: "saves fix " + fixRef + " --mod " + m.PackageID, Target: m.PackageID}}
 				fixable++
 			case !m.InList:
 				is.Fixes = []SaveFix{newList}
@@ -327,7 +331,7 @@ func (a *App) CheckSave(s *Save) (*SaveCheck, error) {
 	}
 	if editable && len(c.ListOnly) > 0 {
 		c.add(SaveIssue{Kind: IssueAdded, Level: LevelInfo, Mods: c.ListOnly,
-			Fixes: []SaveFix{{Action: FixDisableAdded, Label: "Disable to match", Command: "saves fix " + s.Ref + " --disable-added"}}})
+			Fixes: []SaveFix{{Action: FixDisableAdded, Label: "Disable to match", Command: "saves fix " + fixRef + " --disable-added"}}})
 	}
 	var moved []SaveMod
 	for _, m := range c.Mods {
@@ -337,7 +341,7 @@ func (a *App) CheckSave(s *Save) (*SaveCheck, error) {
 	}
 	if editable && len(moved) > 0 {
 		c.add(SaveIssue{Kind: IssueReordered, Level: LevelInfo, Mods: moved,
-			Fixes: []SaveFix{{Action: FixOrder, Label: "Use the save's order", Command: "saves fix " + s.Ref + " --order"}}})
+			Fixes: []SaveFix{{Action: FixOrder, Label: "Use the save's order", Command: "saves fix " + fixRef + " --order"}}})
 	}
 
 	for _, is := range c.Issues {
@@ -350,9 +354,9 @@ func (a *App) CheckSave(s *Save) (*SaveCheck, error) {
 		case !hasList:
 			c.Quick = &newList
 		case editable && fixable > 0:
-			c.Quick = &SaveFix{Action: FixAll, Label: "Fix and launch", Command: "saves fix " + s.Ref + " --launch", Target: s.Ref}
+			c.Quick = &SaveFix{Action: FixAll, Label: "Fix and launch", Command: "saves fix " + fixRef + " --launch", Target: s.Ref}
 		case editable && c.Level == "":
-			c.Quick = &SaveFix{Action: FixLaunch, Label: "Launch", Command: "saves fix " + s.Ref + " --launch", Target: s.Ref}
+			c.Quick = &SaveFix{Action: FixLaunch, Label: "Launch", Command: "saves fix " + fixRef + " --launch", Target: s.Ref}
 		}
 	}
 	return c, nil

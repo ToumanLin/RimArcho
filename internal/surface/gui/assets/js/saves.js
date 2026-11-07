@@ -15,8 +15,8 @@ import { icon } from "./icons.js";
 import { shimmer } from "./motion.js";
 import * as pop from "./popups.js";
 import { getChoices } from "./credit.js";
-import * as plans from "./plans.js";
 import { openLibraryInstance } from "./librarylink.js";
+import { applyItem, focusLaunch } from "./home.js";
 
 let ui = null;
 export function initSaves(u) { ui = u; }
@@ -24,8 +24,9 @@ export function initSaves(u) { ui = u; }
 // page: the listing; sel: the selected save's ref; open: the colonies shown open; q: the
 // search (colony and save names); detail: the middle and right cards' data (for
 // detail.ref); ask: the inline confirmation shown (backup or recycle); renaming: the rename
-// field is open; viewing: the rows whose details View opened (by kind).
-const X = { page: null, sel: "", open: new Set(), q: "", detail: null, ask: null, renaming: false, viewing: new Set(),
+// field is open (colRenaming: the colony's, in the right card); viewing: the rows whose
+// details View opened (by kind).
+const X = { page: null, sel: "", open: new Set(), q: "", detail: null, ask: null, renaming: false, colRenaming: false, viewing: new Set(),
   listSeq: 0, detailSeq: 0, busy: false };
 let leftCard = null, midCard = null, rightCard = null, tree = null, input = null, timer = 0, mods = null;
 const waiting = new Map(); // listing request → its resolve
@@ -218,7 +219,7 @@ function focusTree() {
 
 const lc = (s) => String(s || "").toLowerCase();
 function saveMatch(c, s) { return !X.q || lc(c.name).includes(X.q) || lc(s.name).includes(X.q); }
-function colonyMatch(c) { return !X.q || lc(c.name).includes(X.q) || c.saves.some((s) => lc(s.name).includes(X.q)); }
+function colonyMatch(c) { return !X.q || lc(c.name).includes(X.q) || (c.game && lc(c.game).includes(X.q)) || c.saves.some((s) => lc(s.name).includes(X.q)); }
 
 function setQuery(v) {
   X.q = lc(v.trim());
@@ -253,6 +254,7 @@ function drawLeft() {
     const chv = el("span", "chv"); chv.innerHTML = icon.chev;
     row.append(chv, mark(c.name), el("span", "k", String(c.saves.length)));
     row.setAttribute("aria-label", Tf("%s, %d saves", c.name, c.saves.length));
+    if (c.game) row.title = Tf("its saves name it %s", c.game);
     tree.append(row);
     if (!opened) continue;
     const box = el("div", "sv-saves");
@@ -296,7 +298,7 @@ function pick(ref) {
   if (c) X.open.add(c.key);
   if (ref === X.sel) { drawLeft(); return; }
   X.sel = ref;
-  X.ask = null; X.renaming = false; X.viewing = new Set();
+  X.ask = null; X.renaming = false; X.colRenaming = false; X.viewing = new Set();
   drawLeft();
   showDetail(60);
 }
@@ -437,10 +439,23 @@ const GROUPS = [["file", "the file"], ["load", "the last load"], ["game", "game 
 function loadSection(d) {
   const s = el("div", "sv-sect");
   const h = el("h3", "", T("can it load?"));
-  h.append(el("span", "r", d.against || ""));
+  h.append(el("span", "r", d.switch ? "" : d.against || ""));
   s.append(h);
+  // The save's own game and list, when the Launch page applied others: how it loads with
+  // them, and Switch and launch; the bar and the rows below are then the current ones'.
+  if (d.switch) {
+    const w = d.switch;
+    const sw = el("div", "sv-fixbar sv-switch" + levelClass(w.level));
+    sw.setAttribute("role", "group");
+    sw.setAttribute("aria-label", w.text);
+    sw.append(el("span", "t", w.text));
+    const b = fixButton(d, { action: "switch", label: w.label }, true);
+    b.append(el("kbd", "", "↵"));
+    sw.append(b);
+    s.append(sw, el("p", "sv-cur", d.against));
+  }
   // green only when it loads with its list; no list is neither good nor bad
-  const cls = d.level === "error" ? " bad" : d.level === "warning" ? " warn" : d.level === "writing" || !d.listKind ? " busy" : " ok";
+  const cls = d.level === "writing" || (!d.againstKind && !d.level) ? " busy" : levelClass(d.level);
   const bar = el("div", "sv-fixbar" + cls);
   bar.setAttribute("role", "group");
   bar.setAttribute("aria-label", d.verdict);
@@ -461,6 +476,8 @@ function loadSection(d) {
   }
   return s;
 }
+
+function levelClass(level) { return level === "error" ? " bad" : level === "warning" ? " warn" : " ok"; }
 
 function issueRow(d, is) {
   const row = el("div", "sv-iss " + (is.level || ""));
@@ -508,11 +525,11 @@ function detailsBox(x) {
 }
 
 function fixButton(d, f, primary) {
-  const env = { fix: "save-fix", subscribe: "save-fix", enable: "save-fix", mods: "save-fix", "disable-added": "save-fix", order: "save-fix", launch: "launch",
+  const env = { fix: "save-fix", subscribe: "save-fix", enable: "save-fix", mods: "save-fix", "disable-added": "save-fix", order: "save-fix",
     recycle: "recycle", "new-list": "new-plan", "new-list-analyse": "new-plan" }[f.action] || "";
   const b = button(f.label, "", () => runFix(d, f), primary ? "primary small" : "small sv-fix", env);
   b.dataset.key = "fix-" + f.action + "-" + (f.target || "");
-  b.title = f.command;
+  b.title = f.action === "switch" ? T("make this game and list current, then open the Launch page") : f.command;
   if (f.action === "recycle" && d.locked) { b.disabled = true; b.title = d.locked; }
   return b;
 }
@@ -528,13 +545,13 @@ let modOpen = { ref: "", mode: "" }; // mode: "changes" (all of them) or "full"
 
 function modMode(d) { return modOpen.ref === d.ref ? modOpen.mode : ""; }
 function modItems(d, mode) {
-  if (mode === "full" || !d.listKind) return [...(d.mods || []), ...(d.changes || []).filter((m) => m.change === "added")];
+  if (mode === "full" || !d.againstKind) return [...(d.mods || []), ...(d.changes || []).filter((m) => m.change === "added")];
   return d.changes || [];
 }
 function modShown(d) {
   const mode = modMode(d), all = modItems(d, mode);
   if (mode) return all;
-  return d.listKind ? all.slice(0, MOD_FOLD) : [];
+  return d.againstKind ? all.slice(0, MOD_FOLD) : [];
 }
 
 // modSection is the heading, what the changes are against, the rows (mounted as the card
@@ -543,10 +560,10 @@ function modSection(d) {
   const s = el("div", "sv-sect");
   const mode = modMode(d), shown = modShown(d);
   const changes = d.changes || [], mods = d.mods || [];
-  const h = el("h3", "", d.listKind ? T("mod changes") : T("mod list"));
-  h.append(el("span", "r", d.listKind ? d.against : Tf("this save's %d Mods", mods.length)));
+  const h = el("h3", "", d.againstKind ? T("mod changes") : T("mod list"));
+  h.append(el("span", "r", d.againstKind ? d.against : Tf("this save's %d Mods", mods.length)));
   s.append(h);
-  if (d.listKind) {
+  if (d.againstKind) {
     const added = changes.filter((m) => m.change === "added").length;
     if (!changes.length) s.append(el("p", "sv-none", T("the list has the same Mods as this save")));
     else {
@@ -556,9 +573,9 @@ function modSection(d) {
       s.append(counts);
     }
   }
-  const list = el("div", "sv-mods" + (mode === "full" || !d.listKind ? " full" : ""));
+  const list = el("div", "sv-mods" + (mode === "full" || !d.againstKind ? " full" : ""));
   list.setAttribute("role", "list");
-  list.setAttribute("aria-label", mode === "full" || !d.listKind ? T("mod list") : T("mod changes"));
+  list.setAttribute("aria-label", mode === "full" || !d.againstKind ? T("mod list") : T("mod changes"));
   list.style.height = shown.length * ROW + "px";
   s.append(list);
   const folds = el("p", "sv-folds");
@@ -568,12 +585,12 @@ function modSection(d) {
     b.setAttribute("aria-expanded", String(open));
     folds.append(b);
   };
-  if (d.listKind && changes.length > MOD_FOLD && mode !== "full") {
+  if (d.againstKind && changes.length > MOD_FOLD && mode !== "full") {
     if (mode === "changes") fold(T("show fewer"), "", "mod-fold", true);
     else fold(Tf("show all %d changes", changes.length), "changes", "mod-fold", false);
   }
   if (mods.length) {
-    if (mode === "full") fold(d.listKind ? T("show only the changes") : T("show fewer"), "", "mod-full", true);
+    if (mode === "full") fold(d.againstKind ? T("show only the changes") : T("show fewer"), "", "mod-full", true);
     else fold(Tf("show the full list (%d Mods)", mods.length), "full", "mod-full", false);
   }
   if (folds.childElementCount) s.append(folds);
@@ -648,8 +665,23 @@ function drawRight(keep) {
   b.setAttribute("aria-label", T("the playthrough"));
   const head = el("div", "sv-head");
   const row = el("div", "sv-row1");
-  row.append(anum(rightCard), el("h2", "sv-name", d.colony || ""));
+  row.append(anum(rightCard));
+  if (X.colRenaming && d.colonyKey) row.append(colonyField(d));
+  else {
+    // the colony's name in RimArcho (12 §4.1): double-click or Rename names it; the
+    // name its saves give it stays on hover
+    const h = el("h2", "sv-name", d.colony || "");
+    if (d.colonyGame) h.title = Tf("its saves name it %s", d.colonyGame);
+    if (d.colonyKey) h.ondblclick = () => startColonyRename();
+    row.append(h);
+  }
   if (p) row.append(el("span", "muted", [p.day, p.date].filter(Boolean).join("  ")));
+  if (d.colonyKey && !X.colRenaming) {
+    const rn = button(T("rename"), "", () => startColonyRename(), "small sv-colrename");
+    rn.dataset.key = "rename-colony";
+    rn.title = T("name this colony in RimArcho; the save files keep their names");
+    row.append(rn);
+  }
   head.append(row);
   if (p) {
     const kv = el("dl", "sv-kv");
@@ -806,19 +838,19 @@ async function runFix(d, f) {
     case "open-log": return openGameLog(f.target, f.cluster);
     case "new-list": return newList(d, false);
     case "new-list-analyse": return newList(d, true);
-    case "launch": return launch(d);
-    case "fix": return fix(d, [], false, false, true);
-    case "enable": case "subscribe": return fix(d, [f.target], false, false, false);
-    case "mods": return fix(d, f.target.split(" "), false, false, false); // a folded row: all of its Mods
-    case "disable-added": return fix(d, [], true, false, false);
-    case "order": return fix(d, [], false, true, false);
+    case "go-launch": return goLaunch();
+    case "switch": return switchTo(d.switch);
+    case "enable": case "subscribe": return fix(d, [f.target], false, false);
+    case "mods": return fix(d, f.target.split(" "), false, false); // a folded row: all of its Mods
+    case "disable-added": return fix(d, [], true, false);
+    case "order": return fix(d, [], false, true);
   }
 }
 
-// fix applies the save's fixes to its list (one undo step), then subscribes to the
-// Workshop Mods the fix added, after the usual Steam / SteamCMD choice; with then launch,
-// the list becomes current and launches through the usual launch, with its refusals.
-async function fix(d, mods, disableAdded, order, thenLaunch) {
+// fix applies the save's fixes to the list it is checked against (one undo step), then
+// subscribes to the Workshop Mods the fix added, after the usual Steam / SteamCMD choice.
+// It never launches: the game starts only from the Launch page (16 §2.11).
+async function fix(d, mods, disableAdded, order) {
   if (X.busy) return;
   X.busy = true;
   let r;
@@ -830,25 +862,24 @@ async function fix(d, mods, disableAdded, order, thenLaunch) {
   await ui?.reload?.();
   if (S.screen === "saves") showDetail(0);
   const ids = r.workshopIds || [];
-  // without downloads it launches now; with them the list becomes current once they are
-  // queued, and the player launches when they are in (16 §2.11)
-  const after = async () => {
-    if (!thenLaunch) return;
-    if (!ids.length) { if (await plans.usePlan(r.plan)) await ui.run("launch"); return; }
-    if (await plans.usePlan(r.plan)) say("ok", Tf("%s is current; launch it once the %d Mods are downloaded", d.list, ids.length));
-  };
-  if (!ids.length) return after();
+  if (!ids.length) return;
   pop.choose(Tf("get %d mods", ids.length), getChoices(), async (i) => {
     try { say("ok", await api.Subscribe({ kind: "workshop", url: ids.join(" "), steamcmd: i === 1, batch: true })); }
-    catch (e) { say("fail", errText(e)); return; }
-    await after();
+    catch (e) { say("fail", errText(e)); }
   });
 }
 
-// launch makes the save's list current and launches it through the usual launch.
-async function launch(d) {
-  if (!d.listId) return;
-  if (await plans.usePlan(d.listId)) await ui.run("launch");
+// The game starts only from the Launch page (16 §2.11): Launch opens it with its button
+// focused; Switch and launch applies the save's own game and list or pack there first.
+async function goLaunch() {
+  await ui.go("home");
+  await focusLaunch();
+}
+
+async function switchTo(w) {
+  if (!w) return;
+  await ui.go("home");
+  if (await applyItem({ kind: w.kind, envName: w.env, plan: w.plan || 0, name: w.pack || "" })) await focusLaunch();
 }
 
 // newList makes a list from the save and opens it; with analyse it starts the list's
@@ -967,6 +998,49 @@ function renameField(d) {
   return box;
 }
 
+function startColonyRename() {
+  if (!X.detail?.colonyKey) return;
+  X.colRenaming = true;
+  drawRight(true);
+  const inp = rightCard?.querySelector(".sv-rename input");
+  inp?.focus();
+  inp?.select();
+}
+
+// colonyField names the colony in place: enter or leaving saves, esc cancels, and an empty
+// name gives the colony back its saves' name.
+function colonyField(d) {
+  const box = el("div", "sv-rename");
+  const inp = el("input", "xc-input");
+  inp.value = d.colony || ""; inp.spellcheck = false; inp.maxLength = 80;
+  inp.placeholder = d.colonyGame || "";
+  inp.setAttribute("aria-label", T("rename the colony"));
+  const why = el("div", "plan-why");
+  why.setAttribute("role", "alert");
+  let done = false;
+  const stop = () => { if (done) return; done = true; X.colRenaming = false; drawRight(true); rightCard?.querySelector('[data-key="rename-colony"]')?.focus({ preventScroll: true }); };
+  const commit = async () => {
+    if (done) return;
+    const name = inp.value.trim();
+    if (name === d.colony) return stop();
+    done = true;
+    try {
+      const text = await api.ColonyRename(d.colonyKey, name);
+      X.colRenaming = false;
+      say("ok", text);
+      await reread(d.ref);
+    } catch (e) { done = false; why.textContent = errText(e); inp.focus(); }
+  };
+  inp.onkeydown = (e) => {
+    if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); void commit(); }
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); stop(); }
+    else e.stopPropagation();
+  };
+  inp.onblur = () => { if (!done) void commit(); };
+  box.append(inp, why);
+  return box;
+}
+
 // liveChanged follows the game: a running game locks rename and recycle; when it exits
 // the saves are read again (12 §1.7).
 export function liveChanged(running) {
@@ -985,7 +1059,7 @@ export function key(e) {
   // in the middle and right cards the arrows scroll them, and enter presses the focused button
   const inCards = document.activeElement?.closest?.(".sv-mid, .sv-right");
   if (k === "Enter" && !inCards) {
-    const q = X.detail?.quick;
+    const q = primary(X.detail);
     if (q && !X.detail.loading) { e.preventDefault(); runFix(X.detail, q); return true; }
     return false;
   }
@@ -997,8 +1071,14 @@ export function key(e) {
   return false;
 }
 
+// primary is what enter runs: the Switch line's action, else the bar's.
+function primary(d) {
+  if (!d) return null;
+  return d.switch ? { action: "switch", label: d.switch.label } : d.quick;
+}
+
 export function hintList() {
-  const q = X.detail?.quick;
+  const q = primary(X.detail);
   const out = [{ key: "/", label: T("search") }, { key: "↑↓", label: T("previous / next save") }, { key: "←→", label: T("fold the colony") }];
   if (q) out.push({ key: "enter", label: q.label });
   out.push({ key: "F2", label: T("rename") }, { key: "1–3", label: T("the cards") }, { key: "?", label: T("all keys") });

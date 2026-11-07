@@ -229,5 +229,19 @@
   "first: %s": "第一条：%s",
   "(%d kinds)": "（共 %d 种）",
   "(1 kind)": "（共 1 种）",
-  "open the game log": "打开游戏日志"
+  "open the game log": "打开游戏日志",
+  "open the Launch page": "打开启动页",
+  "switch and launch": "切换并启动",
+  "loads as it is": "能直接载入",
+  "with %s and %s: %s": "使用 %s 和%s：%s",
+  "with the current %s and %s": "使用当前的 %s 和%s",
+  "no list": "没有列表",
+  "make this game and list current, then open the Launch page": "把这个游戏和列表设为当前，然后打开启动页",
+  "%s is not on the Launch page": "启动页上没有 %s",
+  "its saves name it %s": "存档里的名字：%s",
+  "name this colony in RimArcho; the save files keep their names": "在 RimArcho 里给这个殖民地起名；存档文件名不变",
+  "rename the colony": "重命名殖民地",
+  "that colony is gone; the list is read again": "这个殖民地已不在了，正在重新读取列表",
+  "%s has its saves' name again": "%s 已恢复存档里的名字",
+  "renamed colony %s to %s": "已把殖民地 %s 改名为 %s"
 }

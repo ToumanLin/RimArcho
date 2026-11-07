@@ -166,6 +166,7 @@ Evaluate in order:
 3. Otherwise, group by file name after removing trailing numbers and separators. An autosave (`Autosave-<n>`) names no colony: it joins the colony in the same folder whose save has the same Mod list and is nearest in time, else an "Autosaves" group. Regroup when L1 facts arrive.
 
 - Name a colony after its RimSaves folder, else the player faction, else the world. Order colonies by their latest save, and saves newest first.
+- **The player's name.** The player may rename a colony in RimArcho (`App.RenameColony`, `saves rename-colony`, 16 §2.11): the name is stored by the colony's key (`colony_name`, schema 33) and shown instead of the saves' name, which stays beside it (`Colony.GameName`) and still finds the colony. A colony grouped by world identity also takes a name set while its saves were grouped by file name (before their full read). An empty name, or the saves' own, clears it. Save files, the faction and the world keep their names.
 - Saves in a pack's folder belong to that pack (§4.2 rule 1). Colonies whose latest save matches no list form a separate "matches no list" group.
 
 ### 4.2 Matching a plan
@@ -183,7 +184,7 @@ Approximate matching for rule 3 (an enabled set differing by one or two entries)
 
 **Where it belongs**: game version and environment, the matched list or pack with the rule that matched it, and the location (folder and file).
 
-**Can it load?** compares the save with the matched list as it is now and lists only what needs attention. Passed checks are not listed. `app.CheckSave` implements every row: the rows needing only the head (cut off, Mods, order, game version, no list) always, those needing the full read (malformed XML, classes, what a Mod owns) when the save's L1 facts are cached (§1.7; `CheckSave` never reads a save in full), and the last load's errors and warnings when a game log's report is stored (below). Without the full read, the rows and levels are those of the head alone.
+**Can it load?** compares the save with the matched list as it is now and lists only what needs attention. The Saves page checks it against what the Launch page applied instead, when that is another game, list or pack (16 §2.11; `App.SaveAgainstCurrent`, `SameTarget`); `saves show --current` and `saves fix --current` do so against the current game's current list, and the fix commands they print keep `--current`. Passed checks are not listed. `app.CheckSave` implements every row: the rows needing only the head (cut off, Mods, order, game version, no list) always, those needing the full read (malformed XML, classes, what a Mod owns) when the save's L1 facts are cached (§1.7; `CheckSave` never reads a save in full), and the last load's errors and warnings when a game log's report is stored (below). Without the full read, the rows and levels are those of the head alone.
 
 | Item | Level | Consequence shown | Fix |
 | --- | --- | --- | --- |

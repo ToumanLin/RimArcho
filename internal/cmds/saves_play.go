@@ -284,7 +284,7 @@ func addPlay(root *render.Node, s *app.Save, f *savefile.Facts, prev *playPrev, 
 			n.KV("events", line)
 		}
 		if len(f.Colonists) > 0 || len(f.Events) > 0 {
-			n.Add("(every colonist and event: archo saves show " + s.Ref + " --play)")
+			n.Add("(every colonist and event: archo saves show " + showRef(s) + " --play)")
 		}
 		return
 	}
@@ -296,7 +296,7 @@ func addPlay(root *render.Node, s *app.Save, f *savefile.Facts, prev *playPrev, 
 		}
 		n.KV("research", fmt.Sprintf("%s now; %s with progress", line, render.Plural(len(r.Progress), "project")))
 	}
-	expand := "archo saves show " + s.Ref + " --play --all"
+	expand := "archo saves show " + showRef(s) + " --play --all"
 	cn := n.KV("colonists", peopleText(f, now))
 	var was map[string]savefile.Pawn
 	if prev != nil && prev.facts != nil && prev.facts.Malformed == nil {

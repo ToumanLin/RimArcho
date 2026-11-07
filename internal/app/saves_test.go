@@ -385,3 +385,63 @@ func TestSaveListDifferences(t *testing.T) {
 		t.Fatalf("Tundra 3: %q", ch)
 	}
 }
+
+// A colony renamed in RimArcho (12 §4.1): the listing shows the player's name, keeps the
+// saves' name beside it, finds the colony by either, and an empty name gives the saves'
+// name back. The save files are not touched.
+func TestRenameColony(t *testing.T) {
+	t.Parallel()
+	e := savesFixture(t)
+	colony := func(ref string) *app.Colony {
+		t.Helper()
+		l, err := e.App.ListSaves()
+		if err != nil {
+			t.Fatal(err)
+		}
+		c, err := l.FindColony(ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+	out := e.MustRun("saves", "rename-colony", "Tundra", "North Base")
+	if !strings.Contains(out, "renamed colony Tundra → North Base") {
+		t.Fatalf("rename: %s", out)
+	}
+	c := colony("north base")
+	if c.Name != "North Base" || c.GameName != "Tundra" || len(c.Saves) != 3 || colony("Tundra") != nil && colony("Tundra").Key != c.Key {
+		t.Fatalf("renamed: %+v", c)
+	}
+	if _, err := os.Stat(c.Latest().Path); err != nil {
+		t.Fatalf("the save file moved: %v", err)
+	}
+	e.MustRun("saves", "rename-colony", "North Base")
+	if c = colony("Tundra"); c.Name != "Tundra" || c.GameName != "" {
+		t.Fatalf("reset: %+v", c)
+	}
+	if err := e.App.RenameColony(c, strings.Repeat("x", app.ColonyNameMax+1)); err == nil {
+		t.Fatal("a name past the limit")
+	}
+}
+
+// saves show and fix --current check and fix against the current game's current list
+// instead of the list the save matched (12 §4.3); their commands keep --current.
+func TestSavesAgainstCurrentList(t *testing.T) {
+	t.Parallel()
+	e := savesFixture(t)
+	e.MustRun("plan", "new", "other", "--from", "current")
+	e.MustRun("plan", "use", "other")
+	e.MustRun("disable", "pkg:tester.beta")
+	out := e.MustRun("saves", "show", "Tundra", "--current")
+	if !strings.Contains(out, "checked against: the current list plan:other of env:main (--current)") ||
+		!strings.Contains(out, "saves fix sv:") || !strings.Contains(out, "--current") || !strings.Contains(out, "list: plan:default") {
+		t.Fatalf("show --current:\n%s", out)
+	}
+	if out := e.MustRun("saves", "show", "Tundra"); strings.Contains(out, "--current") || strings.Contains(out, "checked against") {
+		t.Fatalf("show without --current:\n%s", out)
+	}
+	out = e.MustRun("saves", "fix", "Tundra", "--current", "--dry-run")
+	if !strings.Contains(out, "plan:other") {
+		t.Fatalf("fix --current:\n%s", out)
+	}
+}

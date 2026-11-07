@@ -125,11 +125,11 @@ func TestGameAssemblyReplacedAndDeleted(t *testing.T) {
 	}
 }
 
-// The steps from 29 (game types 29 → 30, save cache 30 → 31, tag notes 31 → 32) create the same tables as schema.sql.
+// The steps from 29 (game types 29 → 30, save cache 30 → 31, tag notes 31 → 32, colony names 32 → 33) create the same tables as schema.sql.
 func TestUpgradeGameTypes(t *testing.T) {
 	s, path := openTemp(t)
 	want := gameTypeDDL(t, s.DB)
-	for _, q := range []string{`DROP TABLE game_type`, `DROP TABLE game_assembly`, `DROP TABLE save_cache`, `DROP TABLE tag_note`, `UPDATE meta SET value='29' WHERE key='schema_version'`} {
+	for _, q := range []string{`DROP TABLE game_type`, `DROP TABLE game_assembly`, `DROP TABLE save_cache`, `DROP TABLE tag_note`, `DROP TABLE colony_name`, `UPDATE meta SET value='29' WHERE key='schema_version'`} {
 		if _, err := s.DB.Exec(q); err != nil {
 			t.Fatal(err)
 		}
@@ -156,7 +156,7 @@ func TestUpgradeGameTypes(t *testing.T) {
 
 func gameTypeDDL(t *testing.T, db *sql.DB) string {
 	t.Helper()
-	rows, err := db.Query(`SELECT name, sql FROM sqlite_master WHERE tbl_name IN ('game_assembly','game_type','save_cache','tag_note') AND sql IS NOT NULL ORDER BY name`)
+	rows, err := db.Query(`SELECT name, sql FROM sqlite_master WHERE tbl_name IN ('game_assembly','game_type','save_cache','tag_note','colony_name') AND sql IS NOT NULL ORDER BY name`)
 	if err != nil {
 		t.Fatal(err)
 	}

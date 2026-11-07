@@ -452,6 +452,17 @@ func FeaturedValue(envName, pack string, plan int64) string {
 	return envName + "\x1f" + pack + "\x1f" + strconv.FormatInt(plan, 10)
 }
 
+// AppliedPack is the pack the Launch page applied in envName, from FeaturedKey's setting:
+// "" when the setting names another game, or the current plan changed since (a plan is
+// applied then).
+func AppliedPack(setting, envName string, plan int64) string {
+	f := strings.Split(setting, "\x1f")
+	if len(f) == 3 && f[0] == envName && f[2] == strconv.FormatInt(plan, 10) {
+		return f[1]
+	}
+	return ""
+}
+
 // PickFeatured sets h.Featured: the applied pack when it is still valid, else the
 // current environment's current plan.
 func PickFeatured(h *Home, setting, envName string, plan int64) {

@@ -112,7 +112,7 @@ func TestSaveDetail(t *testing.T) {
 
 	// loads as it is: green, Launch, nothing listed
 	d := detail("Tundra", false)
-	if d.Level != "" || d.Verdict != "loads with default as it is" || d.Quick == nil || d.Quick.Action != app.FixLaunch || d.Quick.Label != "launch" || len(d.Issues) != 0 {
+	if d.Level != "" || d.Verdict != "loads with default as it is" || d.Quick == nil || d.Quick.Action != view.SaveGoLaunch || d.Quick.Label != "launch" || len(d.Issues) != 0 {
 		t.Fatalf("same Mods: %+v %v", d, rows(d))
 	}
 	if d.ListKind != "list" || d.List != "default" || d.ListID == 0 || d.Match != "the same Mods as a version of this list" || d.Game != "1.6.4633 rev1261" || d.Env == "" {
@@ -230,6 +230,65 @@ func TestSaveDetailFoldsFixes(t *testing.T) {
 	if len(gone) != 1 || len(gone[0].Fixes) != 1 || gone[0].Fixes[0].Action != "mods" || gone[0].Fixes[0].Label != "subscribe and enable these" ||
 		gone[0].Fixes[0].Target != "more.m0 more.m1 more.m2 more.m3 more.m4 more.m5 more.m6" {
 		t.Fatalf("one row, one fix: %+v", gone)
+	}
+}
+
+// Checked against the applied list when the save's own list is another one (16 §2.11):
+// the bar's Switch line says how it loads with its own game and list; the rows, the Mod
+// changes and their fix commands (--current) are against the current list.
+func TestSaveDetailAgainstCurrent(t *testing.T) {
+	t.Parallel()
+	e := savesEnv(t)
+	e.MustRun("plan", "new", "other", "--from", "current")
+	e.MustRun("plan", "use", "other")
+	e.MustRun("disable", "pkg:tester.beta")
+	s, _, err := e.App.FindSave("Tundra")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cur, err := e.App.SaveAgainstCurrent(s, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if app.SameTarget(s, cur) || cur.Plan == nil || cur.Plan.Name != "other" {
+		t.Fatalf("current target: %+v", cur.Plan)
+	}
+	c, err := e.App.CheckSave(cur)
+	if err != nil {
+		t.Fatal(err)
+	}
+	own, err := e.App.CheckSave(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := view.SaveDetailAgainst(c, false, true, s, own)
+	if d.List != "default" || d.AgainstKind != "list" || d.Against != "with the current main and list other" {
+		t.Fatalf("where it belongs and what it is checked against: %q %q %q", d.List, d.AgainstKind, d.Against)
+	}
+	if w := d.Switch; w == nil || w.Text != "with main and list default: loads as it is" || w.Kind != view.RowPlan || w.Plan != s.Plan.ID || w.Env != "main" || w.Level != "" {
+		t.Fatalf("switch line: %+v", d.Switch)
+	}
+	if d.Quick != nil {
+		t.Fatalf("the switch line has the action: %+v", d.Quick)
+	}
+	if len(d.Changes) != 1 || d.Changes[0].PackageID != "tester.beta" || d.Changes[0].Change != view.SaveModRemoved {
+		t.Fatalf("changes against the current list: %+v", d.Changes)
+	}
+	fixed := false
+	for _, is := range d.Issues {
+		for _, f := range is.Fixes {
+			if f.Action == app.FixEnable {
+				fixed = strings.Contains(f.Command, "--current")
+			}
+		}
+	}
+	if !fixed {
+		t.Fatalf("enable fix names the current list: %+v", d.Issues)
+	}
+	// the same list: no switch line, Launch opens the Launch page
+	e.MustRun("plan", "use", "default")
+	if cur, err = e.App.SaveAgainstCurrent(s, ""); err != nil || !app.SameTarget(s, cur) {
+		t.Fatalf("same target: %v", err)
 	}
 }
 

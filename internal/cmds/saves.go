@@ -20,14 +20,17 @@ func init() {
 			{Name: "attention", Help: "only saves with warnings or errors"}, {Name: "all", Help: "no truncation"}}, Run: savesList})
 	register(&Command{Name: "saves show", Args: "<save>", Summary: "one save: where it belongs, can it load (each issue with its fix), how its Mods differ from the list, the playthrough", MinArgs: 1, MaxArgs: 1,
 		Flags: []Flag{{Name: "mods", Help: "the save's whole Mod list"}, {Name: "play", Help: "the whole playthrough: every colonist, event and stat"},
+			{Name: "current", Help: "check against the current game's current list instead of the list the save matched"},
 			{Name: "all", Help: "no truncation"}}, Run: savesShow})
 	register(&Command{Name: "saves fix", Args: "<save>", Summary: "the save's Mod fixes as one undoable edit of its list, then Workshop subscriptions; --launch starts it", MinArgs: 1, MaxArgs: 1,
 		Flags: []Flag{{Name: "mod", Value: "<packageId>", Multi: true, Help: "only this Mod's fix"}, {Name: "disable-added", Help: "also disable the list's Mods the save lacks"},
 			{Name: "order", Help: "put the Mods both have in the save's order"}, {Name: "launch", Help: "then save the list to the game and start it (not while subscriptions download)"},
+			{Name: "current", Help: "fix the current game's current list instead of the list the save matched"},
 			{Name: "dry-run", Help: "show what would change; change nothing"}}, Run: savesFix})
 	register(&Command{Name: "saves index", Args: "[<save…>]", Summary: "read new and changed saves in full into the cache, the named ones first (the Saves page runs it as a child process)", MaxArgs: -1,
 		Flags: []Flag{{Name: "only", Help: "only the named saves"}, {Name: "progress", Help: "a progress line per save on stderr"}}, Run: savesIndex})
 	register(&Command{Name: "saves rename", Args: "<save> <name>", Summary: "rename a save in its folder (keeps a RimSaves folder; refused while the game runs or when the name exists)", MinArgs: 2, MaxArgs: 2, Run: savesRename})
+	register(&Command{Name: "saves rename-colony", Args: "<colony|save> [<name>]", Summary: "name a colony in RimArcho (without a name: back to its saves' name; save files and the game keep theirs)", MinArgs: 1, MaxArgs: 2, Run: savesRenameColony})
 	register(&Command{Name: "saves copy", Args: "<save>", Summary: "copy a save beside itself as <name> (copy), never overwriting", MinArgs: 1, MaxArgs: 1, Run: savesCopy})
 	yes := []Flag{{Name: "yes", Help: "do it (without it: only show the files and sizes)"}}
 	register(&Command{Name: "saves backup", Args: "<save…>", Summary: "copy saves into RimArcho's backups folder (confirm with --yes)", MinArgs: 1, MaxArgs: -1, Flags: yes, Run: savesBackup})
@@ -505,6 +508,12 @@ func savesShow(c *Ctx, a *Args) (*render.Doc, error) {
 			}
 		}
 	}
+	own := s // where it belongs; with --current s is checked against the current list
+	if a.Bool("current") {
+		if s, err = c.App.SaveAgainstCurrent(s, ""); err != nil {
+			return nil, err
+		}
+	}
 	chk, err := c.App.CheckSave(s)
 	if err != nil {
 		return nil, err
@@ -534,7 +543,14 @@ func savesShow(c *Ctx, a *Args) (*render.Doc, error) {
 	} else if s.Env != nil {
 		root.KV("game", "env:"+s.Env.Name+" runs "+versionText(s.Env.GameVersion))
 	}
-	root.KV("list", matchText(s))
+	root.KV("list", matchText(own))
+	if s.Current {
+		against := "no current list"
+		if s.Plan != nil {
+			against = "the current list " + app.PlanRef(s.Plan)
+		}
+		root.KV("checked against", against+" of env:"+s.Env.Name+" (--current)")
+	}
 	root.KV("file", s.Path)
 	root.KV("saved", saveTime(c, s)+", "+render.Size(s.Size))
 	root.KV("read", readText(facts, s, ferr))
@@ -591,7 +607,7 @@ func savesShow(c *Ctx, a *Args) (*render.Doc, error) {
 		if len(chk.Issues) > 0 {
 			line = chk.Verdict() + ": " + render.Plural(len(chk.Issues), "item")
 		}
-		root.KV("can it load", line+" (archo saves show "+s.Ref+")")
+		root.KV("can it load", line+" (archo saves show "+showRef(s)+")")
 	case len(chk.Issues) == 0:
 		root.KV("can it load", "yes, with the list as it is now")
 	default:
@@ -611,7 +627,7 @@ func savesShow(c *Ctx, a *Args) (*render.Doc, error) {
 				for _, m := range is.Mods {
 					n.Add(saveModLine(ix, s, m))
 				}
-				n.Truncate(min(limit, 10), "archo saves show "+s.Ref+" --all")
+				n.Truncate(min(limit, 10), "archo saves show "+showRef(s)+" --all")
 			}
 			n.KV("consequence", consequence(is))
 			for _, f := range is.Fixes {
@@ -622,7 +638,7 @@ func savesShow(c *Ctx, a *Args) (*render.Doc, error) {
 				more = 1
 			}
 			if budget > 0 && i > 0 && docLines(d)+nodeLines(n)+more+tail > budget {
-				cn.Addf("… %d more (archo saves show %s --all)", len(chk.Issues)-i, s.Ref)
+				cn.Addf("… %d more (archo saves show %s --all)", len(chk.Issues)-i, showRef(s))
 				break
 			}
 			cn.Children = append(cn.Children, n)
@@ -717,10 +733,19 @@ func addSaveMods(root *render.Node, ix *app.Index, chk *app.SaveCheck, full bool
 		rows = append(rows, []string{"-", saveModLine(ix, s, m), "only in the list"})
 	}
 	n.AddColumns(rows)
-	n.Truncate(limit, "archo saves show "+s.Ref+" --mods --all")
+	n.Truncate(limit, "archo saves show "+showRef(s)+" --mods --all")
 	if !full && len(chk.Mods) > 0 {
-		n.Add("(the whole list: archo saves show " + s.Ref + " --mods)")
+		n.Add("(the whole list: archo saves show " + showRef(s) + " --mods)")
 	}
+}
+
+// showRef is what saves show names to show this check again: the save, with --current
+// when it is checked against the current list.
+func showRef(s *app.Save) string {
+	if s.Current {
+		return s.Ref + " --current"
+	}
+	return s.Ref
 }
 
 // ---- saves fix ----
@@ -729,6 +754,11 @@ func savesFix(c *Ctx, a *Args) (*render.Doc, error) {
 	s, amb, err := findSave(c, a.Pos[0])
 	if err != nil || amb != nil {
 		return amb, err
+	}
+	if a.Bool("current") {
+		if s, err = c.App.SaveAgainstCurrent(s, ""); err != nil {
+			return nil, err
+		}
 	}
 	dry, launch := a.Bool("dry-run"), a.Bool("launch")
 	r, err := c.App.FixSave(s, app.SaveFixOptions{Mods: a.List("mod"), DisableAdded: a.Bool("disable-added"), Order: a.Bool("order")}, dry)
@@ -865,7 +895,7 @@ func savesFix(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 	}
 	if broken != "" && !changed {
-		root.KV("note", "the file itself cannot load ("+broken+"); no list fix changes that (archo saves show "+s.Ref+")")
+		root.KV("note", "the file itself cannot load ("+broken+"); no list fix changes that (archo saves show "+showRef(s)+")")
 	}
 	if launch {
 		switch {
@@ -1005,6 +1035,41 @@ func savesRename(c *Ctx, a *Args) (*render.Doc, error) {
 	d, root := render.New("renamed " + s.Ref + " " + s.Name + " → " + ref + " " + name)
 	root.KV("file", to)
 	d.AddNext("archo saves show " + ref)
+	return d, nil
+}
+
+func savesRenameColony(c *Ctx, a *Args) (*render.Doc, error) {
+	l, err := c.App.ListSaves()
+	if err != nil {
+		return nil, err
+	}
+	col, err := l.FindColony(a.Pos[0])
+	if err != nil {
+		s, serr := l.Find(a.Pos[0]) // a save names its colony
+		if serr != nil || s.Colony == nil {
+			return nil, err
+		}
+		col = s.Colony
+	}
+	name := ""
+	if len(a.Pos) > 1 {
+		name = a.Pos[1]
+	}
+	game := col.GameName
+	if game == "" {
+		game = col.Name
+	}
+	if err := c.App.RenameColony(col, name); err != nil {
+		return nil, err
+	}
+	var d *render.Doc
+	if name = strings.TrimSpace(name); name == "" || name == game {
+		name = game
+		d, _ = render.New("colony " + col.Name + " has its saves' name again: " + game)
+	} else {
+		d, _ = render.New("renamed colony " + col.Name + " → " + name + " (its saves name it " + game + ")")
+	}
+	d.AddNext("archo saves list --colony " + quote(name))
 	return d, nil
 }
 

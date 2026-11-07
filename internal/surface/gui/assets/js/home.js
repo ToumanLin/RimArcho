@@ -174,6 +174,17 @@ export async function focusLaunch() {
 }
 
 // liveChanged redraws the launch button when the game starts or stops.
+// applyItem applies a game's list or pack as clicking its row does (the Saves page's Switch
+// and launch, 16 §2.11); t: {kind, envName, plan, name}. True once it is the applied one.
+export async function applyItem(t) {
+  const r = rows().find((x) => key(x) === key(t));
+  if (!r) { say("fail", Tf("%s is not on the Launch page", t.name || t.envName)); return false; }
+  const f = applied();
+  if (!f || key(f) !== key(r)) await apply(r);
+  const now = applied();
+  return !!now && key(now) === key(r);
+}
+
 export function liveChanged() { if (S.screen === "home" && data) { launching = 0; draw(); } }
 
 function draw() {

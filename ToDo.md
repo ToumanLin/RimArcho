@@ -2,18 +2,6 @@
 
 Things to research, not yet decided. Once decided, put them in the specifications (implementation plans in 01 §4); research goes in docs/research/.
 
-## 开始使用
-1. `托管目录`不要放弹窗, 应该作为界面的一部分
-    `暂不设置` 是什么选择... 不能不设置,
-2. 界面要整齐, 顶上的步骤和下面的div都没对齐, 不如把Archo放到和展示步骤同一行
-3. Archo动态可以上下切割, 不应该左右切割, 不能给玩家理解为Archo是展示在格子里面的
-
-## Mod library
-Mod详情, 标签`编辑`的弹窗
-1. 如果标签太多, 底部会被外窗口clip掉, 应该限制y高度, 增加滚动条
-2. 输入和筛选栏表现一致, 基于输入增加/减少下方展示的tag
-3. 下方显示的tag中, 应该顶置当前mod所拥有的tag
-
 ## MCP test&improve
 Baed on benchmark exam on real mod list and error log from corpus research
 
@@ -42,6 +30,18 @@ Auto translate mod details? Need to think about it. 因为需要OCR.
 
 ## Save analysis
 
+### 允许重命名殖民地
+
+### 我创建殖民地之后, 在启动器中修改
+
+sav25 launch不应该存在, 只允许从启动界面启动
+应改为:
+如果当前设置的env和plan是存档对应的值
+    能直接载入 [启动] -> 去启动页
+如果当前设置的env和plan/pack并不是存档对应的值
+    使用$env$和$plan/pack$能直接载入 [切换并启动] -> 去启动页
+    使用当前的$env$和$plan/pack$, 下面展示变化和影响
+
 ### `游戏存档`中栏技术信息
 中栏技术信息底部的完整Mod列表更改为只展示变化(绿色增加红色删除, 不考虑加载顺序改变), 并且在太长的时候折叠, 允许展开, 对数据库中有的mod增加超链接到Mod库对应mod
 - §1.4–1.5：从存档提取引用的 Def，映射回提供它的 Mod
@@ -53,6 +53,7 @@ Auto translate mod details? Need to think about it. 因为需要OCR.
 
 ### 1.1 剩余（10）
 - §3 未使用的内容（1.1 核心答案）：三组分类、解读、功能型 Mod 的处理，Unplayed 分组下的 Play review 页面
+
 ### Playthrough review (data for the third question)
 
 这个估计还得琢磨琢磨, 目前不满意
@@ -69,6 +70,11 @@ Archo should be a Mod development agent that can take action, not just translate
 
 # Deferred
 
+## mod更新的语义理解
+当前只展示什么文件改了, 未来
+1. 从steam拉changelog, 如果mod本身有changelog, 自动读取, 有的mod会做in-game changelog, 需要研究怎么放
+2. 通过AI接口summary更新内容
+
 ## Research displaying, editing, and managing Mod configuration
 
 Not now: profiles, exports, cleanup.
@@ -82,3 +88,5 @@ Maybe add a UI loading animation--low priority for now
 
 ## 1.6 memory on a real graphics card is inferred
 Calibrated in the VM up to 7.5 GiB texture payload (2026-11-01). Most of the VM's texture RAM is the driver's copy, which the VMware adapter (no dedicated VRAM) commits as process memory; the model now counts it as VRAM and adds back only what does not fit in 90% of the card (research: unity16-texture-memory-breakdown). The 720 list: 36–52 GiB resident without dedicated VRAM, 15–30 GiB with a 24 GiB card. Deferred (2026-11-01): the estimate is good enough for now, so no real-hardware run is planned. If false warnings are ever reported, run 1.6 once on a PC with a discrete GPU and compare Task Manager's "Commit size" and "Dedicated GPU memory" with the estimate (vanilla: about 0.9 GiB commit, 0.66 GiB dedicated).
+
+你可用agent-bridge parallel派发任务给codex 用 gpt-6.1-sol effort high, 可当worker或者sub agent, 让它做代码研究和修改代码, 然后你review, 如果你让codex修改前端, 请务必检查她的前端实现的用户体验(不必要和功能重复的选项, 重复性文字等), 简单直接的任务在这里做

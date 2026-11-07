@@ -66,6 +66,10 @@ type Save struct {
 	Plan  *store.Plan
 	Pack  string
 	Match string
+	// Current: a copy whose Env, Plan and Pack are the current game's list or pack instead
+	// of what it matched (SaveAgainstCurrent; saves show and fix --current), so its fix
+	// commands carry --current.
+	Current bool `json:"-"`
 }
 
 // ListName names what the save matched: the plan's or pack's name ("" for none).
@@ -81,9 +85,12 @@ func (s *Save) ListName() string {
 
 // Colony is the group of saves of one game (12 §4.1).
 type Colony struct {
-	Key   string  `json:"key"`
-	Name  string  `json:"name"`
-	Saves []*Save // newest first
+	Key  string `json:"key"`
+	Name string `json:"name"`
+	// GameName is the name its saves give it (RimSaves folder, faction, world or file name)
+	// when the player renamed the colony in RimArcho (Name); "" when not renamed.
+	GameName string  `json:"gameName,omitempty"`
+	Saves    []*Save // newest first
 	// By: how the saves were grouped: "rimsaves" (folder prefix), "world" (the full
 	// read's world identity) or "name" (file name).
 	By string `json:"by"`
@@ -198,7 +205,71 @@ func (a *App) ListSaves() (*SaveList, error) {
 		m.match(s)
 	}
 	l.Colonies = groupColonies(saves)
+	if err := a.nameColonies(l.Colonies); err != nil {
+		return nil, err
+	}
 	return l, nil
+}
+
+// nameColonies gives the colonies the names the player set (12 §4.1). A colony grouped by
+// world identity also takes a name set while its saves were grouped by file name, before
+// their full read.
+func (a *App) nameColonies(cols []*Colony) error {
+	names, err := a.Store.ColonyNames()
+	if err != nil || len(names) == 0 {
+		return err
+	}
+	for _, c := range cols {
+		n, ok := names[c.Key]
+		for i := 0; !ok && c.By == "world" && i < len(c.Saves); i++ {
+			n, ok = names[colonyNameKey(c.Saves[i])]
+		}
+		if ok && n != c.Name {
+			c.GameName, c.Name = c.Name, n
+		}
+	}
+	return nil
+}
+
+// RenameColony names a colony in RimArcho (12 §4.1); "" gives it back its saves' name.
+// The save files and the game keep their names.
+func (a *App) RenameColony(c *Colony, name string) error {
+	name = strings.TrimSpace(name)
+	if len([]rune(name)) > ColonyNameMax {
+		return fmt.Errorf("a colony name has at most %d characters", ColonyNameMax)
+	}
+	if name == c.GameName || c.GameName == "" && name == c.Name {
+		name = ""
+	}
+	return a.Store.SetColonyName(c.Key, name)
+}
+
+// ColonyNameMax is the longest colony name, in characters.
+const ColonyNameMax = 80
+
+// FindColony resolves a colony by its key or name (the player's name or its saves'),
+// case ignored; several colonies of that name are an error naming their latest saves.
+func (l *SaveList) FindColony(ref string) (*Colony, error) {
+	var found []*Colony
+	for _, c := range l.Colonies {
+		if c.Key == ref {
+			return c, nil
+		}
+		if strings.EqualFold(c.Name, ref) || c.GameName != "" && strings.EqualFold(c.GameName, ref) {
+			found = append(found, c)
+		}
+	}
+	switch len(found) {
+	case 0:
+		return nil, fmt.Errorf("no colony named %q (archo saves list)", ref)
+	case 1:
+		return found[0], nil
+	}
+	var refs []string
+	for _, c := range found {
+		refs = append(refs, c.Latest().Ref)
+	}
+	return nil, fmt.Errorf("%d colonies are named %q; name one by a save's colony key or rename from a save (latest saves: %s)", len(found), ref, strings.Join(refs, ", "))
 }
 
 // FindSave resolves a save reference (13 §2): sv:<hex>, a full path, a file name, or
@@ -376,7 +447,7 @@ func groupColonies(saves []*Save) []*Colony {
 		s.Colony = c
 	}
 	folderKey := func(s *Save) string { return env.PathKey(s.Folder.Dir) }
-	nameKey := func(s *Save) string { return folderKey(s) + "|name:" + strings.ToLower(colonyBaseName(s.Name)) }
+	nameKey := colonyNameKey
 	var autos, named []*Save
 	worldByName := map[string]*Colony{} // file-name key → the one world colony with saves of that name
 	for _, s := range saves {
@@ -441,6 +512,11 @@ func groupColonies(saves []*Save) []*Colony {
 	}
 	sort.SliceStable(cols, func(i, j int) bool { return cols[i].Latest().ModTime.After(cols[j].Latest().ModTime) })
 	return cols
+}
+
+// colonyNameKey is the key of the colony a save forms by its file name (12 §4.1 rule 3).
+func colonyNameKey(s *Save) string {
+	return env.PathKey(s.Folder.Dir) + "|name:" + strings.ToLower(colonyBaseName(s.Name))
 }
 
 func sameMods(a, b *Save) bool {
@@ -571,6 +647,40 @@ func (m *saveMatcher) envFor(f *SaveFolder, launchEnv string) *env.Environment {
 
 // inSaveList runs fn with the save's environment and list as the App's current ones, then
 // restores them (as envlinks does for one environment).
+// SaveAgainstCurrent is a copy of s to check or fix against the current game's current
+// list, or, with pack, that pack of the current game (12 §4.3): the Saves page checks
+// a save against what the Launch page applied, whatever the save matched.
+func (a *App) SaveAgainstCurrent(s *Save, pack string) (*Save, error) {
+	e, err := a.Env()
+	if err != nil {
+		return nil, err
+	}
+	if e == nil {
+		return nil, ErrNoEnv
+	}
+	c := *s
+	c.Env, c.Plan, c.Pack, c.Current = e, nil, pack, true
+	if pack == "" {
+		if id := a.Store.CurrentPlanID(e.ID); id != 0 {
+			if c.Plan, err = a.Store.PlanByID(id); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return &c, nil
+}
+
+// SameTarget: a and b are checked against the same game and list or pack.
+func SameTarget(a, b *Save) bool {
+	if a.Env == nil || b.Env == nil || a.Env.ID != b.Env.ID || a.Pack != b.Pack {
+		return false
+	}
+	if a.Pack != "" {
+		return true
+	}
+	return a.Plan != nil && b.Plan != nil && a.Plan.ID == b.Plan.ID
+}
+
 func (a *App) inSaveList(s *Save, fn func() error) error {
 	oldEnv, oldPlan, oldName := a.EnvName, a.OpenPlan, a.PlanName
 	defer func() { a.EnvName, a.OpenPlan, a.PlanName = oldEnv, oldPlan, oldName }()

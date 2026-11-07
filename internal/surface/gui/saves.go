@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -186,15 +187,54 @@ func (s *API) SaveDetail(ref string) (*view.SaveDetail, error) {
 	if err != nil {
 		return nil, err
 	}
-	c, err := r.CheckSave(sv)
+	target, err := appliedTarget(r, sv)
 	if err != nil {
 		return nil, err
 	}
+	c, err := r.CheckSave(target)
+	if err != nil {
+		return nil, err
+	}
+	// The save's own game and list or pack, when the applied ones are others: the bar's
+	// Switch and launch line says how it loads with them.
+	var own *app.SaveCheck
+	if target != sv && (sv.Plan != nil || sv.Pack != "") {
+		if own, err = r.CheckSave(sv); err != nil {
+			return nil, err
+		}
+	}
 	g, _ := r.RunningGame()
-	current := sv.Plan != nil && sv.Env != nil && r.Store.CurrentPlanID(sv.Env.ID) == sv.Plan.ID
-	d := view.SaveDetailOf(c, g != nil, current)
+	current := target.Plan != nil && target.Env != nil && r.Store.CurrentPlanID(target.Env.ID) == target.Plan.ID
+	d := view.SaveDetailAgainst(c, g != nil, current, sv, own)
 	s.savePlay(r, sv, d)
 	return d, nil
+}
+
+// appliedTarget is what the Saves page checks a save against (16 §2.11): what the Launch
+// page applied, the current game's current list or its applied pack. The save itself when
+// that is its own game and list or pack, else a copy (app.SaveAgainstCurrent).
+func appliedTarget(r *app.App, sv *app.Save) (*app.Save, error) {
+	e, err := r.Env()
+	if err != nil {
+		return nil, err
+	}
+	if e == nil {
+		return nil, app.ErrNoEnv
+	}
+	pack := view.AppliedPack(r.Store.Meta(view.FeaturedKey), e.Name, r.Store.CurrentPlanID(e.ID))
+	if pack != "" {
+		if _, err := r.ReadPack(pack); err != nil {
+			pack = "" // removed since: the current list is what launches
+		}
+	}
+	cur, err := r.SaveAgainstCurrent(sv, pack)
+	if err != nil {
+		return nil, err
+	}
+	if app.SameTarget(sv, cur) {
+		return sv, nil
+	}
+	return cur, nil
 }
 
 // SaveFixReply is what a fix did: the status sentence, whether u undoes it, and the
@@ -214,6 +254,10 @@ type SaveFixReply struct {
 func (s *API) SaveFix(ref string, mods []string, disableAdded, order bool) (*SaveFixReply, error) {
 	sv, err := s.findSave(ref)
 	if err != nil {
+		return nil, err
+	}
+	// the list the page checked the save against: the applied one (SaveDetail)
+	if sv, err = appliedTarget(s.a, sv); err != nil {
 		return nil, err
 	}
 	if sv.Plan == nil {
@@ -269,6 +313,40 @@ func (s *API) SaveRename(ref, name string) (*SaveFileReply, error) {
 	}
 	_, shown := app.SplitSaveName(filepath.Base(to))
 	return &SaveFileReply{Text: view.Tf("renamed %s to %s", sv.Name, shown), Ref: app.SaveRef(to)}, nil
+}
+
+// ColonyRename names a colony in RimArcho (12 §4.1); "" gives it back its saves' name.
+// The page lists the saves again to show it.
+func (s *API) ColonyRename(key, name string) (string, error) {
+	s.saves.mu.Lock()
+	l := s.saves.list
+	s.saves.mu.Unlock()
+	if l == nil {
+		return "", errors.New(view.T("the saves are still being read"))
+	}
+	var c *app.Colony
+	for _, x := range l.Colonies {
+		if x.Key == key {
+			c = x
+		}
+	}
+	if c == nil {
+		return "", errors.New(view.T("that colony is gone; the list is read again"))
+	}
+	game := c.GameName
+	if game == "" {
+		game = c.Name
+	}
+	s.mu.Lock()
+	err := s.a.RenameColony(c, name)
+	s.mu.Unlock()
+	if err != nil {
+		return "", errors.New(view.Humanize(nil, err.Error()))
+	}
+	if name = strings.TrimSpace(name); name == "" || name == game {
+		return view.Tf("%s has its saves' name again", game), nil
+	}
+	return view.Tf("renamed colony %s to %s", c.Name, name), nil
 }
 
 // SaveCopy copies a save next to itself as "<name> (copy)" (12 §4.4).
