@@ -101,3 +101,20 @@ RImArcho还提供Ai Agent用于操作游戏的Probe 框架 SKILL, 允许Ai Agent
 | 合计 | 15/15 · 平均 2.3M | 10/15 · 平均 3.0M |
 
 可见, Archo MCP不但让AI识别和修复错误的能力显著提高, 还降低了使用Token开销, 平均每个修复错误的任务消耗人民币~0.017.
+
+en
+p01-01-home.png
+https://images.steamusercontent.com/ugc/11205430902657878447/54C9D9DB15F375034000D616D0D3B1ECC9C97C4B/?imw=5000&imh=5000&ima=fit&impolicy=Letterbox&imcolor=%23000000&letterbox=false
+
+p02-divider-01-performance.png
+https://images.steamusercontent.com/ugc/15138922595427923520/E585AF66E6C161EEB8340D2E75C42530772914C8/?imw=5000&imh=5000&ima=fit&impolicy=Letterbox&imcolor=%23000000&letterbox=false
+
+p03-divider-02-preflight.png
+https://images.steamusercontent.com/ugc/14013348451540590720/E2F9828D0F37057D4852011B5572749B3C42E125/?imw=5000&imh=5000&ima=fit&impolicy=Letterbox&imcolor=%23000000&letterbox=false
+
+p04-02-can-it-run.png
+https://images.steamusercontent.com/ugc/11477129983655017932/802D732C2F5D56437F45B4B05BCC6D46170AB112/?imw=5000&imh=5000&ima=fit&impolicy=Letterbox&imcolor=%23000000&letterbox=false
+
+p05-04-game-log.png
+https://images.steamusercontent.com/ugc/17799181128745893011/56B48093A51EE1CD95C8FE265B10C31089EF6555/?imw=5000&imh=5000&ima=fit&impolicy=Letterbox&imcolor=%23000000&letterbox=false
+
