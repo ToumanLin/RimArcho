@@ -715,15 +715,15 @@ func (cx *attrCtx) dirOwner(path string) (string, string) {
 }
 
 var (
-	bracketRe     = regexp.MustCompile(`^(?:<color=[^>]*>)?\[([^\]]{2,80})\](?:</color>)?`)
-	xmlExtRe      = regexp.MustCompile(`^Verse\.PatchOperation\w*\(xpath="(.*)"\): Failed`)
-	winPathRe     = regexp.MustCompile(`[A-Za-z]:[\\/][^"'<>|\r\n]*?\.(?:xml|dll|png|txt)`)
-	xrefRe        = regexp.MustCompile(`No ([\w.]+) named (\S+) found to give to (\S+)|cross-reference to ([\w.]+) named (\S+)|reference to ([\w.]+) named (\S+)`)
-	forDefRe      = regexp.MustCompile(` for def '([^']+)'`)
-	ctxDefNameRe  = regexp.MustCompile(`(?:Context|Full node): [\s\S]*?<defName>([^<\s]+)</defName>`)
-	parentRe      = regexp.MustCompile(`Could not find parent node named "([^"]+)"`)
-	thinkKeyRe    = regexp.MustCompile(`^Config error in (\S+): Two ThinkNodes have the same unique save key`)
-	ctxNameRe     = regexp.MustCompile(`Context: <\w+[^>]*\bName="([^"]+)"`)
+	bracketRe    = regexp.MustCompile(`^(?:<color=[^>]*>)?\[([^\]]{2,80})\](?:</color>)?`)
+	xmlExtRe     = regexp.MustCompile(`^Verse\.PatchOperation\w*\(xpath="(.*)"\): Failed`)
+	winPathRe    = regexp.MustCompile(`[A-Za-z]:[\\/][^"'<>|\r\n]*?\.(?:xml|dll|png|txt)`)
+	xrefRe       = regexp.MustCompile(`No ([\w.]+) named (\S+) found to give to (\S+)|cross-reference to ([\w.]+) named (\S+)|reference to ([\w.]+) named (\S+)`)
+	forDefRe     = regexp.MustCompile(` for def '([^']+)'`)
+	ctxDefNameRe = regexp.MustCompile(`(?:Context|Full node): [\s\S]*?<defName>([^<\s]+)</defName>`)
+	parentRe     = regexp.MustCompile(`Could not find parent node named "([^"]+)"`)
+	thinkKeyRe   = regexp.MustCompile(`^Config error in (\S+): Two ThinkNodes have the same unique save key`)
+	ctxNameRe    = regexp.MustCompile(`Context: <\w+[^>]*\bName="([^"]+)"`)
 	// A bare name counts only before " from node": the game's wording for a Class="…" it cannot
 	// resolve (VM round 2026-11-05: Class="PatchOperationConditionl" in a patch).
 	missingTypeRe = regexp.MustCompile(`Could not find (?:a )?type (?:named )?(?:([A-Za-z_][\w.+]*\.[\w+]+)|([A-Za-z_]\w*) from node)|expected class '([^']+)'`)
@@ -1363,7 +1363,9 @@ type hotMethod struct {
 // still describes the analysed plan (06 §4). A stale log's problems are listed apart and
 // not counted.
 type LogRun struct {
-	Phases      map[string][]logs.PhaseCount `json:",omitempty"` // finding key → observed counts
+	Phases map[string][]logs.PhaseCount `json:",omitempty"` // finding key → observed counts
+	// Marks are the run's phase boundaries in order (06 §7), nil without markers.
+	Marks       []*logs.Phase `json:"-"`
 	Path, Label string
 	Version     string
 	ModTime     time.Time
@@ -1436,6 +1438,7 @@ func (a *App) logFindings(st *LoadoutState) ([]*finding.Finding, map[string]hotM
 	run := a.logRun(st, path, rep.Version, rep.ModTime)
 	if rep.HasPhases {
 		run.Phases = map[string][]logs.PhaseCount{}
+		run.Marks = rep.Phases
 	}
 	var out []*finding.Finding
 	hot := map[string]hotMethod{}

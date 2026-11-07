@@ -30,6 +30,8 @@ type probState struct {
 	base   []view.Need     // the analysis' items; the running game's lead them (16 §2.1)
 	// lastRun says which run the last-run section is from ("the list · Sep 29 19:41")
 	lastRun string
+	// lastSave is Before you start's last-save line (view.Needs.LastSave); nil none.
+	lastSave *view.LastSaveView
 	// elsewhere is what this page leaves to another page (view.Needs.Elsewhere, 16 §2.4)
 	elsewhere []view.Elsewhere
 }
@@ -80,6 +82,7 @@ func (m *model) loadProblems() {
 	vn := view.BuildNeeds(m.app, m.st, ps)
 	p.never, p.stale = vn.Never, vn.Stale
 	p.base, p.status, p.need, p.lastRun, p.elsewhere = vn.Items, vn.Status, vn.Count, vn.LastRun, vn.Elsewhere
+	p.lastSave = vn.LastSave
 	m.composeNeeds()
 }
 

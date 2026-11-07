@@ -189,8 +189,9 @@ type App struct {
 	pngSnapsKey        string
 	stCache            *LoadoutState
 	stKey              string
-	saveHeads          saveHeadCache // save heads by path, size and mtime (saves.go)
-	saveOwners         saveOwnerMemo // Def and class lookups of save attribution (saveowners.go)
+	saveHeads          saveHeadCache           // save heads by path, size and mtime (saves.go)
+	saveOwners         saveOwnerMemo           // Def and class lookups of save attribution (saveowners.go)
+	saveLoads          map[string]*storedLoads // the logs' loads of saves, by log path (saveload.go)
 	modsCopies         map[string]*modsCopiesCache
 	linkRepairPreviews map[string]*LinkRepairPlan
 	linkRepairSerial   uint64

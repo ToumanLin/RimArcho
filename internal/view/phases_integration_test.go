@@ -76,7 +76,9 @@ func TestPhaseGroupsAndLogSeparators(t *testing.T) {
 			}
 		}
 	}
-	if strings.Join(phases, ",") != "loading,save,new,play,menu" {
+	// The last run's three blocks (16 §2.4): loading and the menu are starting the game; a
+	// new colony is playing.
+	if strings.Join(phases, ",") != "start,load,play" {
 		t.Fatalf("needs phases %v", phases)
 	}
 }

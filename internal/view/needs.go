@@ -193,6 +193,66 @@ type Needs struct {
 	// Elsewhere: what is not on Can it run but handled on another page (SectionElsewhere),
 	// one line each at the bottom of the page (16 §2.4).
 	Elsewhere []Elsewhere `json:"elsewhere,omitempty"`
+	// LastSave is Before you start's first card: whether the save the last run loaded
+	// loads with this list (16 §2.4); nil when no run names a save.
+	LastSave *LastSaveView `json:"lastSave,omitempty"`
+}
+
+// LastSaveView is the save the last run loaded, checked against the list as it is now
+// (app.LastLoadedSave, 12 §4.3): its verdict and the rows that need attention.
+type LastSaveView struct {
+	Ref     string   `json:"ref"`
+	Name    string   `json:"name"`
+	Colony  string   `json:"colony,omitempty"`
+	Loaded  string   `json:"loaded,omitempty"` // when it was loaded: "Oct 28 18:13"
+	Level   string   `json:"level"`            // "" loads, warning, error, writing
+	Verdict string   `json:"verdict"`
+	Lines   []string `json:"lines,omitempty"` // the warning and error rows' headings, LastSaveLines at most
+	More    int      `json:"more,omitempty"`  // rows not in Lines
+	Command string   `json:"command"`         // the archo command that shows the whole check
+	// Gone: the run named a save that is no longer in the Saves folder.
+	Gone bool `json:"gone,omitempty"`
+}
+
+// LastSaveLines is how many rows the last save's card names.
+const LastSaveLines = 3
+
+// lastSaveView checks the save the newest run loaded against st's list (nil: none named,
+// or it could not be checked).
+func lastSaveView(a *app.App, st *app.LoadoutState, runs []*app.LogRun) *LastSaveView {
+	c, run, err := a.LastLoadedSave(st, runs)
+	if err != nil || run == nil {
+		return nil
+	}
+	v := &LastSaveView{}
+	at := run.ModTime
+	for _, p := range run.Marks {
+		if p != nil && p.Name == "save" && !p.At.IsZero() {
+			at = p.At
+		}
+	}
+	if !at.IsZero() {
+		v.Loaded = ShortDate(at) + " " + at.In(a.Loc).Format("15:04")
+	}
+	if c == nil {
+		v.Name, v.Gone = shownSave(run.LastSave()), true
+		v.Verdict = T("not in the Saves folder any more")
+		return v
+	}
+	d := SaveDetailOf(c, false, true)
+	v.Ref, v.Name, v.Colony, v.Level, v.Verdict = d.Ref, d.Name, d.Colony, d.Level, d.Verdict
+	v.Command = "saves show " + d.Ref
+	for _, is := range d.Issues {
+		if is.Level != app.LevelError && is.Level != app.LevelWarning {
+			continue
+		}
+		if len(v.Lines) == LastSaveLines {
+			v.More++
+			continue
+		}
+		v.Lines = append(v.Lines, is.Head)
+	}
+	return v
 }
 
 // Related points at an item of the other column: its ID and a line naming it.
@@ -282,6 +342,7 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 		}
 		break
 	}
+	n.LastSave = lastSaveView(a, st, ps.Logs)
 	indexNeeds(n)
 	return n
 }
