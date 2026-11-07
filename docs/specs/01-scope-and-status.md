@@ -1,6 +1,6 @@
 # 01 · Scope and status
 
-> Status: 1.0.0 was released on 2026-11-02; 1.0.1 is being prepared (`CHANGELOG.md`). What each version includes and excludes, and what is still open.
+> Status: 1.0.0 was released on 2026-11-02; 1.0.5 is being prepared (`CHANGELOG.md`). What each version includes and excludes, and what is still open.
 > Basis: 00 (positioning, three questions, principles), 00a (architecture). Each feature's own specification governs its details.
 
 ## 1. Version scope
@@ -8,7 +8,7 @@
 | Version | Question answered | Contents |
 | --- | --- | --- |
 | 1.0 | What am I playing now, and can it run properly? | Released. Environments with one game directory each and shared Mod folders (03), scanning and identity (04), facts, findings and log attribution (05, 06), plans and sorting (07, 08), launch and link deployment (09), packs (10), downloads, subscriptions and accounts (11), CLI and MCP (13, 14), GUI and TUI (16). In detail: multiple plans shared by all games (07 §1), writing on launch and running only one game at a time (09 §1, §2), attributing outside changes to their writer (07 §4.3), locked versions (07 §5), list exchange (07 §7), the community data channel (08 §2.3), hidden Mods (09 §5), the Archo Monitor companion Mod (19 §6), live game log tracking (06 §6), downloading game versions with SteamCMD (11 §3), unsubscribing and resubscribing through Steam (11 §2), the sidebar and first-run guide (16 §2), the launch page (16 §2.3), the Mod library and change history explaining each Mod's impact (16 §2.9), the shared filter bar, keys and context menus of the editor and the Mod library (16 §3), the settings page and history area (16 §2.14, 07 §3.3), uninstall (02 §2), memory targets (16 §10), a tool for every player action (13 §1). From the log corpus: severity and constraint strength (05 §4.3.1, 08 §1.3), pre-launch notices (09 §2), known dependencies and combinations (05 §4.3), manual Harmony patch targets (05 §5.3), nearby messages and the error pattern library in cluster details (06 §3, §8) |
-| 1.1 | What have I not played? | Content catalog (12 §2), untouched content (12 §3), built-in AI assistant Archo (15). Save reading and save management (12 §1, §4) are implemented ahead of 1.1, in 1.0.1 |
+| 1.1 | What have I not played? | Content catalog (12 §2), untouched content (12 §3), built-in AI assistant Archo (15). Save reading and save management (12 §1, §4) are implemented ahead of 1.1, in 1.0.5 |
 | 1.2 | What have I not played? (continued) | Subscribe to and unsubscribe from Workshop collections in one action (07 §7), playthrough themes and content conflicts (12 §5) |
 | Long term | What is worth playing? | Player-shared packs (the sharing website is a separate project), recommendations based on understanding the player's content and play goals (12 §6) |
 | 1.x | — | Targets of manual `Harmony.Patch` calls that are known only at runtime (scanning methods across the game, collections built by helper methods, `Assembly.GetType`; statically resolvable targets are implemented, 05 §5.3); storing conditional compatibility patches as facts; auditing AllComps additions and removals, icons and materials; static cross-references from Def field types in Assembly-CSharp metadata; macOS and Linux (only compilation is verified) |
@@ -46,7 +46,7 @@ Listed by who can do what; status refers to the current code.
 | Do by keyboard everything that can be done by mouse (shared keys and context menus in the editor and the Mod library) | 16 §3.1 | Implemented |
 | Uninstall RimArcho and reverse its changes | 02 §2 | Implemented; uninstalling an installed release on a clean machine is not yet validated (§4.2) |
 | Subscribe to Mods in Git repositories and on download pages (LoversLab: Git when a gitgud.io repository exists; otherwise the player downloads the zip and installs it), check for and pull updates; download Workshop items with SteamCMD when the Steam client is unavailable | 11 §1, 16 §2.9 | Implemented (GUI, CLI, TUI, MCP `manage_subscriptions`; the TUI subscribes to a download page only through its single Git repository; choose a zip or folders and LoversLab site files in the window, or use `--from`); real SteamCMD Workshop downloads are not yet validated (§4.2) |
-| Manage saves: grouped by colony, whether each loads with its list, fixes, rename, copy, back up, recycle | 12 §4, 16 §2.11 | Implemented in 1.0.1 (GUI Saves page; CLI `saves`; MCP `list_saves`, `get_save`, `manage_saves`) |
+| Manage saves: grouped by colony, whether each loads with its list, fixes, rename, copy, back up, recycle | 12 §4, 16 §2.11 | Implemented in 1.0.5 (GUI Saves page; CLI `saves`; MCP `list_saves`, `get_save`, `manage_saves`) |
 | See Mods and content never played | 12 §3 | Not implemented (1.1) |
 
 ### 2.2 AI assistants

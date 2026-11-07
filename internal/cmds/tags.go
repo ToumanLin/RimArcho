@@ -256,7 +256,9 @@ func previewTagEdit(a *app.App, from []string, into string) (TagEdit, error) {
 func repin(a *app.App, from []string, into string) error {
 	old := PinnedTagList(a)
 	var out []string
-	has := func(t string) bool { return slices.ContainsFunc(out, func(o string) bool { return strings.EqualFold(o, t) }) }
+	has := func(t string) bool {
+		return slices.ContainsFunc(out, func(o string) bool { return strings.EqualFold(o, t) })
+	}
 	intoPinned := into != "" && slices.ContainsFunc(old, func(o string) bool { return strings.EqualFold(o, into) })
 	changed := false
 	for _, p := range old {

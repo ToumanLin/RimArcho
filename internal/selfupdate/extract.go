@@ -15,7 +15,7 @@ import (
 // Files lists the top-level entries replaced for the current operating system.
 // An older RimArcho rejects a zip with entries missing from its own list, so a new entry
 // goes here one release before release.ps1 starts packing it (README.zh-CN.md and skills
-// were added in 1.0.1 and are packed from 1.0.2).
+// were added in 1.0.5 and are packed from 1.0.6).
 var Files = releaseFiles(runtime.GOOS)
 
 func releaseFiles(goos string) []string {

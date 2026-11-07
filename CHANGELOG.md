@@ -2,7 +2,7 @@
 
 All notable changes to RimArcho. Versions follow semantic versioning; the MVP is 0.5.0.
 
-## 1.0.1 (unreleased)
+## 1.0.5 (unreleased)
 
 - Archo keeps you company while RimArcho works. A start that takes longer than 0.21 s shows Archo's chibi figure in the middle of the window with a usage tip below it, until the first page is drawn. A page that takes longer than 0.21 s to load shows the figure on the left of its loading card and a tip on the right, changing every 8 s. The first-run guide has Archo beside each step, winking, thinking while a scan or download runs and saluting when it is done. Waits take turns through seven calm expressions (neutral, smile, laugh, wink, think, ponder, yum), the next one every 4 s in a long wait. Settings › interface › Archo animation chooses off, still or animated (default). Animated uses one small WebGL figure (about 0.15 ms of CPU per frame) that stops when hidden and is released 10 s after the wait. Without GPU acceleration or with reduced motion, it shows still images. Nothing is loaded at start, so a fast start costs nothing.
 - CLI: `archo config set ui.archo.motion off|still|live`.
@@ -59,7 +59,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 - Mod settings: an empty stored value (`<PinnedMods />`) is read only and shows as empty. It can be an empty list as well as empty text, and `archo mod-settings set` wrote text into XML Extensions' list, which then failed to load in the game.
 - Background tasks in Chinese: the RimArcho update check's result "new version available" is translated.
 - `archo problems`: when two copies of a Mod are installed and neither is in the list, the finding no longer suggests `archo swap`, which failed with "not enabled", and no longer says both copies are ignored because another copy wins.
-- RimArcho's own update and uninstall now know `README.zh-CN.md` and `skills/` (agent skills, such as `rimworld-probe` for checking Mod behaviour in the game). Release zips carry them from 1.0.2 on. RimArcho 1.0.0 refuses a zip with files it does not know, so a 1.0.0 install should update to 1.0.1 before 1.0.2 is out; after that, download 1.0.2 by hand.
+- RimArcho's own update and uninstall now know `README.zh-CN.md` and `skills/` (agent skills, such as `rimworld-probe` for checking Mod behaviour in the game). Release zips carry them from 1.0.6 on. RimArcho 1.0.0 refuses a zip with files it does not know, so a 1.0.0 install should update to 1.0.5 before 1.0.6 is out; after that, download 1.0.6 by hand.
 - `rimworld-probe` skill: probes also build and run on RimWorld 1.7, and the game it starts no longer attaches to a running Steam client.
 
 - Switching the interface language now also changes "Background tasks" at the foot of the sidebar, and the search hints of the filter bars (list editor, Mod library, Background tasks, file search). Before, they kept the old language until RimArcho restarted.

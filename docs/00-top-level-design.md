@@ -63,7 +63,7 @@ See 00a §3 for the corresponding technical principles.
 | Version | Question answered | Main content |
 | --- | --- | --- |
 | 1.0 | What am I playing, and will it run | Plans (multiple per environment), launching, packs, locked versions, can it run, log attribution and live tracking, import/export, sidebar UI and first-run guide |
-| 1.1 | What haven't I played yet | Untouched content, Archo; save reading and save management are implemented ahead of 1.1, in 1.0.1 |
+| 1.1 | What haven't I played yet | Untouched content, Archo; save reading and save management are implemented ahead of 1.1, in 1.0.5 |
 | 1.2 | What haven't I played yet (continued) | One-click Workshop collection subscription and unsubscription, playthrough themes and content conflicts |
 | Longer term | What's worth playing | Player-shared packs, content and play-goal recommendations that understand the player |
 

@@ -64,7 +64,7 @@ Recorded for each Mod directory:
 - A dependency `li` may contain a `packageId` child or plain text.
 - A malformed `About.xml` still creates an Instance; the error is recorded in the declaration and the scan goes on.
 
-A scan reads `About.xml` again even when the content is unchanged. If the dependencies then read differently (only possible after the parser learned a field, such as `alternativePackageIds` in 1.0.1), the current snapshot's stored declaration is rewritten in place; no new snapshot or update event is recorded (`store.declReparsed`).
+A scan reads `About.xml` again even when the content is unchanged. If the dependencies then read differently (only possible after the parser learned a field, such as `alternativePackageIds` in 1.0.5), the current snapshot's stored declaration is rewritten in place; no new snapshot or update event is recorded (`store.declReparsed`).
 
 `packageId` is always stored twice: the original `package_id_raw` and the lowercase `package_id`. A missing `packageId` is derived by §1.5.
 

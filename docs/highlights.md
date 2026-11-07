@@ -2,7 +2,7 @@
 
 English | [&#31616;&#20307;&#20013;&#25991;](highlights.zh-CN.md)
 
-Release copy for RimArcho 1.0.1: a tagline, blurbs of three lengths, and the selling points behind them. Every claim here is implemented; numbers carry their conditions. Details are in the [user guide](user-guide.md).
+Release copy for RimArcho 1.0.5: a tagline, blurbs of three lengths, and the selling points behind them. Every claim here is implemented; numbers carry their conditions. Details are in the [user guide](user-guide.md).
 
 ## Tagline
 

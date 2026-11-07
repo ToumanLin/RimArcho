@@ -12,8 +12,8 @@ func TestCLILineZh(t *testing.T) {
 	defer view.SetLang("en")
 	view.SetLang("zh")
 	for in, want := range map[string]string{
-		"dry run, nothing changed: workshop: 1 subscriptions":                            "试运行，没有改动：工坊：1 个订阅",
-		"result: would download with SteamCMD":                                           "结果：将用 SteamCMD 下载",
+		"dry run, nothing changed: workshop: 1 subscriptions":                             "试运行，没有改动：工坊：1 个订阅",
+		"result: would download with SteamCMD":                                            "结果：将用 SteamCMD 下载",
 		"note: Would subscribe through Steam; use SteamCMD only if Steam is unavailable.": "备注：将通过 Steam 订阅；只在 Steam 不可用时用 SteamCMD。",
 		"Workshop 1578693166": "Workshop 1578693166",
 	} {
