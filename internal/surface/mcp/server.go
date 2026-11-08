@@ -434,16 +434,18 @@ func FilesArgv(in FilesIn) []string {
 }
 
 type SourceIn struct {
-	Game   bool     `json:"game,omitempty" jsonschema:"read the current game's code; with search, include it alongside the selected mods"`
+	Game   bool     `json:"game,omitempty" jsonschema:"game code (with search: also searched)"`
 	Env    string   `json:"env,omitempty" jsonschema:"environment name (default: current)"`
-	Ref    string   `json:"ref,omitempty" jsonschema:"decompile this mod (with type: one type) — #id or pkg:…"`
-	Type   string   `json:"type,omitempty" jsonschema:"full type name to show, e.g. MyMod.HarmonyPatches.Pawn_Tick"`
+	Ref    string   `json:"ref,omitempty" jsonschema:"a mod, #id or pkg:… (with type: one type)"`
+	Type   string   `json:"type,omitempty" jsonschema:"full type name (callers: Ns.Type.Method)"`
 	Search string   `json:"search,omitempty" jsonschema:"search decompiled C# for this text instead"`
-	In     []string `json:"in,omitempty" jsonschema:"mods to search (default: the mods the newest log and Harmony warnings implicate)"`
-	Scope  string   `json:"scope,omitempty" jsonschema:"active: search every enabled mod (decompiles missing library projects; can take many minutes)"`
+	In     []string `json:"in,omitempty" jsonschema:"mods to search (default: log and Harmony suspects)"`
+	Scope  string   `json:"scope,omitempty" jsonschema:"active: every enabled mod (slow)"`
 	Regex  bool     `json:"regex,omitempty"`
 	All    bool     `json:"all,omitempty"`
-	Budget int      `json:"budget,omitempty" jsonschema:"seconds to dispatch new decompiles; running work finishes (default 10)"`
+	Budget int      `json:"budget,omitempty" jsonschema:"decompile seconds (default 10)"`
+	Mode   string   `json:"mode,omitempty" jsonschema:"callers (of the method in type) or diff (of dlls)"`
+	DLLs   []string `json:"dlls,omitempty" jsonschema:"old and new DLL"`
 }
 
 type EditIn struct {
@@ -662,6 +664,20 @@ func ProblemsArgv(in ProblemsIn) []string {
 
 // SourceArgv maps read_source: a search gets a 10 s decompile budget by default (14 §1).
 func SourceArgv(in SourceIn) []string {
+	switch in.Mode {
+	case "callers":
+		b := argv("source", "callers", in.Type)
+		for _, r := range in.In {
+			b.str("in", r)
+		}
+		return b.flag("all", in.All).a
+	case "diff":
+		b := argv("source", "diff")
+		for _, p := range in.DLLs {
+			b.pos(p)
+		}
+		return b.flag("all", in.All).a
+	}
 	if in.Search != "" {
 		b := argv("source", "search", in.Search)
 		for _, r := range in.In {
