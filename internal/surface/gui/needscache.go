@@ -96,7 +96,7 @@ func (s *API) saveNeedsLocked(ps *app.ProblemSet, n *view.Needs, eager bool) *ne
 		board.Reasons = n.Reasons
 		board.Needs = n.Count
 		old.Board = &board
-		s.workspace = &workspaceSnapshot{key: key, state: w.state, result: &old}
+		s.workspace = &workspaceSnapshot{key: key, state: w.state, result: &old, boardAt: w.boardAt}
 	}
 	return c
 }

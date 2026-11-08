@@ -2,6 +2,10 @@
 
 All notable changes to RimArcho. Versions follow semantic versioning; the MVP is 0.5.0.
 
+## Unreleased
+
+- The window sees a game that is already running when it opens. Started a second time with nothing changed since the last start, it often missed the game: Start offered "launch the game" and "save N changes", Can it run said the last run had no errors, and nothing refreshed after the game exited until the page was opened again. Whenever a list had no Harmony, the Archo Monitor check at start threw away the window's lists without changing anything, and the next read came from a saved copy that did not give them back. The check now refreshes the page only when it changed something, the saved copy gives the lists back, and the running game is followed through such a gap.
+
 ## 1.0.6 — 2026-11-07
 
 - Reading the mods shows how far it is. With a thousand Mods the first-run guide's “read the mods” step sat on “reading the mods of 1.6…” for minutes with no sign of life; its row now counts the folders as they are read (“reading the mods of 1.6: 340 of 1,200”), then says when it saves and checks the files, and the bar moves with it. A rescan from the window shows the same count on its background task. The guide also no longer reads a new game's own `Mods/` once in the window before its scan.
