@@ -113,7 +113,7 @@ Checked on the host (real 1.6.4871): buggy run with the errors, reference fix wi
 
 ### Round 3, h4 and h7: Pi vs dsh (2026-11-08)
 
-12 runs (h4, h7 × A = Pi, B = dsh × 3) on Eval-3, 20 min limit, archo 1.0.7 (dev/1.1 a3a53af7, `toolsrcho-1.0.7.exe`). Cost as in round 2. The first attempt ran while the model gateway was down (0 tool calls; moved to `results-gateway-down/`).
+12 runs (h4, h7 × A = Pi, B = dsh × 3) on Eval-3, 20 min limit, archo 1.0.7 (dev/1.1 a3a53af7, `tools\archo-1.0.7.exe`). Cost as in round 2. The first attempt ran while the model gateway was down (0 tool calls; moved to `results-gateway-down/`).
 
 | Cell | Solved | Mean s | Tool calls (Archo) | Tokens | Cost per run |
 | --- | --- | --- | --- | --- | --- |
