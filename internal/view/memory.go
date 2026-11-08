@@ -33,6 +33,11 @@ func MemoryNeed(c app.MemoryAssessment, plan int64) Need {
 	if c.Estimated && c.VRAMInRAMHigh > 0 {
 		lines = append(lines, Tf("RAM includes %s of VRAM held in system memory on this computer.", costRange(c.VRAMInRAMLow, c.VRAMInRAMHigh)))
 	}
+	if c.Estimated && c.TexturesOnDemand > 0 {
+		lines = append(lines, Tf("The game keeps only what fits this card; about %s of textures load from the disk cache when drawn, which may stutter but does not stop the game.", SizeText(c.TexturesOnDemand)))
+	}
+	// Only a shortage of committable memory breaks the game; past available physical
+	// RAM it pages, which is slow but runs, so a warning stays in worth knowing.
 	if c.RAMSeverity == "severe" {
 		it.Status = StatusErr
 		it.Section = SectionBreak
@@ -40,8 +45,6 @@ func MemoryNeed(c app.MemoryAssessment, plan int64) Need {
 		lines = append(lines, T("RAM may be insufficient: close other apps or reduce the list before launching."))
 	} else if c.RAMSeverity == "warning" || c.VRAMSeverity == "warning" {
 		it.Status = StatusWarn
-		it.Section = SectionBreak
-		it.Counted = true
 	}
 	if c.RAMSeverity == "warning" {
 		lines = append(lines, T("RAM is tight: closing other apps leaves more room."))
@@ -52,7 +55,7 @@ func MemoryNeed(c app.MemoryAssessment, plan int64) Need {
 	if len(c.Hardware.Adapters) > 0 {
 		lines = append(lines, Tf("GPU: %s (by the system's preference)", c.Hardware.Adapters[0].Name))
 	}
-	if it.Counted {
+	if it.Status != StatusHint {
 		lines = append(lines, T("Saves and memory mods allocate themselves are not counted; a shortfall is a risk, not a certain crash."))
 	}
 	it.Evidence = evidence(EvInferred, T("file estimates and OS memory snapshot"))

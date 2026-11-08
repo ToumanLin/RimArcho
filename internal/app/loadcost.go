@@ -56,11 +56,44 @@ type LoadCost struct {
 	PerMod         []ModCost        `json:"perMod"`
 }
 
-// VRAMInRAM is the share of the resident VRAM estimate (baseline included) held in
-// system memory on the hardware Capacity was assessed with; RAM shown to players adds it.
-func (r *LoadCost) VRAMInRAM() (low, high int64) {
-	return loadcost.Spill(r.Game, r.VRAMLow+r.Baseline.VRAM, r.VRAMHigh+r.Baseline.VRAM, r.Capacity.Hardware.VRAM())
+// LoadFit is a LoadCost on one machine: baseline-included ranges after the hardware
+// adjustments, 1.6 VRAM the card cannot hold (loadcost.Spill) and 1.7 textures above
+// the card's upload watermark (loadcost.Cap17).
+type LoadFit struct {
+	RAMLow, RAMHigh         int64 // resident
+	LoadingLow, LoadingHigh int64
+	VRAMLow, VRAMHigh       int64
+	// HeldLow / HeldHigh: 1.6 VRAM held in system memory, included in the RAM ranges.
+	HeldLow, HeldHigh int64
+	// OnDemand: about how much 1.7 texture VRAM goes beyond what the game keeps on this
+	// card (the low estimate's cut, near the BC7 payload; the high one's when only it is
+	// cut). It stays in the disk cache and loads when drawn; left out of the ranges above.
+	OnDemand int64
 }
+
+// FitTo adjusts the hardware-independent estimate to a card with dedicated bytes of
+// VRAM (<= 0: unknown, no dedicated memory).
+func (r *LoadCost) FitTo(dedicated int64) LoadFit {
+	cutRAMLow, cutRAMHigh, cutVRAMLow, cutVRAMHigh := loadcost.Cap17(r.Game, r.Report, dedicated)
+	f := LoadFit{
+		RAMLow: r.RAMLow - cutRAMLow + r.Baseline.RAM, RAMHigh: r.RAMHigh - cutRAMHigh + r.Baseline.RAM,
+		LoadingLow: r.LoadingRAMLow - cutRAMLow + r.Baseline.RAM, LoadingHigh: r.LoadingRAMHigh - cutRAMHigh + r.Baseline.RAM,
+		VRAMLow: r.VRAMLow - cutVRAMLow + r.Baseline.VRAM, VRAMHigh: r.VRAMHigh - cutVRAMHigh + r.Baseline.VRAM,
+		OnDemand: cutVRAMLow,
+	}
+	if f.OnDemand == 0 {
+		f.OnDemand = cutVRAMHigh
+	}
+	f.HeldLow, f.HeldHigh = loadcost.Spill(r.Game, f.VRAMLow, f.VRAMHigh, dedicated)
+	f.RAMLow += f.HeldLow
+	f.RAMHigh += f.HeldHigh
+	f.LoadingLow += f.HeldLow
+	f.LoadingHigh += f.HeldHigh
+	return f
+}
+
+// Fit is FitTo on the hardware Capacity was assessed with.
+func (r *LoadCost) Fit() LoadFit { return r.FitTo(r.Capacity.Hardware.VRAM()) }
 
 // PlanLoadCost measures the selected plan, using its own enabled entries.
 // Progress callbacks are serialized, including the initial (0, total) callback.

@@ -40,12 +40,15 @@ func planCost(c *Ctx, args *Args) (*render.Doc, error) {
 	rangeText := func(low, high int64) string { return render.Size(low) + "–" + render.Size(high) }
 	d, root := render.New("plan:" + p.Name + " load cost (estimate)")
 	root.KV("mods", fmt.Sprintf("%d (%d measured, %d cached)", r.Mods, r.Measured, r.Cached))
-	heldLow, heldHigh := r.VRAMInRAM()
-	root.KV("RAM, baseline + mods", rangeText(r.RAMLow+r.Baseline.RAM+heldLow, r.RAMHigh+r.Baseline.RAM+heldHigh))
-	root.KV("VRAM, baseline + mods", rangeText(r.VRAMLow+r.Baseline.VRAM, r.VRAMHigh+r.Baseline.VRAM))
-	root.KV("RAM, loading budget", rangeText(r.LoadingRAMLow+r.Baseline.RAM+heldLow, r.LoadingRAMHigh+r.Baseline.RAM+heldHigh))
-	if heldHigh > 0 {
-		root.KV("RAM, VRAM held in RAM", rangeText(heldLow, heldHigh)+" (included above: VRAM beyond the dedicated capacity, or all of it without one)")
+	f := r.Fit()
+	root.KV("RAM, baseline + mods", rangeText(f.RAMLow, f.RAMHigh))
+	root.KV("VRAM, baseline + mods", rangeText(f.VRAMLow, f.VRAMHigh))
+	root.KV("RAM, loading budget", rangeText(f.LoadingLow, f.LoadingHigh))
+	if f.HeldHigh > 0 {
+		root.KV("RAM, VRAM held in RAM", rangeText(f.HeldLow, f.HeldHigh)+" (included above: VRAM beyond the dedicated capacity, or all of it without one)")
+	}
+	if f.OnDemand > 0 {
+		root.KV("VRAM, textures on demand", "about "+render.Size(f.OnDemand)+" (left out above: beyond the card's upload watermark, kept in the disk cache and loaded when drawn)")
 	}
 	capacity := r.Capacity
 	hardware := capacity.Hardware
@@ -57,13 +60,16 @@ func planCost(c *Ctx, args *Args) (*render.Doc, error) {
 		vramAvailable = render.Size(hardware.VRAM())
 	}
 	root.KV("RAM, available now", ramAvailable+" ["+capacity.RAMSeverity+"]")
+	if hardware.CommitAvailable > 0 {
+		root.KV("RAM, commit available", render.Size(hardware.CommitAvailable)+" (RAM + page file; below the loading budget's lower bound is severe)")
+	}
 	root.KV("VRAM, dedicated capacity", vramAvailable+" ["+capacity.VRAMSeverity+"]")
 	if len(hardware.Adapters) > 0 {
 		root.KV("GPU candidate", hardware.Adapters[0].Name+" (OS adapter preference; game selection unverified)")
 	}
 	root.KV("capacity caveat", "Unity 1.6 calibrated in a VM without dedicated VRAM; the RAM / VRAM split on a real graphics card is inferred, and the 1.7 loading reserve is uncalibrated. Excludes saves and arbitrary mod allocations; shortage is a risk, not proof of a crash.")
-	root.KV("RAM, mods only", rangeText(r.RAMLow, r.RAMHigh))
-	root.KV("VRAM, mods only", rangeText(r.VRAMLow, r.VRAMHigh))
+	root.KV("RAM, mods only", rangeText(f.RAMLow-f.HeldLow-r.Baseline.RAM, f.RAMHigh-f.HeldHigh-r.Baseline.RAM))
+	root.KV("VRAM, mods only", rangeText(f.VRAMLow-r.Baseline.VRAM, f.VRAMHigh-r.Baseline.VRAM))
 	root.KV("vanilla + all DLC baseline", "RAM "+render.Size(r.Baseline.RAM)+", VRAM "+render.Size(r.Baseline.VRAM))
 	rows := [][]string{{"category", "files / mods", "disk bytes (DDS payload)", "RAM", "VRAM"}}
 	for _, p := range r.Parts {

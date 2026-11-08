@@ -90,6 +90,8 @@ Add the measured vanilla + DLC baseline (1.7: RAM 2.3 GB, video memory 1.2 GB; 1
 
 **Cost**: 476 Mods took 47 seconds on the first pass (mostly opening 30,000 DDS headers for the first time), then 0.45 seconds (`cache/loadcost-v1.json`, keyed by the fsscan listing fingerprint of each Mod's load folders; PNG headers already read on the texture page are reused).
 
+> Correction, 2026-11-07: players with 8 GB cards were shown 10–28 GB of VRAM and 18–41 GB of RAM for 270 Mods that load fine. Waylith 1.7.5000 (decompiled `TextureResidency`, `Texture2D`, `RimWorldWaylith.Bootstrap`) uploads on demand unless `-EagerTextureUpload` is passed. Above `HighWatermark(budget) = max(budget/2, min(0.8·budget, budget − 512 MiB))` of the VMA device heap budget it evicts textures to the disk cache, or, without a valid cache, moves them to a host heap capped at a quarter of that heap's budget. The 15,283 MB above is that watermark for a budget of 0.78 × 24 GB. The ×0.9–2.6 and ×1.5–3.5 rates therefore hold only below the watermark. Mod RAM was 1.1–1.5× the resident mod VRAM on repeat launches (100 / 250 / 484) and 2.1× on the 484 first launch. `loadcost.Cap17` caps both at the card's watermark (16 §2.17). No run on a smaller card has been made.
+
 ### 4.4 Not implemented / known deviations
 
 - 1.6 could not be calibrated in this round (2026-10-24): `D:\rimworld16` cannot currently reach the main menu (a `_Archo_env_*` junction in Mods points to a deleted directory; see the game-test session record).
