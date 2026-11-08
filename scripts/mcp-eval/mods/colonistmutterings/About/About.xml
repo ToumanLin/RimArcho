@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+  <name>Colonist Mutterings</name>
+  <author>mossbrook</author>
+  <packageId>mossbrook.colonistmutterings</packageId>
+  <supportedVersions>
+    <li>1.6</li>
+  </supportedVersions>
+  <description>Your colonists now and then mutter a short line to themselves: when they are tired, hungry, low, or just bored.
+
+The line floats above the colonist and goes into their social log.
+
+No settings, no Harmony, safe to add or remove mid-save. Source included.</description>
+</ModMetaData>

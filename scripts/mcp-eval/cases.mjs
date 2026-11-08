@@ -211,7 +211,7 @@ if (want('h5')) {
 }
 
 // ---- h7: runtime error with no culprit in the stack — a comp that removes itself from its pawn's comp list mid-tick ----
-// [SSR]Beautiful Body (base list) as of June 2026 (the user's local copy; the Workshop version has since dropped the comp). Its
+// [SSR]Beautiful Body as of June 2026 (the user's local copy; the Workshop version has since dropped the comp). Its
 // TC_ForceBodyShape on Human swaps itself to the end of AllComps and removes itself during CompTick. Vanilla's
 // ThingWithComps.Tick indexes with a cached count, so SSR alone logs nothing. Pawn Comp Profiler (our own small Mod,
 // scripts/mcp-eval/mods) ticks pawn comps with foreach, as the vanilla loop would, timed; the list change then throws
@@ -232,12 +232,15 @@ if (want('h7')) {
     fs.rmSync(path.join(OUT, 'h7', kind), {recursive: true, force: true});   // the recorded logs stay
     const f = path.join(OUT, 'h7', kind, SSR.pkg, dll); fs.mkdirSync(path.dirname(f), {recursive: true}); fs.copyFileSync(from, f);
   }
+  // The VM has only the Workshop copy (the 2026-09 rewrite: no comp). Host and VM both start from it; the overlay turns
+  // it into the June version: these files are all that differ apart from textures, which the June code does not name.
+  for (const rel of ['About/About.xml', 'Patches/Patches.xml', '1.4/Assemblies/FS_SSR_Body.dll', '1.5/Assemblies/FS_SSR_Body.dll']) {
+    const f = path.join(OUT, 'h7', 'overlay', SSR.pkg, rel); fs.mkdirSync(path.dirname(f), {recursive: true}); fs.copyFileSync(path.join(SSR.dir, rel), f);
+  }
   emit('h7', {
     runtime: {ticks: 3000},
-    add: [{pkg: PCP.pkg, name: PCP.name, path: pcp.split(path.sep).join('/')}],
-    // SSR is in the base list (a junction to the same local copy). The backup DLL would load as a second FS_SSR_Body
-    // assembly and give the fix away; the zip at the Mod root is a 26 MB archive copy of the Mod.
-    overlay: [{pkg: SSR.pkg, files: 'overlay/' + SSR.pkg, omit: ['1.6/Assemblies/FS_SSR_Body.pre-codex-backup.dll', '_2985408740_.zip']}],
+    add: [{pkg: SSR.pkg, name: SSR.name, path: `${WS}/2985408740`, replace: true}, {pkg: PCP.pkg, name: PCP.name, path: pcp.split(path.sep).join('/')}],
+    overlay: [{pkg: SSR.pkg, files: 'overlay/' + SSR.pkg}],
   }, {
     culprit: [{pkg: SSR.pkg, name: SSR.name, role: 'its comp TC_ForceBodyShape swaps itself to the end of the pawn\'s AllComps and removes itself while the comps are being ticked'}],
     decoy: [{pkg: PCP.pkg, name: PCP.name, role: 'named in every stack; enumerates the comps with foreach, which is correct as long as no comp changes the list'}],
@@ -245,6 +248,46 @@ if (want('h7')) {
     faultClass: 'runtime.collection-modified (no culprit frame)',
     files: [`${SSR.pkg}/${dll}`],
     fix: 'TC_ForceBodyShape must not change parent.AllComps inside CompTick: set the body type once and then do nothing (the reference fix), or defer the removal outside the tick loop. Rebuild 1.6/Assemblies/FS_SSR_Body.dll (decompile, edit, build); a reference build is in answer/. Rewriting the profiler\'s loop only hides it.',
+  });
+}
+
+// ---- h4: runtime NRE in one Mod's postfix, caused by another Mod's call (stack top names the wrong Mod) -----------
+// Modelled on real 1.6 logs: EcoDialogues builds a one-pawn PlayLogEntry_Interaction (recipient null), and Cyanobot's
+// Genes' postfix on that constructor reads recipient.genes and throws. EcoDialogues is not on disk, so the caller is
+// Colonist Mutterings, our own small Mod of the same shape (scripts/mcp-eval/mods/colonistmutterings). Vanilla's
+// PlayLogEntry_Interaction needs both pawns ("has a null pawn reference" when shown); a one-pawn line belongs in its
+// own LogEntry. Reference fix: PlayLogEntry_Mutter derives from LogEntry. Needs a map: case.json `runtime`.
+if (want('h4')) {
+  const CG = {pkg: 'cyanobot.CyanobotsGenes', dir: `${LIB}/2889844371`, name: "Cyanobot's Genes"};
+  const CM = {pkg: 'mossbrook.colonistmutterings', name: 'Colonist Mutterings'};
+  const src = 'Source/ColonistMutterings.cs', dll = '1.6/Assemblies/ColonistMutterings.dll';
+  const cm = path.join(OUT, '_mods', CM.pkg); fs.rmSync(cm, {recursive: true, force: true});
+  fs.cpSync(path.join(import.meta.dirname, 'mods', 'colonistmutterings'), cm, {recursive: true});
+  buildDll(path.join(cm, 'Source'), 'ColonistMutterings', path.join(cm, dll));
+  const fixedSrc = must(must(must(raw(cm, src),
+    'public class PlayLogEntry_Mutter : PlayLogEntry_Interaction\n    {\n        string text;',
+    'public class PlayLogEntry_Mutter : LogEntry\n    {\n        Pawn initiator;\n        string text;'),
+    ': base(InteractionDefOf.Chitchat, pawn, null, null)\n        {\n            this.text = text;',
+    '\n        {\n            initiator = pawn;\n            this.text = text;'),
+    '            base.ExposeData();\n            Scribe_Values.Look(ref text, "text");\n        }',
+    '            base.ExposeData();\n            Scribe_References.Look(ref initiator, "initiator", saveDestroyedThings: true);\n            Scribe_Values.Look(ref text, "text");\n        }\n\n' +
+    '        public override bool Concerns(Thing t) => t == initiator;\n\n        public override IEnumerable<Thing> GetConcerns() { if (initiator != null) yield return initiator; }\n\n' +
+    '        public override UnityEngine.Texture2D IconFromPOV(Thing pov) => InteractionDefOf.Chitchat.GetSymbol();');
+  fs.rmSync(path.join(OUT, 'h4', 'answer'), {recursive: true, force: true});
+  fixfile('h4', CM.pkg, src, fixedSrc);
+  const fixDir = path.join(OUT, '_build', 'h4-fix-src'); fs.rmSync(fixDir, {recursive: true, force: true}); fs.mkdirSync(fixDir, {recursive: true});
+  fs.writeFileSync(path.join(fixDir, 'ColonistMutterings.cs'), fixedSrc);
+  buildDll(fixDir, 'ColonistMutterings', path.join(OUT, 'h4', 'answer', CM.pkg, dll));
+  emit('h4', {
+    runtime: {ticks: 3000},
+    add: [{pkg: CG.pkg, name: CG.name, path: CG.dir}, {pkg: CM.pkg, name: CM.name, path: cm.split(path.sep).join('/')}],
+  }, {
+    culprit: [{pkg: CM.pkg, name: CM.name, role: 'builds a PlayLogEntry_Interaction with a null recipient, which vanilla does not allow'}],
+    decoy: [{pkg: CG.pkg, name: CG.name, role: 'top of every stack; its postfix assumes both pawns of an interaction exist, as vanilla does'}],
+    required: [CM.pkg],
+    faultClass: 'runtime.nre-in-other-mods-patch (wrong blame)',
+    files: [`${CM.pkg}/${dll}`],
+    fix: 'PlayLogEntry_Mutter must not be a PlayLogEntry_Interaction with a null recipient: derive it from LogEntry (reference in answer/, source and DLL), or give it a real recipient. Rebuild 1.6/Assemblies/ColonistMutterings.dll from the shipped source. A null check in Cyanobot\'s Genes only hides it.',
   });
 }
 

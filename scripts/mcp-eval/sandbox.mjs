@@ -32,6 +32,8 @@ export function build(caseDir, runDir, layerDir) {
   const isDropped = m => c.drop?.some(d => d.toLowerCase() === m.pkg.toLowerCase()) && !enable.includes(m.pkg.toLowerCase());
   const mods = [...base];
   for (const a of c.add || []) { const i = a.before ? mods.findIndex(m => m.pkg.toLowerCase() === a.before.toLowerCase()) : -1; if (i >= 0) mods.splice(i, 0, a); else mods.push(a); }
+  // an `add` with `replace: true` swaps the folder of a Mod already in the base list, keeping its place (h7: the Workshop copy)
+  for (const a of (c.add || []).filter(a => a.replace)) { const i = mods.findIndex(m => m !== a && m.pkg.toLowerCase() === a.pkg.toLowerCase()); if (i >= 0) { mods.splice(mods.indexOf(a), 1); mods[i] = a; } }
   for (const m of mods) {
     if (!isDropped(m)) active.push(m.pkg);   // dropped Mods stay installed but are not enabled
     if (m.path.startsWith(GAME + '/Data') || m.path.startsWith('D:\rimworld16\Data')) continue; // official content is already in Data

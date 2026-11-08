@@ -5,6 +5,8 @@ param([string]$Case)
 $ErrorActionPreference = 'Stop'
 $pkg = "C:\Eval\pkg\$Case"
 $ws = 'C:\Program Files (x86)\Steam\steamapps\workshop\content\294100'
+# Mods the guest's library lacks come with the case (package.mjs `ship:`)
+if (Test-Path "$pkg\lib") { Copy-Item "$pkg\lib\*" C:\Eval\lib -Recurse -Force }
 $list = Get-Content "$pkg\manifest.json" -Raw | ConvertFrom-Json | ForEach-Object { $_ }   # Windows PowerShell 5 emits the array as one object
 foreach ($m in $list | Where-Object { $_.overlay }) {
   $i = $m.src.IndexOf(":"); $kind = $m.src.Substring(0, $i); $id = $m.src.Substring($i + 1)

@@ -22,6 +22,8 @@ const RULES = {
   // touchAll: each fault is fixed where it is
   h5: {keepEnabled: ['khamenman.OutfitStandsPLus', 'mlie.10xcarryingcapacity'], touch: [], touchAll: ['khamenman.OutfitStandsPLus/', 'mlie.10xcarryingcapacity/']},
   // the comp's own code is the fault: SSR's DLL must be rebuilt; a for loop in the profiler, or the profiler off, hides it
+  // the caller is the fault: its DLL must be rebuilt; a null check in Cyanobot's Genes' postfix hides it
+  h4: {keepEnabled: ['mossbrook.colonistmutterings', 'cyanobot.CyanobotsGenes'], touch: ['mossbrook.colonistmutterings/1.6/Assemblies/']},
   h7: {keepEnabled: ['ssr.body', 'tallowbyte.pawncompprofiler'], touch: ['ssr.body/1.6/Assemblies/']},
 };
 const resDir = path.resolve(process.argv[2]); const name = path.basename(resDir); const caseId = name.split('-')[0];
