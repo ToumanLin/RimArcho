@@ -2511,9 +2511,11 @@ select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-s
 .un-summary p { margin: 8px 0 0; overflow-wrap: anywhere; }
 .pop.un-confirm .btns .danger-go { background: var(--red); border-color: var(--red); color: #fff; }
 
-/* Address rows keep their full payload behind a single-line display (16 §3.1). */
-.settings .set .r > .setting-value { flex: 1 1 240px; min-width: 0; }
-.settings .set .r > .setting-value:has(.path-copy), .settings .set .r > .setting-value.path-copy { min-width: min(100%, 240px); }
+/* Address rows keep their full payload behind a single-line display (16 §3.1). Only an
+   address takes the room; a short value (RimArcho's version) keeps its own width, so its
+   note and buttons stay on its line instead of wrapping under it. */
+.settings .set .r > .setting-value { flex: 0 1 auto; min-width: 0; }
+.settings .set .r > .setting-value:has(.path-copy), .settings .set .r > .setting-value.path-copy { flex: 1 1 240px; min-width: min(100%, 240px); }
 .settings .setting-value > .path-copy { flex: 1; }
 .settings .set .l .setting-note.word-facts > .path-copy { min-width: min(100%, 200px); }
 .settings .community-link { border-radius: 999px; }
