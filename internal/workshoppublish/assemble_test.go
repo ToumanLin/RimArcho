@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 	"github.com/ToumanLin/RimArcho/internal/workshoppublish"
 )
 
@@ -64,6 +66,16 @@ func TestAssemble(t *testing.T) {
 		"README.md", "README.zh-CN.md", "UserGuide/user-guide.md", "UserGuide/user-guide.zh-CN.md", "skills/probe/SKILL.md", "skills/probe/template/a.cs"} {
 		if _, err := os.Stat(filepath.Join(item.Folder, filepath.FromSlash(p))); err != nil {
 			t.Fatal(err)
+		}
+	}
+	// Workshop relocation cleanup keeps the item's own copies of release entries.
+	top, err := os.ReadDir(item.Folder)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range top {
+		if slices.Contains(selfupdate.Files, f.Name()) && !slices.Contains(selfupdate.ItemFiles, f.Name()) {
+			t.Errorf("the item carries release entry %s, missing from selfupdate.ItemFiles", f.Name())
 		}
 	}
 	for _, p := range []string{"skills/probe/template/bin", "skills/probe/template/obj"} {

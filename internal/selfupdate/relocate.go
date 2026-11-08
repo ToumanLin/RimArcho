@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -119,26 +120,35 @@ func CopyRelease(from, to string) (swap *Swap, err error) {
 	return swap, err
 }
 
+// ItemFiles are the release entries the published RimArcho Workshop item carries at its
+// own root (17 §5.1 Upload): Monitor's LICENSE, and the READMEs and agent skills that
+// `archo workshop publish` copies beside the zip. A release extracted into the item root
+// overwrites them with the same files, so cleanup there must keep them.
+var ItemFiles = []string{"README.md", "README.zh-CN.md", "LICENSE", "skills"}
+
 // CleanWorkshopRelease removes only the extracted release entries. The caller
 // waits for the old process to exit; the item directory itself is never removed.
+// At the item root the entries the item ships itself (ItemFiles) stay; in a folder
+// below it, where the item has none of them, every release entry is the extraction's.
 func CleanWorkshopRelease(dir string) error {
 	real, err := filepath.EvalSymlinks(dir)
 	if err != nil {
 		return err
 	}
 
-	if _, ok := InWorkshopFolder(real); !ok {
+	item, ok := InWorkshopFolder(real)
+	if !ok {
 		return errors.New("refusing to clean a redirected Workshop folder")
 	}
 	dir = real
+	atRoot := strings.EqualFold(filepath.Clean(item), filepath.Clean(dir))
 
 	if _, err := ReleaseSize(dir); err != nil {
 		return err
 	}
 	var errs []error
 	for _, name := range Files {
-		// The item's Monitor folder carries the same LICENSE; extracting overwrote it.
-		if name == "LICENSE" {
+		if atRoot && slices.Contains(ItemFiles, name) {
 			continue
 		}
 		errs = append(errs, os.RemoveAll(filepath.Join(dir, name)))

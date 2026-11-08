@@ -2,6 +2,12 @@
 
 All notable changes to RimArcho. Versions follow semantic versioning; the MVP is 0.5.0.
 
+## Unreleased
+
+- Use This Instead replacements work again. Two rules in the current Use This Instead list have a number where a packageId belongs, and RimArcho then dropped the whole list: no "use X instead" suggestions, and a continuation never stood in for the Mod it replaces, so the sort, Can it run and Start reported a missing dependency (for example MultiFloors needing Prepatcher). A malformed rule is now skipped on its own; the same holds for single bad entries in the Steam Workshop database and the community sorting rules.
+- "Install and restart" from RimArcho's Workshop item no longer deletes the item's own `README.md`, `README.zh-CN.md` and `skills\`. Only the files the extracted release added are removed; a release extracted into a folder of its own inside the item is removed entirely.
+- A community data update that fails no longer says it succeeded. `archo data update` (and MCP `maintenance` `data_update`) now titles a failure "community data not updated" and shows, for each dataset, why it failed or the version it kept, instead of "community data updated" with the version it had downloaded. The window's update task no longer lists the downloaded entry counts after its error.
+
 ## 1.0.6 — 2026-11-07
 
 - Reading the mods shows how far it is. With a thousand Mods the first-run guide's “read the mods” step sat on “reading the mods of 1.6…” for minutes with no sign of life; its row now counts the folders as they are read (“reading the mods of 1.6: 340 of 1,200”), then says when it saves and checks the files, and the bar moves with it. A rescan from the window shows the same count on its background task. The guide also no longer reads a new game's own `Mods/` once in the window before its scan.

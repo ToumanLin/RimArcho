@@ -105,6 +105,47 @@ func TestCommunityDataEncoding(t *testing.T) {
 	}
 }
 
+// One malformed record never drops a whole dataset: the shipped Use This Instead list has
+// had rules whose oldPackageId is a number (08 §2.3).
+func TestCommunityDataToleratesBadRecords(t *testing.T) {
+	t.Parallel()
+	e := loadoutEnv(t)
+	payloads := map[string]string{
+		"rules": `{"timestamp":1,"rules":{}}`,
+		"steamdb": `{"version":1,"database":{"41":"broken","42":{"packageId":"Tester.Gone","name":"Gone"},
+			"43":{"packageId":7,"name":"Numeric"},"294100":{"appid":true,"packageId":"ludeon.rimworld"}}}`,
+		"replacements": `{"version":"v","rules":[
+			{"oldWorkshopId":"1797397487","oldPackageId":1797397487,"oldName":"Numeric","newWorkshopId":"2195469123","newPackageId":"Tester.Numeric2","newVersions":["1.6"]},
+			{"oldWorkshopId":"1001","oldPackageId":"Tester.A","oldAuthor":null,"newWorkshopId":"9999","newPackageId":"Tester.A2","newName":"A Continued","newVersions":["1.6",1.7]},
+			{"oldWorkshopId":"1002","oldPackageId":{"bad":true},"newPackageId":"tester.b2"},
+			{"oldWorkshopId":"1003","oldPackageId":null,"newPackageId":"tester.c2"}]}`,
+	}
+	for _, d := range app.Datasets {
+		path := filepath.Join(e.Root, "sources", d.File)
+		e.WriteFile(path, payloads[d.Key])
+		e.MustRun("config", "set", "data."+d.Key+".url", path)
+	}
+	e.MustRun("data", "update")
+	if r := e.App.ReplacementFor("", "tester.a"); r == nil || r.NewPackageID != "tester.a2" || strings.Join(r.NewVersions, ",") != "1.6,1.7" {
+		t.Fatalf("valid rule not loaded beside the numeric one: %+v", r)
+	}
+	if r := e.App.ReplacementFor("1797397487", ""); r == nil || r.NewPackageID != "tester.numeric2" {
+		t.Fatalf("numeric oldPackageId rule: %+v", r)
+	}
+	if r := e.App.ReplacementFor("1003", ""); r == nil || r.NewPackageID != "tester.c2" {
+		t.Fatalf("null oldPackageId rule: %+v", r)
+	}
+	if r := e.App.ReplacementFor("1002", ""); r != nil {
+		t.Fatalf("rule with an object oldPackageId loaded: %+v", r)
+	}
+	if w, ok := e.App.WorkshopFor("tester.gone"); !ok || w.WorkshopID != "42" {
+		t.Fatalf("steamDB index dropped by a broken entry: %+v %v", w, ok)
+	}
+	if _, ok := e.App.WorkshopFor("ludeon.rimworld"); ok {
+		t.Fatal("app entry indexed")
+	}
+}
+
 // D1–D3 (08 §2.3): download, all-or-nothing replacement, and what the data adds to Can it run.
 func TestCommunityData(t *testing.T) {
 	t.Parallel()
