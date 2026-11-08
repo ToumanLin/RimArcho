@@ -10,13 +10,20 @@ const info = (description = "old", refreshing = true, error = "") => ({
 async function setup({ folder = { done: true }, space = (path) => ({ path, free: 50e9 }) } = {}) {
   const screen = new Element("div"), S = { screen: "guide" }, chosen = [];
   let now = 0, calls = 0, response = info(), switchWay, pathEditor;
-  const timers = [], delays = [];
+  const timers = [], delays = [], gameCalls = [];
   const el = (tag, cls, text) => new Element(tag, cls, text);
   const guide = await loadModules("./guide.js", {
     "./fields.js": { copyablePath: (n) => n, editablePath: (n) => n, pathContent: (n) => n },
     "./state.js": { S, $: () => screen, el, api: {
       GuideFind: async () => [], GuideDownloadInfo: async () => { calls++; return await response; },
       ManagedFolder: async () => folder, FolderSpace: async (path) => space(path), ChooseManagedFolder: async (path) => { chosen.push(path); },
+      // as view.GameAt: the version's first name not among the environments or pending
+      GuideGame: async (path, pending) => {
+        gameCalls.push([path, pending]);
+        let name = "1.6-2";
+        for (let i = 3; pending.includes(name); i++) name = "1.6-" + i;
+        return { name, game: path, version: "1.6.4871", launch: "direct" };
+      },
     }, T: s => s, Tf: s => s, errText: String, say() {} },
     "./screens.js": {
       page: () => el("div"),
@@ -32,7 +39,7 @@ async function setup({ folder = { done: true }, space = (path) => ({ path, free:
   await guide.start();
   if (folder.done) { switchWay(1); await flush(); }
   return {
-    screen, S, timers, delays, guide, chosen, choosePath: (value) => pathEditor.done(value),
+    screen, S, timers, delays, guide, chosen, gameCalls, choosePath: (value) => pathEditor.done(value),
     calls: () => calls, now: () => now, respond: value => { response = value; },
     switchWay: n => switchWay(n),
     changeDirectory(value) { screen.querySelectorAll("button").find(b => b.textContent === "change…").onclick(); pathEditor.done(value); },
@@ -120,4 +127,14 @@ test("a managed folder already chosen, or adding another game, has no folder ste
   const h = await setup();
   assert.equal(h.screen.querySelectorAll(".st").length, 3);
   assert.match(h.screen.querySelector(".st.cur").textContent, /find the game/);
+});
+
+test("two folders of one version added in one pass get different names", async () => {
+  const h = await setup();
+  h.switchWay(0); await flush();
+  const add = () => h.screen.querySelectorAll("button").find(b => b.textContent === "add this folder");
+  add().onclick(); await h.choosePath("D:\\Game2"); await flush();
+  add().onclick(); await h.choosePath("D:\\Game3"); await flush();
+  assert.deepEqual(h.gameCalls.map(([, pending]) => pending), [[], ["1.6-2"]]);
+  assert.deepEqual(h.screen.querySelectorAll(".game .field").map(i => i.value), ["1.6-2", "1.6-3"]);
 });

@@ -318,11 +318,12 @@ func (s *API) GuideFind() []view.GameFound {
 	return view.FindGames(r)
 }
 
-// GuideGame checks a game folder the player typed.
-func (s *API) GuideGame(path string) (*view.GameFound, error) {
+// GuideGame checks a game folder the player typed; pending are the names the page already
+// proposes for games not added yet, so the suggested name differs from them.
+func (s *API) GuideGame(path string, pending []string) (*view.GameFound, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return view.GameAt(s.a, path)
+	return view.GameAt(s.a, path, pending...)
 }
 
 // GuideScan scans the environments one after another in child processes and returns at

@@ -533,8 +533,10 @@ func FindGames(a *app.App) []GameFound {
 	return out
 }
 
-// GameAt is a game folder the player typed (when detection finds nothing).
-func GameAt(a *app.App, path string) (*GameFound, error) {
+// GameAt is a game folder the player typed (when detection finds nothing). pending are the
+// names already proposed on the page for games not added yet: the suggested name avoids
+// them as well as the environments, so two games of one version get 1.6-2 and 1.6-3.
+func GameAt(a *app.App, path string, pending ...string) (*GameFound, error) {
 	path = strings.Trim(strings.TrimSpace(path), `"'`)
 	if path == "" {
 		return nil, errors.New(T("type the game folder"))
@@ -545,6 +547,9 @@ func GameAt(a *app.App, path string) (*GameFound, error) {
 	envs, _ := a.Store.Envs()
 	taken := map[string]bool{}
 	g := &GameFound{Game: path, Version: env.ReadGameVersion(path), Launch: "direct", UserData: a.DefaultUserData()}
+	for _, n := range pending {
+		taken[strings.TrimSpace(n)] = true
+	}
 	for _, e := range envs {
 		taken[e.Name] = true
 		if env.PathKey(e.GameRoot) == env.PathKey(path) {
@@ -587,8 +592,12 @@ func AddGames(a *app.App, games []GameFound) ([]string, error) {
 	return out, err
 }
 
-// CreateGames registers installs without scanning or selecting them (16 §8.4).
+// CreateGames registers installs without scanning or selecting them (16 §8.4). The names
+// are checked first, all of them, so a bad or clashing name adds none of the games.
 func CreateGames(a *app.App, games []GameFound) ([]string, error) {
+	if err := checkGameNames(a, games); err != nil {
+		return nil, err
+	}
 	var out []string
 	for _, g := range games {
 		if g.Env != "" {
@@ -601,6 +610,31 @@ func CreateGames(a *app.App, games []GameFound) ([]string, error) {
 		out = append(out, name)
 	}
 	return out, nil
+}
+
+// checkGameNames refuses a batch whose names are invalid, repeat each other or belong to
+// an environment already.
+func checkGameNames(a *app.App, games []GameFound) error {
+	seen := map[string]bool{}
+	for _, g := range games {
+		if g.Env != "" {
+			continue
+		}
+		name := strings.TrimSpace(g.Name)
+		if err := app.ValidEnvName(name); err != nil {
+			return err
+		}
+		if seen[name] {
+			return errors.New(Tf("two games are named %s; give each its own name", name))
+		}
+		seen[name] = true
+		if e, err := a.Store.EnvByName(name); err != nil {
+			return err
+		} else if e != nil {
+			return errors.New(Tf("a game named %s is already added; give this one another name", name))
+		}
+	}
+	return nil
 }
 
 // PackImportText says what unpacking a pack did (pack import, 10 §4).

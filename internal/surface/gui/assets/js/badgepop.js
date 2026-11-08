@@ -11,6 +11,7 @@ box.setAttribute("role", "tooltip");
 let shown = null; // { k, key } of the row whose badge the popover is for
 let pinned = false;
 let hideTimer = 0;
+let dragging = false; // a row drag is running (16 §8.5): no popover may cover the drop rows
 // run(item, action) and write(action) come from Can it run (screens.js): the pinned popover
 // offers an item's actions as that page does.
 let runNeed = null, needWrite = () => "";
@@ -86,6 +87,14 @@ export function hide(force = false) {
 
 const rowKey = (it) => it.id || it.ref;
 
+// rowDrag: lists.js says when a row drag starts and ends. Starting closes the popover, even
+// a pinned one (the press that starts a drag may have pinned it), and while the drag runs
+// passing over a badge shows nothing, so the rows under the pointer stay a drop target.
+export function rowDrag(on) {
+  dragging = on;
+  if (on) hide(true);
+}
+
 // wireBadges hooks one list's rows: item(i) is the row's item, status(it) its icon.
 export function wireBadges(k, rows, item, status) {
   listen();
@@ -98,7 +107,7 @@ export function wireBadges(k, rows, item, status) {
   };
   rows.addEventListener("mouseover", (e) => {
     const t = target(e);
-    if (!t || pinned) return;
+    if (!t || pinned || dragging) return;
     show(k, t.it, t.st, t.s);
   });
   rows.addEventListener("mouseout", (e) => {

@@ -368,8 +368,8 @@ function rowStep(f, env, moved) {
 function launchStep(f) {
   const s = step("03", "hm-s3", T("launch"));
   const live = running(), starting = !live && launching > Date.now();
-  const severity = !live && !starting ? f?.memory?.assessment?.ramSeverity : "";
-  const b = el("button", "hm-go" + (["severe", "warning"].includes(severity) ? " memory-" + severity : "") + (live ? " running" : "") + (starting ? " starting" : "") + (arrived ? " arrived" : ""));
+  const severity = ramShown(f);
+  const b = el("button", "hm-go" + (severity ? " memory-" + severity : "") + (live ? " running" : "") + (starting ? " starting" : "") + (arrived ? " arrived" : ""));
   b.dataset.envWrite = "launch";
   arrived = false;
   const top = el("div", "top");
@@ -572,6 +572,29 @@ function actLine(title, text, go) {
   return b;
 }
 
+// ramShown: the RAM state ▶ shows for the row ("severe", "warning" or ""); none while the
+// game runs or starts.
+function ramShown(f) {
+  if (running() || launching > Date.now()) return "";
+  const s = f?.memory?.assessment?.ramSeverity;
+  return s === "severe" || s === "warning" ? s : "";
+}
+
+// showMemory keeps a new estimate for the row. Only ▶'s RAM state shows it, so step 03 is
+// redrawn, in place, only when that state changes: redrawing the page every refresh would
+// restart its animations (the running game's dot blinks again) and costs a frame (16 §10).
+function showMemory(r, m) {
+  r.memory = m;
+  if (S.popup || pendingRow) return;
+  const s3 = document.querySelector(".page.home .hm-s3"), b = s3?.querySelector(".hm-go");
+  if (!b) return;
+  const was = b.classList.contains("memory-severe") ? "severe" : b.classList.contains("memory-warning") ? "warning" : "";
+  if (was === ramShown(r)) return;
+  const focused = focusedStep() === "3";
+  s3.replaceWith(launchStep(r));
+  if (focused) focusStep(3);
+}
+
 // Late estimates must belong to the row, environment and list that are still shown.
 async function refreshHomeMemory(expected) {
   clearTimeout(memoryTimer);
@@ -581,8 +604,7 @@ async function refreshHomeMemory(expected) {
   try {
     let m = await api.HomeMemory();
     if (!current() || m?.env !== r.envName || m?.plan !== r.plan) return;
-    r.memory = m;
-    if (!S.popup) draw();
+    showMemory(r, m);
     if (!m.assessment.estimated || m.assessment.stale) {
       const first = await api.PlanLoadCost(r.plan);
       if (!current()) return;
@@ -594,8 +616,7 @@ async function refreshHomeMemory(expected) {
         if (result.loading) continue;
         m = await api.HomeMemory();
         if (!current() || m?.env !== r.envName || m?.plan !== r.plan || m.token !== r.memory.token) return;
-        r.memory = m;
-        if (!S.popup) draw();
+        showMemory(r, m);
         break;
       }
     }
