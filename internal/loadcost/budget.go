@@ -44,3 +44,42 @@ func Spill(g Game, vramLow, vramHigh, dedicated int64) (low, high int64) {
 	usable := int64(float64(max(dedicated, 0)) * Coef.UsableVRAM)
 	return max(vramLow-usable, 0), max(vramHigh-usable, 0)
 }
+
+// Watermark17 is the VRAM (baseline included) at which 1.7 stops uploading and starts
+// evicting textures on a card with dedicated bytes, or 0 when the card is unknown.
+// Waylith 1.7.5000 TextureResidency.HighWatermark: max(budget/2, min(0.8 budget,
+// budget − 512 MiB)), budget being the driver-reported VMA heap budget.
+func Watermark17(dedicated int64) int64 {
+	if dedicated <= 0 {
+		return 0
+	}
+	budget := int64(float64(dedicated) * Coef.Tex17Budget)
+	return max(budget/2, min(budget/5*4, budget-512<<20))
+}
+
+// Cap17 returns how much to take off a 1.7 mod-only Report on a card with dedicated
+// bytes of VRAM. 1.7 uploads textures on demand (the default without -EagerTextureUpload)
+// and evicts least-recently-used ones to the disk cache above Watermark17, so texture
+// VRAM never exceeds the watermark less the vanilla baseline, and the RAM that grows
+// with resident textures is bounded the same way. Unknown cards (dedicated <= 0) and
+// other games are left uncapped.
+func Cap17(g Game, r Report, dedicated int64) (ramLow, ramHigh, vramLow, vramHigh int64) {
+	if g != Game17 || dedicated <= 0 {
+		return 0, 0, 0, 0
+	}
+	_, base := Baseline(Game17)
+	room := max(Watermark17(dedicated)-base, 0)
+	var tRAMLow, tRAMHigh, tVRAMLow, tVRAMHigh int64
+	for _, p := range r.Parts {
+		if p.Key == "textures" || p.Key == "dds" {
+			tRAMLow += p.RAMLow
+			tRAMHigh += p.RAMHigh
+			tVRAMLow += p.VRAMLow
+			tVRAMHigh += p.VRAMHigh
+		}
+	}
+	cut := func(v, limit int64) int64 { return max(v-limit, 0) }
+	return cut(tRAMLow, int64(float64(room)*Coef.Tex17RAMPerVRAMLow)),
+		cut(tRAMHigh, int64(float64(room)*Coef.Tex17RAMPerVRAMHigh)),
+		cut(tVRAMLow, room), cut(tVRAMHigh, room)
+}
