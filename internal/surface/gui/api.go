@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -66,8 +67,9 @@ type API struct {
 	// building is the pack this window's build child is making ("" none).
 	building  string
 	buildRead buildPageReader
-	live      view.LiveTracker // the running game's log (06 §6)
-	logPath   string           // the log page's Player.log and its clusters' first lines
+	live      view.LiveTracker  // the running game's log (06 §6)
+	liveSt    *app.LoadoutState // the loadout Live last followed the game with (liveStateLocked)
+	logPath   string            // the log page's Player.log and its clusters' first lines
 	logLinks  map[string]string
 	x         exchange // import and export (exchange.go)
 	// removedRule is the rule the editor removed last, for its undo (rules.go).
@@ -182,7 +184,7 @@ func (s *API) checkMonitor() {
 		} else {
 			out, err = app.ChildMonitor(home, env)
 		}
-		if err != nil || !strings.Contains(out, "installed ") && !strings.Contains(out, "plan:") && !strings.Contains(out, "replaced ") {
+		if err != nil || !monitorChanged(out) {
 			return
 		}
 		s.mu.Lock()
@@ -191,6 +193,17 @@ func (s *API) checkMonitor() {
 		s.send("scan", map[string]any{"ok": true, "text": view.T("Archo Monitor is ready")})
 	}()
 }
+
+// monitorChanged reports whether `monitor install` changed something the page shows: it
+// copied or replaced the Monitor, registered or merged its source, or edited a plan
+// (cmds.MonitorLines). The lines naming the plans it left alone ("plan:X: not added: no
+// Harmony") and the deferred replacement while a game runs come on every start and change
+// nothing; until 1.0.6 they dropped the window's board each time (VM round 1.0.6, B2).
+func monitorChanged(out string) bool {
+	return monitorChangeRe.MatchString(out)
+}
+
+var monitorChangeRe = regexp.MustCompile(`\binstalled \S+ to |\breplaced .*\(a development build changed\)|\bregistered src:|\bmerged \d+ older monitor|\(one undoable edit\)`)
 
 // Start is what the page needs once: the language, its text table, the commands.
 type Start struct {
@@ -642,10 +655,29 @@ func (s *API) Live() (*view.Live, error) {
 	defer perftrace.Span("Live")()
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.board == nil || s.board.St == nil {
+	st := s.liveStateLocked()
+	if st == nil {
 		return &view.Live{}, nil
 	}
-	return s.live.Update(s.a, s.board.St)
+	return s.live.Update(s.a, st)
+}
+
+// liveStateLocked is the loadout Live follows the game with: the board's, else the last one
+// it used while that is still the current environment's. Invalidations drop the board until
+// the page reads the workspace again; the running game must not vanish meanwhile (a poll
+// then would also take the gap for the game's exit). VM round 1.0.6, B2.
+func (s *API) liveStateLocked() *app.LoadoutState {
+	if s.board != nil && s.board.St != nil {
+		s.liveSt = s.board.St
+		return s.liveSt
+	}
+	if s.liveSt == nil {
+		return nil
+	}
+	if e, err := s.a.Env(); err != nil || e == nil || e.ID != s.liveSt.Ix.Env.ID {
+		s.liveSt = nil
+	}
+	return s.liveSt
 }
 
 func (s *API) Stamp() string {
@@ -1652,10 +1684,7 @@ func (s *API) startAnalyzeOf(list string) bool {
 func (s *API) Palette(query string) []view.PalEntry {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	var all []view.PalEntry
-	for _, c := range view.Commands {
-		all = append(all, view.PalEntry{Kind: view.PalCommand, ID: c.ID, Name: c.Name(), Alias: c.En, Desc: c.Desc})
-	}
+	all := view.CommandEntries()
 	cur := ""
 	if s.board != nil {
 		cur = s.board.EnvName

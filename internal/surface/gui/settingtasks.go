@@ -162,16 +162,17 @@ func (s *API) runSettingTask(a *app.App, id, kind string, argv []string) (string
 		res, err := a.UpdateDataProgress(nil, false, func(key string, done int) {
 			s.tasks.Update(id, func(t *app.Task) { t.Total, t.Done, t.Phase = len(app.Datasets), done, key })
 		})
-		var parts []string
+		var parts, failed []string
 		for _, u := range res {
 			if u.Err != nil {
-				parts = append(parts, u.Dataset.Key+": "+u.Err.Error())
+				failed = append(failed, u.Dataset.Key+": "+u.Err.Error())
 			} else {
 				parts = append(parts, view.Tf("%s: %d entries", u.Dataset.Key, u.Info.Entries))
 			}
 		}
 		if err != nil {
-			return "", errors.New(err.Error() + "  " + strings.Join(parts, "  "))
+			// Nothing was replaced (08 §2.3 D2): never show the downloaded counts as if stored.
+			return "", errors.New(strings.Join(append([]string{err.Error()}, failed...), "  "))
 		}
 		return view.T("community data updated") + "  " + strings.Join(parts, "  "), nil
 	default:

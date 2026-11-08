@@ -30,6 +30,9 @@ var Coef = struct {
 	Tex17VRAMHigh           float64
 	Tex17RAMLow             float64
 	Tex17RAMHigh            float64
+	Tex17Budget             float64
+	Tex17RAMPerVRAMLow      float64
+	Tex17RAMPerVRAMHigh     float64
 	TextureRAM16Low         float64
 	TextureRAM16High        float64
 	TextureRAM16Knee        int64
@@ -64,6 +67,14 @@ var Coef = struct {
 	Tex17VRAMHigh: 2.6,
 	Tex17RAMLow:   1.5,
 	Tex17RAMHigh:  3.5,
+	// Those rates hold only while the card has room: 1.7 uploads textures on demand and
+	// stops at a watermark of the driver's VRAM budget (Cap17). The 24 GB run's repeat
+	// launches stopped at 15.3 GB, which the watermark gives for a budget of 0.78 × the
+	// dedicated memory. Across the measured runs, mod RAM was 1.1–2.1× the mod VRAM
+	// actually resident (repeat launches 1.1–1.5, the 484-mod first launch 2.1).
+	Tex17Budget:         0.78,
+	Tex17RAMPerVRAMLow:  1.1,
+	Tex17RAMPerVRAMHigh: 2.1,
 	// Unity 1.6 VM calibration: 2026-10-31 baseline and light/texture groups,
 	// extended on 2026-11-01 to 7.5 GiB combined texture payload. Above the
 	// original 3 GiB coverage, retained private bytes grow more slowly.

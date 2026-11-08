@@ -472,5 +472,7 @@
   "errors when %s and %d more saves were last loaded": "上次载入 %s 及另外 %d 个存档时的报错",
   "errors when %s was last played": "上次游玩 %s 时的报错",
   "errors when the game was last played": "上次游玩时的报错",
-  "errors whose phase was not recorded": "未记录阶段的报错"
+  "errors whose phase was not recorded": "未记录阶段的报错",
+  "On this graphics card the game keeps about %s of VRAM; about %s of textures stay in the disk cache and load when drawn. The totals above count only what is kept; the texture rows do not.": "在这张显卡上，游戏最多保留约 %s 显存；另有约 %s 的贴图留在磁盘缓存里，画到时再载入。上面的总数只算保留的部分，贴图那几行没有扣掉",
+  "The game keeps only what fits this card; about %s of textures load from the disk cache when drawn, which may stutter but does not stop the game.": "游戏只在显存里保留这张显卡放得下的贴图；约 %s 的贴图画到时才从磁盘缓存载入，可能会卡顿，但不影响进游戏。"
 }

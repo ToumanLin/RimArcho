@@ -17,13 +17,15 @@ PER_DAY = "30"         # reports a day from everyone; 0 stops sending
 binding = "COUNTS"
 id = "78f113b31b2744a4bccd1184ecb10ebc"
 
-# one report a minute per sender (needs Wrangler 4.36 or later)
-[[ratelimits]]
-name = "PER_MINUTE"
-namespace_id = "1001"
+# one report a minute and PER_IP_DAY a day per sender, exact: a Durable Object per sender
+# (SendGate in worker.mjs; SQLite storage, on the free plan). It replaced the approximate
+# rate-limit binding PER_MINUTE after the 1.0.6 VM round.
+[[durable_objects.bindings]]
+name = "GATE"
+class_name = "SendGate"
 
-  [ratelimits.simple]
-  limit = 1
-  period = 60
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SendGate"]
 
 # secret, never in this file: GITHUB_APP_KEY, the App's private key (README step 4)

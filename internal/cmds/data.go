@@ -43,6 +43,24 @@ func dataUpdateCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 	}
 	res, err := c.App.UpdateData(a.Pos, a.Bool("dry-run"))
+	if err != nil && !a.Bool("dry-run") {
+		// The update is all or nothing (08 §2.3 D2): nothing was replaced, so no dataset
+		// reads as updated; each names its failure or the version still stored.
+		st := c.App.DataStatus()
+		d, root := render.New("community data not updated")
+		for _, u := range res {
+			line := "not updated" // no readable record: none stored yet, or it is locked
+			switch {
+			case u.Err != nil:
+				line = "failed: " + u.Err.Error()
+			case st[u.Dataset.Key] != nil:
+				line = "not updated; kept version " + st[u.Dataset.Key].Version
+			}
+			root.KV(u.Dataset.Key, line)
+		}
+		msg := strings.TrimPrefix(err.Error(), "community data not updated: ") // the title says it
+		return nil, fmt.Errorf("%s\n%s", msg, d.String())
+	}
 	title := "community data updated"
 	if a.Bool("dry-run") {
 		title = "data update: dry run, nothing downloaded"

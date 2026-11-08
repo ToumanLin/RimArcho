@@ -9,7 +9,7 @@ test("replacing rows keeps visible identities valid before the filter answers", 
   const lists=await loadModules("./lists.js", {
     "./state.js":{S,key,cur:k=>S.cols[k].items[S.cols[k].view[S.cols[k].cursor]],col:k=>S.cols[k],$:()=>null,$$:()=>[],el:tag=>new Element(tag),factText:()=>{},esc:String,api:{},T:s=>s,Tf:s=>s,AREAS:[],ROW_H:28},
     "./icons.js":{icon:{},sourceIcon:()=>"",statusIcon:()=>""},
-    "./badgepop.js":{wireBadges:()=>{}},"./motion.js":{bump:()=>{}},
+    "./badgepop.js":{wireBadges:()=>{},rowDrag:()=>{}},"./motion.js":{bump:()=>{}},
     "./screens.js":{beginPageRead:()=>{},pageLoading:()=>false},
   });
   const keep=lists.setItems(0,[{id:"b"},{id:"a"}]);

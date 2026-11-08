@@ -91,3 +91,49 @@ func TestUnity16TextureVRAMSplit(t *testing.T) {
 		}
 	}
 }
+
+// The 24 GB card's repeat launches stopped at 15,283 MB of VRAM (research 2026-10-24
+// §4.2); the watermark must reproduce that, and an 8 GiB card keeps far less.
+func TestWatermark17MatchesMeasuredCap(t *testing.T) {
+	const mib = int64(1 << 20)
+	if w := Watermark17(24564 * mib); w < 15000*mib || w > 15600*mib {
+		t.Fatalf("24 GB watermark %d MiB, measured 15283", w/mib)
+	}
+	if w := Watermark17(8192 * mib); w < 4800*mib || w > 5200*mib {
+		t.Fatalf("8 GiB watermark %d MiB", w/mib)
+	}
+	if Watermark17(0) != 0 {
+		t.Fatal("unknown card has a watermark")
+	}
+}
+
+func TestCap17(t *testing.T) {
+	const gib = int64(1 << 30)
+	r := Report{Parts: []Part{
+		{Key: "textures", RAMLow: 9 * gib, RAMHigh: 21 * gib, VRAMLow: 5 * gib, VRAMHigh: 15 * gib},
+		{Key: "dds", RAMLow: 6 * gib, RAMHigh: 14 * gib, VRAMLow: 4 * gib, VRAMHigh: 11 * gib},
+		{Key: "defs", RAMLow: gib, RAMHigh: 2 * gib},
+	}}
+	if a, b, c, d := Cap17(Game16, r, 8*gib); a+b+c+d != 0 {
+		t.Fatal("1.6 capped")
+	}
+	if a, b, c, d := Cap17(Game17, r, 0); a+b+c+d != 0 {
+		t.Fatal("unknown card capped")
+	}
+	_, base := Baseline(Game17)
+	room := Watermark17(8*gib) - base
+	ramLow, ramHigh, vramLow, vramHigh := Cap17(Game17, r, 8*gib)
+	if 9*gib-vramLow != room || 26*gib-vramHigh != room {
+		t.Fatalf("texture VRAM not cut to the room %d: %d %d", room, vramLow, vramHigh)
+	}
+	if left := 15*gib - ramLow; left != int64(float64(room)*Coef.Tex17RAMPerVRAMLow) {
+		t.Fatalf("low RAM left %d", left)
+	}
+	if left := 35*gib - ramHigh; left != int64(float64(room)*Coef.Tex17RAMPerVRAMHigh) {
+		t.Fatalf("high RAM left %d", left)
+	}
+	// A big card with room cuts nothing.
+	if a, b, c, d := Cap17(Game17, Report{Parts: r.Parts[2:]}, 24*gib); a+b+c+d != 0 {
+		t.Fatal("cut without textures")
+	}
+}

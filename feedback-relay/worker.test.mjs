@@ -1,10 +1,10 @@
 // The feedback relay without Cloudflare or GitHub: node --test "feedback-relay/*.test.mjs".
-// A fake GitHub answers the three calls, a Map stands in for KV, a counter for the
-// PER_MINUTE binding.
+// A fake GitHub answers the three calls, a Map stands in for KV, and the real SendGate class
+// runs behind a fake Durable Object namespace with Map storage.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { generateKeyPairSync, createVerify } from "node:crypto";
-import { handle, clean, defuse, appJWT, pkcs8, forgetToken, LIMITS } from "./worker.mjs";
+import { handle, clean, defuse, appJWT, pkcs8, forgetToken, LIMITS, SendGate } from "./worker.mjs";
 
 const keys = generateKeyPairSync("rsa", {
   modulusLength: 2048,
@@ -19,14 +19,33 @@ function kv() {
   return { m, get: async (k) => m.get(k) ?? null, put: async (k, v) => void m.set(k, v) };
 }
 
-// perMinute lets one report through per key, like { limit = 1, period = 60 }.
-function perMinute() {
-  const seen = new Set();
-  return { limit: async ({ key }) => ({ success: !seen.has(key) && !!seen.add(key) }) };
+// gates is a Durable Object namespace: one SendGate per name, each with its own storage.
+function gates() {
+  const objects = new Map();
+  const storage = () => {
+    const m = new Map();
+    return {
+      m,
+      alarm: 0,
+      get: async (k) => m.get(k),
+      put: async (k, v) => void m.set(k, structuredClone(v)),
+      setAlarm: async function (t) { this.alarm = t; },
+      deleteAll: async () => m.clear(),
+    };
+  };
+  return {
+    objects,
+    idFromName: (name) => name,
+    get: (id) => {
+      if (!objects.has(id)) objects.set(id, new SendGate({ storage: storage() }));
+      const o = objects.get(id);
+      return { fetch: (url, init) => o.fetch(new Request(url, init)) };
+    },
+  };
 }
 
 function env(over = {}) {
-  return { APP_ID: "123456", GITHUB_APP_KEY: keys.privateKey, REPO: "ToumanLin/RimArcho", LABEL: "feedback", COUNTS: kv(), PER_MINUTE: perMinute(), ...over };
+  return { APP_ID: "123456", GITHUB_APP_KEY: keys.privateKey, REPO: "ToumanLin/RimArcho", LABEL: "feedback", COUNTS: kv(), GATE: gates(), ...over };
 }
 
 function github({ labelFails = false, issueStatus = 201 } = {}) {
@@ -57,8 +76,9 @@ function post(data, { ip = "203.0.113.9", agent = "RimArcho/0.9.0", method = "PO
   });
 }
 
-async function send(e, gh, data, opts) {
-  const res = await handle(post(data, opts), e, { fetch: gh.fn, now: () => NOW });
+async function send(e, gh, data, opts = {}) {
+  const at = opts.at ?? NOW;
+  const res = await handle(post(data, opts), e, { fetch: gh.fn, now: () => at });
   return { status: res.status, data: await res.json() };
 }
 
@@ -99,25 +119,44 @@ test("the installation token is reused", async () => {
 
 test("one report a minute, a daily cap per sender and for everyone", async () => {
   forgetToken();
+  const slow = { status: 429, data: { error: "slow_down" } };
   let e = env(), gh = github();
   assert.equal((await send(e, gh, { title: "1", body: "x" })).status, 200);
-  assert.deepEqual(await send(e, gh, { title: "2", body: "x" }), { status: 429, data: { error: "slow_down" } });
+  // the 1.0.6 VM round's case: the same sender 13 s later
+  assert.deepEqual(await send(e, gh, { title: "2", body: "x" }, { at: NOW + 13e3 }), slow);
+  assert.deepEqual(await send(e, gh, { title: "3", body: "x" }, { at: NOW + 59999 }), slow);
+  assert.equal((await send(e, gh, { title: "4", body: "x" }, { at: NOW + 60e3 })).status, 200, "a minute later");
+  assert.equal((await send(e, gh, { title: "5", body: "x" }, { ip: "198.51.100.7", at: NOW + 61e3 })).status, 200, "another sender is not held up");
+  assert.equal(gh.calls.filter((c) => c.url.endsWith("/issues")).length, 3, "refused reports file nothing");
 
-  // per sender: the minute limiter always passes, PER_IP_DAY stops the third
-  e = env({ PER_IP_DAY: "2", PER_MINUTE: { limit: async () => ({ success: true }) } });
-  for (const t of ["1", "2"]) assert.equal((await send(e, gh, { title: t, body: "x" })).status, 200);
-  assert.deepEqual(await send(e, gh, { title: "3", body: "x" }), { status: 429, data: { error: "ip_daily" } });
-  assert.equal((await send(e, gh, { title: "4", body: "x" }, { ip: "198.51.100.7" })).status, 200, "another sender still can");
+  // per sender: PER_IP_DAY stops the third, a minute apart each
+  e = env({ PER_IP_DAY: "2" });
+  for (const i of [0, 1]) assert.equal((await send(e, gh, { title: String(i), body: "x" }, { at: NOW + i * 60e3 })).status, 200);
+  assert.deepEqual(await send(e, gh, { title: "3", body: "x" }, { at: NOW + 120e3 }), { status: 429, data: { error: "ip_daily" } });
+  assert.equal((await send(e, gh, { title: "4", body: "x" }, { ip: "198.51.100.7", at: NOW + 120e3 })).status, 200, "another sender still can");
 
-  // everyone: PER_DAY across senders
+  // everyone: PER_DAY across senders; a refused report does not use the sender's minute
   e = env({ PER_DAY: "2" });
   assert.equal((await send(e, gh, { title: "1", body: "x" }, { ip: "192.0.2.1" })).status, 200);
   assert.equal((await send(e, gh, { title: "2", body: "x" }, { ip: "192.0.2.2" })).status, 200);
   assert.deepEqual(await send(e, gh, { title: "3", body: "x" }, { ip: "192.0.2.3" }), { status: 429, data: { error: "daily" } });
+  const [gate3] = [...e.GATE.objects.values()].slice(-1);
+  assert.deepEqual(gate3.storage.m.get("s"), { last: 0, prev: 0, n: 0 });
 
-  // the counters are per day
-  const keysToday = [...e.COUNTS.m.keys()];
-  assert.ok(keysToday.includes("all:2026-10-31") && keysToday.every((k) => k.endsWith(":2026-10-31")));
+  // the KV counter is per day; the gates clean up two days after their first report
+  assert.deepEqual([...e.COUNTS.m.keys()], ["all:2026-10-31"]);
+  const [gate1] = e.GATE.objects.values();
+  assert.equal(gate1.storage.alarm, NOW + 2 * 86400e3);
+  await gate1.alarm();
+  assert.equal(gate1.storage.m.size, 0);
+});
+
+test("a GitHub failure gives the sender's minute back", async () => {
+  forgetToken();
+  const e = env();
+  assert.equal((await send(e, github({ issueStatus: 500 }), { title: "1", body: "x" })).status, 502);
+  assert.equal((await send(e, github(), { title: "1", body: "x" }, { at: NOW + 5e3 })).status, 200, "sent again at once");
+  assert.deepEqual(await send(e, github(), { title: "2", body: "x" }, { at: NOW + 10e3 }), { status: 429, data: { error: "slow_down" } });
 });
 
 test("refusals: not configured, other clients, wrong method, bad or empty or long reports", async () => {

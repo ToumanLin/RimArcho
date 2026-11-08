@@ -95,7 +95,7 @@ const descTextures = `Convert mods' PNG textures to DDS next to them for lighter
 
 const descUninstall = `Preview what uninstalling RimArcho would delete, move or keep (read-only). No tool uninstalls: that is the player's decision alone.`
 
-const descMemory = `Estimate resident RAM, loading RAM and VRAM for a plan. Available physical RAM below loading low is severe, below high warning, otherwise ok; unknown stays unknown. VRAM shortages warn only. Unity 1.6 RAM is VM-calibrated. Reads headers and caches estimates. Limits: guide estimate_memory.`
+const descMemory = `Estimate resident RAM, loading RAM and VRAM for a plan. Commit room below loading low is severe, free RAM below high warning, else ok; unknown stays unknown. 1.7 textures cap at the card (texturesOnDemand); only 1.6 warns on VRAM. Reads headers, caches estimates. Limits: guide estimate_memory.`
 
 const descListSaves = `Saves of every game and pack, grouped by colony, newest first: each with its sv: reference, in-game day, the list it matches and whether it loads with that list. mod=<ref> finds the saves that use a Mod; attention=true keeps those with warnings or errors. Read-only.`
 
