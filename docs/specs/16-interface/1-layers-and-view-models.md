@@ -33,7 +33,7 @@ surface/tui   (Bubble Tea)        surface/gui   (Wails services + assets/*.html|
 | `modsettings.go` | Mod library > Mod settings (§2.9): one row per settings file of the current list, and one file's stored values as text | `ModSettingsRows`, `ModSettingsFileDetail`, `SettingText` |
 | `verbs.go` | Verbs: enable / disable, stage, put back, move, place at a position, position input candidates (§3.5, §3.6) | `Toggle`, `Stage`, `Unstage`, `StageAll`, `MoveBy`, `Place`, `PosOptions`, `ObjectOf`, `Positions`, `PlacedText`, `NowAt` |
 | `preview.go` | Sort, save, launch: direct execution and read-only preview (§6); undo, redo, put all back, switch copies | `Run`, `Outcome`, `RefusalLines`, `DryRun`, `Apply`, `UndoRedo`, `RestoreAll`, `Swap` |
-| `palette.go` | Command table (names in the interface language, English aliases, **command IDs rather than keys**), scoring and ranking (§3.5) | `Commands`, `PalScore`, `PalRank` |
+| `palette.go` | Command table (names in the interface language, English aliases, **command IDs rather than keys**), scoring and ranking (§3.5) | `Commands`, `CommandEntries`, `PalScore`, `PalRank` |
 | `packs.go`, `packpage.go` | Pack list, each pack's page, create-a-pack page (four choices, summary, reasons for disabled controls), build progress, unfinished builds (§2.6, §2.7) | `PackRows`, `BuildPackPage`, `BuildPageOf`, `DefaultPackName`, `ProgressOf`, `UnfinishedRows` |
 | `logpage.go`, `monitorlog.go` | Game log page and its companion log area (§2.10) | `LogFiles`, `BuildLogPage`, `MonitorOf`, `LiveMonitor`, `MonitorKind`, `MonitorAdd` |
 | `settings.go` | Settings and environment pages (§2.8, §2.14) | `SettingsPage`, `BuildEnvPage`, `EnvGroups`, `SettingCommand` |

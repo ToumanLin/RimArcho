@@ -30,6 +30,7 @@ type palItem struct {
 	kind  palKind
 	name  string // shown
 	alias string // English alias of a command
+	match string // matches but is not shown: a command's ID
 	desc  string // matched last: package id and author of a mod, what a command does
 	run   func(m *model) tea.Cmd
 	score int
@@ -224,8 +225,8 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 // palCommands: every command of the main screen.
 func (m *model) palCommands() []palItem {
 	var out []palItem
-	for _, c := range view.Commands {
-		out = append(out, palItem{kind: palCommand, name: c.Name(), alias: c.En, desc: c.Desc, run: m.palRun(c.ID)})
+	for _, e := range view.CommandEntries() {
+		out = append(out, palItem{kind: palCommand, name: e.Name, alias: e.Alias, match: e.Match, desc: e.Desc, run: m.palRun(e.ID)})
 	}
 	return out
 }
@@ -276,7 +277,7 @@ func (m *model) palAll() []palItem {
 
 // palScore ranks one candidate for q (view.PalScore).
 func palScore(q string, it palItem) int {
-	return view.PalScore(q, view.PalEntry{Name: it.name, Alias: it.alias, Desc: it.desc})
+	return view.PalScore(q, view.PalEntry{Name: it.name, Alias: it.alias, Match: it.match, Desc: it.desc})
 }
 
 func (m *model) palFilter() {
@@ -284,7 +285,7 @@ func (m *model) palFilter() {
 	all := m.palAll()
 	entries := make([]view.PalEntry, len(all))
 	for i, it := range all {
-		entries[i] = view.PalEntry{Kind: int(it.kind), ID: strconv.Itoa(i), Name: it.name, Alias: it.alias, Desc: it.desc}
+		entries[i] = view.PalEntry{Kind: int(it.kind), ID: strconv.Itoa(i), Name: it.name, Alias: it.alias, Match: it.match, Desc: it.desc}
 	}
 	p.results = p.results[:0]
 	for _, e := range view.PalRank(p.query, entries) {

@@ -8,7 +8,9 @@ import (
 // 16 §3.5: word starts in any order, camel-case words, and typos.
 func TestPalScoreFuzzy(t *testing.T) {
 	t.Parallel()
-	e := func(name, alias, desc string) PalEntry { return PalEntry{Name: name, Alias: alias, Desc: desc} }
+	e := func(name, alias, desc string, match ...string) PalEntry {
+		return PalEntry{Name: name, Alias: alias, Desc: desc, Match: strings.Join(match, "")}
+	}
 	for _, c := range []struct {
 		q    string
 		e    PalEntry
@@ -18,16 +20,24 @@ func TestPalScoreFuzzy(t *testing.T) {
 		{"cube", e("Add Cube", "", ""), 6}, // suffix
 		{"d cu", e("Add Cube", "", ""), 5},
 		{"ad cu", e("Add Cube", "", ""), 4},
-		{"cu ad", e("Add Cube", "", ""), 4},                            // any order
-		{"lib hug", e("HugsLib", "", ""), 4},                           // camel case
-		{"ac", e("Add Cube", "", ""), 3},                               // subsequence
-		{"add cueb", e("Add Cube", "", ""), 2},                         // a swap
-		{"add cbu", e("Add Cube", "", ""), 0},                          // short words must be exact
-		{"addd cube", e("Add Cube", "", ""), 2},                        // an extra letter
-		{"sotr", e("x", "sort", ""), 2},                                // a swap in the alias
-		{"subscirbe", e("x", "subscribe", ""), 2},                      // a swap in a long word
-		{"vanila expnded", e("Vanilla Expanded Framework", "", ""), 3}, // letters in order
-		{"vanilka expnded", e("Vanilla Expanded Framework", "", ""), 2},
+		{"cu ad", e("Add Cube", "", ""), 4},                             // any order
+		{"lib hug", e("HugsLib", "", ""), 4},                            // camel case
+		{"ac", e("Add Cube", "", ""), 4},                                // initials
+		{"vfe", e("Vanilla Factions Expanded - Mechanoids", "", ""), 4}, // initials of neighbouring words
+		{"vem", e("Vanilla Factions Expanded - Mechanoids", "", ""), 2}, // not neighbours: letters in order
+		{"add cueb", e("Add Cube", "", ""), 3},                          // a swap
+		{"add cbu", e("Add Cube", "", ""), 0},                           // short words must be exact
+		{"addd cube", e("Add Cube", "", ""), 3},                         // an extra letter
+		{"sotr", e("x", "sort", ""), 3},                                 // a swap in the alias
+		{"subscirbe", e("x", "subscribe", ""), 3},                       // a swap in a long word
+		{"subscirbe", e("add a subscription", "", ""), 0},               // 3 edits from subscription
+		{"subscirbe", e("x", "", "", "subscribe"), 3},                   // the match name (a command's ID)
+		{"search files", e("x", "", "", "search files"), 6},
+		{"srt", e("x", "sort", ""), 2},                                 // letters in order
+		{"sotr", e("Echoes of the Rim", "", ""), 2},                    // letters in order across words
+		{"vanila expnded", e("Vanilla Expanded Framework", "", ""), 3}, // typos at word starts
+		{"vanilka expnded", e("Vanilla Expanded Framework", "", ""), 3},
+		{"vnl xpnd", e("Vanilla Expanded Framework", "", ""), 2},
 		{"cu cu", e("Add Cube", "", ""), 0}, // each query word takes its own word
 		{"git page", e("x", "", "+ Git repository download page"), 1},
 		{"xyzw", e("Add Cube", "", ""), 0},

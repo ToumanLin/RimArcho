@@ -1,15 +1,16 @@
 package view
 
 import (
+	"slices"
 	"sort"
 	"strings"
 	"unicode"
 )
 
-// The command palette (16 §3.5): commands (by their Chinese name or English alias), mods and
-// the other environments. Ranking: prefix > substring > word starts > subsequence > word
-// starts with typos > description; ties go to commands, then mods, then environments, then
-// the shorter name.
+// The command palette (16 §3.5): commands (by their name in the interface language, English
+// name or ID), mods and the other environments. Ranking: prefix > substring > word starts >
+// word starts with typos > subsequence > description; ties go to commands, then mods, then
+// environments, then the shorter name.
 
 // Command is one palette command; each interface maps the ID to what it does.
 type Command struct {
@@ -87,22 +88,54 @@ type PalEntry struct {
 	ID    string `json:"id"` // command id, environment name or instance id
 	Name  string `json:"name"`
 	Alias string `json:"alias,omitempty"`
+	Match string `json:"-"` // a further name that matches but is not shown: a command's ID
 	Desc  string `json:"desc,omitempty"`
 	Score int    `json:"-"`
 }
 
-// PalScore ranks one candidate for q (lower case): 6 prefix or suffix, 5 substring, 4 word
-// starts, 3 subsequence, 2 word starts with typos, 1 description, 0 no match. A suffix
-// counts as a prefix: a Chinese name ends in its head noun, the sort query matches both
-// automatic sorting and load-order rules. Word starts: every word of q begins a different
-// word of the name, in any order, so "ad cu" finds Add Cube and "lib hug" finds HugsLib.
+// CommandEntries are the palette entries of Commands, as both interfaces list them: the
+// name in the interface language, the English name as the alias, and the command's ID
+// (hyphens read as spaces) as a further name, so "subscribe" and "analyze" find their
+// commands whatever the names say.
+func CommandEntries() []PalEntry {
+	out := make([]PalEntry, len(Commands))
+	for i, c := range Commands {
+		out[i] = PalEntry{Kind: PalCommand, ID: c.ID, Name: c.Name(), Alias: c.En, Match: strings.ReplaceAll(c.ID, "-", " "), Desc: c.Desc}
+	}
+	return out
+}
+
+// PalScore ranks one candidate for q (lower case) against its name, alias and match: 6 prefix
+// or suffix, 5 substring, 4 word starts, 3 word starts with typos, 2 subsequence, 1
+// description, 0 no match. A suffix counts as a prefix: a Chinese name ends in its head
+// noun, the sort query matches both automatic sorting and load-order rules. Word starts:
+// every word of q begins a different word of the name, in any order, so "ad cu" finds Add
+// Cube and "lib hug" finds HugsLib; a one-word q may also be the initials of neighbouring
+// words ("vfe"). A typo at a word start outranks letters scattered in order: with a
+// thousand Mods, "sotr" is in order in a hundred long names but meant sort.
 func PalScore(q string, e PalEntry) int {
+	return newPalQuery(q).score(e)
+}
+
+// palQuery is a query split once for scoring many candidates.
+type palQuery struct {
+	q   string
+	qw  [][]rune
+	one bool // a single word of letters and digits only: initials may match
+}
+
+func newPalQuery(q string) palQuery {
+	qw := palWords(q)
+	return palQuery{q: q, qw: qw, one: len(qw) == 1 && len(qw[0]) >= 2 && string(qw[0]) == q}
+}
+
+func (pq palQuery) score(e PalEntry) int {
+	q, qw := pq.q, pq.qw
 	if q == "" {
 		return 1
 	}
-	qw := palWords(q)
 	best := 0
-	for _, f := range []string{e.Name, e.Alias} {
+	for _, f := range [...]string{e.Name, e.Alias, e.Match} {
 		if f == "" || best == 6 {
 			continue
 		}
@@ -120,11 +153,11 @@ func PalScore(q string, e PalEntry) int {
 		}
 		fw := palWords(f)
 		switch {
-		case wordStarts(qw, fw, false):
+		case wordStarts(qw, fw, false) || pq.one && initials(qw[0], fw):
 			best = 4
-		case Subsequence(q, lf):
-			best = max(best, 3)
-		case best < 2 && wordStarts(qw, fw, true):
+		case best < 3 && wordStarts(qw, fw, true):
+			best = 3
+		case best < 2 && Subsequence(q, lf):
 			best = 2
 		}
 	}
@@ -132,6 +165,24 @@ func PalScore(q string, e PalEntry) int {
 		best = 1
 	}
 	return best
+}
+
+// initials reports whether w is the first letters of neighbouring name words: "vfe" in
+// Vanilla Factions Expanded, "hl" in HugsLib.
+func initials(w []rune, fw [][]rune) bool {
+	for i := 0; i+len(w) <= len(fw); i++ {
+		ok := true
+		for j, r := range w {
+			if fw[i+j][0] != r {
+				ok = false
+				break
+			}
+		}
+		if ok {
+			return true
+		}
+	}
+	return false
 }
 
 // palWords splits s into lower-case words at spaces, punctuation and lower-to-upper case
@@ -205,7 +256,7 @@ func wordStarts(qw, fw [][]rune, typos bool) bool {
 			if typos {
 				ok = prefixDist(qw[i], f, palTypos(len(qw[i])))
 			} else {
-				ok = len(f) >= len(qw[i]) && string(f[:len(qw[i])]) == string(qw[i])
+				ok = len(f) >= len(qw[i]) && slices.Equal(f[:len(qw[i])], qw[i])
 			}
 			if ok {
 				used[j] = true
@@ -279,12 +330,13 @@ func PlanEntries(rows []PlanRow) []PalEntry {
 // commands, environments and plans only.
 func PalRank(query string, all []PalEntry) []PalEntry {
 	q := strings.ToLower(strings.TrimSpace(query))
+	pq := newPalQuery(q)
 	var out []PalEntry
 	for _, e := range all {
 		if q == "" && e.Kind == PalMod {
 			continue
 		}
-		if s := PalScore(q, e); s > 0 {
+		if s := pq.score(e); s > 0 {
 			e.Score = s
 			out = append(out, e)
 		}
