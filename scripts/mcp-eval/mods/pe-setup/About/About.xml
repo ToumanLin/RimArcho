@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModMetaData>
+  <name>PE Eval Scenario Setup</name>
+  <author>RimArcho eval</author>
+  <packageId>rimarcho.eval.pesetup</packageId>
+  <supportedVersions><li>1.6</li></supportedVersions>
+  <loadAfter>
+    <li>ferny.ProgressionEducation</li>
+    <li>LovelyDovey.Recreation.WithEuterpe</li>
+  </loadAfter>
+  <description>Authoring tool only, never part of a case. On a -quicktest map it builds a Progression: Education classroom (board, desks, bell, a skill class for the colonists) and puts the students into a Socio Butterfly birthday lord, saves "autostart" and quits. See scripts/mcp-eval/make-pe-save.mjs.</description>
+</ModMetaData>

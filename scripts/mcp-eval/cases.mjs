@@ -436,4 +436,60 @@ if (want('h6')) {
   });
 }
 
+// ---- h8: runtime lord conflict — Progression: Education adds a student who is already in another Mod's lord ------------
+// The Workshop release of Progression: Education (2026-09-07) has no `GetLord()` check where LordToil_AttendClass re-adds an
+// "orphaned" student to the class lord. A student who is in a Socio Butterfly birthday lord then makes Lord.AddPawn log
+// "Tried to add pawn ... to lord ... LordJob_AttendClass ... already a member of lord ... LordJob_Birthday" on every tick
+// of the class. The error names both lord jobs, so Socio Butterfly looks guilty. No Mod is changed: the case adds
+// Progression: Education, Intimacy - Friends n' Lovers and Intimacy - Socio Butterfly to the base list and ships a prepared
+// save (case.json runtime.save, loaded by the sandbox through dev mode's autostart.rws) with a classroom in session and a
+// birthday party that holds the students. The save is built once by make-pe-save.mjs (helper Mod mods/pe-setup).
+if (want('h8')) {
+  const PE = {pkg: 'ferny.ProgressionEducation', dir: `${WS}/3590863552`, name: 'Progression: Education'};
+  const FNL = {pkg: 'LovelyDovey.Sex.WithEuterpe', dir: `${WS}/3498422643`, name: "Intimacy - Friends n' Lovers"};
+  const SB = {pkg: 'LovelyDovey.Recreation.WithEuterpe', dir: `${WS}/3630896210`, name: 'Intimacy - Socio Butterfly'};
+  // the reference fix: the workshop source plus the guard, built with the Mod's own project (net48, Publicizer)
+  const tmp = path.join(OUT, '_build', 'pe-fixed'); fs.rmSync(tmp, {recursive: true, force: true}); fs.mkdirSync(tmp, {recursive: true});
+  const srcDir = `${PE.dir}/1.6/Source`;
+  for (const f of fs.readdirSync(srcDir, {recursive: true})) {
+    const rel = f.split('\\').join('/'); if (/^(obj|bin)(\/|$)/.test(rel) || !fs.statSync(path.join(srcDir, f)).isFile()) continue;
+    fs.mkdirSync(path.dirname(path.join(tmp, rel)), {recursive: true}); fs.copyFileSync(path.join(srcDir, f), path.join(tmp, rel));
+  }
+  const toil = path.join(tmp, 'AI/LordToil_AttendClass.cs');
+  fs.writeFileSync(toil, must(fs.readFileSync(toil, 'utf8'), '|| !CanAddPawn(student))', '|| student.GetLord() != null\n                    || !CanAddPawn(student))'));
+  const proj = path.join(tmp, 'ProgressionEducation.csproj');
+  fs.writeFileSync(proj, fs.readFileSync(proj, 'utf8').split('..\\Assemblies\\').join('out\\'));
+  execFileSync('dotnet', ['build', '-c', 'Release', '-nologo', '-v', 'q'], {cwd: tmp, stdio: 'pipe'});
+  const dll = '1.6/Assemblies/ProgressionEducation.dll';
+  const fixed = path.join(OUT, 'h8', 'answer', PE.pkg, dll); fs.mkdirSync(path.dirname(fixed), {recursive: true}); fs.copyFileSync(path.join(tmp, 'out', 'ProgressionEducation.dll'), fixed);
+  fs.mkdirSync(path.join(OUT, 'h8', 'save'), {recursive: true});   // save/autostart.rws comes from make-pe-save.mjs
+  emit('h8', {
+    runtime: {ticks: 4000, save: 'save/autostart.rws'},
+    add: [PE, FNL, SB].map(m => ({pkg: m.pkg, name: m.name, path: m.dir})),
+  }, {
+    culprit: [{pkg: PE.pkg, name: PE.name, role: 'LordToil_AttendClass adds a student to the class lord without checking that the student already belongs to another lord'}],
+    decoy: [{pkg: SB.pkg, name: SB.name, role: 'owns the other lord (LordJob_Birthday) named in the error; it is not at fault'}, {pkg: FNL.pkg, name: FNL.name, role: 'the framework Socio Butterfly needs; not involved'}],
+    required: [PE.pkg],
+    faultClass: 'runtime.lord-conflict (wrong blame)',
+    files: [`${PE.pkg}/${dll}`],
+    fix: 'In LordToil_AttendClass.LordToilTick, skip a student whose GetLord() is not null before lord.AddPawn(student) (the reference build in answer/ does exactly that). The Mod ships its source (1.6/Source); rebuild 1.6/Assemblies/ProgressionEducation.dll. Removing Socio Butterfly, or the class, only avoids the situation.',
+  });
+}
+
+// ---- h9: no-fault control — the base list as it is, nothing injected -----------------------------------------------
+// The Player.log has only the base list's own noise (ReGrowthCore, VTE, ReBuild ... errors that belong to no task). The right
+// answer is that no Mod needs fixing: answer.json with an empty culprit list, no files. Any file, deletion or list change,
+// or a named Mod, is a false positive. task.md is the same text every case gets: it does not say a case can be fault-free.
+if (want('h9')) {
+  emit('h9', {}, {
+    culprit: [],
+    decoy: [],
+    required: [],
+    control: true,
+    faultClass: 'none (no-fault control)',
+    files: [],
+    fix: 'Nothing: the errors in the log come from Mods of the base list itself and no change is called for. Hand in answer.json with "culprit": [] and no files.',
+  });
+}
+
 console.log('written to', OUT);

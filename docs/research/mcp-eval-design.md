@@ -156,6 +156,56 @@ Observations:
 - dsh again calls Archo more (23.2 against 15.2 per run) and uses more tokens (2.48 M against 2.03 M). With 3 runs per cell, 6/6 against 5/6 is within chance.
 - Archo leads (not bugs): `analyze_log` could attribute an `Error during patching <method> with: ... | trans: <patch method>` line through its own Harmony index (the patch method names map to HAR, and the method's patches name both Mods), which would put Charmweavers in front of the agent without a second call. `test_run` still reports `isError` for the base noise (known, see the c3 pilot). No Archo bug was seen in the 12 runs.
 
+### Runtime lord conflict h8 and no-fault control h9 (built 2026-11-08)
+
+| # | Fault class | Injected fault (real Mods) | What the log shows | Right answer: culprit | Right answer: fix |
+| --- | --- | --- | --- | --- | --- |
+| h8 | Runtime, wrong blame (two Mods' lord jobs) | No file is changed. Progression: Education (`ferny.ProgressionEducation`, Workshop release of 2026-09-07) lacks a `GetLord()` check where `LordToil_AttendClass` re-adds an "orphaned" student to the class lord (the user's PR fixes it). The case adds it, Intimacy - Friends n' Lovers and Intimacy - Socio Butterfly to the base list and ships a prepared save: a classroom in session (board, two desks, bell, a Social class with 2 students) while the students are in a Socio Butterfly `LordJob_Birthday` | 298 identical lines in 4000 ticks: `Tried to add pawn <name> to lord with lord jobProgressionEducation.LordJob_AttendClass but this pawn is already a member of lord with lord jobRecreationalSexWithEuterpe.LordJob_Birthday. Pawns can't be members of more than one lord at the same time.` No stack in Player.log. Both Mods are named | Progression: Education (decoy: Socio Butterfly, whose lord it is; Friends n' Lovers) | `LordToil_AttendClass.LordToilTick` skips a student with `GetLord() != null`; rebuild `1.6/Assemblies/ProgressionEducation.dll` (it ships its source in `1.6/Source`). Reference build in `answer/` |
+| h9 | No fault | Nothing: the base list (34 Mods) | The base list's normal noise: no error line; "Translation data for language English has 19 errors" and the game's own "red text" joke | none | answer.json with an empty culprit list and no files |
+
+h8 is the first case whose trigger is a game state, not a Mod: `case.json` `runtime: {ticks: 4000, save: 'save/autostart.rws'}`. `sandbox.mjs` copies the save to the sandbox as `Saves/autostart.rws`; the pinned Prefs have dev mode on, and the game loads that file at start (`SaveGameFilesUtility.GetAutostartSaveFile`) instead of a `-quicktest` map. It stops at the first autosave, 4000 ticks later (about 100 s). `make-pe-save.mjs` builds the save once from a throw-away helper Mod (`mods/pe-setup`): it spawns the lesson stone, desks and bell, creates the class through PE's own classes, starts a `LordJob_Birthday` with the two students, saves and quits. The helper is removed from the save's Mod list and component list afterwards, so the game loads it without a warning. Findings while building it:
+
+- PE's Workshop DLL and Workshop source agree (both lack the guard); a Skill class needs workbenches unless its skill is taught at the plain school desks (Social works, Crafting did not validate). The board opens a rename dialog that pauses the game: the helper closes it.
+- The class lord needs no extra push: the teacher rings the bell, then every tick the attend toil re-adds each idle student who is not in the class lord, so the error repeats. The first run reproduced the real log line exactly.
+- The line has none of `logdiff.mjs`'s old error words, so the grader would have called both logs clean: `Tried to add pawn` is now in its pattern.
+- In the VM the guest's Workshop copies of the three Mods are the same versions as the host's (`ProgressionEducation.dll` 222,720 bytes), so the case has no overlay. The agent has no save to load in the VM (`test_run` starts a new map, where no class exists): h8 can only be solved by reading, which PE's shipped source allows.
+
+Grading. h8 (`RULES`): both PE and Socio Butterfly stay enabled and the change lands in `ferny.ProgressionEducation/1.6/Assemblies/`; the run must reach the autosave. h9 (`control`): culprit = answer.json present with an empty list; fix = no file, deletion or list change. Naming any Mod or changing anything is `falsePositive`; a missing answer.json is a miss (`answered: false`). `task.md` is unchanged, so it does not say that a case can be fault-free. Checked on the host: the h8 reference answer gets culprit and fix (clean log, autosave reached); only the decoy named gets neither (`decoyNamedOnly`); an empty h9 answer gets both; an h9 answer with a file and a named Mod gets neither and `falsePositive`.
+
+#### Results: h8 and h9, Pi vs dsh, both with Archo (2026-11-08)
+
+12 cells (h8, h9 × A = Pi, B = dsh × 3), 20 min limit, Player-Test only (`matrix.ps1`, about 4 h 45 min), archo 1.0.7 (`tools/archo-1.0.7.exe`, built from dev/1.1 a3a53af7, sha256 `a8380b7b…ffa90`). Cost at CNY 0.5 / 1.0 / 0.01 per Mtok (input / output / cache read). h9 counts as solved only with an `answer.json` that has an empty culprit list and no changed file.
+
+| Group | Solved | Mean s | Turns | Tool calls (Archo) | Tokens | Cost per run |
+| --- | --- | --- | --- | --- | --- | --- |
+| A Pi | 2/6 | 1018 | 76.0 | 85.0 (13.3) | 5.23 M | ¥0.141 |
+| B dsh | 1/6 | 1031 | 75.3 | 92.2 (27.5) | 7.76 M | ¥0.194 |
+
+| Case | A Pi | B dsh |
+| --- | --- | --- |
+| h8 PE lord conflict | 2/3, 1037 s, Archo 11.3, ¥0.113 | 1/3, 948 s, Archo 28.7, ¥0.200 |
+| h9 no fault | 0/3 (2 false positives, 1 timeout), 999 s, Archo 15.3, ¥0.169 | 0/3 (2 false positives, 1 timeout), 1113 s, Archo 26.3, ¥0.188 |
+
+h8 per run (culprit named / fix): A1 no/no (1200 s timeout, nothing submitted); A2 yes/yes (1010 s); A3 yes/yes (902 s); B1 yes/yes (1200 s limit reached, submission graded); B2 yes/no (953 s); B3 yes/no (692 s).
+
+- **Culprit.** All 5 agents that submitted named Progression: Education; none was fooled by the decoys (Socio Butterfly, Friends n' Lovers). Pi A2 also named Socio Butterfly. The log line names both lord jobs and PE ships its source, so reading was enough.
+- **Why the fix failed (B2, B3).** Both rebuilt `ProgressionEducation.dll` from `1.6/Source` without Krafs.Publicizer; the game then logs `FieldAccessException: Field RimWorld.StatWorker:stat is inaccessible` and the map never reaches the autosave. A3 rebuilt it correctly; A2 shipped a small separate DLL instead; B1 shipped a patch DLL (`EducationLordFix.dll`). Archo's `read_source` does not tell an agent how a Mod's DLL is built.
+- **A1** spent 73 `bash` calls rebuilding and diffing the DLL (a Debug build against the Workshop one) and ran out of time without writing a submission.
+- **No agent could load the save.** `list_saves` was called in every run, but `test_run` only starts a new map, where no class exists. `test_run` was used 1 to 2 times per h8 run and could not show whether the fix works.
+
+h9 per run: A1 timeout, no answer; A2 changed `Palpha.godhands` translation files; A3 changed translation files of two Mods; B1 disabled Beheading Dolls in `ModsConfig.xml`; B2 timeout, no answer; B3 changed translation files of two Mods. No agent answered "nothing to fix".
+
+- Every agent that answered chased noise present in the base list: the six Unity `_MainTex` material errors and the 19 "Translation data for language English" errors. The task prompt says there are errors to fix; that is the pressure. All four answers broke nothing, but each is a false positive by the control's rule.
+- The control shows an agent will not volunteer "no fault" without a hint. A task line such as "the log may be fine" would change the case, so it was not added. Whether to count translation-key cleanups as harm is the owner's call (they cost a run's time, not the user's game).
+
+Void cell: h9-A-2 first ended at 489 s on four `521` errors from the model provider (gateway origin down), so it was moved to `results-gateway-down/` and run again (775 s, above). An earlier attempt of all cells had been voided by the gateway outage (0 tool calls, "Request timed out"); those results are also in `results-gateway-down/`.
+
+Archo findings:
+
+- **No Archo defect was hit in these 12 runs.** One tool error appears: `analyze_log` answered "no Player.log found for 1.6 under C:\Users\…\LocalLow\…" in h9-A-1 (5 times) on a guest where the game had not yet been run. The message is the CLI's (`archo log --file <path>`); check that an MCP agent can act on it.
+- **Gap, not a bug:** no tool starts a given save, so a runtime fault that needs a game state (h8) cannot be reproduced or verified through Archo. Likewise nothing tells an agent a Mod's DLL needs publicized references.
+- dsh calls Archo about twice as often (27.5 against 13.3 per run) and uses about 50% more tokens, as in round 2; neither group is more accurate here (3 runs per cell).
+
 ## Grading
 
 `scripts/mcp-eval/logdiff.mjs` compares a run's error lines (paths and addresses normalised) with the case's `reference.Player.log`. A submission is applied as a layer over the case (`sandbox.mjs <case> --layer <dir>`; files at `<packageId>/<mod-relative path>`, `enable.json` for re-enabled Mods), the game starts, and the log must have no error line the reference fix lacks. Culprit scoring uses `answer.json`: every `culprit` must be named; naming only a `decoy` fails.

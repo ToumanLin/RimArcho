@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>netstandard2.1</TargetFramework><LangVersion>latest</LangVersion><AssemblyName>PeEvalSetup</AssemblyName><GenerateAssemblyInfo>false</GenerateAssemblyInfo><OutDir>bin/</OutDir></PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp"><HintPath>D:/rimworld16/RimWorldWin64_Data/Managed/Assembly-CSharp.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine"><HintPath>D:/rimworld16/RimWorldWin64_Data/Managed/UnityEngine.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>D:/rimworld16/RimWorldWin64_Data/Managed/UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="ProgressionEducation"><HintPath>D:/SteamLibrary/steamapps/workshop/content/294100/3590863552/1.6/Assemblies/ProgressionEducation.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="RecreationalSexWithEuterpe"><HintPath>D:/SteamLibrary/steamapps/workshop/content/294100/3630896210/1.6/Assemblies/RecreationalSexWithEuterpe.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+</Project>
