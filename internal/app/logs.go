@@ -30,7 +30,7 @@ const (
 	RoleMentioned  = "mentioned"
 )
 
-var roleRank = map[string]int{RoleSource: 0, RolePatcher: 1, RoleDependency: 2, RoleMentioned: 3}
+var roleRank = map[string]int{RoleSource: 0, RoleListModifier: 1, RolePatcher: 2, RoleDependency: 3, RoleMentioned: 4, RoleListed: 5}
 
 // Attribution is one candidate mod of a cluster.
 type Attribution struct {
@@ -62,6 +62,9 @@ type LogCluster struct {
 	// Consequences and ConsequentLines count them on that cluster (06 §3).
 	ConsequenceOf                 string `json:",omitempty"`
 	Consequences, ConsequentLines int    `json:",omitempty"`
+	// ListScan: the list the throwing loop enumerates and the enabled mods' code that changes
+	// a comp list (loglistmod.go, 06 §2); nil when the rule does not apply.
+	ListScan *ListScan `json:",omitempty"`
 	// providerOff: a missing reference whose def an installed mod defines but is not
 	// enabled. That mod is the reason, not a patcher on the stack (06 §3).
 	providerOff bool
@@ -163,8 +166,10 @@ var ErrLogNotCached = errors.New("log not analysed yet")
 // "rendering only", the saves the run loaded are recorded (LoadedSaves), and a mentioned mod is
 // no subject of the cluster's finding (06 §3); 19: frames keep their IL offset and
 // constructor frames their type, the null trace (who passed the null; the thrower a patcher),
-// Lord.AddPawn call sites, same-role candidates ordered by evidence (06 §2, §3).
-const logCacheVersion = 19
+// Lord.AddPawn call sites, same-role candidates ordered by evidence (06 §2, §3); 20: list modifiers of "Collection
+// was modified" and comp-list tick crashes, Harmony patches on callers listed only, no
+// --target suggestion for TargetMethod() patches (06 §2, §3).
+const logCacheVersion = 20
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a
@@ -387,6 +392,8 @@ type attrCtx struct {
 	// dllMemo: DLL file name (lower) → the enabled mods' copies (shadowing).
 	dllMemo map[string][]*store.AssemblyRow
 	trace   *traceCtx // assemblies the null trace read (logtrace.go)
+	// dynMemo: instance → its patch classes with a target chosen at run time (loglistmod.go).
+	dynMemo map[string]map[string]bool
 }
 
 // notAnalysed qualifies a "nothing defines it" detail: when some enabled mods were never
@@ -525,7 +532,7 @@ func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails [
 		}
 		in := ""
 		for i, at := range lc.Attr {
-			if i == 4 {
+			if i == 4 || at.Role == RoleListed {
 				break
 			}
 			in += " --in " + cx.st.Ix.Ref(at.Instance)
@@ -562,7 +569,9 @@ func (a *App) ImplicatedMods(st *LoadoutState) []string {
 					continue
 				}
 				for _, at := range lc.Attr {
-					addID(at.Instance)
+					if at.Role != RoleListed { // a patch on a caller only (06 §3)
+						addID(at.Instance)
+					}
 				}
 			}
 		}
@@ -613,7 +622,7 @@ func (lc *LogCluster) add(inst, role, ev string) {
 func (lc *LogCluster) Owners() []*Attribution {
 	var out []*Attribution
 	for _, at := range lc.Attr {
-		if at.Role != RoleMentioned {
+		if at.Role != RoleMentioned && at.Role != RoleListed {
 			out = append(out, at)
 		}
 	}
@@ -846,7 +855,7 @@ var hotSpots = map[string]bool{"Verse.Pawn.Tick": true, "Verse.ThingWithComps.Ti
 
 // tickChecklist condenses the inspector workflow for tick crashes (assembly-inspector skill).
 var tickChecklist = []string{
-	"ThingWithComps.Tick caches comps.Count and indexes AllComps in a for loop: removing or reordering comps during a tick throws ArgumentOutOfRangeException in List`1.get_Item",
+	"ThingWithComps.Tick caches comps.Count and indexes AllComps in a for loop: it survives a swap or reorder, and a comp removing itself while it is the last one (swap itself to the end, remove itself on a later tick); removing any other comp throws ArgumentOutOfRangeException in List`1.get_Item, and a comp added during the loop is not ticked; a foreach over AllComps (a mod replacing the loop) throws InvalidOperationException \"Collection was modified\" on any change",
 	"red flags: parent.AllComps.Remove(this) inside CompTick(); pawn.AllComps.Add/Remove for runtime comps without deferral; Swap or list surgery on AllComps; runtime ThingComps added without InitializeComps() invariants",
 	"a PREFIX/POSTFIX line only shows who touched the method last; it is not the cause without other evidence",
 	"also check ExposeData/PostExposeData, SpawnSetup, DeSpawn and Destroy of the mods that patch the method",
@@ -1025,6 +1034,7 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 	// 3. Stack frames and Harmony lines.
 	firstMod := true
 	hot := false
+	throwing, own := cx.throwingModFrame(e), cx.ownFrames(e)
 	for i, fr := range e.Frames {
 		target := fr.Type + "." + fr.Method
 		if hotSpots[strings.ReplaceAll(target, "+", ".")] {
@@ -1032,8 +1042,20 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 		}
 		for _, p := range fr.Harmony {
 			ids, via := cx.harmonyOwners(p)
+			dynamic, listed := false, len(ids) > 0
 			for _, id := range ids {
-				lc.add(id, RolePatcher, fmt.Sprintf("log harmony:%s#%s %q (%s)", target, p.Kind, "- "+strings.ToUpper(p.Kind)+" "+p.Owner, via))
+				ev := fmt.Sprintf("log harmony:%s#%s %q (%s)", target, p.Kind, "- "+strings.ToUpper(p.Kind)+" "+p.Owner, via)
+				if callerPatch(i, throwing, p.Kind, own[id]) {
+					lc.add(id, RoleListed, ev+"; a patch on a caller of the throwing frame, no frame of its own in the stack")
+				} else {
+					lc.add(id, RolePatcher, ev)
+					listed = false
+				}
+				if cx.dynamicPatch(id, p.PatchType) {
+					// TargetMethod() the analysis could not read: --target finds no row (MCP eval h4).
+					dynamic = true
+					lc.next("archo harmony --mod "+ix.Ref(id), fmt.Sprintf("archo source %s --type %s", ix.Ref(id), outerType(p.PatchType)))
+				}
 			}
 			if len(ids) == 0 {
 				d := fmt.Sprintf("harmony owner %q on %s: no installed mod matches", p.Owner, target)
@@ -1042,7 +1064,9 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 				}
 				lc.Details = append(lc.Details, d)
 			}
-			lc.next("archo harmony --target " + strings.ReplaceAll(target, "+", "."))
+			if !dynamic && !listed {
+				lc.next("archo harmony --target " + strings.ReplaceAll(target, "+", "."))
+			}
 		}
 		if logs.GameNamespace(fr.Type) {
 			continue
@@ -1065,6 +1089,9 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 		if len(ids) > 0 {
 			firstMod = false
 		}
+	}
+	if wantsListScan(lc, hot) {
+		cx.listModifiers(lc)
 	}
 	if hot {
 		// Who changes the comp list is not on the stack: the thrower and the patchers named
@@ -1283,9 +1310,9 @@ func (cx *attrCtx) toFinding(lc *LogCluster) *finding.Finding {
 	f := &finding.Finding{Code: "log." + lc.Class, Severity: logSeverity[lc.Class], Layer: "log", Key: findingKey(lc.Key), Confidence: lc.Confidence,
 		Claim: fmt.Sprintf("log:%s x%d: %s%s", lc.ID, lc.Count, msg, logs.PhaseSummary(lc.Phases))}
 	for _, at := range lc.Attr {
-		// A mod only named by the message or a lower frame stays in the evidence, not among the
-		// subjects: the cluster is not its problem (Mod details, test runs).
-		if at.Role != RoleMentioned {
+		// A mod only named by the message or a lower frame, or with only a patch on a caller,
+		// stays in the evidence, not among the subjects: the cluster is not its problem (06 §3).
+		if at.Role != RoleMentioned && at.Role != RoleListed {
 			f.Subjects = append(f.Subjects, finding.Inst(at.Instance))
 		}
 		for _, ev := range at.Evidence {

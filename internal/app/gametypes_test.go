@@ -45,7 +45,7 @@ func TestScanIndexesGameTypes(t *testing.T) {
 		t.Errorf("GameClassOwners(Pawn) = %v", got)
 	}
 	have, err := st.GameAssemblies(en.ID)
-	if err != nil || len(have) != 2 || have[store.GameMainAssembly].Types != 3 || have["Assembly-CSharp-firstpass.dll"].Types == 0 {
+	if err != nil || len(have) != 2 || have[store.GameMainAssembly].Types != 6 || have["Assembly-CSharp-firstpass.dll"].Types == 0 {
 		t.Fatalf("GameAssemblies = %+v, %v", have, err)
 	}
 

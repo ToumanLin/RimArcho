@@ -411,6 +411,8 @@
   "material": "材质",
   "measuring %d mods…": "正在计算 %d 个 Mod 的大小…",
   "mentioned": "被提及",
+  "list-modifier": "改动列表方",
+  "listed": "仅列出",
   "missing dependencies": "缺少的前置",
   "mod authors": "作者",
   "mod list": "Mod 列表",

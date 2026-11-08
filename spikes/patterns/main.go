@@ -198,7 +198,7 @@ var rules = []*Rule{
 		Fixes:   []string{"update", "enable-dependency", "ignore"}, Workflow: "partial"},
 	{ID: "xml.type-missing", Match: `Could not find (a )?type|Could not find type named|Could not find class`, Stage: "load",
 		Summary: "XML names a C# class that no loaded assembly has",
-		Causes:  []string{"the framework mod that defines the class is not active or loads later", "the class was renamed in an update"},
+		Causes:  []string{"the framework mod that defines the class is not active or loads later", "the class was renamed in an update", "a typo or wrong namespace in the mod's XML (Class=\"…\", thingClass); analyze_log names that file and the nearest existing classes"},
 		Route:   []string{"analyze_log cluster=E<n> (dependency candidates)", "search_files <class>", "list_problems code=dep"},
 		Fixes:   []string{"enable-dependency", "update"}, Workflow: "partial"},
 	{ID: "xml.config-error", Match: `^Config error in`, Stage: "load",
@@ -215,7 +215,7 @@ var rules = []*Rule{
 	// assets
 	{ID: "asset.texture-missing", Class: logs.ClassTexture, Match: `.`, Stage: "load",
 		Summary: "a texture or sound path names no file in any active mod",
-		Causes:  []string{"the art comes from a mod or DLC that is not active", "the mod ships the file under another path or case"},
+		Causes:  []string{"the art comes from a mod or DLC that is not active", "the mod ships the file under another path or case", "the mod's own code asks for art it does not ship (a defect of that mod, rendering only; analyze_log says so)"},
 		Route:   []string{"analyze_log cluster=E<n>", "search_files <path>"},
 		Fixes:   []string{"enable-dependency", "update", "ignore"}, Workflow: "no"},
 	// Since 2026-11-04 the solid-colour material made in code (Material 'SolidColorMat-…') is
@@ -256,7 +256,7 @@ var rules = []*Rule{
 	{ID: "rt.tick", Match: `(?i)ticking|\bTick\b`, Stage: "runtime",
 		Summary: "an exception while ticking a pawn, thing or the world",
 		Causes:  []string{"a comp added or removed during tick", "a patch on the tick path"},
-		Route:   []string{"analyze_log cluster=E<n>", "get_harmony target=<each patched frame>", "read_source search=\"AllComps.Remove(\" scope=\"active\""},
+		Route:   []string{"analyze_log cluster=E<n> (comp list modifiers in every enabled mod)", "get_harmony target=<each patched frame>", "read_source search=\"AllComps.Remove(\" scope=\"active\""},
 		Fixes:   []string{"disable", "update", "local-fix"}, Workflow: "yes"},
 	{ID: "rt.ui", Match: `Exception filling window|OnGUI|UIRootUpdate|Root level exception in Update|DoWindowContents`, Stage: "runtime",
 		Summary: "an exception in drawing the UI",
@@ -295,9 +295,13 @@ var rules = []*Rule{
 	{ID: "rt.comp-init", Match: `Could not instantiate or initialize a ThingComp|Could not instantiate inspector tab|Null method for`, Stage: "runtime",
 		Summary: "a comp, tab or worker class could not be created", Causes: []string{"a class named by XML is missing or has no default constructor", "the providing mod is outdated"},
 		Route: []string{"analyze_log cluster=E<n>", "search_files <class>"}, Fixes: []string{"update", "enable-dependency"}, Workflow: "partial"},
+	// After rt.tick: a "Collection was modified" while ticking stays rt.tick, so the counts of
+	// the v0 dataset hold; analyze_log explains the enumerated list on both (06 §2).
 	{ID: "rt.collection-modified", Match: `Collection was modified`, Stage: "runtime",
-		Summary: "a list was changed while iterating (often comps or a mod's cache)", Causes: []string{"AllComps.Add/Remove during tick", "a mod modifying a game list from a patch"},
-		Route: []string{"analyze_log cluster=E<n>", "read_source search=\"AllComps.Remove(\" scope=\"active\""}, Fixes: []string{"disable", "update", "local-fix"}, Workflow: "partial"},
+		Summary: "a list was changed while a foreach loop enumerated it: the frame above List.Enumerator.MoveNext is the loop that threw; the list was changed by code running in that loop body, which is not on the stack",
+		Causes:  []string{"a comp that adds or removes comps (AllComps) in its CompTick, under a mod that replaced the game's index loop with a foreach", "a mod changing a game list from a patch or event called inside the loop"},
+		Route:   []string{"analyze_log cluster=E<n> (enumerated list; list modifiers in every enabled mod)", "read_source <ref> type=<modifier class>", "get_patches / search_files <comp class> (who attaches the comp)"},
+		Fixes:   []string{"disable", "update", "local-fix"}, Workflow: "partial"},
 	{ID: "asset.texture-create", Match: `Failed to create texture because of invalid parameters`, Stage: "load",
 		Summary: "Unity rejected a texture (size or format)", Causes: []string{"a texture-replacement or resizing mod", "corrupt image in a mod"},
 		Route: []string{"analyze_log cluster=E<n>"}, Fixes: []string{"disable", "update"}, Workflow: "no"},

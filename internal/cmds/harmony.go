@@ -33,6 +33,8 @@ func harmonyLine(ix *app.Index, h *store.HarmonyRow, withMod, withTarget bool) s
 		l += "  (Harmony.Patch call in code)"
 	case h.Dynamic:
 		l += "  (target chosen at runtime by TargetMethod())"
+	case h.FromTargetMethod:
+		l += "  (target read from TargetMethod())"
 	}
 	return l
 }
@@ -109,7 +111,7 @@ func harmonyCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			}
 			sec.Truncate(limit, "add --all")
 		}
-		if len(rows) == 0 {
+		if len(rows) == 0 && !dynamicOnTarget(c, st, root, t, inst) {
 			root.Add("no declared patches (mods that patch from code are listed by archo problems --code harmony.manual)")
 		}
 		seenT := map[string]bool{}
