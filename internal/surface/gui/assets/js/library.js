@@ -11,7 +11,7 @@
 import { S, $, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { on } from "./api.js";
 import { icon } from "./icons.js";
-import { detailFrame, noteEl } from "./detail.js";
+import { detailFrame, noteEl, stale } from "./detail.js";
 import * as pop from "./popups.js";
 import { beginPageRead, pageLoading, openScreen, page, act, rescanButton, area, full } from "./screens.js";
 import { updateFromForm } from "./subscribe.js";
@@ -710,36 +710,39 @@ async function drawDetail() {
   const current = () => n === detailSeq && box.dataset.ref === i.ref;
   box.dataset.stamp = stampOf(i);
   if (!same) {
+    // the copy shown stays, inert, until the next one's parts are in; then one swap (16 §4.1)
     box.dataset.ref = i.ref;
+    // (the inner part: the scroll box itself takes the focus in details mode)
+    stale(box.firstElementChild);
     const inner = el("div", "mod-detail");
-    box.replaceChildren(inner);
-    box.scrollTop = 0;
     frame = detailFrame(inner, null, {
       ownFields: true,
       fieldActs: () => ({ folder: () => run("folder", [findCopy(i.ref) || i]), tags: () => run("tags", [findCopy(i.ref) || i]) }),
       run: (c, r) => run(c, [findCopy(r.ref) || r]),
       noteSaved: () => load(),
       noteLeave: () => els.rows.focus(),
+      later: true,
+      mount: () => { box.replaceChildren(inner); box.scrollTop = 0; },
     });
     frame.head(row ? row.name : i.label, "", i.id);
   }
   const f = frame;
   f.inst(i);
-  api.LibraryFields(i.ref).then((fs) => { if (current()) f.fields(fs); }, (e) => { if (current()) f.error(errText(e)); });
-  if (!i.id) return;
-  try {
-    const d = await api.Detail(i.id, false, false, false);
-    if (!current()) return;
+  const fields = api.LibraryFields(i.ref).then((fs) => { if (current()) f.fields(fs); }, (e) => { if (current()) f.error(errText(e)); });
+  // a copy of another game's has no detail here: its fields say what there is
+  const detail = !i.id ? null : api.Detail(i.id, false, false, false).then((d) => {
+    if (!current()) return null;
     f.detail(d);
-    if (d.state === "not cached") {
-      f.fetching();
-      const d2 = await api.Detail(i.id, false, true, false).catch(() => null);
-      if (d2 && current()) f.detail(d2);
-    }
-  } catch (e) {
-    // a copy of another game's has no detail here: its fields say what there is
-    if (current() && !/^no (mod|list)\b/.test(errText(e))) f.error(errText(e));
-  }
+    return d;
+  }, (e) => { if (current() && !/^no (mod|list)\b/.test(errText(e))) f.error(errText(e)); return null; });
+  await f.settle([fields, detail]);
+  if (!current()) return;
+  f.show();
+  const d = await detail;
+  if (!current() || d?.state !== "not cached") return;
+  f.fetching();
+  const d2 = await api.Detail(i.id, false, true, false).catch(() => null);
+  if (d2 && current()) f.detail(d2);
 }
 const stampOf = (i) => [i.note, i.auto, (i.ops || []).join(","), i.state, i.inPlan].join("|");
 

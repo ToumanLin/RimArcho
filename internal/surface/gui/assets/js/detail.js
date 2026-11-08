@@ -10,17 +10,22 @@ import { versionNotice } from "./versionwarnings.js";
 
 let seq = 0, detailTimer;
 
+// A details pane changing Mods keeps the one shown until the next is ready, then swaps once
+// (16 §4.1): drawing each part as it came moved everything below it, up to four times a
+// move. The old Mod is inert at once (its actions cannot run) and dims if the wait is long.
+// REVEAL_MS caps the wait: a slower part fills in place after the swap.
+const REVEAL_MS = 250;
+export function stale(box) { if (box) { box.dataset.stale = ""; box.inert = true; } }
+export function unstale(box) { if (box) { delete box.dataset.stale; box.inert = false; } }
+
 // Cursor bursts keep only the last detail read. Invalidate the previous response
 // immediately so an abandoned row cannot refill the pane while this one waits.
 export function followDetail(it, staged) {
  clearTimeout(detailTimer);
  ++seq;
  S.detail = null;
- const box = $("#detail");
- if (box) { box.replaceChildren(); delete box.dataset.ref; }
- editorFrame = null;
- if (it) box?.append(el("h1", "", it.name));
  if (!it || it.missing || !it.id) return showDetail(it, staged);
+ stale($("#detail"));
  const game = S.envSeq;
  detailTimer = setTimeout(() => {
   if (game === S.envSeq && !S.screen) showDetail(it, staged);
@@ -28,20 +33,21 @@ export function followDetail(it, staged) {
 }
 
 
-// showDetail draws the plan editor's details of a row (16 §4.1): at once what the row knows
-// (its copies, name, picture), then the detail and the copy's note and actions as Go
-// answers. A Workshop page not read yet is fetched straight away.
+// showDetail draws the plan editor's details of a row (16 §4.1): its copies, name and
+// picture, the detail, and the copy's note and actions, shown together once Go has answered
+// (REVEAL_MS at most). A Workshop page not read yet is fetched straight away.
 export async function showDetail(it, staged) {
  clearTimeout(detailTimer);
   const n = ++seq, gameRequest = S.envSeq;
   const current = () => n === seq && S.envSeq === gameRequest;
   const box = $("#detail"), sc = $(".detail .scroll");
-  if (!it) { box.innerHTML = ""; delete box.dataset.ref; editorFrame = null; S.detail = null; return; }
+  if (!it) { box.innerHTML = ""; delete box.dataset.ref; editorFrame = null; S.detail = null; unstale(box); return; }
   if (it.missing || !it.id) {
     S.detail = null;
     box.innerHTML = "";
     delete box.dataset.ref;
     editorFrame = null;
+    unstale(box);
     const pkg = (it.ref || "").replace(/^pkg:/, "");
     box.append(el("h1", "", it.name), ...(pkg && pkg !== it.name ? [el("p", "second", pkg)] : []), el("p", "second", T(it.canUse ? "an installed copy can take its place: use it from the list's problems" : "listed in ModsConfig.xml, but not installed")));
     return;
@@ -55,28 +61,31 @@ export async function showDetail(it, staged) {
     run: (code, i) => document.dispatchEvent(new CustomEvent("detail-op", { detail: { code, id: i.id || it.id } })),
     noteSaved: async () => { const i = await api.LibraryCopy(it.id).catch(() => null); if (current() && i) f.inst(i); },
     tech: true,
+    later: !same,
+    host: box,
   }));
-  box.dataset.ref = it.id;
   f.copies(editorCopies(it));
   if (!same) f.head(it.name, "", it.id);
   // the copy's note and actions come from Mod library's data, rebuilt after an edit: not while
   // edits are on their way (the reload after the last one draws the details again)
-  if (!S.editing) api.LibraryCopy(it.id).then((i) => { if (current() && i) f.inst(i); }, () => {});
-  try {
-    const d = await api.Detail(it.id, !!staged, false, false);
-    if (!current()) return;
+  const copy = S.editing ? null : api.LibraryCopy(it.id).then((i) => { if (current() && i) f.inst(i); }, () => {});
+  const detail = api.Detail(it.id, !!staged, false, false).then((d) => {
+    if (!current()) return null;
     S.detail = d;
     f.detail(d);
-    if (d.state === "not cached") {
-      f.fetching();
-      try {
-        const d2 = await api.Detail(it.id, !!staged, true, false);
-        if (current()) { S.detail = d2; f.detail(d2); }
-      } catch { /* the note stays */ }
-    }
-  } catch (e) {
-    if (current()) f.error(errText(e));
-  }
+    return d;
+  }, (e) => { if (current()) f.error(errText(e)); return null; });
+  await f.settle([copy, detail]);
+  if (!current()) return;
+  box.dataset.ref = it.id;
+  f.show();
+  const d = await detail;
+  if (!current() || d?.state !== "not cached") return;
+  f.fetching();
+  try {
+    const d2 = await api.Detail(it.id, !!staged, true, false);
+    if (current()) { S.detail = d2; f.detail(d2); }
+  } catch { /* the note stays */ }
 }
 let editorFrame = null;
 
@@ -104,17 +113,35 @@ function editorCopies(it) {
 //   fields(list)             a field list of its own (Mod library's, with its extra fields)
 // o: fieldActs(d, row), run(code, row), noteSaved(), noteLeave(), tech (the full detail's
 // link), ownFields (the fields come through fields(), not with the Detail).
+// With o.later the parts are built off screen and replace box's content only at show()
+// (o.mount() instead, when given); settle(waits) waits for them and the picture, REVEAL_MS at
+// most. show() also takes o.host out of its stale state.
 export function detailFrame(box, sc, o = {}) {
-  box.innerHTML = "";
-  if (sc) sc.scrollTop = 0;
-  const part = (cls) => { const e = el("div", "md-" + cls); box.append(e); return e; };
+  const parts = [];
+  const part = (cls) => { const e = el("div", "md-" + cls); parts.push(e); return e; };
   const P = {
     copies: part("copies"), note: part("note"), head: part("head"), facts: part("facts"),
     version: part("version"), fields: part("fields"), acts: part("acts"), desc: part("desc"), hist: part("hist"), more: part("more"),
   };
-  let shownID = "", row = null, d0 = null;
+  let shownID = "", row = null, d0 = null, picture = null, shown = false;
   const f = {
     box,
+    show() {
+      if (!shown) {
+        shown = true;
+        box.replaceChildren(...parts);
+        if (o.mount) o.mount();
+        if (sc) sc.scrollTop = 0;
+      }
+      unstale(o.host);
+    },
+    settle(waits) {
+      if (shown) return Promise.resolve();
+      return new Promise((done) => {
+        const t = setTimeout(done, REVEAL_MS);
+        Promise.allSettled([...waits, picture]).then(() => { clearTimeout(t); done(); });
+      });
+    },
     copies(list) {
       P.copies.innerHTML = "";
       if (!list || list.length < 2) return;
@@ -145,6 +172,8 @@ export function detailFrame(box, sc, o = {}) {
         img.alt = "";
         img.onerror = () => img.remove();
         img.src = "/preview/" + encodeURIComponent(id);
+        // decoded before the swap, so the picture does not push the details down after it
+        picture = shown ? null : img.decode().catch(() => {});
         P.head.append(img, el("h1", "", name || ""), el("div", "who"));
       } else if (!P.head.firstChild) P.head.append(el("h1", "", name || ""), el("div", "who"));
       const h = P.head.querySelector("h1"), w = P.head.querySelector(".who");
@@ -209,6 +238,7 @@ export function detailFrame(box, sc, o = {}) {
     },
     error(text) { P.desc.innerHTML = ""; P.desc.append(el("p", "err", text)); },
   };
+  if (!o.later) f.show();
   return f;
 }
 

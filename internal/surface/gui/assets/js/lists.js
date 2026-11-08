@@ -21,6 +21,13 @@ export async function openEditor(load, replace = false, ready = () => {}) {
   }
   try {
     if (!(await load(read)) || !read.current()) return;
+    // the editor taking its placeholder's place fades in as a page does (screens.js page)
+    if (pageLoading()) for (const e of [board, $("#planhead")]) {
+      if (!e) continue;
+      e.classList.add("enter");
+      const end = (ev) => { if (ev.target === e) { e.classList.remove("enter"); e.removeEventListener("animationend", end); } };
+      e.addEventListener("animationend", end);
+    }
     read.finish();
     $("#screen").replaceChildren();
     $("#screen").hidden = true;

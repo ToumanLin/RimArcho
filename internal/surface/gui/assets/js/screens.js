@@ -239,7 +239,9 @@ function dropBackdrop() {
 // actions: they sit at the right end of that line, quiet unless primary; anything else
 // joins the lead. The top bar has no buttons.
 export function page(cls, lead, ...right) {
-  const w = el("div", "page " + cls + (fresh ? " enter" : ""));
+  // a page taking its placeholder's place enters too: the placeholder is hidden for a fast
+  // read (style.css .page-loading), so the page fades in from the empty page
+  const w = el("div", "page " + cls + (fresh || pageLoading() ? " enter" : ""));
   fresh = false;
   resetAreas();
   const head = el("div", "page-head");

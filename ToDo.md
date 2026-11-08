@@ -25,6 +25,20 @@ Developing would possibly need new tools such as Bash, ilspyCMD, .Net SDK,
 所以这也要考虑, 假设一般玩家用不到这些工具, 那么这整个group都是没法用的
 如果要给一般玩家用, 需要让玩家下载这些工具
 
+## GUI
+Player feedback says the GUI is very jumpy. Investigated 11-08 (headless-Edge filmstrips, `D:\RimArcho-test\jumpy`). Fixed: details pane swaps once (editor + Mod library), loading card hidden for fast reads. Still to do:
+- Late data pushes pages around after they draw: All lists' memory estimate (2 shimmer lines → 4 text lines) moves the sections below; plans page sections shift ~40px; launch page step 03 / problem note / save button change height and push the headline (`home.js` 395–406, 583–597).
+- Launch page redraws on every window focus with no change check and jumps back to the top (`home.js:25`, `main.js:1341`); scan / analyze / new-log events redraw it too.
+- Sidebar: sub-entries open and close with a 250 ms height animation on every page change, and on Mod library they appear only after the page has drawn, so the entries below slide twice. Consider no animation, or reserving the space at once.
+- No in-app "reduce motion" setting: motion only stops with Windows' reduced-animations setting (`motion.js:6`). Status line slides in every message and changes height (24↔30 px); sidebar highlight slides; list FLIP.
+- Scrollbars without `scrollbar-gutter` in the editor lists, library rows and `#screen` pages: content shifts ~5–10 px when a scrollbar appears.
+- Editor page head wraps when the problems chip / "N unsaved" / save button change width (`problems.js:33`, `main.js:210, 221`).
+- Startup: nav-at-top and sidebar width applied after first paint; window buttons added after an async check squeeze the breadcrumb (`shell.js:37, 136`, `window-chrome.js:17`).
+- Smaller: bold on selected rows / chips changes text width; editor number column width follows the digit count; library selection bar in the page flow; Can it run redraws fully on the 2 s live poll while the game runs.
+- Check the details swap and the hidden loading card on a real 5,000-Mod library in the VM (WebView2 timing).
+- Pre-existing test failures found on the way: `/dev/pagecheck` "subscriptions … update preview" (update skipped preview/confirmation) and feedbackcheck.js:143 (`click` of undefined).
+- `motion.js:1-2` says motion uses only opacity and transform; the sidebar grid rows and some progress bars animate layout.
+
 ## Translation
 Auto translate mod details? Need to think about it. 因为需要OCR. 
 

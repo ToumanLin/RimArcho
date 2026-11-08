@@ -32,6 +32,8 @@ export class Element {
     const i = ref ? this.children.indexOf(ref) : this.children.length;
     n.parent = this; this.children.splice(i, 0, n);
   }
+  // an image decodes at once here (detail.js waits for the picture before a swap)
+  decode() { return Promise.resolve(); }
   remove() { if (this.parent) { this.parent.children.splice(this.parent.children.indexOf(this), 1); this.parent = null; } }
   get childNodes() { return this.children; }
   get parentNode() { return this.parent; }
