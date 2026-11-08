@@ -60,6 +60,8 @@ export function build(caseDir, runDir, layerDir) {
   const ticks = c.runtime?.ticks || 0;
   if (ticks) prefs = prefs.replace(/<autosaveIntervalDays>[^<]*<\/autosaveIntervalDays>/, `<autosaveIntervalDays>${ticks / 60000}</autosaveIntervalDays>`);
   fs.writeFileSync(path.join(cfg, 'Prefs.xml'), prefs);
+  // load cases (case.json `load: {save}`): with dev mode on (the pinned Prefs have it), vanilla loads Saves/autostart.rws at startup
+  if (c.load) { const s = path.join(runDir, 'userdata', 'Saves'); fs.mkdirSync(s, {recursive: true}); fs.copyFileSync(path.resolve(caseDir, c.load.save), path.join(s, 'autostart.rws')); }
   return {game: g, userdata: path.join(runDir, 'userdata'), log: path.join(runDir, 'Player.log'), active, ticks};
 }
 

@@ -111,6 +111,51 @@ From the real 1.6 logs: EcoDialogues builds an interaction log entry, and Cyanob
 
 Checked on the host (real 1.6.4871): buggy run with the errors, reference fix with none. Grading results: reference answer through `grade.mjs` gets culprit and fix; Cyanobot's Genes named alone gets neither (`decoyNamedOnly`); a change in Cyanobot's Genes alone, on a clean log, is "workaround elsewhere". Rule: `mossbrook.colonistmutterings/1.6/Assemblies/` must change, both Mods stay enabled.
 
+### Transpiler conflict h3 and save error h6 (built 2026-11-08)
+
+Both follow the commonest unattributed classes in the public 1.6 logs (private corpus, aggregate figures only). Built with `node scripts/mcp-eval/cases.mjs h3 h6`; each was reproduced in the real 1.6.4871 game (host sandbox), and its reference fix removes every injected error line with no new one.
+
+| # | Fault class | Injected fault (real Mods) | What the log shows | Right answer: culprit | Right answer: fix |
+| --- | --- | --- | --- | --- | --- |
+| h3 | Bad IL from two transpilers on one method (no Mod named) | Added Humanoid Alien Races (HAR, early in the list) and ReSplice: Charmweavers (last). Charmweavers' DLL, decompiled and rebuilt, gets a transpiler on `Pawn_RelationsTracker.SecondaryLovinChanceFactor`, patched from its `Mod` constructor (so before every static constructor), that routes vanilla's `pawn.def != otherPawn.def` through a helper `RacesDiffer(ThingDef, ThingDef)`. Alone it is valid. HAR's own transpiler, applied after it, turns each `ldfld Thing::def` into `RaceProps.Humanlike` (a bool), so the helper gets two bools and Mono's JIT rejects the method | one error, as in 544 of 6,734 public 1.6 logs, nearly to the byte: `Error during patching RimWorld.Pawn_RelationsTracker :: Single SecondaryLovinChanceFactor(Verse.Pawn) with: pre \| post: ... SecondaryLovinChanceFactorPostfix ... \| trans: ... SecondaryLovinChanceFactorTranspiler`, then `InvalidProgramException: Invalid IL code in ... SecondaryLovinChanceFactor_Patch2 ...: IL_0021: call 0x0000000b`. HAR's `AlienHarmony.Patch` wrapper catches the exception and names only its own patch methods; no Mod, no assembly, no stack beyond Harmony | Charmweavers (decoy: HAR) | Charmweavers' DLL without the transpiler (reference: the Workshop DLL), or a transpiler that does not assume a ThingDef on the stack. A change under `ReSplice.XOTR.Charmweavers/1.6/Assemblies/` with both Mods enabled; changing HAR only hides it |
+| h6 | Save-load error, a Def removed by another Mod's patch | Vanilla Hairs and Beards Retextured (base list) gets `Patches/Core_Beards_Patch.xml`, which removes the vanilla beards BushyStyled, SideWhiskers and Seer ("they clip through the retextured heads"). The Mod's own way to hide a style is `styleTags` `IgnoreMe` (its `Anomaly_Hairs_Patch.xml`). New games start cleanly; the player's save (a quicktest colony, 3000 ticks, pristine base list) has pawns with those beards | startup is clean; after `Loading game from file ...` four `Could not load reference to RimWorld.BeardDef named SideWhiskers / Seer / BushyStyled` (one per pawn), naming only vanilla Defs. In the corpus, 6,156 of 40,326 1.6 logs have `Could not load reference to <Def> named`; 29,134 load a save. The usual reading, "the save used a Mod that is gone", is wrong here: the beards are Core's | the retexture Mod (decoy, a natural wrong guess: AFU Men's Hairstyles) | hide the beards instead of removing them (reference: `styleTags` `IgnoreMe`), or drop the operation or the file (`delete.json`). A change under `hourai.vanillahairsretex.1.6/` with the Mod enabled |
+
+Harness for h6: `case.json` `load: {save}` makes `sandbox.mjs` copy the save to `Saves/autostart.rws`. With dev mode on (the pinned Prefs have it), vanilla loads that file at startup (`SaveGameFilesUtility.GetAutostartSaveFile`), so grading loads the save without a helper Mod; the run ends on log silence as usual (about 70 s, the map loaded). The VM gets the log only, no save: archo's `test_run` uses isolated test data and never loads a save, and the guest's Steam account is the player's real one, whose Steam Cloud syncs `Saves/*.rws` (an `autostart.rws` there would load on the player's own PC in dev mode). So in h6 an agent cannot reproduce the error; it has to reason from the log and the Mod files.
+
+Found while building them:
+
+- The real HAR + Charmweavers pair loads cleanly in 1.6.4871: Charmweavers' patch on the method is a plain postfix. Whatever made the corpus logs fail (Charmweavers is in 57% of them and in none of the clean ones) is not in today's versions, so h3 injects the second transpiler.
+- Charmweavers patches from a `[StaticConstructorOnStartup]`, as HAR does, and HAR is listed first; a transpiler there would have failed in Charmweavers' own `PatchAll` and named it (`Error in static constructor of ReSpliceCharmweavers.Core`). Patching from the `Mod` constructor is common practice and puts the failure in HAR's call.
+- Rebuilding Charmweavers from `ilspycmd` output needs the references at decompile time (`-r`; without them every struct cast comes out as `((T)(ref x))`), a publicized Assembly-CSharp (Krafs.Publicizer; one accessor then has to be fixed by hand), the Harmony Mod's own `0Harmony.dll` (2.4 API; `Lib.Harmony.Ref` 2.3.6 lacks `CodeMatcher.Advance()`), and `net48`. A plain rebuild of the decompiled source grades as a fix (checked), so an agent's decompile-and-rebuild route works.
+- The vanilla save compressor (`CompressibilityDecider`) keeps every Thing that a job, reservation, designation or projectile references, so "Was it compressed away" (the commonest load warning) needs a Mod-held reference and a Thing that changes within the test window; not reproducible in a 3000-tick quicktest, so h6 uses the second class.
+
+Grading checks (host, real game): h3 reference answer, and a plain rebuild of the decompiled Charmweavers, get culprit and fix; HAR named with a HAR file changed gets neither (`decoyNamedOnly`). h6 reference answer, and `delete.json` removing the patch, get culprit and fix; AFU Men's Hairstyles named and disabled gets neither.
+
+#### Results: h3 and h6, Pi vs dsh, both with Archo (2026-11-08)
+
+12 runs (h3, h6 × A = Pi, B = dsh × 3), 20 min limit, one VM (Eval-2, `matrix.ps1 -Cases h3,h6`, 03:51 to 06:57, 186 min), archo `tools/archo-1.0.7.exe` built from dev/1.1 a3a53af7 (sha256 `a8380b7b26a049f0…`). Cost at CNY 0.5 / 1.0 / 0.01 per Mtok (input / output / cache read). A first attempt from 03:09 is void: the host port proxy to the model gateway had stopped listening, so every run on every VM ended at its first model call with 0 tool calls (`results-gateway-down/`).
+
+| Group | Solved (culprit and fix) | Mean s (median) | Model calls | Tool calls (Archo) | Tokens | Cache hit | Cost per run |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| A Pi | 5/6 | 536 (528) | 42.8 | 50.8 (15.2) | 2.03 M | 96.4% | ¥0.076 |
+| B dsh | 6/6 | 518 (517) | 40.5 | 56.3 (23.2) | 2.48 M | 96.4% | ¥0.094 |
+
+| Case | A Pi | B dsh |
+| --- | --- | --- |
+| h3 transpiler conflict | 2/3, 720 s, Archo 11.7 | 3/3, 586 s, Archo 26.0 |
+| h6 save error | 3/3, 352 s, Archo 18.7 | 3/3, 450 s, Archo 20.3 |
+
+All 12 runs named the right culprit. The one failure:
+
+- **h3-A-1:** Pi named Charmweavers and handed in a rebuilt DLL, but also took Charmweavers out of `ModsConfig.xml` ("with Charmweavers out of the active list the start is clean (verified by a test run)"). The grader's rule caught it ("log is clean only because the broken Mod was disabled"). Graded alone (ModsConfig left out), its DLL still logs the same Invalid IL error: the disabled Mod was the only reason the log was clean.
+
+Observations:
+
+- **h3 is the slowest case so far** (653 s mean over both groups; round 2's cases took 294 to 620 s). Every run took the same path: `analyze_log` attributes the Invalid IL cluster to no Mod (`attribution: (no mod identified)`), then `get_harmony` on `Pawn_RelationsTracker.SecondaryLovinChanceFactor` lists the four patches from both Mods, including `..._RaceCheck_Patch.Transpiler`. That one call turns "no Mod named" into two candidates. The rest of the time goes into decompiling and rebuilding Charmweavers (the reference assembly and publicizer issues listed above).
+- **h6 is easy with Archo:** `get_def` / `get_patches` on the BeardDef find the `PatchOperationRemove` within a few calls. All six runs fixed it by dropping the operation (one by `delete.json`), none with `IgnoreMe`; all are accepted fixes. Several noticed that the retexture Mod ships textures for exactly those three beards, which contradicts the injected "they clip" comment: a shortcut, like h1's `1.5` copy. No run could reproduce the error (no save in the guest), and none needed to.
+- dsh again calls Archo more (23.2 against 15.2 per run) and uses more tokens (2.48 M against 2.03 M). With 3 runs per cell, 6/6 against 5/6 is within chance.
+- Archo leads (not bugs): `analyze_log` could attribute an `Error during patching <method> with: ... | trans: <patch method>` line through its own Harmony index (the patch method names map to HAR, and the method's patches name both Mods), which would put Charmweavers in front of the agent without a second call. `test_run` still reports `isError` for the base noise (known, see the c3 pilot). No Archo bug was seen in the 12 runs.
+
 ## Grading
 
 `scripts/mcp-eval/logdiff.mjs` compares a run's error lines (paths and addresses normalised) with the case's `reference.Player.log`. A submission is applied as a layer over the case (`sandbox.mjs <case> --layer <dir>`; files at `<packageId>/<mod-relative path>`, `enable.json` for re-enabled Mods), the game starts, and the log must have no error line the reference fix lacks. Culprit scoring uses `answer.json`: every `culprit` must be named; naming only a `decoy` fails.

@@ -25,6 +25,11 @@ const RULES = {
   // the caller is the fault: its DLL must be rebuilt; a null check in Cyanobot's Genes' postfix hides it
   h4: {keepEnabled: ['mossbrook.colonistmutterings', 'cyanobot.CyanobotsGenes'], touch: ['mossbrook.colonistmutterings/1.6/Assemblies/']},
   h7: {keepEnabled: ['ssr.body', 'tallowbyte.pawncompprofiler'], touch: ['ssr.body/1.6/Assemblies/']},
+  // Charmweavers' transpiler is the fault: its DLL must change (rebuilt, or a patch DLL of its own beside it); HAR's
+  // transpiler is fine on vanilla IL, so changing HAR, or turning either Mod off, only hides it
+  h3: {keepEnabled: ['ReSplice.XOTR.Charmweavers', 'erdelf.HumanoidAlienRaces'], touch: ['ReSplice.XOTR.Charmweavers/1.6/Assemblies/']},
+  // the retexture Mod's patch removes the beards: it must change (hide them instead, or drop the operation)
+  h6: {keepEnabled: ['hourai.vanillahairsretex.1.6'], touch: ['hourai.vanillahairsretex.1.6/']},
 };
 const resDir = path.resolve(process.argv[2]); const name = path.basename(resDir); const caseId = name.split('-')[0];
 const caseDir = `${ROOT}/cases/${caseId}`; const key = JSON.parse(fs.readFileSync(`${caseDir}/answer.json`, 'utf8'));
