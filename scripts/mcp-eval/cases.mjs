@@ -291,4 +291,149 @@ if (want('h4')) {
   });
 }
 
+// ---- h3: bad IL from two transpilers on one method; the error names only the second Mod's patch methods ----------------
+// Modelled on the public 1.6 logs (private corpus, aggregate only): `Error during patching RimWorld.Pawn_RelationsTracker ::
+// Single SecondaryLovinChanceFactor(Verse.Pawn) with: ... | trans: ...SecondaryLovinChanceFactorTranspiler ... Invalid IL
+// code ... call` in 544 of 6,734 logs. That line comes from Humanoid Alien Races' AlienHarmony.Patch wrapper, which
+// catches the exception and logs HAR's own patch methods, never a Mod name. The real HAR + Charmweavers pair loads cleanly
+// in 1.6.4871 (host probe 2026-11-08), so the second transpiler is injected: ReSplice: Charmweavers (real Mod) gets a
+// transpiler, patched from its Mod constructor (before every static constructor), that routes vanilla's race check
+// `pawn.def != otherPawn.def` through a helper taking two ThingDefs. Alone it is valid IL. HAR's transpiler, applied
+// after it, turns each `ldfld Thing::def` into `RaceProps.Humanlike` (a bool), so the helper call gets two bools and
+// Mono's JIT rejects the method: HAR's patch fails, and the log names HAR's methods only. The agent has to list every
+// patch on the method. Charmweavers ships no source: its DLL is decompiled (with references) and rebuilt.
+if (want('h3')) {
+  const CW = {pkg: 'ReSplice.XOTR.Charmweavers', dir: `${WS}/3131996691`, name: 'ReSplice: Charmweavers'};
+  const HAR = {pkg: 'erdelf.HumanoidAlienRaces', dir: `${WS}/839005762`, name: 'Humanoid Alien Races'};
+  const dll = '1.6/Assemblies/ReSpliceCharmweavers.dll';
+  const tmp = path.join(OUT, '_build', 'h3-charmweavers'); fs.rmSync(tmp, {recursive: true, force: true}); fs.mkdirSync(tmp, {recursive: true});
+  const G = 'D:/rimworld16/RimWorldWin64_Data/Managed';
+  const refs = [G, `${WS}/2023507013/1.6/Assemblies`, `${WS}/2009463077/1.6/Assemblies`, `${WS}/2995385834/1.6/Assemblies`];   // game, VEF, Harmony, VRE Highmate
+  execFileSync('ilspycmd', ['-p', '-o', tmp, ...refs.flatMap(r => ['-r', r]), `${CW.dir}/${dll}`], {stdio: 'pipe'});
+  const src = path.join(tmp, 'ReSpliceCharmweavers');
+  fs.rmSync(path.join(tmp, 'System.Runtime.CompilerServices'), {recursive: true, force: true});   // the publicizer below defines it
+  const edit = (f, from, to) => fs.writeFileSync(path.join(src, f), must(fs.readFileSync(path.join(src, f), 'utf8').split('\r\n').join('\n'), from, to));
+  // built against a publicized Assembly-CSharp: one override comes out with mixed accessibility
+  edit('JobGiver_AIFollowMaster.cs', 'protected override int FollowJobExpireInterval\n\t{\n\t\tpublic get', 'public override int FollowJobExpireInterval\n\t{\n\t\tget');
+  const ref = (n, p) => `<Reference Include="${n}"><HintPath>${p}</HintPath><Private>false</Private></Reference>`;
+  const csproj = `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net48</TargetFramework><LangVersion>latest</LangVersion><AllowUnsafeBlocks>true</AllowUnsafeBlocks><AssemblyName>ReSpliceCharmweavers</AssemblyName><GenerateAssemblyInfo>false</GenerateAssemblyInfo><OutDir>bin/</OutDir><NoWarn>CS0618;CS8632</NoWarn></PropertyGroup><ItemGroup>${
+    ['Assembly-CSharp', 'UnityEngine', 'UnityEngine.CoreModule', 'UnityEngine.IMGUIModule', 'UnityEngine.TextRenderingModule'].map(n => ref(n, `${G}/${n}.dll`)).join('')
+  }${ref('0Harmony', `${refs[2]}/0Harmony.dll`)}${ref('VEF', `${refs[1]}/VEF.dll`)}${ref('VanillaRacesExpandedHighmate', `${refs[3]}/VanillaRacesExpandedHighmate.dll`)}<PackageReference Include="Krafs.Publicizer" Version="2.2.1"><PrivateAssets>all</PrivateAssets></PackageReference><Publicize Include="Assembly-CSharp" /></ItemGroup></Project>`;
+  fs.writeFileSync(path.join(tmp, 'ReSpliceCharmweavers.csproj'), csproj);
+  edit('ReSpliceCharmweaversMod.cs', 'using UnityEngine;', 'using HarmonyLib;\nusing UnityEngine;');
+  edit('ReSpliceCharmweaversMod.cs', 'settings = GetSettings<ReSpliceCharmweaversSettings>();',
+    'settings = GetSettings<ReSpliceCharmweaversSettings>();\n\t\tnew Harmony("ReSpliceCharmweavers.Mod").PatchCategory("EarlyPatches");');
+  fs.writeFileSync(path.join(src, 'Pawn_RelationsTracker_SecondaryLovinChanceFactor_RaceCheck_Patch.cs'), `using System.Collections.Generic;
+using System.Reflection;
+using System.Reflection.Emit;
+using HarmonyLib;
+using RimWorld;
+using Verse;
+
+namespace ReSpliceCharmweavers;
+
+[HarmonyPatch(typeof(Pawn_RelationsTracker), "SecondaryLovinChanceFactor")]
+[HarmonyPatchCategory("EarlyPatches")]
+public static class Pawn_RelationsTracker_SecondaryLovinChanceFactor_RaceCheck_Patch
+{
+\tpublic static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+\t{
+\t\tFieldInfo defField = AccessTools.Field(typeof(Thing), "def");
+\t\tMethodInfo racesDiffer = AccessTools.Method(typeof(Pawn_RelationsTracker_SecondaryLovinChanceFactor_RaceCheck_Patch), "RacesDiffer");
+\t\tList<CodeInstruction> codes = new List<CodeInstruction>(instructions);
+\t\tfor (int i = 1; i < codes.Count; i++)
+\t\t{
+\t\t\tif ((codes[i].opcode == OpCodes.Bne_Un_S || codes[i].opcode == OpCodes.Bne_Un) && codes[i - 1].LoadsField(defField))
+\t\t\t{
+\t\t\t\tobject target = codes[i].operand;
+\t\t\t\tcodes[i] = new CodeInstruction(OpCodes.Call, racesDiffer).MoveLabelsFrom(codes[i]);
+\t\t\t\tcodes.Insert(i + 1, new CodeInstruction(OpCodes.Brtrue, target));
+\t\t\t\tbreak;
+\t\t\t}
+\t\t}
+\t\treturn codes;
+\t}
+
+\t// Lovethralls of a xenotype with its own body def still count as their master's race.
+\tpublic static bool RacesDiffer(ThingDef pawnRace, ThingDef otherRace)
+\t{
+\t\tif (pawnRace == otherRace)
+\t\t{
+\t\t\treturn false;
+\t\t}
+\t\treturn pawnRace?.race == null || otherRace?.race == null || !pawnRace.race.Humanlike || !otherRace.race.Humanlike;
+\t}
+}
+`);
+  execFileSync('dotnet', ['build', '-c', 'Release', '-nologo', '-v', 'q'], {cwd: tmp, stdio: 'pipe'});
+  for (const [kind, from] of [['overlay', path.join(tmp, 'bin', 'ReSpliceCharmweavers.dll')], ['answer', `${CW.dir}/${dll}`]]) {
+    fs.rmSync(path.join(OUT, 'h3', kind), {recursive: true, force: true});   // the recorded logs stay
+    const f = path.join(OUT, 'h3', kind, CW.pkg, dll); fs.mkdirSync(path.dirname(f), {recursive: true}); fs.copyFileSync(from, f);
+  }
+  emit('h3', {
+    // HAR is a framework: early in the list (after the DLCs); Charmweavers loads after VEF, at the end
+    add: [{pkg: HAR.pkg, name: HAR.name, path: HAR.dir, before: 'nals.facialanimation'}, {pkg: CW.pkg, name: CW.name, path: CW.dir}],
+    overlay: [{pkg: CW.pkg, files: 'overlay/' + CW.pkg}],
+  }, {
+    culprit: [{pkg: CW.pkg, name: CW.name, role: 'its transpiler on Pawn_RelationsTracker.SecondaryLovinChanceFactor (patched from the Mod constructor, so first) replaces the race check with a call taking two ThingDefs; HAR\'s transpiler then turns those ThingDefs into bools'}],
+    decoy: [{pkg: HAR.pkg, name: HAR.name, role: 'its AlienHarmony wrapper logs the failure with its own patch methods; its transpiler is fine on vanilla IL'}],
+    required: [CW.pkg],
+    faultClass: 'harmony.invalid-il (transpiler conflict, no Mod named)',
+    files: [`${CW.pkg}/${dll}`],
+    fix: 'Charmweavers\' RaceCheck transpiler must leave the def comparison alone (back to the original postfix: the reference fix is the Workshop DLL), or match without assuming a ThingDef on the stack. Rebuild 1.6/Assemblies/ReSpliceCharmweavers.dll. Changing HAR only hides it; disabling either Mod is not a fix.',
+  });
+}
+
+// ---- h6: save-load error — a Mod's patch removes vanilla Defs that an existing save uses -------------------------------
+// The commonest save-load errors in the public 1.6 logs (private corpus, aggregate only; 29,134 of 40,326 logs load a
+// save) are "Could not resolve reference to object with loadID" (10,305 logs) and "Could not load reference to <Def>
+// named <defName>" (6,156); both name only the vanilla object or Def. Here Vanilla Hairs and Beards Retextured (base list)
+// gets a patch that removes three vanilla beards "until they are redrawn" (the Mod's own way to hide a style is
+// `styleTags` IgnoreMe, see its Anomaly_Hairs_Patch.xml). New games are fine; the player's save has pawns with those
+// beards, so loading it logs one "Could not load reference to RimWorld.BeardDef named ..." per pawn. The save is a
+// quicktest colony played 3000 ticks with the pristine base list (helper case h6save: `sandbox.mjs cases/h6save --run`,
+// then copy run/h6save/userdata/Saves/Autosave-1.rws to cases/h6/save/autostart.rws); case.json `load` makes the sandbox
+// load it at startup. The VM gets no save: archo's test_run never loads one, and the guest's Steam syncs saves to the
+// player's real Steam Cloud.
+if (want('h6')) {
+  const RTX = {pkg: 'hourai.vanillahairsretex.1.6', dir: `${WS}/3626568836`, name: 'Vanilla Hairs and Beards Retextured'};
+  const rel = 'Patches/Core_Beards_Patch.xml';
+  const beards = ['BushyStyled', 'SideWhiskers', 'Seer'];
+  const xp = `Defs/BeardDef[${beards.map(b => `defName="${b}"`).join(' or ')}]`;
+  fs.mkdirSync(path.join(OUT, 'h6save'), {recursive: true});
+  fs.writeFileSync(path.join(OUT, 'h6save', 'case.json'), JSON.stringify({id: 'h6save', base: '../base-mods.json', runtime: {ticks: 3000}}, null, 2));
+  if (!fs.existsSync(path.join(OUT, 'h6', 'save', 'autostart.rws'))) throw new Error('h6 needs its save first: see the comment above the h6 block');
+  for (const kind of ['overlay', 'answer']) fs.rmSync(path.join(OUT, 'h6', kind), {recursive: true, force: true});   // the save and the recorded logs stay
+  put('h6', RTX.pkg, rel, `<?xml version="1.0" encoding="UTF-8"?>
+<Patch>
+    <!-- These three clip through the retextured heads: take them out until they are redrawn. -->
+    <Operation Class="PatchOperationRemove">
+        <xpath>${xp}</xpath>
+    </Operation>
+</Patch>
+`);
+  fixfile('h6', RTX.pkg, rel, `<?xml version="1.0" encoding="UTF-8"?>
+<Patch>
+    <!-- These three clip through the retextured heads: hide them until they are redrawn. -->
+    <Operation Class="PatchOperationReplace">
+        <xpath>${xp}/styleTags</xpath>
+        <value>
+            <styleTags>
+                <li>IgnoreMe</li>
+            </styleTags>
+        </value>
+    </Operation>
+</Patch>
+`);
+  emit('h6', {load: {save: 'save/autostart.rws'}, overlay: [{pkg: RTX.pkg, files: 'overlay/' + RTX.pkg}]}, {
+    culprit: [{pkg: RTX.pkg, name: RTX.name, role: 'its Patches/Core_Beards_Patch.xml removes the vanilla beards BushyStyled, SideWhiskers and Seer, which pawns in the save wear'}],
+    // the log names no Mod; the natural wrong guess is the other style Mod (a removed or changed hair Mod)
+    decoy: [{pkg: 'jintuzilamian.hairstyle.afumenshairstyles', name: 'AFU Men\'s Hairstyles', role: 'the other hair and beard style Mod in the list; not involved'}],
+    required: [RTX.pkg],
+    faultClass: 'save.def-missing (removed by another Mod\'s patch)',
+    files: [`${RTX.pkg}/${rel}`],
+    fix: 'Do not remove Defs that saves use: hide the beards instead (styleTags IgnoreMe, as the Mod does for the Anomaly hairs; the reference fix), or drop the operation or the file. Disabling the Mod is not a fix.',
+  });
+}
+
 console.log('written to', OUT);
