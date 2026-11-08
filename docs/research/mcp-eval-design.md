@@ -111,6 +111,31 @@ From the real 1.6 logs: EcoDialogues builds an interaction log entry, and Cyanob
 
 Checked on the host (real 1.6.4871): buggy run with the errors, reference fix with none. Grading results: reference answer through `grade.mjs` gets culprit and fix; Cyanobot's Genes named alone gets neither (`decoyNamedOnly`); a change in Cyanobot's Genes alone, on a clean log, is "workaround elsewhere". Rule: `mossbrook.colonistmutterings/1.6/Assemblies/` must change, both Mods stay enabled.
 
+### Round 3, h4 and h7: Pi vs dsh (2026-11-08)
+
+12 runs (h4, h7 × A = Pi, B = dsh × 3) on Eval-3, 20 min limit, archo 1.0.7 (dev/1.1 a3a53af7, `toolsrcho-1.0.7.exe`). Cost as in round 2. The first attempt ran while the model gateway was down (0 tool calls; moved to `results-gateway-down/`).
+
+| Cell | Solved | Mean s | Tool calls (Archo) | Tokens | Cost per run |
+| --- | --- | --- | --- | --- | --- |
+| h4 A Pi | 1/3 | 539 | 68 (9.7) | 2.55 M | ¥0.080 |
+| h4 B dsh | 1/3 | 755 | 91 (18.7) | 5.66 M | ¥0.155 |
+| h7 A Pi | 0/3 | 413 | 52 (9.7) | 1.85 M | ¥0.059 |
+| h7 B dsh | 0/3 | 505 | 54 (17.0) | 2.24 M | ¥0.087 |
+
+Every run called `test_run` with `map=true`, and got status `map`: Archo's test run reproduces both faults.
+
+Why the 10 failures failed:
+
+- **h4 (4 failures):** all patched Cyanobot's Genes' postfix with a null check (the stack's top frame), and named only Cyanobot's Genes. The logs were clean, so the grade is "workaround elsewhere". Both solved runs fixed Colonist Mutterings' entry; h4-B-1 also patched Cyanobot's Genes and named both Mods.
+- **h7 (6 failures):** all rewrote the profiler's `foreach` as an index loop. 5 of 6 found SSR's `TC_ForceBodyShape` and its `AllComps.Remove` / `GenList.Swap`, but judged it allowed: vanilla's cached-count loop tolerates it, so the profiler is the one that departs from vanilla (h7-B-1: "Comps are allowed to modify that list while they tick"). 5 of 6 logs were clean. h7-A-1's log had one extra line, `Object with load ID Thing_Human… is referenced … but is not deep-saved`, from the autosave that ends the map run: a grader flake from the harness, not from the submission.
+
+Case design: the h7 verdict is debatable. That SSR is the culprit rests on "a comp must not change `AllComps` inside `CompTick`", but vanilla's loop is written to survive exactly that, and the agents' reading is reasonable. Either accept a profiler fix as a second right answer (then h7 would be 5/6 on the fix), or make the fault one that vanilla does not survive. h4's verdict has vanilla's own error (`has a null pawn reference`) behind it, and two runs found it.
+
+Archo gaps found (no app code changed):
+
+1. Attribution names only the Mods in the stack. h7: both clusters list Pawn Comp Profiler and PA's God Hands (`likely`), nothing about a third Mod's comp changing the list; Archo cannot know which comps the pawn has. h4: Archo lists Colonist Mutterings and Cyanobot's Genes, both `likely`, without saying which frame is the caller.
+2. Harness (not Archo): an autosave-based map run can add a save-time error that the reference lacks; `logdiff.mjs` does not filter it.
+
 ### Transpiler conflict h3 and save error h6 (built 2026-11-08)
 
 Both follow the commonest unattributed classes in the public 1.6 logs (private corpus, aggregate figures only). Built with `node scripts/mcp-eval/cases.mjs h3 h6`; each was reproduced in the real 1.6.4871 game (host sandbox), and its reference fix removes every injected error line with no new one.
