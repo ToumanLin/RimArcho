@@ -51,7 +51,7 @@ const descSave = `Save the current plan to the game (ModsConfig.xml and RimArcho
 
 const descLaunch = `Save the current plan like save_loadout, then start the game. Refused while any game runs. Starts a program and changes the game's list: call with dry_run=true first, show the player and ask.`
 
-const descTestRun = `Start the game with a plan in isolated test data, wait for the main menu (map=true: a test map; probe: a probe mod's RESULT), capture errors, stop it, report JSON. Compares with the player's log (before, fixed) and the previous run (delta, gone). Takes minutes. Pinned copies are linked into Mods/ for the run only.`
+const descTestRun = `Run a plan in isolated data to the menu (or map, save, probe), stop, give errors vs the player's log and last run; not_tested: proved nothing. Links pinned copies. 37-Mod VM: menu 1-2 min, map 6-7; ticks +N/60 s.`
 
 const descPlans = `The environment's plans (named mod lists): list, new, use (switch; writes no game file), rename, remove, import, versions, follow / unfollow / sync a Workshop collection. remove deletes a plan with its whole history: ask the player first, naming the plan.`
 

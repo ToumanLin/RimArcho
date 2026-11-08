@@ -80,6 +80,12 @@ func TestAppGameHelper(t *testing.T) {
 		}
 	} else if mode == "exit" {
 		os.Exit(7)
+	} else if mode == "autosave" { // the first autosave after the asked ticks (20 §2)
+		time.Sleep(20 * time.Millisecond)
+		saves := filepath.Join(os.Getenv("ARCHO_TEST_DATA"), "Saves")
+		if os.MkdirAll(saves, 0o755) != nil || os.WriteFile(filepath.Join(saves, "Autosave-1.rws"), []byte("<savegame/>"), 0o644) != nil {
+			os.Exit(95)
+		}
 	} else if mode == "probe" { // a probe saves its screenshot, logs its RESULT and quits (20 §3)
 		if err := os.WriteFile(filepath.Join(os.Getenv("ARCHO_TEST_DATA"), "probe.png"), []byte("png"), 0o644); err != nil {
 			os.Exit(96)
@@ -398,15 +404,35 @@ func TestTestRunLinksBlockedAndLeftover(t *testing.T) {
 		{"Op": "add", "Name": filepath.Base(keep), "Target": filepath.Join(extra, "Pinned")}, // no longer what was recorded
 	}})
 	e.WriteFile(filepath.Join(base, "links.json"), string(rec))
+	start := e.App.TestGameStart
+	var during []string
+	e.App.TestGameStart = func(cmd *exec.Cmd) error {
+		ents, _ := os.ReadDir(mods)
+		for _, d := range ents {
+			during = append(during, d.Name())
+		}
+		return start(cmd)
+	}
 	r, err := e.App.TestRun(context.Background(), app.TestRunOptions{Timeout: 5 * time.Second, Settle: time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(r.Linked) != 1 || !strings.Contains(r.Linked[0], "Pinned") {
+	// ClashCopy has test.clash's packageId: it goes aside for the run, so the plan's Clash
+	// is the copy the game loads (h8 B2), and comes back after it.
+	if len(r.Linked) != 2 || !strings.Contains(r.Linked[0], "Clash") || !strings.Contains(r.Linked[1], "Pinned") {
 		t.Fatalf("linked %v", r.Linked)
 	}
-	if len(r.Missing) != 1 || r.Missing[0].PackageID != "test.clash" || !strings.Contains(r.Missing[0].Reason, "ClashCopy") {
-		t.Fatalf("missing %+v", r.Missing)
+	if len(r.Missing) != 0 || !slices.Equal(r.Hidden, []string{"ClashCopy"}) || slices.Contains(during, "ClashCopy") || r.Status != "menu" {
+		t.Fatalf("missing %+v, hidden %v, Mods/ during the run %v, status %s", r.Missing, r.Hidden, during, r.Status)
+	}
+	if _, err := os.Stat(filepath.Join(mods, "ClashCopy", "About", "About.xml")); err != nil {
+		t.Fatalf("ClashCopy not back: %v", err)
+	}
+	if _, err := os.Lstat(filepath.Join(e.Game, "_ArchoTestHidden")); !os.IsNotExist(err) {
+		t.Fatalf("hidden folder left: %v", err)
+	}
+	if len(r.Loaded) != 2 || r.LoadedTotal != 2 || !strings.HasPrefix(r.Loaded[0].Folder, "Mods/"+app.DeployPrefix) || r.Loaded[0].From != "disk" {
+		t.Fatalf("loaded %+v", r.Loaded)
 	}
 	if _, err := os.Lstat(leftover); !os.IsNotExist(err) {
 		t.Fatalf("leftover link kept: %v", err)

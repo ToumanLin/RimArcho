@@ -111,6 +111,9 @@ type Entry struct {
 type File struct {
 	HasPhases bool     `json:",omitempty"`
 	Phases    []*Phase `json:",omitempty"`
+	// GameMarks: the game's own new-game and save-load lines (GameMark), kept apart from
+	// the Monitor's phases; only test runs read them (20 §2).
+	GameMarks []*Phase `json:",omitempty"`
 	Entries   []*Entry
 	Lines     int
 	Version   string // "1.6.4871 rev…" from the header, if found
@@ -317,8 +320,11 @@ func (p *Parser) Line(l string) {
 			return
 		}
 		// INFO phase markers must be seen before the usual level filtering.
-		if m := waylithLineRe.FindStringSubmatch(l); m != nil && p.marker(m[2], l, n) {
-			return
+		if m := waylithLineRe.FindStringSubmatch(l); m != nil {
+			if p.marker(m[2], l, n) {
+				return
+			}
+			p.gameMark(m[2], n)
 		}
 		next := waylithLine(f, p.cur, n, l)
 		if next != p.cur {
@@ -336,6 +342,7 @@ func (p *Parser) Line(l string) {
 	if p.marker(l, "", n) {
 		return
 	}
+	p.gameMark(l, n)
 	if f.Version == "" && head {
 		if m := versionRe.FindStringSubmatch(l); m != nil {
 			f.Version = m[1]
@@ -408,6 +415,14 @@ func (p *Parser) waylithXMLBlock(l string) bool {
 	}
 	p.closeBlock()
 	return false
+}
+
+// gameMark records the game's own boundary line (GameMark) without consuming it.
+func (p *Parser) gameMark(msg string, n int) {
+	if mark := GameMark(msg); mark != nil {
+		mark.Index, mark.Line = len(p.F.GameMarks)+1, n
+		p.F.GameMarks = append(p.F.GameMarks, mark)
+	}
 }
 
 func (p *Parser) marker(msg, line string, n int) bool {

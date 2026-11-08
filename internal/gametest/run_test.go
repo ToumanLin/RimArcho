@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -208,6 +209,79 @@ func TestRunMap(t *testing.T) {
 	}
 }
 
+// A save run copies the save in as autostart.rws, turns dev mode on and stops at the first
+// autosave; a map run with ticks does the same on a test map without dev mode (20 §2).
+func TestRunSaveAndTicks(t *testing.T) {
+	for _, mode := range []string{"save", "ticks"} {
+		t.Run(mode, func(t *testing.T) {
+			t.Parallel()
+			o := testOptions(t, mode, false)
+			o.Ticks = 3000
+			o.MapQuiet = time.Hour // the autosave decides, not a quiet log
+			writeTestFile(t, filepath.Join(o.DataDir, "Saves", "Autosave-3.rws"), "an earlier run's autosave")
+			writeTestFile(t, filepath.Join(o.DataDir, "Saves", "keep.rws"), "other save")
+			if mode == "save" {
+				o.Save = filepath.Join(t.TempDir(), "Colony.rws")
+				writeTestFile(t, o.Save, "<savegame>colony</savegame>")
+			} else {
+				o.Map = true
+				writeTestFile(t, filepath.Join(o.DataDir, "Saves", "autostart.rws"), "stale")
+			}
+			r, err := Run(context.Background(), o)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := map[string]string{"save": "save", "ticks": "map"}[mode]
+			assertResult(t, o, r, want)
+			phase := map[string]string{"save": "save", "ticks": "new"}[mode]
+			if r.TicksReached != 3000 || r.Phase != phase || r.MapSeconds < 0.5 || r.LoadSeconds < r.MapSeconds || r.LastLine != "" {
+				t.Fatalf("result %+v", r)
+			}
+			if slices.Contains(r.Args, "quicktest") != (mode == "ticks") {
+				t.Fatalf("args %q", r.Args)
+			}
+			prefs, _ := os.ReadFile(filepath.Join(o.DataDir, "Config", "Prefs.xml"))
+			if !strings.Contains(string(prefs), "<autosaveIntervalDays>0.05</autosaveIntervalDays>") ||
+				strings.Contains(string(prefs), "<devMode>True</devMode>") != (mode == "save") ||
+				!strings.Contains(string(prefs), "<runInBackground>True</runInBackground>") {
+				t.Fatalf("prefs %s", prefs)
+			}
+			autostart, err := os.ReadFile(filepath.Join(o.DataDir, "Saves", "autostart.rws"))
+			if mode == "save" && string(autostart) != "<savegame>colony</savegame>" || mode == "ticks" && !os.IsNotExist(err) {
+				t.Fatalf("autostart %q, %v", autostart, err)
+			}
+			if _, err := os.Stat(filepath.Join(o.DataDir, "Saves", "Autosave-3.rws")); !os.IsNotExist(err) {
+				t.Fatalf("an earlier autosave stayed: %v", err)
+			}
+			if _, err := os.Stat(filepath.Join(o.DataDir, "Saves", "keep.rws")); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+	o := testOptions(t, "idle", false)
+	o.Save, o.Map = "x.rws", true
+	if _, err := Run(context.Background(), o); err == nil {
+		t.Fatal("a save run with a test map accepted")
+	}
+}
+
+// A run that does not arrive reports the furthest phase and the log's last line.
+func TestRunTimeoutLastLine(t *testing.T) {
+	t.Parallel()
+	o := testOptions(t, "map", false)
+	o.Map = true
+	o.MapQuiet = time.Hour
+	o.Timeout = 1200 * time.Millisecond
+	r, err := Run(context.Background(), o)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertResult(t, o, r, "timeout")
+	if r.Phase != "new" || r.LastLine != "03:36:13  INFO Map still loading" || r.MapSeconds <= 0 {
+		t.Fatalf("result %+v", r)
+	}
+}
+
 func TestRunProbe(t *testing.T) {
 	for _, tc := range []struct {
 		mode    string
@@ -335,6 +409,21 @@ func TestGameHelper(t *testing.T) {
 		fmt.Fprintf(log, "03:36:12  INFO %s\r\n", mapMarker)
 		time.Sleep(700 * time.Millisecond)
 		fmt.Fprint(log, "03:36:13  INFO Map still loading\r\n")
+	case "save", "ticks":
+		// The game's load or new-game marker, then the first autosave after the ticks.
+		if mode == "save" {
+			fmt.Fprint(log, "03:36:12  INFO Loading game from file autostart with mods:\r\n  - ludeon.rimworld\r\n")
+		} else {
+			fmt.Fprintf(log, "03:36:12  INFO %s:\r\n  - ludeon.rimworld\r\n", mapMarker)
+		}
+		time.Sleep(700 * time.Millisecond)
+		path := filepath.Join(os.Getenv("RIMARCHO_HELPER_DATA"), "Saves", "Autosave-1.rws")
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			os.Exit(95)
+		}
+		if err := os.WriteFile(path, []byte("<savegame/>"), 0o644); err != nil {
+			os.Exit(94)
+		}
 	case "probe-quit", "probe-stay", "probe-exception":
 		// Unity writes the message alone; the 1.7 console writes time and level first.
 		line := func(s string) {

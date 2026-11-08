@@ -74,6 +74,9 @@ type LogCluster struct {
 type LogReport struct {
 	HasPhases bool          `json:",omitempty"`
 	Phases    []*logs.Phase `json:",omitempty"`
+	// GameMarks: the game's own new-game and save-load lines (logs.GameMark); test runs
+	// place clusters without Monitor phases by them (20 §2).
+	GameMarks []*logs.Phase `json:",omitempty"`
 	Path      string
 	Label     string // "Player.log", "Player-prev.log" or "<text>"
 	ModTime   time.Time
@@ -150,8 +153,9 @@ var ErrLogNotCached = errors.New("log not analysed yet")
 // "Tried to" errors, the game-error class and the lord rule; 14: Unity-format stack frames,
 // HugsLib upload headers skipped (06 §1); 15: XML Extensions blocks in 1.7 logs, any
 // "[Mod] Ns.PatchOperation…(" block line a patch failure; 16: a pawn's name in "Exception
-// ticking …" errors normalised, one cluster for all pawns.
-const logCacheVersion = 16
+// ticking …" errors normalised, one cluster for all pawns; 17: the game's new-game and
+// save-load lines (GameMarks, 20 §2).
+const logCacheVersion = 17
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a
@@ -420,6 +424,7 @@ type dirOwner struct {
 func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails []analyze.LogFailure, comp *logs.Companion) error {
 	rep.HasPhases = lf.HasPhases || comp != nil && comp.HasPhases
 	rep.Phases = lf.Phases
+	rep.GameMarks = lf.GameMarks
 	if comp != nil && comp.HasPhases {
 		rep.Phases = comp.Phases
 		for _, p := range lf.Phases {

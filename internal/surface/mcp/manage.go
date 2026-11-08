@@ -31,18 +31,23 @@ func manageTools() []tool {
 }
 
 type TestRunIn struct {
-	Env            string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
-	Plan           string `json:"plan,omitempty" jsonschema:"plan name or plan:name (default: the environment's current plan)"`
-	Map            bool   `json:"map,omitempty" jsonschema:"load a quick test map instead of the main menu"`
-	Probe          string `json:"probe,omitempty" jsonschema:"probe mod folder: run a test map until its [Probe] RESULT line"`
-	ProbeAfter     string `json:"probe_after,omitempty" jsonschema:"packageId the probe follows (default: last)"`
-	ProbeBefore    string `json:"probe_before,omitempty" jsonschema:"packageId the probe precedes"`
-	TimeoutSeconds int    `json:"timeout_seconds,omitempty" jsonschema:"maximum run time in seconds (default 600)"`
+	Env            string `json:"env,omitempty" jsonschema:"environment (default current)"`
+	Plan           string `json:"plan,omitempty" jsonschema:"plan name (default current)"`
+	Map            bool   `json:"map,omitempty" jsonschema:"a quick test map instead of the menu"`
+	Save           string `json:"save,omitempty" jsonschema:"load this save (list_saves ref or .rws path)"`
+	Ticks          int    `json:"ticks,omitempty" jsonschema:"map/save: ticks to play"`
+	Probe          string `json:"probe,omitempty" jsonschema:"probe mod folder: test map until its [Probe] RESULT"`
+	ProbeAfter     string `json:"probe_after,omitempty" jsonschema:"probe follows this packageId (default: last)"`
+	ProbeBefore    string `json:"probe_before,omitempty" jsonschema:"probe precedes this packageId"`
+	TimeoutSeconds int    `json:"timeout_seconds,omitempty" jsonschema:"seconds (default 600; map/save: 2x last load)"`
 }
 
 func TestRunArgv(in TestRunIn) []string {
-	b := argv("test", "run").pos(in.Plan).flag("map", in.Map).
+	b := argv("test", "run").pos(in.Plan).flag("map", in.Map).str("save", in.Save).
 		str("probe", in.Probe).str("probe-after", in.ProbeAfter).str("probe-before", in.ProbeBefore)
+	if in.Ticks != 0 {
+		b.str("ticks", fmt.Sprint(in.Ticks))
+	}
 	if in.TimeoutSeconds != 0 {
 		b.str("timeout", fmt.Sprintf("%ds", in.TimeoutSeconds))
 	}
