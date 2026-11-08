@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	register(&Command{Name: "guide", Args: "[<topic>]", Summary: "the agent guide behind the MCP tools: a workflow (diagnose, errors, plans, words) or one tool's full reference",
+	register(&Command{Name: "guide", Args: "[<topic>]", Summary: "the agent guide behind the MCP tools: a workflow (diagnose, errors, plans, rebuild, words) or one tool's full reference",
 		MaxArgs: 1, Run: guideCmd})
 }
 
@@ -31,6 +31,7 @@ var guideTopics = []struct{ name, summary, text string }{
 	{"diagnose", "the workflow for a game error or crash: classify it, which tool for which evidence, how to report", guideDiagnose},
 	{"errors", "error kinds the workflow does not cover (save loading, config errors, missing assets, assembly loading, noise), most frequent first", patternChecklist},
 	{"plans", "plans and their versions, the library, subscriptions and textures, and editing mod files safely", guidePlans},
+	{"rebuild", "rebuilding a Mod from the source it ships: the build: block of get_mod, dotnet restore and build, publicizers, or a small patch Mod instead", guideRebuild},
 	{"words", "what the interface calls things, for talking to the player", guideWords},
 }
 

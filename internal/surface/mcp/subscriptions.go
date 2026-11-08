@@ -20,19 +20,19 @@ func subscriptionTools() []tool {
 
 // ManageSubscriptionsIn is manage_subscriptions.
 type ManageSubscriptionsIn struct {
-	Env      string   `json:"env,omitempty" jsonschema:"environment name (default: current)"`
-	Action   string   `json:"action,omitempty" jsonschema:"list (default), add, check, update or remove"`
-	URL      string   `json:"url,omitempty" jsonschema:"add: a Git repository URL, a download page (a LoversLab file page or another https page), or Workshop links or IDs separated by spaces"`
-	Kind     string   `json:"kind,omitempty" jsonschema:"add: git, page or workshop; empty recognises it from url the way the window's paste box does"`
-	Branch   string   `json:"branch,omitempty" jsonschema:"add (git): track this branch (default: the repository's default branch)"`
-	Tag      string   `json:"tag,omitempty" jsonschema:"add (git): track this tag"`
-	Commit   string   `json:"commit,omitempty" jsonschema:"add (git): pin this full commit SHA (never updates)"`
-	Git      bool     `json:"git,omitempty" jsonschema:"add (page): subscribe to the page's single linked Git repository instead of downloaded files"`
-	From     string   `json:"from,omitempty" jsonschema:"add (page) or update (one page subscription): a zip or folder the player downloaded in the browser"`
-	SteamCMD bool     `json:"steamcmd,omitempty" jsonschema:"add (workshop): download with SteamCMD instead of subscribing through the Steam client"`
-	Refs     []string `json:"refs,omitempty" jsonschema:"check, update, remove: the subscribed copies (#id); check without refs checks every subscription"`
-	All      bool     `json:"all,omitempty" jsonschema:"update: every subscription (page ones are skipped: they need from)"`
-	DryRun   bool     `json:"dry_run,omitempty" jsonschema:"add, update, remove: show what would happen, change nothing"`
+	Env      string  `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Action   string  `json:"action,omitempty" jsonschema:"list (default), add, check, update or remove"`
+	URL      string  `json:"url,omitempty" jsonschema:"add: a Git repository URL, a download page (a LoversLab file page or another https page), or Workshop links or IDs separated by spaces"`
+	Kind     string  `json:"kind,omitempty" jsonschema:"add: git, page or workshop; empty recognises it from url the way the window's paste box does"`
+	Branch   string  `json:"branch,omitempty" jsonschema:"add (git): track this branch (default: the repository's default branch)"`
+	Tag      string  `json:"tag,omitempty" jsonschema:"add (git): track this tag"`
+	Commit   string  `json:"commit,omitempty" jsonschema:"add (git): pin this full commit SHA (never updates)"`
+	Git      bool    `json:"git,omitempty" jsonschema:"add (page): subscribe to the page's single linked Git repository instead of downloaded files"`
+	From     string  `json:"from,omitempty" jsonschema:"add (page) or update (one page subscription): a zip or folder the player downloaded in the browser"`
+	SteamCMD bool    `json:"steamcmd,omitempty" jsonschema:"add (workshop): download with SteamCMD instead of subscribing through the Steam client"`
+	Refs     StrList `json:"refs,omitempty" jsonschema:"check, update, remove: the subscribed copies (#id); check without refs checks every subscription"`
+	All      bool    `json:"all,omitempty" jsonschema:"update: every subscription (page ones are skipped: they need from)"`
+	DryRun   bool    `json:"dry_run,omitempty" jsonschema:"add, update, remove: show what would happen, change nothing"`
 }
 
 // SubscriptionsArgv maps manage_subscriptions to archo subscribe list / git / page /

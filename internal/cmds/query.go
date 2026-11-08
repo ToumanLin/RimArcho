@@ -633,6 +633,12 @@ func modDoc(c *Ctx, ix *app.Index, m *store.Mod) (*render.Doc, error) {
 			settingsFiles(root.Section("settings"), sm, 10, "archo mod-settings "+ref)
 		}
 	}
+	// The C# source it ships and how to rebuild it (05 §5.6).
+	if m.Status == identity.Live && m.Kind != source.Official {
+		if b := c.App.ModBuild(ix, m); b != nil {
+			buildBlock(c, root, c.App.ModPath(ix, m), b)
+		}
+	}
 	if decl.ParseError != "" {
 		root.KV("warning", "About.xml: "+decl.ParseError)
 	}

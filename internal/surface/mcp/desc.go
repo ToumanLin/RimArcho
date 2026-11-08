@@ -13,7 +13,7 @@ Tools marked destructive (save_loadout, launch_game, manage_plans, manage_packs,
 The player's management tools (packs, subscriptions, library actions, textures, memory estimate, maintenance, identity, hidden mods, links, player data, save actions, uninstall preview) are served only by archo mcp --tools all; otherwise use the archo CLI (guide topic=<tool name> gives the command).
 guide topic=<tool name> gives a tool's full reference (every action, parameter details, an example call and output); guide alone lists the other topics: errors (kinds the workflow does not cover), plans, words (what the interface calls things, for talking to the player).`
 
-const descGuide = `Read-only help: a tool's full reference (topic=<tool name>: every action, parameter details, an example call and output) or a workflow (diagnose, errors, plans, words). No topic lists them.`
+const descGuide = `Read-only help: a tool's full reference (topic=<tool name>: every action, parameter details, an example call and output) or a workflow (diagnose, errors, plans, rebuild, words). No topic lists them.`
 
 const descStatus = `Overview of the current environment: game version, mods per source, the current plan and how it differs from the game's list, whether a game runs, problem counts, pending updates. Call first in a session. show=envs|folders|settings|data|db|cache gives one read-only page of RimArcho's setup instead.`
 
@@ -43,7 +43,7 @@ const descLog = `For any game error or crash, call this first, before reading Pl
 
 const descFiles = `Text search in the files of the enabled mods as the game loads them (Defs/Patches/About by default, load order, shadowing). def=true finds a whole defName with its roles: defines, inherits, patches, references. For XML evidence; C# is read_source. Paged: follow next:.`
 
-const descSource = `C# in the Source library, decompiled on demand. ref with type reads one type; game=true selects game code or adds it to search. search=<text> searches log suspects or in=[refs]; shared code appears once with its copies. scope="active" (all enabled mods, many minutes) only when the user asks.`
+const descSource = `C# in the Source library, decompiled on demand. ref+type reads a whole type (member=<name>: one member); game=true is the game's code, or joins a search. search=<text> covers in=[refs] or the log's suspects and says what it did not search; scope="active" searches every enabled mod in 10 s steps: repeat while pending.`
 
 const descEdit = `Change the current plan: enable, disable, move, swap (another copy), sort, undo, redo, checkout (a version), stage / unstage / restore, ignore_external. Stored at once and undoable; no game file is written until save_loadout or launch_game.`
 
