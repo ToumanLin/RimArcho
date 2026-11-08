@@ -8,8 +8,8 @@ Until RimArcho has a relay URL, the feedback page offers only "open GitHub".
 
 - Receives: `POST /report`, JSON `{title, body, contact}`, `User-Agent: RimArcho/<version>`. Returns `{number, url}` on success or `{error}` on failure; RimArcho translates error codes into player-facing text.
 - Abuse prevention:
-  - One report per sender per minute, using the `PER_MINUTE` rate-limit binding.
-  - `PER_IP_DAY` reports per sender per day and `PER_DAY` total per day, using approximate KV counters.
+  - One report per sender per minute and `PER_IP_DAY` reports per sender per day, exact: a Durable Object per sender (`SendGate`, binding `GATE`), which handles one request at a time and reads its own writes. A report GitHub refuses gives the minute back. Until 1.0.6 the minute limit was Cloudflare's rate-limit binding, which is approximate and per location: it let a second report through 13 s after the first.
+  - `PER_DAY` total per day, using an approximate KV counter.
   - Length limits: title 120, body 60,000, contact 200 characters.
   - Insert a zero-width space inside `@someone` and `other-repo#123`: GitHub still displays them without notifying anyone.
 - Privacy:
@@ -71,17 +71,17 @@ Requires a Cloudflare account (the free plan suffices), Node.js (LTS) and reposi
 - **Still getting spam**: consider Cloudflare Turnstile verification. This requires a RimArcho change (verification before sending) and is not implemented yet.
 - **Cost**:
   - Workers free plan: 100,000 requests per day.
-  - KV free plan: 100,000 reads and 1,000 writes per day. Each report takes 2–3 writes, so keep `PER_DAY` at or below 300.
-  - Cloudflare's docs do not list pricing for the rate-limit binding.
+  - KV free plan: 100,000 reads and 1,000 writes per day. Each report takes 1–2 writes, so keep `PER_DAY` at or below 300.
+  - Durable Objects (SQLite storage) are on the free plan; each report is one or two requests to its sender's object, which deletes its storage two days later.
 
 ## Tests
 
-`node --test "feedback-relay/*.test.mjs"` (from the repository root). Tests use a fake GitHub, a Map as KV and a counter in place of the rate-limit binding; no real GitHub or Cloudflare calls. Coverage:
+`node --test "feedback-relay/*.test.mjs"` (from the repository root). Tests use a fake GitHub, a Map as KV and the real `SendGate` behind a fake Durable Object namespace; no real GitHub or Cloudflare calls. Coverage:
 
 - Issue creation, with neither IP nor contact details in the issue;
 - JWT verification against the App public key;
 - Installation-token reuse;
-- All three limits: per minute, per sender per day, total per day;
+- All three limits: per minute (including a resend after 13 s), per sender per day, total per day; a GitHub failure gives the minute back;
 - Rejection cases;
 - Retry without a label if the label is rejected;
 - PKCS#1, PKCS#8 and single-line private keys.

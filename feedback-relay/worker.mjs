@@ -3,13 +3,15 @@
 // repository, so a player without a GitHub account can report. The GitHub App's key lives
 // only here, as a Worker secret; RimArcho carries nothing but this Worker's address.
 //
-// Abuse limits: one report a minute per sender (the PER_MINUTE rate-limit binding), a daily
-// cap per sender and a daily cap for everyone (KV counters, approximate), size limits, and
+// Abuse limits: one report a minute and a daily cap per sender (SendGate, a Durable Object per
+// sender: exact), a daily cap for everyone (a KV counter, approximate), size limits, and
 // @mentions defused so a report cannot ping people. The sender's IP is only hashed, with
-// the secret and the day, for the counters; it never reaches the issue.
+// the secret and the day, for the counters; it never reaches the issue. Cloudflare's
+// rate-limit binding did this until 1.0.6: it is approximate and per location, and let a
+// second report through 13 s after the first (VM round 1.0.6).
 //
-// handle and the helpers are exported for worker.test.mjs, which runs them in Node with a
-// fake GitHub, KV and rate limiter.
+// handle, SendGate and the helpers are exported for worker.test.mjs, which runs them in Node
+// with a fake GitHub, KV and Durable Object namespace.
 
 const API = "https://api.github.com";
 
@@ -30,7 +32,7 @@ export async function handle(request, env, deps = {}) {
   const now = deps.now || Date.now;
   if (new URL(request.url).pathname !== "/report") return reply(404, { error: "not_found" });
   if (request.method !== "POST") return reply(405, { error: "method" });
-  if (!env.APP_ID || !env.GITHUB_APP_KEY || !env.REPO || !env.COUNTS || !env.PER_MINUTE) {
+  if (!env.APP_ID || !env.GITHUB_APP_KEY || !env.REPO || !env.COUNTS || !env.GATE) {
     return reply(503, { error: "not_configured" });
   }
   // not a defence (anyone can say it), only keeps stray crawlers out of the counters
@@ -48,15 +50,21 @@ export async function handle(request, env, deps = {}) {
 
   const day = new Date(now()).toISOString().slice(0, 10);
   const who = await sender(request.headers.get("cf-connecting-ip") || "", day, env.GITHUB_APP_KEY);
-  const { success } = await env.PER_MINUTE.limit({ key: who });
-  if (!success) return reply(429, { error: "slow_down" });
-  const cap = await count(env, who, day);
-  if (cap) return reply(429, { error: cap });
+  const gate = env.GATE.get(env.GATE.idFromName(who));
+  const ask = (op) => gate.fetch(`https://gate/${op}?now=${now()}&perSender=${limit(env.PER_IP_DAY, 5)}`, { method: "POST" });
+  const claimed = await (await ask("claim")).json();
+  if (claimed.error) return reply(429, { error: claimed.error });
+  const cap = await count(env, day);
+  if (cap) {
+    await ask("release");
+    return reply(429, { error: cap });
+  }
 
   let issue;
   try {
     issue = await createIssue(env, report, fetchFn, now);
   } catch (e) {
+    await ask("release"); // nothing was filed: the player may send again at once
     return reply(502, { error: "github", detail: String(e?.message || e).slice(0, 200) });
   }
   if (report.contact) {
@@ -99,22 +107,49 @@ export async function sender(ip, day, secret) {
   return [...new Uint8Array(d)].slice(0, 16).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-// count adds a report to today's counters, or names the cap it would pass ("ip_daily",
-// "daily"). KV is eventually consistent, so a burst can pass a cap by a few; PER_MINUTE
-// stops bursts from one sender.
-export async function count(env, who, day) {
-  const perSender = limit(env.PER_IP_DAY, 5);
+// count adds a report to today's counter for everyone, or says "daily" when it is full. KV
+// is eventually consistent, so a burst from many senders can pass the cap by a few; each
+// sender's own limits are exact (SendGate).
+export async function count(env, day) {
   const perDay = limit(env.PER_DAY, 30);
-  const mine = `ip:${who}:${day}`;
   const all = `all:${day}`;
-  const [a, b] = await Promise.all([env.COUNTS.get(mine), env.COUNTS.get(all)]);
-  const n = parseInt(a || "0", 10) || 0;
-  const total = parseInt(b || "0", 10) || 0;
+  const total = parseInt((await env.COUNTS.get(all)) || "0", 10) || 0;
   if (total >= perDay) return "daily";
-  if (n >= perSender) return "ip_daily";
-  const ttl = { expirationTtl: 2 * 86400 };
-  await Promise.all([env.COUNTS.put(mine, String(n + 1), ttl), env.COUNTS.put(all, String(total + 1), ttl)]).catch(() => {});
+  await env.COUNTS.put(all, String(total + 1), { expirationTtl: 2 * 86400 }).catch(() => {});
   return "";
+}
+
+const MINUTE = 60000;
+
+// SendGate is one sender's limits for one day (its name is the day's sender hash): the time of
+// the last report and how many were sent. A Durable Object handles one request at a time per
+// sender and reads back its own writes, so a resend within the minute is always refused.
+// POST /claim?now=&perSender= answers {} or {error: "slow_down" | "ip_daily"} and records the
+// report; POST /release gives the last claim back (no issue was filed). The object deletes its
+// storage two days after its first report.
+export class SendGate {
+  constructor(state) {
+    this.storage = state.storage;
+  }
+
+  async fetch(request) {
+    const u = new URL(request.url);
+    const now = Number(u.searchParams.get("now")) || Date.now();
+    const s = (await this.storage.get("s")) || { last: 0, prev: 0, n: 0 };
+    if (u.pathname === "/release") {
+      if (s.n > 0) await this.storage.put("s", { last: s.prev, prev: s.prev, n: s.n - 1 });
+      return Response.json({});
+    }
+    if (s.last && now - s.last < MINUTE) return Response.json({ error: "slow_down" });
+    if (s.n >= limit(u.searchParams.get("perSender"), 5)) return Response.json({ error: "ip_daily" });
+    if (!s.n) await this.storage.setAlarm(now + 2 * 86400e3);
+    await this.storage.put("s", { last: now, prev: s.last, n: s.n + 1 });
+    return Response.json({});
+  }
+
+  async alarm() {
+    await this.storage.deleteAll();
+  }
 }
 
 function limit(v, dflt) {
