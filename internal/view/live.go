@@ -103,11 +103,13 @@ func LiveNeeds(st *app.LoadoutState, cs []*app.LiveCluster) []Need {
 		// item names only the mod (16 §5).
 		var ids []string
 		text := fmt.Sprintf("%d× %s", c.Count, msg)
-		for _, at := range c.Report.Attr {
+		// A mod only named by the message is not blamed (06 §3).
+		owners := c.Report.Owners()
+		for _, at := range owners {
 			ids = append(ids, at.Instance)
 		}
-		if len(c.Report.Attr) > 0 {
-			text = Tf("%s: %d× %s", TokName(st, finding.Inst(c.Report.Attr[0].Instance)), c.Count, msg)
+		if len(owners) > 0 {
+			text = Tf("%s: %d× %s", TokName(st, finding.Inst(owners[0].Instance)), c.Count, msg)
 		}
 		ev := evidence(EvLog, "Player.log")
 		var texts []string

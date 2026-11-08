@@ -228,6 +228,9 @@ func TestCLIParity(t *testing.T) {
 	for _, c := range cases {
 		got, isErr := call(t, cs, c.tool, c.args)
 		want, code := e.Run(c.cli...)
+		if c.tool != "guide" {
+			want = cmds.MCPHints(want) // 13 §1.1: the same text, its suggested commands as tool calls
+		}
 		if searchMS.ReplaceAllString(got, "${1}<ms> ms)") != searchMS.ReplaceAllString(want, "${1}<ms> ms)") {
 			t.Errorf("%s %v: MCP text differs from `archo %s`:\n--- mcp\n%s\n--- cli\n%s", c.tool, c.args, strings.Join(c.cli[:1], " "), got, want)
 		}
@@ -244,7 +247,7 @@ func TestCLIParity(t *testing.T) {
 		t.Fatal("archo log printed no cursor")
 	}
 	got, _ := call(t, cs, "analyze_log", map[string]any{"since": m[1]})
-	if want, _ := e.Run("log", "--since", m[1]); got != want || !strings.Contains(got, "(nothing new)") {
+	if want, _ := e.Run("log", "--since", m[1]); got != cmds.MCPHints(want) || !strings.Contains(got, "(nothing new)") {
 		t.Errorf("analyze_log since: MCP text differs from `archo log --since`:\n--- mcp\n%s\n--- cli\n%s", got, want)
 	}
 }

@@ -97,6 +97,8 @@ func (a *App) comparePlayerLog(st *LoadoutState, r *TestRunReport) {
 		if slices.Contains(lc.Details, ownArtNote) {
 			// Gone because files were added, not because the fault was fixed (MCP eval h2).
 			c.Note = ownArtNote
+		} else if lc.Class == logs.ClassTexture {
+			c.Note = renderingOnlyNote
 		}
 		r.playerClusters[lc.Key] = c
 		if current[lc.Key] {

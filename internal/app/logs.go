@@ -86,6 +86,9 @@ type LogReport struct {
 	// the environment's (EnvMM): the log's own version (06 §4).
 	AnalysedAs, EnvMM string
 	Clusters          []*LogCluster
+	// LoadedSaves are the saves the run loaded ("Loading game from file <name> with mods"),
+	// in order, each once (06 §3): the output says which are not in Saves/.
+	LoadedSaves []string `json:",omitempty"`
 	// Unanalysed counts the enabled mods (Core and DLC aside) whose content and assemblies
 	// had not been analysed for the attributed version: their types and Harmony IDs could
 	// not name them (06 §2).
@@ -154,8 +157,10 @@ var ErrLogNotCached = errors.New("log not analysed yet")
 // HugsLib upload headers skipped (06 §1); 15: XML Extensions blocks in 1.7 logs, any
 // "[Mod] Ns.PatchOperation…(" block line a patch failure; 16: a pawn's name in "Exception
 // ticking …" errors normalised, one cluster for all pawns; 17: the game's new-game and
-// save-load lines (GameMarks, 20 §2).
-const logCacheVersion = 17
+// save-load lines (GameMarks, 20 §2); 18: a texture-missing cluster says
+// "rendering only", the saves the run loaded are recorded (LoadedSaves), and a mentioned mod is
+// no subject of the cluster's finding (06 §3).
+const logCacheVersion = 18
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a
@@ -499,7 +504,13 @@ func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails [
 		cx.textureProviders(qs)
 	}
 	cx.consequences(rep)
+	rep.LoadedSaves = logLoadedSaves(lf)
 	for _, lc := range rep.Clusters {
+		// A missing texture affects drawing only; say so on every such cluster, not only on the
+		// one whose own mod's code asks for it (ownArtNote says it in its own words).
+		if lc.Class == logs.ClassTexture && !slices.Contains(lc.Details, ownArtNote) {
+			lc.Details = append(lc.Details, renderingOnlyNote)
+		}
 		// Source searches cover the cluster's candidates, not every enabled mod (05 §5.4).
 		if rep.HasPhases {
 			lc.Phases = logs.CompletePhaseCounts(lc.Phases, lc.Count)
@@ -589,6 +600,42 @@ func (lc *LogCluster) add(inst, role, ev string) {
 		}
 	}
 	lc.Attr = append(lc.Attr, &Attribution{Instance: inst, Role: role, Evidence: []string{ev}})
+}
+
+// Owners are the candidates that may carry the cluster as their own problem: every role
+// but mentioned. A mod only named in the message or a lower frame is not blamed by the
+// problem list, Mod details or a test run's mods (06 §3).
+func (lc *LogCluster) Owners() []*Attribution {
+	var out []*Attribution
+	for _, at := range lc.Attr {
+		if at.Role != RoleMentioned {
+			out = append(out, at)
+		}
+	}
+	return out
+}
+
+// ListRank orders the cluster list by how much a row matters (06 §3): errors that stop code
+// (exception, harmony-stack, xml-load) first, then the other warnings, then a missing
+// texture, which affects drawing only, then informational clusters. Cluster IDs keep
+// their order of first appearance; only the list is sorted.
+func (lc *LogCluster) ListRank() int {
+	switch {
+	case logSeverity[lc.Class] == finding.Error:
+		return 0
+	case lc.Class == logs.ClassTexture:
+		return 2
+	case logSeverity[lc.Class] == finding.Warning:
+		return 1
+	}
+	return 3
+}
+
+// ListOrder is the clusters in list order: ListRank, then order of first appearance.
+func ListOrder(cs []*LogCluster) []*LogCluster {
+	out := slices.Clone(cs)
+	sort.SliceStable(out, func(i, j int) bool { return out[i].ListRank() < out[j].ListRank() })
+	return out
 }
 
 // whyProviderOff explains a likely cluster led by a mod left out of the list.
@@ -1219,7 +1266,11 @@ func (cx *attrCtx) toFinding(lc *LogCluster) *finding.Finding {
 	f := &finding.Finding{Code: "log." + lc.Class, Severity: logSeverity[lc.Class], Layer: "log", Key: findingKey(lc.Key), Confidence: lc.Confidence,
 		Claim: fmt.Sprintf("log:%s x%d: %s%s", lc.ID, lc.Count, msg, logs.PhaseSummary(lc.Phases))}
 	for _, at := range lc.Attr {
-		f.Subjects = append(f.Subjects, finding.Inst(at.Instance))
+		// A mod only named by the message or a lower frame stays in the evidence, not among the
+		// subjects: the cluster is not its problem (Mod details, test runs).
+		if at.Role != RoleMentioned {
+			f.Subjects = append(f.Subjects, finding.Inst(at.Instance))
+		}
 		for _, ev := range at.Evidence {
 			f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Log, Ref: finding.Inst(at.Instance), Text: at.Role + ": " + ev})
 		}

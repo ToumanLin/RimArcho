@@ -67,12 +67,12 @@ log Player.log (1.6.4633 rev1261, 1522 lines, 2026-10-01 10:00): 4 clusters
   cursor: <cursor>
   classes: harmony-stack 2, patch-failed 1, xref-missing 1
   list:
-    log:E1 patch-failed x1  [Compat] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) failed  → #hnyg (source, +1)  [pattern:g:patch.op-failed]
-    log:E2 xref-missing x1  Could not resolve cross-reference: No Verse.ThingDef named Lib_Gun found to give to Verse.ThingDe...  → #lqj2 (source, +1)  [pattern:g:xref.def]
     log:E3 harmony-stack x500  Exception ticking Pawn1: System.NullReferenceException: Object reference not set to an instance o...  → #iqmu (patcher, +2)  [pattern:g:rt.tick]
     log:E4 harmony-stack x1  Exception ticking Pawn2: System.ArgumentOutOfRangeException: Index was out of range.  → #iqmu (source)  [pattern:g:rt.tick]
+    log:E1 patch-failed x1  [Compat] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) failed  → #hnyg (source, +1)  [pattern:g:patch.op-failed]
+    log:E2 xref-missing x1  Could not resolve cross-reference: No Verse.ThingDef named Lib_Gun found to give to Verse.ThingDe...  → #lqj2 (source, +1)  [pattern:g:xref.def]
 next:
-  archo log --cluster E1
+  archo log --cluster E3
 
 $ archo log --cluster E1
 log:E1 patch-failed x1  first at Player.log:4
@@ -211,12 +211,12 @@ log Player.log (1.6.4633 rev1261, 1522 lines, 2026-10-01 10:00): 4 clusters
   selected: archo problems now includes these clusters as log.* problems
   classes: harmony-stack 2, patch-failed 1, xref-missing 1
   list:
-    log:E1 patch-failed x1  [Compat] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) failed  → #hnyg (source, +1)  [pattern:g:patch.op-failed]
-    log:E2 xref-missing x1  Could not resolve cross-reference: No Verse.ThingDef named Lib_Gun found to give to Verse.ThingDe...  → #lqj2 (source, +1)  [pattern:g:xref.def]
     log:E3 harmony-stack x500  Exception ticking Pawn1: System.NullReferenceException: Object reference not set to an instance o...  → #iqmu (patcher, +2)  [pattern:g:rt.tick]
     log:E4 harmony-stack x1  Exception ticking Pawn2: System.ArgumentOutOfRangeException: Index was out of range.  → #iqmu (source)  [pattern:g:rt.tick]
+    log:E1 patch-failed x1  [Compat] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) failed  → #hnyg (source, +1)  [pattern:g:patch.op-failed]
+    log:E2 xref-missing x1  Could not resolve cross-reference: No Verse.ThingDef named Lib_Gun found to give to Verse.ThingDe...  → #lqj2 (source, +1)  [pattern:g:xref.def]
 next:
-  archo log --cluster E1
+  archo log --cluster E3
 
 $ archo problems --code log
 problems: 2 error, 2 warning, 0 info

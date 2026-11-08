@@ -521,6 +521,8 @@ func (a *App) testRunLog(st *LoadoutState, r *TestRunReport) error {
 		}
 		if slices.Contains(lc.Details, ownArtNote) {
 			note = ownArtNote
+		} else if class == logs.ClassTexture && !settings {
+			note = strings.TrimSuffix(renderingOnlyNote+"; "+note, "; ")
 		}
 		if n := testRunNote(r, lc); n != "" {
 			note = n
@@ -530,10 +532,12 @@ func (a *App) testRunLog(st *LoadoutState, r *TestRunReport) error {
 	return nil
 }
 
-// testRunMods names a cluster's candidate mods in attribution order.
+// testRunMods names a cluster's candidate mods in attribution order. A mod only named by
+// the message or a lower frame (mentioned) is left out: it did not cause the cluster
+// (06 §3, MCP eval h8).
 func testRunMods(st *LoadoutState, lc *LogCluster) []string {
 	mods := []string{}
-	for _, at := range lc.Attr {
+	for _, at := range lc.Owners() {
 		if m := st.Ix.ByID[at.Instance]; m != nil && !slices.Contains(mods, m.DisplayName()) {
 			mods = append(mods, m.DisplayName())
 		}

@@ -80,6 +80,14 @@ A scan reads `About.xml` again even when the content is unchanged. If the depend
 - `.git`, `.svn` and `.rimarcho` are excluded, so locked versions and their originals have identical fingerprints.
 - Links and device files inside Mod directories are not followed; unreadable entries are skipped.
 
+**Provenance** (`App.Provenance`, the `provenance:` line of `archo mod` / `get_mod`): for an Instance that is not Workshop-like or Official, the Workshop copy it comes from is the Instance its origin marker names, else the Workshop-like Instance of its Lineage (the one with the Workshop ID it declares first). The line compares what the last scan stored; nothing is hashed again, and it says `as of the last scan`:
+
+- `files are the Workshop copy ws:<id> (this folder links to it)`: the folder was found through a link into a Workshop source, or has the same snapshot hash;
+- `files identical to Workshop <id> (<ref>)`: equal snapshot hashes;
+- `N files differ from Workshop <id> (<ref>): <path> changed|added|removed, …` (at most 5 paths, then `+K more`; `added` means only the Instance has the file): the two stored file lists compared by size and hash, so a file outside the semantic set that changed without changing its size is not seen. If a file list was dropped (§4.1), `files differ …; the stored file lists do not say which (archo scan --full)`.
+
+The line is absent for a Workshop copy and for an Instance with no Workshop copy to compare with.
+
 **Similarity**: over the semantic file sets of two snapshots, take the larger of two Jaccard coefficients:
 - `J(paths)`: compares lowercase relative paths only. Recognizes "move + update": contents changed, structure unchanged.
 - `J(hashes)`: compares content hashes without paths, as a **multiset** (each file with identical content counts separately). Recognizes "reorganization": files moved into subdirectories like `1.6/` without content changes.
@@ -338,3 +346,4 @@ Manual maintenance ignores the period and idle conditions but still refuses whil
 | A25 | Move all files into `1.6/` unchanged; change contents with paths unchanged | Both keep enough similarity: same Instance | `TestSimilarityRestructureAndContentOnly` | Pass |
 | A27 | `About.xml` with a UTF-16 LE/BE BOM, a UTF-8 BOM, or declaring utf-16 while being UTF-8 | Declarations are read correctly | `TestReadDeclUTF16` | Pass |
 | A28 | An old Mod without `<packageId>` | Derived by §1.5, matching the game, "inferred" | `TestDerivePackageID` | Pass |
+| A29 | A local copy of a Workshop Mod, identical at first, then one Def edited and one file added; rescan | `archo mod` shows `provenance: files identical to Workshop <id> (<ref>), as of the last scan`, later `2 files differ from Workshop <id> (<ref>), as of the last scan: Defs/Extra.xml added, Defs/ThingDefs/prov.xml changed`; the Workshop copy and a Mod with no Workshop copy show none | `app.TestModDetailsProvenance` | Pass |
