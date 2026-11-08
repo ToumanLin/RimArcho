@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/order"
@@ -71,19 +72,17 @@ func Load(path string) (*Community, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Rules are decoded one package at a time: a malformed rule is skipped, never the
+	// whole file; the timestamp may be a number or a quoted number.
 	var raw struct {
-		Timestamp int64 `json:"timestamp"`
-		Rules     map[string]struct {
-			LoadAfter  map[string]json.RawMessage `json:"loadAfter"`
-			LoadBefore map[string]json.RawMessage `json:"loadBefore"`
-			LoadTop    *flag                      `json:"loadTop"`
-			LoadBottom *flag                      `json:"loadBottom"`
-		} `json:"rules"`
+		Timestamp json.RawMessage            `json:"timestamp"`
+		Rules     map[string]json.RawMessage `json:"rules"`
 	}
 	if err := json.Unmarshal(b, &raw); err != nil {
 		return nil, err
 	}
-	c := &Community{Path: path, Timestamp: raw.Timestamp, after: map[string][]string{}, before: map[string][]string{}, position: map[string]order.Tier{}}
+	ts, _ := strconv.ParseFloat(strings.Trim(string(raw.Timestamp), `" `), 64)
+	c := &Community{Path: path, Timestamp: int64(ts), after: map[string][]string{}, before: map[string][]string{}, position: map[string]order.Tier{}}
 	keys := func(m map[string]json.RawMessage) []string {
 		out := make([]string, 0, len(m))
 		for k := range m {
@@ -92,7 +91,16 @@ func Load(path string) (*Community, error) {
 		sort.Strings(out)
 		return out
 	}
-	for pkg, r := range raw.Rules {
+	for pkg, body := range raw.Rules {
+		var r struct {
+			LoadAfter  map[string]json.RawMessage `json:"loadAfter"`
+			LoadBefore map[string]json.RawMessage `json:"loadBefore"`
+			LoadTop    *flag                      `json:"loadTop"`
+			LoadBottom *flag                      `json:"loadBottom"`
+		}
+		if json.Unmarshal(body, &r) != nil {
+			continue
+		}
 		p := strings.ToLower(pkg)
 		if l := keys(r.LoadAfter); len(l) > 0 {
 			c.after[p] = l

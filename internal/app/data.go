@@ -315,31 +315,31 @@ func validateData(d Dataset, path string, info *DataInfo) error {
 	switch d.Key {
 	case "rules":
 		var v struct {
-			Timestamp json.Number                `json:"timestamp"`
+			Timestamp looseString                `json:"timestamp"`
 			Rules     map[string]json.RawMessage `json:"rules"`
 		}
 		if err := json.Unmarshal(b, &v); err != nil || v.Rules == nil {
 			return fmt.Errorf("not RimSort community rules (%v)", err)
 		}
-		info.Version, info.Entries = v.Timestamp.String(), len(v.Rules)
+		info.Version, info.Entries = string(v.Timestamp), len(v.Rules)
 	case "steamdb":
 		var v struct {
-			Version  json.Number                `json:"version"`
+			Version  looseString                `json:"version"`
 			Database map[string]json.RawMessage `json:"database"`
 		}
 		if err := json.Unmarshal(b, &v); err != nil || v.Database == nil {
 			return fmt.Errorf("not a RimSort Steam Workshop database (%v)", err)
 		}
-		info.Version, info.Entries = v.Version.String(), len(v.Database)
+		info.Version, info.Entries = string(v.Version), len(v.Database)
 	case "replacements":
 		var v struct {
-			Version string            `json:"version"`
+			Version looseString       `json:"version"`
 			Rules   []json.RawMessage `json:"rules"`
 		}
 		if err := json.Unmarshal(b, &v); err != nil || v.Rules == nil {
 			return fmt.Errorf("not a Use This Instead list (%v)", err)
 		}
-		info.Version, info.Entries = v.Version, len(v.Rules)
+		info.Version, info.Entries = string(v.Version), len(v.Rules)
 	}
 	return nil
 }
@@ -373,28 +373,12 @@ func (a *App) dataIndexes() *dataIndex {
 	a.dataKey = key
 	ix := &dataIndex{byOldWS: map[string]*Replacement{}, byOldPkg: map[string]*Replacement{}, byPkg: map[string]WorkshopEntry{}}
 	if b, err := readDataFile(a.dataPath(Datasets[2])); err == nil {
-		var v struct {
-			Rules []struct {
-				OldWorkshopID string   `json:"oldWorkshopId"`
-				OldPackageID  string   `json:"oldPackageId"`
-				OldName       string   `json:"oldName"`
-				NewWorkshopID string   `json:"newWorkshopId"`
-				NewPackageID  string   `json:"newPackageId"`
-				NewName       string   `json:"newName"`
-				NewAuthor     string   `json:"newAuthor"`
-				NewVersions   []string `json:"newVersions"`
-			} `json:"rules"`
-		}
-		if json.Unmarshal(b, &v) == nil {
-			for _, r := range v.Rules {
-				x := &Replacement{OldWorkshopID: r.OldWorkshopID, OldPackageID: strings.ToLower(r.OldPackageID), OldName: r.OldName,
-					NewWorkshopID: r.NewWorkshopID, NewPackageID: strings.ToLower(r.NewPackageID), NewName: r.NewName, NewAuthor: r.NewAuthor, NewVersions: r.NewVersions}
-				if x.OldWorkshopID != "" {
-					ix.byOldWS[x.OldWorkshopID] = x
-				}
-				if x.OldPackageID != "" {
-					ix.byOldPkg[x.OldPackageID] = x
-				}
+		for _, x := range replacementRules(b) {
+			if x.OldWorkshopID != "" {
+				ix.byOldWS[x.OldWorkshopID] = x
+			}
+			if x.OldPackageID != "" {
+				ix.byOldPkg[x.OldPackageID] = x
 			}
 		}
 	}
@@ -420,26 +404,99 @@ func steamIndexData(path string) ([]byte, error) {
 		return nil, err
 	}
 	var v struct {
-		Database map[string]struct {
-			PackageID string `json:"packageId"`
-			Name      string `json:"name"`
-			AppID     bool   `json:"appid"`
-		} `json:"database"`
+		Database map[string]json.RawMessage `json:"database"`
 	}
 	if err := json.Unmarshal(b, &v); err != nil {
 		return nil, err
 	}
+	// One entry at a time: a malformed entry is skipped, not the whole database.
 	m := map[string][2]string{}
-	for id, e := range v.Database {
-		p := strings.ToLower(e.PackageID)
-		if p == "" || e.AppID {
+	readable := 0
+	for id, raw := range v.Database {
+		var e struct {
+			PackageID looseString     `json:"packageId"`
+			Name      looseString     `json:"name"`
+			AppID     json.RawMessage `json:"appid"`
+		}
+		if json.Unmarshal(raw, &e) != nil {
+			continue
+		}
+		readable++
+		p := strings.ToLower(string(e.PackageID))
+		if p == "" || string(e.AppID) == "true" {
 			continue
 		}
 		if prev, ok := m[p]; !ok || id < prev[0] {
-			m[p] = [2]string{id, e.Name}
+			m[p] = [2]string{id, string(e.Name)}
 		}
 	}
+	if readable == 0 && len(v.Database) > 0 {
+		return nil, errors.New("no readable entry in the database")
+	}
 	return json.Marshal(m)
+}
+
+// looseString is a community-data text field that tolerates the maintainers' slips: a
+// number is taken as its text, null as empty. Anything else (an object, a list, true or
+// false) fails only the record holding it, never the whole file (08 §2.3).
+type looseString string
+
+func (s *looseString) UnmarshalJSON(b []byte) error {
+	b = bytes.TrimSpace(b)
+	switch {
+	case string(b) == "null":
+		*s = ""
+	case len(b) > 0 && b[0] == '"':
+		var v string
+		if err := json.Unmarshal(b, &v); err != nil {
+			return err
+		}
+		*s = looseString(v)
+	case len(b) > 0 && (b[0] == '-' || b[0] >= '0' && b[0] <= '9'):
+		var n json.Number
+		if err := json.Unmarshal(b, &n); err != nil {
+			return err
+		}
+		*s = looseString(n.String())
+	default:
+		return fmt.Errorf("not text: %.20s", b)
+	}
+	return nil
+}
+
+// replacementRules reads the Use This Instead list one rule at a time, so a malformed
+// rule is skipped instead of dropping the whole list.
+func replacementRules(b []byte) []*Replacement {
+	var v struct {
+		Rules []json.RawMessage `json:"rules"`
+	}
+	if json.Unmarshal(b, &v) != nil {
+		return nil
+	}
+	out := make([]*Replacement, 0, len(v.Rules))
+	for _, raw := range v.Rules {
+		var r struct {
+			OldWorkshopID looseString   `json:"oldWorkshopId"`
+			OldPackageID  looseString   `json:"oldPackageId"`
+			OldName       looseString   `json:"oldName"`
+			NewWorkshopID looseString   `json:"newWorkshopId"`
+			NewPackageID  looseString   `json:"newPackageId"`
+			NewName       looseString   `json:"newName"`
+			NewAuthor     looseString   `json:"newAuthor"`
+			NewVersions   []looseString `json:"newVersions"`
+		}
+		if json.Unmarshal(raw, &r) != nil {
+			continue
+		}
+		versions := make([]string, len(r.NewVersions))
+		for i, v := range r.NewVersions {
+			versions[i] = string(v)
+		}
+		out = append(out, &Replacement{OldWorkshopID: string(r.OldWorkshopID), OldPackageID: strings.ToLower(string(r.OldPackageID)), OldName: string(r.OldName),
+			NewWorkshopID: string(r.NewWorkshopID), NewPackageID: strings.ToLower(string(r.NewPackageID)), NewName: string(r.NewName),
+			NewAuthor: string(r.NewAuthor), NewVersions: versions})
+	}
+	return out
 }
 
 // ReplacementFor returns the "use this instead" suggestion for an installed mod.

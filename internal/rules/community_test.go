@@ -46,3 +46,19 @@ func TestLoadPositions(t *testing.T) {
 		t.Fatalf("count %d", c.Count())
 	}
 }
+
+// A malformed rule is skipped; the rest of the file still loads (08 §2.3).
+func TestLoadSkipsMalformedRule(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "communityRules.json")
+	os.WriteFile(p, []byte(`{"timestamp": "7", "rules": {
+		"bad.list": {"loadAfter": ["a.mod"]},
+		"bad.value": 3,
+		"good.mod": {"loadAfter": {"a.mod": {}}}}}`), 0o644)
+	c, err := Load(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after, _ := c.Rules("good.mod"); !slices.Equal(after, []string{"a.mod"}) || c.Count() != 1 || c.Timestamp != 7 {
+		t.Fatalf("%v count %d timestamp %d", after, c.Count(), c.Timestamp)
+	}
+}
