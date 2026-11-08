@@ -751,6 +751,40 @@ func (s *Store) TypesUnder(root string, limit int) (map[string][]string, error) 
 	return out, rows.Err()
 }
 
+// TypesNamed returns up to limit type full names of Store.MM (Mods' analysed assemblies and the
+// game's) whose last segment equals the last segment of name: the candidates offered when a
+// type is asked for under the wrong namespace ("RimWorld.PlayLogEntry_Interaction" →
+// "Verse.PlayLogEntry_Interaction").
+func (s *Store) TypesNamed(name string, limit int) ([]string, error) {
+	short := name
+	if i := strings.LastIndexAny(short, ".+"); i >= 0 {
+		short = short[i+1:]
+	}
+	if short == "" {
+		return nil, nil
+	}
+	rows, err := s.DB.Query(`SELECT name FROM (
+ SELECT f.type_name AS name FROM type_fact f CROSS JOIN content_state c ON c.dll_set_id=f.set_id
+  WHERE (f.type_name=?1 OR f.type_name LIKE ?2 ESCAPE '\' OR f.type_name LIKE ?3 ESCAPE '\') AND c.game_mm=?4
+ UNION
+ SELECT g.type_name FROM game_type g JOIN game_assembly a ON a.id=g.assembly_id
+  WHERE (g.type_name=?1 OR g.type_name LIKE ?2 ESCAPE '\' OR g.type_name LIKE ?3 ESCAPE '\') AND a.game_mm=?4)
+ WHERE name<>?5 ORDER BY name LIMIT ?6`, short, "%."+likeEscape(short), "%+"+likeEscape(short), s.MM, name, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var n string
+		if err := rows.Scan(&n); err != nil {
+			return nil, err
+		}
+		out = append(out, n)
+	}
+	return out, rows.Err()
+}
+
 // GameTypesUnder is TypesUnder for the game's own assemblies (any environment of Store.MM).
 func (s *Store) GameTypesUnder(root string, limit int) ([]string, error) {
 	rows, err := s.DB.Query(`SELECT DISTINCT g.type_name FROM game_type g JOIN game_assembly a ON a.id=g.assembly_id

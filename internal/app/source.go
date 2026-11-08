@@ -33,23 +33,63 @@ type Decompiler func(ctx context.Context, dll, outDir, typ string, refs []string
 var ErrNoILSpy = errors.New("ilspycmd not found. Install it with: dotnet tool install --global ilspycmd " +
 	"(requires the .NET SDK; then reopen the terminal). RimArcho never installs it itself")
 
-// ILSpyPath locates ilspycmd: ARCHO_ILSPYCMD, PATH, then ~/.dotnet/tools.
+// ILSpyPath locates ilspycmd: ARCHO_ILSPYCMD, PATH, then ~/.dotnet/tools. ilspycmd 11 installs
+// as a .cmd launcher; ilspyExe resolves it to the exe it starts.
 func ILSpyPath() string {
 	if p := os.Getenv("ARCHO_ILSPYCMD"); p != "" {
-		return p
+		return ilspyExe(p)
 	}
 	if p, err := exec.LookPath("ilspycmd"); err == nil {
-		return p
+		return ilspyExe(p)
 	}
 	if h, err := os.UserHomeDir(); err == nil {
-		for _, n := range []string{"ilspycmd.exe", "ilspycmd"} {
+		for _, n := range []string{"ilspycmd.exe", "ilspycmd.cmd", "ilspycmd"} {
 			p := filepath.Join(h, ".dotnet", "tools", n)
 			if _, err := os.Stat(p); err == nil {
-				return p
+				return ilspyExe(p)
 			}
 		}
 	}
 	return ""
+}
+
+var ilspyShimRe = regexp.MustCompile(`"%~dp0([^"]+)"`)
+
+// ilspyExe returns the exe a dotnet-tool .cmd launcher starts ("%~dp0.store\…\ilspycmd.exe" %*),
+// so arguments never pass through cmd.exe; any other path is returned as it is.
+func ilspyExe(p string) string {
+	if !strings.EqualFold(filepath.Ext(p), ".cmd") {
+		return p
+	}
+	b, err := os.ReadFile(p)
+	if err != nil {
+		return p
+	}
+	if m := ilspyShimRe.FindSubmatch(b); m != nil {
+		exe := filepath.Join(filepath.Dir(p), string(m[1]))
+		if _, err := os.Stat(exe); err == nil {
+			return exe
+		}
+	}
+	return p
+}
+
+// ErrTypeNotDecompiled: ilspycmd -t printed no type (the type is not in that assembly).
+var ErrTypeNotDecompiled = errors.New("no such type in the assembly")
+
+var (
+	ilspyBannerRe = regexp.MustCompile(`(?m)^(?:You are not using the latest version of the tool, please update\.|Latest version is '[^']*' \(yours is '[^']*'\)|Could not find a type named '[^']*'\.)\r?$\n?`)
+	typeDeclRe    = regexp.MustCompile(`\b(?:class|struct|interface|enum|record|delegate)\s+[\w<@]`)
+)
+
+// cleanILSpy drops what ilspycmd prints besides code (its update notice, "Could not find a type")
+// and reports whether a type declaration remains.
+func cleanILSpy(b []byte) ([]byte, bool) {
+	b = bytes.TrimRight(ilspyBannerRe.ReplaceAll(b, nil), " \t\r\n")
+	if len(b) > 0 {
+		b = append(b, '\n')
+	}
+	return b, typeDeclRe.Match(b)
 }
 
 // ILSpyDecompiler runs ilspycmd.
@@ -70,6 +110,10 @@ func ILSpyDecompiler(ctx context.Context, dll, outDir, typ string, refs []string
 		out, err := exec.CommandContext(ctx, exe, args...).Output()
 		if err != nil && len(out) == 0 {
 			return fmt.Errorf("ilspycmd -t %s: %v", typ, err)
+		}
+		out, ok := cleanILSpy(out)
+		if !ok {
+			return fmt.Errorf("%w: %s", ErrTypeNotDecompiled, typ)
 		}
 		return os.WriteFile(filepath.Join(outDir, safeName(typ)+".cs"), out, 0o644)
 	}
@@ -227,6 +271,7 @@ func (a *App) DecompileType(ctx context.Context, st *LoadoutState, ds []*SourceD
 		}
 		if p := findTypeFile(d.Dir, typ); p != "" {
 			b, err := os.ReadFile(p)
+			b, _ = cleanILSpy(b)
 			return string(b), p, errors.Join(err, a.recordSourceUse(d, "type-hit", err))
 		}
 	}
@@ -254,7 +299,11 @@ func (a *App) DecompileType(ctx context.Context, st *LoadoutState, ds []*SourceD
 		}
 		return src, p, nil
 	}
-	return "", "", fmt.Errorf("type %s not found in %d assemblies", typ, len(ds))
+	msg := fmt.Sprintf("type %s not found in %d assemblies", typ, len(ds))
+	if c, _ := a.Store.TypesNamed(typ, 5); len(c) > 0 {
+		msg += "; types with that name: " + strings.Join(c, ", ")
+	}
+	return "", "", errors.New(msg)
 }
 
 func findTypeFile(dir, typ string) string {

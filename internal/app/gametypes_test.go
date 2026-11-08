@@ -96,3 +96,23 @@ func TestScanIndexesGameTypes(t *testing.T) {
 		t.Errorf("1.7 types answer for 1.6: %v", got)
 	}
 }
+
+// A type asked for under the wrong namespace is offered under the right one (read_source,
+// "types with that name").
+func TestTypesNamed(t *testing.T) {
+	e := testkit.New(t)
+	copyFixtureDLL(t, e, "Assembly-CSharp.dll", filepath.Join(e.Game, "RimWorldWin64_Data", "Managed", store.GameMainAssembly))
+	e.AddEnv(false)
+	e.MustRun("scan")
+	st := e.App.Store
+	st.MM = "1.6"
+	if got, err := st.TypesNamed("RimWorld.Pawn", 5); err != nil || !reflect.DeepEqual(got, []string{"Verse.Pawn"}) {
+		t.Fatalf("TypesNamed = %v, %v", got, err)
+	}
+	if got, _ := st.TypesNamed("Verse.Pawn", 5); len(got) != 0 {
+		t.Errorf("the asked name itself offered: %v", got)
+	}
+	if got, _ := st.TypesNamed("Verse.P_wn", 5); len(got) != 0 {
+		t.Errorf("_ matched as a wildcard: %v", got)
+	}
+}

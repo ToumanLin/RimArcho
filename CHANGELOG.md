@@ -2,6 +2,10 @@
 
 All notable changes to RimArcho. Versions follow semantic versioning; the MVP is 0.5.0.
 
+## 1.0.9 (unreleased)
+
+- Reading a Mod's code (Mod details, CLI `archo source`, MCP `read_source`) works with ilspycmd 11, which installs as a `.cmd` launcher that Archo did not find. Its "You are not using the latest version of the tool" notice no longer appears as the last lines of the code, also in code read before. A type asked for under the wrong namespace now says "type … not found" and names the types with that name (`RimWorld.PlayLogEntry_Interaction` → `Verse.PlayLogEntry_Interaction`); before, the notice was shown as if it were that type's code.
+
 ## 1.0.8 — 2026-11-08
 
 - A Mod is no longer told it has a maintained replacement when it is that replacement. Some continuations keep the old Mod's packageId: Vanilla Base Generation Expanded (Workshop `3209927822`) was flagged as replaced by itself, and "subscribe" opened its own page. Use This Instead now matches by packageId only when the Workshop ID does not say it is another item; the import preview no longer suggests such a Mod as its own replacement either.

@@ -225,11 +225,16 @@ func (a *App) sourceType(ctx context.Context, st *LoadoutState, d *SourceDLL, ty
 			return "", "", fmt.Errorf("type %s not found in %s", typ, d.Dir)
 		}
 		b, err := os.ReadFile(p)
+		b, _ = cleanILSpy(b)
 		return string(b), p, errors.Join(err, a.recordSourceUse(d, "type-hit", err))
 	}
 	p := filepath.Join(typeSourceDir(d, typ), safeName(typ)+".cs")
-	if b, err := os.ReadFile(p); err == nil && len(bytes.TrimSpace(b)) > 0 {
-		return string(b), p, a.recordSourceUse(d, "type-hit", nil)
+	if b, err := os.ReadFile(p); err == nil {
+		// files cached before 1.0.9 may hold ilspycmd's update notice, or only that notice
+		if b, ok := cleanILSpy(b); ok {
+			return string(b), p, a.recordSourceUse(d, "type-hit", nil)
+		}
+		_ = os.Remove(p)
 	}
 	err = a.publishSource(ctx, st, d, typ)
 	if rec := a.recordSourceUse(d, "type", err); err != nil || rec != nil {
