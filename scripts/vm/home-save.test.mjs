@@ -20,7 +20,7 @@ function launchContext(live = null) {
     S: { live, busy: {} }, launching: 0, arrived: false, note: () => null,
     running: () => !!(live && live.running), launch: () => calls.push('launch'), save: () => calls.push('save'),
     step: (n, cls) => el('section', 'hm-step ' + cls) });
-  runInContext(part('function canSave(', '// save writes') + part('function launchStep(', '// problemOf:') +
+  runInContext(part('function canSave(', '// save writes') + part('function launchStep(', '// problemOf:') + part('function ramShown(', '// showMemory') +
     '\nglobalThis.launchStep = launchStep;', context);
   return { context, calls };
 }

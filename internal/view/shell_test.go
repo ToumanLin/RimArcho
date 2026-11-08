@@ -208,6 +208,45 @@ func TestFindAndAddGames(t *testing.T) {
 	}
 }
 
+// Two typed folders of one version, added in one pass: the suggested names differ (the
+// page passes the names it already shows), and a clashing batch adds none of its games.
+func TestAddTwoGamesOfOneVersion(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	if _, err := view.AddGames(e.App, view.FindGames(e.App)); err != nil {
+		t.Fatal(err)
+	}
+	g2, err := view.GameAt(e.App, e.OtherGame("game2", "1.6.4871 rev1"))
+	if err != nil || g2.Name != "1.6-2" {
+		t.Fatalf("first typed game %+v %v", g2, err)
+	}
+	g3, err := view.GameAt(e.App, e.OtherGame("game3", "1.6.4871 rev1"), "1.6", g2.Name)
+	if err != nil || g3.Name != "1.6-3" {
+		t.Fatalf("second typed game %+v %v", g3, err)
+	}
+	envCount := func() int {
+		envs, err := e.App.Store.Envs()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return len(envs)
+	}
+	for _, names := range [][2]string{{"1.6-2", "1.6-2"}, {"1.6-2", "1.6"}, {"1.6-2", "bad name"}} {
+		a, b := *g2, *g3
+		a.Name, b.Name = names[0], names[1]
+		if out, err := view.CreateGames(e.App, []view.GameFound{a, b}); err == nil || len(out) != 0 {
+			t.Fatalf("%v: added %v, %v", names, out, err)
+		}
+		if n := envCount(); n != 1 {
+			t.Fatalf("%v: a refused batch left %d environments", names, n)
+		}
+	}
+	out, err := view.CreateGames(e.App, []view.GameFound{*g2, *g3})
+	if err != nil || strings.Join(out, ",") != "1.6-2,1.6-3" || envCount() != 3 {
+		t.Fatalf("added %v, %v", out, err)
+	}
+}
+
 // The home page's large card is what is applied: a pack applied on the home page while the
 // same plan is current, else the current plan; another environment's rows never are.
 func TestPickFeatured(t *testing.T) {

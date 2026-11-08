@@ -2,7 +2,7 @@
 // board has three columns: Not enabled | Enabled | details, with Staging and history folded under details.
 import { factText, S, $, $$, el, esc, col, cur, key, api, T, Tf, AREAS, ROW_H } from "./state.js";
 import { icon, sourceIcon, statusIcon } from "./icons.js";
-import { wireBadges } from "./badgepop.js";
+import { wireBadges, rowDrag } from "./badgepop.js";
 import { listGeometry, rowAt } from "./listgeometry.js";
 import { bump } from "./motion.js";
 import { beginPageRead, pageLoading } from "./screens.js";
@@ -434,6 +434,7 @@ function startDrag() {
   }
   drag = { ui, from: k, items: ui.selectionItems(), to: -1, at: 0, x: 0, y: 0 };
   document.body.classList.add("row-dragging");
+  rowDrag(true);
 }
 
 // overDrop marks where a drop at the pointer would go; a list's edge scrolls it.
@@ -473,6 +474,7 @@ function endDrag() {
   drag = null;
   press = null;
   document.body.classList.remove("row-dragging");
+  rowDrag(false);
   clearDrop();
 }
 

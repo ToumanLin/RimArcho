@@ -241,7 +241,9 @@ function step1(card) {
   const typed = el("div", "typed");
   const addPath = async (path) => {
     let g;
-    try { g = await api.GuideGame(path); } catch (e) { G.typed = path; G.error = errText(e); return draw(); }
+    // the names already on the page count as taken: two games of one version get 1.6-2, 1.6-3
+    const pending = G.games.filter((x) => !x.env && x.name).map((x) => x.name);
+    try { g = await api.GuideGame(path, pending); } catch (e) { G.typed = path; G.error = errText(e); return draw(); }
     G.typed = "";
     G.error = "";
     if (!G.games.some((x) => x.game.toLowerCase() === g.game.toLowerCase())) {

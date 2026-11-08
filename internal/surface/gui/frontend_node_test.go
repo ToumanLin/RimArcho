@@ -10,6 +10,7 @@ import (
 var frontendNodeSuites = []string{
 	"testdata/accent.mjs",
 	"testdata/archo.mjs",
+	"testdata/badgepop.mjs",
 	"testdata/command-panel.mjs",
 	"testdata/credit.mjs",
 	"testdata/datatables.mjs",
@@ -17,6 +18,7 @@ var frontendNodeSuites = []string{
 	"testdata/detail-follow.mjs",
 	"testdata/editorfilter.mjs",
 	"testdata/guide.mjs",
+	"testdata/home-memory.mjs",
 	"testdata/firstrun.mjs",
 	"testdata/packs.mjs",
 	"testdata/paths.mjs",

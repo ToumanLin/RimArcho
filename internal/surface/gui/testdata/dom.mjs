@@ -20,6 +20,13 @@ export class Element {
       n.remove(); n.parent = this; this.children.push(n);
     }
   }
+  prepend(...nodes) {
+    const first = this.children[0];
+    for (let n of nodes) {
+      if (typeof n !== "object") n = new Element("#text", "", String(n));
+      this.insertBefore(n, first);
+    }
+  }
   insertBefore(n, ref) {
     n.remove();
     const i = ref ? this.children.indexOf(ref) : this.children.length;
@@ -60,6 +67,17 @@ export class Element {
       this.children.length === n.children.length && this.children.every((child, i) => child.isEqualNode(n.children[i]));
   }
   matches(s) {
+    if (s.trim().includes(" ")) {
+      const parts = s.trim().split(/\s+/), last = parts.pop();
+      if (!this.matches(last)) return false;
+      let parent = this.parent;
+      for (const p of parts.reverse()) {
+        while (parent && !parent.matches(p)) parent = parent.parent;
+        if (!parent) return false;
+        parent = parent.parent;
+      }
+      return true;
+    }
     const attr = s.match(/\[data-([\w-]+)(?:="([^"]*)")?\]$/);
     if (attr) {
       const key = attr[1].replace(/-([a-z])/g, (_, c) => c.toUpperCase());

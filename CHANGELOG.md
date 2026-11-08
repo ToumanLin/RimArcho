@@ -2,6 +2,12 @@
 
 All notable changes to RimArcho. Versions follow semantic versioning; the MVP is 0.5.0.
 
+## Unreleased
+
+- The green dot on Launch now really holds while the game runs. The page redrew itself every 30 s to refresh the RAM estimate, so the dot blinked again each time and the window did extra work; the refresh now changes only the launch button, and only when its RAM warning changes.
+- Dragging a Mod in the editor over a row's ⚠ or ✖ badge no longer opens the badge's problem popover. The popover covered the rows below, so dropping on one of them did nothing and the popover stayed open afterwards. Starting a drag also closes a popover that is already open.
+- Adding two games of the same version in one go now names them `1.6-2` and `1.6-3`. Both used to be named `1.6-2`: the first was added and the second failed. If two names you typed clash, or one belongs to a game you already have, nothing is added and the message says which name to change.
+
 ## 1.0.6 — 2026-11-07
 
 - Reading the mods shows how far it is. With a thousand Mods the first-run guide's “read the mods” step sat on “reading the mods of 1.6…” for minutes with no sign of life; its row now counts the folders as they are read (“reading the mods of 1.6: 340 of 1,200”), then says when it saves and checks the files, and the bar moves with it. A rescan from the window shows the same count on its background task. The guide also no longer reads a new game's own `Mods/` once in the window before its scan.

@@ -23,7 +23,7 @@
 | GUI: process-tree CPU at rest, no work running, window visible, over 20 seconds | ≤ 2% of one core |
 
 - The GUI's 80 MB target covers only the Go process, because WebView2 cannot fit within it; the total has its own target. The TUI figure excludes the player's terminal process (§9.2).
-- **Nothing moves at rest.** An endless CSS animation makes WebView2 draw a frame on every display refresh, about 5% of a core at 60 Hz even for a 9-pixel dot (18). Endless animations belong only to elements that exist while work runs (spinners, progress, skeletons, problems `updating`); anything shown at rest stops after a few iterations. `TestEndlessAnimationsOnlyWhileWorking` lists the allowed selectors with the work each shows.
+- **Nothing moves at rest.** An endless CSS animation makes WebView2 draw a frame on every display refresh, about 5% of a core at 60 Hz even for a 9-pixel dot (18). Endless animations belong only to elements that exist while work runs (spinners, progress, skeletons, problems `updating`); anything shown at rest stops after a few iterations. A periodic refresh that changes nothing visible writes nothing: rebuilding the element would restart its finite animation (the running game's dot on the launch page blinks again) and costs a frame. `TestEndlessAnimationsOnlyWhileWorking` lists the allowed selectors with the work each shows.
 - On minimize, in the background, and in front without input, the GUI sets WebView2's memory target to low, and restores it on input or when the window is active again (§2.16.1 M08, 17 §7.3).
 - If WebView2 is unavailable, as on a few stripped systems, show an explanation and a Microsoft download link without downloading automatically. The player can still use the `archo.exe` TUI.
 
