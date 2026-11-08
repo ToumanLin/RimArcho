@@ -3,6 +3,7 @@ package cmds
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -158,10 +159,14 @@ func logCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			phases.Add(line)
 		}
 	}
+	savesNote(c, root, st, r)
 	lst := root.Section("list")
 	var noise []*app.LogCluster
 	folded := 0
-	for _, lc := range r.Clusters {
+	// Errors before warnings, and a missing texture (drawing only) last of the warnings;
+	// the IDs keep their order of first appearance (06 §3).
+	ordered := app.ListOrder(r.Clusters)
+	for _, lc := range ordered {
 		if logs.Informational(lc.Class) && !a.Bool("all") {
 			hidden++
 			if lc.Class == logs.ClassNoise {
@@ -186,13 +191,39 @@ func logCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if folded > 0 {
 		root.KV("folded", fmt.Sprintf("%d clusters that follow from a def file that failed to load, counted on its row (archo log --all)", folded))
 	}
-	for _, lc := range r.Clusters {
+	for _, lc := range ordered {
 		if !logs.Informational(lc.Class) && lc.ConsequenceOf == "" {
 			d.AddNext("archo log --cluster " + lc.ID)
 			break
 		}
 	}
 	return d, nil
+}
+
+// savesNote says when the run loaded a save that is not in Saves/: a test run cannot reproduce
+// errors that need it (06 §3, MCP eval h8: agents searched the disk for it).
+func savesNote(c *Ctx, root *render.Node, st *app.LoadoutState, r *app.LogReport) {
+	missing := c.App.MissingSaves(st, r)
+	if len(missing) == 0 {
+		return
+	}
+	names := make([]string, 0, 3)
+	for i, m := range missing {
+		if i == 3 {
+			names = append(names, fmt.Sprintf("and %d more", len(missing)-i))
+			break
+		}
+		names = append(names, strconv.Quote(m))
+	}
+	what := "save " + names[0]
+	if len(missing) > 1 {
+		what = "saves " + strings.Join(names, ", ")
+	}
+	which := "which is"
+	if len(missing) > 1 {
+		which = "which are"
+	}
+	root.KV("saves", fmt.Sprintf("this run loaded %s, %s not in Saves/; a test run cannot reproduce errors that need that save", what, which))
 }
 
 // noiseNote names the hidden clusters that are known noise (logs.KnownNoise), so that a reader
@@ -307,6 +338,9 @@ func clusterDoc(c *Ctx, ix *app.Index, r *app.LogReport, lc *app.LogCluster) *re
 	if note := commonUnattributed(lc); note != "" {
 		root.KV("note", note)
 	}
+	if fx := twoSourcesFix(ix, lc); fx != "" {
+		root.KV("fixes", fx)
+	}
 	addClusterPatterns(root, ix, lc)
 	if len(lc.Checklist) > 0 {
 		cl := root.Section("checklist")
@@ -321,6 +355,26 @@ func clusterDoc(c *Ctx, ix *app.Index, r *app.LogReport, lc *app.LogCluster) *re
 	return d
 }
 
+// twoSourcesFix is the `fixes:` line of an exception or Harmony-stack cluster with two
+// source candidates: one may have thrown and the other made it throw, so the report names both
+// and both fix places (06 §3, MCP eval h7: the thrower's guard hides the error, undoing the
+// other's action removes it). "" for any other cluster.
+func twoSourcesFix(ix *app.Index, lc *app.LogCluster) string {
+	if lc.Class != logs.ClassException && lc.Class != logs.ClassHarmony {
+		return ""
+	}
+	var who []string
+	for _, at := range lc.Attr {
+		if at.Role == app.RoleSource {
+			who = append(who, modLabel(ix, at.Instance))
+		}
+	}
+	if len(who) < 2 {
+		return ""
+	}
+	return fmt.Sprintf("%d sources, %s: one may have thrown and the other made it throw (a null it passed, a list it changed, state it removed). Report both and name both fix places: a guard or a different loop in the one that threw hides the error; undoing the action of the one that caused it removes the error", len(who), strings.Join(who, " and "))
+}
+
 // logSince lists the clusters new or grown after a cursor (06 §6, MCP analyze_log since).
 func logSince(c *Ctx, a *Args, st *app.LoadoutState, r *app.LogReport, cur app.LogCursor, since string) (*render.Doc, error) {
 	s, err := c.App.Since(r, cur)
@@ -330,7 +384,7 @@ func logSince(c *Ctx, a *Args, st *app.LoadoutState, r *app.LogReport, cur app.L
 	shown, hidden := 0, 0
 	var lines []string
 	var noise []*app.LogCluster
-	for _, lc := range s.New {
+	for _, lc := range app.ListOrder(s.New) {
 		if logs.Informational(lc.Class) && !a.Bool("all") {
 			hidden++
 			if lc.Class == logs.ClassNoise {
@@ -358,6 +412,7 @@ func logSince(c *Ctx, a *Args, st *app.LoadoutState, r *app.LogReport, cur app.L
 	}
 	root.KV("cursor", r.Cursor)
 	analysedAs(c, root, r)
+	savesNote(c, root, st, r)
 	lst := root.Section("list")
 	for _, l := range lines {
 		lst.Add(l)
@@ -372,7 +427,7 @@ func logSince(c *Ctx, a *Args, st *app.LoadoutState, r *app.LogReport, cur app.L
 	if s.Moved != "" {
 		d.AddNext("archo log --prev --since " + since)
 	}
-	for _, lc := range s.New {
+	for _, lc := range app.ListOrder(s.New) {
 		if !logs.Informational(lc.Class) {
 			d.AddNext("archo log --cluster " + lc.ID)
 			break

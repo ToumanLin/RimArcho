@@ -595,6 +595,8 @@ func modDoc(c *Ctx, ix *app.Index, m *store.Mod) (*render.Doc, error) {
 		}
 		root.KV("workshop", w)
 	}
+	// Whether its files are the Workshop copy's, from what the last scan stored (04 §1.4).
+	root.KV("provenance", c.App.Provenance(ix, m))
 	root.KV("git", m.GitHead)
 	subscriptionLines(c, root, c.App.SubscriptionOf(m))
 	if m.Origin != "" {

@@ -298,7 +298,7 @@ func TestGoldenManageTools(t *testing.T) {
 		got, isErr := call(t, cs, m.tool, m.args)
 		want, code := ec.Run(c.cli...)
 		// The free space on the packs drive is the test machine's.
-		got, want = freeRe.ReplaceAllString(em.Scrub(got), "$1<free>"), freeRe.ReplaceAllString(ec.Scrub(want), "$1<free>")
+		got, want = freeRe.ReplaceAllString(em.Scrub(got), "$1<free>"), freeRe.ReplaceAllString(ec.Scrub(cmds.MCPHints(want)), "$1<free>")
 		if got != want {
 			t.Errorf("%s %v: MCP text differs from `archo %s`:\n--- mcp\n%s\n--- cli\n%s", m.tool, m.args, strings.Join(c.cli, " "), got, want)
 		}
