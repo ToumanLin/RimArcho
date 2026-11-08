@@ -17,7 +17,7 @@ func fixture(t *testing.T) string {
 	files := map[string]string{
 		"monitor/About/About.xml":                                                                  "<ModMetaData><name>Archo Monitor</name></ModMetaData>",
 		"monitor/About/PublishedFileId.txt":                                                        "81234\n",
-		"dist/archo-1.2.3-windows-amd64/monitor/ArchoMonitor/About/About.xml":                      "<ModMetaData><name>Archo Monitor</name><packageId>test.monitor</packageId><description>A &amp; B</description><extra><name>Keep</name></extra></ModMetaData>",
+		"dist/archo-1.2.3-windows-amd64/monitor/ArchoMonitor/About/About.xml":                      "<ModMetaData><name>Archo Monitor</name><packageId>test.monitor</packageId><supportedVersions><li>1.5</li><li>1.6</li><li>1.6</li><li>1.7</li></supportedVersions><description>A &amp; B</description><extra><name>Keep</name></extra></ModMetaData>",
 		"dist/archo-1.2.3-windows-amd64/monitor/ArchoMonitor/About/Preview.png":                    "synthetic preview",
 		"dist/archo-1.2.3-windows-amd64/monitor/ArchoMonitor/LoadFolders.xml":                      "<loadFolders/>",
 		"dist/archo-1.2.3-windows-amd64/monitor/ArchoMonitor/1.5/Assemblies/ArchoMonitor.dll":      "synthetic 1.5",
@@ -57,7 +57,7 @@ func TestAssemble(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !filepath.IsAbs(item.Folder) || item.ID != 81234 || item.Preview == "" {
+	if !filepath.IsAbs(item.Folder) || item.ID != 81234 || item.Preview == "" || strings.Join(item.Tags, ",") != "Mod,1.5,1.6,1.7" {
 		t.Fatalf("item: %+v", item)
 	}
 	for _, p := range []string{"About/PublishedFileId.txt", "About/Preview.png", "LoadFolders.xml", "1.5/Assemblies/ArchoMonitor.dll", "1.6/Assemblies/ArchoMonitor.dll", "1.7/Assemblies/ArchoMonitor.dll", "Languages/English/Keyed/Settings.xml", item.ZipName, item.ZipName + ".sha256",
@@ -101,6 +101,9 @@ func TestAssembleValidation(t *testing.T) {
 		{"hash mismatch", "dist/archo-1.2.3-windows-amd64.zip", "changed", "does not match"},
 		{"preview limit", "dist/archo-1.2.3-windows-amd64/monitor/ArchoMonitor/About/Preview.png", strings.Repeat("x", 1<<20), "smaller than 1 MB"},
 		{"bad ID", "monitor/About/PublishedFileId.txt", "not an id", "positive decimal"},
+		{"no game versions", "dist/archo-1.2.3-windows-amd64/monitor/ArchoMonitor/About/About.xml", "<ModMetaData><name>Archo Monitor</name></ModMetaData>", "no supported game versions"},
+		{"bad game version", "dist/archo-1.2.3-windows-amd64/monitor/ArchoMonitor/About/About.xml", "<ModMetaData><supportedVersions><li>1.6</li><li>v1.0.5</li></supportedVersions></ModMetaData>", "not a game version"},
+		{"broken About.xml", "dist/archo-1.2.3-windows-amd64/monitor/ArchoMonitor/About/About.xml", "<ModMetaData><supportedVersions>", "About.xml: "},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := fixture(t)

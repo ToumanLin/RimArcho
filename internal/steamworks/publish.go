@@ -13,15 +13,16 @@ import (
 // It lives outside Content, so it cannot become part of the Workshop item.
 // Visibility nil leaves Steam's current/default visibility unchanged.
 type PublishRequest struct {
-	ID          uint64  `json:"id"`
-	Content     string  `json:"content"`
-	Preview     string  `json:"preview,omitempty"`
-	Version     string  `json:"version"`
-	Title       string  `json:"title"`
-	Description string  `json:"description,omitempty"`
-	Note        string  `json:"note"`
-	Visibility  *uint32 `json:"visibility,omitempty"`
-	IDFile      string  `json:"id_file"` // source About/PublishedFileId.txt; saved immediately after CreateItem
+	ID          uint64   `json:"id"`
+	Content     string   `json:"content"`
+	Preview     string   `json:"preview,omitempty"`
+	Version     string   `json:"version"`
+	Tags        []string `json:"tags"` // replace all of the item's tags: Mod and the game versions (17 §5.1)
+	Title       string   `json:"title"`
+	Description string   `json:"description,omitempty"`
+	Note        string   `json:"note"`
+	Visibility  *uint32  `json:"visibility,omitempty"`
+	IDFile      string   `json:"id_file"` // source About/PublishedFileId.txt; saved immediately after CreateItem
 	// Translations set the title and description for other Steam languages, each in
 	// its own update after the main one (Steam's update handle holds one language).
 	Translations []PublishTranslation `json:"translations,omitempty"`
@@ -35,6 +36,9 @@ type PublishTranslation struct {
 
 // DescriptionMax is Steam's description limit in bytes (k_cchPublishedDocumentDescriptionMax).
 const DescriptionMax = 8000
+
+// TagMax is Steam's limit on one tag in bytes (k_cchTagListMax is the whole list).
+const TagMax = 255
 
 // PublishLanguages are the Steam API language codes a translation may use.
 var PublishLanguages = map[string]bool{"schinese": true, "tchinese": true, "japanese": true, "koreana": true, "russian": true, "german": true, "french": true, "spanish": true, "brazilian": true, "polish": true}
@@ -63,7 +67,15 @@ func ReadPublishRequest(path string) (PublishRequest, error) {
 	if r.Title == "" || r.Version == "" || strings.ContainsAny(r.Version, ",\r\n") {
 		return r, errors.New("publish title and version are required; version must be one tag")
 	}
-	texts := []string{r.Content, r.Preview, r.Version, r.Title, r.Description, r.Note, r.IDFile}
+	if len(r.Tags) == 0 {
+		return r, errors.New("publish needs at least one Workshop tag")
+	}
+	for _, t := range r.Tags {
+		if t == "" || len(t) > TagMax || strings.ContainsAny(t, ",\r\n") {
+			return r, fmt.Errorf("invalid Workshop tag %q", t)
+		}
+	}
+	texts := append([]string{r.Content, r.Preview, r.Version, r.Title, r.Description, r.Note, r.IDFile}, r.Tags...)
 	descriptions := []string{r.Description}
 	for _, t := range r.Translations {
 		if !PublishLanguages[t.Language] || t.Description == "" {

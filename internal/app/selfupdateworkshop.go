@@ -38,9 +38,14 @@ func (a *App) workshopSelfRelease(ctx context.Context) (*selfupdate.Release, err
 	case d == nil || d.Result != 1:
 		err = errors.New("Workshop update item is unavailable")
 	default:
-		v, title, notes = selfupdate.WorkshopVersion(d.Tags), d.Title, d.Description
+		// The description's stamp names the release; an item published by 1.0.5 has a
+		// v<version> tag instead.
+		v, title, notes = selfupdate.DescriptionVersion(d.Description), d.Title, d.Description
 		if v == "" {
-			err = errors.New("Workshop update item has no stable version tag")
+			v = selfupdate.WorkshopVersion(d.Tags)
+		}
+		if v == "" {
+			err = errors.New("Workshop update item names no stable version")
 		}
 	}
 	// The anonymous Web API answers 9 for an unlisted item; a subscriber's folder still

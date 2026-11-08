@@ -3,6 +3,7 @@ package app
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
@@ -60,6 +61,29 @@ type ScanOptions struct {
 	// GameOnly reads only the environment's own Data/ and Mods/, not the shared mod folders
 	// (a game just added, 03 §2 item 8).
 	GameOnly bool
+	// Progress, when set, hears how far the scan is: the mod folders read, then saving.
+	Progress func(ScanProgress)
+	// Sources, when set, limits the scan to these source IDs (with GameOnly: the game's own
+	// folders and these). Like GameOnly, the sources left out keep their instances: Archo
+	// Monitor's folder just installed is read alone (19 §6).
+	Sources []string
+}
+
+// ScanProgress is how far a scan is.
+type ScanProgress struct {
+	Saving      bool // every folder is read; reconciling and writing the index
+	Done, Total int  // mod folders read of all of them
+}
+
+// reads reports whether a scan with o reads source s of environment envID.
+func (o ScanOptions) reads(s *source.Source, envID string) bool {
+	if slices.Contains(o.Sources, s.ID) {
+		return true
+	}
+	if o.GameOnly {
+		return s.EnvID == envID
+	}
+	return len(o.Sources) == 0
 }
 
 // Scan runs 04 §1.1 for the current environment: the shared mod folders and the game's own
@@ -76,6 +100,9 @@ func (a *App) ScanWith(o ScanOptions) (*ScanReport, error) {
 }
 
 func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, error) {
+	if o.Progress == nil {
+		o.Progress = a.ScanProgress
+	}
 	full := o.Full
 	started := a.Now()
 	if err := a.adoptGameWorkshops(); err != nil {
@@ -96,8 +123,10 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 	present := map[string]bool{} // left out of this scan, not lost (identity.Input.Present)
 	var active []*source.Source
 	var listed []*source.Source // the sources this scan reports on
+	partial := false            // some sources are left out
 	for _, s := range srcs {
-		if o.GameOnly && s.EnvID != e.ID {
+		if !o.reads(s, e.ID) {
+			partial = true
 			if s.Status != source.StatusRetired {
 				skip[s.ID] = true
 				present[s.ID] = s.Status == source.StatusOK
@@ -174,9 +203,13 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 			h, ok := prevHash[l.Key()]
 			return h, ok
 		},
-		Known: func(l scan.Location) bool { return knownLoc[l.Key()] },
+		Known:    func(l scan.Location) bool { return knownLoc[l.Key()] },
+		Progress: o.readProgress(),
 	})
-	if o.GameOnly {
+	if o.Progress != nil {
+		o.Progress(ScanProgress{Saving: true, Done: len(obs), Total: len(obs)})
+	}
+	if partial {
 		sharedLinkObservations(obs, known, srcs, present, sstats)
 	}
 	prev, prevHash = nil, nil // release the caches before reconciliation
@@ -275,6 +308,13 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 	}
 	rep.GameLinks, err = a.InspectGameLinks()
 	return rep, err
+}
+
+func (o ScanOptions) readProgress() func(done, total int) {
+	if o.Progress == nil {
+		return nil
+	}
+	return func(done, total int) { o.Progress(ScanProgress{Done: done, Total: total}) }
 }
 
 // A game-only scan still sees links into shared folders. They are aliases of the

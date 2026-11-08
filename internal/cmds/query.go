@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -18,7 +19,8 @@ import (
 func init() {
 	register(&Command{Name: "scan", Summary: "scan sources and reconcile identities", MaxArgs: 0,
 		Flags: []Flag{{Name: "full", Help: "re-hash every semantic file"},
-			{Name: "game-only", Help: "only the game's own Data/ and Mods/, not the shared mod folders"}}, Run: scanCmd})
+			{Name: "game-only", Help: "only the game's own Data/ and Mods/, not the shared mod folders"},
+			{Name: "progress", Help: "progress lines on stderr: mod folders read, then saving"}}, Run: scanCmd})
 	register(&Command{Name: "status", Summary: "overview of the current environment", MaxArgs: 0, Run: statusCmd})
 	register(&Command{Name: "list", Summary: "list mods", MaxArgs: 0,
 		Flags: []Flag{{Name: "filter", Value: "<expr>", Help: "terms: source:<label|kind> status:live|tombstone|all residue unloadable copies pkg:<id> ws:<id> tag:<tag> or words"},
@@ -51,7 +53,13 @@ func eventSummary(counts map[string]int) string {
 }
 
 func scanCmd(c *Ctx, a *Args) (*render.Doc, error) {
-	r, err := c.App.ScanWith(app.ScanOptions{Full: a.Bool("full"), GameOnly: a.Bool("game-only")})
+	// Archo Monitor (19 §6) is installed first, so this one scan reads its folder too; a
+	// Monitor-only rescan after it reports through App.ScanProgress.
+	progress := scanProgress(a.Bool("progress"))
+	old := c.App.ScanProgress
+	c.App.ScanProgress = progress
+	defer func() { c.App.ScanProgress = old }()
+	r, m, err := c.App.ScanWithMonitor(app.ScanOptions{Full: a.Bool("full"), GameOnly: a.Bool("game-only"), Progress: progress})
 	if err != nil {
 		return nil, err
 	}
@@ -84,9 +92,8 @@ func scanCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			root.Addf("%s: %s -> %s: %s", l.Code, l.Path, l.Target, l.ShortReason())
 		}
 	}
-	// Archo Monitor (19 §6): install or update the bundled monitor, apply the default.
-	if m, err := c.App.EnsureMonitor(false); err != nil {
-		root.KV("monitor", "error: "+err.Error())
+	if m.Err != nil {
+		root.KV("monitor", "error: "+m.Err.Error())
 	} else {
 		for _, l := range MonitorLines(m, false) {
 			root.KV("monitor", l)
@@ -99,6 +106,27 @@ func scanCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		d.AddNext("archo identity list")
 	}
 	return d, nil
+}
+
+// scanProgress writes a scan's progress to Progress (stderr) with --progress, a few lines
+// a second: the window reads them from its child scan (16 §8.4).
+func scanProgress(on bool) func(app.ScanProgress) {
+	out := Progress
+	if !on || out == nil {
+		return nil
+	}
+	var mu sync.Mutex
+	var last time.Time
+	return func(p app.ScanProgress) {
+		mu.Lock()
+		defer mu.Unlock()
+		now := time.Now()
+		if !p.Saving && p.Done != 0 && p.Done != p.Total && now.Sub(last) < 250*time.Millisecond {
+			return
+		}
+		last = now
+		out(app.ScanProgressLine(p))
+	}
 }
 
 func sourceSummary(s app.SourceStat) string {
