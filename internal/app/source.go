@@ -1,7 +1,6 @@
 package app
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -15,6 +14,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/content"
@@ -339,6 +339,15 @@ type SourceSearchResult struct {
 	Assemblies int
 	Pending    int // not decompiled within the budget
 	Errors     []string
+	// Decompiled counts the assemblies this call decompiled, Took how long that phase
+	// lasted, and Game says one of them was the game's own (a once-per-build run of
+	// ilspycmd over the whole of Assembly-CSharp.dll, which the budget cannot cut short).
+	Decompiled int
+	Took       time.Duration
+	Game       bool
+	// Searched are the mods whose code was searched, the game aside: the command
+	// reports what it left out (05 §5.4).
+	Searched []string
 }
 
 // SourceSearch searches the library for the given instances, decompiling missing
@@ -362,6 +371,7 @@ func (a *App) SourceSearchContext(ctx context.Context, st *LoadoutState, mods []
 		if err != nil {
 			return nil, err
 		}
+		res.Searched = append(res.Searched, m.ID)
 		all = append(all, ds...)
 	}
 	if len(game) > 0 && game[0] {
@@ -394,6 +404,7 @@ func (a *App) SourceSearchContext(ctx context.Context, st *LoadoutState, mods []
 		}
 	}
 	if len(todo) > 0 {
+		began := time.Now()
 		deadline := time.Time{}
 		if budget > 0 {
 			deadline = time.Now().Add(budget)
@@ -412,6 +423,9 @@ func (a *App) SourceSearchContext(ctx context.Context, st *LoadoutState, mods []
 					done++
 					if err != nil {
 						res.Errors = append(res.Errors, fmt.Sprintf("%s %s: %v", st.Ix.Ref(d.Instance), d.File, err))
+					} else {
+						res.Decompiled++
+						res.Game = res.Game || d.Kind == "game"
 					}
 					if progress != nil {
 						progress(fmt.Sprintf("decompiled %d/%d assemblies", done, len(todo)))
@@ -448,6 +462,7 @@ func (a *App) SourceSearchContext(ctx context.Context, st *LoadoutState, mods []
 		}
 		close(next)
 		wg.Wait()
+		res.Took = time.Since(began)
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
@@ -466,48 +481,50 @@ func (a *App) SourceSearchContext(ctx context.Context, st *LoadoutState, mods []
 			}
 		}
 	}
-	lower := strings.ToLower(pattern)
+	m := newLineMatcher(pattern, re)
 	for _, d := range all {
 		if !d.Cached {
 			continue
 		}
+		var files []string
 		filepath.WalkDir(d.Dir, func(p string, de os.DirEntry, err error) error {
 			if ctx.Err() != nil {
 				return filepath.SkipAll
 			}
-			if err != nil || de.IsDir() || !strings.EqualFold(filepath.Ext(p), ".cs") {
-				return nil
-			}
-			b, err := os.ReadFile(p)
-			if err != nil {
-				return nil
-			}
-			if re == nil && !bytes.Contains(bytes.ToLower(b), []byte(lower)) {
-				return nil
-			}
-			rel, _ := filepath.Rel(d.Dir, p)
-			sc := bufio.NewScanner(bytes.NewReader(b))
-			sc.Buffer(make([]byte, 64<<10), 8<<20)
-			n := 0
-			for sc.Scan() {
-				n++
-				l := sc.Text()
-				ok := false
-				if re != nil {
-					ok = re.MatchString(l)
-				} else {
-					ok = strings.Contains(strings.ToLower(l), lower)
-				}
-				if !ok {
-					continue
-				}
-				res.Total++
-				if limit == 0 || len(res.Hits) < limit {
-					res.Hits = append(res.Hits, SourceHit{Instance: d.Instance, File: filepath.ToSlash(filepath.Join(filepath.Base(d.File), rel)), Path: p, Line: n, Text: strings.TrimSpace(l), Shared: d.Shared})
-				}
+			if err == nil && !de.IsDir() && strings.EqualFold(filepath.Ext(p), ".cs") {
+				files = append(files, p)
 			}
 			return nil
 		})
+		// Files are read by several workers; the results are merged in file order, so the
+		// output does not depend on the schedule.
+		found := make([]fileMatches, len(files))
+		var next atomic.Int64
+		var wg sync.WaitGroup
+		for w := 0; w < min(searchWorkers, len(files)); w++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for ctx.Err() == nil {
+					i := int(next.Add(1)) - 1
+					if i >= len(files) {
+						return
+					}
+					found[i] = m.file(files[i], limit)
+				}
+			}()
+		}
+		wg.Wait()
+		for i, f := range found {
+			res.Total += f.total
+			rel, _ := filepath.Rel(d.Dir, files[i])
+			for _, h := range f.hits {
+				if limit != 0 && len(res.Hits) >= limit {
+					break
+				}
+				res.Hits = append(res.Hits, SourceHit{Instance: d.Instance, File: filepath.ToSlash(filepath.Join(filepath.Base(d.File), rel)), Path: files[i], Line: h.line, Text: h.text, Shared: d.Shared})
+			}
+		}
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err

@@ -5,11 +5,11 @@ type LinksCheckIn struct {
 	All bool   `json:"all,omitempty" jsonschema:"inspect every known game"`
 }
 type LinksRepairIn struct {
-	Env     string   `json:"env,omitempty"`
-	All     bool     `json:"all,omitempty"`
-	Confirm bool     `json:"confirm" jsonschema:"explicit player confirmation to remove the previewed links"`
-	DryRun  bool     `json:"dry_run,omitempty"`
-	Include []string `json:"include,omitempty" jsonschema:"full paths of unproven prefixed links explicitly included by the player"`
+	Env     string  `json:"env,omitempty"`
+	All     bool    `json:"all,omitempty"`
+	Confirm bool    `json:"confirm" jsonschema:"explicit player confirmation to remove the previewed links"`
+	DryRun  bool    `json:"dry_run,omitempty"`
+	Include StrList `json:"include,omitempty" jsonschema:"full paths of unproven prefixed links explicitly included by the player"`
 }
 
 func LinksRepairArgv(in LinksRepairIn) []string {

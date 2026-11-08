@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
@@ -146,14 +147,24 @@ func (a *App) sourceVersion(ctx context.Context) string {
 	if exe == "" {
 		return ""
 	}
+	// One process start per ilspycmd, not one after every decompile: on a slow machine
+	// that was a second .NET start behind each type read.
+	if v, ok := ilspyVersions.Load(exe); ok {
+		return v.(string)
+	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, exe, "--version").Output()
 	if err != nil {
 		return "unknown"
 	}
-	return firstN(strings.TrimSpace(string(out)), 200)
+	v := firstN(strings.TrimSpace(string(out)), 200)
+	ilspyVersions.Store(exe, v)
+	return v
 }
+
+// ilspyVersions remembers `ilspycmd --version` per executable.
+var ilspyVersions sync.Map
 
 func typeSourceDir(d *SourceDLL, typ string) string {
 	h := sha256.Sum256([]byte(typ))

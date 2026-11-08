@@ -31,7 +31,7 @@ func manageTools() []tool {
 }
 
 type TestRunIn struct {
-	Env            string `json:"env,omitempty" jsonschema:"environment (default current)"`
+	Env            string `json:"env,omitempty" jsonschema:"environment (default: current)"`
 	Plan           string `json:"plan,omitempty" jsonschema:"plan name (default current)"`
 	Map            bool   `json:"map,omitempty" jsonschema:"a quick test map instead of the menu"`
 	Save           string `json:"save,omitempty" jsonschema:"load this save (list_saves ref or .rws path)"`
@@ -206,18 +206,18 @@ func first(refs []string) string {
 // ---- tool arguments ----
 
 type IgnoreIn struct {
-	Env  string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
+	Env  string `json:"env,omitempty" jsonschema:"environment (default: current)"`
 	Ref  string `json:"ref" jsonschema:"the problem: p:<hex> as printed by list_problems"`
 	Undo bool   `json:"undo,omitempty" jsonschema:"stop ignoring it (problems unignore)"`
 }
 
 type ScanIn struct {
-	Env  string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
+	Env  string `json:"env,omitempty" jsonschema:"environment (default: current)"`
 	Full bool   `json:"full,omitempty" jsonschema:"re-hash every semantic file instead of trusting unchanged sizes and times"`
 }
 
 type ExchangeIn struct {
-	Env    string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
+	Env    string `json:"env,omitempty" jsonschema:"environment (default: current)"`
 	Action string `json:"action" jsonschema:"export, import or collection"`
 	Format string `json:"format,omitempty" jsonschema:"export: text (default), archo (a RimArcho list: each mod with its version), modsconfig, rimsort, rml, rimcrow, rimcrow-xml or workshop (Markdown Workshop links, for subscribing by hand)"`
 	Out    string `json:"out,omitempty" jsonschema:"export: write to this new file (never overwrites); default: return the text"`
@@ -226,7 +226,7 @@ type ExchangeIn struct {
 }
 
 type PackIn struct {
-	Env            string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
+	Env            string `json:"env,omitempty" jsonschema:"environment (default: current)"`
 	Action         string `json:"action" jsonschema:"list, check, build, launch, export, import, remove, stop or unlink"`
 	Name           string `json:"name,omitempty" jsonschema:"the pack (check, build, launch, export, remove, stop)"`
 	File           string `json:"file,omitempty" jsonschema:"check: an archive to verify without extracting; export: the new .archopack (or with list .archolist.json) file; import: the file to read"`
@@ -240,28 +240,28 @@ type PackIn struct {
 }
 
 type IdentityIn struct {
-	Env      string   `json:"env,omitempty" jsonschema:"environment name (default: current)"`
-	Action   string   `json:"action" jsonschema:"list, why, resolve, split or merge"`
-	Question string   `json:"question,omitempty" jsonschema:"why / resolve: the question ref q:<n> from action=list"`
-	Answer   string   `json:"answer,omitempty" jsonschema:"resolve: same (the same mod came back), copy (a copy of it) or unrelated"`
-	Refs     []string `json:"refs,omitempty" jsonschema:"split: the instance to move into a lineage of its own; merge: two refs, the second lineage joins the first"`
-	All      bool     `json:"all,omitempty" jsonschema:"list: include answered questions"`
+	Env      string  `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Action   string  `json:"action" jsonschema:"list, why, resolve, split or merge"`
+	Question string  `json:"question,omitempty" jsonschema:"why / resolve: the question ref q:<n> from action=list"`
+	Answer   string  `json:"answer,omitempty" jsonschema:"resolve: same (the same mod came back), copy (a copy of it) or unrelated"`
+	Refs     StrList `json:"refs,omitempty" jsonschema:"split: the instance to move into a lineage of its own; merge: two refs, the second lineage joins the first"`
+	All      bool    `json:"all,omitempty" jsonschema:"list: include answered questions"`
 }
 
 type HiddenIn struct {
-	Env    string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
+	Env    string `json:"env,omitempty" jsonschema:"environment (default: current)"`
 	Action string `json:"action" jsonschema:"unhide or trash"`
 	Ref    string `json:"ref" jsonschema:"the hidden or unsubscribed mod (#id, ws:…)"`
 	DryRun bool   `json:"dry_run,omitempty" jsonschema:"show what would change, change nothing"`
 }
 
 type MaintenanceIn struct {
-	Env                  string   `json:"env,omitempty" jsonschema:"environment name (default: current)"`
-	Action               string   `json:"action" jsonschema:"data_update, import_rimcrow, vacuum or gc"`
-	Datasets             []string `json:"datasets,omitempty" jsonschema:"data_update: rules, steamdb, replacements (default: all)"`
-	DB                   string   `json:"db,omitempty" jsonschema:"import_rimcrow: RimCrow's data\\mod_manager.db"`
-	Rules                string   `json:"rules,omitempty" jsonschema:"import_rimcrow: RimCrow's user_rules.json (default: next to the database)"`
-	IncludeDisabledRules bool     `json:"include_disabled_rules,omitempty" jsonschema:"import_rimcrow: also import rules switched off in RimCrow"`
-	All                  bool     `json:"all,omitempty" jsonschema:"import_rimcrow: no truncation"`
-	DryRun               bool     `json:"dry_run,omitempty" jsonschema:"report what would happen, change nothing"`
+	Env                  string  `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Action               string  `json:"action" jsonschema:"data_update, import_rimcrow, vacuum or gc"`
+	Datasets             StrList `json:"datasets,omitempty" jsonschema:"data_update: rules, steamdb, replacements (default: all)"`
+	DB                   string  `json:"db,omitempty" jsonschema:"import_rimcrow: RimCrow's data\\mod_manager.db"`
+	Rules                string  `json:"rules,omitempty" jsonschema:"import_rimcrow: RimCrow's user_rules.json (default: next to the database)"`
+	IncludeDisabledRules bool    `json:"include_disabled_rules,omitempty" jsonschema:"import_rimcrow: also import rules switched off in RimCrow"`
+	All                  bool    `json:"all,omitempty" jsonschema:"import_rimcrow: no truncation"`
+	DryRun               bool    `json:"dry_run,omitempty" jsonschema:"report what would happen, change nothing"`
 }

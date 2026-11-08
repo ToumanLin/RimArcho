@@ -1067,7 +1067,9 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 		}
 	}
 	if hot {
-		lc.next(`archo source search "AllComps.Remove(" `+inPlaceholder, `archo source search "AllComps.Add(" `+inPlaceholder)
+		// Who changes the comp list is not on the stack: the thrower and the patchers named
+		// there rarely hold the cause (h7), so these searches cover every enabled mod.
+		lc.next(`archo source search "AllComps.Remove(" --active --yes --budget 10`, `archo source search "AllComps.Add(" --active --yes --budget 10`)
 		lc.Checklist = append(lc.Checklist, tickChecklist...)
 	}
 	// 4. Type names in the message ("Error while instantiating a mod of type X").

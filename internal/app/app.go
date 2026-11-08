@@ -87,6 +87,9 @@ type App struct {
 	FreeSpace func(dir string) int64
 	// Decompile replaces ilspycmd (tests); nil means ILSpyDecompiler.
 	Decompile Decompiler
+	// Dotnet replaces the dotnet SDK lookup of a Mod's build information (tests); nil means
+	// csproj.Dotnet.
+	Dotnet func() string
 	// GameVersion ("X.Y") overrides the environment's game version for analysis commands.
 	GameVersion string
 	// AnalyzeWait bounds how long a command waits for an out-of-date analysis (14 §1:

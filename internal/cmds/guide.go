@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	register(&Command{Name: "guide", Args: "[<topic>]", Summary: "the agent guide behind the MCP tools: a workflow (diagnose, errors, plans, words) or one tool's full reference",
+	register(&Command{Name: "guide", Args: "[<topic>]", Summary: "the agent guide behind the MCP tools: a workflow (diagnose, errors, plans, rebuild, words) or one tool's full reference",
 		MaxArgs: 1, Run: guideCmd})
 }
 
@@ -31,6 +31,7 @@ var guideTopics = []struct{ name, summary, text string }{
 	{"diagnose", "the workflow for a game error or crash: classify it, which tool for which evidence, how to report", guideDiagnose},
 	{"errors", "error kinds the workflow does not cover (save loading, config errors, missing assets, assembly loading, noise), most frequent first", patternChecklist},
 	{"plans", "plans and their versions, the library, subscriptions and textures, and editing mod files safely", guidePlans},
+	{"rebuild", "rebuilding a Mod from the source it ships: the build: block of get_mod, dotnet restore and build, publicizers, or a small patch Mod instead", guideRebuild},
 	{"words", "what the interface calls things, for talking to the player", guideWords},
 }
 
@@ -103,7 +104,7 @@ const guideDiagnose = `Diagnosis workflow (use the exact evidence, not paraphras
 3. Classify the failure:
    - XML (PatchOperation failure, missing cross-reference, duplicate/missing parent def, malformed XML): use get_patches failed=true (reasons: target-inactive, target-missing, target-later, wrong-version-route, stale-name, unguarded-optional, node-absent), get_def, search_files. What a reason means for the player: target-inactive / target-missing / unguarded-optional = a compatibility patch for a mod that is not active (harmless, the mod should guard it); target-later = load order; stale-name / node-absent with the target mod active = the patch is outdated for that mod's version; wrong-version-route = the mod's own folder layout.
    - Material/icon (_MainTex, ResolveIcon): XML-side first; search_files for uiIconColor without uiIconPath/texPath in the mods named. Not for Material 'SolidColorMat-…': that one is known noise (class noise, made in code, no def or file causes it).
-   - Assembly (C# exception, Pawn.Tick, ThingWithComps.Tick, world tick): get_harmony target=<method> for every patched frame, then read_source type=<patch class> or search=<pattern>. For tick crashes check AllComps mutations in the cluster's candidates: read_source search="AllComps.Remove(" in=[…] (also "AllComps.Add(", "InitializeComps", "PostExposeData"). When the top frame is a Harmony patch of a game method, also read the source of the caller frame and the callee's vanilla contract (read_source game=true type=<callee> all=true shows its guards; what vanilla's own call sites pass is the norm): a patch that assumes vanilla's contract is not the owner of a caller that breaks it.
+   - Assembly (C# exception, Pawn.Tick, ThingWithComps.Tick, world tick): get_harmony target=<method> for every patched frame, then read_source type=<patch class> or search=<pattern>. For tick crashes check who changes AllComps: the cluster lists the enabled mods' comp-list modifiers when it finds them; otherwise read_source search="AllComps.Remove(" scope="active" (the culprit is often a mod the stack does not name; also "AllComps.Add(", "InitializeComps", "PostExposeData"). When the top frame is a Harmony patch of a game method, also read the source of the caller frame and the callee's vanilla contract (read_source game=true type=<callee> all=true shows its guards; what vanilla's own call sites pass is the norm): a patch that assumes vanilla's contract is not the owner of a caller that breaks it.
    - Assembly loading (ReflectionTypeLoadException, "Could not resolve type … expected class X in assembly A", TypeLoadException, "Error in static constructor of X"): the failing assembly or type is named in the message or the lines next to it; analyze_log says which enabled mod loads that DLL, or that none does (then no listed mod can be named from that line). A type in namespace Harmony (0Harmony 1.x) means an assembly built for Harmony 1; mods that bundle an old 0Harmony.dll are not missing dependencies.
    - Mixed: confirm the XML side loaded (get_patches failed=true) before blaming code.
    - Anything else (save loading, config errors, missing textures, noise): guide topic=errors.

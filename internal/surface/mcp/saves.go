@@ -31,7 +31,7 @@ func ListSavesArgv(in ListSavesIn) []string {
 
 // GetSaveIn is get_save: archo saves show.
 type GetSaveIn struct {
-	Env  string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
+	Env  string `json:"env,omitempty" jsonschema:"environment (default: current)"`
 	Save string `json:"save" jsonschema:"sv:<hex>, file name or <colony>/<save>"`
 	Mods bool   `json:"mods,omitempty" jsonschema:"every Mod, not only the differences"`
 	Play bool   `json:"play,omitempty" jsonschema:"the whole playthrough: colonists, events"`
@@ -45,16 +45,16 @@ func GetSaveArgv(in GetSaveIn) []string {
 
 // ManageSavesIn is manage_saves.
 type ManageSavesIn struct {
-	Env          string   `json:"env,omitempty" jsonschema:"environment name (default: current)"`
-	Action       string   `json:"action" jsonschema:"fix, rename, copy, backup or trash"`
-	Saves        []string `json:"saves" jsonschema:"sv:<hex>, file names or <colony>/<save>; fix, rename, copy take one"`
-	Name         string   `json:"name,omitempty" jsonschema:"rename: the new name"`
-	Mods         []string `json:"mods,omitempty" jsonschema:"fix: only these packageIds"`
-	DisableAdded bool     `json:"disable_added,omitempty" jsonschema:"fix: disable the list's Mods the save lacks"`
-	Order        bool     `json:"order,omitempty" jsonschema:"fix: use the save's order"`
-	Launch       bool     `json:"launch,omitempty" jsonschema:"fix: then start the game with the list"`
-	DryRun       bool     `json:"dry_run,omitempty" jsonschema:"fix, backup, trash: preview only"`
-	Confirm      bool     `json:"confirm,omitempty" jsonschema:"backup, trash: do it, after the player agreed"`
+	Env          string  `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Action       string  `json:"action" jsonschema:"fix, rename, copy, backup or trash"`
+	Saves        StrList `json:"saves" jsonschema:"sv:<hex>, file names or <colony>/<save>; fix, rename, copy take one"`
+	Name         string  `json:"name,omitempty" jsonschema:"rename: the new name"`
+	Mods         StrList `json:"mods,omitempty" jsonschema:"fix: only these packageIds"`
+	DisableAdded bool    `json:"disable_added,omitempty" jsonschema:"fix: disable the list's Mods the save lacks"`
+	Order        bool    `json:"order,omitempty" jsonschema:"fix: use the save's order"`
+	Launch       bool    `json:"launch,omitempty" jsonschema:"fix: then start the game with the list"`
+	DryRun       bool    `json:"dry_run,omitempty" jsonschema:"fix, backup, trash: preview only"`
+	Confirm      bool    `json:"confirm,omitempty" jsonschema:"backup, trash: do it, after the player agreed"`
 }
 
 // ManageSavesArgv maps manage_saves to saves fix / rename / copy / backup / trash. Backup
