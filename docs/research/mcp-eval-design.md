@@ -20,7 +20,7 @@ Goal: measure how much `archo mcp` helps an agent find and fix a broken Mod, and
 
 Each run starts from a clean image: the VM snapshot (preferred, no evidence can leak between runs) or, on the host, a fresh copy of the case directory plus an empty `%APPDATA%\RimArcho` and empty `Docs\`. Never run B after A in the same writable state: A leaves `archo.db`, Source-library decompilations and notes.
 
-The VM image has .NET SDK 8, `ilspycmd`, Node 26, Pi, dsh and Git for Windows (snapshot `RimArcho-Eval-Staged4` = Staged3 plus Node 26.13.0 and dsh in `C:\Tools\npm`, 2026-11-04; see Harness status).
+The VM image has .NET SDK 8, `ilspycmd` 11.2.0.10050, Node 26, Pi, dsh and Git for Windows (snapshot `RimArcho-Eval-Staged5` = Staged4 plus ilspycmd 11.2, 2026-11-08; Staged4 = Staged3 plus Node 26.13.0 and dsh in `C:\Tools\npm`, 2026-11-04, with ilspycmd 9.1.0.7988; see Harness status).
 
 ## Cases (built 2026-11-02)
 
@@ -245,6 +245,7 @@ Archo findings:
 ## Harness status (2026-11-02)
 
 - VM snapshot `RimArcho-Eval-Staged3` (UID 11, live, `NewPlayer(Chinese)` signed in on the desktop; Staged2, UID 10, without autologon, is its parent): game 1.6.4871 junctioned into `C:\Eval\RimWorld`, non-Workshop Mods in `C:\Eval\lib`, Archo build in `C:\Eval\tools`, Git for Windows (the shell Pi's `bash` tool needs), `ilspycmd` on the machine PATH. Each run reverts to it; see `scripts/mcp-eval/README.md`.
+- Current snapshot `RimArcho-Eval-Staged5` (2026-11-08, on Player-Test, Eval-2 and Eval-3; `run-case.ps1` reverts to it): Staged4 (Node 26.13.0 and dsh) with `ilspycmd` 11.2.0.10050 instead of 9.1.0.7988. The 11.2 build is the self-contained `win-x64` single exe (22 MB, runs without .NET), so `C:\Tools\ilspycmd` holds that one file; `scripts/mcp-eval/setup-ilspy-vm.ps1` built it from Staged4. Runs before 2026-11-08 used 9.1 and later runs use 11.2, so decompiler output may differ between rounds. `Verse.IntVec3` from the guest's `Assembly-CSharp.dll` was decompiled to stdout and to a file as the administrator and as the standard user, in session 0 and on the desktop. Setup scripts wait for the guest with a probe command: `vmrun checkToolsState` says "installed" for these encrypted VMs even with the tools running.
 - Pi reaches the model through a host port proxy 192.168.86.1:3425 (netsh portproxy + firewall rule "RimArcho-eval-VM-to-model-gateway"); remove both after the evaluation.
 - Pi 1.4.0 has native MCP: group A registers `archo mcp` with exposure `direct`; group B runs with `--no-mcp` and has no `archo.exe` on disk.
 - Staging hides the answer: `guest/overlay.ps1` writes the faulty files into the Mod's real folder with the replaced file's timestamps, every Mod in `Mods\` is a junction, and the staging package and scripts are deleted before Pi starts. `run-case.ps1` holds a mutex so two runs never share the VM.
