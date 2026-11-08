@@ -2,7 +2,7 @@
 
 All notable changes to RimArcho. Versions follow semantic versioning; the MVP is 0.5.0.
 
-## 1.0.8 (unreleased)
+## 1.0.8 — 2026-11-08
 
 - A Mod is no longer told it has a maintained replacement when it is that replacement. Some continuations keep the old Mod's packageId: Vanilla Base Generation Expanded (Workshop `3209927822`) was flagged as replaced by itself, and "subscribe" opened its own page. Use This Instead now matches by packageId only when the Workshop ID does not say it is another item; the import preview no longer suggests such a Mod as its own replacement either.
 
