@@ -23,6 +23,9 @@ type workspaceSnapshot struct {
 	key    string
 	state  string
 	result *EnvironmentResult
+	// boardAt is the loadout key the snapshot's board was built at: a read served from
+	// the snapshot gives the window that board back when an invalidation dropped it.
+	boardAt string
 }
 
 type EnvironmentResult struct {
@@ -237,6 +240,12 @@ func (s *API) workspaceRead(request, seq uint64) (*EnvironmentResult, bool) {
 			board := *result.Board
 			board.Scanning, board.Analyzing = s.busy["scan"], s.busy["analyze"]
 			result.Board = &board
+			// The snapshot is of this very workspace: an invalidation that changed nothing
+			// (the Monitor check, a plan left alone) must not leave the window without its
+			// board, or Live, the history and the filter read nothing (VM round 1.0.6, B2).
+			if s.board == nil && board.Board != nil {
+				s.board, s.boardAt = board.Board, cached.boardAt
+			}
 			w.mu.Lock()
 			result.Stale = w.closed || w.seq != seq || w.readSeq != request
 			w.mu.Unlock()
@@ -307,6 +316,6 @@ func (s *API) workspaceRead(request, seq uint64) (*EnvironmentResult, bool) {
 	}
 	_, cacheKey := s.cachedNeedsLocked()
 	saved := *result
-	s.workspace = &workspaceSnapshot{key: cacheKey, state: s.inventoryKey(), result: &saved}
+	s.workspace = &workspaceSnapshot{key: cacheKey, state: s.inventoryKey(), result: &saved, boardAt: reader.boardAt}
 	return result, false
 }
