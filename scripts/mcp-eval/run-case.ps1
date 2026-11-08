@@ -3,7 +3,7 @@
 # Group A = Pi with the Archo MCP server, B = dsh with it (since 2026-11-04), N = Pi without it (B before 2026-11-04). Results: D:\RimArcho-test\mcp-eval\results\<case>-<group>-<run>\
 # -Archo replaces the snapshot's archo.exe with this build; -StageOnly stops after staging and leaves the VM running.
 param([Parameter(Mandatory)][string]$Case, [Parameter(Mandatory)][ValidateSet('A', 'B', 'N')][string]$Group, [int]$Run = 1, [int]$Minutes = 15,
-  [string]$Snapshot = 'RimArcho-Eval-Staged4', [string]$Archo = '', [switch]$KeepRunning, [switch]$StageOnly,
+  [string]$Snapshot = 'RimArcho-Eval-Staged5', [string]$Archo = '', [switch]$KeepRunning, [switch]$StageOnly,
   [string]$VMX = 'D:\VMs\Player-Test\Win11-Player-Test.vmx')
 $ErrorActionPreference = 'Stop'
 # -VMX picks one of the eval VMs (Player-Test, or a copy such as D:\VMs\Eval-2\Win11-Player-Test.vmx).
