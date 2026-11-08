@@ -287,5 +287,10 @@
   "which RimWorld installs should RimArcho manage?": "要让 RimArcho 管理哪些 RimWorld？",
   "wider: %s": "加宽“%s”",
   "your images": "自定义",
-  "← → the previous / next mod, tab the sections": "← → 上一个 / 下一个 Mod，tab 切换分页"
+  "← → the previous / next mod, tab the sections": "← → 上一个 / 下一个 Mod，tab 切换分页",
+  "checking the files of %s…": "正在检查 %s 的文件…",
+  "checking the files of %s: %s": "正在检查 %s 的文件：%s",
+  "reading the mods of %s: %d of %d": "正在读取 %s 的 Mod：%d / %d",
+  "saving the %d mods read from %s…": "正在保存读到的 %d 个 Mod（%s）…",
+  "adding Archo Monitor to %s: %d of %d": "正在把 Archo Monitor 加入 %s：%d / %d"
 }

@@ -74,6 +74,9 @@ type App struct {
 	// AnalyzeRunner brings the Def/Patch analysis up to date; nil means the `archo analyze`
 	// child process (05 §3). Tests run it in-process.
 	AnalyzeRunner func(envName string, progress func(string)) error
+	// ScanProgress hears the scans this App runs without a Progress of their own, such as
+	// the rescan after Archo Monitor is installed (`scan --progress`).
+	ScanProgress func(ScanProgress)
 	// AnalyzeExe is the archo executable the default runner starts; "" is this one.
 	AnalyzeExe string
 	// SavesIndexRunner reads saves into the full-read cache (12 §1.7), the given saves

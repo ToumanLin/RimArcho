@@ -2,10 +2,12 @@ package gui
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 	"github.com/ToumanLin/RimArcho/internal/view"
@@ -100,7 +102,10 @@ func TestGuide(t *testing.T) {
 			t.Fatal("no end of the scan")
 		}
 	}
-	if last["ok"] != true || len(texts) != 2 || !strings.Contains(texts[1], "mods found") {
+	// reading, then checking the files (the analysis' own lines), then the count
+	checking := slices.ContainsFunc(texts, func(s string) bool { return strings.HasPrefix(s, "checking the files of 1.6") })
+	if last["ok"] != true || len(texts) < 3 || !strings.HasPrefix(texts[0], "reading the mods of 1.6") || !checking ||
+		!strings.Contains(texts[len(texts)-1], "mods found") {
 		t.Fatalf("end %v, texts %q", last, texts)
 	}
 	if b := api.Board(); b.Never || b.EnvName != "1.6" {
@@ -239,5 +244,21 @@ func TestOpenListKeepsCurrent(t *testing.T) {
 	}
 	if sh := api.Shell(); sh.Plans[0].Name != "Empty" || !sh.Plans[0].Current || !sh.Plans[0].Open || sh.Current != nil {
 		t.Fatalf("the written list is not current: %+v", sh.Plans)
+	}
+}
+
+// A scan's bar never goes back: the rescan after Archo Monitor is installed fills the rest.
+func TestScanMeter(t *testing.T) {
+	var m scanMeter
+	var got []float64
+	for _, p := range []app.ScanProgress{{Total: 10}, {Done: 5, Total: 10}, {Done: 10, Total: 10}, {Saving: true, Done: 10, Total: 10},
+		{Total: 13}, {Done: 13, Total: 13}, {Saving: true, Done: 13, Total: 13}} {
+		got = append(got, m.frac(p))
+	}
+	want := []float64{0, 0.45, 0.9, 0.9, 0.9, 1, 1}
+	for i := range want {
+		if d := got[i] - want[i]; d > 1e-9 || d < -1e-9 {
+			t.Fatalf("fractions %v, want %v", got, want)
+		}
 	}
 }

@@ -1538,11 +1538,16 @@ func (s *API) Scan() bool {
 		s.filesMu.Lock()
 		var out string
 		var err error
-		if s.Exe != "" {
-			out, err = app.ChildScanExe(s.Exe, home, env)
-		} else {
-			out, err = app.ChildScan(home, env)
+		exe := s.Exe
+		if exe == "" {
+			exe, _ = os.Executable()
 		}
+		var meter scanMeter
+		out, err = app.ChildScanProgress(exe, home, env, func(p app.ScanProgress) {
+			if frac, text := meter.step(p, env); text != "" {
+				s.tasks.Update(task, func(t *app.Task) { t.Phase, t.Frac = text, frac })
+			}
+		})
 		s.filesMu.Unlock()
 		s.mu.Lock()
 		s.busy["scan"], s.board, s.needs = false, nil, nil

@@ -23,12 +23,13 @@ func ChildCommandContext(ctx context.Context, exe, home, env string, argv []stri
 	c := exec.CommandContext(ctx, exe, args...)
 	c.Env = append(os.Environ(), "RIMARCHO_HOME="+home)
 	hideWindow(c)
-	out, err := c.CombinedOutput()
+	raw, err := c.CombinedOutput()
+	out := stripScanProgress(string(raw))
 	if err == nil {
-		return string(out), 0
+		return out, 0
 	}
 	if e, ok := err.(*exec.ExitError); ok {
-		return string(out), e.ExitCode()
+		return out, e.ExitCode()
 	}
-	return string(out) + "error: " + err.Error() + "\n", 1
+	return out + "error: " + err.Error() + "\n", 1
 }

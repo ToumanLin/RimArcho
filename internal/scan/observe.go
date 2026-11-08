@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/fsscan"
@@ -93,6 +94,9 @@ type Options struct {
 	// cased paths relative to it), left out of the fingerprint.
 	Generated func(realDir string) map[string]bool
 	Workers   int // per-source concurrency; default fsscan.Workers(source root)
+	// Progress is called once before reading (0, total) and after each mod folder is read,
+	// from the reading goroutines; it must be cheap and safe for concurrent use.
+	Progress func(done, total int)
 }
 
 // Collect scans every source and returns the observations in reconciliation order
@@ -203,6 +207,13 @@ func Collect(sources []*source.Source, o Options) ([]*Observation, map[string]*S
 	for _, ob := range obs {
 		bySource[ob.Loc.SourceID] = append(bySource[ob.Loc.SourceID], ob)
 	}
+	var read atomic.Int64
+	report := func() {}
+	if o.Progress != nil {
+		total := len(obs)
+		o.Progress(0, total)
+		report = func() { o.Progress(int(read.Add(1)), total) }
+	}
 	var wg sync.WaitGroup
 	for id, list := range bySource {
 		workers := o.Workers
@@ -220,6 +231,7 @@ func Collect(sources []*source.Source, o Options) ([]*Observation, map[string]*S
 					defer inner.Done()
 					for ob := range jobs {
 						observe(ob, o)
+						report()
 					}
 				}()
 			}

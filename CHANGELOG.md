@@ -2,6 +2,11 @@
 
 All notable changes to RimArcho. Versions follow semantic versioning; the MVP is 0.5.0.
 
+## 1.0.6 (unreleased)
+
+- Reading the mods shows how far it is. With a thousand Mods the first-run guide's “read the mods” step sat on “reading the mods of 1.6…” for minutes with no sign of life; its row now counts the folders as they are read (“reading the mods of 1.6: 340 of 1,200”), then says when it saves, adds Archo Monitor and checks the files, and the bar moves with it. A rescan from the window shows the same count on its background task. The guide also no longer reads a new game's own `Mods/` once in the window before its scan: with 3,000 Mods in `Mods/` the step took 10 s instead of 14 s.
+- CLI: `archo scan --progress` writes `progress: scan mods <read>/<total>` lines, then `progress: scan saving <total>`, to stderr. Without the flag the output is unchanged.
+
 ## 1.0.5 — 2026-11-07
 
 - Archo keeps you company while RimArcho works. A start that takes longer than 0.21 s shows Archo's chibi figure in the middle of the window with a usage tip below it, until the first page is drawn. A page that takes longer than 0.21 s to load shows the figure on the left of its loading card and a tip on the right, changing every 8 s. The first-run guide has Archo beside each step, winking, thinking while a scan or download runs and saluting when it is done. Waits take turns through seven calm expressions (neutral, smile, laugh, wink, think, ponder, yum), the next one every 4 s in a long wait. Settings › interface › Archo animation chooses off, still or animated (default). Animated uses one small WebGL figure (about 0.15 ms of CPU per frame) that stops when hidden and is released 10 s after the wait. Without GPU acceleration or with reduced motion, it shows still images. Nothing is loaded at start, so a fast start costs nothing.
