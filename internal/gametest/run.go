@@ -26,6 +26,14 @@ type Options struct {
 	// These three files are replaced on each run.
 	RunDir string
 	Map    bool
+	// Save: a save file to load instead of the main menu or a test map. It is copied into
+	// DataDir/Saves as autostart.rws and Prefs.xml turns dev mode on, so the game loads it
+	// at startup (20 §2).
+	Save string
+	// Ticks: play this many game ticks on the test map or the loaded save, then stop:
+	// Prefs.xml sets the autosave interval to Ticks, and the first autosave marks them
+	// played (20 §2). 0 stops once the map has been quiet for MapQuiet.
+	Ticks int
 	// Probe: run a test map (Map is implied) with -probequit until the probe's RESULT or
 	// EXCEPTION line, then wait up to Settle for the game to quit by itself (20 §3).
 	Probe bool
@@ -40,10 +48,20 @@ type Options struct {
 
 type Result struct {
 	Links        []*source.LinkInfo `json:"links,omitempty"`
-	Status       string             // menu, map, probe, timeout, exited, start-failed or links-blocked
+	Status       string             // menu, map, save, probe, timeout, exited, start-failed or links-blocked
 	ExitCode     *int
-	LoadSeconds  float64 // launch to menu marker, confirmed map quiet period or the probe's last line
+	LoadSeconds  float64 // launch to arrival: the menu marker, a quiet map or save, the first autosave, or the probe's last line
 	TotalSeconds float64
+	// Phase is the furthest boundary the run reached: loading, menu (Knowledge.xml written),
+	// new ("Initializing new game") or save ("Loading game from file").
+	Phase string
+	// MapSeconds: from the new-game marker (the load marker in a save run) to the stop; 0
+	// when the marker never appeared.
+	MapSeconds float64
+	// TicksReached: Ticks, when the first autosave showed they were played.
+	TicksReached int
+	// LastLine: the log's last line, for a run that did not arrive (timeout, exited).
+	LastLine     string
 	PeakMemoryMB int64
 	LogPath      string
 	Args         []string
@@ -51,12 +69,19 @@ type Result struct {
 	Waylith      bool
 }
 
-// Run waits for the menu, a quiet test map or a probe's last line, then kills and reaps the process.
-// Timeout and early exit return a result with no error; cancellation returns ctx.Err().
-// Invalid options and setup failures return no result. Start failures return both.
+// Run waits for the menu, a quiet test map or save, the first autosave or a probe's last
+// line, then kills and reaps the process. Timeout and early exit return a result with no
+// error; cancellation returns ctx.Err(). Invalid options and setup failures return no
+// result. Start failures return both.
 func Run(ctx context.Context, o Options) (result *Result, runErr error) {
-	if o.Timeout < 0 || o.Settle < 0 || o.MapQuiet < 0 {
-		return nil, fmt.Errorf("gametest: durations must not be negative")
+	if o.Timeout < 0 || o.Settle < 0 || o.MapQuiet < 0 || o.Ticks < 0 {
+		return nil, fmt.Errorf("gametest: durations and ticks must not be negative")
+	}
+	if o.Save != "" && (o.Map || o.Probe) {
+		return nil, fmt.Errorf("gametest: a save run loads the save, not a test map")
+	}
+	if o.Ticks > 0 && o.Probe {
+		return nil, fmt.Errorf("gametest: a probe run ends at the probe's last line, not after ticks")
 	}
 	for _, arg := range o.ExtraArgs {
 		key, _, _ := strings.Cut(strings.ToLower(strings.TrimLeft(arg, "-/")), "=")
@@ -113,6 +138,16 @@ func Run(ctx context.Context, o Options) (result *Result, runErr error) {
 	if err := resetPreferences(o.DataDir); err != nil {
 		return nil, err
 	}
+	saves := filepath.Join(o.DataDir, "Saves")
+	if err := prepareSaves(saves, o.Save); err != nil {
+		return nil, err
+	}
+	if o.Save != "" || o.Ticks > 0 {
+		// Dev mode loads Saves/autostart.rws at startup; a test map needs no dev mode.
+		if err := writeRunPreferences(o.DataDir, o.Save != "", o.Ticks); err != nil {
+			return nil, err
+		}
+	}
 	knowledge := filepath.Join(o.DataDir, "Config", "Knowledge.xml")
 	if err := os.Remove(knowledge); err != nil && !os.IsNotExist(err) {
 		return nil, fmt.Errorf("gametest: remove old marker %q: %w", knowledge, err)
@@ -155,8 +190,30 @@ func Run(ctx context.Context, o Options) (result *Result, runErr error) {
 	cmd.Stdout, cmd.Stderr = stdout, stdout
 	launch := o.Now()
 	result = &Result{Status: "start-failed", LogPath: logPath, Args: args, Exe: exe, Waylith: waylith}
+	var menuAt, menuSeen, probeAt time.Time
+	tail := logTail{probe: o.Probe}
 	defer func() {
-		result.TotalSeconds = o.Now().Sub(launch).Seconds()
+		end := o.Now()
+		result.TotalSeconds = end.Sub(launch).Seconds()
+		result.Phase = "loading"
+		switch {
+		case !tail.saveAt.IsZero():
+			result.Phase = "save"
+		case !tail.newAt.IsZero():
+			result.Phase = "new"
+		case !menuSeen.IsZero():
+			result.Phase = "menu"
+		}
+		marker := tail.newAt
+		if o.Save != "" {
+			marker = tail.saveAt
+		}
+		if !marker.IsZero() {
+			result.MapSeconds = end.Sub(marker).Seconds()
+		}
+		if result.Status == "timeout" || result.Status == "exited" {
+			result.LastLine = tail.last
+		}
 		b, err := json.MarshalIndent(result, "", "  ")
 		if err == nil {
 			err = os.WriteFile(filepath.Join(o.RunDir, "result.json"), append(b, '\n'), 0o644)
@@ -218,24 +275,35 @@ func Run(ctx context.Context, o Options) (result *Result, runErr error) {
 	defer deadline.Stop()
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
-	var menuAt, probeAt time.Time
-	tail := logTail{probe: o.Probe}
-	// probeEnded reads the log on and marks the run "probe" once the probe's last line is in it.
-	probeEnded := func(now time.Time) (bool, error) {
-		if !probeAt.IsZero() {
-			return true, nil
+	// seeMenu notes when this run wrote Knowledge.xml (in every mode, for Phase).
+	seeMenu := func(now time.Time) error {
+		if !menuSeen.IsZero() {
+			return nil
 		}
-		if err := tail.read(logPath, now); err != nil {
-			return false, err
+		st, err := os.Stat(knowledge)
+		if err != nil && !os.IsNotExist(err) {
+			return err
 		}
-		if tail.probeEnd == "" {
-			return false, nil
+		if err == nil && !st.IsDir() && !st.ModTime().Before(launch) {
+			menuSeen = now
 		}
-		probeAt = now
-		result.Status = "probe"
-		result.LoadSeconds = now.Sub(launch).Seconds()
-		return true, nil
+		return nil
 	}
+	// probeEnded marks the run "probe" once the probe's last line is in the log.
+	probeEnded := func(now time.Time) bool {
+		if probeAt.IsZero() && tail.probeEnd != "" {
+			probeAt = now
+			result.Status = "probe"
+			result.LoadSeconds = now.Sub(launch).Seconds()
+		}
+		return !probeAt.IsZero()
+	}
+	// The status a quiet map or save, or the first autosave, arrives at.
+	arrival := "map"
+	if o.Save != "" {
+		arrival = "save"
+	}
+	var played autosave
 	for {
 		select {
 		case <-ctx.Done():
@@ -246,14 +314,12 @@ func Run(ctx context.Context, o Options) (result *Result, runErr error) {
 				err = nil
 			}
 			err = finish(err) // flushes the 1.7 console log before the last read
+			now := o.Now()
+			err = errors.Join(err, tail.read(logPath, now), seeMenu(now))
 			result.Status = "exited"
-			if o.Probe {
-				// A probe quits right after its last line, often before the next sample.
-				ended, readErr := probeEnded(o.Now())
-				if ended {
-					result.Status = "probe"
-				}
-				err = errors.Join(err, readErr)
+			// A probe quits right after its last line, often before the next sample.
+			if o.Probe && probeEnded(now) {
+				result.Status = "probe"
 			}
 			return result, errors.Join(ctx.Err(), err)
 		case <-deadline.C:
@@ -261,33 +327,38 @@ func Run(ctx context.Context, o Options) (result *Result, runErr error) {
 		case <-ticker.C:
 			sample()
 			now := o.Now()
-			if o.Probe {
-				ended, err := probeEnded(now)
+			if err := errors.Join(tail.read(logPath, now), seeMenu(now)); err != nil {
+				return result, errors.Join(err, stop())
+			}
+			switch {
+			case o.Probe:
+				if probeEnded(now) && now.Sub(probeAt) >= o.Settle {
+					return result, errors.Join(ctx.Err(), stop())
+				}
+			case o.Ticks > 0:
+				done, err := played.check(saves, launch, now)
 				if err != nil {
 					return result, errors.Join(err, stop())
 				}
-				if ended && now.Sub(probeAt) >= o.Settle {
-					return result, errors.Join(ctx.Err(), stop())
-				}
-			} else if o.Map {
-				if err := tail.read(logPath, now); err != nil {
-					return result, errors.Join(err, stop())
-				}
-				if tail.marker && now.Sub(tail.lastWrite) >= o.MapQuiet {
-					result.Status = "map"
+				if done {
+					result.Status, result.TicksReached = arrival, o.Ticks
 					result.LoadSeconds = now.Sub(launch).Seconds()
 					return result, errors.Join(ctx.Err(), stop())
 				}
-			} else {
-				if menuAt.IsZero() {
-					st, err := os.Stat(knowledge)
-					if err != nil && !os.IsNotExist(err) {
-						return result, errors.Join(err, stop())
-					}
-					if err == nil && !st.IsDir() && !st.ModTime().Before(launch) {
-						menuAt = now
-						result.LoadSeconds = now.Sub(launch).Seconds()
-					}
+			case o.Map || o.Save != "":
+				marker := tail.newAt
+				if o.Save != "" {
+					marker = tail.saveAt
+				}
+				if !marker.IsZero() && now.Sub(tail.lastWrite) >= o.MapQuiet {
+					result.Status = arrival
+					result.LoadSeconds = now.Sub(launch).Seconds()
+					return result, errors.Join(ctx.Err(), stop())
+				}
+			default:
+				if menuAt.IsZero() && !menuSeen.IsZero() {
+					menuAt = now
+					result.LoadSeconds = now.Sub(launch).Seconds()
 				}
 				if !menuAt.IsZero() && now.Sub(menuAt) >= o.Settle {
 					result.Status = "menu"
@@ -298,44 +369,62 @@ func Run(ctx context.Context, o Options) (result *Result, runErr error) {
 	}
 }
 
-const mapMarker = "Initializing new game with mods"
+const (
+	mapMarker  = "Initializing new game with mods"
+	saveMarker = "Loading game from file "
+)
 
+// logTail reads the run's log as it grows, line by line: the game's new-game and load
+// markers, the last line, and in a probe run the probe's last line (20 §3).
 type logTail struct {
 	offset    int64
 	lastWrite time.Time
-	marker    bool
-	pending   string
-	// probe: look for the probe's last line (20 §3) in whole lines; line holds the
-	// unfinished one, probeEnd is "result" or "exception" once it is found.
-	probe    bool
-	line     []byte
-	probeEnd string
+	// newAt, saveAt: when the new-game and save-load markers were first read.
+	newAt, saveAt time.Time
+	last          string // the last non-empty line, cut to 300 characters
+	line          []byte // the unfinished line
+	probe         bool
+	probeEnd      string // "result" or "exception" once the probe's last line is read
 }
 
-// maxProbeLine bounds the unfinished line kept between reads; a longer line is dropped.
-const maxProbeLine = 64 << 10
+// maxLine bounds the unfinished line kept between reads; a longer line is dropped.
+const maxLine = 64 << 10
 
-func (t *logTail) probeLines(chunk []byte) {
-	if t.probeEnd != "" {
-		return
+func (t *logTail) marks(l string, now time.Time) {
+	if t.newAt.IsZero() && strings.Contains(l, mapMarker) {
+		t.newAt = now
 	}
+	if t.saveAt.IsZero() && strings.Contains(l, saveMarker) && strings.Contains(l, " with mods") {
+		t.saveAt = now
+	}
+}
+
+func (t *logTail) lines(chunk []byte, now time.Time) {
 	t.line = append(t.line, chunk...)
 	for {
 		i := bytes.IndexByte(t.line, '\n')
 		if i < 0 {
 			break
 		}
-		if text, ok := ProbeLine(string(t.line[:i])); ok {
-			if end := ProbeEnd(text); end != "" {
-				t.probeEnd, t.line = end, nil
-				return
+		l := strings.TrimRight(string(t.line[:i]), "\r")
+		t.line = t.line[i+1:]
+		t.marks(l, now)
+		if s := strings.TrimSpace(l); s != "" && !strings.HasPrefix(s, "(Filename: ") {
+			if r := []rune(s); len(r) > 300 {
+				s = string(r[:297]) + "..."
+			}
+			t.last = s
+		}
+		if t.probe && t.probeEnd == "" {
+			if text, ok := ProbeLine(l); ok {
+				t.probeEnd = ProbeEnd(text)
 			}
 		}
-		t.line = t.line[i+1:]
 	}
-	if len(t.line) > maxProbeLine {
+	if len(t.line) > maxLine {
 		t.line = nil
 	}
+	t.marks(string(t.line), now) // a marker the game has not ended with a newline yet
 }
 
 func (t *logTail) read(path string, now time.Time) error {
@@ -352,7 +441,7 @@ func (t *logTail) read(path string, now time.Time) error {
 		return err
 	}
 	if st.Size() < t.offset {
-		t.offset, t.pending, t.marker, t.line = 0, "", false, nil
+		*t = logTail{probe: t.probe}
 	}
 	if _, err := f.Seek(t.offset, io.SeekStart); err != nil {
 		return err
@@ -363,12 +452,7 @@ func (t *logTail) read(path string, now time.Time) error {
 		if n > 0 {
 			t.offset += int64(n)
 			t.lastWrite = now
-			text := t.pending + string(buf[:n])
-			t.marker = t.marker || strings.Contains(text, mapMarker)
-			t.pending = text[max(0, len(text)-len(mapMarker)+1):]
-			if t.probe {
-				t.probeLines(buf[:n])
-			}
+			t.lines(buf[:n], now)
 		}
 		if err == io.EOF {
 			return nil
@@ -377,4 +461,35 @@ func (t *logTail) read(path string, now time.Time) error {
 			return err
 		}
 	}
+}
+
+// autosave watches the run's Saves folder for the game's first autosave (Autosave-N.rws),
+// written once the autosave interval's ticks were played.
+type autosave struct {
+	size  int64
+	since time.Time
+}
+
+// autosaveSettle: the autosave's size has not changed for this long, so the game wrote it.
+const autosaveSettle = time.Second
+
+func (a *autosave) check(dir string, launch, now time.Time) (bool, error) {
+	files, err := filepath.Glob(filepath.Join(dir, "Autosave*.rws"))
+	if err != nil {
+		return false, err
+	}
+	var size int64
+	for _, f := range files {
+		if st, err := os.Stat(f); err == nil && !st.IsDir() && !st.ModTime().Before(launch) && st.Size() > size {
+			size = st.Size()
+		}
+	}
+	if size == 0 {
+		return false, nil
+	}
+	if size != a.size {
+		a.size, a.since = size, now
+		return false, nil
+	}
+	return now.Sub(a.since) >= autosaveSettle, nil
 }

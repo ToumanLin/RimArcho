@@ -81,6 +81,11 @@ func (a *App) comparePlayerLog(st *LoadoutState, r *TestRunReport) {
 		}
 	}
 	reached := r.reached()
+	// A probe run starts a new game like a map run; its minutes of play do not count (20 §3).
+	target := testRunTarget{mapRun: slices.Contains(r.Args, "quicktest"), ticks: r.TicksReached > 0}
+	if r.Save != nil {
+		target.save = r.Save.Name
+	}
 	r.playerClusters = map[string]TestRunCluster{}
 	for _, lc := range rep.Clusters {
 		// Preference errors are not compared: test runs use their own preferences.
@@ -97,8 +102,7 @@ func (a *App) comparePlayerLog(st *LoadoutState, r *TestRunReport) {
 		if current[lc.Key] {
 			continue
 		}
-		// A probe run starts a new game like a map run; its minutes of play do not count (20 §3).
-		if !reached || !testRunReaches(lc.Phases, r.Status == "map" || r.Status == "probe") {
+		if !reached || !testRunReaches(lc, rep.Phases, rep.GameMarks, target) {
 			pl.Unreached++
 			continue
 		}
@@ -108,26 +112,6 @@ func (a *App) comparePlayerLog(st *LoadoutState, r *TestRunReport) {
 			r.Fixed = append(r.Fixed, c)
 		}
 	}
-}
-
-// testRunReaches reports whether a test run could show a cluster with these observed
-// phases (19 §4): every run loads and reaches the main menu, a map run also starts a
-// new game, and none loads a save or plays. Unobserved phases count as reached.
-func testRunReaches(phases []logs.PhaseCount, mapRun bool) bool {
-	if len(phases) == 0 {
-		return true
-	}
-	for _, p := range phases {
-		switch logs.PhaseName(p.Phase) {
-		case "loading", "menu", "unknown":
-			return true
-		case "new":
-			if mapRun {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func compareTestRun(r *TestRunReport) {
@@ -230,11 +214,13 @@ func previousTestRun(r *TestRunReport) (*TestRunBaseline, []*logs.Cluster, []Tes
 			Args     []string         `json:"args"`
 			Clusters []TestRunCluster `json:"clusters"`
 			Probe    *TestRunProbe    `json:"probe"`
+			Save     *TestRunSave     `json:"save"`
 		}
-		// A probe run compares only with runs of the same probe (20 §3).
+		// A probe run compares only with runs of the same probe (20 §3), a save run only
+		// with runs of the same save.
 		if json.Unmarshal(b, &report) != nil || report.Plan != r.Plan || report.Status == "links-blocked" ||
 			slices.Contains(report.Args, "quicktest") != slices.Contains(r.Args, "quicktest") ||
-			probePackage(report.Probe) != probePackage(r.Probe) {
+			probePackage(report.Probe) != probePackage(r.Probe) || saveName(report.Save) != saveName(r.Save) {
 			continue
 		}
 		f, err := os.Open(filepath.Join(dir, "Player.log"))

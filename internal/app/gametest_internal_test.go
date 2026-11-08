@@ -18,23 +18,53 @@ import (
 // a save or plays (20 §2).
 func TestTestRunReaches(t *testing.T) {
 	t.Parallel()
-	at := func(names ...string) []logs.PhaseCount {
-		var cs []logs.PhaseCount
-		for _, n := range names {
-			cs = logs.AddPhaseCount(cs, &logs.Phase{Name: n}, 1)
+	// The Monitor's boundaries: menu, new, play (after the new game), save "Colony", play.
+	marks := []*logs.Phase{{Name: "menu", Index: 1}, {Name: "new", Index: 2}, {Name: "play", Index: 3},
+		{Name: "save", Save: "Colony", Index: 4}, {Name: "play", Index: 5}}
+	at := func(idx ...int) *LogCluster {
+		lc := &LogCluster{Cluster: &logs.Cluster{First: &logs.Entry{Line: 1}}}
+		for _, i := range idx {
+			p := logs.LoadingPhase
+			if i > 0 {
+				p = marks[i-1]
+			}
+			lc.Phases = logs.AddPhaseCount(lc.Phases, p, 1)
 		}
-		return cs
+		return lc
 	}
-	for _, c := range []struct {
-		phases   []logs.PhaseCount
-		map_, ok bool
+	menu, mapRun, ticks := testRunTarget{}, testRunTarget{mapRun: true}, testRunTarget{mapRun: true, ticks: true}
+	colony, other := testRunTarget{save: "colony", ticks: true}, testRunTarget{save: "Other", ticks: true}
+	for i, c := range []struct {
+		lc     *LogCluster
+		target testRunTarget
+		ok     bool
 	}{
-		{nil, false, true}, {at("loading"), false, true}, {at("menu"), false, true}, {at("unknown"), false, true},
-		{at("new"), false, false}, {at("new"), true, true}, {at("save", "play"), true, false}, {at("play", "loading"), false, true},
+		{at(), menu, true}, {at(0), menu, true}, {at(1), menu, true},
+		{at(2), menu, false}, {at(2), mapRun, true}, {at(3), mapRun, false}, {at(3), ticks, true}, {at(3), colony, false},
+		{at(4, 5), mapRun, false}, {at(4, 5), colony, true}, {at(5), colony, true}, {at(5), other, false}, {at(4), other, false},
+		{at(5, 0), menu, true},
 	} {
-		if got := testRunReaches(c.phases, c.map_); got != c.ok {
-			t.Errorf("%v map=%v: %v, want %v", c.phases, c.map_, got, c.ok)
+		if got := testRunReaches(c.lc, marks, nil, c.target); got != c.ok {
+			t.Errorf("case %d: %v, want %v", i, got, c.ok)
 		}
+	}
+	// Without Monitor phases the game's own lines place the first occurrence (h8).
+	game := []*logs.Phase{{Name: "save", Save: "autostart", Line: 100}, {Name: "new", Line: 200}}
+	first := func(line int) *LogCluster { return &LogCluster{Cluster: &logs.Cluster{First: &logs.Entry{Line: line}}} }
+	for i, c := range []struct {
+		line   int
+		target testRunTarget
+		ok     bool
+	}{
+		{50, menu, true}, {150, menu, false}, {150, mapRun, false}, {150, testRunTarget{save: "Autostart"}, true},
+		{150, other, false}, {250, mapRun, true}, {250, menu, false}, {250, colony, false},
+	} {
+		if got := testRunReaches(first(c.line), nil, game, c.target); got != c.ok {
+			t.Errorf("game case %d: %v, want %v", i, got, c.ok)
+		}
+	}
+	if !testRunReaches(&LogCluster{Cluster: &logs.Cluster{First: &logs.Entry{Line: 150}}, OnlyCompanion: true}, nil, game, menu) {
+		t.Error("a companion-only cluster has no Player.log line to place")
 	}
 }
 

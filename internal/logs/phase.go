@@ -32,6 +32,42 @@ func ValidPhase(name string) bool {
 	return false
 }
 
+// The game's own boundary lines (Verse.Game.InitNewGame, SavedGameLoaderNow): each lists the
+// running Mods' packageIds on the following "  - " lines.
+const (
+	NewGameLine  = "Initializing new game with mods"
+	LoadSaveLine = "Loading game from file "
+)
+
+// GameMark reads a game boundary line: phase "new" for a new game, "save" (with the save's
+// file name) for a save load; nil for any other line. Unlike a Monitor marker it is an
+// ordinary log message, so Phase and Phases ignore it; only test runs use it, for logs
+// without Monitor phases (06 §1, 20 §2).
+func GameMark(msg string) *Phase {
+	if i := strings.Index(msg, NewGameLine); i >= 0 && i < 40 {
+		return &Phase{Name: "new"}
+	}
+	if i := strings.Index(msg, LoadSaveLine); i >= 0 && i < 40 {
+		rest := msg[i+len(LoadSaveLine):]
+		if j := strings.Index(rest, " with mods"); j > 0 {
+			return &Phase{Name: "save", Save: rest[:j]}
+		}
+	}
+	return nil
+}
+
+// GamePhaseAt is the last game mark before line, nil before the first (loading or menu).
+func GamePhaseAt(marks []*Phase, line int) *Phase {
+	var at *Phase
+	for _, m := range marks {
+		if m.Line >= line {
+			break
+		}
+		at = m
+	}
+	return at
+}
+
 func PhaseName(p *Phase) string {
 	if p == nil {
 		return "loading"

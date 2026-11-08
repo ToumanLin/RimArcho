@@ -26,6 +26,11 @@ import (
 type TestRunOptions struct {
 	Env, Plan string
 	Map       bool
+	// Save: a save (a list_saves reference, its name, or a .rws path) to load instead of
+	// the main menu; the run plays Ticks (default 4000) after the load (20 §2).
+	Save string
+	// Ticks: in a map or save run, play this many ticks, then stop (20 §2).
+	Ticks int
 	// Probe: a probe Mod folder to add to the tested list (map mode implied, 20 §3);
 	// ProbeAfter or ProbeBefore name the packageId it goes next to (default: last).
 	Probe, ProbeAfter, ProbeBefore string
@@ -57,17 +62,41 @@ type TestRunCluster struct {
 }
 
 type TestRunReport struct {
-	Links         []*GameLink      `json:"links,omitempty"`
-	Env           string           `json:"env"`
-	Plan          string           `json:"plan"`
-	GameVersion   string           `json:"game_version"`
-	Status        string           `json:"status"`
-	LoadSeconds   float64          `json:"load_seconds"`
-	TotalSeconds  float64          `json:"total_seconds"`
-	PeakMemoryMB  int64            `json:"peak_memory_mb"`
-	Requested     int              `json:"requested"`
-	Missing       []TestRunMissing `json:"missing"`
-	Linked        []string         `json:"linked,omitempty"` // Mods/ links made for this run and removed after it
+	Links        []*GameLink `json:"links,omitempty"`
+	Env          string      `json:"env"`
+	Plan         string      `json:"plan"`
+	GameVersion  string      `json:"game_version"`
+	Status       string      `json:"status"`
+	LoadSeconds  float64     `json:"load_seconds"`
+	TotalSeconds float64     `json:"total_seconds"`
+	PeakMemoryMB int64       `json:"peak_memory_mb"`
+	// TimeoutSeconds: the time limit the run had (testRunTimeout when none was given).
+	TimeoutSeconds float64 `json:"timeout_seconds"`
+	// NotTested: why this run is no test of the plan (incomplete, timeout, exited), as the
+	// sentence the text report starts with; "" when it reached its target with every Mod.
+	NotTested string `json:"not_tested,omitempty"`
+	// Phase: the furthest boundary the game reached: loading, menu, new or save.
+	Phase string `json:"phase,omitempty"`
+	// MapSeconds: from the new-game marker (the load marker in a save run) to the stop.
+	MapSeconds float64 `json:"map_seconds,omitempty"`
+	// Ticks: the ticks asked for; TicksReached: the same once the first autosave showed them
+	// played; TicksEstimated: at most map_seconds × 60 (normal speed, including map
+	// generation), or TicksReached.
+	Ticks          int    `json:"ticks,omitempty"`
+	TicksReached   int    `json:"ticks_reached,omitempty"`
+	TicksEstimated int    `json:"ticks_estimated,omitempty"`
+	LastLogLine    string `json:"last_log_line,omitempty"` // a run that did not arrive: the log's last line
+	// Save: the save a save run loaded, and how its Mods differ from the plan (testRunSave).
+	Save      *TestRunSave     `json:"save,omitempty"`
+	Requested int              `json:"requested"`
+	Missing   []TestRunMissing `json:"missing"`
+	Linked    []string         `json:"linked,omitempty"` // Mods/ links made for this run and removed after it
+	// Hidden: Mods/ entries with a linked Mod's packageId, moved aside for the run and back after it.
+	Hidden []string `json:"hidden,omitempty"`
+	// Loaded: the folder the game took for each plan Mod outside Data/ (up to 30; links of
+	// this run first), and how that is known; LoadedTotal counts them all.
+	Loaded        []TestRunLoaded  `json:"loaded,omitempty"`
+	LoadedTotal   int              `json:"loaded_total,omitempty"`
 	RunDir        string           `json:"run_dir"`
 	LogPath       string           `json:"log_path"`
 	Args          []string         `json:"args,omitempty"` // saved in report.json (map mode of a baseline); not in --json output
@@ -103,9 +132,10 @@ func (r *TestRunReport) Success() bool {
 	return true
 }
 
-// reached: the run got to its target: the menu, a quiet map, or a probe's last line.
+// reached: the run got to its target with every plan Mod loaded: the menu, a quiet map
+// or save, the asked ticks, or a probe's last line.
 func (r *TestRunReport) reached() bool {
-	return r.Status == "menu" || r.Status == "map" || r.Status == "probe"
+	return r.Status == "menu" || r.Status == "map" || r.Status == "save" || r.Status == "probe"
 }
 
 // TestRun starts the executable directly, including for a Steam-launch environment.
@@ -114,8 +144,16 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (_ *TestRunReport, 
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if o.Timeout < 0 || o.Settle < 0 {
-		return nil, fmt.Errorf("test run: durations must not be negative")
+	if o.Timeout < 0 || o.Settle < 0 || o.Ticks < 0 {
+		return nil, fmt.Errorf("test run: durations and ticks must not be negative")
+	}
+	switch {
+	case o.Save != "" && (o.Map || o.Probe != ""):
+		return nil, fmt.Errorf("test run: a save run loads the save; give a save or a map/probe, not both")
+	case o.Ticks > 0 && o.Probe != "":
+		return nil, fmt.Errorf("test run: a probe run ends at the probe's RESULT line; ticks do not apply")
+	case o.Ticks > 0 && !o.Map && o.Save == "":
+		return nil, fmt.Errorf("test run: ticks need a map or a save run")
 	}
 	prevEnv := a.EnvName
 	if o.Env != "" {
@@ -142,6 +180,15 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (_ *TestRunReport, 
 		return nil, fmt.Errorf("test run: no current plan (archo plan list)")
 	}
 	e := st.Ix.Env
+	var save *TestRunSave
+	if o.Save != "" {
+		if save, err = a.testRunSave(st, o.Save); err != nil {
+			return nil, err
+		}
+		if o.Ticks == 0 {
+			o.Ticks = testRunSaveTicks
+		}
+	}
 	links, err := a.CheckGameLinks(modsDir(st.Ix))
 	if err != nil {
 		return nil, err
@@ -173,15 +220,19 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (_ *TestRunReport, 
 	if err != nil {
 		return nil, err
 	}
-	mods, add, blocked := a.testRunLinks(st)
+	mods, add, hide, blocked := a.testRunLinks(st)
 	if probe != nil && probe.link != nil {
 		mods = modsDir(st.Ix)
 		add = append(add, *probe.link)
 	}
-	unlink, err := a.addTestLinks(base, mods, add)
+	unlink, hidden, notMoved, err := a.addTestLinks(base, mods, add, hide)
 	if err != nil {
 		return nil, err
 	}
+	for id, why := range notMoved {
+		blocked[id] = why
+	}
+	add = slices.DeleteFunc(add, func(c LinkChange) bool { return notMoved[c.Mod] != "" })
 	defer func() { err = errors.Join(err, unlink()) }() // a no-op once removed below
 	if err := a.prepareTestConfig(st, data, protected, probe); err != nil {
 		return nil, err
@@ -192,6 +243,7 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (_ *TestRunReport, 
 		}
 	}
 	missing := testRunMissing(st, blocked)
+	seen := testRunFolders(st) // while this run's links are there
 	if err := os.MkdirAll(runs, 0o755); err != nil {
 		return nil, err
 	}
@@ -208,12 +260,21 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (_ *TestRunReport, 
 		}
 		break
 	}
+	mode := testRunMode(o.Map || probe != nil, save)
+	timeout := o.Timeout
+	if timeout == 0 {
+		timeout = testRunTimeout(runs, runDir, mode, o.Ticks)
+	}
 	if o.Progress != nil {
-		o.Progress("starting test run; waiting for the game to load")
+		o.Progress(fmt.Sprintf("starting test run; waiting for the game to load (at most %s)", timeout))
+	}
+	savePath := ""
+	if save != nil {
+		savePath = save.Path
 	}
 	raw, runErr := gametest.Run(ctx, gametest.Options{
 		GameRoot: e.GameRoot, GameVersion: e.GameVersion, DataDir: data, RunDir: runDir,
-		Map: o.Map, Probe: probe != nil, Timeout: o.Timeout, Settle: o.Settle, Start: a.TestGameStart,
+		Map: o.Map, Save: savePath, Ticks: o.Ticks, Probe: probe != nil, Timeout: timeout, Settle: o.Settle, Start: a.TestGameStart,
 	})
 	// The game has exited (gametest.Run reaps it): take the links away before anything else.
 	unlinkErr := unlink()
@@ -223,9 +284,19 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (_ *TestRunReport, 
 	r := &TestRunReport{
 		Env: e.Name, Plan: PlanRef(st.Plan), GameVersion: e.GameVersion, Status: raw.Status,
 		LoadSeconds: raw.LoadSeconds, TotalSeconds: raw.TotalSeconds, PeakMemoryMB: raw.PeakMemoryMB,
-		Requested: len(st.List), Missing: missing, Linked: linkNames(add), RunDir: runDir, LogPath: raw.LogPath,
+		TimeoutSeconds: timeout.Seconds(), Phase: raw.Phase, MapSeconds: raw.MapSeconds, Ticks: o.Ticks,
+		TicksReached: raw.TicksReached, LastLogLine: raw.LastLine, Save: save,
+		Requested: len(st.List), Missing: missing, Linked: linkNames(add), Hidden: hidden, RunDir: runDir, LogPath: raw.LogPath,
 		Args: raw.Args, Attribution: "tested-plan", Counts: map[string]int{}, Clusters: []TestRunCluster{},
 	}
+	if mode != "menu" && r.MapSeconds > 0 {
+		r.TicksEstimated = int(r.MapSeconds * 60)
+	}
+	if r.TicksReached > 0 {
+		r.TicksEstimated = r.TicksReached
+	}
+	a.testRunLoaded(st, r, seen, data)
+	r.NotTested = testRunNotTested(r, mode)
 	var probeErr error
 	if probe != nil {
 		r.Probe = probe.report
@@ -450,6 +521,9 @@ func (a *App) testRunLog(st *LoadoutState, r *TestRunReport) error {
 		}
 		if slices.Contains(lc.Details, ownArtNote) {
 			note = ownArtNote
+		}
+		if n := testRunNote(r, lc); n != "" {
+			note = n
 		}
 		r.Clusters = append(r.Clusters, TestRunCluster{key: lc.Key, Class: class, Message: firstLine(lc.First.Message), Count: lc.Count, Mods: mods, Confidence: confidence, Note: note, Consequences: lc.Consequences})
 	}

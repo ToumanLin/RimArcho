@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,18 +18,33 @@ func init() {
 		Flags: []Flag{
 			{Name: "env", Value: "<name>", Help: "test another environment"},
 			{Name: "map", Help: "load a quick test map instead of the main menu"},
+			{Name: "save", Value: "<save>", Help: "load this save (a saves list reference, name or .rws path) in the run's own data and play --ticks (default 4000)"},
+			{Name: "ticks", Value: "<n>", Help: "with --map or --save: play this many ticks (60 a second at normal speed), then stop"},
 			{Name: "probe", Value: "<folder>", Help: "add this probe mod and run a test map until its [Probe] RESULT line"},
 			{Name: "probe-after", Value: "<packageId>", Help: "load the probe right after this mod (default: last)"},
 			{Name: "probe-before", Value: "<packageId>", Help: "load the probe right before this mod"},
-			{Name: "timeout", Value: "<duration>", Help: "maximum run time (default 10m)"},
+			{Name: "timeout", Value: "<duration>", Help: "maximum run time (default 10m; a map or save run: twice the previous one's, at least 10m)"},
 			{Name: "settle", Value: "<duration>", Help: "wait after the menu marker (default 5s), or for a probe to quit (default 15s)"},
 			{Name: "json", Help: "print the report as JSON"},
 		}, Run: testRunCmd})
 }
 
 func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
-	o := app.TestRunOptions{Env: args.Str("env"), Map: args.Bool("map"), Progress: c.progressCtx(),
+	o := app.TestRunOptions{Env: args.Str("env"), Map: args.Bool("map"), Progress: c.progressCtx(), Save: args.Str("save"),
 		Probe: args.Str("probe"), ProbeAfter: args.Str("probe-after"), ProbeBefore: args.Str("probe-before")}
+	if args.Bool("ticks") {
+		n, err := strconv.Atoi(args.Str("ticks"))
+		if err != nil || n <= 0 {
+			return nil, &UsageError{Msg: "--ticks needs a positive number of ticks, such as 4000"}
+		}
+		o.Ticks = n
+	}
+	switch {
+	case o.Save != "" && (o.Map || o.Probe != ""):
+		return nil, &UsageError{Msg: "--save loads a save; give --save or --map/--probe, not both"}
+	case o.Ticks > 0 && (o.Probe != "" || !o.Map && o.Save == ""):
+		return nil, &UsageError{Msg: "--ticks needs --map or --save (a probe run ends at its RESULT line)"}
+	}
 	if o.Probe == "" && (o.ProbeAfter != "" || o.ProbeBefore != "") {
 		return nil, &UsageError{Msg: "--probe-after and --probe-before need --probe <folder>"}
 	}
@@ -65,18 +81,45 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 		return &render.Doc{Raw: string(b) + "\n"}, err
 	}
 	d, root := render.New("test run: " + r.Plan + "  env:" + r.Env)
+	if r.NotTested != "" {
+		root.Add("NOT TESTED: " + r.NotTested)
+	}
 	root.KV("status", r.Status)
 	for _, l := range r.Links {
 		root.Addf("%s: %s -> %s: %s", l.Code, l.Path, l.Target, l.ShortReason())
 	}
 	root.KV("game", r.GameVersion)
-	root.KV("load", fmt.Sprintf("%.1fs (total %.1fs)", r.LoadSeconds, r.TotalSeconds))
+	root.KV("load", fmt.Sprintf("%.1fs (total %.1fs, limit %.0fs)", r.LoadSeconds, r.TotalSeconds, r.TimeoutSeconds))
+	if s := r.Save; s != nil {
+		n := root.Addf("save: %s (%s)", s.Name, s.Path)
+		if len(s.Added) > 0 {
+			n.KV("not in the save", strings.Join(s.Added, ", ")+" (added to the colony)")
+		}
+		if s.OrderDiffers {
+			n.KV("order", "the plan loads the save's Mods in another order")
+		}
+	}
+	if line := testMapLine(r); line != "" {
+		root.KV("map", line)
+	}
 	root.KV("peak memory", fmt.Sprintf("%d MB", r.PeakMemoryMB))
 	root.KV("requested", fmt.Sprint(r.Requested))
 	if len(r.Linked) > 0 {
 		linked := root.Section(fmt.Sprintf("linked for this run (removed after it): %d", len(r.Linked)))
 		for _, name := range r.Linked {
 			linked.Add("Mods/" + name)
+		}
+	}
+	if len(r.Hidden) > 0 {
+		hidden := root.Section(fmt.Sprintf("moved aside for this run (same packageId as a linked Mod; back after it): %d", len(r.Hidden)))
+		for _, name := range r.Hidden {
+			hidden.Add("Mods/" + name)
+		}
+	}
+	if len(r.Loaded) > 0 {
+		loaded := root.Section(fmt.Sprintf("loaded from: %d of %d", len(r.Loaded), r.LoadedTotal))
+		for _, l := range r.Loaded {
+			loaded.Addf("%s  %s  (%s)", l.PackageID, l.Folder, l.From)
 		}
 	}
 	if p := r.Probe; p != nil {
@@ -86,7 +129,7 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 	for _, m := range r.Missing {
 		n := missing.Add(m.PackageID + "  " + m.Name)
 		if m.Reason != "" {
-			n.KV("not linked", m.Reason)
+			n.KV("not loaded", m.Reason)
 		}
 	}
 	clusters := root.Section(fmt.Sprintf("error clusters: %d", r.ClustersTotal))
@@ -158,6 +201,22 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 	root.KV("attribution", r.Attribution)
 	root.KV("run dir", r.RunDir)
 	return d, nil
+}
+
+// testMapLine says how long the map ran and how many ticks that was (MCP eval h7: agents
+// read load_seconds as the time the map ran).
+func testMapLine(r *app.TestRunReport) string {
+	marker := "the new-game marker"
+	if r.Save != nil {
+		marker = "the save load"
+	}
+	switch {
+	case r.TicksReached > 0:
+		return fmt.Sprintf("%d ticks played (first autosave), %.1fs after %s", r.TicksReached, r.MapSeconds, marker)
+	case r.MapSeconds > 0:
+		return fmt.Sprintf("ran %.1fs after %s (at most ~%d ticks at normal speed; map generation counts in that time)", r.MapSeconds, marker, r.TicksEstimated)
+	}
+	return ""
 }
 
 // testProbe prints a probe run's result and lines (20 §3).
