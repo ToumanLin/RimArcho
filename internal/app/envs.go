@@ -585,8 +585,22 @@ func (a *App) PrepareEnv(name string) (*env.Environment, error) {
 	if e == nil {
 		return nil, fmt.Errorf("no environment named %q (archo env list)", name)
 	}
-	if err := a.prepareEnvLinks(e); err != nil {
+	if err := a.prepareEnvLinks(e, true); err != nil {
 		return nil, err
 	}
 	return e, nil
+}
+
+// PrepareEnvForScan is PrepareEnv for a caller that scans the game in a child process
+// right after (the guide, 16 §2.15): it makes the links but leaves the scan to that
+// child, which reads the same folders and shows its progress.
+func (a *App) PrepareEnvForScan(name string) (*env.Environment, error) {
+	e, err := a.Store.EnvByName(name)
+	if err != nil {
+		return nil, err
+	}
+	if e == nil {
+		return nil, fmt.Errorf("no environment named %q (archo env list)", name)
+	}
+	return e, a.prepareEnvLinks(e, false)
 }

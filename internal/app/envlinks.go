@@ -25,7 +25,8 @@ func envLink(name string) bool {
 
 // prepareEnvLinks makes mods named by the destination's config/workspace available
 // before its first loadout import. It never saves a list or changes another game's links.
-func (a *App) prepareEnvLinks(e *env.Environment) error {
+// scan false leaves the scan after new links, or of a game never scanned, to the caller.
+func (a *App) prepareEnvLinks(e *env.Environment, scan bool) error {
 	ix, err := a.loadIndex(e)
 	if err != nil {
 		return err
@@ -210,6 +211,9 @@ func (a *App) prepareEnvLinks(e *env.Environment) error {
 			return rollback(err)
 		}
 		added = append(added, c)
+	}
+	if !scan {
+		return nil
 	}
 	// Scan only this game's folders, then sync/heal its list with the links present.
 	oldName := a.EnvName

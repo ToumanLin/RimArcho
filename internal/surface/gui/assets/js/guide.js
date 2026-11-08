@@ -478,7 +478,7 @@ export function guideEvent(ev) {
   }
   const r = G.scan.rows[ev.i];
   if (!r) return;
-  if (ev.step) { r.state = ev.ok ? "ok" : "bad"; r.text = ev.ok ? ev.text : ev.error; } else { r.state = "cur"; r.text = ev.text; }
+  if (ev.step) { r.state = ev.ok ? "ok" : "bad"; r.text = ev.ok ? ev.text : ev.error; r.frac = 1; } else { r.state = "cur"; r.text = ev.text; r.frac = ev.frac || 0; }
   draw();
 }
 
@@ -492,13 +492,14 @@ function step2(card) {
     list.append(d);
   }
   card.append(list);
-  const doneN = s.rows.filter((r) => r.state === "ok" || r.state === "bad").length;
+  // each environment counts as one; the one being read counts how far it is
+  const doneN = s.rows.reduce((n, r) => n + (r.state === "ok" || r.state === "bad" ? 1 : r.state === "cur" ? r.frac || 0 : 0), 0);
   const prog = el("div", "prog");
   const bar = el("div", "bar" + (s.done ? "" : " busy"));
   const fill = el("i");
   fill.style.width = (s.rows.length ? Math.round(100 * doneN / s.rows.length) : 100) + "%";
   bar.append(fill);
-  progress(bar, card.querySelector(".guide-q"), s.rows.length ? doneN : undefined, s.rows.length);
+  progress(bar, card.querySelector(".guide-q"), s.rows.length ? Math.round(100 * doneN / s.rows.length) : undefined, 100);
   prog.append(bar);
   card.append(prog);
   const again = s.done && !s.ok ? button(T("scan again"), "", () => scanAll()) : null;

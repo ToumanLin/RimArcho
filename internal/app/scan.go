@@ -60,6 +60,14 @@ type ScanOptions struct {
 	// GameOnly reads only the environment's own Data/ and Mods/, not the shared mod folders
 	// (a game just added, 03 §2 item 8).
 	GameOnly bool
+	// Progress, when set, hears how far the scan is: the mod folders read, then saving.
+	Progress func(ScanProgress)
+}
+
+// ScanProgress is how far a scan is.
+type ScanProgress struct {
+	Saving      bool // every folder is read; reconciling and writing the index
+	Done, Total int  // mod folders read of all of them
 }
 
 // Scan runs 04 §1.1 for the current environment: the shared mod folders and the game's own
@@ -76,6 +84,9 @@ func (a *App) ScanWith(o ScanOptions) (*ScanReport, error) {
 }
 
 func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, error) {
+	if o.Progress == nil {
+		o.Progress = a.ScanProgress
+	}
 	full := o.Full
 	started := a.Now()
 	if err := a.adoptGameWorkshops(); err != nil {
@@ -174,8 +185,12 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 			h, ok := prevHash[l.Key()]
 			return h, ok
 		},
-		Known: func(l scan.Location) bool { return knownLoc[l.Key()] },
+		Known:    func(l scan.Location) bool { return knownLoc[l.Key()] },
+		Progress: o.readProgress(),
 	})
+	if o.Progress != nil {
+		o.Progress(ScanProgress{Saving: true, Done: len(obs), Total: len(obs)})
+	}
 	if o.GameOnly {
 		sharedLinkObservations(obs, known, srcs, present, sstats)
 	}
@@ -275,6 +290,13 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 	}
 	rep.GameLinks, err = a.InspectGameLinks()
 	return rep, err
+}
+
+func (o ScanOptions) readProgress() func(done, total int) {
+	if o.Progress == nil {
+		return nil
+	}
+	return func(done, total int) { o.Progress(ScanProgress{Done: done, Total: total}) }
 }
 
 // A game-only scan still sees links into shared folders. They are aliases of the
