@@ -21,7 +21,7 @@ var workshopPublishCommand = &Command{
 		{Name: "visibility", Value: "public|unlisted|private|friends", Help: "set visibility (default: leave Steam's current/default value)"},
 		{Name: "description", Value: "<file>", Help: "set the description from a Steam BBCode file, at most 8000 bytes (default: leave it)"},
 		{Name: "description-zh", Value: "<file>", Help: "set the Simplified Chinese description from a Steam BBCode file"},
-		{Name: "preview", Value: "<file>", Help: "preview image (PNG, JPG or GIF, under 1 MB) instead of Monitor's About/Preview.png"},
+		{Name: "preview", Value: "<file>", Help: "Workshop page preview (PNG, JPG or GIF, under 1 MB); default: docs/assets/release-post/workshop-preview.gif, else Monitor's About/Preview.png"},
 		{Name: "dry-run", Help: "assemble and validate locally without contacting Steam"},
 	},
 	Run: workshopPublishCmd,

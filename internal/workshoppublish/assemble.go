@@ -90,6 +90,16 @@ func Assemble(root, version string, id uint64) (*Item, error) {
 	} else if fi.Size() >= 1<<20 {
 		return nil, errors.New("Workshop preview must be smaller than 1 MB")
 	}
+	// The repository's Workshop preview, when present, replaces Monitor's Preview.png on
+	// the item page. It stays outside the item folder: the game shows Preview.png.
+	asset := filepath.Join(root, filepath.FromSlash(PreviewAsset))
+	if fi, err := regular(asset); errors.Is(err, os.ErrNotExist) {
+		asset = ""
+	} else if err != nil {
+		return nil, err
+	} else if fi.Size() >= 1<<20 {
+		return nil, fmt.Errorf("%s must be smaller than 1 MB", PreviewAsset)
+	}
 	idFile := filepath.Join(root, "monitor", "About", "PublishedFileId.txt")
 	if id == 0 {
 		id, err = ReadID(idFile)
@@ -135,12 +145,17 @@ func Assemble(root, version string, id uint64) (*Item, error) {
 	if err := os.WriteFile(filepath.Join(folder, name+".sha256"), b, 0o644); err != nil {
 		return nil, err
 	}
-	if preview != "" {
+	if asset != "" {
+		preview = asset
+	} else if preview != "" {
 		preview = filepath.Join(folder, "About", "Preview.png")
 	}
 	ok = true
 	return &Item{Folder: folder, Preview: preview, ZipName: name, IDFile: idFile, ID: id}, nil
 }
+
+// PreviewAsset is the Workshop page's preview (an animated GIF) in the repository.
+const PreviewAsset = "docs/assets/release-post/workshop-preview.gif"
 
 // Docs are the reading files the item carries beside the zip. The zip stays the GitHub
 // release byte for byte: updaters before 1.0.5 reject top-level entries they do not know,
