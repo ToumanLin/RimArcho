@@ -1,6 +1,7 @@
 package cmds
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/buildinfo"
 	"github.com/ToumanLin/RimArcho/internal/render"
+	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
 	"github.com/ToumanLin/RimArcho/internal/workshoppublish"
 )
@@ -19,8 +21,8 @@ var workshopPublishCommand = &Command{
 		{Name: "item", Value: "<id>", Help: "Workshop item ID (default: Monitor's PublishedFileId.txt; absent creates an item)"},
 		{Name: "note", Value: "<text>", Help: "Workshop change note"},
 		{Name: "visibility", Value: "public|unlisted|private|friends", Help: "set visibility (default: leave Steam's current/default value)"},
-		{Name: "description", Value: "<file>", Help: "set the description from a Steam BBCode file, at most 8000 bytes (default: leave it)"},
-		{Name: "description-zh", Value: "<file>", Help: "set the Simplified Chinese description from a Steam BBCode file"},
+		{Name: "description", Value: "<file>", Help: "description from a Steam BBCode file, at most 8000 bytes with the version line added (default: UserGuide/release-post.steam.txt)"},
+		{Name: "description-zh", Value: "<file>", Help: "Simplified Chinese description from a Steam BBCode file (default: UserGuide/release-post.zh-CN.steam.txt, else leave it)"},
 		{Name: "preview", Value: "<file>", Help: "Workshop page preview (PNG, JPG or GIF, under 1 MB); default: docs/assets/release-post/workshop-preview.gif, else Monitor's About/Preview.png"},
 		{Name: "dry-run", Help: "assemble and validate locally without contacting Steam"},
 	},
@@ -76,14 +78,28 @@ func publishOptions(a *Args) (steamworks.PublishRequest, error) {
 	if strings.ContainsRune(r.Note, 0) || len(r.Note) > 8000 {
 		return r, &UsageError{Msg: "--note must be at most 8000 bytes and contain no NUL characters"}
 	}
+	// Every publish sets the descriptions: the last line of each names the release, and
+	// the update check reads it there (17 §5.1).
 	var err error
-	if r.Description, err = descriptionFile(a, "description"); err != nil {
+	if r.Description, err = descriptionFile(a, "description", workshoppublish.Description); err != nil {
 		return r, err
 	}
-	if zh, err := descriptionFile(a, "description-zh"); err != nil {
+	if r.Description == "" {
+		return r, &UsageError{Msg: "--description needs a file: " + workshoppublish.Description + " is absent, and the description must name the release for the update check"}
+	}
+	if zh, err := descriptionFile(a, "description-zh", workshoppublish.DescriptionZh); err != nil {
 		return r, err
 	} else if zh != "" {
 		r.Translations = []steamworks.PublishTranslation{{Language: "schinese", Description: zh}}
+	}
+	texts := []*string{&r.Description}
+	for i := range r.Translations {
+		texts = append(texts, &r.Translations[i].Description)
+	}
+	for _, d := range texts {
+		if *d = selfupdate.Stamp(*d, r.Version); len(*d) > steamworks.DescriptionMax {
+			return r, &UsageError{Msg: fmt.Sprintf("a Workshop description with its version line is %d bytes; Steam allows at most %d", len(*d), steamworks.DescriptionMax)}
+		}
 	}
 	if a.Bool("preview") {
 		if r.Preview, err = previewFile(a.Str("preview")); err != nil {
@@ -93,13 +109,17 @@ func publishOptions(a *Args) (steamworks.PublishRequest, error) {
 	return r, nil
 }
 
-// descriptionFile reads a description flag's file; an absent flag leaves Steam's text.
-func descriptionFile(a *Args, flag string) (string, error) {
-	if !a.Bool(flag) {
-		return "", nil
-	}
+// descriptionFile reads a description flag's file. Without the flag it reads the
+// repository's file at fallback (relative to the repository root, the working
+// directory), and "" when that is absent.
+func descriptionFile(a *Args, flag, fallback string) (string, error) {
 	path := a.Str(flag)
-	if path == "" {
+	if !a.Bool(flag) {
+		if _, err := os.Stat(filepath.FromSlash(fallback)); errors.Is(err, os.ErrNotExist) {
+			return "", nil
+		}
+		path = filepath.FromSlash(fallback)
+	} else if path == "" {
 		return "", &UsageError{Msg: "--" + flag + " needs a file"}
 	}
 	fi, err := os.Stat(path)
@@ -157,7 +177,7 @@ func workshopPublishCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil {
 		return nil, err
 	}
-	r.ID = item.ID
+	r.ID, r.Tags = item.ID, item.Tags
 	r.Content, r.IDFile = item.Folder, item.IDFile
 	if r.Preview == "" {
 		r.Preview = item.Preview
@@ -185,7 +205,7 @@ func workshopPublishCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	} else {
 		n.KV("item", fmt.Sprintf("would update ws:%d", r.ID))
 	}
-	n.KV("tags", "v"+r.Version+" (replaces all tags)")
+	n.KV("tags", strings.Join(r.Tags, ", ")+" (replaces all tags)")
 	visibility := "leave Steam's current/default value"
 	if r.Visibility != nil {
 		visibility = a.Str("visibility")
@@ -198,10 +218,12 @@ func workshopPublishCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		n.KV("preview", r.Preview)
 	}
 	if r.Description != "" {
-		n.KV("description", fmt.Sprintf("%d bytes (replaces the current one)", len(r.Description)))
+		n.KV("description", fmt.Sprintf("%d bytes (replaces the current one), ending %q", len(r.Description), lastLine(r.Description)))
 	}
 	for _, t := range r.Translations {
-		n.KV("description "+t.Language, fmt.Sprintf("%d bytes, set in a second update", len(t.Description)))
+		n.KV("description "+t.Language, fmt.Sprintf("%d bytes, set in a second update, ending %q", len(t.Description), lastLine(t.Description)))
 	}
 	return d, nil
 }
+
+func lastLine(s string) string { return s[strings.LastIndexByte(s, '\n')+1:] }

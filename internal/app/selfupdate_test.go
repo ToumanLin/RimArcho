@@ -27,6 +27,7 @@ import (
 
 // selfRelease is a fake GitHub (17 §5.1): one release 0.9.1 with its zip and checksum.
 type selfRelease struct {
+	description    string // the Workshop item's description, stamped with its release
 	tags           []string
 	workshopResult int
 	workshopHTTP   int
@@ -43,7 +44,7 @@ type selfRelease struct {
 
 func newSelfRelease(t *testing.T) *selfRelease {
 	t.Helper()
-	f := &selfRelease{program: filepath.Join(t.TempDir(), "RimArcho"), tags: []string{"Mod", "v0.9.1"}, workshopResult: 1}
+	f := &selfRelease{program: filepath.Join(t.TempDir(), "RimArcho"), description: selfupdate.Stamp("About RimArcho", "0.9.1"), tags: []string{"Mod", "1.6"}, workshopResult: 1}
 	var buf bytes.Buffer
 	z := zip.NewWriter(&buf)
 	for _, name := range selfupdate.Files {
@@ -80,7 +81,7 @@ func newSelfRelease(t *testing.T) *selfRelease {
 				w.WriteHeader(f.workshopHTTP)
 				return
 			}
-			fmt.Fprintf(w, `{"response":{"publishedfiledetails":[{"publishedfileid":"8100","result":%d,"title":"RimArcho","tags":[`, f.workshopResult)
+			fmt.Fprintf(w, `{"response":{"publishedfiledetails":[{"publishedfileid":"8100","result":%d,"title":"RimArcho","description":%q,"tags":[`, f.workshopResult, f.description)
 			for i, tag := range f.tags {
 				if i > 0 {
 					fmt.Fprint(w, ",")
@@ -220,7 +221,7 @@ func TestSelfUpdateCheck(t *testing.T) {
 
 func TestSelfUpdateWorkshopCheck(t *testing.T) {
 	t.Setenv(app.UpdateWorkshopItemEnv, "8100")
-	for _, mode := range []string{"workshop", "no tag", "bad result", "offline", "empty item", "github", "prerelease"} {
+	for _, mode := range []string{"workshop", "1.0.5 tag", "no version", "bad result", "offline", "empty item", "github", "prerelease"} {
 		t.Run(mode, func(t *testing.T) {
 			e := testkit.New(t)
 			f := newSelfRelease(t)
@@ -228,8 +229,10 @@ func TestSelfUpdateWorkshopCheck(t *testing.T) {
 			e.App.SteamAPI = f.srv.URL + "/workshop"
 			e.App.SteamCMDRun = func(string, []string) (string, error) { t.Fatal("check started SteamCMD"); return "", nil }
 			switch mode {
-			case "no tag":
-				f.tags = []string{"1.6", "not-a-version"}
+			case "1.0.5 tag": // an item published by 1.0.5: no stamp, a v<version> tag
+				f.description, f.tags = "About RimArcho", []string{"Mod", "v0.9.1"}
+			case "no version": // edited on the web: no stamp, and the tags are the game's
+				f.description, f.tags = "About RimArcho, mentioning RimArcho v0.9.1 in a sentence", []string{"Mod", "1.6", "not-a-version"}
 			case "bad result":
 				f.workshopResult = 9
 			case "offline":
@@ -243,7 +246,7 @@ func TestSelfUpdateWorkshopCheck(t *testing.T) {
 			}
 			out := e.MustRun("update", "--check")
 			source := "GitHub"
-			if mode == "workshop" {
+			if mode == "workshop" || mode == "1.0.5 tag" {
 				source = "Workshop"
 			}
 			info := e.App.SelfUpdateInfo()
@@ -286,7 +289,7 @@ func TestSelfUpdateWorkshopInstall(t *testing.T) {
 			e.MustRun("config", "set", "steamcmd.account", "desktop-player")
 			e.MustRun("config", "set", "updates.source", "auto")
 			if mode == "no matching release" {
-				f.tags = []string{"v0.9.2"}
+				f.description = selfupdate.Stamp("About RimArcho", "0.9.2")
 			}
 			if _, _, err := e.App.CheckSelfUpdate(context.Background()); err != nil {
 				t.Fatal(err)

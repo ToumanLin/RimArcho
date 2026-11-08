@@ -11,9 +11,11 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/ToumanLin/RimArcho/internal/scan"
 	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 )
 
@@ -28,9 +30,35 @@ func ValidateVersion(version string) error {
 }
 
 // Item describes the assembled folder and the source file that remembers its ID.
+// Tags are the item's Workshop tags: Mod and the game versions Monitor supports, the
+// tags RimWorld's own uploader sets.
 type Item struct {
 	Folder, Preview, ZipName, IDFile string
 	ID                               uint64
+	Tags                             []string
+}
+
+var gameVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+$`)
+
+// Tags reads a Mod folder's About.xml: Mod, then each supported game version.
+func Tags(folder string) ([]string, error) {
+	d := scan.ReadDecl(folder, false)
+	if d.ParseError != "" {
+		return nil, fmt.Errorf("Archo Monitor About.xml: %s", d.ParseError)
+	}
+	tags := []string{"Mod"}
+	for _, v := range d.SupportedVersions {
+		if !gameVersion.MatchString(v) {
+			return nil, fmt.Errorf("Archo Monitor About.xml: supported version %q is not a game version like 1.6", v)
+		}
+		if !slices.Contains(tags, v) {
+			tags = append(tags, v)
+		}
+	}
+	if len(tags) == 1 {
+		return nil, errors.New("Archo Monitor About.xml lists no supported game versions")
+	}
+	return tags, nil
 }
 
 // Assemble copies a built Monitor and the matching release assets from a repository
@@ -81,6 +109,10 @@ func Assemble(root, version string, id uint64) (*Item, error) {
 	}
 	if fi, err := os.Stat(filepath.Join(monitor, "Languages")); err != nil || !fi.IsDir() {
 		return nil, errors.New("built Archo Monitor has no Languages directory")
+	}
+	tags, err := Tags(monitor)
+	if err != nil {
+		return nil, err
 	}
 	preview := filepath.Join(monitor, "About", "Preview.png")
 	if fi, err := regular(preview); errors.Is(err, os.ErrNotExist) {
@@ -151,8 +183,16 @@ func Assemble(root, version string, id uint64) (*Item, error) {
 		preview = filepath.Join(folder, "About", "Preview.png")
 	}
 	ok = true
-	return &Item{Folder: folder, Preview: preview, ZipName: name, IDFile: idFile, ID: id}, nil
+	return &Item{Folder: folder, Preview: preview, ZipName: name, IDFile: idFile, ID: id, Tags: tags}, nil
 }
+
+// Description and DescriptionZh are the item's English and Simplified Chinese
+// descriptions in the repository, Steam BBCode; publish uses them without --description
+// and --description-zh.
+const (
+	Description   = "UserGuide/release-post.steam.txt"
+	DescriptionZh = "UserGuide/release-post.zh-CN.steam.txt"
+)
 
 // PreviewAsset is the Workshop page's preview (an animated GIF) in the repository.
 const PreviewAsset = "docs/assets/release-post/workshop-preview.gif"

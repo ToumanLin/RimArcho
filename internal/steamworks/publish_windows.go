@@ -136,17 +136,21 @@ func publishWorker(r PublishRequest, w io.Writer) error {
 			}
 		}
 	}
-	tag := cstr("v" + r.Version)
+	values := make([]uintptr, len(r.Tags)) // ReadPublishRequest requires at least one
+	for i, t := range r.Tags {
+		values[i] = cstr(t)
+	}
 	// SteamParamStringArray_t: const char ** at 0, int32 count at 8, sizeof 16.
 	tags := struct {
 		values  *uintptr
 		count   int32
 		padding int32
-	}{&tag, 1, 0}
+	}{&values[0], int32(len(values)), 0}
 	if ok, _, _ := procs["SetItemTags"].Call(f.ugc, h, uintptr(unsafe.Pointer(&tags)), 0); ok&0xff == 0 { // bAllowAdminTags = false
 		return errors.New("Steam rejected SetItemTags; check the item's inputs and ownership")
 	}
 	runtime.KeepAlive(tags)
+	runtime.KeepAlive(values)
 	if r.Visibility != nil {
 		if err := set("SetItemVisibility", uintptr(*r.Visibility)); err != nil {
 			return err
