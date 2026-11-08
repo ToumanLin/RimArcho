@@ -2,7 +2,7 @@
 
 All notable changes to RimArcho. Versions follow semantic versioning; the MVP is 0.5.0.
 
-## 1.0.6 (unreleased)
+## 1.0.6 — 2026-11-07
 
 - Reading the mods shows how far it is. With a thousand Mods the first-run guide's “read the mods” step sat on “reading the mods of 1.6…” for minutes with no sign of life; its row now counts the folders as they are read (“reading the mods of 1.6: 340 of 1,200”), then says when it saves and checks the files, and the bar moves with it. A rescan from the window shows the same count on its background task. The guide also no longer reads a new game's own `Mods/` once in the window before its scan.
 - CLI: `archo scan --progress` writes `progress: scan mods <read>/<total>` lines, then `progress: scan saving <total>`, to stderr. Without the flag the output is unchanged.
