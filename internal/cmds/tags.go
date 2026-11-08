@@ -113,7 +113,8 @@ func cleanTags(tags []string) []string {
 }
 
 // RenameTag gives a tag another name, which may differ only in case. A name another tag
-// already has is refused: that is a merge.
+// already has is refused: that is a merge. A pinned tag no mod carries does not count, so
+// a tag can be renamed to a preset name.
 func RenameTag(a *app.App, from, to string, dryRun bool) (TagEdit, error) {
 	from, to = strings.TrimSpace(from), strings.TrimSpace(to)
 	if to == "" {
@@ -123,7 +124,7 @@ func RenameTag(a *app.App, from, to string, dryRun bool) (TagEdit, error) {
 	if err != nil {
 		return TagEdit{}, err
 	}
-	if t, ok := findTag(list, to); ok && !strings.EqualFold(from, to) {
+	if t, ok := findTag(list, to); ok && t.N > 0 && !strings.EqualFold(from, to) {
 		return TagEdit{}, fmt.Errorf("tag %q already exists: archo tag merge %s --into %s", t.Tag, quoteArg(from), quoteArg(t.Tag))
 	}
 	return MergeTags(a, []string{from}, to, dryRun)

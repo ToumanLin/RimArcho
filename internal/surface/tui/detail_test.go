@@ -154,7 +154,7 @@ func TestT13TagBar(t *testing.T) {
 		t.Fatalf("# did not open the tag bar on the first candidate: %+v", m.tags)
 	}
 	// the selection's own tags come first: Alpha's "half" leads as [~half], then the pinned ones
-	if c := m.tags.cands; len(c) < 3 || c[0].tag != "half" || c[0].have != 1 || c[2].tag != "美化" {
+	if c := m.tags.cands; len(c) < 3 || c[0].tag != "half" || c[0].have != 1 || c[2].tag != "visuals" {
 		t.Fatalf("candidates not own-first: %+v", c)
 	}
 	press(m, "right")
@@ -173,21 +173,21 @@ func TestT13TagBar(t *testing.T) {
 		}
 		return strings.Join(got, " ")
 	}
-	if got := tagged("美化"); got != "Alpha Harmony" {
+	if got := tagged("visuals"); got != "Alpha Harmony" {
 		t.Fatalf("after # → enter: %q (status %q)", got, m.status)
 	}
 	if len(m.marked) != 2 {
 		t.Fatal("tagging dropped the selection")
 	}
-	press(m, "g") // [✓美化] is on both now, so it leads the bar and starts selected
-	if c := m.tags.cands; len(c) == 0 || c[0].tag != "美化" {
+	press(m, "g") // [✓visuals] is on both now, so it leads the bar and starts selected
+	if c := m.tags.cands; len(c) == 0 || c[0].tag != "visuals" {
 		t.Fatalf("the tag both have is not first: %+v", c)
 	}
-	if s := ansi.Strip(m.View()); !strings.Contains(s, "[✓美化]") {
+	if s := ansi.Strip(m.View()); !strings.Contains(s, "[✓visuals]") {
 		t.Fatalf("no the checked Visuals tag:\n%s", s)
 	}
 	press(m, "enter")
-	if got := tagged("美化"); got != "" {
+	if got := tagged("visuals"); got != "" {
 		t.Fatalf("not removed: %q", got)
 	}
 	// [~half]: Alpha only; enter gives it to Harmony too.

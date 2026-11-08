@@ -18,7 +18,7 @@ settings
   data.steamdb.url: https://raw.githubusercontent.com/RimSort/Steam-Workshop-Database/main/steamDB.json
   monitor.default: on
   network.proxy: system
-  tags.pinned: 框架,美化,服装,种族,武器,建筑,家具,QoL,平衡,剧情,性能,语言包,测试中,待删除
+  tags.pinned: framework,visuals,apparel,races,weapons,buildings,furniture,QoL,balance,story,performance,language packs,testing,to delete
   ui.accent: default
   ui.archo.motion: live
   ui.gpu: on

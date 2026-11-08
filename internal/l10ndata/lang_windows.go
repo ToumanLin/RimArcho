@@ -1,4 +1,4 @@
-package view
+package l10ndata
 
 import "golang.org/x/sys/windows"
 

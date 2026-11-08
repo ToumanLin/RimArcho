@@ -55,8 +55,9 @@ var freeKeys = map[string]struct {
 		}
 		return nil
 	}},
-	// the tags offered first by the tag bar, comma separated; the preset is the default
-	"tags.pinned": {DefaultPinnedTags, func(string) error { return nil }},
+	// the tags offered first by the tag bar, comma separated; the default is the preset of
+	// the display language (DefaultPinnedTags)
+	"tags.pinned": {"", func(string) error { return nil }},
 	// the lock library (07 §5): "" is %LOCALAPPDATA%\RimArcho\locked
 	"lock.dir": {"", func(v string) error {
 		if !filepath.IsAbs(v) {
@@ -90,8 +91,11 @@ var freeKeys = map[string]struct {
 	}},
 }
 
-// DefaultPinnedTags is the preset of common tags (16 §3.8).
-var DefaultPinnedTags = l10ndata.DefaultPinnedTags
+// DefaultPinnedTags is the preset of common tags in the display language (ui.lang, as the
+// window and the TUI resolve it), so every surface offers the same tags (16 §3.8).
+func DefaultPinnedTags(a *app.App) string {
+	return l10ndata.DefaultPinnedTags(l10ndata.ResolveLang(Setting(a, "ui.lang")))
+}
 
 // Setting returns a setting of the app, or its default.
 func Setting(a *app.App, key string) string {
@@ -104,6 +108,9 @@ func Setting(a *app.App, key string) string {
 	}
 	if v != "" {
 		return v
+	}
+	if key == "tags.pinned" {
+		return DefaultPinnedTags(a)
 	}
 	if f, ok := freeKeys[key]; ok {
 		return f.def

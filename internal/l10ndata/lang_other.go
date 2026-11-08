@@ -1,6 +1,6 @@
 //go:build !windows
 
-package view
+package l10ndata
 
 import "os"
 
