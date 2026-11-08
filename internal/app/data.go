@@ -505,7 +505,14 @@ func (a *App) ReplacementFor(workshopID, packageID string) *Replacement {
 	if r := ix.byOldWS[workshopID]; r != nil && workshopID != "" {
 		return r
 	}
-	return ix.byOldPkg[strings.ToLower(packageID)]
+	r := ix.byOldPkg[strings.ToLower(packageID)]
+	// The Workshop ID names the item; a shared packageId does not make it the old one. Some
+	// replacements keep the old packageId (Vanilla Base Generation Expanded), so a package
+	// match on another Workshop item, the replacement itself included, is no match.
+	if r != nil && workshopID != "" && (workshopID == r.NewWorkshopID || r.OldWorkshopID != "" && workshopID != r.OldWorkshopID) {
+		return nil
+	}
+	return r
 }
 
 // WorkshopFor looks a packageId up in steamDB (for missing mods: a direct Workshop link).
