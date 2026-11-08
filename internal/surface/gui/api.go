@@ -1652,10 +1652,7 @@ func (s *API) startAnalyzeOf(list string) bool {
 func (s *API) Palette(query string) []view.PalEntry {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	var all []view.PalEntry
-	for _, c := range view.Commands {
-		all = append(all, view.PalEntry{Kind: view.PalCommand, ID: c.ID, Name: c.Name(), Alias: c.En, Desc: c.Desc})
-	}
+	all := view.CommandEntries()
 	cur := ""
 	if s.board != nil {
 		cur = s.board.EnvName

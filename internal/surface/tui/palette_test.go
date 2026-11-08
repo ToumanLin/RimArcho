@@ -1,10 +1,13 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
 func TestPalScore(t *testing.T) {
@@ -18,8 +21,8 @@ func TestPalScore(t *testing.T) {
 		{"so", it("自动排序", "sort", ""), 6},                    // the English alias, prefix
 		{"排序", it("自动排序", "sort", ""), 6},                    // the Chinese name's head noun, suffix
 		{"动排", it("自动排序", "sort", ""), 5},                    // substring
-		{"srt", it("自动排序", "sort", ""), 3},                   // subsequence
-		{"sotr", it("自动排序", "sort", ""), 2},                  // a typo
+		{"srt", it("自动排序", "sort", ""), 2},                   // subsequence
+		{"sotr", it("自动排序", "sort", ""), 3},                  // a typo
 		{"brrainz", it("Harmony", "", "brrainz.harmony"), 1}, // description only
 		{"xyz", it("Harmony", "", "brrainz.harmony"), 0},
 	} {
@@ -88,4 +91,32 @@ func TestPalette(t *testing.T) {
 	if m.tab != tabProblems {
 		t.Fatal("needs attention did not open")
 	}
+}
+
+// 16 §3.5: the panel's own entries over a thousand Mods, many holding the typed letters in
+// order: a typo still finds its command first, in English and Chinese.
+func TestPaletteLibrary(t *testing.T) {
+	e, _ := fixture(t)
+	m := direct(t, e, 140, 40)
+	for i, name := range testkit.ModNames(1000) {
+		m.cols[cInactive].items = append(m.cols[cInactive].items, item{id: fmt.Sprintf("syn%d", i), name: name, pkg: "syn.mod"})
+	}
+	check := func(lang string) {
+		for _, c := range []struct{ q, alias string }{
+			{"sotr", "sort"},
+			{"subscirbe", "add a subscription"},
+			{"analyze", "check the files again"},
+		} {
+			m.update(tea.KeyMsg{Type: tea.KeyCtrlK})
+			typeIn(m, c.q)
+			if r := m.pal.results; len(r) == 0 || r[0].kind != palCommand || r[0].alias != c.alias {
+				t.Errorf("%s %q: %d results, first %+v", lang, c.q, len(r), r)
+			}
+			m.update(tea.KeyMsg{Type: tea.KeyEsc})
+		}
+	}
+	check("en")
+	SetLang("zh")
+	defer SetLang("en")
+	check("zh")
 }
