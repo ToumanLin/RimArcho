@@ -49,7 +49,7 @@ func dataUpdateCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		st := c.App.DataStatus()
 		d, root := render.New("community data not updated")
 		for _, u := range res {
-			line := "not updated; nothing stored"
+			line := "not updated" // no readable record: none stored yet, or it is locked
 			switch {
 			case u.Err != nil:
 				line = "failed: " + u.Err.Error()
