@@ -53,12 +53,13 @@ func eventSummary(counts map[string]int) string {
 }
 
 func scanCmd(c *Ctx, a *Args) (*render.Doc, error) {
-	// the rescan after installing Archo Monitor reports too
+	// Archo Monitor (19 §6) is installed first, so this one scan reads its folder too; a
+	// Monitor-only rescan after it reports through App.ScanProgress.
 	progress := scanProgress(a.Bool("progress"))
 	old := c.App.ScanProgress
 	c.App.ScanProgress = progress
 	defer func() { c.App.ScanProgress = old }()
-	r, err := c.App.ScanWith(app.ScanOptions{Full: a.Bool("full"), GameOnly: a.Bool("game-only"), Progress: progress})
+	r, m, err := c.App.ScanWithMonitor(app.ScanOptions{Full: a.Bool("full"), GameOnly: a.Bool("game-only"), Progress: progress})
 	if err != nil {
 		return nil, err
 	}
@@ -91,9 +92,8 @@ func scanCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			root.Addf("%s: %s -> %s: %s", l.Code, l.Path, l.Target, l.ShortReason())
 		}
 	}
-	// Archo Monitor (19 §6): install or update the bundled monitor, apply the default.
-	if m, err := c.App.EnsureMonitor(false); err != nil {
-		root.KV("monitor", "error: "+err.Error())
+	if m.Err != nil {
+		root.KV("monitor", "error: "+m.Err.Error())
 	} else {
 		for _, l := range MonitorLines(m, false) {
 			root.KV("monitor", l)
