@@ -57,8 +57,13 @@ export function build(caseDir, runDir, layerDir) {
   // runtime cases (case.json `runtime: {ticks}`): a quicktest map; the first autosave marks `ticks` game ticks played
   const ticks = c.runtime?.ticks || 0;
   if (ticks) prefs = prefs.replace(/<autosaveIntervalDays>[^<]*<\/autosaveIntervalDays>/, `<autosaveIntervalDays>${ticks / 60000}</autosaveIntervalDays>`);
+  // runtime cases that load a prepared save (case.json `runtime.save`): dev mode (on in the pinned Prefs) loads Saves/autostart.rws instead of a new quicktest map
+  const save = c.runtime?.save ? path.resolve(caseDir, c.runtime.save) : null;
+  if (save) {   // the pinned Prefs.xml already has devMode True
+    const sd = path.join(runDir, 'userdata', 'Saves'); fs.mkdirSync(sd, {recursive: true}); fs.copyFileSync(save, path.join(sd, 'autostart.rws'));
+  }
   fs.writeFileSync(path.join(cfg, 'Prefs.xml'), prefs);
-  return {game: g, userdata: path.join(runDir, 'userdata'), log: path.join(runDir, 'Player.log'), active, ticks};
+  return {game: g, userdata: path.join(runDir, 'userdata'), log: path.join(runDir, 'Player.log'), active, ticks, save};
 }
 
 // A Mod with changed files: real folders only on the way to a changed (or left out) path, junctions for the rest,
@@ -94,8 +99,8 @@ function mergeMod(src, dest, layers, drop) {
 
 export async function run(env, seconds = env.ticks ? 600 : 150) {
   const exe = path.join(env.game, 'RimWorldWin64.exe');
-  const args = [`-savedatafolder=${env.userdata}`, '-logFile', env.log, ...(env.ticks ? ['-quicktest'] : [])];
-  const saves = path.join(env.userdata, 'Saves'); if (env.ticks) fs.rmSync(saves, {recursive: true, force: true});
+  const args = [`-savedatafolder=${env.userdata}`, '-logFile', env.log, ...(env.ticks && !env.save ? ['-quicktest'] : [])];
+  const saves = path.join(env.userdata, 'Saves'); if (env.ticks && !env.save) fs.rmSync(saves, {recursive: true, force: true});
   const child = spawn(exe, args, {cwd: env.game, stdio: 'ignore', detached: false, env: {...process.env, HARMONY_LOG_FILE: path.join(path.dirname(env.log), 'harmony.log.txt')}});
   let lastSize = -1, stable = 0; const t0 = Date.now(); env.reached = false;
   while (Date.now() - t0 < seconds * 1000) {

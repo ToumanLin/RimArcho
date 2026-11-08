@@ -22,6 +22,10 @@ const RULES = {
   // touchAll: each fault is fixed where it is
   h5: {keepEnabled: ['khamenman.OutfitStandsPLus', 'mlie.10xcarryingcapacity'], touch: [], touchAll: ['khamenman.OutfitStandsPLus/', 'mlie.10xcarryingcapacity/']},
   // the comp's own code is the fault: SSR's DLL must be rebuilt; a for loop in the profiler, or the profiler off, hides it
+  // h8: the missing check is in PE's own assembly: it must be rebuilt (Socio Butterfly stays on)
+  h8: {keepEnabled: ['ferny.ProgressionEducation', 'LovelyDovey.Recreation.WithEuterpe'], touch: ['ferny.ProgressionEducation/1.6/Assemblies/']},
+  // h9: no fault; the right answer changes nothing
+  h9: {control: true},
   h7: {keepEnabled: ['ssr.body', 'tallowbyte.pawncompprofiler'], touch: ['ssr.body/1.6/Assemblies/']},
 };
 const resDir = path.resolve(process.argv[2]); const name = path.basename(resDir); const caseId = name.split('-')[0];
@@ -46,6 +50,19 @@ if (!result.culprit && !(key.decoy || []).some(d => named.has(d.pkg.toLowerCase(
 }
 result.submitted = fs.readdirSync(layer, {recursive: true}).filter(f => fs.statSync(path.join(layer, f)).isFile());
 
+if (RULES[caseId]?.control) {
+  // no-fault control: correct = nothing named and nothing changed. The answer file is still required: an empty hand-in is a miss, not a pass.
+  const deletedC = fs.existsSync(`${layer}/delete.json`) ? [].concat(readJson(`${layer}/delete.json`)).filter(Boolean) : [];
+  result.control = true; result.answered = answer !== null;
+  result.changed = result.submitted.length > 0 || deletedC.length > 0;
+  result.falsePositive = result.changed || named.size > 0;
+  result.culprit = result.answered && named.size === 0;
+  result.fix = !result.changed;
+  result.fixNote = result.changed ? 'false positive: files were changed in a case with no fault' : (result.answered ? undefined : 'no answer.json');
+  delete result.culpritVia; delete result.decoyNamedOnly;
+  fs.writeFileSync(`${resDir}/grade.json`, JSON.stringify(result, null, 2)); console.log(JSON.stringify(result, null, 2));
+  process.exit(0);
+}
 if (!result.submitted.length) { result.fix = false; result.fixNote = 'nothing submitted'; }
 else {
   const runDir = `${ROOT}/run/${name}`; let log, reached = true;
