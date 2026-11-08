@@ -304,6 +304,9 @@ func clusterDoc(c *Ctx, ix *app.Index, r *app.LogReport, lc *app.LogCluster) *re
 				break
 			}
 			line := strings.ReplaceAll(f.Type, "+", ".") + "." + f.Method
+			if f.HasIL {
+				line += fmt.Sprintf(" +0x%x", f.IL)
+			}
 			if f.Patched {
 				line += "  (patched by Harmony)"
 			}
@@ -315,6 +318,12 @@ func clusterDoc(c *Ctx, ix *app.Index, r *app.LogReport, lc *app.LogCluster) *re
 	}
 	for _, x := range lc.Details {
 		root.KV("detail", x)
+	}
+	if len(lc.Trace) > 0 {
+		tr := root.Section("trace")
+		for _, x := range lc.Trace {
+			tr.Add(x)
+		}
 	}
 	if len(lc.Near) > 0 {
 		nb := root.Section("nearby (other log messages around the first occurrence)")

@@ -137,7 +137,7 @@ log:E3 harmony-stack x500  first at Player.log:9
       - POSTFIX tester.modb: Void ModB.Pawn_Tick_B:Postfix()
       - TRANSPILER tester.modb: IEnumerable`1 ModB.Pawn_Tick_B:Transpiler(IEnumerable`1 instructions)
       - TRANSPILER tester.modc: IEnumerable`1 ModC.Pawn_Tick_C:Rewrite(IEnumerable`1 instructions)
-    Verse.TickList.Tick
+    Verse.TickList.Tick +0x0
   nearby (other log messages around the first occurrence):
     before:1 Mono path[0] = 'x'
     before:2 RimWorld 1.6.4633 rev1261
@@ -171,11 +171,11 @@ $ archo log --cluster E4
 log:E4 harmony-stack x1  first at Player.log:18
   message: Exception ticking Pawn2: System.ArgumentOutOfRangeException: Index was out of range.
   top-frames:
-    ModA.CompBroken.CompTick
-    Verse.ThingWithComps.Tick
+    ModA.CompBroken.CompTick +0x0
+    Verse.ThingWithComps.Tick +0x0
     Verse.Pawn.Tick  (patched by Harmony)
       - PREFIX tester.moda.harmony: Boolean ModA.Pawn_Tick:Prefix(Verse.Pawn __instance)
-    Verse.TickList.Tick
+    Verse.TickList.Tick +0x0
   nearby (other log messages around the first occurrence):
     before:2 RimWorld 1.6.4633 rev1261
     before:4 [Compat] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) failed

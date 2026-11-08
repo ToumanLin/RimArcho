@@ -31,6 +31,7 @@ type Assembly struct {
 	typeSpecs []pe.TypeSpecTableRow
 	methSpecs []pe.MethodSpecTableRow
 	il        *ilState
+	ext       extTables // tables.go
 }
 
 type section struct{ va, vsize, raw, rawSize uint32 }
@@ -81,6 +82,7 @@ func Open(path string) (*Assembly, error) {
 		h := sc.Header
 		a.sections = append(a.sections, section{h.VirtualAddress, h.VirtualSize, h.PointerToRawData, h.SizeOfRawData})
 	}
+	a.readExt(f)
 	for _, n := range table[pe.NestedClassTableRow](f, pe.NestedClass) {
 		a.nestedIn[n.NestedClass] = n.EnclosingClass
 	}

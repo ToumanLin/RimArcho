@@ -68,6 +68,8 @@ type LogCluster struct {
 	// missingTypes: types the log reports missing that no installed mod defines; the XML
 	// naming them is searched for (refQuery.class, 06 §2).
 	missingTypes []string
+	// Trace: the null trace's lines (logtrace.go, 06 §2); empty when it could not be decoded.
+	Trace []string `json:",omitempty"`
 }
 
 // LogReport is an analysed log.
@@ -159,8 +161,10 @@ var ErrLogNotCached = errors.New("log not analysed yet")
 // ticking …" errors normalised, one cluster for all pawns; 17: the game's new-game and
 // save-load lines (GameMarks, 20 §2); 18: a texture-missing cluster says
 // "rendering only", the saves the run loaded are recorded (LoadedSaves), and a mentioned mod is
-// no subject of the cluster's finding (06 §3).
-const logCacheVersion = 18
+// no subject of the cluster's finding (06 §3); 19: frames keep their IL offset and
+// constructor frames their type, the null trace (who passed the null; the thrower a patcher),
+// Lord.AddPawn call sites, same-role candidates ordered by evidence (06 §2, §3).
+const logCacheVersion = 19
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a
@@ -382,6 +386,7 @@ type attrCtx struct {
 
 	// dllMemo: DLL file name (lower) → the enabled mods' copies (shadowing).
 	dllMemo map[string][]*store.AssemblyRow
+	trace   *traceCtx // assemblies the null trace read (logtrace.go)
 }
 
 // notAnalysed qualifies a "nothing defines it" detail: when some enabled mods were never
@@ -644,7 +649,8 @@ const whyProviderOff = "a mod that defines it is installed but not enabled"
 // order sorts the candidates by role (06 §3). A save or def that names a def of a mod
 // left out of the list: that mod comes before whoever only patched the code that read it
 // (VM run 2026-10-28: Vanilla Expanded Framework's Pawn.ExposeData patch was blamed for
-// missing hair).
+// missing hair). Within a role the strongest evidence comes first (evidenceRank), then the
+// order the rules found them.
 func (lc *LogCluster) order() {
 	rank := func(role string) int {
 		if lc.providerOff && role == RoleDependency {
@@ -655,7 +661,13 @@ func (lc *LogCluster) order() {
 		}
 		return roleRank[role]
 	}
-	sort.SliceStable(lc.Attr, func(i, j int) bool { return rank(lc.Attr[i].Role) < rank(lc.Attr[j].Role) })
+	sort.SliceStable(lc.Attr, func(i, j int) bool {
+		ri, rj := rank(lc.Attr[i].Role), rank(lc.Attr[j].Role)
+		if ri != rj {
+			return ri < rj
+		}
+		return evidenceRank(lc.Attr[i]) < evidenceRank(lc.Attr[j])
+	})
 }
 
 func (lc *LogCluster) next(cmds ...string) {
@@ -1091,6 +1103,9 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 	if cx.comp != nil {
 		cx.companion(lc)
 	}
+	// 6. Who supplied the null (logtrace.go); the lord's AddPawn calls (loglordsites.go).
+	cx.nullTrace(lc)
+	cx.lordSites(lc)
 	lc.order()
 	switch {
 	case len(lc.Attr) > 0 && lc.Attr[0].Role == RoleDependency && lc.providerOff:

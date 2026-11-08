@@ -43,7 +43,7 @@ const descLog = `For any game error or crash, call this first, before reading Pl
 
 const descFiles = `Text search in the files of the enabled mods as the game loads them (Defs/Patches/About by default, load order, shadowing). def=true finds a whole defName with its roles: defines, inherits, patches, references. For XML evidence; C# is read_source. Paged: follow next:.`
 
-const descSource = `C# in the Source library, decompiled on demand. ref with type reads one type; game=true selects game code or adds it to search. search=<text> searches log suspects or in=[refs]; shared code appears once with its copies. scope="active" (all enabled mods, many minutes) only when the user asks.`
+const descSource = `C# in the Source library (decompiled on demand). ref with type reads one type; game=true reads game code or adds it to search. search=<text> searches log suspects or in=[refs]; scope="active" (all enabled mods, slow) only if the user asks. mode=callers: who calls a method, passing what; mode=diff: two DLL builds.`
 
 const descEdit = `Change the current plan: enable, disable, move, swap (another copy), sort, undo, redo, checkout (a version), stage / unstage / restore, ignore_external. Stored at once and undoable; no game file is written until save_loadout or launch_game.`
 
