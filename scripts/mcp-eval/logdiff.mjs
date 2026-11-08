@@ -2,8 +2,9 @@
 // usage: node logdiff.mjs <caseDir> <logToJudge>   -> prints missing-fix lines (still in the log, absent from the reference) and gone lines
 import fs from 'fs'; import path from 'path';
 
-const ERR = /Config error|Could not|rror|xception|failed|Failed|Undefined|Patching|cross-reference/;
-const SKIP = /Native Crash|fatal error in the mono|Fallback handler|Translation data for language|0x[0-9a-f]+\]? in|^\s+at /;
+const ERR = /Config error|Could not|rror|xception|failed|Failed|Undefined|Patching|cross-reference|Tried to add pawn/;
+// SteamAPI.Init: present or not depending on whether the host's Steam client runs, not on the submission
+const SKIP = /SteamAPI\.Init\(\) failed|Native Crash|fatal error in the mono|Fallback handler|Translation data for language|0x[0-9a-f]+\]? in|^\s+at /;
 
 export function errorLines(file) {
   const out = new Set();

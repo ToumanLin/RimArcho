@@ -2,6 +2,10 @@
 
 All notable changes to RimArcho. Versions follow semantic versioning; the MVP is 0.5.0.
 
+## 1.0.8 — 2026-11-08
+
+- A Mod is no longer told it has a maintained replacement when it is that replacement. Some continuations keep the old Mod's packageId: Vanilla Base Generation Expanded (Workshop `3209927822`) was flagged as replaced by itself, and "subscribe" opened its own page. Use This Instead now matches by packageId only when the Workshop ID does not say it is another item; the import preview no longer suggests such a Mod as its own replacement either.
+
 ## 1.0.7 — 2026-11-08
 
 - 1.7 memory estimates no longer ask for far more than the game uses. On an 8 GB graphics card, 270 Mods were shown needing 10–28 GB of VRAM and 18–41 GB of RAM, and Can it run and the launch button said memory was insufficient, although the game loads fine. 1.7 keeps only what fits the card in VRAM and loads other textures from its disk cache when they are drawn. The estimate now stops at that limit for the card it finds, for RAM as well as VRAM, and says how much loads on demand. 1.7 no longer warns about VRAM. "Insufficient memory" (red) now means the low estimate exceeds what Windows can still commit (RAM plus page file). An estimate above the RAM free right now is "memory is tight" (yellow); it is listed under worth knowing and no longer counted as something that breaks the game.

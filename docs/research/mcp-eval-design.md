@@ -91,16 +91,145 @@ h1 to h5 are all startup errors. h7 is the first error that appears only while t
 
 | # | Fault class | Injected fault (real Mods) | What the log shows | Right answer: culprit | Right answer: fix |
 | --- | --- | --- | --- | --- | --- |
-| h7 | Runtime, a comp changes its own list mid-tick (no culprit frame) | [SSR]Beautiful Body (`ssr.body`, in the base list, June 2026 local copy) gets its original `1.6/Assemblies/FS_SSR_Body.dll` back (`FS_SSR_Body.pre-codex-backup.dll`). Its comp `TC_ForceBodyShape` on `Human` swaps itself to the end of `AllComps` after 300 ticks and then removes itself during `CompTick`. Added trigger: Pawn Comp Profiler (`tallowbyte.pawncompprofiler`, a small Mod of ours with source, `scripts/mcp-eval/mods/pawncompprofiler`), which ticks every pawn's comps with `foreach` and times each one. Vanilla's `ThingWithComps.Tick` indexes with a cached count, so SSR alone logs nothing | On a map only (about 200 ticks in, in the repro): 23 × `Exception ticking <pawn> (at (x, 0, z)): System.InvalidOperationException: Collection was modified` (2 per colonist, 1 per world pawn, `Suppressing further errors`). Every stack goes through `PawnCompProfiler.ThingWithComps_Tick_Patch.Prefix`, and through a second, unrelated `Pawn.Tick` prefix from the base list (`Palpha.godhands`). No SSR frame; SSR appears only in the `Initializing new game with mods` list | [SSR]Beautiful Body (decoy: Pawn Comp Profiler) | `FS_SSR_Body.dll` rebuilt so the comp never changes `parent.AllComps` (reference: the user's fixed DLL in `answer/`). A `for` loop in the profiler, or the profiler turned off, only hides it |
+| h7 | Runtime, a comp changes its own list mid-tick (no culprit frame) | [SSR]Beautiful Body (`ssr.body`, in the base list; the case uses the Workshop copy turned back into the June 2026 version, see VM below) gets its original `1.6/Assemblies/FS_SSR_Body.dll` back (`FS_SSR_Body.pre-codex-backup.dll`). Its comp `TC_ForceBodyShape` on `Human` swaps itself to the end of `AllComps` after 300 ticks and then removes itself during `CompTick`. Added trigger: Pawn Comp Profiler (`tallowbyte.pawncompprofiler`, a small Mod of ours with source, `scripts/mcp-eval/mods/pawncompprofiler`), which ticks every pawn's comps with `foreach` and times each one. Vanilla's `ThingWithComps.Tick` indexes with a cached count, so SSR alone logs nothing | On a map only (about 200 ticks in, in the repro): 23 × `Exception ticking <pawn> (at (x, 0, z)): System.InvalidOperationException: Collection was modified` (2 per colonist, 1 per world pawn, `Suppressing further errors`). Every stack goes through `PawnCompProfiler.ThingWithComps_Tick_Patch.Prefix`, and through a second, unrelated `Pawn.Tick` prefix from the base list (`Palpha.godhands`). No SSR frame; SSR appears only in the `Initializing new game with mods` list | [SSR]Beautiful Body (decoy: Pawn Comp Profiler) | `FS_SSR_Body.dll` rebuilt so the comp never changes `parent.AllComps` (reference: the user's fixed DLL in `answer/`). A `for` loop in the profiler, or the profiler turned off, only hides it |
 
 Harness: `case.json` has `runtime: {ticks: 3000}`. `sandbox.mjs` then sets the sandbox Prefs' `autosaveIntervalDays` to `ticks / 60000`, starts the game with `-quicktest` (a new map at normal speed), and stops it once `Saves/Autosave-1.rws` is written: a vanilla signal that the map ran 3000 ticks, without a helper Mod in the log or the Mod list. A buggy or fixed run takes about 100 s. `grade.mjs` fails a runtime submission whose map never reached the autosave, and the h7 rule requires a change under `ssr.body/1.6/Assemblies/` with both Mods still enabled. The case overlay leaves the backup DLL and the 26 MB `_2985408740_.zip` out of SSR's folder (overlay `omit`). Since 2026-11-06, `sandbox.mjs` also links the unchanged folders of a changed Mod as junctions instead of copying the Mod; SSR has about 270 MB of textures.
 
 Checked on the host (real 1.6.4871, 2026-11-06). The buggy runs gave 23 tick errors twice, with different random pawns each time. The reference fix gave none, with no other new error line either: the quicktest map's noise was the same in both runs. Grading results: the reference answer through `grade.mjs` gets culprit and fix. The buggy DLL with only the decoy named gets neither (`decoyNamedOnly`). A change in the profiler alone, on a clean log, is "workaround elsewhere".
 
-Not done yet:
+VM (2026-11-08). The guest has only the Workshop copy of SSR, the 2026-09 rewrite without the comp. So h7 now starts from the Workshop copy on the host too (`add` with `replace: true` swaps the base entry's folder), and the overlay turns it into the June version: `About.xml`, `Patches/Patches.xml` (the comp) and the 1.4 to 1.6 DLLs are the only files that differ apart from textures, and the June code names no texture. The logs were recorded again this way: the same 23 errors buggy, none fixed, and no texture error from the Workshop textures. `package.mjs` packs Mods the guest's library lacks (`cases/_mods/*`, Cyanobot's Genes) into `pkg/<case>/lib`; `guest/overlay.ps1` copies them into `C:\Eval\lib`. `logdiff.mjs` now skips `SteamAPI.Init() failed`, which comes and goes with the host's Steam client and would fail a correct fix.
 
-- **VM.** `package.mjs` has no source for the profiler (it is not in the guest's library). In the VM, `ssr.body` resolves to the guest's Workshop copy, which is the 2026-09 rewrite: it has no comp, and its `Patches.xml` adds none. The VM case needs the June `Patches/Patches.xml` in the overlay as well (and the June textures, or a check that the Workshop textures load cleanly).
-- **`test_run`.** archo's `test_run map=true` stops 15 s after the log goes quiet following `Initializing new game with mods`. Whether that leaves enough ticks for the errors (about 200 ticks after the map starts) is untested. If it does not, an agent cannot reproduce h7 with Archo.
+`test_run map=true` (archo 1.0.7, a3a53af7, Eval-3, through Pi's MCP client): status `map` after 126 s, and the report has the h7 errors as two `harmony-stack` clusters (3 colonists, 15 world pawns), attributed to Pawn Comp Profiler and PA's God Hands (`likely`), the two Mods in the stack. So an agent can reproduce h7 with Archo; Archo names only the decoys.
+
+### Runtime case h4 (built 2026-11-08)
+
+From the real 1.6 logs: EcoDialogues builds an interaction log entry, and Cyanobot's Genes' postfix on that constructor throws. The stack's top frame is Cyanobot's Genes; the cause is the caller. EcoDialogues is not on disk, so the caller is our own small Mod of the same shape.
+
+| # | Fault class | Injected fault (real Mods) | What the log shows | Right answer: culprit | Right answer: fix |
+| --- | --- | --- | --- | --- | --- |
+| h4 | Runtime NRE in one Mod's postfix, caused by another Mod's call (wrong blame) | Added: Cyanobot's Genes (`cyanobot.CyanobotsGenes`, library copy 2889844371, unchanged) and Colonist Mutterings (`mossbrook.colonistmutterings`, ours, with source: `scripts/mcp-eval/mods/colonistmutterings`). About once an in-game hour each colonist "mutters"; the line is a `PlayLogEntry_Mutter : PlayLogEntry_Interaction` built with `recipient = null`. Cyanobot's postfix on the `PlayLogEntry_Interaction` constructor reads `recipient.genes`. Vanilla does not allow a null pawn in that entry (`PlayLogEntry_Interaction has a null pawn reference` when it is shown) | On a map: `[Colonist Mutterings] Error creating mutter: System.NullReferenceException`, once per colonist (3 in the recorded log, one identical line). Top frame `CyanobotsGenes.PlayLogEntry_Interaction_Patch.Postfix`, then the vanilla constructor with Cyanobot's `POSTFIX` line, then `ColonistMutterings.PlayLogEntry_Mutter..ctor`. Cyanobot's Genes also logs 4 missing-texture lines (in the reference too) | Colonist Mutterings (decoy: Cyanobot's Genes) | `PlayLogEntry_Mutter` derived from `LogEntry` (or given a real recipient), `1.6/Assemblies/ColonistMutterings.dll` rebuilt from the shipped source (reference in `answer/`). A null check in Cyanobot's postfix only hides it |
+
+Checked on the host (real 1.6.4871): buggy run with the errors, reference fix with none. Grading results: reference answer through `grade.mjs` gets culprit and fix; Cyanobot's Genes named alone gets neither (`decoyNamedOnly`); a change in Cyanobot's Genes alone, on a clean log, is "workaround elsewhere". Rule: `mossbrook.colonistmutterings/1.6/Assemblies/` must change, both Mods stay enabled.
+
+### Round 3, h4 and h7: Pi vs dsh (2026-11-08)
+
+12 runs (h4, h7 × A = Pi, B = dsh × 3) on Eval-3, 20 min limit, archo 1.0.7 (dev/1.1 a3a53af7, `tools\archo-1.0.7.exe`). Cost as in round 2. The first attempt ran while the model gateway was down (0 tool calls; moved to `results-gateway-down/`).
+
+| Cell | Solved | Mean s | Tool calls (Archo) | Tokens | Cost per run |
+| --- | --- | --- | --- | --- | --- |
+| h4 A Pi | 1/3 | 539 | 68 (9.7) | 2.55 M | ¥0.080 |
+| h4 B dsh | 1/3 | 755 | 91 (18.7) | 5.66 M | ¥0.155 |
+| h7 A Pi | 0/3 | 413 | 52 (9.7) | 1.85 M | ¥0.059 |
+| h7 B dsh | 0/3 | 505 | 54 (17.0) | 2.24 M | ¥0.087 |
+
+Every run called `test_run` with `map=true`, and got status `map`: Archo's test run reproduces both faults.
+
+Why the 10 failures failed:
+
+- **h4 (4 failures):** all patched Cyanobot's Genes' postfix with a null check (the stack's top frame), and named only Cyanobot's Genes. The logs were clean, so the grade is "workaround elsewhere". Both solved runs fixed Colonist Mutterings' entry; h4-B-1 also patched Cyanobot's Genes and named both Mods.
+- **h7 (6 failures):** all rewrote the profiler's `foreach` as an index loop. 5 of 6 found SSR's `TC_ForceBodyShape` and its `AllComps.Remove` / `GenList.Swap`, but judged it allowed: vanilla's cached-count loop tolerates it, so the profiler is the one that departs from vanilla (h7-B-1: "Comps are allowed to modify that list while they tick"). 5 of 6 logs were clean. h7-A-1's log had one extra line, `Object with load ID Thing_Human… is referenced … but is not deep-saved`, from the autosave that ends the map run: a grader flake from the harness, not from the submission.
+
+Case design: the h7 verdict is debatable. That SSR is the culprit rests on "a comp must not change `AllComps` inside `CompTick`", but vanilla's loop is written to survive exactly that, and the agents' reading is reasonable. Either accept a profiler fix as a second right answer (then h7 would be 5/6 on the fix), or make the fault one that vanilla does not survive. h4's verdict has vanilla's own error (`has a null pawn reference`) behind it, and two runs found it.
+
+Archo gaps found (no app code changed):
+
+1. Attribution names only the Mods in the stack. h7: both clusters list Pawn Comp Profiler and PA's God Hands (`likely`), nothing about a third Mod's comp changing the list; Archo cannot know which comps the pawn has. h4: Archo lists Colonist Mutterings and Cyanobot's Genes, both `likely`, without saying which frame is the caller.
+2. Harness (not Archo): an autosave-based map run can add a save-time error that the reference lacks; `logdiff.mjs` does not filter it.
+
+### Transpiler conflict h3 and save error h6 (built 2026-11-08)
+
+Both follow the commonest unattributed classes in the public 1.6 logs (private corpus, aggregate figures only). Built with `node scripts/mcp-eval/cases.mjs h3 h6`; each was reproduced in the real 1.6.4871 game (host sandbox), and its reference fix removes every injected error line with no new one.
+
+| # | Fault class | Injected fault (real Mods) | What the log shows | Right answer: culprit | Right answer: fix |
+| --- | --- | --- | --- | --- | --- |
+| h3 | Bad IL from two transpilers on one method (no Mod named) | Added Humanoid Alien Races (HAR, early in the list) and ReSplice: Charmweavers (last). Charmweavers' DLL, decompiled and rebuilt, gets a transpiler on `Pawn_RelationsTracker.SecondaryLovinChanceFactor`, patched from its `Mod` constructor (so before every static constructor), that routes vanilla's `pawn.def != otherPawn.def` through a helper `RacesDiffer(ThingDef, ThingDef)`. Alone it is valid. HAR's own transpiler, applied after it, turns each `ldfld Thing::def` into `RaceProps.Humanlike` (a bool), so the helper gets two bools and Mono's JIT rejects the method | one error, as in 544 of 6,734 public 1.6 logs, nearly to the byte: `Error during patching RimWorld.Pawn_RelationsTracker :: Single SecondaryLovinChanceFactor(Verse.Pawn) with: pre \| post: ... SecondaryLovinChanceFactorPostfix ... \| trans: ... SecondaryLovinChanceFactorTranspiler`, then `InvalidProgramException: Invalid IL code in ... SecondaryLovinChanceFactor_Patch2 ...: IL_0021: call 0x0000000b`. HAR's `AlienHarmony.Patch` wrapper catches the exception and names only its own patch methods; no Mod, no assembly, no stack beyond Harmony | Charmweavers (decoy: HAR) | Charmweavers' DLL without the transpiler (reference: the Workshop DLL), or a transpiler that does not assume a ThingDef on the stack. A change under `ReSplice.XOTR.Charmweavers/1.6/Assemblies/` with both Mods enabled; changing HAR only hides it |
+| h6 | Save-load error, a Def removed by another Mod's patch | Vanilla Hairs and Beards Retextured (base list) gets `Patches/Core_Beards_Patch.xml`, which removes the vanilla beards BushyStyled, SideWhiskers and Seer ("they clip through the retextured heads"). The Mod's own way to hide a style is `styleTags` `IgnoreMe` (its `Anomaly_Hairs_Patch.xml`). New games start cleanly; the player's save (a quicktest colony, 3000 ticks, pristine base list) has pawns with those beards | startup is clean; after `Loading game from file ...` four `Could not load reference to RimWorld.BeardDef named SideWhiskers / Seer / BushyStyled` (one per pawn), naming only vanilla Defs. In the corpus, 6,156 of 40,326 1.6 logs have `Could not load reference to <Def> named`; 29,134 load a save. The usual reading, "the save used a Mod that is gone", is wrong here: the beards are Core's | the retexture Mod (decoy, a natural wrong guess: AFU Men's Hairstyles) | hide the beards instead of removing them (reference: `styleTags` `IgnoreMe`), or drop the operation or the file (`delete.json`). A change under `hourai.vanillahairsretex.1.6/` with the Mod enabled |
+
+Harness for h6: `case.json` `load: {save}` makes `sandbox.mjs` copy the save to `Saves/autostart.rws`. With dev mode on (the pinned Prefs have it), vanilla loads that file at startup (`SaveGameFilesUtility.GetAutostartSaveFile`), so grading loads the save without a helper Mod; the run ends on log silence as usual (about 70 s, the map loaded). The VM gets the log only, no save: archo's `test_run` uses isolated test data and never loads a save, and the guest's Steam account is the player's real one, whose Steam Cloud syncs `Saves/*.rws` (an `autostart.rws` there would load on the player's own PC in dev mode). So in h6 an agent cannot reproduce the error; it has to reason from the log and the Mod files.
+
+Found while building them:
+
+- The real HAR + Charmweavers pair loads cleanly in 1.6.4871: Charmweavers' patch on the method is a plain postfix. Whatever made the corpus logs fail (Charmweavers is in 57% of them and in none of the clean ones) is not in today's versions, so h3 injects the second transpiler.
+- Charmweavers patches from a `[StaticConstructorOnStartup]`, as HAR does, and HAR is listed first; a transpiler there would have failed in Charmweavers' own `PatchAll` and named it (`Error in static constructor of ReSpliceCharmweavers.Core`). Patching from the `Mod` constructor is common practice and puts the failure in HAR's call.
+- Rebuilding Charmweavers from `ilspycmd` output needs the references at decompile time (`-r`; without them every struct cast comes out as `((T)(ref x))`), a publicized Assembly-CSharp (Krafs.Publicizer; one accessor then has to be fixed by hand), the Harmony Mod's own `0Harmony.dll` (2.4 API; `Lib.Harmony.Ref` 2.3.6 lacks `CodeMatcher.Advance()`), and `net48`. A plain rebuild of the decompiled source grades as a fix (checked), so an agent's decompile-and-rebuild route works.
+- The vanilla save compressor (`CompressibilityDecider`) keeps every Thing that a job, reservation, designation or projectile references, so "Was it compressed away" (the commonest load warning) needs a Mod-held reference and a Thing that changes within the test window; not reproducible in a 3000-tick quicktest, so h6 uses the second class.
+
+Grading checks (host, real game): h3 reference answer, and a plain rebuild of the decompiled Charmweavers, get culprit and fix; HAR named with a HAR file changed gets neither (`decoyNamedOnly`). h6 reference answer, and `delete.json` removing the patch, get culprit and fix; AFU Men's Hairstyles named and disabled gets neither.
+
+#### Results: h3 and h6, Pi vs dsh, both with Archo (2026-11-08)
+
+12 runs (h3, h6 × A = Pi, B = dsh × 3), 20 min limit, one VM (Eval-2, `matrix.ps1 -Cases h3,h6`, 03:51 to 06:57, 186 min), archo `tools/archo-1.0.7.exe` built from dev/1.1 a3a53af7 (sha256 `a8380b7b26a049f0…`). Cost at CNY 0.5 / 1.0 / 0.01 per Mtok (input / output / cache read). A first attempt from 03:09 is void: the host port proxy to the model gateway had stopped listening, so every run on every VM ended at its first model call with 0 tool calls (`results-gateway-down/`).
+
+| Group | Solved (culprit and fix) | Mean s (median) | Model calls | Tool calls (Archo) | Tokens | Cache hit | Cost per run |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| A Pi | 5/6 | 536 (528) | 42.8 | 50.8 (15.2) | 2.03 M | 96.4% | ¥0.076 |
+| B dsh | 6/6 | 518 (517) | 40.5 | 56.3 (23.2) | 2.48 M | 96.4% | ¥0.094 |
+
+| Case | A Pi | B dsh |
+| --- | --- | --- |
+| h3 transpiler conflict | 2/3, 720 s, Archo 11.7 | 3/3, 586 s, Archo 26.0 |
+| h6 save error | 3/3, 352 s, Archo 18.7 | 3/3, 450 s, Archo 20.3 |
+
+All 12 runs named the right culprit. The one failure:
+
+- **h3-A-1:** Pi named Charmweavers and handed in a rebuilt DLL, but also took Charmweavers out of `ModsConfig.xml` ("with Charmweavers out of the active list the start is clean (verified by a test run)"). The grader's rule caught it ("log is clean only because the broken Mod was disabled"). Graded alone (ModsConfig left out), its DLL still logs the same Invalid IL error: the disabled Mod was the only reason the log was clean.
+
+Observations:
+
+- **h3 is the slowest case so far** (653 s mean over both groups; round 2's cases took 294 to 620 s). Every run took the same path: `analyze_log` attributes the Invalid IL cluster to no Mod (`attribution: (no mod identified)`), then `get_harmony` on `Pawn_RelationsTracker.SecondaryLovinChanceFactor` lists the four patches from both Mods, including `..._RaceCheck_Patch.Transpiler`. That one call turns "no Mod named" into two candidates. The rest of the time goes into decompiling and rebuilding Charmweavers (the reference assembly and publicizer issues listed above).
+- **h6 is easy with Archo:** `get_def` / `get_patches` on the BeardDef find the `PatchOperationRemove` within a few calls. All six runs fixed it by dropping the operation (one by `delete.json`), none with `IgnoreMe`; all are accepted fixes. Several noticed that the retexture Mod ships textures for exactly those three beards, which contradicts the injected "they clip" comment: a shortcut, like h1's `1.5` copy. No run could reproduce the error (no save in the guest), and none needed to.
+- dsh again calls Archo more (23.2 against 15.2 per run) and uses more tokens (2.48 M against 2.03 M). With 3 runs per cell, 6/6 against 5/6 is within chance.
+- Archo leads (not bugs): `analyze_log` could attribute an `Error during patching <method> with: ... | trans: <patch method>` line through its own Harmony index (the patch method names map to HAR, and the method's patches name both Mods), which would put Charmweavers in front of the agent without a second call. `test_run` still reports `isError` for the base noise (known, see the c3 pilot). No Archo bug was seen in the 12 runs.
+
+### Runtime lord conflict h8 and no-fault control h9 (built 2026-11-08)
+
+| # | Fault class | Injected fault (real Mods) | What the log shows | Right answer: culprit | Right answer: fix |
+| --- | --- | --- | --- | --- | --- |
+| h8 | Runtime, wrong blame (two Mods' lord jobs) | No file is changed. Progression: Education (`ferny.ProgressionEducation`, Workshop release of 2026-09-07) lacks a `GetLord()` check where `LordToil_AttendClass` re-adds an "orphaned" student to the class lord (the user's PR fixes it). The case adds it, Intimacy - Friends n' Lovers and Intimacy - Socio Butterfly to the base list and ships a prepared save: a classroom in session (board, two desks, bell, a Social class with 2 students) while the students are in a Socio Butterfly `LordJob_Birthday` | 298 identical lines in 4000 ticks: `Tried to add pawn <name> to lord with lord jobProgressionEducation.LordJob_AttendClass but this pawn is already a member of lord with lord jobRecreationalSexWithEuterpe.LordJob_Birthday. Pawns can't be members of more than one lord at the same time.` No stack in Player.log. Both Mods are named | Progression: Education (decoy: Socio Butterfly, whose lord it is; Friends n' Lovers) | `LordToil_AttendClass.LordToilTick` skips a student with `GetLord() != null`; rebuild `1.6/Assemblies/ProgressionEducation.dll` (it ships its source in `1.6/Source`). Reference build in `answer/` |
+| h9 | No fault | Nothing: the base list (34 Mods) | The base list's normal noise: no error line; "Translation data for language English has 19 errors" and the game's own "red text" joke | none | answer.json with an empty culprit list and no files |
+
+h8 is the first case whose trigger is a game state, not a Mod: `case.json` `runtime: {ticks: 4000, save: 'save/autostart.rws'}`. `sandbox.mjs` copies the save to the sandbox as `Saves/autostart.rws`; the pinned Prefs have dev mode on, and the game loads that file at start (`SaveGameFilesUtility.GetAutostartSaveFile`) instead of a `-quicktest` map. It stops at the first autosave, 4000 ticks later (about 100 s). `make-pe-save.mjs` builds the save once from a throw-away helper Mod (`mods/pe-setup`): it spawns the lesson stone, desks and bell, creates the class through PE's own classes, starts a `LordJob_Birthday` with the two students, saves and quits. The helper is removed from the save's Mod list and component list afterwards, so the game loads it without a warning. Findings while building it:
+
+- PE's Workshop DLL and Workshop source agree (both lack the guard); a Skill class needs workbenches unless its skill is taught at the plain school desks (Social works, Crafting did not validate). The board opens a rename dialog that pauses the game: the helper closes it.
+- The class lord needs no extra push: the teacher rings the bell, then every tick the attend toil re-adds each idle student who is not in the class lord, so the error repeats. The first run reproduced the real log line exactly.
+- The line has none of `logdiff.mjs`'s old error words, so the grader would have called both logs clean: `Tried to add pawn` is now in its pattern.
+- In the VM the guest's Workshop copies of the three Mods are the same versions as the host's (`ProgressionEducation.dll` 222,720 bytes), so the case has no overlay. The agent has no save to load in the VM (`test_run` starts a new map, where no class exists): h8 can only be solved by reading, which PE's shipped source allows.
+
+Grading. h8 (`RULES`): both PE and Socio Butterfly stay enabled and the change lands in `ferny.ProgressionEducation/1.6/Assemblies/`; the run must reach the autosave. h9 (`control`): culprit = answer.json present with an empty list; fix = no file, deletion or list change. Naming any Mod or changing anything is `falsePositive`; a missing answer.json is a miss (`answered: false`). `task.md` is unchanged, so it does not say that a case can be fault-free. Checked on the host: the h8 reference answer gets culprit and fix (clean log, autosave reached); only the decoy named gets neither (`decoyNamedOnly`); an empty h9 answer gets both; an h9 answer with a file and a named Mod gets neither and `falsePositive`.
+
+#### Results: h8 and h9, Pi vs dsh, both with Archo (2026-11-08)
+
+12 cells (h8, h9 × A = Pi, B = dsh × 3), 20 min limit, Player-Test only (`matrix.ps1`, about 4 h 45 min), archo 1.0.7 (`tools/archo-1.0.7.exe`, built from dev/1.1 a3a53af7, sha256 `a8380b7b…ffa90`). Cost at CNY 0.5 / 1.0 / 0.01 per Mtok (input / output / cache read). h9 counts as solved only with an `answer.json` that has an empty culprit list and no changed file.
+
+| Group | Solved | Mean s | Turns | Tool calls (Archo) | Tokens | Cost per run |
+| --- | --- | --- | --- | --- | --- | --- |
+| A Pi | 2/6 | 1018 | 76.0 | 85.0 (13.3) | 5.23 M | ¥0.141 |
+| B dsh | 1/6 | 1031 | 75.3 | 92.2 (27.5) | 7.76 M | ¥0.194 |
+
+| Case | A Pi | B dsh |
+| --- | --- | --- |
+| h8 PE lord conflict | 2/3, 1037 s, Archo 11.3, ¥0.113 | 1/3, 948 s, Archo 28.7, ¥0.200 |
+| h9 no fault | 0/3 (2 false positives, 1 timeout), 999 s, Archo 15.3, ¥0.169 | 0/3 (2 false positives, 1 timeout), 1113 s, Archo 26.3, ¥0.188 |
+
+h8 per run (culprit named / fix): A1 no/no (1200 s timeout, nothing submitted); A2 yes/yes (1010 s); A3 yes/yes (902 s); B1 yes/yes (1200 s limit reached, submission graded); B2 yes/no (953 s); B3 yes/no (692 s).
+
+- **Culprit.** All 5 agents that submitted named Progression: Education; none was fooled by the decoys (Socio Butterfly, Friends n' Lovers). Pi A2 also named Socio Butterfly. The log line names both lord jobs and PE ships its source, so reading was enough.
+- **Why the fix failed (B2, B3).** Both rebuilt `ProgressionEducation.dll` from `1.6/Source` without Krafs.Publicizer; the game then logs `FieldAccessException: Field RimWorld.StatWorker:stat is inaccessible` and the map never reaches the autosave. A3 rebuilt it correctly; A2 shipped a small separate DLL instead; B1 shipped a patch DLL (`EducationLordFix.dll`). Archo's `read_source` does not tell an agent how a Mod's DLL is built.
+- **A1** spent 73 `bash` calls rebuilding and diffing the DLL (a Debug build against the Workshop one) and ran out of time without writing a submission.
+- **No agent could load the save.** `list_saves` was called in every run, but `test_run` only starts a new map, where no class exists. `test_run` was used 1 to 2 times per h8 run and could not show whether the fix works.
+
+h9 per run: A1 timeout, no answer; A2 changed `Palpha.godhands` translation files; A3 changed translation files of two Mods; B1 disabled Beheading Dolls in `ModsConfig.xml`; B2 timeout, no answer; B3 changed translation files of two Mods. No agent answered "nothing to fix".
+
+- Every agent that answered chased noise present in the base list: the six Unity `_MainTex` material errors and the 19 "Translation data for language English" errors. The task prompt says there are errors to fix; that is the pressure. All four answers broke nothing, but each is a false positive by the control's rule.
+- The control shows an agent will not volunteer "no fault" without a hint. A task line such as "the log may be fine" would change the case, so it was not added. Whether to count translation-key cleanups as harm is the owner's call (they cost a run's time, not the user's game).
+
+Void cell: h9-A-2 first ended at 489 s on four `521` errors from the model provider (gateway origin down), so it was moved to `results-gateway-down/` and run again (775 s, above). An earlier attempt of all cells had been voided by the gateway outage (0 tool calls, "Request timed out"); those results are also in `results-gateway-down/`.
+
+Archo findings:
+
+- **No Archo defect was hit in these 12 runs.** One tool error appears: `analyze_log` answered "no Player.log found for 1.6 under C:\Users\…\LocalLow\…" in h9-A-1 (5 times) on a guest where the game had not yet been run. The message is the CLI's (`archo log --file <path>`); check that an MCP agent can act on it.
+- **Gap, not a bug:** no tool starts a given save, so a runtime fault that needs a game state (h8) cannot be reproduced or verified through Archo. Likewise nothing tells an agent a Mod's DLL needs publicized references.
+- dsh calls Archo about twice as often (27.5 against 13.3 per run) and uses about 50% more tokens, as in round 2; neither group is more accurate here (3 runs per cell).
 
 ## Grading
 

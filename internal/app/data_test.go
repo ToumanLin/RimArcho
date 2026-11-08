@@ -129,6 +129,16 @@ func TestCommunityDataToleratesBadRecords(t *testing.T) {
 	if r := e.App.ReplacementFor("", "tester.a"); r == nil || r.NewPackageID != "tester.a2" || strings.Join(r.NewVersions, ",") != "1.6,1.7" {
 		t.Fatalf("valid rule not loaded beside the numeric one: %+v", r)
 	}
+	if r := e.App.ReplacementFor("1001", "tester.a"); r == nil || r.NewWorkshopID != "9999" {
+		t.Fatalf("old Workshop item not matched: %+v", r)
+	}
+	// A replacement that keeps the old packageId is not its own replacement, nor is another
+	// Workshop item with that packageId.
+	for _, ws := range []string{"9999", "5555"} {
+		if r := e.App.ReplacementFor(ws, "tester.a"); r != nil {
+			t.Fatalf("ws:%s with the old packageId matched: %+v", ws, r)
+		}
+	}
 	if r := e.App.ReplacementFor("1797397487", ""); r == nil || r.NewPackageID != "tester.numeric2" {
 		t.Fatalf("numeric oldPackageId rule: %+v", r)
 	}

@@ -7,6 +7,7 @@ import {loadCase} from './sandbox.mjs';
 const ROOT = 'D:/RimArcho-test/mcp-eval';
 const WS = 'D:/SteamLibrary/steamapps/workshop/content/294100';
 const LIBS = new Set(['2019000693', '3578444636', '3530229241', '_3700765558_alt_decapitate']);
+const SHIP = new Set(['2889844371']);   // Cyanobot's Genes (h4)
 
 function source(p) {
   p = p.split('\\').join('/');
@@ -16,6 +17,8 @@ function source(p) {
   const link = name.startsWith('_Archo_env_') ? fs.readlinkSync(p.replace(/\/$/, '')).split('\\').join('/').split('/').pop() : null;   // _<workshopId>_
   if (link) return 'ws:' + link.replace(/^_|_$/g, '');
   if (LIBS.has(name)) return 'lib:' + name;
+  // a Mod the guest's library lacks (the case's own Mods in cases/_mods, h4's Cyanobot's Genes): packed with the case
+  if (p.startsWith(ROOT + '/cases/_mods/') || SHIP.has(name)) return 'ship:' + name;
   throw new Error('no VM source for ' + p);
 }
 
@@ -34,10 +37,17 @@ for (const id of process.argv.slice(2)) {
   const dropped = new Set((c.drop || []).map(d => d.toLowerCase()));
   const mods = [...base];
   for (const a of c.add || []) { const i = a.before ? mods.findIndex(m => m.pkg.toLowerCase() === a.before.toLowerCase()) : -1; if (i >= 0) mods.splice(i, 0, a); else mods.push(a); }
+  // an `add` with `replace: true` swaps the folder of a Mod already in the base list, keeping its place (h7: the Workshop copy)
+  for (const a of (c.add || []).filter(a => a.replace)) { const i = mods.findIndex(m => m !== a && m.pkg.toLowerCase() === a.pkg.toLowerCase()); if (i >= 0) { mods.splice(mods.indexOf(a), 1); mods[i] = a; } }
   const manifest = mods.map(m => ({pkg: m.pkg, src: source(m.path), overlay: !!c.overlay?.some(o => o.pkg.toLowerCase() === m.pkg.toLowerCase()), active: !dropped.has(m.pkg.toLowerCase())})).filter(m => m.src);
   const out = `${ROOT}/pkg/${id}`; fs.rmSync(out, {recursive: true, force: true}); fs.mkdirSync(out, {recursive: true});
   fs.writeFileSync(`${out}/manifest.json`, JSON.stringify(manifest, null, 1));
   fs.copyFileSync(`${ROOT}/run/${id}/userdata/Config/ModsConfig.xml`, `${out}/ModsConfig.xml`);
+  // shipped Mods go to pkg/<case>/lib/<name>; overlay.ps1 copies them into the guest's C:\Eval\lib
+  for (const m of manifest.filter(m => m.src.startsWith('ship:'))) {
+    const name = m.src.slice(5); fs.cpSync(mods.find(x => x.pkg === m.pkg).path, `${out}/lib/${name}`, {recursive: true, dereference: true}); m.src = 'lib:' + name;
+  }
+  fs.writeFileSync(`${out}/manifest.json`, JSON.stringify(manifest, null, 1));
   for (const o of c.overlay || []) fs.cpSync(path.resolve(caseDir, o.files), `${out}/overlay/${o.pkg}`, {recursive: true});
   const log = vmLog(fs.readFileSync(`${caseDir}/Player.log`, 'utf8'));
   fs.writeFileSync(`${out}/Player.log`, log);

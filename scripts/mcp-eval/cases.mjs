@@ -211,7 +211,7 @@ if (want('h5')) {
 }
 
 // ---- h7: runtime error with no culprit in the stack — a comp that removes itself from its pawn's comp list mid-tick ----
-// [SSR]Beautiful Body (base list) as of June 2026 (the user's local copy; the Workshop version has since dropped the comp). Its
+// [SSR]Beautiful Body as of June 2026 (the user's local copy; the Workshop version has since dropped the comp). Its
 // TC_ForceBodyShape on Human swaps itself to the end of AllComps and removes itself during CompTick. Vanilla's
 // ThingWithComps.Tick indexes with a cached count, so SSR alone logs nothing. Pawn Comp Profiler (our own small Mod,
 // scripts/mcp-eval/mods) ticks pawn comps with foreach, as the vanilla loop would, timed; the list change then throws
@@ -232,12 +232,15 @@ if (want('h7')) {
     fs.rmSync(path.join(OUT, 'h7', kind), {recursive: true, force: true});   // the recorded logs stay
     const f = path.join(OUT, 'h7', kind, SSR.pkg, dll); fs.mkdirSync(path.dirname(f), {recursive: true}); fs.copyFileSync(from, f);
   }
+  // The VM has only the Workshop copy (the 2026-09 rewrite: no comp). Host and VM both start from it; the overlay turns
+  // it into the June version: these files are all that differ apart from textures, which the June code does not name.
+  for (const rel of ['About/About.xml', 'Patches/Patches.xml', '1.4/Assemblies/FS_SSR_Body.dll', '1.5/Assemblies/FS_SSR_Body.dll']) {
+    const f = path.join(OUT, 'h7', 'overlay', SSR.pkg, rel); fs.mkdirSync(path.dirname(f), {recursive: true}); fs.copyFileSync(path.join(SSR.dir, rel), f);
+  }
   emit('h7', {
     runtime: {ticks: 3000},
-    add: [{pkg: PCP.pkg, name: PCP.name, path: pcp.split(path.sep).join('/')}],
-    // SSR is in the base list (a junction to the same local copy). The backup DLL would load as a second FS_SSR_Body
-    // assembly and give the fix away; the zip at the Mod root is a 26 MB archive copy of the Mod.
-    overlay: [{pkg: SSR.pkg, files: 'overlay/' + SSR.pkg, omit: ['1.6/Assemblies/FS_SSR_Body.pre-codex-backup.dll', '_2985408740_.zip']}],
+    add: [{pkg: SSR.pkg, name: SSR.name, path: `${WS}/2985408740`, replace: true}, {pkg: PCP.pkg, name: PCP.name, path: pcp.split(path.sep).join('/')}],
+    overlay: [{pkg: SSR.pkg, files: 'overlay/' + SSR.pkg}],
   }, {
     culprit: [{pkg: SSR.pkg, name: SSR.name, role: 'its comp TC_ForceBodyShape swaps itself to the end of the pawn\'s AllComps and removes itself while the comps are being ticked'}],
     decoy: [{pkg: PCP.pkg, name: PCP.name, role: 'named in every stack; enumerates the comps with foreach, which is correct as long as no comp changes the list'}],
@@ -245,6 +248,247 @@ if (want('h7')) {
     faultClass: 'runtime.collection-modified (no culprit frame)',
     files: [`${SSR.pkg}/${dll}`],
     fix: 'TC_ForceBodyShape must not change parent.AllComps inside CompTick: set the body type once and then do nothing (the reference fix), or defer the removal outside the tick loop. Rebuild 1.6/Assemblies/FS_SSR_Body.dll (decompile, edit, build); a reference build is in answer/. Rewriting the profiler\'s loop only hides it.',
+  });
+}
+
+// ---- h4: runtime NRE in one Mod's postfix, caused by another Mod's call (stack top names the wrong Mod) -----------
+// Modelled on real 1.6 logs: EcoDialogues builds a one-pawn PlayLogEntry_Interaction (recipient null), and Cyanobot's
+// Genes' postfix on that constructor reads recipient.genes and throws. EcoDialogues is not on disk, so the caller is
+// Colonist Mutterings, our own small Mod of the same shape (scripts/mcp-eval/mods/colonistmutterings). Vanilla's
+// PlayLogEntry_Interaction needs both pawns ("has a null pawn reference" when shown); a one-pawn line belongs in its
+// own LogEntry. Reference fix: PlayLogEntry_Mutter derives from LogEntry. Needs a map: case.json `runtime`.
+if (want('h4')) {
+  const CG = {pkg: 'cyanobot.CyanobotsGenes', dir: `${LIB}/2889844371`, name: "Cyanobot's Genes"};
+  const CM = {pkg: 'mossbrook.colonistmutterings', name: 'Colonist Mutterings'};
+  const src = 'Source/ColonistMutterings.cs', dll = '1.6/Assemblies/ColonistMutterings.dll';
+  const cm = path.join(OUT, '_mods', CM.pkg); fs.rmSync(cm, {recursive: true, force: true});
+  fs.cpSync(path.join(import.meta.dirname, 'mods', 'colonistmutterings'), cm, {recursive: true});
+  buildDll(path.join(cm, 'Source'), 'ColonistMutterings', path.join(cm, dll));
+  const fixedSrc = must(must(must(raw(cm, src),
+    'public class PlayLogEntry_Mutter : PlayLogEntry_Interaction\n    {\n        string text;',
+    'public class PlayLogEntry_Mutter : LogEntry\n    {\n        Pawn initiator;\n        string text;'),
+    ': base(InteractionDefOf.Chitchat, pawn, null, null)\n        {\n            this.text = text;',
+    '\n        {\n            initiator = pawn;\n            this.text = text;'),
+    '            base.ExposeData();\n            Scribe_Values.Look(ref text, "text");\n        }',
+    '            base.ExposeData();\n            Scribe_References.Look(ref initiator, "initiator", saveDestroyedThings: true);\n            Scribe_Values.Look(ref text, "text");\n        }\n\n' +
+    '        public override bool Concerns(Thing t) => t == initiator;\n\n        public override IEnumerable<Thing> GetConcerns() { if (initiator != null) yield return initiator; }\n\n' +
+    '        public override UnityEngine.Texture2D IconFromPOV(Thing pov) => InteractionDefOf.Chitchat.GetSymbol();');
+  fs.rmSync(path.join(OUT, 'h4', 'answer'), {recursive: true, force: true});
+  fixfile('h4', CM.pkg, src, fixedSrc);
+  const fixDir = path.join(OUT, '_build', 'h4-fix-src'); fs.rmSync(fixDir, {recursive: true, force: true}); fs.mkdirSync(fixDir, {recursive: true});
+  fs.writeFileSync(path.join(fixDir, 'ColonistMutterings.cs'), fixedSrc);
+  buildDll(fixDir, 'ColonistMutterings', path.join(OUT, 'h4', 'answer', CM.pkg, dll));
+  emit('h4', {
+    runtime: {ticks: 3000},
+    add: [{pkg: CG.pkg, name: CG.name, path: CG.dir}, {pkg: CM.pkg, name: CM.name, path: cm.split(path.sep).join('/')}],
+  }, {
+    culprit: [{pkg: CM.pkg, name: CM.name, role: 'builds a PlayLogEntry_Interaction with a null recipient, which vanilla does not allow'}],
+    decoy: [{pkg: CG.pkg, name: CG.name, role: 'top of every stack; its postfix assumes both pawns of an interaction exist, as vanilla does'}],
+    required: [CM.pkg],
+    faultClass: 'runtime.nre-in-other-mods-patch (wrong blame)',
+    files: [`${CM.pkg}/${dll}`],
+    fix: 'PlayLogEntry_Mutter must not be a PlayLogEntry_Interaction with a null recipient: derive it from LogEntry (reference in answer/, source and DLL), or give it a real recipient. Rebuild 1.6/Assemblies/ColonistMutterings.dll from the shipped source. A null check in Cyanobot\'s Genes only hides it.',
+  });
+}
+
+// ---- h3: bad IL from two transpilers on one method; the error names only the second Mod's patch methods ----------------
+// Modelled on the public 1.6 logs (private corpus, aggregate only): `Error during patching RimWorld.Pawn_RelationsTracker ::
+// Single SecondaryLovinChanceFactor(Verse.Pawn) with: ... | trans: ...SecondaryLovinChanceFactorTranspiler ... Invalid IL
+// code ... call` in 544 of 6,734 logs. That line comes from Humanoid Alien Races' AlienHarmony.Patch wrapper, which
+// catches the exception and logs HAR's own patch methods, never a Mod name. The real HAR + Charmweavers pair loads cleanly
+// in 1.6.4871 (host probe 2026-11-08), so the second transpiler is injected: ReSplice: Charmweavers (real Mod) gets a
+// transpiler, patched from its Mod constructor (before every static constructor), that routes vanilla's race check
+// `pawn.def != otherPawn.def` through a helper taking two ThingDefs. Alone it is valid IL. HAR's transpiler, applied
+// after it, turns each `ldfld Thing::def` into `RaceProps.Humanlike` (a bool), so the helper call gets two bools and
+// Mono's JIT rejects the method: HAR's patch fails, and the log names HAR's methods only. The agent has to list every
+// patch on the method. Charmweavers ships no source: its DLL is decompiled (with references) and rebuilt.
+if (want('h3')) {
+  const CW = {pkg: 'ReSplice.XOTR.Charmweavers', dir: `${WS}/3131996691`, name: 'ReSplice: Charmweavers'};
+  const HAR = {pkg: 'erdelf.HumanoidAlienRaces', dir: `${WS}/839005762`, name: 'Humanoid Alien Races'};
+  const dll = '1.6/Assemblies/ReSpliceCharmweavers.dll';
+  const tmp = path.join(OUT, '_build', 'h3-charmweavers'); fs.rmSync(tmp, {recursive: true, force: true}); fs.mkdirSync(tmp, {recursive: true});
+  const G = 'D:/rimworld16/RimWorldWin64_Data/Managed';
+  const refs = [G, `${WS}/2023507013/1.6/Assemblies`, `${WS}/2009463077/1.6/Assemblies`, `${WS}/2995385834/1.6/Assemblies`];   // game, VEF, Harmony, VRE Highmate
+  execFileSync('ilspycmd', ['-p', '-o', tmp, ...refs.flatMap(r => ['-r', r]), `${CW.dir}/${dll}`], {stdio: 'pipe'});
+  const src = path.join(tmp, 'ReSpliceCharmweavers');
+  fs.rmSync(path.join(tmp, 'System.Runtime.CompilerServices'), {recursive: true, force: true});   // the publicizer below defines it
+  const edit = (f, from, to) => fs.writeFileSync(path.join(src, f), must(fs.readFileSync(path.join(src, f), 'utf8').split('\r\n').join('\n'), from, to));
+  // built against a publicized Assembly-CSharp: one override comes out with mixed accessibility
+  edit('JobGiver_AIFollowMaster.cs', 'protected override int FollowJobExpireInterval\n\t{\n\t\tpublic get', 'public override int FollowJobExpireInterval\n\t{\n\t\tget');
+  const ref = (n, p) => `<Reference Include="${n}"><HintPath>${p}</HintPath><Private>false</Private></Reference>`;
+  const csproj = `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net48</TargetFramework><LangVersion>latest</LangVersion><AllowUnsafeBlocks>true</AllowUnsafeBlocks><AssemblyName>ReSpliceCharmweavers</AssemblyName><GenerateAssemblyInfo>false</GenerateAssemblyInfo><OutDir>bin/</OutDir><NoWarn>CS0618;CS8632</NoWarn></PropertyGroup><ItemGroup>${
+    ['Assembly-CSharp', 'UnityEngine', 'UnityEngine.CoreModule', 'UnityEngine.IMGUIModule', 'UnityEngine.TextRenderingModule'].map(n => ref(n, `${G}/${n}.dll`)).join('')
+  }${ref('0Harmony', `${refs[2]}/0Harmony.dll`)}${ref('VEF', `${refs[1]}/VEF.dll`)}${ref('VanillaRacesExpandedHighmate', `${refs[3]}/VanillaRacesExpandedHighmate.dll`)}<PackageReference Include="Krafs.Publicizer" Version="2.2.1"><PrivateAssets>all</PrivateAssets></PackageReference><Publicize Include="Assembly-CSharp" /></ItemGroup></Project>`;
+  fs.writeFileSync(path.join(tmp, 'ReSpliceCharmweavers.csproj'), csproj);
+  edit('ReSpliceCharmweaversMod.cs', 'using UnityEngine;', 'using HarmonyLib;\nusing UnityEngine;');
+  edit('ReSpliceCharmweaversMod.cs', 'settings = GetSettings<ReSpliceCharmweaversSettings>();',
+    'settings = GetSettings<ReSpliceCharmweaversSettings>();\n\t\tnew Harmony("ReSpliceCharmweavers.Mod").PatchCategory("EarlyPatches");');
+  fs.writeFileSync(path.join(src, 'Pawn_RelationsTracker_SecondaryLovinChanceFactor_RaceCheck_Patch.cs'), `using System.Collections.Generic;
+using System.Reflection;
+using System.Reflection.Emit;
+using HarmonyLib;
+using RimWorld;
+using Verse;
+
+namespace ReSpliceCharmweavers;
+
+[HarmonyPatch(typeof(Pawn_RelationsTracker), "SecondaryLovinChanceFactor")]
+[HarmonyPatchCategory("EarlyPatches")]
+public static class Pawn_RelationsTracker_SecondaryLovinChanceFactor_RaceCheck_Patch
+{
+\tpublic static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+\t{
+\t\tFieldInfo defField = AccessTools.Field(typeof(Thing), "def");
+\t\tMethodInfo racesDiffer = AccessTools.Method(typeof(Pawn_RelationsTracker_SecondaryLovinChanceFactor_RaceCheck_Patch), "RacesDiffer");
+\t\tList<CodeInstruction> codes = new List<CodeInstruction>(instructions);
+\t\tfor (int i = 1; i < codes.Count; i++)
+\t\t{
+\t\t\tif ((codes[i].opcode == OpCodes.Bne_Un_S || codes[i].opcode == OpCodes.Bne_Un) && codes[i - 1].LoadsField(defField))
+\t\t\t{
+\t\t\t\tobject target = codes[i].operand;
+\t\t\t\tcodes[i] = new CodeInstruction(OpCodes.Call, racesDiffer).MoveLabelsFrom(codes[i]);
+\t\t\t\tcodes.Insert(i + 1, new CodeInstruction(OpCodes.Brtrue, target));
+\t\t\t\tbreak;
+\t\t\t}
+\t\t}
+\t\treturn codes;
+\t}
+
+\t// Lovethralls of a xenotype with its own body def still count as their master's race.
+\tpublic static bool RacesDiffer(ThingDef pawnRace, ThingDef otherRace)
+\t{
+\t\tif (pawnRace == otherRace)
+\t\t{
+\t\t\treturn false;
+\t\t}
+\t\treturn pawnRace?.race == null || otherRace?.race == null || !pawnRace.race.Humanlike || !otherRace.race.Humanlike;
+\t}
+}
+`);
+  execFileSync('dotnet', ['build', '-c', 'Release', '-nologo', '-v', 'q'], {cwd: tmp, stdio: 'pipe'});
+  for (const [kind, from] of [['overlay', path.join(tmp, 'bin', 'ReSpliceCharmweavers.dll')], ['answer', `${CW.dir}/${dll}`]]) {
+    fs.rmSync(path.join(OUT, 'h3', kind), {recursive: true, force: true});   // the recorded logs stay
+    const f = path.join(OUT, 'h3', kind, CW.pkg, dll); fs.mkdirSync(path.dirname(f), {recursive: true}); fs.copyFileSync(from, f);
+  }
+  emit('h3', {
+    // HAR is a framework: early in the list (after the DLCs); Charmweavers loads after VEF, at the end
+    add: [{pkg: HAR.pkg, name: HAR.name, path: HAR.dir, before: 'nals.facialanimation'}, {pkg: CW.pkg, name: CW.name, path: CW.dir}],
+    overlay: [{pkg: CW.pkg, files: 'overlay/' + CW.pkg}],
+  }, {
+    culprit: [{pkg: CW.pkg, name: CW.name, role: 'its transpiler on Pawn_RelationsTracker.SecondaryLovinChanceFactor (patched from the Mod constructor, so first) replaces the race check with a call taking two ThingDefs; HAR\'s transpiler then turns those ThingDefs into bools'}],
+    decoy: [{pkg: HAR.pkg, name: HAR.name, role: 'its AlienHarmony wrapper logs the failure with its own patch methods; its transpiler is fine on vanilla IL'}],
+    required: [CW.pkg],
+    faultClass: 'harmony.invalid-il (transpiler conflict, no Mod named)',
+    files: [`${CW.pkg}/${dll}`],
+    fix: 'Charmweavers\' RaceCheck transpiler must leave the def comparison alone (back to the original postfix: the reference fix is the Workshop DLL), or match without assuming a ThingDef on the stack. Rebuild 1.6/Assemblies/ReSpliceCharmweavers.dll. Changing HAR only hides it; disabling either Mod is not a fix.',
+  });
+}
+
+// ---- h6: save-load error — a Mod's patch removes vanilla Defs that an existing save uses -------------------------------
+// The commonest save-load errors in the public 1.6 logs (private corpus, aggregate only; 29,134 of 40,326 logs load a
+// save) are "Could not resolve reference to object with loadID" (10,305 logs) and "Could not load reference to <Def>
+// named <defName>" (6,156); both name only the vanilla object or Def. Here Vanilla Hairs and Beards Retextured (base list)
+// gets a patch that removes three vanilla beards "until they are redrawn" (the Mod's own way to hide a style is
+// `styleTags` IgnoreMe, see its Anomaly_Hairs_Patch.xml). New games are fine; the player's save has pawns with those
+// beards, so loading it logs one "Could not load reference to RimWorld.BeardDef named ..." per pawn. The save is a
+// quicktest colony played 3000 ticks with the pristine base list (helper case h6save: `sandbox.mjs cases/h6save --run`,
+// then copy run/h6save/userdata/Saves/Autosave-1.rws to cases/h6/save/autostart.rws); case.json `load` makes the sandbox
+// load it at startup. The VM gets no save: archo's test_run never loads one, and the guest's Steam syncs saves to the
+// player's real Steam Cloud.
+if (want('h6')) {
+  const RTX = {pkg: 'hourai.vanillahairsretex.1.6', dir: `${WS}/3626568836`, name: 'Vanilla Hairs and Beards Retextured'};
+  const rel = 'Patches/Core_Beards_Patch.xml';
+  const beards = ['BushyStyled', 'SideWhiskers', 'Seer'];
+  const xp = `Defs/BeardDef[${beards.map(b => `defName="${b}"`).join(' or ')}]`;
+  fs.mkdirSync(path.join(OUT, 'h6save'), {recursive: true});
+  fs.writeFileSync(path.join(OUT, 'h6save', 'case.json'), JSON.stringify({id: 'h6save', base: '../base-mods.json', runtime: {ticks: 3000}}, null, 2));
+  if (!fs.existsSync(path.join(OUT, 'h6', 'save', 'autostart.rws'))) throw new Error('h6 needs its save first: see the comment above the h6 block');
+  for (const kind of ['overlay', 'answer']) fs.rmSync(path.join(OUT, 'h6', kind), {recursive: true, force: true});   // the save and the recorded logs stay
+  put('h6', RTX.pkg, rel, `<?xml version="1.0" encoding="UTF-8"?>
+<Patch>
+    <!-- These three clip through the retextured heads: take them out until they are redrawn. -->
+    <Operation Class="PatchOperationRemove">
+        <xpath>${xp}</xpath>
+    </Operation>
+</Patch>
+`);
+  fixfile('h6', RTX.pkg, rel, `<?xml version="1.0" encoding="UTF-8"?>
+<Patch>
+    <!-- These three clip through the retextured heads: hide them until they are redrawn. -->
+    <Operation Class="PatchOperationReplace">
+        <xpath>${xp}/styleTags</xpath>
+        <value>
+            <styleTags>
+                <li>IgnoreMe</li>
+            </styleTags>
+        </value>
+    </Operation>
+</Patch>
+`);
+  emit('h6', {load: {save: 'save/autostart.rws'}, overlay: [{pkg: RTX.pkg, files: 'overlay/' + RTX.pkg}]}, {
+    culprit: [{pkg: RTX.pkg, name: RTX.name, role: 'its Patches/Core_Beards_Patch.xml removes the vanilla beards BushyStyled, SideWhiskers and Seer, which pawns in the save wear'}],
+    // the log names no Mod; the natural wrong guess is the other style Mod (a removed or changed hair Mod)
+    decoy: [{pkg: 'jintuzilamian.hairstyle.afumenshairstyles', name: 'AFU Men\'s Hairstyles', role: 'the other hair and beard style Mod in the list; not involved'}],
+    required: [RTX.pkg],
+    faultClass: 'save.def-missing (removed by another Mod\'s patch)',
+    files: [`${RTX.pkg}/${rel}`],
+    fix: 'Do not remove Defs that saves use: hide the beards instead (styleTags IgnoreMe, as the Mod does for the Anomaly hairs; the reference fix), or drop the operation or the file. Disabling the Mod is not a fix.',
+  });
+}
+
+// ---- h8: runtime lord conflict — Progression: Education adds a student who is already in another Mod's lord ------------
+// The Workshop release of Progression: Education (2026-09-07) has no `GetLord()` check where LordToil_AttendClass re-adds an
+// "orphaned" student to the class lord. A student who is in a Socio Butterfly birthday lord then makes Lord.AddPawn log
+// "Tried to add pawn ... to lord ... LordJob_AttendClass ... already a member of lord ... LordJob_Birthday" on every tick
+// of the class. The error names both lord jobs, so Socio Butterfly looks guilty. No Mod is changed: the case adds
+// Progression: Education, Intimacy - Friends n' Lovers and Intimacy - Socio Butterfly to the base list and ships a prepared
+// save (case.json runtime.save, loaded by the sandbox through dev mode's autostart.rws) with a classroom in session and a
+// birthday party that holds the students. The save is built once by make-pe-save.mjs (helper Mod mods/pe-setup).
+if (want('h8')) {
+  const PE = {pkg: 'ferny.ProgressionEducation', dir: `${WS}/3590863552`, name: 'Progression: Education'};
+  const FNL = {pkg: 'LovelyDovey.Sex.WithEuterpe', dir: `${WS}/3498422643`, name: "Intimacy - Friends n' Lovers"};
+  const SB = {pkg: 'LovelyDovey.Recreation.WithEuterpe', dir: `${WS}/3630896210`, name: 'Intimacy - Socio Butterfly'};
+  // the reference fix: the workshop source plus the guard, built with the Mod's own project (net48, Publicizer)
+  const tmp = path.join(OUT, '_build', 'pe-fixed'); fs.rmSync(tmp, {recursive: true, force: true}); fs.mkdirSync(tmp, {recursive: true});
+  const srcDir = `${PE.dir}/1.6/Source`;
+  for (const f of fs.readdirSync(srcDir, {recursive: true})) {
+    const rel = f.split('\\').join('/'); if (/^(obj|bin)(\/|$)/.test(rel) || !fs.statSync(path.join(srcDir, f)).isFile()) continue;
+    fs.mkdirSync(path.dirname(path.join(tmp, rel)), {recursive: true}); fs.copyFileSync(path.join(srcDir, f), path.join(tmp, rel));
+  }
+  const toil = path.join(tmp, 'AI/LordToil_AttendClass.cs');
+  fs.writeFileSync(toil, must(fs.readFileSync(toil, 'utf8'), '|| !CanAddPawn(student))', '|| student.GetLord() != null\n                    || !CanAddPawn(student))'));
+  const proj = path.join(tmp, 'ProgressionEducation.csproj');
+  fs.writeFileSync(proj, fs.readFileSync(proj, 'utf8').split('..\\Assemblies\\').join('out\\'));
+  execFileSync('dotnet', ['build', '-c', 'Release', '-nologo', '-v', 'q'], {cwd: tmp, stdio: 'pipe'});
+  const dll = '1.6/Assemblies/ProgressionEducation.dll';
+  const fixed = path.join(OUT, 'h8', 'answer', PE.pkg, dll); fs.mkdirSync(path.dirname(fixed), {recursive: true}); fs.copyFileSync(path.join(tmp, 'out', 'ProgressionEducation.dll'), fixed);
+  fs.mkdirSync(path.join(OUT, 'h8', 'save'), {recursive: true});   // save/autostart.rws comes from make-pe-save.mjs
+  emit('h8', {
+    runtime: {ticks: 4000, save: 'save/autostart.rws'},
+    add: [PE, FNL, SB].map(m => ({pkg: m.pkg, name: m.name, path: m.dir})),
+  }, {
+    culprit: [{pkg: PE.pkg, name: PE.name, role: 'LordToil_AttendClass adds a student to the class lord without checking that the student already belongs to another lord'}],
+    decoy: [{pkg: SB.pkg, name: SB.name, role: 'owns the other lord (LordJob_Birthday) named in the error; it is not at fault'}, {pkg: FNL.pkg, name: FNL.name, role: 'the framework Socio Butterfly needs; not involved'}],
+    required: [PE.pkg],
+    faultClass: 'runtime.lord-conflict (wrong blame)',
+    files: [`${PE.pkg}/${dll}`],
+    fix: 'In LordToil_AttendClass.LordToilTick, skip a student whose GetLord() is not null before lord.AddPawn(student) (the reference build in answer/ does exactly that). The Mod ships its source (1.6/Source); rebuild 1.6/Assemblies/ProgressionEducation.dll. Removing Socio Butterfly, or the class, only avoids the situation.',
+  });
+}
+
+// ---- h9: no-fault control — the base list as it is, nothing injected -----------------------------------------------
+// The Player.log has only the base list's own noise (ReGrowthCore, VTE, ReBuild ... errors that belong to no task). The right
+// answer is that no Mod needs fixing: answer.json with an empty culprit list, no files. Any file, deletion or list change,
+// or a named Mod, is a false positive. task.md is the same text every case gets: it does not say a case can be fault-free.
+if (want('h9')) {
+  emit('h9', {}, {
+    culprit: [],
+    decoy: [],
+    required: [],
+    control: true,
+    faultClass: 'none (no-fault control)',
+    files: [],
+    fix: 'Nothing: the errors in the log come from Mods of the base list itself and no change is called for. Hand in answer.json with "culprit": [] and no files.',
   });
 }
 
