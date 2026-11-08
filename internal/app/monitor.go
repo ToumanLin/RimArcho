@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -274,6 +275,9 @@ type MonitorResult struct {
 	Merged     int // monitor instances folded into the newest one's lineage
 	Plans      []MonitorPlanChange
 	Notes      []string
+	Err        error // ScanWithMonitor: the check failed, the scan did not
+
+	stop bool // the monitor directory is unavailable: leave the plans alone
 }
 
 // EnsureMonitor installs or updates the bundled monitor for the current environment and
@@ -281,83 +285,129 @@ type MonitorResult struct {
 // nothing to disk and only adds already installed monitors to plans.
 func (a *App) EnsureMonitor(dryRun bool) (*MonitorResult, error) {
 	r := &MonitorResult{DryRun: dryRun}
-	r.Bundled, r.Tried = a.FindMonitor()
-	ix, err := a.Index()
-	if err != nil {
-		return nil, err
+	read, err := a.prepareMonitor(r, dryRun)
+	if err != nil || dryRun || r.stop {
+		return r, err
 	}
-	needScan := false
-	if b := r.Bundled; b != nil {
-		dir := a.MonitorDir()
-		r.Target = filepath.Join(dir, monitorFolder+b.Version)
-		if err := a.managedRootReady("monitor", dir); err != nil {
-			r.Notes = append(r.Notes, err.Error())
-			r.Deferred = "The monitor directory is unavailable. Choose its current location before installing an update."
-			return r, nil
-		}
-		changed, err := a.installMonitor(r, b, dryRun)
-		if err != nil {
-			return r, err
-		}
-		needScan = changed
-		if monitorSourceOf(ix) == nil {
-			r.Registered = true
-			needScan = true
-			if !dryRun {
-				if err := a.registerMonitorSource(ix, dir); err != nil {
-					return r, err
-				}
-			}
-		} else if src := monitorSourceOf(ix); env.PathKey(src.Root) != env.PathKey(dir) {
-			r.Notes = append(r.Notes, fmt.Sprintf("src:%s is at %s, not %s (monitor.dir changed?); RimArcho keeps using it", MonitorLabel, src.Root, dir))
-		}
-	}
-	if dryRun {
-		return r, nil
-	}
-	if needScan {
-		if _, err := a.Scan(false); err != nil {
+	if read != "" {
+		// Only the monitor's own folder changed; the other sources keep their instances.
+		if _, err := a.ScanWith(ScanOptions{Sources: []string{read}}); err != nil {
 			return r, err
 		}
 		r.Scanned = true
-		if ix, err = a.Index(); err != nil {
-			return r, err
+	}
+	return r, a.finishMonitor(r)
+}
+
+// ScanWithMonitor is `archo scan` (04 §1.1, 19 §6): it installs or updates the bundled
+// monitor and registers its source first, so the one scan reads the monitor's folder with
+// the others, then applies the monitor to the plans. A monitor failure does not fail the
+// scan; it is in the result's Err.
+func (a *App) ScanWithMonitor(o ScanOptions) (*ScanReport, *MonitorResult, error) {
+	m := &MonitorResult{}
+	read, merr := a.prepareMonitor(m, false)
+	if merr == nil && read != "" {
+		m.Scanned = true
+		if o.GameOnly || len(o.Sources) > 0 { // a scan that leaves shared folders out
+			o.Sources = append(slices.Clone(o.Sources), read)
 		}
+	}
+	rep, err := a.ScanWith(o)
+	if err != nil {
+		return nil, nil, err
+	}
+	if merr == nil && !m.stop {
+		merr = a.finishMonitor(m)
+	}
+	m.Err = merr
+	return rep, m, nil
+}
+
+// prepareMonitor installs the bundled monitor and registers src:monitor (19 §6 steps 1–3).
+// read is the monitor source's ID when its folder must be read before finishMonitor.
+func (a *App) prepareMonitor(r *MonitorResult, dryRun bool) (read string, err error) {
+	r.Bundled, r.Tried = a.FindMonitor()
+	b := r.Bundled
+	if b == nil {
+		return "", nil
+	}
+	ix, err := a.Index()
+	if err != nil {
+		return "", err
+	}
+	dir := a.MonitorDir()
+	r.Target = filepath.Join(dir, monitorFolder+b.Version)
+	if err := a.managedRootReady("monitor", dir); err != nil {
+		r.Notes = append(r.Notes, err.Error())
+		r.Deferred = "The monitor directory is unavailable. Choose its current location before installing an update."
+		r.stop = true
+		return "", nil
+	}
+	changed, err := a.installMonitor(r, b, dryRun)
+	if err != nil {
+		return "", err
+	}
+	src := monitorSourceOf(ix)
+	if src == nil {
+		r.Registered = true
+		if dryRun {
+			return "", nil
+		}
+		if src, err = a.registerMonitorSource(dir); err != nil {
+			return "", err
+		}
+		return src.ID, nil
+	}
+	if env.PathKey(src.Root) != env.PathKey(dir) {
+		r.Notes = append(r.Notes, fmt.Sprintf("src:%s is at %s, not %s (monitor.dir changed?); RimArcho keeps using it", MonitorLabel, src.Root, dir))
+	}
+	if changed && !dryRun {
+		return src.ID, nil
+	}
+	return "", nil
+}
+
+// finishMonitor folds the monitor instances into one lineage and applies the newest to
+// every plan (19 §6 step 5), after the monitor's folder was read.
+func (a *App) finishMonitor(r *MonitorResult) error {
+	ix, err := a.Index()
+	if err != nil {
+		return err
 	}
 	ms := monitorInstances(ix)
 	if len(ms) == 0 {
-		return r, nil
+		return nil
 	}
 	newest := ms[0]
 	for _, o := range ms[1:] {
 		if o.Mod.LineageID != newest.Mod.LineageID {
 			if err := a.MergeLineages(ix, newest.Mod.LineageID, o.Mod.LineageID); err != nil {
-				return r, err
+				return err
 			}
 			r.Merged++
 		}
 	}
 	if r.Merged > 0 {
 		if ix, err = a.Index(); err != nil {
-			return r, err
+			return err
 		}
 		ms = monitorInstances(ix)
 		newest = ms[0]
 	}
 	plans, err := a.Store.Plans()
 	if err != nil {
-		return r, err
+		return err
 	}
 	for _, p := range plans {
 		c, err := a.monitorPlan(ix, p, newest)
 		if err != nil {
-			return r, err
+			return err
 		}
 		if c.Change != "" || c.Reason != "" {
 			r.Plans = append(r.Plans, c)
 		}
 	}
-	return r, nil
+	return nil
 }
 
 // installMonitor copies the bundled monitor into its version folder; changed reports a copy.
@@ -413,17 +463,16 @@ func (a *App) installMonitor(r *MonitorResult, b *MonitorBundled, dryRun bool) (
 }
 
 // registerMonitorSource adds src:monitor, a shared extra source (03 §2 item 10).
-func (a *App) registerMonitorSource(ix *Index, dir string) error {
+func (a *App) registerMonitorSource(dir string) (*source.Source, error) {
 	if err := a.checkRoots(dir); err != nil {
-		return err
+		return nil, err
 	}
 	if o, err := a.overlapping(dir, nil); err != nil {
-		return err
+		return nil, err
 	} else if o != nil {
-		return fmt.Errorf("the monitor folder %s overlaps src:%s (%s); choose another folder with archo config set monitor.dir <dir>", dir, o.Label, o.Root)
+		return nil, fmt.Errorf("the monitor folder %s overlaps src:%s (%s); choose another folder with archo config set monitor.dir <dir>", dir, o.Label, o.Root)
 	}
-	_, err := a.sharedSource(MonitorLabel, dir)
-	return err
+	return a.sharedSource(MonitorLabel, dir)
 }
 
 func monitorAddedKey(planID int64) string { return fmt.Sprintf("monitor.added:%d", planID) }

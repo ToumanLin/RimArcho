@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -266,6 +267,91 @@ func TestMonitorUpdate(t *testing.T) {
 	}
 	if app.CompareVersions("0.10.0", "0.9.0") <= 0 || app.CompareVersions("0.9.0", "0.9.0-dev") <= 0 || app.CompareVersions("1.0.0-a", "1.0.0-b") >= 0 {
 		t.Fatal("CompareVersions")
+	}
+}
+
+// 19 §6 step 4: the first `archo scan` installs the monitor before reading, so one scan
+// reads every folder once, the monitor's included; an update reads only the monitor's folder.
+func TestMonitorScanOnePass(t *testing.T) {
+	t.Parallel()
+	e := loadoutEnv(t)
+	e.App.MonitorBundle = monitorBundle(t, e, "0.9.0")
+	cur, err := e.App.Env()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// newScans are the scans since the last call, each with the sources it read.
+	seen := 0
+	newScans := func() [][]string {
+		t.Helper()
+		scans, err := e.App.Store.Scans(cur.ID, 100)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out [][]string
+		for _, sc := range scans[:len(scans)-seen] {
+			var st app.ScanStats
+			sc.DecodeStats(&st)
+			var read []string
+			for _, s := range st.Sources {
+				read = append(read, s.Label)
+			}
+			out = append(out, read)
+		}
+		seen = len(scans)
+		return out
+	}
+	live := func() int {
+		t.Helper()
+		n := 0
+		for _, m := range allMods(t, e) {
+			if m.Status == "live" {
+				n++
+			}
+		}
+		return n
+	}
+
+	out := e.MustRun("scan")
+	for _, want := range []string{"src:monitor", "installed 0.9.0", "registered src:monitor", "plan:default: added after Harmony"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("first scan: missing %q:\n%s", want, out)
+		}
+	}
+	if got := newScans(); len(got) != 1 || !slices.Contains(got[0], app.MonitorLabel) || len(got[0]) < 3 {
+		t.Fatalf("first scan read %v; want one scan of every source", got)
+	}
+	if got := active(t, e); strings.Join(got, ",") != strings.Join(insertAfter(got, "Harmony"), ",") || !contains(got, monName) {
+		t.Fatalf("not right after Harmony: %v", got)
+	}
+	before := live()
+
+	// A new version on window open (`monitor install`): only src:monitor is read again.
+	e.App.MonitorBundle = monitorBundle(t, e, "0.10.0")
+	if out := e.MustRun("monitor", "install"); !strings.Contains(out, "plan:default: updated 0.9.0 → 0.10.0") {
+		t.Fatalf("update:\n%s", out)
+	}
+	if got := newScans(); len(got) != 1 || !slices.Equal(got[0], []string{app.MonitorLabel}) {
+		t.Fatalf("update read %v; want only src:monitor", got)
+	}
+	if n := live(); n != before+1 {
+		t.Fatalf("%d live instances after the update, want %d (the other sources keep theirs)", n, before+1)
+	}
+
+	// `scan --game-only` with a new version reads the game's folders and the monitor's, once.
+	e.App.MonitorBundle = monitorBundle(t, e, "0.11.0")
+	if out := e.MustRun("scan", "--game-only"); !strings.Contains(out, "plan:default: updated 0.10.0 → 0.11.0") {
+		t.Fatalf("game-only scan:\n%s", out)
+	}
+	got := newScans()
+	if len(got) != 1 || !slices.Contains(got[0], app.MonitorLabel) || slices.Contains(got[0], "workshop") {
+		t.Fatalf("game-only scan read %v; want one scan of the game's folders and src:monitor", got)
+	}
+	if n := live(); n != before+2 {
+		t.Fatalf("%d live instances after the game-only scan, want %d", n, before+2)
+	}
+	if ms := named(t, e, monName); len(ms) != 3 || ms[0].LineageID != ms[2].LineageID {
+		t.Fatalf("%d monitor instances, not one lineage", len(ms))
 	}
 }
 

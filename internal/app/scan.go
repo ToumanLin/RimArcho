@@ -3,6 +3,7 @@ package app
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
@@ -60,6 +61,21 @@ type ScanOptions struct {
 	// GameOnly reads only the environment's own Data/ and Mods/, not the shared mod folders
 	// (a game just added, 03 §2 item 8).
 	GameOnly bool
+	// Sources, when set, limits the scan to these source IDs (with GameOnly: the game's own
+	// folders and these). Like GameOnly, the sources left out keep their instances: Archo
+	// Monitor's folder just installed is read alone (19 §6).
+	Sources []string
+}
+
+// reads reports whether a scan with o reads source s of environment envID.
+func (o ScanOptions) reads(s *source.Source, envID string) bool {
+	if slices.Contains(o.Sources, s.ID) {
+		return true
+	}
+	if o.GameOnly {
+		return s.EnvID == envID
+	}
+	return len(o.Sources) == 0
 }
 
 // Scan runs 04 §1.1 for the current environment: the shared mod folders and the game's own
@@ -96,8 +112,10 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 	present := map[string]bool{} // left out of this scan, not lost (identity.Input.Present)
 	var active []*source.Source
 	var listed []*source.Source // the sources this scan reports on
+	partial := false            // some sources are left out
 	for _, s := range srcs {
-		if o.GameOnly && s.EnvID != e.ID {
+		if !o.reads(s, e.ID) {
+			partial = true
 			if s.Status != source.StatusRetired {
 				skip[s.ID] = true
 				present[s.ID] = s.Status == source.StatusOK
@@ -176,7 +194,7 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 		},
 		Known: func(l scan.Location) bool { return knownLoc[l.Key()] },
 	})
-	if o.GameOnly {
+	if partial {
 		sharedLinkObservations(obs, known, srcs, present, sstats)
 	}
 	prev, prevHash = nil, nil // release the caches before reconciliation

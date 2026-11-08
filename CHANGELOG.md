@@ -2,6 +2,11 @@
 
 All notable changes to RimArcho. Versions follow semantic versioning; the MVP is 0.5.0.
 
+## 1.0.6 (unreleased)
+
+- A game's first scan reads each Mod folder once. Archo Monitor used to be installed after the scan and then every folder was read a second time; it is now installed first and read in the same pass. With 3,000 synthetic Mods the first `archo scan` took 3.8 s instead of 6.8 s, and the first-run guide's "read the mods" step is shorter by the same amount. A new Monitor version, installed when the window opens or by `archo monitor install`, reads only the Monitor's folder instead of rescanning the whole library. `archo scan --game-only` reads the Monitor's folder too when it was just installed, instead of a second full scan.
+- CLI: `archo scan` shows the Monitor's source and its new instance in the scan's own report, and `archo status`'s "changes" line now counts the whole first scan, not only the Monitor rescan that followed it.
+
 ## 1.0.5 — 2026-11-07
 
 - Archo keeps you company while RimArcho works. A start that takes longer than 0.21 s shows Archo's chibi figure in the middle of the window with a usage tip below it, until the first page is drawn. A page that takes longer than 0.21 s to load shows the figure on the left of its loading card and a tip on the right, changing every 8 s. The first-run guide has Archo beside each step, winking, thinking while a scan or download runs and saluting when it is done. Waits take turns through seven calm expressions (neutral, smile, laugh, wink, think, ponder, yum), the next one every 4 s in a long wait. Settings › interface › Archo animation chooses off, still or animated (default). Animated uses one small WebGL figure (about 0.15 ms of CPU per frame) that stops when hidden and is released 10 s after the wait. Without GPU acceleration or with reduced motion, it shows still images. Nothing is loaded at start, so a fast start costs nothing.
