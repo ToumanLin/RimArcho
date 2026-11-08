@@ -2,6 +2,8 @@ I've played RimWorld for 1,600 hours. I suspect many of you are like me: you sit
 
 RimArcho is fully open source: https://github.com/ToumanLin/RimArcho
 
+Questions or suggestions? Join us on Discord: https://discord.gg/HF2GVyurQs
+
 If you find it useful, please give it a thumbs-up, add it to your favourites and star it on GitHub. Thank you!
 
 ### How to use

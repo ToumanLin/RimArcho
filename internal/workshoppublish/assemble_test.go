@@ -159,3 +159,30 @@ func TestAssembleNeedsDocsAndSkills(t *testing.T) {
 		}
 	}
 }
+
+func TestAssemblePreviewPrefersRepositoryGIF(t *testing.T) {
+	root := fixture(t)
+	gif := filepath.Join(root, filepath.FromSlash(workshoppublish.PreviewAsset))
+	write(t, gif, []byte("GIF89a synthetic"))
+	item, err := workshoppublish.Assemble(root, "1.2.3", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if item.Preview != gif {
+		t.Fatalf("preview %s, want the repository GIF", item.Preview)
+	}
+	if _, err := os.Stat(filepath.Join(item.Folder, filepath.FromSlash(workshoppublish.PreviewAsset))); !os.IsNotExist(err) {
+		t.Fatal("the page preview must stay outside the item folder")
+	}
+	if err := os.Remove(gif); err != nil {
+		t.Fatal(err)
+	}
+	item, err = workshoppublish.Assemble(root, "1.2.3", 0)
+	if err != nil || item.Preview != filepath.Join(item.Folder, "About", "Preview.png") {
+		t.Fatalf("without the GIF: %+v, %v", item, err)
+	}
+	write(t, gif, []byte(strings.Repeat("G", 1<<20)))
+	if _, err := workshoppublish.Assemble(root, "1.2.3", 0); err == nil || !strings.Contains(err.Error(), "smaller than 1 MB") {
+		t.Fatalf("1 MB GIF: %v", err)
+	}
+}

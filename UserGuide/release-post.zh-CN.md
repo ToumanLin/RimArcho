@@ -2,6 +2,8 @@
 
 本启动器代码完全开源, 地址在 https://github.com/ToumanLin/RimArcho
 
+有问题或建议, 欢迎加入 Discord: https://discord.gg/HF2GVyurQs
+
 如果你觉得好用, 不妨点个赞, 点个收藏, 去github给我点个star, 非常感谢!
 
 ### 怎么用
