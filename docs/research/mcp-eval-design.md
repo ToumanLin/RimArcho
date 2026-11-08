@@ -118,6 +118,40 @@ h8 is the first case whose trigger is a game state, not a Mod: `case.json` `runt
 
 Grading. h8 (`RULES`): both PE and Socio Butterfly stay enabled and the change lands in `ferny.ProgressionEducation/1.6/Assemblies/`; the run must reach the autosave. h9 (`control`): culprit = answer.json present with an empty list; fix = no file, deletion or list change. Naming any Mod or changing anything is `falsePositive`; a missing answer.json is a miss (`answered: false`). `task.md` is unchanged, so it does not say that a case can be fault-free. Checked on the host: the h8 reference answer gets culprit and fix (clean log, autosave reached); only the decoy named gets neither (`decoyNamedOnly`); an empty h9 answer gets both; an h9 answer with a file and a named Mod gets neither and `falsePositive`.
 
+### Round 3: h8 and h9, Pi vs dsh, both with Archo (2026-11-08)
+
+12 cells (h8, h9 × A = Pi, B = dsh × 3), 20 min limit, Player-Test only (`matrix.ps1`, about 4 h 45 min), archo 1.0.7 (`tools/archo-1.0.7.exe`, built from dev/1.1 a3a53af7, sha256 `a8380b7b…ffa90`). Cost at CNY 0.5 / 1.0 / 0.01 per Mtok (input / output / cache read). h9 counts as solved only with an `answer.json` that has an empty culprit list and no changed file.
+
+| Group | Solved | Mean s | Turns | Tool calls (Archo) | Tokens | Cost per run |
+| --- | --- | --- | --- | --- | --- | --- |
+| A Pi | 2/6 | 1018 | 76.0 | 85.0 (13.3) | 5.23 M | ¥0.141 |
+| B dsh | 1/6 | 1031 | 75.3 | 92.2 (27.5) | 7.76 M | ¥0.194 |
+
+| Case | A Pi | B dsh |
+| --- | --- | --- |
+| h8 PE lord conflict | 2/3, 1037 s, Archo 11.3, ¥0.113 | 1/3, 948 s, Archo 28.7, ¥0.200 |
+| h9 no fault | 0/3 (2 false positives, 1 timeout), 999 s, Archo 15.3, ¥0.169 | 0/3 (2 false positives, 1 timeout), 1113 s, Archo 26.3, ¥0.188 |
+
+h8 per run (culprit named / fix): A1 no/no (1200 s timeout, nothing submitted); A2 yes/yes (1010 s); A3 yes/yes (902 s); B1 yes/yes (1200 s limit reached, submission graded); B2 yes/no (953 s); B3 yes/no (692 s).
+
+- **Culprit.** All 5 agents that submitted named Progression: Education; none was fooled by the decoys (Socio Butterfly, Friends n' Lovers). Pi A2 also named Socio Butterfly. The log line names both lord jobs and PE ships its source, so reading was enough.
+- **Why the fix failed (B2, B3).** Both rebuilt `ProgressionEducation.dll` from `1.6/Source` without Krafs.Publicizer; the game then logs `FieldAccessException: Field RimWorld.StatWorker:stat is inaccessible` and the map never reaches the autosave. A3 rebuilt it correctly; A2 shipped a small separate DLL instead; B1 shipped a patch DLL (`EducationLordFix.dll`). Archo's `read_source` does not tell an agent how a Mod's DLL is built.
+- **A1** spent 73 `bash` calls rebuilding and diffing the DLL (a Debug build against the Workshop one) and ran out of time without writing a submission.
+- **No agent could load the save.** `list_saves` was called in every run, but `test_run` only starts a new map, where no class exists. `test_run` was used 1 to 2 times per h8 run and could not show whether the fix works.
+
+h9 per run: A1 timeout, no answer; A2 changed `Palpha.godhands` translation files; A3 changed translation files of two Mods; B1 disabled Beheading Dolls in `ModsConfig.xml`; B2 timeout, no answer; B3 changed translation files of two Mods. No agent answered "nothing to fix".
+
+- Every agent that answered chased noise present in the base list: the six Unity `_MainTex` material errors and the 19 "Translation data for language English" errors. The task prompt says there are errors to fix; that is the pressure. All four answers broke nothing, but each is a false positive by the control's rule.
+- The control shows an agent will not volunteer "no fault" without a hint. A task line such as "the log may be fine" would change the case, so it was not added. Whether to count translation-key cleanups as harm is the owner's call (they cost a run's time, not the user's game).
+
+Void cell: h9-A-2 first ended at 489 s on four `521` errors from the model provider (gateway origin down), so it was moved to `results-gateway-down/` and run again (775 s, above). An earlier attempt of all cells had been voided by the gateway outage (0 tool calls, "Request timed out"); those results are also in `results-gateway-down/`.
+
+Archo findings:
+
+- **No Archo defect was hit in these 12 runs.** One tool error appears: `analyze_log` answered "no Player.log found for 1.6 under C:\Users\…\LocalLow\…" in h9-A-1 (5 times) on a guest where the game had not yet been run. The message is the CLI's (`archo log --file <path>`); check that an MCP agent can act on it.
+- **Gap, not a bug:** no tool starts a given save, so a runtime fault that needs a game state (h8) cannot be reproduced or verified through Archo. Likewise nothing tells an agent a Mod's DLL needs publicized references.
+- dsh calls Archo about twice as often (27.5 against 13.3 per run) and uses about 50% more tokens, as in round 2; neither group is more accurate here (3 runs per cell).
+
 ## Grading
 
 `scripts/mcp-eval/logdiff.mjs` compares a run's error lines (paths and addresses normalised) with the case's `reference.Player.log`. A submission is applied as a layer over the case (`sandbox.mjs <case> --layer <dir>`; files at `<packageId>/<mod-relative path>`, `enable.json` for re-enabled Mods), the game starts, and the log must have no error line the reference fix lacks. Culprit scoring uses `answer.json`: every `culprit` must be named; naming only a `decoy` fails.
