@@ -7,10 +7,70 @@ import (
 	"testing"
 
 	"github.com/ToumanLin/RimArcho/internal/buildinfo"
+	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
+	"github.com/ToumanLin/RimArcho/internal/workshoppublish"
 )
 
+// publishRoot is a repository root holding the default descriptions ("" leaves one out),
+// made the working directory as `archo workshop publish` expects.
+func publishRoot(t *testing.T, en, zh string) {
+	t.Helper()
+	root := t.TempDir()
+	for path, text := range map[string]string{workshoppublish.Description: en, workshoppublish.DescriptionZh: zh} {
+		if text == "" {
+			continue
+		}
+		p := filepath.Join(root, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(text), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Chdir(root)
+}
+
+func TestWorkshopPublishDefaultDescriptions(t *testing.T) {
+	publishRoot(t, "[h3]RimArcho[/h3]\r\n\r\nRimArcho v1.2.2\r\n", "\xef\xbb\xbf[h3]zh[/h3]\n")
+	a, _ := parse(workshopPublishCommand, []string{"--version", "1.2.3"})
+	r, err := publishOptions(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The file's old stamp is replaced; the update check reads the new one (17 §5.1).
+	if r.Description != "[h3]RimArcho[/h3]\n\nRimArcho v1.2.3" || len(r.Translations) != 1 || r.Translations[0].Description != "[h3]zh[/h3]\n\nRimArcho v1.2.3" {
+		t.Fatalf("options: %q %+v", r.Description, r.Translations)
+	}
+	if selfupdate.DescriptionVersion(r.Description) != "1.2.3" {
+		t.Fatal("stamp unreadable")
+	}
+
+	publishRoot(t, "English only", "")
+	r, err = publishOptions(a)
+	if err != nil || r.Description != "English only\n\nRimArcho v1.2.3" || len(r.Translations) != 0 {
+		t.Fatalf("no Chinese file: %+v, %v", r, err)
+	}
+
+	// Without a description the release would not be named: refused before Steam.
+	publishRoot(t, "", "")
+	if _, err := publishOptions(a); err == nil || !strings.Contains(err.Error(), "--description") {
+		t.Fatalf("missing description: %v", err)
+	}
+	if !WorkshopPublishOffline([]string{"workshop", "publish", "--version", "1.2.3"}) {
+		t.Fatal("refused publish would open a player home")
+	}
+
+	// A file under Steam's limit that the version line pushes over it is refused.
+	publishRoot(t, strings.Repeat("x", steamworks.DescriptionMax-5), "")
+	if _, err := publishOptions(a); err == nil || !strings.Contains(err.Error(), "version line") {
+		t.Fatalf("over the limit with the stamp: %v", err)
+	}
+}
+
 func TestWorkshopPublishArguments(t *testing.T) {
+	publishRoot(t, "description", "")
 	for _, tc := range []struct {
 		args          []string
 		version       string
@@ -73,6 +133,7 @@ func TestWorkshopPublishArguments(t *testing.T) {
 }
 
 func TestWorkshopPublishDescriptionAndPreview(t *testing.T) {
+	publishRoot(t, "default description", "")
 	dir := t.TempDir()
 	write := func(name string, size int, fill string) string {
 		p := filepath.Join(dir, name)
@@ -92,7 +153,7 @@ func TestWorkshopPublishDescriptionAndPreview(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r.Description != "[h3]RimArcho[/h3]" || len(r.Translations) != 1 || r.Translations[0] != (steamworks.PublishTranslation{Language: "schinese", Description: "[h3]\u542f\u52a8\u524d\u4f53\u68c0[/h3]"}) || r.Preview != gif {
+	if r.Description != "[h3]RimArcho[/h3]\n\nRimArcho v1.2.3" || len(r.Translations) != 1 || r.Translations[0] != (steamworks.PublishTranslation{Language: "schinese", Description: "[h3]\u542f\u52a8\u524d\u4f53\u68c0[/h3]\n\nRimArcho v1.2.3"}) || r.Preview != gif {
 		t.Fatalf("options: %+v", r)
 	}
 	big := write("big.txt", 8001, "x")

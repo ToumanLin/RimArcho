@@ -10,7 +10,7 @@ import (
 
 func TestReadPublishRequestTranslations(t *testing.T) {
 	dir := t.TempDir()
-	base := PublishRequest{Content: dir, IDFile: filepath.Join(dir, "id.txt"), Version: "1.2.3", Title: "RimArcho", Description: "en"}
+	base := PublishRequest{Content: dir, IDFile: filepath.Join(dir, "id.txt"), Version: "1.2.3", Tags: []string{"Mod", "1.6"}, Title: "RimArcho", Description: "en"}
 	read := func(r PublishRequest) error {
 		b, _ := json.Marshal(r)
 		p := filepath.Join(dir, "request.json")
@@ -34,6 +34,10 @@ func TestReadPublishRequestTranslations(t *testing.T) {
 			r.Translations = []PublishTranslation{{Language: "schinese", Description: strings.Repeat("\u4f53", DescriptionMax/3+1)}}
 		},
 		"long description": func(r *PublishRequest) { r.Description = strings.Repeat("x", DescriptionMax+1) },
+		"no tags":          func(r *PublishRequest) { r.Tags = nil },
+		"empty tag":        func(r *PublishRequest) { r.Tags = []string{"Mod", ""} },
+		"tag with comma":   func(r *PublishRequest) { r.Tags = []string{"Mod,1.6"} },
+		"long tag":         func(r *PublishRequest) { r.Tags = []string{strings.Repeat("x", TagMax+1)} },
 		"NUL in translation": func(r *PublishRequest) {
 			r.Translations = []PublishTranslation{{Language: "schinese", Description: "a\x00b"}}
 		},

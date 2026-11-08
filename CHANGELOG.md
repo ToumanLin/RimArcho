@@ -2,6 +2,11 @@
 
 All notable changes to RimArcho. Versions follow semantic versioning; the MVP is 0.5.0.
 
+## 1.0.6 (unreleased)
+
+- RimArcho's Workshop item is tagged like a Mod: `Mod` and the game versions Archo Monitor supports (`1.5`, `1.6`, `1.7`), instead of RimArcho's own version (`v1.0.5`). The release now shows as the description's last line, `RimArcho v1.0.6`, and the update check reads it there. 1.0.5 looked for the version tag: without it, 1.0.5 still finds updates through a subscribed copy of the item or GitHub.
+- CLI (maintainer only): `archo workshop publish` always sets the description, so its last line names the release: `--description`, else the repository's `UserGuide/release-post.steam.txt` (and `--description-zh`, else `UserGuide/release-post.zh-CN.steam.txt`). With no English description it is refused. The tags are read from Monitor's About.xml; the dry run lists them and each description's last line.
+
 ## 1.0.5 — 2026-11-07
 
 - Archo keeps you company while RimArcho works. A start that takes longer than 0.21 s shows Archo's chibi figure in the middle of the window with a usage tip below it, until the first page is drawn. A page that takes longer than 0.21 s to load shows the figure on the left of its loading card and a tip on the right, changing every 8 s. The first-run guide has Archo beside each step, winking, thinking while a scan or download runs and saluting when it is done. Waits take turns through seven calm expressions (neutral, smile, laugh, wink, think, ponder, yum), the next one every 4 s in a long wait. Settings › interface › Archo animation chooses off, still or animated (default). Animated uses one small WebGL figure (about 0.15 ms of CPU per frame) that stops when hidden and is released 10 s after the wait. Without GPU acceleration or with reduced motion, it shows still images. Nothing is loaded at start, so a fast start costs nothing.
