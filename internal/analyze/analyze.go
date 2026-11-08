@@ -20,7 +20,7 @@ import (
 )
 
 // Version of the analyzers; facts written by another version are rebuilt (05 §2).
-const Version = 10 // 6: manual Harmony.Patch targets, HugsLib.dll in its own mod; 7: harmony.multi-transpiler is info; 8: a parent named by a mod-defined patch operation is not missing; 9: asm.duplicate-name; 10: compiler-added types are not lost types
+const Version = 11 // 6: manual Harmony.Patch targets, HugsLib.dll in its own mod; 7: harmony.multi-transpiler is info; 8: a parent named by a mod-defined patch operation is not missing; 9: asm.duplicate-name; 10: compiler-added types are not lost types; 11: simple TargetMethod() bodies resolved to static targets
 
 // Mod is one installed instance.
 type Mod struct {

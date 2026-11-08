@@ -299,6 +299,7 @@ func clusterDoc(c *Ctx, ix *app.Index, r *app.LogReport, lc *app.LogCluster) *re
 		att.Add(roleLine(ix, x))
 	}
 	att.Truncate(12, "")
+	listScanLines(root, ix, lc)
 	conf := lc.Confidence
 	if lc.Why != "" {
 		conf += " (" + lc.Why + ")"

@@ -495,9 +495,10 @@ func saveHarmony(tx *sql.Tx, asms []*analyze.AssemblyFacts, sets map[string]int6
 			}
 		}
 		for _, p := range a.Patches {
-			// dynamic holds two bits: 1 the target is chosen at run time, 2 the patch was
-			// found at a Harmony.Patch call in code (G9, 05 §5.3).
-			if _, err := insH.Exec(set, file, p.PatchType, p.PatchMethod, p.Kind, p.Target(), p.TargetType, p.TargetMethod, p.Args, b(p.Skips), b(p.Dynamic)|2*b(p.Manual)); err != nil {
+			// dynamic holds three bits: 1 the target is chosen at run time, 2 the patch was
+			// found at a Harmony.Patch call in code (G9, 05 §5.3), 4 the target was read from a
+			// simple TargetMethod() body.
+			if _, err := insH.Exec(set, file, p.PatchType, p.PatchMethod, p.Kind, p.Target(), p.TargetType, p.TargetMethod, p.Args, b(p.Skips), b(p.Dynamic)|2*b(p.Manual)|4*b(p.FromTargetMethod)); err != nil {
 				return err
 			}
 		}
@@ -522,6 +523,8 @@ type HarmonyRow struct {
 	// Manual: found at a Harmony.Patch call in code, not from attributes (G9). With
 	// Dynamic its original was not resolved and Target says why ("<manual: …>").
 	Manual bool
+	// FromTargetMethod: the class picks its target in TargetMethod(), read statically.
+	FromTargetMethod bool
 }
 
 // HarmonyFilter selects Harmony patches.
@@ -562,7 +565,7 @@ func (s *Store) HarmonyPatches(f HarmonyFilter) ([]*HarmonyRow, error) {
 		if err := rows.Scan(&h.Instance, &r.set, &r.ix, &h.PatchType, &h.PatchMethod, &h.Kind, &h.Target, &sk, &dy); err != nil {
 			return nil, err
 		}
-		h.Skips, h.Dynamic, h.Manual = sk != 0, dy&1 != 0, dy&2 != 0
+		h.Skips, h.Dynamic, h.Manual, h.FromTargetMethod = sk != 0, dy&1 != 0, dy&2 != 0, dy&4 != 0
 		out = append(out, h)
 		at = append(at, r)
 	}
