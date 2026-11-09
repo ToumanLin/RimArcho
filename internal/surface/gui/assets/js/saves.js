@@ -52,6 +52,8 @@ function news(ev) {
   if (ev.done && (ev.error || quiet)) say(ev.error ? "fail" : "ok", ev.error || ev.text || "");
   if (ev.page) update(ev.page);
   if (X.sel && (ev.refs || []).includes(X.sel) && X.detail?.ref === X.sel && !X.detail.play && !X.detail.loading) refreshDetail();
+  // read again for its content (an older parser's cache): ask for the content again
+  else if (X.sel && (ev.refs || []).includes(X.sel) && content.ref === X.sel && content.data?.stale) loadContent(X.sel);
 }
 
 // refreshDetail asks for the selected save's cards again after the full read; while the
@@ -102,6 +104,7 @@ function readList() {
 // open shows the page; select names a save to select (Can it run's last save).
 export async function open(select = "") {
   if (select && select !== X.sel) { X.sel = select; X.detail = null; X.ask = null; X.renaming = false; }
+  zoom.clear(); // kept per colony while the page is open
   const read = beginPageRead("saves", { retry: () => open(select), label: "reading the saves…" });
   let p;
   try { p = await readList(); } catch (e) { read.fail(e); return; }
@@ -363,6 +366,8 @@ function drawMid(keep) {
   const focusKey = focused?.dataset?.key;
   mods?.destroy();
   mods = null;
+  timeRO?.disconnect();
+  timeRO = timeBox = null;
   midCard.replaceChildren();
   if (!d) { midCard.append(el("div", "empty-state", T("select a save"))); return; }
   const b = body();
@@ -423,8 +428,6 @@ function drawMid(keep) {
     midCard.append(b);
     return;
   }
-  timeRO?.disconnect();
-  timeBox = null;
   if (!d.error) {
     b.append(loadSection(d));
     b.append(timeBox = el("div", "sv-sect sv-time"));
@@ -700,7 +703,7 @@ function drawRight(keep) {
   if (p?.note) head.append(el("p", "sv-note warn", p.note));
   b.append(head);
   if (d.loading) { rightCard.append(b); return; }
-  b.append(contentSection(d));
+  b.append(contentBox = contentSection(d));
   rightCard.append(b);
   b.scrollTop = top;
   if (focused !== null) (focused && b.querySelector(`[data-key="${CSS.escape(focused)}"]`) || b).focus({ preventScroll: true });
@@ -712,6 +715,19 @@ function drawRight(keep) {
 // the Mods are filtered to; opened: the Mods (by packageId, "?" for source not found)
 // whose names are shown; all: every Mod is listed, not the first CONTENT_FOLD.
 let content = { ref: "", seq: 0, data: null, error: "", cat: "", opened: new Set(), all: false };
+// contentBox is the section in the right card, redrawn on its own (redrawContent) so a
+// colony name being typed in the card's header stays.
+let contentBox = null;
+
+function redrawContent() {
+  const d = X.detail;
+  if (!d || !contentBox?.isConnected) { drawRight(true); return; }
+  const key = contentBox.contains(document.activeElement) ? document.activeElement.dataset?.key : "";
+  const n = contentSection(d);
+  contentBox.replaceWith(n);
+  contentBox = n;
+  if (key) n.querySelector(`[data-key="${CSS.escape(key)}"]`)?.focus({ preventScroll: true });
+}
 const CONTENT_FOLD = 40;
 
 // loadContent asks for the save's content after its check: attributing thousands of Defs
@@ -724,7 +740,7 @@ async function loadContent(ref) {
   if (n !== content.seq || content.ref !== ref || X.sel !== ref || S.screen !== "saves") return;
   content.data = c || null;
   content.error = err;
-  drawRight(true);
+  redrawContent();
 }
 
 function contentSection(d) {
@@ -733,7 +749,10 @@ function contentSection(d) {
   const h = el("h3", "", T("content in this save"));
   s.append(h);
   if (content.ref === d.ref && content.error) { s.append(el("p", "err", content.error)); return s; }
-  if (!c || (!c.read && d.reading)) { s.append(shimmer(d.reading ? T("reading the save…") : T("finding the Mods of its content…"), 5)); return s; }
+  if (!c || c.stale || (!c.read && d.reading)) {
+    s.append(shimmer(c?.stale ? T("reading the save for its content…") : d.reading ? T("reading the save…") : T("finding the Mods of its content…"), 5));
+    return s;
+  }
   if (!c.read) {
     s.append(el("p", "sv-note muted", c.note || d.playNote || T("the save is not read in full yet")));
     return s;
@@ -755,7 +774,7 @@ function contentSection(d) {
       b.setAttribute("aria-pressed", String(on));
       b.append(el("span", "n", String(t.count)), el("span", "l", t.label + (t.under ? " *" : "")));
       b.title = [t.under ? T("may be underestimated: it leaves few traces in a save") : "", t.hidden ? Tf("%d hidden", t.hidden) : "", Tf("%d uses", t.uses)].filter(Boolean).join("  ");
-      b.onclick = () => { content.cat = on ? "" : t.key; drawRight(true); };
+      b.onclick = () => { content.cat = on ? "" : t.key; redrawContent(); };
       cats.append(b);
     }
     s.append(cats);
@@ -783,14 +802,21 @@ function contentSection(d) {
   if (!list.childElementCount) s.append(el("p", "sv-none", T("no Mod of this save has content in this category")));
   else s.append(list);
   if (shownMods.length > cut) {
-    const more = button(Tf("show all %d Mods", shownMods.length), "", () => { content.all = true; drawRight(true); }, "link sv-fold");
+    const more = button(Tf("show all %d Mods", shownMods.length), "", () => { content.all = true; redrawContent(); }, "link sv-fold");
     more.dataset.key = "content-all";
     const f = el("p", "sv-folds");
     f.append(more);
     s.append(f);
   }
   if (c.unchecked?.length) {
-    s.append(el("p", "sv-note warn", Tf("not analysed yet: %s. Their Defs count as source not found until the list is analysed.", namesOf(c.unchecked, 6))));
+    // their Defs lack the category fields (an older analysis, another game or
+    // environment): left out, not counted as source not found. Analysing a list made from
+    // the save reads them; the card asks again when the analysis is done.
+    const p = el("p", "sv-note warn", Tf("not analysed yet: %s. What they add is left out until a list with them is analysed.", namesOf(c.unchecked, 6)) + " ");
+    const go = button(T("make a list from this save and analyse it"), "", () => newList(d, true), "link sv-fold", "new-plan");
+    go.dataset.key = "content-analyse";
+    p.append(go);
+    s.append(p);
   }
   // the save's Mods with nothing in it: code, UI and patch Mods leave no Def (12 §3.3)
   const none = (d.mods || []).filter((m) => !m.missing).length - mods.length - (c.unchecked?.length || 0);
@@ -814,7 +840,7 @@ function contentMod(m, id, name, library, defs, cats) {
   const chv = el("span", "chv" + (open || content.cat ? " open" : "")); chv.innerHTML = icon.chev;
   tg.append(chv, el("span", "n", name), el("span", "k", String(defs)));
   if (m.packageId) tg.title = m.packageId;
-  tg.onclick = () => { if (content.opened.has(id)) content.opened.delete(id); else content.opened.add(id); drawRight(true); };
+  tg.onclick = () => { if (content.opened.has(id)) content.opened.delete(id); else content.opened.add(id); redrawContent(); };
   li.append(tg);
   if (id !== "?") li.append(el("p", "sum", cats.map((x) => Tf("%d %s", x.count, x.label) + (x.under ? " *" : "")).join(T(", "))));
   const shown = content.cat ? cats.filter((x) => x.key === content.cat) : open ? cats : [];
@@ -842,12 +868,12 @@ function contentMod(m, id, name, library, defs, cats) {
 // news redraws it without the rest of the card (a rename in progress stays). zoom is how
 // many times the card's width the chart is drawn, kept per colony: a long colony's saves
 // sit a few pixels apart until zoomed in.
-let timeBox = null, timeRO = null, zoom = { colony: "", z: 1 };
+let timeBox = null, timeRO = null;
+const zoom = new Map(); // colony key → zoom, while the page is open
 const ZOOM_MAX = 64;
 
 function zoomOf() {
-  const k = colonyOf(X.sel)?.key || "";
-  return zoom.colony === k ? zoom.z : 1;
+  return zoom.get(colonyOf(X.sel)?.key || "") || 1;
 }
 
 // fillTime draws Over time: skeletons while the save is read, nothing when it has no
@@ -922,7 +948,7 @@ function setZoom(z, frac) {
   const sc = timeBox?.querySelector(".sv-chartscroll");
   const px = (sc?.clientWidth || 0) * frac;
   const ratio = sc ? (sc.scrollLeft + px) / sc.scrollWidth : 0.5;
-  zoom = { colony: colonyOf(X.sel)?.key || "", z: z < 1.05 ? 1 : z };
+  zoom.set(colonyOf(X.sel)?.key || "", z < 1.05 ? 1 : z);
   const keep = timeBox?.contains(document.activeElement) ? document.activeElement.dataset?.key : "";
   fillTime(X.detail, { ratio, px });
   const f = keep && timeBox?.querySelector(`[data-key="${CSS.escape(keep)}"]`);

@@ -90,10 +90,10 @@ func (s *Store) scanDefsWith(rows *sql.Rows, lists func(set int64) []string) ([]
 		if err := rows.Scan(&f.Instance, &r.set, &f.Type, &f.DefName, &f.Name, &f.Parent, &abs, &r.ix, &f.Line, &f.MayRequire, &f.MayRequireAny, &fields); err != nil {
 			return nil, err
 		}
-		if fields != "" {
-			if err := json.Unmarshal([]byte(fields), &f.Content); err != nil {
-				return nil, err
-			}
+		// Content fields serve the save content card only: a row that does not decode
+		// leaves that Def unclassified instead of failing every reader of Def facts.
+		if fields != "" && json.Unmarshal([]byte(fields), &f.Content) != nil {
+			f.Content = nil
 		}
 		f.Abstract = abs != 0
 		out = append(out, f)

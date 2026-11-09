@@ -6,12 +6,16 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/analyze"
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/savefile"
 )
 
 // SaveContentResult is selected-save L2 evidence, using cached L1 and installed Def
 // facts only. It is never computed while listing saves (12 §1.7).
 type SaveContentResult struct {
-	Read      bool
+	Read bool
+	// Stale: the cached read is from an older parser without the typed references
+	// (savefile.MinParserVersion); the caller reads the save again (SaveFacts with read).
+	Stale     bool
 	Note      string
 	Defs      int
 	Totals    []SaveContentCategory
@@ -70,6 +74,10 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 		out.Note = "This save has not been read yet."
 		return out, nil
 	}
+	if f.Parser != savefile.ParserVersion {
+		out.Stale, out.Note = true, "This save is read again for its content."
+		return out, nil
+	}
 	out.Read = true
 	if f.Malformed != nil {
 		out.Note = "These references are partial because the save is malformed."
@@ -80,6 +88,29 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 	}
 	var mods []SaveMod
 	active := map[string]bool{}
+	// A pack's save loads the pack's own copies; the library's copy of the same packageId
+	// stands in while the pack's has no content facts.
+	packCopy := map[string]string{}
+	if sv.Pack != "" {
+		if p, err := a.ReadPack(sv.Pack); err == nil {
+			for _, e := range p.Entries {
+				if e.Instance != "" {
+					packCopy[normPkg(e.PackageID)] = e.Instance
+				}
+			}
+		}
+	}
+	if sv.Env != nil {
+		a.Store.MM = env.MajorMinor(sv.Env.GameVersion)
+	}
+	var packInsts []string
+	for _, inst := range packCopy {
+		packInsts = append(packInsts, inst)
+	}
+	packReady, err := a.Store.ContentReady(packInsts)
+	if err != nil {
+		return nil, err
+	}
 	err = a.inSaveList(sv, func() error {
 		st, err := a.Loadout()
 		if err != nil {
@@ -89,6 +120,9 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 		for i, pkg := range sv.Head.ModIDs {
 			active[normPkg(pkg)] = true
 			inst := st.Reg.Resolve(pkg).Instance
+			if pc := packCopy[normPkg(pkg)]; pc != "" && (packReady[pc] || inst == "") {
+				inst = pc
+			}
 			if inst != "" && seen[inst] {
 				continue
 			}

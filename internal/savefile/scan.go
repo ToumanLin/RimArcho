@@ -9,6 +9,12 @@ import (
 // (a field added, removed or computed differently): caches of Facts key on it (12 §1.7).
 const ParserVersion = 2
 
+// MinParserVersion is the oldest version whose Facts mean what this version's do, except
+// for fields added since (2 added DefRefs). Lists, grouping, play facts and Can it load use
+// a row this old; a reader of a newer field reads the save again (12 §1.7). Raise it to
+// ParserVersion when a change alters what an existing field means.
+const MinParserVersion = 1
+
 // Limits on the lists Facts keeps; counts beyond them are still exact.
 const (
 	MaxEvents   = 200 // Facts.Events

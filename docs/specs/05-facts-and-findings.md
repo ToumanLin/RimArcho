@@ -25,7 +25,7 @@ The game does not load every file in a Mod directory. All content analysis (`Def
 
 **Cache key**. Conditional `<li>` entries make the effective content depend on the plan, so the effective-content cache key is:
 
-`snapshot hash | hash of ordered effective directory list | analyzer version`
+`snapshot hash | hash of ordered effective directory list | analyzer version | Def content version` (`analyze.DefKeySuffix`: `|a<analyze.Version>|c<analyze.DefContentVersion>`; a set with an existing key is never rewritten, so a change to the content fields alone must still make new sets)
 
 Preserve the directory priority order and duplicates. Clean the paths and normalize their separators first (`content.FolderKey`); changing the order can change which same-name resource overrides another. The game version and condition evaluation already affect directory selection, so identical directories do not need separate sets for different versions or condition text. The key excludes the whole plan. A plan edit invalidates only the `Mods` whose effective directories change (`TestLoadFoldersConditions`).
 

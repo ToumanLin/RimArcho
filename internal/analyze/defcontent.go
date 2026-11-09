@@ -1,12 +1,18 @@
 package analyze
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/xdoc"
 )
 
 const DefContentVersion = 1
+
+// DefKeySuffix ends a Mod's Def fact-set key: the analyzer and Def content versions, so a
+// change to either makes new sets instead of reusing ones without the new fields (a set
+// with an existing key is never rewritten, store.ensureFactSet).
+func DefKeySuffix() string { return fmt.Sprintf("|a%d|c%d", Version, DefContentVersion) }
 
 // DefContent retains only predicate inputs, never a full Def subtree (05 §5.1).
 type DefContent struct {

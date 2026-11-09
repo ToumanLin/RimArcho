@@ -259,7 +259,6 @@
   "zoom out (ctrl+wheel)": "缩小（ctrl+滚轮）",
   "fit": "全部",
   "show the whole colony": "显示整个殖民地",
-  "not analysed yet: %s. Their Defs count as source not found until the list is analysed.": "还没分析：%s。分析列表之前，它们的 Def 算作找不到来源。",
   "not covered yet": "还看不到的内容",
   "%d hidden": "其中 %d 个隐藏",
   "This save has not been read yet.": "这个存档还没读过。",
@@ -290,5 +289,9 @@
   "recipes": "配方",
   "biomes": "生物群系",
   "storytellers": "讲述者",
-  "scenarios": "剧本"
+  "scenarios": "剧本",
+  "not analysed yet: %s. What they add is left out until a list with them is analysed.": "还没分析：%s。分析含有它们的列表之前，它们添加的内容不计入。",
+  "make a list from this save and analyse it": "用这个存档新建列表并分析",
+  "reading the save for its content…": "正在重新读取存档里的内容…",
+  "This save is read again for its content.": "正在为内容重新读取这个存档。"
 }

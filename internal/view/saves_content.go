@@ -4,6 +4,7 @@ import "github.com/ToumanLin/RimArcho/internal/app"
 
 type SaveContent struct {
 	Read      bool             `json:"read"`
+	Stale     bool             `json:"stale,omitempty"` // read again for its content; a saves-read event follows
 	Note      string           `json:"note,omitempty"`
 	Defs      int              `json:"defs"`
 	Totals    []SaveContentCat `json:"totals"`
@@ -33,7 +34,7 @@ type SaveContentCat struct {
 
 // SaveContentOf translates a selected-save content result without additional queries.
 func SaveContentOf(c *app.SaveContentResult) *SaveContent {
-	v := &SaveContent{Read: c.Read, Note: T(c.Note), Defs: c.Defs, Totals: []SaveContentCat{}, Mods: []SaveContentMod{}, Unchecked: c.Unchecked}
+	v := &SaveContent{Read: c.Read, Stale: c.Stale, Note: T(c.Note), Defs: c.Defs, Totals: []SaveContentCat{}, Mods: []SaveContentMod{}, Unchecked: c.Unchecked}
 	if !c.Read {
 		return v
 	}

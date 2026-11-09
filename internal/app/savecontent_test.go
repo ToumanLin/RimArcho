@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/savefile"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
@@ -277,5 +280,56 @@ func TestSaveContentOfficialAndSavePackages(t *testing.T) {
 	c = contentOf(t, e, `<x><def>DLCAbility</def></x>`, "ludeon.rimworld")
 	if len(c.Mods) != 0 || c.Unknown == nil || c.Unknown.Count != 1 {
 		t.Fatalf("DLC outside save counted: %+v", c)
+	}
+}
+
+// A cache row of an older parser that means the same (savefile.MinParserVersion) keeps the
+// save's summary and play facts, so a parser change that only adds facts does not unread
+// every save; the content asks for a new read, which SaveFacts with read does (12 §1.7).
+func TestSaveContentOlderParserRow(t *testing.T) {
+	e := contentFixture(t)
+	contentOf(t, e, `<things><li><def>Shared</def></li></things>`)
+	s, _, err := e.App.FindSave("Content")
+	if err != nil {
+		t.Fatal(err)
+	}
+	key := env.PathKey(s.Path)
+	c, err := e.App.Store.SaveFacts(key)
+	if err != nil || c == nil {
+		t.Fatalf("cached row %v %v", c, err)
+	}
+	var f savefile.Facts
+	if err := json.Unmarshal(c.Facts, &f); err != nil {
+		t.Fatal(err)
+	}
+	f.Parser, f.DefRefs = savefile.MinParserVersion, nil
+	if c.Facts, err = json.Marshal(&f); err != nil {
+		t.Fatal(err)
+	}
+	c.Parser = savefile.MinParserVersion
+	if err := e.App.Store.PutSaveCache(c); err != nil {
+		t.Fatal(err)
+	}
+
+	l, err := e.App.ListSaves()
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err = l.Find(s.Ref)
+	if err != nil || s.Summary == nil {
+		t.Fatalf("an older parser's row lost the summary: %+v %v", s, err)
+	}
+	if old, err := e.App.SaveFacts(s, false); err != nil || old == nil || old.Parser != savefile.MinParserVersion {
+		t.Fatalf("cached facts without read: %+v %v", old, err)
+	}
+	r, err := e.App.SaveContent(s)
+	if err != nil || !r.Stale || r.Read {
+		t.Fatalf("content from an older row: %+v %v", r, err)
+	}
+	if nf, err := e.App.SaveFacts(s, true); err != nil || nf == nil || nf.Parser != savefile.ParserVersion || len(nf.DefRefs) == 0 {
+		t.Fatalf("read again: %+v %v", nf, err)
+	}
+	if r, err = e.App.SaveContent(s); err != nil || r.Stale || !r.Read || len(r.Mods) == 0 {
+		t.Fatalf("content after the read: %+v %v", r, err)
 	}
 }

@@ -26,10 +26,10 @@ type SaveSummaryRow struct {
 	Malformed bool
 }
 
-// Valid reports whether the row still describes a file of this size and mtime read by
-// this parser.
-func (c *SaveCache) Valid(size, mtime int64, parser int) bool {
-	return c != nil && c.Size == size && c.MTime == mtime && c.Parser == parser
+// Valid reports whether the row still describes a file of this size and mtime read by a
+// parser from minParser to parser.
+func (c *SaveCache) Valid(size, mtime int64, minParser, parser int) bool {
+	return c != nil && c.Size == size && c.MTime == mtime && c.Parser >= minParser && c.Parser <= parser
 }
 
 func upgradeSaveCache(tx *sql.Tx, _ func(done, total int64)) error {

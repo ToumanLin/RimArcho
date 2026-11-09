@@ -187,11 +187,26 @@ func (s *API) SaveContent(ref string) (*view.SaveContent, error) {
 	if err != nil {
 		return nil, err
 	}
-	c, err := r.SaveContent(sv)
+	cp := *sv // SaveFacts sets the summary: the listing is shared with other calls
+	c, err := r.SaveContent(&cp)
 	if err != nil {
 		return nil, err
 	}
-	return view.SaveContentOf(c), nil
+	v := view.SaveContentOf(c)
+	if c.Stale {
+		// cached by an older parser: read it again on the page's own session, as an unread
+		// selected save is; its saves-read event asks for the content again. A read that
+		// failed is not retried while the page is open.
+		s.saves.mu.Lock()
+		why := s.saves.failed[factsKey(sv)]
+		s.saves.mu.Unlock()
+		if why != "" {
+			v.Stale, v.Note = false, view.Tf("the save could not be read: %s", why)
+		} else {
+			s.readSelected(sv)
+		}
+	}
+	return v, nil
 }
 
 // SaveDetail is the selected save against its list (12 §4.3): the middle and right cards.

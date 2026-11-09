@@ -161,7 +161,7 @@ func Run(in Input) (*Output, error) {
 		r := content.Resolve(m.Dir, m.Decl.LoadFolders, in.MM, isActive)
 		folders[m.Instance] = r.Folders
 		requires[m.Instance] = r.Requires
-		out.Content[m.Instance] = &ContentState{Key: r.Key(m.SnapHash, in.MM) + fmt.Sprintf("|a%d", Version), Folders: r.Folders}
+		out.Content[m.Instance] = &ContentState{Key: r.Key(m.SnapHash, in.MM) + DefKeySuffix(), Folders: r.Folders}
 		if m.Pos > 0 {
 			out.Content[m.Instance].AssemblyKey = AssemblyKey(m, r.Folders, in.HarmonySkip)
 		}
