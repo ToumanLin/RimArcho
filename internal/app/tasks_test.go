@@ -128,6 +128,26 @@ func TestTasksRecordAndClose(t *testing.T) {
 	}
 }
 
+// Closing the window stops a self task, but not a detached one: its own process goes on
+// (a pack build, 10 §2), and only the record ends here.
+func TestTasksCloseSkipsDetachedStop(t *testing.T) {
+	t.Parallel()
+	ts := OpenTasks("")
+	var stopped []string
+	own := ts.Begin("textures", "main", func() error { stopped = append(stopped, "own"); return nil })
+	pack := ts.Begin("pack", "p", func() error { stopped = append(stopped, "pack"); return nil })
+	ts.Update(pack, func(t *Task) { t.Detached = true })
+	ts.Close()
+	if len(stopped) != 1 || stopped[0] != "own" {
+		t.Fatalf("stopped %v, want only the attached task", stopped)
+	}
+	for _, task := range ts.List() {
+		if task.State != TaskStopped || !task.Closed {
+			t.Fatalf("closed %+v (own %s)", task, own)
+		}
+	}
+}
+
 // Waiting tasks move in their lane's order.
 func TestTasksMove(t *testing.T) {
 	// Not parallel: waits a fixed time for background work, which is too short under load.

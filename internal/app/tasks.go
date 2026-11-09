@@ -65,27 +65,30 @@ type TaskItem struct {
 
 // Task is one background task.
 type Task struct {
-	ID     string     `json:"id"`
-	Kind   string     `json:"kind"` // a Mod library op (view.Lib*) or one of view.Task* kinds
-	Lane   string     `json:"lane"`
-	Obj    string     `json:"obj"` // what it works on: "14 mods", a pack's name
-	State  string     `json:"state"`
-	Phase  string     `json:"phase,omitempty"`  // what it does now
-	Result string     `json:"result,omitempty"` // its end in a sentence (self tasks; the lanes' is counted from the items)
-	Closed bool       `json:"closed,omitempty"` // stopped because the window closed
-	Queued int64      `json:"queued"`           // unix ms
-	Start  int64      `json:"start,omitempty"`
-	End    int64      `json:"end,omitempty"`
-	Done   int        `json:"done,omitempty"`
-	Total  int        `json:"total,omitempty"`
-	Frac   float64    `json:"frac,omitempty"` // a self task's progress when it has no count
-	Step   int        `json:"step,omitempty"` // a pack build's step (1–5)
-	Items  []TaskItem `json:"items,omitempty"`
-	Seen   bool       `json:"seen,omitempty"`   // a failure the player has looked at
-	Target string     `json:"target,omitempty"` // a pack's name, for its page
-	Args   []string   `json:"args,omitempty"`   // maintenance command, for retry after reopening
-	Env    string     `json:"env,omitempty"`    // the environment captured at submission
-	Owner  string     `json:"owner,omitempty"`  // the window that runs it (newTaskOwner)
+	ID     string `json:"id"`
+	Kind   string `json:"kind"` // a Mod library op (view.Lib*) or one of view.Task* kinds
+	Lane   string `json:"lane"`
+	Obj    string `json:"obj"` // what it works on: "14 mods", a pack's name
+	State  string `json:"state"`
+	Phase  string `json:"phase,omitempty"`  // what it does now
+	Result string `json:"result,omitempty"` // its end in a sentence (self tasks; the lanes' is counted from the items)
+	Closed bool   `json:"closed,omitempty"` // stopped because the window closed
+	// Detached: the work runs in its own process and goes on when the window closes (a
+	// pack build, 10 §2): closing ends the record here but does not call its stop.
+	Detached bool       `json:"detached,omitempty"`
+	Queued   int64      `json:"queued"` // unix ms
+	Start    int64      `json:"start,omitempty"`
+	End      int64      `json:"end,omitempty"`
+	Done     int        `json:"done,omitempty"`
+	Total    int        `json:"total,omitempty"`
+	Frac     float64    `json:"frac,omitempty"` // a self task's progress when it has no count
+	Step     int        `json:"step,omitempty"` // a pack build's step (1–5)
+	Items    []TaskItem `json:"items,omitempty"`
+	Seen     bool       `json:"seen,omitempty"`   // a failure the player has looked at
+	Target   string     `json:"target,omitempty"` // a pack's name, for its page
+	Args     []string   `json:"args,omitempty"`   // maintenance command, for retry after reopening
+	Env      string     `json:"env,omitempty"`    // the environment captured at submission
+	Owner    string     `json:"owner,omitempty"`  // the window that runs it (newTaskOwner)
 }
 
 // Ended reports whether the task has finished one way or another.
@@ -630,13 +633,14 @@ func (ts *Tasks) MarkSeen() {
 	}
 }
 
-// Close marks what still runs or waits as stopped by the window closing, and saves.
+// Close marks what still runs or waits as stopped by the window closing, and saves. It
+// stops them too, except detached tasks, whose own process goes on.
 func (ts *Tasks) Close() {
 	ts.mu.Lock()
 	var stops []func() error
 	for _, t := range ts.list {
 		if !t.Ended() {
-			if stop := ts.stops[t.ID]; stop != nil {
+			if stop := ts.stops[t.ID]; stop != nil && !t.Detached {
 				stops = append(stops, stop)
 			}
 			ts.stopping[t.ID] = true

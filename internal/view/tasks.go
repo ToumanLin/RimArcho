@@ -399,7 +399,9 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 			result = Tf("%d done, %d failed", c[app.ItemOK], c[app.ItemFail])
 		}
 	}
-	if t.Closed {
+	if t.Closed && t.Detached {
+		result = joinFacts(T("went on in the background when the window closed"), result)
+	} else if t.Closed {
 		result = joinFacts(T("stopped when the window closed"), result)
 	}
 	if n := handedOver(t); n > 0 {

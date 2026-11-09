@@ -244,7 +244,11 @@ func (m *model) argCands(c *cmds.Command, rest []string, word string) []cmdCand 
 	n := 0
 	for i := 0; i < len(rest); i++ {
 		a := rest[i]
-		if !strings.HasPrefix(a, "--") || a == "--" {
+		if a == "--" {
+			n += len(rest) - i - 1 // like the parser: every later word is positional
+			break
+		}
+		if !strings.HasPrefix(a, "--") {
 			n++
 			continue
 		}
@@ -285,7 +289,11 @@ func (m *model) argCands(c *cmds.Command, rest []string, word string) []cmdCand 
 	case "<value>":
 		if c.Name == "config set" && n == 1 {
 			var out []cmdCand
-			for i, v := range cmds.SettingChoices(positional(rest, c)[0]) {
+			key := positional(rest, c)
+			if len(key) == 0 {
+				return nil
+			}
+			for i, v := range cmds.SettingChoices(key[0]) {
 				if strings.HasPrefix(v, word) {
 					cand := cmdCand{insert: v, label: v}
 					if i == 0 {
@@ -333,11 +341,18 @@ func positional(rest []string, c *cmds.Command) []string {
 	var out []string
 	for i := 0; i < len(rest); i++ {
 		a := rest[i]
+		if a == "--" {
+			return append(out, rest[i+1:]...)
+		}
 		if !strings.HasPrefix(a, "--") {
 			out = append(out, a)
 			continue
 		}
 		if strings.Contains(a, "=") {
+			continue
+		}
+		if a == "--env" {
+			i++ // the global flag's value (cmdEnv)
 			continue
 		}
 		for _, f := range c.Flags {

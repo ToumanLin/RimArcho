@@ -442,7 +442,7 @@ func (s *API) PackBuild(name string, tex int) (string, error) {
 		}
 	}
 	task := s.beginSelf(view.TaskPack, name, func() error { _, err := s.PackStop(name); return err })
-	s.tasks.Update(task, func(t *app.Task) { t.Target = name })
+	s.tasks.Update(task, func(t *app.Task) { t.Target, t.Detached = name, true })
 	go s.watchBuild(task, name, tmp, run)
 	return view.Tf("create pack %s: it goes on in the background; you can use the other pages, or close the window", name), nil
 }
