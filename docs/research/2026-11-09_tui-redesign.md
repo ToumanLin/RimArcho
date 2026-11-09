@@ -8,7 +8,7 @@ The mockups in colour, with a dark/light terminal switch and every screen of eac
 
 ## 1. Method
 
-- Every "today" screen was rendered through `model.View()` on a synthetic home (`internal/testkit`: game 1.6, 41 Mods, 26 enabled, Harmony disabled so that Can it run has a missing dependency), at 120×35 and 80×24, with 24-bit colour: the editor, Can it run `@`, Launch `!`, Mod library `^`, updates, the command palette, a text panel (packs) and a status sentence. The capture test was temporary and is not committed.
+- Every "today" screen was rendered on `dev/1.1` at 09f8d108 through `model.View()` on a synthetic home (`internal/testkit`: game 1.6, 41 Mods, 26 enabled, Harmony disabled so that Can it run has a missing dependency), at 120×35 and 80×24, with 24-bit colour: the editor, Can it run `@`, Launch `!`, Mod library `^`, updates, the command palette, a text panel (packs) and a status sentence. The capture test was temporary and is not committed.
 - Mockups were drawn cell by cell by a small layout script, so every line is exactly the terminal width. They use the compatibility icons. Every glyph they use was checked with `go-runewidth` (`EastAsianWidth: true`) to be one cell, except CJK names.
 
 ## 2. Problems today
@@ -111,7 +111,7 @@ Can it run, with the status and hint lines:
 ▸ ⨯ missing dependency: Harmony
     required by Echoes of the Rim, Multi Analyzer Retexture, Vanilla Armour Expanded and 3 more
     ≣ declared by the mod  About.xml modDependencies
-    space enable Harmony   c subscriptions
+    space enable Harmony   I ignore it   c subscriptions
   ⨯ [sbz] EPOE Retexture needs tester.missing, which is not installed
     ≣ declared by the mod  About.xml modDependencies
 …
