@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -69,13 +68,7 @@ func (e *Env) HarmonyLogFixture() string {
 	e.MustRun("scan")
 	// RimArcho launched the plan before the session that wrote the log (06 §4).
 	e.RecordLaunch(e.Now().Add(-30 * time.Minute))
-	compatFile := filepath.Join(mods, "Compat", "Patches", "Compat.xml")
-	if runtime.GOOS != "windows" {
-		// The transcript exercises Windows log paths. Off Windows, use a
-		// shared log from another machine, attributed by its Mod folder.
-		compatFile = "C:/fixture/Mods/Compat/Patches/Compat.xml"
-	}
-	log := FixtureLog(compatFile)
+	log := FixtureLog(filepath.Join(mods, "Compat", "Patches", "Compat.xml"))
 	p := filepath.Join(e.UserData, "Player.log")
 	e.WriteFile(p, log)
 	os.Chtimes(p, e.Now(), e.Now())

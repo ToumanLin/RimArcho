@@ -1,7 +1,6 @@
 package cmds_test
 
 import (
-	"strings"
 	"testing"
 	"time"
 
@@ -47,8 +46,5 @@ func TestGoldenHarmonyLog(t *testing.T) {
 		cmd("pattern", "--mod", "krkr.rocketman"),
 		cmd("pattern", "pattern:m:krkr.rocketman:e84d5a3b"),
 		cmd("pattern", "pattern:g:nope"),
-	}, func(s string) string {
-		// A shared Windows log names the same file through its Mod folder.
-		return strings.ReplaceAll(s, "log file Patches/Compat.xml (by mod folder)", "log file Patches/Compat.xml")
 	})
 }

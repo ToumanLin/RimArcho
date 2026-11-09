@@ -27,7 +27,3 @@ func TestInWorkshopFolder(t *testing.T) {
 		}
 	}
 }
-
-// The published item ships README.md, README.zh-CN.md, UserGuide/, skills/ and LICENSE
-// beside the zip (17 §5.1 Upload). A release extracted into the item root overwrites
-// them with the same bytes; cleanup removes only what the item does not carry.
