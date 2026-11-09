@@ -27,8 +27,9 @@ const RULES = {
   h8: {keepEnabled: ['ferny.ProgressionEducation', 'LovelyDovey.Recreation.WithEuterpe'], touch: ['ferny.ProgressionEducation/1.6/Assemblies/']},
   // h9: no fault; the right answer changes nothing
   h9: {control: true},
-  // the comp's own code is the fault: SSR's DLL must be rebuilt; a for loop in the profiler, or the profiler off, hides it
-  h7: {keepEnabled: ['ssr.body', 'tallowbyte.pawncompprofiler'], touch: ['ssr.body/1.6/Assemblies/']},
+  // two right answers (answer.json requiredAny): SSR's comp changes AllComps mid-tick, which vanilla's cached-count loop
+  // survives, or the profiler's foreach breaks that tolerance. Either DLL rebuilt counts; the profiler turned off does not
+  h7: {keepEnabled: ['ssr.body', 'tallowbyte.pawncompprofiler'], touch: ['ssr.body/1.6/Assemblies/', 'tallowbyte.pawncompprofiler/1.6/Assemblies/']},
   // Charmweavers' transpiler is the fault: its DLL must change (rebuilt, or a patch DLL of its own beside it); HAR's
   // transpiler is fine on vanilla IL, so changing HAR, or turning either Mod off, only hides it
   h3: {keepEnabled: ['ReSplice.XOTR.Charmweavers', 'erdelf.HumanoidAlienRaces'], touch: ['ReSplice.XOTR.Charmweavers/1.6/Assemblies/']},
@@ -46,14 +47,16 @@ const readJson = f => JSON.parse(fs.readFileSync(f, 'utf8').trimStart());
 let answer = null; try { answer = readJson(`${layer}/answer.json`); fs.rmSync(`${layer}/answer.json`); } catch {}
 const named = new Set([].concat(answer?.culprit || []).map(p => String(p).toLowerCase()));
 result.culpritNamed = [...named];
-result.culprit = key.required.every(p => named.has(p.toLowerCase()));
+// requiredAny: several right answers, each a list of Mods that must all be named; required is the one-answer form
+const answers = key.requiredAny || [key.required];
+result.culprit = answers.some(set => set.every(p => named.has(p.toLowerCase())));
 result.culpritVia = result.culprit ? 'list' : null;
 result.decoyNamedOnly = !result.culprit && (key.decoy || []).some(d => named.has(d.pkg.toLowerCase()));
 if (!result.culprit && !(key.decoy || []).some(d => named.has(d.pkg.toLowerCase()))) {
   // the list can be wrong while the explanation is right (a dependent Mod listed, the framework explained): accept the text, flagged for a human look
   const text = String(answer?.explanation || '').toLowerCase();
-  const names = key.required.map(p => [p.toLowerCase(), (key.culprit.find(c => c.pkg === p)?.name || p).toLowerCase()]);
-  if (names.every(n => n.some(s => text.includes(s)))) { result.culprit = true; result.culpritVia = 'explanation'; }
+  const names = set => set.map(p => [p.toLowerCase(), (key.culprit.find(c => c.pkg === p)?.name || p).toLowerCase()]);
+  if (answers.some(set => names(set).every(n => n.some(s => text.includes(s))))) { result.culprit = true; result.culpritVia = 'explanation'; }
 }
 result.submitted = fs.readdirSync(layer, {recursive: true}).filter(f => fs.statSync(path.join(layer, f)).isFile());
 
