@@ -56,3 +56,4 @@ Investigations, measurements and open questions; once a report's conclusions are
 | [2026-11-04_save-format-fields.md](2026-11-04_save-format-fields.md) | Element paths of a save's full read (L1), from the game's `ExposeData` | Implemented (12 §1.7); open: not yet checked against real saves |
 | [2026-11-09_linux-support-plan.md](2026-11-09_linux-support-plan.md) | Linux support in phases: native CLI/TUI/MCP, GUI on WebKitGTK, `.tar.gz`/`.deb`/`.rpm`/AUR, Proton installs | Plan decided (§8); not started |
 | [2026-11-09_save-content-attribution.md](2026-11-09_save-content-attribution.md) | Save Def reference forms, attribution limits, content categories and synthetic costs | Research proposal; decisions in E; exact-build and real-save checks pending in VM |
+| [2026-11-09_tui-redesign.md](2026-11-09_tui-redesign.md) | TUI looks and navigation: today's problems, a shared visual system, three top-bar options | Proposal; waiting for the maintainer's choice (§5) |
