@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"testing/synctest"
@@ -348,5 +350,61 @@ func TestAutomaticGitAndAuthenticatedPageChecksNeverInstall(t *testing.T) {
 	r, err := subscribe.Read(folder)
 	if err != nil || r.Installed != "1.0" || r.Latest != "2.0" {
 		t.Fatal("page check changed installed version or missed update", r, err)
+	}
+}
+
+// A check whose window was killed leaves only its lease: the record still shows the last
+// finished check, says the check was interrupted once the lease is stale, and the check is
+// due again then instead of a whole interval later. Another writer of the record during a
+// check (the pending count after an update) no longer drops the check's result (16 §2.16).
+func TestAutomaticLeaseSurvivesKillAndOtherWriters(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	ctx := context.Background()
+	if ran, err := e.App.RunAutomatic(ctx, "mods", func(context.Context) (int, string, error) { return 1, "check complete", nil }); !ran || err != nil {
+		t.Fatal(ran, err)
+	}
+	finished := e.App.AutomaticStatus("mods").Checked
+	e.Advance(24 * time.Hour)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		e.App.RunAutomatic(ctx, "mods", func(context.Context) (int, string, error) {
+			runtime.Goexit() // the window is killed mid-check
+			return 0, "", nil
+		})
+	}()
+	<-done
+	s := e.App.AutomaticStatus("mods")
+	if s.State != "checking" || !s.Checked.Equal(finished) || s.Lease == "" {
+		t.Fatalf("claimed record: %+v", s)
+	}
+	if e.App.AutomaticDue("mods") {
+		t.Fatal("due while another window holds the check")
+	}
+	e.Advance(31 * time.Minute)
+	if s := e.App.AutomaticStatus("mods"); s.State != "check interrupted" {
+		t.Fatal("stale lease shown as", s.State)
+	}
+	if !e.App.AutomaticDue("mods") {
+		t.Fatal("a killed check delays the next one")
+	}
+
+	// A subscription update records its pending count while the check runs.
+	ran, err := e.App.RunAutomatic(ctx, "mods", func(context.Context) (int, string, error) {
+		st := e.App.AutomaticStatus("mods")
+		st.Pending = 7
+		b, _ := json.Marshal(st)
+		if err := e.App.Store.SetMeta("automatic:mods", string(b)); err != nil {
+			t.Fatal(err)
+		}
+		return 3, "check complete", nil
+	})
+	if !ran || err != nil {
+		t.Fatal(ran, err)
+	}
+	if s := e.App.AutomaticStatus("mods"); s.State != "check complete" || s.Pending != 3 || s.Lease != "" || !s.Checked.After(finished) {
+		t.Fatalf("result dropped: %+v", s)
 	}
 }
