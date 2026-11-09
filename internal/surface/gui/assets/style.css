@@ -2663,3 +2663,29 @@ select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-s
 .xc-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 
 .folder-space { display: flex; flex-wrap: wrap; gap: 12px; }
+
+/* the Disabled column's view switch and its tag groups (16 §2.5) */
+.area .head .dview { gap: 2px; flex: none; }
+/* a narrow column shortens the title, never the switch */
+.area[data-area="0"] > .head { container-type: inline-size; }
+.area[data-area="0"] > .head .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+@container (max-width: 250px) { .area[data-area="0"] > .head .num { display: none; } }
+.area .head .dview-fold { display: flex; gap: 2px; }
+.area .head .dview-fold[hidden] { display: none; }
+.area .head .dview-fold button { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; border-radius: var(--r-sm); color: var(--muted); }
+.area .head .dview-fold button:hover { background: var(--pill); color: var(--fg-2); }
+.area .head .dview-seg { padding: 2px; margin-left: 2px; border-radius: var(--r-sm); }
+.area .head .dview-seg > .thumb { top: 2px; bottom: 2px; }
+.area .head .dview-seg button { height: 20px; padding: 0 8px; font-size: 12px; }
+.row.group-head { cursor: pointer; gap: 6px; color: var(--fg-2); }
+.row.group-head .fold-chev { display: inline-flex; flex: none; width: 12px; color: var(--faint); transition: transform var(--t-layout) var(--ease); }
+.row.group-head .fold-chev svg.i { width: 10px; height: 10px; stroke-width: 1.8; }
+.row.group-head.open .fold-chev { transform: rotate(90deg); }
+.row.group-head .gdot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.row.group-head .gdot[hidden] { display: none; }
+.row.group-head .t { flex: 0 1 auto; font-weight: 600; }
+.row.group-head.none .t { color: var(--muted); }
+.row.group-head .num { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; flex: none; }
+.row.group-head.later::before { content: ""; position: absolute; left: 4px; right: 4px; top: 0; border-top: var(--hairline) solid var(--line-2); }
+@media (prefers-reduced-motion: reduce) { .row.group-head .fold-chev { transition: none; } }
+:root[data-motion="reduced"] .row.group-head .fold-chev { transition: none; }

@@ -44,7 +44,7 @@ The editor has four focus areas: `1` Disabled, `2` Enabled, `3` Staging / histor
 - The focused heading uses the accent color, and its cursor row has a faint background across the full row (TUI `#1A1C24`). An unfocused cursor only changes the name to the text color, without a background or `▸`. When details have the focus, all lists look unfocused, so there is only one brightest place on the screen.
 - The details heading is `4 details`, changing to `▲ name` when scrolled. It uses the accent color when focused. Content begins on the next line, aligned with the first list row.
 - The position line appears at the top right in the TUI, and on the left of the status line in the GUI editor and full-screen details:
-  - A list shows `Enabled  322 / 488  selected 3`. Positions use the visible row count after filtering; add filtered when a search is active.
+  - A list shows `Enabled  322 / 488  selected 3`. Positions use the visible row count after filtering; add filtered when a search is active. In Disabled's tags view (§2.5) positions count only rows, and on a group's header the line names the tag and how many rows the column shows: `Disabled  framework  5973`.
   - Details show `details  Combat Extended  description 40%`. Use the section heading above the current top line, such as summary, description, history, or technical, followed by the scroll progress.
   - Append an open layer, for example `Enabled  322 / 488 › tags`. Search adds `› search`, and a confirmation waiting for the second keypress adds `› confirm`.
   - Full details show `Enabled › Combat Extended (322 / 488) › Harmony`.
@@ -114,6 +114,8 @@ Editor only:
 | `<` `>` `=` | Narrow, widen, or reset the focused column |
 | `r` | Add a rule for the cursor Mod through the sorting-rules form (§2.5), in the GUI left column or a TUI secondary screen. In full details, r refetches the Workshop description |
 | `P`, `E` | Switch, create, rename, or delete plans; switch environments (the environment page in the GUI) |
+| `v` | GUI: Disabled one row per copy, or grouped by tag (§2.5) |
+| `←` `→`, `enter` on a tag group's header | GUI: close or open the group in Disabled's tags view (§2.5); elsewhere `←→` change areas |
 
 Global:
 
@@ -185,7 +187,7 @@ Content types such as `type:assembly` come from the current snapshot's `snapshot
 
 ### 3.8 Tags
 
-- Mod tags appear in the detail fields (§4.1), next to edit. Their names never appear in list rows, where they would displace long names and be unreadable across more than a thousand rows. Find tagged Mods with tag: search (§3.7), the Mod library's tag filters, or its Tags view, which groups the rows under a header row per tag (§2.9).
+- Mod tags appear in the detail fields (§4.1), next to edit. Their names never appear in list rows, where they would displace long names and be unreadable across more than a thousand rows. Find tagged Mods with tag: search (§3.7), the Mod library's tag filters, or its Tags view, which groups the rows under a header row per tag (§2.9); the editor's Disabled column has the same grouping by first tag (§2.5).
 - **Tag colours.** A tag can have a colour (the Tag manager, §2.9): one of eight presets (blue, cyan, teal, grass, orange, pink, plum, violet; red and amber stay for problems and warnings) or a colour of the player's own. A Mod's tags have an order; its first tag that has a colour marks it: a 3px band in the row's left slot (`.row .m`, `.lib-row .m`), in the editor's three lists and in the Mod library. Rows next to each other with the same colour join into one band, so a group of Mods reads as one block in the load order. In Not enabled, a Mod's band starts at its name line and runs down through all its copies. No legend: hovering the band names the tag, and the details show the tags in order. Presets follow the theme (Radix step 9 on light, step 11 on dark, `--tag-<name>`); a colour of the player's own is used as it is (`tagcolor.js`).
 - **Tag order.** The detail field shows a Mod's tags in its order, as chips the player drags to reorder, or moves with `ctrl+←` / `ctrl+→` (`alt+←/→` is back/forward). The tag whose colour marks the Mod is underlined. With one Mod selected, the tags popup (`g`, edit) shows the same order row above the candidates. A new tag goes last. CLI `tag order <ref> <tag…>`, MCP `set_player_data` `tag_order`.
 - Tags belong to the Mod's Lineage (07 §6). The corresponding interfaces are CLI `tag add|remove <ref> <tag…> --mod <ref>…` and MCP `set_player_data`. Renaming, merging, deleting a tag, its note and its colour are on the Mod library's Tag manager (§2.9), CLI `tag rename|merge|delete|note|color` and the same MCP tool.
