@@ -63,6 +63,7 @@ var ruleKinds = []RuleKind{
 	{order.RuleBefore, "%s loads before %s", true},
 	{order.RuleAttach, "%s loads right after %s", true},
 	{order.RuleIncompatible, "%s is incompatible with %s", true},
+	{order.RuleReplaces, "%s stands in for %s", true},
 	{order.RuleTop, "%s loads as early as it can", false},
 	{order.RuleBottom, "%s loads as late as it can", false},
 }
@@ -82,12 +83,12 @@ func BuildRules(a *app.App) (*Rules, error) {
 		out.Kinds = append(out.Kinds, RuleKind{Kind: k.Kind, Label: T(k.Label), Two: k.Two})
 	}
 	for i := len(rs) - 1; i >= 0; i-- {
-		out.Rows = append(out.Rows, ruleRow(st, rs[i]))
+		out.Rows = append(out.Rows, ruleRow(a, st, rs[i]))
 	}
 	return out, nil
 }
 
-func ruleRow(st *app.LoadoutState, r *store.UserRule) RuleRow {
+func ruleRow(a *app.App, st *app.LoadoutState, r *store.UserRule) RuleRow {
 	row := RuleRow{ID: r.ID, Kind: r.Kind, Note: r.Note, Created: r.Created.Local().Format("2006-01-02 15:04")}
 	if r.Kind == order.RuleIgnore {
 		row.Target = st.Ix.DisplayConstraintRef(r.Target, func(l string) string { return ruleModOf(st, l).Ref })
@@ -96,6 +97,9 @@ func ruleRow(st *app.LoadoutState, r *store.UserRule) RuleRow {
 		row.A = ruleModOf(st, r.A)
 		if r.B != "" {
 			row.B = ruleModOf(st, r.B)
+		}
+		if r.Kind == order.RuleReplaces {
+			row.B = replacedMod(a, st, r.Target)
 		}
 		format := r.Kind
 		for _, k := range ruleKinds {
@@ -179,6 +183,39 @@ func declField(f string) string {
 		return "modDependencies"
 	}
 	return f
+}
+
+// replacedMod is the package a replaces rule stands in for: an installed copy when there is
+// one (the enabled one first), else the package by its Workshop name or its id.
+func replacedMod(a *app.App, st *app.LoadoutState, pkg string) *RuleMod {
+	m := &RuleMod{Ref: "pkg:" + pkg, Name: PackageName(a, st.Ix, pkg)}
+	for _, c := range st.Ix.Mods {
+		if c.Status != identity.Live || strings.TrimSuffix(strings.ToLower(c.PackageID), "_steam") != pkg {
+			continue
+		}
+		if pos := st.Position(c.ID); pos > 0 && (m.Pos == 0 || pos < m.Pos) {
+			m.ID, m.Pos = c.ID, pos
+		} else if m.ID == "" {
+			m.ID = c.ID
+		}
+	}
+	return m
+}
+
+// PackageName names a package: an installed copy's name, else its Workshop name (steamDB),
+// else the id.
+func PackageName(a *app.App, ix *app.Index, pkg string) string {
+	for _, c := range ix.Mods {
+		if c.Status == identity.Live && strings.TrimSuffix(strings.ToLower(c.PackageID), "_steam") == pkg {
+			return c.DisplayName()
+		}
+	}
+	if a != nil {
+		if w, ok := a.WorkshopFor(pkg); ok && w.Name != "" {
+			return w.Name
+		}
+	}
+	return pkg
 }
 
 // ruleModOf is a lineage as a rule names it: the enabled copy, else the primary one.
@@ -294,7 +331,7 @@ func SaveRule(a *app.App, id int64, spec app.RuleSpec) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	text := ruleRow(st, r).Text
+	text := ruleRow(a, st, r).Text
 	if id == 0 {
 		return Tf("rule added: %s", text), nil
 	}
@@ -315,7 +352,7 @@ func RemoveRule(a *app.App, id int64) (string, *store.UserRule, error) {
 		if r.ID != id {
 			continue
 		}
-		text := ruleRow(st, r).Text
+		text := ruleRow(a, st, r).Text
 		if _, err := a.Store.RemoveRule(st.Ix.Env.ID, id); err != nil {
 			return "", nil, err
 		}
@@ -333,5 +370,5 @@ func RestoreRule(a *app.App, r *store.UserRule) (string, error) {
 	if err := a.Store.RestoreRule(r); err != nil {
 		return "", err
 	}
-	return Tf("rule restored: %s", ruleRow(st, r).Text), nil
+	return Tf("rule restored: %s", ruleRow(a, st, r).Text), nil
 }

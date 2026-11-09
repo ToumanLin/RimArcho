@@ -46,6 +46,7 @@ const (
 	ActUseInstalled    = "use-installed"    // Refs: package IDs, bound in place as one undo step
 	ActDisable         = "disable"          // Refs
 	ActChooseDisable   = "choose-disable"   // pick one of Options, then disable its Refs
+	ActStandIn         = "stand-in"         // pick one of Options: a replaces rule, Refs = [mod, pkg:<id>] (08 §2.1)
 	ActOpenURL         = "open-url"         // URL in the browser
 	ActProblem         = "problem"          // focused problem, Problem: p:ref
 	ActView            = "view"             // read-only command text: Argv
@@ -578,10 +579,10 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			if dep == strings.TrimPrefix(y, "pkg:") {
 				dep = nm(y)
 			}
-			add(Need{Group: GroupDeps, Target: dependencyTarget(st, y), RequiredBy: owners(st, x), Text: Tf("%s needs %s, but %s is not installed", nm(x), dep, dep), Actions: []Action{workshop(p, dep)}, Counted: true, Mods: ids, Status: s,
+			add(Need{Group: GroupDeps, Target: dependencyTarget(st, y), RequiredBy: owners(st, x), Text: Tf("%s needs %s, but %s is not installed", nm(x), dep, dep), Actions: depActions(st, p, workshop(p, dep), dependencyTarget(st, y), dep), Counted: true, Mods: ids, Status: s,
 				Title: Tf("missing dependency: %s", dep), Why: Tf("%s needs it, but it is not installed.", nm(x)), Evidence: ev})
 		case "dep.inactive":
-			add(Need{Group: GroupDeps, Target: dependencyTarget(st, y), RequiredBy: owners(st, x), Text: Tf("%s needs %s, but %s is not enabled", nm(x), nm(y), nm(y)), Actions: []Action{enable(st, y)}, Counted: true, Mods: ids, Status: s,
+			add(Need{Group: GroupDeps, Target: dependencyTarget(st, y), RequiredBy: owners(st, x), Text: Tf("%s needs %s, but %s is not enabled", nm(x), nm(y), nm(y)), Actions: depActions(st, p, enable(st, y), dependencyTarget(st, y), nm(y)), Counted: true, Mods: ids, Status: s,
 				Title: Tf("missing dependency: %s", nm(y)), Why: Tf("%s needs it, but it is not enabled.", nm(x)), Evidence: ev})
 		case "dep.observed-missing": // undeclared, seen in shared logs (internal/known)
 			if strings.HasPrefix(y, "pkg:") {
@@ -1189,6 +1190,13 @@ func Do(a *app.App, act Action, option int) (done string, err error) {
 		}
 		o := act.Options[option]
 		_, err = a.Disable(o.Refs)
+		return o.Done, err
+	case ActStandIn:
+		if option < 0 || option >= len(act.Options) || len(act.Options[option].Refs) != 2 {
+			return "", fmt.Errorf("no option %d", option)
+		}
+		o := act.Options[option]
+		_, err = a.AddRule(app.RuleSpec{Kind: "replaces", A: o.Refs[0], B: o.Refs[1]})
 		return o.Done, err
 	case ActIgnoreRule:
 		if act.Rule == "" {

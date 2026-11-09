@@ -132,7 +132,7 @@ The following table gives the highlights of the tool guides. `internal/cmds/guid
 | `get_description` | Learn what a Mod does before recommending it. Fetch Workshop text on demand and cache it until the item updates. The player can disable network access with `workshop.fetch`. |
 | `set_player_data` | Set tags (used by `list --filter tag:<t>` and TUI `tag:` search), aliases, and notes on the Lineage, shared by all copies. `copy_note` belongs to one copy and says why it is kept. `tag_rename`, `tag_merge`, `tag_delete`, `tag_note` and `tag_color` change a tag on every Mod (dry run first; ask before merging or deleting); `tag_order` sets which of a Mod's tags marks it. It does not touch the game. |
 | `manage_subscriptions` | Use it to install a Mod from Git, a download page, or SteamCMD, or to check subscription updates. Check before update; preview add, update, and remove with `dry_run` first. The player downloads page files and supplies `from`; the agent does not log in to LoversLab. Use `manage_library` for client Workshop items. Pin the old version before updating if it should be retained. |
-| `manage_rules` | Ignore wrong-direction About.xml or community constraints to break `order.cycle`. Rules affect sorting and order findings but do not themselves reorder the plan. |
+| `manage_rules` | Ignore wrong-direction About.xml or community constraints to break `order.cycle`; `replaces` A B when A is a continuation of a required Mod B under another packageId. Rules affect sorting and order findings but do not themselves reorder the plan. |
 
 ## 4. Acceptance
 

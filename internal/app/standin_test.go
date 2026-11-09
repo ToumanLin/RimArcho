@@ -157,3 +157,65 @@ func TestDeclRefreshedAfterParserUpgrade(t *testing.T) {
 		t.Fatalf("after rescan: %v", c)
 	}
 }
+
+// The player's replaces rule: New stands in for Old (given as pkg: or as the installed mod).
+func TestDependencyRuleMeets(t *testing.T) {
+	t.Parallel()
+	for _, b := range []string{"pkg:Tester.Old", "Old"} {
+		e := standInSetup(t)
+		scanNow(t, e)
+		if b == "Old" {
+			ix, err := e.App.Index()
+			if err != nil {
+				t.Fatal(err)
+			}
+			b = ix.Ref(named(t, e, "Old")[0].ID)
+		}
+		e.MustRun("rule", "add", "replaces", "pkg:tester.new", b, "--note", "continued")
+		checkStandIn(t, e, app.StandInRule)
+	}
+	e := standInSetup(t)
+	scanNow(t, e)
+	if _, code := e.Run("rule", "add", "replaces", "pkg:tester.new", "pkg:tester.new"); code == 0 {
+		t.Fatal("a mod replacing itself")
+	}
+	if _, code := e.Run("rule", "add", "replaces", "pkg:tester.new"); code == 0 {
+		t.Fatal("replaces with one reference")
+	}
+}
+
+// A dependency the player ignored is not offered after a sort, nor enabled by completing
+// dependencies; the ignore lapses when the requiring mod changes.
+func TestIgnoredDependencyNotOffered(t *testing.T) {
+	t.Parallel()
+	e := standInSetup(t)
+	scanNow(t, e)
+	ps, err := e.App.Problems(false, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref := ""
+	for _, p := range ps.List {
+		if p.Code == "dep.inactive" {
+			ref = p.Ref
+		}
+	}
+	if ref == "" {
+		t.Fatal("no dep.inactive")
+	}
+	e.MustRun("problems", "ignore", ref)
+	r, err := e.App.Sort(false)
+	if err != nil || len(r.MissingDependencies) != 0 {
+		t.Fatal(r.MissingDependencies, err)
+	}
+	c, err := e.App.CompleteDependencies()
+	if err != nil || len(c.Enabled) != 0 {
+		t.Fatal(c, err)
+	}
+	// The translation changes: asked again.
+	e.WriteFile(filepath.Join(e.Game, "Mods", "Translation", "About", "About.xml"), strings.Replace(translationAbout(), "<name>Translation</name>", "<name>Translation</name><description>2</description>", 1))
+	scanNow(t, e)
+	if r, err = e.App.Sort(false); err != nil || len(r.MissingDependencies) != 1 {
+		t.Fatal(r.MissingDependencies, err)
+	}
+}

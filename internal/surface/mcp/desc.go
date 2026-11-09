@@ -63,7 +63,7 @@ const descUnpin = `Unlock a locked version: the current plan uses the upstream (
 
 const descPlayer = `The player's own data on mods, in RimArcho's database: tags, alias and note (shared by a mod's copies), copy_note (one copy's own). tag_rename/merge/delete/note/color change a tag on every mod (dry_run first; ask before merge or delete). Nothing reaches the game.`
 
-const descRules = `User load-order rules: add (after, before, incompatible, attach, top, bottom, or ignore a wrong About.xml / community constraint — how an order.cycle is broken), list, remove. Rules guide sort and the order problems; they do not reorder by themselves.`
+const descRules = `User load-order rules: add (after, before, incompatible, attach, top, bottom, replaces — A, a continuation, meets dependencies on B — or ignore a wrong About.xml / community constraint, how an order.cycle is broken), list, remove. Rules guide sort and the order problems; they do not reorder by themselves.`
 
 const descIgnore = `Ignore a problem (p:<hex>) until its mod's files change; undo=true stops ignoring it. Only after the player decided the problem is fine: ask first.`
 

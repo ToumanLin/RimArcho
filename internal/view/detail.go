@@ -385,11 +385,14 @@ func rulesSection(a *app.App, ix *app.Index, mod *store.Mod) Section {
 	}
 	rs, _ := a.Store.Rules(ix.Env.ID)
 	for _, r := range rs {
-		if r.A != mod.LineageID && r.B != mod.LineageID {
+		replaced := r.Kind == order.RuleReplaces && r.Target == strings.TrimSuffix(strings.ToLower(mod.PackageID), "_steam")
+		if r.A != mod.LineageID && r.B != mod.LineageID && !replaced {
 			continue
 		}
 		var l string
 		switch r.Kind {
+		case order.RuleReplaces:
+			l = Tf("%s stands in for %s (your rule)", lin(r.A), PackageName(a, ix, r.Target))
 		case order.RuleAfter:
 			l = Tf("%s loads after %s (your rule)", lin(r.A), lin(r.B))
 		case order.RuleBefore:

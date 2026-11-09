@@ -120,7 +120,7 @@ func (m *model) actionKey(a view.Action, text string) needKey {
 			p.open[text] = !p.open[text]
 			return nil
 		}
-	case view.ActChooseDisable:
+	case view.ActChooseDisable, view.ActStandIn:
 		k.run = func(m *model) tea.Cmd {
 			p := &panel{title: a.Title}
 			for _, o := range a.Options {

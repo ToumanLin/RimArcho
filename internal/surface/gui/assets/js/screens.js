@@ -779,7 +779,7 @@ function needCard(it, ci, i) {
       body.append(b);
       continue;
     }
-    if (a.kind === "choose-disable") {
+    if (a.kind === "choose-disable" || a.kind === "stand-in") {
       // a choice: each option is a button, none the main one (16 §5)
       a.options.forEach((o, oi) => {
         const b = button(o.label, oi ? "" : a.key, () => { setCur(ci, i); if (N.ask) { N.ask = null; } snapshot(); doAction(a, oi); }, "option", actionWrite(a));
@@ -943,6 +943,7 @@ async function runAction(it, act, here = false) {
       N.open.has(it.text) ? N.open.delete(it.text) : N.open.add(it.text);
       return drawNeeds();
     case "choose-disable":
+    case "stand-in":
       // here the options are the item's buttons: the key puts the focus on the first
       if (here) return focusButtons(it, ".btn.option");
       return pop.choose(act.title, act.options.map((o) => o.label), (i) => doAction(act, i));
