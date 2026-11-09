@@ -11,7 +11,7 @@ import (
 )
 
 // englishPinnedTags is the English preset of common tags (16 §3.8).
-const englishPinnedTags = "framework,visuals,apparel,races,weapons,buildings,furniture,QoL,balance,story,performance,language packs,testing,to delete"
+const englishPinnedTags = "RimWorld,framework,visuals,apparel,races,weapons,buildings,furniture,QoL,balance,story,performance,language packs,testing,to delete"
 
 // A locale may carry its own preset in default-tags.txt; without one it gets English.
 //

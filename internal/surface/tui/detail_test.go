@@ -143,6 +143,7 @@ func TestT13TagBar(t *testing.T) {
 	e, _ := fixture(t)
 	e.MustRun("tag", "add", "pkg:ludeon.rimworld", "official-stuff", "core")
 	e.MustRun("tag", "add", "pkg:tester.a", "half")
+	e.MustRun("config", "set", "tags.pinned", "framework,visuals") // without the default RimWorld (16 §3.8)
 	m := direct(t, e, 160, 40)
 	press(m, "home")
 	press(m, "down")
