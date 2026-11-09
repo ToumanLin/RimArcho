@@ -253,10 +253,13 @@ func TestWorkshopBatchesPartialSuccess(t *testing.T) {
 			}
 		}
 		scripts = append(scripts, filepath.Join(filepath.Dir(exe), args[5]))
-		// No provenance or scan until all batches have finished.
+		// Provenance is written as items are confirmed: earlier batches' successes have it
+		// before the next batch starts, this batch's items do not yet.
 		for _, id := range ids {
-			if _, err := os.Stat(filepath.Join(args[1], "steamapps", "workshop", "content", "294100", id, subscribe.File)); !os.IsNotExist(err) {
-				t.Fatal("provenance written between batches")
+			_, err := os.Stat(filepath.Join(args[1], "steamapps", "workshop", "content", "294100", id, subscribe.File))
+			earlier := slices.Index(ids, id) < 25*(len(sizes)-1)
+			if want := earlier && id != "9002" && id != "9027"; want != (err == nil) {
+				t.Fatalf("provenance of %s before batch %d: %v", id, len(sizes), err)
 			}
 		}
 		var out []string

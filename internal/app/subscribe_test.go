@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -644,5 +646,117 @@ func TestUpdateWorkshopJunctionCacheAndRetiredSource(t *testing.T) {
 				t.Fatal("existing source was not reactivated")
 			}
 		})
+	}
+}
+
+// liveSteamCMD is a SteamCMD process the test drives: each line it is given goes to the
+// console log RimArcho tails, Wait returns when the test ends it or RimArcho kills it.
+type liveSteamCMD struct {
+	log    string
+	lines  chan string
+	exit   chan struct{}
+	killed atomic.Bool
+}
+
+func (p *liveSteamCMD) Wait() error {
+	for {
+		select {
+		case line := <-p.lines:
+			f, _ := os.OpenFile(p.log, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+			fmt.Fprintln(f, line)
+			f.Close()
+		case <-p.exit:
+			return nil
+		}
+	}
+}
+
+func (p *liveSteamCMD) Kill() error {
+	if p.killed.CompareAndSwap(false, true) {
+		close(p.exit)
+	}
+	return nil
+}
+
+// A subscription update reports each Mod while SteamCMD is still running, the one being
+// downloaded as worked on and each confirmed one as done; stop ends SteamCMD and leaves the
+// rest not done (16 §2.16; the window used to show 0 of N until a whole group ended).
+func TestUpdateWorkshopReportsLiveAndStops(t *testing.T) {
+	t.Parallel()
+	e := setup(t, true)
+	root := filepath.Join(e.Root, "live library", "steamapps", "workshop", "content", "294100")
+	for i := 1; i <= 4; i++ {
+		id := fmt.Sprint(8100 + i)
+		e.WriteMod(filepath.Join(root, id), testkit.Sample("live.mod"+id, "Live "+id))
+	}
+	if _, err := e.App.FolderAdd(source.SteamCMD, root); err != nil {
+		t.Fatal(err)
+	}
+	scanNow(t, e)
+	ss, err := e.App.Subscriptions()
+	if err != nil || len(ss) != 4 {
+		t.Fatalf("subscriptions: %d %v", len(ss), err)
+	}
+	exe := filepath.Join(e.Root, "steamcmd", "steamcmd.exe")
+	e.WriteFile(exe, "stub")
+	e.App.FindTool = func(string) (string, bool) { return exe, true }
+	e.App.SteamCMDPoll = 5 * time.Millisecond
+	proc := &liveSteamCMD{log: filepath.Join(filepath.Dir(exe), "logs", "console_log.txt"), lines: make(chan string), exit: make(chan struct{})}
+	os.MkdirAll(filepath.Dir(proc.log), 0o755)
+	e.App.SteamCMDStart = func(string, []string, bool) (app.SteamCMDProc, error) { return proc, nil }
+
+	idOf := func(i int) string { return ss[i].Record.WorkshopID }
+	type event struct {
+		kind string
+		i    int
+		err  error
+	}
+	events := make(chan event, 16)
+	var stop atomic.Bool
+	done := make(chan error)
+	go func() {
+		_, err := e.App.UpdateSubscriptionsWith(nil, false, app.BatchCalls{
+			Stopped: stop.Load,
+			Start:   func(i int) { events <- event{"start", i, nil} },
+			Done:    func(i int, err error) { events <- event{"done", i, err} },
+		})
+		done <- err
+	}()
+	next := func() event {
+		select {
+		case ev := <-events:
+			return ev
+		case <-time.After(10 * time.Second):
+			t.Fatal("no progress while SteamCMD runs")
+		}
+		return event{}
+	}
+	if ev := next(); ev != (event{"start", 0, nil}) {
+		t.Fatalf("first: %+v", ev)
+	}
+	// The first Mod is confirmed once SteamCMD moves on to the second.
+	proc.lines <- "Success. Downloaded item " + idOf(0)
+	proc.lines <- "Downloading item " + idOf(1) + " ..."
+	got := []event{next(), next()}
+	slices.SortFunc(got, func(a, b event) int { return strings.Compare(a.kind, b.kind) })
+	if got[0] != (event{"done", 0, nil}) || got[1] != (event{"start", 1, nil}) {
+		t.Fatalf("after the first Mod: %+v", got)
+	}
+	if r, err := subscribe.Read(ss[0].Folder); err != nil || r == nil || r.InstalledAt.IsZero() {
+		t.Fatal("first Mod's record not written while SteamCMD runs")
+	}
+	// Stop: SteamCMD is ended, the rest are not reported as done.
+	stop.Store(true)
+	if err := <-done; err != nil && !errors.Is(err, context.Canceled) {
+		t.Fatal(err)
+	}
+	if !proc.killed.Load() {
+		t.Fatal("SteamCMD kept running after stop")
+	}
+	close(events)
+	for ev := range events {
+		if ev.kind == "done" {
+			t.Fatalf("reported after stop: %+v", ev)
+		}
 	}
 }

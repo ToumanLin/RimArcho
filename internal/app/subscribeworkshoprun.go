@@ -181,11 +181,15 @@ func (a *App) runWorkshopBatches(exe, base, account string, ids []string, transf
 			parsed := parseWorkshopOutput(pending, out, err)
 			confirmed := 0
 			stopKind := ""
+			w.okPending = "" // the full output decides the batch's last items
 			for _, id := range pending {
 				r := parsed[id]
 				results[id] = r
 				if w.ctx.Err() == nil || r.confirmed || workshopPermanent(r.kind) {
 					w.outcome(id, r)
+				}
+				if r.confirmed && w.confirmed != nil {
+					w.confirmed(id)
 				}
 				if r.confirmed {
 					confirmed++
