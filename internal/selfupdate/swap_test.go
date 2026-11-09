@@ -2,8 +2,10 @@ package selfupdate
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"testing"
 )
@@ -206,4 +208,126 @@ func TestApplyJoinsUndoError(t *testing.T) {
 	if !errors.Is(err, forward) || !errors.Is(err, undo) || calls <= 5 {
 		t.Fatalf("Apply = %v, calls = %d", err, calls)
 	}
+}
+
+// killAt runs f in a goroutine that ends at the n-th rename, before it happens, as a
+// killed process would: nothing after that point runs, no defer touches the files.
+func killAt(t *testing.T, n int, f func()) (killed bool) {
+	t.Helper()
+	originalRename := rename
+	t.Cleanup(func() { rename = originalRename })
+	calls := 0
+	rename = func(from, to string) error {
+		calls++
+		if calls == n {
+			killed = true
+			runtime.Goexit()
+		}
+		return os.Rename(from, to)
+	}
+	done := make(chan struct{})
+	go func() { defer close(done); f() }()
+	<-done
+	rename = originalRename
+	return killed
+}
+
+func TestResumeAfterKill(t *testing.T) {
+	// Every point of the forward renames, then every point of the rollback.
+	for n := 1; n <= 20; n++ {
+		for _, then := range []string{"forward", "back"} {
+			t.Run(fmt.Sprintf("rename %d %s", n, then), func(t *testing.T) {
+				program, stage, old, original, staged := swapFixture(t)
+				before := tree(t, program)
+				journal := filepath.Join(program, "swap.json")
+				if !killAt(t, n, func() { ApplyRecorded(program, stage, old, journal, "9.9.9") }) {
+					t.Skip("fewer renames")
+				}
+				s, state, err := Resume(journal)
+				if err != nil || state != SwapReplacing || s.Version != "9.9.9" {
+					t.Fatal(s, state, err)
+				}
+				want := make(map[string]string)
+				for name, data := range staged {
+					want[name] = data
+				}
+				for name, data := range original {
+					want["old/"+name] = data
+				}
+				want["swap.json"] = "" // compared by name only below
+				got := tree(t, program)
+				if _, ok := got["swap.json"]; !ok {
+					t.Fatal("journal removed before Commit")
+				}
+				got["swap.json"] = ""
+				if !equalTrees(got, want) {
+					t.Fatalf("Resume did not finish the swap: %v", got)
+				}
+				if then == "forward" {
+					if err := s.Commit(); err != nil {
+						t.Fatal(err)
+					}
+					if _, err := os.Stat(journal); !os.IsNotExist(err) {
+						t.Fatal("journal kept after Commit", err)
+					}
+					return
+				}
+				if err := s.Rollback(); err != nil {
+					t.Fatal(err)
+				}
+				if !equalTrees(tree(t, program), mergeStage(before, staged)) {
+					t.Fatal("Rollback after Resume did not restore the installation")
+				}
+				if _, err := os.Stat(journal); !os.IsNotExist(err) {
+					t.Fatal("journal kept after Rollback", err)
+				}
+			})
+		}
+	}
+}
+
+func TestResumeAfterKillDuringRollback(t *testing.T) {
+	for n := 1; n <= 10; n++ {
+		t.Run(fmt.Sprint(n), func(t *testing.T) {
+			program, stage, old, _, staged := swapFixture(t)
+			before := tree(t, program)
+			journal := filepath.Join(program, "swap.json")
+			s, err := ApplyRecorded(program, stage, old, journal, "9.9.9")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !killAt(t, n, func() { s.Rollback() }) {
+				t.Skip("fewer renames")
+			}
+			r, state, err := Resume(journal)
+			if err != nil || state != SwapRollingBack {
+				t.Fatal(state, err)
+			}
+			if err := r.Rollback(); err != nil {
+				t.Fatal(err)
+			}
+			if !equalTrees(tree(t, program), mergeStage(before, staged)) {
+				t.Fatal("interrupted rollback not finished")
+			}
+		})
+	}
+}
+
+func TestResumeWithoutJournal(t *testing.T) {
+	s, state, err := Resume(filepath.Join(t.TempDir(), "swap.json"))
+	if s != nil || state != "" || err != nil {
+		t.Fatal(s, state, err)
+	}
+}
+
+// mergeStage is the program tree with the staged files back under stage/.
+func mergeStage(program, staged map[string]string) map[string]string {
+	out := make(map[string]string)
+	for name, data := range program {
+		out[name] = data
+	}
+	for name, data := range staged {
+		out["stage/"+name] = data
+	}
+	return out
 }

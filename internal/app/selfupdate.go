@@ -221,6 +221,13 @@ func (a *App) InstallSelfUpdate(ctx context.Context, step func(SelfUpdateStep)) 
 		return nil, ErrUpdateBusy
 	}
 	defer release()
+	// A swap an earlier process was killed in comes first: its folders must stay.
+	switch done, err := a.resumeSelfSwap(program, dir); {
+	case err != nil:
+		return nil, fmt.Errorf("an earlier update of RimArcho was cut short and cannot be finished or undone; nothing was changed: %w", err)
+	case done != "":
+		return &SelfUpdateResult{From: cur, To: done, Program: program}, nil
+	}
 
 	zip, err := a.downloadSelfUpdate(ctx, r, filepath.Join(dir, "download"), step)
 	if err != nil {
@@ -237,7 +244,13 @@ func (a *App) InstallSelfUpdate(ctx context.Context, step func(SelfUpdateStep)) 
 	if err := selfupdate.Extract(zip, stage); err != nil {
 		return nil, fmt.Errorf("the release zip cannot be used; nothing was changed: %w", err)
 	}
-	defer os.RemoveAll(stage)
+	journal := filepath.Join(dir, swapJournalName)
+	defer func() {
+		// A journal left by a failed rollback needs the staged files for the next try.
+		if _, err := os.Stat(journal); errors.Is(err, os.ErrNotExist) {
+			os.RemoveAll(stage)
+		}
+	}()
 
 	poll := a.SelfWaitPoll
 	if poll <= 0 {
@@ -262,33 +275,82 @@ func (a *App) InstallSelfUpdate(ctx context.Context, step func(SelfUpdateStep)) 
 	defer swapping.Done()
 	step(SelfUpdateStep{Phase: "replace"})
 	old := filepath.Join(dir, fmt.Sprintf("old-%s-%d", cur, time.Now().UnixNano()))
-	swap, err := selfupdate.Apply(program, stage, old)
+	swap, err := selfupdate.ApplyRecorded(program, stage, old, journal, r.Version)
 	if err != nil {
 		return nil, fmt.Errorf("could not replace the program files; RimArcho %s is unchanged: %w", cur, err)
 	}
 	step(SelfUpdateStep{Phase: "check"})
+	if err := a.checkNewProgram(program, r.Version); err != nil {
+		if rb := swap.Rollback(); rb != nil {
+			return nil, fmt.Errorf("the new program did not start (%s), and putting RimArcho %s back failed: %w; the old files are in %s, and the next start tries again", err.Error(), cur, rb, old)
+		}
+		return nil, fmt.Errorf("the new program did not start, so RimArcho %s was put back: %w", cur, err)
+	}
+	if err := swap.Commit(); err != nil {
+		return nil, fmt.Errorf("RimArcho %s is installed, but its update record cannot be removed: %w", r.Version, err)
+	}
+	a.recordSelfInstalled(r.Version)
+	a.cleanSelfWorkshop()
+	return &SelfUpdateResult{From: cur, To: r.Version, Program: program}, nil
+}
+
+// swapJournalName is the swap's record in the update folder (selfupdate.ApplyRecorded):
+// present only while program files are being replaced or put back.
+const swapJournalName = "swap.json"
+
+// checkNewProgram runs the program-folder archo and requires version want (17 §5.1 step 6).
+func (a *App) checkNewProgram(program, want string) error {
 	versionOf := a.SelfVersionOf
 	if versionOf == nil {
 		versionOf = selfupdate.VersionOf
 	}
 	got, err := versionOf(context.Background(), filepath.Join(program, selfupdate.Files[0]))
-	if err == nil && got != r.Version {
+	if err == nil && got != want {
 		err = fmt.Errorf("it reports version %q", got)
 	}
-	if err != nil {
-		if rb := swap.Rollback(); rb != nil {
-			return nil, fmt.Errorf("the new program did not start (%s), and putting RimArcho %s back failed: %w; the old files are in %s", err.Error(), cur, rb, old)
-		}
-		return nil, fmt.Errorf("the new program did not start, so RimArcho %s was put back: %w", cur, err)
-	}
+	return err
+}
+
+func (a *App) recordSelfInstalled(version string) {
 	s := a.AutomaticStatus("self")
 	if s.Kind != "" && !s.Checked.IsZero() {
-		s.Pending, s.State = 0, "installed "+r.Version
+		s.Pending, s.State = 0, "installed "+version
 		b, _ := json.Marshal(s)
 		_ = a.Store.SetMeta("automatic:self", string(b))
 	}
-	a.cleanSelfWorkshop()
-	return &SelfUpdateResult{From: cur, To: r.Version, Program: program}, nil
+}
+
+// resumeSelfSwap settles a swap a killed process left (its journal), with the update lock
+// held. A replacement is carried forward and checked like an install: the files were
+// verified before it began, and the new program may already have upgraded the database,
+// which the old one cannot open. Only a new program that does not start is rolled back.
+// done is the version now installed when the swap was finished; an error means the
+// journal stays and the folders it needs must not be removed.
+func (a *App) resumeSelfSwap(program, dir string) (done string, err error) {
+	journal := filepath.Join(dir, swapJournalName)
+	if _, err := os.Stat(journal); errors.Is(err, os.ErrNotExist) {
+		return "", nil
+	}
+	swapping.Add(1)
+	defer swapping.Done()
+	swap, state, err := selfupdate.Resume(journal)
+	if swap == nil {
+		return "", err
+	}
+	if err == nil && state == selfupdate.SwapReplacing {
+		if err = a.checkNewProgram(program, swap.Version); err == nil {
+			if err := swap.Commit(); err != nil {
+				return "", err
+			}
+			a.recordSelfInstalled(swap.Version)
+			return swap.Version, nil
+		}
+	}
+	if rb := swap.Rollback(); rb != nil {
+		return "", errors.Join(err, rb)
+	}
+	os.RemoveAll(swap.Stage)
+	return "", nil
 }
 
 var swapping sync.WaitGroup
@@ -305,7 +367,8 @@ func WaitSelfSwap(limit time.Duration) {
 }
 
 // CleanSelfUpdate removes what an earlier install left in the program folder (the old
-// files, unpacked folders and downloads) when no install is running. A file still in use
+// files, unpacked folders and downloads) when no install is running. A swap a killed
+// process left is settled first (resumeSelfSwap); while it cannot be, nothing is removed. A file still in use
 // stays for the next start. With UpdatedFromEnv set it first waits up to ten seconds for
 // that process, which held the old files, to exit.
 func (a *App) CleanSelfUpdate() {
@@ -328,6 +391,14 @@ func (a *App) CleanSelfUpdate() {
 		return
 	}
 	defer release()
+	// A swap cut short is finished (or undone) before anything is removed; one that
+	// cannot be keeps the old and new files it needs for the next start.
+	if _, err := a.resumeSelfSwap(program, dir); err != nil {
+		return
+	}
+	if entries, err = os.ReadDir(dir); err != nil {
+		return
+	}
 	for _, e := range entries {
 		n := e.Name()
 		if n == "download" || strings.HasPrefix(n, "old-") || strings.HasPrefix(n, "new-") {
