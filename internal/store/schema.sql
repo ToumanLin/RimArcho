@@ -71,10 +71,13 @@ CREATE TABLE "source_use"(
 CREATE TABLE lineage_data(
   environment_id TEXT NOT NULL, lineage_id TEXT NOT NULL, alias TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
   PRIMARY KEY(environment_id, lineage_id));
-CREATE TABLE lineage_tag(
-  environment_id TEXT NOT NULL, lineage_id TEXT NOT NULL, tag TEXT NOT NULL COLLATE NOCASE,
+-- pos: the tag's place among the lineage's tags (0 first); the first coloured tag marks the Mod
+CREATE TABLE "lineage_tag"(
+  environment_id TEXT NOT NULL, lineage_id TEXT NOT NULL, tag TEXT NOT NULL COLLATE NOCASE, pos INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY(environment_id, lineage_id, tag));
 CREATE TABLE tag_note(tag TEXT PRIMARY KEY COLLATE NOCASE, note TEXT NOT NULL);
+-- a tag's colour: a preset name (blue, cyan, …) or #rrggbb (16 §2.9 Tag manager)
+CREATE TABLE tag_color(tag TEXT PRIMARY KEY COLLATE NOCASE, color TEXT NOT NULL);
 -- the names the player gave colonies on the Saves page, by colony key (12 §4.1)
 CREATE TABLE colony_name(key TEXT PRIMARY KEY, name TEXT NOT NULL);
 CREATE TABLE log_cache(

@@ -61,7 +61,7 @@ const descPin = `Lock a version of a mod: copy it into RimArcho's lock library a
 
 const descUnpin = `Unlock a locked version: the current plan uses the upstream (usually Workshop) copy again; the locked copy stays. dry_run=true previews.`
 
-const descPlayer = `The player's own data on mods, in RimArcho's database: tags, alias and note (shared by every copy of a mod), copy_note (one copy's own note). tag_rename/merge/delete/note change a tag on every mod (dry_run first; ask before merge or delete). Nothing reaches the game.`
+const descPlayer = `The player's own data on mods, in RimArcho's database: tags, alias and note (shared by a mod's copies), copy_note (one copy's own). tag_rename/merge/delete/note/color change a tag on every mod (dry_run first; ask before merge or delete). Nothing reaches the game.`
 
 const descRules = `User load-order rules: add (after, before, incompatible, attach, top, bottom, or ignore a wrong About.xml / community constraint — how an order.cycle is broken), list, remove. Rules guide sort and the order problems; they do not reorder by themselves.`
 

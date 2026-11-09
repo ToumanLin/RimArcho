@@ -262,11 +262,14 @@ func mergePlayerData(tx *sql.Tx, m map[string]string) error {
 		}
 		d.note = joinText(d.note, x.note)
 	}
-	type trow struct{ lin, tag string }
+	type trow struct {
+		lin, tag string
+		pos      int
+	}
 	var tags []trow
-	if err := eachRow(tx, `SELECT lineage_id, tag FROM lineage_tag ORDER BY rowid`, func(r *sql.Rows) error {
+	if err := eachRow(tx, `SELECT lineage_id, tag, pos FROM lineage_tag ORDER BY rowid`, func(r *sql.Rows) error {
 		var x trow
-		if err := r.Scan(&x.lin, &x.tag); err != nil {
+		if err := r.Scan(&x.lin, &x.tag, &x.pos); err != nil {
 			return err
 		}
 		tags = append(tags, x)
@@ -294,7 +297,7 @@ func mergePlayerData(tx *sql.Tx, m map[string]string) error {
 		if n := m[lin]; n != "" {
 			lin = n
 		}
-		if _, err := tx.Exec(`INSERT OR IGNORE INTO lineage_tag(environment_id, lineage_id, tag) VALUES('', ?, ?)`, lin, t.tag); err != nil {
+		if _, err := tx.Exec(`INSERT OR IGNORE INTO lineage_tag(environment_id, lineage_id, tag, pos) VALUES('', ?, ?, ?)`, lin, t.tag, t.pos); err != nil {
 			return err
 		}
 	}

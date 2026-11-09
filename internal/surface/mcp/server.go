@@ -475,10 +475,10 @@ type DescribeIn struct {
 
 type PlayerIn struct {
 	Env    string  `json:"env,omitempty" jsonschema:"environment (default: current)"`
-	Action string  `json:"action" jsonschema:"tag_add, tag_remove, alias, note (the mod's), copy_note (one copy's own, 16 §2.9); on every mod: tag_rename, tag_merge, tag_delete, tag_note"`
-	Refs   StrList `json:"refs,omitempty" jsonschema:"the mods (tag_add / tag_remove: one or more; alias and note: exactly one)"`
+	Action string  `json:"action" jsonschema:"tag_add, tag_remove, tag_order, alias, note, copy_note (one copy's own); on every mod: tag_rename, tag_merge, tag_delete, tag_note, tag_color"`
+	Refs   StrList `json:"refs,omitempty" jsonschema:"the mods (tag_add / tag_remove: one or more; others: one)"`
 	Tags   StrList `json:"tags,omitempty" jsonschema:"the tags (tag_rename, tag_note: one)"`
-	Text   string  `json:"text,omitempty" jsonschema:"alias / note / copy_note / tag_note: the text, empty clears it; tag_rename: new name; tag_merge: target"`
+	Text   string  `json:"text,omitempty" jsonschema:"alias, note, copy_note, tag_note: text, empty clears it; tag_rename: new name; tag_merge: target; tag_color: colour name or #rrggbb"`
 	DryRun bool    `json:"dry_run,omitempty" jsonschema:"preview a tag edit"`
 }
 
@@ -781,6 +781,14 @@ func PlayerArgv(in PlayerIn) []string {
 		return argv(append([]string{"tag", "merge"}, in.Tags...)...).str("into", in.Text).flag("dry-run", in.DryRun).a
 	case "tag_delete":
 		return argv(append([]string{"tag", "delete"}, in.Tags...)...).flag("dry-run", in.DryRun).a
+	case "tag_color":
+		b := argv(append([]string{"tag", "color"}, in.Tags...)...)
+		if in.Text == "" {
+			return b.flag("clear", true).a
+		}
+		return b.pos(in.Text).a
+	case "tag_order":
+		return argv(append([]string{"tag", "order", first}, in.Tags...)...).a
 	case "tag_note":
 		b := argv(append([]string{"tag", "note"}, in.Tags...)...)
 		if in.Text == "" {

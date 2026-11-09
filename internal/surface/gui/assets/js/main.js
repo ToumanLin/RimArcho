@@ -29,6 +29,7 @@ import { updateFromForm } from "./subscribe.js";
 import { initExchange, exchange, key as importKey, hintList as importHints } from "./exchange.js";
 import { icon } from "./icons.js";
 import * as motion from "./motion.js";
+import { setTagColors } from "./tagcolor.js";
 import * as ops from "./ops.js";
 import * as uninst from "./uninstall.js";
 import * as packsPage from "./packs.js";
@@ -92,7 +93,7 @@ async function reload(snapshot = null, read = null) {
   readRetries = 0;
   // a shell that could not be read keeps the sidebar's lists; the sidebar reads again
   const shellOK = !shell.shellFailed(sh);
-  const apply = () => { S.board = b; if (shellOK) S.shell = sh; S.history = history; };
+  const apply = () => { S.board = b; setTagColors(b.tagColors); if (shellOK) S.shell = sh; S.history = history; };
   if (read) read.commit(apply); else apply();
   if (!shellOK) setTimeout(shell.loadShell, 2000);
   S.busy.scan = b.scanning;
@@ -1302,6 +1303,8 @@ async function start() {
   // a detail's settings row: Mod library › Mod settings at that Mod's files (16 §2.9)
   document.addEventListener("open-mod-settings", (e) => { modSettings.focusMod(e.detail); go("mod-settings"); });
   document.addEventListener("editor-full",()=>fullPage.full("plan",S.detail?.id));
+  // a Mod's tags were reordered in its details: the rows' colour marks follow (16 §2.9)
+  document.addEventListener("tags-changed", () => reload());
   document.addEventListener("editor-use-copy", async (e) => {
     if(environmentReason())return say("busy",environmentReason());
     const id = e.detail;

@@ -19,6 +19,7 @@ import { createBar } from "./filterbar.js";
 import * as ops from "./ops.js";
 import { createTable, mergeColumns } from "./datatable.js";
 import { wireSeparator } from "./separator.js";
+import { markOf, paintMark, tagCSS, tagColors, fromTagList, TAG_PRESETS } from "./tagcolor.js";
 
 const ROW = 30;      // every row has the same height: the list is drawn by position
 const HEAD = 28;     // the column headers, sticky at the top of the table
@@ -122,10 +123,8 @@ async function load(fresh, focusRef, read = null, focusID = "") {
       api.Library(b.search, b.filters, L.sort),
       L.cols ? null : api.Setting(COLS_KEY).catch(() => ""),
       L.view ? null : api.Setting(VIEW_KEY).catch(() => ""),
-      L.view === "tags" ? tagList() : null,
+      tagList(),
     ]);
-    // the first visit learns the view with the page; the Tags view then needs the tags too
-    if (!L.view && view === "tags") tags = await tagList();
   } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
   L.page = p;
@@ -153,7 +152,8 @@ async function load(fresh, focusRef, read = null, focusID = "") {
 }
 
 // tagList reads every tag (API.TagList); a failure leaves the groups in row order.
-const tagList = () => Promise.resolve().then(() => api.TagList()).catch(() => []);
+// tagList reads the tags; their colours mark the rows (tagcolor.js)
+const tagList = () => Promise.resolve().then(() => api.TagList()).then((t) => { fromTagList(t); return t; }).catch(() => []);
 
 // flatten lists the rows: a Lineage, and its copies when it is open (or when the filters
 // show only some of them); a Lineage of one copy is that copy's row.
@@ -404,7 +404,7 @@ function rowEl(x, k) {
   // the cells: a Lineage's from its row, a copy's from the copy (a lone copy is its Lineage)
   const cells = x.t === "lin" || x.lone ? x.r : x.i;
   for (const c of shownCols()) {
-    if (c.key === "name") { r.append(nameCell(x)); continue; }
+    if (c.key === "name") { r.append(nameCell(x, k)); continue; }
     const v = cells[c.key] || "";
     const cell = el("span", "word-facts c " + c.key + (c.key === "state" && cells.code ? " " + cells.code : ""), v);
     if (c.key === "size") cell.classList.add("num");
@@ -440,6 +440,7 @@ function groupEl(x, k) {
   r.style.top = HEAD + k * ROW + "px";
   const cell = el("span", "c name");
   cell.append(el("span", "m"));
+  paintLibMark(cell.firstChild, k);
   const c = el("span", "chev" + (open ? " down" : ""));
   c.innerHTML = icon.chev;
   c.setAttribute("aria-hidden", "true");
@@ -463,10 +464,23 @@ function groupEl(x, k) {
   return r;
 }
 
+// libMark: a row's tag colour band (16 §2.9): a Mod's first coloured tag; a tag's header
+// row shows its own colour, so the band runs on into its Mods of that colour.
+function libMark(x) {
+  if (!x) return null;
+  if (x.t === "grp") { const c = !x.g.none && tagCSS(tagColors()[x.g.key]); return c ? { tag: x.g.tag, color: c } : null; }
+  return markOf(x.r.tags);
+}
+function paintLibMark(span, k) {
+  const mk = libMark(L.flat[k]);
+  paintMark(span, mk, !!mk && libMark(L.flat[k - 1])?.color === mk.color, !!mk && libMark(L.flat[k + 1])?.color === mk.color);
+}
+
 // nameCell: only the name (16 §2.9): a Lineage's, or under an open Lineage the copy's folder.
-function nameCell(x) {
+function nameCell(x, k) {
   const left = el("span", "c name");
   left.append(el("span", "m"));
+  paintLibMark(left.firstChild, k);
   if (x.t === "lin") {
     const c = el("span", "chev" + (L.open.has(x.r.id) || x.r.insts.length < x.r.copies ? " down" : ""));
     c.innerHTML = icon.chev;
@@ -717,7 +731,10 @@ async function drawDetail() {
     const inner = el("div", "mod-detail");
     frame = detailFrame(inner, null, {
       ownFields: true,
-      fieldActs: () => ({ folder: () => run("folder", [findCopy(i.ref) || i]), tags: () => run("tags", [findCopy(i.ref) || i]) }),
+      fieldActs: () => ({
+        folder: () => run("folder", [findCopy(i.ref) || i]), tags: () => run("tags", [findCopy(i.ref) || i]),
+        tagOrder: (list) => api.SetTagOrder(i.id, list).then((t) => { say("ok", t); return load(); }, (e) => say("fail", errText(e))),
+      }),
       run: (c, r) => run(c, [findCopy(r.ref) || r]),
       noteSaved: () => load(),
       noteLeave: () => els.rows.focus(),
@@ -808,7 +825,7 @@ function tagHead(d, g, info) {
   facts.append(el("span", "", Tf("%d mods", info.n)));
   if (info.n !== g.rows.length) facts.append(el("span", "", Tf("%d shown", g.rows.length)));
   if (info.pinned) facts.append(el("span", "", T("on top")));
-  d.append(row, facts);
+  d.append(row, facts, colorField(info, g));
   // similar tags, drawn as fields.js draws a copy's field: a label, the value, its action
   const like = similarTags(info.tag);
   if (like.length) {
@@ -835,6 +852,49 @@ function tagHead(d, g, info) {
   d.append(acts);
 }
 
+// colorField: the tag's colour (16 §2.9): none, the presets, or a colour of the player's
+// own from the colour wheel. It marks the Mods whose first coloured tag this is.
+function colorField(info, g) {
+  const fields = el("div", "fields");
+  const r = el("div", "frow tag-color");
+  const v = el("span", "v tm-swatches");
+  const cur = info.color || "";
+  const set = (c) => tagAct(api.SetTagColor(info.tag, c), g.key);
+  const sw = (value, label, css, cls = "") => {
+    const b = el("button", "tm-swatch" + cls + (value === cur || (value === "#" && cur.startsWith("#")) ? " on" : ""));
+    b.type = "button";
+    b.title = label;
+    b.setAttribute("aria-label", label);
+    b.setAttribute("aria-pressed", String(b.classList.contains("on")));
+    if (css) b.style.setProperty("--sw", css);
+    v.append(b);
+    return b;
+  };
+  sw("", T("no colour"), "", " none").onclick = () => set("");
+  for (const name of TAG_PRESETS) sw(name, T(name), tagCSS(name)).onclick = () => set(name);
+  const own = sw("#", cur.startsWith("#") ? cur : T("a colour of your own…"), cur.startsWith("#") ? cur : "", " own");
+  own.onclick = () => pickOwnColor(own, cur, set);
+  r.append(el("span", "k", T("colour")), v);
+  fields.append(r);
+  const hint = el("div", "tm-hint", T("marks the rows of Mods whose first coloured tag this is; drag a Mod's tags in its details to change which"));
+  const box = el("div", "tm-colorbox");
+  box.append(fields, hint);
+  return box;
+}
+
+// pickOwnColor opens the colour wheel (colorpicker.js); without it, the system's picker.
+async function pickOwnColor(anchor, cur, set) {
+  try {
+    const m = await import("./colorpicker.js");
+    return m.openColorPicker(anchor, { value: cur, presets: TAG_PRESETS.map((name) => ({ name, color: getComputedStyle(document.documentElement).getPropertyValue("--tag-" + name).trim(), label: T(name) })), onPick: (c) => set(c) });
+  } catch { /* not built in: the system picker */ }
+  const input = document.createElement("input");
+  input.type = "color";
+  input.value = cur.startsWith("#") ? cur : "#3a7bd5";
+  input.onchange = () => set(input.value);
+  input.click();
+}
+
 // allTags: every tag with mods, as chips in the groups' order; a click goes to its group,
 // ctrl+click picks several (the cursor's tag first, as a file list's selection would), and
 // a bar under them merges, deletes or clears them. Tags kept on top that no mod has are
@@ -849,6 +909,7 @@ function allTags(d, curKey) {
   for (const t of used) {
     const k = t.tag.toLowerCase();
     const c = el("button", "tm-chip" + (k === curKey ? " cur" : "") + (L.picked.has(k) ? " picked" : ""));
+    if (tagCSS(t.color)) { const m = el("span", "tm-mark"); m.style.background = tagCSS(t.color); m.setAttribute("aria-hidden", "true"); c.append(m); }
     c.append(el("span", "", t.tag), el("span", "n", String(t.n)));
     c.title = (t.note ? t.tag + "\n" + t.note : t.tag) + "\n" + T("ctrl+click picks several");
     c.setAttribute("aria-pressed", String(L.picked.has(k)));

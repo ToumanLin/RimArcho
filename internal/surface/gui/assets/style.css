@@ -57,6 +57,9 @@
   /* log lines in the game's debug-log colours (view.GameLogColors), darkened for white
      with the hue kept (view.LightLogColors); info is the text colour */
   --log-error: #eb0000; --log-warning: #7e7400; --log-info: var(--fg);
+  /* tag colours (16 §2.9 Tag manager): Radix step 9 on white, step 11 on dark */
+  --tag-blue: #0090ff; --tag-cyan: #00a2c7; --tag-teal: #12a594; --tag-grass: #46a758;
+  --tag-orange: #f76b15; --tag-pink: #d6409f; --tag-plum: #ab4aba; --tag-violet: #6e56cf;
 }
 @media (min-resolution: 2dppx) {
   :root { --hairline: 0.5px; }
@@ -72,6 +75,8 @@
   --accent: var(--default-accent); --accent-soft: #2b2c47; --accent-fg: #14142a; --sel: #33345a;
   --green: #6fd99b; --green-soft: #1e3a2b; --red: #f28b82; --red-soft: #45272a; --amber: #f2b544; --amber-soft: #3f3220; --log: #f5a97f;
   --log-error: #ff6666; --log-warning: #ffeb04; --log-info: #ffffff;
+  --tag-blue: #70b8ff; --tag-cyan: #4ccce6; --tag-teal: #0bd8b6; --tag-grass: #71d083;
+  --tag-orange: #ffa057; --tag-pink: #ff8dcc; --tag-plum: #e796f3; --tag-violet: #baa7ff;
   --pop-bg: rgba(38, 38, 43, .96);
   --shadow: 0 16px 44px rgba(0, 0, 0, .55), 0 2px 8px rgba(0, 0, 0, .3), 0 0 0 var(--hairline) rgba(255, 255, 255, .1);
 }
@@ -387,7 +392,11 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .row { position: absolute; left: 6px; right: 6px; height: var(--row-h); display: flex; align-items: center; gap: 7px; padding: 0 8px 0 6px; white-space: nowrap; border-radius: var(--r-sm); }
 .row:hover { background: var(--pill); }
 /* no bar on the left of a selected row (16 §7 rule 4): the selection is the row's tint */
-.row .m { width: 2px; align-self: stretch; margin: 6px 0; flex: none; }
+.row .m { width: 3px; align-self: stretch; margin: 5px 0; flex: none; border-radius: 999px; }
+/* the tag colour band (tagcolor.js): neighbours of one colour join into one band, their
+   round ends overlapping across the row boundary */
+:is(.row, .lib-row) .m.up { margin-top: -2px; }
+:is(.row, .lib-row) .m.down { margin-bottom: -2px; }
 .row .p { width: var(--pw, 3ch); text-align: right; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; flex: none; }
 .row .k { color: var(--faint); display: flex; }
 .row .t { overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
@@ -944,6 +953,18 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .chips .c:hover { border-color: var(--accent); color: var(--accent-11, var(--accent)); background: var(--accent-soft); }
 .chips .c.on { border-color: var(--accent); color: var(--accent-11, var(--accent)); background: var(--accent-soft); }
 .chips .c .h { color: var(--accent-11, var(--accent)); margin-right: 3px; }
+/* a Mod's tags in order, dragged to reorder (tagorder.js, 16 §2.9) */
+.tag-order { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.tag-order > .tag-drag { display: inline-flex; align-items: center; gap: 5px; cursor: grab; position: relative; }
+.tag-drag .tm-mark { display: inline-block; width: 3px; height: 11px; margin-right: 5px; border-radius: 999px; flex: none; vertical-align: -1px; }
+.tag-drag.lead { text-decoration: underline; text-decoration-color: var(--faint); text-underline-offset: 3px; }
+.tag-drag.dragging { opacity: .4; }
+.tag-drag.drop-before { box-shadow: -2px 0 0 var(--accent); }
+.tag-drag.drop-after { box-shadow: 2px 0 0 var(--accent); }
+.tag-drag:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.tag-order-row { display: flex; align-items: center; gap: 10px; padding: 8px 14px 0; }
+.tag-order-row > .k { color: var(--muted); font-size: 12px; flex: none; }
+.tag-order-row .c { height: 25px; padding: 0 10px; border-radius: 999px; border: var(--hairline) solid var(--line-2); color: var(--fg-2); background: var(--card); }
 #menu { transition: opacity var(--t-exit) var(--ease-in), display var(--t-exit) allow-discrete; position: fixed; z-index: 25; background: var(--card); border: var(--hairline) solid var(--line-2); border-radius: var(--r-lg); box-shadow: var(--shadow); padding: 6px; min-width: 200px; display: grid; gap: 1px; animation: pop-in var(--t-enter) var(--ease); }
 #menu[hidden] { opacity: 0; }
 #menu button { display: flex; align-items: center; width: 100%; height: 28px; padding: 0 8px; border-radius: var(--r-sm); gap: 18px; font-size: 13px; }
@@ -1374,7 +1395,7 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .lib-rows:focus .lib-row.cur .t { color: var(--accent-11, var(--accent)); }
 .lib-row.sel { background: color-mix(in srgb, var(--accent) 13%, transparent); }
 .lib-row.sel.cur { background: color-mix(in srgb, var(--accent) 19%, transparent); }
-.lib-row .m { width: 2px; align-self: stretch; margin: 7px 6px 7px 0; border-radius: var(--r-sm); flex: none; }
+.lib-row .m { width: 3px; align-self: stretch; margin: 6px 6px 6px 0; border-radius: 999px; flex: none; }
 .lib-row.open { background: var(--accent-soft); }
 .lib-row.open .t { color: var(--accent-11, var(--accent)); }
 .lib-row .c { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 12px; color: var(--muted); }
@@ -1468,6 +1489,18 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .tag-detail .tm-hint { margin: 8px 0; color: var(--muted); }
 .tag-detail .sub .cnt { margin-left: 8px; color: var(--faint); font-weight: 400; letter-spacing: 0; }
 .tm-cloud { display: flex; flex-wrap: wrap; gap: 4px; }
+.tm-chip .tm-mark { align-self: center; width: 3px; height: 11px; border-radius: 999px; flex: none; }
+/* a tag's colour (16 §2.9): none, the presets, one of the player's own */
+.tm-colorbox { margin: 4px 0 2px; }
+.tm-colorbox .tm-hint { margin: 2px 0 0; }
+.tm-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.tm-swatch { position: relative; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; background: var(--sw, transparent); cursor: pointer; flex: none; }
+.tm-swatch.none { box-shadow: inset 0 0 0 var(--hairline) var(--muted); }
+.tm-swatch.none::after { content: ""; position: absolute; left: 50%; top: 2px; bottom: 2px; width: var(--hairline); background: var(--muted); transform: rotate(45deg); }
+.tm-swatch.own:not([style]) { background: conic-gradient(#e5484d, #ffc53d, #46a758, #12a594, #0090ff, #6e56cf, #d6409f, #e5484d); }
+.tm-swatch.on { box-shadow: 0 0 0 2px var(--card), 0 0 0 3.5px var(--fg-2); }
+.tm-swatch.none.on { box-shadow: inset 0 0 0 var(--hairline) var(--muted), 0 0 0 2px var(--card), 0 0 0 3.5px var(--fg-2); }
+.tm-swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 /* its own chip: the details' .chip rule is scoped through #detail and would beat these */
 .tm-chip { display: inline-flex; align-items: baseline; gap: 6px; max-width: 100%; padding: 0 8px; border: 0; border-radius: 999px; background: var(--pill); color: var(--fg-2); font: inherit; font-size: 12px; line-height: 21px; cursor: pointer; }
 .tm-chip > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2327,6 +2360,10 @@ select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-s
 .fbar-suggestion.on code {color:var(--accent-11,var(--accent));}
 .fbar-clear {color:var(--muted);padding:0 4px;}
 .editor-copy-head {position:absolute;top:0;left:15px;right:8px;height:28px;display:flex;align-items:center;overflow:hidden;text-overflow:ellipsis;font-weight:500;}
+/* a Mod's copies in Not enabled: its colour band stands at the row's left edge and starts
+   at the Mod's name line, running down through every copy (16 §2.9) */
+.row.copy-item .m {margin-left:-16px;margin-right:16px;}
+.row.copy-group-start .m.on {margin-top:-23px;}
 .row.copy-item {padding-left:22px;color:var(--fg-2);font-size:12px;}
 .row.copy-item .k {display:none;}
 .row.copy-item .t {color:var(--muted);}

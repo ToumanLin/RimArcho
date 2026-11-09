@@ -125,11 +125,16 @@ func TestGameAssemblyReplacedAndDeleted(t *testing.T) {
 	}
 }
 
-// The steps from 29 (game types 29 → 30, save cache 30 → 31, tag notes 31 → 32, colony names 32 → 33) create the same tables as schema.sql.
+// The steps from 29 (game types 29 → 30, save cache 30 → 31, tag notes 31 → 32, colony names 32 → 33,
+// tag order 33 → 34) create the same tables as schema.sql.
 func TestUpgradeGameTypes(t *testing.T) {
 	s, path := openTemp(t)
 	want := gameTypeDDL(t, s.DB)
-	for _, q := range []string{`DROP TABLE game_type`, `DROP TABLE game_assembly`, `DROP TABLE save_cache`, `DROP TABLE tag_note`, `DROP TABLE colony_name`, `UPDATE meta SET value='29' WHERE key='schema_version'`} {
+	for _, q := range []string{`DROP TABLE game_type`, `DROP TABLE game_assembly`, `DROP TABLE save_cache`, `DROP TABLE tag_note`, `DROP TABLE colony_name`, `DROP TABLE tag_color`, `DROP TABLE lineage_tag`,
+		`CREATE TABLE lineage_tag(
+  environment_id TEXT NOT NULL, lineage_id TEXT NOT NULL, tag TEXT NOT NULL COLLATE NOCASE,
+  PRIMARY KEY(environment_id, lineage_id, tag))`,
+		`INSERT INTO lineage_tag VALUES('', 'l1', 'zeta'), ('', 'l1', 'Alpha'), ('', 'l2', 'beta')`, `UPDATE meta SET value='29' WHERE key='schema_version'`} {
 		if _, err := s.DB.Exec(q); err != nil {
 			t.Fatal(err)
 		}
@@ -149,6 +154,13 @@ func TestUpgradeGameTypes(t *testing.T) {
 	if got := gameTypeDDL(t, u.DB); got != want {
 		t.Errorf("upgraded schema:\n%s\nwant:\n%s", got, want)
 	}
+	pd, err := u.PlayerDataAll("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := fmt.Sprint(pd["l1"].Tags, pd["l2"].Tags); got != "[Alpha zeta] [beta]" {
+		t.Errorf("tags after the upgrade: %s", got)
+	}
 	if v := u.Meta("schema_version"); v != fmt.Sprint(store.SchemaVersion) || steps == 0 {
 		t.Errorf("schema_version %s after %d progress calls", v, steps)
 	}
@@ -156,7 +168,7 @@ func TestUpgradeGameTypes(t *testing.T) {
 
 func gameTypeDDL(t *testing.T, db *sql.DB) string {
 	t.Helper()
-	rows, err := db.Query(`SELECT name, sql FROM sqlite_master WHERE tbl_name IN ('game_assembly','game_type','save_cache','tag_note','colony_name') AND sql IS NOT NULL ORDER BY name`)
+	rows, err := db.Query(`SELECT name, sql FROM sqlite_master WHERE tbl_name IN ('game_assembly','game_type','save_cache','tag_note','colony_name','lineage_tag','tag_color') AND sql IS NOT NULL ORDER BY name`)
 	if err != nil {
 		t.Fatal(err)
 	}

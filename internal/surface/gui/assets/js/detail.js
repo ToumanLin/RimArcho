@@ -58,6 +58,7 @@ export async function showDetail(it, staged) {
     fieldActs: (d) => ({
       tags: () => document.dispatchEvent(new CustomEvent("verb", { detail: "tags" })),
       folder: () => api.OpenFolder(d.id).catch((e) => say("fail", errText(e))),
+      tagOrder: (list) => api.SetTagOrder(d.id, list).then((t) => { say("ok", t); document.dispatchEvent(new CustomEvent("tags-changed")); }, (e) => say("fail", errText(e))),
     }),
     run: (code, i) => document.dispatchEvent(new CustomEvent("detail-op", { detail: { code, id: i.id || it.id } })),
     noteSaved: async () => { const i = await api.LibraryCopy(it.id).catch(() => null); if (current() && i) f.inst(i); },

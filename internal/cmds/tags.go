@@ -21,6 +21,79 @@ type TagInfo struct {
 	N      int    `json:"n"`
 	Note   string `json:"note,omitempty"`
 	Pinned bool   `json:"pinned,omitempty"`
+	Color  string `json:"color,omitempty"` // a preset name (TagColorNames) or #rrggbb
+}
+
+// TagColorNames are the preset tag colours (16 §2.9 Tag manager). Red and amber are left
+// out: they mean problems and warnings in the lists.
+var TagColorNames = []string{"blue", "cyan", "teal", "grass", "orange", "pink", "plum", "violet"}
+
+// NormalizeTagColor checks a tag colour: a preset name, #rgb or #rrggbb (lower-cased,
+// written out to #rrggbb), or "" / none for no colour.
+func NormalizeTagColor(v string) (string, error) {
+	v = strings.ToLower(strings.TrimSpace(v))
+	if v == "" || v == "none" {
+		return "", nil
+	}
+	if slices.Contains(TagColorNames, v) {
+		return v, nil
+	}
+	hex := strings.TrimPrefix(v, "#")
+	ok := len(hex) == 3 || len(hex) == 6
+	for _, r := range hex {
+		ok = ok && (r >= '0' && r <= '9' || r >= 'a' && r <= 'f')
+	}
+	if !ok || !strings.HasPrefix(v, "#") {
+		return "", &UsageError{Msg: fmt.Sprintf("colour %q: one of %s, a #rrggbb colour, or none", v, strings.Join(TagColorNames, ", "))}
+	}
+	if len(hex) == 3 {
+		hex = string([]byte{hex[0], hex[0], hex[1], hex[1], hex[2], hex[2]})
+	}
+	return "#" + hex, nil
+}
+
+// SetTagColor sets (or with "" / none clears) a tag's colour; it returns the tag as stored
+// and the colour as kept.
+func SetTagColor(a *app.App, tag, color string) (string, string, error) {
+	c, err := NormalizeTagColor(color)
+	if err != nil {
+		return "", "", err
+	}
+	list, err := TagList(a)
+	if err != nil {
+		return "", "", err
+	}
+	t, ok := findTag(list, tag)
+	if !ok {
+		return "", "", fmt.Errorf("no tag %q (archo tag list)", strings.TrimSpace(tag))
+	}
+	return t.Tag, c, a.Store.SetTagColor(t.Tag, c)
+}
+
+// SetModTagOrder puts a mod's tags (all its copies') in this order; the tags not named
+// follow in their order. It returns the tags as they are now.
+func SetModTagOrder(a *app.App, ref string, tags []string) ([]string, error) {
+	ix, err := a.Index()
+	if err != nil {
+		return nil, err
+	}
+	m, err := ix.ResolveOne(ref)
+	if err != nil {
+		return nil, err
+	}
+	for _, t := range cleanTags(tags) {
+		if !slices.ContainsFunc(m.Tags, func(h string) bool { return strings.EqualFold(h, t) }) {
+			return nil, fmt.Errorf("%s has no tag %q", ix.Ref(m.ID), t)
+		}
+	}
+	if err := a.Store.SetTagOrder(m.LineageID, cleanTags(tags)); err != nil {
+		return nil, err
+	}
+	pd, err := a.Store.PlayerDataAll(ix.Env.ID)
+	if err != nil || pd[m.LineageID] == nil {
+		return nil, err
+	}
+	return pd[m.LineageID].Tags, nil
 }
 
 // TagEdit says what a merge or a delete changes: the tags removed, the tag they become
@@ -55,13 +128,18 @@ func TagList(a *app.App) ([]TagInfo, error) {
 	if err != nil {
 		return nil, err
 	}
+	colors, err := a.Store.TagColors()
+	if err != nil {
+		return nil, err
+	}
 	var out []TagInfo
 	seen := map[string]bool{}
 	byKey := map[string]TagInfo{}
 	for _, c := range counts {
 		n := 0
 		fmt.Sscan(c[1], &n)
-		byKey[strings.ToLower(c[0])] = TagInfo{Tag: c[0], N: n, Note: notes[strings.ToLower(c[0])]}
+		k := strings.ToLower(c[0])
+		byKey[k] = TagInfo{Tag: c[0], N: n, Note: notes[k], Color: colors[k]}
 	}
 	for _, p := range PinnedTagList(a) {
 		k := strings.ToLower(p)
@@ -71,7 +149,7 @@ func TagList(a *app.App) ([]TagInfo, error) {
 		seen[k] = true
 		t, ok := byKey[k]
 		if !ok {
-			t = TagInfo{Tag: p, Note: notes[k]}
+			t = TagInfo{Tag: p, Note: notes[k], Color: colors[k]}
 		}
 		t.Pinned = true
 		out = append(out, t)

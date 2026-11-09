@@ -373,5 +373,16 @@
   "collapse all": "全部折叠",
   "expand all": "全部展开",
   "ctrl+click picks several": "ctrl+点击可多选",
-  "%d tags picked": "已选 %d 个标签"
+  "%d tags picked": "已选 %d 个标签",
+  "colour": "颜色",
+  "no colour": "无颜色",
+  "a colour of your own…": "自定义颜色…",
+  "marks the rows of Mods whose first coloured tag this is; drag a Mod's tags in its details to change which": "以此标签为首个带颜色标签的 Mod，会在行首显示这个颜色；在 Mod 详情里拖动标签可改变顺序",
+  "order": "顺序",
+  "drag to reorder; ctrl+← / ctrl+→ moves it": "拖动调整顺序；ctrl+← / ctrl+→ 移动",
+  "this tag's colour marks the Mod": "这个标签的颜色标记此 Mod",
+  "%s, tag %d of %d": "%s，第 %d 个标签，共 %d 个",
+  "; its colour marks the Mod": "；它的颜色标记此 Mod",
+  "colour of %s cleared": "已清除 %s 的颜色",
+  "colour of %s: %s": "%s 的颜色：%s"
 }

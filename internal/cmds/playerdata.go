@@ -16,11 +16,11 @@ func init() {
 		Flags: []Flag{{Name: "clear"}}})
 	register(&Command{Name: "note", Args: "<ref> [<text>]", Summary: "attach a plain-text note to a mod (all its copies), or with --copy to this copy only", MinArgs: 1, MaxArgs: 2, Run: noteCmd,
 		Flags: []Flag{{Name: "clear"}, {Name: "copy", Help: "this copy's own note (Mod library), not the mod's"}}})
-	register(&Command{Name: "tag", Args: "add|remove <ref> <tag…> | list | rename <tag> <new> | merge <tag…> --into <tag> | delete <tag…> | note <tag> [<text>]", Summary: "tags for filtering (list --filter tag:<tag>); rename, merge, delete and note apply to the tag on every mod", MinArgs: 1, MaxArgs: -1, Run: tagCmd,
+	register(&Command{Name: "tag", Args: "add|remove <ref> <tag…> | list | rename <tag> <new> | merge <tag…> --into <tag> | delete <tag…> | note <tag> [<text>] | color <tag> <colour> | order <ref> <tag…>", Summary: "tags for filtering (list --filter tag:<tag>); rename, merge, delete, note and color apply to the tag on every mod; color marks its mods in the lists (blue, cyan, teal, grass, orange, pink, plum, violet, #rrggbb or none); order sets a mod's tag order (its first coloured tag marks it)", MinArgs: 1, MaxArgs: -1, Run: tagCmd,
 		Flags: []Flag{{Name: "mod", Value: "<ref>", Multi: true, Help: "more mods to tag (add/remove)"},
 			{Name: "into", Value: "<tag>", Help: "merge: the tag the others become (new or existing)"},
 			{Name: "dry-run", Help: "rename, merge, delete: show what would change"},
-			{Name: "clear", Help: "note: clear the tag's note"}}})
+			{Name: "clear", Help: "note, color: clear the tag's note or colour"}}})
 }
 
 func playerTarget(c *Ctx, ref string) (*store.Mod, string, error) {
@@ -132,6 +132,9 @@ func tagCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			if t.Pinned {
 				more = append(more, "pinned")
 			}
+			if t.Color != "" {
+				more = append(more, "colour: "+t.Color)
+			}
 			if t.Note != "" {
 				more = append(more, "note: "+strings.ReplaceAll(t.Note, "\n", " / "))
 			}
@@ -192,6 +195,42 @@ func tagCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		d, root := render.New("note set for tag " + t)
 		root.KV("note", strings.TrimSpace(v))
+		return d, nil
+	case "color":
+		v := ""
+		switch {
+		case len(a.Pos) == 2 && a.Bool("clear"):
+		case len(a.Pos) == 3:
+			v = a.Pos[2]
+		default:
+			return nil, &UsageError{Msg: "tag color <tag> <colour> | tag color <tag> --clear (colours: " + strings.Join(TagColorNames, ", ") + ", #rrggbb, none)"}
+		}
+		t, col, err := SetTagColor(c.App, a.Pos[1], v)
+		if err != nil {
+			return nil, err
+		}
+		if col == "" {
+			d, _ := render.New("colour cleared for tag " + t)
+			return d, nil
+		}
+		d, root := render.New("colour set for tag " + t)
+		root.KV("colour", col)
+		root.KV("shows", "a band at the left of its mods' rows, where it is the mod's first coloured tag")
+		return d, nil
+	case "order":
+		if len(a.Pos) < 3 {
+			return nil, &UsageError{Msg: "tag order <ref> <tag…> (the tags first, in this order)"}
+		}
+		m, err := ix.ResolveOne(a.Pos[1])
+		if err != nil {
+			return nil, err
+		}
+		tags, err := SetModTagOrder(c.App, a.Pos[1], a.Pos[2:])
+		if err != nil {
+			return nil, err
+		}
+		d, root := render.New("tag order set for " + modLabel(ix, m.ID))
+		root.KV("tags", strings.Join(tags, ", "))
 		return d, nil
 	case "add", "remove":
 		if len(a.Pos) < 3 {

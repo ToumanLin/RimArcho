@@ -6,6 +6,7 @@ import { wireBadges, rowDrag } from "./badgepop.js";
 import { listGeometry, rowAt } from "./listgeometry.js";
 import { bump } from "./motion.js";
 import { beginPageRead, pageLoading } from "./screens.js";
+import { markOf, paintMark } from "./tagcolor.js";
 
 const rowID = (k, it) => `editor-${k}-${encodeURIComponent(key(it))}`;
 const rowsEl = (k) => $(`.area[data-area="${k}"] .rows`);
@@ -237,10 +238,16 @@ export function renderRows(k) {
   const last = Math.min(c.view.length, rowAt(layout,box.scrollTop+box.clientHeight) + 5);
   const pool = pools[k];
   for (const [i, d] of pool) if (i < first || i >= last) { d.remove(); pool.delete(i); }
+  // the tag colour band (16 §2.9): it runs on through neighbours of the same colour, not
+  // across a copy group's heading
+  const markAt = (j) => { const x = j >= 0 && j < c.view.length ? c.items[c.view[j]] : null; return x && x.id ? markOf(x.tags) : null; };
   for (let i = first; i < last; i++) {
     const it = c.items[c.view[i]];
     let d = pool.get(i);
-    const sig = rowSig(k, i, it) + `:${layout.tops[i]}:${layout.heights[i]}:${layout.heads[i]}:${c.view.length}`;
+    const mk = markAt(i);
+    const up = !!mk && !layout.heads[i] && markAt(i - 1)?.color === mk.color;
+    const down = !!mk && !layout.heads[i + 1] && markAt(i + 1)?.color === mk.color;
+    const sig = rowSig(k, i, it) + `:${layout.tops[i]}:${layout.heights[i]}:${layout.heads[i]}:${c.view.length}:${mk ? mk.color : ""}${up ? "u" : ""}${down ? "d" : ""}`;
     if (d && d.dataset.sig === sig) continue;
     if (!d) { d = el("div", "row"); box.appendChild(d); pool.set(i, d); }
     d.id = rowID(k, it);
@@ -262,6 +269,7 @@ export function renderRows(k) {
       // what the row is short of, or which copy it is, sits on the name's line
       (it.missing || it.gone ? `<span class="src">${esc(T(it.canUse ? "installed copy available" : "not installed"))}</span>` : k === 1 && it.copyCount > 1 && it.copyLabel ? `<span class="src">${esc(it.copyLabel)}</span>` : "") +
       (it.unsaved ? `<span class="u" title="${esc(T("unsaved"))}"></span>` : "") + `<span class="s">${statusIcon(st)}</span>`;
+    paintMark($(".m", d), mk, up, down);
     if (k === 0 && it.copyCount > 1 && it.copyLabel) {
       d.classList.add("copy-item");
       $(".t",d).textContent="└ " + it.copyLabel;

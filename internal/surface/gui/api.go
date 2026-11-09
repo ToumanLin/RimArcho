@@ -1119,6 +1119,31 @@ func (s *API) SetTagNote(tag, note string) (string, error) {
 	return s.tagDone(view.Tf("note of %s saved", t), err)
 }
 
+// SetTagColor sets (or with "" clears) a tag's colour: a preset name or #rrggbb. It marks
+// the Mods whose first coloured tag it is (16 §2.9 Tag manager).
+func (s *API) SetTagColor(tag, color string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t, c, err := cmds.SetTagColor(s.a, tag, color)
+	if c == "" {
+		return s.tagDone(view.Tf("colour of %s cleared", t), err)
+	}
+	return s.tagDone(view.Tf("colour of %s: %s", t, view.T(c)), err)
+}
+
+// SetTagOrder puts a Mod's tags (all its copies') in this order; its first coloured tag
+// marks it in the lists.
+func (s *API) SetTagOrder(id string, tags []string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	st := s.boardState()
+	if st == nil || st.Ix.ByID[id] == nil {
+		return "", errors.New("no mod " + id)
+	}
+	got, err := cmds.SetModTagOrder(s.a, st.Ix.Ref(id), tags)
+	return s.tagDone(view.Tf("tags of %s: %s", st.Ix.ByID[id].DisplayName(), strings.Join(got, ", ")), err)
+}
+
 // PinTag pins a tag in the tag bar and the groups, or unpins it (config tags.pinned).
 func (s *API) PinTag(tag string, on bool) (string, error) {
 	s.mu.Lock()

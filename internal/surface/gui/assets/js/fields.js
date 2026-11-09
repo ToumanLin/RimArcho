@@ -4,6 +4,7 @@
 import { el, esc, api, T, errText, say } from "./state.js";
 import { icon } from "./icons.js";
 import { addressLabel } from "./address.js";
+import { tagOrderChips } from "./tagorder.js";
 import * as rt from "/wails/runtime.js";
 
 const Clipboard = rt.Clipboard || { SetText: () => Promise.reject(new Error("no clipboard")) };
@@ -117,7 +118,8 @@ export function pathContent(node, text, paths = []) {
   return node;
 }
 
-// fieldList draws fields; acts.tags runs the tag bar, acts.folder opens the location.
+// fieldList draws fields; acts.tags runs the tag bar, acts.folder opens the location,
+// acts.tagOrder(list) saves the tags' order after a drag (16 §2.9).
 export function fieldList(fields, acts = {}) {
   const box = el("div", "fields");
   for (const f of fields || []) {
@@ -134,9 +136,8 @@ export function fieldList(fields, acts = {}) {
       }
     } else if (f.kind === "tags") {
       if (!f.list || !f.list.length) v.append(el("span", "dim", T("none")));
-      for (const t of f.list || []) {
-        v.append(el("span", "chip", t));
-      }
+      else if (acts.tagOrder && f.list.length > 1) v.append(tagOrderChips(f.list, acts.tagOrder));
+      else for (const t of f.list) v.append(el("span", "chip", t));
     } else {
       const t = el("span", "", f.value || "—");
       if (f.value && copyable.has(f.kind)) copyablePath(t, f.value);

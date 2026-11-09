@@ -79,6 +79,9 @@ type Board struct {
 	Questions   int                 `json:"questions"` // open identity questions
 	Changes     int                 `json:"changes"`   // events of the last scan
 	LastEvents  map[string]int      `json:"lastEvents,omitempty"`
+	// TagColors is every coloured tag's colour, by lower-cased tag: a row is marked with
+	// its first coloured tag's (16 §2.9 Tag manager)
+	TagColors map[string]string `json:"tagColors,omitempty"`
 }
 
 // BuildBoard builds the columns from the workspace (synced with ModsConfig.xml) and
@@ -188,6 +191,9 @@ func BuildBoard(a *app.App) (*Board, error) {
 		}
 		return ina[i].CopyLabel < ina[j].CopyLabel
 	})
+	if c, err := a.Store.TagColors(); err == nil && len(c) > 0 {
+		b.TagColors = c
+	}
 	if qs, err := a.Store.Questions(st.Ix.Env.ID, false); err == nil {
 		b.Questions = len(qs)
 	}
