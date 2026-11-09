@@ -190,29 +190,46 @@ func (a *App) Workshop(action string, refs []string, dryRun bool, callbacks ...B
 // resubscribe preserves the recorded copy and incoming links while replacing its folder.
 // Only confirmed unsubscribes whose folders are gone proceed to subscribe; residues skip
 // cleanup. Failed items keep their own result for the GUI's batched queue.
+//
+// Unsubscribing and subscribing again are one unit: a stop is honoured before the
+// unsubscribe and once the subscribe is sent (during the download), never between them.
+// The items are recorded before the unsubscribe (resubscribePendingKey), so a crash or a
+// lost Steam connection in between is offered again in Can it run.
 func (a *App) resubscribe(op *WorkshopOp, b BatchCalls) (*WorkshopOp, error) {
+	if b.Stopped != nil && b.Stopped() {
+		return op, context.Canceled
+	}
 	var remove []string
+	pending := map[string]string{}
 	for _, it := range op.Items {
 		if it.Folder != "" {
 			remove = append(remove, it.WorkshopID)
+			pending[it.WorkshopID] = it.Name
 		}
 	}
 	removed := map[string]steamworks.Item{}
 	if len(remove) > 0 {
+		if err := a.markResubscribePending(pending); err != nil {
+			return nil, err
+		}
 		rep, err := a.runSteam(steamworks.Unsubscribe, remove)
 		if err != nil {
+			// The call may have reached Steam: the record stays until Steam confirms a subscription.
 			return nil, a.unavailable(err, op.Items)
 		}
+		var kept []string
 		for _, it := range rep.Items {
-			removed[strconv.FormatUint(it.ID, 10)] = it
+			id := strconv.FormatUint(it.ID, 10)
+			removed[id] = it
+			if it.Result != "ok" {
+				kept = append(kept, id) // Steam did not unsubscribe it
+			}
 		}
+		a.settleResubscribePending(kept)
 	}
 	var add []string
 	for k := range op.Items {
 		it := &op.Items[k]
-		if b.Stopped != nil && b.Stopped() {
-			return op, context.Canceled
-		}
 		it.Result = "timeout"
 		if it.Folder != "" {
 			if r, ok := removed[it.WorkshopID]; ok {
@@ -230,9 +247,6 @@ func (a *App) resubscribe(op *WorkshopOp, b BatchCalls) (*WorkshopOp, error) {
 		add = append(add, it.WorkshopID)
 	}
 	if len(add) > 0 {
-		if b.Stopped != nil && b.Stopped() {
-			return op, context.Canceled
-		}
 		rep, err := a.runSteam(steamworks.Subscribe, add)
 		if err != nil {
 			return nil, a.unavailable(err, op.Items)
@@ -408,6 +422,16 @@ func (a *App) runSteamContext(ctx context.Context, action string, ids []string) 
 			return nil, &SteamUnavailable{Why: "the Steam call did not finish: " + why}
 		}
 		all.Items = append(all.Items, r.Items...)
+	}
+	if action == steamworks.Subscribe {
+		// Any confirmed subscription settles an item an interrupted resubscribe left behind.
+		var ok []string
+		for _, it := range all.Items {
+			if it.Result == "ok" {
+				ok = append(ok, strconv.FormatUint(it.ID, 10))
+			}
+		}
+		a.settleResubscribePending(ok)
 	}
 	return all, nil
 }

@@ -295,6 +295,7 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 	missing := a.MissingMods(st)
 	n.Items = append(mergeDependencies(st, buildItems(a, st, ps, missing)), directoryNeeds(a)...)
 	n.Items = append(n.Items, linkNeeds(a, ps.GameLinks)...)
+	n.Items = append(n.Items, resubscribeNeeds(a, st)...)
 	capacity := a.CachedMemoryAssessment(st)
 	n.Memory = &capacity
 	n.Items = append(n.Items, MemoryNeed(capacity, st.Plan.ID))
@@ -1052,6 +1053,27 @@ func trash(st *app.LoadoutState, tok string) Action {
 
 func keepHidden(p *app.Problem) Action {
 	return Action{Kind: ActIgnore, Key: "I", Label: T("keep it hidden"), Problem: p.Ref, Done: T("kept hidden; asked again if the mod changes")}
+}
+
+// resubscribeNeeds offers to subscribe again to the Workshop items an interrupted
+// resubscribe left unsubscribed (16 §2.9): RimArcho closed, or Steam went away, between
+// the unsubscribe and the subscribe.
+func resubscribeNeeds(a *app.App, st *app.LoadoutState) []Need {
+	items := a.ResubscribePending(st)
+	if len(items) == 0 {
+		return nil
+	}
+	ids, names := make([]string, len(items)), make([]string, len(items))
+	for i, it := range items {
+		ids[i], names[i] = it.WorkshopID, it.Name
+		if names[i] == "" {
+			names[i] = it.WorkshopID
+		}
+	}
+	title := T("a resubscribe was cut short")
+	return []Need{{Group: GroupConfirm, Title: title, Text: title + ": " + strings.Join(names, ", "),
+		Why:    T("RimArcho unsubscribed these Workshop mods to download them again, but closed or lost Steam before subscribing again; they are no longer subscribed") + ": " + strings.Join(names, ", "),
+		Status: StatusWarn, Counted: true, Actions: []Action{subscribeAction(ids, T("subscribe again"))}}}
 }
 
 // subscribeAction subscribes to Workshop items (the interface asks Steam or SteamCMD).
