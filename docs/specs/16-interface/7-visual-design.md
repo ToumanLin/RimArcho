@@ -103,7 +103,7 @@ The motions are implemented in `js/motion.js` and the motion section of `style.c
 - **Sidebar children** expand their grid row from 0fr to 1fr using the layout duration, fade in using the entry duration, and rotate the arrow 90°. The old children collapse while the new children expand, and following entries move smoothly. The highlight slides directly to the final destination that motion.js computes from the expanding and collapsing children. Collapsed children are excluded from the tab order.
 - **List changes** include enabling, disabling, moving, sorting, undoing, and dragging. Before an action, the visible Mod rows' positions are recorded. After redraw, surviving rows move from their old positions using FLIP. Affected rows flash a soft accent and fade over about 400ms; if the affected rows are unknown, moved or new rows flash. Only the rendered virtual rows, a few dozen, are processed, with one style calculation per batch.
 - **Numbers** softly pulse on change: sidebar badges and counts, list headings, Can it run section counts, and the unsaved count.
-- **The status line** slides each new sentence in from below.
+- **The status line** fades each new sentence in, in place; it does not slide (sliding moved the bar on every message).
 - **Loading placeholders** shimmer in lazily loaded game logs, log details, and full-detail pages without loading… text. Screen readers retain the original text.
 - **Cards and overlays** retain their existing slight scale and fade.
 - **Archo figure** (`js/archo.js`, `js/boot.js`, assets in `assets/archo/`): Archo's chibi figure keeps the player company in three places.

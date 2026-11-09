@@ -93,7 +93,13 @@ export function say(kind, text, undo = false, paths = []) {
   s.dataset.kind = kind || "";
   s.dataset.message = text || "";
   s.className = kind || "";
-  factText(s, { text: text || "", paths });
+  // One line (style.css #status): the sentence in its own box, cut with an ellipsis when it
+  // is too long; its line breaks become gaps. A wrapped sentence used to be clipped in the
+  // middle of its lines. The whole text stays in the live region, so a screen reader still
+  // hears all of it, and is the hover text.
+  const msg = factText(el("span", "msg"), { text: String(text || "").replace(/\s*\n\s*/g, "  "), paths });
+  s.replaceChildren(...(text ? [msg] : []));
+  if (text) s.title = text; else s.removeAttribute("title");
   if (kind === "busy" && s.firstElementChild) {
     const label = s.firstElementChild;
     // the busy text itself is the progressbar, with the count it shows (16 §11 A11)

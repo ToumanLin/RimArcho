@@ -159,7 +159,7 @@ function place(h, on, box, outer, jump) {
   h.dataset.placed = "1";
 }
 
-// ---- the status line slides in from below ----
+// ---- the status line fades each new sentence in, in place (no slide: it moved the bar) ----
 
 const statusAnimations = new WeakMap();
 export function statusIn(s) {
@@ -171,8 +171,8 @@ export function statusIn(s) {
   const style = getComputedStyle(s), time = style.getPropertyValue("--t-enter").trim();
   const duration = parseFloat(time) * (time.endsWith("ms") ? 1 : 1000);
   statusAnimations.set(s, s.animate([
-    { opacity: 0, transform: "translateY(6px)" },
-    { opacity: 1, transform: "none" },
+    { opacity: 0 },
+    { opacity: 1 },
   ], { duration, easing: style.getPropertyValue("--ease").trim() }));
 }
 

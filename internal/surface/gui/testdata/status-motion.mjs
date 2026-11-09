@@ -11,13 +11,13 @@ async function harness(time = "200ms", root = {dataset:{}}) {
  return {q,s,reduce,animations};
 }
 
-test("status animation keeps CSS timing and replaces its previous animation without geometry reads",async()=>{
+test("status fade keeps CSS timing and replaces its previous animation without geometry reads",async()=>{
  const {q,s,animations}=await harness();
  q.statusIn(s);q.statusIn(s);
  assert.equal(animations.length,2);assert.equal(animations[0].cancelled,true);
  assert.equal(animations[1].options.duration,200);
  assert.equal(animations[1].options.easing,"cubic-bezier(.2, .8, .2, 1)");
- assert.deepEqual(JSON.parse(JSON.stringify(animations[1].frames)),[{opacity:0,transform:"translateY(6px)"},{opacity:1,transform:"none"}]);
+ assert.deepEqual(JSON.parse(JSON.stringify(animations[1].frames)),[{opacity:0},{opacity:1}],"a new sentence fades in place: it does not move the bar");
 });
 
 test("empty status and reduced motion cancel animation; seconds tokens retain their duration",async()=>{

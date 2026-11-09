@@ -853,13 +853,20 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 #bottom { display: flex; align-items: center; gap: 12px; padding: 0 16px; white-space: nowrap; overflow: hidden; font-size: 12px; color: var(--muted); }
 .where { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: none; max-width: 45%; }
 .where:not(:empty) + #status:not(:empty) { padding-left: 12px; }
-#status { overflow: hidden; text-overflow: ellipsis; color: var(--fg-2); }
-#status.ok::before { content: "✓ "; color: var(--green); }
-#status.fail::before { content: "✗ "; color: var(--red); }
-#status.busy::before { content: "… "; color: var(--muted); }
-#status.warn::before { content: "⚠ "; color: var(--amber); }
-#status a { color: var(--accent-11, var(--accent)); cursor: pointer; margin-left: 8px; }
-#hints { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+/* The status line is one line, always the bar's height (16 §6): the sentence (.msg, say in
+   state.js) is cut at the right with an ellipsis, while its mark and the undo link stay.
+   Before, its parts wrapped onto two or three lines and the bar showed their middle. */
+#status { display: flex; align-items: center; align-self: stretch; gap: 6px; min-width: 0; flex: 0 1 auto; overflow: hidden; color: var(--fg-2); }
+#status > .msg { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 24px; }
+#status > .msg > * + * { margin-left: 12px; }
+#status .path-copy { min-width: 0; max-width: 100%; vertical-align: top; }
+#status.ok::before { content: "✓"; color: var(--green); flex: none; }
+#status.fail::before { content: "✗"; color: var(--red); flex: none; }
+#status.busy::before { content: "…"; color: var(--muted); flex: none; }
+#status.warn::before { content: "⚠"; color: var(--amber); flex: none; }
+#status a { flex: none; margin-left: 2px; color: var(--accent-11, var(--accent)); cursor: pointer; }
+/* the key hints give way before the sentence does, down to a quarter of the bar */
+#hints { flex: 0 100000 auto; min-width: min(25%, 240px); color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
 #hints kbd, #hints .keys { margin: 0 4px 0 0; } #hints kbd { color: var(--fg-2); }
 #hints .sep { color: var(--faint); margin: 0 6px; }
 
@@ -1906,7 +1913,9 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 
 /* Text groups (16 §7.3): facts and key hints use space between elements. */
 .word-facts.word-facts, #detail .word-facts { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 12px; }
-#hints:has(.hint-group) { display: flex; align-items: center; gap: 16px; }
+/* a group that does not fit goes to a second line the bar hides: hints show whole keys
+   and names, never half of one */
+#hints:has(.hint-group) { display: flex; flex-wrap: wrap; align-items: center; gap: 24px 16px; max-height: 24px; }
 .hint-group { white-space: nowrap; }
 
 /* Paths and feedback stay within their columns at narrow widths (16 §7.3 rule 11). */

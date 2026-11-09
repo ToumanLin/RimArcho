@@ -26,10 +26,9 @@ Developing would possibly need new tools such as Bash, ilspyCMD, .Net SDK,
 如果要给一般玩家用, 需要让玩家下载这些工具
 
 ## GUI
-Player feedback says the GUI is very jumpy. Investigated 11-08 (headless-Edge filmstrips, `D:\RimArcho-test\jumpy`). Fixed 11-08: details pane swaps once (editor + Mod library); loading card only after 0.21 s; launch page not redrawn on focus, problem line out of the grid; All lists' memory placeholder holds its height; editor head one line; scrollbar room kept; startup layout from localStorage (nav, separators, window buttons); filter chips keep width; settings › motion (`ui.motion`). Still open:
+Player feedback says the GUI is very jumpy. Investigated 11-08 (headless-Edge filmstrips, `D:\RimArcho-test\jumpy`). Fixed 11-08: details pane swaps once (editor + Mod library); loading card only after 0.21 s; launch page not redrawn on focus, problem line out of the grid; All lists' memory placeholder holds its height; editor head one line; scrollbar room kept; startup layout from localStorage (nav, separators, window buttons); filter chips keep width; settings › motion (`ui.motion`); status line one line, fade instead of slide. Still open:
 - Check all of it on a real 5,000-Mod library in the VM (row in release-vm-tests.md, 2026-11-08 "Less jumpy window").
 - Sidebar: sub-entries still open and close with a 250 ms height animation on every page change (off with motion: reduced). Decide whether the default should be instant, or keep the space reserved.
-- Status line: slides in every message and its height changes (24↔30 px) when a copyable path chip shows.
 - Can it run redraws fully on the 2 s live poll while the game runs; new items push the columns down.
 - Mod library: the selection bar sits in the page flow and shrinks the table when it appears (rows do not move).
 
