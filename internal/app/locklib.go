@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/scan"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
@@ -162,24 +164,54 @@ func (a *App) moveToLibrary(st *LoadoutState, m *store.Mod, dryRun bool) (result
 			moveErr = a.abortLinkLifecycle(r.Links, moveErr)
 		}
 	}()
-	if !r.Copied {
-		if err := os.Rename(from, r.To); err != nil {
-			return nil, err
+	// Every step that can fail runs while the folder can still go back to Mods/, so a
+	// failure ends with the links back on a folder that is there: the marker is written
+	// before the move, and on another volume the original is recycled only once the
+	// database follows the copy.
+	undoOrigin := func() {}
+	if r.Origin {
+		if err := a.writeOrigin(st.Ix, m, from); err != nil {
+			return nil, fmt.Errorf(".rimarcho/origin.json could not be written in %s; nothing was moved: %v", from, err)
 		}
-	} else if err := a.copyMove(from, r.To); err != nil {
+		undoOrigin = func() {
+			os.Remove(filepath.Join(from, filepath.FromSlash(scan.OriginFile)))
+			removeIfEmpty(filepath.Join(from, ".rimarcho"))
+		}
+	}
+	if !r.Copied {
+		err = os.Rename(from, r.To)
+	} else {
+		err = copyChecked(from, r.To)
+	}
+	if err != nil {
+		undoOrigin()
 		return nil, err
 	}
-	if r.Origin {
-		if err := a.writeOrigin(st.Ix, m, r.To); err != nil {
-			return r, fmt.Errorf("moved to %s, but .rimarcho/origin.json could not be written: %v", r.To, err)
-		}
-	}
 	if err := a.Store.RelocateInstance(m.ID, src.ID, filepath.Base(r.To), r.To); err != nil {
-		return r, err
+		var back error
+		if !r.Copied {
+			back = os.Rename(r.To, from)
+		} else {
+			back = removeTree(r.To) // RimArcho's own copy; the original is untouched
+		}
+		if back != nil {
+			return nil, fmt.Errorf("the record could not follow the move (%v), and the folder could not go back: %v; it is in %s, move it back to %s", err, back, r.To, from)
+		}
+		undoOrigin()
+		return nil, fmt.Errorf("the record could not follow the move; nothing was moved: %w", err)
+	}
+	var leftover error
+	if r.Copied {
+		if err := a.recycleTarget(from); err != nil {
+			leftover = fmt.Errorf("copied to %s, but the original could not go to the recycle bin: %v (remove %s yourself)", r.To, err, from)
+		}
 	}
 	finished = true
 	if err := a.finishLinkLifecycle(r.Links); err != nil {
-		return r, err
+		return r, errors.Join(err, leftover)
+	}
+	if leftover != nil {
+		defer func() { moveErr = errors.Join(moveErr, leftover) }()
 	}
 	if _, err := a.Scan(false); err != nil {
 		return nil, err

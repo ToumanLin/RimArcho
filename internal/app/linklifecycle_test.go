@@ -661,3 +661,69 @@ func TestLinkRecoveryClosesCreationWithGoneTarget(t *testing.T) {
 		})
 	}
 }
+
+// A move into the lock library that fails after the folder left Mods/ (the marker cannot
+// be written, the record cannot follow) puts the folder back, so the incoming links return
+// to it and no recovery is left; before, they stayed detached, pointing at nothing (07 §5.4).
+func TestLockMoveFailureLeavesFolderAndLinks(t *testing.T) {
+	t.Parallel()
+	for _, cross := range []bool{false, true} {
+		for _, fail := range []string{"origin", "record"} {
+			name := fail + " rename"
+			if cross {
+				name = fail + " cross-volume"
+			}
+			t.Run(name, func(t *testing.T) {
+				e, from, id, links := incomingFixture(t)
+				e.App.SameVolume = func(string, string) bool { return !cross }
+				e.App.TrashFunc = func(path string) error { t.Fatal("original recycled", path); return nil }
+				switch fail {
+				case "origin": // a file where the marker's folder goes
+					os.RemoveAll(filepath.Join(from, ".rimarcho"))
+					e.WriteFile(filepath.Join(from, ".rimarcho"), "in the way")
+				case "record":
+					if _, err := e.App.Store.DB.Exec(`CREATE TRIGGER fail_move BEFORE UPDATE OF real_path ON instance BEGIN SELECT RAISE(ABORT, 'injected'); END`); err != nil {
+						t.Fatal(err)
+					}
+				}
+				hadOrigin := fileExists(filepath.Join(from, ".rimarcho", "origin.json"))
+				if _, err := e.App.MoveToLocked("#"+id[:6], false); err == nil || !strings.Contains(err.Error(), "nothing was moved") {
+					t.Fatal(err)
+				}
+				if _, err := os.Stat(filepath.Join(from, "About", "About.xml")); err != nil {
+					t.Fatal("folder not back in Mods/", err)
+				}
+				if fileExists(filepath.Join(from, ".rimarcho", "origin.json")) != hadOrigin {
+					t.Fatal("marker left behind")
+				}
+				if entries, _ := os.ReadDir(library(e)); len(entries) != 0 {
+					t.Fatal("copy left in the library", entries)
+				}
+				for _, path := range links {
+					info, err := source.ReadLink(path)
+					if err != nil || info.State != source.TargetPresent || mustReal(t, path) != mustReal(t, from) {
+						t.Fatalf("link not back: %+v %v", info, err)
+					}
+				}
+				rows, err := e.App.Store.ManagedLinks()
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, r := range rows {
+					if !store.LinkFinished(r.Phase) {
+						t.Fatalf("ledger left %s in %q", r.Name, r.Phase)
+					}
+				}
+				m, err := e.App.Store.Mod(id)
+				if err != nil || mustReal(t, m.RealPath) != mustReal(t, from) {
+					t.Fatalf("record moved: %+v %v", m, err)
+				}
+			})
+		}
+	}
+}
+
+func fileExists(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil
+}
