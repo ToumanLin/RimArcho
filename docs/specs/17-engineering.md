@@ -167,7 +167,7 @@ Schema 35 adds unresolved Def classification inputs and per-set content readines
 | Concurrency | `app/concurrent_test.go`: two connections to one data directory; external changes update `ChangeKey`, edits from a stale view do not overwrite them (G8) |
 | Real corpus | Optional tests run only with environment variables: `RIMARCHO_REAL_HOME` (data directory) + `RIMARCHO_EXE` (archo for children) for TUI memory; `RIMARCHO_IDLE_SECONDS` changes idle duration; `RIMARCHO_NO_BROWSE` skips browsing; `RIMARCHO_LOG_VERSION` specifies log replay major/minor version; `RIMARCHO_REAL_COPY` (data directory **copy**) for T1; `RIMARCHO_WORKSHOP_CACHE` replays real Workshop descriptions. Measurement programs in `spikes/` (`tuimem`, `tuistart`, `mcplat`, `mcpcheck`, `analyzereal`, `logreal`, `logfirst`, etc.) |
 
-Test speed: `testkit.New` copies a schema-only database built once per test process instead of creating the schema for each fixture, and replaces the SteamCMD retry backoff (5 s / 15 s) with no wait. Run the suite with `go test -count=1 ./...`: on Windows, recording the test cache's file accesses makes an uncached run about 40% slower (32 threads: 4.5 minutes, against 3.2 with `-count=1`).
+Test speed: `testkit.New` copies a schema-only database built once per test process instead of creating the schema for each fixture, and replaces the SteamCMD retry backoff (5 s / 15 s) with no wait. Run the suite with `go test -count=1 ./...`: on Windows, recording the test cache's file accesses makes an uncached run about 40% slower (32 threads: 4.5 minutes, against 3.2 with `-count=1`). Linux CI coverage and exclusions are in §5.
 
 `l10ndata.TestSourceLanguage` scans tracked source files and falls back to a repository walk when Git is unavailable. Han characters and fullwidth punctuation fail the test outside the centralized, documented exceptions in `internal/l10ndata/source_language_test.go`; a file whose name contains `zh-CN` is exempt without being listed.
 
@@ -204,7 +204,7 @@ In the test VM, `scripts/vm/round.ps1` automates a whole game round (new colony,
 - No installer: extract and run. Uninstall with `archo uninstall` or Settings › "uninstall RimArcho…" (02 §2); after RimArcho closes, a temporary cmd script deletes the ZIP's files. If an installer is adopted later, its uninstaller becomes the last step and also handles updates (§5.1).
 - Record text output format (13 §5) and MCP tool changes in CHANGELOG.
 - Before release, run the entire [release VM tests](../../UserGuide/release-vm-tests.md) table in the VM (real data, `scripts/vm/`); fix findings or record TODOs before tagging.
-- macOS and Linux: `GOOS=linux` and `GOOS=darwin` compile, without runtime testing; official support in 1.x (00 §5).
+- Linux amd64: `CGO_ENABLED=0 go build ./cmd/archo` builds the non-GUI CLI, TUI and MCP. `.github/workflows/ci.yml` tests Linux on `ubuntu-latest`: gofmt, build, `go vet`, pinned staticcheck and `go test -count=1`, excluding `internal/surface/gui`, `internal/surface/upgradewin` and `spikes/...`. Windows CI retains its full-package checks. This is build and synthetic-test coverage, not runtime support: process safety, paths, detection and the SteamCMD installer still require the remaining work in [the Linux plan](../research/2026-11-09_linux-support-plan.md). macOS is not verified.
 
 ### 5.1 RimArcho self-update
 

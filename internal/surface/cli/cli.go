@@ -25,7 +25,6 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/machine"
 	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
-	"github.com/ToumanLin/RimArcho/internal/surface/gui"
 	"github.com/ToumanLin/RimArcho/internal/surface/mcp"
 	"github.com/ToumanLin/RimArcho/internal/surface/tui"
 	"github.com/ToumanLin/RimArcho/internal/view"
@@ -181,31 +180,6 @@ func restartTUI(exe string, argv []string, stderr io.Writer) int {
 		return cmds.ExitError
 	}
 	return cmds.ExitOK
-}
-
-// runGUI opens the GUI. `archo gui` hands over to RimArcho.exe next to it when there is
-// one (no console stays open), else it runs the GUI in this process.
-func runGUI(ap *app.App, fromConsole bool) error {
-	if fromConsole && runtime.GOOS == "windows" {
-		if exe, err := os.Executable(); err == nil {
-			sib := filepath.Join(filepath.Dir(exe), "RimArcho.exe")
-			if !strings.EqualFold(sib, exe) {
-				if _, err := os.Stat(sib); err == nil {
-					var args []string
-					if ap.EnvName != "" {
-						args = []string{"--env", ap.EnvName}
-					}
-					c := exec.Command(sib, args...)
-					c.Env = append(os.Environ(), "RIMARCHO_HOME="+ap.Home)
-					return c.Start()
-				}
-			}
-		}
-	}
-	if err := guiPreflight(); err != nil {
-		return err
-	}
-	return gui.Run(gui.Options{App: ap})
 }
 
 // Tests replace these.

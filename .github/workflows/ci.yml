@@ -49,3 +49,40 @@ jobs:
 
       - name: go test
         run: go test -timeout 20m ./...
+
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: gofmt
+        run: |
+          out=$(git ls-files '*.go' | xargs gofmt -l)
+          if [ -n "$out" ]; then
+            echo "These files need gofmt:"
+            echo "$out"
+            exit 1
+          fi
+
+      - name: Select non-GUI packages
+        run: |
+          go list ./... | grep -Ev '/(internal/surface/(gui|upgradewin)|spikes)(/|$)' > "$RUNNER_TEMP/linux-packages"
+
+      - name: go build
+        run: go build ./cmd/archo
+
+      - name: go vet
+        run: xargs go vet < "$RUNNER_TEMP/linux-packages"
+
+      - name: staticcheck
+        run: xargs go run honnef.co/go/tools/cmd/staticcheck@2026.2.2 < "$RUNNER_TEMP/linux-packages"
+
+      - name: go test
+        run: xargs go test -count=1 -timeout 20m < "$RUNNER_TEMP/linux-packages"
