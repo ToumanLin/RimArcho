@@ -2420,7 +2420,7 @@ select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-s
 .page.filesearch { padding: 0; display: grid; grid-template-columns: minmax(260px,var(--fs-side,38%)) var(--card-gap) minmax(0,1fr); gap: 0; height: 100%; min-height: 0; overflow: hidden; }
 .filesearch .fs-left { display: flex; flex-direction: column; gap: 0; min-width: 0; min-height: 0; }
 .filesearch .fs-left:not(.filters-open) > .fs-vsplit { cursor: default; pointer-events: none; }
-.filesearch .fs-query { flex: none; padding: 8px; z-index: 7; }
+.filesearch .fs-query { flex: none; padding: 8px; z-index: 7; overflow: visible; } /* the value suggestions drop over the results card */
 .filesearch .fs-left.filters-open > .fs-query { height: var(--fs-query-h); min-height: 160px; display: flex; flex-direction: column; }
 .filesearch .fs-left.filters-open .fs-fields { flex: 1; min-height: 0; }
 .filesearch .fs-left.filters-open .fs-fields > .fbar.open { flex: 1; min-height: 0; }
