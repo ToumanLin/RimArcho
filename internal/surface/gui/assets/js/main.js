@@ -15,7 +15,7 @@ import { applyAccent } from "./accent.js";
 import { factText, S, $, $$, el, esc, T, Tf, errText, say, clearSay, undoStatus, busyStart, col, cur, selection, key, idsOf, refsOf, named, AREAS, keyCaps } from "./state.js";
 import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, pageDelta, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn } from "./lists.js";
 import { createBar } from "./filterbar.js";
-import { followDetail, showDetail, scrollDetail } from "./detail.js";
+import { followDetail, showDetail, scrollDetail, refreshCopies } from "./detail.js";
 import * as pop from "./popups.js";
 import * as scr from "./screens.js";
 import * as shell from "./shell.js";
@@ -109,13 +109,17 @@ async function reload(snapshot = null, read = null) {
 }
 
 let detailKey = "";
-function detailFollow(force) {
+// detailTarget: the row the details follow (the focused list's cursor, else the last list's).
+function detailTarget() {
   const k = Math.min(S.focus, 2) === S.focus ? S.focus : lastList;
   const it = cur(k);
-  const id = it ? key(it) + "|" + (it.pos || 0) + "|" + S.board.stamp : "";
-  if (!force && id === detailKey) return;
-  detailKey = id;
-  followDetail(it, k === 2);
+  return { it, k, id: it ? key(it) + "|" + (it.pos || 0) + "|" + S.board.stamp : "" };
+}
+function detailFollow(force) {
+  const t = detailTarget();
+  if (!force && t.id === detailKey) return;
+  detailKey = t.id;
+  followDetail(t.it, t.k === 2);
 }
 
 // relang: the language changed (16 §2.14). The text comes again from Go (the page data and
@@ -434,9 +438,10 @@ function click(k, i, e) {
 // places and the ones it changed (ids; else what moved) flash (16 §7.1). call is a function
 // that starts the verb: the verbs go to Go one after another, in the order given, and the
 // page reads the lists again once, after the last (a key held down does not wait on each
-// step). local, when given, changes the lists here at once, before Go answers.
+// step). local, when given, changes the lists here at once, before Go answers. answered, when
+// given, runs once Go has done the last edit, while the lists are read again.
 let editChain = Promise.resolve(), editsPending = 0, reloadWanted = false, editEpoch = 0;
-async function edited(call, undoable = true, ids = null, local = null) {
+async function edited(call, undoable = true, ids = null, local = null, answered = null) {
   const before = motion.snapshot();
   editEpoch++;
   editsPending++;
@@ -462,7 +467,9 @@ async function edited(call, undoable = true, ids = null, local = null) {
   reloadWanted = false;
   if (!local) for (const c of S.cols) c.sel.clear();
   const again = motion.snapshot();
-  await reload();
+  const read = reload();
+  if (!e && answered) answered(r);
+  await read;
   motion.play(local ? again : before, S.placed || ids);
   return e ? null : r;
 }
@@ -535,6 +542,31 @@ function toggleLocal(k, its) {
   if (k !== 1) return moveLocal(k, 1, mods);
   const gone = take(1, its.filter((it) => !it.id).map(key)).length > 0;
   return moveLocal(1, 0, mods) || gone;
+}
+
+// useLocal is use this copy (view OpUse): the copy takes the place of the copy of the same
+// Mod the list uses, which goes to Not enabled; with none, it is enabled at the end (Go then
+// puts it where the rules say). Only a copy in Not enabled moves here; a staged one waits
+// for Go. The details keep the copy shown, its copies marked anew, until Go has answered.
+function useLocal(id) {
+  const it = S.cols[0].items.find((x) => x.id === id);
+  if (!it) return false;
+  const c = S.cols[1], at = c.items.findIndex((x) => x.id && x.lineage === it.lineage);
+  if (at < 0) {
+    if (!moveLocal(0, 1, [key(it)])) return false;
+  } else {
+    const old = c.items[at], shown = new Set(c.view.map((i) => key(c.items[i])));
+    shown.add(key(it));
+    take(0, [key(it)]);
+    c.items = c.items.map((x, i) => (i === at ? { ...it, pos: old.pos, unsaved: true } : x));
+    relist(1, shown, key(it));
+    put(0, [old]);
+  }
+  lastList = 1;
+  ensureVisible(1);
+  detailKey = detailTarget().id;
+  refreshCopies();
+  return true;
 }
 
 // blockAt: where MoveBy puts the block (view.MoveBy): its first row d places on, in the
@@ -1272,12 +1304,16 @@ async function start() {
   document.addEventListener("editor-full",()=>fullPage.full("plan",S.detail?.id));
   document.addEventListener("editor-use-copy", async (e) => {
     if(environmentReason())return say("busy",environmentReason());
-    const result = await edited(() => api.RunOp("use",[e.detail]),true,[e.detail]);
+    const id = e.detail;
+    // the lists change at once; the copy's details load as soon as Go has made the change,
+    // not after the lists are read again
+    const shownNow = () => { const it = S.cols[1].items.find((x) => x.id === id); if (it) showDetail(it, false); };
+    const result = await edited(() => api.RunOp("use", [id]), true, [id], () => useLocal(id), shownNow);
     if (!result) return;
-    const c = S.cols[1], at = c.view.findIndex((i) => c.items[i].id === e.detail);
-    if (at >= 0) { c.cursor = at; lastList = 1; ensureVisible(1); renderLists(); }
-    const item = c.items.find((it) => it.id === e.detail);
-    if (item) await showDetail(item, false);
+    const c = S.cols[1], at = c.view.findIndex((i) => c.items[i].id === id);
+    if (at >= 0 && cur(1)?.id !== id) { c.cursor = at; lastList = 1; ensureVisible(1); renderLists(); }
+    const item = c.items.find((it) => it.id === id);
+    if (item && $("#detail").dataset.ref !== id) await showDetail(item, false);
     renderWhere(); renderHints();
   });
   // the details' buttons act on the copy shown, whatever the lists' selection

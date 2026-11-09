@@ -91,6 +91,15 @@ export async function showDetail(it, staged) {
 }
 let editorFrame = null;
 
+// refreshCopies draws the shown copies again from the lists, after a change made here
+// before Go answers (use this copy: the "in the current list" mark moves at once).
+export function refreshCopies() {
+  const f = editorFrame;
+  if (!f || f.box !== $("#detail") || $("#detail").dataset.ref !== f.ref) return;
+  const it = S.cols.flatMap((c) => c.items).find((x) => x.id === f.ref);
+  if (it) f.copies(editorCopies(it));
+}
+
 // editorCopies: the row's copies in the editor's lists, the one shown marked; the one the
 // current list uses says so, the others offer to take its place (16 §4.1).
 function editorCopies(it) {
