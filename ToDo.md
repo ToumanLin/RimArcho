@@ -2,8 +2,8 @@
 
 Things to research, not yet decided. Once decided, put them in the specifications (implementation plans in 01 §4); research goes in docs/research/.
 
-## MCP test&improve
-Baed on benchmark exam on real mod list and error log from corpus research
+## 右键菜单
+很多页面有右键菜单, 但是是浏览器菜单, 右键refresh, save as print等, 把这些右键菜单删除掉
 
 ## Decompilation
 
@@ -62,6 +62,8 @@ Include research progress (the undecided item in 12 §1.4) and DLC in content no
 Optionally count occurrences instead of only recording that something appeared. This costs little and can show how deeply the content was played.
 
 ## Archo Agent
+### MCP test&improve
+Baed on benchmark exam on real mod list and error log from corpus research
 
 Archo should be a Mod development agent that can take action, not just translate or tag. Base: dsh (MIT, can ship with RimArcho): on h4, h7 and h8 (eval rounds 4–5) it solved 8/9, Pi 7/9, Pi with Archo's instructions 6/9 (mcp-eval-design Round 5); pass it Archo's MCP instructions. All rounds used deepseek-flash.
 
@@ -103,5 +105,6 @@ Players asked for Linux and macOS (2026-11-07). Linux deferred; macOS later stil
 - GUI on WebKitGTK: `:has()` and `color-mix()` need WebKitGTK ≥ ~2.42; WebGL Archo often falls back to stills; no CDP, so VM harness, memprobe and 16 §10 / 18 baselines need redoing.
 - Release: tarball with exec bits (not `Compress-Archive`), `.desktop` + icon; Flatpak sandbox blocks Steam library writes, symlinks and `/proc`. Workshop self-update is windows/amd64 only; release/relocate code assumes `archo.exe` + `RimArcho.exe`. LoversLab login (WebView2 COM + DPAPI): skip, keep the manual-zip fallback.
 - Suggested order: 1) compile + safety stubs + Linux-only bugs + CI, ship CLI/TUI/MCP; 2) native GUI tarball, Proton, SteamCMD; 3) Steam-client subscribe. Test in a Linux VM.
+- 2026-11-09: phased plan in [research/2026-11-09_linux-support-plan.md](docs/research/2026-11-09_linux-support-plan.md) (players also asked for `.deb`, `.rpm` and Arch; a Proton tester could not get paths detected). Decided 2026-11-09 (its §8): Proton detection in phase 1, an update notice instead of self-update, `.tar.gz`/`.deb`/`.rpm`/AUR, after 1.1.
 
 你可用agent-bridge parallel派发任务给codex 用 gpt-6.1-sol effort high, 可当worker或者sub agent, 让它做代码研究和修改代码, 然后你review, 如果你让codex修改前端, 请务必检查她的前端实现的用户体验(不必要和功能重复的选项, 重复性文字等), 简单直接的任务在这里做
