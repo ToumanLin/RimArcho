@@ -1488,12 +1488,28 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .tag-detail .lib-acts { margin: 12px 0 4px; }
 .tag-detail .tm-hint { margin: 8px 0; color: var(--muted); }
 .tag-detail .sub .cnt { margin-left: 8px; color: var(--faint); font-weight: 400; letter-spacing: 0; }
+/* all tags: the sort on the heading's right (Mod count | A–Z, and the direction) */
+.tag-detail .tm-allhead { display: flex; align-items: center; }
+.tm-sort { display: flex; align-items: center; gap: 2px; margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 400; }
+.tm-sort button { height: 20px; padding: 0 6px; border-radius: var(--r-sm); color: var(--muted); font-size: 12px; }
+.tm-sort button:hover { background: var(--pill); color: var(--fg-2); }
+.tm-sort .tm-sort-by.on { color: var(--accent-11, var(--accent)); background: var(--accent-soft); }
+.tm-sort .tm-sort-dir { display: flex; align-items: center; justify-content: center; width: 20px; padding: 0; }
+.tm-sort .tm-sort-dir svg.i { width: 12px; height: 12px; transition: transform var(--t-layout) var(--ease); }
+.tm-sort .tm-sort-dir.desc svg.i { transform: rotate(180deg); }
+:root[data-motion="reduced"] .tm-sort .tm-sort-dir svg.i { transition: none; }
+@media (prefers-reduced-motion: reduce) { .tm-sort .tm-sort-dir svg.i { transition: none; } }
+/* a tag in a Mod's details opens it in the Tag manager (a lone tag: nothing to drag) */
+.tag-order > .tag-drag.tag-open:not([draggable="true"]) { cursor: pointer; }
+.tag-order > .tag-drag.tag-open:hover { background: color-mix(in srgb, var(--fg) 10%, var(--pill)); }
 .tm-cloud { display: flex; flex-wrap: wrap; gap: 4px; }
 .tm-chip .tm-mark { align-self: center; width: 3px; height: 11px; border-radius: 999px; flex: none; }
 /* a tag's colour (16 §2.9): none, the presets, one of the player's own */
 .tm-colorbox { margin: 4px 0 2px; }
 .tm-colorbox .tm-hint { margin: 2px 0 0; }
-.tm-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+/* (.frow .v sets a field's gap to 2px 0: the swatches need their own) */
+.frow .v.tm-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.frow.tag-color .k { width: auto; margin-right: 12px; }
 .tm-swatch { position: relative; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; background: var(--sw, transparent); cursor: pointer; flex: none; }
 .tm-swatch.none { box-shadow: inset 0 0 0 var(--hairline) var(--muted); }
 .tm-swatch.none::after { content: ""; position: absolute; left: 50%; top: 2px; bottom: 2px; width: var(--hairline); background: var(--muted); transform: rotate(45deg); }
@@ -2389,7 +2405,7 @@ select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-s
 .editor-copy-head {position:absolute;top:0;left:15px;right:8px;height:28px;display:flex;align-items:center;overflow:hidden;text-overflow:ellipsis;font-weight:500;}
 /* a Mod's copies in Not enabled: its colour band stands at the row's left edge and starts
    at the Mod's name line, running down through every copy (16 §2.9) */
-.row.copy-item .m {margin-left:-16px;margin-right:16px;}
+.row.copy-item .m {margin-left:-16px;margin-right:0;}
 .row.copy-group-start .m.on {margin-top:-23px;}
 .row.copy-item {padding-left:22px;color:var(--fg-2);font-size:12px;}
 .row.copy-item .k {display:none;}
@@ -2668,3 +2684,27 @@ select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-s
 .xc-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 
 .folder-space { display: flex; flex-wrap: wrap; gap: 12px; }
+
+/* the Disabled column's view switch and its tag groups (16 §2.5) */
+.area .head .dview { gap: 2px; flex: none; }
+/* a narrow column shortens the title, never the switch */
+.area[data-area="0"] > .head { container-type: inline-size; }
+.area[data-area="0"] > .head .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+@container (max-width: 250px) { .area[data-area="0"] > .head .num { display: none; } }
+.area .head .dview-fold { display: flex; gap: 2px; }
+.area .head .dview-fold[hidden] { display: none; }
+.area .head .dview-fold button { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; border-radius: var(--r-sm); color: var(--muted); }
+.area .head .dview-fold button:hover { background: var(--pill); color: var(--fg-2); }
+.area .head .dview-seg { padding: 2px; margin-left: 2px; border-radius: var(--r-sm); }
+.area .head .dview-seg > .thumb { top: 2px; bottom: 2px; }
+.area .head .dview-seg button { height: 20px; padding: 0 8px; font-size: 12px; }
+.row.group-head { cursor: pointer; gap: 6px; color: var(--fg-2); }
+.row.group-head .fold-chev { display: inline-flex; flex: none; width: 12px; color: var(--faint); transition: transform var(--t-layout) var(--ease); }
+.row.group-head .fold-chev svg.i { width: 10px; height: 10px; stroke-width: 1.8; }
+.row.group-head.open .fold-chev { transform: rotate(90deg); }
+.row.group-head .t { flex: 0 1 auto; font-weight: 600; }
+.row.group-head.none .t { color: var(--muted); }
+.row.group-head .num { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; flex: none; }
+.row.group-head.later::before { content: ""; position: absolute; left: 4px; right: 4px; top: 0; border-top: var(--hairline) solid var(--line-2); }
+@media (prefers-reduced-motion: reduce) { .row.group-head .fold-chev { transition: none; } }
+:root[data-motion="reduced"] .row.group-head .fold-chev { transition: none; }

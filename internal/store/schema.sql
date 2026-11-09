@@ -71,7 +71,7 @@ CREATE TABLE "source_use"(
 CREATE TABLE lineage_data(
   environment_id TEXT NOT NULL, lineage_id TEXT NOT NULL, alias TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
   PRIMARY KEY(environment_id, lineage_id));
--- pos: the tag's place among the lineage's tags (0 first); the first coloured tag marks the Mod
+-- pos: the tag's place among the lineage's tags (0 first); the first tag's colour marks the Mod
 CREATE TABLE "lineage_tag"(
   environment_id TEXT NOT NULL, lineage_id TEXT NOT NULL, tag TEXT NOT NULL COLLATE NOCASE, pos INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY(environment_id, lineage_id, tag));

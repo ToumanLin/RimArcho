@@ -18,7 +18,7 @@ settings
   data.steamdb.url: https://raw.githubusercontent.com/RimSort/Steam-Workshop-Database/main/steamDB.json
   monitor.default: on
   network.proxy: system
-  tags.pinned: framework,visuals,apparel,races,weapons,buildings,furniture,QoL,balance,story,performance,language packs,testing,to delete
+  tags.pinned: RimWorld,framework,visuals,apparel,races,weapons,buildings,furniture,QoL,balance,story,performance,language packs,testing,to delete
   ui.accent: default
   ui.archo.motion: live
   ui.gpu: on

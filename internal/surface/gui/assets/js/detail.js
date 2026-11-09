@@ -59,6 +59,7 @@ export async function showDetail(it, staged) {
       tags: () => document.dispatchEvent(new CustomEvent("verb", { detail: "tags" })),
       folder: () => api.OpenFolder(d.id).catch((e) => say("fail", errText(e))),
       tagOrder: (list) => api.SetTagOrder(d.id, list).then((t) => { say("ok", t); document.dispatchEvent(new CustomEvent("tags-changed")); }, (e) => say("fail", errText(e))),
+      openTag: (t) => document.dispatchEvent(new CustomEvent("open-tag", { detail: t })),
     }),
     run: (code, i) => document.dispatchEvent(new CustomEvent("detail-op", { detail: { code, id: i.id || it.id } })),
     noteSaved: async () => { const i = await api.LibraryCopy(it.id).catch(() => null); if (current() && i) f.inst(i); },
@@ -91,6 +92,22 @@ export async function showDetail(it, staged) {
   } catch { /* the note stays */ }
 }
 let editorFrame = null;
+
+// showPanel puts something other than a Mod in the editor's details (a tag's Tag manager,
+// 16 §2.5), dropping a Mod's details still on their way. ref names it for a redraw.
+export function showPanel(ref, node) {
+  clearTimeout(detailTimer);
+  ++seq;
+  S.detail = null;
+  editorFrame = null;
+  const box = $("#detail");
+  // from one tag to another the panel keeps its place
+  const prev = box.dataset.ref || "", sc = $(".detail .scroll"), top = sc ? sc.scrollTop : 0;
+  box.dataset.ref = ref;
+  box.replaceChildren(node);
+  unstale(box);
+  if (sc) sc.scrollTop = prev.startsWith("tags:") && ref.startsWith("tags:") ? top : 0;
+}
 
 // refreshCopies draws the shown copies again from the lists, after a change made here
 // before Go answers (use this copy: the "in the current list" mark moves at once).

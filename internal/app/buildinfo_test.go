@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -75,11 +76,43 @@ func TestModBuildBlock(t *testing.T) {
 		t.Errorf("dotnet found, DLL built:\n%s", out)
 	}
 
+	// The built DLL checked against the game: a csc build of publicized code is refused at run
+	// time, the same code built unsafe (as Krafs.Publicizer builds it) is not (MCP eval h8).
+	managed := filepath.Join(e.Game, "RimWorldWin64_Data", "Managed")
+	access := filepath.Join("..", "..", "testdata", "dotnet", "bin", "access")
+	copyTo(t, filepath.Join(access, "Assembly-CSharp.dll"), filepath.Join(managed, "Assembly-CSharp.dll"))
+	built := filepath.Join(srcDir, "1.6", "Assemblies", "SrcMod.dll")
+	copyTo(t, filepath.Join(access, "plain", "AccessMod.dll"), built)
+	out = e.MustRun("mod", "pkg:tester.src")
+	if !strings.Contains(out, "built: !! SrcMod.dll uses 2 non-public game members (Verse.StatWorker::Secret(), Verse.StatWorker::stat) and does not skip verification: the game throws FieldAccessException / MethodAccessException when it runs that code. Build it with dotnet build and the project's publicizer (guide topic=rebuild), not csc") {
+		t.Errorf("csc build:\n%s", out)
+	}
+	for _, v := range []string{"unsafe", "sub"} {
+		copyTo(t, filepath.Join(access, v, "AccessMod.dll"), built)
+		if out := e.MustRun("mod", "pkg:tester.src"); strings.Contains(out, "built:") {
+			t.Errorf("%s build:\n%s", v, out)
+		}
+	}
+
 	if out := e.MustRun("mod", "pkg:tester.dll"); strings.Contains(out, "build:") {
 		t.Errorf("a Mod with only a DLL has a build block:\n%s", out)
 	}
 	out = e.MustRun("mod", "pkg:tester.loose")
 	if !strings.Contains(out, "build: C# source without a project file") || !strings.Contains(out, "1 .cs files in Source/") {
 		t.Errorf("source without a project:\n%s", out)
+	}
+}
+
+func copyTo(t *testing.T, from, to string) {
+	t.Helper()
+	b, err := os.ReadFile(from)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(to, b, 0o644); err != nil {
+		t.Fatal(err)
 	}
 }

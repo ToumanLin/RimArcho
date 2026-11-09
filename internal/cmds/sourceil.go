@@ -4,7 +4,6 @@ package cmds
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -111,24 +110,7 @@ func sourceDiffCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			dirs = append(dirs, filepath.Dir(g))
 		}
 	}
-	opened := map[string]*dotnet.Assembly{}
-	open := func(name string) *dotnet.Assembly {
-		if x, ok := opened[name]; ok {
-			return x
-		}
-		var x *dotnet.Assembly
-		for _, dir := range dirs {
-			p := filepath.Join(dir, name+".dll")
-			if _, err := os.Stat(p); err == nil {
-				if y, err := dotnet.Open(p); err == nil {
-					x = y
-					break
-				}
-			}
-		}
-		opened[name] = x
-		return x
-	}
+	open := asmOpener(dirs...)
 	r := dotnet.Diff(asms[0], asms[1], open)
 	d, root := render.New(fmt.Sprintf("assembly diff %s %s → %s %s: %d changed, %d added, %d removed methods (%d unchanged)",
 		r.Old.Name, r.Old.Version, r.New.Name, r.New.Version, len(r.Changed), len(r.Added), len(r.Removed), r.Unchanged))
@@ -145,6 +127,22 @@ func sourceDiffCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			}
 			s.Add(x)
 		}
+	}
+	if n := len(r.Inaccessible); n > 0 {
+		var names []string
+		for _, x := range firstN2(r.Inaccessible, 3) {
+			names = append(names, x.Text)
+		}
+		more := ""
+		if n > 3 {
+			more = fmt.Sprintf(" and %d more", n-3)
+		}
+		was := ""
+		if r.OldSkipsVerification {
+			was = " (the old build does)"
+		}
+		root.KV("access", fmt.Sprintf("!! the new build uses %d non-public %s (%s%s) and does not skip verification%s: the game throws FieldAccessException / MethodAccessException when it runs that code. %s",
+			n, plural(n, "member", "members"), strings.Join(names, ", "), more, was, rebuildHint))
 	}
 	list("methods changed", r.Changed)
 	list("methods added", r.Added)
@@ -176,12 +174,16 @@ func sourceDiffCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		if len(notes) > 0 {
 			l += "  (" + strings.Join(notes, "; ") + ")"
 		}
-		if x.NonPublic() {
-			if ignores[x.Scope] {
-				l += "  non-public; the build declares IgnoresAccessChecksTo(" + x.Scope + ")"
-			} else {
-				l += "  !! non-public and no IgnoresAccessChecksTo(" + x.Scope + "): the game may throw FieldAccessException / MethodAccessException"
-			}
+		switch {
+		case !x.NonPublic():
+		case r.SkipsVerification:
+			l += "  non-public; the build skips verification (unsafe, as Krafs.Publicizer builds it), so the game allows it"
+		case !x.Blocked:
+			l += "  protected, used from a type that derives from " + x.Owner
+		case ignores[x.Scope]:
+			l += "  !! non-public: IgnoresAccessChecksTo(" + x.Scope + ") does not help in the game's Mono; it throws FieldAccessException / MethodAccessException. " + rebuildHint
+		default:
+			l += "  !! non-public and the build does not skip verification: the game throws FieldAccessException / MethodAccessException. " + rebuildHint
 		}
 		return l
 	}

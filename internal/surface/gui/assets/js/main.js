@@ -13,9 +13,11 @@ import "./activity.js";
 import "./fulltitle.js";
 import { applyAccent } from "./accent.js";
 import { factText, S, $, $$, el, esc, T, Tf, errText, say, clearSay, undoStatus, busyStart, col, cur, selection, key, idsOf, refsOf, named, AREAS, keyCaps } from "./state.js";
-import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, pageDelta, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn } from "./lists.js";
+import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, pageDelta, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn, setOnViewChange, detailHead } from "./lists.js";
+import { G, grouped, headOf, curKey, shownItems, shape, findEntry, setGroupOpen, reveal, setView, loadView, refreshOrder, regroup } from "./disabledgroups.js";
 import { createBar } from "./filterbar.js";
-import { followDetail, showDetail, scrollDetail, refreshCopies } from "./detail.js";
+import { followDetail, showDetail, scrollDetail, refreshCopies, showPanel } from "./detail.js";
+import { tagPanel, startRename, editTagNote, pickMerge, confirmDelete } from "./tagmanager.js";
 import * as pop from "./popups.js";
 import * as scr from "./screens.js";
 import * as shell from "./shell.js";
@@ -29,7 +31,7 @@ import { updateFromForm } from "./subscribe.js";
 import { initExchange, exchange, key as importKey, hintList as importHints } from "./exchange.js";
 import { icon } from "./icons.js";
 import * as motion from "./motion.js";
-import { setTagColors } from "./tagcolor.js";
+import { setTagColors, tagColors } from "./tagcolor.js";
 import * as ops from "./ops.js";
 import * as uninst from "./uninstall.js";
 import * as packsPage from "./packs.js";
@@ -104,6 +106,8 @@ async function reload(snapshot = null, read = null) {
   await Promise.all([0, 1, 2].map((k) => refilter(k, keep[k])));
   if (!current()) return;
   if (!read) { render(); detailFollow(); }
+  // the tags view follows the Tag manager's order, read again when the data changed
+  if (grouped()) refreshOrder().then((changed) => { if (changed && current()) { regroup(); renderLists(); } });
   refreshRules();
   await scr.logEnvironmentChanged();
   return true;
@@ -113,6 +117,15 @@ let detailKey = "";
 // detailTarget: the row the details follow (the focused list's cursor, else the last list's).
 function detailTarget() {
   const k = Math.min(S.focus, 2) === S.focus ? S.focus : lastList;
+  // a tag clicked in a Mod's details: that tag, until the cursor moves (16 §2.9)
+  if (pinned && pinned.sig === pinSig(k)) {
+    const g = (col(0).groups || []).find((x) => x.key === pinned.key) || { key: pinned.key, tag: pinned.tag, rows: null };
+    return { group: g, k, id: "tags:" + g.key + "|pinned|" + S.board.stamp };
+  }
+  pinned = null;
+  // a tag group's header in Disabled: its tag in the Tag manager (16 §2.5)
+  const g = k === 0 ? headOf(col(0), col(0).view[col(0).cursor]) : null;
+  if (g) return { group: g, k, id: "tags:" + g.key + "|" + g.rows.length + "|" + S.board.stamp };
   const it = cur(k);
   return { it, k, id: it ? key(it) + "|" + (it.pos || 0) + "|" + S.board.stamp : "" };
 }
@@ -120,8 +133,84 @@ function detailFollow(force) {
   const t = detailTarget();
   if (!force && t.id === detailKey) return;
   detailKey = t.id;
+  const was = S.tagHead;
+  S.tagHead = t.group || null;
+  if (was || S.tagHead) detailHead();
+  if (t.group) return showTagPanel(t.group);
   followDetail(t.it, t.k === 2);
 }
+
+// ---- the Tag manager in the details, on a tag group's header in Disabled (16 §2.5, §2.9) ----
+
+// showTagPanel draws group g's tag as Mod library's Tags view does; a redraw never takes
+// text the player is typing in it.
+function showTagPanel(g) {
+  const box = $("#detail"), ref = "tags:" + g.key, ae = document.activeElement;
+  if (box.dataset.ref === ref && box.contains(ae) && ae.matches("input, textarea")) return;
+  const info = !g.none && G.tags.find((t) => t.tag.toLowerCase() === g.key);
+  showPanel(ref, tagPanel(info ? { ...g, info } : g, tagCtx));
+}
+// pinned: the tag a click in a Mod's details opened ({key, tag, sig}); it stays while the
+// list the details follow keeps its cursor (pinSig)
+let pinned = null;
+const pinSig = (k) => k + "|" + curKey(k);
+async function openTag(tag) {
+  await refreshOrder(true);
+  const info = G.tags.find((t) => t.tag.toLowerCase() === tag.toLowerCase());
+  const k = Math.min(S.focus, 2) === S.focus ? S.focus : lastList;
+  pinned = { key: tag.toLowerCase(), tag: info ? info.tag : tag, sig: pinSig(k) };
+  detailFollow(true);
+}
+const tagPicked = new Set();
+const tagCtx = {
+  tags: () => G.tags,
+  picked: tagPicked,
+  // a tag change: the lists, the groups and the panel again, the cursor on key's header
+  done: async (key) => {
+    if (pinned) { if (key == null) pinned = null; else pinned.key = key; }
+    await reload();
+    await refreshOrder(true);
+    regroup(key != null ? "\u0000" + key : undefined);
+    renderLists();
+    renderWhere();
+    renderHints();
+    detailFollow(true);
+  },
+  goTo: (key) => {
+    const c = col(0), at = pinned ? -1 : c.view.findIndex((vi) => headOf(c, vi)?.key === key);
+    // shown from a Mod's details, or a tag with no header in Disabled: shown in its place
+    if (at < 0) return openTag(G.tags.find((t) => t.tag.toLowerCase() === key)?.tag || key);
+    c.cursor = at;
+    ensureVisible(0);
+    renderRows(0);
+    renderWhere();
+    renderHints();
+    detailFollow();
+  },
+  redraw: () => detailFollow(true),
+  // back to the list the details follow (a pinned tag stays)
+  leave: () => focusArea(Math.min(S.focus, 2) === S.focus ? S.focus : lastList),
+  editing: () => {},
+  // the editor's rows are copies and a header holds only its first-tag Mods: say how many of
+  // the tag's Mods Disabled shows
+  shown: (g, info) => {
+    const c = col(0), lin = new Set();
+    for (const i of shownItems(c)) { const it = c.items[i]; if ((it.tags || []).some((t) => t.toLowerCase() === g.key)) lin.add(it.lineage || it.id); }
+    return Tf("%d not enabled", lin.size);
+  },
+  // a colour shows at once: the rows' bands, the headers and the panel
+  recolor: (tag, color) => {
+    const k = tag.toLowerCase(), map = { ...tagColors() };
+    if (color) map[k] = color; else delete map[k];
+    setTagColors(map);
+    if (S.board) S.board.tagColors = map;
+    const t = G.tags.find((x) => x.tag.toLowerCase() === k);
+    if (t) t.color = color;
+    renderLists();
+    detailFollow(true);
+  },
+};
+const tagBox = () => $("#detail");
 
 // relang: the language changed (16 §2.14). The text comes again from Go (the page data and
 // the T() table); the same page opens again in the new language, with its scroll, the
@@ -285,7 +374,13 @@ function renderWhere() {
     s = `${T("details")}    ${S.detail ? S.detail.name : "—"}    ${pct}%`;
   } else {
     const c = col();
-    s = `${T(AREAS[S.focus])}    ${c.view.length ? c.cursor + 1 : 0} / ${c.view.length}`;
+    const h = headOf(c, c.view[c.cursor]);
+    if (c.groups) {
+      // a tag group's header names its tag; a row counts only the rows shown (16 §3.2)
+      let at = 0, n = 0;
+      c.view.forEach((vi, i) => { if (vi >= 0) { n++; if (i <= c.cursor) at = n; } });
+      s = h ? `${T(AREAS[S.focus])}    ${h.none ? T("no tag") : h.tag}    ${n}` : `${T(AREAS[S.focus])}    ${at} / ${n}`;
+    } else s = `${T(AREAS[S.focus])}    ${c.view.length ? c.cursor + 1 : 0} / ${c.view.length}`;
     if (c.sel.size) s += "  " + Tf("%d selected", c.sel.size);
   }
   if (S.popup) s += " › " + S.popup.title;
@@ -302,6 +397,13 @@ function actions() {
   ];
   const sel = selection();
   const k = S.focus;
+  const group = headOf(col(), col().view[col().cursor]);
+  if (group && !sel.length && !group.none) return [{ key: "← →", label: T("collapse / expand the group"), run: () => toggleGroup() },
+    { key: "F2", label: T("rename"), run: () => startRename(tagBox(), group, tagCtx) }, { key: "M", label: T("merge into…"), run: () => pickMerge(group.tag, tagCtx) },
+    { key: "Del", label: T("delete tag"), run: () => confirmDelete([group.tag], tagCtx) },
+    { key: "v", label: T("individual"), run: () => switchView() }, { key: "ctrl+k", label: T("commands"), run: () => pop.palette() }];
+  if (group && !sel.length) return [{ key: "← →", label: T("collapse / expand the group"), run: () => toggleGroup() },
+    { key: "v", label: T("individual"), run: () => switchView() }, { key: "/", label: T("search"), run: () => startSearch() }, { key: "ctrl+k", label: T("commands"), run: () => pop.palette() }];
   if (!sel.length) return [{ key: "/", label: T("search"), run: () => startSearch() }, { key: "ctrl+k", label: T("commands"), run: () => pop.palette() }];
   const out = [];
   if (k === 0) out.push({ key: "space", label: T("enable"), run: () => verb("toggle") });
@@ -392,7 +494,7 @@ function moveCursor(d, extend) {
     if (S.anchor < 0) S.anchor = from;
     c.sel.clear();
     const [a, b] = [Math.min(S.anchor, c.cursor), Math.max(S.anchor, c.cursor)];
-    for (let i = a; i <= b; i++) c.sel.add(key(c.items[c.view[i]]));
+    for (let i = a; i <= b; i++) if (c.view[i] >= 0) c.sel.add(key(c.items[c.view[i]]));
   } else S.anchor = -1;
   ensureVisible();
   renderRows(S.focus);
@@ -406,6 +508,9 @@ function moveCursor(d, extend) {
 async function step(d) {
   const c = col(lastList);
   c.cursor = Math.max(0, Math.min(c.view.length - 1, c.cursor + d));
+  // full details step past the tag groups' headers
+  const dir = d < 0 ? -1 : 1;
+  while (c.view[c.cursor] < 0 && c.cursor + dir >= 0 && c.cursor + dir < c.view.length) c.cursor += dir;
   ensureVisible(lastList);
   renderRows(lastList);
   detailKey = "";
@@ -415,19 +520,55 @@ async function step(d) {
 function click(k, i, e) {
   const c = S.cols[k];
   if (S.focus !== k) focusArea(k);
+  const g = headOf(c, c.view[i]);
+  if (g && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+    // ctrl+click on a tag group's header selects its rows shown (again: unselects them)
+    const ks = g.rows.map((j) => key(c.items[j]));
+    const all = ks.length && ks.every((x) => c.sel.has(x));
+    for (const x of ks) all ? c.sel.delete(x) : c.sel.add(x);
+    c.cursor = i; S.anchor = i;
+    return clicked(k);
+  }
+  if (g && !e.shiftKey) { c.cursor = i; S.anchor = i; return toggleGroup(); }
   if (e.shiftKey) {
     if (S.anchor < 0) S.anchor = c.cursor;
     c.sel.clear();
     const [a, b] = [Math.min(S.anchor, i), Math.max(S.anchor, i)];
-    for (let j = a; j <= b; j++) c.sel.add(key(c.items[c.view[j]]));
+    for (let j = a; j <= b; j++) if (c.view[j] >= 0) c.sel.add(key(c.items[c.view[j]]));
   } else if (e.ctrlKey || e.metaKey) {
     const kk = key(c.items[c.view[i]]);
     c.sel.has(kk) ? c.sel.delete(kk) : c.sel.add(kk);
     S.anchor = i;
   } else S.anchor = i;
   c.cursor = i;
+  clicked(k);
+}
+function clicked(k) {
   renderRows(k);
   renderHeads();
+  renderWhere();
+  renderHints();
+  detailFollow();
+}
+
+// ---- the Disabled column's tag groups (16 §2.5) ----
+
+// toggleGroup opens or closes the group whose header the cursor is on (open: true / false
+// sets it); false when the cursor is not on a header.
+function toggleGroup(open) {
+  const c = S.cols[0], g = headOf(c, c.view[c.cursor]);
+  if (!g) return false;
+  setGroupOpen(g.key, open ?? !g.open);
+  viewChanged();
+  return true;
+}
+// switchView is v: the Disabled column one row per copy, or grouped by tag.
+async function switchView() {
+  if (await setView(grouped() ? "individual" : "tags")) viewChanged();
+}
+function viewChanged() {
+  renderLists();
+  ensureVisible(0);
   renderWhere();
   renderHints();
   detailFollow();
@@ -482,10 +623,10 @@ function take(k, keys) {
   const c = S.cols[k], want = new Set(keys), out = [], rest = [];
   for (const it of c.items) (want.has(key(it)) ? out : rest).push(it);
   if (!out.length) return out;
-  const curKey = cur(k) && key(cur(k));
-  const shown = new Set(c.view.map((i) => key(c.items[i])));
+  const keep = curKey(k);
+  const shown = new Set(shownItems(c).map((i) => key(c.items[i])));
   c.items = rest;
-  relist(k, shown, curKey && !want.has(curKey) ? curKey : null, c.cursor);
+  relist(k, shown, keep && !want.has(keep) ? keep : null, c.cursor);
   return out;
 }
 
@@ -494,7 +635,7 @@ function take(k, keys) {
 function put(k, its, at = 0) {
   if (!its.length) return;
   const c = S.cols[k];
-  const shown = new Set(c.view.map((i) => key(c.items[i])));
+  const shown = new Set(shownItems(c).map((i) => key(c.items[i])));
   for (const it of its) shown.add(key(it));
   if (k === 1) {
     const i = at > 0 ? Math.min(at - 1, c.items.length) : c.items.length;
@@ -521,7 +662,8 @@ function relist(k, shown, keepKey, keepAt = 0) {
   const filtered = k < 2 ? barOn() : !!c.query.trim();
   c.view = [];
   c.items.forEach((it, i) => { if (!filtered || shown.has(key(it))) c.view.push(i); });
-  let at = keepKey ? c.view.findIndex((i) => key(c.items[i]) === keepKey) : -1;
+  shape(k);
+  let at = findEntry(c, keepKey);
   if (at < 0) at = keepAt;
   c.cursor = Math.max(0, Math.min(at, c.view.length - 1));
 }
@@ -556,7 +698,7 @@ function useLocal(id) {
   if (at < 0) {
     if (!moveLocal(0, 1, [key(it)])) return false;
   } else {
-    const old = c.items[at], shown = new Set(c.view.map((i) => key(c.items[i])));
+    const old = c.items[at], shown = new Set(shownItems(c).map((i) => key(c.items[i])));
     shown.add(key(it));
     take(0, [key(it)]);
     c.items = c.items.map((x, i) => (i === at ? { ...it, pos: old.pos, unsaved: true } : x));
@@ -876,8 +1018,9 @@ async function paletteChoice(o) {
     const c = S.cols[k];
     let i = c.items.findIndex((x) => x.id === o.id);
     if (i < 0) continue;
+    if (k === 0) reveal(i);
     let v = c.view.indexOf(i);
-    if (v < 0 && k < 2) { S.bar.clear(); await barChanged(); v = c.view.indexOf(i); }
+    if (v < 0 && k < 2) { S.bar.clear(); await barChanged(); if (k === 0) reveal(i); v = c.view.indexOf(i); }
     if (v < 0) { c.query = ""; $(`.area[data-area="${k}"] .search input`).value = ""; await refilter(k, o.id); v = c.view.indexOf(i); }
     focusArea(k);
     c.cursor = v;
@@ -938,7 +1081,7 @@ function searchKey(k, e, inp) {
 let barSeq = 0;
 async function barChanged() {
   const n = ++barSeq;
-  const keep = [0, 1].map((k) => (cur(k) ? key(cur(k)) : ""));
+  const keep = [0, 1].map((k) => curKey(k));
   await Promise.all([0, 1].map((k) => refilter(k, keep[k])));
   if (n !== barSeq) return;
   S.bar.draw();
@@ -1130,6 +1273,24 @@ function onKey(e) {
     if (S.focus === 3) return scrollDetail(k === "ArrowDown" ? 1 : -1, false), renderWhere();
     return moveCursor(k === "ArrowDown" ? 1 : -1, e.shiftKey);
   }
+  // on a tag group's header ← closes it and → opens it; otherwise they change areas (16 §2.5)
+  if ((k === "ArrowLeft" || k === "ArrowRight") && !e.shiftKey && S.focus === 0) {
+    const g = headOf(col(0), col(0).view[col(0).cursor]);
+    if (g && g.open === (k === "ArrowLeft")) { handled(); return toggleGroup(k === "ArrowRight"); }
+  }
+  if (k === "Enter" && S.focus === 0 && !ctrl && !e.altKey && toggleGroup()) return handled();
+  // on a tag's header, the Tag manager's keys (16 §2.9): F2 rename, n note, M merge, Del delete
+  if (S.focus === 0 && !ctrl && !e.altKey && !col(0).sel.size) {
+    const g = headOf(col(0), col(0).view[col(0).cursor]);
+    const kk = e.shiftKey && k === "m" ? "M" : k;
+    if (g && !g.none && ["F2", "n", "M", "Delete"].includes(kk)) {
+      handled();
+      if (kk === "F2") return startRename(tagBox(), g, tagCtx);
+      if (kk === "n") return editTagNote(tagBox(), tagCtx);
+      if (kk === "M") return pickMerge(g.tag, tagCtx);
+      return confirmDelete([g.tag], tagCtx);
+    }
+  }
   if (k === "ArrowLeft" || k === "ArrowRight") {
     handled();const areas=[3,1,0],at=areas.indexOf(S.focus===2?0:S.focus);
     return focusArea(areas[Math.max(0,Math.min(2,at+(k==="ArrowRight"?1:-1)))]);
@@ -1156,7 +1317,7 @@ function onKey(e) {
   if (ctrl && k.toLowerCase() === "a" && S.focus < 3) {
     handled();
     const c = col();
-    for (const i of c.view) c.sel.add(key(c.items[i]));
+    for (const i of c.view) if (i >= 0) c.sel.add(key(c.items[i]));
     renderRows(S.focus); renderWhere(); renderHints();
     return;
   }
@@ -1184,7 +1345,7 @@ function onKey(e) {
     "/": () => startSearch(), "\\": () => S.bar.toggle(), c: () => go("changes"), l: () => go("log"), R: () => cmd("rescan"), A: () => cmd("analyze"),
     H: () => historyChooser(), C: () => changesOfCursor(), "<": () => widthKey(-1), ">": () => widthKey(1), "=": () => widthKey(0),
     E: () => go("env"), P: () => plans.chooser(), "?": () => pop.help("plan"), ":": () => commandLine(), i: () => exchange(0), e: () => exportCurrent(),
-    r: () => startRule(actionContext().sel[0]),
+    r: () => startRule(actionContext().sel[0]), v: () => switchView(),
   };
   // shift+letter is the capital letter even where the key reports it in lower case
   const kk = e.shiftKey && /^[a-z]$/.test(k) ? k.toUpperCase() : k;
@@ -1296,6 +1457,9 @@ async function start() {
   $("#board .barhost").replaceWith(S.bar.el);
   $('.area[data-area="3"] > .head').addEventListener("click", () => { if (S.bar.fills()) S.bar.toggle(false); });
   wireLists(ui);
+  setOnViewChange(viewChanged);
+  // the Disabled column's last view (16 §2.5); the editor is not shown yet at start
+  loadView().then((tags) => { if (tags) { regroup(); if (!S.screen) viewChanged(); } });
   initRules(ui);
   wireSplits();
   document.addEventListener("keydown", onKey);
@@ -1305,6 +1469,8 @@ async function start() {
   document.addEventListener("editor-full",()=>fullPage.full("plan",S.detail?.id));
   // a Mod's tags were reordered in its details: the rows' colour marks follow (16 §2.9)
   document.addEventListener("tags-changed", () => reload());
+  document.addEventListener("filter-tag", (e) => S.bar.set("tags:" + e.detail, 1));
+  document.addEventListener("open-tag", (e) => openTag(e.detail));
   document.addEventListener("editor-use-copy", async (e) => {
     if(environmentReason())return say("busy",environmentReason());
     const id = e.detail;

@@ -13,12 +13,14 @@ type extTables struct {
 	params  []pe.ParamTableRow
 	asmRefs []pe.AssemblyRefTableRow
 	asm     []pe.AssemblyTableRow
+	declSec []pe.DeclSecurityTableRow // access.go
 }
 
 func (a *Assembly) readExt(f *pe.File) {
 	a.ext.params = table[pe.ParamTableRow](f, pe.Param)
 	a.ext.asmRefs = table[pe.AssemblyRefTableRow](f, pe.AssemblyRef)
 	a.ext.asm = table[pe.AssemblyTableRow](f, pe.Assembly)
+	a.ext.declSec = table[pe.DeclSecurityTableRow](f, pe.DeclSecurity)
 }
 
 // ParamNames returns the declared parameter names of MethodDef row (1-based), in order,

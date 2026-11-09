@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>netstandard2.0</TargetFramework><AssemblyName>AccessMod</AssemblyName><Deterministic>true</Deterministic><Optimize>true</Optimize></PropertyGroup>
+  <ItemGroup><Reference Include="Assembly-CSharp"><HintPath>$(PubDir)/Assembly-CSharp.dll</HintPath><Private>false</Private></Reference></ItemGroup>
+</Project>

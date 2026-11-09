@@ -214,7 +214,7 @@ export async function tags(items, after) {
     linkOpener(p, chips.id);
     p.restoreFocus = () => { if (p.opener?.isConnected) p.opener.focus({ preventScroll: true, focusVisible: p.openerFocusVisible }); };
     pop.append(chips, fresh);
-    // one Mod: its tags in their order, to drag; the first coloured one marks it (16 §2.9)
+    // one Mod: its tags in their order, to drag; the first one's colour marks it (16 §2.9)
     if (ids.length === 1) {
       const row = S.cols.flatMap((c) => c.items).find((x) => x.id === ids[0]);
       const mine = row?.tags || items[0].tags || cands.filter((c) => c.have).map((c) => c.tag);

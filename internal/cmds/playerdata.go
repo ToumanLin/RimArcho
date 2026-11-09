@@ -16,7 +16,7 @@ func init() {
 		Flags: []Flag{{Name: "clear"}}})
 	register(&Command{Name: "note", Args: "<ref> [<text>]", Summary: "attach a plain-text note to a mod (all its copies), or with --copy to this copy only", MinArgs: 1, MaxArgs: 2, Run: noteCmd,
 		Flags: []Flag{{Name: "clear"}, {Name: "copy", Help: "this copy's own note (Mod library), not the mod's"}}})
-	register(&Command{Name: "tag", Args: "add|remove <ref> <tag…> | list | rename <tag> <new> | merge <tag…> --into <tag> | delete <tag…> | note <tag> [<text>] | color <tag> <colour> | order <ref> <tag…>", Summary: "tags for filtering (list --filter tag:<tag>); rename, merge, delete, note and color apply to the tag on every mod; color marks its mods in the lists (blue, cyan, teal, grass, orange, pink, plum, violet, #rrggbb or none); order sets a mod's tag order (its first coloured tag marks it)", MinArgs: 1, MaxArgs: -1, Run: tagCmd,
+	register(&Command{Name: "tag", Args: "add|remove <ref> <tag…> | list | rename <tag> <new> | merge <tag…> --into <tag> | delete <tag…> | note <tag> [<text>] | color <tag> <colour> | order <ref> <tag…>", Summary: "tags for filtering (list --filter tag:<tag>); rename, merge, delete, note and color apply to the tag on every mod; color marks its mods in the lists (blue, cyan, teal, grass, orange, pink, plum, violet, #rrggbb or none); order sets a mod's tag order (its first tag's colour marks it)", MinArgs: 1, MaxArgs: -1, Run: tagCmd,
 		Flags: []Flag{{Name: "mod", Value: "<ref>", Multi: true, Help: "more mods to tag (add/remove)"},
 			{Name: "into", Value: "<tag>", Help: "merge: the tag the others become (new or existing)"},
 			{Name: "dry-run", Help: "rename, merge, delete: show what would change"},
@@ -215,7 +215,7 @@ func tagCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		d, root := render.New("colour set for tag " + t)
 		root.KV("colour", col)
-		root.KV("shows", "a band at the left of its mods' rows, where it is the mod's first coloured tag")
+		root.KV("shows", "a band at the left of its mods' rows, where it is the mod's first tag")
 		return d, nil
 	case "order":
 		if len(a.Pos) < 3 {

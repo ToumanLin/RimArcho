@@ -1,5 +1,5 @@
 // A Mod's tags in its order, as chips the player drags, or moves with ctrl+← / ctrl+→, to
-// reorder them. The first coloured tag marks the Mod's rows (16 §2.9 Tag manager); it is
+// reorder them. The first tag's colour marks the Mod's rows (16 §2.9 Tag manager); it is
 // underlined here so the order's effect shows.
 import { T } from "./state.js";
 import { markOf, tagCSS, tagColors } from "./tagcolor.js";
@@ -7,8 +7,9 @@ import { markOf, tagCSS, tagColors } from "./tagcolor.js";
 const el = (tag, cls) => { const e = document.createElement(tag); e.className = cls; return e; };
 const Tf = (f, ...a) => { let i = 0; return T(f).replace(/%[sd]/g, () => String(a[i++])); };
 
-// tagOrderChips returns the chips; onOrder(list) gets the new order after each move.
-export function tagOrderChips(tags, onOrder, cls = "chip") {
+// tagOrderChips returns the chips; onOrder(list) gets the new order after each move, and
+// onOpen(tag), when given, a click on a chip (the Tag manager, 16 §2.9).
+export function tagOrderChips(tags, onOrder, cls = "chip", onOpen = null) {
   const box = el("span", "tag-order");
   let list = [...tags], from = -1;
   const clear = () => { for (const c of box.children) c.classList.remove("drop-before", "drop-after"); };
@@ -37,11 +38,26 @@ export function tagOrderChips(tags, onOrder, cls = "chip") {
         c.append(m);
       }
       c.append(document.createTextNode(t));
-      if (list.length > 1) {
-        c.draggable = true;
+      const many = list.length > 1;
+      if (onOpen || many) {
         c.tabIndex = 0;
-        c.title = (t === lead ? T("this tag's colour marks the Mod") + "\n" : "") + T("drag to reorder; ctrl+← / ctrl+→ moves it");
-        c.setAttribute("aria-label", Tf("%s, tag %d of %d", t, i + 1, list.length) + (t === lead ? T("; its colour marks the Mod") : ""));
+        c.title = [t === lead && T("this tag's colour marks the Mod"), onOpen && T("click to open the tag in the Tag manager"), many && T("drag to reorder; ctrl+← / ctrl+→ moves it")].filter(Boolean).join("\n");
+        c.setAttribute("aria-label", (many ? Tf("%s, tag %d of %d", t, i + 1, list.length) : t) + (t === lead ? T("; its colour marks the Mod") : ""));
+      }
+      if (onOpen) {
+        c.classList.add("tag-open");
+        c.setAttribute("role", "button");
+        c.onclick = () => onOpen(t);
+      }
+      c.onkeydown = (e) => {
+        if (onOpen && e.key === "Enter" && !e.ctrlKey && !e.altKey) { e.preventDefault(); e.stopPropagation(); return onOpen(t); }
+        if (!many || !e.ctrlKey || e.altKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+        e.preventDefault();
+        e.stopPropagation();
+        move(i, e.key === "ArrowLeft" ? i - 1 : i + 2, true);
+      };
+      if (many) {
+        c.draggable = true;
         c.ondragstart = (e) => { from = i; e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", t); c.classList.add("dragging"); };
         c.ondragend = () => { from = -1; c.classList.remove("dragging"); clear(); };
         c.ondragover = (e) => {
@@ -57,12 +73,6 @@ export function tagOrderChips(tags, onOrder, cls = "chip") {
           from = -1;
           clear();
           move(f, i + (after(c, e) ? 1 : 0), false);
-        };
-        c.onkeydown = (e) => {
-          if (!e.ctrlKey || e.altKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
-          e.preventDefault();
-          e.stopPropagation();
-          move(i, e.key === "ArrowLeft" ? i - 1 : i + 2, true);
         };
       }
       box.append(c);

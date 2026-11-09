@@ -27,8 +27,8 @@ func TestPinnedTagPresetFollowsLanguage(t *testing.T) {
 	t.Setenv("ARCHO_LANG", "")
 	e := testkit.New(t)
 	for _, tc := range []struct{ lang, want string }{
-		{"en", "framework,visuals,"},
-		{"zh", "框架,美化,"},
+		{"en", "RimWorld,framework,visuals,"},
+		{"zh", "RimWorld,框架,美化,"},
 	} {
 		e.MustRun("config", "set", "ui.lang", tc.lang)
 		if v := cmds.Setting(e.App, "tags.pinned"); !strings.HasPrefix(v, tc.want) {
@@ -36,7 +36,7 @@ func TestPinnedTagPresetFollowsLanguage(t *testing.T) {
 		}
 	}
 	t.Setenv("ARCHO_LANG", "en") // overrides ui.lang, as for the interface
-	if v := cmds.Setting(e.App, "tags.pinned"); !strings.HasPrefix(v, "framework,") {
+	if v := cmds.Setting(e.App, "tags.pinned"); !strings.HasPrefix(v, "RimWorld,framework,") {
 		t.Fatalf("ARCHO_LANG en: tags.pinned default %q", v)
 	}
 	e.MustRun("config", "set", "tags.pinned", "a,b") // a stored list stays in any language

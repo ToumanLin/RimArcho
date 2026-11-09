@@ -143,7 +143,7 @@ func TestTextureRenderingOnlyInTestRun(t *testing.T) {
 func TestLogSaveNotInSaves(t *testing.T) {
 	t.Parallel()
 	e := listEnv(t)
-	const line = `saves: this run loaded save "Colony1", which is not in Saves/; a test run cannot reproduce errors that need that save`
+	const line = `saves: this run loaded save "Colony1", which is not in Saves/; a test run cannot reproduce errors that need that save, but still shows whether a changed Mod loads and a map starts`
 	if out := e.MustRun("log"); !strings.Contains(out, line) {
 		t.Errorf("missing %q:\n%s", line, out)
 	}

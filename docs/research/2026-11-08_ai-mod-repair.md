@@ -2,6 +2,8 @@
 
 Status: proposal, not decided. Question: RimArcho is infrastructure whose first user is an AI agent (00 §3.2, D12). The agent diagnoses and fixes Mod errors and conflicts for a player who does not know Mod internals. What must RimArcho provide so that this is simple, usable and robust *for the player*, and where does fixing C# assemblies fit?
 
+Status 2026-11-09: deferred. R6 is done: rounds 4 and 5 ([mcp-eval-design.md](mcp-eval-design.md), archo e2fa7445, deepseek-flash) re-ran h4, h7 and h8. Attribution now works: h4 5/6 (dsh 3/3, Pi 2/3), h7 6/6 once a fix in either Mod counts (the grading was unfair: vanilla's loop tolerates the list change), h8 culprit named in 8 of 9 runs (Pi 2/3, dsh 3/3, Pi with Archo's instructions 3/3), fixed in 5. What still fails is execution, not diagnosis: a shell command that never returns (`find /`), and h8 DLLs compiled with `csc` that the game refuses (`FieldAccessException`); be8ba34e makes Archo flag those (`built: !!`, `access: !!`, `shipped:`). Pi given Archo's server instructions solved 6/9 against plain Pi 7/9 and dsh 8/9, so the instructions do not explain dsh's lead. h9 was not re-run. Order when this resumes: the player-side promises first (R5, R4, R1); R3 only as facts in output ("nothing to fix"), not a longer prescribed workflow; R2 last or not at all: the failures it targets are now detected, and a tool that does the steps for the agent may limit stronger models.
+
 Evidence: the three MCP evaluation rounds ([mcp-eval-design.md](mcp-eval-design.md), [round 1](2026-11-04_mcp-transcript-review.md), [round 2](2026-11-05_mcp-transcript-review-round2.md)), CHANGELOG 1.0.9 (unreleased), and checks of ilspycmd 11 and dnSpyEx made on 2026-11-08 (Appendix A).
 
 ## 1. The player's side
@@ -42,8 +44,8 @@ For the player, the risks are a wrong fix, an unneeded fix and a change to real 
 | Work on a copy | `pin_mod` (07 §5); `test_run` links pinned copies for the run (P20) | Shipped 1.0.5 |
 | Proof | `test_run` compares with the player's log (`fixed`, `before`) and the previous run (20 §2) | Shipped 1.0.5 |
 | Proof for runtime and save errors | `test_run` `save` loads a save in the run's data, `ticks` plays N ticks (20 §2) | 1.0.9 |
-| Right culprit, null errors (h4) | `trace:` follows the null to the frame that passes it; `source callers` | 1.0.9, not re-evaluated |
-| Right culprit, list changed elsewhere (h7) | list modifiers from an IL scan of every enabled Mod (06 §2) | 1.0.9, not re-evaluated |
+| Right culprit, null errors (h4) | `trace:` follows the null to the frame that passes it; `source callers` | 1.0.9; round 4: 5/6 |
+| Right culprit, list changed elsewhere (h7) | list modifiers from an IL scan of every enabled Mod (06 §2) | 1.0.9; round 4: 6/6 with either Mod accepted |
 | How to rebuild | `build:` block in `get_mod`; `guide topic=rebuild` (pin first, prefer a patch Mod, publicizer, references, `test_run` proves it) | 1.0.9 |
 | What a rebuild changed | `source diff` (`read_source mode=diff`): changed methods, non-public members used without a publicizer | 1.0.9 |
 | Read code | `read_source` with ilspycmd, found on PATH or `~/.dotnet/tools` (05 §5.4) | Needs the SDK to install |
@@ -88,6 +90,12 @@ R2 also lets `skills/rimworld-probe` build without the SDK (20 §4).
 ### R4. A fix is a record
 
 Each applied code or file fix becomes a record the player can see: which Mod and version, what changed (the pinned copy's git baseline, 07 §5.2), why (the cluster and evidence), and the test result.
+
+Where the record lives (the owner's requirement, 2026-11-09): in two places, written by the agent as part of every fix.
+
+- **A file in the pinned copy** (or the patch Mod): what changed, file by file; why (the cluster and its evidence); the original Mod's version or Workshop id; the `test_run` result before and after; the date. It travels with the copy (packs, folder moves) and is readable without RimArcho. File name and format to decide; the game ignores unknown files at a Mod's root.
+- **A summary in the copy's RimArcho note** (Mod library, the copy note of 16 §2.9): one or two lines naming the fix and the file. The copy note was made for this.
+- Gaps today: `pin_mod reason` writes the copy note only when the copy is made, before any fix. Writing it later needs `set_player_data action=copy_note`, which is served only with `--tools all`, and replaces the text, so it would erase the pin reason. A fix needs a core-group way to append to the copy note. Archo can also check that the record is there: a pinned copy whose files differ from its git baseline but has no record file is flagged in `get_mod` and the Mod library.
 
 - **When the Mod updates** (07 §5.3 already warns about the newer Workshop version): re-run the test with the new version. If the error is gone, suggest dropping the fix. If the fix is still needed, say so. Today `pin --update` makes a new copy without the edits (07 §5.4); a patch Mod keeps working, which is one more reason R3 prefers it.
 - **A report for the author**: the cluster, the cause and the change, as text the player can post. The author's fix is the one that lasts.

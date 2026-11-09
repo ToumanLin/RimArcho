@@ -80,7 +80,7 @@ type Board struct {
 	Changes     int                 `json:"changes"`   // events of the last scan
 	LastEvents  map[string]int      `json:"lastEvents,omitempty"`
 	// TagColors is every coloured tag's colour, by lower-cased tag: a row is marked with
-	// its first coloured tag's (16 §2.9 Tag manager)
+	// its first tag's (16 §2.9 Tag manager)
 	TagColors map[string]string `json:"tagColors,omitempty"`
 }
 

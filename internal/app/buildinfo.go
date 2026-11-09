@@ -2,6 +2,7 @@ package app
 
 import (
 	"github.com/ToumanLin/RimArcho/internal/csproj"
+	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
@@ -10,6 +11,9 @@ import (
 type BuildInfo struct {
 	Source *csproj.Source
 	Dotnet string // the dotnet executable; empty when there is none
+	// Managed is the game's folder of assemblies (Assembly-CSharp.dll), for checking a built
+	// DLL's access to game members; empty when unknown.
+	Managed string
 }
 
 // ModBuild reads the Mod's folder for source. It returns nil when the Mod ships none (a Mod
@@ -29,5 +33,9 @@ func (a *App) ModBuild(ix *Index, m *store.Mod) *BuildInfo {
 	} else {
 		dotnet = csproj.Dotnet()
 	}
-	return &BuildInfo{Source: s, Dotnet: dotnet}
+	b := &BuildInfo{Source: s, Dotnet: dotnet}
+	if ix.Env != nil {
+		b.Managed = env.ManagedDir(ix.Env.GameRoot)
+	}
+	return b
 }

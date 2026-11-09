@@ -22,6 +22,9 @@ type RefDiff struct {
 	// TypeAccess the declaring type's; "" when the target assembly was not available.
 	Access, TypeAccess string
 	Missing            bool // the target assembly was read but has no such member
+	// Blocked: the runtime refuses it unless the assembly skips verification (access.go)
+	Blocked bool
+	row     uint32 // the MemberRef row
 }
 
 // NonPublic reports a resolved target that is not public, or whose type is not.
@@ -38,7 +41,12 @@ type DiffReport struct {
 	AsmRefs                  []string // "+ Name 1.0.0.0", "- Name …", "~ Name 1.0 → 2.0"
 	AttrsAdded, AttrsRemoved []string
 	IgnoresAccessChecksTo    []string // assemblies the new build declares IgnoresAccessChecksTo for
-	Unchanged                int      // methods with identical bodies
+	SkipsVerification        bool     // the new build skips verification (access.go)
+	OldSkipsVerification     bool
+	// Inaccessible: every reference of the new build the runtime refuses unless the build skips
+	// verification (filled only when open is given and the new build does not skip it)
+	Inaccessible []RefDiff
+	Unchanged    int // methods with identical bodies
 }
 
 // methodKey is Type::Name(Types) of MethodDef row.
@@ -84,7 +92,7 @@ func (a *Assembly) memberRefs() map[string]RefDiff {
 		if !ok {
 			continue
 		}
-		d := RefDiff{Owner: m.Owner, Name: m.Name, Field: m.Field, Params: m.Params}
+		d := RefDiff{Owner: m.Owner, Name: m.Name, Field: m.Field, Params: m.Params, row: r}
 		if m.Field {
 			d.Text = m.Owner + "::" + m.Name
 			d.Params = -1
@@ -194,17 +202,18 @@ func Diff(old, cur *Assembly, open func(name string) *Assembly) *DiffReport {
 	sort.Slice(r.RefsAdded, func(i, j int) bool { return r.RefsAdded[i].Text < r.RefsAdded[j].Text })
 	sort.Slice(r.RefsRemoved, func(i, j int) bool { return r.RefsRemoved[i].Text < r.RefsRemoved[j].Text })
 	if open != nil {
+		blocked := map[string]bool{}
+		all := cur.InaccessibleRefs(open)
+		for _, b := range all {
+			blocked[b.Text] = true
+		}
+		if !cur.SkipsVerification() {
+			r.Inaccessible = all
+		}
 		for i := range r.RefsAdded {
 			d := &r.RefsAdded[i]
-			if d.Scope == "" {
-				continue
-			}
-			t := open(d.Scope)
-			if t == nil {
-				continue
-			}
-			acc, tacc, ok := t.MemberAccess(d.Owner, d.Name, d.Field, d.Params)
-			d.Access, d.TypeAccess, d.Missing = acc, tacc, !ok
+			resolveAccess(d, open)
+			d.Blocked = blocked[d.Text]
 		}
 	}
 
@@ -233,5 +242,6 @@ func Diff(old, cur *Assembly, open func(name string) *Assembly) *DiffReport {
 	nat, ignores := cur.attrTexts()
 	r.AttrsAdded, r.AttrsRemoved = diffSets(oat, nat)
 	r.IgnoresAccessChecksTo = ignores
+	r.SkipsVerification, r.OldSkipsVerification = cur.SkipsVerification(), old.SkipsVerification()
 	return r
 }

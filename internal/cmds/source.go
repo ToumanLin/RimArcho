@@ -51,6 +51,7 @@ func sourceReadCmd(c *Ctx, a *Args, game bool) (*render.Doc, error) {
 		return nil, err
 	}
 	var ds []*app.SourceDLL
+	shipped := ""
 	label, ref := "RimWorld "+st.Ix.Env.GameVersion, "game"
 	if game {
 		var d *app.SourceDLL
@@ -66,6 +67,11 @@ func sourceReadCmd(c *Ctx, a *Args, game bool) (*render.Doc, error) {
 		}
 		label, ref = modLabel(st.Ix, m.ID), st.Ix.Ref(m.ID)
 		ds, err = c.App.SourceDLLs(st, m)
+		if err == nil {
+			if b := c.App.ModBuild(st.Ix, m); b != nil {
+				shipped = shippedSource(c.App.ModPath(st.Ix, m), b, a.Str("type"))
+			}
+		}
 	}
 	if err != nil {
 		return nil, err
@@ -73,6 +79,9 @@ func sourceReadCmd(c *Ctx, a *Args, game bool) (*render.Doc, error) {
 	if len(ds) == 0 {
 		d, root := render.New(label + "  no assemblies to decompile")
 		root.Add("the effective content has no Assemblies/*.dll (or only known libraries such as 0Harmony.dll)")
+		if shipped != "" {
+			root.KV("shipped", shipped)
+		}
 		return d, nil
 	}
 	ctx := context.Background()
@@ -81,12 +90,19 @@ func sourceReadCmd(c *Ctx, a *Args, game bool) (*render.Doc, error) {
 		if err != nil {
 			return nil, noILSpy(err)
 		}
-		return typeDoc(label, ref, t, src, path, a.Str("member"), a.Bool("all"))
+		d, err := typeDoc(label, ref, t, src, path, a.Str("member"), a.Bool("all"))
+		if err == nil && shipped != "" {
+			d.Nodes[0].KV("shipped", shipped)
+		}
+		return d, err
 	}
 	if a.Str("member") != "" {
 		return nil, &UsageError{Msg: "--member needs --type"}
 	}
 	d, root := render.New(fmt.Sprintf("%s  %d assemblies", label, len(ds)))
+	if shipped != "" {
+		root.KV("shipped", shipped)
+	}
 	sec := root.Section("assemblies")
 	for _, x := range ds {
 		was := x.Cached
@@ -423,4 +439,85 @@ func sourceCleanCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		d.AddNext("archo source clean --yes")
 	}
 	return d, nil
+}
+
+// shippedSource is the shipped: line of read_source for a Mod that ships a C# project (05 §5.6):
+// the code shown is decompiled, the Mod's own source is the one to edit, and a rebuild goes
+// through dotnet build. Agents read a Mod with read_source, found the shipped source and
+// compiled it with csc, which the game refuses for publicized code (MCP eval h8).
+func shippedSource(modRoot string, b *app.BuildInfo, typ string) string {
+	var projs []string
+	publicizer := false
+	for _, p := range b.Source.Projects {
+		if p.Err != "" {
+			continue
+		}
+		rel, err := filepath.Rel(modRoot, p.File)
+		if err != nil {
+			rel = p.File
+		}
+		projs = append(projs, filepath.ToSlash(rel))
+		publicizer = publicizer || p.Publicizer
+	}
+	if len(projs) == 0 {
+		return ""
+	}
+	s := "the Mod ships its source: " + strings.Join(firstN(projs, 2), ", ")
+	if len(projs) > 2 {
+		s += fmt.Sprintf(" and %d more", len(projs)-2)
+	}
+	if typ != "" {
+		if f := typeFile(modRoot, b, typ); f != "" {
+			s += "; this type: " + f
+		}
+	}
+	s += ". To change the Mod, edit that source and rebuild it with dotnet build (get_mod build:, guide topic=rebuild)"
+	if publicizer {
+		s += "; it uses a publicizer, so a DLL compiled with csc throws FieldAccessException in the game"
+	}
+	return s
+}
+
+var typeDeclRx = regexp.MustCompile(`\b(?:class|struct|interface|enum|record)\s+(\w+)`)
+
+// typeFile finds the shipped .cs file that declares typ's short name (outside bin/ and obj/).
+func typeFile(modRoot string, b *app.BuildInfo, typ string) string {
+	short := typ
+	if i := strings.LastIndexAny(short, ".+"); i >= 0 {
+		short = short[i+1:]
+	}
+	found := ""
+	for _, p := range b.Source.Projects {
+		filepath.WalkDir(p.Dir, func(path string, de os.DirEntry, err error) error {
+			if err != nil || found != "" {
+				return filepath.SkipDir
+			}
+			if de.IsDir() {
+				if n := strings.ToLower(de.Name()); n == "bin" || n == "obj" || strings.HasPrefix(n, ".") {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if !strings.HasSuffix(path, ".cs") {
+				return nil
+			}
+			src, err := os.ReadFile(path)
+			if err != nil {
+				return nil
+			}
+			for _, m := range typeDeclRx.FindAllSubmatch(src, -1) {
+				if string(m[1]) == short {
+					if rel, err := filepath.Rel(modRoot, path); err == nil {
+						found = filepath.ToSlash(rel)
+					}
+					return filepath.SkipAll
+				}
+			}
+			return nil
+		})
+		if found != "" {
+			break
+		}
+	}
+	return found
 }
