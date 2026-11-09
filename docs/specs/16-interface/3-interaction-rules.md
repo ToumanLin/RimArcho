@@ -116,6 +116,7 @@ Editor only:
 | `P`, `E` | Switch, create, rename, or delete plans; switch environments (the environment page in the GUI) |
 | `v` | GUI: Disabled one row per copy, or grouped by tag (§2.5) |
 | `←` `→`, `enter` on a tag group's header | GUI: close or open the group in Disabled's tags view (§2.5); elsewhere `←→` change areas |
+| `F2` `n` `M` `Del` on a tag group's header | GUI: rename the tag, edit its note, merge it, delete it (the Tag manager in the details, §2.5, §2.9) |
 
 Global:
 

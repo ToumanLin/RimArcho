@@ -89,6 +89,7 @@ func KeyHelp(page string, tui bool) []KeyRow {
 				out = append(out,
 					r("v", "Disabled: one row per copy / grouped by tag"),
 					r("← → / enter / click", "on a tag group's header in Disabled: collapse / expand"),
+					r("F2 / n / M / Del", "on a tag group's header in Disabled: rename, note, merge, delete the tag"),
 				)
 			}
 		}

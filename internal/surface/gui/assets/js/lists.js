@@ -165,13 +165,7 @@ export function renderHeads() {
     const a = $(`.area[data-area="${k}"]`);
     a.classList.toggle("focus", S.focus === k && !S.popup);
     const h = $(".head", a);
-    if (k === 3) {
-      h.innerHTML = `<span class="n">4</span><span class="t">${esc(T(AREAS[3]))}</span>`;
-      const full=el("button","editor-full-link",T("view full details") + "  Enter ↵");
-      full.onmousedown=(e)=>e.stopPropagation();
-      full.onclick=()=>document.dispatchEvent(new CustomEvent("editor-full"));h.append(full);
-      continue;
-    }
+    if (k === 3) { detailHead(h); continue; }
     const c = S.cols[k];
     const filtered = k < 2 ? barOn() : !!c.query.trim();
     const n = filtered ? Tf("%d / %d", matched(c), c.items.length) : `${c.items.length}`;
@@ -204,6 +198,25 @@ export function renderHeads() {
       factText(o, Tf("other areas: %s, tab goes to the next area with matches", parts.join("  ")));
     } else if (o) o.remove();
   }
+}
+
+// detailHead: the details area's head. On a tag group's header in Disabled (S.tagHead) it is
+// the Tag manager's, as on Mod library (16 §2.9): "tags", the tag, and a filter to it.
+export function detailHead(h = $('.area[data-area="3"] .head')) {
+  const g = S.tagHead;
+  const link = (label, run) => {
+    const b = el("button", "editor-full-link", label);
+    b.onmousedown = (e) => e.stopPropagation();
+    b.onclick = (e) => { e.stopPropagation(); run(); };
+    return b;
+  };
+  if (!g) {
+    h.innerHTML = `<span class="n">4</span><span class="t">${esc(T(AREAS[3]))}</span>`;
+    h.append(link(T("view full details") + "  Enter ↵", () => document.dispatchEvent(new CustomEvent("editor-full"))));
+    return;
+  }
+  h.innerHTML = `<span class="n">4</span><span class="t">${esc(T("tags"))}</span><span class="q word-facts">${esc(g.none ? T("no tag") : g.tag)}</span>`;
+  if (!g.none) h.append(link(T("filter to this tag"), () => document.dispatchEvent(new CustomEvent("filter-tag", { detail: g.tag }))));
 }
 
 // viewControls: the Disabled column's view switch, individual | tags (v), and in the tags

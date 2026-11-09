@@ -13,10 +13,11 @@ import "./activity.js";
 import "./fulltitle.js";
 import { applyAccent } from "./accent.js";
 import { factText, S, $, $$, el, esc, T, Tf, errText, say, clearSay, undoStatus, busyStart, col, cur, selection, key, idsOf, refsOf, named, AREAS, keyCaps } from "./state.js";
-import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, pageDelta, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn, setOnViewChange } from "./lists.js";
-import { grouped, headOf, curKey, shownItems, shape, findEntry, setGroupOpen, reveal, setView, loadView, refreshOrder, regroup } from "./disabledgroups.js";
+import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, pageDelta, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn, setOnViewChange, detailHead } from "./lists.js";
+import { G, grouped, headOf, curKey, shownItems, shape, findEntry, setGroupOpen, reveal, setView, loadView, refreshOrder, regroup } from "./disabledgroups.js";
 import { createBar } from "./filterbar.js";
-import { followDetail, showDetail, scrollDetail, refreshCopies } from "./detail.js";
+import { followDetail, showDetail, scrollDetail, refreshCopies, showPanel } from "./detail.js";
+import { tagPanel, startRename, editTagNote, pickMerge, confirmDelete } from "./tagmanager.js";
 import * as pop from "./popups.js";
 import * as scr from "./screens.js";
 import * as shell from "./shell.js";
@@ -116,6 +117,9 @@ let detailKey = "";
 // detailTarget: the row the details follow (the focused list's cursor, else the last list's).
 function detailTarget() {
   const k = Math.min(S.focus, 2) === S.focus ? S.focus : lastList;
+  // a tag group's header in Disabled: its tag in the Tag manager (16 §2.5)
+  const g = k === 0 ? headOf(col(0), col(0).view[col(0).cursor]) : null;
+  if (g) return { group: g, k, id: "tags:" + g.key + "|" + g.rows.length + "|" + S.board.stamp };
   const it = cur(k);
   return { it, k, id: it ? key(it) + "|" + (it.pos || 0) + "|" + S.board.stamp : "" };
 }
@@ -123,8 +127,52 @@ function detailFollow(force) {
   const t = detailTarget();
   if (!force && t.id === detailKey) return;
   detailKey = t.id;
+  const was = S.tagHead;
+  S.tagHead = t.group || null;
+  if (was || S.tagHead) detailHead();
+  if (t.group) return showTagPanel(t.group);
   followDetail(t.it, t.k === 2);
 }
+
+// ---- the Tag manager in the details, on a tag group's header in Disabled (16 §2.5, §2.9) ----
+
+// showTagPanel draws group g's tag as Mod library's Tags view does; a redraw never takes
+// text the player is typing in it.
+function showTagPanel(g) {
+  const box = $("#detail"), ref = "tags:" + g.key, ae = document.activeElement;
+  if (box.dataset.ref === ref && box.contains(ae) && ae.matches("input, textarea")) return;
+  const info = !g.none && G.tags.find((t) => t.tag.toLowerCase() === g.key);
+  showPanel(ref, tagPanel(info ? { ...g, info } : g, tagCtx));
+}
+const tagPicked = new Set();
+const tagCtx = {
+  tags: () => G.tags,
+  picked: tagPicked,
+  // a tag change: the lists, the groups and the panel again, the cursor on key's header
+  done: async (key) => {
+    await reload();
+    await refreshOrder(true);
+    regroup(key != null ? "\u0000" + key : undefined);
+    renderLists();
+    renderWhere();
+    renderHints();
+    detailFollow(true);
+  },
+  goTo: (key) => {
+    const c = col(0), at = c.view.findIndex((vi) => headOf(c, vi)?.key === key);
+    if (at < 0) return;
+    c.cursor = at;
+    ensureVisible(0);
+    renderRows(0);
+    renderWhere();
+    renderHints();
+    detailFollow();
+  },
+  redraw: () => detailFollow(true),
+  leave: () => focusArea(0),
+  editing: () => {},
+};
+const tagBox = () => $("#detail");
 
 // relang: the language changed (16 §2.14). The text comes again from Go (the page data and
 // the T() table); the same page opens again in the new language, with its scroll, the
@@ -312,6 +360,10 @@ function actions() {
   const sel = selection();
   const k = S.focus;
   const group = headOf(col(), col().view[col().cursor]);
+  if (group && !sel.length && !group.none) return [{ key: "← →", label: T("collapse / expand the group"), run: () => toggleGroup() },
+    { key: "F2", label: T("rename"), run: () => startRename(tagBox(), group, tagCtx) }, { key: "M", label: T("merge into…"), run: () => pickMerge(group.tag, tagCtx) },
+    { key: "Del", label: T("delete tag"), run: () => confirmDelete([group.tag], tagCtx) },
+    { key: "v", label: T("individual"), run: () => switchView() }, { key: "ctrl+k", label: T("commands"), run: () => pop.palette() }];
   if (group && !sel.length) return [{ key: "← →", label: T("collapse / expand the group"), run: () => toggleGroup() },
     { key: "v", label: T("individual"), run: () => switchView() }, { key: "/", label: T("search"), run: () => startSearch() }, { key: "ctrl+k", label: T("commands"), run: () => pop.palette() }];
   if (!sel.length) return [{ key: "/", label: T("search"), run: () => startSearch() }, { key: "ctrl+k", label: T("commands"), run: () => pop.palette() }];
@@ -1189,6 +1241,18 @@ function onKey(e) {
     if (g && g.open === (k === "ArrowLeft")) { handled(); return toggleGroup(k === "ArrowRight"); }
   }
   if (k === "Enter" && S.focus === 0 && !ctrl && !e.altKey && toggleGroup()) return handled();
+  // on a tag's header, the Tag manager's keys (16 §2.9): F2 rename, n note, M merge, Del delete
+  if (S.focus === 0 && !ctrl && !e.altKey && !col(0).sel.size) {
+    const g = headOf(col(0), col(0).view[col(0).cursor]);
+    const kk = e.shiftKey && k === "m" ? "M" : k;
+    if (g && !g.none && ["F2", "n", "M", "Delete"].includes(kk)) {
+      handled();
+      if (kk === "F2") return startRename(tagBox(), g, tagCtx);
+      if (kk === "n") return editTagNote(tagBox(), tagCtx);
+      if (kk === "M") return pickMerge(g.tag, tagCtx);
+      return confirmDelete([g.tag], tagCtx);
+    }
+  }
   if (k === "ArrowLeft" || k === "ArrowRight") {
     handled();const areas=[3,1,0],at=areas.indexOf(S.focus===2?0:S.focus);
     return focusArea(areas[Math.max(0,Math.min(2,at+(k==="ArrowRight"?1:-1)))]);
@@ -1367,6 +1431,7 @@ async function start() {
   document.addEventListener("editor-full",()=>fullPage.full("plan",S.detail?.id));
   // a Mod's tags were reordered in its details: the rows' colour marks follow (16 §2.9)
   document.addEventListener("tags-changed", () => reload());
+  document.addEventListener("filter-tag", (e) => S.bar.set("tags:" + e.detail, 1));
   document.addEventListener("editor-use-copy", async (e) => {
     if(environmentReason())return say("busy",environmentReason());
     const id = e.detail;

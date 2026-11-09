@@ -324,5 +324,6 @@
   "expanded": "已展开",
   "collapsed": "已折叠",
   "Disabled: one row per copy / grouped by tag": "未启用：逐个列出 / 按标签分组",
-  "on a tag group's header in Disabled: collapse / expand": "在未启用的标签组标题上：折叠 / 展开"
+  "on a tag group's header in Disabled: collapse / expand": "在未启用的标签组标题上：折叠 / 展开",
+  "on a tag group's header in Disabled: rename, note, merge, delete the tag": "在未启用的标签组标题上：改名、备注、合并、删除标签"
 }

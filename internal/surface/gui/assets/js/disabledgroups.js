@@ -10,7 +10,7 @@ import { S, key, api } from "./state.js";
 export const VIEW_KEY = "ui.gui.plan.disabled"; // "individual" or "tags"
 const CLOSED_KEY = "archo.disabled.closed";     // closed groups, by lower-case tag ("" no tag)
 
-export const G = { view: "individual", order: [], orderStamp: undefined, closed: new Set() };
+export const G = { view: "individual", order: [], tags: [], orderStamp: undefined, closed: new Set() };
 try { const v = JSON.parse(localStorage.getItem(CLOSED_KEY) || "[]"); if (Array.isArray(v)) G.closed = new Set(v); } catch { /* none closed */ }
 const keepClosed = () => { try { localStorage.setItem(CLOSED_KEY, JSON.stringify([...G.closed])); } catch { /* not kept */ } };
 
@@ -122,13 +122,15 @@ export async function setView(v) {
   return true;
 }
 
-// refreshOrder reads the tags' order again when the data changed; true when it changed.
-export async function refreshOrder() {
+// refreshOrder reads the tags again (API.TagList: their order, notes, colours, counts) when
+// the data changed, or always with force; true when the order changed.
+export async function refreshOrder(force = false) {
   const stamp = S.board ? S.board.stamp : null;
-  if (G.orderStamp === stamp) return false;
+  if (!force && G.orderStamp === stamp) return false;
   let tags;
   try { tags = await api.TagList(); } catch { return false; }
-  const order = (tags || []).map((t) => t.tag);
+  G.tags = tags || [];
+  const order = G.tags.map((t) => t.tag);
   G.orderStamp = stamp;
   if (order.join("\n") === G.order.join("\n")) return false;
   G.order = order;
