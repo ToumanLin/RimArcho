@@ -65,13 +65,15 @@ Existing Windows-only files and pre-existing skips, including WebView2 preflight
 - WSL: Ubuntu 22.04, Linux amd64, Go version from `go.mod` downloaded into `~/sdk`, `CGO_ENABLED=0`; clone in `~/rimarcho-linux`, module/build/test caches in `~/go`. Commits were made in the Windows worktree and pulled into WSL.
 - Linux static `archo` build: passed; `file` reports a statically linked x86-64 ELF.
 - Linux gofmt, vet, pinned staticcheck: passed on the CI package selection.
-- Linux `go test -count=1 -timeout 20m`: passed for all selected packages with the explicit exclusions above.
-- Windows full build, vet and uncached suite: passed after fixture portability changes; final verification after lint cleanup is pending.
+- Linux `go test -count=1 -timeout 20m`: passed for all 58 selected packages with the explicit exclusions above.
+- Windows `go build ./...` and `go vet ./...`: passed. Final `go test -count=1 ./...`: passed with `GOMAXPROCS=4`; test code and assertions were unchanged. Earlier full runs also passed at default concurrency. Two final default-concurrency runs intermittently failed to rename a synthetic Monitor install directory (`Access is denied`), first in `TestSortAddsMonitor`, then in `TestUninstallRechecksSourceLibraryBeforeDeletion/link`. The first run overlapped temporary-directory inspection; the second did not. Lower concurrency passed; the cause is not established and no Monitor behavior was changed.
 - Node VM/feedback-relay tests: 107 passed, none failed or skipped.
-- Documentation references: passed before the final report; final check pending.
+- Documentation references and `git diff --check`: passed.
 - No native Linux GUI, real games, real Mods, Steam, or real RimArcho home were used. No merge or push was performed.
 
 Resource exception: simultaneous cold build caches briefly exceeded the 3 GB combined disk limit (approximately 3.4 GB measured). The Windows cache was removed immediately after the measurement; build caches are cleared between the final Linux and Windows runs. The time limit was not approached.
+
+Test logs are retained in WSL under `~/go/linux-tests.log`, `~/go/windows-tests.log` and `~/go/windows-tests-retry-*.log`; the selected Linux package list is `~/go/linux-packages.txt`. Build caches were cleared after verification; the toolchain, module cache, binary and clone remain in the authorized directories.
 
 ## Documentation discrepancies
 
