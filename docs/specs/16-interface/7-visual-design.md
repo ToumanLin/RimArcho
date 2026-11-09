@@ -118,7 +118,8 @@ The motions are implemented in `js/motion.js` and the motion section of `style.c
 The following rules apply:
 - Continuous or moving animations change only opacity and transform so WebView2 can composite without relayout or repaint. A flash uses a fading overlay instead of animating the background color; shimmer and progress use moving gradient layers. The exceptions are one-off 120ms hover-color transitions and the few sidebar grid rows expanding once over 250ms.
 - Do not use `backdrop-filter` blur; WebView2 repaints it on every frame.
-- Under `prefers-reduced-motion: reduce`, CSS sets all animation and transition durations to 0; `motion.js` skips FLIP, flashing, pulsing, and sliding.
+- Under `prefers-reduced-motion: reduce`, or with settings › motion: reduced (`ui.motion`, §2.14; the root's `data-motion="reduced"`), CSS sets all animation and transition durations to 0; `motion.js` skips FLIP, flashing, pulsing, and sliding. Every reduced-motion rule in `style.css` has a twin for `:root[data-motion="reduced"]`.
+- **Nothing moves after it is drawn without a reason.** Scrollers whose content comes with data keep their scrollbar's room (`scrollbar-gutter: stable`: the editor lists, details, Mod library, pages, Can it run, tasks, updates, saves, Mod settings, All lists). A filter chip is as wide as its bold label. The editor's list number column holds three digits. Placeholders hold the height of what replaces them (All lists' memory estimate keeps the last estimate's height). Sizes and the navigation layout saved as settings are restored before the first drawing from a copy in localStorage (`separator.js`, `shell.js`); the saved setting follows and wins.
 - Scrolling triggers no animations.
 
 ### 7.2 Interface wording

@@ -40,6 +40,7 @@ const shown = { game: null, row: null, note: false, drawn: false };
 const markY = new Map();
 
 let homeRetries = 0, homeRetryTimer = null;
+let drawnSig = ""; // the last read drawn (home)
 let memoryTimer = null, launchPending = false;
 export async function home({ keep = false } = {}) {
   clearTimeout(homeRetryTimer);
@@ -59,10 +60,19 @@ export async function home({ keep = false } = {}) {
     return;
   }
   homeRetries = 0;
+  // A read that brings nothing new (the window got the focus back, a scan that changed
+  // nothing here) leaves the page as it is: redrawing it restarted its motion and moved it.
+  const sig = JSON.stringify([next, backdrop, h || ""]);
+  if (sig === drawnSig && S.screen === "home" && document.querySelector("#screen .page.home .hm-step")) {
+    read.finish();
+    refreshHomeMemory(data);
+    return;
+  }
   data = next; bg = backdrop; hidden = h || "";
   const f = applied();
   if (f) picks.set(f.envName, key(f));
   draw();
+  drawnSig = sig;
   read.finish();
   refreshHomeMemory(next);
 }
@@ -188,10 +198,14 @@ export async function applyItem(t) {
 export function liveChanged() { if (S.screen === "home" && data) { launching = 0; draw(); } }
 
 function draw() {
+  drawnSig = ""; // drawn from anything but this read: the next read draws again
   const focus = focusedStep();
   const sc = S.screen === "home" ? document.querySelector("#screen") : openScreen("home");
   // where the rows were, so a row that moves to the top slides there
-  const before = places(sc.querySelector(".page.home"), ".hm-pick");
+  const old = sc.querySelector(".page.home");
+  const before = places(old, ".hm-pick");
+  // a redraw keeps where the page and its columns were scrolled
+  const scrolled = old ? [old.scrollTop, [...old.querySelectorAll(".hm-picks")].map((l) => l.scrollTop)] : null;
   sc.innerHTML = "";
   setBackdrop(bg);
   // no page actions: rescanning is Mod library's, a new plan is Lists's
@@ -218,6 +232,10 @@ function draw() {
   fitHeadline();
   placeMarks(gameMoved);
   if (pendingRow && S.busy.env) showSwitch(pendingRow);
+  if (scrolled) {
+    w.scrollTop = scrolled[0];
+    w.querySelectorAll(".hm-picks").forEach((l, i) => { if (!gameMoved || i === 0) l.scrollTop = scrolled[1][i] || 0; });
+  }
   if (focus) focusStep(focus);
   shown.game = env; shown.row = f ? key(f) : null; shown.drawn = true;
   shown.note = !!w.querySelector(".hm-note");
@@ -402,8 +420,9 @@ function launchStep(f) {
     block.append(sv);
   }
   s.append(block);
+  // the problem hangs under ▶ (style.css): appearing or going, it moves nothing on the page
   const n = f && note(f);
-  if (n) s.append(n);
+  if (n) block.append(n);
   return s;
 }
 

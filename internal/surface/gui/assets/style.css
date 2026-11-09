@@ -111,6 +111,10 @@ svg.i { width: 14px; height: 14px; flex: none; vertical-align: -2px; }
 /* the plan editor's description line, like every page's (16 §2.5): the lead, its actions */
 #planhead { grid-row: 1; padding: 0 12px 10px; min-height: 28px; }
 #planhead[hidden] { display: none; }
+/* The editor's head stays one line: its actions change width as edits come (problems,
+   unsaved, save) and a second line pushed the lists down. The lead gives way first. */
+#planhead.page-head { flex-wrap: nowrap; }
+#planhead .lead { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #body > #board { grid-row: 2; }
 
 #side { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; border-right: var(--hairline) solid var(--line-2); background: var(--bg); }
@@ -444,6 +448,9 @@ body.row-dragging, body.row-dragging * { cursor: grabbing !important; user-selec
 /* 1px above #body: at fractional display scales the editor's focused column border, on the
    same row as the page's top edge, otherwise shows through as a short line */
 #screen { position: absolute; inset: -1px 0 0; padding-top: 1px; background: var(--bg); overflow-y: auto; z-index: 10; }
+/* scrollers whose content comes with data keep their scrollbar's room: a bar coming or going
+   does not move or re-wrap what is in them (16 §7.1) */
+:is(#screen, .rows, .lib-rows, .needcol > .scroll, .page-scroll, .cols .col .scroll, .tk-rows, .tk-sum, .subs-list > .scroll, .subs-detail > .scroll, .sv-body, .ms-body, .pm-list .scroll) { scrollbar-gutter: stable; }
 /* focus lands on the page or a confirmation itself only to keep it in the dialog or page (16 §11 A1, A6); no ring */
 #board:focus, #screen:focus, .pop:focus { outline: none; }
 .page { padding: 0 max(20px, calc(50% - 600px)) 24px; display: flex; flex-direction: column; gap: var(--card-gap); }
@@ -467,6 +474,7 @@ body.row-dragging, body.row-dragging * { cursor: grabbing !important; user-selec
 .envrow .btn.quiet:hover, .envrow .btn.quiet:focus-visible { color: var(--fg); background: var(--pill); }
 .chip.cur { color: var(--accent-11, var(--accent)); background: var(--accent-soft); margin: 0; }
 @media (prefers-reduced-motion: reduce) { .page.enter, :is(#board, #planhead).enter, .seg > .thumb { animation: none; transition: none; } }
+:root[data-motion="reduced"] .page.enter, :root[data-motion="reduced"] :is(#board, #planhead).enter, :root[data-motion="reduced"] .seg > .thumb { animation: none; transition: none; }
 .page-head { display: flex; gap: 6px 12px; align-items: center; flex-wrap: wrap; color: var(--muted); min-height: 28px; }
 /* the page's actions at the right end of its description line (16 §2.2) */
 .page-head .page-acts { margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
@@ -761,6 +769,7 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .bd-link:hover { text-decoration: underline; }
 .page .btn.bd-dry { height: 30px; border-radius: var(--r-sm); font-size: 13px; }
 @media (prefers-reduced-motion: reduce) { .bd-step.cur .n::after { animation: none; } }
+:root[data-motion="reduced"] .bd-step.cur .n::after { animation: none; }
 .settings select { height: 26px; background: var(--card-2); color: var(--fg); border: var(--hairline) solid var(--line-2); border-radius: var(--r-sm); padding: 0 6px; font: inherit; }
 .settings .set .r > .muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 /* Notes wrap inside their column: a long path never runs under the controls (16 §7.3 rule 11). */
@@ -832,11 +841,13 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .guide .folder-row { margin-top: 0; }
 .guide .folder-space { margin-top: 8px; font-size: 12px; }
 @media (prefers-reduced-motion: reduce) { .archo-slot { transform: none; } }
+:root[data-motion="reduced"] .archo-slot { transform: none; }
 /* nothing moves when the system asks for less motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0s !important; animation-iteration-count: 1 !important; transition-duration: 0s !important; }
   .row.flash::after { display: none; }
 }
+:root[data-motion="reduced"] *, :root[data-motion="reduced"] *::before, :root[data-motion="reduced"] *::after { animation-duration: 0s !important; animation-iteration-count: 1 !important; transition-duration: 0s !important; } :root[data-motion="reduced"] .row.flash::after { display: none; }
 
 /* ---- the bottom line: where you are, what happened, what you can do (16 §6) ---- */
 #bottom { display: flex; align-items: center; gap: 12px; padding: 0 16px; white-space: nowrap; overflow: hidden; font-size: 12px; color: var(--muted); }
@@ -861,6 +872,7 @@ pre.lines.files { padding: 6px 14px 10px 28px; color: var(--muted); border-top: 
 .env-progress-bar > span { display: block; width: 38%; height: 100%; border-radius: inherit; background: var(--accent); animation: env-progress 1.3s ease-in-out infinite; }
 @keyframes env-progress { from { transform: translateX(-100%); } to { transform: translateX(365%); } }
 @media (prefers-reduced-motion: reduce) { .env-progress-bar > span { width: 100%; transform: none; opacity: .65; } }
+:root[data-motion="reduced"] .env-progress-bar > span { width: 100%; transform: none; opacity: .65; }
 
 #popup { position: absolute; inset: 0; z-index: 20; background: rgba(0, 0, 0, .28); display: flex; justify-content: center; align-items: flex-start; padding-top: 12vh; animation: fade var(--t-press) ease-out; }
 @keyframes fade { from { opacity: 0; } }
@@ -1068,6 +1080,10 @@ svg.i.fill { fill: currentColor; }
 .hm-note:hover .x, .hm-note .x:focus-visible { opacity: 1; }
 .hm-note .x:hover { color: var(--fg); background: var(--pill); }
 .hm-note.enter { animation: hm-fade var(--t-enter) var(--ease) both; }
+/* under ▶ in the page's bottom margin, out of the grid's rows: a problem that comes or goes
+   later does not lift the headline */
+.hm-launch > .hm-note { position: absolute; left: 0; right: 0; top: 100%; }
+.hm-launch > .hm-note .box { margin-top: 6px; padding-top: 8px; }
 .hm-note.leaving { grid-template-rows: 0fr; opacity: 0; transition-duration: var(--t-exit); transition-timing-function: var(--ease-in); }
 .hm-empty { grid-column: 1 / 13; grid-row: 2; align-self: center; }
 .hm-empty .btn { font-size: 12px; border: 1px solid var(--line); }
@@ -1084,6 +1100,7 @@ svg.i.fill { fill: currentColor; }
 @keyframes hm-flash { 0% { opacity: .22; } 100% { opacity: 0; } }
 @keyframes hm-leave { to { opacity: 0; transform: translateY(-6px); } }
 @media (prefers-reduced-motion: reduce) { .page.home * { animation: none !important; transition: none !important; } }
+:root[data-motion="reduced"] .page.home * { animation: none !important; transition: none !important; }
 @media (max-width: 1000px) {
   .page.home { padding: 8px 28px 28px; }
   .hm-act { display: none; }
@@ -1212,6 +1229,7 @@ svg.i.fill { fill: currentColor; }
 .dl-state .t { font-weight: 500; }
 .dl-line { margin-top: 8px; font: 12px var(--code); color: var(--muted); overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) { .prog .bar.busy i { animation: none; } ::view-transition-group(*) { animation: none; } }
+:root[data-motion="reduced"] .prog .bar.busy i { animation: none; } :root[data-motion="reduced"]::view-transition-group(*) { animation: none; }
 
 /* ---- import / export (js/exchange.js) ---- */
 .pop.xc { width: min(760px, 94vw); display: flex; flex-direction: column; max-height: 80vh; }
@@ -1392,6 +1410,7 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .lib-bar > .accent { font-weight: 600; margin-right: 4px; font-size: 12px; }
 .lib-bar .btn.quiet { margin-left: auto; border-color: transparent; background: none; box-shadow: none; }
 @media (prefers-reduced-motion: reduce) { .lib-bar, .fbar-panel { animation: none; } .lib-row .chev svg { transition: none; } }
+:root[data-motion="reduced"] .lib-bar, :root[data-motion="reduced"] .fbar-panel { animation: none; } :root[data-motion="reduced"] .lib-row .chev svg { transition: none; }
 
 /* ---- the Tags view (16 §2.9): a header row per tag, its rows under it; the Tag manager ---- */
 .lib-head .lib-fold { display: flex; gap: 2px; margin-left: auto; }
@@ -1464,6 +1483,8 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .fbar-line { display: flex; gap: 3px; min-width: 0; overflow: hidden; white-space: nowrap; align-items: center; }
 .fbar-v { flex: none; display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 7px; border-radius: var(--r-sm); font-size: 12px; color: var(--fg-2); min-width: 0; max-width: min(220px, 100%); white-space: nowrap; transition: background var(--t-press); }
 .fbar-v .l { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* a chip is as wide as its bold label, so turning it on does not rewrap the bar */
+.fbar-v .l[data-text]::after { content: attr(data-text); display: block; height: 0; overflow: hidden; visibility: hidden; font-weight: 600; }
 .fbar-v:hover { background: var(--pill); color: var(--fg); }
 .fbar-v:focus-visible, .fbar-v:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
 .fbar-v .n { flex: none; color: var(--faint); font-size: 12px; }
@@ -1722,6 +1743,7 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
   .tk .tk-split, .tk .tk-right { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .mini i, .tasks-line .ring circle.v { transition: none; } }
+:root[data-motion="reduced"] .mini i, :root[data-motion="reduced"] .tasks-line .ring circle.v { transition: none; }
 
 /* ---- Manage lists (16 §2.17): the lists on the left, the picked one on the right ---- */
 .pm { display: grid; grid-template-columns: minmax(270px, 320px) minmax(0, 1fr); gap: var(--card-gap); align-items: start; }

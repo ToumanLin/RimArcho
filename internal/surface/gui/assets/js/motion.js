@@ -1,10 +1,12 @@
-// Motion (16 §7.1): short, and only opacity and transform, so WebView2 composites it
-// without layout or paint work; nothing moves under prefers-reduced-motion. The CSS side
-// (the tokens --t-press, --t-enter, --t-layout and the keyframes) is in style.css.
+// Motion (16 §7.1): short, and mostly opacity and transform, so WebView2 composites it
+// without layout or paint work (the sidebar's sub-entries grow their grid row); nothing
+// moves under prefers-reduced-motion or settings › motion: reduced (ui.motion, the root's
+// data-motion). The CSS side (the tokens --t-press, --t-enter, --t-layout and the
+// keyframes) is in style.css.
 import { S, $$, key, ROW_H } from "./state.js";
 
 const reduce = matchMedia("(prefers-reduced-motion: reduce)");
-export const still = () => reduce.matches;
+export const still = () => reduce.matches || globalThis.document?.documentElement?.dataset?.motion === "reduced";
 
 const LAYOUT_MS = 250;
 const FLASH_MS = 400;

@@ -12,6 +12,11 @@ export function initWindowChrome() {
   // their native frame (gui.go), so none of them gets desktop caption buttons.
   if (controls || !runtime.Window) return;
   const os = globalThis._wails?.environment?.OS;
+  // The last run's answer (localStorage) puts the buttons in at once: added after the
+  // first drawing, they took their room from the breadcrumb (16 §8.2).
+  let known = "";
+  try { known = localStorage.getItem("window.os") || ""; } catch { /* storage can be off */ }
+  if (!os && known === "windows") { createControls(); return; }
   // Wails may publish environment after Init has already returned. Ask its
   // runtime once, without delaying the page, then use the latest nav layout.
   if (!os && runtime.System?.Environment) {
@@ -25,6 +30,7 @@ export function initWindowChrome() {
 
 function createControls() {
   if (controls) return;
+  try { localStorage.setItem("window.os", "windows"); } catch { /* storage can be off */ }
   const win = runtime.Window;
   controls = el("div", "window-controls");
   controls.setAttribute("role", "group");

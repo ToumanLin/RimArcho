@@ -35,7 +35,7 @@ The same source tree is linked twice:
 
 **The Windows main window** is borderless and uses WebView2 composition hosting while retaining Wails' default window decorations and resizing support. `window-chrome.js` provides minimize, maximize/restore, and close controls. Browser debug pages and other platforms retain their existing window form without these buttons. Blank space in the topmost navigation row drags the window, and double-clicking maximizes or restores it. Buttons, links, inputs, and splitters do not drag the window. The maximize button uses Wails' native hit region for Win11 Snap Layouts. Wails and Windows handle edge resizing, Aero Snap, the maximized work area, shadows, and corners; these require VM verification. Close must call `Window.Close()` to trigger the cancellable `WindowClosing`, sharing the close interception used by Alt+F4 and the taskbar. It must not call the application quit interface. Buttons follow the page's light or dark theme; see §2.2 for their placement.
 
-Window-control initialization allows Wails system information to arrive after the page. Once Windows is confirmed asynchronously, the buttons are added in the current navigation position. First paint does not wait for that information.
+Window-control initialization allows Wails system information to arrive after the page. Once Windows is confirmed asynchronously, the buttons are added in the current navigation position. First paint does not wait for that information; a window that found Windows before (localStorage `window.os`) adds the buttons at once, so they do not take their room from the breadcrumb after the first drawing.
 
 ### 8.3 Security
 

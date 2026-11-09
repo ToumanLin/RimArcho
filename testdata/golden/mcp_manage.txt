@@ -24,6 +24,7 @@ settings
   ui.gpu: on
   ui.icons: compat
   ui.lang: auto
+  ui.motion: auto
   ui.mouse: on
   ui.theme: auto
   updates.auto: on

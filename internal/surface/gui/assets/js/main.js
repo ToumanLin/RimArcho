@@ -145,6 +145,7 @@ async function reaccent() {
   S.start.accent = s.accent;
   S.start.theme = s.theme;
   archoTheme.apply(s.theme);
+  archoTheme.motion(s.motion);
   applyAccent(s.accent);
   setArchoMode(s.archoMotion); // settings › Archo animation (16 §2.14)
 }
@@ -164,7 +165,8 @@ function render() {
 // mods the plan enables; its actions sit at the right end of the line (renderWhere).
 function renderTop() {
   if (!S.board) return;
-  $("#planhead .lead").textContent = Tf("%d enabled, in the order the game loads them", col(1).items.length);
+  // one line (style.css #planhead): a narrow window cuts the lead, its hover keeps it whole
+  $("#planhead .lead").textContent = $("#planhead .lead").title = Tf("%d enabled, in the order the game loads them", col(1).items.length);
 }
 
 // goLaunch is the editor's launch game (and its L): the game starts from Start, so it opens that
@@ -1229,6 +1231,7 @@ async function start() {
   setArchoMode(s.archoMotion);
   bootLive(); // the start-up screen's figure and tip, from 0.21 s (16 §7.1)
   archoTheme.apply(s.theme);
+  archoTheme.motion(s.motion);
   applyAccent(s.accent);
   S.start = s;
   setText(s.text, s.extraText);

@@ -211,6 +211,7 @@ type Start struct {
 	Accent      string            `json:"accent"`
 	Theme       string            `json:"theme"`
 	ArchoMotion string            `json:"archoMotion"`
+	Motion      string            `json:"motion"`
 	Text        map[string]string `json:"text"`
 	ExtraText   map[string]string `json:"extraText,omitempty"`
 	Commands    []view.Command    `json:"commands"`
@@ -224,7 +225,7 @@ func (s *API) Init() *Start {
 	defer perftrace.Span("Init")()
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return &Start{Lang: view.Lang(), Accent: cmds.Setting(s.a, "ui.accent"), Theme: cmds.Setting(s.a, "ui.theme"), ArchoMotion: cmds.Setting(s.a, "ui.archo.motion"), Text: view.Table(), ExtraText: view.ExtraText(), Commands: view.Commands, Version: buildinfo.String(), Ops: view.OpTable()}
+	return &Start{Lang: view.Lang(), Accent: cmds.Setting(s.a, "ui.accent"), Theme: cmds.Setting(s.a, "ui.theme"), ArchoMotion: cmds.Setting(s.a, "ui.archo.motion"), Motion: cmds.Setting(s.a, "ui.motion"), Text: view.Table(), ExtraText: view.ExtraText(), Commands: view.Commands, Version: buildinfo.String(), Ops: view.OpTable()}
 }
 
 // ---- the board ----

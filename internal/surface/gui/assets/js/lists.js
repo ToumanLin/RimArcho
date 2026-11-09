@@ -227,7 +227,7 @@ export function renderRows(k) {
   const layout = listGeometry(c.items,c.view,k,ROW_H);
   pad.style.height = layout.total + "px";
   // the position column is as wide as the longest number, not a fixed gutter
-  if (k === 1) box.style.setProperty("--pw", Math.max(2, String(c.items.length).length) + "ch");
+  if (k === 1) box.style.setProperty("--pw", Math.max(3, String(c.items.length).length) + "ch"); // room for 100s: the names do not move at 99 → 100
   let empty = $(".empty", box);
   if (!c.view.length) {
     if (!empty) box.appendChild(empty = el("div", "empty"));

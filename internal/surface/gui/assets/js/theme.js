@@ -14,8 +14,17 @@
     try { localStorage.setItem("ui.theme", theme); } catch { /* Storage can be disabled. */ }
     update();
   }
-  globalThis.archoTheme = { apply, subscribe: fn => listeners.add(fn) };
+  // ui.motion (16 §2.14): "reduced" stills the window as the system's reduced motion does
+  // (style.css, motion.js still); cached so the first drawing already follows it
+  function motion(value) {
+    root.dataset.motion = value === "reduced" ? "reduced" : "auto";
+    try { localStorage.setItem("ui.motion", root.dataset.motion); } catch { /* Storage can be disabled. */ }
+  }
+  globalThis.archoTheme = { apply, motion, subscribe: fn => listeners.add(fn) };
   try { theme = localStorage.getItem("ui.theme"); } catch { /* Init supplies the saved value. */ }
   apply(theme);
+  let saved = "auto";
+  try { saved = localStorage.getItem("ui.motion"); } catch { /* Init supplies the saved value. */ }
+  motion(saved);
   system.addEventListener("change", update);
 })();

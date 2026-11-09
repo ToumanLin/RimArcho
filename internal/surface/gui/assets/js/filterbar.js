@@ -432,7 +432,9 @@ export function createBar(opts) {
       line.dataset.g = gi;
       vals.forEach((v, vi) => {
         const x = el("button", "fbar-v" + (v.on === 1 ? " on" : v.on === -1 ? " ex" : "") + (v.cur ? " cur" : ""));
-        x.append(el("span", "l", v.label));
+        const l = el("span", "l", v.label);
+        l.dataset.text = v.label; // the bold width, kept whether on or not (style.css)
+        x.append(l);
         if (v.cur) {
           x.append(el("span", "curv", T(g.key === "lists" ? "current list" : "this game")));
         }

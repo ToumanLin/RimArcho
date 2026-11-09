@@ -140,10 +140,10 @@ export async function checkFeedback({ handlers, test, assert, deferred }) {
     await new Promise(r => setTimeout(r, 0));
     assert(document.querySelector('.guide .typed input').getAttribute('aria-invalid') === 'true', 'guide URL error not linked');
     handlers.set('PickPackFile', () => { throw Error('Fixture pack picker failed'); });
-    [...document.querySelectorAll('.guide .typed button')].find(b => b.textContent === 'choose a pack…').click();
+    [...document.querySelectorAll('.guide .way button')].find(b => b.textContent === 'choose a pack…').click();
     await new Promise(r => setTimeout(r, 0));
     assert(!document.querySelector('.guide .typed input').hasAttribute('aria-invalid'), 'pack error marked URL invalid');
-    assert([...document.querySelectorAll('.guide .typed button')].find(b => b.textContent === 'choose a pack…').getAttribute('aria-invalid') === 'true', 'pack picker error not linked');
+    assert([...document.querySelectorAll('.guide .way button')].find(b => b.textContent === 'choose a pack…').getAttribute('aria-invalid') === 'true', 'pack picker error not linked');
   });
   await test('A12: shared import errors follow the selected source control', async () => {
     const exchange = await import('/js/exchange.js');
