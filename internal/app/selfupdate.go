@@ -378,8 +378,7 @@ func (a *App) CleanSelfUpdate() {
 		return
 	}
 	dir := filepath.Join(program, UpdateDirName)
-	entries, err := os.ReadDir(dir)
-	if err != nil {
+	if _, err := os.ReadDir(dir); err != nil {
 		return
 	}
 	if pid := os.Getenv(UpdatedFromEnv); pid != "" {
@@ -396,7 +395,8 @@ func (a *App) CleanSelfUpdate() {
 	if _, err := a.resumeSelfSwap(program, dir); err != nil {
 		return
 	}
-	if entries, err = os.ReadDir(dir); err != nil {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
 		return
 	}
 	for _, e := range entries {

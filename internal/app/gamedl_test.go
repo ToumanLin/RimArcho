@@ -61,6 +61,10 @@ func steamZip(t *testing.T) []byte {
 // 11 §3: SteamCMD is downloaded from Valve only after the player saw the size, into
 // %LOCALAPPDATA%\RimArcho\steamcmd.
 func TestInstallSteamCMD(t *testing.T) {
+	if runtime.GOOS == "linux" {
+		// Linux plan §3 steps 3 and 6: process safety and the SteamCMD installer.
+		t.Skip("Linux tool-process detection and SteamCMD installation are not implemented (plan steps 3, 6)")
+	}
 	t.Parallel()
 	e := testkit.New(t)
 	z := steamZip(t)

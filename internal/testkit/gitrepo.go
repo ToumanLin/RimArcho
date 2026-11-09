@@ -3,6 +3,7 @@ package testkit
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -58,7 +59,13 @@ func (g *GitRepo) Commit(t testing.TB, path, content string) string {
 	if _, err := w.Add(filepath.ToSlash(path)); err != nil {
 		t.Fatal(err)
 	}
-	h, err := w.Commit("update "+path, &git.CommitOptions{Author: &object.Signature{Name: "Tester", Email: "test@example.invalid", When: Start.Add(time.Minute)}})
+	messagePath := path
+	if g.First == "" {
+		// Preserve the initial fixture commit's Windows spelling so its hash
+		// and descendants match the same golden transcript on every OS.
+		messagePath = strings.ReplaceAll(filepath.ToSlash(path), "/", `\`)
+	}
+	h, err := w.Commit("update "+messagePath, &git.CommitOptions{Author: &object.Signature{Name: "Tester", Email: "test@example.invalid", When: Start.Add(time.Minute)}})
 	if err != nil {
 		t.Fatal(err)
 	}

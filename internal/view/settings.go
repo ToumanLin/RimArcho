@@ -278,8 +278,8 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 			Argv:  []string{"config", "set", "ui.archo.motion", "{}"}},
 		{Label: T("motion"), Value: cmds.Setting(a, "ui.motion"), Edit: "segments", Choices: cmds.SettingChoices("ui.motion"),
 			ChoiceLabels: []string{T("follow system"), T("reduced")},
-			Hover: T("reduced keeps the window still: the sidebar, lists, pages and status line change without sliding or fading; follow system uses the Windows animation setting"),
-			Argv:  []string{"config", "set", "ui.motion", "{}"}},
+			Hover:        T("reduced keeps the window still: the sidebar, lists, pages and status line change without sliding or fading; follow system uses the Windows animation setting"),
+			Argv:         []string{"config", "set", "ui.motion", "{}"}},
 	}}, AccountGroup(a), AutomaticGroup(a)}
 
 	// RimArcho's folders, each with relocation controls, then adding a mod folder.

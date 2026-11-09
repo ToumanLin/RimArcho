@@ -2,6 +2,7 @@ package view_test
 
 import (
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -10,6 +11,10 @@ import (
 )
 
 func TestExternalToolsSettings(t *testing.T) {
+	if runtime.GOOS == "linux" {
+		// Linux plan §3 step 3: toolIdle hides removal until process safety exists.
+		t.Skip("Linux tool-process detection is not implemented (plan step 3)")
+	}
 	e, _, _ := shellEnv(t)
 	e.App.SteamCMDNoPath = true
 	path := filepath.Join(e.App.LocalDir(), deps.SteamCMD, "steamcmd.exe")

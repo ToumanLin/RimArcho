@@ -65,10 +65,7 @@ type Project struct {
 	Inherited      []string // Directory.Build.props and imports that contributed, relative to Dir
 }
 
-var (
-	propRe   = regexp.MustCompile(`\$\(([A-Za-z_][A-Za-z0-9_.\-]*)\)`)
-	skipDirs = map[string]bool{"obj": true, "bin": true, ".git": true, ".vs": true, "node_modules": true, ".rimarcho": true}
-)
+var propRe = regexp.MustCompile(`\$\(([A-Za-z_][A-Za-z0-9_.\-]*)\)`)
 
 // node is an XML element, read without a schema: MSBuild files are free-form.
 type node struct {

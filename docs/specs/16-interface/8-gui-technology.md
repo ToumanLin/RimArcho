@@ -15,13 +15,14 @@ The same source tree is linked twice:
 
 - Both executables share the data directory and database and may run together; SQLite WAL supports multiple processes. When the GUI gains focus, it compares `Stamp()` (the database state, `ChangeKey`) and reloads if it changed. An edit from a stale view never overwrites the other process's changes (G8).
 - If an adjacent `RimArcho.exe` exists, `archo gui` starts it and immediately returns. Otherwise, it runs the GUI in the current process.
+- GUI startup is compiled only on Windows (`surface/cli/gui_enabled.go`); other builds return the localized no-window message (13 §4.1). Linux build and test coverage is in 17 §5.
 - Before the window starts, the GUI checks for a WebView2 runtime (86 or later, `accounts.WebView2Installed`). Without one Wails creates no window and only logs, so the process would run unseen; instead a message box says the runtime is missing and where to get it, or, under Wine or Proton (`machine.Wine`), that WebView2 does not run there and `wine archo.exe` in a Linux terminal does. Wine with a WebView2 installed is given its chance. Any other error from starting the window also shows a message box in `RimArcho.exe`.
 - When opening the database runs upgrade steps for longer than 300 ms, `RimArcho.exe` shows a small progress window, which cannot be closed, before the main window; the TUI and CLI write the progress to stderr (04 §4).
 - Releases contain both executables; see 18 for their sizes.
 
 ### 8.2 Frontend
 
-- The GUI uses Wails v3, at the beta version pinned in 17 §7.1. CGO is not required (`CGO_ENABLED=0`).
+- The Windows GUI uses Wails v3, at the beta version pinned in 17 §7.1. CGO is not required (`CGO_ENABLED=0`).
 - The frontend uses plain HTML, CSS, and native JavaScript ES modules. **It has no framework, npm dependency, or build step.** The files are in `internal/surface/gui/assets/`: `index.html`, `style.css`, and `js/`, with one module per area (for example `api.js`, `state.js`, `shell.js`, `lists.js`, `screens.js`, `fulldetail.js`, and `main.js`). They are embedded in the executable with `go:embed`.
 - To call Go, the handwritten `api.js` uses `import { Call } from "/wails/runtime.js"` and `Call.ByName`. A `Proxy` assembles the full method name, `github.com/ToumanLin/RimArcho/internal/surface/gui.API.<method>`. There are no `wails3`-generated bindings; building requires only `go build`.
 - In `internal/surface/gui`, `api.go` provides the Wails service, whose methods only call view; `gui.go` owns the window, the `/preview/` and `/img/` local image handlers, the CSP, and the icon routes; `exchange.go` provides the import and export file dialogs; `Init` sends the interface text (`view.Table`) and the settings the first draw needs (`ui.theme`, `ui.accent`, `ui.archo.motion`); `Tips` sends the usage tips (`view.Tips`). Files under `/archo/` (Archo's figure, 16 §7.1) are served with `Cache-Control: no-cache` and an ETag of the build, so an upgrade never shows an old figure; Wails drops conditional request headers on Windows, so the native window currently fetches them whole each time a figure is created.
