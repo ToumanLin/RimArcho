@@ -8,6 +8,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/csproj"
+	"github.com/ToumanLin/RimArcho/internal/dotnet"
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
@@ -62,7 +63,7 @@ func buildBlock(c *Ctx, root *render.Node, modRoot string, b *app.BuildInfo) {
 			blk.Addf("… %d more projects (read their .csproj files)", len(s.Projects)-maxBuildProjects)
 			break
 		}
-		projectBlock(blk, modRoot, p)
+		projectBlock(blk, modRoot, p, b.Managed)
 	}
 	if b.Dotnet != "" {
 		blk.KV("dotnet", b.Dotnet)
@@ -87,7 +88,7 @@ func relDir(d string) string {
 	return d + "/"
 }
 
-func projectBlock(blk *render.Node, modRoot string, p *csproj.Project) {
+func projectBlock(blk *render.Node, modRoot string, p *csproj.Project, managed string) {
 	rel, err := filepath.Rel(modRoot, p.File)
 	if err != nil {
 		rel = p.File
@@ -157,6 +158,9 @@ func projectBlock(blk *render.Node, modRoot string, p *csproj.Project) {
 		n.KV("unresolved", strings.Join(ps, ", ")+" (set outside the project: an environment variable or dotnet build -p:Name=value)")
 	}
 	n.KV("output", outputLine(p))
+	if l := builtAccessLine(p, managed); l != "" {
+		n.KV("built", l)
+	}
 	if len(p.Inherited) > 0 {
 		n.KV("also read", strings.Join(firstN(p.Inherited, 3), ", "))
 	}
@@ -198,4 +202,72 @@ func firstN(l []string, n int) []string {
 		return l[:n]
 	}
 	return l
+}
+
+// rebuildHint ends a line that finds a DLL the game will refuse (05 §5.4, §5.6).
+const rebuildHint = "Build it with dotnet build and the project's publicizer (guide topic=rebuild), not csc"
+
+// builtAccessLine checks the DLL at the project's output: one that uses non-public game members
+// without skipping verification loads, then throws FieldAccessException or MethodAccessException
+// in the game (05 §5.6). Empty when there is no DLL or nothing to report.
+func builtAccessLine(p *csproj.Project, managed string) string {
+	if p.OutputAbs == "" {
+		return ""
+	}
+	path := filepath.Join(p.OutputAbs, p.DLL())
+	a, err := dotnet.Open(path)
+	if err != nil || a.SkipsVerification() {
+		return ""
+	}
+	refs := a.InaccessibleRefs(asmOpener(p.OutputAbs, managed))
+	if len(refs) == 0 {
+		return ""
+	}
+	var names []string
+	for _, r := range firstN2(refs, 3) {
+		names = append(names, r.Text)
+	}
+	more := ""
+	if len(refs) > 3 {
+		more = fmt.Sprintf(" and %d more", len(refs)-3)
+	}
+	return fmt.Sprintf("!! %s uses %d non-public game %s (%s%s) and does not skip verification: the game throws FieldAccessException / MethodAccessException when it runs that code. %s",
+		p.DLL(), len(refs), plural(len(refs), "member", "members"), strings.Join(names, ", "), more, rebuildHint)
+}
+
+func firstN2(l []dotnet.RefDiff, n int) []dotnet.RefDiff {
+	if len(l) > n {
+		return l[:n]
+	}
+	return l
+}
+
+// asmOpener opens a referenced assembly by name from the first folder that has it; nil when
+// none does. Results are kept.
+func asmOpener(dirs ...string) func(string) *dotnet.Assembly {
+	opened := map[string]*dotnet.Assembly{}
+	return func(name string) *dotnet.Assembly {
+		if x, ok := opened[name]; ok {
+			return x
+		}
+		var x *dotnet.Assembly
+		for _, dir := range dirs {
+			if dir == "" {
+				continue
+			}
+			if y, err := dotnet.Open(filepath.Join(dir, name+".dll")); err == nil {
+				x = y
+				break
+			}
+		}
+		opened[name] = x
+		return x
+	}
+}
+
+func plural(n int, one, many string) string {
+	if n == 1 {
+		return one
+	}
+	return many
 }

@@ -223,7 +223,7 @@ func savesNote(c *Ctx, root *render.Node, st *app.LoadoutState, r *app.LogReport
 	if len(missing) > 1 {
 		which = "which are"
 	}
-	root.KV("saves", fmt.Sprintf("this run loaded %s, %s not in Saves/; a test run cannot reproduce errors that need that save", what, which))
+	root.KV("saves", fmt.Sprintf("this run loaded %s, %s not in Saves/; a test run cannot reproduce errors that need that save, but still shows whether a changed Mod loads and a map starts", what, which))
 }
 
 // noiseNote names the hidden clusters that are known noise (logs.KnownNoise), so that a reader

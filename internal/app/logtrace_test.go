@@ -264,7 +264,8 @@ func TestSourceDiff(t *testing.T) {
 		"assembly diff TraceDiff 1.0.0.0 → TraceDiff 1.1.0.0: 1 changed, 1 added, 0 removed methods (1 unchanged)",
 		"methods changed:",
 		"TraceDiff.Changed::Value(Verse.Pawn)",
-		"Verse.Secret::Hidden()  (Assembly-CSharp; internal, type internal)  !! non-public and no IgnoresAccessChecksTo(Assembly-CSharp)",
+		"Verse.Secret::Hidden()  (Assembly-CSharp; internal, type internal)  !! non-public and the build does not skip verification",
+		"access: !! the new build uses 1 non-public member (Verse.Secret::Hidden()) and does not skip verification:",
 		"~ Assembly-CSharp 1.0.0.0 → 1.1.0.0",
 		"System.ObsoleteAttribute on TraceDiff.Changed::Added (use Value)",
 	} {
