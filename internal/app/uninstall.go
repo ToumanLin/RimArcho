@@ -908,7 +908,7 @@ func (a *App) uninstallItem(step string, it *UninstallItem) error {
 		if step == UnSource {
 			return a.uninstallSource(it.Path)
 		}
-		return a.withIncomingLinks(it.Path, "", func() error { return removeTree(it.Path) })
+		return a.withIncomingLinks(it.Path, "", func() error { return removeModTree(it.Path) })
 	case DoDDS:
 		return a.deleteTexturesIn(it.Path)
 	case DoMove:
@@ -1039,8 +1039,19 @@ func writeSyncFile(path string, b []byte) error {
 // removeTree deletes a folder RimArcho owns. A link inside it is removed as a link; its
 // target is never entered.
 func removeTree(dir string) error {
+	var n int
+	return removeTreeCounted(dir, &n)
+}
+
+// removeTreeCounted is removeTree that counts the entries it removed, so a caller can tell
+// a folder left whole from one left in part.
+func removeTreeCounted(dir string, removed *int) error {
 	if source.IsLink(dir) {
-		return source.RemoveLink(dir)
+		if err := source.RemoveLink(dir); err != nil {
+			return err
+		}
+		*removed++
+		return nil
 	}
 	ents, err := os.ReadDir(dir)
 	if err != nil {
@@ -1055,11 +1066,15 @@ func removeTree(dir string) error {
 		var err error
 		switch {
 		case source.IsLink(p):
-			err = source.RemoveLink(p)
+			if err = source.RemoveLink(p); err == nil {
+				*removed++
+			}
 		case d.IsDir():
-			err = removeTree(p)
+			err = removeTreeCounted(p, removed)
 		default:
-			err = os.Remove(p)
+			if err = os.Remove(p); err == nil {
+				*removed++
+			}
 		}
 		if err != nil && first == nil {
 			first = err
@@ -1068,7 +1083,39 @@ func removeTree(dir string) error {
 	if first != nil {
 		return first
 	}
-	return os.Remove(dir)
+	if err := os.Remove(dir); err != nil {
+		return err
+	}
+	*removed++
+	return nil
+}
+
+// partlyRemovedError is a deletion that failed after removing part of the folder. The link
+// bracket then leaves the game links removed instead of linking a game to what is left
+// (abortLinkLifecycle).
+type partlyRemovedError struct {
+	path string
+	err  error
+}
+
+func (e *partlyRemovedError) Error() string {
+	return fmt.Sprintf("%s was only partly deleted (%v); the game links to it were removed, delete the rest yourself", e.path, e.err)
+}
+
+func (e *partlyRemovedError) Unwrap() error { return e.err }
+
+// removeModTree deletes a Mod folder inside the link bracket: a failure after anything was
+// removed is a partlyRemovedError.
+func removeModTree(path string) error {
+	if info, err := os.Lstat(path); err == nil && info.Mode().IsRegular() {
+		return os.Remove(path)
+	}
+	var n int
+	err := removeTreeCounted(path, &n)
+	if err != nil && n > 0 {
+		return &partlyRemovedError{path: path, err: err}
+	}
+	return err
 }
 
 func removeIfEmpty(dir string) {
