@@ -595,7 +595,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			}
 		case "combo.known-bad":
 			if y != "" {
-				add(Need{Group: GroupConflict, Text: Tf("%s and %s often produce errors together (seen in shared logs)", nm(x), nm(y)), Actions: []Action{disableOne(st, x, y)}, Counted: true, Mods: ids, Status: s,
+				add(Need{Group: GroupConflict, Text: Tf("%s and %s often produce errors together (seen in shared logs)", nm(x), nm(y)), Actions: []Action{disableOne(a, st, x, y)}, Counted: true, Mods: ids, Status: s,
 					Title: Tf("%s and %s often fail together", nm(x), nm(y)), Why: T("in shared logs this pair produces errors far more often than either one alone. Disable one if you see errors."), Evidence: ev})
 			} else {
 				add(Need{Group: GroupConflict, Text: Tf("this version of %s often produces errors (seen in shared logs); other versions did not", nm(x)), Actions: []Action{disable(st, x, Tf("disable %s", nm(x)))}, Counted: true, Mods: ids, Status: s,
@@ -612,7 +612,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 				Actions: []Action{enable(st, y), problemAction(p.Ref)}, Counted: true, Mods: ids, Status: s,
 				Title: Tf("part of %s does not take effect", nm(x)), Why: Tf("it changes things %s adds, and %s is not enabled.", nm(y), nm(y)), Evidence: ev})
 		case "incompat.active":
-			add(Need{Group: GroupConflict, Text: Tf("%s is incompatible with %s", nm(x), nm(y)), Actions: []Action{disableOne(st, x, y)}, Counted: true, Mods: ids, Status: s,
+			add(Need{Group: GroupConflict, Text: Tf("%s is incompatible with %s", nm(x), nm(y)), Actions: []Action{disableOne(a, st, x, y)}, Counted: true, Mods: ids, Status: s,
 				Why: T("one of them says so; with both enabled the game misbehaves. Disable one."), Evidence: ev})
 		case "mod.pinned":
 			add(Need{Group: GroupHidden, Text: Tf("%s is locked to another copy, and the workshop version has been updated since", nm(x)),
@@ -1096,13 +1096,47 @@ func disable(st *app.LoadoutState, tok, label string) Action {
 	return Action{Kind: ActDisable, Key: "space", Label: label, Refs: []string{TokRef(st, tok)}, Done: Tf("disabled %s", TokName(st, tok))}
 }
 
-// disableOne: choose which of two to disable (incompatible mods).
-func disableOne(st *app.LoadoutState, x, y string) Action {
-	nx, ny := TokName(st, x), TokName(st, y)
-	return Action{Kind: ActChooseDisable, Key: "space", Label: T("choose which to disable"), Title: T("disable which one?"), Options: []Option{
-		{Label: Tf("disable %s", nx), Refs: []string{TokRef(st, x)}, Done: Tf("disabled %s", nx)},
-		{Label: Tf("disable %s", ny), Refs: []string{TokRef(st, y)}, Done: Tf("disabled %s", ny)},
-	}}
+// disableOne: choose which of two to disable (incompatible mods). Each option says which
+// enabled mods would be left without a required mod (app.DependentsOf), and the one fewer
+// mods need comes first: disabling a library to settle a conflict breaks everything built
+// on it.
+func disableOne(a *app.App, st *app.LoadoutState, x, y string) Action {
+	type opt struct {
+		o    Option
+		need int
+	}
+	var opts []opt
+	for _, tok := range []string{x, y} {
+		name := TokName(st, tok)
+		o := opt{o: Option{Label: Tf("disable %s", name), Refs: []string{TokRef(st, tok)}, Done: Tf("disabled %s", name)}}
+		if id := finding.InstID(tok); id != "" {
+			if deps, err := a.DependentsOf(st, []string{id}); err == nil && len(deps) > 0 {
+				o.need = len(deps)
+				o.o.Label = Tf("disable %s (%d enabled mods need it: %s)", name, len(deps), modNames(deps, 3))
+				o.o.Done = Tf("disabled %s; %d mods that need it lack it now", name, len(deps))
+			}
+		}
+		opts = append(opts, o)
+	}
+	slices.SortStableFunc(opts, func(p, q opt) int { return p.need - q.need })
+	act := Action{Kind: ActChooseDisable, Key: "space", Label: T("choose which to disable"), Title: T("disable which one?")}
+	for _, o := range opts {
+		act.Options = append(act.Options, o.o)
+	}
+	return act
+}
+
+// modNames: up to n display names, then an ellipsis.
+func modNames(ms []*store.Mod, n int) string {
+	var names []string
+	for _, m := range ms[:min(n, len(ms))] {
+		names = append(names, m.DisplayName())
+	}
+	s := strings.Join(names, ", ")
+	if len(ms) > n {
+		s += ", …"
+	}
+	return s
 }
 
 // keepOne: choose which copy to keep (the same mod enabled twice).

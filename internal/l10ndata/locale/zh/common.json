@@ -278,6 +278,8 @@
   "different values": "不同",
   "disable": "停用",
   "disable %s": "停用 %s",
+  "disable %s (%d enabled mods need it: %s)": "停用 %s（%d 个已启用的 Mod 需要它：%s）",
+  "disabled %s; %d mods that need it lack it now": "停用了 %s；需要它的 %d 个 Mod 现在缺少它",
   "disable which one?": "停用哪一个？",
   "disabled %s": "停用了 %s",
   "do not list as a copy": "不列为副本",

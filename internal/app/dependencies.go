@@ -359,3 +359,63 @@ func (a *App) CompleteDependencies() (*DependencyCompletion, error) {
 	out.Edit = r
 	return out, nil
 }
+
+// DependentsOf lists the enabled mods that would be left without a required mod if the
+// instances ids were disabled, in load order: first those that require one of them (with
+// no other enabled mod or stand-in meeting it), then the mods that require those, and so
+// on. A dependency already missing before does not count.
+func (a *App) DependentsOf(st *LoadoutState, ids []string) ([]*store.Mod, error) {
+	off := map[string]bool{}
+	for _, id := range ids {
+		off[id] = true
+	}
+	var active []*store.Mod
+	seen := map[string]bool{}
+	for _, e := range st.List {
+		if m := st.Ix.ByID[e.Instance]; m != nil && !seen[m.ID] {
+			seen[m.ID] = true
+			active = append(active, m)
+		}
+	}
+	if err := a.Store.LoadDecls(active); err != nil {
+		return nil, err
+	}
+	missing := func(off map[string]bool) map[string][]string {
+		byPkg := map[string][]*store.Mod{}
+		for _, m := range active {
+			if !off[m.ID] {
+				p := dependencyPackage(m.PackageID)
+				byPkg[p] = append(byPkg[p], m)
+			}
+		}
+		ix := a.newDependencyIndex(st, byPkg)
+		out := map[string][]string{}
+		for _, m := range active {
+			if !off[m.ID] {
+				for _, d := range ix.missing(m) {
+					out[m.ID] = append(out[m.ID], d.pkg)
+				}
+			}
+		}
+		return out
+	}
+	base := missing(nil)
+	var out []*store.Mod
+	for {
+		now, more := missing(off), false
+		for _, m := range active {
+			if off[m.ID] {
+				continue
+			}
+			for _, p := range now[m.ID] {
+				if !slices.Contains(base[m.ID], p) {
+					out, off[m.ID], more = append(out, m), true, true
+					break
+				}
+			}
+		}
+		if !more {
+			return out, nil
+		}
+	}
+}
