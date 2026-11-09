@@ -58,7 +58,7 @@ func TestAccentStartupAndSettings(t *testing.T) {
 	if got := api.Init().Accent; got != "default" {
 		t.Fatalf("startup accent: %q", got)
 	}
-	for _, value := range []string{"blue", "amber", "default"} {
+	for _, value := range []string{"blue", "amber", "#3a7bd5", "default"} {
 		if _, err := api.ApplySetting([]string{"config", "set", "ui.accent", "{}"}, value); err != nil {
 			t.Fatal(err)
 		}

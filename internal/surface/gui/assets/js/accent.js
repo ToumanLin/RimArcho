@@ -87,29 +87,136 @@ export const scales = {
   }
 };
 
+// ---- colour arithmetic (OKLCH, WCAG contrast) ----
+
+export const isHex = v => typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v);
+const channel = c => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+const gamma = c => c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055;
+const linear = hex => [1, 3, 5].map(i => channel(parseInt(hex.slice(i, i + 2), 16) / 255));
+
+export function hexToOklch(hex) {
+  const [r, g, b] = linear(hex);
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  const L = 0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s;
+  const A = 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s;
+  const B = 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s;
+  return [L, Math.hypot(A, B), (Math.atan2(B, A) * 180 / Math.PI + 360) % 360];
+}
+
+function oklchToLinear(L, C, H) {
+  const a = C * Math.cos(H * Math.PI / 180), b = C * Math.sin(H * Math.PI / 180);
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (L - 0.0894841775 * a - 1.2914855480 * b) ** 3;
+  return [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s];
+}
+
+// oklchToHex keeps lightness and hue and lowers chroma until the colour fits sRGB.
+export function oklchToHex(L, C, H) {
+  L = Math.min(1, Math.max(0, L));
+  const fits = c => oklchToLinear(L, c, H).every(v => v >= -1e-4 && v <= 1 + 1e-4);
+  if (!fits(C)) {
+    let lo = 0, hi = C;
+    for (let n = 0; n < 20; n++) { const mid = (lo + hi) / 2; if (fits(mid)) lo = mid; else hi = mid; }
+    C = lo;
+  }
+  return "#" + oklchToLinear(L, C, H).map(v => Math.round(Math.min(1, Math.max(0, gamma(v))) * 255).toString(16).padStart(2, "0")).join("");
+}
+
+const luminance = hex => { const [r, g, b] = linear(hex); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+export function contrast(a, b) {
+  const x = luminance(a), y = luminance(b);
+  return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+}
+
+// The surfaces accent text sits on in each theme (style.css --card and --pill); text uses
+// step 11 (16 §7.4) and must reach 4.5:1 on the worse of them.
+const surfaces = { light: ["#ffffff", "#f1f1f4"], dark: ["#232327", "#2d2d33"] };
+const textContrast = (hex, mode) => Math.min(...surfaces[mode].map(bg => contrast(hex, bg)));
+
+// ---- a custom accent: one #rrggbb colour ----
+
+// customScales derives the light and dark 12-step scales from one colour. The named scale
+// nearest in hue gives each step's lightness and relative chroma; the colour's own hue is
+// kept throughout and step 9 is the colour itself. Step 11 moves away from the surface until
+// it reads at 4.5:1 there.
+const templates = {};
+const customCache = new Map();
+function template(name) {
+  return templates[name] ??= {
+    light: scales[name].light.map(hexToOklch),
+    dark: scales[name].dark.map(hexToOklch),
+  };
+}
+function nearestScale(H, C) {
+  if (C < 0.02) return "indigo";
+  let best = "indigo", gap = 360;
+  for (const name of Object.keys(scales)) {
+    const d = Math.abs(((template(name).light[8][2] - H + 540) % 360) - 180);
+    if (d < gap) { gap = d; best = name; }
+  }
+  return best;
+}
+export function customScales(value) {
+  const hex = value.toLowerCase();
+  if (customCache.has(hex)) return customCache.get(hex);
+  const [L, C, H] = hexToOklch(hex);
+  const t = template(nearestScale(H, C));
+  const out = {};
+  for (const mode of ["light", "dark"]) {
+    const steps = t[mode], k = Math.min(1.5, C / Math.max(steps[8][1], 1e-3));
+    const scale = steps.map(([l, c]) => oklchToHex(l, c * k, H));
+    scale[8] = hex;
+    scale[9] = oklchToHex(mode === "light" ? L - 0.035 : L + 0.04, C, H);
+    let l11 = steps[10][0];
+    const dir = mode === "light" ? -0.01 : 0.01;
+    while (textContrast(scale[10] = oklchToHex(l11, steps[10][1] * k, H), mode) < 4.5 && l11 > 0 && l11 < 1) l11 += dir;
+    out[mode] = scale;
+  }
+  // Text on the light fill (step 9): white unless it reads poorly and dark text reads better.
+  const white = contrast("#ffffff", hex);
+  out.fg = white >= 3 || white >= contrast(out.light[11], hex) ? "#ffffff" : out.light[11];
+  customCache.set(hex, out);
+  return out;
+}
+
+// accentPalette is the light and dark scales and the light fill's text colour of a named or
+// custom accent; null for default and unknown values.
+export function accentPalette(value) {
+  if (isHex(value)) return customScales(value);
+  if (typeof value !== "string" || !Object.hasOwn(scales, value)) return null;
+  const palette = scales[value];
+  // Amber is the only bright solid-fill scale offered here (Radix also names yellow,
+  // lime, mint and sky); white text cannot read against its light step 9.
+  return { light: palette.light, dark: palette.dark, fg: value === "amber" ? palette.light[11] : "#ffffff" };
+}
+
 let selected = "default";
 const properties = ["--accent", "--accent-soft", "--sel", "--accent-fg",
   ...Array.from({ length: 12 }, (_, i) => `--accent-${i + 1}`),
   "--accent-dark-1", "--accent-dark-3", "--accent-dark-5", "--accent-dark-11"];
 
 export function applyAccent(value) {
-  selected = Object.hasOwn(scales, value) ? value : "default";
+  const palette = accentPalette(value);
+  selected = palette ? (isHex(value) ? value.toLowerCase() : value) : "default";
   const root = document.documentElement, style = root.style;
-  if (selected === "default") {
+  if (!palette) {
     delete root.dataset.accent;
     properties.forEach(name => style.removeProperty(name));
     return;
   }
-  root.dataset.accent = selected;
-  const dark = document.documentElement.dataset.scheme === "dark", palette = scales[selected];
+  root.dataset.accent = isHex(selected) ? "custom" : selected;
+  const dark = document.documentElement.dataset.scheme === "dark";
   const steps = palette[dark ? "dark" : "light"];
   steps.forEach((hex, i) => style.setProperty(`--accent-${i + 1}`, hex));
   style.setProperty("--accent", steps[dark ? 10 : 8]);
   style.setProperty("--accent-soft", steps[2]);
   style.setProperty("--sel", steps[dark ? 4 : 3]);
-  // Amber is the only bright solid-fill scale offered here (Radix also names yellow,
-  // lime, mint and sky); white text cannot read against its light step 9.
-  style.setProperty("--accent-fg", dark ? steps[0] : selected === "amber" ? steps[11] : "#ffffff");
+  style.setProperty("--accent-fg", dark ? steps[0] : palette.fg);
   // Photo backdrops always use dark colours, including when the page theme is light.
   for (const step of [1, 3, 5, 11]) style.setProperty(`--accent-dark-${step}`, palette.dark[step - 1]);
 }

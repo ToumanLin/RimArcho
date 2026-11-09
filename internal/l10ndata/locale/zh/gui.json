@@ -295,5 +295,14 @@
   "checking the files of %s: %s": "正在检查 %s 的文件：%s",
   "reading the mods of %s: %d of %d": "正在读取 %s 的 Mod：%d / %d",
   "saving the %d mods read from %s…": "正在保存读到的 %d 个 Mod（%s）…",
-  "adding Archo Monitor to %s: %d of %d": "正在把 Archo Monitor 加入 %s：%d / %d"
+  "adding Archo Monitor to %s: %d of %d": "正在把 Archo Monitor 加入 %s：%d / %d",
+  "colour": "颜色",
+  "colour wheel": "色轮",
+  "hex colour": "十六进制颜色",
+  "hue %d°, saturation %d": "色相 %d°，饱和度 %d",
+  "hue and saturation": "色相和饱和度",
+  "lightness": "亮度",
+  "new colour %s": "新颜色 %s",
+  "preset colours": "预设颜色",
+  "use colour": "用这个颜色"
 }
