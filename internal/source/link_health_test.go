@@ -71,7 +71,9 @@ func TestCheckedRemoveRefusesReplacement(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := source.RemoveLink(link); err != nil {
+			// Keep the old inode allocated: Unix may otherwise reuse it for
+			// the replacement, making this a different (inode reuse) case.
+			if err := os.Rename(link, filepath.Join(root, "previous-link")); err != nil {
 				t.Fatal(err)
 			}
 			switch kind {

@@ -81,7 +81,7 @@ func TestCopyLocal(t *testing.T) {
 	if out := e.MustRun("copy-local", orig); !strings.Contains(out, "123456_local2") {
 		t.Fatalf("an existing folder must not be overwritten:\n%s", out)
 	}
-	if _, code := e.Run("copy-local", orig, "--name", `..\up`); code != 1 {
+	if _, code := e.Run("copy-local", orig, "--name", ".."+string(filepath.Separator)+"up"); code != 1 {
 		t.Fatal("--name must be a plain folder name")
 	}
 }
