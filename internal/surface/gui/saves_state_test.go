@@ -102,6 +102,23 @@ func TestSavesRunUnreadable(t *testing.T) {
 	}
 }
 
+// A child that failed on its own after a save it could not read (its "error:" line, such
+// as the database failing while it tidies) ends the run failed, not done.
+func TestSavesRunFatalAfterUnreadable(t *testing.T) {
+	e, api, events := fixture(t)
+	lists, news := savesDrain(events)
+	e.WriteSave("Landing.rws", testkit.SaveSpec{Mods: []string{"ludeon.rimworld"}, ModTime: e.Now().Add(-time.Hour)})
+	api.saves.runner = func(_ context.Context, _ []string, progress func(string)) error {
+		progress("progress: saves 1/1 sv:abcdef Landing/Landing\nprogress: saves-failed sv:abcdef read Landing.rws: the device is not ready")
+		return &app.SavesIndexError{Err: errors.New("exit status 1"), Why: "database is locked", Fatal: true}
+	}
+	awaitListingOf(t, api, lists, 1)
+	end := awaitNews(t, news, "the run's end", func(ev SavesReadEvent) bool { return ev.Done })
+	if end.Error == "" || !strings.Contains(end.Error, "database is locked") {
+		t.Fatalf("end %+v", end)
+	}
+}
+
 // A save whose read failed and is unchanged since is not counted as unread: no run starts
 // on every visit, and the right card says why it could not be read.
 func TestSavesStoredFailure(t *testing.T) {

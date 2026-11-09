@@ -1075,6 +1075,11 @@ func savesIndex(c *Ctx, a *Args) (*render.Doc, error) {
 		if pruned, err = c.App.PruneSaveCache(l); err != nil {
 			return nil, err
 		}
+		// names settle against the saves as just read: before the read, a save changed
+		// since its last one is grouped by file name, not by its world
+		if l, err = c.App.ListSaves(); err != nil {
+			return nil, err
+		}
 		if _, err = c.App.SettleColonyNames(l); err != nil {
 			return nil, err
 		}

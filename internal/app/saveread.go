@@ -427,15 +427,18 @@ func ChildSavesIndexContext(ctx context.Context, exe, home string, first []strin
 		if errLine != "" {
 			why = errLine
 		}
-		return &SavesIndexError{Err: err, Why: why}
+		return &SavesIndexError{Err: err, Why: why, Fatal: errLine != ""}
 	}
 	return nil
 }
 
 // SavesIndexError is a failed `archo saves index` child: its exit and its own words.
+// Fatal: it ended on an "error:" line (the run itself failed), not only on saves it
+// could not read, which it lists and exits non-zero for.
 type SavesIndexError struct {
-	Err error
-	Why string
+	Err   error
+	Why   string
+	Fatal bool
 }
 
 func (e *SavesIndexError) Error() string {

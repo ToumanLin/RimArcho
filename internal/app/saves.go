@@ -296,9 +296,9 @@ func (a *App) RenameColony(c *Colony, name string) error {
 
 // SettleColonyNames tidies the stored colony names against a listing (12 §4.1): a name a
 // world colony takes from a file-name key moves to the colony's own key, and a name no
-// listed colony answers to is removed when its folder was read (a folder that is missing
-// for now, such as on a drive not plugged in, keeps its names). It returns how many keys
-// it removed.
+// listed colony answers to is removed when its folder was read and all its saves have a
+// full read (a folder that is missing for now, such as on a drive not plugged in, keeps
+// its names). It returns how many keys it removed.
 func (a *App) SettleColonyNames(l *SaveList) (int, error) {
 	names, err := a.Store.ColonyNames()
 	if err != nil || len(names) == 0 {
@@ -334,13 +334,21 @@ func (a *App) SettleColonyNames(l *SaveList) (int, error) {
 		}
 		removed += len(drop)
 	}
+	// A save without a full read groups by its file name, so its world colony answers to
+	// nothing yet: a folder with such a save keeps every name until its saves are read.
+	unread := map[*SaveFolder]bool{}
+	for _, s := range l.Saves() {
+		if s.Summary == nil {
+			unread[s.Folder] = true
+		}
+	}
 	var dead []string
 	for k := range names {
 		if answered[k] {
 			continue
 		}
 		for _, f := range l.Folders {
-			if f.Listed && strings.HasPrefix(k, env.PathKey(f.Dir)+"|") {
+			if f.Listed && !unread[f] && strings.HasPrefix(k, env.PathKey(f.Dir)+"|") {
 				dead = append(dead, k)
 				break
 			}

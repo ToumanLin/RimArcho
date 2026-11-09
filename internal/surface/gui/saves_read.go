@@ -226,9 +226,10 @@ func (s *API) startSavesIndex(l *app.SaveList, first string, visit uint64) {
 		}
 		// The child exits with an error when a save could not be read; each such save
 		// was named on its own line and its failure is stored, so the run itself did
-		// its work: it ends done, saying how many could not be read and why.
+		// its work: it ends done, saying how many could not be read and why. A child that
+		// failed on its own (its "error:" line) still ends failed.
 		var child *app.SavesIndexError
-		if failed > 0 && errors.As(err, &child) {
+		if failed > 0 && errors.As(err, &child) && !child.Fatal {
 			err = nil
 		}
 		ev := &SavesReadEvent{Done: true}

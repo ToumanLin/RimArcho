@@ -236,6 +236,23 @@ func TestColonyNamesFollowTheColony(t *testing.T) {
 	if c := colonyOf(list(), "Rim 1"); c.Name != "North" {
 		t.Fatalf("after settling: %+v", c)
 	}
+	// The colony saved again: until the full read its saves group by file name, so no listed
+	// colony answers to the world key, yet the name stays (a listing taken before the read,
+	// or a parser bump that unreads every save, must not drop it).
+	w1.ModTime, w1.Ticks = now.Add(-3*time.Hour), 130000
+	e.WriteSave("Rim 1.rws", w1)
+	w1.ModTime, w1.Ticks = now.Add(-2*time.Hour), 140000
+	e.WriteSave("Rim 2.rws", w1)
+	if _, err := e.App.SettleColonyNames(list()); err != nil {
+		t.Fatal(err)
+	}
+	if names, _ := e.App.Store.ColonyNames(); len(names) != 1 {
+		t.Fatalf("settled against saves not read yet: %v", names)
+	}
+	e.MustRun("saves", "index")
+	if c := colonyOf(list(), "Rim 1"); c.Name != "North" || c.By != "world" {
+		t.Fatalf("after saving again and saves index: %+v", c)
+	}
 	// its saves gone, the name goes too
 	for _, f := range []string{"Rim 1.rws", "Rim 2.rws"} {
 		if err := os.Remove(filepath.Join(e.SavesDir(), f)); err != nil {
