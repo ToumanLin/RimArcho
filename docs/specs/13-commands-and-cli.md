@@ -193,7 +193,7 @@ next:
 | Syntax | Effect |
 | --- | --- |
 | `archo` (no arguments), `archo tui` | Open the TUI in the current terminal. Double-clicking `archo.exe` uses the Windows default terminal (16 §9.2). `archo --here` does the same. |
-| `archo gui` | Open the desktop window (16 §8.1). A build without the GUI returns an error explaining that this build has no window and the text interface (`archo`) has the same features. |
+| `archo gui` | Open the desktop window (16 §8.1). Delegate to the adjacent `RimArcho.exe` and return immediately if it exists; otherwise run in-process. A build without the GUI returns an error explaining that this build has no window and the text interface (`archo`) has the same features. |
 | `archo mcp [--tools core\|all]` | Run the stdio MCP server (14) with the core tools (default) or all tools (14 §1). |
 | `archo <command> [arguments]` | Execute one command and exit. |
 | `--env <name>` / `--env=<name>` | Use another environment for this command only. |

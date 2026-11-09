@@ -10,25 +10,29 @@ import (
 	"syscall"
 )
 
-// A separate process group keeps cancellation scoped to this invocation and
-// its updater children, without signalling the terminal that launched archo.
+// A hidden run gets its own process group, so cancellation reaches its updater
+// children without signalling the terminal that launched archo. An interactive
+// run stays in archo's group: a background group that reads the terminal is
+// stopped by SIGTTIN, so a login prompt would hang.
 func startWorkshopCMD(exe string, args []string, console bool) (SteamCMDProc, error) {
 	cmd := exec.Command(exe, args...)
 	cmd.Dir = filepath.Dir(exe)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	if console {
 		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	} else {
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	}
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
-	return &workshopProcess{Cmd: cmd}, nil
+	return &workshopProcess{Cmd: cmd, group: !console}, nil
 }
 
 type workshopProcess struct {
 	*exec.Cmd
-	mu   sync.Mutex
-	done bool
+	group bool // the process leads its own group
+	mu    sync.Mutex
+	done  bool
 }
 
 func (p *workshopProcess) Wait() error {
@@ -44,6 +48,9 @@ func (p *workshopProcess) KillTree() error {
 	defer p.mu.Unlock()
 	if p.done {
 		return os.ErrProcessDone
+	}
+	if !p.group {
+		return p.Process.Kill()
 	}
 	return syscall.Kill(-p.Process.Pid, syscall.SIGKILL)
 }
