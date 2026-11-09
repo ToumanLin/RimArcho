@@ -60,6 +60,10 @@ function applyNav() {
   app.classList.toggle("nav-top", layout === "top");
   app.classList.toggle("nav-side", layout === "side");
   placeWindowControls(layout);
+  // RimArcho's update button (16 §2.1): on Settings' row at the side, before background
+  // tasks at the top; moved, not styled, so the tab order follows what is seen
+  const up = $("#self-update");
+  if (up) $(".side-foot").insertBefore(up, layout === "top" ? $("#tasks-line") : null);
   const t = $("#navtoggle");
   t.title = (layout === "side" ? T("navigation at the top") : T("navigation at the side")) + T("; ") + "ctrl+b";
   slideNav($("#nav"), true);

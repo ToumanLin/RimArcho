@@ -184,7 +184,21 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .nav-kid.on { color: var(--fg); font-weight: 600; }
 .kid-hl { position: absolute; left: 0; top: 0; z-index: 0; border-radius: var(--r-sm); background: color-mix(in srgb, var(--fg) 6.5%, transparent); opacity: 0; pointer-events: none; transition: transform var(--t-layout) var(--ease), opacity var(--t-press); will-change: transform; }
 .side-foot .nav-item.on { background: var(--card); box-shadow: var(--seg-edge); }
-.side-foot { flex: none; padding: 8px 10px 10px; border-top: var(--hairline) solid var(--line-2); display: flex; flex-direction: column; gap: 6px; }
+.side-foot { flex: none; padding: 8px 10px 10px; border-top: var(--hairline) solid var(--line-2); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 0; }
+.side-foot > * { grid-column: 1 / -1; }
+/* RimArcho's update (16 §2.1): an accent pill on Settings' row, or before background tasks
+   at the top (shell.js moves it); its × shows on hover, as the launch page's note's does */
+.side-foot > #nav-settings { grid-column: 1; }
+.side-foot > .self-update { grid-column: 2; align-self: center; margin-left: 6px; }
+.self-update { position: relative; display: flex; align-items: center; }
+.self-update .su-go { height: 24px; display: inline-flex; align-items: center; gap: 4px; padding: 0 11px 0 8px; border-radius: 999px; color: var(--accent-fg); background: var(--accent); font-size: 12px; font-weight: 600; white-space: nowrap; transition: filter var(--t-press); }
+.self-update .su-go:hover { filter: brightness(1.08); }
+.self-update .su-go .ic { display: inline-flex; }
+.self-update .su-go svg.i { width: 12px; height: 12px; stroke-width: 2; }
+.self-update .su-x { position: absolute; top: -6px; right: -6px; width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; color: var(--bg); background: var(--muted); box-shadow: 0 0 0 2px var(--bg); opacity: 0; transition: opacity var(--t-press), background var(--t-press); }
+.self-update .su-x svg.i { width: 10px; height: 10px; stroke-width: 2; }
+.self-update:hover .su-x, .self-update .su-x:focus-visible { opacity: 1; }
+.self-update .su-x:hover { background: var(--fg-2); }
 /* the navigation at the top (16 §2.1): the same entries as one strip over the page. The
    toggle ends it on the left; the groups are thin separators; an entry's sub-entries are a
    dropdown from its chevron (↓ on the keyboard); settings at the right
@@ -199,7 +213,8 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 #app.nav-top .nav-item .ic, #app.nav-top .nav-item .chev { display: none; }
 #app.nav-top .nav-item .badge-n { margin: 0 -4px 0 2px; }
 #app.nav-top .kids-wrap { display: none; }
-#app.nav-top .side-foot { flex-direction: row; align-items: center; gap: 4px; padding: 0; border-top: 0; }
+#app.nav-top .side-foot { display: flex; flex-direction: row; align-items: center; gap: 4px; padding: 0; border-top: 0; }
+#app.nav-top .side-foot > .self-update { margin: 0 4px 0 0; }
 #app.nav-top .side-foot .nav-item { width: auto; }
 #app.nav-top .side-foot .nav-item .ic { display: inline-flex; }
 #app.nav-top .side-foot .nav-item .lbl { display: none; }
@@ -2522,7 +2537,7 @@ select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-s
 .pm-field > .choice-control { width: 100%; }
 
 /* Uninstall owns the page until its report (16 §2.14). */
-.uninstall-exclusive :is(#nav, #nav-settings, #tasks-line) { pointer-events: none; opacity: .45; }
+.uninstall-exclusive :is(#nav, #nav-settings, #tasks-line, #self-update) { pointer-events: none; opacity: .45; }
 .uninstall-exclusive #crumbs, .uninstall-exclusive #env, .uninstall-exclusive #hints { pointer-events: none; }
 .uninstall-exclusive #hints { visibility: hidden; }
 .un-progress-page { width: min(640px, 100%); margin-inline: auto; padding: 0 20px 24px; min-height: 65vh; justify-content: center; }

@@ -215,7 +215,7 @@ async function run(choice) {
 function exclusive() {
   const lock = locked();
   document.body.classList.toggle("uninstall-exclusive", lock);
-  for (const selector of ["#nav", "#navtoggle", "#nav-settings", "#tasks-line", "#side-split", "#crumbs", "#env", "#hints", "#planhead"]) {
+  for (const selector of ["#nav", "#navtoggle", "#nav-settings", "#tasks-line", "#self-update", "#side-split", "#crumbs", "#env", "#hints", "#planhead"]) {
     const node = $(selector);
     if (node) node.inert = lock;
   }

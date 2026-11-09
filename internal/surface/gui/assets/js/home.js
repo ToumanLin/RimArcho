@@ -16,6 +16,7 @@ import { launchPack } from "./packs.js";
 import { withEnvironmentSwitch } from "./environment.js";
 import { places, slideFrom } from "./motion.js";
 import { memoryConfirm } from "./popups.js";
+import { goSelfUpdate } from "./selfupdate.js";
 
 let ui = null;
 export function initHome(u) {
@@ -573,14 +574,6 @@ function activity() {
   // a new RimArcho (17 §5.1): opens its row in settings, where it is installed
   if (data.update) box.append(actLine(data.update.title, data.update.text, goSelfUpdate));
   return box;
-}
-
-async function goSelfUpdate() {
-  await ui.go("settings");
-  const row = document.querySelector('[data-setting-action="update"]')?.closest("[data-setting-row]")
-    || document.querySelector('[data-setting-action="update --check"]')?.closest("[data-setting-row]");
-  row?.scrollIntoView({ block: "center" });
-  row?.querySelector("button")?.focus({ preventScroll: true });
 }
 
 function actLine(title, text, go) {

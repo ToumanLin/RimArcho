@@ -11,6 +11,14 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
+// SelfUpdateLine is the release waiting to be installed, for the navigation's update
+// button (16 §2.1), or nil. It reads only the last check's record (17 §5.1).
+func (s *API) SelfUpdateLine() *view.SelfUpdateLine {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return view.SelfUpdateHome(s.a)
+}
+
 // runSelfCheck is settings' "check for updates" (17 §5.1): recorded like the automatic check.
 func (s *API) runSelfCheck(a *app.App) (string, error) {
 	ran, err := a.RunAutomaticNow(s.branchCtx, "self")

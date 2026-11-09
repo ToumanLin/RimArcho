@@ -35,6 +35,7 @@ import * as packsPage from "./packs.js";
 import * as planManage from "./planmanage.js";
 import * as tex from "./textures.js";
 import * as tasksPage from "./tasks.js";
+import * as selfUpdate from "./selfupdate.js";
 import { refreshBackgrounds } from "./bg.js";
 import { environmentReason, withEnvironmentSwitch } from "./environment.js";
 import { wireSeparator } from "./separator.js";
@@ -135,6 +136,7 @@ async function relang() {
   else if (screen === "library") await library.relang();
   else if (screen && screen !== "guide" && screen !== "tasks") await openPage(screen);
   await tasksPage.relang();
+  selfUpdate.draw();
   S.bar.showGhost(); // the editor's bar: its placeholder in the new language
   if (screen) $("#screen").scrollTop = top;
   render();
@@ -1253,6 +1255,7 @@ async function start() {
   plans.initPlans(ui);
   library.initLibrary(ui);
   tasksPage.initTasks(ui);
+  selfUpdate.initSelfUpdate(ui);
   savesPage.initSaves(ui);
   S.bar = createBar({ data: () => S.barData, change: () => barChanged(), splitKey: "ui.gui.filter.split:plan",
     column: () => $("#board > .fcol"), resized: () => renderRows(0), leave: () => focusArea(lastList < 2 ? lastList : 1),
