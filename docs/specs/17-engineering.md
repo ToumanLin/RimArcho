@@ -310,7 +310,7 @@ Basis: ilspycmd decompilation of 1.7.4982 `Assembly-CSharp.dll`, covering `Verse
 - **Parsing pipeline**: up to 8 workers turn files into events with `encoding/xml`, retaining at most twice the worker count in files; build documents sequentially in load order.
 - **defName/@Name index fast path is mandatory** (otherwise the 30-second target is unreachable); invalidation rules: `spikes/xpathcompat/index.go`.
 - **Child process**: `debug.SetMemoryLimit(300 MiB)`.
-- **Freshness**: `AnalysisKey` hashes analyzer version, game major/minor, each included Instance's ID, snapshot hash and position. User/community rules do not enter the key (they affect only the dynamically computed declaration layer). Included Instances = enabled list + all live, loadable, disabled Instances (the latter build only Def facts as `target-inactive` providers).
+- **Freshness**: `AnalysisKey` hashes analyzer version, Def content version, game major/minor, each included Instance's ID, snapshot hash and position. User/community rules do not enter the key (they affect only the dynamically computed declaration layer). Included Instances = enabled list + all live, loadable, disabled Instances (the latter build only Def facts as `target-inactive` providers).
 - **Storage**: analysis slots, content sets and reference cleanup: 05 §3 (`store.SaveAnalysis`, `store.PruneFacts`); log attribution reports and file reference indexes: 06 §5.
 - **Per-plan analysis caching**: results are cached by the fingerprint of the enabled set, several at a time; switching plans does not evict the others (05 §3).
 

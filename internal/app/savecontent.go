@@ -129,7 +129,7 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 			seen[inst] = true
 			name := sv.Head.Name(i)
 			if m := st.Ix.ByID[inst]; m != nil {
-				name = m.Name
+				name = m.DisplayName()
 				active[normPkg(m.PackageID)] = true
 			}
 			mods = append(mods, SaveMod{Name: name, PackageID: pkg, Instance: inst, Library: inst})
@@ -228,12 +228,25 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 			}
 		}
 	}
+	// One name per category of a Mod: Defs of several types sharing a name (a skill and a
+	// work type both called Mining) are listed once, with the most uses.
 	byMod := map[string]map[string][]SaveContentName{}
+	at := map[string]int{}
 	for _, e := range entries {
 		inst := e.node.fact.Instance
 		if byMod[inst] == nil {
 			byMod[inst] = map[string][]SaveContentName{}
 		}
+		id := inst + "|" + e.key + "|" + e.name
+		if i, ok := at[id]; ok {
+			n := &byMod[inst][e.key][i]
+			n.Uses = max(n.Uses, e.uses)
+			n.Hidden = n.Hidden || e.hidden
+			n.Inferred = n.Inferred && e.inferred
+			n.Unclassified = n.Unclassified && e.unknown
+			continue
+		}
+		at[id] = len(byMod[inst][e.key])
 		byMod[inst][e.key] = append(byMod[inst][e.key], SaveContentName{Name: e.name, Uses: e.uses, Hidden: e.hidden, Inferred: e.inferred, Unclassified: e.unknown})
 	}
 	totals := map[string]*SaveContentCategory{}
@@ -313,6 +326,8 @@ func generatedCategory(name, key, typ string) (string, string) {
 		return "terrain", "TerrainDef"
 	case strings.HasPrefix(name, "Techprint_"), strings.HasPrefix(name, "Meat_"), strings.HasPrefix(name, "Psytrainer_"), strings.HasPrefix(name, "Neurotrainer_"):
 		return "items", "ThingDef"
+	case strings.HasPrefix(name, "Aptitude"), strings.HasPrefix(name, "ChemicalDependency_"), strings.HasPrefix(name, "Addiction"):
+		return "xenotypes", "GeneDef"
 	}
 	return key, typ
 }
@@ -323,8 +338,10 @@ func generatedBaseType(name string) string {
 		return "ResearchProjectDef"
 	case strings.HasPrefix(name, "Psytrainer_"):
 		return "AbilityDef"
-	case strings.HasPrefix(name, "Neurotrainer_"):
+	case strings.HasPrefix(name, "Neurotrainer_"), strings.HasPrefix(name, "Aptitude"):
 		return "SkillDef"
+	case strings.HasPrefix(name, "ChemicalDependency_"), strings.HasPrefix(name, "Addiction"):
+		return "ChemicalDef"
 	default:
 		return "ThingDef"
 	}

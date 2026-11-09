@@ -65,7 +65,7 @@ Assemblies use a separate key, `analyze.AssemblyKey`: the snapshot hash, the rel
 - Tests inject an in-process runner (`InProcessAnalyze`).
 - **Wait limit**: the default `App.AnalyzeWait` for each entry point is in 16 §2.16.1 W01; the CLI has no limit. On timeout, return the declaration findings with "still computing in the background". The subprocess continues, and the next call retrieves its results. Meanwhile, def, patches, and harmony use the previous, stale results.
 
-**AnalysisKey (freshness)**. Hash the analyzer version, the game major.minor version, and each included Instance's ID, snapshot hash, and position in the plan. Use the first 24 hexadecimal characters. User and community rules are excluded because they affect only the on-demand declarations. Computing the key is cheap and does not require loading the declarations.
+**AnalysisKey (freshness)**. Hash the analyzer version, the Def content version (`analyze.DefContentVersion`: a change to the stored content fields alone runs the analysis again), the game major.minor version, and each included Instance's ID, snapshot hash, and position in the plan. Use the first 24 hexadecimal characters. User and community rules are excluded because they affect only the on-demand declarations. Computing the key is cheap and does not require loading the declarations.
 
 **Included Instances**. Include the analyzed plan's enabled list and all other live, loadable, disabled Instances. Loadable Instances include `Mods` already visible to the game and SteamCMD or other-folder `Mods` that can be deployed through links on save. Extract only `Def` facts from disabled Instances, for `target-inactive` (§4.4) and for log queries about who provides a missing `Def`. Harmony reads only enabled Instances.
 

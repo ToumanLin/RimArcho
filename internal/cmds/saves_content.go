@@ -52,7 +52,11 @@ func addSaveContent(root *render.Node, c *app.SaveContentResult, all bool, ref s
 		root.KV("source not found", render.Plural(c.Unknown.Count, "name"))
 	}
 	if len(c.Unchecked) > 0 {
-		root.KV("not analysed", strings.Join(c.Unchecked, ", "))
+		names := c.Unchecked
+		if !all && len(names) > 6 {
+			names = append(names[:6:6], fmt.Sprintf("and %d more (--all)", len(c.Unchecked)-6))
+		}
+		root.KV("not analysed", strings.Join(names, ", "))
 	}
 	n := root.Add("limits:")
 	for _, text := range app.ContentLimits {

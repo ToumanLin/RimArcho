@@ -102,7 +102,7 @@ The selected-save catalog (`App.SaveContent`) uses these ordered categories. Eac
 | `mechanoids` | Race flesh type is Mechanoid | Humanlike takes precedence |
 | `creatures` | Other races | Entities, drones, other ToolUser/nonorganic races. A PawnKindDef is not content of its own: it counts as its race (the race ThingDef it names, through its parents), attributed to the race's Mod; a kind whose race is not found stays itself under `other` |
 | `buildings` | Artificial building | category Building, excluding natural/resource rock |
-| `weapons` | Item with verbs or tools, without apparel | Tools-only weapons count; inherited lists and resets matter |
+| `weapons` | Item with verbs or tools, without apparel | Tools-only weapons count; inherited lists and resets matter. This is `ThingDef.IsWeapon`: wood, beer and tusks have tools and `equipmentType` Primary in 1.6, so they count as weapons |
 | `apparel` | Nonnull apparel block | Apparel with verbs remains apparel |
 | `plants` | Plant thingClass family | Built-in Plant/Plant_* recognized; custom subclasses inferred from retained class/plant evidence and marked inferred |
 | `items` | Remaining category Item | Food, medicine, materials, etc. |

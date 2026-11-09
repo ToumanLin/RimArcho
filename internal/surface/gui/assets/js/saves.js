@@ -893,7 +893,7 @@ function fillTime(d, at = null) {
   const r = el("span", "r sv-zoom");
   r.append(el("span", "", T("a point opens its save")));
   const zb = (label, key, title, to, off) => {
-    const b = button(label, "", () => setZoom(to(), 0.5), "small sv-zb");
+    const b = button(label, "", () => setZoom(to(), zoomAnchor()), "small sv-zb");
     b.dataset.key = key;
     b.title = title;
     b.setAttribute("aria-label", title);
@@ -917,10 +917,13 @@ function fillTime(d, at = null) {
   const names = dead.join(T(", ")) + (p.dead > dead.length ? " " + Tf("and %d more", p.dead - dead.length) : "");
   legend.append(el("span", "muted", p.dead ? Tf("%d dead: %s", p.dead, names) : T("no colonist has died")));
   s.append(legend);
-  if (at) sc.scrollLeft = at.ratio * sc.scrollWidth - at.px;
+  const sel = sc.querySelector(".pt.sel");
+  // the selected save stays under its pixel; points sit inside a margin, so a ratio of the
+  // width would drift them (12 px a step at the right edge)
+  if (at?.selPx !== undefined && sel) sc.scrollLeft = +sel.getAttribute("cx") - at.selPx;
+  else if (at) sc.scrollLeft = at.ratio * sc.scrollWidth - at.px;
   else if (z > 1) {
     // the selected save in view
-    const sel = sc.querySelector(".pt.sel");
     if (sel) sc.scrollLeft = +sel.getAttribute("cx") - sc.clientWidth / 2;
   }
   wireZoom(sc);
@@ -939,6 +942,16 @@ function fillTime(d, at = null) {
   timeRO.observe(s);
 }
 
+// zoomAnchor: the buttons and keys zoom around the selected save while it is in view, else
+// around the middle (VM 2026-11-09: from the whole colony, + lost the newest save off the
+// right edge).
+function zoomAnchor() {
+  const c = timeBox?.querySelector(".sv-chartscroll"), p = c?.querySelector(".pt.sel");
+  if (!p) return 0.5;
+  const f = (+p.getAttribute("cx") - c.scrollLeft) / c.clientWidth;
+  return f >= 0 && f <= 1 ? f : 0.5;
+}
+
 // setZoom draws the chart at z, keeping the place at frac of the view (0 left, 1 right)
 // where it was.
 function setZoom(z, frac) {
@@ -948,9 +961,11 @@ function setZoom(z, frac) {
   const sc = timeBox?.querySelector(".sv-chartscroll");
   const px = (sc?.clientWidth || 0) * frac;
   const ratio = sc ? (sc.scrollLeft + px) / sc.scrollWidth : 0.5;
+  const p = sc?.querySelector(".pt.sel");
+  const selPx = p ? +p.getAttribute("cx") - sc.scrollLeft : NaN;
   zoom.set(colonyOf(X.sel)?.key || "", z < 1.05 ? 1 : z);
   const keep = timeBox?.contains(document.activeElement) ? document.activeElement.dataset?.key : "";
-  fillTime(X.detail, { ratio, px });
+  fillTime(X.detail, Math.abs(selPx - px) < 1 ? { selPx } : { ratio, px });
   const f = keep && timeBox?.querySelector(`[data-key="${CSS.escape(keep)}"]`);
   if (f && !f.disabled) f.focus({ preventScroll: true });
   else if (keep) timeBox?.querySelector(".sv-zb:not(:disabled)")?.focus({ preventScroll: true });
@@ -979,7 +994,7 @@ function wireZoom(sc) {
     const to = e.key === "+" || e.key === "=" ? zoomOf() * 2 : e.key === "-" ? zoomOf() / 2 : e.key === "0" ? 1 : 0;
     if (!to) return;
     e.preventDefault(); e.stopPropagation();
-    setZoom(to, 0.5);
+    setZoom(to, zoomAnchor());
   };
 }
 
@@ -1040,10 +1055,19 @@ function chart(tl, w) {
     svg.append(svgEl("polyline", { class: "ln", points: line }));
   }
   if (people.length > 1) svg.append(svgEl("polyline", { class: "pop", points: along(people, maxP) }));
+  // saves of one day sit side by side, the last on the day, so each can be clicked once
+  // zoomed (VM 2026-11-09: saves minutes apart covered each other at every zoom)
+  const left = new Map(), count = new Map();
+  for (const pt of tl.points) count.set(pt.day, (count.get(pt.day) || 0) + 1);
+  for (const pt of tl.points) {
+    const n = count.get(pt.day) - 1;
+    count.set(pt.day, n);
+    left.set(pt, n);
+  }
   // the selected point last, so a neighbour never covers it
   for (const pt of [...tl.points].sort((p, q) => (p.ref === X.sel) - (q.ref === X.sel))) {
     const on = pt.ref === X.sel, off = pt.wealth < 0;
-    const cx = x(pt.day), cy = off ? h - B : y(pt.wealth, maxW), r = pt.auto ? 3.5 : 5;
+    const cx = Math.max(L, x(pt.day) - left.get(pt) * 11), cy = off ? h - B : y(pt.wealth, maxW), r = pt.auto ? 3.5 : 5;
     if (on) svg.append(svgEl("circle", { class: "ring", cx, cy, r: r + 4 }));
     const c = svgEl("circle", { class: "pt" + (pt.auto ? " auto" : "") + (off ? " off" : "") + (on ? " sel" : ""), cx, cy, r });
     c.dataset.save = pt.ref;

@@ -46,7 +46,7 @@ func contentFixture(t testing.TB) *testkit.Env {
 <ThingDef MayRequire="missing.pkg"><defName>Guarded</defName><category>Item</category></ThingDef>
 <ThingDef MayRequireAnyOf="missing.pkg,tester.b"><defName>AnyGuard</defName><category>Item</category></ThingDef>
 <ThingDef><defName>NestedGuard</defName><category>Item</category><tools><li MayRequire="missing.pkg"/></tools></ThingDef>
-<ResearchProjectDef><defName>Project</defName></ResearchProjectDef><AbilityDef><defName>Power</defName></AbilityDef><SkillDef><defName>Craft</defName></SkillDef><TerrainDef><defName>Soil</defName></TerrainDef>`,
+<ResearchProjectDef><defName>Project</defName></ResearchProjectDef><AbilityDef><defName>Power</defName></AbilityDef><SkillDef><defName>Craft</defName></SkillDef><WorkTypeDef><defName>Craft</defName></WorkTypeDef><ChemicalDef><defName>Brew</defName></ChemicalDef><TerrainDef><defName>Soil</defName></TerrainDef>`,
 		`<ThingDef ParentName="Base"><defName>ChildB</defName><tools/></ThingDef>
 <ThingDef ParentName="Base"><defName>ResetTools</defName><tools Inherit="False"/></ThingDef>
 <ThingDef ParentName="NoDefName"><defName>AbstractParent</defName></ThingDef>
@@ -331,5 +331,38 @@ func TestSaveContentOlderParserRow(t *testing.T) {
 	}
 	if r, err = e.App.SaveContent(s); err != nil || r.Stale || !r.Read || len(r.Mods) == 0 {
 		t.Fatalf("content after the read: %+v %v", r, err)
+	}
+}
+
+// Real 1.6 save (VM 2026-11-09): Biotech's generated genes resolve by their skill or
+// chemical, and a name shared by two types of one category is listed once.
+func TestSaveContentGeneratedGenesAndSharedNames(t *testing.T) {
+	e := contentFixture(t)
+	c := contentOf(t, e, `<things><li><def>AptitudeRemarkable_Craft</def></li><li><def>ChemicalDependency_Brew</def></li><li><def>AddictionImmune_Brew</def></li><li><def>Craft</def></li><li><def>Craft</def></li></things>`)
+	got := contentEntries(c)
+	for _, key := range []string{"Alpha/xenotypes/AptitudeRemarkable_Craft", "Alpha/xenotypes/ChemicalDependency_Brew", "Alpha/xenotypes/AddictionImmune_Brew"} {
+		if got[key] != "1" {
+			t.Errorf("%s=%q; %v", key, got[key], got)
+		}
+	}
+	if c.Unknown != nil {
+		t.Errorf("source not found: %+v", c.Unknown)
+	}
+	for _, m := range c.Mods {
+		for _, cat := range m.Cats {
+			seen := map[string]bool{}
+			for _, n := range cat.Names {
+				if seen[n.Name] {
+					t.Errorf("%s/%s lists %s twice", m.Name, cat.Key, n.Name)
+				}
+				seen[n.Name] = true
+			}
+			if cat.Count != len(cat.Names) {
+				t.Errorf("%s/%s count %d, names %d", m.Name, cat.Key, cat.Count, len(cat.Names))
+			}
+		}
+	}
+	if got["Alpha/other/Craft"] != "2" {
+		t.Errorf("Craft: %v", got)
 	}
 }
