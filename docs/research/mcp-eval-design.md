@@ -12,6 +12,7 @@ Goal: measure how much `archo mcp` helps an agent find and fix a broken Mod, and
 | Agent | model `apikeyfan/deepseek-flash` through the magpie gateway, reasoning effort `high`, same task text and wall clock for every group |
 | Group A | Pi 1.4.0: bash + file read/write + `dotnet` + `ilspycmd` + **Archo MCP** (`archo mcp`, exposure `direct`) |
 | Group B (from 2026-11-04) | dsh 0.2.1-rc.5 (DeepSeek Harness, `--profile headless --json`, patch `scripts/mcp-eval/guest/dsh-eval.yml`): its own PowerShell, file and search tools, subagents, todo; the same **Archo MCP** (per-call timeout 15 min; dsh's default 60 s would cut `test_run` off). Web search and fetch, the session-title model call and telemetry are off; no approval prompts (`danger-full-access`, Pi has none either). dsh puts Archo's MCP server instructions into the system prompt; Pi 1.4 drops them (review P10), so the groups do not see the same Archo guidance |
+| Group P (2026-11-09) | Pi as in group A, plus Archo's MCP server instructions appended to the system prompt (`--append-system-prompt`), so it sees the same Archo guidance as dsh |
 | Group N (Group B before 2026-11-04) | Pi without Archo MCP and without the `archo` CLI. Gets `Player.log` path, the Mod folders and the game folder. The c1 to c5 matrix (A 15/15, N 10/15) settled this comparison; the 2026-11-04 round compares harnesses on h1, h2 and h5 only |
 | Prompt | "The game logs errors / misbehaves with this Mod list. Find the Mod that causes it, then fix it. Hand in the rewritten XML or the recompiled DLL." No hint about the fault class |
 | Repeats | at least 3 runs per task per group (DeepSeek is stochastic) |
@@ -256,6 +257,24 @@ Failures:
 - **h7:** all six named Pawn Comp Profiler and rewrote its loop as an index loop over the comps, rebuilt from its source; every log was clean. The list-modifier output named SSR's comp, and the agents judged the profiler the one that departs from vanilla.
 
 h7 and dsh's h4 and h8 runs are much cheaper than in round 3 (h7 about a third of the tokens and two thirds of the time).
+
+### Round 5, group P: Pi with Archo's server instructions (2026-11-09)
+
+Question: is dsh ahead because it passes Archo's MCP server instructions to the model, which Pi 1.4 drops? Group P is Pi as in group A plus those instructions in the system prompt: `guest/agent.ps1` asks the run's `archo.exe` for them (`initialize`) and passes the file with `--append-system-prompt` (saved per run as `archo-instructions.md`, 1,949 characters). 9 runs (h4, h7, h8 × 3) on the three VMs, 20 min limit, the same build as round 4 (`tools/archo-e2fa7445.exe`), graded with the same rules (h7 accepts either Mod). Columns A and B are round 4's.
+
+| Case | A Pi | P Pi + instructions | B dsh |
+| --- | --- | --- | --- |
+| h4 | 2/3, 523 s, Archo 16.0, 2.75 M | 2/3, 740 s, Archo 12.7, 1.08 M | 3/3, 677 s, Archo 21.0, 2.90 M |
+| h7 | 3/3, 267 s, Archo 10.7, 0.62 M | 3/3, 384 s, Archo 14.7, 0.81 M | 3/3, 283 s, Archo 13.7, 0.89 M |
+| h8 | 2/3, 925 s, Archo 10.0, 3.97 M | 1/3, 440 s, Archo 17.7, 3.14 M | 2/3, 545 s, Archo 28.7, 5.40 M |
+| All | 7/9 | 6/9 (culprit 8/9) | 8/9 |
+
+Failures:
+
+- **h4-P-3:** 20 turns, then `find / -name "Mono.Cecil*.dll" -maxdepth 6` over the guest's disk, which ran past the time limit (no answer). Pi's bash tool has no default timeout; round 2's h2-A-2 ended the same way.
+- **h8-P-2, h8-P-3:** named PE and rebuilt `ProgressionEducation.dll` with Krafs.Publicizer (both found `PublicizedAssemblies/`), but the game logs `FieldAccessException: Field RimWorld.StatWorker:stat is inaccessible from method ProgressionEducation.StatWorker_IsDisabledFor_Patch:Postfix` at startup and the test map fails ("Error while generating a map"). The Workshop DLL, built from the same csproj, does not throw; why the agents' builds do is not yet known. No P run called `guide topic=rebuild`.
+
+Reading: the instructions do not close the gap. P solves no more than A (6/9 against 7/9, within chance) and names the culprit as often as dsh (8/9 against 9/9). Its failures are a hung shell command and two DLL builds, not diagnosis. They cut Pi's tokens on h4 and h8 (1.08 M against 2.75 M; 3.14 M against 3.97 M) and raise its Archo calls on h7 and h8. Over rounds 2 to 5 dsh is ahead mainly on execution: bounded commands and a fix that runs. For an Archo Agent that points at dsh as the base (MIT, so it can ship with RimArcho), with Archo's instructions given to whichever harness is used.
 
 ## Grading
 
