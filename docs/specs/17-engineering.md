@@ -128,6 +128,8 @@ Some of RimArcho's hosts are often unreachable in mainland China: `raw.githubuse
 
 The `RIMARCHO_HOME` environment variable overrides this table (used by tests and child processes).
 
+Schema 35 adds unresolved Def classification inputs and per-set content readiness without discarding existing Def/DLL facts or views (05 §5.1). Migration from schema 34 is additive; re-extraction uses background analysis.
+
 | Content | Description |
 | --- | --- |
 | `config.toml` | Reads only `tombstone_days` (default 90); writes defaults on first launch. Other settings live in the database meta table (`cfg:<key>`, 13 §4.2) |

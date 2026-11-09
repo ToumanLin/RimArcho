@@ -7,7 +7,7 @@ import (
 
 // ParserVersion is the version of Scan's output. Bump it whenever Facts changes meaning
 // (a field added, removed or computed differently): caches of Facts key on it (12 §1.7).
-const ParserVersion = 1
+const ParserVersion = 2
 
 // Limits on the lists Facts keeps; counts beyond them are still exact.
 const (
@@ -73,9 +73,10 @@ type Facts struct {
 	History  []Recorder `json:"history,omitempty"` // the game's history recorders (wealth, colonists, mood…)
 
 	// References for the checks of 12 §4.3 and §4.6.
-	Defs    map[string]int `json:"defs,omitempty"`    // text of every <def> element → occurrences (12 §1.4)
-	Classes map[string]int `json:"classes,omitempty"` // every Class="…" attribute value → occurrences
-	Refs    Refs           `json:"refs"`
+	Defs    map[string]int            `json:"defs,omitempty"`    // text of every <def> element → occurrences (12 §1.4)
+	DefRefs map[string]map[string]int `json:"defRefs,omitempty"` // Def type (empty when unknown) → name → references, excluding configuration/help links
+	Classes map[string]int            `json:"classes,omitempty"` // every Class="…" attribute value → occurrences
+	Refs    Refs                      `json:"refs"`
 
 	// Events are the letters in the game's archive, newest first, at most MaxEvents.
 	Events []Event `json:"events,omitempty"`

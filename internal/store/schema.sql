@@ -160,7 +160,7 @@ CREATE TABLE version_mute(
 CREATE INDEX identity_question_open ON identity_question(status, environment_id);
 CREATE TABLE fact_set(
  id INTEGER PRIMARY KEY, instance_id TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('def','dll')),
- content_key TEXT NOT NULL, files TEXT NOT NULL DEFAULT '[]', UNIQUE(instance_id,kind,content_key));
+ content_key TEXT NOT NULL, files TEXT NOT NULL DEFAULT '[]', def_content_version INTEGER NOT NULL DEFAULT 0, UNIQUE(instance_id,kind,content_key));
 CREATE TABLE content_state(
  instance_id TEXT NOT NULL, game_mm TEXT NOT NULL, content_key TEXT NOT NULL, folders TEXT NOT NULL DEFAULT '',
  def_files INTEGER NOT NULL DEFAULT 0, patch_files INTEGER NOT NULL DEFAULT 0, parse_errors TEXT NOT NULL DEFAULT '',
@@ -174,7 +174,7 @@ CREATE TABLE def_fact(
  set_id INTEGER NOT NULL REFERENCES fact_set(id) ON DELETE CASCADE,
  def_type TEXT NOT NULL, def_name TEXT NOT NULL DEFAULT '', name TEXT NOT NULL DEFAULT '',
  parent TEXT NOT NULL DEFAULT '', abstract INTEGER NOT NULL DEFAULT 0, file_ix INTEGER NOT NULL, line INTEGER NOT NULL,
- may_require TEXT NOT NULL DEFAULT '', may_require_any TEXT NOT NULL DEFAULT '');
+ may_require TEXT NOT NULL DEFAULT '', may_require_any TEXT NOT NULL DEFAULT '', content_fields TEXT NOT NULL DEFAULT '');
 CREATE TABLE assembly_fact(
  set_id INTEGER NOT NULL REFERENCES fact_set(id) ON DELETE CASCADE,
  file_ix INTEGER NOT NULL, skipped INTEGER NOT NULL DEFAULT 0, manual INTEGER NOT NULL DEFAULT 0,

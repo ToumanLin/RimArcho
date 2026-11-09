@@ -20,6 +20,7 @@ func init() {
 			{Name: "attention", Help: "only saves with warnings or errors"}, {Name: "all", Help: "no truncation"}}, Run: savesList})
 	register(&Command{Name: "saves show", Args: "<save>", Summary: "one save: where it belongs, can it load (each issue with its fix), how its Mods differ from the list, the playthrough", MinArgs: 1, MaxArgs: 1,
 		Flags: []Flag{{Name: "mods", Help: "the save's whole Mod list"}, {Name: "play", Help: "the whole playthrough: every colonist, event and stat"},
+			{Name: "content", Help: "content references by Mod and category, with coverage limits"},
 			{Name: "current", Help: "check against the current game's current list instead of the list the save matched"},
 			{Name: "all", Help: "no truncation"}}, Run: savesShow})
 	register(&Command{Name: "saves fix", Args: "<save>", Summary: "the save's Mod fixes as one undoable edit of its list, then Workshop subscriptions; --launch starts it", MinArgs: 1, MaxArgs: 1,
@@ -554,6 +555,14 @@ func savesShow(c *Ctx, a *Args) (*render.Doc, error) {
 	root.KV("file", s.Path)
 	root.KV("saved", saveTime(c, s)+", "+render.Size(s.Size))
 	root.KV("read", readText(facts, s, ferr))
+	if a.Bool("content") {
+		content, err := c.App.SaveContent(own)
+		if err != nil {
+			return nil, err
+		}
+		addSaveContent(root, content, all, showRef(own), showLines-docLines(d))
+		return d, nil
+	}
 
 	if chk.Level == "writing" {
 		root.KV("can it load", "no verdict: the file is being written; show it again when the game has saved")

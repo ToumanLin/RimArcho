@@ -27,8 +27,8 @@ import (
 // second, so rows get their day and colonies regroup by world). The selected save never
 // waits for that run: SaveDetail of a save not read yet returns at once with skeletons
 // and reads that one save on its own session in a goroutine (readSelected), then sends
-// "saves-read" with its ref. The page holds the facts of the selected save and of its
-// colony's previous read save only (savesState.facts); listings carry summaries.
+// "saves-read" with its ref. The page holds the facts of the selected save only
+// (savesState.facts); listings carry summaries.
 
 // savesState is the page's reader and its last listing. Lock order: read.mu, then mu.
 type savesState struct {
@@ -171,6 +171,27 @@ func (s *API) findSave(ref string) (*app.Save, error) {
 		return nil, errors.New(view.T("that save is gone; the list is read again"))
 	}
 	return sv, err
+}
+
+// SaveContent returns the selected save's cached references by Mod and category (12 §2).
+func (s *API) SaveContent(ref string) (*view.SaveContent, error) {
+	sv, err := s.findSave(ref)
+	if err != nil {
+		return nil, err
+	}
+	w := &s.saves.read
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	defer s.retainReader(w)
+	r, err := s.savesSession()
+	if err != nil {
+		return nil, err
+	}
+	c, err := r.SaveContent(sv)
+	if err != nil {
+		return nil, err
+	}
+	return view.SaveContentOf(c), nil
 }
 
 // SaveDetail is the selected save against its list (12 §4.3): the middle and right cards.

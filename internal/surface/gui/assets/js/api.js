@@ -56,6 +56,7 @@ let table = {};
 export function setText(t, extra) { table = Object.assign(t || {}, extra || {}); }
 export function T(s) { return table[s] || s; }
 export function Tf(f, ...a) {
+  // %[n]s takes the nth argument, as in Go, so a translation may reorder them
   let i = 0;
-  return T(f).replace(/%[sdv]/g, () => String(a[i++]));
+  return T(f).replace(/%(?:\[(\d+)\])?[sdv]/g, (_, n) => String(n ? a[(i = +n) - 1] : a[i++]));
 }

@@ -59,7 +59,7 @@ func (s *Store) CachedDefs(instanceID, key string) ([]analyze.DefFact, bool) {
 }
 
 // defFields: file_ix indexes the set's file list (05 §3); scanDefs turns it into the path.
-const defFields = `f.set_id, f.def_type, f.def_name, f.name, f.parent, f.abstract, f.file_ix, f.line, f.may_require, f.may_require_any`
+const defFields = `f.set_id, f.def_type, f.def_name, f.name, f.parent, f.abstract, f.file_ix, f.line, f.may_require, f.may_require_any, f.content_fields`
 const defCols = `c.instance_id, ` + defFields
 const defView = ` FROM def_fact f JOIN content_state c ON c.def_set_id=f.set_id `
 
@@ -86,8 +86,14 @@ func (s *Store) scanDefsWith(rows *sql.Rows, lists func(set int64) []string) ([]
 		var f analyze.DefFact
 		var abs int
 		var r fileRef
-		if err := rows.Scan(&f.Instance, &r.set, &f.Type, &f.DefName, &f.Name, &f.Parent, &abs, &r.ix, &f.Line, &f.MayRequire, &f.MayRequireAny); err != nil {
+		var fields string
+		if err := rows.Scan(&f.Instance, &r.set, &f.Type, &f.DefName, &f.Name, &f.Parent, &abs, &r.ix, &f.Line, &f.MayRequire, &f.MayRequireAny, &fields); err != nil {
 			return nil, err
+		}
+		if fields != "" {
+			if err := json.Unmarshal([]byte(fields), &f.Content); err != nil {
+				return nil, err
+			}
 		}
 		f.Abstract = abs != 0
 		out = append(out, f)

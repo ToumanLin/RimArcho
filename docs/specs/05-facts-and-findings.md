@@ -36,7 +36,7 @@ Assemblies use a separate key, `analyze.AssemblyKey`: the snapshot hash, the rel
 | Fact | Fields | Source |
 | --- | --- | --- |
 | `ModDecl` | Dependencies (including version-specific dependencies), loadBefore/After, forceLoad*, incompatibleWith, `supportedVersions`, and the original `LoadFolders.xml` | The snapshot's `decl_blob` (04 §1.3) |
-| `Def` | Type (element name), `defName`, `Name`, `ParentName`, `Abstract`, file relative to the Mod root, line of the opening tag, owning Instance, and the `Def`'s own `MayRequire` and `MayRequireAnyOf` | Effective `Defs/**/*.xml` |
+| `Def` | Type (element name), `defName`, `Name`, `ParentName`, `Abstract`, file relative to the Mod root, line of the opening tag, owning Instance, the `Def`'s own `MayRequire` and `MayRequireAnyOf`, and bounded unresolved content-predicate fields (§5.1) | Effective `Defs/**/*.xml` |
 | `PatchOp` | Operation class, XPath, child-operation structure, value summary, file and line, ordinal, and simulation result and reason | Effective `Patches/**/*.xml` |
 | `TypeDef` | Assembly, namespace, and full type name | .NET metadata in effective DLLs |
 | Game type | Game assembly file, game version, full type name, namespace, simple name | .NET metadata in the game's own `Assembly-CSharp.dll` and `Assembly-CSharp-firstpass.dll`, read at scan (§5.3) |
@@ -268,8 +268,11 @@ Each entry point shows a different default subset of the same findings. Usually,
 
 ### 5.1 Def layer
 
-- Parse the XML as a stream, extracting only the fields in §2 without keeping a full DOM.
-- Resolve inheritance after all patches have been applied, as the game does. Patches can change `Name` and `ParentName`; for example, `AttributeAdd` can name Core `Defs`. First collect all `Name` values in the patched documents, then resolve `ParentName`. For abstract nodes with the same name, the later node in load order overrides the earlier one. Checking before patches produces false positives (see 18 for measurements in a real environment).
+- Parse effective Def XML into the arena, extracting §2 facts. Persisted per-Mod Def facts describe raw effective files before Patch simulation; folder selection does not establish a post-Patch catalog.
+- Analysis checks parent-name existence **after** Patch simulation, accounting for patches changing `Name`/`ParentName`. This check does not resolve inherited content-classification fields.
+- `DefFact.Content` retains versioned bounded unresolved predicate inputs beside `def_fact`: category, thingClass, race intelligence/flesh, apparel/plant presence, natural/resource-rock flags, verbs/tools entry presence, hidden faction, organic flesh. Presence, null, empty/append/reset lists (`Inherit="False"`) and nested MayRequire conditions survive. Bounds: 256 retained nodes, 512 bytes per value; exceeding a bound marks classification incomplete.
+- Selected-save classification follows 12 §2.2: XML `Name` is the inheritance key and the best parent is the greatest Mod order not after the child, not the last parent globally. It does not resolve post-Patch fields or DLL class ancestry; custom plant inference and unknown parents are labeled.
+- Schema 35 adds `def_fact.content_fields` and `fact_set.def_content_version` without removing fact sets or `content_state` views. The analyzer-version bump rebuilds immutable sets in the next background analysis; old Def/DLL facts remain readable meanwhile. Content readiness is per Mod and required field version, including analyzed Mods with zero Defs, not view existence alone. Parser-version changes invalidate L1 only (12 §1.7).
 
 ### 5.2 Patch simulation
 

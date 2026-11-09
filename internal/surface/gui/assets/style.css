@@ -2238,28 +2238,33 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 .sv-folder { margin: 6px auto 0; max-width: 560px; font: 12px var(--code); }
 /* the right card (16 §2.11 "Right"): numbers at this save, colonists, letters, the colony over time */
 .sv-note.warn { color: var(--amber); }
-.sv-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
-.sv-stat { padding: 8px 10px; border-radius: var(--r-lg); background: var(--card-2); border: var(--hairline) solid var(--line-2); min-width: 0; }
-.sv-stat p { margin: 0; }
-.sv-stat .n { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.sv-stat .l { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sv-stat .d { font-size: 12px; color: var(--green); font-variant-numeric: tabular-nums; }
-.sv-stat .d.neg { color: var(--red); }
-.sv-stat .d.same { color: var(--muted); }
-.sv-people { display: flex; flex-wrap: wrap; gap: 4px; margin: 10px 0 0; padding: 0; list-style: none; }
-.sv-person { height: 22px; display: inline-flex; align-items: center; gap: 5px; padding: 0 8px 0 3px; border-radius: 999px; background: var(--pill); font-size: 12px; color: var(--fg-2); }
-.sv-person::before { content: ""; width: 16px; height: 16px; border-radius: 50%; background: color-mix(in srgb, var(--accent) 35%, var(--pill)); }
-.sv-person.dead { color: var(--faint); text-decoration: line-through; }
-.sv-person.dead::before { background: var(--line); }
-.sv-person.slave::before { background: color-mix(in srgb, var(--amber) 45%, var(--pill)); }
-.sv-person.more { padding-left: 8px; color: var(--muted); }
-.sv-person.more::before { display: none; }
-.sv-events { margin: 0; padding: 0; list-style: none; font-size: 13px; }
-.sv-events li { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; padding: 3px 0; color: var(--fg-2); }
-.sv-events li .t { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-.sv-events li .x { overflow-wrap: anywhere; }
-.sv-events li.death .x { color: var(--red); }
-.sv-chart { width: 100%; height: 120px; display: block; }
+.sv-chartscroll { overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+.sv-chartscroll.zoomed { cursor: grab; }
+.sv-chartscroll.drag { cursor: grabbing; user-select: none; }
+.sv-chart { height: 140px; display: block; }
+.sv-chart .tk { stroke: var(--line); }
+.sv-zoom { display: inline-flex; align-items: center; gap: 4px; }
+.sv-zoom > span { margin-right: 6px; }
+.sv-zoom .btn.sv-zb { height: 20px; min-width: 22px; padding: 0 6px; font-size: 12px; }
+.sv-cats { display: flex; flex-wrap: wrap; gap: 4px; }
+.sv-cat { display: inline-flex; align-items: baseline; gap: 5px; height: 22px; padding: 0 8px; border: var(--hairline) solid var(--line-2); border-radius: 999px; background: var(--pill); color: var(--fg-2); font: inherit; font-size: 12px; cursor: pointer; }
+.sv-cat .n { font-weight: 600; color: var(--fg); font-variant-numeric: tabular-nums; }
+.sv-cat.other { color: var(--muted); }
+.sv-cat:hover { border-color: var(--line); }
+.sv-cat.on { background: var(--accent-soft); border-color: var(--accent); }
+.sv-limits { margin: 4px 0 0; padding-left: 18px; font-size: 12px; color: var(--muted); }
+.sv-cmods { margin: 10px 0 0; padding: 0; list-style: none; }
+.sv-cmod { padding: 4px 0; }
+.sv-cmod + .sv-cmod { border-top: var(--hairline) solid var(--line-2); }
+.sv-cmod .h { display: flex; align-items: center; gap: 6px; width: 100%; padding: 2px 0; border: 0; background: none; color: var(--fg); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+.sv-cmod .h .n { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.sv-cmod .h .k { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.sv-cmod .chv { display: inline-flex; color: var(--faint); transition: transform var(--t-press); }
+.sv-cmod .chv.open { transform: rotate(90deg); }
+.sv-cmod .sum { margin: 0 0 0 20px; font-size: 12px; color: var(--fg-2); overflow-wrap: anywhere; }
+.sv-cmod .sv-details { margin: 6px 0 2px 20px; }
+.sv-cmod .sv-details .sv-lost:first-child { margin-top: 0; }
+.sv-cmod.unknown .h .n { font-weight: 400; color: var(--muted); }
 .sv-chart .ax { stroke: var(--line); }
 .sv-chart .ln { fill: none; stroke: var(--accent); stroke-width: 1.5; }
 .sv-chart .area { fill: color-mix(in srgb, var(--accent) 10%, transparent); }

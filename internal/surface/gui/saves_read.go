@@ -49,22 +49,15 @@ func (s *API) savePlay(r *app.App, sv *app.Save, d *view.SaveDetail) {
 		return
 	}
 	keep := map[string]*savefile.Facts{factsKey(sv): f}
-	prevSave := view.PreviousReadSave(sv)
-	var prev *savefile.Facts
-	if prevSave != nil {
-		if prev, _ = s.factsOf(r, prevSave); prev != nil {
-			keep[factsKey(prevSave)] = prev
-		}
-	}
 	st.mu.Lock()
 	if st.list != nil { // still on the page
 		st.facts = keep
 	}
 	st.mu.Unlock()
-	d.Play = view.SavePlayOf(sv, f, prevSave, prev)
+	d.Play = view.SavePlayOf(sv, f)
 }
 
-// factsOf is a save's full read from the page's two kept facts or the cache; nil when it
+// factsOf is a save's full read from the page's kept facts or the cache; nil when it
 // is not read. It never reads the file.
 func (s *API) factsOf(r *app.App, sv *app.Save) (*savefile.Facts, error) {
 	k := factsKey(sv)

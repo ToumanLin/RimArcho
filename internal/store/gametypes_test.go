@@ -130,7 +130,7 @@ func TestGameAssemblyReplacedAndDeleted(t *testing.T) {
 func TestUpgradeGameTypes(t *testing.T) {
 	s, path := openTemp(t)
 	want := gameTypeDDL(t, s.DB)
-	for _, q := range []string{`DROP TABLE game_type`, `DROP TABLE game_assembly`, `DROP TABLE save_cache`, `DROP TABLE tag_note`, `DROP TABLE colony_name`, `DROP TABLE tag_color`, `DROP TABLE lineage_tag`,
+	for _, q := range []string{`ALTER TABLE def_fact DROP COLUMN content_fields`, `ALTER TABLE fact_set DROP COLUMN def_content_version`, `DROP TABLE game_type`, `DROP TABLE game_assembly`, `DROP TABLE save_cache`, `DROP TABLE tag_note`, `DROP TABLE colony_name`, `DROP TABLE tag_color`, `DROP TABLE lineage_tag`,
 		`CREATE TABLE lineage_tag(
   environment_id TEXT NOT NULL, lineage_id TEXT NOT NULL, tag TEXT NOT NULL COLLATE NOCASE,
   PRIMARY KEY(environment_id, lineage_id, tag))`,

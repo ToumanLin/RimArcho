@@ -99,6 +99,6 @@ const descMemory = `Estimate resident RAM, loading RAM and VRAM for a plan. Comm
 
 const descListSaves = `Saves of every game and pack, grouped by colony, newest first: each with its sv: reference, in-game day, the list it matches and whether it loads with that list. mod=<ref> finds the saves that use a Mod; attention=true keeps those with warnings or errors. Read-only.`
 
-const descGetSave = `One save (sv:<hex>, file name or <colony>/<save>): where it belongs, can it load (each issue with its consequence and the command that fixes it), how its Mods differ from the list, the playthrough (day, colonists, wealth, events; play=true in full). For a save that will not load. Read-only.`
+const descGetSave = `One save (sv:ref, name or colony/save): load issues with fixes, Mod differences and playthrough (play=true for all colonists/events). content=true shows referenced content by Mod/category, using installed versions, with coverage limits. Read-only.`
 
 const descManageSaves = `Save actions: fix (the save's Mod fixes as one undoable edit of its list, subscribing missing Workshop Mods; launch=true then starts it), rename, copy, backup, trash (recycle bin). dry_run=true previews fix; backup and trash only preview unless confirm=true: ask the player first.`
