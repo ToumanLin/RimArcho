@@ -191,6 +191,13 @@ const tagCtx = {
   // back to the list the details follow (a pinned tag stays)
   leave: () => focusArea(Math.min(S.focus, 2) === S.focus ? S.focus : lastList),
   editing: () => {},
+  // the editor's rows are copies and a header holds only its first-tag Mods: say how many of
+  // the tag's Mods Disabled shows
+  shown: (g, info) => {
+    const c = col(0), lin = new Set();
+    for (const i of shownItems(c)) { const it = c.items[i]; if ((it.tags || []).some((t) => t.toLowerCase() === g.key)) lin.add(it.lineage || it.id); }
+    return Tf("%d not enabled", lin.size);
+  },
   // a colour shows at once: the rows' bands, the headers and the panel
   recolor: (tag, color) => {
     const k = tag.toLowerCase(), map = { ...tagColors() };

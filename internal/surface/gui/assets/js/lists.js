@@ -354,8 +354,9 @@ export function renderRows(k) {
   } else box.removeAttribute("aria-activedescendant");
 }
 
-// headRow draws a tag group's header (16 §2.5): a chevron, the tag's colour mark, the tag
-// and how many of its rows are shown. A click or ← → opens and closes it (main.js).
+// headRow draws a tag group's header (16 §2.5): the tag's colour as a band in the rows' left
+// slot (as the rows below it carry theirs), a chevron, the tag and how many of its rows are
+// shown. A click or ← → opens and closes it (main.js).
 function headRow(k, c, i, g, layout, pool, box) {
   const color = g.none ? "" : tagCSS(tagColors()[g.key]);
   const n = g.total && g.total !== g.rows.length ? Tf("%d / %d", g.rows.length, g.total) : String(g.rows.length);
@@ -380,8 +381,8 @@ function headRow(k, c, i, g, layout, pool, box) {
   d.setAttribute("aria-label", label + ", " + n + ", " + T(g.open ? "expanded" : "collapsed"));
   d.title = label;
   d.innerHTML = `<span class="m"></span><span class="fold-chev">${icon.chev}</span>` +
-    `<span class="gdot"${color ? ` style="background:${esc(color)}"` : " hidden"}></span>` +
     `<span class="t">${esc(label)}</span><span class="num">${esc(n)}</span>`;
+  paintMark($(".m", d), color ? { tag: label, color } : null);
 }
 
 // onHistory runs when a history row is clicked (main.js sets it).

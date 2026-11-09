@@ -1507,7 +1507,8 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 /* a tag's colour (16 §2.9): none, the presets, one of the player's own */
 .tm-colorbox { margin: 4px 0 2px; }
 .tm-colorbox .tm-hint { margin: 2px 0 0; }
-.tm-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+/* (.frow .v sets a field's gap to 2px 0: the swatches need their own) */
+.frow .v.tm-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .tm-swatch { position: relative; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; background: var(--sw, transparent); cursor: pointer; flex: none; }
 .tm-swatch.none { box-shadow: inset 0 0 0 var(--hairline) var(--muted); }
 .tm-swatch.none::after { content: ""; position: absolute; left: 50%; top: 2px; bottom: 2px; width: var(--hairline); background: var(--muted); transform: rotate(45deg); }
@@ -2695,8 +2696,6 @@ select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-s
 .row.group-head .fold-chev { display: inline-flex; flex: none; width: 12px; color: var(--faint); transition: transform var(--t-layout) var(--ease); }
 .row.group-head .fold-chev svg.i { width: 10px; height: 10px; stroke-width: 1.8; }
 .row.group-head.open .fold-chev { transform: rotate(90deg); }
-.row.group-head .gdot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-.row.group-head .gdot[hidden] { display: none; }
 .row.group-head .t { flex: 0 1 auto; font-weight: 600; }
 .row.group-head.none .t { color: var(--muted); }
 .row.group-head .num { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; flex: none; }
