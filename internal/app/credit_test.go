@@ -492,10 +492,7 @@ func TestCreditInterruptedRecycleResumes(t *testing.T) {
 		defer r.Close()
 		guard := make(chan error, 1)
 		go func() {
-			b, err := r.BeginBatch()
-			if err == nil {
-				err = b.Commit("test")
-			}
+			_, err := r.MoveBlock(nil, 1) // takes the launch lock, writes nothing
 			guard <- err
 		}()
 		if err := <-guard; err != nil {
@@ -749,10 +746,7 @@ func TestCreditRealLaunchRemapsRestorableStatesAndRecycles(t *testing.T) {
 		defer r.Close()
 		guard := make(chan error, 1)
 		go func() {
-			b, err := r.BeginBatch()
-			if err == nil {
-				err = b.Commit("test")
-			}
+			_, err := r.MoveBlock(nil, 1) // takes the launch lock, writes nothing
 			guard <- err
 		}()
 		if err := <-guard; err != nil {
@@ -1028,16 +1022,10 @@ func TestCreditResumeAfterRecycleBeforeScan(t *testing.T) {
 	}
 }
 
-func TestCreditNotesTexturesAndStaleBatch(t *testing.T) {
+func TestCreditNotesAndTextures(t *testing.T) {
 	t.Parallel()
 	e, batch, items := creditEnv(t, "8100")
 	old := items[0].InstanceID
-	e.MustRun("enable", old)
-	pick, err := e.App.BeginBatch()
-	if err != nil {
-		t.Fatal(err)
-	}
-	e.MustRun("disable", old)
 	e.MustRun("enable", old)
 	creditStart(t, e, batch, items)
 	creditClient(t, e, items)
@@ -1095,12 +1083,6 @@ func TestCreditNotesTexturesAndStaleBatch(t *testing.T) {
 	}
 	if err := e.App.Store.DB.QueryRow(`SELECT count(*) FROM texture_mod WHERE instance_id=?`, target).Scan(&n); err != nil || n != 0 {
 		t.Fatalf("false optimisation state: %d %v", n, err)
-	}
-	if err := pick.Commit("pick"); err == nil || !strings.Contains(err.Error(), "reload") {
-		t.Fatalf("stale undo accepted: %v", err)
-	}
-	if err := pick.Revert(); err == nil || !strings.Contains(err.Error(), "reload") {
-		t.Fatalf("stale workspace accepted: %v", err)
 	}
 	ws, err := e.App.Store.Workspace(mustPlan(t, e))
 	if err != nil || loadout.Decode(ws.Entries).Index(old) >= 0 || loadout.Decode(ws.Entries).Index(target) < 0 {
@@ -1168,39 +1150,5 @@ func TestCreditManagedLinkOutsideEnvironmentRetained(t *testing.T) {
 	}
 	if !source.IsLink(link) {
 		t.Fatal("managed link changed")
-	}
-}
-
-func TestCreditRemovedStageSnapshotCannotResurrectCopy(t *testing.T) {
-	t.Parallel()
-	e, batch, items := creditEnv(t, "8100")
-	old := items[0].InstanceID
-	if _, err := e.App.Stage([]string{old}); err != nil {
-		t.Fatal(err)
-	}
-	pick, err := e.App.BeginBatch()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := e.App.Unstage([]string{old}); err != nil {
-		t.Fatal(err)
-	}
-	// No current/history SQL row refers to the old item; only the open pick
-	// snapshot does. A remap must still invalidate it before the copy is recycled.
-	creditStart(t, e, batch, items)
-	creditClient(t, e, items)
-	e.App.TrashFunc = func(path string) error { return creditRecycle(e, path) }
-	if err := e.App.CreditStep(nil); err != nil {
-		t.Fatal(err)
-	}
-	if it := creditItem(t, e, batch); it.State != "done" {
-		t.Fatal(it)
-	}
-	if err := pick.Revert(); err == nil {
-		t.Fatal("removed staged item restored from stale snapshot")
-	}
-	staged, _, err := e.App.Staged()
-	if err != nil || len(staged) != 0 {
-		t.Fatalf("stale staging restored: %+v %v", staged, err)
 	}
 }

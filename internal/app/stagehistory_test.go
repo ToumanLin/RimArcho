@@ -201,35 +201,6 @@ func TestStageHistoryAtomicFailure(t *testing.T) {
 	}
 }
 
-func TestStageBatchHistory(t *testing.T) {
-	t.Parallel()
-	e := stageEnv(t)
-	before := stageState(t, e)
-	b, err := e.App.BeginBatch()
-	if err != nil {
-		t.Fatal(err)
-	}
-	e.MustRun("stage", "add", "pkg:tester.m31")
-	e.MustRun("stage", "add", "pkg:tester.m32")
-	if err := b.Commit("stage"); err != nil {
-		t.Fatal(err)
-	}
-	after := stageState(t, e)
-	e.MustRun("undo")
-	expectStageState(t, e, before)
-	e.MustRun("redo")
-	expectStageState(t, e, after)
-	b, err = e.App.BeginBatch()
-	if err != nil {
-		t.Fatal(err)
-	}
-	e.MustRun("stage", "drop", "pkg:tester.m31")
-	if err := b.Revert(); err != nil {
-		t.Fatal(err)
-	}
-	expectStageState(t, e, after)
-}
-
 func TestStageEmptyRepresentationsAndNoops(t *testing.T) {
 	t.Parallel()
 	e := stageEnv(t)

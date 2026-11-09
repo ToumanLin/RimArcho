@@ -202,35 +202,6 @@ func TestCrossGameSortUndoPreservesBindings(t *testing.T) {
 	if ws.Entries != original.Entries {
 		t.Error("second undo failed exact restoration")
 	}
-	// Picker batches must preserve the same stored bindings as individual edits.
-	e.MustRun("env", "use", "old")
-	for _, revert := range []bool{false, true} {
-		b, err := e.App.BeginBatch()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := e.App.Sort(false); err != nil {
-			t.Fatal(err)
-		}
-		if revert {
-			err = b.Revert()
-		} else {
-			err = b.Commit("sort batch")
-		}
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !revert {
-			e.MustRun("undo")
-		}
-		ws, err = e.App.Store.Workspace(planID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if ws.Entries != original.Entries {
-			t.Errorf("batch revert=%v changed bindings: %s", revert, ws.Entries)
-		}
-	}
 }
 
 // Undoing a checkout leaves a list that is not the checked-out version, so saving it is

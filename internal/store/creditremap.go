@@ -116,15 +116,9 @@ func (s *Store) RemapCreditPlans(plans []int64, old, target string, now time.Tim
 				}
 			}
 		}
-		if _, err := tx.Exec(`INSERT INTO meta(key,value) VALUES(?, '1') ON CONFLICT(key) DO UPDATE SET value=CAST(value AS INTEGER)+1`, CreditRemapKey); err != nil {
-			return err
-		}
 		return mergeCopyNote(tx, old, target)
 	})
 }
-
-// CreditRemapKey invalidates long-lived TUI batch snapshots after a physical handoff.
-const CreditRemapKey = "credit.remap"
 
 // CreditPeer finds durable subscription confirmation or permanent failure shared
 // by overlapping batches.

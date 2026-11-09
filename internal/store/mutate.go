@@ -78,9 +78,6 @@ func (s *Store) ResolveSame(q *Question, now time.Time) error {
 				return err
 			}
 		}
-		if _, err := tx.Exec(`INSERT INTO meta(key,value) VALUES(?, '1') ON CONFLICT(key) DO UPDATE SET value=CAST(value AS INTEGER)+1`, CreditRemapKey); err != nil {
-			return err
-		}
 		stmts := []struct {
 			q    string
 			args []any

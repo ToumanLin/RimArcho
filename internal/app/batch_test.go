@@ -25,50 +25,21 @@ func ids(t *testing.T, e *testkit.Env, refs ...string) []string {
 	return out
 }
 
-// 16 §3.4: a pick session's edits become one undo step; a reverted one leaves nothing.
-func TestBatchCommitAndRevert(t *testing.T) {
+// 16 §3.4: a block move keeps the picked Mods' order and is one undo step.
+func TestMoveBlock(t *testing.T) {
 	t.Parallel()
 	e := stageEnv(t)
-	before := names(t, e)
-	b, err := e.App.BeginBatch()
-	if err != nil {
-		t.Fatal(err)
-	}
 	e.MustRun("enable", "pkg:tester.m31", "pkg:tester.m32")
-	if _, err := e.App.MoveBlock(ids(t, e, "pkg:tester.m31", "pkg:tester.m32"), 2); err != nil {
-		t.Fatal(err)
-	}
+	before := names(t, e)
 	if _, err := e.App.MoveBlock(ids(t, e, "pkg:tester.m31", "pkg:tester.m32"), 3); err != nil {
 		t.Fatal(err)
 	}
-	after := names(t, e)
-	if !strings.HasPrefix(after, "Core M01 M31 M32 M02") {
+	if after := names(t, e); !strings.HasPrefix(after, "Core M01 M31 M32 M02") {
 		t.Fatalf("block move: %s", after)
-	}
-	if err := b.Commit("pick"); err != nil {
-		t.Fatal(err)
 	}
 	e.MustRun("undo")
 	if got := names(t, e); got != before {
 		t.Fatalf("one undo:\n%s\nwant\n%s", got, before)
-	}
-	e.MustRun("redo")
-	if got := names(t, e); got != after {
-		t.Fatalf("redo: %s", got)
-	}
-	// Revert: list and staging as they were, and no undo step left behind.
-	e.MustRun("undo")
-	b, _ = e.App.BeginBatch()
-	e.MustRun("stage", "add", "pkg:tester.m05")
-	e.MustRun("enable", "pkg:tester.m33")
-	if err := b.Revert(); err != nil {
-		t.Fatal(err)
-	}
-	if got := names(t, e); got != before {
-		t.Fatalf("revert: %s", got)
-	}
-	if out := e.MustRun("stage", "list"); !strings.Contains(out, "staging: 0") {
-		t.Fatalf("staging after revert:\n%s", out)
 	}
 }
 
