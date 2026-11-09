@@ -33,8 +33,8 @@ Players asked for Linux (2026-11-07, again 2026-11-09). One asked for a `.deb`, 
 
 Goal: a static `archo` for `linux/amd64` (`CGO_ENABLED=0`) that is as safe on Linux as on Windows. Size: medium.
 
-1. **Build split.** Register the `gui` command from a file with a `windows` (later `windows || (linux && cgo)`) build tag, so `cmd/archo` builds without Wails. On a build without the GUI, `archo gui` says the window is not in this build.
-2. **`startWorkshopCMD` off Windows.** `os/exec` with its own process group (`Setpgid`); cancel kills the group, matching the Windows job object. `console=true` runs in the current terminal (CLI/TUI) instead of a new window.
+1. **Build split — done.** GUI startup is selected by a `windows` build tag (later `windows || (linux && cgo)`), so `cmd/archo` builds without Wails. On a build without the GUI, `archo gui` says the window is not in this build and points to the text interface. Contract: 13 §4.1, 16 §8.1.
+2. **`startWorkshopCMD` off Windows — done.** `os/exec` with its own process group (`Setpgid`); cancel kills the group, matching the Windows job object. `console=true` inherits the current terminal's streams (CLI/TUI) instead of opening a new window. Contract: 11 §1.
 3. **Safety stubs.** `gameProcesses` reads `/proc/*/exe` and `cmdline`: the native `RimWorldLinux`, and `RimWorldWin64.exe` running under Wine (Proton). `toolIdle` checks `/proc` for a process running the tool's executable. Without these, "refuse while the game runs" never fires: fix them before anything ships.
 4. **Linux-only bugs** (ToDo):
    - Same-volume checks compare `st_dev` (one helper used at the four call sites in §1), so moves across mounts copy instead of failing with `EXDEV`.
@@ -49,7 +49,7 @@ Goal: a static `archo` for `linux/amd64` (`CGO_ENABLED=0`) that is as safe on Li
 6. **SteamCMD.** Install `steamcmd_linux.tar.gz` (runs `linux32/steamcmd`, needs 32-bit libraries); prefer a `steamcmd` already on `PATH` (distribution packages exist). When it fails to start, say which package is missing (`lib32gcc-s1` on Debian/Ubuntu, `glibc.i686` on Fedora) **[I: names to confirm]**. Login works in the terminal that runs `archo`.
 7. **Update notice instead of self-update (D2).** Run the same check as `CheckSelfUpdate` (GitHub Releases); when a newer version exists, say so with the release link and how to update: through the package manager for a `.deb`, `.rpm` or AUR install, by downloading the new tarball otherwise. Nothing is downloaded or replaced.
 8. **Not in phase 1, with a clear message:** subscribing through the Steam client (phase 4: SteamCMD only); LoversLab login (manual zip, as decided).
-9. **CI.** Add an `ubuntu-latest` job: gofmt, `go vet`, staticcheck and `go test` on every package except the GUI. The first run will show which tests assume Windows (`mklink /J` in `testkit`, `.exe` names, drive letters); fix them or tag them `windows`.
+9. **CI — done.** `ubuntu-latest` checks the static `archo` build, gofmt, `go vet`, pinned staticcheck and `go test -count=1` on every package except `surface/gui`, `surface/upgradewin` and `spikes/...`. Windows checks are unchanged. WSL verification, portable fixtures and explicit Linux test exclusions are recorded in [the base validation report](2026-11-09_linux-base-validation.md); runtime safety remains unfinished.
 10. **Release.** `archo-<version>-linux-amd64.tar.gz` with execute bits, made with `tar` or Go's `archive/tar`, not `Compress-Archive` (`scripts/release.ps1`); add a `.sha256`.
 11. **Docs.** 17 §5 (what compiles and what is tested), 01 §1 (Linux CLI in 1.x), 03 §3 (Steam roots, Proton), 09 §2 (Proton launches through Steam), the user guide (Linux section), CHANGELOG, a release VM table for Linux.
 
