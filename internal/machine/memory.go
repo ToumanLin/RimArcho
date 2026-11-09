@@ -1,4 +1,5 @@
-// Package machine reads hardware capacity without scanning game or mod files.
+// Package machine reads the machine RimArcho runs on without scanning game or mod files:
+// hardware capacity, Wine, and the console.
 package machine
 
 import (

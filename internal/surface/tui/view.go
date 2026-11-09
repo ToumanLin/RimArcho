@@ -2,7 +2,10 @@ package tui
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -25,6 +28,9 @@ func (m *model) View() string {
 	case m.loadErr != nil:
 		content = []string{"", "  " + sErrS.Render(fit(T("error: ")+m.loadErr.Error(), m.w-2)),
 			"  " + sSecond.Render(fit(T("Add a game first: archo env detect, archo env add <name> --detected"), m.w-2))}
+		if windowNextToUs() {
+			content = append(content, "  "+sSecond.Render(fit(T("Or open RimArcho.exe in this folder: the window has a guide that finds your games."), m.w-2)))
+		}
 	case m.pal != nil:
 		content = m.paletteLines(body)
 	case m.panel != nil:
@@ -439,3 +445,14 @@ func (m *model) detailLines(w, n int) []string {
 }
 
 var _ = fmt.Sprint
+
+// windowNextToUs reports whether RimArcho.exe sits next to this program: a player who
+// double-clicked archo.exe often meant the window (16 §9.2).
+var windowNextToUs = sync.OnceValue(func() bool {
+	exe, err := os.Executable()
+	if err != nil || strings.EqualFold(filepath.Base(exe), "RimArcho.exe") {
+		return false
+	}
+	_, err = os.Stat(filepath.Join(filepath.Dir(exe), "RimArcho.exe"))
+	return err == nil
+})

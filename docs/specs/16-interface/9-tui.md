@@ -39,6 +39,8 @@ The TUI is the **keyboard version of the plan editor**. It opens the current pla
 
 The TUI bundles no terminal (00 §6 D24). Both `archo` without arguments and `archo tui` run in the terminal that launches them. Double-clicking `archo.exe` lets Windows open its default terminal: Windows Terminal on Windows 11, or a console window on older systems. The TUI runs there, and the window closes when it exits. `archo --here`, found in old shortcuts, is accepted and behaves like `archo` (`cli.globalFlags`).
 
+- A console that would print the TUI's escape sequences as text gets plain lines instead, and `archo` exits with an error: one where `ENABLE_VIRTUAL_TERMINAL_PROCESSING` cannot be turned on, or Wine's own console window (Wine with no `TERM`; a Linux terminal sets it and draws the TUI) (`machine.TerminalDrawsTUI`). The lines say so, point to `RimArcho.exe` (under Wine: `wine archo.exe` in a Linux terminal), and note that commands still work. When archo owns its console (a double click), it waits for Enter so the window does not close at once.
+- With no game added, the TUI's screen also points to `RimArcho.exe` when it sits next to `archo.exe`: its first-run guide finds the games (§2.15).
 - The player's terminal determines the font; RimArcho distributes no fonts.
 - For colors, termenv cannot query the terminal under ConPTY and falls back to no color. Therefore `SetColors` forces 24-bit color when the terminal declares support through `COLORTERM=truecolor|24bit` or `WT_SESSION` (Windows Terminal). Other terminals retain termenv detection.
 - WezTerm files that older versions left in the data directory: 17 §3.
