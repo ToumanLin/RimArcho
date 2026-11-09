@@ -4,9 +4,6 @@ package app_test
 
 import (
 	"context"
-	"github.com/ToumanLin/RimArcho/internal/accounts"
-	"github.com/ToumanLin/RimArcho/internal/subscribe"
-	"github.com/ToumanLin/RimArcho/internal/testkit"
 	"io"
 	"net/http"
 	"net/url"
@@ -14,6 +11,10 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/ToumanLin/RimArcho/internal/accounts"
+	"github.com/ToumanLin/RimArcho/internal/subscribe"
+	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
 func TestAutomaticGitAndAuthenticatedPageChecksNeverInstall(t *testing.T) {

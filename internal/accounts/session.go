@@ -190,13 +190,6 @@ func (s *Session) save() error {
 	return nil
 }
 
-// Capture is called only by the native CookieManager completion handler.
-func (s *Session) capture(cookies []*http.Cookie) error {
-	s.accept(cookies)
-	s.status.State = "login required"
-	return s.save()
-}
-
 // Jar restricts both incoming and outgoing cookies, including hostile Domain attributes.
 // CDN requests never receive site credentials. The client does not use browser databases.
 func (s *Session) Jar() http.CookieJar {

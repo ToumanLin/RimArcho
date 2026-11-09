@@ -5,8 +5,6 @@ package app_test
 import (
 	"context"
 	"fmt"
-	"github.com/ToumanLin/RimArcho/internal/accounts"
-	"github.com/ToumanLin/RimArcho/internal/subscribe"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -15,6 +13,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/ToumanLin/RimArcho/internal/accounts"
+	"github.com/ToumanLin/RimArcho/internal/subscribe"
 )
 
 type accountSiteTransport struct {

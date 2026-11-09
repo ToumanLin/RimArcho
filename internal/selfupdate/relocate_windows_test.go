@@ -3,11 +3,12 @@
 package selfupdate_test
 
 import (
-	"github.com/ToumanLin/RimArcho/internal/selfupdate"
-	"github.com/ToumanLin/RimArcho/internal/testkit"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/ToumanLin/RimArcho/internal/selfupdate"
+	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
 func TestWorkshopCopyCleanupKeepsItem(t *testing.T) {
