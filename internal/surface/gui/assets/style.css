@@ -142,6 +142,8 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .window-controls { display: flex; align-items: center; gap: 0; flex: none; margin-left: auto; padding-left: 8px; }
 .window-controls .window-control { flex: none; width: 36px; height: 32px; border-radius: inherit; border-left: var(--hairline) solid var(--line); }
 .window-controls .window-control:last-child:hover { color: var(--bg); background: var(--red); }
+/* Light mode over a picture: grey glyphs and near-white dividers vanish on the shaded photo. */
+:root:not([data-scheme="dark"]) #app.photo .window-controls { --muted: var(--fg); --line: rgba(0, 0, 0, .16); }
 .window-maximize { --wails-non-client-region: maximize; }
 /* the bow, RimArcho's mark (16 §7) */
 .bow { display: block; width: 100%; height: 100%; overflow: visible; }
