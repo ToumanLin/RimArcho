@@ -172,13 +172,14 @@ func signed(n int) string {
 	return "-" + patterns.Thousands(-n)
 }
 
-// previousSave is the colony's save just older than s (nil for its oldest).
+// previousSave is the colony's save just older than s (nil for its oldest); s may be a
+// copy checked against the current list (--current).
 func previousSave(s *app.Save) *app.Save {
 	if s.Colony == nil {
 		return nil
 	}
 	for i, o := range s.Colony.Saves {
-		if o == s && i+1 < len(s.Colony.Saves) {
+		if (o == s || o.Path == s.Path) && i+1 < len(s.Colony.Saves) { // s may be a --current copy
 			return s.Colony.Saves[i+1]
 		}
 	}

@@ -32,7 +32,8 @@ func init() {
 	register(&Command{Name: "saves rename", Args: "<save> <name>", Summary: "rename a save in its folder (keeps a RimSaves folder; refused while the game runs or when the name exists)", MinArgs: 2, MaxArgs: 2, Run: savesRename})
 	register(&Command{Name: "saves rename-colony", Args: "<colony|save> [<name>]", Summary: "name a colony in RimArcho (without a name: back to its saves' name; save files and the game keep theirs)", MinArgs: 1, MaxArgs: 2, Run: savesRenameColony})
 	register(&Command{Name: "saves copy", Args: "<save>", Summary: "copy a save beside itself as <name> (copy), never overwriting", MinArgs: 1, MaxArgs: 1, Run: savesCopy})
-	yes := []Flag{{Name: "yes", Help: "do it (without it: only show the files and sizes)"}}
+	yes := []Flag{{Name: "yes", Help: "do it (without it: only show the files and sizes)"},
+		{Name: "token", Value: "<token>", Help: "with --yes: the preview's token; refused when the saves changed since that preview"}}
 	register(&Command{Name: "saves backup", Args: "<save…>", Summary: "copy saves into RimArcho's backups folder (confirm with --yes)", MinArgs: 1, MaxArgs: -1, Flags: yes, Run: savesBackup})
 	register(&Command{Name: "saves trash", Args: "<save…>", Summary: "move saves to the recycle bin (confirm with --yes; refused while the game runs)", MinArgs: 1, MaxArgs: -1, Flags: yes, Run: savesTrash})
 }
@@ -41,9 +42,11 @@ func init() {
 const metaOnly = "meta only"
 
 // dayText is saves list's day column: the in-game day from the cached full read, else
-// meta only.
+// unreadable (a stored read failed, 12 §1.7) or meta only.
 func dayText(s *app.Save) string {
 	switch {
+	case s.ReadFailed:
+		return "unreadable"
 	case s.Summary == nil:
 		return metaOnly
 	case s.Summary.Malformed:
@@ -329,7 +332,7 @@ func savesList(c *Ctx, a *Args) (*render.Doc, error) {
 	var groups []group
 	total, colonyFound := 0, colony == ""
 	for _, col := range l.Colonies {
-		if colony != "" && !strings.EqualFold(col.Name, colony) {
+		if colony != "" && !strings.EqualFold(col.Name, colony) && (col.GameName == "" || !strings.EqualFold(col.GameName, colony)) {
 			continue
 		}
 		colonyFound = true
@@ -427,7 +430,7 @@ func savesList(c *Ctx, a *Args) (*render.Doc, error) {
 	unread := 0
 	for _, g := range groups {
 		for _, r := range g.rows {
-			if r.s.Summary == nil {
+			if r.s.Summary == nil && !r.s.ReadFailed {
 				unread++
 			}
 		}
@@ -530,7 +533,7 @@ func savesShow(c *Ctx, a *Args) (*render.Doc, error) {
 	d, root := render.New(s.Ref + " " + s.Name + "  [" + chk.Verdict() + "]")
 	col := s.Colony
 	cl := col.Name + " (" + render.Plural(len(col.Saves), "save")
-	if l := col.Latest(); l != s {
+	if l := col.Latest(); l.Path != s.Path {
 		cl += ", latest " + l.Name + " " + l.Ref
 	}
 	root.KV("colony", cl+")")
@@ -773,8 +776,12 @@ func savesFix(c *Ctx, a *Args) (*render.Doc, error) {
 	changed := r.Changed()
 	var head string
 	switch {
+	case !changed && len(r.Waiting) > 0 && len(r.Already) > 0:
+		head = s.Ref + " " + s.Name + ": " + plan + " already loads " + modNames(r.Already) + "; " + render.Plural(len(r.Waiting), "Mod") + " still to download"
 	case !changed && len(r.Waiting) > 0:
 		head = s.Ref + " " + s.Name + ": " + plan + " already has the save's Mods; " + render.Plural(len(r.Waiting), "Mod") + " still to download"
+	case !changed && len(r.Already) > 0:
+		head = s.Ref + " " + s.Name + ": already done, " + plan + " loads " + modNames(r.Already)
 	case !changed:
 		head = s.Ref + " " + s.Name + ": nothing to fix in " + plan
 	case dry:
@@ -814,6 +821,12 @@ func savesFix(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 		n.Add("(a list from the save keeps them: archo loadout import " + quote(s.Path) + " --new " + quote(s.Colony.Name) + ")")
 	}
+	if len(r.Stuck) > 0 {
+		n := root.Section("in the list, not installed, cannot be downloaded")
+		for _, m := range r.Stuck {
+			n.Add(saveModLine(ix, s, m.SaveMod) + "  " + m.Why)
+		}
+	}
 	if len(r.Disable) > 0 {
 		n := root.Section(verb("disabled", "would disable"))
 		for _, m := range r.Disable {
@@ -838,6 +851,7 @@ func savesFix(c *Ctx, a *Args) (*render.Doc, error) {
 	// Subscriptions through the existing Workshop operation, in the save's game.
 	ids := r.WorkshopIDs()
 	var subErr error
+	gone := map[string]string{} // Workshop ID -> why it can never be downloaded (removed from the Workshop)
 	if len(ids) > 0 {
 		var op *app.SubscribeOp
 		subErr = c.App.InSaveList(s, func() error {
@@ -865,10 +879,18 @@ func savesFix(c *Ctx, a *Args) (*render.Doc, error) {
 					line += "  " + it.Result
 				}
 				n.Add(line)
+				if it.Permanent && id != "" {
+					gone[id] = strings.TrimPrefix(it.Result, "failed: ")
+				}
 			}
 			for _, note := range op.Notes {
 				n.KV("note", note)
 			}
+		}
+		// Only items that can never download (removed from the Workshop) failed: not an
+		// error to retry; the save loads without them.
+		if subErr != nil && op != nil && len(gone) > 0 && allGone(op) {
+			subErr = nil
 		}
 		if subErr != nil {
 			n.KV("error", steamErr(subErr).Error())
@@ -884,13 +906,23 @@ func savesFix(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	broken := ""
 	var waiting []app.SaveMod
+	var stuck []app.StuckMod // missing entries no download installs: final, not waited for
 	for _, is := range after.Issues {
 		if is.Kind == app.IssueCutOff || is.Kind == app.IssueUnreadable || is.Kind == app.IssueMalformed {
 			broken = is.Kind
 		}
 	}
 	for _, m := range after.Mods {
-		if m.InList && m.Instance == "" {
+		if !m.InList || m.Instance != "" {
+			continue
+		}
+		why := app.StuckWhy(ix, m)
+		if why == "" && gone[m.SteamID] != "" {
+			why = "ws:" + m.SteamID + " " + gone[m.SteamID]
+		}
+		if why != "" {
+			stuck = append(stuck, app.StuckMod{SaveMod: m, Why: why})
+		} else {
 			waiting = append(waiting, m)
 		}
 	}
@@ -918,7 +950,9 @@ func savesFix(c *Ctx, a *Args) (*render.Doc, error) {
 			d.AddNext("archo scan", "archo saves fix "+s.Ref+" --launch")
 		case dry:
 			root.KV("launch", "would save "+plan+" to the game and start it")
+			stuckNote(root, ix, s, stuck)
 		default:
+			stuckNote(root, ix, s, stuck)
 			var lr *app.SaveResult
 			err := c.App.InSaveList(s, func() error {
 				var err error
@@ -943,6 +977,42 @@ func savesFix(c *Ctx, a *Args) (*render.Doc, error) {
 		d.AddNext("archo saves fix " + s.Ref + " --launch --dry-run")
 	}
 	return d, nil
+}
+
+// modNames names Mods for a status line: their names, the first 3, then how many more.
+func modNames(ms []app.SaveMod) string {
+	var names []string
+	for _, m := range ms[:min(3, len(ms))] {
+		names = append(names, m.Name)
+	}
+	t := strings.Join(names, ", ")
+	if len(ms) > 3 {
+		t += fmt.Sprintf(" and %d more", len(ms)-3)
+	}
+	return t
+}
+
+// allGone reports whether every failed item of a subscription can never download.
+func allGone(op *app.SubscribeOp) bool {
+	for _, it := range op.Items {
+		if strings.HasPrefix(it.Result, "failed") && !it.Permanent {
+			return false
+		}
+	}
+	return true
+}
+
+// stuckNote says which of the save's Mods the launch goes without: missing entries that no
+// download installs (12 §4.4), so --launch does not wait for them.
+func stuckNote(root *render.Node, ix *app.Index, s *app.Save, stuck []app.StuckMod) {
+	if len(stuck) == 0 {
+		return
+	}
+	n := root.KV("without", render.Plural(len(stuck), "Mod")+" of the save that cannot be downloaded; what they added is lost on load")
+	for _, m := range stuck {
+		n.Add(saveModLine(ix, s, m.SaveMod) + "  " + m.Why)
+	}
+	n.Truncate(10, "")
 }
 
 // fixArgv is the saves fix command line without --dry-run.
@@ -989,9 +1059,14 @@ func savesIndex(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Tidy what belongs to saves that are gone, also when saves are named to go first (the
+	// Saves page always names its selected save); --only reads only those and tidies nothing.
 	pruned := 0
-	if len(a.Pos) == 0 {
+	if !a.Bool("only") {
 		if pruned, err = c.App.PruneSaveCache(l); err != nil {
+			return nil, err
+		}
+		if _, err = c.App.SettleColonyNames(l); err != nil {
 			return nil, err
 		}
 	}
@@ -1103,7 +1178,7 @@ func savesBackup(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil || amb != nil {
 		return amb, err
 	}
-	r, err := c.App.BackupSaves(ss, a.Bool("yes"))
+	r, err := c.App.BackupSaves(ss, a.Bool("yes"), a.Str("token"))
 	if err != nil {
 		return nil, err
 	}
@@ -1115,7 +1190,7 @@ func savesBackup(c *Ctx, a *Args) (*render.Doc, error) {
 	d := saveFilesDoc(c, head, r)
 	d.Nodes[0].KV("to", r.Dir)
 	if !r.Done {
-		d.AddNext(confirmCmd("backup", r.Saves))
+		d.AddNext(confirmCmd("backup", r))
 	}
 	return d, nil
 }
@@ -1125,7 +1200,7 @@ func savesTrash(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil || amb != nil {
 		return amb, err
 	}
-	r, err := c.App.TrashSaves(ss, a.Bool("yes"))
+	r, err := c.App.TrashSaves(ss, a.Bool("yes"), a.Str("token"))
 	if err != nil {
 		return nil, err
 	}
@@ -1136,7 +1211,7 @@ func savesTrash(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	d := saveFilesDoc(c, head, r)
 	if !r.Done {
-		d.AddNext(confirmCmd("trash", r.Saves))
+		d.AddNext(confirmCmd("trash", r))
 	}
 	return d, nil
 }
@@ -1156,15 +1231,16 @@ func saveFilesDoc(c *Ctx, head string, r *app.SaveFilesResult) *render.Doc {
 		c.ExitCode = ExitError
 	}
 	if !r.Done {
-		root.KV("confirm", "ask the player, then run it again with --yes")
+		root.KV("confirm", "ask the player, then run it again with --yes --token "+r.Token+" (refused if the saves changed since)")
 	}
 	return d
 }
 
-func confirmCmd(verb string, ss []*app.Save) string {
-	refs := make([]string, len(ss))
-	for i, s := range ss {
+// confirmCmd is the command that confirms a preview, bound to it by its token.
+func confirmCmd(verb string, r *app.SaveFilesResult) string {
+	refs := make([]string, len(r.Saves))
+	for i, s := range r.Saves {
 		refs[i] = s.Ref
 	}
-	return "archo saves " + verb + " " + strings.Join(refs, " ") + " --yes"
+	return "archo saves " + verb + " " + strings.Join(refs, " ") + " --yes --token " + r.Token
 }

@@ -110,6 +110,10 @@ func (r *saveRefs) scrub(s string) string {
 // elapsedRe is the reading time in saves index's first line.
 var elapsedRe = regexp.MustCompile(`\) in [0-9.]+(µs|ms|s|m[0-9.]+s)`)
 
+// tokenRe is a backup or recycle preview's token: it hashes the save references, which
+// depend on the test's folder.
+var tokenRe = regexp.MustCompile(`--token (\d{8}-\d{6}\.)?[0-9a-f]{10}`)
+
 // progressRe is one --progress line of saves index.
 var progressRe = regexp.MustCompile(`^progress: saves (\d+)/(\d+) `)
 
@@ -138,7 +142,7 @@ func runSavesGolden(t *testing.T, name string, e *testkit.Env, steps []step) {
 		}
 		refs.learn()
 		fmt.Fprintf(&sb, "$ archo %s\n", refs.scrub(e.Scrub(strings.Join(args, " "))))
-		sb.WriteString(elapsedRe.ReplaceAllString(refs.scrub(e.Scrub(out)), ") in <time>"))
+		sb.WriteString(tokenRe.ReplaceAllString(elapsedRe.ReplaceAllString(refs.scrub(e.Scrub(out)), ") in <time>"), "--token <token>"))
 		if code != 0 {
 			fmt.Fprintf(&sb, "[exit %d]\n", code)
 		}

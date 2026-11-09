@@ -852,12 +852,15 @@ type SaveFilesPreview struct {
 	Lines  []string `json:"lines"`
 	To     string   `json:"to"`
 	Button string   `json:"button"`
+	// Token binds the confirmation to this preview (app.SaveFilesToken): the page sends it
+	// back, and the action refuses when the saves changed since (12 §4.4).
+	Token string `json:"token"`
 }
 
 // SaveBackupPreview lists what a backup copies and where.
 func SaveBackupPreview(r *app.SaveFilesResult) *SaveFilesPreview {
 	p := &SaveFilesPreview{Title: Tf("back up %d saves (%s)?", len(r.Saves), SizeText(r.Bytes)), Button: T("back up"),
-		To: Tf("copies go to a new folder in %s; the saves stay where they are", filepath.Dir(r.Dir))}
+		To: Tf("copies go to a new folder in %s; the saves stay where they are", filepath.Dir(r.Dir)), Token: r.Token}
 	if len(r.Saves) == 1 {
 		p.Title = Tf("back up %s (%s)?", r.Saves[0].Name, SizeText(r.Bytes))
 	}
@@ -870,7 +873,7 @@ func SaveBackupPreview(r *app.SaveFilesResult) *SaveFilesPreview {
 // SaveTrashPreview lists what recycling moves.
 func SaveTrashPreview(r *app.SaveFilesResult) *SaveFilesPreview {
 	p := &SaveFilesPreview{Title: Tf("move %d saves to the recycle bin (%s)?", len(r.Saves), SizeText(r.Bytes)), Button: T("recycle"),
-		To: T("they go to the recycle bin, where they can be restored; nothing is deleted for good")}
+		To: T("they go to the recycle bin, where they can be restored; nothing is deleted for good"), Token: r.Token}
 	if len(r.Saves) == 1 {
 		p.Title = Tf("move %s to the recycle bin (%s)?", r.Saves[0].Name, SizeText(r.Bytes))
 	}

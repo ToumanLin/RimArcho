@@ -151,6 +151,7 @@
   "reading the saves %d/%d  %s": "正在读取存档 %d/%d  %s",
   "stopped reading the saves: %d read are kept": "已停止读取存档：已读的 %d 个保留",
   "read %d saves": "读取了 %d 个存档",
+  "read %d saves; %d could not be read: %s": "读取了 %d 个存档；%d 个读不了：%s",
   "read the saves": "读取存档",
   "reading the save…": "正在读取存档…",
   "change since %s": "和 %s 相比",

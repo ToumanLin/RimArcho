@@ -259,10 +259,10 @@ $ archo saves backup Tundra Broken
 backup preview, nothing written: 2 saves, 912 B
   sv:<Tundra.rws>  Tundra/Tundra  487 B  $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Tundra.rws
   sv:<Broken.rws>  Broken/Broken  425 B  $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Broken.rws
-  confirm: ask the player, then run it again with --yes
+  confirm: ask the player, then run it again with --yes --token <token> (refused if the saves changed since)
   to: $ROOT/ArchoHome/backups/saves/20261001-100000
 next:
-  archo saves backup sv:<Tundra.rws> sv:<Broken.rws> --yes
+  archo saves backup sv:<Tundra.rws> sv:<Broken.rws> --yes --token <token>
 
 $ archo saves backup Tundra Broken --yes
 backed up 2 saves, 912 B
@@ -273,9 +273,9 @@ backed up 2 saves, 912 B
 $ archo saves trash Broken
 recycle preview, nothing moved: 1 save, 425 B
   sv:<Broken.rws>  Broken/Broken  425 B  $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Broken.rws
-  confirm: ask the player, then run it again with --yes
+  confirm: ask the player, then run it again with --yes --token <token> (refused if the saves changed since)
 next:
-  archo saves trash sv:<Broken.rws> --yes
+  archo saves trash sv:<Broken.rws> --yes --token <token>
 
 $ archo saves trash Broken --yes
 moved to the recycle bin: 1 save, 425 B

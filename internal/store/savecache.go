@@ -5,7 +5,10 @@ import "database/sql"
 // The full read of a save (12 §1.7 L1) depends only on the file, so it is kept by path
 // and valid while the size, modification time and parser version are unchanged. Lists
 // read only the summary columns; the facts (gzip JSON) are read for one save at a time.
-// Path is the caller's key for the file (app uses env.PathKey).
+// Path is the caller's key for the file (app uses env.PathKey). A read that failed is kept
+// as a row too (PutSaveFailure), so a save that cannot be read is not read again on every
+// visit while it is unchanged: its parser is the negative parser version and its facts
+// hold the reason.
 
 // SaveCache is one save's stored full read.
 type SaveCache struct {
@@ -30,6 +33,12 @@ type SaveSummaryRow struct {
 // this parser.
 func (c *SaveCache) Valid(size, mtime int64, parser int) bool {
 	return c != nil && c.Size == size && c.MTime == mtime && c.Parser == parser
+}
+
+// Failed reports whether the row records a failed read of a file of this size and mtime by
+// this parser; Facts then holds the reason.
+func (c *SaveCache) Failed(size, mtime int64, parser int) bool {
+	return c != nil && c.Size == size && c.MTime == mtime && c.Parser == -parser
 }
 
 func upgradeSaveCache(tx *sql.Tx, _ func(done, total int64)) error {
@@ -87,6 +96,11 @@ ON CONFLICT(path) DO UPDATE SET size=excluded.size, mtime=excluded.mtime, parser
  identity=excluded.identity, world=excluded.world, faction=excluded.faction, malformed=excluded.malformed, facts=excluded.facts`,
 		c.Path, c.Size, c.MTime, c.Parser, c.Ticks, c.Identity, c.World, c.Faction, c.Malformed, z)
 	return err
+}
+
+// PutSaveFailure stores (replaces) a failed read of a save: why it could not be read.
+func (s *Store) PutSaveFailure(path string, size, mtime int64, parser int, reason string) error {
+	return s.PutSaveCache(&SaveCache{Path: path, Size: size, MTime: mtime, Parser: -parser, Facts: []byte(reason)})
 }
 
 // DeleteSaveCache removes the rows of saves that no longer exist.
