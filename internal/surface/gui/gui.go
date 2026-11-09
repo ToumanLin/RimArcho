@@ -74,10 +74,12 @@ func Run(o Options) error {
 	frame.options.WebView2CompositionHosting = true
 	win := w.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title: "RimArcho", Width: 1440, Height: 880, MinWidth: 720, MinHeight: 480, URL: perfURL(),
-		Frameless:                  runtime.GOOS == "windows",
-		BackgroundColour:           frame.background,
-		Windows:                    frame.options,
-		DefaultContextMenuDisabled: true, // the page draws its own (16 §8.5)
+		Frameless:        runtime.GOOS == "windows",
+		BackgroundColour: frame.background,
+		Windows:          frame.options,
+		// The page draws its own menus. Without the `production` build tag Wails ignores this,
+		// so nativemenu.js cancels the browser menu too (16 §8.5).
+		DefaultContextMenuDisabled: true,
 	})
 	win.RegisterHook(events.Common.WindowClosing, api.guardWindowClose)
 	api.uninstall.shutdownBlock = uninstallShutdownBlock(win)

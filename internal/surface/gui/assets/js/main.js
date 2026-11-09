@@ -8,6 +8,7 @@
 import { phase as perfPhase } from "./perf.js";
 import { api, on, setText } from "./api.js";
 import "./window-theme.js";
+import { blockNativeMenu } from "./nativemenu.js";
 import "./refnums.js";
 import "./activity.js";
 import "./fulltitle.js";
@@ -50,6 +51,8 @@ import * as modSettings from "./modsettings.js";
 import * as savesPage from "./saves.js";
 import { initRules, refreshRules, startRule, showRules } from "./rules.js";
 import { setMode as setArchoMode, bootLive, bootDone } from "./archo.js";
+
+blockNativeMenu(document);
 
 // ---- loading ----
 
