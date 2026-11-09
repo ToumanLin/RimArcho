@@ -18,27 +18,30 @@ type homeState struct {
 	err     error
 	loading bool
 	seq     int
+	key     string
 }
 
 // openHome shows Start and reads its data on a session of its own.
 func (m *model) openHome() tea.Cmd {
 	m.tab, m.full, m.insp, m.panel = tabHome, false, nil, nil
 	h := &m.home
+	key := m.pageKey()
+	if h.data != nil && h.key == key {
+		return nil
+	}
 	h.seq++
 	h.loading = true
 	seq := m.home.seq
-	return m.bg(func(a *app.App) func(m *model) tea.Cmd {
+	valid := func(m *model) bool { return m.home.seq == seq && m.tab == tabHome && m.pageKey() == key }
+	return m.bgWhen(valid, func(a *app.App) func(m *model) tea.Cmd {
 		// the page is about the current list, whichever list the editor has open (07 §1.3)
 		a.OpenPlan, a.PlanName = 0, ""
 		data, err := homeOf(a)
 		return func(m *model) tea.Cmd {
-			if m.home.seq == seq {
-				m.home.data, m.home.err, m.home.loading = data, err, false
-				if m.tab == tabHome {
-					if row := m.homeRow(); row != nil && row.Memory != nil && (!row.Memory.Assessment.Estimated || row.Memory.Assessment.Stale) {
-						return m.startMemoryEstimateAt(row.Plan, row.EnvName)
-					}
-				}
+			m.home.data, m.home.err, m.home.loading = data, err, false
+			m.home.key = key
+			if row := m.homeRow(); row != nil && row.Memory != nil && (!row.Memory.Assessment.Estimated || row.Memory.Assessment.Stale) {
+				return m.startMemoryEstimateAt(row.Plan, row.EnvName)
 			}
 			return nil
 		}
@@ -62,7 +65,7 @@ func homeOf(a *app.App) (*view.Home, error) {
 	if err != nil {
 		return nil, err
 	}
-	return view.BuildHomeFromState(a, st, view.BuildNeeds(a, st, ps), plans, nil), nil
+	return view.BuildLaunchFromState(a, st, view.BuildNeeds(a, st, ps), plans), nil
 }
 
 // goLaunch is the editor's L (and the palette's launch game): the list in the editor becomes

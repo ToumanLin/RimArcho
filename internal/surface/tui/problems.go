@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -14,6 +16,10 @@ import (
 // process (A) and the choice of log (l).
 
 type probState struct {
+	seq           int
+	reading       bool
+	readKey       string
+	logKey        string
 	memoryReading bool
 	memoryAt      time.Time
 	items         []need
@@ -48,11 +54,63 @@ type analyzeDoneMsg struct{ err error }
 type AnalyzeRunner func(envName string, progress func(string)) error
 
 func (m *model) ensureProblems() tea.Cmd {
-	before := m.status
 	// The player looks at problems now: include the newest log, parsing it if needed.
 	m.app.LazyLog, m.app.LogCacheOnly = false, false
-	m.loadProblems()
+	m.prob.seq++
+	m.prob.reading = true
+	seq, scope, key := m.prob.seq, m.pageScope(), m.pageKey()
+	readKey, logKey := m.prob.readKey, m.prob.logKey
+	// Parsing the log can itself write a report. Local edits change the scope;
+	// a worker's own report must not invalidate its answer.
+	valid := func(m *model) bool {
+		if m.tab != tabProblems || m.prob.seq != seq || m.pageScope() != scope {
+			return false
+		}
+		m.prob.reading = false
+		return true
+	}
+	return m.bgWhen(valid, func(a *app.App) func(*model) tea.Cmd {
+		st, err := a.Loadout()
+		logPath, stamp := "", ""
+		if err == nil && st != nil {
+			logPath = a.ProblemLog(st)
+			stamp = logPath
+			if fi, e := os.Stat(logPath); e == nil {
+				stamp = fmt.Sprintf("%s|%d|%d", logPath, fi.Size(), fi.ModTime().UnixNano())
+			}
+		}
+		if err == nil && readKey == key && logKey == stamp {
+			return func(m *model) tea.Cmd { return m.checkProblems() }
+		}
+		var vn *view.Needs
+		if err == nil {
+			ps, e := a.Problems(false, nil)
+			err = e
+			if err == nil {
+				vn = view.BuildNeeds(a, st, ps)
+			}
+		}
+		return func(m *model) tea.Cmd {
+			if err != nil {
+				m.say(sayFail, m.humanize(err.Error()))
+				return nil
+			}
+			m.setNeeds(vn)
+			m.prob.readKey, m.prob.logKey = key, stamp
+			if m.newLog && m.st != nil {
+				if cur, _ := m.app.LogPaths(m.st); cur != "" && logPath == cur {
+					m.app.SelectLog(m.st, cur)
+					m.newLog = false
+				}
+			}
+			return m.checkProblems()
+		}
+	})
+}
+
+func (m *model) checkProblems() tea.Cmd {
 	if (m.prob.stale || m.prob.never) && !m.analyzing {
+		before := m.status
 		cmd := m.startAnalyze()
 		m.analyzeQuiet, m.status = true, before
 		return tea.Batch(cmd, m.startMemoryEstimate(false))
@@ -80,6 +138,15 @@ func (m *model) loadProblems() {
 		}
 	}
 	vn := view.BuildNeeds(m.app, m.st, ps)
+	m.setNeeds(vn)
+	// The initial cache-only read is complete when there is no log. Opening the
+	// page still checks its log path/mtime on the worker before reusing these items.
+	p.readKey, p.logKey = m.pageKey(), ""
+}
+
+func (m *model) setNeeds(vn *view.Needs) {
+	p := &m.prob
+	p.loaded, p.countsKey = true, m.app.Store.ChangeKey()
 	p.never, p.stale = vn.Never, vn.Stale
 	p.base, p.status, p.need, p.lastRun, p.elsewhere = vn.Items, vn.Status, vn.Count, vn.LastRun, vn.Elsewhere
 	p.lastSave = vn.LastSave

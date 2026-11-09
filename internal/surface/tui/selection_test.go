@@ -70,7 +70,7 @@ func TestSelectionRows(t *testing.T) {
 					}
 				}
 			}
-			m.openLibrary()
+			finishPage(m, m.openLibrary())
 			libAt(t, m, "Alpha")
 			i := m.libr.cursor
 			m.libr.marked = map[string]bool{}

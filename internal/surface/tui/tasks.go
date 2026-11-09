@@ -76,16 +76,41 @@ func (m *model) snapshot() *app.App {
 // bg runs read on its own session off the screen goroutine (16 §3.1 rule 9) and hands the
 // result back as a message.
 func (m *model) bg(read func(a *app.App) func(m *model) tea.Cmd) tea.Cmd {
+	return m.bgWhen(nil, read)
+}
+
+// bgWhen also guards session-open errors, so a late failure cannot change a newer page.
+func (m *model) bgWhen(valid func(*model) bool, read func(a *app.App) func(m *model) tea.Cmd) tea.Cmd {
 	snap := m.snapshot()
+	snap.ReadIndex(m.app)
 	return func() tea.Msg {
 		a, err := snap.ReadSession()
+		var apply func(*model) tea.Cmd
 		if err != nil {
-			return bgMsg{func(m *model) tea.Cmd { m.say(sayFail, m.humanize(err.Error())); return nil }}
+			apply = func(m *model) tea.Cmd { m.say(sayFail, m.humanize(err.Error())); return nil }
+		} else {
+			defer a.Close()
+			a.ReadIndex(snap)
+			a.WorkspaceSnapshot()
+			apply = read(a)
 		}
-		defer a.Close()
-		a.WorkspaceSnapshot()
-		return bgMsg{read(a)}
+		return bgMsg{func(m *model) tea.Cmd {
+			if valid != nil && !valid(m) {
+				return nil
+			}
+			return apply(m)
+		}}
 	}
+}
+
+// pageKey invalidates the bounded page snapshots after edits, external writes,
+// environment changes or an editor reload, including an open-list change.
+func (m *model) pageKey() string {
+	return m.app.Store.ChangeKey() + "|" + m.pageScope()
+}
+
+func (m *model) pageScope() string {
+	return m.envName + "|" + view.PlanPage(m.app.OpenPlan) + "|" + itoa(m.boardSeq)
 }
 
 // taskList opens the record the first time a task is queued (the window may have written

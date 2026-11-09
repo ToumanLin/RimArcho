@@ -98,7 +98,7 @@ func TestShortcutsFolderWorkshopChanges(t *testing.T) {
 	}
 
 	// Mod library: the cursor's Lineage
-	m.openLibrary()
+	finishPage(m, m.openLibrary())
 	for i, r := range m.libr.page.Rows {
 		if r.Name == "Alpha" {
 			m.libr.cursor = i

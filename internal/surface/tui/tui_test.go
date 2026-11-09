@@ -178,34 +178,51 @@ func direct(t *testing.T, e *testkit.Env, w, h int) *model {
 	return m
 }
 
+// finishPage delivers a page read without running unrelated ticks or analysis commands.
+func finishPage(m *model, cmd tea.Cmd) {
+	if cmd != nil {
+		if msg, ok := cmd().(bgMsg); ok {
+			msg.apply(m)
+		}
+	}
+}
+
+func updatePage(m *model, msg tea.Msg) {
+	seq := m.prob.seq
+	_, cmd := m.update(msg)
+	if m.tab == tabLibrary && m.libr.loading || m.tab == tabHome && m.home.loading || m.prob.seq != seq || m.panel != nil && m.panel.title == T("texture optimisation") {
+		finishPage(m, cmd)
+	}
+}
+
 func press(m *model, k string) {
 	switch k {
 	case "space":
-		m.update(tea.KeyMsg{Type: tea.KeySpace, Runes: []rune(" ")})
+		updatePage(m, tea.KeyMsg{Type: tea.KeySpace, Runes: []rune(" ")})
 	case "down":
-		m.update(tea.KeyMsg{Type: tea.KeyDown})
+		updatePage(m, tea.KeyMsg{Type: tea.KeyDown})
 	case "up":
-		m.update(tea.KeyMsg{Type: tea.KeyUp})
+		updatePage(m, tea.KeyMsg{Type: tea.KeyUp})
 	case "enter":
-		m.update(tea.KeyMsg{Type: tea.KeyEnter})
+		updatePage(m, tea.KeyMsg{Type: tea.KeyEnter})
 	case "esc":
-		m.update(tea.KeyMsg{Type: tea.KeyEsc})
+		updatePage(m, tea.KeyMsg{Type: tea.KeyEsc})
 	case "left":
-		m.update(tea.KeyMsg{Type: tea.KeyLeft})
+		updatePage(m, tea.KeyMsg{Type: tea.KeyLeft})
 	case "right":
-		m.update(tea.KeyMsg{Type: tea.KeyRight})
+		updatePage(m, tea.KeyMsg{Type: tea.KeyRight})
 	case "shift+up":
-		m.update(tea.KeyMsg{Type: tea.KeyShiftUp})
+		updatePage(m, tea.KeyMsg{Type: tea.KeyShiftUp})
 	case "shift+down":
-		m.update(tea.KeyMsg{Type: tea.KeyShiftDown})
+		updatePage(m, tea.KeyMsg{Type: tea.KeyShiftDown})
 	case "ctrl+up":
-		m.update(tea.KeyMsg{Type: tea.KeyCtrlUp})
+		updatePage(m, tea.KeyMsg{Type: tea.KeyCtrlUp})
 	case "ctrl+down":
-		m.update(tea.KeyMsg{Type: tea.KeyCtrlDown})
+		updatePage(m, tea.KeyMsg{Type: tea.KeyCtrlDown})
 	case "ctrl+space":
-		m.update(tea.KeyMsg{Type: tea.KeyCtrlAt})
+		updatePage(m, tea.KeyMsg{Type: tea.KeyCtrlAt})
 	default:
-		m.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)})
+		updatePage(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)})
 	}
 }
 

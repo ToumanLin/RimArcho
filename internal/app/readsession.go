@@ -89,6 +89,17 @@ func (a *App) AdoptReadSnapshot(r *App) {
 	a.OpenPlan, a.PlanName = r.OpenPlan, r.PlanName
 }
 
+// AdoptLibrary detaches a finished page's inventory from its closed read session.
+// Keep the worker's list and index, including external changes not yet in the editor.
+func (a *App) AdoptLibrary(lib *Library) {
+	st := *lib.St
+	ix := *st.Ix
+	ix.store = a.Store
+	st.Ix = &ix
+	st.localize = a.localizer(ix.Env.ID, st.Reg, &ix)
+	lib.St = &st
+}
+
 // ReadIndex gives an idle reader the warm index of a. Call with a locked. The reader gets
 // its own Index (environment, session for foreign-list lookups) over the same Mods, maps,
 // lineages and sources: they are not changed once built, and their lazy declarations are
@@ -106,6 +117,11 @@ func (b *App) ReadIndex(a *App) {
 	d := a.declStore()
 	if d == nil {
 		return
+	}
+	// An options snapshot can carry this index into a later ReadSession too.
+	// It borrows the directory owner's declaration connection; it never owns it.
+	if b.decl == nil {
+		b.decl = a.decl
 	}
 	d.BindMods(a.ixCache.Mods)
 	x := *a.ixCache
