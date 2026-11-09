@@ -13,6 +13,7 @@ Investigations, measurements and open questions; once a report's conclusions are
 | [mcp-eval-design.md](mcp-eval-design.md) | Design, cases and aggregate results of the Archo MCP A/B evaluation | Active |
 | [2026-11-04_mcp-transcript-review.md](2026-11-04_mcp-transcript-review.md) | Round 1 transcript review: where agents lost time with `archo mcp` | Evidence for known noise (06 §1); proposals in §7, status in round 2 §6 |
 | [2026-11-05_mcp-transcript-review-round2.md](2026-11-05_mcp-transcript-review-round2.md) | Round 2 transcript review (h1, h2, h5; Pi and dsh) | Open: proposals in §7 |
+| [2026-11-08_ai-mod-repair.md](2026-11-08_ai-mod-repair.md) | What RimArcho must provide for agents to fix Mods for players: zero setup, copies, proof, fix records; where C# rebuilding fits | Proposal (ToDo: Archo Agent); order in §5 |
 
 ## Performance and memory
 

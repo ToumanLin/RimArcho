@@ -2,6 +2,8 @@
 
 Things to research, not yet decided. Once decided, put them in the specifications (implementation plans in 01 §4); research goes in docs/research/.
 
+## Change UI, make upgrade RimArcho more visible
+
 ## MCP test&improve
 Baed on benchmark exam on real mod list and error log from corpus research
 
@@ -61,6 +63,14 @@ Optionally count occurrences instead of only recording that something appeared. 
 ## Archo Agent
 
 Archo should be a Mod development agent that can take action, not just translate or tag. Tentatively use a modified Pi agent; the approach needs research.
+
+AI Mod repair ([research](docs/research/2026-11-08_ai-mod-repair.md)). Evaluations say the player's risks are a wrong fix, an unneeded fix (h9: 0/6 said "nothing to fix") and changes to real files, more than a missing .NET SDK. In order:
+1. Re-run h4, h7, h8, h9 on 1.0.9 (the h4/h7 attribution fixes are not measured yet).
+2. Fix ladder (list → settings → XML → patch Mod → rebuild) and "nothing to fix" in the guide and outputs; flag a change that only hides the error.
+3. ilspycmd as a `deps` entry: the win-x64 AOT build runs without .NET, downloaded after consent, pinned hash, GitHub copy for the mirror. Changes 05 §5.4 / 17 §1 "never installed".
+4. `archo build` / `build_mod` without the SDK: framework, references and publicizer from the plan, output only to a pinned copy or patch Mod, then `source diff` and `test_run`. Compiler size and AOT unmeasured.
+5. Fix records: what, why, which Mod version, test result; recheck on upstream update; report text for the author; remove all.
+6. 15 §4.2 says code fixes are explanation only: allow them on a copy, after a passing `test_run`, behind a confirmation card.
 
 # Deferred
 
