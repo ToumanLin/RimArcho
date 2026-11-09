@@ -2,8 +2,6 @@
 
 Things to research, not yet decided. Once decided, put them in the specifications (implementation plans in 01 §4); research goes in docs/research/.
 
-## Change UI, make upgrade RimArcho more visible
-
 ## MCP test&improve
 Baed on benchmark exam on real mod list and error log from corpus research
 
@@ -32,12 +30,6 @@ Player feedback says the GUI is very jumpy. Investigated 11-08 (headless-Edge fi
 - Check all of it on a real 5,000-Mod library in the VM (row in release-vm-tests.md, 2026-11-08 "Less jumpy window").
 - Sidebar: sub-entries still open and close with a 250 ms height animation on every page change (off with motion: reduced). Decide whether the default should be instant, or keep the space reserved.
 - Can it run redraws fully on the 2 s live poll while the game runs; new items push the columns down.
-- Mod library: the selection bar sits in the page flow and shrinks the table when it appears (rows do not move).
-
-### color
-per player:
-Is it possible to add the ability to change the background color of a mod in the list (or attach a background color to a "main" tag)? I like to group mods that are not for every playthrough into categories like "Gravship", "Medieval" or "Rimworld of Magic" and while tags help with it, having a direct visualization in the list would be helpful.
-It does not have to be a full background color, it can be just a colored shape in front of the mod name or something.
 
 ## Translation
 Auto translate mod details? Need to think about it. 因为需要OCR. 
@@ -62,15 +54,14 @@ Optionally count occurrences instead of only recording that something appeared. 
 
 ## Archo Agent
 
-Archo should be a Mod development agent that can take action, not just translate or tag. Tentatively use a modified Pi agent; the approach needs research.
+Archo should be a Mod development agent that can take action, not just translate or tag. Base: dsh (MIT, can ship with RimArcho): on h4, h7 and h8 (eval rounds 4–5) it solved 8/9, Pi 7/9, Pi with Archo's instructions 6/9 (mcp-eval-design Round 5); pass it Archo's MCP instructions. All rounds used deepseek-flash.
 
-AI Mod repair ([research](docs/research/2026-11-08_ai-mod-repair.md)). Evaluations say the player's risks are a wrong fix, an unneeded fix (h9: 0/6 said "nothing to fix") and changes to real files, more than a missing .NET SDK. In order:
-1. Re-run h4, h7, h8, h9 on 1.0.9 (the h4/h7 attribution fixes are not measured yet).
-2. Fix ladder (list → settings → XML → patch Mod → rebuild) and "nothing to fix" in the guide and outputs; flag a change that only hides the error.
+AI Mod repair ([research](docs/research/2026-11-08_ai-mod-repair.md)), deferred 2026-11-09: the MCP tools are good enough for now (diagnosis works: h4 5/6, h7 6/6, h8 culprit 8/9; what fails is execution). Prefer facts and checks over prescribed workflows: guidance that does the steps for the model may limit stronger models. When it resumes:
+1. Fix records (the most important): every agent fix writes a record file in the pinned copy or patch Mod (what changed per file, why: cluster and evidence, original Mod version, `test_run` before/after, date) and a one or two line summary in the copy's RimArcho note, which was built for this. Today `pin_mod reason` sets the note only at pin time and `set_player_data copy_note` is `--tools all` only and replaces the text: add a core-group way to append. Flag a pinned copy that differs from its git baseline without a record. Also: recheck on upstream update, report text for the author, remove all.
+2. 15 §4.2 says code fixes are explanation only: allow them on a copy, after a passing `test_run`, behind a confirmation card.
 3. ilspycmd as a `deps` entry: the win-x64 AOT build runs without .NET, downloaded after consent, pinned hash, GitHub copy for the mirror. Changes 05 §5.4 / 17 §1 "never installed".
-4. `archo build` / `build_mod` without the SDK: framework, references and publicizer from the plan, output only to a pinned copy or patch Mod, then `source diff` and `test_run`. Compiler size and AOT unmeasured.
-5. Fix records: what, why, which Mod version, test result; recheck on upstream update; report text for the author; remove all.
-6. 15 §4.2 says code fixes are explanation only: allow them on a copy, after a passing `test_run`, behind a confirmation card.
+4. "Nothing to fix" said by `status` / `analyze_log` as a fact (h9 0/6, not re-run on 1.0.9); keep any fix ladder short.
+5. `archo build` / `build_mod`: last or not at all. The `csc` builds it was meant to prevent are now flagged (`built: !!`, `access: !!`, `shipped:`).
 
 # Deferred
 
