@@ -73,7 +73,7 @@ jobs:
 
       - name: Select non-GUI packages
         run: |
-          go list ./... | grep -Ev '/(internal/surface/(gui|upgradewin)|spikes)(/|$)' > "$RUNNER_TEMP/linux-packages"
+          go list -e ./... | grep -Ev '/(internal/surface/(gui|upgradewin)|spikes)(/|$)' > "$RUNNER_TEMP/linux-packages"
 
       - name: go build
         run: go build ./cmd/archo
