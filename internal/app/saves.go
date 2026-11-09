@@ -39,6 +39,9 @@ type SaveFolder struct {
 	Dir  string
 	Envs []*env.Environment // the games that save here (none for a pack of a removed game)
 	Pack string             // the pack whose folder this is
+	// Listed: the folder was read (it exists and is readable), so a colony name kept for
+	// its saves that no colony answers to any more can go (SettleColonyNames).
+	Listed bool
 }
 
 // Save is one .rws file as read now.
@@ -60,6 +63,9 @@ type Save struct {
 	// Summary is the full read's summary (12 §1.7 L1) when the cache has a valid one;
 	// nil: read from the head only ("meta only"). SaveFacts gives the whole read.
 	Summary *SaveSummary
+	// ReadFailed: the full read of the file as it is now failed (stored, 12 §1.7), so it is
+	// not read again until the file changes; SaveFacts gives the reason.
+	ReadFailed bool
 
 	// The list it matches (12 §4.2): a plan, a pack, or neither.
 	Env   *env.Environment
@@ -91,6 +97,9 @@ type Colony struct {
 	// when the player renamed the colony in RimArcho (Name); "" when not renamed.
 	GameName string  `json:"gameName,omitempty"`
 	Saves    []*Save // newest first
+	// nameKeys are the colony_name keys this colony answers to: its Key, then (a world
+	// colony) the file-name keys it claims (nameClaims), newest save first.
+	nameKeys []string
 	// By: how the saves were grouped: "rimsaves" (folder prefix), "world" (the full
 	// read's world identity) or "name" (file name).
 	By string `json:"by"`
@@ -182,6 +191,7 @@ func (a *App) ListSaves() (*SaveList, error) {
 			}
 			continue
 		}
+		f.Listed = true
 		for _, de := range ents {
 			if de.IsDir() || !strings.EqualFold(filepath.Ext(de.Name()), ".rws") {
 				continue
@@ -213,26 +223,62 @@ func (a *App) ListSaves() (*SaveList, error) {
 
 // nameColonies gives the colonies the names the player set (12 §4.1). A colony grouped by
 // world identity also takes a name set while its saves were grouped by file name, before
-// their full read.
+// their full read: the file-name key it claims (nameClaims).
 func (a *App) nameColonies(cols []*Colony) error {
+	claims := nameClaims(cols)
+	for _, c := range cols {
+		c.nameKeys = []string{c.Key}
+		for _, s := range c.Saves {
+			if k := colonyNameKey(s); claims[k] == c && !slices.Contains(c.nameKeys, k) {
+				c.nameKeys = append(c.nameKeys, k)
+			}
+		}
+	}
 	names, err := a.Store.ColonyNames()
 	if err != nil || len(names) == 0 {
 		return err
 	}
 	for _, c := range cols {
-		n, ok := names[c.Key]
-		for i := 0; !ok && c.By == "world" && i < len(c.Saves); i++ {
-			n, ok = names[colonyNameKey(c.Saves[i])]
-		}
-		if ok && n != c.Name {
-			c.GameName, c.Name = c.Name, n
+		for _, k := range c.nameKeys {
+			if n, ok := names[k]; ok {
+				if n != c.Name {
+					c.GameName, c.Name = c.Name, n
+				}
+				break
+			}
 		}
 	}
 	return nil
 }
 
+// nameClaims gives each file-name key (colonyNameKey) the one world colony that answers to
+// it: of the world colonies with a manual save of that name, the one with the oldest such
+// save, which was there when the name was set. A later playthrough saved under the same
+// name in another world does not take that colony's name.
+func nameClaims(cols []*Colony) map[string]*Colony {
+	claims := map[string]*Colony{}
+	oldest := map[string]time.Time{}
+	for _, c := range cols {
+		if c.By != "world" {
+			continue
+		}
+		for _, s := range c.Saves {
+			if s.Auto {
+				continue
+			}
+			k := colonyNameKey(s)
+			if t, ok := oldest[k]; !ok || s.ModTime.Before(t) {
+				claims[k], oldest[k] = c, s.ModTime
+			}
+		}
+	}
+	return claims
+}
+
 // RenameColony names a colony in RimArcho (12 §4.1); "" gives it back its saves' name.
-// The save files and the game keep their names.
+// The name is kept by the colony's key; every other key it answered to is cleared, so an
+// older name does not come back and a file-name key does not pass the name on. The save
+// files and the game keep their names.
 func (a *App) RenameColony(c *Colony, name string) error {
 	name = strings.TrimSpace(name)
 	if len([]rune(name)) > ColonyNameMax {
@@ -241,7 +287,79 @@ func (a *App) RenameColony(c *Colony, name string) error {
 	if name == c.GameName || c.GameName == "" && name == c.Name {
 		name = ""
 	}
-	return a.Store.SetColonyName(c.Key, name)
+	keys := c.nameKeys
+	if len(keys) == 0 {
+		keys = []string{c.Key}
+	}
+	return a.Store.ReplaceColonyName(c.Key, keys, name)
+}
+
+// SettleColonyNames tidies the stored colony names against a listing (12 §4.1): a name a
+// world colony takes from a file-name key moves to the colony's own key, and a name no
+// listed colony answers to is removed when its folder was read and all its saves have a
+// full read (a folder that is missing for now, such as on a drive not plugged in, keeps
+// its names). It returns how many keys it removed.
+func (a *App) SettleColonyNames(l *SaveList) (int, error) {
+	names, err := a.Store.ColonyNames()
+	if err != nil || len(names) == 0 {
+		return 0, err
+	}
+	answered, own := map[string]bool{}, map[string]bool{}
+	for _, c := range l.Colonies {
+		own[c.Key] = true
+	}
+	removed := 0
+	for _, c := range l.Colonies {
+		for _, k := range c.nameKeys {
+			answered[k] = true
+		}
+		if len(c.nameKeys) < 2 {
+			continue
+		}
+		n, ok := names[c.Key]
+		var drop []string
+		for _, k := range c.nameKeys[1:] {
+			if v, has := names[k]; has && !own[k] { // a colony grouped by that file name keeps it
+				if !ok {
+					n, ok = v, true
+				}
+				drop = append(drop, k)
+			}
+		}
+		if len(drop) == 0 {
+			continue
+		}
+		if err := a.Store.ReplaceColonyName(c.Key, append([]string{c.Key}, drop...), n); err != nil {
+			return removed, err
+		}
+		removed += len(drop)
+	}
+	// A save without a full read groups by its file name, so its world colony answers to
+	// nothing yet: a folder with such a save keeps every name until its saves are read.
+	unread := map[*SaveFolder]bool{}
+	for _, s := range l.Saves() {
+		if s.Summary == nil {
+			unread[s.Folder] = true
+		}
+	}
+	var dead []string
+	for k := range names {
+		if answered[k] {
+			continue
+		}
+		for _, f := range l.Folders {
+			if f.Listed && !unread[f] && strings.HasPrefix(k, env.PathKey(f.Dir)+"|") {
+				dead = append(dead, k)
+				break
+			}
+		}
+	}
+	if len(dead) > 0 {
+		if err := a.Store.DeleteColonyNames(dead); err != nil {
+			return removed, err
+		}
+	}
+	return removed + len(dead), nil
 }
 
 // ColonyNameMax is the longest colony name, in characters.

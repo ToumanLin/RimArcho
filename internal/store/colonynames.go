@@ -31,6 +31,30 @@ func (s *Store) ColonyNames() (map[string]string, error) {
 	return out, rows.Err()
 }
 
+// ReplaceColonyName clears every key in clear, then names the colony by key ("" leaves it
+// unnamed), in one transaction: a colony answers to several keys (12 §4.1).
+func (s *Store) ReplaceColonyName(key string, clear []string, name string) error {
+	name = strings.TrimSpace(name)
+	return s.inTx(func(tx *sql.Tx) error {
+		for _, k := range clear {
+			if _, err := tx.Exec(`DELETE FROM colony_name WHERE key=?`, k); err != nil {
+				return err
+			}
+		}
+		if name == "" {
+			return nil
+		}
+		_, err := tx.Exec(`INSERT INTO colony_name(key, name) VALUES(?,?)
+		ON CONFLICT(key) DO UPDATE SET name=excluded.name`, key, name)
+		return err
+	})
+}
+
+// DeleteColonyNames removes the names kept by these keys.
+func (s *Store) DeleteColonyNames(keys []string) error {
+	return s.ReplaceColonyName("", keys, "")
+}
+
 // SetColonyName names a colony; "" clears the name, so the colony takes its saves' name.
 func (s *Store) SetColonyName(key, name string) error {
 	name = strings.TrimSpace(name)

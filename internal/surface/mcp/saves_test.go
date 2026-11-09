@@ -164,7 +164,15 @@ func TestManageSavesActions(t *testing.T) {
 	if isErr || len(trashed) != 0 || !strings.Contains(out, "recycle preview, nothing moved") {
 		t.Errorf("trash without confirm moved %v:\n%s", trashed, out)
 	}
-	out, isErr = call(t, cs, "manage_saves", map[string]any{"action": "trash", "saves": []string{"Broken"}, "confirm": true})
+	i := strings.Index(out, "--token ")
+	if i < 0 {
+		t.Fatalf("the trash preview names no token:\n%s", out)
+	}
+	token := strings.Fields(out[i+len("--token "):])[0]
+	if out, isErr = call(t, cs, "manage_saves", map[string]any{"action": "trash", "saves": []string{"Broken"}, "confirm": true}); !isErr || len(trashed) != 0 {
+		t.Errorf("trash confirm=true without its preview's token: trashed %v\n%s", trashed, out)
+	}
+	out, isErr = call(t, cs, "manage_saves", map[string]any{"action": "trash", "saves": []string{"Broken"}, "confirm": true, "token": token})
 	if isErr || !slices.Equal(trashed, []string{"Broken.rws"}) || !strings.HasPrefix(out, "moved to the recycle bin: 1 save") {
 		t.Errorf("trash confirm=true: trashed %v\n%s", trashed, out)
 	}
@@ -210,7 +218,9 @@ func TestManageSavesArgv(t *testing.T) {
 		{`{"action":"backup","saves":["a","b"]}`, []string{"saves", "backup", "a", "b"}},
 		{`{"action":"backup","saves":["a"],"confirm":true}`, []string{"saves", "backup", "a", "--yes"}},
 		{`{"action":"trash","saves":["a"],"confirm":true,"dry_run":true}`, []string{"saves", "trash", "a"}},
-		{`{"action":"trash","saves":["a"],"confirm":true}`, []string{"saves", "trash", "a", "--yes"}},
+		{`{"action":"trash","saves":["a"],"confirm":true,"token":"0a1b"}`, []string{"saves", "trash", "a", "--yes", "--token", "0a1b"}},
+		{`{"action":"backup","saves":["a"],"confirm":true,"token":"20261109-120000.0a1b"}`, []string{"saves", "backup", "a", "--yes", "--token", "20261109-120000.0a1b"}},
+		{`{"action":"backup","saves":["a"],"token":"0a1b"}`, []string{"saves", "backup", "a"}},
 	} {
 		got, err := mcp.ArgvFor("manage_saves", []byte(c.args))
 		if err != nil || !slices.Equal(got, c.want) {

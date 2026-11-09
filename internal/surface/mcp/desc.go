@@ -101,4 +101,4 @@ const descListSaves = `Saves of every game and pack, grouped by colony, newest f
 
 const descGetSave = `One save (sv:ref, name or colony/save): load issues with fixes, Mod differences and playthrough (play=true for all colonists/events). content=true shows referenced content by Mod/category, using installed versions, with coverage limits. Read-only.`
 
-const descManageSaves = `Save actions: fix (the save's Mod fixes as one undoable edit of its list, subscribing missing Workshop Mods; launch=true then starts it), rename, copy, backup, trash (recycle bin). dry_run=true previews fix; backup and trash only preview unless confirm=true: ask the player first.`
+const descManageSaves = `Save actions: fix (its Mod fixes as one undoable list edit, subscribing Workshop Mods; launch=true then starts it), rename, copy, backup, trash (recycle bin). dry_run=true previews fix; backup and trash only preview unless confirm=true with the preview's token: ask the player first.`

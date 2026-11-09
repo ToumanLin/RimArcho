@@ -114,23 +114,23 @@ func TestSavesPage(t *testing.T) {
 	}
 
 	// backup and recycle preview first, then act
-	b, err := api.SaveBackup([]string{"Colony 1"}, false)
+	b, err := api.SaveBackup([]string{"Colony 1"}, false, "")
 	if err != nil || b.Preview == nil || len(b.Preview.Lines) != 1 || b.Text != "" {
 		t.Fatalf("backup preview %+v %v", b, err)
 	}
-	if b, err = api.SaveBackup([]string{"Colony 1"}, true); err != nil || b.Failed || !strings.HasPrefix(b.Text, "backed up Colony 1 to ") {
+	if b, err = api.SaveBackup([]string{"Colony 1"}, true, b.Preview.Token); err != nil || b.Failed || !strings.HasPrefix(b.Text, "backed up Colony 1 to ") {
 		t.Fatalf("backup %+v %v", b, err)
 	}
 	var trashed []string
 	e.App.TrashFunc = func(path string) error { trashed = append(trashed, path); return os.Remove(path) }
-	tr, err := api.SaveTrash([]string{"Colony 2"}, false)
+	tr, err := api.SaveTrash([]string{"Colony 2"}, false, "")
 	if err != nil || tr.Preview == nil || tr.Preview.Button != "recycle" || len(trashed) != 0 {
 		t.Fatalf("recycle preview %+v %v %v", tr, err, trashed)
 	}
-	if tr, err = api.SaveTrash([]string{"Colony 2"}, true); err != nil || tr.Failed || len(trashed) != 1 {
+	if tr, err = api.SaveTrash([]string{"Colony 2"}, true, tr.Preview.Token); err != nil || tr.Failed || len(trashed) != 1 {
 		t.Fatalf("recycle %+v %v %v", tr, err, trashed)
 	}
-	if _, err := api.SaveTrash(nil, false); err == nil {
+	if _, err := api.SaveTrash(nil, false, ""); err == nil {
 		t.Fatal("recycled nothing")
 	}
 

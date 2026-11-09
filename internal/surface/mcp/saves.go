@@ -51,15 +51,18 @@ type ManageSavesIn struct {
 	Saves        StrList `json:"saves" jsonschema:"sv:<hex>, file names or <colony>/<save>; fix, rename, copy take one"`
 	Name         string  `json:"name,omitempty" jsonschema:"rename: the new name"`
 	Mods         StrList `json:"mods,omitempty" jsonschema:"fix: only these packageIds"`
-	DisableAdded bool    `json:"disable_added,omitempty" jsonschema:"fix: disable the list's Mods the save lacks"`
+	DisableAdded bool    `json:"disable_added,omitempty" jsonschema:"fix: disable Mods the save lacks"`
 	Order        bool    `json:"order,omitempty" jsonschema:"fix: use the save's order"`
-	Launch       bool    `json:"launch,omitempty" jsonschema:"fix: then start the game with the list"`
-	DryRun       bool    `json:"dry_run,omitempty" jsonschema:"fix, backup, trash: preview only"`
-	Confirm      bool    `json:"confirm,omitempty" jsonschema:"backup, trash: do it, after the player agreed"`
+	Launch       bool    `json:"launch,omitempty" jsonschema:"fix: then launch"`
+	DryRun       bool    `json:"dry_run,omitempty" jsonschema:"preview only"`
+	Confirm      bool    `json:"confirm,omitempty" jsonschema:"backup, trash: do it once the player agreed"`
+	Token        string  `json:"token,omitempty" jsonschema:"the preview's token"`
 }
 
 // ManageSavesArgv maps manage_saves to saves fix / rename / copy / backup / trash. Backup
-// and trash only preview unless confirm=true (--yes) and dry_run is not set (12 §4.4).
+// and trash only preview unless confirm=true (--yes) and dry_run is not set (12 §4.4); the
+// preview's token goes with the confirmation (--token), and trash refuses one without it,
+// so what the player agreed to is what is recycled.
 func ManageSavesArgv(in ManageSavesIn) []string {
 	switch in.Action {
 	case "fix":
@@ -78,7 +81,15 @@ func ManageSavesArgv(in ManageSavesIn) []string {
 		}
 		return b.a
 	case "backup", "trash":
-		return append(append([]string{"saves", in.Action}, in.Saves...), argv().flag("yes", in.Confirm && !in.DryRun).a...)
+		yes := in.Confirm && !in.DryRun
+		if yes && in.Action == "trash" && in.Token == "" {
+			return []string{"manage_saves: trash with confirm=true needs the token of its preview: call it without confirm, show the player the files, then confirm with that token"}
+		}
+		b := argv(append([]string{"saves", in.Action}, in.Saves...)...).flag("yes", yes)
+		if yes {
+			b.str("token", in.Token)
+		}
+		return b.a
 	}
 	return unknown("manage_saves", in.Action)
 }

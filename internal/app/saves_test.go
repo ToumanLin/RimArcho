@@ -230,14 +230,14 @@ func TestSaveFileActions(t *testing.T) {
 	}
 
 	saves := []*app.Save{find("Tundra"), find("Broken")}
-	prev, err := e.App.BackupSaves(saves, false)
+	prev, err := e.App.BackupSaves(saves, false, "")
 	if err != nil || prev.Done || prev.Bytes == 0 {
 		t.Fatalf("backup preview: %+v %v", prev, err)
 	}
 	if _, err := os.Stat(prev.Dir); err == nil {
 		t.Fatal("preview wrote the backup folder")
 	}
-	done, err := e.App.BackupSaves(saves, true)
+	done, err := e.App.BackupSaves(saves, true, "")
 	if err != nil || !done.Done || len(done.Errs) != 0 {
 		t.Fatalf("backup: %+v %v", done, err)
 	}
@@ -250,10 +250,10 @@ func TestSaveFileActions(t *testing.T) {
 
 	var trashed []string
 	e.App.TrashFunc = func(p string) error { trashed = append(trashed, filepath.Base(p)); return os.Remove(p) }
-	if r, err := e.App.TrashSaves([]*app.Save{find("Broken")}, false); err != nil || r.Done || len(trashed) != 0 {
+	if r, err := e.App.TrashSaves([]*app.Save{find("Broken")}, false, ""); err != nil || r.Done || len(trashed) != 0 {
 		t.Fatalf("trash preview: %+v %v", r, err)
 	}
-	if r, err := e.App.TrashSaves([]*app.Save{find("Broken")}, true); err != nil || !r.Done || len(r.Errs) != 0 || !slices.Equal(trashed, []string{"Broken.rws"}) {
+	if r, err := e.App.TrashSaves([]*app.Save{find("Broken")}, true, ""); err != nil || !r.Done || len(r.Errs) != 0 || !slices.Equal(trashed, []string{"Broken.rws"}) {
 		t.Fatalf("trash: %+v %v %v", r, err, trashed)
 	}
 }

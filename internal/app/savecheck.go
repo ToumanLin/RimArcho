@@ -401,7 +401,7 @@ func (s *Save) previousReadable() *Save {
 	}
 	after := false
 	for _, o := range s.Colony.Saves {
-		if o == s {
+		if o == s || o.Path == s.Path { // s may be a copy (SaveAgainstCurrent)
 			after = true
 			continue
 		}

@@ -303,7 +303,7 @@ func TestSaveFilePreviews(t *testing.T) {
 		}
 		return s
 	}
-	r, err := e.App.BackupSaves([]*app.Save{find("Tundra"), find("Broken")}, false)
+	r, err := e.App.BackupSaves([]*app.Save{find("Tundra"), find("Broken")}, false, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,7 +311,7 @@ func TestSaveFilePreviews(t *testing.T) {
 	if !strings.HasPrefix(p.Title, "back up 2 saves (") || len(p.Lines) != 2 || !strings.HasPrefix(p.Lines[0], "Tundra.rws  ") || !strings.Contains(p.To, filepath.Join("backups", "saves")) {
 		t.Fatalf("backup preview: %+v", p)
 	}
-	tr, err := e.App.TrashSaves([]*app.Save{find("Broken")}, false)
+	tr, err := e.App.TrashSaves([]*app.Save{find("Broken")}, false, "")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -23,14 +23,23 @@ export function initSaves(u) { ui = u; }
 
 // page: the listing; sel: the selected save's ref; open: the colonies shown open; q: the
 // search (colony and save names); detail: the middle and right cards' data (for
-// detail.ref); ask: the inline confirmation shown (backup or recycle); renaming: the rename
-// field is open (colRenaming: the colony's, in the right card); viewing: the rows whose
-// details View opened (by kind).
-const X = { page: null, sel: "", open: new Set(), q: "", detail: null, ask: null, renaming: false, colRenaming: false, viewing: new Set(),
-  listSeq: 0, detailSeq: 0, busy: false };
+// detail.ref); mode: what the player is editing, tied to a save (mode.ref): null when only
+// viewing, {kind: "rename"} the save's name field, {kind: "colony"} the colony's (right
+// card), {kind: "confirm", what: "backup" | "recycle", preview, running} the inline
+// confirmation; viewing: the rows whose details View opened (by kind). built: the
+// navigation (S.screenSeq) whose visit drew the page; visit: the one open() last reset for.
+const X = { page: null, sel: "", open: new Set(), q: "", detail: null, mode: null, viewing: new Set(),
+  listSeq: 0, detailSeq: 0, askSeq: 0, busy: false, built: -1, visit: -1 };
 let leftCard = null, midCard = null, rightCard = null, tree = null, input = null, timer = 0, mods = null;
 const waiting = new Map(); // listing request → its resolve
+const running = new Set(); // actions waiting for their reply: a second click does nothing
 const ROW = 24; // a Mod list row's height: the list mounts only the rows in view (16 §11 A18)
+
+// live: the page drawn in this visit is shown; news and redraws are for it only (a listing
+// kept from an earlier visit is not).
+const live = () => S.screen === "saves" && X.built === S.screenSeq && !!X.page;
+// editing: the selected save has this editor open.
+const editing = (kind) => X.mode?.kind === kind && X.mode.ref === X.sel;
 
 on("saves", (ev) => {
   const w = waiting.get(ev?.request);
@@ -40,42 +49,29 @@ on("saves", (ev) => {
 });
 on("saves-read", (ev) => news(ev || {}));
 // a list made from a save to analyse it: the save is checked again with what it indexed
-on("analyze", (ev) => { if (ev?.done && S.screen === "saves" && X.detail && !X.detail.loading) showDetail(0); });
+on("analyze", (ev) => { if (ev?.done && live() && X.detail && !X.detail.loading) showDetail(0); });
 
 // news is the full read's progress (16 §2.11 "Loading"): the status line while the page
 // is open (never over a failure or a message with its undo), rows with their day and
 // colonies regrouped, and the selected save's play facts once it is read.
 function news(ev) {
-  if (S.screen !== "saves" || !X.page) return;
+  if (S.screen !== "saves") return;
   const st = $("#status"), quiet = !st || (st.dataset.kind !== "fail" && !st.querySelector("a"));
   if (ev.line && quiet) say("busy", ev.line);
   if (ev.done && (ev.error || quiet)) say(ev.error ? "fail" : "ok", ev.error || ev.text || "");
+  if (!live()) return;
   if (ev.page) update(ev.page);
-  if (X.sel && (ev.refs || []).includes(X.sel) && X.detail?.ref === X.sel && !X.detail.play && !X.detail.loading) refreshDetail();
+  if (X.sel && (ev.refs || []).includes(X.sel) && X.detail?.ref === X.sel && !X.detail.play && !X.detail.loading) showDetail(0);
   // read again for its content (an older parser's cache): ask for the content again
   else if (X.sel && (ev.refs || []).includes(X.sel) && content.ref === X.sel && content.data?.stale) loadContent(X.sel);
 }
 
-// refreshDetail asks for the selected save's cards again after the full read; while the
-// rename field or a confirmation is open only the right card is redrawn, so neither loses
-// what the player is doing.
-async function refreshDetail() {
-  if (!X.renaming && !X.ask) { showDetail(0); return; }
-  const ref = X.sel, n = ++X.detailSeq;
-  let d;
-  try { d = await api.SaveDetail(ref); } catch { return; }
-  if (n !== X.detailSeq || S.screen !== "saves" || X.sel !== ref || X.detail?.ref !== ref) return;
-  Object.assign(X.detail, { play: d.play, reading: d.reading, playNote: d.playNote, colony: d.colony });
-  fillTime(X.detail);
-  drawRight(true);
-  loadContent(ref);
-}
-
 // update takes a newer listing from the full read: rows get their in-game day and colonies
 // regroup by world, while the selection and the colonies shown open (by their saves) stay.
+// A selected save the listing no longer has gives way to the first one, cards and all.
 function update(p) {
   const shown = new Set(X.page.colonies.filter((c) => X.open.has(c.key)).flatMap((c) => c.saves.map((s) => s.ref)));
-  const colony = colonyOf(X.sel)?.name;
+  const colony = colonyOf(X.sel)?.name, was = X.sel;
   X.open = new Set();
   setPage(p);
   for (const c of p.colonies) if (c.saves.some((s) => shown.has(s.ref))) X.open.add(c.key);
@@ -83,7 +79,7 @@ function update(p) {
   const lead = $("#screen .page.saves .page-head .lead");
   if (lead && p.lead) lead.textContent = p.lead;
   drawLeft();
-  if (X.detail && !X.detail.loading && colonyOf(X.sel)?.name !== colony) refreshDetail();
+  if (X.sel !== was || X.detail && !X.detail.loading && colonyOf(X.sel)?.name !== colony) showDetail(0);
 }
 
 // readList asks for the listing and waits for its event; a newer request makes it stale.
@@ -101,43 +97,72 @@ function readList() {
   });
 }
 
-// open shows the page; select names a save to select (Can it run's last save).
-export async function open(select = "") {
-  if (select && select !== X.sel) { X.sel = select; X.detail = null; X.ask = null; X.renaming = false; }
-  zoom.clear(); // kept per colony while the page is open
-  const read = beginPageRead("saves", { retry: () => open(select), label: "reading the saves…" });
-  let p;
-  try { p = await readList(); } catch (e) { read.fail(e); return; }
-  if (!p || !read.current()) return;
+// open shows the page; want names a save to select (Can it run's last save). Coming back
+// to the page starts from the listing: nothing of the last visit's cards, editors or
+// confirmations stays (leave).
+export async function open(want = "") {
+  const read = beginPageRead("saves", { retry: () => open(want), label: "reading the saves…" });
+  if (X.visit !== S.screenSeq) { X.visit = S.screenSeq; leave(); }
+  if (want) selectSave(want);
+  let p = null;
+  // a newer listing asked for meanwhile makes this one stale: ask again, so this read ends
+  while (!p) {
+    try { p = await readList(); } catch (e) { read.fail(e); return; }
+    if (!read.current()) return;
+  }
   setPage(p);
   build();
   read.finish();
   showDetail(0);
 }
 
+// leave forgets the last visit (16 §2.11, 17 §7.3): the listing, the cards, the editor or
+// confirmation open, the content and Over time's zoom, and any reply still on its way to
+// them.
+function leave() {
+  clearTimeout(timer);
+  mods?.destroy();
+  mods = null;
+  timeRO?.disconnect();
+  timeRO = timeBox = contentBox = null;
+  zoom.clear(); // kept per colony while the page is open
+  content = { ref: "", seq: content.seq + 1, data: null, error: "", cat: "", opened: new Set(), all: false };
+  X.page = null; X.detail = null; X.mode = null; X.viewing = new Set();
+  X.detailSeq++; X.askSeq++;
+  leftCard = midCard = rightCard = tree = input = null;
+}
+
 // reread reads the listing again behind the page shown (after an action, a game exit):
-// the selection stays when its save is still there; select names a save to go to.
-async function reread(select = "") {
+// the selection stays when its save is still there; want names a save to go to. true when
+// the page now shows this listing.
+async function reread(want = "") {
   let p;
-  try { p = await readList(); } catch (e) { say("fail", errText(e)); return; }
-  if (!p || S.screen !== "saves") return;
-  if (select) X.sel = select;
+  try { p = await readList(); } catch (e) { say("fail", errText(e)); return false; }
+  if (!p || !live()) return false;
+  if (want) selectSave(want);
   setPage(p);
-  if (!leftCard?.isConnected) { build(); showDetail(0); return; }
+  if (!leftCard?.isConnected) { build(); showDetail(0); return true; }
   drawLeft();
   showDetail(0);
+  return true;
 }
 
 function setPage(p) {
   X.page = p;
   p.colonies ||= [];
   const all = p.colonies.flatMap((c) => c.saves);
-  if (!all.some((s) => s.ref === X.sel)) {
-    X.sel = all[0]?.ref || "";
-    X.detail = null;
-  }
+  if (!all.some((s) => s.ref === X.sel)) selectSave(all[0]?.ref || "");
   const c = colonyOf(X.sel);
   if (c) X.open.add(c.key);
+}
+
+// selectSave makes ref the selected save: the cards, the editor or confirmation open and
+// the replies on their way belong to the save before it, so they go.
+function selectSave(ref) {
+  if (ref === X.sel) return;
+  X.sel = ref;
+  X.detail = null; X.mode = null; X.viewing = new Set();
+  X.detailSeq++; X.askSeq++;
 }
 
 const colonyOf = (ref) => X.page?.colonies.find((c) => c.saves.some((s) => s.ref === ref)) || null;
@@ -147,8 +172,9 @@ function build() {
   const p = X.page;
   const sc = $("#screen");
   sc.innerHTML = "";
-  const w = page("fill saves", p.lead || "", act(T("rescan"), "rescan", () => { say("busy", T("reading the saves…")); reread().then(() => say("ok", T("saves read again"))); }));
+  const w = page("fill saves", p.lead || "", act(T("rescan"), "rescan", rescan));
   leftCard = midCard = rightCard = tree = input = null;
+  X.built = S.screenSeq;
   if (!p.saves) {
     const empty = el("section", "card empty-state");
     empty.append(el("p", "", p.empty || T("no save in the Saves folders of your games and packs")));
@@ -212,6 +238,22 @@ function build() {
   tree.ondblclick = (e) => { if (e.target.closest("[data-save]")) startRename(); };
   drawLeft();
   drawDetail();
+}
+
+// rescan reads the saves again; "read again" only when this listing is the one shown (a
+// failure says itself, a newer listing has its own news).
+async function rescan() {
+  const busy = T("reading the saves…");
+  say("busy", busy);
+  if (await reread()) say("ok", T("saves read again"));
+  else if ($("#status")?.textContent === busy) say("", "");
+}
+
+// refocus moves the focus where fn puts it when the focused control went with a redraw,
+// never away from where the player moved it.
+function refocus(fn) {
+  const a = document.activeElement;
+  if (!a || a === document.body || !a.isConnected) fn();
 }
 
 function focusTree() {
@@ -302,8 +344,7 @@ function pick(ref) {
   const c = colonyOf(ref);
   if (c) X.open.add(c.key);
   if (ref === X.sel) { drawLeft(); return; }
-  X.sel = ref;
-  X.ask = null; X.renaming = false; X.colRenaming = false; X.viewing = new Set();
+  selectSave(ref);
   drawLeft();
   showDetail(60);
 }
@@ -319,7 +360,9 @@ function moveSave(step) {
 // ---- middle and right: the selected save ----
 
 // showDetail reads the selected save's check once the cursor rests (a held arrow reads
-// only where it stops); the header shows at once from the tree's row.
+// only where it stops); the header shows at once from the tree's row. The reply redraws
+// the cards except one holding an open name field, which keeps what the player typed and
+// its focus; that card is drawn when the field closes.
 function showDetail(delay) {
   clearTimeout(timer);
   const ref = X.sel;
@@ -333,9 +376,11 @@ function showDetail(delay) {
   timer = setTimeout(async () => {
     let d;
     try { d = await api.SaveDetail(ref); } catch (e) { d = { ref, name: rowOf(ref)?.name || "", error: errText(e), issues: [], mods: [] }; }
-    if (n !== X.detailSeq || S.screen !== "saves" || X.sel !== ref) return;
+    if (n !== X.detailSeq || !live() || X.sel !== ref) return;
     X.detail = d;
-    drawDetail(true);
+    if (!editing("rename")) drawMid(true);
+    else fillTime(d); // the card keeps the name field; Over time is filled in place
+    if (!editing("colony")) drawRight(true);
     hintsChanged();
     if (!d.error) loadContent(ref);
   }, delay);
@@ -362,7 +407,7 @@ function drawMid(keep) {
   if (!midCard) return;
   const d = X.detail;
   const top = keep ? midCard.querySelector(".sv-body")?.scrollTop || 0 : 0;
-  const focused = midCard.contains(document.activeElement) && !X.renaming ? document.activeElement : null;
+  const focused = midCard.contains(document.activeElement) && X.mode?.kind !== "rename" ? document.activeElement : null;
   const focusKey = focused?.dataset?.key;
   mods?.destroy();
   mods = null;
@@ -376,7 +421,7 @@ function drawMid(keep) {
   const head = el("div", "sv-head");
   const row1 = el("div", "sv-row1");
   row1.append(anum(midCard));
-  if (X.renaming && !d.loading && !d.error) row1.append(renameField(d));
+  if (X.mode?.kind === "rename" && X.mode.ref === d.ref && !d.loading && !d.error) row1.append(renameField(d, X.mode));
   else {
     const h = el("h2", "sv-name", d.name);
     h.ondblclick = () => startRename();
@@ -420,7 +465,7 @@ function drawMid(keep) {
     head.append(kv);
   }
   b.append(head);
-  if (X.ask && X.ask.ref === d.ref) b.append(confirmBox());
+  if (X.mode?.kind === "confirm" && X.mode.ref === d.ref) b.append(confirmBox(X.mode));
   if (d.loading) {
     const sk = el("div", "sv-sect");
     sk.append(shimmer(T("checking the save…"), 4));
@@ -676,7 +721,8 @@ function drawRight(keep) {
   const head = el("div", "sv-head");
   const row = el("div", "sv-row1");
   row.append(anum(rightCard));
-  if (X.colRenaming && d.colonyKey) row.append(colonyField(d));
+  const colEdit = X.mode?.kind === "colony" && X.mode.ref === d.ref && !!d.colonyKey;
+  if (colEdit) row.append(colonyField(d, X.mode));
   else {
     // the colony's name in RimArcho (12 §4.1): double-click or Rename names it; the
     // name its saves give it stays on hover
@@ -686,7 +732,7 @@ function drawRight(keep) {
     row.append(h);
   }
   if (p) row.append(el("span", "muted", [p.day, p.date].filter(Boolean).join("  ")));
-  if (d.colonyKey && !X.colRenaming) {
+  if (d.colonyKey && !colEdit) {
     const rn = button(T("rename"), "", () => startColonyRename(), "small sv-colrename");
     rn.dataset.key = "rename-colony";
     rn.title = T("name this colony in RimArcho; the save files keep their names");
@@ -754,7 +800,8 @@ function contentSection(d) {
     return s;
   }
   if (!c.read) {
-    s.append(el("p", "sv-note muted", c.note || d.playNote || T("the save is not read in full yet")));
+    // why it is not read (it failed, the game is writing it) before "not read yet"
+    s.append(el("p", "sv-note muted", d.playNote || c.note || T("the save is not read in full yet")));
     return s;
   }
   const mods = c.mods || [];
@@ -1108,9 +1155,9 @@ async function fix(d, mods, disableAdded, order) {
   catch (e) { X.busy = false; say("fail", errText(e)); return; }
   X.busy = false;
   // u and the status line's undo take the edit back, and the save is checked again
-  say("ok", r.text, r.undo ? async () => { await ui.verb("undo"); if (S.screen === "saves") showDetail(0); } : false);
+  say("ok", r.text, r.undo ? async () => { await ui.verb("undo"); if (live()) showDetail(0); } : false);
   await ui?.reload?.();
-  if (S.screen === "saves") showDetail(0);
+  if (live()) showDetail(0);
   const ids = r.workshopIds || [];
   if (!ids.length) return;
   pop.choose(Tf("get %d mods", ids.length), getChoices(), async (i) => {
@@ -1135,40 +1182,59 @@ async function switchTo(w) {
 // newList makes a list from the save and opens it; with analyse it starts the list's
 // analysis instead and stays, and the save is checked again when it is done.
 async function newList(d, analyse) {
-  let r;
-  try { r = await api.SaveNewList(d.ref, analyse); } catch (e) { say("fail", errText(e)); return; }
-  say(analyse ? "busy" : "ok", r.text);
-  await ui?.reload?.();
-  if (r.page) ui.go(r.page);
+  await once("new-list", async () => {
+    let r;
+    try { r = await api.SaveNewList(d.ref, analyse); } catch (e) { say("fail", errText(e)); return; }
+    say(analyse ? "busy" : "ok", r.text);
+    await ui?.reload?.();
+    if (r.page) ui.go(r.page);
+  });
+}
+
+// once runs an action unless the same one still waits for its reply (a double click or a
+// second enter makes no second copy or list).
+async function once(key, run) {
+  if (running.has(key)) return;
+  running.add(key);
+  try { await run(); } finally { running.delete(key); }
 }
 
 async function copySave() {
   const d = X.detail;
   if (!d || d.loading) return;
-  let r;
-  try { r = await api.SaveCopy(d.ref); } catch (e) { say("fail", errText(e)); return; }
-  say("ok", r.text);
-  await reread(r.ref);
+  await once("copy", async () => {
+    let r;
+    try { r = await api.SaveCopy(d.ref); } catch (e) { say("fail", errText(e)); return; }
+    say("ok", r.text);
+    // the copy is selected, unless the player went to another save meanwhile
+    await reread(X.sel === d.ref ? r.ref : "");
+  });
 }
 
 // askFiles shows the inline confirmation of Back up or Recycle (16 §6): the files and
-// sizes first; only the confirm button acts.
-async function askFiles(kind) {
+// sizes first; only the confirm button acts. The last one asked for is the one shown.
+async function askFiles(what) {
   const d = X.detail;
   if (!d || d.loading) return;
-  if (kind === "recycle" && d.locked) return say("fail", d.locked);
+  if (what === "recycle" && d.locked) return say("fail", d.locked);
+  const n = ++X.askSeq;
   let r;
-  try { r = await (kind === "backup" ? api.SaveBackup([d.ref], false) : api.SaveTrash([d.ref], false)); }
-  catch (e) { say("fail", errText(e)); return; }
-  if (X.sel !== d.ref || S.screen !== "saves") return;
-  X.ask = { ref: d.ref, kind, preview: r.preview };
+  try { r = await (what === "backup" ? api.SaveBackup([d.ref], false, "") : api.SaveTrash([d.ref], false, "")); }
+  catch (e) { if (n === X.askSeq) say("fail", errText(e)); return; }
+  if (n !== X.askSeq || X.sel !== d.ref || !live()) return;
+  X.mode = { kind: "confirm", ref: d.ref, what, preview: r.preview };
   drawMid(true);
   midCard?.querySelector(".sv-ask .btn.go")?.focus({ preventScroll: true });
 }
 
-function confirmBox() {
-  const a = X.ask, p = a.preview;
-  const box = el("div", "sv-ask" + (a.kind === "recycle" ? " danger" : ""));
+// focusFileAction puts the focus back on the button that asked for the confirmation.
+function focusFileAction(what) {
+  midCard?.querySelector(`[data-key="${what === "backup" ? "backup" : "recycle"}"]`)?.focus({ preventScroll: true });
+}
+
+function confirmBox(a) {
+  const p = a.preview;
+  const box = el("div", "sv-ask" + (a.what === "recycle" ? " danger" : ""));
   box.setAttribute("role", "group");
   box.setAttribute("aria-label", p.title);
   box.append(el("p", "t", p.title));
@@ -1176,9 +1242,10 @@ function confirmBox() {
   for (const l of p.lines || []) ul.append(el("li", "", l));
   box.append(ul, el("p", "muted", p.to));
   const btns = el("div", "btns");
-  const go = button(p.button, "", () => doFiles(a), "small go primary" + (a.kind === "recycle" ? " danger-go" : ""), a.kind === "recycle" ? "recycle" : "");
+  const go = button(p.button, "", () => doFiles(a), "small go primary" + (a.what === "recycle" ? " danger-go" : ""), a.what === "recycle" ? "recycle" : "");
   go.dataset.key = "confirm";
-  const no = button(T("cancel"), "", () => { X.ask = null; drawMid(true); midCard?.querySelector(`[data-key="${a.kind === "backup" ? "backup" : "recycle"}"]`)?.focus({ preventScroll: true }); }, "small");
+  if (a.running) go.disabled = true;
+  const no = button(T("cancel"), "", () => { if (X.mode === a) X.mode = null; drawMid(true); focusFileAction(a.what); }, "small");
   no.dataset.key = "cancel";
   box.onkeydown = (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); no.click(); } };
   btns.append(go, no);
@@ -1186,59 +1253,90 @@ function confirmBox() {
   return box;
 }
 
+// doFiles backs up or recycles what the confirmation listed: the preview's token binds the
+// confirm to those files as they were, so a save that changed since is refused and the
+// confirmation goes.
 async function doFiles(a) {
   // the confirm button stays until the reply: a second click must not back up or recycle again
   if (a.running) return;
   a.running = true;
-  X.ask = null;
+  const token = a.preview?.token || "";
   let r;
-  try { r = await (a.kind === "backup" ? api.SaveBackup([a.ref], true) : api.SaveTrash([a.ref], true)); }
-  catch (e) { say("fail", errText(e)); drawMid(true); return; }
+  try { r = await (a.what === "backup" ? api.SaveBackup([a.ref], true, token) : api.SaveTrash([a.ref], true, token)); }
+  catch (e) {
+    if (X.mode === a) X.mode = null;
+    say("fail", errText(e));
+    if (live()) { drawMid(true); refocus(() => focusFileAction(a.what)); }
+    return;
+  }
+  if (X.mode === a) X.mode = null;
   say(r.failed ? "fail" : "ok", r.text);
-  if (a.kind === "recycle") await reread();
-  else drawMid(true);
+  if (!live()) return;
+  if (a.what === "recycle") { if (await reread()) refocus(focusTree); }
+  else { drawMid(true); refocus(() => focusFileAction(a.what)); }
 }
 
 function startRename() {
   const d = X.detail;
   if (!d || d.loading || d.error) return;
   if (d.locked) return say("fail", d.locked);
-  X.renaming = true;
-  drawMid(true);
+  if (!editing("rename")) {
+    X.mode = { kind: "rename", ref: d.ref };
+    drawMid(true);
+  }
   const inp = midCard?.querySelector(".sv-rename input");
   inp?.focus();
   inp?.select();
 }
 
 // renameField is the inline rename (16 §2.17): duplicates are checked while typing; enter
-// or leaving saves, esc cancels.
-function renameField(d) {
+// or leaving saves, esc cancels. mine is the mode that opened it: once the player selects
+// another save the field is no longer theirs, and a rename still saving leaves that
+// selection alone.
+function renameField(d, mine) {
   const box = el("div", "sv-rename");
   const inp = el("input", "xc-input");
   inp.value = d.name; inp.spellcheck = false;
   inp.setAttribute("aria-label", T("rename the save"));
   const why = el("div", "plan-why");
   why.setAttribute("role", "alert");
-  let seq = 0, done = false;
+  let seq = 0, done = false, busy = false;
   const check = async () => {
     const n = ++seq;
     const p = await api.SaveNameProblem(d.ref, inp.value).catch(() => "");
     if (n === seq) why.textContent = p;
     return n === seq && !p;
   };
-  const stop = () => { if (done) return; done = true; X.renaming = false; drawMid(true); midCard?.querySelector('[data-key="rename"]')?.focus({ preventScroll: true }); };
-  const commit = async () => {
+  const stop = () => {
     if (done) return;
+    done = true;
+    const mineNow = X.mode === mine;
+    if (mineNow) X.mode = null;
+    if (!live() || !inp.isConnected) return;
+    drawMid(true);
+    if (mineNow) midCard?.querySelector('[data-key="rename"]')?.focus({ preventScroll: true });
+  };
+  const commit = async () => {
+    if (done || busy) return;
     const name = inp.value.trim();
     if (!name || name === d.name) return stop();
-    if (!(await check())) { inp.focus(); return; }
-    done = true;
+    busy = true; // leaving the field while it saves (its blur, its removal) saves once
     try {
-      const r = await api.SaveRename(d.ref, name);
-      X.renaming = false;
+      if (!(await check())) {
+        if (inp.isConnected) inp.focus(); else if (why.textContent) say("fail", why.textContent);
+        return;
+      }
+      let r;
+      try { r = await api.SaveRename(d.ref, name); }
+      catch (e) { why.textContent = errText(e); if (inp.isConnected) inp.focus(); else say("fail", errText(e)); return; }
+      done = true;
+      const stayed = X.mode === mine;
+      if (stayed) X.mode = null;
       say("ok", r.text);
-      await reread(r.ref);
-    } catch (e) { done = false; why.textContent = errText(e); inp.focus(); }
+      // the renamed save stays selected under its new name, unless the player went to
+      // another save meanwhile (leaving the field is what saved it)
+      if (await reread(X.sel === d.ref ? r.ref : "") && stayed) refocus(focusTree);
+    } finally { busy = false; }
   };
   inp.oninput = () => { void check(); };
   inp.onkeydown = (e) => {
@@ -1252,37 +1350,51 @@ function renameField(d) {
 }
 
 function startColonyRename() {
-  if (!X.detail?.colonyKey) return;
-  X.colRenaming = true;
-  drawRight(true);
+  const d = X.detail;
+  if (!d?.colonyKey) return;
+  if (!editing("colony")) {
+    X.mode = { kind: "colony", ref: d.ref };
+    drawRight(true);
+  }
   const inp = rightCard?.querySelector(".sv-rename input");
   inp?.focus();
   inp?.select();
 }
 
 // colonyField names the colony in place: enter or leaving saves, esc cancels, and an empty
-// name gives the colony back its saves' name.
-function colonyField(d) {
+// name gives the colony back its saves' name. mine is the mode that opened it (renameField).
+function colonyField(d, mine) {
   const box = el("div", "sv-rename");
   const inp = el("input", "xc-input");
   inp.value = d.colony || ""; inp.spellcheck = false; inp.maxLength = 80;
   inp.placeholder = d.colonyGame || "";
   inp.setAttribute("aria-label", T("rename the colony"));
+  inp.dataset.key = "rename-colony"; // a redraw after saving puts the focus on Rename
   const why = el("div", "plan-why");
   why.setAttribute("role", "alert");
-  let done = false;
-  const stop = () => { if (done) return; done = true; X.colRenaming = false; drawRight(true); rightCard?.querySelector('[data-key="rename-colony"]')?.focus({ preventScroll: true }); };
-  const commit = async () => {
+  let done = false, busy = false;
+  const stop = () => {
     if (done) return;
+    done = true;
+    const mineNow = X.mode === mine;
+    if (mineNow) X.mode = null;
+    if (!live() || !inp.isConnected) return;
+    drawRight(true);
+    if (mineNow) rightCard?.querySelector('[data-key="rename-colony"]')?.focus({ preventScroll: true });
+  };
+  const commit = async () => {
+    if (done || busy) return;
     const name = inp.value.trim();
     if (name === d.colony) return stop();
-    done = true;
+    busy = true;
     try {
       const text = await api.ColonyRename(d.colonyKey, name);
-      X.colRenaming = false;
+      done = true;
+      if (X.mode === mine) X.mode = null;
       say("ok", text);
-      await reread(d.ref);
-    } catch (e) { done = false; why.textContent = errText(e); inp.focus(); }
+      await reread();
+    } catch (e) { why.textContent = errText(e); if (inp.isConnected) inp.focus(); else say("fail", errText(e)); }
+    finally { busy = false; }
   };
   inp.onkeydown = (e) => {
     if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); void commit(); }
@@ -1296,9 +1408,9 @@ function colonyField(d) {
 
 // liveChanged follows the game: a running game locks rename and recycle; when it exits
 // the saves are read again (12 §1.7).
-export function liveChanged(running) {
-  if (S.screen !== "saves" || !X.page) return;
-  if (!running) reread(); else showDetail(0);
+export function liveChanged(gameRuns) {
+  if (!live()) return;
+  if (!gameRuns) reread(); else showDetail(0);
 }
 
 // key: the page's keys (16 §2.11). true when taken.
@@ -1307,7 +1419,7 @@ export function key(e) {
   if (e.ctrlKey || e.metaKey || e.altKey) return false;
   if (k === "/") { e.preventDefault(); input?.focus(); input?.select(); return true; }
   if (k === "F2") { e.preventDefault(); startRename(); return true; }
-  if (X.ask && k === "Escape") { e.preventDefault(); X.ask = null; drawMid(true); return true; }
+  if (editing("confirm") && k === "Escape") { e.preventDefault(); const what = X.mode.what; X.mode = null; drawMid(true); focusFileAction(what); return true; }
   if (k === "Escape" && X.q) { e.preventDefault(); if (input) input.value = ""; setQuery(""); return true; }
   // in the middle and right cards the arrows scroll them, and enter presses the focused button
   const inCards = document.activeElement?.closest?.(".sv-mid, .sv-right");

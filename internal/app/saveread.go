@@ -61,30 +61,42 @@ func worldIdentity(f *savefile.Facts) string {
 
 func saveKey(s *Save) string { return env.PathKey(s.Path) }
 
-// attachSummaries sets the summary of every save whose cache row is still valid; a row of
-// an older parser that means the same is (savefile.MinParserVersion), so a parser change
-// that only adds facts does not unread every save.
+// attachSummaries sets the summary of every save whose cache row is still valid (a row of
+// an older parser that means the same is, savefile.MinParserVersion, so a parser change
+// that only adds facts does not unread every save), and marks the saves whose stored read
+// failed on the file as it is now.
 func (a *App) attachSummaries(saves []*Save) error {
 	rows, err := a.Store.SaveSummaries()
 	if err != nil {
 		return err
 	}
 	for _, s := range saves {
-		if s.Writing || s.HeadErr != "" && s.Size == 0 {
+		if s.Writing || s.ModTime.IsZero() { // being written, or not even its size is known
 			continue
 		}
-		if r := rows[saveKey(s)]; r.Valid(s.Size, s.ModTime.UnixNano(), savefile.MinParserVersion, savefile.ParserVersion) {
+		r := rows[saveKey(s)]
+		switch {
+		case r.Valid(s.Size, s.ModTime.UnixNano(), savefile.MinParserVersion, savefile.ParserVersion):
 			s.Summary = summaryOf(r.SaveSummaryRow)
+		case r.Failed(s.Size, s.ModTime.UnixNano(), savefile.ParserVersion):
+			s.ReadFailed = true
 		}
 	}
 	return nil
 }
 
+// NeedsRead reports whether a full read (12 §1.7 L1) would read the save: no valid cache
+// row, not being written, and no stored failure on the file as it is now.
+func (s *Save) NeedsRead() bool {
+	return s.Summary == nil && !s.Writing && !s.ReadFailed && !s.ModTime.IsZero()
+}
+
 // SaveFacts returns a save's full read from the cache. With read, a save without a valid
 // cache row, or with a row of an older parser (MinParserVersion), is read now and stored
-// (the CLI's one save, the page's selected one: tens of ms per 10 MB). Without read it may
-// return an older parser's facts (Facts.Parser says which); nil when not cached or for a
-// save being written.
+// (the CLI's one save, the page's selected one: tens of ms per 10 MB), even when an earlier
+// read of it failed. Without read it may return an older parser's facts (Facts.Parser says
+// which); nil when not cached or for a save being written (SaveReadFailure says why when a
+// stored read failed).
 func (a *App) SaveFacts(s *Save, read bool) (*savefile.Facts, error) {
 	if s.Writing {
 		return nil, nil
@@ -106,20 +118,26 @@ func (a *App) SaveFacts(s *Save, read bool) (*savefile.Facts, error) {
 	return a.readSave(s)
 }
 
+// SaveReadFailure is why the stored full read of the save as it is now failed; "" when it
+// did not fail or the file changed since.
+func (a *App) SaveReadFailure(s *Save) (string, error) {
+	c, err := a.Store.SaveFacts(saveKey(s))
+	if err != nil || !c.Failed(s.Size, s.ModTime.UnixNano(), savefile.ParserVersion) {
+		return "", err
+	}
+	return string(c.Facts), nil
+}
+
 // readSave reads a whole save and stores its facts. A file that changes while it is read
-// is being written: nil, not stored.
+// is being written: nil, not stored. A read that fails is stored as a failure of the file
+// as it is (unless the failure passes by itself: the file is gone or another program
+// holds it), so lists do not read it again until it changes.
 func (a *App) readSave(s *Save) (*savefile.Facts, error) {
-	fh, err := os.Open(s.Path)
+	f, before, err := scanSave(s.Path)
 	if err != nil {
-		return nil, err
-	}
-	defer fh.Close()
-	before, err := fh.Stat()
-	if err != nil {
-		return nil, err
-	}
-	f, err := savefile.Scan(bufio.NewReaderSize(fh, 256<<10))
-	if err != nil {
+		if fi, serr := os.Stat(s.Path); serr == nil && !passingReadErr(err) {
+			a.Store.PutSaveFailure(saveKey(s), fi.Size(), fi.ModTime().UnixNano(), savefile.ParserVersion, err.Error())
+		}
 		return nil, err
 	}
 	after, err := os.Stat(s.Path)
@@ -136,28 +154,55 @@ func (a *App) readSave(s *Save) (*savefile.Facts, error) {
 		Parser: savefile.ParserVersion, SaveSummaryRow: row, Facts: raw}); err != nil {
 		return nil, err
 	}
-	s.Size, s.ModTime, s.Summary = before.Size(), before.ModTime(), summaryOf(row)
+	s.Size, s.ModTime, s.Summary, s.ReadFailed = before.Size(), before.ModTime(), summaryOf(row), false
 	return f, nil
 }
 
-// SaveIndexProgress is reported after each save is read.
+// scanSave reads the whole file at path; before is its state when opened.
+func scanSave(path string) (*savefile.Facts, os.FileInfo, error) {
+	fh, err := os.Open(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer fh.Close()
+	before, err := fh.Stat()
+	if err != nil {
+		return nil, nil, err
+	}
+	f, err := savefile.Scan(bufio.NewReaderSize(fh, 256<<10))
+	if err != nil {
+		return nil, nil, err
+	}
+	return f, before, nil
+}
+
+// passingReadErr: the read failed for a reason that passes by itself (the file is gone, or
+// another program holds it), so the failure is not stored.
+func passingReadErr(err error) bool {
+	return errors.Is(err, os.ErrNotExist) || sharingViolation(err)
+}
+
+// SaveIndexProgress is reported after each save is read (Err: why it could not be).
 type SaveIndexProgress struct {
 	Done, Total int
 	Save        *Save
+	Err         string
 }
 
 // SaveIndexResult is what IndexSaves did.
 type SaveIndexResult struct {
-	Read    int      // read now
-	Cached  int      // already in the cache
-	Writing int      // being written: read on a later run
-	Bytes   int64    // bytes read
-	Errs    []string // per save that could not be read
-	Elapsed time.Duration
+	Read       int      // read now
+	Cached     int      // already in the cache
+	Writing    int      // being written: read on a later run
+	Unreadable int      // an earlier read failed and the file is unchanged: not read again
+	Bytes      int64    // bytes read
+	Errs       []string // per save that could not be read now
+	Elapsed    time.Duration
 }
 
 // IndexSaves reads the saves without a valid cache row in the order given, 2–4 at a
 // time, storing each as soon as it is read, so a stopped run keeps what it read (12 §1.7).
+// A save whose stored read failed is not read again while it is unchanged.
 func (a *App) IndexSaves(saves []*Save, progress func(SaveIndexProgress)) (*SaveIndexResult, error) {
 	start := time.Now()
 	r := &SaveIndexResult{}
@@ -168,6 +213,8 @@ func (a *App) IndexSaves(saves []*Save, progress func(SaveIndexProgress)) (*Save
 			r.Cached++
 		case s.Writing:
 			r.Writing++
+		case s.ReadFailed:
+			r.Unreadable++
 		default:
 			todo = append(todo, s)
 		}
@@ -183,9 +230,11 @@ func (a *App) IndexSaves(saves []*Save, progress func(SaveIndexProgress)) (*Save
 			for s := range work {
 				f, err := a.readSave(s)
 				mu.Lock()
+				p := SaveIndexProgress{Total: len(todo), Save: s}
 				switch {
 				case err != nil:
 					r.Errs = append(r.Errs, s.Name+": "+err.Error())
+					p.Err = err.Error()
 				case f == nil:
 					r.Writing++
 				default:
@@ -194,7 +243,8 @@ func (a *App) IndexSaves(saves []*Save, progress func(SaveIndexProgress)) (*Save
 				}
 				done++
 				if progress != nil {
-					progress(SaveIndexProgress{Done: done, Total: len(todo), Save: s})
+					p.Done = done
+					progress(p)
 				}
 				mu.Unlock()
 			}
@@ -267,16 +317,34 @@ func (a *App) PruneSaveCache(l *SaveList) (int, error) {
 
 // ---- the child process ----
 
-// SavesIndexLine is the progress line `archo saves index --progress` prints per save.
+// SavesIndexLine is the progress line `archo saves index --progress` prints per save; a
+// save that could not be read gets a second line, "saves-failed <ref> <reason>".
 func SavesIndexLine(p SaveIndexProgress) string {
 	name := p.Save.Name
 	if p.Save.Colony != nil {
 		name = p.Save.Colony.Name + "/" + name
 	}
-	return fmt.Sprintf("progress: saves %d/%d %s %s", p.Done, p.Total, p.Save.Ref, name)
+	line := fmt.Sprintf("progress: saves %d/%d %s %s", p.Done, p.Total, p.Save.Ref, name)
+	if p.Err != "" {
+		line += "\nprogress: saves-failed " + p.Save.Ref + " " + strings.ReplaceAll(p.Err, "\n", " ")
+	}
+	return line
 }
 
-var savesIndexLineRe = regexp.MustCompile(`^(?:progress: )?saves (\d+)/(\d+) (sv:[0-9a-f]+) (.*)$`)
+var (
+	savesIndexLineRe = regexp.MustCompile(`^(?:progress: )?saves (\d+)/(\d+) (sv:[0-9a-f]+) (.*)$`)
+	savesFailLineRe  = regexp.MustCompile(`^(?:progress: )?saves-failed (sv:[0-9a-f]+) (.*)$`)
+)
+
+// ParseSavesFailLine reads the "saves-failed" line of SavesIndexLine: the save and why it
+// could not be read.
+func ParseSavesFailLine(line string) (ref, reason string, ok bool) {
+	m := savesFailLineRe.FindStringSubmatch(strings.TrimSpace(line))
+	if m == nil {
+		return "", "", false
+	}
+	return m[1], m[2], true
+}
 
 // ParseSavesIndexLine reads a progress line of SavesIndexLine.
 func ParseSavesIndexLine(line string) (done, total int, ref, name string, ok bool) {
@@ -333,22 +401,54 @@ func ChildSavesIndexContext(ctx context.Context, exe, home string, first []strin
 	if err := cmd.Start(); err != nil {
 		return err
 	}
-	var last string
+	// why is the child's own words for a failure, not its closing "next:" hint: its first
+	// error line, else its last line that is neither progress nor a hint
+	var why, errLine string
 	sc := bufio.NewScanner(out)
 	for sc.Scan() {
-		last = strings.TrimSpace(sc.Text())
+		line := strings.TrimSpace(sc.Text())
 		if progress != nil {
-			progress(last)
+			progress(line)
+		}
+		switch {
+		case line == "" || strings.HasPrefix(line, "progress:") || strings.HasPrefix(line, "next:"):
+		case strings.HasPrefix(line, "error:"):
+			if errLine == "" {
+				errLine = strings.TrimSpace(strings.TrimPrefix(line, "error:"))
+			}
+		default:
+			why = line
 		}
 	}
 	if err := cmd.Wait(); err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		return fmt.Errorf("archo saves index: %v (%s)", err, last)
+		if errLine != "" {
+			why = errLine
+		}
+		return &SavesIndexError{Err: err, Why: why, Fatal: errLine != ""}
 	}
 	return nil
 }
+
+// SavesIndexError is a failed `archo saves index` child: its exit and its own words.
+// Fatal: it ended on an "error:" line (the run itself failed), not only on saves it
+// could not read, which it lists and exits non-zero for.
+type SavesIndexError struct {
+	Err   error
+	Why   string
+	Fatal bool
+}
+
+func (e *SavesIndexError) Error() string {
+	if e.Why == "" {
+		return "archo saves index: " + e.Err.Error()
+	}
+	return "archo saves index: " + e.Why
+}
+
+func (e *SavesIndexError) Unwrap() error { return e.Err }
 
 // InProcessSavesIndex runs the indexing in this process (tests).
 func InProcessSavesIndex(a *App) func([]string, func(string)) error {
