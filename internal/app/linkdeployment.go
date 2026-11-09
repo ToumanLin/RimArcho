@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 
@@ -52,14 +53,18 @@ func (a *App) applyLinks(mods string, changes []LinkChange) error {
 				row.Pack = filepath.Base(filepath.Dir(filepath.Dir(c.Target)))
 			}
 		}
+		_, statErr := os.Lstat(path)
+		existed := statErr == nil
 		if err := a.Store.RecordLinkIntent([]store.ManagedLink{row}); err != nil {
 			return err
 		}
 		if snapshot != nil {
 			if err := source.RemoveLinkChecked(snapshot); err != nil {
+				a.settleFailedLink(row.Operation, path, snapshot, existed)
 				return err
 			}
 		} else if err := applyLinks(mods, []LinkChange{c}); err != nil {
+			a.settleFailedLink(row.Operation, path, nil, existed)
 			return err
 		}
 		if err := a.Store.LinkPhase(row.Operation, "complete"); err != nil {
@@ -67,6 +72,24 @@ func (a *App) applyLinks(mods string, changes []LinkChange) error {
 		}
 	}
 	return nil
+}
+
+// settleFailedLink closes the record of a single link step that failed without changing
+// the disk: a removal whose link is still the one read before (before), or a creation that
+// left nothing new at path. Left at intent, it would report a recovery that blocks launch
+// although there is nothing to recover (09 §3). A step whose effect is unclear stays at
+// intent for the confirmed repair.
+func (a *App) settleFailedLink(op, path string, before *source.LinkInfo, existed bool) {
+	unchanged := false
+	if before != nil {
+		unchanged = source.VerifyLink(before) == nil
+	} else {
+		_, err := os.Lstat(path)
+		unchanged = existed || os.IsNotExist(err) // CreateLink removes what it made when it fails
+	}
+	if unchanged {
+		a.Store.LinkPhase(op, "rolled-back")
+	}
 }
 
 func (p *LinkLifecyclePlan) Lines() []string {

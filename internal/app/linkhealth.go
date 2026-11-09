@@ -467,6 +467,7 @@ func (a *App) ApplyLinkRepair(plan *LinkRepairPlan) error {
 				return err
 			}
 			if err := source.RemoveLinkChecked(l.snapshot); err != nil {
+				a.settleFailedLink(op, l.Path, l.snapshot, true)
 				return err
 			}
 			if err := a.Store.LinkPhase(op, "complete"); err != nil {
