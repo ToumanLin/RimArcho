@@ -28,8 +28,8 @@ import (
 // second, so rows get their day and colonies regroup by world). The selected save never
 // waits for that run: SaveDetail of a save not read yet returns at once with skeletons
 // and reads that one save on its own session in a goroutine (readSelected), then sends
-// "saves-read" with its ref. The page holds the facts of the selected save and of its
-// colony's previous read save only (savesState.facts); listings carry summaries.
+// "saves-read" with its ref. The page holds the facts of the selected save only
+// (savesState.facts); listings carry summaries.
 
 // savesState is the page's reader and its last listing. Lock order: read.mu, then mu.
 type savesState struct {
@@ -40,7 +40,7 @@ type savesState struct {
 	// visit counts the times the page was left: a listing asked for before the player left
 	// neither stores itself nor starts the full read when it finishes after.
 	visit uint64
-	asked atomic.Uint64 // SaveDetail calls, numbered as they come (the selection's order)
+	asked atomic.Uint64 // SaveDetail and SaveContent calls, numbered as they come (the selection's order)
 
 	// The full read.
 	stop      context.CancelFunc         // the background run's stop; nil when none runs
@@ -192,6 +192,43 @@ func (s *API) findSave(ref string) (*app.Save, error) {
 		return nil, errors.New(view.T("that save is gone; the list is read again"))
 	}
 	return sv, err
+}
+
+// SaveContent returns the selected save's cached references by Mod and category (12 §2).
+func (s *API) SaveContent(ref string) (*view.SaveContent, error) {
+	asked := s.saves.asked.Add(1) // as SaveDetail: a stale save's read keeps the selection's order
+	sv, err := s.findSave(ref)
+	if err != nil {
+		return nil, err
+	}
+	w := &s.saves.read
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	defer s.retainReader(w)
+	r, err := s.savesSession()
+	if err != nil {
+		return nil, err
+	}
+	cp := *sv // SaveFacts sets the summary: the listing is shared with other calls
+	c, err := r.SaveContent(&cp)
+	if err != nil {
+		return nil, err
+	}
+	v := view.SaveContentOf(c)
+	if c.Stale {
+		// cached by an older parser: read it again on the page's own session, as an unread
+		// selected save is; its saves-read event asks for the content again. A read that
+		// failed is not retried while the page is open.
+		s.saves.mu.Lock()
+		why := s.saves.failed[factsKey(sv)]
+		s.saves.mu.Unlock()
+		if why != "" {
+			v.Stale, v.Note = false, view.Tf("the save could not be read: %s", why)
+		} else {
+			s.readSelected(sv, asked)
+		}
+	}
+	return v, nil
 }
 
 // SaveDetail is the selected save against its list (12 §4.3): the middle and right cards.

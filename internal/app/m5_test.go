@@ -158,7 +158,8 @@ func TestImportRimCrow(t *testing.T) {
 			t.Fatalf("dry run lacks %q:\n%s", want, dry)
 		}
 	}
-	if out := e.MustRun("tag", "list"); !strings.Contains(out, "tags: 0") {
+	// only the default RimWorld tag on Core (16 §3.8): the dry run wrote none
+	if out := e.MustRun("tag", "list"); !strings.Contains(out, "tags: 1") || !strings.Contains(out, "RimWorld  1 mod") {
 		t.Fatalf("dry run wrote tags:\n%s", out)
 	}
 	// Alpha's package has two lineages; the path picks the workshop one.

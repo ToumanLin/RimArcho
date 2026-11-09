@@ -67,7 +67,8 @@ func analysisMods(st *LoadoutState) ([]*store.Mod, map[string]int) {
 	return all, pos
 }
 
-// AnalysisKey identifies what an analysis depends on: analyzer version, game version, and
+// AnalysisKey identifies what an analysis depends on: analyzer and Def content versions
+// (a change to the stored content fields alone runs it again), game version, and
 // every included instance with its snapshot and position. Cheap (no declarations loaded).
 func (a *App) AnalysisKey(st *LoadoutState, mm string) string {
 	if mm == "" {
@@ -75,7 +76,7 @@ func (a *App) AnalysisKey(st *LoadoutState, mm string) string {
 	}
 	all, pos := analysisMods(st)
 	h := sha256.New()
-	fmt.Fprintf(h, "v%d|%s\n", analyze.Version, mm)
+	fmt.Fprintf(h, "v%d|c%d|%s\n", analyze.Version, analyze.DefContentVersion, mm)
 	for _, m := range all {
 		fmt.Fprintf(h, "%s %x %d\n", m.ID, m.SnapHash, pos[m.ID])
 	}

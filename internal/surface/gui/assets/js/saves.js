@@ -62,6 +62,8 @@ function news(ev) {
   if (!live()) return;
   if (ev.page) update(ev.page);
   if (X.sel && (ev.refs || []).includes(X.sel) && X.detail?.ref === X.sel && !X.detail.play && !X.detail.loading) showDetail(0);
+  // read again for its content (an older parser's cache): ask for the content again
+  else if (X.sel && (ev.refs || []).includes(X.sel) && content.ref === X.sel && content.data?.stale) loadContent(X.sel);
 }
 
 // update takes a newer listing from the full read: rows get their in-game day and colonies
@@ -115,11 +117,16 @@ export async function open(want = "") {
 }
 
 // leave forgets the last visit (16 §2.11, 17 §7.3): the listing, the cards, the editor or
-// confirmation open, and any reply still on its way to them.
+// confirmation open, the content and Over time's zoom, and any reply still on its way to
+// them.
 function leave() {
   clearTimeout(timer);
   mods?.destroy();
   mods = null;
+  timeRO?.disconnect();
+  timeRO = timeBox = contentBox = null;
+  zoom.clear(); // kept per colony while the page is open
+  content = { ref: "", seq: content.seq + 1, data: null, error: "", cat: "", opened: new Set(), all: false };
   X.page = null; X.detail = null; X.mode = null; X.viewing = new Set();
   X.detailSeq++; X.askSeq++;
   leftCard = midCard = rightCard = tree = input = null;
@@ -372,8 +379,10 @@ function showDetail(delay) {
     if (n !== X.detailSeq || !live() || X.sel !== ref) return;
     X.detail = d;
     if (!editing("rename")) drawMid(true);
+    else fillTime(d); // the card keeps the name field; Over time is filled in place
     if (!editing("colony")) drawRight(true);
     hintsChanged();
+    if (!d.error) loadContent(ref);
   }, delay);
 }
 
@@ -402,6 +411,8 @@ function drawMid(keep) {
   const focusKey = focused?.dataset?.key;
   mods?.destroy();
   mods = null;
+  timeRO?.disconnect();
+  timeRO = timeBox = null;
   midCard.replaceChildren();
   if (!d) { midCard.append(el("div", "empty-state", T("select a save"))); return; }
   const b = body();
@@ -464,9 +475,11 @@ function drawMid(keep) {
   }
   if (!d.error) {
     b.append(loadSection(d));
+    b.append(timeBox = el("div", "sv-sect sv-time"));
     if (d.mods?.length || d.changes?.length) b.append(modSection(d));
   }
   midCard.append(b);
+  if (timeBox) fillTime(d);
   const list = b.querySelector(".sv-mods");
   if (list && !d.error) mods = modRows(b, list, modShown(d));
   b.scrollTop = top;
@@ -691,10 +704,10 @@ function modRows(scroll, list, all) {
   return { draw, destroy() { cancelAnimationFrame(frame); ro.disconnect(); scroll.removeEventListener("scroll", later); } };
 }
 
-// drawRight is the playthrough (12 §4.3 Play facts, §4.5; the draft's right column):
-// the colony, its day and date, storyteller, difficulty and play time; the numbers at this
-// save with their change since the colony's previous read save, the colonists; the
-// newest letters; the colony over time. Skeletons while the save is read.
+// drawRight is the colony and the content its save references (16 §2.11 "Right"): the
+// colony, its day and date, storyteller, difficulty and play time; then the Defs the save
+// references, by the Mod providing them and by content category (12 §1.4, §1.5, §2).
+// Skeletons while the save is read.
 function drawRight(keep) {
   if (!rightCard) return;
   const d = X.detail;
@@ -704,7 +717,7 @@ function drawRight(keep) {
   if (!d) return;
   const p = d.play;
   const b = body();
-  b.setAttribute("aria-label", T("the playthrough"));
+  b.setAttribute("aria-label", T("the colony and its content"));
   const head = el("div", "sv-head");
   const row = el("div", "sv-row1");
   row.append(anum(rightCard));
@@ -733,88 +746,303 @@ function drawRight(keep) {
     }
     if (kv.childNodes.length) head.append(kv);
   }
+  if (p?.note) head.append(el("p", "sv-note warn", p.note));
   b.append(head);
   if (d.loading) { rightCard.append(b); return; }
-  if (p) b.append(...playSections(p));
-  else if (d.reading) {
-    const sk = el("div", "sv-sect");
-    sk.append(shimmer(T("reading the save…"), 5));
-    b.append(sk);
-  } else {
-    const s = el("div", "sv-sect");
-    const kv = el("dl", "sv-kv");
-    const c = colonyOf(d.ref);
-    if (c) kv.append(el("dt", "", T("saves")), el("dd", "", String(c.saves.length)));
-    if (d.saved) kv.append(el("dt", "", T("saved on")), el("dd", "", d.saved));
-    if (d.size) kv.append(el("dt", "", T("size")), el("dd", "", d.size));
-    s.append(kv);
-    if (d.playNote) s.append(el("p", "sv-note muted", d.playNote));
-    b.append(s);
-  }
+  b.append(contentBox = contentSection(d));
   rightCard.append(b);
   b.scrollTop = top;
   if (focused !== null) (focused && b.querySelector(`[data-key="${CSS.escape(focused)}"]`) || b).focus({ preventScroll: true });
 }
 
-// playSections draws the full read's facts (L1).
-function playSections(p) {
-  const out = [];
-  const at = el("div", "sv-sect");
-  const h = el("h3", "", T("at this save"));
-  h.append(el("span", "r", p.since ? Tf("change since %s", p.since) : T("no earlier save of this colony is read")));
-  at.append(h);
-  if (p.note) at.append(el("p", "sv-note warn", p.note));
-  const grid = el("div", "sv-stats");
-  for (const st of p.stats || []) {
-    const tile = el("div", "sv-stat");
-    // paragraphs, so each number gets its reference number (ctrl+\)
-    tile.append(el("p", "n", st.value), el("p", "l", st.label));
-    if (st.change) tile.append(el("p", "d" + (st.down ? " neg" : st.change === "±0" ? " same" : ""), st.change));
-    grid.append(tile);
+// ---- right: the content the save references (12 §1.4, §1.5, §2) ----
+
+// content: the selected save's content (API.SaveContent) once asked for; cat: the category
+// the Mods are filtered to; opened: the Mods (by packageId, "?" for source not found)
+// whose names are shown; all: every Mod is listed, not the first CONTENT_FOLD.
+let content = { ref: "", seq: 0, data: null, error: "", cat: "", opened: new Set(), all: false };
+// contentBox is the section in the right card, redrawn on its own (redrawContent) so a
+// colony name being typed in the card's header stays.
+let contentBox = null;
+
+function redrawContent() {
+  const d = X.detail;
+  if (!d || !contentBox?.isConnected) { drawRight(true); return; }
+  const key = contentBox.contains(document.activeElement) ? document.activeElement.dataset?.key : "";
+  const n = contentSection(d);
+  contentBox.replaceWith(n);
+  contentBox = n;
+  if (key) n.querySelector(`[data-key="${CSS.escape(key)}"]`)?.focus({ preventScroll: true });
+}
+const CONTENT_FOLD = 40;
+
+// loadContent asks for the save's content after its check: attributing thousands of Defs
+// is a separate call, so the cards above never wait for it.
+async function loadContent(ref) {
+  if (content.ref !== ref) content = { ref, seq: content.seq, data: null, error: "", cat: "", opened: new Set(), all: false };
+  const n = ++content.seq;
+  let c, err = "";
+  try { c = await api.SaveContent(ref); } catch (e) { err = errText(e); }
+  if (n !== content.seq || content.ref !== ref || X.sel !== ref || S.screen !== "saves") return;
+  content.data = c || null;
+  content.error = err;
+  redrawContent();
+}
+
+function contentSection(d) {
+  const s = el("div", "sv-sect sv-content");
+  const c = content.ref === d.ref ? content.data : null;
+  const h = el("h3", "", T("content in this save"));
+  s.append(h);
+  if (content.ref === d.ref && content.error) { s.append(el("p", "err", content.error)); return s; }
+  if (!c || c.stale || (!c.read && d.reading)) {
+    s.append(shimmer(c?.stale ? T("reading the save for its content…") : d.reading ? T("reading the save…") : T("finding the Mods of its content…"), 5));
+    return s;
   }
-  at.append(grid);
-  if (p.colonists?.length) {
-    const ul = el("ul", "sv-people");
-    ul.setAttribute("aria-label", T("colonists"));
-    for (const c of p.colonists) {
-      const li = el("li", "sv-person" + (c.dead ? " dead" : "") + (c.slave ? " slave" : ""), c.name);
-      if (c.dead) { li.setAttribute("aria-label", Tf("%s, dead", c.name)); li.title = T("dead"); }
-      else if (c.slave) { li.setAttribute("aria-label", Tf("%s, slave", c.name)); li.title = T("slave"); }
-      ul.append(li);
+  if (!c.read) {
+    // why it is not read (it failed, the game is writing it) before "not read yet"
+    s.append(el("p", "sv-note muted", d.playNote || c.note || T("the save is not read in full yet")));
+    return s;
+  }
+  const mods = c.mods || [];
+  h.append(el("span", "r", Tf("%d Defs from %d Mods", c.defs, mods.length)));
+  if (c.note) s.append(el("p", "sv-note warn", c.note));
+  // the categories over all Mods: one filters the Mods to it and shows its names
+  const totals = c.totals || [];
+  if (totals.length) {
+    const cats = el("div", "sv-cats");
+    cats.setAttribute("role", "group");
+    cats.setAttribute("aria-label", T("content categories"));
+    for (const t of totals) {
+      const on = content.cat === t.key;
+      const b = el("button", "sv-cat" + (on ? " on" : "") + (t.key === "other" ? " other" : ""));
+      b.type = "button";
+      b.dataset.key = "cat-" + t.key;
+      b.setAttribute("aria-pressed", String(on));
+      b.append(el("span", "n", String(t.count)), el("span", "l", t.label + (t.under ? " *" : "")));
+      b.title = [t.under ? T("may be underestimated: it leaves few traces in a save") : "", t.hidden ? Tf("%d hidden", t.hidden) : "", Tf("%d uses", t.uses)].filter(Boolean).join("  ");
+      b.onclick = () => { content.cat = on ? "" : t.key; redrawContent(); };
+      cats.append(b);
     }
-    if (p.more) ul.append(el("li", "sv-person more", Tf("and %d more", p.more)));
-    at.append(ul);
+    s.append(cats);
   }
-  out.push(at);
-  if (p.events?.length) {
-    const s = el("div", "sv-sect");
-    const eh = el("h3", "", T("events"));
-    eh.append(el("span", "r", T("newest first")));
-    const ul = el("ul", "sv-events");
-    for (const e of p.events) {
-      const li = el("li", e.death ? "death" : "");
-      li.append(el("span", "t", Tf("day %d", e.day)), el("span", "x", e.text));
-      ul.append(li);
+  s.append(el("p", "sv-note muted", T("a Def in the save means it was present, not how much it was played")));
+  // what this version cannot see in a save (12 §2): said, so no Mod looks unused for it
+  if (c.limits?.length) {
+    const ul = el("ul", "sv-limits");
+    ul.setAttribute("aria-label", T("not covered yet"));
+    for (const l of c.limits) ul.append(el("li", "", l));
+    s.append(ul);
+  }
+  const shownMods = content.cat ? mods.filter((m) => (m.cats || []).some((x) => x.key === content.cat)) : mods;
+  const list = el("ul", "sv-cmods");
+  list.setAttribute("aria-label", T("Mods by their content in this save"));
+  const cut = content.all || content.cat ? shownMods.length : Math.min(shownMods.length, CONTENT_FOLD);
+  for (const m of shownMods.slice(0, cut)) list.append(contentMod(m, m.packageId, m.name, m.library, m.defs, m.cats || []));
+  if (c.unknown && (!content.cat || content.cat === "unknown")) {
+    const u = c.unknown;
+    const li = contentMod(u, "?", T("source not found"), "", u.count, [u]);
+    li.classList.add("unknown");
+    li.title = T("no installed Mod of this save defines them: a Mod update removed them, or their Mod is not installed");
+    list.append(li);
+  }
+  if (!list.childElementCount) s.append(el("p", "sv-none", T("no Mod of this save has content in this category")));
+  else s.append(list);
+  if (shownMods.length > cut) {
+    const more = button(Tf("show all %d Mods", shownMods.length), "", () => { content.all = true; redrawContent(); }, "link sv-fold");
+    more.dataset.key = "content-all";
+    const f = el("p", "sv-folds");
+    f.append(more);
+    s.append(f);
+  }
+  if (c.unchecked?.length) {
+    // their Defs lack the category fields (an older analysis, another game or
+    // environment): left out, not counted as source not found. Analysing a list made from
+    // the save reads them; the card asks again when the analysis is done.
+    const p = el("p", "sv-note warn", Tf("not analysed yet: %s. What they add is left out until a list with them is analysed.", namesOf(c.unchecked, 6)) + " ");
+    const go = button(T("make a list from this save and analyse it"), "", () => newList(d, true), "link sv-fold", "new-plan");
+    go.dataset.key = "content-analyse";
+    p.append(go);
+    s.append(p);
+  }
+  // the save's Mods with nothing in it: code, UI and patch Mods leave no Def (12 §3.3)
+  const none = (d.mods || []).filter((m) => !m.missing).length - mods.length - (c.unchecked?.length || 0);
+  if (none > 0 && !content.cat) s.append(el("p", "sv-note muted", Tf("%d of the save's Mods have no Def in it: code, interface and patch Mods leave none", none)));
+  return s;
+}
+
+function namesOf(names, max) {
+  return names.slice(0, max).join(T(", ")) + (names.length > max ? " " + Tf("and %d more", names.length - max) : "");
+}
+
+// contentMod is one Mod (or source not found) with its categories; opening it, or
+// filtering to a category, shows the Defs' names.
+function contentMod(m, id, name, library, defs, cats) {
+  const li = el("li", "sv-cmod");
+  const open = content.opened.has(id);
+  const tg = el("button", "h");
+  tg.type = "button";
+  tg.dataset.key = "content-" + id;
+  tg.setAttribute("aria-expanded", String(open || !!content.cat));
+  const chv = el("span", "chv" + (open || content.cat ? " open" : "")); chv.innerHTML = icon.chev;
+  tg.append(chv, el("span", "n", name), el("span", "k", String(defs)));
+  if (m.packageId) tg.title = m.packageId;
+  tg.onclick = () => { if (content.opened.has(id)) content.opened.delete(id); else content.opened.add(id); redrawContent(); };
+  li.append(tg);
+  if (id !== "?") li.append(el("p", "sum", cats.map((x) => Tf("%d %s", x.count, x.label) + (x.under ? " *" : "")).join(T(", "))));
+  const shown = content.cat ? cats.filter((x) => x.key === content.cat) : open ? cats : [];
+  if (shown.length || (open && library)) {
+    const box = el("div", "sv-details");
+    for (const x of shown) {
+      const p = el("p", "sv-lost");
+      const names = x.names || [];
+      p.append(el("b", "", Tf("%d %s", x.count, x.label)), " " + names.join(T(", ")) + (x.count > names.length ? " " + Tf("and %d more", x.count - names.length) : ""));
+      box.append(p);
     }
-    s.append(eh, ul);
-    out.push(s);
+    if (open && library) {
+      const lk = button(T("show in the mod library"), "", () => openLibraryInstance(library), "link");
+      lk.dataset.key = "content-lib-" + id;
+      box.append(lk);
+    }
+    li.append(box);
   }
-  if (p.timeline) {
-    const s = el("div", "sv-sect");
-    const th = el("h3", "", T("over time"));
-    th.append(el("span", "r", T("a point opens its save")));
-    s.append(th, chart(p.timeline));
-    const dead = (p.colonists || []).filter((c) => c.dead).map((c) => c.name);
-    const legend = el("p", "sv-legend");
-    if (p.timeline.wealth) legend.append(el("span", "w", T("wealth")));
-    if (p.timeline.people) legend.append(el("span", "p", T("colonists")));
-    if (p.timeline.deaths?.length) legend.append(el("span", "x", T("deaths")));
-    const names = dead.join(T(", ")) + (p.dead > dead.length ? " " + Tf("and %d more", p.dead - dead.length) : "");
-    legend.append(el("span", "muted", p.dead ? Tf("%d dead: %s", p.dead, names) : T("no colonist has died")));
-    s.append(legend);
-    out.push(s);
+  return li;
+}
+
+// ---- middle: the colony over time (12 §4.5) ----
+
+// timeBox is Over time's section in the middle card, drawn on its own so the full read's
+// news redraws it without the rest of the card (a rename in progress stays). zoom is how
+// many times the card's width the chart is drawn, kept per colony: a long colony's saves
+// sit a few pixels apart until zoomed in.
+let timeBox = null, timeRO = null;
+const zoom = new Map(); // colony key → zoom, while the page is open
+const ZOOM_MAX = 64;
+
+function zoomOf() {
+  return zoom.get(colonyOf(X.sel)?.key || "") || 1;
+}
+
+// fillTime draws Over time: skeletons while the save is read, nothing when it has no
+// timeline. at keeps a place of the chart under the same pixel after a zoom: ratio is the
+// place along the whole chart, px where it was in view.
+function fillTime(d, at = null) {
+  const s = timeBox;
+  if (!s || !s.isConnected || d !== X.detail) return;
+  const tl = d.play?.timeline;
+  s.replaceChildren();
+  s.hidden = !tl && !d.reading;
+  if (s.hidden) return;
+  const h = el("h3", "", T("over time"));
+  s.append(h);
+  if (!tl) { s.append(shimmer(T("reading the save…"), 2)); return; }
+  const z = zoomOf();
+  const r = el("span", "r sv-zoom");
+  r.append(el("span", "", T("a point opens its save")));
+  const zb = (label, key, title, to, off) => {
+    const b = button(label, "", () => setZoom(to(), zoomAnchor()), "small sv-zb");
+    b.dataset.key = key;
+    b.title = title;
+    b.setAttribute("aria-label", title);
+    if (off) b.disabled = true;
+    r.append(b);
+  };
+  zb("−", "zoom-out", T("zoom out (ctrl+wheel)"), () => zoomOf() / 2, z <= 1);
+  zb("+", "zoom-in", T("zoom in (ctrl+wheel)"), () => zoomOf() * 2, z >= ZOOM_MAX);
+  zb(T("fit"), "zoom-fit", T("show the whole colony"), () => 1, z <= 1);
+  h.append(r);
+  const sc = el("div", "sv-chartscroll" + (z > 1 ? " zoomed" : ""));
+  const width = s.clientWidth - 32;
+  sc.append(chart(tl, Math.max(240, width) * z));
+  s.append(sc);
+  const p = d.play;
+  const dead = (p.colonists || []).filter((c) => c.dead).map((c) => c.name);
+  const legend = el("p", "sv-legend");
+  if (tl.wealth) legend.append(el("span", "w", T("wealth")));
+  if (tl.people) legend.append(el("span", "p", T("colonists")));
+  if (tl.deaths?.length) legend.append(el("span", "x", T("deaths")));
+  const names = dead.join(T(", ")) + (p.dead > dead.length ? " " + Tf("and %d more", p.dead - dead.length) : "");
+  legend.append(el("span", "muted", p.dead ? Tf("%d dead: %s", p.dead, names) : T("no colonist has died")));
+  s.append(legend);
+  const sel = sc.querySelector(".pt.sel");
+  // the selected save stays under its pixel; points sit inside a margin, so a ratio of the
+  // width would drift them (12 px a step at the right edge)
+  if (at?.selPx !== undefined && sel) sc.scrollLeft = +sel.getAttribute("cx") - at.selPx;
+  else if (at) sc.scrollLeft = at.ratio * sc.scrollWidth - at.px;
+  else if (z > 1) {
+    // the selected save in view
+    if (sel) sc.scrollLeft = +sel.getAttribute("cx") - sc.clientWidth / 2;
   }
-  return out;
+  wireZoom(sc);
+  // the card's width changes with the window and the gaps: draw again at the new width
+  timeRO?.disconnect();
+  let w0 = s.clientWidth, frame = 0;
+  timeRO = new ResizeObserver(() => {
+    if (s.clientWidth === w0 || frame) return;
+    frame = requestAnimationFrame(() => {
+      frame = 0;
+      w0 = s.clientWidth;
+      const c = s.querySelector(".sv-chartscroll");
+      if (c) fillTime(X.detail, { ratio: (c.scrollLeft + c.clientWidth / 2) / c.scrollWidth, px: c.clientWidth / 2 });
+    });
+  });
+  timeRO.observe(s);
+}
+
+// zoomAnchor: the buttons and keys zoom around the selected save while it is in view, else
+// around the middle (VM 2026-11-09: from the whole colony, + lost the newest save off the
+// right edge).
+function zoomAnchor() {
+  const c = timeBox?.querySelector(".sv-chartscroll"), p = c?.querySelector(".pt.sel");
+  if (!p) return 0.5;
+  const f = (+p.getAttribute("cx") - c.scrollLeft) / c.clientWidth;
+  return f >= 0 && f <= 1 ? f : 0.5;
+}
+
+// setZoom draws the chart at z, keeping the place at frac of the view (0 left, 1 right)
+// where it was.
+function setZoom(z, frac) {
+  z = Math.max(1, Math.min(ZOOM_MAX, z));
+  const old = zoomOf();
+  if (Math.abs(z - old) < 0.01) return;
+  const sc = timeBox?.querySelector(".sv-chartscroll");
+  const px = (sc?.clientWidth || 0) * frac;
+  const ratio = sc ? (sc.scrollLeft + px) / sc.scrollWidth : 0.5;
+  const p = sc?.querySelector(".pt.sel");
+  const selPx = p ? +p.getAttribute("cx") - sc.scrollLeft : NaN;
+  zoom.set(colonyOf(X.sel)?.key || "", z < 1.05 ? 1 : z);
+  const keep = timeBox?.contains(document.activeElement) ? document.activeElement.dataset?.key : "";
+  fillTime(X.detail, Math.abs(selPx - px) < 1 ? { selPx } : { ratio, px });
+  const f = keep && timeBox?.querySelector(`[data-key="${CSS.escape(keep)}"]`);
+  if (f && !f.disabled) f.focus({ preventScroll: true });
+  else if (keep) timeBox?.querySelector(".sv-zb:not(:disabled)")?.focus({ preventScroll: true });
+}
+
+// wireZoom: ctrl+wheel zooms around the pointer; dragging a zoomed chart pans it; + − 0
+// zoom while the section has the focus.
+function wireZoom(sc) {
+  sc.addEventListener("wheel", (e) => {
+    if (!e.ctrlKey) return;
+    e.preventDefault();
+    const r = sc.getBoundingClientRect();
+    setZoom(zoomOf() * (e.deltaY < 0 ? 1.25 : 0.8), (e.clientX - r.left) / r.width);
+  }, { passive: false });
+  let drag = null;
+  sc.onpointerdown = (e) => {
+    if (e.button !== 0 || zoomOf() <= 1 || e.target.closest?.("[data-save]")) return;
+    drag = { x: e.clientX, left: sc.scrollLeft, id: e.pointerId };
+    sc.setPointerCapture(e.pointerId);
+    sc.classList.add("drag");
+  };
+  sc.onpointermove = (e) => { if (drag && e.pointerId === drag.id) sc.scrollLeft = drag.left - (e.clientX - drag.x); };
+  sc.onpointerup = sc.onpointercancel = (e) => { if (drag && e.pointerId === drag.id) { drag = null; sc.classList.remove("drag"); } };
+  timeBox.onkeydown = (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const to = e.key === "+" || e.key === "=" ? zoomOf() * 2 : e.key === "-" ? zoomOf() / 2 : e.key === "0" ? 1 : 0;
+    if (!to) return;
+    e.preventDefault(); e.stopPropagation();
+    setZoom(to, zoomAnchor());
+  };
 }
 
 const SVG = "http://www.w3.org/2000/svg";
@@ -833,23 +1061,39 @@ function kilo(v) {
   return (Math.round(v / 1e5) / 10) + "M";
 }
 
-// chart is the colony over in-game days (12 §4.5): this save's wealth (line and area) and
-// colonists (dashed) from its own history, a mark per death letter, and a point per read
-// save of the colony; a point opens its save. The tree reaches every save by keys, so the
-// points are for the mouse; the chart reads as one image.
-function chart(tl) {
-  const w = Math.max(240, (rightCard?.clientWidth || 360) - 34), h = 120, L = 12, R = 12, TOP = 10, B = 20;
+// dayStep is the days between the axis's labels: 1, 2, 5, 10, 20, 50… so that labels
+// stand about 90 px apart.
+function dayStep(days, width) {
+  const raw = days / Math.max(1, Math.floor(width / 90));
+  const e = Math.pow(10, Math.floor(Math.log10(Math.max(1, raw))));
+  for (const m of [1, 2, 5, 10]) if (m * e >= raw) return m * e;
+  return 10 * e;
+}
+
+// chart is the colony over in-game days (12 §4.5), w pixels wide: this save's wealth (line
+// and area) and colonists (dashed) from its own history, a mark per death letter, and a
+// point per read save of the colony; a point opens its save. The tree reaches every save
+// by keys, so the points are for the mouse; the chart reads as one image.
+function chart(tl, w) {
+  const h = 140, L = 12, R = 12, TOP = 10, B = 20;
   const days = Math.max(1, tl.days), wealth = tl.wealth || [], people = tl.people || [];
   const maxW = Math.max(1, ...wealth, ...tl.points.map((p) => p.wealth));
   const maxP = Math.max(1, ...people);
   const x = (d) => L + (Math.min(d, days) / days) * (w - L - R);
   const y = (v, max) => h - B - (v / max) * (h - B - TOP);
   const along = (vals, max) => vals.map((v, i) => `${x(tl.upto * i / Math.max(1, vals.length - 1)).toFixed(1)},${y(v, max).toFixed(1)}`).join(" ");
-  const svg = svgEl("svg", { class: "sv-chart", viewBox: `0 0 ${w} ${h}`, role: "img",
+  const svg = svgEl("svg", { class: "sv-chart", width: w, height: h, viewBox: `0 0 ${w} ${h}`, role: "img",
     "aria-label": Tf("wealth and colonists over %d days, %d saves", days, tl.points.length) });
   svg.append(svgEl("line", { class: "ax", x1: L, x2: w - R, y1: h - B, y2: h - B }));
-  for (const t of [...new Set([0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(f * days)))]) {
-    svg.append(svgEl("text", { x: x(t), y: h - 5, "text-anchor": t === 0 ? "start" : t === days ? "end" : "middle" }, Tf("day %d", t)));
+  const step = dayStep(days, w - L - R);
+  const ticks = [];
+  for (let t = 0; t <= days; t += step) ticks.push(t);
+  // the last day, unless a label stands too close to it
+  if (x(days) - x(ticks[ticks.length - 1]) > 60) ticks.push(days);
+  for (const t of ticks) {
+    const end = x(days) - x(t) < 30;
+    svg.append(svgEl("line", { class: "tk", x1: x(t), x2: x(t), y1: h - B, y2: h - B + 3 }));
+    svg.append(svgEl("text", { x: x(t), y: h - 5, "text-anchor": t === 0 ? "start" : end ? "end" : "middle" }, Tf("day %d", t)));
   }
   for (const d of tl.deaths || []) svg.append(svgEl("line", { class: "ev", x1: x(d), x2: x(d), y1: TOP, y2: h - B }));
   if (wealth.length > 1) {
@@ -858,9 +1102,19 @@ function chart(tl) {
     svg.append(svgEl("polyline", { class: "ln", points: line }));
   }
   if (people.length > 1) svg.append(svgEl("polyline", { class: "pop", points: along(people, maxP) }));
+  // saves of one day sit side by side, the last on the day, so each can be clicked once
+  // zoomed (VM 2026-11-09: saves minutes apart covered each other at every zoom)
+  const left = new Map(), count = new Map();
+  for (const pt of tl.points) count.set(pt.day, (count.get(pt.day) || 0) + 1);
   for (const pt of tl.points) {
+    const n = count.get(pt.day) - 1;
+    count.set(pt.day, n);
+    left.set(pt, n);
+  }
+  // the selected point last, so a neighbour never covers it
+  for (const pt of [...tl.points].sort((p, q) => (p.ref === X.sel) - (q.ref === X.sel))) {
     const on = pt.ref === X.sel, off = pt.wealth < 0;
-    const cx = x(pt.day), cy = off ? h - B : y(pt.wealth, maxW), r = pt.auto ? 3.5 : 5;
+    const cx = Math.max(L, x(pt.day) - left.get(pt) * 11), cy = off ? h - B : y(pt.wealth, maxW), r = pt.auto ? 3.5 : 5;
     if (on) svg.append(svgEl("circle", { class: "ring", cx, cy, r: r + 4 }));
     const c = svgEl("circle", { class: "pt" + (pt.auto ? " auto" : "") + (off ? " off" : "") + (on ? " sel" : ""), cx, cy, r });
     c.dataset.save = pt.ref;

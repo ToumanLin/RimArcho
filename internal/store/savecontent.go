@@ -11,7 +11,7 @@ import (
 )
 
 func saveContent(tx *sql.Tx, out *analyze.Output, mm string) error {
-	ins, err := tx.Prepare(`INSERT INTO def_fact(set_id,def_type,def_name,name,parent,abstract,file_ix,line,may_require,may_require_any) VALUES(?,?,?,?,?,?,?,?,?,?)`)
+	ins, err := tx.Prepare(`INSERT INTO def_fact(set_id,def_type,def_name,name,parent,abstract,file_ix,line,may_require,may_require_any,content_fields) VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
 	if err != nil {
 		return err
 	}
@@ -32,12 +32,26 @@ func saveContent(tx *sql.Tx, out *analyze.Output, mm string) error {
 				return fmt.Errorf("missing rebuilt Def facts for %s", inst)
 			}
 			var files fileIndex
+			ready := true
 			for _, f := range fs {
-				if _, err := ins.Exec(defID, f.Type, f.DefName, f.Name, f.Parent, f.Abstract, files.of(f.File), f.Line, f.MayRequire, f.MayRequireAny); err != nil {
+				fields := ""
+				if f.Content != nil {
+					b, err := json.Marshal(f.Content)
+					if err != nil {
+						return err
+					}
+					fields = string(b)
+				}
+				ready = ready && f.Content != nil && f.Content.Version == analyze.DefContentVersion
+				if _, err := ins.Exec(defID, f.Type, f.DefName, f.Name, f.Parent, f.Abstract, files.of(f.File), f.Line, f.MayRequire, f.MayRequireAny, fields); err != nil {
 					return err
 				}
 			}
-			if _, err := tx.Exec(`UPDATE fact_set SET files=? WHERE id=?`, files.json(), defID); err != nil {
+			version := 0
+			if ready {
+				version = analyze.DefContentVersion
+			}
+			if _, err := tx.Exec(`UPDATE fact_set SET files=?,def_content_version=? WHERE id=?`, files.json(), version, defID); err != nil {
 				return err
 			}
 		}

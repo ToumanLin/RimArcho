@@ -803,6 +803,7 @@ func TestWrap(t *testing.T) {
 func TestColumnSearch(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)
+	e.MustRun("tag", "remove", "pkg:ludeon.rimworld", "RimWorld") // the default tag (16 §3.8): not under test here
 	e.MustRun("tag", "add", "pkg:brrainz.harmony", "core-lib", "--mod", "pkg:tester.b")
 	e.MustRun("note", "pkg:tester.b", "check later")
 	e.WriteFile(filepath.Join(e.Game, "Mods", "B", "Assemblies", "Beta.dll"), "MZ")

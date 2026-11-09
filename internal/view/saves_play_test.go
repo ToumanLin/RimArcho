@@ -31,16 +31,13 @@ func series(n int, f func(i int) float32) []float32 {
 	return v
 }
 
-// The right card from the full read (16 §2.11 "Right", 12 §4.5): only what the facts
-// hold, the change since the colony's previous read save, and lists kept short.
+// The right card's header and Over time from the full read (16 §2.11, 12 §4.5): only what
+// the facts hold, and the dead the legend names kept short.
 func TestSavePlayOf(t *testing.T) {
 	t.Parallel()
 	// newest first: a later save (day 60), the selected one (day 40), one not read, the previous (day 20)
 	c := colonyOf(60, 40, -1, 20)
-	sel, prevSave := c.Saves[1], c.Saves[3]
-	if got := view.PreviousReadSave(sel); got != prevSave {
-		t.Fatalf("previous read save %v", got)
-	}
+	sel := c.Saves[1]
 	f := &savefile.Facts{TicksGame: 40*savefile.TicksPerDay + 1000, GameStartAbsTick: 300000, Storyteller: "Kiiro_Storyteller",
 		Difficulty: "Extreme", Permadeath: true, RealPlayTime: 1500, Animals: 2, Prisoners: 1,
 		Stats:    savefile.Stats{RaidsEnemy: 7},
@@ -55,34 +52,14 @@ func TestSavePlayOf(t *testing.T) {
 	for i := range 45 {
 		f.Colonists = append(f.Colonists, savefile.Pawn{Nick: fmt.Sprintf("P%d", i), Dead: i == 0, Slave: i == 1})
 	}
-	prev := &savefile.Facts{TicksGame: 20 * savefile.TicksPerDay, Animals: 2, Stats: savefile.Stats{RaidsEnemy: 3},
-		History: []savefile.Recorder{{Def: "Wealth_Total", Count: 1, Last: 150000}}}
-	for range 40 {
-		prev.Colonists = append(prev.Colonists, savefile.Pawn{Nick: "x"})
-	}
-
-	p := view.SavePlayOf(sel, f, prevSave, prev)
+	p := view.SavePlayOf(sel, f)
 	if p.Day != "day 40" || p.Date != "1st of Decembary, 5500" || p.Storyteller != "Kiiro_Storyteller" || p.Difficulty != "losing is fun  commitment mode" ||
-		p.Played != "25m" || p.Since != "Save 3" || p.Note == "" {
+		p.Played != "25m" || p.Note == "" {
 		t.Fatalf("head %+v", p)
 	}
-	var stats []string
-	for _, s := range p.Stats {
-		stats = append(stats, fmt.Sprintf("%s=%s(%s)%v", s.Label, s.Value, s.Change, s.Down))
-	}
-	want := []string{"wealth=120k(−30k)true", "colonists=44(+4)false", "animals=2(±0)false", "research points=2k(+2k)false",
-		"raids=7(+4)false", "prisoners=1(+1)false"}
-	if !slices.Equal(stats, want) {
-		t.Fatalf("stats\n%q\nwant\n%q", stats, want)
-	}
-	// alive first, the dead last; at most PlayColonists
-	last := p.Colonists[len(p.Colonists)-1]
-	if len(p.Colonists) != view.PlayColonists || p.More != 5 || p.Dead != 1 || p.Colonists[0].Name != "P1" || !p.Colonists[0].Slave ||
-		p.Colonists[0].Dead || last.Name != "P0" || !last.Dead {
-		t.Fatalf("colonists %d more %d dead %d first %+v last %+v", len(p.Colonists), p.More, p.Dead, p.Colonists[0], last)
-	}
-	if len(p.Events) != 2 || p.Events[0].Text != "Death: Ozzie" || p.Events[0].Day != 39 || !p.Events[0].Death {
-		t.Fatalf("events %+v", p.Events)
+	// the dead only, for the legend
+	if len(p.Colonists) != 1 || p.Dead != 1 || p.Colonists[0].Name != "P0" || !p.Colonists[0].Dead {
+		t.Fatalf("dead %d %+v", p.Dead, p.Colonists)
 	}
 
 	tl := p.Timeline
@@ -99,19 +76,11 @@ func TestSavePlayOf(t *testing.T) {
 		t.Fatalf("points %q", pts)
 	}
 
-	// Without a previous read save: no changes; a lone save without history draws nothing.
+	// A lone save without history draws nothing.
 	lone := colonyOf(5)
-	p = view.SavePlayOf(lone.Saves[0], &savefile.Facts{TicksGame: 5 * savefile.TicksPerDay, Storyteller: "Cassandra", Difficulty: "Rough"}, nil, nil)
-	if p.Since != "" || p.Timeline != nil || p.Storyteller != "Cassandra Classic" || p.Difficulty != "strive to survive" || p.Played != "" {
+	p = view.SavePlayOf(lone.Saves[0], &savefile.Facts{TicksGame: 5 * savefile.TicksPerDay, Storyteller: "Cassandra", Difficulty: "Rough"})
+	if p.Timeline != nil || p.Storyteller != "Cassandra Classic" || p.Difficulty != "strive to survive" || p.Played != "" {
 		t.Fatalf("lone save %+v", p)
-	}
-	for _, s := range p.Stats {
-		if s.Change != "" {
-			t.Fatalf("a change without a previous save: %+v", s)
-		}
-		if s.Label == "wealth" || s.Label == "prisoners" {
-			t.Fatalf("a number the save does not hold: %+v", s)
-		}
 	}
 }
 
@@ -133,11 +102,11 @@ func TestSavePlayDateZh(t *testing.T) {
 	defer view.SetLang("en")
 	c := colonyOf(25)
 	f := &savefile.Facts{TicksGame: 25 * savefile.TicksPerDay}
-	if p := view.SavePlayOf(c.Saves[0], f, nil, nil); p.Date != "11th of Jugust, 5500" {
+	if p := view.SavePlayOf(c.Saves[0], f); p.Date != "11th of Jugust, 5500" {
 		t.Fatalf("en date %q", p.Date)
 	}
 	view.SetLang("zh")
-	if p := view.SavePlayOf(c.Saves[0], f, nil, nil); p.Date != "5500 年赫象 11 日" {
+	if p := view.SavePlayOf(c.Saves[0], f); p.Date != "5500 年赫象 11 日" {
 		t.Fatalf("zh date %q", p.Date)
 	}
 }

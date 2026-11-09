@@ -25,7 +25,7 @@ The game does not load every file in a Mod directory. All content analysis (`Def
 
 **Cache key**. Conditional `<li>` entries make the effective content depend on the plan, so the effective-content cache key is:
 
-`snapshot hash | hash of ordered effective directory list | analyzer version`
+`snapshot hash | hash of ordered effective directory list | analyzer version | Def content version` (`analyze.DefKeySuffix`: `|a<analyze.Version>|c<analyze.DefContentVersion>`; a set with an existing key is never rewritten, so a change to the content fields alone must still make new sets)
 
 Preserve the directory priority order and duplicates. Clean the paths and normalize their separators first (`content.FolderKey`); changing the order can change which same-name resource overrides another. The game version and condition evaluation already affect directory selection, so identical directories do not need separate sets for different versions or condition text. The key excludes the whole plan. A plan edit invalidates only the `Mods` whose effective directories change (`TestLoadFoldersConditions`).
 
@@ -36,7 +36,7 @@ Assemblies use a separate key, `analyze.AssemblyKey`: the snapshot hash, the rel
 | Fact | Fields | Source |
 | --- | --- | --- |
 | `ModDecl` | Dependencies (including version-specific dependencies), loadBefore/After, forceLoad*, incompatibleWith, `supportedVersions`, and the original `LoadFolders.xml` | The snapshot's `decl_blob` (04 §1.3) |
-| `Def` | Type (element name), `defName`, `Name`, `ParentName`, `Abstract`, file relative to the Mod root, line of the opening tag, owning Instance, and the `Def`'s own `MayRequire` and `MayRequireAnyOf` | Effective `Defs/**/*.xml` |
+| `Def` | Type (element name), `defName`, `Name`, `ParentName`, `Abstract`, file relative to the Mod root, line of the opening tag, owning Instance, the `Def`'s own `MayRequire` and `MayRequireAnyOf`, and bounded unresolved content-predicate fields (§5.1) | Effective `Defs/**/*.xml` |
 | `PatchOp` | Operation class, XPath, child-operation structure, value summary, file and line, ordinal, and simulation result and reason | Effective `Patches/**/*.xml` |
 | `TypeDef` | Assembly, namespace, and full type name | .NET metadata in effective DLLs |
 | Game type | Game assembly file, game version, full type name, namespace, simple name | .NET metadata in the game's own `Assembly-CSharp.dll` and `Assembly-CSharp-firstpass.dll`, read at scan (§5.3) |
@@ -65,7 +65,7 @@ Assemblies use a separate key, `analyze.AssemblyKey`: the snapshot hash, the rel
 - Tests inject an in-process runner (`InProcessAnalyze`).
 - **Wait limit**: the default `App.AnalyzeWait` for each entry point is in 16 §2.16.1 W01; the CLI has no limit. On timeout, return the declaration findings with "still computing in the background". The subprocess continues, and the next call retrieves its results. Meanwhile, def, patches, and harmony use the previous, stale results.
 
-**AnalysisKey (freshness)**. Hash the analyzer version, the game major.minor version, and each included Instance's ID, snapshot hash, and position in the plan. Use the first 24 hexadecimal characters. User and community rules are excluded because they affect only the on-demand declarations. Computing the key is cheap and does not require loading the declarations.
+**AnalysisKey (freshness)**. Hash the analyzer version, the Def content version (`analyze.DefContentVersion`: a change to the stored content fields alone runs the analysis again), the game major.minor version, and each included Instance's ID, snapshot hash, and position in the plan. Use the first 24 hexadecimal characters. User and community rules are excluded because they affect only the on-demand declarations. Computing the key is cheap and does not require loading the declarations.
 
 **Included Instances**. Include the analyzed plan's enabled list and all other live, loadable, disabled Instances. Loadable Instances include `Mods` already visible to the game and SteamCMD or other-folder `Mods` that can be deployed through links on save. Extract only `Def` facts from disabled Instances, for `target-inactive` (§4.4) and for log queries about who provides a missing `Def`. Harmony reads only enabled Instances.
 
@@ -268,8 +268,11 @@ Each entry point shows a different default subset of the same findings. Usually,
 
 ### 5.1 Def layer
 
-- Parse the XML as a stream, extracting only the fields in §2 without keeping a full DOM.
-- Resolve inheritance after all patches have been applied, as the game does. Patches can change `Name` and `ParentName`; for example, `AttributeAdd` can name Core `Defs`. First collect all `Name` values in the patched documents, then resolve `ParentName`. For abstract nodes with the same name, the later node in load order overrides the earlier one. Checking before patches produces false positives (see 18 for measurements in a real environment).
+- Parse effective Def XML into the arena, extracting §2 facts. Persisted per-Mod Def facts describe raw effective files before Patch simulation; folder selection does not establish a post-Patch catalog.
+- Analysis checks parent-name existence **after** Patch simulation, accounting for patches changing `Name`/`ParentName`. This check does not resolve inherited content-classification fields.
+- `DefFact.Content` retains versioned bounded unresolved predicate inputs beside `def_fact`: category, thingClass, race intelligence/flesh, apparel/plant presence, natural/resource-rock flags, verbs/tools entry presence, hidden faction, organic flesh. Presence, null, empty/append/reset lists (`Inherit="False"`) and nested MayRequire conditions survive. Bounds: 256 retained nodes, 512 bytes per value; exceeding a bound marks classification incomplete.
+- Selected-save classification follows 12 §2.2: XML `Name` is the inheritance key and the best parent is the greatest Mod order not after the child, not the last parent globally. It does not resolve post-Patch fields or DLL class ancestry; custom plant inference and unknown parents are labeled.
+- Schema 35 adds `def_fact.content_fields` and `fact_set.def_content_version` without removing fact sets or `content_state` views. The analyzer-version bump rebuilds immutable sets in the next background analysis; old Def/DLL facts remain readable meanwhile. Content readiness is per Mod and required field version, including analyzed Mods with zero Defs, not view existence alone. Parser-version changes invalidate L1 only (12 §1.7).
 
 ### 5.2 Patch simulation
 

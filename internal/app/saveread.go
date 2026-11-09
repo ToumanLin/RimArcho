@@ -61,8 +61,10 @@ func worldIdentity(f *savefile.Facts) string {
 
 func saveKey(s *Save) string { return env.PathKey(s.Path) }
 
-// attachSummaries sets the summary of every save whose cache row is still valid, and marks
-// the saves whose stored read failed on the file as it is now.
+// attachSummaries sets the summary of every save whose cache row is still valid (a row of
+// an older parser that means the same is, savefile.MinParserVersion, so a parser change
+// that only adds facts does not unread every save), and marks the saves whose stored read
+// failed on the file as it is now.
 func (a *App) attachSummaries(saves []*Save) error {
 	rows, err := a.Store.SaveSummaries()
 	if err != nil {
@@ -74,7 +76,7 @@ func (a *App) attachSummaries(saves []*Save) error {
 		}
 		r := rows[saveKey(s)]
 		switch {
-		case r.Valid(s.Size, s.ModTime.UnixNano(), savefile.ParserVersion):
+		case r.Valid(s.Size, s.ModTime.UnixNano(), savefile.MinParserVersion, savefile.ParserVersion):
 			s.Summary = summaryOf(r.SaveSummaryRow)
 		case r.Failed(s.Size, s.ModTime.UnixNano(), savefile.ParserVersion):
 			s.ReadFailed = true
@@ -90,9 +92,11 @@ func (s *Save) NeedsRead() bool {
 }
 
 // SaveFacts returns a save's full read from the cache. With read, a save without a valid
-// cache row is read now and stored (the CLI's one save: tens of ms per 10 MB), even when
-// an earlier read of it failed. Without read, or for a save being written, it is nil when
-// not cached (SaveReadFailure says why when a stored read failed).
+// cache row, or with a row of an older parser (MinParserVersion), is read now and stored
+// (the CLI's one save, the page's selected one: tens of ms per 10 MB), even when an earlier
+// read of it failed. Without read it may return an older parser's facts (Facts.Parser says
+// which); nil when not cached or for a save being written (SaveReadFailure says why when a
+// stored read failed).
 func (a *App) SaveFacts(s *Save, read bool) (*savefile.Facts, error) {
 	if s.Writing {
 		return nil, nil
@@ -101,9 +105,9 @@ func (a *App) SaveFacts(s *Save, read bool) (*savefile.Facts, error) {
 	if err != nil {
 		return nil, err
 	}
-	if c.Valid(s.Size, s.ModTime.UnixNano(), savefile.ParserVersion) {
+	if c.Valid(s.Size, s.ModTime.UnixNano(), savefile.MinParserVersion, savefile.ParserVersion) {
 		var f savefile.Facts
-		if json.Unmarshal(c.Facts, &f) == nil {
+		if json.Unmarshal(c.Facts, &f) == nil && (!read || f.Parser == savefile.ParserVersion) {
 			s.Summary = summaryOf(c.SaveSummaryRow)
 			return &f, nil
 		}

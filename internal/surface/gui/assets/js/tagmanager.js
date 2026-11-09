@@ -13,6 +13,8 @@
 //   redraw()    draws the panel again (the picked tags changed)
 //   leave()     gives the keyboard back to the rows
 //   editing()   a field in the panel takes the keyboard (rename)
+//   shown(g, info)  optional: the facts line's second fact (default: how many of the group's
+//               rows the filter shows, when not all)
 //   recolor(tag, colour)  shows a tag's new colour at once (rows, headers, the panel); Go
 //               saves it meanwhile, and a failure reads the page again
 import { el, api, T, Tf, errText, say, keyCaps } from "./state.js";
@@ -63,7 +65,8 @@ function tagHead(d, g, info, ctx) {
   row.append(h, pin);
   const facts = el("div", "facts");
   facts.append(el("span", "", Tf("%d mods", info.n)));
-  if (g.rows && info.n !== g.rows.length) facts.append(el("span", "", Tf("%d shown", g.rows.length)));
+  const shown = ctx.shown ? ctx.shown(g, info) : g.rows && info.n !== g.rows.length ? Tf("%d shown", g.rows.length) : "";
+  if (shown) facts.append(el("span", "", shown));
   if (info.pinned) facts.append(el("span", "", T("on top")));
   d.append(row, facts, colorField(info, g, ctx));
   const acts = el("div", "lib-acts");

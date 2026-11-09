@@ -89,6 +89,7 @@ func TestSaveToolsCLIParity(t *testing.T) {
 		{"get_save", map[string]any{"save": "Nope"}, []string{"saves", "show", "Nope"}},
 		{"get_save", map[string]any{"save": "Rimward"}, []string{"saves", "show", "Rimward"}},
 		{"get_save", map[string]any{"save": "Rimward", "play": true}, []string{"saves", "show", "Rimward", "--play"}},
+		{"get_save", map[string]any{"save": "Rimward", "content": true}, []string{"saves", "show", "Rimward", "--content"}},
 		{"get_save", map[string]any{"save": "Rimward.rws", "play": true, "mods": true, "all": true}, []string{"saves", "show", "Rimward.rws", "--mods", "--play", "--all"}},
 		{"list_saves", map[string]any{"colony": "New Arrivals"}, []string{"saves", "list", "--colony", "New Arrivals"}},
 		{"manage_saves", map[string]any{"action": "fix", "saves": []string{"Tundra 2"}, "dry_run": true}, []string{"saves", "fix", "Tundra 2", "--dry-run"}},

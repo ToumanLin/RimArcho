@@ -20,7 +20,7 @@ import (
 )
 
 // Version of the analyzers; facts written by another version are rebuilt (05 §2).
-const Version = 11 // 6: manual Harmony.Patch targets, HugsLib.dll in its own mod; 7: harmony.multi-transpiler is info; 8: a parent named by a mod-defined patch operation is not missing; 9: asm.duplicate-name; 10: compiler-added types are not lost types; 11: simple TargetMethod() bodies resolved to static targets
+const Version = 12 // 12: unresolved content classification fields (12 §2).
 
 // Mod is one installed instance.
 type Mod struct {
@@ -46,8 +46,9 @@ type DefFact struct {
 	File     string `json:"f"` // relative to the mod root
 	Line     int    `json:"l"`
 	// MayRequire / MayRequireAnyOf on the def: the game skips it unless they are active.
-	MayRequire    string `json:"mr,omitempty"`
-	MayRequireAny string `json:"mra,omitempty"`
+	MayRequire    string      `json:"mr,omitempty"`
+	MayRequireAny string      `json:"mra,omitempty"`
+	Content       *DefContent `json:"content,omitempty"`
 }
 
 // Loaded reports whether the game loads the def with the given packages active.
@@ -160,7 +161,7 @@ func Run(in Input) (*Output, error) {
 		r := content.Resolve(m.Dir, m.Decl.LoadFolders, in.MM, isActive)
 		folders[m.Instance] = r.Folders
 		requires[m.Instance] = r.Requires
-		out.Content[m.Instance] = &ContentState{Key: r.Key(m.SnapHash, in.MM) + fmt.Sprintf("|a%d", Version), Folders: r.Folders}
+		out.Content[m.Instance] = &ContentState{Key: r.Key(m.SnapHash, in.MM) + DefKeySuffix(), Folders: r.Folders}
 		if m.Pos > 0 {
 			out.Content[m.Instance].AssemblyKey = AssemblyKey(m, r.Folders, in.HarmonySkip)
 		}
@@ -363,6 +364,7 @@ func Run(in Input) (*Output, error) {
 
 func defFact(d *xdoc.Doc, t int32, file string, line int) DefFact {
 	f := DefFact{Type: d.Name(t), File: file, Line: line}
+	f.Content = extractDefContent(d, t)
 	if c := d.Child(t, "defName"); c != xdoc.None {
 		f.DefName = strings.Clone(strings.TrimSpace(d.InnerText(c))) // detach from the doc's text pages
 	}

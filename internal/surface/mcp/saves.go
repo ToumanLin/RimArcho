@@ -31,16 +31,17 @@ func ListSavesArgv(in ListSavesIn) []string {
 
 // GetSaveIn is get_save: archo saves show.
 type GetSaveIn struct {
-	Env  string `json:"env,omitempty" jsonschema:"environment (default: current)"`
-	Save string `json:"save" jsonschema:"sv:<hex>, file name or <colony>/<save>"`
-	Mods bool   `json:"mods,omitempty" jsonschema:"every Mod, not only the differences"`
-	Play bool   `json:"play,omitempty" jsonschema:"the whole playthrough: colonists, events"`
-	All  bool   `json:"all,omitempty" jsonschema:"no truncation"`
+	Env     string `json:"env,omitempty" jsonschema:"environment; default current"`
+	Save    string `json:"save" jsonschema:"sv:ref, name or colony/save"`
+	Mods    bool   `json:"mods,omitempty" jsonschema:"all Mods"`
+	Play    bool   `json:"play,omitempty" jsonschema:"all colonists and events"`
+	Content bool   `json:"content,omitempty" jsonschema:"content by Mod"`
+	All     bool   `json:"all,omitempty" jsonschema:"no truncation"`
 }
 
 // GetSaveArgv maps get_save.
 func GetSaveArgv(in GetSaveIn) []string {
-	return argv("saves", "show", in.Save).flag("mods", in.Mods).flag("play", in.Play).flag("all", in.All).a
+	return argv("saves", "show", in.Save).flag("mods", in.Mods).flag("play", in.Play).flag("content", in.Content).flag("all", in.All).a
 }
 
 // ManageSavesIn is manage_saves.

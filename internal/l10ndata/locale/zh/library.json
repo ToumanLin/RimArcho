@@ -367,6 +367,7 @@
   "every mod / group by tag": "全部 Mod / 按标签分组",
   "on a tag's group row: rename, note, merge, delete the tag": "在标签分组行上：改名、备注、合并、删除标签",
   "%d shown": "显示 %d 个",
+  "%d not enabled": "%d 个未启用",
   "on top, but no mod has them: %s": "已置顶但没有 Mod 在用：%s",
   "collapse all": "全部折叠",
   "expand all": "全部展开",

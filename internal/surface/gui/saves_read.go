@@ -55,22 +55,15 @@ func (s *API) savePlay(r *app.App, sv *app.Save, d *view.SaveDetail, asked uint6
 		return
 	}
 	keep := map[string]*savefile.Facts{factsKey(sv): f}
-	prevSave := view.PreviousReadSave(sv)
-	var prev *savefile.Facts
-	if prevSave != nil {
-		if prev, _ = s.factsOf(r, prevSave); prev != nil {
-			keep[factsKey(prevSave)] = prev
-		}
-	}
 	st.mu.Lock()
 	if st.list != nil { // still on the page
 		st.facts = keep
 	}
 	st.mu.Unlock()
-	d.Play = view.SavePlayOf(sv, f, prevSave, prev)
+	d.Play = view.SavePlayOf(sv, f)
 }
 
-// factsOf is a save's full read from the page's two kept facts or the cache; nil when it
+// factsOf is a save's full read from the page's kept facts or the cache; nil when it
 // is not read. It never reads the file.
 func (s *API) factsOf(r *app.App, sv *app.Save) (*savefile.Facts, error) {
 	k := factsKey(sv)
@@ -86,9 +79,9 @@ func (s *API) factsOf(r *app.App, sv *app.Save) (*savefile.Facts, error) {
 
 // readSelected reads the selected save on its own session, off the call path (16 §8.4):
 // one at a time, a newer selection replacing one that waits. Newer means asked for later
-// (asked numbers the SaveDetail calls as they come, not as they take the reader's lock):
-// an older selection never replaces a newer one. The background run may read the same
-// save; the second read only rewrites the same cache row.
+// (asked numbers the SaveDetail and SaveContent calls as they come, not as they take the
+// reader's lock): an older selection never replaces a newer one. The background run may
+// read the same save; the second read only rewrites the same cache row.
 func (s *API) readSelected(sv *app.Save, asked uint64) {
 	st := &s.saves
 	k := factsKey(sv)

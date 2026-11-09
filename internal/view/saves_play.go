@@ -2,58 +2,34 @@ package view
 
 import (
 	"math"
-	"strconv"
-	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/savefile"
 )
 
-// The Saves page's right card (16 §2.11 "Right"; 12 §4.3 Play facts, §4.5): the
-// playthrough at the selected save from its full read (12 §1.7 L1), the change since the
-// colony's previous read save, and the colony over time. Only what the facts hold is
-// shown: the biome is not read, so the card has none.
+// The Saves page's right card header and the middle card's Over time (16 §2.11; 12 §4.3
+// Play facts, §4.5), from the selected save's full read (12 §1.7 L1). Only what the facts
+// hold is shown: the biome is not read, so there is none.
 
-// SavePlay is the playthrough at one save.
+// SavePlay is the colony at one save: its header facts, the dead and the timeline.
 type SavePlay struct {
 	Day         string `json:"day"`            // "day 214"
 	Date        string `json:"date,omitempty"` // "5th of Aprimay, 5502", as the game writes it
 	Storyteller string `json:"storyteller,omitempty"`
 	Difficulty  string `json:"difficulty,omitempty"`
 	Played      string `json:"played,omitempty"` // real play time
-	// Since names the save the changes are against: the colony's previous read save
-	// ("" when there is none, and the stats carry no change).
-	Since     string         `json:"since,omitempty"`
-	Stats     []SaveStat     `json:"stats"`
+	// Colonists are the dead the chart's legend names (16 §2.11 Over time).
 	Colonists []SaveColonist `json:"colonists"`
-	More      int            `json:"more,omitempty"` // colonists not listed
 	Dead      int            `json:"dead,omitempty"` // dead colonists, listed or not
-	Events    []SaveEvent    `json:"events"`
 	Timeline  *SaveTimeline  `json:"timeline,omitempty"`
 	// Note says the facts are partial (a malformed file read up to where it broke off).
 	Note string `json:"note,omitempty"`
 }
 
-// SaveStat is one number at this save and its change since the previous read save.
-type SaveStat struct {
-	Label  string `json:"label"`
-	Value  string `json:"value"`
-	Change string `json:"change,omitempty"` // "+3", "−1.2k", "±0"; "" without a previous save
-	Down   bool   `json:"down,omitempty"`   // the change is a loss
-}
-
-// SaveColonist is one colonist; the dead are struck through.
+// SaveColonist is one colonist the legend names.
 type SaveColonist struct {
-	Name  string `json:"name"`
-	Dead  bool   `json:"dead,omitempty"`
-	Slave bool   `json:"slave,omitempty"`
-}
-
-// SaveEvent is one letter of the game's archive, newest first.
-type SaveEvent struct {
-	Day   int    `json:"day"`
-	Text  string `json:"text"`
-	Death bool   `json:"death,omitempty"`
+	Name string `json:"name"`
+	Dead bool   `json:"dead,omitempty"`
 }
 
 // SaveTimeline is the colony over in-game days (12 §4.5). The lines are the selected
@@ -80,69 +56,29 @@ type SaveTimepoint struct {
 	Auto   bool `json:"auto,omitempty"`
 }
 
-// Limits that keep the right card within the page's size budget (16 §10, §11 A18).
+// Limits that keep the page within its size budget (16 §10, §11 A18).
 const (
 	TimelineValues = 120 // values per line
-	PlayColonists  = 40  // colonists listed
-	PlayEvents     = 8   // letters listed
+	PlayDead       = 40  // dead colonists the legend names
 	TimelineDeaths = 60  // death marks
 )
 
-// PreviousReadSave is the save the right card's changes are against: the next older save
-// of the colony (saves are newest first) that is read and well formed, or nil.
-func PreviousReadSave(s *app.Save) *app.Save {
-	if s.Colony == nil {
-		return nil
-	}
-	past := false
-	for _, o := range s.Colony.Saves {
-		if o == s || o.Ref == s.Ref {
-			past = true
-			continue
-		}
-		if past && o.Summary != nil && !o.Summary.Malformed {
-			return o
-		}
-	}
-	return nil
-}
-
-// SavePlayOf is the right card of save s from its full read f, with the changes since the
-// colony's previous read save (prevSave and its read prev, both nil when there is none).
-func SavePlayOf(s *app.Save, f *savefile.Facts, prevSave *app.Save, prev *savefile.Facts) *SavePlay {
+// SavePlayOf is the right card's header and the middle card's Over time of save s, from
+// its full read f.
+func SavePlayOf(s *app.Save, f *savefile.Facts) *SavePlay {
 	p := &SavePlay{Day: Tf("day %d", f.Day()), Storyteller: storytellerText(f.Storyteller),
 		Difficulty: difficultyText(f.Difficulty, f.Permadeath), Played: playedText(f.RealPlayTime),
-		Stats: []SaveStat{}, Colonists: []SaveColonist{}, Events: []SaveEvent{}}
+		Colonists: []SaveColonist{}}
 	if f.TicksGame > 0 || f.GameStartAbsTick > 0 {
 		y, q, d := f.Date()
 		p.Date = Tf("%[1]d%[2]s of %[3]s, %[4]d", d, ordinal(d), quadrumName(q), y)
 	}
-	if prev != nil && prevSave != nil {
-		p.Since = prevSave.Name
-	} else {
-		prev = nil
-	}
-	p.Stats = playStats(f, prev)
-	// the living first, then the dead; a quarter of the places stay for the dead
-	var alive, dead []SaveColonist
 	for _, c := range f.Colonists {
-		v := SaveColonist{Name: c.Display(), Dead: c.Dead, Slave: c.Slave}
-		if c.Dead {
-			dead = append(dead, v)
-		} else {
-			alive = append(alive, v)
+		if !c.Dead {
+			continue
 		}
-	}
-	nAlive := min(len(alive), PlayColonists-min(len(dead), PlayColonists/4))
-	nDead := min(len(dead), PlayColonists-nAlive)
-	p.Colonists = append(append(p.Colonists, alive[:nAlive]...), dead[:nDead]...)
-	p.More, p.Dead = len(alive)+len(dead)-nAlive-nDead, len(dead)
-	for _, e := range f.Events {
-		if len(p.Events) == PlayEvents {
-			break
-		}
-		if t := letterText(e.Label); t != "" {
-			p.Events = append(p.Events, SaveEvent{Day: int(e.Tick / savefile.TicksPerDay), Text: t, Death: e.Def == "Death"})
+		if p.Dead++; len(p.Colonists) < PlayDead {
+			p.Colonists = append(p.Colonists, SaveColonist{Name: c.Display(), Dead: true})
 		}
 	}
 	p.Timeline = saveTimeline(s, f)
@@ -150,83 +86,6 @@ func SavePlayOf(s *app.Save, f *savefile.Facts, prevSave *app.Save, prev *savefi
 		p.Note = Tf("the file breaks off at line %d: these facts come from before it", m.Line)
 	}
 	return p
-}
-
-// playStats are the numbers at this save: wealth, colonists, animals, research points,
-// raids, and prisoners and mechanoids when either save has any.
-func playStats(f, prev *savefile.Facts) []SaveStat {
-	out := []SaveStat{}
-	add := func(label string, v, was float64, compact bool, has bool) {
-		st := SaveStat{Label: label, Value: numText(v, compact)}
-		if has {
-			d := v - was
-			switch {
-			case math.Abs(d) < 0.5:
-				st.Change = "±0"
-			case d > 0:
-				st.Change = "+" + numText(d, compact)
-			default:
-				st.Change, st.Down = "−"+numText(-d, compact), true
-			}
-		}
-		out = append(out, st)
-	}
-	if r := f.Recorder("Wealth_Total"); r != nil && r.Count > 0 {
-		was, has := 0.0, false
-		if prev != nil {
-			if pr := prev.Recorder("Wealth_Total"); pr != nil && pr.Count > 0 {
-				was, has = float64(pr.Last), true
-			}
-		}
-		add(T("wealth"), float64(r.Last), was, true, has)
-	}
-	type num struct {
-		label   string
-		get     func(*savefile.Facts) float64
-		compact bool
-		always  bool
-	}
-	for _, n := range []num{
-		{T("colonists"), func(f *savefile.Facts) float64 { return float64(f.Alive()) }, false, true},
-		{T("animals"), func(f *savefile.Facts) float64 { return float64(f.Animals) }, false, true},
-		{T("research points"), func(f *savefile.Facts) float64 { return researchPoints(f) }, true, true},
-		{T("raids"), func(f *savefile.Facts) float64 { return float64(f.Stats.RaidsEnemy) }, false, true},
-		{T("prisoners"), func(f *savefile.Facts) float64 { return float64(f.Prisoners) }, false, false},
-		{T("mechanoids"), func(f *savefile.Facts) float64 { return float64(f.Mechs) }, false, false},
-	} {
-		v, was := n.get(f), 0.0
-		if prev != nil {
-			was = n.get(prev)
-		}
-		if !n.always && v == 0 && was == 0 {
-			continue
-		}
-		add(n.label, v, was, n.compact, prev != nil)
-	}
-	return out
-}
-
-// researchPoints is the research done: the points of every project, finished or not
-// (whether a project is finished needs its cost from the Defs, 12 §1.7 L2).
-func researchPoints(f *savefile.Facts) float64 {
-	t := 0.0
-	for _, v := range f.Research.Progress {
-		t += v
-	}
-	return t
-}
-
-// numText is a count, or with compact a large number as 850, 12.4k, 1.2M.
-func numText(v float64, compact bool) string {
-	switch {
-	case !compact || v < 1000:
-		return strconv.FormatFloat(math.Round(v), 'f', -1, 64)
-	case v < 10_000:
-		return strconv.FormatFloat(math.Round(v/100)/10, 'f', -1, 64) + "k"
-	case v < 1_000_000:
-		return strconv.FormatFloat(math.Round(v/1000), 'f', -1, 64) + "k"
-	}
-	return strconv.FormatFloat(math.Round(v/100_000)/10, 'f', -1, 64) + "M"
 }
 
 // playedText is real play time as saves show writes it: "3h 25m", "25m", "under a
@@ -302,26 +161,6 @@ func difficultyText(def string, permadeath bool) string {
 // interface language as the game's own translation names it (docs/glossary.md, Saves).
 func quadrumName(q int) string {
 	return T([...]string{"Aprimay", "Jugust", "Septober", "Decembary"}[q&3])
-}
-
-// letterText is a letter's label without the game's rich-text tags.
-func letterText(s string) string {
-	if !strings.Contains(s, "<") {
-		return strings.TrimSpace(s)
-	}
-	var b strings.Builder
-	in := false
-	for _, r := range s {
-		switch {
-		case r == '<':
-			in = true
-		case r == '>' && in:
-			in = false
-		case !in:
-			b.WriteRune(r)
-		}
-	}
-	return strings.TrimSpace(b.String())
 }
 
 // saveTimeline is the colony over time, from f (the selected save s) and the summaries of

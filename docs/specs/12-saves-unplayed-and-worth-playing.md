@@ -1,6 +1,6 @@
 # 12 · Saves, unplayed and worth playing
 
-> Status: save reading (§1) and Saves (§4) are implemented in the CLI, MCP and GUI, except the items marked "not implemented" there. Question two, "what haven't I played?" (the content catalog §2, unused content §3, `unplayed`), is designed for 1.1 and not implemented; §5 is for 1.2; §6 is a long-term direction.
+> Status: save reading (§1) and Saves (§4) are implemented in the CLI, MCP and GUI, except the items marked "not implemented" there. Selected-save content attribution (§2) is implemented with the stated limits. Cross-save unused content (§3, `unplayed`) is designed for 1.1 and not implemented; §5 is for 1.2; §6 is a long-term direction.
 > Basis: 00 (§2, §4), 00a, 02 §3, 05, 06, 07, 08, 09, 10, 15, 16.
 
 Question two asks: **which installed Mods and content have gone unused across multiple playthroughs?** Read all saves without modifying them and map the Defs they reference back to their providing Mods. This analysis is deterministic and needs no AI; Archo participates only in interpreting results and making suggestions (15 §4).
@@ -43,17 +43,23 @@ Saves are XML with a `<savegame>` root, starting with `<meta>`, followed by `<ga
 
 ### 1.4 Extracting Def references
 
-- Stream the entire save, collect text from all `<def>` elements and deduplicate it into "the set of defNames referenced by this save".
-- Whether to include other reference forms (research-name keys in research progress, `<kindDef>` and other fields not named `<def>`), and their exact element paths, will be decided after measurement (undecided).
-- Extraction is part of the full read (§1.7 L1), cached and run in the background as described there.
+`savefile.Scan` streams the whole save once. `Facts.Defs` retains every `<def>` value and its occurrence count for existing load checks (§4.6). `Facts.DefRefs` separately records content references by Def type and name; an empty type means unknown. Parser changes invalidate L1 by `savefile.ParserVersion` (§1.7).
+
+- Bare `<def>` values remain untyped unless context identifies factions, storyteller, pawn genes, precepts, traits, hediffs, abilities, active conditions or queued incidents.
+- Named references: `kindDef` → `PawnKindDef`; `stuff` → `ThingDef`; research manager `currentProj` and `progress/techprints/knowledge/keys/li` → `ResearchProjectDef`; pawn `genes/xenotype` → `XenotypeDef`; `geneSet/genes/li` → `GeneDef`; ideology `memes/li` → `MemeDef`; precept `sourcePattern` → `RitualPatternDef`; quest `root` → `QuestScriptDef`; scenario `playerFaction/factionDef` → `FactionDef`; bill `recipe` → `RecipeDef`.
+- Appearance under pawn `story`: `childhood`, `adulthood`, `hairDef`, `bodyType`, `headType`, `furDef`; under `style`: `beardDef`, `faceTattoo`, `bodyTattoo`. Each uses its corresponding Def type; both tattoos use `TattooDef`.
+- Surviving history: tale `surroundings/biome` → `BiomeDef`. This means only that its record survives.
+- Exclude configuration/help links: ThingFilter lists (`allowedDefs`, `disallowedDefs` and filter subtrees), letter `hyperlinkThingDefs` and `hyperlinkHediffDefs`. Arbitrary list items, object-reference roots and cosmetic fields outside their context are not Def references.
+- No compressed terrain/world grids or indexed `DefMap` values are decoded. Measurements: 18 §2. Paths and evidence: [save-content research](../research/2026-11-09_save-content-attribution.md).
 
 ### 1.5 Mapping Defs back to Mods
 
-- Candidates: **Mods in this save's `<modIds>`**, resolved to currently installed Instances under 07 §4.2. This save does not count toward Mods outside that set.
-- Use Def facts (05 §5.1) in those Mods' effective content (05 §1) to find the defining Mod by defName. When several Mods define (override) the same defName, attribute it to the last in the save's load order, matching the game. If several Def types share a name, count all those types as present (minimal rule; element context may distinguish them later, undecided).
-- Exclude abstract Defs (`Abstract="True"`).
-- A defName in a save but not defined by any installed Mod means a Mod update removed it, or the Mod was uninstalled. Count it as "in the save, source not found", without an error.
-- Interpretation: a Def reference means only **"was present"**, not depth of play.
+- Candidates are this save's `<modIds>`, resolved to currently installed Instances under 07 §4.2, including Core and DLC. Duplicate resolved Instances keep their first save position, independently of the current plan's enabled list.
+- Use persisted raw Def facts from effective folders (05 §1). Evaluate retained top-level and nested `MayRequire` / `MayRequireAnyOf` against the save's packages. Patches are not replayed.
+- Exclude abstract Defs. Choose the provider last in the save's load order **within each type**. An untyped name counts every eligible `(type,name)` candidate, potentially in several Mods/categories. A typed name matches only that type. Candidate totals may exceed distinct-name counts.
+- Wrappers/generated Defs follow §2.2. Each attributed identity counts once; occurrence totals are references, not objects made or content completed.
+- A reference with no eligible installed definition or supported generated-base match enters `unknown` (source not found), not a load error. Installed save Mods without the new content-field version appear separately in `unchecked` (a Mod that is not installed is not unchecked: its references are source not found); an older Def view is insufficient readiness. A known provider awaiting re-extraction contributes no card totals and is not treated as an unmatched source: what it adds is left out until an analysis that includes it, which for a save of another environment or game version is a list made from the save and analysed (the card offers it). A pack's save uses the pack's own copies, or the library's copy of the packageId while the pack's has no content facts. A Def whose stored content fields do not decode is unclassified; it fails no reader of Def facts.
+- Sources use **currently installed Mod versions**. References mean only **was present**, not depth of play, contact, completion, or evidence of absence elsewhere.
 
 ### 1.6 Tools for Archo and external agents
 
@@ -66,10 +72,10 @@ A save is read at three costs; each tier is computed and cached separately. L0: 
 | Tier | What | Cost | Used for |
 | --- | --- | --- | --- |
 | **L0 head** | File path, size and modification time; `<meta>` (§1.3, plus `<modSteamIds>`); the last 64 bytes, checking for `</savegame>` | A few ms per save | Grouping by RimSaves prefix or file name (§4.1), list matching (§4.2), the Mod list and its differences, cut-off files (§4.3) |
-| **L1 full read** | One streaming pass over the whole file (`savefile.Scan` → `savefile.Facts`, versioned by `savefile.ParserVersion`): whether the XML is well formed and where reading stopped; colony identity (world name, seed and persistent random value; player faction and every faction; scenario; maps with their settlement); ticks, start tick, in-game day and date, storyteller and difficulty, real play time, permadeath; the player's humanlike pawns (name, race, kind, dead, slave, where) and counts of animals, mechanoids and prisoners; raid and colonist statistics, research progress, the game's history series (wealth and colonists in full, the rest as last value); letters from the archive; every `<def>` value and `Class="…"` value with counts (§1.4); references of six kinds checked against the objects the save defines. Element paths and their sources: [save format fields](../research/2026-11-04_save-format-fields.md), from the game's code and unverified on real saves; biome is not read | Synthetic 27 MB save: 0.08 s, 4 MB peak heap (18 baseline: 0.11 s for `<def>` extraction) | Grouping by world, consequences of missing Mods (§4.6), play facts and timeline (§4.5), unused content (§3) |
-| **L2 derived** | L1 joined with the current state: matched list, differences, Def and class attribution (§1.5, §4.6), last-load evidence from the game log (06 §7) | Milliseconds | Can it load (§4.3) |
+| **L1 full read** | One streaming pass over the whole file (`savefile.Scan` → `savefile.Facts`, versioned by `savefile.ParserVersion`): whether the XML is well formed and where reading stopped; colony identity (world name, seed and persistent random value; player faction and every faction; scenario; maps with their settlement); ticks, start tick, in-game day and date, storyteller and difficulty, real play time, permadeath; the player's humanlike pawns (name, race, kind, dead, slave, where) and counts of animals, mechanoids and prisoners; raid and colonist statistics, research progress, the game's history series (wealth and colonists in full, the rest as last value); letters from the archive; every `<def>` value and `Class="…"` value with counts, plus typed content references (§1.4); references of six kinds checked against the objects the save defines. Element paths and their sources: [save format fields](../research/2026-11-04_save-format-fields.md), from the game's code and unverified on real saves; only named tale biomes are read | Streaming scan and memory measurements: 18 §2 | Grouping by world, consequences of missing Mods (§4.6), play facts and timeline (§4.5), unused content (§3) |
+| **L2 derived** | L1 joined with the current state: matched list, differences, selected-save content categories (§2), Def and class attribution (§1.5, §4.6), last-load evidence from the game log (06 §7) | Milliseconds | Can it load (§4.3); content referenced in the selected save (§2) |
 
-- L1 depends only on the file, so it is cached in the database (`save_cache`, 17 §3) by path, size, modification time and parser version, as gzip JSON like `log_cache`; it is not reread while all four are unchanged. Beside the facts the row keeps what lists need (ticks, world identity, world and player faction names, malformed), so listing reads no facts; `App.SaveFacts` loads one save's facts. A file whose size or modification time changes while it is read is being written: not stored. A read that fails is stored too, by path, size and modification time with the parser version negated and the reason (`store.PutSaveFailure`), unless the file is gone or another program holds it (Windows sharing or lock violation): such a save is `Save.ReadFailed`, `saves index` and the page do not read it again until the file changes (`Save.NeedsRead`), `App.SaveFacts` without reading gives the reason (`ErrSaveUnreadable`), and `saves show` reads it again. L2 depends on the current list and index, so it is not cached and is recomputed when either changes. L0 is read on demand.
+- L1 depends only on the file, so it is cached in the database (`save_cache`, 17 §3) by path, size, modification time and parser version, as gzip JSON like `log_cache`; it is not reread while all four are unchanged. A row from `savefile.MinParserVersion` up to `ParserVersion` is valid for lists, grouping, play facts and Can it load (a parser change that only adds facts keeps their meaning: 2 added `DefRefs`), so a new version does not unread every save; raise `MinParserVersion` when an existing field changes meaning. A reader of a newer field reads that save again on demand: `SaveFacts` with read rereads an older row (the CLI's one save, the page's selected one), and `SaveContent` reports an older row as `Stale` (`TestSaveContentOlderParserRow`). Beside the facts the row keeps what lists need (ticks, world identity, world and player faction names, malformed), so listing reads no facts; `App.SaveFacts` loads one save's facts. A file whose size or modification time changes while it is read is being written: not stored. A read that fails is stored too, by path, size and modification time with the current parser version negated and the reason (`store.PutSaveFailure`), unless the file is gone or another program holds it (Windows sharing or lock violation): such a save is `Save.ReadFailed`, `saves index` and the page do not read it again until the file changes or the parser version does (`Save.NeedsRead`), `App.SaveReadFailure` gives the reason, and `saves show` reads it again. L2 depends on the current list and index, so it is not cached and is recomputed when either changes. L0 is read on demand.
 - L1 runs in a child process, `archo saves index` (13 §4.2), as background task kind `saves` (16 §2.16, §8.4): progress lines reach the status line and the task record, and each finished file is written to the cache at once, so a stopped run keeps what it read. A save it cannot read gets a line of its own (`progress: saves-failed <ref> <reason>`, `app.ParseSavesFailLine`) and the child exits with an error; the GUI's run then ends done, "read N saves; M could not be read: <reason>", and a child that fails for another reason is reported by its own error line, not its closing `next:` hint (`app.SavesIndexError`). Without `--only`, the run also removes the cache rows of saves that are gone (`PruneSaveCache`), the named first saves notwithstanding. The selected save is read first, then newest first, with 2–4 readers. Reading streams with constant memory; the child process keeps the GUI within its memory budget (16 §10). So that selecting never waits for the run, the GUI reads a selected save that is not read yet itself, one save at a time on its own session (16 §2.11); a save read by both is stored twice, the same row.
 - A file modified in the last 5 seconds, or whose size changes between two reads, is **being written**: it gets no verdict and is read again later. The page rereads L0 when it opens and when a running game exits (09 §4).
 - CLI and MCP do not wait for the background run: `saves show` reads L1 for its one save inline, before its load check, then lists the saves again when that read was new so the save sits in its world's colony; the previous save it compares with (§4.3) is used only from the cache. `saves list` never reads: it shows the day of saves with L1, `meta only` for the rest (a note counts them and names `saves index`) and `malformed` for saves whose read stopped early. A save being written is not read; `saves show` says so. Measured (synthetic 25.8 MB save, Windows): the inline read takes about 0.1 s, plus about 0.14 s inside the first `open` of the freshly written file (most likely the antivirus scanning it); `saves show` from the cache takes about 2 ms, `saves list` 1 ms.
@@ -84,38 +90,57 @@ Players do not know `ThingDef` or `IncidentDef`. The content catalog groups each
 - List unused content by category (§3);
 - Identify functional Mods (§3.3).
 
-### 2.2 Mapping Def types to categories (draft)
+### 2.2 Mapping Def types to categories
 
-| Category | Def type | Notes |
+The selected-save catalog (`App.SaveContent`) uses these ordered categories. Each candidate has one category; `other` is last. Groupings use the game's predicates, with inference stated where class ancestry is unavailable.
+
+| Category key | Def type / predicate | Rules |
 | --- | --- | --- |
-| Factions | `FactionDef` | Whether hidden factions (`hidden`) count is undecided |
-| Races | `ThingDef` with `race` and `humanlike` | |
-| Animals | `ThingDef` with `race`, neither humanlike nor mechanoid | |
-| Mechanoids | `ThingDef` with `race`, a mechanoid | |
-| Buildings | `ThingDef` with `category` of `Building` | Includes furniture, production benches and defenses |
-| Weapons | `ThingDef`, a weapon (has `verbs` or belongs to a weapon item category) | |
-| Apparel | `ThingDef` with `apparel` | Includes armor |
-| Plants | `ThingDef` with `plant` | |
-| Items | Other `ThingDef` with `category` of `Item` | Food, medicine, materials, etc. |
-| Floors | `TerrainDef` | |
-| Research | `ResearchProjectDef` | |
-| Events | `IncidentDef`, `GameConditionDef` | |
-| Quests | `QuestScriptDef` | |
-| Xenotypes and genes | `XenotypeDef`, `GeneDef` | Biotech |
-| Culture | `MemeDef`, `PreceptDef`, `RitualPatternDef` | Ideology |
-| Abilities | `AbilityDef` | Includes psycasts |
-| Implants and conditions | `HediffDef` | |
-| Traits | `TraitDef` | |
-| Biomes | `BiomeDef` | |
-| Storytellers | `StorytellerDef` | |
-| Scenarios | `ScenarioDef` | |
-| Not content | Other types, such as `KeyBindingDef`, `MainButtonDef`, `StatDef`, `JobDef`, `WorkGiverDef`, `ThinkTreeDef`, `SoundDef`, `DesignationCategoryDef`, `LetterDef` | Mechanics and UI; players do not "play" these |
+| `factions` | `FactionDef` | Hidden factions count, with a hidden count and translated name suffix |
+| `races` | Race ThingDef, intelligence ≥ Humanlike | Humanlike races |
+| `animals` | Race: not ToolUser, organic flesh, not an Anomaly entity | FleshTypeDef `isOrganic` defaults true; omitted flesh defaults Normal |
+| `mechanoids` | Race flesh type is Mechanoid | Humanlike takes precedence |
+| `creatures` | Other races | Entities, drones, other ToolUser/nonorganic races. A PawnKindDef is not content of its own: it counts as its race (the race ThingDef it names, through its parents), attributed to the race's Mod; a kind whose race is not found stays itself under `other` |
+| `buildings` | Artificial building | category Building, excluding natural/resource rock |
+| `weapons` | Item with verbs or tools, without apparel | Tools-only weapons count; inherited lists and resets matter. This is `ThingDef.IsWeapon`: wood, beer and tusks have tools and `equipmentType` Primary in 1.6, so they count as weapons |
+| `apparel` | Nonnull apparel block | Apparel with verbs remains apparel |
+| `plants` | Plant thingClass family | Built-in Plant/Plant_* recognized; custom subclasses inferred from retained class/plant evidence and marked inferred |
+| `items` | Remaining category Item | Food, medicine, materials, etc. |
+| `terrain` | `TerrainDef` | All terrain, natural included; named references only |
+| `research` | `ResearchProjectDef` | Zero-progress keys still count |
+| `events` | `IncidentDef`, `GameConditionDef` | Queued/active content; not proof of completion |
+| `quests` | `QuestScriptDef` | Includes surviving offered/expired quests |
+| `xenotypes` | `XenotypeDef`, `GeneDef` | Named xenotypes and genes |
+| `culture` | `MemeDef`, `PreceptDef`, `RitualPatternDef`, `CultureDef`, `StyleCategoryDef`, `ThingStyleDef` | Supported saved reference forms only |
+| `abilities` | `AbilityDef` | Includes psycasts |
+| `hediffs` | `HediffDef` | Implants, conditions, diseases, injuries |
+| `traits` | `TraitDef` | |
+| `recipes` | `RecipeDef` | Includes bills and generated recipes |
+| `appearance` | `HairDef`, `BeardDef`, `TattooDef`, `BodyTypeDef`, `HeadTypeDef`, `FurDef`, `BackstoryDef` | Appearance and backstories |
+| `biomes` | `BiomeDef` | Named tale evidence only |
+| `storytellers` | `StorytellerDef` | Current and any other surviving supported references |
+| `scenarios` | `ScenarioDef` | Usually no original identity survives |
+| `other` | Remaining types or unknown classification | Mechanics/UI references remain visible; incomplete classification marks names classification unknown |
+| `unknown` | No eligible source | Separate source-not-found group; outside Mod/category totals |
 
-- This table is a draft. Subdividing `ThingDef` requires reading its fields (`race`, `category`, `apparel`, `plant`, `verbs`). Def facts (05 §5.1) do not carry them (`def_fact` stores the type, name, parent and whether the Def is abstract); adding them is not implemented.
-- Inheritance: fields may come from a parent Def (`ParentName`); classify using inherited values.
-- Each Def belongs to one category: use the first matching row, top to bottom.
-- `PawnKindDef` is not a separate category: it forms part of factions and races.
-- Label categories that may leave no trace in saves (events, quests, scenarios, storytellers) "may be underestimated" in the UI.
+**Inheritance.** Persist bounded unresolved fields (05 §5.1), resolving only referenced nodes and dependencies for the selected save. XML `Name` is the parent key across Def types. Choose the greatest Mod order not after the child; ties keep the first node. Abstract parents may omit `defName`. Memoization is local to this query, with cycle and 64-level depth guards. Lists append; empty children preserve inherited lists; `Inherit="False"` resets; null blocks clear inherited presence. Missing, cyclic, over-depth or truncated inputs produce unknown classification, without default predicates.
+
+**Generated Defs.** `Corpse_`, `Blueprint_`, `Blueprint_Install_`, `Frame_` point to their base: it counts once in its own category/provider without a separate wrapper entry. Minified things contribute their contained serialized Def, not a wrapper item. Other generated forms use their base provider but their own identity/category: `Techprint_`, `Meat_`, `Psytrainer_`, `Neurotrainer_` are items; `Make_`, `Administer_` are recipes; `_Rough`, `_RoughHewn`, `_Smooth` are terrain. Construction references mean planned/under construction, not necessarily built.
+
+### 2.3 Selected-save result and limits
+
+`App.SaveContent` uses cached L1 facts only and never reads the save. Missing/invalid cache returns `Read=false` with a note; a row of an older parser returns `Stale` (the GUI then reads the save on the page's own session, as an unread selected one, and asks again on its `saves-read` event; a read that failed is not retried while the page is open); malformed cached saves yield partial results with a note. GUI `SaveContent(ref)` returns `view.SaveContent` (`internal/view/saves_content.go`): distinct names, totals without names, Mods in save order, unknown sources, unchecked Mods and coverage limits. Mod Def counts are distinct `(type,name)` candidates; category names sort by references then name, capped at 100. Empty categories/Mods are omitted. Events, quests, scenarios, storytellers, biomes and terrain carry `Under=true`.
+
+Compute only for the selected save, never during listing. Queries batch names/candidate Instances, including parent/race/flesh dependencies; no Def XML is opened and L2 is not persisted. `saves show --content` and `get_save content=true` share text/counts (13 §4.2, 14 §2).
+
+Coverage limits accompany every read result:
+
+- Patch-added Defs and Patch changes to existing Defs are not reflected; no post-Patch catalog.
+- Terrain grids and world biomes are not decoded; named evidence is partial.
+- Past events, quests and storytellers may leave no surviving references; indexed history maps (`DefMap`) are not decoded.
+- Scenario names/parts normally do not recover the original ScenarioDef.
+
+Full per-Mod content totals and cross-save unused-content comparisons (§3) are **not implemented**. Absence from this result cannot establish never played.
 
 ## 3. Unused content
 
@@ -125,7 +150,7 @@ Under "not played yet › playthrough review › unused content" (16 §2.11). Co
 
 | Group | Criterion | UI wording |
 | --- | --- | --- |
-| Never appeared | The Mod has playable content (categories other than "not content" in §2.2), none of which appears in any save with it enabled | "Enabled across 4 colonies, never encountered", followed by what it adds, by category |
+| Never appeared | The Mod has playable content (supported playable categories in §2.2), none of which appears in any save with it enabled | "Enabled across 4 colonies, never encountered", followed by what it adds, by category |
 | Only a small part played | The share of playable content encountered is below a threshold (draft: 20%, configurable in settings, undecided) | "Adds 40 weapons, only 3 used", listing unused content by category |
 | Functional, excluded | See §3.3 | Separate collapsed group: "These Mods leave no save data; saves cannot tell whether they were used" |
 
@@ -144,7 +169,7 @@ Under "not played yet › playthrough review › unused content" (16 §2.11). Co
 
 UI, performance, bug-fix and pure mechanics-adjustment Mods do not add Defs to saves; saves cannot tell whether they were used. Criterion (draft):
 
-1. A Mod with **no** Def in a playable content category in its effective content (only Patches, assemblies, textures, language files, or Defs solely in "not content") is functional;
+1. A Mod with **no** Def in a playable content category in its effective content (only Patches, assemblies, textures, language files, or mechanics/UI Defs outside the playable groups in §2.2) is functional;
 2. The player may mark a Mod "functional" or "not functional", overriding detection. This is player data on its Lineage (07 §6); storage is undecided (possibly a reserved tag).
 
 Functional Mods do not enter the first two groups. Framework Mods (such as Harmony and HugsLib) naturally fall under rule 1.
@@ -206,7 +231,7 @@ Approximate matching for rule 3 (an enabled set differing by one or two entries)
 
 **Mod list**: the save's Mods in load order, named from `<modNames>`; not-installed entries and reordered entries marked; the list's Mods missing from the save named after it (`saves show --mods`). **Changes against the list**: the save's Mods the list or pack it is checked against lacks (`SaveMod.InList` false) and the list's Mods the save lacks (`SaveCheck.ListOnly`, in the list's order), by packageId with case and the `_steam` suffix ignored, load order ignored; a save with no list or pack has none. Each Mod, the list's own included, carries the installed copy this environment resolves it to (`SaveMod.Library`), for a link to the Mod library.
 
-**Play facts** (L1): day and date, storyteller and difficulty, real play time, biome, wealth, colonists (with deaths), animals, research progress and raids survived, each with the change since the colony's previous save. `saves show` (13 §4.2) shows them without biome (not read, §1.7) and with research as the current project and how many projects have progress (whether one is finished needs its cost from the Def, L2). The previous save is the next older save of the colony; the change is computed when its L1 read is cached and well formed and lists only what changed; with `--play` each colonist is marked `new` (absent from the previous save) or `died` (alive in it), matched by pawn ID. The GUI shows them (16 §2.11, `view.SavePlayOf`) without the biome, which is not read, and with research as points, since a project's progress needs its Def's cost (§1.7 L2).
+**Play facts** (L1): day and date, storyteller and difficulty, real play time, biome, wealth, colonists (with deaths), animals, research progress and raids survived, each with the change since the colony's previous save. `saves show` (13 §4.2) shows them without biome (not read, §1.7) and with research as the current project and how many projects have progress (whether one is finished needs its cost from the Def, L2). The previous save is the next older save of the colony; the change is computed when its L1 read is cached and well formed and lists only what changed; with `--play` each colonist is marked `new` (absent from the previous save) or `died` (alive in it), matched by pawn ID. The GUI shows only the day and date, storyteller, difficulty and play time (16 §2.11, `view.SavePlayOf`), and the dead in Over time's legend; the numbers, colonists and events are in `saves show`.
 
 ### 4.4 Actions
 
@@ -298,3 +323,8 @@ Two pages under "worth playing" in the sidebar: play goals and shared packs (16 
 | SV14 | A save whose Mod with pawns is not installed | Error naming what is lost; Fix subscribes and enables it as one reversible edit | Pass (synthetic: `TestCheckSaveOwnership`, a removed and two never-installed Mods; the fix as SV10); a real save untested (release VM row) |
 | SV15 | `get_save` on MCP | Same text as `saves show`; each fix names its command or tool call | Pass (synthetic: `TestSaveToolsCLIParity` with `play`, golden `saves`) |
 | SV16 | `saves show` on a save not read in full, then `saves index` and `saves list` | The save is read inline and joins its world's colony; play facts as §4.3; the previous save is compared only once it is read; `saves list` shows `day N`, `meta only` with a note naming `saves index`, `malformed`; every call within 40 lines without `--all` | Pass (synthetic: golden `saves_play`, `TestSavePlayText`); real saves untested |
+| SV17 | Typed/untyped names and same-name overrides | Every untyped type candidate counts; typed references restrict type; last provider per type follows save order; abstracts excluded | Pass (synthetic: `TestSaveContentCandidates`) |
+| SV18 | A/B/C parents, empty/reset lists, predicates and custom plants | Child-relative Name lookup; correct categories and inferred/unknown markers | Pass (synthetic: `TestSaveContentPredicatesAndInheritance`) |
+| SV19 | Wrappers, generated Defs, cached save file unavailable | Wrappers collapse; generated identities keep their categories with base ownership; L2 reads no save | Pass (synthetic: `TestSaveContentGeneratedAndCache`) |
+| SV20 | Schema 34 facts, per-Mod readiness, MayRequire | Def/DLL views survive schema 35; unchecked until new fields; save packages determine conditions | Pass (synthetic: `TestUpgradeDefContentKeepsFacts`, `TestSaveContentUnchecked`, predicate test) |
+| SV21 | GUI JSON and CLI/MCP content with many Mods | Exact contract, bounded names, totals without names, limits, ≤40 text lines without all | Pass (synthetic: `TestSaveContentContract`, `TestSaveContentAPI`, golden `saves_content`, `TestSaveContentTextBudget`, `TestSaveToolsCLIParity`); real saves untested |
