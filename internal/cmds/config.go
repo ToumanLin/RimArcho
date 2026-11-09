@@ -37,6 +37,26 @@ var configKeys = map[string][]string{
 	"ui.motion": {"auto", "reduced"},
 }
 
+// customValues are settings that take a free form besides their named choices, normalized
+// before storing: "" means the value is not of that form.
+var customValues = map[string]func(string) string{
+	// 16 §2.14, §7.4: a custom accent, one #rrggbb colour the GUI derives its scales from
+	"ui.accent": HexColour,
+}
+
+// HexColour returns v as a lower-case #rrggbb colour, or "" when v is not one.
+func HexColour(v string) string {
+	if len(v) != 7 || v[0] != '#' {
+		return ""
+	}
+	for _, c := range v[1:] {
+		if !('0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F') {
+			return ""
+		}
+	}
+	return strings.ToLower(v)
+}
+
 // freeKeys are settings with free values: their default and a check (16 §3.8, §2.14).
 var freeKeys = map[string]struct {
 	def   string
@@ -106,6 +126,9 @@ func Setting(a *app.App, key string) string {
 		if slices.Contains(vs, v) {
 			return v
 		}
+		if custom := customValues[key]; custom != nil && custom(v) != "" {
+			return custom(v)
+		}
 		return vs[0]
 	}
 	if v != "" {
@@ -120,7 +143,8 @@ func Setting(a *app.App, key string) string {
 	return ""
 }
 
-// SettingChoices returns the allowed values in display order, with the default first.
+// SettingChoices returns the named values in display order, with the default first; a
+// setting in customValues also takes its free form.
 func SettingChoices(key string) []string { return slices.Clone(configKeys[key]) }
 
 // SettingKeys are every setting `config get` lists, sorted.
@@ -138,7 +162,7 @@ func SettingKeys() []string {
 
 func init() {
 	register(&Command{Name: "config get", Args: "[<key>]", Summary: "show settings", MaxArgs: 1, Run: configGetCmd})
-	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (local.dir: unused managed-folder root; updates.source: auto|github; updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris; ui.icons: compat|nerd; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; ui.archo.motion: off|still|live; ui.motion: auto|reduced; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; network.proxy: system|off|a proxy URL; network.github_mirror: empty or a mirror prefix such as https://gh-proxy.org/)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
+	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (local.dir: unused managed-folder root; updates.source: auto|github; updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris or a #rrggbb colour; ui.icons: compat|nerd; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; ui.archo.motion: off|still|live; ui.motion: auto|reduced; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; network.proxy: system|off|a proxy URL; network.github_mirror: empty or a mirror prefix such as https://gh-proxy.org/)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
 }
 
 // ConfigValue returns a setting, or its default.
@@ -170,7 +194,12 @@ func configSetCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		if !ok {
 			return nil, &UsageError{Msg: fmt.Sprintf("unknown setting %q", k)}
 		}
-		if !slices.Contains(allowed, v) {
+		if custom := customValues[k]; !slices.Contains(allowed, v) && custom != nil && custom(v) != "" {
+			v = custom(v)
+		} else if !slices.Contains(allowed, v) {
+			if custom != nil {
+				return nil, &UsageError{Msg: fmt.Sprintf("%s must be one of %v, or a colour such as #3a7bd5", k, allowed)}
+			}
 			return nil, &UsageError{Msg: fmt.Sprintf("%s must be one of %v", k, allowed)}
 		}
 	}

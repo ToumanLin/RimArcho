@@ -1958,6 +1958,28 @@ body.vresizing, body.vresizing * { cursor: row-resize !important; user-select: n
 :root[data-scheme="dark"] .accent-swatch { background: var(--swatch-dark, var(--default-accent)); color: var(--swatch-ink-dark, var(--default-accent-fg)); }
 .accent-swatch.on { box-shadow: 0 0 0 2px var(--card), 0 0 0 3px var(--fg-2); }
 .accent-name { min-width: 3em; color: var(--fg-2); }
+/* the custom accent swatch before a colour is set: a hue ring around + */
+.accent-swatch.accent-custom:not(.has-colour), :root[data-scheme="dark"] .accent-swatch.accent-custom:not(.has-colour) { background: radial-gradient(circle, var(--card) 0 52%, transparent 54%), conic-gradient(#e5484d, #ffc53d, #46a758, #12a594, #0090ff, #6e56cf, #d6409f, #e5484d); color: var(--fg-2); }
+/* the colour picker popover (16 §7.5, colorpicker.js) */
+.color-pop { position: fixed; z-index: 30; width: 228px; padding: 10px; display: grid; gap: 10px; background: var(--pop-bg); border: var(--hairline) solid var(--line-2); border-radius: var(--r-lg); box-shadow: var(--shadow); color: var(--fg); font-size: 12px; user-select: none; animation: pop-in var(--t-enter) var(--ease); }
+.cp-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.cp-swatch { width: 20px; height: 20px; flex: none; border-radius: 50%; background: var(--swatch); color: var(--swatch-ink); font-size: 12px; line-height: 1; }
+.cp-swatch.on { box-shadow: 0 0 0 2px var(--card), 0 0 0 3px var(--fg-2); }
+.cp-wheel { position: relative; width: 176px; height: 176px; justify-self: center; border-radius: 50%; touch-action: none; cursor: crosshair; }
+.cp-wheel:focus { outline: 0; }
+.cp-wheel:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.cp-wheel canvas { display: block; width: 100%; height: 100%; border-radius: 50%; }
+.cp-thumb { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; pointer-events: none; box-shadow: 0 0 0 2px #ffffff, 0 0 0 3px rgba(0, 0, 0, .45); }
+.cp-light { -webkit-appearance: none; appearance: none; height: 12px; border-radius: 999px; background: linear-gradient(to right, #000000, var(--cp-hue, #808080), #ffffff); box-shadow: 0 0 0 var(--hairline) var(--line-2); }
+.cp-light::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: transparent; box-shadow: 0 0 0 2px #ffffff, 0 0 0 3px rgba(0, 0, 0, .45); }
+.cp-row { display: flex; align-items: center; gap: 8px; }
+.cp-go { justify-self: end; }
+.cp-preview { display: flex; flex: none; width: 36px; height: 24px; border-radius: var(--r-sm); overflow: hidden; box-shadow: 0 0 0 var(--hairline) var(--line-2); }
+.cp-preview span { flex: 1; }
+.cp-preview .none { background: repeating-linear-gradient(45deg, var(--pill) 0 4px, var(--card) 4px 8px); }
+.cp-hex { flex: 1; min-width: 0; user-select: text; height: 24px; padding: 0 6px; border: var(--hairline) solid var(--line-2); border-radius: var(--r-sm); background: var(--card); font-family: var(--code); font-size: 12px; }
+.cp-hex:focus { border-color: var(--accent); }
+.cp-hex[aria-invalid="true"] { border-color: var(--red); }
 .theme-segments { max-width: 100%; flex-wrap: wrap; }
 .bg-title { font-weight: 500; margin-bottom: 14px; }
 .settings > .bg-sec { border-top: var(--hairline) solid var(--line-2); }
