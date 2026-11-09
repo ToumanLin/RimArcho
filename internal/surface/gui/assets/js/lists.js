@@ -1,11 +1,12 @@
 // The three lists (16 §2.5): virtual rows, the cursor, selection, search, dragging. The
 // board has three columns: Not enabled | Enabled | details, with Staging and history folded under details.
-import { factText, S, $, $$, el, esc, col, cur, key, api, T, Tf, AREAS, ROW_H } from "./state.js";
+import { factText, S, $, $$, el, esc, col, cur, key, api, T, Tf, AREAS, ROW_H, slideThumb } from "./state.js";
 import { icon, sourceIcon, statusIcon } from "./icons.js";
 import { wireBadges, rowDrag } from "./badgepop.js";
 import { listGeometry, rowAt } from "./listgeometry.js";
 import { bump } from "./motion.js";
 import { beginPageRead, pageLoading } from "./screens.js";
+import { G, grouped, shape, curKey, headOf, findEntry, matched, foldAll, setView, tagColor } from "./disabledgroups.js";
 
 const rowID = (k, it) => `editor-${k}-${encodeURIComponent(key(it))}`;
 const rowsEl = (k) => $(`.area[data-area="${k}"] .rows`);
@@ -43,16 +44,18 @@ export async function openEditor(load, replace = false, ready = () => {}) {
 // setItems replaces a column's rows and keeps the cursor on the same mod.
 export function setItems(k, items) {
   const c = S.cols[k];
-  const keep = cur(k);
+  const keep = curKey(k);
   // Resize/scroll can draw before the asynchronous filter answers. Retain
   // visible identities, never indices into the previous items array.
-  const shown = new Set(c.view.map((i) => c.items[i]).filter(Boolean).map(key));
+  const shown = new Set((c.flat || c.view).map((i) => c.items[i]).filter(Boolean).map(key));
   c.items = items;
   c.view = items.flatMap((it, i) => shown.has(key(it)) ? [i] : []);
-  c.cursor = Math.max(0, Math.min(c.cursor, c.view.length - 1));
+  shape(k);
+  const at = findEntry(c, keep);
+  c.cursor = Math.max(0, Math.min(at >= 0 ? at : c.cursor, c.view.length - 1));
   const alive = new Set(items.map(key));
   for (const x of [...c.sel]) if (!alive.has(x)) c.sel.delete(x);
-  return keep ? key(keep) : "";
+  return keep;
 }
 
 // The filter bar over Not enabled and Enabled (16 §2.5): one search and one set of filters for both
@@ -93,11 +96,10 @@ export async function refilter(k, keepKey) {
     c.others = null; // no "other lists" line: tab no longer jumps lists (16 §3.7)
     c.complete = r.complete || "";
   }
+  shape(k);
   c.cursor = Math.max(0, Math.min(c.cursor, c.view.length - 1));
-  if (keepKey) {
-    const i = c.view.findIndex((vi) => key(c.items[vi]) === keepKey);
-    if (i >= 0) c.cursor = i;
-  }
+  const i = findEntry(c, keepKey);
+  if (i >= 0) c.cursor = i;
 }
 
 // showGhost draws column k's completion after its query, only while the caret is at the end
@@ -171,7 +173,7 @@ export function renderHeads() {
     }
     const c = S.cols[k];
     const filtered = k < 2 ? barOn() : !!c.query.trim();
-    const n = filtered ? Tf("%d / %d", c.view.length, c.items.length) : `${c.items.length}`;
+    const n = filtered ? Tf("%d / %d", matched(c), c.items.length) : `${c.items.length}`;
     const markup = `<span class="n">${k + 1}</span><span class="t">${esc(T(AREAS[k]))}</span><span class="num">${n}</span>` +
       (c.query && !c.searching ? `<span class="q">${esc(c.query)}</span>` : "") + (k === 1 ? listActions() : "") + (k === 2 ? chev() : "");
     // Retain the collection's visible label while only cursor/focus changes.
@@ -179,7 +181,9 @@ export function renderHeads() {
       h.innerHTML = markup;
       h.listMarkup = markup;
       $(".t", h).id = `editor-heading-${k}`;
+      if (k === 0) h.append(viewControls());
     }
+    if (k === 0) syncViewControls();
     const box = rowsEl(k);
     if (box.getAttribute("role") !== "listbox") {
       box.setAttribute("role", "listbox");
@@ -199,6 +203,52 @@ export function renderHeads() {
       factText(o, Tf("other areas: %s, tab goes to the next area with matches", parts.join("  ")));
     } else if (o) o.remove();
   }
+}
+
+// viewControls: the Disabled column's view switch, individual | tags (v), and in the tags
+// view expand all / collapse all (16 §2.5). Made once and kept, so the thumb slides.
+let controls = null;
+export let onViewChange = () => {};
+export function setOnViewChange(fn) { onViewChange = fn; }
+function viewControls() {
+  if (controls) return controls;
+  controls = el("span", "acts dview");
+  const fold = el("span", "dview-fold");
+  for (const [open, label, ic] of [[false, T("collapse all"), icon.fold], [true, T("expand all"), icon.unfold]]) {
+    const b = el("button");
+    b.innerHTML = ic;
+    b.title = label;
+    b.setAttribute("aria-label", label);
+    b.onmousedown = (e) => e.preventDefault();
+    b.onclick = (e) => { e.stopPropagation(); foldAll(open); onViewChange(); };
+    fold.append(b);
+  }
+  const seg = el("span", "seg sub dview-seg");
+  seg.setAttribute("role", "group");
+  seg.setAttribute("aria-label", T("group by"));
+  seg.append(el("span", "thumb"));
+  for (const [v, label] of [["individual", T("individual")], ["tags", T("tags")]]) {
+    const b = el("button", "", label);
+    b.dataset.view = v;
+    b.title = "v";
+    b.onmousedown = (e) => e.preventDefault();
+    b.onclick = async (e) => { e.stopPropagation(); if (await setView(v)) onViewChange(); };
+    seg.append(b);
+  }
+  controls.append(fold, seg);
+  return controls;
+}
+function syncViewControls() {
+  if (!controls) return;
+  const fold = $(".dview-fold", controls);
+  fold.hidden = !grouped();
+  for (const b of controls.querySelectorAll(".dview-seg > button")) {
+    const on = b.dataset.view === G.view;
+    b.classList.toggle("on", on);
+    b.setAttribute("aria-pressed", String(on));
+  }
+  const on = $(".dview-seg > button.on", controls);
+  if (controls.isConnected && on && on.offsetWidth) slideThumb($(".dview-seg", controls), on);
 }
 
 // listActions: undo and sort sit in the enabled list's head, since they change that list;
@@ -238,6 +288,8 @@ export function renderRows(k) {
   const pool = pools[k];
   for (const [i, d] of pool) if (i < first || i >= last) { d.remove(); pool.delete(i); }
   for (let i = first; i < last; i++) {
+    const g = headOf(c, c.view[i]);
+    if (g) { headRow(k, c, i, g, layout, pool, box); continue; }
     const it = c.items[c.view[i]];
     let d = pool.get(i);
     const sig = rowSig(k, i, it) + `:${layout.tops[i]}:${layout.heights[i]}:${layout.heads[i]}:${c.view.length}`;
@@ -279,6 +331,36 @@ export function renderRows(k) {
   if (active) {
     if (box.getAttribute("aria-activedescendant") !== active.id) box.setAttribute("aria-activedescendant", active.id);
   } else box.removeAttribute("aria-activedescendant");
+}
+
+// headRow draws a tag group's header (16 §2.5): a chevron, the tag's colour mark, the tag
+// and how many of its rows are shown. A click or ← → opens and closes it (main.js).
+function headRow(k, c, i, g, layout, pool, box) {
+  const color = tagColor(g.tag);
+  const n = g.total && g.total !== g.rows.length ? Tf("%d / %d", g.rows.length, g.total) : String(g.rows.length);
+  const label = g.none ? T("no tag") : g.tag;
+  const sig = ["G", g.key, label, n, g.open, color, i === c.cursor, layout.tops[i], c.view.length].join("|");
+  let d = pool.get(i);
+  if (d && d.dataset.sig === sig) return;
+  if (!d) { d = el("div", "row"); box.appendChild(d); pool.set(i, d); }
+  d.id = `editor-${k}-group-${encodeURIComponent(g.key)}`;
+  d.dataset.sig = sig;
+  d.dataset.i = i;
+  d.className = "row group-head" + (g.open ? " open" : "") + (g.none ? " none" : "") + (i ? " later" : "") + (i === c.cursor ? " cur" : "");
+  d.style.transform = "";
+  d.style.top = layout.tops[i] + "px";
+  d.style.height = layout.heights[i] + "px";
+  d.setAttribute("role", "option");
+  d.setAttribute("aria-selected", "false");
+  d.setAttribute("aria-setsize", String(c.view.length));
+  d.setAttribute("aria-posinset", String(i + 1));
+  d.removeAttribute("aria-labelledby");
+  d.removeAttribute("aria-description");
+  d.setAttribute("aria-label", label + ", " + n + ", " + T(g.open ? "expanded" : "collapsed"));
+  d.title = label;
+  d.innerHTML = `<span class="m"></span><span class="fold-chev">${icon.chev}</span>` +
+    `<span class="gdot"${color ? ` style="background:${esc(color)}"` : " hidden"}></span>` +
+    `<span class="t">${esc(label)}</span><span class="num">${esc(n)}</span>`;
 }
 
 // onHistory runs when a history row is clicked (main.js sets it).
@@ -383,7 +465,7 @@ export function wireLists(ui) {
     });
     box.addEventListener("dblclick", (e) => {
       const r = e.target.closest(".row");
-      if (r) ui.verb("toggle");
+      if (r && !r.classList.contains("group-head")) ui.verb("toggle");
     });
     box.addEventListener("contextmenu", (e) => {
       e.preventDefault();
@@ -391,6 +473,7 @@ export function wireLists(ui) {
       if (!r) return;
       const i = +r.dataset.i;
       const c = S.cols[k];
+      if (headOf(c, c.view[i])) return; // a tag group's header has no menu
       if (S.focus !== k || !c.sel.has(key(c.items[c.view[i]]))) ui.click(k, i, { shiftKey: false, ctrlKey: false });
       ui.menu(e.clientX, e.clientY);
     });

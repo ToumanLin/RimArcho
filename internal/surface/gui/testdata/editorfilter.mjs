@@ -7,7 +7,7 @@ test("replacing rows keeps visible identities valid before the filter answers", 
   const c={items:[{id:"a"},{id:"b"},{id:"c"}],view:[2,1],cursor:0,sel:new Set(["b","c"])};
   const S={cols:[c]};
   const lists=await loadModules("./lists.js", {
-    "./state.js":{S,key,cur:k=>S.cols[k].items[S.cols[k].view[S.cols[k].cursor]],col:k=>S.cols[k],$:()=>null,$$:()=>[],el:tag=>new Element(tag),factText:()=>{},esc:String,api:{},T:s=>s,Tf:s=>s,AREAS:[],ROW_H:28},
+    "./state.js":{S,key,cur:k=>S.cols[k].items[S.cols[k].view[S.cols[k].cursor]],col:k=>S.cols[k],$:()=>null,$$:()=>[],el:tag=>new Element(tag),factText:()=>{},esc:String,api:{},T:s=>s,Tf:s=>s,AREAS:[],ROW_H:28,slideThumb:()=>{}},
     "./icons.js":{icon:{},sourceIcon:()=>"",statusIcon:()=>""},
     "./badgepop.js":{wireBadges:()=>{},rowDrag:()=>{}},"./motion.js":{bump:()=>{}},
     "./screens.js":{beginPageRead:()=>{},pageLoading:()=>false},
@@ -18,6 +18,30 @@ test("replacing rows keeps visible identities valid before the filter answers", 
   assert.deepEqual([...c.sel],["b"]);
   const geometry=await loadModules("./listgeometry.js",{});
   assert.doesNotThrow(()=>geometry.listGeometry(c.items,c.view,0));
+});
+
+test("the Disabled tags view groups rows under their first tag; a closed group keeps the cursor on its header", async () => {
+  const key=it=>it.id||it.ref;
+  const items=[{id:"a",tags:["UI"]},{id:"b",tags:["apparel","UI"]},{id:"c"},{id:"d",tags:["ui"]},{id:"e",tags:["new"]}];
+  const c={items,view:[0,1,2,3,4],cursor:0,sel:new Set()};
+  const S={cols:[c],board:{stamp:1}};
+  const g=await loadModules("./disabledgroups.js", {"./state.js":{S,key,api:{SetSetting:async()=>{},TagList:async()=>[{tag:"apparel"},{tag:"UI"}]}}}, {localStorage:{getItem:()=>null,setItem:()=>{}}});
+  assert.equal(await g.setView("tags"),true);
+  // the Tag manager's order, a tag it does not list yet after it, no tag last; each row once
+  assert.equal(JSON.stringify(c.groups.map(x=>x.key)),JSON.stringify(["apparel","ui","new",""]));
+  assert.equal(JSON.stringify([...c.view]),JSON.stringify([-1,1,-2,0,3,-3,4,-4,2]));
+  c.cursor=4; // d, under UI
+  g.setGroupOpen("ui",false);
+  assert.equal(JSON.stringify([...c.view]),JSON.stringify([-1,1,-2,-3,4,-4,2]));
+  assert.equal(c.cursor,2); assert.equal(g.curKey(0),"\u0000ui");
+  const geometry=await loadModules("./listgeometry.js",{});
+  const layout=geometry.listGeometry(items,c.view,0);
+  assert.equal(layout.total,7*28); assert.equal(layout.heads.some(Boolean),false);
+  // filtered: the groups show only matching rows, and a group with none is left out
+  c.view=[0,2]; g.shape(0);
+  assert.equal(JSON.stringify(c.groups.map(x=>[x.key,x.rows.length,x.total])),JSON.stringify([["ui",1,2],["",1,1]]));
+  assert.equal(await g.setView("individual"),true);
+  assert.equal(JSON.stringify([...c.view]),JSON.stringify([0,2])); assert.equal(c.groups,null);
 });
 
 test("typed conditions preserve quoted paths, replace one condition and share the tag alias", async () => {

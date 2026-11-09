@@ -318,5 +318,11 @@
   "worked out once the problems are fixed": "问题修好后算出",
   "workshop links": "工坊链接",
   "wrote %s (%s, list %s) to %s": "已把 %[3]s 写成 %[1]s（%[2]s）：%[4]s",
-  "yesterday %s": "昨天 %s"
+  "yesterday %s": "昨天 %s",
+  "individual": "逐个",
+  "collapse / expand the group": "折叠 / 展开该组",
+  "expanded": "已展开",
+  "collapsed": "已折叠",
+  "Disabled: one row per copy / grouped by tag": "未启用：逐个列出 / 按标签分组",
+  "on a tag group's header in Disabled: collapse / expand": "在未启用的标签组标题上：折叠 / 展开"
 }

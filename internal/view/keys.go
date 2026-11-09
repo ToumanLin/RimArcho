@@ -85,6 +85,11 @@ func KeyHelp(page string, tui bool) []KeyRow {
 				)
 			} else {
 				out = append(out, r(T("drag"), "between areas: enable, disable, stage; within Enabled: reorder"))
+				// the Disabled column's tag groups are the window's (16 §2.5)
+				out = append(out,
+					r("v", "Disabled: one row per copy / grouped by tag"),
+					r("← → / enter / click", "on a tag group's header in Disabled: collapse / expand"),
+				)
 			}
 		}
 	}
