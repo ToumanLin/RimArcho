@@ -127,7 +127,7 @@ func (a *App) FolderAdd(kind source.Kind, root string) (SourceChange, error) {
 			if err != nil {
 				return SourceChange{}, err
 			}
-			s.Label, s.Status = nextLabel(all, kind), source.StatusOK
+			s.Label, s.Status, s.PendingRoot = nextLabel(all, kind), source.StatusOK, ""
 			if !dirExists(root) {
 				s.Status = source.StatusMissing
 			}
@@ -195,7 +195,7 @@ func (a *App) FolderRemove(ref string) (SourceChange, error) {
 	case OwnFolder(s):
 		return SourceChange{}, fmt.Errorf("src:%s is RimArcho's own folder (%s); it is not removed", label, s.Root)
 	}
-	s.Status = source.StatusRetired
+	s.Status, s.PendingRoot = source.StatusRetired, "" // a pending re-binding goes with it
 	s.Label = nextLabel(all, source.Kind(label+"-removed"))
 	if err := a.Store.UpdateSource(s); err != nil {
 		return SourceChange{}, err

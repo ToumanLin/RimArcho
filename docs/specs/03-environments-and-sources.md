@@ -171,6 +171,8 @@ Every source has its own `source_id`. Instances record only `source_id + relativ
 
 If the player changes the game path and deletes Mods at the same time: rebind first, then turn the unmatched items into identity questions (04 §2.4).
 
+**Writing a move**: the environment row and its official and local sources change in one transaction (`Store.MoveRecords`), so an error leaves the environment on its old game with its sources there; shared folders named in the same `env set` are separate changes after it. Setting or moving a managed directory (16 §2.14) writes the environment row, every source inside the directory and the folder settings in one transaction too. `MoveDirectory` moves the files first; if the records cannot be written, the directory is renamed back (across drives RimArcho's copy is deleted), so the incoming links are reattached to it (09 §3). Across drives the original goes to the recycle bin only after the records point to the copy. Removing a folder (`folder remove`) clears a pending re-binding with it; adding the folder back revives it as `ok` (or `missing`) without one.
+
 ### 4.3 Links and aliases
 
 The lifecycle of links RimArcho creates is separate from scan aliases: `managed_link` persistently records the physical `Mods` path, the name and type, the Instance or pack identity, the original target, the new location and target, the move's source and destination, the managed directory's identity, the operation ID and the phase. Inspection prefers the ledger's ownership evidence; ordinary aliases still create no Instance. All known games share one enumeration of inbound links; see 09 §3.

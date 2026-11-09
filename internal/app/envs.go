@@ -398,6 +398,7 @@ func (a *App) EnvSet(name string, spec EnvSpec) (*env.Environment, []SourceChang
 		return nil, nil, err
 	}
 	var changes []SourceChange
+	var moves []store.SourceMove
 	for _, kind := range []source.Kind{source.Official, source.Local} {
 		root, ok := want[kind]
 		if !ok {
@@ -406,9 +407,7 @@ func (a *App) EnvSet(name string, spec EnvSpec) (*env.Environment, []SourceChang
 		s := byKind[kind]
 		if s == nil {
 			s = &source.Source{ID: a.NewID(), EnvID: e.ID, Kind: kind, Label: nextLabel(srcs, kind), Root: root, Status: source.StatusOK}
-			if err := a.Store.InsertSource(s); err != nil {
-				return nil, nil, err
-			}
+			moves = append(moves, store.SourceMove{Src: s, Insert: true})
 			srcs = append(srcs, s)
 			changes = append(changes, SourceChange{Source: s, Action: "added"})
 			continue
@@ -417,11 +416,18 @@ func (a *App) EnvSet(name string, spec EnvSpec) (*env.Environment, []SourceChang
 			changes = append(changes, SourceChange{Source: s, Action: "unchanged"})
 			continue
 		}
-		ch, err := a.rebind(s, root)
+		ch, mv, err := a.evalRebind(s, root)
 		if err != nil {
 			return nil, nil, err
 		}
+		moves = append(moves, mv)
 		changes = append(changes, ch)
+	}
+	// The environment row and its game folders change together: an error leaves the
+	// environment on its old game with its sources there (03 §4.2). Shared folders below
+	// are separate changes.
+	if err := a.Store.MoveRecords(e, moves, nil); err != nil {
+		return nil, nil, err
 	}
 	more, err := a.foldersFromSpec(e, spec, false, gameChanged)
 	changes = append(changes, more...)
@@ -434,9 +440,6 @@ func (a *App) EnvSet(name string, spec EnvSpec) (*env.Environment, []SourceChang
 			return nil, nil, err
 		}
 		changes = append(changes, ch)
-	}
-	if err := a.Store.UpdateEnv(e); err != nil {
-		return nil, nil, err
 	}
 	return e, changes, nil
 }
@@ -510,20 +513,28 @@ func (a *App) EnvRemove(name string) (*EnvRemoval, error) {
 
 // rebind evaluates moving source s to newRoot and applies it when the sample matches.
 func (a *App) rebind(s *source.Source, newRoot string) (SourceChange, error) {
+	ch, mv, err := a.evalRebind(s, newRoot)
+	if err != nil {
+		return ch, err
+	}
+	return ch, a.Store.MoveRecords(nil, []store.SourceMove{mv}, nil)
+}
+
+// evalRebind is rebind without the write: the source change for MoveRecords.
+func (a *App) evalRebind(s *source.Source, newRoot string) (SourceChange, store.SourceMove, error) {
 	old, err := a.Store.SourceSemantics(s.ID)
 	if err != nil {
-		return SourceChange{}, err
+		return SourceChange{}, store.SourceMove{}, err
 	}
 	r := source.EvaluateRebind(newRoot, old, scan.SemanticOnly, scan.Similarity)
 	ch := SourceChange{Source: s, OldRoot: s.Root, Rebind: &r}
 	if r.Accept {
 		ch.Action = "rebound"
-		return ch, a.Store.RebindSource(s, newRoot)
-	} else {
-		s.Status, s.PendingRoot = source.StatusRebindPending, newRoot
-		ch.Action = "rebind-pending"
+		return ch, store.SourceMove{Src: s, Rebind: newRoot}, nil
 	}
-	return ch, a.Store.UpdateSource(s)
+	s.Status, s.PendingRoot = source.StatusRebindPending, newRoot
+	ch.Action = "rebind-pending"
+	return ch, store.SourceMove{Src: s}, nil
 }
 
 // EnvRebind answers a pending re-binding. yes: the new root is the same source. no: the old
