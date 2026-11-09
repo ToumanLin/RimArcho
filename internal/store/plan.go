@@ -31,6 +31,10 @@ const DefaultPlanName = "default"
 // StageKey is the meta key of a plan's staging list (07 §2.2).
 func StageKey(planID int64) string { return fmt.Sprintf("stage:%d", planID) }
 
+// MonitorAddedKey is the meta key recording that Archo Monitor was added to a plan once
+// (07 §1.5).
+func MonitorAddedKey(planID int64) string { return fmt.Sprintf("monitor.added:%d", planID) }
+
 const planCols = `id, environment_id, name, created_at, updated_at, created_game, versions`
 
 func scanPlan(row interface{ Scan(...any) error }) (*Plan, error) {
@@ -115,7 +119,8 @@ func (s *Store) RenamePlan(id int64, name string) error {
 	return err
 }
 
-// DeletePlan removes a plan with its workspace, undo stack, versions and staging list.
+// DeletePlan removes a plan with its workspace, undo stack, versions, staging list and
+// Archo Monitor mark.
 // Launch records and the ModsConfig.xml writer keep pointing at its (now unknown) ID.
 func (s *Store) DeletePlan(id int64) error {
 	return s.inTx(func(tx *sql.Tx) error {
@@ -132,7 +137,8 @@ func (s *Store) DeletePlan(id int64) error {
 				return err
 			}
 		}
-		_, err := tx.Exec(`DELETE FROM meta WHERE key=?`, StageKey(id))
+		// Plan IDs are reused, so a new plan must not inherit these.
+		_, err := tx.Exec(`DELETE FROM meta WHERE key IN (?, ?)`, StageKey(id), MonitorAddedKey(id))
 		return err
 	})
 }

@@ -517,6 +517,12 @@ func (a *App) edit(op string, f func(st *LoadoutState, l loadout.List) (loadout.
 }
 
 func (a *App) editStaged(op string, staged *string, f func(st *LoadoutState, l loadout.List) (loadout.List, []string, error)) (*EditResult, error) {
+	return a.editOrigin(op, staged, nil, f)
+}
+
+// editOrigin is editStaged with origin, when set, adjusting the workspace's origin in the
+// same transaction as the edit.
+func (a *App) editOrigin(op string, staged *string, origin func(ws *store.Workspace), f func(st *LoadoutState, l loadout.List) (loadout.List, []string, error)) (*EditResult, error) {
 	unlock, err := a.lockLaunch()
 	if err != nil {
 		return nil, err
@@ -538,6 +544,9 @@ func (a *App) editStaged(op string, staged *string, f func(st *LoadoutState, l l
 		ws.Entries, ws.Updated = after.Encode(), a.Now().UTC()
 		if ws.OriginKind == "checkout" {
 			ws.OriginKind = "edited"
+		}
+		if origin != nil {
+			origin(&ws)
 		}
 		// History keeps stored identities; before is localized to the current game.
 		if err := a.Store.EditWorkspace(&ws, st.WS.Entries, op, staged); err != nil {
@@ -1003,6 +1012,10 @@ func (a *App) UndoRedo(redo bool) (*EditResult, string, error) {
 	before := st.List
 	ws := *st.WS
 	ws.Entries, ws.Updated = step.Entries, a.Now().UTC()
+	if ws.OriginKind == "checkout" {
+		// The list is no longer the checked-out version: saving it is not a restore.
+		ws.OriginKind = "edited"
+	}
 	if err := a.Store.RestoreStep(&ws, st.WS.Entries, from, to, *step); err != nil {
 		return nil, "", err
 	}
@@ -1308,7 +1321,14 @@ func (a *App) Checkout(ref string) (*EditResult, int, error) {
 	defer unlock()
 
 	var n int
-	r, err := a.edit("checkout", func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
+	// The origin is written with the list, in one transaction.
+	origin := func(ws *store.Workspace) {
+		ws.OriginVersion, ws.OriginKind = n, "checkout"
+		if ws.Conflict == n {
+			ws.Conflict = 0
+		}
+	}
+	r, err := a.editOrigin("checkout", nil, origin, func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
 		var err error
 		if n, err = a.parsePlanVersion(st.Plan, ref); err != nil {
 			return nil, nil, err
@@ -1333,13 +1353,6 @@ func (a *App) Checkout(ref string) (*EditResult, int, error) {
 			}
 		}
 		return r, n, nil
-	}
-	st.WS.OriginVersion, st.WS.OriginKind = n, "checkout"
-	if st.WS.Conflict == n {
-		st.WS.Conflict = 0
-	}
-	if err := a.Store.SetWorkspace(st.WS); err != nil {
-		return nil, 0, err
 	}
 	return r, n, nil
 }

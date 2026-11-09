@@ -69,6 +69,10 @@ func (t *LiveTracker) Update(a *app.App, st *app.LoadoutState) (*Live, error) {
 		return newLog(a, st, &Live{}), nil
 	}
 	if t.lv == nil || t.pid != run.PID {
+		if t.lv != nil { // the game restarted: end the old run's follower as an exit would
+			t.lv.Close(a)
+			t.lv, t.pid = nil, 0
+		}
 		// a pack run writes its own log on 1.7 (10 §3): follow the one this run writes
 		t.what = a.WhatRuns(st.Ix.Env, run)
 		path := a.RunLog(st, t.what)

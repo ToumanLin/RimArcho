@@ -52,7 +52,8 @@ export async function showDetail(it, staged) {
     box.append(el("h1", "", it.name), ...(pkg && pkg !== it.name ? [el("p", "second", pkg)] : []), el("p", "second", T(it.canUse ? "an installed copy can take its place: use it from the list's problems" : "listed in ModsConfig.xml, but not installed")));
     return;
   }
-  const same = box.dataset.ref === it.id && editorFrame && editorFrame.box === box && box.firstChild;
+  // The frame must be this Mod's: after A→B→A the unshown frame is still B's (its header, its note closures).
+  const same = box.dataset.ref === it.id && editorFrame && editorFrame.ref === it.id && editorFrame.box === box && box.firstChild;
   const f = same ? editorFrame : (editorFrame = detailFrame(box, sc, {
     fieldActs: (d) => ({
       tags: () => document.dispatchEvent(new CustomEvent("verb", { detail: "tags" })),
@@ -64,6 +65,7 @@ export async function showDetail(it, staged) {
     later: !same,
     host: box,
   }));
+  f.ref = it.id;
   f.copies(editorCopies(it));
   if (!same) f.head(it.name, "", it.id);
   // the copy's note and actions come from Mod library's data, rebuilt after an edit: not while

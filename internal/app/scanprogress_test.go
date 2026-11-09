@@ -57,3 +57,27 @@ func TestScanProgressLine(t *testing.T) {
 		}
 	}
 }
+
+// A scan that failed or was cut short is not the last scan: an environment switch and the
+// "never scanned" prompts look past it.
+func TestLastScanSkipsUnfinished(t *testing.T) {
+	t.Parallel()
+	e := setup(t, false)
+	env, err := e.App.Env()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.App.Store.BeginScan(env.ID, e.Now(), false); err != nil {
+		t.Fatal(err)
+	}
+	if sc, _, err := e.App.LastScan(env.ID); err != nil || sc != nil {
+		t.Fatalf("only an unfinished scan: %+v %v", sc, err)
+	}
+	done := scanNow(t, e)
+	if _, err := e.App.Store.BeginScan(env.ID, e.Now(), false); err != nil {
+		t.Fatal(err)
+	}
+	if sc, st, err := e.App.LastScan(env.ID); err != nil || sc == nil || sc.ID != done || st == nil {
+		t.Fatalf("last scan %+v, want scan:%d", sc, done)
+	}
+}

@@ -575,6 +575,8 @@ function inlineImport(draft, active, updateButtons) {
       const value = await (/\.rws$/i.test(f.name) ? f.slice(0, 4 << 20) : f).text();
       if (!active() || n !== M.importSeq) return;
       imp.text = ""; text.value = ""; imp.path = f.name; showFile();
+      // an empty file has nothing to read: the preview button must not wait for it
+      if (!value.trim()) { draft.importing = false; updateButtons(); return; }
       await read("text", value, f.name);
     } catch (e) { if (active() && n === M.importSeq) { draft.importing = false; error.textContent = errText(e); updateButtons(); } }
   }

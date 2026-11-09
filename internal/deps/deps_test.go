@@ -164,18 +164,24 @@ func TestVersionCacheInvalidatesByPathSizeAndMtime(t *testing.T) {
 	}
 }
 
-func TestVersionCacheKeepsFailures(t *testing.T) {
+// A failed probe may be passing (a virus scanner holding the file): it is not cached, so the
+// next status sees the tool once it runs.
+func TestVersionCacheRetriesFailures(t *testing.T) {
 	f, _ := fixture(t)
 	calls := 0
-	f.Version = func(string, string) (string, error) { calls++; return "", errors.New("broken executable") }
+	f.Version = func(string, string) (string, error) { calls++; return "", errors.New("access denied") }
 	file(t, filepath.Join(f.LocalDir, Todds, "todds.exe"))
 	for range 2 {
 		if f.Status(Todds).OK {
-			t.Fatal("broken tool usable")
+			t.Fatal("failing tool usable")
 		}
 	}
-	if calls != 1 {
-		t.Fatalf("failed probe retried %d times", calls)
+	if calls != 2 {
+		t.Fatalf("failed probe ran %d times, want 2", calls)
+	}
+	f.Version = func(string, string) (string, error) { calls++; return textures.ToddsVersion, nil }
+	if !f.Status(Todds).OK {
+		t.Fatal("tool still unusable after the probe succeeds")
 	}
 }
 

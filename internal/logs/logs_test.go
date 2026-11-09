@@ -1,6 +1,7 @@
 package logs
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -441,6 +442,28 @@ func TestParseXMLExtensionsBlock(t *testing.T) {
 	}
 	if f.Entries[2].Message != "GAGARIN: Cache created!" {
 		t.Fatalf("line after a block: %q", f.Entries[2].Message)
+	}
+}
+
+// A Monitor phase marker inside an XML Extensions block, or between its end and its "Source file:"
+// line, ends the block instead of leaving it open for a nil entry.
+func TestParseXMLExtensionsBlockCutByMarker(t *testing.T) {
+	for _, at := range []int{2, 3} {
+		t.Run(fmt.Sprint(at), func(t *testing.T) {
+			lines := []string{"[ReBuild: Doors and Corners - Start of stack trace]",
+				`Verse.PatchOperationAdd(xpath="Defs/ThingDef"): Failed to find a node with the given xpath`,
+				"[End of stack trace]",
+				`Source file: C:\Mods\A\Patches\x.xml`,
+				"GAGARIN: Cache created!"}
+			lines = append(lines[:at], append([]string{"[Archo Monitor] phase menu"}, lines[at:]...)...)
+			f, err := Parse(strings.NewReader(strings.Join(lines, "\n") + "\n"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(f.Entries) == 0 || !strings.HasPrefix(f.Entries[0].Message, "[ReBuild: Doors and Corners]") {
+				t.Fatalf("entries %+v", f.Entries)
+			}
+		})
 	}
 }
 

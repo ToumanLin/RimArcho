@@ -64,7 +64,9 @@ export async function handle(request, env, deps = {}) {
   try {
     issue = await createIssue(env, report, fetchFn, now);
   } catch (e) {
-    await ask("release"); // nothing was filed: the player may send again at once
+    // nothing was filed: the player may send again at once, and it does not use the daily cap
+    await ask("release");
+    await uncount(env, day).catch(() => {});
     return reply(502, { error: "github", detail: String(e?.message || e).slice(0, 200) });
   }
   if (report.contact) {
@@ -117,6 +119,13 @@ export async function count(env, day) {
   if (total >= perDay) return "daily";
   await env.COUNTS.put(all, String(total + 1), { expirationTtl: 2 * 86400 }).catch(() => {});
   return "";
+}
+
+// uncount gives a report back to today's counter for everyone when nothing was filed.
+export async function uncount(env, day) {
+  const all = `all:${day}`;
+  const total = parseInt((await env.COUNTS.get(all)) || "0", 10) || 0;
+  if (total > 0) await env.COUNTS.put(all, String(total - 1), { expirationTtl: 2 * 86400 });
 }
 
 const MINUTE = 60000;

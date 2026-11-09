@@ -95,7 +95,7 @@ app.InstallDep(name, progress)           // Download to own directory (call only
 app.RemoveDep(name)                      // Delete only own copy; see 02 §1
 ```
 
-- Discovery does not use networking, download or modify files. Cache version probes by path, size and modification time so refreshing settings does not run todds each time.
+- Discovery does not use networking, download or modify files. Cache version probes by path, size and modification time so refreshing settings does not run todds each time. A failed probe is not cached (a scanner holding the file, a timeout): the next lookup probes again. Probes run outside the cache lock.
 - Installation does not change settings: if the player specified another copy, it remains selected after installation (the settings explanation shows the source).
 - `app.CheckToolUpdates` checks only the currently used managed SteamCMD and todds: Valve's Windows SteamCMD package manifest and todds' latest stable GitHub release. It downloads no executables. Results appear in settings rows and `archo deps`; scheduling: 16 §2.16. Read SteamCMD's version from the package manifest; manual updates run its own update process, never overwrite an installed tool with the bootstrap ZIP. Install only the todds version supported by the caller; merely notify about incompatible newer releases.
 - Check processes before updating or removing; refuse while a same-named tool is in use. In-app use and replacement of SteamCMD and todds share locks. Refuse replacement if Windows process inspection fails; do not infer whether a tool is busy from a single failed write.

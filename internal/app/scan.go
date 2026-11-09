@@ -370,13 +370,13 @@ func sharedLinkObservations(obs []*scan.Observation, known []*identity.Known, so
 
 // LastScan returns the newest finished scan of the environment, or nil.
 func (a *App) LastScan(envID string) (*store.Scan, *ScanStats, error) {
-	scans, err := a.Store.Scans(envID, 1)
-	if err != nil || len(scans) == 0 {
+	sc, err := a.Store.LastFinishedScan(envID)
+	if err != nil || sc == nil {
 		return nil, nil, err
 	}
 	var st ScanStats
-	scans[0].DecodeStats(&st)
-	return scans[0], &st, nil
+	sc.DecodeStats(&st)
+	return sc, &st, nil
 }
 
 // Elapsed is a duration rounded for display.

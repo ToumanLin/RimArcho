@@ -311,6 +311,9 @@ func (m *model) libTagKey(refs []string, what string) tea.Cmd {
 
 // libMenu: the row menu of the cursor's copy (or the selection), beside the row.
 func (m *model) libMenu() tea.Cmd {
+	if m.libr.page == nil || m.libr.err != "" {
+		return nil // no rows shown
+	}
 	y := m.libr.rowY + m.libr.cursor - m.libr.off + 1
 	return m.openMenu(targetOps(m.targets()), 8, y, func(m *model, code string) tea.Cmd { return m.runLibOp(code) })
 }
@@ -319,7 +322,7 @@ func (m *model) libMenu() tea.Cmd {
 func (m *model) libRightClick(x, y int) tea.Cmd {
 	l := &m.libr
 	i := l.off + y - l.rowY
-	if l.page == nil || i < 0 || i >= len(l.flat) {
+	if l.page == nil || l.err != "" || i < 0 || i >= len(l.flat) {
 		return nil
 	}
 	if !m.libRowSelected(i) {
@@ -333,6 +336,9 @@ func (m *model) libRightClick(x, y int) tea.Cmd {
 // detail column it gives it the keys.
 func (m *model) libClick(e tea.MouseMsg) tea.Cmd {
 	l := &m.libr
+	if l.err != "" {
+		return nil // the rows under the error are stale
+	}
 	if tw, _ := m.libWidths(); tw < m.w && e.X >= tw+2 {
 		l.detail = true
 		return nil
@@ -424,6 +430,15 @@ func (m *model) libraryKey(s string) tea.Cmd {
 			m.tab = tabList
 		}
 		return nil
+	}
+	if l.err != "" {
+		// A failed reload shows only the error; the rows kept under it are stale, so only
+		// the keys that fix the search or leave the page work.
+		switch s {
+		case "esc", "/", "ctrl+f", `\`, "1":
+		default:
+			return nil
+		}
 	}
 	n := len(l.flat)
 	page := max(m.h-8-l.bar.lineCount(), 1)

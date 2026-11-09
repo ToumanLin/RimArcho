@@ -43,7 +43,12 @@ type GameLink struct {
 	recovery *linkRecovery
 }
 
-type gameMods struct{ game, mods string }
+// gameMods is a game's Mods directory. past: known only from finished link operations,
+// so an unreadable one (a drive taken offline) is skipped rather than blocking.
+type gameMods struct {
+	game, mods string
+	past       bool
+}
 
 // knownGameMods also serves target-lifecycle callers: it never uses scan aliases.
 func (a *App) knownGameMods() ([]gameMods, error) {
@@ -58,7 +63,7 @@ func (a *App) knownGameMods() ([]gameMods, error) {
 	roots := []gameMods{}
 	for _, e := range es {
 		if e.GameRoot != "" {
-			roots = append(roots, gameMods{e.GameRoot, filepath.Join(e.GameRoot, "Mods")})
+			roots = append(roots, gameMods{game: e.GameRoot, mods: filepath.Join(e.GameRoot, "Mods")})
 		}
 	}
 	for _, s := range ss {
@@ -70,7 +75,7 @@ func (a *App) knownGameMods() ([]gameMods, error) {
 					break
 				}
 			}
-			roots = append(roots, gameMods{game, s.Root})
+			roots = append(roots, gameMods{game: game, mods: s.Root})
 		}
 	}
 	ledger, err := a.Store.ManagedLinks()
@@ -78,21 +83,24 @@ func (a *App) knownGameMods() ([]gameMods, error) {
 		return nil, err
 	}
 	for _, l := range ledger {
-		roots = append(roots, gameMods{filepath.Dir(l.Mods), l.Mods})
+		past := store.LinkFinished(l.Phase)
+		roots = append(roots, gameMods{filepath.Dir(l.Mods), l.Mods, past})
 		if l.NextPath != "" {
-			roots = append(roots, gameMods{filepath.Dir(filepath.Dir(l.NextPath)), filepath.Dir(l.NextPath)})
+			roots = append(roots, gameMods{filepath.Dir(filepath.Dir(l.NextPath)), filepath.Dir(l.NextPath), past})
 		}
 	}
-	seen := map[string]bool{}
+	seen := map[string]int{}
 	out := []gameMods{}
 	for _, r := range roots {
 		r.mods = realOrAbs(r.mods)
 		key := env.PathKey(r.mods)
-		if !seen[key] {
-			seen[key] = true
-			r.game = realOrAbs(r.game)
-			out = append(out, r)
+		if i, ok := seen[key]; ok {
+			out[i].past = out[i].past && r.past
+			continue
 		}
+		seen[key] = len(out)
+		r.game = realOrAbs(r.game)
+		out = append(out, r)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].mods < out[j].mods })
 	return out, nil
@@ -174,6 +182,9 @@ func (a *App) InspectGameLinks() ([]*GameLink, error) {
 				if state, _ := source.ProbeTarget(root.mods); state == source.TargetMissing {
 					continue
 				}
+			}
+			if root.past {
+				continue
 			}
 			out = append(out, &GameLink{Game: root.game, Mods: root.mods, Path: root.mods, State: source.TargetUnknown, Code: CodeLinkUnknown, Reason: err.Error(), Action: "keep"})
 			continue

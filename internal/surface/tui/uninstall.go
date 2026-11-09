@@ -131,6 +131,9 @@ func (m *model) uninstallPromptFor(shown app.UninstallOptions) {
 type uninstallRun struct {
 	ch   chan tea.Msg
 	done chan struct{}
+	// held: results of other work that arrived during the run. They are delivered once
+	// a failed run ends, so busy flags (scan, tasks, command line, analysis) clear.
+	held []tea.Msg
 }
 type uninstallStepMsg struct{ progress app.UninstallProgress }
 type uninstallDoneMsg struct {
@@ -192,6 +195,7 @@ func (m *model) onUninstall(msg tea.Msg) tea.Cmd {
 		m.openPanel(T("uninstall RimArcho"), fmt.Sprintf("%s %s  %d / %d", T("uninstalling…"), view.UninstallTitle(p.Step), p.I, p.N))
 		return m.uninstallRun.next()
 	case uninstallDoneMsg:
+		held := m.uninstallRun.held
 		m.uninstallRun = nil
 		m.app.Uninstalled = msg.uninstalled
 		report := ""
@@ -210,7 +214,13 @@ func (m *model) onUninstall(msg tea.Msg) tea.Cmd {
 		m.openPanel(T("uninstall RimArcho"), report)
 		if msg.uninstalled {
 			m.panel.onEnter = func(m *model) tea.Cmd { m.quitting = true; return tea.Quit }
+			return nil // RimArcho is gone; nothing else runs
 		}
+		var cmds []tea.Cmd
+		for _, h := range held {
+			cmds = append(cmds, func() tea.Msg { return h })
+		}
+		return tea.Batch(cmds...)
 	}
 	return nil
 }

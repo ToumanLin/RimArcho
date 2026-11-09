@@ -937,6 +937,9 @@ function confirmBox() {
 }
 
 async function doFiles(a) {
+  // the confirm button stays until the reply: a second click must not back up or recycle again
+  if (a.running) return;
+  a.running = true;
   X.ask = null;
   let r;
   try { r = await (a.kind === "backup" ? api.SaveBackup([a.ref], true) : api.SaveTrash([a.ref], true)); }

@@ -434,6 +434,10 @@ func (p *Parser) marker(msg, line string, n int) bool {
 	if !ok || !ValidPhase(name) {
 		return false
 	}
+	if p.xname != "" {
+		// A marker inside an XML Extensions block ends it; a later "Source file:" must not find it open.
+		p.closeBlock()
+	}
 	p.finish()
 	p.cur, p.afterSubnode = nil, false
 	p.F.HasPhases = true

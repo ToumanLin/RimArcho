@@ -266,3 +266,13 @@ test("duplicate copies the list as it is now and offers its name for editing", a
   assert.deepEqual(copies, [[1, "%s copy", "current"]]);
   assert.ok(h.screen.querySelector(".pm-title-input"), "the copy's name is up for editing");
 });
+
+test("an empty import file leaves the preview button usable", async () => {
+  const previews = [], h = await setup({ ImportPreviewFor: async (...args) => { previews.push(args); return { request: 1, summary: "", installed: [], missing: [] }; } });
+  await h.pm.open(1); await h.pm.newList(); await mode(h, "import");
+  const file = h.screen.querySelectorAll("input").find(i => i.type === "file");
+  file.files = [{ name: "empty.txt", text: async () => "  \n" }];
+  file.onchange(); await flush();
+  assert.equal(previews.length, 0, "nothing to read");
+  assert.equal(buttonNamed(h.screen, "preview").disabled, false, "the button does not wait for a read that never starts");
+});

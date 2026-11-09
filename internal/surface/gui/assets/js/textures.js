@@ -31,7 +31,11 @@ export async function open() {
 
 // readInfo asks for the encoder and the scope's mods: quick, no texture is read.
 async function readInfo(entryRead = null) {
-  const read = entryRead || beginPageRead("textures", { keep: true, label: "loading…", retry: open });
+  // During a count (install, clean or a run ending mid-count) the count keeps the page read:
+  // a new one would invalidate its ticket and leave "stop counting" up for good.
+  const counting = !entryRead && X.loading && X.countRead;
+  const read = entryRead || (counting ? { current: () => counting.current(), finish() {}, fail() {} }
+    : beginPageRead("textures", { keep: true, label: "loading…", retry: open }));
   const n = ++X.infoSeq;
   const progress = X.prog;
   try {

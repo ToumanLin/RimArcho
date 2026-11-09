@@ -475,7 +475,7 @@ func (a *App) registerMonitorSource(dir string) (*source.Source, error) {
 	return a.sharedSource(MonitorLabel, dir)
 }
 
-func monitorAddedKey(planID int64) string { return fmt.Sprintf("monitor.added:%d", planID) }
+func monitorAddedKey(planID int64) string { return store.MonitorAddedKey(planID) }
 
 // monitorPlan updates a plan's older monitor to the newest, or adds the monitor right after
 // Harmony once (07 §1.5). Each change is one undoable edit of that plan.

@@ -67,7 +67,7 @@ func (a *App) readIncomingLinks() (*incomingLinkCheck, error) {
 	var out []*GameLink
 	for _, root := range roots {
 		entries, err := os.ReadDir(root.mods)
-		if os.IsNotExist(err) && missingTarget(root.mods) {
+		if os.IsNotExist(err) && missingTarget(root.mods) || err != nil && root.past {
 			continue
 		}
 		if err != nil {

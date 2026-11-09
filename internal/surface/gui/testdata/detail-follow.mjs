@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { loadModules, Element, deferred } from "./dom.mjs";
 
-async function harness() {
+async function harness(details=null) {
  const box=new Element("div"), S={envSeq:0,screen:null,cols:[{items:[]},{items:[]},{items:[]}]};
  let next=0;const timers=new Map(),calls=[],detail=deferred();
  const q=await loadModules("./detail.js",{
-  "./state.js":{S,$:()=>box,el:(tag,cls,text)=>{const e=new Element(tag,cls,text);return e},esc:String,api:{LibraryCopy:async()=>null,Detail:()=>{calls.push("Detail");return detail.promise}},T:s=>s,Tf:s=>s,errText:String,say:()=>{},factText:()=>{}},
+  "./state.js":{S,$:()=>box,el:(tag,cls,text)=>{const e=new Element(tag,cls,text);return e},esc:String,api:{LibraryCopy:async()=>null,Detail:id=>{calls.push("Detail");return details?details(id):detail.promise}},T:s=>s,Tf:s=>s,errText:String,say:()=>{},factText:()=>{}},
   "./icons.js":{icon:{},sourceIcon:()=>"",statusIcon:()=>""},"./fields.js":{fieldList:()=>new Element("div")},"./ops.js":{},
  },{setTimeout:fn=>{timers.set(++next,fn);return next},clearTimeout:id=>timers.delete(id)});
  return {q,S,box,timers,calls,detail};
@@ -62,4 +62,16 @@ test("the next Mod's details replace the old ones in one swap, once its parts ar
  assert.ok(box.textContent.includes("new mod")&&box.textContent.includes("someone")&&!box.textContent.includes("old mod"));
  assert.equal(box.inert,false);assert.ok(!("stale" in box.dataset));assert.equal(S.detail.id,"new");
  assert.equal(timers.size,0,"the debounce and the reveal cap are both cleared");
+});
+
+test("back to a Mod before the next one showed builds its own frame, not the next one's", async()=>{
+ const pending=new Map();
+ const {q,box,timers}=await harness(id=>{if(id==="a"&&!pending.has("a")){pending.set("a",null);return Promise.resolve({id:"a",name:"A mod",header:"",show:"about",about:[]})}const d=deferred();pending.set(id,d);return d.promise});
+ await q.showDetail({id:"a",name:"A mod"},false);
+ assert.equal(box.querySelector("h1").textContent,"A mod");
+ // B is still on its way when the cursor returns to A, whose detail is slow
+ q.showDetail({id:"b",name:"B mod"},false);await settle();
+ const back=q.showDetail({id:"a",name:"A mod"},false);await settle();
+ for(const fn of [...timers.values()])fn();await settle();void back;
+ assert.equal(box.querySelector("h1").textContent,"A mod");
 });

@@ -312,7 +312,11 @@ func (m *model) paletteKey(k tea.KeyMsg) tea.Cmd {
 	case tea.KeyEnter:
 		m.pal = nil
 		if p.sel < len(p.results) {
-			return p.results[p.sel].run(m)
+			cmd := p.results[p.sel].run(m)
+			if m.tab != tabList {
+				m.full = false // the full detail belongs to the lists; left set, it takes the new page's keys
+			}
+			return cmd
 		}
 		return nil
 	case tea.KeyUp, tea.KeyLeft, tea.KeyCtrlP: // 16 §3.3: in a popup both pairs of arrows choose

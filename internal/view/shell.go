@@ -354,25 +354,18 @@ func BuildHomeFromState(a *app.App, st *app.LoadoutState, n *Needs, plans []Plan
 				r.Versions = vs
 			}
 		}
-		k, checked := 0, false
+		k, checked, stale := 0, false, false
 		if p.Current {
 			r.Memory = BuildMemoryLaunch(a, st)
 			r.Mods = active
 			r.Facts = Tf("%d mods", active)
 			r.Unsaved = len(st.Changes())
-			k, checked = BreakCount(n), !n.Never
+			k, checked, stale = BreakCount(n), !n.Never, n.Stale
 			r.Links = PackLinksText(n)
 		} else {
-			k, checked = PlanProblems(a, p.ID)
+			k, checked, stale = PlanProblems(a, p.ID)
 		}
-		switch {
-		case !checked:
-			r.State = T("not checked yet")
-		case k > 0:
-			r.State, r.Level = Tf("%d problems break the game", k), LevelBad
-		default:
-			r.State, r.Level = T("ready to play"), HomeOK
-		}
+		r.State, r.Level = planState(k, checked, stale)
 		h.Rows = append(h.Rows, r)
 	}
 	for _, p := range packs {
@@ -384,6 +377,21 @@ func BuildHomeFromState(a *app.App, st *app.LoadoutState, n *Needs, plans []Plan
 	h.Changes = ChangeHome(a, st)
 	h.Update = SelfUpdateHome(a)
 	return h
+}
+
+// planState is a plan row's state and level from its check. A check older than the list
+// still shows its problems, but never "ready to play" (as Can it run says, 16 §2.4).
+func planState(k int, checked, stale bool) (string, string) {
+	switch {
+	case !checked:
+		return T("not checked yet"), ""
+	case k > 0:
+		return Tf("%d problems break the game", k), LevelBad
+	case stale:
+		return T("the files changed since the last check"), ""
+	default:
+		return T("ready to play"), HomeOK
+	}
 }
 
 func packHomeRow(p PackRow, chip, envName, gameVersion string) HomeRow {
@@ -423,12 +431,7 @@ func AddOtherEnvs(a *app.App, h *Home, current string) {
 			if !p.LastPlayed.IsZero() {
 				r.Played = Tf("played %s", ShortDate(p.LastPlayed))
 			}
-			r.State = T("not checked yet")
-			if k, checked := PlanProblems(a, p.ID); checked && k > 0 {
-				r.State, r.Level = Tf("%d problems break the game", k), LevelBad
-			} else if checked {
-				r.State, r.Level = T("ready to play"), HomeOK
-			}
+			r.State, r.Level = planState(PlanProblems(a, p.ID))
 			h.Rows = append(h.Rows, r)
 		}
 		if packs, _, err := a.PacksOf(e); err == nil {

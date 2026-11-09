@@ -94,6 +94,7 @@ func (s *Session) accept(cookies []*http.Cookie) {
 }
 
 func (s *Session) Status() Status {
+	s.fresh()
 	r := s.status
 	r.Expiry = time.Time{}
 	if len(s.cookies) == 0 && r.State == "" {
@@ -199,8 +200,11 @@ func (s *Session) capture(cookies []*http.Cookie) error {
 // Jar restricts both incoming and outgoing cookies, including hostile Domain attributes.
 // CDN requests never receive site credentials. The client does not use browser databases.
 func (s *Session) Jar() http.CookieJar {
+	return &restrictedJar{jar: s.innerJar(), session: s, revision: s.revision}
+}
+
+func (s *Session) innerJar() http.CookieJar {
 	j, _ := cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
-	r := &restrictedJar{jar: j, session: s}
 	for _, c := range s.cookies {
 		copy := *c
 		copy.MaxAge = 0 // Expires is absolute; restart must not extend Max-Age.
@@ -210,17 +214,21 @@ func (s *Session) Jar() http.CookieJar {
 		}
 		j.SetCookies(u, []*http.Cookie{&copy})
 	}
-	return r
+	return j
 }
 
 type restrictedJar struct {
-	jar     http.CookieJar
-	session *Session
+	jar      http.CookieJar
+	session  *Session
+	revision [32]byte // the session file the jar's cookies came from
 }
 
 func (j *restrictedJar) Cookies(u *url.URL) []*http.Cookie {
-	if u.Scheme != "https" || u.User != nil || u.Port() != "" || !SiteHost(u.Hostname()) || !j.session.current() {
+	if u.Scheme != "https" || u.User != nil || u.Port() != "" || !SiteHost(u.Hostname()) || !j.session.fresh() {
 		return nil
+	}
+	if j.revision != j.session.revision {
+		j.jar, j.revision = j.session.innerJar(), j.session.revision
 	}
 	return j.jar.Cookies(u)
 }
@@ -291,7 +299,7 @@ func (s *Session) Forget() error {
 func Forget(dir string) error { return (&Session{dir: dir}).Forget() }
 
 func (s *Session) HasCookies() bool {
-	if !s.current() {
+	if !s.fresh() {
 		return false
 	}
 	for _, c := range s.cookies {
@@ -309,6 +317,20 @@ func (s *Session) current() bool {
 		return !s.exists
 	}
 	return err == nil && s.exists && sha256.Sum256(b) == s.revision
+}
+
+// fresh is current, after taking over a session another window saved since (a new login or
+// renewed cookies). A forgotten session stays invalid, so a stale client cannot recreate it.
+func (s *Session) fresh() bool {
+	if s.current() {
+		return true
+	}
+	n, err := Open(s.dir)
+	if err != nil || !n.exists {
+		return false
+	}
+	s.cookies, s.status, s.revision, s.exists = n.cookies, n.status, n.revision, true
+	return true
 }
 
 func safePath(path string) error {

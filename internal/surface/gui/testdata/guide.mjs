@@ -7,15 +7,15 @@ const info = (description = "old", refreshing = true, error = "") => ({
   branches: [{ name: "public", description }, { name: "version-1.5", version: "1.5", description }],
 });
 
-async function setup({ folder = { done: true }, space = (path) => ({ path, free: 50e9 }) } = {}) {
-  const screen = new Element("div"), S = { screen: "guide" }, chosen = [];
+async function setup({ folder = { done: true }, space = (path) => ({ path, free: 50e9 }), scan = async () => true } = {}) {
+  const screen = new Element("div"), S = { screen: "guide", busy: {} }, chosen = [];
   let now = 0, calls = 0, response = info(), switchWay, pathEditor;
   const timers = [], delays = [], gameCalls = [];
   const el = (tag, cls, text) => new Element(tag, cls, text);
   const guide = await loadModules("./guide.js", {
     "./fields.js": { copyablePath: (n) => n, editablePath: (n) => n, pathContent: (n) => n },
     "./state.js": { S, $: () => screen, el, api: {
-      GuideFind: async () => [], GuideDownloadInfo: async () => { calls++; return await response; },
+      GuideFind: async () => [], GuideAdd: async (games) => games.map((g) => g.name), GuideScan: (names) => scan(names), GuideDownloadInfo: async () => { calls++; return await response; },
       ManagedFolder: async () => folder, FolderSpace: async (path) => space(path), ChooseManagedFolder: async (path) => { chosen.push(path); },
       // as view.GameAt: the version's first name not among the environments or pending
       GuideGame: async (path, pending) => {
@@ -32,7 +32,7 @@ async function setup({ folder = { done: true }, space = (path) => ({ path, free:
       chooseLocalPath: (value, done) => { pathEditor = { value, done }; }, beginPageRead: () => ({ current: () => true, finish() {}, fail(e) { throw e; } }),
     },
     "./exchange.js": { exchange() {}, importFrom() {} },
-    "./environment.js": { withEnvironmentSwitch() {} },
+    "./environment.js": { withEnvironmentSwitch: async (_, run) => { await run(); return true; } },
     "./api.js": { on() {} },
   }, { Date: { now: () => now }, setTimeout: (fn, ms) => { timers.push({fn,ms}); delays.push(ms); } });
   guide.initGuide({ renderWhere() {} });
@@ -137,4 +137,14 @@ test("two folders of one version added in one pass get different names", async (
   add().onclick(); await h.choosePath("D:\\Game3"); await flush();
   assert.deepEqual(h.gameCalls.map(([, pending]) => pending), [[], ["1.6-2"]]);
   assert.deepEqual(h.screen.querySelectorAll(".game .field").map(i => i.value), ["1.6-2", "1.6-3"]);
+});
+
+for (const way of ["throws", "refuses"]) test(`a first scan that ${way} gives back the scan flag and ends the step`, async () => {
+  const h = await setup({ scan: async () => { if (way === "throws") throw "scan failed"; return false; } });
+  h.switchWay(0); await flush();
+  h.screen.querySelectorAll("button").find(b => b.textContent === "add this folder").onclick(); await h.choosePath("D:\Game2"); await flush();
+  await h.screen.querySelectorAll("button").find(b => b.textContent === "add and continue").onclick(); await flush();
+  assert.ok(!h.S.busy.scan, "no scan runs");
+  assert.match(h.screen.textContent, way === "throws" ? /scan failed/ : /a scan is already running/);
+  if (way === "throws") assert.ok(h.screen.querySelectorAll("button").some(b => b.textContent === "scan again"));
 });

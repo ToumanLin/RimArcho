@@ -460,11 +460,22 @@ async function scanAll() {
   G.step = 1;
   G.scan = { rows: G.added.map((n) => ({ env: n, text: T("waiting"), state: "wait" })), done: false, ok: true };
   draw();
+  // A scan that did not start gives the flag back as it was (another scan may still run).
+  const was = S.busy.scan;
   S.busy.scan = true;
-  if (!(await api.GuideScan(G.added))) {
-    G.scan.done = true;
-    G.error = T("a scan is already running; wait for it to finish");
-    draw();
+  let started = false;
+  try {
+    started = await api.GuideScan(G.added);
+    if (!started) G.error = T("a scan is already running; wait for it to finish");
+  } catch (e) {
+    G.error = errText(e);
+    G.scan.ok = false;
+  } finally {
+    if (!started) {
+      S.busy.scan = was;
+      G.scan.done = true;
+      draw();
+    }
   }
 }
 

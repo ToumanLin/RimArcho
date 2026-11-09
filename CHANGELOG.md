@@ -20,6 +20,36 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 - Closing the window while a pack is being created no longer stops the build and deletes what it copied. The build goes on in the background as the create-pack message says, and the task record says so; the Packs page shows how it ended.
 - Database maintenance runs again after you leave the plans, launch or texture page while it is still measuring. Before, the abandoned measurement kept saying "loading", which held maintenance off until RimArcho restarted.
 - The command line (TUI `:` and the GUI command panel) no longer crashes when completing after `--`, as in `config set -- `. Words after `--` and the `--env` value are counted the way the command itself reads them.
+- The home page no longer says "ready to play" from a check that is older than the list: such a list shows "the files changed since the last check" until it is checked again (problems found by the old check still show).
+- Data kept right after errors and interruptions:
+  - Finished tasks no longer disappear from Background tasks when writing `tasks.json` fails.
+  - Saving after undoing a checkout is recorded as your own save, not as "restored vN". A checkout writes the list and where it came from together.
+  - A new list gets Archo Monitor added even when it reuses a deleted list's ID.
+  - Copy folders left by an interrupted copy (`<name>.archo-tmp`) are no longer scanned as Mods.
+  - Switching games scans again when the last scan failed or was cut short.
+  - A pack's HugsLib settings copy that was cut short is completed on the next prepare, instead of counting as the pack's own.
+  - A Workshop manifest that Steam is rewriting (`appworkshop_294100.acf`) no longer marks every Workshop Mod as subscribed; the last known value is kept.
+  - A failure to record converted textures stops the run instead of marking the Mod optimised.
+  - Feedback relay: a report GitHub failed to file no longer counts against the shared daily limit.
+- Things that stayed stuck:
+  - A drive taken offline that held only finished link operations no longer blocks moving, removing or updating Mods in other games.
+  - A compaction cut short (RimArcho closed or killed during VACUUM) no longer blocks the next one for 15 minutes; automatic maintenance on a disk too full to compact finishes without compacting and waits its week, instead of running at every start.
+  - A todds that failed its first check (held by a virus scanner, a timeout) is found later without restarting RimArcho.
+  - A LoversLab login made in another RimArcho window works here without a restart.
+  - "Directory check failed" in Can it run disappears once the directories can be read again, and no longer repeats.
+  - Restarting the game while RimArcho follows its log no longer drops the old run's last log entry.
+  - The log reader no longer crashes on a Monitor phase marker inside an XML Extensions error.
+  - TUI: a command run from ctrl+k while a Mod's full details are open opens its page ready for keys; before, keys were ignored until esc.
+  - TUI: after a failed uninstall, a scan, command or analysis that was running no longer stays busy.
+  - TUI Mod library: when the list cannot be shown, keys and clicks no longer move, select or delete Mods that are not on screen.
+  - Window: ctrl+k while the first-run folder dialog is working no longer leaves the window unresponsive. A failing step at start-up shows its error and the window still opens its first page.
+  - Window: a first-run scan that fails to start no longer blocks scanning again.
+  - Window: installing todds, or a conversion ending, while textures are being counted no longer leaves "stop counting" up for good. An empty import file no longer disables Preview.
+  - Window: ctrl+j on Background tasks returns to the page you came from, including a pack's page; opening Tasks another way no longer hijacks the next ctrl+j.
+- No more double actions or stale details:
+  - In Can it run, Enter no longer runs a confirmation whose item has disappeared.
+  - Enter pressed twice no longer adds a rule twice or subscribes twice; a double-click no longer repeats a save's backup or recycle.
+  - Moving quickly from one Mod to another and back no longer shows the other Mod's name in the details.
 - Reading a Mod's code (Mod details, CLI `archo source`, MCP `read_source`) works with ilspycmd 11, which installs as a `.cmd` launcher that Archo did not find. Its "You are not using the latest version of the tool" notice no longer appears as the last lines of the code, also in code read before. A type asked for under the wrong namespace now says "type … not found" and names the types with that name (`RimWorld.PlayLogEntry_Interaction` → `Verse.PlayLogEntry_Interaction`); before, the notice was shown as if it were that type's code.
 - A test run no longer calls an error "fixed" that it could not have seen. When your log shows an error after loading a save, and the log has no Archo Monitor phases, the game's own "Loading game from file" and "Initializing new game" lines now place it: a menu run counts it as not reached, and so does a map run unless the error came after a new game.
 - Testing a pinned copy works when the original sits in `Mods/`. The original (a folder or a link with the same packageId) is moved aside into `_ArchoTestHidden` next to `Mods/` for the run and moved back after it; before, the run quietly loaded the original and compared its errors as if it had tested the copy. A run in which any listed Mod was not loaded now has status `incomplete`, starts with "NOT TESTED: these Mods were not loaded: …" and reports nothing as fixed. The report lists the folder the game took for each Mod (`loaded`: from Archo Monitor's log where it says, otherwise from what was in the game folders), and a Mod missing from the game's running list moves to `missing`.

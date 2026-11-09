@@ -268,6 +268,13 @@ func TestRun(t *testing.T) {
 		t.Fatalf("stop: %v, %d calls", err, len(enc2.calls))
 	}
 	_ = res
+	// a failure to record a batch ends the run with that error, even when todds failed too
+	stored := errors.New("disk I/O error")
+	enc3 := &fakeEnc{err: errors.New("exit status 1")}
+	_, err = Run(context.Background(), enc3, p.Jobs, Options{}, nil, func([]Result) error { return stored }, nil)
+	if !errors.Is(err, stored) || len(enc3.calls) != 1 {
+		t.Fatalf("after error: %v, %d calls", err, len(enc3.calls))
+	}
 }
 
 func TestArgs(t *testing.T) {

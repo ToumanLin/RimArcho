@@ -125,7 +125,7 @@ func TestLibraryPlanOps(t *testing.T) {
 		}
 	}
 	libAt(t, m, "Alpha")
-	press(m, "f10")
+	pressKey(m, tea.KeyF10)
 	if m.menu == nil {
 		t.Fatal("F10: no menu")
 	}
@@ -141,14 +141,14 @@ func TestLibraryPlanOps(t *testing.T) {
 	press(m, "esc")
 	// Del: the dry run, then enter does it (here: Steam is out of reach, the page opens);
 	// an enabled copy only warns which list has it
-	press(m, "delete")
+	pressKey(m, tea.KeyDelete)
 	if m.panel == nil || m.panel.onEnter == nil || !strings.Contains(strings.Join(m.panel.lines, "\n"), "is in list") {
 		t.Fatalf("Del on an enabled copy: %+v", m.panel)
 	}
 	press(m, "esc")
 	var opened string
 	m.opts.OpenURL = func(u string) error { opened = u; return nil }
-	press(m, "delete")
+	pressKey(m, tea.KeyDelete)
 	if m.panel == nil || m.panel.onEnter == nil {
 		t.Fatalf("Del: no confirmation (%q)", m.status)
 	}
@@ -182,5 +182,35 @@ func TestEveryOpRuns(t *testing.T) {
 			t.Errorf("editor: %s: %q", o.Code, m.status)
 		}
 		m.panel, m.pos, m.prompt, m.tags = nil, nil, nil, nil
+	}
+}
+
+// After a failed reload the page shows only the error: the rows kept under it are stale, so
+// the cursor, the selection, the menu and the operations do nothing; esc still leaves.
+func TestLibraryFailedReloadIgnoresStaleRows(t *testing.T) {
+	t.Parallel()
+	e, _ := fixture(t)
+	m := direct(t, e, 140, 40)
+	m.openLibrary()
+	if m.libr.page == nil || len(m.libr.flat) < 2 {
+		t.Fatal("no library rows")
+	}
+	m.libr.sort = "synthetic-bad-sort"
+	m.loadLibrary()
+	if m.libr.err == "" || m.libr.page == nil {
+		t.Fatalf("want an error over the kept page: err %q", m.libr.err)
+	}
+	press(m, "down")
+	press(m, "v")
+	pressKey(m, tea.KeyDelete)
+	pressKey(m, tea.KeyF10)
+	m.update(tea.MouseMsg{X: 4, Y: m.libr.rowY + 1, Action: tea.MouseActionPress, Button: tea.MouseButtonLeft})
+	if m.libr.cursor != 0 || len(m.libr.marked) != 0 || m.panel != nil || m.menu != nil || m.armed != nil {
+		t.Fatalf("stale rows acted on: cursor %d, marked %d, panel %v, menu %v, armed %v",
+			m.libr.cursor, len(m.libr.marked), m.panel != nil, m.menu != nil, m.armed != nil)
+	}
+	press(m, "esc")
+	if m.tab != tabList {
+		t.Fatalf("esc: tab %d", m.tab)
 	}
 }

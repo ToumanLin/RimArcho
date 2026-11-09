@@ -150,8 +150,10 @@ func (s *Store) ApplyScan(envID string, scanID int64, now time.Time, res *identi
 				return err
 			}
 		} else {
-			if _, err = tx.Exec(`UPDATE instance SET environment_id=?, source_id=?, rel_path=?, real_path=?, status=?, residue=?, unloadable=?, last_seen=?, tombstone_at=NULL WHERE id=?`,
-				instEnv[a.InstanceID], ob.Loc.SourceID, ob.Loc.Rel, ob.RealPath, identity.Live, residue, unloadable, ts, a.InstanceID); err != nil {
+			// An unreadable workshop manifest says nothing about subscriptions: keep the stored residue.
+			if _, err = tx.Exec(`UPDATE instance SET environment_id=?, source_id=?, rel_path=?, real_path=?, status=?,
+				residue=CASE WHEN ? THEN residue ELSE ? END, unloadable=?, last_seen=?, tombstone_at=NULL WHERE id=?`,
+				instEnv[a.InstanceID], ob.Loc.SourceID, ob.Loc.Rel, ob.RealPath, identity.Live, ob.ResidueUnknown, residue, unloadable, ts, a.InstanceID); err != nil {
 				return err
 			}
 		}

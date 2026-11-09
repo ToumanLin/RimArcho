@@ -185,6 +185,7 @@ The lifecycle of links RimArcho creates is separate from scan aliases: `managed_
 - A link outside all sources has only one location; its real path is recorded (`links-to` in mod output), not as an alias. RimCrow's `Mods/_Link_<Workshop-ID>` works this way and is recognized as a normal local Mod; RimArcho does not manage or delete these links.
 - **`_Archo_` links**: `Mods/_Archo_<source-label>_<directory-name>`, created when deploying Mods from steamcmd or extra sources (09 §3). They resolve to the real source directories and are only aliases of those Instances: no new Instance or event.
 - **Pack links**: scans skip links whose names start with `!ArchoPack_` (case-insensitive). They exist only while a pack is played (10 §3), outside the environment. Pack copies carry `.rimarcho/origin.json` but are not scanned.
+- **Work folders**: scans skip any folder whose name contains `.archo-` (case-insensitive): `.archo-*` and the `<name>.archo-tmp` / `.archo-old` folders a copy or replace leaves when cut short (`source.List`).
 - Links **inside** Mod directories are not followed (02 §1). For a Mod whose root is a link, the target is fingerprinted.
 
 ## 5. Acceptance

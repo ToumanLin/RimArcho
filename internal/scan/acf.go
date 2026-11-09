@@ -1,6 +1,8 @@
 package scan
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -34,18 +36,30 @@ func ACFPathFor(contentRoot string) string {
 // WorkshopItemDetails; the Steam client drops unsubscribed items from both lists while the
 // folder may stay behind as residue.
 func ReadACF(contentRoot string) *ACF {
+	a, _ := readACF(contentRoot)
+	return a
+}
+
+// errACF reports a manifest that exists but has no AppWorkshop section (Steam may be rewriting it).
+var errACF = errors.New("workshop manifest has no AppWorkshop section")
+
+// readACF is ReadACF that tells an absent manifest (nil, nil) from an unreadable one (nil, error).
+func readACF(contentRoot string) (*ACF, error) {
 	p := ACFPathFor(contentRoot)
 	b, err := os.ReadFile(p)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, nil
+	}
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	n, err := vdf.Parse(b)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	root := n.Get("AppWorkshop")
 	if root == nil {
-		return nil
+		return nil, errACF
 	}
 	a := &ACF{Path: p, Items: map[string]*ACFItem{}}
 	item := func(id string) *ACFItem {
@@ -73,7 +87,7 @@ func ReadACF(contentRoot string) *ACF {
 			it.TimeUpdated, _ = strconv.ParseInt(c.Str("timeupdated"), 10, 64)
 		}
 	}
-	return a
+	return a, nil
 }
 
 func kids(n *vdf.Node) []*vdf.Node {

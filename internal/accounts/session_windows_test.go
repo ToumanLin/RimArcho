@@ -119,6 +119,41 @@ func TestSessionExpiryDeletionAndForgetInvalidatesClients(t *testing.T) {
 	}
 }
 
+// A session another window saved (a login after this one went stale) is taken over: this
+// client's cookies, status and saves work again without a restart.
+func TestSessionSavedByAnotherWindowIsTakenOver(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "accounts")
+	s, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, _ := url.Parse(Site)
+	jar := s.Jar()
+	login := func(value string) {
+		t.Helper()
+		other, err := Open(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = other.capture([]*http.Cookie{{Name: "ips4_login_key", Value: value, Domain: ".loverslab.com", Path: "/", Secure: true, Expires: time.Now().Add(time.Hour)}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, value := range []string{"first-offline", "second-offline"} {
+		login(value)
+		if !s.HasCookies() || s.Status().State != "login required" {
+			t.Fatalf("%s: not taken over: %+v", value, s.Status())
+		}
+		got := jar.Cookies(u)
+		if len(got) != 1 || got[0].Value != value {
+			t.Fatalf("%s: jar cookies %v", value, got)
+		}
+		if err = s.SetStatus("available", "Fixture"); err != nil {
+			t.Fatalf("%s: save after takeover: %v", value, err)
+		}
+	}
+}
+
 func TestRememberMeExpiryAndCookieRotationPersist(t *testing.T) {
 	dir := t.TempDir()
 	s, err := Open(dir)

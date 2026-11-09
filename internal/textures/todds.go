@@ -176,8 +176,9 @@ type Progress struct {
 
 // Run encodes the jobs in batches of one scale, checks every DDS it was meant to write and
 // returns a result per job, in job order. Before each batch, before(jobs) is called (to
-// record what is about to be written); after it, after(results). A stop (ctx) ends between
-// or inside a batch; the results so far are returned with ctx's error.
+// record what is about to be written); after it, after(results). An error from either ends
+// the run with that error. A stop (ctx) ends between or inside a batch; the results so far are
+// returned with ctx's error.
 func Run(ctx context.Context, enc Encoder, jobs []Job, o Options, before func([]Job) error, after func([]Result) error, progress func(Progress)) ([]Result, error) {
 	o = o.Normal()
 	_, exact := enc.(*Todds) // a test encoder writes headers only
@@ -224,8 +225,9 @@ func Run(ctx context.Context, enc Encoder, jobs []Job, o Options, before func([]
 			}
 			p.Done += n
 			if after != nil {
-				if aerr := after(br); aerr != nil && err == nil {
-					err = aerr
+				// what was written could not be recorded: stop rather than report success
+				if err := after(br); err != nil {
+					return res, err
 				}
 			}
 			if progress != nil {

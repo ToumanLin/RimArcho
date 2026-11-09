@@ -38,7 +38,7 @@ import * as tasksPage from "./tasks.js";
 import { refreshBackgrounds } from "./bg.js";
 import { environmentReason, withEnvironmentSwitch } from "./environment.js";
 import { wireSeparator } from "./separator.js";
-import { go, openPage, initNavigation, pageEntering, pageEntered, wireHistory } from "./navigation.js";
+import { go, openPage, initNavigation, pageEntering, pageEntered, wireHistory, travel } from "./navigation.js";
 import { checkCredit, getChoices } from "./credit.js";
 import * as problems from "./problems.js";
 import * as fileSearch from "./filesearch.js";
@@ -1212,6 +1212,7 @@ async function loadWidths() {
 
 const ui = {
   reload, refreshEnvironment, relang, reaccent, render, pageEntering, pageEntered, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go, useEnv,
+  back: () => travel(-1),
   palette: paletteChoice, commandDone, uninstallStarted: () => uninst.restore(), selectionItems: selection, planMenu: (id, x, y, opener, keys) => plans.menuAt(id, x, y, opener, keys),
   menu: (x, y) => openRowMenu(x, y, false),
   detailFollow: (f) => detailFollow(f),
@@ -1344,8 +1345,11 @@ async function start() {
     try { if (S.board && (await api.Stamp()) !== S.board.stamp) await reload(); } catch { /* keep the page */ }
     checkCredit();
   });
-  if (!(await firstRun.workshopStart())) return;
-  if (await uninst.restore()) { bootDone(); shell.settle(); return; }
+  // From here on a failing step says why and the window still boots: a page, the live
+  // poll and Ready (an early throw used to leave the boot screen with no page behind it).
+  const failed = (e) => say("fail", errText(e));
+  try { if (!(await firstRun.workshopStart())) return; } catch (e) { failed(e); }
+  try { if (await uninst.restore()) { bootDone(); shell.settle(); return; } } catch (e) { failed(e); }
   // The start page needs only Workspace's shell and board. The editor behind it gets its
   // filter answer (the bar's first one reads every mod's content) and its rows afterwards,
   // so the first page does not wait for them.
@@ -1362,17 +1366,21 @@ async function start() {
   await shellRead;
   // No environment yet: the first-run guide (16 §2.15); else the home page (16 §2.3).
   const first = !S.shell || !S.shell.envs;
-  if (first) await guide.start("first");
-  else await go("home");
+  try {
+    if (first) await guide.start("first");
+    else await go("home");
+  } catch (e) { failed(e); }
   bootDone();
   shell.settle();
   requestAnimationFrame(() => api.Ready().catch(() => {}));
   pollLive();
-  await loadWidths();
-  if (first) return;
-  await scr.checkDirectories();
-  if (S.board && S.board.neverScanned) cmd("rescan");
-  checkCredit();
+  try {
+    await loadWidths();
+    if (first) return;
+    await scr.checkDirectories();
+    if (S.board && S.board.neverScanned) cmd("rescan");
+    checkCredit();
+  } catch (e) { failed(e); }
 }
 
 // A history row (16 §2.5): a click goes there at once. Loading a version is one step: the

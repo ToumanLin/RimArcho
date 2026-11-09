@@ -522,6 +522,8 @@ function needsLead(d) {
   return Tf("%s can run: nothing to handle.", plan);
 }
 
+// askShown: drawNeeds drew N.ask's confirmation row.
+let askShown = false;
 function drawNeeds() {
   const sc = S.screen === "needs" ? $("#screen") : openScreen("needs");
   const keep = [...sc.querySelectorAll(".needcol > .scroll")].map((s) => s.scrollTop);
@@ -547,6 +549,7 @@ function drawNeeds() {
     c.append(cap, box);
     return [c, box];
   };
+  askShown = false;
   const [left, lbox] = column(0, "before you start", "found by checking the mods' files and shared logs");
   const [right, rbox] = column(1, live ? "this run and the last" : "when you last played", "seen in the game's log");
   const split = el("div", "split needsplit");
@@ -563,6 +566,8 @@ function drawNeeds() {
       box.append(needSection(si, rows, ci, shut, live));
     }
   }
+  // a question whose item is gone (resolved by a refresh) is no question: enter must not run it
+  if (!askShown) N.ask = null;
   if (!N.cols[0].length && !d.lastSave) lbox.append(el("section", "card empty-state", "✓ " + T("nothing here")));
   if (!N.cols[1].length) rbox.append(el("div", "need-empty", T("no errors in the last run")));
   // what other pages handle: one line each (16 §2.4)
@@ -791,7 +796,7 @@ function needCard(it, ci, i) {
   }
   if (acts.some((a) => a.kind === "answer")) btns.classList.add("identity-answers");
   if (x.children.length) row.append(x);
-  if (N.ask && N.ask.id === it.id) row.append(confirmRow(it, N.ask.act));
+  if (N.ask && N.ask.id === it.id) { row.append(confirmRow(it, N.ask.act)); askShown = true; }
   else {
     foot.append(btns);
     if (it.evidence) foot.append(needEvidence(it.evidence));

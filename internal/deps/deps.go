@@ -175,23 +175,29 @@ func (f *Finder) version(name, path string) (string, error) {
 	if f.Version != nil {
 		c = &f.probes
 	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.entries == nil {
-		c.entries = make(map[string]probe)
-	}
 	key := name + ":" + path
+	c.mu.Lock()
 	p, ok := c.entries[key]
+	c.mu.Unlock()
 	if ok && p.size == s.Size() && p.mtime == s.ModTime().UnixNano() {
 		return p.version, p.err
 	}
+	// Probe without the lock: a slow program must not hold up other lookups.
 	p = probe{size: s.Size(), mtime: s.ModTime().UnixNano()}
 	if f.Version != nil {
 		p.version, p.err = f.Version(name, path)
 	} else {
 		p.version, p.err = (&textures.Todds{Path: path, Prepare: hideWindow}).Version()
 	}
+	if p.err != nil {
+		return p.version, p.err // may be passing (a scanner holding the file, a timeout): probe again next time
+	}
+	c.mu.Lock()
+	if c.entries == nil {
+		c.entries = make(map[string]probe)
+	}
 	c.entries[key] = p
+	c.mu.Unlock()
 	return p.version, p.err
 }
 

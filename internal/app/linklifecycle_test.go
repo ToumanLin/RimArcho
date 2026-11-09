@@ -565,3 +565,38 @@ func TestIncomingStaleIDLinkMove(t *testing.T) {
 		t.Fatalf("moved link health: %+v", l)
 	}
 }
+
+// A finished link operation in a Mods directory that cannot be read now (its drive is
+// offline) does not block target operations or link checks; an unfinished one still does.
+func TestFinishedLedgerRowOnUnreadableModsDoesNotBlock(t *testing.T) {
+	t.Parallel()
+	e, target, id, links := incomingFixture(t)
+	offline := filepath.Join(e.Root, "OfflineGame", "Mods")
+	e.WriteFile(offline, "") // a file stands in for a directory that cannot be read
+	row := store.ManagedLink{Operation: "old", Mods: offline, Name: "_Archo_env_" + id, Kind: "junction", Instance: id, Target: target, NextPath: filepath.Join(offline, "_Archo_env_"+id), NextTarget: target}
+	if err := e.App.Store.RecordLinkIntent([]store.ManagedLink{row}); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.App.Store.LinkPhase(row.Operation, "complete"); err != nil {
+		t.Fatal(err)
+	}
+	incoming, err := e.App.IncomingLinks(target)
+	if err != nil || len(incoming) != len(links) {
+		t.Fatalf("incoming %d, %v", len(incoming), err)
+	}
+	all, err := e.App.InspectGameLinks()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, l := range all {
+		if l.Code == app.CodeLinkUnknown {
+			t.Fatalf("finished row's directory reported: %+v", l)
+		}
+	}
+	if err := e.App.Store.LinkPhase(row.Operation, "intent"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.App.IncomingLinks(target); err == nil {
+		t.Fatal("an unfinished row on an unreadable directory did not block")
+	}
+}

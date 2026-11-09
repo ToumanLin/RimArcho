@@ -210,25 +210,37 @@ func (ts *Tasks) syncLocked(write bool) {
 	if write {
 		file = trimTasks(file)
 		kept := make(map[string]bool, len(file))
-		ts.written = map[string]bool{}
+		written := map[string]bool{}
 		for _, t := range file {
 			kept[t.ID] = true
 			if t.Owner == ts.owner {
-				ts.written[t.ID] = true
+				written[t.ID] = true
 			}
 		}
 		mem = slicesFilter(mem, func(t *Task) bool { return kept[t.ID] || !t.Ended() })
-		if b, err := json.Marshal(file); err == nil {
-			os.MkdirAll(filepath.Dir(ts.path), 0o755)
-			tmp := ts.path + ".tmp"
-			if os.WriteFile(tmp, b, 0o644) == nil {
-				os.Rename(tmp, ts.path)
-			}
+		// Only a write that landed counts: a task marked written but missing from the
+		// file reads as taken out in another window on the next sync.
+		if writeTaskFile(ts.path, file) {
+			ts.written = written
+			clear(ts.gone)
 		}
-		clear(ts.gone)
 	}
 	ts.list = mem
 	ts.stampSeen = stampOf(ts.path)
+}
+
+// writeTaskFile replaces the record through a temporary file, and reports whether it did.
+func writeTaskFile(path string, list []*Task) bool {
+	b, err := json.Marshal(list)
+	if err != nil {
+		return false
+	}
+	os.MkdirAll(filepath.Dir(path), 0o755)
+	tmp := path + ".tmp"
+	if os.WriteFile(tmp, b, 0o644) != nil {
+		return false
+	}
+	return os.Rename(tmp, path) == nil
 }
 
 func slicesFilter(list []*Task, keep func(*Task) bool) []*Task {

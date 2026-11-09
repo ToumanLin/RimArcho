@@ -46,6 +46,10 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.key(msg)
 		case tea.WindowSizeMsg:
 			m.w, m.h = msg.Width, msg.Height
+		case tea.MouseMsg: // the mouse does nothing during the run
+		default:
+			// Other work's results wait for the end of the run (onUninstall).
+			m.uninstallRun.held = append(m.uninstallRun.held, msg)
 		}
 		return m, nil
 	}

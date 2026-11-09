@@ -169,3 +169,13 @@ test("450 rows arrive in batches and unchanged polls create no DOM", async () =>
   assert.equal(h.screen.querySelectorAll('.data-row').length, 450, "a single poll applies the whole batch");
   assert.equal(h.screen.querySelectorAll('.tex-rows .tex-pending').length, 0);
 });
+
+test("reading the encoder again during a count keeps the count going", async () => {
+  const h = await setup();
+  await h.count();
+  // a conversion started elsewhere ends mid-count: the page reads the encoder and mods again
+  h.tex.event({ done: true, ok: true, text: "converted" }); await flush();
+  h.requests[0].resolve(result(1, false, "finished estimate")); await flush();
+  assert.ok(h.screen.textContent.includes("finished estimate"));
+  assert.ok(!h.screen.querySelectorAll("button").some((b) => b.textContent === "stop counting"), "the count ended");
+});

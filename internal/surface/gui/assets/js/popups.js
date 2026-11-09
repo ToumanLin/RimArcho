@@ -66,6 +66,9 @@ export function initPopups(u) { ui = u; }
 export function open(kind, title, build) {
   closeChoiceMenu();
   close();
+  // A popup that refuses to close (the first-run folder dialog while it works) stays: replacing
+  // it would skip its onclose and leave the window inert (ctrl+k reaches here over a dialog).
+  if (S.popup) return;
   const opener = document.activeElement;
   const box = $("#popup");
   box.classList.remove("command-dock");

@@ -148,7 +148,9 @@ func List(root string) (entries []Entry, realRoot string, err error) {
 		return nil, realRoot, err
 	}
 	for _, de := range des {
-		if strings.HasPrefix(strings.ToLower(de.Name()), ".archo-") {
+		// RimArcho's work folders: .archo-* and <name>.archo-tmp / .archo-old left by a
+		// copy or replace cut short.
+		if strings.Contains(strings.ToLower(de.Name()), ".archo-") {
 			continue
 		}
 		p := filepath.Join(root, de.Name())

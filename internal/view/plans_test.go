@@ -243,16 +243,28 @@ func TestHomePerPlan(t *testing.T) {
 	}
 
 	// The per-plan count plugs in through the hook.
-	defer func(f func(*appT, int64) (int, bool)) { view.PlanProblems = f }(view.PlanProblems)
-	view.PlanProblems = func(_ *appT, id int64) (int, bool) {
+	defer func(f func(*appT, int64) (int, bool, bool)) { view.PlanProblems = f }(view.PlanProblems)
+	def0 := def.ID
+	view.PlanProblems = func(_ *appT, id int64) (int, bool, bool) {
 		if id == beta.ID {
-			return 2, true
+			return 2, true, true // an old check's problems still show
 		}
-		return 0, true
+		return 0, true, id != def0
 	}
 	h = view.BuildHome(a, b, n, plans, packs)
 	if h.Rows[0].State != "2 problems break the game" || h.Rows[2].State != "ready to play" {
 		t.Fatalf("hooked %+v", h.Rows)
+	}
+	// A check older than the list never says "ready to play": not for another plan, nor
+	// for the current one.
+	if r := h.Rows[4]; r.State != "the files changed since the last check" || r.Level != "" {
+		t.Fatalf("stale other plan %+v", r)
+	}
+	n.Stale = true
+	n.Items = nil
+	h = view.BuildHome(a, b, n, plans, packs)
+	if r := h.Rows[3]; !r.Current || r.State != "the files changed since the last check" || r.Level != "" {
+		t.Fatalf("stale current plan %+v", r)
 	}
 }
 
