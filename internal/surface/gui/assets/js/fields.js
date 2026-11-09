@@ -119,7 +119,8 @@ export function pathContent(node, text, paths = []) {
 }
 
 // fieldList draws fields; acts.tags runs the tag bar, acts.folder opens the location,
-// acts.tagOrder(list) saves the tags' order after a drag (16 §2.9).
+// acts.tagOrder(list) saves the tags' order after a drag, acts.openTag(tag) shows a tag in
+// the Tag manager (16 §2.9).
 export function fieldList(fields, acts = {}) {
   const box = el("div", "fields");
   for (const f of fields || []) {
@@ -136,7 +137,7 @@ export function fieldList(fields, acts = {}) {
       }
     } else if (f.kind === "tags") {
       if (!f.list || !f.list.length) v.append(el("span", "dim", T("none")));
-      else if (acts.tagOrder && f.list.length > 1) v.append(tagOrderChips(f.list, acts.tagOrder));
+      else if (acts.tagOrder && f.list.length > 1 || acts.openTag) v.append(tagOrderChips(f.list, acts.tagOrder || (() => {}), "chip", acts.openTag || null));
       else for (const t of f.list) v.append(el("span", "chip", t));
     } else {
       const t = el("span", "", f.value || "—");

@@ -465,7 +465,7 @@ function groupEl(x, k) {
   return r;
 }
 
-// libMark: a row's tag colour band (16 §2.9): a Mod's first coloured tag; a tag's header
+// libMark: a row's tag colour band (16 §2.9): a Mod's first tag's colour; a tag's header
 // row shows its own colour, so the band runs on into its Mods of that colour.
 function libMark(x) {
   if (!x) return null;
@@ -735,6 +735,7 @@ async function drawDetail() {
       fieldActs: () => ({
         folder: () => run("folder", [findCopy(i.ref) || i]), tags: () => run("tags", [findCopy(i.ref) || i]),
         tagOrder: (list) => api.SetTagOrder(i.id, list).then((t) => { say("ok", t); return load(); }, (e) => say("fail", errText(e))),
+        openTag: (t) => openTag(t),
       }),
       run: (c, r) => run(c, [findCopy(r.ref) || r]),
       noteSaved: () => load(),
@@ -808,7 +809,25 @@ const tagCtx = {
   redraw: () => drawDetail(),
   leave: () => backToRows(),
   editing: () => { L.focus = "detail"; markFocus(); },
+  // a colour shows at once: the rows' bands, the headers and the panel
+  recolor: (tag, color) => {
+    const t = L.tags.find((x) => x.tag.toLowerCase() === tag.toLowerCase());
+    if (t) t.color = color;
+    fromTagList(L.tags);
+    els.rows.dataset.sig = "";
+    drawRows();
+    drawDetail();
+  },
 };
+
+// openTag: a tag clicked in a Mod's details: the Tags view, the cursor on the tag's header,
+// the details the Tag manager (16 §2.9).
+async function openTag(tag) {
+  const key = tag.toLowerCase();
+  await setView("tags");
+  goToGroup(key);
+  backToRows();
+}
 const cursorGroup = () => L.flat[L.cur]?.g;
 const startRename = () => tagStartRename(els.scroll, cursorGroup(), tagCtx);
 const editTagNote = () => tagEditNote(els.scroll, tagCtx);

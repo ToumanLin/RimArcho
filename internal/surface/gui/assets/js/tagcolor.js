@@ -1,5 +1,5 @@
 // Tag colours (16 §2.9 Tag manager): a tag's colour is a preset name or #rrggbb. A Mod is
-// marked with its first coloured tag's colour, a band in its row's left slot (.m); rows
+// marked with its first tag's colour (none when that tag has none), a band in its row's left slot (.m); rows
 // next to each other with the same colour join into one band.
 // The presets, as cmds.TagColorNames; red and amber mean problems and warnings.
 export const TAG_PRESETS = ["blue", "cyan", "teal", "grass", "orange", "pink", "plum", "violet"];
@@ -23,14 +23,11 @@ export function tagCSS(v) {
   return /^#[0-9a-f]{6}$/i.test(v || "") ? v : "";
 }
 
-// markOf is the mark of a Mod with these tags (in its order): its first coloured tag.
+// markOf is the mark of a Mod with these tags (in its order): its first tag's colour.
 export function markOf(tags) {
-  const m = tagColors();
-  for (const t of tags || []) {
-    const css = tagCSS(m[t.toLowerCase()]);
-    if (css) return { tag: t, color: css };
-  }
-  return null;
+  const t = (tags || [])[0];
+  const css = t ? tagCSS(tagColors()[t.toLowerCase()]) : "";
+  return css ? { tag: t, color: css } : null;
 }
 
 // paintMark fills a row's .m slot: the colour, and whether the band goes on from the row

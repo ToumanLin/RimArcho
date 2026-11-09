@@ -1488,12 +1488,26 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .tag-detail .lib-acts { margin: 12px 0 4px; }
 .tag-detail .tm-hint { margin: 8px 0; color: var(--muted); }
 .tag-detail .sub .cnt { margin-left: 8px; color: var(--faint); font-weight: 400; letter-spacing: 0; }
+/* all tags: the sort on the heading's right (Mod count | A–Z, and the direction) */
+.tag-detail .tm-allhead { display: flex; align-items: center; }
+.tm-sort { display: flex; align-items: center; gap: 2px; margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 400; }
+.tm-sort button { height: 20px; padding: 0 6px; border-radius: var(--r-sm); color: var(--muted); font-size: 12px; }
+.tm-sort button:hover { background: var(--pill); color: var(--fg-2); }
+.tm-sort .tm-sort-by.on { color: var(--accent-11, var(--accent)); background: var(--accent-soft); }
+.tm-sort .tm-sort-dir { display: flex; align-items: center; justify-content: center; width: 20px; padding: 0; }
+.tm-sort .tm-sort-dir svg.i { width: 12px; height: 12px; transition: transform var(--t-layout) var(--ease); }
+.tm-sort .tm-sort-dir.desc svg.i { transform: rotate(180deg); }
+:root[data-motion="reduced"] .tm-sort .tm-sort-dir svg.i { transition: none; }
+@media (prefers-reduced-motion: reduce) { .tm-sort .tm-sort-dir svg.i { transition: none; } }
+/* a tag in a Mod's details opens it in the Tag manager (a lone tag: nothing to drag) */
+.tag-order > .tag-drag.tag-open:not([draggable="true"]) { cursor: pointer; }
+.tag-order > .tag-drag.tag-open:hover { background: color-mix(in srgb, var(--fg) 10%, var(--pill)); }
 .tm-cloud { display: flex; flex-wrap: wrap; gap: 4px; }
 .tm-chip .tm-mark { align-self: center; width: 3px; height: 11px; border-radius: 999px; flex: none; }
 /* a tag's colour (16 §2.9): none, the presets, one of the player's own */
 .tm-colorbox { margin: 4px 0 2px; }
 .tm-colorbox .tm-hint { margin: 2px 0 0; }
-.tm-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.tm-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .tm-swatch { position: relative; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; background: var(--sw, transparent); cursor: pointer; flex: none; }
 .tm-swatch.none { box-shadow: inset 0 0 0 var(--hairline) var(--muted); }
 .tm-swatch.none::after { content: ""; position: absolute; left: 50%; top: 2px; bottom: 2px; width: var(--hairline); background: var(--muted); transform: rotate(45deg); }
@@ -2384,7 +2398,7 @@ select.ms-choice { padding: 1px 4px; margin-left: -4px; border-radius: var(--r-s
 .editor-copy-head {position:absolute;top:0;left:15px;right:8px;height:28px;display:flex;align-items:center;overflow:hidden;text-overflow:ellipsis;font-weight:500;}
 /* a Mod's copies in Not enabled: its colour band stands at the row's left edge and starts
    at the Mod's name line, running down through every copy (16 §2.9) */
-.row.copy-item .m {margin-left:-16px;margin-right:16px;}
+.row.copy-item .m {margin-left:-16px;margin-right:0;}
 .row.copy-group-start .m.on {margin-top:-23px;}
 .row.copy-item {padding-left:22px;color:var(--fg-2);font-size:12px;}
 .row.copy-item .k {display:none;}

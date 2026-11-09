@@ -1120,7 +1120,7 @@ func (s *API) SetTagNote(tag, note string) (string, error) {
 }
 
 // SetTagColor sets (or with "" clears) a tag's colour: a preset name or #rrggbb. It marks
-// the Mods whose first coloured tag it is (16 §2.9 Tag manager).
+// the Mods whose first tag it is (16 §2.9 Tag manager).
 func (s *API) SetTagColor(tag, color string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -1131,7 +1131,7 @@ func (s *API) SetTagColor(tag, color string) (string, error) {
 	return s.tagDone(view.Tf("colour of %s: %s", t, view.T(c)), err)
 }
 
-// SetTagOrder puts a Mod's tags (all its copies') in this order; its first coloured tag
+// SetTagOrder puts a Mod's tags (all its copies') in this order; its first tag
 // marks it in the lists.
 func (s *API) SetTagOrder(id string, tags []string) (string, error) {
 	s.mu.Lock()

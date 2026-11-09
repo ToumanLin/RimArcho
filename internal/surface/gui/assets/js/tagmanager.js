@@ -1,6 +1,6 @@
 // The Tag manager (16 §2.9): a tag's details, shown where a copy's would be when the cursor
 // is on a tag's header row: Mod library's Tags view, and the editor's Disabled column grouped
-// by tag (16 §2.5). Its note, name, how many Mods have it, its colour, similar tags, its
+// by tag (16 §2.5). Its note, name, how many Mods have it, its colour, its
 // actions (rename, merge into, delete), then every tag to go to. Tag changes are player
 // data, outside the list's undo (16 §3.8), so merge and delete confirm first.
 //
@@ -13,7 +13,10 @@
 //   redraw()    draws the panel again (the picked tags changed)
 //   leave()     gives the keyboard back to the rows
 //   editing()   a field in the panel takes the keyboard (rename)
+//   recolor(tag, colour)  shows a tag's new colour at once (rows, headers, the panel); Go
+//               saves it meanwhile, and a failure reads the page again
 import { el, api, T, Tf, errText, say, keyCaps } from "./state.js";
+import { icon } from "./icons.js";
 import { noteEl } from "./detail.js";
 import * as pop from "./popups.js";
 import { tagCSS, TAG_PRESETS } from "./tagcolor.js";
@@ -31,7 +34,7 @@ export function tagPanel(g, ctx) {
 
 // tagInfo: group g's row of API.TagList (a tag no Mod list has read yet: its name alone).
 export function tagInfo(g) {
-  return g && !g.none ? g.info || { tag: g.tag, n: g.rows.length, note: "", pinned: false } : null;
+  return g && !g.none ? g.info || { tag: g.tag, n: g.rows ? g.rows.length : 0, note: "", pinned: false } : null;
 }
 
 // act runs a tag change, says how it went and reads the page again.
@@ -60,22 +63,9 @@ function tagHead(d, g, info, ctx) {
   row.append(h, pin);
   const facts = el("div", "facts");
   facts.append(el("span", "", Tf("%d mods", info.n)));
-  if (info.n !== g.rows.length) facts.append(el("span", "", Tf("%d shown", g.rows.length)));
+  if (g.rows && info.n !== g.rows.length) facts.append(el("span", "", Tf("%d shown", g.rows.length)));
   if (info.pinned) facts.append(el("span", "", T("on top")));
   d.append(row, facts, colorField(info, g, ctx));
-  // similar tags, drawn as fields.js draws a copy's field: a label, the value, its action
-  const like = similarTags(info.tag, ctx.tags());
-  if (like.length) {
-    const r = el("div", "frow");
-    const v = el("span", "v");
-    v.append(...like.map((t) => el("span", "chip", t)));
-    const b = el("button", "fact", T("merge in"));
-    b.onclick = () => confirmMerge(like, info.tag, ctx);
-    r.append(el("span", "k", T("similar")), v, b);
-    const fields = el("div", "fields");
-    fields.append(r);
-    d.append(fields);
-  }
   const acts = el("div", "lib-acts");
   const btn = (label, key, run, cls = "") => {
     const b = el("button", "btn" + cls, label);
@@ -90,13 +80,18 @@ function tagHead(d, g, info, ctx) {
 }
 
 // colorField: the tag's colour: none, the presets, or a colour of the player's own from the
-// colour wheel. It marks the Mods whose first coloured tag this is.
+// colour wheel. It marks the Mods whose first tag this is.
 function colorField(info, g, ctx) {
   const fields = el("div", "fields");
   const r = el("div", "frow tag-color");
   const v = el("span", "v tm-swatches");
   const cur = info.color || "";
-  const set = (c) => act(ctx, api.SetTagColor(info.tag, c), g.key);
+  // at once here; Go saves it meanwhile (reading the whole page again took a beat per click)
+  const set = (c) => {
+    if (c === cur) return;
+    ctx.recolor(info.tag, c);
+    api.SetTagColor(info.tag, c).then((t) => say("ok", t), (e) => { say("fail", errText(e)); ctx.done(g.key); });
+  };
   const sw = (value, label, css, cls = "") => {
     const b = el("button", "tm-swatch" + cls + (value === cur || (value === "#" && cur.startsWith("#")) ? " on" : ""));
     b.type = "button";
@@ -113,7 +108,7 @@ function colorField(info, g, ctx) {
   own.onclick = () => pickOwnColor(own, cur, set);
   r.append(el("span", "k", T("colour")), v);
   fields.append(r);
-  const hint = el("div", "tm-hint", T("marks the rows of Mods whose first coloured tag this is; drag a Mod's tags in its details to change which"));
+  const hint = el("div", "tm-hint", T("a Mod's row colour comes from its first tag; drag its tags in its details to reorder them"));
   const box = el("div", "tm-colorbox");
   box.append(fields, hint);
   return box;
@@ -138,11 +133,11 @@ async function pickOwnColor(anchor, cur, set) {
 // named after them.
 function allTags(d, curKey, ctx) {
   const all = ctx.tags(), picked = ctx.picked;
-  const used = all.filter((t) => t.n), idle = all.filter((t) => !t.n);
+  const used = sortTags(all.filter((t) => t.n)), idle = all.filter((t) => !t.n);
   if (!used.length && !idle.length) return;
   for (const k of picked) if (!used.some((t) => t.tag.toLowerCase() === k)) picked.delete(k);
-  const sub = el("div", "sub", T("all tags"));
-  sub.append(el("span", "cnt", String(used.length)));
+  const sub = el("div", "sub tm-allhead", T("all tags"));
+  sub.append(el("span", "cnt", String(used.length)), sortControl(ctx));
   const cloud = el("div", "tm-cloud");
   for (const t of used) {
     const k = t.tag.toLowerCase();
@@ -176,18 +171,42 @@ function allTags(d, curKey, ctx) {
   if (idle.length) d.append(el("p", "tm-idle", Tf("on top, but no mod has them: %s", idle.map((t) => t.tag).join(", "))));
 }
 
-// similarTags: tags spelled almost the same (case, spaces, dashes, a plural s), or one a
-// longer form of the other: candidates for a merge.
-export function similarTags(tag, all) {
-  const norm = (s) => s.toLowerCase().replace(/[\s_\-./]+/g, "").replace(/s$/, "");
-  const n = norm(tag);
-  return all.filter((t) => {
-    if (!t.n || t.tag.toLowerCase() === tag.toLowerCase()) return false;
-    const m = norm(t.tag);
-    if (m === n) return true;
-    const [a, b] = m.length < n.length ? [m, n] : [n, m];
-    return a.length >= 4 && b.startsWith(a);
-  }).map((t) => t.tag);
+// The all tags chips' order: by how many Mods have them, or by name; either way round. Kept
+// per viewer in the browser.
+const SORT_KEY = "archo.tags.sort";
+let sort = { by: "mods", desc: true };
+try { const v = JSON.parse(localStorage.getItem(SORT_KEY) || "null"); if (v && (v.by === "mods" || v.by === "name")) sort = { by: v.by, desc: !!v.desc }; } catch { /* the default */ }
+const byName = (a, b) => a.tag.localeCompare(b.tag, undefined, { sensitivity: "base", numeric: true });
+function sortTags(list) {
+  const d = sort.desc ? -1 : 1;
+  // the same count: by name, A first, either way round
+  return [...list].sort(sort.by === "mods" ? (x, y) => d * (x.n - y.n) || byName(x, y) : (x, y) => d * byName(x, y));
+}
+// sortControl: Mod count | A–Z, and the direction, on the right of the all tags heading.
+function sortControl(ctx) {
+  const box = el("span", "tm-sort");
+  const set = (next) => {
+    sort = next;
+    try { localStorage.setItem(SORT_KEY, JSON.stringify(sort)); } catch { /* not kept */ }
+    ctx.redraw();
+  };
+  for (const [by, label] of [["mods", T("Mod count")], ["name", T("A–Z")]]) {
+    const b = el("button", "tm-sort-by" + (sort.by === by ? " on" : ""), label);
+    b.type = "button";
+    b.setAttribute("aria-pressed", String(sort.by === by));
+    // each starts the natural way round: most Mods first, A first
+    b.onclick = () => { if (sort.by !== by) set({ by, desc: by === "mods" }); };
+    box.append(b);
+  }
+  const dir = el("button", "tm-sort-dir" + (sort.desc ? " desc" : ""));
+  dir.type = "button";
+  dir.innerHTML = icon.up;
+  const label = sort.desc ? T("descending") : T("ascending");
+  dir.title = label;
+  dir.setAttribute("aria-label", label);
+  dir.onclick = () => set({ ...sort, desc: !sort.desc });
+  box.append(dir);
+  return box;
 }
 
 // startRename turns the tag's name in box into a field: enter renames, esc (or leaving it)

@@ -31,7 +31,7 @@ import { updateFromForm } from "./subscribe.js";
 import { initExchange, exchange, key as importKey, hintList as importHints } from "./exchange.js";
 import { icon } from "./icons.js";
 import * as motion from "./motion.js";
-import { setTagColors } from "./tagcolor.js";
+import { setTagColors, tagColors } from "./tagcolor.js";
 import * as ops from "./ops.js";
 import * as uninst from "./uninstall.js";
 import * as packsPage from "./packs.js";
@@ -117,6 +117,12 @@ let detailKey = "";
 // detailTarget: the row the details follow (the focused list's cursor, else the last list's).
 function detailTarget() {
   const k = Math.min(S.focus, 2) === S.focus ? S.focus : lastList;
+  // a tag clicked in a Mod's details: that tag, until the cursor moves (16 §2.9)
+  if (pinned && pinned.sig === pinSig(k)) {
+    const g = (col(0).groups || []).find((x) => x.key === pinned.key) || { key: pinned.key, tag: pinned.tag, rows: null };
+    return { group: g, k, id: "tags:" + g.key + "|pinned|" + S.board.stamp };
+  }
+  pinned = null;
   // a tag group's header in Disabled: its tag in the Tag manager (16 §2.5)
   const g = k === 0 ? headOf(col(0), col(0).view[col(0).cursor]) : null;
   if (g) return { group: g, k, id: "tags:" + g.key + "|" + g.rows.length + "|" + S.board.stamp };
@@ -144,12 +150,24 @@ function showTagPanel(g) {
   const info = !g.none && G.tags.find((t) => t.tag.toLowerCase() === g.key);
   showPanel(ref, tagPanel(info ? { ...g, info } : g, tagCtx));
 }
+// pinned: the tag a click in a Mod's details opened ({key, tag, sig}); it stays while the
+// list the details follow keeps its cursor (pinSig)
+let pinned = null;
+const pinSig = (k) => k + "|" + curKey(k);
+async function openTag(tag) {
+  await refreshOrder(true);
+  const info = G.tags.find((t) => t.tag.toLowerCase() === tag.toLowerCase());
+  const k = Math.min(S.focus, 2) === S.focus ? S.focus : lastList;
+  pinned = { key: tag.toLowerCase(), tag: info ? info.tag : tag, sig: pinSig(k) };
+  detailFollow(true);
+}
 const tagPicked = new Set();
 const tagCtx = {
   tags: () => G.tags,
   picked: tagPicked,
   // a tag change: the lists, the groups and the panel again, the cursor on key's header
   done: async (key) => {
+    if (pinned) { if (key == null) pinned = null; else pinned.key = key; }
     await reload();
     await refreshOrder(true);
     regroup(key != null ? "\u0000" + key : undefined);
@@ -159,8 +177,9 @@ const tagCtx = {
     detailFollow(true);
   },
   goTo: (key) => {
-    const c = col(0), at = c.view.findIndex((vi) => headOf(c, vi)?.key === key);
-    if (at < 0) return;
+    const c = col(0), at = pinned ? -1 : c.view.findIndex((vi) => headOf(c, vi)?.key === key);
+    // shown from a Mod's details, or a tag with no header in Disabled: shown in its place
+    if (at < 0) return openTag(G.tags.find((t) => t.tag.toLowerCase() === key)?.tag || key);
     c.cursor = at;
     ensureVisible(0);
     renderRows(0);
@@ -169,8 +188,20 @@ const tagCtx = {
     detailFollow();
   },
   redraw: () => detailFollow(true),
-  leave: () => focusArea(0),
+  // back to the list the details follow (a pinned tag stays)
+  leave: () => focusArea(Math.min(S.focus, 2) === S.focus ? S.focus : lastList),
   editing: () => {},
+  // a colour shows at once: the rows' bands, the headers and the panel
+  recolor: (tag, color) => {
+    const k = tag.toLowerCase(), map = { ...tagColors() };
+    if (color) map[k] = color; else delete map[k];
+    setTagColors(map);
+    if (S.board) S.board.tagColors = map;
+    const t = G.tags.find((x) => x.tag.toLowerCase() === k);
+    if (t) t.color = color;
+    renderLists();
+    detailFollow(true);
+  },
 };
 const tagBox = () => $("#detail");
 
@@ -1432,6 +1463,7 @@ async function start() {
   // a Mod's tags were reordered in its details: the rows' colour marks follow (16 §2.9)
   document.addEventListener("tags-changed", () => reload());
   document.addEventListener("filter-tag", (e) => S.bar.set("tags:" + e.detail, 1));
+  document.addEventListener("open-tag", (e) => openTag(e.detail));
   document.addEventListener("editor-use-copy", async (e) => {
     if(environmentReason())return say("busy",environmentReason());
     const id = e.detail;
