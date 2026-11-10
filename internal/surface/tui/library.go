@@ -490,7 +490,7 @@ func (m *model) libraryKey(s string) tea.Cmd {
 		}
 	}
 	n := len(l.flat)
-	page := max(m.h-8-l.bar.lineCount(), 1)
+	page := max(m.h-bodyTop-6-l.bar.lineCount(), 1)
 	if l.full || l.detail {
 		switch s {
 		case "down", "j":
@@ -754,9 +754,9 @@ func (m *model) libraryLines(n int) []string {
 		count += "  " + Tf("selected %d", k)
 	}
 	top := len(out)
-	table := []string{sDimS.Render(fit("2 "+count+"  "+p.Size, tw))}
+	table := []string{areaHead("2", count, "  "+p.Size, !l.detail && !l.full && !l.bar.typing && !l.bar.open, tw)}
 	rows := max(n-top-1, 1)
-	l.rowY = 2 + top + 1 // screen row of the first table row (0-based)
+	l.rowY = bodyTop + top + 1 // screen row of the first table row (0-based)
 	if len(l.flat) == 0 {
 		table = append(table, sSecond.Render(fit(T("no mod matches"), tw)))
 	}
@@ -843,15 +843,11 @@ func (m *model) libRowLine(i, w, right int) string {
 func (m *model) libDetailLines(w, n int) []string {
 	l := &m.libr
 	i, name := m.cursorCopy()
-	st := sDimS
-	if l.detail || l.full {
-		st = sAccent
-	}
 	if i == nil {
-		return []string{st.Render(fit("3 "+T("details"), w))}
+		return []string{areaHead("3", T("details"), "", l.detail || l.full, w)}
 	}
 	var body []string
-	body = append(body, sBold.Render(fit(name, w)), sSecond.Render(fit(i.Label, w)), "")
+	body = append(body, "  "+sBold.Render(fit(name, w-2)), "  "+sSecond.Render(fit(i.Label, w-2)), "")
 	note, ns := i.Note, sText
 	if note == "" {
 		note, ns = i.Auto, sDimS
@@ -863,16 +859,14 @@ func (m *model) libDetailLines(w, n int) []string {
 		body = append(body, "  "+ns.Render(ln))
 	}
 	body = append(body, "")
-	var acts []string
+	var acts [][2]string
 	for _, o := range view.OpTable() {
 		if slices.Contains(i.Ops, o.Code) && o.Key != "" {
-			acts = append(acts, o.Key+" "+o.Label)
+			acts = append(acts, [2]string{o.Key, o.Label})
 		}
 	}
-	acts = append(acts, "F10 "+T("menu"))
-	for _, ln := range wrap(strings.Join(acts, "  "), w-2) {
-		body = append(body, "  "+sSecond.Render(ln))
-	}
+	acts = append(acts, [2]string{"F10", T("menu")})
+	body = append(body, keyLines(acts, w-2)...)
 	if len(i.States) > 0 {
 		body = append(body, "")
 		for _, s := range i.States {
@@ -889,11 +883,11 @@ func (m *model) libDetailLines(w, n int) []string {
 	}
 	off := max(0, min(l.detailOff, len(body)-(n-1)))
 	l.detailOff = off
-	title := "3 " + T("details")
+	head := T("details")
 	if off > 0 {
-		title = "▲ " + name
+		head = "▲ " + name
 	}
-	out := []string{st.Render(fit(title, w))}
+	out := []string{areaHead("3", head, "", l.detail || l.full, w)}
 	for k := off; k < len(body) && len(out) < n; k++ {
 		out = append(out, body[k])
 	}

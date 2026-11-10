@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -148,10 +150,16 @@ func (m *model) homeLines(n int) []string {
 		add("  " + sDimS.Render(T("no game")))
 		return out
 	}
-	add("")
 	add("  " + sBold.Render(r.Name))
 	add("")
-	label := func(s string) string { return sDimS.Render(fit(T(s), 8)) + "  " }
+	// labels in one column as wide as the longest, and everything below them on the value
+	// column (16 §7 grid)
+	lw := 0
+	for _, s := range []string{"game", "list", "last game"} {
+		lw = max(lw, width.StringWidth(T(s)))
+	}
+	label := func(s string) string { return sDimS.Render(fit(T(s), lw)) + "  " }
+	indent := strings.Repeat(" ", lw+2)
 	ver := sText.Render(r.EnvName) // the full version: the chip's short one says less
 	if r.GameVersion != "" {
 		ver += "  " + sDimS.Render(r.GameVersion)
@@ -170,9 +178,11 @@ func (m *model) homeLines(n int) []string {
 		add("  " + label("last game") + sText.Render(d.LastRun) + "  " + sText.Render(errs))
 	}
 	if l := h.data.Launch; l != nil && l.Text != "" {
-		add("  " + sWarnS.Render(Tf("watch for: %s", l.Text)) + "  " + sDimS.Render("shift+2"))
+		add("")
+		add("  " + indent + sWarnS.Render(ic.warn+" "+Tf("watch for: %s", l.Text)) + "   " + sBold.Render("@"))
 	}
 	add("")
+	// the launch action is the page's one solid block: a pill (16 §7 principle 4)
 	launchLabel, launchStyle := T("launch the game"), sAccent
 	if r.Memory != nil {
 		switch r.Memory.Assessment.RAMSeverity {
@@ -182,9 +192,9 @@ func (m *model) homeLines(n int) []string {
 			launchLabel, launchStyle = T("launch with limited RAM"), sWarnS
 		}
 	}
-	add("  " + launchStyle.Render(ic.play+" "+launchLabel) + "  " + sText.Render("L"))
+	add("  " + indent + launchStyle.Background(cPill).Bold(true).Render("  "+ic.play+" "+launchLabel+"   ") + sPill.Bold(true).Render("L") + sPill.Render("  "))
 	if r.Unsaved > 0 && m.launches == "" {
-		add("  " + sDimS.Render(Tf("save %d changes", r.Unsaved)) + "  " + sText.Render("w"))
+		add("  " + indent + sSecond.Render("  "+Tf("save %d changes", r.Unsaved)) + "  " + sBold.Render("w"))
 	}
 	return out
 }

@@ -14,23 +14,23 @@
 7. **Keep the interface still.** The TUI has no animations or spinners; the status line uses … for work in progress. GUI motion only explains what changed or where something went (§7.1). It is brief and is disabled under `prefers-reduced-motion`. The one exception is Archo's figure while the player waits (§7.1 "Archo figure"): it moves continuously on one canvas, only during a wait, and becomes a still under `prefers-reduced-motion`, without hardware WebGL2, or when the player chooses still or off.
 8. **Each TUI row occupies one line**, with no line spacing. Ellipsize overflow and state the hidden count, for example 12 more. Detail text wraps (§4.1).
 
-**The TUI dark palette** uses the following colors:
+**The TUI palettes** use the following colors; `ui.tui.theme` picks dark or light (§9.2):
 
-| Role | Value | Use |
-| --- | --- | --- |
-| Text | `#E6E6E6` | Names, values, keys |
-| Secondary | `#7C8290` | Explanations, hints, authors |
-| Faint | `#4A4F5A` | Numbers, subheadings, unfocused content |
-| Accent | `#A5B4FC` | Cursor, selected names, focused headings, prompt |
-| Pill | `#2C2E4A` | Current environment or focused filter |
-| Focused row | `#1A1C24` | Cursor in the focused area |
-| Selected row | `#232539` | The whole selected row, including wrapped continuation lines |
-| Selected cursor | `#303450` | The whole selected cursor row in the focused area, including continuation lines |
-| Success | `#7EE2A8` | ✓ result |
-| Warning | `#F2C46D` | Warning icons; magpie has no warning color, but Mod management must distinguish a failure from a possible problem |
-| Error | `#FF8A80` | Error icons and failed results |
+| Role | Dark | Light | Use |
+| --- | --- | --- | --- |
+| Text | `#E6E6E6` | `#1C1C21` | Names, values, keys |
+| Secondary | `#858B99` | `#5F5F68` | Explanations, hints, authors, area headings |
+| Faint | `#5C6270` | `#8E8E97` | Numbers, digits, unfocused content |
+| Accent | `#A5B4FC` | `#4F46E5` | Cursor, selected names, focused headings, prompt |
+| Pill | `#2C2E4A` | `#E4E3FB` | Current page on the navigation row, focused filter |
+| Focused row | `#1A1C24` | `#F0F0F4` | Cursor in the focused area; current subpage on the context row |
+| Selected row | `#232539` | `#ECEBFB` | The whole selected row, including wrapped continuation lines |
+| Selected cursor | `#303450` | `#DCDAF8` | The whole selected cursor row in the focused area, including continuation lines |
+| Success | `#7EE2A8` | `#188A50` | ✓ result |
+| Warning | `#F2C46D` | `#B45309` | Warning icons and counts; magpie has no warning color, but Mod management must distinguish a failure from a possible problem |
+| Error | `#FF8A80` | `#D64545` | Error icons and failed results |
 
-The TUI has only a dark palette and uses the terminal's background. ConPTY cannot reliably detect the terminal background, for the same reason as the color-detection limitation in §9.2, so the TUI does not automatically switch to a light theme.
+Both palettes draw text on the terminal's own background. Each role also names an xterm-256 and a 16-colour stand-in (`theme.go`), chosen by hand for terminals without 24-bit colour, such as a plain xterm on Linux: the nearest matches would put faint text on a same-grey selected cursor row in 256 colours, and turn the light pill magenta and warnings red in 16. In 16 colours selected and selected-cursor rows share one background; ▸ marks the cursor. Secondary and faint are lighter than in earlier versions so that they stay readable on common dark terminal backgrounds; area headings use bold secondary rather than faint.
 
 **Log colors** (§2.10) are an exception to gray text. Raw log rows use the game's log-window colors: Error red `#ff6666`, Warning yellow `#ffeb04`, and Message white. A Mod message's `<color>` is retained. The light theme adjusts contrast without changing the hue. Interface text and icons retain the palette above.
 

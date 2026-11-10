@@ -43,12 +43,12 @@ The editor has four focus areas: `1` Disabled, `2` Enabled, `3` Staging / histor
 
 - The focused heading uses the accent color, and its cursor row has a faint background across the full row (TUI `#1A1C24`). An unfocused cursor only changes the name to the text color, without a background or `▸`. When details have the focus, all lists look unfocused, so there is only one brightest place on the screen.
 - The details heading is `4 details`, changing to `▲ name` when scrolled. It uses the accent color when focused. Content begins on the next line, aligned with the first list row.
-- The position line appears at the top right in the TUI, and on the left of the status line in the GUI editor and full-screen details:
+- The position line appears on the left of the status line in the GUI editor and full-screen details, and in the TUI whenever the status line has no sentence; full-screen details and technical pages in the TUI show it on the context row instead (§9.6):
   - A list shows `Enabled  322 / 488  selected 3`. Positions use the visible row count after filtering; add filtered when a search is active. In Disabled's tags view (§2.5) positions count only rows, and on a group's header the line names the tag and how many rows the column shows: `Disabled  framework  5973`.
   - Details show `details  Combat Extended  description 40%`. Use the section heading above the current top line, such as summary, description, history, or technical, followed by the scroll progress.
   - Append an open layer, for example `Enabled  322 / 488 › tags`. Search adds `› search`, and a confirmation waiting for the second keypress adds `› confirm`.
   - Full details show `Enabled › Combat Extended (322 / 488) › Harmony`.
-  - On other pages, including full-screen details, technical pages, can it run and updates, the breadcrumbs serve as the position line.
+  - On other pages, including full-screen details, technical pages, can it run and updates, the breadcrumbs serve as the position line. The TUI writes them as `can it run  1 / 3` or `mod library › updates`; Launch has none.
 
 ### 3.3 Arrows
 

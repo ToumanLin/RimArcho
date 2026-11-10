@@ -470,26 +470,26 @@ func TestMouseClicks(t *testing.T) {
 		m.update(tea.MouseMsg{X: x, Y: y, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress, Shift: shift, Ctrl: ctrl})
 		m.View()
 	}
-	// Disabled rows start at y=4 (the filter bar is above the lists): Beta, N1 … N5, the CJK-named mod
-	click(xOf(cInactive), 4, false, false)
+	// Disabled rows start at y=5 (the filter bar is above the lists): Beta, N1 … N5, the CJK-named mod
+	click(xOf(cInactive), 5, false, false)
 	if m.focus != cInactive || m.current().name != "Beta" || len(m.marked) != 0 {
 		t.Fatalf("click: focus %d on %+v, selected %d", m.focus, m.current(), len(m.marked))
 	}
-	click(xOf(cInactive), 6, false, true) // ctrl: N2
-	click(xOf(cInactive), 8, false, true) // ctrl: N4
+	click(xOf(cInactive), 7, false, true) // ctrl: N2
+	click(xOf(cInactive), 9, false, true) // ctrl: N4
 	if len(m.marked) != 2 {
 		t.Fatalf("ctrl+click: %d selected", len(m.marked))
 	}
-	click(xOf(cInactive), 9, true, false) // shift: N4 … N5 added to the range from N4
+	click(xOf(cInactive), 10, true, false) // shift: N4 … N5 added to the range from N4
 	if names := pickedNames(m); names != "N2 N4 N5" {
 		t.Fatalf("shift+click: %q", names)
 	}
-	click(xOf(cInactive), 4, false, false) // a plain click in the same list keeps the selection
+	click(xOf(cInactive), 5, false, false) // a plain click in the same list keeps the selection
 	if names := pickedNames(m); names != "N2 N4 N5" || m.current().name != "Beta" {
 		t.Fatalf("plain click: %q on %s", names, m.current().name)
 	}
 	// A click in another list moves the focus there and drops the selection (16 §3.4).
-	click(xOf(cActive), 5, false, false)
+	click(xOf(cActive), 6, false, false)
 	if len(m.marked) != 0 || m.focus != cActive || m.current().name != "Alpha" {
 		t.Fatalf("click in Enabled: selected %d, %+v", len(m.marked), m.current())
 	}

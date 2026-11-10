@@ -67,6 +67,11 @@ type panel struct {
 	onEnter func(m *model) tea.Cmd
 	// keys: a text panel's own keys (Feedback's m / p / l, 16 §2.14); the panel stays open
 	keys map[string]func(m *model) tea.Cmd
+	// nav, navSub: the navigation entry (1–8) and sub-entry the panel stands for; 0 for none
+	nav    int
+	navSub string
+	// wrap: the text is prose and wraps to the width; command output does not (panelText)
+	wrap bool
 }
 
 // prompt is an input line: a name, a note, a rule (r), an import source. The command
@@ -185,6 +190,8 @@ type model struct {
 	detailOffID string // the mod it was scrolled for
 	lastLines   []dline
 
+	nav navState // the navigation row (16 §9.1)
+
 	scanning bool
 	quitting bool
 
@@ -231,6 +238,7 @@ func Run(o Options) error {
 	SetLang(o.App.Store.Meta("cfg:ui.lang"))
 	SetIcons(o.App.Store.Meta("cfg:ui.icons"))
 	SetColors()
+	SetTheme(o.App.Store.Meta("cfg:ui.tui.theme"))
 	opts := []tea.ProgramOption{tea.WithAltScreen()}
 	if o.App.Store.Meta("cfg:ui.mouse") != "off" {
 		opts = append(opts, tea.WithMouseCellMotion())

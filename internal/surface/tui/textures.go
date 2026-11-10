@@ -71,6 +71,7 @@ func (m *model) texturesPanel() tea.Cmd {
 	}
 	m.openPanel(T("texture optimisation"), T("loading…"))
 	panel := m.panel
+	panel.wrap, panel.nav = true, 7
 	if m.texturePanel != nil {
 		panel.lines = m.texturePanel.lines
 	}

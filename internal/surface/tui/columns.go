@@ -163,8 +163,8 @@ func (l layout) has(k colKind) bool {
 	return false
 }
 
-// rowsShown is the number of list rows: top bar, blank, titles … blank, status, hints.
-func (m *model) rowsShown() int { return max(m.h-6-m.barLines(), 1) }
+// rowsShown is the number of list rows: the top rows, the titles … blank, status, hints.
+func (m *model) rowsShown() int { return max(m.h-bodyTop-4-m.barLines(), 1) }
 
 // ---- building the rows ----
 
@@ -341,13 +341,21 @@ func (m *model) columnTitle(c *column, focused bool, w int) string {
 	if c.kind != cStaging && m.bar.active() {
 		t = fmt.Sprintf("%s %d / %d", c.kind.title(), len(c.view), len(c.items)) // the bar filters both lists (16 §2.5)
 	}
-	st := sDimS
+	// the heading in bold secondary, accent when focused; its count faint (16 §7)
+	st := sHead
 	if focused {
-		st = sAccent
+		st = sSel
 	}
-	num := fmt.Sprintf("%d ", int(c.kind)+1) // the area's number key (16 §3.2)
-	title := sDimS.Render(num) + st.Render(fit(t, min(width.StringWidth(t), w-2)))
-	used := 2 + min(width.StringWidth(t), w-2)
+	num := fmt.Sprintf("%d ", int(c.kind)+1) // the area's number key, in the cursor's slot (16 §3.2)
+	tt := width.Truncate(t, max(w-2, 0), "…")
+	name := c.kind.title()
+	title := sDimS.Render(num)
+	if strings.HasPrefix(tt, name) {
+		title += st.Render(name) + sDimS.Render(tt[len(name):])
+	} else {
+		title += st.Render(tt)
+	}
+	used := 2 + width.StringWidth(tt)
 	if c.filter != "" || (focused && m.editing) {
 		f := "  " + ic.search + " " + c.filter
 		// while typing: the grey completion tab takes (16 §3.7), else the cursor mark
@@ -393,8 +401,8 @@ func (m *model) tabStrip(w int) string {
 	return b.String() + strings.Repeat(" ", max(w-used, 0))
 }
 
-// drawRow: mark, position (enabled column), source icon, name, unsaved dot, status icon at
-// the right edge (16 §2.5). Exactly w cells.
+// drawRow: mark, position (enabled column), source icon, status icon, name, unsaved dot
+// (16 §2.5). Exactly w cells.
 func (m *model) drawRow(c *column, vi int, focused bool, w int) string {
 	return m.drawRowLines(c, vi, focused, w, false)[0]
 }
@@ -417,7 +425,8 @@ func (m *model) drawRowLines(c *column, vi int, focused bool, w int, wrapName bo
 	var b strings.Builder
 	b.WriteString(mark)
 	if c.kind == cActive {
-		p := fmt.Sprintf("%4d  ", it.pos)
+		// as wide as the longest number, so the ▸ sits next to it (16 §7 grid)
+		p := fmt.Sprintf("%*d ", max(2, len(itoa(len(c.items)))), it.pos)
 		b.WriteString(bg(sDimS).Render(p))
 		used += len(p)
 	}
@@ -425,11 +434,12 @@ func (m *model) drawRowLines(c *column, vi int, focused bool, w int, wrapName bo
 	if icon == "" {
 		icon = " "
 	}
-	b.WriteString(bg(sDimS).Render(icon) + pad(2))
-	used += 3
+	// source and status icons in fixed columns before the name, so every name starts in
+	// the same column and its status is beside it (16 §2.5, §7)
 	st := m.rowStatus(it)
-	statusW := 2 // a space and the icon
-	nameW := max(w-used-statusW, 1)
+	b.WriteString(bg(sDimS).Render(icon) + pad(1) + bg(statusStyle(st)).Render(statusGlyph(st)) + pad(1))
+	used += 4
+	nameW := max(w-used, 1)
 	name := it.name
 	if it.missing {
 		name += " " + T("(not installed)")
@@ -469,10 +479,9 @@ func (m *model) drawRowLines(c *column, vi int, focused bool, w int, wrapName bo
 	}
 	used += nw + width.StringWidth(dot)
 	// No tags after the name (16 §3.8): they are in the detail and in search.
-	b.WriteString(pad(w - used - statusW))
-	b.WriteString(pad(1) + bg(statusStyle(st)).Render(statusGlyph(st)))
+	b.WriteString(pad(w - used))
 	lines := []string{b.String()}
-	pre := w - nameW - statusW // the cells before the name
+	pre := w - nameW // the cells before the name
 	for i, l := range more {
 		lead := pad(pre)
 		d := ""

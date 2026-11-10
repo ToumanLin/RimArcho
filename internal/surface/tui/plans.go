@@ -17,6 +17,7 @@ import (
 func (m *model) planChanged(text string) tea.Cmd {
 	m.tab, m.full, m.insp = tabList, false, nil
 	m.clearSel()
+	m.navStale() // a list was made, renamed, removed or switched: the navigation lists them
 	m.reload()
 	for k := range m.cols {
 		m.cols[k].cursor, m.cols[k].off, m.cols[k].filter = 0, 0, ""
@@ -60,7 +61,7 @@ func (m *model) choosePlan() tea.Cmd {
 		m.say(sayFail, m.humanize(err.Error()))
 		return nil
 	}
-	p := &panel{title: T("lists")}
+	p := &panel{title: T("lists"), nav: 4, navSub: view.PagePlans}
 	runs := map[string]func(m *model) tea.Cmd{}
 	add := func(label string, run func(m *model) tea.Cmd) {
 		p.choices = append(p.choices, label)

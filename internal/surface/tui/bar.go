@@ -341,9 +341,11 @@ func (m *model) barView(w int) []string {
 		used += cells
 	}
 	if m.tab == tabLibrary {
-		add(sDimS.Render("1 "), 2) // Mod library's first area (16 §3.5)
+		add(sDimS.Render("1 "), 2) // Mod library's first area (16 §3.5), in the cursor's slot
+	} else {
+		add("  ", 2) // content starts at column 2 (16 §7)
 	}
-	add(sDimS.Render(ic.search+" "), 2)
+	add(sSecond.Render(ic.search+" "), 2)
 	switch {
 	case b.typing:
 		t := b.search

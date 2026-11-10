@@ -127,7 +127,7 @@ func refArgv(r string) []string {
 
 func (m *model) inspectKey(s string) tea.Cmd {
 	v := m.insp
-	page := max(m.h-4, 1)
+	page := max(m.h-bodyTop-2, 1)
 	move := func(d int) {
 		v.cursor = max(0, min(v.cursor+d, len(v.lines)-1))
 		if v.cursor < v.off {

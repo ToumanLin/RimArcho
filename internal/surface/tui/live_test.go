@@ -33,7 +33,7 @@ func TestLiveGame(t *testing.T) {
 	}
 	// the status line says so, the errors an amber number beside it; the top bar does not
 	line := ansi.Strip(m.statusLine())
-	if want := "● " + Tf("game running since %s", since) + " " + itoa(m.live.Errors); !strings.HasSuffix(strings.TrimRight(line, " "), want) {
+	if want := ic.unsaved + " " + Tf("game running since %s", since) + " " + itoa(m.live.Errors); !strings.HasSuffix(strings.TrimRight(line, " "), want) {
 		t.Fatalf("status line %q, want %q at its end", line, want)
 	}
 	if bar := ansi.Strip(m.topBar()); strings.Contains(bar, Tf("game running since %s", since)) || strings.Contains(bar, "RimArcho  RimArcho") {
@@ -179,17 +179,17 @@ func TestHistoryArea(t *testing.T) {
 	}
 }
 
-// 09 §1: while another environment's game runs, the top bar shows why launching is off
+// 09 §1: while another environment's game runs, the context row shows why launching is off
 // instead of the L key.
 func TestTopBarLaunchBlocked(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
 	m := direct(t, e, 160, 40)
-	if bar := ansi.Strip(m.topBar()); !strings.Contains(bar, "L "+T("launch")) {
+	if bar := ansi.Strip(m.contextRow()); !strings.Contains(bar, "L "+T("launch")) {
 		t.Fatalf("no launch key: %q", bar)
 	}
 	m.live = &view.Live{Blocked: Tf("a game is already running (%s)", "second")}
-	bar := ansi.Strip(m.topBar())
+	bar := ansi.Strip(m.contextRow())
 	if !strings.Contains(bar, Tf("a game is already running (%s)", "second")) || strings.Contains(bar, "L "+T("launch")) {
 		t.Fatalf("blocked top bar: %q", bar)
 	}
@@ -202,11 +202,11 @@ func TestStatusLineAfterGame(t *testing.T) {
 	e := testkit.New(t)
 	m := direct(t, e, 160, 40)
 	m.live = &view.Live{}
-	if line := strings.TrimSpace(ansi.Strip(m.statusLine())); line != "" {
-		t.Fatalf("idle status line %q", line)
+	if live, _ := m.liveStatus(); live != "" {
+		t.Fatalf("idle status line %q", ansi.Strip(m.statusLine()))
 	}
 	m.live = &view.Live{NewLog: T("analyse this run's log")}
-	if line := strings.TrimSpace(ansi.Strip(m.statusLine())); line != "● "+T("analyse this run's log")+"  shift+2" {
+	if line := strings.TrimSpace(ansi.Strip(m.statusLine())); !strings.HasSuffix(line, ic.unsaved+" "+T("analyse this run's log")+"  shift+2") {
 		t.Fatalf("new-log status line %q", line)
 	}
 	press(m, "@")
