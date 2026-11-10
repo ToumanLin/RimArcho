@@ -50,6 +50,9 @@ Goal: a static `archo` for `linux/amd64` (`CGO_ENABLED=0`) that is as safe on Li
 9. **CI — done.** `ubuntu-latest` checks the static `archo` build, gofmt, `go vet`, pinned staticcheck and `go test -count=1` on every package except `surface/gui`, `surface/upgradewin` and `spikes/...`. Windows checks are unchanged. WSL verification, portable fixtures and explicit Linux test exclusions are recorded in [the base validation report](2026-11-09_linux-base-validation.md); runtime safety remains unfinished.
 10. **Release — done.** The release script also builds a static Linux amd64 tarball and SHA-256, preserving executable permissions through Go archive/tar. Contract: 17 §5; local dry run and WSL extraction: [SteamCMD validation](2026-11-09_linux-steamcmd-validation.md).
 11. **Docs.** 17 §5 (what compiles and what is tested), 01 §1 (Linux CLI in 1.x), 03 §3 (Steam roots, Proton), 09 §2 (Proton launches through Steam), the user guide (Linux section), CHANGELOG, a release VM table for Linux.
+12. **Found in the TUI run under tmux (2026-11-09), still open:**
+    - todds: `textures.ToddsZipURL` (`internal/textures/todds.go:24`) is the Windows zip on every platform, so the texture page offers to install the Windows encoder on Linux. Use the Linux release asset, or say texture optimisation needs a Linux `todds`.
+    - Memory: `internal/machine/memory_other.go` and `internal/procmem/procmem_other.go` are stubs, so Can it run says "available now unavailable of unavailable". Read `/proc/meminfo` (`MemAvailable`, `MemTotal`) and the game's RSS from `/proc/<pid>/status`; VRAM can stay unknown, but the wording must read well when it is.
 
 ## 4. Phase 2: native GUI
 
