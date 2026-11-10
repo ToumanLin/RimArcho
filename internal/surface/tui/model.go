@@ -36,7 +36,13 @@ type Options struct {
 
 // ChildScan runs `<exe> scan --env <name>` as a separate process (app.ChildScan with the
 // data directory of the environment variable or the default).
-func ChildScan(envName string) (string, error) { return app.ChildScan(env.AppHome(), envName) }
+func ChildScan(envName string) (string, error) {
+	home, err := env.AppHome()
+	if err != nil {
+		return "", err
+	}
+	return app.ChildScan(home, envName)
+}
 
 // Screens. The main screen is the four columns; the others are opened from it and esc
 // returns (16 §2.2).

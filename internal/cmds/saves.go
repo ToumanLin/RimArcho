@@ -1198,6 +1198,9 @@ func savesBackup(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	what := render.Plural(len(r.Saves), "save") + ", " + render.Size(r.Bytes)
 	head := "backed up " + what
+	if r.Done && len(r.Saves) == 0 {
+		head = "backup failed, nothing copied"
+	}
 	if !r.Done {
 		head = "backup preview, nothing written: " + what
 	}
@@ -1220,6 +1223,9 @@ func savesTrash(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	what := render.Plural(len(r.Saves), "save") + ", " + render.Size(r.Bytes)
 	head := "moved to the recycle bin: " + what
+	if r.Done && len(r.Saves) == 0 {
+		head = "recycle failed, nothing moved"
+	}
 	if !r.Done {
 		head = "recycle preview, nothing moved: " + what
 	}

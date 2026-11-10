@@ -242,15 +242,22 @@ func statusCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	ps, err := c.App.Problems(false, nil)
 	c.App.LogCacheOnly = false
 	if err == nil && ps.State != nil {
+		previousRun := len(ps.Logs) > 0 && c.App.LiveLog(ps.State) != ""
 		line := severityCounts(ps.List) + " (archo problems)"
 		if ps.Analysis == nil || ps.Analysis.Run == nil {
 			line = severityCounts(ps.List) + " in declarations; Defs and Patches not analysed yet (archo problems)"
 		} else if !ps.Analysis.Fresh {
 			line = severityCounts(ps.List) + "; Def/Patch analysis stale (archo problems)"
 		}
+		if previousRun {
+			line += "; log findings are from a previous run (current run: archo log --follow)"
+		}
 		root.KV("problems", line)
 		for _, r := range ps.Logs {
 			text := logRunText(c, r)
+			if previousRun {
+				text = "previous run: " + text
+			}
 			switch {
 			case r.Pending:
 				text += ": not analysed yet, so its errors are not in the counts (archo problems)"

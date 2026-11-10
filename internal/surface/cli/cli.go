@@ -85,7 +85,14 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	}
 	// A database upgrade runs inside app.Open; show it (04 §4): RimArcho.exe has no console,
 	// so it gets a small window; the TUI's line follows ui.lang.
-	home := env.AppHome()
+	home, err := env.AppHome()
+	if err != nil {
+		fmt.Fprintln(stderr, "error:", err)
+		if buildinfo.GUI == "1" {
+			showOpenError("RimArcho", err.Error())
+		}
+		return cmds.ExitError
+	}
 	netcfg.Install() // proxy and GitHub mirror for every request of this process (17 §2.2)
 	tuiMode := buildinfo.GUI != "1" && (len(rest) == 0 || len(rest) == 1 && rest[0] == "tui")
 	up := &upgradeReport{window: buildinfo.GUI == "1", lang: buildinfo.GUI == "1" || tuiMode, dbPath: filepath.Join(home, "archo.db"), stderr: stderr}

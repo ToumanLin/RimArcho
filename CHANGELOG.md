@@ -4,6 +4,10 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 1.0.9 (unreleased)
 
+- Save recycling and backups report only files successfully moved or copied; total failures no longer print a success headline. Save renaming refuses another file's name regardless of case on every platform, while allowing the same save's case-only rename.
+- Linux: relative `XDG_DATA_HOME` values are ignored for the data directory; an unset or relative `HOME` without an absolute XDG value now gives a clear startup error.
+- Game log: audio and asset paths with spaces keep machine-independent problem references with either separator, including Linux logs read on Windows. Existing stable Windows keys are unchanged; the log attribution cache version is now 22, so stored reports are rebuilt when read.
+- CLI/MCP status labels findings and logs from a previous run while the game is running, and points to `archo log --follow` for the current run. `env detect` also lists additional games found in registered Steam libraries, including unmanaged Proton copies without a manifest; `env add --detected` keeps its first-match choice.
 - Linux: texture optimisation uses native todds from `PATH` or `textures.todds`; missing-tool guidance explains how to provide it, and no Windows encoder download is offered.
 - Linux: Can it run and CLI/MCP memory estimates read system RAM from `/proc`; unavailable RAM or VRAM is described clearly in English and Chinese. Process probes and game test reports now read resident and peak memory on Linux.
 

@@ -9,8 +9,79 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/render"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
+	"github.com/ToumanLin/RimArcho/internal/view"
 )
+
+func TestSaveFilesReportOnlySuccesses(t *testing.T) {
+	t.Parallel()
+	e := savesFixture(t)
+	first, _, err := e.App.FindSave("Tundra")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, _, err := e.App.FindSave("Tundra 2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rejected := errors.New("synthetic trash directory must have mode 0700")
+	e.App.TrashFunc = func(string) error { return rejected }
+	out, code := e.Run("saves", "trash", first.Ref, "--yes")
+	if code != 1 || !strings.HasPrefix(out, "recycle failed, nothing moved") || strings.Contains(out, "moved to the recycle bin:") || !strings.Contains(out, rejected.Error()) {
+		t.Fatalf("failed trash: exit %d\n%s", code, out)
+	}
+	if _, err := os.Stat(first.Path); err != nil {
+		t.Fatal("failure lost the source:", err)
+	}
+	e.App.TrashFunc = func(p string) error {
+		if p == first.Path {
+			return rejected
+		}
+		return os.Remove(p)
+	}
+	out, code = e.Run("saves", "trash", first.Ref, second.Ref, "--yes")
+	if code != 1 || !strings.HasPrefix(out, "moved to the recycle bin: 1 save, "+render.Size(second.Size)) || strings.Contains(out, "moved to the recycle bin: 2 saves") {
+		t.Fatalf("partial trash: exit %d\n%s", code, out)
+	}
+	if _, err := os.Stat(first.Path); err != nil {
+		t.Fatal("failure lost the source:", err)
+	}
+	if _, err := os.Stat(second.Path); !os.IsNotExist(err) {
+		t.Fatal("success left the source:", err)
+	}
+	// A disappeared source also makes a backup partial; its totals and GUI text
+	// describe the files actually copied, just as the recycle result does.
+	r, err := e.App.BackupSaves([]*app.Save{first, second}, true, "")
+	if err != nil || len(r.Saves) != 1 || r.Saves[0].Ref != first.Ref || r.Bytes != first.Size || len(r.Errs) != 1 {
+		t.Fatalf("partial backup: %+v %v", r, err)
+	}
+	if text := view.SaveFilesText(r, true); !strings.Contains(text, first.Name) || !strings.Contains(text, "1 failed:") {
+		t.Fatal(text)
+	}
+}
+
+func TestSaveRenameRefusesCaseVariant(t *testing.T) {
+	t.Parallel()
+	e := savesFixture(t)
+	s, _, err := e.App.FindSave("Tundra 2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := os.ReadFile(s.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.App.RenameSave(s, "TUNDRA"); err == nil || !strings.Contains(err.Error(), "already exists") {
+		t.Fatalf("case variant accepted: %v", err)
+	}
+	if after, err := os.ReadFile(s.Path); err != nil || string(after) != string(before) {
+		t.Fatalf("refusal changed the source: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(s.Path), "Tundra.rws")); err != nil {
+		t.Fatal("refusal lost the existing save:", err)
+	}
+}
 
 // A fix asked for by name that is done already is done, not an error; missing entries no
 // download installs (no Workshop ID, or the Workshop item installs another packageId) are

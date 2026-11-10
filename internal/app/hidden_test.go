@@ -1,6 +1,7 @@
 package app_test
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -91,6 +92,12 @@ func TestHiddenResidueTrash(t *testing.T) {
 	var trashed []string
 	e.App.TrashFunc = func(p string) error { trashed = append(trashed, p); return os.RemoveAll(p) }
 	ref := refOf(t, e, "Gone", "")
+	successfulTrash := e.App.TrashFunc
+	e.App.TrashFunc = func(string) error { return errors.New("synthetic unsafe trash directory") }
+	if out, code := e.Run("trash", ref); code == 0 || strings.Contains(out, "moved to the recycle bin") {
+		t.Fatalf("failed Mod trash reported success: exit %d\n%s", code, out)
+	}
+	e.App.TrashFunc = successfulTrash
 	out := e.MustRun("trash", ref, "--dry-run")
 	if !strings.Contains(out, "dry run") || len(trashed) != 0 {
 		t.Fatalf("dry run:\n%s", out)
