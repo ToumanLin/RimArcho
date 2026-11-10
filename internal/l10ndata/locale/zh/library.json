@@ -388,5 +388,6 @@
   "%s, tag %d of %d": "%s，第 %d 个标签，共 %d 个",
   "; its colour marks the Mod": "；它的颜色标记此 Mod",
   "colour of %s cleared": "已清除 %s 的颜色",
-  "colour of %s: %s": "%s 的颜色：%s"
+  "colour of %s: %s": "%s 的颜色：%s",
+  "Texture optimisation needs a Linux todds 0.4.1. Build it from https://github.com/todds-encoder/todds (tag 0.4.1), then put todds on PATH or set textures.todds to its absolute path.": "贴图优化需要 Linux 版 todds 0.4.1。请从 https://github.com/todds-encoder/todds（标签 0.4.1）的说明生成程序，然后将 todds 放到 PATH 中，或将 textures.todds 设置为它的绝对路径。"
 }

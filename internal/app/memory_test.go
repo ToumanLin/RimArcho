@@ -64,3 +64,11 @@ func TestMemoryCapacityHoldsUnity16VRAMInRAM(t *testing.T) {
 		t.Fatalf("24 GiB card holds the textures: %+v", c)
 	}
 }
+
+func TestMemoryAvailableUnknownIsNotZero(t *testing.T) {
+	m := machine.Memory{TotalRAM: 8 << 30, RAMAvailableUnknown: true, SampledAt: time.Unix(1, 0)}
+	c := AssessMemory(m, &LoadCost{LoadingRAMLow: 2 << 30, LoadingRAMHigh: 4 << 30})
+	if c.RAMSeverity != "unknown" || c.VRAMSeverity != "unknown" {
+		t.Fatalf("unknown memory warned: %+v", c)
+	}
+}

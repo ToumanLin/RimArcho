@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/ToumanLin/RimArcho/internal/deps"
+	"github.com/ToumanLin/RimArcho/internal/textures"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -43,7 +44,7 @@ func TestExternalToolsSettings(t *testing.T) {
 				if it.Edit != "path" || it.EditValue == nil || !it.File || view.SettingCommand(it.Argv) != nil {
 					t.Fatalf("path editor %+v", it)
 				}
-				if it.Value == "" || len(it.Actions) == 0 {
+				if it.Value == "" || (len(it.Actions) == 0 && !(name == deps.Todds && textures.ToddsZipURL == "")) {
 					t.Fatalf("tool status/actions %+v", it)
 				}
 				if name == deps.SteamCMD {

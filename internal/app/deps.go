@@ -94,7 +94,7 @@ func (a *App) CheckDepRemoval(name string) error {
 	if err := toolIdle(name, i.Dir); err != nil {
 		return err
 	}
-	if !i.Installable || !i.Own {
+	if !i.Own {
 		return fmt.Errorf("%s is not RimArcho's own copy; nothing removed", name)
 	}
 	// Recheck with filesystem metadata immediately before removal. This also rejects
@@ -163,6 +163,9 @@ func (a *App) OfferDep(name string) (*SteamCMDOffer, error) {
 		}
 		return offer, err
 	case deps.Todds:
+		if textures.ToddsZipURL == "" {
+			return nil, ErrNoTodds
+		}
 		offer := a.OfferTodds()
 		return &SteamCMDOffer{URL: offer.URL, Dir: dir, Bytes: offer.Bytes}, nil
 	default:

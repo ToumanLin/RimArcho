@@ -16,6 +16,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
+	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
 func TestRemoveSteamCMDProtectsContent(t *testing.T) {
@@ -93,7 +94,7 @@ func TestRemoveDepStaysInsideManagedDirectory(t *testing.T) {
 				t.Setenv(key, "")
 			}
 			i := e.App.Deps().Status(name)
-			exe := "todds.exe"
+			exe := textures.ToddsExecutable
 			e.WriteFile(filepath.Join(i.Dir, exe), "tool")
 			sibling := i.Dir + "-other"
 			e.WriteFile(filepath.Join(sibling, "keep.txt"), "keep")
@@ -197,12 +198,15 @@ func TestDepUnknownAndMissingRefusals(t *testing.T) {
 }
 
 func TestInstallDepToddsAndRemove(t *testing.T) {
+	if textures.ToddsZipURL == "" {
+		t.Skip("automatic installation is Windows-only")
+	}
 	t.Parallel()
 	e := testkit.New(t)
 	e.App.TextureEncoder = &texEnc{}
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
-	for _, name := range []string{"todds.exe", "LICENSE"} {
+	for _, name := range []string{textures.ToddsExecutable, "LICENSE"} {
 		w, err := zw.Create("release/" + name)
 		if err != nil {
 			t.Fatal(err)
@@ -216,7 +220,7 @@ func TestInstallDepToddsAndRemove(t *testing.T) {
 	e.App.ToddsZip = srv.URL
 	var done int64
 	p, err := e.App.InstallDep(deps.Todds, func(n, total int64) { done = n })
-	if err != nil || p != filepath.Join(e.App.ToddsDir(), "todds.exe") || done != int64(len(z)) {
+	if err != nil || p != filepath.Join(e.App.ToddsDir(), textures.ToddsExecutable) || done != int64(len(z)) {
 		t.Fatalf("install %s, progress %d: %v", p, done, err)
 	}
 	if i := e.App.Deps().Status(deps.Todds); !i.Own || !i.OK {

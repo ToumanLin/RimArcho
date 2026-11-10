@@ -352,12 +352,15 @@ func TestTexturesUninstall(t *testing.T) {
 
 // todds is downloaded from the release (a fake server here) into RimArcho's own folder.
 func TestInstallTodds(t *testing.T) {
+	if textures.ToddsZipURL == "" {
+		t.Skip("automatic installation is Windows-only")
+	}
 	t.Parallel()
 	e := setup(t, false)
 	e.App.TextureEncoder = &texEnc{}
 	var zb bytes.Buffer
 	zw := zip.NewWriter(&zb)
-	for _, n := range []string{"todds_Windows_0.4.1/todds.exe", "todds_Windows_0.4.1/LICENSE", "todds_Windows_0.4.1/README.md"} {
+	for _, n := range []string{"todds_0.4.1/" + textures.ToddsExecutable, "todds_Windows_0.4.1/LICENSE", "todds_Windows_0.4.1/README.md"} {
 		w, _ := zw.Create(n)
 		w.Write([]byte(n))
 	}
@@ -373,7 +376,7 @@ func TestInstallTodds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if exe != filepath.Join(e.App.ToddsDir(), "todds.exe") || e.App.ToddsPath() != exe || !exists(filepath.Join(e.App.ToddsDir(), "LICENSE.txt")) || exists(filepath.Join(e.App.ToddsDir(), "README.md")) {
+	if exe != filepath.Join(e.App.ToddsDir(), textures.ToddsExecutable) || e.App.ToddsPath() != exe || !exists(filepath.Join(e.App.ToddsDir(), "LICENSE.txt")) || exists(filepath.Join(e.App.ToddsDir(), "README.md")) {
 		t.Fatalf("installed %s; found %s", exe, e.App.ToddsPath())
 	}
 }

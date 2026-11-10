@@ -80,3 +80,30 @@ func TestMemoryToolRAMLevels(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestMemoryToolUnknownCapacity(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	e.AddEnv(false)
+	e.MustRun("scan")
+	hardware := machine.Memory{}
+	e.App.MemoryProbe = func() machine.Memory { return hardware }
+	cs := connect(t, e)
+	for _, partial := range []bool{false, true} {
+		if partial {
+			hardware = machine.Memory{TotalRAM: 8 << 30, RAMAvailableUnknown: true, SampledAt: time.Unix(1, 0)}
+		}
+		e.MustRun("plan", "cost")
+		cli := e.MustRun("plan", "cost")
+		got, bad := call(t, cs, "estimate_memory", nil)
+		if bad || got != cli {
+			t.Fatalf("CLI/MCP differ: %s\n%s", cli, got)
+		}
+		if !strings.Contains(got, "unknown [unknown]") || strings.Contains(got, "[severe]") || strings.Contains(got, "[warning]") {
+			t.Fatal(got)
+		}
+		if partial && !strings.Contains(got, "unknown / total 8.0 GB [unknown]") {
+			t.Fatal(got)
+		}
+	}
+}

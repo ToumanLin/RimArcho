@@ -108,7 +108,7 @@ func (f *Finder) Status(name string) Info {
 	}
 	switch name {
 	case Todds:
-		i.ConfigKey, i.Dir, i.Installable = "textures.todds", filepath.Join(f.LocalDir, Todds), true
+		i.ConfigKey, i.Dir, i.Installable = "textures.todds", filepath.Join(f.LocalDir, Todds), textures.ToddsZipURL != ""
 		if !selectPath(textures.FindTodds(setting(i.ConfigKey)), "config") &&
 			!selectPath(textures.FindTodds(i.Dir), "own") {
 			selectPath(path("todds"), "path")
@@ -141,6 +141,9 @@ func (f *Finder) Status(name string) Info {
 	}
 	if i.Path == "" {
 		i.Err = name + " is not installed"
+		if name == Todds && !i.Installable {
+			i.Err = textures.ToddsMissing
+		}
 		return i
 	}
 	i.Own = i.Source == "own" && owned(i.Dir, i.Path)

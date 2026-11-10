@@ -1,6 +1,7 @@
 package view_test
 
 import (
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -87,5 +88,38 @@ func TestRefreshMemoryPreservesSectionOrder(t *testing.T) {
 	}
 	if old.Items[0].Section != view.SectionRun {
 		t.Fatal("refresh mutated cached items")
+	}
+}
+
+func TestMemoryNeedUnknownWording(t *testing.T) {
+	t.Cleanup(func() { view.SetLang("en") })
+	for _, lang := range []string{"en", "zh"} {
+		view.SetLang(lang)
+		for _, hardware := range []machine.Memory{
+			{},
+			{TotalRAM: 8 << 30, RAMAvailableUnknown: true, SampledAt: time.Unix(1, 0)},
+			{TotalRAM: 8 << 30, AvailableRAM: 0, SampledAt: time.Unix(1, 0)},
+		} {
+			c := app.AssessMemory(hardware, nil)
+			n := view.MemoryNeed(c, 1)
+			if n.Counted || n.Status != view.StatusHint || c.RAMSeverity != "unknown" || c.VRAMSeverity != "unknown" {
+				t.Fatalf("unknown capacity warned: %+v", c)
+			}
+			if runtime.GOOS == "windows" {
+				if hardware.TotalRAM == 0 && !strings.Contains(n.Text, view.Tf("RAM: loading needs %s; available now %s of %s", view.T("not measured"), view.T("unavailable"), view.T("unavailable"))) {
+					t.Fatalf("Windows text changed: %s", n.Text)
+				}
+			} else {
+				if !strings.Contains(n.Text, view.Tf("VRAM: estimated %s; dedicated capacity is unknown", view.T("not measured"))) {
+					t.Fatal(n.Text)
+				}
+				if hardware.TotalRAM == 0 && !strings.Contains(n.Text, view.Tf("RAM: loading needs %s; available memory and total capacity are unavailable", view.T("not measured"))) {
+					t.Fatal(n.Text)
+				}
+				if hardware.RAMAvailableUnknown && !strings.Contains(n.Text, view.Tf("RAM: loading needs %s; available memory is unavailable; total capacity %s", view.T("not measured"), view.SizeText(hardware.TotalRAM))) {
+					t.Fatal(n.Text)
+				}
+			}
+		}
 	}
 }

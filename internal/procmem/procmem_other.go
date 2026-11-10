@@ -1,4 +1,4 @@
-//go:build !windows
+//go:build !windows && !linux
 
 // Package procmem reports the current process's memory use.
 package procmem

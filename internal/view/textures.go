@@ -130,6 +130,13 @@ func TexturePageInfo(a *app.App, scope string, scale int, tool *app.TextureTool,
 		if t != nil && t.Path != "" {
 			p.Tool = t.Err
 		}
+		if textures.ToddsZipURL == "" {
+			p.Tool = T(textures.ToddsMissing)
+			if t != nil && t.Path != "" {
+				p.Tool = t.Err + "\n" + p.Tool
+			}
+			return p
+		}
 		off := a.OfferTodds()
 		p.Offer = Tf("todds %s  %s  from %s (MPL-2.0)", off.Version, SizeText(off.Bytes), off.URL)
 		p.OfferTo = off.Dir

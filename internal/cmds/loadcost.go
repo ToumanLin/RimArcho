@@ -55,6 +55,9 @@ func planCost(c *Ctx, args *Args) (*render.Doc, error) {
 	ramAvailable, vramAvailable := "unknown", "unknown"
 	if hardware.TotalRAM > 0 {
 		ramAvailable = render.Size(capacity.RAMBudget) + " / total " + render.Size(hardware.TotalRAM)
+		if hardware.RAMAvailableUnknown {
+			ramAvailable = "unknown / total " + render.Size(hardware.TotalRAM)
+		}
 	}
 	if hardware.VRAM() > 0 {
 		vramAvailable = render.Size(hardware.VRAM())

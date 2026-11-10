@@ -30,9 +30,9 @@ import (
 // deletes those. Packs convert their own copies instead (pack.go) and drop the PNGs.
 
 // ErrNoTodds: the encoder is not on this computer.
-var ErrNoTodds = errors.New("todds (the DDS encoder) is not installed; archo textures tool --install downloads it")
+var ErrNoTodds = errors.New(textures.ToddsMissing)
 
-// ToddsDir is where RimArcho keeps the todds it downloads: %LOCALAPPDATA%\RimArcho\todds.
+// ToddsDir is where RimArcho keeps the todds it downloads: <LocalDir>/todds.
 func (a *App) ToddsDir() string { return filepath.Join(a.LocalDir(), "todds") }
 
 // ToddsPath finds todds: config textures.todds, RimArcho's own copy, then PATH ("" none).
@@ -94,11 +94,15 @@ func (a *App) toddsURL() string {
 // OfferTodds says where todds comes from and how big it is, so the player can be asked
 // first (02 §1: RimArcho only goes online when the player asks).
 func (a *App) OfferTodds() *ToddsOffer {
-	return &ToddsOffer{URL: a.toddsURL(), Dir: a.ToddsDir(), Bytes: textures.ToddsZipSize, Version: textures.ToddsVersion, Home: textures.ToddsHome}
+	url := a.toddsURL()
+	if textures.ToddsZipURL == "" {
+		url = ""
+	}
+	return &ToddsOffer{URL: url, Dir: a.ToddsDir(), Bytes: textures.ToddsZipSize, Version: textures.ToddsVersion, Home: textures.ToddsHome}
 }
 
 // InstallTodds downloads the todds release zip (its size must be the release's), unpacks
-// todds.exe and its licence into ToddsDir and checks that it runs and is the right version.
+// the native encoder and its licence into ToddsDir and checks that it runs and is the right version.
 // It runs only when the player said yes to OfferTodds.
 func (a *App) InstallTodds() (string, error) {
 	return a.InstallToddsProgress(nil)
@@ -106,6 +110,9 @@ func (a *App) InstallTodds() (string, error) {
 
 // InstallToddsProgress reports the download to the task record (16 §2.16).
 func (a *App) InstallToddsProgress(progress func(done, total int64)) (string, error) {
+	if textures.ToddsZipURL == "" {
+		return "", ErrNoTodds
+	}
 	unlock := accounts.Lock(a.ToddsDir())
 	defer unlock()
 	if err := toolIdle("todds", a.ToddsDir()); err != nil {
@@ -151,7 +158,7 @@ func (a *App) InstallToddsProgress(progress func(done, total int64)) (string, er
 		name := strings.ToLower(filepath.Base(filepath.FromSlash(f.Name)))
 		var to string
 		switch {
-		case name == "todds.exe" || name == "todds":
+		case name == textures.ToddsExecutable || (textures.ToddsExecutable == "todds.exe" && name == "todds"):
 			to = filepath.Join(dir, filepath.Base(f.Name))
 		case strings.HasPrefix(name, "license") || strings.HasPrefix(name, "copying"):
 			to = filepath.Join(dir, "LICENSE.txt")

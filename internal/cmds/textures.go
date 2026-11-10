@@ -44,8 +44,14 @@ func init() {
 			Flag{Name: "no-mipmaps", Help: "no mipmaps (not recommended: textures shimmer when zoomed out)"}, dry)})
 	register(&Command{Name: "textures clean", Args: "[<mod>...]", Summary: "delete the DDS RimArcho wrote (only those; the game goes back to the PNGs)", MaxArgs: -1, Run: texCleanCmd,
 		Flags: append(slices.Clone(scope), dry)})
-	register(&Command{Name: "textures tool", Summary: "the DDS encoder (todds): where it is, or --install to download it", MaxArgs: 0, Run: texToolCmd,
-		Flags: []Flag{{Name: "install", Help: "download todds " + textures.ToddsVersion + " from its GitHub release into RimArcho's own folder"}}})
+	toolSummary := "the DDS encoder (todds): where it is, or --install to download it"
+	installHelp := "download todds " + textures.ToddsVersion + " from its GitHub release into RimArcho's own folder"
+	if textures.ToddsZipURL == "" {
+		toolSummary = "locate the native DDS encoder (todds) on PATH or at textures.todds"
+		installHelp = "automatic installation is unavailable; provide a native todds via PATH or textures.todds"
+	}
+	register(&Command{Name: "textures tool", Summary: toolSummary, MaxArgs: 0, Run: texToolCmd,
+		Flags: []Flag{{Name: "install", Help: installHelp}}})
 }
 
 // textureOptions reads --scale (or --texture-scale) and --no-mipmaps.
@@ -293,6 +299,9 @@ func texCleanCmd(c *Ctx, a *Args) (*render.Doc, error) {
 
 func texToolCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if a.Bool("install") {
+		if textures.ToddsZipURL == "" {
+			return nil, app.ErrNoTodds
+		}
 		o := c.App.OfferTodds()
 		if Progress != nil {
 			Progress(fmt.Sprintf("progress: downloading todds %s (%s) from %s", o.Version, mb(o.Bytes), o.URL))
@@ -309,7 +318,7 @@ func texToolCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	t := c.App.TextureTool()
 	d, root := render.New("the DDS encoder")
 	texToolLine(root, t)
-	if t.Err != "" {
+	if t.Err != "" && textures.ToddsZipURL != "" {
 		o := c.App.OfferTodds()
 		root.KV("download", fmt.Sprintf("todds %s, %s, from %s into %s", o.Version, mb(o.Bytes), o.URL, o.Dir))
 		d.AddNext("archo textures tool --install")
