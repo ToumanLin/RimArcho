@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+
+	"github.com/ToumanLin/RimArcho/internal/env"
 )
 
 func prepareUnity(ctx context.Context, game, cache string, defs []expansion) ([]Item, error) {
 	stamp := Stamp(game)
-	root := filepath.Join(game, "RimWorldWin64_Data")
+	root := env.UnityDataDir(game)
 	u, err := openUnity(filepath.Join(root, "resources.assets"))
 	if err != nil {
 		return nil, err

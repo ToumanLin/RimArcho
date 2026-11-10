@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -112,12 +113,17 @@ func (a *App) OwnSavesRoot() string { return filepath.Join(a.Home, "userdata") }
 func (a *App) ownSaves(name string) string { return filepath.Join(a.OwnSavesRoot(), name) }
 
 // DefaultUserData is the game's default user data folder.
-func (a *App) DefaultUserData() string { return env.DefaultUserDataFor(a.Detect) }
+func (a *App) DefaultUserData(gameRoot ...string) string {
+	if len(gameRoot) > 0 {
+		return env.DefaultUserDataForGame(a.Detect, gameRoot[0])
+	}
+	return env.DefaultUserDataFor(a.Detect)
+}
 
 // Saves tells how an environment keeps its saves: shared, own or custom.
 func (a *App) Saves(e *env.Environment) string {
 	switch {
-	case e.UserDataRoot == "" || env.PathKey(e.UserDataRoot) == env.PathKey(a.DefaultUserData()):
+	case e.UserDataRoot == "" || env.PathKey(e.UserDataRoot) == env.PathKey(a.DefaultUserData(e.GameRoot)):
 		return SavesShared
 	case source.Within(e.UserDataRoot, a.OwnSavesRoot()):
 		return SavesOwn
@@ -142,7 +148,7 @@ func (a *App) userDataFor(name string, spec EnvSpec, adding bool) string {
 	case spec.Saves == SavesOwn:
 		return a.ownSaves(name)
 	case spec.Saves == SavesShared || adding:
-		return a.DefaultUserData()
+		return a.DefaultUserData(spec.GameRoot)
 	}
 	return ""
 }
@@ -198,6 +204,9 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 		return nil, nil, fmt.Errorf("environment %s already uses %s; one environment per game folder (several lists of one game are plans: archo plan new <name>)", o.Name, spec.GameRoot)
 	}
 	user := a.userDataFor(name, spec, true)
+	if spec.Saves == SavesOwn && (a.Detect.GOOS == "linux" || a.Detect.GOOS == "" && runtime.GOOS == "linux") && env.IsProtonGame(spec.GameRoot) {
+		return nil, nil, fmt.Errorf("Proton games do not support own saves yet; use --saves shared")
+	}
 	if err := a.checkRoots(spec.GameRoot, filepath.Join(spec.GameRoot, "Data"), filepath.Join(spec.GameRoot, "Mods")); err != nil {
 		return nil, nil, err
 	}
@@ -358,7 +367,12 @@ func (a *App) EnvSet(name string, spec EnvSpec) (*env.Environment, []SourceChang
 		e.GameRoot = spec.GameRoot
 		e.GameVersion = env.ReadGameVersion(spec.GameRoot)
 	}
-	if u := a.userDataFor(e.Name, spec, false); u != "" {
+	dataSpec := spec
+	dataSpec.GameRoot = e.GameRoot
+	if spec.Saves == SavesOwn && (a.Detect.GOOS == "linux" || a.Detect.GOOS == "" && runtime.GOOS == "linux") && env.IsProtonGame(e.GameRoot) {
+		return nil, nil, fmt.Errorf("Proton games do not support own saves yet; use --saves shared")
+	}
+	if u := a.userDataFor(e.Name, dataSpec, false); u != "" {
 		if err := a.checkUserData(u); err != nil {
 			return nil, nil, err
 		}

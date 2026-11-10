@@ -41,11 +41,7 @@ Goal: a static `archo` for `linux/amd64` (`CGO_ENABLED=0`) that is as safe on Li
    - Renaming a save to a name that differs only by case must not overwrite the other save (`saveactions.go`): on a case-sensitive file system they are two files.
    - `LocalDir` uses the XDG data directory, not `~/.cache` (it holds the lock library).
    - `source.Trash` (`trash_other.go`) works across volumes: freedesktop trash in `$XDG_DATA_HOME/Trash`, or `<mount>/.Trash-<uid>` for another volume.
-5. **Detection** (03 §3):
-   - Steam roots: `~/.steam/steam`, `~/.local/share/Steam`, Flatpak `~/.var/app/com.valvesoftware.Steam/.local/share/Steam`, Snap `~/snap/steam/common/.local/share/Steam`; then `libraryfolders.vdf` as on Windows.
-   - A game folder with `RimWorldWin64.exe` beside `steamapps/compatdata/294100` is a **Proton game**: user data in `compatdata/294100/pfx/drive_c/users/steamuser/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios`, Player.log in the same folder. It launches only through Steam (09 §2); own-saves mode is phase 2 (`-savedatafolder` needs a `Z:` path).
-   - Game layout: `RimWorldLinux_Data` beside `RimWorldWin64_Data` (Managed folder, menu backgrounds, `gametest` paths).
-   - `SteamSignedIn` reads `~/.steam/registry.vdf`.
+5. **Detection — done.** Steam roots, library discovery, per-game native / Proton / Flatpak user data and sign-in state: 03 §3.2. Steam-only Proton launch and save-redirection refusals: 09 §2. Native Managed assemblies, menu backgrounds and test-run executable paths are supported. Synthetic verification and the outstanding Linux VM checks are recorded in [the detection validation report](2026-11-09_linux-detect-validation.md).
 6. **SteamCMD.** Install `steamcmd_linux.tar.gz` (runs `linux32/steamcmd`, needs 32-bit libraries); prefer a `steamcmd` already on `PATH` (distribution packages exist). When it fails to start, say which package is missing (`lib32gcc-s1` on Debian/Ubuntu, `glibc.i686` on Fedora) **[I: names to confirm]**. Login works in the terminal that runs `archo`.
 7. **Update notice instead of self-update (D2).** Run the same check as `CheckSelfUpdate` (GitHub Releases); when a newer version exists, say so with the release link and how to update: through the package manager for a `.deb`, `.rpm` or AUR install, by downloading the new tarball otherwise. Nothing is downloaded or replaced.
 8. **Not in phase 1, with a clear message:** subscribing through the Steam client (phase 4: SteamCMD only); LoversLab login (manual zip, as decided).

@@ -12,7 +12,7 @@ import (
 )
 
 var envFlags = []Flag{
-	{Name: "game", Value: "<dir>", Help: "game install (contains RimWorldWin64.exe / RimWorld.exe)"},
+	{Name: "game", Value: "<dir>", Help: "game install directory"},
 	{Name: "saves", Value: "shared|own", Help: "shared: the game's default user data folder; own: a folder of its own (-savedatafolder)"},
 	{Name: "user-data", Value: "<dir>", Help: "a user data folder of your choice (contains Config/ModsConfig.xml)"},
 	{Name: "launch", Value: "direct|steam"},

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -61,20 +62,52 @@ func TestManagedExtraArgs(t *testing.T) {
 	}
 }
 
+func TestProtonRefusesIsolatedRun(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("Linux Proton launch guard")
+	}
+	o := testOptions(t, "idle", false)
+	base := t.TempDir()
+	o.GameRoot = filepath.Join(base, "steamapps", "common", "RimWorld")
+	o.DataDir, o.RunDir = filepath.Join(base, "data"), filepath.Join(base, "run")
+	writeTestFile(t, filepath.Join(o.GameRoot, "RimWorldWin64.exe"), "fake")
+	if err := os.MkdirAll(filepath.Join(base, "steamapps", "compatdata", "294100", "pfx"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	called := false
+	o.Start = func(*exec.Cmd) error { called = true; return nil }
+	if _, err := Run(context.Background(), o); err == nil || !strings.Contains(err.Error(), "Proton") || called {
+		t.Fatalf("Proton run: %v, started %v", err, called)
+	}
+	for _, dir := range []string{o.DataDir, o.RunDir} {
+		if _, err := os.Stat(dir); !os.IsNotExist(err) {
+			t.Fatalf("refused run created %s", dir)
+		}
+	}
+}
+
 func TestExecutable(t *testing.T) {
 	for _, tc := range []struct {
 		name, version, remove, want string
-		dll, waylith                bool
+		dll, waylith, native        bool
 	}{
 		{name: "unity", version: "1.6.4871 rev1261", want: "RimWorldWin64.exe"},
 		{name: "version", version: "1.7.4985 rev1269", want: "RimWorld.exe", waylith: true},
 		{name: "dll", want: "RimWorld.exe", dll: true, waylith: true},
 		{name: "unity fallback", remove: "RimWorldWin64.exe", want: "RimWorld.exe"},
 		{name: "waylith fallback", dll: true, remove: "RimWorld.exe", want: "RimWorldWin64.exe", waylith: true},
+		{name: "native unity", version: "1.6.4871 rev1261", want: "RimWorldLinux", native: true},
+		{name: "native waylith", version: "1.7.4985 rev1269", want: "RimWorldLinux", native: true, waylith: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			o := testOptions(t, "idle", tc.dll)
 			o.GameVersion = tc.version
+			if tc.native {
+				if runtime.GOOS != "linux" {
+					t.Skip("Linux executable selection")
+				}
+				writeTestFile(t, filepath.Join(o.GameRoot, "RimWorldLinux"), "fake")
+			}
 			if tc.remove != "" {
 				if err := os.Remove(filepath.Join(o.GameRoot, tc.remove)); err != nil {
 					t.Fatal(err)
