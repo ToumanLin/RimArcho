@@ -46,7 +46,7 @@ if (-not $SkipTests) {
 $name = "archo-$Version-$GOOS-$GOARCH"
 $OutputDir = [IO.Path]::GetFullPath($OutputDir)
 $out = Join-Path $OutputDir $name
-if (Test-Path $out) { throw "Release staging folder already exists: $out; choose an empty -OutputDir" }
+if (Test-Path $out) { Remove-Item -Recurse -Force $out }
 New-Item -ItemType Directory -Force $out | Out-Null
 
 $pkg = "github.com/ToumanLin/RimArcho/internal/buildinfo"

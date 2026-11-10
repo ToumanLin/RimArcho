@@ -26,14 +26,14 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/vdf"
 )
 
-// Downloading a game version with SteamCMD (01 Ã‚Â§3, 11 Ã‚Â§3). Anonymous by default; an
+// Downloading a game version with SteamCMD (01 §3, 11 §3). Anonymous by default; an
 // optional account name comes from settings or the download form. Passwords and Steam
 // Guard codes are entered only in SteamCMD's own console. Progress comes from its log.
 
 // SteamCMDURL is Valve's SteamCMD for Windows.
 const SteamCMDURL = "https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip"
 
-// SteamCMDLinuxURL is the Linux bootstrap documented by Valve (11 Ã‚Â§3).
+// SteamCMDLinuxURL is the Linux bootstrap documented by Valve (11 §3).
 const SteamCMDLinuxURL = "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz"
 
 // SteamCMDProc is a running SteamCMD.
@@ -103,7 +103,7 @@ func (a *App) InstallSteamCMD() (string, error) {
 	return a.InstallSteamCMDProgress(nil)
 }
 
-// InstallSteamCMDProgress also reports bytes received to the guide and task (16 Ã‚Â§2.15).
+// InstallSteamCMDProgress also reports bytes received to the guide and task (16 §2.15).
 func (a *App) InstallSteamCMDProgress(progress func(done, total int64)) (string, error) {
 	return a.installSteamCMDProgress(a.SteamCMDDir(), progress)
 }
@@ -192,7 +192,7 @@ var ErrNoSteamCMD = errors.New("SteamCMD is not installed")
 
 // GameBranch is one Steam branch of RimWorld (app 294100), as app_info_print lists it.
 type GameBranch struct {
-	Name        string    `json:"name"`        // "public", "version-1.5", Ã¢â‚¬Â¦
+	Name        string    `json:"name"`        // "public", "version-1.5", …
 	Description string    `json:"description"` // Steam's, e.g. "Previous 1.6 version"
 	Version     string    `json:"version"`     // major.minor read from the name ("" for public / unstable)
 	BuildID     string    `json:"buildId"`
@@ -610,7 +610,7 @@ type SourceChangeEnv struct {
 	Changes []SourceChange
 }
 
-// freeEnvName is base ("1.6"), or base-2Ã¢â‚¬Â¦ when an environment has it.
+// freeEnvName is base ("1.6"), or base-2… when an environment has it.
 func (a *App) freeEnvName(base string) string {
 	if base == "" {
 		base = "rimworld"

@@ -57,7 +57,7 @@ func SelfUpdateItem(a *app.App) SettingItem {
 	it.ValueNote = Tf("new version available: %s", r.Version)
 	it.Details = &SettingDetails{Summary: T("release notes"), Text: strings.TrimSpace(r.Notes), Link: r.Page}
 	if !app.SelfUpdateSupported() {
-		it.ValueNote += "  " + a.SelfUpdateInstructions()
+		it.ValueNote += "  " + T(a.SelfUpdateInstructions())
 		it.Actions = []SettingAction{check}
 		return it
 	}
@@ -115,7 +115,7 @@ func SelfUpdatePhase(s app.SelfUpdateStep) string {
 func SelfCheckResult(a *app.App) string {
 	if r := a.SelfUpdatePending(); r != nil {
 		if !app.SelfUpdateSupported() {
-			return Tf("RimArcho %s available", r.Version) + "; " + r.Page + "; " + a.SelfUpdateInstructions()
+			return Tf("RimArcho %s available", r.Version) + "; " + r.Page + "; " + T(a.SelfUpdateInstructions())
 		}
 		return Tf("RimArcho %s can be updated", r.Version)
 	}
