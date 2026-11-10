@@ -71,8 +71,7 @@ AI Mod repair ([research](docs/research/2026-11-08_ai-mod-repair.md)), deferred 
 1. Fix records (the most important): every agent fix writes a record file in the pinned copy or patch Mod (what changed per file, why: cluster and evidence, original Mod version, `test_run` before/after, date) and a one or two line summary in the copy's RimArcho note, which was built for this. Today `pin_mod reason` sets the note only at pin time and `set_player_data copy_note` is `--tools all` only and replaces the text: add a core-group way to append. Flag a pinned copy that differs from its git baseline without a record. Also: recheck on upstream update, report text for the author, remove all.
 2. 15 §4.2 says code fixes are explanation only: allow them on a copy, after a passing `test_run`, behind a confirmation card.
 3. ilspycmd as a `deps` entry: the win-x64 AOT build runs without .NET, downloaded after consent, pinned hash, GitHub copy for the mirror. Changes 05 §5.4 / 17 §1 "never installed".
-4. "Nothing to fix" said by `status` / `analyze_log` as a fact (h9 0/6, not re-run on 1.0.9); keep any fix ladder short.
-5. `archo build` / `build_mod`: last or not at all. The `csc` builds it was meant to prevent are now flagged (`built: !!`, `access: !!`, `shipped:`).
+4. `archo build` / `build_mod`: last or not at all. The `csc` builds it was meant to prevent are now flagged (`built: !!`, `access: !!`, `shipped:`).
 
 # Deferred
 

@@ -40,6 +40,10 @@ RimArcho 要回答三个问题：
 
 可执行文件没有代码签名。首次运行 `RimArcho.exe` 或 `archo.exe` 时，Windows SmartScreen 可能显示“Windows 已保护你的电脑”：选择**更多信息**，再选**仍要运行**。你可以自行构建（见下文），核对下载内容与源码是否一致。
 
+### Linux（试验性）
+
+从 1.0.9 起，每个版本另有 `archo-<version>-linux-amd64.tar.gz`：只有 `archo`，包含终端界面、CLI 和 MCP，没有窗口。它能找到原生、Proton 和 Flatpak Steam 的游戏，但目前只用合成数据测过，还没在 Linux 上用真实游戏测过，可能有问题，请先备份存档和 Mod 列表。解压到任意位置后运行 `./archo`。Linux 上 RimArcho 不会自动更新；`archo update` 会告诉你新版本和安装方法。纹理优化需要 `PATH` 上有原生的 `todds`。遇到问题请到 GitHub 反馈。
+
 从源码构建（Go 1.27+）：运行 `go build -o archo.exe ./cmd/archo`；若要生成带版本号的发布压缩包，运行 `pwsh scripts/release.ps1 -Version x.y.z`。
 
 ## 首次运行

@@ -69,6 +69,15 @@ The executables are not code-signed. The first time you run `RimArcho.exe` or `a
 SmartScreen may say "Windows protected your PC": choose **More info**, then **Run anyway**. You can
 check a download against the source by building it yourself (below).
 
+### Linux (experimental)
+
+From 1.0.9 each release also has `archo-<version>-linux-amd64.tar.gz`: `archo` only, with the
+terminal UI, CLI and MCP. There is no window. It finds native, Proton and Flatpak Steam games, but
+it has been tested only with synthetic data, not yet with a real game on Linux, so expect bugs and
+keep a backup of your saves and Mod lists. Extract it anywhere and run `./archo`. RimArcho does not
+update itself on Linux; `archo update` shows the new version and how to install it. Texture
+optimisation needs a native `todds` on `PATH`. Please report problems on GitHub.
+
 To build from source (Go 1.27+), run `go build -o archo.exe ./cmd/archo`, or
 `pwsh scripts/release.ps1 -Version x.y.z` for a release zip with the version stamped in.
 
