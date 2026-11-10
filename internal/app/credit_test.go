@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
@@ -22,7 +23,7 @@ import (
 func creditEnv(t *testing.T, ids ...string) (*testkit.Env, int64, []store.CreditItem) {
 	t.Helper()
 	e := setup(t, false)
-	exe := filepath.Join(e.Root, "tools", "steamcmd.exe")
+	exe := filepath.Join(e.Root, "tools", deps.SteamCMDExecutable())
 	e.MkdirAll(filepath.Dir(exe))
 	e.App.FindTool = func(string) (string, bool) { return exe, true }
 	e.App.SteamCMDRun = func(_ string, args []string) (string, error) {

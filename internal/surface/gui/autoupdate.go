@@ -72,7 +72,7 @@ func (s *API) automaticCycle(parent context.Context) {
 		}
 		s.subRevision.Add(1)
 		if parent.Err() == nil {
-			s.send("automatic-update", map[string]any{"kind": kind, "notice": view.AutomaticNotice(before, after)})
+			s.send("automatic-update", map[string]any{"kind": kind, "notice": view.AutomaticNotice(r, before, after)})
 		}
 	})
 }

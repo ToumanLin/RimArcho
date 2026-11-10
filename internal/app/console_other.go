@@ -23,7 +23,7 @@ func startWorkshopCMD(exe string, args []string, console bool) (SteamCMDProc, er
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	}
 	if err := cmd.Start(); err != nil {
-		return nil, err
+		return nil, steamCMDStartError(exe, "", err)
 	}
 	return &workshopProcess{Cmd: cmd, group: !console}, nil
 }
@@ -40,7 +40,7 @@ func (p *workshopProcess) Wait() error {
 	p.mu.Lock()
 	p.done = true
 	p.mu.Unlock()
-	return err
+	return steamCMDStartError(p.Path, "", err)
 }
 
 func (p *workshopProcess) KillTree() error {

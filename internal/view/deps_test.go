@@ -17,7 +17,7 @@ func TestExternalToolsSettings(t *testing.T) {
 	}
 	e, _, _ := shellEnv(t)
 	e.App.SteamCMDNoPath = true
-	path := filepath.Join(e.App.LocalDir(), deps.SteamCMD, "steamcmd.exe")
+	path := filepath.Join(e.App.LocalDir(), deps.SteamCMD, deps.SteamCMDExecutable())
 	e.WriteFile(path, "fake")
 	for _, lang := range []string{"en", "zh"} {
 		view.SetLang(lang)
@@ -72,7 +72,7 @@ func TestExternalToolsSettings(t *testing.T) {
 func TestExternalToolConfiguredEditValue(t *testing.T) {
 	t.Parallel()
 	e, _, _ := shellEnv(t)
-	external := filepath.Join(e.Root, "external", "steamcmd.exe")
+	external := filepath.Join(e.Root, "external", deps.SteamCMDExecutable())
 	e.WriteFile(external, "external")
 	e.MustRun("config", "set", "steamcmd.path", external)
 	g := view.DependencyGroup(e.App)
@@ -95,7 +95,7 @@ func TestSteamCMDRemovalHiddenWhenItHoldsMods(t *testing.T) {
 	e, _, _ := shellEnv(t)
 	e.App.SteamCMDNoPath = true
 	dir := filepath.Join(e.App.LocalDir(), deps.SteamCMD)
-	e.WriteFile(filepath.Join(dir, "steamcmd.exe"), "tool")
+	e.WriteFile(filepath.Join(dir, deps.SteamCMDExecutable()), "tool")
 	e.WriteFile(filepath.Join(dir, "steamapps", "workshop", "content", "294100", "123", "keep.txt"), "mod")
 	it := view.DependencyGroup(e.App).Items[1]
 	if len(it.Actions) != 1 || it.Actions[0].Argv[1] != "install" {

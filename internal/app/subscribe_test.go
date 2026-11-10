@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/store"
@@ -373,7 +374,7 @@ func TestUpdateWorkshopGroups(t *testing.T) {
 	if err := source.CreateLink(incoming, target); err != nil {
 		t.Fatal(err)
 	}
-	e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, "steamcmd.exe"), true }
+	e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, deps.SteamCMDExecutable()), true }
 	var calls [][]string
 	var bases []string
 	e.App.SteamCMDRun = func(exe string, args []string) (string, error) {
@@ -487,7 +488,7 @@ func TestUpdateWorkshopGitOrdering(t *testing.T) {
 			if failingGit {
 				e.WriteFile(filepath.Join(gitOp.Items[0].Folder, "About", "About.xml"), "player changes")
 			}
-			e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, "steamcmd.exe"), true }
+			e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, deps.SteamCMDExecutable()), true }
 			var calls [][]string
 			e.App.SteamCMDRun = func(exe string, args []string) (string, error) {
 				ids := workshopScriptIDs(t, exe, args)
@@ -551,7 +552,7 @@ func TestUpdateWorkshopGroupsAcrossSkippedPages(t *testing.T) {
 	if err != nil || len(ss) != 3 || ss[0].Record.Kind != "steamcmd" || ss[1].Record.Kind != "page" || ss[2].Record.Kind != "steamcmd" {
 		t.Fatalf("ordering fixture: %+v %v", ss, err)
 	}
-	e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, "steamcmd.exe"), true }
+	e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, deps.SteamCMDExecutable()), true }
 	var calls [][]string
 	e.App.SteamCMDRun = func(exe string, args []string) (string, error) {
 		ids := workshopScriptIDs(t, exe, args)
@@ -613,7 +614,7 @@ func TestUpdateWorkshopJunctionCacheAndRetiredSource(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
-				return filepath.Join(e.Root, "steamcmd.exe"), true
+				return filepath.Join(e.Root, deps.SteamCMDExecutable()), true
 			}
 			e.App.SteamCMDRun = func(exe string, args []string) (string, error) {
 				workshopScriptIDs(t, exe, args)
@@ -697,7 +698,7 @@ func TestUpdateWorkshopReportsLiveAndStops(t *testing.T) {
 	if err != nil || len(ss) != 4 {
 		t.Fatalf("subscriptions: %d %v", len(ss), err)
 	}
-	exe := filepath.Join(e.Root, "steamcmd", "steamcmd.exe")
+	exe := filepath.Join(e.Root, "steamcmd", deps.SteamCMDExecutable())
 	e.WriteFile(exe, "stub")
 	e.App.FindTool = func(string) (string, bool) { return exe, true }
 	e.App.SteamCMDPoll = 5 * time.Millisecond

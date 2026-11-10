@@ -1,8 +1,10 @@
 package app_test
 
 import (
+	"archive/tar"
 	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -16,6 +18,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
@@ -51,8 +54,28 @@ func TestParseBranches(t *testing.T) {
 
 func steamZip(t *testing.T) []byte {
 	var buf bytes.Buffer
+	if runtime.GOOS == "linux" {
+		gz := gzip.NewWriter(&buf)
+		tw := tar.NewWriter(gz)
+		for _, name := range []string{deps.SteamCMDExecutable(), "linux32/steamcmd"} {
+			data := []byte("#!/bin/sh\nexit 0\n")
+			if err := tw.WriteHeader(&tar.Header{Name: name, Mode: 0o755, Size: int64(len(data))}); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := tw.Write(data); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := tw.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if err := gz.Close(); err != nil {
+			t.Fatal(err)
+		}
+		return buf.Bytes()
+	}
 	zw := zip.NewWriter(&buf)
-	w, _ := zw.Create("steamcmd.exe")
+	w, _ := zw.Create(deps.SteamCMDExecutable())
 	w.Write([]byte("MZ fake steamcmd"))
 	zw.Close()
 	return buf.Bytes()
@@ -61,10 +84,6 @@ func steamZip(t *testing.T) []byte {
 // 11 §3: SteamCMD is downloaded from Valve only after the player saw the size, into
 // %LOCALAPPDATA%\RimArcho\steamcmd.
 func TestInstallSteamCMD(t *testing.T) {
-	if runtime.GOOS == "linux" {
-		// Linux plan §3 steps 3 and 6: process safety and the SteamCMD installer.
-		t.Skip("Linux tool-process detection and SteamCMD installation are not implemented (plan steps 3, 6)")
-	}
 	t.Parallel()
 	e := testkit.New(t)
 	z := steamZip(t)
@@ -88,6 +107,9 @@ func TestInstallSteamCMD(t *testing.T) {
 		t.Fatalf("offer: %+v %v", o, err)
 	}
 	exe, err := e.App.InstallSteamCMD()
+	if runtime.GOOS == "linux" && err != nil && strings.Contains(err.Error(), "tool replacement requires Windows process detection") {
+		t.Skip("Linux toolIdle is not implemented (plan step 3)")
+	}
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +128,7 @@ type fakeSteamCMD struct {
 
 func (f *fakeSteamCMD) install(t *testing.T, e *testkit.Env) {
 	dir := e.App.SteamCMDDir()
-	e.WriteFile(filepath.Join(dir, "steamcmd.exe"), "fake")
+	e.WriteFile(filepath.Join(dir, deps.SteamCMDExecutable()), "fake")
 	e.WriteFile(filepath.Join(dir, "logs", "console_log.txt"), "[2026-10-21 10:00:00] an older run\n")
 	e.App.SteamCMDNoPath = true
 	e.App.SteamCMDPoll = time.Millisecond

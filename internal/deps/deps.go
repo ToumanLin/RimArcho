@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -61,9 +62,17 @@ func isFile(path string) bool {
 	return err == nil && !s.IsDir()
 }
 
+// SteamCMDExecutable is the bootstrap launcher installed for this platform.
+func SteamCMDExecutable() string {
+	if runtime.GOOS == "windows" {
+		return "steamcmd.exe"
+	}
+	return "steamcmd.sh"
+}
+
 // SteamCMDIn finds the executable in a SteamCMD installation directory.
 func SteamCMDIn(dir string) string {
-	for _, n := range []string{"steamcmd.exe", "steamcmd.sh", "steamcmd"} {
+	for _, n := range []string{SteamCMDExecutable(), "steamcmd"} {
 		if p := filepath.Join(dir, n); isFile(p) {
 			return p
 		}
@@ -115,7 +124,12 @@ func (f *Finder) Status(name string) Info {
 			if p != "" {
 				selectPath(SteamCMDIn(filepath.Dir(p)), "config")
 			} else {
-				selectPath(SteamCMDIn(i.Dir), "own")
+				if runtime.GOOS == "linux" {
+					selectPath(path("steamcmd"), "path")
+				}
+				if i.Path == "" {
+					selectPath(SteamCMDIn(i.Dir), "own")
+				}
 			}
 			if i.Path == "" {
 				selectPath(path("steamcmd"), "path")

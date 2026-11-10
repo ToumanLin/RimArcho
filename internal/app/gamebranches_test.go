@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/accounts"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 )
 
 func waitBranchFlight(t *testing.T, c *branchCache, key branchKey) {
@@ -172,7 +173,7 @@ func TestBranchCacheColdFailureRetries(t *testing.T) {
 
 func TestBranchToolIdentity(t *testing.T) {
 	dir := t.TempDir()
-	exe := filepath.Join(dir, "steamcmd.exe")
+	exe := filepath.Join(dir, deps.SteamCMDExecutable())
 	if err := os.WriteFile(exe, []byte("tool"), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +181,7 @@ func TestBranchToolIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	same, err := branchToolKey(filepath.Join(dir, ".", "steamcmd.exe"), "294100")
+	same, err := branchToolKey(filepath.Join(dir, ".", deps.SteamCMDExecutable()), "294100")
 	if err != nil || same != key {
 		t.Fatalf("same tool: %v %v", same, err)
 	}
@@ -227,7 +228,7 @@ func TestBranchToolIdentity(t *testing.T) {
 }
 
 func TestGameBranchesSelfUpdateRetainsCache(t *testing.T) {
-	exe := filepath.Join(t.TempDir(), "steamcmd.exe")
+	exe := filepath.Join(t.TempDir(), deps.SteamCMDExecutable())
 	if err := os.WriteFile(exe, []byte("before"), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -290,7 +291,7 @@ func TestBranchCacheSelfUpdateSingleflight(t *testing.T) {
 }
 
 func TestBranchRefreshCanceledWhileWaitingForLock(t *testing.T) {
-	exe := filepath.Join(t.TempDir(), "steamcmd.exe")
+	exe := filepath.Join(t.TempDir(), deps.SteamCMDExecutable())
 	if err := os.WriteFile(exe, []byte("fake"), 0600); err != nil {
 		t.Fatal(err)
 	}

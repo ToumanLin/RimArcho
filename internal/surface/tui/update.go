@@ -71,7 +71,7 @@ func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.kind == "data" {
 			m.app.DropCommunityData()
 		}
-		if notice := view.AutomaticNotice(msg.before, msg.after); notice != "" {
+		if notice := view.AutomaticNotice(m.app, msg.before, msg.after); notice != "" {
 			kind := sayOK
 			if msg.kind == "session" {
 				kind = sayWarn

@@ -114,7 +114,7 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 		}
 		return cmds.ExitOK
 	}
-	if program, err := ap.SelfProgramDir(); err == nil {
+	if program, err := ap.SelfProgramDir(); err == nil && app.SelfUpdateSupported() {
 		if _, ok := selfupdate.InWorkshopFolder(program); ok {
 			fmt.Fprintln(stderr, "warning: Steam can replace this Workshop folder; open RimArcho.exe to move RimArcho")
 		}

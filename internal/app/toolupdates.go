@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -18,7 +19,12 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
-const steamCMDManifest = "https://client-update.akamai.steamstatic.com/steam_cmd_win32"
+func steamCMDPackage() string {
+	if runtime.GOOS == "linux" {
+		return "steam_cmd_linux"
+	}
+	return "steam_cmd_win32"
+}
 
 var steamVersionRE = regexp.MustCompile(`"version"\s*"([0-9]+)"`)
 
@@ -54,7 +60,7 @@ func (a *App) recordToolInstalled(name string) {
 	info := a.Deps().Status(name)
 	installed := info.Version
 	if name == deps.SteamCMD {
-		if b, err := os.ReadFile(filepath.Join(info.Dir, "package", "steam_cmd_win32.installed")); err == nil {
+		if b, err := os.ReadFile(filepath.Join(info.Dir, "package", steamCMDPackage()+".installed")); err == nil {
 			installed = steamManifestVersion(b)
 		}
 	}
@@ -96,12 +102,12 @@ func (a *App) CheckToolUpdates(ctx context.Context) (int, string, error) {
 		var err error
 		var latest string
 		if name == deps.SteamCMD {
-			installed, e := os.ReadFile(filepath.Join(info.Dir, "package", "steam_cmd_win32.installed"))
+			installed, e := os.ReadFile(filepath.Join(info.Dir, "package", steamCMDPackage()+".installed"))
 			if e == nil {
 				s.Installed = steamManifestVersion(installed)
 			}
 			var b []byte
-			b, err = a.readToolRelease(ctx, steamCMDManifest)
+			b, err = a.readToolRelease(ctx, "https://client-update.akamai.steamstatic.com/"+steamCMDPackage())
 			latest = steamManifestVersion(b)
 		} else {
 			var b []byte

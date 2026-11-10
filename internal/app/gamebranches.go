@@ -54,7 +54,7 @@ func runBranchSteamCMD(ctx context.Context, exe string, args []string) (string, 
 	cmd.Dir = filepath.Dir(exe)
 	hideWindow(cmd)
 	out, err := cmd.CombinedOutput()
-	return string(out), err
+	return string(out), steamCMDStartError(exe, string(out), err)
 }
 
 type branchCache struct {

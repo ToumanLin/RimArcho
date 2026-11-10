@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -79,8 +80,8 @@ func TestToddsOrderAndCompatibility(t *testing.T) {
 func TestSteamCMDOrderWithoutRunningIt(t *testing.T) {
 	f, settings := fixture(t)
 	f.Version = func(string, string) (string, error) { t.Fatal("SteamCMD must not be run"); return "", nil }
-	configured := file(t, filepath.Join(t.TempDir(), "steamcmd.exe"))
-	own := file(t, filepath.Join(f.LocalDir, SteamCMD, "steamcmd.exe"))
+	configured := file(t, filepath.Join(t.TempDir(), SteamCMDExecutable()))
+	own := file(t, filepath.Join(f.LocalDir, SteamCMD, SteamCMDExecutable()))
 	fromPath := file(t, filepath.Join(t.TempDir(), "steamcmd"))
 	f.LookPath = func(n string) (string, error) {
 		if n != "steamcmd" {
@@ -98,12 +99,19 @@ func TestSteamCMDOrderWithoutRunningIt(t *testing.T) {
 		t.Fatalf("sibling fallback %+v", i)
 	}
 	settings["steamcmd.path"] = ""
+	if runtime.GOOS == "linux" {
+		if i := f.Status(SteamCMD); i.Path != fromPath || i.Own || i.Source != "path" {
+			t.Fatalf("external preference %+v", i)
+		}
+		f.LookPath = nil
+	}
 	if i := f.Status(SteamCMD); i.Path != own || !i.Own || !i.OK {
 		t.Fatalf("own %+v", i)
 	}
 	if err := os.Remove(own); err != nil {
 		t.Fatal(err)
 	}
+	f.LookPath = func(string) (string, error) { return fromPath, nil }
 	if i := f.Status(SteamCMD); i.Path != fromPath || i.Source != "path" || i.Own {
 		t.Fatalf("PATH %+v", i)
 	}
@@ -188,7 +196,7 @@ func TestVersionCacheRetriesFailures(t *testing.T) {
 func TestRedirectedOwnDirectoryIsNotOwned(t *testing.T) {
 	f, _ := fixture(t)
 	external := t.TempDir()
-	file(t, filepath.Join(external, "steamcmd.exe"))
+	file(t, filepath.Join(external, SteamCMDExecutable()))
 	if err := os.MkdirAll(f.LocalDir, 0o755); err != nil {
 		t.Fatal(err)
 	}

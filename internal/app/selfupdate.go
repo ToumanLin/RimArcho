@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -99,7 +100,7 @@ func (a *App) CheckSelfUpdate(ctx context.Context) (int, string, error) {
 	var r *selfupdate.Release
 	var err error
 	source, fallback := "GitHub", ""
-	if a.Store.Meta("cfg:updates.source") != "github" && !selfPrerelease(cur) && updateWorkshopItem() != "" {
+	if runtime.GOOS == "windows" && a.Store.Meta("cfg:updates.source") != "github" && !selfPrerelease(cur) && updateWorkshopItem() != "" {
 		r, err = a.workshopSelfRelease(ctx)
 		if err == nil {
 			source = "Workshop"
@@ -186,6 +187,9 @@ var ErrUpdateBusy = errors.New("another RimArcho is already installing the updat
 // new archo must then report the new version, or the old files are put back. The caller
 // restarts the program; the data folder is not touched.
 func (a *App) InstallSelfUpdate(ctx context.Context, step func(SelfUpdateStep)) (*SelfUpdateResult, error) {
+	if !SelfUpdateSupported() {
+		return nil, errors.New("update RimArcho manually: " + a.SelfUpdateInstructions())
+	}
 	programDir, programErr := a.SelfProgramDir()
 	if programErr != nil {
 		return nil, programErr
@@ -372,6 +376,9 @@ func WaitSelfSwap(limit time.Duration) {
 // stays for the next start. With UpdatedFromEnv set it first waits up to ten seconds for
 // that process, which held the old files, to exit.
 func (a *App) CleanSelfUpdate() {
+	if !SelfUpdateSupported() {
+		return
+	}
 	a.cleanSelfWorkshop()
 	program, err := a.SelfProgramDir()
 	if err != nil {

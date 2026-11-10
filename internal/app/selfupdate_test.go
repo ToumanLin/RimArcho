@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 	"github.com/ToumanLin/RimArcho/internal/view"
@@ -220,6 +221,9 @@ func TestSelfUpdateCheck(t *testing.T) {
 }
 
 func TestSelfUpdateWorkshopCheck(t *testing.T) {
+	if !app.SelfUpdateSupported() {
+		t.Skip("program replacement and Workshop self-update are Windows-only (D2)")
+	}
 	t.Setenv(app.UpdateWorkshopItemEnv, "8100")
 	for _, mode := range []string{"workshop", "1.0.5 tag", "no version", "bad result", "offline", "empty item", "github", "prerelease"} {
 		t.Run(mode, func(t *testing.T) {
@@ -267,7 +271,7 @@ func TestSelfUpdateWorkshopCheck(t *testing.T) {
 				before := e.App.AutomaticStatus("self")
 				e.MustRun("config", "set", "updates.source", "github")
 				e.MustRun("update", "--check")
-				if notice := view.AutomaticNotice(before, e.App.AutomaticStatus("self")); notice != "" {
+				if notice := view.AutomaticNotice(e.App, before, e.App.AutomaticStatus("self")); notice != "" {
 					t.Fatal("repeated notification", notice)
 				}
 			}
@@ -306,7 +310,9 @@ func TestSelfUpdateWorkshopInstall(t *testing.T) {
 				put(filepath.Join(library, "steamapps", "workshop", "content", "294100", "8100"))
 				e.App.FindTool = func(string) (string, bool) { t.Fatal("subscribed copy started tool lookup"); return "", false }
 			} else {
-				e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, "steamcmd.exe"), mode != "missing tool" }
+				e.App.FindTool = func(string) (string, bool) {
+					return filepath.Join(e.Root, deps.SteamCMDExecutable()), mode != "missing tool"
+				}
 			}
 			base := filepath.Join(e.App.LocalDir(), "steamcmd-self")
 			calls := 0
@@ -370,6 +376,9 @@ func TestSelfUpdateWorkshopInstall(t *testing.T) {
 }
 
 func TestSelfUpdateInstallWaitsForOthersThenSwaps(t *testing.T) {
+	if !app.SelfUpdateSupported() {
+		t.Skip("program replacement and Workshop self-update are Windows-only (D2)")
+	}
 	t.Parallel()
 	e := testkit.New(t)
 	f := newSelfRelease(t)
@@ -436,6 +445,9 @@ func TestSelfUpdateInstallWaitsForOthersThenSwaps(t *testing.T) {
 }
 
 func TestSelfUpdateFailuresChangeNothing(t *testing.T) {
+	if !app.SelfUpdateSupported() {
+		t.Skip("program replacement and Workshop self-update are Windows-only (D2)")
+	}
 	t.Parallel()
 	ctx := context.Background()
 	for _, tc := range []struct {
@@ -483,6 +495,9 @@ func TestSelfUpdateFailuresChangeNothing(t *testing.T) {
 }
 
 func TestSelfUpdateStopWhileWaitingAndOneInstallAtATime(t *testing.T) {
+	if !app.SelfUpdateSupported() {
+		t.Skip("program replacement and Workshop self-update are Windows-only (D2)")
+	}
 	t.Parallel()
 	e := testkit.New(t)
 	f := newSelfRelease(t)
@@ -545,6 +560,9 @@ func TestSelfUpdateStopWhileWaitingAndOneInstallAtATime(t *testing.T) {
 // install when the new program runs, or puts the old one back when it does not, and only
 // then removes the update folder's leftovers (17 §5.1 step 5).
 func TestSelfUpdateKilledMidSwapIsSettledNextStart(t *testing.T) {
+	if !app.SelfUpdateSupported() {
+		t.Skip("program replacement and Workshop self-update are Windows-only (D2)")
+	}
 	t.Parallel()
 	for _, next := range []string{"new program runs", "new program fails", "install again"} {
 		t.Run(next, func(t *testing.T) {
