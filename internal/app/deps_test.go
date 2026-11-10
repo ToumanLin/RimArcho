@@ -20,10 +20,6 @@ import (
 )
 
 func TestRemoveSteamCMDProtectsContent(t *testing.T) {
-	if runtime.GOOS == "linux" {
-		// Linux plan §3 step 3: toolIdle still refuses tool replacement.
-		t.Skip("Linux tool-process detection is not implemented (plan step 3)")
-	}
 	t.Parallel()
 	for _, kind := range []string{"workshop", "game", "shared-source", "env-source", "lock"} {
 		t.Run(kind, func(t *testing.T) {
@@ -89,10 +85,6 @@ func TestRemoveSteamCMDProtectsContent(t *testing.T) {
 }
 
 func TestRemoveDepStaysInsideManagedDirectory(t *testing.T) {
-	if runtime.GOOS == "linux" {
-		// Linux plan §3 step 3: toolIdle still refuses tool replacement.
-		t.Skip("Linux tool-process detection is not implemented (plan step 3)")
-	}
 	for _, name := range []string{deps.Todds} {
 		t.Run(name, func(t *testing.T) {
 			e := testkit.New(t)
@@ -210,10 +202,6 @@ func TestDepUnknownAndMissingRefusals(t *testing.T) {
 }
 
 func TestInstallDepToddsAndRemove(t *testing.T) {
-	if runtime.GOOS == "linux" {
-		// Linux plan §3 step 3: toolIdle still refuses tool replacement.
-		t.Skip("Linux tool-process detection is not implemented (plan step 3)")
-	}
 	t.Parallel()
 	e := testkit.New(t)
 	e.App.TextureEncoder = &texEnc{}

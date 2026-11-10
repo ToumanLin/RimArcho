@@ -1,7 +1,6 @@
 package cmds_test
 
 import (
-	"runtime"
 	"testing"
 	"time"
 
@@ -11,11 +10,6 @@ import (
 // TestGoldenHarmonyLog covers the Harmony layer (C5 multi-transpiler, C6 manual-only) and
 // log attribution (B1 patch failure, B2 cross-reference, B3 Pawn.Tick patchers, B4 repeats).
 func TestGoldenHarmonyLog(t *testing.T) {
-	if runtime.GOOS == "linux" {
-		// Additional Linux path-support gap: app.winPathRe and findingKey
-		// recognize only Windows absolute paths; see the Linux base report.
-		t.Skip("native Linux log-path attribution is not implemented")
-	}
 	t.Parallel()
 	e := testkit.New(t)
 	e.HarmonyLogFixture()

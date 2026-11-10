@@ -14,7 +14,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -353,10 +352,6 @@ func TestTexturesUninstall(t *testing.T) {
 
 // todds is downloaded from the release (a fake server here) into RimArcho's own folder.
 func TestInstallTodds(t *testing.T) {
-	if runtime.GOOS == "linux" {
-		// Linux plan §3 step 3: toolIdle still refuses tool replacement.
-		t.Skip("Linux tool-process detection is not implemented (plan step 3)")
-	}
 	t.Parallel()
 	e := setup(t, false)
 	e.App.TextureEncoder = &texEnc{}

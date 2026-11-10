@@ -75,9 +75,9 @@ func processIn(procs []*GameRun, gameRoot string) *GameRun {
 	if gameRoot == "" {
 		return nil
 	}
-	root := env.PathKey(gameRoot)
+	root := env.PathKey(realOrAbs(gameRoot))
 	for _, r := range procs {
-		if underDir(env.PathKey(filepath.Dir(r.Exe)), root) {
+		if underDir(env.PathKey(realOrAbs(filepath.Dir(r.Exe))), root) {
 			return r
 		}
 	}

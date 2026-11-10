@@ -70,7 +70,7 @@ Use the following evidence, strongest first:
 | Evidence | Rule |
 | --- | --- |
 | `[Mod name]` prefix | A self-reported issue identifies the Mod as source. XML Extensions uses full names (`[[FSF] Vanilla Bionics Expansion] Verse.PatchOperation…`). |
-| File path | A `.xml/.dll/.png/.txt` path in the message or continuations inside an Instance directory identifies it as source. For logs from other machines, match Mod directories: `…\workshop\content\294100\<id>\…` or `…\Mods\<directory>\…`, including HugsLib-redacted `[Rimworld_dir]\Mods\…` paths. |
+| File path | An absolute Windows or native Linux `.xml/.dll/.png/.txt` path in the message or continuations inside an Instance directory identifies it as source. For logs from other machines, match Mod directories: `…\workshop\content\294100\<id>\…` or `…\Mods\<directory>\…`, with either separator, including HugsLib-redacted `[Rimworld_dir]\Mods\…` paths. |
 | Patch failure versus simulation | Match `patch-failed` to the simulated failure by `[Mod]\|description` or `file:` and mark the Mod as source, with `file:line` and 05 §4.4 reasons. A disabled target provider is dependency, with `archo enable`. Match XML Extensions failures by XPath. If the operation no longer fails, state "the mod or the Loadout changed since the log"; the Mod stays the source. |
 | `defName` (`xref-missing`) | Record the missing `def:<Type>/<name>` and list its enabled and disabled providers from the `Def` facts. A disabled provider is dependency, with `archo enable`; if none exist, state "providers: none among installed mods". For `Could not load reference`, explain that the error occurred while reading a save. **Wanter**: the enabled, nonofficial definer of the `Def` in "found to give to `<XDef>` `<name>`" is source. **Referrers**: search enabled effective `Defs` and `Patches` once for `>Name<` and `<Name>` (ThingDefCountClass lists such as `costList` and products). Skip Core and DLC and any `Mods` that define the name themselves. If over 3 `Mods` match, or the wanter rule already found a source, mark referrers only as mentioned. |
 | `for def 'X'` in `texture-missing` | The definer of X is source. |
@@ -101,7 +101,7 @@ Use the following evidence, strongest first:
 - The claim is `log:E<n> x<count>: <message>`.
 - The evidence includes each candidate's `<role>: <evidence>` (log), plus category details such as reasons and providers (inferred).
 - The first suggestion is `archo log --cluster E<n>` (MCP shows suggestions as tool calls, 13 §1.1), followed by next steps such as `archo patches --mod <ref> --failed`, `archo harmony --target Verse.Pawn.Tick`, `archo source <ref> --type <type>`, `archo def <Type>/<name>`, or `archo enable <ref>`.
-- The key is the cluster key, with absolute paths reduced to their final three segments (05 §4.2).
+- The key is the cluster key, with absolute Windows and native Linux paths reduced to their final three segments (05 §4.2).
 
 **Cluster details** (`archo log --cluster E<n>`, MCP, and the interface) include the complete message and continuations, the top frames with their IL offsets, the null trace's `trace:` lines (§2), plus messages around the first occurrence (nearby: 4 before and 3 after, ≤30 lines, truncated to 200 characters per message), so that the reader does not have to look up the raw log (corpus G7). Lines of a transpiler's IL listing (`AdjustParms - ldfld …`, `IL_001a: ldarg.0`; `logs.ILDump`) are skipped and the next message counts instead (MCP review P13).
 

@@ -218,6 +218,35 @@ func TestSaveFileActions(t *testing.T) {
 	if _, err := e.App.RenameSave(find("Tundra"), "Tundra 2"); err == nil {
 		t.Fatal("renamed over an existing save")
 	}
+	// Ask the filesystem whether two case variants can name different saves.
+	upper := find("Tundra")
+	lowerPath := filepath.Join(filepath.Dir(upper.Path), "tundra.rws")
+	f, createErr := os.OpenFile(lowerPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if createErr == nil {
+		if _, err := f.WriteString("other save"); err != nil {
+			t.Fatal(err)
+		}
+		f.Close()
+		if _, err := e.App.RenameSave(upper, "tundra"); err == nil {
+			t.Fatal("renamed over a different save with a case-only name")
+		}
+		if b, err := os.ReadFile(lowerPath); err != nil || string(b) != "other save" {
+			t.Fatalf("case-only collision changed the other save: %q %v", b, err)
+		}
+		if err := os.Remove(lowerPath); err != nil {
+			t.Fatal(err)
+		}
+	} else if !os.IsExist(createErr) {
+		t.Fatal(createErr)
+	}
+	if to, err := e.App.RenameSave(upper, "tundra"); err != nil {
+		t.Fatal("rename to own case variant:", err)
+	} else {
+		upper.Path, upper.File = to, filepath.Base(to)
+		if _, err := e.App.RenameSave(upper, "Tundra"); err != nil {
+			t.Fatal("restore case:", err)
+		}
+	}
 	if _, err := e.App.RenameSave(find("Tundra"), `a\b`); err == nil {
 		t.Fatal("accepted a path in a name")
 	}

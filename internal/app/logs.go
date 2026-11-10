@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"sort"
 	"strings"
@@ -169,7 +170,7 @@ var ErrLogNotCached = errors.New("log not analysed yet")
 // Lord.AddPawn call sites, same-role candidates ordered by evidence (06 §2, §3); 20: list modifiers of "Collection
 // was modified" and comp-list tick crashes, Harmony patches on callers listed only, no
 // --target suggestion for TargetMethod() patches (06 §2, §3).
-const logCacheVersion = 20
+const logCacheVersion = 21
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a
@@ -788,9 +789,12 @@ func (cx *attrCtx) dirOwner(path string) (string, string) {
 }
 
 var (
-	bracketRe    = regexp.MustCompile(`^(?:<color=[^>]*>)?\[([^\]]{2,80})\](?:</color>)?`)
-	xmlExtRe     = regexp.MustCompile(`^Verse\.PatchOperation\w*\(xpath="(.*)"\): Failed`)
-	winPathRe    = regexp.MustCompile(`[A-Za-z]:[\\/][^"'<>|\r\n]*?\.(?:xml|dll|png|txt)`)
+	bracketRe = regexp.MustCompile(`^(?:<color=[^>]*>)?\[([^\]]{2,80})\](?:</color>)?`)
+	xmlExtRe  = regexp.MustCompile(`^Verse\.PatchOperation\w*\(xpath="(.*)"\): Failed`)
+	winPathRe = regexp.MustCompile(`[A-Za-z]:[\\/][^"'<>|\r\n]*?\.(?:xml|dll|png|txt)`)
+	// A native Linux path starts after a boundary, so a relative Defs/a/b.xml and a URL
+	// are not cut into absolute paths. Used off Windows only: Windows keys stay unchanged.
+	unixPathRe   = regexp.MustCompile(`(?:^|[\s"'(\[=])/[^"'<>|\r\n]*?\.(?:xml|dll|png|txt)`)
 	xrefRe       = regexp.MustCompile(`No ([\w.]+) named (\S+) found to give to (\S+)|cross-reference to ([\w.]+) named (\S+)|reference to ([\w.]+) named (\S+)`)
 	forDefRe     = regexp.MustCompile(` for def '([^']+)'`)
 	ctxDefNameRe = regexp.MustCompile(`(?:Context|Full node): [\s\S]*?<defName>([^<\s]+)</defName>`)
@@ -887,7 +891,7 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 			}
 			continue
 		}
-		for _, p := range winPathRe.FindAllString(t, -1) {
+		for _, p := range logPaths(t) {
 			if id, rel := cx.dirOwner(p); id != "" {
 				lc.add(id, RoleSource, "log file "+rel)
 			} else if id, rel := cx.folderOwner(p); id != "" {
@@ -1293,13 +1297,33 @@ var logSeverity = map[string]string{
 // findingKey keeps a log problem's ref (and an ignore of it) stable across logs and
 // install locations: the cluster key with each absolute path cut to its last three parts.
 func findingKey(key string) string {
-	return winPathRe.ReplaceAllStringFunc(key, func(p string) string {
+	cut := func(p string) string {
 		parts := strings.FieldsFunc(p, func(r rune) bool { return r == '\\' || r == '/' })
 		if len(parts) > 3 {
 			parts = parts[len(parts)-3:]
 		}
 		return strings.ToLower(strings.Join(parts, "/"))
-	})
+	}
+	key = winPathRe.ReplaceAllStringFunc(key, cut)
+	if runtime.GOOS != "windows" {
+		key = unixPathRe.ReplaceAllStringFunc(key, func(m string) string {
+			i := strings.IndexByte(m, '/')
+			return m[:i] + cut(m[i:])
+		})
+	}
+	return key
+}
+
+// logPaths lists the absolute file paths in a log line: drive paths (Windows, Wine),
+// and off Windows native paths too.
+func logPaths(t string) []string {
+	out := winPathRe.FindAllString(t, -1)
+	if runtime.GOOS != "windows" {
+		for _, m := range unixPathRe.FindAllString(t, -1) {
+			out = append(out, m[strings.IndexByte(m, '/'):])
+		}
+	}
+	return out
 }
 
 func (cx *attrCtx) toFinding(lc *LogCluster) *finding.Finding {

@@ -35,12 +35,14 @@ Goal: a static `archo` for `linux/amd64` (`CGO_ENABLED=0`) that is as safe on Li
 
 1. **Build split — done.** GUI startup is selected by a `windows` build tag (later `windows || (linux && cgo)`), so `cmd/archo` builds without Wails. On a build without the GUI, `archo gui` says the window is not in this build and points to the text interface. Contract: 13 §4.1, 16 §8.1.
 2. **`startWorkshopCMD` off Windows — done.** `os/exec` with its own process group (`Setpgid`); cancel kills the group, matching the Windows job object. `console=true` inherits the current terminal's streams (CLI/TUI) instead of opening a new window. Contract: 11 §1.
-3. **Safety stubs.** `gameProcesses` reads `/proc/*/exe` and `cmdline`: the native `RimWorldLinux`, and `RimWorldWin64.exe` running under Wine (Proton). `toolIdle` checks `/proc` for a process running the tool's executable. Without these, "refuse while the game runs" never fires: fix them before anything ships.
-4. **Linux-only bugs** (ToDo):
-   - Same-volume checks compare `st_dev` (one helper used at the four call sites in §1), so moves across mounts copy instead of failing with `EXDEV`.
+3. **Safety stubs — done.** Linux reads `/proc` for native and Wine/Proton games and for busy tools. Contracts: 09 §4 and 17 §2.1. Synthetic processes exercise discovery; guarded operations share the existing running-game checks.
+4. **Linux-only bugs — done for non-GUI `archo`:**
+   - Same-volume checks compare `st_dev` through one helper at the three non-GUI call sites in §1, so moves across mounts copy instead of failing with `EXDEV`. The GUI shell call site remains phase 2 work.
    - Renaming a save to a name that differs only by case must not overwrite the other save (`saveactions.go`): on a case-sensitive file system they are two files.
-   - `LocalDir` uses the XDG data directory, not `~/.cache` (it holds the lock library).
+   - `LocalDir` uses `$XDG_DATA_HOME/rimarcho-local`, beside the data directory, not `~/.cache` (it holds the lock library).
    - `source.Trash` (`trash_other.go`) works across volumes: freedesktop trash in `$XDG_DATA_HOME/Trash`, or `<mount>/.Trash-<uid>` for another volume.
+   - The base task's additional log-path gap is fixed: native absolute Linux paths participate in attribution and stable finding keys (06 §2–§3); the Harmony-log golden runs unchanged on both systems.
+   - Verification and remaining limitations, [safety validation](2026-11-09_linux-safety-validation.md).
 5. **Detection — done.** Steam roots, library discovery, per-game native / Proton / Flatpak user data and sign-in state: 03 §3.2. Steam-only Proton launch and save-redirection refusals: 09 §2. Native Managed assemblies, menu backgrounds and test-run executable paths are supported. Synthetic verification and the outstanding Linux VM checks are recorded in [the detection validation report](2026-11-09_linux-detect-validation.md).
 6. **SteamCMD.** Install `steamcmd_linux.tar.gz` (runs `linux32/steamcmd`, needs 32-bit libraries); prefer a `steamcmd` already on `PATH` (distribution packages exist). When it fails to start, say which package is missing (`lib32gcc-s1` on Debian/Ubuntu, `glibc.i686` on Fedora) **[I: names to confirm]**. Login works in the terminal that runs `archo`.
 7. **Update notice instead of self-update (D2).** Run the same check as `CheckSelfUpdate` (GitHub Releases); when a newer version exists, say so with the release link and how to update: through the package manager for a `.deb`, `.rpm` or AUR install, by downloading the new tarball otherwise. Nothing is downloaded or replaced.

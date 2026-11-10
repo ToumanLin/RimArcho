@@ -108,7 +108,7 @@ func (a *App) InstallTodds() (string, error) {
 func (a *App) InstallToddsProgress(progress func(done, total int64)) (string, error) {
 	unlock := accounts.Lock(a.ToddsDir())
 	defer unlock()
-	if err := toolIdle("todds"); err != nil {
+	if err := toolIdle("todds", a.ToddsDir()); err != nil {
 		return "", err
 	}
 	dir := a.ToddsDir()

@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -167,13 +168,22 @@ func joinInts(n []int) string {
 	return strings.Join(s, ", ")
 }
 
-// LocalDir is %LOCALAPPDATA%\RimArcho: the default lock library, Monitor, SteamCMD and the
-// Steam runtime folder live here.
+// LocalDir resolves the persistent managed root (17 §3), including the lock library.
 func (a *App) LocalDir() string {
 	if p := a.storeMeta("cfg:local.dir"); p != "" {
 		return p
 	}
 	base := a.LockBase
+	if base == "" && runtime.GOOS != "windows" {
+		base = os.Getenv("XDG_DATA_HOME")
+		if !filepath.IsAbs(base) {
+			home, _ := os.UserHomeDir()
+			base = filepath.Join(home, ".local", "share")
+		}
+		// A sibling of the data directory (17 §3), as %LOCALAPPDATA% is on Windows:
+		// managed Mod folders must not lie inside the data directory.
+		return filepath.Join(base, "rimarcho-local")
+	}
 	if base == "" {
 		base = os.Getenv("LOCALAPPDATA")
 	}
@@ -934,7 +944,11 @@ func (a *App) moveDir(from, to string) error {
 	if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
 		return err
 	}
-	if strings.EqualFold(filepath.VolumeName(from), filepath.VolumeName(to)) {
+	same := a.SameVolume
+	if same == nil {
+		same = source.SameVolume
+	}
+	if same(from, to) {
 		if err := os.Rename(from, to); err == nil {
 			return nil
 		}

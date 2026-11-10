@@ -1,6 +1,6 @@
 # 09 · Launch
 
-> Status: implemented: writing on launch, one running game at a time, launch records that name the plan, link deployment and repair, running-game detection (Windows only), and hidden Mods. Test runs are in 20; Archo Monitor is in 19.
+> Status: implemented: writing on launch, one running game at a time, launch records that name the plan, link deployment and repair, running-game detection (Windows and Linux), and hidden Mods. Test runs are in 20; Archo Monitor is in 19.
 > Basis: 00, 00a, 02 §1 / §3, 03 §3.4 / §4.3, 04 §1.2, 06 §4 / §7, 07 §1.5 / §4 / §5, 12 §4, 16 §2.
 
 This specification describes how RimArcho hands a plan to the game: which files it writes, which links it creates, how it launches the game, and how it detects a running game. It also covers hidden Mods, whose actions change Mod folders directly (§5); test runs are in 20, and Archo Monitor, the bundled in-game helper Mod, is in 19. Packs are in 10; Steam client calls and SteamCMD downloads are in 11.
@@ -122,9 +122,11 @@ Mods may live in directories the game does not read: SteamCMD download directori
 - The start time (`GetProcessTimes`).
 - The command line (`NtQueryInformationProcess` with `ProcessCommandLineInformation`; since Windows 8.1, only `PROCESS_QUERY_LIMITED_INFORMATION` is needed). Extract the value of `-savedatafolder=`; either the value or the whole argument may be quoted.
 
+On Linux, `gamerun_linux.go` reads `/proc/<pid>/exe` and NUL-separated `cmdline`. It recognizes native `RimWorldLinux`, `RimWorldWin64.exe`, and Wine/Proton loaders (`wine`, `wine64`, and their preloaders) whose arguments name `RimWorldWin64.exe`. Match the game's host path to the environment, rather than the loader's installation. Resolve relative arguments from the process's working directory, `Z:` paths from the host root, and other Wine drives through `WINEPREFIX/dosdevices`. Read start time from procfs when available; unreadable native-game arguments leave `ArgsKnown` false and still block guarded operations. Process visibility is limited by the operating system, as on Windows. These processes feed the same launch, link-lifecycle, texture, save and uninstall guards across environments.
+
 Detection is not implemented on other systems, where games are always considered stopped.
 
-**Across environments.** The prelaunch check (§1) inspects every environment. A process whose executable is under any registered game directory counts as a running game. The refusal identifies the environment and uses the launch records to name the plan or pack. Read the process list once and compare it with each registered root using path boundaries (`RimWorld2` is not within `RimWorld`). Both the refusal and `archo status` name the plan (for example, `environment main is running plan:default`) or pack. For a game launched outside RimArcho, display `plan:X (last written to the game)`.
+**Across environments.** The prelaunch check (§1) inspects every environment. A process whose executable is under any registered game directory counts as a running game. The refusal identifies the environment and uses the launch records to name the plan or pack. Read the process list once and compare it with each registered root after resolving filesystem links, using path boundaries (`RimWorld2` is not within `RimWorld`). Both the refusal and `archo status` name the plan (for example, `environment main is running plan:default`) or pack. For a game launched outside RimArcho, display `plan:X (last written to the game)`.
 
 **What is being played.** After finding a process, determine whether it is playing the environment's list or a pack:
 

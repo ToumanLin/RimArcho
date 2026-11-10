@@ -103,7 +103,7 @@ func (a *App) InstallSteamCMDProgress(progress func(done, total int64)) (string,
 func (a *App) installSteamCMDProgress(dir string, progress func(done, total int64)) (string, error) {
 	unlock := accounts.Lock(filepath.Join(dir, "steamcmd.exe"))
 	defer unlock()
-	if err := toolIdle("steamcmd"); err != nil {
+	if err := toolIdle("steamcmd", dir); err != nil {
 		return "", err
 	}
 	if err := a.checkRoots(dir); err != nil {
