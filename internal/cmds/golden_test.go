@@ -82,6 +82,10 @@ func runGolden(t *testing.T, name string, e *testkit.Env, steps []step, scrub ..
 		out = msRe.ReplaceAllString(e.Scrub(out), "${1}<dur>")
 		out = cursorRe.ReplaceAllString(out, "<cursor>")
 		out = searchMSRe.ReplaceAllString(out, "${1}<ms> ms)")
+		if runtime.GOOS != "windows" {
+			// Transcripts are Windows-shaped; Linux's SteamCMD launcher is steamcmd.sh.
+			out = strings.ReplaceAll(out, "/steamcmd.sh", "/steamcmd.exe")
+		}
 		for _, f := range scrub {
 			out = f(out)
 		}
