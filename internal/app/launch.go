@@ -137,7 +137,10 @@ func (a *App) gamePlan(e *env.Environment, userData string) (*LaunchPlan, error)
 	proton := goos == "linux" && env.IsProtonGame(e.GameRoot)
 	defaultUserData := env.DefaultUserDataRoot()
 	if goos == "linux" {
-		defaultUserData = a.DefaultUserData(e.GameRoot)
+		defaultUserData = a.DefaultUserData()
+		if e.Launch == "steam" || proton {
+			defaultUserData = a.DefaultUserData(e.GameRoot)
+		}
 	}
 	if proton && e.Launch != "steam" {
 		return nil, fmt.Errorf("%w: Proton games must launch through Steam; use archo env set --launch steam", ErrLaunchBlocked)

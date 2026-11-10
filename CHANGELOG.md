@@ -4,7 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 1.0.9 (unreleased)
 
-- The rebuild guide now names the native Linux Managed folder alongside the Windows folder.
+- The rebuild guide lists Windows and native Linux Managed folders; environment command help describes game directories on either platform.
 - The text interface switches pages faster with shift+1–8. Launch, Can it run, Mod library and texture optimisation keep keys responsive while reading, reuse unchanged data, and discard replies for pages already left. Page layout and styling are unchanged.
 - RimArcho.exe no longer starts invisibly when the Microsoft Edge WebView2 Runtime is missing: a message box says so and where to get it. Under Wine or Proton it says WebView2 does not run there and to use `wine archo.exe` in a Linux terminal. Other errors while opening the window also show a message box instead of nothing.
 - archo.exe in a console that cannot draw the text interface (Wine's console window, where it showed lines of `[K`) now prints a short plain explanation instead: open RimArcho.exe, or under Wine run `wine archo.exe` from a Linux terminal. A double-clicked window waits for Enter before closing. With no game added, the text interface also points to RimArcho.exe and its first-run guide.

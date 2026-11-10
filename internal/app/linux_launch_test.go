@@ -2,8 +2,10 @@ package app_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -12,7 +14,7 @@ import (
 )
 
 func TestLinuxLaunch(t *testing.T) {
-	for _, mode := range []string{"steam", "direct", "own", "custom", "argument", "missing steam", "native"} {
+	for _, mode := range []string{"steam", "direct", "own", "custom", "argument", "missing steam", "native", "flatpak direct", "flatpak native", "flatpak proton"} {
 		t.Run(mode, func(t *testing.T) {
 			e := loadoutEnv(t)
 			bin := filepath.Join(e.Root, "empty-path")
@@ -20,8 +22,23 @@ func TestLinuxLaunch(t *testing.T) {
 			t.Setenv("PATH", bin)
 			e.App.Detect = env.DetectOptions{GOOS: "linux", Home: e.Root, SteamRoots: []string{e.Steam}, ManualRoots: []string{}, SkipRegistry: true}
 			e.MkdirAll(filepath.Join(e.Steam, "steamapps", "compatdata", env.WorkshopAppID, "pfx"))
-			if mode == "native" {
+			if mode == "native" || mode == "flatpak direct" || mode == "flatpak native" {
 				e.WriteFile(filepath.Join(e.Game, "RimWorldLinux"), "")
+			}
+			if strings.HasPrefix(mode, "flatpak") {
+				flatRoot := filepath.Join(e.Root, ".var", "app", "com.valvesoftware.Steam", "data", "Steam")
+				e.WriteFile(filepath.Join(flatRoot, "steamapps", "libraryfolders.vdf"), fmt.Sprintf(`"libraryfolders" { "1" { "path" %q } }`, e.Steam))
+				e.App.Detect.SteamRoots = []string{flatRoot}
+				if mode != "flatpak direct" {
+					name := "flatpak"
+					if runtime.GOOS == "windows" {
+						name += ".exe"
+					}
+					t.Setenv("PATHEXT", ".EXE")
+					if err := os.WriteFile(filepath.Join(bin, name), []byte("never executed"), 0o755); err != nil {
+						t.Fatal(err)
+					}
+				}
 			}
 			ud := env.DefaultUserDataForGame(e.App.Detect, e.Game)
 			e.WriteFile(filepath.Join(ud, "Config", "ModsConfig.xml"), e.ReadModsConfig())
@@ -52,7 +69,7 @@ func TestLinuxLaunch(t *testing.T) {
 			if mode != "missing steam" {
 				e.WriteFile(filepath.Join(e.Steam, "steam.sh"), "never executed")
 			}
-			if mode == "direct" || mode == "native" {
+			if mode == "direct" || mode == "native" || mode == "flatpak direct" {
 				e.MustRun("env", "set", "main", "--launch", "direct")
 			}
 			if mode == "custom" {
@@ -68,13 +85,19 @@ func TestLinuxLaunch(t *testing.T) {
 				t.Fatal(err)
 			}
 			out, code := e.Run("launch", "--dry-run")
-			if mode == "steam" || mode == "native" {
+			if mode == "steam" || mode == "native" || strings.HasPrefix(mode, "flatpak") {
 				want := "-applaunch 294100"
-				if mode == "native" {
+				if mode == "native" || mode == "flatpak direct" {
 					want = "RimWorldLinux"
 				}
-				if code != 0 || !strings.Contains(out, want) || strings.Contains(out, "-savedatafolder") {
+				if mode == "flatpak native" || mode == "flatpak proton" {
+					want = "run com.valvesoftware.Steam -applaunch 294100"
+				}
+				if code != 0 || !strings.Contains(out, want) || strings.Contains(out, "-savedatafolder") != (mode == "flatpak direct") {
 					t.Fatalf("launch preview: %d %s", code, out)
+				}
+				if mode == "flatpak direct" && !strings.Contains(out, "-savedatafolder="+ud) {
+					t.Fatalf("Flatpak data argument: %s", out)
 				}
 				e.MustRun("launch")
 				if len(e.Launched) != 1 || !strings.Contains(e.Launched[0], want) {

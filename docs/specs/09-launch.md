@@ -47,7 +47,7 @@ The links are handled before ModsConfig.xml is written. If a link operation fail
 | `steam` | The Steam client (`env.SteamCommand`): on Windows, `steam.exe`, `steam.sh` or `steam` in the detected Steam directory; on Linux, `steam` on PATH, then a root's `steam.sh` or `steam`, then `flatpak run com.valvesoftware.Steam` when a Flatpak Steam root exists | `-applaunch 294100`, followed by the extra arguments |
 | `direct` | The first executable found in the game directory: `RimWorldWin64.exe`, `RimWorld.exe`, `RimWorldLinux`, `RimWorldMac.app`; Linux tries `RimWorldLinux` first | The extra arguments |
 
-- Both methods append `-savedatafolder=<path>` when the user data directory differs from the local default, using normalized paths for the comparison. On Linux the default is specific to the game (03 §3.2).
+- Both methods append `-savedatafolder=<path>` when the user data directory differs from the local default, using normalized paths for the comparison. On Linux Steam launches use the game's default (03 §3.2); direct native launches use the host default, so a native Flatpak game launched directly receives its Flatpak data path explicitly.
 - The player enters "extra arguments" in the "this game" group in settings (16 §2.14). They are stored as `env:<environmentID>:launch_args`, split on whitespace and appended last.
 - The working directory is the game directory. Arguments containing spaces or tabs are displayed in double quotes.
 - If Steam is missing, refuse and suggest `archo env set --launch direct` for a native game; for Proton, explain that Steam is required. If the game executable is missing, refuse and name the directory that was searched. Scripts inside a Flatpak Steam root are launched through Flatpak, not directly on the host.
