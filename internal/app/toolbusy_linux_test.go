@@ -44,3 +44,24 @@ func TestLinuxToolIdle(t *testing.T) {
 		t.Fatal("unavailable process table was reported idle")
 	}
 }
+
+func TestToolProcessName(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	bin := filepath.Join(dir, "runtime")
+	if err := os.Mkdir(bin, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(bin, "long-tool-runtime-name"), nil, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if match, err := toolProcessName(dir, "long-tool-runt"); err != nil || match {
+		t.Fatalf("partial name must not match: %v %v", match, err)
+	}
+	if match, err := toolProcessName(dir, "long-tool-runti"); err != nil || !match {
+		t.Fatalf("15-byte kernel name must protect nested runtime: %v %v", match, err)
+	}
+	if match, err := toolProcessName(dir, "(sd-pam)"); err != nil || match {
+		t.Fatalf("unrelated protected process: %v %v", match, err)
+	}
+}

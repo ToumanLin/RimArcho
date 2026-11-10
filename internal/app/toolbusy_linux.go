@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -29,10 +30,21 @@ func toolIdleAt(proc, dir string) error {
 		}
 		if err != nil {
 			// Other users' process links are normally inaccessible. An unreadable
-			// process of our user must block replacement rather than guess idle.
+			// matching process must block replacement, as on Windows. Ubuntu's
+			// same-user sd-pam is also protected, so unrelated names cannot block
+			// every tool forever. Compare against names throughout the tool tree.
 			info, statErr := os.Stat(p)
 			if os.IsPermission(err) && statErr == nil && info.Sys().(*syscall.Stat_t).Uid != uint32(os.Geteuid()) {
 				continue
+			}
+			if os.IsPermission(err) {
+				comm, commErr := os.ReadFile(filepath.Join(p, "comm"))
+				if commErr == nil {
+					match, nameErr := toolProcessName(dir, strings.TrimSuffix(string(comm), "\n"))
+					if nameErr == nil && !match {
+						continue
+					}
+				}
 			}
 			return fmt.Errorf("cannot check whether the tool in %s is in use: %w", dir, err)
 		}
@@ -42,4 +54,28 @@ func toolIdleAt(proc, dir string) error {
 		}
 	}
 	return nil
+}
+
+// Linux comm holds at most 15 bytes. Inspect the tool tree only when a same-user
+// executable link is protected; readable processes always use their full path.
+func toolProcessName(dir, comm string) (bool, error) {
+	match := false
+	err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		name := entry.Name()
+		if len(name) > 15 {
+			name = name[:15]
+		}
+		if !entry.IsDir() && name == comm {
+			match = true
+			return fs.SkipAll
+		}
+		return nil
+	})
+	return match, err
 }
