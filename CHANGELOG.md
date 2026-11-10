@@ -4,6 +4,9 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 1.0.9 (unreleased)
 
+- Linux: texture optimisation uses native todds from `PATH` or `textures.todds`; missing-tool guidance explains how to provide it, and no Windows encoder download is offered.
+- Linux: Can it run and CLI/MCP memory estimates read system RAM from `/proc`; unavailable RAM or VRAM is described clearly in English and Chinese. Process probes and game test reports now read resident and peak memory on Linux.
+
 - The rebuild guide lists Windows and native Linux Managed folders; environment command help describes game directories on either platform.
 - Game log: shared Linux logs now identify Mods from native absolute file paths and keep problem references stable across installation locations. Running-game checks also recognize game directories reached through filesystem links.
 - CLI: `archo help` describes `update` as checking for a newer RimArcho and showing update options; Windows installation behavior is unchanged.

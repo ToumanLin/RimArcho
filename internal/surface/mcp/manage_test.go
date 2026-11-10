@@ -318,7 +318,7 @@ func TestGoldenManageTools(t *testing.T) {
 		}
 		args, _ = json.Marshal(unq)
 		fmt.Fprintf(&sb, "> %s %s\n", m.tool, args)
-		sb.WriteString(got)
+		sb.WriteString(testkit.WindowsShaped(got))
 		if isErr {
 			sb.WriteString("[isError]\n")
 		}

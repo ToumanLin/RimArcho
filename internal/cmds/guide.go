@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/render"
+	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
 func init() {
@@ -117,3 +118,17 @@ Inventory: list_library lists every mod on this machine with its copies, sizes, 
 Editing mod files: pin_mod first creates a locked version (a copy the current plan uses instead; never edit Workshop files in place — Steam overwrites them), then edit the copy; test_run tests the copy before anything is saved.`
 
 const guideWords = `Talking to the player: the interface calls a plan a list, an environment a game, the library the mod library, save_loadout "save", pin_mod "lock this version", swap "switch version" and a pack a pack (16 §7.2); use those words with the player, and the tool names only in calls.`
+
+func textureToolInstallGuide() string {
+	if textures.ToddsZipURL == "" {
+		return textures.ToddsMissing + " Ask the player to provide it; do not download it."
+	}
+	return "needs the encoder todds, which the player installs with archo textures tool --install or in the window — tell them, do not try to download it"
+}
+
+func textureToolExamplePath() string {
+	if textures.ToddsZipURL == "" {
+		return "/usr/local/bin/todds"
+	}
+	return `C:\Users\me\AppData\Local\RimArcho\todds\todds.exe`
+}

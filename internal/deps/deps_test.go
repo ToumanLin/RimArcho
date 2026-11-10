@@ -35,9 +35,9 @@ func fixture(t *testing.T) (*Finder, map[string]string) {
 
 func TestToddsOrderAndCompatibility(t *testing.T) {
 	f, settings := fixture(t)
-	configured := file(t, filepath.Join(t.TempDir(), "todds.exe"))
-	own := file(t, filepath.Join(f.LocalDir, Todds, "todds.exe"))
-	fromPath := file(t, filepath.Join(t.TempDir(), "todds.exe"))
+	configured := file(t, filepath.Join(t.TempDir(), textures.ToddsExecutable))
+	own := file(t, filepath.Join(f.LocalDir, Todds, textures.ToddsExecutable))
+	fromPath := file(t, filepath.Join(t.TempDir(), textures.ToddsExecutable))
 	f.LookPath = func(n string) (string, error) {
 		if n != "todds" {
 			t.Fatalf("PATH lookup %q", n)
@@ -50,7 +50,7 @@ func TestToddsOrderAndCompatibility(t *testing.T) {
 		own          bool
 	}{{configured, "config", false}, {own, "own", true}, {fromPath, "path", false}} {
 		i := f.Status(Todds)
-		if i.Path != tc.path || i.Source != tc.source || i.Own != tc.own || !i.OK || !i.Installable || i.ConfigKey != "textures.todds" {
+		if i.Path != tc.path || i.Source != tc.source || i.Own != tc.own || !i.OK || i.Installable != (textures.ToddsZipURL != "") || i.ConfigKey != "textures.todds" {
 			t.Fatalf("status %+v, want %+v", i, tc)
 		}
 		if err := os.Remove(tc.path); err != nil {
@@ -139,7 +139,7 @@ func TestVersionCacheInvalidatesByPathSizeAndMtime(t *testing.T) {
 	f, settings := fixture(t)
 	calls := 0
 	f.Version = func(string, string) (string, error) { calls++; return textures.ToddsVersion, nil }
-	p := file(t, filepath.Join(f.LocalDir, Todds, "todds.exe"))
+	p := file(t, filepath.Join(f.LocalDir, Todds, textures.ToddsExecutable))
 	for range 3 {
 		f.Status(Todds)
 	}
@@ -165,7 +165,7 @@ func TestVersionCacheInvalidatesByPathSizeAndMtime(t *testing.T) {
 	if calls != 3 {
 		t.Fatalf("mtime change calls %d", calls)
 	}
-	settings["textures.todds"] = file(t, filepath.Join(t.TempDir(), "todds.exe"))
+	settings["textures.todds"] = file(t, filepath.Join(t.TempDir(), textures.ToddsExecutable))
 	f.Status(Todds)
 	if calls != 4 {
 		t.Fatalf("path change calls %d", calls)
@@ -178,7 +178,7 @@ func TestVersionCacheRetriesFailures(t *testing.T) {
 	f, _ := fixture(t)
 	calls := 0
 	f.Version = func(string, string) (string, error) { calls++; return "", errors.New("access denied") }
-	file(t, filepath.Join(f.LocalDir, Todds, "todds.exe"))
+	file(t, filepath.Join(f.LocalDir, Todds, textures.ToddsExecutable))
 	for range 2 {
 		if f.Status(Todds).OK {
 			t.Fatal("failing tool usable")

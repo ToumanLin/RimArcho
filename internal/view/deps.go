@@ -18,7 +18,7 @@ func DependencyGroup(a *app.App) SettingGroup {
 		} else if i.OK {
 			item.Value = T("installed")
 		}
-		if i.Err != "" && i.Path != "" {
+		if i.Err != "" && (i.Path != "" || !i.Installable) {
 			item.Note += "  " + Humanize(nil, T(i.Err))
 		}
 		item.Note = strings.TrimSpace(item.Note)
@@ -44,10 +44,10 @@ func DependencyGroup(a *app.App) SettingGroup {
 			if update.Pending && !update.Compatible && i.Own {
 				item.Actions = nil
 			}
-			if i.Own && a.CheckDepRemoval(i.Name) == nil {
-				item.Actions = append(item.Actions, SettingAction{Label: T("remove"), Argv: []string{"deps", "remove", i.Name},
-					Confirm: Tf("remove RimArcho's own copy of %s?", labels[i.Name])})
-			}
+		}
+		if i.Own && a.CheckDepRemoval(i.Name) == nil {
+			item.Actions = append(item.Actions, SettingAction{Label: T("remove"), Argv: []string{"deps", "remove", i.Name},
+				Confirm: Tf("remove RimArcho's own copy of %s?", labels[i.Name])})
 		}
 		if item.EditValue != nil && *item.EditValue != "" {
 			item.Actions = append(item.Actions, SettingAction{Label: T("use default"), Argv: []string{"config", "set", i.ConfigKey, ""}})

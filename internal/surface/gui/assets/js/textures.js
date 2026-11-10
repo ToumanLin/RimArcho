@@ -179,7 +179,7 @@ function draw(measurements = false) {
   w.append(el("div", "label section", T("encoder")));
   const enc = el("section", "card settings");
   setRow(enc, T("the DDS encoder"), I.toolOk ? null : [I.offer, I.offerTo && { text: "→ " + I.offerTo, paths: [I.offerTo] }], I.toolOk ? factText(el("span", "muted"), { text: I.tool, paths: [I.toolPath] }) : null,
-    I.toolOk ? null : button(T("download todds…"), "", () => install(I), "primary"));
+    I.toolOk || !I.offer ? null : button(T("download todds…"), "", () => install(I), "primary"));
   if (!I.toolOk) enc.querySelector(".name").after(pathContent(el("div", "sub warn"), I.tool, [I.toolPath]));
   w.append(slot(enc, "encoder"));
 

@@ -19,7 +19,9 @@ type Memory struct {
 	CommitAvailable int64     `json:"commitAvailable"`
 	Adapters        []Adapter `json:"adapters,omitempty"`
 	SampledAt       time.Time `json:"sampledAt"`
-	Error           string    `json:"error,omitempty"`
+	// RAMAvailableUnknown distinguishes an absent Linux counter from measured zero.
+	RAMAvailableUnknown bool   `json:"ramAvailableUnknown,omitempty"`
+	Error               string `json:"error,omitempty"`
 }
 
 // VRAM uses Windows' high-performance adapter ordering. This is a candidate,

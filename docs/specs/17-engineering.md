@@ -81,7 +81,7 @@ RimArcho uses two programs that are not compiled into the exe. Only `deps` disco
 
 | Name | Purpose | Search order | Version | RimArcho-owned directory |
 | --- | --- | --- | --- | --- |
-| `todds` | DDS encoder (10 §2) | `textures.todds` → own copy → `PATH` | Run `--version`; anything other than 0.4.1 is unusable | `%LOCALAPPDATA%\RimArcho\todds` |
+| `todds` | DDS encoder (10 §2) | `textures.todds` → own copy → `PATH` | Run `--help`; anything other than 0.4.1 is unusable | `%LOCALAPPDATA%\RimArcho\todds` |
 | `steamcmd` | Download game versions (11 §3) and Mods | Configured `steamcmd.path` (or siblings if absent) → `PATH`; without a setting: own copy → `PATH` on Windows, `PATH` → own copy on Linux | Do not run it (it self-updates); leave version empty | `%LOCALAPPDATA%\RimArcho\steamcmd` |
 
 Interface (kept small for other features):
@@ -96,6 +96,7 @@ app.RemoveDep(name)                      // Delete only own copy; see 02 §1
 ```
 
 - Discovery does not use networking, download or modify files. Cache version probes by path, size and modification time so refreshing settings does not run todds each time. A failed probe is not cached (a scanner holding the file, a timeout): the next lookup probes again. Probes run outside the cache lock.
+- Automatic todds installation is available only on Windows. Linux discovers the native `todds` executable (not `todds.exe`); a missing copy explains how to build it and use `PATH` or `textures.todds`. No Linux install offer or install command downloads anything, including through dependency management. See 10 §2.
 - Installation does not change settings: if the player specified another copy, it remains selected after installation (the settings explanation shows the source).
 - `app.CheckToolUpdates` checks only the currently used managed SteamCMD and todds: Valve's platform-specific SteamCMD package manifest and todds' latest stable GitHub release. It downloads no executables. Results appear in settings rows and `archo deps`; scheduling: 16 §2.16. Read SteamCMD's version from the package manifest; manual updates run its own update process, never overwrite an installed tool with the bootstrap ZIP. Install only the todds version supported by the caller; merely notify about incompatible newer releases.
 - Check processes before updating or removing. Windows refuses while a same-named tool is in use; Linux checks `/proc/<pid>/exe` for any executable inside the managed tool directory, including nested runtime directories and deleted executables still running. In-app use and replacement of SteamCMD and todds share locks. Refuse replacement when the process table cannot be inspected. For a protected same-user Linux process, compare `comm` against filenames throughout the tool directory, accounting for the kernel's 15-byte name limit; refuse if a name matches or the comparison cannot be completed. Unrelated protected processes and inaccessible processes of other Linux users are skipped. Do not infer whether a tool is busy from a single failed write.
@@ -290,6 +291,7 @@ Basis: ilspycmd decompilation of 1.7.4982 `Assembly-CSharp.dll`, covering `Verse
 
 ### 7.3 Memory measures
 
+- **Process counters** (`internal/procmem`, `internal/procfs`): Linux reads `/proc/self/status`: `VmRSS` for working set, `VmHWM` for peak RSS and `RssAnon` for anonymous resident memory. The latter is a private-memory approximation excluding file mappings and swapped-out pages, not Windows committed private bytes. Missing or unreadable counters remain unknown (zero from the numeric probe); parser tests use synthetic text and temporary proc roots.
 - **TUI process** (`tui.TuneProcess`, first line of `tui.Run`): `debug.SetMemoryLimit(40 MiB)` soft limit, GOGC 50, sole TUI connection `PRAGMA cache_size=-256` (256 KiB page cache). All scans run in children, never in the main process.
 - **On-demand loading**: `store.Mods` omits `decl_blob`; `Mod.Decl()` reads it on demand; sorting and analysis batch-load through `Store.LoadDecls`.
 - **Caching**: `app.Loadout()` and `app.Problems()` cache by `Store.ChangeKey()` (`PRAGMA data_version` + `total_changes()`) + environment ID + ModsConfig.xml size/mtime. Concurrent executables detect each other's changes through `ChangeKey`. `app.Index()` and link checks cache by `Store.IndexKey()`; the index also includes environment ID. `store.Open` installs the shared `archo_index_gen` counter table and persistent triggers, advancing generation only on environment, source, lineage, instance, snapshot, lineage_data, lineage_tag and tag_color changes (rows show tag colours). List edits do not invalidate other connections' indexes. `OpenSession` installs no triggers and writes nothing. Shared indexes (`ReadIndex`) retain their source generation, avoiding marking stale data current after a concurrent commit. Link checks read all environments once, caching only IDs, source labels, relative paths, real paths and status; shared Instances are not loaded twice.

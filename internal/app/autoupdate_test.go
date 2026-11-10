@@ -20,6 +20,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
+	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
 func TestAutomaticLoopStartupIntervalAndCancellation(t *testing.T) {
@@ -245,7 +246,7 @@ func TestAutomaticToolVersionsAndOfflineRetention(t *testing.T) {
 		}
 		return "steam_cmd_win32.installed"
 	}()), `"steam_cmd_win32" { "version" "100" }`)
-	e.WriteFile(filepath.Join(e.App.LocalDir(), "todds", "todds.exe"), "fixture encoder")
+	e.WriteFile(filepath.Join(e.App.LocalDir(), "todds", textures.ToddsExecutable), "fixture encoder")
 	failed := false
 	calls := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

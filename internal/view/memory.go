@@ -2,6 +2,7 @@ package view
 
 import (
 	"fmt"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -29,6 +30,16 @@ func MemoryNeed(c app.MemoryAssessment, plan int64) Need {
 	lines := []string{
 		Tf("RAM: loading needs %s; available now %s of %s", ram, available, total),
 		Tf("VRAM: estimated %s; dedicated capacity %s", vram, video),
+	}
+	if runtime.GOOS != "windows" {
+		if c.Hardware.TotalRAM <= 0 {
+			lines[0] = Tf("RAM: loading needs %s; available memory and total capacity are unavailable", ram)
+		} else if c.Hardware.RAMAvailableUnknown {
+			lines[0] = Tf("RAM: loading needs %s; available memory is unavailable; total capacity %s", ram, total)
+		}
+		if c.Hardware.VRAM() <= 0 {
+			lines[1] = Tf("VRAM: estimated %s; dedicated capacity is unknown", vram)
+		}
 	}
 	if c.Estimated && c.VRAMInRAMHigh > 0 {
 		lines = append(lines, Tf("RAM includes %s of VRAM held in system memory on this computer.", costRange(c.VRAMInRAMLow, c.VRAMInRAMHigh)))

@@ -325,3 +325,17 @@ func TestRealTodds(t *testing.T) {
 		}
 	}
 }
+
+func TestFindToddsNativeName(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, ToddsExecutable)
+	if err := os.WriteFile(p, []byte("fixture"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if got := FindTodds(dir); got != p {
+		t.Fatalf("native discovery = %q", got)
+	}
+	if got := FindTodds(p); got != p {
+		t.Fatalf("configured executable = %q", got)
+	}
+}
