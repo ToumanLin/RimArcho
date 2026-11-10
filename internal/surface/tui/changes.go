@@ -32,6 +32,7 @@ const (
 	chSource             // a subscription source (enter checks it)
 	chPending            // an update waiting for the player
 	chGone               // an installed copy removed from the Workshop
+	chScope              // already updated's scope: what is shown, since when, the key that switches
 )
 
 type chRow struct {
@@ -86,15 +87,22 @@ func (c *chState) build() {
 	add := func(text string, kind int) { c.rows = append(c.rows, chRow{text: text, kind: kind}) }
 	if c.subscriptions != nil {
 		add("1 "+T("sources"), chHead)
+		// the sources as a table: names, then their counts right-aligned (16 §7.3 rule 9)
+		nameW, countW := 0, 0
+		for _, s := range c.subscriptions.Sources {
+			nameW, countW = max(nameW, width.StringWidth(s.Name)), max(countW, len(itoa(s.Count)))
+		}
 		for i := range c.subscriptions.Sources {
 			s := &c.subscriptions.Sources[i]
-			c.rows = append(c.rows, chRow{text: fmt.Sprintf("  %s  %d  %s  %s  %s", s.Name, s.Count, s.Checked, s.Result, s.Account), kind: chSource, src: s, key: "src:" + s.Key})
+			text := strings.TrimRight(fmt.Sprintf("  %s  %*d  %s  %s  %s", fit(s.Name, nameW), countW, s.Count, s.Checked, s.Result, s.Account), " ")
+			c.rows = append(c.rows, chRow{text: text, kind: chSource, src: s, key: "src:" + s.Key})
 			for _, failure := range s.Failures {
 				for _, item := range failure.Items {
 					add("    "+item, chDim)
 				}
 			}
 		}
+		add("", chDim)
 		add("2 "+T("waiting for you to update"), chHead) // the window's names (16 §2.9)
 		for i := range c.subscriptions.Pending {
 			r := &c.subscriptions.Pending[i]
@@ -112,7 +120,8 @@ func (c *chState) build() {
 				continue
 			}
 			if !heading {
-				add(T("won't update any more"), chHead)
+				add("", chDim)
+				add("  "+T("won't update any more"), chHead)
 				heading = true
 			}
 			k := "gone:" + r.ID
@@ -123,14 +132,19 @@ func (c *chState) build() {
 			}
 		}
 	}
+	if len(c.rows) > 0 {
+		add("", chDim)
+	}
 	add("3 "+T("already updated"), chHead)
+	// the window's scope bar: what is shown and since when, then the key that switches;
+	// "\x00" parts are drawn as a key and its label (changeLines)
 	switch {
 	case c.of != "":
-		add(Tf("only %s", c.ofName)+"  "+T("esc shows every mod"), chHead)
-	case c.library: // the window's scope bar: list "…" / every mod, a switches
-		add(T("every mod")+"  "+p.Since+"  a "+Tf("list “%s”", p.Plan), chHead)
+		add("  "+Tf("only %s", c.ofName)+"  "+T("esc shows every mod"), chScope)
+	case c.library:
+		add("  "+T("every mod")+"  "+p.Since+"\x00a\x00"+Tf("list “%s”", p.Plan), chScope)
 	default:
-		add(Tf("list “%s”", p.Plan)+"  "+p.Since+"  a "+T("every mod"), chHead)
+		add("  "+Tf("list “%s”", p.Plan)+"  "+p.Since+"\x00a\x00"+T("every mod"), chScope)
 	}
 	if p.NoScan {
 		add("  "+T("no scan yet (R scans)"), chDim)
@@ -142,7 +156,8 @@ func (c *chState) build() {
 		add("  "+T("nothing changed"), chDim)
 	}
 	if len(p.Older) > 0 && c.of == "" {
-		add(T("earlier"), chHead)
+		add("", chDim)
+		add("  "+T("earlier"), chHead)
 	}
 	for _, d := range p.Older {
 		k := "day:" + d.Day
@@ -280,7 +295,7 @@ func (c *chState) relayoutAt(key string) {
 
 func (m *model) changesKey(s string) tea.Cmd {
 	c := &m.chg
-	page := max(m.h-4, 1)
+	page := max(m.h-bodyTop-2, 1)
 	var r *chRow
 	if c.cursor < len(c.rows) && c.rows[c.cursor].selectable() {
 		r = &c.rows[c.cursor]
@@ -479,12 +494,33 @@ func (m *model) changeLines(n int) []string {
 		switch {
 		case i == c.cursor && r.selectable():
 			l = sSel.Render(l)
-		case r.kind == chHead || r.kind == chDim:
+		case r.kind == chHead && len(r.text) > 1 && r.text[0] >= '1' && r.text[0] <= '9' && r.text[1] == ' ':
+			l = areaHead(r.text[:1], r.text[2:], "", false, m.w) // an area: its key in the slot (16 §7)
+		case r.kind == chHead:
+			l = sHead.Render(l)
+		case r.kind == chScope:
+			l = scopeLine(r.text, m.w)
+		case r.kind == chDim:
 			l = sDimS.Render(l)
 		}
 		out = append(out, l)
 	}
 	return out
+}
+
+// scopeLine draws already updated's scope: "what  since" secondary, then the key bold and
+// what it switches to, 3 cells after (the text's "\x00" parts).
+func scopeLine(text string, w int) string {
+	parts := strings.Split(text, "\x00")
+	if len(parts) != 3 {
+		return sSecond.Render(fit(text, w))
+	}
+	lw := width.StringWidth(parts[0])
+	kw := width.StringWidth(parts[1]) + 1 + width.StringWidth(parts[2])
+	if lw+3+kw > w {
+		return sSecond.Render(fit(parts[0], w))
+	}
+	return sSecond.Render(parts[0]) + "   " + sBold.Render(parts[1]) + " " + sSecond.Render(parts[2]) + strings.Repeat(" ", w-lw-3-kw)
 }
 
 // shownPending: the updates the list shows (U updates all of them).

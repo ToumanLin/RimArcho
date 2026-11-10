@@ -604,7 +604,7 @@ func (m *model) promptKey(k tea.KeyMsg) tea.Cmd {
 
 func (m *model) panelKey(s string) tea.Cmd {
 	p := m.panel
-	page := max(m.h-6, 1)
+	page := max(m.h-bodyTop-4, 1)
 	if p.choices != nil {
 		switch s {
 		case "up", "k":
@@ -635,11 +635,11 @@ func (m *model) panelKey(s string) tea.Cmd {
 		m.panel = nil // one command after another (16 §9.4)
 		return m.openCmdLine()
 	case "down", "j":
-		p.off = min(p.off+1, max(len(p.lines)-page, 0))
+		p.off = min(p.off+1, max(len(m.panelText())-page, 0))
 	case "up", "k":
 		p.off = max(p.off-1, 0)
 	case "pgdown", " ":
-		p.off = min(p.off+page, max(len(p.lines)-page, 0))
+		p.off = min(p.off+page, max(len(m.panelText())-page, 0))
 	case "pgup":
 		p.off = max(p.off-page, 0)
 	case "enter":
@@ -659,7 +659,7 @@ func (m *model) chooseEnv() tea.Cmd {
 		m.say(sayInfo, T("no games yet (archo env add)"))
 		return nil
 	}
-	p := &panel{title: T("switch game")}
+	p := &panel{title: T("switch game"), nav: 8}
 	for i, e := range envs {
 		p.choices = append(p.choices, e.Name)
 		if e.Name == m.envName {
@@ -717,7 +717,7 @@ func (m *model) hit(x, y int) (colKind, int, bool) {
 			continue
 		}
 		rm := m.rowMap[s.kind]
-		y := y - 2 - m.barLines()
+		y := y - bodyTop - m.barLines()
 		if y < 0 || y >= len(rm) {
 			return s.kind, -1, true
 		}
@@ -746,6 +746,10 @@ func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
 		}
 		return nil
 	}
+	// the navigation and context rows: a click opens the page or sub-page (16 §9.1)
+	if e.Y < bodyTop-1 && e.Action == tea.MouseActionPress && e.Button == tea.MouseButtonLeft && m.prompt == nil && m.pal == nil && m.tags == nil && m.pos == nil {
+		return m.navClick(e.X, e.Y)
+	}
 	if m.tab == tabLibrary && e.Action == tea.MouseActionPress && m.panel == nil && m.prompt == nil && m.pal == nil && m.tags == nil && m.pos == nil && !m.libr.full {
 		switch e.Button {
 		case tea.MouseButtonRight:
@@ -770,7 +774,7 @@ func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
 		return m.scrollDetail(wheel)
 	}
 	// A click on the detail column focuses it (area 4).
-	if l := m.layout(); l.detailW > 0 && e.X >= l.detailX && e.Y >= 2 {
+	if l := m.layout(); l.detailW > 0 && e.X >= l.detailX && e.Y >= bodyTop {
 		if e.Action == tea.MouseActionPress && e.Button == tea.MouseButtonLeft {
 			m.detailFocus = true
 		}
@@ -788,7 +792,7 @@ func (m *model) mouse(e tea.MouseMsg) tea.Cmd {
 		}
 		return nil
 	}
-	if e.Action == tea.MouseActionPress && e.Button == tea.MouseButtonLeft && e.Y >= 2 {
+	if e.Action == tea.MouseActionPress && e.Button == tea.MouseButtonLeft && e.Y >= bodyTop {
 		if k, w, ok := m.gapAt(e.X); ok {
 			m.resizing = &resizeDrag{kind: k, x0: e.X, w0: w}
 			return nil

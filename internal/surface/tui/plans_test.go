@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func choicesOf(t *testing.T, m *model) []string {
@@ -39,13 +40,13 @@ func typeText(m *model, s string) {
 }
 
 // 16 §9.1, T21/T22: P manages the plans with the view verbs; the palette goes to another
-// plan; the editor and the top bar show the current one.
+// plan; the editor and the context row show the current one.
 func TestPlansInTUI(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 160, 40)
-	if !strings.Contains(m.topBar(), "list default") {
-		t.Fatalf("top bar %q", m.topBar())
+	if !strings.Contains(ansi.Strip(m.contextRow()), " default ") {
+		t.Fatalf("context row %q", m.contextRow())
 	}
 	enabled := len(m.cols[cActive].items)
 
@@ -60,7 +61,7 @@ func TestPlansInTUI(t *testing.T) {
 		t.Fatalf("name prompt %+v", m.prompt)
 	}
 	press(m, "enter")
-	if m.st.Plan.Name != "new list" || len(m.cols[cActive].items) != 0 || !strings.Contains(m.topBar(), "list new list") {
+	if m.st.Plan.Name != "new list" || len(m.cols[cActive].items) != 0 || !strings.Contains(ansi.Strip(m.contextRow()), " new list ") {
 		t.Fatalf("after new: plan %s, %d enabled, status %q", m.st.Plan.Name, len(m.cols[cActive].items), m.status)
 	}
 

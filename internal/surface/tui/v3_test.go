@@ -244,8 +244,19 @@ func idOf(t *testing.T, m *model, name string) string {
 // tagsDefault is the i-th pinned tag (16 §3.8).
 func (m *model) tagsDefault(i int) string { return view.PinnedTags(m.app)[i] }
 
+// positionLine is where the screen says where the player is: the status line, as in the
+// GUI, or the context row when the status line does not (full screen, technical pages, the
+// tag bar on the status line).
+func positionLine(m *model) string {
+	lines := strings.Split(ansi.Strip(m.View()), "\n")
+	if st := strings.TrimSpace(lines[len(lines)-2]); st != "" && m.tags == nil {
+		return st
+	}
+	return strings.TrimSpace(lines[1])
+}
+
 // T19: every state, popups and the full screen included, shows the focused area and the
-// place in it on the position line, and the open popup's name.
+// place in it on the position line, and the open popup's name (16 §2.2, §9.1).
 func TestT19PositionLine(t *testing.T) {
 	e, _ := v3Fixture(t)
 	// The states share one environment (Staging stages a mod), so the counts are patterns.
@@ -263,15 +274,16 @@ func TestT19PositionLine(t *testing.T) {
 		"move to":         `Enabled  2 / \d+ › move to…$`,
 		"preview":         `Enabled  1 / \d+ › preview the sort$`,
 		"help":            `Enabled  1 / \d+ › all keys$`,
-		"needs attention": `› can it run  1 / \d+`,
-		"recent changes":  `› updates`,
+		// the check that opening starts says so on the status line, which then has no room for
+		// the position (as in the GUI)
+		"needs attention": `^(can it run  1 / \d+|… analyzing…)$`,
+		"recent changes":  `mod library › updates`,
 	}
 	for _, s := range v3States {
 		t.Run(s.name, func(t *testing.T) {
 			m := direct(t, e, 160, 40)
 			s.setup(m)
-			top := strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(ansi.Strip(strings.Split(m.View(), "\n")[0])), "L launch ►"))
-			if !regexp.MustCompile(want[s.name]).MatchString(top) {
+			if top := positionLine(m); !regexp.MustCompile(want[s.name]).MatchString(top) {
 				t.Fatalf("position line %q, want %s", top, want[s.name])
 			}
 		})
@@ -281,7 +293,7 @@ func TestT19PositionLine(t *testing.T) {
 	defer SetLang("en")
 	m := direct(t, e, 160, 40)
 	pressAll(m, "down", "shift+down")
-	if top := ansi.Strip(strings.Split(m.View(), "\n")[0]); !regexp.MustCompile(`已启用  3 / \d+  已选 2`).MatchString(top) {
+	if top := positionLine(m); !regexp.MustCompile(`已启用  3 / \d+  已选 2`).MatchString(top) {
 		t.Fatalf("zh: %q", top)
 	}
 }

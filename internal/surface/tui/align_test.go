@@ -339,7 +339,7 @@ func TestStartPage(t *testing.T) {
 	m := direct(t, e, 160, 40)
 	key(m, runes("!"))
 	s := screen(m)
-	if m.tab != tabHome || !strings.Contains(s, "default") || !strings.Contains(s, T("launch the game")) || !strings.Contains(s, "› "+T("start")) {
+	if m.tab != tabHome || !strings.Contains(s, "default") || !strings.Contains(s, T("launch the game")) || !strings.Contains(strings.Split(s, "\n")[0], "1 "+T("start")) {
 		t.Fatalf("start page:\n%s", s)
 	}
 	press(m, "esc")
@@ -380,7 +380,7 @@ func TestOpenListIsNotCurrent(t *testing.T) {
 	if m.st.Plan.Name != "second" || e.App.Store.CurrentPlanID(envID) != cur || m.launches == "" {
 		t.Fatalf("open: editing %s, current %d (was %d), launches %q", m.st.Plan.Name, e.App.Store.CurrentPlanID(envID), cur, m.launches)
 	}
-	if top := strings.Split(screen(m), "\n")[0]; !strings.Contains(top, Tf("launching plays %s", m.launches)) {
+	if top := strings.Split(screen(m), "\n")[1]; !strings.Contains(top, Tf("launching plays %s", m.launches)) {
 		t.Fatalf("top bar: %q", top)
 	}
 	pick(T("make current"))

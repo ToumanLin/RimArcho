@@ -1,6 +1,6 @@
 # TUI redesign: navigation bar and visual system (2026-11-09)
 
-Status: **proposal, waiting for the maintainer's choice.** Nothing in `internal/surface/tui` has changed yet.
+Status: **option A implemented** on branch `claude/tui-redesign-1a5eed` (16 §9.6). The maintainer chose A; questions 2–4 in §5 took the proposal's defaults: faint shift digits on the navigation row, `ui.tui.theme` auto / dark / light with detection, and the position on the status line. P8 below was partly wrong; see the correction in its row.
 
 Why now: Linux players are asking for RimArcho, and the Linux plan (`2026-11-09_linux-support-plan.md` on `dev/1.1`) ships the TUI before the GUI there. The TUI has to look good and navigate like the GUI. The page-switch lag of shift+1–8 is a separate task (`codex/tui-page-lag`); this document covers looks and navigation only.
 
@@ -22,7 +22,7 @@ The mockups in colour, with a dark/light terminal switch and every screen of eac
 | P5 | Headings are faint `#4A4F5A` (`Disabled 16`, `details`, the filter placeholder): about 2.4:1 on Windows Terminal's `#0C0C0C`. Numbers, icons and explanations share that colour, so there is no hierarchy. | `theme.go`, `columns.go` |
 | P6 | Enabled's cursor `▸` is drawn in the gap to the left of the row number, next to the Disabled column, far from the name it marks. | `columns.go` |
 | P7 | The status icon `⨯` sits at the right end of the name column, away from the name, and at 80 columns on the screen edge. | `columns.go` |
-| P8 | The detail column breaks paths mid-word. It shows `Archo ID  #j5pq`, although 16 §9.1 says the interface does not show `#id` (**the code and the spec disagree**). Mod library details wrap key hints between the key and its label (`ctrl+w` / `open the Workshop page`). | `detail.go`, `library.go` |
+| P8 | Mod library details wrap key hints between the key and its label (`ctrl+w` / `open the Workshop page`). **Correction:** the first version of this row also said the detail column breaks paths mid-word and that `Archo ID  #j5pq` contradicts 16 §9.1. Both were wrong: 16 §4.1 places Archo ID in details on purpose (§9.1's rule is about results and errors), and paths already break at `\`. Only the key-hint split was real; it is fixed (`keyLines`). | `library.go` |
 | P9 | Updates has no blank line between its three areas, its counts are not in a column, and `list “default”  the last scan  Oct 1 10:00  a every mod` mixes a heading with a key. | `changes.go` |
 | P10 | Launch puts everything in the top-left corner over 25 empty rows; `► launch the game  L` looks like any other line; `watch for:` is not on the label column. | `home.go` |
 | P11 | Can it run headings read `1 breaks the game  2` (focus key, name, count). An item's key line has the same colour as its evidence line. | `needs.go` |
@@ -169,5 +169,7 @@ Can it run, with the status and hint lines:
 5. Anything else, such as a Launch page closer to the GUI's three columns, or command palette groups.
 
 ## 6. After the choice
+
+Done as below, except P17. Answers taken: 1 A; 2 yes; 3 yes; 4 yes; 5 nothing more for now.
 
 Rebase onto `dev/1.1` (with the page-lag fix), keep Bubble Tea and the existing keys, and in the same commits update 16 §9 (and §3 and §7 where touched), CHANGELOG and `UserGuide/release-vm-tests.md`. Check both icon modes and 80×24. P17 (non-US layouts) is a separate follow-up.

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"os"
+	"sync"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-runewidth"
@@ -17,33 +18,59 @@ import (
 // (17 §6 item 3, 16 §7): ambiguous-width characters and Nerd Font icons are 1 cell.
 var width = &runewidth.Condition{EastAsianWidth: false}
 
-// Palette (16 §7, dark).
-var (
-	cText     = lipgloss.Color("#E6E6E6")
-	cSecond   = lipgloss.Color("#7C8290")
-	cDim      = lipgloss.Color("#4A4F5A")
-	cAccent   = lipgloss.Color("#A5B4FC")
-	cPill     = lipgloss.Color("#2C2E4A")
-	cRowBg    = lipgloss.Color("#1A1C24") // the focused area's cursor row (16 §3.2)
-	cSelBg    = lipgloss.Color("#232539") // selected rows (16 §3.4)
-	cSelCurBg = lipgloss.Color("#303450") // selected row under the focused cursor
-	cOK       = lipgloss.Color("#7EE2A8")
-	cWarn     = lipgloss.Color("#F2C46D")
-	cErr      = lipgloss.Color("#FF8A80")
-)
+// Palettes (16 §7): one for dark terminals, one for light ones. SetTheme picks one.
+type colours struct {
+	text, second, dim, accent, pill lipgloss.Color
+	row, sel, selCur                lipgloss.Color // focused cursor row, selected, selected under the cursor
+	ok, warn, err                   lipgloss.Color
+}
 
 var (
-	sText   = lipgloss.NewStyle().Foreground(cText)
-	sBold   = lipgloss.NewStyle().Foreground(cText).Bold(true)
-	sSecond = lipgloss.NewStyle().Foreground(cSecond)
-	sDimS   = lipgloss.NewStyle().Foreground(cDim)
-	sAccent = lipgloss.NewStyle().Foreground(cAccent)
-	sSel    = lipgloss.NewStyle().Foreground(cAccent).Bold(true)
-	sPill   = lipgloss.NewStyle().Foreground(cText).Background(cPill)
-	sOK     = lipgloss.NewStyle().Foreground(cOK)
-	sWarnS  = lipgloss.NewStyle().Foreground(cWarn)
-	sErrS   = lipgloss.NewStyle().Foreground(cErr)
+	darkPalette  = colours{"#E6E6E6", "#858B99", "#5C6270", "#A5B4FC", "#2C2E4A", "#1A1C24", "#232539", "#303450", "#7EE2A8", "#F2C46D", "#FF8A80"}
+	lightPalette = colours{"#1C1C21", "#5F5F68", "#8E8E97", "#4F46E5", "#E4E3FB", "#F0F0F4", "#ECEBFB", "#DCDAF8", "#188A50", "#B45309", "#D64545"}
 )
+
+// The colours and styles in use; applyPalette sets them.
+var (
+	cText, cSecond, cDim, cAccent, cPill lipgloss.Color
+	cRowBg, cSelBg, cSelCurBg            lipgloss.Color
+	cOK, cWarn, cErr                     lipgloss.Color
+
+	sText, sBold, sSecond, sHead, sDimS, sAccent, sSel lipgloss.Style
+	sPill, sPillDim, sPillWarn                         lipgloss.Style
+	sOK, sWarnS, sWarnB, sErrS, sErrB                  lipgloss.Style
+	sRowBold                                           lipgloss.Style // the open sub-page in the context row
+
+	// Styles used by the Problems, Changes and Inspect screens (kept from v1 until V3/V4,
+	// restyled: selection is a colour change, not a reversed bar; 16 §7).
+	stSel, stDim, stTabOn lipgloss.Style
+)
+
+func init() { applyPalette(darkPalette) }
+
+func applyPalette(p colours) {
+	cText, cSecond, cDim, cAccent, cPill = p.text, p.second, p.dim, p.accent, p.pill
+	cRowBg, cSelBg, cSelCurBg = p.row, p.sel, p.selCur
+	cOK, cWarn, cErr = p.ok, p.warn, p.err
+	st := lipgloss.NewStyle
+	sText = st().Foreground(cText)
+	sBold = st().Foreground(cText).Bold(true)
+	sSecond = st().Foreground(cSecond)
+	sHead = st().Foreground(cSecond).Bold(true) // an area or section heading (16 §7)
+	sDimS = st().Foreground(cDim)
+	sAccent = st().Foreground(cAccent)
+	sSel = st().Foreground(cAccent).Bold(true)
+	sPill = st().Foreground(cText).Background(cPill)
+	sPillDim = st().Foreground(cDim).Background(cPill)
+	sPillWarn = st().Foreground(cWarn).Background(cPill).Bold(true)
+	sOK = st().Foreground(cOK)
+	sWarnS = st().Foreground(cWarn)
+	sWarnB = st().Foreground(cWarn).Bold(true)
+	sErrS = st().Foreground(cErr)
+	sErrB = st().Foreground(cErr).Bold(true)
+	sRowBold = st().Foreground(cText).Background(cRowBg).Bold(true)
+	stSel, stDim, stTabOn = sSel, sDimS, sSel
+}
 
 // rowBackground keeps selection and the focused cursor distinct across list views.
 func rowBackground(st lipgloss.Style, selected, cursor bool) lipgloss.Style {
@@ -58,14 +85,6 @@ func rowBackground(st lipgloss.Style, selected, cursor bool) lipgloss.Style {
 		return st
 	}
 }
-
-// Styles used by the Problems, Changes and Inspect screens (kept from v1 until V3/V4,
-// restyled: selection is a colour change, not a reversed bar; 16 §7).
-var (
-	stSel   = sSel
-	stDim   = sDimS
-	stTabOn = sSel
-)
 
 // icons is one icon set (16 §7).
 type icons struct {
@@ -121,6 +140,28 @@ func SetColors() {
 	ct := os.Getenv("COLORTERM")
 	if ct == "truecolor" || ct == "24bit" || os.Getenv("WT_SESSION") != "" {
 		lipgloss.SetColorProfile(termenv.TrueColor)
+	}
+}
+
+// darkTerminal is the terminal's background as asked once before the screen starts
+// (termenv: OSC 11, then COLORFGBG); Windows' console host cannot answer, so it reads dark.
+var darkTerminal = sync.OnceValue(func() bool { return lipgloss.HasDarkBackground() })
+
+// SetTheme picks the palette (ui.tui.theme, 16 §9.2): light, dark, or auto by the
+// terminal's background. Run calls it before the program reads the keyboard, so the
+// terminal's answer cannot reach the key handler; later calls reuse that answer.
+func SetTheme(setting string) {
+	switch setting {
+	case "light":
+		applyPalette(lightPalette)
+	case "dark":
+		applyPalette(darkPalette)
+	default:
+		if darkTerminal() {
+			applyPalette(darkPalette)
+		} else {
+			applyPalette(lightPalette)
+		}
 	}
 }
 

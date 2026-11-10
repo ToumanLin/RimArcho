@@ -27,6 +27,7 @@ settings
   ui.motion: auto
   ui.mouse: on
   ui.theme: auto
+  ui.tui.theme: auto
   updates.auto: on
   updates.interval: normal
   updates.source: auto

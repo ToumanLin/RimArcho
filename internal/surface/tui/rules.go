@@ -127,9 +127,9 @@ func (m *model) rulesKey(k tea.KeyMsg) tea.Cmd {
 	case "down", "j":
 		r.cursor = min(r.cursor+1, max(len(rows)-1, 0))
 	case "pgup":
-		r.cursor = max(r.cursor-max(m.h-8, 1), 0)
+		r.cursor = max(r.cursor-max(m.h-bodyTop-6, 1), 0)
 	case "pgdown":
-		r.cursor = min(r.cursor+max(m.h-8, 1), max(len(rows)-1, 0))
+		r.cursor = min(r.cursor+max(m.h-bodyTop-6, 1), max(len(rows)-1, 0))
 	case "home":
 		r.cursor = 0
 	case "end":

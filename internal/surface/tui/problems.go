@@ -256,7 +256,7 @@ func (m *model) chooseLog() tea.Cmd {
 		m.status = T("no Player.log found")
 		return nil
 	}
-	p := &panel{title: T("analyze which log? (enter)"), choices: []string{cur}}
+	p := &panel{title: T("analyze which log? (enter)"), choices: []string{cur}, nav: 3}
 	if prev != "" {
 		p.choices = append(p.choices, prev)
 	}
