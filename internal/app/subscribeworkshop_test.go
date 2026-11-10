@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
@@ -73,7 +74,7 @@ func TestSubscribeWorkshopFallback(t *testing.T) {
 					return steamworks.ErrorLine("Steam unavailable"), errors.New("worker")
 				}
 			}
-			exe := filepath.Join(e.Root, "tools", "steamcmd.exe")
+			exe := filepath.Join(e.Root, "tools", deps.SteamCMDExecutable())
 			e.MkdirAll(filepath.Dir(exe))
 			e.App.FindTool = func(name string) (string, bool) { return exe, name == "steamcmd" }
 			var calls [][]string
@@ -180,7 +181,7 @@ func TestSubscribeWorkshopFallback(t *testing.T) {
 	})
 	t.Run("account console and failure", func(t *testing.T) {
 		e := setup(t, false)
-		exe := filepath.Join(e.Root, "tools", "steamcmd.exe")
+		exe := filepath.Join(e.Root, "tools", deps.SteamCMDExecutable())
 		e.MkdirAll(filepath.Dir(exe))
 		e.App.FindTool = func(string) (string, bool) { return exe, true }
 		e.App.Store.SetMeta("cfg:steamcmd.account", "example-player")
@@ -235,7 +236,7 @@ func workshopScriptIDs(t *testing.T, exe string, args []string) []string {
 func TestWorkshopBatchesPartialSuccess(t *testing.T) {
 	t.Parallel()
 	e := setup(t, false)
-	e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, "steamcmd.exe"), true }
+	e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, deps.SteamCMDExecutable()), true }
 	var ids, scripts []string
 	for i := 1; i <= 52; i++ {
 		ids = append(ids, fmt.Sprint(9000+i))
@@ -253,10 +254,13 @@ func TestWorkshopBatchesPartialSuccess(t *testing.T) {
 			}
 		}
 		scripts = append(scripts, filepath.Join(filepath.Dir(exe), args[5]))
-		// No provenance or scan until all batches have finished.
+		// Provenance is written as items are confirmed: earlier batches' successes have it
+		// before the next batch starts, this batch's items do not yet.
 		for _, id := range ids {
-			if _, err := os.Stat(filepath.Join(args[1], "steamapps", "workshop", "content", "294100", id, subscribe.File)); !os.IsNotExist(err) {
-				t.Fatal("provenance written between batches")
+			_, err := os.Stat(filepath.Join(args[1], "steamapps", "workshop", "content", "294100", id, subscribe.File))
+			earlier := slices.Index(ids, id) < 25*(len(sizes)-1)
+			if want := earlier && id != "9002" && id != "9027"; want != (err == nil) {
+				t.Fatalf("provenance of %s before batch %d: %v", id, len(sizes), err)
 			}
 		}
 		var out []string
@@ -320,7 +324,7 @@ func TestWorkshopRetryClassification(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			e := setup(t, false)
-			e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, "steamcmd.exe"), true }
+			e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, deps.SteamCMDExecutable()), true }
 			var waits []time.Duration
 			e.App.SteamCMDWait = func(d time.Duration) { waits = append(waits, d) }
 			var scripts []string
@@ -348,7 +352,7 @@ func TestWorkshopRetryClassification(t *testing.T) {
 func TestWorkshopRetryOnlyFailedIDs(t *testing.T) {
 	t.Parallel()
 	e := setup(t, false)
-	e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, "steamcmd.exe"), true }
+	e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, deps.SteamCMDExecutable()), true }
 	e.App.SteamCMDWait = func(time.Duration) {}
 	var calls [][]string
 	e.App.SteamCMDRun = func(exe string, args []string) (string, error) {
@@ -384,9 +388,9 @@ func TestWorkshopScriptCleanupOnStartFailure(t *testing.T) {
 		t.Run(account, func(t *testing.T) {
 			e := setup(t, false)
 			e.App.Store.SetMeta("cfg:steamcmd.account", account)
-			e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, "steamcmd.exe"), true }
+			e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, deps.SteamCMDExecutable()), true }
 			var script string
-			exe := filepath.Join(e.Root, "steamcmd.exe")
+			exe := filepath.Join(e.Root, deps.SteamCMDExecutable())
 			fail := func(args []string) (string, error) {
 				workshopScriptIDs(t, exe, args)
 				script = filepath.Join(filepath.Dir(exe), args[5])
@@ -416,7 +420,7 @@ func TestWorkshopScriptCleanupOnStartFailure(t *testing.T) {
 func TestWorkshopSuccessWithProcessError(t *testing.T) {
 	t.Parallel()
 	e := setup(t, false)
-	e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, "steamcmd.exe"), true }
+	e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, deps.SteamCMDExecutable()), true }
 	e.App.SteamCMDRun = func(exe string, args []string) (string, error) {
 		workshopScriptIDs(t, exe, args)
 		e.WriteMod(filepath.Join(args[1], "steamapps", "workshop", "content", "294100", "8100"), testkit.Sample("exit.mod", "Exit Mod"))

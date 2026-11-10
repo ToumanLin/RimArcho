@@ -94,15 +94,19 @@ export async function event(ev) {
   refreshFoot();
 }
 
-// toggle: ctrl+j opens the page, and from it goes back where it came from.
+// toggle: ctrl+j opens the page, and from it goes back where it came from. X.from belongs
+// to the visit ctrl+j opened; on a visit opened another way it goes back in the page history.
+let byKey = false;
 export function toggle() {
-  if (S.screen === "tasks" && X.from) return ui.go(X.from);
-  X.from = S.screen ? (S.screen === "full" ? "plan" : S.screen) : "plan";
-  return open();
+  if (S.screen === "tasks") return X.from ? ui.go(X.from) : ui.back();
+  X.from = !S.screen || S.screen === "full" ? "plan" : S.screen === "packs" && S.packFocus ? "pack:" + S.packFocus : S.screen;
+  // through go(), as the sidebar's foot line: the visit is recorded and a pack's focus let go
+  byKey = true;
+  try { return ui.go("tasks"); } finally { byKey = false; }
 }
 
 export async function open() {
-  if (S.screen !== "tasks") X.focus = "list";
+  if (S.screen !== "tasks") { X.focus = "list"; if (!byKey) X.from = null; }
   const read = beginPageRead("tasks", { retry: open });
   await load(read);
   api.TasksSeen().then(refreshFoot).catch(() => {});

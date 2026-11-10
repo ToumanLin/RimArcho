@@ -17,6 +17,7 @@ func TestTagCandidatesOwnFirst(t *testing.T) {
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld")
 	e.AddEnv(false)
 	e.MustRun("scan")
+	e.MustRun("tag", "remove", "pkg:ludeon.rimworld", "RimWorld") // the default tag (16 §3.8): not under test here
 	e.MustRun("config", "set", "tags.pinned", "framework,visuals")
 	e.MustRun("tag", "add", "pkg:tester.a", "popular", "races")
 	e.MustRun("tag", "add", "pkg:tester.b", "popular", "weapons")

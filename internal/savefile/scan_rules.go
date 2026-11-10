@@ -521,6 +521,7 @@ func idOrZero(b []byte) []byte {
 }
 
 func (x *extract) leaf(s *scanner, f, p *frame, v []byte) {
+	s.contentRef(f, v)
 	switch f.name {
 	case nDef:
 		if p != nil && len(v) > 0 && string(v) != "null" {

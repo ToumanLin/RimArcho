@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
 )
 
@@ -18,7 +19,7 @@ import (
 func TestSteamCMDSameAccountAndOffline(t *testing.T) {
 	t.Parallel()
 	e := setup(t, false)
-	e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, "steamcmd.exe"), true }
+	e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, deps.SteamCMDExecutable()), true }
 	note := fmt.Sprintf(app.SteamSignOutNote, "player")
 	for _, tc := range []struct {
 		account, client string

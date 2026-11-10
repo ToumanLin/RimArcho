@@ -1,7 +1,8 @@
 package app
 
 import (
-	"github.com/ToumanLin/RimArcho/internal/source"
+	"errors"
+
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
@@ -18,7 +19,7 @@ func (a *App) removeMod(ix *Index, m *store.Mod, path string, permanent bool) (*
 			if err := a.trashAllowed(path); err != nil {
 				return err
 			}
-			if err := source.RemoveTree(path); err != nil {
+			if err := removeModTree(path); err != nil {
 				return err
 			}
 		} else if err := a.recycleTarget(path); err != nil {
@@ -26,6 +27,10 @@ func (a *App) removeMod(ix *Index, m *store.Mod, path string, permanent bool) (*
 		}
 		return a.Store.RecordRemoved(m.ID, m.RealPath, a.Now())
 	})
+	if partly := (*partlyRemovedError)(nil); errors.As(err, &partly) {
+		// The record still says live; let a scan say what is left.
+		a.scanLinkedEnvironments(ix, m, links)
+	}
 	if err != nil {
 		return nil, err
 	}

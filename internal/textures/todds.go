@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -21,11 +22,7 @@ import (
 // last release) is the encoder RimSort and RimCrow use.
 const (
 	ToddsVersion = "0.4.1"
-	ToddsZipURL  = "https://github.com/todds-encoder/todds/releases/download/0.4.1/todds_Windows_0.4.1.zip"
-	ToddsZipSize = 3846213 // bytes, as the release lists it
-	// The release is final, so its bytes are pinned: a GitHub mirror (17 §2.2) cannot swap them.
-	ToddsZipSHA256 = "5ecec319eb49fc87b1a83a62bd0dbbfe8660967e68f0026393d42d3c54d870b8"
-	ToddsHome      = "https://github.com/todds-encoder/todds"
+	ToddsHome    = "https://github.com/todds-encoder/todds"
 )
 
 // Encoder writes the DDS of each PNG next to it.
@@ -33,7 +30,7 @@ type Encoder interface {
 	Encode(ctx context.Context, files []string, scale int, mips bool) error
 }
 
-// Todds runs todds.exe.
+// Todds runs the native todds encoder.
 type Todds struct {
 	Path    string
 	Threads int             // 0: todds' default (all cores)
@@ -176,8 +173,9 @@ type Progress struct {
 
 // Run encodes the jobs in batches of one scale, checks every DDS it was meant to write and
 // returns a result per job, in job order. Before each batch, before(jobs) is called (to
-// record what is about to be written); after it, after(results). A stop (ctx) ends between
-// or inside a batch; the results so far are returned with ctx's error.
+// record what is about to be written); after it, after(results). An error from either ends
+// the run with that error. A stop (ctx) ends between or inside a batch; the results so far are
+// returned with ctx's error.
 func Run(ctx context.Context, enc Encoder, jobs []Job, o Options, before func([]Job) error, after func([]Result) error, progress func(Progress)) ([]Result, error) {
 	o = o.Normal()
 	_, exact := enc.(*Todds) // a test encoder writes headers only
@@ -224,8 +222,9 @@ func Run(ctx context.Context, enc Encoder, jobs []Job, o Options, before func([]
 			}
 			p.Done += n
 			if after != nil {
-				if aerr := after(br); aerr != nil && err == nil {
-					err = aerr
+				// what was written could not be recorded: stop rather than report success
+				if err := after(br); err != nil {
+					return res, err
 				}
 			}
 			if progress != nil {
@@ -319,13 +318,17 @@ func CheckDDS(path string) error {
 	return err
 }
 
-// FindTodds looks for todds.exe in dirs (each a folder or the program itself).
+// FindTodds looks for the native encoder in dirs (each a folder or the program itself).
 func FindTodds(dirs ...string) string {
 	for _, d := range dirs {
 		if d == "" {
 			continue
 		}
-		for _, p := range []string{d, filepath.Join(d, "todds.exe"), filepath.Join(d, "todds")} {
+		candidates := []string{d, filepath.Join(d, ToddsExecutable)}
+		if runtime.GOOS == "windows" {
+			candidates = append(candidates, filepath.Join(d, "todds"))
+		}
+		for _, p := range candidates {
 			if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
 				return p
 			}

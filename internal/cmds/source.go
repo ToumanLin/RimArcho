@@ -12,15 +12,16 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/csharp"
 	"github.com/ToumanLin/RimArcho/internal/render"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 func init() {
 	register(&Command{Name: "source", Args: "<ref>", Summary: "decompile a mod's assemblies into the Source library (ilspycmd)", MinArgs: 1, MaxArgs: 1, Run: sourceCmd,
-		Flags: []Flag{{Name: "type", Value: "<Namespace.Type>"}, {Name: "all"}}})
+		Flags: []Flag{{Name: "type", Value: "<Namespace.Type>"}, {Name: "member", Value: "<name>", Help: "with --type: only this member, with its line numbers"}, {Name: "all"}}})
 	register(&Command{Name: "source game", Summary: "read the current game's code from the Source library", Run: sourceGameCmd,
-		Flags: []Flag{{Name: "type", Value: "<Namespace.Type>"}, {Name: "all"}}})
+		Flags: []Flag{{Name: "type", Value: "<Namespace.Type>"}, {Name: "member", Value: "<name>", Help: "with --type: only this member, with its line numbers"}, {Name: "all"}}})
 	register(&Command{Name: "source decompile", Summary: "decompile the current list's mods into the Source library", Run: sourceDecompileCmd,
 		Flags: []Flag{{Name: "active", Help: "decompile every enabled mod"}}})
 	register(&Command{Name: "source clean", Summary: "preview or remove unused Source library folders", Run: sourceCleanCmd,
@@ -50,6 +51,7 @@ func sourceReadCmd(c *Ctx, a *Args, game bool) (*render.Doc, error) {
 		return nil, err
 	}
 	var ds []*app.SourceDLL
+	shipped := ""
 	label, ref := "RimWorld "+st.Ix.Env.GameVersion, "game"
 	if game {
 		var d *app.SourceDLL
@@ -65,6 +67,11 @@ func sourceReadCmd(c *Ctx, a *Args, game bool) (*render.Doc, error) {
 		}
 		label, ref = modLabel(st.Ix, m.ID), st.Ix.Ref(m.ID)
 		ds, err = c.App.SourceDLLs(st, m)
+		if err == nil {
+			if b := c.App.ModBuild(st.Ix, m); b != nil {
+				shipped = shippedSource(c.App.ModPath(st.Ix, m), b, a.Str("type"))
+			}
+		}
 	}
 	if err != nil {
 		return nil, err
@@ -72,6 +79,9 @@ func sourceReadCmd(c *Ctx, a *Args, game bool) (*render.Doc, error) {
 	if len(ds) == 0 {
 		d, root := render.New(label + "  no assemblies to decompile")
 		root.Add("the effective content has no Assemblies/*.dll (or only known libraries such as 0Harmony.dll)")
+		if shipped != "" {
+			root.KV("shipped", shipped)
+		}
 		return d, nil
 	}
 	ctx := context.Background()
@@ -80,24 +90,19 @@ func sourceReadCmd(c *Ctx, a *Args, game bool) (*render.Doc, error) {
 		if err != nil {
 			return nil, noILSpy(err)
 		}
-		lines := strings.Split(strings.TrimRight(src, "\n"), "\n")
-		d, root := render.New(fmt.Sprintf("%s  %s  (%d lines)", label, t, len(lines)))
-		root.KV("file", path)
-		code := root.Section("source")
-		limit := 34
-		if a.Bool("all") {
-			limit = len(lines)
+		d, err := typeDoc(label, ref, t, src, path, a.Str("member"), a.Bool("all"))
+		if err == nil && shipped != "" {
+			d.Nodes[0].KV("shipped", shipped)
 		}
-		for i, l := range lines {
-			if i >= limit {
-				code.Addf("… %d more lines (archo source %s --type %s --all)", len(lines)-limit, ref, t)
-				break
-			}
-			code.Addf("%4d  %s", i+1, strings.ReplaceAll(strings.TrimRight(l, "\r"), "\t", "    "))
-		}
-		return d, nil
+		return d, err
+	}
+	if a.Str("member") != "" {
+		return nil, &UsageError{Msg: "--member needs --type"}
 	}
 	d, root := render.New(fmt.Sprintf("%s  %d assemblies", label, len(ds)))
+	if shipped != "" {
+		root.KV("shipped", shipped)
+	}
 	sec := root.Section("assemblies")
 	for _, x := range ds {
 		was := x.Cached
@@ -127,6 +132,76 @@ func sourceReadCmd(c *Ctx, a *Args, game bool) (*render.Doc, error) {
 		d.AddNext(fmt.Sprintf("archo source search \"<pattern>\" --in %s", ref))
 	}
 	return d, nil
+}
+
+// A type is shown whole when it is short; a longer one gets its head and a member index.
+// Agents read the first lines of a long type, then asked again with --all every time
+// (h4 P5, h8 G5): both limits are generous enough that most types fit.
+const (
+	wholeTypeLines = 250
+	wholeTypeBytes = 12 << 10
+	typeHeadLines  = 34
+	memberIndexMax = 80
+)
+
+func numberedLine(n int, l string) string {
+	return fmt.Sprintf("%4d  %s", n, strings.ReplaceAll(strings.TrimRight(l, "\r"), "\t", "    "))
+}
+
+// typeDoc renders one type of the Source library: whole, or head plus member index, or the
+// members named by member (their line numbers are the file's).
+func typeDoc(label, ref, typ, src, path, member string, all bool) (*render.Doc, error) {
+	lines := strings.Split(strings.TrimRight(src, "\n"), "\n")
+	outline := csharp.Find(csharp.Parse(src), typ)
+	if member != "" {
+		if outline == nil {
+			return nil, fmt.Errorf("no type declaration found in %s: read it whole with --all", path)
+		}
+		ms := outline.Match(member)
+		if len(ms) == 0 {
+			return nil, fmt.Errorf("%s has no member %q; members: %s", typ, member, outline.Index(memberIndexMax))
+		}
+		d, root := render.New(fmt.Sprintf("%s  %s.%s  (%s)", label, typ, ms[0].Name, memberLines(ms)))
+		root.KV("file", path)
+		for i, m := range ms {
+			code := root.Section("source")
+			if len(ms) > 1 {
+				code = root.Addf("source %d of %d:", i+1, len(ms))
+			}
+			for n := m.Start; n <= m.End && n <= len(lines); n++ {
+				code.Add(numberedLine(n, lines[n-1]))
+			}
+		}
+		return d, nil
+	}
+	d, root := render.New(fmt.Sprintf("%s  %s  (%d lines)", label, typ, len(lines)))
+	root.KV("file", path)
+	whole := all || len(lines) <= wholeTypeLines && len(src) <= wholeTypeBytes
+	if !whole && outline != nil {
+		root.KV("members", outline.Index(memberIndexMax))
+	}
+	code := root.Section("source")
+	limit := len(lines)
+	if !whole {
+		limit = typeHeadLines
+	}
+	for i, l := range lines {
+		if i >= limit {
+			code.Addf("… %d more lines (archo source %s --type %s --all, or --member <name>)", len(lines)-limit, ref, typ)
+			break
+		}
+		code.Add(numberedLine(i+1, l))
+	}
+	return d, nil
+}
+
+// memberLines names the lines of the matched members: "lines 141-175", "lines 3-5 and 8-10".
+func memberLines(ms []csharp.Member) string {
+	var parts []string
+	for _, m := range ms {
+		parts = append(parts, fmt.Sprintf("%d-%d", m.Start, m.End))
+	}
+	return "lines " + strings.Join(parts, " and ")
 }
 
 // activeEstimate prints what searching every enabled mod would decompile (decisions-m4
@@ -178,9 +253,11 @@ func sourceSearchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		mods = append(mods, m)
 	}
 	scope := fmt.Sprintf("%d mods", len(mods))
+	kind := "named" // how the scope was chosen: shown in the coverage line
 	switch {
 	case len(mods) > 0:
 	case a.Bool("implicated"):
+		kind = "implicated"
 		for _, id := range c.App.ImplicatedMods(st) {
 			mods = append(mods, st.Ix.ByID[id])
 		}
@@ -191,6 +268,7 @@ func sourceSearchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			return d, nil
 		}
 	case a.Bool("active"):
+		kind = "active"
 		for _, e := range st.List {
 			if m := st.Ix.ByID[e.Instance]; m != nil {
 				mods = append(mods, m)
@@ -204,6 +282,7 @@ func sourceSearchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 	case a.Bool("game"):
 		scope = "the game"
+		kind = "game only"
 	default:
 		return nil, &UsageError{Msg: "source search needs a scope: --in <ref>, --implicated, or --active --yes"}
 	}
@@ -230,6 +309,14 @@ func sourceSearchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		return nil, noILSpy(err)
 	}
 	d, root := render.New(fmt.Sprintf("source search %q in %s: %d matches in %d assemblies", a.Pos[0], scope, res.Total, res.Assemblies))
+	if res.Decompiled > 0 {
+		// Why the call took long: the budget stops new decompiles but never one that runs.
+		note := fmt.Sprintf("%s now, %.0f s", render.Plural(res.Decompiled, "assembly"), res.Took.Seconds())
+		if res.Game {
+			note += " (the game's code is decompiled once per game build)"
+		}
+		root.KV("decompiled", note)
+	}
 	if res.Pending > 0 {
 		root.KV("pending", fmt.Sprintf("%d assemblies not decompiled yet (still computing; run again)", res.Pending))
 	}
@@ -261,7 +348,61 @@ func sourceSearchCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if res.Total > len(res.Hits) {
 		lst.Addf("… %d more (add --all)", res.Total-len(res.Hits))
 	}
+	for _, l := range sourceCoverage(c, st, res, kind, a.Bool("game"), scope) {
+		root.Add(l)
+	}
 	return d, nil
+}
+
+// sourceCoverage ends a source search with what it did not search (05 §5.4): a search of
+// the implicated pair that finds nothing says nothing about the other enabled mods, and
+// agents took it for an answer (h7 G2). A restricted search with no match also says where
+// to look next.
+func sourceCoverage(c *Ctx, st *app.LoadoutState, res *app.SourceSearchResult, kind string, game bool, scope string) []string {
+	enabled := map[string]bool{}
+	for _, e := range st.List {
+		if st.Ix.ByID[e.Instance] != nil {
+			enabled[e.Instance] = true
+		}
+	}
+	in, other := 0, 0
+	for _, id := range res.Searched {
+		if enabled[id] {
+			in++
+		} else {
+			other++
+		}
+	}
+	rest := len(enabled) - in
+	hint := "--active --yes"
+	if IsMCP(c.Context) {
+		hint = `scope="active": repeat while pending`
+	}
+	var sb strings.Builder
+	switch {
+	case kind == "game only":
+		sb.WriteString("searched the game only")
+	default:
+		fmt.Fprintf(&sb, "searched %d of %d enabled mods", in, len(enabled))
+		if other > 0 {
+			fmt.Fprintf(&sb, " and %d not enabled", other)
+		}
+		if game {
+			sb.WriteString(" and the game")
+		}
+		fmt.Fprintf(&sb, " (%s)", kind)
+	}
+	if res.Pending > 0 {
+		fmt.Fprintf(&sb, "; %d of %d assemblies not decompiled yet: repeat the call", res.Pending, res.Assemblies)
+	}
+	if rest > 0 {
+		fmt.Fprintf(&sb, "; not searched: %d (%s)", rest, hint)
+	}
+	out := []string{sb.String()}
+	if res.Total == 0 && res.Pending == 0 && rest > 0 {
+		out = append(out, fmt.Sprintf("no matches in %s: the code you look for may be in one of the %d enabled mods not searched; search them with %s", scope, rest, hint))
+	}
+	return out
 }
 
 func sourceDecompileCmd(c *Ctx, a *Args) (*render.Doc, error) {
@@ -298,4 +439,85 @@ func sourceCleanCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		d.AddNext("archo source clean --yes")
 	}
 	return d, nil
+}
+
+// shippedSource is the shipped: line of read_source for a Mod that ships a C# project (05 §5.6):
+// the code shown is decompiled, the Mod's own source is the one to edit, and a rebuild goes
+// through dotnet build. Agents read a Mod with read_source, found the shipped source and
+// compiled it with csc, which the game refuses for publicized code (MCP eval h8).
+func shippedSource(modRoot string, b *app.BuildInfo, typ string) string {
+	var projs []string
+	publicizer := false
+	for _, p := range b.Source.Projects {
+		if p.Err != "" {
+			continue
+		}
+		rel, err := filepath.Rel(modRoot, p.File)
+		if err != nil {
+			rel = p.File
+		}
+		projs = append(projs, filepath.ToSlash(rel))
+		publicizer = publicizer || p.Publicizer
+	}
+	if len(projs) == 0 {
+		return ""
+	}
+	s := "the Mod ships its source: " + strings.Join(firstN(projs, 2), ", ")
+	if len(projs) > 2 {
+		s += fmt.Sprintf(" and %d more", len(projs)-2)
+	}
+	if typ != "" {
+		if f := typeFile(modRoot, b, typ); f != "" {
+			s += "; this type: " + f
+		}
+	}
+	s += ". To change the Mod, edit that source and rebuild it with dotnet build (get_mod build:, guide topic=rebuild)"
+	if publicizer {
+		s += "; it uses a publicizer, so a DLL compiled with csc throws FieldAccessException in the game"
+	}
+	return s
+}
+
+var typeDeclRx = regexp.MustCompile(`\b(?:class|struct|interface|enum|record)\s+(\w+)`)
+
+// typeFile finds the shipped .cs file that declares typ's short name (outside bin/ and obj/).
+func typeFile(modRoot string, b *app.BuildInfo, typ string) string {
+	short := typ
+	if i := strings.LastIndexAny(short, ".+"); i >= 0 {
+		short = short[i+1:]
+	}
+	found := ""
+	for _, p := range b.Source.Projects {
+		filepath.WalkDir(p.Dir, func(path string, de os.DirEntry, err error) error {
+			if err != nil || found != "" {
+				return filepath.SkipDir
+			}
+			if de.IsDir() {
+				if n := strings.ToLower(de.Name()); n == "bin" || n == "obj" || strings.HasPrefix(n, ".") {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if !strings.HasSuffix(path, ".cs") {
+				return nil
+			}
+			src, err := os.ReadFile(path)
+			if err != nil {
+				return nil
+			}
+			for _, m := range typeDeclRx.FindAllSubmatch(src, -1) {
+				if string(m[1]) == short {
+					if rel, err := filepath.Rel(modRoot, path); err == nil {
+						found = filepath.ToSlash(rel)
+					}
+					return filepath.SkipAll
+				}
+			}
+			return nil
+		})
+		if found != "" {
+			break
+		}
+	}
+	return found
 }

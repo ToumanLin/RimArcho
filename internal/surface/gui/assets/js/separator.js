@@ -8,8 +8,15 @@ export function wireSeparator(handle, opts) {
   const enabled = () => handle.getClientRects().length > 0 &&
     getComputedStyle(handle).visibility !== "hidden" && (!opts.enabled || opts.enabled());
   const range = () => { const [min, max] = opts.range(); return [min, Math.max(min, max)]; };
+  // A copy in localStorage restores the size before the first drawing; the saved setting
+  // follows and wins (another window may have changed it). Without it the columns and the
+  // sidebar moved once the setting arrived.
+  const cacheKey = () => "setting:" + key();
+  const cached = () => { try { return localStorage.getItem(cacheKey()); } catch { return null; } };
+  const remember = (value) => { try { localStorage.setItem(cacheKey(), value); } catch { /* storage can be off */ } };
   const save = (reset = false) => {
     const value = reset ? "" : opts.serialize ? opts.serialize() : String(Math.round(opts.get()));
+    remember(value);
     return api.SetSetting(key(), value).catch(() => {});
   };
   // Writes only what changed: the same value written again is still a mutation, and the
@@ -72,8 +79,14 @@ export function wireSeparator(handle, opts) {
   handle.addEventListener("keydown", () => { touched = true; });
   handle.addEventListener("mousedown", () => { touched = true; });
   handle.addEventListener("dblclick", () => { touched = true; });
+  // (after the caller's own setup, still before the first drawing)
+  const early = opts.restore ? cached() : null;
+  if (early) queueMicrotask(() => { if (!touched) opts.restore(early); });
   const ready = opts.restore ? api.Setting(key()).then((value) => {
-    if (!touched) opts.restore(value);
+    remember(value || "");
+    if (!touched && (value || "") !== (early || "")) {
+      if (!value && early) opts.reset(); else opts.restore(value);
+    }
     refresh();
   }).catch(() => {}) : Promise.resolve();
   handle.refreshSeparator = refresh;

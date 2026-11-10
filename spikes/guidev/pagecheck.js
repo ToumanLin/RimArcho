@@ -187,7 +187,8 @@ try {
     let reads = [], checks = [], previews = [], updates = [], went = [];
     handlers.set("SubscriptionsPage", (library, of) => { reads.push([library, of]); return data; });
     handlers.set("CheckSubscriptionSource", kind => { checks.push(kind); return "queued"; });
-    handlers.set("LibraryPreview", (kind, refs) => { previews.push([kind, refs]); return { title: "preview", apply: true, lines: ["abc → def"] }; });
+    // updates preview through their own call (subscriptions.js updateRows), then run as a library task
+    handlers.set("SubscriptionUpdatePreview", (refs) => { previews.push(["subscription-update", refs]); return { title: "preview", apply: true, lines: ["abc → def"] }; });
     handlers.set("LibraryDo", (kind, refs) => { updates.push([kind, refs]); return "queued"; });
     handlers.set("SubscriptionFilePage", () => "");
     handlers.set("ChangeFiles", () => ["~ Defs/a.xml"]);

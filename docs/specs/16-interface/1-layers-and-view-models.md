@@ -18,7 +18,7 @@ surface/tui   (Bubble Tea)        surface/gui   (Wails services + assets/*.html|
 
 | File | Content | Main functions |
 | --- | --- | --- |
-| `text.go` | Language selection and lookup; language detection (`lang_windows.go`, `lang_other.go`); English interface overrides in `enText` | `T`, `Tf`, `Table`, `ExtraText`, `SetLang`, `Lang` |
+| `text.go` | Language selection and lookup; language detection (`l10ndata.ResolveLang`, which the `tags.pinned` preset also uses); English interface overrides in `enText` | `T`, `Tf`, `Table`, `ExtraText`, `SetLang`, `Lang` |
 | `columns.go` | Mods in each of the three columns; each row's number, source type, name (alias first), status, dimming, and unsaved state | `BuildBoard`, `ModItem`, `RowStatus`, `SourceKind`, `SourceText` |
 | `query.go` | Search syntax parsing and matching, subsequence fallback, content type cache (§3.7) | `ParseQuery`, `Query.Filter`, `Subsequence`, `ContentCache.Get` |
 | `needs.go`, `evidence.go` | Groups and sections for can it run (`Section`, `SectionOf`; items outside this page use `SectionElsewhere` / `Needs.Elsewhere`), links between columns (`Need.Related`), plain wording (`Text`: one sentence; GUI cards: `Title` / `Why`), evidence (`Evidence{Kind, Label, Source}`), merging rules, counts, row status; **one-step actions are data** (`Action{Kind, …}`), with the interface choosing the key or button; `Do` performs data mutations (§5) | `BuildNeeds`, `Do`, `Humanize`, `TokName`, `EdgeWords`, `ShortDate`, `WorkshopSearch`; page lead and automatic fix count (`needs_layout.go`: `NeedsLead`, `AutoFixCount`) |

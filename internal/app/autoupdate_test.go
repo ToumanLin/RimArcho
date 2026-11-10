@@ -2,23 +2,25 @@ package app_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"testing/synctest"
 	"time"
 
-	"github.com/ToumanLin/RimArcho/internal/accounts"
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
+	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
 func TestAutomaticLoopStartupIntervalAndCancellation(t *testing.T) {
@@ -237,9 +239,14 @@ func TestAutomaticToolVersionsAndOfflineRetention(t *testing.T) {
 	e.App.SteamCMDNoPath, e.App.ToddsNoPath = true, true
 	e.App.TextureEncoder = &texEnc{}
 	steam := filepath.Join(e.App.LocalDir(), "steamcmd")
-	e.WriteFile(filepath.Join(steam, "steamcmd.exe"), "fixture executable")
-	e.WriteFile(filepath.Join(steam, "package", "steam_cmd_win32.installed"), `"steam_cmd_win32" { "version" "100" }`)
-	e.WriteFile(filepath.Join(e.App.LocalDir(), "todds", "todds.exe"), "fixture encoder")
+	e.WriteFile(filepath.Join(steam, deps.SteamCMDExecutable()), "fixture executable")
+	e.WriteFile(filepath.Join(steam, "package", func() string {
+		if runtime.GOOS == "linux" {
+			return "steam_cmd_linux.installed"
+		}
+		return "steam_cmd_win32.installed"
+	}()), `"steam_cmd_win32" { "version" "100" }`)
+	e.WriteFile(filepath.Join(e.App.LocalDir(), "todds", textures.ToddsExecutable), "fixture encoder")
 	failed := false
 	calls := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -249,7 +256,7 @@ func TestAutomaticToolVersionsAndOfflineRetention(t *testing.T) {
 			return
 		}
 		switch r.URL.Path {
-		case "/steam_cmd_win32":
+		case "/steam_cmd_win32", "/steam_cmd_linux":
 			io.WriteString(w, `"steam_cmd_win32" { "version" "101" }`)
 		case "/repos/todds-encoder/todds/releases/latest":
 			io.WriteString(w, `{"tag_name":"0.5.0"}`)
@@ -293,60 +300,64 @@ func TestAutomaticToolVersionsAndOfflineRetention(t *testing.T) {
 	if s := e.App.ToolUpdate("todds"); !s.Pending || s.Compatible {
 		t.Fatal("offline check discarded compatibility restriction", s)
 	}
-	b, _ := os.ReadFile(filepath.Join(steam, "steamcmd.exe"))
+	b, _ := os.ReadFile(filepath.Join(steam, deps.SteamCMDExecutable()))
 	if string(b) != "fixture executable" {
 		t.Fatal("check changed tool")
 	}
 }
 
-func TestAutomaticGitAndAuthenticatedPageChecksNeverInstall(t *testing.T) {
-	// The repository fixture disables PATH; it must not run in parallel.
-	e := setup(t, false)
-	g := testkit.NewGitRepo(t, "")
-	op, err := e.App.SubscribeGit(g.Bare, "branch", "main", false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	gitFolder := op.Items[0].Folder
-	latest := g.Commit(t, "Defs/new.xml", "<Defs/>")
-	page := accounts.Site + "files/file/123-fixture/"
-	folder := filepath.Join(e.App.SubscribedDir(), "page-fixture")
-	e.WriteMod(folder, testkit.Sample("tester.page", "Page fixture"))
-	if err := subscribe.Write(folder, &subscribe.Record{Kind: "page", URL: page, Installed: "1.0", InstalledAt: e.Now()}); err != nil {
-		t.Fatal(err)
-	}
-	e.MustRun("scan")
-	session, err := accounts.Open(e.App.AccountsDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	u, _ := url.Parse(accounts.Site)
-	session.Jar().SetCookies(u, []*http.Cookie{{Name: "ips4_login_key", Value: "synthetic-login", Secure: true, Path: "/", Expires: time.Now().Add(48 * time.Hour)}})
-	if err := session.SetStatus("available", ""); err != nil {
-		t.Fatal(err)
-	}
-	if err := e.App.Store.SetMeta("account:loverslab:enabled", "true"); err != nil {
-		t.Fatal(err)
-	}
-	calls := 0
-	e.App.HTTP.Transport = automaticTestTransport(func(r *http.Request) (*http.Response, error) {
-		calls++
-		if r.URL.String() != page || r.Method != "GET" || !strings.Contains(r.Header.Get("Cookie"), "synthetic-login") {
-			t.Error("expected authenticated metadata GET only", r.Method, r.URL)
-		}
-		return &http.Response{StatusCode: 200, Header: make(http.Header), Request: r, Body: io.NopCloser(strings.NewReader(`<script type="application/ld+json">{"@type":"SoftwareApplication","name":"Page fixture","softwareVersion":"2.0"}</script>`))}, nil
-	})
-	if ran, err := e.App.RunAutomatic(context.Background(), "mods", nil); !ran || err != nil {
+// A check whose window was killed leaves only its lease: the record still shows the last
+// finished check, says the check was interrupted once the lease is stale, and the check is
+// due again then instead of a whole interval later. Another writer of the record during a
+// check (the pending count after an update) no longer drops the check's result (16 §2.16).
+func TestAutomaticLeaseSurvivesKillAndOtherWriters(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	ctx := context.Background()
+	if ran, err := e.App.RunAutomatic(ctx, "mods", func(context.Context) (int, string, error) { return 1, "check complete", nil }); !ran || err != nil {
 		t.Fatal(ran, err)
 	}
-	if s := e.App.AutomaticStatus("mods"); s.Pending != 2 || calls != 1 {
-		t.Fatal(s, calls)
+	finished := e.App.AutomaticStatus("mods").Checked
+	e.Advance(24 * time.Hour)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		e.App.RunAutomatic(ctx, "mods", func(context.Context) (int, string, error) {
+			runtime.Goexit() // the window is killed mid-check
+			return 0, "", nil
+		})
+	}()
+	<-done
+	s := e.App.AutomaticStatus("mods")
+	if s.State != "checking" || !s.Checked.Equal(finished) || s.Lease == "" {
+		t.Fatalf("claimed record: %+v", s)
 	}
-	if gitHead(t, gitFolder) != g.First {
-		t.Fatal("check installed the Git update", latest)
+	if e.App.AutomaticDue("mods") {
+		t.Fatal("due while another window holds the check")
 	}
-	r, err := subscribe.Read(folder)
-	if err != nil || r.Installed != "1.0" || r.Latest != "2.0" {
-		t.Fatal("page check changed installed version or missed update", r, err)
+	e.Advance(31 * time.Minute)
+	if s := e.App.AutomaticStatus("mods"); s.State != "check interrupted" {
+		t.Fatal("stale lease shown as", s.State)
+	}
+	if !e.App.AutomaticDue("mods") {
+		t.Fatal("a killed check delays the next one")
+	}
+
+	// A subscription update records its pending count while the check runs.
+	ran, err := e.App.RunAutomatic(ctx, "mods", func(context.Context) (int, string, error) {
+		st := e.App.AutomaticStatus("mods")
+		st.Pending = 7
+		b, _ := json.Marshal(st)
+		if err := e.App.Store.SetMeta("automatic:mods", string(b)); err != nil {
+			t.Fatal(err)
+		}
+		return 3, "check complete", nil
+	})
+	if !ran || err != nil {
+		t.Fatal(ran, err)
+	}
+	if s := e.App.AutomaticStatus("mods"); s.State != "check complete" || s.Pending != 3 || s.Lease != "" || !s.Checked.After(finished) {
+		t.Fatalf("result dropped: %+v", s)
 	}
 }

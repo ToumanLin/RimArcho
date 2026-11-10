@@ -7,6 +7,7 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
@@ -26,7 +27,7 @@ func TestAnonymousConfigAndCLI(t *testing.T) {
 	if _, code := e.Run("config", "set", "steamcmd.account", "player password"); code == cmds.ExitOK {
 		t.Fatal("accepted credentials")
 	}
-	e.WriteFile(filepath.Join(e.App.SteamCMDDir(), "steamcmd.exe"), "fake")
+	e.WriteFile(filepath.Join(e.App.SteamCMDDir(), deps.SteamCMDExecutable()), "fake")
 	e.App.SteamCMDNoPath = true
 	var account string
 	e.App.SteamCMDStart = func(_ string, args []string, _ bool) (app.SteamCMDProc, error) {

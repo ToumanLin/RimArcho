@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -13,6 +14,141 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
+
+type latencyOffline struct{}
+
+func (latencyOffline) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, fmt.Errorf("synthetic latency measurement is offline")
+}
+
+// TestPageSwitchLatency measures first visits and repeat visits, including page commands
+// and their resulting frames. The supplied home must be synthetic (16 §10).
+func TestPageSwitchLatency(t *testing.T) {
+	home := os.Getenv("RIMARCHO_TUI_LATENCY_HOME")
+	if home == "" {
+		t.Skip("set RIMARCHO_TUI_LATENCY_HOME to a synthetic home")
+	}
+	a, err := app.Open(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	a.HTTP = &http.Client{Transport: latencyOffline{}}
+	a.MonitorBundle = app.MonitorNone
+	a.ToddsNoPath = true
+	a.LockBase = t.TempDir()
+	a.Launcher = func(string, []string, string) error { t.Fatal("launch attempted"); return nil }
+	a.SteamSignedIn = func() (string, bool) { return "", false }
+	a.WorkspaceSnapshot()
+	TuneProcess(a)
+	m := New(Options{App: a, Analyze: func(string, func(string)) error { return nil }, Scan: func(string) (string, error) { t.Fatal("scan attempted"); return "", nil }}).(*model)
+	m.Init()
+	m.w, m.h = 160, 46
+	_ = m.View()
+	t.Logf("inventory: %d copies", len(m.st.Ix.Mods))
+	pageSwitchLatency(t, m)
+}
+
+func pageSwitchLatency(t *testing.T, m *model) {
+	t.Helper()
+	// The timer installed by Update is not a page read. Measure its handler directly;
+	// drain every page command and measure each reply's handler and frame as well.
+	var ignored, replyMax time.Duration
+	var drain func(tea.Cmd)
+	drain = func(cmd tea.Cmd) {
+		if cmd == nil {
+			return
+		}
+		start := time.Now()
+		msg := cmd()
+		if batch, ok := msg.(tea.BatchMsg); ok {
+			for _, c := range batch {
+				drain(c)
+			}
+			return
+		}
+		// Cursor debounce and automatic analysis are independent of page data.
+		switch msg.(type) {
+		case detailTick, analyzeDoneMsg, analyzeLineMsg:
+			ignored += time.Since(start)
+			return
+		}
+		start = time.Now()
+		_, next := m.update(msg)
+		_ = m.View()
+		replyMax = max(replyMax, time.Since(start))
+		drain(next)
+	}
+	for round := 0; round < 4; round++ {
+		for _, key := range "!@#$%^&*" {
+			m.panel, m.prompt = nil, nil // close the previous chooser/text panel
+			ignored, replyMax = 0, 0
+			t0 := time.Now()
+			_, cmd := m.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{key}})
+			update := time.Since(t0)
+			v0 := time.Now()
+			_ = m.View()
+			frame := time.Since(v0)
+			drain(cmd)
+			ready := time.Since(t0) - ignored
+			t.Logf("round=%d key=%c update=%.3f view=%.3f reply=%.3f ready=%.3f ms", round, key, float64(update)/1e6, float64(frame)/1e6, float64(replyMax)/1e6, float64(ready)/1e6)
+			if len(m.st.Ix.Mods) <= 1355 && max(update+frame, replyMax) > 50*time.Millisecond {
+				t.Errorf("%c: key/frame %v, reply/frame %v > 50 ms", key, update+frame, replyMax)
+			}
+			if round > 0 && len(m.st.Ix.Mods) <= 1355 && ready > 50*time.Millisecond {
+				t.Errorf("%c: repeat visit including page commands %v > 50 ms", key, ready)
+			}
+		}
+	}
+}
+
+func TestPageReadSnapshots(t *testing.T) {
+	for _, page := range []int{1, 2, 6, 7} {
+		t.Run(fmt.Sprint(page), func(t *testing.T) {
+			e, _ := fixture(t)
+			m := direct(t, e, 160, 46)
+			m.opts.Analyze = func(string, func(string)) error { return nil }
+			cmd := m.goPage(page)
+			if cmd == nil {
+				t.Fatal("first visit must read in the background")
+			}
+			msg := cmd()
+			m.goPage(4)
+			m.prob.base = nil
+			m.prob.readKey = "newer page"
+			m.say(sayInfo, "newer page")
+			_, next := m.update(msg)
+			if next != nil || m.tab != tabList || m.home.data != nil || m.libr.page != nil || m.texturePanel != nil || len(m.prob.base) != 0 || m.prob.readKey != "newer page" || m.status != "newer page" {
+				t.Fatal("late page read changed the newer page")
+			}
+			finishPage(m, m.goPage(page))
+			if page == 1 && m.home.data == nil || page == 6 && m.libr.page == nil || page == 7 && m.texturePanel == nil || page == 2 && len(m.prob.base) == 0 {
+				t.Fatal("current page read was not applied")
+			}
+			if page != 2 && m.goPage(page) != nil {
+				t.Fatal("unchanged page was rebuilt")
+			}
+			before := len(m.st.List)
+			if page == 6 {
+				e.MustRun("disable", "pkg:tester.a") // a change the editor has not reloaded
+			}
+			if err := e.App.Store.SetMeta("test:page-generation", "changed"); err != nil {
+				t.Fatal(err)
+			}
+			cmd = m.goPage(page)
+			if cmd == nil {
+				t.Fatal("changed state reused a stale page")
+			}
+			if page == 6 {
+				finishPage(m, cmd)
+				if len(m.libCache.St.List) != before-1 || len(m.st.List) != before {
+					t.Fatal("adopted library lost the worker's newer list")
+				}
+				_ = m.View() // copy fields remain usable after the worker session closes
+			}
+		})
+	}
+}
 
 // keyLatency sends navigation and filter keys to a model and returns the time of each
 // key's Update plus the View that follows it (what the player waits for, 16 §11 T1).
@@ -107,12 +243,15 @@ func TestT1KeyLatency1354(t *testing.T) {
 	e.AddEnv(false)
 	e.MustRun("scan")
 	m := direct(t, e, 160, 46)
+	m.opts.Analyze = func(string, func(string)) error { return nil }
+	TuneProcess(e.App)
 	if n := len(m.cols[cActive].items) + len(m.cols[cInactive].items); n != 1354 {
 		t.Fatalf("%d mods in the columns", n)
 	}
 	if worst := report(t, keyLatency(t, m)); worst > 50*time.Millisecond {
 		t.Fatalf("slowest key %v > 50 ms", worst)
 	}
+	pageSwitchLatency(t, m)
 }
 
 // The same on a real data directory (a copy: the TUI syncs the workspace into it).

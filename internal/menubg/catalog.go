@@ -13,6 +13,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/ToumanLin/RimArcho/internal/env"
 )
 
 type expansion struct {
@@ -176,7 +178,7 @@ func Stamp(game string) string {
 		return stamp
 	}
 	for _, name := range []string{"resources.assets", "resources.assets.resS", "globalgamemanagers"} {
-		stamp += "|" + fileStamp(filepath.Join(filepath.Dir(path), "RimWorldWin64_Data", name))
+		stamp += "|" + fileStamp(filepath.Join(env.UnityDataDir(game), name))
 	}
 	return stamp
 }

@@ -8,9 +8,11 @@ import (
 	"testing"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/source"
+	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
@@ -419,18 +421,155 @@ func TestManagedPackAndSteamCMDDirectories(t *testing.T) {
 	}
 
 	tool := filepath.Join(e.Root, "Tool")
-	e.WriteFile(filepath.Join(tool, "steamcmd.exe"), "")
+	e.WriteFile(filepath.Join(tool, deps.SteamCMDExecutable()), "")
 	if err := e.App.SetDirectory("steamcmd-tool", tool); err != nil {
 		t.Fatal(err)
 	}
-	if e.App.SteamCMDDir() != tool || e.App.SteamCMDPath() != filepath.Join(tool, "steamcmd.exe") {
+	if e.App.SteamCMDDir() != tool || e.App.SteamCMDPath() != filepath.Join(tool, deps.SteamCMDExecutable()) {
 		t.Fatal("SteamCMD config did not follow set")
 	}
 	tool2 := filepath.Join(e.Root, "ToolMoved")
 	if _, err := e.App.MoveDirectory("steamcmd-tool", tool2); err != nil {
 		t.Fatal(err)
 	}
-	if e.App.SteamCMDDir() != tool2 || e.App.SteamCMDPath() != filepath.Join(tool2, "steamcmd.exe") {
+	if e.App.SteamCMDDir() != tool2 || e.App.SteamCMDPath() != filepath.Join(tool2, deps.SteamCMDExecutable()) {
 		t.Fatal("SteamCMD config did not follow move")
+	}
+}
+
+// A directory move whose records cannot be written puts the directory back where the
+// records still point, so the deployment link returns to it; across drives the original is
+// never recycled (03 §4.2).
+func TestMoveDirectoryRecordFailureMovesBack(t *testing.T) {
+	t.Parallel()
+	for _, cross := range []bool{false, true} {
+		t.Run(map[bool]string{false: "rename", true: "cross-volume"}[cross], func(t *testing.T) {
+			e := testkit.New(t)
+			e.AddWorkshop("5100", testkit.Sample("tester.moveback", "Move Back"))
+			e.AddEnv(false)
+			scanNow(t, e)
+			e.MustRun("enable", "ws:5100")
+			e.MustRun("pin", "ws:5100")
+			e.MustRun("save")
+			st, err := e.App.Loadout()
+			if err != nil {
+				t.Fatal(err)
+			}
+			var id string
+			for _, m := range st.Ix.Mods {
+				if m.SourceLabel == app.LockLabel {
+					id = m.ID
+				}
+			}
+			link := filepath.Join(e.Game, "Mods", app.DeployName(st.Ix.ByID[id]))
+			e.App.GameProbe = func(string) *app.GameRun { return nil }
+			e.App.SameVolume = func(string, string) bool { return !cross }
+			e.App.TrashFunc = func(p string) error { t.Fatal("recycled", p); return nil }
+			if _, err := e.App.Store.DB.Exec(`CREATE TRIGGER fail_move BEFORE UPDATE OF root ON source BEGIN SELECT RAISE(ABORT, 'injected'); END`); err != nil {
+				t.Fatal(err)
+			}
+			old := e.App.LockDir()
+			to := filepath.Join(e.Root, "MovedLocks")
+			if _, err := e.App.MoveDirectory("lock", to); err == nil || !strings.Contains(err.Error(), "stays at") {
+				t.Fatal(err)
+			}
+			if _, err := os.Stat(to); !os.IsNotExist(err) {
+				t.Fatal("directory left at the new place", err)
+			}
+			if env.PathKey(e.App.LockDir()) != env.PathKey(old) || directory(t, e.App, "lock").Status != "ok" {
+				t.Fatal("settings changed", e.App.LockDir(), directory(t, e.App, "lock").Status)
+			}
+			realOld, _ := source.RealPath(old)
+			if actual, err := source.RealPath(link); err != nil || !source.Within(actual, realOld) {
+				t.Fatalf("deployment link not back: %s %v", actual, err)
+			}
+			rows, _ := e.App.Store.ManagedLinks()
+			for _, r := range rows {
+				if !store.LinkFinished(r.Phase) {
+					t.Fatalf("ledger left %s in %q", r.Name, r.Phase)
+				}
+			}
+		})
+	}
+}
+
+// Changing an environment's game folder writes the environment and its game folders
+// together: a failed write changes neither, and a later error (removing an unknown folder)
+// leaves both on the new game.
+func TestEnvSetGameMoveIsOneWrite(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	e.AddEnv(false)
+	scanNow(t, e)
+	game, _ := e.App.Env()
+	moved := filepath.Join(e.Root, "MovedGame")
+	e.CopyTree(e.Game, moved)
+	rootsOf := func() (string, []string) {
+		cur, err := e.App.Store.EnvByID(game.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		srcs, _ := e.App.Store.Sources(game.ID)
+		var roots []string
+		for _, s := range srcs {
+			if s.EnvID == game.ID && (s.Kind == source.Official || s.Kind == source.Local) && s.Status != source.StatusRetired {
+				roots = append(roots, filepath.Dir(s.Root))
+			}
+		}
+		return cur.GameRoot, roots
+	}
+	if _, err := e.App.Store.DB.Exec(`CREATE TRIGGER fail_env BEFORE UPDATE ON environment BEGIN SELECT RAISE(ABORT, 'injected'); END`); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := e.App.EnvSet(game.Name, app.EnvSpec{GameRoot: moved}); err == nil {
+		t.Fatal("want the injected error")
+	}
+	if root, srcs := rootsOf(); env.PathKey(root) != env.PathKey(e.Game) || len(srcs) != 2 || env.PathKey(srcs[0]) != env.PathKey(e.Game) || env.PathKey(srcs[1]) != env.PathKey(e.Game) {
+		t.Fatalf("split after a failed write: game %s, sources in %v", root, srcs)
+	}
+	e.App.Store.DB.Exec(`DROP TRIGGER fail_env`)
+	if _, _, err := e.App.EnvSet(game.Name, app.EnvSpec{GameRoot: moved, RemoveSources: []string{"no-such-folder"}}); err == nil {
+		t.Fatal("want the unknown folder refused")
+	}
+	if root, srcs := rootsOf(); env.PathKey(root) != env.PathKey(moved) || len(srcs) != 2 || env.PathKey(srcs[0]) != env.PathKey(moved) || env.PathKey(srcs[1]) != env.PathKey(moved) {
+		t.Fatalf("split after a later error: game %s, sources in %v", root, srcs)
+	}
+}
+
+// Removing a folder whose re-binding was pending drops the pending root, so adding the
+// folder back later does not bring a stale re-binding with it.
+func TestFolderRemoveDropsPendingRebind(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	e.AddEnv(false)
+	extra := filepath.Join(e.Root, "Extra")
+	e.WriteMod(filepath.Join(extra, "A"), testkit.Sample("tester.extra", "Extra"))
+	e.MustRun("folder", "add", "extra", extra)
+	shared, err := e.App.Store.SharedSources()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var s *source.Source
+	for _, x := range shared {
+		if env.PathKey(x.Root) == env.PathKey(extra) {
+			s = x
+		}
+	}
+	if s == nil {
+		t.Fatal("no extra source")
+	}
+	s.Status, s.PendingRoot = source.StatusRebindPending, filepath.Join(e.Root, "Elsewhere")
+	if err := e.App.Store.UpdateSource(s); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.App.FolderRemove(s.Label); err != nil {
+		t.Fatal(err)
+	}
+	e.MustRun("folder", "add", "extra", extra)
+	all, _ := e.App.Store.AllSources()
+	for _, x := range all {
+		if x.ID == s.ID && (x.Status == source.StatusRetired || x.PendingRoot != "") {
+			t.Fatalf("revived with %q, pending %q", x.Status, x.PendingRoot)
+		}
 	}
 }

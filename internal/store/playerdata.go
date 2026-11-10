@@ -37,7 +37,7 @@ func (s *Store) PlayerDataAll(envID string) (map[string]*PlayerData, error) {
 		}
 	}
 	rows.Close()
-	rows, err = s.DB.Query(`SELECT lineage_id, tag FROM lineage_tag ORDER BY tag`)
+	rows, err = s.DB.Query(`SELECT lineage_id, tag FROM lineage_tag ORDER BY lineage_id, pos, tag`)
 	if err != nil {
 		return nil, err
 	}
@@ -69,9 +69,10 @@ func (s *Store) setData(envID, lineage, col, v string) error {
 	return err
 }
 
-// AddTag tags a lineage; it reports whether the tag is new.
+// AddTag tags a lineage, after its other tags; it reports whether the tag is new.
 func (s *Store) AddTag(envID, lineage, tag string) (bool, error) {
-	r, err := s.DB.Exec(`INSERT OR IGNORE INTO lineage_tag(environment_id, lineage_id, tag) VALUES(?,?,?)`, Shared, lineage, strings.TrimSpace(tag))
+	r, err := s.DB.Exec(`INSERT OR IGNORE INTO lineage_tag(environment_id, lineage_id, tag, pos)
+		VALUES(?,?,?,(SELECT coalesce(max(pos)+1, 0) FROM lineage_tag WHERE lineage_id=?))`, Shared, lineage, strings.TrimSpace(tag), lineage)
 	if err != nil {
 		return false, err
 	}
@@ -173,14 +174,15 @@ func (s *Store) TagLineages(tags []string) (map[string][]string, error) {
 }
 
 // MergeTags replaces the tags from with into on every lineage, in one transaction: a
-// lineage carrying any of from carries into afterwards. into may differ from a source only
-// in case (a rename). The notes of from are joined onto into's. It returns how many
-// lineages carried one of from.
+// lineage carrying any of from carries into afterwards, at the first place one of them had.
+// into may differ from a source only in case (a rename). The notes of from are joined onto
+// into's; into keeps its colour, else takes the first colour among from. It returns how
+// many lineages carried one of from.
 func (s *Store) MergeTags(from []string, into string) (int, error) {
 	return s.retag(from, strings.TrimSpace(into))
 }
 
-// DeleteTags removes the tags from every lineage, with their notes. It returns how many
+// DeleteTags removes the tags from every lineage, with their notes and colours. It returns how many
 // lineages carried one of them.
 func (s *Store) DeleteTags(tags []string) (int, error) { return s.retag(tags, "") }
 
@@ -192,6 +194,19 @@ func (s *Store) retag(from []string, into string) (int, error) {
 	notes, err := s.TagNotes()
 	if err != nil {
 		return 0, err
+	}
+	colors, err := s.TagColors()
+	if err != nil {
+		return 0, err
+	}
+	color := ""
+	if into != "" {
+		color = colors[strings.ToLower(into)]
+		for _, t := range from {
+			if color == "" {
+				color = colors[strings.ToLower(strings.TrimSpace(t))]
+			}
+		}
 	}
 	var joined []string
 	seen := map[string]bool{}
@@ -209,9 +224,16 @@ func (s *Store) retag(from []string, into string) (int, error) {
 		return 0, err
 	}
 	defer tx.Rollback()
+	places, err := tagPositions(tx, from)
+	if err != nil {
+		return 0, err
+	}
 	for _, t := range from {
 		t = strings.TrimSpace(t)
 		addNote(t)
+		if _, err := tx.Exec(`DELETE FROM tag_color WHERE tag=?`, t); err != nil {
+			return 0, err
+		}
 		if _, err := tx.Exec(`DELETE FROM lineage_tag WHERE tag=?`, t); err != nil {
 			return 0, err
 		}
@@ -221,7 +243,13 @@ func (s *Store) retag(from []string, into string) (int, error) {
 	}
 	if into != "" {
 		for lin := range lins {
-			if _, err := tx.Exec(`INSERT OR IGNORE INTO lineage_tag(environment_id, lineage_id, tag) VALUES(?,?,?)`, Shared, lin, into); err != nil {
+			if _, err := tx.Exec(`INSERT OR IGNORE INTO lineage_tag(environment_id, lineage_id, tag, pos) VALUES(?,?,?,?)`, Shared, lin, into, places[lin]); err != nil {
+				return 0, err
+			}
+		}
+		if color != "" {
+			if _, err := tx.Exec(`INSERT INTO tag_color(tag, color) VALUES(?,?)
+				ON CONFLICT(tag) DO UPDATE SET tag=excluded.tag, color=excluded.color`, into, color); err != nil {
 				return 0, err
 			}
 		}

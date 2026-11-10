@@ -13,7 +13,7 @@
 | Metric | Target |
 | --- | --- |
 | TUI: archo working set after 10 idle minutes | ≤ 80 MB |
-| TUI: each key response with 1354 Mods, scrolling and filtering | ≤ 50 ms |
+| TUI: each key response with 1354 Mods, including page shortcuts, scrolling and filtering | ≤ 50 ms |
 | GUI: idle Go memory, measured as private working set | ≤ 80 MB |
 | GUI: total memory, Go + WebView2, using Task Manager's Memory metric after 10 idle minutes | ≤ 200 MB |
 | GUI: cold start to an interactive list | ≤ 1.5 seconds |
@@ -23,6 +23,7 @@
 | GUI: process-tree CPU at rest, no work running, window visible, over 20 seconds | ≤ 2% of one core |
 
 - The GUI's 80 MB target covers only the Go process, because WebView2 cannot fit within it; the total has its own target. The TUI figure excludes the player's terminal process (§9.2).
+- TUI page measurements include the key's Update and View, every page command, and each reply's Update and View. Each key/frame and reply/frame must meet the response target; first-time background reads may finish later while existing data remains interactive. Record their complete time separately in 18 §2. Repeat visits with unchanged state must also complete their page commands within 50 ms on the 1354-Mod fixture. Cursor debounce, idle timers, automatic file analysis and memory estimation are separate operations; report an estimate started by a page in its complete background time.
 - **Nothing moves at rest.** An endless CSS animation makes WebView2 draw a frame on every display refresh, about 5% of a core at 60 Hz even for a 9-pixel dot (18). Endless animations belong only to elements that exist while work runs (spinners, progress, skeletons, problems `updating`); anything shown at rest stops after a few iterations. A periodic refresh that changes nothing visible writes nothing: rebuilding the element would restart its finite animation (the running game's dot on the launch page blinks again) and costs a frame. `TestEndlessAnimationsOnlyWhileWorking` lists the allowed selectors with the work each shows.
 - On minimize, in the background, and in front without input, the GUI sets WebView2's memory target to low, and restores it on input or when the window is active again (§2.16.1 M08, 17 §7.3).
 - If WebView2 is unavailable, as on a few stripped systems, show an explanation and a Microsoft download link without downloading automatically. The player can still use the `archo.exe` TUI.
@@ -33,7 +34,7 @@
 
 | # | Scenario | Expected | Status |
 | --- | --- | --- | --- |
-| T1 | Scroll and search four areas with 1354 Mods, including CJK | Each key responds in ≤ 50 ms | Passed |
+| T1 | Scroll and search four areas with 1354 Mods, including CJK; visit shift+1–8 once and three more times | Each key/frame and page reply/frame responds in ≤ 50 ms; unchanged repeat visits including page reads finish in ≤ 50 ms | Passed with synthetic homes (`TestT1KeyLatency1354`, `TestPageSwitchLatency`); native terminal redraw remains a VM check |
 | T2 | Use terminal widths 160, 130, 100, and 78 | The layout degrades correctly under §2.5, and all operations remain usable (`TestBreakpointsAndCJK`) | Passed |
 | T3 | Use Chinese names and aliases | Alignment is correct; truncation never splits a character or produces U+FFFD | Passed |
 | T4 | A new user enables, sorts, and launches without reading docs | Complete within 5 minutes in a human usability test | Unverified |
@@ -50,7 +51,7 @@
 | T20 | Repeat `esc` from any state until nothing changes | At most 3 presses reach the base state: the current page, no selection or overlay, and collapsed filters. `TestT20EscBack` covers 15 editor states plus 7 nested states. `TestT20EscBackPages` covers 27 states across Launch, Can it run, game log, Mod library › all mods, updates, search files, sorting rules, packs, texture optimisation, settings, and uninstall. Each of its subtests first verifies that the state was actually built | Passed |
 | T21 | Start the TUI without arguments | The current plan's editor opens, and the command panel reaches every TUI page in §9.1 | Passed |
 | T22 | Switch through the command panel between two plans in one environment | The editor shows the other plan's list, staging, and history | Passed |
-| T24 | Align with the GUI (§9.1, §9.5): every command-panel action responds; the top bar and breadcrumbs use GUI names such as can it run and mod library › updates. Search defaults to the current list, supports all installed copies with a blank mods field, groups Mod → file → line, reruns after a toggle, and stops on leaving. Rules use `r` to add, `Del` to delete, immediate `u` to restore, and `a` for scope. Check the editor's `H` picker, narrow-screen `4` details, and full-details `?`. `shift+1` and editor `L` visit launch, where only `L` launches. `P` opens a list without changing the current list, and the top bar says launching X. Outside Staging, `T` stages all | All behavior is correct (`TestWindowNames`, `TestFileSearchPage`, `TestFileSearchPage/leave_stops`, `TestRulesScreen`, `TestEditorKeysOfTheWindow`, `TestStartPage`, `TestOpenListIsNotCurrent`, `TestStageAllKey`) | Passed |
+| T24 | Align with the GUI (§9.1, §9.5): every command-panel action responds; the navigation row and breadcrumbs use GUI names such as can it run and mod library › updates. Search defaults to the current list, supports all installed copies with a blank mods field, groups Mod → file → line, reruns after a toggle, and stops on leaving. Rules use `r` to add, `Del` to delete, immediate `u` to restore, and `a` for scope. Check the editor's `H` picker, narrow-screen `4` details, and full-details `?`. `shift+1` and editor `L` visit launch, where only `L` launches. `P` opens a list without changing the current list, and the context row says launching plays X. Outside Staging, `T` stages all | All behavior is correct (`TestWindowNames`, `TestFileSearchPage`, `TestFileSearchPage/leave_stops`, `TestRulesScreen`, `TestEditorKeysOfTheWindow`, `TestStartPage`, `TestOpenListIsNotCurrent`, `TestStageAllKey`) | Passed |
 | T23 | Use `:` (§9.4): type `pl`, press `tab`, choose `plan new`, and complete the name; after `enable`, use `tab` to complete the cursor Mod; use `↑` to recall history; enter invalid arguments; run a multiline command | Candidates and help are correct. Usage errors retain the input and show red text. Single-line results use status; multiline results open a panel. A quoted name is one argument. Commands run in the background without blocking, and history survives restart (`TestCmdLine*`) | Passed |
 
 

@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ToumanLin/RimArcho/internal/deps"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -100,7 +102,7 @@ func TestT20EscBackPages(t *testing.T) {
 	t.Parallel()
 	e, _ := v3Fixture(t)
 	e.WriteFile(filepath.Join(e.UserData, "Player.log"), "RimWorld 1.6.4633 rev1261\n") // game log has a log to choose
-	e.WriteFile(filepath.Join(e.Root, "LocalAppData", "RimArcho", "steamcmd", "steamcmd.exe"), "MZ")
+	e.WriteFile(filepath.Join(e.Root, "LocalAppData", "RimArcho", "steamcmd", deps.SteamCMDExecutable()), "MZ")
 	for _, s := range escPages {
 		t.Run(s.name, func(t *testing.T) {
 			m := direct(t, e, 160, 40)

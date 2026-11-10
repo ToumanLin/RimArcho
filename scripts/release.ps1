@@ -9,11 +9,13 @@
 #   pwsh scripts/release.ps1 -Version 0.5.0            # tests, then dist/archo-0.5.0-windows-amd64.zip and .zip.sha256
 #   pwsh scripts/release.ps1 -Version 0.5.0 -SkipTests
 #
-# Nothing outside dist/ is written; the script never pushes or publishes.
+# Outputs go to -OutputDir (default dist/); the script never pushes or publishes.
+# -GOOS linux builds only the Linux tarball. The default builds both platforms.
 param(
     [Parameter(Mandatory = $true)][string]$Version,
-    [string]$GOOS = "windows",
-    [string]$GOARCH = "amd64",
+    [ValidateSet("windows", "linux")][string]$GOOS = "windows",
+    [ValidateSet("amd64")][string]$GOARCH = "amd64",
+    [string]$OutputDir = "dist",
     [switch]$SkipTests
 )
 $ErrorActionPreference = "Stop"
@@ -42,7 +44,8 @@ if (-not $SkipTests) {
 }
 
 $name = "archo-$Version-$GOOS-$GOARCH"
-$out = Join-Path "dist" $name
+$OutputDir = [IO.Path]::GetFullPath($OutputDir)
+$out = Join-Path $OutputDir $name
 if (Test-Path $out) { Remove-Item -Recurse -Force $out }
 New-Item -ItemType Directory -Force $out | Out-Null
 
@@ -101,21 +104,22 @@ Write-Host "building Archo Monitor"
 & (Join-Path $PSScriptRoot "..\monitor\build.ps1") -Out (Join-Path $out "monitor\ArchoMonitor")
 if (-not (Test-Path (Join-Path $out "monitor\ArchoMonitor\About\About.xml"))) { throw "Archo Monitor build produced no About.xml" }
 
-$zip = "$out.zip"
-if (Test-Path $zip) { Remove-Item -Force $zip }
-Compress-Archive -Path (Join-Path $out "*") -DestinationPath $zip
+if ($GOOS -eq "linux") {
+    $archive = "$out.tar.gz"
+    go run ./scripts/releasetar -dir $out -out $archive
+    if ($LASTEXITCODE -ne 0) { throw "tar.gz packaging failed" }
+} else {
+    $archive = "$out.zip"
+    Compress-Archive -Path (Join-Path $out "*") -DestinationPath $archive
+}
 
-# The checksum RimArcho's own update verifies the download against (17 §5.1): upload it to
-# the GitHub release next to the zip, as <zip>.sha256 in sha256sum format.
-$zipName = Split-Path -Leaf $zip
-$sum = "$zip.sha256"
-$hash = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLowerInvariant()
-[IO.File]::WriteAllText((Join-Path (Resolve-Path "dist").Path "$zipName.sha256"), "$hash  $zipName`n", [Text.Encoding]::ASCII)
-Write-Host ("sha256: {0}  {1}" -f $hash, $sum)
-
-$size = [math]::Round((Get-Item (Join-Path $out $exe)).Length / 1MB, 1)
+# sha256sum format is shared by both platforms (17 §5.1).
+$archiveName = Split-Path -Leaf $archive
+$hash = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
+[IO.File]::WriteAllText("$archive.sha256", "$hash  $archiveName`n", [Text.Encoding]::ASCII)
+Write-Host ("dist: {0} ({1:N0} bytes)" -f $archive, (Get-Item $archive).Length)
+Get-ChildItem -LiteralPath $out -Recurse -File | ForEach-Object { "  {0}  {1:N0}" -f $_.FullName, $_.Length }
 if ($GOOS -eq "windows" -and $env:OS -eq "Windows_NT") { & (Join-Path $out $exe) version }
-Write-Host ("dist: {0} ({1:N1} MB; {2} {3} MB)" -f $zip, ((Get-Item $zip).Length / 1MB), $exe, $size)
-Add-Type -AssemblyName System.IO.Compression.FileSystem
-$z = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $zip))
-try { $z.Entries | ForEach-Object { "  {0,-40} {1,12:N0}" -f $_.FullName, $_.Length } } finally { $z.Dispose() }
+if ($GOOS -eq "windows") {
+    & $PSCommandPath -Version $Version -GOOS linux -GOARCH $GOARCH -OutputDir $OutputDir -SkipTests
+}

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/loadout"
+	"github.com/ToumanLin/RimArcho/internal/order"
 	"github.com/ToumanLin/RimArcho/internal/scan"
 	"github.com/ToumanLin/RimArcho/internal/store"
 )
@@ -27,13 +28,28 @@ type dependencyIndex struct {
 	installed   map[string][]*store.Mod
 	loadable    map[string][]*store.Mod
 	activeByWS  map[string][]*store.Mod // built on first need
+	activeByLin map[string][]*store.Mod // built on first need
 	// replacement: Use This Instead's replacement for a package (08 §2.3); nil: none known.
 	replacement func(workshopID, pkg string) *Replacement
+	// replacedBy: the player's replaces rules, package → the lineages standing in (08 §2.1).
+	replacedBy map[string][]string
 }
 
 // newDependencyIndex indexes the enabled mods (by packageId, as the game matches them).
 func (a *App) newDependencyIndex(st *LoadoutState, activeByPkg map[string][]*store.Mod) *dependencyIndex {
-	return &dependencyIndex{st: st, activeByPkg: activeByPkg, installed: installedDependencies(st), replacement: a.ReplacementFor}
+	ix := &dependencyIndex{st: st, activeByPkg: activeByPkg, installed: installedDependencies(st), replacement: a.ReplacementFor}
+	// Without its rules a stand-in only goes unseen: the dependency reads as missing again.
+	if rs, err := a.Store.Rules(st.Ix.Env.ID); err == nil {
+		for _, r := range rs {
+			if r.Kind == order.RuleReplaces && r.A != "" && r.Target != "" {
+				if ix.replacedBy == nil {
+					ix.replacedBy = map[string][]string{}
+				}
+				ix.replacedBy[r.Target] = append(ix.replacedBy[r.Target], r.A)
+			}
+		}
+	}
+	return ix
 }
 
 // How an enabled mod stands in for a required package that is not enabled itself.
@@ -45,14 +61,35 @@ const (
 	// still warns in its mod list, but loads both, and the replacement is what the player
 	// meant to use (08 §1.1).
 	StandInReplacement = "replacement"
+	// StandInRule: the player's replaces rule names it (08 §2.1); like a replacement, the
+	// game still warns in its mod list.
+	StandInRule = "rule"
 )
 
 // standIns returns the enabled mods that satisfy dep although no mod with its packageId is
-// enabled, and how (StandIn*). Alternatives come first, as the game reads them.
+// enabled, and how (StandIn*). Alternatives come first, as the game reads them; then the
+// player's own rules, then community data.
 func (ix *dependencyIndex) standIns(dep scanDep) ([]*store.Mod, string) {
 	for _, alt := range dep.alts {
 		if ms := ix.activeByPkg[dependencyPackage(alt)]; len(ms) > 0 {
 			return ms, StandInAlternative
+		}
+	}
+	if lins := ix.replacedBy[dependencyPackage(dep.pkg)]; len(lins) > 0 {
+		if ix.activeByLin == nil {
+			ix.activeByLin = map[string][]*store.Mod{}
+			for _, ms := range ix.activeByPkg {
+				for _, m := range ms {
+					ix.activeByLin[m.LineageID] = append(ix.activeByLin[m.LineageID], m)
+				}
+			}
+		}
+		var ms []*store.Mod
+		for _, lin := range lins {
+			ms = append(ms, ix.activeByLin[lin]...)
+		}
+		if len(ms) > 0 {
+			return ms, StandInRule
 		}
 	}
 	if ix.replacement == nil {
@@ -203,10 +240,21 @@ func (a *App) MissingDependencies(st *LoadoutState) ([]MissingDependency, error)
 	if err := a.Store.LoadDecls(active); err != nil {
 		return nil, err
 	}
+	ignored, err := a.ignoredDependencies(st)
+	if err != nil {
+		return nil, err
+	}
 	out := []MissingDependency{}
 	byPkg := map[string]int{}
 	for _, m := range active {
 		for _, dep := range ix.missing(m) {
+			code := "dep.missing"
+			if len(ix.candidates(dep.pkg)) > 0 {
+				code = "dep.inactive"
+			}
+			if ignored(m, code, dep.pkg) {
+				continue
+			}
 			i, ok := byPkg[dep.pkg]
 			if !ok {
 				i = len(out)
@@ -235,6 +283,28 @@ func (a *App) MissingDependencies(st *LoadoutState) ([]MissingDependency, error)
 		}
 	}
 	return out, nil
+}
+
+// ignoredDependencies says whether the player ignored m's dep.missing / dep.inactive finding
+// for a package (05 §4.2): the same match Problems makes, so a dependency hidden in Can it
+// run is neither offered after a sort nor enabled by completing dependencies. An ignore
+// lapses when m changes.
+func (a *App) ignoredDependencies(st *LoadoutState) (func(m *store.Mod, code, pkg string) bool, error) {
+	gs, err := a.Store.Ignores(st.Ix.Env.ID)
+	if err != nil {
+		return nil, err
+	}
+	type key struct{ lin, code, pkg string }
+	snap := map[key]int64{}
+	for _, g := range gs {
+		if g.Code == "dep.missing" || g.Code == "dep.inactive" {
+			snap[key{g.LineageID, g.Code, g.Key}] = g.SnapshotID
+		}
+	}
+	return func(m *store.Mod, code, pkg string) bool {
+		s, ok := snap[key{m.LineageID, code, pkg}]
+		return ok && s == m.SnapID
+	}, nil
 }
 
 // DependencyCompletion enables the available dependency closure and sorts in one edit.
@@ -288,4 +358,64 @@ func (a *App) CompleteDependencies() (*DependencyCompletion, error) {
 	}
 	out.Edit = r
 	return out, nil
+}
+
+// DependentsOf lists the enabled mods that would be left without a required mod if the
+// instances ids were disabled, in load order: first those that require one of them (with
+// no other enabled mod or stand-in meeting it), then the mods that require those, and so
+// on. A dependency already missing before does not count.
+func (a *App) DependentsOf(st *LoadoutState, ids []string) ([]*store.Mod, error) {
+	off := map[string]bool{}
+	for _, id := range ids {
+		off[id] = true
+	}
+	var active []*store.Mod
+	seen := map[string]bool{}
+	for _, e := range st.List {
+		if m := st.Ix.ByID[e.Instance]; m != nil && !seen[m.ID] {
+			seen[m.ID] = true
+			active = append(active, m)
+		}
+	}
+	if err := a.Store.LoadDecls(active); err != nil {
+		return nil, err
+	}
+	missing := func(off map[string]bool) map[string][]string {
+		byPkg := map[string][]*store.Mod{}
+		for _, m := range active {
+			if !off[m.ID] {
+				p := dependencyPackage(m.PackageID)
+				byPkg[p] = append(byPkg[p], m)
+			}
+		}
+		ix := a.newDependencyIndex(st, byPkg)
+		out := map[string][]string{}
+		for _, m := range active {
+			if !off[m.ID] {
+				for _, d := range ix.missing(m) {
+					out[m.ID] = append(out[m.ID], d.pkg)
+				}
+			}
+		}
+		return out
+	}
+	base := missing(nil)
+	var out []*store.Mod
+	for {
+		now, more := missing(off), false
+		for _, m := range active {
+			if off[m.ID] {
+				continue
+			}
+			for _, p := range now[m.ID] {
+				if !slices.Contains(base[m.ID], p) {
+					out, off[m.ID], more = append(out, m), true, true
+					break
+				}
+			}
+		}
+		if !more {
+			return out, nil
+		}
+	}
 }

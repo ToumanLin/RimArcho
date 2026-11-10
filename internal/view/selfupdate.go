@@ -15,10 +15,12 @@ const (
 	TaskSelfCheck  = "self-check"
 )
 
-// SelfUpdateLine is the launch page's line (16 §2.3): nil when nothing is to install.
+// SelfUpdateLine is the launch page's line (16 §2.3) and the navigation's update button
+// (16 §2.1): nil when nothing is to install.
 type SelfUpdateLine struct {
-	Title string `json:"title"` // "RimArcho"
-	Text  string `json:"text"`  // "0.9.1 can be updated"
+	Title   string `json:"title"`   // "RimArcho"
+	Text    string `json:"text"`    // "0.9.1 can be updated"
+	Version string `json:"version"` // "0.9.1": the button's × hides it until a newer one
 }
 
 func SelfUpdateHome(a *app.App) *SelfUpdateLine {
@@ -26,7 +28,10 @@ func SelfUpdateHome(a *app.App) *SelfUpdateLine {
 	if r == nil {
 		return nil
 	}
-	return &SelfUpdateLine{Title: "RimArcho", Text: Tf("%s can be updated", r.Version)}
+	if !app.SelfUpdateSupported() {
+		return &SelfUpdateLine{Title: "RimArcho", Text: SelfCheckResult(a), Version: r.Version}
+	}
+	return &SelfUpdateLine{Title: "RimArcho", Text: Tf("%s can be updated", r.Version), Version: r.Version}
 }
 
 // SelfUpdateItem is the first row of the About group (16 §2.14): the running
@@ -51,6 +56,11 @@ func SelfUpdateItem(a *app.App) SettingItem {
 	}
 	it.ValueNote = Tf("new version available: %s", r.Version)
 	it.Details = &SettingDetails{Summary: T("release notes"), Text: strings.TrimSpace(r.Notes), Link: r.Page}
+	if !app.SelfUpdateSupported() {
+		it.ValueNote += "  " + T(a.SelfUpdateInstructions())
+		it.Actions = []SettingAction{check}
+		return it
+	}
 	if err := r.Installable(); err != nil {
 		it.ValueNote += "  " + T("download it from the release page")
 		it.Actions = []SettingAction{check}
@@ -104,6 +114,9 @@ func SelfUpdatePhase(s app.SelfUpdateStep) string {
 // SelfCheckResult is the check task's result line.
 func SelfCheckResult(a *app.App) string {
 	if r := a.SelfUpdatePending(); r != nil {
+		if !app.SelfUpdateSupported() {
+			return Tf("RimArcho %s available", r.Version) + "; " + r.Page + "; " + T(a.SelfUpdateInstructions())
+		}
 		return Tf("RimArcho %s can be updated", r.Version)
 	}
 	return selfCheckText(a.SelfUpdateInfo().State)

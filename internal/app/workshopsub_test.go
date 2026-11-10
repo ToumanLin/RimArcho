@@ -18,6 +18,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
+	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
 // fakeSteamWorker answers like the worker: every call succeeds, and the state follows it.
@@ -512,4 +513,104 @@ func TestWorkshopStopCancelsWatch(t *testing.T) {
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("%v", err)
 	}
+}
+
+// 16 §2.9: unsubscribing and subscribing again are one unit. A stop before the unsubscribe
+// does nothing; a stop after it still subscribes; Steam lost in between leaves a record
+// that Can it run offers to subscribe again, cleared once Steam confirms a subscription.
+func TestWorkshopResubscribeIsOneUnit(t *testing.T) {
+	t.Parallel()
+	prepare := func(t *testing.T) (*testkit.Env, *[][]string) {
+		e := setup(t, false)
+		e.AddWorkshop("8100", testkit.Sample("tester.repair", "Repair"))
+		scanNow(t, e)
+		steamDLL(e)
+		e.App.TrashFunc = os.RemoveAll
+		calls := &[][]string{}
+		e.App.SteamWorker = fakeSteamWorker(calls)
+		return e, calls
+	}
+	pending := func(t *testing.T, e *testkit.Env) []app.PendingResubscribe {
+		st, err := e.App.Loadout()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return e.App.ResubscribePending(st)
+	}
+	t.Run("stop before", func(t *testing.T) {
+		e, calls := prepare(t)
+		_, err := e.App.Workshop(steamworks.Resubscribe, []string{"ws:8100"}, false, app.BatchCalls{Stopped: func() bool { return true }})
+		if !errors.Is(err, context.Canceled) || len(*calls) != 0 || len(pending(t, e)) != 0 {
+			t.Fatalf("err %v, calls %v, pending %v", err, *calls, pending(t, e))
+		}
+	})
+	t.Run("stop after unsubscribe", func(t *testing.T) {
+		e, calls := prepare(t)
+		stopped := func() bool { return len(*calls) > 0 }
+		e.App.Workshop(steamworks.Resubscribe, []string{"ws:8100"}, false, app.BatchCalls{Stopped: stopped})
+		if len(*calls) < 2 || (*calls)[1][1] != steamworks.Subscribe {
+			t.Fatalf("not subscribed again after a stop: %v", *calls)
+		}
+		if p := pending(t, e); len(p) != 0 {
+			t.Fatalf("pending after a confirmed subscribe: %v", p)
+		}
+	})
+	t.Run("Steam lost in between", func(t *testing.T) {
+		e, calls := prepare(t)
+		fake := e.App.SteamWorker
+		e.App.SteamWorker = func(dir string, args []string) (string, error) {
+			if args[0] == steamworks.Subscribe {
+				return "", errors.New("synthetic: Steam closed")
+			}
+			return fake(dir, args)
+		}
+		if _, err := e.App.Workshop(steamworks.Resubscribe, []string{"ws:8100"}, false); err == nil {
+			t.Fatal("want an error")
+		}
+		scanNow(t, e) // the folder is gone: no copy is left to resubscribe from
+		p := pending(t, e)
+		if len(p) != 1 || p[0].WorkshopID != "8100" || p[0].Name != "Repair" {
+			t.Fatalf("pending: %+v", p)
+		}
+		st, err := e.App.Loadout()
+		if err != nil {
+			t.Fatal(err)
+		}
+		ps, err := e.App.Problems(false, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		found := false
+		for _, n := range view.BuildNeeds(e.App, st, ps).Items {
+			for _, a := range n.Actions {
+				found = found || a.Kind == view.ActSubscribe && slices.Equal(a.Refs, []string{"8100"})
+			}
+		}
+		if !found {
+			t.Fatal("Can it run does not offer to subscribe again")
+		}
+		e.App.SteamWorker = fake
+		if _, err := e.App.SubscribeWorkshop([]string{"8100"}, false, false); err != nil {
+			t.Fatal(err)
+		}
+		if p := pending(t, e); len(p) != 0 {
+			t.Fatalf("pending after subscribing again: %+v (calls %v)", p, *calls)
+		}
+	})
+	t.Run("subscribed in the Steam client", func(t *testing.T) {
+		e, _ := prepare(t)
+		fake := e.App.SteamWorker
+		e.App.SteamWorker = func(dir string, args []string) (string, error) {
+			if args[0] == steamworks.Subscribe {
+				return "", errors.New("synthetic: Steam closed")
+			}
+			return fake(dir, args)
+		}
+		e.App.Workshop(steamworks.Resubscribe, []string{"ws:8100"}, false)
+		e.AddWorkshop("8100", testkit.Sample("tester.repair", "Repair")) // the player subscribed in Steam
+		scanNow(t, e)
+		if p := pending(t, e); len(p) != 0 {
+			t.Fatalf("pending though subscribed: %+v", p)
+		}
+	})
 }

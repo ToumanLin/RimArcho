@@ -56,7 +56,7 @@ func (a *App) InstallDep(name string, progress func(done, total int64)) (path st
 		if info := a.Deps().Status(name); info.Own {
 			unlock := accounts.Lock(info.Path)
 			defer unlock()
-			if err := toolIdle(name); err != nil {
+			if err := toolIdle(name, info.Dir); err != nil {
 				return "", err
 			}
 			p, err := a.steamCMD().start(info.Path, []string{"+quit"}, false)
@@ -90,11 +90,11 @@ func (a *App) RemoveDep(name string) error {
 // CheckDepRemoval checks ownership and protected content without changing files.
 // Settings use the same check as RemoveDep, which repeats it when the action runs.
 func (a *App) CheckDepRemoval(name string) error {
-	if err := toolIdle(name); err != nil {
+	i := a.Deps().Status(name)
+	if err := toolIdle(name, i.Dir); err != nil {
 		return err
 	}
-	i := a.Deps().Status(name)
-	if !i.Installable || !i.Own {
+	if !i.Own {
 		return fmt.Errorf("%s is not RimArcho's own copy; nothing removed", name)
 	}
 	// Recheck with filesystem metadata immediately before removal. This also rejects
@@ -163,6 +163,9 @@ func (a *App) OfferDep(name string) (*SteamCMDOffer, error) {
 		}
 		return offer, err
 	case deps.Todds:
+		if textures.ToddsZipURL == "" {
+			return nil, ErrNoTodds
+		}
 		offer := a.OfferTodds()
 		return &SteamCMDOffer{URL: offer.URL, Dir: dir, Bytes: offer.Bytes}, nil
 	default:

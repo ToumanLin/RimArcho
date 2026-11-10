@@ -14,23 +14,23 @@
 7. **Keep the interface still.** The TUI has no animations or spinners; the status line uses … for work in progress. GUI motion only explains what changed or where something went (§7.1). It is brief and is disabled under `prefers-reduced-motion`. The one exception is Archo's figure while the player waits (§7.1 "Archo figure"): it moves continuously on one canvas, only during a wait, and becomes a still under `prefers-reduced-motion`, without hardware WebGL2, or when the player chooses still or off.
 8. **Each TUI row occupies one line**, with no line spacing. Ellipsize overflow and state the hidden count, for example 12 more. Detail text wraps (§4.1).
 
-**The TUI dark palette** uses the following colors:
+**The TUI palettes** use the following colors; `ui.tui.theme` picks dark or light (§9.2):
 
-| Role | Value | Use |
-| --- | --- | --- |
-| Text | `#E6E6E6` | Names, values, keys |
-| Secondary | `#7C8290` | Explanations, hints, authors |
-| Faint | `#4A4F5A` | Numbers, subheadings, unfocused content |
-| Accent | `#A5B4FC` | Cursor, selected names, focused headings, prompt |
-| Pill | `#2C2E4A` | Current environment or focused filter |
-| Focused row | `#1A1C24` | Cursor in the focused area |
-| Selected row | `#232539` | The whole selected row, including wrapped continuation lines |
-| Selected cursor | `#303450` | The whole selected cursor row in the focused area, including continuation lines |
-| Success | `#7EE2A8` | ✓ result |
-| Warning | `#F2C46D` | Warning icons; magpie has no warning color, but Mod management must distinguish a failure from a possible problem |
-| Error | `#FF8A80` | Error icons and failed results |
+| Role | Dark | Light | Use |
+| --- | --- | --- | --- |
+| Text | `#E6E6E6` | `#1C1C21` | Names, values, keys |
+| Secondary | `#858B99` | `#5F5F68` | Explanations, hints, authors, area headings |
+| Faint | `#5C6270` | `#8E8E97` | Numbers, digits, unfocused content |
+| Accent | `#A5B4FC` | `#4F46E5` | Cursor, selected names, focused headings, prompt |
+| Pill | `#2C2E4A` | `#E4E3FB` | Current page on the navigation row, focused filter |
+| Focused row | `#1A1C24` | `#F0F0F4` | Cursor in the focused area; current subpage on the context row |
+| Selected row | `#232539` | `#ECEBFB` | The whole selected row, including wrapped continuation lines |
+| Selected cursor | `#303450` | `#DCDAF8` | The whole selected cursor row in the focused area, including continuation lines |
+| Success | `#7EE2A8` | `#188A50` | ✓ result |
+| Warning | `#F2C46D` | `#B45309` | Warning icons and counts; magpie has no warning color, but Mod management must distinguish a failure from a possible problem |
+| Error | `#FF8A80` | `#D64545` | Error icons and failed results |
 
-The TUI has only a dark palette and uses the terminal's background. ConPTY cannot reliably detect the terminal background, for the same reason as the color-detection limitation in §9.2, so the TUI does not automatically switch to a light theme.
+Both palettes draw text on the terminal's own background. Each role also names an xterm-256 and a 16-colour stand-in (`theme.go`), chosen by hand for terminals without 24-bit colour, such as a plain xterm on Linux: the nearest matches would put faint text on a same-grey selected cursor row in 256 colours, and turn the light pill magenta and warnings red in 16. In 16 colours selected and selected-cursor rows share one background; ▸ marks the cursor. Secondary and faint are lighter than in earlier versions so that they stay readable on common dark terminal backgrounds; area headings use bold secondary rather than faint.
 
 **Log colors** (§2.10) are an exception to gray text. Raw log rows use the game's log-window colors: Error red `#ff6666`, Warning yellow `#ffeb04`, and Message white. A Mod message's `<color>` is retained. The light theme adjusts contrast without changing the hue. Interface text and icons retain the palette above.
 
@@ -98,17 +98,17 @@ Four durations are defined in `style.css` :root. Entry and movement use the ease
 Menu closing and card-content collapse use the exit duration and ease-in curve. Layout movement and FLIP in `motion.js` share the 250ms timing.
 
 The motions are implemented in `js/motion.js` and the motion section of `style.css`:
-- **Page entry** fades in and rises 4px. A redraw of the same page after an action or subview switch has no motion.
+- **Page entry** fades in and rises 4px. A redraw of the same page after an action or subview switch has no motion. A page that replaces its loading placeholder also enters this way (`screens.js` `page`); the editor's lists and head do the same when they replace theirs (`lists.js` `openEditor`). A fast read therefore fades in from the emptied page in one step.
 - **The sidebar highlight** slides from the old entry to the new one. Its size changes immediately; only its position is animated. Children have their own highlight that slides within the same entry.
 - **Sidebar children** expand their grid row from 0fr to 1fr using the layout duration, fade in using the entry duration, and rotate the arrow 90°. The old children collapse while the new children expand, and following entries move smoothly. The highlight slides directly to the final destination that motion.js computes from the expanding and collapsing children. Collapsed children are excluded from the tab order.
 - **List changes** include enabling, disabling, moving, sorting, undoing, and dragging. Before an action, the visible Mod rows' positions are recorded. After redraw, surviving rows move from their old positions using FLIP. Affected rows flash a soft accent and fade over about 400ms; if the affected rows are unknown, moved or new rows flash. Only the rendered virtual rows, a few dozen, are processed, with one style calculation per batch.
 - **Numbers** softly pulse on change: sidebar badges and counts, list headings, Can it run section counts, and the unsaved count.
-- **The status line** slides each new sentence in from below.
+- **The status line** fades each new sentence in, in place; it does not slide (sliding moved the bar on every message).
 - **Loading placeholders** shimmer in lazily loaded game logs, log details, and full-detail pages without loading… text. Screen readers retain the original text.
 - **Cards and overlays** retain their existing slight scale and fade.
 - **Archo figure** (`js/archo.js`, `js/boot.js`, assets in `assets/archo/`): Archo's chibi figure keeps the player company in three places.
   - **Start-up screen.** From 0.21 s after the page starts until the first page or the first-run guide has drawn, the window shows the figure centred, 176 px wide, with one usage tip below it. A start that finishes within 0.21 s shows nothing. The still is chosen by `boot.js` before `Init` from the cached setting; the tip and the live figure follow `Init`. A dialog at start (the Workshop install offer, the managed-folder question) removes the screen first.
-  - **Loading cards.** `beginPageRead`'s placeholder card holds a 120 px slot on the left and, on the right, a tip line above three shimmer lines. The figure and the tip appear only after the read has taken 0.21 s; a faster read shows the plain placeholder. The tip changes every 8 s in a long wait. On the first-run guide's page, the tips are those for a new player. On a grid page (home, file search) the placeholder and a read error span every column at their own height.
+  - **Loading cards.** `beginPageRead`'s placeholder card holds a 120 px slot on the left and, on the right, a tip line above three shimmer lines. The whole card, with the figure and the tip, appears only after the read has taken 0.21 s (`style.css` `.page-loading`); a faster read shows no placeholder, so the page does not flash a small card before its content. The card stays in the page from the start for `pageLoading()` and screen readers. The tip changes every 8 s in a long wait. On the first-run guide's page, the tips are those for a new player. On a grid page (home, file search) the placeholder and a read error span every column at their own height.
   - **First-run guide.** A 156 px figure at the right end of the step bar, standing behind the step's card, whose top edge hides her below the shoulders (16 §2.15); shown at once. Its expression follows the guide: wink at step 1, ponder on the download way, think while a download or scan runs, salute when it is done, surprised at an error, smile at step 3.
   - Waits rotate the calm expressions neutral, smile, laugh, wink, think, ponder and yum, one per wait in turn (the turn is kept across starts), and a long wait moves to the next one every 4 s.
   - Every figure uses the model's `wide` framing (head to chest, her whole width plus a margin), so hair, ribbons and gestures are never cut at the sides; she ends only at the bottom, by a fade (start-up screen, loading cards) or behind a card (the guide).
@@ -118,7 +118,8 @@ The motions are implemented in `js/motion.js` and the motion section of `style.c
 The following rules apply:
 - Continuous or moving animations change only opacity and transform so WebView2 can composite without relayout or repaint. A flash uses a fading overlay instead of animating the background color; shimmer and progress use moving gradient layers. The exceptions are one-off 120ms hover-color transitions and the few sidebar grid rows expanding once over 250ms.
 - Do not use `backdrop-filter` blur; WebView2 repaints it on every frame.
-- Under `prefers-reduced-motion: reduce`, CSS sets all animation and transition durations to 0; `motion.js` skips FLIP, flashing, pulsing, and sliding.
+- Under `prefers-reduced-motion: reduce`, or with settings › motion: reduced (`ui.motion`, §2.14; the root's `data-motion="reduced"`), CSS sets all animation and transition durations to 0; `motion.js` skips FLIP, flashing, pulsing, and sliding. Every reduced-motion rule in `style.css` has a twin for `:root[data-motion="reduced"]`.
+- **Nothing moves after it is drawn without a reason.** Scrollers whose content comes with data keep their scrollbar's room (`scrollbar-gutter: stable`: the editor lists, details, Mod library, pages, Can it run, tasks, updates, saves, Mod settings, All lists). A filter chip is as wide as its bold label. The editor's list number column holds three digits. Placeholders hold the height of what replaces them (All lists' memory estimate keeps the last estimate's height). Sizes and the navigation layout saved as settings are restored before the first drawing from a copy in localStorage (`separator.js`, `shell.js`); the saved setting follows and wins.
 - Scrolling triggers no animations.
 
 ### 7.2 Interface wording
@@ -197,6 +198,7 @@ Launch (§2.3) is an exception: its sizes, rules, and radii follow its own desig
 ### 7.4 Accent themes (GUI)
 
 - Settings > interface > accent (`ui.accent`, §2.14) offers default, which leaves the existing indigo values unchanged without overriding variables, and 15 Radix Colors 3.0.0 scales: indigo, blue, cyan, teal, green, grass, orange, amber, red, crimson, pink, plum, purple, violet, and iris. Each has 12 light <name> levels and 12 dark <name>Dark levels. The original values are in assets/js/accent.js with the MIT notice.
+- **A custom accent** is one `#rrggbb` colour (`ui.accent` stores it in lower case; `config set` rejects other forms and keeps the old value). `customScales` in accent.js derives a light and a dark 12-level scale from it in OKLCH: the named scale nearest in hue gives each level's lightness and relative chroma, the colour's own hue runs through all levels, and level 9 is the colour itself in both themes. Level 10 is level 9 slightly darker (light) or lighter (dark). Level 11, the text level, moves away from the surface until it reaches 4.5:1 on both `--card` and `--pill` of its theme. Colours outside sRGB lose chroma, not lightness. The variables below then follow the same table; `--accent-fg` on the light fill is white when that reaches 3:1, as the named scales' white does, otherwise level 12. `<html data-accent>` is `custom`.
 - **Only four accent variables change.** Success green, error red, warning amber, and grays retain their values, following §7 principle 2:
 
   | Variable | Light | Dark |
@@ -208,6 +210,15 @@ Launch (§2.3) is an exception: its sizes, rules, and radii follow its own desig
 
   All 12 levels are also exposed as `--accent-1` … `--accent-12`. Accent text uses level 11, `var(--accent-11, var(--accent))`, which is clearer on white than level 9.
 - **Day/night selection** uses `ui.theme`: auto is the default and follows the OS; light and dark are manual choices. Grays, log colors, and accents use the same effective theme. A manual theme ignores system changes. The local cached theme is restored before styles load to avoid a flash, then `Init.theme` synchronizes the database value. If local storage is disabled, startup data still supplies the theme.
-- **Changes apply immediately.** Init includes accent, and the root inline variables are set before first paint. Changing a setting refetches and applies the values without reloading the page. Manual light or dark selection switches immediately; OS changes apply only with `ui.theme=auto`. Swatches show the actual effective --accent color. A ring and ✓ mark the selection, and hover and adjacent text show the name. Default removes the inline variables. The TUI retains the §7 palette.
+- **Changes apply immediately.** Init includes accent, and the root inline variables are set before first paint. Changing a setting refetches and applies the values without reloading the page. Manual light or dark selection switches immediately; OS changes apply only with `ui.theme=auto`. Swatches show the actual effective --accent color. A ring and ✓ mark the selection, and hover and adjacent text show the name. Default removes the inline variables. The TUI retains the §7 palette for every accent, a custom one included: it never reads `ui.accent`.
 - A known limitation is that white on level 9 in some light scales has contrast below 4.5:1, a Radix tradeoff. Buttons keep 13px medium text.
-- `internal/surface/gui/accent_test.go` verifies that each choice has 12+12 valid colors in accent.js. New CSS rules also pass TestStyleRules.
+- `internal/surface/gui/accent_test.go` verifies that each choice has 12+12 valid colors in accent.js and that a custom accent reaches Init; `internal/cmds/config_accent_test.go` checks the `#rrggbb` validation. New CSS rules also pass TestStyleRules.
+
+### 7.5 Colour picker (GUI)
+
+`openColorPicker(anchor, { value, presets, onPick, onClose, label })` in `js/colorpicker.js` is the shared control for choosing a colour; Settings' custom accent (§2.14) uses it. `value` is a preset name, `#rrggbb` or `""`; `presets` are `{ name, color, label?, ink? }`; `onPick` receives a preset name or a lower-case `#rrggbb`.
+
+- **Layout**: a floating popover below the anchor (above it when there is no room, kept 8px inside the window), styled like the other popovers: `--pop-bg`, `--shadow`, `--r-lg`, a hairline frame. From top to bottom: the preset swatches, a hue/saturation wheel (hue is the angle, 0° red at the top, clockwise; saturation the distance from the centre), a lightness slider whose track runs black → the hue → white, then a preview (the colour before, striped for none, and the new one) beside the hex field, and “use colour” with its enter cap. The wheel is drawn on a canvas at the current lightness.
+- **Picking**: a preset swatch picks at once. The wheel, slider and hex field change only the preview; Enter (anywhere but on a button) or “use colour” picks the wheel's colour. An invalid hex field is marked invalid and Enter does nothing. Esc, a click outside, scrolling the page, resizing the window, back (§3.1 rule 11), entering another page or the anchor leaving the page close it without a change. Clicking the anchor again closes it. Only one picker is open; it never opens over another overlay of its own kind.
+- **Keyboard**: the picker opens with the focus on the wheel. On the wheel, ←/→ turn the hue by 2° and ↑/↓ change the saturation by 2 (shift: 10); the slider takes its native keys. These change only the preview, as a native slider would (§3.1 rule 1). Tab and shift+Tab cycle inside the picker. When it closes, the focus returns to the anchor.
+- **Accessibility**: a dialog named by `label`; the presets are a named group of toggle buttons (`aria-pressed` on the current one); the wheel is a slider with the role description “colour wheel”, its value the hue and its value text the hue and saturation; the slider, the hex field (`aria-invalid`) and the preview (an image named by the new hex) are labelled. The anchor gets `aria-haspopup="dialog"` and `aria-expanded`.

@@ -2,15 +2,18 @@ package tui
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
-// Screen structure (16 §2.2): top bar, blank, body, blank, status line, hint line.
+// Screen structure (16 §2.2, §9.1): navigation row, context row, blank, body, status line,
+// hint line.
 
 func (m *model) View() string {
 	if m.quitting {
@@ -19,12 +22,16 @@ func (m *model) View() string {
 	h := max(m.h, 6)
 	lines := make([]string, h)
 	lines[0] = m.topBar()
-	body := h - 4 // rows 2 … h-3
+	lines[1] = m.contextRow()
+	body := h - bodyTop - 2 // rows bodyTop … h-3
 	var content []string
 	switch {
 	case m.loadErr != nil:
 		content = []string{"", "  " + sErrS.Render(fit(T("error: ")+m.loadErr.Error(), m.w-2)),
 			"  " + sSecond.Render(fit(T("Add a game first: archo env detect, archo env add <name> --detected"), m.w-2))}
+		if windowNextToUs() {
+			content = append(content, "  "+sSecond.Render(fit(T("Or open RimArcho.exe in this folder: the window has a guide that finds your games."), m.w-2)))
+		}
 	case m.pal != nil:
 		content = m.paletteLines(body)
 	case m.panel != nil:
@@ -60,7 +67,7 @@ func (m *model) View() string {
 		content = append(bar, content...)
 	}
 	for i := 0; i < body && i < len(content); i++ {
-		lines[2+i] = content[i]
+		lines[bodyTop+i] = content[i]
 	}
 	lines[h-2] = m.statusLine()
 	lines[h-1] = m.hintLine()
@@ -84,92 +91,37 @@ func (m *model) View() string {
 	return strings.Join(lines, "\n")
 }
 
-// topBar: brand · environment pill · needs attention · unsaved, and on the right the
-// position line (16 §3.2) and launch. Secondary screens show a breadcrumb that is the
-// position line.
-func (m *model) topBar() string {
-	left := sBold.Render("RimArcho")
-	lw := len("RimArcho")
-	add := func(s string, w int) { left += s; lw += w }
-	pos := m.position()
-	if m.full || m.insp != nil || m.tab != tabList {
-		c := "  › " + pos
-		cw := width.StringWidth(c)
-		add(sSecond.Render(fit(c, min(cw, m.w-lw))), min(cw, m.w-lw))
-		return left + strings.Repeat(" ", max(m.w-lw, 0))
+// positionText is the status line when it has nothing to say: where the player is (16 §2.2,
+// §3.2), as in the GUI. Launch has none; a page shown as a panel, a technical page and the
+// full detail show their place in the context row. A popup panel over a page (help, a
+// preview) keeps the page's place with its own name after it.
+func (m *model) positionText(w int) string {
+	if m.tab == tabHome || (m.panel != nil && m.panel.nav > 0) || m.insp != nil || m.full || w < 8 {
+		return ""
 	}
-	envText := T("no game")
-	if m.envName != "" {
-		envText = m.envName
-		if mm := env.MajorMinor(m.gameVer); mm != "" {
-			envText += "  " + mm
-		}
-	}
-	pill := " " + envText + " "
-	add("  ", 2)
-	add(sPill.Render(pill), width.StringWidth(pill))
-	// the plan being edited (16 §9.1) and its "an outside version has not been loaded" (07 §4.3)
-	if m.st != nil && m.st.Plan != nil {
-		t := T("list") + " " + m.st.Plan.Name
-		add("  "+sText.Render(t), 2+width.StringWidth(t))
-		if m.launches != "" { // only open here: launching plays the current list
-			t := Tf("launching plays %s", m.launches)
-			add("  "+sDimS.Render(t), 2+width.StringWidth(t))
-		}
-		if m.st.WS != nil && m.st.WS.Conflict != 0 && m.w >= 110 {
-			t := Tf("an outside change is not used yet (v%d)", m.st.WS.Conflict)
-			add("  "+sWarnS.Render(t), 2+width.StringWidth(t))
-		}
-	}
-	if n := m.needCount(); n > 0 {
-		t := Tf("can it run %d", n)
-		add("  "+sWarnS.Render(t), 2+width.StringWidth(t))
-	}
-	// (the running game is on the status line, 16 §9.1)
-	if m.unsaved > 0 {
-		t := Tf("%d unsaved", m.unsaved)
-		add("  "+sAccent.Render(ic.unsaved+" "+t), 2+2+width.StringWidth(t))
-	}
-	launch := T("launch") + " " + ic.play
-	launchW := width.StringWidth(launch) + 2 // "L "
-	key := sText.Render("L") + " "
-	if m.live != nil && m.live.Blocked != "" {
-		// another environment's game runs: launching is refused until it exits (09 §1)
-		launch, key = m.live.Blocked, ""
-		launchW = width.StringWidth(launch)
-	}
-	pw := width.StringWidth(pos)
-	room := m.w - lw - 3 // at least three cells between the left side and the position
-	right, rw := "", 0
-	if pw+3+launchW <= room {
-		right = m.renderPos(pos) + "   " + key + sSecond.Render(launch)
-		rw = pw + 3 + launchW
-	} else if room >= 8 {
-		pw = min(pw, room)
-		right, rw = m.renderPos(fit(pos, pw)), pw
-	}
-	return left + strings.Repeat(" ", max(m.w-lw-rw, 0)) + right
+	return m.renderPos(width.Truncate(m.position(), w, "…"))
 }
 
-// renderPos styles the position line: the area in the accent colour, the rest secondary,
-// an open popup in the text colour.
+// renderPos styles the position line: the area secondary, the place in it faint, the open
+// popup (position's last " › " part) in the text colour.
 func (m *model) renderPos(p string) string {
+	pop := ""
+	if name := m.popupName(); name != "" {
+		if i := strings.LastIndex(p, " › "+name); i >= 0 {
+			p, pop = p[:i], p[i:]
+		}
+	}
 	head, rest := p, ""
 	if i := strings.Index(p, "  "); i >= 0 {
 		head, rest = p[:i], p[i:]
 	}
-	pop := ""
-	if i := strings.Index(rest, " › "); i >= 0 {
-		rest, pop = rest[:i], rest[i:]
-	} else if i := strings.Index(head, " › "); i >= 0 {
-		head, pop = head[:i], head[i:]
-	}
-	return sAccent.Render(head) + sSecond.Render(rest) + sText.Render(pop)
+	return sSecond.Render(head) + sDimS.Render(rest) + sText.Render(pop)
 }
 
 // statusLine: the sentence (statusText) and, on its right, the running game while there is
-// something to say (16 §9.1; the sidebar's foot in the GUI): "● game running since 14:05"
-// with this run's errors in amber, or after the game "● analyse this run's log".
+// something to say (16 §9.1; the sidebar's foot in the GUI): "⬤ game running since 14:05"
+// with this run's errors in amber, or after the game "⬤ analyse this run's log". The dot is
+// the unsaved mark's one-cell glyph (16 §7), not ●, which is two cells in some terminals.
 func (m *model) statusLine() string {
 	if m.tags != nil {
 		return m.tagBarLine(m.w)
@@ -189,7 +141,7 @@ func (m *model) liveStatus() (string, int) {
 	switch {
 	case l != nil && l.Running:
 		t := view.LiveText(l)
-		s, w := sOK.Render("●")+" "+sSecond.Render(t), 2+width.StringWidth(t)
+		s, w := sOK.Render(ic.unsaved)+" "+sSecond.Render(t), 2+width.StringWidth(t)
 		if l.Errors > 0 {
 			n := itoa(l.Errors)
 			s, w = s+" "+sWarnS.Render(n), w+1+len(n)
@@ -197,7 +149,7 @@ func (m *model) liveStatus() (string, int) {
 		return s, w
 	case l != nil && l.NewLog != "":
 		// 09 §2 "after the game exits": a new Player.log; Can it run (shift+2) analyses it
-		return sAccent.Render("● "+l.NewLog) + sDimS.Render("  shift+2"), 2 + width.StringWidth(l.NewLog) + 9
+		return sAccent.Render(ic.unsaved+" "+l.NewLog) + sDimS.Render("  shift+2"), 2 + width.StringWidth(l.NewLog) + 9
 	}
 	return "", 0
 }
@@ -221,7 +173,7 @@ func (m *model) statusText(w int) string {
 		text, kind = Tf("running archo %s…", m.cmdBusy), sayBusy
 	}
 	if text == "" {
-		return ""
+		return m.positionText(w)
 	}
 	var mark string
 	var ms = sSecond
@@ -241,8 +193,8 @@ func (m *model) statusText(w int) string {
 	return ms.Render(mark) + " " + sText.Render(fit(text, w-2))
 }
 
-// hintLine: "key label · key label", only what the object can do now, at most 7 (16 §6,
-// §13.2 rule 4); ? lists everything.
+// hintLine: "key label   key label", only what the object can do now, at most 7 (16 §6,
+// §13.2 rule 4); ? lists everything and is never the one left out.
 func (m *model) hintLine() string {
 	var pairs [][2]string
 	prefix := ""
@@ -275,9 +227,11 @@ func (m *model) hintLine() string {
 	case m.full:
 		pairs = [][2]string{{"↑↓", T("scroll")}, {"←→", T("previous / next mod")}, {"tab", T("sections")}, {"g", T("tags")}, {"ctrl+w", T("Workshop page")}, {"esc", T("back")}, {"?", T("all keys")}}
 	case m.tab == tabProblems:
-		pairs = [][2]string{{"↑↓", T("choose")}, {"esc", T("back")}, {"l", T("choose a log")}, {"A", T("check the files again")}} // each item shows its own keys
-		if n := view.AutoFixCount(m.prob.base); n > 0 {
-			pairs = append([][2]string{{"F", Tf("fix %d automatically", n)}}, pairs...) // the window's main action
+		// each item shows its own keys; F, A and l are the page's, in the context row unless
+		// the conclusion takes its room (needsLayout)
+		pairs = [][2]string{{"↑↓", T("choose")}, {"esc", T("back")}, {"?", T("all keys")}}
+		if _, acts := m.needsLayout(); !acts {
+			pairs = append(m.needsActions(), pairs...)
 		}
 	case m.tab == tabSubscribe:
 		pairs = m.addPairs()
@@ -316,6 +270,26 @@ func (m *model) hintLine() string {
 	}
 	if len(pairs) > 7 {
 		pairs = append(pairs[:6], pairs[len(pairs)-1])
+	}
+	// too wide: drop from the middle, so the first actions and "? all keys" stay
+	cells := func() int {
+		n := width.StringWidth(prefix)
+		for i, p := range pairs {
+			if i > 0 || prefix != "" {
+				n += 3
+			}
+			n += width.StringWidth(p[0] + " " + p[1])
+		}
+		return n
+	}
+	last := len(pairs) - 1
+	keepLast := last > 0 && pairs[last][0] == "?"
+	for len(pairs) > 1 && cells() > m.w {
+		if keepLast {
+			pairs = append(pairs[:len(pairs)-2], pairs[len(pairs)-1])
+		} else {
+			pairs = pairs[:len(pairs)-1]
+		}
 	}
 	var b strings.Builder
 	used := 0
@@ -383,11 +357,32 @@ func (m *model) panelLines(n int) []string {
 		return out
 	}
 	rows := max(n-2, 1)
-	for _, l := range window(p.lines, p.off, rows) {
-		out = append(out, "  "+sText.Render(width.Truncate(m.humanize(l), inner, "…")))
+	lines := m.panelText()
+	for _, l := range window(lines, p.off, rows) {
+		out = append(out, "  "+sText.Render(width.Truncate(l, inner, "…")))
 	}
-	if len(p.lines) > rows {
-		out = append(out, "", "  "+sDimS.Render(Tf("%d–%d of %d", p.off+1, min(p.off+rows, len(p.lines)), len(p.lines))))
+	if len(lines) > rows {
+		out = append(out, "", "  "+sDimS.Render(Tf("%d–%d of %d", p.off+1, min(p.off+rows, len(lines)), len(lines))))
+	}
+	return out
+}
+
+// panelText is a text panel's lines as drawn: a prose panel (wrap) wraps them to the width;
+// command output keeps its lines, and its columns, and is cut at the edge (16 §9.4).
+func (m *model) panelText() []string {
+	p := m.panel
+	out := make([]string, 0, len(p.lines))
+	for _, l := range p.lines {
+		l = m.humanize(l)
+		if !p.wrap {
+			out = append(out, l)
+			continue
+		}
+		ls := wrap(l, max(m.w-4, 10))
+		if len(ls) == 0 {
+			ls = []string{""}
+		}
+		out = append(out, ls...)
 	}
 	return out
 }
@@ -427,11 +422,7 @@ func (m *model) detailLines(w, n int) []string {
 			title = "▲ " + it.name
 		}
 	}
-	st := sDimS
-	if m.detailFocus {
-		st = sAccent
-	}
-	out := []string{sDimS.Render("4 ") + st.Render(fit(title, w-2))}
+	out := []string{areaHead("4", title, "", m.detailFocus, w)}
 	for i := off; i < len(lines) && len(out) < n; i++ {
 		out = append(out, lines[i].text)
 	}
@@ -439,3 +430,14 @@ func (m *model) detailLines(w, n int) []string {
 }
 
 var _ = fmt.Sprint
+
+// windowNextToUs reports whether RimArcho.exe sits next to this program: a player who
+// double-clicked archo.exe often meant the window (16 §9.2).
+var windowNextToUs = sync.OnceValue(func() bool {
+	exe, err := os.Executable()
+	if err != nil || strings.EqualFold(filepath.Base(exe), "RimArcho.exe") {
+		return false
+	}
+	_, err = os.Stat(filepath.Join(filepath.Dir(exe), "RimArcho.exe"))
+	return err == nil
+})

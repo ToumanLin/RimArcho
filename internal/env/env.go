@@ -2,6 +2,7 @@
 package env
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -107,10 +108,10 @@ func ReadGameVersion(gameRoot string) string {
 }
 
 // ManagedDir is the folder holding the game's own managed assemblies: the first of
-// <game_root>/RimWorldWin64_Data/Managed and the game folder itself (1.7) that contains
+// <game_root>/RimWorldWin64_Data/Managed, RimWorldLinux_Data/Managed and the game folder itself (1.7) that contains
 // Assembly-CSharp.dll, or "" when neither does (05 §5.3, §5.4).
 func ManagedDir(gameRoot string) string {
-	for _, d := range []string{filepath.Join(gameRoot, "RimWorldWin64_Data", "Managed"), gameRoot} {
+	for _, d := range []string{filepath.Join(gameRoot, "RimWorldWin64_Data", "Managed"), filepath.Join(gameRoot, "RimWorldLinux_Data", "Managed"), gameRoot} {
 		if _, err := os.Stat(filepath.Join(d, "Assembly-CSharp.dll")); err == nil {
 			return d
 		}
@@ -175,23 +176,30 @@ func VersionLess(a, b string) bool {
 
 // AppHome is RimArcho's own data directory (17 §3). RIMARCHO_HOME overrides it, which the
 // tests use to stay inside a temporary directory.
-func AppHome() string {
+func AppHome() (string, error) {
 	if h := os.Getenv("RIMARCHO_HOME"); h != "" {
-		return h
+		return h, nil
 	}
 	switch runtime.GOOS {
 	case "windows":
 		if a := os.Getenv("APPDATA"); a != "" {
-			return filepath.Join(a, "RimArcho")
+			return filepath.Join(a, "RimArcho"), nil
 		}
 	case "darwin":
 		if h, err := os.UserHomeDir(); err == nil {
-			return filepath.Join(h, "Library", "Application Support", "RimArcho")
+			return filepath.Join(h, "Library", "Application Support", "RimArcho"), nil
 		}
 	}
-	if x := os.Getenv("XDG_DATA_HOME"); x != "" {
-		return filepath.Join(x, "rimarcho")
+	return xdgAppHome()
+}
+
+func xdgAppHome() (string, error) {
+	if x := os.Getenv("XDG_DATA_HOME"); filepath.IsAbs(x) {
+		return filepath.Join(x, "rimarcho"), nil
 	}
-	h, _ := os.UserHomeDir()
-	return filepath.Join(h, ".local", "share", "rimarcho")
+	h, err := os.UserHomeDir()
+	if err != nil || !filepath.IsAbs(h) {
+		return "", fmt.Errorf("cannot locate RimArcho data: set an absolute HOME or XDG_DATA_HOME, or set RIMARCHO_HOME")
+	}
+	return filepath.Join(h, ".local", "share", "rimarcho"), nil
 }

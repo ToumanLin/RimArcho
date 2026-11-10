@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -29,7 +30,7 @@ func (p *workshopCancelableProc) Kill() error { return errors.New("must kill own
 
 func TestWorkshopLogProgressBeforeExitAndCancellation(t *testing.T) {
 	base := t.TempDir()
-	exe := filepath.Join(base, "steamcmd.exe")
+	exe := filepath.Join(base, deps.SteamCMDExecutable())
 	log := filepath.Join(base, "logs", "console_log.txt")
 	if err := os.MkdirAll(filepath.Dir(log), 0755); err != nil {
 		t.Fatal(err)
@@ -85,7 +86,7 @@ func TestWorkshopLogProgressBeforeExitAndCancellation(t *testing.T) {
 
 func TestWorkshopRetryRoundsAndMonotonicProgress(t *testing.T) {
 	base := t.TempDir()
-	exe := filepath.Join(base, "steamcmd.exe")
+	exe := filepath.Join(base, deps.SteamCMDExecutable())
 	var ids []string
 	w := &workshopTransfer{ctx: context.Background()}
 	for i := 0; i < 28; i++ {

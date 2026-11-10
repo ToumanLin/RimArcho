@@ -10,6 +10,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"slices"
 	"sort"
 	"strings"
@@ -30,7 +31,7 @@ const (
 	RoleMentioned  = "mentioned"
 )
 
-var roleRank = map[string]int{RoleSource: 0, RolePatcher: 1, RoleDependency: 2, RoleMentioned: 3}
+var roleRank = map[string]int{RoleSource: 0, RoleListModifier: 1, RolePatcher: 2, RoleDependency: 3, RoleMentioned: 4, RoleListed: 5}
 
 // Attribution is one candidate mod of a cluster.
 type Attribution struct {
@@ -62,18 +63,26 @@ type LogCluster struct {
 	// Consequences and ConsequentLines count them on that cluster (06 §3).
 	ConsequenceOf                 string `json:",omitempty"`
 	Consequences, ConsequentLines int    `json:",omitempty"`
+	// ListScan: the list the throwing loop enumerates and the enabled mods' code that changes
+	// a comp list (loglistmod.go, 06 §2); nil when the rule does not apply.
+	ListScan *ListScan `json:",omitempty"`
 	// providerOff: a missing reference whose def an installed mod defines but is not
 	// enabled. That mod is the reason, not a patcher on the stack (06 §3).
 	providerOff bool
 	// missingTypes: types the log reports missing that no installed mod defines; the XML
 	// naming them is searched for (refQuery.class, 06 §2).
 	missingTypes []string
+	// Trace: the null trace's lines (logtrace.go, 06 §2); empty when it could not be decoded.
+	Trace []string `json:",omitempty"`
 }
 
 // LogReport is an analysed log.
 type LogReport struct {
 	HasPhases bool          `json:",omitempty"`
 	Phases    []*logs.Phase `json:",omitempty"`
+	// GameMarks: the game's own new-game and save-load lines (logs.GameMark); test runs
+	// place clusters without Monitor phases by them (20 §2).
+	GameMarks []*logs.Phase `json:",omitempty"`
 	Path      string
 	Label     string // "Player.log", "Player-prev.log" or "<text>"
 	ModTime   time.Time
@@ -83,6 +92,9 @@ type LogReport struct {
 	// the environment's (EnvMM): the log's own version (06 §4).
 	AnalysedAs, EnvMM string
 	Clusters          []*LogCluster
+	// LoadedSaves are the saves the run loaded ("Loading game from file <name> with mods"),
+	// in order, each once (06 §3): the output says which are not in Saves/.
+	LoadedSaves []string `json:",omitempty"`
 	// Unanalysed counts the enabled mods (Core and DLC aside) whose content and assemblies
 	// had not been analysed for the attributed version: their types and Harmony IDs could
 	// not name them (06 §2).
@@ -150,8 +162,16 @@ var ErrLogNotCached = errors.New("log not analysed yet")
 // "Tried to" errors, the game-error class and the lord rule; 14: Unity-format stack frames,
 // HugsLib upload headers skipped (06 §1); 15: XML Extensions blocks in 1.7 logs, any
 // "[Mod] Ns.PatchOperation…(" block line a patch failure; 16: a pawn's name in "Exception
-// ticking …" errors normalised, one cluster for all pawns.
-const logCacheVersion = 16
+// ticking …" errors normalised, one cluster for all pawns; 17: the game's new-game and
+// save-load lines (GameMarks, 20 §2); 18: a texture-missing cluster says
+// "rendering only", the saves the run loaded are recorded (LoadedSaves), and a mentioned mod is
+// no subject of the cluster's finding (06 §3); 19: frames keep their IL offset and
+// constructor frames their type, the null trace (who passed the null; the thrower a patcher),
+// Lord.AddPawn call sites, same-role candidates ordered by evidence (06 §2, §3); 20: list modifiers of "Collection
+// was modified" and comp-list tick crashes, Harmony patches on callers listed only, no
+// --target suggestion for TargetMethod() patches (06 §2, §3); 21: native Linux paths;
+// 22: audio and other asset paths in stable finding keys and attribution on both platforms.
+const logCacheVersion = 22
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a
@@ -373,6 +393,9 @@ type attrCtx struct {
 
 	// dllMemo: DLL file name (lower) → the enabled mods' copies (shadowing).
 	dllMemo map[string][]*store.AssemblyRow
+	trace   *traceCtx // assemblies the null trace read (logtrace.go)
+	// dynMemo: instance → its patch classes with a target chosen at run time (loglistmod.go).
+	dynMemo map[string]map[string]bool
 }
 
 // notAnalysed qualifies a "nothing defines it" detail: when some enabled mods were never
@@ -420,6 +443,7 @@ type dirOwner struct {
 func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails []analyze.LogFailure, comp *logs.Companion) error {
 	rep.HasPhases = lf.HasPhases || comp != nil && comp.HasPhases
 	rep.Phases = lf.Phases
+	rep.GameMarks = lf.GameMarks
 	if comp != nil && comp.HasPhases {
 		rep.Phases = comp.Phases
 		for _, p := range lf.Phases {
@@ -494,7 +518,13 @@ func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails [
 		cx.textureProviders(qs)
 	}
 	cx.consequences(rep)
+	rep.LoadedSaves = logLoadedSaves(lf)
 	for _, lc := range rep.Clusters {
+		// A missing texture affects drawing only; say so on every such cluster, not only on the
+		// one whose own mod's code asks for it (ownArtNote says it in its own words).
+		if lc.Class == logs.ClassTexture && !slices.Contains(lc.Details, ownArtNote) {
+			lc.Details = append(lc.Details, renderingOnlyNote)
+		}
 		// Source searches cover the cluster's candidates, not every enabled mod (05 §5.4).
 		if rep.HasPhases {
 			lc.Phases = logs.CompletePhaseCounts(lc.Phases, lc.Count)
@@ -504,7 +534,7 @@ func (a *App) attribute(st *LoadoutState, rep *LogReport, lf *logs.File, fails [
 		}
 		in := ""
 		for i, at := range lc.Attr {
-			if i == 4 {
+			if i == 4 || at.Role == RoleListed {
 				break
 			}
 			in += " --in " + cx.st.Ix.Ref(at.Instance)
@@ -541,7 +571,9 @@ func (a *App) ImplicatedMods(st *LoadoutState) []string {
 					continue
 				}
 				for _, at := range lc.Attr {
-					addID(at.Instance)
+					if at.Role != RoleListed { // a patch on a caller only (06 §3)
+						addID(at.Instance)
+					}
 				}
 			}
 		}
@@ -586,13 +618,50 @@ func (lc *LogCluster) add(inst, role, ev string) {
 	lc.Attr = append(lc.Attr, &Attribution{Instance: inst, Role: role, Evidence: []string{ev}})
 }
 
+// Owners are the candidates that may carry the cluster as their own problem: every role
+// but mentioned. A mod only named in the message or a lower frame is not blamed by the
+// problem list, Mod details or a test run's mods (06 §3).
+func (lc *LogCluster) Owners() []*Attribution {
+	var out []*Attribution
+	for _, at := range lc.Attr {
+		if at.Role != RoleMentioned && at.Role != RoleListed {
+			out = append(out, at)
+		}
+	}
+	return out
+}
+
+// ListRank orders the cluster list by how much a row matters (06 §3): errors that stop code
+// (exception, harmony-stack, xml-load) first, then the other warnings, then a missing
+// texture, which affects drawing only, then informational clusters. Cluster IDs keep
+// their order of first appearance; only the list is sorted.
+func (lc *LogCluster) ListRank() int {
+	switch {
+	case logSeverity[lc.Class] == finding.Error:
+		return 0
+	case lc.Class == logs.ClassTexture:
+		return 2
+	case logSeverity[lc.Class] == finding.Warning:
+		return 1
+	}
+	return 3
+}
+
+// ListOrder is the clusters in list order: ListRank, then order of first appearance.
+func ListOrder(cs []*LogCluster) []*LogCluster {
+	out := slices.Clone(cs)
+	sort.SliceStable(out, func(i, j int) bool { return out[i].ListRank() < out[j].ListRank() })
+	return out
+}
+
 // whyProviderOff explains a likely cluster led by a mod left out of the list.
 const whyProviderOff = "a mod that defines it is installed but not enabled"
 
 // order sorts the candidates by role (06 §3). A save or def that names a def of a mod
 // left out of the list: that mod comes before whoever only patched the code that read it
 // (VM run 2026-10-28: Vanilla Expanded Framework's Pawn.ExposeData patch was blamed for
-// missing hair).
+// missing hair). Within a role the strongest evidence comes first (evidenceRank), then the
+// order the rules found them.
 func (lc *LogCluster) order() {
 	rank := func(role string) int {
 		if lc.providerOff && role == RoleDependency {
@@ -603,7 +672,13 @@ func (lc *LogCluster) order() {
 		}
 		return roleRank[role]
 	}
-	sort.SliceStable(lc.Attr, func(i, j int) bool { return rank(lc.Attr[i].Role) < rank(lc.Attr[j].Role) })
+	sort.SliceStable(lc.Attr, func(i, j int) bool {
+		ri, rj := rank(lc.Attr[i].Role), rank(lc.Attr[j].Role)
+		if ri != rj {
+			return ri < rj
+		}
+		return evidenceRank(lc.Attr[i]) < evidenceRank(lc.Attr[j])
+	})
 }
 
 func (lc *LogCluster) next(cmds ...string) {
@@ -715,9 +790,12 @@ func (cx *attrCtx) dirOwner(path string) (string, string) {
 }
 
 var (
-	bracketRe    = regexp.MustCompile(`^(?:<color=[^>]*>)?\[([^\]]{2,80})\](?:</color>)?`)
-	xmlExtRe     = regexp.MustCompile(`^Verse\.PatchOperation\w*\(xpath="(.*)"\): Failed`)
-	winPathRe    = regexp.MustCompile(`[A-Za-z]:[\\/][^"'<>|\r\n]*?\.(?:xml|dll|png|txt)`)
+	bracketRe = regexp.MustCompile(`^(?:<color=[^>]*>)?\[([^\]]{2,80})\](?:</color>)?`)
+	xmlExtRe  = regexp.MustCompile(`^Verse\.PatchOperation\w*\(xpath="(.*)"\): Failed`)
+	winPathRe = regexp.MustCompile(`[A-Za-z]:[\\/][^"'<>|\r\n]*?\.(?:xml|dll|png|txt|mp3|ogg|wav|dds|jpg|jpeg|tga|asset|bundle)`)
+	// A native Linux path starts after a boundary, so a relative Defs/a/b.xml and a URL
+	// are not cut into absolute paths. Spaces inside a path belong to the path.
+	unixPathRe   = regexp.MustCompile(`(?:^|[\s"'(\[=])/[^"'<>|\r\n]*?\.(?:xml|dll|png|txt|mp3|ogg|wav|dds|jpg|jpeg|tga|asset|bundle)`)
 	xrefRe       = regexp.MustCompile(`No ([\w.]+) named (\S+) found to give to (\S+)|cross-reference to ([\w.]+) named (\S+)|reference to ([\w.]+) named (\S+)`)
 	forDefRe     = regexp.MustCompile(` for def '([^']+)'`)
 	ctxDefNameRe = regexp.MustCompile(`(?:Context|Full node): [\s\S]*?<defName>([^<\s]+)</defName>`)
@@ -782,7 +860,7 @@ var hotSpots = map[string]bool{"Verse.Pawn.Tick": true, "Verse.ThingWithComps.Ti
 
 // tickChecklist condenses the inspector workflow for tick crashes (assembly-inspector skill).
 var tickChecklist = []string{
-	"ThingWithComps.Tick caches comps.Count and indexes AllComps in a for loop: removing or reordering comps during a tick throws ArgumentOutOfRangeException in List`1.get_Item",
+	"ThingWithComps.Tick caches comps.Count and indexes AllComps in a for loop: it survives a swap or reorder, and a comp removing itself while it is the last one (swap itself to the end, remove itself on a later tick); removing any other comp throws ArgumentOutOfRangeException in List`1.get_Item, and a comp added during the loop is not ticked; a foreach over AllComps (a mod replacing the loop) throws InvalidOperationException \"Collection was modified\" on any change",
 	"red flags: parent.AllComps.Remove(this) inside CompTick(); pawn.AllComps.Add/Remove for runtime comps without deferral; Swap or list surgery on AllComps; runtime ThingComps added without InitializeComps() invariants",
 	"a PREFIX/POSTFIX line only shows who touched the method last; it is not the cause without other evidence",
 	"also check ExposeData/PostExposeData, SpawnSetup, DeSpawn and Destroy of the mods that patch the method",
@@ -814,7 +892,7 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 			}
 			continue
 		}
-		for _, p := range winPathRe.FindAllString(t, -1) {
+		for _, p := range logPaths(t) {
 			if id, rel := cx.dirOwner(p); id != "" {
 				lc.add(id, RoleSource, "log file "+rel)
 			} else if id, rel := cx.folderOwner(p); id != "" {
@@ -961,6 +1039,7 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 	// 3. Stack frames and Harmony lines.
 	firstMod := true
 	hot := false
+	throwing, own := cx.throwingModFrame(e), cx.ownFrames(e)
 	for i, fr := range e.Frames {
 		target := fr.Type + "." + fr.Method
 		if hotSpots[strings.ReplaceAll(target, "+", ".")] {
@@ -968,8 +1047,20 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 		}
 		for _, p := range fr.Harmony {
 			ids, via := cx.harmonyOwners(p)
+			dynamic, listed := false, len(ids) > 0
 			for _, id := range ids {
-				lc.add(id, RolePatcher, fmt.Sprintf("log harmony:%s#%s %q (%s)", target, p.Kind, "- "+strings.ToUpper(p.Kind)+" "+p.Owner, via))
+				ev := fmt.Sprintf("log harmony:%s#%s %q (%s)", target, p.Kind, "- "+strings.ToUpper(p.Kind)+" "+p.Owner, via)
+				if callerPatch(i, throwing, p.Kind, own[id]) {
+					lc.add(id, RoleListed, ev+"; a patch on a caller of the throwing frame, no frame of its own in the stack")
+				} else {
+					lc.add(id, RolePatcher, ev)
+					listed = false
+				}
+				if cx.dynamicPatch(id, p.PatchType) {
+					// TargetMethod() the analysis could not read: --target finds no row (MCP eval h4).
+					dynamic = true
+					lc.next("archo harmony --mod "+ix.Ref(id), fmt.Sprintf("archo source %s --type %s", ix.Ref(id), outerType(p.PatchType)))
+				}
 			}
 			if len(ids) == 0 {
 				d := fmt.Sprintf("harmony owner %q on %s: no installed mod matches", p.Owner, target)
@@ -978,7 +1069,9 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 				}
 				lc.Details = append(lc.Details, d)
 			}
-			lc.next("archo harmony --target " + strings.ReplaceAll(target, "+", "."))
+			if !dynamic && !listed {
+				lc.next("archo harmony --target " + strings.ReplaceAll(target, "+", "."))
+			}
 		}
 		if logs.GameNamespace(fr.Type) {
 			continue
@@ -1002,8 +1095,13 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 			firstMod = false
 		}
 	}
+	if wantsListScan(lc, hot) {
+		cx.listModifiers(lc)
+	}
 	if hot {
-		lc.next(`archo source search "AllComps.Remove(" `+inPlaceholder, `archo source search "AllComps.Add(" `+inPlaceholder)
+		// Who changes the comp list is not on the stack: the thrower and the patchers named
+		// there rarely hold the cause (h7), so these searches cover every enabled mod.
+		lc.next(`archo source search "AllComps.Remove(" --active --yes --budget 10`, `archo source search "AllComps.Add(" --active --yes --budget 10`)
 		lc.Checklist = append(lc.Checklist, tickChecklist...)
 	}
 	// 4. Type names in the message ("Error while instantiating a mod of type X").
@@ -1039,6 +1137,9 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 	if cx.comp != nil {
 		cx.companion(lc)
 	}
+	// 6. Who supplied the null (logtrace.go); the lord's AddPawn calls (loglordsites.go).
+	cx.nullTrace(lc)
+	cx.lordSites(lc)
 	lc.order()
 	switch {
 	case len(lc.Attr) > 0 && lc.Attr[0].Role == RoleDependency && lc.providerOff:
@@ -1197,13 +1298,31 @@ var logSeverity = map[string]string{
 // findingKey keeps a log problem's ref (and an ignore of it) stable across logs and
 // install locations: the cluster key with each absolute path cut to its last three parts.
 func findingKey(key string) string {
-	return winPathRe.ReplaceAllStringFunc(key, func(p string) string {
+	cut := func(p string) string {
 		parts := strings.FieldsFunc(p, func(r rune) bool { return r == '\\' || r == '/' })
 		if len(parts) > 3 {
 			parts = parts[len(parts)-3:]
 		}
 		return strings.ToLower(strings.Join(parts, "/"))
+	}
+	key = winPathRe.ReplaceAllStringFunc(key, cut)
+	key = unixPathRe.ReplaceAllStringFunc(key, func(m string) string {
+		i := strings.IndexByte(m, '/')
+		return m[:i] + cut(m[i:])
 	})
+	return key
+}
+
+// logPaths lists the absolute file paths in a log line: drive paths (Windows, Wine),
+// and off Windows native paths too.
+func logPaths(t string) []string {
+	out := winPathRe.FindAllString(t, -1)
+	if runtime.GOOS != "windows" {
+		for _, m := range unixPathRe.FindAllString(t, -1) {
+			out = append(out, m[strings.IndexByte(m, '/'):])
+		}
+	}
+	return out
 }
 
 func (cx *attrCtx) toFinding(lc *LogCluster) *finding.Finding {
@@ -1214,7 +1333,11 @@ func (cx *attrCtx) toFinding(lc *LogCluster) *finding.Finding {
 	f := &finding.Finding{Code: "log." + lc.Class, Severity: logSeverity[lc.Class], Layer: "log", Key: findingKey(lc.Key), Confidence: lc.Confidence,
 		Claim: fmt.Sprintf("log:%s x%d: %s%s", lc.ID, lc.Count, msg, logs.PhaseSummary(lc.Phases))}
 	for _, at := range lc.Attr {
-		f.Subjects = append(f.Subjects, finding.Inst(at.Instance))
+		// A mod only named by the message or a lower frame, or with only a patch on a caller,
+		// stays in the evidence, not among the subjects: the cluster is not its problem (06 §3).
+		if at.Role != RoleMentioned && at.Role != RoleListed {
+			f.Subjects = append(f.Subjects, finding.Inst(at.Instance))
+		}
 		for _, ev := range at.Evidence {
 			f.Evidence = append(f.Evidence, finding.Evidence{Source: finding.Log, Ref: finding.Inst(at.Instance), Text: at.Role + ": " + ev})
 		}

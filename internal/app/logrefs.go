@@ -514,6 +514,9 @@ func (cx *attrCtx) textureProviders(qs []*refQuery) {
 // ownArtNote marks a missing texture that only its source mod's code asks for.
 const ownArtNote = "own art missing: the source mod's code asks for this texture and no installed mod ships it; a defect of that mod, rendering only (adding the file elsewhere hides it, it fixes nothing that loads)"
 
+// renderingOnlyNote is on every missing-texture cluster that ownArtNote does not cover.
+const renderingOnlyNote = "rendering only: the game draws a placeholder (or nothing) where this texture belongs; nothing stops loading or playing because of it, and it causes none of the other errors in this log"
+
 // codeSource: the cluster's first candidate is a source by a string literal in its code.
 func codeSource(lc *LogCluster) bool {
 	if len(lc.Attr) == 0 || lc.Attr[0].Role != RoleSource {

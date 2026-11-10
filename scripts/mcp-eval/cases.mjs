@@ -242,12 +242,17 @@ if (want('h7')) {
     add: [{pkg: SSR.pkg, name: SSR.name, path: `${WS}/2985408740`, replace: true}, {pkg: PCP.pkg, name: PCP.name, path: pcp.split(path.sep).join('/')}],
     overlay: [{pkg: SSR.pkg, files: 'overlay/' + SSR.pkg}],
   }, {
-    culprit: [{pkg: SSR.pkg, name: SSR.name, role: 'its comp TC_ForceBodyShape swaps itself to the end of the pawn\'s AllComps and removes itself while the comps are being ticked'}],
-    decoy: [{pkg: PCP.pkg, name: PCP.name, role: 'named in every stack; enumerates the comps with foreach, which is correct as long as no comp changes the list'}],
+    culprit: [
+      {pkg: SSR.pkg, name: SSR.name, role: "its comp TC_ForceBodyShape swaps itself to the end of the pawn's AllComps and removes itself while the comps are being ticked"},
+      {pkg: PCP.pkg, name: PCP.name, role: "named in every stack; ticks the comps with foreach, which throws when a comp changes the list, while vanilla's cached-count index loop survives it"},
+    ],
+    decoy: [],
+    // either answer is right: vanilla tolerates the list change, so the profiler's departure from vanilla is as much at fault
     required: [SSR.pkg],
+    requiredAny: [[SSR.pkg], [PCP.pkg]],
     faultClass: 'runtime.collection-modified (no culprit frame)',
-    files: [`${SSR.pkg}/${dll}`],
-    fix: 'TC_ForceBodyShape must not change parent.AllComps inside CompTick: set the body type once and then do nothing (the reference fix), or defer the removal outside the tick loop. Rebuild 1.6/Assemblies/FS_SSR_Body.dll (decompile, edit, build); a reference build is in answer/. Rewriting the profiler\'s loop only hides it.',
+    files: [`${SSR.pkg}/${dll}`, `${PCP.pkg}/1.6/Assemblies/PawnCompProfiler.dll`],
+    fix: 'Either: TC_ForceBodyShape must not change parent.AllComps inside CompTick (set the body type once and then do nothing, the reference fix in answer/; or defer the removal outside the tick loop), rebuilding 1.6/Assemblies/FS_SSR_Body.dll; or the profiler ticks the comps as vanilla does (an index loop over a cached count), rebuilding PawnCompProfiler.dll. Turning either Mod off does not count.',
   });
 }
 

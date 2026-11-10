@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
@@ -37,7 +38,7 @@ func TestForeignLogCLIParity(t *testing.T) {
 	} {
 		want, code := e.Run(tc.argv...)
 		got, bad := call(t, cs, tc.name, tc.in)
-		if got != want || bad != (code != 0) {
+		if got != cmds.MCPHints(want) || bad != (code != 0) {
 			t.Fatalf("%s: CLI (%d) %s\nMCP (%v) %s", tc.name, code, want, bad, got)
 		}
 		if tc.name != "analyze_log" && (strings.Contains(got, "stale log") || strings.Contains(got, "log:E")) {

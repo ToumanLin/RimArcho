@@ -111,6 +111,9 @@ func (s *API) cancelLoadCost(close bool) {
 		m.cancel = nil
 	}
 	m.request++
+	// The cancelled worker publishes nothing, so this page would say Loading for good and
+	// keep maintenance waiting (maintenanceSnapshot).
+	m.page.Loading = false
 	if close {
 		m.closed = true
 	}

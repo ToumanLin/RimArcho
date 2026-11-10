@@ -37,6 +37,9 @@ type SettingItem struct {
 	Note         string   `json:"note,omitempty"`
 	Hover        string   `json:"hover,omitempty"`
 	ValueNote    string   `json:"valueNote,omitempty"`
+	// Custom labels a last swatch that picks any #rrggbb colour, which Value may then be
+	// (16 §2.14 accent colour); empty offers only Choices.
+	Custom string `json:"custom,omitempty"`
 	// URL: the value is a web page; the interfaces open it in the browser (Community, 16 §2.14).
 	URL     string          `json:"url,omitempty"`
 	Links   []CommunityLink `json:"links,omitempty"`
@@ -264,6 +267,7 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 			ChoiceLabels: []string{T("follow system"), T("light"), T("dark")}, Argv: []string{"config", "set", "ui.theme", "{}"}},
 		{Label: T("accent colour"), Value: cmds.Setting(a, "ui.accent"), Edit: "swatches", Choices: cmds.SettingChoices("ui.accent"),
 			ChoiceLabels: []string{T("default"), T("indigo"), T("blue"), T("cyan"), T("teal"), T("green"), T("grass"), T("orange"), T("amber"), T("red"), T("crimson"), T("pink"), T("plum"), T("purple"), T("violet"), T("iris")},
+			Custom:       T("custom…"),
 			Argv:         []string{"config", "set", "ui.accent", "{}"}},
 		onOff(T("Workshop descriptions"), "workshop.fetch"),
 		onOff(T("images in descriptions"), "workshop.images"),
@@ -272,6 +276,10 @@ func SettingsPage(a *app.App, st *app.LoadoutState) []SettingGroup {
 			Choices: []string{"off", "still", "live"}, ChoiceLabels: []string{T("off"), T("still"), T("animated")},
 			Hover: T("Archo's figure while pages load and in the first-run guide; still uses no GPU"),
 			Argv:  []string{"config", "set", "ui.archo.motion", "{}"}},
+		{Label: T("motion"), Value: cmds.Setting(a, "ui.motion"), Edit: "segments", Choices: cmds.SettingChoices("ui.motion"),
+			ChoiceLabels: []string{T("follow system"), T("reduced")},
+			Hover:        T("reduced keeps the window still: the sidebar, lists, pages and status line change without sliding or fading; follow system uses the Windows animation setting"),
+			Argv:         []string{"config", "set", "ui.motion", "{}"}},
 	}}, AccountGroup(a), AutomaticGroup(a)}
 
 	// RimArcho's folders, each with relocation controls, then adding a mod folder.

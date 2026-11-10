@@ -82,6 +82,13 @@ type workshopTransfer struct {
 	ctx     context.Context
 	items   []TaskItem
 	changed func([]TaskItem)
+	// confirmed is told when SteamCMD's output confirms an item and moves on to the next
+	// one (a success line can still be followed by an error for the same item), or when
+	// its batch ends; downloadWorkshopGroup finishes the item then.
+	confirmed func(id string)
+	okPending string // the item whose success line came last, not yet passed on
+	// settled receives each item downloadWorkshopGroup has finished, success or not.
+	settled func(SubscribeItem)
 }
 
 func workshopObserver(transfers []*workshopTransfer) *workshopTransfer {
@@ -143,6 +150,26 @@ func (w *workshopTransfer) line(line string) {
 		break
 	}
 	w.publish()
+	switch {
+	case state == ItemOK:
+		w.passOn(id)
+		w.okPending = id
+	case state == ItemFail && w.okPending == id:
+		w.okPending = ""
+	case state == ItemRun:
+		w.passOn(id)
+	}
+}
+
+// passOn confirms the item whose success line came last unless it is next (the same item
+// again); its output is complete once SteamCMD reports another one.
+func (w *workshopTransfer) passOn(next string) {
+	if id := w.okPending; id != "" && id != next {
+		w.okPending = ""
+		if w.confirmed != nil {
+			w.confirmed(id)
+		}
+	}
 }
 
 func (w *workshopTransfer) outcome(id string, outcome workshopOutcome) {

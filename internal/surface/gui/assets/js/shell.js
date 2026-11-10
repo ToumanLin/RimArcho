@@ -32,7 +32,14 @@ export function initShell(u) {
   $("#tasks-line").onclick = () => ui.go("tasks");
   $("#side").addEventListener("keydown", navKey);
   wireSideSplit();
-  api.Setting(NAV_KEY).then((v) => { if (v === "top") { layout = "top"; applyNav(); } }).catch(() => {});
+  // the layout from the last run first (a copy in localStorage), so the window does not
+  // draw the side layout and then flip; the saved setting follows and wins
+  try { if (localStorage.getItem("setting:" + NAV_KEY) === "top") layout = "top"; } catch { /* storage can be off */ }
+  api.Setting(NAV_KEY).then((v) => {
+    try { localStorage.setItem("setting:" + NAV_KEY, v || ""); } catch { /* storage can be off */ }
+    const want = v === "top" ? "top" : "side";
+    if (want !== layout) { layout = want; applyNav(); }
+  }).catch(() => {});
   addEventListener("resize", () => slideNav($("#nav"), true));
   applyNav();
 }
@@ -42,7 +49,8 @@ export function initShell(u) {
 export function toggleNav() {
   layout = layout === "side" ? "top" : "side";
   api.SetSetting(NAV_KEY, layout === "top" ? "top" : "").catch(() => {});
-  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  try { localStorage.setItem("setting:" + NAV_KEY, layout === "top" ? "top" : ""); } catch { /* storage can be off */ }
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches || document.documentElement.dataset.motion === "reduced";
   if (document.startViewTransition && !still) document.startViewTransition(() => applyNav());
   else applyNav();
 }
@@ -52,6 +60,10 @@ function applyNav() {
   app.classList.toggle("nav-top", layout === "top");
   app.classList.toggle("nav-side", layout === "side");
   placeWindowControls(layout);
+  // RimArcho's update button (16 §2.1): on Settings' row at the side, before background
+  // tasks at the top; moved, not styled, so the tab order follows what is seen
+  const up = $("#self-update");
+  if (up) $(".side-foot").insertBefore(up, layout === "top" ? $("#tasks-line") : null);
   const t = $("#navtoggle");
   t.title = (layout === "side" ? T("navigation at the top") : T("navigation at the side")) + T("; ") + "ctrl+b";
   slideNav($("#nav"), true);

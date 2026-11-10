@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
@@ -36,6 +37,9 @@ func within(root, path string) bool {
 }
 
 func preparePaths(o *Options) error {
+	if runtime.GOOS == "linux" && env.IsProtonGame(o.GameRoot) {
+		return fmt.Errorf("gametest: Proton games do not support isolated saves yet; use a native Linux game for test runs")
+	}
 	for _, p := range []*string{&o.GameRoot, &o.DataDir, &o.RunDir} {
 		if *p == "" {
 			return fmt.Errorf("gametest: GameRoot, DataDir and RunDir must be set")
@@ -59,7 +63,7 @@ func preparePaths(o *Options) error {
 		}
 	}
 	for _, item := range []struct{ dir, name string }{
-		{o.DataDir, "Config"}, {o.DataDir, filepath.Join("Config", "Knowledge.xml")},
+		{o.DataDir, "Config"}, {o.DataDir, filepath.Join("Config", "Knowledge.xml")}, {o.DataDir, "Saves"},
 		{o.RunDir, "Player.log"}, {o.RunDir, "stdout.log"}, {o.RunDir, "result.json"},
 	} {
 		path := filepath.Join(item.dir, item.name)
@@ -78,6 +82,12 @@ func executable(o Options) (string, bool) {
 	_, dllErr := os.Stat(filepath.Join(o.GameRoot, "Waylith.dll"))
 	mm := env.MajorMinor(o.GameVersion)
 	waylith := dllErr == nil || mm != "" && !env.VersionLess(mm, "1.7")
+	if runtime.GOOS == "linux" {
+		path := filepath.Join(o.GameRoot, "RimWorldLinux")
+		if st, err := os.Stat(path); err == nil && !st.IsDir() {
+			return path, waylith
+		}
+	}
 	first, second := "RimWorldWin64.exe", "RimWorld.exe"
 	if waylith {
 		first, second = second, first

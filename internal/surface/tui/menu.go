@@ -74,7 +74,7 @@ func (m *model) openRowMenu() tea.Cmd {
 		x = s.x + 8
 		for i, vi := range m.rowMap[s.kind] {
 			if vi == m.col().cursor {
-				y = 2 + m.barLines() + i + 1
+				y = bodyTop + m.barLines() + i + 1
 				break
 			}
 		}

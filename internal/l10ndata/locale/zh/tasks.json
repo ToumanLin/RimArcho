@@ -44,6 +44,7 @@
   "stop the rest / cancel the wait": "停止后续 / 取消排队",
   "stopped": "已停止",
   "stopped when the window closed": "窗口关闭时停止",
+  "went on in the background when the window closed": "窗口关闭后在后台继续",
   "take off the record": "从记录里去掉",
   "take off the record, put it back": "从记录里去掉，放回",
   "take the done ones off the record": "清除已完成",

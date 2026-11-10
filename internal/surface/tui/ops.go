@@ -201,6 +201,14 @@ var navKeys = map[string]int{"!": 1, "@": 2, "#": 3, "$": 4, "%": 5, "^": 6, "&"
 
 // goPage opens the n-th sidebar entry: Start Can it run game log Lists pack Mod library Texture optimisation Games.
 func (m *model) goPage(n int) tea.Cmd {
+	cmd := m.goPageOf(n)
+	if m.panel != nil && m.panel.nav == 0 {
+		m.panel.nav = n // a page the TUI shows as a panel (game log, packs, textures, games)
+	}
+	return cmd
+}
+
+func (m *model) goPageOf(n int) tea.Cmd {
 	m.full, m.insp, m.panel = false, nil, nil
 	switch n {
 	case 1:

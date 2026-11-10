@@ -151,12 +151,19 @@ test("one report a minute, a daily cap per sender and for everyone", async () =>
   assert.equal(gate1.storage.m.size, 0);
 });
 
-test("a GitHub failure gives the sender's minute back", async () => {
+test("a GitHub failure gives the sender's minute and the daily count back", async () => {
   forgetToken();
   const e = env();
   assert.equal((await send(e, github({ issueStatus: 500 }), { title: "1", body: "x" })).status, 502);
+  assert.equal(e.COUNTS.m.get("all:2026-10-31"), "0", "nothing filed, nothing counted");
   assert.equal((await send(e, github(), { title: "1", body: "x" }, { at: NOW + 5e3 })).status, 200, "sent again at once");
   assert.deepEqual(await send(e, github(), { title: "2", body: "x" }, { at: NOW + 10e3 }), { status: 429, data: { error: "slow_down" } });
+  assert.equal(e.COUNTS.m.get("all:2026-10-31"), "1");
+
+  // PER_DAY 1: failures from other senders do not use up everyone's cap
+  const one = env({ PER_DAY: "1" });
+  for (const ip of ["192.0.2.1", "192.0.2.2"]) assert.equal((await send(one, github({ issueStatus: 500 }), { title: "1", body: "x" }, { ip })).status, 502);
+  assert.equal((await send(one, github(), { title: "1", body: "x" }, { ip: "192.0.2.3" })).status, 200);
 });
 
 test("refusals: not configured, other clients, wrong method, bad or empty or long reports", async () => {

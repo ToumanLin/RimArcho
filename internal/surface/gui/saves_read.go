@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -20,8 +21,8 @@ func factsKey(sv *app.Save) string {
 
 // savePlay fills the right card of d: the play facts when the save is read, else skeletons
 // while readSelected reads it, else why there are none. Called with the page's reader
-// locked; the facts of other saves are dropped.
-func (s *API) savePlay(r *app.App, sv *app.Save, d *view.SaveDetail) {
+// locked; the facts of other saves are dropped. asked numbers the SaveDetail call.
+func (s *API) savePlay(r *app.App, sv *app.Save, d *view.SaveDetail, asked uint64) {
 	st := &s.saves
 	if sv.Writing {
 		d.PlayNote = view.T("the game is writing this file: its play facts are read once it has saved")
@@ -36,12 +37,17 @@ func (s *API) savePlay(r *app.App, sv *app.Save, d *view.SaveDetail) {
 		st.mu.Lock()
 		why := st.failed[factsKey(sv)]
 		st.mu.Unlock()
+		if why == "" { // read before and failed; unchanged since (12 §1.7)
+			if stored, _ := r.SaveReadFailure(sv); stored != "" {
+				why = view.Humanize(nil, stored)
+			}
+		}
 		if why != "" {
 			d.PlayNote = view.Tf("the save could not be read: %s", why)
 			return
 		}
 		d.Reading = true
-		s.readSelected(sv)
+		s.readSelected(sv, asked)
 		return
 	}
 	if m := f.Malformed; m != nil && f.TicksGame == 0 { // broke off before the game's time: nothing to show
@@ -49,22 +55,15 @@ func (s *API) savePlay(r *app.App, sv *app.Save, d *view.SaveDetail) {
 		return
 	}
 	keep := map[string]*savefile.Facts{factsKey(sv): f}
-	prevSave := view.PreviousReadSave(sv)
-	var prev *savefile.Facts
-	if prevSave != nil {
-		if prev, _ = s.factsOf(r, prevSave); prev != nil {
-			keep[factsKey(prevSave)] = prev
-		}
-	}
 	st.mu.Lock()
 	if st.list != nil { // still on the page
 		st.facts = keep
 	}
 	st.mu.Unlock()
-	d.Play = view.SavePlayOf(sv, f, prevSave, prev)
+	d.Play = view.SavePlayOf(sv, f)
 }
 
-// factsOf is a save's full read from the page's two kept facts or the cache; nil when it
+// factsOf is a save's full read from the page's kept facts or the cache; nil when it
 // is not read. It never reads the file.
 func (s *API) factsOf(r *app.App, sv *app.Save) (*savefile.Facts, error) {
 	k := factsKey(sv)
@@ -79,21 +78,26 @@ func (s *API) factsOf(r *app.App, sv *app.Save) (*savefile.Facts, error) {
 }
 
 // readSelected reads the selected save on its own session, off the call path (16 §8.4):
-// one at a time, a newer selection replacing one that waits. The background run may read
-// the same save; the second read only rewrites the same cache row.
-func (s *API) readSelected(sv *app.Save) {
+// one at a time, a newer selection replacing one that waits. Newer means asked for later
+// (asked numbers the SaveDetail and SaveContent calls as they come, not as they take the
+// reader's lock): an older selection never replaces a newer one. The background run may
+// read the same save; the second read only rewrites the same cache row.
+func (s *API) readSelected(sv *app.Save, asked uint64) {
 	st := &s.saves
 	k := factsKey(sv)
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	switch {
-	case st.closed || st.list == nil || st.reading == k:
+	case st.closed || st.list == nil || asked < max(st.readingAt, st.nextAt):
+		return
+	case st.reading == k: // the newest selection is the one being read
+		st.next, st.nextAt = nil, asked
 		return
 	case st.reading != "":
-		st.next = sv
+		st.next, st.nextAt = sv, asked
 		return
 	}
-	st.reading = k
+	st.reading, st.readingAt = k, asked
 	st.jobs.Add(1)
 	go s.readSelectedLoop(sv)
 }
@@ -107,16 +111,19 @@ func (s *API) readSelectedLoop(sv *app.Save) {
 	}
 	for sv != nil {
 		why := ""
+		var read *savefile.Facts
+		cp := *sv
 		if rerr != nil {
 			why = rerr.Error()
 		} else {
-			cp := *sv
 			f, err := r.SaveFacts(&cp, true)
 			switch {
 			case err != nil:
 				why = view.Humanize(nil, err.Error())
 			case f == nil:
 				why = view.T("the file changed while it was read; the game may be writing it")
+			default:
+				read = f
 			}
 		}
 		st.mu.Lock()
@@ -126,14 +133,24 @@ func (s *API) readSelectedLoop(sv *app.Save) {
 			}
 			st.failed[factsKey(sv)] = why
 		}
+		// The file changed since it was listed (the game saved over it): the cache now
+		// holds it by its new size and time, which the listing does not know until the
+		// page is relisted. Keep its facts under the listing's key meanwhile, so the page
+		// shows them instead of reading the file again and again.
+		if read != nil && st.list != nil && factsKey(&cp) != factsKey(sv) {
+			if st.facts == nil {
+				st.facts = map[string]*savefile.Facts{}
+			}
+			st.facts[factsKey(sv)] = read
+		}
 		ref := sv.Ref
 		sv, st.next = st.next, nil
 		if st.closed || st.list == nil {
 			sv = nil
 		}
-		st.reading = ""
+		st.reading, st.readingAt = "", 0
 		if sv != nil {
-			st.reading = factsKey(sv)
+			st.reading, st.readingAt = factsKey(sv), st.nextAt
 		}
 		st.mu.Unlock()
 		s.savesNews([]string{ref}, "", true)
@@ -142,10 +159,12 @@ func (s *API) readSelectedLoop(sv *app.Save) {
 
 // startSavesIndex starts the background read of the saves in l that are not read yet,
 // first the one named by first (16 §2.11, 12 §1.7): one run at a time, task kind "saves".
-func (s *API) startSavesIndex(l *app.SaveList, first string) {
+// A save whose read failed before and is unchanged is not counted (app.Save.NeedsRead),
+// and nothing starts when the player left the page since the listing (visit).
+func (s *API) startSavesIndex(l *app.SaveList, first string, visit uint64) {
 	n := 0
 	for _, sv := range l.Saves() {
-		if sv.Summary == nil && !sv.Writing {
+		if sv.NeedsRead() {
 			n++
 		}
 	}
@@ -160,7 +179,7 @@ func (s *API) startSavesIndex(l *app.SaveList, first string) {
 	}
 	st := &s.saves
 	st.mu.Lock()
-	if st.closed || st.stop != nil {
+	if st.closed || st.stop != nil || st.visit != visit || st.list == nil {
 		st.mu.Unlock()
 		return
 	}
@@ -171,17 +190,25 @@ func (s *API) startSavesIndex(l *app.SaveList, first string) {
 	task := s.beginSelf(view.TaskSaves, view.Tf("%d saves", n), func() error { cancel(); return nil })
 	go func() {
 		defer st.jobs.Done()
-		read := 0
-		progress := func(line string) {
-			done, total, ref, name, ok := app.ParseSavesIndexLine(line)
-			if !ok {
-				return
+		read, failed, why := 0, 0, ""
+		progress := func(lines string) {
+			for _, line := range strings.Split(lines, "\n") {
+				if _, reason, ok := app.ParseSavesFailLine(line); ok {
+					if failed++; why == "" {
+						why = view.Humanize(nil, reason)
+					}
+					continue
+				}
+				done, total, ref, name, ok := app.ParseSavesIndexLine(line)
+				if !ok {
+					continue
+				}
+				read = done
+				// "n/m" makes the status line a progress bar (16 §11 A11)
+				text := view.Tf("reading the saves %d/%d  %s", done, total, name)
+				s.tasks.Update(task, func(t *app.Task) { t.Phase, t.Done, t.Total = text, done, total })
+				s.savesNews([]string{ref}, text, false)
 			}
-			read = done
-			// "n/m" makes the status line a progress bar (16 §11 A11)
-			text := view.Tf("reading the saves %d/%d  %s", done, total, name)
-			s.tasks.Update(task, func(t *app.Task) { t.Phase, t.Done, t.Total = text, done, total })
-			s.savesNews([]string{ref}, text, false)
 		}
 		var firsts []string
 		if first != "" {
@@ -197,6 +224,14 @@ func (s *API) startSavesIndex(l *app.SaveList, first string) {
 		if closed { // Close marks it stopped with the window (16 §2.16)
 			return
 		}
+		// The child exits with an error when a save could not be read; each such save
+		// was named on its own line and its failure is stored, so the run itself did
+		// its work: it ends done, saying how many could not be read and why. A child that
+		// failed on its own (its "error:" line) still ends failed.
+		var child *app.SavesIndexError
+		if failed > 0 && errors.As(err, &child) && !child.Fatal {
+			err = nil
+		}
 		ev := &SavesReadEvent{Done: true}
 		switch {
 		case stopped:
@@ -206,6 +241,9 @@ func (s *API) startSavesIndex(l *app.SaveList, first string) {
 			reason := view.Humanize(nil, err.Error())
 			ev.Error = failedText(view.TaskSaves, view.Tf("%d saves", n), reason)
 			s.endSelf(task, errors.New(reason), "")
+		case failed > 0:
+			ev.Text = view.Tf("read %d saves; %d could not be read: %s", read-failed, failed, why)
+			s.endSelf(task, nil, ev.Text)
 		default:
 			ev.Text = view.Tf("read %d saves", read)
 			s.endSelf(task, nil, ev.Text)
@@ -294,16 +332,27 @@ func (s *API) savesFlush(end *SavesReadEvent) {
 		st.dirty = false
 	}
 	st.sent = time.Now()
+	st.flushes++
+	ticket := st.flushes
 	st.mu.Unlock()
 	if closed {
 		return
 	}
+	st.sendMu.Lock()
 	if relist && onPage {
 		ev.Page = s.relistSaves()
 	}
+	st.mu.Lock()
+	if ticket < st.lastSent { // a newer event went first: this line is old news
+		ev.Line = ""
+	} else {
+		st.lastSent = ticket
+	}
+	st.mu.Unlock()
 	if ev.Refs != nil || ev.Line != "" || ev.Page != nil || ev.Done {
 		s.send("saves-read", ev)
 	}
+	st.sendMu.Unlock()
 	st.mu.Lock()
 	later := st.dirty && st.timer == nil && !st.closed && st.list != nil
 	if later {

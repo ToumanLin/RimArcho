@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -61,9 +62,17 @@ func isFile(path string) bool {
 	return err == nil && !s.IsDir()
 }
 
+// SteamCMDExecutable is the bootstrap launcher installed for this platform.
+func SteamCMDExecutable() string {
+	if runtime.GOOS == "windows" {
+		return "steamcmd.exe"
+	}
+	return "steamcmd.sh"
+}
+
 // SteamCMDIn finds the executable in a SteamCMD installation directory.
 func SteamCMDIn(dir string) string {
-	for _, n := range []string{"steamcmd.exe", "steamcmd.sh", "steamcmd"} {
+	for _, n := range []string{SteamCMDExecutable(), "steamcmd"} {
 		if p := filepath.Join(dir, n); isFile(p) {
 			return p
 		}
@@ -99,7 +108,7 @@ func (f *Finder) Status(name string) Info {
 	}
 	switch name {
 	case Todds:
-		i.ConfigKey, i.Dir, i.Installable = "textures.todds", filepath.Join(f.LocalDir, Todds), true
+		i.ConfigKey, i.Dir, i.Installable = "textures.todds", filepath.Join(f.LocalDir, Todds), textures.ToddsZipURL != ""
 		if !selectPath(textures.FindTodds(setting(i.ConfigKey)), "config") &&
 			!selectPath(textures.FindTodds(i.Dir), "own") {
 			selectPath(path("todds"), "path")
@@ -115,7 +124,12 @@ func (f *Finder) Status(name string) Info {
 			if p != "" {
 				selectPath(SteamCMDIn(filepath.Dir(p)), "config")
 			} else {
-				selectPath(SteamCMDIn(i.Dir), "own")
+				if runtime.GOOS == "linux" {
+					selectPath(path("steamcmd"), "path")
+				}
+				if i.Path == "" {
+					selectPath(SteamCMDIn(i.Dir), "own")
+				}
 			}
 			if i.Path == "" {
 				selectPath(path("steamcmd"), "path")
@@ -127,6 +141,9 @@ func (f *Finder) Status(name string) Info {
 	}
 	if i.Path == "" {
 		i.Err = name + " is not installed"
+		if name == Todds && !i.Installable {
+			i.Err = textures.ToddsMissing
+		}
 		return i
 	}
 	i.Own = i.Source == "own" && owned(i.Dir, i.Path)
@@ -175,23 +192,29 @@ func (f *Finder) version(name, path string) (string, error) {
 	if f.Version != nil {
 		c = &f.probes
 	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.entries == nil {
-		c.entries = make(map[string]probe)
-	}
 	key := name + ":" + path
+	c.mu.Lock()
 	p, ok := c.entries[key]
+	c.mu.Unlock()
 	if ok && p.size == s.Size() && p.mtime == s.ModTime().UnixNano() {
 		return p.version, p.err
 	}
+	// Probe without the lock: a slow program must not hold up other lookups.
 	p = probe{size: s.Size(), mtime: s.ModTime().UnixNano()}
 	if f.Version != nil {
 		p.version, p.err = f.Version(name, path)
 	} else {
 		p.version, p.err = (&textures.Todds{Path: path, Prepare: hideWindow}).Version()
 	}
+	if p.err != nil {
+		return p.version, p.err // may be passing (a scanner holding the file, a timeout): probe again next time
+	}
+	c.mu.Lock()
+	if c.entries == nil {
+		c.entries = make(map[string]probe)
+	}
 	c.entries[key] = p
+	c.mu.Unlock()
 	return p.version, p.err
 }
 

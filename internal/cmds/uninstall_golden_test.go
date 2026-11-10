@@ -6,7 +6,9 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
+	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
 var sizeRe = regexp.MustCompile(`\b\d+(\.\d+)? (B|KB|MB|GB)\b`)
@@ -33,8 +35,8 @@ func TestGoldenUninstall(t *testing.T) {
 	e.WriteFile(filepath.Join(e.Home, "packs", "P1", "pack.json"), `{"format":1,"name":"P1","entries":[]}`)
 	local := filepath.Join(e.Root, "LocalAppData", "RimArcho")
 	e.WriteFile(filepath.Join(local, "monitor", "ArchoMonitor-0.9.0", "About", "About.xml"), "<ModMetaData/>")
-	e.WriteFile(filepath.Join(local, "steamcmd", "steamcmd.exe"), "MZ")
-	e.WriteFile(filepath.Join(local, "todds", "todds.exe"), "MZ")
+	e.WriteFile(filepath.Join(local, "steamcmd", deps.SteamCMDExecutable()), "MZ")
+	e.WriteFile(filepath.Join(local, "todds", textures.ToddsExecutable), "MZ")
 	for _, n := range []string{"archo.exe", "RimArcho.exe", "README.md", "fonts/legacy.ttf"} {
 		e.WriteFile(filepath.Join(e.Root, "Program", n), "x")
 	}

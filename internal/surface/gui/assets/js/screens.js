@@ -239,7 +239,9 @@ function dropBackdrop() {
 // actions: they sit at the right end of that line, quiet unless primary; anything else
 // joins the lead. The top bar has no buttons.
 export function page(cls, lead, ...right) {
-  const w = el("div", "page " + cls + (fresh ? " enter" : ""));
+  // a page taking its placeholder's place enters too: the placeholder is hidden for a fast
+  // read (style.css .page-loading), so the page fades in from the empty page
+  const w = el("div", "page " + cls + (fresh || pageLoading() ? " enter" : ""));
   fresh = false;
   resetAreas();
   const head = el("div", "page-head");
@@ -520,6 +522,8 @@ function needsLead(d) {
   return Tf("%s can run: nothing to handle.", plan);
 }
 
+// askShown: drawNeeds drew N.ask's confirmation row.
+let askShown = false;
 function drawNeeds() {
   const sc = S.screen === "needs" ? $("#screen") : openScreen("needs");
   const keep = [...sc.querySelectorAll(".needcol > .scroll")].map((s) => s.scrollTop);
@@ -545,6 +549,7 @@ function drawNeeds() {
     c.append(cap, box);
     return [c, box];
   };
+  askShown = false;
   const [left, lbox] = column(0, "before you start", "found by checking the mods' files and shared logs");
   const [right, rbox] = column(1, live ? "this run and the last" : "when you last played", "seen in the game's log");
   const split = el("div", "split needsplit");
@@ -561,6 +566,8 @@ function drawNeeds() {
       box.append(needSection(si, rows, ci, shut, live));
     }
   }
+  // a question whose item is gone (resolved by a refresh) is no question: enter must not run it
+  if (!askShown) N.ask = null;
   if (!N.cols[0].length && !d.lastSave) lbox.append(el("section", "card empty-state", "✓ " + T("nothing here")));
   if (!N.cols[1].length) rbox.append(el("div", "need-empty", T("no errors in the last run")));
   // what other pages handle: one line each (16 §2.4)
@@ -772,7 +779,7 @@ function needCard(it, ci, i) {
       body.append(b);
       continue;
     }
-    if (a.kind === "choose-disable") {
+    if (a.kind === "choose-disable" || a.kind === "stand-in") {
       // a choice: each option is a button, none the main one (16 §5)
       a.options.forEach((o, oi) => {
         const b = button(o.label, oi ? "" : a.key, () => { setCur(ci, i); if (N.ask) { N.ask = null; } snapshot(); doAction(a, oi); }, "option", actionWrite(a));
@@ -789,7 +796,7 @@ function needCard(it, ci, i) {
   }
   if (acts.some((a) => a.kind === "answer")) btns.classList.add("identity-answers");
   if (x.children.length) row.append(x);
-  if (N.ask && N.ask.id === it.id) row.append(confirmRow(it, N.ask.act));
+  if (N.ask && N.ask.id === it.id) { row.append(confirmRow(it, N.ask.act)); askShown = true; }
   else {
     foot.append(btns);
     if (it.evidence) foot.append(needEvidence(it.evidence));
@@ -936,6 +943,7 @@ async function runAction(it, act, here = false) {
       N.open.has(it.text) ? N.open.delete(it.text) : N.open.add(it.text);
       return drawNeeds();
     case "choose-disable":
+    case "stand-in":
       // here the options are the item's buttons: the key puts the focus on the first
       if (here) return focusButtons(it, ".btn.option");
       return pop.choose(act.title, act.options.map((o) => o.label), (i) => doAction(act, i));

@@ -242,15 +242,22 @@ func statusCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	ps, err := c.App.Problems(false, nil)
 	c.App.LogCacheOnly = false
 	if err == nil && ps.State != nil {
+		previousRun := len(ps.Logs) > 0 && c.App.LiveLog(ps.State) != ""
 		line := severityCounts(ps.List) + " (archo problems)"
 		if ps.Analysis == nil || ps.Analysis.Run == nil {
 			line = severityCounts(ps.List) + " in declarations; Defs and Patches not analysed yet (archo problems)"
 		} else if !ps.Analysis.Fresh {
 			line = severityCounts(ps.List) + "; Def/Patch analysis stale (archo problems)"
 		}
+		if previousRun {
+			line += "; log findings are from a previous run (current run: archo log --follow)"
+		}
 		root.KV("problems", line)
 		for _, r := range ps.Logs {
 			text := logRunText(c, r)
+			if previousRun {
+				text = "previous run: " + text
+			}
 			switch {
 			case r.Pending:
 				text += ": not analysed yet, so its errors are not in the counts (archo problems)"
@@ -595,6 +602,8 @@ func modDoc(c *Ctx, ix *app.Index, m *store.Mod) (*render.Doc, error) {
 		}
 		root.KV("workshop", w)
 	}
+	// Whether its files are the Workshop copy's, from what the last scan stored (04 §1.4).
+	root.KV("provenance", c.App.Provenance(ix, m))
 	root.KV("git", m.GitHead)
 	subscriptionLines(c, root, c.App.SubscriptionOf(m))
 	if m.Origin != "" {
@@ -631,6 +640,12 @@ func modDoc(c *Ctx, ix *app.Index, m *store.Mod) (*render.Doc, error) {
 	if m.Status == identity.Live && m.Kind != source.Official {
 		if sm, err := c.App.ModSettingsOf(m); err == nil && len(sm.Files) > 0 {
 			settingsFiles(root.Section("settings"), sm, 10, "archo mod-settings "+ref)
+		}
+	}
+	// The C# source it ships and how to rebuild it (05 §5.6).
+	if m.Status == identity.Live && m.Kind != source.Official {
+		if b := c.App.ModBuild(ix, m); b != nil {
+			buildBlock(c, root, c.App.ModPath(ix, m), b)
 		}
 	}
 	if decl.ParseError != "" {

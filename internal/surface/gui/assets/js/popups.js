@@ -5,6 +5,7 @@ import { closeChoiceMenu } from "./choices.js";
 import { pathContent, copyablePath } from "./fields.js";
 import { S, $, el, esc, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { buildCommandPanel } from "./command-panel.js";
+import { tagOrderChips } from "./tagorder.js";
 
 const MODALS = new Set(["url", "memory", "uninstall-confirm", "plan-rename", "ask"]);
 let ui = null;
@@ -66,6 +67,9 @@ export function initPopups(u) { ui = u; }
 export function open(kind, title, build) {
   closeChoiceMenu();
   close();
+  // A popup that refuses to close (the first-run folder dialog while it works) stays: replacing
+  // it would skip its onclose and leave the window inert (ctrl+k reaches here over a dialog).
+  if (S.popup) return;
   const opener = document.activeElement;
   const box = $("#popup");
   box.classList.remove("command-dock");
@@ -210,6 +214,20 @@ export async function tags(items, after) {
     linkOpener(p, chips.id);
     p.restoreFocus = () => { if (p.opener?.isConnected) p.opener.focus({ preventScroll: true, focusVisible: p.openerFocusVisible }); };
     pop.append(chips, fresh);
+    // one Mod: its tags in their order, to drag; the first one's colour marks it (16 §2.9)
+    if (ids.length === 1) {
+      const row = S.cols.flatMap((c) => c.items).find((x) => x.id === ids[0]);
+      const mine = row?.tags || items[0].tags || cands.filter((c) => c.have).map((c) => c.tag);
+      if (mine.length > 1) {
+        const order = el("div", "tag-order-row");
+        order.append(el("span", "k", T("order")), tagOrderChips(mine, async (list) => {
+          try { say("ok", await api.SetTagOrder(ids[0], list)); } catch (e) { say("fail", errText(e)); }
+          ui.reload();
+          if (after) after();
+        }, "c"));
+        pop.insertBefore(order, chips);
+      }
+    }
     p.sel = -1;
     let shown = cands;
     const typed = () => inp.value.trim();

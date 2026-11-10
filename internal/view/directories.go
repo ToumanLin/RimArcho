@@ -70,10 +70,13 @@ func DirectoryGroup(a *app.App) SettingGroup {
 	return g
 }
 
+// directoryCode marks the needs directoryNeeds makes, which RefreshDirectories replaces.
+const directoryCode = "directory"
+
 func directoryNeeds(a *app.App) []Need {
 	dirs, err := a.ManagedDirectories()
 	if err != nil {
-		return []Need{{Group: GroupConfirm, Title: T("directory check failed"), Text: err.Error(), Why: err.Error(), Status: StatusWarn, Counted: true}}
+		return []Need{{code: directoryCode, Group: GroupConfirm, Title: T("directory check failed"), Text: err.Error(), Why: err.Error(), Status: StatusWarn, Counted: true}}
 	}
 	var out []Need
 	for _, d := range dirs {
@@ -82,7 +85,7 @@ func directoryNeeds(a *app.App) []Need {
 		}
 		title := Tf("locate %s", DirectoryLabel(d))
 		why := T("the saved directory is unavailable or has changed; enter its new location in settings. You can keep playing")
-		out = append(out, Need{Group: GroupConfirm, Title: title, Text: title + "  " + d.Path, Why: why + "  " + d.Path,
+		out = append(out, Need{code: directoryCode, Group: GroupConfirm, Title: title, Text: title + "  " + d.Path, Why: why + "  " + d.Path,
 			Status: StatusWarn, Counted: true, Actions: []Action{{Kind: ActLocateDirectory, Key: "o", Label: T("locate directory"), Refs: []string{d.ID}, Lines: []string{d.Path}},
 				{Kind: ActView, Key: "v", Label: T("directory details"), Argv: []string{"folder", "check"}}}})
 	}

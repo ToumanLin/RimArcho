@@ -565,3 +565,165 @@ func TestIncomingStaleIDLinkMove(t *testing.T) {
 		t.Fatalf("moved link health: %+v", l)
 	}
 }
+
+// A finished link operation in a Mods directory that cannot be read now (its drive is
+// offline) does not block target operations or link checks; an unfinished one still does.
+func TestFinishedLedgerRowOnUnreadableModsDoesNotBlock(t *testing.T) {
+	t.Parallel()
+	e, target, id, links := incomingFixture(t)
+	offline := filepath.Join(e.Root, "OfflineGame", "Mods")
+	e.WriteFile(offline, "") // a file stands in for a directory that cannot be read
+	row := store.ManagedLink{Operation: "old", Mods: offline, Name: "_Archo_env_" + id, Kind: "junction", Instance: id, Target: target, NextPath: filepath.Join(offline, "_Archo_env_"+id), NextTarget: target}
+	if err := e.App.Store.RecordLinkIntent([]store.ManagedLink{row}); err != nil {
+		t.Fatal(err)
+	}
+	if err := e.App.Store.LinkPhase(row.Operation, "complete"); err != nil {
+		t.Fatal(err)
+	}
+	incoming, err := e.App.IncomingLinks(target)
+	if err != nil || len(incoming) != len(links) {
+		t.Fatalf("incoming %d, %v", len(incoming), err)
+	}
+	all, err := e.App.InspectGameLinks()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, l := range all {
+		if l.Code == app.CodeLinkUnknown {
+			t.Fatalf("finished row's directory reported: %+v", l)
+		}
+	}
+	if err := e.App.Store.LinkPhase(row.Operation, "intent"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.App.IncomingLinks(target); err == nil {
+		t.Fatal("an unfinished row on an unreadable directory did not block")
+	}
+}
+
+// An interrupted link creation whose target is gone has nothing to finish: repair closes
+// its record instead of refusing it for good, and a link it left becomes an ordinary
+// dangling link that the next repair removes.
+func TestLinkRecoveryClosesCreationWithGoneTarget(t *testing.T) {
+	t.Parallel()
+	for _, leftLink := range []bool{false, true} {
+		t.Run(map[bool]string{false: "nothing linked", true: "dangling link left"}[leftLink], func(t *testing.T) {
+			e, _, id := linkHealthEnv(t)
+			mods := mustReal(t, filepath.Join(e.Game, "Mods"))
+			path := filepath.Join(mods, "_Archo_env_"+id)
+			gone := filepath.Join(e.Root, "gone-target")
+			kind := "junction"
+			if leftLink {
+				e.MkdirAll(gone)
+				e.Junction(path, gone)
+				info, err := source.ReadLink(path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				kind = info.Kind
+			}
+			row := store.ManagedLink{Operation: "dead-add", Mods: mods, Name: filepath.Base(path), Kind: kind, Instance: id, NextPath: path, NextTarget: gone}
+			if err := e.App.Store.RecordLinkIntent([]store.ManagedLink{row}); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.RemoveAll(gone); err != nil {
+				t.Fatal(err)
+			}
+			out := e.MustRun("links", "repair", "--all", "--dry-run")
+			if !strings.Contains(out, app.CodeLinkRecovery) {
+				t.Fatal(out)
+			}
+			e.MustRun("links", "repair", "--all", "--yes")
+			rows, err := e.App.Store.ManagedLinks()
+			if err != nil || len(rows) != 1 || rows[0].Phase != "rolled-back" {
+				t.Fatalf("rows %+v, %v", rows, err)
+			}
+			all, err := e.App.InspectGameLinks()
+			if err != nil {
+				t.Fatal(err)
+			}
+			dangling := false
+			for _, l := range all {
+				if l.Code == app.CodeLinkRecovery {
+					t.Fatalf("recovery remains: %+v", l)
+				}
+				dangling = dangling || l.Code == app.CodeLinkDangling && l.Path == path
+			}
+			if dangling != leftLink {
+				t.Fatalf("dangling link reported %v, want %v", dangling, leftLink)
+			}
+			if leftLink {
+				e.MustRun("links", "repair", "--yes")
+				if _, err := os.Lstat(path); !os.IsNotExist(err) {
+					t.Fatal("dangling link not removed")
+				}
+			}
+		})
+	}
+}
+
+// A move into the lock library that fails after the folder left Mods/ (the marker cannot
+// be written, the record cannot follow) puts the folder back, so the incoming links return
+// to it and no recovery is left; before, they stayed detached, pointing at nothing (07 §5.4).
+func TestLockMoveFailureLeavesFolderAndLinks(t *testing.T) {
+	t.Parallel()
+	for _, cross := range []bool{false, true} {
+		for _, fail := range []string{"origin", "record"} {
+			name := fail + " rename"
+			if cross {
+				name = fail + " cross-volume"
+			}
+			t.Run(name, func(t *testing.T) {
+				e, from, id, links := incomingFixture(t)
+				e.App.SameVolume = func(string, string) bool { return !cross }
+				e.App.TrashFunc = func(path string) error { t.Fatal("original recycled", path); return nil }
+				switch fail {
+				case "origin": // a file where the marker's folder goes
+					os.RemoveAll(filepath.Join(from, ".rimarcho"))
+					e.WriteFile(filepath.Join(from, ".rimarcho"), "in the way")
+				case "record":
+					if _, err := e.App.Store.DB.Exec(`CREATE TRIGGER fail_move BEFORE UPDATE OF real_path ON instance BEGIN SELECT RAISE(ABORT, 'injected'); END`); err != nil {
+						t.Fatal(err)
+					}
+				}
+				hadOrigin := fileExists(filepath.Join(from, ".rimarcho", "origin.json"))
+				if _, err := e.App.MoveToLocked("#"+id[:6], false); err == nil || !strings.Contains(err.Error(), "nothing was moved") {
+					t.Fatal(err)
+				}
+				if _, err := os.Stat(filepath.Join(from, "About", "About.xml")); err != nil {
+					t.Fatal("folder not back in Mods/", err)
+				}
+				if fileExists(filepath.Join(from, ".rimarcho", "origin.json")) != hadOrigin {
+					t.Fatal("marker left behind")
+				}
+				if entries, _ := os.ReadDir(library(e)); len(entries) != 0 {
+					t.Fatal("copy left in the library", entries)
+				}
+				for _, path := range links {
+					info, err := source.ReadLink(path)
+					if err != nil || info.State != source.TargetPresent || mustReal(t, path) != mustReal(t, from) {
+						t.Fatalf("link not back: %+v %v", info, err)
+					}
+				}
+				rows, err := e.App.Store.ManagedLinks()
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, r := range rows {
+					if !store.LinkFinished(r.Phase) {
+						t.Fatalf("ledger left %s in %q", r.Name, r.Phase)
+					}
+				}
+				m, err := e.App.Store.Mod(id)
+				if err != nil || mustReal(t, m.RealPath) != mustReal(t, from) {
+					t.Fatalf("record moved: %+v %v", m, err)
+				}
+			})
+		}
+	}
+}
+
+func fileExists(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil
+}

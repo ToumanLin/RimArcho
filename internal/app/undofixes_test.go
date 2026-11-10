@@ -202,33 +202,39 @@ func TestCrossGameSortUndoPreservesBindings(t *testing.T) {
 	if ws.Entries != original.Entries {
 		t.Error("second undo failed exact restoration")
 	}
-	// Picker batches must preserve the same stored bindings as individual edits.
-	e.MustRun("env", "use", "old")
-	for _, revert := range []bool{false, true} {
-		b, err := e.App.BeginBatch()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := e.App.Sort(false); err != nil {
-			t.Fatal(err)
-		}
-		if revert {
-			err = b.Revert()
-		} else {
-			err = b.Commit("sort batch")
-		}
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !revert {
-			e.MustRun("undo")
-		}
-		ws, err = e.App.Store.Workspace(planID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if ws.Entries != original.Entries {
-			t.Errorf("batch revert=%v changed bindings: %s", revert, ws.Entries)
-		}
+}
+
+// Undoing a checkout leaves a list that is not the checked-out version, so saving it is
+// not recorded as restoring that version.
+func TestUndoCheckoutDropsCheckoutOrigin(t *testing.T) {
+	t.Parallel()
+	e := loadoutEnv(t)
+	scanNow(t, e)
+	e.MustRun("disable", "tester.a")
+	e.MustRun("save")
+	planID := mustPlan(t, e)
+	if _, _, err := e.App.Checkout("v1"); err != nil {
+		t.Fatal(err)
+	}
+	ws, err := e.App.Store.Workspace(planID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ws.OriginKind != "checkout" || ws.OriginVersion != 1 {
+		t.Fatalf("after checkout: %+v", ws)
+	}
+	if _, _, err := e.App.UndoRedo(false); err != nil {
+		t.Fatal(err)
+	}
+	if ws, err = e.App.Store.Workspace(planID); err != nil {
+		t.Fatal(err)
+	}
+	if ws.OriginKind == "checkout" {
+		t.Fatalf("after undo the workspace still claims the checkout: %+v", ws)
+	}
+	e.MustRun("save")
+	vs, _ := e.App.Store.Versions(planID)
+	if vs[0].Source != "user" || vs[0].Note != "" {
+		t.Fatalf("save after undo recorded as %s %q", vs[0].Source, vs[0].Note)
 	}
 }

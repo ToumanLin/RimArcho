@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -27,8 +28,8 @@ import (
 // second, so rows get their day and colonies regroup by world). The selected save never
 // waits for that run: SaveDetail of a save not read yet returns at once with skeletons
 // and reads that one save on its own session in a goroutine (readSelected), then sends
-// "saves-read" with its ref. The page holds the facts of the selected save and of its
-// colony's previous read save only (savesState.facts); listings carry summaries.
+// "saves-read" with its ref. The page holds the facts of the selected save only
+// (savesState.facts); listings carry summaries.
 
 // savesState is the page's reader and its last listing. Lock order: read.mu, then mu.
 type savesState struct {
@@ -36,21 +37,32 @@ type savesState struct {
 	mu   sync.Mutex
 	list *app.SaveList // the last listing: the saves that checks and actions name by ref
 	seq  uint64        // the newest listing asked for
+	// visit counts the times the page was left: a listing asked for before the player left
+	// neither stores itself nor starts the full read when it finishes after.
+	visit uint64
+	asked atomic.Uint64 // SaveDetail and SaveContent calls, numbered as they come (the selection's order)
 
 	// The full read.
-	stop    context.CancelFunc         // the background run's stop; nil when none runs
-	closed  bool                       // the window is closing: nothing new starts or is sent
-	jobs    sync.WaitGroup             // the run, the selected save's read and a pending event
-	facts   map[string]*savefile.Facts // by factsKey: the selected save's and its previous one's
-	failed  map[string]string          // by factsKey: why the selected save could not be read
-	reading string                     // factsKey of the save readSelected reads now ("" none)
-	next    *app.Save                  // the newest selection waiting for readSelected
-	fresh   []string                   // refs read since the last "saves-read" event
-	line    string                     // the run's newest progress, for the status line
-	dirty   bool                       // saves were read since the page was last relisted
-	timer   *time.Timer                // the next "saves-read" event, when one is due
-	sent    time.Time                  // when the last event went
-	listed  time.Time                  // when the page was last listed
+	stop      context.CancelFunc         // the background run's stop; nil when none runs
+	closed    bool                       // the window is closing: nothing new starts or is sent
+	jobs      sync.WaitGroup             // the run, the selected save's read and a pending event
+	facts     map[string]*savefile.Facts // by factsKey: the selected save's and its previous one's
+	failed    map[string]string          // by factsKey: why the selected save could not be read
+	reading   string                     // factsKey of the save readSelected reads now ("" none)
+	readingAt uint64                     // the SaveDetail call that asked for it (asked)
+	next      *app.Save                  // the newest selection waiting for readSelected
+	nextAt    uint64                     // the SaveDetail call that asked for next
+	fresh     []string                   // refs read since the last "saves-read" event
+	line      string                     // the run's newest progress, for the status line
+	dirty     bool                       // saves were read since the page was last relisted
+	timer     *time.Timer                // the next "saves-read" event, when one is due
+	sent      time.Time                  // when the last event went
+	listed    time.Time                  // when the page was last listed
+	// Events are numbered when their news is taken (flushes) and sent in that order: an
+	// event taken before one already sent drops its progress line, so a late flush never
+	// puts "reading the saves n/m" back after the run's end (sendMu: one send at a time).
+	flushes, lastSent uint64
+	sendMu            sync.Mutex
 	// runner replaces the background run's child process (tests); set before use.
 	runner func(ctx context.Context, first []string, progress func(string)) error
 }
@@ -114,27 +126,29 @@ func (s *API) SavesRead(request uint64, first string) bool {
 	if request > s.saves.seq {
 		s.saves.seq = request
 	}
+	visit := s.saves.visit
 	s.saves.mu.Unlock()
 	go func() {
-		ev, l := s.listSaves(request)
+		ev, l := s.listSaves(request, visit)
 		s.send("saves", ev)
 		if l != nil {
-			s.startSavesIndex(l, first)
+			s.startSavesIndex(l, first, visit)
 		}
 	}()
 	return true
 }
 
 // listSaves reads the listing on the page's reader. A request older than the newest one
-// asked for is not read at all.
-func (s *API) listSaves(request uint64) (*SavesEvent, *app.SaveList) {
+// asked for is not read at all, and is not kept when a newer one came or the player left
+// the page since it was asked for (visit: the page's visit then, savesState.visit).
+func (s *API) listSaves(request, visit uint64) (*SavesEvent, *app.SaveList) {
 	ev := &SavesEvent{Request: request}
 	w := &s.saves.read
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	defer s.retainReader(w)
 	s.saves.mu.Lock()
-	stale := request < s.saves.seq
+	stale := request < s.saves.seq || visit != s.saves.visit
 	s.saves.mu.Unlock()
 	if stale {
 		ev.Error = "stale"
@@ -151,9 +165,16 @@ func (s *API) listSaves(request uint64) (*SavesEvent, *app.SaveList) {
 		return ev, nil
 	}
 	s.saves.mu.Lock()
-	s.saves.list = l
-	s.saves.listed = time.Now()
+	stale = request < s.saves.seq || visit != s.saves.visit
+	if !stale {
+		s.saves.list = l
+		s.saves.listed = time.Now()
+	}
 	s.saves.mu.Unlock()
+	if stale {
+		ev.Error = "stale"
+		return ev, nil
+	}
 	ev.Page = view.SavesRows(l)
 	return ev, l
 }
@@ -173,8 +194,46 @@ func (s *API) findSave(ref string) (*app.Save, error) {
 	return sv, err
 }
 
+// SaveContent returns the selected save's cached references by Mod and category (12 §2).
+func (s *API) SaveContent(ref string) (*view.SaveContent, error) {
+	asked := s.saves.asked.Add(1) // as SaveDetail: a stale save's read keeps the selection's order
+	sv, err := s.findSave(ref)
+	if err != nil {
+		return nil, err
+	}
+	w := &s.saves.read
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	defer s.retainReader(w)
+	r, err := s.savesSession()
+	if err != nil {
+		return nil, err
+	}
+	cp := *sv // SaveFacts sets the summary: the listing is shared with other calls
+	c, err := r.SaveContent(&cp)
+	if err != nil {
+		return nil, err
+	}
+	v := view.SaveContentOf(c)
+	if c.Stale {
+		// cached by an older parser: read it again on the page's own session, as an unread
+		// selected save is; its saves-read event asks for the content again. A read that
+		// failed is not retried while the page is open.
+		s.saves.mu.Lock()
+		why := s.saves.failed[factsKey(sv)]
+		s.saves.mu.Unlock()
+		if why != "" {
+			v.Stale, v.Note = false, view.Tf("the save could not be read: %s", why)
+		} else {
+			s.readSelected(sv, asked)
+		}
+	}
+	return v, nil
+}
+
 // SaveDetail is the selected save against its list (12 §4.3): the middle and right cards.
 func (s *API) SaveDetail(ref string) (*view.SaveDetail, error) {
+	asked := s.saves.asked.Add(1) // before the reader's lock: calls may take it out of order
 	sv, err := s.findSave(ref)
 	if err != nil {
 		return nil, err
@@ -206,7 +265,7 @@ func (s *API) SaveDetail(ref string) (*view.SaveDetail, error) {
 	g, _ := r.RunningGame()
 	current := target.Plan != nil && target.Env != nil && r.Store.CurrentPlanID(target.Env.ID) == target.Plan.ID
 	d := view.SaveDetailAgainst(c, g != nil, current, sv, own)
-	s.savePlay(r, sv, d)
+	s.savePlay(r, sv, d, asked)
 	return d, nil
 }
 
@@ -256,7 +315,10 @@ func (s *API) SaveFix(ref string, mods []string, disableAdded, order bool) (*Sav
 	if err != nil {
 		return nil, err
 	}
-	// the list the page checked the save against: the applied one (SaveDetail)
+	// the list the page checked the save against: the applied one (SaveDetail), found on
+	// the window's session under its lock, so it is still the applied one when fixed
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if sv, err = appliedTarget(s.a, sv); err != nil {
 		return nil, err
 	}
@@ -266,8 +328,6 @@ func (s *API) SaveFix(ref string, mods []string, disableAdded, order bool) (*Sav
 		}
 		return nil, errors.New(view.T("this save matches no list; make a list from it instead"))
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	s.board, s.needs = nil, nil
 	if _, err := view.OpenPlan(s.a, sv.Plan.ID); err != nil {
 		return nil, err
@@ -389,13 +449,13 @@ func (s *API) savesOf(refs []string) ([]*app.Save, error) {
 
 // SaveBackup copies saves to <data>/backups/saves/<time>/ (12 §4.4). Without yes it only
 // lists the files and their sizes for the page's confirmation (16 §6).
-func (s *API) SaveBackup(refs []string, yes bool) (*SaveFilesReply, error) {
+func (s *API) SaveBackup(refs []string, yes bool, token string) (*SaveFilesReply, error) {
 	saves, err := s.savesOf(refs)
 	if err != nil {
 		return nil, err
 	}
 	s.mu.Lock()
-	r, err := s.a.BackupSaves(saves, yes)
+	r, err := s.a.BackupSaves(saves, yes, token)
 	s.mu.Unlock()
 	if err != nil {
 		return nil, saveErr(err)
@@ -408,13 +468,13 @@ func (s *API) SaveBackup(refs []string, yes bool) (*SaveFilesReply, error) {
 
 // SaveTrash moves saves to the recycle bin (02 §3, 12 §4.4), refused while a game runs.
 // Without yes it only lists the files and their sizes.
-func (s *API) SaveTrash(refs []string, yes bool) (*SaveFilesReply, error) {
+func (s *API) SaveTrash(refs []string, yes bool, token string) (*SaveFilesReply, error) {
 	saves, err := s.savesOf(refs)
 	if err != nil {
 		return nil, err
 	}
 	s.mu.Lock()
-	r, err := s.a.TrashSaves(saves, yes)
+	r, err := s.a.TrashSaves(saves, yes, token)
 	s.mu.Unlock()
 	if err != nil {
 		return nil, saveErr(err)
@@ -480,9 +540,11 @@ func saveErr(err error) error {
 
 // leaveSaves forgets the listing and the facts when the player leaves the page (17 §7.3);
 // the reader and its head cache stay until it is idle (readerIdle). A background read
-// goes on (it is a task, 16 §2.16); a selected save waiting to be read is dropped.
+// goes on (it is a task, 16 §2.16); a selected save waiting to be read is dropped, and a
+// listing still being read when the player leaves is not kept (visit).
 func (s *API) leaveSaves() {
 	s.saves.mu.Lock()
 	s.saves.list, s.saves.facts, s.saves.failed, s.saves.next = nil, nil, nil, nil
+	s.saves.visit++
 	s.saves.mu.Unlock()
 }

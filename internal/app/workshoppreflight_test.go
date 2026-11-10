@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
@@ -29,7 +30,7 @@ func TestSubscribeWorkshopPreflightBothRoutesAndCredit(t *testing.T) {
 			})}
 			var sent []string
 			if steamcmd {
-				e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, "steamcmd.exe"), true }
+				e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, deps.SteamCMDExecutable()), true }
 				e.App.SteamCMDRun = func(exe string, args []string) (string, error) {
 					sent = workshopScriptIDs(t, exe, args)
 					e.WriteMod(filepath.Join(args[1], "steamapps", "workshop", "content", "294100", "8102"), testkit.Sample("preflight.mod", "Actual Mod"))

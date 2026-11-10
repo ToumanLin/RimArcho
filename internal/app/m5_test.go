@@ -81,7 +81,7 @@ func TestCopyLocal(t *testing.T) {
 	if out := e.MustRun("copy-local", orig); !strings.Contains(out, "123456_local2") {
 		t.Fatalf("an existing folder must not be overwritten:\n%s", out)
 	}
-	if _, code := e.Run("copy-local", orig, "--name", `..\up`); code != 1 {
+	if _, code := e.Run("copy-local", orig, "--name", ".."+string(filepath.Separator)+"up"); code != 1 {
 		t.Fatal("--name must be a plain folder name")
 	}
 }
@@ -158,7 +158,8 @@ func TestImportRimCrow(t *testing.T) {
 			t.Fatalf("dry run lacks %q:\n%s", want, dry)
 		}
 	}
-	if out := e.MustRun("tag", "list"); !strings.Contains(out, "tags: 0") {
+	// only the default RimWorld tag on Core (16 §3.8): the dry run wrote none
+	if out := e.MustRun("tag", "list"); !strings.Contains(out, "tags: 1") || !strings.Contains(out, "RimWorld  1 mod") {
 		t.Fatalf("dry run wrote tags:\n%s", out)
 	}
 	// Alpha's package has two lineages; the path picks the workshop one.

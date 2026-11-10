@@ -85,6 +85,10 @@ type Frame struct {
 	Patched bool // a Harmony replacement (wrapper dynamic-method …_PatchN)
 	Caller  bool // a frame of the stack that logged the message, not of an exception (Waylith, Unity's full stack traces)
 	Harmony []Patch
+	// IL is the IL offset Mono prints as "[0x00076]" (HasIL); the null trace decodes the
+	// instruction there (06 §2).
+	IL    int  `json:",omitempty"`
+	HasIL bool `json:",omitempty"`
 }
 
 // Patch is a Harmony line under a frame: "- PREFIX owner: Ret Type:Method(args)".
@@ -111,6 +115,9 @@ type Entry struct {
 type File struct {
 	HasPhases bool     `json:",omitempty"`
 	Phases    []*Phase `json:",omitempty"`
+	// GameMarks: the game's own new-game and save-load lines (GameMark), kept apart from
+	// the Monitor's phases; only test runs read them (20 §2).
+	GameMarks []*Phase `json:",omitempty"`
 	Entries   []*Entry
 	Lines     int
 	Version   string // "1.6.4871 rev…" from the header, if found
@@ -317,8 +324,11 @@ func (p *Parser) Line(l string) {
 			return
 		}
 		// INFO phase markers must be seen before the usual level filtering.
-		if m := waylithLineRe.FindStringSubmatch(l); m != nil && p.marker(m[2], l, n) {
-			return
+		if m := waylithLineRe.FindStringSubmatch(l); m != nil {
+			if p.marker(m[2], l, n) {
+				return
+			}
+			p.gameMark(m[2], n)
 		}
 		next := waylithLine(f, p.cur, n, l)
 		if next != p.cur {
@@ -336,6 +346,7 @@ func (p *Parser) Line(l string) {
 	if p.marker(l, "", n) {
 		return
 	}
+	p.gameMark(l, n)
 	if f.Version == "" && head {
 		if m := versionRe.FindStringSubmatch(l); m != nil {
 			f.Version = m[1]
@@ -410,10 +421,22 @@ func (p *Parser) waylithXMLBlock(l string) bool {
 	return false
 }
 
+// gameMark records the game's own boundary line (GameMark) without consuming it.
+func (p *Parser) gameMark(msg string, n int) {
+	if mark := GameMark(msg); mark != nil {
+		mark.Index, mark.Line = len(p.F.GameMarks)+1, n
+		p.F.GameMarks = append(p.F.GameMarks, mark)
+	}
+}
+
 func (p *Parser) marker(msg, line string, n int) bool {
 	name, ok := strings.CutPrefix(msg, "[Archo Monitor] phase ")
 	if !ok || !ValidPhase(name) {
 		return false
+	}
+	if p.xname != "" {
+		// A marker inside an XML Extensions block ends it; a later "Source file:" must not find it open.
+		p.closeBlock()
 	}
 	p.finish()
 	p.cur, p.afterSubnode = nil, false
@@ -517,6 +540,7 @@ func addLine(e *Entry, l string) {
 	if m := frameRe.FindStringSubmatch(l); m != nil {
 		fr := Frame{Text: strings.TrimSpace(l)}
 		fr.Type, fr.Method = splitMember(m[1])
+		fr.IL, fr.HasIL = ilOffset(fr.Text)
 		e.Frames = append(e.Frames, fr)
 		return
 	}
@@ -550,6 +574,9 @@ func splitMember(s string) (typ, method string) {
 		return "", s
 	}
 	typ, method = s[:i], s[i+1:]
+	if strings.HasSuffix(typ, ".") { // "Ns.Type..ctor": the type and ".ctor" (also .cctor)
+		typ, method = typ[:len(typ)-1], "."+method
+	}
 	if j := strings.Index(typ, "+<"); j >= 0 { // compiler-generated closure or iterator
 		if a, b := strings.IndexByte(method, '<'), strings.IndexByte(method, '>'); a == 0 && b > 1 {
 			method = method[1:b]

@@ -9,6 +9,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
+	"github.com/ToumanLin/RimArcho/internal/textures"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -21,7 +22,7 @@ func TestUninstallNamesOwnedToolsAndLeavesConfiguredTools(t *testing.T) {
 			for _, key := range []string{"ProgramW6432", "ProgramFiles", "LOCALAPPDATA"} {
 				t.Setenv(key, "")
 			}
-			paths := map[string]string{deps.Todds: filepath.Join(e.App.LocalDir(), deps.Todds, "todds.exe")}
+			paths := map[string]string{deps.Todds: filepath.Join(e.App.LocalDir(), deps.Todds, textures.ToddsExecutable)}
 			for name, path := range paths {
 				if configured {
 					path = filepath.Join(e.Root, "external", name, filepath.Base(path))

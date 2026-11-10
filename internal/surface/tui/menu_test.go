@@ -54,7 +54,7 @@ func TestRowMenu(t *testing.T) {
 	m.View()
 	l := m.layout()
 	x := l.slots[0].x + 5
-	m.update(tea.MouseMsg{X: x, Y: 4, Button: tea.MouseButtonRight, Action: tea.MouseActionPress})
+	m.update(tea.MouseMsg{X: x, Y: 5, Button: tea.MouseButtonRight, Action: tea.MouseActionPress})
 	if m.menu == nil || m.menu.items[0].code != view.OpEnable {
 		t.Fatalf("right click: %+v", m.menu)
 	}

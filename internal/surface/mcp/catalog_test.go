@@ -44,9 +44,12 @@ func TestCatalogAndArgvFor(t *testing.T) {
 		{"read_source", `{"search":"AllComps.Remove(","in":["#a1"]}`, []string{"source", "search", "AllComps.Remove(", "--in", "#a1", "--budget", "10"}},
 		{"read_source", `{"game":true,"type":"Verse.Pawn"}`, []string{"source", "game", "--type", "Verse.Pawn"}},
 		{"read_source", `{"game":true,"search":"Tick","in":["#a1"]}`, []string{"source", "search", "Tick", "--in", "#a1", "--game", "--budget", "10"}},
+		{"read_source", `{"mode":"callers","type":"Verse.PlayLogEntry_Interaction..ctor","in":["#a1"]}`, []string{"source", "callers", "Verse.PlayLogEntry_Interaction..ctor", "--in", "#a1"}},
+		{"read_source", `{"mode":"diff","dlls":["a.dll","b.dll"]}`, []string{"source", "diff", "a.dll", "b.dll"}},
 		{"status", ``, []string{"status"}},
 		{"test_run", ``, []string{"test", "run", "--json"}},
 		{"test_run", `{"plan":"small","map":true,"timeout_seconds":30}`, []string{"test", "run", "small", "--map", "--timeout", "30s", "--json"}},
+		{"test_run", `{"save":"sv:abc123","ticks":600,"timeout_seconds":900}`, []string{"test", "run", "--save", "sv:abc123", "--ticks", "600", "--timeout", "900s", "--json"}},
 		{"test_run", `{"probe":"D:\\work\\probe","probe_after":"brrainz.harmony"}`, []string{"test", "run", "--probe", `D:\work\probe`, "--probe-after", "brrainz.harmony", "--json"}},
 	}
 	for _, c := range cases {

@@ -3,6 +3,7 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -21,11 +22,12 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/buildinfo"
 	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/env"
+	"github.com/ToumanLin/RimArcho/internal/machine"
 	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 	"github.com/ToumanLin/RimArcho/internal/steamworks"
-	"github.com/ToumanLin/RimArcho/internal/surface/gui"
 	"github.com/ToumanLin/RimArcho/internal/surface/mcp"
 	"github.com/ToumanLin/RimArcho/internal/surface/tui"
+	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
 // Run executes argv (without the program name) and returns the exit code.
@@ -83,7 +85,14 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	}
 	// A database upgrade runs inside app.Open; show it (04 §4): RimArcho.exe has no console,
 	// so it gets a small window; the TUI's line follows ui.lang.
-	home := env.AppHome()
+	home, err := env.AppHome()
+	if err != nil {
+		fmt.Fprintln(stderr, "error:", err)
+		if buildinfo.GUI == "1" {
+			showOpenError("RimArcho", err.Error())
+		}
+		return cmds.ExitError
+	}
 	netcfg.Install() // proxy and GitHub mirror for every request of this process (17 §2.2)
 	tuiMode := buildinfo.GUI != "1" && (len(rest) == 0 || len(rest) == 1 && rest[0] == "tui")
 	up := &upgradeReport{window: buildinfo.GUI == "1", lang: buildinfo.GUI == "1" || tuiMode, dbPath: filepath.Join(home, "archo.db"), stderr: stderr}
@@ -105,11 +114,14 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 		// RimArcho.exe (a double click) or `archo gui` (16 §8.1).
 		if err := runGUI(ap, len(rest) == 1); err != nil {
 			fmt.Fprintln(stderr, "error:", err)
+			if buildinfo.GUI == "1" { // no console: say it in a message box (16 §8.1)
+				showOpenError("RimArcho", windowFailureText(err))
+			}
 			return cmds.ExitError
 		}
 		return cmds.ExitOK
 	}
-	if program, err := ap.SelfProgramDir(); err == nil {
+	if program, err := ap.SelfProgramDir(); err == nil && app.SelfUpdateSupported() {
 		if _, ok := selfupdate.InWorkshopFolder(program); ok {
 			fmt.Fprintln(stderr, "warning: Steam can replace this Workshop folder; open RimArcho.exe to move RimArcho")
 		}
@@ -117,6 +129,9 @@ func Run(argv []string, stdout, stderr io.Writer) int {
 	if len(rest) == 0 || (len(rest) == 1 && rest[0] == "tui") {
 		// No command, or `archo tui`: run the TUI in the current terminal.
 		// Scans run as a child process of this executable.
+		if !terminalDrawsTUI() {
+			return noTUI(ap, stderr)
+		}
 		err := tui.Run(tui.Options{App: ap, ScanOnStart: true})
 		var restart *tui.Restart
 		if errors.As(err, &restart) {
@@ -174,26 +189,58 @@ func restartTUI(exe string, argv []string, stderr io.Writer) int {
 	return cmds.ExitOK
 }
 
-// runGUI opens the GUI. `archo gui` hands over to RimArcho.exe next to it when there is
-// one (no console stays open), else it runs the GUI in this process.
-func runGUI(ap *app.App, fromConsole bool) error {
-	if fromConsole && runtime.GOOS == "windows" {
-		if exe, err := os.Executable(); err == nil {
-			sib := filepath.Join(filepath.Dir(exe), "RimArcho.exe")
-			if !strings.EqualFold(sib, exe) {
-				if _, err := os.Stat(sib); err == nil {
-					var args []string
-					if ap.EnvName != "" {
-						args = []string{"--env", ap.EnvName}
-					}
-					c := exec.Command(sib, args...)
-					c.Env = append(os.Environ(), "RIMARCHO_HOME="+ap.Home)
-					return c.Start()
-				}
-			}
-		}
+// Tests replace these.
+var (
+	webView2Installed = accounts.WebView2Installed
+	underWine         = machine.Wine
+	terminalDrawsTUI  = machine.TerminalDrawsTUI
+	ownConsole        = machine.OwnConsole
+)
+
+// windowUnavailable is why the window cannot open on this machine; its text is complete.
+type windowUnavailable struct{ text string }
+
+func (e *windowUnavailable) Error() string { return e.text }
+
+// guiPreflight checks what the window needs before Wails starts (16 §8.1). Without a
+// WebView2 runtime Wails creates no window and only logs, so the process would run unseen.
+// Under Wine an installed WebView2 is given its chance.
+func guiPreflight() error {
+	if runtime.GOOS != "windows" || webView2Installed() {
+		return nil
 	}
-	return gui.Run(gui.Options{App: ap})
+	if underWine() {
+		return &windowUnavailable{view.T("RimArcho's window needs Microsoft Edge WebView2, which does not run under Wine or Proton.\n\nUse archo.exe from a Linux terminal instead (wine archo.exe): the same manager as a text interface.")}
+	}
+	return &windowUnavailable{view.T("RimArcho's window needs the Microsoft Edge WebView2 Runtime, which is not installed.\n\nInstall it from https://developer.microsoft.com/microsoft-edge/webview2/ and start RimArcho again. archo.exe, the text interface, works without it.")}
+}
+
+// windowFailureText is the message box text for a window that did not open.
+func windowFailureText(err error) string {
+	var u *windowUnavailable
+	if errors.As(err, &u) {
+		return u.text
+	}
+	return view.Tf("RimArcho could not open its window:\n%s", err.Error())
+}
+
+// noTUI explains, in plain lines, a console that would show the TUI's escape sequences as
+// text (Wine's console window, 16 §9.2). A double click owns its console, which closes
+// when archo exits, so it waits for Enter.
+func noTUI(ap *app.App, stderr io.Writer) int {
+	view.SetLang(cmds.Setting(ap, "ui.lang"))
+	fmt.Fprintln(stderr, view.T("This console cannot draw RimArcho's text interface."))
+	if underWine() {
+		fmt.Fprintln(stderr, view.T("Under Wine or Proton, run archo.exe from a Linux terminal: wine archo.exe"))
+	} else {
+		fmt.Fprintln(stderr, view.T("For the window, open RimArcho.exe."))
+	}
+	fmt.Fprintln(stderr, view.T("Commands still work here: archo help"))
+	if ownConsole() {
+		fmt.Fprintln(stderr, view.T("Press Enter to close."))
+		bufio.NewReader(os.Stdin).ReadString('\n')
+	}
+	return cmds.ExitError
 }
 
 // globalFlags removes --env <name> / --env=<name> and --here from argv.

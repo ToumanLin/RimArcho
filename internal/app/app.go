@@ -87,6 +87,9 @@ type App struct {
 	FreeSpace func(dir string) int64
 	// Decompile replaces ilspycmd (tests); nil means ILSpyDecompiler.
 	Decompile Decompiler
+	// Dotnet replaces the dotnet SDK lookup of a Mod's build information (tests); nil means
+	// csproj.Dotnet.
+	Dotnet func() string
 	// GameVersion ("X.Y") overrides the environment's game version for analysis commands.
 	GameVersion string
 	// AnalyzeWait bounds how long a command waits for an out-of-date analysis (14 §1:
@@ -110,7 +113,7 @@ type App struct {
 	// TrashFunc moves a folder to the recycle bin; nil means source.Trash (tests replace it).
 	TrashFunc func(path string) error
 	// SameVolume says whether a folder can be renamed from one path to another (MoveDirectory);
-	// nil compares the volume names (tests replace it to copy on one drive).
+	// nil uses source.SameVolume (tests replace it to copy on one volume).
 	SameVolume func(from, to string) bool
 	// trashAllow replaces the recycle bin's allow-list check (02 §3) in tests of a bare App
 	// with no store; nil means trashAllowed.

@@ -8,12 +8,12 @@ package mcp
 // Instructions is sent to the client at initialisation.
 const Instructions = `RimArcho knows one RimWorld installation: every mod instance, the plans (named mod lists; one is current), Defs, simulated Patches, Harmony patches, Player.log error clusters and decompiled C#. Tools return outline text; its references (#id, L#id, pkg:, ws:, def:Type/name, p:<hex>, log:E<n>, r:<n>, pattern:<id>) pass straight to other tools. Results are capped at 24 KB: narrow with mod=, target=, a cluster or a pattern instead of all=true.
 Start with status. For a game error or crash, read guide topic=diagnose before concluding: it says how to classify the error, which tool gives which evidence and how to report. In short: analyze_log (text= for a pasted log), then analyze_log cluster=E<n>; a patcher or a mentioned mod is not the cause without further evidence, and with no source the cause is undecided.
-Editing tools act on the current plan and never touch the game until save_loadout or launch_game. Never edit Workshop files in place: pin_mod first, edit the copy, then test_run (it tests the copy without saving).
+Editing tools act on the current plan and never touch the game until save_loadout or launch_game. Never edit Workshop files in place: pin_mod first, edit the copy, then test_run it. Rebuild code with dotnet build only, never csc (guide topic=rebuild).
 Tools marked destructive (save_loadout, launch_game, manage_plans, manage_packs, resolve_identity, manage_hidden, manage_library, manage_subscriptions, manage_textures, manage_saves, repair_links, maintenance) write game or mod files, start the game or are hard to undo: show the dry run where there is one and ask the player before the real call.
 The player's management tools (packs, subscriptions, library actions, textures, memory estimate, maintenance, identity, hidden mods, links, player data, save actions, uninstall preview) are served only by archo mcp --tools all; otherwise use the archo CLI (guide topic=<tool name> gives the command).
 guide topic=<tool name> gives a tool's full reference (every action, parameter details, an example call and output); guide alone lists the other topics: errors (kinds the workflow does not cover), plans, words (what the interface calls things, for talking to the player).`
 
-const descGuide = `Read-only help: a tool's full reference (topic=<tool name>: every action, parameter details, an example call and output) or a workflow (diagnose, errors, plans, words). No topic lists them.`
+const descGuide = `Read-only help: a tool's full reference (topic=<tool name>: every action, parameter details, an example call and output) or a workflow (diagnose, errors, plans, rebuild, words). No topic lists them.`
 
 const descStatus = `Overview of the current environment: game version, mods per source, the current plan and how it differs from the game's list, whether a game runs, problem counts, pending updates. Call first in a session. show=envs|folders|settings|data|db|cache gives one read-only page of RimArcho's setup instead.`
 
@@ -43,7 +43,7 @@ const descLog = `For any game error or crash, call this first, before reading Pl
 
 const descFiles = `Text search in the files of the enabled mods as the game loads them (Defs/Patches/About by default, load order, shadowing). def=true finds a whole defName with its roles: defines, inherits, patches, references. For XML evidence; C# is read_source. Paged: follow next:.`
 
-const descSource = `C# in the Source library, decompiled on demand. ref with type reads one type; game=true selects game code or adds it to search. search=<text> searches log suspects or in=[refs]; shared code appears once with its copies. scope="active" (all enabled mods, many minutes) only when the user asks.`
+const descSource = `C# decompiled on demand. ref+type: one type (member=: one member); game=true: the game's code. search=<text> covers in=[refs] or the log's suspects and says what it skipped; scope="active": every enabled mod, repeat while pending. mode=callers: who calls a method, passing what; mode=diff: two DLL builds.`
 
 const descEdit = `Change the current plan: enable, disable, move, swap (another copy), sort, undo, redo, checkout (a version), stage / unstage / restore, ignore_external. Stored at once and undoable; no game file is written until save_loadout or launch_game.`
 
@@ -51,7 +51,7 @@ const descSave = `Save the current plan to the game (ModsConfig.xml and RimArcho
 
 const descLaunch = `Save the current plan like save_loadout, then start the game. Refused while any game runs. Starts a program and changes the game's list: call with dry_run=true first, show the player and ask.`
 
-const descTestRun = `Start the game with a plan in isolated test data, wait for the main menu (map=true: a test map; probe: a probe mod's RESULT), capture errors, stop it, report JSON. Compares with the player's log (before, fixed) and the previous run (delta, gone). Takes minutes. Pinned copies are linked into Mods/ for the run only.`
+const descTestRun = `Run a plan in isolated data to the menu (or map, save, probe), stop, give errors vs the player's log and last run; not_tested: proved nothing. Links pinned copies. 37-Mod VM: menu 1-2 min, map 6-7; ticks +N/60 s.`
 
 const descPlans = `The environment's plans (named mod lists): list, new, use (switch; writes no game file), rename, remove, import, versions, follow / unfollow / sync a Workshop collection. remove deletes a plan with its whole history: ask the player first, naming the plan.`
 
@@ -61,9 +61,9 @@ const descPin = `Lock a version of a mod: copy it into RimArcho's lock library a
 
 const descUnpin = `Unlock a locked version: the current plan uses the upstream (usually Workshop) copy again; the locked copy stays. dry_run=true previews.`
 
-const descPlayer = `The player's own data on mods, in RimArcho's database: tags, alias and note (shared by every copy of a mod), copy_note (one copy's own note). tag_rename/merge/delete/note change a tag on every mod (dry_run first; ask before merge or delete). Nothing reaches the game.`
+const descPlayer = `The player's own data on mods, in RimArcho's database: tags, alias and note (shared by a mod's copies), copy_note (one copy's own). tag_rename/merge/delete/note/color change a tag on every mod (dry_run first; ask before merge or delete). Nothing reaches the game.`
 
-const descRules = `User load-order rules: add (after, before, incompatible, attach, top, bottom, or ignore a wrong About.xml / community constraint — how an order.cycle is broken), list, remove. Rules guide sort and the order problems; they do not reorder by themselves.`
+const descRules = `User load-order rules: add (after, before, incompatible, attach, top, bottom, replaces — A, a continuation, meets dependencies on B — or ignore a wrong About.xml / community constraint, how an order.cycle is broken), list, remove. Rules guide sort and the order problems; they do not reorder by themselves.`
 
 const descIgnore = `Ignore a problem (p:<hex>) until its mod's files change; undo=true stops ignoring it. Only after the player decided the problem is fine: ask first.`
 
@@ -99,6 +99,6 @@ const descMemory = `Estimate resident RAM, loading RAM and VRAM for a plan. Comm
 
 const descListSaves = `Saves of every game and pack, grouped by colony, newest first: each with its sv: reference, in-game day, the list it matches and whether it loads with that list. mod=<ref> finds the saves that use a Mod; attention=true keeps those with warnings or errors. Read-only.`
 
-const descGetSave = `One save (sv:<hex>, file name or <colony>/<save>): where it belongs, can it load (each issue with its consequence and the command that fixes it), how its Mods differ from the list, the playthrough (day, colonists, wealth, events; play=true in full). For a save that will not load. Read-only.`
+const descGetSave = `One save (sv:ref, name or colony/save): load issues with fixes, Mod differences and playthrough (play=true for all colonists/events). content=true shows referenced content by Mod/category, using installed versions, with coverage limits. Read-only.`
 
-const descManageSaves = `Save actions: fix (the save's Mod fixes as one undoable edit of its list, subscribing missing Workshop Mods; launch=true then starts it), rename, copy, backup, trash (recycle bin). dry_run=true previews fix; backup and trash only preview unless confirm=true: ask the player first.`
+const descManageSaves = `Save actions: fix (its Mod fixes as one undoable list edit, subscribing Workshop Mods; launch=true then starts it), rename, copy, backup, trash (recycle bin). dry_run=true previews fix; backup and trash only preview unless confirm=true with the preview's token: ask the player first.`

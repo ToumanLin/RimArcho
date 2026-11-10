@@ -178,34 +178,51 @@ func direct(t *testing.T, e *testkit.Env, w, h int) *model {
 	return m
 }
 
+// finishPage delivers a page read without running unrelated ticks or analysis commands.
+func finishPage(m *model, cmd tea.Cmd) {
+	if cmd != nil {
+		if msg, ok := cmd().(bgMsg); ok {
+			msg.apply(m)
+		}
+	}
+}
+
+func updatePage(m *model, msg tea.Msg) {
+	seq := m.prob.seq
+	_, cmd := m.update(msg)
+	if m.tab == tabLibrary && m.libr.loading || m.tab == tabHome && m.home.loading || m.prob.seq != seq || m.panel != nil && m.panel.title == T("texture optimisation") {
+		finishPage(m, cmd)
+	}
+}
+
 func press(m *model, k string) {
 	switch k {
 	case "space":
-		m.update(tea.KeyMsg{Type: tea.KeySpace, Runes: []rune(" ")})
+		updatePage(m, tea.KeyMsg{Type: tea.KeySpace, Runes: []rune(" ")})
 	case "down":
-		m.update(tea.KeyMsg{Type: tea.KeyDown})
+		updatePage(m, tea.KeyMsg{Type: tea.KeyDown})
 	case "up":
-		m.update(tea.KeyMsg{Type: tea.KeyUp})
+		updatePage(m, tea.KeyMsg{Type: tea.KeyUp})
 	case "enter":
-		m.update(tea.KeyMsg{Type: tea.KeyEnter})
+		updatePage(m, tea.KeyMsg{Type: tea.KeyEnter})
 	case "esc":
-		m.update(tea.KeyMsg{Type: tea.KeyEsc})
+		updatePage(m, tea.KeyMsg{Type: tea.KeyEsc})
 	case "left":
-		m.update(tea.KeyMsg{Type: tea.KeyLeft})
+		updatePage(m, tea.KeyMsg{Type: tea.KeyLeft})
 	case "right":
-		m.update(tea.KeyMsg{Type: tea.KeyRight})
+		updatePage(m, tea.KeyMsg{Type: tea.KeyRight})
 	case "shift+up":
-		m.update(tea.KeyMsg{Type: tea.KeyShiftUp})
+		updatePage(m, tea.KeyMsg{Type: tea.KeyShiftUp})
 	case "shift+down":
-		m.update(tea.KeyMsg{Type: tea.KeyShiftDown})
+		updatePage(m, tea.KeyMsg{Type: tea.KeyShiftDown})
 	case "ctrl+up":
-		m.update(tea.KeyMsg{Type: tea.KeyCtrlUp})
+		updatePage(m, tea.KeyMsg{Type: tea.KeyCtrlUp})
 	case "ctrl+down":
-		m.update(tea.KeyMsg{Type: tea.KeyCtrlDown})
+		updatePage(m, tea.KeyMsg{Type: tea.KeyCtrlDown})
 	case "ctrl+space":
-		m.update(tea.KeyMsg{Type: tea.KeyCtrlAt})
+		updatePage(m, tea.KeyMsg{Type: tea.KeyCtrlAt})
 	default:
-		m.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)})
+		updatePage(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)})
 	}
 }
 
@@ -453,26 +470,26 @@ func TestMouseClicks(t *testing.T) {
 		m.update(tea.MouseMsg{X: x, Y: y, Button: tea.MouseButtonLeft, Action: tea.MouseActionPress, Shift: shift, Ctrl: ctrl})
 		m.View()
 	}
-	// Disabled rows start at y=4 (the filter bar is above the lists): Beta, N1 … N5, the CJK-named mod
-	click(xOf(cInactive), 4, false, false)
+	// Disabled rows start at y=5 (the filter bar is above the lists): Beta, N1 … N5, the CJK-named mod
+	click(xOf(cInactive), 5, false, false)
 	if m.focus != cInactive || m.current().name != "Beta" || len(m.marked) != 0 {
 		t.Fatalf("click: focus %d on %+v, selected %d", m.focus, m.current(), len(m.marked))
 	}
-	click(xOf(cInactive), 6, false, true) // ctrl: N2
-	click(xOf(cInactive), 8, false, true) // ctrl: N4
+	click(xOf(cInactive), 7, false, true) // ctrl: N2
+	click(xOf(cInactive), 9, false, true) // ctrl: N4
 	if len(m.marked) != 2 {
 		t.Fatalf("ctrl+click: %d selected", len(m.marked))
 	}
-	click(xOf(cInactive), 9, true, false) // shift: N4 … N5 added to the range from N4
+	click(xOf(cInactive), 10, true, false) // shift: N4 … N5 added to the range from N4
 	if names := pickedNames(m); names != "N2 N4 N5" {
 		t.Fatalf("shift+click: %q", names)
 	}
-	click(xOf(cInactive), 4, false, false) // a plain click in the same list keeps the selection
+	click(xOf(cInactive), 5, false, false) // a plain click in the same list keeps the selection
 	if names := pickedNames(m); names != "N2 N4 N5" || m.current().name != "Beta" {
 		t.Fatalf("plain click: %q on %s", names, m.current().name)
 	}
 	// A click in another list moves the focus there and drops the selection (16 §3.4).
-	click(xOf(cActive), 5, false, false)
+	click(xOf(cActive), 6, false, false)
 	if len(m.marked) != 0 || m.focus != cActive || m.current().name != "Alpha" {
 		t.Fatalf("click in Enabled: selected %d, %+v", len(m.marked), m.current())
 	}
@@ -803,6 +820,7 @@ func TestWrap(t *testing.T) {
 func TestColumnSearch(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)
+	e.MustRun("tag", "remove", "pkg:ludeon.rimworld", "RimWorld") // the default tag (16 §3.8): not under test here
 	e.MustRun("tag", "add", "pkg:brrainz.harmony", "core-lib", "--mod", "pkg:tester.b")
 	e.MustRun("note", "pkg:tester.b", "check later")
 	e.WriteFile(filepath.Join(e.Game, "Mods", "B", "Assemblies", "Beta.dll"), "MZ")

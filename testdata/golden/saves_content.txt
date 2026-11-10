@@ -1,0 +1,56 @@
+$ archo saves show Content --content
+sv:<Content.rws> Content  [loads with the list]
+  colony: Content (1 save)
+  game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
+  list: plan:default (same Mods as one of its versions)
+  file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Content.rws
+  saved: 2026-10-01 09:59, 617 B
+  read: in full
+  content: 5 distinct names; sources use installed Mod versions
+  totals: none
+  source not found: 5 names
+  not analysed: Core, Content Mod
+  limits:
+    Patch-added Defs and Patch changes to existing Defs are not reflected.
+    Terrain grids and world biomes are not decoded; only named references are included.
+    Past events, quests and storytellers may leave no surviving references; indexed history maps are not decoded.
+    The original ScenarioDef cannot usually be recovered from a save's scenario name and parts.
+
+$ archo saves show Content --content
+sv:<Content.rws> Content  [loads with the list]
+  colony: Content (1 save)
+  game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
+  list: plan:default (same Mods as one of its versions)
+  file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Content.rws
+  saved: 2026-10-01 09:59, 617 B
+  read: in full
+  content: 5 distinct names; sources use installed Mod versions
+  totals: 1 faction, 1 humanlike race, 1 weapon, 1 recipe
+  Core: 1 humanlike race, 1 weapon
+  Content Mod: 1 faction, 1 recipe
+  source not found: 1 name
+  limits:
+    Patch-added Defs and Patch changes to existing Defs are not reflected.
+    Terrain grids and world biomes are not decoded; only named references are included.
+    Past events, quests and storytellers may leave no surviving references; indexed history maps are not decoded.
+    The original ScenarioDef cannot usually be recovered from a save's scenario name and parts.
+
+$ archo saves show Content --content --all
+sv:<Content.rws> Content  [loads with the list]
+  colony: Content (1 save)
+  game: 1.6.4633 rev1261, env:main runs 1.6.4633 rev1261
+  list: plan:default (same Mods as one of its versions)
+  file: $ROOT/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Saves/Content.rws
+  saved: 2026-10-01 09:59, 617 B
+  read: in full
+  content: 5 distinct names; sources use installed Mod versions
+  totals: 1 faction, 1 humanlike race, 1 weapon, 1 recipe
+  Core: 1 humanlike race, 1 weapon
+  Content Mod: 1 faction, 1 recipe
+  source not found: 1 name
+  limits:
+    Patch-added Defs and Patch changes to existing Defs are not reflected.
+    Terrain grids and world biomes are not decoded; only named references are included.
+    Past events, quests and storytellers may leave no surviving references; indexed history maps are not decoded.
+    The original ScenarioDef cannot usually be recovered from a save's scenario name and parts.
+

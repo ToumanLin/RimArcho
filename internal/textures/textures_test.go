@@ -268,6 +268,13 @@ func TestRun(t *testing.T) {
 		t.Fatalf("stop: %v, %d calls", err, len(enc2.calls))
 	}
 	_ = res
+	// a failure to record a batch ends the run with that error, even when todds failed too
+	stored := errors.New("disk I/O error")
+	enc3 := &fakeEnc{err: errors.New("exit status 1")}
+	_, err = Run(context.Background(), enc3, p.Jobs, Options{}, nil, func([]Result) error { return stored }, nil)
+	if !errors.Is(err, stored) || len(enc3.calls) != 1 {
+		t.Fatalf("after error: %v, %d calls", err, len(enc3.calls))
+	}
 }
 
 func TestArgs(t *testing.T) {
@@ -316,5 +323,19 @@ func TestRealTodds(t *testing.T) {
 		if wantF := map[bool]string{true: "BC7", false: "BC1"}[r.Alpha]; in.Format != wantF {
 			t.Errorf("%s: %s, want %s", r.Rel, in.Format, wantF)
 		}
+	}
+}
+
+func TestFindToddsNativeName(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, ToddsExecutable)
+	if err := os.WriteFile(p, []byte("fixture"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if got := FindTodds(dir); got != p {
+		t.Fatalf("native discovery = %q", got)
+	}
+	if got := FindTodds(p); got != p {
+		t.Fatalf("configured executable = %q", got)
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -19,7 +20,7 @@ import (
 func TestUninstallPalette(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)
-	e.WriteFile(filepath.Join(e.Root, "LocalAppData", "RimArcho", "steamcmd", "steamcmd.exe"), "MZ")
+	e.WriteFile(filepath.Join(e.Root, "LocalAppData", "RimArcho", "steamcmd", deps.SteamCMDExecutable()), "MZ")
 	m := direct(t, e, 140, 40)
 	enter := tea.KeyMsg{Type: tea.KeyEnter}
 	m.update(tea.KeyMsg{Type: tea.KeyCtrlK})
@@ -210,5 +211,43 @@ func TestUninstallReviewsQuotedDestination(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(destination, "synthetic", "pack.json")); err != nil {
 		t.Fatalf("did not use reviewed destination: %v", err)
+	}
+}
+
+// Results of other work that arrive while an uninstall runs are delivered once it fails, so
+// the scan and the command line do not stay busy.
+func TestUninstallFailureDeliversHeldResults(t *testing.T) {
+	t.Parallel()
+	e, _ := fixture(t)
+	m := direct(t, e, 140, 40)
+	m.scanning = true
+	m.tasks.scanning.Store(true)
+	m.openCmdLine() // the command line keeps its history
+	press(m, "esc")
+	m.cmdBusy = "check"
+	m.uninstallRun = &uninstallRun{ch: make(chan tea.Msg, 1), done: make(chan struct{})}
+	m.update(scanDoneMsg{})
+	m.update(cmdDoneMsg{line: "check", argv: []string{"check"}})
+	if !m.scanning || m.cmdBusy == "" {
+		t.Fatal("results applied during the run")
+	}
+	_, cmd := m.update(uninstallDoneMsg{err: fmt.Errorf("synthetic failure")})
+	var deliver func(tea.Cmd)
+	deliver = func(c tea.Cmd) {
+		if c == nil {
+			return
+		}
+		switch msg := c().(type) {
+		case tea.BatchMsg:
+			for _, c := range msg {
+				deliver(c)
+			}
+		case scanDoneMsg, cmdDoneMsg:
+			m.update(msg)
+		}
+	}
+	deliver(cmd)
+	if m.scanning || m.tasks.scanning.Load() || m.cmdBusy != "" {
+		t.Fatalf("still busy after a failed uninstall: scan %v, command %q", m.scanning, m.cmdBusy)
 	}
 }

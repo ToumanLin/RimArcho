@@ -2,9 +2,10 @@ package view
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"sync/atomic"
+
+	"github.com/ToumanLin/RimArcho/internal/l10ndata"
 )
 
 // Package view holds the shared interface models and text (16 §1).
@@ -30,17 +31,7 @@ func Table() map[string]string {
 // SetLang selects a locale, with ARCHO_LANG overriding the setting and auto using the OS.
 // Each locale is parsed once, only when selected. English never parses Chinese resources.
 func SetLang(v string) {
-	if e := os.Getenv("ARCHO_LANG"); e != "" {
-		v = e
-	}
-	if v == "" || v == "auto" {
-		v = systemLang()
-	}
-	v = strings.ToLower(v)
-	if strings.HasPrefix(v, "zh") {
-		v = "zh"
-	}
-	if load, ok := locales[v]; ok {
+	if load, ok := locales[l10ndata.ResolveLang(v)]; ok {
 		selectedLocale.Store(load())
 		return
 	}

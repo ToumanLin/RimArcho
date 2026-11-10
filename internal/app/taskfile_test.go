@@ -171,3 +171,28 @@ func findOnFile(list []*Task, id string) *Task {
 	}
 	return nil
 }
+
+// A write that fails (disk full, a scanner holding the file) does not count as written:
+// the finished task stays listed, and lands in the file once a write gets through.
+func TestTasksFailedWriteKeepsFinishedTasks(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "tasks.json")
+	ts := OpenTasks(path)
+	defer ts.Close()
+	ts.Finish(ts.Begin("scan", "main", nil), TaskDone, "")
+	block := path + ".tmp"
+	if err := os.Mkdir(block, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	b := ts.Begin("analyze", "main", nil)
+	ts.Finish(b, TaskDone, "2 problems")
+	ts.Finish(ts.Begin("cache-clear", "previews", nil), TaskDone, "")
+	if find(ts.List(), b) == nil {
+		t.Fatal("a failed write dropped the finished task")
+	}
+	os.Remove(block)
+	ts.Finish(ts.Begin("scan", "main", nil), TaskDone, "")
+	if !slices.Contains(onFile(t, path), b) {
+		t.Fatalf("file %v, want %s", onFile(t, path), b)
+	}
+}

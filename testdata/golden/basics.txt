@@ -64,9 +64,9 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     import rimcrow                            one-time import of RimCrow's aliases, notes, groups (as tags) and user rules; repeatable
     alias <ref> [<name>]                      set the name RimArcho shows for a mod (all its copies)
     note <ref> [<text>]                       attach a plain-text note to a mod (all its copies), or with --copy to this copy only
-    tag add|remove <ref> <tag…> | list | rename <tag> <new> | merge <tag…> --into <tag> | delete <tag…> | note <tag> [<text>]  tags for filtering (list --filter tag:<tag>); rename, merge, delete and note apply to the tag on every mod
-    rule add after|before|incompatible|attach <A> <B> | top|bottom <A> | ignore <constraint>  add a user rule
-    rule edit <r:n> after|before|incompatible|attach <A> <B> | top|bottom <A> | ignore <constraint>  replace a user rule; r:<n> stays
+    tag add|remove <ref> <tag…> | list | rename <tag> <new> | merge <tag…> --into <tag> | delete <tag…> | note <tag> [<text>] | color <tag> <colour> | order <ref> <tag…>  tags for filtering (list --filter tag:<tag>); rename, merge, delete, note and color apply to the tag on every mod; color marks its mods in the lists (blue, cyan, teal, grass, orange, pink, plum, violet, #rrggbb or none); order sets a mod's tag order (its first tag's colour marks it)
+    rule add after|before|incompatible|attach <A> <B> | replaces <A> <B|pkg:id> | top|bottom <A> | ignore <constraint>  add a user rule
+    rule edit <r:n> after|before|incompatible|attach <A> <B> | replaces <A> <B|pkg:id> | top|bottom <A> | ignore <constraint>  replace a user rule; r:<n> stays
     rule list                                 list user rules
     rule remove <r:n>                         delete a user rule
     launch                                    save the list and start the game (one game at a time)
@@ -79,8 +79,8 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     lineage merge <ref> <ref>                 merge the second lineage into the first
     gc                                        remove expired tombstones and superseded snapshots
     config get [<key>]                        show settings
-    config set <key> <value>                  change a setting (local.dir: unused managed-folder root; updates.source: auto|github; updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris; ui.icons: compat|nerd; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; ui.archo.motion: off|still|live; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; network.proxy: system|off|a proxy URL; network.github_mirror: empty or a mirror prefix such as https://gh-proxy.org/)
-    guide [<topic>]                           the agent guide behind the MCP tools: a workflow (diagnose, errors, plans, words) or one tool's full reference
+    config set <key> <value>                  change a setting (local.dir: unused managed-folder root; updates.source: auto|github; updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris or a #rrggbb colour; ui.icons: compat|nerd; ui.mouse: on|off; ui.tui.theme: auto|dark|light; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; ui.archo.motion: off|still|live; ui.motion: auto|reduced; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; network.proxy: system|off|a proxy URL; network.github_mirror: empty or a mirror prefix such as https://gh-proxy.org/)
+    guide [<topic>]                           the agent guide behind the MCP tools: a workflow (diagnose, errors, plans, rebuild, words) or one tool's full reference
     mcp                                       serve the MCP tools over stdio (for Claude Code, Codex and other agents)
     gui                                       open the desktop window (RimArcho.exe does this on a double click)
     version                                   print the RimArcho version
@@ -141,6 +141,8 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     source game                               read the current game's code from the Source library
     source decompile                          decompile the current list's mods into the Source library
     source clean                              preview or remove unused Source library folders
+    source callers <Type.Method>              list the calls of a method in the game and the enabled mods, with the shape of each argument
+    source diff <old.dll> <new.dll>           compare two builds of an assembly: changed methods, member and assembly references, attributes
     subscribe git <url>                       install a Git mod and track its branch, tag or commit
     subscribe list                            list installed subscriptions and their last update check
     subscribe page <url>                      inspect a download page or install its Git repository or a downloaded archive
@@ -152,7 +154,7 @@ archo — RimWorld mod manager (CLI; run archo without arguments for the TUI)
     textures optimize [<mod>...]              write the DDS of mods' PNG textures next to them (the game loads them instead; the PNGs stay)
     textures clean [<mod>...]                 delete the DDS RimArcho wrote (only those; the game goes back to the PNGs)
     textures tool                             the DDS encoder (todds): where it is, or --install to download it
-    update                                    check Workshop or GitHub for a newer RimArcho and install it; the data folder is not touched (17 §5.1)
+    update                                    check for a newer RimArcho and show update options; the data folder is not touched (17 §5.1)
     workshop unsubscribe <ref…>               unsubscribe in Steam: Steam deletes the Workshop folder (refused while the game runs; plans that use it show it missing)
     workshop subscribe <ref…>                 subscribe again in Steam to an unsubscribed leftover
     workshop resubscribe <ref…>               resubscribe and wait for Steam to download mods; local edits are lost (refused while the game runs)

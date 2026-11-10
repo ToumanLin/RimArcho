@@ -13,6 +13,7 @@ Investigations, measurements and open questions; once a report's conclusions are
 | [mcp-eval-design.md](mcp-eval-design.md) | Design, cases and aggregate results of the Archo MCP A/B evaluation | Active |
 | [2026-11-04_mcp-transcript-review.md](2026-11-04_mcp-transcript-review.md) | Round 1 transcript review: where agents lost time with `archo mcp` | Evidence for known noise (06 §1); proposals in §7, status in round 2 §6 |
 | [2026-11-05_mcp-transcript-review-round2.md](2026-11-05_mcp-transcript-review-round2.md) | Round 2 transcript review (h1, h2, h5; Pi and dsh) | Open: proposals in §7 |
+| [2026-11-08_ai-mod-repair.md](2026-11-08_ai-mod-repair.md) | What RimArcho must provide for agents to fix Mods for players: zero setup, copies, proof, fix records; where C# rebuilding fits | Proposal (ToDo: Archo Agent); order in §5 |
 
 ## Performance and memory
 
@@ -53,3 +54,6 @@ Investigations, measurements and open questions; once a report's conclusions are
 | [2026-11-01_decompile-storage.md](2026-11-01_decompile-storage.md) | Where decompiled code lives: the Source library and Mod projects | A and B in 05 §5.4; open: C, Mod projects (ToDo) |
 | [2026-11-02_gui-accessibility.md](2026-11-02_gui-accessibility.md) | Screenshot-free GUI acceptance for agents: criteria, baseline, fix rounds | Criteria in 16 §11 (A1–A18); open: failing criteria (01 §4), proposed rule and open decisions |
 | [2026-11-04_save-format-fields.md](2026-11-04_save-format-fields.md) | Element paths of a save's full read (L1), from the game's `ExposeData` | Implemented (12 §1.7); open: not yet checked against real saves |
+| [2026-11-09_linux-support-plan.md](2026-11-09_linux-support-plan.md) | Linux support in phases: native CLI/TUI/MCP, GUI on WebKitGTK, `.tar.gz`/`.deb`/`.rpm`/AUR, Proton installs | Plan decided (§8); not started |
+| [2026-11-09_save-content-attribution.md](2026-11-09_save-content-attribution.md) | Save Def reference forms, attribution limits, content categories and synthetic costs | Research proposal; decisions in E; exact-build and real-save checks pending in VM |
+| [2026-11-09_tui-redesign.md](2026-11-09_tui-redesign.md) | TUI looks and navigation: today's problems, a shared visual system, three top-bar options | Option A (two-row top) chosen and implemented (16 §9.6); P17 open |

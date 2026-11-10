@@ -34,6 +34,9 @@ export const icon = {
   // Background tasks: stacked bars, the work in a queue
   tasks: svg('<path d="M3 4.5h10M3 8h10M3 11.5h6"/>'),
   chev: svg('<path d="M6 4l4 4-4 4"/>'),
+  // RimArcho's own update in the navigation (16 §2.1): an arrow up, and the × that hides it
+  up: svg('<path d="M8 13V3.6M4 7.4l4-4 4 4"/>'),
+  close: svg('<path d="M5 5l6 6M11 5l-6 6"/>'),
   // collapse all / expand all (Mod library's table heading): chevrons closing in, opening out
   fold: svg('<path d="M5 2.5l3 3 3-3M5 13.5l3-3 3 3"/>'),
   unfold: svg('<path d="M5 5.5l3-3 3 3M5 10.5l3 3 3-3"/>'),

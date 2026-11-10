@@ -852,12 +852,15 @@ type SaveFilesPreview struct {
 	Lines  []string `json:"lines"`
 	To     string   `json:"to"`
 	Button string   `json:"button"`
+	// Token binds the confirmation to this preview (app.SaveFilesToken): the page sends it
+	// back, and the action refuses when the saves changed since (12 §4.4).
+	Token string `json:"token"`
 }
 
 // SaveBackupPreview lists what a backup copies and where.
 func SaveBackupPreview(r *app.SaveFilesResult) *SaveFilesPreview {
 	p := &SaveFilesPreview{Title: Tf("back up %d saves (%s)?", len(r.Saves), SizeText(r.Bytes)), Button: T("back up"),
-		To: Tf("copies go to a new folder in %s; the saves stay where they are", filepath.Dir(r.Dir))}
+		To: Tf("copies go to a new folder in %s; the saves stay where they are", filepath.Dir(r.Dir)), Token: r.Token}
 	if len(r.Saves) == 1 {
 		p.Title = Tf("back up %s (%s)?", r.Saves[0].Name, SizeText(r.Bytes))
 	}
@@ -870,7 +873,7 @@ func SaveBackupPreview(r *app.SaveFilesResult) *SaveFilesPreview {
 // SaveTrashPreview lists what recycling moves.
 func SaveTrashPreview(r *app.SaveFilesResult) *SaveFilesPreview {
 	p := &SaveFilesPreview{Title: Tf("move %d saves to the recycle bin (%s)?", len(r.Saves), SizeText(r.Bytes)), Button: T("recycle"),
-		To: T("they go to the recycle bin, where they can be restored; nothing is deleted for good")}
+		To: T("they go to the recycle bin, where they can be restored; nothing is deleted for good"), Token: r.Token}
 	if len(r.Saves) == 1 {
 		p.Title = Tf("move %s to the recycle bin (%s)?", r.Saves[0].Name, SizeText(r.Bytes))
 	}
@@ -882,7 +885,7 @@ func SaveTrashPreview(r *app.SaveFilesResult) *SaveFilesPreview {
 
 // SaveFilesText says what a backup or recycle did.
 func SaveFilesText(r *app.SaveFilesResult, backup bool) string {
-	n := len(r.Saves) - len(r.Errs)
+	n := len(r.Saves)
 	var t string
 	switch {
 	case backup && n == 1:
@@ -909,15 +912,21 @@ func SaveNameProblem(s *app.Save, name string) string {
 		return T("the name is empty")
 	case strings.ContainsAny(name, `\/:*?"<>|`) || strings.Contains(name, "#§#"):
 		return T(`a save name cannot hold \ / : * ? " < > |`)
-	case strings.EqualFold(name, s.Name):
-		return ""
 	}
 	file := name + ".rws"
 	if s.Prefix != "" {
 		file = s.Prefix + "#§#" + file
 	}
-	if fileThere(filepath.Join(filepath.Dir(s.Path), file)) {
-		return Tf("a save named %s is already there", name)
+	entries, _ := os.ReadDir(filepath.Dir(s.Path))
+	original, _ := os.Lstat(s.Path)
+	for _, entry := range entries {
+		if !strings.EqualFold(entry.Name(), file) {
+			continue
+		}
+		target, err := entry.Info()
+		if err != nil || original == nil || !os.SameFile(original, target) {
+			return Tf("a save named %s is already there", name)
+		}
 	}
 	return ""
 }

@@ -1,10 +1,12 @@
-// Motion (16 §7.1): short, and only opacity and transform, so WebView2 composites it
-// without layout or paint work; nothing moves under prefers-reduced-motion. The CSS side
-// (the tokens --t-press, --t-enter, --t-layout and the keyframes) is in style.css.
+// Motion (16 §7.1): short, and mostly opacity and transform, so WebView2 composites it
+// without layout or paint work (the sidebar's sub-entries grow their grid row); nothing
+// moves under prefers-reduced-motion or settings › motion: reduced (ui.motion, the root's
+// data-motion). The CSS side (the tokens --t-press, --t-enter, --t-layout and the
+// keyframes) is in style.css.
 import { S, $$, key, ROW_H } from "./state.js";
 
 const reduce = matchMedia("(prefers-reduced-motion: reduce)");
-export const still = () => reduce.matches;
+export const still = () => reduce.matches || globalThis.document?.documentElement?.dataset?.motion === "reduced";
 
 const LAYOUT_MS = 250;
 const FLASH_MS = 400;
@@ -157,7 +159,7 @@ function place(h, on, box, outer, jump) {
   h.dataset.placed = "1";
 }
 
-// ---- the status line slides in from below ----
+// ---- the status line fades each new sentence in, in place (no slide: it moved the bar) ----
 
 const statusAnimations = new WeakMap();
 export function statusIn(s) {
@@ -169,8 +171,8 @@ export function statusIn(s) {
   const style = getComputedStyle(s), time = style.getPropertyValue("--t-enter").trim();
   const duration = parseFloat(time) * (time.endsWith("ms") ? 1 : 1000);
   statusAnimations.set(s, s.animate([
-    { opacity: 0, transform: "translateY(6px)" },
-    { opacity: 1, transform: "none" },
+    { opacity: 0 },
+    { opacity: 1 },
   ], { duration, easing: style.getPropertyValue("--ease").trim() }));
 }
 

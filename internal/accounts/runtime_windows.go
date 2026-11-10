@@ -129,3 +129,10 @@ func newEnvironmentOptions() *environmentOptions {
 	}
 	return options
 }
+
+// WebView2Installed reports whether a usable WebView2 runtime (86 or later) is installed,
+// the one RimArcho's window and login windows draw with.
+func WebView2Installed() bool {
+	_, err := runtimeDLL()
+	return err == nil
+}

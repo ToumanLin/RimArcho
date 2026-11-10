@@ -85,3 +85,48 @@ func TestLinkLifecycleRacePreflight(t *testing.T) {
 		t.Fatalf("failed preflight journalled intent: %+v %v", ledger, err)
 	}
 }
+
+// A single link step that fails without touching the disk is closed as rolled back, so it
+// reports no recovery and does not block launch (09 §3).
+func TestFailedLinkStepRollsBack(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	a, err := Open(filepath.Join(root, "data"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	a.LockBase = filepath.Join(root, "local")
+	a.GameProbe = func(string) *GameRun { return nil }
+	mods := filepath.Join(root, "game", "Mods")
+	target := filepath.Join(root, "target")
+	occupied := filepath.Join(mods, "_Archo_env_occupied")
+	for _, p := range []string{target, occupied} {
+		if err := os.MkdirAll(p, 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, c := range []LinkChange{
+		{Op: "add", Name: "_Archo_env_gone", Target: filepath.Join(root, "missing"), Mod: "gone"}, // target missing
+		{Op: "add", Name: "_Archo_env_occupied", Target: target, Mod: "occupied"},                 // a folder is in the way
+	} {
+		if err := a.applyLinks(mods, []LinkChange{c}); err == nil {
+			t.Fatalf("%s: want an error", c.Name)
+		}
+	}
+	rows, err := a.Store.ManagedLinks()
+	if err != nil || len(rows) != 2 {
+		t.Fatalf("rows %+v, %v", rows, err)
+	}
+	for _, r := range rows {
+		if r.Phase != "rolled-back" {
+			t.Fatalf("%s: phase %q", r.Name, r.Phase)
+		}
+	}
+	if rec, err := a.linkRecoveries(rows); err != nil || len(rec) != 0 {
+		t.Fatalf("recoveries %+v, %v", rec, err)
+	}
+	if fi, err := os.Lstat(occupied); err != nil || !fi.IsDir() {
+		t.Fatal("the folder in the way changed")
+	}
+}

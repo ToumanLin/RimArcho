@@ -9,10 +9,11 @@ import (
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/render"
+	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
 func init() {
-	register(&Command{Name: "guide", Args: "[<topic>]", Summary: "the agent guide behind the MCP tools: a workflow (diagnose, errors, plans, words) or one tool's full reference",
+	register(&Command{Name: "guide", Args: "[<topic>]", Summary: "the agent guide behind the MCP tools: a workflow (diagnose, errors, plans, rebuild, words) or one tool's full reference",
 		MaxArgs: 1, Run: guideCmd})
 }
 
@@ -31,6 +32,7 @@ var guideTopics = []struct{ name, summary, text string }{
 	{"diagnose", "the workflow for a game error or crash: classify it, which tool for which evidence, how to report", guideDiagnose},
 	{"errors", "error kinds the workflow does not cover (save loading, config errors, missing assets, assembly loading, noise), most frequent first", patternChecklist},
 	{"plans", "plans and their versions, the library, subscriptions and textures, and editing mod files safely", guidePlans},
+	{"rebuild", "rebuilding a Mod from the source it ships: the build: block of get_mod, dotnet restore and build, publicizers, or a small patch Mod instead", guideRebuild},
 	{"words", "what the interface calls things, for talking to the player", guideWords},
 }
 
@@ -96,19 +98,19 @@ func guideCmd(c *Ctx, a *Args) (*render.Doc, error) {
 }
 
 const guideDiagnose = `Diagnosis workflow (use the exact evidence, not paraphrases):
-1. Start from the error. If the user pasted log text, call analyze_log with text=…; otherwise analyze_log (current Player.log), then analyze_log cluster=E<n> for the cluster in question. Each cluster lists candidate mods with a role: source (its code/data produced the error), patcher (only has a Harmony patch on a frame), dependency (provides something that is missing or disabled), mentioned (appears in the message or a lower frame). Never call a patcher or a mentioned mod the cause without further evidence.
-   Evidence that is the mod's own (log message prefix [Mod], a patch file or log file in its folder, "defines … which is the def the XML error is in", "loads X.dll") keeps it the source unless a tool result contradicts it: a patch-failed cluster's owner stays the source even when get_patches failed=true lists nothing for it (the simulation runs on the installed files; the player's copy, list or order may differ) — only the reason stays open. A framework that only provides the class, field or type an error mentions (Vanilla Expanded Framework, HugsLib, Harmony) is not the source of an error in another mod's def, patch or code; a mod that only calls into failing code (it runs every static constructor, lists every assembly's types, uploads the log) is not its owner.
+1. Start from the error. If the user pasted log text, call analyze_log with text=…; otherwise analyze_log (current Player.log), then analyze_log cluster=E<n> for the cluster in question. Each cluster lists candidate mods with a role: source (its code/data produced the error), list-modifier (its code changes the comp list the throwing loop walks, not on the stack), patcher (only has a Harmony patch on a frame), dependency (provides something that is missing or disabled), mentioned (appears in the message or a lower frame), listed (only a patch on a caller of the throwing mod frame; not a candidate). Never call a patcher or a mentioned mod the cause without further evidence.
+   Evidence that is the mod's own (log message prefix [Mod], a patch file or log file in its folder, "defines … which is the def the XML error is in", "loads X.dll") keeps it the source unless a tool result contradicts it: a patch-failed cluster's owner stays the source even when get_patches failed=true lists nothing for it (the simulation runs on the installed files; the player's copy, list or order may differ) — only the reason stays open. A framework that only provides the class, field or type an error mentions (Vanilla Expanded Framework, HugsLib, Harmony) is not the source of an error in another mod's def, patch or code. A mod that invokes code generically (it runs every static constructor, lists every assembly's types, uploads the log) is not its owner either. A mod whose own call passes the arguments (a constructor call, an event, a def it builds) can be: compare what the callee dereferences with what that call passes, using the trace: lines of analyze_log cluster=E<n> and the callers view of read_source when they are shown. Do not acquit a caller only because the exception is thrown in someone else's code.
    When the cluster names no source and no tool result shows a mod's own file, def or code failing, say the cause is undecided: many errors (vanilla code, save data of removed mods, a texture no installed mod ships) cannot be pinned on a mod, and naming one there is wrong.
 2. Confirm identity and state with get_mod: the exact instance (#id), whether it is enabled and at which position, its path, other copies in its lineage.
 3. Classify the failure:
    - XML (PatchOperation failure, missing cross-reference, duplicate/missing parent def, malformed XML): use get_patches failed=true (reasons: target-inactive, target-missing, target-later, wrong-version-route, stale-name, unguarded-optional, node-absent), get_def, search_files. What a reason means for the player: target-inactive / target-missing / unguarded-optional = a compatibility patch for a mod that is not active (harmless, the mod should guard it); target-later = load order; stale-name / node-absent with the target mod active = the patch is outdated for that mod's version; wrong-version-route = the mod's own folder layout.
    - Material/icon (_MainTex, ResolveIcon): XML-side first; search_files for uiIconColor without uiIconPath/texPath in the mods named. Not for Material 'SolidColorMat-…': that one is known noise (class noise, made in code, no def or file causes it).
-   - Assembly (C# exception, Pawn.Tick, ThingWithComps.Tick, world tick): get_harmony target=<method> for every patched frame, then read_source type=<patch class> or search=<pattern>. For tick crashes check AllComps mutations in the cluster's candidates: read_source search="AllComps.Remove(" in=[…] (also "AllComps.Add(", "InitializeComps", "PostExposeData").
+   - Assembly (C# exception, Pawn.Tick, ThingWithComps.Tick, world tick): get_harmony target=<method> for every patched frame, then read_source type=<patch class> or search=<pattern>. For "Collection was modified" and tick crashes the cluster lists the enabled mods whose code changes a comp list (comp tick overrides first, and where XML attaches that comp): read_source type=<that class>. When it lists none, read_source search="AllComps.Remove(" scope="active" (the culprit is often a mod the stack does not name; also "AllComps.Add(", "InitializeComps", "PostExposeData"). When a patch line's target is chosen by TargetMethod(), the next step is get_harmony mod=<ref> or read_source on its patch class, not target=<frame>. When the top frame is a Harmony patch of a game method, also read the source of the caller frame and the callee's vanilla contract (read_source game=true type=<callee> all=true shows its guards; what vanilla's own call sites pass is the norm): a patch that assumes vanilla's contract is not the owner of a caller that breaks it.
    - Assembly loading (ReflectionTypeLoadException, "Could not resolve type … expected class X in assembly A", TypeLoadException, "Error in static constructor of X"): the failing assembly or type is named in the message or the lines next to it; analyze_log says which enabled mod loads that DLL, or that none does (then no listed mod can be named from that line). A type in namespace Harmony (0Harmony 1.x) means an assembly built for Harmony 1; mods that bundle an old 0Harmony.dll are not missing dependencies.
    - Mixed: confirm the XML side loaded (get_patches failed=true) before blaming code.
    - Anything else (save loading, config errors, missing textures, noise): guide topic=errors.
 4. list_problems gives the static picture (dependencies, incompatibilities, load order, def overrides, patch failures, Harmony conflicts); explain_relation explains two specific mods.
-5. Report: failure stage, XML/Assembly/Mixed, the exact mod instance and path, the file+line or class+method, why it fails, whether a named mod is cause, dependency or observer, and the smallest fix.
+5. Report: failure stage, XML/Assembly/Mixed, the exact mod instance and path, the file+line or class+method, why it fails, whether a named mod is cause, dependency or observer, and the smallest fix. When two mods are involved in one error, the one that threw and the one whose action made it throw (it passed a null, removed an item from a list the other enumerates, changed state the other relies on), report both and list both fix places: in the one that threw, a guard or a different loop hides the error; in the one whose action caused it, removing that action removes it. Say which is which; do not pick one silently.
 6. If it worked before: list_changes (mods that changed) and plan_history action=diff (what changed in the plan since a version).`
 
 const guidePlans = `Plans: every editing tool acts on the current plan. edit_loadout changes it (stored at once, every step undoable) and never touches the game; edit_loadout action=checkout goes back to a version from plan_history. Nothing reaches the game until it is saved: save_loadout saves the current plan without starting the game, launch_game saves it and starts the game (refused while any game runs). manage_plans lists, creates, switches (writes no game file), renames and removes plans.
@@ -116,3 +118,17 @@ Inventory: list_library lists every mod on this machine with its copies, sizes, 
 Editing mod files: pin_mod first creates a locked version (a copy the current plan uses instead; never edit Workshop files in place — Steam overwrites them), then edit the copy; test_run tests the copy before anything is saved.`
 
 const guideWords = `Talking to the player: the interface calls a plan a list, an environment a game, the library the mod library, save_loadout "save", pin_mod "lock this version", swap "switch version" and a pack a pack (16 §7.2); use those words with the player, and the tool names only in calls.`
+
+func textureToolInstallGuide() string {
+	if textures.ToddsZipURL == "" {
+		return textures.ToddsMissing + " Ask the player to provide it; do not download it."
+	}
+	return "needs the encoder todds, which the player installs with archo textures tool --install or in the window — tell them, do not try to download it"
+}
+
+func textureToolExamplePath() string {
+	if textures.ToddsZipURL == "" {
+		return "/usr/local/bin/todds"
+	}
+	return `C:\Users\me\AppData\Local\RimArcho\todds\todds.exe`
+}

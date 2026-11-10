@@ -70,7 +70,7 @@ func TestAutomaticDatesBelongToTheirSubjects(t *testing.T) {
 	defer view.SetLang("en")
 	e, _, _ := shellEnv(t)
 	e.App.SteamCMDNoPath = true
-	e.WriteFile(filepath.Join(e.App.LocalDir(), deps.SteamCMD, "steamcmd.exe"), "synthetic tool")
+	e.WriteFile(filepath.Join(e.App.LocalDir(), deps.SteamCMD, deps.SteamCMDExecutable()), "synthetic tool")
 	seed := func(key string, value any) {
 		b, err := json.Marshal(value)
 		if err != nil {

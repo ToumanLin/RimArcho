@@ -22,6 +22,33 @@ export async function checkFeedback({ handlers, test, assert, deferred }) {
     assert(status.getAttribute('role') === 'alert' && status.getAttribute('aria-live') === 'assertive', 'failure not assertive');
     assert(!status.querySelector('a') && text.isConnected === false, 'previous undo survives refusal');
   });
+  await test('16 §6: a long or multi-line outcome stays one line of the bar; undo, mark and the whole text remain', async () => {
+    // the real bar: where, status, spacer, hints, at a narrow width
+    const home = status.parentNode, next = status.nextSibling;
+    const bar = document.createElement('footer'); bar.id = 'bottom'; bar.style.cssText = 'width:600px;height:30px;';
+    const where = document.createElement('span'); where.className = 'where'; where.textContent = 'Enabled  1 / 484';
+    const grow = document.createElement('span'); grow.className = 'grow';
+    const hints = document.createElement('span'); hints.id = 'hints'; hints.textContent = 'space disable   t stage   m move to…   ctrl+o folder';
+    bar.append(where, status, grow, hints); document.body.append(bar);
+    try {
+      const long = 'could not move the folder C:/Fixture/Steam/steamapps/workshop/content/294100/1234567890 to the recycle bin\nclose RimWorld and try again\nnothing changed';
+      say('warn', long, true, ['C:/Fixture/Steam/steamapps/workshop/content/294100/1234567890']);
+      const msg = status.querySelector('.msg'), undo = status.querySelector('a');
+      const b = bar.getBoundingClientRect(), r = status.getBoundingClientRect(), m = msg.getBoundingClientRect(), u = undo.getBoundingClientRect();
+      assert(Math.round(r.height) === 30 && r.top >= b.top - 0.5 && r.bottom <= b.bottom + 0.5, 'status left the bar: ' + r.height);
+      assert(m.height <= 24.5, 'the sentence wrapped: ' + m.height);
+      assert(msg.scrollWidth > msg.clientWidth && getComputedStyle(msg).textOverflow === 'ellipsis', 'a long sentence is not cut with an ellipsis');
+      assert(u.width > 0 && u.right <= r.right + 0.5 && u.left >= m.right - 0.5, 'undo is not visible after the sentence');
+      for (const part of ['recycle bin', 'try again', 'nothing changed']) assert(status.textContent.includes(part), 'a screen reader loses: ' + part);
+      assert(status.title === long && status.getAttribute('aria-live') === 'polite', 'the whole sentence is not the hover text');
+      say('ok', 'saved');
+      assert(!status.querySelector('.msg').scrollWidth || status.querySelector('.msg').scrollWidth <= status.querySelector('.msg').clientWidth, 'a short sentence was cut');
+      assert(Math.round(status.getBoundingClientRect().height) === 30, 'a short outcome changed the bar height');
+    } finally {
+      say('', '');
+      home.insertBefore(status, next); bar.remove();
+    }
+  });
   await test('A11: a start shows before its reply; a refused start takes back only its own line', async () => {
     S.busy.scan = false;
     const reply = deferred();
@@ -140,10 +167,10 @@ export async function checkFeedback({ handlers, test, assert, deferred }) {
     await new Promise(r => setTimeout(r, 0));
     assert(document.querySelector('.guide .typed input').getAttribute('aria-invalid') === 'true', 'guide URL error not linked');
     handlers.set('PickPackFile', () => { throw Error('Fixture pack picker failed'); });
-    [...document.querySelectorAll('.guide .typed button')].find(b => b.textContent === 'choose a pack…').click();
+    [...document.querySelectorAll('.guide .way button')].find(b => b.textContent === 'choose a pack…').click();
     await new Promise(r => setTimeout(r, 0));
     assert(!document.querySelector('.guide .typed input').hasAttribute('aria-invalid'), 'pack error marked URL invalid');
-    assert([...document.querySelectorAll('.guide .typed button')].find(b => b.textContent === 'choose a pack…').getAttribute('aria-invalid') === 'true', 'pack picker error not linked');
+    assert([...document.querySelectorAll('.guide .way button')].find(b => b.textContent === 'choose a pack…').getAttribute('aria-invalid') === 'true', 'pack picker error not linked');
   });
   await test('A12: shared import errors follow the selected source control', async () => {
     const exchange = await import('/js/exchange.js');

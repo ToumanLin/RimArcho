@@ -8,14 +8,17 @@
 import { phase as perfPhase } from "./perf.js";
 import { api, on, setText } from "./api.js";
 import "./window-theme.js";
+import { blockNativeMenu } from "./nativemenu.js";
 import "./refnums.js";
 import "./activity.js";
 import "./fulltitle.js";
 import { applyAccent } from "./accent.js";
 import { factText, S, $, $$, el, esc, T, Tf, errText, say, clearSay, undoStatus, busyStart, col, cur, selection, key, idsOf, refsOf, named, AREAS, keyCaps } from "./state.js";
-import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, pageDelta, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn } from "./lists.js";
+import { openEditor, setItems, refilter, renderLists, renderHeads, renderRows, ensureVisible, pageDelta, wireLists, setOnHistory, stagingOpen, setStagingOpen, showGhost, acceptGhost, barOn, setOnViewChange, detailHead } from "./lists.js";
+import { G, grouped, headOf, curKey, shownItems, shape, findEntry, setGroupOpen, reveal, setView, loadView, refreshOrder, regroup } from "./disabledgroups.js";
 import { createBar } from "./filterbar.js";
-import { followDetail, showDetail, scrollDetail } from "./detail.js";
+import { followDetail, showDetail, scrollDetail, refreshCopies, showPanel } from "./detail.js";
+import { tagPanel, startRename, editTagNote, pickMerge, confirmDelete } from "./tagmanager.js";
 import * as pop from "./popups.js";
 import * as scr from "./screens.js";
 import * as shell from "./shell.js";
@@ -29,16 +32,18 @@ import { updateFromForm } from "./subscribe.js";
 import { initExchange, exchange, key as importKey, hintList as importHints } from "./exchange.js";
 import { icon } from "./icons.js";
 import * as motion from "./motion.js";
+import { setTagColors, tagColors } from "./tagcolor.js";
 import * as ops from "./ops.js";
 import * as uninst from "./uninstall.js";
 import * as packsPage from "./packs.js";
 import * as planManage from "./planmanage.js";
 import * as tex from "./textures.js";
 import * as tasksPage from "./tasks.js";
+import * as selfUpdate from "./selfupdate.js";
 import { refreshBackgrounds } from "./bg.js";
 import { environmentReason, withEnvironmentSwitch } from "./environment.js";
 import { wireSeparator } from "./separator.js";
-import { go, openPage, initNavigation, pageEntering, pageEntered, wireHistory } from "./navigation.js";
+import { go, openPage, initNavigation, pageEntering, pageEntered, wireHistory, travel } from "./navigation.js";
 import { checkCredit, getChoices } from "./credit.js";
 import * as problems from "./problems.js";
 import * as fileSearch from "./filesearch.js";
@@ -46,6 +51,8 @@ import * as modSettings from "./modsettings.js";
 import * as savesPage from "./saves.js";
 import { initRules, refreshRules, startRule, showRules } from "./rules.js";
 import { setMode as setArchoMode, bootLive, bootDone } from "./archo.js";
+
+blockNativeMenu(document);
 
 // ---- loading ----
 
@@ -91,7 +98,7 @@ async function reload(snapshot = null, read = null) {
   readRetries = 0;
   // a shell that could not be read keeps the sidebar's lists; the sidebar reads again
   const shellOK = !shell.shellFailed(sh);
-  const apply = () => { S.board = b; if (shellOK) S.shell = sh; S.history = history; };
+  const apply = () => { S.board = b; setTagColors(b.tagColors); if (shellOK) S.shell = sh; S.history = history; };
   if (read) read.commit(apply); else apply();
   if (!shellOK) setTimeout(shell.loadShell, 2000);
   S.busy.scan = b.scanning;
@@ -102,20 +109,111 @@ async function reload(snapshot = null, read = null) {
   await Promise.all([0, 1, 2].map((k) => refilter(k, keep[k])));
   if (!current()) return;
   if (!read) { render(); detailFollow(); }
+  // the tags view follows the Tag manager's order, read again when the data changed
+  if (grouped()) refreshOrder().then((changed) => { if (changed && current()) { regroup(); renderLists(); } });
   refreshRules();
   await scr.logEnvironmentChanged();
   return true;
 }
 
 let detailKey = "";
-function detailFollow(force) {
+// detailTarget: the row the details follow (the focused list's cursor, else the last list's).
+function detailTarget() {
   const k = Math.min(S.focus, 2) === S.focus ? S.focus : lastList;
+  // a tag clicked in a Mod's details: that tag, until the cursor moves (16 §2.9)
+  if (pinned && pinned.sig === pinSig(k)) {
+    const g = (col(0).groups || []).find((x) => x.key === pinned.key) || { key: pinned.key, tag: pinned.tag, rows: null };
+    return { group: g, k, id: "tags:" + g.key + "|pinned|" + S.board.stamp };
+  }
+  pinned = null;
+  // a tag group's header in Disabled: its tag in the Tag manager (16 §2.5)
+  const g = k === 0 ? headOf(col(0), col(0).view[col(0).cursor]) : null;
+  if (g) return { group: g, k, id: "tags:" + g.key + "|" + g.rows.length + "|" + S.board.stamp };
   const it = cur(k);
-  const id = it ? key(it) + "|" + (it.pos || 0) + "|" + S.board.stamp : "";
-  if (!force && id === detailKey) return;
-  detailKey = id;
-  followDetail(it, k === 2);
+  return { it, k, id: it ? key(it) + "|" + (it.pos || 0) + "|" + S.board.stamp : "" };
 }
+function detailFollow(force) {
+  const t = detailTarget();
+  if (!force && t.id === detailKey) return;
+  detailKey = t.id;
+  const was = S.tagHead;
+  S.tagHead = t.group || null;
+  if (was || S.tagHead) detailHead();
+  if (t.group) return showTagPanel(t.group);
+  followDetail(t.it, t.k === 2);
+}
+
+// ---- the Tag manager in the details, on a tag group's header in Disabled (16 §2.5, §2.9) ----
+
+// showTagPanel draws group g's tag as Mod library's Tags view does; a redraw never takes
+// text the player is typing in it.
+function showTagPanel(g) {
+  const box = $("#detail"), ref = "tags:" + g.key, ae = document.activeElement;
+  if (box.dataset.ref === ref && box.contains(ae) && ae.matches("input, textarea")) return;
+  const info = !g.none && G.tags.find((t) => t.tag.toLowerCase() === g.key);
+  showPanel(ref, tagPanel(info ? { ...g, info } : g, tagCtx));
+}
+// pinned: the tag a click in a Mod's details opened ({key, tag, sig}); it stays while the
+// list the details follow keeps its cursor (pinSig)
+let pinned = null;
+const pinSig = (k) => k + "|" + curKey(k);
+async function openTag(tag) {
+  await refreshOrder(true);
+  const info = G.tags.find((t) => t.tag.toLowerCase() === tag.toLowerCase());
+  const k = Math.min(S.focus, 2) === S.focus ? S.focus : lastList;
+  pinned = { key: tag.toLowerCase(), tag: info ? info.tag : tag, sig: pinSig(k) };
+  detailFollow(true);
+}
+const tagPicked = new Set();
+const tagCtx = {
+  tags: () => G.tags,
+  picked: tagPicked,
+  // a tag change: the lists, the groups and the panel again, the cursor on key's header
+  done: async (key) => {
+    if (pinned) { if (key == null) pinned = null; else pinned.key = key; }
+    await reload();
+    await refreshOrder(true);
+    regroup(key != null ? "\u0000" + key : undefined);
+    renderLists();
+    renderWhere();
+    renderHints();
+    detailFollow(true);
+  },
+  goTo: (key) => {
+    const c = col(0), at = pinned ? -1 : c.view.findIndex((vi) => headOf(c, vi)?.key === key);
+    // shown from a Mod's details, or a tag with no header in Disabled: shown in its place
+    if (at < 0) return openTag(G.tags.find((t) => t.tag.toLowerCase() === key)?.tag || key);
+    c.cursor = at;
+    ensureVisible(0);
+    renderRows(0);
+    renderWhere();
+    renderHints();
+    detailFollow();
+  },
+  redraw: () => detailFollow(true),
+  // back to the list the details follow (a pinned tag stays)
+  leave: () => focusArea(Math.min(S.focus, 2) === S.focus ? S.focus : lastList),
+  editing: () => {},
+  // the editor's rows are copies and a header holds only its first-tag Mods: say how many of
+  // the tag's Mods Disabled shows
+  shown: (g, info) => {
+    const c = col(0), lin = new Set();
+    for (const i of shownItems(c)) { const it = c.items[i]; if ((it.tags || []).some((t) => t.toLowerCase() === g.key)) lin.add(it.lineage || it.id); }
+    return Tf("%d not enabled", lin.size);
+  },
+  // a colour shows at once: the rows' bands, the headers and the panel
+  recolor: (tag, color) => {
+    const k = tag.toLowerCase(), map = { ...tagColors() };
+    if (color) map[k] = color; else delete map[k];
+    setTagColors(map);
+    if (S.board) S.board.tagColors = map;
+    const t = G.tags.find((x) => x.tag.toLowerCase() === k);
+    if (t) t.color = color;
+    renderLists();
+    detailFollow(true);
+  },
+};
+const tagBox = () => $("#detail");
 
 // relang: the language changed (16 §2.14). The text comes again from Go (the page data and
 // the T() table); the same page opens again in the new language, with its scroll, the
@@ -135,6 +233,7 @@ async function relang() {
   else if (screen === "library") await library.relang();
   else if (screen && screen !== "guide" && screen !== "tasks") await openPage(screen);
   await tasksPage.relang();
+  selfUpdate.draw();
   S.bar.showGhost(); // the editor's bar: its placeholder in the new language
   if (screen) $("#screen").scrollTop = top;
   render();
@@ -145,6 +244,7 @@ async function reaccent() {
   S.start.accent = s.accent;
   S.start.theme = s.theme;
   archoTheme.apply(s.theme);
+  archoTheme.motion(s.motion);
   applyAccent(s.accent);
   setArchoMode(s.archoMotion); // settings › Archo animation (16 §2.14)
 }
@@ -164,7 +264,8 @@ function render() {
 // mods the plan enables; its actions sit at the right end of the line (renderWhere).
 function renderTop() {
   if (!S.board) return;
-  $("#planhead .lead").textContent = Tf("%d enabled, in the order the game loads them", col(1).items.length);
+  // one line (style.css #planhead): a narrow window cuts the lead, its hover keeps it whole
+  $("#planhead .lead").textContent = $("#planhead .lead").title = Tf("%d enabled, in the order the game loads them", col(1).items.length);
 }
 
 // goLaunch is the editor's launch game (and its L): the game starts from Start, so it opens that
@@ -276,7 +377,13 @@ function renderWhere() {
     s = `${T("details")}    ${S.detail ? S.detail.name : "—"}    ${pct}%`;
   } else {
     const c = col();
-    s = `${T(AREAS[S.focus])}    ${c.view.length ? c.cursor + 1 : 0} / ${c.view.length}`;
+    const h = headOf(c, c.view[c.cursor]);
+    if (c.groups) {
+      // a tag group's header names its tag; a row counts only the rows shown (16 §3.2)
+      let at = 0, n = 0;
+      c.view.forEach((vi, i) => { if (vi >= 0) { n++; if (i <= c.cursor) at = n; } });
+      s = h ? `${T(AREAS[S.focus])}    ${h.none ? T("no tag") : h.tag}    ${n}` : `${T(AREAS[S.focus])}    ${at} / ${n}`;
+    } else s = `${T(AREAS[S.focus])}    ${c.view.length ? c.cursor + 1 : 0} / ${c.view.length}`;
     if (c.sel.size) s += "  " + Tf("%d selected", c.sel.size);
   }
   if (S.popup) s += " › " + S.popup.title;
@@ -293,6 +400,13 @@ function actions() {
   ];
   const sel = selection();
   const k = S.focus;
+  const group = headOf(col(), col().view[col().cursor]);
+  if (group && !sel.length && !group.none) return [{ key: "← →", label: T("collapse / expand the group"), run: () => toggleGroup() },
+    { key: "F2", label: T("rename"), run: () => startRename(tagBox(), group, tagCtx) }, { key: "M", label: T("merge into…"), run: () => pickMerge(group.tag, tagCtx) },
+    { key: "Del", label: T("delete tag"), run: () => confirmDelete([group.tag], tagCtx) },
+    { key: "v", label: T("individual"), run: () => switchView() }, { key: "ctrl+k", label: T("commands"), run: () => pop.palette() }];
+  if (group && !sel.length) return [{ key: "← →", label: T("collapse / expand the group"), run: () => toggleGroup() },
+    { key: "v", label: T("individual"), run: () => switchView() }, { key: "/", label: T("search"), run: () => startSearch() }, { key: "ctrl+k", label: T("commands"), run: () => pop.palette() }];
   if (!sel.length) return [{ key: "/", label: T("search"), run: () => startSearch() }, { key: "ctrl+k", label: T("commands"), run: () => pop.palette() }];
   const out = [];
   if (k === 0) out.push({ key: "space", label: T("enable"), run: () => verb("toggle") });
@@ -383,7 +497,7 @@ function moveCursor(d, extend) {
     if (S.anchor < 0) S.anchor = from;
     c.sel.clear();
     const [a, b] = [Math.min(S.anchor, c.cursor), Math.max(S.anchor, c.cursor)];
-    for (let i = a; i <= b; i++) c.sel.add(key(c.items[c.view[i]]));
+    for (let i = a; i <= b; i++) if (c.view[i] >= 0) c.sel.add(key(c.items[c.view[i]]));
   } else S.anchor = -1;
   ensureVisible();
   renderRows(S.focus);
@@ -397,6 +511,9 @@ function moveCursor(d, extend) {
 async function step(d) {
   const c = col(lastList);
   c.cursor = Math.max(0, Math.min(c.view.length - 1, c.cursor + d));
+  // full details step past the tag groups' headers
+  const dir = d < 0 ? -1 : 1;
+  while (c.view[c.cursor] < 0 && c.cursor + dir >= 0 && c.cursor + dir < c.view.length) c.cursor += dir;
   ensureVisible(lastList);
   renderRows(lastList);
   detailKey = "";
@@ -406,19 +523,55 @@ async function step(d) {
 function click(k, i, e) {
   const c = S.cols[k];
   if (S.focus !== k) focusArea(k);
+  const g = headOf(c, c.view[i]);
+  if (g && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+    // ctrl+click on a tag group's header selects its rows shown (again: unselects them)
+    const ks = g.rows.map((j) => key(c.items[j]));
+    const all = ks.length && ks.every((x) => c.sel.has(x));
+    for (const x of ks) all ? c.sel.delete(x) : c.sel.add(x);
+    c.cursor = i; S.anchor = i;
+    return clicked(k);
+  }
+  if (g && !e.shiftKey) { c.cursor = i; S.anchor = i; return toggleGroup(); }
   if (e.shiftKey) {
     if (S.anchor < 0) S.anchor = c.cursor;
     c.sel.clear();
     const [a, b] = [Math.min(S.anchor, i), Math.max(S.anchor, i)];
-    for (let j = a; j <= b; j++) c.sel.add(key(c.items[c.view[j]]));
+    for (let j = a; j <= b; j++) if (c.view[j] >= 0) c.sel.add(key(c.items[c.view[j]]));
   } else if (e.ctrlKey || e.metaKey) {
     const kk = key(c.items[c.view[i]]);
     c.sel.has(kk) ? c.sel.delete(kk) : c.sel.add(kk);
     S.anchor = i;
   } else S.anchor = i;
   c.cursor = i;
+  clicked(k);
+}
+function clicked(k) {
   renderRows(k);
   renderHeads();
+  renderWhere();
+  renderHints();
+  detailFollow();
+}
+
+// ---- the Disabled column's tag groups (16 §2.5) ----
+
+// toggleGroup opens or closes the group whose header the cursor is on (open: true / false
+// sets it); false when the cursor is not on a header.
+function toggleGroup(open) {
+  const c = S.cols[0], g = headOf(c, c.view[c.cursor]);
+  if (!g) return false;
+  setGroupOpen(g.key, open ?? !g.open);
+  viewChanged();
+  return true;
+}
+// switchView is v: the Disabled column one row per copy, or grouped by tag.
+async function switchView() {
+  if (await setView(grouped() ? "individual" : "tags")) viewChanged();
+}
+function viewChanged() {
+  renderLists();
+  ensureVisible(0);
   renderWhere();
   renderHints();
   detailFollow();
@@ -430,9 +583,10 @@ function click(k, i, e) {
 // places and the ones it changed (ids; else what moved) flash (16 §7.1). call is a function
 // that starts the verb: the verbs go to Go one after another, in the order given, and the
 // page reads the lists again once, after the last (a key held down does not wait on each
-// step). local, when given, changes the lists here at once, before Go answers.
+// step). local, when given, changes the lists here at once, before Go answers. answered, when
+// given, runs once Go has done the last edit, while the lists are read again.
 let editChain = Promise.resolve(), editsPending = 0, reloadWanted = false, editEpoch = 0;
-async function edited(call, undoable = true, ids = null, local = null) {
+async function edited(call, undoable = true, ids = null, local = null, answered = null) {
   const before = motion.snapshot();
   editEpoch++;
   editsPending++;
@@ -458,7 +612,9 @@ async function edited(call, undoable = true, ids = null, local = null) {
   reloadWanted = false;
   if (!local) for (const c of S.cols) c.sel.clear();
   const again = motion.snapshot();
-  await reload();
+  const read = reload();
+  if (!e && answered) answered(r);
+  await read;
   motion.play(local ? again : before, S.placed || ids);
   return e ? null : r;
 }
@@ -470,10 +626,10 @@ function take(k, keys) {
   const c = S.cols[k], want = new Set(keys), out = [], rest = [];
   for (const it of c.items) (want.has(key(it)) ? out : rest).push(it);
   if (!out.length) return out;
-  const curKey = cur(k) && key(cur(k));
-  const shown = new Set(c.view.map((i) => key(c.items[i])));
+  const keep = curKey(k);
+  const shown = new Set(shownItems(c).map((i) => key(c.items[i])));
   c.items = rest;
-  relist(k, shown, curKey && !want.has(curKey) ? curKey : null, c.cursor);
+  relist(k, shown, keep && !want.has(keep) ? keep : null, c.cursor);
   return out;
 }
 
@@ -482,7 +638,7 @@ function take(k, keys) {
 function put(k, its, at = 0) {
   if (!its.length) return;
   const c = S.cols[k];
-  const shown = new Set(c.view.map((i) => key(c.items[i])));
+  const shown = new Set(shownItems(c).map((i) => key(c.items[i])));
   for (const it of its) shown.add(key(it));
   if (k === 1) {
     const i = at > 0 ? Math.min(at - 1, c.items.length) : c.items.length;
@@ -509,7 +665,8 @@ function relist(k, shown, keepKey, keepAt = 0) {
   const filtered = k < 2 ? barOn() : !!c.query.trim();
   c.view = [];
   c.items.forEach((it, i) => { if (!filtered || shown.has(key(it))) c.view.push(i); });
-  let at = keepKey ? c.view.findIndex((i) => key(c.items[i]) === keepKey) : -1;
+  shape(k);
+  let at = findEntry(c, keepKey);
   if (at < 0) at = keepAt;
   c.cursor = Math.max(0, Math.min(at, c.view.length - 1));
 }
@@ -531,6 +688,31 @@ function toggleLocal(k, its) {
   if (k !== 1) return moveLocal(k, 1, mods);
   const gone = take(1, its.filter((it) => !it.id).map(key)).length > 0;
   return moveLocal(1, 0, mods) || gone;
+}
+
+// useLocal is use this copy (view OpUse): the copy takes the place of the copy of the same
+// Mod the list uses, which goes to Not enabled; with none, it is enabled at the end (Go then
+// puts it where the rules say). Only a copy in Not enabled moves here; a staged one waits
+// for Go. The details keep the copy shown, its copies marked anew, until Go has answered.
+function useLocal(id) {
+  const it = S.cols[0].items.find((x) => x.id === id);
+  if (!it) return false;
+  const c = S.cols[1], at = c.items.findIndex((x) => x.id && x.lineage === it.lineage);
+  if (at < 0) {
+    if (!moveLocal(0, 1, [key(it)])) return false;
+  } else {
+    const old = c.items[at], shown = new Set(shownItems(c).map((i) => key(c.items[i])));
+    shown.add(key(it));
+    take(0, [key(it)]);
+    c.items = c.items.map((x, i) => (i === at ? { ...it, pos: old.pos, unsaved: true } : x));
+    relist(1, shown, key(it));
+    put(0, [old]);
+  }
+  lastList = 1;
+  ensureVisible(1);
+  detailKey = detailTarget().id;
+  refreshCopies();
+  return true;
 }
 
 // blockAt: where MoveBy puts the block (view.MoveBy): its first row d places on, in the
@@ -839,8 +1021,9 @@ async function paletteChoice(o) {
     const c = S.cols[k];
     let i = c.items.findIndex((x) => x.id === o.id);
     if (i < 0) continue;
+    if (k === 0) reveal(i);
     let v = c.view.indexOf(i);
-    if (v < 0 && k < 2) { S.bar.clear(); await barChanged(); v = c.view.indexOf(i); }
+    if (v < 0 && k < 2) { S.bar.clear(); await barChanged(); if (k === 0) reveal(i); v = c.view.indexOf(i); }
     if (v < 0) { c.query = ""; $(`.area[data-area="${k}"] .search input`).value = ""; await refilter(k, o.id); v = c.view.indexOf(i); }
     focusArea(k);
     c.cursor = v;
@@ -901,7 +1084,7 @@ function searchKey(k, e, inp) {
 let barSeq = 0;
 async function barChanged() {
   const n = ++barSeq;
-  const keep = [0, 1].map((k) => (cur(k) ? key(cur(k)) : ""));
+  const keep = [0, 1].map((k) => curKey(k));
   await Promise.all([0, 1].map((k) => refilter(k, keep[k])));
   if (n !== barSeq) return;
   S.bar.draw();
@@ -1093,6 +1276,24 @@ function onKey(e) {
     if (S.focus === 3) return scrollDetail(k === "ArrowDown" ? 1 : -1, false), renderWhere();
     return moveCursor(k === "ArrowDown" ? 1 : -1, e.shiftKey);
   }
+  // on a tag group's header ← closes it and → opens it; otherwise they change areas (16 §2.5)
+  if ((k === "ArrowLeft" || k === "ArrowRight") && !e.shiftKey && S.focus === 0) {
+    const g = headOf(col(0), col(0).view[col(0).cursor]);
+    if (g && g.open === (k === "ArrowLeft")) { handled(); return toggleGroup(k === "ArrowRight"); }
+  }
+  if (k === "Enter" && S.focus === 0 && !ctrl && !e.altKey && toggleGroup()) return handled();
+  // on a tag's header, the Tag manager's keys (16 §2.9): F2 rename, n note, M merge, Del delete
+  if (S.focus === 0 && !ctrl && !e.altKey && !col(0).sel.size) {
+    const g = headOf(col(0), col(0).view[col(0).cursor]);
+    const kk = e.shiftKey && k === "m" ? "M" : k;
+    if (g && !g.none && ["F2", "n", "M", "Delete"].includes(kk)) {
+      handled();
+      if (kk === "F2") return startRename(tagBox(), g, tagCtx);
+      if (kk === "n") return editTagNote(tagBox(), tagCtx);
+      if (kk === "M") return pickMerge(g.tag, tagCtx);
+      return confirmDelete([g.tag], tagCtx);
+    }
+  }
   if (k === "ArrowLeft" || k === "ArrowRight") {
     handled();const areas=[3,1,0],at=areas.indexOf(S.focus===2?0:S.focus);
     return focusArea(areas[Math.max(0,Math.min(2,at+(k==="ArrowRight"?1:-1)))]);
@@ -1119,7 +1320,7 @@ function onKey(e) {
   if (ctrl && k.toLowerCase() === "a" && S.focus < 3) {
     handled();
     const c = col();
-    for (const i of c.view) c.sel.add(key(c.items[i]));
+    for (const i of c.view) if (i >= 0) c.sel.add(key(c.items[i]));
     renderRows(S.focus); renderWhere(); renderHints();
     return;
   }
@@ -1147,7 +1348,7 @@ function onKey(e) {
     "/": () => startSearch(), "\\": () => S.bar.toggle(), c: () => go("changes"), l: () => go("log"), R: () => cmd("rescan"), A: () => cmd("analyze"),
     H: () => historyChooser(), C: () => changesOfCursor(), "<": () => widthKey(-1), ">": () => widthKey(1), "=": () => widthKey(0),
     E: () => go("env"), P: () => plans.chooser(), "?": () => pop.help("plan"), ":": () => commandLine(), i: () => exchange(0), e: () => exportCurrent(),
-    r: () => startRule(actionContext().sel[0]),
+    r: () => startRule(actionContext().sel[0]), v: () => switchView(),
   };
   // shift+letter is the capital letter even where the key reports it in lower case
   const kk = e.shiftKey && /^[a-z]$/.test(k) ? k.toUpperCase() : k;
@@ -1210,6 +1411,7 @@ async function loadWidths() {
 
 const ui = {
   reload, refreshEnvironment, relang, reaccent, render, pageEntering, pageEntered, renderWhere, renderHints, renderHeads, click, verb, drop, place, run, preview, cmd, step, search, searchKey, go, useEnv,
+  back: () => travel(-1),
   palette: paletteChoice, commandDone, uninstallStarted: () => uninst.restore(), selectionItems: selection, planMenu: (id, x, y, opener, keys) => plans.menuAt(id, x, y, opener, keys),
   menu: (x, y) => openRowMenu(x, y, false),
   detailFollow: (f) => detailFollow(f),
@@ -1229,6 +1431,7 @@ async function start() {
   setArchoMode(s.archoMotion);
   bootLive(); // the start-up screen's figure and tip, from 0.21 s (16 §7.1)
   archoTheme.apply(s.theme);
+  archoTheme.motion(s.motion);
   applyAccent(s.accent);
   S.start = s;
   setText(s.text, s.extraText);
@@ -1249,6 +1452,7 @@ async function start() {
   plans.initPlans(ui);
   library.initLibrary(ui);
   tasksPage.initTasks(ui);
+  selfUpdate.initSelfUpdate(ui);
   savesPage.initSaves(ui);
   S.bar = createBar({ data: () => S.barData, change: () => barChanged(), splitKey: "ui.gui.filter.split:plan",
     column: () => $("#board > .fcol"), resized: () => renderRows(0), leave: () => focusArea(lastList < 2 ? lastList : 1),
@@ -1256,6 +1460,9 @@ async function start() {
   $("#board .barhost").replaceWith(S.bar.el);
   $('.area[data-area="3"] > .head').addEventListener("click", () => { if (S.bar.fills()) S.bar.toggle(false); });
   wireLists(ui);
+  setOnViewChange(viewChanged);
+  // the Disabled column's last view (16 §2.5); the editor is not shown yet at start
+  loadView().then((tags) => { if (tags) { regroup(); if (!S.screen) viewChanged(); } });
   initRules(ui);
   wireSplits();
   document.addEventListener("keydown", onKey);
@@ -1263,14 +1470,22 @@ async function start() {
   // a detail's settings row: Mod library › Mod settings at that Mod's files (16 §2.9)
   document.addEventListener("open-mod-settings", (e) => { modSettings.focusMod(e.detail); go("mod-settings"); });
   document.addEventListener("editor-full",()=>fullPage.full("plan",S.detail?.id));
+  // a Mod's tags were reordered in its details: the rows' colour marks follow (16 §2.9)
+  document.addEventListener("tags-changed", () => reload());
+  document.addEventListener("filter-tag", (e) => S.bar.set("tags:" + e.detail, 1));
+  document.addEventListener("open-tag", (e) => openTag(e.detail));
   document.addEventListener("editor-use-copy", async (e) => {
     if(environmentReason())return say("busy",environmentReason());
-    const result = await edited(() => api.RunOp("use",[e.detail]),true,[e.detail]);
+    const id = e.detail;
+    // the lists change at once; the copy's details load as soon as Go has made the change,
+    // not after the lists are read again
+    const shownNow = () => { const it = S.cols[1].items.find((x) => x.id === id); if (it) showDetail(it, false); };
+    const result = await edited(() => api.RunOp("use", [id]), true, [id], () => useLocal(id), shownNow);
     if (!result) return;
-    const c = S.cols[1], at = c.view.findIndex((i) => c.items[i].id === e.detail);
-    if (at >= 0) { c.cursor = at; lastList = 1; ensureVisible(1); renderLists(); }
-    const item = c.items.find((it) => it.id === e.detail);
-    if (item) await showDetail(item, false);
+    const c = S.cols[1], at = c.view.findIndex((i) => c.items[i].id === id);
+    if (at >= 0 && cur(1)?.id !== id) { c.cursor = at; lastList = 1; ensureVisible(1); renderLists(); }
+    const item = c.items.find((it) => it.id === id);
+    if (item && $("#detail").dataset.ref !== id) await showDetail(item, false);
     renderWhere(); renderHints();
   });
   // the details' buttons act on the copy shown, whatever the lists' selection
@@ -1341,8 +1556,11 @@ async function start() {
     try { if (S.board && (await api.Stamp()) !== S.board.stamp) await reload(); } catch { /* keep the page */ }
     checkCredit();
   });
-  if (!(await firstRun.workshopStart())) return;
-  if (await uninst.restore()) { bootDone(); shell.settle(); return; }
+  // From here on a failing step says why and the window still boots: a page, the live
+  // poll and Ready (an early throw used to leave the boot screen with no page behind it).
+  const failed = (e) => say("fail", errText(e));
+  try { if (!(await firstRun.workshopStart())) return; } catch (e) { failed(e); }
+  try { if (await uninst.restore()) { bootDone(); shell.settle(); return; } } catch (e) { failed(e); }
   // The start page needs only Workspace's shell and board. The editor behind it gets its
   // filter answer (the bar's first one reads every mod's content) and its rows afterwards,
   // so the first page does not wait for them.
@@ -1359,17 +1577,21 @@ async function start() {
   await shellRead;
   // No environment yet: the first-run guide (16 §2.15); else the home page (16 §2.3).
   const first = !S.shell || !S.shell.envs;
-  if (first) await guide.start("first");
-  else await go("home");
+  try {
+    if (first) await guide.start("first");
+    else await go("home");
+  } catch (e) { failed(e); }
   bootDone();
   shell.settle();
   requestAnimationFrame(() => api.Ready().catch(() => {}));
   pollLive();
-  await loadWidths();
-  if (first) return;
-  await scr.checkDirectories();
-  if (S.board && S.board.neverScanned) cmd("rescan");
-  checkCredit();
+  try {
+    await loadWidths();
+    if (first) return;
+    await scr.checkDirectories();
+    if (S.board && S.board.neverScanned) cmd("rescan");
+    checkCredit();
+  } catch (e) { failed(e); }
 }
 
 // A history row (16 §2.5): a click goes there at once. Loading a version is one step: the

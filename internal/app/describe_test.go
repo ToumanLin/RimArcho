@@ -8,6 +8,7 @@ import (
 	"image/png"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -54,7 +55,7 @@ func TestDescribe(t *testing.T) {
 	e := testkit.New(t)
 	short := testkit.Sample("tester.short", "Short About")
 	dir := e.AddWorkshop("1001", short)
-	e.WriteFile(dir+`\About\About.xml`, strings.Replace(short.AboutXML(), "</ModMetaData>", "<description>Adds a thing.</description></ModMetaData>", 1))
+	e.WriteFile(filepath.Join(dir, "About", "About.xml"), strings.Replace(short.AboutXML(), "</ModMetaData>", "<description>Adds a thing.</description></ModMetaData>", 1))
 	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld")
 	e.AddEnv(false)
 	e.MustRun("scan")
@@ -126,7 +127,7 @@ func TestDescribe(t *testing.T) {
 		t.Fatalf("--source both:\n%s", out)
 	}
 	// A local mod has no Workshop page.
-	e.WriteMod(e.Game+`\Mods\Loc`, testkit.Sample("tester.loc", "Local One"))
+	e.WriteMod(filepath.Join(e.Game, "Mods", "Loc"), testkit.Sample("tester.loc", "Local One"))
 	e.MustRun("scan")
 	if out := e.MustRun("describe", "pkg:tester.loc"); !strings.Contains(out, "not a workshop mod") || *api != 2 {
 		t.Fatalf("local mod:\n%s", out)
@@ -139,7 +140,7 @@ func TestDescribeChoice(t *testing.T) {
 	long := strings.Repeat("About text that is long enough. ", 15)
 	m := testkit.Sample("tester.long", "Long About")
 	e.AddWorkshop("2002", m)
-	dir := e.Workshop + `\2002\About\About.xml`
+	dir := filepath.Join(e.Workshop, "2002", "About", "About.xml")
 	e.WriteFile(dir, strings.Replace(m.AboutXML(), "</ModMetaData>", "<description>"+long+"</description></ModMetaData>", 1))
 	e.AddEnv(false)
 	e.MustRun("scan")

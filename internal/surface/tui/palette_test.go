@@ -120,3 +120,28 @@ func TestPaletteLibrary(t *testing.T) {
 	defer SetLang("en")
 	check("zh")
 }
+
+// 16 §3.5: a command run from the full detail opens its page with the keys of that page; the
+// full detail closes when the command leaves the lists.
+func TestPaletteFromFullDetail(t *testing.T) {
+	e, _ := fixture(t)
+	m := direct(t, e, 140, 40)
+	press(m, "enter")
+	if !m.full {
+		t.Fatal("enter: no full detail")
+	}
+	m.update(tea.KeyMsg{Type: tea.KeyCtrlK})
+	typeIn(m, "mod library")
+	if r := m.pal.results; len(r) == 0 || r[0].alias != "mod library" {
+		t.Fatalf("mod library: results %+v", r)
+	}
+	press(m, "enter")
+	if m.tab != tabLibrary || m.full {
+		t.Fatalf("after the command: tab %d, full %v", m.tab, m.full)
+	}
+	// the library takes its keys: tab goes to the next page under the same sidebar entry
+	pressKey(m, tea.KeyTab)
+	if m.tab == tabLibrary {
+		t.Fatal("tab in the library did nothing")
+	}
+}

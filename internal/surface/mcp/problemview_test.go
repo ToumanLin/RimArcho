@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ToumanLin/RimArcho/internal/cmds"
 	"github.com/ToumanLin/RimArcho/internal/surface/mcp"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 	"reflect"
@@ -31,10 +32,10 @@ func TestParentProblemRefParity(t *testing.T) {
 		}
 	}
 	out, isErr := call(t, connect(t, e), "list_problems", map[string]any{"ref": ref})
-	if isErr || out != e.MustRun("problems", "--ref", ref) {
+	if isErr || out != cmds.MCPHints(e.MustRun("problems", "--ref", ref)) {
 		t.Fatalf("parity error=%v:\n%s", isErr, out)
 	}
-	if !strings.Contains(out, "fix: archo enable") || strings.Contains(out, "ParentName=") {
+	if !strings.Contains(out, "fix: edit_loadout action=enable") || strings.Contains(out, "ParentName=") {
 		t.Fatal(out)
 	}
 }

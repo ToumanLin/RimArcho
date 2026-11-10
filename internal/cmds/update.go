@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	register(&Command{Name: "update", Summary: "check Workshop or GitHub for a newer RimArcho and install it; the data folder is not touched (17 §5.1)",
+	register(&Command{Name: "update", Summary: "check for a newer RimArcho and show update options; the data folder is not touched (17 §5.1)",
 		Flags: []Flag{{Name: "check", Help: "only check and show what installing would do; nothing is downloaded"}}, MaxArgs: 0, Run: updateCmd})
 }
 
@@ -35,10 +35,10 @@ func updateCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	}
 	info := c.App.SelfUpdateInfo()
 	r := c.App.SelfUpdatePending()
-	if a.Bool("check") || r == nil {
+	if a.Bool("check") || r == nil || !app.SelfUpdateSupported() {
 		d, root := render.New("RimArcho " + cur)
 		updateFacts(c, root, info, r)
-		if r != nil {
+		if r != nil && app.SelfUpdateSupported() {
 			d.AddNext("archo update")
 		}
 		return d, nil
@@ -96,6 +96,15 @@ func updateFacts(c *Ctx, root *render.Node, info app.SelfUpdate, r *selfupdate.R
 	}
 	root.KV("latest", latest)
 	root.KV("checked", c.App.FormatTime(info.Checked))
+	if !app.SelfUpdateSupported() {
+		root.KV("update", "available")
+		root.KV("page", r.Page)
+		root.KV("how", c.App.SelfUpdateInstructions())
+		if notes := strings.TrimSpace(r.Notes); notes != "" {
+			root.Section("notes").Add(notes)
+		}
+		return
+	}
 	if err := r.Installable(); err != nil {
 		root.KV("update", "available, but cannot be installed from here: "+err.Error())
 		root.KV("page", r.Page)

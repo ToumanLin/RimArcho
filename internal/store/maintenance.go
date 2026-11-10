@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -87,7 +89,9 @@ func (s *Store) Maintain(ctx context.Context, o MaintenanceOptions) (r Maintenan
 	if err = c.QueryRowContext(ctx, "SELECT value FROM meta WHERE key=?", maintenanceLeaseKey).Scan(&lease); err != nil && err != sql.ErrNoRows {
 		return r, err
 	}
-	if t, e := time.Parse(time.RFC3339, lease); e == nil && o.Now.Before(t.Add(15*time.Minute)) {
+	// The lease names its process: one killed mid-VACUUM no longer holds it.
+	at, owner, _ := strings.Cut(lease, " ")
+	if t, e := time.Parse(time.RFC3339, at); e == nil && o.Now.Before(t.Add(15*time.Minute)) && leaseOwnerAlive(owner) {
 		return r, ErrMaintenanceBusy
 	}
 	err = nil
@@ -137,7 +141,8 @@ func (s *Store) Maintain(ctx context.Context, o MaintenanceOptions) (r Maintenan
 	if err = pruneFactsOn(ctx, c, o.Now); err != nil {
 		return r, err
 	}
-	if _, err = c.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, maintenanceLeaseKey, o.Now.UTC().Format(time.RFC3339)); err != nil {
+	if _, err = c.ExecContext(ctx, `INSERT INTO meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, maintenanceLeaseKey,
+		o.Now.UTC().Format(time.RFC3339)+" "+strconv.Itoa(os.Getpid())); err != nil {
 		return r, err
 	}
 	// 3. Commit pruning before VACUUM, which cannot run inside a transaction.
@@ -176,16 +181,22 @@ func (s *Store) Maintain(ctx context.Context, o MaintenanceOptions) (r Maintenan
 	if !o.Automatic || free*pageSize >= 16<<20 || (free*pageSize >= 1<<20 && free*5 >= pages) {
 		// SQLite may need a temporary database AND a full WAL concurrently.
 		need := 2*pages*pageSize + 64<<20
-		if o.FreeSpace == nil || o.FreeSpace(s.Path) < need {
+		short := o.FreeSpace == nil || o.FreeSpace(s.Path) < need
+		switch {
+		case short && !o.Automatic:
 			return r, &NeedSpaceError{Need: need}
+		case short:
+			// Automatic: skip reclamation and complete, so it waits the interval instead of
+			// pruning again at every start.
+		default:
+			if err = maintenanceCheckpoint(ctx, c); err != nil {
+				return r, err
+			}
+			if _, err = c.ExecContext(ctx, "VACUUM"); err != nil {
+				return r, err
+			}
+			r.Vacuumed = true
 		}
-		if err = maintenanceCheckpoint(ctx, c); err != nil {
-			return r, err
-		}
-		if _, err = c.ExecContext(ctx, "VACUUM"); err != nil {
-			return r, err
-		}
-		r.Vacuumed = true
 	}
 	// 5. Checkpoint reports busy as a result column, not as an SQLite error.
 	if err = maintenanceCheckpoint(ctx, c); err != nil {
@@ -201,6 +212,16 @@ func (s *Store) Maintain(ctx context.Context, o MaintenanceOptions) (r Maintenan
 	err = maintenanceCheckpoint(ctx, c)
 	r.After = databaseBytes(s.Path)
 	return r, err
+}
+
+// leaseOwnerAlive reports whether the process that wrote a lease may still run; a lease
+// without a process ID (older format) is trusted until it expires.
+func leaseOwnerAlive(owner string) bool {
+	pid, err := strconv.Atoi(owner)
+	if err != nil || pid <= 0 || pid == os.Getpid() {
+		return true
+	}
+	return processAlive(pid)
 }
 
 func maintenanceCheckpoint(ctx context.Context, c *sql.Conn) error {

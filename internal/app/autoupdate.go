@@ -24,6 +24,19 @@ type AutomaticStatus struct {
 	// Latest is the newest RimArcho release the "self" check found (17 §5.1): a notice is
 	// due again when it changes even though Pending stays 1.
 	Latest string `json:"latest,omitempty"`
+	// Lease is when a running check claimed the record (RFC 3339), empty when none runs.
+	// Checked moves only when a check finishes, so a check that was killed delays nothing;
+	// a lease older than automaticLeaseTTL belongs to such a check.
+	Lease string `json:"lease,omitempty"`
+}
+
+// automaticLeaseTTL is how long a claimed check keeps other windows from starting the same
+// one; longer than any check runs, short enough that a killed one is retried the same day.
+const automaticLeaseTTL = 30 * time.Minute
+
+func (s AutomaticStatus) leaseLive(now time.Time) bool {
+	t, err := time.Parse(time.RFC3339Nano, s.Lease)
+	return err == nil && now.Sub(t) < automaticLeaseTTL
 }
 
 func (a *App) AutomaticEnabled() bool { return a.Store.Meta("cfg:updates.auto") != "off" }
@@ -49,6 +62,9 @@ func (a *App) AutomaticInterval(kind string) time.Duration {
 func (a *App) AutomaticStatus(kind string) AutomaticStatus {
 	s := AutomaticStatus{Kind: kind, State: "not checked yet"}
 	_ = json.Unmarshal([]byte(a.Store.Meta("automatic:"+kind)), &s)
+	if s.State == "checking" && !s.leaseLive(a.Now()) {
+		s.State = "check interrupted" // the window running it closed or was killed
+	}
 	return s
 }
 
@@ -56,7 +72,11 @@ func (a *App) AutomaticDue(kind string) bool {
 	if !a.AutomaticEnabled() {
 		return false
 	}
-	last := a.AutomaticStatus(kind).Checked
+	st := a.AutomaticStatus(kind)
+	if st.leaseLive(a.Now()) {
+		return false // another window is checking
+	}
+	last := st.Checked
 	interval := a.AutomaticInterval(kind)
 	if kind == "session" {
 		if a.Store.Meta("account:loverslab:enabled") != "true" {
@@ -129,9 +149,13 @@ func (a *App) runAutomatic(ctx context.Context, kind string, run func(context.Co
 		return false, ctx.Err()
 	}
 	s := a.AutomaticStatus(kind)
-	s.Checked, s.State = a.Now().UTC(), "checking"
+	if s.leaseLive(a.Now()) {
+		return false, nil // another window is checking; its result will be recorded
+	}
+	started := a.Now().UTC()
+	s.Lease, s.State = started.Format(time.RFC3339Nano), "checking"
+	lease := s.Lease
 	b, _ := json.Marshal(s)
-	claimed := string(b)
 	_, err := a.Store.DB.Exec(`INSERT OR IGNORE INTO meta(key,value) VALUES(?, '')`, key)
 	if err != nil {
 		return false, err
@@ -161,10 +185,12 @@ func (a *App) runAutomatic(ctx context.Context, kind string, run func(context.Co
 	if checkErr != nil && s.State == "" {
 		s.State = "check unavailable offline"
 	}
-	s.Completed = a.Now().UTC()
+	s.Checked, s.Completed, s.Lease = started, a.Now().UTC(), ""
 	b, _ = json.Marshal(s)
-	// Do not overwrite a newer attempt from another window after a long suspension.
-	_, err = a.Store.DB.Exec(`UPDATE meta SET value=? WHERE key=? AND value=?`, string(b), key, claimed)
+	// The result is written while the lease is still ours: other writers of the record (a
+	// pending count after an update) keep the lease, a newer claim from another window
+	// after a long suspension replaces it and wins.
+	_, err = a.Store.DB.Exec(`UPDATE meta SET value=? WHERE key=? AND json_extract(value, '$.lease')=?`, string(b), key, lease)
 	return true, errors.Join(checkErr, err)
 }
 

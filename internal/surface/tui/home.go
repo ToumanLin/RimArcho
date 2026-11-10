@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
@@ -18,27 +20,30 @@ type homeState struct {
 	err     error
 	loading bool
 	seq     int
+	key     string
 }
 
 // openHome shows Start and reads its data on a session of its own.
 func (m *model) openHome() tea.Cmd {
 	m.tab, m.full, m.insp, m.panel = tabHome, false, nil, nil
 	h := &m.home
+	key := m.pageKey()
+	if h.data != nil && h.key == key {
+		return nil
+	}
 	h.seq++
 	h.loading = true
 	seq := m.home.seq
-	return m.bg(func(a *app.App) func(m *model) tea.Cmd {
+	valid := func(m *model) bool { return m.home.seq == seq && m.tab == tabHome && m.pageKey() == key }
+	return m.bgWhen(valid, func(a *app.App) func(m *model) tea.Cmd {
 		// the page is about the current list, whichever list the editor has open (07 §1.3)
 		a.OpenPlan, a.PlanName = 0, ""
 		data, err := homeOf(a)
 		return func(m *model) tea.Cmd {
-			if m.home.seq == seq {
-				m.home.data, m.home.err, m.home.loading = data, err, false
-				if m.tab == tabHome {
-					if row := m.homeRow(); row != nil && row.Memory != nil && (!row.Memory.Assessment.Estimated || row.Memory.Assessment.Stale) {
-						return m.startMemoryEstimateAt(row.Plan, row.EnvName)
-					}
-				}
+			m.home.data, m.home.err, m.home.loading = data, err, false
+			m.home.key = key
+			if row := m.homeRow(); row != nil && row.Memory != nil && (!row.Memory.Assessment.Estimated || row.Memory.Assessment.Stale) {
+				return m.startMemoryEstimateAt(row.Plan, row.EnvName)
 			}
 			return nil
 		}
@@ -62,7 +67,7 @@ func homeOf(a *app.App) (*view.Home, error) {
 	if err != nil {
 		return nil, err
 	}
-	return view.BuildHomeFromState(a, st, view.BuildNeeds(a, st, ps), plans, nil), nil
+	return view.BuildLaunchFromState(a, st, view.BuildNeeds(a, st, ps), plans), nil
 }
 
 // goLaunch is the editor's L (and the palette's launch game): the list in the editor becomes
@@ -145,10 +150,16 @@ func (m *model) homeLines(n int) []string {
 		add("  " + sDimS.Render(T("no game")))
 		return out
 	}
-	add("")
 	add("  " + sBold.Render(r.Name))
 	add("")
-	label := func(s string) string { return sDimS.Render(fit(T(s), 8)) + "  " }
+	// labels in one column as wide as the longest, and everything below them on the value
+	// column (16 §7 grid)
+	lw := 0
+	for _, s := range []string{"game", "list", "last game"} {
+		lw = max(lw, width.StringWidth(T(s)))
+	}
+	label := func(s string) string { return sDimS.Render(fit(T(s), lw)) + "  " }
+	indent := strings.Repeat(" ", lw+2)
 	ver := sText.Render(r.EnvName) // the full version: the chip's short one says less
 	if r.GameVersion != "" {
 		ver += "  " + sDimS.Render(r.GameVersion)
@@ -161,15 +172,20 @@ func (m *model) homeLines(n int) []string {
 	add("  " + label("list") + sText.Render(r.Facts) + "  " + state)
 	if d := h.data; d.LastRun != "" {
 		errs := T("no errors")
-		if d.LastRunErrors > 0 {
+		switch {
+		case d.LastRunErrors > 0:
 			errs = Tf("%d errors", d.LastRunErrors)
+		case d.LastRunPending:
+			errs = T("not checked yet")
 		}
 		add("  " + label("last game") + sText.Render(d.LastRun) + "  " + sText.Render(errs))
 	}
 	if l := h.data.Launch; l != nil && l.Text != "" {
-		add("  " + sWarnS.Render(Tf("watch for: %s", l.Text)) + "  " + sDimS.Render("shift+2"))
+		add("")
+		add("  " + indent + sWarnS.Render(ic.warn+" "+Tf("watch for: %s", l.Text)) + "   " + sBold.Render("@"))
 	}
 	add("")
+	// the launch action is the page's one solid block: a pill (16 §7 principle 4)
 	launchLabel, launchStyle := T("launch the game"), sAccent
 	if r.Memory != nil {
 		switch r.Memory.Assessment.RAMSeverity {
@@ -179,9 +195,9 @@ func (m *model) homeLines(n int) []string {
 			launchLabel, launchStyle = T("launch with limited RAM"), sWarnS
 		}
 	}
-	add("  " + launchStyle.Render(ic.play+" "+launchLabel) + "  " + sText.Render("L"))
+	add("  " + indent + launchStyle.Background(cPill).Bold(true).Render("  "+ic.play+" "+launchLabel+"   ") + sPill.Bold(true).Render("L") + sPill.Render("  "))
 	if r.Unsaved > 0 && m.launches == "" {
-		add("  " + sDimS.Render(Tf("save %d changes", r.Unsaved)) + "  " + sText.Render("w"))
+		add("  " + indent + sSecond.Render("  "+Tf("save %d changes", r.Unsaved)) + "  " + sBold.Render("w"))
 	}
 	return out
 }

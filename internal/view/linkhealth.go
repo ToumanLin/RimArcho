@@ -32,21 +32,28 @@ func linkNeeds(a *app.App, links []*app.GameLink) []Need {
 			plan.Links = append(plan.Links, &copy)
 		}
 		previewGroups, preview := linkRows(a, plan.Links)
-		label := T("remove the broken or wrong links")
-		if include != "" {
-			label = Tf("include unproven link: %s", filepath.Base(include))
+		recovery, removes, copies := false, false, false
+		for _, l := range plan.Links {
+			recovery = recovery || l.Code == app.CodeLinkRecovery
+			removes = removes || l.Action == "remove link"
+			copies = copies || l.Action == "recycle copy"
 		}
-		for _, l := range issues {
-			if l.Code == app.CodeLinkRecovery {
-				label = T("repair the previewed links")
-				break
-			}
+		label := T("remove the broken or wrong links")
+		switch {
+		case recovery:
+			label = T("repair the previewed links")
+		case include != "":
+			label = Tf("include unproven link: %s", filepath.Base(include))
+		case removes && copies:
+			label = T("repair the previewed links")
+		case copies:
+			label = T("move the copies to the recycle bin")
 		}
 		return Action{Kind: ActRepairLinks, Key: "R", Label: label, Refs: []string{a.RememberLinkRepair(plan)}, Confirm: T("press R again to apply the previewed link repair"), Warn: strings.Join(preview, "\n\n"), Lines: preview, LinkGroups: previewGroups, Done: T("applied the previewed link repair")}
 	}
 	owned := false
 	for _, l := range issues {
-		if l.Action == "remove link" || l.Action == "recover link" || l.Action == "complete recovery" {
+		if l.Action == "remove link" || l.Action == "recycle copy" || l.Action == "recover link" || l.Action == "complete recovery" {
 			owned = true
 		}
 	}
@@ -113,10 +120,15 @@ func linkRows(a *app.App, links []*app.GameLink) ([]LinkGroup, []string) {
 		switch l.Action {
 		case "remove link":
 			action = T("will delete")
+		case "recycle copy":
+			action = T("to the recycle bin")
 		case "recover link", "complete recovery":
 			action = T(l.Action)
 		}
 		row := LinkRow{Name: filepath.Base(l.Path), Path: l.Path, Target: l.Target, Reason: LinkReason(l), Action: action}
+		if l.Copy != "" {
+			row.Target = l.Copy // the folder the link points at again once the copy is gone
+		}
 		groups[at].Rows = append(groups[at].Rows, row)
 		lines = append(lines, fmt.Sprintf("%s → %s  %s [%s]", l.Path, row.Target, row.Reason, row.Action))
 	}

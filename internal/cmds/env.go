@@ -12,7 +12,7 @@ import (
 )
 
 var envFlags = []Flag{
-	{Name: "game", Value: "<dir>", Help: "game install (contains RimWorldWin64.exe / RimWorld.exe)"},
+	{Name: "game", Value: "<dir>", Help: "game install directory"},
 	{Name: "saves", Value: "shared|own", Help: "shared: the game's default user data folder; own: a folder of its own (-savedatafolder)"},
 	{Name: "user-data", Value: "<dir>", Help: "a user data folder of your choice (contains Config/ModsConfig.xml)"},
 	{Name: "launch", Value: "direct|steam"},
@@ -134,6 +134,19 @@ func envDetect(c *Ctx, a *Args) (*render.Doc, error) {
 		d.AddNext("archo env add <name> --game <dir> [--user-data <dir>] [--workshop <dir>]")
 	} else {
 		d.AddNext("archo env add <name> --detected")
+	}
+	for _, other := range env.DetectAll(c.App.Detect) {
+		if env.PathKey(other.GameRoot) == env.PathKey(det.GameRoot) {
+			continue
+		}
+		n := root.Section("another detected environment (suggestion, not saved)")
+		n.KV("game", other.GameRoot)
+		n.KV("version", versionText(other.GameVersion))
+		n.KV("launch", other.Launch)
+		n.KV("steam-library", other.SteamLibrary)
+		n.KV("user-data", other.UserDataRoot)
+		n.KV("workshop", other.WorkshopRoot)
+		d.AddNext("archo env add <name> --game " + quoteArg(other.GameRoot))
 	}
 	return d, nil
 }
@@ -348,7 +361,7 @@ func needSteamCMD(c *Ctx, a *Args) error {
 		if o != nil && o.Bytes > 0 {
 			size = render.Size(o.Bytes)
 		}
-		return &UsageError{Msg: fmt.Sprintf("SteamCMD is not installed. Add --install-steamcmd to download it from Valve (%s, %s) into %s", app.SteamCMDURL, size, c.App.SteamCMDDir())}
+		return &UsageError{Msg: fmt.Sprintf("SteamCMD is not installed. Add --install-steamcmd to download it from Valve (%s, %s) into %s", c.App.SteamCMDDownloadURL(), size, c.App.SteamCMDDir())}
 	}
 	_, err := c.App.InstallSteamCMD()
 	return err

@@ -67,7 +67,7 @@ func (a *App) readIncomingLinks() (*incomingLinkCheck, error) {
 	var out []*GameLink
 	for _, root := range roots {
 		entries, err := os.ReadDir(root.mods)
-		if os.IsNotExist(err) && missingTarget(root.mods) {
+		if os.IsNotExist(err) && missingTarget(root.mods) || err != nil && root.past {
 			continue
 		}
 		if err != nil {
@@ -368,15 +368,22 @@ func (a *App) beginLinkLifecycle(p *LinkLifecyclePlan) error {
 }
 
 // abort never re-creates a link into a missing/unknown target. Unresolved intent
-// stays in the ledger for a read-only recovery finding on the next startup.
+// stays in the ledger for a read-only recovery finding on the next startup. A deletion that
+// removed part of the target (partlyRemovedError) keeps its links removed: the game must
+// not load what is left. Those entries are complete, as a finished deletion's would be.
 func (a *App) abortLinkLifecycle(p *LinkLifecyclePlan, cause error) error {
 	defer p.release()
+	partly := errors.As(cause, new(*partlyRemovedError))
 	for _, l := range p.Links {
 		if !l.detached {
 			if l.snapshot == nil && l.From != "" && missingTarget(l.From) {
 				continue
 			}
 			cause = errors.Join(cause, a.Store.LinkEntryPhase(p.operation, l.Mods, l.Name, "rolled-back"))
+			continue
+		}
+		if partly {
+			cause = errors.Join(cause, a.Store.LinkEntryPhase(p.operation, l.Mods, l.Name, "complete"))
 			continue
 		}
 		state, _ := source.ProbeTarget(l.Target)

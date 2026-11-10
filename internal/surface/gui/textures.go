@@ -123,8 +123,24 @@ func (s *API) publishTextureMeasure(ctx context.Context, request uint64, update 
 	}
 }
 
+// settleTextureMeasure ends Loading for a read cancelled by leaving the page or closing:
+// publishTextureMeasure drops its writes, and a Loading page keeps maintenance waiting
+// (maintenanceSnapshot). A newer request owns the page and is left alone.
+func (s *API) settleTextureMeasure(ctx context.Context, request uint64) {
+	if ctx.Err() == nil {
+		return
+	}
+	m := &s.texMeasure
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if request == m.request && m.page != nil {
+		m.page.Loading = false
+	}
+}
+
 func (s *API) measureTextures(ctx context.Context, request uint64, scope string, scale int) {
 	defer s.free.soon()
+	defer s.settleTextureMeasure(ctx, request)
 	s.texRead.mu.Lock()
 	defer s.texRead.mu.Unlock()
 	defer s.retainReader(&s.texRead)

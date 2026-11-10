@@ -11,7 +11,7 @@
 import { S, $, el, api, T, Tf, errText, say, keyCaps } from "./state.js";
 import { on } from "./api.js";
 import { icon } from "./icons.js";
-import { detailFrame, noteEl } from "./detail.js";
+import { detailFrame, stale } from "./detail.js";
 import * as pop from "./popups.js";
 import { beginPageRead, pageLoading, openScreen, page, act, rescanButton, area, full } from "./screens.js";
 import { updateFromForm } from "./subscribe.js";
@@ -19,6 +19,8 @@ import { createBar } from "./filterbar.js";
 import * as ops from "./ops.js";
 import { createTable, mergeColumns } from "./datatable.js";
 import { wireSeparator } from "./separator.js";
+import { markOf, paintMark, tagCSS, tagColors, fromTagList } from "./tagcolor.js";
+import { tagPanel, tagInfo, startRename as tagStartRename, editTagNote as tagEditNote, pickMerge as tagPickMerge, confirmDelete as tagConfirmDelete } from "./tagmanager.js";
 
 const ROW = 30;      // every row has the same height: the list is drawn by position
 const HEAD = 28;     // the column headers, sticky at the top of the table
@@ -122,10 +124,8 @@ async function load(fresh, focusRef, read = null, focusID = "") {
       api.Library(b.search, b.filters, L.sort),
       L.cols ? null : api.Setting(COLS_KEY).catch(() => ""),
       L.view ? null : api.Setting(VIEW_KEY).catch(() => ""),
-      L.view === "tags" ? tagList() : null,
+      tagList(),
     ]);
-    // the first visit learns the view with the page; the Tags view then needs the tags too
-    if (!L.view && view === "tags") tags = await tagList();
   } catch (e) { read.fail(e); return; }
   if (!read.current()) return;
   L.page = p;
@@ -153,7 +153,8 @@ async function load(fresh, focusRef, read = null, focusID = "") {
 }
 
 // tagList reads every tag (API.TagList); a failure leaves the groups in row order.
-const tagList = () => Promise.resolve().then(() => api.TagList()).catch(() => []);
+// tagList reads the tags; their colours mark the rows (tagcolor.js)
+const tagList = () => Promise.resolve().then(() => api.TagList()).then((t) => { fromTagList(t); return t; }).catch(() => []);
 
 // flatten lists the rows: a Lineage, and its copies when it is open (or when the filters
 // show only some of them); a Lineage of one copy is that copy's row.
@@ -404,7 +405,7 @@ function rowEl(x, k) {
   // the cells: a Lineage's from its row, a copy's from the copy (a lone copy is its Lineage)
   const cells = x.t === "lin" || x.lone ? x.r : x.i;
   for (const c of shownCols()) {
-    if (c.key === "name") { r.append(nameCell(x)); continue; }
+    if (c.key === "name") { r.append(nameCell(x, k)); continue; }
     const v = cells[c.key] || "";
     const cell = el("span", "word-facts c " + c.key + (c.key === "state" && cells.code ? " " + cells.code : ""), v);
     if (c.key === "size") cell.classList.add("num");
@@ -440,6 +441,7 @@ function groupEl(x, k) {
   r.style.top = HEAD + k * ROW + "px";
   const cell = el("span", "c name");
   cell.append(el("span", "m"));
+  paintLibMark(cell.firstChild, k);
   const c = el("span", "chev" + (open ? " down" : ""));
   c.innerHTML = icon.chev;
   c.setAttribute("aria-hidden", "true");
@@ -463,10 +465,23 @@ function groupEl(x, k) {
   return r;
 }
 
+// libMark: a row's tag colour band (16 §2.9): a Mod's first tag's colour; a tag's header
+// row shows its own colour, so the band runs on into its Mods of that colour.
+function libMark(x) {
+  if (!x) return null;
+  if (x.t === "grp") { const c = !x.g.none && tagCSS(tagColors()[x.g.key]); return c ? { tag: x.g.tag, color: c } : null; }
+  return markOf(x.r.tags);
+}
+function paintLibMark(span, k) {
+  const mk = libMark(L.flat[k]);
+  paintMark(span, mk, !!mk && libMark(L.flat[k - 1])?.color === mk.color, !!mk && libMark(L.flat[k + 1])?.color === mk.color);
+}
+
 // nameCell: only the name (16 §2.9): a Lineage's, or under an open Lineage the copy's folder.
-function nameCell(x) {
+function nameCell(x, k) {
   const left = el("span", "c name");
   left.append(el("span", "m"));
+  paintLibMark(left.firstChild, k);
   if (x.t === "lin") {
     const c = el("span", "chev" + (L.open.has(x.r.id) || x.r.insts.length < x.r.copies ? " down" : ""));
     c.innerHTML = icon.chev;
@@ -710,36 +725,43 @@ async function drawDetail() {
   const current = () => n === detailSeq && box.dataset.ref === i.ref;
   box.dataset.stamp = stampOf(i);
   if (!same) {
+    // the copy shown stays, inert, until the next one's parts are in; then one swap (16 §4.1)
     box.dataset.ref = i.ref;
+    // (the inner part: the scroll box itself takes the focus in details mode)
+    stale(box.firstElementChild);
     const inner = el("div", "mod-detail");
-    box.replaceChildren(inner);
-    box.scrollTop = 0;
     frame = detailFrame(inner, null, {
       ownFields: true,
-      fieldActs: () => ({ folder: () => run("folder", [findCopy(i.ref) || i]), tags: () => run("tags", [findCopy(i.ref) || i]) }),
+      fieldActs: () => ({
+        folder: () => run("folder", [findCopy(i.ref) || i]), tags: () => run("tags", [findCopy(i.ref) || i]),
+        tagOrder: (list) => api.SetTagOrder(i.id, list).then((t) => { say("ok", t); return load(); }, (e) => say("fail", errText(e))),
+        openTag: (t) => openTag(t),
+      }),
       run: (c, r) => run(c, [findCopy(r.ref) || r]),
       noteSaved: () => load(),
       noteLeave: () => els.rows.focus(),
+      later: true,
+      mount: () => { box.replaceChildren(inner); box.scrollTop = 0; },
     });
     frame.head(row ? row.name : i.label, "", i.id);
   }
   const f = frame;
   f.inst(i);
-  api.LibraryFields(i.ref).then((fs) => { if (current()) f.fields(fs); }, (e) => { if (current()) f.error(errText(e)); });
-  if (!i.id) return;
-  try {
-    const d = await api.Detail(i.id, false, false, false);
-    if (!current()) return;
+  const fields = api.LibraryFields(i.ref).then((fs) => { if (current()) f.fields(fs); }, (e) => { if (current()) f.error(errText(e)); });
+  // a copy of another game's has no detail here: its fields say what there is
+  const detail = !i.id ? null : api.Detail(i.id, false, false, false).then((d) => {
+    if (!current()) return null;
     f.detail(d);
-    if (d.state === "not cached") {
-      f.fetching();
-      const d2 = await api.Detail(i.id, false, true, false).catch(() => null);
-      if (d2 && current()) f.detail(d2);
-    }
-  } catch (e) {
-    // a copy of another game's has no detail here: its fields say what there is
-    if (current() && !/^no (mod|list)\b/.test(errText(e))) f.error(errText(e));
-  }
+    return d;
+  }, (e) => { if (current() && !/^no (mod|list)\b/.test(errText(e))) f.error(errText(e)); return null; });
+  await f.settle([fields, detail]);
+  if (!current()) return;
+  f.show();
+  const d = await detail;
+  if (!current() || d?.state !== "not cached") return;
+  f.fetching();
+  const d2 = await api.Detail(i.id, false, true, false).catch(() => null);
+  if (d2 && current()) f.detail(d2);
 }
 const stampOf = (i) => [i.note, i.auto, (i.ops || []).join(","), i.state, i.inPlan].join("|");
 
@@ -750,10 +772,8 @@ function findCopy(ref) {
 
 // ---- the Tag manager: the details on a tag's header row in the Tags view (16 §2.9) ----
 
-// drawTagManager lays the cursor's tag out as a copy's details are: its note, its name, how
-// many mods have it, its fields (on top, similar tags), its actions (rename, merge into,
-// delete), then every tag to go to. Tag changes are player data, outside the list's undo
-// (16 §3.8), so merge and delete confirm first.
+// drawTagManager: the cursor's tag in the details (tagmanager.js), with the filter to it in
+// the area's head.
 function drawTagManager(g) {
   const box = els.scroll;
   const ref = "tags:" + (g ? g.key : "-");
@@ -766,7 +786,7 @@ function drawTagManager(g) {
   detailSeq++;
   box.dataset.ref = ref;
   box.dataset.stamp = "";
-  const info = g && !g.none ? g.info || { tag: g.tag, n: g.rows.length, note: "", pinned: false } : null;
+  const info = tagInfo(g);
   els.dhead.innerHTML = "";
   els.dhead.append(el("span", "n", "3"), el("span", "t", T("tags")));
   if (g) els.dhead.append(el("span", "q word-facts", info ? info.tag : T("no tag")));
@@ -776,194 +796,43 @@ function drawTagManager(g) {
     only.onclick = (e) => { e.stopPropagation(); bar().set("tags:" + info.tag, 1); };
     els.dhead.append(only);
   }
-  const d = el("div", "mod-detail tag-detail");
-  if (info) tagHead(d, g, info);
-  else if (g) d.append(el("h1", "", T("no tag")), el("div", "facts", Tf("%d mods", g.rows.length)), el("p", "tm-hint", T("mods without tags: select them and press g to tag them")));
-  else d.append(el("p", "tm-hint", T("no tags yet: select mods and press g to tag them")));
-  allTags(d, g ? g.key : null);
-  box.replaceChildren(d);
+  box.replaceChildren(tagPanel(g, tagCtx));
   box.scrollTop = same ? top : 0;
 }
 
-// tagHead: the tag's note, name, facts, fields and actions.
-function tagHead(d, g, info) {
-  d.append(noteEl({ id: info.tag, note: info.note || "" }, {
-    placeholder: T("what this tag is for (shown in its group row)"),
-    save: (text) => api.SetTagNote(info.tag, text),
-    saved: async () => { await load(false); goToGroup(g.key); },
-    leave: () => backToRows(),
-  }));
-  // the name, and keep on top (first in the tag bar and in this view) on its right
-  const row = el("div", "tm-titlerow");
-  const h = el("h1", "tm-name", info.tag);
-  h.title = T("rename") + T("; ") + "F2";
-  h.ondblclick = () => startRename();
-  const pin = el("button", "fact", info.pinned ? T("stop keeping on top") : T("keep on top"));
-  pin.onclick = () => tagAct(api.PinTag(info.tag, !info.pinned), g.key);
-  row.append(h, pin);
-  const facts = el("div", "facts");
-  facts.append(el("span", "", Tf("%d mods", info.n)));
-  if (info.n !== g.rows.length) facts.append(el("span", "", Tf("%d shown", g.rows.length)));
-  if (info.pinned) facts.append(el("span", "", T("on top")));
-  d.append(row, facts);
-  // similar tags, drawn as fields.js draws a copy's field: a label, the value, its action
-  const like = similarTags(info.tag);
-  if (like.length) {
-    const r = el("div", "frow");
-    const v = el("span", "v");
-    v.append(...like.map((t) => el("span", "chip", t)));
-    const b = el("button", "fact", T("merge in"));
-    b.onclick = () => confirmMerge(like, info.tag);
-    r.append(el("span", "k", T("similar")), v, b);
-    const fields = el("div", "fields");
-    fields.append(r);
-    d.append(fields);
-  }
-  const acts = el("div", "lib-acts");
-  const btn = (label, key, run, cls = "") => {
-    const b = el("button", "btn" + cls, label);
-    b.append(keyCaps(key));
-    b.onclick = run;
-    acts.append(b);
-  };
-  btn(T("rename"), "F2", () => startRename());
-  btn(T("merge into…"), "M", () => pickMerge(info.tag));
-  btn(T("delete tag"), "Del", () => confirmDelete([info.tag]), " danger");
-  d.append(acts);
-}
+// tagCtx: what the Tag manager does on this page.
+const tagCtx = {
+  tags: () => L.tags,
+  get picked() { return L.picked; },
+  done: async (key) => { await load(false); if (key != null) goToGroup(key); },
+  goTo: (key) => goToGroup(key),
+  redraw: () => drawDetail(),
+  leave: () => backToRows(),
+  editing: () => { L.focus = "detail"; markFocus(); },
+  // a colour shows at once: the rows' bands, the headers and the panel
+  recolor: (tag, color) => {
+    const t = L.tags.find((x) => x.tag.toLowerCase() === tag.toLowerCase());
+    if (t) t.color = color;
+    fromTagList(L.tags);
+    els.rows.dataset.sig = "";
+    drawRows();
+    drawDetail();
+  },
+};
 
-// allTags: every tag with mods, as chips in the groups' order; a click goes to its group,
-// ctrl+click picks several (the cursor's tag first, as a file list's selection would), and
-// a bar under them merges, deletes or clears them. Tags kept on top that no mod has are
-// named after them.
-function allTags(d, curKey) {
-  const used = L.tags.filter((t) => t.n), idle = L.tags.filter((t) => !t.n);
-  if (!used.length && !idle.length) return;
-  for (const k of L.picked) if (!used.some((t) => t.tag.toLowerCase() === k)) L.picked.delete(k);
-  const sub = el("div", "sub", T("all tags"));
-  sub.append(el("span", "cnt", String(used.length)));
-  const cloud = el("div", "tm-cloud");
-  for (const t of used) {
-    const k = t.tag.toLowerCase();
-    const c = el("button", "tm-chip" + (k === curKey ? " cur" : "") + (L.picked.has(k) ? " picked" : ""));
-    c.append(el("span", "", t.tag), el("span", "n", String(t.n)));
-    c.title = (t.note ? t.tag + "\n" + t.note : t.tag) + "\n" + T("ctrl+click picks several");
-    c.setAttribute("aria-pressed", String(L.picked.has(k)));
-    c.onclick = (e) => {
-      if (e.ctrlKey || e.metaKey) {
-        if (!L.picked.size && curKey && curKey !== k && used.some((u) => u.tag.toLowerCase() === curKey)) L.picked.add(curKey);
-        if (L.picked.has(k)) L.picked.delete(k); else L.picked.add(k);
-        return drawDetail();
-      }
-      L.picked.clear();
-      goToGroup(k);
-    };
-    cloud.append(c);
-  }
-  d.append(sub, cloud);
-  if (L.picked.size) {
-    const tags = used.filter((t) => L.picked.has(t.tag.toLowerCase())).map((t) => t.tag);
-    const b = el("div", "tm-picked");
-    b.append(el("span", "cnt", Tf("%d tags picked", tags.length)));
-    const btn = (label, run, cls = "") => { const x = el("button", "btn" + cls, label); x.onclick = run; b.append(x); };
-    btn(T("merge into…"), () => pop.tagTarget(Tf("merge %s into", tags.join(", ")), used, (into) => confirmMerge(tags, into)));
-    btn(T("delete tags"), () => confirmDelete(tags), " danger");
-    btn(T("clear the selection"), () => { L.picked.clear(); drawDetail(); }, " quiet");
-    d.append(b);
-  }
-  if (idle.length) d.append(el("p", "tm-idle", Tf("on top, but no mod has them: %s", idle.map((t) => t.tag).join(", "))));
+// openTag: a tag clicked in a Mod's details: the Tags view, the cursor on the tag's header,
+// the details the Tag manager (16 §2.9).
+async function openTag(tag) {
+  const key = tag.toLowerCase();
+  await setView("tags");
+  goToGroup(key);
+  backToRows();
 }
-
-// similarTags: tags spelled almost the same (case, spaces, dashes, a plural s), or one a
-// longer form of the other: candidates for a merge.
-function similarTags(tag) {
-  const norm = (s) => s.toLowerCase().replace(/[\s_\-./]+/g, "").replace(/s$/, "");
-  const n = norm(tag);
-  return L.tags.filter((t) => {
-    if (!t.n || t.tag.toLowerCase() === tag.toLowerCase()) return false;
-    const m = norm(t.tag);
-    if (m === n) return true;
-    const [a, b] = m.length < n.length ? [m, n] : [n, m];
-    return a.length >= 4 && b.startsWith(a);
-  }).map((t) => t.tag);
-}
-
-// startRename turns the tag's name into a field: enter renames, esc (or leaving it) does not.
-function startRename() {
-  const h = els.scroll.querySelector(".tag-detail .tm-name");
-  const g = L.flat[L.cur]?.g;
-  if (!h || !g || g.none) return;
-  const from = h.textContent;
-  const inp = el("input", "tm-title");
-  inp.value = from;
-  inp.spellcheck = false;
-  inp.setAttribute("aria-label", T("rename"));
-  let over = false;
-  const end = () => { if (over) return; over = true; inp.replaceWith(h); };
-  inp.onkeydown = (e) => {
-    if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); const to = inp.value; end(); renameTag(from, to); }
-    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); end(); backToRows(); }
-  };
-  inp.onblur = end;
-  h.replaceWith(inp);
-  L.focus = "detail";
-  markFocus();
-  inp.focus();
-  inp.select();
-}
-
-// editTagNote opens the tag's note as a click on it does (n).
-function editTagNote() {
-  const n = els.scroll.querySelector(".tag-detail .lib-note");
-  if (!n) return;
-  L.focus = "detail";
-  markFocus();
-  n.click();
-}
-
-function pickMerge(tag) {
-  const others = L.tags.filter((t) => t.n && t.tag.toLowerCase() !== tag.toLowerCase());
-  pop.tagTarget(Tf("merge %s into", tag), others, (into) => confirmMerge([tag], into));
-}
-
-async function confirmMerge(from, into) {
-  let p;
-  try { p = await api.TagPreview(from, into); } catch (e) { return say("fail", errText(e)); }
-  const lines = [
-    p.from.join(", ") + "  →  " + p.into,
-    p.both ? Tf("%d mods change to %s (%d already had it)", p.lineages, p.into, p.both) : Tf("%d mods change to %s", p.lineages, p.into),
-    T("their notes are joined; tag changes cannot be undone"),
-  ];
-  pop.confirm(T("merge tags"), lines, T("merge"), () => tagAct(api.MergeTags(p.from, p.into), p.into.toLowerCase()), "");
-}
-
-async function confirmDelete(tags) {
-  let p;
-  try { p = await api.TagPreview(tags, ""); } catch (e) { return say("fail", errText(e)); }
-  const lines = [
-    Tf("remove %s from %d mods", p.from.join(", "), p.lineages),
-    T("mod files and lists are not touched; tag changes cannot be undone"),
-  ];
-  pop.confirm(tags.length > 1 ? T("delete tags") : T("delete tag"), lines, T("delete"), () => tagAct(api.DeleteTags(p.from), null), "");
-}
-
-function renameTag(from, to) {
-  to = to.trim();
-  if (!to || to === from) return backToRows();
-  const other = L.tags.find((t) => t.tag.toLowerCase() === to.toLowerCase() && t.tag.toLowerCase() !== from.toLowerCase());
-  if (other) return confirmMerge([from], other.tag); // the name is taken: that is a merge
-  tagAct(api.RenameTag(from, to), to.toLowerCase());
-}
-
-// tagAct runs a tag change, reads the page again and puts the cursor on the group of key
-// (when there is one).
-async function tagAct(p, key) {
-  backToRows(); // first, so the redraw below is not held back by a field being typed in
-  try { say("ok", await p); } catch (e) { say("fail", errText(e)); }
-  L.picked.clear();
-  await load(false);
-  if (key != null) goToGroup(key);
-}
+const cursorGroup = () => L.flat[L.cur]?.g;
+const startRename = () => tagStartRename(els.scroll, cursorGroup(), tagCtx);
+const editTagNote = () => tagEditNote(els.scroll, tagCtx);
+const pickMerge = (tag) => tagPickMerge(tag, tagCtx);
+const confirmDelete = (tags) => tagConfirmDelete(tags, tagCtx);
 
 function goToGroup(key) {
   const at = L.flat.findIndex((x) => x.t === "grp" && x.g.key === key);

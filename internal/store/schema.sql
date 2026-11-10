@@ -71,10 +71,13 @@ CREATE TABLE "source_use"(
 CREATE TABLE lineage_data(
   environment_id TEXT NOT NULL, lineage_id TEXT NOT NULL, alias TEXT NOT NULL DEFAULT '', note TEXT NOT NULL DEFAULT '',
   PRIMARY KEY(environment_id, lineage_id));
-CREATE TABLE lineage_tag(
-  environment_id TEXT NOT NULL, lineage_id TEXT NOT NULL, tag TEXT NOT NULL COLLATE NOCASE,
+-- pos: the tag's place among the lineage's tags (0 first); the first tag's colour marks the Mod
+CREATE TABLE "lineage_tag"(
+  environment_id TEXT NOT NULL, lineage_id TEXT NOT NULL, tag TEXT NOT NULL COLLATE NOCASE, pos INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY(environment_id, lineage_id, tag));
 CREATE TABLE tag_note(tag TEXT PRIMARY KEY COLLATE NOCASE, note TEXT NOT NULL);
+-- a tag's colour: a preset name (blue, cyan, …) or #rrggbb (16 §2.9 Tag manager)
+CREATE TABLE tag_color(tag TEXT PRIMARY KEY COLLATE NOCASE, color TEXT NOT NULL);
 -- the names the player gave colonies on the Saves page, by colony key (12 §4.1)
 CREATE TABLE colony_name(key TEXT PRIMARY KEY, name TEXT NOT NULL);
 CREATE TABLE log_cache(
@@ -157,7 +160,7 @@ CREATE TABLE version_mute(
 CREATE INDEX identity_question_open ON identity_question(status, environment_id);
 CREATE TABLE fact_set(
  id INTEGER PRIMARY KEY, instance_id TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('def','dll')),
- content_key TEXT NOT NULL, files TEXT NOT NULL DEFAULT '[]', UNIQUE(instance_id,kind,content_key));
+ content_key TEXT NOT NULL, files TEXT NOT NULL DEFAULT '[]', def_content_version INTEGER NOT NULL DEFAULT 0, UNIQUE(instance_id,kind,content_key));
 CREATE TABLE content_state(
  instance_id TEXT NOT NULL, game_mm TEXT NOT NULL, content_key TEXT NOT NULL, folders TEXT NOT NULL DEFAULT '',
  def_files INTEGER NOT NULL DEFAULT 0, patch_files INTEGER NOT NULL DEFAULT 0, parse_errors TEXT NOT NULL DEFAULT '',
@@ -171,7 +174,7 @@ CREATE TABLE def_fact(
  set_id INTEGER NOT NULL REFERENCES fact_set(id) ON DELETE CASCADE,
  def_type TEXT NOT NULL, def_name TEXT NOT NULL DEFAULT '', name TEXT NOT NULL DEFAULT '',
  parent TEXT NOT NULL DEFAULT '', abstract INTEGER NOT NULL DEFAULT 0, file_ix INTEGER NOT NULL, line INTEGER NOT NULL,
- may_require TEXT NOT NULL DEFAULT '', may_require_any TEXT NOT NULL DEFAULT '');
+ may_require TEXT NOT NULL DEFAULT '', may_require_any TEXT NOT NULL DEFAULT '', content_fields TEXT NOT NULL DEFAULT '');
 CREATE TABLE assembly_fact(
  set_id INTEGER NOT NULL REFERENCES fact_set(id) ON DELETE CASCADE,
  file_ix INTEGER NOT NULL, skipped INTEGER NOT NULL DEFAULT 0, manual INTEGER NOT NULL DEFAULT 0,

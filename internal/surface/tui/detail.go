@@ -528,7 +528,7 @@ func (m *model) fullKey(s string) tea.Cmd {
 	if cmd, ok := m.versionDetailKey(s); ok {
 		return cmd
 	}
-	page := max(m.h-6, 1)
+	page := max(m.h-bodyTop-4, 1)
 	switch s {
 	case "esc", "q", "backspace", "enter":
 		m.full = false // the cursor is on the last mod shown (enter opens and closes, 16 §3.5)

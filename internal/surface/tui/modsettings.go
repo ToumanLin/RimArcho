@@ -23,6 +23,7 @@ func (m *model) modSettingsPanel() tea.Cmd {
 		return nil
 	}
 	m.openPanel(T("mod settings"), modSettingsText(l))
+	m.panel.nav, m.panel.navSub = 6, view.PageModSettings
 	return nil
 }
 

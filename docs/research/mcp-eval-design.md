@@ -12,6 +12,7 @@ Goal: measure how much `archo mcp` helps an agent find and fix a broken Mod, and
 | Agent | model `apikeyfan/deepseek-flash` through the magpie gateway, reasoning effort `high`, same task text and wall clock for every group |
 | Group A | Pi 1.4.0: bash + file read/write + `dotnet` + `ilspycmd` + **Archo MCP** (`archo mcp`, exposure `direct`) |
 | Group B (from 2026-11-04) | dsh 0.2.1-rc.5 (DeepSeek Harness, `--profile headless --json`, patch `scripts/mcp-eval/guest/dsh-eval.yml`): its own PowerShell, file and search tools, subagents, todo; the same **Archo MCP** (per-call timeout 15 min; dsh's default 60 s would cut `test_run` off). Web search and fetch, the session-title model call and telemetry are off; no approval prompts (`danger-full-access`, Pi has none either). dsh puts Archo's MCP server instructions into the system prompt; Pi 1.4 drops them (review P10), so the groups do not see the same Archo guidance |
+| Group P (2026-11-09) | Pi as in group A, plus Archo's MCP server instructions appended to the system prompt (`--append-system-prompt`), so it sees the same Archo guidance as dsh |
 | Group N (Group B before 2026-11-04) | Pi without Archo MCP and without the `archo` CLI. Gets `Player.log` path, the Mod folders and the game folder. The c1 to c5 matrix (A 15/15, N 10/15) settled this comparison; the 2026-11-04 round compares harnesses on h1, h2 and h5 only |
 | Prompt | "The game logs errors / misbehaves with this Mod list. Find the Mod that causes it, then fix it. Hand in the rewritten XML or the recompiled DLL." No hint about the fault class |
 | Repeats | at least 3 runs per task per group (DeepSeek is stochastic) |
@@ -20,7 +21,7 @@ Goal: measure how much `archo mcp` helps an agent find and fix a broken Mod, and
 
 Each run starts from a clean image: the VM snapshot (preferred, no evidence can leak between runs) or, on the host, a fresh copy of the case directory plus an empty `%APPDATA%\RimArcho` and empty `Docs\`. Never run B after A in the same writable state: A leaves `archo.db`, Source-library decompilations and notes.
 
-The VM image has .NET SDK 8, `ilspycmd`, Node 26, Pi, dsh and Git for Windows (snapshot `RimArcho-Eval-Staged4` = Staged3 plus Node 26.13.0 and dsh in `C:\Tools\npm`, 2026-11-04; see Harness status).
+The VM image has .NET SDK 8, `ilspycmd` 11.2.0.10050, Node 26, Pi, dsh and Git for Windows (snapshot `RimArcho-Eval-Staged5` = Staged4 plus ilspycmd 11.2, 2026-11-08; Staged4 = Staged3 plus Node 26.13.0 and dsh in `C:\Tools\npm`, 2026-11-04, with ilspycmd 9.1.0.7988; see Harness status).
 
 ## Cases (built 2026-11-02)
 
@@ -91,9 +92,9 @@ h1 to h5 are all startup errors. h7 is the first error that appears only while t
 
 | # | Fault class | Injected fault (real Mods) | What the log shows | Right answer: culprit | Right answer: fix |
 | --- | --- | --- | --- | --- | --- |
-| h7 | Runtime, a comp changes its own list mid-tick (no culprit frame) | [SSR]Beautiful Body (`ssr.body`, in the base list; the case uses the Workshop copy turned back into the June 2026 version, see VM below) gets its original `1.6/Assemblies/FS_SSR_Body.dll` back (`FS_SSR_Body.pre-codex-backup.dll`). Its comp `TC_ForceBodyShape` on `Human` swaps itself to the end of `AllComps` after 300 ticks and then removes itself during `CompTick`. Added trigger: Pawn Comp Profiler (`tallowbyte.pawncompprofiler`, a small Mod of ours with source, `scripts/mcp-eval/mods/pawncompprofiler`), which ticks every pawn's comps with `foreach` and times each one. Vanilla's `ThingWithComps.Tick` indexes with a cached count, so SSR alone logs nothing | On a map only (about 200 ticks in, in the repro): 23 × `Exception ticking <pawn> (at (x, 0, z)): System.InvalidOperationException: Collection was modified` (2 per colonist, 1 per world pawn, `Suppressing further errors`). Every stack goes through `PawnCompProfiler.ThingWithComps_Tick_Patch.Prefix`, and through a second, unrelated `Pawn.Tick` prefix from the base list (`Palpha.godhands`). No SSR frame; SSR appears only in the `Initializing new game with mods` list | [SSR]Beautiful Body (decoy: Pawn Comp Profiler) | `FS_SSR_Body.dll` rebuilt so the comp never changes `parent.AllComps` (reference: the user's fixed DLL in `answer/`). A `for` loop in the profiler, or the profiler turned off, only hides it |
+| h7 | Runtime, a comp changes its own list mid-tick (no culprit frame) | [SSR]Beautiful Body (`ssr.body`, in the base list; the case uses the Workshop copy turned back into the June 2026 version, see VM below) gets its original `1.6/Assemblies/FS_SSR_Body.dll` back (`FS_SSR_Body.pre-codex-backup.dll`). Its comp `TC_ForceBodyShape` on `Human` swaps itself to the end of `AllComps` after 300 ticks and then removes itself during `CompTick`. Added trigger: Pawn Comp Profiler (`tallowbyte.pawncompprofiler`, a small Mod of ours with source, `scripts/mcp-eval/mods/pawncompprofiler`), which ticks every pawn's comps with `foreach` and times each one. Vanilla's `ThingWithComps.Tick` indexes with a cached count, so SSR alone logs nothing | On a map only (about 200 ticks in, in the repro): 23 × `Exception ticking <pawn> (at (x, 0, z)): System.InvalidOperationException: Collection was modified` (2 per colonist, 1 per world pawn, `Suppressing further errors`). Every stack goes through `PawnCompProfiler.ThingWithComps_Tick_Patch.Prefix`, and through a second, unrelated `Pawn.Tick` prefix from the base list (`Palpha.godhands`). No SSR frame; SSR appears only in the `Initializing new game with mods` list | [SSR]Beautiful Body or Pawn Comp Profiler (two right answers since 2026-11-08, see Round 4) | `FS_SSR_Body.dll` rebuilt so the comp never changes `parent.AllComps` (reference: the user's fixed DLL in `answer/`), or `PawnCompProfiler.dll` rebuilt with vanilla's index loop over a cached count. Either Mod turned off does not count |
 
-Harness: `case.json` has `runtime: {ticks: 3000}`. `sandbox.mjs` then sets the sandbox Prefs' `autosaveIntervalDays` to `ticks / 60000`, starts the game with `-quicktest` (a new map at normal speed), and stops it once `Saves/Autosave-1.rws` is written: a vanilla signal that the map ran 3000 ticks, without a helper Mod in the log or the Mod list. A buggy or fixed run takes about 100 s. `grade.mjs` fails a runtime submission whose map never reached the autosave, and the h7 rule requires a change under `ssr.body/1.6/Assemblies/` with both Mods still enabled. The case overlay leaves the backup DLL and the 26 MB `_2985408740_.zip` out of SSR's folder (overlay `omit`). Since 2026-11-06, `sandbox.mjs` also links the unchanged folders of a changed Mod as junctions instead of copying the Mod; SSR has about 270 MB of textures.
+Harness: `case.json` has `runtime: {ticks: 3000}`. `sandbox.mjs` then sets the sandbox Prefs' `autosaveIntervalDays` to `ticks / 60000`, starts the game with `-quicktest` (a new map at normal speed), and stops it once `Saves/Autosave-1.rws` is written: a vanilla signal that the map ran 3000 ticks, without a helper Mod in the log or the Mod list. A buggy or fixed run takes about 100 s. `grade.mjs` fails a runtime submission whose map never reached the autosave, and the h7 rule requires a change under `ssr.body/1.6/Assemblies/` or `tallowbyte.pawncompprofiler/1.6/Assemblies/` with both Mods still enabled (until 2026-11-08 only SSR's). The case overlay leaves the backup DLL and the 26 MB `_2985408740_.zip` out of SSR's folder (overlay `omit`). Since 2026-11-06, `sandbox.mjs` also links the unchanged folders of a changed Mod as junctions instead of copying the Mod; SSR has about 270 MB of textures.
 
 Checked on the host (real 1.6.4871, 2026-11-06). The buggy runs gave 23 tick errors twice, with different random pawns each time. The reference fix gave none, with no other new error line either: the quicktest map's noise was the same in both runs. Grading results: the reference answer through `grade.mjs` gets culprit and fix. The buggy DLL with only the decoy named gets neither (`decoyNamedOnly`). A change in the profiler alone, on a clean log, is "workaround elsewhere".
 
@@ -128,6 +129,8 @@ Why the 10 failures failed:
 
 - **h4 (4 failures):** all patched Cyanobot's Genes' postfix with a null check (the stack's top frame), and named only Cyanobot's Genes. The logs were clean, so the grade is "workaround elsewhere". Both solved runs fixed Colonist Mutterings' entry; h4-B-1 also patched Cyanobot's Genes and named both Mods.
 - **h7 (6 failures):** all rewrote the profiler's `foreach` as an index loop. 5 of 6 found SSR's `TC_ForceBodyShape` and its `AllComps.Remove` / `GenList.Swap`, but judged it allowed: vanilla's cached-count loop tolerates it, so the profiler is the one that departs from vanilla (h7-B-1: "Comps are allowed to modify that list while they tick"). 5 of 6 logs were clean. h7-A-1's log had one extra line, `Object with load ID Thing_Human… is referenced … but is not deep-saved`, from the autosave that ends the map run: a grader flake from the harness, not from the submission.
+
+Regraded 2026-11-08 with both answers accepted (Round 4): h7 is 5/6, Pi 2/3 and dsh 3/3; h7-A-1 still fails on the autosave line.
 
 Case design: the h7 verdict is debatable. That SSR is the culprit rests on "a comp must not change `AllComps` inside `CompTick`", but vanilla's loop is written to survive exactly that, and the agents' reading is reasonable. Either accept a profiler fix as a second right answer (then h7 would be 5/6 on the fix), or make the fault one that vanilla does not survive. h4's verdict has vanilla's own error (`has a null pawn reference`) behind it, and two runs found it.
 
@@ -231,9 +234,51 @@ Archo findings:
 - **Gap, not a bug:** no tool starts a given save, so a runtime fault that needs a game state (h8) cannot be reproduced or verified through Archo. Likewise nothing tells an agent a Mod's DLL needs publicized references.
 - dsh calls Archo about twice as often (27.5 against 13.3 per run) and uses about 50% more tokens, as in round 2; neither group is more accurate here (3 runs per cell).
 
+### Round 4, h4, h7 and h8 rerun with the improved tools (2026-11-08)
+
+18 runs (h4, h7, h8 × A = Pi, B = dsh × 3) on Player-Test, Eval-2 and Eval-3 (snapshot `RimArcho-Eval-Staged5`, ilspycmd 11.2), 20 min limit, archo from dev/1.1 e2fa7445: comp-list modifiers and `listed` attribution, TargetMethod() targets, the null trace, source search coverage and member view, `test_run` with saves, and the other changes from the round 3 transcript reviews. Round 3 figures in brackets (h8: the round 2 h8 cells).
+
+h7 grading changed in this round: the profiler's `foreach` departs from vanilla's cached-count loop, which tolerates a comp that removes itself, so a profiler fix is a right answer too (`answer.json` `requiredAny`, `grade.mjs` h7 rule). Both rounds' h7 runs were regraded from their saved logs (`GRADE_REUSE_LOG=1`).
+
+| Cell | Solved | Mean s | Archo calls | Tokens |
+| --- | --- | --- | --- | --- |
+| h4 A Pi | 2/3 (1/3) | 523 (539) | 16.0 (9.7) | 2.75 M (2.55 M) |
+| h4 B dsh | 3/3 (1/3) | 677 (755) | 21.0 (18.7) | 2.90 M (5.66 M) |
+| h7 A Pi | 3/3 (2/3 regraded) | 267 (413) | 10.7 (9.7) | 0.62 M (1.85 M) |
+| h7 B dsh | 3/3 (3/3 regraded) | 283 (505) | 13.7 (17.0) | 0.89 M (2.24 M) |
+| h8 A Pi | 2/3 (2/3) | 925 (1037) | 10.0 (11.3) | 3.97 M (4.00 M) |
+| h8 B dsh | 2/3 (1/3) | 545 (948) | 28.7 (28.7) | 5.40 M (8.45 M) |
+
+Failures:
+
+- **h4-A-2:** named and patched Cyanobot's Genes (the decoy at the stack top), as the round 3 failures did.
+- **h8-B-2:** named both PE and Recreation With Euterpe; its rebuilt PE DLL left `Exception in Verse.AI.ThinkNode_Priority TryIssueJobPackage: System.NullReferenceException` in the log.
+- **h8-A-3:** reached the 1200 s limit with nothing submitted.
+- **h7:** all six named Pawn Comp Profiler and rewrote its loop as an index loop over the comps, rebuilt from its source; every log was clean. The list-modifier output named SSR's comp, and the agents judged the profiler the one that departs from vanilla.
+
+h7 and dsh's h4 and h8 runs are much cheaper than in round 3 (h7 about a third of the tokens and two thirds of the time).
+
+### Round 5, group P: Pi with Archo's server instructions (2026-11-09)
+
+Question: is dsh ahead because it passes Archo's MCP server instructions to the model, which Pi 1.4 drops? Group P is Pi as in group A plus those instructions in the system prompt: `guest/agent.ps1` asks the run's `archo.exe` for them (`initialize`) and passes the file with `--append-system-prompt` (saved per run as `archo-instructions.md`, 1,949 characters). 9 runs (h4, h7, h8 × 3) on the three VMs, 20 min limit, the same build as round 4 (`tools/archo-e2fa7445.exe`), graded with the same rules (h7 accepts either Mod). Columns A and B are round 4's.
+
+| Case | A Pi | P Pi + instructions | B dsh |
+| --- | --- | --- | --- |
+| h4 | 2/3, 523 s, Archo 16.0, 2.75 M | 2/3, 740 s, Archo 12.7, 1.08 M | 3/3, 677 s, Archo 21.0, 2.90 M |
+| h7 | 3/3, 267 s, Archo 10.7, 0.62 M | 3/3, 384 s, Archo 14.7, 0.81 M | 3/3, 283 s, Archo 13.7, 0.89 M |
+| h8 | 2/3, 925 s, Archo 10.0, 3.97 M | 1/3, 440 s, Archo 17.7, 3.14 M | 2/3, 545 s, Archo 28.7, 5.40 M |
+| All | 7/9 | 6/9 (culprit 8/9) | 8/9 |
+
+Failures:
+
+- **h4-P-3:** 20 turns, then `find / -name "Mono.Cecil*.dll" -maxdepth 6` over the guest's disk, which ran past the time limit (no answer). Pi's bash tool has no default timeout; round 2's h2-A-2 ended the same way.
+- **h8-P-2, h8-P-3:** named PE and rebuilt `ProgressionEducation.dll` with Krafs.Publicizer (both found `PublicizedAssemblies/`), but the game logs `FieldAccessException: Field RimWorld.StatWorker:stat is inaccessible from method ProgressionEducation.StatWorker_IsDisabledFor_Patch:Postfix` at startup and the test map fails ("Error while generating a map"). The Workshop DLL, built from the same csproj, does not throw; why the agents' builds do is not yet known. No P run called `guide topic=rebuild`.
+
+Reading: the instructions do not close the gap. P solves no more than A (6/9 against 7/9, within chance) and names the culprit as often as dsh (8/9 against 9/9). Its failures are a hung shell command and two DLL builds, not diagnosis. They cut Pi's tokens on h4 and h8 (1.08 M against 2.75 M; 3.14 M against 3.97 M) and raise its Archo calls on h7 and h8. Over rounds 2 to 5 dsh is ahead mainly on execution: bounded commands and a fix that runs. For an Archo Agent that points at dsh as the base (MIT, so it can ship with RimArcho), with Archo's instructions given to whichever harness is used.
+
 ## Grading
 
-`scripts/mcp-eval/logdiff.mjs` compares a run's error lines (paths and addresses normalised) with the case's `reference.Player.log`. A submission is applied as a layer over the case (`sandbox.mjs <case> --layer <dir>`; files at `<packageId>/<mod-relative path>`, `enable.json` for re-enabled Mods), the game starts, and the log must have no error line the reference fix lacks. Culprit scoring uses `answer.json`: every `culprit` must be named; naming only a `decoy` fails.
+`scripts/mcp-eval/logdiff.mjs` compares a run's error lines (paths and addresses normalised) with the case's `reference.Player.log`. A submission is applied as a layer over the case (`sandbox.mjs <case> --layer <dir>`; files at `<packageId>/<mod-relative path>`, `enable.json` for re-enabled Mods), the game starts, and the log must have no error line the reference fix lacks. Culprit scoring uses `answer.json`: every Mod in `required` must be named, or, where the key has `requiredAny` (h7), every Mod of one of its lists; naming only a `decoy` fails.
 
 ## Scoring
 
@@ -245,6 +290,7 @@ Archo findings:
 ## Harness status (2026-11-02)
 
 - VM snapshot `RimArcho-Eval-Staged3` (UID 11, live, `NewPlayer(Chinese)` signed in on the desktop; Staged2, UID 10, without autologon, is its parent): game 1.6.4871 junctioned into `C:\Eval\RimWorld`, non-Workshop Mods in `C:\Eval\lib`, Archo build in `C:\Eval\tools`, Git for Windows (the shell Pi's `bash` tool needs), `ilspycmd` on the machine PATH. Each run reverts to it; see `scripts/mcp-eval/README.md`.
+- Current snapshot `RimArcho-Eval-Staged5` (2026-11-08, on Player-Test, Eval-2 and Eval-3; `run-case.ps1` reverts to it): Staged4 (Node 26.13.0 and dsh) with `ilspycmd` 11.2.0.10050 instead of 9.1.0.7988. The 11.2 build is the self-contained `win-x64` single exe (22 MB, runs without .NET), so `C:\Tools\ilspycmd` holds that one file; `scripts/mcp-eval/setup-ilspy-vm.ps1` built it from Staged4. Runs before 2026-11-08 used 9.1 and later runs use 11.2, so decompiler output may differ between rounds. `Verse.IntVec3` from the guest's `Assembly-CSharp.dll` was decompiled to stdout and to a file as the administrator and as the standard user, in session 0 and on the desktop. Setup scripts wait for the guest with a probe command: `vmrun checkToolsState` says "installed" for these encrypted VMs even with the tools running.
 - Pi reaches the model through a host port proxy 192.168.86.1:3425 (netsh portproxy + firewall rule "RimArcho-eval-VM-to-model-gateway"); remove both after the evaluation.
 - Pi 1.4.0 has native MCP: group A registers `archo mcp` with exposure `direct`; group B runs with `--no-mcp` and has no `archo.exe` on disk.
 - Staging hides the answer: `guest/overlay.ps1` writes the faulty files into the Mod's real folder with the replaced file's timestamps, every Mod in `Mods\` is a junction, and the staging package and scripts are deleted before Pi starts. `run-case.ps1` holds a mutex so two runs never share the VM.

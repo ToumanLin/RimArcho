@@ -18,7 +18,7 @@ export const POOL = ["neutral", "smile", "laugh", "wink", "think", "ponder", "yu
 const BASE = "/archo/", PACK = BASE + "archo-s/";
 const DELAY = 210, ROTATE = 4000, TIP_ROTATE = 8000, IDLE = 10000, SIZE = 176;
 const still = (expr) => `${PACK}stills/${expr}@360.webp`;
-const reduced = () => !!globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+const reduced = () => !!globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches || globalThis.document?.documentElement?.dataset?.motion === "reduced";
 const image = () => { const i = document.createElement("img"); i.alt = ""; i.decoding = "async"; i.draggable = false; return i; };
 const decoded = (i) => i.decode?.().catch(() => {}) || Promise.resolve();
 

@@ -109,3 +109,31 @@ func TestManualCompactUsesMaintenanceAndIgnoresPeriodAndTasks(t *testing.T) {
 		t.Fatal("manual only vacuumed")
 	}
 }
+
+// Leaving a page while it measures must not leave it Loading: the cancelled worker publishes
+// nothing, and a Loading page would keep maintenance waiting for the rest of the session.
+func TestLeavingMidMeasureEndsLoading(t *testing.T) {
+	_, api, _ := fixture(t)
+	api.costMeasure.page.Loading = true
+	api.Leave("plans")
+	if api.costMeasure.page.Loading {
+		t.Fatal("load cost still Loading after leaving the page")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	api.texMeasure.request = 5
+	api.texMeasure.page = &view.TexturePage{Loading: true}
+	api.settleTextureMeasure(ctx, 4) // an older request: the page is not its own
+	if !api.texMeasure.page.Loading {
+		t.Fatal("an older cancelled read ended a newer request's Loading")
+	}
+	api.settleTextureMeasure(context.Background(), 5) // not cancelled: it publishes its own end
+	if !api.texMeasure.page.Loading {
+		t.Fatal("a live read's Loading was ended")
+	}
+	api.settleTextureMeasure(ctx, 5)
+	if api.texMeasure.page.Loading {
+		t.Fatal("texture read still Loading after it was cancelled")
+	}
+}

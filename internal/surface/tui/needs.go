@@ -120,7 +120,7 @@ func (m *model) actionKey(a view.Action, text string) needKey {
 			p.open[text] = !p.open[text]
 			return nil
 		}
-	case view.ActChooseDisable:
+	case view.ActChooseDisable, view.ActStandIn:
 		k.run = func(m *model) tea.Cmd {
 			p := &panel{title: a.Title}
 			for _, o := range a.Options {
@@ -261,16 +261,11 @@ func lastSaveLine(v *view.LastSaveView) string {
 
 // ---- the screen ----
 
-// needLines draws Can it run: a count line, then the groups with their items; the selected
-// item shows its keys.
-func (m *model) needLines(n int) []string {
-	p := &m.prob
-	w := m.w
-	items := p.items
-	// the window's lead sentence (view.NeedsLead), then the state of the check; A is on
-	// the hint line
+// needsHead is the page's conclusion (view.NeedsLead) and the state of the check, shown in
+// the context row (16 §2.4).
+func (m *model) needsHead() string {
 	before, runs, hints := 0, 0, false
-	for _, it := range items {
+	for _, it := range m.prob.items {
 		switch {
 		case it.counted && it.section == view.SectionRun:
 			runs++
@@ -283,18 +278,33 @@ func (m *model) needLines(n int) []string {
 	if m.st != nil && m.st.Plan != nil {
 		plan = m.st.Plan.Name
 	}
-	head := view.NeedsLead(plan, before, runs, p.never, hints)
+	head := view.NeedsLead(plan, before, runs, m.prob.never, hints)
 	switch {
-	case m.analyzing:
+	case m.analyzing || m.prob.reading:
 		head += "   " + T("checking the mods' files…")
-	case p.stale:
+	case m.prob.stale:
 		head += "   " + T("the files changed since the last check")
 	}
-	out := []string{"  " + sText.Render(fit(head, w-2))}
-	if l := lastSaveLine(p.lastSave); l != "" {
-		out = append(out, "  "+sSecond.Render(fit(l, w-2)))
+	return head
+}
+
+// needLines draws Can it run: the groups with their items; the selected item shows its keys.
+func (m *model) needLines(n int) []string {
+	p := &m.prob
+	w := m.w
+	items := p.items
+	// the lead sentence is the context row's (needsHead) when it fits there beside the page
+	// actions; otherwise it opens the body. Then the last save.
+	var out []string
+	if lead, _ := m.needsLayout(); !lead {
+		for _, l := range wrap(m.needsHead(), w-2) {
+			out = append(out, "  "+sText.Render(l))
+		}
+		out = append(out, "")
 	}
-	out = append(out, "")
+	if l := lastSaveLine(p.lastSave); l != "" {
+		out = append(out, "  "+sSecond.Render(fit(l, w-2)), "")
+	}
 	if len(items) == 0 {
 		out = append(out, "  "+sOK.Render(markOK)+" "+sSecond.Render(fit(T("nothing needs your attention"), w-4)))
 		if away := m.elsewhereLines(w); len(away) > 0 {
@@ -316,7 +326,7 @@ func (m *model) needLines(n int) []string {
 				rows = append(rows, row{"", -1})
 			}
 			sec = it.section
-			rows = append(rows, row{"  " + m.sectionHead(sec, w-2), -1})
+			rows = append(rows, row{m.sectionHead(sec, w), -1}) // its number in the cursor's slot (16 §7)
 		}
 		// while the game runs, the last run's items follow this run's: say which run they are
 		// from, or the same phase headings repeat over the same errors
@@ -442,13 +452,13 @@ func (m *model) sectionHead(sec, w int) string {
 	}
 	// its number among the sections shown: 1–4 jump to it (16 §3.5)
 	num := itoa(m.sectionNumber(sec)) + " "
-	head := sDimS.Render(num) + sDimS.Render(title)
+	head := sDimS.Render(num) + sHead.Render(title)
 	switch {
 	case sec == view.SectionBreak && !hintsOnly:
-		head = sDimS.Render(num) + sErrS.Render(title)
+		head = sDimS.Render(num) + sErrB.Render(title)
 	case sec == view.SectionHint:
 		// worth knowing is RimArcho's own knowledge: the accent, not dimmed
-		head = sDimS.Render(num) + sAccent.Render(title)
+		head = sDimS.Render(num) + sSel.Render(title)
 	}
 	used := width.StringWidth(num + title)
 	add := func(s string, st lipgloss.Style) {

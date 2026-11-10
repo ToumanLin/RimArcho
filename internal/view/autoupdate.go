@@ -11,9 +11,9 @@ func AutomaticName(kind string) string {
 	return T(map[string]string{"mods": "mods", "tools": "external tools", "session": "LoversLab session", "data": "community data", "self": "RimArcho updates"}[kind])
 }
 
-func AutomaticNotice(before, after app.AutomaticStatus) string {
+func AutomaticNotice(a *app.App, before, after app.AutomaticStatus) string {
 	if after.Kind == "self" {
-		return selfNotice(before, after)
+		return selfNotice(a, before, after)
 	}
 	if after.Pending <= 0 || after.Pending == before.Pending {
 		return ""
@@ -30,9 +30,12 @@ func AutomaticNotice(before, after app.AutomaticStatus) string {
 }
 
 // selfNotice: once per new version, not on every check that still finds it.
-func selfNotice(before, after app.AutomaticStatus) string {
+func selfNotice(a *app.App, before, after app.AutomaticStatus) string {
 	if after.Pending <= 0 || after.Latest == "" || before.Pending > 0 && before.Latest == after.Latest {
 		return ""
+	}
+	if !app.SelfUpdateSupported() {
+		return SelfCheckResult(a)
 	}
 	return Tf("RimArcho %s can be updated; see Settings", after.Latest)
 }

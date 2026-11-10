@@ -43,7 +43,31 @@ type palette struct {
 }
 
 // palRun: what each shared command (view.Commands) does here, with the key that also does it.
+// palNav: the navigation entry and sub-entry of a palette command that opens a panel.
+var palNav = map[string]struct {
+	nav int
+	sub string
+}{
+	"log": {3, ""}, "packs": {5, ""}, "textures": {7, ""}, "env": {8, ""},
+	"plans": {4, view.PagePlans}, "mod-settings": {6, view.PageModSettings},
+}
+
 func (m *model) palRun(id string) func(m *model) tea.Cmd {
+	run := m.palRunOf(id)
+	nav, ok := palNav[id]
+	if !ok {
+		return run
+	}
+	return func(m *model) tea.Cmd {
+		cmd := run(m)
+		if m.panel != nil && m.panel.nav == 0 {
+			m.panel.nav, m.panel.navSub = nav.nav, nav.sub
+		}
+		return cmd
+	}
+}
+
+func (m *model) palRunOf(id string) func(m *model) tea.Cmd {
 	list := func(key string) func(m *model) tea.Cmd {
 		return func(m *model) tea.Cmd { m.tab = tabList; return m.listKey(key) }
 	}
@@ -144,6 +168,7 @@ func (m *model) palRun(id string) func(m *model) tea.Cmd {
 			}
 			b.WriteString(": archo pack build <name>\n")
 			m.openPanel(T("packs"), b.String())
+			m.panel.wrap = true // prose: it wraps (16 §9.1)
 			return nil
 		}
 	case "settings":
@@ -312,7 +337,11 @@ func (m *model) paletteKey(k tea.KeyMsg) tea.Cmd {
 	case tea.KeyEnter:
 		m.pal = nil
 		if p.sel < len(p.results) {
-			return p.results[p.sel].run(m)
+			cmd := p.results[p.sel].run(m)
+			if m.tab != tabList {
+				m.full = false // the full detail belongs to the lists; left set, it takes the new page's keys
+			}
+			return cmd
 		}
 		return nil
 	case tea.KeyUp, tea.KeyLeft, tea.KeyCtrlP: // 16 §3.3: in a popup both pairs of arrows choose
@@ -343,8 +372,10 @@ func (m *model) paletteKey(k tea.KeyMsg) tea.Cmd {
 func (m *model) paletteLines(n int) []string {
 	p := m.pal
 	w := m.w
-	out := []string{"  " + sAccent.Render(markPrompt+" ") + sText.Render(fit(p.query+"_", w-4)), ""}
-	kinds := map[palKind]string{palCommand: T("command"), palMod: "Mod", palEnv: T("game"), palPlan: T("list")}
+	// the input's cursor is the filter bar's ▌ (one cursor style, 16 §7)
+	out := []string{"  " + sAccent.Render(markPrompt+" ") + sText.Render(p.query) + sDimS.Render(fit("▌", max(w-4-width.StringWidth(p.query), 1))), ""}
+	// commands are what the palette is for and carry no tag; a Mod, game or list says so
+	kinds := map[palKind]string{palMod: "Mod", palEnv: T("game"), palPlan: T("list")}
 	rows := max(n-len(out), 1)
 	off := max(0, p.sel-rows+1)
 	for i := off; i < len(p.results) && len(out) < n; i++ {

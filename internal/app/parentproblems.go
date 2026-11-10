@@ -229,11 +229,11 @@ func parentIndex(st *LoadoutState, mod *store.Mod, key string, isActive func(str
 	afterEnable = func(pkg string) bool {
 		return dependencyPackage(pkg) == dependencyPackage(mod.PackageID) || isActive(pkg)
 	}
-	matches := key == resolved.Key(mod.SnapHash, st.GameMM())+fmt.Sprintf("|a%d", analyze.Version)
+	matches := key == resolved.Key(mod.SnapHash, st.GameMM())+analyze.DefKeySuffix()
 	// Without LoadFolders there are no plan-dependent directories. The snapshot guards
 	// the version-directory layout, which this fast path deliberately does not enumerate.
 	if mod.Decl().LoadFolders == "" {
-		matches = strings.HasPrefix(key, fmt.Sprintf("%x|f", mod.SnapHash)) && strings.HasSuffix(key, fmt.Sprintf("|a%d", analyze.Version))
+		matches = strings.HasPrefix(key, fmt.Sprintf("%x|f", mod.SnapHash)) && strings.HasSuffix(key, analyze.DefKeySuffix())
 	}
 	if !matches {
 		return false, false, afterEnable

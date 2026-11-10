@@ -317,7 +317,11 @@ func ExecuteContext(ctx context.Context, ap *app.App, argv []string) (string, in
 	if err != nil {
 		var amb *app.Ambiguous
 		if errors.As(err, &amb) {
-			return ambiguousDoc(ap, amb, c).String(), ExitAmbiguous
+			out := ambiguousDoc(ap, amb, c).String()
+			if IsMCP(ctx) {
+				out = MCPHints(out)
+			}
+			return out, ExitAmbiguous
 		}
 		var ue *UsageError
 		if errors.As(err, &ue) {
@@ -332,16 +336,27 @@ func ExecuteContext(ctx context.Context, ap *app.App, argv []string) (string, in
 		if IsMCP(ctx) && errors.As(err, &re) && re.Find != "" {
 			msg = strings.Replace(msg, re.Error(), re.MCPError(), 1)
 		}
-		return render.ShellSafe("error: " + msg + "\n"), ExitError
+		out := render.ShellSafe("error: " + msg + "\n")
+		if IsMCP(ctx) {
+			out = MCPHints(out)
+		}
+		return out, ExitError
 	}
-	return doc.String(), cctx.ExitCode
+	out := doc.String()
+	// The guide describes both surfaces on purpose, and a raw document is file content.
+	if IsMCP(ctx) && doc.Raw == "" && c.Name != "guide" {
+		out = MCPHints(out)
+	}
+	return out, cctx.ExitCode
 }
 
 type mcpKey struct{}
 
 // ForMCP marks a command as an MCP tool call. The text stays the CLI's, except that a
 // reference matching nothing suggests the find_mods tool instead of archo find (13 §3.3):
-// agents never ran the CLI to recover (MCP review 2026-11-04 §2.3).
+// agents never ran the CLI to recover (MCP review 2026-11-04 §2.3), and that the commands it
+// suggests (next:, fix:, "(archo log --all)") are written as the MCP calls that do the same
+// (MCPHints).
 func ForMCP(ctx context.Context) context.Context { return context.WithValue(ctx, mcpKey{}, true) }
 
 // IsMCP reports whether ctx is an MCP tool call (ForMCP).

@@ -166,7 +166,7 @@ func (m *model) fsKey(k string) tea.Cmd {
 		}
 		return nil
 	}
-	n := max(m.h-10, 1)
+	n := max(m.h-bodyTop-8, 1)
 	switch k {
 	case "up", "k":
 		s.step(-1)

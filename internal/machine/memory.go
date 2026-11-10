@@ -1,4 +1,5 @@
-// Package machine reads hardware capacity without scanning game or mod files.
+// Package machine reads the machine RimArcho runs on without scanning game or mod files:
+// hardware capacity, Wine, and the console.
 package machine
 
 import (
@@ -18,7 +19,9 @@ type Memory struct {
 	CommitAvailable int64     `json:"commitAvailable"`
 	Adapters        []Adapter `json:"adapters,omitempty"`
 	SampledAt       time.Time `json:"sampledAt"`
-	Error           string    `json:"error,omitempty"`
+	// RAMAvailableUnknown distinguishes an absent Linux counter from measured zero.
+	RAMAvailableUnknown bool   `json:"ramAvailableUnknown,omitempty"`
+	Error               string `json:"error,omitempty"`
 }
 
 // VRAM uses Windows' high-performance adapter ordering. This is a candidate,

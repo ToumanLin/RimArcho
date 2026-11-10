@@ -73,7 +73,7 @@ func AssessMemory(m machine.Memory, r *LoadCost) MemoryAssessment {
 	c.VRAMLow, c.VRAMHigh = f.VRAMLow, f.VRAMHigh
 	c.VRAMInRAMLow, c.VRAMInRAMHigh = f.HeldLow, f.HeldHigh
 	c.TexturesOnDemand = f.OnDemand
-	if m.TotalRAM > 0 && !m.SampledAt.IsZero() {
+	if m.TotalRAM > 0 && !m.RAMAvailableUnknown && !m.SampledAt.IsZero() {
 		c.RAMSeverity = "ok"
 		if CommitBudget(m) < c.RAMLow {
 			c.RAMSeverity = "severe"

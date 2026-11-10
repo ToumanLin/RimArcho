@@ -2,16 +2,48 @@
 package l10ndata
 
 import (
-	_ "embed"
+	"embed"
 	"encoding/json"
+	"os"
+	"strings"
 	"sync"
 	"unicode"
 )
 
-// Keep the existing preset: saved tags and newly offered tags must still match.
+// englishPinnedTags is the English preset of common tags (16 §3.8).
+const englishPinnedTags = "RimWorld,framework,visuals,apparel,races,weapons,buildings,furniture,QoL,balance,story,performance,language packs,testing,to delete"
+
+// A locale may carry its own preset in default-tags.txt; without one it gets English.
 //
-//go:embed locale/zh/default-tags.txt
-var DefaultPinnedTags string
+//go:embed locale/*/default-tags.txt
+var defaultTagFiles embed.FS
+
+// DefaultPinnedTags is the preset of common tags for a language code (from ResolveLang).
+func DefaultPinnedTags(lang string) string {
+	if b, err := defaultTagFiles.ReadFile("locale/" + lang + "/default-tags.txt"); err == nil {
+		return strings.TrimSpace(string(b))
+	}
+	return englishPinnedTags
+}
+
+// ResolveLang turns a ui.lang value into a bundled locale code, or en: ARCHO_LANG overrides
+// the value and auto (or empty) uses the system language.
+func ResolveLang(v string) string {
+	if e := os.Getenv("ARCHO_LANG"); e != "" {
+		v = e
+	}
+	if v == "" || v == "auto" {
+		v = systemLang()
+	}
+	v = strings.ToLower(v)
+	if strings.HasPrefix(v, "zh") {
+		v = "zh"
+	}
+	if _, ok := Locales[v]; ok {
+		return v
+	}
+	return "en"
+}
 
 //go:embed locale/en/legacy-accounts.json
 var legacyAccounts string

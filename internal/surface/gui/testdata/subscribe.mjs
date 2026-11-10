@@ -163,3 +163,13 @@ test("recent names open the exact installed instance when names match", async ()
   links[1].onclick(); links[0].onclick();
   assert.deepEqual(h.opened,["copy-b","copy-a"]);
 });
+
+test("enter twice while subscribing sends one request", async () => {
+  const h = await setup(), reply = deferred();
+  await h.paste("https://github.com/Example/colony");
+  h.api.Subscribe = (r) => { h.calls.push(["subscribe", r]); return reply.promise; };
+  const field = h.root.querySelector("input");
+  field.onkeydown(event("Enter")); field.onkeydown(event("Enter")); await flush();
+  assert.equal(h.calls.filter((c) => c[0] === "subscribe").length, 1);
+  reply.resolve("queued"); await flush();
+});

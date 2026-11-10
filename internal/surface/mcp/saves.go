@@ -31,34 +31,38 @@ func ListSavesArgv(in ListSavesIn) []string {
 
 // GetSaveIn is get_save: archo saves show.
 type GetSaveIn struct {
-	Env  string `json:"env,omitempty" jsonschema:"environment name (default: current)"`
-	Save string `json:"save" jsonschema:"sv:<hex>, file name or <colony>/<save>"`
-	Mods bool   `json:"mods,omitempty" jsonschema:"every Mod, not only the differences"`
-	Play bool   `json:"play,omitempty" jsonschema:"the whole playthrough: colonists, events"`
-	All  bool   `json:"all,omitempty" jsonschema:"no truncation"`
+	Env     string `json:"env,omitempty" jsonschema:"environment; default current"`
+	Save    string `json:"save" jsonschema:"sv:ref, name or colony/save"`
+	Mods    bool   `json:"mods,omitempty" jsonschema:"all Mods"`
+	Play    bool   `json:"play,omitempty" jsonschema:"all colonists and events"`
+	Content bool   `json:"content,omitempty" jsonschema:"content by Mod"`
+	All     bool   `json:"all,omitempty" jsonschema:"no truncation"`
 }
 
 // GetSaveArgv maps get_save.
 func GetSaveArgv(in GetSaveIn) []string {
-	return argv("saves", "show", in.Save).flag("mods", in.Mods).flag("play", in.Play).flag("all", in.All).a
+	return argv("saves", "show", in.Save).flag("mods", in.Mods).flag("play", in.Play).flag("content", in.Content).flag("all", in.All).a
 }
 
 // ManageSavesIn is manage_saves.
 type ManageSavesIn struct {
-	Env          string   `json:"env,omitempty" jsonschema:"environment name (default: current)"`
-	Action       string   `json:"action" jsonschema:"fix, rename, copy, backup or trash"`
-	Saves        []string `json:"saves" jsonschema:"sv:<hex>, file names or <colony>/<save>; fix, rename, copy take one"`
-	Name         string   `json:"name,omitempty" jsonschema:"rename: the new name"`
-	Mods         []string `json:"mods,omitempty" jsonschema:"fix: only these packageIds"`
-	DisableAdded bool     `json:"disable_added,omitempty" jsonschema:"fix: disable the list's Mods the save lacks"`
-	Order        bool     `json:"order,omitempty" jsonschema:"fix: use the save's order"`
-	Launch       bool     `json:"launch,omitempty" jsonschema:"fix: then start the game with the list"`
-	DryRun       bool     `json:"dry_run,omitempty" jsonschema:"fix, backup, trash: preview only"`
-	Confirm      bool     `json:"confirm,omitempty" jsonschema:"backup, trash: do it, after the player agreed"`
+	Env          string  `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Action       string  `json:"action" jsonschema:"fix, rename, copy, backup or trash"`
+	Saves        StrList `json:"saves" jsonschema:"sv:<hex>, file names or <colony>/<save>; fix, rename, copy take one"`
+	Name         string  `json:"name,omitempty" jsonschema:"rename: the new name"`
+	Mods         StrList `json:"mods,omitempty" jsonschema:"fix: only these packageIds"`
+	DisableAdded bool    `json:"disable_added,omitempty" jsonschema:"fix: disable Mods the save lacks"`
+	Order        bool    `json:"order,omitempty" jsonschema:"fix: use the save's order"`
+	Launch       bool    `json:"launch,omitempty" jsonschema:"fix: then launch"`
+	DryRun       bool    `json:"dry_run,omitempty" jsonschema:"preview only"`
+	Confirm      bool    `json:"confirm,omitempty" jsonschema:"backup, trash: do it once the player agreed"`
+	Token        string  `json:"token,omitempty" jsonschema:"the preview's token"`
 }
 
 // ManageSavesArgv maps manage_saves to saves fix / rename / copy / backup / trash. Backup
-// and trash only preview unless confirm=true (--yes) and dry_run is not set (12 §4.4).
+// and trash only preview unless confirm=true (--yes) and dry_run is not set (12 §4.4); the
+// preview's token goes with the confirmation (--token), and trash refuses one without it,
+// so what the player agreed to is what is recycled.
 func ManageSavesArgv(in ManageSavesIn) []string {
 	switch in.Action {
 	case "fix":
@@ -77,7 +81,15 @@ func ManageSavesArgv(in ManageSavesIn) []string {
 		}
 		return b.a
 	case "backup", "trash":
-		return append(append([]string{"saves", in.Action}, in.Saves...), argv().flag("yes", in.Confirm && !in.DryRun).a...)
+		yes := in.Confirm && !in.DryRun
+		if yes && in.Action == "trash" && in.Token == "" {
+			return []string{"manage_saves: trash with confirm=true needs the token of its preview: call it without confirm, show the player the files, then confirm with that token"}
+		}
+		b := argv(append([]string{"saves", in.Action}, in.Saves...)...).flag("yes", yes)
+		if yes {
+			b.str("token", in.Token)
+		}
+		return b.a
 	}
 	return unknown("manage_saves", in.Action)
 }

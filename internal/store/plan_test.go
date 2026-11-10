@@ -38,6 +38,7 @@ func TestPlanStore(t *testing.T) {
 	s.PushStep(b.ID, "undo", "y", "enable")
 	s.AddVersion(b.ID, &Version{Source: "import", Created: fixed})
 	s.SetMeta(StageKey(b.ID), "[]")
+	s.SetMeta(MonitorAddedKey(b.ID), "1")
 	if p, _ := s.PlanByID(b.ID); !p.Updated.Equal(fixed.Add(time.Hour)) {
 		t.Fatal("updated_at follows the workspace")
 	}
@@ -47,7 +48,7 @@ func TestPlanStore(t *testing.T) {
 	if err := s.DeletePlan(b.ID); err != nil {
 		t.Fatal(err)
 	}
-	if w, _ := s.Workspace(b.ID); w != nil || s.StepCount(b.ID, "undo") != 0 || s.VersionCount(b.ID) != 0 || s.Meta(StageKey(b.ID)) != "" {
+	if w, _ := s.Workspace(b.ID); w != nil || s.StepCount(b.ID, "undo") != 0 || s.VersionCount(b.ID) != 0 || s.Meta(StageKey(b.ID)) != "" || s.Meta(MonitorAddedKey(b.ID)) != "" {
 		t.Fatal("a removed plan's data is gone")
 	}
 	if p, _ := s.CurrentPlan("e"); p == nil || p.ID != a.ID {

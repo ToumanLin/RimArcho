@@ -34,6 +34,9 @@ type Patch struct {
 	Dynamic      bool   // TargetMethod()/TargetMethods(), or a manual target not statically known
 	Manual       bool   // found at a Harmony.Patch call site (manual.go), not from attributes
 	Unresolved   string // manual patch whose original was not resolved: why
+	// FromTargetMethod: the class chooses its target in TargetMethod(), whose body was simple
+	// enough to evaluate (targetmethod.go); the target is static.
+	FromTargetMethod bool
 }
 
 // Target is "Type.Method" (or "Type.Method(args)").
@@ -272,6 +275,7 @@ func Read(path string, skipHarmony bool) (*Assembly, error) {
 			out.Patches = append(out.Patches, p)
 		}
 	}
+	resolveTargetMethods(a, out)
 	// Harmony.Patch calls, direct or through a wrapper taking HarmonyMethods (manual.go).
 	if out.Manual || a.References("HarmonyLib.HarmonyMethod") || a.References("Harmony.HarmonyMethod") {
 		scanManual(a, out)

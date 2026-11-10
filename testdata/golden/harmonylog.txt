@@ -67,12 +67,12 @@ log Player.log (1.6.4633 rev1261, 1522 lines, 2026-10-01 10:00): 4 clusters
   cursor: <cursor>
   classes: harmony-stack 2, patch-failed 1, xref-missing 1
   list:
-    log:E1 patch-failed x1  [Compat] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) failed  → #hnyg (source, +1)  [pattern:g:patch.op-failed]
-    log:E2 xref-missing x1  Could not resolve cross-reference: No Verse.ThingDef named Lib_Gun found to give to Verse.ThingDe...  → #lqj2 (source, +1)  [pattern:g:xref.def]
     log:E3 harmony-stack x500  Exception ticking Pawn1: System.NullReferenceException: Object reference not set to an instance o...  → #iqmu (patcher, +2)  [pattern:g:rt.tick]
     log:E4 harmony-stack x1  Exception ticking Pawn2: System.ArgumentOutOfRangeException: Index was out of range.  → #iqmu (source)  [pattern:g:rt.tick]
+    log:E1 patch-failed x1  [Compat] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) failed  → #hnyg (source, +1)  [pattern:g:patch.op-failed]
+    log:E2 xref-missing x1  Could not resolve cross-reference: No Verse.ThingDef named Lib_Gun found to give to Verse.ThingDe...  → #lqj2 (source, +1)  [pattern:g:xref.def]
 next:
-  archo log --cluster E1
+  archo log --cluster E3
 
 $ archo log --cluster E1
 log:E1 patch-failed x1  first at Player.log:4
@@ -137,7 +137,7 @@ log:E3 harmony-stack x500  first at Player.log:9
       - POSTFIX tester.modb: Void ModB.Pawn_Tick_B:Postfix()
       - TRANSPILER tester.modb: IEnumerable`1 ModB.Pawn_Tick_B:Transpiler(IEnumerable`1 instructions)
       - TRANSPILER tester.modc: IEnumerable`1 ModC.Pawn_Tick_C:Rewrite(IEnumerable`1 instructions)
-    Verse.TickList.Tick
+    Verse.TickList.Tick +0x0
   nearby (other log messages around the first occurrence):
     before:1 Mono path[0] = 'x'
     before:2 RimWorld 1.6.4633 rev1261
@@ -154,28 +154,28 @@ log:E3 harmony-stack x500  first at Player.log:9
   pattern: pattern:g:rt.tick  an exception while ticking a pawn, thing or the world
     evidence: community: seen in 5,398 of 40,326 public 1.6 logs (0.7% of error clusters); what this kind of error usually is, not evidence about this list
     causes: a comp added or removed during tick; a patch on the tick path
-    route (tools): get_harmony target=<each patched frame> → read_source search="AllComps.Remove("
+    route (tools): get_harmony target=<each patched frame> → read_source search="AllComps.Remove(" scope="active"
     fixes: disable, update, local-fix
     repeat-uploads: after 1-3 list changes it went away in 53% of 255 repeat uploads (without any change: 13% of 834)
   checklist:
-    ThingWithComps.Tick caches comps.Count and indexes AllComps in a for loop: removing or reordering comps during a tick throws ArgumentOutOfRangeException in List`1.get_Item
+    ThingWithComps.Tick caches comps.Count and indexes AllComps in a for loop: it survives a swap or reorder, and a comp removing itself while it is the last one (swap itself to the end, remove itself on a later tick); removing any other comp throws ArgumentOutOfRangeException in List`1.get_Item, and a comp added during the loop is not ticked; a foreach over AllComps (a mod replacing the loop) throws InvalidOperationException "Collection was modified" on any change
     red flags: parent.AllComps.Remove(this) inside CompTick(); pawn.AllComps.Add/Remove for runtime comps without deferral; Swap or list surgery on AllComps; runtime ThingComps added without InitializeComps() invariants
     a PREFIX/POSTFIX line only shows who touched the method last; it is not the cause without other evidence
     also check ExposeData/PostExposeData, SpawnSetup, DeSpawn and Destroy of the mods that patch the method
 next:
   archo harmony --target Verse.Pawn.Tick
-  archo source search "AllComps.Remove(" --in iqmu --in gpto --in xamx
-  archo source search "AllComps.Add(" --in iqmu --in gpto --in xamx
+  archo source search "AllComps.Remove(" --active --yes --budget 10
+  archo source search "AllComps.Add(" --active --yes --budget 10
 
 $ archo log --cluster E4
 log:E4 harmony-stack x1  first at Player.log:18
   message: Exception ticking Pawn2: System.ArgumentOutOfRangeException: Index was out of range.
   top-frames:
-    ModA.CompBroken.CompTick
-    Verse.ThingWithComps.Tick
+    ModA.CompBroken.CompTick +0x0
+    Verse.ThingWithComps.Tick +0x0
     Verse.Pawn.Tick  (patched by Harmony)
       - PREFIX tester.moda.harmony: Boolean ModA.Pawn_Tick:Prefix(Verse.Pawn __instance)
-    Verse.TickList.Tick
+    Verse.TickList.Tick +0x0
   nearby (other log messages around the first occurrence):
     before:2 RimWorld 1.6.4633 rev1261
     before:4 [Compat] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) failed
@@ -186,23 +186,25 @@ log:E4 harmony-stack x1  first at Player.log:18
     after:32 Exception ticking Pawn102: System.NullReferenceException: Object reference not set to an instance of an object
   attribution:
     #iqmu Mod A  source  evidence: log frame 1 ModA.CompBroken.CompTick (topmost mod code in the stack); log harmony:Verse.Pawn.Tick#prefix "- PREFIX tester.moda.harmony" (type ModA.Pawn_Tick)
+  comp list changed by (candidates; 4 enabled mods, 4 assemblies scanned):
+    (no enabled mod's code changes AllComps or comps; reflection and a mod's own reference to the list are not seen)
   confidence: likely
   pattern: pattern:g:rt.tick  an exception while ticking a pawn, thing or the world
     evidence: community: seen in 5,398 of 40,326 public 1.6 logs (0.7% of error clusters); what this kind of error usually is, not evidence about this list
     causes: a comp added or removed during tick; a patch on the tick path
-    route (tools): get_harmony target=<each patched frame> → read_source search="AllComps.Remove("
+    route (tools): get_harmony target=<each patched frame> → read_source search="AllComps.Remove(" scope="active"
     fixes: disable, update, local-fix
     repeat-uploads: after 1-3 list changes it went away in 53% of 255 repeat uploads (without any change: 13% of 834)
   checklist:
-    ThingWithComps.Tick caches comps.Count and indexes AllComps in a for loop: removing or reordering comps during a tick throws ArgumentOutOfRangeException in List`1.get_Item
+    ThingWithComps.Tick caches comps.Count and indexes AllComps in a for loop: it survives a swap or reorder, and a comp removing itself while it is the last one (swap itself to the end, remove itself on a later tick); removing any other comp throws ArgumentOutOfRangeException in List`1.get_Item, and a comp added during the loop is not ticked; a foreach over AllComps (a mod replacing the loop) throws InvalidOperationException "Collection was modified" on any change
     red flags: parent.AllComps.Remove(this) inside CompTick(); pawn.AllComps.Add/Remove for runtime comps without deferral; Swap or list surgery on AllComps; runtime ThingComps added without InitializeComps() invariants
     a PREFIX/POSTFIX line only shows who touched the method last; it is not the cause without other evidence
     also check ExposeData/PostExposeData, SpawnSetup, DeSpawn and Destroy of the mods that patch the method
 next:
   archo source iqmu --type ModA.CompBroken
   archo harmony --target Verse.Pawn.Tick
-  archo source search "AllComps.Remove(" --in iqmu
-  archo source search "AllComps.Add(" --in iqmu
+  archo source search "AllComps.Remove(" --active --yes --budget 10
+  archo source search "AllComps.Add(" --active --yes --budget 10
 
 $ archo log --select
 log Player.log (1.6.4633 rev1261, 1522 lines, 2026-10-01 10:00): 4 clusters
@@ -211,12 +213,12 @@ log Player.log (1.6.4633 rev1261, 1522 lines, 2026-10-01 10:00): 4 clusters
   selected: archo problems now includes these clusters as log.* problems
   classes: harmony-stack 2, patch-failed 1, xref-missing 1
   list:
-    log:E1 patch-failed x1  [Compat] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) failed  → #hnyg (source, +1)  [pattern:g:patch.op-failed]
-    log:E2 xref-missing x1  Could not resolve cross-reference: No Verse.ThingDef named Lib_Gun found to give to Verse.ThingDe...  → #lqj2 (source, +1)  [pattern:g:xref.def]
     log:E3 harmony-stack x500  Exception ticking Pawn1: System.NullReferenceException: Object reference not set to an instance o...  → #iqmu (patcher, +2)  [pattern:g:rt.tick]
     log:E4 harmony-stack x1  Exception ticking Pawn2: System.ArgumentOutOfRangeException: Index was out of range.  → #iqmu (source)  [pattern:g:rt.tick]
+    log:E1 patch-failed x1  [Compat] Patch operation Verse.PatchOperationAdd(Defs/ThingDef[defName="Lib_Gun"]) failed  → #hnyg (source, +1)  [pattern:g:patch.op-failed]
+    log:E2 xref-missing x1  Could not resolve cross-reference: No Verse.ThingDef named Lib_Gun found to give to Verse.ThingDe...  → #lqj2 (source, +1)  [pattern:g:xref.def]
 next:
-  archo log --cluster E1
+  archo log --cluster E3
 
 $ archo problems --code log
 problems: 2 error, 2 warning, 0 info
@@ -320,8 +322,8 @@ error log.harmony-stack  log:E4 x1: Exception ticking Pawn2: System.ArgumentOutO
   fix: archo log --cluster E4
   fix: archo source iqmu --type ModA.CompBroken
   fix: archo harmony --target Verse.Pawn.Tick
-  fix: archo source search "AllComps.Remove(" --in iqmu
-  fix: archo source search "AllComps.Add(" --in iqmu
+  fix: archo source search "AllComps.Remove(" --active --yes --budget 10
+  fix: archo source search "AllComps.Add(" --active --yes --budget 10
 next:
   archo log --cluster E4
 

@@ -575,6 +575,8 @@ function inlineImport(draft, active, updateButtons) {
       const value = await (/\.rws$/i.test(f.name) ? f.slice(0, 4 << 20) : f).text();
       if (!active() || n !== M.importSeq) return;
       imp.text = ""; text.value = ""; imp.path = f.name; showFile();
+      // an empty file has nothing to read: the preview button must not wait for it
+      if (!value.trim()) { draft.importing = false; updateButtons(); return; }
       await read("text", value, f.name);
     } catch (e) { if (active() && n === M.importSeq) { draft.importing = false; error.textContent = errText(e); updateButtons(); } }
   }
@@ -640,7 +642,10 @@ function costSection(p) {
     const pending = el("div", "skel");
     progress(pending, s.querySelector(".pm-sub"));
     pending.setAttribute("aria-busy", "true");
-    pending.append(el("span", "bar"), el("span", "bar"));
+    // as tall as an estimate (the last one shown, else its usual four lines), so the
+    // estimate arriving does not push the sections below it down
+    pending.append(el("span", "bar"), el("span", "bar"), el("span", "bar"), el("span", "bar"));
+    if (C.height) s.style.minHeight = C.height + "px";
     C.progress = el("div", "muted pm-note", C.page?.progress || "");
     C.progress.setAttribute("aria-live", "polite");
     s.append(pending, C.progress);
@@ -692,6 +697,7 @@ function showCost(p, id) {
   const s = C.slot;
   if (!s) return;
   s.replaceChildren(el("div", "pm-sub", T("Loaded memory (estimate)")));
+  s.style.minHeight = "";
   if (p.error) { s.append(el("div", "muted pm-note", p.error)); return; }
   s.append(el("div", "word-facts", p.summary), el("div", "muted pm-note", p.detail));
   if (p.loadingBudget) s.append(el("div", "muted pm-note", p.loadingBudget));
@@ -707,6 +713,8 @@ function showCost(p, id) {
   }
   for (const note of p.notes || []) details.append(el("div", "muted pm-note", note));
   s.append(details);
+  // the next wait keeps this height (its breakdown closed: an open one is the player's)
+  if (!details.open && s.isConnected) C.height = s.offsetHeight;
 }
 
 // ---- game version (07 §1.6): one small button per version, the allowed ones raised ----

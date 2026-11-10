@@ -59,7 +59,7 @@ func (s *Store) CachedDefs(instanceID, key string) ([]analyze.DefFact, bool) {
 }
 
 // defFields: file_ix indexes the set's file list (05 §3); scanDefs turns it into the path.
-const defFields = `f.set_id, f.def_type, f.def_name, f.name, f.parent, f.abstract, f.file_ix, f.line, f.may_require, f.may_require_any`
+const defFields = `f.set_id, f.def_type, f.def_name, f.name, f.parent, f.abstract, f.file_ix, f.line, f.may_require, f.may_require_any, f.content_fields`
 const defCols = `c.instance_id, ` + defFields
 const defView = ` FROM def_fact f JOIN content_state c ON c.def_set_id=f.set_id `
 
@@ -86,8 +86,14 @@ func (s *Store) scanDefsWith(rows *sql.Rows, lists func(set int64) []string) ([]
 		var f analyze.DefFact
 		var abs int
 		var r fileRef
-		if err := rows.Scan(&f.Instance, &r.set, &f.Type, &f.DefName, &f.Name, &f.Parent, &abs, &r.ix, &f.Line, &f.MayRequire, &f.MayRequireAny); err != nil {
+		var fields string
+		if err := rows.Scan(&f.Instance, &r.set, &f.Type, &f.DefName, &f.Name, &f.Parent, &abs, &r.ix, &f.Line, &f.MayRequire, &f.MayRequireAny, &fields); err != nil {
 			return nil, err
+		}
+		// Content fields serve the save content card only: a row that does not decode
+		// leaves that Def unclassified instead of failing every reader of Def facts.
+		if fields != "" && json.Unmarshal([]byte(fields), &f.Content) != nil {
+			f.Content = nil
 		}
 		f.Abstract = abs != 0
 		out = append(out, f)
@@ -495,9 +501,10 @@ func saveHarmony(tx *sql.Tx, asms []*analyze.AssemblyFacts, sets map[string]int6
 			}
 		}
 		for _, p := range a.Patches {
-			// dynamic holds two bits: 1 the target is chosen at run time, 2 the patch was
-			// found at a Harmony.Patch call in code (G9, 05 §5.3).
-			if _, err := insH.Exec(set, file, p.PatchType, p.PatchMethod, p.Kind, p.Target(), p.TargetType, p.TargetMethod, p.Args, b(p.Skips), b(p.Dynamic)|2*b(p.Manual)); err != nil {
+			// dynamic holds three bits: 1 the target is chosen at run time, 2 the patch was
+			// found at a Harmony.Patch call in code (G9, 05 §5.3), 4 the target was read from a
+			// simple TargetMethod() body.
+			if _, err := insH.Exec(set, file, p.PatchType, p.PatchMethod, p.Kind, p.Target(), p.TargetType, p.TargetMethod, p.Args, b(p.Skips), b(p.Dynamic)|2*b(p.Manual)|4*b(p.FromTargetMethod)); err != nil {
 				return err
 			}
 		}
@@ -522,6 +529,8 @@ type HarmonyRow struct {
 	// Manual: found at a Harmony.Patch call in code, not from attributes (G9). With
 	// Dynamic its original was not resolved and Target says why ("<manual: …>").
 	Manual bool
+	// FromTargetMethod: the class picks its target in TargetMethod(), read statically.
+	FromTargetMethod bool
 }
 
 // HarmonyFilter selects Harmony patches.
@@ -562,7 +571,7 @@ func (s *Store) HarmonyPatches(f HarmonyFilter) ([]*HarmonyRow, error) {
 		if err := rows.Scan(&h.Instance, &r.set, &r.ix, &h.PatchType, &h.PatchMethod, &h.Kind, &h.Target, &sk, &dy); err != nil {
 			return nil, err
 		}
-		h.Skips, h.Dynamic, h.Manual = sk != 0, dy&1 != 0, dy&2 != 0
+		h.Skips, h.Dynamic, h.Manual, h.FromTargetMethod = sk != 0, dy&1 != 0, dy&2 != 0, dy&4 != 0
 		out = append(out, h)
 		at = append(at, r)
 	}
@@ -747,6 +756,40 @@ func (s *Store) TypesUnder(root string, limit int) (map[string][]string, error) 
 			return nil, err
 		}
 		out[name] = append(out[name], inst)
+	}
+	return out, rows.Err()
+}
+
+// TypesNamed returns up to limit type full names of Store.MM (Mods' analysed assemblies and the
+// game's) whose last segment equals the last segment of name: the candidates offered when a
+// type is asked for under the wrong namespace ("RimWorld.PlayLogEntry_Interaction" →
+// "Verse.PlayLogEntry_Interaction").
+func (s *Store) TypesNamed(name string, limit int) ([]string, error) {
+	short := name
+	if i := strings.LastIndexAny(short, ".+"); i >= 0 {
+		short = short[i+1:]
+	}
+	if short == "" {
+		return nil, nil
+	}
+	rows, err := s.DB.Query(`SELECT name FROM (
+ SELECT f.type_name AS name FROM type_fact f CROSS JOIN content_state c ON c.dll_set_id=f.set_id
+  WHERE (f.type_name=?1 OR f.type_name LIKE ?2 ESCAPE '\' OR f.type_name LIKE ?3 ESCAPE '\') AND c.game_mm=?4
+ UNION
+ SELECT g.type_name FROM game_type g JOIN game_assembly a ON a.id=g.assembly_id
+  WHERE (g.type_name=?1 OR g.type_name LIKE ?2 ESCAPE '\' OR g.type_name LIKE ?3 ESCAPE '\') AND a.game_mm=?4)
+ WHERE name<>?5 ORDER BY name LIMIT ?6`, short, "%."+likeEscape(short), "%+"+likeEscape(short), s.MM, name, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var n string
+		if err := rows.Scan(&n); err != nil {
+			return nil, err
+		}
+		out = append(out, n)
 	}
 	return out, rows.Err()
 }

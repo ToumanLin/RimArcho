@@ -231,9 +231,12 @@ type classInfo struct {
 // impliedPrefixes and impliedSuffixes name the Defs the game generates from other Defs at
 // startup (DefGenerator.GenerateImpliedDefs_PreResolve, 1.6): no Def file defines them, so
 // they resolve by the Def they are made from. A save holds them as things: corpses, meat,
-// blueprints and frames, techprints, trainers, and the stone terrains.
+// blueprints and frames, techprints, trainers, and the stone terrains. Biotech's gene
+// templates (GeneDefGenerator) add the aptitude genes of each skill and the dependency
+// genes of each chemical.
 var (
-	impliedPrefixes = []string{"Blueprint_Install_", "Blueprint_", "Frame_", "Corpse_", "Meat_", "Techprint_", "Psytrainer_", "Neurotrainer_", "Make_", "Administer_"}
+	impliedPrefixes = []string{"Blueprint_Install_", "Blueprint_", "Frame_", "Corpse_", "Meat_", "Techprint_", "Psytrainer_", "Neurotrainer_", "Make_", "Administer_",
+		"AptitudeTerrible_", "AptitudePoor_", "AptitudeStrong_", "AptitudeRemarkable_", "ChemicalDependency_", "AddictionImmune_", "AddictionResistant_"}
 	impliedSuffixes = []string{"_RoughHewn", "_Rough", "_Smooth"}
 )
 

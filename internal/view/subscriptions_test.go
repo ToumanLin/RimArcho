@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/modchanges"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
@@ -171,7 +172,7 @@ func TestSubscriptionSourceStates(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
 	e.App.SteamCMDNoPath = true
-	e.WriteFile(filepath.Join(e.App.LocalDir(), "steamcmd", "steamcmd.exe"), "fixture executable")
+	e.WriteFile(filepath.Join(e.App.LocalDir(), "steamcmd", deps.SteamCMDExecutable()), "fixture executable")
 	e.AddEnv(false)
 	e.MustRun("scan")
 	st, err := e.App.Loadout()

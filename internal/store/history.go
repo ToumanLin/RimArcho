@@ -18,8 +18,22 @@ type Scan struct {
 
 // Scans lists an environment's scans, newest first.
 func (s *Store) Scans(envID string, limit int) ([]*Scan, error) {
+	return s.scans(``, envID, limit)
+}
+
+// LastFinishedScan is the environment's newest finished scan, or nil. A scan that failed
+// or was cut short keeps its row without a finish time.
+func (s *Store) LastFinishedScan(envID string) (*Scan, error) {
+	list, err := s.scans(` AND finished_at IS NOT NULL`, envID, 1)
+	if err != nil || len(list) == 0 {
+		return nil, err
+	}
+	return list[0], nil
+}
+
+func (s *Store) scans(where, envID string, limit int) ([]*Scan, error) {
 	rows, err := s.DB.Query(`SELECT id, environment_id, started_at, coalesce(finished_at, 0), full, stats FROM scan
-		WHERE environment_id=? ORDER BY id DESC LIMIT ?`, envID, limit)
+		WHERE environment_id=?`+where+` ORDER BY id DESC LIMIT ?`, envID, limit)
 	if err != nil {
 		return nil, err
 	}

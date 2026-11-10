@@ -63,6 +63,10 @@ type Observation struct {
 	Residue    bool   // workshop folder that Steam no longer lists as subscribed
 	Unloadable string // why the game cannot load the folder at all, e.g. "about-disabled"
 	Err        string
+
+	// ResidueUnknown: the workshop manifest exists but could not be read, so Residue is
+	// only a guess and the stored value is kept.
+	ResidueUnknown bool
 }
 
 // SourceStats counts what a scan saw under one source.
@@ -107,6 +111,7 @@ func Collect(sources []*source.Source, o Options) ([]*Observation, map[string]*S
 		loc      Location
 		real     string
 		residue  bool
+		unknown  bool // residue unknown: the manifest could not be read
 		disabled bool
 		acf      *ACFItem
 		srcOrder int
@@ -122,9 +127,12 @@ func Collect(sources []*source.Source, o Options) ([]*Observation, map[string]*S
 			continue
 		}
 		var acf *ACF
+		acfErr := false
 		if s.Kind.WorkshopLike() {
-			acf = ReadACF(s.Root)
+			var err error
+			acf, err = readACF(s.Root)
 			st.HasACF = acf != nil
+			acfErr = err != nil && s.Kind == source.Workshop
 		}
 		for _, e := range entries {
 			st.Folders++
@@ -149,6 +157,7 @@ func Collect(sources []*source.Source, o Options) ([]*Observation, map[string]*S
 				loc:      Location{SourceID: s.ID, Kind: s.Kind, Label: s.Label, Rel: e.Name, Path: e.Path, IsLink: e.IsLink},
 				real:     e.RealPath,
 				residue:  residue,
+				unknown:  acfErr,
 				disabled: about == source.AboutDisabled,
 				acf:      item,
 				srcOrder: si,
@@ -183,7 +192,7 @@ func Collect(sources []*source.Source, o Options) ([]*Observation, map[string]*S
 			return a.loc.Rel < b.loc.Rel
 		})
 		p := g[0]
-		ob := &Observation{Loc: p.loc, RealPath: p.real, Residue: p.residue, ACF: p.acf}
+		ob := &Observation{Loc: p.loc, RealPath: p.real, Residue: p.residue, ResidueUnknown: p.unknown, ACF: p.acf}
 		if p.disabled {
 			ob.Unloadable = UnloadableAboutDisabled
 		}

@@ -307,6 +307,8 @@ type Home struct {
 	LastRun       string `json:"lastRun,omitempty"`
 	LastRunDay    string `json:"lastRunDay,omitempty"`
 	LastRunErrors int    `json:"lastRunErrors"`
+	// LastRunPending: the last run's log is not analysed yet (no count to show).
+	LastRunPending bool `json:"lastRunPending,omitempty"`
 	// Changes is the current plan's changes since it was last played (16 §2.3): one
 	// sentence that opens Updates with that scope and time.
 	Changes *modchanges.Home `json:"changes,omitempty"`
@@ -334,6 +336,16 @@ func BuildHome(a *app.App, b *Board, n *Needs, plans []PlanRow, packs []PackRow)
 // BuildHomeFromState needs counts and list state, not the editor's thousands of
 // inactive rows, copy captions and search fields.
 func BuildHomeFromState(a *app.App, st *app.LoadoutState, n *Needs, plans []PlanRow, packs []PackRow) *Home {
+	return buildHome(a, st, n, plans, packs, false)
+}
+
+// BuildLaunchFromState supplies the TUI's current-list summary, without the window's
+// other lists, version ranges, changes card or self-update line (16 §9.1).
+func BuildLaunchFromState(a *app.App, st *app.LoadoutState, n *Needs, plans []PlanRow) *Home {
+	return buildHome(a, st, n, plans, nil, true)
+}
+
+func buildHome(a *app.App, st *app.LoadoutState, n *Needs, plans []PlanRow, packs []PackRow, launchOnly bool) *Home {
 	defer perftrace.Span("Home-rows")()
 	h := &Home{Featured: -1}
 	name, version := st.Ix.Env.Name, st.Ix.Env.GameVersion
@@ -345,45 +357,60 @@ func BuildHomeFromState(a *app.App, st *app.LoadoutState, n *Needs, plans []Plan
 		}
 	}
 	for _, p := range plans {
+		if launchOnly && !p.Current {
+			continue
+		}
 		r := HomeRow{Kind: RowPlan, Name: p.Name, Env: chip, Played: p.Played, at: p.PlayedAt, Plan: p.ID, Page: p.Page,
 			Current: p.Current, Mark: p.ConflictText, InGame: p.InGame, Facts: Tf("%d mods", p.Entries), Mode: T("follows Workshop updates"),
 			EnvName: name, GameVersion: version, Versions: ver, Mods: p.Entries}
 		// a list says the game versions it allows (07 §1.6, 16 §2.3)
-		if sp, err := a.Store.PlanByID(p.ID); err == nil && sp != nil {
-			if vs := app.FormatVersions(a.PlanAllowedVersions(st, sp)); vs != "" {
-				r.Versions = vs
+		if !launchOnly {
+			if sp, err := a.Store.PlanByID(p.ID); err == nil && sp != nil {
+				if vs := app.FormatVersions(a.PlanAllowedVersions(st, sp)); vs != "" {
+					r.Versions = vs
+				}
 			}
 		}
-		k, checked := 0, false
+		k, checked, stale := 0, false, false
 		if p.Current {
 			r.Memory = BuildMemoryLaunch(a, st)
 			r.Mods = active
 			r.Facts = Tf("%d mods", active)
 			r.Unsaved = len(st.Changes())
-			k, checked = BreakCount(n), !n.Never
+			k, checked, stale = BreakCount(n), !n.Never, n.Stale
 			r.Links = PackLinksText(n)
 		} else {
-			k, checked = PlanProblems(a, p.ID)
+			k, checked, stale = PlanProblems(a, p.ID)
 		}
-		switch {
-		case !checked:
-			r.State = T("not checked yet")
-		case k > 0:
-			r.State, r.Level = Tf("%d problems break the game", k), LevelBad
-		default:
-			r.State, r.Level = T("ready to play"), HomeOK
-		}
+		r.State, r.Level = planState(k, checked, stale)
 		h.Rows = append(h.Rows, r)
 	}
 	for _, p := range packs {
 		h.Rows = append(h.Rows, packHomeRow(p, chip, name, version))
 	}
 	SortHome(h.Rows)
-	h.LastRun, h.LastRunDay, h.LastRunErrors = n.LastRun, n.LastRunDay, LastRunErrors(n)
+	h.LastRun, h.LastRunDay, h.LastRunErrors, h.LastRunPending = n.LastRun, n.LastRunDay, LastRunErrors(n), n.LastRunPending
 	h.Launch = n.Launch
-	h.Changes = ChangeHome(a, st)
-	h.Update = SelfUpdateHome(a)
+	if !launchOnly {
+		h.Changes = ChangeHome(a, st)
+		h.Update = SelfUpdateHome(a)
+	}
 	return h
+}
+
+// planState is a plan row's state and level from its check. A check older than the list
+// still shows its problems, but never "ready to play" (as Can it run says, 16 §2.4).
+func planState(k int, checked, stale bool) (string, string) {
+	switch {
+	case !checked:
+		return T("not checked yet"), ""
+	case k > 0:
+		return Tf("%d problems break the game", k), LevelBad
+	case stale:
+		return T("the files changed since the last check"), ""
+	default:
+		return T("ready to play"), HomeOK
+	}
 }
 
 func packHomeRow(p PackRow, chip, envName, gameVersion string) HomeRow {
@@ -423,12 +450,7 @@ func AddOtherEnvs(a *app.App, h *Home, current string) {
 			if !p.LastPlayed.IsZero() {
 				r.Played = Tf("played %s", ShortDate(p.LastPlayed))
 			}
-			r.State = T("not checked yet")
-			if k, checked := PlanProblems(a, p.ID); checked && k > 0 {
-				r.State, r.Level = Tf("%d problems break the game", k), LevelBad
-			} else if checked {
-				r.State, r.Level = T("ready to play"), HomeOK
-			}
+			r.State, r.Level = planState(PlanProblems(a, p.ID))
 			h.Rows = append(h.Rows, r)
 		}
 		if packs, _, err := a.PacksOf(e); err == nil {
@@ -546,7 +568,7 @@ func GameAt(a *app.App, path string, pending ...string) (*GameFound, error) {
 	}
 	envs, _ := a.Store.Envs()
 	taken := map[string]bool{}
-	g := &GameFound{Game: path, Version: env.ReadGameVersion(path), Launch: "direct", UserData: a.DefaultUserData()}
+	g := &GameFound{Game: path, Version: env.ReadGameVersion(path), Launch: "direct", UserData: a.DefaultUserData(path)}
 	for _, n := range pending {
 		taken[strings.TrimSpace(n)] = true
 	}

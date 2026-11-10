@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
@@ -22,7 +23,7 @@ func TestSteamAccountWindowVerificationAndManagedForget(t *testing.T) {
 	e := testkit.New(t)
 	e.App.SteamCMDNoPath = true
 	dir := filepath.Join(e.App.LocalDir(), "steamcmd")
-	exe := filepath.Join(dir, "steamcmd.exe")
+	exe := filepath.Join(dir, deps.SteamCMDExecutable())
 	e.WriteFile(exe, "fake executable marker")
 	e.MustRun("config", "set", "steamcmd.account", "fixture-player")
 	log := filepath.Join(dir, "logs", "console_log.txt")
@@ -90,7 +91,7 @@ func TestSteamAccountWindowVerificationAndManagedForget(t *testing.T) {
 	if _, err := os.Stat(mod); err != nil {
 		t.Fatal("mod changed")
 	}
-	external := filepath.Join(e.Root, "external", "steamcmd.exe")
+	external := filepath.Join(e.Root, "external", deps.SteamCMDExecutable())
 	e.WriteFile(external, "external")
 	externalCache := filepath.Join(filepath.Dir(external), "config", "config.vdf")
 	e.WriteFile(externalCache, "external-auth-fixture")
@@ -117,7 +118,7 @@ func TestFakeSteamCMDScript(t *testing.T) {
 	e := testkit.New(t)
 	e.App.SteamCMDNoPath = true
 	dir := filepath.Join(e.App.LocalDir(), "steamcmd")
-	e.WriteFile(filepath.Join(dir, "steamcmd.exe"), "stub marker")
+	e.WriteFile(filepath.Join(dir, deps.SteamCMDExecutable()), "stub marker")
 	script := filepath.Join(dir, "fake.cmd")
 	e.WriteFile(script, "@echo off\r\nif not exist logs mkdir logs\r\necho Logging in user 'fixture-player' to Steam Public...OK>>logs\\console_log.txt\r\necho Waiting for user info...OK>>logs\\console_log.txt\r\n")
 	e.MustRun("config", "set", "steamcmd.account", "fixture-player")
@@ -144,7 +145,7 @@ func TestUninstallForgetsSessionsBeforeKeptSteamCMD(t *testing.T) {
 	e.App.ArchoProbe = func() []int { return nil }
 	e.App.AfterExitFunc = func(app.AfterExit) error { return nil }
 	dir := filepath.Join(e.App.LocalDir(), "steamcmd")
-	e.WriteFile(filepath.Join(dir, "steamcmd.exe"), "stub")
+	e.WriteFile(filepath.Join(dir, deps.SteamCMDExecutable()), "stub")
 	cache := filepath.Join(dir, "config", "config.vdf")
 	e.WriteFile(cache, "offline-auth-fixture")
 	mod := filepath.Join(dir, "steamapps", "workshop", "content", "294100", "1", "About", "About.xml")
@@ -185,7 +186,7 @@ func TestUninstallForgetFailurePreservesToolsAndData(t *testing.T) {
 	called := false
 	e.App.AfterExitFunc = func(app.AfterExit) error { called = true; return nil }
 	dir := filepath.Join(e.App.LocalDir(), "steamcmd")
-	exe := filepath.Join(dir, "steamcmd.exe")
+	exe := filepath.Join(dir, deps.SteamCMDExecutable())
 	e.WriteFile(exe, "stub")
 	// An unknown auth-cache layout must stop uninstall before deleting tools or DB.
 	e.MkdirAll(filepath.Join(dir, "config", "config.vdf"))
@@ -205,7 +206,7 @@ func TestSteamLoginRequiresNameButVerifyAllowsAnonymous(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
 	e.App.SteamCMDNoPath = true
-	e.WriteFile(filepath.Join(e.App.LocalDir(), "steamcmd", "steamcmd.exe"), "offline fixture")
+	e.WriteFile(filepath.Join(e.App.LocalDir(), "steamcmd", deps.SteamCMDExecutable()), "offline fixture")
 	calls := 0
 	e.App.SteamCMDStart = func(_ string, args []string, _ bool) (app.SteamCMDProc, error) {
 		calls++
@@ -241,7 +242,7 @@ func TestSteamAccountVerificationLogFormats(t *testing.T) {
 		t.Run(tc.sample, func(t *testing.T) {
 			e := testkit.New(t)
 			e.App.SteamCMDNoPath = true
-			exe := filepath.Join(e.App.LocalDir(), "steamcmd", "steamcmd.exe")
+			exe := filepath.Join(e.App.LocalDir(), "steamcmd", deps.SteamCMDExecutable())
 			e.WriteFile(exe, "offline fixture")
 			e.MustRun("config", "set", "steamcmd.account", tc.account)
 			sample, err := os.ReadFile(filepath.Join("testdata", "steam-login", tc.sample+".log"))
@@ -273,7 +274,7 @@ func TestSteamLoginAutomaticallyVerifiesOwnershipAndLogoutFallsBack(t *testing.T
 			e := testkit.New(t)
 			e.App.SteamCMDNoPath = true
 			dir := filepath.Join(e.App.LocalDir(), "steamcmd")
-			exe := filepath.Join(dir, "steamcmd.exe")
+			exe := filepath.Join(dir, deps.SteamCMDExecutable())
 			e.WriteFile(exe, "offline fixture")
 			e.MustRun("config", "set", "steamcmd.account", "dummyPlayer")
 			calls := 0

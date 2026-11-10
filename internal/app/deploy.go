@@ -217,6 +217,9 @@ func planLinks(st *LoadoutState, copies []ModsCopy) (string, []LinkChange, []Dup
 		}
 		p := filepath.Join(mods, name)
 		if !source.IsLink(p) {
+			if m := want[strings.ToLower(name)]; m != nil && sameFiles(p, m.RealPath) {
+				return "", nil, nil, copiedLinkError(p)
+			}
 			return "", nil, nil, fmt.Errorf("%s starts with %s but is not a link; RimArcho does not touch it (rename or remove it yourself)", p, DeployPrefix)
 		}
 		m := want[strings.ToLower(name)]
@@ -240,6 +243,9 @@ func planLinks(st *LoadoutState, copies []ModsCopy) (string, []LinkChange, []Dup
 		if !have[key] {
 			if p := filepath.Join(mods, DeployName(m)); !source.IsLink(p) {
 				if _, err := os.Lstat(p); err == nil {
+					if sameFiles(p, m.RealPath) {
+						return "", nil, nil, copiedLinkError(p)
+					}
 					return "", nil, nil, fmt.Errorf("%s already exists and is not a link; RimArcho does not touch it", p)
 				}
 			}
@@ -304,4 +310,11 @@ func deployDuplicates(st *LoadoutState, want map[string]*store.Mod, copies []Mod
 		}
 	}
 	return out
+}
+
+// copiedLinkError: a folder where RimArcho's link belongs, holding the same files as the
+// link's target, as Explorer leaves it when a game folder is copied. The link repair can
+// move it to the recycle bin (09 §3).
+func copiedLinkError(p string) error {
+	return fmt.Errorf("%s is a copy of the folder RimArcho links there (was the game folder copied?); repair it in Can it run, or run archo links repair --dry-run", p)
 }

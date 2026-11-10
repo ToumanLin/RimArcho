@@ -63,11 +63,29 @@ func texturesText(p *view.TexturePage) string {
 }
 
 func (m *model) texturesPanel() tea.Cmd {
-	p, err := view.TexturePageOf(m.app, app.TexPlan, 100)
-	if err != nil {
-		m.say(sayFail, err.Error())
+	key := m.pageKey()
+	if m.texturePanel != nil && m.textureKey == key {
+		m.texturePanel.off = 0
+		m.panel = m.texturePanel
 		return nil
 	}
-	m.openPanel(T("texture optimisation"), texturesText(p))
-	return nil
+	m.openPanel(T("texture optimisation"), T("loading…"))
+	panel := m.panel
+	panel.wrap, panel.nav = true, 7
+	if m.texturePanel != nil {
+		panel.lines = m.texturePanel.lines
+	}
+	valid := func(m *model) bool { return m.panel == panel && m.pageKey() == key }
+	return m.bgWhen(valid, func(a *app.App) func(*model) tea.Cmd {
+		p, err := view.TexturePageOf(a, app.TexPlan, 100)
+		return func(m *model) tea.Cmd {
+			if err != nil {
+				m.say(sayFail, m.humanize(err.Error()))
+				return nil
+			}
+			panel.lines = strings.Split(strings.TrimRight(texturesText(p), "\n"), "\n")
+			m.texturePanel, m.textureKey = panel, key
+			return nil
+		}
+	})
 }

@@ -502,14 +502,77 @@ func (a *App) UpdateSubscriptionsWith(refs []string, dryRun bool, calls BatchCal
 				if stopped() {
 					break
 				}
+				// Each Mod is shown as worked on when SteamCMD starts it and done when it is
+				// confirmed, not all of them at the group's start and end; stop ends SteamCMD.
+				ctx, cancel := context.WithCancel(context.Background())
+				watched := make(chan struct{})
+				go func() {
+					tick := time.NewTicker(250 * time.Millisecond)
+					defer tick.Stop()
+					for {
+						select {
+						case <-watched:
+							return
+						case <-tick.C:
+							if stopped() {
+								cancel()
+								return
+							}
+						}
+					}
+				}()
+				byID := map[string][]int{}
 				for _, j := range g.indices {
-					start(j)
+					byID[ss[j].Record.WorkshopID] = append(byID[ss[j].Record.WorkshopID], j)
 				}
-				download, err := a.downloadWorkshopGroup(g.ids, g.key.root, g.key.account, false, false)
-				if err != nil {
+				apply := func(j int, item SubscribeItem) error {
+					op.Items[j].To, op.Items[j].Result = item.To, item.Result
+					op.Items[j].Record, op.Items[j].Links = item.Record, item.Links
+					delete(a.subscriptionCache, ss[j].Folder)
+					delete(a.subscriptionCache, realOrAbs(ss[j].Folder))
+					changed = changed || item.To != ""
+					if why, failed := strings.CutPrefix(item.Result, "failed: "); failed {
+						return errors.New(why)
+					}
+					return nil
+				}
+				reported := map[int]bool{}
+				transfer := &workshopTransfer{ctx: ctx, items: make([]TaskItem, len(g.ids))}
+				for k, id := range g.ids {
+					transfer.items[k] = TaskItem{Ref: "ws:" + id, State: ItemWait}
+				}
+				startedIDs := map[string]bool{}
+				transfer.changed = func(items []TaskItem) {
+					for _, it := range items {
+						if id := strings.TrimPrefix(it.Ref, "ws:"); it.State == ItemRun && !startedIDs[id] {
+							startedIDs[id] = true
+							for _, j := range byID[id] {
+								start(j)
+							}
+						}
+					}
+				}
+				transfer.settled = func(item SubscribeItem) {
+					for _, j := range byID[item.Record.WorkshopID] {
+						itemErr := apply(j, item)
+						if itemErr != nil && ctx.Err() != nil {
+							continue // stopped before it was confirmed: left as not done
+						}
+						reported[j] = true
+						done(j, itemErr)
+					}
+				}
+				download, err := a.downloadWorkshopGroup(g.ids, g.key.root, g.key.account, false, false, transfer)
+				close(watched)
+				halted := ctx.Err() != nil
+				cancel()
+				if err != nil && !(halted && errors.Is(err, context.Canceled)) {
 					failures = append(failures, err)
 				}
 				for _, j := range g.indices {
+					if reported[j] || halted {
+						continue
+					}
 					if download == nil {
 						op.Items[j].To = ""
 						op.Items[j].Result = "failed: " + err.Error()
@@ -519,15 +582,7 @@ func (a *App) UpdateSubscriptionsWith(refs []string, dryRun bool, calls BatchCal
 					var itemErr error = fmt.Errorf("SteamCMD did not report Workshop %s", ss[j].Record.WorkshopID)
 					for _, item := range download.Items {
 						if item.Record.WorkshopID == ss[j].Record.WorkshopID {
-							op.Items[j].To, op.Items[j].Result = item.To, item.Result
-							op.Items[j].Record, op.Items[j].Links = item.Record, item.Links
-							delete(a.subscriptionCache, ss[j].Folder)
-							delete(a.subscriptionCache, realOrAbs(ss[j].Folder))
-							changed = changed || item.To != ""
-							itemErr = nil
-							if why, failed := strings.CutPrefix(item.Result, "failed: "); failed {
-								itemErr = errors.New(why)
-							}
+							itemErr = apply(j, item)
 						}
 					}
 					done(j, itemErr)

@@ -211,6 +211,7 @@ type Start struct {
 	Accent      string            `json:"accent"`
 	Theme       string            `json:"theme"`
 	ArchoMotion string            `json:"archoMotion"`
+	Motion      string            `json:"motion"`
 	Text        map[string]string `json:"text"`
 	ExtraText   map[string]string `json:"extraText,omitempty"`
 	Commands    []view.Command    `json:"commands"`
@@ -224,7 +225,7 @@ func (s *API) Init() *Start {
 	defer perftrace.Span("Init")()
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return &Start{Lang: view.Lang(), Accent: cmds.Setting(s.a, "ui.accent"), Theme: cmds.Setting(s.a, "ui.theme"), ArchoMotion: cmds.Setting(s.a, "ui.archo.motion"), Text: view.Table(), ExtraText: view.ExtraText(), Commands: view.Commands, Version: buildinfo.String(), Ops: view.OpTable()}
+	return &Start{Lang: view.Lang(), Accent: cmds.Setting(s.a, "ui.accent"), Theme: cmds.Setting(s.a, "ui.theme"), ArchoMotion: cmds.Setting(s.a, "ui.archo.motion"), Motion: cmds.Setting(s.a, "ui.motion"), Text: view.Table(), ExtraText: view.ExtraText(), Commands: view.Commands, Version: buildinfo.String(), Ops: view.OpTable()}
 }
 
 // ---- the board ----
@@ -441,7 +442,7 @@ func (s *API) PackBuild(name string, tex int) (string, error) {
 		}
 	}
 	task := s.beginSelf(view.TaskPack, name, func() error { _, err := s.PackStop(name); return err })
-	s.tasks.Update(task, func(t *app.Task) { t.Target = name })
+	s.tasks.Update(task, func(t *app.Task) { t.Target, t.Detached = name, true })
 	go s.watchBuild(task, name, tmp, run)
 	return view.Tf("create pack %s: it goes on in the background; you can use the other pages, or close the window", name), nil
 }
@@ -1116,6 +1117,31 @@ func (s *API) SetTagNote(tag, note string) (string, error) {
 		return s.tagDone(view.Tf("note of %s cleared", t), err)
 	}
 	return s.tagDone(view.Tf("note of %s saved", t), err)
+}
+
+// SetTagColor sets (or with "" clears) a tag's colour: a preset name or #rrggbb. It marks
+// the Mods whose first tag it is (16 §2.9 Tag manager).
+func (s *API) SetTagColor(tag, color string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t, c, err := cmds.SetTagColor(s.a, tag, color)
+	if c == "" {
+		return s.tagDone(view.Tf("colour of %s cleared", t), err)
+	}
+	return s.tagDone(view.Tf("colour of %s: %s", t, view.T(c)), err)
+}
+
+// SetTagOrder puts a Mod's tags (all its copies') in this order; its first tag
+// marks it in the lists.
+func (s *API) SetTagOrder(id string, tags []string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	st := s.boardState()
+	if st == nil || st.Ix.ByID[id] == nil {
+		return "", errors.New("no mod " + id)
+	}
+	got, err := cmds.SetModTagOrder(s.a, st.Ix.Ref(id), tags)
+	return s.tagDone(view.Tf("tags of %s: %s", st.Ix.ByID[id].DisplayName(), strings.Join(got, ", ")), err)
 }
 
 // PinTag pins a tag in the tag bar and the groups, or unpins it (config tags.pinned).

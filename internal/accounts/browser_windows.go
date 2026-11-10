@@ -24,6 +24,13 @@ func hideLoginHost(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: windows.CREATE_NO_WINDOW}
 }
 
+// capture is called only by the native CookieManager completion handler.
+func (s *Session) capture(cookies []*http.Cookie) error {
+	s.accept(cookies)
+	s.status.State = "login required"
+	return s.save()
+}
+
 type comObject struct{ table *[80]uintptr }
 
 func (o *comObject) call(slot int, args ...uintptr) uintptr {

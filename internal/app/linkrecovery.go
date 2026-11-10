@@ -84,12 +84,33 @@ func (a *App) linkRecoveries(rows []store.ManagedLink) ([]*GameLink, error) {
 					l.Action = "complete recovery"
 				}
 			}
+		} else if state == source.TargetMissing && row.Target == "" && row.From == "" && a.closeDeadAdd(r, l) {
+			// handled: the creation's target is gone
 		} else {
 			l.Reason += "; " + reason
 		}
 		out = append(out, l)
 	}
 	return out, nil
+}
+
+// closeDeadAdd offers to close an interrupted link creation whose target is gone. There is
+// nothing to finish, and without this the record could never be cleared and would block
+// launch for good (mods.link-recovery). The record is closed as rolled back; a link the
+// creation left (now dangling) stays for the ordinary link check, which offers to remove it.
+// It reports false when the path holds something else, which stays for manual resolution.
+func (a *App) closeDeadAdd(r *linkRecovery, l *GameLink) bool {
+	if _, err := os.Lstat(r.path); os.IsNotExist(err) {
+		r.absent = true
+	} else if info, err := source.ReadLink(r.path); err == nil && info.Kind == r.row.Kind && env.PathKey(physicalLinkPath(info.Target)) == env.PathKey(physicalLinkPath(r.target)) {
+		r.snapshot = info
+	} else {
+		return false
+	}
+	r.target, r.phase = "", "rolled-back"
+	l.State, l.Action = source.TargetMissing, "complete recovery"
+	l.Reason += "; its target is gone: the record is closed, nothing is linked"
+	return true
 }
 
 func (a *App) applyLinkRecoveries(p *LinkRepairPlan) error {

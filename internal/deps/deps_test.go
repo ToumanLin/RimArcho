@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -34,9 +35,9 @@ func fixture(t *testing.T) (*Finder, map[string]string) {
 
 func TestToddsOrderAndCompatibility(t *testing.T) {
 	f, settings := fixture(t)
-	configured := file(t, filepath.Join(t.TempDir(), "todds.exe"))
-	own := file(t, filepath.Join(f.LocalDir, Todds, "todds.exe"))
-	fromPath := file(t, filepath.Join(t.TempDir(), "todds.exe"))
+	configured := file(t, filepath.Join(t.TempDir(), textures.ToddsExecutable))
+	own := file(t, filepath.Join(f.LocalDir, Todds, textures.ToddsExecutable))
+	fromPath := file(t, filepath.Join(t.TempDir(), textures.ToddsExecutable))
 	f.LookPath = func(n string) (string, error) {
 		if n != "todds" {
 			t.Fatalf("PATH lookup %q", n)
@@ -49,7 +50,7 @@ func TestToddsOrderAndCompatibility(t *testing.T) {
 		own          bool
 	}{{configured, "config", false}, {own, "own", true}, {fromPath, "path", false}} {
 		i := f.Status(Todds)
-		if i.Path != tc.path || i.Source != tc.source || i.Own != tc.own || !i.OK || !i.Installable || i.ConfigKey != "textures.todds" {
+		if i.Path != tc.path || i.Source != tc.source || i.Own != tc.own || !i.OK || i.Installable != (textures.ToddsZipURL != "") || i.ConfigKey != "textures.todds" {
 			t.Fatalf("status %+v, want %+v", i, tc)
 		}
 		if err := os.Remove(tc.path); err != nil {
@@ -79,8 +80,8 @@ func TestToddsOrderAndCompatibility(t *testing.T) {
 func TestSteamCMDOrderWithoutRunningIt(t *testing.T) {
 	f, settings := fixture(t)
 	f.Version = func(string, string) (string, error) { t.Fatal("SteamCMD must not be run"); return "", nil }
-	configured := file(t, filepath.Join(t.TempDir(), "steamcmd.exe"))
-	own := file(t, filepath.Join(f.LocalDir, SteamCMD, "steamcmd.exe"))
+	configured := file(t, filepath.Join(t.TempDir(), SteamCMDExecutable()))
+	own := file(t, filepath.Join(f.LocalDir, SteamCMD, SteamCMDExecutable()))
 	fromPath := file(t, filepath.Join(t.TempDir(), "steamcmd"))
 	f.LookPath = func(n string) (string, error) {
 		if n != "steamcmd" {
@@ -98,12 +99,19 @@ func TestSteamCMDOrderWithoutRunningIt(t *testing.T) {
 		t.Fatalf("sibling fallback %+v", i)
 	}
 	settings["steamcmd.path"] = ""
+	if runtime.GOOS == "linux" {
+		if i := f.Status(SteamCMD); i.Path != fromPath || i.Own || i.Source != "path" {
+			t.Fatalf("external preference %+v", i)
+		}
+		f.LookPath = nil
+	}
 	if i := f.Status(SteamCMD); i.Path != own || !i.Own || !i.OK {
 		t.Fatalf("own %+v", i)
 	}
 	if err := os.Remove(own); err != nil {
 		t.Fatal(err)
 	}
+	f.LookPath = func(string) (string, error) { return fromPath, nil }
 	if i := f.Status(SteamCMD); i.Path != fromPath || i.Source != "path" || i.Own {
 		t.Fatalf("PATH %+v", i)
 	}
@@ -131,7 +139,7 @@ func TestVersionCacheInvalidatesByPathSizeAndMtime(t *testing.T) {
 	f, settings := fixture(t)
 	calls := 0
 	f.Version = func(string, string) (string, error) { calls++; return textures.ToddsVersion, nil }
-	p := file(t, filepath.Join(f.LocalDir, Todds, "todds.exe"))
+	p := file(t, filepath.Join(f.LocalDir, Todds, textures.ToddsExecutable))
 	for range 3 {
 		f.Status(Todds)
 	}
@@ -157,32 +165,38 @@ func TestVersionCacheInvalidatesByPathSizeAndMtime(t *testing.T) {
 	if calls != 3 {
 		t.Fatalf("mtime change calls %d", calls)
 	}
-	settings["textures.todds"] = file(t, filepath.Join(t.TempDir(), "todds.exe"))
+	settings["textures.todds"] = file(t, filepath.Join(t.TempDir(), textures.ToddsExecutable))
 	f.Status(Todds)
 	if calls != 4 {
 		t.Fatalf("path change calls %d", calls)
 	}
 }
 
-func TestVersionCacheKeepsFailures(t *testing.T) {
+// A failed probe may be passing (a virus scanner holding the file): it is not cached, so the
+// next status sees the tool once it runs.
+func TestVersionCacheRetriesFailures(t *testing.T) {
 	f, _ := fixture(t)
 	calls := 0
-	f.Version = func(string, string) (string, error) { calls++; return "", errors.New("broken executable") }
-	file(t, filepath.Join(f.LocalDir, Todds, "todds.exe"))
+	f.Version = func(string, string) (string, error) { calls++; return "", errors.New("access denied") }
+	file(t, filepath.Join(f.LocalDir, Todds, textures.ToddsExecutable))
 	for range 2 {
 		if f.Status(Todds).OK {
-			t.Fatal("broken tool usable")
+			t.Fatal("failing tool usable")
 		}
 	}
-	if calls != 1 {
-		t.Fatalf("failed probe retried %d times", calls)
+	if calls != 2 {
+		t.Fatalf("failed probe ran %d times, want 2", calls)
+	}
+	f.Version = func(string, string) (string, error) { calls++; return textures.ToddsVersion, nil }
+	if !f.Status(Todds).OK {
+		t.Fatal("tool still unusable after the probe succeeds")
 	}
 }
 
 func TestRedirectedOwnDirectoryIsNotOwned(t *testing.T) {
 	f, _ := fixture(t)
 	external := t.TempDir()
-	file(t, filepath.Join(external, "steamcmd.exe"))
+	file(t, filepath.Join(external, SteamCMDExecutable()))
 	if err := os.MkdirAll(f.LocalDir, 0o755); err != nil {
 		t.Fatal(err)
 	}

@@ -6,11 +6,16 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/render"
+	"github.com/ToumanLin/RimArcho/internal/textures"
 )
 
 func init() {
 	register(&Command{Name: "deps", Summary: "show external dependencies: status, version, path and source", MaxArgs: 0, Run: depsCmd})
-	register(&Command{Name: "deps install", Args: "<name>", Summary: "download todds or steamcmd into RimArcho's own folder", MinArgs: 1, MaxArgs: 1, Run: depsInstallCmd})
+	installSummary := "download todds or steamcmd into RimArcho's own folder"
+	if textures.ToddsZipURL == "" {
+		installSummary = "download steamcmd into RimArcho's own folder (provide todds separately)"
+	}
+	register(&Command{Name: "deps install", Args: "<name>", Summary: installSummary, MinArgs: 1, MaxArgs: 1, Run: depsInstallCmd})
 	register(&Command{Name: "deps remove", Args: "<name>", Summary: "remove only RimArcho's own downloaded dependency", MinArgs: 1, MaxArgs: 1, Run: depsRemoveCmd})
 }
 

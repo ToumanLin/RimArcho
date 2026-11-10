@@ -2,8 +2,8 @@
 
 Things to research, not yet decided. Once decided, put them in the specifications (implementation plans in 01 §4); research goes in docs/research/.
 
-## MCP test&improve
-Baed on benchmark exam on real mod list and error log from corpus research
+## 右键菜单
+很多页面有右键菜单, 但是是浏览器菜单, 右键refresh, save as print等, 把这些右键菜单删除掉
 
 ## Decompilation
 
@@ -25,6 +25,12 @@ Developing would possibly need new tools such as Bash, ilspyCMD, .Net SDK,
 所以这也要考虑, 假设一般玩家用不到这些工具, 那么这整个group都是没法用的
 如果要给一般玩家用, 需要让玩家下载这些工具
 
+## GUI
+Player feedback says the GUI is very jumpy. Investigated 11-08 (headless-Edge filmstrips, `D:\RimArcho-test\jumpy`). Fixed 11-08: details pane swaps once (editor + Mod library); loading card only after 0.21 s; launch page not redrawn on focus, problem line out of the grid; All lists' memory placeholder holds its height; editor head one line; scrollbar room kept; startup layout from localStorage (nav, separators, window buttons); filter chips keep width; settings › motion (`ui.motion`); status line one line, fade instead of slide. Still open:
+- Check all of it on a real 5,000-Mod library in the VM (row in release-vm-tests.md, 2026-11-08 "Less jumpy window").
+- Sidebar: sub-entries still open and close with a 250 ms height animation on every page change (off with motion: reduced). Decide whether the default should be instant, or keep the space reserved.
+- Can it run redraws fully on the 2 s live poll while the game runs; new items push the columns down.
+
 ## Translation
 Auto translate mod details? Need to think about it. 因为需要OCR. 
 
@@ -32,6 +38,15 @@ Auto translate mod details? Need to think about it. 因为需要OCR.
 
 - §1.4–1.5：从存档提取引用的 Def，映射回提供它的 Mod
 - §2 内容目录：Def 类型 → 内容类别的映射（现为草案）
+
+2026-11-09 调研：[research/2026-11-09_save-content-attribution.md](docs/research/2026-11-09_save-content-attribution.md)。决定：先做第一阶段（不完整版），卡片上写清楚看不到什么；Def 字段在后台分析时重建（分析器版本 +1，旧事实先照用，未重建前卡片显示“还没分析”）。
+
+第一阶段之后还没做的：
+- **Patch 新增的 Def**：`def_fact` 只记 Def 文件里原有的 Def，Patch（PatchOperationAdd 等）新建的 Def 不在库里，存档里引用它们会显示“找不到来源”。要做按分析范围保存的 Patch 后内容目录（谁创建、谁修改分开记）。
+- **地形和生物群系**：存档把地形（`terrainGrid`）、压缩的岩石/石块（`compressedThingMap`）和世界地块生物群系（`tileBiome`）存成哈希压缩网格，没有 Def 名。要按精确的已加载 Def 集合解码，先在 VM 验证。
+- **只留在历史里的内容**：已结束的事件、做完的任务、以前用过的讲述者、原始剧本（ScenarioDef 不写进存档）基本看不到；卡片标“可能偏少”。
+- **VM 验证**（调研报告最后一节）：1.6.4871 精确版本的路径、每种引用形式的实际增益、真实存档的归属比例、端到端耗时和内存。
+- 第三节“没玩过的内容”要另定证据规则：配置类引用（过滤器、账单）和帮助链接不算玩过，也不能凭“没出现”说“从没遇到”。
 
 ### 1.1 剩余（10）
 - §3 未使用的内容（1.1 核心答案）：三组分类、解读、功能型 Mod 的处理，Unplayed 分组下的 Play review 页面
@@ -47,8 +62,16 @@ Include research progress (the undecided item in 12 §1.4) and DLC in content no
 Optionally count occurrences instead of only recording that something appeared. This costs little and can show how deeply the content was played.
 
 ## Archo Agent
+### MCP test&improve
+Baed on benchmark exam on real mod list and error log from corpus research
 
-Archo should be a Mod development agent that can take action, not just translate or tag. Tentatively use a modified Pi agent; the approach needs research.
+Archo should be a Mod development agent that can take action, not just translate or tag. Base: dsh (MIT, can ship with RimArcho): on h4, h7 and h8 (eval rounds 4–5) it solved 8/9, Pi 7/9, Pi with Archo's instructions 6/9 (mcp-eval-design Round 5); pass it Archo's MCP instructions. All rounds used deepseek-flash.
+
+AI Mod repair ([research](docs/research/2026-11-08_ai-mod-repair.md)), deferred 2026-11-09: the MCP tools are good enough for now (diagnosis works: h4 5/6, h7 6/6, h8 culprit 8/9; what fails is execution). Prefer facts and checks over prescribed workflows: guidance that does the steps for the model may limit stronger models. When it resumes:
+1. Fix records (the most important): every agent fix writes a record file in the pinned copy or patch Mod (what changed per file, why: cluster and evidence, original Mod version, `test_run` before/after, date) and a one or two line summary in the copy's RimArcho note, which was built for this. Today `pin_mod reason` sets the note only at pin time and `set_player_data copy_note` is `--tools all` only and replaces the text: add a core-group way to append. Flag a pinned copy that differs from its git baseline without a record. Also: recheck on upstream update, report text for the author, remove all.
+2. 15 §4.2 says code fixes are explanation only: allow them on a copy, after a passing `test_run`, behind a confirmation card.
+3. ilspycmd as a `deps` entry: the win-x64 AOT build runs without .NET, downloaded after consent, pinned hash, GitHub copy for the mirror. Changes 05 §5.4 / 17 §1 "never installed".
+4. `archo build` / `build_mod`: last or not at all. The `csc` builds it was meant to prevent are now flagged (`built: !!`, `access: !!`, `shipped:`).
 
 # Deferred
 
@@ -81,5 +104,6 @@ Players asked for Linux and macOS (2026-11-07). Linux deferred; macOS later stil
 - GUI on WebKitGTK: `:has()` and `color-mix()` need WebKitGTK ≥ ~2.42; WebGL Archo often falls back to stills; no CDP, so VM harness, memprobe and 16 §10 / 18 baselines need redoing.
 - Release: tarball with exec bits (not `Compress-Archive`), `.desktop` + icon; Flatpak sandbox blocks Steam library writes, symlinks and `/proc`. Workshop self-update is windows/amd64 only; release/relocate code assumes `archo.exe` + `RimArcho.exe`. LoversLab login (WebView2 COM + DPAPI): skip, keep the manual-zip fallback.
 - Suggested order: 1) compile + safety stubs + Linux-only bugs + CI, ship CLI/TUI/MCP; 2) native GUI tarball, Proton, SteamCMD; 3) Steam-client subscribe. Test in a Linux VM.
+- 2026-11-09: phased plan in [research/2026-11-09_linux-support-plan.md](docs/research/2026-11-09_linux-support-plan.md) (players also asked for `.deb`, `.rpm` and Arch; a Proton tester could not get paths detected). Decided 2026-11-09 (its §8): Proton detection in phase 1, an update notice instead of self-update, `.tar.gz`/`.deb`/`.rpm`/AUR, after 1.1.
 
 你可用agent-bridge parallel派发任务给codex 用 gpt-6.1-sol effort high, 可当worker或者sub agent, 让它做代码研究和修改代码, 然后你review, 如果你让codex修改前端, 请务必检查她的前端实现的用户体验(不必要和功能重复的选项, 重复性文字等), 简单直接的任务在这里做

@@ -78,9 +78,6 @@ func (s *Store) ResolveSame(q *Question, now time.Time) error {
 				return err
 			}
 		}
-		if _, err := tx.Exec(`INSERT INTO meta(key,value) VALUES(?, '1') ON CONFLICT(key) DO UPDATE SET value=CAST(value AS INTEGER)+1`, CreditRemapKey); err != nil {
-			return err
-		}
 		stmts := []struct {
 			q    string
 			args []any
@@ -153,8 +150,8 @@ func (s *Store) SplitLineage(envID, instanceID, newLineageID string, now time.Ti
 			SELECT environment_id, ?, alias, note FROM lineage_data WHERE lineage_id=?`, newLineageID, oldLineage); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`INSERT INTO lineage_tag(environment_id, lineage_id, tag)
-			SELECT environment_id, ?, tag FROM lineage_tag WHERE lineage_id=?`, newLineageID, oldLineage); err != nil {
+		if _, err := tx.Exec(`INSERT INTO lineage_tag(environment_id, lineage_id, tag, pos)
+			SELECT environment_id, ?, tag, pos FROM lineage_tag WHERE lineage_id=?`, newLineageID, oldLineage); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(`UPDATE instance SET lineage_id=?, lineage_basis=? WHERE id=?`, newLineageID, identity.BasisManual, instanceID); err != nil {

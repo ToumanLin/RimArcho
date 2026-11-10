@@ -144,30 +144,6 @@ func (s *Store) RestoreStep(w *Workspace, before, from, to string, step Step) er
 	})
 }
 
-// FinishBatch collapses preview steps or restores the pre-session payload.
-func (s *Store) FinishBatch(w *Workspace, last int64, entries, staging, op string, revert bool) error {
-	return s.inTx(func(tx *sql.Tx) error {
-		if _, err := tx.Exec(`DELETE FROM workspace_undo WHERE plan_id=? AND stack='undo' AND id>?`, w.PlanID, last); err != nil {
-			return err
-		}
-		if revert {
-			w.Entries = entries
-			if err := setWorkspace(tx, w); err != nil {
-				return err
-			}
-			return setStage(tx, w.PlanID, staging)
-		}
-		current, err := stageMeta(tx, w.PlanID)
-		if err != nil {
-			return err
-		}
-		if w.Entries == entries && current == staging {
-			return nil
-		}
-		return pushStep(tx, w.PlanID, "undo", entries, op, staging)
-	})
-}
-
 // remapHistoryStages follows physical-copy identity changes in restorable staging
 // items and anchors, just as the entries payload follows them.
 func remapHistoryStages(tx *sql.Tx, mapping map[string]string, plan *int64) error {

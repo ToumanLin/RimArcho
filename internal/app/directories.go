@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/env"
@@ -280,6 +281,9 @@ func (a *App) setDirectory(d *ManagedDirectory, path string) error {
 	return a.finishLinkLifecycle(p)
 }
 
+// setDirectoryRecords points every record of directory d at path in one transaction (the
+// environment row for a game, its sources, the folder settings), so an error leaves them
+// all at the old path.
 func (a *App) setDirectoryRecords(d *ManagedDirectory, path string) error {
 	if d.ID == "steamcmd-tool" && steamCMDIn(path) == "" {
 		return fmt.Errorf("%s contains no SteamCMD program", path)
@@ -288,44 +292,50 @@ func (a *App) setDirectoryRecords(d *ManagedDirectory, path string) error {
 	if err != nil {
 		return err
 	}
-	linkKey := "directory.links:" + d.ID
-	linkRoot := a.Store.Meta(linkKey)
-	if linkRoot == "" {
-		linkRoot = d.Path
-		if err := a.Store.SetMeta(linkKey, linkRoot); err != nil {
-			return err
-		}
-	}
+	var e *env.Environment
+	var moves []store.SourceMove
+	meta := map[string]string{}
 	if d.Kind == "game" {
-		e, err := a.Store.EnvByID(strings.TrimPrefix(d.ID, "game:"))
-		if err != nil {
+		if e, err = a.Store.EnvByID(strings.TrimPrefix(d.ID, "game:")); err != nil {
 			return err
+		} else if e == nil {
+			return fmt.Errorf("no environment for %s", d.ID)
 		}
 		if !env.LooksLikeGameRoot(path) {
 			return fmt.Errorf("%s does not look like a RimWorld installation", path)
 		}
-		if _, _, err := a.EnvSet(e.Name, EnvSpec{GameRoot: path, directoryOnly: true}); err != nil {
+		if o, err := a.envOfGame(path); err != nil {
+			return err
+		} else if o != nil && o.ID != e.ID {
+			return fmt.Errorf("environment %s already uses %s; one environment per game folder", o.Name, path)
+		}
+		if err := a.checkRoots(path, filepath.Join(path, "Data"), filepath.Join(path, "Mods")); err != nil {
 			return err
 		}
+		e.GameRoot, e.GameVersion = path, env.ReadGameVersion(path)
+		have := map[source.Kind]bool{}
 		for _, s := range ss {
 			if s.Status == source.StatusRetired {
 				continue
 			}
 			root := ""
-			if s.EnvID == e.ID && s.Kind == source.Official {
-				root = filepath.Join(path, "Data")
-			}
-			if s.EnvID == e.ID && s.Kind == source.Local {
-				root = filepath.Join(path, "Mods")
+			if s.EnvID == e.ID && (s.Kind == source.Official || s.Kind == source.Local) {
+				root = filepath.Join(path, map[source.Kind]string{source.Official: "Data", source.Local: "Mods"}[s.Kind])
+				have[s.Kind] = true
 			}
 			if root == "" && source.Within(s.Root, d.Path) {
 				rel, _ := filepath.Rel(d.Path, s.Root)
 				root = filepath.Join(path, rel)
 			}
 			if root != "" {
-				if err := a.Store.RebindSource(s, root); err != nil {
-					return err
-				}
+				moves = append(moves, store.SourceMove{Src: s, Rebind: root})
+			}
+		}
+		for kind, dir := range map[source.Kind]string{source.Official: "Data", source.Local: "Mods"} {
+			if !have[kind] {
+				s := &source.Source{ID: a.NewID(), EnvID: e.ID, Kind: kind, Label: nextLabel(ss, kind), Root: filepath.Join(path, dir), Status: source.StatusOK}
+				moves = append(moves, store.SourceMove{Src: s, Insert: true})
+				ss = append(ss, s)
 			}
 		}
 	} else {
@@ -342,28 +352,25 @@ func (a *App) setDirectoryRecords(d *ManagedDirectory, path string) error {
 				rel, _ := filepath.Rel(d.Path, s.Root)
 				root = filepath.Join(path, rel)
 			}
-			if err := a.Store.RebindSource(s, root); err != nil {
-				return err
-			}
+			moves = append(moves, store.SourceMove{Src: s, Rebind: root})
 		}
 		if d.ID == "steamcmd-tool" {
-			if err := a.Store.SetMeta("cfg:steamcmd.path", steamCMDIn(path)); err != nil {
-				return err
-			}
+			meta["cfg:steamcmd.path"] = steamCMDIn(path)
 		}
 		key := map[string]string{"lock": "lock.dir", "source": "source.dir", "packs": "pack.dir", "monitor": "monitor.dir", SubscribedLabel: "subscribed.dir"}[d.ID]
 		if key != "" {
-			if err := a.Store.SetMeta("cfg:"+key, path); err != nil {
-				return err
-			}
+			meta["cfg:"+key] = path
 		}
 	}
-	if err := a.Store.SetMeta(directoryKey(d.ID), path); err != nil {
+	meta[directoryKey(d.ID)] = path
+	// The marker of a move earlier versions left half done (shown as "changed") goes.
+	meta["directory.links:"+d.ID] = ""
+	if err := a.Store.MoveRecords(e, moves, meta); err != nil {
 		return err
 	}
 	a.ixCache, a.stCache, a.prCache, a.linkInst = nil, nil, nil, nil
 	forgetLinks(a.Store)
-	return a.Store.SetMeta(linkKey, "")
+	return nil
 }
 
 // PlanDirectoryMove previews the common incoming-link plan without writing files.
@@ -449,9 +456,7 @@ func (a *App) MoveDirectory(id, path string) (copied bool, err error) {
 	}
 	same := a.SameVolume
 	if same == nil {
-		same = func(from, to string) bool {
-			return strings.EqualFold(filepath.VolumeName(from), filepath.VolumeName(to))
-		}
+		same = source.SameVolume
 	}
 	copied = !same(d.Path, path)
 	links, err := a.PlanIncomingLinks(d.Path, path)
@@ -462,18 +467,39 @@ func (a *App) MoveDirectory(id, path string) (copied bool, err error) {
 	if err := a.beginLinkLifecycle(links); err != nil {
 		return false, err
 	}
-	var trashErr error
 	if copied {
 		err = copyChecked(d.Path, path)
 		if err != nil {
 			return false, a.abortLinkLifecycle(links, fmt.Errorf("could not copy the directory: %w; move it manually, then set its new location (archo folder set)", err))
 		}
-		trashErr = a.trash(d.Path)
 	} else if err := os.Rename(d.Path, path); err != nil {
-		return false, a.abortLinkLifecycle(links, fmt.Errorf("could not safely rename the directory: %w; move it manually, then set its new location (archo folder set)", err))
+		// Bind mounts can share st_dev and still reject rename.
+		if !errors.Is(err, syscall.EXDEV) {
+			return false, a.abortLinkLifecycle(links, fmt.Errorf("could not safely rename the directory: %w; move it manually, then set its new location (archo folder set)", err))
+		}
+		copied = true
+		if err := copyChecked(d.Path, path); err != nil {
+			return false, a.abortLinkLifecycle(links, err)
+		}
 	}
 	if err := a.setDirectoryRecords(d, path); err != nil {
-		return copied, a.abortLinkLifecycle(links, fmt.Errorf("the directory was moved to %s, but updating records or links failed: %w; set this location to finish (archo folder set)", path, err))
+		// The records stayed at the old path: the directory goes back there, so the
+		// links are reattached to it. A copy's original was never touched.
+		var back error
+		if copied {
+			back = removeTree(path)
+		} else {
+			back = os.Rename(path, d.Path)
+		}
+		if back != nil {
+			return copied, a.abortLinkLifecycle(links, fmt.Errorf("the directory was moved to %s, but updating records failed (%v) and it could not go back (%v); set this location to finish (archo folder set)", path, err, back))
+		}
+		return false, a.abortLinkLifecycle(links, fmt.Errorf("updating records failed, so the directory stays at %s: %w", d.Path, err))
+	}
+	// The original of a copy goes only now that RimArcho uses the copy.
+	var trashErr error
+	if copied {
+		trashErr = a.trash(d.Path)
 	}
 	if err := a.finishLinkLifecycle(links); err != nil {
 		return copied, err

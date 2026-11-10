@@ -42,10 +42,10 @@ func init() {
 		Flags: []Flag{{Name: "all", Help: "no truncation"}}, Run: loadoutDiff})
 	register(&Command{Name: "loadout checkout", Args: "<v>", Summary: "load a version into the workspace (save to apply)", MinArgs: 1, MaxArgs: 1, Run: loadoutCheckout})
 	register(&Command{Name: "loadout ignore-external", Summary: "ignore the external ModsConfig.xml version that was not loaded (it stays in the history)", MaxArgs: 0, Run: loadoutIgnoreExternal})
-	register(&Command{Name: "rule add", Args: "after|before|incompatible|attach <A> <B> | top|bottom <A> | ignore <constraint>", Summary: "add a user rule",
+	register(&Command{Name: "rule add", Args: "after|before|incompatible|attach <A> <B> | replaces <A> <B|pkg:id> | top|bottom <A> | ignore <constraint>", Summary: "add a user rule",
 		MinArgs: 2, MaxArgs: 3, Flags: []Flag{{Name: "note", Value: "<text>"}}, Run: ruleAdd})
 	register(&Command{Name: "rule list", Summary: "list user rules", MaxArgs: 0, Run: ruleList})
-	register(&Command{Name: "rule edit", Args: "<r:n> after|before|incompatible|attach <A> <B> | top|bottom <A> | ignore <constraint>", Summary: "replace a user rule; r:<n> stays",
+	register(&Command{Name: "rule edit", Args: "<r:n> after|before|incompatible|attach <A> <B> | replaces <A> <B|pkg:id> | top|bottom <A> | ignore <constraint>", Summary: "replace a user rule; r:<n> stays",
 		MinArgs: 3, MaxArgs: 4, Flags: []Flag{{Name: "note", Value: "<text>"}}, Run: ruleEdit})
 	register(&Command{Name: "rule remove", Args: "<r:n>", Summary: "delete a user rule", MinArgs: 1, MaxArgs: 1, Run: ruleRemove})
 	register(&Command{Name: "launch", Summary: "save the list and start the game (one game at a time)", MaxArgs: 0,
@@ -644,6 +644,9 @@ func ruleLine(c *Ctx, ix *app.Index, r *store.UserRule) []string {
 	if r.Kind == order.RuleIgnore {
 		return []string{fmt.Sprintf("r:%d", r.ID), r.Kind, ix.DisplayConstraintRef(r.Target, primaryRef(ix)), "", r.Note}
 	}
+	if r.Kind == order.RuleReplaces {
+		return []string{fmt.Sprintf("r:%d", r.ID), r.Kind, lin(r.A), "pkg:" + r.Target, r.Note}
+	}
 	if r.B == "" {
 		return []string{fmt.Sprintf("r:%d", r.ID), r.Kind, lin(r.A), "", r.Note}
 	}
@@ -670,7 +673,7 @@ func ruleSpec(pos []string, note string) (app.RuleSpec, error) {
 	case spec.Kind != order.RuleIgnore && spec.Kind != order.RuleTop && spec.Kind != order.RuleBottom && len(pos) == 3:
 		spec.A, spec.B = pos[1], pos[2]
 	default:
-		return spec, &UsageError{Msg: "after|before|incompatible|attach take two references; top|bottom take one; ignore takes one constraint reference"}
+		return spec, &UsageError{Msg: "after|before|incompatible|attach|replaces take two references (replaces: the mod standing in, then the mod or pkg:<id> it replaces); top|bottom take one; ignore takes one constraint reference"}
 	}
 	return spec, nil
 }
@@ -713,6 +716,9 @@ func ruleDone(c *Ctx, r *store.UserRule, did string) (*render.Doc, error) {
 	switch r.Kind {
 	case order.RuleIncompatible:
 		root.KV("note", "incompatible rules are reported by the problem analysis (M3); sorting ignores them")
+	case order.RuleReplaces:
+		root.KV("note", "mods that require the replaced package count it as met while the replacement is enabled, and load after it")
+		d.AddNext("archo sort --dry-run")
 	default:
 		d.AddNext("archo sort --dry-run")
 	}

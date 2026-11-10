@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/selfupdate"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 	"github.com/ToumanLin/RimArcho/internal/view"
@@ -220,6 +221,9 @@ func TestSelfUpdateCheck(t *testing.T) {
 }
 
 func TestSelfUpdateWorkshopCheck(t *testing.T) {
+	if !app.SelfUpdateSupported() {
+		t.Skip("program replacement and Workshop self-update are Windows-only (D2)")
+	}
 	t.Setenv(app.UpdateWorkshopItemEnv, "8100")
 	for _, mode := range []string{"workshop", "1.0.5 tag", "no version", "bad result", "offline", "empty item", "github", "prerelease"} {
 		t.Run(mode, func(t *testing.T) {
@@ -267,7 +271,7 @@ func TestSelfUpdateWorkshopCheck(t *testing.T) {
 				before := e.App.AutomaticStatus("self")
 				e.MustRun("config", "set", "updates.source", "github")
 				e.MustRun("update", "--check")
-				if notice := view.AutomaticNotice(before, e.App.AutomaticStatus("self")); notice != "" {
+				if notice := view.AutomaticNotice(e.App, before, e.App.AutomaticStatus("self")); notice != "" {
 					t.Fatal("repeated notification", notice)
 				}
 			}
@@ -306,7 +310,9 @@ func TestSelfUpdateWorkshopInstall(t *testing.T) {
 				put(filepath.Join(library, "steamapps", "workshop", "content", "294100", "8100"))
 				e.App.FindTool = func(string) (string, bool) { t.Fatal("subscribed copy started tool lookup"); return "", false }
 			} else {
-				e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, "steamcmd.exe"), mode != "missing tool" }
+				e.App.FindTool = func(string) (string, bool) {
+					return filepath.Join(e.Root, deps.SteamCMDExecutable()), mode != "missing tool"
+				}
 			}
 			base := filepath.Join(e.App.LocalDir(), "steamcmd-self")
 			calls := 0
@@ -370,6 +376,9 @@ func TestSelfUpdateWorkshopInstall(t *testing.T) {
 }
 
 func TestSelfUpdateInstallWaitsForOthersThenSwaps(t *testing.T) {
+	if !app.SelfUpdateSupported() {
+		t.Skip("program replacement and Workshop self-update are Windows-only (D2)")
+	}
 	t.Parallel()
 	e := testkit.New(t)
 	f := newSelfRelease(t)
@@ -436,6 +445,9 @@ func TestSelfUpdateInstallWaitsForOthersThenSwaps(t *testing.T) {
 }
 
 func TestSelfUpdateFailuresChangeNothing(t *testing.T) {
+	if !app.SelfUpdateSupported() {
+		t.Skip("program replacement and Workshop self-update are Windows-only (D2)")
+	}
 	t.Parallel()
 	ctx := context.Background()
 	for _, tc := range []struct {
@@ -483,6 +495,9 @@ func TestSelfUpdateFailuresChangeNothing(t *testing.T) {
 }
 
 func TestSelfUpdateStopWhileWaitingAndOneInstallAtATime(t *testing.T) {
+	if !app.SelfUpdateSupported() {
+		t.Skip("program replacement and Workshop self-update are Windows-only (D2)")
+	}
 	t.Parallel()
 	e := testkit.New(t)
 	f := newSelfRelease(t)
@@ -537,5 +552,82 @@ func TestSelfUpdateStopWhileWaitingAndOneInstallAtATime(t *testing.T) {
 	}
 	if f.files(t) != allWith("new") {
 		t.Fatal("not installed")
+	}
+}
+
+// TestSelfUpdateKilledMidSwapIsSettledNextStart: a process killed after the files moved
+// but before the new program was confirmed leaves its record; the next start finishes the
+// install when the new program runs, or puts the old one back when it does not, and only
+// then removes the update folder's leftovers (17 §5.1 step 5).
+func TestSelfUpdateKilledMidSwapIsSettledNextStart(t *testing.T) {
+	if !app.SelfUpdateSupported() {
+		t.Skip("program replacement and Workshop self-update are Windows-only (D2)")
+	}
+	t.Parallel()
+	for _, next := range []string{"new program runs", "new program fails", "install again"} {
+		t.Run(next, func(t *testing.T) {
+			e := testkit.New(t)
+			f := newSelfRelease(t)
+			f.use(e.App)
+			if _, err := e.App.RunAutomatic(context.Background(), "self", nil); err != nil {
+				t.Fatal(err)
+			}
+			e.App.SelfVersionOf = func(context.Context, string) (string, error) {
+				runtime.Goexit() // the process dies during the check
+				return "", nil
+			}
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				e.App.InstallSelfUpdate(context.Background(), nil)
+			}()
+			<-done
+			dir := filepath.Join(f.program, app.UpdateDirName)
+			if _, err := os.Stat(filepath.Join(dir, "swap.json")); err != nil {
+				t.Fatal("no record of the swap", err)
+			}
+			if news, _ := filepath.Glob(filepath.Join(dir, "new-*")); len(news) != 1 {
+				t.Fatal("staged files removed while the swap is open", news)
+			}
+			// The next start: a fresh session over the same data folder.
+			a, err := e.App.ReadSession()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer a.Close()
+			f.use(a)
+			want := allWith("new")
+			switch next {
+			case "new program fails":
+				a.SelfVersionOf = func(context.Context, string) (string, error) { return "", errors.New("exit status 3221225781") }
+				want = allWith("old")
+				a.CleanSelfUpdate()
+			case "install again":
+				res, err := a.InstallSelfUpdate(context.Background(), nil)
+				if err != nil || res.To != "0.9.1" {
+					t.Fatal(res, err)
+				}
+				if f.zipHits.Load() != 1 {
+					t.Fatal("downloaded again", f.zipHits.Load())
+				}
+				a.SelfVersion = "0.9.1"
+				a.CleanSelfUpdate()
+			default:
+				a.SelfVersion = "0.9.1" // the new program started and cleans up
+				a.CleanSelfUpdate()
+			}
+			if got := f.files(t); got != want {
+				t.Fatal(got)
+			}
+			left, _ := os.ReadDir(dir)
+			for _, d := range left {
+				if d.Name() != "lock" {
+					t.Fatal("left after clean-up:", d.Name())
+				}
+			}
+			if pending := a.SelfUpdatePending() != nil; pending != (next == "new program fails") {
+				t.Fatal("update still offered:", pending)
+			}
+		})
 	}
 }

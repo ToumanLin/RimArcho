@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -32,6 +33,9 @@ import (
 // SteamCMDURL is Valve's SteamCMD for Windows.
 const SteamCMDURL = "https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip"
 
+// SteamCMDLinuxURL is the Linux bootstrap documented by Valve (11 §3).
+const SteamCMDLinuxURL = "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz"
+
 // SteamCMDProc is a running SteamCMD.
 type SteamCMDProc interface{ Wait() error }
 
@@ -50,8 +54,8 @@ func (a *App) SteamCMDDir() string {
 	return filepath.Join(a.LocalDir(), "steamcmd")
 }
 
-// SteamCMDPath finds steamcmd: config steamcmd.path, RimArcho's own copy, then PATH. ""
-// when there is none.
+// SteamCMDPath uses the dependency finder's platform discovery order (17 §2.1).
+// It returns an empty path when no SteamCMD is found.
 func (a *App) SteamCMDPath() string {
 	return a.Deps().Status(deps.SteamCMD).Path
 }
@@ -63,9 +67,13 @@ type SteamCMDOffer struct {
 	Bytes int64  `json:"bytes"` // -1 when the server did not say
 }
 
-func (a *App) steamCMDURL() string {
+// SteamCMDDownloadURL returns the platform bootstrap URL, or a synthetic-test override.
+func (a *App) SteamCMDDownloadURL() string {
 	if a.SteamCMDZip != "" {
 		return a.SteamCMDZip
+	}
+	if runtime.GOOS == "linux" {
+		return SteamCMDLinuxURL
 	}
 	return SteamCMDURL
 }
@@ -73,7 +81,7 @@ func (a *App) steamCMDURL() string {
 // OfferSteamCMD asks Valve's server for the size of SteamCMD (a HEAD request), so the player
 // can be asked first.
 func (a *App) OfferSteamCMD() (*SteamCMDOffer, error) {
-	o := &SteamCMDOffer{URL: a.steamCMDURL(), Dir: a.SteamCMDDir(), Bytes: -1}
+	o := &SteamCMDOffer{URL: a.SteamCMDDownloadURL(), Dir: a.SteamCMDDir(), Bytes: -1}
 	req, err := http.NewRequest(http.MethodHead, o.URL, nil)
 	if err != nil {
 		return nil, err
@@ -101,9 +109,9 @@ func (a *App) InstallSteamCMDProgress(progress func(done, total int64)) (string,
 }
 
 func (a *App) installSteamCMDProgress(dir string, progress func(done, total int64)) (string, error) {
-	unlock := accounts.Lock(filepath.Join(dir, "steamcmd.exe"))
+	unlock := accounts.Lock(filepath.Join(dir, deps.SteamCMDExecutable()))
 	defer unlock()
-	if err := toolIdle("steamcmd"); err != nil {
+	if err := toolIdle("steamcmd", dir); err != nil {
 		return "", err
 	}
 	if err := a.checkRoots(dir); err != nil {
@@ -115,7 +123,7 @@ func (a *App) installSteamCMDProgress(dir string, progress func(done, total int6
 		cc.Timeout = 2 * time.Minute
 		c = &cc
 	}
-	resp, err := c.Get(a.steamCMDURL())
+	resp, err := c.Get(a.SteamCMDDownloadURL())
 	if err != nil {
 		return "", fmt.Errorf("downloading SteamCMD: %w", err)
 	}
@@ -126,6 +134,16 @@ func (a *App) installSteamCMDProgress(dir string, progress func(done, total int6
 	b, err := readToolDownload(resp, progress)
 	if err != nil {
 		return "", fmt.Errorf("downloading SteamCMD: %w", err)
+	}
+	if runtime.GOOS == "linux" {
+		exe, err := extractSteamCMDTar(b, dir)
+		if err != nil {
+			return "", err
+		}
+		if err := a.Store.SetMeta(directoryKey("steamcmd-tool"), dir); err != nil {
+			return "", err
+		}
+		return exe, nil
 	}
 	zr, err := zip.NewReader(bytes.NewReader(b), int64(len(b)))
 	if err != nil {
@@ -156,7 +174,7 @@ func (a *App) installSteamCMDProgress(dir string, progress func(done, total int6
 		if err != nil {
 			return "", err
 		}
-		if strings.HasPrefix(strings.ToLower(name), "steamcmd") {
+		if name == deps.SteamCMDExecutable() {
 			exe = p
 		}
 	}
@@ -536,6 +554,10 @@ func (a *App) FetchGame(spec DownloadSpec, progress func(DownloadProgress)) (str
 			}
 		}
 	}
+	var libraries *steamCMDLibraryError
+	if !res.success && errors.As(werr, &libraries) {
+		return "", libraries
+	}
 	if res.err != nil {
 		if account == "anonymous" {
 			switch res.err.Kind {
@@ -626,11 +648,19 @@ func runSteamCMD(exe string, args []string) (string, error) {
 	cmd := exec.Command(exe, args...)
 	cmd.Dir = filepath.Dir(exe)
 	hideWindow(cmd)
+	env, err := steamCMDEnv(exe)
+	if err != nil {
+		return "", err
+	}
+	cmd.Env = env
 	out, err := cmd.CombinedOutput()
-	return string(out), err
+	return string(out), steamCMDStartError(exe, string(out), err)
 }
 
 func startSteamCMD(exe string, args []string, console bool) (SteamCMDProc, error) {
+	if runtime.GOOS == "linux" {
+		return startWorkshopCMD(exe, args, console)
+	}
 	if console {
 		return startConsole(exe, args)
 	}

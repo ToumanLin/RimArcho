@@ -7,14 +7,7 @@ func RefreshDirectories(a *app.App, old *Needs) *Needs {
 	n := *old
 	n.Items = nil
 	for _, it := range old.Items {
-		directory := false
-		for _, act := range it.Actions {
-			if act.Kind == ActLocateDirectory {
-				directory = true
-				break
-			}
-		}
-		if !directory {
+		if it.code != directoryCode {
 			n.Items = append(n.Items, it)
 		}
 	}

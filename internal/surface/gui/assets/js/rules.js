@@ -261,7 +261,8 @@ function pick(c) {
 
 async function save() {
   const f = R.form;
-  if (!f) return;
+  // Enter again while the rule is on its way must not add it twice
+  if (!f || f.saving) return;
   const two = kindOf(f.kind)?.two;
   if (two && !f.b) {
     if (R.cands.length) return pick(R.cands[R.at]);
@@ -270,7 +271,8 @@ async function save() {
   const spec = f.kind === "ignore" ? { kind: "ignore", target: f.target, note: f.note, a: "", b: "" }
     : { kind: f.kind, a: f.a.ref, b: two ? f.b.ref : "", target: "", note: f.note };
   let text;
-  try { text = await api.SaveRule(f.id, spec); } catch (e) { return say("fail", errText(e)); }
+  f.saving = true;
+  try { text = await api.SaveRule(f.id, spec); } catch (e) { f.saving = false; return say("fail", errText(e)); }
   R.form = null; R.cands = [];
   say("ok", text);
   await refreshRules();

@@ -280,46 +280,75 @@ func (a *App) downloadWorkshopGroup(ids []string, root, account string, dryRun, 
 			downloadErr = a.abortLinkLifecycle(incoming, downloadErr)
 		}
 	}()
-	outcomes, runErr := a.runWorkshopBatches(exe, base, account, ids, transfer...)
 	var errs []error
-	if runErr != nil {
-		errs = append(errs, runErr)
-	}
 	changed := false
-	for i, id := range ids {
-		it := &op.Items[i]
-		if outcome := outcomes[id]; !outcome.confirmed {
+	// settle finishes one item: its record is written as soon as SteamCMD confirms it, so
+	// a long run reports each Mod when it is done instead of all of them at the end.
+	w := workshopObserver(transfer)
+	settled := map[string]bool{}
+	settle := func(i int, outcome workshopOutcome) {
+		id, it := ids[i], &op.Items[i]
+		settled[id] = true
+		defer func() {
+			if w.settled != nil {
+				w.settled(*it)
+			}
+		}()
+		if !outcome.confirmed {
 			why := outcome.why()
 			it.Result = "failed: " + why
 			it.FailureKind, it.Permanent = outcome.kind, workshopPermanent(outcome.kind)
 			errs = append(errs, fmt.Errorf("SteamCMD item %s: %s; %s", id, why, workshopURL(id)))
-			continue
+			return
 		}
 		if relocate {
 			downloaded := filepath.Join(base, "steamapps", "workshop", "content", env.WorkshopAppID, id)
 			if err := a.replaceWorkshopImport(downloaded, it.Folder); err != nil {
 				it.Result = "failed: " + err.Error()
 				errs = append(errs, err)
-				continue
+				return
 			}
 		}
 		if source.AboutState(it.Folder) != source.AboutPresent {
 			it.Result = "failed: no About/About.xml"
 			errs = append(errs, fmt.Errorf("SteamCMD item %s has no About/About.xml at %s", id, it.Folder))
-			continue
+			return
 		}
 		now := a.Now()
 		it.Record.Installed, it.Record.InstalledAt = now.Format(time.RFC3339), now
 		if err := subscribe.Write(it.Folder, it.Record); err != nil {
 			it.Result = "failed: " + err.Error()
 			errs = append(errs, err)
-			continue
+			return
 		}
 		delete(a.subscriptionCache, it.Folder)
 		delete(a.subscriptionCache, realOrAbs(it.Folder))
 		delete(a.subscriptionCache, filepath.Join(registrationRoot, id))
 		it.To, it.Result = it.Record.Installed, "downloaded with SteamCMD"
 		changed = true
+	}
+	index := make(map[string]int, len(ids))
+	for i, id := range ids {
+		index[id] = i
+	}
+	before := w.confirmed
+	w.confirmed = func(id string) {
+		if before != nil {
+			before(id)
+		}
+		if i, ok := index[id]; ok && !settled[id] {
+			settle(i, workshopOutcome{confirmed: true})
+		}
+	}
+	outcomes, runErr := a.runWorkshopBatches(exe, base, account, ids, w)
+	w.confirmed = before
+	if runErr != nil {
+		errs = append(errs, runErr)
+	}
+	for i, id := range ids {
+		if !settled[id] {
+			settle(i, outcomes[id])
+		}
 	}
 	if changed {
 		if !activeSource {

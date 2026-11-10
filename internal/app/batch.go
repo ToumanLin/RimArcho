@@ -5,80 +5,9 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/loadout"
 	"github.com/ToumanLin/RimArcho/internal/order"
-	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
-// Batches and block moves for the TUI's pick sessions (16 §3.4): the edits of one session
-// apply at once, as previews, and become one undo step when the session ends; a cancelled
-// session puts the list and the staging list back as they were.
-
-// Batch is an open pick session.
-type Batch struct {
-	remap   string
-	a       *App
-	planID  int64
-	entries string // the workspace list when it began
-	staged  string // the staging list when it began
-	lastID  int64  // the newest undo step then
-}
-
-// BeginBatch starts a session on the current plan.
-func (a *App) BeginBatch() (*Batch, error) {
-	unlock, err := a.lockLaunch()
-	if err != nil {
-		return nil, err
-	}
-	defer unlock()
-
-	st, err := a.Loadout()
-	if err != nil {
-		return nil, err
-	}
-	p := st.Plan.ID
-	return &Batch{a: a, planID: p, entries: st.WS.Entries, staged: a.Store.Meta(store.StageKey(p)), lastID: a.Store.LastStepID(p, "undo"), remap: a.Store.Meta(store.CreditRemapKey)}, nil
-}
-
-// Commit ends the session: its undo steps become one, which restores the list as it was
-// when the session began.
-func (b *Batch) Commit(op string) error {
-	unlock, err := b.a.lockLaunch()
-	if err != nil {
-		return err
-	}
-	defer unlock()
-	if b.remap != b.a.Store.Meta(store.CreditRemapKey) {
-		return fmt.Errorf("list changed during credit replacement; reload the pick session")
-	}
-
-	if b.a.Store.LastStepID(b.planID, "undo") == b.lastID {
-		return nil // nothing was edited
-	}
-	st, err := b.a.Loadout()
-	if err != nil {
-		return err
-	}
-	return b.a.Store.FinishBatch(st.WS, b.lastID, b.entries, b.staged, op, false)
-}
-
-// Revert ends the session and undoes everything it did, staging included.
-func (b *Batch) Revert() error {
-	unlock, err := b.a.lockLaunch()
-	if err != nil {
-		return err
-	}
-	defer unlock()
-	if b.remap != b.a.Store.Meta(store.CreditRemapKey) {
-		return fmt.Errorf("list changed during credit replacement; reload the pick session")
-	}
-
-	st, err := b.a.Loadout()
-	if err != nil {
-		return err
-	}
-	ws := *st.WS
-	ws.Updated = b.a.Now().UTC()
-	return b.a.Store.FinishBatch(&ws, b.lastID, b.entries, b.staged, "", true)
-}
+// Block moves and suggested positions for the TUI's and the window's verbs (16 §3.4).
 
 // MoveBlock moves enabled instances to a 1-based position as one block, keeping their
 // order in the list; at counts in the list without them.

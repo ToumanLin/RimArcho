@@ -13,6 +13,8 @@ const button = (label, run, cls = "", enabled = () => true) => {
   const b = el("button", "btn " + cls, label);
   b.type = "button";
   b.onclick = async () => {
+    // Enter calls onclick directly: a disabled (or running) button does nothing, as a click
+    if (b.disabled) return;
     b.disabled = true; b.classList.add("busy");
     try { await run(); } catch (e) { say("fail", errText(e)); }
     finally { b.disabled = !enabled(); b.classList.remove("busy"); }

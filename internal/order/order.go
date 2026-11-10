@@ -44,6 +44,10 @@ const (
 	RuleIgnore       = "ignore"
 	RuleTop          = "top"    // A loads as early as its constraints allow (08 §1.5)
 	RuleBottom       = "bottom" // A loads as late as its constraints allow
+	// RuleReplaces: A stands in for the package Target wherever a mod requires that package
+	// and it is not enabled (08 §1.1, §2.1). Not a sorting rule by itself: the dependency
+	// orders after A (Input.Replacements).
+	RuleReplaces = "replaces"
 )
 
 // Rule is a user rule; A and B are lineage IDs, Target an ignore reference.

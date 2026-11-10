@@ -319,7 +319,9 @@ func copySettingsFile(job settingsJob, c SettingsCarry, check func(path string) 
 }
 
 // copyHugsLib gives a pack HugsLib's settings (<user data>/HugsLib/, named by Mod rather
-// than folder) while the pack has none of its own (10 §3 step 4).
+// than folder) while the pack has none of its own (10 §3 step 4). The folder is assembled
+// next to its place and renamed, so a copy cut short leaves no partial HugsLib/ that would
+// count as the pack's own.
 func copyHugsLib(from, to string) ([]string, error) {
 	dst := filepath.Join(to, "HugsLib")
 	if _, err := os.Lstat(dst); err == nil || !errors.Is(err, os.ErrNotExist) {
@@ -329,24 +331,29 @@ func copyHugsLib(from, to string) ([]string, error) {
 	if err != nil {
 		return nil, nil
 	}
-	if err := os.MkdirAll(dst, 0o755); err != nil {
+	tmp := dst + ".rimarcho-tmp"
+	os.RemoveAll(tmp)
+	if err := os.MkdirAll(tmp, 0o755); err != nil {
 		return nil, err
 	}
 	var copied []string
-	var errs []error
 	for _, e := range ents {
 		if !e.Type().IsRegular() {
 			continue
 		}
 		fi, err := e.Info()
 		if err == nil {
-			err = copyFile(filepath.Join(from, "HugsLib", e.Name()), filepath.Join(dst, e.Name()), fi)
+			err = copyFile(filepath.Join(from, "HugsLib", e.Name()), filepath.Join(tmp, e.Name()), fi)
 		}
 		if err != nil {
-			errs = append(errs, err)
-			continue
+			os.RemoveAll(tmp)
+			return nil, err
 		}
 		copied = append(copied, "HugsLib/"+e.Name())
 	}
-	return copied, errors.Join(errs...)
+	if err := os.Rename(tmp, dst); err != nil {
+		os.RemoveAll(tmp)
+		return nil, err
+	}
+	return copied, nil
 }

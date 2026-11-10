@@ -12,15 +12,36 @@ import (
 func TestFreeSettings(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
-	if v := cmds.Setting(e.App, "tags.pinned"); !strings.HasPrefix(v, "框架,美化,") {
-		t.Fatalf("tags.pinned default: %q", v)
-	}
 	e.MustRun("config", "set", "tags.pinned", "a,b")
 	if out := e.MustRun("config", "get"); !strings.Contains(out, "tags.pinned") {
 		t.Fatalf("config get:\n%s", out)
 	}
 	if v := cmds.Setting(e.App, "tags.pinned"); v != "a,b" {
 		t.Fatalf("tags.pinned: %q", v)
+	}
+}
+
+// The tags.pinned preset follows the display language (16 §3.8): English players got the
+// Chinese preset before.
+func TestPinnedTagPresetFollowsLanguage(t *testing.T) {
+	t.Setenv("ARCHO_LANG", "")
+	e := testkit.New(t)
+	for _, tc := range []struct{ lang, want string }{
+		{"en", "RimWorld,framework,visuals,"},
+		{"zh", "RimWorld,框架,美化,"},
+	} {
+		e.MustRun("config", "set", "ui.lang", tc.lang)
+		if v := cmds.Setting(e.App, "tags.pinned"); !strings.HasPrefix(v, tc.want) {
+			t.Fatalf("ui.lang %s: tags.pinned default %q", tc.lang, v)
+		}
+	}
+	t.Setenv("ARCHO_LANG", "en") // overrides ui.lang, as for the interface
+	if v := cmds.Setting(e.App, "tags.pinned"); !strings.HasPrefix(v, "RimWorld,framework,") {
+		t.Fatalf("ARCHO_LANG en: tags.pinned default %q", v)
+	}
+	e.MustRun("config", "set", "tags.pinned", "a,b") // a stored list stays in any language
+	if v := cmds.Setting(e.App, "tags.pinned"); v != "a,b" {
+		t.Fatalf("stored tags.pinned: %q", v)
 	}
 }
 

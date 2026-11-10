@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
@@ -146,14 +147,24 @@ func (a *App) sourceVersion(ctx context.Context) string {
 	if exe == "" {
 		return ""
 	}
+	// One process start per ilspycmd, not one after every decompile: on a slow machine
+	// that was a second .NET start behind each type read.
+	if v, ok := ilspyVersions.Load(exe); ok {
+		return v.(string)
+	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, exe, "--version").Output()
 	if err != nil {
 		return "unknown"
 	}
-	return firstN(strings.TrimSpace(string(out)), 200)
+	v := firstN(strings.TrimSpace(string(out)), 200)
+	ilspyVersions.Store(exe, v)
+	return v
 }
+
+// ilspyVersions remembers `ilspycmd --version` per executable.
+var ilspyVersions sync.Map
 
 func typeSourceDir(d *SourceDLL, typ string) string {
 	h := sha256.Sum256([]byte(typ))
@@ -225,11 +236,16 @@ func (a *App) sourceType(ctx context.Context, st *LoadoutState, d *SourceDLL, ty
 			return "", "", fmt.Errorf("type %s not found in %s", typ, d.Dir)
 		}
 		b, err := os.ReadFile(p)
+		b, _ = cleanILSpy(b)
 		return string(b), p, errors.Join(err, a.recordSourceUse(d, "type-hit", err))
 	}
 	p := filepath.Join(typeSourceDir(d, typ), safeName(typ)+".cs")
-	if b, err := os.ReadFile(p); err == nil && len(bytes.TrimSpace(b)) > 0 {
-		return string(b), p, a.recordSourceUse(d, "type-hit", nil)
+	if b, err := os.ReadFile(p); err == nil {
+		// files cached before 1.0.9 may hold ilspycmd's update notice, or only that notice
+		if b, ok := cleanILSpy(b); ok {
+			return string(b), p, a.recordSourceUse(d, "type-hit", nil)
+		}
+		_ = os.Remove(p)
 	}
 	err = a.publishSource(ctx, st, d, typ)
 	if rec := a.recordSourceUse(d, "type", err); err != nil || rec != nil {

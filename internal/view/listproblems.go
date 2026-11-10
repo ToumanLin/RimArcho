@@ -114,6 +114,36 @@ func dependencyTarget(st *app.LoadoutState, tok string) string {
 	}
 	return strings.TrimSuffix(strings.ToLower(pkg), "_steam")
 }
+
+// ignoreRefs: the problems the ignore actions of merged items cover, each once.
+func ignoreRefs(lists ...[]Action) []string {
+	var out []string
+	for _, acts := range lists {
+		for _, a := range acts {
+			if a.Kind == ActIgnore {
+				for _, r := range a.Refs {
+					if !slices.Contains(out, r) {
+						out = append(out, r)
+					}
+				}
+			}
+		}
+	}
+	return out
+}
+
+// withIgnoreRefs gives the ignore action every merged item's problems: ignoring a dependency
+// ignores it for every mod that needs it.
+func withIgnoreRefs(acts []Action, refs []string) []Action {
+	out := slices.Clone(acts)
+	for i := range out {
+		if out[i].Kind == ActIgnore {
+			out[i].Refs = refs
+		}
+	}
+	return out
+}
+
 func mergeDependencies(st *app.LoadoutState, items []Need) []Need {
 	var out []Need
 	by := map[string]int{}
@@ -149,9 +179,11 @@ func mergeDependencies(st *app.LoadoutState, items []Need) []Need {
 				n.Status = it.Status
 				n.Title = it.Title
 			}
+			ignored := ignoreRefs(n.Actions, it.Actions)
 			if len(it.Actions) > 0 && it.Actions[0].Kind == ActSubscribe {
 				n.Actions = it.Actions
 			}
+			n.Actions = withIgnoreRefs(n.Actions, ignored)
 			if len(it.Parts) > 0 {
 				n.Parts = append(n.Parts, it.Parts...)
 			} else {

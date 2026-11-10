@@ -1,9 +1,9 @@
 # One eval run, from the host: revert the VM, stage the case, run Pi, collect the evidence, stop the VM.
 #   pwsh run-case.ps1 -Case c1 -Group A -Run 1 [-Minutes 15] [-Archo D:\RimArcho-test\mcp-eval\tools\archo.exe] [-StageOnly]
-# Group A = Pi with the Archo MCP server, B = dsh with it (since 2026-11-04), N = Pi without it (B before 2026-11-04). Results: D:\RimArcho-test\mcp-eval\results\<case>-<group>-<run>\
+# Group A = Pi with the Archo MCP server, B = dsh with it (since 2026-11-04), N = Pi without it (B before 2026-11-04), P = Pi with it and its server instructions in the system prompt (as dsh has them). Results: D:\RimArcho-test\mcp-eval\results\<case>-<group>-<run>\
 # -Archo replaces the snapshot's archo.exe with this build; -StageOnly stops after staging and leaves the VM running.
-param([Parameter(Mandatory)][string]$Case, [Parameter(Mandatory)][ValidateSet('A', 'B', 'N')][string]$Group, [int]$Run = 1, [int]$Minutes = 15,
-  [string]$Snapshot = 'RimArcho-Eval-Staged4', [string]$Archo = '', [switch]$KeepRunning, [switch]$StageOnly,
+param([Parameter(Mandatory)][string]$Case, [Parameter(Mandatory)][ValidateSet('A', 'B', 'N', 'P')][string]$Group, [int]$Run = 1, [int]$Minutes = 15,
+  [string]$Snapshot = 'RimArcho-Eval-Staged5', [string]$Archo = '', [switch]$KeepRunning, [switch]$StageOnly,
   [string]$VMX = 'D:\VMs\Player-Test\Win11-Player-Test.vmx')
 $ErrorActionPreference = 'Stop'
 # -VMX picks one of the eval VMs (Player-Test, or a copy such as D:\VMs\Eval-2\Win11-Player-Test.vmx).
@@ -32,7 +32,8 @@ Start-Sleep 20
 
 # 2. stage the case (the guest scripts are pushed every run, so the snapshot never needs refreshing for them)
 foreach ($f in 'overlay.ps1', 'case.ps1', 'agent.ps1', 'task.md', 'dsh-eval.yml') { Put "$PSScriptRoot\guest\$f" "C:\Eval\$f" }
-if ($Archo) { Put $Archo 'C:\Eval\tools\archo.exe'; Copy-Item $Archo "$out\archo.exe" }   # keep the evaluated build with the results
+# the evaluated build's name and hash go with the results (the builds stay in tools\)
+if ($Archo) { Put $Archo 'C:\Eval\tools\archo.exe'; "$(Split-Path $Archo -Leaf) sha256 $((Get-FileHash $Archo).Hash.ToLower())" | Set-Content "$out\archo-build.txt" }
 Remove-Item "$xfer\pkg-$Case-$vmName.tar" -Force -ErrorAction SilentlyContinue
 & C:\Windows\System32\tar.exe -cf "$xfer\pkg-$Case-$vmName.tar" -C "$root\pkg" $Case   # not Git's tar: it mis-parses D:
 if (-not (Test-Path "$xfer\pkg-$Case-$vmName.tar")) { throw 'packing the case failed' }
@@ -59,7 +60,7 @@ while ((Get-Date) -lt $deadline) {
 
 # 4. evidence
 Guest -Rest @('-Command', 'Compress-Archive -Path C:\Eval\submit\* -DestinationPath C:\Eval\submit.zip -Force; Copy-Item C:\Eval\work\TASK.md C:\Eval\out\TASK.md')
-foreach ($f in 'transcript.jsonl', 'stderr.txt', 'TASK.md', 'session.v4.jsonl.zstd') { if ($f -like 'session*' -and $Group -ne 'B') { continue }; try { Pull "C:\Eval\out\$f" "$out\$f" } catch { Write-Warning "missing $f" } }
+foreach ($f in 'transcript.jsonl', 'stderr.txt', 'TASK.md', 'session.v4.jsonl.zstd', 'archo-instructions.md') { if (($f -like 'session*' -and $Group -ne 'B') -or ($f -like 'archo-*' -and $Group -ne 'P')) { continue }; try { Pull "C:\Eval\out\$f" "$out\$f" } catch { Write-Warning "missing $f" } }
 try { Pull 'C:\Eval\submit.zip' "$out\submit.zip" } catch { Write-Warning 'nothing submitted' }
 if (-not $KeepRunning) { & $inv -VMX $vmx -Command stop -VMArgs @('hard') | Out-Null }
 "done $Case $Group $Run -> $out"

@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"fmt"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -88,7 +89,7 @@ func TestWorkshopBatchSessionFailureStopsQueue(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			base := t.TempDir()
-			exe := filepath.Join(base, "steamcmd.exe")
+			exe := filepath.Join(base, deps.SteamCMDExecutable())
 			a := &App{SteamCMDWait: func(time.Duration) {}}
 			var calls [][]string
 			run := func(args []string) (string, error) {
@@ -153,7 +154,7 @@ func TestWorkshopInvalidIDDoesNotPoisonBatch(t *testing.T) {
 	if err := os.Mkdir(base, 0755); err != nil {
 		t.Fatal(err)
 	}
-	exe := filepath.Join(base, "steamcmd.exe")
+	exe := filepath.Join(base, deps.SteamCMDExecutable())
 	a := &App{}
 	var calls [][]string
 	a.SteamCMDRun = func(_ string, args []string) (string, error) {
@@ -181,7 +182,7 @@ func TestWorkshopInvalidIDDoesNotPoisonBatch(t *testing.T) {
 
 func TestWorkshopPreparationErrorRetained(t *testing.T) {
 	base := t.TempDir()
-	exe := filepath.Join(base, "missing-tools", "steamcmd.exe")
+	exe := filepath.Join(base, "missing-tools", deps.SteamCMDExecutable())
 	a := &App{SteamCMDRun: func(string, []string) (string, error) {
 		t.Fatal("runner called after script creation failed")
 		return "", nil

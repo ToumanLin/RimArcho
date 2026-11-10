@@ -370,74 +370,82 @@ func managerFixture(paths map[string]int64) []byte {
 }
 
 func TestPrepareUnityExactResourcesAndCache(t *testing.T) {
-	game, cache := gameFixture(t), t.TempDir()
-	root := filepath.Join(game, "RimWorldWin64_Data")
-	put(t, filepath.Join(game, "Data/Core/Defs/Misc/ExpansionDefs/ExpansionDefs.xml"), []byte(strings.ReplaceAll(testDefs, "<defName>Ambiguous</defName>", "<defName>Uninstalled</defName>")))
-	put(t, filepath.Join(game, "Data/Royalty/About/About.xml"), []byte("<ModMetaData/>"))
-	engine := "2022.3.35f1"
-	// The path points to the object whose name does not match the backgroundPath.
-	objects := []unityFixtureObject{{7, 28, textureFixture(engine, "NotThePath", 8, 8, 4, rgbaRows(8, 8), 0, "")}, {8, 28, textureFixture(engine, "MenuCore", 8, 8, 4, rgbaRows(8, 8), 0, "")}}
-	put(t, filepath.Join(root, "resources.assets"), serializedFixture(22, engine, binary.LittleEndian, false, objects, nil))
-	put(t, filepath.Join(root, "globalgamemanagers"), serializedFixture(22, engine, binary.LittleEndian, true, []unityFixtureObject{{13, 147, managerFixture(map[string]int64{"textures/ui/menucore": 7, "textures/ui/menuroyalty": 8})}}, []string{"resources.assets"}))
-	items, err := Prepare(context.Background(), game, cache, "en")
-	if err != nil || len(items) != 2 || items[0].Key != "game:ludeon.rimworld" {
-		t.Fatalf("exact resources: %+v %v", items, err)
-	}
-	old := time.Unix(100, 0)
-	os.Chtimes(items[0].Full, old, old)
-	again, err := Prepare(context.Background(), game, cache, "zh")
-	if err != nil || len(again) != 2 || again[0].Full != items[0].Full {
-		t.Fatal("cache hit", err)
-	}
-	st, _ := os.Stat(items[0].Full)
-	if !st.ModTime().Equal(old) {
-		t.Fatal("cache hit rewrote image")
-	}
-	os.Remove(items[0].Thumb)
-	if _, err := Prepare(context.Background(), game, cache, "en"); err != nil || !validPair(items[0]) {
-		t.Fatal("pair repair", err)
-	}
-	for _, name := range []string{"resources.assets", "globalgamemanagers", "resources.assets.resS"} {
-		path := filepath.Join(root, name)
-		if name == "resources.assets.resS" {
-			put(t, path, []byte{1})
-		} else {
-			if err := os.Chtimes(path, old, old); err != nil {
+	for _, dataDir := range []string{"RimWorldWin64_Data", "RimWorldLinux_Data"} {
+		t.Run(dataDir, func(t *testing.T) {
+			game, cache := gameFixture(t), t.TempDir()
+			root := filepath.Join(game, dataDir)
+			put(t, filepath.Join(game, "Data/Core/Defs/Misc/ExpansionDefs/ExpansionDefs.xml"), []byte(strings.ReplaceAll(testDefs, "<defName>Ambiguous</defName>", "<defName>Uninstalled</defName>")))
+			put(t, filepath.Join(game, "Data/Royalty/About/About.xml"), []byte("<ModMetaData/>"))
+			engine := "2022.3.35f1"
+			// The path points to the object whose name does not match the backgroundPath.
+			objects := []unityFixtureObject{{7, 28, textureFixture(engine, "NotThePath", 8, 8, 4, rgbaRows(8, 8), 0, "")}, {8, 28, textureFixture(engine, "MenuCore", 8, 8, 4, rgbaRows(8, 8), 0, "")}}
+			put(t, filepath.Join(root, "resources.assets"), serializedFixture(22, engine, binary.LittleEndian, false, objects, nil))
+			put(t, filepath.Join(root, "globalgamemanagers"), serializedFixture(22, engine, binary.LittleEndian, true, []unityFixtureObject{{13, 147, managerFixture(map[string]int64{"textures/ui/menucore": 7, "textures/ui/menuroyalty": 8})}}, []string{"resources.assets"}))
+			items, err := Prepare(context.Background(), game, cache, "en")
+			if err != nil || len(items) != 2 || items[0].Key != "game:ludeon.rimworld" {
+				t.Fatalf("exact resources: %+v %v", items, err)
+			}
+			old := time.Unix(100, 0)
+			os.Chtimes(items[0].Full, old, old)
+			again, err := Prepare(context.Background(), game, cache, "zh")
+			if err != nil || len(again) != 2 || again[0].Full != items[0].Full {
+				t.Fatal("cache hit", err)
+			}
+			st, _ := os.Stat(items[0].Full)
+			if !st.ModTime().Equal(old) {
+				t.Fatal("cache hit rewrote image")
+			}
+			os.Remove(items[0].Thumb)
+			if _, err := Prepare(context.Background(), game, cache, "en"); err != nil || !validPair(items[0]) {
+				t.Fatal("pair repair", err)
+			}
+			for _, name := range []string{"resources.assets", "globalgamemanagers", "resources.assets.resS"} {
+				before := Stamp(game)
+				path := filepath.Join(root, name)
+				if name == "resources.assets.resS" {
+					put(t, path, []byte{1})
+				} else {
+					if err := os.Chtimes(path, old, old); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if Stamp(game) == before {
+					t.Fatalf("%s change did not invalidate the source stamp", name)
+				}
+				changed, err := Prepare(context.Background(), game, cache, "en")
+				if err != nil || len(changed) != 2 || changed[0].Full != items[0].Full {
+					t.Fatalf("%s replaced shared cache: %v", name, err)
+				}
+				items = changed
+			}
+			u, err := openUnity(filepath.Join(root, "resources.assets"))
+			if err != nil {
 				t.Fatal(err)
 			}
-		}
-		changed, err := Prepare(context.Background(), game, cache, "en")
-		if err != nil || len(changed) != 2 || changed[0].Full != items[0].Full {
-			t.Fatalf("%s replaced shared cache: %v", name, err)
-		}
-		items = changed
-	}
-	u, err := openUnity(filepath.Join(root, "resources.assets"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer u.f.Close()
-	manager, err := openUnity(filepath.Join(root, "globalgamemanagers"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer manager.f.Close()
-	resources, err := manager.resources()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if o, err := resolveUnityTexture(u, manager, resources, "UI/MenuCore"); err != nil || o.id != 7 {
-		t.Fatal("PPtr resolution", err)
-	}
-	if _, err := resolveUnityTexture(u, manager, resources, "Other/MenuCore"); err == nil {
-		t.Fatal("guessed by name despite available mapping")
-	}
-	if o, err := resolveUnityTexture(u, nil, nil, "UI/MenuCore"); err != nil || o.id != 8 {
-		t.Fatal("name fallback", err)
-	}
-	u.objects[9] = u.objects[8]
-	if _, err := u.textureByName("MenuCore"); err == nil {
-		t.Fatal("ambiguous name accepted")
+			defer u.f.Close()
+			manager, err := openUnity(filepath.Join(root, "globalgamemanagers"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer manager.f.Close()
+			resources, err := manager.resources()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if o, err := resolveUnityTexture(u, manager, resources, "UI/MenuCore"); err != nil || o.id != 7 {
+				t.Fatal("PPtr resolution", err)
+			}
+			if _, err := resolveUnityTexture(u, manager, resources, "Other/MenuCore"); err == nil {
+				t.Fatal("guessed by name despite available mapping")
+			}
+			if o, err := resolveUnityTexture(u, nil, nil, "UI/MenuCore"); err != nil || o.id != 8 {
+				t.Fatal("name fallback", err)
+			}
+			u.objects[9] = u.objects[8]
+			if _, err := u.textureByName("MenuCore"); err == nil {
+				t.Fatal("ambiguous name accepted")
+			}
+		})
 	}
 }
 

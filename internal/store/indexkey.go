@@ -8,9 +8,10 @@ import (
 )
 
 // indexTables are the tables a mod index is built from (app.Index): instances, their
-// snapshots, sources, lineages, the player's data on lineages and the environments.
+// snapshots, sources, lineages, the player's data on lineages (tag colours too: the rows
+// show them) and the environments.
 // List tables (workspace, undo, versions, plans) are not among them.
-var indexTables = []string{"environment", "source", "lineage", "instance", "snapshot", "lineage_data", "lineage_tag"}
+var indexTables = []string{"environment", "source", "lineage", "instance", "snapshot", "lineage_data", "lineage_tag", "tag_color"}
 
 // IndexKey changes only when an index table changes, including writes by another
 // connection/process. data_version cannot distinguish a list edit from a scan.

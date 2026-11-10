@@ -13,14 +13,14 @@ func textureTools() []tool {
 
 // TexturesIn is manage_textures.
 type TexturesIn struct {
-	Env    string   `json:"env,omitempty" jsonschema:"environment name (default: current)"`
-	Action string   `json:"action" jsonschema:"status, optimize or clean"`
-	Refs   []string `json:"refs,omitempty" jsonschema:"the mods (#id, pkg:…); or plan / all"`
-	Plan   bool     `json:"plan,omitempty" jsonschema:"the current plan's mods"`
-	All    bool     `json:"all,omitempty" jsonschema:"every installed mod"`
-	Scale  int      `json:"scale,omitempty" jsonschema:"status, optimize: scale textures down to this percent (20 25 40 50 60 75 80); 0 = full size"`
-	Force  bool     `json:"force,omitempty" jsonschema:"optimize: convert again the textures that are up to date"`
-	DryRun bool     `json:"dry_run,omitempty" jsonschema:"optimize, clean: show what would happen, change nothing"`
+	Env    string  `json:"env,omitempty" jsonschema:"environment (default: current)"`
+	Action string  `json:"action" jsonschema:"status, optimize or clean"`
+	Refs   StrList `json:"refs,omitempty" jsonschema:"the mods (#id, pkg:…); or plan / all"`
+	Plan   bool    `json:"plan,omitempty" jsonschema:"the current plan's mods"`
+	All    bool    `json:"all,omitempty" jsonschema:"every installed mod"`
+	Scale  int     `json:"scale,omitempty" jsonschema:"status, optimize: scale textures down to this percent (20 25 40 50 60 75 80); 0 = full size"`
+	Force  bool    `json:"force,omitempty" jsonschema:"optimize: convert again the textures that are up to date"`
+	DryRun bool    `json:"dry_run,omitempty" jsonschema:"optimize, clean: show what would happen, change nothing"`
 }
 
 // TexturesArgv maps manage_textures to archo textures.

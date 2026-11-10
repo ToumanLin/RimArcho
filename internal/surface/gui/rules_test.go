@@ -16,7 +16,7 @@ func TestRulesFold(t *testing.T) {
 	view.SetLang("en")
 	e, s, _ := fixture(t)
 	rules, err := s.Rules()
-	if err != nil || len(rules.Rows) != 0 || len(rules.Kinds) != 6 {
+	if err != nil || len(rules.Rows) != 0 || len(rules.Kinds) != 7 {
 		t.Fatalf("empty rules %+v %v", rules, err)
 	}
 	text, err := s.SaveRule(0, RuleSpec{Kind: "after", A: "pkg:tester.a", B: "pkg:brrainz.harmony", Note: " needs it "})

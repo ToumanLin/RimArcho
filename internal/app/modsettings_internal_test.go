@@ -156,6 +156,27 @@ func TestCopyHugsLib(t *testing.T) {
 	}
 }
 
+// A HugsLib copy cut short leaves only its temporary folder, which the next copy replaces;
+// a partial HugsLib/ never stands in for the whole.
+func TestCopyHugsLibAfterCutShort(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	from, to := filepath.Join(root, "env"), filepath.Join(root, "pack")
+	writeSettings(t, filepath.Join(from, "HugsLib"), "ModSettings.xml", "<settings/>", time.Now())
+	writeSettings(t, filepath.Join(from, "HugsLib"), "LogPublisher.xml", "<log/>", time.Now())
+	writeSettings(t, filepath.Join(to, "HugsLib.rimarcho-tmp"), "ModSettings.xml", "<sett", time.Now())
+	got, err := copyHugsLib(from, to)
+	if err != nil || len(got) != 2 {
+		t.Fatalf("copied %v, %v", got, err)
+	}
+	if s := readText(t, filepath.Join(to, "HugsLib", "ModSettings.xml")); s != "<settings/>" {
+		t.Fatalf("ModSettings.xml %q", s)
+	}
+	if _, err := os.Stat(filepath.Join(to, "HugsLib.rimarcho-tmp")); !os.IsNotExist(err) {
+		t.Fatal("the temporary folder stayed")
+	}
+}
+
 // What a settings file stores: flat values as values; lists, dictionaries, nested objects
 // and nulls summarised (16 §2.9).
 func TestParseSettings(t *testing.T) {

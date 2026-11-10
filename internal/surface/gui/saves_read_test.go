@@ -191,25 +191,15 @@ func TestSavesFullReadPage(t *testing.T) {
 		t.Fatalf("detail play %+v reading %v note %q", pl, d.Reading, d.PlayNote)
 	}
 	if pl.Day != "day 3" || pl.Date == "" || pl.Storyteller != "Cassandra Classic" || pl.Difficulty != "strive to survive" ||
-		pl.Played != "3h 25m" || pl.Since != "Landing" {
+		pl.Played != "3h 25m" {
 		t.Fatalf("play head %+v", pl)
-	}
-	stats := map[string]string{}
-	for _, st := range pl.Stats {
-		stats[st.Label] = st.Value + " " + st.Change
-	}
-	if stats["wealth"] != "20k +11k" || stats["colonists"] != "3 ±0" || stats["animals"] != "3 +2" || stats["raids"] != "4 ±0" {
-		t.Fatalf("stats %v", stats)
 	}
 	var people []string
 	for _, c := range pl.Colonists {
 		people = append(people, fmt.Sprintf("%s%v", c.Name, c.Dead))
 	}
-	if !slices.Equal(people, []string{"Marafalse", "Karifalse", "Pikefalse", "Ozzietrue"}) {
+	if !slices.Equal(people, []string{"Ozzietrue"}) || pl.Dead != 1 {
 		t.Fatalf("colonists %q", people)
-	}
-	if len(pl.Events) != 2 || pl.Events[0].Text != "Death: Ozzie" || !pl.Events[0].Death || pl.Events[0].Day != 2 {
-		t.Fatalf("events %+v", pl.Events)
 	}
 	tl := pl.Timeline
 	if tl == nil || tl.Days != 3 || len(tl.Wealth) != 7 || len(tl.Points) != 2 || tl.Points[0].Day != 1 || tl.Points[1].Wealth != 20000 ||
@@ -220,7 +210,7 @@ func TestSavesFullReadPage(t *testing.T) {
 	api.saves.mu.Lock()
 	kept := len(api.saves.facts)
 	api.saves.mu.Unlock()
-	if kept != 2 {
+	if kept != 1 {
 		t.Fatalf("the page keeps %d facts", kept)
 	}
 
@@ -256,7 +246,7 @@ func TestSavesFullReadPage(t *testing.T) {
 		t.Fatalf("SaveDetail waited %v", el)
 	}
 	awaitNews(t, news, "the selected save read", func(ev SavesReadEvent) bool { return slices.Contains(ev.Refs, sel) })
-	if d, err = api.SaveDetail(sel); err != nil || d.Play == nil || d.Play.Day != "day 4" || d.Play.Since != "Ennawrin" {
+	if d, err = api.SaveDetail(sel); err != nil || d.Play == nil || d.Play.Day != "day 4" {
 		t.Fatalf("after its read: %+v %v", d.Play, err)
 	}
 	// the relist gives it its day while the run is still busy

@@ -517,6 +517,12 @@ func (a *App) edit(op string, f func(st *LoadoutState, l loadout.List) (loadout.
 }
 
 func (a *App) editStaged(op string, staged *string, f func(st *LoadoutState, l loadout.List) (loadout.List, []string, error)) (*EditResult, error) {
+	return a.editOrigin(op, staged, nil, f)
+}
+
+// editOrigin is editStaged with origin, when set, adjusting the workspace's origin in the
+// same transaction as the edit.
+func (a *App) editOrigin(op string, staged *string, origin func(ws *store.Workspace), f func(st *LoadoutState, l loadout.List) (loadout.List, []string, error)) (*EditResult, error) {
 	unlock, err := a.lockLaunch()
 	if err != nil {
 		return nil, err
@@ -538,6 +544,9 @@ func (a *App) editStaged(op string, staged *string, f func(st *LoadoutState, l l
 		ws.Entries, ws.Updated = after.Encode(), a.Now().UTC()
 		if ws.OriginKind == "checkout" {
 			ws.OriginKind = "edited"
+		}
+		if origin != nil {
+			origin(&ws)
 		}
 		// History keeps stored identities; before is localized to the current game.
 		if err := a.Store.EditWorkspace(&ws, st.WS.Entries, op, staged); err != nil {
@@ -878,8 +887,9 @@ func (a *App) SortInput(st *LoadoutState, l loadout.List) (order.Input, error) {
 	return in, nil
 }
 
-// sortReplacements: for each required package no list entry has, the enabled mods Use This
-// Instead names as its replacement (order.Input.Replacements, 08 §1.1).
+// sortReplacements: for each required package no list entry has, the enabled mods the
+// player's replaces rules or Use This Instead name as its replacement (order.Input.Replacements,
+// 08 §1.1).
 func (a *App) sortReplacements(st *LoadoutState, nodes []order.Node, enabled []*store.Mod) map[string][]string {
 	inList := map[string]bool{}
 	for _, nd := range nodes {
@@ -902,7 +912,7 @@ func (a *App) sortReplacements(st *LoadoutState, nodes []order.Node, enabled []*
 				continue
 			}
 			dep.alts = nil // the sort reads alternatives from the declaration itself
-			if ms, how := ix.standIns(dep); how == StandInReplacement {
+			if ms, how := ix.standIns(dep); how == StandInReplacement || how == StandInRule {
 				if out == nil {
 					out = map[string][]string{}
 				}
@@ -1003,6 +1013,10 @@ func (a *App) UndoRedo(redo bool) (*EditResult, string, error) {
 	before := st.List
 	ws := *st.WS
 	ws.Entries, ws.Updated = step.Entries, a.Now().UTC()
+	if ws.OriginKind == "checkout" {
+		// The list is no longer the checked-out version: saving it is not a restore.
+		ws.OriginKind = "edited"
+	}
 	if err := a.Store.RestoreStep(&ws, st.WS.Entries, from, to, *step); err != nil {
 		return nil, "", err
 	}
@@ -1308,7 +1322,14 @@ func (a *App) Checkout(ref string) (*EditResult, int, error) {
 	defer unlock()
 
 	var n int
-	r, err := a.edit("checkout", func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
+	// The origin is written with the list, in one transaction.
+	origin := func(ws *store.Workspace) {
+		ws.OriginVersion, ws.OriginKind = n, "checkout"
+		if ws.Conflict == n {
+			ws.Conflict = 0
+		}
+	}
+	r, err := a.editOrigin("checkout", nil, origin, func(st *LoadoutState, l loadout.List) (loadout.List, []string, error) {
 		var err error
 		if n, err = a.parsePlanVersion(st.Plan, ref); err != nil {
 			return nil, nil, err
@@ -1333,13 +1354,6 @@ func (a *App) Checkout(ref string) (*EditResult, int, error) {
 			}
 		}
 		return r, n, nil
-	}
-	st.WS.OriginVersion, st.WS.OriginKind = n, "checkout"
-	if st.WS.Conflict == n {
-		st.WS.Conflict = 0
-	}
-	if err := a.Store.SetWorkspace(st.WS); err != nil {
-		return nil, 0, err
 	}
 	return r, n, nil
 }
@@ -1425,10 +1439,38 @@ func (ix *Index) resolveRule(spec RuleSpec) (*store.UserRule, error) {
 		if r.Target, err = ix.StoredConstraintRef(spec.Target); err != nil {
 			return nil, err
 		}
+	case order.RuleReplaces:
+		if r.A, err = ix.ResolveLineage(spec.A); err != nil {
+			return nil, err
+		}
+		if r.Target, err = ix.replacedPackage(spec.B); err != nil {
+			return nil, err
+		}
+		for _, m := range ix.ByLineage[r.A] {
+			if dependencyPackage(m.PackageID) == r.Target {
+				return nil, fmt.Errorf("%s is %s itself", spec.A, spec.B)
+			}
+		}
 	default:
-		return nil, fmt.Errorf("unknown rule kind %q (after, before, incompatible, attach, top, bottom, ignore)", spec.Kind)
+		return nil, fmt.Errorf("unknown rule kind %q (after, before, incompatible, attach, top, bottom, replaces, ignore)", spec.Kind)
 	}
 	return r, nil
+}
+
+// replacedPackage is the package a replaces rule stands in for: pkg:<id>, which need not be
+// installed, or a mod reference, whose packageId it takes.
+func (ix *Index) replacedPackage(ref string) (string, error) {
+	if p, ok := strings.CutPrefix(strings.TrimSpace(ref), "pkg:"); ok {
+		if p = dependencyPackage(p); p != "" {
+			return p, nil
+		}
+		return "", fmt.Errorf("%q names no package", ref)
+	}
+	m, err := ix.ResolveOne(ref)
+	if err != nil {
+		return "", fmt.Errorf("%w (a package that is not installed: pkg:<packageId>)", err)
+	}
+	return dependencyPackage(m.PackageID), nil
 }
 
 // StoredConstraintRef converts a printed constraint reference (with an instance or lineage

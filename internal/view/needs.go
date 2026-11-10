@@ -46,6 +46,7 @@ const (
 	ActUseInstalled    = "use-installed"    // Refs: package IDs, bound in place as one undo step
 	ActDisable         = "disable"          // Refs
 	ActChooseDisable   = "choose-disable"   // pick one of Options, then disable its Refs
+	ActStandIn         = "stand-in"         // pick one of Options: a replaces rule, Refs = [mod, pkg:<id>] (08 §2.1)
 	ActOpenURL         = "open-url"         // URL in the browser
 	ActProblem         = "problem"          // focused problem, Problem: p:ref
 	ActView            = "view"             // read-only command text: Argv
@@ -190,6 +191,8 @@ type Needs struct {
 	// "pack X · …" (10 §3: a pack's errors are not the list's).
 	LastRun    string `json:"lastRun,omitempty"`
 	LastRunDay string `json:"lastRunDay,omitempty"` // its day: "Oct 21"
+	// LastRunPending: that log is not analysed yet, so its errors are not counted.
+	LastRunPending bool `json:"lastRunPending,omitempty"`
 	// Elsewhere: what is not on Can it run but handled on another page (SectionElsewhere),
 	// one line each at the bottom of the page (16 §2.4).
 	Elsewhere []Elsewhere `json:"elsewhere,omitempty"`
@@ -295,6 +298,7 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 	missing := a.MissingMods(st)
 	n.Items = append(mergeDependencies(st, buildItems(a, st, ps, missing)), directoryNeeds(a)...)
 	n.Items = append(n.Items, linkNeeds(a, ps.GameLinks)...)
+	n.Items = append(n.Items, resubscribeNeeds(a, st)...)
 	capacity := a.CachedMemoryAssessment(st)
 	n.Memory = &capacity
 	n.Items = append(n.Items, MemoryNeed(capacity, st.Plan.ID))
@@ -335,6 +339,7 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 		}
 		when := ShortDate(r.ModTime) + " " + r.ModTime.In(a.Loc).Format("15:04")
 		n.LastRunDay = ShortDate(r.ModTime)
+		n.LastRunPending = r.Pending
 		if pack := a.RunOfLog(st.Ix.Env.ID, r.ModTime); pack != "" {
 			n.LastRun = Tf("pack %s", pack) + "  " + when
 		} else {
@@ -577,10 +582,10 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			if dep == strings.TrimPrefix(y, "pkg:") {
 				dep = nm(y)
 			}
-			add(Need{Group: GroupDeps, Target: dependencyTarget(st, y), RequiredBy: owners(st, x), Text: Tf("%s needs %s, but %s is not installed", nm(x), dep, dep), Actions: []Action{workshop(p, dep)}, Counted: true, Mods: ids, Status: s,
+			add(Need{Group: GroupDeps, Target: dependencyTarget(st, y), RequiredBy: owners(st, x), Text: Tf("%s needs %s, but %s is not installed", nm(x), dep, dep), Actions: depActions(st, p, workshop(p, dep), dependencyTarget(st, y), dep), Counted: true, Mods: ids, Status: s,
 				Title: Tf("missing dependency: %s", dep), Why: Tf("%s needs it, but it is not installed.", nm(x)), Evidence: ev})
 		case "dep.inactive":
-			add(Need{Group: GroupDeps, Target: dependencyTarget(st, y), RequiredBy: owners(st, x), Text: Tf("%s needs %s, but %s is not enabled", nm(x), nm(y), nm(y)), Actions: []Action{enable(st, y)}, Counted: true, Mods: ids, Status: s,
+			add(Need{Group: GroupDeps, Target: dependencyTarget(st, y), RequiredBy: owners(st, x), Text: Tf("%s needs %s, but %s is not enabled", nm(x), nm(y), nm(y)), Actions: depActions(st, p, enable(st, y), dependencyTarget(st, y), nm(y)), Counted: true, Mods: ids, Status: s,
 				Title: Tf("missing dependency: %s", nm(y)), Why: Tf("%s needs it, but it is not enabled.", nm(x)), Evidence: ev})
 		case "dep.observed-missing": // undeclared, seen in shared logs (internal/known)
 			if strings.HasPrefix(y, "pkg:") {
@@ -593,7 +598,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			}
 		case "combo.known-bad":
 			if y != "" {
-				add(Need{Group: GroupConflict, Text: Tf("%s and %s often produce errors together (seen in shared logs)", nm(x), nm(y)), Actions: []Action{disableOne(st, x, y)}, Counted: true, Mods: ids, Status: s,
+				add(Need{Group: GroupConflict, Text: Tf("%s and %s often produce errors together (seen in shared logs)", nm(x), nm(y)), Actions: []Action{disableOne(a, st, x, y)}, Counted: true, Mods: ids, Status: s,
 					Title: Tf("%s and %s often fail together", nm(x), nm(y)), Why: T("in shared logs this pair produces errors far more often than either one alone. Disable one if you see errors."), Evidence: ev})
 			} else {
 				add(Need{Group: GroupConflict, Text: Tf("this version of %s often produces errors (seen in shared logs); other versions did not", nm(x)), Actions: []Action{disable(st, x, Tf("disable %s", nm(x)))}, Counted: true, Mods: ids, Status: s,
@@ -610,7 +615,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 				Actions: []Action{enable(st, y), problemAction(p.Ref)}, Counted: true, Mods: ids, Status: s,
 				Title: Tf("part of %s does not take effect", nm(x)), Why: Tf("it changes things %s adds, and %s is not enabled.", nm(y), nm(y)), Evidence: ev})
 		case "incompat.active":
-			add(Need{Group: GroupConflict, Text: Tf("%s is incompatible with %s", nm(x), nm(y)), Actions: []Action{disableOne(st, x, y)}, Counted: true, Mods: ids, Status: s,
+			add(Need{Group: GroupConflict, Text: Tf("%s is incompatible with %s", nm(x), nm(y)), Actions: []Action{disableOne(a, st, x, y)}, Counted: true, Mods: ids, Status: s,
 				Why: T("one of them says so; with both enabled the game misbehaves. Disable one."), Evidence: ev})
 		case "mod.pinned":
 			add(Need{Group: GroupHidden, Text: Tf("%s is locked to another copy, and the workshop version has been updated since", nm(x)),
@@ -1054,6 +1059,27 @@ func keepHidden(p *app.Problem) Action {
 	return Action{Kind: ActIgnore, Key: "I", Label: T("keep it hidden"), Problem: p.Ref, Done: T("kept hidden; asked again if the mod changes")}
 }
 
+// resubscribeNeeds offers to subscribe again to the Workshop items an interrupted
+// resubscribe left unsubscribed (16 §2.9): RimArcho closed, or Steam went away, between
+// the unsubscribe and the subscribe.
+func resubscribeNeeds(a *app.App, st *app.LoadoutState) []Need {
+	items := a.ResubscribePending(st)
+	if len(items) == 0 {
+		return nil
+	}
+	ids, names := make([]string, len(items)), make([]string, len(items))
+	for i, it := range items {
+		ids[i], names[i] = it.WorkshopID, it.Name
+		if names[i] == "" {
+			names[i] = it.WorkshopID
+		}
+	}
+	title := T("a resubscribe was cut short")
+	return []Need{{Group: GroupConfirm, Title: title, Text: title + ": " + strings.Join(names, ", "),
+		Why:    T("RimArcho unsubscribed these Workshop mods to download them again, but closed or lost Steam before subscribing again; they are no longer subscribed") + ": " + strings.Join(names, ", "),
+		Status: StatusWarn, Counted: true, Actions: []Action{subscribeAction(ids, T("subscribe again"))}}}
+}
+
 // subscribeAction subscribes to Workshop items (the interface asks Steam or SteamCMD).
 func subscribeAction(ws []string, label string) Action {
 	return Action{Kind: ActSubscribe, Key: "s", Label: label, Refs: ws, Argv: append([]string{"subscribe", "workshop"}, ws...),
@@ -1073,13 +1099,47 @@ func disable(st *app.LoadoutState, tok, label string) Action {
 	return Action{Kind: ActDisable, Key: "space", Label: label, Refs: []string{TokRef(st, tok)}, Done: Tf("disabled %s", TokName(st, tok))}
 }
 
-// disableOne: choose which of two to disable (incompatible mods).
-func disableOne(st *app.LoadoutState, x, y string) Action {
-	nx, ny := TokName(st, x), TokName(st, y)
-	return Action{Kind: ActChooseDisable, Key: "space", Label: T("choose which to disable"), Title: T("disable which one?"), Options: []Option{
-		{Label: Tf("disable %s", nx), Refs: []string{TokRef(st, x)}, Done: Tf("disabled %s", nx)},
-		{Label: Tf("disable %s", ny), Refs: []string{TokRef(st, y)}, Done: Tf("disabled %s", ny)},
-	}}
+// disableOne: choose which of two to disable (incompatible mods). Each option says which
+// enabled mods would be left without a required mod (app.DependentsOf), and the one fewer
+// mods need comes first: disabling a library to settle a conflict breaks everything built
+// on it.
+func disableOne(a *app.App, st *app.LoadoutState, x, y string) Action {
+	type opt struct {
+		o    Option
+		need int
+	}
+	var opts []opt
+	for _, tok := range []string{x, y} {
+		name := TokName(st, tok)
+		o := opt{o: Option{Label: Tf("disable %s", name), Refs: []string{TokRef(st, tok)}, Done: Tf("disabled %s", name)}}
+		if id := finding.InstID(tok); id != "" {
+			if deps, err := a.DependentsOf(st, []string{id}); err == nil && len(deps) > 0 {
+				o.need = len(deps)
+				o.o.Label = Tf("disable %s (%d enabled mods need it: %s)", name, len(deps), modNames(deps, 3))
+				o.o.Done = Tf("disabled %s; %d mods that need it lack it now", name, len(deps))
+			}
+		}
+		opts = append(opts, o)
+	}
+	slices.SortStableFunc(opts, func(p, q opt) int { return p.need - q.need })
+	act := Action{Kind: ActChooseDisable, Key: "space", Label: T("choose which to disable"), Title: T("disable which one?")}
+	for _, o := range opts {
+		act.Options = append(act.Options, o.o)
+	}
+	return act
+}
+
+// modNames: up to n display names, then an ellipsis.
+func modNames(ms []*store.Mod, n int) string {
+	var names []string
+	for _, m := range ms[:min(n, len(ms))] {
+		names = append(names, m.DisplayName())
+	}
+	s := strings.Join(names, ", ")
+	if len(ms) > n {
+		s += ", …"
+	}
+	return s
 }
 
 // keepOne: choose which copy to keep (the same mod enabled twice).
@@ -1167,6 +1227,13 @@ func Do(a *app.App, act Action, option int) (done string, err error) {
 		}
 		o := act.Options[option]
 		_, err = a.Disable(o.Refs)
+		return o.Done, err
+	case ActStandIn:
+		if option < 0 || option >= len(act.Options) || len(act.Options[option].Refs) != 2 {
+			return "", fmt.Errorf("no option %d", option)
+		}
+		o := act.Options[option]
+		_, err = a.AddRule(app.RuleSpec{Kind: "replaces", A: o.Refs[0], B: o.Refs[1]})
 		return o.Done, err
 	case ActIgnoreRule:
 		if act.Rule == "" {

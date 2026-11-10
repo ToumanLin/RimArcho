@@ -27,6 +27,7 @@ async function setup({ running = false, severity = "" } = {}) {
     "./environment.js": { withEnvironmentSwitch() {} },
     "./motion.js": { places: () => new Map(), slideFrom() {} },
     "./popups.js": { memoryConfirm() {} },
+    "./selfupdate.js": { goSelfUpdate() {} },
   }, {
     document: { querySelector: (s) => body.querySelector(s), querySelectorAll: (s) => body.querySelectorAll(s), activeElement: null },
     addEventListener() {}, getComputedStyle: () => ({ fontSize: "96px" }),

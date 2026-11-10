@@ -29,6 +29,7 @@ Check source states → list source subdirectories → group (merge identical re
 **Subscriptions and residue** (workshop sources only; the game does not load SteamCMD directories directly):
 - The game loads only **subscribed** Workshop items (17 §6). Subscribed means listed in `WorkshopItemsInstalled` or `WorkshopItemDetails` of `appworkshop_294100.acf`.
 - Without an ACF, everything counts as subscribed.
+- An ACF that exists but cannot be read or parsed (Steam may be rewriting it) says nothing: the scan keeps each Instance's stored residue value (`Observation.ResidueUnknown`).
 - Folders missing from the subscription records are residue: they still get Instances but cannot be added to plans, and can it run suggests cleaning them up (05 §4.3, 02 §3).
 - Residue folders with neither `About.xml` nor `About.xml.disabled` are only counted, without Instances.
 
@@ -79,6 +80,14 @@ A scan reads `About.xml` again even when the content is unchanged. If the depend
 - Large files such as textures and audio are compared by size only, without reading their content.
 - `.git`, `.svn` and `.rimarcho` are excluded, so locked versions and their originals have identical fingerprints.
 - Links and device files inside Mod directories are not followed; unreadable entries are skipped.
+
+**Provenance** (`App.Provenance`, the `provenance:` line of `archo mod` / `get_mod`): for an Instance that is not Workshop-like or Official, the Workshop copy it comes from is the Instance its origin marker names, else the Workshop-like Instance of its Lineage (the one with the Workshop ID it declares first). The line compares what the last scan stored; nothing is hashed again, and it says `as of the last scan`:
+
+- `files are the Workshop copy ws:<id> (this folder links to it)`: the folder was found through a link into a Workshop source, or has the same snapshot hash;
+- `files identical to Workshop <id> (<ref>)`: equal snapshot hashes;
+- `N files differ from Workshop <id> (<ref>): <path> changed|added|removed, …` (at most 5 paths, then `+K more`; `added` means only the Instance has the file): the two stored file lists compared by size and hash, so a file outside the semantic set that changed without changing its size is not seen. If a file list was dropped (§4.1), `files differ …; the stored file lists do not say which (archo scan --full)`.
+
+The line is absent for a Workshop copy and for an Instance with no Workshop copy to compare with.
 
 **Similarity**: over the semantic file sets of two snapshots, take the larger of two Jaccard coefficients:
 - `J(paths)`: compares lowercase relative paths only. Recognizes "move + update": contents changed, structure unchanged.
@@ -302,7 +311,7 @@ Entry point: `App.Maintain` → `Store.Maintain`; Settings "compact", `archo db 
 3. After the commit, reclaim space: manual maintenance always runs VACUUM; automatic maintenance only if free pages total at least 16 MiB, or at least 1 MiB and 20% of the database's pages. The existing auto_vacuum mode is kept, with no schema change.
 4. Run `wal_checkpoint(TRUNCATE)`, record `meta[maintenance:last_completed]` and truncate the WAL of that completion marker too. Completion reports the space freed and the current size ("database compacted: freed 183 MB, now 260 MB").
 
-Before VACUUM, the database's volume must have free space of at least twice the total database page size plus 64 MiB, for the temporary database and a full WAL; if there is less, or it is unknown, reclamation is skipped, and manual maintenance says how much space it needs ("cannot compact database: it needs 1.2 GB of free disk space"). File-list cleanup already committed needs no restore; retry later. The private maintenance connection waits zero time when busy: SQLite busy / locked or a busy checkpoint aborts at once, silently for automatic maintenance. On interruption or failure, WAL truncation is attempted; otherwise it retries later. `meta[maintenance:lease]` keeps several windows from entering between VACUUM transactions; expiry in 16 §2.16.1 A10.
+Before VACUUM, the database's volume must have free space of at least twice the total database page size plus 64 MiB, for the temporary database and a full WAL; if there is less, or it is unknown, reclamation is skipped, and manual maintenance says how much space it needs ("cannot compact database: it needs 1.2 GB of free disk space"). Automatic maintenance then completes without compacting, so it waits its interval instead of pruning again at every start. File-list cleanup already committed needs no restore; retry later. The private maintenance connection waits zero time when busy: SQLite busy / locked or a busy checkpoint aborts at once, silently for automatic maintenance. On interruption or failure, WAL truncation is attempted; otherwise it retries later. `meta[maintenance:lease]` (`<RFC 3339 time> <process ID>`) keeps several windows from entering between VACUUM transactions; a lease whose process has ended does not block. Expiry in 16 §2.16.1 A10.
 
 Only the GUI schedules automatic maintenance, after the first paint. The initial delay, attempt period, interval after success and recheck frequency are in [16 §2.16.1](16-interface/2.16.1-scheduled-behavior.md) A08 and A10; the completion time is in the meta key above. It is skipped while any registered game's process, a scan, an analysis, a running or queued background task, or a page's background file read exists; it keeps rechecking, and is cancelled by foreground work, a game starting, or the window closing. It uses its own connection, no page connection or page mutex, and retries later when busy. The CLI, MCP and TUI do not schedule it.
 
@@ -338,3 +347,4 @@ Manual maintenance ignores the period and idle conditions but still refuses whil
 | A25 | Move all files into `1.6/` unchanged; change contents with paths unchanged | Both keep enough similarity: same Instance | `TestSimilarityRestructureAndContentOnly` | Pass |
 | A27 | `About.xml` with a UTF-16 LE/BE BOM, a UTF-8 BOM, or declaring utf-16 while being UTF-8 | Declarations are read correctly | `TestReadDeclUTF16` | Pass |
 | A28 | An old Mod without `<packageId>` | Derived by §1.5, matching the game, "inferred" | `TestDerivePackageID` | Pass |
+| A29 | A local copy of a Workshop Mod, identical at first, then one Def edited and one file added; rescan | `archo mod` shows `provenance: files identical to Workshop <id> (<ref>), as of the last scan`, later `2 files differ from Workshop <id> (<ref>), as of the last scan: Defs/Extra.xml added, Defs/ThingDefs/prov.xml changed`; the Workshop copy and a Mod with no Workshop copy show none | `app.TestModDetailsProvenance` | Pass |

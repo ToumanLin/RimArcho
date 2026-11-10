@@ -69,6 +69,10 @@ func (t *LiveTracker) Update(a *app.App, st *app.LoadoutState) (*Live, error) {
 		return newLog(a, st, &Live{}), nil
 	}
 	if t.lv == nil || t.pid != run.PID {
+		if t.lv != nil { // the game restarted: end the old run's follower as an exit would
+			t.lv.Close(a)
+			t.lv, t.pid = nil, 0
+		}
 		// a pack run writes its own log on 1.7 (10 §3): follow the one this run writes
 		t.what = a.WhatRuns(st.Ix.Env, run)
 		path := a.RunLog(st, t.what)
@@ -103,11 +107,13 @@ func LiveNeeds(st *app.LoadoutState, cs []*app.LiveCluster) []Need {
 		// item names only the mod (16 §5).
 		var ids []string
 		text := fmt.Sprintf("%d× %s", c.Count, msg)
-		for _, at := range c.Report.Attr {
+		// A mod only named by the message is not blamed (06 §3).
+		owners := c.Report.Owners()
+		for _, at := range owners {
 			ids = append(ids, at.Instance)
 		}
-		if len(c.Report.Attr) > 0 {
-			text = Tf("%s: %d× %s", TokName(st, finding.Inst(c.Report.Attr[0].Instance)), c.Count, msg)
+		if len(owners) > 0 {
+			text = Tf("%s: %d× %s", TokName(st, finding.Inst(owners[0].Instance)), c.Count, msg)
 		}
 		ev := evidence(EvLog, "Player.log")
 		var texts []string

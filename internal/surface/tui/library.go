@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -18,6 +19,9 @@ import (
 // ctrl+w open the folder and Workshop page, Del previews deletion, F10 opens the menu.
 
 type libState struct {
+	key         string
+	seq         int
+	loading     bool
 	page        *view.LibPage
 	err         string
 	cursor, off int
@@ -45,7 +49,6 @@ func (m *model) loadLibrary() {
 	if l.open == nil {
 		l.open, l.marked, l.anchor = map[string]bool{}, map[string]bool{}, -1
 	}
-	keep := l.lineKey(l.cursor)
 	l.err = ""
 	lib := m.library()
 	if lib == nil {
@@ -57,7 +60,21 @@ func (m *model) loadLibrary() {
 		l.err = err.Error()
 		return
 	}
-	l.page = p
+	m.applyLibrary(p)
+}
+
+func (m *model) libraryStamp() string {
+	l := &m.libr
+	return m.pageKey() + "|" + l.bar.search + "|" + strings.Join(l.bar.filters, "\x00") + "|" + l.sort
+}
+
+func (m *model) applyLibrary(p *view.LibPage) {
+	l := &m.libr
+	if l.open == nil {
+		l.open, l.marked, l.anchor = map[string]bool{}, map[string]bool{}, -1
+	}
+	keep := l.lineKey(l.cursor)
+	l.page, l.err, l.key, l.loading = p, "", m.libraryStamp(), false
 	b := &l.bar
 	b.conds, b.ghost, b.groups = p.Conds, p.Complete, nil
 	if b.open {
@@ -167,6 +184,9 @@ func (m *model) cursorCopy() (*view.LibInstRow, string) {
 // targets are the copies an op acts on: the selected ones, else the cursor's.
 func (m *model) targets() []*view.LibInstRow {
 	l := &m.libr
+	if l.loading && l.key != m.libraryStamp() {
+		return nil
+	}
 	if len(l.marked) > 0 {
 		var out []*view.LibInstRow
 		for ri := range l.page.Rows {
@@ -203,15 +223,44 @@ func targetOps(ts []*view.LibInstRow) []string {
 
 func (m *model) openLibrary() tea.Cmd {
 	m.tab = tabLibrary
-	m.loadLibrary()
-	return nil
+	l := &m.libr
+	key := m.libraryStamp()
+	if l.page != nil && l.key == key {
+		return nil
+	}
+	l.seq++
+	seq := l.seq
+	l.loading = true
+	search, filters, sort := l.bar.search, slices.Clone(l.bar.filters), l.sort
+	valid := func(m *model) bool { return m.tab == tabLibrary && m.libr.seq == seq && m.libraryStamp() == key }
+	return m.bgWhen(valid, func(a *app.App) func(*model) tea.Cmd {
+		lib, err := a.Library()
+		var p *view.LibPage
+		if err == nil {
+			p, err = view.BuildLibrary(lib, search, filters, sort)
+		}
+		return func(m *model) tea.Cmd {
+			m.libr.loading = false
+			if err != nil {
+				m.libr.err = m.humanize(err.Error())
+				return nil
+			}
+			// Details and row actions use the same inventory, rather than building
+			// it again from View. Rebind its loadout to the live UI session.
+			m.app.AdoptLibrary(lib)
+			m.libCache, m.libAt = lib, m.boardSeq
+			m.applyLibrary(p)
+			return nil
+		}
+	})
 }
 
 // openLibraryInstance selects a specific installed copy, clearing filters that could hide it.
 func (m *model) openLibraryInstance(id string) tea.Cmd {
 	m.libr.bar = barState{}
 	m.libr.full, m.libr.detail = false, false
-	m.openLibrary()
+	m.tab = tabLibrary
+	m.loadLibrary()
 	l := &m.libr
 	if l.page == nil {
 		return nil
@@ -311,6 +360,9 @@ func (m *model) libTagKey(refs []string, what string) tea.Cmd {
 
 // libMenu: the row menu of the cursor's copy (or the selection), beside the row.
 func (m *model) libMenu() tea.Cmd {
+	if m.libr.page == nil || m.libr.err != "" {
+		return nil // no rows shown
+	}
 	y := m.libr.rowY + m.libr.cursor - m.libr.off + 1
 	return m.openMenu(targetOps(m.targets()), 8, y, func(m *model, code string) tea.Cmd { return m.runLibOp(code) })
 }
@@ -319,7 +371,7 @@ func (m *model) libMenu() tea.Cmd {
 func (m *model) libRightClick(x, y int) tea.Cmd {
 	l := &m.libr
 	i := l.off + y - l.rowY
-	if l.page == nil || i < 0 || i >= len(l.flat) {
+	if l.page == nil || l.err != "" || i < 0 || i >= len(l.flat) {
 		return nil
 	}
 	if !m.libRowSelected(i) {
@@ -333,6 +385,9 @@ func (m *model) libRightClick(x, y int) tea.Cmd {
 // detail column it gives it the keys.
 func (m *model) libClick(e tea.MouseMsg) tea.Cmd {
 	l := &m.libr
+	if l.err != "" {
+		return nil // the rows under the error are stale
+	}
 	if tw, _ := m.libWidths(); tw < m.w && e.X >= tw+2 {
 		l.detail = true
 		return nil
@@ -419,14 +474,23 @@ func (m *model) libToggleOpen(x libLine) {
 
 func (m *model) libraryKey(s string) tea.Cmd {
 	l := &m.libr
-	if l.page == nil {
+	if l.page == nil || l.loading && l.key != m.libraryStamp() {
 		if s == "esc" {
 			m.tab = tabList
 		}
 		return nil
 	}
+	if l.err != "" {
+		// A failed reload shows only the error; the rows kept under it are stale, so only
+		// the keys that fix the search or leave the page work.
+		switch s {
+		case "esc", "/", "ctrl+f", `\`, "1":
+		default:
+			return nil
+		}
+	}
 	n := len(l.flat)
-	page := max(m.h-8-l.bar.lineCount(), 1)
+	page := max(m.h-bodyTop-6-l.bar.lineCount(), 1)
 	if l.full || l.detail {
 		switch s {
 		case "down", "j":
@@ -690,9 +754,9 @@ func (m *model) libraryLines(n int) []string {
 		count += "  " + Tf("selected %d", k)
 	}
 	top := len(out)
-	table := []string{sDimS.Render(fit("2 "+count+"  "+p.Size, tw))}
+	table := []string{areaHead("2", count, "  "+p.Size, !l.detail && !l.full && !l.bar.typing && !l.bar.open, tw)}
 	rows := max(n-top-1, 1)
-	l.rowY = 2 + top + 1 // screen row of the first table row (0-based)
+	l.rowY = bodyTop + top + 1 // screen row of the first table row (0-based)
 	if len(l.flat) == 0 {
 		table = append(table, sSecond.Render(fit(T("no mod matches"), tw)))
 	}
@@ -779,15 +843,11 @@ func (m *model) libRowLine(i, w, right int) string {
 func (m *model) libDetailLines(w, n int) []string {
 	l := &m.libr
 	i, name := m.cursorCopy()
-	st := sDimS
-	if l.detail || l.full {
-		st = sAccent
-	}
 	if i == nil {
-		return []string{st.Render(fit("3 "+T("details"), w))}
+		return []string{areaHead("3", T("details"), "", l.detail || l.full, w)}
 	}
 	var body []string
-	body = append(body, sBold.Render(fit(name, w)), sSecond.Render(fit(i.Label, w)), "")
+	body = append(body, "  "+sBold.Render(fit(name, w-2)), "  "+sSecond.Render(fit(i.Label, w-2)), "")
 	note, ns := i.Note, sText
 	if note == "" {
 		note, ns = i.Auto, sDimS
@@ -799,16 +859,14 @@ func (m *model) libDetailLines(w, n int) []string {
 		body = append(body, "  "+ns.Render(ln))
 	}
 	body = append(body, "")
-	var acts []string
+	var acts [][2]string
 	for _, o := range view.OpTable() {
 		if slices.Contains(i.Ops, o.Code) && o.Key != "" {
-			acts = append(acts, o.Key+" "+o.Label)
+			acts = append(acts, [2]string{o.Key, o.Label})
 		}
 	}
-	acts = append(acts, "F10 "+T("menu"))
-	for _, ln := range wrap(strings.Join(acts, "  "), w-2) {
-		body = append(body, "  "+sSecond.Render(ln))
-	}
+	acts = append(acts, [2]string{"F10", T("menu")})
+	body = append(body, keyLines(acts, w-2)...)
 	if len(i.States) > 0 {
 		body = append(body, "")
 		for _, s := range i.States {
@@ -825,11 +883,11 @@ func (m *model) libDetailLines(w, n int) []string {
 	}
 	off := max(0, min(l.detailOff, len(body)-(n-1)))
 	l.detailOff = off
-	title := "3 " + T("details")
+	head := T("details")
 	if off > 0 {
-		title = "▲ " + name
+		head = "▲ " + name
 	}
-	out := []string{st.Render(fit(title, w))}
+	out := []string{areaHead("3", head, "", l.detail || l.full, w)}
 	for k := off; k < len(body) && len(out) < n; k++ {
 		out = append(out, body[k])
 	}

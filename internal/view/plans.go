@@ -131,19 +131,19 @@ func InGame(a *app.App) *InGameState {
 }
 
 // PlanProblems is the number of "Will cause errors" items of a plan that is not the current
-// one, and whether its analysis is known. It reads stored results only (PlanCheckOf,
-// 05 §3): a plan whose enabled set has no stored run is "not checked yet". A variable so
-// tests can replace it.
-var PlanProblems = func(a *app.App, planID int64) (count int, checked bool) {
+// one, whether its analysis is known, and whether that analysis is older than the list. It
+// reads stored results only (PlanCheckOf, 05 §3): a plan whose enabled set has no stored
+// run is "not checked yet". A variable so tests can replace it.
+var PlanProblems = func(a *app.App, planID int64) (count int, checked, stale bool) {
 	p, err := a.Store.PlanByID(planID)
 	if err != nil || p == nil {
-		return 0, false
+		return 0, false, false
 	}
 	c, err := PlanCheckOf(a, p)
 	if err != nil || c.Pending {
-		return 0, false
+		return 0, false, false
 	}
-	return c.Count, true
+	return c.Count, true, c.Stale
 }
 
 // ---- managing (07 §1.3) ----

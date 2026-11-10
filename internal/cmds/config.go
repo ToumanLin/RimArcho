@@ -24,6 +24,8 @@ var configKeys = map[string][]string{
 	"ui.theme":         {"auto", "light", "dark"},
 	"ui.icons":         {"compat", "nerd"}, // nerd: the player's terminal already uses a Nerd Font
 	"ui.mouse":         {"on", "off"},
+	// 16 §9.2: the TUI's palette; auto asks the terminal for its background
+	"ui.tui.theme": {"auto", "dark", "light"},
 	// 16 §4.3: whether descriptions and their images may be fetched from the Steam Workshop
 	"workshop.fetch":  {"on", "off"},
 	"workshop.images": {"on", "off"},
@@ -33,6 +35,28 @@ var configKeys = map[string][]string{
 	// software drawing); read when the window opens
 	"ui.gpu":          {"on", "off"},
 	"ui.archo.motion": {"live", "still", "off"},
+	// 16 §2.14, §7.1: reduced stills the window as Windows' animation setting does
+	"ui.motion": {"auto", "reduced"},
+}
+
+// customValues are settings that take a free form besides their named choices, normalized
+// before storing: "" means the value is not of that form.
+var customValues = map[string]func(string) string{
+	// 16 §2.14, §7.4: a custom accent, one #rrggbb colour the GUI derives its scales from
+	"ui.accent": HexColour,
+}
+
+// HexColour returns v as a lower-case #rrggbb colour, or "" when v is not one.
+func HexColour(v string) string {
+	if len(v) != 7 || v[0] != '#' {
+		return ""
+	}
+	for _, c := range v[1:] {
+		if !('0' <= c && c <= '9' || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F') {
+			return ""
+		}
+	}
+	return strings.ToLower(v)
 }
 
 // freeKeys are settings with free values: their default and a check (16 §3.8, §2.14).
@@ -55,8 +79,9 @@ var freeKeys = map[string]struct {
 		}
 		return nil
 	}},
-	// the tags offered first by the tag bar, comma separated; the preset is the default
-	"tags.pinned": {DefaultPinnedTags, func(string) error { return nil }},
+	// the tags offered first by the tag bar, comma separated; the default is the preset of
+	// the display language (DefaultPinnedTags)
+	"tags.pinned": {"", func(string) error { return nil }},
 	// the lock library (07 §5): "" is %LOCALAPPDATA%\RimArcho\locked
 	"lock.dir": {"", func(v string) error {
 		if !filepath.IsAbs(v) {
@@ -90,8 +115,11 @@ var freeKeys = map[string]struct {
 	}},
 }
 
-// DefaultPinnedTags is the preset of common tags (16 §3.8).
-var DefaultPinnedTags = l10ndata.DefaultPinnedTags
+// DefaultPinnedTags is the preset of common tags in the display language (ui.lang, as the
+// window and the TUI resolve it), so every surface offers the same tags (16 §3.8).
+func DefaultPinnedTags(a *app.App) string {
+	return l10ndata.DefaultPinnedTags(l10ndata.ResolveLang(Setting(a, "ui.lang")))
+}
 
 // Setting returns a setting of the app, or its default.
 func Setting(a *app.App, key string) string {
@@ -100,10 +128,16 @@ func Setting(a *app.App, key string) string {
 		if slices.Contains(vs, v) {
 			return v
 		}
+		if custom := customValues[key]; custom != nil && custom(v) != "" {
+			return custom(v)
+		}
 		return vs[0]
 	}
 	if v != "" {
 		return v
+	}
+	if key == "tags.pinned" {
+		return DefaultPinnedTags(a)
 	}
 	if f, ok := freeKeys[key]; ok {
 		return f.def
@@ -111,7 +145,8 @@ func Setting(a *app.App, key string) string {
 	return ""
 }
 
-// SettingChoices returns the allowed values in display order, with the default first.
+// SettingChoices returns the named values in display order, with the default first; a
+// setting in customValues also takes its free form.
 func SettingChoices(key string) []string { return slices.Clone(configKeys[key]) }
 
 // SettingKeys are every setting `config get` lists, sorted.
@@ -129,7 +164,7 @@ func SettingKeys() []string {
 
 func init() {
 	register(&Command{Name: "config get", Args: "[<key>]", Summary: "show settings", MaxArgs: 1, Run: configGetCmd})
-	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (local.dir: unused managed-folder root; updates.source: auto|github; updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris; ui.icons: compat|nerd; ui.mouse: on|off; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; ui.archo.motion: off|still|live; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; network.proxy: system|off|a proxy URL; network.github_mirror: empty or a mirror prefix such as https://gh-proxy.org/)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
+	register(&Command{Name: "config set", Args: "<key> <value>", Summary: "change a setting (local.dir: unused managed-folder root; updates.source: auto|github; updates.auto: on|off; updates.interval: normal|frequent|relaxed; ui.lang: auto or a bundled locale; ui.theme: auto|light|dark; ui.accent: default|indigo|blue|cyan|teal|green|grass|orange|amber|red|crimson|pink|plum|purple|violet|iris or a #rrggbb colour; ui.icons: compat|nerd; ui.mouse: on|off; ui.tui.theme: auto|dark|light; workshop.fetch, workshop.images: on|off; ui.gpu: on|off; ui.archo.motion: off|still|live; ui.motion: auto|reduced; tags.pinned: comma-separated tags; monitor.default: on|off; monitor.dir: a folder; steamcmd.account: optional account name, empty or anonymous for anonymous login; steamcmd.path: a steamcmd program; network.proxy: system|off|a proxy URL; network.github_mirror: empty or a mirror prefix such as https://gh-proxy.org/)", MinArgs: 2, MaxArgs: 2, Run: configSetCmd})
 }
 
 // ConfigValue returns a setting, or its default.
@@ -161,7 +196,12 @@ func configSetCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		if !ok {
 			return nil, &UsageError{Msg: fmt.Sprintf("unknown setting %q", k)}
 		}
-		if !slices.Contains(allowed, v) {
+		if custom := customValues[k]; !slices.Contains(allowed, v) && custom != nil && custom(v) != "" {
+			v = custom(v)
+		} else if !slices.Contains(allowed, v) {
+			if custom != nil {
+				return nil, &UsageError{Msg: fmt.Sprintf("%s must be one of %v, or a colour such as #3a7bd5", k, allowed)}
+			}
 			return nil, &UsageError{Msg: fmt.Sprintf("%s must be one of %v", k, allowed)}
 		}
 	}

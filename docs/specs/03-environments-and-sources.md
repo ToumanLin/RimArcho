@@ -97,7 +97,7 @@ Environment commands (full syntax in 13 §4):
 ### 3.2 Automatic detection
 
 Try in order, stopping at the first match in each step:
-1. **Game directory**: first find the Steam roots (Windows: the registry, then `C:\Program Files (x86)\Steam`, `C:\Program Files\Steam`; macOS: `~/Library/Application Support/Steam`; Linux: `~/.steam/steam`, `~/.local/share/Steam`, Flatpak `~/.var/app/com.valvesoftware.Steam/.local/share/Steam`). Read each root's `steamapps/libraryfolders.vdf` (or `config/libraryfolders.vdf`; old formats such as `"1" "D:\\SteamLibrary"` are supported) and search each library for `steamapps/common/RimWorld`. A match uses steam launch.
+1. **Game directory**: first find the Steam roots (Windows: the registry, then `C:\Program Files (x86)\Steam`, `C:\Program Files\Steam`; macOS: `~/Library/Application Support/Steam`; Linux: `~/.steam/steam`, `~/.steam/root`, `~/.local/share/Steam`, Flatpak `~/.var/app/com.valvesoftware.Steam/.local/share/Steam` and `~/.var/app/com.valvesoftware.Steam/data/Steam`, Snap `~/snap/steam/common/.local/share/Steam`). Off Windows, resolve symlinks and discard duplicate roots and libraries. Read each root's `steamapps/libraryfolders.vdf` (or `config/libraryfolders.vdf`; old formats such as `"1" "D:\\SteamLibrary"` are supported) and search each library for `steamapps/common/RimWorld`. A match uses steam launch. A RimWorld executable or `Data/Core` identifies the game (`env.LooksLikeGameRoot`); no `appmanifest_294100.acf` is required, including for unmanaged Proton copies in an extra library.
    If none is found, try common manual installation locations, with direct launch:
    - Windows: `C:\Games\RimWorld`, `D:\Games\RimWorld`, `C:\GOG Games\RimWorld`, `D:\GOG Games\RimWorld`, `C:\Program Files\RimWorld`, `C:\Program Files (x86)\RimWorld`
    - macOS: `/Applications/RimWorld.app`, `/Applications/RimWorld`
@@ -105,10 +105,15 @@ Try in order, stopping at the first match in each step:
 2. **User data directory**:
    - Windows: `%USERPROFILE%\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios`
    - macOS: `~/Library/Application Support/RimWorld`
-   - Linux: `~/.config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios`, plus Flatpak `~/.var/app/com.valvesoftware.Steam/.config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios`
+   - Linux native (`RimWorldLinux`): `~/.config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios`. For a game in a Flatpak Steam root or one of its listed libraries, use `~/.var/app/com.valvesoftware.Steam/.config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios` instead.
+   - Linux Proton: a game with `RimWorldWin64.exe`, no `RimWorldLinux`, and `steamapps/compatdata/294100/pfx` in the same Steam library uses `<library>/steamapps/compatdata/294100/pfx/drive_c/users/steamuser/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios`. This also applies to Flatpak Steam. The native executable takes precedence when both are present. The kind is derived from the layout, without a database field; changing Steam's compatibility setting does not require a schema upgrade. Launch restrictions: 09 §2.
 3. **Workshop directory**: `steamapps/workshop/content/294100` in the game's Steam library, inferred from a game path shaped like `…/steamapps/common/RimWorld`. If settings have no Workshop directory yet, search the libraries in `libraryfolders.vdf` for `workshop/content/294100`, preferring the game's library, and offer a "use it" button.
 
-Detection results are only suggestions: `env detect` prints the suggestions and the locations tried; only `env add --detected` writes. In the GUI first-run guide, the player may select several detected environments and add them together (16 §2.15).
+Detection results are only suggestions: `env detect` prints the first match, then every additional game from `env.DetectAll` with its own user data and library paths and an explicit `env add --game` hint. With no game it prints the locations tried. Detection writes nothing; `env add --detected` adds the first match, and `env add --game` chooses another. In the GUI first-run guide, the player may select several detected environments and add them together (16 §2.15).
+
+`env.Detect` and `env.DetectAll` select an existing user data directory for each game separately; `env.DefaultUserDataForGame` also returns its default before it exists, for `env add` and `--saves shared`. Detection options accept a synthetic home and Steam roots for tests. Without a game, the Linux user data search tries the native location, then Flatpak.
+
+`env.SteamSignedIn` reads the active user and live process ID from the Windows registry on Windows or `~/.steam/registry.vdf` off Windows. It resolves the account name through the Steam root's `config/loginusers.vdf`, falling back to `AutoLoginUser`; a missing or invalid active user or a dead process means signed out.
 
 ### 3.3 Player.log location
 
@@ -171,6 +176,8 @@ Every source has its own `source_id`. Instances record only `source_id + relativ
 
 If the player changes the game path and deletes Mods at the same time: rebind first, then turn the unmatched items into identity questions (04 §2.4).
 
+**Writing a move**: the environment row and its official and local sources change in one transaction (`Store.MoveRecords`), so an error leaves the environment on its old game with its sources there; shared folders named in the same `env set` are separate changes after it. Setting or moving a managed directory (16 §2.14) writes the environment row, every source inside the directory and the folder settings in one transaction too. `MoveDirectory` moves the files first; if the records cannot be written, the directory is renamed back (across drives RimArcho's copy is deleted), so the incoming links are reattached to it (09 §3). Across drives the original goes to the recycle bin only after the records point to the copy. Removing a folder (`folder remove`) clears a pending re-binding with it; adding the folder back revives it as `ok` (or `missing`) without one.
+
 ### 4.3 Links and aliases
 
 The lifecycle of links RimArcho creates is separate from scan aliases: `managed_link` persistently records the physical `Mods` path, the name and type, the Instance or pack identity, the original target, the new location and target, the move's source and destination, the managed directory's identity, the operation ID and the phase. Inspection prefers the ledger's ownership evidence; ordinary aliases still create no Instance. All known games share one enumeration of inbound links; see 09 §3.
@@ -185,6 +192,7 @@ The lifecycle of links RimArcho creates is separate from scan aliases: `managed_
 - A link outside all sources has only one location; its real path is recorded (`links-to` in mod output), not as an alias. RimCrow's `Mods/_Link_<Workshop-ID>` works this way and is recognized as a normal local Mod; RimArcho does not manage or delete these links.
 - **`_Archo_` links**: `Mods/_Archo_<source-label>_<directory-name>`, created when deploying Mods from steamcmd or extra sources (09 §3). They resolve to the real source directories and are only aliases of those Instances: no new Instance or event.
 - **Pack links**: scans skip links whose names start with `!ArchoPack_` (case-insensitive). They exist only while a pack is played (10 §3), outside the environment. Pack copies carry `.rimarcho/origin.json` but are not scanned.
+- **Work folders**: scans skip any folder whose name contains `.archo-` (case-insensitive): `.archo-*` and the `<name>.archo-tmp` / `.archo-old` folders a copy or replace leaves when cut short (`source.List`).
 - Links **inside** Mod directories are not followed (02 §1). For a Mod whose root is a link, the target is fingerprinted.
 
 ## 5. Acceptance
@@ -198,3 +206,4 @@ The lifecycle of links RimArcho creates is separate from scan aliases: `managed_
 | A29 | RimArcho's data directory inside a game or source root | `env add`, `env set` and scan refuse with an explanation | — | Pending validation |
 | A30 | Save modes | `--saves own` creates `<data-directory>/userdata/<environment-name>` and launches with `-savedatafolder`; `--saves shared` restores the default; `--saves` together with `--user-data` is refused | `TestEnvModelSaves` | Pass |
 | A31 | Add and remove Mod folders | Adding an existing directory changes nothing; containment and a game's `Mods` are refused; only shared folders can be removed, and their Instances disappear on the next scan; a second Workshop directory means rebinding, with Instances unchanged | `TestFolderCommands` | Pass |
+| A32 | Linux Steam roots, external libraries, native / Proton / Flatpak games together, manual games and symlink aliases | Each game has its own default data and Player.log path; aliases produce one suggestion | `TestLinuxDetection` | Synthetic; Linux VM pending |
