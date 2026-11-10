@@ -172,8 +172,11 @@ func (m *model) homeLines(n int) []string {
 	add("  " + label("list") + sText.Render(r.Facts) + "  " + state)
 	if d := h.data; d.LastRun != "" {
 		errs := T("no errors")
-		if d.LastRunErrors > 0 {
+		switch {
+		case d.LastRunErrors > 0:
 			errs = Tf("%d errors", d.LastRunErrors)
+		case d.LastRunPending:
+			errs = T("not checked yet")
 		}
 		add("  " + label("last game") + sText.Render(d.LastRun) + "  " + sText.Render(errs))
 	}

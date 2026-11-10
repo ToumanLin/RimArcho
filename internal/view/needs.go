@@ -191,6 +191,8 @@ type Needs struct {
 	// "pack X · …" (10 §3: a pack's errors are not the list's).
 	LastRun    string `json:"lastRun,omitempty"`
 	LastRunDay string `json:"lastRunDay,omitempty"` // its day: "Oct 21"
+	// LastRunPending: that log is not analysed yet, so its errors are not counted.
+	LastRunPending bool `json:"lastRunPending,omitempty"`
 	// Elsewhere: what is not on Can it run but handled on another page (SectionElsewhere),
 	// one line each at the bottom of the page (16 §2.4).
 	Elsewhere []Elsewhere `json:"elsewhere,omitempty"`
@@ -337,6 +339,7 @@ func BuildNeeds(a *app.App, st *app.LoadoutState, ps *app.ProblemSet) *Needs {
 		}
 		when := ShortDate(r.ModTime) + " " + r.ModTime.In(a.Loc).Format("15:04")
 		n.LastRunDay = ShortDate(r.ModTime)
+		n.LastRunPending = r.Pending
 		if pack := a.RunOfLog(st.Ix.Env.ID, r.ModTime); pack != "" {
 			n.LastRun = Tf("pack %s", pack) + "  " + when
 		} else {

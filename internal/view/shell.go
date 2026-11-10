@@ -307,6 +307,8 @@ type Home struct {
 	LastRun       string `json:"lastRun,omitempty"`
 	LastRunDay    string `json:"lastRunDay,omitempty"`
 	LastRunErrors int    `json:"lastRunErrors"`
+	// LastRunPending: the last run's log is not analysed yet (no count to show).
+	LastRunPending bool `json:"lastRunPending,omitempty"`
 	// Changes is the current plan's changes since it was last played (16 §2.3): one
 	// sentence that opens Updates with that scope and time.
 	Changes *modchanges.Home `json:"changes,omitempty"`
@@ -387,7 +389,7 @@ func buildHome(a *app.App, st *app.LoadoutState, n *Needs, plans []PlanRow, pack
 		h.Rows = append(h.Rows, packHomeRow(p, chip, name, version))
 	}
 	SortHome(h.Rows)
-	h.LastRun, h.LastRunDay, h.LastRunErrors = n.LastRun, n.LastRunDay, LastRunErrors(n)
+	h.LastRun, h.LastRunDay, h.LastRunErrors, h.LastRunPending = n.LastRun, n.LastRunDay, LastRunErrors(n), n.LastRunPending
 	h.Launch = n.Launch
 	if !launchOnly {
 		h.Changes = ChangeHome(a, st)

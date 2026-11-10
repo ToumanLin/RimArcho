@@ -5,6 +5,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 ## 1.0.9 (unreleased)
 
 - **Linux (experimental):** releases now include `archo-<version>-linux-amd64.tar.gz` with the terminal UI, CLI and MCP (no window). It is tested only with synthetic data so far, not with a real game on Linux; expect bugs and back up saves and Mod lists. The Linux entries below are part of it.
+- Home page: right after an update, the last game's line said "no errors" while its log was still waiting to be analysed again; it now says "not checked yet" until the analysis has run (window and TUI).
 - Linux: SteamCMD runs with a home folder of its own (next to the program, or under the cache folder), so it can no longer change the desktop Steam client's settings or library list.
 - Save recycling and backups report only files successfully moved or copied; total failures no longer print a success headline. Save renaming refuses another file's name regardless of case on every platform, while allowing the same save's case-only rename.
 - Linux: relative `XDG_DATA_HOME` values are ignored for the data directory; an unset or relative `HOME` without an absolute XDG value now gives a clear startup error.
