@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ToumanLin/RimArcho/internal/deps"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
 )
