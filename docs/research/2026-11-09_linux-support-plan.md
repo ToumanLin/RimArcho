@@ -42,7 +42,7 @@ Goal: a static `archo` for `linux/amd64` (`CGO_ENABLED=0`) that is as safe on Li
    - `LocalDir` uses the XDG data directory, not `~/.cache` (it holds the lock library).
    - `source.Trash` (`trash_other.go`) works across volumes: freedesktop trash in `$XDG_DATA_HOME/Trash`, or `<mount>/.Trash-<uid>` for another volume.
    - The base task's additional log-path gap is fixed: native absolute Linux paths participate in attribution and stable finding keys (06 §2–§3); the Harmony-log golden runs unchanged on both systems.
-   - Verification and remaining limitations, including the default managed/data-root overlap: [safety validation](2026-11-09_linux-safety-validation.md).
+   - Verification and remaining limitations, [safety validation](2026-11-09_linux-safety-validation.md).
 5. **Detection** (03 §3):
    - Steam roots: `~/.steam/steam`, `~/.local/share/Steam`, Flatpak `~/.var/app/com.valvesoftware.Steam/.local/share/Steam`, Snap `~/snap/steam/common/.local/share/Steam`; then `libraryfolders.vdf` as on Windows.
    - A game folder with `RimWorldWin64.exe` beside `steamapps/compatdata/294100` is a **Proton game**: user data in `compatdata/294100/pfx/drive_c/users/steamuser/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios`, Player.log in the same folder. It launches only through Steam (09 §2); own-saves mode is phase 2 (`-savedatafolder` needs a `Z:` path).

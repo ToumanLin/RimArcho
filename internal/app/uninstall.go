@@ -180,7 +180,9 @@ func (a *App) LocalDir() string {
 			home, _ := os.UserHomeDir()
 			base = filepath.Join(home, ".local", "share")
 		}
-		return filepath.Join(base, "rimarcho")
+		// A sibling of the data directory (17 §3), as %LOCALAPPDATA% is on Windows:
+		// managed Mod folders must not lie inside the data directory.
+		return filepath.Join(base, "rimarcho-local")
 	}
 	if base == "" {
 		base = os.Getenv("LOCALAPPDATA")

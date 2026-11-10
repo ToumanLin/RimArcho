@@ -15,9 +15,9 @@ func TestLocalDirXDG(t *testing.T) {
 	a := &App{}
 	for _, root := range []string{data, "", "relative-not-valid"} {
 		t.Setenv("XDG_DATA_HOME", root)
-		want := filepath.Join(home, ".local", "share", "rimarcho")
+		want := filepath.Join(home, ".local", "share", "rimarcho-local")
 		if root == data {
-			want = filepath.Join(data, "rimarcho")
+			want = filepath.Join(data, "rimarcho-local")
 		}
 		if got := a.LocalDir(); got != want {
 			t.Fatalf("LocalDir with XDG_DATA_HOME=%q: %s, want %s", root, got, want)
