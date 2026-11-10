@@ -3,6 +3,7 @@ package env
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 
 	"github.com/ToumanLin/RimArcho/internal/vdf"
@@ -19,7 +20,15 @@ func SteamSignedIn() (account string, ok bool) {
 	if id == 0 {
 		return "", false
 	}
-	if root := registrySteamPath(); root != "" {
+	roots := []string{registrySteamPath()}
+	if runtime.GOOS != "windows" {
+		home, _ := os.UserHomeDir()
+		roots = defaultSteamRoots(DetectOptions{GOOS: runtime.GOOS, Home: home})
+	}
+	for _, root := range roots {
+		if root == "" {
+			continue
+		}
 		if b, err := os.ReadFile(filepath.Join(root, "config", "loginusers.vdf")); err == nil {
 			if name := LoginUserName(b, id); name != "" {
 				return name, true

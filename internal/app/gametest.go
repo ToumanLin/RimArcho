@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -180,6 +181,9 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (_ *TestRunReport, 
 		return nil, fmt.Errorf("test run: no current plan (archo plan list)")
 	}
 	e := st.Ix.Env
+	if (a.Detect.GOOS == "linux" || a.Detect.GOOS == "" && runtime.GOOS == "linux") && env.IsProtonGame(e.GameRoot) {
+		return nil, fmt.Errorf("test run: Proton games do not support isolated saves yet; use a native Linux game for test runs")
+	}
 	var save *TestRunSave
 	if o.Save != "" {
 		if save, err = a.testRunSave(st, o.Save); err != nil {
@@ -199,7 +203,7 @@ func (a *App) TestRun(ctx context.Context, o TestRunOptions) (_ *TestRunReport, 
 	base := filepath.Join(a.Home, "tests", e.ID)
 	data := filepath.Join(base, "userdata")
 	runs := filepath.Join(base, "runs")
-	protected := []string{e.GameRoot, e.UserDataRoot, env.DefaultUserDataRoot()}
+	protected := []string{e.GameRoot, e.UserDataRoot, a.DefaultUserData(e.GameRoot)}
 	for _, path := range []string{base, data, filepath.Join(data, "Config"), runs} {
 		if err := testRunPath(a.Home, path, protected); err != nil {
 			return nil, err

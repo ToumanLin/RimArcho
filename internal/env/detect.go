@@ -2,6 +2,7 @@ package env
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -71,7 +72,7 @@ func Detect(o DetectOptions) Detected {
 	if d.GameRoot != "" {
 		d.GameVersion = ReadGameVersion(d.GameRoot)
 	}
-	for _, u := range userDataCandidates(o.GOOS, o.Home) {
+	for _, u := range gameUserDataCandidates(o, d.GameRoot) {
 		d.Tried = append(d.Tried, u)
 		if isDir(u) {
 			d.UserDataRoot = u
@@ -85,7 +86,6 @@ func Detect(o DetectOptions) Detected {
 // Steam libraries and the usual folders, in the same order (the first-run guide lets the
 // player pick several, 16 §2.15). Each carries the shared user data folder.
 func DetectAll(o DetectOptions) []Detected {
-	first := Detect(o) // fills in the defaults' user data folder
 	if o.GOOS == "" {
 		o.GOOS = runtime.GOOS
 	}
@@ -107,7 +107,12 @@ func DetectAll(o DetectOptions) []Detected {
 		}
 		seen[k] = true
 		d.GameVersion = ReadGameVersion(d.GameRoot)
-		d.UserDataRoot = first.UserDataRoot
+		for _, u := range gameUserDataCandidates(o, d.GameRoot) {
+			if isDir(u) {
+				d.UserDataRoot = u
+				break
+			}
+		}
 		out = append(out, d)
 	}
 	for _, lib := range SteamLibraries(o.SteamRoots) {
@@ -137,6 +142,11 @@ func SteamLibraries(steamRoots []string) []string {
 	add := func(p string) {
 		if p == "" {
 			return
+		}
+		if runtime.GOOS != "windows" {
+			if real, err := filepath.EvalSymlinks(p); err == nil {
+				p = real
+			}
 		}
 		k := PathKey(p)
 		if !seen[k] {
@@ -182,7 +192,7 @@ func SteamLibraries(steamRoots []string) []string {
 
 func defaultSteamRoots(o DetectOptions) []string {
 	var roots []string
-	if !o.SkipRegistry {
+	if o.GOOS == "windows" && !o.SkipRegistry {
 		if r := registrySteamPath(); r != "" {
 			roots = append(roots, filepath.FromSlash(r))
 		}
@@ -193,8 +203,11 @@ func defaultSteamRoots(o DetectOptions) []string {
 	case "darwin":
 		roots = append(roots, filepath.Join(o.Home, "Library", "Application Support", "Steam"))
 	default:
-		roots = append(roots, filepath.Join(o.Home, ".steam", "steam"), filepath.Join(o.Home, ".local", "share", "Steam"),
-			filepath.Join(o.Home, ".var", "app", "com.valvesoftware.Steam", ".local", "share", "Steam"))
+		roots = append(roots, filepath.Join(o.Home, ".steam", "steam"), filepath.Join(o.Home, ".steam", "root"),
+			filepath.Join(o.Home, ".local", "share", "Steam"),
+			filepath.Join(o.Home, ".var", "app", "com.valvesoftware.Steam", ".local", "share", "Steam"),
+			filepath.Join(o.Home, ".var", "app", "com.valvesoftware.Steam", "data", "Steam"),
+			filepath.Join(o.Home, "snap", "steam", "common", ".local", "share", "Steam"))
 	}
 	return roots
 }
@@ -253,7 +266,14 @@ func DefaultUserDataRoot() string {
 }
 
 // SteamExe locates the Steam client executable ("" if not found).
+// Use SteamCommand when launching: Flatpak also needs an argument prefix.
 func SteamExe(o DetectOptions) string {
+	exe, _ := SteamCommand(o)
+	return exe
+}
+
+// SteamCommand locates Steam and any arguments needed before -applaunch (09 §2).
+func SteamCommand(o DetectOptions) (string, []string) {
 	if o.GOOS == "" {
 		o.GOOS = runtime.GOOS
 	}
@@ -264,15 +284,36 @@ func SteamExe(o DetectOptions) string {
 	if roots == nil {
 		roots = defaultSteamRoots(o)
 	}
+	if o.GOOS == "linux" {
+		if p, err := exec.LookPath("steam"); err == nil {
+			return p, nil
+		}
+	}
 	for _, r := range roots {
-		for _, name := range []string{"steam.exe", "steam.sh", "steam"} {
+		if o.GOOS == "linux" && flatpakSteamRoot(o.Home, r) {
+			continue // Scripts inside the Flatpak install need its sandbox.
+		}
+		names := []string{"steam.exe", "steam.sh", "steam"}
+		if o.GOOS == "linux" {
+			names = []string{"steam.sh", "steam"}
+		}
+		for _, name := range names {
 			p := filepath.Join(r, name)
 			if st, err := os.Stat(p); err == nil && !st.IsDir() {
-				return p
+				return p, nil
 			}
 		}
 	}
-	return ""
+	if o.GOOS == "linux" {
+		for _, root := range roots {
+			if isDir(root) && flatpakSteamRoot(o.Home, root) {
+				if p, err := exec.LookPath("flatpak"); err == nil {
+					return p, []string{"run", "com.valvesoftware.Steam"}
+				}
+			}
+		}
+	}
+	return "", nil
 }
 
 // DefaultUserDataFor is the game's default user data folder under the detection options

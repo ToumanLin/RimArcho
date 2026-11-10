@@ -107,10 +107,10 @@ func ReadGameVersion(gameRoot string) string {
 }
 
 // ManagedDir is the folder holding the game's own managed assemblies: the first of
-// <game_root>/RimWorldWin64_Data/Managed and the game folder itself (1.7) that contains
+// <game_root>/RimWorldWin64_Data/Managed, RimWorldLinux_Data/Managed and the game folder itself (1.7) that contains
 // Assembly-CSharp.dll, or "" when neither does (05 §5.3, §5.4).
 func ManagedDir(gameRoot string) string {
-	for _, d := range []string{filepath.Join(gameRoot, "RimWorldWin64_Data", "Managed"), gameRoot} {
+	for _, d := range []string{filepath.Join(gameRoot, "RimWorldWin64_Data", "Managed"), filepath.Join(gameRoot, "RimWorldLinux_Data", "Managed"), gameRoot} {
 		if _, err := os.Stat(filepath.Join(d, "Assembly-CSharp.dll")); err == nil {
 			return d
 		}

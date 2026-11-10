@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
@@ -129,21 +130,51 @@ func (a *App) startGame(p *LaunchPlan) error {
 // Steam or the executable, -savedatafolder when it is not the default, the launch arguments.
 func (a *App) gamePlan(e *env.Environment, userData string) (*LaunchPlan, error) {
 	p := &LaunchPlan{Method: e.Launch, Dir: e.GameRoot}
+	goos := a.Detect.GOOS
+	if goos == "" {
+		goos = runtime.GOOS
+	}
+	proton := goos == "linux" && env.IsProtonGame(e.GameRoot)
+	defaultUserData := env.DefaultUserDataRoot()
+	if goos == "linux" {
+		defaultUserData = a.DefaultUserData(e.GameRoot)
+	}
+	if proton && e.Launch != "steam" {
+		return nil, fmt.Errorf("%w: Proton games must launch through Steam; use archo env set --launch steam", ErrLaunchBlocked)
+	}
 	var extra []string
-	if userData != "" && env.PathKey(userData) != env.PathKey(env.DefaultUserDataRoot()) {
+	if userData != "" && env.PathKey(userData) != env.PathKey(defaultUserData) {
+		if proton {
+			return nil, fmt.Errorf("%w: Proton games do not support own or custom saves yet; use archo env set --saves shared", ErrLaunchBlocked)
+		}
 		extra = append(extra, "-savedatafolder="+userData)
 	}
 	extra = append(extra, strings.Fields(a.LaunchArgs(e.ID))...) // 16 §2.14
+	if proton {
+		for _, arg := range extra {
+			if strings.HasPrefix(strings.ToLower(arg), "-savedatafolder") {
+				return nil, fmt.Errorf("%w: Proton games do not support -savedatafolder yet; remove it from the launch arguments", ErrLaunchBlocked)
+			}
+		}
+	}
 	switch e.Launch {
 	case "steam":
-		p.Exe = env.SteamExe(a.Detect)
+		p.Exe, p.Args = env.SteamCommand(a.Detect)
 		if p.Exe == "" {
+			if proton {
+				return nil, fmt.Errorf("%w: Steam is required for Proton games; install Steam or add it to PATH", ErrLaunchBlocked)
+			}
 			return nil, fmt.Errorf("%w: Steam not found; use archo env set --launch direct", ErrLaunchBlocked)
 		}
-		p.Args = append([]string{"-applaunch", env.WorkshopAppID}, extra...)
+		p.Args = append(p.Args, "-applaunch", env.WorkshopAppID)
+		p.Args = append(p.Args, extra...)
 	default:
 		p.Method = "direct"
-		for _, name := range []string{"RimWorldWin64.exe", "RimWorld.exe", "RimWorldLinux", "RimWorldMac.app"} {
+		names := []string{"RimWorldWin64.exe", "RimWorld.exe", "RimWorldLinux", "RimWorldMac.app"}
+		if goos == "linux" {
+			names = []string{"RimWorldLinux", "RimWorldWin64.exe", "RimWorld.exe", "RimWorldMac.app"}
+		}
+		for _, name := range names {
 			if _, err := os.Stat(filepath.Join(e.GameRoot, name)); err == nil {
 				p.Exe = filepath.Join(e.GameRoot, name)
 				break

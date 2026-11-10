@@ -44,13 +44,15 @@ The links are handled before ModsConfig.xml is written. If a link operation fail
 
 | Method | Run | Arguments |
 | --- | --- | --- |
-| `steam` | The Steam client (`steam.exe`, `steam.sh` or `steam`, found in the detected Steam directory) | `-applaunch 294100`, followed by the extra arguments |
-| `direct` | The first executable found in the game directory: `RimWorldWin64.exe`, `RimWorld.exe`, `RimWorldLinux`, `RimWorldMac.app` | The extra arguments |
+| `steam` | The Steam client (`env.SteamCommand`): on Windows, `steam.exe`, `steam.sh` or `steam` in the detected Steam directory; on Linux, `steam` on PATH, then a root's `steam.sh` or `steam`, then `flatpak run com.valvesoftware.Steam` when a Flatpak Steam root exists | `-applaunch 294100`, followed by the extra arguments |
+| `direct` | The first executable found in the game directory: `RimWorldWin64.exe`, `RimWorld.exe`, `RimWorldLinux`, `RimWorldMac.app`; Linux tries `RimWorldLinux` first | The extra arguments |
 
-- Both methods append `-savedatafolder=<path>` when the user data directory differs from the local default, using normalized paths for the comparison.
+- Both methods append `-savedatafolder=<path>` when the user data directory differs from the local default, using normalized paths for the comparison. On Linux the default is specific to the game (03 §3.2).
 - The player enters "extra arguments" in the "this game" group in settings (16 §2.14). They are stored as `env:<environmentID>:launch_args`, split on whitespace and appended last.
 - The working directory is the game directory. Arguments containing spaces or tabs are displayed in double quotes.
-- If Steam is missing, refuse and suggest `archo env set --launch direct`. If the game executable is missing, refuse and name the directory that was searched.
+- If Steam is missing, refuse and suggest `archo env set --launch direct` for a native game; for Proton, explain that Steam is required. If the game executable is missing, refuse and name the directory that was searched. Scripts inside a Flatpak Steam root are launched through Flatpak, not directly on the host.
+
+**Proton games on Linux** (03 §3.2) launch only through Steam. Direct launch is refused in one sentence. Own saves (`env add/set --saves own`) are refused; launch also refuses a custom data directory or a `-savedatafolder` extra argument. Proton save redirection is not implemented until Linux phase 2. These checks precede game-file writes, including pack launch; isolated test runs are refused before preparing their data (20 §2). A native game supports both launch methods and save redirection.
 
 **`--dry-run` shows** the `_Archo_` and `!ArchoPack_` links to create or remove (`+ name` / `- name`), the ModsConfig.xml path, whether `version` will be rewritten from X to Y, the numbers of entries to write and missing entries, and the full launch command. It does not write to disk or launch the game. `save --dry-run` shows the same preview without the launch command.
 
@@ -195,6 +197,7 @@ Test runs and probe runs launch a plan with isolated data and report its errors;
 | --- | --- | --- | --- |
 | J1 | `launch --dry-run` with Steam and nondefault user data | The command includes `steam.exe`, `-applaunch 294100` and `-savedatafolder=`; no launch (`TestLaunchPlans`) | Pass |
 | J2 | Launch after `--launch direct` | Run `RimWorldWin64.exe` and create one launch record | Pass |
+| J17 | Linux native and Proton launches; missing Steam; own/custom saves, extra savedatafolder, pack and test runs | Native selects its executable; Proton shared saves launch through Steam, and unsupported routes refuse before game-file writes (`TestLinuxLaunch`, `TestSteamCommand`, `TestProtonRefusesIsolatedRun`) | Synthetic; Linux VM pending |
 | J3 | Enable a SteamCMD Mod, run `save --dry-run`, then `save` | The preview lists the link without creating it; save creates `Mods/_Archo_…` (`TestLinkDeployment`) | Pass |
 | J4 | A real `_Archo_` directory exists in `Mods/` | Refuse with "not a link" and preserve the directory (`TestLinkDeploymentRefusesRealFolder`) | Pass |
 | J5 | A SteamCMD Mod has the same package ID as a `Mods/` Mod, or as an enabled Workshop copy | Refuse to enable the first (`pkg.duplicate-installed`); suggest `swap` for the second, after which the deployed copy writes the unsuffixed ID (`TestLinkDeploymentSamePackage`) | Pass |

@@ -566,7 +566,7 @@ func GameAt(a *app.App, path string, pending ...string) (*GameFound, error) {
 	}
 	envs, _ := a.Store.Envs()
 	taken := map[string]bool{}
-	g := &GameFound{Game: path, Version: env.ReadGameVersion(path), Launch: "direct", UserData: a.DefaultUserData()}
+	g := &GameFound{Game: path, Version: env.ReadGameVersion(path), Launch: "direct", UserData: a.DefaultUserData(path)}
 	for _, n := range pending {
 		taken[strings.TrimSpace(n)] = true
 	}

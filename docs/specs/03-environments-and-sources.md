@@ -97,7 +97,7 @@ Environment commands (full syntax in 13 §4):
 ### 3.2 Automatic detection
 
 Try in order, stopping at the first match in each step:
-1. **Game directory**: first find the Steam roots (Windows: the registry, then `C:\Program Files (x86)\Steam`, `C:\Program Files\Steam`; macOS: `~/Library/Application Support/Steam`; Linux: `~/.steam/steam`, `~/.local/share/Steam`, Flatpak `~/.var/app/com.valvesoftware.Steam/.local/share/Steam`). Read each root's `steamapps/libraryfolders.vdf` (or `config/libraryfolders.vdf`; old formats such as `"1" "D:\\SteamLibrary"` are supported) and search each library for `steamapps/common/RimWorld`. A match uses steam launch.
+1. **Game directory**: first find the Steam roots (Windows: the registry, then `C:\Program Files (x86)\Steam`, `C:\Program Files\Steam`; macOS: `~/Library/Application Support/Steam`; Linux: `~/.steam/steam`, `~/.steam/root`, `~/.local/share/Steam`, Flatpak `~/.var/app/com.valvesoftware.Steam/.local/share/Steam` and `~/.var/app/com.valvesoftware.Steam/data/Steam`, Snap `~/snap/steam/common/.local/share/Steam`). Off Windows, resolve symlinks and discard duplicate roots and libraries. Read each root's `steamapps/libraryfolders.vdf` (or `config/libraryfolders.vdf`; old formats such as `"1" "D:\\SteamLibrary"` are supported) and search each library for `steamapps/common/RimWorld`. A match uses steam launch.
    If none is found, try common manual installation locations, with direct launch:
    - Windows: `C:\Games\RimWorld`, `D:\Games\RimWorld`, `C:\GOG Games\RimWorld`, `D:\GOG Games\RimWorld`, `C:\Program Files\RimWorld`, `C:\Program Files (x86)\RimWorld`
    - macOS: `/Applications/RimWorld.app`, `/Applications/RimWorld`
@@ -105,10 +105,15 @@ Try in order, stopping at the first match in each step:
 2. **User data directory**:
    - Windows: `%USERPROFILE%\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios`
    - macOS: `~/Library/Application Support/RimWorld`
-   - Linux: `~/.config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios`, plus Flatpak `~/.var/app/com.valvesoftware.Steam/.config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios`
+   - Linux native (`RimWorldLinux`): `~/.config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios`. For a game in a Flatpak Steam root or one of its listed libraries, use `~/.var/app/com.valvesoftware.Steam/.config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios` instead.
+   - Linux Proton: a game with `RimWorldWin64.exe`, no `RimWorldLinux`, and `steamapps/compatdata/294100/pfx` in the same Steam library uses `<library>/steamapps/compatdata/294100/pfx/drive_c/users/steamuser/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios`. This also applies to Flatpak Steam. The native executable takes precedence when both are present. The kind is derived from the layout, without a database field; changing Steam's compatibility setting does not require a schema upgrade. Launch restrictions: 09 §2.
 3. **Workshop directory**: `steamapps/workshop/content/294100` in the game's Steam library, inferred from a game path shaped like `…/steamapps/common/RimWorld`. If settings have no Workshop directory yet, search the libraries in `libraryfolders.vdf` for `workshop/content/294100`, preferring the game's library, and offer a "use it" button.
 
 Detection results are only suggestions: `env detect` prints the suggestions and the locations tried; only `env add --detected` writes. In the GUI first-run guide, the player may select several detected environments and add them together (16 §2.15).
+
+`env.Detect` and `env.DetectAll` select an existing user data directory for each game separately; `env.DefaultUserDataForGame` also returns its default before it exists, for `env add` and `--saves shared`. Detection options accept a synthetic home and Steam roots for tests. Without a game, the Linux user data search tries the native location, then Flatpak.
+
+`env.SteamSignedIn` reads the active user and live process ID from the Windows registry on Windows or `~/.steam/registry.vdf` off Windows. It resolves the account name through the Steam root's `config/loginusers.vdf`, falling back to `AutoLoginUser`; a missing or invalid active user or a dead process means signed out.
 
 ### 3.3 Player.log location
 
@@ -201,3 +206,4 @@ The lifecycle of links RimArcho creates is separate from scan aliases: `managed_
 | A29 | RimArcho's data directory inside a game or source root | `env add`, `env set` and scan refuse with an explanation | — | Pending validation |
 | A30 | Save modes | `--saves own` creates `<data-directory>/userdata/<environment-name>` and launches with `-savedatafolder`; `--saves shared` restores the default; `--saves` together with `--user-data` is refused | `TestEnvModelSaves` | Pass |
 | A31 | Add and remove Mod folders | Adding an existing directory changes nothing; containment and a game's `Mods` are refused; only shared folders can be removed, and their Instances disappear on the next scan; a second Workshop directory means rebinding, with Instances unchanged | `TestFolderCommands` | Pass |
+| A32 | Linux Steam roots, external libraries, native / Proton / Flatpak games together, manual games and symlink aliases | Each game has its own default data and Player.log path; aliases produce one suggestion | `TestLinuxDetection` | Synthetic; Linux VM pending |
