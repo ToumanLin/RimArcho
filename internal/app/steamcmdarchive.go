@@ -49,7 +49,7 @@ func extractSteamCMDTar(b []byte, dir string) (string, error) {
 			if err := root.MkdirAll(name, 0o755); err != nil {
 				return "", err
 			}
-		case tar.TypeReg, tar.TypeRegA:
+		case tar.TypeReg:
 			total += h.Size
 			if h.Size < 0 || total > 200<<20 {
 				return "", errors.New("SteamCMD archive exceeds 200 MB")
