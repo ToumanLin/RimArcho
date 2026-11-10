@@ -9,5 +9,5 @@ const (
 	ToddsZipURL     = ""
 	ToddsZipSize    = 0
 	ToddsZipSHA256  = ""
-	ToddsMissing    = "Texture optimisation needs a Linux todds 0.4.1. Build it from https://github.com/todds-encoder/todds (tag 0.4.1), then put todds on PATH or set textures.todds to its absolute path."
+	ToddsMissing    = "Texture optimisation needs a Linux todds. The Linux build of todds 0.4.1 (https://github.com/todds-encoder/todds/releases/tag/0.4.1) runs on Ubuntu 24.04, Fedora 39, Arch and newer; on older systems, build it from source. Then put todds on PATH or set textures.todds to its full path."
 )
