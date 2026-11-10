@@ -89,7 +89,7 @@ Before a target is recycled, RimArcho's links into it are detached (09 §3). Rem
 
 | Category | Conditions | Callers |
 | --- | --- | --- |
-| Mod folder | An Instance's real directory inside, but not equal to, its source root: a hidden or unsubscribed Workshop or SteamCMD copy (Steam downloads subscribed ones again), or the player's own copy in `Mods/` or the lock library (refused when the copy itself is a link). Enabled Mods and Mods used by plans only warn | `trash` (09 §5), Mod library "delete" (16 §2.9), 1.2 unsubscribe |
+| Mod folder | An Instance's real directory inside, but not equal to, its source root: a hidden or unsubscribed Workshop or SteamCMD copy (Steam downloads subscribed ones again), or the player's own copy in `Mods/` or the lock library (refused when the copy itself is a link). Enabled Mods and Mods used by plans only warn | `trash` (09 §5), Mod library "delete" (16 §2.9), 1.2 unsubscribe, link repair of an exact copy under a link name in `Mods/` (09 §3) |
 | Pack directory | `<pack name>/` in the pack directory | `pack remove` (10 §4) |
 | Save file | A save in the environment's user data `Saves/` or a pack's `userdata/Saves/` (product rules in 12 §4) | Save management (`app.TrashSaves`, 12 §4.4) |
 | Player content during uninstall | Lock library copies (selected by default), packs, own save directories, `<data directory>/backups/saves/` and games downloaded with SteamCMD, only when the player chooses deletion. RimArcho's own folders (data, Monitor and the downloaded SteamCMD) are deleted directly rather than recycled | Uninstall (§2) |

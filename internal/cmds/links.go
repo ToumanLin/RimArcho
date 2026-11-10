@@ -11,7 +11,7 @@ import (
 func init() {
 	common := []Flag{{Name: "all", Help: "inspect every known game"}, {Name: "json", Help: "print structured JSON"}}
 	register(&Command{Name: "links check", Summary: "check RimArcho links without changing files", MaxArgs: 0, Flags: common, Run: linksCheck})
-	flags := append(append([]Flag{}, common...), Flag{Name: "dry-run", Help: "preview without changing files"}, Flag{Name: "yes", Help: "confirm the listed link removals and ledger recovery"}, Flag{Name: "include", Value: "<link-path>", Multi: true, Help: "explicitly include an unproven prefixed link after reviewing its evidence"})
+	flags := append(append([]Flag{}, common...), Flag{Name: "dry-run", Help: "preview without changing files"}, Flag{Name: "yes", Help: "confirm the listed link removals, copies to the recycle bin and ledger recovery"}, Flag{Name: "include", Value: "<link-path>", Multi: true, Help: "explicitly include an unproven prefixed link after reviewing its evidence"})
 	register(&Command{Name: "links repair", Summary: "preview or confirm link repair and unfinished-operation recovery", MaxArgs: 0, Flags: flags, Run: linksRepair})
 }
 
@@ -66,6 +66,9 @@ func linksDoc(p *app.LinkRepairPlan, asJSON bool, title string) (*render.Doc, er
 	}
 	if title != "links check" {
 		root.KV("removed", fmt.Sprint(len(p.Removed)))
+		if len(p.Recycled) > 0 {
+			root.KV("recycled", fmt.Sprint(len(p.Recycled)))
+		}
 	}
 	return d, nil
 }

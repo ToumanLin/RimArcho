@@ -133,6 +133,9 @@ func monitorInstances(ix *Index) []MonitorInstance {
 		if !IsMonitor(m) || m.Status != identity.Live || m.Residue || m.Unloadable != "" {
 			continue
 		}
+		if linkCopy(m) {
+			continue
+		}
 		out = append(out, MonitorInstance{Mod: m, Version: strings.TrimSpace(m.Decl().ModVersion)})
 	}
 	sort.SliceStable(out, func(i, j int) bool {
@@ -151,6 +154,13 @@ func monitorSourceOf(ix *Index) *source.Source {
 		}
 	}
 	return nil
+}
+
+// linkCopy: a folder in a game's Mods/ under a RimArcho link name, a copy made when the game
+// folder was copied (Explorer copies a link as a folder). The link repair moves it away
+// (09 §3); the plans every game shares must not follow it.
+func linkCopy(m *store.Mod) bool {
+	return (m.Kind == source.Local || m.Kind == source.Elsewhere) && managedLink(m.Rel)
 }
 
 // IsMonitor reports whether m is an Archo Monitor instance (any source).
@@ -495,6 +505,12 @@ func (a *App) monitorPlan(ix *Index, p *store.Plan, newest MonitorInstance) (Mon
 	old, found := "", false
 	for _, e := range list {
 		m := ix.ByID[e.Instance]
+		if m == nil && e.Instance != "" {
+			// A copy in another game's Mods/ that a plan was switched to before 1.0.9.
+			if o, _ := a.Store.Mod(e.Instance); IsMonitor(o) && linkCopy(o) {
+				m = o
+			}
+		}
 		if !IsMonitor(m) && packageBase(strings.ToLower(e.Missing)) != MonitorPackage {
 			after = append(after, e)
 			continue

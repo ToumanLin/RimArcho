@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -40,7 +41,56 @@ type GameLink struct {
 	snapshot *source.LinkInfo
 	Instance string `json:"instance,omitempty"`
 	Pack     string `json:"pack,omitempty"`
+	// Copy: a real folder under the link's name that holds the same files as the folder
+	// RimArcho links there (Action "recycle copy").
+	Copy     string `json:"copy,omitempty"`
 	recovery *linkRecovery
+}
+
+// sameFiles reports whether two different folders hold the same relative files with the same
+// sizes, links refused: the cheap look of a copy. A repair compares the contents
+// (treeDigest) before it moves anything.
+func sameFiles(a, b string) bool {
+	ra, rb := realOrAbs(a), realOrAbs(b)
+	if env.PathKey(ra) == env.PathKey(rb) || source.Within(ra, rb) || source.Within(rb, ra) {
+		return false
+	}
+	list := func(root string) (map[string]int64, bool) {
+		out := map[string]int64{}
+		err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if d.Type()&fs.ModeType != 0 && !d.IsDir() {
+				return fmt.Errorf("not a plain file: %s", p)
+			}
+			if d.IsDir() {
+				return nil
+			}
+			info, err := d.Info()
+			if err != nil {
+				return err
+			}
+			rel, _ := filepath.Rel(root, p)
+			out[strings.ToLower(filepath.ToSlash(rel))] = info.Size()
+			return nil
+		})
+		return out, err == nil && len(out) > 0
+	}
+	fa, ok := list(a)
+	if !ok {
+		return false
+	}
+	fb, ok := list(b)
+	if !ok || len(fa) != len(fb) {
+		return false
+	}
+	for k, n := range fa {
+		if m, ok := fb[k]; !ok || m != n {
+			return false
+		}
+	}
+	return true
 }
 
 // gameMods is a game's Mods directory. past: known only from finished link operations,
@@ -234,6 +284,14 @@ func (a *App) InspectGameLinks() ([]*GameLink, error) {
 			switch {
 			case info.Kind == "plain":
 				l.Code, l.Reason = CodeLinkOccupied, "real directory or file uses a RimArcho prefix; rename it yourself"
+				// A game folder copied in Explorer turns RimArcho's links into folders holding
+				// their targets' files (09 §3): such a copy may go to the recycle bin, so the
+				// link can come back. Anything else under the prefix stays the player's.
+				if exp != "" && sameFiles(l.Path, exp) {
+					l.Copy, l.Action = exp, "recycle copy"
+					l.Reason = "a copy of the folder RimArcho links here (the game folder was copied?); it can go to the recycle bin and the link is made again"
+					l.Evidence += "; same files and sizes as " + exp
+				}
 			case info.Kind != "junction" && info.Kind != "symlink" || info.State == source.TargetUnknown:
 				l.Code, l.Reason = CodeLinkUnknown, info.Reason
 			case info.State == source.TargetMissing:
@@ -344,6 +402,8 @@ func (a *App) refuseUnhealthyLinks(mods string) error {
 type LinkRepairPlan struct {
 	Links   []*GameLink `json:"links"`
 	Removed []string    `json:"removed"`
+	// Recycled: copies of linked folders moved to the recycle bin (Action "recycle copy").
+	Recycled []string `json:"recycled,omitempty"`
 }
 
 func (a *App) PlanLinkRepair(all bool, include []string) (*LinkRepairPlan, error) {
@@ -402,8 +462,33 @@ func (a *App) PlanLinkRepair(all bool, include []string) (*LinkRepairPlan, error
 }
 
 // ApplyLinkRepair uses the original preview identities. Preflight the complete
-// batch before removing anything; a changed or newly healthy link cancels it.
+// batch before removing anything; a changed or newly healthy link cancels it. A copy moved
+// out of the current game's Mods/ is read again at once, so its instance goes and the
+// folder RimArcho links there takes its place (19 §6).
 func (a *App) ApplyLinkRepair(plan *LinkRepairPlan) error {
+	if err := a.applyLinkRepair(plan); err != nil {
+		return err
+	}
+	if len(plan.Recycled) == 0 {
+		return nil
+	}
+	e, err := a.Env()
+	if err != nil {
+		return nil
+	}
+	mods := env.PathKey(realOrAbs(filepath.Join(e.GameRoot, "Mods")))
+	for _, p := range plan.Recycled {
+		if env.PathKey(realOrAbs(filepath.Dir(p))) == mods {
+			if _, _, err := a.ScanWithMonitor(ScanOptions{GameOnly: true}); err != nil {
+				return fmt.Errorf("the copies are in the recycle bin, but reading the game's Mods/ again failed (run archo scan): %w", err)
+			}
+			return nil
+		}
+	}
+	return nil
+}
+
+func (a *App) applyLinkRepair(plan *LinkRepairPlan) error {
 	if plan == nil {
 		return fmt.Errorf("missing link repair preview")
 	}
@@ -415,7 +500,7 @@ func (a *App) ApplyLinkRepair(plan *LinkRepairPlan) error {
 		}
 	}()
 	for _, l := range plan.Links {
-		if l.Action == "remove link" && !locked[l.Mods] {
+		if (l.Action == "remove link" || l.Action == "recycle copy") && !locked[l.Mods] {
 			unlock, err := lockGameLinks(l.Mods)
 			if err != nil {
 				return err
@@ -426,6 +511,31 @@ func (a *App) ApplyLinkRepair(plan *LinkRepairPlan) error {
 	}
 	probe := a.probe()
 	for _, l := range plan.Links {
+		if l.Action == "recycle copy" {
+			if !managedLink(filepath.Base(l.Path)) && !packLink(filepath.Base(l.Path)) || filepath.Dir(l.Path) != l.Mods || l.Copy == "" {
+				return fmt.Errorf("invalid repair entry: %s", l.Path)
+			}
+			if probe(l.Game) != nil {
+				return fmt.Errorf("game is running: %s; stop it before repairing links", l.Game)
+			}
+			if fresh, err := source.ReadLink(l.Path); err != nil {
+				return err
+			} else if fresh.Kind != "plain" {
+				return fmt.Errorf("link changed since preview: %s", l.Path)
+			}
+			// The preview compared names and sizes; the files themselves must match too.
+			have, err := treeDigest(l.Path)
+			if err != nil {
+				return fmt.Errorf("reading %s: %w", l.Path, err)
+			}
+			want, err := treeDigest(l.Copy)
+			if err != nil {
+				return fmt.Errorf("reading %s: %w", l.Copy, err)
+			}
+			if have != want {
+				return fmt.Errorf("%s is not an exact copy of %s; nothing was moved (move it out of Mods/ yourself if you do not need it)", l.Path, l.Copy)
+			}
+		}
 		if l.Action == "remove link" {
 			if !managedLink(filepath.Base(l.Path)) && !packLink(filepath.Base(l.Path)) || filepath.Dir(l.Path) != l.Mods || l.snapshot == nil {
 				return fmt.Errorf("invalid repair entry: %s", l.Path)
@@ -475,6 +585,15 @@ func (a *App) ApplyLinkRepair(plan *LinkRepairPlan) error {
 			}
 			plan.Removed = append(plan.Removed, l.Path)
 		}
+		if l.Action == "recycle copy" {
+			if a.probe()(l.Game) != nil {
+				return fmt.Errorf("game is running: %s", l.Game)
+			}
+			if err := a.ToTrash(l.Path); err != nil {
+				return fmt.Errorf("moving %s to the recycle bin: %w", l.Path, err)
+			}
+			plan.Recycled = append(plan.Recycled, l.Path)
+		}
 	}
 	a.modsCopies = nil
 	return nil
@@ -490,7 +609,8 @@ func (a *App) RememberLinkRepair(plan *LinkRepairPlan) string {
 				p := previous.Links[i]
 				// Occupied plain entries are informational: this token permits no
 				// operation on them. Removable links still require full identities.
-				occupied := l.Code == CodeLinkOccupied && l.Action == "keep" && l.Kind == "plain" && p.Kind == "plain"
+				// A copy to recycle is checked again, file by file, when the repair runs.
+				occupied := l.Code == CodeLinkOccupied && (l.Action == "keep" || l.Action == "recycle copy" && l.Copy == p.Copy) && l.Kind == "plain" && p.Kind == "plain"
 				if l.Path != p.Path || l.Action != p.Action || l.Code != p.Code || !occupied && !source.SameLink(l.snapshot, p.snapshot) {
 					same = false
 					break
@@ -535,6 +655,9 @@ func (l *GameLink) ShortReason() string {
 	case CodeLinkUnknown:
 		return "cannot read (offline or access denied)"
 	case CodeLinkOccupied:
+		if l.Action == "recycle copy" {
+			return "a copy of the linked folder (the game folder was copied?)"
+		}
 		return "a real file or folder occupies this name"
 	case CodeModsDuplicate:
 		return "duplicate entry"
