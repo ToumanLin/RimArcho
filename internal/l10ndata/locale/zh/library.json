@@ -389,5 +389,5 @@
   "; its colour marks the Mod": "；它的颜色标记此 Mod",
   "colour of %s cleared": "已清除 %s 的颜色",
   "colour of %s: %s": "%s 的颜色：%s",
-  "Texture optimisation needs a Linux todds. The Linux build of todds 0.4.1 (https://github.com/todds-encoder/todds/releases/tag/0.4.1) runs on Ubuntu 24.04, Fedora 39, Arch and newer; on older systems, build it from source. Then put todds on PATH or set textures.todds to its full path.": "贴图优化需要 Linux 版 todds。todds 0.4.1 的 Linux 版（https://github.com/todds-encoder/todds/releases/tag/0.4.1）可在 Ubuntu 24.04、Fedora 39、Arch 及更新的系统上运行；更旧的系统请从源码编译。然后把 todds 放进 PATH，或把 textures.todds 设为它的完整路径。"
+  "Texture optimisation needs a Linux todds. The Linux build of todds 0.4.1 (https://github.com/todds-encoder/todds/releases/tag/0.4.1) runs on Ubuntu 24.04, Fedora 39, Arch and newer; on older systems, build it from source. Then put todds on PATH or set textures.todds to its full path.": "贴图优化需要 Linux 版 todds。todds 0.4.1 的 Linux 版（https://github.com/todds-encoder/todds/releases/tag/0.4.1）可在 Ubuntu 24.04、Fedora 39、Arch 及更新的系统上运行；更旧的系统请从源码构建。然后把 todds 放进 PATH，或把 textures.todds 设为它的完整路径。"
 }
