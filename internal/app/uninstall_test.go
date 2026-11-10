@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
@@ -60,7 +61,7 @@ func uninstallFixture(t *testing.T) *unFix {
 
 	e.WriteFile(filepath.Join(e.Home, "packs", "P1", "pack.json"), `{"format":1,"name":"P1","entries":[]}`)
 	e.WriteFile(filepath.Join(e.Home, "packs", "P1", "userdata", "Saves", "pack.rws"), "a pack save")
-	e.WriteFile(filepath.Join(f.local, "steamcmd", "steamcmd.exe"), "MZ")
+	e.WriteFile(filepath.Join(f.local, "steamcmd", deps.SteamCMDExecutable()), "MZ")
 	e.WriteFile(filepath.Join(f.local, "steam", "steam_appid.txt"), "294100")
 
 	f.program = filepath.Join(e.Root, "Program")

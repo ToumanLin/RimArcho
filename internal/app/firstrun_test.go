@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
@@ -57,12 +58,16 @@ func TestManagedRootAndWorkshopRefusal(t *testing.T) {
 	if _, err := os.Stat(root); !os.IsNotExist(err) {
 		t.Fatal("selection created a folder")
 	}
-	e.WriteFile(filepath.Join(root, "steamcmd", "steamcmd.exe"), "synthetic")
+	e.WriteFile(filepath.Join(root, "steamcmd", deps.SteamCMDExecutable()), "synthetic")
 	if err := e.App.SetManagedRoot(filepath.Join(e.Root, "another")); err == nil {
 		t.Fatal("silently abandoned used root")
 	}
 	e.App.SelfProgram = filepath.Join(e.Workshop, "123", "extracted")
-	if _, err := e.App.InstallSelfUpdate(context.Background(), nil); err == nil || !strings.Contains(err.Error(), "Workshop folder") {
+	refusal := "Workshop folder"
+	if !app.SelfUpdateSupported() {
+		refusal = "update RimArcho manually"
+	}
+	if _, err := e.App.InstallSelfUpdate(context.Background(), nil); err == nil || !strings.Contains(err.Error(), refusal) {
 		t.Fatalf("update refusal: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(e.App.SelfProgram, app.UpdateDirName)); !os.IsNotExist(err) {

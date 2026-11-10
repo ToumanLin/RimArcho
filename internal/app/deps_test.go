@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -26,7 +25,7 @@ func TestRemoveSteamCMDProtectsContent(t *testing.T) {
 			e := testkit.New(t)
 			e.App.SteamCMDNoPath = true
 			dir := filepath.Join(e.App.LocalDir(), deps.SteamCMD)
-			exe := filepath.Join(dir, "steamcmd.exe")
+			exe := filepath.Join(dir, deps.SteamCMDExecutable())
 			e.WriteFile(exe, "tool")
 			content := filepath.Join(dir, "protected")
 			switch kind {
@@ -115,14 +114,10 @@ func TestRemoveDepStaysInsideManagedDirectory(t *testing.T) {
 }
 
 func TestInstallDepSteamCMDOwnDirectoryAndRemove(t *testing.T) {
-	if runtime.GOOS == "linux" {
-		// Linux plan §3 steps 3 and 6: process safety and the SteamCMD installer.
-		t.Skip("Linux tool-process detection and SteamCMD installation are not implemented (plan steps 3, 6)")
-	}
 	t.Parallel()
 	e := testkit.New(t)
 	e.App.SteamCMDNoPath = true
-	external := filepath.Join(e.Root, "external", "steamcmd.exe")
+	external := filepath.Join(e.Root, "external", deps.SteamCMDExecutable())
 	e.WriteFile(external, "external program")
 	e.MustRun("config", "set", "steamcmd.path", external)
 	z := steamZip(t)
@@ -134,7 +129,7 @@ func TestInstallDepSteamCMDOwnDirectoryAndRemove(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := filepath.Join(e.App.LocalDir(), deps.SteamCMD, "steamcmd.exe")
+	want := filepath.Join(e.App.LocalDir(), deps.SteamCMD, deps.SteamCMDExecutable())
 	if p != want || done != int64(len(z)) {
 		t.Fatalf("installed %s, progress %d", p, done)
 	}

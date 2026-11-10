@@ -11,6 +11,7 @@ import (
 	"unicode"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/modchanges"
 	"github.com/ToumanLin/RimArcho/internal/source"
 	"github.com/ToumanLin/RimArcho/internal/view"
@@ -21,7 +22,7 @@ func TestCompactAccountRows(t *testing.T) {
 	e, _, _ := shellEnv(t)
 	view.SetLang("zh")
 	e.App.SteamCMDNoPath = true
-	e.WriteFile(filepath.Join(e.App.LocalDir(), "steamcmd", "steamcmd.exe"), "offline fixture")
+	e.WriteFile(filepath.Join(e.App.LocalDir(), "steamcmd", deps.SteamCMDExecutable()), "offline fixture")
 	group := view.AccountGroup(e.App)
 	steam, ll := group.Items[0], group.Items[1]
 	if steam.Note != "下载Mod可用，未登录" || ll.Note != "" {
@@ -52,7 +53,7 @@ func TestCompactAccountRows(t *testing.T) {
 			t.Fatal(text)
 		}
 	}
-	external := filepath.Join(e.Root, "external", "steamcmd.exe")
+	external := filepath.Join(e.Root, "external", deps.SteamCMDExecutable())
 	e.WriteFile(external, "fixture")
 	e.MustRun("config", "set", "steamcmd.path", external)
 	steam = view.AccountGroup(e.App).Items[0]
@@ -69,7 +70,7 @@ func TestAccountSubscriptionsAndTaskResultsEnglishHaveNoCJK(t *testing.T) {
 	t.Parallel()
 	e, _, _ := shellEnv(t)
 	e.App.SteamCMDNoPath = true
-	e.WriteFile(filepath.Join(e.App.LocalDir(), "steamcmd", "steamcmd.exe"), "offline")
+	e.WriteFile(filepath.Join(e.App.LocalDir(), "steamcmd", deps.SteamCMDExecutable()), "offline")
 	st, err := e.App.Loadout()
 	if err != nil {
 		t.Fatal(err)
@@ -110,14 +111,14 @@ func TestLegacySteamOwnershipUnknownOnBothPages(t *testing.T) {
 	defer view.SetLang("en")
 	e, _, _ := shellEnv(t)
 	e.App.SteamCMDNoPath = true
-	e.WriteFile(filepath.Join(e.App.LocalDir(), "steamcmd", "steamcmd.exe"), "offline")
+	e.WriteFile(filepath.Join(e.App.LocalDir(), "steamcmd", deps.SteamCMDExecutable()), "offline")
 	e.MustRun("config", "set", "steamcmd.account", "dummyPlayer")
 	e.App.SteamCMDStart = func(string, []string, bool) (app.SteamCMDProc, error) {
 		t.Fatal("page started authentication")
 		return nil, nil
 	}
 	// Seed the pre-ownership record format in the isolated fixture store.
-	exe := filepath.Join(e.App.LocalDir(), "steamcmd", "steamcmd.exe")
+	exe := filepath.Join(e.App.LocalDir(), "steamcmd", deps.SteamCMDExecutable())
 	hash := sha256.Sum256([]byte(strings.ToLower(exe) + "\x00dummyPlayer"))
 	key := "account:steamcmd:" + hex.EncodeToString(hash[:]) + ":"
 	if err := e.App.Store.SetMeta(key, `{"state":"最近登录成功，需时再验证"}`); err != nil {

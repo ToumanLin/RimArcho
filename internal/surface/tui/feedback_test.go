@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/feedback"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 	"github.com/ToumanLin/RimArcho/internal/view"
@@ -126,7 +127,7 @@ func TestFeedbackSendTUI(t *testing.T) {
 // Shared settings order and full links survive the terminal's text presentation.
 func TestSettingsAboutFirst(t *testing.T) {
 	e, _ := fixture(t)
-	tool := filepath.Join(e.Root, "tools", "steamcmd.exe")
+	tool := filepath.Join(e.Root, "tools", deps.SteamCMDExecutable())
 	e.WriteFile(tool, "synthetic tool")
 	e.MustRun("config", "set", "steamcmd.path", tool)
 	m := New(Options{App: e.App}).(*model)

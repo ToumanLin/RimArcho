@@ -348,7 +348,7 @@ func needSteamCMD(c *Ctx, a *Args) error {
 		if o != nil && o.Bytes > 0 {
 			size = render.Size(o.Bytes)
 		}
-		return &UsageError{Msg: fmt.Sprintf("SteamCMD is not installed. Add --install-steamcmd to download it from Valve (%s, %s) into %s", app.SteamCMDURL, size, c.App.SteamCMDDir())}
+		return &UsageError{Msg: fmt.Sprintf("SteamCMD is not installed. Add --install-steamcmd to download it from Valve (%s, %s) into %s", c.App.SteamCMDDownloadURL(), size, c.App.SteamCMDDir())}
 	}
 	_, err := c.App.InstallSteamCMD()
 	return err

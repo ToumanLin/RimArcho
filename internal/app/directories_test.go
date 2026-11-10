@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/identity"
 	"github.com/ToumanLin/RimArcho/internal/source"
@@ -420,18 +421,18 @@ func TestManagedPackAndSteamCMDDirectories(t *testing.T) {
 	}
 
 	tool := filepath.Join(e.Root, "Tool")
-	e.WriteFile(filepath.Join(tool, "steamcmd.exe"), "")
+	e.WriteFile(filepath.Join(tool, deps.SteamCMDExecutable()), "")
 	if err := e.App.SetDirectory("steamcmd-tool", tool); err != nil {
 		t.Fatal(err)
 	}
-	if e.App.SteamCMDDir() != tool || e.App.SteamCMDPath() != filepath.Join(tool, "steamcmd.exe") {
+	if e.App.SteamCMDDir() != tool || e.App.SteamCMDPath() != filepath.Join(tool, deps.SteamCMDExecutable()) {
 		t.Fatal("SteamCMD config did not follow set")
 	}
 	tool2 := filepath.Join(e.Root, "ToolMoved")
 	if _, err := e.App.MoveDirectory("steamcmd-tool", tool2); err != nil {
 		t.Fatal(err)
 	}
-	if e.App.SteamCMDDir() != tool2 || e.App.SteamCMDPath() != filepath.Join(tool2, "steamcmd.exe") {
+	if e.App.SteamCMDDir() != tool2 || e.App.SteamCMDPath() != filepath.Join(tool2, deps.SteamCMDExecutable()) {
 		t.Fatal("SteamCMD config did not follow move")
 	}
 }

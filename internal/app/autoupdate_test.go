@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/subscribe"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
@@ -237,8 +238,13 @@ func TestAutomaticToolVersionsAndOfflineRetention(t *testing.T) {
 	e.App.SteamCMDNoPath, e.App.ToddsNoPath = true, true
 	e.App.TextureEncoder = &texEnc{}
 	steam := filepath.Join(e.App.LocalDir(), "steamcmd")
-	e.WriteFile(filepath.Join(steam, "steamcmd.exe"), "fixture executable")
-	e.WriteFile(filepath.Join(steam, "package", "steam_cmd_win32.installed"), `"steam_cmd_win32" { "version" "100" }`)
+	e.WriteFile(filepath.Join(steam, deps.SteamCMDExecutable()), "fixture executable")
+	e.WriteFile(filepath.Join(steam, "package", func() string {
+		if runtime.GOOS == "linux" {
+			return "steam_cmd_linux.installed"
+		}
+		return "steam_cmd_win32.installed"
+	}()), `"steam_cmd_win32" { "version" "100" }`)
 	e.WriteFile(filepath.Join(e.App.LocalDir(), "todds", "todds.exe"), "fixture encoder")
 	failed := false
 	calls := 0
@@ -249,7 +255,7 @@ func TestAutomaticToolVersionsAndOfflineRetention(t *testing.T) {
 			return
 		}
 		switch r.URL.Path {
-		case "/steam_cmd_win32":
+		case "/steam_cmd_win32", "/steam_cmd_linux":
 			io.WriteString(w, `"steam_cmd_win32" { "version" "101" }`)
 		case "/repos/todds-encoder/todds/releases/latest":
 			io.WriteString(w, `{"tag_name":"0.5.0"}`)
@@ -293,7 +299,7 @@ func TestAutomaticToolVersionsAndOfflineRetention(t *testing.T) {
 	if s := e.App.ToolUpdate("todds"); !s.Pending || s.Compatible {
 		t.Fatal("offline check discarded compatibility restriction", s)
 	}
-	b, _ := os.ReadFile(filepath.Join(steam, "steamcmd.exe"))
+	b, _ := os.ReadFile(filepath.Join(steam, deps.SteamCMDExecutable()))
 	if string(b) != "fixture executable" {
 		t.Fatal("check changed tool")
 	}

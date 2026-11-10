@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -19,7 +20,7 @@ import (
 func TestUninstallPalette(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)
-	e.WriteFile(filepath.Join(e.Root, "LocalAppData", "RimArcho", "steamcmd", "steamcmd.exe"), "MZ")
+	e.WriteFile(filepath.Join(e.Root, "LocalAppData", "RimArcho", "steamcmd", deps.SteamCMDExecutable()), "MZ")
 	m := direct(t, e, 140, 40)
 	enter := tea.KeyMsg{Type: tea.KeyEnter}
 	m.update(tea.KeyMsg{Type: tea.KeyCtrlK})

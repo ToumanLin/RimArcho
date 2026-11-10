@@ -12,13 +12,14 @@ import (
 
 	"github.com/ToumanLin/RimArcho/internal/accounts"
 	"github.com/ToumanLin/RimArcho/internal/app"
+	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
 func TestGameBranchesRunnerAndInstanceLock(t *testing.T) {
 	t.Parallel()
 	e := testkit.New(t)
-	exe := filepath.Join(e.App.SteamCMDDir(), "steamcmd.exe")
+	exe := filepath.Join(e.App.SteamCMDDir(), deps.SteamCMDExecutable())
 	e.WriteFile(exe, "fake")
 	e.App.SteamCMDNoPath = true
 	out, err := os.ReadFile(filepath.Join("..", "..", "testdata", "steamcmd", "app_info_print_294100.txt"))

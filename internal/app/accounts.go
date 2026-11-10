@@ -142,15 +142,26 @@ func (a *App) SteamAccountAction(action string) error {
 	if action == "login" {
 		p, err := a.steamCMD().start(i.Path, []string{"+login", account}, true)
 		if err != nil {
+			var libraries *steamCMDLibraryError
+			if errors.As(err, &libraries) {
+				return libraries
+			}
 			a.steamAccountRecord(i.Path, account, "login required", false)
 			return errors.New("SteamCMD window did not complete; try signing in again")
 		}
 		// Closing the console with X can return a nonzero exit code even after
 		// authentication. The cached check below decides whether login succeeded.
-		_ = p.Wait()
+		var libraries *steamCMDLibraryError
+		if err := p.Wait(); errors.As(err, &libraries) {
+			return libraries
+		}
 	}
 	// The cached check never receives a password and cannot prompt in the GUI process.
 	lines, runErr := run([]string{"+login", account, "+licenses_print", "+quit"}, false)
+	var libraries *steamCMDLibraryError
+	if errors.As(runErr, &libraries) {
+		return libraries
+	}
 	login := steamLogin{account: account}
 	for _, line := range lines {
 		if !login.ready {
@@ -180,7 +191,7 @@ func (a *App) forgetManagedSteam() (result error) {
 	dir := filepath.Join(a.LocalDir(), "steamcmd")
 	defer func() {
 		if result == nil {
-			result = a.Store.SetMeta(steamStateKey(filepath.Join(dir, "steamcmd.exe"), "cache-generation"), time.Now().UTC().Format(time.RFC3339Nano))
+			result = a.Store.SetMeta(steamStateKey(filepath.Join(dir, deps.SteamCMDExecutable()), "cache-generation"), time.Now().UTC().Format(time.RFC3339Nano))
 		}
 	}()
 	if _, err := os.Lstat(dir); errors.Is(err, os.ErrNotExist) {
@@ -216,7 +227,7 @@ func (a *App) forgetManagedSteam() (result error) {
 	return nil
 }
 func (a *App) ForgetAccounts() error {
-	un := accounts.Lock(filepath.Join(a.LocalDir(), "steamcmd", "steamcmd.exe"))
+	un := accounts.Lock(filepath.Join(a.LocalDir(), "steamcmd", deps.SteamCMDExecutable()))
 	defer un()
 	unLL := accounts.Lock(a.AccountsDir())
 	defer unLL()

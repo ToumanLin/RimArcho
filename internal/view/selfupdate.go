@@ -28,6 +28,9 @@ func SelfUpdateHome(a *app.App) *SelfUpdateLine {
 	if r == nil {
 		return nil
 	}
+	if !app.SelfUpdateSupported() {
+		return &SelfUpdateLine{Title: "RimArcho", Text: SelfCheckResult(a), Version: r.Version}
+	}
 	return &SelfUpdateLine{Title: "RimArcho", Text: Tf("%s can be updated", r.Version), Version: r.Version}
 }
 
@@ -53,6 +56,11 @@ func SelfUpdateItem(a *app.App) SettingItem {
 	}
 	it.ValueNote = Tf("new version available: %s", r.Version)
 	it.Details = &SettingDetails{Summary: T("release notes"), Text: strings.TrimSpace(r.Notes), Link: r.Page}
+	if !app.SelfUpdateSupported() {
+		it.ValueNote += "  " + T(a.SelfUpdateInstructions())
+		it.Actions = []SettingAction{check}
+		return it
+	}
 	if err := r.Installable(); err != nil {
 		it.ValueNote += "  " + T("download it from the release page")
 		it.Actions = []SettingAction{check}
@@ -106,6 +114,9 @@ func SelfUpdatePhase(s app.SelfUpdateStep) string {
 // SelfCheckResult is the check task's result line.
 func SelfCheckResult(a *app.App) string {
 	if r := a.SelfUpdatePending(); r != nil {
+		if !app.SelfUpdateSupported() {
+			return Tf("RimArcho %s available", r.Version) + "; " + r.Page + "; " + T(a.SelfUpdateInstructions())
+		}
 		return Tf("RimArcho %s can be updated", r.Version)
 	}
 	return selfCheckText(a.SelfUpdateInfo().State)
