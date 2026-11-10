@@ -1,7 +1,9 @@
-//go:build !windows
+//go:build !windows && !linux
 
 package app
 
 import "errors"
 
-func toolIdle(string) error { return errors.New("tool replacement requires Windows process detection") }
+func toolIdle(string, string) error {
+	return errors.New("tool replacement requires process detection on this platform")
+}

@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/scan"
@@ -130,7 +131,7 @@ func (a *App) moveToLibrary(st *LoadoutState, m *store.Mod, dryRun bool) (result
 	}
 	root := a.lockRoot(st.Ix.Env)
 	r := &MoveResult{Mod: m, From: from, To: filepath.Join(root, freeName(root, filepath.Base(from))), DryRun: dryRun,
-		Copied: !strings.EqualFold(filepath.VolumeName(from), filepath.VolumeName(root)), Origin: !hasOrigin(from)}
+		Copied: !source.SameVolume(from, root), Origin: !hasOrigin(from)}
 	if a.SameVolume != nil {
 		r.Copied = !a.SameVolume(from, root)
 	}
@@ -180,7 +181,11 @@ func (a *App) moveToLibrary(st *LoadoutState, m *store.Mod, dryRun bool) (result
 	}
 	if !r.Copied {
 		err = os.Rename(from, r.To)
-	} else {
+		if errors.Is(err, syscall.EXDEV) {
+			r.Copied = true
+		}
+	}
+	if r.Copied {
 		err = copyChecked(from, r.To)
 	}
 	if err != nil {

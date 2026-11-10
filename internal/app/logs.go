@@ -169,7 +169,7 @@ var ErrLogNotCached = errors.New("log not analysed yet")
 // Lord.AddPawn call sites, same-role candidates ordered by evidence (06 §2, §3); 20: list modifiers of "Collection
 // was modified" and comp-list tick crashes, Harmony patches on callers listed only, no
 // --target suggestion for TargetMethod() patches (06 §2, §3).
-const logCacheVersion = 20
+const logCacheVersion = 21
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a
@@ -790,7 +790,7 @@ func (cx *attrCtx) dirOwner(path string) (string, string) {
 var (
 	bracketRe    = regexp.MustCompile(`^(?:<color=[^>]*>)?\[([^\]]{2,80})\](?:</color>)?`)
 	xmlExtRe     = regexp.MustCompile(`^Verse\.PatchOperation\w*\(xpath="(.*)"\): Failed`)
-	winPathRe    = regexp.MustCompile(`[A-Za-z]:[\\/][^"'<>|\r\n]*?\.(?:xml|dll|png|txt)`)
+	absPathRe    = regexp.MustCompile(`(?:[A-Za-z]:[\\/]|/)[^"'<>|\r\n]*?\.(?:xml|dll|png|txt)`)
 	xrefRe       = regexp.MustCompile(`No ([\w.]+) named (\S+) found to give to (\S+)|cross-reference to ([\w.]+) named (\S+)|reference to ([\w.]+) named (\S+)`)
 	forDefRe     = regexp.MustCompile(` for def '([^']+)'`)
 	ctxDefNameRe = regexp.MustCompile(`(?:Context|Full node): [\s\S]*?<defName>([^<\s]+)</defName>`)
@@ -887,7 +887,7 @@ func (cx *attrCtx) attributeCluster(lc *LogCluster, failAt map[string]analyze.Lo
 			}
 			continue
 		}
-		for _, p := range winPathRe.FindAllString(t, -1) {
+		for _, p := range absPathRe.FindAllString(t, -1) {
 			if id, rel := cx.dirOwner(p); id != "" {
 				lc.add(id, RoleSource, "log file "+rel)
 			} else if id, rel := cx.folderOwner(p); id != "" {
@@ -1293,7 +1293,7 @@ var logSeverity = map[string]string{
 // findingKey keeps a log problem's ref (and an ignore of it) stable across logs and
 // install locations: the cluster key with each absolute path cut to its last three parts.
 func findingKey(key string) string {
-	return winPathRe.ReplaceAllStringFunc(key, func(p string) string {
+	return absPathRe.ReplaceAllStringFunc(key, func(p string) string {
 		parts := strings.FieldsFunc(p, func(r rune) bool { return r == '\\' || r == '/' })
 		if len(parts) > 3 {
 			parts = parts[len(parts)-3:]

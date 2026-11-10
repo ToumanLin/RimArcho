@@ -106,8 +106,8 @@ Other paths are refused (`ErrNotInTrashList`, `TestTrashAllowList`).
 
 - **Windows** uses `SHFileOperationW` with `FO_DELETE` and the flags `FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI | FOF_WANTNUKEWARNING`. The last flag makes a volume without a recycle bin, such as a network drive, return an error instead of deleting permanently. A nonzero return value or a cancelled operation is reported as an error with the shell code.
 - **macOS** renames the item into `~/.Trash`, adding `.2`, `.3` on name collisions.
-- **Other systems** follow freedesktop: move the item to `$XDG_DATA_HOME/Trash/files/` (default `~/.local/share/Trash`) and write `info/<name>.trashinfo` with `Path` and `DeletionDate`, adding `.2`, `.3` on name collisions.
-- Outside Windows, a rename across volumes fails; RimArcho then refuses, without falling back to copying and deleting.
+- **Other systems** follow freedesktop: on the data directory's volume use `$XDG_DATA_HOME/Trash` (default `~/.local/share/Trash`); on other volumes use `<mount>/.Trash-<uid>`. The volume trash and its `files/` and `info/` directories must be owned by the current user, have mode 0700 and be real directories, not links. Move the item into `files/` and write `info/<name>.trashinfo` with URL-escaped `Path` and local `DeletionDate`; `Path` is absolute for the home trash and relative to the mount for volume trash. Reserve metadata exclusively and finish writing it before moving the item; existing files or metadata get `.2`, `.3` suffixes. An unavailable or unsafe trash, metadata failure or failed rename leaves the original in place; remove this attempt's metadata when the move fails.
+- Trash never falls back to copying and permanently deleting. macOS still refuses a rename across volumes.
 
 ## 4. Acceptance
 

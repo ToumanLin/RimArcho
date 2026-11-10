@@ -2,7 +2,6 @@ package cmds_test
 
 import (
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/ToumanLin/RimArcho/internal/deps"
@@ -10,10 +9,6 @@ import (
 )
 
 func TestGoldenDeps(t *testing.T) {
-	if runtime.GOOS == "linux" {
-		// Linux plan §3 step 3: the removal transcript needs toolIdle.
-		t.Skip("Linux tool-process detection is not implemented (plan step 3)")
-	}
 	t.Parallel()
 	e := testkit.New(t)
 	e.App.SteamCMDNoPath = true

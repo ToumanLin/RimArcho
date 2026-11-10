@@ -35,12 +35,13 @@ Goal: a static `archo` for `linux/amd64` (`CGO_ENABLED=0`) that is as safe on Li
 
 1. **Build split — done.** GUI startup is selected by a `windows` build tag (later `windows || (linux && cgo)`), so `cmd/archo` builds without Wails. On a build without the GUI, `archo gui` says the window is not in this build and points to the text interface. Contract: 13 §4.1, 16 §8.1.
 2. **`startWorkshopCMD` off Windows — done.** `os/exec` with its own process group (`Setpgid`); cancel kills the group, matching the Windows job object. `console=true` inherits the current terminal's streams (CLI/TUI) instead of opening a new window. Contract: 11 §1.
-3. **Safety stubs.** `gameProcesses` reads `/proc/*/exe` and `cmdline`: the native `RimWorldLinux`, and `RimWorldWin64.exe` running under Wine (Proton). `toolIdle` checks `/proc` for a process running the tool's executable. Without these, "refuse while the game runs" never fires: fix them before anything ships.
-4. **Linux-only bugs** (ToDo):
-   - Same-volume checks compare `st_dev` (one helper used at the four call sites in §1), so moves across mounts copy instead of failing with `EXDEV`.
+3. **Safety stubs — done.** Linux reads `/proc` for native and Wine/Proton games and for busy tools. Contracts: 09 §4 and 17 §2.1. Synthetic processes exercise discovery; guarded operations share the existing running-game checks.
+4. **Linux-only bugs — done for non-GUI `archo`:**
+   - Same-volume checks compare `st_dev` through one helper at the three non-GUI call sites in §1, so moves across mounts copy instead of failing with `EXDEV`. The GUI shell call site remains phase 2 work.
    - Renaming a save to a name that differs only by case must not overwrite the other save (`saveactions.go`): on a case-sensitive file system they are two files.
    - `LocalDir` uses the XDG data directory, not `~/.cache` (it holds the lock library).
    - `source.Trash` (`trash_other.go`) works across volumes: freedesktop trash in `$XDG_DATA_HOME/Trash`, or `<mount>/.Trash-<uid>` for another volume.
+   - The base task's additional log-path gap is fixed: native absolute Linux paths participate in attribution and stable finding keys (06 §2–§3); the Harmony-log golden runs unchanged on both systems.
 5. **Detection** (03 §3):
    - Steam roots: `~/.steam/steam`, `~/.local/share/Steam`, Flatpak `~/.var/app/com.valvesoftware.Steam/.local/share/Steam`, Snap `~/snap/steam/common/.local/share/Steam`; then `libraryfolders.vdf` as on Windows.
    - A game folder with `RimWorldWin64.exe` beside `steamapps/compatdata/294100` is a **Proton game**: user data in `compatdata/294100/pfx/drive_c/users/steamuser/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios`, Player.log in the same folder. It launches only through Steam (09 §2); own-saves mode is phase 2 (`-savedatafolder` needs a `Z:` path).

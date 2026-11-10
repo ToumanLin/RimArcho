@@ -113,7 +113,7 @@ type App struct {
 	// TrashFunc moves a folder to the recycle bin; nil means source.Trash (tests replace it).
 	TrashFunc func(path string) error
 	// SameVolume says whether a folder can be renamed from one path to another (MoveDirectory);
-	// nil compares the volume names (tests replace it to copy on one drive).
+	// nil uses source.SameVolume (tests replace it to copy on one volume).
 	SameVolume func(from, to string) bool
 	// trashAllow replaces the recycle bin's allow-list check (02 §3) in tests of a bare App
 	// with no store; nil means trashAllowed.

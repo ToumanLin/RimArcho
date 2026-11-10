@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/ToumanLin/RimArcho/internal/deps"
 	"github.com/ToumanLin/RimArcho/internal/env"
@@ -455,9 +456,7 @@ func (a *App) MoveDirectory(id, path string) (copied bool, err error) {
 	}
 	same := a.SameVolume
 	if same == nil {
-		same = func(from, to string) bool {
-			return strings.EqualFold(filepath.VolumeName(from), filepath.VolumeName(to))
-		}
+		same = source.SameVolume
 	}
 	copied = !same(d.Path, path)
 	links, err := a.PlanIncomingLinks(d.Path, path)
@@ -474,7 +473,14 @@ func (a *App) MoveDirectory(id, path string) (copied bool, err error) {
 			return false, a.abortLinkLifecycle(links, fmt.Errorf("could not copy the directory: %w; move it manually, then set its new location (archo folder set)", err))
 		}
 	} else if err := os.Rename(d.Path, path); err != nil {
-		return false, a.abortLinkLifecycle(links, fmt.Errorf("could not safely rename the directory: %w; move it manually, then set its new location (archo folder set)", err))
+		// Bind mounts can share st_dev and still reject rename.
+		if !errors.Is(err, syscall.EXDEV) {
+			return false, a.abortLinkLifecycle(links, fmt.Errorf("could not safely rename the directory: %w; move it manually, then set its new location (archo folder set)", err))
+		}
+		copied = true
+		if err := copyChecked(d.Path, path); err != nil {
+			return false, a.abortLinkLifecycle(links, err)
+		}
 	}
 	if err := a.setDirectoryRecords(d, path); err != nil {
 		// The records stayed at the old path: the directory goes back there, so the

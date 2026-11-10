@@ -311,11 +311,19 @@ func (a *App) RenameSave(s *Save, name string) (string, error) {
 		file = s.Prefix + rimSavesSep + file
 	}
 	to := filepath.Join(filepath.Dir(s.Path), file)
-	if strings.EqualFold(to, s.Path) && file == s.File {
+	if to == s.Path && file == s.File {
 		return to, nil
 	}
-	if _, err := os.Stat(to); err == nil && !strings.EqualFold(to, s.Path) {
-		return "", fmt.Errorf("a save named %s already exists", name)
+	if target, err := os.Lstat(to); err == nil {
+		original, err := os.Lstat(s.Path)
+		if err != nil {
+			return "", err
+		}
+		if !os.SameFile(original, target) {
+			return "", fmt.Errorf("a save named %s already exists", name)
+		}
+	} else if !os.IsNotExist(err) {
+		return "", err
 	}
 	// never over a file that appeared since the check (os.Rename replaces on Windows)
 	if err := renameNoReplace(s.Path, to); err != nil {
