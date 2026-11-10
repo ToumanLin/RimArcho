@@ -5,6 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
@@ -19,7 +20,9 @@ const bodyTop = 3
 // navState caches the navigation entries (view.Nav, the GUI's sidebar model) and what the
 // last drawn top rows hold, for clicks.
 type navState struct {
-	key   string
+	key   string         // what items were built for (navKey)
+	want  string         // the key a background read is running for
+	gen   int            // bumped when the lists or the language change (navStale)
 	items []view.NavItem // the shift+1–8 entries in order; Saves, with no key, is left out
 	hits  []navHit
 }
@@ -31,20 +34,53 @@ type navHit struct {
 	sub         string // a sub-entry's page ID
 }
 
-// navItems returns the navigation entries, rebuilt when the game, the open list or the
-// current list changed; planChanged and a language change clear the key.
-func (m *model) navItems() []view.NavItem {
-	key := m.envName + "\x00" + itoa(int(m.launchesID))
+// navKey names what the entries depend on: the game, the open list, the current list,
+// and navStale's generation.
+func (m *model) navKey() string {
+	key := m.envName + "|" + itoa(int(m.launchesID)) + "|" + itoa(m.nav.gen)
 	if m.st != nil && m.st.Plan != nil {
-		key += "\x00" + itoa(int(m.st.Plan.ID))
+		key += "|" + itoa(int(m.st.Plan.ID))
 	}
-	if m.nav.items != nil && m.nav.key == key {
-		return m.nav.items
+	return key
+}
+
+// navStale makes the next update read the entries again: a list was made, renamed,
+// removed or switched, or the language changed.
+func (m *model) navStale() { m.nav.gen++ }
+
+// navItems returns the entries to draw. View reads nothing (16 §10): until the first read
+// (navRefresh) lands, the pages are there without the lists' tabs; after a change, the
+// previous entries stay until the new ones arrive.
+func (m *model) navItems() []view.NavItem {
+	if m.nav.items == nil {
+		return navBuild(nil)
 	}
-	var plans []view.PlanRow
-	if m.loadErr == nil {
-		plans, _ = view.PlanRows(m.app)
+	return m.nav.items
+}
+
+// navRefresh reads the lists in the background when navKey changed (Update calls it after
+// every message; it does nothing while the entries are current or already being read).
+func (m *model) navRefresh() tea.Cmd {
+	if m.app == nil || m.loadErr != nil {
+		return nil
 	}
+	key := m.navKey()
+	if key == m.nav.key || key == m.nav.want {
+		return nil
+	}
+	m.nav.want = key
+	return m.bgWhen(func(m *model) bool { return m.navKey() == key }, func(a *app.App) func(*model) tea.Cmd {
+		plans, _ := view.PlanRows(a)
+		items := navBuild(plans)
+		return func(m *model) tea.Cmd {
+			m.nav.items, m.nav.key = items, key
+			return nil
+		}
+	})
+}
+
+// navBuild keeps the entries that have a shift key, in the GUI's order.
+func navBuild(plans []view.PlanRow) []view.NavItem {
 	var out []view.NavItem
 	for _, g := range view.Nav(0, plans, nil) {
 		for _, it := range g.Items {
@@ -57,7 +93,6 @@ func (m *model) navItems() []view.NavItem {
 			out = append(out, it)
 		}
 	}
-	m.nav.items, m.nav.key = out, key
 	return out
 }
 

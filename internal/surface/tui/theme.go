@@ -18,23 +18,41 @@ import (
 // (17 §6 item 3, 16 §7): ambiguous-width characters and Nerd Font icons are 1 cell.
 var width = &runewidth.Condition{EastAsianWidth: false}
 
-// Palettes (16 §7): one for dark terminals, one for light ones. SetTheme picks one.
+// Palettes (16 §7): one for dark terminals, one for light ones. SetTheme picks one. Each
+// colour also names its xterm-256 and 16-colour stand-ins, chosen by hand: the nearest
+// match lipgloss would pick merges faint text with the selected cursor row in 256 colours
+// and turns the light pill magenta in 16.
 type colours struct {
-	text, second, dim, accent, pill lipgloss.Color
-	row, sel, selCur                lipgloss.Color // focused cursor row, selected, selected under the cursor
-	ok, warn, err                   lipgloss.Color
+	text, second, dim, accent, pill lipgloss.TerminalColor
+	row, sel, selCur                lipgloss.TerminalColor // focused cursor row, selected, selected under the cursor
+	ok, warn, err                   lipgloss.TerminalColor
+}
+
+// cc is one colour in 24-bit, xterm-256 and 16-colour terminals.
+func cc(hex, c256, c16 string) lipgloss.CompleteColor {
+	return lipgloss.CompleteColor{TrueColor: hex, ANSI256: c256, ANSI: c16}
 }
 
 var (
-	darkPalette  = colours{"#E6E6E6", "#858B99", "#5C6270", "#A5B4FC", "#2C2E4A", "#1A1C24", "#232539", "#303450", "#7EE2A8", "#F2C46D", "#FF8A80"}
-	lightPalette = colours{"#1C1C21", "#5F5F68", "#8E8E97", "#4F46E5", "#E4E3FB", "#F0F0F4", "#ECEBFB", "#DCDAF8", "#188A50", "#B45309", "#D64545"}
+	darkPalette = colours{
+		text: cc("#E6E6E6", "253", "15"), second: cc("#858B99", "245", "7"), dim: cc("#5C6270", "241", "8"),
+		accent: cc("#A5B4FC", "147", "12"), pill: cc("#2C2E4A", "236", "4"),
+		row: cc("#1A1C24", "234", "0"), sel: cc("#232539", "17", "4"), selCur: cc("#303450", "18", "4"),
+		ok: cc("#7EE2A8", "115", "10"), warn: cc("#F2C46D", "221", "11"), err: cc("#FF8A80", "210", "9"),
+	}
+	lightPalette = colours{
+		text: cc("#1C1C21", "234", "0"), second: cc("#5F5F68", "241", "8"), dim: cc("#8E8E97", "246", "8"),
+		accent: cc("#4F46E5", "62", "4"), pill: cc("#E4E3FB", "189", "7"),
+		row: cc("#F0F0F4", "255", "15"), sel: cc("#ECEBFB", "254", "7"), selCur: cc("#DCDAF8", "189", "7"),
+		ok: cc("#188A50", "29", "2"), warn: cc("#B45309", "130", "3"), err: cc("#D64545", "167", "1"),
+	}
 )
 
 // The colours and styles in use; applyPalette sets them.
 var (
-	cText, cSecond, cDim, cAccent, cPill lipgloss.Color
-	cRowBg, cSelBg, cSelCurBg            lipgloss.Color
-	cOK, cWarn, cErr                     lipgloss.Color
+	cText, cSecond, cDim, cAccent, cPill lipgloss.TerminalColor
+	cRowBg, cSelBg, cSelCurBg            lipgloss.TerminalColor
+	cOK, cWarn, cErr                     lipgloss.TerminalColor
 
 	sText, sBold, sSecond, sHead, sDimS, sAccent, sSel lipgloss.Style
 	sPill, sPillDim, sPillWarn                         lipgloss.Style

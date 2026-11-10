@@ -114,4 +114,5 @@ Every TUI screen has the same frame (`surface/tui/chrome.go`, `view.go`; researc
 - Which page is current: the editor and its secondary screens are lists, the four mod library screens and the Mod settings panel are mod library, and command-panel entries, `shift+N` and text panels each name their page.
 - **Mouse:** clicking a name on the navigation row opens that page, as `shift+N` does; clicking a subpage on the context row opens it (a list opens for editing, as `P` does). Rows below keep the clicks of §3.
 - **Theme:** the dark and light palettes are in §7; `ui.tui.theme` chooses (§9.2).
+- Drawing reads nothing (§10): the lists for the context row are read in the background after a message changes the game, the open or current list, a list's name or the language (`navRefresh`), and the previous tabs stay until they arrive. Before the first read, lists shows only all lists.
 - At 80 columns the navigation row is in its digit form and long context rows lose their tail; at 80×24 every screen keeps its body, status and hint lines.

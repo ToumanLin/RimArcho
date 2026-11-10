@@ -30,7 +30,7 @@
 | Warning | `#F2C46D` | `#B45309` | Warning icons and counts; magpie has no warning color, but Mod management must distinguish a failure from a possible problem |
 | Error | `#FF8A80` | `#D64545` | Error icons and failed results |
 
-Both palettes draw text on the terminal's own background. Secondary and faint are lighter than in earlier versions so that they stay readable on common dark terminal backgrounds; area headings use bold secondary rather than faint.
+Both palettes draw text on the terminal's own background. Each role also names an xterm-256 and a 16-colour stand-in (`theme.go`), chosen by hand for terminals without 24-bit colour, such as a plain xterm on Linux: the nearest matches would put faint text on a same-grey selected cursor row in 256 colours, and turn the light pill magenta and warnings red in 16. In 16 colours selected and selected-cursor rows share one background; ▸ marks the cursor. Secondary and faint are lighter than in earlier versions so that they stay readable on common dark terminal backgrounds; area headings use bold secondary rather than faint.
 
 **Log colors** (§2.10) are an exception to gray text. Raw log rows use the game's log-window colors: Error red `#ff6666`, Warning yellow `#ffeb04`, and Message white. A Mod message's `<color>` is retained. The light theme adjusts contrast without changing the hue. Interface text and icons retain the palette above.
 

@@ -35,6 +35,10 @@ func pick(t *testing.T, m *model, prefix string) {
 	t.Fatalf("no choice %q in %q", prefix, cs)
 }
 
+// navSettle runs the navigation read that Update starts after a message (navRefresh):
+// tests call update directly.
+func navSettle(m *model) { drain(m, m.navRefresh()) }
+
 func typeText(m *model, s string) {
 	m.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)})
 }
@@ -45,6 +49,7 @@ func TestPlansInTUI(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 160, 40)
+	navSettle(m)
 	if !strings.Contains(ansi.Strip(m.contextRow()), " default ") {
 		t.Fatalf("context row %q", m.contextRow())
 	}
@@ -61,6 +66,7 @@ func TestPlansInTUI(t *testing.T) {
 		t.Fatalf("name prompt %+v", m.prompt)
 	}
 	press(m, "enter")
+	navSettle(m)
 	if m.st.Plan.Name != "new list" || len(m.cols[cActive].items) != 0 || !strings.Contains(ansi.Strip(m.contextRow()), " new list ") {
 		t.Fatalf("after new: plan %s, %d enabled, status %q", m.st.Plan.Name, len(m.cols[cActive].items), m.status)
 	}

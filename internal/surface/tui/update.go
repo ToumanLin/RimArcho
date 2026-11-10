@@ -33,7 +33,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	seq := m.idleSeq
 	next := tea.Tick(idleAfter, func(time.Time) tea.Msg { return idleTick{seq} })
 	mm, cmd := m.update(msg)
-	return mm, tea.Batch(cmd, next)
+	return mm, tea.Batch(cmd, next, m.navRefresh())
 }
 
 func (m *model) update(msg tea.Msg) (tea.Model, tea.Cmd) {

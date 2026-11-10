@@ -17,7 +17,7 @@ import (
 func (m *model) planChanged(text string) tea.Cmd {
 	m.tab, m.full, m.insp = tabList, false, nil
 	m.clearSel()
-	m.nav.key = "" // a list was made, renamed, removed or switched: the navigation lists them
+	m.navStale() // a list was made, renamed, removed or switched: the navigation lists them
 	m.reload()
 	for k := range m.cols {
 		m.cols[k].cursor, m.cols[k].off, m.cols[k].filter = 0, 0, ""

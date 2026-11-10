@@ -449,7 +449,7 @@ func (m *model) cmdAfter(d cmdDoneMsg) {
 			switch d.argv[2] {
 			case "ui.lang":
 				SetLang(m.app.Store.Meta("cfg:ui.lang"))
-				m.nav.key = "" // the navigation's names are in the language
+				m.navStale() // the navigation's names are in the language
 			case "ui.tui.theme":
 				SetTheme(m.app.Store.Meta("cfg:ui.tui.theme"))
 			case "ui.icons":
