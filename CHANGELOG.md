@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## 1.0.9 (unreleased)
 
+- Linux: SteamCMD runs with a home folder of its own (next to the program, or under the cache folder), so it can no longer change the desktop Steam client's settings or library list.
 - Save recycling and backups report only files successfully moved or copied; total failures no longer print a success headline. Save renaming refuses another file's name regardless of case on every platform, while allowing the same save's case-only rename.
 - Linux: relative `XDG_DATA_HOME` values are ignored for the data directory; an unset or relative `HOME` without an absolute XDG value now gives a clear startup error.
 - Game log: audio and asset paths with spaces keep machine-independent problem references with either separator, including Linux logs read on Windows. Existing stable Windows keys are unchanged; the log attribution cache version is now 22, so stored reports are rebuilt when read.

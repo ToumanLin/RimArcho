@@ -53,6 +53,11 @@ func runBranchSteamCMD(ctx context.Context, exe string, args []string) (string, 
 	cmd := exec.CommandContext(ctx, exe, args...)
 	cmd.Dir = filepath.Dir(exe)
 	hideWindow(cmd)
+	env, err := steamCMDEnv(exe)
+	if err != nil {
+		return "", err
+	}
+	cmd.Env = env
 	out, err := cmd.CombinedOutput()
 	return string(out), steamCMDStartError(exe, string(out), err)
 }

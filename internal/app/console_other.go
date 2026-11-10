@@ -17,6 +17,11 @@ import (
 func startWorkshopCMD(exe string, args []string, console bool) (SteamCMDProc, error) {
 	cmd := exec.Command(exe, args...)
 	cmd.Dir = filepath.Dir(exe)
+	env, err := steamCMDEnv(exe)
+	if err != nil {
+		return nil, err
+	}
+	cmd.Env = env
 	if console {
 		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	} else {

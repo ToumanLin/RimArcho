@@ -15,7 +15,12 @@ func TestWorkshopProcessCancellation(t *testing.T) {
 	ready, survived := filepath.Join(dir, "ready"), filepath.Join(dir, "survived")
 	// A child that outlives cancellation would leave evidence after the parent
 	// has been reaped. All paths are synthetic and passed as shell arguments.
-	proc, err := startWorkshopCMD("/bin/sh", []string{"-c", `(sleep 1; echo survived > "$2") & echo ready > "$1"; wait`, "sh", ready, survived}, false)
+	// The program sits in the temporary folder, so SteamCMD's own home goes there too.
+	sh := filepath.Join(dir, "sh")
+	if err := os.WriteFile(sh, []byte("#!/bin/sh\nexec /bin/sh \"$@\"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	proc, err := startWorkshopCMD(sh, []string{"-c", `(sleep 1; echo survived > "$2") & echo ready > "$1"; wait`, "sh", ready, survived}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
