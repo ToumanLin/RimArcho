@@ -2,7 +2,7 @@
 
 All notable changes to RimArcho. Versions follow semantic versioning; the MVP is 0.5.0.
 
-## 1.0.9 (unreleased)
+## 1.0.9 — 2026-11-10
 
 - **Linux (experimental):** releases now include `archo-<version>-linux-amd64.tar.gz` with the terminal UI, CLI and MCP (no window). It is tested only with synthetic data so far, not with a real game on Linux; expect bugs and back up saves and Mod lists. The Linux entries below are part of it.
 - Copying a game folder (for a second game) no longer breaks Archo Monitor. Explorer copies RimArcho's `_Archo_` links as plain folders; the copy's Monitor folder was then picked as the newest Monitor, every list switched to it, and launching refused with "is not a link; rename or remove it yourself". RimArcho now ignores those copies when it picks Monitor, puts the installed Monitor back in lists already switched (on the next scan, in either game), and Can it run offers R "move the copies to the recycle bin" for folders whose files match what RimArcho links there exactly; launching then makes the links again. Any copy with changed files stays where it is. Launch and save point to this repair. CLI: `archo links check` / `links repair` show the action `recycle copy`, and a repair reports `recycled: <n>`; MCP `check_links` / `repair_links` return `copy` and `recycled`.

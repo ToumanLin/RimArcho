@@ -1,6 +1,6 @@
 # 01 · Scope and status
 
-> Status: 1.0.0 was released on 2026-11-02, 1.0.5 and 1.0.6 on 2026-11-07, 1.0.7 and 1.0.8 on 2026-11-08 (`CHANGELOG.md`). What each version includes and excludes, and what is still open.
+> Status: 1.0.0 was released on 2026-11-02, 1.0.5 and 1.0.6 on 2026-11-07, 1.0.7 and 1.0.8 on 2026-11-08, 1.0.9 on 2026-11-10 (`CHANGELOG.md`). What each version includes and excludes, and what is still open.
 > Basis: 00 (positioning, three questions, principles), 00a (architecture). Each feature's own specification governs its details.
 
 ## 1. Version scope
