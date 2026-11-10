@@ -54,8 +54,8 @@ func (a *App) SteamCMDDir() string {
 	return filepath.Join(a.LocalDir(), "steamcmd")
 }
 
-// SteamCMDPath finds steamcmd: config steamcmd.path, RimArcho's own copy, then PATH. ""
-// when there is none.
+// SteamCMDPath uses the dependency finder's platform discovery order (17 §2.1).
+// It returns an empty path when no SteamCMD is found.
 func (a *App) SteamCMDPath() string {
 	return a.Deps().Status(deps.SteamCMD).Path
 }

@@ -82,7 +82,7 @@ RimArcho uses two programs that are not compiled into the exe. Only `deps` disco
 | Name | Purpose | Search order | Version | RimArcho-owned directory |
 | --- | --- | --- | --- | --- |
 | `todds` | DDS encoder (10 §2) | `textures.todds` → own copy → `PATH` | Run `--version`; anything other than 0.4.1 is unusable | `%LOCALAPPDATA%\RimArcho\todds` |
-| `steamcmd` | Download game versions (11 §3) and Mods | `steamcmd.path` (search same directory if file absent) → own copy → `PATH` on Windows; setting → `PATH` → own copy on Linux | Do not run it (it self-updates); leave version empty | `%LOCALAPPDATA%\RimArcho\steamcmd` |
+| `steamcmd` | Download game versions (11 §3) and Mods | Configured `steamcmd.path` (or siblings if absent) → `PATH`; without a setting: own copy → `PATH` on Windows, `PATH` → own copy on Linux | Do not run it (it self-updates); leave version empty | `%LOCALAPPDATA%\RimArcho\steamcmd` |
 
 Interface (kept small for other features):
 
