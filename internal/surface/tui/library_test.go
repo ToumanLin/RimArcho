@@ -87,7 +87,7 @@ func TestLibraryCopyNote(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 140, 40)
-	m.openLibrary()
+	finishPage(m, m.openLibrary())
 	libAt(t, m, "Beta")
 	press(m, "n")
 	if m.prompt == nil {
@@ -115,7 +115,7 @@ func TestLibraryPlanOps(t *testing.T) {
 	// Make an undoable edit first so a stray library undo would be observable.
 	e.MustRun("enable", "pkg:tester.b")
 	m.reload()
-	m.openLibrary()
+	finishPage(m, m.openLibrary())
 	libAt(t, m, "Beta")
 	before := activeNames(t, e)
 	for _, key := range []string{"space", "m", "t", "x", "u", "ctrl+z", "ctrl+y", "ctrl+r"} {
@@ -168,7 +168,7 @@ func TestEveryOpRuns(t *testing.T) {
 			t.Errorf("%s: no key and no menu", o.Code)
 		}
 		m.status = ""
-		m.openLibrary()
+		finishPage(m, m.openLibrary())
 		m.libr.marked = map[string]bool{}
 		m.panel, m.pos, m.prompt, m.tags = nil, nil, nil, nil
 		m.runLibOp(o.Code)
@@ -191,7 +191,7 @@ func TestLibraryFailedReloadIgnoresStaleRows(t *testing.T) {
 	t.Parallel()
 	e, _ := fixture(t)
 	m := direct(t, e, 140, 40)
-	m.openLibrary()
+	finishPage(m, m.openLibrary())
 	if m.libr.page == nil || len(m.libr.flat) < 2 {
 		t.Fatal("no library rows")
 	}

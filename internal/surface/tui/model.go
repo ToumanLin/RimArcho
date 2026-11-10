@@ -125,12 +125,14 @@ type model struct {
 	analyzeQuiet bool
 	analyzeWait  func() tea.Msg
 
-	chg   chState
-	libr  libState
-	add   addState   // add a subscription
-	fs    fsState    // Search files
-	rules rulesState // Load-order rules
-	home  homeState  // Start
+	chg          chState
+	libr         libState
+	add          addState   // add a subscription
+	fs           fsState    // Search files
+	rules        rulesState // Load-order rules
+	home         homeState  // Start
+	texturePanel *panel
+	textureKey   string
 	// launches: the current list when the editor has another one open ("": the editor's
 	// list is the current one); the top bar says it (07 §1.3)
 	launches   string

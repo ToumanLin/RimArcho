@@ -334,6 +334,16 @@ func BuildHome(a *app.App, b *Board, n *Needs, plans []PlanRow, packs []PackRow)
 // BuildHomeFromState needs counts and list state, not the editor's thousands of
 // inactive rows, copy captions and search fields.
 func BuildHomeFromState(a *app.App, st *app.LoadoutState, n *Needs, plans []PlanRow, packs []PackRow) *Home {
+	return buildHome(a, st, n, plans, packs, false)
+}
+
+// BuildLaunchFromState supplies the TUI's current-list summary, without the window's
+// other lists, version ranges, changes card or self-update line (16 §9.1).
+func BuildLaunchFromState(a *app.App, st *app.LoadoutState, n *Needs, plans []PlanRow) *Home {
+	return buildHome(a, st, n, plans, nil, true)
+}
+
+func buildHome(a *app.App, st *app.LoadoutState, n *Needs, plans []PlanRow, packs []PackRow, launchOnly bool) *Home {
 	defer perftrace.Span("Home-rows")()
 	h := &Home{Featured: -1}
 	name, version := st.Ix.Env.Name, st.Ix.Env.GameVersion
@@ -345,13 +355,18 @@ func BuildHomeFromState(a *app.App, st *app.LoadoutState, n *Needs, plans []Plan
 		}
 	}
 	for _, p := range plans {
+		if launchOnly && !p.Current {
+			continue
+		}
 		r := HomeRow{Kind: RowPlan, Name: p.Name, Env: chip, Played: p.Played, at: p.PlayedAt, Plan: p.ID, Page: p.Page,
 			Current: p.Current, Mark: p.ConflictText, InGame: p.InGame, Facts: Tf("%d mods", p.Entries), Mode: T("follows Workshop updates"),
 			EnvName: name, GameVersion: version, Versions: ver, Mods: p.Entries}
 		// a list says the game versions it allows (07 §1.6, 16 §2.3)
-		if sp, err := a.Store.PlanByID(p.ID); err == nil && sp != nil {
-			if vs := app.FormatVersions(a.PlanAllowedVersions(st, sp)); vs != "" {
-				r.Versions = vs
+		if !launchOnly {
+			if sp, err := a.Store.PlanByID(p.ID); err == nil && sp != nil {
+				if vs := app.FormatVersions(a.PlanAllowedVersions(st, sp)); vs != "" {
+					r.Versions = vs
+				}
 			}
 		}
 		k, checked, stale := 0, false, false
@@ -374,8 +389,10 @@ func BuildHomeFromState(a *app.App, st *app.LoadoutState, n *Needs, plans []Plan
 	SortHome(h.Rows)
 	h.LastRun, h.LastRunDay, h.LastRunErrors = n.LastRun, n.LastRunDay, LastRunErrors(n)
 	h.Launch = n.Launch
-	h.Changes = ChangeHome(a, st)
-	h.Update = SelfUpdateHome(a)
+	if !launchOnly {
+		h.Changes = ChangeHome(a, st)
+		h.Update = SelfUpdateHome(a)
+	}
 	return h
 }
 

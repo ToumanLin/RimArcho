@@ -285,7 +285,7 @@ func (m *model) needLines(n int) []string {
 	}
 	head := view.NeedsLead(plan, before, runs, p.never, hints)
 	switch {
-	case m.analyzing:
+	case m.analyzing || p.reading:
 		head += "   " + T("checking the mods' files…")
 	case p.stale:
 		head += "   " + T("the files changed since the last check")

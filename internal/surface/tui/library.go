@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -18,6 +19,9 @@ import (
 // ctrl+w open the folder and Workshop page, Del previews deletion, F10 opens the menu.
 
 type libState struct {
+	key         string
+	seq         int
+	loading     bool
 	page        *view.LibPage
 	err         string
 	cursor, off int
@@ -45,7 +49,6 @@ func (m *model) loadLibrary() {
 	if l.open == nil {
 		l.open, l.marked, l.anchor = map[string]bool{}, map[string]bool{}, -1
 	}
-	keep := l.lineKey(l.cursor)
 	l.err = ""
 	lib := m.library()
 	if lib == nil {
@@ -57,7 +60,21 @@ func (m *model) loadLibrary() {
 		l.err = err.Error()
 		return
 	}
-	l.page = p
+	m.applyLibrary(p)
+}
+
+func (m *model) libraryStamp() string {
+	l := &m.libr
+	return m.pageKey() + "|" + l.bar.search + "|" + strings.Join(l.bar.filters, "\x00") + "|" + l.sort
+}
+
+func (m *model) applyLibrary(p *view.LibPage) {
+	l := &m.libr
+	if l.open == nil {
+		l.open, l.marked, l.anchor = map[string]bool{}, map[string]bool{}, -1
+	}
+	keep := l.lineKey(l.cursor)
+	l.page, l.err, l.key, l.loading = p, "", m.libraryStamp(), false
 	b := &l.bar
 	b.conds, b.ghost, b.groups = p.Conds, p.Complete, nil
 	if b.open {
@@ -167,6 +184,9 @@ func (m *model) cursorCopy() (*view.LibInstRow, string) {
 // targets are the copies an op acts on: the selected ones, else the cursor's.
 func (m *model) targets() []*view.LibInstRow {
 	l := &m.libr
+	if l.loading && l.key != m.libraryStamp() {
+		return nil
+	}
 	if len(l.marked) > 0 {
 		var out []*view.LibInstRow
 		for ri := range l.page.Rows {
@@ -203,15 +223,44 @@ func targetOps(ts []*view.LibInstRow) []string {
 
 func (m *model) openLibrary() tea.Cmd {
 	m.tab = tabLibrary
-	m.loadLibrary()
-	return nil
+	l := &m.libr
+	key := m.libraryStamp()
+	if l.page != nil && l.key == key {
+		return nil
+	}
+	l.seq++
+	seq := l.seq
+	l.loading = true
+	search, filters, sort := l.bar.search, slices.Clone(l.bar.filters), l.sort
+	valid := func(m *model) bool { return m.tab == tabLibrary && m.libr.seq == seq && m.libraryStamp() == key }
+	return m.bgWhen(valid, func(a *app.App) func(*model) tea.Cmd {
+		lib, err := a.Library()
+		var p *view.LibPage
+		if err == nil {
+			p, err = view.BuildLibrary(lib, search, filters, sort)
+		}
+		return func(m *model) tea.Cmd {
+			m.libr.loading = false
+			if err != nil {
+				m.libr.err = m.humanize(err.Error())
+				return nil
+			}
+			// Details and row actions use the same inventory, rather than building
+			// it again from View. Rebind its loadout to the live UI session.
+			m.app.AdoptLibrary(lib)
+			m.libCache, m.libAt = lib, m.boardSeq
+			m.applyLibrary(p)
+			return nil
+		}
+	})
 }
 
 // openLibraryInstance selects a specific installed copy, clearing filters that could hide it.
 func (m *model) openLibraryInstance(id string) tea.Cmd {
 	m.libr.bar = barState{}
 	m.libr.full, m.libr.detail = false, false
-	m.openLibrary()
+	m.tab = tabLibrary
+	m.loadLibrary()
 	l := &m.libr
 	if l.page == nil {
 		return nil
@@ -425,7 +474,7 @@ func (m *model) libToggleOpen(x libLine) {
 
 func (m *model) libraryKey(s string) tea.Cmd {
 	l := &m.libr
-	if l.page == nil {
+	if l.page == nil || l.loading && l.key != m.libraryStamp() {
 		if s == "esc" {
 			m.tab = tabList
 		}
