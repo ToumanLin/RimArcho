@@ -311,19 +311,30 @@ func (a *App) RenameSave(s *Save, name string) (string, error) {
 		file = s.Prefix + rimSavesSep + file
 	}
 	to := filepath.Join(filepath.Dir(s.Path), file)
-	if to == s.Path && file == s.File {
-		return to, nil
+	// Saves travel between filesystems and Steam Cloud: check every case variant,
+	// including on case-sensitive volumes, but allow this file's own case to change.
+	entries, err := os.ReadDir(filepath.Dir(s.Path))
+	if err != nil {
+		return "", err
 	}
-	if target, err := os.Lstat(to); err == nil {
-		original, err := os.Lstat(s.Path)
+	original, err := os.Lstat(s.Path)
+	if err != nil {
+		return "", err
+	}
+	for _, entry := range entries {
+		if !strings.EqualFold(entry.Name(), file) {
+			continue
+		}
+		target, err := entry.Info()
 		if err != nil {
 			return "", err
 		}
 		if !os.SameFile(original, target) {
 			return "", fmt.Errorf("a save named %s already exists", name)
 		}
-	} else if !os.IsNotExist(err) {
-		return "", err
+	}
+	if to == s.Path && file == s.File {
+		return to, nil
 	}
 	// never over a file that appeared since the check (os.Rename replaces on Windows)
 	if err := renameNoReplace(s.Path, to); err != nil {
@@ -385,7 +396,7 @@ func copyFileExcl(src, dst string) error {
 
 // SaveFilesResult is the preview or result of backing up or recycling saves.
 type SaveFilesResult struct {
-	Saves []*Save
+	Saves []*Save // preview: requested saves; done: successful saves only
 	Bytes int64
 	Dir   string   // backup: the time folder
 	Done  bool     // false: preview only
@@ -495,6 +506,7 @@ func (a *App) BackupSaves(saves []*Save, yes bool, token string) (*SaveFilesResu
 		r.Dir = filepath.Join(root, fmt.Sprintf("%s-%d", stamp, n))
 	}
 	used := map[string]bool{}
+	r.Saves, r.Bytes = nil, 0
 	for _, s := range saves {
 		rel := backupName(s, used)
 		to := filepath.Join(r.Dir, rel)
@@ -507,6 +519,8 @@ func (a *App) BackupSaves(saves []*Save, yes bool, token string) (*SaveFilesResu
 			continue
 		}
 		os.Chtimes(to, s.ModTime, s.ModTime)
+		r.Saves = append(r.Saves, s)
+		r.Bytes += s.Size
 	}
 	r.Done = true
 	return r, nil
@@ -569,6 +583,7 @@ func (a *App) TrashSaves(saves []*Save, yes bool, token string) (*SaveFilesResul
 	if _, err := checkToken(saves, token, false); err != nil {
 		return nil, err
 	}
+	r.Saves, r.Bytes = nil, 0
 	for _, s := range saves {
 		if s.Writing {
 			r.Errs = append(r.Errs, s.Name+": being written")
@@ -576,7 +591,10 @@ func (a *App) TrashSaves(saves []*Save, yes bool, token string) (*SaveFilesResul
 		}
 		if err := a.ToTrash(s.Path); err != nil {
 			r.Errs = append(r.Errs, s.Name+": "+err.Error())
+			continue
 		}
+		r.Saves = append(r.Saves, s)
+		r.Bytes += s.Size
 	}
 	r.Done = true
 	return r, nil

@@ -81,7 +81,7 @@ The link ledger stays with the data until the uninstall steps finish. Owned link
 
 ## 3. Recycle bin
 
-RimArcho never permanently deletes the player's content. It always moves it to the system recycle bin, and refuses when the recycle bin is unavailable.
+RimArcho never permanently deletes the player's content. It always moves it to the system recycle bin, and refuses when the recycle bin is unavailable. Success output describes only completed moves; failures remain errors. Batch save results follow 12 §4.4; uninstall keeps each item's failure and retains its data so it can run again (§2).
 
 Before a target is recycled, RimArcho's links into it are detached (09 §3). Removing a link deletes only the link itself; it creates no recycle bin entry and does not widen this section's allowlist.
 

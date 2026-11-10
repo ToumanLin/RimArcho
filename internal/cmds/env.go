@@ -135,6 +135,19 @@ func envDetect(c *Ctx, a *Args) (*render.Doc, error) {
 	} else {
 		d.AddNext("archo env add <name> --detected")
 	}
+	for _, other := range env.DetectAll(c.App.Detect) {
+		if env.PathKey(other.GameRoot) == env.PathKey(det.GameRoot) {
+			continue
+		}
+		n := root.Section("another detected environment (suggestion, not saved)")
+		n.KV("game", other.GameRoot)
+		n.KV("version", versionText(other.GameVersion))
+		n.KV("launch", other.Launch)
+		n.KV("steam-library", other.SteamLibrary)
+		n.KV("user-data", other.UserDataRoot)
+		n.KV("workshop", other.WorkshopRoot)
+		d.AddNext("archo env add <name> --game " + quoteArg(other.GameRoot))
+	}
 	return d, nil
 }
 

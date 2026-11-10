@@ -2,10 +2,27 @@ package l10ndata
 
 import (
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"testing/fstest"
 )
+
+func TestChineseMemoryPunctuation(t *testing.T) {
+	table := Locales["zh"]()
+	for _, key := range []string{
+		"RAM: loading needs %s; available now %s of %s",
+		"RAM: loading needs %s; available memory and total capacity are unavailable",
+		"RAM: loading needs %s; available memory is unavailable; total capacity %s",
+		"VRAM: estimated %s; dedicated capacity %s",
+		"VRAM: estimated %s; dedicated capacity is unknown",
+	} {
+		text := table.Text[key]
+		if text == "" || strings.ContainsAny(text, ";:") {
+			t.Errorf("memory translation must use localized punctuation: %q: %q", key, text)
+		}
+	}
+}
 
 func TestLocaleDuplicateKeys(t *testing.T) {
 	tests := []struct {

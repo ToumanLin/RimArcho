@@ -3,7 +3,6 @@ package view_test
 import (
 	"fmt"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -331,10 +330,7 @@ func TestSaveFilePreviews(t *testing.T) {
 		}
 	}
 	e.WriteSave("Ashfall#§#Second.rws", testkit.SaveSpec{Mods: []string{"ludeon.rimworld"}})
-	duplicate := "Second"
-	if runtime.GOOS == "windows" {
-		duplicate = "second" // Windows file lookup also catches a different case.
-	}
+	duplicate := "second" // Save names collide regardless of filesystem case rules.
 	if got := view.SaveNameProblem(landing, duplicate); got != "a save named "+duplicate+" is already there" {
 		t.Fatalf("a duplicate in the colony: %q", got)
 	}

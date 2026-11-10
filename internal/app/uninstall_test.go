@@ -314,6 +314,9 @@ func TestUninstallNoRecycleBin(t *testing.T) {
 	if !exists(filepath.Join(f.Home, "archo.db")) {
 		t.Fatal("the database must stay to run again")
 	}
+	if out, _ := f.Run("uninstall", "--yes"); !strings.HasPrefix(out, "uninstall stopped short:") || strings.Contains(out, "uninstalled:") {
+		t.Fatalf("failed uninstall reported success:\n%s", out)
+	}
 	// The real recycle bin refuses on a missing path instead of deleting anything.
 	if err := source.Trash(filepath.Join(f.Root, "no such folder")); err == nil {
 		t.Fatal("trashing a missing folder must fail")

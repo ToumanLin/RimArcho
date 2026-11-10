@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -156,6 +157,10 @@ func TestPackExportImport(t *testing.T) {
 
 	full := filepath.Join(e.Root, "first.archopack")
 	e.MustRun("pack", "export", "first", full)
+	e.App.TrashFunc = func(string) error { return errors.New("synthetic unsafe trash directory") }
+	if out, code := e.Run("pack", "remove", "first"); code == 0 || strings.Contains(out, "to the recycle bin") {
+		t.Fatalf("failed pack trash reported success: exit %d\n%s", code, out)
+	}
 	var trashed []string
 	e.App.TrashFunc = func(p string) error { trashed = append(trashed, p); return os.RemoveAll(p) }
 	e.MustRun("pack", "remove", "first")

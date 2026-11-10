@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -49,12 +50,21 @@ func TestProblemLogSkipsTheRunningGamesLog(t *testing.T) {
 	if err := e.App.SelectLog(st, cur); err != nil {
 		t.Fatal(err)
 	}
+	e.RecordLaunch(e.Now().Add(-10 * time.Minute))
 	running = true
 	if e.App.LiveLog(st) != cur {
 		t.Fatalf("live log %q", e.App.LiveLog(st))
 	}
 	if got := e.App.ProblemLog(st); got != prev || logOf() != prev {
 		t.Fatalf("running: %s", got)
+	}
+	// A clean live log must not make the cached previous report look like this run.
+	e.WriteFile(cur, "synthetic clean live log\n")
+	out := e.MustRun("status")
+	for _, want := range []string{"game: running plan:default", "log findings are from a previous run", "log: previous run: Player-prev.log", "current run: archo log --follow"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("missing %q:\n%s", want, out)
+		}
 	}
 	// cache-only reads (the sidebar's count): the selected log is the live one, so the run
 	// before it
@@ -66,5 +76,8 @@ func TestProblemLogSkipsTheRunningGamesLog(t *testing.T) {
 	running = false
 	if got := e.App.ProblemLog(st); got != cur || logOf() != cur {
 		t.Fatalf("after exit: %s", got)
+	}
+	if out := e.MustRun("status"); strings.Contains(out, "log: previous run:") || strings.Contains(out, "log findings are from a previous run") {
+		t.Fatalf("labels survived game exit:\n%s", out)
 	}
 }

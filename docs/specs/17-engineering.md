@@ -100,7 +100,7 @@ app.RemoveDep(name)                      // Delete only own copy; see 02 §1
 - Installation does not change settings: if the player specified another copy, it remains selected after installation (the settings explanation shows the source).
 - `app.CheckToolUpdates` checks only the currently used managed SteamCMD and todds: Valve's platform-specific SteamCMD package manifest and todds' latest stable GitHub release. It downloads no executables. Results appear in settings rows and `archo deps`; scheduling: 16 §2.16. Read SteamCMD's version from the package manifest; manual updates run its own update process, never overwrite an installed tool with the bootstrap ZIP. Install only the todds version supported by the caller; merely notify about incompatible newer releases.
 - Check processes before updating or removing. Windows refuses while a same-named tool is in use; Linux checks `/proc/<pid>/exe` for any executable inside the managed tool directory, including nested runtime directories and deleted executables still running. In-app use and replacement of SteamCMD and todds share locks. Refuse replacement when the process table cannot be inspected. For a protected same-user Linux process, compare `comm` against filenames throughout the tool directory, accounting for the kernel's 15-byte name limit; refuse if a name matches or the comparison cannot be completed. Unrelated protected processes and inaccessible processes of other Linux users are skipped. Do not infer whether a tool is busy from a single failed write.
-- CLI: `archo deps` (status, versions, paths, sources), `archo deps install <name>`, `archo deps remove <name>`. Settings buttons run the same commands; downloads enter background tasks (16 §2.16).
+- CLI: `archo deps` (status, versions, paths, and a `source` for each located tool, including `config` when `textures.todds` selects todds), `archo deps install <name>`, `archo deps remove <name>`. Settings buttons run the same commands; downloads enter background tasks (16 §2.16).
 - Tests: `internal/deps` uses temporary directories and fake `LookPath` / `Version` to check discovery order, version caching and `Own`; `internal/app/deps_test.go` checks that `RemoveDep` refuses copies it does not own.
 
 ### 2.2 Network: proxy and GitHub mirror (`internal/netcfg`)
@@ -127,7 +127,7 @@ Some of RimArcho's hosts are often unreachable in mainland China: `raw.githubuse
 | macOS | `~/Library/Application Support/RimArcho/` |
 | Linux | `$XDG_DATA_HOME/rimarcho/`, otherwise `~/.local/share/rimarcho/` |
 
-The `RIMARCHO_HOME` environment variable overrides this table (used by tests and child processes).
+The `RIMARCHO_HOME` environment variable overrides this table (used by tests and child processes). On Linux, only an absolute `XDG_DATA_HOME` is accepted; an unset or relative value falls back to `$HOME/.local/share/rimarcho`. Without an absolute XDG value, an unset or relative `HOME` fails startup with instructions to set an absolute `HOME` or `XDG_DATA_HOME`, or override `RIMARCHO_HOME`; no relative data directory is created (`env.AppHome`).
 
 Schema 35 adds unresolved Def classification inputs and per-set content readiness without discarding existing Def/DLL facts or views (05 §5.1). Migration from schema 34 is additive; re-extraction uses background analysis.
 

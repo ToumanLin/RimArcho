@@ -169,8 +169,9 @@ var ErrLogNotCached = errors.New("log not analysed yet")
 // constructor frames their type, the null trace (who passed the null; the thrower a patcher),
 // Lord.AddPawn call sites, same-role candidates ordered by evidence (06 §2, §3); 20: list modifiers of "Collection
 // was modified" and comp-list tick crashes, Harmony patches on callers listed only, no
-// --target suggestion for TargetMethod() patches (06 §2, §3).
-const logCacheVersion = 21
+// --target suggestion for TargetMethod() patches (06 §2, §3); 21: native Linux paths;
+// 22: audio and other asset paths in stable finding keys and attribution on both platforms.
+const logCacheVersion = 22
 
 // AnalyzeLog parses and attributes a log file. The report is cached in memory and in the
 // database, keyed by path, size and mtime plus the attribution inputs (logInputKey), so a
@@ -791,10 +792,10 @@ func (cx *attrCtx) dirOwner(path string) (string, string) {
 var (
 	bracketRe = regexp.MustCompile(`^(?:<color=[^>]*>)?\[([^\]]{2,80})\](?:</color>)?`)
 	xmlExtRe  = regexp.MustCompile(`^Verse\.PatchOperation\w*\(xpath="(.*)"\): Failed`)
-	winPathRe = regexp.MustCompile(`[A-Za-z]:[\\/][^"'<>|\r\n]*?\.(?:xml|dll|png|txt)`)
+	winPathRe = regexp.MustCompile(`[A-Za-z]:[\\/][^"'<>|\r\n]*?\.(?:xml|dll|png|txt|mp3|ogg|wav|dds|jpg|jpeg|tga|asset|bundle)`)
 	// A native Linux path starts after a boundary, so a relative Defs/a/b.xml and a URL
-	// are not cut into absolute paths. Used off Windows only: Windows keys stay unchanged.
-	unixPathRe   = regexp.MustCompile(`(?:^|[\s"'(\[=])/[^"'<>|\r\n]*?\.(?:xml|dll|png|txt)`)
+	// are not cut into absolute paths. Spaces inside a path belong to the path.
+	unixPathRe   = regexp.MustCompile(`(?:^|[\s"'(\[=])/[^"'<>|\r\n]*?\.(?:xml|dll|png|txt|mp3|ogg|wav|dds|jpg|jpeg|tga|asset|bundle)`)
 	xrefRe       = regexp.MustCompile(`No ([\w.]+) named (\S+) found to give to (\S+)|cross-reference to ([\w.]+) named (\S+)|reference to ([\w.]+) named (\S+)`)
 	forDefRe     = regexp.MustCompile(` for def '([^']+)'`)
 	ctxDefNameRe = regexp.MustCompile(`(?:Context|Full node): [\s\S]*?<defName>([^<\s]+)</defName>`)
@@ -1305,12 +1306,10 @@ func findingKey(key string) string {
 		return strings.ToLower(strings.Join(parts, "/"))
 	}
 	key = winPathRe.ReplaceAllStringFunc(key, cut)
-	if runtime.GOOS != "windows" {
-		key = unixPathRe.ReplaceAllStringFunc(key, func(m string) string {
-			i := strings.IndexByte(m, '/')
-			return m[:i] + cut(m[i:])
-		})
-	}
+	key = unixPathRe.ReplaceAllStringFunc(key, func(m string) string {
+		i := strings.IndexByte(m, '/')
+		return m[:i] + cut(m[i:])
+	})
 	return key
 }
 

@@ -209,7 +209,7 @@ Commands and output call a plan `loadout` or `plan`. The editing commands below 
 
 | Group | Command | Description |
 | --- | --- | --- |
-| Environments | `env list` / `env detect` / `env use <name>` | List environments (one per game directory) and shared Mod folders; suggest detected game, user-data, and Workshop paths (03 §3.2); or switch the current environment. |
+| Environments | `env list` / `env detect` / `env use <name>` | List environments (one per game directory) and shared Mod folders; suggest every detected game with its user-data and Workshop paths (03 §3.2); or switch the current environment. |
 | | `env add <name> [--detected] [--game <directory>] [--saves shared\|own \| --user-data <directory>] [--launch direct\|steam]` | Create an environment (03 §3.1), one per game directory. Add its Steam library's Workshop directory if it is missing. The first environment becomes current. `--workshop`, `--steamcmd`, and `--extra` are aliases for `folder add`. |
 | | `env set <name> [--game <directory>] [--saves shared\|own] [--user-data <directory>] [--launch …] [--launch-args <arguments>]` | Change the game directory (rebinding `Data` and `Mods`, 03 §4.2), saves, launch method, or extra launch arguments (for example, `-popupwindow`; `""` clears them). `--remove-source` is the same as `folder remove`. |
 | | `env branches [--install-steamcmd]` / `env download <branch> --to <directory> --account <account-name> [--name <environment>] [--saves …] [--install-steamcmd]` | Use SteamCMD to list RimWorld branches, or download a version and add it as an environment. Login happens in SteamCMD (11 §3). |
