@@ -168,7 +168,7 @@ func (m *model) scanSummary(out string) string {
 }
 
 func (m *model) key(k tea.KeyMsg) tea.Cmd {
-	s := k.String()
+	s := keyName(k) // an input method's full-width punctuation as the US key (imekeys.go)
 	if m.uninstallRun != nil {
 		if s == "ctrl+c" || s == "q" || s == "esc" {
 			m.say(sayBusy, T("uninstalling; you can close RimArcho when it finishes"))
