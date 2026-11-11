@@ -325,11 +325,16 @@
   "could not check": "无法检查",
   "removing one can stop the save loading: its pawns, factions or code are in it": "移除后存档可能读不了：存档里有它的人物、派系或代码",
   "the save loads without one; its buildings, items and the like are gone": "移除后存档能读，但它的建筑、物品等会消失",
-  "only research, recipes, appearance and the like: they reset and the colony goes on": "只有研究、配方、外观之类：会重置，殖民地照常继续",
   "nothing of theirs is in the save, as far as the save can tell": "就存档能看出的而言，里面没有它们的东西",
   "not installed or not analysed: nothing can be said of them": "没有安装或还没分析：无法下结论",
   "%s (%d dead)": "%s（其中 %d 个已死亡）",
   "a map's weather": "地图的天气",
   "not analysed for this game version": "这个游戏版本下还没分析",
-  "its code is not analysed": "它的代码还没分析"
+  "its code is not analysed": "它的代码还没分析",
+  "research, recipes, appearance and the like reset and the colony goes on; or only Mods that are safe to remove need them": "研究、配方、外观之类会重置，殖民地照常继续；或者只有可以安全移除的 Mod 需要它们",
+  "needed by 1 Mod": "有 1 个 Mod 需要它",
+  "needed by %d Mods": "有 %d 个 Mod 需要它",
+  "a Mod that needs it could not be checked": "需要它的 Mod 无法检查",
+  "show what it holds": "显示它在存档里的内容",
+  "hide what it holds": "收起它在存档里的内容"
 }

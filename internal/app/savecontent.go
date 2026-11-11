@@ -7,6 +7,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/analyze"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/savefile"
+	"github.com/ToumanLin/RimArcho/internal/store"
 )
 
 // SaveContentResult is selected-save L2 evidence, using cached L1 and installed Def
@@ -98,6 +99,7 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 	// A pack's save loads the pack's own copies; the library's copy of the same packageId
 	// stands in while the pack's has no content facts.
 	packCopy := map[string]string{}
+	deps := map[string][]scanDep{} // by instance: what its About.xml requires (12 §4.7)
 	if sv.Pack != "" {
 		if p, err := a.ReadPack(sv.Pack); err == nil {
 			for _, e := range p.Entries {
@@ -140,6 +142,18 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 				active[normPkg(m.PackageID)] = true
 			}
 			mods = append(mods, SaveMod{Name: name, PackageID: pkg, Instance: inst, Library: inst})
+		}
+		var installed []*store.Mod
+		for _, m := range mods {
+			if im := st.Ix.ByID[m.Instance]; im != nil {
+				installed = append(installed, im)
+			}
+		}
+		if err := a.Store.LoadDecls(installed); err != nil {
+			return err
+		}
+		for _, im := range installed {
+			deps[im.ID] = requiredDeps(im, st.GameMM())
 		}
 		return nil
 	})
@@ -312,7 +326,7 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 		cat := finishContentCat("unknown", ns)
 		out.Unknown = &cat
 	}
-	if out.Needs, err = a.saveNeeds(f, mods, ready, catsOf, own); err != nil {
+	if out.Needs, err = a.saveNeeds(f, mods, ready, catsOf, own, deps); err != nil {
 		return nil, err
 	}
 	return out, nil

@@ -254,11 +254,18 @@ func needHint(key string) string {
 	case app.NeedLoses:
 		return T("the save loads without one; its buildings, items and the like are gone")
 	case app.NeedCare:
-		return T("only research, recipes, appearance and the like: they reset and the colony goes on")
+		return T("research, recipes, appearance and the like reset and the colony goes on; or only Mods that are safe to remove need them")
 	case app.NeedSafe:
 		return T("nothing of theirs is in the save, as far as the save can tell")
 	}
 	return T("not installed or not analysed: nothing can be said of them")
+}
+
+func neededBy(k int) string {
+	if k == 1 {
+		return T("needed by 1 Mod")
+	}
+	return Tf("needed by %d Mods", k)
 }
 
 // needSumParts bounds a Mod's one-line summary; the rest is in its parts.
@@ -266,10 +273,6 @@ const needSumParts = 3
 
 func saveNeedMod(n app.SaveNeed) SaveNeedMod {
 	m := SaveNeedMod{Name: n.Name, PackageID: n.PackageID, Library: n.Library}
-	if n.Verdict == app.NeedUnchecked {
-		m.Sum = T(n.Why)
-		return m
-	}
 	count := func(k int, one, many string) string {
 		if k == 1 {
 			return Tf("%d %s", k, T(one))
@@ -293,6 +296,10 @@ func saveNeedMod(n app.SaveNeed) SaveNeedMod {
 	if len(n.Weather) > 0 {
 		m.Parts = append(m.Parts, SaveNeedPart{Label: T("a map's weather"), Names: n.Weather})
 	}
+	if k := len(n.NeededBy); k > 0 {
+		names := n.NeededBy[:min(k, app.OwnedDefNames)]
+		m.Parts = append(m.Parts, SaveNeedPart{Label: neededBy(k), Names: names, More: k - len(names)})
+	}
 	for _, c := range n.Cats {
 		// said above by the faction's name and by the colonists
 		if c.Key == "factions" && len(n.Factions) > 0 || c.Key == "races" && n.Colonists+n.Dead > 0 {
@@ -308,6 +315,13 @@ func saveNeedMod(n app.SaveNeed) SaveNeedMod {
 		}
 		x := saveContentCat(c)
 		m.Parts = append(m.Parts, SaveNeedPart{Label: Tf("%d %s", x.Count, x.Label), Names: x.Names, More: x.Count - len(x.Names)})
+	}
+	if n.Verdict == app.NeedUnchecked {
+		m.Sum = T(n.Why)
+		if n.Why != app.NeedWhyDependent {
+			m.Parts = nil
+		}
+		return m
 	}
 	var sum []string
 	for i, p := range m.Parts {

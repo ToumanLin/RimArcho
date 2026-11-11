@@ -26,6 +26,8 @@ const (
 	NeedWhyGone   = "not installed"
 	NeedWhyNoDefs = "not analysed for this game version"
 	NeedWhyNoCode = "its code is not analysed"
+	// required by a Mod that is itself not checked
+	NeedWhyDependent = "a Mod that needs it could not be checked"
 )
 
 // SaveNeed is one Mod of the save.
@@ -40,7 +42,10 @@ type SaveNeed struct {
 	Classes         []string // Class="…" values only its assemblies define among the save's Mods
 	Weather         []string // its WeatherDefs a map has now or had last
 	Defs            int      // distinct Defs of it the save references
-	Cats            []SaveContentCategory
+	// NeededBy are the save's other Mods whose About.xml requires this one, by name: its
+	// verdict is at least the heaviest of theirs, since they do not run without it.
+	NeededBy []string
+	Cats     []SaveContentCategory
 }
 
 // needWorld are the content categories whose Defs are objects in the world, plus culture:
@@ -86,7 +91,7 @@ type needOwners struct {
 
 // saveNeeds gives every Mod of the save its verdict. cats are the content categories by
 // instance; ready the instances with content facts.
-func (a *App) saveNeeds(f *savefile.Facts, mods []SaveMod, ready map[string]bool, cats map[string][]SaveContentCategory, own needOwners) ([]SaveNeed, error) {
+func (a *App) saveNeeds(f *savefile.Facts, mods []SaveMod, ready map[string]bool, cats map[string][]SaveContentCategory, own needOwners, deps map[string][]scanDep) ([]SaveNeed, error) {
 	var insts []string
 	for _, m := range mods {
 		if m.Instance != "" {
@@ -154,7 +159,72 @@ func (a *App) saveNeeds(f *savefile.Facts, mods []SaveMod, ready map[string]bool
 		}
 		out = append(out, n)
 	}
+	needDependents(out, mods, deps)
 	return out, nil
+}
+
+// needRank orders the verdicts for what a Mod takes from the Mods that require it: an
+// unchecked dependent outweighs safe, since nothing can be said of it.
+var needRank = map[string]int{NeedBreaks: 5, NeedLoses: 4, NeedCare: 3, NeedUnchecked: 2, NeedSafe: 1}
+
+// needDependents raises a Mod's verdict to the heaviest of the save's Mods that require it
+// (About.xml modDependencies for the save's game version, as 08 reads them), through chains
+// of requirements: without it they do not run, so what they hold in the save goes with it.
+// A requirement several of the save's Mods can meet (alternatives) binds none of them. A
+// Mod required only by Mods safe to remove is NeedCare, not safe: removing it alone leaves
+// them broken. The game's own Mods are left as they are.
+func needDependents(out []SaveNeed, mods []SaveMod, deps map[string][]scanDep) {
+	at := map[string]int{}
+	for i, m := range mods {
+		if p := dependencyPackage(m.PackageID); p != "" {
+			if _, ok := at[p]; !ok {
+				at[p] = i
+			}
+		}
+	}
+	by := make([][]int, len(mods)) // the Mods requiring each one
+	for j, m := range mods {
+		seen := map[int]bool{}
+		for _, d := range deps[m.Instance] {
+			met := -1
+			for _, p := range append([]string{d.pkg}, d.alts...) {
+				i, ok := at[dependencyPackage(p)]
+				if !ok || i == met {
+					continue
+				}
+				if met >= 0 { // two of the save's Mods meet it
+					met = -2
+					break
+				}
+				met = i
+			}
+			if met < 0 || met == j || seen[met] || out[met].Game {
+				continue
+			}
+			seen[met] = true
+			by[met] = append(by[met], j)
+			out[met].NeededBy = append(out[met].NeededBy, out[j].Name)
+		}
+	}
+	for changed := true; changed; {
+		changed = false
+		for i := range out {
+			for _, j := range by[i] {
+				v := out[j].Verdict
+				if v == NeedSafe {
+					v = NeedCare
+				}
+				if needRank[v] > needRank[out[i].Verdict] {
+					out[i].Verdict, changed = v, true
+					if v == NeedUnchecked {
+						out[i].Why = NeedWhyDependent
+					} else {
+						out[i].Why = ""
+					}
+				}
+			}
+		}
+	}
 }
 
 // saveClassOwners gives, by instance, the save's Class="…" values that only that copy

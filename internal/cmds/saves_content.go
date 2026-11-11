@@ -146,6 +146,9 @@ func needsBreaking(needs []app.SaveNeed, all bool) string {
 		if len(m.Weather) > 0 {
 			parts = append(parts, "a map's weather")
 		}
+		if k := len(m.NeededBy); k > 0 {
+			parts = append(parts, "needed by "+render.Plural(k, "Mod"))
+		}
 		if len(parts) == 0 { // a FactionDef the save names with no faction of it left
 			parts = append(parts, "a faction Def")
 		}

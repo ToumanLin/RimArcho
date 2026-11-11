@@ -24,18 +24,26 @@ func TestSaveNeeds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	add := func(id, pkg, name string, files map[string]string) {
-		e.AddWorkshop(id, testkit.Mod{PackageID: pkg, Name: name, Files: files})
+	add := func(id, pkg, name string, files map[string]string, deps ...string) {
+		e.AddWorkshop(id, testkit.Mod{PackageID: pkg, Name: name, Files: files, Deps: deps})
 	}
+	// libraries with nothing in the save: Lib is required by a Mod that breaks the save and
+	// requires Base; Menu Lib is required only by a Mod safe to remove
+	key := func(n string) map[string]string {
+		return map[string]string{"Defs/K.xml": "<Defs><KeyBindingDef><defName>" + n + "</defName></KeyBindingDef></Defs>\n"}
+	}
+	add("3000000001", "tester.base", "Base", key("BaseKey"))
+	add("3000000002", "tester.lib", "Lib", key("LibKey"), "tester.base")
+	add("3000000003", "tester.menulib", "Menu Lib", key("MenuLibKey"))
 	add("3000000005", "tester.kurin", "Kurin", map[string]string{
 		"Defs/Kurin.xml":      "<Defs><ThingDef><defName>Kurin_Race</defName><race><intelligence>Humanlike</intelligence></race></ThingDef><FactionDef><defName>KurinClan</defName></FactionDef></Defs>\n",
 		"Assemblies/ModA.dll": string(dll),
-	})
+	}, "tester.lib")
 	add("3000000006", "tester.chairs", "Chairs", map[string]string{"Defs/C.xml": "<Defs><ThingDef><defName>Stool</defName><category>Building</category></ThingDef></Defs>\n"})
 	add("3000000007", "tester.hair", "Hair", map[string]string{"Defs/H.xml": "<Defs><HairDef><defName>Bob</defName></HairDef></Defs>\n"})
 	add("3000000008", "tester.rain", "Rain", map[string]string{"Defs/W.xml": "<Defs><WeatherDef><defName>AcidRain</defName></WeatherDef></Defs>\n"})
-	add("3000000009", "tester.menus", "Menus", map[string]string{"Defs/M.xml": "<Defs><KeyBindingDef><defName>Unused</defName></KeyBindingDef></Defs>\n"})
-	mods := []string{"ludeon.rimworld", "tester.kurin", "tester.chairs", "tester.hair", "tester.rain", "tester.menus"}
+	add("3000000009", "tester.menus", "Menus", key("Unused"), "tester.menulib", "ludeon.rimworld")
+	mods := []string{"ludeon.rimworld", "tester.base", "tester.lib", "tester.menulib", "tester.kurin", "tester.chairs", "tester.hair", "tester.rain", "tester.menus"}
 	e.WriteModsConfig("1.6.4633 rev1261", mods...)
 	e.AddEnv(false)
 	e.MustRun("scan")
@@ -66,12 +74,13 @@ func TestSaveNeeds(t *testing.T) {
 	for _, n := range c.Needs {
 		by[n.PackageID] = n
 	}
-	if len(c.Needs) != 7 {
+	if len(c.Needs) != 10 {
 		t.Fatalf("needs: %+v", c.Needs)
 	}
 	for pkg, want := range map[string]string{
 		"tester.kurin": app.NeedBreaks, "tester.chairs": app.NeedLoses, "tester.hair": app.NeedCare,
 		"tester.rain": app.NeedBreaks, "tester.menus": app.NeedSafe, "tester.gone": app.NeedUnchecked,
+		"tester.lib": app.NeedBreaks, "tester.base": app.NeedBreaks, "tester.menulib": app.NeedCare,
 	} {
 		if got := by[pkg].Verdict; got != want {
 			t.Errorf("%s: %s, want %s (%+v)", pkg, got, want, by[pkg])
@@ -84,6 +93,12 @@ func TestSaveNeeds(t *testing.T) {
 		t.Errorf("rain: %+v", r)
 	}
 	if g := by["ludeon.rimworld"]; !g.Game || g.Colonists != 1 {
+		t.Errorf("core: %+v", g)
+	}
+	if l, b := by["tester.lib"], by["tester.base"]; !slices.Equal(l.NeededBy, []string{"Kurin"}) || !slices.Equal(b.NeededBy, []string{"Lib"}) {
+		t.Errorf("needed by: %+v %+v", l, b)
+	}
+	if g := by["ludeon.rimworld"]; len(g.NeededBy) != 0 {
 		t.Errorf("core: %+v", g)
 	}
 	if g := by["tester.gone"]; g.Why != app.NeedWhyGone {

@@ -911,21 +911,42 @@ function fillNeeds(list, d, groups) {
 function needMod(m) {
   const li = el("li", "sv-nmod");
   const open = content.opened.has(m.packageId);
-  const more = (m.parts || []).length > 0 || !!m.library;
-  const tg = el("button", "h");
-  tg.type = "button";
-  tg.dataset.key = "need-mod-" + m.packageId;
-  tg.title = m.packageId;
-  if (more) tg.setAttribute("aria-expanded", String(open));
+  const more = (m.parts || []).length > 0;
+  // a row of text, not a button, so its name and summary can be selected; the chevron
+  // opens it and the name is the link to the library
+  const row = el("div", "h");
+  if (more) {
+    const tg = el("button", "tg" + (open ? " open" : ""));
+    tg.type = "button";
+    tg.innerHTML = icon.chev;
+    tg.dataset.key = "need-mod-" + m.packageId;
+    tg.title = open ? T("hide what it holds") : T("show what it holds");
+    tg.setAttribute("aria-label", tg.title + T(": ") + m.name);
+    tg.setAttribute("aria-expanded", String(open));
+    tg.onclick = () => {
+      if (open) content.opened.delete(m.packageId); else content.opened.add(m.packageId);
+      redrawContent();
+    };
+    row.append(tg);
+  }
+  let name;
+  if (m.library) {
+    name = el("a", "n lk", m.name);
+    name.setAttribute("role", "link");
+    name.tabIndex = 0;
+    name.dataset.key = "need-lib-" + m.packageId;
+    name.title = m.packageId + "  " + T("show in the mod library");
+    // a drag over the name selects it; a plain click follows it
+    name.onclick = () => { if (String(getSelection()) === "") openLibraryInstance(m.library); };
+    name.onkeydown = (e) => { if (e.key === "Enter") openLibraryInstance(m.library); };
+  } else {
+    name = el("span", "n", m.name);
+    name.title = m.packageId;
+  }
   const sum = el("span", "c", m.sum || "");
   if (m.sum) sum.title = m.sum; // the line may be cut short
-  tg.append(el("span", "n", m.name), sum);
-  tg.onclick = () => {
-    if (!more) return;
-    if (open) content.opened.delete(m.packageId); else content.opened.add(m.packageId);
-    redrawContent();
-  };
-  li.append(tg);
+  row.append(name, sum);
+  li.append(row);
   if (open && more) {
     const box = el("div", "sv-details");
     for (const x of m.parts || []) {
@@ -933,11 +954,6 @@ function needMod(m) {
       const names = x.names || [];
       p.append(el("b", "", x.label), names.length ? " " + names.join(T(", ")) + (x.more ? " " + Tf("and %d more", x.more) : "") : "");
       box.append(p);
-    }
-    if (m.library) {
-      const lk = button(T("show in the mod library"), "", () => openLibraryInstance(m.library), "link");
-      lk.dataset.key = "need-lib-" + m.packageId;
-      box.append(lk);
     }
     li.append(box);
   }
