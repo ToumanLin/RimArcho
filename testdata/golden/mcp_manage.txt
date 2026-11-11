@@ -388,7 +388,7 @@ versions: 1 (plan:default, env:main)
   v1  2026-10-01 10:00  import  3 entries  1.6.4633 rev1261  ModsConfig.xml
 
 > plan_history {"action":"steps"}
-history: 1 unsaved edits, 0 redoable, 1 versions
+history: 1 edit to undo, 0 redoable, 1 version
   now: workspace: 2 active, 1 change unsaved (plan:default, env:main)
   undo: archo undo <n> returns to before step n
     1    disable    removed #hnyg Harmony was 2
@@ -409,7 +409,7 @@ workspace: 3 active, saved (plan:default, env:main)
   added  #hnyg  Harmony  at 2
 
 > plan_history {"action":"steps"}
-history: 2 unsaved edits, 0 redoable, 1 versions
+history: 2 edits to undo, 0 redoable, 1 version
   now: workspace: 3 active, saved (plan:default, env:main)
   undo: archo undo <n> returns to before step n
     1    checkout   added #hnyg Harmony at 2
