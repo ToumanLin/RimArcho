@@ -15,6 +15,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 - `archo mod <ref>` (and MCP `get_mod`): under `depends:`, a dependency met by another Mod says so: "pkg:<id> met by <name> (an alternative it accepts / Use This Instead / your replaces rule)", as the window's details do.
 - Scans no longer fail with "database is locked (SQLITE_BUSY)" when another RimArcho process (the window and the text interface together) writes at the same moment.
 - Text interface, Can it run: an item's `R` (an enabled Mod replaces it, repair the links, unhide) did a rescan instead. The selected item's keys now come before the page-wide ones.
+- Game log: after an analysis, a log read before it is attributed again. Before, the stored report could survive (a new analysis reused the old one's number), so Mods installed since still read "assemblies not analysed yet", and their errors were blamed on another Mod that patches the same method.
+- Text interface, Can it run: the memory item's lines are joined in the interface's language (Chinese read `…内存里。; 显存…`).
 
 ## 1.0.9 — 2026-11-10
 

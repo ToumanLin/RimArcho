@@ -71,7 +71,7 @@ func MemoryNeed(c app.MemoryAssessment, plan int64) Need {
 	}
 	it.Evidence = evidence(EvInferred, T("file estimates and OS memory snapshot"))
 	it.Why = strings.Join(lines, "\n")
-	it.Text = it.Title + ": " + strings.Join(lines, "; ")
+	it.Text = Tf("%s: %s", it.Title, joinSentences(lines))
 	identifyNeed(&it)
 	return it
 }
@@ -117,4 +117,25 @@ func BuildMemoryLaunch(a *app.App, st *app.LoadoutState) *MemoryLaunch {
 	}
 	c := a.CachedMemoryAssessment(st)
 	return &MemoryLaunch{Env: st.Ix.Env.Name, Plan: st.Plan.ID, Token: app.MemoryFingerprint(st), Assessment: c, Needed: costRange(c.RAMLow, c.RAMHigh), Available: SizeText(c.RAMBudget)}
+}
+
+// joinSentences puts the lines on one line, for the TUI's item text: the language's "; "
+// between them, or a space after a line that already ends a sentence (VM 2026-11-10: the
+// Chinese item put "; " right after a full stop).
+func joinSentences(lines []string) string {
+	var b strings.Builder
+	for i, l := range lines {
+		if i > 0 {
+			prev := lines[i-1]
+			switch {
+			case strings.HasSuffix(prev, "\u3002"), strings.HasSuffix(prev, "\uff1b"): // full-width full stop, semicolon
+			case strings.HasSuffix(prev, "."):
+				b.WriteString(" ")
+			default:
+				b.WriteString(T("; "))
+			}
+		}
+		b.WriteString(l)
+	}
+	return b.String()
 }

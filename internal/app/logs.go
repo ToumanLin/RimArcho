@@ -272,8 +272,11 @@ func (a *App) analyzeLog(path string, cacheOnly bool) (*LogReport, error) {
 func (a *App) logInputKey(st *LoadoutState) string {
 	h := sha1.New()
 	fmt.Fprintf(h, "v%d|%s|%s|", logCacheVersion, a.GameVersion, st.GameMM())
+	// Not the run's id alone: a new run of the same slot replaces the old row and SQLite
+	// gives it the same id again (VM 2026-11-10: after `archo analyze` the log still said
+	// two new Mods were not analysed and blamed another Mod).
 	if s, err := a.Analysis(st); err == nil && s.Run != nil {
-		fmt.Fprintf(h, "a%d|", s.Run.ID)
+		fmt.Fprintf(h, "a%d.%s.%d.%d|", s.Run.ID, s.Run.RunKey, s.Run.Started.UnixNano(), s.Run.Finished.UnixNano())
 	}
 	for _, e := range st.List {
 		fmt.Fprintf(h, "%s;", e.Instance)
