@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Window, plan editor: Disabled rows no longer start with a source icon. Only Mods with one copy had it (the box of a Mods/ folder, the Workshop icon), so the names did not line up with Mods of several copies.
 - Japanese interface: Settings › language now offers `日本語`, and a Japanese Windows opens RimArcho in Japanese. Translation by tousin61 (community contribution, brought up to date for this release); dates and counts read the Japanese way, kanji use Japanese fonts, and the menu art names the DLC from the game's Japanese translation. Archo Monitor's settings in the game are in Japanese too.
 - New Mods are marked: a Mod a scan found in the last 7 days has a "new" mark after its name in the plan editor and Mod library, and new Mods come first in the editor's Disabled list, so a Mod you just subscribed to is at the top instead of somewhere in the alphabet. Mods found by a game's first scan are not marked. The filter `added:new` (also `added:week`, `month`, `half-year`, `older`) finds them in the editor and Mod library; Mod library has an "added" column and sort. `archo library` says `new` on such a line and accepts `--include added:new` and `--sort added`; MCP `list_library` takes the same filter.
 - Window, launch page: the last-run and update lines in the top right are readable over a background image again; on a grey part of the image (the default planet in the light theme) they were grey on grey.

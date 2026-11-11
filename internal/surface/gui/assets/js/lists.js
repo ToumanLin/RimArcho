@@ -330,7 +330,8 @@ export function renderRows(k) {
     const st = S.board && S.board.status ? rowStatus(it) : 0;
     d.className = "row" + (i === c.cursor ? " cur" : "") + (c.sel.has(key(it)) ? " sel" : "") + (it.dim || it.missing ? " dimmed" : "");
     d.innerHTML = `<span class="m"></span>` + (k === 1 ? `<span class="p">${it.pos || ""}</span>` : "") +
-      `<span class="k">${it.missing ? "" : sourceIcon(it.kind)}</span><span class="t">${esc(it.name)}</span>` +
+      // no source icon in Disabled (16 §2.5): the copy shows in details and source: filters
+      (k === 0 ? "" : `<span class="k">${it.missing ? "" : sourceIcon(it.kind)}</span>`) + `<span class="t">${esc(it.name)}</span>` +
       // a Mod a scan found in the last week (16 §2.5)
       (it.new && !(k === 0 && it.copyCount > 1 && it.copyLabel) ? `<span class="nw">${esc(T("new"))}</span>` : "") +
       // what the row is short of, or which copy it is, sits on the name's line
