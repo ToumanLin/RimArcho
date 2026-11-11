@@ -15,6 +15,7 @@ var imeKeys = map[string]string{
 	"\uff04":       "$", // Japanese
 	"\uff05":       "%",
 	"\u2026\u2026": "^", // shift+6, Chinese
+	"\u2026":       "^", // shift+6 as two keys
 	"\uff3e":       "^",
 	"\uff06":       "&",
 	"\uff0a":       "*",
