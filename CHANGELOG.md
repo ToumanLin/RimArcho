@@ -30,6 +30,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 - Can it run (Chinese): the confirm for a link repair asked about links marked "will be removed", which a recovery or a copy to recycle does not show; it now asks to repair the links as previewed above.
 - Mod library › remove subscription: the "quick delete" box sits beside its words (it was on a line of its own), and the preview reads in the window's language ("remove: 1 subscription", folder, affected link).
 - A quick delete that could remove only part of a Mod folder (a file held open by another program), and a move into the lock library that was refused ("nothing was moved"), now read in Chinese in the Chinese window; the copy button next to the folder copies only the folder, not the words after it. English: "<folder>: only part of it was deleted (…)".
+- Background tasks: a task of one item that failed now gives that item's reason in the window's language in the status line too (its row in Tasks already did); link previews say "detach link", "create link" and "detach and reattach" in Chinese.
 - CLI: plural counts read "2 aliases", "7 classes" (were "2 aliass"); `archo subscribe` previews say "1 subscription".
 - Text interface, Can it run: the memory item's lines are joined in the interface's language (Chinese read `…内存里。; 显存…`).
 

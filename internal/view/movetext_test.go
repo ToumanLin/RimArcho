@@ -3,7 +3,9 @@ package view_test
 import (
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -28,6 +30,14 @@ func TestMoveAndDeleteFailuresTranslated(t *testing.T) {
 		if strings.Contains(got, "%!") {
 			t.Errorf("format arguments lost: %q", got)
 		}
+	}
+	// A task of one item that failed says the item's reason in the status line, translated
+	// as its row in Tasks is (VM round: the quick delete's line stayed English).
+	why := dir + ": only part of it was deleted (in use); the game links to it were removed, delete the rest yourself"
+	task := app.Task{ID: "t1", Kind: view.OpSubRemoveFast, Lane: app.LaneFiles, State: app.TaskFailed, Total: 1, Items: []app.TaskItem{{Ref: "#a", Name: "A", State: app.ItemFail, Why: why}}}
+	row := view.BuildTasks([]app.Task{task}, time.Now()).Rows[0]
+	if row.Line != row.Items[0].Why || strings.Contains(row.Line, "only part") || !strings.Contains(row.Line, dir) {
+		t.Errorf("line %q, item %q", row.Line, row.Items[0].Why)
 	}
 	view.SetLang("en")
 	msg := dir + " already exists; nothing was moved"

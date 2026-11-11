@@ -394,7 +394,7 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 		case t.State == app.TaskStopped:
 			result = Tf("%d done, %d left untouched", c[app.ItemOK], c[app.ItemSkip])
 		case c[app.ItemOK] == 0 && len(t.Items) == 1:
-			result = t.Items[0].Why
+			result = Humanize(nil, t.Items[0].Why) // as its row says it
 		default:
 			result = Tf("%d done, %d failed", c[app.ItemOK], c[app.ItemFail])
 		}
