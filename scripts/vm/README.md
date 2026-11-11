@@ -124,7 +124,7 @@ pwsh scripts/vm/vm.ps1 input stop
 | Keys, to whatever window has focus | `node scripts/vm/input.mjs <ip> key ctrl+shift+k [repeat]` (also `win+up`, `alt+f4`, `KeyK`, `Digit2`) |
 | Type text (Unicode, Chinese too; bypasses the IME) | `node scripts/vm/input.mjs <ip> type "plan new 测试 列表"` |
 | Read / set the clipboard | `node scripts/vm/input.mjs <ip> clip` · `setclip <text>` |
-| The text a window shows through UI Automation (Windows Terminal: the TUI screen) | `node scripts/vm/input.mjs <ip> text WindowsTerminal` |
+| The text a window shows through UI Automation (Windows Terminal: the TUI screen). Windows Terminal can report the screen before a key's redraw, even seconds later: a panel the key opened may show only after the next key. Read again after a harmless key (a page key such as shift+4 back and forth) before calling a key dead | `node scripts/vm/input.mjs <ip> text WindowsTerminal` |
 
 In a test script, `connectReal(ip)` from `input.mjs` gives both connections and a calibration: `real.click(sel, { mods: ['ctrl'] })`, `real.drag(from, to, { holdMs, during })`, `real.input.key('esc')`, `real.cdp.evaluate(...)`. Calibration moves the real cursor to two points in RimArcho's window and reads where the page saw them, so page zoom, display scaling and the frameless frame need no special handling; call `real.recalibrate()` after moving or resizing the window. Read results with `cdp.mjs text` and `input.mjs text`, not screenshots.
 

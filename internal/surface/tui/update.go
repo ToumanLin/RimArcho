@@ -229,6 +229,11 @@ func (m *model) key(k tea.KeyMsg) tea.Cmd {
 	case m.full && s != "?":
 		return m.fullKey(s)
 	}
+	if m.tab == tabProblems && s != "q" && s != "?" && s != ":" {
+		if cmd, ok := m.needItemKey(s); ok {
+			return cmd
+		}
+	}
 	switch s {
 	case "q":
 		m.quitting = true

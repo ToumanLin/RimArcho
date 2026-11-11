@@ -595,7 +595,7 @@ body.resizing-y, body.resizing-y * { cursor: row-resize !important; }
 .need .acts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
 .need .acts .btn { height: 28px; padding: 0 12px; border-radius: var(--r-sm); font-size: 13px; }
 .need .acts .btn.primary { font-weight: 600; }
-.need .acts .btn.option { border: var(--hairline) solid var(--line); background: var(--card); color: var(--fg); }
+.need .acts .btn.option { border: var(--hairline) solid var(--line); background: var(--card); color: var(--fg); height: auto; min-height: 26px; padding: 3px 10px; white-space: normal; text-align: left; justify-content: flex-start; max-width: 100%; flex: 0 1 auto; }
 .need .acts .btn.option:hover { border-color: var(--accent); color: var(--accent-11, var(--accent)); background: var(--accent-soft); }
 .need:not(.cur) .btn kbd { display: none; }
 .need-foot > .ev-line { margin-left: auto; justify-content: flex-end; }

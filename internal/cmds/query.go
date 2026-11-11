@@ -549,7 +549,22 @@ func modDoc(c *Ctx, ix *app.Index, m *store.Mod) (*render.Doc, error) {
 		}
 	}
 	if dl := forVersion(deps, byV, mm); len(dl) > 0 {
-		root.KV("depends", pkgRefs(ix, dl))
+		dn := root.KV("depends", pkgRefs(ix, dl))
+		// A dependency met by another enabled Mod (16 §4.1): say which, as the window does.
+		if st, err := c.App.Loadout(); err == nil && dn != nil {
+			all := append(slices.Clone(decl.Dependencies), decl.DependenciesByVersion["v"+mm]...)
+			seen := map[string]bool{}
+			for _, x := range all {
+				if seen[strings.ToLower(x.PackageID)] {
+					continue
+				}
+				seen[strings.ToLower(x.PackageID)] = true
+				if s, how := c.App.DependencyStandIn(st, x); s != nil {
+					why := map[string]string{app.StandInAlternative: "an alternative it accepts", app.StandInReplacement: "Use This Instead", app.StandInRule: "your replaces rule"}[how]
+					dn.Addf("pkg:%s met by %s %s (%s)", strings.ToLower(x.PackageID), ix.Ref(s.ID), s.DisplayName(), why)
+				}
+			}
+		}
 	}
 	for _, r := range []struct {
 		key  string

@@ -603,15 +603,8 @@ func (m *model) needsKey(s string) tea.Cmd {
 	case "l":
 		return m.chooseLog()
 	}
-	if s == " " {
-		s = "space"
-	}
-	if p.cursor < len(p.items) {
-		for _, k := range p.items[p.cursor].keys {
-			if k.key == s {
-				return k.run(m)
-			}
-		}
+	if cmd, ok := m.needItemKey(s); ok {
+		return cmd
 	}
 	if s == "u" || s == "ctrl+z" { // undo what an item or F just did, as in the window
 		m.act(T("undid the last change"), "undo")
@@ -619,4 +612,22 @@ func (m *model) needsKey(s string) tea.Cmd {
 		return m.ensureProblems()
 	}
 	return nil
+}
+
+// needItemKey runs the selected item's action for the key, if it has one. The item's keys
+// come before the global ones: its R (an enabled Mod replaces it, repair the links,
+// unhide) is not a rescan (VM 2026-11-10: R did nothing on Can it run).
+func (m *model) needItemKey(s string) (tea.Cmd, bool) {
+	p := &m.prob
+	if s == " " {
+		s = "space"
+	}
+	if p.cursor < len(p.items) {
+		for _, k := range p.items[p.cursor].keys {
+			if k.key == s {
+				return k.run(m), true
+			}
+		}
+	}
+	return nil, false
 }

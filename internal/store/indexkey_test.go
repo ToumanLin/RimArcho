@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 )
@@ -99,4 +100,30 @@ func TestOpenRestoresIndexTriggers(t *testing.T) {
 	if got := s.IndexKey(); got == key {
 		t.Fatal("Open did not restore the dropped trigger")
 	}
+}
+
+// Opening a store that already has the triggers does not write: it works while another
+// connection holds a write transaction (VM 2026-11-10: the TUI's scan failed with
+// SQLITE_BUSY while the window was writing).
+func TestOpenWhileAnotherWrites(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "archo.db")
+	s, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	c, err := s.DB.Conn(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	if _, err := c.ExecContext(context.Background(), `BEGIN IMMEDIATE`); err != nil {
+		t.Fatal(err)
+	}
+	defer c.ExecContext(context.Background(), `ROLLBACK`)
+	other, err := Open(path)
+	if err != nil {
+		t.Fatal("open while another connection writes:", err)
+	}
+	other.Close()
 }

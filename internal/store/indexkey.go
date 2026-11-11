@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"time"
 )
 
 // indexTables are the tables a mod index is built from (app.Index): instances, their
@@ -40,13 +41,48 @@ INSERT INTO archo_index_gen SELECT '` + hex.EncodeToString(b) + `', 0 WHERE NOT 
 				t, strings.ToLower(op), op, t)
 		}
 	}
+	// Almost always everything is there already: say so from a read, which never waits for
+	// another process's write. A deferred transaction that reads first and then writes gets
+	// BUSY at once when another process committed in between, whatever busy_timeout says
+	// (VM 2026-11-10: the TUI's scan failed while the window was writing).
+	if s.indexTriggersInstalled() {
+		return nil
+	}
+	var err error
+	for try := 0; try < 20; try++ {
+		if err = s.execTx(sql.String()); err == nil || !isBusy(err) {
+			return err
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+	return err
+}
+
+func (s *Store) execTx(q string) error {
 	tx, err := s.DB.Begin()
 	if err != nil {
 		return err
 	}
-	if _, err := tx.Exec(sql.String()); err != nil {
+	if _, err := tx.Exec(q); err != nil {
 		tx.Rollback()
 		return err
 	}
 	return tx.Commit()
+}
+
+// indexTriggersInstalled: the counter row and every trigger exist.
+func (s *Store) indexTriggersInstalled() bool {
+	var rows, triggers int
+	if s.DB.QueryRow(`SELECT count(*) FROM archo_index_gen`).Scan(&rows) != nil || rows == 0 {
+		return false
+	}
+	if s.DB.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='trigger' AND name LIKE 'archo!_ix!_%' ESCAPE '!'`).Scan(&triggers) != nil {
+		return false
+	}
+	return triggers == len(indexTables)*3
+}
+
+func isBusy(err error) bool {
+	m := err.Error()
+	return strings.Contains(m, "SQLITE_BUSY") || strings.Contains(m, "database is locked")
 }

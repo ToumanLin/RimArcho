@@ -108,7 +108,7 @@ Editor only:
 | `T` | In Staging, put all staged Mods back at their original positions; elsewhere, stage all Enabled Mods. The TUI does the same |
 | `S` / `w` / `L` | Sort, save or launch the whole plan. Sorting is undoable, and previews are in the panel. L goes to Launch with the launch button focused; another L launches. The TUI does the same (§2.5, §9.1) |
 | `i` / `e` | Import or export in the GUI; TUI i toggles technical details |
-| `R` / `A` | Rescan, or check the files again. In the TUI, A works in the editor and on Can it run |
+| `R` / `A` | Rescan, or check the files again. In the TUI, A works in the editor and on Can it run. On Can it run the selected item's own keys come first: an item's `R` (an enabled Mod replaces it, repair the links, unhide) runs that action, not a rescan; so do its `E` and `P`. `q`, `?` and `:` stay global |
 | `c` / `C` | Open updates for all Mods, or only the cursor Mod's Lineage (§2.9) |
 | `H` | Open the picker for history steps and versions. The TUI has it too, alongside area 3 history |
 | `<` `>` `=` | Narrow, widen, or reset the focused column |
