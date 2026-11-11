@@ -300,7 +300,7 @@ func TestPinPlainModsFolder(t *testing.T) {
 	if strings.Contains(out, "unchanged") || inPlan(t, e, up) || !inPlan(t, e, cp) {
 		t.Fatalf("the plan must use the copy:\n%s", out)
 	}
-	if out, code := e.Run("save"); code == 0 || !strings.Contains(out, "--move-duplicates") {
+	if out, code := e.Run("save"); code == 0 || !strings.Contains(out, "--move-duplicates") || !strings.Contains(out, "save blocked: Mods/ already holds") {
 		t.Fatalf("save with the original still in Mods/ (%d):\n%s", code, out)
 	}
 	e.MustRun("save", "--move-duplicates")

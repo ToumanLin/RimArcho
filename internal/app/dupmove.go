@@ -54,7 +54,11 @@ func (e *DuplicatesError) Movable() bool {
 
 func (e *DuplicatesError) Error() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "%v: Mods/ already holds %d of these mods in another version; the game would load both and report an error:", ErrLaunchBlocked, len(e.Moves))
+	what := ErrLaunchBlocked.Error()
+	if strings.HasPrefix(e.Fix, "archo save") { // VM 2026-11-10: a save's refusal said "launch blocked"
+		what = "save blocked"
+	}
+	fmt.Fprintf(&b, "%s: Mods/ already holds %d of these mods in another version; the game would load both and report an error:", what, len(e.Moves))
 	for _, m := range e.Moves {
 		fmt.Fprintf(&b, "\n  Mods/%s is in the way of %s", m.Copy.Name, m.For)
 		if m.Why != "" {
