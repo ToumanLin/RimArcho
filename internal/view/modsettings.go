@@ -283,6 +283,12 @@ func windowView(w *app.SeenSettingsWindow) *SettingsWindowView {
 	return v
 }
 
+// WindowLabel is a label the game drew without its own trailing colon ("Search:"), for
+// surfaces that add one after it.
+func WindowLabel(s string) string {
+	return strings.TrimRight(strings.TrimSpace(s), ":\uff1a ")
+}
+
 // WindowText is a control's value as shown: on/off, a chosen choice, a slider's value and
 // range, text in quotes; "" for headings and buttons.
 func WindowText(c logs.SettingsControl) string {

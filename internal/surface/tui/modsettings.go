@@ -66,7 +66,7 @@ func modSettingsText(l *app.ModSettingsList) string {
 					case "button":
 						fmt.Fprintf(&b, "    [%s]\n", c.Label)
 					default:
-						fmt.Fprintf(&b, "    %s: %s\n", c.Label, c.Text)
+						fmt.Fprintf(&b, "    %s: %s\n", view.WindowLabel(c.Label), c.Text)
 					}
 				}
 			}
