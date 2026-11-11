@@ -306,7 +306,23 @@ Reading:
 - **With them, M calls Archo in 6 of 9 runs**, always from `run_script` scripts and never directly. Three runs ignored it, and those include M's only failure. M uses no fewer tokens than L.
 - **Q passed every run.** Each Q run called Archo directly, and 8 of 9 verified with `test_run` (P on h8: 0 of 3). No command hit the 120 s default; the model often set its own `timeout`. P's two failure modes did not recur: a hung command, and an unverified DLL that throws at startup.
 - **The sample is small.** With 9 runs a group, 9/9 against 6/9 is within chance (Fisher's two-sided p ≈ 0.2). The extension is kept as the baseline for the next round, not counted as proven.
-- **Alma ran without its extras.** On a custom gateway its "tool model" features and its embedding memory stay off, so L and M measure its coding harness only.
+- **L and M ran Alma without its extras.** On a custom gateway Alma picks no tool model (it recognises only official model names), so titles, tool preselection, memory and query rewriting stay off, and its memory has no embeddings. Groups J and K below turn them on.
+
+Follow-up the same day, groups **J** (L + extras) and **K** (M + extras): the tool model is the same deepseek-flash, and memory uses Alma's local embedding model `multilingual-e5-small`. The model files are pushed into the guest from `D:\VMs\Transfer\alma\embedding-models.tar` (`alma-run.mjs --full`). The 18 runs ran on Player-Test, Eval-2 and the linked clone Eval-4.
+
+| Case | J Alma + extras | K Alma + instructions + extras |
+| --- | --- | --- |
+| h4 | 2/3, 801 s, Archo 1.7, 4.42 M | 3/3, 543 s, Archo 2.3, 1.96 M |
+| h7 | 3/3, 383 s, Archo 2.0, 1.94 M | 3/3, 537 s, Archo 6.7, 2.53 M |
+| h8 | 2/3, 516 s, Archo 2.7, 4.16 M | 3/3, 443 s, Archo 9.0, 3.16 M |
+| All | 7/9 | 9/9 |
+
+- **Failures:**
+  - h4-J-3 is the decoy-workaround mode again.
+  - h8-J-2 named the right culprit, but its rebuilt DLL still logs errors.
+- **With the tool model, Alma calls Archo even without the instructions.** J averages about 2 calls a run, where L made none. The tool model's preselection is what surfaces the deferred `archo__` tools.
+- **K matches Q at 9/9**, at about twice Q's tokens. J costs more than L on h4 and h8 and passes no more.
+- **Memory stayed idle:** across 18 runs it stored 1 memory. Each run starts with a fresh data folder and one thread, so this setup cannot test cross-session memory.
 
 The Chinese reports (`ArchoAgent/research/`: results, reverse engineering of Alma's coding harness and memory system, Pi upgrade plan) stay outside the repo.
 

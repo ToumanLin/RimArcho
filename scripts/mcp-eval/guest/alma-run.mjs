@@ -2,7 +2,11 @@
 // add the magpie gateway and model, Archo as MCP server, a project at C:\Eval\work, then send the
 // task over the thread WebSocket and record every event until the thread stops generating.
 //   node alma-run.mjs --alma C:\Eval\alma --task C:\Eval\work\TASK.md --out C:\Eval\out --minutes 15
-//     --base-url <gateway /v1> --api-key <key> [--instructions] [--probe]
+//     --base-url <gateway /v1> --api-key <key> [--instructions] [--full] [--probe]
+// --full (groups J and K): also the tool model Alma uses for titles, tool preselection, memory and
+// query rewriting (it picks one by itself only from official model names, so on a gateway it has
+// none), and memory with the local embedding model multilingual-e5-small (the gateway has no
+// embeddings; the model files are pushed into C:\Eval\alma-data\embedding-models beforehand).
 // --instructions (group M): Alma never reads an MCP server's instructions and keeps MCP tools out of
 // the model's tool list until ToolSearch finds them or the model calls one by name. This puts
 // Archo's instructions in the project card, which Alma adds to the system prompt (as group P does
@@ -60,6 +64,10 @@ try {
   const prov = await api('POST', '/api/providers', { name: 'magpie', type: 'custom', apiFormat: 'openai-chat', apiKey: arg('api-key'), baseURL: arg('base-url'), models: [model] });
   const settings = await api('GET', '/api/settings');
   settings.chat = { ...(settings.chat || {}), defaultModel: `${prov.id}:${model}` };
+  if (process.argv.includes('--full')) {
+    settings.toolModel = { model: `${prov.id}:${model}` };
+    settings.memory = { ...(settings.memory || {}), enabled: true, autoSummarize: true, autoRetrieve: true, embeddingModel: '__local__:multilingual-e5-small' };
+  }
   await api('PUT', '/api/settings', settings);
   await api('POST', '/api/mcp-servers', { name: 'archo', config: { command: 'C:\\Eval\\tools\\archo.exe', args: ['mcp'] } });
   let mcp;
@@ -117,6 +125,11 @@ try {
   if (threadId) {
     try { save('messages.json', await api('GET', `/api/threads/${threadId}/messages?limit=1000`)); } catch (e) { note({ type: 'driver_error', error: 'messages: ' + e }); }
     try { save('traces.json', await api('GET', `/api/threads/${threadId}/traces`)); } catch (e) { note({ type: 'driver_error', error: 'traces: ' + e }); }
+  }
+  // --full: what the tool model and memory did (usage includes the tool model's calls)
+  if (process.argv.includes('--full')) {
+    try { save('memories.json', await api('GET', '/api/memories')); } catch (e) { note({ type: 'driver_error', error: 'memories: ' + e }); }
+    try { save('usage.json', await api('GET', '/api/usage/stats')); } catch (e) { note({ type: 'driver_error', error: 'usage: ' + e }); }
   }
   // agent.ps1 writes run.json (the host waits for it) after this process exits
   save('alma-run.json', { finished, seconds: Math.round((Date.now() - t0) / 1000) });

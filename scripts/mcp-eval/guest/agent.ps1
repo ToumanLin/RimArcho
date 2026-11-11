@@ -3,6 +3,7 @@
 #   P = Pi + Archo MCP + Archo's MCP server instructions in the system prompt, as dsh puts them (Pi 1.4 drops them)
 #   Q = P + pi-harness.ts (bash default timeout, run rules taken from Alma)
 #   L = Alma (headless alma-server driven by alma-run.mjs) + Archo MCP, M = L + Archo's MCP server instructions in the system prompt
+#   J = L and K = M, each with Alma's tool model and local-embedding memory set (alma-run.mjs --full)
 param([string]$Group, [int]$Minutes = 15, [switch]$Probe)
 $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine')
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'; $env:DOTNET_NOLOGO = '1'
@@ -18,13 +19,14 @@ if ($Group -eq 'B') {
   $env:DSH_PERMISSION_MODE = 'danger-full-access'; $env:DSH_TELEMETRY_MODE = 'DISABLED'
   [IO.File]::WriteAllText('C:\Eval\work\prompt.txt', "$task`n`nDo the task described above.", (New-Object Text.UTF8Encoding($false)))
   $line = 'dsh --profile headless --patch C:\Eval\dsh-eval.yml --json < C:\Eval\work\prompt.txt > C:\Eval\out\transcript.jsonl 2> C:\Eval\out\stderr.txt'
-} elseif ($Group -eq 'L' -or $Group -eq 'M') {
+} elseif ($Group -in 'L', 'M', 'J', 'K') {
   # Alma headless (alma-run.mjs writes transcript.jsonl and stderr.txt itself); the same gateway, model and key
   $gw = (Get-Content "$pi\models.json" -Raw | ConvertFrom-Json).providers.magpie
   # not $probe: PowerShell names ignore case, so that is the -Probe switch itself
   $almaFlags = ''
   if ($Probe) { $almaFlags += ' --probe' }
-  if ($Group -eq 'M') { $almaFlags += ' --instructions' }
+  if ($Group -in 'M', 'K') { $almaFlags += ' --instructions' }
+  if ($Group -in 'J', 'K') { $almaFlags += ' --full' }
   $line = "node C:\Eval\alma-run.mjs --alma C:\Eval\alma\Alma --task C:\Eval\work\TASK.md --out C:\Eval\out --minutes $Minutes --base-url $($gw.baseUrl) --api-key $($gw.apiKey)$almaFlags > C:\Eval\out\driver.log 2>&1"
 } else {
   $extra = ''
@@ -53,7 +55,7 @@ if ($Group -eq 'B') {
 $sw = [Diagnostics.Stopwatch]::StartNew()
 $p = Start-Process cmd -ArgumentList '/c', $line -WorkingDirectory C:\Eval\work -WindowStyle Hidden -PassThru
 # Alma's driver stops the agent at the limit itself, then saves the thread: give it 2 more minutes
-$limit = $Minutes; if ($Group -eq 'L' -or $Group -eq 'M') { $limit += 2 }
+$limit = $Minutes; if ($Group -in 'L', 'M', 'J', 'K') { $limit += 2 }
 $done = $p.WaitForExit($limit * 60 * 1000)
 if (-not $done) { & taskkill /PID $p.Id /T /F | Out-Null }
 if ($Group -eq 'B') {
