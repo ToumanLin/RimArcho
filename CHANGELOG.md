@@ -2,6 +2,16 @@
 
 All notable changes to RimArcho. Versions follow semantic versioning; the MVP is 0.5.0.
 
+## Unreleased
+
+- Saves › content in this save: a count of one reads "1 faction", not "1 factions" (English).
+- Saves: a save file that cannot be opened (its permissions, or another program holding it) no longer shows "loads with <list> as it is" next to its error; the verdict says it cannot be loaded, the row says the file could not be opened (not "no Mod list at its start"), and its content and Over time cards say so instead of loading forever.
+- Saves: a save the program may not open (for example a file whose permissions deny reading) no longer makes the window's "read the saves" task fail; it ends "read N saves; 1 could not be read: …" as intended. `archo saves index` also says how many saves could not be read on an earlier run.
+- Saves: when a save changed between Recycle's or Back up's confirmation and the click, the refusal is now in the window's language and says to press it again.
+- MCP: a tool call whose arguments are refused before it runs (an unknown action, `manage_saves` trash with `confirm=true` but no token, a URL not recognised) now says why, instead of `error: unknown command "…" (archo help)`. `manage_saves` backup and trash previews say to call again with `confirm=true token=…` and suggest that call, not the `archo saves … --yes --token` command.
+- Saves › Can it load?: errors from loading a save with another list (for example one missing two of its Mods) no longer mark the save as not loading cleanly with the list it was made with; the last-load row shows only against the list that load used.
+- `archo saves show` (and MCP `get_save`): the colonists line no longer counts the starting pawns the player did not choose, which the game keeps as world pawns of the player's faction; they show as "N world pawns". Research counts only projects with progress above 0 (a new colony said "160 projects with progress" instead of 14).
+
 ## 1.0.9 — 2026-11-10
 
 - **Linux (experimental):** releases now include `archo-<version>-linux-amd64.tar.gz` with the terminal UI, CLI and MCP (no window). It is tested only with synthetic data so far, not with a real game on Linux; expect bugs and back up saves and Mod lists. The Linux entries below are part of it.

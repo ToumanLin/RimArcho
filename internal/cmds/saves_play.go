@@ -78,7 +78,7 @@ func playedText(sec float64) string {
 
 // playCounts are the numbers the change line compares.
 type playCounts struct {
-	alive, slaves, dead, animals, mechs, prisoners int
+	alive, slaves, dead, world, animals, mechs, prisoners int
 	wealth                                         int
 	hasWealth, hasStats                            bool
 	stats                                          savefile.Stats
@@ -91,6 +91,10 @@ func countsOf(f *savefile.Facts) playCounts {
 		switch {
 		case p.Dead:
 			c.dead++
+		case p.Where == savefile.WhereWorld:
+			// The game keeps the starting pawns the player did not choose as world pawns of
+			// the player's faction; they are not in the colony.
+			c.world++
 		case p.Slave:
 			c.alive++
 			c.slaves++
@@ -104,7 +108,8 @@ func countsOf(f *savefile.Facts) playCounts {
 	return c
 }
 
-// peopleText is the colonists: line: "3 (1 slave), 2 dead; animals 2, mechanoids 1, prisoners 1".
+// peopleText is the colonists: line: "3 (1 slave), 2 dead, 5 world pawns; animals 2, mechanoids 1,
+// prisoners 1".
 // Without the player faction nothing in the save can be counted as the player's.
 func peopleText(f *savefile.Facts, c playCounts) string {
 	if f.Player.Def == "" {
@@ -116,6 +121,9 @@ func peopleText(f *savefile.Facts, c playCounts) string {
 	}
 	if c.dead > 0 {
 		s += fmt.Sprintf(", %d dead", c.dead)
+	}
+	if c.world > 0 {
+		s += ", " + render.Plural(c.world, "world pawn")
 	}
 	return s + fmt.Sprintf("; animals %d, mechanoids %d, prisoners %d", c.animals, c.mechs, c.prisoners)
 }
@@ -290,12 +298,19 @@ func addPlay(root *render.Node, s *app.Save, f *savefile.Facts, prev *playPrev, 
 		return
 	}
 
-	if r := f.Research; r.Current != "" || len(r.Progress) > 0 {
+	// The game saves every project it has a key for, most of them at 0.
+	progressed := 0
+	for _, v := range f.Research.Progress {
+		if v > 0 {
+			progressed++
+		}
+	}
+	if r := f.Research; r.Current != "" || progressed > 0 {
 		line := r.Current
 		if line == "" {
 			line = "nothing"
 		}
-		n.KV("research", fmt.Sprintf("%s now; %s with progress", line, render.Plural(len(r.Progress), "project")))
+		n.KV("research", fmt.Sprintf("%s now; %s with progress", line, render.Plural(progressed, "project")))
 	}
 	expand := "archo saves show " + showRef(s) + " --play --all"
 	cn := n.KV("colonists", peopleText(f, now))

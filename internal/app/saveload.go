@@ -133,6 +133,14 @@ func (a *App) lastLoadOf(s *Save, st *LoadoutState) *SaveLoad {
 		}
 		loads := a.logLoads(p)
 		if l, ok := loads[key]; ok {
+			// Errors from a load with another list say nothing about this one: a save loaded
+			// with Mods missing would otherwise read as broken with the list it was made with.
+			if l != nil && len(st.List) > 0 {
+				if r := a.LogRunOf(st, p); r != nil && r.Source != nil && r.Source.Fingerprint != "" &&
+					r.Source.Fingerprint != ListFingerprint(st.List) {
+					return nil
+				}
+			}
 			return l
 		}
 	}

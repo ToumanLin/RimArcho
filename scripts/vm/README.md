@@ -65,7 +65,7 @@ How the round runs:
 
 A failed round kills the game and takes one guest screenshot (`failure.png`, `-NoShot` for none) for a person to look at. The driver acts only when `ArchoDrive.txt` is there and moves it away on start, so the next launch is not driven.
 
-The guest's saves sync to the player's real Steam Cloud when the game exits. So while a script runs, autosave is off; the game's Prefs are not changed. The standard round deletes its save before it quits. When a round fails, `round.ps1` deletes the round's saves before it stops the game.
+The guest's saves sync to the player's real Steam Cloud when the game exits. So while a script runs, autosave is off; the game's Prefs are not changed. The standard round deletes its save before it quits. When a round fails, `round.ps1` deletes the round's saves, and the saves its `delete` steps name, before it stops the game. It answers a mods mismatch with "Load anyway" (the message box of 1.5 and the 1.6 window).
 
 Round script, one step per line (`drive/src/Script.cs`):
 

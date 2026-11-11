@@ -68,6 +68,10 @@ var hintSpecs = []hintSpec{
 	{cmd: "workshop unsubscribe", tool: "manage_library", fixed: [][2]string{{"action", "unsubscribe"}}, posList: true, pos: []string{"refs"}, flag: map[string]string{"dry-run": "dry_run"}},
 	{cmd: "workshop resubscribe", tool: "manage_library", fixed: [][2]string{{"action", "resubscribe"}}, posList: true, pos: []string{"refs"}, flag: map[string]string{"dry-run": "dry_run"}},
 	{cmd: "workshop state", tool: "manage_library", fixed: [][2]string{{"action", "steam_state"}}, posList: true, pos: []string{"refs"}},
+	{cmd: "saves backup", tool: "manage_saves", fixed: [][2]string{{"action", "backup"}}, posList: true, pos: []string{"saves"},
+		flag: map[string]string{"yes": "confirm"}, value: map[string]string{"token": "token"}},
+	{cmd: "saves trash", tool: "manage_saves", fixed: [][2]string{{"action", "trash"}}, posList: true, pos: []string{"saves"},
+		flag: map[string]string{"yes": "confirm"}, value: map[string]string{"token": "token"}},
 	{cmd: "pin", tool: "pin_mod", pos: []string{"ref"}, flag: map[string]string{"dry-run": "dry_run", "update": "update", "git": "git"}},
 	{cmd: "unpin", tool: "unpin_mod", pos: []string{"ref"}, flag: map[string]string{"dry-run": "dry_run"}},
 }

@@ -70,6 +70,10 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 		return nil, err
 	}
 	out := &SaveContentResult{Totals: []SaveContentCategory{}, Mods: []SaveContentMod{}}
+	if f == nil && sv.Head == nil { // its start could not be read: a full read cannot either
+		out.Note = "The save's Mod list could not be read."
+		return out, nil
+	}
 	if f == nil {
 		out.Note = "This save has not been read yet."
 		return out, nil

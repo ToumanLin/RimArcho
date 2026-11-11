@@ -748,6 +748,9 @@ func issueView(is app.SaveIssue, s *app.Save) SaveIssueView {
 	case app.IssueUnreadable:
 		v.Head = T("the file cannot be read as a save")
 		v.Consequence = T("it has no Mod list at its start, so the game cannot load it")
+		if strings.HasPrefix(is.Text, "open ") { // os.Open failed: permissions, or another program holds it
+			v.Consequence = T("the file could not be opened (its permissions, or another program holding it)")
+		}
 		if is.Text != "" {
 			v.Consequence += "  (" + is.Text + ")"
 		}

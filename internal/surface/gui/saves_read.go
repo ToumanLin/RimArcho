@@ -33,6 +33,10 @@ func (s *API) savePlay(r *app.App, sv *app.Save, d *view.SaveDetail, asked uint6
 		d.PlayNote = view.Humanize(nil, err.Error())
 		return
 	}
+	if f == nil && sv.Head == nil && sv.HeadErr != "" { // its start could not be read: neither can the rest
+		d.PlayNote = view.Tf("the save could not be read: %s", view.Humanize(nil, sv.HeadErr))
+		return
+	}
 	if f == nil {
 		st.mu.Lock()
 		why := st.failed[factsKey(sv)]

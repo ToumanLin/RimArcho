@@ -269,7 +269,22 @@ namespace ArchoDrive
         {
             error = null;
             var box = Windows.OfType<Dialog_MessageBox>().LastOrDefault();
-            if (box == null) return false;
+            if (box == null)
+            {
+                // 1.6 shows a mods mismatch in its own window; press its "Load anyway".
+                var mm = Windows.OfType<Dialog_ModMismatch>().LastOrDefault();
+                if (mm == null) return false;
+                Driver.Note("dialog mods mismatch -> load anyway");
+                // Its button handler reads the GUI event, so outside OnGUI do what it does:
+                // close the window, then queue the load it was given as the game does.
+                error = Act("mods mismatch: load anyway", () =>
+                {
+                    var load = AccessTools.Field(typeof(Dialog_ModMismatch), "loadAction").GetValue(mm) as Action;
+                    mm.Close(false);
+                    if (load != null) LongEventHandler.QueueLongEvent(load, "LoadingLongEvent", true, GameAndMapInitExceptionHandlers.ErrorWhileLoadingGame);
+                });
+                return true;
+            }
             string text = Line(box.text.ToString());
             Driver.Note("dialog " + (string.IsNullOrEmpty(box.title) ? "" : Line(box.title) + ": ") + text + " -> " + Line(box.buttonAText ?? "OK"));
             error = Act("dialog button A", () =>

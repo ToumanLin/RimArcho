@@ -131,7 +131,7 @@ func (a *App) CheckSave(s *Save) (*SaveCheck, error) {
 	recycle := SaveFix{Action: FixRecycle, Label: "Recycle…", Command: "saves trash " + s.Ref, Target: s.Ref}
 	if s.Head == nil {
 		c.add(SaveIssue{Kind: IssueUnreadable, Level: LevelError, Text: s.HeadErr, Fixes: []SaveFix{recycle}})
-		c.Quick = &recycle
+		c.Level, c.Quick = LevelError, &recycle
 		return c, nil
 	}
 	unloadable := func() []SaveFix {

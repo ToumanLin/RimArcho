@@ -535,6 +535,9 @@ func saveErr(err error) error {
 	if errors.Is(err, app.ErrGameRunning) {
 		return errors.New(view.T("the game is running: close it first"))
 	}
+	if errors.Is(err, app.ErrPreviewChanged) {
+		return errors.New(view.T("the saves changed since you were shown them; press it again to see them as they are now"))
+	}
 	return errors.New(view.Humanize(nil, err.Error()))
 }
 

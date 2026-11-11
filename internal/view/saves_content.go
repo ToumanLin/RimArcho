@@ -61,7 +61,7 @@ func SaveContentOf(c *app.SaveContentResult) *SaveContent {
 }
 
 func saveContentCat(c app.SaveContentCategory) SaveContentCat {
-	v := SaveContentCat{Key: c.Key, Label: contentCategoryLabel(c.Key), Count: c.Count, Uses: c.Uses, Under: c.Under, Hidden: c.Hidden}
+	v := SaveContentCat{Key: c.Key, Label: contentCategoryLabelN(c.Key, c.Count), Count: c.Count, Uses: c.Uses, Under: c.Under, Hidden: c.Hidden}
 	for _, n := range c.Names {
 		name := n.Name
 		if n.Hidden {
@@ -76,6 +76,24 @@ func saveContentCat(c app.SaveContentCategory) SaveContentCat {
 		v.Names = append(v.Names, name)
 	}
 	return v
+}
+
+// contentCategoryOne is a category's label for a count of one ("1 faction", not "1 factions");
+// categories whose name has no plural are left out.
+var contentCategoryOne = map[string]string{
+	"factions": "faction", "races": "humanlike race", "animals": "animal", "mechanoids": "mechanoid",
+	"creatures": "other creature", "buildings": "building", "weapons": "weapon", "plants": "plant",
+	"items": "item", "research": "research project", "events": "event", "quests": "quest",
+	"xenotypes": "xenotype or gene", "abilities": "ability", "hediffs": "health condition", "traits": "trait",
+	"recipes": "recipe", "biomes": "biome", "storytellers": "storyteller", "scenarios": "scenario",
+}
+
+// contentCategoryLabelN is the label shown after a count.
+func contentCategoryLabelN(key string, n int) string {
+	if one, ok := contentCategoryOne[key]; ok && n == 1 {
+		return T(one)
+	}
+	return contentCategoryLabel(key)
 }
 
 func contentCategoryLabel(key string) string {

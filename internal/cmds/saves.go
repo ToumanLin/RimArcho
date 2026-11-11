@@ -1095,6 +1095,9 @@ func savesIndex(c *Ctx, a *Args) (*render.Doc, error) {
 	if r.Writing > 0 {
 		root.KV("being written", fmt.Sprintf("%d (read on a later run)", r.Writing))
 	}
+	if r.Unreadable > 0 {
+		root.KV("could not be read", fmt.Sprintf("%d, not tried again until the file changes (archo saves show <save> says why)", r.Unreadable))
+	}
 	for _, e := range r.Errs {
 		root.KV("error", e)
 	}
@@ -1251,7 +1254,11 @@ func saveFilesDoc(c *Ctx, head string, r *app.SaveFilesResult) *render.Doc {
 		c.ExitCode = ExitError
 	}
 	if !r.Done {
-		root.KV("confirm", "ask the player, then run it again with --yes --token "+r.Token+" (refused if the saves changed since)")
+		again := "run it again with --yes --token " + r.Token
+		if IsMCP(c.Context) {
+			again = "call it again with confirm=true token=" + r.Token
+		}
+		root.KV("confirm", "ask the player, then "+again+" (refused if the saves changed since)")
 	}
 	return d
 }

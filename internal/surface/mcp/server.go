@@ -114,6 +114,11 @@ func ClipOutput(out string) string {
 }
 
 func (s *Server) run(ctx context.Context, req *sdk.CallToolRequest, env string, argv []string) (*sdk.CallToolResult, any, error) {
+	// An argv builder that refuses the arguments returns its message as the only word (unknown,
+	// for example); no command name has a space, so say it as the refusal it is.
+	if len(argv) == 1 && strings.ContainsRune(argv[0], ' ') {
+		return &sdk.CallToolResult{Content: []sdk.Content{&sdk.TextContent{Text: "error: " + argv[0] + "\n"}}, IsError: true}, nil, nil
+	}
 	ctx, stop := heartbeat(ctx, req)
 	out, code := s.executeContext(ctx, env, argv)
 	stop()

@@ -81,6 +81,6 @@ remove: 1 subscriptions
 0 subscriptions
 
 > manage_subscriptions {"action":"add","url":"not an address"}
-error: unknown command "manage_subscriptions: url not recognised: give a Git repository, a download page, Workshop links or IDs, or kind" (archo help)
+error: manage_subscriptions: url not recognised: give a Git repository, a download page, Workshop links or IDs, or kind
 [isError]
 
