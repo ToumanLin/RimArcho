@@ -150,7 +150,22 @@ namespace ArchoMonitor
         // Each control's prefix records it unless it is drawn inside another control (the label a
         // checkbox draws); Leave is its postfix. A control that throws skips Leave, which only
         // hides what that frame draws after it.
-        static void Leave() { if (recording) depth--; }
+        internal static void Leave() { if (recording) depth--; }
+
+        // Recorded runs draw as one frame of a window and returns what it recorded (null when
+        // the record was dropped); for tests, which have no game to open a window.
+        internal static List<SettingsControl> Recorded(Action draw)
+        {
+            items = new List<SettingsControl>();
+            depth = 0;
+            lastLabel = false;
+            recording = true;
+            try { draw(); }
+            finally { recording = false; }
+            var got = items;
+            items = null;
+            return got;
+        }
 
         static void LabelText(string label) { Add("label", label, ""); }
         static void LabelTagged(TaggedString label) { Add("label", label.RawText, ""); }
@@ -165,9 +180,22 @@ namespace ArchoMonitor
 
         static string Num(float f) => f.ToString("0.####", CultureInfo.InvariantCulture);
 
-        static void Add(string kind, string label, string value, string min = "", string max = "")
+        // Add records one control. It never throws into the Mod's window: a failure ends this
+        // record (nothing is written for the opening) and is logged as Monitor's own.
+        internal static void Add(string kind, string label, string value, string min = "", string max = "")
         {
             if (!recording) return;
+            try { Record(kind, label, value ?? "", min ?? "", max ?? ""); }
+            catch (Exception e)
+            {
+                recording = false;
+                items = null;
+                Writer.Failure(e);
+            }
+        }
+
+        static void Record(string kind, string label, string value, string min, string max)
+        {
             if (depth++ > 0 || items.Count >= MaxControls) return;
             label = Clean(label);
             bool wasLabel = lastLabel;

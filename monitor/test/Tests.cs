@@ -74,10 +74,22 @@ static class Tests
                 new SettingsControl { Kind = "checkbox", Label = "Raids", Value = "False" },
                 new SettingsControl { Kind = "slider", Label = "Scale", Value = "0.75", Min = "0", Max = "2" },
             });
+        // Recording a window: a text field drawn with null text (Alpha Animals' search box,
+        // 1.0.9 VM round) records "" and does not throw into the Mod's window.
+        var drawn = SettingsWindow.Recorded(() =>
+        {
+            SettingsWindow.Add("label", "Search:", ""); SettingsWindow.Leave();
+            SettingsWindow.Add("text", "", null); SettingsWindow.Leave();
+            SettingsWindow.Add("checkbox", null, "True", null, null); SettingsWindow.Leave();
+        });
+        Check(drawn != null && drawn.Count == 2, "null text recorded: " + (drawn == null ? "dropped" : drawn.Count.ToString()));
+        Check(drawn != null && drawn[0].Kind == "text" && drawn[0].Label == "Search:" && drawn[0].Value == "", "null text takes its label");
+        Check(drawn != null && drawn[1].Label == "" && drawn[1].Value == "True" && drawn[1].Min == "", "null label and range");
         Writer.WriteHugsLib(new System.Collections.Generic.List<HugsLibPack> {
             new HugsLibPack { Id = "APack", PackageId = "a.mod", Folder = "A", Title = "A mod", Handles = new System.Collections.Generic.List<HugsLibHandle> {
                 new HugsLibHandle { Name = "raids", Title = "Raids", Description = "More raids", Value = "True", Default = "False", Type = "Boolean" },
                 new HugsLibHandle { Name = "seen", Value = "3", Default = "0", Type = "Int32", Hidden = true },
+                new HugsLibHandle { Name = "news", Title = "Show news", Value = "False", Default = "False", Type = "Boolean", Unsaved = true },
                 new HugsLibHandle { Name = "mode", Title = "Mode", Value = "Hard", Default = "Normal", Type = "Mode", Choices = new[] { "Easy", "Normal", "Hard" } },
             } },
         });
@@ -124,10 +136,11 @@ static class Tests
         Check(hugs.GetProperty("kind").GetString() == "hugslib", "hugslib line: " + lines[8]);
         var pack = hugs.GetProperty("context").GetProperty("hugslib")[0];
         var handles = pack.GetProperty("settings");
-        Check(pack.GetProperty("id").GetString() == "APack" && pack.GetProperty("packageId").GetString() == "a.mod" && pack.GetProperty("full").GetBoolean() && handles.GetArrayLength() == 3, "hugslib pack");
+        Check(pack.GetProperty("id").GetString() == "APack" && pack.GetProperty("packageId").GetString() == "a.mod" && pack.GetProperty("full").GetBoolean() && handles.GetArrayLength() == 4, "hugslib pack");
         Check(handles[0].GetProperty("title").GetString() == "Raids" && handles[0].GetProperty("default").GetString() == "False" && !handles[0].TryGetProperty("hidden", out _), "hugslib setting");
         Check(!handles[1].TryGetProperty("title", out _) && handles[1].GetProperty("hidden").GetBoolean() && handles[1].GetProperty("type").GetString() == "Int32", "hidden hugslib setting");
-        Check(!handles[0].TryGetProperty("choices", out _) && handles[2].GetProperty("choices").GetArrayLength() == 3 && handles[2].GetProperty("choices")[2].GetString() == "Hard", "enum choices");
+        Check(handles[2].GetProperty("unsaved").GetBoolean() && !handles[0].TryGetProperty("unsaved", out _), "unsaved hugslib setting");
+        Check(!handles[0].TryGetProperty("choices", out _) && handles[3].GetProperty("choices").GetArrayLength() == 3 && handles[3].GetProperty("choices")[2].GetString() == "Hard", "enum choices");
         var exit = JsonDocument.Parse(lines[9]).RootElement;
         Check(exit.GetProperty("kind").GetString() == "exit", "exit line");
         Directory.Delete(dir, true);

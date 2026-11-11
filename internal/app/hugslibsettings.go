@@ -132,7 +132,8 @@ type HugsLibRow struct {
 
 // HugsLibRows joins pack's record (nil: none) with what the file stores: the record's
 // settings in its order, then values the file stores that the record does not name. Settings
-// the Mod keeps hidden are left out; hidden counts them.
+// the Mod keeps hidden are left out; hidden counts them. Settings HugsLib never saves (a
+// button in its dialog) are left out too, even when the file holds a value for them.
 func HugsLibRows(rec *SeenHugsLibPack, sc *SettingsContent) (rows []HugsLibRow, hidden int) {
 	stored := map[string]SettingValue{}
 	for _, v := range sc.Values {
@@ -142,6 +143,9 @@ func HugsLibRows(rec *SeenHugsLibPack, sc *SettingsContent) (rows []HugsLibRow, 
 	if rec != nil {
 		for _, h := range rec.Settings {
 			named[h.Name] = true
+			if h.Unsaved {
+				continue // nothing of it is stored: a button in HugsLib's dialog
+			}
 			if h.Hidden {
 				hidden++
 				continue

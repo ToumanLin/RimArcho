@@ -247,7 +247,7 @@ func TestModSettingsHugsLib(t *testing.T) {
 	e.WriteFile(filepath.Join(e.UserData, "HugsLib", "ModSettings.xml"), `<?xml version="1.0" encoding="utf-8"?>
 <settings>
   <tester.a><raids>True</raids></tester.a>
-  <BPack><scale>2</scale><seen>5</seen><gone>x</gone></BPack>
+  <BPack><scale>2</scale><seen>5</seen><gone>x</gone><news>True</news></BPack>
 </settings>`)
 	out := e.MustRun("mod-settings")
 	if !strings.Contains(out, "HugsLib (tester.a)") || strings.Contains(out, "BPack") {
@@ -259,7 +259,7 @@ func TestModSettingsHugsLib(t *testing.T) {
 
 	log := filepath.Join(e.UserData, "ArchoMonitor.log")
 	session := `{"timestamp":"2026-11-03 10:00:00.000","level":"INFO","message":"[Archo Monitor] session 0123456789ab","details":"","count":1,"context":{"session":"0123456789ab","version":"0.11.0","game":"1.6.4633 rev1261"},"source":"archo-monitor","schema":1,"kind":"session"}` + "\n"
-	record := `{"timestamp":"2026-11-03 10:01:00.000","level":"INFO","message":"[Archo Monitor] hugslib 1","details":"","count":1,"context":{"hugslib":[{"id":"BPack","packageId":"tester.b","folder":"B","title":"B options","full":true,"settings":[{"name":"scale","title":"Scale","value":"2","default":"1","type":"Single"},{"name":"mode","title":"Mode","description":"How B works","value":"Normal","default":"Normal","type":"BMode"},{"name":"seen","value":"5","default":"0","type":"Int32","hidden":true}]}]},"source":"archo-monitor","schema":1,"kind":"hugslib"}` + "\n"
+	record := `{"timestamp":"2026-11-03 10:01:00.000","level":"INFO","message":"[Archo Monitor] hugslib 1","details":"","count":1,"context":{"hugslib":[{"id":"BPack","packageId":"tester.b","folder":"B","title":"B options","full":true,"settings":[{"name":"scale","title":"Scale","value":"2","default":"1","type":"Single"},{"name":"mode","title":"Mode","description":"How B works","value":"Normal","default":"Normal","type":"BMode"},{"name":"seen","value":"5","default":"0","type":"Int32","hidden":true},{"name":"news","title":"Show all news","value":"False","default":"False","type":"Boolean","unsaved":true}]}]},"source":"archo-monitor","schema":1,"kind":"hugslib"}` + "\n"
 	e.WriteFile(log, session+record)
 	if out := e.MustRun("mod-settings"); !strings.Contains(out, "HugsLib: B options") {
 		t.Fatalf("the record maps a pack:\n%s", out)
@@ -275,6 +275,9 @@ func TestModSettingsHugsLib(t *testing.T) {
 	}
 	if strings.Contains(out, "seen") {
 		t.Fatalf("a hidden setting is shown:\n%s", out)
+	}
+	if strings.Contains(out, "news") {
+		t.Fatalf("a setting HugsLib never saves is shown:\n%s", out)
 	}
 }
 

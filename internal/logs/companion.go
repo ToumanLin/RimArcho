@@ -395,6 +395,7 @@ type HugsLibSetting struct {
 	Default     string   `json:"default"`
 	Type        string   `json:"type"` // the value type's simple name: Boolean, Int32, an enum's
 	Hidden      bool     `json:"hidden,omitempty"`
+	Unsaved     bool     `json:"unsaved,omitempty"` // HugsLib never writes it (a button in its dialog)
 	Choices     []string `json:"choices,omitempty"` // an enum's names (at most 50)
 }
 
