@@ -1776,6 +1776,11 @@ function renderGroups(w, groups, again) {
       const right = el("div", "r");
       if (it.edit === "swatches" || it.edit === "segments") {
         row.classList.add("appearance-row");
+        // Set outside the window (archo config set): the window takes it when Settings shows it,
+        // so the selected swatch and the colours agree (VM round 2026-11-10).
+        const key = it.argv?.[2], shown = String(it.value || "").toLowerCase();
+        const applied = String((key === "ui.accent" ? S.start?.accent || "default" : key === "ui.theme" ? S.start?.theme || "auto" : shown) || "").toLowerCase();
+        if ((key === "ui.accent" || key === "ui.theme") && shown && shown !== applied) ui.reaccent();
         right.append(appearanceControl(it, () => ui.reaccent()));
       } else if (it.edit === "choice") {
         const s = choiceControl(it.label, it.choices.map((c, i) => ({ value: c, label: it.choiceLabels?.[i] || c })), it.value);
