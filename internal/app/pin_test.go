@@ -283,3 +283,31 @@ func TestPinNoJunctions(t *testing.T) {
 		t.Fatal("no copy fallback into Mods/")
 	}
 }
+
+// 07 §5.2 step 6: pinning a Mod whose original is a plain Mods/ folder swaps the copy in;
+// save then refuses with the --move-duplicates fix and, with it, moves the original into
+// the lock library and links the copy (VM 2026-11-10: the plan stayed unchanged).
+func TestPinPlainModsFolder(t *testing.T) {
+	t.Parallel()
+	e := testkit.New(t)
+	e.WriteMod(filepath.Join(e.Game, "Mods", "Local"), testkit.Sample("tester.local", "Local"))
+	e.WriteModsConfig("1.6.4633 rev1261", "ludeon.rimworld", "tester.local")
+	e.AddEnv(false)
+	scanNow(t, e)
+	up := refID(t, e, "Local", source.Local)
+	out := e.MustRun("pin", refOf(t, e, "Local", ""))
+	cp := lockedAt(t, e, "Local_local")
+	if strings.Contains(out, "unchanged") || inPlan(t, e, up) || !inPlan(t, e, cp) {
+		t.Fatalf("the plan must use the copy:\n%s", out)
+	}
+	if out, code := e.Run("save"); code == 0 || !strings.Contains(out, "--move-duplicates") {
+		t.Fatalf("save with the original still in Mods/ (%d):\n%s", code, out)
+	}
+	e.MustRun("save", "--move-duplicates")
+	if _, err := os.Stat(filepath.Join(e.Game, "Mods", "Local")); err == nil {
+		t.Fatal("the original is still a plain Mods/ folder")
+	}
+	if links := archoLinks(t, e); len(links) != 1 || !strings.EqualFold(links["_Archo_locked_Local_local"], mustReal(t, filepath.Join(library(e), "Local_local"))) {
+		t.Fatalf("links: %v", links)
+	}
+}
