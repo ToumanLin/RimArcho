@@ -44,14 +44,15 @@ type ModSettingsFile struct {
 	// Kind is "" for a Config file and SettingsKindHugsLib for a HugsLib pack: Class is then
 	// the pack's identifier, File and Path HugsLib's settings file, Exists whether the file
 	// stores the pack, and Title its entry in HugsLib's dialog.
-	Kind   string
-	Class  string    // the Mod class: the file name's last part
-	Title  string    // the settings window's title, from Archo Monitor ("" unknown)
-	File   string    // name in Config/
-	Path   string    // full path
-	Exists bool      // false: the Mod uses its defaults (nothing changed yet)
-	Size   int64     // bytes, when it exists
-	Seen   time.Time // when Archo Monitor last recorded it (zero: never)
+	Kind     string
+	Class    string    // the Mod class: the file name's last part
+	Title    string    // the settings window's title, from Archo Monitor ("" unknown)
+	File     string    // name in Config/
+	Path     string    // full path
+	Exists   bool      // false: the Mod uses its defaults (nothing changed yet)
+	Size     int64     // bytes, when it exists
+	Modified time.Time // when the file was last written, when it exists
+	Seen     time.Time // when Archo Monitor last recorded it (zero: never)
 	// Window is what the settings window drew when the player last opened it (Archo Monitor);
 	// nil when never seen.
 	Window *SeenSettingsWindow
@@ -385,7 +386,7 @@ func (r *settingsReader) of(m *store.Mod, folder string) ModSettingsMod {
 		f := byClass[k]
 		f.Path = filepath.Join(r.cfg, f.File)
 		if fi, err := os.Stat(f.Path); err == nil && fi.Mode().IsRegular() {
-			f.Exists, f.Size = true, fi.Size()
+			f.Exists, f.Size, f.Modified = true, fi.Size(), fi.ModTime()
 		}
 		sm.Files = append(sm.Files, *f)
 	}

@@ -101,8 +101,11 @@ type ModSettingsDetail struct {
 
 // SettingsWindowView is a settings window as Archo Monitor saw it.
 type SettingsWindowView struct {
-	Seen     string      `json:"seen"` // the date it was seen
-	Full     bool        `json:"full"` // false: the window drew more than Monitor keeps
+	Seen string `json:"seen"` // the date it was seen
+	Full bool   `json:"full"` // false: the window drew more than Monitor keeps
+	// Older: the file was written after the window was seen (a value changed in that
+	// opening or here), so the window's values may be out of date.
+	Older    bool        `json:"older"`
 	Controls []WindowRow `json:"controls"`
 }
 
@@ -157,6 +160,7 @@ func ModSettingsFileDetail(sm *app.ModSettingsMod, class string) *ModSettingsDet
 	}
 	if f.Window != nil {
 		d.Window = windowView(f.Window)
+		d.Window.Older = f.Exists && f.Modified.After(f.Window.Seen)
 	}
 	if !f.Exists {
 		d.Notes = []string{T("no file yet: the Mod uses its defaults until its settings are changed in the game")}

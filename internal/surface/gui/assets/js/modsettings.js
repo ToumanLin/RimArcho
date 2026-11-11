@@ -169,6 +169,7 @@ function drawDetail(d, keep = false) {
   // the game's window as Archo Monitor saw it, then what the file stores
   if (d.window) {
     body.append(el("h3", "ms-sub", Tf("in the game's window (%s)", d.window.seen)));
+    if (d.window.older) body.append(el("p", "ms-note muted", T("changed since: the values stored in the file are the current ones")));
     const kv = el("dl", "ms-values ms-window");
     for (const c of d.window.controls) {
       if (c.kind === "label") { kv.append(el("dt", "ms-head", c.label)); continue; }

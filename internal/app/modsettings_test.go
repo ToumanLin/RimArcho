@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/source"
@@ -203,6 +204,26 @@ func TestModSettingsWindow(t *testing.T) {
 	}
 	if out := e.MustRun("mod-settings"); !strings.Contains(out, "B window") {
 		t.Fatalf("a window alone lists its Mod:\n%s", out)
+	}
+	if strings.Contains(out, "changed since") {
+		t.Fatalf("no file yet, nothing changed since:\n%s", out)
+	}
+	// the file written after the window was seen (a value changed in that opening): the
+	// window's values may be out of date
+	cfg := filepath.Join(e.UserData, "Config", "Mod_1001_AMod.xml")
+	e.WriteFile(cfg, `<?xml version="1.0" encoding="utf-8"?><SettingsBlock><ModSettings Class="AMod"><raids>True</raids></ModSettings></SettingsBlock>`)
+	seen := time.Date(2026, 11, 3, 10, 5, 0, 0, time.Local)
+	if err := os.Chtimes(cfg, seen.Add(-time.Minute), seen.Add(-time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if out := e.MustRun("mod-settings", "pkg:tester.a"); strings.Contains(out, "changed since") {
+		t.Fatalf("a file older than the window:\n%s", out)
+	}
+	if err := os.Chtimes(cfg, seen.Add(time.Minute), seen.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if out := e.MustRun("mod-settings", "pkg:tester.a"); !strings.Contains(out, "changed since: the values stored in the file are the current ones") {
+		t.Fatalf("a file written after the window:\n%s", out)
 	}
 	// the next run rotates the log away: the window stays
 	e.WriteFile(filepath.Join(e.UserData, "ArchoMonitor-prev.log"), "")
