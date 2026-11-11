@@ -71,7 +71,7 @@ foreach ($c in $cells) {
   } finally { Pop-Location }
   try {
     $s = Get-Content "$r\summary.json" -Raw | ConvertFrom-Json; $gr = Get-Content "$r\grade.json" -Raw | ConvertFrom-Json
-    $ar = ($s.tools.PSObject.Properties | Where-Object Name -like 'mcp__archo__*' | Measure-Object Value -Sum).Sum
+    $ar = ($s.tools.PSObject.Properties | Where-Object { $_.Name -like 'mcp__archo__*' -or $_.Name -like 'archo__*' } | Measure-Object Value -Sum).Sum
     Log ("done  {0} on {9}: {1}s turns {2} calls {3} (archo {4}) tokens {5:N2}M culprit {6} fix {7} finished {8}" -f $c, $s.seconds, $s.turns, $s.toolCalls, [int]$ar, ($s.usage.total / 1e6), $gr.culprit, $gr.fix, $s.finished, $vmName)
   } catch { Log "done  $c on $vmName (no summary/grade: $_)" }
 }

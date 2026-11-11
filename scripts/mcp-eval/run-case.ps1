@@ -1,9 +1,9 @@
 # One eval run, from the host: revert the VM, stage the case, run Pi, collect the evidence, stop the VM.
 #   pwsh run-case.ps1 -Case c1 -Group A -Run 1 [-Minutes 15] [-Archo D:\RimArcho-test\mcp-eval\tools\archo.exe] [-StageOnly]
-# Group A = Pi with the Archo MCP server, B = dsh with it (since 2026-11-04), N = Pi without it (B before 2026-11-04), P = Pi with it and its server instructions in the system prompt (as dsh has them). Results: D:\RimArcho-test\mcp-eval\results\<case>-<group>-<run>\
+# Group A = Pi with the Archo MCP server, B = dsh with it (since 2026-11-04), N = Pi without it (B before 2026-11-04), P = Pi with it and its server instructions in the system prompt (as dsh has them), L = Alma with it, Q = P plus guest/pi-harness.ts, M = Alma with it and its server instructions in the project card (headless; -Probe sets Alma up and saves its tools instead of running the task). Results: D:\RimArcho-test\mcp-eval\results\<case>-<group>-<run>\
 # -Archo replaces the snapshot's archo.exe with this build; -StageOnly stops after staging and leaves the VM running.
-param([Parameter(Mandatory)][string]$Case, [Parameter(Mandatory)][ValidateSet('A', 'B', 'N', 'P')][string]$Group, [int]$Run = 1, [int]$Minutes = 15,
-  [string]$Snapshot = 'RimArcho-Eval-Staged5', [string]$Archo = '', [switch]$KeepRunning, [switch]$StageOnly,
+param([Parameter(Mandatory)][string]$Case, [Parameter(Mandatory)][ValidateSet('A', 'B', 'N', 'P', 'L', 'M', 'Q')][string]$Group, [int]$Run = 1, [int]$Minutes = 15,
+  [string]$Snapshot = 'RimArcho-Eval-Staged5', [string]$Archo = '', [switch]$KeepRunning, [switch]$StageOnly, [switch]$Probe, [string]$AlmaZip = 'D:\VMs\Transfer\alma\alma-0.4.567-win-x64.zip',
   [string]$VMX = 'D:\VMs\Player-Test\Win11-Player-Test.vmx')
 $ErrorActionPreference = 'Stop'
 # -VMX picks one of the eval VMs (Player-Test, or a copy such as D:\VMs\Eval-2\Win11-Player-Test.vmx).
@@ -31,7 +31,12 @@ for ($i = 0; $i -lt 40; $i++) { if ((& $inv -VMX $vmx -Command checkToolsState) 
 Start-Sleep 20
 
 # 2. stage the case (the guest scripts are pushed every run, so the snapshot never needs refreshing for them)
-foreach ($f in 'overlay.ps1', 'case.ps1', 'agent.ps1', 'task.md', 'dsh-eval.yml') { Put "$PSScriptRoot\guest\$f" "C:\Eval\$f" }
+foreach ($f in 'overlay.ps1', 'case.ps1', 'agent.ps1', 'task.md', 'dsh-eval.yml', 'alma-run.mjs', 'pi-harness.ts') { Put "$PSScriptRoot\guest\$f" "C:\Eval\$f" }
+# Alma is not in the snapshot: its portable build goes in with every run
+if ($Group -eq 'L' -or $Group -eq 'M') {
+  Put $AlmaZip 'C:\Users\Public\alma.zip'
+  Guest -Rest @('-Command', 'New-Item -ItemType Directory -Force C:\Eval\alma | Out-Null; tar -xf C:\Users\Public\alma.zip -C C:\Eval\alma; Remove-Item C:\Users\Public\alma.zip')
+}
 # the evaluated build's name and hash go with the results (the builds stay in tools\)
 if ($Archo) { Put $Archo 'C:\Eval\tools\archo.exe'; "$(Split-Path $Archo -Leaf) sha256 $((Get-FileHash $Archo).Hash.ToLower())" | Set-Content "$out\archo-build.txt" }
 Remove-Item "$xfer\pkg-$Case-$vmName.tar" -Force -ErrorAction SilentlyContinue
@@ -51,8 +56,11 @@ if ($StageOnly) { "staged $Case $Group; the VM is still running"; return }
 $t0 = Get-Date
 # -interactive: the logged-in desktop session. Without it the agent runs in session 0, where the
 # game it starts (test_run or by hand) has no display and hangs at "could not switch resolution".
-& $inv -VMX $vmx -Guest -StandardUser -Command runProgramInGuest -VMArgs @('-noWait', '-interactive', $ps5, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'C:\Eval\agent.ps1', '-Group', $Group, '-Minutes', $Minutes)
-$deadline = $t0.AddMinutes($Minutes + 3)
+$agentArgs = @('-noWait', '-interactive', $ps5, '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'C:\Eval\agent.ps1', '-Group', $Group, '-Minutes', $Minutes)
+if ($Probe) { $agentArgs += '-Probe' }
+& $inv -VMX $vmx -Guest -StandardUser -Command runProgramInGuest -VMArgs $agentArgs
+# Alma's driver gets 2 more minutes in the guest to save the thread after the limit
+$deadline = $t0.AddMinutes($Minutes + $(if ($Group -eq 'L' -or $Group -eq 'M') { 5 } else { 3 }))
 while ((Get-Date) -lt $deadline) {
   Start-Sleep 20
   try { Pull 'C:\Eval\out\run.json' "$out\run.json" 2>$null; if (Test-Path "$out\run.json") { break } } catch {}
@@ -60,7 +68,8 @@ while ((Get-Date) -lt $deadline) {
 
 # 4. evidence
 Guest -Rest @('-Command', 'Compress-Archive -Path C:\Eval\submit\* -DestinationPath C:\Eval\submit.zip -Force; Copy-Item C:\Eval\work\TASK.md C:\Eval\out\TASK.md')
-foreach ($f in 'transcript.jsonl', 'stderr.txt', 'TASK.md', 'session.v4.jsonl.zstd', 'archo-instructions.md') { if (($f -like 'session*' -and $Group -ne 'B') -or ($f -like 'archo-*' -and $Group -ne 'P')) { continue }; try { Pull "C:\Eval\out\$f" "$out\$f" } catch { Write-Warning "missing $f" } }
+$alma = 'driver.log', 'alma-run.json', 'messages.json', 'traces.json', 'probe-settings.json', 'probe-providers.json', 'probe-mcp-tools.json', 'probe-tools.json', 'probe-thread.json'
+foreach ($f in @('transcript.jsonl', 'stderr.txt', 'TASK.md', 'session.v4.jsonl.zstd', 'archo-instructions.md') + $alma) { if (($f -like 'session*' -and $Group -ne 'B') -or ($f -like 'archo-*' -and $Group -notin 'P', 'M', 'Q') -or ($alma -contains $f -and $Group -ne 'L' -and $Group -ne 'M')) { continue }; try { Pull "C:\Eval\out\$f" "$out\$f" } catch { Write-Warning "missing $f" } }
 try { Pull 'C:\Eval\submit.zip' "$out\submit.zip" } catch { Write-Warning 'nothing submitted' }
 if (-not $KeepRunning) { & $inv -VMX $vmx -Command stop -VMArgs @('hard') | Out-Null }
 "done $Case $Group $Run -> $out"

@@ -1,7 +1,9 @@
 # Runs the agent once, as the standard user. param: group, minutes
 #   A = Pi + Archo MCP, B = dsh + Archo MCP (since 2026-11-04), N = Pi without MCP (group B before 2026-11-04),
 #   P = Pi + Archo MCP + Archo's MCP server instructions in the system prompt, as dsh puts them (Pi 1.4 drops them)
-param([string]$Group, [int]$Minutes = 15)
+#   Q = P + pi-harness.ts (bash default timeout, run rules taken from Alma)
+#   L = Alma (headless alma-server driven by alma-run.mjs) + Archo MCP, M = L + Archo's MCP server instructions in the system prompt
+param([string]$Group, [int]$Minutes = 15, [switch]$Probe)
 $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine')
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'; $env:DOTNET_NOLOGO = '1'
 $ud = "$env:USERPROFILE\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios"
@@ -16,14 +18,22 @@ if ($Group -eq 'B') {
   $env:DSH_PERMISSION_MODE = 'danger-full-access'; $env:DSH_TELEMETRY_MODE = 'DISABLED'
   [IO.File]::WriteAllText('C:\Eval\work\prompt.txt', "$task`n`nDo the task described above.", (New-Object Text.UTF8Encoding($false)))
   $line = 'dsh --profile headless --patch C:\Eval\dsh-eval.yml --json < C:\Eval\work\prompt.txt > C:\Eval\out\transcript.jsonl 2> C:\Eval\out\stderr.txt'
+} elseif ($Group -eq 'L' -or $Group -eq 'M') {
+  # Alma headless (alma-run.mjs writes transcript.jsonl and stderr.txt itself); the same gateway, model and key
+  $gw = (Get-Content "$pi\models.json" -Raw | ConvertFrom-Json).providers.magpie
+  # not $probe: PowerShell names ignore case, so that is the -Probe switch itself
+  $almaFlags = ''
+  if ($Probe) { $almaFlags += ' --probe' }
+  if ($Group -eq 'M') { $almaFlags += ' --instructions' }
+  $line = "node C:\Eval\alma-run.mjs --alma C:\Eval\alma\Alma --task C:\Eval\work\TASK.md --out C:\Eval\out --minutes $Minutes --base-url $($gw.baseUrl) --api-key $($gw.apiKey)$almaFlags > C:\Eval\out\driver.log 2>&1"
 } else {
   $extra = ''
-  if ($Group -eq 'A' -or $Group -eq 'P') {
+  if ($Group -eq 'A' -or $Group -eq 'P' -or $Group -eq 'Q') {
     @{mcpServers = @{archo = @{command = 'C:\Eval\tools\archo.exe'; args = @('mcp'); exposure = 'direct'}}} | ConvertTo-Json -Depth 5 | Set-Content "$pi\mcp.json"
   } else {
     Remove-Item "$pi\mcp.json" -EA 0; $extra = ' --no-mcp'
   }
-  if ($Group -eq 'P') {
+  if ($Group -eq 'P' -or $Group -eq 'Q') {
     # the instructions this archo build sends at initialize, read from the server itself
     $psi = New-Object Diagnostics.ProcessStartInfo 'C:\Eval\tools\archo.exe', 'mcp'
     $psi.UseShellExecute = $false; $psi.RedirectStandardInput = $true; $psi.RedirectStandardOutput = $true; $psi.RedirectStandardError = $true
@@ -35,12 +45,16 @@ if ($Group -eq 'B') {
     [IO.File]::WriteAllText('C:\Eval\archo-instructions.md', "# Instructions from the MCP server archo`n`n$ins`n", (New-Object Text.UTF8Encoding($false)))
     New-Item -ItemType Directory -Force C:\Eval\out | Out-Null; Copy-Item C:\Eval\archo-instructions.md C:\Eval\out\archo-instructions.md
     $extra = ' --append-system-prompt C:\Eval\archo-instructions.md'
+    # Q: P plus the harness changes taken from Alma (pi-harness.ts)
+    if ($Group -eq 'Q') { $extra += ' --extension C:\Eval\pi-harness.ts' }
   }
   $line = "pi -p @C:\Eval\work\TASK.md ""Do the task described in the attached file."" --mode json --no-session --no-context-files --no-skills --no-prompt-templates --model magpie/apikeyfan/deepseek-flash$extra > C:\Eval\out\transcript.jsonl 2> C:\Eval\out\stderr.txt"
 }
 $sw = [Diagnostics.Stopwatch]::StartNew()
 $p = Start-Process cmd -ArgumentList '/c', $line -WorkingDirectory C:\Eval\work -WindowStyle Hidden -PassThru
-$done = $p.WaitForExit($Minutes * 60 * 1000)
+# Alma's driver stops the agent at the limit itself, then saves the thread: give it 2 more minutes
+$limit = $Minutes; if ($Group -eq 'L' -or $Group -eq 'M') { $limit += 2 }
+$done = $p.WaitForExit($limit * 60 * 1000)
 if (-not $done) { & taskkill /PID $p.Id /T /F | Out-Null }
 if ($Group -eq 'B') {
   # the full session log (tool results uncut; --json caps them at 8 KiB)

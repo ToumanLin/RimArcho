@@ -276,6 +276,40 @@ Failures:
 
 Reading: the instructions do not close the gap. P solves no more than A (6/9 against 7/9, within chance) and names the culprit as often as dsh (8/9 against 9/9). Its failures are a hung shell command and two DLL builds, not diagnosis. They cut Pi's tokens on h4 and h8 (1.08 M against 2.75 M; 3.14 M against 3.97 M) and raise its Archo calls on h7 and h8. Over rounds 2 to 5 dsh is ahead mainly on execution: bounded commands and a fix that runs. For an Archo Agent that points at dsh as the base (MIT, so it can ship with RimArcho), with Archo's instructions given to whichever harness is used.
 
+### Round 6, Alma and a Pi harness prototype (2026-11-11)
+
+Questions: how does a third harness, Alma 0.4.567 (closed source, studied by reverse engineering), do with Archo? And do two of its execution rules, ported to Pi as an extension, close Pi's gap?
+
+- **L:** Alma as shipped, driven headless by `guest/alma-run.mjs`, with Archo as its MCP server. Alma never reads an MCP server's `instructions`, and its MCP tools are deferred: their names appear only in the description of its `run_script` tool.
+- **M:** L plus Archo's instructions in Alma's project card, which is rendered into the system prompt. The card's focus line says the tools are named `archo__<tool>`.
+- **Q:** P plus `guest/pi-harness.ts`:
+  - bash gets a 120 s default timeout;
+  - a prompt section with four run rules: bounded commands and searches, Git Bash vs Windows paths, put the answer in place early, check the result against the task's own terms.
+
+Setup: 27 runs (h4, h7, h8 × 3 per group) on Player-Test and the re-copied Eval-2 and Eval-3, 20 min limit, the same build, model and grading as round 5. Columns A, B and P are from rounds 4 and 5.
+
+| Case | A Pi | B dsh | P Pi + instructions | Q P + harness | L Alma | M Alma + instructions |
+| --- | --- | --- | --- | --- | --- | --- |
+| h4 | 2/3 | 3/3 | 2/3, 740 s, 1.08 M | 3/3, 439 s, Archo 12.0, 1.56 M | 2/3, 433 s, Archo 0, 2.22 M | 2/3, 582 s, Archo 7.7, 2.99 M |
+| h7 | 3/3 | 3/3 | 3/3, 384 s, 0.81 M | 3/3, 335 s, Archo 12.7, 0.99 M | 3/3, 464 s, Archo 0, 1.68 M | 3/3, 439 s, Archo 2.0, 1.73 M |
+| h8 | 2/3 | 2/3 | 1/3, 440 s, 3.14 M | 3/3, 366 s, Archo 18.3, 1.82 M | 2/3, 482 s, Archo 0, 2.91 M | 3/3, 401 s, Archo 13.3, 2.88 M |
+| All | 7/9 | 8/9 | 6/9 | 9/9 | 7/9 | 8/9 |
+
+Failures:
+
+- **h4-L-1, h4-M-2:** named the decoy and shipped a new DLL that works around CyanobotsGenes' postfix instead of fixing it; this is the same mode as h4-A-2. h4-M-2 made no Archo call.
+- **h8-L-2:** right culprit and a working rebuild, but after `cd /c/Eval/work` it wrote to the relative `submit/`, so nothing reached `C:\Eval\submit`.
+
+Reading:
+
+- **Alma without the instructions never calls Archo:** 0 calls in 9 L runs, so L measures Alma alone.
+- **With them, M calls Archo in 6 of 9 runs**, always from `run_script` scripts and never directly. Three runs ignored it, and those include M's only failure. M uses no fewer tokens than L.
+- **Q passed every run.** Each Q run called Archo directly, and 8 of 9 verified with `test_run` (P on h8: 0 of 3). No command hit the 120 s default; the model often set its own `timeout`. P's two failure modes did not recur: a hung command, and an unverified DLL that throws at startup.
+- **The sample is small.** With 9 runs a group, 9/9 against 6/9 is within chance (Fisher's two-sided p ≈ 0.2). The extension is kept as the baseline for the next round, not counted as proven.
+- **Alma ran without its extras.** On a custom gateway its "tool model" features and its embedding memory stay off, so L and M measure its coding harness only.
+
+The Chinese reports (`ArchoAgent/research/`: results, reverse engineering of Alma's coding harness and memory system, Pi upgrade plan) stay outside the repo.
+
 ## Grading
 
 `scripts/mcp-eval/logdiff.mjs` compares a run's error lines (paths and addresses normalised) with the case's `reference.Player.log`. A submission is applied as a layer over the case (`sandbox.mjs <case> --layer <dir>`; files at `<packageId>/<mod-relative path>`, `enable.json` for re-enabled Mods), the game starts, and the log must have no error line the reference fix lacks. Culprit scoring uses `answer.json`: every Mod in `required` must be named, or, where the key has `requiredAny` (h7), every Mod of one of its lists; naming only a `decoy` fails.
