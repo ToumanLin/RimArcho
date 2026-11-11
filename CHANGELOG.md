@@ -26,6 +26,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 - Test runs: `--save` with a save that uses Mods the plan lacks names the first 8 and how many more, instead of every one on one line (a big list's save named 474).
 - Pin (`archo pin`, MCP `pin_mod`, the window's lock): pinning a Mod whose original is a plain folder in `Mods/` left the list unchanged ("the game would not load" the copy). The copy now replaces it in the current list; saving or launching offers to move the original into the lock library (`--move-duplicates`), and test runs move it aside while they run, as specified.
 - `archo save` refused for a Mods/ folder in the way of a linked copy says "save blocked", not "launch blocked".
+- Copied game folder: a copy of a RimArcho link that the list no longer uses (for example the installed Monitor's, after a Workshop Monitor of the same version took its place) made launch and save say "rename or remove it yourself"; they now point to the repair in Can it run (`archo links repair`), as for the links the list uses.
 - Text interface, Can it run: the memory item's lines are joined in the interface's language (Chinese read `…内存里。; 显存…`).
 
 ## 1.0.9 — 2026-11-10
