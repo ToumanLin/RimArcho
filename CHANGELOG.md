@@ -28,6 +28,9 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 - `archo save` refused for a Mods/ folder in the way of a linked copy says "save blocked", not "launch blocked".
 - Copied game folder: a copy of a RimArcho link that the list no longer uses (for example the installed Monitor's, after a Workshop Monitor of the same version took its place) made launch and save say "rename or remove it yourself"; they now point to the repair in Can it run (`archo links repair`), as for the links the list uses.
 - Can it run (Chinese): the confirm for a link repair asked about links marked "will be removed", which a recovery or a copy to recycle does not show; it now asks to repair the links as previewed above.
+- Mod library › remove subscription: the "quick delete" box sits beside its words (it was on a line of its own), and the preview reads in the window's language ("remove: 1 subscription", folder, affected link).
+- A quick delete that could remove only part of a Mod folder (a file held open by another program), and a move into the lock library that was refused ("nothing was moved"), now read in Chinese in the Chinese window; the copy button next to the folder copies only the folder, not the words after it. English: "<folder>: only part of it was deleted (…)".
+- CLI: plural counts read "2 aliases", "7 classes" (were "2 aliass"); `archo subscribe` previews say "1 subscription".
 - Text interface, Can it run: the memory item's lines are joined in the interface's language (Chinese read `…内存里。; 显存…`).
 
 ## 1.0.9 — 2026-11-10

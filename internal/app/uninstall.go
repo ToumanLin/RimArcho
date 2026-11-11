@@ -1113,7 +1113,7 @@ type partlyRemovedError struct {
 }
 
 func (e *partlyRemovedError) Error() string {
-	return fmt.Sprintf("%s was only partly deleted (%v); the game links to it were removed, delete the rest yourself", e.path, e.err)
+	return fmt.Sprintf("%s: only part of it was deleted (%s); the game links to it were removed, delete the rest yourself", e.path, e.err)
 }
 
 func (e *partlyRemovedError) Unwrap() error { return e.err }

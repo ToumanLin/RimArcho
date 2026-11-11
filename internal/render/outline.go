@@ -166,5 +166,10 @@ func Plural(n int, word string) string {
 	if strings.HasSuffix(word, "y") && !strings.HasSuffix(word, "ey") {
 		return fmt.Sprintf("%d %sies", n, word[:len(word)-1])
 	}
+	for _, end := range []string{"s", "x", "z", "ch", "sh"} {
+		if strings.HasSuffix(word, end) {
+			return fmt.Sprintf("%d %ses", n, word)
+		}
+	}
 	return fmt.Sprintf("%d %ss", n, word)
 }

@@ -780,7 +780,7 @@ func LibPreview(a *app.App, kind string, refs []string) (*Preview, error) {
 			if strings.HasPrefix(strings.TrimSpace(l), "warning: used by ") {
 				continue // said below, in the interface language
 			}
-			l = Humanize(st, l)
+			l = CLILine(st, l)
 			// "#ref Name" became "Name Name"
 			if m, err := st.Ix.ResolveOne(ref); err == nil {
 				n := m.DisplayName()

@@ -163,7 +163,7 @@ func subscriptionDoc(op *app.SubscribeOp, err error) (*render.Doc, error) {
 	if op == nil {
 		return nil, err
 	}
-	head := fmt.Sprintf("%s: %d subscriptions", op.Action, len(op.Items))
+	head := op.Action + ": " + render.Plural(len(op.Items), "subscription")
 	if op.DryRun {
 		head = "dry run, nothing changed: " + head
 	}

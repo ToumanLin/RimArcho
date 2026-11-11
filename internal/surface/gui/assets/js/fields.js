@@ -92,7 +92,7 @@ export function pathContent(node, text, paths = []) {
   const plain = value => {
     // Legacy command/task text has no metadata. Rooted paths and web addresses
     // need a clear boundary; shortcuts do not qualify.
-    const rooted = /(^|[\s("'\uff08\uff1a])((?:https?:\/\/[^\s<>"'\uff1f\u3002\uff1b\uff0c\uff09]+)|(?:(?:[a-z]:[\\/]|\\\\[^\\\s]+\\|\/[^/\s:]+\/)[^<>"|\n]*?)(?=:\s|:\d+\b|["'?\uff1f\u3002\uff1b\uff0c\uff09]|$))/gi;
+    const rooted = /(^|[\s("'\uff08\uff1a])((?:https?:\/\/[^\s<>"'\uff1f\u3002\uff1b\uff0c\uff09]+)|(?:(?:[a-z]:[\\/]|\\\\[^\\\s]+\\|\/[^/\s:]+\/)[^<>"|\n]*?)(?=[:;]\s|:\d+\b|["'?\uff1f\u3002\uff1b\uff0c\uff09]|$))/gi;
     for (const part of value.split(/( {2,}|\n| → )/)) {
       if (!part) continue;
       let at = 0;

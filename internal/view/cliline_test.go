@@ -16,6 +16,8 @@ func TestCLILineZh(t *testing.T) {
 		"result: would download with SteamCMD":                                            "结果：将用 SteamCMD 下载",
 		"note: Would subscribe through Steam; use SteamCMD only if Steam is unavailable.": "备注：将通过 Steam 订阅；只在 Steam 不可用时用 SteamCMD。",
 		"Workshop 1578693166": "Workshop 1578693166",
+		// the Mod library's remove dialog (VM round 2026-11-10: its lines were English)
+		"dry run, nothing changed: remove: 1 subscription": "试运行，没有改动：移除：1 个订阅",
 	} {
 		if got := view.CLILine(nil, in); got != want {
 			t.Errorf("%q: %q, want %q", in, got, want)

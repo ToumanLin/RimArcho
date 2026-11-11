@@ -1629,6 +1629,8 @@ body.col-resizing, body.col-resizing * { cursor: col-resize !important; user-sel
 .fb-check { display: flex; gap: 8px; align-items: center; cursor: pointer; width: max-content; max-width: 100%; }
 .fb-check input { flex: none; width: 15px; height: 15px; margin: 0; accent-color: var(--accent); }
 .fb-check input:disabled { cursor: default; }
+.check-row { display: flex; gap: 8px; align-items: center; cursor: pointer; width: max-content; max-width: 100%; }
+.check-row input { flex: none; width: 15px; height: 15px; margin: 0; accent-color: var(--accent); }
 .feedback .set .l .setting-note { white-space: normal; padding-left: 23px; }
 .fb-prev { padding: 12px 14px 14px; max-height: 420px; overflow: auto; display: flex; flex-direction: column; gap: 12px; user-select: text; cursor: text; }
 .fb-p-title { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }

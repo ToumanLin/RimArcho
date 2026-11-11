@@ -350,8 +350,9 @@ export async function libraryConfirm(kind, refs, label, done) {
   const fast = el("input");
   fast.type = "checkbox";
   if (kind === "subscription-remove") {
-    const choice = el("label");
-    choice.append(fast, document.createTextNode(" " + T("quick delete (cannot be undone)")));
+    // the box beside its words (VM round 2026-11-10: the page's input width put it on a line of its own)
+    const choice = el("label", "check-row");
+    choice.append(fast, document.createTextNode(T("quick delete (cannot be undone)")));
     body.append(choice, el("p", "muted", T("Quick delete skips the recycle bin. Deleted files cannot be restored.")));
   }
   let ready = false, go = refs;
