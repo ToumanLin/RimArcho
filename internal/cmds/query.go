@@ -926,6 +926,9 @@ func loadoutStatus(c *Ctx, root *render.Node, d *render.Doc) {
 				what += " (from the launch records)"
 			}
 		}
+		if w.Test { // VM 2026-11-10: a test run's game read "running the list"
+			what = "a test run"
+		}
 		root.KV("game", fmt.Sprintf("running %s for %s (pid %d; archo log --follow)", what, c.App.Now().Sub(run.Started).Round(time.Minute), run.PID))
 	}
 	for _, n := range st.Notices {

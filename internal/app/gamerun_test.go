@@ -46,6 +46,14 @@ func TestWhatRuns(t *testing.T) {
 	if w := a.WhatRuns(en, &app.GameRun{ArgsKnown: true, SaveData: ud, Started: now}); w.Pack != "Big Pack" || w.Guess {
 		t.Fatalf("pack data folder: %+v", w)
 	}
+	// A test run's game is not the player's (VM 2026-11-10: status said "running the list").
+	tr := &app.RunningGame{Env: en, Run: &app.GameRun{ArgsKnown: true, PID: 7, SaveData: filepath.Join(a.Home, "tests", en.ID, "userdata")}}
+	if tr.What = a.WhatRuns(en, tr.Run); !tr.What.Test || tr.What.Pack != "" {
+		t.Fatalf("test run data folder: %+v", tr.What)
+	}
+	if d := tr.Describe(nil); d != "environment "+en.Name+" is running a test run (pid 7)" {
+		t.Fatal(d)
+	}
 	// The command line unreadable: the launch records decide.
 	if w := a.WhatRuns(en, &app.GameRun{Started: now}); w.Pack != "" {
 		t.Fatalf("no launch: %+v", w)

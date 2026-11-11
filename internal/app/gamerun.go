@@ -112,6 +112,8 @@ func (g *RunningGame) Describe(loc *time.Location) string {
 		if g.What.Guess {
 			what += " (from the launch records)"
 		}
+	} else if g.What.Test {
+		what = "a test run"
 	} else if g.What.UserData != "" && env.PathKey(g.What.UserData) != env.PathKey(g.Env.UserDataRoot) {
 		what = "data folder " + g.What.UserData
 	}
@@ -183,6 +185,9 @@ type RunWhat struct {
 	Plan string
 	// PlanWritten: Plan comes from the write record, not from a launch.
 	PlanWritten bool
+	// Test: the game of a test run (archo test run, 20 §1), in RimArcho's own data folder;
+	// not the player's game.
+	Test bool
 }
 
 // PlanText names the plan a run plays: "plan:<name>", "plan:<name> (last written to the
@@ -227,7 +232,7 @@ func (a *App) WhatRuns(e *env.Environment, r *GameRun) RunWhat {
 		if name := a.packOfDir(r.SaveData); name != "" {
 			return RunWhat{Pack: name, UserData: r.SaveData}
 		}
-		return RunWhat{UserData: r.SaveData}
+		return RunWhat{UserData: r.SaveData, Test: a.Home != "" && underDir(env.PathKey(realOrAbs(r.SaveData)), env.PathKey(realOrAbs(filepath.Join(a.Home, "tests"))))}
 	}
 	if m, t := a.Store.LaunchBefore(e.ID, at.Add(time.Minute)); strings.HasPrefix(m, "pack:") && at.Sub(t) < launchSlack {
 		name := strings.TrimPrefix(m, "pack:")

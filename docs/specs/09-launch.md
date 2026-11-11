@@ -137,7 +137,7 @@ Detection is not implemented on other systems, where games are always considered
 
 **Display.** Show "not running" or "running", with the PID and start time when running.
 
-- `archo status` displays `game: running the list for 12m (pid 1234; archo log --follow)`. For a pack, it uses `pack <pack name>`; an inferred pack adds `(from the launch records)`.
+- `archo status` displays `game: running the list for 12m (pid 1234; archo log --follow)`. For a pack, it uses `pack <pack name>`; an inferred pack adds `(from the launch records)`. The game of a test run (its data folder is under RimArcho's `tests/`, 20 §1) is `a test run`, here and in refusals that name a running game.
 - In the GUI, the disabled block on the Launch page says "the game is running" and shows the error count for this run. The "last game" control at the top right does the same. Errors enter Can it run and its badge (16 §2.1, §2.3).
 - The TUI displays the same information in its status bar (16 §9).
 - On exit, stop following the log, perform a full analysis (06 §6), and suggest log analysis under §2.

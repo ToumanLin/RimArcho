@@ -72,6 +72,7 @@ var hintSpecs = []hintSpec{
 		flag: map[string]string{"yes": "confirm"}, value: map[string]string{"token": "token"}},
 	{cmd: "saves trash", tool: "manage_saves", fixed: [][2]string{{"action", "trash"}}, posList: true, pos: []string{"saves"},
 		flag: map[string]string{"yes": "confirm"}, value: map[string]string{"token": "token"}},
+	{cmd: "plan list", tool: "manage_plans", fixed: [][2]string{{"action", "list"}}}, // VM 2026-11-10: status said "archo plan list"
 	{cmd: "pin", tool: "pin_mod", pos: []string{"ref"}, flag: map[string]string{"dry-run": "dry_run", "update": "update", "git": "git"}},
 	{cmd: "unpin", tool: "unpin_mod", pos: []string{"ref"}, flag: map[string]string{"dry-run": "dry_run"}},
 }

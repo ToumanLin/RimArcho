@@ -44,6 +44,7 @@ func TestMCPCall(t *testing.T) {
 		{`archo pattern pattern:g:rt.tick`, `analyze_log pattern=pattern:g:rt.tick`},
 		{`archo workshop resubscribe 6olp --dry-run`, `manage_library action=resubscribe dry_run=true refs=[6olp]`},
 		{`archo workshop subscribe nyh3`, `manage_library action=subscribe refs=[nyh3]`},
+		{`archo plan list`, `manage_plans action=list`},
 	} {
 		got, ok := cmds.MCPCall(c.cli)
 		if !ok || got != c.want {
