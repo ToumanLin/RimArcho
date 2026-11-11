@@ -407,6 +407,19 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 		}
 		return name
 	}
+	// what disabling one of two conflicting mods leaves without a requirement (disableOne),
+	// read once for all of them
+	var deps *app.Dependents
+	dependents := func(id string) []*store.Mod {
+		if deps == nil {
+			d, err := a.NewDependents(st)
+			if err != nil {
+				return nil
+			}
+			deps = d
+		}
+		return deps.Of([]string{id})
+	}
 	var out []Need
 	cur := "" // the code of the problem being turned into an item
 	var linkProblem *app.Problem
@@ -598,7 +611,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 			}
 		case "combo.known-bad":
 			if y != "" {
-				add(Need{Group: GroupConflict, Text: Tf("%s and %s often produce errors together (seen in shared logs)", nm(x), nm(y)), Actions: []Action{disableOne(a, st, x, y)}, Counted: true, Mods: ids, Status: s,
+				add(Need{Group: GroupConflict, Text: Tf("%s and %s often produce errors together (seen in shared logs)", nm(x), nm(y)), Actions: []Action{disableOne(st, dependents, x, y)}, Counted: true, Mods: ids, Status: s,
 					Title: Tf("%s and %s often fail together", nm(x), nm(y)), Why: T("in shared logs this pair produces errors far more often than either one alone. Disable one if you see errors."), Evidence: ev})
 			} else {
 				add(Need{Group: GroupConflict, Text: Tf("this version of %s often produces errors (seen in shared logs); other versions did not", nm(x)), Actions: []Action{disable(st, x, Tf("disable %s", nm(x)))}, Counted: true, Mods: ids, Status: s,
@@ -615,7 +628,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 				Actions: []Action{enable(st, y), problemAction(p.Ref)}, Counted: true, Mods: ids, Status: s,
 				Title: Tf("part of %s does not take effect", nm(x)), Why: Tf("it changes things %s adds, and %s is not enabled.", nm(y), nm(y)), Evidence: ev})
 		case "incompat.active":
-			add(Need{Group: GroupConflict, Text: Tf("%s is incompatible with %s", nm(x), nm(y)), Actions: []Action{disableOne(a, st, x, y)}, Counted: true, Mods: ids, Status: s,
+			add(Need{Group: GroupConflict, Text: Tf("%s is incompatible with %s", nm(x), nm(y)), Actions: []Action{disableOne(st, dependents, x, y)}, Counted: true, Mods: ids, Status: s,
 				Why: T("one of them says so; with both enabled the game misbehaves. Disable one."), Evidence: ev})
 		case "mod.pinned":
 			add(Need{Group: GroupHidden, Text: Tf("%s is locked to another copy, and the workshop version has been updated since", nm(x)),
@@ -1103,7 +1116,7 @@ func disable(st *app.LoadoutState, tok, label string) Action {
 // enabled mods would be left without a required mod (app.DependentsOf), and the one fewer
 // mods need comes first: disabling a library to settle a conflict breaks everything built
 // on it.
-func disableOne(a *app.App, st *app.LoadoutState, x, y string) Action {
+func disableOne(st *app.LoadoutState, dependents func(id string) []*store.Mod, x, y string) Action {
 	type opt struct {
 		o    Option
 		need int
@@ -1113,7 +1126,7 @@ func disableOne(a *app.App, st *app.LoadoutState, x, y string) Action {
 		name := TokName(st, tok)
 		o := opt{o: Option{Label: Tf("disable %s", name), Refs: []string{TokRef(st, tok)}, Done: Tf("disabled %s", name)}}
 		if id := finding.InstID(tok); id != "" {
-			if deps, err := a.DependentsOf(st, []string{id}); err == nil && len(deps) > 0 {
+			if deps := dependents(id); len(deps) > 0 {
 				o.need = len(deps)
 				o.o.Label = Tf("disable %s (%d enabled mods need it: %s)", name, len(deps), modNames(deps, 3))
 				o.o.Done = Tf("disabled %s; %d mods that need it lack it now", name, len(deps))

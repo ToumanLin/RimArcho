@@ -1414,7 +1414,7 @@ func (a *App) LiveLog(st *LoadoutState) string {
 	if st == nil || st.Ix == nil || st.Ix.Env == nil {
 		return ""
 	}
-	r := a.probe()(st.Ix.Env.GameRoot)
+	r := a.readProbe()(st.Ix.Env.GameRoot)
 	if r == nil {
 		return ""
 	}

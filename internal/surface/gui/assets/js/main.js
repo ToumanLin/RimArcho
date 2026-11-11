@@ -1532,7 +1532,7 @@ async function start() {
   });
   // Menu art is prepared after the first draw, outside the task page (16 §2.14).
   on("backgrounds", () => {
-    if (S.screen === "home") homePage.home({ keep: true });
+    if (S.screen === "home") homePage.backgroundChanged();
     if (S.screen === "settings") refreshBackgrounds();
   });
   // a task's o on a mod: Mod library searching for it (16 §2.16)
@@ -1563,7 +1563,8 @@ async function start() {
   try { if (await uninst.restore()) { bootDone(); shell.settle(); return; } } catch (e) { failed(e); }
   // The start page needs only Workspace's shell and board. The editor behind it gets its
   // filter answer (the bar's first one reads every mod's content) and its rows afterwards,
-  // so the first page does not wait for them.
+  // so the first page does not wait for them. The launch page's own read starts now too.
+  homePage.readEarly();
   let shellIn;
   const shellRead = new Promise((r) => { shellIn = r; });
   reload(null, { current: () => true, commit(apply) { apply(); shellIn(); return true; } })
@@ -1578,7 +1579,7 @@ async function start() {
   // No environment yet: the first-run guide (16 §2.15); else the home page (16 §2.3).
   const first = !S.shell || !S.shell.envs;
   try {
-    if (first) await guide.start("first");
+    if (first) { homePage.forgetEarly(); await guide.start("first"); }
     else await go("home");
   } catch (e) { failed(e); }
   bootDone();

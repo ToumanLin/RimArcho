@@ -22,8 +22,9 @@ let ui = null;
 export function initHome(u) {
   ui = u;
   // Back from a game: the page reads the new Player.log (API.Home reads it when it is newer
-  // than the last one read).
-  addEventListener("focus", () => { if (S.screen === "home") home(); });
+  // than the last one read). A read on its way reads it already, so the focus a new window
+  // gets at start asks for nothing more.
+  addEventListener("focus", () => { if (S.screen === "home" && !homeRun) home(); });
   addEventListener("resize", () => { if (S.screen === "home") { markY.clear(); placeMarks(); fitHeadline(); } });
 }
 
@@ -43,12 +44,54 @@ const markY = new Map();
 let homeRetries = 0, homeRetryTimer = null;
 let drawnSig = ""; // the last read drawn (home)
 let memoryTimer = null, launchPending = false;
-export async function home({ keep = false } = {}) {
+// One read at a time: API.Home waits for the one before it, so at start the page opening,
+// the window's focus and the menu art coming in read it three times, one after another
+// (1.0.9). Asks while one is on its way make one more read when it ends.
+let homeRun = null, homeAgain = null, homeAgainRun = null;
+export function home(opts = {}) {
+  if (homeRun) {
+    homeAgain = { keep: (homeAgain ? homeAgain.keep : true) && !!opts.keep };
+    return homeAgainRun ??= homeRun.catch(() => {}).then(() => {
+      const again = homeAgain;
+      homeAgain = homeAgainRun = null;
+      return S.screen === "home" ? home(again) : undefined;
+    });
+  }
+  homeRun = readHome(opts).finally(() => { homeRun = null; });
+  return homeRun;
+}
+
+// backgroundChanged: menu art came in (16 §2.14); only the backdrop is read again. In 1.0.9
+// the whole page was, and at start that read went before the page's own.
+export async function backgroundChanged() {
+  if (homeRun) await homeRun.catch(() => {});
+  if (!data || S.screen !== "home") return; // the page's first read brings it
+  let b;
+  try { b = await api.HomeBackground(); } catch { return; }
+  if (S.screen !== "home" || JSON.stringify(b) === JSON.stringify(bg)) return;
+  bg = b;
+  setBackdrop(bg);
+  if (drawnSig) drawnSig = JSON.stringify([data, bg, hidden || ""]);
+}
+
+// At start the window reads this page alongside Workspace's shell instead of after it
+// (main.js); the first read takes that answer.
+let early = null;
+export function readEarly() {
+  early = [api.Home(), api.HomeBackground()];
+  for (const p of early) p.catch(() => {}); // the read that takes it says what failed
+}
+// forgetEarly: the window opened another page first (the first-run guide).
+export function forgetEarly() { early = null; }
+
+async function readHome({ keep = false } = {}) {
   clearTimeout(homeRetryTimer);
   const read = beginPageRead("home", { keep, retry: () => home() });
+  const [homeRead, bgRead] = early || [api.Home(), api.HomeBackground()];
+  early = null;
   let next, backdrop, h;
   try {
-    [next, backdrop, h] = await Promise.all([api.Home(), api.HomeBackground(), hidden == null ? api.Setting(HIDDEN_KEY).catch(() => "") : hidden]);
+    [next, backdrop, h] = await Promise.all([homeRead, bgRead, hidden == null ? api.Setting(HIDDEN_KEY).catch(() => "") : hidden]);
   } catch (e) { read.fail(e); retryHome(); return; }
   if (!read.current()) return;
   // An empty page while games exist is a read that failed (a background job holding the

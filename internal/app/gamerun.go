@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ToumanLin/RimArcho/internal/env"
@@ -70,10 +71,34 @@ func (a *App) probe() func(gameRoot string) *GameRun {
 	}
 }
 
+// recentProcs is the process table listed for readProbe, with when.
+var recentProcs struct {
+	sync.Mutex
+	at    time.Time
+	procs []*GameRun
+}
+
+// readProbe is probe for reads that only choose what to show, such as which log is the
+// run in progress (LiveLog): a table listed in the last second will do. Listing it takes
+// tens of milliseconds, and the launch page asks once for every plan (1.0.9: a second at
+// start). Anything that writes, or refuses to while the game runs, uses probe.
+func (a *App) readProbe() func(gameRoot string) *GameRun {
+	if a.GameProbe != nil {
+		return a.GameProbe
+	}
+	recentProcs.Lock()
+	if recentProcs.at.IsZero() || time.Since(recentProcs.at) > time.Second {
+		recentProcs.procs, recentProcs.at = gameProcesses(), time.Now()
+	}
+	procs := recentProcs.procs
+	recentProcs.Unlock()
+	return func(gameRoot string) *GameRun { return processIn(procs, gameRoot) }
+}
+
 // processIn picks the process whose executable lies in gameRoot.
 func processIn(procs []*GameRun, gameRoot string) *GameRun {
-	if gameRoot == "" {
-		return nil
+	if gameRoot == "" || len(procs) == 0 {
+		return nil // no game runs: the folder's real path is not needed
 	}
 	root := env.PathKey(realOrAbs(gameRoot))
 	for _, r := range procs {
