@@ -25,7 +25,7 @@ func TestCompactAccountRows(t *testing.T) {
 	e.WriteFile(filepath.Join(e.App.LocalDir(), "steamcmd", deps.SteamCMDExecutable()), "offline fixture")
 	group := view.AccountGroup(e.App)
 	steam, ll := group.Items[0], group.Items[1]
-	if steam.Note != "下载Mod可用，未登录" || ll.Note != "" {
+	if steam.Note != "下载 Mod 可用，未登录" || ll.Note != "" {
 		t.Fatal(group)
 	}
 	for _, item := range group.Items {
@@ -45,9 +45,9 @@ func TestCompactAccountRows(t *testing.T) {
 	for _, owned := range []bool{false, true} {
 		status := app.SteamAccountStatus{Account: "dummyPlayer", LoggedIn: true, OwnsRimWorld: owned, OwnershipChecked: time.Now(), Managed: true}
 		text := view.SteamAccountLine(status)
-		expected := "下载Mod可用，下载游戏不可用，登录账号：dummyPlayer"
+		expected := "下载 Mod 可用，下载游戏不可用，登录账号：dummyPlayer"
 		if owned {
-			expected = "下载Mod可用，下载游戏可用，登录账号：dummyPlayer"
+			expected = "下载 Mod 可用，下载游戏可用，登录账号：dummyPlayer"
 		}
 		if text != expected {
 			t.Fatal(text)
@@ -136,7 +136,7 @@ func TestLegacySteamOwnershipUnknownOnBothPages(t *testing.T) {
 		view.SetLang(lang)
 		want := "mod downloads available, game downloads: not checked, account: dummyPlayer"
 		if lang == "zh" {
-			want = "下载Mod可用，下载游戏：未检查，登录账号：dummyPlayer"
+			want = "下载 Mod 可用，下载游戏：未检查，登录账号：dummyPlayer"
 		}
 		if got := view.SteamAccountLine(status); got != want {
 			t.Fatal(got)
