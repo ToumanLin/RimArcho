@@ -7,10 +7,10 @@ import (
 
 // ParserVersion is the version of Scan's output. Bump it whenever Facts changes meaning
 // (a field added, removed or computed differently): caches of Facts key on it (12 §1.7).
-const ParserVersion = 7
+const ParserVersion = 8
 
 // MinParserVersion is the oldest version whose Facts mean what this version's do, except
-// for fields added since (2 added DefRefs, 3 the weather references in them, 4 GridDefs, 5 the compressed things in them, 6 the storyteller's record of fired incidents and quests in DefRefs, 7 ConfigRefs, taken out of DefRefs). Lists, grouping, play facts and Can it load use
+// for fields added since (2 added DefRefs, 3 the weather references in them, 4 GridDefs, 5 the compressed things in them, 6 the storyteller's record of fired incidents and quests in DefRefs, 7 ConfigRefs, taken out of DefRefs, 8 things' styles and ideoligions' style categories in DefRefs). Lists, grouping, play facts and Can it load use
 // a row this old; a reader of a newer field reads the save again (12 §1.7). Raise it to
 // ParserVersion when a change alters what an existing field means.
 const MinParserVersion = 1

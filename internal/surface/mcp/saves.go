@@ -14,18 +14,23 @@ func saveTools() []tool {
 	}
 }
 
-// ListSavesIn is list_saves: archo saves list. env both selects the game and keeps only
+// ListSavesIn is list_saves: archo saves list, or with review archo saves review --read (12 §3):
+// the review first reads the saves that lack a current full read, as get_save reads its one. env both selects the game and keeps only
 // its saves, as the global --env does on the CLI.
 type ListSavesIn struct {
-	Env       string `json:"env,omitempty" jsonschema:"environment name: only its saves (default: all)"`
+	Env       string `json:"env,omitempty" jsonschema:"only this environment's saves"`
 	Colony    string `json:"colony,omitempty" jsonschema:"only this colony"`
 	Mod       string `json:"mod,omitempty" jsonschema:"only saves using this Mod (#id, pkg:, packageId or ws:), installed or not"`
-	Attention bool   `json:"attention,omitempty" jsonschema:"only saves with warnings or errors"`
+	Attention bool   `json:"attention,omitempty" jsonschema:"only warnings or errors"`
+	Review    bool   `json:"review,omitempty" jsonschema:"playthrough review"`
 	All       bool   `json:"all,omitempty" jsonschema:"no truncation"`
 }
 
 // ListSavesArgv maps list_saves.
 func ListSavesArgv(in ListSavesIn) []string {
+	if in.Review {
+		return argv("saves", "review").str("colony", in.Colony).str("mod", in.Mod).flag("read", true).flag("all", in.All).a
+	}
 	return argv("saves", "list").str("colony", in.Colony).str("mod", in.Mod).flag("attention", in.Attention).flag("all", in.All).a
 }
 

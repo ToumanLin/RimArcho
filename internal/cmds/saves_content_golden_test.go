@@ -26,6 +26,34 @@ func TestGoldenSavesContent(t *testing.T) {
 	})
 }
 
+// saves review (12 §3): before and after the saves are read, one Mod in full, one colony.
+func TestGoldenSavesReview(t *testing.T) {
+	e := testkit.New(t)
+	e.WriteFile(filepath.Join(e.Game, "Data", "Core", "Defs", "Content.xml"), `<Defs><ThingDef><defName>Human</defName><race><intelligence>Humanlike</intelligence></race></ThingDef></Defs>`)
+	weapon := func(n string) string {
+		return "<ThingDef><defName>" + n + "</defName><category>Item</category><tools><li><label>edge</label></li></tools></ThingDef>"
+	}
+	e.AddWorkshop("3100000001", testkit.Mod{PackageID: "tester.arms", Name: "Arms", Files: map[string]string{"Defs/A.xml": "<Defs>" + weapon("Sword") + weapon("Axe") + weapon("Club") +
+		"<ResearchProjectDef><defName>Smithing</defName></ResearchProjectDef><QuestScriptDef><defName>ArmsRace</defName></QuestScriptDef><RecipeDef><defName>MakeSword</defName></RecipeDef></Defs>"}})
+	e.AddWorkshop("3100000002", testkit.Mod{PackageID: "tester.hats", Name: "Hats", Files: map[string]string{"Defs/H.xml": "<Defs><ThingDef><defName>Cap</defName><category>Item</category><apparel><layers><li>Overhead</li></layers></apparel></ThingDef></Defs>"}})
+	e.AddWorkshop("3100000003", testkit.Mod{PackageID: "tester.menus", Name: "Menus", Files: map[string]string{"Defs/K.xml": "<Defs><KeyBindingDef><defName>MenuKey</defName></KeyBindingDef></Defs>"}})
+	mods := []string{"ludeon.rimworld", "tester.arms", "tester.hats", "tester.menus"}
+	e.WriteModsConfig("1.6.4633 rev1261", mods...)
+	e.AddEnv(false)
+	e.MustRun("scan")
+	e.MustRun("analyze")
+	e.WriteSave("Fort 1.rws", testkit.SaveSpec{Mods: mods, Faction: "Fort", Seed: "alpha", PRV: 1, Body: `<things><li><def>Sword</def></li></things>`})
+	e.WriteSave("Fort 2.rws", testkit.SaveSpec{Mods: mods, Faction: "Fort", Seed: "alpha", PRV: 1, Body: `<things><li><def>Axe</def><bills><li><recipe>MakeSword</recipe></li></bills></li></things>`})
+	e.WriteSave("Camp.rws", testkit.SaveSpec{Mods: []string{"ludeon.rimworld", "tester.hats"}, Faction: "Camp", Seed: "beta", PRV: 2})
+	runSavesGolden(t, "saves_review", e, []step{
+		cmd("saves", "review"),
+		cmd("saves", "review", "--read"),
+		cmd("saves", "review", "--mod", "tester.arms"),
+		cmd("saves", "review", "--colony", "Camp"),
+		cmd("saves", "review", "--colony", "Nowhere"),
+	})
+}
+
 func TestSaveContentTextBudget(t *testing.T) {
 	e := testkit.New(t)
 	mods := []string{"ludeon.rimworld"}

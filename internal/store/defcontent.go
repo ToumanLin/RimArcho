@@ -80,6 +80,22 @@ func (s *Store) DefsOfTypes(instances, types []string) ([]analyze.DefFact, error
 	return out, err
 }
 
+// ContentDefsAll reads every Def instances provide for the current game version, by
+// instance and then in file order.
+func (s *Store) ContentDefsAll(instances []string) ([]analyze.DefFact, error) {
+	var out []analyze.DefFact
+	err := chunked(instances, func(part []string) error {
+		rows, err := s.DB.Query(`SELECT `+defCols+defView+`WHERE c.game_mm=? AND c.instance_id IN (`+placeholders(len(part))+`) ORDER BY c.instance_id, f.rowid`, append([]any{s.MM}, anys(part)...)...)
+		if err != nil {
+			return err
+		}
+		fs, err := s.scanDefs(rows)
+		out = append(out, fs...)
+		return err
+	})
+	return out, err
+}
+
 // DefsLite reads the Defs of one type that instances provide for the current game version,
 // without their files, and with their content fields only where those mention field: enough
 // to walk ParentName chains for one inherited field over tens of thousands of Defs.

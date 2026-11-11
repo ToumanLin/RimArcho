@@ -12,7 +12,8 @@ func TestContentReferenceForms(t *testing.T) {
 <geneSet><genes><li>PackGene</li></genes></geneSet>
 <story><childhood>Child</childhood><adulthood>Adult</adulthood><hairDef>Hair</hairDef><bodyType>Body</bodyType><headType>Head</headType><furDef>Fur</furDef></story>
 <style><beardDef>Beard</beardDef><faceTattoo>Face</faceTattoo><bodyTattoo>Tattoo</bodyTattoo></style>
-<bills><li><recipe>Surgery</recipe></li></bills></thing>
+<bills><li><recipe>Surgery</recipe></li></bills><styleDef>Spiky_Lamp</styleDef><category>NotAStyle</category></thing>
+<ideos><li><thingStyleCategories><li><category>Spiky</category></li></thingStyleCategories></li></ideos>
 <researchManager><currentProj>Electricity</currentProj><progress><keys><li>Electricity</li><li>Untouched</li><li>Done</li></keys><values><li>0</li><li>0</li><li>500.5</li></values></progress><techprints><keys><li>NoValue</li></keys></techprints><knowledge><keys><li>Brain</li><li>Void</li></keys><values><li>1</li><li>0</li></values></knowledge></researchManager>
 <world><grid><layers><values><li><tileBiome>c9U=</tileBiome></li></values></layers></grid><ideoManager><ideos><li><memes><li>Rancher</li></memes><precepts><li><def>Precept</def><sourcePattern>Festival</sourcePattern></li></precepts></li></ideos></ideoManager></world>
 <questManager><quests><li><root>Quest</root><parts><li><incident>QuestRaid</incident><questScript>SubQuest</questScript></li></parts></li></quests></questManager>
@@ -32,7 +33,7 @@ func TestContentReferenceForms(t *testing.T) {
 	for typ, ns := range map[string][]string{
 		"": {"Shared", "UnknownType"}, "ThingDef": {"Steel"}, "PawnKindDef": {"Soldier"}, "XenotypeDef": {"Baseliner"}, "GeneDef": {"Strong", "PackGene"},
 		"BackstoryDef": {"Child", "Adult"}, "HairDef": {"Hair"}, "BodyTypeDef": {"Body"}, "HeadTypeDef": {"Head"}, "FurDef": {"Fur"}, "BeardDef": {"Beard"}, "TattooDef": {"Face", "Tattoo"},
-		"ResearchProjectDef": {"Electricity", "Brain", "Done"}, "MemeDef": {"Rancher"}, "PreceptDef": {"Precept"}, "RitualPatternDef": {"Festival"}, "QuestScriptDef": {"Quest"}, "FactionDef": {"Player"}, "BiomeDef": {"Desert"}, "WeatherDef": {"AcidRain", "Clear"},
+		"ResearchProjectDef": {"Electricity", "Brain", "Done"}, "MemeDef": {"Rancher"}, "PreceptDef": {"Precept"}, "RitualPatternDef": {"Festival"}, "QuestScriptDef": {"Quest"}, "FactionDef": {"Player"}, "BiomeDef": {"Desert"}, "ThingStyleDef": {"Spiky_Lamp"}, "StyleCategoryDef": {"Spiky"}, "WeatherDef": {"AcidRain", "Clear"},
 	} {
 		for _, n := range ns {
 			if f.DefRefs[typ][n] == 0 {
@@ -70,7 +71,7 @@ func TestContentReferenceForms(t *testing.T) {
 	if f.DefRefs["ResearchProjectDef"]["Electricity"] != 1 || len(f.DefRefs["ResearchProjectDef"]) != 3 {
 		t.Errorf("research: the current project, and those with progress: %v", f.DefRefs["ResearchProjectDef"])
 	}
-	for _, n := range []string{"FilterOnly", "NestedFilter", "HelpOnly", "NestedHelp", "ObjectReference", "Arbitrary", "WrongContext", "NotAQuest", "5", "Surgery", "QuestRaid", "SubQuest", "Untouched", "Void", "NoValue", "500.5", "GridNotDecoded", "WrongWeather"} {
+	for _, n := range []string{"FilterOnly", "NestedFilter", "HelpOnly", "NestedHelp", "ObjectReference", "Arbitrary", "WrongContext", "NotAQuest", "NotAStyle", "5", "Surgery", "QuestRaid", "SubQuest", "Untouched", "Void", "NoValue", "500.5", "GridNotDecoded", "WrongWeather"} {
 		for _, refs := range f.DefRefs {
 			if refs[n] != 0 {
 				t.Errorf("unexpected %s", n)

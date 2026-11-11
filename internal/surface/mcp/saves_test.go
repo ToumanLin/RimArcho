@@ -83,6 +83,8 @@ func TestSaveToolsCLIParity(t *testing.T) {
 		{"list_saves", map[string]any{"mod": "tester.gone"}, []string{"saves", "list", "--mod", "tester.gone"}},
 		{"list_saves", map[string]any{"mod": "pkg:tester.gamma", "colony": "tundra", "all": true}, []string{"saves", "list", "--colony", "tundra", "--mod", "pkg:tester.gamma", "--all"}},
 		{"list_saves", map[string]any{"colony": "nope"}, []string{"saves", "list", "--colony", "nope"}},
+		{"list_saves", map[string]any{"review": true}, []string{"saves", "review", "--read"}},
+		{"list_saves", map[string]any{"review": true, "mod": "tester.alpha", "all": true}, []string{"saves", "review", "--mod", "tester.alpha", "--read", "--all"}},
 		{"get_save", map[string]any{"save": "Tundra 2"}, []string{"saves", "show", "Tundra 2"}},
 		{"get_save", map[string]any{"save": "Tundra 2.rws", "mods": true, "all": true}, []string{"saves", "show", "Tundra 2.rws", "--mods", "--all"}},
 		{"get_save", map[string]any{"save": "Broken"}, []string{"saves", "show", "Broken"}},

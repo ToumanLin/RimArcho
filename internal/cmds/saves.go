@@ -23,6 +23,10 @@ func init() {
 			{Name: "content", Help: "content references by Mod and category, with coverage limits"},
 			{Name: "current", Help: "check against the current game's current list instead of the list the save matched"},
 			{Name: "all", Help: "no truncation"}}, Run: savesShow})
+	register(&Command{Name: "saves review", Summary: "playthrough review: what the installed Mods add, by category, and how much of it the saves show", MaxArgs: 0,
+		Flags: []Flag{{Name: "colony", Value: "<name>", Help: "only this colony"}, {Name: "mod", Value: "<ref>", Help: "one Mod in full, with the names not seen"},
+			{Name: "read", Help: "first read in full the saves without a current read (minutes for a large library)"}, {Name: "progress", Help: "a progress line per save on stderr"},
+			{Name: "all", Help: "no truncation"}}, Run: savesReview})
 	register(&Command{Name: "saves fix", Args: "<save>", Summary: "the save's Mod fixes as one undoable edit of its list, then Workshop subscriptions; --launch starts it", MinArgs: 1, MaxArgs: 1,
 		Flags: []Flag{{Name: "mod", Value: "<packageId>", Multi: true, Help: "only this Mod's fix"}, {Name: "disable-added", Help: "also disable the list's Mods the save lacks"},
 			{Name: "order", Help: "put the Mods both have in the save's order"}, {Name: "launch", Help: "then save the list to the game and start it (not while subscriptions download)"},

@@ -21,7 +21,83 @@ type contentResolver struct {
 	active   func(string) bool
 }
 
-func (a *App) contentResolver(insts []string, pos map[string]int, packages map[string]bool, names map[string]bool) (*contentResolver, error) {
+// defSource holds every Def of the copies it has loaded, for one game version: the
+// playthrough review attributes hundreds of saves, and asking the database for each save's
+// names is nearly all of an attribution's time.
+type defSource struct {
+	mm      string
+	loaded  map[string]bool
+	byDef   map[string][]analyze.DefFact // defName → Defs, by instance then file order
+	byName  map[string][]analyze.DefFact // Name attribute → Defs
+	defName map[string][]string          // instance → its distinct defNames
+}
+
+// ensure loads the copies among insts it lacks; a change of game version starts it over.
+func (s *defSource) ensure(a *App, insts []string) error {
+	if s.loaded == nil || s.mm != a.Store.MM {
+		s.mm, s.loaded = a.Store.MM, map[string]bool{}
+		s.byDef, s.byName, s.defName = map[string][]analyze.DefFact{}, map[string][]analyze.DefFact{}, map[string][]string{}
+	}
+	var need []string
+	for _, inst := range insts {
+		if !s.loaded[inst] {
+			s.loaded[inst] = true
+			need = append(need, inst)
+		}
+	}
+	if len(need) == 0 {
+		return nil
+	}
+	fs, err := a.Store.ContentDefsAll(need)
+	if err != nil {
+		return err
+	}
+	had := map[string]bool{}
+	for _, f := range fs {
+		if f.DefName != "" {
+			s.byDef[f.DefName] = append(s.byDef[f.DefName], f)
+			if id := f.Instance + "|" + f.DefName; !had[id] {
+				had[id] = true
+				s.defName[f.Instance] = append(s.defName[f.Instance], f.DefName)
+			}
+		}
+		if f.Name != "" {
+			s.byName[f.Name] = append(s.byName[f.Name], f)
+		}
+	}
+	return nil
+}
+
+// defs is Store.ContentDefs from memory.
+func (s *defSource) defs(insts map[string]bool, names []string, parent bool) []analyze.DefFact {
+	from := s.byDef
+	if parent {
+		from = s.byName
+	}
+	var out []analyze.DefFact
+	for _, n := range names {
+		for _, f := range from[n] {
+			if insts[f.Instance] {
+				out = append(out, f)
+			}
+		}
+	}
+	return out
+}
+
+// contentResolver loads the Defs named names, and what they inherit from, of insts: from
+// src when given, else from the database.
+func (a *App) contentResolver(src *defSource, insts []string, pos map[string]int, packages map[string]bool, names map[string]bool) (*contentResolver, error) {
+	var instSet map[string]bool
+	if src != nil {
+		if err := src.ensure(a, insts); err != nil {
+			return nil, err
+		}
+		instSet = map[string]bool{}
+		for _, inst := range insts {
+			instSet[inst] = true
+		}
+	}
 	r := &contentResolver{defs: map[string][]*contentNode{}, parents: map[string][]*contentNode{}, memo: map[*contentNode]contentResolution{}, visiting: map[*contentNode]bool{}, active: func(p string) bool { return packages[normPkg(p)] }}
 	pending := [2]map[string]bool{names, {}}
 	seen := [2]map[string]bool{{}, {}}
@@ -41,9 +117,14 @@ func (a *App) contentResolver(insts []string, pos map[string]int, packages map[s
 			}
 			progress = true
 			sort.Strings(todo)
-			fs, err := a.Store.ContentDefs(insts, todo, kind == 1)
-			if err != nil {
-				return nil, err
+			var fs []analyze.DefFact
+			if src != nil {
+				fs = src.defs(instSet, todo, kind == 1)
+			} else {
+				var err error
+				if fs, err = a.Store.ContentDefs(insts, todo, kind == 1); err != nil {
+					return nil, err
+				}
 			}
 			for _, f := range fs {
 				if !f.Loaded(r.active) {

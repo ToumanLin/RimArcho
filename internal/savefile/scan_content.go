@@ -121,6 +121,14 @@ func (s *scanner) contentRef(f *frame, v []byte) {
 		if path("parts", "li", "questScript") && under("questManager") {
 			typ, config = "QuestScriptDef", true
 		}
+	case "styleDef":
+		// the style a thing was made in
+		typ = "ThingStyleDef"
+	case "category":
+		// the style categories of an ideoligion
+		if path("thingStyleCategories", "li", "category") {
+			typ = "StyleCategoryDef"
+		}
 	case "factionDef":
 		if path("scenario", "playerFaction", "factionDef") {
 			typ = "FactionDef"
@@ -180,7 +188,7 @@ var storyTypes = map[string]string{"childhood": "BackstoryDef", "adulthood": "Ba
 var styleTypes = map[string]string{"beardDef": "BeardDef", "faceTattoo": "TattooDef", "bodyTattoo": "TattooDef"}
 var contentLabels = func() map[string]bool {
 	m := map[string]bool{}
-	for _, n := range []string{"kindDef", "stuff", "currentProj", "li", "xenotype", "sourcePattern", "root", "factionDef", "recipe", "biome", "curWeather", "lastWeather", "incident", "questScript"} {
+	for _, n := range []string{"kindDef", "stuff", "currentProj", "li", "xenotype", "sourcePattern", "root", "factionDef", "recipe", "biome", "curWeather", "lastWeather", "incident", "questScript", "styleDef", "category"} {
 		m[n] = true
 	}
 	for n := range storyTypes {

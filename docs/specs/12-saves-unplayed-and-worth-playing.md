@@ -48,6 +48,7 @@ Saves are XML with a `<savegame>` root, starting with `<meta>`, followed by `<ga
 - Bare `<def>` values remain untyped unless context identifies factions, storyteller, pawn genes, precepts, traits, hediffs, abilities, active conditions or queued incidents.
 - Named references: `kindDef` → `PawnKindDef`; `stuff` → `ThingDef`; research manager `currentProj` and `progress/techprints/knowledge/keys/li` → `ResearchProjectDef`; pawn `genes/xenotype` → `XenotypeDef`; `geneSet/genes/li` → `GeneDef`; ideology `memes/li` → `MemeDef`; precept `sourcePattern` → `RitualPatternDef`; quest `root` → `QuestScriptDef`; scenario `playerFaction/factionDef` → `FactionDef`; bill `recipe` → `RecipeDef`.
 - Appearance under pawn `story`: `childhood`, `adulthood`, `hairDef`, `bodyType`, `headType`, `furDef`; under `style`: `beardDef`, `faceTattoo`, `bodyTattoo`. Each uses its corresponding Def type; both tattoos use `TattooDef`.
+- Styles (parser 8): a thing's `styleDef` → `ThingStyleDef`; an ideoligion's `thingStyleCategories/li/category` → `StyleCategoryDef`.
 - Surviving history: tale `surroundings/biome` → `BiomeDef`. This means only that its record survives.
 - What the storyteller fired (`StoryState`, on the world and on each map; parser 6): `storyState/lastFireTicks/keys/li` → `IncidentDef`, the tick every incident last fired there, which the game keeps for good; `storyState/recentRandomIncidents/li` → `IncidentDef` and `recentRandomQuests/li`, `recentRandomDecrees/li` → `QuestScriptDef`, the last five of each. It is the only trace of an event that is over. An abandoned map's record goes with the map.
 - What a quest or the scenario fires: `parts/li/incident` under `questManager` or `scenario` → `IncidentDef`, and `parts/li/questScript` under `questManager` → `QuestScriptDef`. These name what a part would fire, not what happened.
@@ -72,7 +73,7 @@ Saves are XML with a `<savegame>` root, starting with `<meta>`, followed by `<ga
 
 ### 1.6 Tools for Archo and external agents
 
-Save reading has read-only tools in the tool layer (13 §1.2, §4.2, 14 §2): `saves list` (`list_saves`), `saves show` (`get_save`) and `unplayed` (`list_unplayed`, not implemented). Save-management actions are `manage_saves` (§4.4). A save reference is `sv:<hex>`, a short hash of the save's real path (13 §2); a file name or `<colony>/<save>` also resolves. Every fix in `saves show` names the command or tool call that performs it, so agents act through the existing tools (§4.3).
+Save reading has read-only tools in the tool layer (13 §1.2, §4.2, 14 §2): `saves list` (`list_saves`), `saves show` (`get_save`) and `saves review` (`list_saves` with `review`, §3). Save-management actions are `manage_saves` (§4.4). A save reference is `sv:<hex>`, a short hash of the save's real path (13 §2); a file name or `<colony>/<save>` also resolves. Every fix in `saves show` names the command or tool call that performs it, so agents act through the existing tools (§4.3).
 
 ### 1.7 Read tiers, cache and background reading
 
@@ -188,7 +189,19 @@ UI, performance, bug-fix and pure mechanics-adjustment Mods do not add Defs to s
 
 Functional Mods do not enter the first two groups. Framework Mods (such as Harmony and HugsLib) naturally fall under rule 1.
 
-### 3.4 Relationship with Archo
+### 3.4 Computation and tools
+
+`App.SaveReview` (CLI `saves review`, MCP `list_saves` with `review`; no page yet).
+
+- Each save is attributed as in §2.3 with `ConfigRefs` left out. A Mod's catalog, what it adds by category, is every Def it provides when loaded with the Mods of the first counted save that has it, categorised as in §2.2; a pawn kind is its race. Seen is the catalog's names that some counted save has, so generated names (meat, techprints, smoothed stone) count for neither side.
+- Counted categories are those of §2.2 without `recipes`, `scenarios` and `other`. A Mod with nothing in them is functional (§3.3 rule 1; the player's mark of rule 2 is not built).
+- Mods: installed and analysed copies only. The game's own (Core, DLC) are included.
+- Order: Mods with something to see first, by the share seen, lowest first, then by how much they add; functional ones last.
+- A save counts when it has a current full read (`savefile.ParserVersion`; the index keeps reads of older parsers, §1.7). The others are counted as left out, or read first on request (`--read`).
+- The Defs of the saves' Mods are loaded once and kept in memory for the run (`defSource`): asking the database per save was nine tenths of the time. Measured on a real library of 209 saves in 21 colonies, 520 Mods: 11 s from cached reads, 37 s reading every save first.
+- Things' styles and ideoligions' style categories are read since parser 8 (§1.4); without them every style Mod was never seen.
+
+### 3.5 Relationship with Archo
 
 Results need no AI. Archo may "interpret" this page: pick unused content worth trying and explain why (15 §4.2, after 1.1). Send statistics, not saves, with consent under 15 §3.2.
 

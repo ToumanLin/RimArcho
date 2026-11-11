@@ -29,6 +29,23 @@ type SaveContentResult struct {
 	// GridUnnamed is, by Def type, how many distinct terrain, biome or compressed-thing hashes in the save's
 	// grids no Def of the save's Mods has (12 §1.4).
 	GridUnnamed map[string]int
+
+	// For the playthrough review (savereview.go): the save's Mods, and by instance and
+	// category every name attributed to it, uncut.
+	mods  []SaveMod
+	names map[string]map[string][]SaveContentName
+}
+
+// contentOpts are what the playthrough review asks of the attribution (12 §3).
+type contentOpts struct {
+	// seen: count only what is there (DefRefs and the grids), not what is only set up
+	// (ConfigRefs).
+	seen bool
+	// catalog, when not nil, is filled for the save's analysed copies it has not yet: by
+	// instance, category → the names of every Def the copy provides among the save's Mods.
+	catalog map[string]map[string][]string
+	// src, when not nil, keeps the Defs in memory between saves.
+	src *defSource
 }
 
 // ContentLimits describes the supported reference forms, not a claim of play depth.
@@ -70,6 +87,10 @@ func contentUnder(k string) bool {
 
 // SaveContent never opens the save. A missing/currently invalid L1 cache yields Read=false.
 func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
+	return a.saveContent(sv, contentOpts{})
+}
+
+func (a *App) saveContent(sv *Save, o contentOpts) (*SaveContentResult, error) {
 	oldMM := a.Store.MM
 	defer func() { a.Store.MM = oldMM }()
 	f, err := a.SaveFacts(sv, false)
@@ -197,9 +218,13 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 	// So do the references that only set something up (bills, quest parts, research not
 	// begun): the save names those Defs too, and loading without them drops what named them.
 	defRefs := f.DefRefs
-	if len(grid)+len(f.ConfigRefs) > 0 {
+	config := f.ConfigRefs
+	if o.seen {
+		config = nil
+	}
+	if len(grid)+len(config) > 0 {
 		defRefs = map[string]map[string]int{}
-		for _, more := range []map[string]map[string]int{f.DefRefs, f.ConfigRefs, grid} {
+		for _, more := range []map[string]map[string]int{f.DefRefs, config, grid} {
 			for typ, refs := range more {
 				if defRefs[typ] == nil {
 					defRefs[typ] = map[string]int{}
@@ -227,9 +252,14 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 			n = impliedBase(n)
 		}
 	}
-	resolver, err := a.contentResolver(insts, pos, active, lookup)
+	resolver, err := a.contentResolver(o.src, insts, pos, active, lookup)
 	if err != nil {
 		return nil, err
+	}
+	if o.catalog != nil {
+		if err := a.contentCatalog(o.catalog, o.src, insts, ready, pos, active); err != nil {
+			return nil, err
+		}
 	}
 	type entry struct {
 		node                      *contentNode
@@ -317,6 +347,7 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 			own.weather[inst] = append(own.weather[inst], e.name)
 		}
 	}
+	out.mods, out.names = mods, byMod
 	catsOf := map[string][]SaveContentCategory{}
 	totals := map[string]*SaveContentCategory{}
 	for _, m := range mods {
