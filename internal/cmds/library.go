@@ -14,9 +14,9 @@ import (
 func init() {
 	flags := []Flag{
 		{Name: "search", Value: "<words>", Help: "all words in a name, package id, author, alias, tag, note, Workshop ID or folder"},
-		{Name: "include", Value: "<key:value>", Multi: true, Help: "keep copies with this value; keys lists (list name), tag, tags (exact tag), source, location (source folder path), version, state, used, updated (week, month, half-year, older); one key's values: either, different keys: all"},
+		{Name: "include", Value: "<key:value>", Multi: true, Help: "keep copies with this value; keys lists (list name), tag, tags (exact tag), source, location (source folder path), version, state, used, updated (week, month, half-year, older), added (new, week, month, half-year, older: when a scan first found the mod; new is the last week, not the first scan); one key's values: either, different keys: all"},
 		{Name: "exclude", Value: "<key:value>", Multi: true, Help: "drop copies with this value"},
-		{Name: "sort", Value: "name|size|state|source|used|updated|version|author|tags|changed|played", Help: "default name; a leading - reverses"},
+		{Name: "sort", Value: "name|size|state|source|used|updated|added|version|author|tags|changed|played", Help: "default name; a leading - reverses"},
 		{Name: "lineage", Value: "<ref>", Help: "one mod: every copy with its path, states, plans and last launch"},
 		{Name: "facets", Help: "list each filter's values with how many mods they show"},
 		{Name: "all", Help: "do not truncate"},
@@ -174,6 +174,9 @@ func libraryCmd(c *Ctx, a *Args) (*render.Doc, error) {
 			parts = append(parts, render.Plural(len(m.Instances), "copy"))
 		}
 		parts = append(parts, libSize(m.Bytes()))
+		if m.New {
+			parts = append(parts, "new")
+		}
 		if s := m.State(); s != "" {
 			parts = append(parts, libStateText(s, lib.GameMM))
 		}
@@ -212,6 +215,13 @@ func libraryLineageDoc(c *Ctx, lib *app.Library, l *app.LibLineage) *render.Doc 
 	}
 	if l.Note != "" {
 		root.KV("note", l.Note)
+	}
+	if !l.Added.IsZero() {
+		added := c.App.FormatTime(l.Added)
+		if l.New {
+			added += " (new)"
+		}
+		root.KV("added", added)
 	}
 	for _, i := range l.Instances {
 		line := i.Ref + " " + libKind(c, i) + "  " + libSize(i.Bytes, i.Sized)

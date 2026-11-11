@@ -54,11 +54,14 @@ const (
 var LibSources = []string{LibWorkshop, LibLocal, LibLocked, LibSteamCMD, LibGit, LibPage, LibExtra, LibMonitor}
 
 // Library filter keys (LibQuery Include / Exclude are "key:value").
-var LibKeys = []string{"lists", "tag", "source", "location", "version", "state", "used", "updated", "content", "has", "name", "author", "id"}
+var LibKeys = []string{"lists", "tag", "source", "location", "version", "state", "used", "updated", "added", "content", "has", "name", "author", "id"}
 
 // LibAges are the updated: values (16 §2.9): within a week, a month, half a year, and
 // older. They nest: a copy updated three days ago is in week, month and half-year.
 var LibAges = []string{"week", "month", "half-year", "older"}
+
+// LibAdded are the added: values: new (the Mods marked new), then LibAges.
+var LibAdded = append([]string{"new"}, LibAges...)
 
 func libAges(t, now time.Time) []string {
 	if t.IsZero() {
@@ -149,7 +152,11 @@ type LibLineage struct {
 	Alias, Note   string
 	Tags          []string
 	Instances     []*LibInstance
-	search        string // lower-cased names, package ids, authors, ids, folders, player data
+	// Added: when a scan first found the Mod (its earliest copy, app.Added); New: within
+	// NewFor and after the environment's first scan (16 §2.9).
+	Added  time.Time
+	New    bool
+	search string // lower-cased names, package ids, authors, ids, folders, player data
 }
 
 // InPlan reports whether the current plan uses one of its copies.
@@ -487,10 +494,13 @@ func (a *App) buildLibrary(st *LoadoutState, only string, search, snapshot bool)
 			add(ghost, i)
 		}
 	}
+	added, newSince := Added(st), a.NewSince(ix.Env.ID)
 	for id, l := range byLin {
 		if l.Name == "" {
 			l.Name = libName(ix, id, l)
 		}
+		l.Added = added[id]
+		l.New = IsNew(l.Added, newSince)
 		l.search = strings.ToLower(l.Name) + l.search
 		// a copy beside a Workshop copy of the same mod: how often the Workshop updated since
 		var ws *LibInstance
@@ -792,7 +802,7 @@ type LibQuery struct {
 // LibSorts are the sort orders, by column (16 §2.9); a leading "-" reverses one. Each has
 // its natural direction: names, sources, authors and tags A to Z; sizes biggest first;
 // dates and versions newest first; states most important first; used-in most used first.
-var LibSorts = []string{"name", "size", "changed", "played", "state", "source", "used", "updated", "version", "author", "tags"}
+var LibSorts = []string{"name", "size", "changed", "played", "state", "source", "used", "updated", "added", "version", "author", "tags"}
 
 // LibMatch is a lineage that matches, with the instances that match.
 type LibMatch struct {
@@ -841,6 +851,8 @@ func libValues(l *LibLineage, i *LibInstance, key string, now time.Time) []strin
 	switch key {
 	case "updated":
 		return libAges(i.Updated, now)
+	case "added":
+		return AddedValues(l.Added, l.New, now)
 	case "tag":
 		return l.Tags
 	case "lists":
@@ -1148,6 +1160,8 @@ func sortFacet(k string, vs []LibFacetValue, lib *Library) {
 			return slices.Index(LibStates, v)
 		case "updated":
 			return slices.Index(LibAges, v)
+		case "added":
+			return slices.Index(LibAdded, v)
 		case "used":
 			if v == "none" {
 				return -1
@@ -1233,6 +1247,8 @@ func sortLineages(ls []*LibLineage, by string) {
 			return timeDesc(a.Played(), b.Played())
 		case "updated":
 			return timeDesc(a.updated(), b.updated())
+		case "added":
+			return timeDesc(a.Added, b.Added)
 		case "state":
 			return compareDesc(-stateRank(a.State()), -stateRank(b.State()))
 		case "source":

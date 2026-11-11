@@ -205,6 +205,8 @@ func termMatch(t term, it *Item, f MatchFacts) bool {
 			}
 		}
 		return false
+	case "added":
+		return slices.Contains(it.added, v)
 	case "has":
 		switch v {
 		case "problem", "problems":

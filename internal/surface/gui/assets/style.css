@@ -64,6 +64,11 @@
 @media (min-resolution: 2dppx) {
   :root { --hairline: 0.5px; }
 }
+/* Japanese kanji in Japanese glyph shapes (YaHei draws the Chinese ones) */
+:root:lang(ja) {
+  --font: "Segoe UI Variable Text", "Segoe UI", "Yu Gothic UI", "Meiryo UI", "Meiryo", system-ui, sans-serif;
+  --code: "Cascadia Mono", Consolas, "BIZ UDGothic", "MS Gothic", "Yu Gothic UI", monospace;
+}
 :root[data-scheme="dark"] {
   color-scheme: dark;
   --photo-shade: 0, 0, 0;
@@ -402,6 +407,13 @@ body.resizing, body.resizing * { cursor: col-resize !important; }
 .row .t { overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
 .row .g { color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; max-width: 40%; }
 .row .u { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: none; }
+/* new: a Mod a scan found in the last week (16 §2.5, §2.9) */
+.nw { flex: none; height: 17px; line-height: 17px; padding: 0 7px; border-radius: 999px; font-size: 12px; font-weight: 500; color: var(--accent-11, var(--accent));
+  background: var(--accent-soft); outline: var(--hairline) solid color-mix(in srgb, var(--accent) 35%, transparent); outline-offset: -1px; }
+.row:has(> .nw) .t { flex: 0 1 auto; }
+.row > .nw { margin-right: auto; }
+.row:has(> .src) > .nw { margin-right: 0; }
+.editor-copy-head .nw { margin-left: 6px; }
 .row .s { display: flex; flex: none; width: 14px; }
 .row.dimmed .t { color: var(--faint); }
 .area.focus .row.cur { background: var(--accent-soft); }

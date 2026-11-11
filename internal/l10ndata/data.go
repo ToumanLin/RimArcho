@@ -35,9 +35,10 @@ func ResolveLang(v string) string {
 	if v == "" || v == "auto" {
 		v = systemLang()
 	}
+	// System names carry a region or encoding (zh-Hans-CN, ja-JP, ja_JP.UTF-8): keep the language.
 	v = strings.ToLower(v)
-	if strings.HasPrefix(v, "zh") {
-		v = "zh"
+	if i := strings.IndexAny(v, "-_.@"); i > 0 {
+		v = v[:i]
 	}
 	if _, ok := Locales[v]; ok {
 		return v

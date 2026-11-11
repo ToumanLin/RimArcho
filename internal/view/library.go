@@ -79,6 +79,7 @@ type LibCells struct {
 	Author  string `json:"author,omitempty"`
 	Tags    string `json:"tags,omitempty"`
 	Played  string `json:"played,omitempty"`
+	Added   string `json:"added,omitempty"` // when a scan first found the Mod (Lineage rows)
 }
 
 // LibColumns are the table's columns: key (= the sort), shown by default.
@@ -86,7 +87,7 @@ var LibColumns = []struct {
 	Key   string
 	Shown bool
 }{{"name", true}, {"size", true}, {"state", true}, {"source", true}, {"used", true},
-	{"updated", false}, {"version", false}, {"author", false}, {"tags", false}, {"played", false}}
+	{"updated", false}, {"added", false}, {"version", false}, {"author", false}, {"tags", false}, {"played", false}}
 
 // LibColumn is a table column: its key (= its sort), header, shown by default.
 type LibColumn struct {
@@ -103,6 +104,7 @@ type LibRow struct {
 	Tags []string `json:"tags,omitempty"`
 	LibCells
 	Single bool         `json:"single,omitempty"`
+	New    bool         `json:"new,omitempty"` // a scan first found it lately (app.IsNew)
 	Insts  []LibInstRow `json:"insts"`
 	Copies int          `json:"copies"` // all copies (Insts are the matching ones)
 }
@@ -224,7 +226,7 @@ func LibSourceText(s string) string {
 }
 
 func libKeyTitle(k string) string {
-	return map[string]string{"lists": T("lists"), "content": T("content"), "has": T("has"), "name": T("name"), "author": T("author"), "id": T("package"), "tag": T("tags"), "source": T("library source"), "location": T("location"), "version": T("supported versions"), "state": T("state"), "used": T("used in"), "updated": T("update date")}[k]
+	return map[string]string{"lists": T("lists"), "content": T("content"), "has": T("has"), "name": T("name"), "author": T("author"), "id": T("package"), "tag": T("tags"), "source": T("library source"), "location": T("location"), "version": T("supported versions"), "state": T("state"), "used": T("used in"), "updated": T("update date"), "added": T("added")}[k]
 }
 
 func libUseText(v string) string {
@@ -249,8 +251,18 @@ func libValueText(key, v, mm string) string {
 		return libUseText(v)
 	case "updated":
 		return map[string]string{"week": T("within a week"), "month": T("within a month"), "half-year": T("within half a year"), "older": T("earlier")}[v]
+	case "added":
+		return addedText(v)
 	}
 	return v
+}
+
+// addedText names an added: value (16 §2.9).
+func addedText(v string) string {
+	if v == "new" {
+		return T("new")
+	}
+	return libValueText("updated", v, "")
 }
 
 // LibSetNote sets a copy's own note from the page (16 §2.9); "" clears it.
@@ -268,7 +280,7 @@ func LibSetNote(a *app.App, ref, text string) (string, error) {
 // LibColumnTitle is a table column's header.
 func LibColumnTitle(k string) string {
 	return map[string]string{"name": T("name"), "size": T("size"), "state": T("state"), "source": T("library source"), "used": T("used in"),
-		"updated": T("update date"), "version": T("supported versions"), "author": T("author"), "tags": T("tags"), "played": T("last played")}[k]
+		"updated": T("update date"), "added": T("added"), "version": T("supported versions"), "author": T("author"), "tags": T("tags"), "played": T("last played")}[k]
 }
 
 // libStamp is a locked copy's creation time (16 §2.9).
@@ -419,7 +431,8 @@ func BuildLibrary(lib *app.Library, search string, filters []string, sort string
 	p := &LibPage{Total: res.Total, Shown: len(res.Matches), Sort: sort, Search: search, Complete: CompleteLibrary(search, lib), Ops: OpTable()}
 	var bytes int64
 	for _, m := range res.Matches {
-		r := LibRow{ID: m.ID, Ref: m.Ref, Name: m.Name, Tags: m.Tags, Copies: len(m.Instances), Single: len(m.Instances) == 1}
+		r := LibRow{ID: m.ID, Ref: m.Ref, Name: m.Name, Tags: m.Tags, Copies: len(m.Instances), Single: len(m.Instances) == 1, New: m.New}
+		r.Added = libDate(m.Added)
 		if m.Instances[0].Mod == nil {
 			r.Name = Tf("Workshop item %s", m.Instances[0].WorkshopID)
 		}

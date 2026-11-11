@@ -544,6 +544,7 @@ next:
 
 > list_library {"lineage":"L#l4xt"}
 L#l4xt A  [2 copies, 1.3 KB]
+  added: 2026-10-01 10:00
   #6olp workshop  672 B
     path: $ROOT/Steam/steamapps/workshop/content/294100/1001
     workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=1001
@@ -602,6 +603,7 @@ tag deleted: visual, visuals
 
 > list_library {"lineage":"L#l4xt","sort":"-size"}
 L#l4xt A  [2 copies, 1.3 KB]
+  added: 2026-10-01 10:00
   #6olp workshop  672 B
     path: $ROOT/Steam/steamapps/workshop/content/294100/1001
     workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=1001

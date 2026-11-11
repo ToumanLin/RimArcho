@@ -63,6 +63,10 @@ type Item struct {
 	Location    string            `json:"-"` // the registered source root, including for linked mods
 
 	Lower string `json:"-"` // sort key
+	// New: a scan first found the Mod within app.NewFor, after the game's first scan
+	// (16 §2.5); added are its added: values.
+	New   bool `json:"new,omitempty"`
+	added []string
 	// search fields (16 §3.7), lower case
 	names, author, text string
 }
@@ -154,6 +158,7 @@ func BuildBoard(a *app.App) (*Board, error) {
 			}
 		}
 	}
+	added, newSince, now := app.Added(st), a.NewSince(st.Ix.Env.ID), a.Now()
 	for k := range b.Cols {
 		for i := range b.Cols[k] {
 			it := &b.Cols[k][i]
@@ -162,6 +167,8 @@ func BuildBoard(a *app.App) (*Board, error) {
 			if m == nil {
 				continue
 			}
+			it.New = app.IsNew(added[m.LineageID], newSince)
+			it.added = app.AddedValues(added[m.LineageID], it.New, now)
 			if k == int(Inactive) {
 				it.Name = names[it.Lineage]
 				it.Lower = strings.ToLower(it.Name)
@@ -178,8 +185,12 @@ func BuildBoard(a *app.App) (*Board, error) {
 			}
 		}
 	}
+	// New Mods first, so a Mod just subscribed is at the top of Not enabled (16 §2.5).
 	ina := b.Cols[Inactive]
 	sort.SliceStable(ina, func(i, j int) bool {
+		if ina[i].New != ina[j].New {
+			return ina[i].New
+		}
 		if c := order.CompareOfficial(ina[i].Package, ina[j].Package); c != 0 {
 			return c < 0
 		}

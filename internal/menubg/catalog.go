@@ -72,8 +72,9 @@ func expansions(game, lang string) ([]expansion, error) {
 		return nil, err
 	}
 	labels := map[string]string{}
-	if lang == "zh" {
-		labels = chineseLabels(game)
+	folder, translated := gameLanguageFolders[lang]
+	if translated {
+		labels = translatedLabels(game, folder)
 	}
 	var out []expansion
 	for _, d := range defs.Expansions {
@@ -86,7 +87,7 @@ func expansions(game, lang string) ([]expansion, error) {
 		if d.Mod == "" {
 			d.Mod = "ludeon.rimworld." + d.Name
 		}
-		if lang == "zh" {
+		if translated {
 			d.Label = labels[d.Name]
 		}
 		if strings.TrimSpace(d.Label) == "" {
@@ -100,7 +101,11 @@ func expansions(game, lang string) ([]expansion, error) {
 
 // Both unpacked translations and RimWorld 1.7's language tar files are read in
 // place. Translation XML is small; no language archive is extracted (16 §2.14).
-func chineseLabels(game string) map[string]string {
+// gameLanguageFolders names the game's own Languages folder (or .tar) for an interface
+// language whose ExpansionDef labels the backgrounds use; other languages keep the defName.
+var gameLanguageFolders = map[string]string{"zh": "ChineseSimplified", "ja": "Japanese"}
+
+func translatedLabels(game, folder string) map[string]string {
 	labels := map[string]string{}
 	data, _ := os.ReadDir(filepath.Join(game, "Data"))
 	for _, content := range data {
@@ -110,7 +115,7 @@ func chineseLabels(game string) map[string]string {
 		root := filepath.Join(game, "Data", content.Name(), "Languages")
 		languages, _ := os.ReadDir(root)
 		for _, language := range languages {
-			if !strings.HasPrefix(language.Name(), "ChineseSimplified") {
+			if !strings.HasPrefix(language.Name(), folder) {
 				continue
 			}
 			path := filepath.Join(root, language.Name())

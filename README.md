@@ -137,7 +137,7 @@ click. Locations combine with the other filter groups. Search also accepts
 In the window, the mouse does the same: click, `shift`/`ctrl`+click, double-click to enable or
 disable, drag between lists (enable, disable, stage) or within Enabled (reorder), right-click for
 what you can do with the mod. The language follows the system; change it with
-`archo config set ui.lang zh|en|auto`.
+`archo config set ui.lang ja|zh|en|auto`.
 
 Settings lists every registered game, Workshop, SteamCMD and other mod directory, together with
 RimArcho's lock library and packs directory. Each entry shows its actual path, including default

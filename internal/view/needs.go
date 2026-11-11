@@ -1435,8 +1435,8 @@ func Humanize(st *app.LoadoutState, s string) string {
 // ShortDate: a locale-appropriate short date, such as "Oct 17".
 func ShortDate(t time.Time) string {
 	t = t.Local()
-	if Lang() == "zh" {
-		return fmt.Sprintf(localeExtra("zh", "@date.short"), int(t.Month()), t.Day())
+	if format, ok := localeFormat("@date.short"); ok {
+		return fmt.Sprintf(format, int(t.Month()), t.Day())
 	}
 	return t.Format("Jan 2")
 }

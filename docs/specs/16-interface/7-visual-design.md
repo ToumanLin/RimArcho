@@ -38,7 +38,7 @@ Both palettes draw text on the terminal's own background. Each role also names a
 
 **Card spacing:** all horizontal and vertical gaps between rounded cards use `--card-gap`, 4px, with no other value. This covers the editor columns; details, staging, and history in the third column; left filters and the list or details below them; Mod library filters and table; log and change-history columns; task columns and right-side cards; and All lists columns. **Gaps between cards sharing a fixed space are draggable** (§3.1 rule 10). Double-clicking resets them, and sizes persist in `ui.gui.<page>.*`. New cards of this kind must include splitters. Gaps between content-height cards stacked down the page are not draggable: Can it run sections, settings groups, and the six full-detail sections. A draggable gap remains visibly 4px wide, but its hit area extends `--grab`, 3px, into each card, for about 10px total. The resize cursor, the accent hairline on hover (§7.3), and double-click reset still apply. The sidebar's right-edge hit area is 6px, inside the sidebar.
 
-**Fonts:** see §7.3 for sizes. The TUI uses the player's terminal font (§9.2). The GUI uses the system fonts Segoe UI Variable Text, Segoe UI, and Microsoft YaHei UI, with tabular numbers and Cascadia Mono for code.
+**Fonts:** see §7.3 for sizes. The TUI uses the player's terminal font (§9.2). The GUI uses the system fonts Segoe UI Variable Text, Segoe UI, and Microsoft YaHei UI, with tabular numbers and Cascadia Mono for code. In Japanese (`<html lang="ja">`) Yu Gothic UI and Meiryo UI take YaHei's place, so kanji are drawn in their Japanese shapes.
 
 **Wording** follows these rules:
 - The Chinese UI uses short sentences beginning with a verb, for example enable Vehicle Framework rather than perform enable operation.
@@ -46,7 +46,7 @@ Both palettes draw text on the terminal's own background. Each role also names a
 - An empty state has one sentence that identifies the key to use, for example staging is empty; t stages selected mods.
 - Do not use middle-dot separators (§7.3).
 - An unknown value appears as a faint — rather than the word unknown.
-- Every UI string has a Chinese translation; GUI tests check every string used by the pages.
+- Every UI string has a Chinese translation; GUI tests check every string used by the pages. Chinese is the reference locale: every other bundled locale (Japanese, `locale/ja/`) has exactly its keys with the same placeholders (`l10ndata.TestLocalesMatchChinese`), so a new string needs its Japanese text in the same commit. Dates and counts use the locale's `@date.short`, `@date.long` and `@plural` from `_extra.json` when it has them, English formats otherwise.
 
 **Icons:** the TUI defaults to the compatibility Unicode characters below. With ui.icons nerd, it uses Nerd Font's Font Awesome 4 range, U+F000–U+F2E0, which all Nerd Fonts include (§9.3). The GUI uses simple custom SVGs in `js/icons.js`, with the same meanings.
 

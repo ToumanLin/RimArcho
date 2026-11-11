@@ -448,6 +448,9 @@ func (m *model) drawRowLines(c *column, vi int, focused bool, w int, wrapName bo
 	if it.unsaved {
 		dot = " " + ic.unsaved
 	}
+	if it.v.New { // a Mod a scan found in the last week (16 §2.5)
+		dot = " " + T("new") + dot
+	}
 	var more []string // wrapped lines after the first
 	if wrapName && width.StringWidth(name) > nameW {
 		if ls := wrap(name, nameW); len(ls) > 1 {

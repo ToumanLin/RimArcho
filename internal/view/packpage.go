@@ -340,9 +340,9 @@ func packsOfCurrent(a *app.App) ([]*app.PackInfo, int, error) {
 	return a.PacksOf(e)
 }
 
-// sp joins two sentences: a space in English, nothing after a Chinese full stop.
+// sp joins two sentences: a space in English, nothing after a Chinese or Japanese full stop.
 func sp() string {
-	if Lang() == "zh" {
+	if Lang() == "zh" || Lang() == "ja" {
 		return ""
 	}
 	return " "

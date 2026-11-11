@@ -2,13 +2,6 @@
 
 Things to research, not yet decided. Once decided, put them in the specifications (implementation plans in 01 §4); research goes in docs/research/.
 
-## Localization
-Japanese: 
-I'd be very happy if you would consider adding Japanese language support to the official release! https://github.com/tousin61/RimArcho-Japanese-Localization
-
-## New mod mark
-提个建议：新加的mod增加个标志，我每次想找刚订阅的mod翻半天，这点还不如rimsort好用
-
 ## Decompilation
 
 Decompilation serves two purposes: investigating Mod conflicts and creating Mods. Reconsider storing decompiled assemblies in the cache and propose an approach.

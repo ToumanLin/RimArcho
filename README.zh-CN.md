@@ -90,7 +90,7 @@ archo import rimcrow --db "D:\Game\RimModManager\data\mod_manager.db" --dry-run 
 
 方案编辑器和 Mod 库的筛选栏包含**位置**：已登记的来源目录（例如游戏的 `Mods/`、工坊，或某个 SteamCMD、额外目录）。可选多个位置，匹配其中任一位置；右键排除某个位置。位置与其他筛选组组合使用。搜索也接受 `location:"D:\Steam Library\steamapps\common\RimWorld\Mods"`；CLI 用 `archo library --include 'location:D:\Steam Library\steamapps\common\RimWorld\Mods'`。
 
-窗口里的鼠标操作效果相同：单击、`shift`/`ctrl`+单击、双击启用或停用，在列表间拖动（启用、停用、暂存）或在已启用列表内拖动（调整顺序），右键查看该 Mod 可做的操作。语言跟随系统；用 `archo config set ui.lang zh|en|auto` 更改。
+窗口里的鼠标操作效果相同：单击、`shift`/`ctrl`+单击、双击启用或停用，在列表间拖动（启用、停用、暂存）或在已启用列表内拖动（调整顺序），右键查看该 Mod 可做的操作。语言跟随系统；用 `archo config set ui.lang ja|zh|en|auto` 更改。
 
 设置列出所有已登记的游戏、工坊、SteamCMD 和其他 Mod 目录，以及 RimArcho 的锁定库和整合包目录。每项都显示实际路径，包括默认位置。**重新定位**用于重新关联你自行移动的目录；**移动到…**把目录移到新路径。Mod 身份、标签和列表保持关联。不会覆盖已占用的目标。跨盘移动时，先用文件管理器移动目录，再重新定位。
 

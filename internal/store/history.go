@@ -31,6 +31,19 @@ func (s *Store) LastFinishedScan(envID string) (*Scan, error) {
 	return list[0], nil
 }
 
+// FirstFinishedScan is the environment's oldest finished scan, or nil.
+func (s *Store) FirstFinishedScan(envID string) (*Scan, error) {
+	var id int64
+	err := s.DB.QueryRow(`SELECT id FROM scan WHERE environment_id=? AND finished_at IS NOT NULL ORDER BY id LIMIT 1`, envID).Scan(&id)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return s.ScanByID(id)
+}
+
 func (s *Store) scans(where, envID string, limit int) ([]*Scan, error) {
 	rows, err := s.DB.Query(`SELECT id, environment_id, started_at, coalesce(finished_at, 0), full, stats FROM scan
 		WHERE environment_id=?`+where+` ORDER BY id DESC LIMIT ?`, envID, limit)

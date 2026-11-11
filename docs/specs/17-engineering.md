@@ -52,7 +52,7 @@ internal/
   rules/              Community rule data
   bbcode/             Workshop description BBCode parsing
   app/                Operations behind commands: environments, scan pipeline, reference resolution, plans, analysis, logs, packs, launch, running-game detection
-  l10ndata/           Embedded feature JSON translations under locale/<language>/; add a locale directory to bundle another language (16 §1)
+  l10ndata/           Embedded feature JSON translations under locale/<language>/; add a locale directory to bundle another language (16 §1); every locale carries the Chinese keys (16 §7)
   view/               Surface-independent view models; language selection and lookup shared by TUI and GUI (16 §1)
   cmds/               Single command table: argument parsing, execution, outline text (13 §1)
   render/             Outline text rendering (13 §3)

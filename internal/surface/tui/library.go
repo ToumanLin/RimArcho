@@ -807,12 +807,19 @@ func (m *model) libRowLine(i, w, right int) string {
 	case x.lone:
 		cells = r.Insts[0].LibCells
 		name = "  " + r.Name
+		if r.New {
+			dim = T("new")
+			name += "  " + dim
+		}
 	case x.inst < 0:
 		chev := "▸ "
 		if l.open[r.ID] || len(r.Insts) < r.Copies {
 			chev = "▾ "
 		}
 		dim = Tf("%d copies", r.Copies)
+		if r.New {
+			dim = T("new") + "  " + dim
+		}
 		name = chev + r.Name + "  " + dim
 	default:
 		in := r.Insts[x.inst]

@@ -28,7 +28,7 @@ const COLS_KEY = "ui.gui.library.columns";
 const VIEW_KEY = "ui.gui.library.view"; // "mods" or "tags" (16 §2.9)
 // a column's width when the player has not set one; the name column takes whatever is left
 // (its width here is its least), so the table grows with the window
-const WIDTH = { name: 200, size: 72, state: 116, source: 120, used: 150, updated: 84, version: 64, author: 130, tags: 160, played: 84 };
+const WIDTH = { name: 200, size: 72, state: 116, source: 120, used: 150, updated: 84, added: 84, version: 64, author: 130, tags: 160, played: 84 };
 // columns whose natural order is A to Z (the arrow points up); the rest start biggest or newest
 const ASC = new Set(["name", "source", "author", "tags"]);
 const L = {
@@ -491,8 +491,10 @@ function nameCell(x, k) {
     c.setAttribute("aria-labelledby", "library-row-" + encodeURIComponent(rowKey(x)) + "-name");
     c.onclick = (e) => { e.stopPropagation(); toggle(x.r); };
     left.append(c, el("span", "t", x.r.name));
+    if (x.r.new) left.append(el("span", "nw", T("new")));
   } else if (x.lone) {
     left.append(el("span", "t", x.r.name));
+    if (x.r.new) left.append(el("span", "nw", T("new")));
   } else {
     const branch = el("span", "tree", "└");
     branch.setAttribute("aria-hidden", "true");
