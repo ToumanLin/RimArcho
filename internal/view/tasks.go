@@ -400,7 +400,9 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 		}
 	}
 	if t.Closed && t.Detached {
-		result = joinFacts(T("went on in the background when the window closed"), result)
+		// its own process went on; this record cannot know how it ended (16 §2.16)
+		r.StateText = T("went on in the background")
+		result = T("the window closed; the Packs page shows how it ended")
 	} else if t.Closed {
 		result = joinFacts(T("stopped when the window closed"), result)
 	}
@@ -439,6 +441,8 @@ func taskRow(t *app.Task, now time.Time) TaskRow {
 				st = app.ItemOK
 			case i == at && t.State == app.TaskRunning:
 				st = app.ItemRun
+			case t.Closed && t.Detached:
+				st = app.ItemWait
 			case i == at:
 				st = app.ItemFail
 			}

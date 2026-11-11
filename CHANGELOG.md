@@ -32,6 +32,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 - A quick delete that could remove only part of a Mod folder (a file held open by another program), and a move into the lock library that was refused ("nothing was moved"), now read in Chinese in the Chinese window; the copy button next to the folder copies only the folder, not the words after it. English: "<folder>: only part of it was deleted (…)".
 - Background tasks: a task of one item that failed now gives that item's reason in the window's language in the status line too (its row in Tasks already did); link previews say "detach link", "create link" and "detach and reattach" in Chinese.
 - `archo history`: the header counts "edits to undo", not "unsaved edits" (the undo steps stay after a save, so a saved list read "17 unsaved edits"); "1 version", not "1 versions".
+- Background tasks: a pack build left running when the window closed now reads "went on in the background" with "the Packs page shows how it ended", instead of "stopped" with the copy step marked failed (the build had finished).
 - CLI: plural counts read "2 aliases", "7 classes" (were "2 aliass"); `archo subscribe` previews say "1 subscription".
 - Text interface, Can it run: the memory item's lines are joined in the interface's language (Chinese read `…内存里。; 显存…`).
 
