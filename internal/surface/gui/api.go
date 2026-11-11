@@ -1217,7 +1217,7 @@ func (s *API) Needs() *view.Needs {
 	if sameNeedsList(st, current) {
 		// The eager pass may have saved a parsed log report. Read its ProblemSet again.
 		ps, _ = r.Problems(false, nil)
-		s.saveNeedsLocked(ps, n, true)
+		s.saveFreshNeedsLocked(ps, n, true)
 		if (n.Stale || n.Never) && !s.busy["analyze"] {
 			s.startAnalyze()
 		}
@@ -1295,7 +1295,7 @@ func (s *API) needsLocked() *view.Needs {
 		return &view.Needs{Status: map[string]int{}, Error: "could not read list problems"}
 	}
 	n := view.BuildNeeds(s.a, ps.State, ps)
-	s.saveNeedsLocked(ps, n, false)
+	s.saveFreshNeedsLocked(ps, n, false)
 	return n
 }
 

@@ -141,19 +141,32 @@ func (a *App) knownGameMods() ([]gameMods, error) {
 	}
 	seen := map[string]int{}
 	out := []gameMods{}
+	real := realPaths{} // the ledger names one folder for every link it ever made
 	for _, r := range roots {
-		r.mods = realOrAbs(r.mods)
+		r.mods = real.of(r.mods)
 		key := env.PathKey(r.mods)
 		if i, ok := seen[key]; ok {
 			out[i].past = out[i].past && r.past
 			continue
 		}
 		seen[key] = len(out)
-		r.game = realOrAbs(r.game)
+		r.game = real.of(r.game)
 		out = append(out, r)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].mods < out[j].mods })
 	return out, nil
+}
+
+// realPaths resolves each path once (realOrAbs) for the length of one look at the disk.
+type realPaths map[string]string
+
+func (c realPaths) of(p string) string {
+	if r, ok := c[p]; ok {
+		return r
+	}
+	r := realOrAbs(p)
+	c[p] = r
+	return r
 }
 
 // InspectGameLinks reads every known game Mods directory afresh. Healthy links
@@ -170,16 +183,18 @@ func (a *App) InspectGameLinks() ([]*GameLink, error) {
 	// A link's target is matched against the real path its instance's scan recorded and
 	// confirmed on disk; only a miss resolves every instance's path again (one file-system
 	// call per mod, thousands with a large library).
+	// Real paths are resolved once per call: a link's target is compared more than once.
+	real := realPaths{}
 	var resolved map[string]*store.LinkMod
 	liveTarget := func(target string) *store.LinkMod {
-		key := env.PathKey(realOrAbs(target))
-		if m := li.recorded[key]; m != nil && env.PathKey(realOrAbs(m.RealPath)) == key {
+		key := env.PathKey(real.of(target))
+		if m := li.recorded[key]; m != nil && env.PathKey(real.of(m.RealPath)) == key {
 			return m
 		}
 		if resolved == nil {
 			resolved = make(map[string]*store.LinkMod, len(li.live))
 			for _, m := range li.live {
-				resolved[env.PathKey(realOrAbs(m.RealPath))] = m
+				resolved[env.PathKey(real.of(m.RealPath))] = m
 			}
 		}
 		return resolved[key]
@@ -225,6 +240,7 @@ func (a *App) InspectGameLinks() ([]*GameLink, error) {
 		}
 	}
 	out := []*GameLink{}
+	var reader source.LinkReader
 	for _, root := range roots {
 		entries, err := os.ReadDir(root.mods)
 		if err != nil {
@@ -248,7 +264,7 @@ func (a *App) InspectGameLinks() ([]*GameLink, error) {
 			if packLink(name) && packEvidenceError != "" {
 				l.Evidence += "; " + packEvidenceError
 			}
-			info, err := source.ReadLink(l.Path)
+			info, err := reader.Read(l.Path)
 			if err != nil {
 				l.Code, l.Reason = CodeLinkUnknown, err.Error()
 				out = append(out, l)
@@ -298,7 +314,7 @@ func (a *App) InspectGameLinks() ([]*GameLink, error) {
 				l.Code, l.Reason = CodeLinkDangling, info.Reason
 			case !l.Owned:
 				l.Code, l.Reason = CodeLinkForeign, "no matching instance or pack"
-			case env.PathKey(realOrAbs(info.Target)) != env.PathKey(realOrAbs(exp)):
+			case env.PathKey(real.of(info.Target)) != env.PathKey(real.of(exp)):
 				l.Code, l.Reason = CodeLinkForeign, "target differs from known instance or pack"
 			default:
 				l.Reason = "target exists"

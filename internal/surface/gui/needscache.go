@@ -34,17 +34,26 @@ func fileNeedsStamp(path string) string {
 	return fmt.Sprintf("%s:%d:%d", path, f.Size(), f.ModTime().UnixNano())
 }
 func (s *API) needsKeyLocked() (scope, key, index, list string) {
+	return s.needsKeyOfLocked(nil)
+}
+
+// needsKeyOfLocked is needsKeyLocked with the game links already read, or nil to read
+// them now.
+func (s *API) needsKeyOfLocked(read []*app.GameLink) (scope, key, index, list string) {
 	st, _ := s.a.Loadout()
 	if st == nil {
 		return
 	}
-	scope = fmt.Sprintf("%s|%d|%s|%s", st.Ix.Env.ID, st.Plan.ID, st.GameMM(), view.Lang())
+	scope = s.needsScopeLocked()
 	index = s.a.Store.IndexKey()
 	list = app.ListFingerprint(st.List)
 	cur, prev := s.a.LogPaths(st)
 	// Links are outside SQLite. Probe them even on a hit; a removed junction target
 	// must not hide behind a scan or database version.
-	links, err := s.a.InspectGameLinks()
+	links, err := read, error(nil)
+	if links == nil {
+		links, err = s.a.InspectGameLinks()
+	}
 	b, _ := json.Marshal(links)
 	lh := sha256.Sum256(b)
 	dirs, _ := s.a.ManagedDirectories()
@@ -53,16 +62,41 @@ func (s *API) needsKeyLocked() (scope, key, index, list string) {
 	key = fmt.Sprintf("%s|%s|%s|%s|%s|%s|%s|%x|%v", scope, s.a.Store.ChangeKey(), list, s.a.AnalysisKey(st, ""), fileNeedsStamp(cur), fileNeedsStamp(prev), fileNeedsStamp(s.a.ProblemLog(st)), lh, err) + fmt.Sprintf("|%x", dh)
 	return
 }
+
+// needsScopeLocked is the scope part of needsKeyLocked, which needs no look at the disk.
+func (s *API) needsScopeLocked() string {
+	st, _ := s.a.Loadout()
+	if st == nil {
+		return ""
+	}
+	return fmt.Sprintf("%s|%d|%s|%s", st.Ix.Env.ID, st.Plan.ID, st.GameMM(), view.Lang())
+}
+
 func (s *API) cachedNeedsLocked() (*needsSnapshot, string) {
 	scope, key, _, _ := s.needsKeyLocked()
 	return s.needsCache[scope], key
 }
 func (s *API) saveNeedsLocked(ps *app.ProblemSet, n *view.Needs, eager bool) *needsSnapshot {
+	return s.saveNeedsOfLocked(ps, n, eager, false)
+}
+
+// saveFreshNeedsLocked is saveNeedsLocked for a ProblemSet that Problems has just read: its
+// game links are the ones the key describes, so they are not read a third time (one look
+// takes 0.1-0.25 s with a few hundred links, and the launch page saves at every start).
+func (s *API) saveFreshNeedsLocked(ps *app.ProblemSet, n *view.Needs, eager bool) *needsSnapshot {
+	return s.saveNeedsOfLocked(ps, n, eager, true)
+}
+
+func (s *API) saveNeedsOfLocked(ps *app.ProblemSet, n *view.Needs, eager, fresh bool) *needsSnapshot {
 	if ps == nil {
 		return nil
 	}
 	*n = *view.RebindNeedsLinks(s.a, n, ps.GameLinks)
-	scope, key, index, list := s.needsKeyLocked()
+	var read []*app.GameLink
+	if fresh && ps.GameLinks != nil {
+		read = ps.GameLinks
+	}
+	scope, key, index, list := s.needsKeyOfLocked(read)
 	if scope == "" {
 		return nil
 	}
@@ -151,13 +185,11 @@ func (s *API) refreshNeedsLocked(c *needsSnapshot) {
 	if c == nil || s.needsClosed || s.needsRefreshing || s.tasks == nil {
 		return
 	}
-	if c.eager {
-		if _, key := s.cachedNeedsLocked(); key == c.key {
-			return
-		}
+	_, diskKey := s.cachedNeedsLocked()
+	if c.eager && diskKey == c.key {
+		return
 	}
 	expected := s.inventoryKey()
-	_, diskKey := s.cachedNeedsLocked()
 	r, err := s.readInventorySession()
 	if err != nil {
 		return
@@ -189,7 +221,7 @@ func (s *API) refreshNeedsLocked(c *needsSnapshot) {
 		}
 		var event *view.ListProblems
 		if n != nil {
-			s.saveNeedsLocked(ps, n, true)
+			s.saveFreshNeedsLocked(ps, n, true)
 			if s.needsWanted && (n.Stale || n.Never) && !s.busy["analyze"] {
 				s.startAnalyze()
 			}
