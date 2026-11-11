@@ -9,9 +9,10 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/render"
 )
 
-// The history (16 §2.5): unsaved edits around "now", then the saved versions.
+// The history (16 §2.5): the edits around "now" (undo and redo; they stay after a save),
+// then the saved versions.
 func init() {
-	register(&Command{Name: "history", Summary: "the workspace's unsaved edits (undo/redo) and the saved versions", MaxArgs: 0, Run: historyCmd,
+	register(&Command{Name: "history", Summary: "the workspace's edits (undo/redo) and the saved versions", MaxArgs: 0, Run: historyCmd,
 		Flags: []Flag{{Name: "all", Help: "every version (default: the newest 10)"}}})
 }
 
@@ -24,7 +25,7 @@ func historyCmd(c *Ctx, a *Args) (*render.Doc, error) {
 	if err != nil {
 		return nil, err
 	}
-	d, root := render.New(fmt.Sprintf("history: %d unsaved edits, %d redoable, %d versions", len(h.Undo), len(h.Redo), len(h.Versions)))
+	d, root := render.New(fmt.Sprintf("history: %s to undo, %d redoable, %s", render.Plural(len(h.Undo), "edit"), len(h.Redo), render.Plural(len(h.Versions), "version")))
 	step := func(s app.HistoryStep) string {
 		what := fmt.Sprintf("%d changes", len(s.Changes))
 		if rows := changeRows(c, st, s.Changes); len(rows) == 1 {

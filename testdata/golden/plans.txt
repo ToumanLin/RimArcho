@@ -97,7 +97,7 @@ next:
   archo save
 
 $ archo history
-history: 2 unsaved edits, 0 redoable, 1 versions
+history: 2 edits to undo, 0 redoable, 1 version
   now: workspace: 5 active, 1 change unsaved (plan:copy, env:main)
   undo: archo undo <n> returns to before step n
     1    stage      0 changes
@@ -111,7 +111,7 @@ current plan: plan:default (env:main)
   game: ModsConfig.xml unchanged (archo save or archo launch saves this plan)
 
 $ archo history
-history: 0 unsaved edits, 0 redoable, 1 versions
+history: 0 edits to undo, 0 redoable, 1 version
   now: workspace: 4 active, saved (plan:default, env:main)
   versions: archo loadout checkout v<n>
     v1   2026-10-01  import   4 mods  ModsConfig.xml

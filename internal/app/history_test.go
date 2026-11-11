@@ -47,7 +47,8 @@ func TestHistorySteps(t *testing.T) {
 		t.Fatalf("undo 3: %s, want %s", got, start)
 	}
 	out := e.MustRun("history")
-	if !strings.Contains(out, "redo") || !strings.Contains(out, "versions") {
+	// the undo steps stay after a save: the header does not call them unsaved
+	if !strings.Contains(out, "redo") || !strings.Contains(out, "versions") || !strings.Contains(out, "to undo") || strings.Contains(out, "unsaved") {
 		t.Fatalf("history:\n%s", out)
 	}
 }
