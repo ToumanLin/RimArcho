@@ -101,7 +101,7 @@ A script that does not end with `quit` leaves the game running when its last ste
 
 `<ip>` is the guest IP from `status`; it comes from DHCP, so don't hard-code it.
 
-DevTools is on only because `launch` sets `RIMARCHO_DEVTOOLS_PORT`; players never set it, so nothing listens. CDP key presses and clicks go to the page, not to Windows. For anything that needs Windows input, use the input agent below. The game is not one of these: use `round.ps1`.
+DevTools is on only because `launch` sets `RIMARCHO_DEVTOOLS_PORT`; players never set it, so nothing listens. CDP key presses and clicks go to the page, not to Windows. A CDP key sends no character event, so Enter on a focused button does not press it; use `input.mjs key enter` for that. For anything that needs Windows input, use the input agent below. The game is not one of these: use `round.ps1`.
 
 ## Real mouse and keyboard
 

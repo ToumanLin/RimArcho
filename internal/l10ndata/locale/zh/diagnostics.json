@@ -191,7 +191,7 @@
   "an exception while ticking a pawn, thing or the world": "更新小人、物品或世界时出错",
   "an inherited definition is missing": "继承的定义不存在",
   "applied the previewed link repair": "已执行预览中的链接修复",
-  "apply the repair shown above?": "修复上面标着“将删除”的链接？",
+  "apply the repair shown above?": "按上面的预览修复链接？",
   "as patch.xpath, for the operation named": "同“补丁没找到节点”，针对写出的那个操作",
   "as patch.xpath: target inactive, renamed or loading later": "同“补丁没找到节点”：目标没启用、改了名或加载得更晚",
   "assemblies": "程序集",
