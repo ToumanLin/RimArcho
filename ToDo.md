@@ -2,8 +2,12 @@
 
 Things to research, not yet decided. Once decided, put them in the specifications (implementation plans in 01 §4); research goes in docs/research/.
 
-## 右键菜单
-很多页面有右键菜单, 但是是浏览器菜单, 右键refresh, save as print等, 把这些右键菜单删除掉
+## Localization
+Japanese: 
+I'd be very happy if you would consider adding Japanese language support to the official release! https://github.com/tousin61/RimArcho-Japanese-Localization
+
+## New mod mark
+提个建议：新加的mod增加个标志，我每次想找刚订阅的mod翻半天，这点还不如rimsort好用
 
 ## Decompilation
 
@@ -107,3 +111,6 @@ Players asked for Linux and macOS (2026-11-07). Linux deferred; macOS later stil
 - 2026-11-09: phased plan in [research/2026-11-09_linux-support-plan.md](docs/research/2026-11-09_linux-support-plan.md) (players also asked for `.deb`, `.rpm` and Arch; a Proton tester could not get paths detected). Decided 2026-11-09 (its §8): Proton detection in phase 1, an update notice instead of self-update, `.tar.gz`/`.deb`/`.rpm`/AUR, after 1.1.
 
 你可用agent-bridge parallel派发任务给codex 用 gpt-6.1-sol effort high, 可当worker或者sub agent, 让它做代码研究和修改代码, 然后你review, 如果你让codex修改前端, 请务必检查她的前端实现的用户体验(不必要和功能重复的选项, 重复性文字等), 简单直接的任务在这里做
+
+## TUI idle CPU
+VM round 1.0.9 (S9): the TUI at rest uses 2.4–3.4 % of a core in the VM, the window 0.76 %. Each 2-second running-game poll takes a full process snapshot (`CreateToolhelp32Snapshot`, 12–24 ms with 526 processes on the host) and redraws (5 ms). Idea: with no game running, take the snapshot only when an environment's `Player.log` changed or every ten seconds; while a game runs, check only its process. Applies to the window's poll too (`view.LiveTracker`). Decide whether the detection delay for a game started with its own `-logFile` is acceptable.
