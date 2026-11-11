@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/view"
 )
 
@@ -27,7 +29,13 @@ func (m *model) View() string {
 	var content []string
 	switch {
 	case m.loadErr != nil:
-		content = []string{"", "  " + sErrS.Render(fit(T("error: ")+m.loadErr.Error(), m.w-2)),
+		// No game yet is where a new player starts, not an error: the hints below say
+		// what to do (the raw error repeated them in English).
+		first := sBold.Render(fit(T("No game added yet."), m.w-2))
+		if !errors.Is(m.loadErr, app.ErrNoEnv) {
+			first = sErrS.Render(fit(T("error: ")+view.Humanize(nil, m.loadErr.Error()), m.w-2))
+		}
+		content = []string{"", "  " + first,
 			"  " + sSecond.Render(fit(T("Add a game first: archo env detect, archo env add <name> --detected"), m.w-2))}
 		if windowNextToUs() {
 			content = append(content, "  "+sSecond.Render(fit(T("Or open RimArcho.exe in this folder: the window has a guide that finds your games."), m.w-2)))

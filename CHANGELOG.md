@@ -38,6 +38,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 - Text interface, Can it run: the memory item's lines are joined in the interface's language (Chinese read `…内存里。; 显存…`).
 - First-run guide, "read the mods" (Chinese): the last phase read "indexing def references" in English; it reads in Chinese.
 - SteamCMD downloads: the first Workshop download after installing SteamCMD reported "SteamCMD did not exit successfully" although the Mod was downloaded (SteamCMD exits 7 from the run in which it updates itself); it is reported downloaded.
+- Text interface opened before any game was added (double-clicking archo.exe on a new machine): it says "No game added yet." in the interface's language instead of the English error "no environment configured (…)", which repeated the hints below it.
 
 ## 1.0.9 — 2026-11-10
 

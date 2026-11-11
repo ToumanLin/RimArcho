@@ -119,6 +119,7 @@
   ", %s": "，%s",
   "About.xml is renamed: the game cannot load it": "About.xml 被改了名，游戏无法加载它",
   "Add a game first: archo env detect, archo env add <name> --detected": "请先添加游戏：archo env detect，archo env add <名称> --detected",
+  "No game added yet.": "还没有添加游戏。",
   "Archo Monitor not added: %s": "没有加入 Archo Monitor：%s",
   "Core and %d DLCs from the game": "Core 和 %d 个 DLC 用游戏自带的",
   "Core and the DLCs come from the game": "Core 和 DLC 用游戏自带的",
