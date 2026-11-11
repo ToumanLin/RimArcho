@@ -163,7 +163,7 @@
   "keep %d where they are": "保留 %d 个，留在原处",
   "keep %d: moved to the folder below": "保留 %d 个，移到下面的文件夹",
   "keep at least one version": "至少要留一个版本",
-  "keep each game's current list (%d), without Archo Monitor and the mods only there through a link; RimArcho's backup is deleted": "保留游戏当前的列表（%d 处），只去掉 Archo Monitor 和只靠链接才有的 Mod；删除 RimArcho 的备份",
+  "keep each game's current list (%d), without Archo Monitor and the mods only there through a link; RimArcho's backups of the list and of Mod settings are deleted (the settings stay)": "保留游戏当前的列表（%d 处），只去掉 Archo Monitor 和只靠链接才有的 Mod；删除 RimArcho 对列表和 Mod 设置做的备份（设置本身保留）",
   "keep the change": "保留这次修改",
   "keep them as ordinary mods": "保留，作为普通 Mod",
   "keep; move out": "保留并移出",

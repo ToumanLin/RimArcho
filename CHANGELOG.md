@@ -42,6 +42,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 - Text interface opened before any game was added (double-clicking archo.exe on a new machine): it says "No game added yet." in the interface's language instead of the English error "no environment configured (…)", which repeated the hints below it.
 - Text interface, Mod library: a Mod with several copies showed its row a few cells short without its copies count, which pulled the details column on that line to the left; the row keeps its width and "4 copies".
 - Text interface with a Chinese input method left in Chinese mode: shift+1–8, `?`, `:` and the other punctuation keys did nothing (the input method sends `！`, `￥`, `……`, `？`, `：`); they work as on a US layout. Text boxes keep what was typed.
+- Uninstall preview: the mod-list step says that RimArcho's backups of Mod settings are deleted too (it said only "RimArcho's backup"); the changed settings stay.
 
 ## 1.0.9 — 2026-11-10
 
