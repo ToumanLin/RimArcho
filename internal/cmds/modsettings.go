@@ -286,7 +286,7 @@ func windowSection(n *render.Node, w *app.SeenSettingsWindow, older bool, limit 
 			break
 		}
 		if c.Kind == "label" {
-			at = win.Section(c.Label)
+			at = win.Section(bareLabel(c.Label))
 			continue
 		}
 		shown++
@@ -299,7 +299,7 @@ func windowSection(n *render.Node, w *app.SeenSettingsWindow, older bool, limit 
 
 // windowText is one control of a settings window as the CLI shows it.
 func windowText(c logs.SettingsControl) string {
-	label := c.Label
+	label := bareLabel(c.Label)
 	if label == "" {
 		label = "-"
 	}
@@ -314,6 +314,12 @@ func windowText(c logs.SettingsControl) string {
 		return fmt.Sprintf("%s: %q (text)", label, c.Value)
 	}
 	return fmt.Sprintf("%s: %s (%s)", label, c.Value, c.Kind)
+}
+
+// bareLabel is a label the game drew without its own trailing colon ("Search:"), since the
+// CLI adds one.
+func bareLabel(s string) string {
+	return strings.TrimRight(strings.TrimSpace(s), ":\uff1a ")
 }
 
 // settingText is a stored value as the CLI shows it.

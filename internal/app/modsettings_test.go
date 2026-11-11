@@ -193,11 +193,11 @@ func TestModSettingsWindow(t *testing.T) {
 	if out := e.MustRun("mod-settings"); strings.Contains(out, "B window") {
 		t.Fatalf("before any window:\n%s", out)
 	}
-	windows := `{"timestamp":"2026-11-03 10:05:00.000","level":"INFO","message":"[Archo Monitor] settings window A settings","details":"","count":1,"context":{"window":{"packageId":"tester.a","folder":"1001","class":"AMod","file":"Mod_1001_AMod.xml","title":"A settings","full":true,"controls":[{"kind":"label","label":"General"},{"kind":"checkbox","label":"Raids","value":"False"},{"kind":"slider","label":"Scale","value":"0.75","min":"0","max":"2"},{"kind":"button","label":"Reset"}]}},"source":"archo-monitor","schema":1,"kind":"settings-window"}` + "\n" +
+	windows := `{"timestamp":"2026-11-03 10:05:00.000","level":"INFO","message":"[Archo Monitor] settings window A settings","details":"","count":1,"context":{"window":{"packageId":"tester.a","folder":"1001","class":"AMod","file":"Mod_1001_AMod.xml","title":"A settings","full":true,"controls":[{"kind":"label","label":"General"},{"kind":"checkbox","label":"Raids","value":"False"},{"kind":"slider","label":"Scale","value":"0.75","min":"0","max":"2"},{"kind":"button","label":"Reset"},{"kind":"text","label":"Search:","value":""}]}},"source":"archo-monitor","schema":1,"kind":"settings-window"}` + "\n" +
 		`{"timestamp":"2026-11-03 10:06:00.000","level":"INFO","message":"[Archo Monitor] settings window B window","details":"","count":1,"context":{"window":{"packageId":"tester.b","folder":"B","class":"BMod","file":"Mod_B_BMod.xml","title":"B window","full":false,"controls":[{"kind":"text","label":"Name","value":"Bob"}]}},"source":"archo-monitor","schema":1,"kind":"settings-window"}` + "\n"
 	e.WriteFile(log, session+windows)
 	out := e.MustRun("mod-settings", "pkg:tester.a")
-	for _, want := range []string{"the game's window (seen 2026-11-03", "General:", "Raids: False (checkbox)", "Scale: 0.75 (slider 0 to 2)", "[Reset] (button)"} {
+	for _, want := range []string{"the game's window (seen 2026-11-03", "General:", "Raids: False (checkbox)", "Scale: 0.75 (slider 0 to 2)", "[Reset] (button)", `Search: "" (text)`} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("missing %q in:\n%s", want, out)
 		}
