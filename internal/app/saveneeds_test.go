@@ -42,6 +42,9 @@ func TestSaveNeeds(t *testing.T) {
 	// Terrain the game generates: smooth stone of Rocks' natural rock (the field is its
 	// parent's) and Carpets' template in a structure colour, both in the grid by hash.
 	add("3000000013", "tester.rocks", "Rocks", map[string]string{"Defs/R.xml": `<Defs><ThingDef Name="GlimBase" Abstract="True"><building><isNaturalRock>true</isNaturalRock></building></ThingDef><ThingDef ParentName="GlimBase"><defName>Glimstone</defName></ThingDef><ThingDef ParentName="GlimBase"><defName>GlimOre</defName><building><isResourceRock>true</isResourceRock></building></ThingDef></Defs>` + nl})
+	// A compressed thing: Ore's resource rock is in a map's compressed things, one place
+	// after its own hash (60750), as when a ThingDef not seen here took that one.
+	add("3000000015", "tester.ore", "Ore", map[string]string{"Defs/O.xml": `<Defs><ThingDef Name="OreBase" Abstract="True"><building><isNaturalRock>true</isNaturalRock><isResourceRock>true</isResourceRock></building></ThingDef><ThingDef ParentName="OreBase"><defName>MineableGlim</defName><category>Building</category></ThingDef></Defs>` + nl})
 	add("3000000014", "tester.carpets", "Carpets", map[string]string{"Defs/C.xml": "<Defs><TerrainTemplateDef><defName>ShagCarpet</defName></TerrainTemplateDef><ColorDef><defName>Structure_Teal</defName></ColorDef></Defs>" + nl})
 	add("3000000012", "tester.tiles", "Tiles", map[string]string{"Defs/F.xml": "<Defs><TerrainDef><defName>PlainTile</defName></TerrainDef></Defs>" + nl})
 	add("3000000004", "tester.swamp", "Swamp", map[string]string{"Defs/B.xml": "<Defs><BiomeDef><defName>DeepSwamp</defName></BiomeDef></Defs>\n"})
@@ -59,14 +62,14 @@ func TestSaveNeeds(t *testing.T) {
 	menus := key("Unused")
 	menus["Defs/H.xml"] = "<Defs><HeadTypeDef><defName>TribeFire</defName></HeadTypeDef></Defs>" + nl
 	add("3000000009", "tester.menus", "Menus", menus, "tester.menulib", "ludeon.rimworld")
-	mods := []string{"ludeon.rimworld", "tester.base", "tester.lib", "tester.menulib", "tester.swamp", "tester.floors", "tester.tiles", "tester.rocks", "tester.carpets", "tester.kurin", "tester.chairs", "tester.hair", "tester.rain", "tester.menus", "tester.tribe"}
+	mods := []string{"ludeon.rimworld", "tester.base", "tester.lib", "tester.menulib", "tester.swamp", "tester.floors", "tester.tiles", "tester.rocks", "tester.carpets", "tester.ore", "tester.kurin", "tester.chairs", "tester.hair", "tester.rain", "tester.menus", "tester.tribe"}
 	e.WriteModsConfig("1.6.4633 rev1261", mods...)
 	e.AddEnv(false)
 	e.MustRun("scan")
 	e.MustRun("analyze")
 	e.RecordLaunch(e.Now().Add(-time.Hour))
 
-	body := `<maps><li><uniqueID>0</uniqueID><weatherManager><curWeather>AcidRain</curWeather><lastWeather>Clear</lastWeather></weatherManager><terrainGrid><topGrid>GxsbGwAAOTA9iJDF</topGrid></terrainGrid><things>
+	body := `<maps><li><uniqueID>0</uniqueID><weatherManager><curWeather>AcidRain</curWeather><lastWeather>Clear</lastWeather></weatherManager><terrainGrid><topGrid>GxsbGwAAOTA9iJDF</topGrid></terrainGrid><compressedThingMap>T+0AAE/t</compressedThingMap><things>
 <thing Class="Pawn"><def>Kurin_Race</def><id>Kurin_Race1</id><faction>Faction_1</faction><kindDef>Colonist</kindDef><story><hairDef>Bob</hairDef></story></thing>
 <thing Class="ThingWithComps"><def>Corpse_Kurin_Race</def><id>Corpse_Kurin_Race3</id><innerContainer><innerList><li>
  <def>Kurin_Race</def><id>Kurin_Race4</id><faction>Faction_1</faction><kindDef>Colonist</kindDef><story /><healthTracker><healthState>Dead</healthState></healthTracker></li></innerList></innerContainer></thing>
@@ -91,14 +94,14 @@ func TestSaveNeeds(t *testing.T) {
 	for _, n := range c.Needs {
 		by[n.PackageID] = n
 	}
-	if len(c.Needs) != 16 {
+	if len(c.Needs) != 17 {
 		t.Fatalf("needs: %+v", c.Needs)
 	}
 	for pkg, want := range map[string]string{
 		"tester.kurin": app.NeedBreaks, "tester.chairs": app.NeedLoses, "tester.hair": app.NeedCare,
 		"tester.rain": app.NeedBreaks, "tester.menus": app.NeedSafe, "tester.gone": app.NeedUnchecked,
 		"tester.lib": app.NeedBreaks, "tester.base": app.NeedBreaks, "tester.menulib": app.NeedCare, "tester.swamp": app.NeedSafe, "tester.floors": app.NeedLoses, "tester.tiles": app.NeedUnchecked,
-		"tester.rocks": app.NeedLoses, "tester.carpets": app.NeedLoses,
+		"tester.rocks": app.NeedLoses, "tester.carpets": app.NeedLoses, "tester.ore": app.NeedLoses,
 		"tester.tribe": app.NeedCare,
 	} {
 		if got := by[pkg].Verdict; got != want {

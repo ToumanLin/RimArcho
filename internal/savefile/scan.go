@@ -7,10 +7,10 @@ import (
 
 // ParserVersion is the version of Scan's output. Bump it whenever Facts changes meaning
 // (a field added, removed or computed differently): caches of Facts key on it (12 §1.7).
-const ParserVersion = 4
+const ParserVersion = 6
 
 // MinParserVersion is the oldest version whose Facts mean what this version's do, except
-// for fields added since (2 added DefRefs, 3 the weather references in them, 4 GridDefs). Lists, grouping, play facts and Can it load use
+// for fields added since (2 added DefRefs, 3 the weather references in them, 4 GridDefs, 5 the compressed things in them, 6 the storyteller's record of fired incidents and quests in DefRefs). Lists, grouping, play facts and Can it load use
 // a row this old; a reader of a newer field reads the save again (12 §1.7). Raise it to
 // ParserVersion when a change alters what an existing field means.
 const MinParserVersion = 1
@@ -83,7 +83,8 @@ type Facts struct {
 	DefRefs map[string]map[string]int `json:"defRefs,omitempty"` // Def type (empty when unknown) → name → references, excluding configuration/help links
 	Classes map[string]int            `json:"classes,omitempty"` // every Class="…" attribute value → occurrences
 	// GridDefs are the Defs the save stores by short hash in grids: Def type (TerrainDef for
-	// the maps' terrain grids, BiomeDef for the world's tiles) → short hash → cells (12 §1.4).
+	// the maps' terrain grids, BiomeDef for the world's tiles, ThingDef for the maps'
+	// compressed things) → short hash → cells (12 §1.4).
 	GridDefs map[string]map[uint16]int `json:"gridDefs,omitempty"`
 	Refs     Refs                      `json:"refs"`
 

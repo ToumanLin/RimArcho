@@ -13,8 +13,8 @@ sv:<Content.rws> Content  [loads with the list]
   not analysed: Core, Content Mod
   limits:
     Patch-added Defs and Patch changes to existing Defs are not reflected.
-    Terrain and biomes are read from the maps' and the world's grids by Def hash; rock, ore and other compressed things are not.
-    Past events, quests and storytellers may leave no surviving references; indexed history maps are not decoded.
+    Terrain and biomes are read from the maps' and the world's grids by Def hash; so are rock, ore and chunks, less surely.
+    Past events are read from the storyteller's record of what it fired; finished quests and past storytellers may leave nothing.
     The original ScenarioDef cannot usually be recovered from a save's scenario name and parts.
 
 $ archo saves show Content --content
@@ -34,8 +34,8 @@ sv:<Content.rws> Content  [loads with the list]
   source not found: 1 name
   limits:
     Patch-added Defs and Patch changes to existing Defs are not reflected.
-    Terrain and biomes are read from the maps' and the world's grids by Def hash; rock, ore and other compressed things are not.
-    Past events, quests and storytellers may leave no surviving references; indexed history maps are not decoded.
+    Terrain and biomes are read from the maps' and the world's grids by Def hash; so are rock, ore and chunks, less surely.
+    Past events are read from the storyteller's record of what it fired; finished quests and past storytellers may leave nothing.
     The original ScenarioDef cannot usually be recovered from a save's scenario name and parts.
 
 $ archo saves show Content --content --all
@@ -55,7 +55,7 @@ sv:<Content.rws> Content  [loads with the list]
   source not found: 1 name
   limits:
     Patch-added Defs and Patch changes to existing Defs are not reflected.
-    Terrain and biomes are read from the maps' and the world's grids by Def hash; rock, ore and other compressed things are not.
-    Past events, quests and storytellers may leave no surviving references; indexed history maps are not decoded.
+    Terrain and biomes are read from the maps' and the world's grids by Def hash; so are rock, ore and chunks, less surely.
+    Past events are read from the storyteller's record of what it fired; finished quests and past storytellers may leave nothing.
     The original ScenarioDef cannot usually be recovered from a save's scenario name and parts.
 

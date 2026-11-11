@@ -55,6 +55,8 @@ const (
 	aTerrainGridDeflate
 	aBiomeGrid
 	aBiomeGridDeflate
+	aThingGrid
+	aThingGridDeflate
 	aLetterDef
 	aLetterLabel
 	aLetterTick
@@ -136,6 +138,8 @@ var pathRules = []struct {
 	{g + "maps/li/terrainGrid/foundationGridDeflate", aTerrainGridDeflate},
 	{g + "maps/li/terrainGrid/tempGrid", aTerrainGrid},
 	{g + "maps/li/terrainGrid/tempGridDeflate", aTerrainGridDeflate},
+	{g + "maps/li/compressedThingMap", aThingGrid},
+	{g + "maps/li/compressedThingMapDeflate", aThingGridDeflate},
 	{world + "grid/tileBiome", aBiomeGrid}, // before 1.6: one grid
 	{world + "grid/tileBiomeDeflate", aBiomeGridDeflate},
 	{world + "grid/layers/values/li/tileBiome", aBiomeGrid},
@@ -260,7 +264,7 @@ func init() {
 			panic("savefile: two rules for " + path)
 		}
 		ruleNodes[n].act = a
-		ruleNodes[n].capture = a >= aRecords && a <= aBiomeGridDeflate
+		ruleNodes[n].capture = a >= aRecords && a <= aThingGridDeflate
 	}
 	rootNode = newNode()
 	pawnRoot = newNode()
@@ -642,6 +646,8 @@ func (x *extract) rule(s *scanner, f, p *frame, v []byte) {
 		}
 	case aTerrainGrid, aTerrainGridDeflate:
 		fs.gridDefs("TerrainDef", v, ruleNodes[f.node].act == aTerrainGridDeflate)
+	case aThingGrid, aThingGridDeflate:
+		fs.gridDefs("ThingDef", v, ruleNodes[f.node].act == aThingGridDeflate)
 	case aBiomeGrid, aBiomeGridDeflate:
 		fs.gridDefs("BiomeDef", v, ruleNodes[f.node].act == aBiomeGridDeflate)
 	case aLetterDef:

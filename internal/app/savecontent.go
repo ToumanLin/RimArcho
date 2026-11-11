@@ -27,7 +27,7 @@ type SaveContentResult struct {
 	// Needs is every Mod of the save, in the save's order, with what removing it costs
 	// (12 §4.7).
 	Needs []SaveNeed
-	// GridUnnamed is, by Def type, how many distinct terrain or biome hashes in the save's
+	// GridUnnamed is, by Def type, how many distinct terrain, biome or compressed-thing hashes in the save's
 	// grids no Def of the save's Mods has (12 §1.4).
 	GridUnnamed map[string]int
 }
@@ -35,8 +35,8 @@ type SaveContentResult struct {
 // ContentLimits describes the supported reference forms, not a claim of play depth.
 var ContentLimits = []string{
 	"Patch-added Defs and Patch changes to existing Defs are not reflected.",
-	"Terrain and biomes are read from the maps' and the world's grids by Def hash; rock, ore and other compressed things are not.",
-	"Past events, quests and storytellers may leave no surviving references; indexed history maps are not decoded.",
+	"Terrain and biomes are read from the maps' and the world's grids by Def hash; so are rock, ore and chunks, less surely.",
+	"Past events are read from the storyteller's record of what it fired; finished quests and past storytellers may leave nothing.",
 	"The original ScenarioDef cannot usually be recovered from a save's scenario name and parts.",
 }
 
@@ -63,7 +63,7 @@ var ContentCategoryOrder = []string{"factions", "races", "animals", "mechanoids"
 
 func contentUnder(k string) bool {
 	switch k {
-	case "events", "quests", "scenarios", "storytellers", "biomes", "terrain":
+	case "quests", "scenarios", "storytellers":
 		return true
 	}
 	return false
@@ -190,10 +190,11 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 	}
 	// The Defs the grids hold by hash count as typed references (12 §1.4).
 	activePkg := func(p string) bool { return active[normPkg(p)] }
-	grid, gridLeft, err := a.gridRefs(f, insts, activePkg)
+	grids, err := a.gridRefs(f, insts, activePkg)
 	if err != nil {
 		return nil, err
 	}
+	grid := grids.refs
 	defRefs := f.DefRefs
 	if len(grid) > 0 {
 		defRefs = map[string]map[string]int{}
@@ -209,7 +210,7 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 			}
 		}
 	}
-	out.GridUnnamed = gridLeft
+	out.GridUnnamed = grids.left
 	names := map[string]bool{}
 	for _, refs := range defRefs {
 		for name := range refs {
@@ -236,6 +237,7 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 		uses                      int
 		hidden, inferred, unknown bool
 		weather                   bool
+		grid                      bool // in a map's or the world's grid
 	}
 	entries := map[string]*entry{}
 	unmatched := map[string]int{}
@@ -274,6 +276,7 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 				}
 				e.uses += uses
 				e.weather = e.weather || typ == "WeatherDef"
+				e.grid = e.grid || grid[typ][name] > 0 || grid[typ][target.name] > 0
 			}
 		}
 	}
@@ -298,7 +301,7 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 		at[id] = len(byMod[inst][e.key])
 		byMod[inst][e.key] = append(byMod[inst][e.key], SaveContentName{Name: e.name, Uses: e.uses, Hidden: e.hidden, Inferred: e.inferred, Unclassified: e.unknown})
 	}
-	own := needOwners{things: map[string]string{}, factions: map[string]string{}, weather: map[string][]string{}}
+	own := needOwners{things: map[string]string{}, factions: map[string]string{}, weather: map[string][]string{}, grid: map[string]bool{}}
 	for _, e := range entries {
 		inst := e.node.fact.Instance
 		if e.node.fact.Type == "ThingDef" {
@@ -306,6 +309,9 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 		}
 		if e.key == "factions" {
 			own.factions[e.name] = inst
+		}
+		if e.grid {
+			own.grid[inst] = true
 		}
 		if e.weather {
 			own.weather[inst] = append(own.weather[inst], e.name)
@@ -352,7 +358,7 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 		cat := finishContentCat("unknown", ns)
 		out.Unknown = &cat
 	}
-	if out.Needs, err = a.saveNeeds(f, mods, ready, catsOf, own, deps, gridLeft); err != nil {
+	if out.Needs, err = a.saveNeeds(f, mods, ready, catsOf, own, deps, grids); err != nil {
 		return nil, err
 	}
 	return out, nil

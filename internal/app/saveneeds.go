@@ -26,9 +26,9 @@ const (
 	NeedWhyGone   = "not installed"
 	NeedWhyNoDefs = "not analysed for this game version"
 	NeedWhyNoCode = "its code is not analysed"
-	// It defines terrain or biomes, and the save's grids hold some that no Def of the
+	// It defines terrain, biomes, rock or chunks, and the save's grids hold some that no Def of the
 	// save's Mods matches (12 §1.4): they may be this Mod's.
-	NeedWhyGrid = "the save has terrain or biomes that could not be named"
+	NeedWhyGrid = "the save has terrain, biomes or rock that could not be named"
 	// required by a Mod that is itself not checked
 	NeedWhyDependent = "a Mod that needs it could not be checked"
 )
@@ -45,6 +45,9 @@ type SaveNeed struct {
 	Classes         []string // Class="…" values only its assemblies define among the save's Mods
 	Weather         []string // its WeatherDefs a map has now or had last
 	Defs            int      // distinct Defs of it the save references
+	// Grid: a Def of it is in a map's terrain or compressed things, or on a world tile
+	// (12 §1.4): rock and ore are in no world category, but they are gone without it.
+	Grid bool
 	// NeededBy are the save's other Mods whose About.xml requires this one, by name: its
 	// verdict is at least the heaviest of theirs, since they do not run without it.
 	NeededBy []string
@@ -78,6 +81,9 @@ func (n *SaveNeed) verdict() string {
 		}
 		care = true
 	}
+	if n.Grid {
+		return NeedLoses
+	}
 	if care {
 		return NeedCare
 	}
@@ -90,11 +96,12 @@ type needOwners struct {
 	things   map[string]string // ThingDef name → instance
 	factions map[string]string // FactionDef name → instance
 	weather  map[string][]string
+	grid     map[string]bool // instance: a Def of it is in a map's or the world's grid
 }
 
 // saveNeeds gives every Mod of the save its verdict. cats are the content categories by
 // instance; ready the instances with content facts.
-func (a *App) saveNeeds(f *savefile.Facts, mods []SaveMod, ready map[string]bool, cats map[string][]SaveContentCategory, own needOwners, deps map[string][]scanDep, gridLeft map[string]int) ([]SaveNeed, error) {
+func (a *App) saveNeeds(f *savefile.Facts, mods []SaveMod, ready map[string]bool, cats map[string][]SaveContentCategory, own needOwners, deps map[string][]scanDep, grids *gridResult) ([]SaveNeed, error) {
 	var insts []string
 	for _, m := range mods {
 		if m.Instance != "" {
@@ -133,16 +140,12 @@ func (a *App) saveNeeds(f *savefile.Facts, mods []SaveMod, ready map[string]bool
 			factions[inst] = append(factions[inst], name)
 		}
 	}
-	// Mods defining a kind of grid Def of which the save has hashes nobody could name
+	// copies defining a kind of grid Def of which the save has hashes nobody could name
 	grid := map[string]bool{}
-	if len(gridLeft) > 0 {
-		facts, err := a.Store.DefsOfTypes(insts, gridDefTypes)
-		if err != nil {
-			return nil, err
-		}
-		for i := range facts {
-			if d := &facts[i]; !d.Abstract && d.DefName != "" && gridLeft[d.Type] > 0 {
-				grid[d.Instance] = true
+	for typ, k := range grids.left {
+		if k > 0 {
+			for inst := range grids.may[typ] {
+				grid[inst] = true
 			}
 		}
 	}
@@ -165,6 +168,7 @@ func (a *App) saveNeeds(f *savefile.Facts, mods []SaveMod, ready map[string]bool
 			n.Factions = factions[m.Instance]
 			n.Classes = classes[m.Instance]
 			n.Weather = own.weather[m.Instance]
+			n.Grid = own.grid[m.Instance]
 			sort.Strings(n.Weather)
 			n.Verdict = n.verdict()
 			// Without its type facts a class of its own would go unseen: only what is

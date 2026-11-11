@@ -70,6 +70,13 @@ func (s *scanner) contentRef(f *frame, v []byte) {
 			typ = "GeneDef"
 		case path("ideos", "li", "memes", "li"):
 			typ = "MemeDef"
+		// What the storyteller has fired, on the world and on each map (StoryState): the
+		// tick every incident last fired at, kept for good, and the last five random quests,
+		// decrees and incidents. They are the only trace of an event that is over.
+		case path("storyState", "lastFireTicks", "keys", "li"), path("storyState", "recentRandomIncidents", "li"):
+			typ = "IncidentDef"
+		case path("storyState", "recentRandomQuests", "li"), path("storyState", "recentRandomDecrees", "li"):
+			typ = "QuestScriptDef"
 		}
 	case "xenotype":
 		if path("genes", "xenotype") {
@@ -81,6 +88,15 @@ func (s *scanner) contentRef(f *frame, v []byte) {
 		}
 	case "root":
 		if path("questManager", "quests", "li", "root") {
+			typ = "QuestScriptDef"
+		}
+	case "incident":
+		// the incident a quest part or a scenario part fires
+		if path("parts", "li", "incident") && (under("questManager") || under("scenario")) {
+			typ = "IncidentDef"
+		}
+	case "questScript":
+		if path("parts", "li", "questScript") && under("questManager") {
 			typ = "QuestScriptDef"
 		}
 	case "factionDef":
@@ -138,7 +154,7 @@ var storyTypes = map[string]string{"childhood": "BackstoryDef", "adulthood": "Ba
 var styleTypes = map[string]string{"beardDef": "BeardDef", "faceTattoo": "TattooDef", "bodyTattoo": "TattooDef"}
 var contentLabels = func() map[string]bool {
 	m := map[string]bool{}
-	for _, n := range []string{"kindDef", "stuff", "currentProj", "li", "xenotype", "sourcePattern", "root", "factionDef", "recipe", "biome", "curWeather", "lastWeather"} {
+	for _, n := range []string{"kindDef", "stuff", "currentProj", "li", "xenotype", "sourcePattern", "root", "factionDef", "recipe", "biome", "curWeather", "lastWeather", "incident", "questScript"} {
 		m[n] = true
 	}
 	for n := range storyTypes {

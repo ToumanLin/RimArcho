@@ -15,9 +15,11 @@ func TestContentReferenceForms(t *testing.T) {
 <bills><li><recipe>Surgery</recipe></li></bills></thing>
 <researchManager><currentProj>Electricity</currentProj><progress><keys><li>Electricity</li></keys><values><li>0</li></values></progress><techprints><keys><li>Brain</li></keys></techprints><knowledge><keys><li>Void</li></keys></knowledge></researchManager>
 <world><grid><layers><values><li><tileBiome>c9U=</tileBiome></li></values></layers></grid><ideoManager><ideos><li><memes><li>Rancher</li></memes><precepts><li><def>Precept</def><sourcePattern>Festival</sourcePattern></li></precepts></li></ideos></ideoManager></world>
-<questManager><quests><li><root>Quest</root></li></quests></questManager>
+<questManager><quests><li><root>Quest</root><parts><li><incident>QuestRaid</incident><questScript>SubQuest</questScript></li></parts></li></quests></questManager>
+<world><storyState><recentRandomQuests><li>RandomQuest</li></recentRandomQuests><recentRandomDecrees><li>Decree</li></recentRandomDecrees><recentRandomIncidents><li>RandomIncident</li></recentRandomIncidents><lastFireTicks><keys><li>PastFlare</li></keys><values><li>5</li></values></lastFireTicks></storyState></world>
+<parts><li><incident>NotAQuest</incident><questScript>NotAQuest</questScript></li></parts>
 <scenario><playerFaction><factionDef>Player</factionDef></playerFaction></scenario>
-<maps><li><weatherManager><curWeather>AcidRain</curWeather><lastWeather>Clear</lastWeather></weatherManager><terrainGrid><topGrid>GxsbGwAAOTA=</topGrid><underGridDeflate>szRgYAAA</underGridDeflate></terrainGrid></li></maps>
+<maps><li><weatherManager><curWeather>AcidRain</curWeather><lastWeather>Clear</lastWeather></weatherManager><terrainGrid><topGrid>GxsbGwAAOTA=</topGrid><underGridDeflate>szRgYAAA</underGridDeflate></terrainGrid><compressedThingMap>T+0AAE/t</compressedThingMap></li></maps>
 <taleManager><tales><li><surroundings><biome>Desert</biome></surroundings></li></tales></taleManager>
 <allowedDefs><li>FilterOnly</li><li><def>NestedFilter</def></li></allowedDefs>
 <history><archive><archivables><li><hyperlinkThingDefs><li>HelpOnly</li><li><def>NestedHelp</def></li></hyperlinkThingDefs></li></archivables></archive></history>
@@ -39,13 +41,24 @@ func TestContentReferenceForms(t *testing.T) {
 		}
 	}
 	// grids of Defs by short hash: plain and deflated base64 of little-endian uint16s, 0 none
+	if g := f.GridDefs["ThingDef"]; g[60751] != 2 || len(g) != 1 {
+		t.Errorf("compressed things: %v", f.GridDefs)
+	}
 	if g := f.GridDefs["TerrainDef"]; g[6939] != 2 || g[12345] != 2 || len(g) != 2 || len(f.GridDefs["BiomeDef"]) != 1 || f.GridDefs["BiomeDef"][54643] != 1 {
 		t.Errorf("grids: %v", f.GridDefs)
+	}
+	// what the storyteller fired, and what quest parts fire
+	for typ, ns := range map[string][]string{"IncidentDef": {"PastFlare", "RandomIncident", "QuestRaid"}, "QuestScriptDef": {"RandomQuest", "Decree", "SubQuest"}} {
+		for _, n := range ns {
+			if f.DefRefs[typ][n] != 1 {
+				t.Errorf("%s/%s: %v", typ, n, f.DefRefs[typ])
+			}
+		}
 	}
 	if f.DefRefs["ResearchProjectDef"]["Electricity"] != 2 {
 		t.Error("current and zero-progress reference must both count")
 	}
-	for _, n := range []string{"FilterOnly", "NestedFilter", "HelpOnly", "NestedHelp", "ObjectReference", "Arbitrary", "WrongContext", "GridNotDecoded", "WrongWeather"} {
+	for _, n := range []string{"FilterOnly", "NestedFilter", "HelpOnly", "NestedHelp", "ObjectReference", "Arbitrary", "WrongContext", "NotAQuest", "5", "GridNotDecoded", "WrongWeather"} {
 		for _, refs := range f.DefRefs {
 			if refs[n] != 0 {
 				t.Errorf("unexpected %s", n)

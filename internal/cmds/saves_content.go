@@ -59,8 +59,8 @@ func addSaveContent(root *render.Node, c *app.SaveContentResult, all bool, ref s
 	if c.Unknown != nil {
 		root.KV("source not found", render.Plural(c.Unknown.Count, "name"))
 	}
-	if k := c.GridUnnamed["TerrainDef"] + c.GridUnnamed["BiomeDef"]; k > 0 {
-		root.KV("terrain and biomes not named", render.Plural(k, "kind"))
+	if k := c.GridUnnamed["TerrainDef"] + c.GridUnnamed["BiomeDef"] + c.GridUnnamed["ThingDef"]; k > 0 {
+		root.KV("terrain, biomes and rock not named", render.Plural(k, "kind"))
 	}
 	if len(c.Unchecked) > 0 {
 		names := c.Unchecked

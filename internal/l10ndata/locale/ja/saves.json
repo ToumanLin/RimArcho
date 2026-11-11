@@ -260,7 +260,6 @@
   "These references are partial because the save is malformed.": "セーブファイルが不正なため、参照情報は一部のみです",
   "The save's Mod list could not be read.": "セーブのMODリストを読み取れませんでした",
   "Patch-added Defs and Patch changes to existing Defs are not reflected.": "パッチで追加・変更されたDefは反映されません",
-  "Past events, quests and storytellers may leave no surviving references; indexed history maps are not decoded.": "過去のイベント・クエスト・ストーリーテラーは参照情報が残らない場合があります。履歴マップは解析していません",
   "The original ScenarioDef cannot usually be recovered from a save's scenario name and parts.": "通常、セーブに含まれるシナリオ名や構成要素だけでは元のScenarioDefを復元できません",
   "%s (hidden)": "%s（非表示）",
   "%s (inferred)": "%s（推定）",
@@ -335,7 +334,8 @@
   "show what it holds": "セーブ内の内容を表示",
   "hide what it holds": "セーブ内の内容を隠す",
   "not installed, not analysed, or what they hold cannot be read from a save: nothing can be said of them": "未インストール、未解析、またはセーブから内容を読み取れないため、判断できません",
-  "Terrain and biomes are read from the maps' and the world's grids by Def hash; rock, ore and other compressed things are not.": "地形とバイオームはマップとワールドのグリッドから Def のハッシュで読み取ります。岩、鉱石など圧縮保存される物は読み取れません。",
-  "the save has terrain or biomes that could not be named": "セーブに名前を特定できない地形またはバイオームがあります",
-  "the save loads without one; its buildings, items, floors, biomes and the like are gone": "外してもセーブは読み込めますが、その建物、アイテム、床、バイオームなどは失われます"
+  "the save loads without one; its buildings, items, floors, biomes and the like are gone": "外してもセーブは読み込めますが、その建物、アイテム、床、バイオームなどは失われます",
+  "Terrain and biomes are read from the maps' and the world's grids by Def hash; so are rock, ore and chunks, less surely.": "地形とバイオームはマップとワールドのグリッドから Def のハッシュで読み取ります。岩、鉱石、岩塊も読み取りますが、確実さは下がります。",
+  "the save has terrain, biomes or rock that could not be named": "セーブに名前を特定できない地形、バイオーム、または岩があります",
+  "Past events are read from the storyteller's record of what it fired; finished quests and past storytellers may leave nothing.": "終了したイベントはストーリーテラーの発生記録から読み取ります。完了したクエストや以前のストーリーテラーは痕跡が残らないことがあります。"
 }
