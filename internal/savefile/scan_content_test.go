@@ -17,10 +17,11 @@ func TestContentReferenceForms(t *testing.T) {
 <world><ideoManager><ideos><li><memes><li>Rancher</li></memes><precepts><li><def>Precept</def><sourcePattern>Festival</sourcePattern></li></precepts></li></ideos></ideoManager></world>
 <questManager><quests><li><root>Quest</root></li></quests></questManager>
 <scenario><playerFaction><factionDef>Player</factionDef></playerFaction></scenario>
+<maps><li><weatherManager><curWeather>AcidRain</curWeather><lastWeather>Clear</lastWeather></weatherManager></li></maps>
 <taleManager><tales><li><surroundings><biome>Desert</biome></surroundings></li></tales></taleManager>
 <allowedDefs><li>FilterOnly</li><li><def>NestedFilter</def></li></allowedDefs>
 <history><archive><archivables><li><hyperlinkThingDefs><li>HelpOnly</li><li><def>NestedHelp</def></li></hyperlinkThingDefs></li></archivables></archive></history>
-<misc><root>ObjectReference</root><li>Arbitrary</li><hairDef>WrongContext</hairDef><biome>GridNotDecoded</biome><def>UnknownType</def></misc>
+<misc><root>ObjectReference</root><li>Arbitrary</li><hairDef>WrongContext</hairDef><biome>GridNotDecoded</biome><curWeather>WrongWeather</curWeather><def>UnknownType</def></misc>
 </game></savegame>`
 	f, err := Scan(strings.NewReader(x))
 	if err != nil || f.Malformed != nil {
@@ -29,7 +30,7 @@ func TestContentReferenceForms(t *testing.T) {
 	for typ, ns := range map[string][]string{
 		"": {"Shared", "UnknownType"}, "ThingDef": {"Steel"}, "PawnKindDef": {"Soldier"}, "XenotypeDef": {"Baseliner"}, "GeneDef": {"Strong", "PackGene"},
 		"BackstoryDef": {"Child", "Adult"}, "HairDef": {"Hair"}, "BodyTypeDef": {"Body"}, "HeadTypeDef": {"Head"}, "FurDef": {"Fur"}, "BeardDef": {"Beard"}, "TattooDef": {"Face", "Tattoo"},
-		"RecipeDef": {"Surgery"}, "ResearchProjectDef": {"Electricity", "Brain", "Void"}, "MemeDef": {"Rancher"}, "PreceptDef": {"Precept"}, "RitualPatternDef": {"Festival"}, "QuestScriptDef": {"Quest"}, "FactionDef": {"Player"}, "BiomeDef": {"Desert"},
+		"RecipeDef": {"Surgery"}, "ResearchProjectDef": {"Electricity", "Brain", "Void"}, "MemeDef": {"Rancher"}, "PreceptDef": {"Precept"}, "RitualPatternDef": {"Festival"}, "QuestScriptDef": {"Quest"}, "FactionDef": {"Player"}, "BiomeDef": {"Desert"}, "WeatherDef": {"AcidRain", "Clear"},
 	} {
 		for _, n := range ns {
 			if f.DefRefs[typ][n] == 0 {
@@ -40,7 +41,7 @@ func TestContentReferenceForms(t *testing.T) {
 	if f.DefRefs["ResearchProjectDef"]["Electricity"] != 2 {
 		t.Error("current and zero-progress reference must both count")
 	}
-	for _, n := range []string{"FilterOnly", "NestedFilter", "HelpOnly", "NestedHelp", "ObjectReference", "Arbitrary", "WrongContext", "GridNotDecoded"} {
+	for _, n := range []string{"FilterOnly", "NestedFilter", "HelpOnly", "NestedHelp", "ObjectReference", "Arbitrary", "WrongContext", "GridNotDecoded", "WrongWeather"} {
 		for _, refs := range f.DefRefs {
 			if refs[n] != 0 {
 				t.Errorf("unexpected %s", n)

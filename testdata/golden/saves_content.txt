@@ -8,6 +8,7 @@ sv:<Content.rws> Content  [loads with the list]
   read: in full
   content: 5 distinct names; sources use installed Mod versions
   totals: none
+  removing a Mod: 1 not checked
   source not found: 5 names
   not analysed: Core, Content Mod
   limits:
@@ -26,6 +27,8 @@ sv:<Content.rws> Content  [loads with the list]
   read: in full
   content: 5 distinct names; sources use installed Mod versions
   totals: 1 faction, 1 humanlike race, 1 weapon, 1 recipe
+  removing a Mod: 1 breaks the save
+  breaks the save: Content Mod (a faction Def)
   Core: 1 humanlike race, 1 weapon
   Content Mod: 1 faction, 1 recipe
   source not found: 1 name
@@ -45,6 +48,8 @@ sv:<Content.rws> Content  [loads with the list]
   read: in full
   content: 5 distinct names; sources use installed Mod versions
   totals: 1 faction, 1 humanlike race, 1 weapon, 1 recipe
+  removing a Mod: 1 breaks the save
+  breaks the save: Content Mod (a faction Def)
   Core: 1 humanlike race, 1 weapon
   Content Mod: 1 faction, 1 recipe
   source not found: 1 name

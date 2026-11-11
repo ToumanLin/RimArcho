@@ -22,6 +22,9 @@ type SaveContentResult struct {
 	Mods      []SaveContentMod
 	Unknown   *SaveContentCategory
 	Unchecked []string
+	// Needs is every Mod of the save, in the save's order, with what removing it costs
+	// (12 §4.7).
+	Needs []SaveNeed
 }
 
 // ContentLimits describes the supported reference forms, not a claim of play depth.
@@ -192,6 +195,7 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 		name, key                 string
 		uses                      int
 		hidden, inferred, unknown bool
+		weather                   bool
 	}
 	entries := map[string]*entry{}
 	unmatched := map[string]int{}
@@ -229,6 +233,7 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 					entries[id] = e
 				}
 				e.uses += uses
+				e.weather = e.weather || typ == "WeatherDef"
 			}
 		}
 	}
@@ -253,6 +258,20 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 		at[id] = len(byMod[inst][e.key])
 		byMod[inst][e.key] = append(byMod[inst][e.key], SaveContentName{Name: e.name, Uses: e.uses, Hidden: e.hidden, Inferred: e.inferred, Unclassified: e.unknown})
 	}
+	own := needOwners{things: map[string]string{}, factions: map[string]string{}, weather: map[string][]string{}}
+	for _, e := range entries {
+		inst := e.node.fact.Instance
+		if e.node.fact.Type == "ThingDef" {
+			own.things[e.name] = inst
+		}
+		if e.key == "factions" {
+			own.factions[e.name] = inst
+		}
+		if e.weather {
+			own.weather[inst] = append(own.weather[inst], e.name)
+		}
+	}
+	catsOf := map[string][]SaveContentCategory{}
 	totals := map[string]*SaveContentCategory{}
 	for _, m := range mods {
 		groups := byMod[m.Instance]
@@ -278,6 +297,7 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 			t.Hidden += cat.Hidden
 		}
 		out.Mods = append(out.Mods, v)
+		catsOf[m.Instance] = v.Cats
 	}
 	for _, key := range ContentCategoryOrder {
 		if t := totals[key]; t != nil {
@@ -291,6 +311,9 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 		}
 		cat := finishContentCat("unknown", ns)
 		out.Unknown = &cat
+	}
+	if out.Needs, err = a.saveNeeds(f, mods, ready, catsOf, own); err != nil {
+		return nil, err
 	}
 	return out, nil
 }

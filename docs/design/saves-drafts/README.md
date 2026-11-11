@@ -64,6 +64,10 @@ B is the best for stepping through many saves, but its narrow right column fight
 
 Written on 2026-11-04 from revised B: page layout 16 §2.11 (Saves moved to the Library group, 16 §2.1); read tiers, cache and background reading 12 §1.7; grouping, matching, can it load, actions, timeline and attribution 12 §4; commands, `sv:` references and MCP tools 13 §2, §4.2, 14 §2; cache location 17 §3; decision 00 D18.
 
+## Right card: what this save needs
+
+`needs.html` holds six candidates for the right card, each with the middle card as it would change (buttons or `1`–`6`). The card first listed the save's Defs by Mod and category, which was a great deal of information a player could do little with. The page answers "can this save load?", so the right card now says which Mods the save needs. Candidate 6 was chosen and built: the middle card unchanged (what the current list's changes cost), the right card the save itself with four verdicts and Could not check (12 §4.7, 16 §2.11).
+
 ## Open
 
 ```bash

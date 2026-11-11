@@ -4,6 +4,10 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Saves: the right card now answers "which Mods does this save need?" instead of listing its Defs by category. Every Mod of the save is in one of five groups: **breaks the save** (its pawns, factions, code or a map's weather are in it), **loses content** (its buildings, items and the like), **remove with care** (only research, recipes, appearance and the like), **safe to remove** (nothing of it is in the save) and **could not check** (not installed or not analysed). A bar shows the split, a find box answers "can I remove this one?", and opening a Mod shows what it holds. The card describes the save itself; what the current list's changes cost stays in the middle card.
+- `archo saves show --content` (MCP `get_save content=true`): two new lines, `removing a Mod` (the count of each group above) and `breaks the save` (those Mods with what each holds).
+- Saves: a map's weather is now read from a save, so a Mod whose weather a map has counts as breaking the save when removed. Saves read before are read again when selected.
+- Saves › Can it load?: "loses 7 classs" reads "7 classes" (English).
 - Saves › content in this save: a count of one reads "1 faction", not "1 factions" (English).
 - Saves: a save file that cannot be opened (its permissions, or another program holding it) no longer shows "loads with <list> as it is" next to its error; the verdict says it cannot be loaded, the row says the file could not be opened (not "no Mod list at its start"), and its content and Over time cards say so instead of loading forever.
 - Saves: a save the program may not open (for example a file whose permissions deny reading) no longer makes the window's "read the saves" task fail; it ends "read N saves; 1 could not be read: …" as intended. `archo saves index` also says how many saves could not be read on an earlier run.

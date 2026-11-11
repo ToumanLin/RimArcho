@@ -95,6 +95,11 @@ func (s *scanner) contentRef(f *frame, v []byte) {
 		if under("taleManager") && path("surroundings", "biome") {
 			typ = "BiomeDef"
 		}
+	case "curWeather", "lastWeather":
+		// a map's weather: the game cannot draw a map whose weather Def is gone
+		if path("weatherManager", n) {
+			typ = "WeatherDef"
+		}
 	default:
 		if path("story", n) {
 			typ = storyTypes[n]
@@ -133,7 +138,7 @@ var storyTypes = map[string]string{"childhood": "BackstoryDef", "adulthood": "Ba
 var styleTypes = map[string]string{"beardDef": "BeardDef", "faceTattoo": "TattooDef", "bodyTattoo": "TattooDef"}
 var contentLabels = func() map[string]bool {
 	m := map[string]bool{}
-	for _, n := range []string{"kindDef", "stuff", "currentProj", "li", "xenotype", "sourcePattern", "root", "factionDef", "recipe", "biome"} {
+	for _, n := range []string{"kindDef", "stuff", "currentProj", "li", "xenotype", "sourcePattern", "root", "factionDef", "recipe", "biome", "curWeather", "lastWeather"} {
 		m[n] = true
 	}
 	for n := range storyTypes {

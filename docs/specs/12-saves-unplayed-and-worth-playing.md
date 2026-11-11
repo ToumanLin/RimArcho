@@ -49,6 +49,7 @@ Saves are XML with a `<savegame>` root, starting with `<meta>`, followed by `<ga
 - Named references: `kindDef` → `PawnKindDef`; `stuff` → `ThingDef`; research manager `currentProj` and `progress/techprints/knowledge/keys/li` → `ResearchProjectDef`; pawn `genes/xenotype` → `XenotypeDef`; `geneSet/genes/li` → `GeneDef`; ideology `memes/li` → `MemeDef`; precept `sourcePattern` → `RitualPatternDef`; quest `root` → `QuestScriptDef`; scenario `playerFaction/factionDef` → `FactionDef`; bill `recipe` → `RecipeDef`.
 - Appearance under pawn `story`: `childhood`, `adulthood`, `hairDef`, `bodyType`, `headType`, `furDef`; under `style`: `beardDef`, `faceTattoo`, `bodyTattoo`. Each uses its corresponding Def type; both tattoos use `TattooDef`.
 - Surviving history: tale `surroundings/biome` → `BiomeDef`. This means only that its record survives.
+- A map's weather: `weatherManager/curWeather` and `lastWeather` → `WeatherDef` (§4.7).
 - Exclude configuration/help links: ThingFilter lists (`allowedDefs`, `disallowedDefs` and filter subtrees), letter `hyperlinkThingDefs` and `hyperlinkHediffDefs`. Arbitrary list items, object-reference roots and cosmetic fields outside their context are not Def references.
 - No compressed terrain/world grids or indexed `DefMap` values are decoded. Measurements: 18 §2. Paths and evidence: [save-content research](../research/2026-11-09_save-content-attribution.md).
 
@@ -139,6 +140,8 @@ Coverage limits accompany every read result:
 - Terrain grids and world biomes are not decoded; named evidence is partial.
 - Past events, quests and storytellers may leave no surviving references; indexed history maps (`DefMap`) are not decoded.
 - Scenario names/parts normally do not recover the original ScenarioDef.
+
+The same result carries what the save needs of each Mod (`Needs`, §4.7).
 
 Full per-Mod content totals and cross-save unused-content comparisons (§3) are **not implemented**. Absence from this result cannot establish never played.
 
@@ -275,7 +278,25 @@ Implemented for can it load (`internal/app/saveowners.go`; tested on synthetic s
 - **Names**: each `OwnedDefs` keeps the names of its Defs, most used first, at most 100 (`OwnedDefNames`), for the page's View.
 - Counts per kind ("3 colonists of race Kurin_Race (1 dead), 1 faction (Kurin Clan), 1 class (ModA.CompBroken), 3 things, 1 hediff") are `app.SaveOwned` on the row's `SaveIssue.Owns` (JSON `owns`); the text is `consequence()` in `internal/cmds/saves.go` (CLI and MCP) and `issueView()` / `goneView()` in `internal/view/saves.go` (the page).
 - Speed: `saves list` checks every save, so lookups are batched and kept per App while the database is unchanged (`saveOwnerMemo`); Defs are looked up only for saves with a Mod row. Measured in 18.
-- Not implemented: whether a Mod can be removed mid-playthrough, which the same attribution answers. `saves list --mod` lists the saves whose Mod list has the Mod but does not say what removing it loses.
+- Whether a Mod can be removed mid-playthrough is §4.7. `saves list --mod` lists the saves whose Mod list has the Mod but does not say what removing it loses.
+
+### 4.7 What the save needs of each Mod
+
+Implemented (`internal/app/saveneeds.go`, `SaveContentResult.Needs`; tested on synthetic saves only, unverified on real saves). §4.6 says what the list the save is checked against costs it; this says, whatever that list is, what removing each one of the save's Mods would cost, so a player knows which Mods must stay before changing a list. Every Mod of the save gets one verdict:
+
+| Verdict | Criterion | Meaning |
+| --- | --- | --- |
+| `breaks` | It provides the race of a player's humanlike pawn (alive or dead), a FactionDef the save names, a `Class="…"` value, or a map's current or last weather | The save may not load without it. These are what make a missing Mod's row an error in §4.3, plus the weather |
+| `loses` | Otherwise, it provides a Def in a category of things in the world: races, animals, mechanoids, other creatures, buildings, weapons, apparel, plants, items, terrain, or culture (§2.2) | The save loads; those things are gone. A precept or a material whose Def is gone leaves errors behind rather than a clean reset, so culture counts here |
+| `care` | Otherwise, it provides any other Def the save references (research, recipes, appearance, traits, health conditions, quests…) | They reset and the colony goes on |
+| `safe` | It is installed and analysed and nothing of it is in the save | Safe as far as the save can tell: a save cannot show what a Mod's code or patches do without leaving a Def or class |
+| `unchecked` | It is not installed, has no content facts for the game version, or has no type facts and nothing known breaks the save | Nothing can be said; analysing a list made from the save (16 §2.11) checks it |
+
+- **Sources.** Defs, categories and the providing Mod are the selected-save content attribution (§2, §1.5: of several of the save's Mods defining a Def, the last in the save's order). Pawns are `Facts.Colonists` by their race's ThingDef; factions are `Facts.Factions` by FactionDef, named by the faction's name; weather is the `WeatherDef` references (§1.4).
+- **Classes.** A `Class="…"` value belongs to a Mod when, among the save's Mods, only that Mod's assemblies define a part of it (lookups as in §4.6: `store.TypeDefiners`, `SaveNamespaces`, nested types); a class the game, the runtime or another of the save's Mods also defines is not lost with it. A Mod without type facts (05 §3) may hold classes nobody can see, so unless something else already makes it `breaks` it is `unchecked` ("its code is not analysed").
+- **The game.** Core and the DLC (`ludeon.rimworld…`) get a verdict like any Mod and are marked `Game`: the interfaces name them apart and leave them out of the groups and counts.
+- **Limits.** As §2.3 and §3.2: a reference means present, not how much. Animals, mechanoids and prisoners are not attributed as pawns (§4.6), so a Mod whose only pawns are those is `loses`. A Def that an earlier Mod of the save also defines is counted for the last one, although removing that one would fall back to the earlier definition. Fixes the game or other Mods offer for a removed Mod are not considered.
+- Interfaces: the Saves page's right card (16 §2.11), `saves show --content` and `get_save content=true` (13 §4.2).
 
 ## 5. Playthrough themes and content conflicts (1.2)
 
