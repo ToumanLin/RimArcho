@@ -31,7 +31,7 @@ Auto translate mod details? Need to think about it. 因为需要OCR.
 
 第一阶段之后还没做的：
 - **Patch 新增的 Def**：`def_fact` 只记 Def 文件里原有的 Def，Patch（PatchOperationAdd 等）新建的 Def 不在库里，存档里引用它们会显示“找不到来源”。要做按分析范围保存的 Patch 后内容目录（谁创建、谁修改分开记）。
-- **地形和生物群系**：存档把地形（`terrainGrid`）、压缩的岩石/石块（`compressedThingMap`）和世界地块生物群系（`tileBiome`）存成哈希压缩网格，没有 Def 名。要按精确的已加载 Def 集合解码，先在 VM 验证。
+- **压缩保存的物体**：`compressedThingMap`（岩石、矿石等，按 ThingDef 短哈希存）还没读。地形（`terrainGrid`）和世界生物群系（`tileBiome`）已按短哈希解码（12 §1.4），包括游戏生成的石地和地毯；ThingDef 数量多，哈希冲突要按精确的已加载集合处理。
 - **只留在历史里的内容**：已结束的事件、做完的任务、以前用过的讲述者、原始剧本（ScenarioDef 不写进存档）基本看不到；卡片标“可能偏少”。
 - **VM 验证**（调研报告最后一节）：1.6.4871 精确版本的路径、每种引用形式的实际增益、真实存档的归属比例、端到端耗时和内存。
 - 第三节“没玩过的内容”要另定证据规则：配置类引用（过滤器、账单）和帮助链接不算玩过，也不能凭“没出现”说“从没遇到”。

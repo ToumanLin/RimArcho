@@ -51,6 +51,10 @@ const (
 	aRecorderDef
 	aRecords
 	aRecordsDeflate
+	aTerrainGrid
+	aTerrainGridDeflate
+	aBiomeGrid
+	aBiomeGridDeflate
 	aLetterDef
 	aLetterLabel
 	aLetterTick
@@ -124,6 +128,18 @@ var pathRules = []struct {
 	{recPth + "/def", aRecorderDef},
 	{recPth + "/records", aRecords},
 	{recPth + "/recordsDeflate", aRecordsDeflate},
+	{g + "maps/li/terrainGrid/topGrid", aTerrainGrid},
+	{g + "maps/li/terrainGrid/topGridDeflate", aTerrainGridDeflate},
+	{g + "maps/li/terrainGrid/underGrid", aTerrainGrid},
+	{g + "maps/li/terrainGrid/underGridDeflate", aTerrainGridDeflate},
+	{g + "maps/li/terrainGrid/foundationGrid", aTerrainGrid},
+	{g + "maps/li/terrainGrid/foundationGridDeflate", aTerrainGridDeflate},
+	{g + "maps/li/terrainGrid/tempGrid", aTerrainGrid},
+	{g + "maps/li/terrainGrid/tempGridDeflate", aTerrainGridDeflate},
+	{world + "grid/tileBiome", aBiomeGrid}, // before 1.6: one grid
+	{world + "grid/tileBiomeDeflate", aBiomeGridDeflate},
+	{world + "grid/layers/values/li/tileBiome", aBiomeGrid},
+	{world + "grid/layers/values/li/tileBiomeDeflate", aBiomeGridDeflate},
 	{g + "history/archive/archivables/li", aLetter},
 	{g + "history/archive/archivables/li/def", aLetterDef},
 	{g + "history/archive/archivables/li/label", aLetterLabel},
@@ -244,7 +260,7 @@ func init() {
 			panic("savefile: two rules for " + path)
 		}
 		ruleNodes[n].act = a
-		ruleNodes[n].capture = a == aRecords || a == aRecordsDeflate
+		ruleNodes[n].capture = a >= aRecords && a <= aBiomeGridDeflate
 	}
 	rootNode = newNode()
 	pawnRoot = newNode()
@@ -624,6 +640,10 @@ func (x *extract) rule(s *scanner, f, p *frame, v []byte) {
 		if p != nil && p.obj >= 0 {
 			setRecords(&fs.History[p.obj], v, ruleNodes[f.node].act == aRecordsDeflate)
 		}
+	case aTerrainGrid, aTerrainGridDeflate:
+		fs.gridDefs("TerrainDef", v, ruleNodes[f.node].act == aTerrainGridDeflate)
+	case aBiomeGrid, aBiomeGridDeflate:
+		fs.gridDefs("BiomeDef", v, ruleNodes[f.node].act == aBiomeGridDeflate)
 	case aLetterDef:
 		if p != nil && p.obj >= 0 {
 			fs.Events[p.obj].Def = x.str(v)
@@ -704,9 +724,9 @@ func (x *extract) rule(s *scanner, f, p *frame, v []byte) {
 	}
 }
 
-// setRecords decodes a HistoryAutoRecorder series: base64 of little-endian float32s,
-// raw-deflated when the element is recordsDeflate (DataExposeUtility.LookByteArray).
-func setRecords(r *Recorder, v []byte, deflated bool) {
+// byteArray decodes what DataExposeUtility.LookByteArray wrote: base64 with line breaks,
+// raw-deflated when the element's name ends in Deflate.
+func byteArray(v []byte, deflated bool) []byte {
 	clean := make([]byte, 0, len(v))
 	for _, c := range v {
 		if !isSpace(c) {
@@ -716,16 +736,44 @@ func setRecords(r *Recorder, v []byte, deflated bool) {
 	raw := make([]byte, base64.StdEncoding.DecodedLen(len(clean)))
 	n, err := base64.StdEncoding.Decode(raw, clean)
 	if err != nil {
-		return
+		return nil
 	}
 	raw = raw[:n]
 	if deflated {
 		b, err := io.ReadAll(io.LimitReader(flate.NewReader(bytes.NewReader(raw)), maxCapture))
 		if err != nil {
-			return
+			return nil
 		}
 		raw = b
 	}
+	return raw
+}
+
+// gridDefs counts the short hashes of a grid of Defs: little-endian uint16s, one a cell,
+// 0 for none (TerrainGrid.ExposeTerrainGrid, PlanetLayer.TilesToRawData).
+func (f *Facts) gridDefs(typ string, v []byte, deflated bool) {
+	raw := byteArray(v, deflated)
+	if len(raw) < 2 {
+		return
+	}
+	if f.GridDefs == nil {
+		f.GridDefs = map[string]map[uint16]int{}
+	}
+	m := f.GridDefs[typ]
+	if m == nil {
+		m = map[uint16]int{}
+		f.GridDefs[typ] = m
+	}
+	for i := 0; i+1 < len(raw); i += 2 {
+		if h := binary.LittleEndian.Uint16(raw[i:]); h != 0 {
+			m[h]++
+		}
+	}
+}
+
+// setRecords decodes a HistoryAutoRecorder series: little-endian float32s.
+func setRecords(r *Recorder, v []byte, deflated bool) {
+	raw := byteArray(v, deflated)
 	cnt := len(raw) / 4
 	r.Count = cnt
 	if cnt == 0 {

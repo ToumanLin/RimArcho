@@ -1,6 +1,7 @@
 package app
 
 import (
+	"maps"
 	"sort"
 	"strings"
 
@@ -26,12 +27,15 @@ type SaveContentResult struct {
 	// Needs is every Mod of the save, in the save's order, with what removing it costs
 	// (12 §4.7).
 	Needs []SaveNeed
+	// GridUnnamed is, by Def type, how many distinct terrain or biome hashes in the save's
+	// grids no Def of the save's Mods has (12 §1.4).
+	GridUnnamed map[string]int
 }
 
 // ContentLimits describes the supported reference forms, not a claim of play depth.
 var ContentLimits = []string{
 	"Patch-added Defs and Patch changes to existing Defs are not reflected.",
-	"Terrain grids and world biomes are not decoded; only named references are included.",
+	"Terrain and biomes are read from the maps' and the world's grids by Def hash; rock, ore and other compressed things are not.",
 	"Past events, quests and storytellers may leave no surviving references; indexed history maps are not decoded.",
 	"The original ScenarioDef cannot usually be recovered from a save's scenario name and parts.",
 }
@@ -184,8 +188,30 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 			out.Unchecked = append(out.Unchecked, m.Name)
 		}
 	}
+	// The Defs the grids hold by hash count as typed references (12 §1.4).
+	activePkg := func(p string) bool { return active[normPkg(p)] }
+	grid, gridLeft, err := a.gridRefs(f, insts, activePkg)
+	if err != nil {
+		return nil, err
+	}
+	defRefs := f.DefRefs
+	if len(grid) > 0 {
+		defRefs = map[string]map[string]int{}
+		for typ, refs := range f.DefRefs {
+			defRefs[typ] = maps.Clone(refs)
+		}
+		for typ, refs := range grid {
+			if defRefs[typ] == nil {
+				defRefs[typ] = map[string]int{}
+			}
+			for name, k := range refs {
+				defRefs[typ][name] += k
+			}
+		}
+	}
+	out.GridUnnamed = gridLeft
 	names := map[string]bool{}
-	for _, refs := range f.DefRefs {
+	for _, refs := range defRefs {
 		for name := range refs {
 			names[name] = true
 		}
@@ -213,7 +239,7 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 	}
 	entries := map[string]*entry{}
 	unmatched := map[string]int{}
-	for typ, refs := range f.DefRefs {
+	for typ, refs := range defRefs {
 		for name, uses := range refs {
 			// Minified things serialize their contained object separately.
 			if name == "MinifiedThing" || name == "MinifiedTree" {
@@ -326,7 +352,7 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 		cat := finishContentCat("unknown", ns)
 		out.Unknown = &cat
 	}
-	if out.Needs, err = a.saveNeeds(f, mods, ready, catsOf, own, deps); err != nil {
+	if out.Needs, err = a.saveNeeds(f, mods, ready, catsOf, own, deps, gridLeft); err != nil {
 		return nil, err
 	}
 	return out, nil

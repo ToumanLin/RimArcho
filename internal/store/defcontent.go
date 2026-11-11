@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
 
 	"github.com/ToumanLin/RimArcho/internal/analyze"
 )
@@ -62,23 +63,47 @@ func (s *Store) ContentDefs(instances, names []string, parent bool) ([]analyze.D
 	return out, err
 }
 
-// DefTypeDefiners says which of instances define a concrete Def of one of types for the
-// current game version, with the types each defines.
-func (s *Store) DefTypeDefiners(instances, types []string) (map[string][]string, error) {
-	out := map[string][]string{}
+// DefsOfTypes reads the Defs of the given types that instances provide for the current
+// game version.
+func (s *Store) DefsOfTypes(instances, types []string) ([]analyze.DefFact, error) {
+	var out []analyze.DefFact
 	err := chunked(instances, func(part []string) error {
 		args := append([]any{s.MM}, anys(part)...)
-		rows, err := s.DB.Query(`SELECT DISTINCT c.instance_id,f.def_type`+defView+`WHERE c.game_mm=? AND c.instance_id IN (`+placeholders(len(part))+`) AND f.def_type IN (`+placeholders(len(types))+`) AND f.def_name<>'' AND f.abstract=0 ORDER BY c.instance_id,f.def_type`, append(args, anys(types)...)...)
+		rows, err := s.DB.Query(`SELECT `+defCols+defView+`WHERE c.game_mm=? AND c.instance_id IN (`+placeholders(len(part))+`) AND f.def_type IN (`+placeholders(len(types))+`) ORDER BY c.instance_id, f.rowid`, append(args, anys(types)...)...)
+		if err != nil {
+			return err
+		}
+		fs, err := s.scanDefs(rows)
+		out = append(out, fs...)
+		return err
+	})
+	return out, err
+}
+
+// DefsLite reads the Defs of one type that instances provide for the current game version,
+// without their files, and with their content fields only where those mention field: enough
+// to walk ParentName chains for one inherited field over tens of thousands of Defs.
+func (s *Store) DefsLite(instances []string, typ, field string) ([]analyze.DefFact, error) {
+	var out []analyze.DefFact
+	err := chunked(instances, func(part []string) error {
+		args := append([]any{"%" + field + "%", s.MM}, anys(part)...)
+		rows, err := s.DB.Query(`SELECT c.instance_id,f.def_name,f.name,f.parent,f.abstract,f.may_require,f.may_require_any,CASE WHEN f.content_fields LIKE ? THEN f.content_fields ELSE '' END`+defView+`WHERE c.game_mm=? AND c.instance_id IN (`+placeholders(len(part))+`) AND f.def_type=? ORDER BY c.instance_id, f.rowid`, append(args, typ)...)
 		if err != nil {
 			return err
 		}
 		defer rows.Close()
 		for rows.Next() {
-			var id, typ string
-			if err := rows.Scan(&id, &typ); err != nil {
+			f := analyze.DefFact{Type: typ}
+			var abs int
+			var fields string
+			if err := rows.Scan(&f.Instance, &f.DefName, &f.Name, &f.Parent, &abs, &f.MayRequire, &f.MayRequireAny, &fields); err != nil {
 				return err
 			}
-			out[id] = append(out[id], typ)
+			if fields != "" && json.Unmarshal([]byte(fields), &f.Content) != nil {
+				f.Content = nil
+			}
+			f.Abstract = abs != 0
+			out = append(out, f)
 		}
 		return rows.Err()
 	})

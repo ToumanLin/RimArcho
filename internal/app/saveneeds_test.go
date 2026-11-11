@@ -35,7 +35,15 @@ func TestSaveNeeds(t *testing.T) {
 	}
 	add("3000000001", "tester.base", "Base", key("BaseKey"))
 	add("3000000002", "tester.lib", "Lib", key("LibKey"), "tester.base")
-	// a biome Mod with nothing in the save: the world grid cannot be read, so it is not safe
+	// Terrain: Floors' is in a map's grid (by its short hash, 6939), Tiles' is not, and the
+	// grid has a hash (12345) no Def of the save's Mods has, which may be Tiles' under another
+	// name. The save has no biome grid, so nothing of the biome Mod is in it.
+	add("3000000011", "tester.floors", "Floors", map[string]string{"Defs/F.xml": "<Defs><TerrainDef><defName>FancyFloor</defName></TerrainDef></Defs>" + nl})
+	// Terrain the game generates: smooth stone of Rocks' natural rock (the field is its
+	// parent's) and Carpets' template in a structure colour, both in the grid by hash.
+	add("3000000013", "tester.rocks", "Rocks", map[string]string{"Defs/R.xml": `<Defs><ThingDef Name="GlimBase" Abstract="True"><building><isNaturalRock>true</isNaturalRock></building></ThingDef><ThingDef ParentName="GlimBase"><defName>Glimstone</defName></ThingDef><ThingDef ParentName="GlimBase"><defName>GlimOre</defName><building><isResourceRock>true</isResourceRock></building></ThingDef></Defs>` + nl})
+	add("3000000014", "tester.carpets", "Carpets", map[string]string{"Defs/C.xml": "<Defs><TerrainTemplateDef><defName>ShagCarpet</defName></TerrainTemplateDef><ColorDef><defName>Structure_Teal</defName></ColorDef></Defs>" + nl})
+	add("3000000012", "tester.tiles", "Tiles", map[string]string{"Defs/F.xml": "<Defs><TerrainDef><defName>PlainTile</defName></TerrainDef></Defs>" + nl})
 	add("3000000004", "tester.swamp", "Swamp", map[string]string{"Defs/B.xml": "<Defs><BiomeDef><defName>DeepSwamp</defName></BiomeDef></Defs>\n"})
 	add("3000000003", "tester.menulib", "Menu Lib", key("MenuLibKey"))
 	add("3000000005", "tester.kurin", "Kurin", map[string]string{
@@ -51,14 +59,14 @@ func TestSaveNeeds(t *testing.T) {
 	menus := key("Unused")
 	menus["Defs/H.xml"] = "<Defs><HeadTypeDef><defName>TribeFire</defName></HeadTypeDef></Defs>" + nl
 	add("3000000009", "tester.menus", "Menus", menus, "tester.menulib", "ludeon.rimworld")
-	mods := []string{"ludeon.rimworld", "tester.base", "tester.lib", "tester.menulib", "tester.swamp", "tester.kurin", "tester.chairs", "tester.hair", "tester.rain", "tester.menus", "tester.tribe"}
+	mods := []string{"ludeon.rimworld", "tester.base", "tester.lib", "tester.menulib", "tester.swamp", "tester.floors", "tester.tiles", "tester.rocks", "tester.carpets", "tester.kurin", "tester.chairs", "tester.hair", "tester.rain", "tester.menus", "tester.tribe"}
 	e.WriteModsConfig("1.6.4633 rev1261", mods...)
 	e.AddEnv(false)
 	e.MustRun("scan")
 	e.MustRun("analyze")
 	e.RecordLaunch(e.Now().Add(-time.Hour))
 
-	body := `<maps><li><uniqueID>0</uniqueID><weatherManager><curWeather>AcidRain</curWeather><lastWeather>Clear</lastWeather></weatherManager><things>
+	body := `<maps><li><uniqueID>0</uniqueID><weatherManager><curWeather>AcidRain</curWeather><lastWeather>Clear</lastWeather></weatherManager><terrainGrid><topGrid>GxsbGwAAOTA9iJDF</topGrid></terrainGrid><things>
 <thing Class="Pawn"><def>Kurin_Race</def><id>Kurin_Race1</id><faction>Faction_1</faction><kindDef>Colonist</kindDef><story><hairDef>Bob</hairDef></story></thing>
 <thing Class="ThingWithComps"><def>Corpse_Kurin_Race</def><id>Corpse_Kurin_Race3</id><innerContainer><innerList><li>
  <def>Kurin_Race</def><id>Kurin_Race4</id><faction>Faction_1</faction><kindDef>Colonist</kindDef><story /><healthTracker><healthState>Dead</healthState></healthTracker></li></innerList></innerContainer></thing>
@@ -83,13 +91,14 @@ func TestSaveNeeds(t *testing.T) {
 	for _, n := range c.Needs {
 		by[n.PackageID] = n
 	}
-	if len(c.Needs) != 12 {
+	if len(c.Needs) != 16 {
 		t.Fatalf("needs: %+v", c.Needs)
 	}
 	for pkg, want := range map[string]string{
 		"tester.kurin": app.NeedBreaks, "tester.chairs": app.NeedLoses, "tester.hair": app.NeedCare,
 		"tester.rain": app.NeedBreaks, "tester.menus": app.NeedSafe, "tester.gone": app.NeedUnchecked,
-		"tester.lib": app.NeedBreaks, "tester.base": app.NeedBreaks, "tester.menulib": app.NeedCare, "tester.swamp": app.NeedUnchecked,
+		"tester.lib": app.NeedBreaks, "tester.base": app.NeedBreaks, "tester.menulib": app.NeedCare, "tester.swamp": app.NeedSafe, "tester.floors": app.NeedLoses, "tester.tiles": app.NeedUnchecked,
+		"tester.rocks": app.NeedLoses, "tester.carpets": app.NeedLoses,
 		"tester.tribe": app.NeedCare,
 	} {
 		if got := by[pkg].Verdict; got != want {
@@ -111,8 +120,8 @@ func TestSaveNeeds(t *testing.T) {
 	if g := by["ludeon.rimworld"]; len(g.NeededBy) != 0 {
 		t.Errorf("core: %+v", g)
 	}
-	if g := by["tester.swamp"]; g.Why != app.NeedWhyGrid {
-		t.Errorf("swamp: %+v", g)
+	if g := by["tester.tiles"]; g.Why != app.NeedWhyGrid || c.GridUnnamed["TerrainDef"] != 1 {
+		t.Errorf("tiles: %+v %v", g, c.GridUnnamed)
 	}
 	if g := by["tester.gone"]; g.Why != app.NeedWhyGone {
 		t.Errorf("gone: %+v", g)

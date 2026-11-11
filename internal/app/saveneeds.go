@@ -26,9 +26,9 @@ const (
 	NeedWhyGone   = "not installed"
 	NeedWhyNoDefs = "not analysed for this game version"
 	NeedWhyNoCode = "its code is not analysed"
-	// It defines terrain or biomes, which a save stores as hashed grids without Def names
-	// (12 §2.3): whether the maps or the world use them cannot be read.
-	NeedWhyGrid = "its terrain or biomes cannot be read from a save"
+	// It defines terrain or biomes, and the save's grids hold some that no Def of the
+	// save's Mods matches (12 §1.4): they may be this Mod's.
+	NeedWhyGrid = "the save has terrain or biomes that could not be named"
 	// required by a Mod that is itself not checked
 	NeedWhyDependent = "a Mod that needs it could not be checked"
 )
@@ -56,7 +56,7 @@ type SaveNeed struct {
 var needWorld = map[string]bool{
 	"factions": true, "races": true, "animals": true, "mechanoids": true, "creatures": true,
 	"buildings": true, "weapons": true, "apparel": true, "plants": true, "items": true,
-	"terrain": true, "culture": true,
+	"terrain": true, "biomes": true, "culture": true,
 }
 
 // Severe: what the game cannot load the save without.
@@ -94,7 +94,7 @@ type needOwners struct {
 
 // saveNeeds gives every Mod of the save its verdict. cats are the content categories by
 // instance; ready the instances with content facts.
-func (a *App) saveNeeds(f *savefile.Facts, mods []SaveMod, ready map[string]bool, cats map[string][]SaveContentCategory, own needOwners, deps map[string][]scanDep) ([]SaveNeed, error) {
+func (a *App) saveNeeds(f *savefile.Facts, mods []SaveMod, ready map[string]bool, cats map[string][]SaveContentCategory, own needOwners, deps map[string][]scanDep, gridLeft map[string]int) ([]SaveNeed, error) {
 	var insts []string
 	for _, m := range mods {
 		if m.Instance != "" {
@@ -133,9 +133,18 @@ func (a *App) saveNeeds(f *savefile.Facts, mods []SaveMod, ready map[string]bool
 			factions[inst] = append(factions[inst], name)
 		}
 	}
-	grid, err := a.Store.DefTypeDefiners(insts, []string{"BiomeDef", "TerrainDef"})
-	if err != nil {
-		return nil, err
+	// Mods defining a kind of grid Def of which the save has hashes nobody could name
+	grid := map[string]bool{}
+	if len(gridLeft) > 0 {
+		facts, err := a.Store.DefsOfTypes(insts, gridDefTypes)
+		if err != nil {
+			return nil, err
+		}
+		for i := range facts {
+			if d := &facts[i]; !d.Abstract && d.DefName != "" && gridLeft[d.Type] > 0 {
+				grid[d.Instance] = true
+			}
+		}
 	}
 	out := make([]SaveNeed, 0, len(mods))
 	for _, m := range mods {
@@ -163,9 +172,9 @@ func (a *App) saveNeeds(f *savefile.Facts, mods []SaveMod, ready map[string]bool
 			if n.Verdict != NeedBreaks && !code[m.Instance] && !n.Game {
 				n.Verdict, n.Why = NeedUnchecked, NeedWhyNoCode
 			}
-			// Nothing heavier is known of it, and what it may hold in the grids is: a map
-			// on its terrain or a world tile of its biome does not survive its removal.
-			if (n.Verdict == NeedSafe || n.Verdict == NeedCare) && len(grid[m.Instance]) > 0 && !n.Game {
+			// The save has terrain or biomes nobody could name, and this Mod defines some:
+			// one of them may be its own, under another name then or added by a Patch.
+			if (n.Verdict == NeedSafe || n.Verdict == NeedCare) && grid[m.Instance] && !n.Game {
 				n.Verdict, n.Why = NeedUnchecked, NeedWhyGrid
 			}
 		}

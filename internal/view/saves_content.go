@@ -252,7 +252,7 @@ func needHint(key string) string {
 	case app.NeedBreaks:
 		return T("removing one can stop the save loading: its pawns, factions or code are in it")
 	case app.NeedLoses:
-		return T("the save loads without one; its buildings, items and the like are gone")
+		return T("the save loads without one; its buildings, items, floors, biomes and the like are gone")
 	case app.NeedCare:
 		return T("research, recipes, appearance and the like reset and the colony goes on; or only Mods that are safe to remove need them")
 	case app.NeedSafe:

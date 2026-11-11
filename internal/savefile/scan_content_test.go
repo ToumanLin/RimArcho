@@ -14,10 +14,10 @@ func TestContentReferenceForms(t *testing.T) {
 <style><beardDef>Beard</beardDef><faceTattoo>Face</faceTattoo><bodyTattoo>Tattoo</bodyTattoo></style>
 <bills><li><recipe>Surgery</recipe></li></bills></thing>
 <researchManager><currentProj>Electricity</currentProj><progress><keys><li>Electricity</li></keys><values><li>0</li></values></progress><techprints><keys><li>Brain</li></keys></techprints><knowledge><keys><li>Void</li></keys></knowledge></researchManager>
-<world><ideoManager><ideos><li><memes><li>Rancher</li></memes><precepts><li><def>Precept</def><sourcePattern>Festival</sourcePattern></li></precepts></li></ideos></ideoManager></world>
+<world><grid><layers><values><li><tileBiome>c9U=</tileBiome></li></values></layers></grid><ideoManager><ideos><li><memes><li>Rancher</li></memes><precepts><li><def>Precept</def><sourcePattern>Festival</sourcePattern></li></precepts></li></ideos></ideoManager></world>
 <questManager><quests><li><root>Quest</root></li></quests></questManager>
 <scenario><playerFaction><factionDef>Player</factionDef></playerFaction></scenario>
-<maps><li><weatherManager><curWeather>AcidRain</curWeather><lastWeather>Clear</lastWeather></weatherManager></li></maps>
+<maps><li><weatherManager><curWeather>AcidRain</curWeather><lastWeather>Clear</lastWeather></weatherManager><terrainGrid><topGrid>GxsbGwAAOTA=</topGrid><underGridDeflate>szRgYAAA</underGridDeflate></terrainGrid></li></maps>
 <taleManager><tales><li><surroundings><biome>Desert</biome></surroundings></li></tales></taleManager>
 <allowedDefs><li>FilterOnly</li><li><def>NestedFilter</def></li></allowedDefs>
 <history><archive><archivables><li><hyperlinkThingDefs><li>HelpOnly</li><li><def>NestedHelp</def></li></hyperlinkThingDefs></li></archivables></archive></history>
@@ -37,6 +37,10 @@ func TestContentReferenceForms(t *testing.T) {
 				t.Errorf("missing %s/%s: %v", typ, n, f.DefRefs)
 			}
 		}
+	}
+	// grids of Defs by short hash: plain and deflated base64 of little-endian uint16s, 0 none
+	if g := f.GridDefs["TerrainDef"]; g[6939] != 2 || g[12345] != 2 || len(g) != 2 || len(f.GridDefs["BiomeDef"]) != 1 || f.GridDefs["BiomeDef"][54643] != 1 {
+		t.Errorf("grids: %v", f.GridDefs)
 	}
 	if f.DefRefs["ResearchProjectDef"]["Electricity"] != 2 {
 		t.Error("current and zero-progress reference must both count")

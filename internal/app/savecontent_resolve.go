@@ -365,7 +365,7 @@ func (r *contentResolver) category(n *contentNode, f contentFields, ok bool) (ke
 }
 
 var contentTypes = map[string]string{
-	"FactionDef": "factions", "TerrainDef": "terrain", "ResearchProjectDef": "research",
+	"FactionDef": "factions", "TerrainDef": "terrain", "TerrainTemplateDef": "terrain", "ResearchProjectDef": "research",
 	"IncidentDef": "events", "GameConditionDef": "events", "QuestScriptDef": "quests", "XenotypeDef": "xenotypes", "GeneDef": "xenotypes",
 	"MemeDef": "culture", "PreceptDef": "culture", "RitualPatternDef": "culture", "CultureDef": "culture", "StyleCategoryDef": "culture", "ThingStyleDef": "culture",
 	"AbilityDef": "abilities", "HediffDef": "hediffs", "TraitDef": "traits", "RecipeDef": "recipes", "HairDef": "appearance", "BeardDef": "appearance", "TattooDef": "appearance",

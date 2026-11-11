@@ -260,7 +260,6 @@
   "These references are partial because the save is malformed.": "存档文件不完整，这里只有断开之前读到的引用。",
   "The save's Mod list could not be read.": "读不出这个存档的 Mod 列表。",
   "Patch-added Defs and Patch changes to existing Defs are not reflected.": "看不到 Patch 新增的 Def，也看不到 Patch 对已有 Def 的修改。",
-  "Terrain grids and world biomes are not decoded; only named references are included.": "地形网格和世界地块的生物群系还没解码，只算存档里写了名字的引用。",
   "Past events, quests and storytellers may leave no surviving references; indexed history maps are not decoded.": "已经过去的事件、任务和讲述者可能不留痕迹；按序号存的历史记录还没解码。",
   "The original ScenarioDef cannot usually be recovered from a save's scenario name and parts.": "通常没法从存档里的剧本名称和组成部分认出原来的 ScenarioDef。",
   "%s (hidden)": "%s（隐藏）",
@@ -324,7 +323,6 @@
   "safe to remove": "可以安全移除",
   "could not check": "无法检查",
   "removing one can stop the save loading: its pawns, factions or code are in it": "移除后存档可能读不了：存档里有它的人物、派系或代码",
-  "the save loads without one; its buildings, items and the like are gone": "移除后存档能读，但它的建筑、物品等会消失",
   "nothing of theirs is in the save, as far as the save can tell": "就存档能看出的而言，里面没有它们的东西",
   "%s (%d dead)": "%s（其中 %d 个已死亡）",
   "a map's weather": "地图的天气",
@@ -337,5 +335,7 @@
   "show what it holds": "显示它在存档里的内容",
   "hide what it holds": "收起它在存档里的内容",
   "not installed, not analysed, or what they hold cannot be read from a save: nothing can be said of them": "没有安装、还没分析，或者存档里读不出它们的内容：无法下结论",
-  "its terrain or biomes cannot be read from a save": "存档里读不出它的地形或生物群系"
+  "Terrain and biomes are read from the maps' and the world's grids by Def hash; rock, ore and other compressed things are not.": "地形和生物群系按 Def 哈希从地图和世界网格里读出；岩石、矿石等压缩保存的物体读不出。",
+  "the save has terrain or biomes that could not be named": "存档里有对不上名字的地形或生物群系",
+  "the save loads without one; its buildings, items, floors, biomes and the like are gone": "移除后存档能读，但它的建筑、物品、地板、生物群系等会消失"
 }
