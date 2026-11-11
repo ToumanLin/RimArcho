@@ -431,3 +431,27 @@ func TestWorkshopSuccessWithProcessError(t *testing.T) {
 		t.Fatalf("confirmed result lost: %+v %v", op, err)
 	}
 }
+
+type steamCMDExit int
+
+func (e steamCMDExit) Error() string { return fmt.Sprintf("exit status %d", int(e)) }
+func (e steamCMDExit) ExitCode() int { return int(e) }
+
+// A freshly installed SteamCMD updates itself on its first run and exits 7 after the
+// script ran: the confirmed download is a success, not "did not exit successfully".
+func TestWorkshopSteamCMDSelfUpdateExit(t *testing.T) {
+	t.Parallel()
+	for code, wantErr := range map[int]bool{7: false, 8: true} {
+		e := setup(t, false)
+		e.App.FindTool = func(string) (string, bool) { return filepath.Join(e.Root, deps.SteamCMDExecutable()), true }
+		e.App.SteamCMDRun = func(exe string, args []string) (string, error) {
+			workshopScriptIDs(t, exe, args)
+			e.WriteMod(filepath.Join(args[1], "steamapps", "workshop", "content", "294100", "8100"), testkit.Sample("exit.mod", "Exit Mod"))
+			return "Success. Downloaded item 8100", fmt.Errorf("running: %w", steamCMDExit(code))
+		}
+		op, err := e.App.SubscribeWorkshop([]string{"8100"}, true, false)
+		if (err != nil) != wantErr || op.Items[0].Result != "downloaded with SteamCMD" {
+			t.Fatalf("exit %d: %+v %v", code, op, err)
+		}
+	}
+}

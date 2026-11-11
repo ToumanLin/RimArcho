@@ -36,6 +36,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 - Settings: an accent colour or theme set with `archo config set` while the window is open is applied when Settings shows it; Settings marked the new colour selected while the window kept the old one.
 - CLI: plural counts read "2 aliases", "7 classes" (were "2 aliass"); `archo subscribe` previews say "1 subscription".
 - Text interface, Can it run: the memory item's lines are joined in the interface's language (Chinese read `…内存里。; 显存…`).
+- First-run guide, "read the mods" (Chinese): the last phase read "indexing def references" in English; it reads in Chinese.
+- SteamCMD downloads: the first Workshop download after installing SteamCMD reported "SteamCMD did not exit successfully" although the Mod was downloaded (SteamCMD exits 7 from the run in which it updates itself); it is reported downloaded.
 
 ## 1.0.9 — 2026-11-10
 

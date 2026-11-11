@@ -227,6 +227,7 @@
   "do not warn again about %s": "不再提醒 %s",
   "done: %d failed operations, %d findings, %s": "完成：%d 个操作失败，%d 个发现，用时 %s",
   "duplicate entry": "重复入口",
+  "indexing def references": "正在为 Def 引用建索引",
   "duplicate key in a dictionary": "字典里有重复的键",
   "duplicate think-node keys": "思考树节点的键重复",
   "edit the mod's files (lock its version first)": "改 Mod 的文件（先锁定版本）",
