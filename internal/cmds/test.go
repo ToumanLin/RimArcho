@@ -190,7 +190,11 @@ func testRunCmd(c *Ctx, args *Args) (*render.Doc, error) {
 		}
 	}
 	if b := r.Baseline; b != nil {
-		root.Addf("compared with run %s (%s): %d new, %d present, %d gone", filepath.Base(b.RunDir), b.Status, b.New, b.Present, b.Gone)
+		line := fmt.Sprintf("compared with run %s (%s): %d new, %d present, %d gone", filepath.Base(b.RunDir), b.Status, b.New, b.Present, b.Gone)
+		if b.Unreached > 0 {
+			line += fmt.Sprintf(", %d not reached by this run", b.Unreached)
+		}
+		root.Addf("%s", line)
 		gone := root.Section(fmt.Sprintf("gone: %d", b.Gone))
 		for _, cluster := range r.Gone {
 			testClusterMods(gone.Addf("%s x%d: %s", cluster.Class, cluster.Count, cluster.Message), cluster)

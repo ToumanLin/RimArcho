@@ -21,6 +21,9 @@ type TestRunBaseline struct {
 	New     int    `json:"new"`
 	Present int    `json:"present"`
 	Gone    int    `json:"gone"`
+	// Unreached: the earlier run's clusters this run lacks because it stopped before its
+	// target; not gone (VM 2026-11-10: a 30 s timeout listed a start-up texture as gone).
+	Unreached int `json:"unreached,omitempty"`
 }
 
 // TestRunPlayerLog compares a test run with the player's problem log, the log
@@ -150,8 +153,13 @@ func compareTestRun(r *TestRunReport) {
 	for _, c := range listed {
 		attributed[goneKey(c.Class, c.Message, c.Count)] = c
 	}
+	reached := r.reached()
 	for _, c := range clusters {
 		if !previous[c.Key] || current[c.Key] {
+			continue
+		}
+		if !reached {
+			baseline.Unreached++
 			continue
 		}
 		baseline.Gone++

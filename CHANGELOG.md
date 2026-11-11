@@ -18,6 +18,8 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 - Game log: after an analysis, a log read before it is attributed again. Before, the stored report could survive (a new analysis reused the old one's number), so Mods installed since still read "assemblies not analysed yet", and their errors were blamed on another Mod that patches the same method.
 - `archo status` (MCP `status`) and the refusals that name a running game say "a test run" while `archo test run` has the game open, instead of "running the list" as if the player had started it.
 - MCP: a result's `archo plan list` hint is now the tool call `manage_plans action=list`.
+- Test runs: a run that stops before its target (a timeout) no longer lists the previous run's errors as gone; they are "not reached by this run" (`baseline.unreached`).
+- Test runs: `--save` with a save that uses Mods the plan lacks names the first 8 and how many more, instead of every one on one line (a big list's save named 474).
 - Text interface, Can it run: the memory item's lines are joined in the interface's language (Chinese read `…内存里。; 显存…`).
 
 ## 1.0.9 — 2026-11-10

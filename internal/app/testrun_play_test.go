@@ -3,6 +3,7 @@ package app_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -166,6 +167,11 @@ func TestTestRunSave(t *testing.T) {
 	// does not: refused with the Mods named.
 	e.WriteSave("Fewer.rws", testkit.SaveSpec{Mods: []string{"ludeon.rimworld"}})
 	e.WriteSave("More.rws", testkit.SaveSpec{Mods: []string{"ludeon.rimworld", "test.played", "other.mod"}, Names: []string{"", "", "Other Mod"}})
+	many := []string{"ludeon.rimworld"}
+	for i := range 10 {
+		many = append(many, fmt.Sprintf("other.mod%d", i))
+	}
+	e.WriteSave("Many.rws", testkit.SaveSpec{Mods: many})
 	e.WriteSave("Old.rws", testkit.SaveSpec{Game: "1.5.4409 rev1118", Mods: []string{"ludeon.rimworld", "test.played"}})
 	e.WriteSave("Cut.rws", testkit.SaveSpec{Mods: []string{"ludeon.rimworld"}, CutOff: true})
 	r2, err := e.App.TestRun(context.Background(), app.TestRunOptions{Save: "Fewer", Timeout: 20 * time.Second})
@@ -173,8 +179,8 @@ func TestTestRunSave(t *testing.T) {
 		t.Fatalf("fewer: %+v, %v", r2, err)
 	}
 	for save, want := range map[string]string{
-		"More": "uses 1 Mods the plan does not have: Other Mod (other.mod)", "Old": "from RimWorld 1.5",
-		"Cut": "cut off", "Missing": "no such save",
+		"More": "uses 1 Mod the plan does not have: Other Mod (other.mod). ", "Old": "from RimWorld 1.5",
+		"Cut": "cut off", "Many": "uses 10 Mods the plan does not have: other.mod0 (other.mod0), other.mod1 (other.mod1), other.mod2 (other.mod2), other.mod3 (other.mod3), other.mod4 (other.mod4), other.mod5 (other.mod5), other.mod6 (other.mod6), other.mod7 (other.mod7), and 2 more. ", "Missing": "no such save",
 	} {
 		if _, err := e.App.TestRun(context.Background(), app.TestRunOptions{Save: save}); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%s: %v, want %q", save, err, want)
