@@ -13,7 +13,7 @@ func TestContentReferenceForms(t *testing.T) {
 <story><childhood>Child</childhood><adulthood>Adult</adulthood><hairDef>Hair</hairDef><bodyType>Body</bodyType><headType>Head</headType><furDef>Fur</furDef></story>
 <style><beardDef>Beard</beardDef><faceTattoo>Face</faceTattoo><bodyTattoo>Tattoo</bodyTattoo></style>
 <bills><li><recipe>Surgery</recipe></li></bills></thing>
-<researchManager><currentProj>Electricity</currentProj><progress><keys><li>Electricity</li></keys><values><li>0</li></values></progress><techprints><keys><li>Brain</li></keys></techprints><knowledge><keys><li>Void</li></keys></knowledge></researchManager>
+<researchManager><currentProj>Electricity</currentProj><progress><keys><li>Electricity</li><li>Untouched</li><li>Done</li></keys><values><li>0</li><li>0</li><li>500.5</li></values></progress><techprints><keys><li>NoValue</li></keys></techprints><knowledge><keys><li>Brain</li><li>Void</li></keys><values><li>1</li><li>0</li></values></knowledge></researchManager>
 <world><grid><layers><values><li><tileBiome>c9U=</tileBiome></li></values></layers></grid><ideoManager><ideos><li><memes><li>Rancher</li></memes><precepts><li><def>Precept</def><sourcePattern>Festival</sourcePattern></li></precepts></li></ideos></ideoManager></world>
 <questManager><quests><li><root>Quest</root><parts><li><incident>QuestRaid</incident><questScript>SubQuest</questScript></li></parts></li></quests></questManager>
 <world><storyState><recentRandomQuests><li>RandomQuest</li></recentRandomQuests><recentRandomDecrees><li>Decree</li></recentRandomDecrees><recentRandomIncidents><li>RandomIncident</li></recentRandomIncidents><lastFireTicks><keys><li>PastFlare</li></keys><values><li>5</li></values></lastFireTicks></storyState></world>
@@ -32,7 +32,7 @@ func TestContentReferenceForms(t *testing.T) {
 	for typ, ns := range map[string][]string{
 		"": {"Shared", "UnknownType"}, "ThingDef": {"Steel"}, "PawnKindDef": {"Soldier"}, "XenotypeDef": {"Baseliner"}, "GeneDef": {"Strong", "PackGene"},
 		"BackstoryDef": {"Child", "Adult"}, "HairDef": {"Hair"}, "BodyTypeDef": {"Body"}, "HeadTypeDef": {"Head"}, "FurDef": {"Fur"}, "BeardDef": {"Beard"}, "TattooDef": {"Face", "Tattoo"},
-		"RecipeDef": {"Surgery"}, "ResearchProjectDef": {"Electricity", "Brain", "Void"}, "MemeDef": {"Rancher"}, "PreceptDef": {"Precept"}, "RitualPatternDef": {"Festival"}, "QuestScriptDef": {"Quest"}, "FactionDef": {"Player"}, "BiomeDef": {"Desert"}, "WeatherDef": {"AcidRain", "Clear"},
+		"ResearchProjectDef": {"Electricity", "Brain", "Done"}, "MemeDef": {"Rancher"}, "PreceptDef": {"Precept"}, "RitualPatternDef": {"Festival"}, "QuestScriptDef": {"Quest"}, "FactionDef": {"Player"}, "BiomeDef": {"Desert"}, "WeatherDef": {"AcidRain", "Clear"},
 	} {
 		for _, n := range ns {
 			if f.DefRefs[typ][n] == 0 {
@@ -48,17 +48,29 @@ func TestContentReferenceForms(t *testing.T) {
 		t.Errorf("grids: %v", f.GridDefs)
 	}
 	// what the storyteller fired, and what quest parts fire
-	for typ, ns := range map[string][]string{"IncidentDef": {"PastFlare", "RandomIncident", "QuestRaid"}, "QuestScriptDef": {"RandomQuest", "Decree", "SubQuest"}} {
+	for typ, ns := range map[string][]string{"IncidentDef": {"PastFlare", "RandomIncident"}, "QuestScriptDef": {"RandomQuest", "Decree"}} {
 		for _, n := range ns {
 			if f.DefRefs[typ][n] != 1 {
 				t.Errorf("%s/%s: %v", typ, n, f.DefRefs[typ])
 			}
 		}
 	}
-	if f.DefRefs["ResearchProjectDef"]["Electricity"] != 2 {
-		t.Error("current and zero-progress reference must both count")
+	// what only sets something up or may come: bills, what quest parts fire, research
+	// with no progress
+	for typ, ns := range map[string][]string{"RecipeDef": {"Surgery"}, "IncidentDef": {"QuestRaid"}, "QuestScriptDef": {"SubQuest"}, "ResearchProjectDef": {"Electricity", "Untouched", "Void"}} {
+		for _, n := range ns {
+			if f.ConfigRefs[typ][n] != 1 {
+				t.Errorf("config %s/%s: %v", typ, n, f.ConfigRefs[typ])
+			}
+		}
+		if len(f.ConfigRefs[typ]) != len(ns) {
+			t.Errorf("config %s: %v", typ, f.ConfigRefs[typ])
+		}
 	}
-	for _, n := range []string{"FilterOnly", "NestedFilter", "HelpOnly", "NestedHelp", "ObjectReference", "Arbitrary", "WrongContext", "NotAQuest", "5", "GridNotDecoded", "WrongWeather"} {
+	if f.DefRefs["ResearchProjectDef"]["Electricity"] != 1 || len(f.DefRefs["ResearchProjectDef"]) != 3 {
+		t.Errorf("research: the current project, and those with progress: %v", f.DefRefs["ResearchProjectDef"])
+	}
+	for _, n := range []string{"FilterOnly", "NestedFilter", "HelpOnly", "NestedHelp", "ObjectReference", "Arbitrary", "WrongContext", "NotAQuest", "5", "Surgery", "QuestRaid", "SubQuest", "Untouched", "Void", "NoValue", "500.5", "GridNotDecoded", "WrongWeather"} {
 		for _, refs := range f.DefRefs {
 			if refs[n] != 0 {
 				t.Errorf("unexpected %s", n)

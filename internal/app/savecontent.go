@@ -1,7 +1,6 @@
 package app
 
 import (
-	"maps"
 	"sort"
 	"strings"
 
@@ -195,18 +194,19 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 		return nil, err
 	}
 	grid := grids.refs
+	// So do the references that only set something up (bills, quest parts, research not
+	// begun): the save names those Defs too, and loading without them drops what named them.
 	defRefs := f.DefRefs
-	if len(grid) > 0 {
+	if len(grid)+len(f.ConfigRefs) > 0 {
 		defRefs = map[string]map[string]int{}
-		for typ, refs := range f.DefRefs {
-			defRefs[typ] = maps.Clone(refs)
-		}
-		for typ, refs := range grid {
-			if defRefs[typ] == nil {
-				defRefs[typ] = map[string]int{}
-			}
-			for name, k := range refs {
-				defRefs[typ][name] += k
+		for _, more := range []map[string]map[string]int{f.DefRefs, f.ConfigRefs, grid} {
+			for typ, refs := range more {
+				if defRefs[typ] == nil {
+					defRefs[typ] = map[string]int{}
+				}
+				for name, k := range refs {
+					defRefs[typ][name] += k
+				}
 			}
 		}
 	}
