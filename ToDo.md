@@ -29,12 +29,6 @@ Developing would possibly need new tools such as Bash, ilspyCMD, .Net SDK,
 所以这也要考虑, 假设一般玩家用不到这些工具, 那么这整个group都是没法用的
 如果要给一般玩家用, 需要让玩家下载这些工具
 
-## GUI
-Player feedback says the GUI is very jumpy. Investigated 11-08 (headless-Edge filmstrips, `D:\RimArcho-test\jumpy`). Fixed 11-08: details pane swaps once (editor + Mod library); loading card only after 0.21 s; launch page not redrawn on focus, problem line out of the grid; All lists' memory placeholder holds its height; editor head one line; scrollbar room kept; startup layout from localStorage (nav, separators, window buttons); filter chips keep width; settings › motion (`ui.motion`); status line one line, fade instead of slide. Still open:
-- Check all of it on a real 5,000-Mod library in the VM (row in release-vm-tests.md, 2026-11-08 "Less jumpy window").
-- Sidebar: sub-entries still open and close with a 250 ms height animation on every page change (off with motion: reduced). Decide whether the default should be instant, or keep the space reserved.
-- Can it run redraws fully on the 2 s live poll while the game runs; new items push the columns down.
-
 ## Translation
 Auto translate mod details? Need to think about it. 因为需要OCR. 
 
@@ -113,4 +107,4 @@ Players asked for Linux and macOS (2026-11-07). Linux deferred; macOS later stil
 你可用agent-bridge parallel派发任务给codex 用 gpt-6.1-sol effort high, 可当worker或者sub agent, 让它做代码研究和修改代码, 然后你review, 如果你让codex修改前端, 请务必检查她的前端实现的用户体验(不必要和功能重复的选项, 重复性文字等), 简单直接的任务在这里做
 
 ## TUI idle CPU
-VM round 1.0.9 (S9): the TUI at rest uses 2.4–3.4 % of a core in the VM, the window 0.76 %. Each 2-second running-game poll takes a full process snapshot (`CreateToolhelp32Snapshot`, 12–24 ms with 526 processes on the host) and redraws (5 ms). Idea: with no game running, take the snapshot only when an environment's `Player.log` changed or every ten seconds; while a game runs, check only its process. Applies to the window's poll too (`view.LiveTracker`). Decide whether the detection delay for a game started with its own `-logFile` is acceptable.
+VM round 1.0.9 (S9): the TUI at rest on its start page uses 2.4–3.4 % of a core in the VM, the window 0.76 %. Each 2-second running-game poll takes a full process snapshot (`CreateToolhelp32Snapshot`, 12–24 ms with 526 processes on the host) and redraws (5 ms). Idea: with no game running, take the snapshot only when an environment's `Player.log` changed or every ten seconds; while a game runs, check only its process. Applies to the window's poll too (`view.LiveTracker`). Decide whether the detection delay for a game started with its own `-logFile` is acceptable.
