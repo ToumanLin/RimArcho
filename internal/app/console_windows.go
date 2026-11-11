@@ -124,11 +124,18 @@ func (p *consoleProcess) Wait() error {
 		var code uint32
 		p.err = windows.GetExitCodeProcess(p.handle, &code)
 		if p.err == nil && code != 0 {
-			p.err = fmt.Errorf("process exited with code %d", code)
+			p.err = processExit(code)
 		}
 	})
 	return p.err
 }
+
+// processExit is a non-zero exit code; it keeps the code for callers that read it
+// (steamCMDUpdatedItself), as exec.ExitError does.
+type processExit uint32
+
+func (e processExit) Error() string { return fmt.Sprintf("process exited with code %d", uint32(e)) }
+func (e processExit) ExitCode() int { return int(e) }
 
 func (p *consoleProcess) Kill() error {
 	p.mu.Lock()
