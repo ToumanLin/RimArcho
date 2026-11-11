@@ -82,15 +82,24 @@ func (a *App) contentResolver(insts []string, pos map[string]int, packages map[s
 	return r, nil
 }
 
+// winners are the Defs named name the save's Mods provide, one per Def type: of several
+// Mods defining one, the last in the save's order. typ is the type the save's reference
+// implies; a Def of a subclass of it (defSubtype) counts when no Def has the type itself,
+// since the game stores a reference by the field's type, not the Def's own class.
 func (r *contentResolver) winners(name, typ string) []*contentNode {
 	byType := map[string]*contentNode{}
-	for _, n := range r.defs[name] {
-		f := n.fact
-		if f.Abstract || typ != "" && f.Type != typ {
-			continue
+	for _, sub := range []bool{false, true} {
+		for _, n := range r.defs[name] {
+			f := n.fact
+			if f.Abstract || typ != "" && f.Type != typ && !(sub && defSubtype(f.Type, typ)) {
+				continue
+			}
+			if old := byType[f.Type]; old == nil || n.pos >= old.pos {
+				byType[f.Type] = n
+			}
 		}
-		if old := byType[f.Type]; old == nil || n.pos >= old.pos {
-			byType[f.Type] = n
+		if typ == "" || len(byType) > 0 {
+			break
 		}
 	}
 	var types []string
@@ -361,4 +370,18 @@ var contentTypes = map[string]string{
 	"MemeDef": "culture", "PreceptDef": "culture", "RitualPatternDef": "culture", "CultureDef": "culture", "StyleCategoryDef": "culture", "ThingStyleDef": "culture",
 	"AbilityDef": "abilities", "HediffDef": "hediffs", "TraitDef": "traits", "RecipeDef": "recipes", "HairDef": "appearance", "BeardDef": "appearance", "TattooDef": "appearance",
 	"BodyTypeDef": "appearance", "HeadTypeDef": "appearance", "FurDef": "appearance", "BackstoryDef": "appearance", "BiomeDef": "biomes", "StorytellerDef": "storytellers", "ScenarioDef": "scenarios",
+}
+
+// gameDefSubtypes are the game's own Def classes derived from another concrete Def class.
+var gameDefSubtypes = map[string]string{"CreepJoinerFormKindDef": "PawnKindDef"}
+
+// defSubtype says whether a Def of class typ can stand where a base Def is referenced. No
+// class hierarchy is stored for Def types, so a Mod's own Def class (it has a namespace:
+// VFETribals.TribalResearchProjectDef) is taken to derive from the referenced type; the
+// game's classes have no namespace in Def XML and count only when listed.
+func defSubtype(typ, base string) bool {
+	if strings.Contains(typ, ".") {
+		return true
+	}
+	return gameDefSubtypes[typ] == base
 }

@@ -61,3 +61,26 @@ func (s *Store) ContentDefs(instances, names []string, parent bool) ([]analyze.D
 	})
 	return out, err
 }
+
+// DefTypeDefiners says which of instances define a concrete Def of one of types for the
+// current game version, with the types each defines.
+func (s *Store) DefTypeDefiners(instances, types []string) (map[string][]string, error) {
+	out := map[string][]string{}
+	err := chunked(instances, func(part []string) error {
+		args := append([]any{s.MM}, anys(part)...)
+		rows, err := s.DB.Query(`SELECT DISTINCT c.instance_id,f.def_type`+defView+`WHERE c.game_mm=? AND c.instance_id IN (`+placeholders(len(part))+`) AND f.def_type IN (`+placeholders(len(types))+`) AND f.def_name<>'' AND f.abstract=0 ORDER BY c.instance_id,f.def_type`, append(args, anys(types)...)...)
+		if err != nil {
+			return err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var id, typ string
+			if err := rows.Scan(&id, &typ); err != nil {
+				return err
+			}
+			out[id] = append(out[id], typ)
+		}
+		return rows.Err()
+	})
+	return out, err
+}

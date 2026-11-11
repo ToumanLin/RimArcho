@@ -26,6 +26,9 @@ const (
 	NeedWhyGone   = "not installed"
 	NeedWhyNoDefs = "not analysed for this game version"
 	NeedWhyNoCode = "its code is not analysed"
+	// It defines terrain or biomes, which a save stores as hashed grids without Def names
+	// (12 §2.3): whether the maps or the world use them cannot be read.
+	NeedWhyGrid = "its terrain or biomes cannot be read from a save"
 	// required by a Mod that is itself not checked
 	NeedWhyDependent = "a Mod that needs it could not be checked"
 )
@@ -130,6 +133,10 @@ func (a *App) saveNeeds(f *savefile.Facts, mods []SaveMod, ready map[string]bool
 			factions[inst] = append(factions[inst], name)
 		}
 	}
+	grid, err := a.Store.DefTypeDefiners(insts, []string{"BiomeDef", "TerrainDef"})
+	if err != nil {
+		return nil, err
+	}
 	out := make([]SaveNeed, 0, len(mods))
 	for _, m := range mods {
 		n := SaveNeed{Name: m.Name, PackageID: m.PackageID, Library: m.Library, Game: strings.HasPrefix(normPkg(m.PackageID), "ludeon.rimworld")}
@@ -155,6 +162,11 @@ func (a *App) saveNeeds(f *savefile.Facts, mods []SaveMod, ready map[string]bool
 			// already known to break the save can be said.
 			if n.Verdict != NeedBreaks && !code[m.Instance] && !n.Game {
 				n.Verdict, n.Why = NeedUnchecked, NeedWhyNoCode
+			}
+			// Nothing heavier is known of it, and what it may hold in the grids is: a map
+			// on its terrain or a world tile of its biome does not survive its removal.
+			if (n.Verdict == NeedSafe || n.Verdict == NeedCare) && len(grid[m.Instance]) > 0 && !n.Game {
+				n.Verdict, n.Why = NeedUnchecked, NeedWhyGrid
 			}
 		}
 		out = append(out, n)

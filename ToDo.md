@@ -27,9 +27,6 @@ Auto translate mod details? Need to think about it. 因为需要OCR.
 
 ## Save analysis
 
-- §1.4–1.5：从存档提取引用的 Def，映射回提供它的 Mod
-- §2 内容目录：Def 类型 → 内容类别的映射（现为草案）
-
 2026-11-09 调研：[research/2026-11-09_save-content-attribution.md](docs/research/2026-11-09_save-content-attribution.md)。决定：先做第一阶段（不完整版），卡片上写清楚看不到什么；Def 字段在后台分析时重建（分析器版本 +1，旧事实先照用，未重建前卡片显示“还没分析”）。
 
 第一阶段之后还没做的：

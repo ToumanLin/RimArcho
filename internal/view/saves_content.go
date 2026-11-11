@@ -258,7 +258,7 @@ func needHint(key string) string {
 	case app.NeedSafe:
 		return T("nothing of theirs is in the save, as far as the save can tell")
 	}
-	return T("not installed or not analysed: nothing can be said of them")
+	return T("not installed, not analysed, or what they hold cannot be read from a save: nothing can be said of them")
 }
 
 func neededBy(k int) string {
@@ -318,7 +318,7 @@ func saveNeedMod(n app.SaveNeed) SaveNeedMod {
 	}
 	if n.Verdict == app.NeedUnchecked {
 		m.Sum = T(n.Why)
-		if n.Why != app.NeedWhyDependent {
+		if n.Why != app.NeedWhyDependent && n.Why != app.NeedWhyGrid {
 			m.Parts = nil
 		}
 		return m

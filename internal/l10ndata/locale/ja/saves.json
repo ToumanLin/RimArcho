@@ -326,7 +326,6 @@
   "removing one can stop the save loading: its pawns, factions or code are in it": "外すとセーブを読み込めなくなる可能性があります：そのMODのポーン、派閥、コードがセーブに含まれています",
   "the save loads without one; its buildings, items and the like are gone": "外してもセーブは読み込めますが、そのMODの建築物やアイテムなどは消えます",
   "nothing of theirs is in the save, as far as the save can tell": "セーブから分かる範囲では、それらのMODのものはセーブに含まれていません",
-  "not installed or not analysed: nothing can be said of them": "未インストールか未解析のため、判断できません",
   "%s (%d dead)": "%s（うち%d人死亡）",
   "a map's weather": "マップの天候",
   "not analysed for this game version": "このゲームバージョンではまだ解析していません",
@@ -336,5 +335,7 @@
   "needed by %d Mods": "%d個のMODが必要としています",
   "a Mod that needs it could not be checked": "これを必要とするMODを確認できませんでした",
   "show what it holds": "セーブ内の内容を表示",
-  "hide what it holds": "セーブ内の内容を隠す"
+  "hide what it holds": "セーブ内の内容を隠す",
+  "not installed, not analysed, or what they hold cannot be read from a save: nothing can be said of them": "未インストール、未解析、またはセーブから内容を読み取れないため、判断できません",
+  "its terrain or biomes cannot be read from a save": "地形やバイオームはセーブから読み取れません"
 }

@@ -24,6 +24,7 @@ func TestSaveNeeds(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	const nl = "\n"
 	add := func(id, pkg, name string, files map[string]string, deps ...string) {
 		e.AddWorkshop(id, testkit.Mod{PackageID: pkg, Name: name, Files: files, Deps: deps})
 	}
@@ -34,6 +35,8 @@ func TestSaveNeeds(t *testing.T) {
 	}
 	add("3000000001", "tester.base", "Base", key("BaseKey"))
 	add("3000000002", "tester.lib", "Lib", key("LibKey"), "tester.base")
+	// a biome Mod with nothing in the save: the world grid cannot be read, so it is not safe
+	add("3000000004", "tester.swamp", "Swamp", map[string]string{"Defs/B.xml": "<Defs><BiomeDef><defName>DeepSwamp</defName></BiomeDef></Defs>\n"})
 	add("3000000003", "tester.menulib", "Menu Lib", key("MenuLibKey"))
 	add("3000000005", "tester.kurin", "Kurin", map[string]string{
 		"Defs/Kurin.xml":      "<Defs><ThingDef><defName>Kurin_Race</defName><race><intelligence>Humanlike</intelligence></race></ThingDef><FactionDef><defName>KurinClan</defName></FactionDef></Defs>\n",
@@ -42,8 +45,13 @@ func TestSaveNeeds(t *testing.T) {
 	add("3000000006", "tester.chairs", "Chairs", map[string]string{"Defs/C.xml": "<Defs><ThingDef><defName>Stool</defName><category>Building</category></ThingDef></Defs>\n"})
 	add("3000000007", "tester.hair", "Hair", map[string]string{"Defs/H.xml": "<Defs><HairDef><defName>Bob</defName></HairDef></Defs>\n"})
 	add("3000000008", "tester.rain", "Rain", map[string]string{"Defs/W.xml": "<Defs><WeatherDef><defName>AcidRain</defName></WeatherDef></Defs>\n"})
-	add("3000000009", "tester.menus", "Menus", key("Unused"), "tester.menulib", "ludeon.rimworld")
-	mods := []string{"ludeon.rimworld", "tester.base", "tester.lib", "tester.menulib", "tester.kurin", "tester.chairs", "tester.hair", "tester.rain", "tester.menus"}
+	// a research project of the Mod's own Def class, which the save references as a
+	// ResearchProjectDef; Menus has a Def of that name and an unrelated game type
+	add("3000000010", "tester.tribe", "Tribe", map[string]string{"Defs/T.xml": "<Defs><TesterTribe.TribeResearchDef><defName>TribeFire</defName></TesterTribe.TribeResearchDef></Defs>" + nl})
+	menus := key("Unused")
+	menus["Defs/H.xml"] = "<Defs><HeadTypeDef><defName>TribeFire</defName></HeadTypeDef></Defs>" + nl
+	add("3000000009", "tester.menus", "Menus", menus, "tester.menulib", "ludeon.rimworld")
+	mods := []string{"ludeon.rimworld", "tester.base", "tester.lib", "tester.menulib", "tester.swamp", "tester.kurin", "tester.chairs", "tester.hair", "tester.rain", "tester.menus", "tester.tribe"}
 	e.WriteModsConfig("1.6.4633 rev1261", mods...)
 	e.AddEnv(false)
 	e.MustRun("scan")
@@ -57,7 +65,8 @@ func TestSaveNeeds(t *testing.T) {
 <thing Class="Pawn"><def>Human</def><id>Human5</id><faction>Faction_1</faction><kindDef>Colonist</kindDef><story /></thing>
 <thing Class="Building"><def>Stool</def><id>Stool6</id></thing>
 </things></li></maps>
-<components><li Class="ModA.CompBroken" /></components>`
+<components><li Class="ModA.CompBroken" /></components>
+<researchManager><progress><keys><li>TribeFire</li></keys><values><li>10</li></values></progress></researchManager>`
 	writeOwnersSave(t, e, "Needs.rws", testkit.SaveSpec{Mods: append(slices.Clone(mods), "tester.gone"), Faction: "Colony", Body: body})
 	s, _, err := e.App.FindSave("Needs")
 	if err != nil {
@@ -74,13 +83,14 @@ func TestSaveNeeds(t *testing.T) {
 	for _, n := range c.Needs {
 		by[n.PackageID] = n
 	}
-	if len(c.Needs) != 10 {
+	if len(c.Needs) != 12 {
 		t.Fatalf("needs: %+v", c.Needs)
 	}
 	for pkg, want := range map[string]string{
 		"tester.kurin": app.NeedBreaks, "tester.chairs": app.NeedLoses, "tester.hair": app.NeedCare,
 		"tester.rain": app.NeedBreaks, "tester.menus": app.NeedSafe, "tester.gone": app.NeedUnchecked,
-		"tester.lib": app.NeedBreaks, "tester.base": app.NeedBreaks, "tester.menulib": app.NeedCare,
+		"tester.lib": app.NeedBreaks, "tester.base": app.NeedBreaks, "tester.menulib": app.NeedCare, "tester.swamp": app.NeedUnchecked,
+		"tester.tribe": app.NeedCare,
 	} {
 		if got := by[pkg].Verdict; got != want {
 			t.Errorf("%s: %s, want %s (%+v)", pkg, got, want, by[pkg])
@@ -100,6 +110,9 @@ func TestSaveNeeds(t *testing.T) {
 	}
 	if g := by["ludeon.rimworld"]; len(g.NeededBy) != 0 {
 		t.Errorf("core: %+v", g)
+	}
+	if g := by["tester.swamp"]; g.Why != app.NeedWhyGrid {
+		t.Errorf("swamp: %+v", g)
 	}
 	if g := by["tester.gone"]; g.Why != app.NeedWhyGone {
 		t.Errorf("gone: %+v", g)
