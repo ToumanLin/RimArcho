@@ -4,6 +4,7 @@ All notable changes to RimArcho. Versions follow semantic versioning; the MVP is
 
 ## Unreleased
 
+- Window, launch page: the last-run and update lines in the top right are readable over a background image again; on a grey part of the image (the default planet in the light theme) they were grey on grey.
 - `archo mod-settings` and the TUI's Mod settings panel: a label in the game's window that ends in a colon (`Search:`) no longer prints with two.
 - Archo Monitor 0.11.1: opening the settings window of a Mod that draws an empty text box (Alpha Animals' Spawn Toggles, with its search box) no longer puts a NullReferenceException from Archo Monitor in the game log. Monitor's window recording now never throws into a Mod's window; if it fails, it skips that record and logs its own error.
 - Mod library › Mod settings: a HugsLib setting that HugsLib never saves (HugsLib's own "show all Mod update news", which its dialog draws as a button) is no longer offered as an on/off switch. Needs Archo Monitor 0.11.1, which records it; `archo mod-settings` and MCP leave it out too.

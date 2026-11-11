@@ -990,10 +990,12 @@ svg.i.fill { fill: currentColor; }
 #main { position: relative; }
 #top, #body { z-index: 1; }
 /* The shade uses white in light mode and black in dark mode. Its strength is --dim,
-   with extra coverage behind text: down the left, along the bottom and under the top bar. */
+   with extra coverage behind text: down the left, along the bottom, under the top bar and in
+   the top right corner (the last run and update lines). */
 #backdrop { position: absolute; left: 0; right: 0; top: 0; bottom: 30px; z-index: 0; overflow: hidden; pointer-events: none; background: var(--bg); }
 #backdrop .img { position: absolute; inset: 0; background-size: cover; background-repeat: no-repeat; animation: fade var(--t-enter) ease-out; }
 #backdrop .shade { position: absolute; inset: 0; background:
+  radial-gradient(640px 260px at 100% 0, rgba(var(--photo-shade), .8), rgba(var(--photo-shade), 0)),
   linear-gradient(rgba(var(--photo-shade), var(--dim, .3)), rgba(var(--photo-shade), var(--dim, .3))),
   linear-gradient(90deg, rgba(var(--photo-shade), .86) 0, rgba(var(--photo-shade), .55) 340px, rgba(var(--photo-shade), 0) 600px),
   linear-gradient(0deg, rgba(var(--photo-shade), .82) 0, rgba(var(--photo-shade), .5) 30%, rgba(var(--photo-shade), 0) 55%),
