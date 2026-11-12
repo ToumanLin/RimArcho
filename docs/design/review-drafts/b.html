@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>play review · B By your tags</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  #page { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 12px; overflow: hidden; padding-bottom: 12px; }
+  #left, #detail { min-height: 0; overflow-y: auto; }
+  .bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--card); border-bottom: var(--hairline) solid var(--line-2); }
+  .bar .find { flex: 0 1 240px; margin-left: auto; }
+  .band { border-bottom: var(--hairline) solid var(--line-2); }
+  .bh { width: 100%; display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 14px; }
+  .bh:hover { background: var(--pill); }
+  .bh .chv { display: inline-flex; color: var(--faint); transition: transform var(--t-press); } .band.open .bh .chv { transform: rotate(90deg); }
+  .bh .n { font-weight: 600; } .bh .k { font-size: 12px; color: var(--muted); }
+  .bh .r { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .bh .nv { font-size: 12px; color: var(--amber); }
+  .rows { padding: 0 8px 8px 30px; display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 0 12px; }
+  .mrow { min-height: 28px; }
+  .mrow .n { font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="review" id="review"></div>
+<div id="app">
+  <aside id="side"><div class="side-head">RimArcho</div><nav id="nav"></nav></aside>
+  <main id="main">
+    <div id="top"></div><div class="page-head" id="head"></div>
+    <div id="page">
+      <div class="card" id="left"><div class="bar"><span class="muted">group by</span><div class="seg" id="by"></div><label class="find"><span id="qi"></span><input id="q" placeholder="Find a Mod" autocomplete="off"><kbd>/</kbd></label></div><div id="bands"></div></div>
+      <div class="card" id="detail"></div>
+    </div>
+    <div id="bottom"><span id="status"></span><span id="hints"></span></div>
+  </main>
+</div>
+<div id="toast"></div>
+<script src="shared.js"></script>
+<script>
+shell("b", [["/", "find a Mod"], ["←→", "fold / unfold"], ["↑↓", "Mod"]]);
+$("#qi").innerHTML = ic("search");
+let by = "tags", q = "", sel = MODS[0].id;
+const openBands = new Set(["furniture", "decor", "never"]);
+function groups() {
+  const ms = MODS.filter((m) => m.name.toLowerCase().includes(q));
+  if (by === "state") return STATES.map(([k, t]) => ({ key: k, head: `<span class="sdot ${k}"></span><span class="n">${t}</span>`, mods: ms.filter((m) => state(m) === k) }));
+  const out = TAGS.map(([t]) => ({ key: t, head: tagChip(t), mods: ms.filter((m) => m.tags.includes(t)) }));
+  out.push({ key: "untagged", head: `<span class="n muted">no tag</span>`, mods: ms.filter((m) => !m.tags.length) });
+  return out;
+}
+function draw() {
+  $("#by").innerHTML = [["tags", "your tags"], ["state", "how much is seen"]].map(([k, t]) => `<button class="${by === k ? "on" : ""}" data-by="${k}">${t}</button>`).join("");
+  $("#bands").innerHTML = groups().filter((g) => g.mods.length).map((g) => {
+    const content = g.mods.filter((m) => !m.functional), adds = content.reduce((n, m) => n + m.adds, 0), seen = content.reduce((n, m) => n + m.seen, 0);
+    const never = content.filter((m) => m.seen === 0).length, isOpen = q || openBands.has(g.key);
+    const ms = [...g.mods].sort((a, b) => !!a.functional - !!b.functional || share(a) - share(b) || b.adds - a.adds);
+    return `<section class="band ${isOpen ? "open" : ""}"><button class="bh" data-band="${g.key}"><span class="chv">${ic("chev")}</span>${g.head}<span class="k">${g.mods.length} Mods</span>
+      <span class="r">${never ? `<span class="nv">${never} never seen</span>` : ""}${adds ? meter(seen, adds, 120) + frac(seen, adds) : `<span class="k">no content to see</span>`}</span></button>
+      ${isOpen ? `<div class="rows">${ms.map((m) => `<button class="mrow ${m.id === sel ? "on" : ""}" data-m="${m.id}"><span class="sdot ${state(m)}"></span><span class="n">${esc(m.name)}</span>
+        <span class="r">${m.functional ? `<span class="w">no content to see</span>` : meter(m.seen, m.adds, 48) + frac(m.seen, m.adds)}</span></button>`).join("")}</div>` : ""}</section>`;
+  }).join("") || `<div class="empty">No Mod matches</div>`;
+  $("#detail").innerHTML = detailHTML(MODS.find((m) => m.id === sel));
+}
+$("#by").onclick = (e) => { const b = e.target.closest("[data-by]"); if (b) { by = b.dataset.by; draw(); } };
+$("#bands").onclick = (e) => {
+  const h = e.target.closest("[data-band]"), r = e.target.closest("[data-m]");
+  if (h) { const k = h.dataset.band; if (openBands.has(k)) openBands.delete(k); else openBands.add(k); draw(); }
+  else if (r) { sel = r.dataset.m; draw(); }
+};
+$("#q").oninput = (e) => { q = e.target.value.toLowerCase(); draw(); };
+addEventListener("keydown", (e) => { if (e.key === "/" && document.activeElement !== $("#q")) { e.preventDefault(); $("#q").focus(); } });
+$("#status").textContent = "B: the groups are the tags you gave your Mods in the Mod library; a Mod with two tags is in both. The same bands can group by how much is seen.";
+draw();
+</script>
+</body>
+</html>

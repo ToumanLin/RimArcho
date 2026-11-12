@@ -62,7 +62,7 @@ func savesReview(c *Ctx, a *Args) (*render.Doc, error) {
 	if a.Bool("progress") && Progress != nil {
 		progress = func(done, total int) { Progress(fmt.Sprintf("review %d/%d", done, total)) }
 	}
-	r, err := c.App.SaveReview(cols, a.Bool("read"), progress)
+	r, err := c.App.SaveReview(cols, app.ReviewOpts{Read: a.Bool("read"), Progress: progress})
 	if err != nil {
 		return nil, err
 	}

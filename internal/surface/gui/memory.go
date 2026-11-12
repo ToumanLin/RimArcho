@@ -67,6 +67,9 @@ func (s *API) Leave(page string) {
 	if page == "saves" { // view.PageSaves
 		s.leaveSaves()
 	}
+	if page == "review" { // view.PageReview
+		s.leaveReview()
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	switch page {

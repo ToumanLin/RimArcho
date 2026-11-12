@@ -1,6 +1,7 @@
 package store_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/ToumanLin/RimArcho/internal/store"
@@ -28,7 +29,7 @@ func TestUpgradeDefContentKeepsFacts(t *testing.T) {
 	}
 	defer u.Close()
 	u.MM = "1.6"
-	if u.Meta("schema_version") != "35" {
+	if u.Meta("schema_version") != fmt.Sprint(store.SchemaVersion) {
 		t.Fatal("not migrated")
 	}
 	defs, err := u.DefDefiners([]string{"Old"})

@@ -24,6 +24,8 @@ export const icon = {
   packs: svg('<path d="M2.4 5L8 2.4 13.6 5v6L8 13.6 2.4 11z"/><path d="M2.4 5L8 7.6 13.6 5M8 7.6v6"/>'),
   // Saves (16 §2.11): a save file
   saves: svg('<path d="M3 2.6h7.8l2.6 2.6v8.2H2.6V3z"/><path d="M5.2 2.6v3.2h5V2.6M5 13.4V9.2h6v4.2"/>'),
+  // Play review (16 §2.11): looking back over a playthrough
+  review: svg('<path d="M2.6 8a5.4 5.4 0 1 0 1.6-3.8"/><path d="M2.4 2.4v2.4h2.4M8 5v3.2l2.2 1.4"/>'),
   search: svg('<circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2l3.2 3.2"/>'),
   env: svg('<rect x="2" y="2.8" width="12" height="8.4" rx="1.6"/><path d="M5.6 13.6h4.8M8 11.2v2.4"/>'),
   library: svg('<rect x="2.4" y="2.6" width="3" height="10.8" rx=".8"/><rect x="6.5" y="2.6" width="3" height="10.8" rx=".8"/><path d="M11 3.4l2.6-.6 1.4 10-2.6.6z"/>'),

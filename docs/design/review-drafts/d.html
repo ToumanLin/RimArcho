@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>play review · D Map</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  #page { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 12px; overflow: hidden; padding-bottom: 12px; }
+  #left, #detail { min-height: 0; overflow-y: auto; }
+  .bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--card); border-bottom: var(--hairline) solid var(--line-2); }
+  .bar .legend { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  .bar .legend i { display: inline-block; width: 90px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--amber), color-mix(in srgb, var(--accent) 60%, var(--card)) 35%, var(--accent) 70%, var(--green)); }
+  .grp2 { padding: 10px 14px 4px; }
+  .grp2 h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--fg-2); }
+  .grp2 h3 .k { font-weight: 400; color: var(--muted); }
+  .tiles { display: flex; flex-wrap: wrap; gap: 3px; }
+  .seg button { white-space: nowrap; } .bar > .muted { white-space: nowrap; }
+  .tile { color: var(--fg); position: relative; height: var(--s); width: var(--s); min-width: 14px; min-height: 14px; border-radius: 4px; background: var(--c); overflow: hidden;  }
+  .tile.edge { color: #1a1a1e; }
+  .tile.on { outline: 2px solid var(--fg); outline-offset: 1px; }
+  .tile:hover { filter: brightness(1.12); }
+  .tile .t { position: absolute; inset: 4px 5px; font-size: 11px; line-height: 1.2; font-weight: 600; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+  .tile .p { position: absolute; left: 5px; bottom: 3px; font-size: 10.5px; opacity: .85; }
+  .tile.fn { background: none; box-shadow: inset 0 0 0 1px var(--line); }
+  #tip { position: fixed; z-index: 40; pointer-events: none; padding: 6px 9px; border-radius: 8px; background: var(--card); box-shadow: var(--shadow); font-size: 12px; max-width: 320px; }
+</style>
+</head>
+<body>
+<div class="review" id="review"></div>
+<div id="app">
+  <aside id="side"><div class="side-head">RimArcho</div><nav id="nav"></nav></aside>
+  <main id="main">
+    <div id="top"></div><div class="page-head" id="head"></div>
+    <div id="page">
+      <div class="card" id="left"><div class="bar"><span class="muted">group by</span><div class="seg" id="by"></div>
+        <span class="legend">size: how much it adds · never seen <i></i> all seen</span></div><div id="map"></div></div>
+      <div class="card" id="detail"></div>
+    </div>
+    <div id="bottom"><span id="status"></span><span id="hints"></span></div>
+  </main>
+</div>
+<div id="toast"></div><div id="tip" hidden></div>
+<script src="shared.js"></script>
+<script>
+shell("d", [["click", "open a Mod"], ["hover", "its numbers"]]);
+let by = "tags", sel = MODS[0].id;
+const color = (m) => { const p = share(m); return p === 0 ? "var(--amber)" : p >= 1 ? "var(--green)" : `color-mix(in srgb, var(--accent) ${Math.round(35 + p * 65)}%, var(--card))`; };
+const size = (m) => Math.round(Math.max(14, Math.min(150, Math.sqrt(m.adds) * 7)));
+function groups() {
+  const content = MODS.filter((m) => !m.functional);
+  let gs;
+  if (by === "tags") gs = [...TAGS.map(([t]) => ({ head: tagChip(t), mods: content.filter((m) => m.tags.includes(t)) })), { head: `<span class="muted">no tag</span>`, mods: content.filter((m) => !m.tags.length) }];
+  else if (by === "kind") gs = CATS.map(([k, t]) => ({ head: t, mods: content.filter((m) => [...m.cats].sort((a, b) => b.adds - a.adds)[0].key === k) }));
+  else gs = [{ head: "every Mod with content", mods: content }];
+  gs.push({ head: "no content to see", mods: MODS.filter((m) => m.functional), fn: true });
+  return gs.filter((g) => g.mods.length);
+}
+function draw() {
+  $("#by").innerHTML = [["tags", "your tags"], ["kind", "main kind of content"], ["none", "none"]].map(([k, t]) => `<button class="${by === k ? "on" : ""}" data-by="${k}">${t}</button>`).join("");
+  $("#map").innerHTML = groups().map((g) => {
+    const adds = g.mods.reduce((n, m) => n + m.adds, 0), seen = g.mods.reduce((n, m) => n + m.seen, 0);
+    return `<section class="grp2"><h3>${g.head}<span class="k">${g.mods.length} Mods${adds ? ` · ${seen.toLocaleString()} of ${adds.toLocaleString()} seen` : ""}</span></h3>
+      <div class="tiles">${[...g.mods].sort((a, b) => b.adds - a.adds).map((m) => { const s = g.fn ? 14 : size(m);
+        return `<button class="tile ${g.fn ? "fn" : ""} ${!g.fn && (m.seen === 0 || m.seen >= m.adds) ? "edge" : ""} ${m.id === sel ? "on" : ""}" data-m="${m.id}" style="--s:${s}px;--c:${color(m)}">${s >= 62 ? `<span class="t">${esc(m.name)}</span><span class="p">${m.seen}/${m.adds}</span>` : ""}</button>`; }).join("")}</div></section>`;
+  }).join("");
+  $("#detail").innerHTML = detailHTML(MODS.find((m) => m.id === sel));
+}
+$("#by").onclick = (e) => { const b = e.target.closest("[data-by]"); if (b) { by = b.dataset.by; draw(); } };
+$("#map").onclick = (e) => { const b = e.target.closest("[data-m]"); if (b) { sel = b.dataset.m; draw(); } };
+$("#map").onmousemove = (e) => {
+  const b = e.target.closest("[data-m]"), tip = $("#tip");
+  if (!b) { tip.hidden = true; return; }
+  const m = MODS.find((x) => x.id === b.dataset.m);
+  tip.innerHTML = `<b>${esc(m.name)}</b><br>${m.functional ? "no content to see" : `${m.seen} of ${m.adds.toLocaleString()} seen<br>${catLine(m, 3)}`}`;
+  tip.hidden = false; tip.style.left = Math.min(innerWidth - 340, e.clientX + 14) + "px"; tip.style.top = e.clientY + 16 + "px";
+};
+$("#map").onmouseleave = () => { $("#tip").hidden = true; };
+$("#status").textContent = "D: the whole library at a glance. Big amber squares are large Mods you never touched; the list of names is one click away.";
+draw();
+</script>
+</body>
+</html>

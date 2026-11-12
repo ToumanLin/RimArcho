@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>play review · G One colony, three questions</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  #page { overflow-y: auto; padding-bottom: 24px; }
+  .cols { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 18px; }
+  .run { display: flex; align-items: baseline; gap: 18px; margin: 0 2px 22px; }
+  .run h1 { margin: 0; font-size: 26px; }
+  .run .f { color: var(--muted); font-size: 13px; } .run .f b { color: var(--fg); font-size: 17px; font-weight: 600; margin-right: 4px; }
+  .q { margin: 0 0 26px; }
+  .q > h2 { margin: 0 2px 10px; font-size: 15px; display: flex; align-items: baseline; gap: 10px; }
+  .q > h2 .k { font-size: 12px; font-weight: 400; color: var(--muted); }
+  .q > h2 a { margin-left: auto; font-size: 12px; font-weight: 400; color: var(--accent); text-decoration: none; }
+  /* 1: what is still ahead: one row a Mod, one pip a quest / project / event */
+  .left { display: grid; grid-template-columns: minmax(150px, 230px) minmax(0, 1fr); gap: 0 16px; }
+  .left .r { display: contents; }
+  .left .r > * { padding: 7px 0; border-top: var(--hairline) solid var(--line-2); }
+  .left .r:first-child > * { border-top: 0; }
+  .left .n { padding-left: 2px !important; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .left .ks { display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: center; }
+  .kd { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+  .kd .g { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  .pips { display: inline-flex; flex-wrap: wrap; gap: 2px; max-width: 330px; }
+  .pips i { width: 7px; height: 7px; border-radius: 2px; box-shadow: inset 0 0 0 1px var(--line); }
+  .pips i.s { background: var(--accent); box-shadow: none; }
+  /* 2: what the run was built on */
+  .built { display: flex; gap: 3px; height: 54px; }
+  .built > div { min-width: 0; padding: 6px 8px; border-radius: 8px; color: #fff; font-size: 12px; line-height: 1.25; overflow: hidden; background: linear-gradient(135deg, hsl(var(--h) 45% 46%), hsl(calc(var(--h) + 40) 45% 34%)); }
+  .built b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .built span { opacity: .8; }
+  /* 3: never showed up */
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { height: 26px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border-radius: 13px; background: var(--pill); color: var(--fg-2); font-size: 12.5px; }
+  .chip .k { color: var(--muted); }
+  .chip.more { color: var(--accent); background: none; }
+  .foot { margin: 0 2px; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="review" id="review"></div>
+<div id="app">
+  <aside id="side"><div class="side-head">RimArcho</div><nav id="nav"></nav></aside>
+  <main id="main">
+    <div id="top"></div><div class="page-head" id="head"></div>
+    <div id="page" class="narrow"><div id="view"></div></div>
+    <div id="bottom"><span id="status"></span><span id="hints"></span></div>
+  </main>
+</div>
+<div id="toast"></div>
+<script src="shared.js"></script>
+<script>
+// Numbers measured on one real colony (48 saves over 379 days, 485 Mods in the save), not example data.
+shell("g", [["←→", "colony"], ["enter", "open a Mod"]]);
+$("#head").innerHTML = "";
+const AHEAD = [ // only what a game brings you to: quests, research, events, creatures, factions
+  ["Anomaly", [["research", 4, 42], ["events", 6, 43], ["quests", 3, 12], ["creatures", 4, 14]]],
+  ["Royalty", [["quests", 12, 61], ["research", 8, 19]]],
+  ["Odyssey", [["animals", 10, 44], ["quests", 14, 31], ["events", 4, 16]]],
+  ["Vanilla Quests Expanded - Drone Factory", [["creatures", 0, 17], ["quests", 2, 3]]],
+  ["Vanilla Events Expanded", [["events", 15, 32]]],
+  ["Progression: Gravship", [["research", 0, 14]]],
+  ["Romance On The Rim", [["quests", 0, 13]]],
+  ["Vanilla Vehicles Expanded - Tier 3", [["research", 0, 11]]],
+  ["Caravan Adventures", [["mechanoids", 0, 6], ["events", 0, 5]]],
+  ["ReGrowth 2", [["animals", 1, 12]]],
+  ["Vanilla Quests Expanded - Ancients", [["quests", 1, 6]]],
+  ["Vanilla Quests Expanded - The Generator", [["quests", 2, 7]]],
+  ["Simple Warrants", [["quests", 0, 4]]],
+];
+const BUILT = [["Ideology", 214], ["Biotech", 201], ["Odyssey", 178], ["Royalty", 126], ["Vanilla Ideology Expanded - Memes and Structures", 114], ["Vanilla Gravship Expanded - Chapter 1", 87], ["Vanilla Furniture Expanded - Props and Decor", 74], ["Anomaly", 60], ["Expanded Prosthetics and Organ Engineering", 56], ["Alpha Biomes", 51]];
+const NEVER = [["Alpha Props - Parks and Gardens", 196], ["Outland - More Floors", 131], ["Alpha Props - Ship Parts", 68], ["Lily-Style Pack", 40], ["Fine Fastfood Machine", 21], ["Architecture of the Rim", 17], ["Bread Mo's Valentine's Day apparel", 17], ["PA's God Hands", 13], ["Amnabi's Flags", 8], ["BondageFurniture", 8], ["Universal Lift Structure", 7], ["Laser Weapons: Re-Examined", 5]];
+const pips = (s, n) => `<span class="pips" title="${s} of ${n}">${Array.from({ length: n }, (_, i) => `<i class="${i < s ? "s" : ""}"></i>`).join("")}</span>`;
+$("#view").innerHTML = `
+  <div class="cols"><button class="pill on">Fort Ember</button><button class="pill">Orbit Run</button><button class="pill">Harbour</button><button class="pill">18 more</button><button class="pill" style="margin-left:auto">all colonies together</button></div>
+  <div class="run"><h1>Fort Ember</h1><span class="f"><b>379</b>days</span><span class="f"><b>56</b>hours</span><span class="f"><b>48</b>saves</span><span class="f"><b>32</b>raids</span></div>
+  <section class="q"><h2>Still ahead of you <span class="k">what a game brings you to: quests, research, events, creatures</span><a href="e.html">all 31</a></h2>
+    <div class="card" style="padding:6px 14px"><div class="left">${AHEAD.map(([n, ks]) => `<div class="r"><span class="n" title="${esc(n)}">${esc(n)}</span><span class="ks">${ks.map(([k, s, a]) => `<span class="kd" title="${k}: ${s} of ${a}">${glyph(k)}${pips(s, a)}</span>`).join("")}</span></div>`).join("")}</div></div></section>
+  <section class="q"><h2>What this colony was built on <span class="k">the Mods with the most in the saves</span></h2>
+    <div class="built">${BUILT.map(([n, c]) => `<div style="flex:${c};--h:${hue(n)}" title="${esc(n)}: ${c} things in the saves"><b>${esc(n)}</b><span>${c}</span></div>`).join("")}</div></section>
+  <section class="q"><h2>Installed, never showed up <span class="k">42 Mods</span></h2>
+    <div class="chips">${NEVER.map(([n, c]) => `<span class="chip">${esc(n)}<span class="k">${c}</span></span>`).join("")}<span class="chip more">30 more</span></div></section>
+  <p class="foot">121 more Mods are things you pick from (floors, furniture, hair, clothes): you used some of each, and how much says nothing. 300 Mods add nothing a save can show.</p>`;
+$("#status").textContent = "G: one colony at a time, three questions in the order a player asks them. A square is one quest, project, event or creature; filled means it is in the saves.";
+</script>
+</body>
+</html>

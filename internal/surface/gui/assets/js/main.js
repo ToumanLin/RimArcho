@@ -49,6 +49,7 @@ import * as problems from "./problems.js";
 import * as fileSearch from "./filesearch.js";
 import * as modSettings from "./modsettings.js";
 import * as savesPage from "./saves.js";
+import * as reviewPage from "./review.js";
 import { initRules, refreshRules, startRule, showRules } from "./rules.js";
 import { setMode as setArchoMode, bootLive, bootDone } from "./archo.js";
 
@@ -436,6 +437,7 @@ function renderHints() {
   else if (S.screen === "search") list = fileSearch.hintList();
   else if (S.screen === "mod-settings") list = modSettings.hintList();
   else if (S.screen === "saves") list = savesPage.hintList();
+  else if (S.screen === "review") list = reviewPage.hintList();
   else if (S.screen === "changes") list = scr.changesHints();
   else if (S.screen === "log") list = scr.logHints();
   else if (S.screen === "subscribe") list = scr.addHints();
@@ -1262,6 +1264,7 @@ function onKey(e) {
     if (S.screen === "search") return fileSearch.key(e);
     if (S.screen === "mod-settings") return modSettings.key(e);
     if (S.screen === "saves") return savesPage.key(e);
+    if (S.screen === "review") return reviewPage.key(e);
     if (S.screen === "log" || S.screen === "changes") return scr.logsKey(e);
     // add a subscription: the form takes its keys; esc outside it goes back to updates
     if (S.screen === "subscribe") { if (k === "Escape") { e.preventDefault(); go("changes"); } return; }

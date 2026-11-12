@@ -96,7 +96,7 @@ func TestRowOpsColumns(t *testing.T) {
 func TestKeyHelpText(t *testing.T) {
 	SetLang("zh")
 	defer SetLang("en")
-	for _, page := range []string{EditorPage, LibraryPage, "home", ChangesPage, SubscribePage} {
+	for _, page := range []string{EditorPage, LibraryPage, "home", ChangesPage, SubscribePage, PageReview} {
 		for _, tui := range []bool{false, true} {
 			rows := KeyHelp(page, tui)
 			history := slices.ContainsFunc(rows, func(r KeyRow) bool { return r.Keys == "alt+← / alt+→" })
@@ -135,6 +135,18 @@ func TestHomeFocusKeyHelp(t *testing.T) {
 	t.Parallel()
 	if !slices.ContainsFunc(KeyHelp("home", false), func(r KeyRow) bool { return r.Keys == "1–3" }) {
 		t.Fatal("home help does not list its three focus keys")
+	}
+}
+
+func TestReviewKeyHelp(t *testing.T) {
+	rows := KeyHelp(PageReview, false)
+	for _, key := range []string{"/", "↑↓", "←→↑↓ / Home End", "enter", "1–4"} {
+		if !slices.ContainsFunc(rows, func(r KeyRow) bool { return r.Keys == key }) {
+			t.Errorf("review help does not list %s", key)
+		}
+	}
+	if slices.ContainsFunc(rows, func(r KeyRow) bool { return r.Keys == "1–9" }) {
+		t.Error("review help lists more than its four cards")
 	}
 }
 

@@ -148,7 +148,11 @@ func handler(api *API, files fs.FS) http.Handler {
 		var path string
 		var err error = app.ErrNoPreview
 		if target != nil {
-			path, _, _, err = previewOf(api.a, *target)
+			if r.URL.Query().Get("w") == "thumb" {
+				path, err = api.a.PreviewThumbOf(*target)
+			} else {
+				path, _, _, err = previewOf(api.a, *target)
+			}
 		}
 		serveFile(w, r, path, err)
 	})

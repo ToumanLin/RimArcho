@@ -156,20 +156,15 @@ Full per-Mod content totals and cross-save unused-content comparisons (§3) are 
 
 ## 3. Unused content
 
-Under "not played yet › playthrough review › unused content" (16 §2.11). Consider only saves where the player actually played with the Mod enabled: compare a Mod only against saves whose `<modIds>` includes it.
+Under Saves › Play review (16 §2.11). Consider only saves where the player actually played with the Mod enabled: compare a Mod only against saves whose `<modIds>` includes it.
 
-### 3.1 Three groups
+### 3.1 Coverage and presentation
 
-| Group | Criterion | UI wording |
-| --- | --- | --- |
-| Never appeared | The Mod has playable content (supported playable categories in §2.2), none of which appears in any save with it enabled | "Enabled across 4 colonies, never encountered", followed by what it adds, by category |
-| Only part seen | Some of its playable content appears, some does not. No threshold: Mods are ordered by the share seen, lowest first | "Adds 40 weapons, 3 seen", listing what was not seen by category |
-| Functional, excluded | See §3.3 | Separate collapsed group: "These Mods leave no save data; saves cannot tell whether they were used" |
+For each Mod, the review counts the content added and the content seen, by category, and lists the names not seen. Functional Mods (§3.3) have no counted content. The GUI presents these results as a map with two content groups and a functional-Mod count at its foot; the groups, square sizes, colour steps, grouping switch and selected Mod's details are specified in 16 §2.11. CLI and MCP list never-seen and partly-seen Mods and report counts of all-seen and functional Mods.
 
 - Count **colonies** (§4.1): union all saves of the same colony, not only its latest (what was used up or sold is only in older saves), so that saving a colony 30 times does not count as 30 playthroughs. Saves are read in the background (§1.7); until all are read the result says how many it covers.
-- Count only Mods still installed. Current enabled status does not affect the result, but show "enabled / not enabled in the current list" in the UI.
-- A Mod enabled in only one short colony (few saves) has a low-confidence conclusion; label it "small sample" (threshold undecided).
-- Each item expands to show evidence: which saves enabled it and which defNames appeared (00 §4 item 2).
+- Count only Mods still installed and analysed (§3.4). Current enabled status does not affect the result.
+- The GUI shows how many colonies and saves had each Mod enabled, plus its category totals and the names not seen (16 §2.11). A current-list enabled mark, a small-sample warning and individual save evidence are not implemented.
 
 ### 3.2 Interpretation
 
@@ -187,18 +182,21 @@ UI, performance, bug-fix and pure mechanics-adjustment Mods do not add Defs to s
 1. A Mod with **no** Def in a playable content category in its effective content (only Patches, assemblies, textures, language files, or mechanics/UI Defs outside the playable groups in §2.2) is functional;
 2. The player may mark a Mod "functional" or "not functional", overriding detection. This is player data on its Lineage (07 §6); storage is undecided (possibly a reserved tag).
 
-Functional Mods do not enter the first two groups. Framework Mods (such as Harmony and HugsLib) naturally fall under rule 1.
+Functional Mods are excluded from the GUI map and counted in its foot line (16 §2.11). Framework Mods (such as Harmony and HugsLib) naturally fall under rule 1.
 
 ### 3.4 Computation and tools
 
-`App.SaveReview` (CLI `saves review`, MCP `list_saves` with `review`; no page yet).
+`App.SaveReview` (CLI `saves review`, MCP `list_saves` with `review`, and the page Saves › Play review, 16 §2.11).
 
 - Each save is attributed as in §2.3 with `ConfigRefs` left out. A Mod's catalog, what it adds by category, is every Def it provides when loaded with the Mods of the first counted save that has it, categorised as in §2.2; a pawn kind is its race. Seen is the catalog's names that some counted save has, so generated names (meat, techprints, smoothed stone) count for neither side.
 - Counted categories are those of §2.2 without `recipes`, `scenarios` and `other`. A Mod with nothing in them is functional (§3.3 rule 1; the player's mark of rule 2 is not built).
 - Mods: installed and analysed copies only. The game's own (Core, DLC) are included.
-- Order: Mods with something to see first, by the share seen, lowest first, then by how much they add; functional ones last.
+- Application result order: Mods with something to see first, by the share seen, lowest first, then by how much they add; functional ones last. CLI and MCP use coverage groups; the GUI orders its content groups by amount added (16 §2.11).
 - A save counts when it has a current full read (`savefile.ParserVersion`; the index keeps reads of older parsers, §1.7). The others are counted as left out, or read first on request (`--read`).
-- The Defs of the saves' Mods are loaded once and kept in memory for the run (`defSource`): asking the database per save was nine tenths of the time. Measured on a real library of 209 saves in 21 colonies, 520 Mods: 11 s from cached reads, 37 s reading every save first.
+- Per-save attribution is kept in the store's `save_review_cache` as gzip JSON: seen names by copy and category, plus a catalog reference. Enabled-copy metadata and categorized catalog names are stored once in `save_review_catalog`, content-addressed by SHA-256 of canonical JSON, with a foreign-key reference from each save. Saves with the same resolved copies, order and catalog share the stored and decoded object. Per-save storage grows with seen evidence, not the library's Def count. A save result is valid only for the same normalized path, file size, nanosecond mtime, exact `savefile.ParserVersion` and `App.ReviewInputKey`. The input key includes the review format version, `analyze.DefContentVersion`, installed-copy index generation, active Def set identities/content keys/readiness for each game version, registry workspace/alias inputs, pack manifest stamps and the save's matched environment/version. Content extraction version alone cannot detect changed Mod Defs; immutable fact sets distinguish their contents. Changing a cache row does not invalidate other entries.
+- A hit merges only kept evidence and its shared catalog, without loading full facts, rerunning attribution or rebuilding the catalog. A miss attributes one save at a time and builds the catalog once per enabled-copy order while that set remains in the run's two-entry catalog LRU. Different orders and active packages have separate lookup keys; identical content hashes share the catalog. The run retains the union of seen names, first-counted per-copy catalog references and, only when needed, installed Defs (`defSource`); it never retains all saves' full facts or one catalog per save. The LRU is released with the run. Colonies are processed by last played and saves newest first.
+- Each save has one replaceable row, deleted with its full-read row when pruning confirms the file is gone. Catalog publication and the save reference commit atomically. Replacing a reference or deleting saves prunes catalogs with no remaining references; review startup also removes obsolete cache formats and orphan catalogs. Schema 37 adds the catalog table and reference; the first review drops the older embedded-catalog format while keeping reusable full-read facts. Deleted SQLite pages are reusable; file shrinking follows normal database compaction. CLI and MCP use the same cache without changing their review output or `--read` behavior.
+- On the synthetic 500-Mod / 100,000-Def / 200-save measurement, rows are 17,250 bytes/save plus one shared catalog, versus 1,301,898 bytes/save with embedded catalogs. Combined payload falls from 260.4 MB to 4.74 MB; restart review is 216 ms versus 4.52 s. Full methodology, first-run times, heap measurements and the comparison with rebuilding catalogs are in 18 §2.
 - Things' styles and ideoligions' style categories are read since parser 8 (§1.4); without them every style Mod was never seen.
 
 ### 3.5 Relationship with Archo

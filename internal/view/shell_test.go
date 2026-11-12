@@ -43,8 +43,8 @@ func TestNavAndPath(t *testing.T) {
 		t.Fatalf("plans %+v %v", plans, err)
 	}
 	g := view.Nav(n.Count, plans, []view.PackRow{{Name: "Main"}})
-	if len(g) != 2 || g[0].Title != "playing" || g[1].Title != "library" {
-		t.Fatalf("two groups, Playing and Library (16 §2.1): %+v", g)
+	if len(g) != 3 || g[0].Title != "playing" || g[1].Title != "saves" || g[2].Title != "library" {
+		t.Fatalf("three groups, Playing, Saves and Library (16 §2.1): %+v", g)
 	}
 	var ids, keys []string
 	for _, gr := range g {
@@ -52,11 +52,11 @@ func TestNavAndPath(t *testing.T) {
 			ids, keys = append(ids, it.ID), append(keys, it.Key)
 		}
 	}
-	if strings.Join(ids, ",") != "home,needs,log,plan,packs,saves,library,textures,env" {
+	if strings.Join(ids, ",") != "home,needs,log,saves,review,plan,packs,library,textures,env" {
 		t.Fatalf("order %v", ids)
 	}
 	// Saves has no shift key: shift+1–8 stay the eight entries the TUI also has (16 §3.5)
-	if keys[0] != "shift+1" || keys[5] != "" || keys[6] != "shift+6" || keys[8] != "shift+8" {
+	if strings.Join(keys, ",") != "shift+1,shift+2,shift+3,,,shift+4,shift+5,shift+6,shift+7,shift+8" {
 		t.Fatalf("keys %v", keys)
 	}
 	if g[0].Items[1].Badge != n.Count || n.Count == 0 {
@@ -83,6 +83,8 @@ func TestNavAndPath(t *testing.T) {
 		"plans":       "library=plan / lists=plan / all lists=plans",
 		"needs":       "playing=home / can it run=needs",
 		"log":         "playing=home / game log=log",
+		"saves":       "saves=saves / all saves=saves",
+		"review":      "saves=saves / play review=review",
 		"changes":     "library=plan / mod library=library / updates=changes",
 		"library":     "library=plan / mod library=library / all mods=library",
 		"pack:Main":   "library=plan / packs=packs / Main=pack:Main",

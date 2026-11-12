@@ -53,7 +53,7 @@ func TestSaveReview(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		r, err := e.App.SaveReview(l.Colonies, read, nil)
+		r, err := e.App.SaveReview(l.Colonies, app.ReviewOpts{Read: read})
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -1,9 +1,11 @@
 # 16 · Interface
 
-> Status: two interfaces, the GUI (window) and the TUI (terminal). The GUI implements every page in §2 except play review (§2.11), Worth playing (§2.12) and the Archo panel (§2.13, planned for 1.1); the TUI is the keyboard plan editor with secondary screens and text panels for the other pages (§9.1), without the Saves, game log and create-a-pack pages or the versions and collections of All lists.
+> Status: two interfaces, the GUI (window) and the TUI (terminal). The GUI implements every page in §2 except Worth playing (§2.12) and the Archo panel (§2.13, planned for 1.1); the TUI is the keyboard plan editor with secondary screens and text panels for the other pages (§9.1), without the Saves, game log and create-a-pack pages or the versions and collections of All lists.
 > Basis: 00 (positioning, three questions, principles), 00a (architecture), 01 (scope), 05 and 06 (findings and logs), 07 and 08 (plans and sorting), 09 and 10 (launch and packs), 12 (saves, unplayed and worth playing), 13 and 14 (commands and MCP), 15 (Archo).
 
 Design principle: players **always know where they are, where they can go and how to get back**, and finish tasks in **as few steps as possible**. "How to get back" has two layers: in the interface, every overlay and secondary screen goes back one level with `esc` or the breadcrumbs (§3.1 rule 5); in the data, every change appears in plan history and can be undone (§2.5, area 3; 07 §3).
+
+The GUI sidebar has Playing, Saves and Library groups (§2.1). The two pages in Saves are described in §2.11.
 
 ## Files
 

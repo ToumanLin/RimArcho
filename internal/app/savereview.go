@@ -1,17 +1,23 @@
 package app
 
 import (
+	"context"
+	"fmt"
+	"slices"
 	"sort"
 	"strings"
+	"time"
 )
 
 // SaveReview is the playthrough review (12 §3): for every installed Mod some colony ran
 // with, what it adds by category and how much of that the colony's saves show.
 type SaveReview struct {
-	Colonies int // colonies looked at
-	Saves    int // their saves counted
-	Unread   int // their saves not counted: not read yet, or read by an older parser
-	Mods     []ReviewMod
+	Colonies    int // colonies looked at
+	Saves       int // their saves counted
+	Unread      int // their saves not counted: not read yet, or read by an older parser
+	Done, Total int // saves processed, including unread saves
+	Cached      int // per-save attributions merged without reading facts or attributing again
+	Mods        []ReviewMod
 }
 
 // ReviewMod is one installed copy. Mods with something to see come first, the lowest share
@@ -40,66 +46,120 @@ type ReviewCat struct {
 // or the original scenario, and "other" is mechanics, not content to play (12 §3.2).
 var reviewSkip = map[string]bool{"recipes": true, "scenarios": true, "other": true}
 
-// SaveReview uses the cached reads. A save without a current one is read now when read is
-// set (a save read by an older parser lacks what the review counts, and the index keeps
-// such a read: 12 §1.7), and is otherwise counted under Unread, as is one that cannot be
-// read. progress, when not nil, is called after each save.
-func (a *App) SaveReview(cols []*Colony, read bool, progress func(done, total int)) (*SaveReview, error) {
-	type modState struct {
-		ReviewMod
-		colonies map[*Colony]bool
-		seen     map[string]map[string]bool // category → name
-	}
+// ReviewOpts are how SaveReview runs. Read: a save without a current full read is read now
+// (a save read by an older parser lacks what the review counts, and the index keeps such a
+// read: 12 §1.7); otherwise it is counted under Unread, as is one that cannot be read.
+// Progress is called after each save. Stop, when it says true, ends the review with
+// context.Canceled.
+type ReviewOpts struct {
+	Read     bool
+	Progress func(done, total int)
+	// Partial receives independent snapshots at most every 500 ms, after merging a save.
+	Partial func(*SaveReview)
+	Stop    func() bool
+}
+
+// SaveReview uses the cached reads, and reads saves only with ReviewOpts.Read.
+func (a *App) SaveReview(cols []*Colony, o ReviewOpts) (*SaveReview, error) {
 	out := &SaveReview{Colonies: len(cols)}
 	catalog := map[string]map[string][]string{}
 	src := &defSource{}
-	mods := map[string]*modState{}
-	total, done := 0, 0
+	catalogs := &reviewCatalogs{}
+	mods := map[string]*reviewModState{}
+	// Copy only the ordering slices, never the save facts. Callers may supply a filtered
+	// listing; attribution still follows the Saves page's newest-first order.
+	cols = slices.Clone(cols)
+	sort.SliceStable(cols, func(i, j int) bool { return cols[i].Latest().ModTime.After(cols[j].Latest().ModTime) })
 	for _, c := range cols {
-		total += len(c.Saves)
+		out.Total += len(c.Saves)
 	}
+	input, err := a.ReviewInputKey()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := a.PruneSaveCache(&SaveList{Colonies: cols}); err != nil {
+		return nil, err
+	}
+	// Old rows duplicated full catalogs. Drop that format even for saves outside
+	// this request, while retaining their reusable L1 facts.
+	if err := a.Store.PruneSaveReviewFormat(fmt.Sprintf("review%d:", reviewCacheVersion)); err != nil {
+		return nil, err
+	}
+	// Building a snapshot walks the accumulated catalog, not the saves. Facts and each
+	// compact result fall out of scope before the next save.
+	snapshot := func() *SaveReview { return reviewSnapshot(out, mods, catalog) }
+	sent := time.Now()
 	for _, c := range cols {
-		for _, sv := range c.Saves {
-			if read {
-				a.SaveFacts(sv, true) // a failure leaves it unread
+		saves := slices.Clone(c.Saves)
+		sort.SliceStable(saves, func(i, j int) bool { return saves[i].ModTime.After(saves[j].ModTime) })
+		for _, sv := range saves {
+			if o.Stop != nil && o.Stop() {
+				return nil, context.Canceled
 			}
-			res, err := a.saveContent(sv, contentOpts{seen: true, catalog: catalog, src: src})
+			res, cached, err := a.reviewSave(sv, o.Read, input, src, catalogs)
 			if err != nil {
 				return nil, err
 			}
-			done++
-			if progress != nil {
-				progress(done, total)
+			out.Done++
+			if cached {
+				out.Cached++
 			}
-			if !res.Read || sv.Head == nil {
+			if !res.Read {
 				out.Unread++
-				continue
+			} else {
+				out.Saves++
+				for inst, cats := range res.Catalog {
+					if catalog[inst] == nil {
+						catalog[inst] = cats
+					}
+				}
+				for _, m := range res.Mods {
+					if m.Instance == "" || res.Catalog[m.Instance] == nil {
+						continue // not installed, or not analysed: nothing to compare with
+					}
+					st := mods[m.Instance]
+					if st == nil {
+						st = &reviewModState{colonies: map[*Colony]bool{}, seen: map[string]map[string]bool{}}
+						st.Name, st.PackageID, st.Library = m.Name, m.PackageID, m.Library
+						st.Game = strings.HasPrefix(normPkg(m.PackageID), "ludeon.rimworld")
+						mods[m.Instance] = st
+					}
+					st.Saves++
+					st.colonies[c] = true
+					for key, ns := range res.Names[m.Instance] {
+						if st.seen[key] == nil {
+							st.seen[key] = map[string]bool{}
+						}
+						for _, n := range ns {
+							st.seen[key][n] = true
+						}
+					}
+				}
 			}
-			out.Saves++
-			for _, m := range res.mods {
-				if m.Instance == "" || catalog[m.Instance] == nil {
-					continue // not installed, or not analysed: nothing to compare with
-				}
-				st := mods[m.Instance]
-				if st == nil {
-					st = &modState{colonies: map[*Colony]bool{}, seen: map[string]map[string]bool{}}
-					st.Name, st.PackageID, st.Library = m.Name, m.PackageID, m.Library
-					st.Game = strings.HasPrefix(normPkg(m.PackageID), "ludeon.rimworld")
-					mods[m.Instance] = st
-				}
-				st.Saves++
-				st.colonies[c] = true
-				for key, ns := range res.names[m.Instance] {
-					if st.seen[key] == nil {
-						st.seen[key] = map[string]bool{}
-					}
-					for _, n := range ns {
-						st.seen[key][n.Name] = true
-					}
-				}
+			if o.Progress != nil {
+				o.Progress(out.Done, out.Total)
+			}
+			if o.Stop != nil && o.Stop() {
+				return nil, context.Canceled
+			}
+			if o.Partial != nil && out.Done < out.Total && time.Since(sent) >= 500*time.Millisecond {
+				o.Partial(snapshot())
+				sent = time.Now()
 			}
 		}
 	}
+	return snapshot(), nil
+}
+
+type reviewModState struct {
+	ReviewMod
+	colonies map[*Colony]bool
+	seen     map[string]map[string]bool
+}
+
+func reviewSnapshot(counts *SaveReview, mods map[string]*reviewModState, catalog map[string]map[string][]string) *SaveReview {
+	out := *counts
+	out.Mods = nil
 	for inst, st := range mods {
 		m := st.ReviewMod
 		m.Colonies = len(st.colonies)
@@ -140,7 +200,7 @@ func (a *App) SaveReview(cols []*Colony, read bool, progress func(done, total in
 		}
 		return x.Library < y.Library
 	})
-	return out, nil
+	return &out
 }
 
 // contentCatalog fills catalog for the analysed copies among insts it lacks: by category,

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>play review · F Highlights</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  #page { overflow-y: auto; padding-bottom: 24px; }
+  .hl { margin: 6px 0 26px; }
+  .hl > h2 { display: flex; align-items: baseline; gap: 10px; margin: 0 2px 10px; font-size: 16px; }
+  .hl > h2 a { margin-left: auto; font-size: 12px; font-weight: 400; color: var(--accent); text-decoration: none; }
+  .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .hc { display: block; width: 100%; text-decoration: none; color: inherit; padding: 8px; border-radius: 14px; background: var(--card); border: var(--hairline) solid var(--line-2); }
+  .hc:hover { border-color: var(--muted); }
+  .hc .n { display: flex; align-items: center; gap: 8px; margin: 8px 2px 8px; font-weight: 600; }
+  .hc .n span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hc .row { display: flex; gap: 4px; overflow: hidden; padding: 0 2px 2px; }
+  .hc .row .it { width: 34px; height: 34px; } .hc .row .it .g { width: 18px; height: 18px; }
+  .kinds { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .kd { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--card); border: var(--hairline) solid var(--line-2); }
+  .kd:hover { border-color: var(--muted); }
+  .kd .g { width: 22px; height: 22px; fill: none; stroke: var(--fg-2); stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  .kd span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @media (max-width: 1100px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+</style>
+</head>
+<body>
+<div class="review" id="review"></div>
+<div id="app">
+  <aside id="side"><div class="side-head">RimArcho</div><nav id="nav"></nav></aside>
+  <main id="main">
+    <div id="top"></div><div class="page-head" id="head"></div>
+    <div id="page" class="narrow"><div id="view"></div></div>
+    <div id="bottom"><span id="status"></span><span id="hints"></span></div>
+  </main>
+</div>
+<div id="toast"></div>
+<script src="shared.js"></script>
+<script>
+shell("f", [["enter", "open"]]);
+$("#head .lead").innerHTML = "What you have and have not tried";
+const content = MODS.filter((m) => !m.functional);
+const big = (c) => [...c.cats].sort((a, b) => b.adds - a.adds)[0];
+const card = (m) => `<a class="hc" href="e.html" title="${m.seen} of ${m.adds} seen">${cover(m)}<div class="n"><span>${esc(m.name)}</span>${ring(m.seen, m.adds, 22)}</div><div class="row">${tiles(m, big(m), 7, true)}</div></a>`;
+const never = content.filter((m) => m.seen === 0).sort((a, b) => b.adds - a.adds).slice(0, 3);
+const barely = content.filter((m) => m.seen > 0 && share(m) < .15).sort((a, b) => b.adds - a.adds).slice(0, 3);
+const kinds = CATS.map(([k, t]) => { const cs = content.flatMap((m) => m.cats.filter((c) => c.key === k)); return { k, t, adds: cs.reduce((n, c) => n + c.adds, 0), seen: cs.reduce((n, c) => n + c.seen, 0) }; }).filter((x) => x.adds).sort((a, b) => a.seen / a.adds - b.seen / b.adds);
+$("#view").innerHTML = `
+  <section class="hl"><h2>Never touched <a href="e.html">all ${content.filter((m) => m.seen === 0).length}</a></h2><div class="cards">${never.map(card).join("")}</div></section>
+  <section class="hl"><h2>Barely used <a href="e.html">all ${content.filter((m) => m.seen > 0 && m.seen < m.adds).length}</a></h2><div class="cards">${barely.map(card).join("")}</div></section>
+  <section class="hl"><h2>By kind</h2><div class="kinds">${kinds.map((x) => `<a class="kd" href="a.html" style="text-decoration:none;color:inherit" title="${x.seen} of ${x.adds} seen">${glyph(x.k)}<span>${x.t}</span>${ring(x.seen, x.adds, 24)}</a>`).join("")}</div></section>`;
+$("#status").textContent = "F: the page picks. Three big Mods you never touched, three you barely used, and the kinds of content by how much is tried; everything else is one click away.";
+</script>
+</body>
+</html>

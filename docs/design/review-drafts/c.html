@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>play review · C Table and detail</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  #page { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 12px; overflow: hidden; padding-bottom: 12px; }
+  #left { min-height: 0; display: flex; flex-direction: column; }
+  #detail { min-height: 0; overflow-y: auto; }
+  .tools { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px 12px; border-bottom: var(--hairline) solid var(--line-2); }
+  .tools .find { flex: 1 1 200px; max-width: 280px; }
+  .tools .sp { width: 6px; }
+  #tbl { flex: 1; min-height: 0; overflow-y: auto; }
+  .th, .tr { display: grid; grid-template-columns: minmax(170px, 1.3fr) 118px 52px minmax(0, 2fr) 128px 48px; gap: 10px; align-items: center; padding: 0 12px; }
+  .th { position: sticky; top: 0; z-index: 1; height: 28px; background: var(--card); border-bottom: var(--hairline) solid var(--line-2); font-size: 12px; color: var(--muted); }
+  .th button { text-align: left; color: inherit; } .th button.on { color: var(--fg); font-weight: 600; } .th button:hover { color: var(--fg); }
+  .tr { width: 100%; height: 26px; font-size: 12.5px; }
+  .tr:hover { background: var(--pill); } .tr.on { background: var(--sel); }
+  .tr > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tr .n { color: var(--fg); display: flex; align-items: center; gap: 8px; } .tr .n span:last-child { overflow: hidden; text-overflow: ellipsis; }
+  .tr .num { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .tr .sh { display: flex; align-items: center; gap: 8px; }
+  .tr .tags { display: flex; gap: 4px; }
+  .foot { flex: none; padding: 6px 12px; font-size: 12px; color: var(--muted); border-top: var(--hairline) solid var(--line-2); }
+</style>
+</head>
+<body>
+<div class="review" id="review"></div>
+<div id="app">
+  <aside id="side"><div class="side-head">RimArcho</div><nav id="nav"></nav></aside>
+  <main id="main">
+    <div id="top"></div><div class="page-head" id="head"></div>
+    <div id="page">
+      <div class="card" id="left"><div class="tools" id="tools"></div><div id="tbl"></div><div class="foot" id="foot"></div></div>
+      <div class="card" id="detail"></div>
+    </div>
+    <div id="bottom"><span id="status"></span><span id="hints"></span></div>
+  </main>
+</div>
+<div id="toast"></div>
+<script src="shared.js"></script>
+<script>
+shell("c", [["/", "find"], ["↑↓", "Mod"], ["s", "sort and columns"], ["\\", "filter"]]);
+let q = "", st = "", kind = "", tag = "", sort = "share", dir = 1, sel = MODS[0].id;
+function rows() {
+  let ms = MODS.filter((m) => m.name.toLowerCase().includes(q) && (!st || state(m) === st) && (!kind || m.cats.some((c) => c.key === kind)) && (!tag || m.tags.includes(tag)));
+  const key = { share: (m) => (m.functional ? 2 : share(m)), name: (m) => m.name.toLowerCase(), adds: (m) => -m.adds, saves: (m) => -m.saves }[sort];
+  return ms.sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : b.adds - a.adds) * dir);
+}
+function draw() {
+  const count = (k) => MODS.filter((m) => state(m) === k).length;
+  $("#tools").innerHTML = `<label class="find"><span>${ic("search")}</span><input id="q" placeholder="Find a Mod" value="${esc(q)}" autocomplete="off"><kbd>/</kbd></label><span class="sp"></span>
+    <button class="pill ${st === "" ? "on" : ""}" data-st="">all <span class="k">${MODS.length}</span></button>
+    ${STATES.map(([k, t]) => `<button class="pill ${st === k ? "on" : ""}" data-st="${k}"><span class="sdot ${k}"></span>${t} <span class="k">${count(k)}</span></button>`).join("")}<span class="sp"></span>
+    <select class="sel" id="kind"><option value="">any kind of content</option>${CATS.map(([k, t]) => `<option value="${k}" ${kind === k ? "selected" : ""}>${t}</option>`).join("")}</select>
+    <select class="sel" id="tag"><option value="">any tag</option>${TAGS.map(([t]) => `<option ${tag === t ? "selected" : ""}>${t}</option>`).join("")}</select>`;
+  const ms = rows(), arrow = (k) => (sort === k ? (dir > 0 ? " ↑" : " ↓") : "");
+  $("#tbl").innerHTML = `<div class="th"><button data-sort="name" class="${sort === "name" ? "on" : ""}">Mod${arrow("name")}</button><button data-sort="share" class="${sort === "share" ? "on" : ""}">seen${arrow("share")}</button>
+      <button data-sort="adds" class="${sort === "adds" ? "on" : ""}" style="text-align:right">adds${arrow("adds")}</button><span>${kind ? CAT_LABEL[kind] + ", then the rest" : "what it adds"}</span><span>tags</span><button data-sort="saves" class="${sort === "saves" ? "on" : ""}" style="text-align:right">saves${arrow("saves")}</button></div>` +
+    (ms.map((m) => `<button class="tr ${m.id === sel ? "on" : ""}" data-m="${m.id}"><span class="n"><span class="sdot ${state(m)}"></span><span>${esc(m.name)}</span></span>
+      <span class="sh">${m.functional ? `<span class="muted">—</span>` : meter(m.seen, m.adds, 60) + `<span class="num">${Math.round(share(m) * 100)}%</span>`}</span>
+      <span class="num">${m.adds ? m.adds.toLocaleString() : ""}</span><span>${m.functional ? `<span class="muted">no content to see</span>` : catLine(kind ? { cats: [...m.cats].sort((a, b) => (b.key === kind) - (a.key === kind) || b.adds - a.adds) } : m, 3)}</span>
+      <span class="tags">${m.tags.map(tagChip).join("")}</span><span class="num">${m.saves}</span></button>`).join("") || `<div class="empty">No Mod matches</div>`);
+  $("#foot").textContent = `${ms.length} of ${MODS.length} Mods · ${ms.reduce((n, m) => n + m.seen, 0).toLocaleString()} of ${ms.reduce((n, m) => n + m.adds, 0).toLocaleString()} seen`;
+  $("#detail").innerHTML = detailHTML(MODS.find((m) => m.id === sel), kind);
+  $("#q").oninput = (e) => { q = e.target.value.toLowerCase(); draw(); const i = $("#q"); i.focus(); i.setSelectionRange(i.value.length, i.value.length); };
+  $("#kind").onchange = (e) => { kind = e.target.value; draw(); };
+  $("#tag").onchange = (e) => { tag = e.target.value; draw(); };
+}
+$("#tools").onclick = (e) => { const b = e.target.closest("[data-st]"); if (b) { st = b.dataset.st; draw(); } };
+$("#tbl").onclick = (e) => {
+  const h = e.target.closest("[data-sort]"), r = e.target.closest("[data-m]");
+  if (h) { if (sort === h.dataset.sort) dir = -dir; else { sort = h.dataset.sort; dir = 1; } draw(); }
+  else if (r) { sel = r.dataset.m; draw(); }
+};
+addEventListener("keydown", (e) => {
+  if (e.key === "/" && document.activeElement?.id !== "q") { e.preventDefault(); $("#q").focus(); return; }
+  if (document.activeElement?.id === "q" || !["ArrowDown", "ArrowUp"].includes(e.key)) return;
+  const ms = rows(), i = ms.findIndex((m) => m.id === sel);
+  sel = ms[Math.max(0, Math.min(ms.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)))]?.id || sel;
+  e.preventDefault(); draw(); $(".tr.on")?.scrollIntoView({ block: "nearest" });
+});
+$("#status").textContent = "C: one row a Mod, as the Mod library's table: sort by any column, filter by state, kind of content and tag. Made for hundreds of Mods.";
+draw();
+</script>
+</body>
+</html>

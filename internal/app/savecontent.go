@@ -38,12 +38,11 @@ type SaveContentResult struct {
 
 // contentOpts are what the playthrough review asks of the attribution (12 §3).
 type contentOpts struct {
+	// facts supplies this save's just-read facts without a second cache decode.
+	facts *savefile.Facts
 	// seen: count only what is there (DefRefs and the grids), not what is only set up
 	// (ConfigRefs).
 	seen bool
-	// catalog, when not nil, is filled for the save's analysed copies it has not yet: by
-	// instance, category → the names of every Def the copy provides among the save's Mods.
-	catalog map[string]map[string][]string
 	// src, when not nil, keeps the Defs in memory between saves.
 	src *defSource
 }
@@ -93,7 +92,11 @@ func (a *App) SaveContent(sv *Save) (*SaveContentResult, error) {
 func (a *App) saveContent(sv *Save, o contentOpts) (*SaveContentResult, error) {
 	oldMM := a.Store.MM
 	defer func() { a.Store.MM = oldMM }()
-	f, err := a.SaveFacts(sv, false)
+	f := o.facts
+	var err error
+	if f == nil {
+		f, err = a.SaveFacts(sv, false)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -255,11 +258,6 @@ func (a *App) saveContent(sv *Save, o contentOpts) (*SaveContentResult, error) {
 	resolver, err := a.contentResolver(o.src, insts, pos, active, lookup)
 	if err != nil {
 		return nil, err
-	}
-	if o.catalog != nil {
-		if err := a.contentCatalog(o.catalog, o.src, insts, ready, pos, active); err != nil {
-			return nil, err
-		}
 	}
 	type entry struct {
 		node                      *contentNode

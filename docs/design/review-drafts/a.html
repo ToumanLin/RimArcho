@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>play review · A By kind of content</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  #page { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 12px; overflow: hidden; padding-bottom: 12px; }
+  #rail, #main2 { min-height: 0; overflow-y: auto; }
+  #rail { padding: 6px; }
+  .krow { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; align-items: center; padding: 7px 10px; border-radius: 8px; }
+  .krow:hover { background: var(--pill); } .krow.on { background: var(--sel); }
+  .krow .n { font-weight: 600; } .krow .f { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .krow .meter { grid-column: 1 / -1; width: 100% !important; }
+  .krow .s { grid-column: 1 / -1; font-size: 11.5px; color: var(--muted); }
+  .rail-h { padding: 10px 10px 4px; font-size: 12px; color: var(--muted); }
+  .bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--card); border-bottom: var(--hairline) solid var(--line-2); }
+  .bar h2 { margin: 0; font-size: 15px; } .bar .find { flex: 0 1 240px; margin-left: auto; }
+  #list { padding: 6px; }
+  .mrow .chv { display: inline-flex; color: var(--faint); transition: transform var(--t-press); }
+  .mrow.open .chv { transform: rotate(90deg); }
+  .mrow .other { font-size: 12px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .inl { margin: 2px 10px 8px 34px; padding: 8px 10px; border-radius: 8px; background: var(--card-2); border: var(--hairline) solid var(--line-2); }
+  .gh { display: flex; align-items: center; gap: 8px; padding: 12px 10px 4px; font-size: 12px; font-weight: 600; color: var(--fg-2); }
+  .gh .k { font-weight: 400; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="review" id="review"></div>
+<div id="app">
+  <aside id="side"><div class="side-head">RimArcho</div><nav id="nav"></nav></aside>
+  <main id="main">
+    <div id="top"></div><div class="page-head" id="head"></div>
+    <div id="page">
+      <div class="card" id="rail"></div>
+      <div class="card" id="main2"><div class="bar"><h2 id="title"></h2><span class="muted" id="sub"></span><label class="find"><span id="qi"></span><input id="q" placeholder="Find a Mod" autocomplete="off"><kbd>/</kbd></label></div><div id="list"></div></div>
+    </div>
+    <div id="bottom"><span id="status"></span><span id="hints"></span></div>
+  </main>
+</div>
+<div id="toast"></div>
+<script src="shared.js"></script>
+<script>
+shell("a", [["↑↓", "kind"], ["/", "find a Mod"], ["enter", "open"]]);
+$("#qi").innerHTML = ic("search");
+let cur = "buildings", q = "";
+const open = new Set();
+// a kind's totals over every Mod that adds it
+const totals = CATS.map(([key, label]) => {
+  const ms = MODS.filter((m) => m.cats.some((c) => c.key === key));
+  const adds = ms.reduce((n, m) => n + m.cats.find((c) => c.key === key).adds, 0), seen = ms.reduce((n, m) => n + m.cats.find((c) => c.key === key).seen, 0);
+  return { key, label, adds, seen, mods: ms.length, never: ms.filter((m) => m.cats.find((c) => c.key === key).seen === 0).length };
+}).filter((t) => t.mods);
+function drawRail() {
+  $("#rail").innerHTML = `<div class="rail-h">kind of content · seen / added</div>` + totals.map((t) => `<button class="krow ${t.key === cur ? "on" : ""}" data-k="${t.key}">
+    <span class="n">${t.label}</span><span class="f">${t.seen} / ${t.adds.toLocaleString()}</span>${meter(t.seen, t.adds)}
+    <span class="s">${t.mods} Mods${t.never ? `, ${t.never} never seen` : ""}</span></button>`).join("") +
+    `<div class="rail-h">${MODS.filter((m) => m.functional).length} Mods add nothing a save can show</div>`;
+}
+function drawList() {
+  const t = totals.find((x) => x.key === cur);
+  $("#title").textContent = t.label; $("#sub").textContent = `${t.seen} of ${t.adds.toLocaleString()} seen, from ${t.mods} Mods`;
+  const ms = MODS.filter((m) => m.cats.some((c) => c.key === cur) && m.name.toLowerCase().includes(q))
+    .map((m) => ({ m, c: m.cats.find((c) => c.key === cur) })).sort((a, b) => a.c.seen / a.c.adds - b.c.seen / b.c.adds || b.c.adds - a.c.adds);
+  const row = ({ m, c }) => `<button class="mrow ${open.has(m.id) ? "open" : ""}" data-m="${m.id}"><span class="chv">${ic("chev")}</span><span class="n">${esc(m.name)}</span>
+      <span class="other">${m.cats.filter((x) => x.key !== cur).map((x) => CAT_LABEL[x.key]).join(", ")}</span>
+      <span class="r">${meter(c.seen, c.adds)}${frac(c.seen, c.adds)}</span></button>
+    ${open.has(m.id) ? `<div class="inl"><p class="names">${names(m, c).slice(0, 60).map((x) => `<span>${esc(x.n)}</span>`).join("")}${c.adds - c.seen > 60 ? `<button class="btn link" data-toast="would show the rest">${c.adds - c.seen - 60} more</button>` : ""}</p></div>` : ""}`;
+  const never = ms.filter((x) => x.c.seen === 0), part = ms.filter((x) => x.c.seen > 0 && x.c.seen < x.c.adds), whole = ms.filter((x) => x.c.seen >= x.c.adds);
+  $("#list").innerHTML = [["never seen", never], ["partly seen", part], ["all seen", whole]].filter(([, g]) => g.length)
+    .map(([h, g]) => `<div class="gh">${h} <span class="k">${g.length}</span></div>${g.map(row).join("")}`).join("") || `<div class="empty">No Mod matches</div>`;
+}
+$("#rail").onclick = (e) => { const b = e.target.closest("[data-k]"); if (b) { cur = b.dataset.k; open.clear(); drawRail(); drawList(); } };
+$("#list").onclick = (e) => { const b = e.target.closest("[data-m]"); if (b && !e.target.closest("[data-toast]")) { const id = b.dataset.m; if (open.has(id)) open.delete(id); else open.add(id); drawList(); } };
+$("#q").oninput = (e) => { q = e.target.value.toLowerCase(); drawList(); };
+addEventListener("keydown", (e) => {
+  if (e.key === "/" && document.activeElement !== $("#q")) { e.preventDefault(); $("#q").focus(); return; }
+  if (document.activeElement === $("#q")) return;
+  const i = totals.findIndex((t) => t.key === cur);
+  if (e.key === "ArrowDown") cur = totals[Math.min(totals.length - 1, i + 1)].key; else if (e.key === "ArrowUp") cur = totals[Math.max(0, i - 1)].key; else return;
+  e.preventDefault(); open.clear(); drawRail(); drawList();
+});
+$("#status").textContent = "A: the question is “what buildings have I never built?”. A Mod appears under every kind it adds; opening it lists that kind only.";
+drawRail(); drawList();
+</script>
+</body>
+</html>
