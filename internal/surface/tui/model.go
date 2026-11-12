@@ -324,7 +324,7 @@ func (m *model) neverScanned() bool {
 	if err != nil {
 		return false
 	}
-	sc, _, _ := m.app.LastScan(e.ID)
+	sc, _, _ := m.app.LastScan(e.GameID)
 	return sc == nil
 }
 

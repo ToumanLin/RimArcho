@@ -28,7 +28,7 @@ func (a *App) attributeExternal(st *LoadoutState, mcs *store.ModsConfigState, h 
 	}
 	list, _ := reg.FromTokens(st.File.Active)
 	read := func(entries string) loadout.List {
-		return reg.Heal(a.localizer(tenv.ID, reg, nil)(loadout.Decode(entries)))
+		return reg.Heal(a.localizer(tenv.GameID, reg, nil)(loadout.Decode(entries)))
 	}
 	// The version the file was known to hold: the writer's, else (no record) the newest.
 	var ref *store.Version

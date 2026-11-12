@@ -148,7 +148,7 @@ func (a *App) FolderAdd(kind source.Kind, root string) (SourceChange, error) {
 	} else if o != nil {
 		where := "a shared folder"
 		if o.EnvID != store.Shared {
-			if e, _ := a.Store.EnvByID(o.EnvID); e != nil {
+			if e, _ := a.Store.EnvForGame(o.EnvID); e != nil {
 				where = "env:" + e.Name
 			}
 		}

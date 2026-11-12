@@ -690,12 +690,12 @@ func TestEnvRemoveAndSourceRemove(t *testing.T) {
 	}
 	// The game's own rows go; the shared mod folders and their mods stay (03 §2).
 	var n, shared int
-	e.App.Store.DB.QueryRow(`SELECT (SELECT count(*) FROM instance WHERE environment_id<>'') + (SELECT count(*) FROM source WHERE environment_id<>'')
+	e.App.Store.DB.QueryRow(`SELECT (SELECT count(*) FROM instance WHERE game_id<>'') + (SELECT count(*) FROM source WHERE game_id<>'')
 		+ (SELECT count(*) FROM snapshot_file WHERE snapshot_id IN (SELECT n.id FROM snapshot n LEFT JOIN instance i ON i.id=n.instance_id WHERE i.id IS NULL))`).Scan(&n)
 	if n != 0 {
 		t.Fatalf("%d rows of the environment left after env remove", n)
 	}
-	e.App.Store.DB.QueryRow(`SELECT count(*) FROM source WHERE environment_id='' AND kind='workshop' AND status='ok'`).Scan(&shared)
+	e.App.Store.DB.QueryRow(`SELECT count(*) FROM source WHERE game_id='' AND kind='workshop' AND status='ok'`).Scan(&shared)
 	if shared != 1 {
 		t.Fatal("the shared Workshop folder must stay")
 	}

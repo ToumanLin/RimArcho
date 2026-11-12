@@ -158,7 +158,7 @@ func BuildBoard(a *app.App) (*Board, error) {
 			}
 		}
 	}
-	added, newSince, now := app.Added(st), a.NewSince(st.Ix.Env.ID), a.Now()
+	added, newSince, now := app.Added(st), a.NewSince(st.Ix.Env.GameID), a.Now()
 	for k := range b.Cols {
 		for i := range b.Cols[k] {
 			it := &b.Cols[k][i]
@@ -205,10 +205,10 @@ func BuildBoard(a *app.App) (*Board, error) {
 	if c, err := a.Store.TagColors(); err == nil && len(c) > 0 {
 		b.TagColors = c
 	}
-	if qs, err := a.Store.Questions(st.Ix.Env.ID, false); err == nil {
+	if qs, err := a.Store.Questions(st.Ix.Env.GameID, false); err == nil {
 		b.Questions = len(qs)
 	}
-	if sc, ss, _ := a.LastScan(st.Ix.Env.ID); sc != nil && ss != nil {
+	if sc, ss, _ := a.LastScan(st.Ix.Env.GameID); sc != nil && ss != nil {
 		b.LastEvents = ss.Events
 		for _, n := range ss.Events {
 			b.Changes += n

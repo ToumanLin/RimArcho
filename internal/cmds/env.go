@@ -81,13 +81,13 @@ func envList(c *Ctx, a *Args) (*render.Doc, error) {
 		if e.UserDataRoot != "" {
 			n.KV("player-log", env.PlayerLog(e.UserDataRoot, e.GameVersion))
 		}
-		srcs, err := c.App.Store.Sources(e.ID)
+		srcs, err := c.App.Store.Sources(e.GameID)
 		if err != nil {
 			return nil, err
 		}
 		var own []*source.Source
 		for _, s := range srcs {
-			if s.EnvID == e.ID {
+			if s.EnvID == e.GameID {
 				own = append(own, s)
 			}
 		}

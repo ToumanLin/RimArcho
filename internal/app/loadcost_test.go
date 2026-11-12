@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/ToumanLin/RimArcho/internal/loadcost"
+	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
@@ -179,7 +180,7 @@ func TestPlanLoadCostUsesSelectedEnvironmentVersion(t *testing.T) {
 	}
 	for _, bad := range []string{"", "not-a-version"} {
 		game.GameVersion = bad
-		if err := e.App.Store.UpdateEnv(game); err != nil {
+		if err := e.App.Store.UpdateGame(&store.Game{ID: game.GameID, Name: game.Name, GameRoot: game.GameRoot, GameVersion: game.GameVersion}); err != nil {
 			t.Fatal(err)
 		}
 		if r, err := e.App.PlanLoadCost(context.Background(), saved.ID, nil); err == nil || r != nil || !strings.Contains(err.Error(), "game version is unknown") {

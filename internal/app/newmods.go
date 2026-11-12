@@ -31,8 +31,8 @@ func Added(st *LoadoutState) map[string]time.Time {
 // NewSince is the time after which a Mod first found is new: NewFor ago, and never before
 // the environment's first finished scan, which finds everything already installed. Without
 // a finished scan nothing is new (zero time).
-func (a *App) NewSince(envID string) time.Time {
-	sc, err := a.Store.FirstFinishedScan(envID)
+func (a *App) NewSince(gameID string) time.Time {
+	sc, err := a.Store.FirstFinishedScan(gameID)
 	if err != nil || sc == nil {
 		return time.Time{}
 	}

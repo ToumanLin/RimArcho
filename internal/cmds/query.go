@@ -208,7 +208,7 @@ func statusCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		}
 	}
 	root.KV("lineages", fmt.Sprintf("%d (%d with several instances)", len(ix.ByLineage), withCopies))
-	sc, st, err := c.App.LastScan(e.ID)
+	sc, st, err := c.App.LastScan(e.GameID)
 	if err != nil {
 		return nil, err
 	}
@@ -219,7 +219,7 @@ func statusCmd(c *Ctx, a *Args) (*render.Doc, error) {
 		root.KV("last-scan", fmt.Sprintf("scan:%d %s, %s", sc.ID, c.App.FormatTime(sc.Started), app.Elapsed(st.DurationMS)))
 		root.KV("changes", fmt.Sprintf("%s (archo changes)", eventSummary(st.Events)))
 	}
-	qs, err := c.App.Store.Questions(e.ID, false)
+	qs, err := c.App.Store.Questions(e.GameID, false)
 	if err != nil {
 		return nil, err
 	}
@@ -626,7 +626,7 @@ func modDoc(c *Ctx, ix *app.Index, m *store.Mod) (*render.Doc, error) {
 	}
 	root.KV("files", fmt.Sprintf("%d (%s), %d semantic", m.FileCount, render.Size(m.TotalSize), m.SemanticCount))
 	root.KV("seen", fmt.Sprintf("first %s, last %s", c.App.FormatTime(m.FirstSeen), c.App.FormatTime(m.LastSeen)))
-	evs, err := c.App.Store.Events(store.EventFilter{EnvID: ix.Env.ID, InstanceIDs: []string{m.ID}})
+	evs, err := c.App.Store.Events(store.EventFilter{EnvID: ix.Env.GameID, InstanceIDs: []string{m.ID}})
 	if err != nil {
 		return nil, err
 	}
@@ -634,7 +634,7 @@ func modDoc(c *Ctx, ix *app.Index, m *store.Mod) (*render.Doc, error) {
 		last := evs[len(evs)-1]
 		root.KV("changes", fmt.Sprintf("%d, latest %s %s (archo changes %s)", len(evs), last.Kind, c.App.FormatDate(last.ScanTime), ref))
 	}
-	qs, err := c.App.Store.Questions(ix.Env.ID, false)
+	qs, err := c.App.Store.Questions(ix.Env.GameID, false)
 	if err != nil {
 		return nil, err
 	}

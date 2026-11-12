@@ -832,10 +832,10 @@ func TestCreditCrossEnvironmentCandidateRequired(t *testing.T) {
 		t.Fatal("missing client copy")
 	}
 	// A sees the client copy, B does not. Scan preserves source ownership.
-	if _, err := e.App.Store.DB.Exec(`UPDATE source SET environment_id=? WHERE id=?`, mainEnv.ID, target.SourceID); err != nil {
+	if _, err := e.App.Store.DB.Exec(`UPDATE source SET game_id=? WHERE id=?`, mainEnv.ID, target.SourceID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.App.Store.DB.Exec(`UPDATE instance SET environment_id=? WHERE id=?`, mainEnv.ID, target.ID); err != nil {
+	if _, err := e.App.Store.DB.Exec(`UPDATE instance SET game_id=? WHERE id=?`, mainEnv.ID, target.ID); err != nil {
 		t.Fatal(err)
 	}
 	e.App.TrashFunc = func(string) error { t.Fatal("copy needed by blocked game recycled"); return nil }

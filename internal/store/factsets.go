@@ -30,7 +30,7 @@ type factDB interface {
 func pruneFactsOn(ctx context.Context, tx factDB, now time.Time) error {
 	type game struct{ id, mm string }
 	var games []game
-	rows, err := tx.QueryContext(ctx, `SELECT id, game_version FROM environment`)
+	rows, err := tx.QueryContext(ctx, `SELECT id, game_version FROM game`)
 	if err != nil {
 		return err
 	}
@@ -55,17 +55,17 @@ func pruneFactsOn(ctx context.Context, tx factDB, now time.Time) error {
 			continue
 		}
 		for _, table := range []string{"patch_fact", "finding"} {
-			if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE analysis_id IN (SELECT id FROM analysis WHERE environment_id=? AND game_mm<>? AND finished_at<?)`, g.id, g.mm, now.Add(-ForeignAnalysisRetention).Unix()); err != nil {
+			if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE analysis_id IN (SELECT id FROM analysis WHERE game_id=? AND game_mm<>? AND finished_at<?)`, g.id, g.mm, now.Add(-ForeignAnalysisRetention).Unix()); err != nil {
 				return err
 			}
 		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM analysis WHERE environment_id=? AND game_mm<>? AND finished_at<?`, g.id, g.mm, now.Add(-ForeignAnalysisRetention).Unix()); err != nil {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM analysis WHERE game_id=? AND game_mm<>? AND finished_at<?`, g.id, g.mm, now.Add(-ForeignAnalysisRetention).Unix()); err != nil {
 			return err
 		}
 	}
 	// Materialize the small set of needed (visibility owner, mm) pairs once. Shared
 	// instances can use any environment; private instances only their owning one.
-	if _, err := tx.ExecContext(ctx, `CREATE TEMP TABLE IF NOT EXISTS needed_fact_version(environment_id TEXT NOT NULL, game_mm TEXT NOT NULL, PRIMARY KEY(environment_id,game_mm)) WITHOUT ROWID; DELETE FROM needed_fact_version`); err != nil {
+	if _, err := tx.ExecContext(ctx, `CREATE TEMP TABLE IF NOT EXISTS needed_fact_version(game_id TEXT NOT NULL, game_mm TEXT NOT NULL, PRIMARY KEY(game_id,game_mm)) WITHOUT ROWID; DELETE FROM needed_fact_version`); err != nil {
 		return err
 	}
 	for _, g := range games {
@@ -73,12 +73,12 @@ func pruneFactsOn(ctx context.Context, tx factDB, now time.Time) error {
 			return err
 		}
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO needed_fact_version SELECT environment_id,game_mm FROM analysis`); err != nil {
+	if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO needed_fact_version SELECT game_id,game_mm FROM analysis`); err != nil {
 		return err
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM content_state WHERE NOT EXISTS (
  SELECT 1 FROM instance i WHERE i.id=content_state.instance_id AND EXISTS (
- SELECT 1 FROM needed_fact_version n WHERE (i.environment_id='' OR n.environment_id=i.environment_id)
+ SELECT 1 FROM needed_fact_version n WHERE (i.game_id='' OR n.game_id=i.game_id)
  AND (n.game_mm=content_state.game_mm OR n.game_mm='')))`); err != nil {
 		return err
 	}

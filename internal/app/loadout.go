@@ -57,7 +57,7 @@ func (st *LoadoutState) readList(entries string) loadout.List {
 // instance at the same folder (a link it made, or the other game's Mods/ copy in ix,
 // linked in on save); else a missing entry naming the packageId, so Heal can find this
 // game's copy (Core and DLCs always go this way). ix may be nil.
-func (a *App) localizer(envID string, reg *loadout.Registry, ix *Index) func(loadout.List) loadout.List {
+func (a *App) localizer(gameID string, reg *loadout.Registry, ix *Index) func(loadout.List) loadout.List {
 	return func(l loadout.List) loadout.List {
 		var ids []string
 		own := false
@@ -88,7 +88,7 @@ func (a *App) localizer(envID string, reg *loadout.Registry, ix *Index) func(loa
 		if ix != nil && ix.store != nil {
 			db = ix.store
 		}
-		fs, err := db.ForeignInstances(envID, ids)
+		fs, err := db.ForeignInstances(gameID, ids)
 		if err != nil || len(fs) == 0 {
 			return l
 		}
@@ -300,7 +300,7 @@ func (a *App) storedLoadout() (*LoadoutState, error) {
 			ws.Entries, ws.OriginVersion, ws.OriginKind = latest.Entries, latest.N, latest.Source
 		}
 	}
-	st := &LoadoutState{Ix: ix, Plan: plan, Reg: reg, Aliases: aliases, cands: all, deploy: deploy, WS: ws, Latest: latest, localize: a.localizer(ix.Env.ID, reg, ix)}
+	st := &LoadoutState{Ix: ix, Plan: plan, Reg: reg, Aliases: aliases, cands: all, deploy: deploy, WS: ws, Latest: latest, localize: a.localizer(ix.Env.GameID, reg, ix)}
 	st.List = st.readList(ws.Entries)
 	if ix.Env.UserDataRoot != "" {
 		st.FilePath = env.ModsConfigPath(ix.Env.UserDataRoot)
@@ -315,7 +315,7 @@ func (a *App) storedLoadout() (*LoadoutState, error) {
 // registry builds the environment's instance registry (07 §4.2): the game-loadable
 // instances plus the ones RimArcho deploys into Mods/.
 func (a *App) registry(ix *Index) (*loadout.Registry, map[string][]store.Alias, []loadout.Candidate, map[string]bool, error) {
-	aliases, err := a.Store.AllAliases(ix.Env.ID)
+	aliases, err := a.Store.AllAliases(ix.Env.GameID)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -351,7 +351,7 @@ func (a *App) sync(st *LoadoutState) error {
 	if err != nil {
 		return err
 	}
-	*st = LoadoutState{Ix: ix, Reg: reg, Aliases: aliases, cands: all, deploy: deploy, localize: a.localizer(ix.Env.ID, reg, ix)}
+	*st = LoadoutState{Ix: ix, Reg: reg, Aliases: aliases, cands: all, deploy: deploy, localize: a.localizer(ix.Env.GameID, reg, ix)}
 	return a.syncLocked(st, now)
 }
 

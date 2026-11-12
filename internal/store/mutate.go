@@ -83,7 +83,7 @@ func (s *Store) ResolveSame(q *Question, now time.Time) error {
 			args []any
 		}{
 			{`UPDATE instance SET source_id=?, rel_path=?, real_path=?, residue=?, last_seen=?, status=?, tombstone_at=NULL, current_snapshot_id=?,
-				environment_id=coalesce((SELECT environment_id FROM source WHERE id=?), environment_id) WHERE id=?`,
+				game_id=coalesce((SELECT game_id FROM source WHERE id=?), game_id) WHERE id=?`,
 				[]any{src, rel, real, residue, lastSeen, identity.Live, newSnap, src, q.CandidateID}},
 			{`UPDATE snapshot SET instance_id=? WHERE instance_id=?`, []any{q.CandidateID, q.InstanceID}},
 			{`DELETE FROM change_event WHERE instance_id=? AND kind=?`, []any{q.InstanceID, identity.EvDiscovered}},
@@ -181,11 +181,11 @@ type GCResult struct {
 
 // GC removes tombstones that died before cutoff (04 §2.5) unless an open question refers to
 // them, and drops superseded snapshots no event refers to. dryRun only counts.
-func (s *Store) GC(envID string, cutoff time.Time, dryRun bool) (*GCResult, error) {
+func (s *Store) GC(gameID string, cutoff time.Time, dryRun bool) (*GCResult, error) {
 	r := &GCResult{}
 	err := s.inTx(func(tx *sql.Tx) error {
 		rows, err := tx.Query(`SELECT id, EXISTS(SELECT 1 FROM identity_question q WHERE q.status='open' AND (q.instance_id=i.id OR q.candidate_instance_id=i.id))
-			FROM instance i WHERE environment_id IN ('', ?) AND status=? AND tombstone_at < ? ORDER BY id`, envID, identity.Tombstone, cutoff.Unix())
+			FROM instance i WHERE game_id IN ('', ?) AND status=? AND tombstone_at < ? ORDER BY id`, gameID, identity.Tombstone, cutoff.Unix())
 		if err != nil {
 			return err
 		}
@@ -221,10 +221,10 @@ func (s *Store) GC(envID string, cutoff time.Time, dryRun bool) (*GCResult, erro
 			}
 		}
 		// Superseded snapshots: not current, not referenced by any event or question.
-		orphan := `SELECT n.id FROM snapshot n JOIN instance i ON i.id=n.instance_id WHERE i.environment_id IN ('', ?) AND n.id <> coalesce(i.current_snapshot_id, -1)
+		orphan := `SELECT n.id FROM snapshot n JOIN instance i ON i.id=n.instance_id WHERE i.game_id IN ('', ?) AND n.id <> coalesce(i.current_snapshot_id, -1)
 			AND NOT EXISTS(SELECT 1 FROM change_event e WHERE e.before_snapshot=n.id OR e.after_snapshot=n.id)
 			AND NOT EXISTS(SELECT 1 FROM identity_question q WHERE q.observation_snapshot_id=n.id)`
-		rows, err = tx.Query(orphan, envID)
+		rows, err = tx.Query(orphan, gameID)
 		if err != nil {
 			return err
 		}
@@ -246,7 +246,7 @@ func (s *Store) GC(envID string, cutoff time.Time, dryRun bool) (*GCResult, erro
 				return err
 			}
 		}
-		if err := recomputePrimaries(tx, envID); err != nil {
+		if err := recomputePrimaries(tx, gameID); err != nil {
 			return err
 		}
 		if err := pruneFacts(tx, time.Now()); err != nil {

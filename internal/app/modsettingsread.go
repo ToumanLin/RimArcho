@@ -285,7 +285,7 @@ func (a *App) ModSettingsOf(m *store.Mod) (*ModSettingsMod, error) {
 	if ix.Env.UserDataRoot == "" {
 		return nil, errors.New("the environment has no user data directory; set one with archo env set --user-data <dir>")
 	}
-	aliases, err := a.Store.AllAliases(ix.Env.ID)
+	aliases, err := a.Store.AllAliases(ix.Env.GameID)
 	if err != nil {
 		return nil, err
 	}

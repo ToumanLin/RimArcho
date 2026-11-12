@@ -876,7 +876,7 @@ func buildItems(a *app.App, st *app.LoadoutState, ps *app.ProblemSet, missingMod
 		}
 	}
 	// Needs your answer: identity questions and an external change of the list.
-	if qs, err := a.Store.Questions(ix.Env.ID, false); err == nil {
+	if qs, err := a.Store.Questions(ix.Env.GameID, false); err == nil {
 		for _, q := range qs {
 			out = append(out, questionNeed(st, q))
 		}

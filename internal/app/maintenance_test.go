@@ -28,7 +28,7 @@ func TestMaintenanceRetentionAndHistory(t *testing.T) {
 	}
 	// The observation is historical and the candidate's current snapshot is newer
 	// than its question-time evidence. All three must survive.
-	if _, err := s.DB.Exec(`INSERT INTO identity_question(environment_id,scan_id,instance_id,observation_snapshot_id,candidate_instance_id,score) VALUES('',?,'other',?,'history',0.9)`, scan, other[0]); err != nil {
+	if _, err := s.DB.Exec(`INSERT INTO identity_question(game_id,scan_id,instance_id,observation_snapshot_id,candidate_instance_id,score) VALUES('',?,'other',?,'history',0.9)`, scan, other[0]); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.DB.Exec(`UPDATE instance SET status='tombstone',tombstone_at=1 WHERE id='history'`); err != nil {
@@ -37,7 +37,7 @@ func TestMaintenanceRetentionAndHistory(t *testing.T) {
 	if _, err := s.DB.Exec(`UPDATE instance SET status='tombstone',tombstone_at=1 WHERE id='tombstone-only'`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.DB.Exec(`INSERT INTO identity_question(environment_id,scan_id,instance_id,observation_snapshot_id,candidate_instance_id,score,status) VALUES('',?,'other',?,'history',0.9,'resolved')`, scan, ids[1]); err != nil {
+	if _, err := s.DB.Exec(`INSERT INTO identity_question(game_id,scan_id,instance_id,observation_snapshot_id,candidate_instance_id,score,status) VALUES('',?,'other',?,'history',0.9,'resolved')`, scan, ids[1]); err != nil {
 		t.Fatal(err)
 	}
 	r, err := e.App.Maintain(context.Background(), false, true)

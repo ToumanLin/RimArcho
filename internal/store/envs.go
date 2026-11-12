@@ -11,35 +11,50 @@ import (
 
 const metaCurrentEnv = "current_env"
 
-// InsertEnv stores a new environment.
+// InsertEnv stores an environment. An omitted GameID creates its installation with
+// the same ID, preserving the existing one-environment registration contract.
 func (s *Store) InsertEnv(e *env.Environment) error {
-	_, err := s.DB.Exec(`INSERT INTO environment(id,name,game_root,user_data_root,game_version,launch,created_at) VALUES(?,?,?,?,?,?,?)`,
-		e.ID, e.Name, e.GameRoot, e.UserDataRoot, e.GameVersion, e.Launch, e.CreatedAt.Unix())
+	gameID := e.GameID
+	if gameID == "" {
+		gameID = e.ID
+	}
+	err := s.inTx(func(tx *sql.Tx) error {
+		if e.GameID == "" {
+			if err := insertGame(tx, &Game{ID: gameID, Name: e.Name, GameRoot: e.GameRoot, GameVersion: e.GameVersion, CreatedAt: e.CreatedAt}); err != nil {
+				return err
+			}
+		}
+		_, err := tx.Exec(`INSERT INTO environment(id,name,game_id,user_data_root,launch,created_at) VALUES(?,?,?,?,?,?)`, e.ID, e.Name, gameID, e.UserDataRoot, e.Launch, e.CreatedAt.Unix())
+		return err
+	})
+	if err == nil {
+		e.GameID = gameID
+	}
 	return err
 }
 
-// UpdateEnv rewrites an environment's mutable fields.
+// UpdateEnv rewrites only environment settings. Installation fields use UpdateGame.
 func (s *Store) UpdateEnv(e *env.Environment) error {
-	_, err := s.DB.Exec(`UPDATE environment SET name=?, game_root=?, user_data_root=?, game_version=?, launch=? WHERE id=?`,
-		e.Name, e.GameRoot, e.UserDataRoot, e.GameVersion, e.Launch, e.ID)
+	_, err := s.DB.Exec(`UPDATE environment SET name=?, user_data_root=?, launch=? WHERE id=?`, e.Name, e.UserDataRoot, e.Launch, e.ID)
 	return err
 }
 
 func scanEnv(row interface{ Scan(...any) error }) (*env.Environment, error) {
 	var e env.Environment
 	var created int64
-	if err := row.Scan(&e.ID, &e.Name, &e.GameRoot, &e.UserDataRoot, &e.GameVersion, &e.Launch, &created); err != nil {
+	if err := row.Scan(&e.ID, &e.GameID, &e.Name, &e.GameRoot, &e.UserDataRoot, &e.GameVersion, &e.Launch, &created); err != nil {
 		return nil, err
 	}
 	e.CreatedAt = time.Unix(created, 0).UTC()
 	return &e, nil
 }
 
-const envCols = `id,name,game_root,user_data_root,game_version,launch,created_at`
+const envCols = `e.id,e.game_id,e.name,g.game_root,e.user_data_root,g.game_version,e.launch,e.created_at`
+const envFrom = ` FROM environment e JOIN game g ON g.id=e.game_id`
 
 // Envs lists environments by name.
 func (s *Store) Envs() ([]*env.Environment, error) {
-	rows, err := s.DB.Query(`SELECT ` + envCols + ` FROM environment ORDER BY name`)
+	rows, err := s.DB.Query(`SELECT ` + envCols + envFrom + ` ORDER BY e.name`)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +72,7 @@ func (s *Store) Envs() ([]*env.Environment, error) {
 
 // EnvByName returns the named environment, or nil.
 func (s *Store) EnvByName(name string) (*env.Environment, error) {
-	e, err := scanEnv(s.DB.QueryRow(`SELECT `+envCols+` FROM environment WHERE name=?`, name))
+	e, err := scanEnv(s.DB.QueryRow(`SELECT `+envCols+envFrom+` WHERE e.name=?`, name))
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -66,7 +81,17 @@ func (s *Store) EnvByName(name string) (*env.Environment, error) {
 
 // EnvByID returns the environment, or nil.
 func (s *Store) EnvByID(id string) (*env.Environment, error) {
-	e, err := scanEnv(s.DB.QueryRow(`SELECT `+envCols+` FROM environment WHERE id=?`, id))
+	e, err := scanEnv(s.DB.QueryRow(`SELECT `+envCols+envFrom+` WHERE e.id=?`, id))
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	return e, err
+}
+
+// EnvForGame returns a representative environment for operations on an installation's
+// physical inventory. It does not select launch settings or a current plan.
+func (s *Store) EnvForGame(gameID string) (*env.Environment, error) {
+	e, err := scanEnv(s.DB.QueryRow(`SELECT `+envCols+envFrom+` WHERE g.id=? ORDER BY e.name LIMIT 1`, gameID))
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -93,18 +118,18 @@ func (s *Store) SetCurrentEnv(id string) error { return s.SetMeta(metaCurrentEnv
 
 // Sources lists the sources an environment sees: its own (official, local) and the shared
 // mod folders (03 §2), by kind, then label.
-func (s *Store) Sources(envID string) ([]*source.Source, error) {
-	return s.sources(`environment_id IN ('', ?)`, envID)
+func (s *Store) Sources(gameID string) ([]*source.Source, error) {
+	return s.sources(`game_id IN ('', ?)`, gameID)
 }
 
 // SharedSources lists the shared mod folders (every environment sees them).
-func (s *Store) SharedSources() ([]*source.Source, error) { return s.sources(`environment_id=''`) }
+func (s *Store) SharedSources() ([]*source.Source, error) { return s.sources(`game_id=''`) }
 
 // AllSources lists every source of every environment and the shared ones.
 func (s *Store) AllSources() ([]*source.Source, error) { return s.sources(`1`) }
 
 func (s *Store) sources(where string, args ...any) ([]*source.Source, error) {
-	rows, err := s.DB.Query(`SELECT id,environment_id,kind,label,root,status,pending_root FROM source WHERE `+where+`
+	rows, err := s.DB.Query(`SELECT id,game_id,kind,label,root,status,pending_root FROM source WHERE `+where+`
 		ORDER BY CASE kind WHEN 'official' THEN 0 WHEN 'local' THEN 1 WHEN 'workshop' THEN 2 WHEN 'steamcmd' THEN 3 ELSE 4 END, label`, args...)
 	if err != nil {
 		return nil, err
@@ -125,7 +150,7 @@ func (s *Store) sources(where string, args ...any) ([]*source.Source, error) {
 
 // InsertSource stores a new source.
 func (s *Store) InsertSource(src *source.Source) error {
-	_, err := s.DB.Exec(`INSERT INTO source(id,environment_id,kind,label,root,status,pending_root) VALUES(?,?,?,?,?,?,?)`,
+	_, err := s.DB.Exec(`INSERT INTO source(id,game_id,kind,label,root,status,pending_root) VALUES(?,?,?,?,?,?,?)`,
 		src.ID, src.EnvID, string(src.Kind), src.Label, src.Root, src.Status, src.PendingRoot)
 	return err
 }
@@ -179,45 +204,72 @@ func (s *Store) SourceSemantics(sourceID string) (map[string]map[string][16]byte
 	return out, rows2.Err()
 }
 
-// DeleteEnv removes an environment and everything RimArcho stored for it: its own sources
-// (Data/, Mods/) and their instances, its plans, launches, analyses and ignores. The shared
-// mod folders, their instances and the player's data on lineages stay (03 §2); a lineage
-// left without instances goes. Only RimArcho's own database is touched; no game or mod file is.
+// DeleteEnv forgets one environment and, only for its last environment, its
+// installation and inventory. Global plans and shared folders stay; no files are touched.
 func (s *Store) DeleteEnv(envID string) error {
 	return s.inTx(func(tx *sql.Tx) error {
-		if err := keepLists(tx, envID); err != nil {
+		var gameID string
+		err := tx.QueryRow(`SELECT game_id FROM environment WHERE id=?`, envID).Scan(&gameID)
+		if err == sql.ErrNoRows {
+			return nil
+		}
+		if err != nil {
 			return err
 		}
-		inst := `(SELECT id FROM instance WHERE environment_id=?)`
+		var wasCurrent bool
+		if err := tx.QueryRow(`SELECT EXISTS(SELECT 1 FROM meta WHERE key=? AND value=?)`, metaCurrentEnv, envID).Scan(&wasCurrent); err != nil {
+			return err
+		}
+		for _, q := range []string{`DELETE FROM launch WHERE environment_id=?`, `DELETE FROM finding_ignore WHERE environment_id=?`, `DELETE FROM environment WHERE id=?`} {
+			if _, err := tx.Exec(q, envID); err != nil {
+				return err
+			}
+		}
+		if _, err := tx.Exec(`DELETE FROM meta WHERE (key=? AND value=?) OR key IN (?,?,?)`, metaCurrentEnv, envID, "env:"+envID+":launch_args", "log.selected:"+envID, "log.seen:"+envID); err != nil {
+			return err
+		}
+		var remaining int
+		if err := tx.QueryRow(`SELECT count(*) FROM environment WHERE game_id=?`, gameID).Scan(&remaining); err != nil {
+			return err
+		}
+		if remaining != 0 {
+			if wasCurrent {
+				_, err := tx.Exec(`INSERT INTO meta(key,value) SELECT ?,id FROM environment WHERE game_id=? ORDER BY name LIMIT 1`, metaCurrentEnv, gameID)
+				return err
+			}
+			return nil
+		}
+		if err := keepLists(tx, gameID); err != nil {
+			return err
+		}
+		inst := `(SELECT id FROM instance WHERE game_id=?)`
 		for _, q := range []string{
 			`DELETE FROM snapshot_file WHERE snapshot_id IN (SELECT id FROM snapshot WHERE instance_id IN ` + inst + `)`,
 			`DELETE FROM snapshot_list WHERE snapshot_id IN (SELECT id FROM snapshot WHERE instance_id IN ` + inst + `)`,
 			`DELETE FROM content_state WHERE instance_id IN ` + inst,
 			`DELETE FROM instance_note WHERE instance_id IN ` + inst,
-			`DELETE FROM patch_fact WHERE analysis_id IN (SELECT id FROM analysis WHERE environment_id=?)`,
-			`DELETE FROM finding WHERE analysis_id IN (SELECT id FROM analysis WHERE environment_id=?)`,
-			`DELETE FROM analysis WHERE environment_id=?`,
-			`DELETE FROM finding_ignore WHERE environment_id=?`,
+			`DELETE FROM patch_fact WHERE analysis_id IN (SELECT id FROM analysis WHERE game_id=?)`,
+			`DELETE FROM finding WHERE analysis_id IN (SELECT id FROM analysis WHERE game_id=?)`,
+			`DELETE FROM analysis WHERE game_id=?`,
 			`DELETE FROM snapshot WHERE instance_id IN ` + inst,
 			`DELETE FROM instance_alias WHERE instance_id IN ` + inst,
-			`DELETE FROM instance_alias WHERE source_id IN (SELECT id FROM source WHERE environment_id=?)`,
+			`DELETE FROM instance_alias WHERE source_id IN (SELECT id FROM source WHERE game_id=?)`,
 			`DELETE FROM change_event WHERE instance_id IN ` + inst,
-			`DELETE FROM identity_question WHERE instance_id IN ` + inst + ` OR candidate_instance_id IN ` + inst,
-			`DELETE FROM instance WHERE environment_id=?`,
-			`DELETE FROM scan WHERE environment_id=? AND id NOT IN (SELECT scan_id FROM change_event)`,
-			`UPDATE scan SET environment_id='' WHERE environment_id=?`,
-			`DELETE FROM source WHERE environment_id=?`,
+			`DELETE FROM identity_question WHERE game_id=? OR instance_id IN ` + inst + ` OR candidate_instance_id IN ` + inst,
+			`DELETE FROM instance WHERE game_id=?`,
+			`DELETE FROM scan WHERE game_id=? AND id NOT IN (SELECT scan_id FROM change_event)`,
+			`UPDATE scan SET game_id='' WHERE game_id=?`,
+			`DELETE FROM source WHERE game_id=?`,
 			// The ModsConfig.xml write record belongs to the user data folder, which other
 			// environments may share; it stays.
 			// Lists are shared by every game and stay (07 §1.1); keepLists already named
 			// this game's own mods in them by packageId.
-			`DELETE FROM launch WHERE environment_id=?`,
-			`DELETE FROM game_assembly WHERE environment_id=?`, // and its game_type rows
-			`DELETE FROM environment WHERE id=?`,
+			`DELETE FROM game_assembly WHERE game_id=?`, // and its game_type rows
+			`DELETE FROM game WHERE id=?`,
 		} {
 			args := make([]any, strings.Count(q, "?"))
 			for i := range args {
-				args[i] = envID
+				args[i] = gameID
 			}
 			if _, err := tx.Exec(q, args...); err != nil {
 				return err
@@ -233,7 +285,7 @@ func (s *Store) DeleteEnv(envID string) error {
 				return err
 			}
 		}
-		_, err := tx.Exec(`DELETE FROM meta WHERE key=? AND value=?`, metaCurrentEnv, envID)
+		_, err = tx.Exec(`DELETE FROM meta WHERE key=? AND value=?`, metaCurrentEnv, envID)
 		if err != nil {
 			return err
 		}

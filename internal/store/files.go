@@ -8,10 +8,10 @@ import "sort"
 // uses it to find the installed mod that ships a missing texture or assembly (06 §2). A
 // pattern for .dll files reads only manifest rows; any other also unpacks the current
 // snapshots' blocks (04 §4).
-func (s *Store) InstanceFiles(envID, like string) (map[string][]string, error) {
+func (s *Store) InstanceFiles(gameID, like string) (map[string][]string, error) {
 	rows, err := s.DB.Query(`SELECT i.id, f.rel_path FROM instance i
 		JOIN snapshot_file f ON f.snapshot_id = i.current_snapshot_id
-		WHERE i.environment_id IN ('', ?) AND i.tombstone_at IS NULL AND f.rel_path LIKE ?`, envID, like)
+		WHERE i.game_id IN ('', ?) AND i.tombstone_at IS NULL AND f.rel_path LIKE ?`, gameID, like)
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +30,7 @@ func (s *Store) InstanceFiles(envID, like string) (map[string][]string, error) {
 	rows.Close()
 	lists, err := s.DB.Query(`SELECT i.id, l.data FROM instance i
 		JOIN snapshot_list l ON l.snapshot_id = i.current_snapshot_id
-		WHERE i.environment_id IN ('', ?) AND i.tombstone_at IS NULL`, envID)
+		WHERE i.game_id IN ('', ?) AND i.tombstone_at IS NULL`, gameID)
 	if err != nil {
 		return nil, err
 	}

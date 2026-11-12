@@ -10,6 +10,7 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/finding"
+	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/testkit"
 )
 
@@ -32,7 +33,7 @@ func TestCheckPack(t *testing.T) {
 		t.Fatal(err)
 	}
 	game.GameVersion = "1.6.4871 rev590"
-	if err := e.App.Store.UpdateEnv(game); err != nil {
+	if err := e.App.Store.UpdateGame(&store.Game{ID: game.GameID, Name: game.Name, GameRoot: game.GameRoot, GameVersion: game.GameVersion}); err != nil {
 		t.Fatal(err)
 	}
 	base, err := e.App.ReadPack("checked")

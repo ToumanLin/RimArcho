@@ -75,13 +75,13 @@ type ScanProgress struct {
 	Done, Total int  // mod folders read of all of them
 }
 
-// reads reports whether a scan with o reads source s of environment envID.
-func (o ScanOptions) reads(s *source.Source, envID string) bool {
+// reads reports whether a scan with o reads source s of installation gameID.
+func (o ScanOptions) reads(s *source.Source, gameID string) bool {
 	if slices.Contains(o.Sources, s.ID) {
 		return true
 	}
 	if o.GameOnly {
-		return s.EnvID == envID
+		return s.EnvID == gameID
 	}
 	return len(o.Sources) == 0
 }
@@ -108,7 +108,7 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 	if err := a.adoptGameWorkshops(); err != nil {
 		return nil, err
 	}
-	srcs, err := a.Store.Sources(e.ID)
+	srcs, err := a.Store.Sources(e.GameID)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +125,7 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 	var listed []*source.Source // the sources this scan reports on
 	partial := false            // some sources are left out
 	for _, s := range srcs {
-		if !o.reads(s, e.ID) {
+		if !o.reads(s, e.GameID) {
 			partial = true
 			if s.Status != source.StatusRetired {
 				skip[s.ID] = true
@@ -158,7 +158,7 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 		active = append(active, s)
 	}
 
-	known, err := a.Store.Known(e.ID)
+	known, err := a.Store.Known(e.GameID)
 	if err != nil {
 		return nil, err
 	}
@@ -169,10 +169,10 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 	var prev map[string]map[string]scan.File
 	var prevHash map[string]scan.Hash
 	if !full {
-		if prev, err = a.Store.CurrentFiles(e.ID); err != nil {
+		if prev, err = a.Store.CurrentFiles(e.GameID); err != nil {
 			return nil, err
 		}
-		if prevHash, err = a.Store.CurrentHashes(e.ID); err != nil {
+		if prevHash, err = a.Store.CurrentHashes(e.GameID); err != nil {
 			return nil, err
 		}
 	}
@@ -181,7 +181,7 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 	if err != nil {
 		return nil, err
 	}
-	scanID, err := a.Store.BeginScan(e.ID, started, full)
+	scanID, err := a.Store.BeginScan(e.GameID, started, full)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +213,7 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 		sharedLinkObservations(obs, known, srcs, present, sstats)
 	}
 	prev, prevHash = nil, nil // release the caches before reconciliation
-	lineages, err := a.Store.LineageIDs(e.ID)
+	lineages, err := a.Store.LineageIDs(e.GameID)
 	if err != nil {
 		return nil, err
 	}
@@ -247,12 +247,12 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 	for _, s := range active {
 		scanned = append(scanned, s.ID)
 	}
-	if err := a.Store.ApplyScan(e.ID, scanID, now, res, scanned); err != nil {
+	if err := a.Store.ApplyScan(e.GameID, scanID, now, res, scanned); err != nil {
 		return nil, err
 	}
 	if v := env.ReadGameVersion(e.GameRoot); v != "" && v != e.GameVersion {
 		e.GameVersion = v
-		a.Store.UpdateEnv(e)
+		a.Store.UpdateGame(&store.Game{ID: e.GameID, Name: e.Name, GameRoot: e.GameRoot, GameVersion: e.GameVersion})
 	}
 	if err := a.indexGameTypes(e); err != nil {
 		return nil, err
@@ -281,7 +281,7 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 			st.Snapshots++
 		}
 	}
-	mods, err := a.Store.Mods(e.ID)
+	mods, err := a.Store.Mods(e.GameID)
 	if err != nil {
 		return nil, err
 	}
@@ -299,7 +299,7 @@ func (a *App) scanEnvironment(e *env.Environment, o ScanOptions) (*ScanReport, e
 	if st.Snapshots > 0 {
 		a.Store.TruncateWAL() // new snapshots wrote their file lists through the WAL (04 §4)
 	}
-	if err := a.tagOfficial(e.ID); err != nil {
+	if err := a.tagOfficial(e.GameID); err != nil {
 		return nil, err
 	}
 	rep := &ScanReport{Env: e, ScanID: scanID, Full: full, GameOnly: o.GameOnly, Stats: st}
@@ -371,9 +371,9 @@ func sharedLinkObservations(obs []*scan.Observation, known []*identity.Known, so
 	}
 }
 
-// LastScan returns the newest finished scan of the environment, or nil.
-func (a *App) LastScan(envID string) (*store.Scan, *ScanStats, error) {
-	sc, err := a.Store.LastFinishedScan(envID)
+// LastScan returns the newest finished scan of the installation, or nil.
+func (a *App) LastScan(gameID string) (*store.Scan, *ScanStats, error) {
+	sc, err := a.Store.LastFinishedScan(gameID)
 	if err != nil || sc == nil {
 		return nil, nil, err
 	}

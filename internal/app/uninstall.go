@@ -687,9 +687,9 @@ func (a *App) planUninstall(o UninstallOptions, sizeOf func(string) int64) (*Uni
 
 // modsFolder is an environment's Mods/ folder: its local source's root, else <game>/Mods.
 func (a *App) modsFolder(e *env.Environment) string {
-	if srcs, err := a.Store.Sources(e.ID); err == nil {
+	if srcs, err := a.Store.Sources(e.GameID); err == nil {
 		for _, s := range srcs {
-			if s.Kind == source.Local && s.Status != source.StatusRetired && s.EnvID == e.ID {
+			if s.Kind == source.Local && s.Status != source.StatusRetired && s.EnvID == e.GameID {
 				return s.Root
 			}
 		}
@@ -709,7 +709,7 @@ func (a *App) presentPackages(envs []*env.Environment, udKey string) (map[string
 		if store.UserDataKey(e.UserDataRoot) != udKey {
 			continue
 		}
-		mods, err := a.Store.UninstallMods(e.ID)
+		mods, err := a.Store.UninstallMods(e.GameID)
 		if err != nil {
 			return nil, err
 		}

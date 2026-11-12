@@ -102,7 +102,7 @@ func TestForeignLogExcludedBeforeAnalysis(t *testing.T) {
 		t.Fatalf("foreign log page %+v, %v, %d analyses", p, err, runs)
 	}
 	var count int
-	if err := e.App.Store.DB.QueryRow(`SELECT count(*) FROM analysis WHERE environment_id=? AND game_mm='1.7'`, st.Ix.Env.ID).Scan(&count); err != nil || count != 0 {
+	if err := e.App.Store.DB.QueryRow(`SELECT count(*) FROM analysis WHERE game_id=? AND game_mm='1.7'`, st.Ix.Env.ID).Scan(&count); err != nil || count != 0 {
 		t.Fatalf("foreign analysis slots: %d, %v", count, err)
 	}
 

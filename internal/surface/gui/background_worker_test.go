@@ -4,7 +4,10 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"image"
+	"image/color"
 	"image/jpeg"
+	"image/png"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -16,10 +19,8 @@ import (
 	"github.com/ToumanLin/RimArcho/internal/app"
 	"github.com/ToumanLin/RimArcho/internal/env"
 	"github.com/ToumanLin/RimArcho/internal/menubg"
+	"github.com/ToumanLin/RimArcho/internal/store"
 	"github.com/ToumanLin/RimArcho/internal/view"
-	"image"
-	"image/color"
-	"image/png"
 )
 
 func menuGame(t *testing.T, game string) {
@@ -148,7 +149,7 @@ func TestMenuBackgroundSettingsAndSharedCache(t *testing.T) {
 		t.Fatal(err)
 	}
 	env.GameRoot = t.TempDir()
-	if err := e.App.Store.UpdateEnv(env); err != nil {
+	if err := e.App.Store.UpdateGame(&store.Game{ID: env.GameID, Name: env.Name, GameRoot: env.GameRoot, GameVersion: env.GameVersion}); err != nil {
 		t.Fatal(err)
 	}
 	api.HomeBackground()

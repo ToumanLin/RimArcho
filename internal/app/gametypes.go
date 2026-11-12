@@ -24,7 +24,7 @@ func (a *App) indexGameTypes(e *env.Environment) error {
 	if mm == "" {
 		return nil // lookups are per game version; an unknown one keeps what was stored
 	}
-	have, err := a.Store.GameAssemblies(e.ID)
+	have, err := a.Store.GameAssemblies(e.GameID)
 	if err != nil {
 		return err
 	}
@@ -38,13 +38,13 @@ func (a *App) indexGameTypes(e *env.Environment) error {
 		}
 		if dir == "" || err != nil || !st.Mode().IsRegular() {
 			if have[file] != nil {
-				if err := a.Store.DeleteGameAssembly(e.ID, file); err != nil {
+				if err := a.Store.DeleteGameAssembly(e.GameID, file); err != nil {
 					return err
 				}
 			}
 			continue
 		}
-		g := &store.GameAssembly{EnvID: e.ID, File: file, MM: mm, Path: p, Size: st.Size(), MTime: st.ModTime().UnixNano(), Reader: analyze.Version}
+		g := &store.GameAssembly{EnvID: e.GameID, File: file, MM: mm, Path: p, Size: st.Size(), MTime: st.ModTime().UnixNano(), Reader: analyze.Version}
 		if old := have[file]; old != nil && old.Unchanged(g) {
 			continue
 		}

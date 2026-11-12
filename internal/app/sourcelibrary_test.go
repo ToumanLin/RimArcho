@@ -80,7 +80,7 @@ func TestSourceLibraryGameBuildReuseAcrossEnvironments(t *testing.T) {
 	st, _ := e.App.Loadout()
 	first, _ := e.App.GameSourceDLL(st)
 	other := *st.Ix.Env
-	other.ID, other.Name = "other-game", "Other game"
+	other.ID, other.Name, other.GameID = "other-game", "Other game", ""
 	if err := e.App.Store.InsertEnv(&other); err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func TestSourceLibraryGameBuildReuseAcrossEnvironments(t *testing.T) {
 		t.Fatalf("same build not shared: %+v %v", shared, err)
 	}
 	other.GameVersion = "1.6.9999"
-	if err := e.App.Store.UpdateEnv(&other); err != nil {
+	if err := e.App.Store.UpdateGame(&store.Game{ID: other.GameID, Name: other.Name, GameRoot: other.GameRoot, GameVersion: other.GameVersion}); err != nil {
 		t.Fatal(err)
 	}
 	newBuild, err := e.App.GameSourceDLL(st)
@@ -291,7 +291,7 @@ func TestSourceLibraryGameBuildAndCleanup(t *testing.T) {
 	// A changed environment build makes only the previous game build unused.
 	env, _ := e.App.Env()
 	env.GameVersion = "1.6.9999"
-	if err := e.App.Store.UpdateEnv(env); err != nil {
+	if err := e.App.Store.UpdateGame(&store.Game{ID: env.GameID, Name: env.Name, GameRoot: env.GameRoot, GameVersion: env.GameVersion}); err != nil {
 		t.Fatal(err)
 	}
 	p, err = e.App.CleanSourceLibrary(context.Background(), false)

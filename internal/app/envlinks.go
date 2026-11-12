@@ -177,7 +177,7 @@ func (a *App) prepareEnvLinks(e *env.Environment, scan bool) error {
 		present[m.PackageID] = true
 	}
 	if len(want) == 0 {
-		if sc, _, err := a.LastScan(e.ID); err != nil {
+		if sc, _, err := a.LastScan(e.GameID); err != nil {
 			return err
 		} else if sc != nil {
 			return nil

@@ -11,6 +11,7 @@ import (
 
 func TestUpgradeSaveReviewCache(t *testing.T) {
 	s, path := openTemp(t)
+ legacyGameSchema(t, s)
 	if err := s.PutSaveCache(&store.SaveCache{Path: "synthetic", Size: 1, MTime: 2, Parser: 3, Facts: []byte(`{}`)}); err != nil {
 		t.Fatal(err)
 	}
@@ -60,6 +61,7 @@ func TestUpgradeSaveReviewCache(t *testing.T) {
 
 func TestUpgradeSharedReviewCatalog(t *testing.T) {
 	s, path := openTemp(t)
+ legacyGameSchema(t, s)
 	if err := s.PutSaveCache(&store.SaveCache{Path: "legacy", Size: 1, MTime: 2, Parser: 3, Facts: []byte(`{}`)}); err != nil {
 		t.Fatal(err)
 	}

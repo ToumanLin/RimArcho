@@ -232,13 +232,13 @@ func (a *App) EnvAdd(name string, spec EnvSpec) (*env.Environment, []SourceChang
 	if err := a.Store.InsertEnv(e); err != nil {
 		return nil, nil, err
 	}
-	srcs, err := a.Store.Sources(e.ID)
+	srcs, err := a.Store.Sources(e.GameID)
 	if err != nil {
 		return nil, nil, err
 	}
 	var changes []SourceChange
 	for _, sp := range []source.Spec{{Kind: source.Official, Root: filepath.Join(e.GameRoot, "Data")}, {Kind: source.Local, Root: filepath.Join(e.GameRoot, "Mods")}} {
-		s := &source.Source{ID: a.NewID(), EnvID: e.ID, Kind: sp.Kind, Label: nextLabel(srcs, sp.Kind), Root: sp.Root, Status: source.StatusOK}
+		s := &source.Source{ID: a.NewID(), EnvID: e.GameID, Kind: sp.Kind, Label: nextLabel(srcs, sp.Kind), Root: sp.Root, Status: source.StatusOK}
 		if !dirExists(sp.Root) {
 			s.Status = source.StatusMissing
 		}
@@ -386,13 +386,13 @@ func (a *App) EnvSet(name string, spec EnvSpec) (*env.Environment, []SourceChang
 	if spec.Launch != "" {
 		e.Launch = spec.Launch
 	}
-	srcs, err := a.Store.Sources(e.ID)
+	srcs, err := a.Store.Sources(e.GameID)
 	if err != nil {
 		return nil, nil, err
 	}
 	byKind := map[source.Kind]*source.Source{}
 	for _, s := range srcs {
-		if s.EnvID == e.ID && s.Status != source.StatusRetired && (s.Kind == source.Official || s.Kind == source.Local) {
+		if s.EnvID == e.GameID && s.Status != source.StatusRetired && (s.Kind == source.Official || s.Kind == source.Local) {
 			byKind[s.Kind] = s
 		}
 	}
@@ -420,7 +420,7 @@ func (a *App) EnvSet(name string, spec EnvSpec) (*env.Environment, []SourceChang
 		}
 		s := byKind[kind]
 		if s == nil {
-			s = &source.Source{ID: a.NewID(), EnvID: e.ID, Kind: kind, Label: nextLabel(srcs, kind), Root: root, Status: source.StatusOK}
+			s = &source.Source{ID: a.NewID(), EnvID: e.GameID, Kind: kind, Label: nextLabel(srcs, kind), Root: root, Status: source.StatusOK}
 			moves = append(moves, store.SourceMove{Src: s, Insert: true})
 			srcs = append(srcs, s)
 			changes = append(changes, SourceChange{Source: s, Action: "added"})
@@ -481,7 +481,7 @@ func (a *App) EnvRemovePreview(name string) (*EnvRemoval, error) {
 	r := &EnvRemoval{Env: e}
 	db := a.Store.DB
 	if err := db.QueryRow(`SELECT (SELECT count(*) FROM launch WHERE environment_id=?),
-		(SELECT count(*) FROM instance WHERE environment_id=? AND status='live')`, e.ID, e.ID).Scan(&r.Launches, &r.Mods); err != nil {
+		(SELECT count(*) FROM instance WHERE game_id=? AND status='live')`, e.ID, e.GameID).Scan(&r.Launches, &r.Mods); err != nil {
 		return nil, err
 	}
 	if cur, _ := a.Store.CurrentEnv(); cur != nil && cur.ID == e.ID {
@@ -555,7 +555,7 @@ func (a *App) evalRebind(s *source.Source, newRoot string) (SourceChange, store.
 // source is retired (its instances become tombstones on the next scan) and a new source is
 // created at the new root. The source may be the environment's or a shared folder.
 func (a *App) EnvRebind(e *env.Environment, label string, yes bool) (*source.Source, *source.Source, error) {
-	srcs, err := a.Store.Sources(e.ID)
+	srcs, err := a.Store.Sources(e.GameID)
 	if err != nil {
 		return nil, nil, err
 	}

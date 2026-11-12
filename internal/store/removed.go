@@ -28,13 +28,13 @@ func (s *Store) RecordRemoved(id, path string, now time.Time) error {
 		}
 		var envID, lineage string
 		var snapshot int64
-		if err := tx.QueryRow(`SELECT environment_id,lineage_id,coalesce(current_snapshot_id,0) FROM instance WHERE id=?`, id).Scan(&envID, &lineage, &snapshot); err != nil {
+		if err := tx.QueryRow(`SELECT game_id,lineage_id,coalesce(current_snapshot_id,0) FROM instance WHERE id=?`, id).Scan(&envID, &lineage, &snapshot); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(`DELETE FROM instance_alias WHERE instance_id=?`, id); err != nil {
 			return err
 		}
-		scan, err := tx.Exec(`INSERT INTO scan(environment_id,started_at,finished_at,stats) VALUES(?,?,?,?)`, envID, now.Unix(), now.Unix(), `{"events":{"disappeared":1}}`)
+		scan, err := tx.Exec(`INSERT INTO scan(game_id,started_at,finished_at,stats) VALUES(?,?,?,?)`, envID, now.Unix(), now.Unix(), `{"events":{"disappeared":1}}`)
 		if err != nil {
 			return err
 		}

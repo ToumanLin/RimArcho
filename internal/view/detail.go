@@ -41,7 +41,7 @@ func LoadDetail(a *app.App, ix *app.Index, mod *store.Mod, fetch, refresh bool) 
 	}
 	d.Desc = a.Describe(ix, mod, fetch, refresh)
 	d.About, d.Workshop = bbcode.Parse(d.Desc.About), bbcode.Parse(d.Desc.Workshop)
-	d.Events, _ = a.Store.Events(store.EventFilter{EnvID: ix.Env.ID, InstanceIDs: []string{mod.ID}})
+	d.Events, _ = a.Store.Events(store.EventFilter{EnvID: ix.Env.GameID, InstanceIDs: []string{mod.ID}})
 	return d
 }
 
@@ -422,7 +422,7 @@ func rulesSection(a *app.App, ix *app.Index, mod *store.Mod) Section {
 // historySection: every change event of the mod, newest first.
 func historySection(a *app.App, ix *app.Index, id string) Section {
 	sec := Section{Title: T("full history"), Count: -1}
-	evs, _ := a.Store.Events(store.EventFilter{EnvID: ix.Env.ID, InstanceIDs: []string{id}})
+	evs, _ := a.Store.Events(store.EventFilter{EnvID: ix.Env.GameID, InstanceIDs: []string{id}})
 	for i := len(evs) - 1; i >= 0; i-- {
 		e := evs[i]
 		l := "  " + e.ScanTime.Local().Format("2006-01-02 15:04") + "  " + EventText(e.Kind)

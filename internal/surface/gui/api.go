@@ -280,7 +280,7 @@ func (s *API) boardLocked() *Board {
 		out.Envs = append(out.Envs, e.Name)
 	}
 	if e, err := s.a.Env(); err == nil {
-		sc, _, _ := s.a.LastScan(e.ID)
+		sc, _, _ := s.a.LastScan(e.GameID)
 		out.Never = sc == nil
 	}
 	n := s.needsLocked()

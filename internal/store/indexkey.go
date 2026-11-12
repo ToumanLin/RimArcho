@@ -10,9 +10,9 @@ import (
 
 // indexTables are the tables a mod index is built from (app.Index): instances, their
 // snapshots, sources, lineages, the player's data on lineages (tag colours too: the rows
-// show them) and the environments.
+// show them), installations and environments.
 // List tables (workspace, undo, versions, plans) are not among them.
-var indexTables = []string{"environment", "source", "lineage", "instance", "snapshot", "lineage_data", "lineage_tag", "tag_color"}
+var indexTables = []string{"game", "environment", "source", "lineage", "instance", "snapshot", "lineage_data", "lineage_tag", "tag_color"}
 
 // IndexKey changes only when an index table changes, including writes by another
 // connection/process. data_version cannot distinguish a list edit from a scan.
@@ -28,7 +28,7 @@ func (s *Store) IndexKey() string {
 
 // Only Open installs the shared counter. OpenSession and IndexKey never write,
 // including when a different connection is holding a WAL write transaction.
-func (s *Store) installIndexTriggers() error {
+func indexTriggerSQL() string {
 	b := make([]byte, 6)
 	rand.Read(b)
 	var sql strings.Builder
@@ -41,6 +41,10 @@ INSERT INTO archo_index_gen SELECT '` + hex.EncodeToString(b) + `', 0 WHERE NOT 
 				t, strings.ToLower(op), op, t)
 		}
 	}
+	return sql.String()
+}
+
+func (s *Store) installIndexTriggers() error {
 	// Almost always everything is there already: say so from a read, which never waits for
 	// another process's write. A deferred transaction that reads first and then writes gets
 	// BUSY at once when another process committed in between, whatever busy_timeout says
@@ -50,7 +54,7 @@ INSERT INTO archo_index_gen SELECT '` + hex.EncodeToString(b) + `', 0 WHERE NOT 
 	}
 	var err error
 	for try := 0; try < 20; try++ {
-		if err = s.execTx(sql.String()); err == nil || !isBusy(err) {
+		if err = s.execTx(indexTriggerSQL()); err == nil || !isBusy(err) {
 			return err
 		}
 		time.Sleep(250 * time.Millisecond)

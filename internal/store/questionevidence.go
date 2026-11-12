@@ -74,9 +74,9 @@ func questionEvidence(db questionReader, q *Question) (*QuestionEvidence, error)
 // decisions are never selected. Every open question of the environment is judged, from the
 // stored snapshots, whether or not this scan read its folders: before 24 a question about a
 // folder the scan skipped (another game's Mods/, a partial scan) stayed however wrong it was.
-func recheckQuestions(tx *sql.Tx, envID string) (map[int64]bool, error) {
+func recheckQuestions(tx *sql.Tx, gameID string) (map[int64]bool, error) {
 	rows, err := tx.Query(`SELECT id, instance_id, candidate_instance_id FROM identity_question
-		WHERE status='open' AND environment_id IN ('', ?) ORDER BY id`, envID)
+		WHERE status='open' AND game_id IN ('', ?) ORDER BY id`, gameID)
 	if err != nil {
 		return nil, err
 	}

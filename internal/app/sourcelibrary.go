@@ -280,7 +280,7 @@ func (a *App) GameSourceDLL(st *LoadoutState) (*SourceDLL, error) {
 	if err != nil {
 		return nil, err
 	}
-	d := &SourceDLL{Instance: "game:" + st.Ix.Env.ID, File: "Assembly-CSharp.dll", Path: p, Hash: h, Kind: "game", GameBuild: build}
+	d := &SourceDLL{Instance: "game:" + st.Ix.Env.GameID, File: "Assembly-CSharp.dll", Path: p, Hash: h, Kind: "game", GameBuild: build}
 	if err := a.locateSource(d); err != nil {
 		return nil, err
 	}
@@ -372,7 +372,7 @@ func (a *App) unusedSourceArtifacts(ctx context.Context) ([]*store.SourceArtifac
 	ids := []string{store.Shared}
 	for _, e := range es {
 		builds[sourceGameBuild(e.GameVersion)] = true
-		ids = append(ids, e.ID)
+		ids = append(ids, e.GameID)
 	}
 	for _, id := range ids {
 		mods, err := a.Store.Mods(id)

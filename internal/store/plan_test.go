@@ -18,7 +18,7 @@ func TestPlanStore(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer s.Close()
-	s.DB.Exec(`INSERT INTO environment(id, name, game_root, user_data_root, created_at) VALUES ('e', 'e', 'g', 'u', 0)`)
+	s.DB.Exec(`INSERT INTO game(id,name,game_root,game_root_key,created_at) VALUES('e','e','g','g',0); INSERT INTO environment(id,name,game_id,user_data_root,created_at) VALUES('e','e','e','u',0)`)
 	if p, _ := s.CurrentPlan("e"); p != nil {
 		t.Fatal("no plan yet")
 	}

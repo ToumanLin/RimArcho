@@ -273,7 +273,7 @@ func TestEnvUseRepairsLegacyLocalMonitorReferences(t *testing.T) {
 			local := sourcesOf(t, e)["local"]
 			// Reproduce the record created by the old game-only scan. The same
 			// directory has a second identity, selected by its environment's plans.
-			if _, err := e.App.Store.DB.Exec(`INSERT INTO instance(id,environment_id,lineage_id,source_id,rel_path,real_path,status,current_snapshot_id,first_seen,last_seen)
+			if _, err := e.App.Store.DB.Exec(`INSERT INTO instance(id,game_id,lineage_id,source_id,rel_path,real_path,status,current_snapshot_id,first_seen,last_seen)
 				VALUES(?,?,?,?,?,?,?,?,?,?)`, legacyID, st.Ix.Env.ID, m.LineageID, local.ID, app.DeployName(m), m.RealPath, status, m.SnapID, m.FirstSeen.Unix(), m.LastSeen.Unix()); err != nil {
 				t.Fatal(err)
 			}

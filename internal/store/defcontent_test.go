@@ -9,6 +9,7 @@ import (
 
 func TestUpgradeDefContentKeepsFacts(t *testing.T) {
 	s, path := openTemp(t)
+ legacyGameSchema(t, s)
 	for _, q := range []string{
 		`ALTER TABLE def_fact DROP COLUMN content_fields`,
 		`ALTER TABLE fact_set DROP COLUMN def_content_version`,

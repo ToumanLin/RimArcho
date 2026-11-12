@@ -303,11 +303,11 @@ func (a *App) buildLibrary(st *LoadoutState, only string, search, snapshot bool)
 			instances = []string{""}
 		}
 	}
-	changed, err := a.Store.LastChanged(ix.Env.ID, instances...)
+	changed, err := a.Store.LastChanged(ix.Env.GameID, instances...)
 	if err != nil {
 		return nil, err
 	}
-	notes, err := a.Store.CopyNotes(ix.Env.ID, instances...)
+	notes, err := a.Store.CopyNotes(ix.Env.GameID, instances...)
 	texs := a.textureSummariesAtIndex(ix) // Texture optimisation: the DDS RimArcho wrote into each copy
 	if err != nil {
 		return nil, err
@@ -494,7 +494,7 @@ func (a *App) buildLibrary(st *LoadoutState, only string, search, snapshot bool)
 			add(ghost, i)
 		}
 	}
-	added, newSince := Added(st), a.NewSince(ix.Env.ID)
+	added, newSince := Added(st), a.NewSince(ix.Env.GameID)
 	for id, l := range byLin {
 		if l.Name == "" {
 			l.Name = libName(ix, id, l)
@@ -605,7 +605,7 @@ func (a *App) libEnvs(st *LoadoutState) ([]libEnv, error) {
 					}
 				}
 			}
-			mods, err := a.Store.Mods(e.ID)
+			mods, err := a.Store.Mods(e.GameID)
 			if err != nil {
 				return nil, err
 			}

@@ -120,7 +120,7 @@ func (a *App) knownGameMods() ([]gameMods, error) {
 		if s.Kind == source.Local && s.Status != source.StatusRetired && s.Root != "" {
 			game := filepath.Dir(s.Root)
 			for _, e := range es {
-				if e.ID == s.EnvID && e.GameRoot != "" {
+				if e.GameID == s.EnvID && e.GameRoot != "" {
 					game = e.GameRoot
 					break
 				}
@@ -434,7 +434,7 @@ func (a *App) PlanLinkRepair(all bool, include []string) (*LinkRepairPlan, error
 			return nil, err
 		}
 		selected[env.PathKey(realOrAbs(filepath.Join(e.GameRoot, "Mods")))] = true
-		sources, err := a.Store.Sources(e.ID)
+		sources, err := a.Store.Sources(e.GameID)
 		if err != nil {
 			return nil, err
 		}

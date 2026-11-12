@@ -72,8 +72,8 @@ func (a *App) DirectoryValues(s *source.Source) []string {
 // LocalValue is the source: value of a game's own Mods/ folder, "local-<game>" (local-main,
 // local-1.6; 2026-10-25): every game's Mods/ is in the library and the editor (07 §1.7), so
 // the value says which. source:local still matches all of them (LocalMatches).
-func (a *App) LocalValue(envID string) string {
-	if e, err := a.Store.EnvByID(envID); err == nil && e != nil && e.Name != "" {
+func (a *App) LocalValue(gameID string) string {
+	if e, err := a.Store.GameByID(gameID); err == nil && e != nil && e.Name != "" {
 		return LibLocal + "-" + e.Name
 	}
 	return LibLocal

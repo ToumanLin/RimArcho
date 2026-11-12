@@ -14,6 +14,7 @@ import (
 // Environment is one game install plus one user data directory (03 §3.1).
 type Environment struct {
 	ID           string
+	GameID       string `json:"-"` // Installation identity; omitted from existing interface output.
 	Name         string
 	GameRoot     string
 	UserDataRoot string

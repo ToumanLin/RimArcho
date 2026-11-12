@@ -186,11 +186,11 @@ type Analysis struct {
 }
 
 // SaveAnalysis persists a run: content states and rebuilt Def facts, the Patch facts and
-// findings. The run fills the slot (environment, mm, setKey) (05 §3): the slot's older run
-// is deleted, and so is every run of the environment whose set key is not in keep
-// (the enabled sets the environment's plans have now), so slots do not pile up as plans
+// findings. The run fills the slot (GameID, mm, setKey) (05 §3): the slot's older run
+// is deleted, and so is every run of the installation whose set key is not in keep
+// (the enabled sets the global plans have now), so slots do not pile up as plans
 // are edited.
-func (s *Store) SaveAnalysis(envID, setKey, runKey, mm string, keep []string, out *analyze.Output, started, finished time.Time) (int64, error) {
+func (s *Store) SaveAnalysis(gameID, setKey, runKey, mm string, keep []string, out *analyze.Output, started, finished time.Time) (int64, error) {
 	var id int64
 	err := s.inTx(func(tx *sql.Tx) error {
 		if err := saveContent(tx, out, mm); err != nil {
@@ -201,7 +201,7 @@ func (s *Store) SaveAnalysis(envID, setKey, runKey, mm string, keep []string, ou
 			kept[k] = true
 		}
 		var old []int64
-		rows, err := tx.Query(`SELECT id, set_key, game_mm FROM analysis WHERE environment_id=?`, envID)
+		rows, err := tx.Query(`SELECT id, set_key, game_mm FROM analysis WHERE game_id=?`, gameID)
 		if err != nil {
 			return err
 		}
@@ -225,8 +225,8 @@ func (s *Store) SaveAnalysis(envID, setKey, runKey, mm string, keep []string, ou
 			}
 		}
 		st, _ := json.Marshal(out.Stats)
-		res, err := tx.Exec(`INSERT INTO analysis(environment_id, set_key, run_key, game_mm, version, started_at, finished_at, stats) VALUES(?,?,?,?,?,?,?,?)`,
-			envID, setKey, runKey, mm, analyze.Version, started.Unix(), finished.Unix(), string(st))
+		res, err := tx.Exec(`INSERT INTO analysis(game_id, set_key, run_key, game_mm, version, started_at, finished_at, stats) VALUES(?,?,?,?,?,?,?,?)`,
+			gameID, setKey, runKey, mm, analyze.Version, started.Unix(), finished.Unix(), string(st))
 		if err != nil {
 			return err
 		}
@@ -259,18 +259,18 @@ func (s *Store) SaveAnalysis(envID, setKey, runKey, mm string, keep []string, ou
 	return id, err
 }
 
-// LatestAnalysis returns the stored run of the slot (environment, Store.MM, setKey) (nil if
+// LatestAnalysis returns the stored run of the slot (GameID, Store.MM, setKey) (nil if
 // none).
-func (s *Store) LatestAnalysis(envID, setKey string) (*Analysis, error) {
+func (s *Store) LatestAnalysis(gameID, setKey string) (*Analysis, error) {
 	return s.latestAnalysis(`SELECT id, set_key, run_key, game_mm, version, started_at, finished_at, stats FROM analysis
-		WHERE environment_id=? AND game_mm=? AND set_key=? ORDER BY id DESC LIMIT 1`, envID, s.MM, setKey)
+		WHERE game_id=? AND game_mm=? AND set_key=? ORDER BY id DESC LIMIT 1`, gameID, s.MM, setKey)
 }
 
-// NewestAnalysis returns the environment's newest run for Store.MM in any slot (nil if
+// NewestAnalysis returns the installation's newest run for Store.MM in any slot (nil if
 // none).
-func (s *Store) NewestAnalysis(envID string) (*Analysis, error) {
+func (s *Store) NewestAnalysis(gameID string) (*Analysis, error) {
 	return s.latestAnalysis(`SELECT id, set_key, run_key, game_mm, version, started_at, finished_at, stats FROM analysis
-		WHERE environment_id=? AND game_mm=? ORDER BY id DESC LIMIT 1`, envID, s.MM)
+		WHERE game_id=? AND game_mm=? ORDER BY id DESC LIMIT 1`, gameID, s.MM)
 }
 
 func (s *Store) latestAnalysis(q string, args ...any) (*Analysis, error) {

@@ -96,7 +96,7 @@ func (a *App) AdoptLibrary(lib *Library) {
 	ix := *st.Ix
 	ix.store = a.Store
 	st.Ix = &ix
-	st.localize = a.localizer(ix.Env.ID, st.Reg, &ix)
+	st.localize = a.localizer(ix.Env.GameID, st.Reg, &ix)
 	lib.St = &st
 }
 
